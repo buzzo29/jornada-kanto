@@ -1,0 +1,12 @@
+# dependências instaladas (cada um gera a sua com "npm install")
+functions/node_modules/
+
+# arquivos locais do Firebase CLI
+.firebase/
+firebase-debug.log
+firebase-debug.*.log
+.runtimeconfig.json
+
+# arquivos de sistema/editor
+.DS_Store
+*.log
