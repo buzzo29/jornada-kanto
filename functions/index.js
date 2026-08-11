@@ -367,22 +367,6 @@ function shuffleWithSeed(arr, seedStr){
   }
   return a;
 }
-async function syncLeaguePlayerLevels(playerRef, leveledTeam){
-  if(!playerRef.uid || playerRef.slot==null) return;
-  try{
-    const ref = db.collection('users').doc(playerRef.uid).collection('saves').doc(String(playerRef.slot));
-    const snap = await ref.get();
-    if(!snap.exists) return;
-    const saveData = snap.data();
-    const currentTeam = saveData.team || [];
-    const updatedTeam = currentTeam.map((p,i)=>{
-      const leveled = leveledTeam[i];
-      if(leveled && leveled.speciesId===p.speciesId){ return { ...p, level: leveled.level }; }
-      return p;
-    });
-    await ref.set({ ...saveData, team: updatedTeam });
-  } catch(e){ logger.error('Erro ao sincronizar levels da Liga pro save:', e); }
-}
 async function recordLeagueChampionWin(name, uid, slot){
   try{
     await db.collection('leagues').doc('champions_alltime').set(
@@ -415,7 +399,7 @@ async function recordLeaguePlacement(uid, slot, record){
     await ref.set({ leaguePlacementsBySlot: { [slotKey]: updated } }, { merge: true });
   } catch(e){ logger.error('Erro ao gravar colocação na Liga:', e); }
 }
-function resolveLeagueMatch(match, seedStr, pendingSyncs){
+function resolveLeagueMatch(match, seedStr){
   const rng = makeSeededRng(seedStr);
   const teamA = decodeTeamCode(match.a.code);
   const teamB = decodeTeamCode(match.b.code);
@@ -426,20 +410,11 @@ function resolveLeagueMatch(match, seedStr, pendingSyncs){
     return;
   }
   const result = simulateGymBattle(teamA, teamB, rng);
-  // mesma mecânica dos ginásios: pokémon que desmaiou ganha +1 level, e isso acompanha o treinador pra próxima fase
-  // (e é gravado de volta no save real do jogador, mesmo que ele seja eliminado — a Cloud Function usa o Admin SDK,
-  // então consegue escrever no save de QUALQUER jogador, diferente do cliente que só escreve no próprio)
-  teamA.forEach(p=>{ if(p.hp<=0) p.level += 1; });
-  teamB.forEach(p=>{ if(p.hp<=0) p.level += 1; });
-  const updatedA = { name: match.a.name, code: encodeTeamCode(teamA), uid: match.a.uid, slot: match.a.slot };
-  const updatedB = { name: match.b.name, code: encodeTeamCode(teamB), uid: match.b.uid, slot: match.b.slot };
-  match.a = updatedA;
-  match.b = updatedB;
+  // diferente dos ginásios, os níveis ficam CONGELADOS na Liga -- depois da 8ª insígnia, o time do
+  // treinador não sobe mais de nível, então nem precisa re-codificar/sincronizar nada aqui
   match.matchups = result.matchups; // mantém o log completo, pro botão "Assistir batalha" funcionar mesmo quando quem resolve é a Cloud Function
-  match.winner = result.win ? updatedA : updatedB;
+  match.winner = result.win ? match.a : match.b;
   match.resolved = true;
-  pendingSyncs.push({ playerRef: updatedA, leveledTeam: teamA });
-  pendingSyncs.push({ playerRef: updatedB, leveledTeam: teamB });
 }
 const STUCK_CLAIM_THRESHOLD_MS = 3 * 60 * 1000;
 async function claimCycleForProcessing(cycleId, fromStatus, toStatus){
@@ -556,7 +531,7 @@ function computePlacement(league, playerName){
 async function advanceCyclePhases(cycleEntry){
   const claimed = await claimCycleForProcessing(cycleEntry.id, 'drawn', 'advancing');
   if(!claimed) return false;
-  let pendingSyncs = [], pendingChampions = [], pendingPlacements = [], changed = false;
+  let pendingChampions = [], pendingPlacements = [], changed = false;
   try{
     const ref = cycleDocRef(cycleEntry.id);
     const snap = await ref.get();
@@ -572,7 +547,7 @@ async function advanceCyclePhases(cycleEntry){
         for(let mi=0; mi<round.length; mi++){
           const match = round[mi];
           if(!match.resolved && match.a && match.b){
-            resolveLeagueMatch(match, `${cycleEntry.scheduledTime}-L${league.id}-R${ri}-M${mi}`, pendingSyncs);
+            resolveLeagueMatch(match, `${cycleEntry.scheduledTime}-L${league.id}-R${ri}-M${mi}`);
             changed = true;
             if(ri+1 < roundKeys.length){
               const nextRound = league.rounds[roundKeys[ri+1]];
@@ -603,7 +578,6 @@ async function advanceCyclePhases(cycleEntry){
     detail.updatedAt = Date.now();
     await ref.set(detail);
     await claimCycleForProcessing(cycleEntry.id, 'advancing', allDone ? 'complete' : 'drawn');
-    for(const {playerRef, leveledTeam} of pendingSyncs){ await syncLeaguePlayerLevels(playerRef, leveledTeam); }
     for(const champ of pendingChampions){ await recordLeagueChampionWin(champ.name, champ.uid, champ.slot); }
     for(const p of pendingPlacements){ await recordLeaguePlacement(p.uid, p.slot, p.record); }
     return changed;

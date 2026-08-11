@@ -266,6 +266,8 @@
   }
   .fighter{flex:1;text-align:center;font-weight:800;font-size:.85rem;}
   .fighter-emoji{font-size:1.9rem;line-height:1.2;margin-bottom:2px;}
+  .fighter-types{margin:3px 0 6px; display:flex; justify-content:center; flex-wrap:wrap; gap:2px;}
+  .fighter-types .type-pill{margin-right:0;}
   .fighter-level{display:block;font-size:.68rem;color:var(--muted);font-weight:700;margin-top:1px;}
   .vs-swords{font-size:1.4rem;display:inline-block;}
   .vs-swords.spin{animation:swordSpin .9s linear infinite;}
@@ -1320,17 +1322,22 @@ async function loadPermanentUserData(){
   try{
     const snap = await userDocRef(game.authUser.uid).get();
     const d = snap.exists ? snap.data() : {};
-    let permanent = d.pokedexCaught || [];
-    // migração: se ainda não existe um registro permanente, usa o que já está nos saves atuais como base inicial
-    if(permanent.length === 0){
-      const fromSaves = new Set();
-      (game.saveSlots||[]).forEach(s=>{ if(s && s.caughtSpecies){ s.caughtSpecies.forEach(id=>fromSaves.add(id)); } });
-      if(fromSaves.size>0){
-        permanent = [...fromSaves];
-        await userDocRef(game.authUser.uid).set({ pokedexCaught: permanent }, { merge: true });
+    const permanent = new Set(d.pokedexCaught || []);
+    // reconciliação: além do registro individual feito a cada captura (markCaught -> syncPermanentPokedex),
+    // isso aqui é uma rede de segurança que roda TODA VEZ -- une o que já estiver nos saves atuais com o
+    // registro permanente da conta. Antes isso só rodava uma única vez (só se o registro permanente estivesse
+    // vazio), então qualquer captura "antiga" (de antes da sincronização individual existir, ou perdida por
+    // alguma falha de rede pontual) nunca era migrada -- e ao apagar aquele save, a espécie sumia de vez
+    let changed = false;
+    (game.saveSlots||[]).forEach(s=>{
+      if(s && s.caughtSpecies){
+        s.caughtSpecies.forEach(id=>{ if(!permanent.has(id)){ permanent.add(id); changed = true; } });
       }
+    });
+    if(changed){
+      await userDocRef(game.authUser.uid).set({ pokedexCaught: [...permanent] }, { merge: true });
     }
-    game.permanentPokedex = permanent;
+    game.permanentPokedex = [...permanent];
     game.leagueWinsTotal = d.leagueWinsTotal || 0;
     game.leagueWinsBySlot = d.leagueWinsBySlot || {};
   } catch(e){ console.error('Erro ao carregar dados permanentes da conta:', e); }
@@ -2083,27 +2090,7 @@ function makeFreshScheduleData(){
    cada um escreve no próprio documento (chave = nome sanitizado),
    então 1000 pessoas se inscrevendo ao mesmo tempo não brigam entre si
 ------------------------------------------------------------------- */
-async function syncLeaguePlayerLevels(playerRef, leveledTeam){
-  if(!playerRef.uid || playerRef.slot==null) return;
-  // por causa das regras do Firestore, o cliente só pode escrever na PRÓPRIA conta -- se foi o navegador de
-  // outro jogador (ou ninguém) que resolveu essa partida, essa escrita é responsabilidade da Cloud Function
-  if(!game.authUser || game.authUser.uid !== playerRef.uid) return;
-  try{
-    const ref = saveDocRef(playerRef.uid, playerRef.slot);
-    const snap = await ref.get();
-    if(!snap.exists) return;
-    const saveData = snap.data();
-    const currentTeam = saveData.team || [];
-    const updatedTeam = currentTeam.map((p,i)=>{
-      const leveled = leveledTeam[i];
-      if(leveled && leveled.speciesId===p.speciesId){ return { ...p, level: leveled.level }; }
-      return p;
-    });
-    await ref.set({ ...saveData, team: updatedTeam });
-    if(game.currentSaveSlot===playerRef.slot){ game.team = updatedTeam; }
-  } catch(e){ console.error('Erro ao sincronizar levels da Liga pro save:', e); }
-}
-function resolveLeagueMatch(match, seedStr, pendingSyncs){
+function resolveLeagueMatch(match, seedStr){
   const rng = makeSeededRng(seedStr);
   const teamA = decodeTeamCode(match.a.code);
   const teamB = decodeTeamCode(match.b.code);
@@ -2114,18 +2101,11 @@ function resolveLeagueMatch(match, seedStr, pendingSyncs){
     return;
   }
   const result = simulateGymBattle(teamA, teamB, rng);
-  // mesma mecânica dos ginásios: pokémon que desmaiou ganha +1 level, e isso acompanha o treinador pras próximas fases
-  teamA.forEach(p=>{ if(p.hp<=0) p.level += 1; });
-  teamB.forEach(p=>{ if(p.hp<=0) p.level += 1; });
-  const updatedA = { name: match.a.name, code: encodeTeamCode(teamA), uid: match.a.uid, slot: match.a.slot };
-  const updatedB = { name: match.b.name, code: encodeTeamCode(teamB), uid: match.b.uid, slot: match.b.slot };
-  match.a = updatedA;
-  match.b = updatedB;
+  // diferente dos ginásios, os níveis ficam CONGELADOS na Liga -- depois da 8ª insígnia, o time do
+  // treinador não sobe mais de nível, então nem precisa re-codificar/sincronizar nada aqui
   match.matchups = result.matchups;
-  match.winner = result.win ? updatedA : updatedB;
+  match.winner = result.win ? match.a : match.b;
   match.resolved = true;
-  pendingSyncs.push({ playerRef: updatedA, leveledTeam: teamA });
-  pendingSyncs.push({ playerRef: updatedB, leveledTeam: teamB });
 }
 async function migrateOldLeagueDataIfNeeded(){
   // se ainda existir o documento antigo (formato de antes da reestruturação), migra pro formato novo e o remove.
@@ -2395,7 +2375,7 @@ async function drawCycle(cycleEntry){
 async function advanceCyclePhases(cycleEntry){
   const claimed = await claimCycleForProcessing(cycleEntry.id, 'drawn', 'advancing');
   if(!claimed) return false;
-  let pendingSyncs = [], pendingChampions = [], pendingPlacements = [], changed = false;
+  let pendingChampions = [], pendingPlacements = [], changed = false;
   try{
     const ref = cycleDocRef(cycleEntry.id);
     const snap = await ref.get();
@@ -2411,7 +2391,7 @@ async function advanceCyclePhases(cycleEntry){
         for(let mi=0; mi<round.length; mi++){
           const match = round[mi];
           if(!match.resolved && match.a && match.b){
-            resolveLeagueMatch(match, `${cycleEntry.scheduledTime}-L${league.id}-R${ri}-M${mi}`, pendingSyncs);
+            resolveLeagueMatch(match, `${cycleEntry.scheduledTime}-L${league.id}-R${ri}-M${mi}`);
             changed = true;
             if(ri+1 < roundKeys.length){
               const nextRound = league.rounds[roundKeys[ri+1]];
@@ -2443,7 +2423,6 @@ async function advanceCyclePhases(cycleEntry){
     detail.updatedAt = Date.now();
     await ref.set(detail);
     await claimCycleForProcessing(cycleEntry.id, 'advancing', allDone ? 'complete' : 'drawn');
-    for(const {playerRef, leveledTeam} of pendingSyncs){ await syncLeaguePlayerLevels(playerRef, leveledTeam); }
     for(const champ of pendingChampions){ await recordLeagueChampionWin(champ.name, champ.uid, champ.slot); }
     for(const p of pendingPlacements){ await recordLeaguePlacement(p.uid, p.slot, p.record); }
     return changed;
@@ -2990,6 +2969,18 @@ async function confirmDeleteSave(){
   const slot = game.deleteSaveTarget;
   if(slot==null || !game.authUser) return;
   try{
+    // antes de apagar, garante que nenhuma captura desse save se perca do Pokédex permanente da conta --
+    // segurança extra, independente da reconciliação que já roda ao abrir a tela do Pokédex
+    const snap = await saveDocRef(game.authUser.uid, slot).get();
+    const caught = (snap.exists && snap.data().caughtSpecies) ? snap.data().caughtSpecies : [];
+    if(caught.length>0){
+      await userDocRef(game.authUser.uid).set(
+        { pokedexCaught: firebase.firestore.FieldValue.arrayUnion(...caught) },
+        { merge: true }
+      );
+      if(!game.permanentPokedex){ game.permanentPokedex = []; }
+      caught.forEach(id=>{ if(!game.permanentPokedex.includes(id)){ game.permanentPokedex.push(id); } });
+    }
     await saveDocRef(game.authUser.uid, slot).delete();
   } catch(e){ console.error(e); }
   game.deleteSaveTarget = null;
@@ -3358,11 +3349,13 @@ function renderTrainerBattling(){
     <div class="battle-vs">
       <div class="fighter">
         <div class="fighter-emoji">${playerSp?battleSpriteHtml(m.playerSpecies, m.enemySpecies, 'sprite-lg'):''}</div>${m.player} <span class="fighter-level">Lv.${m.playerLevel}</span>
+        <div class="fighter-types">${playerSp?typesHtml(playerSp.types):''}</div>
         ${renderHpBar(m.playerHpBefore, m.playerMaxHp, 'hp-fill-player', 'hp-label-player')}
       </div>
       <span class="vs-swords ${loading?'spin':''}">⚔️</span>
       <div class="fighter">
         <div class="fighter-emoji">${enemySp?battleSpriteHtml(m.enemySpecies, m.playerSpecies, 'sprite-lg'):''}</div>${m.enemy} <span class="fighter-level">Lv.${m.enemyLevel}</span>
+        <div class="fighter-types">${enemySp?typesHtml(enemySp.types):''}</div>
         ${renderHpBar(m.enemyHpBefore, m.enemyMaxHp, 'hp-fill-enemy', 'hp-label-enemy')}
       </div>
     </div>
@@ -3459,11 +3452,13 @@ function renderBattling(){
     <div class="battle-vs">
       <div class="fighter">
         <div class="fighter-emoji">${playerSp?battleSpriteHtml(m.playerSpecies, m.enemySpecies, 'sprite-lg'):''}</div>${m.player} <span class="fighter-level">Lv.${m.playerLevel}</span>
+        <div class="fighter-types">${playerSp?typesHtml(playerSp.types):''}</div>
         ${renderHpBar(m.playerHpBefore, m.playerMaxHp, 'hp-fill-player', 'hp-label-player')}
       </div>
       <span class="vs-swords ${loading?'spin':''}">⚔️</span>
       <div class="fighter">
         <div class="fighter-emoji">${enemySp?battleSpriteHtml(m.enemySpecies, m.playerSpecies, 'sprite-lg'):''}</div>${m.enemy} <span class="fighter-level">Lv.${m.enemyLevel}</span>
+        <div class="fighter-types">${enemySp?typesHtml(enemySp.types):''}</div>
         ${renderHpBar(m.enemyHpBefore, m.enemyMaxHp, 'hp-fill-enemy', 'hp-label-enemy')}
       </div>
     </div>
@@ -3715,11 +3710,13 @@ function renderLeagueWatch(){
     <div class="battle-vs">
       <div class="fighter">
         <div class="fighter-emoji">${playerSp?battleSpriteHtml(m.playerSpecies, m.enemySpecies, 'sprite-lg'):''}</div>${m.player} <span class="fighter-level">Lv.${m.playerLevel}</span>
+        <div class="fighter-types">${playerSp?typesHtml(playerSp.types):''}</div>
         ${renderHpBar(m.playerHpBefore, m.playerMaxHp, 'hp-fill-player', 'hp-label-player')}
       </div>
       <span class="vs-swords ${loading?'spin':''}">⚔️</span>
       <div class="fighter">
         <div class="fighter-emoji">${enemySp?battleSpriteHtml(m.enemySpecies, m.playerSpecies, 'sprite-lg'):''}</div>${m.enemy} <span class="fighter-level">Lv.${m.enemyLevel}</span>
+        <div class="fighter-types">${enemySp?typesHtml(enemySp.types):''}</div>
         ${renderHpBar(m.enemyHpBefore, m.enemyMaxHp, 'hp-fill-enemy', 'hp-label-enemy')}
       </div>
     </div>
