@@ -10,8 +10,25 @@ Jogo de desafio de ginásios estilo Gen 1 Pokémon, em um único arquivo HTML, c
 ├── functions/
 │   ├── index.js         → Cloud Function que avança a Liga Pokémon a cada minuto
 │   └── package.json
+├── tools/               → simuladores e testes headless (Node puro, sem navegador)
+├── CLAUDE.md            → memória do projeto: arquitetura e regras de negócio
 └── firestore.rules      → regras de segurança do Firestore
 ```
+
+## Testes e simulações
+
+O motor de batalha é JS puro e determinístico, então dá pra rodar tudo sem navegador:
+
+```bash
+npm test                # economia + 20 jornadas completas headless
+npm run test:economia   # confirma que perder de propósito continua sendo o pior caminho
+npm run test:jornada    # joga jornadas inteiras e verifica que nenhuma tela quebra
+npm run sim             # winrate por espécie (quem está OP)
+npm run sim:ginasios    # winrate contra cada líder de ginásio
+```
+
+> **Rode `npm run test:economia` depois de qualquer mexida na economia de pontos.** Ele existe pra
+> pegar a volta do exploit de perder de propósito — e já pegou uma vez.
 
 > **Falta nesse repositório**: `firebase.json` e `.firebaserc`, que já existem no projeto Firebase de quem criou o projeto originalmente. Quem tiver esses dois arquivos localmente deve adicioná-los na raiz antes do primeiro `firebase deploy` (veja o Passo 4 abaixo).
 

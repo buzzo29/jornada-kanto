@@ -1,0 +1,13 @@
+{
+  "name": "jornada-kanto",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Jogo de desafio de ginásios estilo Gen 1 — ferramentas de simulação e teste",
+  "scripts": {
+    "test": "node tools/sim-economia.js && node tools/smoke-jornada.js --runs 20",
+    "test:economia": "node tools/sim-economia.js",
+    "test:jornada": "node tools/smoke-jornada.js --runs 20",
+    "sim": "node tools/sim-balanceamento.js",
+    "sim:ginasios": "node tools/sim-balanceamento.js --ginasios"
+  }
+}

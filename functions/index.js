@@ -9,156 +9,156 @@ const db = admin.firestore();
    se adicionar pokémons/tipos novos no jogo, gere de novo esse trecho)
 --------------------------------------------------- */
 const SPECIES = {
-  bulbasaur:{name:'Bulbasaur', types:['Grass','Poison'], hp:45, attack:49, defense:49},
-  charmander:{name:'Charmander', types:['Fire'], hp:39, attack:52, defense:43},
-  squirtle:{name:'Squirtle', types:['Water'], hp:44, attack:48, defense:65},
-  weedle:{name:'Weedle', types:['Bug','Poison'], hp:40, attack:35, defense:30},
-  caterpie:{name:'Caterpie', types:['Bug'], hp:45, attack:30, defense:35},
-  ratata:{name:'Ratata', types:['Normal'], hp:30, attack:56, defense:35},
-  pidgey:{name:'Pidgey', types:['Normal','Flying'], hp:40, attack:45, defense:40},
-  mankey:{name:'Mankey', types:['Fighting'], hp:40, attack:80, defense:35},
-  spearow:{name:'Spearow', types:['Normal','Flying'], hp:40, attack:60, defense:30},
-  nidoranm:{name:'Nidoran (M)', types:['Poison'], hp:46, attack:57, defense:40},
-  oddish:{name:'Oddish', types:['Grass','Poison'], hp:45, attack:50, defense:55},
-  geodude:{name:'Geodude', types:['Rock','Ground'], hp:40, attack:80, defense:100},
-  onix:{name:'Onix', types:['Rock','Ground'], hp:35, attack:45, defense:160},
-  ivysaur:{name:'Ivysaur', types:['Grass','Poison'], hp:60, attack:62, defense:63},
-  venusaur:{name:'Venusaur', types:['Grass','Poison'], hp:80, attack:82, defense:83},
-  charmeleon:{name:'Charmeleon', types:['Fire'], hp:58, attack:64, defense:58},
-  charizard:{name:'Charizard', types:['Fire','Flying'], hp:78, attack:84, defense:78},
-  wartortle:{name:'Wartortle', types:['Water'], hp:59, attack:63, defense:80},
-  blastoise:{name:'Blastoise', types:['Water'], hp:79, attack:83, defense:100},
-  kakuna:{name:'Kakuna', types:['Bug','Poison'], hp:45, attack:25, defense:50},
-  beedrill:{name:'Beedrill', types:['Bug','Poison'], hp:65, attack:80, defense:40},
-  metapod:{name:'Metapod', types:['Bug'], hp:50, attack:20, defense:55},
-  butterfree:{name:'Butterfree', types:['Bug','Flying'], hp:60, attack:45, defense:50},
-  raticate:{name:'Raticate', types:['Normal'], hp:55, attack:81, defense:60},
-  pidgeotto:{name:'Pidgeotto', types:['Normal','Flying'], hp:63, attack:60, defense:55},
-  pidgeot:{name:'Pidgeot', types:['Normal','Flying'], hp:83, attack:80, defense:75},
-  primeape:{name:'Primeape', types:['Fighting'], hp:65, attack:105, defense:60},
-  fearow:{name:'Fearow', types:['Normal','Flying'], hp:65, attack:90, defense:65},
-  nidorino:{name:'Nidorino', types:['Poison'], hp:61, attack:72, defense:57},
-  gloom:{name:'Gloom', types:['Grass','Poison'], hp:60, attack:65, defense:70},
-  sandshrew:{name:'Sandshrew', types:['Ground'], hp:50, attack:75, defense:85},
-  sandslash:{name:'Sandslash', types:['Ground'], hp:75, attack:100, defense:110},
-  clefairy:{name:'Clefairy', types:['Normal'], hp:70, attack:45, defense:48},
-  jigglypuff:{name:'Jigglypuff', types:['Normal'], hp:115, attack:45, defense:20},
-  zubat:{name:'Zubat', types:['Poison','Flying'], hp:40, attack:45, defense:35},
-  golbat:{name:'Golbat', types:['Poison','Flying'], hp:75, attack:80, defense:70},
-  paras:{name:'Paras', types:['Bug','Grass'], hp:35, attack:70, defense:55},
-  parasect:{name:'Parasect', types:['Bug','Grass'], hp:60, attack:95, defense:80},
-  meowth:{name:'Meowth', types:['Normal'], hp:40, attack:45, defense:35},
-  persian:{name:'Persian', types:['Normal'], hp:65, attack:70, defense:60},
-  bellsprout:{name:'Bellsprout', types:['Grass','Poison'], hp:50, attack:75, defense:35},
-  weepinbell:{name:'Weepinbell', types:['Grass','Poison'], hp:65, attack:90, defense:50},
-  abra:{name:'Abra', types:['Psychic'], hp:25, attack:20, defense:15},
-  kadabra:{name:'Kadabra', types:['Psychic'], hp:40, attack:35, defense:30},
-  staryu:{name:'Staryu', types:['Water'], hp:30, attack:45, defense:55},
-  starmie:{name:'Starmie', types:['Water','Psychic'], hp:60, attack:75, defense:85},
-  growlithe:{name:'Growlithe', types:['Fire'], hp:55, attack:70, defense:45},
-  vulpix:{name:'Vulpix', types:['Fire'], hp:38, attack:41, defense:40},
-  ekans:{name:'Ekans', types:['Poison'], hp:35, attack:60, defense:44},
-  arbok:{name:'Arbok', types:['Poison'], hp:60, attack:85, defense:69},
-  diglett:{name:'Diglett', types:['Ground'], hp:10, attack:55, defense:25},
-  dugtrio:{name:'Dugtrio', types:['Ground'], hp:35, attack:80, defense:50},
-  magnemite:{name:'Magnemite', types:['Electric'], hp:25, attack:35, defense:70},
-  magneton:{name:'Magneton', types:['Electric'], hp:50, attack:60, defense:95},
-  drowzee:{name:'Drowzee', types:['Psychic'], hp:60, attack:48, defense:45},
-  hypno:{name:'Hypno', types:['Psychic'], hp:85, attack:73, defense:70},
-  nidoranf:{name:'Nidoran (F)', types:['Poison'], hp:55, attack:47, defense:52},
-  nidorina:{name:'Nidorina', types:['Poison'], hp:70, attack:62, defense:67},
-  venonat:{name:'Venonat', types:['Bug','Poison'], hp:60, attack:55, defense:50},
-  venomoth:{name:'Venomoth', types:['Bug','Poison'], hp:70, attack:65, defense:60},
-  voltorb:{name:'Voltorb', types:['Electric'], hp:40, attack:30, defense:50},
-  pikachu:{name:'Pikachu', types:['Electric'], hp:35, attack:55, defense:30},
-  raichu:{name:'Raichu', types:['Electric'], hp:60, attack:90, defense:55},
-  poliwag:{name:'Poliwag', types:['Water'], hp:40, attack:50, defense:40},
-  poliwhirl:{name:'Poliwhirl', types:['Water'], hp:65, attack:65, defense:65},
-  tentacool:{name:'Tentacool', types:['Water','Poison'], hp:40, attack:40, defense:35},
-  tentacruel:{name:'Tentacruel', types:['Water','Poison'], hp:80, attack:70, defense:65},
-  machop:{name:'Machop', types:['Fighting'], hp:70, attack:80, defense:50},
-  machoke:{name:'Machoke', types:['Fighting'], hp:80, attack:100, defense:70},
-  doduo:{name:'Doduo', types:['Normal','Flying'], hp:35, attack:85, defense:45},
-  dodrio:{name:'Dodrio', types:['Normal','Flying'], hp:60, attack:110, defense:70},
-  ponyta:{name:'Ponyta', types:['Fire'], hp:50, attack:85, defense:55},
-  rapidash:{name:'Rapidash', types:['Fire'], hp:65, attack:100, defense:70},
-  slowpoke:{name:'Slowpoke', types:['Water','Psychic'], hp:90, attack:65, defense:65},
-  slowbro:{name:'Slowbro', types:['Water','Psychic'], hp:95, attack:75, defense:110},
-  magikarp:{name:'Magikarp', types:['Water'], hp:20, attack:10, defense:55},
-  gyarados:{name:'Gyarados', types:['Water','Flying'], hp:95, attack:125, defense:79},
-  grimer:{name:'Grimer', types:['Poison'], hp:80, attack:80, defense:50},
-  muk:{name:'Muk', types:['Poison'], hp:105, attack:105, defense:75},
-  tauros:{name:'Tauros', types:['Normal'], hp:75, attack:100, defense:95},
-  psyduck:{name:'Psyduck', types:['Water'], hp:50, attack:52, defense:48},
-  golduck:{name:'Golduck', types:['Water'], hp:80, attack:82, defense:78},
-  krabby:{name:'Krabby', types:['Water'], hp:30, attack:105, defense:90},
-  kingler:{name:'Kingler', types:['Water'], hp:55, attack:130, defense:115},
-  horsea:{name:'Horsea', types:['Water'], hp:30, attack:40, defense:70},
-  seadra:{name:'Seadra', types:['Water'], hp:55, attack:65, defense:95},
-  goldeen:{name:'Goldeen', types:['Water'], hp:45, attack:67, defense:60},
-  seaking:{name:'Seaking', types:['Water'], hp:80, attack:92, defense:65},
-  shellder:{name:'Shellder', types:['Water'], hp:30, attack:65, defense:100},
-  exeggcute:{name:'Exeggcute', types:['Grass','Psychic'], hp:60, attack:40, defense:80},
-  cubone:{name:'Cubone', types:['Ground'], hp:50, attack:50, defense:95},
-  marowak:{name:'Marowak', types:['Ground'], hp:60, attack:80, defense:110},
-  victreebel:{name:'Victreebel', types:['Grass','Poison'], hp:80, attack:105, defense:65},
-  tangela:{name:'Tangela', types:['Grass'], hp:65, attack:55, defense:115},
-  vileplume:{name:'Vileplume', types:['Grass','Poison'], hp:75, attack:80, defense:85},
-  koffing:{name:'Koffing', types:['Poison'], hp:40, attack:65, defense:95},
-  weezing:{name:'Weezing', types:['Poison'], hp:65, attack:90, defense:120},
-  gastly:{name:'Gastly', types:['Ghost','Poison'], hp:30, attack:35, defense:30},
-  haunter:{name:'Haunter', types:['Ghost','Poison'], hp:45, attack:50, defense:45},
-  ditto:{name:'Ditto', types:['Normal'], hp:48, attack:48, defense:48},
-  lickitung:{name:'Lickitung', types:['Normal'], hp:90, attack:55, defense:75},
-  rhyhorn:{name:'Rhyhorn', types:['Ground','Rock'], hp:80, attack:85, defense:95},
-  rhydon:{name:'Rhydon', types:['Ground','Rock'], hp:105, attack:130, defense:120},
-  seel:{name:'Seel', types:['Water'], hp:65, attack:45, defense:55},
-  dewgong:{name:'Dewgong', types:['Water','Ice'], hp:90, attack:70, defense:80},
-  farfetchd:{name:"Farfetch'd", types:['Normal','Flying'], hp:52, attack:65, defense:55},
-  kangaskhan:{name:'Kangaskhan', types:['Normal'], hp:105, attack:95, defense:80},
-  scyther:{name:'Scyther', types:['Bug','Flying'], hp:70, attack:110, defense:80},
-  omanyte:{name:'Omanyte', types:['Rock','Water'], hp:35, attack:40, defense:100},
-  omastar:{name:'Omastar', types:['Rock','Water'], hp:70, attack:60, defense:125},
-  kabuto:{name:'Kabuto', types:['Rock','Water'], hp:30, attack:80, defense:90},
-  kabutops:{name:'Kabutops', types:['Rock','Water'], hp:60, attack:115, defense:105},
-  electrode:{name:'Electrode', types:['Electric'], hp:60, attack:50, defense:70},
-  magmar:{name:'Magmar', types:['Fire'], hp:65, attack:95, defense:57},
-  lapras:{name:'Lapras', types:['Water','Ice'], hp:130, attack:85, defense:80},
-  porygon:{name:'Porygon', types:['Normal'], hp:65, attack:60, defense:70},
-  eevee:{name:'Eevee', types:['Normal'], hp:55, attack:55, defense:50},
-  snorlax:{name:'Snorlax', types:['Normal'], hp:160, attack:110, defense:65},
-  chansey:{name:'Chansey', types:['Normal'], hp:250, attack:5, defense:5},
-  hitmonlee:{name:'Hitmonlee', types:['Fighting'], hp:50, attack:120, defense:53},
-  hitmonchan:{name:'Hitmonchan', types:['Fighting'], hp:50, attack:105, defense:79},
-  pinsir:{name:'Pinsir', types:['Bug'], hp:65, attack:125, defense:100},
-  electabuzz:{name:'Electabuzz', types:['Electric'], hp:65, attack:83, defense:57},
-  aerodactyl:{name:'Aerodactyl', types:['Rock','Flying'], hp:80, attack:105, defense:65},
-  alakazam:{name:'Alakazam', types:['Psychic'], hp:55, attack:50, defense:45},
-  mrmime:{name:'Mr. Mime', types:['Psychic'], hp:40, attack:45, defense:65},
-  arcanine:{name:'Arcanine', types:['Fire'], hp:90, attack:110, defense:80},
-  nidoqueen:{name:'Nidoqueen', types:['Poison','Ground'], hp:90, attack:82, defense:87},
-  nidoking:{name:'Nidoking', types:['Poison','Ground'], hp:81, attack:92, defense:77},
-  graveler:{name:'Graveler', types:['Rock','Ground'], hp:55, attack:95, defense:115},
-  dratini:{name:'Dratini', types:['Dragon'], hp:41, attack:64, defense:45},
-  dragonair:{name:'Dragonair', types:['Dragon'], hp:61, attack:84, defense:65},
-  dragonite:{name:'Dragonite', types:['Dragon','Flying'], hp:91, attack:134, defense:95},
-  jynx:{name:'Jynx', types:['Ice','Psychic'], hp:65, attack:50, defense:35},
-  exeggutor:{name:'Exeggutor', types:['Grass','Psychic'], hp:95, attack:95, defense:85},
-  clefable:{name:'Clefable', types:['Normal'], hp:95, attack:70, defense:73},
-  wigglytuff:{name:'Wigglytuff', types:['Normal'], hp:140, attack:70, defense:45},
-  ninetales:{name:'Ninetales', types:['Fire'], hp:73, attack:76, defense:75},
-  poliwrath:{name:'Poliwrath', types:['Water','Fighting'], hp:90, attack:85, defense:95},
-  cloyster:{name:'Cloyster', types:['Water','Ice'], hp:50, attack:95, defense:180},
-  machamp:{name:'Machamp', types:['Fighting'], hp:90, attack:130, defense:80},
-  golem:{name:'Golem', types:['Rock','Ground'], hp:80, attack:110, defense:130},
-  gengar:{name:'Gengar', types:['Ghost','Poison'], hp:60, attack:65, defense:60},
-  moltres:{name:'Moltres', types:['Fire','Flying'], hp:90, attack:100, defense:90},
-  zapdos:{name:'Zapdos', types:['Electric','Flying'], hp:90, attack:90, defense:85},
-  articuno:{name:'Articuno', types:['Ice','Flying'], hp:90, attack:85, defense:100},
-  vaporeon:{name:'Vaporeon', types:['Water'], hp:130, attack:65, defense:60},
-  jolteon:{name:'Jolteon', types:['Electric'], hp:65, attack:65, defense:60},
-  flareon:{name:'Flareon', types:['Fire'], hp:65, attack:130, defense:60},
-  mewtwo:{name:'Mewtwo', types:['Psychic'], hp:106, attack:110, defense:90}
+  bulbasaur:{name:'Bulbasaur', types:['Grass','Poison'], hp:45, attack:49, defense:49, speed:45},
+  charmander:{name:'Charmander', types:['Fire'], hp:39, attack:52, defense:43, speed:65},
+  squirtle:{name:'Squirtle', types:['Water'], hp:44, attack:48, defense:65, speed:43},
+  weedle:{name:'Weedle', types:['Bug','Poison'], hp:40, attack:35, defense:30, speed:50},
+  caterpie:{name:'Caterpie', types:['Bug'], hp:45, attack:30, defense:35, speed:45},
+  ratata:{name:'Ratata', types:['Normal'], hp:30, attack:56, defense:35, speed:72},
+  pidgey:{name:'Pidgey', types:['Normal','Flying'], hp:40, attack:45, defense:40, speed:56},
+  mankey:{name:'Mankey', types:['Fighting'], hp:40, attack:80, defense:35, speed:70},
+  spearow:{name:'Spearow', types:['Normal','Flying'], hp:40, attack:60, defense:30, speed:70},
+  nidoranm:{name:'Nidoran (M)', types:['Poison'], hp:46, attack:57, defense:40, speed:50},
+  oddish:{name:'Oddish', types:['Grass','Poison'], hp:45, attack:50, defense:55, speed:30},
+  geodude:{name:'Geodude', types:['Rock','Ground'], hp:40, attack:80, defense:100, speed:20},
+  onix:{name:'Onix', types:['Rock','Ground'], hp:35, attack:45, defense:160, speed:70},
+  ivysaur:{name:'Ivysaur', types:['Grass','Poison'], hp:60, attack:62, defense:63, speed:60},
+  venusaur:{name:'Venusaur', types:['Grass','Poison'], hp:80, attack:82, defense:83, speed:80},
+  charmeleon:{name:'Charmeleon', types:['Fire'], hp:58, attack:64, defense:58, speed:80},
+  charizard:{name:'Charizard', types:['Fire','Flying'], hp:78, attack:84, defense:78, speed:100},
+  wartortle:{name:'Wartortle', types:['Water'], hp:59, attack:63, defense:80, speed:58},
+  blastoise:{name:'Blastoise', types:['Water'], hp:79, attack:83, defense:100, speed:78},
+  kakuna:{name:'Kakuna', types:['Bug','Poison'], hp:45, attack:25, defense:50, speed:35},
+  beedrill:{name:'Beedrill', types:['Bug','Poison'], hp:65, attack:80, defense:40, speed:75},
+  metapod:{name:'Metapod', types:['Bug'], hp:50, attack:20, defense:55, speed:30},
+  butterfree:{name:'Butterfree', types:['Bug','Flying'], hp:60, attack:45, defense:50, speed:70},
+  raticate:{name:'Raticate', types:['Normal'], hp:55, attack:81, defense:60, speed:97},
+  pidgeotto:{name:'Pidgeotto', types:['Normal','Flying'], hp:63, attack:60, defense:55, speed:71},
+  pidgeot:{name:'Pidgeot', types:['Normal','Flying'], hp:83, attack:80, defense:75, speed:91},
+  primeape:{name:'Primeape', types:['Fighting'], hp:65, attack:105, defense:60, speed:95},
+  fearow:{name:'Fearow', types:['Normal','Flying'], hp:65, attack:90, defense:65, speed:100},
+  nidorino:{name:'Nidorino', types:['Poison'], hp:61, attack:72, defense:57, speed:65},
+  gloom:{name:'Gloom', types:['Grass','Poison'], hp:60, attack:65, defense:70, speed:50},
+  sandshrew:{name:'Sandshrew', types:['Ground'], hp:50, attack:75, defense:85, speed:40},
+  sandslash:{name:'Sandslash', types:['Ground'], hp:75, attack:100, defense:110, speed:65},
+  clefairy:{name:'Clefairy', types:['Normal'], hp:70, attack:45, defense:48, speed:35},
+  jigglypuff:{name:'Jigglypuff', types:['Normal'], hp:115, attack:45, defense:20, speed:20},
+  zubat:{name:'Zubat', types:['Poison','Flying'], hp:40, attack:45, defense:35, speed:55},
+  golbat:{name:'Golbat', types:['Poison','Flying'], hp:75, attack:80, defense:70, speed:90},
+  paras:{name:'Paras', types:['Bug','Grass'], hp:35, attack:70, defense:55, speed:25},
+  parasect:{name:'Parasect', types:['Bug','Grass'], hp:60, attack:95, defense:80, speed:30},
+  meowth:{name:'Meowth', types:['Normal'], hp:40, attack:45, defense:35, speed:90},
+  persian:{name:'Persian', types:['Normal'], hp:65, attack:70, defense:60, speed:115},
+  bellsprout:{name:'Bellsprout', types:['Grass','Poison'], hp:50, attack:75, defense:35, speed:40},
+  weepinbell:{name:'Weepinbell', types:['Grass','Poison'], hp:65, attack:90, defense:50, speed:55},
+  abra:{name:'Abra', types:['Psychic'], hp:25, attack:20, defense:15, speed:105},
+  kadabra:{name:'Kadabra', types:['Psychic'], hp:40, attack:35, defense:30, speed:105},
+  staryu:{name:'Staryu', types:['Water'], hp:30, attack:45, defense:55, speed:85},
+  starmie:{name:'Starmie', types:['Water','Psychic'], hp:60, attack:75, defense:85, speed:115},
+  growlithe:{name:'Growlithe', types:['Fire'], hp:55, attack:70, defense:45, speed:60},
+  vulpix:{name:'Vulpix', types:['Fire'], hp:38, attack:41, defense:40, speed:65},
+  ekans:{name:'Ekans', types:['Poison'], hp:35, attack:60, defense:44, speed:55},
+  arbok:{name:'Arbok', types:['Poison'], hp:60, attack:85, defense:69, speed:80},
+  diglett:{name:'Diglett', types:['Ground'], hp:10, attack:55, defense:25, speed:95},
+  dugtrio:{name:'Dugtrio', types:['Ground'], hp:35, attack:80, defense:50, speed:120},
+  magnemite:{name:'Magnemite', types:['Electric'], hp:25, attack:35, defense:70, speed:45},
+  magneton:{name:'Magneton', types:['Electric'], hp:50, attack:60, defense:95, speed:70},
+  drowzee:{name:'Drowzee', types:['Psychic'], hp:60, attack:48, defense:45, speed:42},
+  hypno:{name:'Hypno', types:['Psychic'], hp:85, attack:73, defense:70, speed:67},
+  nidoranf:{name:'Nidoran (F)', types:['Poison'], hp:55, attack:47, defense:52, speed:41},
+  nidorina:{name:'Nidorina', types:['Poison'], hp:70, attack:62, defense:67, speed:56},
+  venonat:{name:'Venonat', types:['Bug','Poison'], hp:60, attack:55, defense:50, speed:45},
+  venomoth:{name:'Venomoth', types:['Bug','Poison'], hp:70, attack:65, defense:60, speed:90},
+  voltorb:{name:'Voltorb', types:['Electric'], hp:40, attack:30, defense:50, speed:100},
+  pikachu:{name:'Pikachu', types:['Electric'], hp:35, attack:55, defense:30, speed:90},
+  raichu:{name:'Raichu', types:['Electric'], hp:60, attack:90, defense:55, speed:100},
+  poliwag:{name:'Poliwag', types:['Water'], hp:40, attack:50, defense:40, speed:90},
+  poliwhirl:{name:'Poliwhirl', types:['Water'], hp:65, attack:65, defense:65, speed:90},
+  tentacool:{name:'Tentacool', types:['Water','Poison'], hp:40, attack:40, defense:35, speed:70},
+  tentacruel:{name:'Tentacruel', types:['Water','Poison'], hp:80, attack:70, defense:65, speed:100},
+  machop:{name:'Machop', types:['Fighting'], hp:70, attack:80, defense:50, speed:35},
+  machoke:{name:'Machoke', types:['Fighting'], hp:80, attack:100, defense:70, speed:45},
+  doduo:{name:'Doduo', types:['Normal','Flying'], hp:35, attack:85, defense:45, speed:75},
+  dodrio:{name:'Dodrio', types:['Normal','Flying'], hp:60, attack:110, defense:70, speed:100},
+  ponyta:{name:'Ponyta', types:['Fire'], hp:50, attack:85, defense:55, speed:90},
+  rapidash:{name:'Rapidash', types:['Fire'], hp:65, attack:100, defense:70, speed:105},
+  slowpoke:{name:'Slowpoke', types:['Water','Psychic'], hp:90, attack:65, defense:65, speed:15},
+  slowbro:{name:'Slowbro', types:['Water','Psychic'], hp:95, attack:75, defense:110, speed:30},
+  magikarp:{name:'Magikarp', types:['Water'], hp:20, attack:10, defense:55, speed:80},
+  gyarados:{name:'Gyarados', types:['Water','Flying'], hp:95, attack:125, defense:79, speed:81},
+  grimer:{name:'Grimer', types:['Poison'], hp:80, attack:80, defense:50, speed:25},
+  muk:{name:'Muk', types:['Poison'], hp:105, attack:105, defense:75, speed:50},
+  tauros:{name:'Tauros', types:['Normal'], hp:75, attack:100, defense:95, speed:110},
+  psyduck:{name:'Psyduck', types:['Water'], hp:50, attack:52, defense:48, speed:55},
+  golduck:{name:'Golduck', types:['Water'], hp:80, attack:82, defense:78, speed:85},
+  krabby:{name:'Krabby', types:['Water'], hp:30, attack:105, defense:90, speed:50},
+  kingler:{name:'Kingler', types:['Water'], hp:55, attack:130, defense:115, speed:75},
+  horsea:{name:'Horsea', types:['Water'], hp:30, attack:40, defense:70, speed:60},
+  seadra:{name:'Seadra', types:['Water'], hp:55, attack:65, defense:95, speed:85},
+  goldeen:{name:'Goldeen', types:['Water'], hp:45, attack:67, defense:60, speed:63},
+  seaking:{name:'Seaking', types:['Water'], hp:80, attack:92, defense:65, speed:68},
+  shellder:{name:'Shellder', types:['Water'], hp:30, attack:65, defense:100, speed:40},
+  exeggcute:{name:'Exeggcute', types:['Grass','Psychic'], hp:60, attack:40, defense:80, speed:40},
+  cubone:{name:'Cubone', types:['Ground'], hp:50, attack:50, defense:95, speed:35},
+  marowak:{name:'Marowak', types:['Ground'], hp:60, attack:80, defense:110, speed:45},
+  victreebel:{name:'Victreebel', types:['Grass','Poison'], hp:80, attack:105, defense:65, speed:70},
+  tangela:{name:'Tangela', types:['Grass'], hp:65, attack:55, defense:115, speed:40},
+  vileplume:{name:'Vileplume', types:['Grass','Poison'], hp:75, attack:80, defense:85, speed:50},
+  koffing:{name:'Koffing', types:['Poison'], hp:40, attack:65, defense:95, speed:35},
+  weezing:{name:'Weezing', types:['Poison'], hp:65, attack:90, defense:120, speed:60},
+  gastly:{name:'Gastly', types:['Ghost','Poison'], hp:30, attack:35, defense:30, speed:80},
+  haunter:{name:'Haunter', types:['Ghost','Poison'], hp:45, attack:50, defense:45, speed:95},
+  ditto:{name:'Ditto', types:['Normal'], hp:48, attack:48, defense:48, speed:48},
+  lickitung:{name:'Lickitung', types:['Normal'], hp:90, attack:55, defense:75, speed:30},
+  rhyhorn:{name:'Rhyhorn', types:['Ground','Rock'], hp:80, attack:85, defense:95, speed:25},
+  rhydon:{name:'Rhydon', types:['Ground','Rock'], hp:105, attack:130, defense:120, speed:40},
+  seel:{name:'Seel', types:['Water'], hp:65, attack:45, defense:55, speed:45},
+  dewgong:{name:'Dewgong', types:['Water','Ice'], hp:90, attack:70, defense:80, speed:70},
+  farfetchd:{name:"Farfetch'd", types:['Normal','Flying'], hp:52, attack:65, defense:55, speed:60},
+  kangaskhan:{name:'Kangaskhan', types:['Normal'], hp:105, attack:95, defense:80, speed:90},
+  scyther:{name:'Scyther', types:['Bug','Flying'], hp:70, attack:110, defense:80, speed:105},
+  omanyte:{name:'Omanyte', types:['Rock','Water'], hp:35, attack:40, defense:100, speed:35},
+  omastar:{name:'Omastar', types:['Rock','Water'], hp:70, attack:60, defense:125, speed:55},
+  kabuto:{name:'Kabuto', types:['Rock','Water'], hp:30, attack:80, defense:90, speed:55},
+  kabutops:{name:'Kabutops', types:['Rock','Water'], hp:60, attack:115, defense:105, speed:80},
+  electrode:{name:'Electrode', types:['Electric'], hp:60, attack:50, defense:70, speed:140},
+  magmar:{name:'Magmar', types:['Fire'], hp:65, attack:95, defense:57, speed:93},
+  lapras:{name:'Lapras', types:['Water','Ice'], hp:130, attack:85, defense:80, speed:60},
+  porygon:{name:'Porygon', types:['Normal'], hp:65, attack:60, defense:70, speed:40},
+  eevee:{name:'Eevee', types:['Normal'], hp:55, attack:55, defense:50, speed:55},
+  snorlax:{name:'Snorlax', types:['Normal'], hp:160, attack:110, defense:65, speed:30},
+  chansey:{name:'Chansey', types:['Normal'], hp:250, attack:5, defense:5, speed:50},
+  hitmonlee:{name:'Hitmonlee', types:['Fighting'], hp:50, attack:120, defense:53, speed:87},
+  hitmonchan:{name:'Hitmonchan', types:['Fighting'], hp:50, attack:105, defense:79, speed:76},
+  pinsir:{name:'Pinsir', types:['Bug'], hp:65, attack:125, defense:100, speed:85},
+  electabuzz:{name:'Electabuzz', types:['Electric'], hp:65, attack:83, defense:57, speed:105},
+  aerodactyl:{name:'Aerodactyl', types:['Rock','Flying'], hp:80, attack:105, defense:65, speed:130},
+  alakazam:{name:'Alakazam', types:['Psychic'], hp:55, attack:50, defense:45, speed:120},
+  mrmime:{name:'Mr. Mime', types:['Psychic'], hp:40, attack:45, defense:65, speed:90},
+  arcanine:{name:'Arcanine', types:['Fire'], hp:90, attack:110, defense:80, speed:95},
+  nidoqueen:{name:'Nidoqueen', types:['Poison','Ground'], hp:90, attack:82, defense:87, speed:76},
+  nidoking:{name:'Nidoking', types:['Poison','Ground'], hp:81, attack:92, defense:77, speed:85},
+  graveler:{name:'Graveler', types:['Rock','Ground'], hp:55, attack:95, defense:115, speed:35},
+  dratini:{name:'Dratini', types:['Dragon'], hp:41, attack:64, defense:45, speed:50},
+  dragonair:{name:'Dragonair', types:['Dragon'], hp:61, attack:84, defense:65, speed:70},
+  dragonite:{name:'Dragonite', types:['Dragon','Flying'], hp:91, attack:134, defense:95, speed:80},
+  jynx:{name:'Jynx', types:['Ice','Psychic'], hp:65, attack:50, defense:35, speed:95},
+  exeggutor:{name:'Exeggutor', types:['Grass','Psychic'], hp:95, attack:95, defense:85, speed:55},
+  clefable:{name:'Clefable', types:['Normal'], hp:95, attack:70, defense:73, speed:60},
+  wigglytuff:{name:'Wigglytuff', types:['Normal'], hp:140, attack:70, defense:45, speed:45},
+  ninetales:{name:'Ninetales', types:['Fire'], hp:73, attack:76, defense:75, speed:100},
+  poliwrath:{name:'Poliwrath', types:['Water','Fighting'], hp:90, attack:85, defense:95, speed:70},
+  cloyster:{name:'Cloyster', types:['Water','Ice'], hp:50, attack:95, defense:180, speed:70},
+  machamp:{name:'Machamp', types:['Fighting'], hp:90, attack:130, defense:80, speed:55},
+  golem:{name:'Golem', types:['Rock','Ground'], hp:80, attack:110, defense:130, speed:45},
+  gengar:{name:'Gengar', types:['Ghost','Poison'], hp:60, attack:65, defense:60, speed:110},
+  moltres:{name:'Moltres', types:['Fire','Flying'], hp:90, attack:100, defense:90, speed:90},
+  zapdos:{name:'Zapdos', types:['Electric','Flying'], hp:90, attack:90, defense:85, speed:100},
+  articuno:{name:'Articuno', types:['Ice','Flying'], hp:90, attack:85, defense:100, speed:85},
+  vaporeon:{name:'Vaporeon', types:['Water'], hp:130, attack:65, defense:60, speed:65},
+  jolteon:{name:'Jolteon', types:['Electric'], hp:65, attack:65, defense:60, speed:130},
+  flareon:{name:'Flareon', types:['Fire'], hp:65, attack:130, defense:60, speed:65},
+  mewtwo:{name:'Mewtwo', types:['Psychic'], hp:106, attack:110, defense:90, speed:130}
 };
 
 const TYPE_CHART = {
@@ -200,12 +200,43 @@ function bestMultiplier(atkTypes, defTypes){
 function createInstance(speciesId, level){
   const sp = SPECIES[speciesId];
   if(!sp) return null;
-  return { speciesId, name:sp.name, types:sp.types, baseHp:sp.hp, attack:sp.attack, defense:sp.defense, level, maxHp:0, hp:0 };
+  return { speciesId, name:sp.name, types:sp.types, baseHp:sp.hp, attack:sp.attack, defense:sp.defense, speed:sp.speed, level, maxHp:0, hp:0, dmgBonus:1 };
 }
 function calcMaxHp(p){ return Math.round(30 + p.level*5 + p.baseHp); }
+// ⚠️ ESTE TRECHO É UMA CÓPIA DO MOTOR DE public/index.html.
+// Qualquer ajuste de balanceamento tem que ir NOS DOIS LUGARES, senão cliente e servidor
+// simulam a mesma batalha e chegam a resultados diferentes.
+const DUAL_TYPE_BEST_CHANCE = 0.70;
+function multiplierForType(atkType, defTypes){
+  let m = 1;
+  defTypes.forEach(d=> m *= typeVsType(atkType, d));
+  return m;
+}
+function rolledMultiplier(atkTypes, defTypes, rng){
+  if(atkTypes.length < 2) return multiplierForType(atkTypes[0], defTypes);
+  const mults = atkTypes.map(t=>multiplierForType(t, defTypes));
+  const bestIdx = mults[0] >= mults[1] ? 0 : 1;
+  const otherIdx = 1 - bestIdx;
+  return (rng() < DUAL_TYPE_BEST_CHANCE) ? mults[bestIdx] : mults[otherIdx];
+}
+function badgeDamageBonus(badgeCount){ return Math.min(8, badgeCount||0) * 0.01; }
+function diversityDamageBonus(team){
+  const types = new Set();
+  team.forEach(p=> (p.types||[]).forEach(t=>types.add(t)));
+  return Math.min(6, types.size) * 0.02;
+}
+function applyTeamBonuses(team, badgeCount){
+  const bonus = 1 + badgeDamageBonus(badgeCount) + diversityDamageBonus(team);
+  team.forEach(p=>{ p.dmgBonus = bonus; });
+  return bonus;
+}
+function firstStrikeChance(a, b){
+  const sa = a.speed || 50, sb = b.speed || 50;
+  return 0.5 + 0.5 * ((sa - sb) / (sa + sb));
+}
 function calcDamage(attacker, defender, rng){
-  const mult = bestMultiplier(attacker.types, defender.types);
-  const base = attacker.level*2.5 + attacker.attack/6;
+  const mult = rolledMultiplier(attacker.types, defender.types, rng);
+  const base = (attacker.level*2.5 + attacker.attack/6) * (attacker.dmgBonus || 1);
   let defense = Math.pow(defender.defense/70, 0.7);
   const wins = defender.winsThisBattle||0;
   if(wins > 0){
@@ -219,14 +250,18 @@ function calcDamage(attacker, defender, rng){
   return Math.max(1, dmg);
 }
 function doExchange(active, enemy, rng){
-  const dmgToEnemy = calcDamage(active, enemy, rng);
-  const dmgToActive = calcDamage(enemy, active, rng);
-  enemy.hp = Math.max(0, enemy.hp - dmgToEnemy);
-  active.hp = Math.max(0, active.hp - dmgToActive);
+  const activeFirst = rng() < firstStrikeChance(active, enemy);
+  const first = activeFirst ? active : enemy;
+  const second = activeFirst ? enemy : active;
+  const dmgFromFirst = calcDamage(first, second, rng);
+  second.hp = Math.max(0, second.hp - dmgFromFirst);
+  if(second.hp <= 0){ return; }
+  const dmgFromSecond = calcDamage(second, first, rng);
+  first.hp = Math.max(0, first.hp - dmgFromSecond);
 }
 function simulateGymBattle(team, enemyTeam, rng){
-  team.forEach(p=>{ p.maxHp=calcMaxHp(p); p.hp=p.maxHp; p.winsThisBattle=0; });
-  enemyTeam.forEach(p=>{ p.maxHp=calcMaxHp(p); p.hp=p.maxHp; p.winsThisBattle=0; });
+  team.forEach(p=>{ p.maxHp=calcMaxHp(p); p.hp=p.maxHp; p.winsThisBattle=0; if(p.dmgBonus==null) p.dmgBonus=1; });
+  enemyTeam.forEach(p=>{ p.maxHp=calcMaxHp(p); p.hp=p.maxHp; p.winsThisBattle=0; if(p.dmgBonus==null) p.dmgBonus=1; });
 
   const matchups = [];
   let enemyIndex = 0;
@@ -299,6 +334,35 @@ function encodeTeamCode(team){
   const payload = team.map(p=>`${p.speciesId}:${p.level}`).join(',');
   return Buffer.from(payload, 'utf8').toString('base64').replace(/=+$/,'');
 }
+/* ===================================================================
+   VALIDAÇÃO DE INTEGRIDADE DO TIME (doc 02 §4.5 e doc 04)
+
+   Isto NÃO é um limite novo de jogo: é a régua que separa um time possível de
+   um time forjado no console do navegador. Antes daqui, a função aceitava
+   qualquer nível até 200 -- ou seja, 6 Mewtwo Lv.200 passavam batido.
+
+   O teto honesto sai da própria economia: o jogo já não deixa distribuir pontos
+   acima do nível 55, o doce raro e a creche também param em 55, e o bônus de
+   desmaio (que só existe em vitória) também. Logo, o máximo alcançável por
+   jogador legítimo é 55 por pokémon. Os valores abaixo têm folga de propósito,
+   pra não punir saves antigos criados antes do teto de desmaio existir.
+   =================================================================== */
+const MAX_LEVEL_PER_MON = 60;      // teto honesto é 55; 60 é a folga pra saves antigos
+const MAX_TEAM_LEVEL_SUM = 6 * 60; // 360 -- um time de 6 no teto absoluto
+const MAX_TEAM_SIZE = 6;
+function validateTeamForLeague(team){
+  if(!team || team.length === 0) return { ok:false, reason:'time vazio' };
+  if(team.length > MAX_TEAM_SIZE) return { ok:false, reason:`time com ${team.length} pokémons` };
+  const overLevel = team.find(p=>p.level > MAX_LEVEL_PER_MON);
+  if(overLevel) return { ok:false, reason:`${overLevel.name} no nível ${overLevel.level} (máximo alcançável: ${MAX_LEVEL_PER_MON})` };
+  const sum = team.reduce((a,p)=>a+p.level, 0);
+  if(sum > MAX_TEAM_LEVEL_SUM) return { ok:false, reason:`soma de níveis ${sum} acima do teto teórico ${MAX_TEAM_LEVEL_SUM}` };
+  return { ok:true, levelSum:sum };
+}
+function teamLevelSum(code){
+  const team = decodeTeamCode(code);
+  return team ? team.reduce((a,p)=>a+p.level, 0) : 0;
+}
 function decodeTeamCode(code){
   if(!code) return null;
   let padded = code.trim();
@@ -314,7 +378,7 @@ function decodeTeamCode(code){
     if(bits.length!==2) return null;
     const id = bits[0];
     const lvl = parseInt(bits[1],10);
-    if(!SPECIES[id] || !Number.isFinite(lvl) || lvl<1 || lvl>200) return null;
+    if(!SPECIES[id] || !Number.isFinite(lvl) || lvl<1 || lvl>MAX_LEVEL_PER_MON) return null;
     const inst = createInstance(id, lvl);
     if(!inst) return null;
     team.push(inst);
@@ -401,14 +465,24 @@ async function recordLeaguePlacement(uid, slot, record){
 }
 function resolveLeagueMatch(match, seedStr){
   const rng = makeSeededRng(seedStr);
-  const teamA = decodeTeamCode(match.a.code);
-  const teamB = decodeTeamCode(match.b.code);
-  if(!teamA || !teamB){
-    match.winner = teamA ? match.a : match.b;
+  const rawA = decodeTeamCode(match.a.code);
+  const rawB = decodeTeamCode(match.b.code);
+  const okA = rawA && validateTeamForLeague(rawA).ok;
+  const okB = rawB && validateTeamForLeague(rawB).ok;
+  // time inválido (forjado ou corrompido) perde por W.O. -- nunca decide a partida por sorte
+  if(!okA || !okB){
+    if(!okA && !okB){ logger.warn('Ambos os times inválidos em', seedStr); }
+    match.winner = okA ? match.a : match.b;
     match.resolved = true;
     match.matchups = [];
+    match.invalidTeam = !okA ? (match.a && match.a.name) : (match.b && match.b.name);
     return;
   }
+  const teamA = rawA, teamB = rawB;
+  // todo mundo na Liga tem as 8 insígnias, então o bônus de insígnia é igual pros dois --
+  // o que realmente diferencia é a diversidade de tipos do time (doc 02 §4.5)
+  applyTeamBonuses(teamA, 8);
+  applyTeamBonuses(teamB, 8);
   const result = simulateGymBattle(teamA, teamB, rng);
   // diferente dos ginásios, os níveis ficam CONGELADOS na Liga -- depois da 8ª insígnia, o time do
   // treinador não sobe mais de nível, então nem precisa re-codificar/sincronizar nada aqui
@@ -452,27 +526,101 @@ async function recoverStuckCycles(){
     });
   } catch(e){ logger.error('Erro ao recuperar ciclos travados:', e); }
 }
+/* ===================================================================
+   CHAVEAMENTO POR FORÇA + FANTASMAS DO RIVAL (doc 02 §4.5 e §2.5)
+
+   Antes: sorteio puro. Um novato recém-classificado podia cair contra um time
+   de 6 Dragonite na primeira rodada, e quem sobrava do múltiplo de 8/16
+   simplesmente esperava o ciclo seguinte.
+
+   Agora: os inscritos são ordenados por força (soma de níveis + BST/10) e
+   fatiados em divisões — cada Liga junta gente de força parecida. Dentro da
+   Liga o sorteio continua aleatório e determinístico pela seed.
+   E as sobras deixam de esperar: o "fantasma" do rival de cada jogador (time
+   montado com os Pokémons que ele recusou na jornada) entra como bot para
+   fechar o chaveamento.
+   =================================================================== */
+function teamStrength(code){
+  const team = decodeTeamCode(code);
+  if(!team) return 0;
+  return team.reduce((acc,p)=>{
+    const sp = SPECIES[p.speciesId];
+    const bst = sp ? (sp.hp + sp.attack + sp.defense + sp.speed) : 300;
+    return acc + p.level + bst/10;
+  }, 0);
+}
+function makeRivalGhost(registrant, index){
+  // usa o rival real do jogador quando o cliente enviou; senão devolve null e a vaga fica vazia
+  if(!registrant || !registrant.rivalCode) return null;
+  const team = decodeTeamCode(registrant.rivalCode);
+  if(!team || !validateTeamForLeague(team).ok) return null;
+  const baseName = (registrant.rivalName || 'Rival').trim() || 'Rival';
+  return {
+    name: `👻 ${baseName} (fantasma de ${registrant.name})`.slice(0, 90),
+    code: registrant.rivalCode,
+    uid: null,
+    slot: null,
+    isBot: true,
+    ghostOf: registrant.name
+  };
+}
+// completa o grupo até `size` com fantasmas dos próprios jogadores que sobraram
+function fillWithGhosts(players, size){
+  const filled = players.slice();
+  let i = 0;
+  while(filled.length < size && i < players.length * 4){
+    const ghost = makeRivalGhost(players[i % players.length], i);
+    i++;
+    if(ghost && !filled.some(p=>p.name===ghost.name)) filled.push(ghost);
+  }
+  return filled.length === size ? filled : null;
+}
+const MIN_REAL_PLAYERS_FOR_GHOST_LEAGUE = 3;
+
 async function drawCycle(cycleEntry){
   const claimed = await claimCycleForProcessing(cycleEntry.id, 'registering', 'drawing');
   if(!claimed) return false;
   try{
     const regSnap = await registrantsCollRef(cycleEntry.id).get();
     const registrants = regSnap.docs.map(d=>d.data());
-    const shuffled = shuffleWithSeed(registrants, 'draw-'+cycleEntry.scheduledTime);
+    // rejeita na porta quem chegou com time impossível (doc 04: validação por teto teórico)
+    const valid = [], rejected = [];
+    for(const r of registrants){
+      const team = decodeTeamCode(r.code);
+      const check = team ? validateTeamForLeague(team) : { ok:false, reason:'código de time ilegível' };
+      if(check.ok){ valid.push({ ...r, levelSum: check.levelSum }); }
+      else { rejected.push({ name:r.name, reason:check.reason }); }
+    }
+    if(rejected.length){
+      logger.warn('Inscrições recusadas por time inválido:', JSON.stringify(rejected));
+    }
+    // divisões por força: os mais fortes se enfrentam entre si, novatos entre novatos
+    const byStrength = valid.slice().sort((a,b)=>teamStrength(b.code) - teamStrength(a.code));
     const leagues = [];
     let cursor = 0;
-    const grandeCount = Math.floor(shuffled.length / GRANDE_LIGA_SIZE);
+    const grandeCount = Math.floor(byStrength.length / GRANDE_LIGA_SIZE);
     for(let i=0;i<grandeCount;i++){
-      leagues.push({ id: leagues.length, size: GRANDE_LIGA_SIZE, rounds: buildRounds(shuffled.slice(cursor, cursor+GRANDE_LIGA_SIZE)), champion:null });
+      const band = byStrength.slice(cursor, cursor+GRANDE_LIGA_SIZE);
+      leagues.push({ id: leagues.length, size: GRANDE_LIGA_SIZE, division:'Grande Liga', rounds: buildRounds(shuffleWithSeed(band, `draw-${cycleEntry.scheduledTime}-G${i}`)), champion:null });
       cursor += GRANDE_LIGA_SIZE;
     }
-    const remaining = shuffled.length - cursor;
+    const remaining = byStrength.length - cursor;
     const regularCount = Math.floor(remaining / REGULAR_LIGA_SIZE);
     for(let i=0;i<regularCount;i++){
-      leagues.push({ id: leagues.length, size: REGULAR_LIGA_SIZE, rounds: buildRounds(shuffled.slice(cursor, cursor+REGULAR_LIGA_SIZE)), champion:null });
+      const band = byStrength.slice(cursor, cursor+REGULAR_LIGA_SIZE);
+      leagues.push({ id: leagues.length, size: REGULAR_LIGA_SIZE, division:'Liga', rounds: buildRounds(shuffleWithSeed(band, `draw-${cycleEntry.scheduledTime}-R${i}`)), champion:null });
       cursor += REGULAR_LIGA_SIZE;
     }
-    const leftover = shuffled.slice(cursor);
+    let leftover = byStrength.slice(cursor);
+    // as sobras não esperam mais o próximo ciclo: os fantasmas dos rivais fecham o chaveamento
+    if(leftover.length >= MIN_REAL_PLAYERS_FOR_GHOST_LEAGUE){
+      const filled = fillWithGhosts(leftover, REGULAR_LIGA_SIZE);
+      if(filled){
+        leagues.push({ id: leagues.length, size: REGULAR_LIGA_SIZE, division:'Liga (com fantasmas)', withGhosts:true,
+          rounds: buildRounds(shuffleWithSeed(filled, `draw-${cycleEntry.scheduledTime}-Gh`)), champion:null });
+        leftover = [];
+      }
+    }
     const detail = {
       scheduledTime: cycleEntry.scheduledTime,
       leagues, leftover,
@@ -555,7 +703,11 @@ async function advanceCyclePhases(cycleEntry){
               if(mi%2===0){ nextMatch.a = match.winner; } else { nextMatch.b = match.winner; }
             } else {
               league.champion = match.winner;
-              pendingChampions.push({ name: match.winner.name, uid: match.winner.uid, slot: match.winner.slot });
+              // um fantasma do rival pode até vencer a Liga (e é engraçado), mas não entra
+              // no ranking global de campeões nem na conta de ninguém
+              if(!match.winner.isBot){
+                pendingChampions.push({ name: match.winner.name, uid: match.winner.uid, slot: match.winner.slot });
+              }
               const participants = [];
               (league.rounds['0']||[]).forEach(m=>{ if(m.a) participants.push(m.a); if(m.b) participants.push(m.b); });
               for(const p of participants){

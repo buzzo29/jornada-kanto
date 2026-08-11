@@ -801,6 +801,36 @@
     .intro-half, .intro-button{transition-duration:.01s;}
     .intro-ball.clunk, .intro-ball.wobble, .intro-core.lit.pulse, .intro-star{animation:none !important;}
   }
+
+/* ===== rotas, roleta, cassino e eventos (docs 02/04/05) ===== */
+.route-card{ text-align:left; }
+.route-card.golden{ border-color:#f5c518; box-shadow:0 0 0 2px #f5c518 inset, 4px 4px 0 rgba(0,0,0,.35); animation:goldenPulse 1.6s ease-in-out infinite; }
+@keyframes goldenPulse{ 0%,100%{ filter:brightness(1); } 50%{ filter:brightness(1.25); } }
+.route-risk{ font-size:.55rem; padding:2px 5px; border-radius:3px; margin-left:6px; vertical-align:middle; }
+.route-risk.calm{ background:#3a7d44; color:#fff; }
+.route-risk.risky{ background:#a33; color:#fff; }
+.route-risk.golden{ background:#f5c518; color:#2b2b1a; }
+.route-rumor{ display:block; margin-top:6px; font-size:.6rem; opacity:.8; font-style:italic; }
+.shiny-offer{ border-color:#f5c518 !important; }
+.shiny-star{ color:#f5c518; font-size:.55rem; }
+.shiny-wrap{ filter:drop-shadow(0 0 3px #f5c518); }
+.rewards-box .reward-row{ display:flex; justify-content:space-between; gap:8px; padding:3px 0; font-size:.62rem; border-bottom:1px dotted rgba(255,255,255,.15); }
+.rewards-box .reward-row.total{ border-bottom:none; border-top:2px solid rgba(255,255,255,.35); margin-top:4px; padding-top:6px; }
+.rewards-box .reward-row.owed .reward-pts{ color:#e88; }
+.reward-pts{ font-weight:bold; color:#7ec87e; white-space:nowrap; }
+.reward-pts.zero{ color:#999; }
+.streak-banner{ background:#8a3b00; color:#ffd9a0; text-align:center; padding:8px; font-size:.62rem; margin-bottom:10px; border:2px solid #ffb347; }
+.roulette-row{ display:flex; gap:10px; justify-content:center; margin:12px 0; }
+.roulette-card{ width:80px; height:110px; font-size:2rem; background:#2b3a5a; color:#fff; border:3px solid #8fa8d8; cursor:pointer; transition:transform .25s, opacity .25s; }
+.roulette-card:hover:not(:disabled){ transform:translateY(-6px); }
+.roulette-card.flipped{ background:#f5c518; color:#2b2b1a; transform:rotateY(0deg) scale(1.06); }
+.roulette-card.dim{ opacity:.35; }
+.casino-reels{ display:flex; gap:10px; justify-content:center; margin:10px 0; }
+.casino-reel{ font-size:2.2rem; background:#111; border:3px solid #f5c518; padding:6px 12px; }
+.diary-step{ padding:5px 0; border-bottom:1px dotted rgba(255,255,255,.15); font-size:.62rem; }
+.new-save-option{ display:block; width:100%; text-align:left; margin-top:6px; }
+.level-sum{ font-size:.5rem; opacity:.65; margin-left:4px; }
+.ghost-tag{ font-size:.5rem; background:#4b3a6b; color:#d8c8ff; padding:1px 4px; border-radius:3px; margin-right:3px; }
 </style>
 </head>
 <body>
@@ -860,171 +890,171 @@ const TYPE_NAMES_PT = {
 };
 
 const SPECIES = {
-  bulbasaur:{dex:1, name:'Bulbasaur', types:['Grass','Poison'], hp:45, attack:49, defense:49, emoji:'🌱'},
-  charmander:{dex:4, name:'Charmander', types:['Fire'], hp:39, attack:52, defense:43, emoji:'🔥'},
-  squirtle:{dex:7, name:'Squirtle', types:['Water'], hp:44, attack:48, defense:65, emoji:'💧'},
-  weedle:{dex:13, name:'Weedle', types:['Bug','Poison'], hp:40, attack:35, defense:30, emoji:'🐛'},
-  caterpie:{dex:10, name:'Caterpie', types:['Bug'], hp:45, attack:30, defense:35, emoji:'🐛'},
-  ratata:{dex:19, name:'Ratata', types:['Normal'], hp:30, attack:56, defense:35, emoji:'🐭'},
-  pidgey:{dex:16, name:'Pidgey', types:['Normal','Flying'], hp:40, attack:45, defense:40, emoji:'🐦'},
-  mankey:{dex:56, name:'Mankey', types:['Fighting'], hp:40, attack:80, defense:35, emoji:'🐵'},
-  spearow:{dex:21, name:'Spearow', types:['Normal','Flying'], hp:40, attack:60, defense:30, emoji:'🐦'},
-  nidoranm:{dex:32, name:'Nidoran (M)', types:['Poison'], hp:46, attack:57, defense:40, emoji:'🐭'},
-  oddish:{dex:43, name:'Oddish', types:['Grass','Poison'], hp:45, attack:50, defense:55, emoji:'🌿'},
-  geodude:{dex:74, name:'Geodude', types:['Rock','Ground'], hp:40, attack:80, defense:100, emoji:'🪨'},
-  onix:{dex:95, name:'Onix', types:['Rock','Ground'], hp:35, attack:45, defense:160, emoji:'🗿'},
+  bulbasaur:{dex:1, name:'Bulbasaur', types:['Grass','Poison'], hp:45, attack:49, defense:49, speed:45, emoji:'🌱'},
+  charmander:{dex:4, name:'Charmander', types:['Fire'], hp:39, attack:52, defense:43, speed:65, emoji:'🔥'},
+  squirtle:{dex:7, name:'Squirtle', types:['Water'], hp:44, attack:48, defense:65, speed:43, emoji:'💧'},
+  weedle:{dex:13, name:'Weedle', types:['Bug','Poison'], hp:40, attack:35, defense:30, speed:50, emoji:'🐛'},
+  caterpie:{dex:10, name:'Caterpie', types:['Bug'], hp:45, attack:30, defense:35, speed:45, emoji:'🐛'},
+  ratata:{dex:19, name:'Ratata', types:['Normal'], hp:30, attack:56, defense:35, speed:72, emoji:'🐭'},
+  pidgey:{dex:16, name:'Pidgey', types:['Normal','Flying'], hp:40, attack:45, defense:40, speed:56, emoji:'🐦'},
+  mankey:{dex:56, name:'Mankey', types:['Fighting'], hp:40, attack:80, defense:35, speed:70, emoji:'🐵'},
+  spearow:{dex:21, name:'Spearow', types:['Normal','Flying'], hp:40, attack:60, defense:30, speed:70, emoji:'🐦'},
+  nidoranm:{dex:32, name:'Nidoran (M)', types:['Poison'], hp:46, attack:57, defense:40, speed:50, emoji:'🐭'},
+  oddish:{dex:43, name:'Oddish', types:['Grass','Poison'], hp:45, attack:50, defense:55, speed:30, emoji:'🌿'},
+  geodude:{dex:74, name:'Geodude', types:['Rock','Ground'], hp:40, attack:80, defense:100, speed:20, emoji:'🪨'},
+  onix:{dex:95, name:'Onix', types:['Rock','Ground'], hp:35, attack:45, defense:160, speed:70, emoji:'🗿'},
 
-  ivysaur:{dex:2, name:'Ivysaur', types:['Grass','Poison'], hp:60, attack:62, defense:63, emoji:'🌿'},
-  venusaur:{dex:3, name:'Venusaur', types:['Grass','Poison'], hp:80, attack:82, defense:83, emoji:'🌺'},
-  charmeleon:{dex:5, name:'Charmeleon', types:['Fire'], hp:58, attack:64, defense:58, emoji:'🔥'},
-  charizard:{dex:6, name:'Charizard', types:['Fire','Flying'], hp:78, attack:84, defense:78, emoji:'🐉'},
-  wartortle:{dex:8, name:'Wartortle', types:['Water'], hp:59, attack:63, defense:80, emoji:'🐢'},
-  blastoise:{dex:9, name:'Blastoise', types:['Water'], hp:79, attack:83, defense:100, emoji:'🐢'},
-  kakuna:{dex:14, name:'Kakuna', types:['Bug','Poison'], hp:45, attack:25, defense:50, emoji:'🛡'},
-  beedrill:{dex:15, name:'Beedrill', types:['Bug','Poison'], hp:65, attack:80, defense:40, emoji:'🐝'},
-  metapod:{dex:11, name:'Metapod', types:['Bug'], hp:50, attack:20, defense:55, emoji:'🛡'},
-  butterfree:{dex:12, name:'Butterfree', types:['Bug','Flying'], hp:60, attack:45, defense:50, emoji:'🦋'},
-  raticate:{dex:20, name:'Raticate', types:['Normal'], hp:55, attack:81, defense:60, emoji:'🐀'},
-  pidgeotto:{dex:17, name:'Pidgeotto', types:['Normal','Flying'], hp:63, attack:60, defense:55, emoji:'🐦'},
-  pidgeot:{dex:18, name:'Pidgeot', types:['Normal','Flying'], hp:83, attack:80, defense:75, emoji:'🦅'},
-  primeape:{dex:57, name:'Primeape', types:['Fighting'], hp:65, attack:105, defense:60, emoji:'🐒'},
-  fearow:{dex:22, name:'Fearow', types:['Normal','Flying'], hp:65, attack:90, defense:65, emoji:'🦅'},
-  nidorino:{dex:33, name:'Nidorino', types:['Poison'], hp:61, attack:72, defense:57, emoji:'🐭'},
-  gloom:{dex:44, name:'Gloom', types:['Grass','Poison'], hp:60, attack:65, defense:70, emoji:'🌸'},
+  ivysaur:{dex:2, name:'Ivysaur', types:['Grass','Poison'], hp:60, attack:62, defense:63, speed:60, emoji:'🌿'},
+  venusaur:{dex:3, name:'Venusaur', types:['Grass','Poison'], hp:80, attack:82, defense:83, speed:80, emoji:'🌺'},
+  charmeleon:{dex:5, name:'Charmeleon', types:['Fire'], hp:58, attack:64, defense:58, speed:80, emoji:'🔥'},
+  charizard:{dex:6, name:'Charizard', types:['Fire','Flying'], hp:78, attack:84, defense:78, speed:100, emoji:'🐉'},
+  wartortle:{dex:8, name:'Wartortle', types:['Water'], hp:59, attack:63, defense:80, speed:58, emoji:'🐢'},
+  blastoise:{dex:9, name:'Blastoise', types:['Water'], hp:79, attack:83, defense:100, speed:78, emoji:'🐢'},
+  kakuna:{dex:14, name:'Kakuna', types:['Bug','Poison'], hp:45, attack:25, defense:50, speed:35, emoji:'🛡'},
+  beedrill:{dex:15, name:'Beedrill', types:['Bug','Poison'], hp:65, attack:80, defense:40, speed:75, emoji:'🐝'},
+  metapod:{dex:11, name:'Metapod', types:['Bug'], hp:50, attack:20, defense:55, speed:30, emoji:'🛡'},
+  butterfree:{dex:12, name:'Butterfree', types:['Bug','Flying'], hp:60, attack:45, defense:50, speed:70, emoji:'🦋'},
+  raticate:{dex:20, name:'Raticate', types:['Normal'], hp:55, attack:81, defense:60, speed:97, emoji:'🐀'},
+  pidgeotto:{dex:17, name:'Pidgeotto', types:['Normal','Flying'], hp:63, attack:60, defense:55, speed:71, emoji:'🐦'},
+  pidgeot:{dex:18, name:'Pidgeot', types:['Normal','Flying'], hp:83, attack:80, defense:75, speed:91, emoji:'🦅'},
+  primeape:{dex:57, name:'Primeape', types:['Fighting'], hp:65, attack:105, defense:60, speed:95, emoji:'🐒'},
+  fearow:{dex:22, name:'Fearow', types:['Normal','Flying'], hp:65, attack:90, defense:65, speed:100, emoji:'🦅'},
+  nidorino:{dex:33, name:'Nidorino', types:['Poison'], hp:61, attack:72, defense:57, speed:65, emoji:'🐭'},
+  gloom:{dex:44, name:'Gloom', types:['Grass','Poison'], hp:60, attack:65, defense:70, speed:50, emoji:'🌸'},
 
-  sandshrew:{dex:27, name:'Sandshrew', types:['Ground'], hp:50, attack:75, defense:85, emoji:'🦔'},
-  sandslash:{dex:28, name:'Sandslash', types:['Ground'], hp:75, attack:100, defense:110, emoji:'🦔'},
-  clefairy:{dex:35, name:'Clefairy', types:['Normal'], hp:70, attack:45, defense:48, emoji:'🧚'},
-  jigglypuff:{dex:39, name:'Jigglypuff', types:['Normal'], hp:115, attack:45, defense:20, emoji:'🎈'},
-  zubat:{dex:41, name:'Zubat', types:['Poison','Flying'], hp:40, attack:45, defense:35, emoji:'🦇'},
-  golbat:{dex:42, name:'Golbat', types:['Poison','Flying'], hp:75, attack:80, defense:70, emoji:'🦇'},
-  paras:{dex:46, name:'Paras', types:['Bug','Grass'], hp:35, attack:70, defense:55, emoji:'🍄'},
-  parasect:{dex:47, name:'Parasect', types:['Bug','Grass'], hp:60, attack:95, defense:80, emoji:'🍄'},
-  meowth:{dex:52, name:'Meowth', types:['Normal'], hp:40, attack:45, defense:35, emoji:'🐱'},
-  persian:{dex:53, name:'Persian', types:['Normal'], hp:65, attack:70, defense:60, emoji:'🐈'},
-  bellsprout:{dex:69, name:'Bellsprout', types:['Grass','Poison'], hp:50, attack:75, defense:35, emoji:'🪴'},
-  weepinbell:{dex:70, name:'Weepinbell', types:['Grass','Poison'], hp:65, attack:90, defense:50, emoji:'🪴'},
-  abra:{dex:63, name:'Abra', types:['Psychic'], hp:25, attack:20, defense:15, emoji:'😴'},
-  kadabra:{dex:64, name:'Kadabra', types:['Psychic'], hp:40, attack:35, defense:30, emoji:'🔮'},
-  staryu:{dex:120, name:'Staryu', types:['Water'], hp:30, attack:45, defense:55, emoji:'⭐'},
-  starmie:{dex:121, name:'Starmie', types:['Water','Psychic'], hp:60, attack:75, defense:85, emoji:'🌟'},
+  sandshrew:{dex:27, name:'Sandshrew', types:['Ground'], hp:50, attack:75, defense:85, speed:40, emoji:'🦔'},
+  sandslash:{dex:28, name:'Sandslash', types:['Ground'], hp:75, attack:100, defense:110, speed:65, emoji:'🦔'},
+  clefairy:{dex:35, name:'Clefairy', types:['Normal'], hp:70, attack:45, defense:48, speed:35, emoji:'🧚'},
+  jigglypuff:{dex:39, name:'Jigglypuff', types:['Normal'], hp:115, attack:45, defense:20, speed:20, emoji:'🎈'},
+  zubat:{dex:41, name:'Zubat', types:['Poison','Flying'], hp:40, attack:45, defense:35, speed:55, emoji:'🦇'},
+  golbat:{dex:42, name:'Golbat', types:['Poison','Flying'], hp:75, attack:80, defense:70, speed:90, emoji:'🦇'},
+  paras:{dex:46, name:'Paras', types:['Bug','Grass'], hp:35, attack:70, defense:55, speed:25, emoji:'🍄'},
+  parasect:{dex:47, name:'Parasect', types:['Bug','Grass'], hp:60, attack:95, defense:80, speed:30, emoji:'🍄'},
+  meowth:{dex:52, name:'Meowth', types:['Normal'], hp:40, attack:45, defense:35, speed:90, emoji:'🐱'},
+  persian:{dex:53, name:'Persian', types:['Normal'], hp:65, attack:70, defense:60, speed:115, emoji:'🐈'},
+  bellsprout:{dex:69, name:'Bellsprout', types:['Grass','Poison'], hp:50, attack:75, defense:35, speed:40, emoji:'🪴'},
+  weepinbell:{dex:70, name:'Weepinbell', types:['Grass','Poison'], hp:65, attack:90, defense:50, speed:55, emoji:'🪴'},
+  abra:{dex:63, name:'Abra', types:['Psychic'], hp:25, attack:20, defense:15, speed:105, emoji:'😴'},
+  kadabra:{dex:64, name:'Kadabra', types:['Psychic'], hp:40, attack:35, defense:30, speed:105, emoji:'🔮'},
+  staryu:{dex:120, name:'Staryu', types:['Water'], hp:30, attack:45, defense:55, speed:85, emoji:'⭐'},
+  starmie:{dex:121, name:'Starmie', types:['Water','Psychic'], hp:60, attack:75, defense:85, speed:115, emoji:'🌟'},
 
-  growlithe:{dex:58, name:'Growlithe', types:['Fire'], hp:55, attack:70, defense:45, emoji:'🐕'},
-  vulpix:{dex:37, name:'Vulpix', types:['Fire'], hp:38, attack:41, defense:40, emoji:'🦊'},
-  ekans:{dex:23, name:'Ekans', types:['Poison'], hp:35, attack:60, defense:44, emoji:'🐍'},
-  arbok:{dex:24, name:'Arbok', types:['Poison'], hp:60, attack:85, defense:69, emoji:'🐍'},
-  diglett:{dex:50, name:'Diglett', types:['Ground'], hp:10, attack:55, defense:25, emoji:'🕳️'},
-  dugtrio:{dex:51, name:'Dugtrio', types:['Ground'], hp:35, attack:80, defense:50, emoji:'🕳️'},
-  magnemite:{dex:81, name:'Magnemite', types:['Electric'], hp:25, attack:35, defense:70, emoji:'🧲'},
-  magneton:{dex:82, name:'Magneton', types:['Electric'], hp:50, attack:60, defense:95, emoji:'🧲'},
-  drowzee:{dex:96, name:'Drowzee', types:['Psychic'], hp:60, attack:48, defense:45, emoji:'😪'},
-  hypno:{dex:97, name:'Hypno', types:['Psychic'], hp:85, attack:73, defense:70, emoji:'😪'},
-  nidoranf:{dex:29, name:'Nidoran (F)', types:['Poison'], hp:55, attack:47, defense:52, emoji:'🐭'},
-  nidorina:{dex:30, name:'Nidorina', types:['Poison'], hp:70, attack:62, defense:67, emoji:'🐭'},
-  venonat:{dex:48, name:'Venonat', types:['Bug','Poison'], hp:60, attack:55, defense:50, emoji:'🦟'},
-  venomoth:{dex:49, name:'Venomoth', types:['Bug','Poison'], hp:70, attack:65, defense:60, emoji:'🦟'},
+  growlithe:{dex:58, name:'Growlithe', types:['Fire'], hp:55, attack:70, defense:45, speed:60, emoji:'🐕'},
+  vulpix:{dex:37, name:'Vulpix', types:['Fire'], hp:38, attack:41, defense:40, speed:65, emoji:'🦊'},
+  ekans:{dex:23, name:'Ekans', types:['Poison'], hp:35, attack:60, defense:44, speed:55, emoji:'🐍'},
+  arbok:{dex:24, name:'Arbok', types:['Poison'], hp:60, attack:85, defense:69, speed:80, emoji:'🐍'},
+  diglett:{dex:50, name:'Diglett', types:['Ground'], hp:10, attack:55, defense:25, speed:95, emoji:'🕳️'},
+  dugtrio:{dex:51, name:'Dugtrio', types:['Ground'], hp:35, attack:80, defense:50, speed:120, emoji:'🕳️'},
+  magnemite:{dex:81, name:'Magnemite', types:['Electric'], hp:25, attack:35, defense:70, speed:45, emoji:'🧲'},
+  magneton:{dex:82, name:'Magneton', types:['Electric'], hp:50, attack:60, defense:95, speed:70, emoji:'🧲'},
+  drowzee:{dex:96, name:'Drowzee', types:['Psychic'], hp:60, attack:48, defense:45, speed:42, emoji:'😪'},
+  hypno:{dex:97, name:'Hypno', types:['Psychic'], hp:85, attack:73, defense:70, speed:67, emoji:'😪'},
+  nidoranf:{dex:29, name:'Nidoran (F)', types:['Poison'], hp:55, attack:47, defense:52, speed:41, emoji:'🐭'},
+  nidorina:{dex:30, name:'Nidorina', types:['Poison'], hp:70, attack:62, defense:67, speed:56, emoji:'🐭'},
+  venonat:{dex:48, name:'Venonat', types:['Bug','Poison'], hp:60, attack:55, defense:50, speed:45, emoji:'🦟'},
+  venomoth:{dex:49, name:'Venomoth', types:['Bug','Poison'], hp:70, attack:65, defense:60, speed:90, emoji:'🦟'},
 
-  voltorb:{dex:100, name:'Voltorb', types:['Electric'], hp:40, attack:30, defense:50, emoji:'⚫'},
-  pikachu:{dex:25, name:'Pikachu', types:['Electric'], hp:35, attack:55, defense:30, emoji:'⚡'},
-  raichu:{dex:26, name:'Raichu', types:['Electric'], hp:60, attack:90, defense:55, emoji:'⚡'},
+  voltorb:{dex:100, name:'Voltorb', types:['Electric'], hp:40, attack:30, defense:50, speed:100, emoji:'⚫'},
+  pikachu:{dex:25, name:'Pikachu', types:['Electric'], hp:35, attack:55, defense:30, speed:90, emoji:'⚡'},
+  raichu:{dex:26, name:'Raichu', types:['Electric'], hp:60, attack:90, defense:55, speed:100, emoji:'⚡'},
 
-  poliwag:{dex:60, name:'Poliwag', types:['Water'], hp:40, attack:50, defense:40, emoji:'🐸'},
-  poliwhirl:{dex:61, name:'Poliwhirl', types:['Water'], hp:65, attack:65, defense:65, emoji:'🐸'},
-  tentacool:{dex:72, name:'Tentacool', types:['Water','Poison'], hp:40, attack:40, defense:35, emoji:'🪼'},
-  tentacruel:{dex:73, name:'Tentacruel', types:['Water','Poison'], hp:80, attack:70, defense:65, emoji:'🪼'},
-  machop:{dex:66, name:'Machop', types:['Fighting'], hp:70, attack:80, defense:50, emoji:'💪'},
-  machoke:{dex:67, name:'Machoke', types:['Fighting'], hp:80, attack:100, defense:70, emoji:'💪'},
-  doduo:{dex:84, name:'Doduo', types:['Normal','Flying'], hp:35, attack:85, defense:45, emoji:'🐦'},
-  dodrio:{dex:85, name:'Dodrio', types:['Normal','Flying'], hp:60, attack:110, defense:70, emoji:'🐦'},
-  ponyta:{dex:77, name:'Ponyta', types:['Fire'], hp:50, attack:85, defense:55, emoji:'🐴'},
-  rapidash:{dex:78, name:'Rapidash', types:['Fire'], hp:65, attack:100, defense:70, emoji:'🐴'},
-  slowpoke:{dex:79, name:'Slowpoke', types:['Water','Psychic'], hp:90, attack:65, defense:65, emoji:'🦥'},
-  slowbro:{dex:80, name:'Slowbro', types:['Water','Psychic'], hp:95, attack:75, defense:110, emoji:'🦥'},
-  magikarp:{dex:129, name:'Magikarp', types:['Water'], hp:20, attack:10, defense:55, emoji:'🐟'},
-  gyarados:{dex:130, name:'Gyarados', types:['Water','Flying'], hp:95, attack:125, defense:79, emoji:'🐉'},
-  grimer:{dex:88, name:'Grimer', types:['Poison'], hp:80, attack:80, defense:50, emoji:'🟣'},
-  muk:{dex:89, name:'Muk', types:['Poison'], hp:105, attack:105, defense:75, emoji:'🟣'},
+  poliwag:{dex:60, name:'Poliwag', types:['Water'], hp:40, attack:50, defense:40, speed:90, emoji:'🐸'},
+  poliwhirl:{dex:61, name:'Poliwhirl', types:['Water'], hp:65, attack:65, defense:65, speed:90, emoji:'🐸'},
+  tentacool:{dex:72, name:'Tentacool', types:['Water','Poison'], hp:40, attack:40, defense:35, speed:70, emoji:'🪼'},
+  tentacruel:{dex:73, name:'Tentacruel', types:['Water','Poison'], hp:80, attack:70, defense:65, speed:100, emoji:'🪼'},
+  machop:{dex:66, name:'Machop', types:['Fighting'], hp:70, attack:80, defense:50, speed:35, emoji:'💪'},
+  machoke:{dex:67, name:'Machoke', types:['Fighting'], hp:80, attack:100, defense:70, speed:45, emoji:'💪'},
+  doduo:{dex:84, name:'Doduo', types:['Normal','Flying'], hp:35, attack:85, defense:45, speed:75, emoji:'🐦'},
+  dodrio:{dex:85, name:'Dodrio', types:['Normal','Flying'], hp:60, attack:110, defense:70, speed:100, emoji:'🐦'},
+  ponyta:{dex:77, name:'Ponyta', types:['Fire'], hp:50, attack:85, defense:55, speed:90, emoji:'🐴'},
+  rapidash:{dex:78, name:'Rapidash', types:['Fire'], hp:65, attack:100, defense:70, speed:105, emoji:'🐴'},
+  slowpoke:{dex:79, name:'Slowpoke', types:['Water','Psychic'], hp:90, attack:65, defense:65, speed:15, emoji:'🦥'},
+  slowbro:{dex:80, name:'Slowbro', types:['Water','Psychic'], hp:95, attack:75, defense:110, speed:30, emoji:'🦥'},
+  magikarp:{dex:129, name:'Magikarp', types:['Water'], hp:20, attack:10, defense:55, speed:80, emoji:'🐟'},
+  gyarados:{dex:130, name:'Gyarados', types:['Water','Flying'], hp:95, attack:125, defense:79, speed:81, emoji:'🐉'},
+  grimer:{dex:88, name:'Grimer', types:['Poison'], hp:80, attack:80, defense:50, speed:25, emoji:'🟣'},
+  muk:{dex:89, name:'Muk', types:['Poison'], hp:105, attack:105, defense:75, speed:50, emoji:'🟣'},
 
-  tauros:{dex:128, name:'Tauros', types:['Normal'], hp:75, attack:100, defense:95, emoji:'🐂'},
-  psyduck:{dex:54, name:'Psyduck', types:['Water'], hp:50, attack:52, defense:48, emoji:'🦆'},
-  golduck:{dex:55, name:'Golduck', types:['Water'], hp:80, attack:82, defense:78, emoji:'🦆'},
-  krabby:{dex:98, name:'Krabby', types:['Water'], hp:30, attack:105, defense:90, emoji:'🦀'},
-  kingler:{dex:99, name:'Kingler', types:['Water'], hp:55, attack:130, defense:115, emoji:'🦀'},
-  horsea:{dex:116, name:'Horsea', types:['Water'], hp:30, attack:40, defense:70, emoji:'🐠'},
-  seadra:{dex:117, name:'Seadra', types:['Water'], hp:55, attack:65, defense:95, emoji:'🐠'},
-  goldeen:{dex:118, name:'Goldeen', types:['Water'], hp:45, attack:67, defense:60, emoji:'🐠'},
-  seaking:{dex:119, name:'Seaking', types:['Water'], hp:80, attack:92, defense:65, emoji:'🐠'},
-  shellder:{dex:90, name:'Shellder', types:['Water'], hp:30, attack:65, defense:100, emoji:'🐚'},
-  exeggcute:{dex:102, name:'Exeggcute', types:['Grass','Psychic'], hp:60, attack:40, defense:80, emoji:'🥚'},
-  cubone:{dex:104, name:'Cubone', types:['Ground'], hp:50, attack:50, defense:95, emoji:'💀'},
-  marowak:{dex:105, name:'Marowak', types:['Ground'], hp:60, attack:80, defense:110, emoji:'💀'},
+  tauros:{dex:128, name:'Tauros', types:['Normal'], hp:75, attack:100, defense:95, speed:110, emoji:'🐂'},
+  psyduck:{dex:54, name:'Psyduck', types:['Water'], hp:50, attack:52, defense:48, speed:55, emoji:'🦆'},
+  golduck:{dex:55, name:'Golduck', types:['Water'], hp:80, attack:82, defense:78, speed:85, emoji:'🦆'},
+  krabby:{dex:98, name:'Krabby', types:['Water'], hp:30, attack:105, defense:90, speed:50, emoji:'🦀'},
+  kingler:{dex:99, name:'Kingler', types:['Water'], hp:55, attack:130, defense:115, speed:75, emoji:'🦀'},
+  horsea:{dex:116, name:'Horsea', types:['Water'], hp:30, attack:40, defense:70, speed:60, emoji:'🐠'},
+  seadra:{dex:117, name:'Seadra', types:['Water'], hp:55, attack:65, defense:95, speed:85, emoji:'🐠'},
+  goldeen:{dex:118, name:'Goldeen', types:['Water'], hp:45, attack:67, defense:60, speed:63, emoji:'🐠'},
+  seaking:{dex:119, name:'Seaking', types:['Water'], hp:80, attack:92, defense:65, speed:68, emoji:'🐠'},
+  shellder:{dex:90, name:'Shellder', types:['Water'], hp:30, attack:65, defense:100, speed:40, emoji:'🐚'},
+  exeggcute:{dex:102, name:'Exeggcute', types:['Grass','Psychic'], hp:60, attack:40, defense:80, speed:40, emoji:'🥚'},
+  cubone:{dex:104, name:'Cubone', types:['Ground'], hp:50, attack:50, defense:95, speed:35, emoji:'💀'},
+  marowak:{dex:105, name:'Marowak', types:['Ground'], hp:60, attack:80, defense:110, speed:45, emoji:'💀'},
 
-  victreebel:{dex:71, name:'Victreebel', types:['Grass','Poison'], hp:80, attack:105, defense:65, emoji:'🪴'},
-  tangela:{dex:114, name:'Tangela', types:['Grass'], hp:65, attack:55, defense:115, emoji:'🧶'},
-  vileplume:{dex:45, name:'Vileplume', types:['Grass','Poison'], hp:75, attack:80, defense:85, emoji:'🌼'},
-  koffing:{dex:109, name:'Koffing', types:['Poison'], hp:40, attack:65, defense:95, emoji:'☁️'},
-  weezing:{dex:110, name:'Weezing', types:['Poison'], hp:65, attack:90, defense:120, emoji:'🌫️'},
+  victreebel:{dex:71, name:'Victreebel', types:['Grass','Poison'], hp:80, attack:105, defense:65, speed:70, emoji:'🪴'},
+  tangela:{dex:114, name:'Tangela', types:['Grass'], hp:65, attack:55, defense:115, speed:40, emoji:'🧶'},
+  vileplume:{dex:45, name:'Vileplume', types:['Grass','Poison'], hp:75, attack:80, defense:85, speed:50, emoji:'🌼'},
+  koffing:{dex:109, name:'Koffing', types:['Poison'], hp:40, attack:65, defense:95, speed:35, emoji:'☁️'},
+  weezing:{dex:110, name:'Weezing', types:['Poison'], hp:65, attack:90, defense:120, speed:60, emoji:'🌫️'},
 
-  gastly:{dex:92, name:'Gastly', types:['Ghost','Poison'], hp:30, attack:35, defense:30, emoji:'👻'},
-  haunter:{dex:93, name:'Haunter', types:['Ghost','Poison'], hp:45, attack:50, defense:45, emoji:'👻'},
-  ditto:{dex:132, name:'Ditto', types:['Normal'], hp:48, attack:48, defense:48, emoji:'🫥'},
-  lickitung:{dex:108, name:'Lickitung', types:['Normal'], hp:90, attack:55, defense:75, emoji:'👅'},
-  rhyhorn:{dex:111, name:'Rhyhorn', types:['Ground','Rock'], hp:80, attack:85, defense:95, emoji:'🦏'},
-  rhydon:{dex:112, name:'Rhydon', types:['Ground','Rock'], hp:105, attack:130, defense:120, emoji:'🦏'},
-  seel:{dex:86, name:'Seel', types:['Water'], hp:65, attack:45, defense:55, emoji:'🦭'},
-  dewgong:{dex:87, name:'Dewgong', types:['Water','Ice'], hp:90, attack:70, defense:80, emoji:'🦭'},
-  farfetchd:{dex:83, name:"Farfetch'd", types:['Normal','Flying'], hp:52, attack:65, defense:55, emoji:'🦆'},
-  kangaskhan:{dex:115, name:'Kangaskhan', types:['Normal'], hp:105, attack:95, defense:80, emoji:'🦘'},
-  scyther:{dex:123, name:'Scyther', types:['Bug','Flying'], hp:70, attack:110, defense:80, emoji:'🦗'},
+  gastly:{dex:92, name:'Gastly', types:['Ghost','Poison'], hp:30, attack:35, defense:30, speed:80, emoji:'👻'},
+  haunter:{dex:93, name:'Haunter', types:['Ghost','Poison'], hp:45, attack:50, defense:45, speed:95, emoji:'👻'},
+  ditto:{dex:132, name:'Ditto', types:['Normal'], hp:48, attack:48, defense:48, speed:48, emoji:'🫥'},
+  lickitung:{dex:108, name:'Lickitung', types:['Normal'], hp:90, attack:55, defense:75, speed:30, emoji:'👅'},
+  rhyhorn:{dex:111, name:'Rhyhorn', types:['Ground','Rock'], hp:80, attack:85, defense:95, speed:25, emoji:'🦏'},
+  rhydon:{dex:112, name:'Rhydon', types:['Ground','Rock'], hp:105, attack:130, defense:120, speed:40, emoji:'🦏'},
+  seel:{dex:86, name:'Seel', types:['Water'], hp:65, attack:45, defense:55, speed:45, emoji:'🦭'},
+  dewgong:{dex:87, name:'Dewgong', types:['Water','Ice'], hp:90, attack:70, defense:80, speed:70, emoji:'🦭'},
+  farfetchd:{dex:83, name:"Farfetch'd", types:['Normal','Flying'], hp:52, attack:65, defense:55, speed:60, emoji:'🦆'},
+  kangaskhan:{dex:115, name:'Kangaskhan', types:['Normal'], hp:105, attack:95, defense:80, speed:90, emoji:'🦘'},
+  scyther:{dex:123, name:'Scyther', types:['Bug','Flying'], hp:70, attack:110, defense:80, speed:105, emoji:'🦗'},
 
-  omanyte:{dex:138, name:'Omanyte', types:['Rock','Water'], hp:35, attack:40, defense:100, emoji:'🐌'},
-  omastar:{dex:139, name:'Omastar', types:['Rock','Water'], hp:70, attack:60, defense:125, emoji:'🐌'},
-  kabuto:{dex:140, name:'Kabuto', types:['Rock','Water'], hp:30, attack:80, defense:90, emoji:'🦂'},
-  kabutops:{dex:141, name:'Kabutops', types:['Rock','Water'], hp:60, attack:115, defense:105, emoji:'🦂'},
-  electrode:{dex:101, name:'Electrode', types:['Electric'], hp:60, attack:50, defense:70, emoji:'⚫'},
-  magmar:{dex:126, name:'Magmar', types:['Fire'], hp:65, attack:95, defense:57, emoji:'🔥'},
-  lapras:{dex:131, name:'Lapras', types:['Water','Ice'], hp:130, attack:85, defense:80, emoji:'🦕'},
-  porygon:{dex:137, name:'Porygon', types:['Normal'], hp:65, attack:60, defense:70, emoji:'🤖'},
-  eevee:{dex:133, name:'Eevee', types:['Normal'], hp:55, attack:55, defense:50, emoji:'🦊'},
+  omanyte:{dex:138, name:'Omanyte', types:['Rock','Water'], hp:35, attack:40, defense:100, speed:35, emoji:'🐌'},
+  omastar:{dex:139, name:'Omastar', types:['Rock','Water'], hp:70, attack:60, defense:125, speed:55, emoji:'🐌'},
+  kabuto:{dex:140, name:'Kabuto', types:['Rock','Water'], hp:30, attack:80, defense:90, speed:55, emoji:'🦂'},
+  kabutops:{dex:141, name:'Kabutops', types:['Rock','Water'], hp:60, attack:115, defense:105, speed:80, emoji:'🦂'},
+  electrode:{dex:101, name:'Electrode', types:['Electric'], hp:60, attack:50, defense:70, speed:140, emoji:'⚫'},
+  magmar:{dex:126, name:'Magmar', types:['Fire'], hp:65, attack:95, defense:57, speed:93, emoji:'🔥'},
+  lapras:{dex:131, name:'Lapras', types:['Water','Ice'], hp:130, attack:85, defense:80, speed:60, emoji:'🦕'},
+  porygon:{dex:137, name:'Porygon', types:['Normal'], hp:65, attack:60, defense:70, speed:40, emoji:'🤖'},
+  eevee:{dex:133, name:'Eevee', types:['Normal'], hp:55, attack:55, defense:50, speed:55, emoji:'🦊'},
 
-  snorlax:{dex:143, name:'Snorlax', types:['Normal'], hp:160, attack:110, defense:65, emoji:'🐻'},
-  chansey:{dex:113, name:'Chansey', types:['Normal'], hp:250, attack:5, defense:5, emoji:'🐣'},
-  hitmonlee:{dex:106, name:'Hitmonlee', types:['Fighting'], hp:50, attack:120, defense:53, emoji:'🦵'},
-  hitmonchan:{dex:107, name:'Hitmonchan', types:['Fighting'], hp:50, attack:105, defense:79, emoji:'🥊'},
-  pinsir:{dex:127, name:'Pinsir', types:['Bug'], hp:65, attack:125, defense:100, emoji:'🪲'},
-  electabuzz:{dex:125, name:'Electabuzz', types:['Electric'], hp:65, attack:83, defense:57, emoji:'⚡'},
-  aerodactyl:{dex:142, name:'Aerodactyl', types:['Rock','Flying'], hp:80, attack:105, defense:65, emoji:'🦖'},
+  snorlax:{dex:143, name:'Snorlax', types:['Normal'], hp:160, attack:110, defense:65, speed:30, emoji:'🐻'},
+  chansey:{dex:113, name:'Chansey', types:['Normal'], hp:250, attack:5, defense:5, speed:50, emoji:'🐣'},
+  hitmonlee:{dex:106, name:'Hitmonlee', types:['Fighting'], hp:50, attack:120, defense:53, speed:87, emoji:'🦵'},
+  hitmonchan:{dex:107, name:'Hitmonchan', types:['Fighting'], hp:50, attack:105, defense:79, speed:76, emoji:'🥊'},
+  pinsir:{dex:127, name:'Pinsir', types:['Bug'], hp:65, attack:125, defense:100, speed:85, emoji:'🪲'},
+  electabuzz:{dex:125, name:'Electabuzz', types:['Electric'], hp:65, attack:83, defense:57, speed:105, emoji:'⚡'},
+  aerodactyl:{dex:142, name:'Aerodactyl', types:['Rock','Flying'], hp:80, attack:105, defense:65, speed:130, emoji:'🦖'},
 
-  alakazam:{dex:65, name:'Alakazam', types:['Psychic'], hp:55, attack:50, defense:45, emoji:'🧙'},
-  mrmime:{dex:122, name:'Mr. Mime', types:['Psychic'], hp:40, attack:45, defense:65, emoji:'🤡'},
-  arcanine:{dex:59, name:'Arcanine', types:['Fire'], hp:90, attack:110, defense:80, emoji:'🦁'},
-  nidoqueen:{dex:31, name:'Nidoqueen', types:['Poison','Ground'], hp:90, attack:82, defense:87, emoji:'👸'},
-  nidoking:{dex:34, name:'Nidoking', types:['Poison','Ground'], hp:81, attack:92, defense:77, emoji:'🤴'},
+  alakazam:{dex:65, name:'Alakazam', types:['Psychic'], hp:55, attack:50, defense:45, speed:120, emoji:'🧙'},
+  mrmime:{dex:122, name:'Mr. Mime', types:['Psychic'], hp:40, attack:45, defense:65, speed:90, emoji:'🤡'},
+  arcanine:{dex:59, name:'Arcanine', types:['Fire'], hp:90, attack:110, defense:80, speed:95, emoji:'🦁'},
+  nidoqueen:{dex:31, name:'Nidoqueen', types:['Poison','Ground'], hp:90, attack:82, defense:87, speed:76, emoji:'👸'},
+  nidoking:{dex:34, name:'Nidoking', types:['Poison','Ground'], hp:81, attack:92, defense:77, speed:85, emoji:'🤴'},
 
-  graveler:{dex:75, name:'Graveler', types:['Rock','Ground'], hp:55, attack:95, defense:115, emoji:'🪨'},
-  dratini:{dex:147, name:'Dratini', types:['Dragon'], hp:41, attack:64, defense:45, emoji:'🐲'},
-  dragonair:{dex:148, name:'Dragonair', types:['Dragon'], hp:61, attack:84, defense:65, emoji:'🐲'},
-  dragonite:{dex:149, name:'Dragonite', types:['Dragon','Flying'], hp:91, attack:134, defense:95, emoji:'🐉'},
-  jynx:{dex:124, name:'Jynx', types:['Ice','Psychic'], hp:65, attack:50, defense:35, emoji:'🥶'},
+  graveler:{dex:75, name:'Graveler', types:['Rock','Ground'], hp:55, attack:95, defense:115, speed:35, emoji:'🪨'},
+  dratini:{dex:147, name:'Dratini', types:['Dragon'], hp:41, attack:64, defense:45, speed:50, emoji:'🐲'},
+  dragonair:{dex:148, name:'Dragonair', types:['Dragon'], hp:61, attack:84, defense:65, speed:70, emoji:'🐲'},
+  dragonite:{dex:149, name:'Dragonite', types:['Dragon','Flying'], hp:91, attack:134, defense:95, speed:80, emoji:'🐉'},
+  jynx:{dex:124, name:'Jynx', types:['Ice','Psychic'], hp:65, attack:50, defense:35, speed:95, emoji:'🥶'},
 
-  exeggutor:{dex:103, name:'Exeggutor', types:['Grass','Psychic'], hp:95, attack:95, defense:85, emoji:'🌴'},
-  clefable:{dex:36, name:'Clefable', types:['Normal'], hp:95, attack:70, defense:73, emoji:'🎀'},
-  wigglytuff:{dex:40, name:'Wigglytuff', types:['Normal'], hp:140, attack:70, defense:45, emoji:'🎈'},
-  ninetales:{dex:38, name:'Ninetales', types:['Fire'], hp:73, attack:76, defense:75, emoji:'🦊'},
-  poliwrath:{dex:62, name:'Poliwrath', types:['Water','Fighting'], hp:90, attack:85, defense:95, emoji:'🐸'},
-  cloyster:{dex:91, name:'Cloyster', types:['Water','Ice'], hp:50, attack:95, defense:180, emoji:'🐚'},
-  machamp:{dex:68, name:'Machamp', types:['Fighting'], hp:90, attack:130, defense:80, emoji:'💪'},
-  golem:{dex:76, name:'Golem', types:['Rock','Ground'], hp:80, attack:110, defense:130, emoji:'🪨'},
-  gengar:{dex:94, name:'Gengar', types:['Ghost','Poison'], hp:60, attack:65, defense:60, emoji:'👻'},
+  exeggutor:{dex:103, name:'Exeggutor', types:['Grass','Psychic'], hp:95, attack:95, defense:85, speed:55, emoji:'🌴'},
+  clefable:{dex:36, name:'Clefable', types:['Normal'], hp:95, attack:70, defense:73, speed:60, emoji:'🎀'},
+  wigglytuff:{dex:40, name:'Wigglytuff', types:['Normal'], hp:140, attack:70, defense:45, speed:45, emoji:'🎈'},
+  ninetales:{dex:38, name:'Ninetales', types:['Fire'], hp:73, attack:76, defense:75, speed:100, emoji:'🦊'},
+  poliwrath:{dex:62, name:'Poliwrath', types:['Water','Fighting'], hp:90, attack:85, defense:95, speed:70, emoji:'🐸'},
+  cloyster:{dex:91, name:'Cloyster', types:['Water','Ice'], hp:50, attack:95, defense:180, speed:70, emoji:'🐚'},
+  machamp:{dex:68, name:'Machamp', types:['Fighting'], hp:90, attack:130, defense:80, speed:55, emoji:'💪'},
+  golem:{dex:76, name:'Golem', types:['Rock','Ground'], hp:80, attack:110, defense:130, speed:45, emoji:'🪨'},
+  gengar:{dex:94, name:'Gengar', types:['Ghost','Poison'], hp:60, attack:65, defense:60, speed:110, emoji:'👻'},
 
-  moltres:{dex:146, name:'Moltres', types:['Fire','Flying'], hp:90, attack:100, defense:90, emoji:'🔥'},
-  zapdos:{dex:145, name:'Zapdos', types:['Electric','Flying'], hp:90, attack:90, defense:85, emoji:'⚡'},
-  articuno:{dex:144, name:'Articuno', types:['Ice','Flying'], hp:90, attack:85, defense:100, emoji:'❄️'},
+  moltres:{dex:146, name:'Moltres', types:['Fire','Flying'], hp:90, attack:100, defense:90, speed:90, emoji:'🔥'},
+  zapdos:{dex:145, name:'Zapdos', types:['Electric','Flying'], hp:90, attack:90, defense:85, speed:100, emoji:'⚡'},
+  articuno:{dex:144, name:'Articuno', types:['Ice','Flying'], hp:90, attack:85, defense:100, speed:85, emoji:'❄️'},
 
-  vaporeon:{dex:134, name:'Vaporeon', types:['Water'], hp:130, attack:65, defense:60, emoji:'💧'},
-  jolteon:{dex:135, name:'Jolteon', types:['Electric'], hp:65, attack:65, defense:60, emoji:'⚡'},
-  flareon:{dex:136, name:'Flareon', types:['Fire'], hp:65, attack:130, defense:60, emoji:'🔥'},
-  mewtwo:{dex:150, name:'Mewtwo', types:['Psychic'], hp:106, attack:110, defense:90, emoji:'🧬'}
+  vaporeon:{dex:134, name:'Vaporeon', types:['Water'], hp:130, attack:65, defense:60, speed:65, emoji:'💧'},
+  jolteon:{dex:135, name:'Jolteon', types:['Electric'], hp:65, attack:65, defense:60, speed:130, emoji:'⚡'},
+  flareon:{dex:136, name:'Flareon', types:['Fire'], hp:65, attack:130, defense:60, speed:65, emoji:'🔥'},
+  mewtwo:{dex:150, name:'Mewtwo', types:['Psychic'], hp:106, attack:110, defense:90, speed:130, emoji:'🧬'}
 };
 
 const EVOLUTIONS = {
@@ -1229,6 +1259,64 @@ function freshGameDefaults(){
     leagueLeaderboard:[],
     myLeagueHistory:[],
 
+    /* --- economia de habilidade (docs 03/04) --- */
+    pointsOwed:0,          // empréstimo: a derrota adianta pontos, a vitória desconta
+    totalPointsEarned:20,  // tudo que já entrou na jornada (transparência + teto teórico)
+    nextLegPoints:10,      // quanto a próxima distribuição vai valer (vitória com nota)
+    winStreak:0,           // maré de vitórias
+    lastRewards:null,      // detalhamento da nota da última vitória
+    declaredChallenge:null,// desafio declarado antes da batalha (risco opt-in)
+    mvpBet:null,           // aposta: qual pokémon será o MVP
+    scoreBet:false,        // aposta: vencer perdendo no máximo 2
+    roulette:null,         // roleta do vencedor: {cards, picked, prize}
+    stickers:[],           // colecionáveis cosméticos da roleta
+    rareCandyPending:0,    // doces raros a usar
+    /* --- socorro não-numérico (doc 03 proposta E) --- */
+    leaderRevealed:false,
+    hpBuffNext:0,
+    emergencyOffer:null,
+    emergencyUsed:false,
+    advanceUsedAtGym:null,
+    /* --- rival (doc 02 §2) --- */
+    rivalName:'Gary',
+    rivalStarterId:null,
+    rivalPool:[],          // espécies que você recusou vão pro time dele
+    rivalWins:0,
+    rivalLosses:0,
+    rivalTaunt:null,
+    /* --- Equipe Rocket (doc 02 §1) --- */
+    rocketAmbushesWon:0,
+    stolenMon:null,        // pokémon sequestrado esperando resgate
+    hideoutStage:0,
+    casinoDone:false,
+    casinoBet:0,
+    casinoReels:null,
+    jessieDefeats:0,
+    /* --- rotas ramificadas (doc 05) --- */
+    routeCards:null,       // cartas da escolha atual
+    routeHistory:[],       // ids das rotas percorridas
+    currentRoute:null,
+    pendingSteps:[],       // pipeline de telas da perna atual
+    /* --- eventos e extras (doc 02 §3) --- */
+    eventBattle:null,
+    eventResult:null,
+    eventRevealIndex:0,
+    eventRevealPhase:'loading',
+    safariOffer:null,
+    safariCaught:[],
+    npcTradeOffer:null,
+    npcTradesDone:[],
+    dayCareMon:null,
+    dayCareReturnLeg:null,
+    fossilChoice:null,
+    dojoChoice:null,
+    nuzlocke:false,
+    faintedForever:[],
+    dailyChallenge:false,
+    dailySeed:null,
+    pityCounter:0,         // encontros seguidos sem oferta rara
+    routeEventDone:{},
+
     trainerName:'',
     authUser:null,
     authMode:'login',
@@ -1266,17 +1354,18 @@ function typePill(t){
 }
 function typesHtml(types){ return types.map(typePill).join(''); }
 
-function spriteHtml(speciesId, sizeClass){
+function spriteHtml(speciesId, sizeClass, shiny){
   const sp = SPECIES[speciesId];
   if(!sp) return '';
   const cls = sizeClass || 'sprite-md';
-  const url = `https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/${sp.dex}.png`;
-  return `<span class="sprite-wrap ${cls}"><img src="${url}" class="sprite-img" alt="${sp.name}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='inline';"><span class="sprite-fallback">${sp.emoji}</span></span>`;
+  const dir = shiny ? 'shiny/' : '';
+  const url = `https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/${dir}${sp.dex}.png`;
+  return `<span class="sprite-wrap ${cls} ${shiny?'shiny-wrap':''}"><img src="${url}" class="sprite-img" alt="${sp.name}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='inline';"><span class="sprite-fallback">${sp.emoji}</span></span>`;
 }
-function battleSpriteHtml(ownSpeciesId, opponentSpeciesId, sizeClass){
+function battleSpriteHtml(ownSpeciesId, opponentSpeciesId, sizeClass, shiny){
   // Ditto usa Transformar: na tela de batalha mostra o sprite do adversário, mas o nome continua "Ditto"
   const displaySpecies = (ownSpeciesId === 'ditto' && opponentSpeciesId && SPECIES[opponentSpeciesId]) ? opponentSpeciesId : ownSpeciesId;
-  return spriteHtml(displaySpecies, sizeClass);
+  return spriteHtml(displaySpecies, sizeClass, shiny);
 }
 function badgeSpriteUrl(gymIndex){
   // no site de origem, os números das insígnias do Koga (5º ginásio) e da Sabrina (6º) estão trocados
@@ -1292,7 +1381,7 @@ function badgeSpriteUrlByName(badgeName){
 let nextInstanceId = 1;
 function createInstance(speciesId, level){
   const sp = SPECIES[speciesId];
-  return {id:'mon'+(nextInstanceId++), speciesId, name:sp.name, types:sp.types, baseHp:sp.hp, attack:sp.attack, defense:sp.defense, level:level, maxHp:0, hp:0};
+  return {id:'mon'+(nextInstanceId++), speciesId, name:sp.name, types:sp.types, baseHp:sp.hp, attack:sp.attack, defense:sp.defense, speed:sp.speed, level:level, maxHp:0, hp:0, shiny:false};
 }
 function calcMaxHp(p){ return Math.round(30 + p.level*5 + p.baseHp); }
 
@@ -1509,6 +1598,7 @@ function tryEvolve(p){
     p.baseHp = newSp.hp;
     p.attack = newSp.attack;
     p.defense = newSp.defense;
+    p.speed = newSp.speed;
   }
   return events;
 }
@@ -1528,10 +1618,27 @@ function bestMultiplier(atkTypes, defTypes){
   });
   return best;
 }
+function multiplierForType(atkType, defTypes){
+  let m = 1;
+  defTypes.forEach(d=> m *= typeVsType(atkType, d));
+  return m;
+}
+// doc 02 §4.2 -- antes o atacante SEMPRE usava o melhor tipo dele, o que fazia dual-type ser
+// estritamente melhor que mono-type, sem nenhum lado ruim. Agora ele "escolhe o golpe" a cada
+// confronto: 70% das vezes usa o tipo mais eficaz, 30% usa o outro. Dual-type continua bom,
+// mas deixa de ser dominante automático.
+const DUAL_TYPE_BEST_CHANCE = 0.70;
+function rolledMultiplier(atkTypes, defTypes, rng){
+  if(atkTypes.length < 2) return multiplierForType(atkTypes[0], defTypes);
+  const mults = atkTypes.map(t=>multiplierForType(t, defTypes));
+  const bestIdx = mults[0] >= mults[1] ? 0 : 1;
+  const otherIdx = 1 - bestIdx;
+  return (rng() < DUAL_TYPE_BEST_CHANCE) ? mults[bestIdx] : mults[otherIdx];
+}
 function calcDamage(attacker, defender, rng){
   rng = rng || Math.random;
-  const mult = bestMultiplier(attacker.types, defender.types);
-  const base = attacker.level*2.5 + attacker.attack/6;
+  const mult = rolledMultiplier(attacker.types, defender.types, rng);
+  const base = (attacker.level*2.5 + attacker.attack/6) * (attacker.dmgBonus || 1);
   let defense = Math.pow(defender.defense/70, 0.7); // 70 = referência (média de defesa da Gen 1); quanto maior a defesa do defensor, mais ele resiste
   const wins = defender.winsThisBattle||0;
   if(wins > 0){
@@ -1554,27 +1661,57 @@ function effText(mult){
   return '';
 }
 
+// doc 02 §4.1 -- Speed decide quem bate primeiro. Não é determinístico de propósito: a chance de
+// sair na frente é proporcional à diferença de velocidade, então o rápido leva vantagem real
+// (pode nocautear antes de apanhar) sem que o lento vire estatueta. Empate = 50/50.
+function firstStrikeChance(a, b){
+  const sa = a.speed || 50, sb = b.speed || 50;
+  return 0.5 + 0.5 * ((sa - sb) / (sa + sb));
+}
 function doExchange(active, enemy, rng){
   rng = rng || Math.random;
-  const dmgToEnemy = calcDamage(active, enemy, rng);
-  const dmgToActive = calcDamage(enemy, active, rng);
-  enemy.hp = Math.max(0, enemy.hp - dmgToEnemy);
-  active.hp = Math.max(0, active.hp - dmgToActive);
+  const activeFirst = rng() < firstStrikeChance(active, enemy);
+  const first = activeFirst ? active : enemy;
+  const second = activeFirst ? enemy : active;
+  const dmgFromFirst = calcDamage(first, second, rng);
+  second.hp = Math.max(0, second.hp - dmgFromFirst);
+  if(second.hp <= 0){ return; } // desmaiou antes de revidar -- essa é a recompensa de ser rápido
+  const dmgFromSecond = calcDamage(second, first, rng);
+  first.hp = Math.max(0, first.hp - dmgFromSecond);
+}
+/* ---------------------------------------------------
+   BÔNUS PASSIVOS DO TIME (doc 02 §3 insígnias e §4.5 diversidade)
+   Aplicados como multiplicador de dano em cada pokémon do jogador antes da batalha.
+--------------------------------------------------- */
+function badgeDamageBonus(badgeCount){
+  return Math.min(8, badgeCount||0) * 0.01; // +1% por insígnia, cap +8%
+}
+function diversityDamageBonus(team){
+  const types = new Set();
+  team.forEach(p=> (p.types||[]).forEach(t=>types.add(t)));
+  return Math.min(6, types.size) * 0.02; // +2% por tipo único, cap +12%
+}
+function applyTeamBonuses(team, badgeCount){
+  const bonus = 1 + badgeDamageBonus(badgeCount) + diversityDamageBonus(team);
+  team.forEach(p=>{ p.dmgBonus = bonus; });
+  return bonus;
 }
 
 function buildResult(team, brockTeam, win, matchups){
   return {
     win,
     matchups,
-    playerStatus: team.map(p=>({ name:p.name, speciesId:p.speciesId, level:p.level, fainted: p.hp<=0 })),
+    playerStatus: team.map(p=>({ id:p.id, name:p.name, speciesId:p.speciesId, level:p.level, shiny:!!p.shiny, fainted: p.hp<=0, wins: p.winsThisBattle||0 })),
     brockStatus: brockTeam.map(p=>({ name:p.name, speciesId:p.speciesId, level:p.level, fainted: p.hp<=0 }))
   };
 }
 
-function simulateGymBattle(team, brockTeam, rng){
+function simulateGymBattle(team, brockTeam, rng, opts){
   rng = rng || Math.random;
-  team.forEach(p=>{ p.maxHp=calcMaxHp(p); p.hp=p.maxHp; p.winsThisBattle=0; });
-  brockTeam.forEach(p=>{ p.maxHp=calcMaxHp(p); p.hp=p.maxHp; p.winsThisBattle=0; });
+  opts = opts || {};
+  const hpBuff = 1 + (opts.playerHpBuffPct || 0);
+  team.forEach(p=>{ p.maxHp=Math.round(calcMaxHp(p)*hpBuff); p.hp=p.maxHp; p.winsThisBattle=0; if(p.dmgBonus==null) p.dmgBonus=1; });
+  brockTeam.forEach(p=>{ p.maxHp=calcMaxHp(p); p.hp=p.maxHp; p.winsThisBattle=0; if(p.dmgBonus==null) p.dmgBonus=1; });
 
   const matchups = [];
   let brockIndex = 0;
@@ -1655,31 +1792,14 @@ function chooseStarter(id){
   game.starterId = id;
   game.team = [createInstance(id, 5)];
   markCaught(id);
+  // doc 02 §2.2 -- o rival começa com o inicial FORTE contra o seu, como no jogo original
+  game.rivalStarterId = RIVAL_STARTER_COUNTER[id] || 'charmander';
+  game.rivalTaunt = randomRivalTaunt();
   game.screen = 'walk';
   render();
 }
 const LEGENDARY_BIRDS = ['moltres','zapdos','articuno'];
 const STARTER_EVOLUTIONS = { bulbasaur:'ivysaur', charmander:'charmeleon', squirtle:'wartortle' };
-function goToWildEncounter(){
-  const leg = LEGS[game.gymIndex];
-  let speciesOffer = shuffle(leg.pool).slice(0, leg.offerCount);
-  let offer = speciesOffer.map(id=>({ speciesId:id, level: randomInt(leg.minLevel, leg.maxLevel) }));
-  if(game.gymIndex===7 && Math.random()<0.05){
-    const bird = LEGENDARY_BIRDS[Math.floor(Math.random()*LEGENDARY_BIRDS.length)];
-    offer[Math.floor(Math.random()*offer.length)] = { speciesId: bird, level: 45 };
-  }
-  if(game.gymIndex===4 && Math.random()<0.10){
-    // rota 5 (antes do Koga): chance de achar a pré-evolução de outro inicial (nunca o do próprio jogador)
-    const ownEvolution = STARTER_EVOLUTIONS[game.starterId];
-    const options = Object.values(STARTER_EVOLUTIONS).filter(id=>id!==ownEvolution);
-    const pick = options[Math.floor(Math.random()*options.length)];
-    offer[Math.floor(Math.random()*offer.length)] = { speciesId: pick, level: randomInt(leg.minLevel, leg.maxLevel) };
-  }
-  game.wildOffer = offer;
-  game.wildSelected = [];
-  game.screen = 'wild';
-  render();
-}
 function toggleWild(id){
   const idx = game.wildSelected.indexOf(id);
   if(idx>=0){ game.wildSelected.splice(idx,1); }
@@ -1691,9 +1811,15 @@ function confirmWild(){
   game.wildSelected.forEach(id=>{
     const offerEntry = game.wildOffer.find(o=>o.speciesId===id);
     const level = LEGENDARY_BIRDS.includes(id) ? 45 : (offerEntry ? offerEntry.level : LEGS[game.gymIndex].minLevel);
-    game.team.push(createInstance(id, level));
+    const mon = createInstance(id, level);
+    mon.shiny = !!(offerEntry && offerEntry.shiny);
+    game.team.push(mon);
     markCaught(id);
   });
+  // doc 02 §2.1 -- A MECÂNICA DE OURO: tudo que você recusou aqui vai para o time do rival.
+  // Recusar um Abra forte deixa de ser neutro e vira uma decisão com consequência.
+  const refused = game.wildOffer.map(o=>o.speciesId).filter(id=>!game.wildSelected.includes(id));
+  game.rivalPool = [...new Set((game.rivalPool||[]).concat(refused))];
   if(game.team.length > 6){
     game.releaseSelected = [];
     game.screen = 'release';
@@ -1724,7 +1850,7 @@ function proceedAfterTeamLocked(){
     game.screen = 'eeveeChoice';
     render();
   } else {
-    startLevelDistribution();
+    advanceJourney();
   }
 }
 function chooseEeveeEvolution(choice){
@@ -1739,17 +1865,20 @@ function chooseEeveeEvolution(choice){
       eevee.baseHp = newSp.hp;
       eevee.attack = newSp.attack;
       eevee.defense = newSp.defense;
+      eevee.speed = newSp.speed;
       markCaught(choice);
     }
   }
   if(hasUnresolvedEevee()){
     render();
   } else {
-    startLevelDistribution();
+    advanceJourney();
   }
 }
 function startLevelDistribution(){
-  game.pool = (game.gymIndex===0) ? 20 : 10;
+  // doc 04 §1 -- a distribuição deixou de ser fixa em 10: vale o que a vitória anterior mereceu
+  // (nota de desempenho + desafios + apostas + roleta + eventos), já descontado o empréstimo.
+  game.pool = (game.gymIndex===0) ? 20 : Math.max(0, game.nextLegPoints||10);
   game.poolTotal = game.pool;
   game.alloc = {};
   game.team.forEach(p=> game.alloc[p.id]=0 );
@@ -1823,8 +1952,11 @@ function confirmOrder(){
   render();
 }
 function runBattle(){
-  const gymTeam = GYMS[game.gymIndex].team.map(b=> createInstance(b.species, b.level));
-  const result = simulateGymBattle(game.team, gymTeam);
+  const gymTeam = gymTeamForBattle();
+  const lineup = battleLineup();                       // aplica o desafio declarado, se houver
+  applyTeamBonuses(lineup, game.badgesEarned.length);  // insígnias (+1%/insígnia) e diversidade (+2%/tipo)
+  const result = simulateGymBattle(lineup, gymTeam, null, { playerHpBuffPct: game.hpBuffNext||0 });
+  result.benched = game.team.filter(p=>!lineup.includes(p)).map(p=>p.name);
   game.battleResult = result;
   game.revealIndex = 0;
   game.revealPhase = 'loading';
@@ -1879,23 +2011,57 @@ function animateHpBars(){
 function finishBattle(){
   if(game.screen !== 'battling') return;
   const result = game.battleResult;
+  // doc 03 proposta D -- O CANAL ESCONDIDO DO FEEDING: antes, cada pokémon que desmaiava dava
+  // +1 nível de graça, ganhando ou perdendo. Deixar o time inteiro cair numa derrota rendia
+  // +6 níveis fora da economia de pontos. Agora o bônus de desmaio só existe em batalha VENCIDA:
+  // "perdeu lutando numa vitória" = experiência; "time inteiro no chão numa derrota" = nada.
   let anyLeveledUp = false;
-  game.team.forEach((p, idx)=>{
-    if(p.hp<=0){
-      p.level += 1;
-      if(result.playerStatus[idx]){ result.playerStatus[idx].level = p.level; }
-      anyLeveledUp = true;
-    }
-  });
-  result.leveledUpFromFaint = anyLeveledUp;
   if(result.win){
+    game.team.forEach(p=>{
+      if(p.hp<=0 && p.hp!=null){
+        p.level = Math.min(55, p.level + 1);
+        const st = result.playerStatus.find(s=>s.id===p.id);
+        if(st){ st.level = p.level; }
+        anyLeveledUp = true;
+      }
+    });
+  }
+  result.leveledUpFromFaint = anyLeveledUp;
+  applyNuzlockeFaints(result);
+  if((game.team||[]).length === 0){ game.screen = 'gameover'; render(); return; }
+
+  if(result.win){
+    const rewards = computeVictoryRewards(result);
+    game.lastRewards = rewards;
+    game.nextLegPoints = rewards.net;
+    game.pointsOwed = rewards.owedAfter;
+    game.totalPointsEarned = (game.totalPointsEarned||0) + rewards.net;
+    game.winStreak = (game.winStreak||0) + 1;
+    game.bestStreak = Math.max(game.bestStreak||0, game.winStreak);
+    if(game.declaredChallenge){
+      game.challengesWon = [...new Set((game.challengesWon||[]).concat([game.declaredChallenge]))];
+    }
+    if(result.playerStatus.every(st=>!st.fainted)){ game.anyPerfectGym = true; }
+    game.hpBuffNext = 0;          // o socorro da derrota expira ao vencer
+    game.leaderRevealed = false;
     game.badgesEarned.push(GYMS[game.gymIndex].badge);
     game.screen = 'victory';
   } else {
     game.losses++;
+    game.totalLossesJourney = (game.totalLossesJourney||0) + 1;
+    game.winStreak = 0;           // qualquer derrota zera a maré (doc 04 §5)
+    game.declaredChallenge = null;
     game.screen = game.losses>=5 ? 'gameover' : 'defeat';
   }
   render();
+}
+// depois da tela de vitória vem a roleta (doc 04 §4) e só então a jornada continua
+function goToRouletteOrContinue(){
+  openRoulette();
+}
+function goAfterGymVictory(){
+  const hasNextGym = (game.gymIndex+1 < GYMS.length);
+  if(hasNextGym){ continueJourney(); } else { showJourneyEnd(); }
 }
 
 /* ---------------------------------------------------
@@ -2090,16 +2256,74 @@ function makeFreshScheduleData(){
    cada um escreve no próprio documento (chave = nome sanitizado),
    então 1000 pessoas se inscrevendo ao mesmo tempo não brigam entre si
 ------------------------------------------------------------------- */
+/* ===================================================================
+   INTEGRIDADE DA LIGA (doc 02 §4.5 e doc 04)
+   ⚠️ ESTE BLOCO É ESPELHO EXATO DE functions/index.js. Mudou aqui, muda lá.
+
+   Isto não é limite novo de jogo: o próprio jogo já para de distribuir pontos
+   no nível 55 (doce raro, creche e bônus de desmaio também). O que existia antes
+   era a Cloud Function aceitando nível até 200 — ou seja, 6 Mewtwo Lv.200
+   passavam pela validação. Os números abaixo têm folga pra não punir saves
+   antigos, criados quando o bônus de desmaio ainda não tinha teto.
+   =================================================================== */
+const MAX_LEVEL_PER_MON = 60;
+const MAX_TEAM_LEVEL_SUM = 6 * 60;
+function validateTeamForLeague(team){
+  if(!team || team.length === 0) return { ok:false, reason:'time vazio' };
+  if(team.length > 6) return { ok:false, reason:`time com ${team.length} pokémons` };
+  const over = team.find(p=>p.level > MAX_LEVEL_PER_MON);
+  if(over) return { ok:false, reason:`${over.name} está no nível ${over.level} (máximo alcançável: ${MAX_LEVEL_PER_MON})` };
+  const sum = team.reduce((a,p)=>a+p.level, 0);
+  if(sum > MAX_TEAM_LEVEL_SUM) return { ok:false, reason:`soma de níveis ${sum} acima do teto teórico ${MAX_TEAM_LEVEL_SUM}` };
+  return { ok:true, levelSum:sum };
+}
+function teamStrength(code){
+  const team = decodeTeamCode(code);
+  if(!team) return 0;
+  return team.reduce((acc,p)=>{
+    const sp = SPECIES[p.speciesId];
+    const bst = sp ? (sp.hp + sp.attack + sp.defense + sp.speed) : 300;
+    return acc + p.level + bst/10;
+  }, 0);
+}
+function makeRivalGhost(registrant){
+  if(!registrant || !registrant.rivalCode) return null;
+  const team = decodeTeamCode(registrant.rivalCode);
+  if(!team || !validateTeamForLeague(team).ok) return null;
+  const baseName = (registrant.rivalName || 'Rival').trim() || 'Rival';
+  return { name:`👻 ${baseName} (fantasma de ${registrant.name})`.slice(0,90), code:registrant.rivalCode,
+           uid:null, slot:null, isBot:true, ghostOf:registrant.name };
+}
+function fillWithGhosts(players, size){
+  const filled = players.slice();
+  let i = 0;
+  while(filled.length < size && i < players.length * 4){
+    const ghost = makeRivalGhost(players[i % players.length]);
+    i++;
+    if(ghost && !filled.some(p=>p.name===ghost.name)) filled.push(ghost);
+  }
+  return filled.length === size ? filled : null;
+}
+const MIN_REAL_PLAYERS_FOR_GHOST_LEAGUE = 3;
+
 function resolveLeagueMatch(match, seedStr){
   const rng = makeSeededRng(seedStr);
-  const teamA = decodeTeamCode(match.a.code);
-  const teamB = decodeTeamCode(match.b.code);
-  if(!teamA || !teamB){
-    match.winner = teamA ? match.a : match.b;
+  const rawA = decodeTeamCode(match.a.code);
+  const rawB = decodeTeamCode(match.b.code);
+  const okA = rawA && validateTeamForLeague(rawA).ok;
+  const okB = rawB && validateTeamForLeague(rawB).ok;
+  if(!okA || !okB){
+    match.winner = okA ? match.a : match.b;
     match.resolved = true;
     match.matchups = [];
+    match.invalidTeam = !okA ? (match.a && match.a.name) : (match.b && match.b.name);
     return;
   }
+  const teamA = rawA, teamB = rawB;
+  // todo mundo na Liga tem as 8 insígnias: o bônus de insígnia é igual pros dois lados,
+  // quem faz diferença é a diversidade de tipos do time (doc 02 §4.5)
+  applyTeamBonuses(teamA, 8);
+  applyTeamBonuses(teamB, 8);
   const result = simulateGymBattle(teamA, teamB, rng);
   // diferente dos ginásios, os níveis ficam CONGELADOS na Liga -- depois da 8ª insígnia, o time do
   // treinador não sobe mais de nível, então nem precisa re-codificar/sincronizar nada aqui
@@ -2181,6 +2405,17 @@ async function registerForLeague(){
   game.leagueError = null;
   render();
   const code = encodeTeamCode(game.team);
+  const check = validateTeamForLeague(decodeTeamCode(code) || []);
+  if(!check.ok){
+    game.leagueSubmitting = false;
+    game.leagueError = `Seu time não passou na validação da Liga: ${check.reason}. Se isso parece errado, avise no grupo.`;
+    render();
+    return;
+  }
+  // o fantasma do rival vai junto: ele preenche vagas ímpares no chaveamento em vez de
+  // alguém ficar esperando o próximo ciclo (doc 02 §2.5)
+  const rivalTeam = buildRivalTeam().map(o=>({ speciesId:o.speciesId, level:Math.min(MAX_LEVEL_PER_MON, o.level) }));
+  const rivalCode = encodeTeamCode(rivalTeam);
   try{
     const cycleEntry = await ensureRegisteringCycle();
     const activeElsewhere = await isTrainerActiveInLeague(name);
@@ -2189,7 +2424,15 @@ async function registerForLeague(){
     await db.runTransaction(async (tx)=>{
       const snap = await tx.get(regRef);
       if(snap.exists){ throw new Error('DUPLICATE_NAME'); }
-      tx.set(regRef, { name, code, uid: game.authUser ? game.authUser.uid : null, slot: game.currentSaveSlot });
+      tx.set(regRef, {
+        name, code,
+        uid: game.authUser ? game.authUser.uid : null,
+        slot: game.currentSaveSlot,
+        levelSum: check.levelSum,            // transparência: aparece no chaveamento (doc 04)
+        nuzlocke: !!game.nuzlocke,           // quem zerou no Nuzlocke aparece marcado (doc 02 §3)
+        rivalName: game.rivalName || 'Gary',
+        rivalCode
+      });
     });
     game.leagueSubmitting = false;
     render();
@@ -2319,21 +2562,38 @@ async function drawCycle(cycleEntry){
   try{
     const regSnap = await registrantsCollRef(cycleEntry.id).get();
     const registrants = regSnap.docs.map(d=>d.data());
-    const shuffled = shuffleWithSeed(registrants, 'draw-'+cycleEntry.scheduledTime);
+    // porta de entrada: time impossível não entra no chaveamento
+    const valid = registrants.filter(r=>{
+      const team = decodeTeamCode(r.code);
+      return team && validateTeamForLeague(team).ok;
+    }).map(r=>({ ...r, levelSum: (decodeTeamCode(r.code)||[]).reduce((a,p)=>a+p.level,0) }));
+    // divisões por força: fortes com fortes, novatos com novatos (doc 02 §4.5)
+    const byStrength = valid.slice().sort((a,b)=>teamStrength(b.code) - teamStrength(a.code));
     const leagues = [];
     let cursor = 0;
-    const grandeCount = Math.floor(shuffled.length / GRANDE_LIGA_SIZE);
+    const grandeCount = Math.floor(byStrength.length / GRANDE_LIGA_SIZE);
     for(let i=0;i<grandeCount;i++){
-      leagues.push({ id: leagues.length, size: GRANDE_LIGA_SIZE, rounds: buildRounds(shuffled.slice(cursor, cursor+GRANDE_LIGA_SIZE)), champion:null });
+      const band = byStrength.slice(cursor, cursor+GRANDE_LIGA_SIZE);
+      leagues.push({ id: leagues.length, size: GRANDE_LIGA_SIZE, division:'Grande Liga', rounds: buildRounds(shuffleWithSeed(band, `draw-${cycleEntry.scheduledTime}-G${i}`)), champion:null });
       cursor += GRANDE_LIGA_SIZE;
     }
-    const remaining = shuffled.length - cursor;
+    const remaining = byStrength.length - cursor;
     const regularCount = Math.floor(remaining / REGULAR_LIGA_SIZE);
     for(let i=0;i<regularCount;i++){
-      leagues.push({ id: leagues.length, size: REGULAR_LIGA_SIZE, rounds: buildRounds(shuffled.slice(cursor, cursor+REGULAR_LIGA_SIZE)), champion:null });
+      const band = byStrength.slice(cursor, cursor+REGULAR_LIGA_SIZE);
+      leagues.push({ id: leagues.length, size: REGULAR_LIGA_SIZE, division:'Liga', rounds: buildRounds(shuffleWithSeed(band, `draw-${cycleEntry.scheduledTime}-R${i}`)), champion:null });
       cursor += REGULAR_LIGA_SIZE;
     }
-    const leftover = shuffled.slice(cursor);
+    let leftover = byStrength.slice(cursor);
+    // sobras não esperam mais um ciclo inteiro: os fantasmas dos rivais fecham as vagas (doc 02 §2.5)
+    if(leftover.length >= MIN_REAL_PLAYERS_FOR_GHOST_LEAGUE){
+      const filled = fillWithGhosts(leftover, REGULAR_LIGA_SIZE);
+      if(filled){
+        leagues.push({ id: leagues.length, size: REGULAR_LIGA_SIZE, division:'Liga (com fantasmas)', withGhosts:true,
+          rounds: buildRounds(shuffleWithSeed(filled, `draw-${cycleEntry.scheduledTime}-Gh`)), champion:null });
+        leftover = [];
+      }
+    }
     const detail = {
       scheduledTime: cycleEntry.scheduledTime,
       leagues,
@@ -2638,17 +2898,22 @@ function leaveLeagueScreen(){
 }
 
 
-function prepareRetry(){
-  game.pool = 5;
-  game.poolTotal = 5;
-  game.alloc = {};
-  game.team.forEach(p=> game.alloc[p.id]=0 );
-  game.screen = 'levels';
-  render();
-}
 function continueJourney(){
+  const returned = returnStolenAfterGym();   // o sequestrado volta maltratado se não foi resgatado
   game.gymIndex++;
   game.losses = 0;
+  game.currentRoute = null;
+  game.pendingSteps = [];
+  game.declaredChallenge = null;
+  game.mvpBet = null;
+  game.scoreBet = false;
+  game.leaderRevealed = false;
+  game.hpBuffNext = 0;
+  game.emergencyOffer = null;
+  game.emergencyUsed = false;
+  game.tunnelBonus = false;
+  game.advanceUsedAtGym = null;
+  game.stolenReturned = returned ? returned.name : null;
   game.screen = 'walkNext';
   render();
 }
@@ -2657,6 +2922,7 @@ function showJourneyEnd(){
   game.journeyEndRegistered = null;
   render();
   checkLeagueRegistrationStatus();
+  if(game.dailyChallenge){ submitDailyResult().then(loadDailyRanking); }
 }
 function resetGame(){
   stopLeaguePolling();
@@ -2757,7 +3023,7 @@ async function logout(){
 /* ---------------------------------------------------
    SAVES (3 slots por usuário no Firestore)
 --------------------------------------------------- */
-const SAFE_SAVE_SCREENS = new Set(['start','walk','walkNext','wild','release','levels','evolution','eeveeChoice','teamOrder','preBattle','victory','defeat','gameover','journeyEnd']);
+const SAFE_SAVE_SCREENS = new Set(['start','walk','walkNext','wild','release','levels','evolution','eeveeChoice','teamOrder','preBattle','victory','defeat','gameover','journeyEnd','routeChoice','routeEvent','eventIntro','eventResult','rocketHideout','casino','safari','npcTrade','dayCare','roulette','emergency','fossil','dojo','journeyDiary','nuzlockeFaint']);
 function saveDocRef(uid, slot){
   return db.collection('users').doc(uid).collection('saves').doc(String(slot));
 }
@@ -2792,6 +3058,9 @@ async function confirmNewSaveName(){
   const input = document.getElementById('new-save-name-input');
   const name = input ? input.value.trim() : '';
   if(!name){ game.newSaveNameError = 'Digite um nome de treinador.'; render(); return; }
+  const rivalInput = document.getElementById('new-rival-name-input');
+  const rivalName = (rivalInput && rivalInput.value.trim()) ? rivalInput.value.trim().slice(0,20) : 'Gary';
+  const wantNuzlocke = !!game.pendingNuzlocke, wantDaily = !!game.pendingDaily;
   const slot = game.pendingNewSaveSlot;
   const keepUser = game.authUser, keepSlots = game.saveSlots, keepPokedex = game.permanentPokedex, keepWinsTotal = game.leagueWinsTotal;
   const keepWinsBySlot = { ...(game.leagueWinsBySlot||{}) };
@@ -2804,6 +3073,10 @@ async function confirmNewSaveName(){
   game.leagueWinsBySlot = keepWinsBySlot;
   game.currentSaveSlot = slot;
   game.trainerName = name;
+  game.rivalName = rivalName;
+  game.nuzlocke = wantNuzlocke;
+  game.dailyChallenge = wantDaily;
+  game.dailySeed = wantDaily ? todaySeedString() : null;
   game.myLeagueHistory = []; // idem -- o save novo não deve mostrar o histórico de Liga de quem usava esse slot antes
   game.screen = 'start';
   render();
@@ -2843,6 +3116,63 @@ function serializeGame(){
     badgeCount: game.badgesEarned.length,
     caughtSpecies: game.caughtSpecies || [],
     battleResult: game.battleResult || null,
+    /* economia de habilidade */
+    pointsOwed: game.pointsOwed || 0,
+    totalPointsEarned: game.totalPointsEarned || 0,
+    totalLossesJourney: game.totalLossesJourney || 0,
+    nextLegPoints: game.nextLegPoints || 10,
+    winStreak: game.winStreak || 0,
+    lastRewards: game.lastRewards || null,
+    declaredChallenge: game.declaredChallenge || null,
+    mvpBet: game.mvpBet || null,
+    scoreBet: !!game.scoreBet,
+    roulette: game.roulette || null,
+    stickers: game.stickers || [],
+    rareCandyPending: game.rareCandyPending || 0,
+    leaderRevealed: !!game.leaderRevealed,
+    hpBuffNext: game.hpBuffNext || 0,
+    emergencyOffer: game.emergencyOffer || null,
+    /* rival */
+    rivalName: game.rivalName || 'Gary',
+    rivalStarterId: game.rivalStarterId || null,
+    rivalPool: game.rivalPool || [],
+    rivalWins: game.rivalWins || 0,
+    rivalLosses: game.rivalLosses || 0,
+    /* rocket */
+    rocketAmbushesWon: game.rocketAmbushesWon || 0,
+    stolenMon: game.stolenMon || null,
+    hideoutStage: game.hideoutStage || 0,
+    casinoDone: !!game.casinoDone,
+    jessieDefeats: game.jessieDefeats || 0,
+    /* rotas */
+    routeCards: game.routeCards || null,
+    routeHistory: game.routeHistory || [],
+    currentRoute: game.currentRoute || null,
+    pendingSteps: game.pendingSteps || [],
+    routeEventDone: game.routeEventDone || {},
+    /* eventos */
+    eventBattle: game.eventBattle || null,
+    eventResult: game.eventResult || null,
+    safariOffer: game.safariOffer || null,
+    safariCaught: game.safariCaught || [],
+    npcTradeOffer: game.npcTradeOffer || null,
+    npcTradesDone: game.npcTradesDone || [],
+    dayCareMon: game.dayCareMon || null,
+    dayCareReturnLeg: game.dayCareReturnLeg != null ? game.dayCareReturnLeg : null,
+    fossilChoice: game.fossilChoice || null,
+    dojoChoice: game.dojoChoice || null,
+    nuzlocke: !!game.nuzlocke,
+    faintedForever: game.faintedForever || [],
+    dailyChallenge: !!game.dailyChallenge,
+    dailySeed: game.dailySeed || null,
+    pityCounter: game.pityCounter || 0,
+    pendingGift: game.pendingGift || null,
+    advanceUsedAtGym: game.advanceUsedAtGym != null ? game.advanceUsedAtGym : null,
+    emergencyUsed: !!game.emergencyUsed,
+    challengesWon: game.challengesWon || [],
+    bestStreak: game.bestStreak || 0,
+    anyPerfectGym: !!game.anyPerfectGym,
+    safariPerfect: !!game.safariPerfect,
     updatedAt: Date.now()
   };
 }
@@ -2891,6 +3221,62 @@ function applySavedState(data){
   game.badgesEarned = data.badgesEarned || [];
   game.caughtSpecies = data.caughtSpecies || [];
   game.battleResult = data.battleResult || null;
+  // migração defensiva: saves antigos (antes da economia de habilidade e das rotas) não têm
+  // nenhum desses campos -- os defaults abaixo deixam o save continuar funcionando normalmente
+  game.pointsOwed = data.pointsOwed || 0;
+  game.totalPointsEarned = data.totalPointsEarned != null ? data.totalPointsEarned : 20;
+  game.totalLossesJourney = data.totalLossesJourney || 0;
+  game.nextLegPoints = data.nextLegPoints || 10;
+  game.winStreak = data.winStreak || 0;
+  game.lastRewards = data.lastRewards || null;
+  game.declaredChallenge = data.declaredChallenge || null;
+  game.mvpBet = data.mvpBet || null;
+  game.scoreBet = !!data.scoreBet;
+  game.roulette = data.roulette || null;
+  game.stickers = data.stickers || [];
+  game.rareCandyPending = data.rareCandyPending || 0;
+  game.leaderRevealed = !!data.leaderRevealed;
+  game.hpBuffNext = data.hpBuffNext || 0;
+  game.emergencyOffer = data.emergencyOffer || null;
+  game.rivalName = data.rivalName || 'Gary';
+  game.rivalStarterId = data.rivalStarterId || null;
+  game.rivalPool = data.rivalPool || [];
+  game.rivalWins = data.rivalWins || 0;
+  game.rivalLosses = data.rivalLosses || 0;
+  game.rocketAmbushesWon = data.rocketAmbushesWon || 0;
+  game.stolenMon = data.stolenMon || null;
+  game.hideoutStage = data.hideoutStage || 0;
+  game.casinoDone = !!data.casinoDone;
+  game.jessieDefeats = data.jessieDefeats || 0;
+  game.routeCards = data.routeCards || null;
+  game.routeHistory = data.routeHistory || [];
+  game.currentRoute = data.currentRoute || null;
+  game.pendingSteps = data.pendingSteps || [];
+  game.routeEventDone = data.routeEventDone || {};
+  game.eventBattle = data.eventBattle || null;
+  game.eventResult = data.eventResult || null;
+  game.safariOffer = data.safariOffer || null;
+  game.safariCaught = data.safariCaught || [];
+  game.npcTradeOffer = data.npcTradeOffer || null;
+  game.npcTradesDone = data.npcTradesDone || [];
+  game.dayCareMon = data.dayCareMon || null;
+  game.dayCareReturnLeg = data.dayCareReturnLeg != null ? data.dayCareReturnLeg : null;
+  game.fossilChoice = data.fossilChoice || null;
+  game.dojoChoice = data.dojoChoice || null;
+  game.nuzlocke = !!data.nuzlocke;
+  game.faintedForever = data.faintedForever || [];
+  game.dailyChallenge = !!data.dailyChallenge;
+  game.dailySeed = data.dailySeed || null;
+  game.pityCounter = data.pityCounter || 0;
+  game.pendingGift = data.pendingGift || null;
+  game.advanceUsedAtGym = data.advanceUsedAtGym != null ? data.advanceUsedAtGym : null;
+  game.emergencyUsed = !!data.emergencyUsed;
+  game.challengesWon = data.challengesWon || [];
+  game.bestStreak = data.bestStreak || 0;
+  game.anyPerfectGym = !!data.anyPerfectGym;
+  game.safariPerfect = !!data.safariPerfect;
+  // pokémons salvos antes da chegada do Speed não têm o campo -- recupera da tabela de espécies
+  game.team.forEach(p=>{ if(p.speed==null && SPECIES[p.speciesId]){ p.speed = SPECIES[p.speciesId].speed; } });
   // rede de segurança: saves salvos antes dessa correção (ou qualquer dado corrompido) podem ter ficado
   // parados numa tela de resultado de batalha sem o resultado em si -- em vez de travar, volta pra uma
   // tela segura em que o jogador consegue seguir jogando normalmente
@@ -2950,7 +3336,7 @@ async function requestDeleteSave(slot){
   const isActive = await isTrainerActiveInLeague(s.trainerName);
   game.deleteSaveChecking = null;
   if(isActive){
-    game.deleteSaveBlockedReason = `O save "${s.trainerName}" está inscrito ou disputando a Liga Pokémon agora. Cancele a inscrição (ou espere a Liga terminar) antes de deletar esse save.`;
+    game.deleteSaveBlockedReason = `O save "${escapeHtml(s.trainerName)}" está inscrito ou disputando a Liga Pokémon agora. Cancele a inscrição (ou espere a Liga terminar) antes de deletar esse save.`;
     render();
     return;
   }
@@ -3082,19 +3468,1728 @@ const ACHIEVEMENTS = [
   { id:'league_champion', icon:'🏆', name:'Campeão da Liga', desc:'Vença uma Liga Pokémon inteira.', check:(a,x)=>x.anyChampion },
   { id:'legend_of_kanto', icon:'🐉', name:'Lenda de Kanto', desc:'Vença os 8 ginásios em um save E seja campeão de uma Liga.', check:(a,x)=>a.anyJourneyEnd && x.anyChampion }
 ];
+// as conquistas novas (doc 02) são definidas mais abaixo no arquivo -- a lista só é
+// completada na primeira vez que alguém abre a tela, pra não depender da ordem de declaração
+let extraAchievementsMerged = false;
+function ensureExtraAchievements(){
+  if(extraAchievementsMerged) return;
+  extraAchievementsMerged = true;
+  ACHIEVEMENTS.push(...EXTRA_ACHIEVEMENTS);
+}
 async function openAchievements(){
+  ensureExtraAchievements();
   game.screen = 'achievements';
   game.achievementsExtra = null;
   render();
   await loadSaveSlots();
   await loadPermanentUserData();
-  const agg = getAchievementAggregate();
+  const agg = Object.assign(getAchievementAggregate(), extraAchievementAggregate());
   game.achievementsExtra = await computeLeagueAchievementExtra(agg.trainerNames);
   if(game.screen==='achievements'){ render(); }
 }
 function closeAchievements(){
   game.screen = 'saveSelect';
   render();
+}
+
+
+/* ===================================================================
+   ROTAS RAMIFICADAS (doc 05)
+   Cada perna deixa de ter um pool fixo e passa a oferecer 2 rotas com
+   tema, faixa de risco e evento próprios. `LEGS` continua mandando na
+   faixa de nível; a rota decide QUEM aparece e o que acontece no caminho.
+   =================================================================== */
+const ROUTE_MAP = [
+  // ---- Perna 1 — antes de Brock (Pedra) ----
+  [
+    { id:'viridian_forest', name:'Floresta de Viridian', icon:'🌲', risk:'calma',
+      types:['Bug','Grass'], rumor:'Dizem que uma faísca amarela se esconde entre as árvores…',
+      pool:['caterpie','weedle','oddish','pidgey','bellsprout','paras'], rare:['pikachu'] },
+    { id:'route_22', name:'Rota 22', icon:'🌾', risk:'arriscada',
+      types:['Normal','Fighting'], rumor:'Treinadores contam de um macaco furioso que quebra pedras.',
+      pool:['ratata','spearow','mankey','nidoranm','meowth','sandshrew'], rare:['growlithe'] }
+  ],
+  // ---- Perna 2 — antes de Misty (Água) ----
+  [
+    { id:'mt_moon', name:'Monte Lua', icon:'🌙', risk:'arriscada',
+      types:['Rock','Poison'], rumor:'Há fósseis antigos enterrados nas cavernas — e Rockets cavando.',
+      pool:['geodude','zubat','clefairy','paras','sandshrew','jigglypuff'], rare:['onix'],
+      event:'fossil' },
+    { id:'coast_24_25', name:'Rotas 24/25 (Costa)', icon:'🌊', risk:'calma',
+      types:['Water','Electric'], rumor:'Pescadores juram ter visto um roedor elétrico na margem.',
+      pool:['bellsprout','oddish','psyduck','poliwag','abra','pidgey'], rare:['pikachu'] }
+  ],
+  // ---- Perna 3 — antes de Lt. Surge (Elétrico) ----
+  [
+    { id:'diglett_cave', name:'Caverna Diglett', icon:'🕳️', risk:'calma',
+      types:['Ground'], rumor:'O chão inteiro se mexe. O counter do Surge mora aqui embaixo.',
+      pool:['diglett','zubat','sandshrew','geodude','ekans'], rare:['dugtrio'] },
+    { id:'ss_anne', name:'S.S. Anne', icon:'🚢', risk:'arriscada',
+      types:['Normal','Water'], rumor:'Sem selvagens a bordo — só treinadores ricos querendo apostar.',
+      pool:[], rare:[], event:'ss_anne', noWild:true }
+  ],
+  // ---- Perna 4 — antes de Erika (Planta) ----
+  [
+    { id:'rock_tunnel', name:'Túnel de Pedra', icon:'⛏️', risk:'arriscada',
+      types:['Rock','Fighting'], rumor:'Escuro demais pra enxergar o time. Quem passa, passa às cegas.',
+      pool:['geodude','onix','machop','zubat','graveler','cubone'], rare:['golbat'],
+      event:'rock_tunnel' },
+    { id:'lavender_detour', name:'Desvio por Lavender', icon:'👻', risk:'arriscada',
+      types:['Ghost','Ground'], rumor:'A torre chora à noite. Alguma coisa lá dentro não é sólida.',
+      pool:['gastly','cubone','haunter','ratata','zubat'], rare:['haunter'],
+      event:'lavender_tower' }
+  ],
+  // ---- Perna 5 — antes de Koga (Veneno) ----
+  [
+    { id:'cycling_road', name:'Estrada Ciclável', icon:'🚴', risk:'calma',
+      types:['Poison','Electric'], rumor:'Rápido, plano e cheio de fumaça. Dá pra atravessar correndo.',
+      pool:['grimer','koffing','doduo','voltorb','magnemite','ekans'], rare:['muk'] },
+    { id:'safari_zone', name:'Zona de Safári', icon:'🦓', risk:'arriscada',
+      types:['Normal','Dragon'], rumor:'Oito ofertas raríssimas — e cada uma pode fugir na sua cara.',
+      pool:['chansey','kangaskhan','tauros','exeggcute','nidoranf','paras','venonat','rhyhorn'],
+      rare:['dratini','scyther'], event:'safari', noWild:true }
+  ],
+  // ---- Perna 6 — antes de Sabrina (Psíquico) ----
+  [
+    { id:'fighting_dojo', name:'Dojo Lutador', icon:'🥋', risk:'arriscada',
+      types:['Fighting'], rumor:'O mestre entrega um discípulo pra quem vencer. Mas lutador não gosta de psíquico…',
+      pool:['machop','machoke','primeape','mankey','poliwhirl'], rare:['machoke'],
+      event:'dojo' },
+    { id:'silph_co', name:'Silph Co.', icon:'🏢', risk:'arriscada',
+      types:['Poison','Psychic'], rumor:'Onze andares tomados pela Rocket. Dizem que há um presente no cofre.',
+      pool:[], rare:[], event:'silph', noWild:true }
+  ],
+  // ---- Perna 7 — antes de Blaine (Fogo) ----
+  [
+    { id:'seafoam', name:'Ilhas Seafoam', icon:'❄️', risk:'arriscada',
+      types:['Water','Ice'], rumor:'Um vento congelante sopra do fundo da caverna. Algo bate asas lá dentro.',
+      pool:['seel','shellder','staryu','dewgong','horsea','goldeen','krabby'], rare:['articuno'] },
+    { id:'pokemon_mansion', name:'Mansão Pokémon', icon:'🏚️', risk:'calma',
+      types:['Fire','Normal'], rumor:'Diários queimados falam de um experimento chamado… Mewtwo.',
+      pool:['growlithe','ponyta','vulpix','magmar','rapidash'], rare:['ditto'] }
+  ],
+  // ---- Perna 8 — antes de Giovanni (Terra) ----
+  [
+    { id:'power_plant', name:'Usina de Força', icon:'⚡', risk:'arriscada',
+      types:['Electric'], rumor:'A usina abandonada ainda tem energia. E ela tem asas.',
+      pool:['magnemite','electabuzz','voltorb','magneton','electrode','pikachu'], rare:['zapdos'] },
+    { id:'victory_road', name:'Victory Road', icon:'🏔️', risk:'arriscada',
+      types:['Rock','Fighting'], rumor:'Só passa quem merece. Uma chama vive no topo da montanha.',
+      pool:['onix','machoke','graveler','rhyhorn','primeape','golbat'], rare:['moltres'] }
+  ]
+];
+
+// A terceira carta rara (doc 05 §5): aparece brilhando, com chance dobrada de shiny e uma
+// oferta garantida acima da média. Sorte pura, positiva, e impossível de farmar perdendo.
+const GOLDEN_ROUTE_CHANCE = 0.08;
+const LEGENDARY_ROUTE_CHANCE = 0.05; // as aves só existem na rota canônica delas
+
+function routesForLeg(legIndex){
+  return ROUTE_MAP[legIndex] || ROUTE_MAP[ROUTE_MAP.length-1];
+}
+function findRoute(routeId){
+  for(const pair of ROUTE_MAP){
+    const found = pair.find(r=>r.id===routeId);
+    if(found) return found;
+  }
+  return null;
+}
+function makeGoldenRoute(legIndex){
+  const pair = routesForLeg(legIndex);
+  const merged = [...new Set([].concat(pair[0].pool, pair[1].pool, pair[0].rare||[], pair[1].rare||[]))]
+    .filter(id=>SPECIES[id]);
+  return {
+    id:'golden_'+legIndex, name:'Clareira Dourada', icon:'✨', risk:'dourada', golden:true,
+    types:['Normal'], rumor:'Uma luz dourada atravessa as árvores. Isso quase nunca acontece.',
+    pool: merged.length ? merged : LEGS[legIndex].pool, rare:[]
+  };
+}
+
+/* ---------------------------------------------------
+   ESCOLHA DE ROTA
+--------------------------------------------------- */
+function goToRouteChoice(){
+  const legIndex = game.gymIndex;
+  const pair = routesForLeg(legIndex).map(r=>r.id);
+  const cards = pair.slice();
+  // no desafio diário a seed global decide as rotas douradas -- todo mundo enfrenta o mesmo mapa
+  const roll = game.dailyChallenge ? dailyRng()() : Math.random();
+  if(roll < GOLDEN_ROUTE_CHANCE){ cards.push('golden_'+legIndex); }
+  game.routeCards = cards;
+  game.screen = 'routeChoice';
+  render();
+}
+function routeById(id){
+  if(String(id).startsWith('golden_')) return makeGoldenRoute(parseInt(String(id).split('_')[1],10));
+  return findRoute(id);
+}
+function chooseRoute(id){
+  const route = routeById(id);
+  if(!route) return;
+  game.currentRoute = id;
+  game.routeHistory = (game.routeHistory||[]).slice();
+  game.routeHistory[game.gymIndex] = id;
+  game.routeCards = null;
+  game.pendingSteps = buildLegSteps();
+  advanceJourney();
+}
+
+/* ===================================================================
+   PIPELINE DA JORNADA
+   Cada perna virou uma sequência de telas opcionais (rota, evento da
+   rota, encontro selvagem, troca com NPC, emboscada, rival, cassino...).
+   Em vez de encadear callbacks, a perna monta uma fila de "passos" e
+   `advanceJourney()` vai consumindo até sobrar a distribuição de levels.
+   =================================================================== */
+function buildLegSteps(){
+  const i = game.gymIndex;
+  const steps = ['routeEvent', 'wild'];
+  if(NPC_TRADE_LEGS.includes(i) && !(game.npcTradesDone||[]).includes(i)) steps.push('npcTrade');
+  if(JESSIE_LEGS.includes(i)) steps.push('jessie');
+  if(i >= 1) steps.push('rocket');
+  steps.push('hideout');
+  if(RIVAL_LEGS.includes(i)) steps.push('rival');
+  if(i === CASINO_LEG && !game.casinoDone) steps.push('casino');
+  if(i === SNORLAX_LEG && !game.routeEventDone['snorlax']) steps.push('snorlax');
+  if(i >= 1) steps.push('dayCare');
+  return steps;
+}
+function startLeg(){
+  game.pendingSteps = [];
+  goToRouteChoice();
+}
+// chamado depois da escolha de rota e no fim de cada passo
+function advanceJourney(){
+  // A fila é montada UMA vez, na escolha da rota (`chooseRoute`). Reconstruí-la aqui faria o
+  // último passo da perna reabrir o encontro selvagem inteiro — a perna rodava duas vezes.
+  if(!game.currentRoute){ goToRouteChoice(); return; }
+  if(!Array.isArray(game.pendingSteps)) game.pendingSteps = [];
+  while(game.pendingSteps.length){
+    const step = game.pendingSteps.shift();
+    if(runJourneyStep(step)) return; // o passo abriu uma tela; o resto continua quando ela terminar
+  }
+  collectDayCareMon();
+  startLevelDistribution();
+}
+function runJourneyStep(step){
+  switch(step){
+    case 'routeEvent': return startRouteEvent();
+    case 'wild':       return startWildEncounter();
+    case 'npcTrade':   return startNpcTrade();
+    case 'jessie':     return startJessieJames();
+    case 'rocket':     return maybeRocketAmbush();
+    case 'hideout':    return maybeOpenHideout();
+    case 'rival':      return startRivalBattle();
+    case 'casino':     return openCasino();
+    case 'snorlax':    return startSnorlax();
+    case 'dayCare':    return openDayCare();
+  }
+  return false;
+}
+
+/* ---------------------------------------------------
+   ENCONTRO SELVAGEM (doc 02 §4.4 raridade + pity, doc 05 pools de rota)
+--------------------------------------------------- */
+const PITY_THRESHOLD_BST = 400;   // "raro" pra efeito de pity
+const PITY_ENCOUNTERS = 3;        // 3 encontros secos garantem um raro no próximo
+const SHINY_CHANCE = 1/128;
+
+function bstOf(speciesId){
+  const sp = SPECIES[speciesId];
+  if(!sp) return 300;
+  return sp.hp + sp.attack + sp.defense + sp.speed;
+}
+// Peso inverso ao BST: um Rattata aparece muito mais que um Dratini. Sem isso, todo pokémon
+// do pool tinha exatamente a mesma chance e "raro" não queria dizer nada (doc 02 §4.4).
+function rarityWeight(speciesId){
+  const bst = bstOf(speciesId);
+  return Math.max(0.15, Math.pow(420 / Math.max(120, bst), 2.2));
+}
+function weightedPick(pool, rng, exclude){
+  const options = pool.filter(id=>SPECIES[id] && !(exclude||[]).includes(id));
+  if(options.length===0) return null;
+  const weights = options.map(rarityWeight);
+  const total = weights.reduce((a,b)=>a+b,0);
+  let r = rng() * total;
+  for(let i=0;i<options.length;i++){
+    r -= weights[i];
+    if(r <= 0) return options[i];
+  }
+  return options[options.length-1];
+}
+function startWildEncounter(){
+  const route = routeById(game.currentRoute) || { pool: LEGS[game.gymIndex].pool, rare:[], risk:'calma' };
+  if(route.noWild) return false; // S.S. Anne / Silph Co. / Safári resolvem tudo no evento da rota
+  const leg = LEGS[game.gymIndex];
+  const rng = game.dailyChallenge ? dailyRng('wild'+game.gymIndex) : Math.random;
+  const risky = route.risk === 'arriscada';
+  const golden = !!route.golden;
+  const levelBump = golden ? 2 : (risky ? 1 : 0);
+
+  const picked = [];
+  for(let i=0;i<leg.offerCount;i++){
+    const id = weightedPick(route.pool, rng, picked);
+    if(id) picked.push(id);
+  }
+  // raros da rota: 5% pras aves lendárias (que agora só existem na rota canônica delas),
+  // 12% (ou 20% em rota arriscada) pros demais exclusivos
+  (route.rare||[]).forEach(rareId=>{
+    if(!SPECIES[rareId] || picked.includes(rareId)) return;
+    const isBird = LEGENDARY_BIRDS.includes(rareId);
+    const chance = isBird ? LEGENDARY_ROUTE_CHANCE : (risky ? 0.20 : 0.12);
+    if(rng() < chance){ picked[Math.floor(rng()*picked.length)] = rareId; }
+  });
+  // pity: 3 encontros seguidos sem nada acima de 400 de BST garantem um raro agora
+  const hasRare = picked.some(id=>bstOf(id) >= PITY_THRESHOLD_BST);
+  if(!hasRare && (game.pityCounter||0) >= PITY_ENCOUNTERS){
+    const candidates = [].concat(route.pool, route.rare||[])
+      .filter(id=>SPECIES[id] && bstOf(id) >= PITY_THRESHOLD_BST && !LEGENDARY_BIRDS.includes(id));
+    if(candidates.length){
+      picked[Math.floor(rng()*picked.length)] = candidates[Math.floor(rng()*candidates.length)];
+    }
+  }
+  // rota dourada: uma oferta garantidamente acima da média do próprio pool
+  if(golden){
+    const best = route.pool.slice().sort((a,b)=>bstOf(b)-bstOf(a))[0];
+    if(best) picked[0] = best;
+  }
+  const finalHasRare = picked.some(id=>bstOf(id) >= PITY_THRESHOLD_BST);
+  game.pityCounter = finalHasRare ? 0 : (game.pityCounter||0) + 1;
+
+  // presentes de evento (Lapras da Silph, Gengar da torre, Porygon do cassino, Farfetch'd do capitão)
+  // entram garantidos na próxima leva de ofertas
+  if(game.pendingGift && SPECIES[game.pendingGift]){
+    picked[picked.length-1] = game.pendingGift;
+    game.pendingGift = null;
+  }
+  const shinyChance = golden ? SHINY_CHANCE*2 : SHINY_CHANCE;
+  game.wildOffer = picked.map(id=>({
+    speciesId: id,
+    level: LEGENDARY_BIRDS.includes(id) ? 45 : Math.min(55, randomInt(leg.minLevel, leg.maxLevel) + levelBump),
+    shiny: rng() < shinyChance
+  }));
+  game.wildSelected = [];
+  game.screen = 'wild';
+  render();
+  return true;
+}
+// mantido pra compatibilidade com saves antigos parados na tela 'walk'
+function goToWildEncounter(){ startLeg(); }
+
+/* ---------------------------------------------------
+   CRECHE (doc 02 §3)
+--------------------------------------------------- */
+function openDayCare(){
+  if(game.dayCareMon) return false;         // já tem alguém lá dentro
+  if((game.team||[]).length < 2) return false;
+  game.screen = 'dayCare';
+  render();
+  return true;
+}
+function leaveAtDayCare(id){
+  const idx = game.team.findIndex(p=>p.id===id);
+  if(idx<0) return;
+  game.dayCareMon = game.team.splice(idx,1)[0];
+  game.dayCareReturnLeg = game.gymIndex + 1;
+  advanceJourney();
+}
+function skipDayCare(){ advanceJourney(); }
+function collectDayCareMon(){
+  if(!game.dayCareMon) return;
+  if(game.dayCareReturnLeg != null && game.gymIndex < game.dayCareReturnLeg) return;
+  const mon = game.dayCareMon;
+  mon.level = Math.min(55, mon.level + 2);
+  game.dayCareMon = null;
+  game.dayCareReturnLeg = null;
+  if(game.team.length < 6){
+    game.team.push(mon);
+    tryEvolve(mon);
+    game.dayCareReturned = mon.name;
+  } else {
+    game.dayCareMon = mon; // time cheio: ele espera mais uma perna
+    game.dayCareReturnLeg = game.gymIndex + 1;
+  }
+}
+
+/* ---------------------------------------------------
+   RANKING DO DIA (doc 02 §3)
+   Quem joga o desafio diário entra num placar do dia: quem zerou com menos derrotas.
+--------------------------------------------------- */
+function dailyRankDocRef(seed){ return db.collection('leagues').doc('daily_'+seed); }
+async function submitDailyResult(){
+  if(!game.dailyChallenge || !game.dailySeed || !game.authUser) return;
+  const key = sanitizeForDocId(game.trainerName || 'sememnome');
+  try{
+    const entry = {
+      name: game.trainerName || 'Sem nome',
+      badges: game.badgesEarned.length,
+      losses: game.totalLossesJourney || 0,
+      points: game.totalPointsEarned || 0,
+      nuzlocke: !!game.nuzlocke,
+      at: Date.now()
+    };
+    await dailyRankDocRef(game.dailySeed).set({ seed: game.dailySeed, entries: { [key]: entry } }, { merge: true });
+  } catch(e){ console.error('Erro ao enviar resultado do desafio diário:', e); }
+}
+async function loadDailyRanking(){
+  if(!game.dailySeed) return;
+  try{
+    const snap = await dailyRankDocRef(game.dailySeed).get();
+    const entries = (snap.exists && snap.data().entries) ? Object.values(snap.data().entries) : [];
+    // ordem: mais insígnias, depois menos derrotas, depois menos pontos gastos
+    entries.sort((a,b)=> (b.badges-a.badges) || (a.losses-b.losses) || (a.points-b.points));
+    game.dailyRanking = entries.slice(0, 20);
+    if(game.screen==='journeyEnd' || game.screen==='journeyDiary') render();
+  } catch(e){ console.error('Erro ao carregar ranking do dia:', e); }
+}
+
+/* ---------------------------------------------------
+   DESAFIO DIÁRIO COM SEED GLOBAL (doc 02 §3)
+   Todo mundo que joga no mesmo dia enfrenta exatamente as mesmas ofertas,
+   as mesmas rotas douradas e os mesmos eventos.
+--------------------------------------------------- */
+function todaySeedString(){
+  const d = new Date();
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;
+}
+let dailyRngCache = {};
+function dailyRng(salt){
+  const key = (game.dailySeed || todaySeedString()) + '|' + (salt||'');
+  if(!dailyRngCache[key]) dailyRngCache[key] = makeSeededRng(key);
+  return dailyRngCache[key];
+}
+
+/* ===================================================================
+   MOTOR GENÉRICO DE BATALHAS DE EVENTO
+   Rocket, rival, Jessie & James, Snorlax, torre de Lavender, dojo,
+   S.S. Anne e Silph Co. usam todos o MESMO motor dos ginásios — muda só
+   quem é o adversário, o texto e o que acontece no fim. Os desfechos
+   ficam num registro por id (`EVENT_OUTCOMES`) porque callbacks não
+   sobrevivem ao save no Firestore.
+   =================================================================== */
+function avgTeamLevel(){
+  if(!game.team || game.team.length===0) return 5;
+  return Math.round(game.team.reduce((a,p)=>a+p.level,0) / game.team.length);
+}
+function scaledTeam(list, offset){
+  const avg = avgTeamLevel();
+  return list.map(entry=>({
+    speciesId: entry.species,
+    level: Math.max(2, Math.min(60, entry.level != null ? entry.level : avg + (entry.rel||0) + (offset||0)))
+  }));
+}
+function startEventBattle(cfg){
+  game.eventBattle = cfg;
+  game.eventResult = null;
+  game.screen = 'eventIntro';
+  render();
+  return true;
+}
+function runEventBattle(){
+  const cfg = game.eventBattle;
+  if(!cfg) { advanceJourney(); return; }
+  const myTeam = game.team.map(p=>Object.assign(createInstance(p.speciesId, p.level), { id:p.id, shiny:p.shiny }));
+  applyTeamBonuses(myTeam, game.badgesEarned.length);
+  const foeTeam = cfg.opponentTeam.map(o=>createInstance(o.speciesId, o.level));
+  const result = simulateGymBattle(myTeam, foeTeam);
+  game.eventResult = result;
+  game.eventRevealIndex = 0;
+  game.eventRevealPhase = 'loading';
+  game.screen = 'eventBattling';
+  render();
+  setTimeout(advanceEventReveal, 1200);
+}
+function advanceEventReveal(){
+  if(game.screen !== 'eventBattling') return;
+  if(game.eventRevealPhase === 'loading'){
+    game.eventRevealPhase = 'result';
+    render();
+    setTimeout(animateEventHpBars, 50);
+    setTimeout(advanceEventReveal, 1300);
+  } else {
+    const matchups = game.eventResult.matchups;
+    if(game.eventRevealIndex < matchups.length - 1){
+      game.eventRevealIndex++;
+      game.eventRevealPhase = 'loading';
+      render();
+      setTimeout(advanceEventReveal, 1200);
+    } else {
+      finishEventBattle();
+    }
+  }
+}
+function animateEventHpBars(){
+  if(game.screen !== 'eventBattling' || game.eventRevealPhase !== 'result') return;
+  const m = game.eventResult.matchups[game.eventRevealIndex];
+  const pf = document.getElementById('hp-fill-player'), ef = document.getElementById('hp-fill-enemy');
+  const pl = document.getElementById('hp-label-player'), el = document.getElementById('hp-label-enemy');
+  if(pf){ const pct = Math.max(0,(m.playerHpAfter/m.playerMaxHp)*100); pf.style.width = pct+'%'; pf.className='hp-bar-fill '+hpBarClass(pct); }
+  if(ef){ const pct = Math.max(0,(m.enemyHpAfter/m.enemyMaxHp)*100); ef.style.width = pct+'%'; ef.className='hp-bar-fill '+hpBarClass(pct); }
+  if(pl){ pl.textContent = `${Math.max(0,m.playerHpAfter)}/${m.playerMaxHp} HP`; }
+  if(el){ el.textContent = `${Math.max(0,m.enemyHpAfter)}/${m.enemyMaxHp} HP`; }
+}
+function finishEventBattle(){
+  if(game.screen !== 'eventBattling') return;
+  const cfg = game.eventBattle;
+  const outcome = EVENT_OUTCOMES[cfg.id];
+  game.eventOutcomeText = '';
+  applyNuzlockeFaints(game.eventResult);
+  if(game.eventResult.win){
+    if(outcome && outcome.onWin) game.eventOutcomeText = outcome.onWin(cfg) || '';
+  } else {
+    if(outcome && outcome.onLose) game.eventOutcomeText = outcome.onLose(cfg) || '';
+  }
+  game.screen = 'eventResult';
+  render();
+}
+function closeEventResultInner(){
+  const cfg = game.eventBattle;
+  game.eventBattle = null;
+  game.eventResult = null;
+  game.eventOutcomeText = '';
+  if(cfg && cfg.returnScreen && !(cfg.chain && cfg.chain.length)){
+    game.screen = cfg.returnScreen;
+    render();
+    return;
+  }
+  if(cfg && cfg.chain && cfg.chain.length){
+    const next = cfg.chain.shift();
+    // batalhas encadeadas (torre de Lavender, esconderijo, Silph) continuam sem redistribuir pontos
+    if(game.eventChainFailed){ game.eventChainFailed = false; advanceJourney(); return; }
+    startEventBattle(Object.assign({}, next, { chain: cfg.chain }));
+    return;
+  }
+  advanceJourney();
+}
+function closeEventResult(){
+  if((game.team||[]).length === 0){ game.screen = 'gameover'; render(); return; }
+  closeEventResultInner();
+}
+
+/* ---------------------------------------------------
+   MODO NUZLOCKE (doc 02 §3)
+--------------------------------------------------- */
+function applyNuzlockeFaints(result){
+  if(!game.nuzlocke || !result || !result.playerStatus) return;
+  const dead = result.playerStatus.filter(s=>s.fainted).map(s=>s.id);
+  if(dead.length===0) return;
+  game.faintedForever = (game.faintedForever||[]).concat(
+    result.playerStatus.filter(s=>s.fainted).map(s=>({ name:s.name, speciesId:s.speciesId, level:s.level }))
+  );
+  game.team = game.team.filter(p=>!dead.includes(p.id));
+}
+// no Nuzlocke o time pode acabar zerado no meio de qualquer batalha -- aí a jornada termina
+// ali mesmo, em vez de o jogo cair numa tela de distribuição sem ninguém pra receber pontos
+function checkTeamWipe(){
+  if((game.team||[]).length > 0) return false;
+  game.screen = 'gameover';
+  render();
+  return true;
+}
+
+/* ===================================================================
+   EQUIPE ROCKET (doc 02 §1)
+   =================================================================== */
+const ROCKET_POOL = ['ratata','zubat','ekans','koffing','grimer','golbat','arbok','weezing','muk','raticate'];
+const ROCKET_NAMES = ['Recruta Rocket', 'Agente Rocket', 'Capanga Rocket', 'Executiva Rocket'];
+const CASINO_LEG = 3;
+const SNORLAX_LEG = 4;
+const JESSIE_LEGS = [0, 3, 6];
+const RIVAL_LEGS = [2, 4, 6];
+const NPC_TRADE_LEGS = [2, 5];
+
+function rocketAmbushChance(){
+  const route = routeById(game.currentRoute);
+  if(route && route.golden) return 0;            // a clareira dourada é só coisa boa
+  return (route && route.risk==='arriscada') ? 0.35 : 0.20;
+}
+function maybeRocketAmbush(){
+  if(game.stolenMon) return false;               // um sequestro por vez
+  if(Math.random() >= rocketAmbushChance()) return false;
+  const avg = avgTeamLevel();
+  const size = Math.min(3, 1 + Math.floor(game.gymIndex/3));
+  const picks = shuffle(ROCKET_POOL).slice(0, size);
+  return startEventBattle({
+    id:'rocket_ambush', icon:'🚀',
+    title:'Emboscada da Equipe Rocket!',
+    opponentName: ROCKET_NAMES[Math.min(ROCKET_NAMES.length-1, Math.floor(game.gymIndex/2))],
+    intro:'Uma sombra sai do mato: «Parado aí, pirralho! A Equipe Rocket fica com o que é seu.» Essa batalha <strong>não conta</strong> nas suas 5 derrotas — mas perder dói no bolso.',
+    opponentTeam: picks.map(id=>({ speciesId:id, level: Math.max(2, avg - 1 + randomInt(0,2)) })),
+    freeLoss:true
+  });
+}
+const EVENT_OUTCOMES = {
+  rocket_ambush: {
+    onWin(){
+      game.rocketAmbushesWon = (game.rocketAmbushesWon||0) + 1;
+      game.nextLegPoints = (game.nextLegPoints||10) + 3;
+      const giovanniNote = game.rocketAmbushesWon <= 4
+        ? ` O time do <strong>Giovanni</strong> perde <strong>1 nível</strong> por causa disso (${Math.min(4,game.rocketAmbushesWon)}/4).`
+        : '';
+      return `Você espantou a Rocket! <strong>+3 pontos</strong> de nível bônus na próxima distribuição.${giovanniNote}`;
+    },
+    onLose(){
+      const half = Math.floor((game.nextLegPoints||10) / 2);
+      game.nextLegPoints = Math.max(0, (game.nextLegPoints||10) - half);
+      let msg = `«Obrigado pela contribuição!» O Rocket levou <strong>${half} pontos</strong> da sua próxima distribuição.`;
+      if(game.team.length > 1){
+        const idx = Math.floor(Math.random()*game.team.length);
+        game.stolenMon = game.team.splice(idx,1)[0];
+        game.hideoutStage = 0;
+        msg += ` E pior: ele <strong>sequestrou ${game.stolenMon.name}</strong>! Dá pra tentar o resgate antes do próximo ginásio.`;
+      }
+      return msg;
+    }
+  },
+  hideout_1: {
+    onWin(){ game.hideoutStage = 1; return 'Primeiro guarda no chão. Só falta o chefe da sala dos fundos!'; },
+    onLose(){ game.eventChainFailed = true; return 'Você foi expulso do esconderijo. Ainda dá pra buscar depois do ginásio — mas ele volta maltratado.'; }
+  },
+  hideout_2: {
+    onWin(){
+      const mon = game.stolenMon;
+      game.stolenMon = null; game.hideoutStage = 0;
+      if(mon && game.team.length < 6){ game.team.push(mon); }
+      else if(mon){ game.stolenMon = mon; return `${mon.name} foi resgatado, mas seu time está cheio — ele espera na próxima vaga.`; }
+      return `Resgate concluído! <strong>${mon ? mon.name : 'Seu Pokémon'}</strong> voltou pro time inteirinho.`;
+    },
+    onLose(){ game.eventChainFailed = true; return 'O chefe do esconderijo é osso duro. Seu Pokémon fica mais um pouco por lá…'; }
+  },
+  jessie_james: {
+    onWin(){
+      game.jessieDefeats = (game.jessieDefeats||0) + 1;
+      game.nextLegPoints = (game.nextLegPoints||10) + 1;
+      const lines = [
+        '«Estamos decolando de novooo! ✨»',
+        '«Isso não foi justo, o Meowth escorregou!» «Eu não escorreguei, foi você!»',
+        '«Prepare-se para encrenca… na próxima vez! Nós VOLTAMOS!»'
+      ];
+      return `${lines[Math.min(lines.length-1, game.jessieDefeats-1)]} <strong>+1 ponto</strong> pela zoeira.` +
+        (game.jessieDefeats>=3 ? ' <br>🏆 Conquista desbloqueada: <strong>Prepare-se para Encrenca</strong>!' : '');
+    },
+    onLose(){ return '«HAHAHA! Pela primeira vez a gente ganhou!» Eles fogem comemorando antes que você peça revanche. Nada mudou no seu time.'; }
+  },
+  rival_battle: {
+    onWin(){
+      game.rivalWins = (game.rivalWins||0) + 1;
+      if(game.screen !== 'journeyEnd' && game.badgesEarned.length < GYMS.length){
+        game.nextLegPoints = (game.nextLegPoints||10) + 2;
+      }
+      return `${escapeHtml(game.rivalName)} não acredita: «Isso foi sorte! SORTE!» <strong>+2 pontos</strong> pela vitória.` +
+        (game.rivalWins>=4 ? ` <br>🏆 Conquista desbloqueada: <strong>Cheiro de derrota, ${escapeHtml(game.rivalName)}?</strong>` : '');
+    },
+    onLose(){
+      game.rivalLosses = (game.rivalLosses||0) + 1;
+      return `${escapeHtml(game.rivalName)} dá risada: «${randomRivalTaunt()}» Essa derrota <strong>não conta</strong> nas suas 5 — mas o orgulho conta.`;
+    }
+  },
+  snorlax: {
+    onWin(){
+      const lvl = 30;
+      if(game.team.length < 6){
+        const mon = createInstance('snorlax', lvl);
+        game.team.push(mon); markCaught('snorlax');
+        return 'O Snorlax rolou pro lado e... aceitou vir junto! <strong>Snorlax Lv.30</strong> entrou no time.';
+      }
+      markCaught('snorlax');
+      return 'Você venceu o Snorlax, mas seu time está cheio — ele só saiu da estrada e entrou pra Pokédex.';
+    },
+    onLose(){ return 'O Snorlax nem acordou direito. Você contorna a estrada e segue viagem — sem prêmio, sem punição.'; }
+  },
+  lavender_1: { onWin(){ return 'O Gastly some rindo. Dois pela frente…'; }, onLose(){ game.eventChainFailed=true; return 'Os fantasmas te expulsam da torre. Você segue viagem arrepiado.'; } },
+  lavender_2: { onWin(){ return 'O Haunter recua pra escuridão. Falta o dono da torre.'; }, onLose(){ game.eventChainFailed=true; return 'O Haunter foi demais. Você abandona a torre.'; } },
+  lavender_3: {
+    onWin(){
+      game.pendingGift = 'gengar';
+      return 'O Gengar reconhece sua coragem! Ele vai <strong>aparecer nas ofertas do próximo encontro</strong>.';
+    },
+    onLose(){ return 'O Gengar te encara e some. Ninguém vence a Torre na primeira noite.'; }
+  },
+  dojo_master: {
+    onWin(){ game.screenAfterEvent = 'dojo'; return 'O mestre se curva: «Escolha um discípulo para levar.»'; },
+    onLose(){ return 'O mestre balança a cabeça: «Volte quando estiver mais forte.»'; }
+  },
+  ss_anne_1: { onWin(){ game.nextLegPoints=(game.nextLegPoints||10)+2; return 'Marinheiro derrotado! <strong>+2 pontos</strong>.'; }, onLose(){ game.eventChainFailed=true; return 'Você foi jogado pra fora do convés. Sem prêmio.'; } },
+  ss_anne_2: { onWin(){ game.nextLegPoints=(game.nextLegPoints||10)+2; return 'Cavalheiro derrotado! <strong>+2 pontos</strong>.'; }, onLose(){ game.eventChainFailed=true; return 'O cavalheiro te venceu e voltou pro jantar. Sem prêmio.'; } },
+  ss_anne_3: {
+    onWin(){
+      game.nextLegPoints = (game.nextLegPoints||10) + 3;
+      game.pendingGift = 'farfetchd';
+      return 'O Capitão agradece e te dá um presente: <strong>+3 pontos</strong> e um <strong>Farfetch\'d</strong> nas ofertas do próximo encontro.';
+    },
+    onLose(){ return 'O Capitão te venceu — mas pagou o almoço. Nada além disso.'; }
+  },
+  silph_1: { onWin(){ return 'Andar liberado! O elevador sobe até a sala do presidente.'; }, onLose(){ game.eventChainFailed=true; return 'A Rocket dominou o prédio. Você sai pela escada de incêndio.'; } },
+  silph_2: {
+    onWin(){
+      game.pendingGift = 'lapras';
+      game.nextLegPoints = (game.nextLegPoints||10) + 3;
+      return 'A Silph Co. é libertada! O presidente te dá uma <strong>Lapras</strong> de presente (aparece no próximo encontro) e <strong>+3 pontos</strong>.';
+    },
+    onLose(){ game.eventChainFailed=true; return 'O executivo Rocket riu na sua cara e trancou o cofre.'; }
+  }
+};
+
+/* --- Jessie & James --- */
+function startJessieJames(){
+  const avg = avgTeamLevel();
+  const stage = (game.jessieDefeats||0);
+  const teams = [
+    [{speciesId:'ekans', level: avg-2}, {speciesId:'meowth', level: avg-2}],
+    [{speciesId:'arbok', level: avg-1}, {speciesId:'koffing', level: avg-1}, {speciesId:'meowth', level: avg-1}],
+    [{speciesId:'arbok', level: avg}, {speciesId:'weezing', level: avg}, {speciesId:'persian', level: avg}]
+  ];
+  const team = teams[Math.min(2, stage)].map(t=>({ speciesId:t.speciesId, level: Math.max(3, t.level) }));
+  return startEventBattle({
+    id:'jessie_james', icon:'🎈',
+    title:'Prepare-se para encrenca!',
+    opponentName:'Jessie & James',
+    intro:'«E façam ser em dobro!» Um balão em forma de Meowth pousa na sua frente. «Para proteger o mundo da devastação…» — eles não vão embora sem batalhar.',
+    opponentTeam: team,
+    freeLoss:true
+  });
+}
+
+/* --- Rival (doc 02 §2) --- */
+const RIVAL_TAUNTS = [
+  'Ainda usando esse time? Que fofo.',
+  'Eu já tinha 4 insígnias na sua idade. Ah, espera.',
+  'Smell ya later!',
+  'Sabia que ia te encontrar aqui. Perdido, né?',
+  'Meu Pokémon come o seu no café da manhã.',
+  'Você recusou os melhores. Eu não.',
+  'Vovô sempre gostou mais de mim mesmo.',
+  'Isso é um time ou uma creche?',
+  'Vou te vencer com metade do meu time. Brincadeira: vou usar todos.',
+  'A Liga não é lugar pra amador, sabia?',
+  'Nem esquentei ainda.',
+  'Da próxima vez traga um time de verdade.',
+  'Já pensou em virar Criador de Pokémon? Combina mais com você.',
+  'Eu escolhi o inicial certo. Você não.',
+  'Anota aí: eu vou ser o Campeão.'
+];
+function randomRivalTaunt(){ return RIVAL_TAUNTS[Math.floor(Math.random()*RIVAL_TAUNTS.length)]; }
+const RIVAL_STARTER_COUNTER = { bulbasaur:'charmander', charmander:'squirtle', squirtle:'bulbasaur' };
+function rivalStarterEvolvedId(){
+  const base = game.rivalStarterId || 'charmander';
+  let cur = base, lvl = avgTeamLevel() + 1;
+  while(EVOLUTIONS[cur] && lvl >= EVOLUTIONS[cur].level){ cur = EVOLUTIONS[cur].into; }
+  return cur;
+}
+// doc 02 §2.1 — a mecânica de ouro: o que você recusou no encontro selvagem vira o time dele
+function buildRivalTeam(){
+  const avg = avgTeamLevel();
+  const team = [{ speciesId: rivalStarterEvolvedId(), level: avg + 1 }];
+  const refused = (game.rivalPool||[]).filter(id=>SPECIES[id]);
+  const best = refused.slice().sort((a,b)=>bstOf(b)-bstOf(a)).slice(0, 5);
+  best.forEach(id=>{
+    let cur = id, lvl = avg + randomInt(-1, 1);
+    while(EVOLUTIONS[cur] && lvl >= EVOLUTIONS[cur].level){ cur = EVOLUTIONS[cur].into; }
+    team.push({ speciesId: cur, level: Math.max(3, lvl) });
+  });
+  while(team.length < 3){
+    const filler = shuffle(LEGS[game.gymIndex].pool)[0];
+    team.push({ speciesId: filler, level: Math.max(3, avg) });
+  }
+  return team.slice(0, 6);
+}
+function startRivalBattle(){
+  game.rivalTaunt = randomRivalTaunt();
+  return startEventBattle({
+    id:'rival_battle', icon:'😤',
+    title:`${escapeHtml(game.rivalName)} bloqueia o caminho!`,
+    opponentName: game.rivalName,
+    intro:`«${game.rivalTaunt}» — o time dele é feito dos Pokémons que <strong>você recusou</strong> pelo caminho. Derrota aqui <strong>não conta</strong> nas suas 5.`,
+    opponentTeam: buildRivalTeam(),
+    freeLoss:true
+  });
+}
+/* --- Esconderijo Rocket (doc 02 §1.3) --- */
+function maybeOpenHideout(){
+  if(!game.stolenMon) return false;
+  game.screen = 'rocketHideout';
+  render();
+  return true;
+}
+function enterHideout(){
+  const avg = avgTeamLevel();
+  const first = {
+    id:'hideout_1', icon:'🕵️', title:'Esconderijo Rocket — Guarda da entrada',
+    opponentName:'Guarda Rocket',
+    intro:`Duas batalhas seguidas, <strong>sem redistribuir pontos no meio</strong>. É o preço de resgatar ${game.stolenMon ? game.stolenMon.name : 'seu Pokémon'}.`,
+    opponentTeam:[{speciesId:'raticate', level:avg}, {speciesId:'golbat', level:avg}],
+    freeLoss:true,
+    chain:[{
+      id:'hideout_2', icon:'🕶️', title:'Esconderijo Rocket — Chefe da sala dos fundos',
+      opponentName:'Executivo Rocket',
+      intro:'A porta dos fundos se abre. «Você chegou longe demais, pirralho.»',
+      opponentTeam:[{speciesId:'arbok', level:avg+1}, {speciesId:'weezing', level:avg+1}, {speciesId:'muk', level:avg+1}],
+      freeLoss:true
+    }]
+  };
+  startEventBattle(first);
+}
+function skipHideout(){
+  // ignorou o resgate: ele volta depois do ginásio, "maltratado" (-2 níveis)
+  const mon = game.stolenMon;
+  if(mon){ mon.level = Math.max(2, mon.level - 2); mon.mistreated = true; }
+  game.hideoutStage = 0;
+  advanceJourney();
+}
+function returnStolenAfterGym(){
+  if(!game.stolenMon) return null;
+  if(game.team.length >= 6) return null;
+  const mon = game.stolenMon;
+  mon.level = Math.max(2, mon.level - 2);
+  game.team.push(mon);
+  game.stolenMon = null;
+  return mon;
+}
+/* --- Snorlax (doc 02 §3) --- */
+function startSnorlax(){
+  game.routeEventDone['snorlax'] = true;
+  return startEventBattle({
+    id:'snorlax', icon:'😴',
+    title:'Um Snorlax bloqueia a estrada!',
+    opponentName:'Snorlax selvagem',
+    intro:'Ele ocupa a estrada inteira e ronca alto. Enfrentar um <strong>Snorlax Lv.30</strong> é arriscado — mas quem vence, leva. Perder só custa o tempo do desvio.',
+    opponentTeam:[{ speciesId:'snorlax', level:30 }],
+    freeLoss:true
+  });
+}
+
+/* ===================================================================
+   EVENTOS DE ROTA (doc 05 §4)
+   =================================================================== */
+function startRouteEvent(){
+  const route = routeById(game.currentRoute);
+  if(!route || !route.event) return false;
+  const key = route.event + '_' + game.gymIndex;
+  if(game.routeEventDone[key]) return false;
+  game.routeEventDone[key] = true;
+  switch(route.event){
+    case 'fossil':         game.screen = 'fossil'; render(); return true;
+    case 'rock_tunnel':    game.screen = 'routeEvent'; render(); return true;
+    case 'lavender_tower': return startLavenderTower();
+    case 'safari':         return openSafari();
+    case 'dojo':           return startDojoMaster();
+    case 'ss_anne':        return startSSAnne();
+    case 'silph':          return startSilph();
+  }
+  return false;
+}
+/* --- Fóssil do Monte Lua: escolha excludente clássica --- */
+function chooseFossil(which){
+  game.fossilChoice = which;
+  const mon = createInstance(which, Math.max(5, LEGS[game.gymIndex].minLevel));
+  markCaught(which);
+  if(game.team.length < 6){ game.team.push(mon); }
+  else { game.pendingGift = which; }
+  advanceJourney();
+}
+function skipFossil(){ advanceJourney(); }
+
+/* --- Túnel de Pedra: travessia às cegas (risco opt-in) --- */
+function crossTunnelBlind(){
+  game.declaredChallenge = 'blind';
+  game.tunnelBonus = true;
+  game.nextLegPoints = (game.nextLegPoints||10) + 3;
+  advanceJourney();
+}
+function crossTunnelSlow(){ advanceJourney(); }
+
+/* --- Torre de Lavender: 3 fantasmas em sequência --- */
+function startLavenderTower(){
+  const avg = avgTeamLevel();
+  return startEventBattle({
+    id:'lavender_1', icon:'🕯️', title:'Torre Pokémon — 3º andar',
+    opponentName:'Gastly da torre',
+    intro:'A escada range. Três presenças bloqueiam os andares — e não dá pra redistribuir pontos entre elas.',
+    opponentTeam:[{speciesId:'gastly', level:avg-1}], freeLoss:true,
+    chain:[
+      { id:'lavender_2', icon:'🕯️', title:'Torre Pokémon — 5º andar', opponentName:'Haunter da torre',
+        intro:'Mais alto, mais frio. O Haunter já sabe seu nome.',
+        opponentTeam:[{speciesId:'haunter', level:avg}, {speciesId:'gastly', level:avg-2}], freeLoss:true },
+      { id:'lavender_3', icon:'👻', title:'Torre Pokémon — Topo', opponentName:'Gengar da torre',
+        intro:'No topo, uma sombra sorri de orelha a orelha.',
+        opponentTeam:[{speciesId:'gengar', level:avg+1}], freeLoss:true }
+    ]
+  });
+}
+/* --- Dojo Lutador --- */
+function startDojoMaster(){
+  const avg = avgTeamLevel();
+  return startEventBattle({
+    id:'dojo_master', icon:'🥋', title:'Dojo de Saffron — o Mestre',
+    opponentName:'Mestre do Dojo',
+    intro:'«Vença e leve um discípulo.» Ele avisa: lutador não é boa ideia contra a Sabrina. Quem sabe, sabe.',
+    opponentTeam:[{speciesId:'machop', level:avg-1}, {speciesId:'machoke', level:avg}, {speciesId:'primeape', level:avg}],
+    freeLoss:true
+  });
+}
+function chooseDojoPrize(id){
+  game.eventBattle = null;
+  game.eventResult = null;
+  game.eventOutcomeText = '';
+  game.dojoChoice = id;
+  const mon = createInstance(id, avgTeamLevel());
+  markCaught(id);
+  if(game.team.length < 6){ game.team.push(mon); } else { game.pendingGift = id; }
+  game.screenAfterEvent = null;
+  advanceJourney();
+}
+/* --- S.S. Anne: 3 treinadores, sem captura --- */
+function startSSAnne(){
+  const avg = avgTeamLevel();
+  return startEventBattle({
+    id:'ss_anne_1', icon:'⚓', title:'S.S. Anne — Marinheiro',
+    opponentName:'Marinheiro',
+    intro:'Sem Pokémons selvagens a bordo: aqui você troca captura por <strong>pontos e um presente raro</strong>. Três batalhas seguidas.',
+    opponentTeam:[{speciesId:'machop', level:avg-1}, {speciesId:'tentacool', level:avg-1}], freeLoss:true,
+    chain:[
+      { id:'ss_anne_2', icon:'🎩', title:'S.S. Anne — Cavalheiro', opponentName:'Cavalheiro',
+        intro:'«Meu Growlithe custou mais que sua bicicleta.»',
+        opponentTeam:[{speciesId:'growlithe', level:avg}, {speciesId:'ratata', level:avg-2}], freeLoss:true },
+      { id:'ss_anne_3', icon:'🧭', title:'S.S. Anne — O Capitão', opponentName:'Capitão',
+        intro:'Ele está enjoado, mas ainda quer lutar.',
+        opponentTeam:[{speciesId:'machoke', level:avg+1}, {speciesId:'tentacruel', level:avg}], freeLoss:true }
+    ]
+  });
+}
+/* --- Silph Co.: o evento Rocket grande --- */
+function startSilph(){
+  const avg = avgTeamLevel();
+  return startEventBattle({
+    id:'silph_1', icon:'🏢', title:'Silph Co. — 7º andar',
+    opponentName:'Agente Rocket',
+    intro:'O prédio inteiro está tomado. Duas batalhas até o cofre do presidente — e um presente esperando lá dentro.',
+    opponentTeam:[{speciesId:'golbat', level:avg}, {speciesId:'weezing', level:avg}], freeLoss:true,
+    chain:[
+      { id:'silph_2', icon:'🕶️', title:'Silph Co. — Sala do presidente', opponentName:'Executivo Rocket',
+        intro:'«O Giovanni vai adorar saber que você chegou até aqui.»',
+        opponentTeam:[{speciesId:'arbok', level:avg+1}, {speciesId:'muk', level:avg+1}, {speciesId:'persian', level:avg}], freeLoss:true }
+    ]
+  });
+}
+/* --- Zona de Safári (doc 02 §3): 8 ofertas, 30% de fuga --- */
+const SAFARI_FLEE_CHANCE = 0.30;
+function openSafari(){
+  const route = routeById(game.currentRoute);
+  const leg = LEGS[game.gymIndex];
+  const pool = [].concat(route.pool, route.rare||[]).filter(id=>SPECIES[id]);
+  const picked = [];
+  for(let i=0;i<8;i++){
+    const id = weightedPick(pool, Math.random, picked);
+    if(id) picked.push(id);
+  }
+  game.safariOffer = picked.map(id=>({
+    speciesId:id, level: randomInt(leg.minLevel, leg.maxLevel), status:'wild'
+  }));
+  game.safariCaught = [];
+  game.screen = 'safari';
+  render();
+  return true;
+}
+function safariTry(index){
+  const entry = game.safariOffer[index];
+  if(!entry || entry.status !== 'wild') return;
+  if(game.safariCaught.length >= 3){ return; }
+  if(Math.random() < SAFARI_FLEE_CHANCE){
+    entry.status = 'fled';
+  } else {
+    entry.status = 'caught';
+    game.safariCaught.push(index);
+  }
+  render();
+}
+function finishSafari(){
+  if(game.safariCaught.length>=3 && !game.safariOffer.some(e=>e.status==='fled')){ game.safariPerfect = true; }
+  game.safariCaught.forEach(i=>{
+    const e = game.safariOffer[i];
+    if(!e) return;
+    game.team.push(Object.assign(createInstance(e.speciesId, e.level), { shiny: Math.random() < SHINY_CHANCE }));
+    markCaught(e.speciesId);
+  });
+  game.safariOffer = null;
+  game.safariCaught = [];
+  if(game.team.length > 6){ game.releaseSelected = []; game.screen = 'release'; render(); return; }
+  advanceJourney();
+}
+
+/* ===================================================================
+   TROCAS COM NPC (doc 02 §3)
+   Resolve de quebra as evoluções por troca (Machamp, Golem, Alakazam, Gengar).
+   =================================================================== */
+const NPC_TRADES = [
+  { id:'machamp',  wantTypes:['Water','Psychic'], giveId:'machamp',  npc:'Colecionador de Cerulean', line:'Troco meu Machamp por qualquer bicho aquático ou psíquico seu. Fechado?' },
+  { id:'golem',    wantTypes:['Normal','Flying'], giveId:'golem',    npc:'Minerador do Túnel',       line:'Preciso de algo que voe. Levo o seu, te dou meu Golem.' },
+  { id:'alakazam', wantTypes:['Fighting','Bug'],  giveId:'alakazam', npc:'Estudante de Saffron',     line:'Meu Alakazam por algo mais... braçal. Topa?' },
+  { id:'gengar',   wantTypes:['Grass','Ground'],  giveId:'gengar',   npc:'Garota de Lavender',       line:'Ele me dá medo. Troco por qualquer coisa de planta ou terra.' }
+];
+function startNpcTrade(){
+  const done = game.npcTradesDone || [];
+  const available = NPC_TRADES.filter(t=>!done.includes(t.id) && !getAllCaughtSpecies().has(t.giveId));
+  const usable = available.filter(t=> game.team.some(p=>p.types.some(ty=>t.wantTypes.includes(ty))) );
+  const pick = usable[0] || available[0];
+  if(!pick) return false;
+  const eligible = game.team.filter(p=>p.types.some(ty=>pick.wantTypes.includes(ty)));
+  if(eligible.length===0) return false;
+  game.npcTradeOffer = { tradeId: pick.id, eligibleIds: eligible.map(p=>p.id) };
+  game.screen = 'npcTrade';
+  render();
+  return true;
+}
+function acceptNpcTrade(monId){
+  const offer = game.npcTradeOffer;
+  if(!offer) return;
+  const trade = NPC_TRADES.find(t=>t.id===offer.tradeId);
+  const idx = game.team.findIndex(p=>p.id===monId);
+  if(!trade || idx<0) return;
+  const given = game.team[idx];
+  const received = createInstance(trade.giveId, given.level);
+  received.shiny = given.shiny;
+  game.team[idx] = received;
+  markCaught(trade.giveId);
+  game.npcTradesDone = (game.npcTradesDone||[]).concat([trade.id]);
+  game.npcTradeOffer = null;
+  game.lastTradeText = `${given.name} foi trocado por ${received.name} (Lv.${received.level})!`;
+  advanceJourney();
+}
+function declineNpcTrade(){
+  const offer = game.npcTradeOffer;
+  if(offer){ game.npcTradesDone = (game.npcTradesDone||[]).concat([offer.tradeId]); }
+  game.npcTradeOffer = null;
+  advanceJourney();
+}
+
+/* ===================================================================
+   CASSINO ROCKET — Celadon (doc 02 §1.5)
+   =================================================================== */
+const CASINO_PRIZES = ['porygon','scyther','pinsir'];
+const CASINO_SYMBOLS = ['🍒','🔔','⭐','7️⃣','🃏'];
+function openCasino(){
+  game.casinoReels = null;
+  game.casinoBet = 0;
+  game.screen = 'casino';
+  render();
+  return true;
+}
+function setCasinoBet(n){
+  const max = Math.min(6, game.nextLegPoints||10);
+  game.casinoBet = Math.max(0, Math.min(max, n));
+  render();
+}
+function spinCasino(){
+  const bet = game.casinoBet;
+  if(bet <= 0) return;
+  const reels = [0,1,2].map(()=>CASINO_SYMBOLS[Math.floor(Math.random()*CASINO_SYMBOLS.length)]);
+  let prize = null;
+  if(reels[0]===reels[1] && reels[1]===reels[2]){
+    prize = (reels[0]==='7️⃣') ? 'pokemon' : 'double';
+  } else if(reels[0]===reels[1] || reels[1]===reels[2] || reels[0]===reels[2]){
+    prize = 'refund';
+  } else {
+    prize = 'lose';
+  }
+  if(prize==='double'){ game.nextLegPoints = (game.nextLegPoints||10) + bet; }
+  else if(prize==='lose'){ game.nextLegPoints = Math.max(0,(game.nextLegPoints||10) - bet); }
+  else if(prize==='pokemon'){
+    const id = CASINO_PRIZES[Math.floor(Math.random()*CASINO_PRIZES.length)];
+    game.pendingGift = id;
+    game.casinoWonMon = SPECIES[id].name;
+  }
+  game.casinoReels = { reels, prize };
+  game.casinoDone = true;
+  render();
+}
+function leaveCasino(){ game.casinoReels = null; advanceJourney(); }
+function skipCasino(){ game.casinoDone = true; advanceJourney(); }
+
+/* ===================================================================
+   ECONOMIA DE HABILIDADE (docs 03 e 04)
+
+   Princípio: A DERROTA DEFINE O PISO, O MÉRITO E A SORTE DEFINEM O TETO.
+   - Perder nunca cria pontos: adianta pontos que a próxima vitória desconta
+     (empréstimo, doc 03 proposta A).
+   - Desmaiar só rende nível em batalha VENCIDA (doc 03 proposta D) — era esse
+     o canal escondido que fazia perder de propósito valer a pena.
+   - A vitória deixa de valer +10 fixos e passa a valer de +8 a +14 conforme
+     desempenho, mais bônus opcionais de risco, conhecimento, sorte e sequência.
+   Resultado: o feeder não apanha, ele só fica pobre.
+   =================================================================== */
+const WIN_BASE_POINTS = 8;
+const SURVIVOR_BONUS_CAP = 3;
+const STREAK_BONUS_CAP = 4;
+const REMATCH_LEVEL_CAP = 3;      // doc 03 proposta C: o ginásio "aprende" a cada revanche
+const GIOVANNI_RELIEF_CAP = 4;    // doc 02 §1.4: cada emboscada Rocket vencida enfraquece o Giovanni
+const DEFEAT_ADVANCE = 5;         // o adiantamento entregue na hora da dificuldade
+/* IMPORTANTE — por que o adiantamento é UM POR GINÁSIO, e não um por derrota:
+   `game.losses` zera a cada ginásio, então um jogador pode perder de propósito 4 vezes em CADA
+   um dos 8 ginásios (32 derrotas), não só 4 na jornada inteira como os docs 03/04 supunham.
+   Se cada derrota adiantasse +5, seriam +160 adiantados contra no máximo ~14 por vitória: a
+   dívida nunca seria quitada e o empréstimo viraria doação — o exploit voltaria inteiro
+   (foi exatamente isso que `tools/sim-economia.js` pegou).
+   Com o teto de 5 por ginásio, o adiantamento é SEMPRE menor que a base da vitória (+8), então
+   ele é integralmente descontado e o saldo líquido de perder de propósito é exatamente zero —
+   enquanto o feeder abre mão de tudo que é mérito: primeira tentativa, sobreviventes, maré e
+   desafios. Da 2ª derrota em diante o socorro continua existindo, mas em forma de INFORMAÇÃO e
+   FÔLEGO (time do líder revelado, reordenar, +10% de HP, reforço de emergência), nunca de poder
+   permanente — que é a proposta E do doc 03. */
+
+/* --- Desafios declarados (doc 04 §2): risco escolhido, nunca imposto --- */
+const DECLARED_CHALLENGES = [
+  { id:'four',     icon:'4️⃣', name:'Só 4 Pokémon',        desc:'Os 2 últimos da sua ordem ficam de fora.',              bonus:3 },
+  { id:'notype',   icon:'🚫', name:'Sem vantagem de tipo', desc:'Quem tiver vantagem contra o líder fica no banco.',     bonus:4 },
+  { id:'blind',    icon:'🎲', name:'Ordem cega',           desc:'A ordem do seu time é sorteada na hora da batalha.',    bonus:3 },
+  { id:'handicap', icon:'🪢', name:'Mão amarrada',         desc:'Seu Pokémon mais forte fica de fora da batalha.',       bonus:3 }
+];
+function challengeById(id){ return DECLARED_CHALLENGES.find(c=>c.id===id) || null; }
+function declareChallenge(id){
+  game.declaredChallenge = (game.declaredChallenge===id) ? null : id;
+  render();
+}
+function setMvpBet(id){
+  game.mvpBet = (game.mvpBet===id) ? null : id;
+  render();
+}
+function toggleScoreBet(){
+  game.scoreBet = !game.scoreBet;
+  render();
+}
+function hasTypeAdvantageAgainstGym(mon, gymTeam){
+  return gymTeam.some(foe=>{
+    const sp = SPECIES[foe.species || foe.speciesId];
+    return sp && bestMultiplier(mon.types, sp.types) > 1;
+  });
+}
+// devolve o time que realmente entra em campo, já com o handicap declarado aplicado
+function battleLineup(){
+  const gym = GYMS[game.gymIndex];
+  let lineup = game.team.slice();
+  switch(game.declaredChallenge){
+    case 'four':
+      lineup = lineup.slice(0, 4);
+      break;
+    case 'notype':
+      lineup = lineup.filter(p=>!hasTypeAdvantageAgainstGym(p, gym.team));
+      break;
+    case 'blind':
+      lineup = shuffle(lineup);
+      break;
+    case 'handicap': {
+      let strongestIdx = 0, best = -1;
+      lineup.forEach((p,i)=>{
+        const score = p.level*10 + p.attack;
+        if(score > best){ best = score; strongestIdx = i; }
+      });
+      lineup = lineup.filter((_,i)=>i!==strongestIdx);
+      break;
+    }
+  }
+  return lineup.length ? lineup : game.team.slice();
+}
+function challengeIsViable(id){
+  const saved = game.declaredChallenge;
+  game.declaredChallenge = id;
+  const ok = battleLineup().length > 0 && !(id==='notype' && battleLineup().length===game.team.length && game.team.length===0);
+  game.declaredChallenge = saved;
+  if(id==='four') return game.team.length > 4;
+  if(id==='handicap') return game.team.length > 1;
+  if(id==='notype'){
+    const gym = GYMS[game.gymIndex];
+    const remaining = game.team.filter(p=>!hasTypeAdvantageAgainstGym(p, gym.team));
+    return remaining.length > 0 && remaining.length < game.team.length;
+  }
+  return ok;
+}
+
+/* --- Time do líder: revanche encarece, emboscadas Rocket aliviam o Giovanni --- */
+// doc 03 proposta C, com a dose que o próprio doc pede ("cuidado, senão pune demais quem está
+// travado de verdade"): a PRIMEIRA revanche é contra o líder no nível normal. A escalada só
+// começa da segunda em diante, e para em +3.
+function rematchLevelBump(){
+  return Math.min(REMATCH_LEVEL_CAP, Math.max(0, (game.losses||0) - 1));
+}
+function gymTeamForBattle(){
+  const gym = GYMS[game.gymIndex];
+  const rematchBump = rematchLevelBump();
+  const giovanniRelief = (game.gymIndex===7) ? Math.min(GIOVANNI_RELIEF_CAP, game.rocketAmbushesWon||0) : 0;
+  return gym.team.map(b=>createInstance(b.species, Math.max(2, b.level + rematchBump - giovanniRelief)));
+}
+function gymLevelAdjustNote(){
+  const rematchBump = rematchLevelBump();
+  const giovanniRelief = (game.gymIndex===7) ? Math.min(GIOVANNI_RELIEF_CAP, game.rocketAmbushesWon||0) : 0;
+  const parts = [];
+  if(rematchBump>0) parts.push(`<strong>+${rematchBump} nível</strong> no time dele (ele decorou sua estratégia)`);
+  if(giovanniRelief>0) parts.push(`<strong>-${giovanniRelief} nível</strong> por cada emboscada Rocket que você venceu`);
+  return parts.length ? parts.join(' e ') : '';
+}
+
+/* --- A nota da vitória (doc 04 §1) --- */
+function computeVictoryRewards(result){
+  const items = [];
+  const status = result.playerStatus || [];
+  const survivors = status.filter(s=>!s.fainted).length;
+
+  items.push({ label:'Base da vitória', pts: WIN_BASE_POINTS });
+  const survBonus = Math.min(SURVIVOR_BONUS_CAP, survivors);
+  if(survBonus > 0) items.push({ label:`${survBonus} Pokémon de pé no fim`, pts: survBonus });
+  if((game.losses||0) === 0) items.push({ label:'Vitória de primeira tentativa', pts: 2 });
+  if(survivors === status.length && status.length > 0) items.push({ label:'Vitória perfeita ✨ (ninguém desmaiou)', pts: 1 });
+
+  // maré de vitórias (doc 04 §5)
+  const streakBonus = Math.min(STREAK_BONUS_CAP, Math.max(0, (game.winStreak||0)));
+  if(streakBonus > 0) items.push({ label:`🔥 Maré de vitórias (${(game.winStreak||0)+1} seguidas)`, pts: streakBonus });
+
+  // desafio declarado (doc 04 §2)
+  const ch = challengeById(game.declaredChallenge);
+  if(ch) items.push({ label:`${ch.icon} Desafio cumprido: ${ch.name}`, pts: ch.bonus });
+
+  // aposta do treinador (doc 04 §3)
+  if(game.mvpBet){
+    const maxWins = Math.max(0, ...status.map(s=>s.wins||0));
+    const betted = status.find(s=>s.id===game.mvpBet);
+    if(betted && maxWins>0 && (betted.wins||0) === maxWins){
+      items.push({ label:`🧠 MVP na mosca: ${betted.name}`, pts: 2 });
+    } else {
+      items.push({ label:`🧠 Aposta de MVP furada`, pts: 0 });
+    }
+  }
+  if(game.scoreBet){
+    const fainted = status.filter(s=>s.fainted).length;
+    items.push({ label: fainted<=2 ? '🎯 Placar previsto (até 2 desmaios)' : '🎯 Previsão de placar furada', pts: fainted<=2 ? 1 : 0 });
+  }
+
+  const gross = items.reduce((a,it)=>a+it.pts, 0);
+  // empréstimo: o adiantamento das derrotas é descontado aqui (doc 03 proposta A)
+  const owed = game.pointsOwed || 0;
+  const paid = Math.min(owed, gross);
+  const net = gross - paid;
+  return { items, gross, paid, net, owedAfter: owed - paid };
+}
+
+/* --- Roleta do vencedor (doc 04 §4): só quem vence gira --- */
+const ROULETTE_PRIZES = [
+  { id:'candy',  weight:35, icon:'🍬', name:'Doce Raro',    desc:'+1 nível imediato num Pokémon à sua escolha.' },
+  { id:'points', weight:35, icon:'💰', name:'+3 pontos',    desc:'Três pontos de nível extras na próxima distribuição.' },
+  { id:'glory',  weight:30, icon:'🎁', name:'Só a glória',  desc:'Nada além de uma frase engraçada e um sticker no save.' }
+];
+const GLORY_LINES = [
+  'Você abre a carta. É um cupom de desconto de Pokébola vencido em 1996.',
+  'Dentro da carta: um bilhete que diz «boa sorte na próxima». Assinado: a carta.',
+  'A carta estava vazia. O Meowth passou correndo rindo.',
+  'Parabéns! Você ganhou... nada. Mas ganhou com estilo.',
+  'A carta continha pó de estrela. Você espirrou.'
+];
+function openRoulette(){
+  game.roulette = { cards:[0,1,2], picked:null, prize:null, line:null };
+  game.screen = 'roulette';
+  render();
+}
+function pickRouletteCard(index){
+  if(!game.roulette || game.roulette.picked != null) return;
+  const total = ROULETTE_PRIZES.reduce((a,p)=>a+p.weight,0);
+  let r = Math.random()*total, chosen = ROULETTE_PRIZES[ROULETTE_PRIZES.length-1];
+  for(const p of ROULETTE_PRIZES){ r -= p.weight; if(r<=0){ chosen = p; break; } }
+  game.roulette.picked = index;
+  game.roulette.prize = chosen.id;
+  if(chosen.id === 'points'){
+    game.nextLegPoints = (game.nextLegPoints||0) + 3;
+    game.totalPointsEarned = (game.totalPointsEarned||0) + 3;
+  } else if(chosen.id === 'candy'){
+    game.rareCandyPending = (game.rareCandyPending||0) + 1;
+  } else {
+    game.roulette.line = GLORY_LINES[Math.floor(Math.random()*GLORY_LINES.length)];
+    game.stickers = (game.stickers||[]).concat([GYMS[game.gymIndex].badge]);
+  }
+  render();
+}
+function useRareCandy(monId){
+  if((game.rareCandyPending||0) <= 0) return;
+  const mon = game.team.find(p=>p.id===monId);
+  if(!mon) return;
+  mon.level = Math.min(55, mon.level + 1);
+  game.rareCandyPending--;
+  tryEvolve(mon);
+  render();
+}
+function closeRoulette(){
+  game.roulette = null;
+  goAfterGymVictory();
+}
+
+/* --- Socorro não-numérico na derrota (doc 03 proposta E) --- */
+function prepareRetry(){
+  // o adiantamento: +5 agora, descontados da próxima vitória. O total da jornada não sobe.
+  const alreadyAdvanced = (game.advanceUsedAtGym === game.gymIndex);
+  const advance = alreadyAdvanced ? 0 : DEFEAT_ADVANCE;
+  game.advanceUsedAtGym = game.gymIndex;
+  game.pool = advance;
+  game.poolTotal = advance;
+  game.pointsOwed = (game.pointsOwed||0) + advance;
+  game.totalPointsEarned = (game.totalPointsEarned||0) + advance;
+  game.leaderRevealed = true;          // informação: o time completo do líder fica visível
+  // Fôlego crescente: +10% de HP por derrota acumulada, até +30%. É temporário (expira na
+  // vitória) e NÃO vai para a Liga -- por isso não reabre o feeding: nada disso vira poder
+  // permanente. É a resposta à segunda restrição do doc 03: perder não pode virar espiral
+  // da morte. Quem perde de verdade ganha fôlego; quem perde de propósito ganha nada que dure.
+  game.hpBuffNext = Math.min(0.30, 0.10 * (game.losses||1));
+  game.declaredChallenge = null;
+  game.mvpBet = null;
+  game.scoreBet = false;
+  game.alloc = {};
+  game.team.forEach(p=> game.alloc[p.id]=0 );
+  // na 4ª derrota, à beira do game over: reforço de emergência do pool da rota atual
+  if(game.losses >= 3 && !game.emergencyUsed && game.team.length < 6){
+    const route = routeById(game.currentRoute);
+    const pool = (route && route.pool && route.pool.length) ? route.pool : LEGS[game.gymIndex].pool;
+    game.emergencyOffer = shuffle(pool).slice(0,3);
+    game.screen = 'emergency';
+    render();
+    return;
+  }
+  game.screen = (advance > 0) ? 'levels' : 'teamOrder';
+  render();
+}
+function takeEmergencyMon(id){
+  game.emergencyUsed = true;
+  const leg = LEGS[game.gymIndex];
+  const mon = createInstance(id, randomInt(leg.minLevel, leg.maxLevel));
+  markCaught(id);
+  if(game.team.length < 6){ game.team.push(mon); game.alloc[mon.id] = 0; }
+  game.emergencyOffer = null;
+  game.screen = (game.poolTotal > 0) ? 'levels' : 'teamOrder';
+  render();
+}
+function skipEmergency(){
+  game.emergencyUsed = true;
+  game.emergencyOffer = null;
+  game.screen = (game.poolTotal > 0) ? 'levels' : 'teamOrder';
+  render();
+}
+
+/* --- Teto teórico: quanto de nível é possível ter honestamente (doc 04) ---
+   Não é limite de jogo: é a régua que a Cloud Function usa pra recusar time forjado. --- */
+function theoreticalMaxPoints(){
+  // 20 iniciais + 7 distribuições no melhor caminho possível (nota máxima + bônus + eventos)
+  return 20 + 7 * 26;
+}
+function currentTeamLevelSum(){
+  return (game.team||[]).reduce((a,p)=>a+p.level, 0);
+}
+
+/* ===================================================================
+   TELAS NOVAS
+   =================================================================== */
+function riskChip(risk){
+  if(risk==='dourada') return '<span class="route-risk golden">✨ DOURADA</span>';
+  if(risk==='arriscada') return '<span class="route-risk risky">⚠️ ARRISCADA</span>';
+  return '<span class="route-risk calm">🌤️ TRANQUILA</span>';
+}
+function renderRouteChoice(){
+  const gym = GYMS[game.gymIndex];
+  const cards = (game.routeCards||[]).map(routeById).filter(Boolean);
+  return `
+  <div class="eyebrow">🗺️ ESCOLHA DO CAMINHO — PERNA ${game.gymIndex+1}/8</div>
+  <div class="box cursor">
+    <h2>Por onde você segue?</h2>
+    <p>À frente está o Ginásio <strong>${gym.gymTypeName}</strong> de <strong>${gym.leaderName}</strong>. Cada caminho tem seus próprios Pokémons, seus próprios perigos e sua própria história. Você não vê a lista exata — vê o suficiente pra decidir.</p>
+  </div>
+  ${cards.map(r=>`
+    <button class="btn route-card ${r.golden?'golden':''}" onclick="chooseRoute('${r.id}')">
+      <span class="mon-name">${r.icon} ${r.name} ${riskChip(r.risk)}</span>
+      <span class="mon-sub">${r.types.map(typePill).join('')}</span>
+      <span class="route-rumor">💬 ${r.rumor}</span>
+    </button>`).join('')}
+  <div class="box">
+    <p class="hint-text">A rota arriscada oferece Pokémons de nível mais alto e mais chance de raros — em troca de emboscadas da Equipe Rocket. A tranquila é o caminho seguro.</p>
+  </div>`;
+}
+function renderRouteEvent(){
+  return `
+  <div class="eyebrow">⛏️ TÚNEL DE PEDRA</div>
+  <div class="box cursor">
+    <h2>Escuridão total</h2>
+    <p>O túnel não tem iluminação. Dá pra atravessar correndo às cegas — rende <strong>+3 pontos</strong>, mas a ordem do seu time na próxima batalha de ginásio será <strong>sorteada</strong>. Ou dá pra ir devagar, tateando a parede, sem prêmio nenhum.</p>
+  </div>
+  <button class="btn danger" onclick="crossTunnelBlind()">🎲 Atravessar às cegas (+3 pontos)</button>
+  <button class="btn secondary" onclick="crossTunnelSlow()">🐢 Ir devagar (sem risco)</button>`;
+}
+function renderFossil(){
+  return `
+  <div class="eyebrow">🌙 MONTE LUA — SALA DOS FÓSSEIS</div>
+  <div class="box cursor">
+    <h2>Dois fósseis, uma escolha</h2>
+    <p>Um pesquisador te oferece um dos dois fósseis encontrados na caverna. <strong>Só dá pra levar um</strong> — o outro fica pra sempre com ele.</p>
+  </div>
+  <button class="btn" onclick="chooseFossil('omanyte')">
+    <span class="mon-name">${spriteHtml('omanyte','sprite-sm')} Fóssil de Concha → Omanyte</span>
+    <span class="mon-sub">${typesHtml(SPECIES.omanyte.types)}</span>
+  </button>
+  <button class="btn" onclick="chooseFossil('kabuto')">
+    <span class="mon-name">${spriteHtml('kabuto','sprite-sm')} Fóssil de Domo → Kabuto</span>
+    <span class="mon-sub">${typesHtml(SPECIES.kabuto.types)}</span>
+  </button>
+  <button class="btn secondary" onclick="skipFossil()">Deixar os dois e seguir ➜</button>`;
+}
+function renderDojo(){
+  return `
+  <div class="eyebrow">🥋 DOJO DE SAFFRON</div>
+  <div class="box cursor">
+    <h2>Escolha seu discípulo</h2>
+    <p>O Mestre do Dojo se curva. Um dos dois vem com você — o outro continua treinando aqui.</p>
+  </div>
+  ${['hitmonlee','hitmonchan'].map(id=>`
+    <button class="btn" onclick="chooseDojoPrize('${id}')">
+      <span class="mon-name">${spriteHtml(id,'sprite-sm')} ${SPECIES[id].name}</span>
+      <span class="mon-sub">${typesHtml(SPECIES[id].types)}</span>
+    </button>`).join('')}`;
+}
+function renderSafari(){
+  const picked = game.safariCaught.length;
+  return `
+  <div class="eyebrow">🦓 ZONA DE SAFÁRI</div>
+  <div class="box cursor">
+    <h2>Oito ofertas, mas elas fogem</h2>
+    <p>Aqui aparecem <strong>8 Pokémons</strong> em vez de 5, incluindo raros que não moram em lugar nenhum. Mas cada tentativa tem <strong>30% de chance do Pokémon fugir</strong> — e fugiu, acabou. Você pode capturar até 3.</p>
+  </div>
+  <div class="pool-badge">CAPTURADOS: ${picked}/3</div>
+  <div class="box">
+    ${game.safariOffer.map((e,i)=>{
+      const sp = SPECIES[e.speciesId];
+      const done = e.status !== 'wild';
+      const label = e.status==='caught' ? '✅ CAPTURADO' : (e.status==='fled' ? '💨 FUGIU' : '');
+      const disabled = (done || picked>=3) ? 'disabled' : '';
+      return `<button class="btn ${e.status==='caught'?'selected':''}" ${disabled} onclick="safariTry(${i})">
+        <span class="mon-name">${spriteHtml(e.speciesId,'sprite-sm')} ${sp.name} — Lv.${e.level} ${label}</span>
+        <span class="mon-sub">${typesHtml(sp.types)}</span>
+      </button>`;
+    }).join('')}
+  </div>
+  <button class="btn success" onclick="finishSafari()">Sair do Safári ➜</button>`;
+}
+function renderNpcTrade(){
+  const offer = game.npcTradeOffer;
+  const trade = NPC_TRADES.find(t=>t.id===offer.tradeId);
+  const give = SPECIES[trade.giveId];
+  return `
+  <div class="eyebrow">🤝 PROPOSTA DE TROCA</div>
+  <div class="box cursor">
+    <h2>${trade.npc}</h2>
+    <p>«${trade.line}»</p>
+    <div class="team-mini"><div class="team-chip">Ele oferece: ${spriteHtml(trade.giveId,'sprite-sm')} <strong>${give.name}</strong></div></div>
+    <p class="hint-text">O Pokémon trocado mantém o nível do seu. É assim que ${give.name} entra no jogo — evoluções por troca não acontecem por nível.</p>
+  </div>
+  <div class="box">
+    <h2>Qual você entrega?</h2>
+    ${offer.eligibleIds.map(id=>{
+      const p = game.team.find(t=>t.id===id);
+      if(!p) return '';
+      return `<button class="btn" onclick="acceptNpcTrade('${id}')">
+        <span class="mon-name">${spriteHtml(p.speciesId,'sprite-sm')} ${p.name} — Lv.${p.level}</span>
+        <span class="mon-sub">${typesHtml(p.types)}</span>
+      </button>`;
+    }).join('')}
+  </div>
+  <button class="btn secondary" onclick="declineNpcTrade()">Recusar a troca ➜</button>`;
+}
+function renderDayCare(){
+  return `
+  <div class="eyebrow">🏡 CRECHE POKÉMON</div>
+  <div class="box cursor">
+    <h2>Deixar alguém treinando?</h2>
+    <p>O casal da creche cuida de <strong>1 Pokémon</strong> enquanto você enfrenta o ginásio. Ele fica <strong>fora da batalha</strong>, mas volta na próxima perna com <strong>+2 níveis</strong>.</p>
+  </div>
+  <div class="box">
+    ${game.team.map(p=>`
+      <button class="btn" onclick="leaveAtDayCare('${p.id}')">
+        <span class="mon-name">${spriteHtml(p.speciesId,'sprite-sm')} ${p.name} — Lv.${p.level}</span>
+        <span class="mon-sub">${typesHtml(p.types)}</span>
+      </button>`).join('')}
+  </div>
+  <button class="btn secondary" onclick="skipDayCare()">Não, levo o time inteiro ➜</button>`;
+}
+function renderRocketHideout(){
+  const mon = game.stolenMon;
+  return `
+  <div class="eyebrow">🕵️ ESCONDERIJO ROCKET</div>
+  <div class="box cursor">
+    <h2>${mon ? mon.name : 'Seu Pokémon'} está lá dentro</h2>
+    <p>Duas batalhas seguidas, <strong>sem redistribuir pontos entre elas</strong>. Vencer as duas traz ${mon ? mon.name : 'ele'} de volta inteiro.</p>
+    <p class="hint-text">Se você ignorar, ${mon ? mon.name : 'ele'} volta sozinho depois do ginásio — mas maltratado, com <strong>-2 níveis</strong>.</p>
+  </div>
+  <button class="btn danger" onclick="enterHideout()">Invadir o esconderijo 🚪</button>
+  <button class="btn secondary" onclick="skipHideout()">Seguir para o ginásio ➜</button>`;
+}
+function renderCasino(){
+  const r = game.casinoReels;
+  const max = Math.min(6, game.nextLegPoints||10);
+  if(r){
+    const msg = {
+      double:`🎉 TRÊS IGUAIS! Você <strong>dobrou a aposta</strong>: +${game.casinoBet} pontos.`,
+      pokemon:`🎰 TRIPLO SETE! O cassino solta um <strong>${game.casinoWonMon}</strong> — ele aparece no seu próximo encontro!`,
+      refund:`😌 Dois iguais. A casa devolve sua aposta. Nada ganho, nada perdido.`,
+      lose:`💸 Nada. Você perdeu os <strong>${game.casinoBet} pontos</strong> apostados.`
+    }[r.prize];
+    return `
+    <div class="eyebrow">🎰 CASSINO ROCKET — CELADON</div>
+    <div class="box cursor">
+      <div class="casino-reels">${r.reels.map(s=>`<span class="casino-reel">${s}</span>`).join('')}</div>
+      <p>${msg}</p>
+    </div>
+    <button class="btn success" onclick="leaveCasino()">Sair do cassino ➜</button>`;
+  }
+  return `
+  <div class="eyebrow">🎰 CASSINO ROCKET — CELADON</div>
+  <div class="box cursor">
+    <h2>Game Corner</h2>
+    <p>Nos fundos da loja de Celadon, as máquinas piscam. Aposte pontos da sua próxima distribuição: <strong>três iguais dobram</strong>, <strong>três setes soltam um Pokémon raro</strong> (Porygon, Scyther ou Pinsir), dois iguais devolvem a aposta e o resto some.</p>
+    <p class="hint-text">Você tem ${game.nextLegPoints||10} pontos programados para a próxima distribuição.</p>
+  </div>
+  <div class="pool-badge">APOSTA: ${game.casinoBet} PONTO${game.casinoBet===1?'':'S'}</div>
+  <div class="box">
+    <div class="order-row">
+      <div class="order-info"><span class="mon-name">Ajustar aposta (máx. ${max})</span></div>
+      <div class="order-controls">
+        <button class="circle-btn" onclick="setCasinoBet(${game.casinoBet-1})" ${game.casinoBet<=0?'disabled':''}>−</button>
+        <button class="circle-btn" onclick="setCasinoBet(${game.casinoBet+1})" ${game.casinoBet>=max?'disabled':''}>+</button>
+      </div>
+    </div>
+  </div>
+  <button class="btn danger" onclick="spinCasino()" ${game.casinoBet<=0?'disabled':''}>🎰 Girar!</button>
+  <button class="btn secondary" onclick="skipCasino()">Sair sem apostar ➜</button>`;
+}
+function renderEmergency(){
+  return `
+  <div class="eyebrow">🆘 REFORÇO DE EMERGÊNCIA</div>
+  <div class="box cursor">
+    <h2>Última chance</h2>
+    <p>Quarta derrota. A próxima é o fim da jornada. Um treinador que passava pela rota se compadece e te oferece <strong>um Pokémon do caminho que você escolheu</strong> — sem custo, sem pontos, só ajuda.</p>
+    <p class="hint-text">Isso não aumenta seu total de pontos: é ferramenta, não músculo.</p>
+  </div>
+  <div class="box">
+    ${(game.emergencyOffer||[]).map(id=>{
+      const sp = SPECIES[id];
+      const leg = LEGS[game.gymIndex];
+      return `<button class="btn" onclick="takeEmergencyMon('${id}')">
+        <span class="mon-name">${spriteHtml(id,'sprite-sm')} ${sp.name} — Lv.${leg.minLevel}~${leg.maxLevel}</span>
+        <span class="mon-sub">${typesHtml(sp.types)}</span>
+      </button>`;
+    }).join('')}
+  </div>
+  <button class="btn secondary" onclick="skipEmergency()">Recusar — eu consigo sozinho 💪</button>`;
+}
+function renderRoulette(){
+  const r = game.roulette;
+  const prize = r.prize ? ROULETTE_PRIZES.find(p=>p.id===r.prize) : null;
+  return `
+  <div class="eyebrow">🎴 ROLETA DO VENCEDOR</div>
+  <div class="box cursor">
+    <h2>Só quem vence gira</h2>
+    <p>Três cartas viradas pra baixo. Escolha uma — e boa sorte.</p>
+  </div>
+  <div class="roulette-row">
+    ${r.cards.map(i=>`
+      <button class="roulette-card ${r.picked===i?'flipped':''} ${r.picked!=null&&r.picked!==i?'dim':''}"
+        onclick="pickRouletteCard(${i})" ${r.picked!=null?'disabled':''}>
+        ${r.picked===i && prize ? prize.icon : '❔'}
+      </button>`).join('')}
+  </div>
+  ${prize ? `
+  <div class="box">
+    <h2>${prize.icon} ${prize.name}</h2>
+    <p>${r.line || prize.desc}</p>
+    ${r.prize==='candy' && (game.rareCandyPending||0)>0 ? `
+      <p class="hint-text">Escolha quem come o doce:</p>
+      ${game.team.map(p=>`<button class="btn" onclick="useRareCandy('${p.id}')">
+        <span class="mon-name">${spriteHtml(p.speciesId,'sprite-sm')} ${p.name} — Lv.${p.level} ➜ Lv.${Math.min(55,p.level+1)}</span>
+      </button>`).join('')}` : ''}
+  </div>
+  <button class="btn success" onclick="closeRoulette()" ${r.prize==='candy'&&(game.rareCandyPending||0)>0?'disabled':''}>Continuar jornada ➜</button>` : ''}`;
+}
+function renderEventIntro(){
+  const cfg = game.eventBattle;
+  return `
+  <div class="eyebrow">${cfg.icon} ${cfg.title.toUpperCase()}</div>
+  <div class="box cursor">
+    <h2>${cfg.icon} ${cfg.opponentName}</h2>
+    <p>${cfg.intro}</p>
+    <div class="team-mini">
+      ${cfg.opponentTeam.map(o=>`<div class="team-chip">${spriteHtml(o.speciesId,'sprite-sm')} ${SPECIES[o.speciesId].name} Lv.${o.level}</div>`).join('')}
+    </div>
+  </div>
+  <div class="box">
+    <h2>Seu time</h2>
+    <div class="team-mini">
+      ${game.team.map((p,i)=>`<div class="team-chip">${i+1}º ${spriteHtml(p.speciesId,'sprite-sm')} ${p.name} Lv.${p.level}</div>`).join('')}
+    </div>
+  </div>
+  <button class="btn danger" onclick="runEventBattle()">Batalhar! ⚔️</button>`;
+}
+function renderEventBattling(){
+  const cfg = game.eventBattle;
+  const matchups = game.eventResult.matchups;
+  const m = matchups[game.eventRevealIndex];
+  const loading = game.eventRevealPhase === 'loading';
+  const playerSp = SPECIES[m.playerSpecies], enemySp = SPECIES[m.enemySpecies];
+  return `
+  <div class="eyebrow">${cfg.icon} ${cfg.opponentName.toUpperCase()} — BATALHA</div>
+  <div class="box cursor">
+    <div class="team-alive-row">
+      <span class="team-alive-chip">🎒 Seu time: ${loading?m.playerAliveBefore:m.playerAliveAfter}/${m.playerTeamSize} vivos</span>
+      <span class="team-alive-chip">${cfg.icon} ${cfg.opponentName}: ${loading?m.enemyAliveBefore:m.enemyAliveAfter}/${m.enemyTeamSize} vivos</span>
+    </div>
+    <div class="battle-vs">
+      <div class="fighter">
+        <div class="fighter-emoji">${playerSp?battleSpriteHtml(m.playerSpecies, m.enemySpecies, 'sprite-lg'):''}</div>${m.player} <span class="fighter-level">Lv.${m.playerLevel}</span>
+        <div class="fighter-types">${playerSp?typesHtml(playerSp.types):''}</div>
+        ${renderHpBar(m.playerHpBefore, m.playerMaxHp, 'hp-fill-player', 'hp-label-player')}
+      </div>
+      <span class="vs-swords ${loading?'spin':''}">⚔️</span>
+      <div class="fighter">
+        <div class="fighter-emoji">${enemySp?battleSpriteHtml(m.enemySpecies, m.playerSpecies, 'sprite-lg'):''}</div>${m.enemy} <span class="fighter-level">Lv.${m.enemyLevel}</span>
+        <div class="fighter-types">${enemySp?typesHtml(enemySp.types):''}</div>
+        ${renderHpBar(m.enemyHpBefore, m.enemyMaxHp, 'hp-fill-enemy', 'hp-label-enemy')}
+      </div>
+    </div>
+    ${loading
+      ? `<div class="loading-dots"><span></span><span></span><span></span></div><p class="loading-text">Aguardando o resultado da batalha...</p>`
+      : `<p class="battle-result-line">${matchupResultLine(m)}!${suddenDeathNote(m)}</p>`}
+  </div>`;
+}
+function renderEventResult(){
+  const cfg = game.eventBattle;
+  const r = game.eventResult;
+  const win = r.win;
+  const showDojoPick = win && cfg.id==='dojo_master';
+  return `
+  <div class="result-banner ${win?'win':'lose'}">${win ? `✅ VOCÊ VENCEU ${cfg.opponentName.toUpperCase()}!` : `💥 ${cfg.opponentName.toUpperCase()} VENCEU`}</div>
+  <div class="box">
+    <h2>Log da batalha</h2>
+    <div class="status-list">${renderMatchupLog(r.matchups)}</div>
+  </div>
+  <div class="box">
+    <h2>Seu time</h2>
+    <div class="status-list">${renderPlayerStatus(r.playerStatus)}</div>
+  </div>
+  <div class="box">
+    <p>${game.eventOutcomeText || ''}</p>
+    ${!win && cfg.freeLoss ? `<p class="hint-text">Essa derrota <strong>não conta</strong> nas suas 5 tentativas do ginásio.</p>` : ''}
+    ${game.nuzlocke && (game.faintedForever||[]).length ? `<p class="hint-text">☠️ Modo Nuzlocke: quem desmaiou foi liberado para sempre.</p>` : ''}
+  </div>
+  ${showDojoPick
+    ? `<button class="btn success" onclick="game.screen='dojo';render()">Escolher o discípulo ➜</button>`
+    : `<button class="btn primary" onclick="closeEventResult()">Continuar ➜</button>`}`;
+}
+function renderJourneyDiary(){
+  const path = (game.routeHistory||[]).map((id,i)=>{
+    const r = routeById(id);
+    return r ? `<div class="diary-step">${r.icon} <strong>${r.name}</strong> <span class="hint-text">— rumo a ${GYMS[i] ? GYMS[i].city : '?'}</span></div>` : '';
+  }).join('');
+  return `
+  <div class="eyebrow">📔 DIÁRIO DA JORNADA</div>
+  <div class="box cursor">
+    <h2>O caminho que você escolheu</h2>
+    ${path || '<p>Nenhuma rota registrada nessa jornada.</p>'}
+  </div>
+  <div class="box">
+    <h2>👥 Time final</h2>
+    <div class="team-mini">
+      ${game.team.map(p=>`<div class="team-chip">${spriteHtml(p.speciesId,'sprite-sm')} ${p.name} Lv.${p.level}${p.shiny?' ✨':''}</div>`).join('')}
+    </div>
+  </div>
+  ${game.nuzlocke && (game.faintedForever||[]).length ? `
+  <div class="box">
+    <h2>☠️ Memorial Nuzlocke</h2>
+    <div class="status-list">${game.faintedForever.map(f=>`<div class="status-row"><span>${spriteHtml(f.speciesId,'sprite-sm')} ${f.name} — Lv.${f.level}</span></div>`).join('')}</div>
+  </div>` : ''}
+  <div class="box">
+    <h2>📊 Números</h2>
+    <p>Pontos acumulados na jornada: <strong>${game.totalPointsEarned||0}</strong><br>
+    Soma de níveis do time: <strong>${currentTeamLevelSum()}</strong><br>
+    Emboscadas Rocket vencidas: <strong>${game.rocketAmbushesWon||0}</strong><br>
+    Vitórias contra ${escapeHtml(game.rivalName)}: <strong>${game.rivalWins||0}</strong><br>
+    Maior maré de vitórias: <strong>${game.bestStreak||game.winStreak||0}</strong>
+    ${(game.stickers||[]).length ? `<br>Stickers da roleta: ${(game.stickers||[]).length} 🎁` : ''}</p>
+  </div>
+  ${game.dailyChallenge ? `
+  <div class="box">
+    <h2>📅 Ranking do dia <span class="hint-text">(seed ${escapeHtml(game.dailySeed||'')})</span></h2>
+    <p class="hint-text">Todo mundo que jogou o desafio diário hoje enfrentou exatamente as mesmas ofertas e as mesmas rotas douradas. Critério: mais insígnias, depois menos derrotas.</p>
+    ${(game.dailyRanking||[]).length
+      ? `<div class="status-list">${game.dailyRanking.map((e,i)=>`<div class="status-row"><span>${i+1}º ${e.nuzlocke?'☠️ ':''}${escapeHtml(e.name)} — ${e.badges} insígnia(s), ${e.losses} derrota(s)</span></div>`).join('')}</div>`
+      : `<p>Carregando o placar de hoje…</p>`}
+  </div>` : ''}
+  <button class="btn primary" onclick="game.screen='journeyEnd';render()">Voltar ao resumo ➜</button>`;
+}
+
+/* ===================================================================
+   BATALHA FINAL DO RIVAL (doc 02 §2.3 — "uma última vez antes da Liga")
+   =================================================================== */
+function startFinalRivalBattle(){
+  game.rivalTaunt = randomRivalTaunt();
+  startEventBattle({
+    id:'rival_battle', icon:'👑',
+    title:`${escapeHtml(game.rivalName)}, o Campeão da porta`,
+    opponentName: game.rivalName,
+    intro:`«${game.rivalTaunt}» — última chance de calar a boca dele antes da Liga. O time é feito de tudo que você deixou pra trás.`,
+    opponentTeam: buildRivalTeam(),
+    freeLoss:true,
+    returnScreen:'journeyEnd'
+  });
+}
+
+/* ===================================================================
+   MODO NUZLOCKE E DESAFIO DIÁRIO — opções na criação do save
+   =================================================================== */
+function toggleNuzlocke(){ game.pendingNuzlocke = !game.pendingNuzlocke; render(); }
+function toggleDaily(){ game.pendingDaily = !game.pendingDaily; render(); }
+
+/* ===================================================================
+   CONQUISTAS NOVAS (doc 02)
+   =================================================================== */
+const EXTRA_ACHIEVEMENTS = [
+  { id:'shiny',        icon:'✨', name:'Estrela Rara',              desc:'Encontre um Pokémon shiny (1 em 128).',                              check:a=>a.anyShiny },
+  { id:'jessie_james', icon:'🎈', name:'Prepare-se para Encrenca',  desc:'Vença Jessie & James as 3 vezes em uma jornada.',                     check:a=>a.maxJessie>=3 },
+  { id:'rival_master', icon:'😤', name:'Cheiro de derrota, Gary?',  desc:'Vença o rival nas 4 batalhas de uma jornada.',                        check:a=>a.maxRivalWins>=4 },
+  { id:'rocket_buster',icon:'🚀', name:'Anti-Rocket',               desc:'Vença 4 emboscadas da Equipe Rocket em uma jornada.',                 check:a=>a.maxRocket>=4 },
+  { id:'perfect_gym',  icon:'💎', name:'Sem um Arranhão',           desc:'Vença um ginásio sem nenhum Pokémon desmaiar.',                       check:a=>a.anyPerfect },
+  { id:'streak_master',icon:'🔥', name:'Maré Cheia',                desc:'Vença 5 ginásios seguidos sem nenhuma derrota.',                      check:a=>a.maxStreak>=5 },
+  { id:'blind_win',    icon:'🎲', name:'Ordem Cega',                desc:'Vença um ginásio com o desafio "Ordem cega" declarado.',              check:a=>a.challengesWon.includes('blind') },
+  { id:'notype_win',   icon:'🚫', name:'Sem Colinha',               desc:'Vença um ginásio sem nenhum Pokémon com vantagem de tipo.',           check:a=>a.challengesWon.includes('notype') },
+  { id:'risky_run',    icon:'⚠️', name:'Caminho Difícil',           desc:'Termine uma jornada passando só por rotas arriscadas.',               check:a=>a.anyAllRisky },
+  { id:'golden_route', icon:'🌟', name:'Clareira Dourada',          desc:'Encontre a rota dourada (8% por perna).',                             check:a=>a.anyGolden },
+  { id:'nuzlocke',     icon:'☠️', name:'Sobrevivente',              desc:'Conquiste as 8 insígnias no modo Nuzlocke.',                          check:a=>a.anyNuzlockeWin },
+  { id:'fossil',       icon:'🦴', name:'Arqueólogo',                desc:'Reviva um fóssil no Monte Lua.',                                      check:a=>a.anyFossil },
+  { id:'trade_evo',    icon:'🤝', name:'Amigos para Sempre',        desc:'Obtenha um Pokémon de evolução por troca (Machamp, Golem, Alakazam ou Gengar).', check:a=>a.anyTradeEvo },
+  { id:'snorlax',      icon:'😴', name:'Acorda, Preguiça',          desc:'Capture o Snorlax que bloqueia a estrada.',                           check:a=>a.anySnorlax },
+  { id:'safari',       icon:'🦓', name:'Safári Bem-Sucedido',       desc:'Capture 3 Pokémons na Zona de Safári sem que nenhum fuja antes.',     check:a=>a.anySafari3 }
+];
+function extraAchievementAggregate(){
+  const slots = (game.saveSlots || []).filter(Boolean);
+  const caught = getAllCaughtSpecies();
+  const challengesWon = [];
+  slots.forEach(sl=>{ (sl.challengesWon||[]).forEach(c=>{ if(!challengesWon.includes(c)) challengesWon.push(c); }); });
+  return {
+    anyShiny: slots.some(sl=>(sl.team||[]).some(p=>p.shiny)) || (game.team||[]).some(p=>p.shiny),
+    maxJessie: slots.reduce((m,sl)=>Math.max(m, sl.jessieDefeats||0), game.jessieDefeats||0),
+    maxRivalWins: slots.reduce((m,sl)=>Math.max(m, sl.rivalWins||0), game.rivalWins||0),
+    maxRocket: slots.reduce((m,sl)=>Math.max(m, sl.rocketAmbushesWon||0), game.rocketAmbushesWon||0),
+    maxStreak: slots.reduce((m,sl)=>Math.max(m, sl.bestStreak||0), game.bestStreak||0),
+    anyPerfect: slots.some(sl=>sl.anyPerfectGym) || !!game.anyPerfectGym,
+    challengesWon,
+    anyAllRisky: slots.some(sl=>{
+      const rh = sl.routeHistory||[];
+      return rh.length>=8 && rh.every(id=>{ const r = routeById(id); return r && (r.risk==='arriscada'||r.golden); });
+    }),
+    anyGolden: slots.some(sl=>(sl.routeHistory||[]).some(id=>String(id).startsWith('golden_'))) ||
+               (game.routeHistory||[]).some(id=>String(id).startsWith('golden_')),
+    anyNuzlockeWin: slots.some(sl=>sl.nuzlocke && (sl.badgeCount||0)>=8),
+    anyFossil: caught.has('omanyte') || caught.has('kabuto'),
+    anyTradeEvo: ['machamp','golem','alakazam','gengar'].some(id=>caught.has(id)),
+    anySnorlax: caught.has('snorlax'),
+    anySafari3: slots.some(sl=>(sl.safariPerfect)) || !!game.safariPerfect
+  };
 }
 
 /* ---------------------------------------------------
@@ -3127,26 +5222,37 @@ function renderWalk(){
     <h2>${spriteHtml(game.starterId,'sprite-sm')} Você escolheu ${sp.name}!</h2>
     <p>Com seu companheiro ao seu lado, você deixa o laboratório e começa a caminhar em direção ao Ginásio ${gym.gymTypeName}, na ${gym.city}, onde ${gym.leaderName} te espera.</p>
   </div>
-  <button class="btn primary" onclick="goToWildEncounter()">Continuar caminhada ➜</button>`;
+  <button class="btn primary" onclick="startLeg()">Escolher o caminho 🗺️</button>`;
 }
 
 function renderWalkNext(){
   const prevGym = GYMS[game.gymIndex-1];
   const gym = GYMS[game.gymIndex];
+  const avisos = [];
+  if(game.stolenReturned){ avisos.push(`😢 <strong>${escapeHtml(game.stolenReturned)}</strong> voltou sozinho da Equipe Rocket — maltratado, com <strong>-2 níveis</strong>.`); }
+  if(game.dayCareReturned){ avisos.push(`🏡 <strong>${escapeHtml(game.dayCareReturned)}</strong> voltou da creche com <strong>+2 níveis</strong>!`); }
+  if(game.lastTradeText){ avisos.push(`🤝 ${escapeHtml(game.lastTradeText)}`); }
+  if((game.rareCandyPending||0) > 0){ avisos.push(`🍬 Você ainda tem <strong>${game.rareCandyPending} Doce(s) Raro(s)</strong> guardado(s).`); }
+  game.dayCareReturned = null; game.lastTradeText = null; game.stolenReturned = null;
   return `
   <div class="box cursor">
     <h2>🚶 Rumo à ${gym.city}</h2>
     <p>Com a <strong>${prevGym.badge}</strong> guardada com carinho, você deixa ${prevGym.city} para trás e segue viagem até ${gym.city}, onde ${gym.leaderName} te espera no Ginásio ${gym.gymTypeName}.</p>
+    ${avisos.length ? `<div class="status-list">${avisos.map(a=>`<div class="status-row"><span>${a}</span></div>`).join('')}</div>` : ''}
   </div>
-  <button class="btn primary" onclick="goToWildEncounter()">Continuar caminhada ➜</button>`;
+  <button class="btn primary" onclick="startLeg()">Escolher o caminho 🗺️</button>`;
 }
 
 function renderWild(){
   const caught = getAllCaughtSpecies();
+  const route = routeById(game.currentRoute);
+  const refused = game.wildOffer.filter(o=>!game.wildSelected.includes(o.speciesId));
   return `
   <div class="box">
     <h2>🌿 Pokémons selvagens!</h2>
+    ${route ? `<p class="hint-text">${route.icon} Você está em <strong>${route.name}</strong> ${riskChip(route.risk)}</p>` : ''}
     <p>No meio do caminho, vários Pokémons selvagens aparecem. Escolha até <strong>3</strong> para se juntarem ao seu time — se não quiser nenhum, pode seguir em frente também.</p>
+    <p class="hint-text">⚠️ Cuidado: tudo que você <strong>recusar</strong> aqui vai parar no time de ${escapeHtml(game.rivalName)}.</p>
   </div>
   <div class="pool-badge">SELECIONADOS: ${game.wildSelected.length}/3</div>
   <div class="box">
@@ -3157,12 +5263,13 @@ function renderWild(){
       const isSel = game.wildSelected.includes(id);
       const isCaught = caught.has(id);
       const disabled = (!isSel && game.wildSelected.length>=3) ? 'disabled' : '';
-      return `<button class="btn ${isSel?'selected':''}" ${disabled} onclick="toggleWild('${id}')">
-        <span class="mon-name">${spriteHtml(id,'sprite-sm')} ${sp.name} — Lv.${entry.level} ${isSel?'✓':''} ${isLegendary?'✨':''} ${isCaught?'<span class="pokedex-owned-badge" title="Já está na sua Pokédex">📱</span>':''}</span>
+      return `<button class="btn ${isSel?'selected':''} ${entry.shiny?'shiny-offer':''}" ${disabled} onclick="toggleWild('${id}')">
+        <span class="mon-name">${spriteHtml(id,'sprite-sm', entry.shiny)} ${sp.name} — Lv.${entry.level} ${isSel?'✓':''} ${entry.shiny?'<span class="shiny-star" title="SHINY! 1 em 128">✨ SHINY</span>':''} ${isLegendary?'👑':''} ${isCaught?'<span class="pokedex-owned-badge" title="Já está na sua Pokédex">📱</span>':''}</span>
         <span class="mon-sub">${typesHtml(sp.types)}</span>
       </button>`;
     }).join('')}
   </div>
+  ${refused.length ? `<div class="box"><p class="hint-text">😤 ${escapeHtml(game.rivalName)} levaria: ${refused.map(o=>SPECIES[o.speciesId].name).join(', ')}</p></div>` : ''}
   <button class="btn success" onclick="confirmWild()">Confirmar equipe ✔</button>`;
 }
 
@@ -3215,11 +5322,11 @@ function renderLevels(){
   const maxPer = getMaxPerPokemon();
   let message;
   if(game.losses>0){
-    message = `Não desanime! Você ganhou <strong>+5 levels</strong> extras para reforçar o time antes de enfrentar ${gym.leaderName} de novo.`;
+    message = `Seus Pokémons treinaram no vale da derrota: <strong>+${game.poolTotal} pontos adiantados</strong> da sua próxima vitória. Não é presente — é empréstimo, e por isso perder nunca aumenta seu total.`;
   } else if(game.gymIndex===0){
     message = `Antes da batalha, você recebe <strong>20 levels</strong> para distribuir entre os membros do seu time.`;
   } else {
-    message = `Parabéns pela vitória! Você recebe <strong>+10 levels</strong> para fortalecer seu time antes de enfrentar ${gym.leaderName}.`;
+    message = `Você recebe <strong>${game.poolTotal} pontos</strong> — a nota que sua vitória anterior mereceu${(game.pointsOwed||0)>0 ? ' (já descontado o que foi adiantado nas derrotas)' : ''}.`;
   }
   message += ` Você pode colocar no máximo <strong>${maxPer} levels</strong> em um único Pokémon nesta distribuição.`;
   return `
@@ -3298,15 +5405,59 @@ function renderTeamOrder(){
 
 function renderPreBattle(){
   const gym = GYMS[game.gymIndex];
+  const lineup = battleLineup();
+  const benched = game.team.filter(p=>!lineup.includes(p));
+  const adjust = gymLevelAdjustNote();
+  const gymTeam = gymTeamForBattle();
   return `
   <div class="box">
     <h2>🥊 Ginásio ${gym.gymTypeName} — ${gym.leaderName}</h2>
     ${game.losses>0 ? `<div class="attempts">TENTATIVA ${game.losses+1} DE 5</div>` : ''}
     <p>Seu time está pronto e na ordem que você escolheu! ${gym.leaderName} usa Pokémons do tipo <strong>${gym.gymTypeName}</strong> — tipos como ${gym.adviceTypes} levam grande vantagem.</p>
+    ${adjust ? `<p class="hint-text">⚖️ Nesta tentativa: ${adjust}.</p>` : ''}
+    ${game.hpBuffNext ? `<p class="hint-text">💚 Seus Pokémons entram com <strong>+${Math.round(game.hpBuffNext*100)}% de HP</strong> nesta revanche (temporário: expira quando você vencer e não vale na Liga).</p>` : ''}
     <div class="team-mini">
-      ${game.team.map((p,idx)=>`<div class="team-chip">${idx+1}º ${spriteHtml(p.speciesId,'sprite-sm')} ${p.name} Lv.${p.level}</div>`).join('')}
+      ${lineup.map((p,idx)=>`<div class="team-chip">${idx+1}º ${spriteHtml(p.speciesId,'sprite-sm')} ${p.name} Lv.${p.level}${p.shiny?' ✨':''}</div>`).join('')}
     </div>
+    ${benched.length ? `<p class="hint-text">🪑 Fora da batalha por causa do desafio declarado: ${benched.map(p=>p.name).join(', ')}.</p>` : ''}
   </div>
+
+  ${game.leaderRevealed ? `
+  <div class="box">
+    <h2>🔍 Time de ${gym.leaderName} (revelado)</h2>
+    <p class="hint-text">Depois da derrota você ganhou informação, não força: agora sabe exatamente o que vem pela frente — e em que ordem.</p>
+    <div class="team-mini">
+      ${gymTeam.map((b,i)=>`<div class="team-chip">${i+1}º ${spriteHtml(b.speciesId,'sprite-sm')} ${b.name} Lv.${b.level}</div>`).join('')}
+    </div>
+    <p class="hint-text">Dica: reordene seu time (botão abaixo) para casar os tipos com essa sequência.</p>
+    <button class="btn secondary" onclick="game.screen='teamOrder';render()">↕️ Reorganizar a ordem do time</button>
+  </div>` : ''}
+
+  <div class="box">
+    <h2>🎯 Desafio declarado <span class="hint-text">(opcional)</span></h2>
+    <p class="hint-text">Assuma um handicap por escolha própria e leve bônus de pontos se vencer. Falhou, sem bônus — e a derrota conta normal. Máximo de 1 por batalha.</p>
+    ${DECLARED_CHALLENGES.map(c=>{
+      const viable = challengeIsViable(c.id);
+      const sel = game.declaredChallenge===c.id;
+      return `<button class="btn ${sel?'selected':''}" ${viable?'':'disabled'} onclick="declareChallenge('${c.id}')">
+        <span class="mon-name">${c.icon} ${c.name} — <strong>+${c.bonus} pontos</strong> ${sel?'✓':''}</span>
+        <span class="mon-sub">${viable ? c.desc : 'Indisponível com o time atual'}</span>
+      </button>`;
+    }).join('')}
+  </div>
+
+  <div class="box">
+    <h2>🧠 A aposta do treinador <span class="hint-text">(opcional)</span></h2>
+    <p class="hint-text">Qual dos seus vai vencer mais confrontos nesta batalha? Acertou, <strong>+2 pontos</strong>. Errar não custa nada além do bônus.</p>
+    ${lineup.map(p=>`<button class="btn ${game.mvpBet===p.id?'selected':''}" onclick="setMvpBet('${p.id}')">
+      <span class="mon-name">${spriteHtml(p.speciesId,'sprite-sm')} ${p.name} Lv.${p.level} ${game.mvpBet===p.id?'✓ MVP':''}</span>
+      <span class="mon-sub">${typesHtml(p.types)}</span>
+    </button>`).join('')}
+    <button class="btn ${game.scoreBet?'selected':''}" onclick="toggleScoreBet()">
+      <span class="mon-name">🎯 «Vou vencer perdendo no máximo 2» — <strong>+1 ponto</strong> ${game.scoreBet?'✓':''}</span>
+    </button>
+  </div>
+
   <button class="btn danger" onclick="runBattle()">Entrar na batalha!</button>
   <button class="btn secondary" onclick="openTrainerBattle()">🤝 Batalhar contra outro treinador</button>`;
 }
@@ -3391,7 +5542,7 @@ function renderPlayerStatus(list){
     const cls = p.fainted ? 'fainted' : '';
     return `<div class="status-row ${cls}">
       <span class="icon">${p.fainted?'❌':'✅'}</span>
-      <span>${sp?spriteHtml(p.speciesId,'sprite-sm'):''} ${p.name} — Lv.${p.level}</span>
+      <span>${sp?spriteHtml(p.speciesId,'sprite-sm',p.shiny):''} ${p.name}${p.shiny?' ✨':''} — Lv.${p.level}</span>
       <span class="tag ${p.fainted?'dead':'alive'}">${p.fainted?'Desmaiou':'Sobreviveu'}</span>
     </div>`;
   }).join('');
@@ -3469,6 +5620,20 @@ function renderBattling(){
   </div>`;
 }
 
+function renderRewardsBox(){
+  const rw = game.lastRewards;
+  if(!rw) return '';
+  return `
+  <div class="box rewards-box">
+    <h2>⭐ Nota da vitória</h2>
+    ${rw.items.map(it=>`<div class="reward-row"><span>${it.label}</span><span class="reward-pts ${it.pts>0?'':'zero'}">${it.pts>0?'+':''}${it.pts}</span></div>`).join('')}
+    <div class="reward-row total"><span>Total ganho</span><span class="reward-pts">+${rw.gross}</span></div>
+    ${rw.paid>0 ? `<div class="reward-row owed"><span>Empréstimo das derrotas (adiantado antes)</span><span class="reward-pts zero">−${rw.paid}</span></div>` : ''}
+    <div class="reward-row total"><span><strong>Vai para a próxima distribuição</strong></span><span class="reward-pts">${rw.net}</span></div>
+    ${rw.owedAfter>0 ? `<p class="hint-text">Ainda restam <strong>${rw.owedAfter} pontos</strong> adiantados a descontar na próxima vitória.</p>` : ''}
+    <p class="hint-text">A vitória vale de <strong>+8</strong> (vencer raspando na 3ª tentativa) a <strong>+14</strong> (vencer redondo de primeira), mais bônus de desafio, aposta, maré e eventos.</p>
+  </div>`;
+}
 function renderBattleResult(win){
   const gym = GYMS[game.gymIndex];
   const r = game.battleResult;
@@ -3481,15 +5646,18 @@ function renderBattleResult(win){
     <div class="badge-icon" style="display:none;">🏅</div>
     <div class="badge-text">Você ganhou a<br><strong>${gym.badge}</strong>!</div>
   </div>` : ''}
+  ${win && (game.winStreak||0)>1 ? `<div class="streak-banner">🔥 MARÉ DE VITÓRIAS: ${game.winStreak} GINÁSIOS SEGUIDOS SEM PERDER</div>` : ''}
   <div class="box">
     <h2>Log da batalha</h2>
     <div class="status-list">${renderMatchupLog(r.matchups)}</div>
   </div>
   <div class="box">
     <h2>Seu time</h2>
-    ${r.leveledUpFromFaint ? `<p class="faint-xp-note">💪 Pokémons que desmaiaram ganharam <strong>+1 level</strong> pela experiência da batalha!</p>` : ''}
+    ${r.leveledUpFromFaint ? `<p class="faint-xp-note">💪 Pokémons que desmaiaram na vitória ganharam <strong>+1 level</strong> pela experiência da batalha!</p>` : ''}
+    ${(r.benched||[]).length ? `<p class="hint-text">🪑 Ficaram de fora pelo desafio declarado: ${r.benched.join(', ')}.</p>` : ''}
     <div class="status-list">${renderPlayerStatus(r.playerStatus)}</div>
   </div>
+  ${win ? renderRewardsBox() : ''}
   <div class="box">
     <h2>Time de ${gym.leaderName}</h2>
     <div class="status-list">${renderEnemyStatus(r.brockStatus)}</div>
@@ -3499,13 +5667,12 @@ function renderBattleResult(win){
       ? (hasNextGym
           ? `<p>Parabéns! Você provou que tem o que é preciso para seguir em frente. Sua jornada continua!</p>`
           : `<p>Parabéns! Você conquistou todas as <strong>8 insígnias</strong> de Kanto e está <strong>classificado para participar da Liga Pokémon</strong>!</p>`)
-      : `<p>Tentativa <strong>${game.losses}/5</strong> falhou. Você recebeu <strong>+5 levels</strong> para fortalecer seu time antes da próxima tentativa.</p>`}
+      : `<p>Tentativa <strong>${game.losses}/5</strong> falhou. Seus Pokémons treinaram no vale da derrota: você recebe <strong>+5 pontos adiantados</strong> — eles serão descontados da sua próxima vitória, então perder nunca soma poder, só antecipa.</p>
+         <p class="hint-text">Como compensação de verdade você ganha <strong>informação e fôlego</strong>: o time completo de ${gym.leaderName} fica visível, a ordem pode ser refeita e seus Pokémons entram com +10% de HP na revanche.${game.losses>=2 ? ' Da 3ª derrota em diante, um reforço de emergência do caminho aparece.' : ''}</p>`}
   </div>
   ${win
-    ? (hasNextGym
-        ? `<button class="btn primary" onclick="continueJourney()">Continuar jornada ➜</button>`
-        : `<button class="btn success" onclick="showJourneyEnd()">Ver resumo da jornada ➜</button>`)
-    : `<button class="btn primary" onclick="prepareRetry()">Distribuir levels e tentar de novo</button>`}`;
+    ? `<button class="btn primary" onclick="goToRouletteOrContinue()">🎴 Girar a roleta do vencedor ➜</button>`
+    : `<button class="btn primary" onclick="prepareRetry()">Distribuir pontos e tentar de novo</button>`}`;
 }
 
 function renderGameOver(){
@@ -3565,12 +5732,37 @@ function renderJourneyEnd(){
       </div>`;
     }).join('')}
   </div>
+  ${won && (game.rivalWins||0) + (game.rivalLosses||0) < 4 ? `
+  <div class="box">
+    <h2>😤 ${escapeHtml(game.rivalName)} te espera na porta da Liga</h2>
+    <p>«Chegou até aqui? Impressionante. Mas a Liga é minha.» — a última batalha do rival, com o time feito de tudo que você recusou pelo caminho. Ela <strong>não conta</strong> nas suas derrotas.</p>
+    <button class="btn danger" onclick="startFinalRivalBattle()">Enfrentar ${escapeHtml(game.rivalName)} ⚔️</button>
+  </div>` : ''}
+  <button class="btn secondary" onclick="game.screen='journeyDiary';render()">📔 Ver o diário da jornada</button>
   ${won ? `<button class="btn primary" onclick="openLeague()">🏆 Ir para a Liga Pokémon</button>` : ''}
   <button class="btn success" onclick="requestReset()">Jogar novamente</button>`;
 }
 
+// Nome de treinador e nome de rival são texto livre do jogador e aparecem no chaveamento,
+// no ranking e nos fantasmas da Liga. Tudo isso é montado com innerHTML, então precisa passar
+// por aqui — sem escapar, um nome como `<img src=x onerror=...>` roda no navegador de todo mundo.
+function escapeHtml(str){
+  return String(str == null ? '' : str)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
 function escJs(str){
   return String(str).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+}
+// doc 04 — transparência: mostrar a soma de níveis de cada time no chaveamento. Se a comunidade
+// enxerga, a própria Liga cria cultura, e vocês ganham dados reais pra decidir depois, com calma,
+// se algum limite chega a ser necessário.
+function playerChip(p){
+  if(!p) return '?';
+  const sum = p.levelSum != null ? p.levelSum : (decodeTeamCode(p.code)||[]).reduce((a,m)=>a+m.level,0);
+  const ghost = p.isBot ? '<span class="ghost-tag" title="Fantasma do rival preenchendo a vaga">👻 BOT</span> ' : '';
+  const nuz = p.nuzlocke ? '<span class="ghost-tag" title="Zerou a jornada no modo Nuzlocke">☠️ NUZLOCKE</span> ' : '';
+  return `${nuz}${ghost}<span class="player-link" onclick="showPlayerTeamModal('${escJs(p.code)}','${escJs(p.name)}')">${escapeHtml(p.name)}</span><span class="level-sum" title="Soma de níveis do time">Σ${sum}</span>`;
 }
 function leagueMatchRow(match, roundLabel, ct, li, rk, mi){
   const isMyMatch = match.a && match.b && (match.a.name===game.trainerName || match.b.name===game.trainerName);
@@ -3579,16 +5771,16 @@ function leagueMatchRow(match, roundLabel, ct, li, rk, mi){
     const known = match.a || match.b;
     return `<div class="league-match pending${highlightClass}">
       <div class="league-match-title">${roundLabel}</div>
-      <div class="league-match-players">${known?known.name:'?'} <span class="vs">vs</span> ${match.a&&match.b?'':'(aguardando adversário)'}</div>
+      <div class="league-match-players">${known?escapeHtml(known.name):'?'} <span class="vs">vs</span> ${match.a&&match.b?'':'(aguardando adversário)'}</div>
     </div>`;
   }
   if(!match.resolved){
     return `<div class="league-match pending${highlightClass}">
       <div class="league-match-title">${roundLabel}</div>
       <div class="league-match-players centered">
-        <span class="player-link" onclick="showPlayerTeamModal('${escJs(match.a.code)}','${escJs(match.a.name)}')">${match.a.name}</span>
+        ${playerChip(match.a)}
         <span class="vs">vs</span>
-        <span class="player-link" onclick="showPlayerTeamModal('${escJs(match.b.code)}','${escJs(match.b.name)}')">${match.b.name}</span>
+        ${playerChip(match.b)}
       </div>
       <div class="league-match-status">⏳ Aguardando o horário da batalha</div>
     </div>`;
@@ -3596,11 +5788,11 @@ function leagueMatchRow(match, roundLabel, ct, li, rk, mi){
   return `<div class="league-match resolved${highlightClass}">
     <div class="league-match-title">${roundLabel}</div>
     <div class="league-match-players centered">
-      <span class="player-link ${match.winner.name===match.a.name?'win-text':''}" onclick="showPlayerTeamModal('${escJs(match.a.code)}','${escJs(match.a.name)}')">${match.a.name}</span>
+      <span class="${match.winner.name===match.a.name?'win-text':''}">${playerChip(match.a)}</span>
       <span class="vs">vs</span>
-      <span class="player-link ${match.winner.name===match.b.name?'win-text':''}" onclick="showPlayerTeamModal('${escJs(match.b.code)}','${escJs(match.b.name)}')">${match.b.name}</span>
+      <span class="${match.winner.name===match.b.name?'win-text':''}">${playerChip(match.b)}</span>
     </div>
-    <div class="league-match-status">🏅 ${match.winner.name} venceu!</div>
+    <div class="league-match-status">🏅 ${escapeHtml(match.winner.name)} venceu!${match.invalidTeam ? ` <span class="hint-text">(${escapeHtml(match.invalidTeam)} foi desclassificado por time inválido)</span>` : ''}</div>
     ${match.matchups && match.matchups.length>0 ? `<button class="btn secondary league-watch-btn" onclick="watchLeagueMatch(${ct},${li},'${rk}',${mi})">▶ Assistir batalha</button>` : ''}
   </div>`;
 }
@@ -3769,14 +5961,14 @@ function renderLeagueCycle(cycle){
   ${myLeague.champion ? `
   <div class="badge-earned">
     <div class="badge-icon">👑</div>
-    <div class="badge-text">Campeão da sua Liga:<br><strong>${myLeague.champion.name}</strong>!</div>
+    <div class="badge-text">Campeão da sua Liga:<br><strong>${escapeHtml(myLeague.champion.name)}</strong>!</div>
   </div>` : ''}
   ` : `<div class="box"><p>Você não está em nenhuma Liga dessa rodada.</p></div>`}
   ${otherLeagues.length>0 ? `
   <div class="box">
     <h2>Outras Ligas rolando junto</h2>
     <div class="status-list">
-      ${otherLeagues.map(l=>`<div class="status-row"><span class="icon">${l.size===GRANDE_LIGA_SIZE?'🌟':'🏆'}</span><span>${l.size===GRANDE_LIGA_SIZE?'Grande Liga':'Liga'} ${l.id+1}${l.champion?` — campeão: ${l.champion.name}`:' — em andamento'}</span></div>`).join('')}
+      ${otherLeagues.map(l=>`<div class="status-row"><span class="icon">${l.size===GRANDE_LIGA_SIZE?'🌟':'🏆'}</span><span>${l.size===GRANDE_LIGA_SIZE?'Grande Liga':'Liga'} ${l.id+1}${l.champion?` — campeão: ${escapeHtml(l.champion.name)}`:' — em andamento'}</span></div>`).join('')}
     </div>
   </div>` : ''}
   `;
@@ -3802,7 +5994,7 @@ function renderLeagueHistoryScreen(){
   ${league.champion ? `
   <div class="badge-earned">
     <div class="badge-icon">👑</div>
-    <div class="badge-text">Campeão:<br><strong>${league.champion.name}</strong>!</div>
+    <div class="badge-text">Campeão:<br><strong>${escapeHtml(league.champion.name)}</strong>!</div>
   </div>` : ''}
   <button class="btn primary" onclick="closeLeagueHistory()">⬅ Voltar</button>`;
 }
@@ -3862,13 +6054,13 @@ function renderLeague(){
     ${!alreadyIn ? `
     <div class="box">
       <h2>Inscreva-se</h2>
-      <p>Você vai se inscrever como <strong>${game.trainerName}</strong> (nome do seu save).</p>
+      <p>Você vai se inscrever como <strong>${escapeHtml(game.trainerName)}</strong> (nome do seu save).</p>
       ${game.leagueError ? `<p class="error-text">${game.leagueError}</p>` : ''}
       <button class="btn danger" ${game.leagueSubmitting?'disabled':''} onclick="registerForLeague()">${game.leagueSubmitting?'Inscrevendo...':'Confirmar inscrição ⚔️'}</button>
     </div>` : `
     <div class="box">
       <h2>✅ Você está inscrito!</h2>
-      <p>Você está confirmado como <strong>${game.trainerName}</strong> pra essa rodada.</p>
+      <p>Você está confirmado como <strong>${escapeHtml(game.trainerName)}</strong> pra essa rodada.</p>
       ${game.leagueError ? `<p class="error-text">${game.leagueError}</p>` : ''}
       <button class="btn secondary" ${game.leagueSubmitting?'disabled':''} onclick="cancelLeagueRegistration()">${game.leagueSubmitting?'Cancelando...':'Cancelar inscrição'}</button>
     </div>`}
@@ -3923,7 +6115,7 @@ function renderDeleteSaveModal(){
     <div class="modal-box">
       <div class="modal-icon">🗑️</div>
       <h2>Deletar save?</h2>
-      <p>Tem certeza que quer apagar o save do slot ${slot+1}${s?` (${s.trainerName})`:''}? Essa ação não pode ser desfeita.</p>
+      <p>Tem certeza que quer apagar o save do slot ${slot+1}${s?` (${escapeHtml(s.trainerName)})`:''}? Essa ação não pode ser desfeita.</p>
       <button class="btn danger" onclick="confirmDeleteSave()">Sim, deletar</button>
       <button class="btn secondary" onclick="cancelDeleteSave()">Cancelar</button>
     </div>
@@ -4012,7 +6204,7 @@ function renderSaveSelect(){
       ${game.leagueLeaderboard.map((entry,idx)=>`
         <div class="leaderboard-row">
           <span class="leaderboard-rank">${idx+1}º</span>
-          <span class="leaderboard-name">${entry.name}</span>
+          <span class="leaderboard-name">${escapeHtml(entry.name)}</span>
           <span class="leaderboard-count">${entry.count}🏆</span>
         </div>`).join('')}
     </div>` : `<p>Ninguém venceu uma Liga ainda. Seja o primeiro!</p>`}
@@ -4031,7 +6223,7 @@ function renderSaveSelect(){
     const slotWins = (game.leagueWinsBySlot && game.leagueWinsBySlot[String(slot)]) || 0;
     return `<div class="save-slot-card ${isComplete?'complete':''}">
       <div class="save-slot-top">
-        <span class="save-slot-name">${isComplete?'🏆 ':''}${s.trainerName}</span>
+        <span class="save-slot-name">${isComplete?'🏆 ':''}${escapeHtml(s.trainerName)}</span>
         <span class="save-slot-actions">
           <button class="save-slot-team-btn" onclick="showSaveTeamModal(${slot})" aria-label="Ver time">👥</button>
           <button class="save-slot-delete" onclick="requestDeleteSave(${slot})" ${game.deleteSaveChecking===slot?'disabled':''} aria-label="Deletar save">${game.deleteSaveChecking===slot?'⏳':'🗑'}</button>
@@ -4093,7 +6285,7 @@ function renderMewtwoPicker(){
   ${occupied.length>0 ? occupied.map(slot=>{
     const s = game.saveSlots[slot];
     return `<div class="box">
-      <h2>Slot ${slot+1} — ${s.trainerName}</h2>
+      <h2>Slot ${slot+1} — ${escapeHtml(s.trainerName)}</h2>
       <p>${s.team.length} pokémon(s) no time</p>
       <button class="btn danger" onclick="startMewtwoBattle(${slot})">Desafiar com esse time ⚔️</button>
     </div>`;
@@ -4140,7 +6332,8 @@ async function startMewtwoBattle(slot){
 }
 
 function renderAchievements(){
-  const agg = getAchievementAggregate();
+  ensureExtraAchievements();
+  const agg = Object.assign(getAchievementAggregate(), extraAchievementAggregate());
   const extra = game.achievementsExtra || { anyRegistered:false, anySemifinal:false, anyRunnerUp:false, anyChampion:false };
   const loadingExtra = game.achievementsExtra === null;
   const unlockedCount = ACHIEVEMENTS.filter(ach=>ach.check(agg, extra)).length;
@@ -4170,8 +6363,26 @@ function renderNewSaveName(){
     <p>Como você quer ser chamado(a) nessa jornada?</p>
   </div>
   <div class="box">
-    <input type="text" id="new-save-name-input" class="code-input" style="min-height:auto;" placeholder="Seu nome de treinador">
+    <input type="text" id="new-save-name-input" class="code-input" style="min-height:auto;" maxlength="20" placeholder="Seu nome de treinador">
     ${game.newSaveNameError ? `<p class="error-text">${game.newSaveNameError}</p>` : ''}
+  </div>
+  <div class="box">
+    <h2>😤 Nome do rival</h2>
+    <p class="hint-text">Ele vai ficar com todos os Pokémons que você recusar pelo caminho — e não vai deixar você esquecer disso.</p>
+    <input type="text" id="new-rival-name-input" class="code-input" style="min-height:auto;" maxlength="20" placeholder="Gary" value="">
+  </div>
+  <div class="box">
+    <h2>⚙️ Modos de jogo <span class="hint-text">(opcional)</span></h2>
+    <button class="btn new-save-option ${game.pendingNuzlocke?'selected':''}" onclick="toggleNuzlocke()">
+      <span class="mon-name">☠️ Modo Nuzlocke ${game.pendingNuzlocke?'✓':''}</span>
+      <span class="mon-sub">Pokémon que desmaia é liberado para sempre. Para veteranos.</span>
+    </button>
+    <button class="btn new-save-option ${game.pendingDaily?'selected':''}" onclick="toggleDaily()">
+      <span class="mon-name">📅 Desafio diário ${game.pendingDaily?'✓':''}</span>
+      <span class="mon-sub">A seed do dia é global: todo mundo enfrenta exatamente as mesmas ofertas e as mesmas rotas douradas hoje.</span>
+    </button>
+  </div>
+  <div class="box">
     <button class="btn success" onclick="confirmNewSaveName()">Começar jornada ⚔️</button>
   </div>
   <button class="btn secondary" onclick="openSaveSelect()">⬅ Voltar</button>`;
@@ -4208,8 +6419,23 @@ function render(){
     case 'mewtwoPicker': html = renderMewtwoPicker(); break;
     case 'achievements': html = renderAchievements(); break;
     case 'newSaveName': html = renderNewSaveName(); break;
+    case 'routeChoice': html = renderRouteChoice(); break;
+    case 'routeEvent': html = renderRouteEvent(); break;
+    case 'fossil': html = renderFossil(); break;
+    case 'dojo': html = renderDojo(); break;
+    case 'safari': html = renderSafari(); break;
+    case 'npcTrade': html = renderNpcTrade(); break;
+    case 'dayCare': html = renderDayCare(); break;
+    case 'rocketHideout': html = renderRocketHideout(); break;
+    case 'casino': html = renderCasino(); break;
+    case 'emergency': html = renderEmergency(); break;
+    case 'roulette': html = renderRoulette(); break;
+    case 'eventIntro': html = renderEventIntro(); break;
+    case 'eventBattling': html = renderEventBattling(); break;
+    case 'eventResult': html = renderEventResult(); break;
+    case 'journeyDiary': html = renderJourneyDiary(); break;
   }
-  const noMenuScreens = new Set(['auth','saveSelect','newSaveName','battling','trainerBattling','leagueWatch','pokedex','achievements','mewtwoPicker']);
+  const noMenuScreens = new Set(['auth','saveSelect','newSaveName','battling','trainerBattling','leagueWatch','pokedex','achievements','mewtwoPicker','eventBattling']);
   if(game.authUser && !noMenuScreens.has(game.screen)){
     html += `<button class="home-nav-btn" onclick="goToSaveMenu()">🏠 Home</button>`;
   }
