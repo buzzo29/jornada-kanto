@@ -402,6 +402,19 @@ async function recordLeagueChampionWin(name, uid, slot){
     } catch(e){ logger.error('Erro ao registrar campeão na conta:', e); }
   }
 }
+async function recordLeaguePlacement(uid, slot, record){
+  if(!uid || slot==null) return;
+  try{
+    const ref = db.collection('users').doc(uid);
+    const snap = await ref.get();
+    const bySlot = (snap.exists && snap.data().leaguePlacementsBySlot) ? snap.data().leaguePlacementsBySlot : {};
+    const slotKey = String(slot);
+    const current = bySlot[slotKey] || [];
+    if(current.some(p=>p.cycleId===record.cycleId && p.leagueId===record.leagueId)) return;
+    const updated = [record, ...current].sort((a,b)=>b.cycleTime-a.cycleTime).slice(0, 12);
+    await ref.set({ leaguePlacementsBySlot: { [slotKey]: updated } }, { merge: true });
+  } catch(e){ logger.error('Erro ao gravar colocação na Liga:', e); }
+}
 function resolveLeagueMatch(match, seedStr, pendingSyncs){
   const rng = makeSeededRng(seedStr);
   const teamA = decodeTeamCode(match.a.code);
@@ -428,6 +441,7 @@ function resolveLeagueMatch(match, seedStr, pendingSyncs){
   pendingSyncs.push({ playerRef: updatedA, leveledTeam: teamA });
   pendingSyncs.push({ playerRef: updatedB, leveledTeam: teamB });
 }
+const STUCK_CLAIM_THRESHOLD_MS = 3 * 60 * 1000;
 async function claimCycleForProcessing(cycleId, fromStatus, toStatus){
   return await db.runTransaction(async (tx)=>{
     const snap = await tx.get(scheduleDocRef());
@@ -436,10 +450,32 @@ async function claimCycleForProcessing(cycleId, fromStatus, toStatus){
     const entry = data.cycles.find(c=>c.id===cycleId);
     if(!entry || entry.status!==fromStatus) return false;
     entry.status = toStatus;
+    entry.claimedAt = (toStatus==='advancing' || toStatus==='drawing') ? Date.now() : null;
     data.updatedAt = Date.now();
     tx.set(scheduleDocRef(), data);
     return true;
   });
+}
+async function recoverStuckCycles(){
+  try{
+    await db.runTransaction(async (tx)=>{
+      const snap = await tx.get(scheduleDocRef());
+      if(!snap.exists) return;
+      const data = snap.data();
+      const now = Date.now();
+      let changed = false;
+      for(const entry of data.cycles){
+        const isStuck = (entry.status==='advancing' || entry.status==='drawing') &&
+          (!entry.claimedAt || (now - entry.claimedAt > STUCK_CLAIM_THRESHOLD_MS));
+        if(isStuck){
+          entry.status = entry.status==='advancing' ? 'drawn' : 'registering';
+          entry.claimedAt = null;
+          changed = true;
+        }
+      }
+      if(changed){ data.updatedAt = Date.now(); tx.set(scheduleDocRef(), data); }
+    });
+  } catch(e){ logger.error('Erro ao recuperar ciclos travados:', e); }
 }
 async function drawCycle(cycleEntry){
   const claimed = await claimCycleForProcessing(cycleEntry.id, 'registering', 'drawing');
@@ -497,10 +533,30 @@ async function drawCycle(cycleEntry){
     return false;
   }
 }
+function computePlacement(league, playerName){
+  if(!league.champion) return null;
+  if(league.champion.name===playerName) return 'Campeão';
+  const roundKeys = Object.keys(league.rounds).sort((a,b)=>Number(a)-Number(b));
+  const lastRoundIdx = roundKeys.length - 1;
+  const finalMatch = league.rounds[roundKeys[lastRoundIdx]][0];
+  if(finalMatch.a && finalMatch.b && (finalMatch.a.name===playerName || finalMatch.b.name===playerName)){
+    return 'Vice-campeão';
+  }
+  for(let ri=lastRoundIdx-1; ri>=0; ri--){
+    const round = league.rounds[roundKeys[ri]];
+    const wasHere = round.some(m=> m.a && m.b && (m.a.name===playerName || m.b.name===playerName));
+    if(wasHere){
+      const eliminatedInSize = round.length * 2;
+      const nextSize = eliminatedInSize / 2;
+      return `${nextSize+1}º–${eliminatedInSize}º Lugar`;
+    }
+  }
+  return null;
+}
 async function advanceCyclePhases(cycleEntry){
   const claimed = await claimCycleForProcessing(cycleEntry.id, 'drawn', 'advancing');
   if(!claimed) return false;
-  let pendingSyncs = [], pendingChampions = [], changed = false;
+  let pendingSyncs = [], pendingChampions = [], pendingPlacements = [], changed = false;
   try{
     const ref = cycleDocRef(cycleEntry.id);
     const snap = await ref.get();
@@ -525,6 +581,19 @@ async function advanceCyclePhases(cycleEntry){
             } else {
               league.champion = match.winner;
               pendingChampions.push({ name: match.winner.name, uid: match.winner.uid, slot: match.winner.slot });
+              const participants = [];
+              (league.rounds['0']||[]).forEach(m=>{ if(m.a) participants.push(m.a); if(m.b) participants.push(m.b); });
+              for(const p of participants){
+                const placement = computePlacement(league, p.name);
+                if(placement && p.uid){
+                  // mesmo fallback defensivo do cliente -- alguns ciclos antigos podem estar sem "scheduledTime"/
+                  // "size" (de antes desses campos existirem, ou de uma migração), e o Firestore recusa gravar
+                  // "undefined" -- sem isso um único registro velho malformado quebrava a gravação inteira
+                  const cycleTime = cycleEntry.scheduledTime!=null ? cycleEntry.scheduledTime : Number(cycleEntry.id) || 0;
+                  const leagueSize = league.size!=null ? league.size : ((league.rounds['0']||[]).length * 2 || REGULAR_LIGA_SIZE);
+                  pendingPlacements.push({ uid: p.uid, slot: p.slot, record: { cycleId: cycleEntry.id, cycleTime, leagueId: league.id, leagueSize, placement } });
+                }
+              }
             }
           }
         }
@@ -536,6 +605,7 @@ async function advanceCyclePhases(cycleEntry){
     await claimCycleForProcessing(cycleEntry.id, 'advancing', allDone ? 'complete' : 'drawn');
     for(const {playerRef, leveledTeam} of pendingSyncs){ await syncLeaguePlayerLevels(playerRef, leveledTeam); }
     for(const champ of pendingChampions){ await recordLeagueChampionWin(champ.name, champ.uid, champ.slot); }
+    for(const p of pendingPlacements){ await recordLeaguePlacement(p.uid, p.slot, p.record); }
     return changed;
   } catch(e){
     logger.error('Erro ao avançar fases do ciclo:', e);
@@ -550,6 +620,7 @@ async function advanceCyclePhases(cycleEntry){
 exports.advanceLeague = onSchedule('every 1 minutes', async (event) => {
   let anyChanged = false;
   try{
+    await recoverStuckCycles();
     const scheduleSnap = await scheduleDocRef().get();
     if(!scheduleSnap.exists){
       await scheduleDocRef().set({ cycles: [{ id: makeCycleId(computeNextScheduledTime()), scheduledTime: computeNextScheduledTime(), status:'registering' }], updatedAt: Date.now() });

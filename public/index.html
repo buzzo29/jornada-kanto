@@ -1206,25 +1206,78 @@ async function recordLeagueChampionWin(name, uid, slot){
     } catch(e){ console.error('Erro ao registrar campeão na conta:', e); }
   }
 }
+async function recordLeaguePlacement(uid, slot, record){
+  // grava a colocação final (Campeão, Vice, etc.) direto na conta do jogador, assim que a Liga termina --
+  // isso evita ter que vasculhar várias Ligas depois só pra montar a lista "Suas últimas Ligas".
+  // IMPORTANTE: guardado por SLOT (personagem), não só por conta -- uma mesma conta pode ter vários saves,
+  // cada um com seu próprio treinador, e cada um pode ter uma trajetória bem diferente na Liga (inclusive
+  // podendo se enfrentar entre si na mesma Liga, então misturar tudo numa lista só faria um sobrescrever o outro).
+  if(!uid || slot==null) return;
+  // mesma restrição de segurança do restante da Liga: o cliente só grava na PRÓPRIA conta; se foi outro
+  // navegador (ou ninguém) que processou essa Liga, a Cloud Function cobre isso com privilégio de admin
+  if(!game.authUser || game.authUser.uid !== uid) return;
+  try{
+    const ref = userDocRef(uid);
+    const snap = await ref.get();
+    const bySlot = (snap.exists && snap.data().leaguePlacementsBySlot) ? snap.data().leaguePlacementsBySlot : {};
+    const slotKey = String(slot);
+    const current = bySlot[slotKey] || [];
+    if(current.some(p=>p.cycleId===record.cycleId && p.leagueId===record.leagueId)) return; // já registrado, evita duplicar
+    const updated = [record, ...current].sort((a,b)=>b.cycleTime-a.cycleTime).slice(0, 12);
+    await ref.set({ leaguePlacementsBySlot: { [slotKey]: updated } }, { merge: true });
+    if(game.currentSaveSlot===slot){ game.myLeagueHistory = updated; }
+  } catch(e){ console.error('Erro ao gravar colocação na Liga:', e); }
+}
 async function reconcileLeagueWinsFromHistory(){
   // rede de segurança: se por algum motivo a Cloud Function não rodou (ex: não foi implantada ainda) e
   // ninguém logado na própria conta processou a Final, o total da conta pode ficar desatualizado mesmo
   // com o ranking global correto. Isso corrige comparando com o histórico retido da Liga (até 12 ciclos).
+  // aproveita a MESMA varredura pra também preencher retroativamente colocações de antes dessa funcionalidade existir.
   if(!game.authUser) return;
   try{
-    const scheduleSnap = await scheduleDocRef().get();
+    const [scheduleSnap, userSnapEarly] = await Promise.all([scheduleDocRef().get(), userDocRef(game.authUser.uid).get()]);
     if(!scheduleSnap.exists) return;
+    // marca, por slot, a partir de quando um save "conta" pra esse slot -- criado quando um save novo é
+    // iniciado num slot reaproveitado (de um save apagado). Sem isso, essa mesma varredura (que busca por
+    // UID da conta, não por save específico) ficaria ressuscitando pra sempre as Ligas do save antigo
+    const slotResetAt = (userSnapEarly.exists && userSnapEarly.data().leagueSlotResetAt) ? userSnapEarly.data().leagueSlotResetAt : {};
     const completedEntries = (scheduleSnap.data().cycles||[]).filter(c=>c.status==='complete');
     const winsBySlotFromHistory = {};
     let totalFromHistory = 0;
-    for(const entry of completedEntries){
-      const detailSnap = await cycleDocRef(entry.id).get();
-      if(!detailSnap.exists) continue;
+    const backfillPlacementsBySlot = {};
+    // busca todos os ciclos concluídos em paralelo, em vez de um de cada vez -- bem mais rápido
+    const detailSnaps = await Promise.all(completedEntries.map(entry=>cycleDocRef(entry.id).get().catch(()=>null)));
+    for(let i=0;i<completedEntries.length;i++){
+      const entry = completedEntries[i];
+      const detailSnap = detailSnaps[i];
+      if(!detailSnap || !detailSnap.exists) continue;
+      const cycleTime = entry.scheduledTime!=null ? entry.scheduledTime : Number(entry.id) || 0;
       for(const league of (detailSnap.data().leagues||[])){
         if(league.champion && league.champion.uid===game.authUser.uid){
           const slotKey = String(league.champion.slot);
-          winsBySlotFromHistory[slotKey] = (winsBySlotFromHistory[slotKey]||0) + 1;
+          // o total "vitalício" da conta soma tudo, mas a contagem POR SLOT não conta vitórias de antes do
+          // save atual desse slot ter começado (senão um save novo herdaria vitórias do save antigo apagado)
+          if(cycleTime >= (slotResetAt[slotKey]||0)){
+            winsBySlotFromHistory[slotKey] = (winsBySlotFromHistory[slotKey]||0) + 1;
+          }
           totalFromHistory++;
+        }
+        // usa filter, não find -- a MESMA conta pode ter mais de um personagem (save) nessa Liga
+        // (podem até ter se enfrentado entre si), então cada um precisa da própria colocação registrada
+        const myParticipants = (league.rounds['0']||[]).flatMap(m=>[m.a,m.b]).filter(p=>p && p.uid===game.authUser.uid);
+        for(const participant of myParticipants){
+          if(participant.slot==null) continue;
+          const slotKey = String(participant.slot);
+          if(cycleTime < (slotResetAt[slotKey]||0)) continue; // pertence a um save antigo já apagado desse slot
+          const placement = computePlacement(league, participant.name);
+          if(placement){
+            if(!backfillPlacementsBySlot[slotKey]) backfillPlacementsBySlot[slotKey] = [];
+            // alguns ciclos antigos (de antes desse campo existir, ou de uma migração) podem estar sem
+            // "scheduledTime"/"size" -- o Firestore recusa gravar "undefined", então sem esse fallback
+            // um único registro velho malformado quebrava a gravação de TODO o histórico, não só o dele
+            const leagueSize = league.size!=null ? league.size : ((league.rounds['0']||[]).length * 2 || REGULAR_LIGA_SIZE);
+            backfillPlacementsBySlot[slotKey].push({ cycleId: entry.id, cycleTime, leagueId: league.id, leagueSize, placement });
+          }
         }
       }
     }
@@ -1236,6 +1289,25 @@ async function reconcileLeagueWinsFromHistory(){
       if(winsBySlotFromHistory[slotKey] > (currentBySlot[slotKey]||0)){
         mergedBySlot[slotKey] = winsBySlotFromHistory[slotKey];
         needsUpdate = true;
+      }
+    }
+    const backfillSlotKeys = Object.keys(backfillPlacementsBySlot);
+    if(backfillSlotKeys.length>0){
+      const existingBySlot = (userSnapEarly.exists && userSnapEarly.data().leaguePlacementsBySlot) ? userSnapEarly.data().leaguePlacementsBySlot : {};
+      const mergedPlacementsBySlot = {};
+      let anyNew = false;
+      for(const slotKey of backfillSlotKeys){
+        const existing = existingBySlot[slotKey] || [];
+        const existingKeys = new Set(existing.map(p=>p.cycleId+'-'+p.leagueId));
+        const newOnes = backfillPlacementsBySlot[slotKey].filter(p=>!existingKeys.has(p.cycleId+'-'+p.leagueId));
+        if(newOnes.length>0){
+          mergedPlacementsBySlot[slotKey] = [...existing, ...newOnes].sort((a,b)=>b.cycleTime-a.cycleTime).slice(0,12);
+          anyNew = true;
+        }
+      }
+      if(anyNew){
+        await userDocRef(game.authUser.uid).set({ leaguePlacementsBySlot: mergedPlacementsBySlot }, { merge: true });
+        if(mergedPlacementsBySlot[String(game.currentSaveSlot)]){ game.myLeagueHistory = mergedPlacementsBySlot[String(game.currentSaveSlot)]; }
       }
     }
     if(needsUpdate){
@@ -1923,7 +1995,10 @@ async function migrateOldLeagueDataIfNeeded(){
           scheduledTime: oldCycle.scheduledTime,
           leagues: oldCycle.leagues,
           leftover: oldCycle.leftover || [],
-          qfTime: oldCycle.qfTime, sfTime: oldCycle.sfTime, finalTime: oldCycle.finalTime, phase4Time: oldCycle.phase4Time,
+          qfTime: oldCycle.qfTime ?? null,
+          sfTime: oldCycle.sfTime ?? null,
+          finalTime: oldCycle.finalTime ?? null,
+          phase4Time: oldCycle.phase4Time ?? null, // saves antigos de antes da Grande Liga não tinham esse campo
           updatedAt: Date.now()
         });
       }
@@ -1979,6 +2054,7 @@ async function registerForLeague(){
     });
     game.leagueSubmitting = false;
     render();
+    if(game.screen==='league'){ refreshLeagueView(false); } // atualiza a tela na hora, sem esperar o próximo tick de 5s
   } catch(e){
     game.leagueSubmitting = false;
     if(e.message==='DUPLICATE_NAME') game.leagueError = 'Já existe um treinador inscrito com esse nome. Tente outro.';
@@ -1999,6 +2075,7 @@ async function cancelLeagueRegistration(){
     if(cycleEntry){ await registrantDocRef(cycleEntry.id, name).delete(); }
     game.leagueSubmitting = false;
     render();
+    if(game.screen==='league'){ refreshLeagueView(false); }
   } catch(e){
     console.error(e);
     game.leagueSubmitting = false;
@@ -2057,6 +2134,7 @@ function scheduleLeagueTeamCodeSync(){
    pra garantir que só um processo sorteia cada ciclo mesmo com vários
    navegadores tentando ao mesmo tempo
 ------------------------------------------------------------------- */
+const STUCK_CLAIM_THRESHOLD_MS = 3 * 60 * 1000; // se um "lacre" ficar preso por mais que isso, algo deu errado (ex: navegador fechado no meio do processamento) -- libera sozinho
 async function claimCycleForProcessing(cycleId, fromStatus, toStatus){
   return await db.runTransaction(async (tx)=>{
     const snap = await tx.get(scheduleDocRef());
@@ -2065,10 +2143,36 @@ async function claimCycleForProcessing(cycleId, fromStatus, toStatus){
     const entry = data.cycles.find(c=>c.id===cycleId);
     if(!entry || entry.status!==fromStatus) return false;
     entry.status = toStatus;
+    entry.claimedAt = (toStatus==='advancing' || toStatus==='drawing') ? Date.now() : null;
     data.updatedAt = Date.now();
     tx.set(scheduleDocRef(), data);
     return true;
   });
+}
+async function recoverStuckCycles(){
+  // se algum navegador fechou (ou caiu a conexão) bem no meio de processar uma fase, o "lacre" pode ficar
+  // preso pra sempre, já que nenhum outro navegador consegue reivindicar um ciclo fora do status esperado.
+  // isso destrava sozinho qualquer lacre preso há mais tempo do que um processamento normal deveria levar
+  // (também cobre lacres antigos, de antes dessa proteção existir, que nunca tiveram um horário registrado).
+  try{
+    await db.runTransaction(async (tx)=>{
+      const snap = await tx.get(scheduleDocRef());
+      if(!snap.exists) return;
+      const data = snap.data();
+      const now = Date.now();
+      let changed = false;
+      for(const entry of data.cycles){
+        const isStuck = (entry.status==='advancing' || entry.status==='drawing') &&
+          (!entry.claimedAt || (now - entry.claimedAt > STUCK_CLAIM_THRESHOLD_MS));
+        if(isStuck){
+          entry.status = entry.status==='advancing' ? 'drawn' : 'registering';
+          entry.claimedAt = null;
+          changed = true;
+        }
+      }
+      if(changed){ data.updatedAt = Date.now(); tx.set(scheduleDocRef(), data); }
+    });
+  } catch(e){ console.error('Erro ao recuperar ciclos travados:', e); }
 }
 async function drawCycle(cycleEntry){
   const claimed = await claimCycleForProcessing(cycleEntry.id, 'registering', 'drawing');
@@ -2132,7 +2236,7 @@ async function drawCycle(cycleEntry){
 async function advanceCyclePhases(cycleEntry){
   const claimed = await claimCycleForProcessing(cycleEntry.id, 'drawn', 'advancing');
   if(!claimed) return false;
-  let pendingSyncs = [], pendingChampions = [], changed = false;
+  let pendingSyncs = [], pendingChampions = [], pendingPlacements = [], changed = false;
   try{
     const ref = cycleDocRef(cycleEntry.id);
     const snap = await ref.get();
@@ -2157,6 +2261,20 @@ async function advanceCyclePhases(cycleEntry){
             } else {
               league.champion = match.winner;
               pendingChampions.push({ name: match.winner.name, uid: match.winner.uid, slot: match.winner.slot });
+              // o chaveamento inteiro dessa Liga já está resolvido agora -- aproveita pra gravar a
+              // colocação final de todo mundo que participou, direto na conta de cada um
+              const participants = [];
+              (league.rounds['0']||[]).forEach(m=>{ if(m.a) participants.push(m.a); if(m.b) participants.push(m.b); });
+              for(const p of participants){
+                const placement = computePlacement(league, p.name);
+                if(placement && p.uid){
+                  // mesmo fallback defensivo de reconcileLeagueWinsFromHistory -- evita gravar "undefined"
+                  // caso esse ciclo específico esteja com algum campo faltando
+                  const cycleTime = cycleEntry.scheduledTime!=null ? cycleEntry.scheduledTime : Number(cycleEntry.id) || 0;
+                  const leagueSize = league.size!=null ? league.size : ((league.rounds['0']||[]).length * 2 || REGULAR_LIGA_SIZE);
+                  pendingPlacements.push({ uid: p.uid, slot: p.slot, record: { cycleId: cycleEntry.id, cycleTime, leagueId: league.id, leagueSize, placement } });
+                }
+              }
             }
           }
         }
@@ -2168,6 +2286,7 @@ async function advanceCyclePhases(cycleEntry){
     await claimCycleForProcessing(cycleEntry.id, 'advancing', allDone ? 'complete' : 'drawn');
     for(const {playerRef, leveledTeam} of pendingSyncs){ await syncLeaguePlayerLevels(playerRef, leveledTeam); }
     for(const champ of pendingChampions){ await recordLeagueChampionWin(champ.name, champ.uid, champ.slot); }
+    for(const p of pendingPlacements){ await recordLeaguePlacement(p.uid, p.slot, p.record); }
     return changed;
   } catch(e){
     console.error('Erro ao avançar fases do ciclo:', e);
@@ -2178,6 +2297,7 @@ async function advanceCyclePhases(cycleEntry){
 async function advanceLeagueOnce(){
   let anyChanged = false;
   try{
+    await recoverStuckCycles();
     const scheduleSnap = await scheduleDocRef().get();
     if(!scheduleSnap.exists){
       await scheduleDocRef().set(makeFreshScheduleData());
@@ -2212,55 +2332,46 @@ async function loadLeagueViewData(){
   try{
     const scheduleSnap = await scheduleDocRef().get();
     const scheduleData = scheduleSnap.exists ? scheduleSnap.data() : { cycles: [] };
-    const cycles = [];
-    for(const entry of scheduleData.cycles){
+    // só busca (e mostra "ao vivo") o chaveamento do ciclo mais recente entre os que já foram sorteados
+    // (drawn/advancing/complete) -- não necessariamente o mais recente CONCLUÍDO especificamente, porque assim
+    // que uma Liga nova é sorteada, ela passa a ser "a atual" e a anterior (mesmo já encerrada) sai da tela
+    // ao vivo, ficando disponível só via "Suas últimas Ligas" → "Rever"
+    const activeTimes = scheduleData.cycles.filter(c=>c.status==='drawn' || c.status==='advancing' || c.status==='complete').map(c=>c.scheduledTime);
+    const latestActiveTime = activeTimes.length>0 ? Math.max(...activeTimes) : null;
+    const cycles = await Promise.all(scheduleData.cycles.map(async (entry)=>{
       if(entry.status==='registering'){
-        const registrantCount = await countRegistrants(entry.id);
-        let amIRegistered = false;
-        if(game.trainerName){
-          try{ const regSnap = await registrantDocRef(entry.id, game.trainerName).get(); amIRegistered = regSnap.exists; }
-          catch(e){ /* ignora, assume não inscrito */ }
-        }
-        cycles.push({ ...entry, registrantCount, registrants: { length: registrantCount }, leagues: null, amIRegistered });
-      } else if(entry.status==='drawn' || entry.status==='complete'){
+        const [registrantCount, amIRegistered] = await Promise.all([
+          countRegistrants(entry.id),
+          game.trainerName ? registrantDocRef(entry.id, game.trainerName).get().then(s=>s.exists).catch(()=>false) : Promise.resolve(false)
+        ]);
+        return { ...entry, registrantCount, registrants: { length: registrantCount }, leagues: null, amIRegistered };
+      } else if(entry.scheduledTime===latestActiveTime && (entry.status==='drawn' || entry.status==='advancing' || entry.status==='complete')){
+        // 'advancing' é um estado transitório (alguém, talvez outro jogador com a tela aberta, está processando
+        // uma fase agora mesmo) -- o chaveamento já existe e continua legível nesse meio-tempo, só o status
+        // muda por um instante. Buscar aqui também evita a tela "piscar" vazia enquanto isso acontece.
         try{
           const detailSnap = await cycleDocRef(entry.id).get();
-          if(detailSnap.exists){ cycles.push({ ...entry, ...detailSnap.data() }); }
-          else { cycles.push(entry); }
-        } catch(e){ cycles.push(entry); }
-      } else {
-        cycles.push(entry); // drawing/advancing -- transitório, mostra o que tiver
+          return detailSnap.exists ? { ...entry, ...detailSnap.data() } : entry;
+        } catch(e){ return entry; }
       }
-    }
+      return entry; // ciclo mais antigo (já superado por um mais novo) -- fica só com os dados leves (id, horário, status)
+    }));
     return { cycles };
   } catch(e){
     console.error('Erro ao carregar a Liga:', e);
     return { cycles: [] };
   }
 }
-async function loadPlayerLeagueHistory(playerName, limit){
-  const results = [];
+async function loadMyLeagueHistory(limit){
+  // le direto da conta do jogador, filtrado pelo slot (personagem) atual -- uma mesma conta pode ter vários
+  // saves, cada um com sua própria trajetória na Liga, então não faz sentido misturar tudo numa lista só
+  if(!game.authUser || game.currentSaveSlot==null) return [];
   try{
-    const scheduleSnap = await scheduleDocRef().get();
-    if(!scheduleSnap.exists) return results;
-    const completed = (scheduleSnap.data().cycles||[])
-      .filter(c=>c.status==='complete')
-      .sort((a,b)=>b.scheduledTime-a.scheduledTime)
-      .slice(0, 12); // não retém mais que os últimos 12 ciclos concluídos
-    for(const entry of completed){
-      const detailSnap = await cycleDocRef(entry.id).get();
-      if(!detailSnap.exists) continue;
-      const detail = detailSnap.data();
-      for(const league of detail.leagues||[]){
-        const placement = computePlacement(league, playerName);
-        if(placement){
-          results.push({ cycleTime: entry.scheduledTime, cycleId: entry.id, league, placement });
-          if(results.length>=limit) return results;
-        }
-      }
-    }
-  } catch(e){ console.error('Erro ao carregar histórico da Liga:', e); }
-  return results;
+    const snap = await userDocRef(game.authUser.uid).get();
+    const bySlot = (snap.exists && snap.data().leaguePlacementsBySlot) ? snap.data().leaguePlacementsBySlot : {};
+    const placements = bySlot[String(game.currentSaveSlot)] || [];
+    return placements.slice(0, limit);
+  } catch(e){ console.error('Erro ao carregar histórico da Liga:', e); return []; }
 }
 function findMyLeagueInCycle(cycle){
   if(!cycle.leagues) return null;
@@ -2288,9 +2399,8 @@ function computePlacement(league, playerName){
   }
   return null;
 }
-async function viewLeagueHistory(cycleTime, leagueId){
+async function viewLeagueHistory(cycleId, leagueId, cycleTime){
   try{
-    const cycleId = makeCycleId(cycleTime);
     const detailSnap = await cycleDocRef(cycleId).get();
     if(!detailSnap.exists) return;
     const league = (detailSnap.data().leagues||[]).find(l=>l.id===leagueId);
@@ -2330,14 +2440,25 @@ function openLeague(){
   game.leagueError = null;
   game.screen = 'league';
   render();
-  refreshLeagueView();
+  refreshLeagueView(true); // primeira abertura: carrega tudo, incluindo o histórico
   startLeagueListener();
 }
-async function refreshLeagueView(){
+async function refreshLeagueView(includeHistory){
   const data = await loadLeagueViewData();
   game.leagueData = data;
-  if(game.trainerName){
-    game.myLeagueHistory = await loadPlayerLeagueHistory(game.trainerName, 5);
+  // mesmo quando ESTE navegador não foi quem processou a mudança (ex: a Cloud Function ou o navegador de
+  // outro jogador já cuidou disso), se o ciclo "atual" mostrado na tela mudou de identidade ou status desde
+  // a última vez, trata como se algo tivesse mudado -- senão "Suas últimas Ligas" fica desatualizada
+  // indefinidamente sempre que este navegador não é quem processa as fases
+  const activeCycle = data.cycles.find(c=>c.leagues);
+  const activeCycleSignature = activeCycle ? (activeCycle.id + ':' + activeCycle.status) : null;
+  const cycleChangedRemotely = activeCycleSignature !== game.lastSeenLeagueCycleSignature;
+  game.lastSeenLeagueCycleSignature = activeCycleSignature;
+  if((includeHistory || cycleChangedRemotely) && game.trainerName){
+    // garante que colocações/títulos estejam em dia antes de mostrar "Suas últimas Ligas" -- sem isso,
+    // quem não foi o navegador que processou sua própria partida só veria o histórico depois de visitar a Home
+    await reconcileLeagueWinsFromHistory();
+    game.myLeagueHistory = await loadMyLeagueHistory(5);
   }
   if(game.screen==='league'){ render(); }
 }
@@ -2346,8 +2467,7 @@ function startLeagueListener(){
     leagueTickInterval = setInterval(async ()=>{
       if(game.screen!=='league') return;
       const changed = await advanceLeagueOnce();
-      await refreshLeagueView();
-      if(changed){ /* já atualizou acima */ }
+      await refreshLeagueView(changed); // só recarrega o histórico (mais pesado) se algo realmente avançou
     }, 5000);
   }
 }
@@ -2528,11 +2648,23 @@ async function confirmNewSaveName(){
   game.leagueWinsBySlot = keepWinsBySlot;
   game.currentSaveSlot = slot;
   game.trainerName = name;
+  game.myLeagueHistory = []; // idem -- o save novo não deve mostrar o histórico de Liga de quem usava esse slot antes
   game.screen = 'start';
   render();
   saveCurrentGame();
   if(keepUser){
-    try{ await userDocRef(keepUser.uid).set({ leagueWinsBySlot: { [String(slot)]: 0 } }, { merge: true }); }
+    try{
+      // zera tanto o contador de vitórias quanto a lista de colocações desse slot -- sem isso, um save novo
+      // criado num slot reaproveitado (de um save apagado) continuaria mostrando as Ligas do save antigo em
+      // "Suas últimas Ligas", já que os dados ficam guardados por número de slot, não por save específico.
+      // leagueSlotResetAt marca a partir de quando esse slot "conta" -- sem isso, a reconciliação (que
+      // varre por UID da conta, não por save específico) ficaria ressuscitando as Ligas antigas de volta
+      await userDocRef(keepUser.uid).set({
+        leagueWinsBySlot: { [String(slot)]: 0 },
+        leaguePlacementsBySlot: { [String(slot)]: [] },
+        leagueSlotResetAt: { [String(slot)]: Date.now() }
+      }, { merge: true });
+    }
     catch(e){ console.error('Erro ao zerar vitórias do slot novo:', e); }
   }
 }
@@ -2554,6 +2686,7 @@ function serializeGame(){
     badgesEarned: game.badgesEarned,
     badgeCount: game.badgesEarned.length,
     caughtSpecies: game.caughtSpecies || [],
+    battleResult: game.battleResult || null,
     updatedAt: Date.now()
   };
 }
@@ -2601,6 +2734,14 @@ function applySavedState(data){
   game.evolutions = data.evolutions || [];
   game.badgesEarned = data.badgesEarned || [];
   game.caughtSpecies = data.caughtSpecies || [];
+  game.battleResult = data.battleResult || null;
+  // rede de segurança: saves salvos antes dessa correção (ou qualquer dado corrompido) podem ter ficado
+  // parados numa tela de resultado de batalha sem o resultado em si -- em vez de travar, volta pra uma
+  // tela segura em que o jogador consegue seguir jogando normalmente
+  const needsBattleResult = ['victory','defeat','gameover'].includes(game.screen);
+  if(needsBattleResult && (!game.battleResult || !game.battleResult.matchups)){
+    game.screen = 'preBattle';
+  }
 }
 function reconcileInstanceIdCounter(){
   let maxId = 0;
@@ -2627,22 +2768,22 @@ async function isTrainerActiveInLeague(trainerName){
     const scheduleSnap = await scheduleDocRef().get();
     if(!scheduleSnap.exists) return false;
     const cycles = scheduleSnap.data().cycles || [];
-    for(const entry of cycles){
+    const checks = await Promise.all(cycles.map(async (entry)=>{
       if(entry.status==='registering'){
         const regSnap = await registrantDocRef(entry.id, trainerName).get();
-        if(regSnap.exists) return true;
+        return regSnap.exists;
       } else if(entry.status==='drawn'){
         const detailSnap = await cycleDocRef(entry.id).get();
-        if(!detailSnap.exists) continue;
-        const found = (detailSnap.data().leagues||[]).some(league=>
+        if(!detailSnap.exists) return false;
+        return (detailSnap.data().leagues||[]).some(league=>
           Object.values(league.rounds||{}).some(round=>
             round.some(m=> (m.a && m.a.name===trainerName) || (m.b && m.b.name===trainerName))
           )
         );
-        if(found) return true;
       }
-    }
-    return false;
+      return false;
+    }));
+    return checks.some(Boolean);
   } catch(e){ console.error('Erro ao checar Liga:', e); return false; }
 }
 async function requestDeleteSave(slot){
@@ -2731,15 +2872,13 @@ async function computeLeagueAchievementExtra(trainerNames){
     const cycles = scheduleSnap.data().cycles || [];
     const registering = cycles.find(c=>c.status==='registering');
     if(registering){
-      for(const name of trainerNames){
-        const regSnap = await registrantDocRef(registering.id, name).get();
-        if(regSnap.exists){ result.anyRegistered = true; break; }
-      }
+      const regChecks = await Promise.all(trainerNames.map(name=>registrantDocRef(registering.id, name).get().then(s=>s.exists).catch(()=>false)));
+      if(regChecks.some(Boolean)){ result.anyRegistered = true; }
     }
-    for(const entry of cycles){
-      if(entry.status!=='complete') continue;
-      const detailSnap = await cycleDocRef(entry.id).get();
-      if(!detailSnap.exists) continue;
+    const completedEntries = cycles.filter(c=>c.status==='complete');
+    const detailSnaps = await Promise.all(completedEntries.map(entry=>cycleDocRef(entry.id).get().catch(()=>null)));
+    for(const detailSnap of detailSnaps){
+      if(!detailSnap || !detailSnap.exists) continue;
       const detail = detailSnap.data();
       for(const name of trainerNames){
         for(const league of (detail.leagues||[])){
@@ -3500,7 +3639,15 @@ function renderLeague(){
     <button class="btn primary" onclick="leaveLeagueScreen()">⬅ Voltar</button>`;
   }
   const registeringCycle = data.cycles.find(c=>c.status==='registering');
-  const drawnCycles = data.cycles.filter(c=>c.status==='drawn' && c.leagues && c.leagues.length>0);
+  const drawnCycles = data.cycles.filter(c=>{
+    if(!c.leagues || c.leagues.length===0) return false;
+    if(c.status==='drawn' || c.status==='advancing') return true;
+    // ligas já concluídas só continuam aparecendo aqui se o jogador participou dela -- assim a Liga que
+    // acabou de terminar não some da tela (mostra o campeão!), mas ligas antigas de outras pessoas não
+    // ficam acumulando indefinidamente nessa seção
+    if(c.status==='complete') return !!findMyLeagueInCycle(c);
+    return false;
+  });
   const alreadyIn = registeringCycle ? !!registeringCycle.amIRegistered : false;
 
   let body = `
@@ -3508,6 +3655,7 @@ function renderLeague(){
     <h2>🏆 Liga Pokémon</h2>
     <p>Todos os treinadores que já venceram as 8 insígnias e chegaram até aqui. Se inscreva para participar da liga.</p>
     <p>Serão criadas ligas de 16 ou 8 jogadores de acordo com o número de jogadores inscritos.</p>
+    <p>Caso algum jogador fique de fora do sorteio das ligas por conta do número de participantes, ele será automaticamente inscrito na próxima liga.</p>
   </div>`;
 
   if(registeringCycle){
@@ -3546,7 +3694,7 @@ function renderLeague(){
     </div>` : `
     <div class="box">
       <h2>✅ Você está inscrito!</h2>
-      <p>Você está confirmado como <strong>${game.trainerName}</strong> pra essa rodada. Não precisa ficar com a tela aberta.</p>
+      <p>Você está confirmado como <strong>${game.trainerName}</strong> pra essa rodada.</p>
       ${game.leagueError ? `<p class="error-text">${game.leagueError}</p>` : ''}
       <button class="btn secondary" ${game.leagueSubmitting?'disabled':''} onclick="cancelLeagueRegistration()">${game.leagueSubmitting?'Cancelando...':'Cancelar inscrição'}</button>
     </div>`}
@@ -3564,9 +3712,9 @@ function renderLeague(){
         <div class="status-list">
           ${myHistory.map(h=>`
             <div class="status-row">
-              <span class="icon">${h.league.size===GRANDE_LIGA_SIZE?'🌟':'🏅'}</span>
-              <span>${h.league.size===GRANDE_LIGA_SIZE?'Grande Liga':'Liga'} ${formatDateShort(h.cycleTime)} - ${formatClock(h.cycleTime)}: <strong>${h.placement}</strong></span>
-              <button class="league-history-btn" onclick="viewLeagueHistory(${h.cycleTime},${h.league.id})">▶ Rever</button>
+              <span class="icon">${h.leagueSize===GRANDE_LIGA_SIZE?'🌟':'🏅'}</span>
+              <span>${h.leagueSize===GRANDE_LIGA_SIZE?'Grande Liga':'Liga'} ${formatDateShort(h.cycleTime)} - ${formatClock(h.cycleTime)}: <strong>${h.placement}</strong></span>
+              <button class="league-history-btn" onclick="viewLeagueHistory('${h.cycleId}',${h.leagueId},${h.cycleTime})">▶ Rever</button>
             </div>
           `).join('')}
         </div>
@@ -3911,7 +4059,16 @@ auth.onAuthStateChanged((user)=>{
 });
 if(typeof window !== 'undefined'){
   window.addEventListener('beforeunload', flushPendingAutoSave);
-  document.addEventListener('visibilitychange', ()=>{ if(document.hidden){ flushPendingAutoSave(); } });
+  document.addEventListener('visibilitychange', ()=>{
+    if(document.hidden){
+      flushPendingAutoSave();
+    } else if(game.screen==='league'){
+      // navegadores (principalmente no celular) pausam o "setInterval" enquanto a aba fica em segundo plano --
+      // sem isso, ao voltar pra aba a tela continuaria mostrando dados desatualizados até o próximo tick de 5s
+      // (que pode nem disparar imediatamente, dependendo de como o navegador retoma os temporizadores)
+      advanceLeagueOnce().then(changed=>refreshLeagueView(changed));
+    }
+  });
 }
 migrateOldLeagueDataIfNeeded();
 
