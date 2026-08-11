@@ -78,6 +78,15 @@
     text-align:center;
     color:var(--box-border);
   }
+  .jornada-title{
+    font-family:'Press Start 2P', monospace;
+    font-size:1.3rem;
+    line-height:1.6;
+    margin:0 0 22px;
+    text-align:center;
+    color:var(--yellow);
+    text-shadow:3px 3px 0 var(--red-dark), 6px 6px 0 rgba(0,0,0,.4);
+  }
   h2{
     font-family:'Press Start 2P', monospace;
     font-size:.8rem;
@@ -660,10 +669,156 @@
   .sprite-md .sprite-fallback{font-size:2.4rem;}
   .sprite-lg .sprite-img{width:110px;height:110px;}
   .sprite-lg .sprite-fallback{font-size:3.6rem;}
+
+  /* ============ INTRO POKÉBOLA (toca uma vez a cada carregamento da página) ============ */
+  #boot{
+    position:fixed; inset:0; z-index:9999;
+    display:flex; flex-direction:column;
+    align-items:center; justify-content:center;
+    gap:38px;
+    background:linear-gradient(160deg, var(--bg), var(--bg2));
+  }
+  #boot.gone{display:none;}
+  .intro-stage{
+    width:240px; height:240px;
+    position:relative;
+    filter:drop-shadow(0 18px 22px rgba(0,0,0,.55));
+  }
+  .intro-ball{ position:absolute; inset:0; transform-origin:50% 88%; }
+  .intro-half{
+    position:absolute; left:0; width:240px; height:120px;
+    transition:transform .55s cubic-bezier(.34,1.3,.5,1);
+  }
+  .intro-half.top{
+    top:0; border-radius:120px 120px 0 0;
+    background:
+      radial-gradient(circle at 34% 118%, rgba(255,255,255,.42) 0 18%, transparent 45%),
+      radial-gradient(circle at 30% 30%, #ff6a5b 0 30%, transparent 62%),
+      linear-gradient(180deg, #e8402f 0%, var(--red) 62%, #a81f12 100%);
+    border-bottom:9px solid var(--box-border);
+    transform:translateY(-70vh);
+  }
+  .intro-half.bottom{
+    bottom:0; border-radius:0 0 120px 120px;
+    background:
+      radial-gradient(circle at 32% -14%, rgba(255,255,255,.85) 0 20%, transparent 50%),
+      linear-gradient(180deg, #ffffff 0%, #e9e4d2 55%, #b9b2a0 100%);
+    border-top:9px solid var(--box-border);
+    transform:translateY(70vh);
+  }
+  .intro-stage.closed .intro-half.top{transform:translateY(0);}
+  .intro-stage.closed .intro-half.bottom{transform:translateY(0);}
+  @keyframes introClunk{
+    0%{transform:scale(1,1);} 30%{transform:scale(1.06,.92);} 60%{transform:scale(.97,1.04);} 100%{transform:scale(1,1);}
+  }
+  .intro-ball.clunk{animation:introClunk .35s ease-out;}
+  @keyframes introWobble{
+    0%,100%{transform:rotate(0);} 20%{transform:rotate(-14deg);} 45%{transform:rotate(11deg);} 70%{transform:rotate(-5deg);}
+  }
+  .intro-ball.wobble{animation:introWobble .8s ease-in-out;}
+  .intro-button{
+    position:absolute; top:50%; left:50%;
+    width:62px; height:62px;
+    transform:translate(-50%,-50%) scale(0);
+    background:var(--box-border);
+    border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    transition:transform .3s cubic-bezier(.34,1.56,.64,1);
+    z-index:3;
+  }
+  .intro-stage.closed .intro-button{transform:translate(-50%,-50%) scale(1);}
+  .intro-button::before{
+    content:''; position:absolute;
+    width:44px; height:44px; border-radius:50%;
+    background:#f4f1e4; border:4px solid #cfc9b4;
+  }
+  .intro-core{
+    position:relative; z-index:2;
+    width:22px; height:22px; border-radius:50%;
+    background:#d8d3c0;
+    transition:background .15s;
+  }
+  .intro-core.lit{
+    background:radial-gradient(circle at 38% 34%, #ffd9d3 0 22%, #ff5040 45%, var(--red) 100%);
+    box-shadow:0 0 10px 4px rgba(255,70,50,.95), 0 0 34px 14px rgba(255,60,40,.55), 0 0 70px 30px rgba(255,50,30,.22);
+  }
+  @keyframes introCorePulse{
+    0%,100%{box-shadow:0 0 10px 4px rgba(255,70,50,.95),0 0 34px 14px rgba(255,60,40,.55),0 0 70px 30px rgba(255,50,30,.22);}
+    50%{box-shadow:0 0 6px 2px rgba(255,70,50,.55),0 0 18px 7px rgba(255,60,40,.3),0 0 36px 14px rgba(255,50,30,.12);}
+  }
+  .intro-core.lit.pulse{animation:introCorePulse 1s ease-in-out infinite;}
+  .intro-core.burst{
+    background:#fffdf2;
+    box-shadow:0 0 16px 8px rgba(255,255,240,.95), 0 0 60px 30px rgba(255,240,180,.6), 0 0 120px 60px rgba(255,220,120,.3);
+  }
+  .intro-star{
+    position:absolute; top:50%; left:50%;
+    font-size:26px; z-index:5; pointer-events:none;
+    animation:introFly .9s ease-out forwards;
+  }
+  @keyframes introFly{
+    0%{transform:translate(-50%,-50%) scale(.4) rotate(0); opacity:1;}
+    100%{transform:translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1.25) rotate(var(--rot)); opacity:0;}
+  }
+  #introFlash{
+    position:fixed; inset:0; z-index:10000;
+    background:#fffdf2; opacity:0; pointer-events:none;
+  }
+  #introFlash.go{animation:introFlashout 1s ease-out forwards;}
+  @keyframes introFlashout{0%{opacity:0;} 18%{opacity:1;} 100%{opacity:0;}}
+  .intro-load-ui{
+    display:flex; flex-direction:column; align-items:center; gap:16px;
+    opacity:0; transform:translateY(8px);
+    transition:opacity .5s ease, transform .5s ease;
+  }
+  .intro-load-ui.show{opacity:1; transform:translateY(0);}
+  .intro-load-label{
+    font-family:'Press Start 2P', monospace;
+    font-size:.62rem; color:#e8ebff; letter-spacing:1px;
+  }
+  .intro-load-label .dots::after{
+    content:''; animation:introDots 1.2s steps(4) infinite;
+  }
+  @keyframes introDots{
+    0%{content:'';} 25%{content:'.';} 50%{content:'..';} 75%{content:'...';} 100%{content:'';}
+  }
+  .intro-hpbar{
+    width:230px; padding:5px;
+    background:var(--box);
+    border:3px solid var(--box-border);
+    border-radius:4px;
+    box-shadow:4px 4px 0 rgba(0,0,0,.45);
+  }
+  .intro-hpbar .track{ height:12px; background:#ddd7c2; border-radius:2px; overflow:hidden; }
+  .intro-hpbar .fill{
+    height:100%; width:0%;
+    background:linear-gradient(180deg,#5dd07a,var(--green));
+    transition:width .25s linear;
+  }
+  @media (prefers-reduced-motion: reduce){
+    .intro-half, .intro-button{transition-duration:.01s;}
+    .intro-ball.clunk, .intro-ball.wobble, .intro-core.lit.pulse, .intro-star{animation:none !important;}
+  }
 </style>
 </head>
 <body>
 <div id="app"></div>
+
+<!-- ============ INTRO POKÉBOLA (toca por cima do jogo a cada carregamento) ============ -->
+<div id="boot">
+  <div class="intro-stage" id="introStage">
+    <div class="intro-ball" id="introBall">
+      <div class="intro-half top"></div>
+      <div class="intro-half bottom"></div>
+      <div class="intro-button"><div class="intro-core" id="introCore"></div></div>
+    </div>
+  </div>
+  <div class="intro-load-ui" id="introLoadUi">
+    <div class="intro-load-label">CARREGANDO<span class="dots"></span></div>
+    <div class="intro-hpbar"><div class="track"><div class="fill" id="introFill"></div></div></div>
+  </div>
+</div>
+<div id="introFlash"></div>
 
 <!-- ==========================================================
      FIREBASE — troque os dados abaixo pelos do SEU projeto
@@ -703,171 +858,171 @@ const TYPE_NAMES_PT = {
 };
 
 const SPECIES = {
-  bulbasaur:{dex:1, name:'Bulbasaur', types:['Grass','Poison'], bst:318, emoji:'🌱'},
-  charmander:{dex:4, name:'Charmander', types:['Fire'], bst:309, emoji:'🔥'},
-  squirtle:{dex:7, name:'Squirtle', types:['Water'], bst:314, emoji:'💧'},
-  weedle:{dex:13, name:'Weedle', types:['Bug','Poison'], bst:195, emoji:'🐛'},
-  caterpie:{dex:10, name:'Caterpie', types:['Bug'], bst:195, emoji:'🐛'},
-  ratata:{dex:19, name:'Ratata', types:['Normal'], bst:275, emoji:'🐭'},
-  pidgey:{dex:16, name:'Pidgey', types:['Normal','Flying'], bst:270, emoji:'🐦'},
-  mankey:{dex:56, name:'Mankey', types:['Fighting'], bst:305, emoji:'🐵'},
-  spearow:{dex:21, name:'Spearow', types:['Normal','Flying'], bst:285, emoji:'🐦'},
-  nidoranm:{dex:32, name:'Nidoran (M)', types:['Poison'], bst:273, emoji:'🐭'},
-  oddish:{dex:43, name:'Oddish', types:['Grass','Poison'], bst:320, emoji:'🌿'},
-  geodude:{dex:74, name:'Geodude', types:['Rock','Ground'], bst:300, emoji:'🪨'},
-  onix:{dex:95, name:'Onix', types:['Rock','Ground'], bst:385, emoji:'🗿'},
+  bulbasaur:{dex:1, name:'Bulbasaur', types:['Grass','Poison'], hp:45, attack:49, defense:49, emoji:'🌱'},
+  charmander:{dex:4, name:'Charmander', types:['Fire'], hp:39, attack:52, defense:43, emoji:'🔥'},
+  squirtle:{dex:7, name:'Squirtle', types:['Water'], hp:44, attack:48, defense:65, emoji:'💧'},
+  weedle:{dex:13, name:'Weedle', types:['Bug','Poison'], hp:40, attack:35, defense:30, emoji:'🐛'},
+  caterpie:{dex:10, name:'Caterpie', types:['Bug'], hp:45, attack:30, defense:35, emoji:'🐛'},
+  ratata:{dex:19, name:'Ratata', types:['Normal'], hp:30, attack:56, defense:35, emoji:'🐭'},
+  pidgey:{dex:16, name:'Pidgey', types:['Normal','Flying'], hp:40, attack:45, defense:40, emoji:'🐦'},
+  mankey:{dex:56, name:'Mankey', types:['Fighting'], hp:40, attack:80, defense:35, emoji:'🐵'},
+  spearow:{dex:21, name:'Spearow', types:['Normal','Flying'], hp:40, attack:60, defense:30, emoji:'🐦'},
+  nidoranm:{dex:32, name:'Nidoran (M)', types:['Poison'], hp:46, attack:57, defense:40, emoji:'🐭'},
+  oddish:{dex:43, name:'Oddish', types:['Grass','Poison'], hp:45, attack:50, defense:55, emoji:'🌿'},
+  geodude:{dex:74, name:'Geodude', types:['Rock','Ground'], hp:40, attack:80, defense:100, emoji:'🪨'},
+  onix:{dex:95, name:'Onix', types:['Rock','Ground'], hp:35, attack:45, defense:160, emoji:'🗿'},
 
-  ivysaur:{dex:2, name:'Ivysaur', types:['Grass','Poison'], bst:405, emoji:'🌿'},
-  venusaur:{dex:3, name:'Venusaur', types:['Grass','Poison'], bst:525, emoji:'🌺'},
-  charmeleon:{dex:5, name:'Charmeleon', types:['Fire'], bst:405, emoji:'🔥'},
-  charizard:{dex:6, name:'Charizard', types:['Fire','Flying'], bst:534, emoji:'🐉'},
-  wartortle:{dex:8, name:'Wartortle', types:['Water'], bst:405, emoji:'🐢'},
-  blastoise:{dex:9, name:'Blastoise', types:['Water'], bst:530, emoji:'🐢'},
-  kakuna:{dex:14, name:'Kakuna', types:['Bug','Poison'], bst:205, emoji:'🛡'},
-  beedrill:{dex:15, name:'Beedrill', types:['Bug','Poison'], bst:395, emoji:'🐝'},
-  metapod:{dex:11, name:'Metapod', types:['Bug'], bst:205, emoji:'🛡'},
-  butterfree:{dex:12, name:'Butterfree', types:['Bug','Flying'], bst:395, emoji:'🦋'},
-  raticate:{dex:20, name:'Raticate', types:['Normal'], bst:445, emoji:'🐀'},
-  pidgeotto:{dex:17, name:'Pidgeotto', types:['Normal','Flying'], bst:375, emoji:'🐦'},
-  pidgeot:{dex:18, name:'Pidgeot', types:['Normal','Flying'], bst:515, emoji:'🦅'},
-  primeape:{dex:57, name:'Primeape', types:['Fighting'], bst:455, emoji:'🐒'},
-  fearow:{dex:22, name:'Fearow', types:['Normal','Flying'], bst:475, emoji:'🦅'},
-  nidorino:{dex:33, name:'Nidorino', types:['Poison'], bst:335, emoji:'🐭'},
-  gloom:{dex:44, name:'Gloom', types:['Grass','Poison'], bst:395, emoji:'🌸'},
+  ivysaur:{dex:2, name:'Ivysaur', types:['Grass','Poison'], hp:60, attack:62, defense:63, emoji:'🌿'},
+  venusaur:{dex:3, name:'Venusaur', types:['Grass','Poison'], hp:80, attack:82, defense:83, emoji:'🌺'},
+  charmeleon:{dex:5, name:'Charmeleon', types:['Fire'], hp:58, attack:64, defense:58, emoji:'🔥'},
+  charizard:{dex:6, name:'Charizard', types:['Fire','Flying'], hp:78, attack:84, defense:78, emoji:'🐉'},
+  wartortle:{dex:8, name:'Wartortle', types:['Water'], hp:59, attack:63, defense:80, emoji:'🐢'},
+  blastoise:{dex:9, name:'Blastoise', types:['Water'], hp:79, attack:83, defense:100, emoji:'🐢'},
+  kakuna:{dex:14, name:'Kakuna', types:['Bug','Poison'], hp:45, attack:25, defense:50, emoji:'🛡'},
+  beedrill:{dex:15, name:'Beedrill', types:['Bug','Poison'], hp:65, attack:80, defense:40, emoji:'🐝'},
+  metapod:{dex:11, name:'Metapod', types:['Bug'], hp:50, attack:20, defense:55, emoji:'🛡'},
+  butterfree:{dex:12, name:'Butterfree', types:['Bug','Flying'], hp:60, attack:45, defense:50, emoji:'🦋'},
+  raticate:{dex:20, name:'Raticate', types:['Normal'], hp:55, attack:81, defense:60, emoji:'🐀'},
+  pidgeotto:{dex:17, name:'Pidgeotto', types:['Normal','Flying'], hp:63, attack:60, defense:55, emoji:'🐦'},
+  pidgeot:{dex:18, name:'Pidgeot', types:['Normal','Flying'], hp:83, attack:80, defense:75, emoji:'🦅'},
+  primeape:{dex:57, name:'Primeape', types:['Fighting'], hp:65, attack:105, defense:60, emoji:'🐒'},
+  fearow:{dex:22, name:'Fearow', types:['Normal','Flying'], hp:65, attack:90, defense:65, emoji:'🦅'},
+  nidorino:{dex:33, name:'Nidorino', types:['Poison'], hp:61, attack:72, defense:57, emoji:'🐭'},
+  gloom:{dex:44, name:'Gloom', types:['Grass','Poison'], hp:60, attack:65, defense:70, emoji:'🌸'},
 
-  sandshrew:{dex:27, name:'Sandshrew', types:['Ground'], bst:300, emoji:'🦔'},
-  sandslash:{dex:28, name:'Sandslash', types:['Ground'], bst:450, emoji:'🦔'},
-  clefairy:{dex:35, name:'Clefairy', types:['Normal'], bst:350, emoji:'🧚'},
-  jigglypuff:{dex:39, name:'Jigglypuff', types:['Normal'], bst:290, emoji:'🎈'},
-  zubat:{dex:41, name:'Zubat', types:['Poison','Flying'], bst:245, emoji:'🦇'},
-  golbat:{dex:42, name:'Golbat', types:['Poison','Flying'], bst:455, emoji:'🦇'},
-  paras:{dex:46, name:'Paras', types:['Bug','Grass'], bst:285, emoji:'🍄'},
-  parasect:{dex:47, name:'Parasect', types:['Bug','Grass'], bst:405, emoji:'🍄'},
-  meowth:{dex:52, name:'Meowth', types:['Normal'], bst:315, emoji:'🐱'},
-  persian:{dex:53, name:'Persian', types:['Normal'], bst:475, emoji:'🐈'},
-  bellsprout:{dex:69, name:'Bellsprout', types:['Grass','Poison'], bst:300, emoji:'🪴'},
-  weepinbell:{dex:70, name:'Weepinbell', types:['Grass','Poison'], bst:390, emoji:'🪴'},
-  abra:{dex:63, name:'Abra', types:['Psychic'], bst:310, emoji:'😴'},
-  kadabra:{dex:64, name:'Kadabra', types:['Psychic'], bst:400, emoji:'🔮'},
-  staryu:{dex:120, name:'Staryu', types:['Water'], bst:340, emoji:'⭐'},
-  starmie:{dex:121, name:'Starmie', types:['Water','Psychic'], bst:520, emoji:'🌟'},
+  sandshrew:{dex:27, name:'Sandshrew', types:['Ground'], hp:50, attack:75, defense:85, emoji:'🦔'},
+  sandslash:{dex:28, name:'Sandslash', types:['Ground'], hp:75, attack:100, defense:110, emoji:'🦔'},
+  clefairy:{dex:35, name:'Clefairy', types:['Normal'], hp:70, attack:45, defense:48, emoji:'🧚'},
+  jigglypuff:{dex:39, name:'Jigglypuff', types:['Normal'], hp:115, attack:45, defense:20, emoji:'🎈'},
+  zubat:{dex:41, name:'Zubat', types:['Poison','Flying'], hp:40, attack:45, defense:35, emoji:'🦇'},
+  golbat:{dex:42, name:'Golbat', types:['Poison','Flying'], hp:75, attack:80, defense:70, emoji:'🦇'},
+  paras:{dex:46, name:'Paras', types:['Bug','Grass'], hp:35, attack:70, defense:55, emoji:'🍄'},
+  parasect:{dex:47, name:'Parasect', types:['Bug','Grass'], hp:60, attack:95, defense:80, emoji:'🍄'},
+  meowth:{dex:52, name:'Meowth', types:['Normal'], hp:40, attack:45, defense:35, emoji:'🐱'},
+  persian:{dex:53, name:'Persian', types:['Normal'], hp:65, attack:70, defense:60, emoji:'🐈'},
+  bellsprout:{dex:69, name:'Bellsprout', types:['Grass','Poison'], hp:50, attack:75, defense:35, emoji:'🪴'},
+  weepinbell:{dex:70, name:'Weepinbell', types:['Grass','Poison'], hp:65, attack:90, defense:50, emoji:'🪴'},
+  abra:{dex:63, name:'Abra', types:['Psychic'], hp:25, attack:20, defense:15, emoji:'😴'},
+  kadabra:{dex:64, name:'Kadabra', types:['Psychic'], hp:40, attack:35, defense:30, emoji:'🔮'},
+  staryu:{dex:120, name:'Staryu', types:['Water'], hp:30, attack:45, defense:55, emoji:'⭐'},
+  starmie:{dex:121, name:'Starmie', types:['Water','Psychic'], hp:60, attack:75, defense:85, emoji:'🌟'},
 
-  growlithe:{dex:58, name:'Growlithe', types:['Fire'], bst:350, emoji:'🐕'},
-  vulpix:{dex:37, name:'Vulpix', types:['Fire'], bst:299, emoji:'🦊'},
-  ekans:{dex:23, name:'Ekans', types:['Poison'], bst:288, emoji:'🐍'},
-  arbok:{dex:24, name:'Arbok', types:['Poison'], bst:448, emoji:'🐍'},
-  diglett:{dex:50, name:'Diglett', types:['Ground'], bst:265, emoji:'🕳️'},
-  dugtrio:{dex:51, name:'Dugtrio', types:['Ground'], bst:425, emoji:'🕳️'},
-  magnemite:{dex:81, name:'Magnemite', types:['Electric'], bst:325, emoji:'🧲'},
-  magneton:{dex:82, name:'Magneton', types:['Electric'], bst:465, emoji:'🧲'},
-  drowzee:{dex:96, name:'Drowzee', types:['Psychic'], bst:328, emoji:'😪'},
-  hypno:{dex:97, name:'Hypno', types:['Psychic'], bst:483, emoji:'😪'},
-  nidoranf:{dex:29, name:'Nidoran (F)', types:['Poison'], bst:275, emoji:'🐭'},
-  nidorina:{dex:30, name:'Nidorina', types:['Poison'], bst:365, emoji:'🐭'},
-  venonat:{dex:48, name:'Venonat', types:['Bug','Poison'], bst:305, emoji:'🦟'},
-  venomoth:{dex:49, name:'Venomoth', types:['Bug','Poison'], bst:450, emoji:'🦟'},
+  growlithe:{dex:58, name:'Growlithe', types:['Fire'], hp:55, attack:70, defense:45, emoji:'🐕'},
+  vulpix:{dex:37, name:'Vulpix', types:['Fire'], hp:38, attack:41, defense:40, emoji:'🦊'},
+  ekans:{dex:23, name:'Ekans', types:['Poison'], hp:35, attack:60, defense:44, emoji:'🐍'},
+  arbok:{dex:24, name:'Arbok', types:['Poison'], hp:60, attack:85, defense:69, emoji:'🐍'},
+  diglett:{dex:50, name:'Diglett', types:['Ground'], hp:10, attack:55, defense:25, emoji:'🕳️'},
+  dugtrio:{dex:51, name:'Dugtrio', types:['Ground'], hp:35, attack:80, defense:50, emoji:'🕳️'},
+  magnemite:{dex:81, name:'Magnemite', types:['Electric'], hp:25, attack:35, defense:70, emoji:'🧲'},
+  magneton:{dex:82, name:'Magneton', types:['Electric'], hp:50, attack:60, defense:95, emoji:'🧲'},
+  drowzee:{dex:96, name:'Drowzee', types:['Psychic'], hp:60, attack:48, defense:45, emoji:'😪'},
+  hypno:{dex:97, name:'Hypno', types:['Psychic'], hp:85, attack:73, defense:70, emoji:'😪'},
+  nidoranf:{dex:29, name:'Nidoran (F)', types:['Poison'], hp:55, attack:47, defense:52, emoji:'🐭'},
+  nidorina:{dex:30, name:'Nidorina', types:['Poison'], hp:70, attack:62, defense:67, emoji:'🐭'},
+  venonat:{dex:48, name:'Venonat', types:['Bug','Poison'], hp:60, attack:55, defense:50, emoji:'🦟'},
+  venomoth:{dex:49, name:'Venomoth', types:['Bug','Poison'], hp:70, attack:65, defense:60, emoji:'🦟'},
 
-  voltorb:{dex:100, name:'Voltorb', types:['Electric'], bst:330, emoji:'⚫'},
-  pikachu:{dex:25, name:'Pikachu', types:['Electric'], bst:320, emoji:'⚡'},
-  raichu:{dex:26, name:'Raichu', types:['Electric'], bst:485, emoji:'⚡'},
+  voltorb:{dex:100, name:'Voltorb', types:['Electric'], hp:40, attack:30, defense:50, emoji:'⚫'},
+  pikachu:{dex:25, name:'Pikachu', types:['Electric'], hp:35, attack:55, defense:30, emoji:'⚡'},
+  raichu:{dex:26, name:'Raichu', types:['Electric'], hp:60, attack:90, defense:55, emoji:'⚡'},
 
-  poliwag:{dex:60, name:'Poliwag', types:['Water'], bst:300, emoji:'🐸'},
-  poliwhirl:{dex:61, name:'Poliwhirl', types:['Water'], bst:385, emoji:'🐸'},
-  tentacool:{dex:72, name:'Tentacool', types:['Water','Poison'], bst:335, emoji:'🪼'},
-  tentacruel:{dex:73, name:'Tentacruel', types:['Water','Poison'], bst:515, emoji:'🪼'},
-  machop:{dex:66, name:'Machop', types:['Fighting'], bst:305, emoji:'💪'},
-  machoke:{dex:67, name:'Machoke', types:['Fighting'], bst:405, emoji:'💪'},
-  doduo:{dex:84, name:'Doduo', types:['Normal','Flying'], bst:335, emoji:'🐦'},
-  dodrio:{dex:85, name:'Dodrio', types:['Normal','Flying'], bst:510, emoji:'🐦'},
-  ponyta:{dex:77, name:'Ponyta', types:['Fire'], bst:410, emoji:'🐴'},
-  rapidash:{dex:78, name:'Rapidash', types:['Fire'], bst:500, emoji:'🐴'},
-  slowpoke:{dex:79, name:'Slowpoke', types:['Water','Psychic'], bst:315, emoji:'🦥'},
-  slowbro:{dex:80, name:'Slowbro', types:['Water','Psychic'], bst:490, emoji:'🦥'},
-  magikarp:{dex:129, name:'Magikarp', types:['Water'], bst:200, emoji:'🐟'},
-  gyarados:{dex:130, name:'Gyarados', types:['Water','Flying'], bst:540, emoji:'🐉'},
-  grimer:{dex:88, name:'Grimer', types:['Poison'], bst:325, emoji:'🟣'},
-  muk:{dex:89, name:'Muk', types:['Poison'], bst:500, emoji:'🟣'},
+  poliwag:{dex:60, name:'Poliwag', types:['Water'], hp:40, attack:50, defense:40, emoji:'🐸'},
+  poliwhirl:{dex:61, name:'Poliwhirl', types:['Water'], hp:65, attack:65, defense:65, emoji:'🐸'},
+  tentacool:{dex:72, name:'Tentacool', types:['Water','Poison'], hp:40, attack:40, defense:35, emoji:'🪼'},
+  tentacruel:{dex:73, name:'Tentacruel', types:['Water','Poison'], hp:80, attack:70, defense:65, emoji:'🪼'},
+  machop:{dex:66, name:'Machop', types:['Fighting'], hp:70, attack:80, defense:50, emoji:'💪'},
+  machoke:{dex:67, name:'Machoke', types:['Fighting'], hp:80, attack:100, defense:70, emoji:'💪'},
+  doduo:{dex:84, name:'Doduo', types:['Normal','Flying'], hp:35, attack:85, defense:45, emoji:'🐦'},
+  dodrio:{dex:85, name:'Dodrio', types:['Normal','Flying'], hp:60, attack:110, defense:70, emoji:'🐦'},
+  ponyta:{dex:77, name:'Ponyta', types:['Fire'], hp:50, attack:85, defense:55, emoji:'🐴'},
+  rapidash:{dex:78, name:'Rapidash', types:['Fire'], hp:65, attack:100, defense:70, emoji:'🐴'},
+  slowpoke:{dex:79, name:'Slowpoke', types:['Water','Psychic'], hp:90, attack:65, defense:65, emoji:'🦥'},
+  slowbro:{dex:80, name:'Slowbro', types:['Water','Psychic'], hp:95, attack:75, defense:110, emoji:'🦥'},
+  magikarp:{dex:129, name:'Magikarp', types:['Water'], hp:20, attack:10, defense:55, emoji:'🐟'},
+  gyarados:{dex:130, name:'Gyarados', types:['Water','Flying'], hp:95, attack:125, defense:79, emoji:'🐉'},
+  grimer:{dex:88, name:'Grimer', types:['Poison'], hp:80, attack:80, defense:50, emoji:'🟣'},
+  muk:{dex:89, name:'Muk', types:['Poison'], hp:105, attack:105, defense:75, emoji:'🟣'},
 
-  tauros:{dex:128, name:'Tauros', types:['Normal'], bst:530, emoji:'🐂'},
-  psyduck:{dex:54, name:'Psyduck', types:['Water'], bst:320, emoji:'🦆'},
-  golduck:{dex:55, name:'Golduck', types:['Water'], bst:500, emoji:'🦆'},
-  krabby:{dex:98, name:'Krabby', types:['Water'], bst:325, emoji:'🦀'},
-  kingler:{dex:99, name:'Kingler', types:['Water'], bst:475, emoji:'🦀'},
-  horsea:{dex:116, name:'Horsea', types:['Water'], bst:295, emoji:'🐠'},
-  seadra:{dex:117, name:'Seadra', types:['Water'], bst:440, emoji:'🐠'},
-  goldeen:{dex:118, name:'Goldeen', types:['Water'], bst:320, emoji:'🐠'},
-  seaking:{dex:119, name:'Seaking', types:['Water'], bst:450, emoji:'🐠'},
-  shellder:{dex:90, name:'Shellder', types:['Water'], bst:305, emoji:'🐚'},
-  exeggcute:{dex:102, name:'Exeggcute', types:['Grass','Psychic'], bst:325, emoji:'🥚'},
-  cubone:{dex:104, name:'Cubone', types:['Ground'], bst:320, emoji:'💀'},
-  marowak:{dex:105, name:'Marowak', types:['Ground'], bst:425, emoji:'💀'},
+  tauros:{dex:128, name:'Tauros', types:['Normal'], hp:75, attack:100, defense:95, emoji:'🐂'},
+  psyduck:{dex:54, name:'Psyduck', types:['Water'], hp:50, attack:52, defense:48, emoji:'🦆'},
+  golduck:{dex:55, name:'Golduck', types:['Water'], hp:80, attack:82, defense:78, emoji:'🦆'},
+  krabby:{dex:98, name:'Krabby', types:['Water'], hp:30, attack:105, defense:90, emoji:'🦀'},
+  kingler:{dex:99, name:'Kingler', types:['Water'], hp:55, attack:130, defense:115, emoji:'🦀'},
+  horsea:{dex:116, name:'Horsea', types:['Water'], hp:30, attack:40, defense:70, emoji:'🐠'},
+  seadra:{dex:117, name:'Seadra', types:['Water'], hp:55, attack:65, defense:95, emoji:'🐠'},
+  goldeen:{dex:118, name:'Goldeen', types:['Water'], hp:45, attack:67, defense:60, emoji:'🐠'},
+  seaking:{dex:119, name:'Seaking', types:['Water'], hp:80, attack:92, defense:65, emoji:'🐠'},
+  shellder:{dex:90, name:'Shellder', types:['Water'], hp:30, attack:65, defense:100, emoji:'🐚'},
+  exeggcute:{dex:102, name:'Exeggcute', types:['Grass','Psychic'], hp:60, attack:40, defense:80, emoji:'🥚'},
+  cubone:{dex:104, name:'Cubone', types:['Ground'], hp:50, attack:50, defense:95, emoji:'💀'},
+  marowak:{dex:105, name:'Marowak', types:['Ground'], hp:60, attack:80, defense:110, emoji:'💀'},
 
-  victreebel:{dex:71, name:'Victreebel', types:['Grass','Poison'], bst:490, emoji:'🪴'},
-  tangela:{dex:114, name:'Tangela', types:['Grass'], bst:435, emoji:'🧶'},
-  vileplume:{dex:45, name:'Vileplume', types:['Grass','Poison'], bst:490, emoji:'🌼'},
-  koffing:{dex:109, name:'Koffing', types:['Poison'], bst:305, emoji:'☁️'},
-  weezing:{dex:110, name:'Weezing', types:['Poison'], bst:490, emoji:'🌫️'},
+  victreebel:{dex:71, name:'Victreebel', types:['Grass','Poison'], hp:80, attack:105, defense:65, emoji:'🪴'},
+  tangela:{dex:114, name:'Tangela', types:['Grass'], hp:65, attack:55, defense:115, emoji:'🧶'},
+  vileplume:{dex:45, name:'Vileplume', types:['Grass','Poison'], hp:75, attack:80, defense:85, emoji:'🌼'},
+  koffing:{dex:109, name:'Koffing', types:['Poison'], hp:40, attack:65, defense:95, emoji:'☁️'},
+  weezing:{dex:110, name:'Weezing', types:['Poison'], hp:65, attack:90, defense:120, emoji:'🌫️'},
 
-  gastly:{dex:92, name:'Gastly', types:['Ghost','Poison'], bst:310, emoji:'👻'},
-  haunter:{dex:93, name:'Haunter', types:['Ghost','Poison'], bst:405, emoji:'👻'},
-  ditto:{dex:132, name:'Ditto', types:['Normal'], bst:345, emoji:'🫥'},
-  lickitung:{dex:108, name:'Lickitung', types:['Normal'], bst:415, emoji:'👅'},
-  rhyhorn:{dex:111, name:'Rhyhorn', types:['Ground','Rock'], bst:345, emoji:'🦏'},
-  rhydon:{dex:112, name:'Rhydon', types:['Ground','Rock'], bst:485, emoji:'🦏'},
-  seel:{dex:86, name:'Seel', types:['Water'], bst:325, emoji:'🦭'},
-  dewgong:{dex:87, name:'Dewgong', types:['Water'], bst:475, emoji:'🦭'},
-  farfetchd:{dex:83, name:"Farfetch'd", types:['Normal','Flying'], bst:450, emoji:'🦆'},
-  kangaskhan:{dex:115, name:'Kangaskhan', types:['Normal'], bst:530, emoji:'🦘'},
-  scyther:{dex:123, name:'Scyther', types:['Bug','Flying'], bst:470, emoji:'🦗'},
+  gastly:{dex:92, name:'Gastly', types:['Ghost','Poison'], hp:30, attack:35, defense:30, emoji:'👻'},
+  haunter:{dex:93, name:'Haunter', types:['Ghost','Poison'], hp:45, attack:50, defense:45, emoji:'👻'},
+  ditto:{dex:132, name:'Ditto', types:['Normal'], hp:48, attack:48, defense:48, emoji:'🫥'},
+  lickitung:{dex:108, name:'Lickitung', types:['Normal'], hp:90, attack:55, defense:75, emoji:'👅'},
+  rhyhorn:{dex:111, name:'Rhyhorn', types:['Ground','Rock'], hp:80, attack:85, defense:95, emoji:'🦏'},
+  rhydon:{dex:112, name:'Rhydon', types:['Ground','Rock'], hp:105, attack:130, defense:120, emoji:'🦏'},
+  seel:{dex:86, name:'Seel', types:['Water'], hp:65, attack:45, defense:55, emoji:'🦭'},
+  dewgong:{dex:87, name:'Dewgong', types:['Water','Ice'], hp:90, attack:70, defense:80, emoji:'🦭'},
+  farfetchd:{dex:83, name:"Farfetch'd", types:['Normal','Flying'], hp:52, attack:65, defense:55, emoji:'🦆'},
+  kangaskhan:{dex:115, name:'Kangaskhan', types:['Normal'], hp:105, attack:95, defense:80, emoji:'🦘'},
+  scyther:{dex:123, name:'Scyther', types:['Bug','Flying'], hp:70, attack:110, defense:80, emoji:'🦗'},
 
-  omanyte:{dex:138, name:'Omanyte', types:['Rock','Water'], bst:355, emoji:'🐌'},
-  omastar:{dex:139, name:'Omastar', types:['Rock','Water'], bst:495, emoji:'🐌'},
-  kabuto:{dex:140, name:'Kabuto', types:['Rock','Water'], bst:355, emoji:'🦂'},
-  kabutops:{dex:141, name:'Kabutops', types:['Rock','Water'], bst:495, emoji:'🦂'},
-  electrode:{dex:101, name:'Electrode', types:['Electric'], bst:480, emoji:'⚫'},
-  magmar:{dex:126, name:'Magmar', types:['Fire'], bst:495, emoji:'🔥'},
-  lapras:{dex:131, name:'Lapras', types:['Water'], bst:535, emoji:'🦕'},
-  porygon:{dex:137, name:'Porygon', types:['Normal'], bst:475, emoji:'🤖'},
-  eevee:{dex:133, name:'Eevee', types:['Normal'], bst:390, emoji:'🦊'},
+  omanyte:{dex:138, name:'Omanyte', types:['Rock','Water'], hp:35, attack:40, defense:100, emoji:'🐌'},
+  omastar:{dex:139, name:'Omastar', types:['Rock','Water'], hp:70, attack:60, defense:125, emoji:'🐌'},
+  kabuto:{dex:140, name:'Kabuto', types:['Rock','Water'], hp:30, attack:80, defense:90, emoji:'🦂'},
+  kabutops:{dex:141, name:'Kabutops', types:['Rock','Water'], hp:60, attack:115, defense:105, emoji:'🦂'},
+  electrode:{dex:101, name:'Electrode', types:['Electric'], hp:60, attack:50, defense:70, emoji:'⚫'},
+  magmar:{dex:126, name:'Magmar', types:['Fire'], hp:65, attack:95, defense:57, emoji:'🔥'},
+  lapras:{dex:131, name:'Lapras', types:['Water','Ice'], hp:130, attack:85, defense:80, emoji:'🦕'},
+  porygon:{dex:137, name:'Porygon', types:['Normal'], hp:65, attack:60, defense:70, emoji:'🤖'},
+  eevee:{dex:133, name:'Eevee', types:['Normal'], hp:55, attack:55, defense:50, emoji:'🦊'},
 
-  snorlax:{dex:143, name:'Snorlax', types:['Normal'], bst:585, emoji:'🐻'},
-  chansey:{dex:113, name:'Chansey', types:['Normal'], bst:485, emoji:'🐣'},
-  hitmonlee:{dex:106, name:'Hitmonlee', types:['Fighting'], bst:455, emoji:'🦵'},
-  hitmonchan:{dex:107, name:'Hitmonchan', types:['Fighting'], bst:455, emoji:'🥊'},
-  pinsir:{dex:127, name:'Pinsir', types:['Bug'], bst:500, emoji:'🪲'},
-  electabuzz:{dex:125, name:'Electabuzz', types:['Electric'], bst:490, emoji:'⚡'},
-  aerodactyl:{dex:142, name:'Aerodactyl', types:['Rock','Flying'], bst:515, emoji:'🦖'},
+  snorlax:{dex:143, name:'Snorlax', types:['Normal'], hp:160, attack:110, defense:65, emoji:'🐻'},
+  chansey:{dex:113, name:'Chansey', types:['Normal'], hp:250, attack:5, defense:5, emoji:'🐣'},
+  hitmonlee:{dex:106, name:'Hitmonlee', types:['Fighting'], hp:50, attack:120, defense:53, emoji:'🦵'},
+  hitmonchan:{dex:107, name:'Hitmonchan', types:['Fighting'], hp:50, attack:105, defense:79, emoji:'🥊'},
+  pinsir:{dex:127, name:'Pinsir', types:['Bug'], hp:65, attack:125, defense:100, emoji:'🪲'},
+  electabuzz:{dex:125, name:'Electabuzz', types:['Electric'], hp:65, attack:83, defense:57, emoji:'⚡'},
+  aerodactyl:{dex:142, name:'Aerodactyl', types:['Rock','Flying'], hp:80, attack:105, defense:65, emoji:'🦖'},
 
-  alakazam:{dex:65, name:'Alakazam', types:['Psychic'], bst:500, emoji:'🧙'},
-  mrmime:{dex:122, name:'Mr. Mime', types:['Psychic'], bst:460, emoji:'🤡'},
-  arcanine:{dex:59, name:'Arcanine', types:['Fire'], bst:555, emoji:'🦁'},
-  nidoqueen:{dex:31, name:'Nidoqueen', types:['Poison','Ground'], bst:505, emoji:'👸'},
-  nidoking:{dex:34, name:'Nidoking', types:['Poison','Ground'], bst:505, emoji:'🤴'},
+  alakazam:{dex:65, name:'Alakazam', types:['Psychic'], hp:55, attack:50, defense:45, emoji:'🧙'},
+  mrmime:{dex:122, name:'Mr. Mime', types:['Psychic'], hp:40, attack:45, defense:65, emoji:'🤡'},
+  arcanine:{dex:59, name:'Arcanine', types:['Fire'], hp:90, attack:110, defense:80, emoji:'🦁'},
+  nidoqueen:{dex:31, name:'Nidoqueen', types:['Poison','Ground'], hp:90, attack:82, defense:87, emoji:'👸'},
+  nidoking:{dex:34, name:'Nidoking', types:['Poison','Ground'], hp:81, attack:92, defense:77, emoji:'🤴'},
 
-  graveler:{dex:75, name:'Graveler', types:['Rock','Ground'], bst:425, emoji:'🪨'},
-  dratini:{dex:147, name:'Dratini', types:['Dragon'], bst:300, emoji:'🐲'},
-  dragonair:{dex:148, name:'Dragonair', types:['Dragon'], bst:420, emoji:'🐲'},
-  dragonite:{dex:149, name:'Dragonite', types:['Dragon','Flying'], bst:600, emoji:'🐉'},
-  jynx:{dex:124, name:'Jynx', types:['Ice','Psychic'], bst:455, emoji:'🥶'},
+  graveler:{dex:75, name:'Graveler', types:['Rock','Ground'], hp:55, attack:95, defense:115, emoji:'🪨'},
+  dratini:{dex:147, name:'Dratini', types:['Dragon'], hp:41, attack:64, defense:45, emoji:'🐲'},
+  dragonair:{dex:148, name:'Dragonair', types:['Dragon'], hp:61, attack:84, defense:65, emoji:'🐲'},
+  dragonite:{dex:149, name:'Dragonite', types:['Dragon','Flying'], hp:91, attack:134, defense:95, emoji:'🐉'},
+  jynx:{dex:124, name:'Jynx', types:['Ice','Psychic'], hp:65, attack:50, defense:35, emoji:'🥶'},
 
-  exeggutor:{dex:103, name:'Exeggutor', types:['Grass','Psychic'], bst:520, emoji:'🌴'},
-  clefable:{dex:36, name:'Clefable', types:['Normal'], bst:520, emoji:'🎀'},
-  wigglytuff:{dex:40, name:'Wigglytuff', types:['Normal'], bst:470, emoji:'🎈'},
-  ninetales:{dex:38, name:'Ninetales', types:['Fire'], bst:505, emoji:'🦊'},
-  poliwrath:{dex:62, name:'Poliwrath', types:['Water','Fighting'], bst:510, emoji:'🐸'},
-  cloyster:{dex:91, name:'Cloyster', types:['Water','Ice'], bst:525, emoji:'🐚'},
-  machamp:{dex:68, name:'Machamp', types:['Fighting'], bst:505, emoji:'💪'},
-  golem:{dex:76, name:'Golem', types:['Rock','Ground'], bst:495, emoji:'🪨'},
-  gengar:{dex:94, name:'Gengar', types:['Ghost','Poison'], bst:500, emoji:'👻'},
+  exeggutor:{dex:103, name:'Exeggutor', types:['Grass','Psychic'], hp:95, attack:95, defense:85, emoji:'🌴'},
+  clefable:{dex:36, name:'Clefable', types:['Normal'], hp:95, attack:70, defense:73, emoji:'🎀'},
+  wigglytuff:{dex:40, name:'Wigglytuff', types:['Normal'], hp:140, attack:70, defense:45, emoji:'🎈'},
+  ninetales:{dex:38, name:'Ninetales', types:['Fire'], hp:73, attack:76, defense:75, emoji:'🦊'},
+  poliwrath:{dex:62, name:'Poliwrath', types:['Water','Fighting'], hp:90, attack:85, defense:95, emoji:'🐸'},
+  cloyster:{dex:91, name:'Cloyster', types:['Water','Ice'], hp:50, attack:95, defense:180, emoji:'🐚'},
+  machamp:{dex:68, name:'Machamp', types:['Fighting'], hp:90, attack:130, defense:80, emoji:'💪'},
+  golem:{dex:76, name:'Golem', types:['Rock','Ground'], hp:80, attack:110, defense:130, emoji:'🪨'},
+  gengar:{dex:94, name:'Gengar', types:['Ghost','Poison'], hp:60, attack:65, defense:60, emoji:'👻'},
 
-  moltres:{dex:146, name:'Moltres', types:['Fire','Flying'], bst:580, emoji:'🔥'},
-  zapdos:{dex:145, name:'Zapdos', types:['Electric','Flying'], bst:580, emoji:'⚡'},
-  articuno:{dex:144, name:'Articuno', types:['Ice','Flying'], bst:580, emoji:'❄️'},
+  moltres:{dex:146, name:'Moltres', types:['Fire','Flying'], hp:90, attack:100, defense:90, emoji:'🔥'},
+  zapdos:{dex:145, name:'Zapdos', types:['Electric','Flying'], hp:90, attack:90, defense:85, emoji:'⚡'},
+  articuno:{dex:144, name:'Articuno', types:['Ice','Flying'], hp:90, attack:85, defense:100, emoji:'❄️'},
 
-  vaporeon:{dex:134, name:'Vaporeon', types:['Water'], bst:525, emoji:'💧'},
-  jolteon:{dex:135, name:'Jolteon', types:['Electric'], bst:525, emoji:'⚡'},
-  flareon:{dex:136, name:'Flareon', types:['Fire'], bst:525, emoji:'🔥'},
-  mewtwo:{dex:150, name:'Mewtwo', types:['Psychic'], bst:680, emoji:'🧬'}
+  vaporeon:{dex:134, name:'Vaporeon', types:['Water'], hp:130, attack:65, defense:60, emoji:'💧'},
+  jolteon:{dex:135, name:'Jolteon', types:['Electric'], hp:65, attack:65, defense:60, emoji:'⚡'},
+  flareon:{dex:136, name:'Flareon', types:['Fire'], hp:65, attack:130, defense:60, emoji:'🔥'},
+  mewtwo:{dex:150, name:'Mewtwo', types:['Psychic'], hp:106, attack:110, defense:90, emoji:'🧬'}
 };
 
 const EVOLUTIONS = {
@@ -973,42 +1128,42 @@ const GYMS = [
   {
     id:'brock', leaderName:'Brock', gymTypeName:'Pedra', badge:'Insígnia Pedra',
     city:'Pewter City', adviceTypes:'Planta, Água e Lutador',
-    team:[{species:'geodude', level: 15}, {species:'onix', level: 17}]
+    team:[{species:'sandshrew', level: 15}, {species:'geodude', level: 16}, {species:'onix', level: 18}]
   },
   {
     id:'misty', leaderName:'Misty', gymTypeName:'Água', badge:'Insígnia Cascata',
     city:'Cerulean City', adviceTypes:'Elétrico e Planta',
-    team:[{species:'staryu', level: 21}, {species:'starmie', level: 24}]
+    team:[{species:'goldeen', level: 20}, {species:'staryu', level: 22}, {species:'starmie', level: 25}]
   },
   {
     id:'surge', leaderName:'Lt. Surge', gymTypeName:'Elétrico', badge:'Insígnia Trovão',
     city:'Vermilion City', adviceTypes:'Terra',
-    team:[{species:'voltorb', level: 24}, {species:'pikachu', level: 21}, {species:'raichu', level: 27}]
+    team:[{species:'magnemite', level: 21}, {species:'voltorb', level: 25}, {species:'pikachu', level: 22}, {species:'raichu', level: 28}]
   },
   {
     id:'erika', leaderName:'Erika', gymTypeName:'Planta', badge:'Insígnia Arco-Íris',
     city:'Celadon City', adviceTypes:'Fogo e Voador',
-    team:[{species:'victreebel', level: 32}, {species:'tangela', level: 27}, {species:'exeggutor', level: 30}, {species:'vileplume', level: 32}]
+    team:[{species:'exeggcute', level: 25}, {species:'victreebel', level: 33}, {species:'tangela', level: 28}, {species:'exeggutor', level: 31}, {species:'vileplume', level: 33}]
   },
   {
     id:'koga', leaderName:'Koga', gymTypeName:'Veneno', badge:'Insígnia Alma',
     city:'Fuchsia City', adviceTypes:'Psíquico e Terra',
-    team:[{species:'koffing', level: 40}, {species:'muk', level: 42}, {species:'koffing', level: 40}, {species:'weezing', level: 46}]
+    team:[{species:'grimer', level: 37}, {species:'koffing', level: 41}, {species:'muk', level: 43}, {species:'koffing', level: 41}, {species:'weezing', level: 47}]
   },
   {
     id:'sabrina', leaderName:'Sabrina', gymTypeName:'Psíquico', badge:'Insígnia Pântano',
     city:'Saffron City', adviceTypes:'Inseto e Fantasma',
-    team:[{species:'kadabra', level: 41}, {species:'mrmime', level: 40}, {species:'venomoth', level: 41}, {species:'alakazam', level: 46}]
+    team:[{species:'kadabra', level: 42}, {species:'mrmime', level: 41}, {species:'venomoth', level: 42}, {species:'slowbro', level: 44}, {species:'alakazam', level: 47}]
   },
   {
     id:'blaine', leaderName:'Blaine', gymTypeName:'Fogo', badge:'Insígnia Vulcão',
     city:'Cinnabar Island', adviceTypes:'Água, Terra e Pedra',
-    team:[{species:'growlithe', level: 45}, {species:'ponyta', level: 43}, {species:'rapidash', level: 45}, {species:'arcanine', level: 50}]
+    team:[{species:'growlithe', level: 46}, {species:'ponyta', level: 44}, {species:'rapidash', level: 46}, {species:'magmar', level: 47}, {species:'arcanine', level: 51}]
   },
   {
     id:'giovanni', leaderName:'Giovanni', gymTypeName:'Terra', badge:'Insígnia Terra',
     city:'Viridian City', adviceTypes:'Água e Planta',
-    team:[{species:'rhyhorn', level: 48}, {species:'dugtrio', level: 45}, {species:'nidoqueen', level: 47}, {species:'nidoking', level: 48}, {species:'rhydon', level: 53}]
+    team:[{species:'rhyhorn', level: 51}, {species:'dugtrio', level: 48}, {species:'nidoqueen', level: 50}, {species:'nidoking', level: 51}, {species:'rhydon', level: 56}]
   }
 ];
 
@@ -1135,9 +1290,9 @@ function badgeSpriteUrlByName(badgeName){
 let nextInstanceId = 1;
 function createInstance(speciesId, level){
   const sp = SPECIES[speciesId];
-  return {id:'mon'+(nextInstanceId++), speciesId, name:sp.name, types:sp.types, bst:sp.bst, level:level, maxHp:0, hp:0};
+  return {id:'mon'+(nextInstanceId++), speciesId, name:sp.name, types:sp.types, baseHp:sp.hp, attack:sp.attack, defense:sp.defense, level:level, maxHp:0, hp:0};
 }
-function calcMaxHp(p){ return Math.round(30 + p.level*5 + p.bst/5); }
+function calcMaxHp(p){ return Math.round(30 + p.level*5 + p.baseHp); }
 
 function markCaught(speciesId){
   if(!game.caughtSpecies){ game.caughtSpecies = []; }
@@ -1344,7 +1499,9 @@ function tryEvolve(p){
     p.speciesId = currentId;
     p.name = newSp.name;
     p.types = newSp.types;
-    p.bst = newSp.bst;
+    p.baseHp = newSp.hp;
+    p.attack = newSp.attack;
+    p.defense = newSp.defense;
   }
   return events;
 }
@@ -1367,8 +1524,8 @@ function bestMultiplier(atkTypes, defTypes){
 function calcDamage(attacker, defender, rng){
   rng = rng || Math.random;
   const mult = bestMultiplier(attacker.types, defender.types);
-  const base = attacker.level*2.5 + attacker.bst/35;
-  let defense = Math.pow(defender.bst/300, 0.7); // 300 = referência (bst do Geodude); quanto maior o bst do defensor, mais ele resiste
+  const base = attacker.level*2.5 + attacker.attack/6;
+  let defense = Math.pow(defender.defense/70, 0.7); // 70 = referência (média de defesa da Gen 1); quanto maior a defesa do defensor, mais ele resiste
   const wins = defender.winsThisBattle||0;
   if(wins > 0){
     // depois da primeira vitória na mesma batalha, o pokémon fica mais vulnerável conforme o HP cai --
@@ -1572,7 +1729,9 @@ function chooseEeveeEvolution(choice){
       eevee.speciesId = choice;
       eevee.name = newSp.name;
       eevee.types = newSp.types;
-      eevee.bst = newSp.bst;
+      eevee.baseHp = newSp.hp;
+      eevee.attack = newSp.attack;
+      eevee.defense = newSp.defense;
       markCaught(choice);
     }
   }
@@ -2419,10 +2578,28 @@ async function checkLeagueRegistrationStatus(){
   try{
     const scheduleSnap = await scheduleDocRef().get();
     if(!scheduleSnap.exists){ game.journeyEndRegistered = false; if(game.screen==='journeyEnd'){ render(); } return; }
-    const registering = (scheduleSnap.data().cycles||[]).find(c=>c.status==='registering');
-    if(!registering){ game.journeyEndRegistered = false; if(game.screen==='journeyEnd'){ render(); } return; }
-    const regSnap = await registrantDocRef(registering.id, game.trainerName).get();
-    game.journeyEndRegistered = regSnap.exists;
+    const cycles = scheduleSnap.data().cycles || [];
+    const registering = cycles.find(c=>c.status==='registering');
+    if(registering){
+      const regSnap = await registrantDocRef(registering.id, game.trainerName).get();
+      if(regSnap.exists){ game.journeyEndRegistered = true; if(game.screen==='journeyEnd'){ render(); } return; }
+    }
+    // além da inscrição em si, o jogador pode já estar competindo num ciclo sorteado (drawn/advancing) --
+    // sem checar isso aqui, o aviso "você já está inscrito" (e por tabela, a confiança de que reordenar o
+    // time aqui ainda tem efeito) sumia assim que a Liga saía da fase de inscrição e entrava em andamento,
+    // mesmo com a sincronização em si continuando funcionando normalmente por trás
+    const activeCycles = cycles.filter(c=>c.status==='drawn' || c.status==='advancing');
+    for(const entry of activeCycles){
+      const detailSnap = await cycleDocRef(entry.id).get();
+      if(!detailSnap.exists) continue;
+      const inThisCycle = (detailSnap.data().leagues||[]).some(league=>
+        Object.values(league.rounds||{}).some(round=>
+          round.some(m=> (m.a && m.a.name===game.trainerName) || (m.b && m.b.name===game.trainerName))
+        )
+      );
+      if(inThisCycle){ game.journeyEndRegistered = true; if(game.screen==='journeyEnd'){ render(); } return; }
+    }
+    game.journeyEndRegistered = false;
   } catch(e){
     console.error('Erro ao checar inscrição na Liga:', e);
     game.journeyEndRegistered = false;
@@ -3769,10 +3946,11 @@ function renderSaveBlockedModal(){
 
 function renderAuth(){
   return `
+  <div class="jornada-title">JORNADA<br>KANTO</div>
   <div class="eyebrow">★ JORNADA POKÉMON ★</div>
   <div class="box cursor">
     <h1>Bem-vindo(a)!</h1>
-    <p>Entre com sua conta pra guardar seu progresso e jogar de qualquer lugar.</p>
+    <p>Treinador, faça login para continuar sua jornada ou crie uma nova conta.</p>
   </div>
   <div class="box">
     <button class="btn primary" ${game.authBusy?'disabled':''} onclick="signInWithGoogle()">🔵 Entrar com Google</button>
@@ -4046,6 +4224,8 @@ function render(){
   maybeAutoSave();
 }
 
+let resolveAuthChecked;
+const authCheckedOnce = new Promise(res=>{ resolveAuthChecked = res; });
 auth.onAuthStateChanged((user)=>{
   if(user){
     game.authUser = { uid:user.uid, email:user.email, displayName:user.displayName };
@@ -4056,6 +4236,7 @@ auth.onAuthStateChanged((user)=>{
     game.currentSaveSlot = null;
     if(game.screen!=='auth'){ game.screen = 'auth'; render(); }
   }
+  resolveAuthChecked();
 });
 if(typeof window !== 'undefined'){
   window.addEventListener('beforeunload', flushPendingAutoSave);
@@ -4073,6 +4254,77 @@ if(typeof window !== 'undefined'){
 migrateOldLeagueDataIfNeeded();
 
 render();
+
+/* ============ INTRO POKÉBOLA ============ */
+(function(){
+  const introBall = document.getElementById('introBall');
+  const introStage = document.getElementById('introStage');
+  const introCore = document.getElementById('introCore');
+  const introLoadUi = document.getElementById('introLoadUi');
+  const introFill = document.getElementById('introFill');
+  const bootEl = document.getElementById('boot');
+  const introFlashEl = document.getElementById('introFlash');
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+
+  function introStars(){
+    for(let i=0;i<8;i++){
+      const s = document.createElement('div');
+      s.className = 'intro-star';
+      s.textContent = i%2 ? '✦' : '★';
+      s.style.color = i%2 ? '#ffcb05' : '#fff5d6';
+      const ang = (Math.PI*2/8)*i + 0.4;
+      s.style.setProperty('--dx', Math.cos(ang)*150+'px');
+      s.style.setProperty('--dy', Math.sin(ang)*150+'px');
+      s.style.setProperty('--rot', (i%2? 160:-160)+'deg');
+      introStage.appendChild(s);
+      setTimeout(()=>s.remove(), 1000);
+    }
+  }
+
+  async function runIntro(){
+    await wait(450);
+
+    // 1. metades fecham
+    introStage.classList.add('closed');
+    introBall.classList.add('closed');
+    await wait(560);
+    introBall.classList.add('clunk');
+    await wait(380);
+
+    // 2. luz vermelha acende + balanço de captura
+    introCore.classList.add('lit');
+    introBall.classList.add('wobble');
+    await wait(850);
+    introBall.classList.remove('wobble');
+    introCore.classList.add('pulse');
+
+    // 3. carregando -- ao mesmo tempo, o Firebase real já está resolvendo o login em segundo plano
+    introLoadUi.classList.add('show');
+    for(let p=0; p<=100; p+=4){
+      introFill.style.width = p+'%';
+      await wait(90);
+    }
+    await wait(250);
+
+    // espera o Firebase confirmar se o jogador já está logado ou não, pra revelar a tela certa
+    // por trás (sem isso, quem já tava logado veria a tela de login piscar por um instante antes
+    // de cair na seleção de save). Tem um limite de segurança pra não travar o jogo se a conexão
+    // estiver ruim ou o Firebase demorar demais pra responder.
+    await Promise.race([authCheckedOnce, wait(4000)]);
+
+    // 4. captura concluída: clarão + estrelas
+    introCore.classList.remove('pulse');
+    introCore.classList.add('burst');
+    introStars();
+    await wait(450);
+    introFlashEl.classList.add('go');
+    await wait(320);
+
+    // 5. revela o jogo (a tela de login ou a seleção de save, o que já estiver certo por trás)
+    bootEl.classList.add('gone');
+  }
+  runIntro();
+})();
 </script>
 </body>
 </html>
