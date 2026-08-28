@@ -3645,6 +3645,16 @@ const BATTLE_IDLE_MS = 3 * 60 * 1000;    // batalha parada sem ninguém consulta
    confirmar, e ninguém fica esperando indefinidamente por alguém que sumiu. */
 const BATTLE_ACCEPT_MS = 15000;
 
+/* Janela pra ESCOLHER O TIME -- com os dois treinadores JÁ conectados.
+   Antes o time era escolhido antes de entrar na fila, e a pessoa ficava presa àquele time por
+   minutos esperando um oponente que talvez nem aparecesse. Agora o cliente manda TODOS os times
+   elegíveis ao entrar na fila (ou no lobby) e escolhe UM POR ÍNDICE quando a partida já existe.
+   Mandar a lista inteira lá atrás é o que permite ter um padrão: se o jogador não escolher (ou
+   fechar a aba), o servidor entra com o primeiro da lista sozinho -- ele não tem os times salvos,
+   só o que o cliente enviou. */
+const BATTLE_TEAM_PICK_MS = 15000;
+const MAX_BATTLE_CODES = 10;   // mesmo teto de saves do cliente (MAX_SAVE_SLOTS)
+
 function battleQueueColl(){ return db.collection('onlineBattleQueue'); }
 function pendingMatchRef(id){ return db.collection('onlinePendingMatch').doc(id); }
 function matchPointerRef(uid){ return db.collection('onlineMatchPointer').doc(uid); }
@@ -3691,6 +3701,31 @@ function battleInstances(code){
     return { speciesId: inst.speciesId, name: inst.name, level: inst.level,
              shiny: !!inst.shiny, hp: inst.hp, maxHp: inst.maxHp };
   });
+}
+/* Times elegíveis que o cliente mandou, todos de uma vez e na MESMA ORDEM da tela dele --
+   a escolha depois é só um índice nessa lista. Validar aqui é o que impede um código forjado
+   de virar time no meio da batalha. */
+function battleCodes(data){
+  const bruto = Array.isArray(data?.codes) ? data.codes : (data?.code ? [data.code] : []);
+  const codes = [];
+  for(const c of bruto.slice(0, MAX_BATTLE_CODES)){
+    const s = String(c || '');
+    if(!s) continue;
+    const time = decodeTeamCode(s);
+    if(!time || !time.length) continue;
+    codes.push(s);
+  }
+  return codes;
+}
+/* Faixa de nível dos times de um jogador, pro lobby. Com vários times não existe mais "a média
+   dele" -- mostrar a faixa diz o que dá pra esperar sem entregar qual time ele vai escolher. */
+function battleMediaRange(codes){
+  const medias = (codes||[]).map(c=>{
+    const t = decodeTeamCode(c) || [];
+    return t.length ? t.reduce((a,p)=>a+(p.level||0),0)/t.length : 0;
+  }).filter(m=>m>0);
+  if(!medias.length) return null;
+  return { min: Math.round(Math.min(...medias)), max: Math.round(Math.max(...medias)) };
 }
 function battleHydrate(guardado){
   const inst = createInstance(guardado.speciesId, guardado.level);
@@ -3741,6 +3776,32 @@ function battleResolveMatchup(estado, rng){
    Chamada por QUALQUER consulta -- é o que faz o tempo "andar" sem cron. */
 function battleAdvance(estado){
   let voltas = 0;
+  /* ESCOLHA DO TIME -- 15s, agora que os dois já estão conectados.
+     Diferente da janela de escolha do POKÉMON (que vale inteira, sempre, porque é o ritmo da
+     batalha), esta acaba assim que os dois escolhem: aqui não há nada acontecendo na tela, e
+     segurar quinze segundos com os dois prontos é só tempo morto antes de a partida começar. */
+  if(estado.phase === 'teamPick'){
+    const doisEscolheram = Number.isInteger(estado.aTeamChoice) && Number.isInteger(estado.bTeamChoice);
+    if(!doisEscolheram && Date.now() < (estado.teamUntil || 0) + GRACA_REDE_MS) return estado;
+    // quem não escolheu a tempo entra com o primeiro time da lista dele
+    const montar = (codes, idx) => {
+      const lista = codes || [];
+      const i = (Number.isInteger(idx) && idx >= 0 && idx < lista.length) ? idx : 0;
+      return battleInstances(lista[i]) || [];
+    };
+    estado.aTeam = montar(estado.aCodes, estado.aTeamChoice);
+    estado.bTeam = montar(estado.bCodes, estado.bTeamChoice);
+    // sem time válido de algum lado não existe batalha: encerra sem vencedor em vez de travar
+    if(!estado.aTeam.length || !estado.bTeam.length){
+      estado.phase = 'done'; estado.winnerUid = null; estado.updatedAt = Date.now();
+      return estado;
+    }
+    estado.aCurrent = 0; estado.bCurrent = 0;
+    estado.phase = 'intro';
+    estado.introUntil = Date.now() + BATTLE_INTRO_MS;
+    estado.updatedAt = Date.now();
+    return estado;   // daqui pra frente a sequência é a de sempre: apresentação, inicial, 3-2-1
+  }
   /* Sequência de abertura: apresentação (10s) -> escolha do inicial (5s) -> 3,2,1 (3s) -> luta.
      A escolha do inicial usa a MESMA fase 'choosing' das trocas do meio da batalha: o jogador
      escolhe quem entra, e quem não escolher manda o primeiro da ordem. A única diferença é que
@@ -3802,8 +3863,9 @@ function battleAdvance(estado){
 // o que o jogador pode ver: o time do adversário sem HP oculto (ele já viu na batalha)
 function battleView(estado, uid){
   const souA = estado.a.uid === uid;
-  const meu = souA ? estado.aTeam : estado.bTeam;
-  const dele = souA ? estado.bTeam : estado.aTeam;
+  // na fase de escolha de time os dois ainda estão vazios -- o || [] evita quebrar a tela ali
+  const meu = (souA ? estado.aTeam : estado.bTeam) || [];
+  const dele = (souA ? estado.bTeam : estado.aTeam) || [];
   return {
     id: estado.id,
     /* A hora do SERVIDOR viaja em toda resposta. O cliente usa ela pra calcular a diferença pro
@@ -3814,6 +3876,15 @@ function battleView(estado, uid){
     deadline: estado.deadline || null,
     animUntil: estado.animUntil || null,
     introUntil: estado.introUntil || null,
+    teamUntil: estado.teamUntil || null,
+    /* Os códigos de time que EU mandei -- e só os meus. Mandar os do adversário entregaria os
+       times dele antes de a batalha começar, que é justamente o que a escolha às cegas evita.
+       Vão de volta pro cliente pra a lista da tela bater com os índices que o servidor tem,
+       mesmo que a lista local dele tenha mudado enquanto ele esperava na fila. */
+    meusTimes: estado.phase === 'teamPick' ? ((souA ? estado.aCodes : estado.bCodes) || []) : null,
+    escolhiTime: Number.isInteger(souA ? estado.aTeamChoice : estado.bTeamChoice),
+    timeIdx: (souA ? estado.aTeamChoice : estado.bTeamChoice),
+    oponenteEscolheuTime: Number.isInteger(souA ? estado.bTeamChoice : estado.aTeamChoice),
     countdownUntil: estado.countdownUntil || null,
     primeiraEscolha: estado.matchups.length === 0 && !estado.countdownDone,
     // estatísticas congeladas na criação da batalha -- a tela de apresentação lê daqui, sem
@@ -3836,13 +3907,14 @@ exports.joinBattleQueue = onCall(async (request) => {
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   const uid = request.auth.uid;
   await battleRequireTester(uid);
-  const code = String(request.data?.code || '');
-  const meuTime = battleInstances(code);
-  if(!meuTime || !meuTime.length){ throw new HttpsError('invalid-argument', 'Time inválido.'); }
+  // entra na fila com TODOS os times elegíveis: qual deles vai jogar só é decidido depois,
+  // quando o oponente aparecer (fase 'teamPick' da batalha)
+  const codes = battleCodes(request.data);
+  if(!codes.length){ throw new HttpsError('invalid-argument', 'Time inválido.'); }
 
   const userSnap = await db.collection('users').doc(uid).get();
   const userData = userSnap.exists ? userSnap.data() : {};
-  const eu = { uid, name: userData.trainerName || 'Treinador', code,
+  const eu = { uid, name: userData.trainerName || 'Treinador', codes,
                specialties: userData.specialties || [],
                stats: battleStatsFrom(userData),
                joinedAt: Date.now() };
@@ -3863,8 +3935,8 @@ exports.joinBattleQueue = onCall(async (request) => {
       return { matched: false };
     }
     tx.delete(oponente.ref);
-    const timeA = battleInstances(oponente.data.code);
-    if(!timeA){ tx.set(battleQueueColl().doc(uid), eu); return { matched:false }; }
+    // entrada antiga na fila (sem lista de times): descarta e continua procurando
+    if(!(oponente.data.codes || []).length){ tx.set(battleQueueColl().doc(uid), eu); return { matched:false }; }
     // achou oponente: cria uma PENDÊNCIA e avisa os dois. A batalha só nasce quando ambos aceitarem
     const matchId = 'pm_' + agora + '_' + Math.random().toString(36).slice(2,8);
     const pend = {
@@ -3898,17 +3970,21 @@ exports.acceptOnlineMatch = onCall(async (request) => {
     }
     const agora = Date.now();
     const battleId = 'ob_' + agora + '_' + Math.random().toString(36).slice(2,8);
-    const timeA = battleInstances(pend.a.code), timeB = battleInstances(pend.b.code);
     const estado = {
       id: battleId, players: pend.players,
       a: { uid: pend.a.uid, name: pend.a.name }, b: { uid: pend.b.uid, name: pend.b.name },
-      aTeam: timeA, bTeam: timeB,
+      /* Os times ainda NÃO existem: a batalha nasce na escolha de time. aCodes/bCodes são as
+         opções que cada um mandou ao entrar na fila (ou no lobby); aTeam/bTeam são montados
+         quando a janela fecha, em battleAdvance. */
+      aCodes: pend.a.codes || [], bCodes: pend.b.codes || [],
+      aTeam: [], bTeam: [], aTeamChoice: null, bTeamChoice: null,
       aSpecialties: pend.a.specialties || [], bSpecialties: pend.b.specialties || [],
       aStats: pend.a.stats || { wins:0, losses:0, favorito:null },
       bStats: pend.b.stats || { wins:0, losses:0, favorito:null },
       aCurrent: 0, bCurrent: 0, aChoice: null, bChoice: null,
-      matchups: [], phase: 'intro',
-      introUntil: agora + BATTLE_INTRO_MS,   // só a apresentação; escolha e contagem vêm depois
+      matchups: [], phase: 'teamPick',
+      teamUntil: agora + BATTLE_TEAM_PICK_MS,   // depois dela: apresentação, inicial e contagem
+      introUntil: 0,
       countdownDone: false,
       deadline: agora, winnerUid: null, createdAt: agora, updatedAt: agora
     };
@@ -4063,7 +4139,9 @@ exports.getOnlineBattle = onCall(async (request) => {
     if(estado.phase !== 'done' && Date.now() - (estado.updatedAt||0) > BATTLE_IDLE_MS){
       estado.phase = 'done'; estado.winnerUid = null;
       tx.set(onlineBattleRef(battleId), estado);
-      return battleView(estado, uid);
+      // no MESMO formato do retorno normal: devolvendo a view crua aqui, o cliente recebia
+      // undefined (a chamada lê .view) e ficava consultando pra sempre uma batalha já encerrada
+      return { view: battleView(estado, uid), aplicarStats: null };
     }
     const antes = JSON.stringify([estado.phase, estado.matchups.length, estado.deadline]);
     battleAdvance(estado);
@@ -4089,27 +4167,28 @@ async function battleApplyStats(estado){
   try{
     const venceuA = estado.winnerUid === estado.a.uid;
     const venceuB = estado.winnerUid === estado.b.uid;
-    const contar = (time) => {
+    // batalha encerrada antes de os times existirem (abandonada na escolha) não tem o que contar
+    const contarEspecies = async (uid, time) => {
       const m = {};
-      time.forEach(p => { m['onlineSpecies.' + p.speciesId] = admin.firestore.FieldValue.increment(1); });
-      return m;
+      (time||[]).forEach(p => { m['onlineSpecies.' + p.speciesId] = admin.firestore.FieldValue.increment(1); });
+      if(Object.keys(m).length) await db.collection('users').doc(uid).update(m);
     };
     await db.collection('users').doc(estado.a.uid).set(Object.assign({
       onlineWins: admin.firestore.FieldValue.increment(venceuA ? 1 : 0),
       onlineLosses: admin.firestore.FieldValue.increment(venceuB ? 1 : 0)
     }), { merge:true });
-    await db.collection('users').doc(estado.a.uid).update(contar(estado.aTeam));
+    await contarEspecies(estado.a.uid, estado.aTeam);
     await db.collection('users').doc(estado.b.uid).set(Object.assign({
       onlineWins: admin.firestore.FieldValue.increment(venceuB ? 1 : 0),
       onlineLosses: admin.firestore.FieldValue.increment(venceuA ? 1 : 0)
     }), { merge:true });
-    await db.collection('users').doc(estado.b.uid).update(contar(estado.bTeam));
+    await contarEspecies(estado.b.uid, estado.bTeam);
     /* Histórico das últimas 10 partidas. Guardo o array inteiro reescrito em vez de usar
        arrayUnion: preciso CORTAR nas 10 mais recentes, e arrayUnion só sabe adicionar. */
     /* Placar em pokémon de pé no fim, como "3 x 0". É o que resume a partida pra quem olha o
        histórico depois -- diferente do número de confrontos, que é detalhe interno do motor e
        não diz se foi passeio ou luta apertada. */
-    const vivos = (time) => time.filter(p => p.hp > 0).length;
+    const vivos = (time) => (time||[]).filter(p => p.hp > 0).length;
     const registro = (meuTime, deleTime, dele, venceu) => ({
       battleId: estado.id,          // sem isso não dá pra rever a partida depois
       oponente: dele.name, venceu, quando: Date.now(),
@@ -4128,6 +4207,34 @@ async function battleApplyStats(estado){
     }
   } catch(e){ logger.error('Erro ao aplicar estatísticas da batalha online:', e); }
 }
+
+/* Escolhe COM QUAL TIME jogar, já dentro da batalha e com o oponente do outro lado.
+   O cliente manda um ÍNDICE na lista que ele mesmo enviou ao entrar na fila (ou no lobby) --
+   nunca um código novo. Aceitar um código aqui deixaria montar o time depois de ver o adversário,
+   que é exatamente o que a escolha às cegas existe pra impedir. */
+exports.pickOnlineBattleTeam = onCall(async (request) => {
+  if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
+  const uid = request.auth.uid;
+  const battleId = String(request.data?.battleId || '');
+  const idx = Number(request.data?.index);
+  return await db.runTransaction(async (tx) => {
+    const snap = await tx.get(onlineBattleRef(battleId));
+    if(!snap.exists) throw new HttpsError('not-found', 'Batalha não encontrada.');
+    const estado = snap.data();
+    if(!estado.players.includes(uid)) throw new HttpsError('permission-denied', 'Essa batalha não é sua.');
+    if(estado.phase !== 'teamPick') throw new HttpsError('failed-precondition', 'O tempo de escolher o time acabou.');
+    const souA = estado.a.uid === uid;
+    const codes = (souA ? estado.aCodes : estado.bCodes) || [];
+    if(!Number.isInteger(idx) || idx < 0 || idx >= codes.length){
+      throw new HttpsError('invalid-argument', 'Esse time não existe.');
+    }
+    if(souA) estado.aTeamChoice = idx; else estado.bTeamChoice = idx;
+    // se o outro já tinha escolhido, isto aqui já monta os times e manda pra apresentação
+    battleAdvance(estado);
+    tx.set(onlineBattleRef(battleId), estado);
+    return battleView(estado, uid);
+  });
+});
 
 /* Escolhe quem entra no próximo confronto. Se os DOIS já escolheram, a espera acaba na hora --
    não faz sentido segurar os 5 segundos se ninguém mais precisa deles. */
@@ -4183,24 +4290,33 @@ function lobbyColl(){ return db.collection('battleLobby'); }
 exports.joinBattleLobby = onCall(async (request) => {
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   const uid = request.auth.uid;
-  const code = String(request.data?.code || '');
-  if(code){
-    const time = decodeTeamCode(code);
-    if(!time || !time.length) throw new HttpsError('invalid-argument', 'Time inválido.');
+  const codes = battleCodes(request.data);
+  if((request.data?.codes || request.data?.code) && !codes.length){
+    throw new HttpsError('invalid-argument', 'Time inválido.');
   }
   const userSnap = await db.collection('users').doc(uid).get();
   const userData = userSnap.exists ? userSnap.data() : {};
   const stats = battleStatsFrom(userData);
   const agora = Date.now();
-  // sem código = só atualizando presença; com código = entrando/trocando de time
-  const dados = { uid, name: userData.trainerName || 'Treinador', stats, lastSeen: agora };
-  if(code) dados.code = code;
+  /* As especialidades entram AQUI, no documento do lobby, porque é dele que challengeLobbyPlayer
+     monta a pendência. Sem isso o desafio do lobby criava batalha com specialties [] e o buff de
+     tipo simplesmente não valia -- só as partidas da fila (joinBattleQueue) o aplicavam.
+     Buff que existe num caminho e não no outro é a pior versão possível: a mesma batalha dava
+     resultado diferente dependendo de por onde os dois se encontraram. */
+  // sem códigos = só renovando presença; com códigos = entrando no lobby
+  const dados = { uid, name: userData.trainerName || 'Treinador', stats,
+                  specialties: userData.specialties || [], lastSeen: agora };
+  if(codes.length) dados.codes = codes;
   await lobbyColl().doc(uid).set(dados, { merge: true });
 
   const snap = await lobbyColl().where('lastSeen', '>', agora - LOBBY_TTL_MS).get();
-  const jogadores = snap.docs.map(d=>d.data()).filter(d => d.uid !== uid && d.code)
-    .map(d => ({ uid:d.uid, name:d.name, stats:d.stats||null,
-                 media: (decodeTeamCode(d.code)||[]).reduce((a,p,_,arr)=>a+p.level/arr.length,0) }));
+  const jogadores = snap.docs.map(d=>d.data()).filter(d => d.uid !== uid && (d.codes||[]).length)
+    .map(d => {
+      // faixa de nível dos times dele: qual vai entrar em campo nem ele decidiu ainda
+      const faixa = battleMediaRange(d.codes) || { min:0, max:0 };
+      return { uid:d.uid, name:d.name, stats:d.stats||null, times:(d.codes||[]).length,
+               media: faixa.max, mediaMin: faixa.min, mediaMax: faixa.max };
+    });
   jogadores.sort((a,b)=> (b.stats?.wins||0) - (a.stats?.wins||0));
 
   // desafio pendente pra mim? (o cliente mostra o mesmo convite do pareamento aleatório)
@@ -4244,9 +4360,10 @@ exports.challengeLobbyPlayer = onCall(async (request) => {
   if(!alvo || alvo === uid) throw new HttpsError('invalid-argument', 'Alvo inválido.');
 
   const [meuSnap, alvoSnap] = await Promise.all([lobbyColl().doc(uid).get(), lobbyColl().doc(alvo).get()]);
-  if(!meuSnap.exists || !meuSnap.data().code) throw new HttpsError('failed-precondition', 'Entre no lobby com um time.');
+  if(!meuSnap.exists || !(meuSnap.data().codes||[]).length) throw new HttpsError('failed-precondition', 'Entre no lobby antes de desafiar.');
   if(!alvoSnap.exists) throw new HttpsError('failed-precondition', 'Esse treinador saiu do lobby.');
   const alvoDados = alvoSnap.data();
+  if(!(alvoDados.codes||[]).length) throw new HttpsError('failed-precondition', 'Esse treinador saiu do lobby.');
   if(Date.now() - (alvoDados.lastSeen||0) > LOBBY_TTL_MS) throw new HttpsError('failed-precondition', 'Esse treinador saiu do lobby.');
 
   return await db.runTransaction(async (tx) => {
@@ -4259,8 +4376,8 @@ exports.challengeLobbyPlayer = onCall(async (request) => {
     const eu = meuSnap.data();
     const pend = {
       id: matchId, players: [uid, alvo],
-      a: { uid, name: eu.name, code: eu.code, specialties: eu.specialties||[], stats: eu.stats||null },
-      b: { uid: alvo, name: alvoDados.name, code: alvoDados.code, specialties: alvoDados.specialties||[], stats: alvoDados.stats||null },
+      a: { uid, name: eu.name, codes: eu.codes||[], specialties: eu.specialties||[], stats: eu.stats||null },
+      b: { uid: alvo, name: alvoDados.name, codes: alvoDados.codes||[], specialties: alvoDados.specialties||[], stats: alvoDados.stats||null },
       accepted: { [uid]: true },      // quem desafia já está dentro
       desafio: true,
       deadline: agora + BATTLE_ACCEPT_MS, createdAt: agora

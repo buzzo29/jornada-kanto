@@ -50,6 +50,13 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
   trocar de pokémon no meio do confronto, e tipo puro viraria sentença de morte.
 - **Imunidades valem 0,25, não 0.** Consequência da mesma decisão. Normal acerta Fantasma.
 - Velocidade alta é mais valiosa do que parece, porque entra na taxa de crítico (ver acima).
+- **Todo modo aplica os mesmos buffs.** Shiny e especialidade valem em TODA batalha (liga, liga dos
+  treinadores, ginásio do bairro, torre e online); terreno só existe onde há terreno escolhido
+  (liga, liga dos treinadores e ginásio do bairro — na torre e no online não existe terreno).
+  Um caminho que esquecia o buff já aconteceu: desafio do lobby criava batalha com `specialties: []`
+  porque `joinBattleLobby` não gravava o campo. Medido antes de corrigir: num confronto parelho o
+  buff de especialidade cobrindo o time todo vale **~13 pontos percentuais** de vitória (53,7% →
+  66,6%), e **~19** num espelho. "+1% em tudo" engana — em batalha parelha decide.
 - Buffs: **shiny 1,20× e terreno 1,15×, em TODOS os atributos** — ataque, especial, defesa,
   velocidade e HP. Multiplicam entre si: um shiny no terreno do tipo dele fica 1,38× em tudo.
   Houve uma fase em que foram só ofensivos (1,15 e 1,10); acabou, por decisão de design.
@@ -106,6 +113,16 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
 - Pareamento e desafio do lobby criam a MESMA pendência, com 15s pra aceitar. Só volta pra fila
   quem tinha aceitado — recolocar quem não aceitou criava fantasmas eternos na fila.
 - Presença do lobby: carimbo de tempo renovado a cada 4s, expira em 20s.
+- **O time é escolhido DENTRO da batalha** (fase `teamPick`, 15s), depois que os dois aceitam —
+  não antes de entrar na fila. Quem busca oponente não fica preso a um time enquanto espera.
+- Como o servidor não conhece os saves, o cliente manda **todos os times elegíveis** ao entrar na
+  fila (ou no lobby) e depois escolhe **por índice**. É isso que dá um padrão pra quem não escolhe
+  (entra o primeiro da lista) mesmo com a aba fechada. O servidor **nunca aceita um código novo**
+  na hora da escolha: aceitaria montar time depois de ver o adversário.
+- A janela de time acaba **assim que os dois escolhem** — ao contrário da janela de escolha de
+  pokémon, que vale inteira sempre (lá é ritmo de batalha; aqui seria só tela parada).
+- No lobby cada treinador aparece com a **faixa** de nível dos times dele (`Lv.62–70`), não com uma
+  média só: qual time vai entrar nem ele decidiu ainda.
 
 ## Frontend
 

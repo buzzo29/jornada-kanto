@@ -12294,7 +12294,6 @@ function openOnlineBattle(){
   if(game.onlineSearching){ render(); return; }
   carregarHistoricoOnline();   // carrega em paralelo: a tela abre sem esperar
   game.onlineError = null;
-  game.onlinePickedSlot = null;
   render();
 }
 /* AVISO SONORO -- sintetizado, sem arquivo de áudio.
@@ -12355,22 +12354,26 @@ function tocarAvisoOponente(){
 let buscaTimer = null;
 function pararBuscaGlobal(){ if(buscaTimer){ clearTimeout(buscaTimer); buscaTimer = null; } }
 
-async function startOnlineSearch(slot){
-  const s = game.saveSlots[slot];
-  if(!s || !s.team) return;
+/* Códigos de TODOS os times elegíveis, na mesma ordem em que a tela os mostra.
+   Vão pro servidor no momento de entrar na fila (ou no lobby); QUAL deles vai jogar só é
+   decidido depois, com os dois treinadores já conectados. Mandar todos aqui é o que permite ao
+   servidor ter um padrão quando alguém não escolhe: ele não conhece os saves, só esta lista. */
+function codigosElegiveisOnline(){
+  return timeElegiveisOnline().map(slot => encodeTeamCode(game.saveSlots[slot].team));
+}
+async function startOnlineSearch(){
+  const codes = codigosElegiveisOnline();
+  if(!codes.length) return;
   prepararAudio();   // AQUI existe gesto do usuário: é o único momento em que dá pra liberar o áudio
-  game.onlinePickedSlot = slot;
   game.onlineSearching = true;
   game.onlineError = null;   // limpa aviso de uma busca anterior que expirou
   game.onlineSince = Date.now() - 1000;
   game.onlinePendente = null;
-  /* Volta pra tela da Batalha Online: o estado "procurando..." é desenhado LÁ.
-     Ficando em onlineTeamPick, a busca começava de verdade mas a tela continuava mostrando a
-     lista de times -- do lado de quem clicou, parecia que o botão não fazia nada. */
+  // o estado "procurando..." é desenhado na própria tela da Batalha Online
   game.screen = 'onlineBattle';
   render();
   try{
-    const r = await functionsClient.httpsCallable('joinBattleQueue')({ code: encodeTeamCode(s.team) });
+    const r = await functionsClient.httpsCallable('joinBattleQueue')({ codes });
     if(r.data.pending){ mostrarConvite(r.data); return; }
     agendarBuscaGlobal();
   } catch(e){
@@ -12389,9 +12392,9 @@ function agendarBuscaGlobal(){
       if(r.data.matched){ entrarNaBatalha(r.data.battleId); return; }
       if(r.data.pending){ mostrarConvite(r.data); return; }
       // caiu da fila sem batalha (expirou): reentra, senão a busca fica parada pra sempre
-      if(!r.data.inQueue && game.onlinePickedSlot !== null){
-        const s = game.saveSlots[game.onlinePickedSlot];
-        if(s) await functionsClient.httpsCallable('joinBattleQueue')({ code: encodeTeamCode(s.team) });
+      if(!r.data.inQueue){
+        const codes = codigosElegiveisOnline();
+        if(codes.length) await functionsClient.httpsCallable('joinBattleQueue')({ codes });
       }
     } catch(e){ console.error('Erro na fila:', e); }
     agendarBuscaGlobal();
@@ -12515,7 +12518,8 @@ function entrarNaBatalha(battleId){
    Agora o render() só acontece quando algo que a tela mostra realmente mudou. */
 function assinaturaBatalha(st){
   if(!st) return 'vazio';
-  return [st.phase, st.matchups.length, st.eu.atual, st.oponente.atual, st.escolhaIdx, st.escolhi].join('|');
+  return [st.phase, st.matchups.length, st.eu.atual, st.oponente.atual, st.escolhaIdx, st.escolhi,
+          st.escolhiTime, st.timeIdx, st.oponenteEscolheuTime].join('|');
 }
 async function pollBatalha(){
   if(game.screen !== 'onlineFight' || !game.onlineBattleId) return;
@@ -12680,11 +12684,6 @@ function timeElegiveisOnline(){
     return s && s.team && (s.badgeCount||0) >= 8;
   });
 }
-function abrirEscolhaTimeOnline(){
-  game.lobbyEscolhendo = false;
-  game.screen = 'onlineTeamPick';
-  render();
-}
 /* Reprise: reaproveita a MESMA tela de revelação das outras batalhas (ver finishTrainerBattle),
    como a Torre já faz. A batalha já aconteceu -- aqui é só tocar o log de novo. */
 async function reverPartidaOnline(battleId){
@@ -12741,29 +12740,22 @@ const LOBBY_POLL_MS = 4000;
 let lobbyTimer = null;
 function pararLobby(){ if(lobbyTimer){ clearTimeout(lobbyTimer); lobbyTimer = null; } }
 
-function abrirLobbyEscolhaTime(){
-  game.lobbyEscolhendo = true;
-  game.screen = 'onlineTeamPick';
-  render();
-}
-async function entrarNoLobby(slot){
-  const sv = game.saveSlots[slot];
-  if(!sv || !sv.team) return;
+async function entrarNoLobby(){
+  const codes = codigosElegiveisOnline();
+  if(!codes.length) return;
   prepararAudio();   // gesto do usuário: libera o som do desafio
-  game.lobbyEscolhendo = false;
-  game.lobbySlot = slot;
   game.lobbyJogadores = null;
   game.lobbyErro = null;
   game.onlineSince = Date.now() - 1000;
   game.screen = 'battleLobby';
   render();
-  await pulsarLobby(encodeTeamCode(sv.team));
+  await pulsarLobby(codes);
   agendarLobby();
 }
-async function pulsarLobby(code){
+async function pulsarLobby(codes){
   try{
     const r = await functionsClient.httpsCallable('joinBattleLobby')(
-      code ? { code, since: game.onlineSince } : { since: game.onlineSince });
+      codes ? { codes, since: game.onlineSince } : { since: game.onlineSince });
     game.lobbyJogadores = r.data.jogadores || [];
     if(r.data.battleId){ pararLobby(); game.onlinePendente = null; entrarNaBatalha(r.data.battleId); return true; }
     if(r.data.convite && !game.onlinePendente){ mostrarConvite(r.data.convite); }
@@ -12810,13 +12802,19 @@ async function desafiarJogador(uid, nome){
 }
 function renderBattleLobby(){
   const lista = game.lobbyJogadores;
-  const sv = game.saveSlots[game.lobbySlot];
+  /* Faixa de nível dos MEUS times. Nenhum deles foi escolhido ainda -- isso acontece depois que
+     o desafio for aceito -- então mostrar "seu time" com uma média só seria mentira. */
+  const medias = timeElegiveisOnline().map(slot=>{
+    const t = game.saveSlots[slot].team;
+    return Math.round(t.reduce((a,p)=>a+(p.level||0),0)/t.length);
+  });
+  const faixa = (min, max) => (min===max ? `Lv.${min}` : `Lv.${min}–${max}`);
   return `
   <div class="eyebrow">🏟️ LOBBY DE BATALHA</div>
   <div class="box">
     <h2>Quem está aqui agora${lista && lista.length ? ` <span class="lobby-contador">${lista.length}</span>` : ''}</h2>
-    <p class="hint-text">Só aparecem treinadores com esta tela aberta. O desafiado tem 15 segundos pra aceitar.</p>
-    ${sv ? `<div class="lobby-meu-time"><span class="lobby-meu-l">SEU TIME · méd. Lv.${Math.round(sv.team.reduce((a,p)=>a+(p.level||0),0)/sv.team.length)}</span></div>` : ''}
+    <p class="hint-text">Só aparecem treinadores com esta tela aberta. São 15 segundos pra aceitar o desafio e mais 15 pra escolher o time.</p>
+    ${medias.length ? `<div class="lobby-meu-time"><span class="lobby-meu-l">SEUS TIMES · ${medias.length} ${medias.length===1?'disponível':'disponíveis'} · ${faixa(Math.min(...medias), Math.max(...medias))}</span></div>` : ''}
   </div>
   ${game.lobbyErro ? `<div class="box"><p class="error-text">${escapeHtmlSafe(game.lobbyErro)}</p></div>` : ''}
   ${lista === null
@@ -12843,7 +12841,7 @@ function renderBattleLobby(){
                 <span class="lobby-stat"><strong>${t.losses||0}</strong>D</span>
                 ${total ? `<span class="lobby-stat pct">${pct}%</span>` : `<span class="lobby-stat novo">novo</span>`}
                 ${(t.seq>0) ? `<span class="lobby-stat">${t.seqVitoria?'🔥':'🧊'}${t.seq}</span>` : ''}
-                <span class="lobby-stat media">Lv.${Math.round(j.media||0)}</span>
+                <span class="lobby-stat media">${faixa(Math.round(j.mediaMin||j.media||0), Math.round(j.mediaMax||j.media||0))}</span>
               </div>
             </div>
             <button class="lobby-acao" ${game.lobbyDesafiando?'disabled':''} onclick="desafiarJogador('${escJs(j.uid)}','${escJs(j.name)}')">${game.lobbyDesafiando===j.uid ? '⏳' : '⚔️'}</button>
@@ -12851,43 +12849,81 @@ function renderBattleLobby(){
         }).join('')}</div>`)}
   <button class="btn secondary" onclick="sairDoLobby()">⬅ Sair do lobby</button>`;
 }
-function renderOnlineTeamPick(){
-  const elegiveis = timeElegiveisOnline();
+/* ESCOLHA DO TIME -- primeira fase da batalha, com o oponente já do outro lado.
+   A lista vem do SERVIDOR (são os códigos que este cliente mandou ao entrar na fila), não dos
+   saves locais: assim os índices continuam batendo com os que o servidor guardou, mesmo que o
+   jogador tenha ganhado a 8ª insígnia num outro save enquanto esperava na fila. */
+async function escolherTimeOnline(idx){
+  if(!game.onlineBattleId) return;
+  // marca antes da resposta chegar, como na escolha de pokémon: sem isso o ✓ só aparece depois
+  // da ida e volta e a pessoa clica de novo achando que o toque não pegou
+  if(game.onlineState){ game.onlineState.timeIdx = idx; game.onlineState.escolhiTime = true; render(); }
+  try{
+    const r = await functionsClient.httpsCallable('pickOnlineBattleTeam')({ battleId: game.onlineBattleId, index: idx });
+    ajustarRelogio(r.data.serverNow);
+    game.onlineState = r.data;
+    render();
+  } catch(e){
+    console.error('Erro ao escolher o time:', e);
+    if(game.onlineState){ game.onlineState.timeIdx = null; game.onlineState.escolhiTime = false; render(); }
+  }
+}
+function renderOnlineTeamPickFase(st){
+  const codes = st.meusTimes || [];
+  /* O cronômetro anda por DOM, igual ao da apresentação: um render() a cada 250ms recriaria os
+     sprites dos times inteiros e faria a tela piscar debaixo do dedo de quem vai clicar. */
+  clearTimeout(introTickTimer);
+  introTickTimer = setTimeout(function tick(){
+    const s2 = game.onlineState;
+    if(game.screen!=='onlineFight' || !s2 || s2.phase!=='teamPick') return;
+    const el = document.querySelector('.online-teampick-timer');
+    if(el){
+      const n = Math.max(0, Math.ceil(((s2.teamUntil||0) - agoraServidor())/1000));
+      if(el.textContent !== String(n)) el.textContent = n;
+      const painel = el.closest('.online-choose');
+      if(painel) painel.classList.toggle('urgente', n<=3);
+    }
+    introTickTimer = setTimeout(tick, 250);
+  }, 250);
+  const restam = Math.max(0, Math.ceil(((st.teamUntil||0) - agoraServidor())/1000));
+  // nome e insígnia saem do save local que gerou aquele código; se não achar, vale o número
+  const porCodigo = {};
+  timeElegiveisOnline().forEach(slot => { porCodigo[encodeTeamCode(game.saveSlots[slot].team)] = game.saveSlots[slot]; });
+  const cartoes = codes.map((code, i)=>{
+    const time = decodeTeamCode(code) || [];
+    const s = porCodigo[code] || null;
+    const media = time.length ? Math.round(time.reduce((a,p)=>a+(p.level||0),0)/time.length) : 0;
+    const escolhido = st.timeIdx === i;
+    return `<div class="save-slot-card clickable ${escolhido?'favorited':''}" onclick="escolherTimeOnline(${i})">
+      <div class="save-slot-top">
+        <span class="save-slot-name"><span class="team-avg-star-name">${escolhido?'✅ ':''}${s && s.eliteStatus==='champion'?'🏆 ':''}${escapeHtmlSafe((s && s.customName) || ('Time '+(i+1)))}</span></span>
+        <span class="save-slot-actions"><span class="save-slot-mewtwo">média Lv.${media}</span></span>
+      </div>
+      ${towerTeamRowHtml(time)}
+    </div>`;
+  }).join('');
+  const oponente = escapeHtmlSafe(st.oponente.nome || 'o oponente');
   return `
-  <div class="eyebrow">⚔️ ESCOLHA O TIME</div>
-  <div class="box">
-    <h2>Com qual time você vai batalhar?</h2>
-    <p class="hint-text">${game.lobbyEscolhendo ? 'Esse time fica visível pros outros treinadores no lobby.' : 'A busca começa assim que você escolher.'}</p>
+  <div class="eyebrow">⚔️ BATALHA ONLINE</div>
+  <div class="box online-choose ${st.escolhiTime?'esperando':''}">
+    <h2>${st.escolhiTime ? 'Time enviado!' : 'Escolha seu time'}</h2>
+    <div class="online-timer online-teampick-timer">${restam}</div>
+    <p class="hint-text">${st.escolhiTime
+      ? `Aguardando ${oponente} escolher...`
+      : `Você vai enfrentar <strong>${oponente}</strong>.${st.oponenteEscolheuTime ? ' Já escolheu o time.' : ''} Sem escolha até o fim do tempo, entra o primeiro da lista.`}</p>
   </div>
-  ${game.onlineError ? `<div class="box"><p class="error-text">${escapeHtmlSafe(game.onlineError)}</p></div>` : ''}
-  ${elegiveis.length === 0
-    ? `<div class="box"><p class="error-text">Você ainda não tem nenhum time com as 8 insígnias.</p></div>`
-    : elegiveis.map(slot=>{
-        const s = game.saveSlots[slot];
-        const media = Math.round(s.team.reduce((a,p)=>a+(p.level||0),0)/s.team.length);
-        /* O card inteiro é o botão, como na home. Um botão verde dentro de cada card criava dois
-           alvos de clique pra a mesma ação e empurrava a lista pra baixo. */
-        return `<div class="save-slot-card clickable" onclick="${game.lobbyEscolhendo?`entrarNoLobby(${slot})`:`startOnlineSearch(${slot})`}">
-          <div class="save-slot-top">
-            <span class="save-slot-name"><span class="team-avg-star-name">${s.eliteStatus==='champion'?'🏆 ':''}${escapeHtmlSafe(s.customName || ('Time '+(slot+1)))}</span></span>
-            <span class="save-slot-actions"><span class="save-slot-mewtwo">média Lv.${media}</span></span>
-          </div>
-          ${towerTeamRowHtml(s.team)}
-        </div>`;
-      }).join('')}
-  <button class="btn secondary" onclick="game.lobbyEscolhendo=false;openOnlineBattle();">⬅ Voltar</button>`;
+  ${cartoes}`;
 }
 function renderOnlineBattle(){
   const elegiveis = timeElegiveisOnline();
   if(game.onlineSearching){
-    const s = game.saveSlots[game.onlinePickedSlot];
     return `
     <div class="eyebrow">⚔️ BATALHA ONLINE</div>
     <div class="box online-searching">
       <div class="online-radar">📡</div>
       <h2>Procurando oponente...</h2>
       <p><strong>Pode continuar jogando.</strong> A busca segue rodando em qualquer tela — quando alguém aparecer, você recebe um aviso com 15 segundos pra aceitar.</p>
-      ${s ? towerTeamRowHtml(s.team) : ''}
+      <p class="hint-text">O time você escolhe depois, com o oponente já do outro lado.</p>
       <button class="btn danger" onclick="cancelOnlineSearch()">✖ Cancelar busca</button>
       <button class="btn secondary" onclick="goToSaveMenu()">⬅ Voltar e continuar jogando</button>
     </div>`;
@@ -12945,10 +12981,11 @@ function renderOnlineBattle(){
   </div>` : `<div class="box"><p class="loading-text">Carregando seu histórico...</p></div>`}
 
   <div class="online-acoes">
-    <button class="btn success" onclick="abrirEscolhaTimeOnline()">🔎 Buscar oponente</button>
-    <button class="btn primary" onclick="abrirLobbyEscolhaTime()">🏟️ Lobby de batalha</button>
+    <button class="btn success" ${elegiveis.length?'':'disabled'} onclick="startOnlineSearch()">🔎 Buscar oponente</button>
+    <button class="btn primary" ${elegiveis.length?'':'disabled'} onclick="entrarNoLobby()">🏟️ Lobby de batalha</button>
   </div>
-  <p class="hint-text online-acoes-sub">Buscar sorteia qualquer treinador da fila. No lobby você escolhe contra quem lutar.</p>
+  <p class="hint-text online-acoes-sub">Buscar sorteia qualquer treinador da fila. No lobby você escolhe contra quem lutar. O time vem depois, com os dois conectados.</p>
+  ${elegiveis.length === 0 ? `<div class="box"><p class="error-text">Você ainda não tem nenhum time com as 8 insígnias.</p></div>` : ''}
   ${game.onlineError ? `<div class="box"><p class="error-text">${escapeHtmlSafe(game.onlineError)}</p></div>` : ''}
 
   ${hist.length ? `
@@ -13042,7 +13079,7 @@ function renderOnlineIntro(st){
   return `
   <div class="eyebrow">⚔️ BATALHA ONLINE</div>
   <div class="box online-intro-head">
-    <h2>Oponente encontrado!</h2>
+    <h2>Times escolhidos!</h2>
     <div class="online-countdown intro"><span class="online-intro-espera">${Math.ceil(faltam/1000)}</span></div>
     <p class="hint-text">A batalha começa em instantes — dá uma olhada no adversário.</p>
   </div>
@@ -13086,6 +13123,7 @@ function renderOnlineCountdown(st){
 }
 function renderOnlineFight(){
   const st = game.onlineState;
+  if(st && st.phase === 'teamPick'){ return renderOnlineTeamPickFase(st); }
   if(st && st.phase === 'intro'){ return renderOnlineIntro(st); }
   if(st && st.phase === 'countdown'){ return renderOnlineCountdown(st); }
   if(!st){
@@ -13758,7 +13796,6 @@ function render(){
     case 'neighborhoodGym': html = renderNeighborhoodGym(); break;
     case 'trainerTower': html = renderTrainerTower(); break;
     case 'onlineBattle': html = renderOnlineBattle(); break;
-    case 'onlineTeamPick': html = renderOnlineTeamPick(); break;
     case 'battleLobby': html = renderBattleLobby(); break;
     case 'onlineFight': html = renderOnlineFight(); break;
     case 'neighborhoodGymLeaderboard': html = renderNeighborhoodGymLeaderboard(); break;
