@@ -3525,12 +3525,12 @@ async function loadPermanentUserData(){
     // registro permanente da conta. Antes isso só rodava uma única vez (só se o registro permanente estivesse
     // vazio), então qualquer captura "antiga" (de antes da sincronização individual existir, ou perdida por
     // alguma falha de rede pontual) nunca era migrada -- e ao apagar aquele save, a espécie sumia de vez
-    let changed = false;
+    const novos = [];               // só o que falta no registro do servidor -- ver o arrayUnion abaixo
     const permanentShiny = new Set(d.pokedexShinyCaught || []);
-    let shinyChanged = false;
+    const novosShiny = [];
     (game.saveSlots||[]).forEach(s=>{
       if(s && s.caughtSpecies){
-        s.caughtSpecies.forEach(id=>{ if(!permanent.has(id)){ permanent.add(id); changed = true; } });
+        s.caughtSpecies.forEach(id=>{ if(!permanent.has(id)){ permanent.add(id); novos.push(id); } });
       }
       // rede de segurança pro Pokédex SHINY: diferente do normal, não existe um registro histórico de
       // "espécies já capturadas shiny" por save (caughtSpecies não distingue shiny) -- então só dá pra
@@ -3540,17 +3540,26 @@ async function loadPermanentUserData(){
         s.team.forEach(p=>{
           if(p && p.shiny && p.speciesId){
             shinyChainSpeciesIds(p.speciesId).forEach(id=>{
-              if(!permanentShiny.has(id)){ permanentShiny.add(id); shinyChanged = true; }
+              if(!permanentShiny.has(id)){ permanentShiny.add(id); novosShiny.push(id); }
             });
           }
         });
       }
     });
-    if(changed){
-      await userDocRef(game.authUser.uid).set({ pokedexCaught: [...permanent] }, { merge: true });
+    /* arrayUnion em vez de reescrever a lista inteira. A versão anterior mandava [...permanent], o que
+       é um read-modify-write: se a LEITURA lá em cima devolvesse menos do que o servidor tem (aba velha
+       aberta, cache do SDK, dois aparelhos ao mesmo tempo), a escrita seguinte apagava a diferença --
+       e esta era a ÚNICA escrita do projeto capaz de ENCOLHER a Pokédex; todas as outras já eram
+       arrayUnion. Um jogador perdeu 49 espécies assim, o Mewtwo entre elas, e não havia backup pra
+       restaurar (PITR desligado, retenção de 1h). Com arrayUnion quem soma é o servidor: encolher passa
+       a ser impossível, não importa o que a leitura devolva. */
+    if(novos.length){
+      await userDocRef(game.authUser.uid).set(
+        { pokedexCaught: firebase.firestore.FieldValue.arrayUnion(...novos) }, { merge: true });
     }
-    if(shinyChanged){
-      await userDocRef(game.authUser.uid).set({ pokedexShinyCaught: [...permanentShiny] }, { merge: true });
+    if(novosShiny.length){
+      await userDocRef(game.authUser.uid).set(
+        { pokedexShinyCaught: firebase.firestore.FieldValue.arrayUnion(...novosShiny) }, { merge: true });
     }
     game.permanentPokedex = [...permanent];
     game.permanentShinyDex = [...permanentShiny];
