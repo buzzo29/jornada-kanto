@@ -73,3 +73,6 @@ node_modules/
 # que fica versionado. Fora do repo pra que o histórico mostre só o que foi escrito aqui.
 .claude/skills/
 .agents/skills/
+
+# preview de telas gerado pelo tools/gerar-preview.js -- e um artefato, nao fonte
+preview-telas.html
