@@ -1398,7 +1398,11 @@
     box-shadow:5px 5px 0 rgba(0,0,0,.35);
   }
   .encounter-banner .encounter-icon{ font-size:2.2rem; display:block; margin-bottom:8px; }
-  .encounter-banner.rocket{ background:linear-gradient(160deg,#2b2b3d,#1a1a2e); color:#ff8a75; border-color:#ff5a45; }
+  /* o salmao #ff8a75 sobre esse fundo escuro ficava perto demais do proprio fundo na tela do
+     celular -- texto em fonte pixel, fino, sumia. Fundo mais escuro e texto quase branco com um
+     toque de vermelho: mantem a identidade da Rocket e passa a ler de longe */
+  .encounter-banner.rocket{ background:linear-gradient(160deg,#241d2b,#100d1a); color:#ffd9d0; border-color:#ff5a45; }
+  .encounter-banner.rocket .encounter-sub{ color:#ff9c88; opacity:1; }
   .encounter-banner.rival{ background:linear-gradient(160deg,#ffe27a,#ffcb05); color:var(--red-dark); border-color:var(--red-dark); }
   .encounter-banner.elite{ background:linear-gradient(160deg,#2e2440,#1a1330); color:#ffd76a; border-color:var(--yellow); }
   .encounter-sub{ font-family:var(--font-ui); font-size:.8rem; font-weight:700; margin-top:6px; opacity:.85; }
@@ -4564,7 +4568,7 @@ function enterHideout(){
   if((game.hideoutStage||0) === 0){
     startSpecialBattle('hideout1',
       [{speciesId:'raticate', level:avg+3}, {speciesId:'golbat', level:avg+3}],
-      { opponentName:'Guarda Rocket', icon:'🕵️', title:'Esconderijo Rocket — Guarda da entrada',
+      { opponentName:'Guarda Rocket', icon:'🕵️', title:'Esconderijo Rocket', sub:'Guarda da entrada',
         intro:`Duas batalhas seguidas te separam de ${game.stolenMon ? game.stolenMon.name : 'seu pokémon'}. Restam <strong>${game.hideoutAttemptsLeft||0} tentativa(s)</strong> antes de perdê-lo(a) pra sempre. Vamos lá.` }
     );
   } else {
@@ -4572,7 +4576,7 @@ function enterHideout(){
       // Meowth entra como o pokémon do chefe: é o mascote da Equipe Rocket na série, e dá cara de
       // "chefe" à luta em vez de mais um time de Veneno. Fica no nível mais alto dos quatro
       [{speciesId:'koffing', level:avg+3}, {speciesId:'weezing', level:avg+4}, {speciesId:'muk', level:avg+4}, {speciesId:'meowth', level:avg+5}],
-      { opponentName:'Chefe Rocket', icon:'👑', title:'Esconderijo Rocket — Sala dos fundos',
+      { opponentName:'Chefe Rocket', icon:'👑', title:'Esconderijo Rocket', sub:'Sala dos fundos',
         intro:`O chefe da operação te encara. Restam <strong>${game.hideoutAttemptsLeft||0} tentativa(s)</strong>. É agora ou nunca.` }
     );
   }
@@ -4931,14 +4935,21 @@ function finishSpecialBattle(){
   const cfg = game.specialBattle;
   const result = game.specialBattleResult;
   const win = result.win;
-  // mesma mecânica dos ginásios/treinadores: pokémon que desmaiou ganha +1 level -- mas só quem
-  // desmaiou NESSA batalha (estava vivo no snapshot de antes e caiu agora). Sem isso, na Elite (onde
-  // o HP carrega entre lutas), um pokémon já desmaiado numa luta anterior e ainda não curado subiria
-  // de nível de novo em toda luta seguinte, sem ter lutado
-  const hpBefore = game.specialHpBeforeBattle || [];
+  /* Mesma mecânica dos ginásios: pokémon que desmaiou ganha +1 level.
+
+     O filtro "estava vivo antes" existe pela ELITE, e só faz sentido lá: as 5 lutas do rush são uma
+     tentativa só, o HP carrega entre elas, e sem o filtro um pokémon caído na luta 1 subia de nível
+     de novo nas lutas 2 a 5 sem ter lutado.
+
+     Só que ele estava valendo para TODOS os contextos, e aí quebrava Rocket e rival: nesses fluxos
+     o time também não é curado entre tentativas (continueAfterSpecial devolve pro esconderijo com o
+     HP como ficou), então da segunda tentativa em diante todo mundo entrava com hp 0, "não estava
+     vivo antes", e ninguém ganhava o +1 -- diferente do ginásio, onde finishBattle dá o nível sempre
+     que o pokémon termina caído. Agora o filtro fica restrito à Elite, que é de onde ele veio. */
+  const hpBefore = (cfg.context === 'elite') ? (game.specialHpBeforeBattle || []) : [];
   let anyLeveledUp = false;
   game.team.forEach((p, idx)=>{
-    const wasAlive = hpBefore[idx]==null || hpBefore[idx] > 0; // sem snapshot (contextos antigos): trata como se estivesse vivo antes, igual sempre foi
+    const wasAlive = hpBefore[idx]==null || hpBefore[idx] > 0; // fora da Elite hpBefore é vazio, então isso é sempre true
     if(p.hp<=0 && wasAlive){
       p.level += 1;
       if(result.playerStatus[idx]){ result.playerStatus[idx].level = p.level; }
@@ -9588,6 +9599,9 @@ function renderSpecialIntro(){
   <div class="encounter-banner ${bannerClass}">
     ${showIcon ? `<span class="encounter-icon">${cfg.meta.icon||'⚔️'}</span>` : ''}
     ${cfg.meta.title||'Batalha'}
+    ${/* subtitulo em linha propria, no lugar do travessao que separava as duas partes num titulo
+         so -- em duas linhas o nome do lugar e o comodo param de competir pelo mesmo espaco */''}
+    ${cfg.meta.sub ? `<div class="encounter-sub">${cfg.meta.sub}</div>` : ''}
   </div>
   ${eliteTerrainBadgeHtml()}
   <div class="box cursor">
@@ -9606,7 +9620,7 @@ function renderSpecialBattling(){
   const displayPlayerHp = loading ? m.playerHpBefore : (game.specialCurrentPlayerHp!=null ? game.specialCurrentPlayerHp : m.playerHpAfter);
   const displayEnemyHp = loading ? m.enemyHpBefore : (game.specialCurrentEnemyHp!=null ? game.specialCurrentEnemyHp : m.enemyHpAfter);
   return `
-  <div class="eyebrow">${cfg.meta.icon||'⚔️'} ${(cfg.meta.title||'Batalha').toUpperCase()}</div>
+  <div class="eyebrow">${cfg.meta.icon||'⚔️'} ${((cfg.meta.title||'Batalha') + (cfg.meta.sub ? ' — ' + cfg.meta.sub : '')).toUpperCase()}</div>
   ${eliteTerrainBadgeHtml()}
   <div class="box cursor" style="${terrainBattleBgStyle(cfg.context==='elite' ? game.eliteTerrain : null)}">
     <div class="team-alive-row">
@@ -10559,7 +10573,9 @@ function renderNeighborhoodGym(){
           }).join('')}
         </div>
       </div>
-      ${detail.leaderTerrain ? `<div class="gym-terrain-line"><span>🗺️ Terreno:</span><span class="terrain-inline-badge" style="background:${terrainColor(detail.leaderTerrain)}">${detail.leaderTerrain.name}</span></div>` : ''}
+      ${/* o selo é botão, como em todas as outras telas: abre o modal com os tipos que o terreno
+           favorece. Aqui tinha ficado <span>, então era o único selo do jogo que não respondia ao toque */''}
+      ${detail.leaderTerrain ? `<div class="gym-terrain-line"><span>🗺️ Terreno:</span><button class="terrain-inline-badge" style="background:${terrainColor(detail.leaderTerrain)}" onclick="event.stopPropagation();openTerrainInfoModal('${detail.leaderTerrain.id}')">${detail.leaderTerrain.name}</button></div>` : ''}
       </div>`;
       if(iAmLeader){
         actionSquares.push(`<button class="gym-action-square gym-btn-team" onclick="openNeighborhoodGymTeamPicker()">
@@ -10657,7 +10673,7 @@ function renderNeighborhoodGymChallengeOrderPicker(){
         </div>`;
       }).join('')}
     </div>
-    ${detail && detail.leaderTerrain ? `<p class="hint-text">🗺️ Terreno: <span class="terrain-inline-badge" style="background:${terrainColor(detail.leaderTerrain)}">${detail.leaderTerrain.name}</span></p>` : ''}
+    ${detail && detail.leaderTerrain ? `<p class="hint-text">🗺️ Terreno: <button class="terrain-inline-badge" style="background:${terrainColor(detail.leaderTerrain)}" onclick="event.stopPropagation();openTerrainInfoModal('${detail.leaderTerrain.id}')">${detail.leaderTerrain.name}</button></p>` : ''}
   </div>
   <div class="box">
     <h2>⚔️ Seu time — escolha a ordem</h2>
