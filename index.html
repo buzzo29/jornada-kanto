@@ -2379,7 +2379,7 @@ const TYPE_CHART = {
 // especial, usando o mesmo atributo Especial tanto pra atacar quanto pra defender
 const SPECIAL_TYPES = new Set(['Fire','Water','Grass','Electric','Psychic','Ice','Dragon']);
 function isSpecialType(type){ return SPECIAL_TYPES.has(type); }
-const TERRAIN_BUFF_MULT = 1.10; // idem -- só ofensivo
+const TERRAIN_BUFF_MULT = 1.15; // +15% em TODOS os atributos de quem casa com o terreno
 const TERRAINS = [
   { id:'vulcao', name:'Vulcão', icon:'🌋', types:['Fire','Ground'] },
   { id:'arena_suspensa', name:'Arena Suspensa', icon:'☁️', types:['Flying','Dragon'] },
@@ -2806,15 +2806,21 @@ function createInstance(speciesId, level){
 // Firestore (game.userTest) mas NÃO decide mais nada de batalha; ficou disponível caso um dia seja
 // preciso um novo A/B.
 //
-// ATENÇÃO -- o servidor (index.js) ainda calcula ligas e Ginásio da Cidade com o motor LEGADO.
-// Enquanto os dois não forem alinhados, batalhas locais e multiplayer usam matemáticas diferentes.
+// O servidor (functions/index.js) usa A MESMA fórmula e OS MESMOS buffs -- alinhado e verificado:
+// 20 mil batalhas com times, seeds e terrenos idênticos deram 0 divergências, maxHp incluído.
+// Se mexer em qualquer coisa daqui pra baixo, mexa lá também e rode a comparação de novo. Já houve
+// um período em que os dois discordavam, e a mesma partida dava vencedor diferente em 12,6% dos casos.
 //
 // PRA REVERTER tudo pro legado: trocar o return abaixo por `!!game.userTest` (ou por `false`, pra
 // reverter geral) e descomentar calcDamageLegacy lá embaixo.
 function useNewBattleEngine(){ return true; }
-const SHINY_BUFF_LEGACY = 1.20;   // motor legado: buff em TODOS os stats
-const TERRAIN_BUFF_LEGACY = 1.15;
-const SHINY_BUFF_MULT = 1.15;     // motor novo: só ofensivo (ataque/especial)
+const SHINY_BUFF_MULT = 1.20;     // +20% em TODOS os atributos (TERRAIN_BUFF_MULT = 1.15 fica lá em cima, junto de TERRAINS)
+// Shiny e terreno valem em TUDO -- ataque, especial, defesa, velocidade e HP -- e MULTIPLICAM entre
+// si: um shiny no terreno do tipo dele fica 1.20 x 1.15 = 1.38x em todos os atributos.
+// Houve uma fase em que esses buffs foram só ofensivos (shiny 1.15, terreno 1.10). As constantes
+// SHINY_BUFF_LEGACY/TERRAIN_BUFF_LEGACY daquela fase sumiram junto com os ifs de motor que as usavam,
+// porque os valores de agora são exatamente os de antes dela -- manter as duas cópias só criaria de
+// novo a chance de uma delas ficar pra trás, que foi o que aconteceu no servidor.
 // diferente do buff de terreno (que muta os atributos de uma cópia temporária, descartada depois da
 // batalha), o brilho é uma característica PERMANENTE do pokémon salvo -- se mutássemos baseHp/attack/
 // defense diretamente, o bônus se acumularia toda vez que esse mesmo pokémon batalhasse de novo. Por
@@ -2851,46 +2857,40 @@ function applySpecialtyBuff(team, specialties){
   }
 }
 function withSpecialty(v, p){ return p.specialtyBuffed ? Math.round(v * SPECIALTY_BUFF) : v; }
+/* Shiny e terreno entram em TODOS os atributos, um depois do outro. Existirem num lugar só é o
+   ponto: as cinco funções abaixo já estiveram fora de sincronia entre si e com o servidor, e era
+   dali que vinha o bug de a mesma partida, com a mesma seed, dar vencedor diferente nos dois lados.
+   Mudou aqui, mudou nos cinco atributos -- e o mesmo bloco precisa ir pro functions/index.js.
+
+   O arredondamento é por buff, na ordem shiny -> terreno. Os dois arquivos têm que arredondar na
+   MESMA ordem, senão voltam a divergir por 1 ponto de atributo em alguns pokémon. */
+function withBuffs(v, p){
+  if(p.shiny){ v = Math.round(v * SHINY_BUFF_MULT); }
+  if(p.terrainBuffed){ v = Math.round(v * TERRAIN_BUFF_MULT); }
+  return v;
+}
 function effectiveBaseHp(p){
-  let v = (typeof p.baseHp === 'number') ? p.baseHp : ((SPECIES[p.speciesId] && SPECIES[p.speciesId].hp) || 50);
-  if(!useNewBattleEngine()){ // motor novo: buffs são só ofensivos, HP nunca muda
-    if(p.shiny){ v = Math.round(v * SHINY_BUFF_LEGACY); }
-    if(p.terrainBuffed){ v = Math.round(v * TERRAIN_BUFF_LEGACY); }
-  }
-  return withSpecialty(v, p);
+  const v = (typeof p.baseHp === 'number') ? p.baseHp : ((SPECIES[p.speciesId] && SPECIES[p.speciesId].hp) || 50);
+  return withSpecialty(withBuffs(v, p), p);
 }
 function effectiveAttack(p){
-  let v = (typeof p.attack === 'number') ? p.attack : ((SPECIES[p.speciesId] && SPECIES[p.speciesId].attack) || 50);
-  const shinyM = useNewBattleEngine() ? SHINY_BUFF_MULT : SHINY_BUFF_LEGACY;
-  const terrM = useNewBattleEngine() ? TERRAIN_BUFF_MULT : TERRAIN_BUFF_LEGACY;
-  if(p.shiny){ v = Math.round(v * shinyM); }
-  if(p.terrainBuffed){ v = Math.round(v * terrM); }
-  return withSpecialty(v, p);
+  const v = (typeof p.attack === 'number') ? p.attack : ((SPECIES[p.speciesId] && SPECIES[p.speciesId].attack) || 50);
+  return withSpecialty(withBuffs(v, p), p);
 }
 function effectiveDefense(p){
-  let v = (typeof p.defense === 'number') ? p.defense : ((SPECIES[p.speciesId] && SPECIES[p.speciesId].defense) || 50);
-  if(!useNewBattleEngine()){ // motor novo: defesa nunca é buffada
-    if(p.shiny){ v = Math.round(v * SHINY_BUFF_LEGACY); }
-    if(p.terrainBuffed){ v = Math.round(v * TERRAIN_BUFF_LEGACY); }
-  }
-  return withSpecialty(v, p);
+  const v = (typeof p.defense === 'number') ? p.defense : ((SPECIES[p.speciesId] && SPECIES[p.speciesId].defense) || 50);
+  return withSpecialty(withBuffs(v, p), p);
 }
 function effectiveSpecial(p){
-  let v = (typeof p.special === 'number') ? p.special : ((SPECIES[p.speciesId] && SPECIES[p.speciesId].special) || 50);
-  const shinyM = useNewBattleEngine() ? SHINY_BUFF_MULT : SHINY_BUFF_LEGACY;
-  const terrM = useNewBattleEngine() ? TERRAIN_BUFF_MULT : TERRAIN_BUFF_LEGACY;
-  if(p.shiny){ v = Math.round(v * shinyM); }
-  if(p.terrainBuffed){ v = Math.round(v * terrM); }
-  return withSpecialty(v, p);
+  const v = (typeof p.special === 'number') ? p.special : ((SPECIES[p.speciesId] && SPECIES[p.speciesId].special) || 50);
+  return withSpecialty(withBuffs(v, p), p);
 }
 function effectiveSpeed(p){
-  // instâncias salvas ANTES da velocidade existir não têm o campo -- cai pro valor da espécie
-  let v = (typeof p.speed === 'number') ? p.speed : ((SPECIES[p.speciesId] && SPECIES[p.speciesId].speed) || 50);
-  if(!useNewBattleEngine()){ // motor novo: velocidade base pura (crítico oficial da Gen 1 usa a base)
-    if(p.shiny){ v = Math.round(v * SHINY_BUFF_LEGACY); }
-    if(p.terrainBuffed){ v = Math.round(v * TERRAIN_BUFF_LEGACY); }
-  }
-  return withSpecialty(v, p);
+  // instâncias salvas ANTES da velocidade existir não têm o campo -- cai pro valor da espécie.
+  // A velocidade buffada entra também na chance de crítico (rng < speed/512, regra da Gen 1):
+  // quem está no terreno do tipo dele critica mais, além de bater mais forte
+  const v = (typeof p.speed === 'number') ? p.speed : ((SPECIES[p.speciesId] && SPECIES[p.speciesId].speed) || 50);
+  return withSpecialty(withBuffs(v, p), p);
 }
 function calcMaxHp(p){
   // A ESCALA de HP é a clássica do jogo nos DOIS motores (Arcanine 67 = 455, como sempre foi) -- no

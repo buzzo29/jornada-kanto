@@ -92,7 +92,11 @@ function createSandbox(htmlPath){
     'runBattle','advanceReveal','runEventBattle','advanceEventReveal','closeEventResult',
     'takeEmergencyMon','skipEmergency','goToRouletteOrContinue','pickRouletteCard','useRareCandy',
     'closeRoulette','prepareRetry','declareChallenge','setMvpBet','toggleScoreBet','challengeIsViable',
-    'advanceJourney','startWildEncounter','rematchLevelBump','NPC_TRADES,'.slice(0,-1)
+    'advanceJourney','startWildEncounter','rematchLevelBump','NPC_TRADES,'.slice(0,-1),
+    // terreno, buffs e atributos: sem eles nao da pra medir o efeito de terreno/shiny,
+    // que e justamente onde cliente e servidor ja divergiram
+    'TERRAINS','TERRAIN_BUFF_MULT','SHINY_BUFF_MULT','applyTerrainBuff','applySpecialtyBuff','withBuffs',
+    'effectiveBaseHp','effectiveAttack','effectiveDefense','effectiveSpecial','effectiveSpeed','gen1MaxHp'
   ];
   const epilogue = '\n;globalThis.render = function(){};\n' +
     EXPORTS.map(n=>`try{ globalThis[${JSON.stringify(n)}] = ${n}; }catch(e){}`).join('\n') +

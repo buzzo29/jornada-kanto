@@ -236,16 +236,21 @@ function pickTerrain(rng, allowedIds){
   const usable = pool.length>0 ? pool : TERRAINS;
   return usable[Math.floor(rng()*usable.length)];
 }
+/* Só MARCA a flag. Quem multiplica é withBuffs, chamada por todas as effective* -- ver o bloco
+   dos atributos mais abaixo. Idêntica à do cliente, inclusive em atribuir false a quem não casa.
+
+   Esta função mutava os atributos direto (baseHp/attack/defense/special/speed x1.15) E marcava a
+   flag, enquanto effectiveAttack/effectiveSpecial JÁ multiplicavam de novo por causa da flag. O
+   resultado era 1.15 x 1.15 = 1.32x em ataque e especial, contra 1.15x no resto -- ou seja, o
+   terreno valia mais no ataque do que devia, e a MESMA partida com a MESMA seed dava vencedor
+   diferente aqui e no cliente em 12,6% dos casos (medido em 30 mil batalhas).
+
+   Mutar era perigoso por si só: as instâncias vêm de decodeTeamCode e são descartadas, mas bastava
+   alguém reaproveitar uma pra o bônus se acumular a cada batalha. Marcar a flag e multiplicar só na
+   hora de LER o atributo não tem esse risco. */
 function applyTerrainBuff(team, terrain){
   team.forEach(p=>{
-    if(p.types.some(t=>terrain.types.includes(t))){
-      p.baseHp = Math.round(p.baseHp * TERRAIN_BUFF_MULT);
-      p.attack = Math.round(p.attack * TERRAIN_BUFF_MULT);
-      p.defense = Math.round(p.defense * TERRAIN_BUFF_MULT);
-      p.special = Math.round(p.special * TERRAIN_BUFF_MULT);
-      if(typeof p.speed === 'number'){ p.speed = Math.round(p.speed * TERRAIN_BUFF_MULT); }
-      p.terrainBuffed = true;
-    }
+    p.terrainBuffed = p.types.some(t=>terrain.types.includes(t));
   });
 }
 
@@ -323,19 +328,23 @@ function createInstance(speciesId, level){
    Até aqui o servidor usava o motor LEGADO e o cliente o motor Gen 1 novo. Isso fazia a mesma
    batalha dar resultados diferentes na jornada e na liga -- e como a escolha de tipo depende da
    fórmula, os dois discordavam do melhor golpe em 4% dos confrontos.
-   Este bloco é o espelho do pokemon-ginasio.html. Qualquer mudança aqui precisa ir pra lá também.
+   Este bloco é o espelho do index.html (era pokemon-ginasio.html quando isto foi escrito).
+   Qualquer mudança aqui precisa ir pra lá também.
 
    Diferenças do legado que valem registrar:
-   - buffs de shiny e terreno agora são SÓ OFENSIVOS (ataque e especial). Antes entravam também em
-     HP e defesa, e os dois somados davam +38% -- era o "penhasco" que fazia um pokémon buffado de
-     nível baixo ganhar de 99% a 0% de um bem maior.
-   - shiny caiu de 1.20 pra 1.15, terreno de 1.15 pra 1.10
    - sumiu a vulnerabilidade por sequência de vitórias (quem vencia ficava mais frágil a cada luta,
      causando a "morte súbita" que os jogadores relatavam)
-   - dano tem teto de 65% do HP (70% em crítico): one-shot não existe mais */
-const SHINY_BUFF_LEGACY = 1.20;
-const TERRAIN_BUFF_LEGACY = 1.15;
-const SHINY_BUFF_MULT = 1.15;
+   - dano tem teto de 65% do HP (70% em crítico): one-shot não existe mais
+
+   SOBRE OS BUFFS -- houve uma fase intermediária em que shiny e terreno foram reduzidos a SÓ
+   OFENSIVOS (shiny 1.15, terreno 1.10), pra derrubar o "penhasco" de um pokémon buffado de nível
+   baixo ganhar de um bem maior. Essa fase acabou: por decisão de design, os dois voltaram a valer
+   em TODOS os atributos, com shiny 1.20 e terreno 1.15, multiplicando entre si (1.38x em tudo).
+   O penhasco voltou junto, e foi medido: 1 contra 1 da MESMA espécie, um shiny no terreno dele em
+   nível 60 ganha de um normal de nível 70 em 90% das vezes, e de um de nível 75 em 59%. O buff
+   vale mais ou menos +15 níveis. Isso é intencional -- não "conserte" mexendo nas constantes sem
+   falar com o dono do jogo. */
+const SHINY_BUFF_MULT = 1.20;   // +20% em TODOS os atributos (TERRAIN_BUFF_MULT = 1.15 fica lá em cima, junto de TERRAINS)
 /* ---- ESPECIALIDADE DE TIPO ----------------------------------------------------------------
    Treinador que já levou SPECIALTY_THRESHOLD pokémon de um tipo ao nível SPECIALTY_LEVEL ganha
    especialidade naquele tipo, e todos os pokémon dele daquele tipo ficam SPECIALTY_BUFF mais fortes.
@@ -359,25 +368,36 @@ function applySpecialtyBuff(team, specialties){
   }
 }
 function withSpecialty(v, p){ return p.specialtyBuffed ? Math.round(v * SPECIALTY_BUFF) : v; }
-// HP e defesa NÃO recebem buff: o motor novo só bonifica o lado ofensivo
-function effectiveBaseHp(p){ return withSpecialty((typeof p.baseHp==='number') ? p.baseHp : ((SPECIES[p.speciesId]&&SPECIES[p.speciesId].hp)||50), p); }
-function effectiveAttack(p){
-  let v = (typeof p.attack==='number') ? p.attack : ((SPECIES[p.speciesId]&&SPECIES[p.speciesId].attack)||50);
+/* ESPELHO EXATO do bloco de atributos do index.html -- qualquer mudança aqui vai pra lá também.
+   Shiny e terreno entram em TODOS os atributos e multiplicam entre si: um shiny no terreno do tipo
+   dele fica 1.20 x 1.15 = 1.38x em tudo. O arredondamento é por buff, na ordem shiny -> terreno;
+   inverter a ordem num dos arquivos faz os dois divergirem por 1 ponto em alguns pokémon. */
+function withBuffs(v, p){
   if(p.shiny){ v = Math.round(v * SHINY_BUFF_MULT); }
   if(p.terrainBuffed){ v = Math.round(v * TERRAIN_BUFF_MULT); }
-  return withSpecialty(v, p);
+  return v;
 }
-function effectiveDefense(p){ return withSpecialty((typeof p.defense==='number') ? p.defense : ((SPECIES[p.speciesId]&&SPECIES[p.speciesId].defense)||50), p); }
+function effectiveBaseHp(p){
+  const v = (typeof p.baseHp==='number') ? p.baseHp : ((SPECIES[p.speciesId]&&SPECIES[p.speciesId].hp)||50);
+  return withSpecialty(withBuffs(v, p), p);
+}
+function effectiveAttack(p){
+  const v = (typeof p.attack==='number') ? p.attack : ((SPECIES[p.speciesId]&&SPECIES[p.speciesId].attack)||50);
+  return withSpecialty(withBuffs(v, p), p);
+}
+function effectiveDefense(p){
+  const v = (typeof p.defense==='number') ? p.defense : ((SPECIES[p.speciesId]&&SPECIES[p.speciesId].defense)||50);
+  return withSpecialty(withBuffs(v, p), p);
+}
 function effectiveSpecial(p){
-  let v = (typeof p.special==='number') ? p.special : ((SPECIES[p.speciesId]&&SPECIES[p.speciesId].special)||50);
-  if(p.shiny){ v = Math.round(v * SHINY_BUFF_MULT); }
-  if(p.terrainBuffed){ v = Math.round(v * TERRAIN_BUFF_MULT); }
-  return withSpecialty(v, p);
+  const v = (typeof p.special==='number') ? p.special : ((SPECIES[p.speciesId]&&SPECIES[p.speciesId].special)||50);
+  return withSpecialty(withBuffs(v, p), p);
 }
 function effectiveSpeed(p){
-  // velocidade base pura: o crítico oficial da Gen 1 usa a base, sem buff
-  const base = (typeof p.speed === 'number') ? p.speed : ((SPECIES[p.speciesId] && SPECIES[p.speciesId].speed) || 50);
-  return withSpecialty(base, p);
+  // a velocidade buffada entra também na chance de crítico (rng < speed/512, regra da Gen 1):
+  // quem está no terreno do tipo dele critica mais, além de bater mais forte
+  const v = (typeof p.speed === 'number') ? p.speed : ((SPECIES[p.speciesId] && SPECIES[p.speciesId].speed) || 50);
+  return withSpecialty(withBuffs(v, p), p);
 }
 function calcMaxHp(p){ return Math.round(30 + p.level*5 + effectiveBaseHp(p)); }
 // HP na escala Gen 1 -- usado só internamente, pra converter o dano em fração da vida

@@ -39,7 +39,14 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
   trocar de pokémon no meio do confronto, e tipo puro viraria sentença de morte.
 - **Imunidades valem 0,25, não 0.** Consequência da mesma decisão. Normal acerta Fantasma.
 - Crítico depende da velocidade (Gen 1). Velocidade alta é mais valiosa do que parece.
-- Buffs: shiny 1,15× e terreno 1,10×, **só ofensivos**.
+- Buffs: **shiny 1,20× e terreno 1,15×, em TODOS os atributos** — ataque, especial, defesa,
+  velocidade e HP. Multiplicam entre si: um shiny no terreno do tipo dele fica 1,38× em tudo.
+  Houve uma fase em que foram só ofensivos (1,15 e 1,10); acabou, por decisão de design.
+  O custo é conhecido e aceito: 1 contra 1 da mesma espécie, um shiny no terreno dele em nível 60
+  ganha de um normal de nível 70 em 90% das vezes. O buff vale ~15 níveis.
+- Os buffs entram por `withBuffs()`, chamada pelas cinco `effective*`. **Existe uma cópia em cada
+  arquivo e elas têm que ser idênticas, inclusive na ordem de arredondamento** (shiny → terreno).
+  `applyTerrainBuff` só marca a flag — nunca mutar atributo, senão o bônus aplica duas vezes.
 - Subtipos: 69 espécies atacam por um tipo alternativo quando rende mais dano. Sem STAB, com
   redutor 0,85.
 - Teto de nível: **99** (`MAX_POKEMON_LEVEL`).
