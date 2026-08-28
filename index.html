@@ -11575,16 +11575,29 @@ function renderTrainerTower(){
     // quem é ajuda a escolher. Antes eu exigia run.team, e o andar 1 aparecia bloqueado justo na
     // tela em que a pessoa está decidindo o time
     const atual = !run.cleared && f.floor === run.floor;
-    // "vencido" aqui é visual: usa o MELHOR andar do dia, não o atual. Depois de uma derrota o
-    // jogador volta pro andar 1, mas os andares que ele já passou continuam revelados
-    const melhor = Math.max(run.floor||1, run.bestFloor||1);
-    const vencido = run.cleared || f.floor < melhor;
-    const cls = vencido ? 'vencido' : (atual ? 'atual' : 'bloqueado');
+    /* Duas coisas que antes eram uma só, e por isso brigavam:
+
+       REVELADO -- o time e o nome do andar aparecem. Vale até o andar mais alto alcançado HOJE,
+       mesmo depois de uma derrota: quem chegou ao 8 continua vendo os times do 1 ao 8 na tentativa
+       seguinte. Quem decide isso é o servidor (towerVisibleFloors, pelo bestFloor), então aqui
+       basta olhar se o time veio na resposta.
+
+       VENCIDO (o detalhe verde) -- só os andares derrotados NESTA tentativa. Antes isso também
+       saía do bestFloor do dia, e quem perdia no 8 recomeçava vendo os andares 1 a 7 já verdes,
+       como se tivesse passado por eles de novo. Agora sai do run.floor: no andar 3, verdes são
+       o 1 e o 2.
+
+       O andar revelado que ainda não foi vencido nesta tentativa não é 'bloqueado': fica sem
+       classe, com o card normal. Assim o time continua legível -- 'bloqueado' esmaece o cartão,
+       e esmaecer justamente o que a pessoa conquistou o direito de ver seria o contrário do ponto. */
+    const revelado = !!f.team;
+    const vencido = run.cleared || f.floor < (run.floor || 1);
+    const cls = vencido ? 'vencido' : (atual ? 'atual' : (revelado ? '' : 'bloqueado'));
     const timeHtml = f.team ? towerTeamRowHtml(f.team) : `<div class="tower-floor-hidden">time desconhecido</div>`;
     return `<div class="tower-floor ${cls}">
       <div class="tower-floor-head">
         <span class="tower-floor-num">${f.floor}</span>
-        <span class="tower-floor-name">${vencido||atual ? escapeHtmlSafe(f.name) : '???'}</span>
+        <span class="tower-floor-name">${revelado||atual ? escapeHtmlSafe(f.name) : '???'}</span>
       </div>
       ${timeHtml}
     </div>`;
