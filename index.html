@@ -1328,6 +1328,29 @@
     box-shadow:0 0 6px rgba(184,140,0,.5);
   }
   .pokedex-number{font-size:.55rem;font-weight:800;color:var(--muted);}
+  /* célula de pokémon já registrado: abre a ficha. Fica com a mão do cursor e um leve
+     levantar no hover -- sem borda nova, senão competiria com o .clickable dourado do Mewtwo,
+     que significa outra coisa (abre o empréstimo) */
+  .pokedex-cell.abrivel{cursor:pointer;transition:transform .08s;}
+  .pokedex-cell.abrivel:hover{transform:translateY(-2px);}
+  .dex-ficha{max-width:340px;}
+  .dex-ficha-nome{font-family:var(--font-pixel);font-size:.8rem;margin:8px 0 2px;line-height:1.5;}
+  .dex-ficha-num{font-size:.7rem;font-weight:800;color:var(--muted);}
+  .dex-ficha-tipos{display:flex;gap:5px;justify-content:center;margin:8px 0 12px;flex-wrap:wrap;}
+  .dex-ficha-shiny{font-size:.62rem;font-weight:800;color:var(--yellow-dark);}
+  .dex-stats{text-align:left;margin-bottom:14px;}
+  .dex-stat{display:grid;grid-template-columns:58px 30px 1fr;align-items:center;gap:6px;margin-bottom:5px;}
+  .dex-stat-nome{font-size:.62rem;font-weight:800;color:var(--muted);}
+  .dex-stat-num{font-size:.68rem;font-weight:800;text-align:right;}
+  .dex-stat-barra{height:9px;background:#e8e4d0;border:1px solid var(--box-border);border-radius:2px;overflow:hidden;}
+  .dex-stat-fill{height:100%;}
+  .dex-stat-fill.baixo{background:var(--red);}
+  .dex-stat-fill.medio{background:var(--yellow-dark);}
+  .dex-stat-fill.alto{background:var(--green);}
+  .dex-stat.total{border-top:2px solid var(--box-border);margin-top:8px;padding-top:7px;}
+  .dex-stat.total .dex-stat-nome,.dex-stat.total .dex-stat-num{color:var(--ink);}
+  /* 320px: a coluna do nome do atributo encolhe pra barra não sumir */
+  @media (max-width:340px){ .dex-stat{grid-template-columns:48px 28px 1fr;gap:4px;} .dex-stat-nome{font-size:.56rem;} }
 
   .achievement-row{align-items:flex-start;}
   .achievement-row.locked{opacity:.45;}
@@ -9245,6 +9268,7 @@ function togglePokedexShinyView(){
 }
 function closePokedex(){
   game.screen = 'saveSelect';
+  game.pokedexFicha = null;   // sair da Pokedex nao pode deixar a ficha pendurada pra proxima vez
   render();
 }
 
@@ -13330,7 +13354,7 @@ function renderSaveSelect(){
    Existe porque na hora de escolher entre 3 selvagens a pergunta é sempre "qual desses eu ainda
    não tenho?", e sair da tela pra conferir custava a captura. */
 function abrirPokedexModal(){ game.pokedexModal = true; render(); }
-function fecharPokedexModal(){ game.pokedexModal = false; render(); }
+function fecharPokedexModal(){ game.pokedexModal = false; game.pokedexFicha = null; render(); }
 function renderPokedexModal(){
   if(!game.pokedexModal) return '';
   return `
@@ -13338,6 +13362,73 @@ function renderPokedexModal(){
     <div class="modal-box dex-modal" onclick="event.stopPropagation()">
       <div class="dex-modal-conteudo">${renderPokedex()}</div>
       <button class="btn secondary" onclick="fecharPokedexModal()">Fechar</button>
+    </div>
+  </div>`;
+}
+/* Ficha de um pokémon da Pokédex: sprite grande e os atributos base da espécie.
+   Só abre pra quem JÁ ESTÁ REGISTRADO -- numa célula "???" ela entregaria de graça o que a pessoa
+   ainda não capturou, e a Pokédex perderia a graça. Por isso o onclick só entra nas células caught.
+
+   Os atributos vêm do SPECIES, não de uma instância: aqui é a ficha da ESPÉCIE, sem nível, buff de
+   shiny/terreno ou especialidade. Mostrar o valor de um pokémon específico daria números diferentes
+   pra mesma espécie dependendo do save aberto.
+
+   A escala das barras é 0-150, com clamp: quase todo atributo de Kanto cabe aí, e os poucos que
+   estouram (o HP 250 da Chansey) mostram a barra cheia com o número exato do lado -- que é o que
+   importa. Uma escala até 250 deixaria todas as outras barras curtas e ilegíveis. */
+const DEX_ESCALA_STAT = 150;
+function abrirPokedexFicha(speciesId, shiny){
+  if(!SPECIES[speciesId]) return;
+  game.pokedexFicha = { id: speciesId, shiny: !!shiny };
+  render();
+}
+function fecharPokedexFicha(){
+  game.pokedexFicha = null;
+  render();
+}
+function dexStatLinha(rotulo, valor){
+  const pct = Math.min(100, Math.round((valor / DEX_ESCALA_STAT) * 100));
+  const faixa = valor >= 100 ? 'alto' : (valor >= 60 ? 'medio' : 'baixo');
+  return `<div class="dex-stat">
+    <span class="dex-stat-nome">${rotulo}</span>
+    <span class="dex-stat-num">${valor}</span>
+    <span class="dex-stat-barra"><span class="dex-stat-fill ${faixa}" style="width:${pct}%"></span></span>
+  </div>`;
+}
+function renderPokedexFicha(){
+  if(!game.pokedexFicha) return '';
+  const { id, shiny } = game.pokedexFicha;
+  const sp = SPECIES[id];
+  if(!sp) return '';
+  // spAtk/spDef são o split da Gen 2 (ver GEN2_SPECIAL). O || sp.special é rede pra espécie que,
+  // por algum motivo, não tenha entrado na tabela -- aí ela cai no valor único de antes
+  const spa = (typeof sp.spAtk === 'number') ? sp.spAtk : sp.special;
+  const spd = (typeof sp.spDef === 'number') ? sp.spDef : sp.special;
+  const total = sp.hp + sp.attack + sp.defense + spa + spd + sp.speed;
+  const ehMewtwo = id === 'mewtwo' && game.mewtwoLoanUnlocked;
+  return `
+  <div class="modal-overlay" onclick="fecharPokedexFicha()">
+    <div class="modal-box dex-ficha" onclick="event.stopPropagation()">
+      ${spriteHtml(id,'sprite-lg',shiny)}
+      <div class="dex-ficha-num">#${String(sp.dex).padStart(3,'0')}</div>
+      <div class="dex-ficha-nome">${escapeHtmlSafe(sp.name)}</div>
+      ${shiny ? '<div class="dex-ficha-shiny">🌟 SHINY</div>' : ''}
+      <div class="dex-ficha-tipos">${typesHtml(sp.types)}</div>
+      <div class="dex-stats">
+        ${dexStatLinha('HP', sp.hp)}
+        ${dexStatLinha('Ataque', sp.attack)}
+        ${dexStatLinha('Defesa', sp.defense)}
+        ${dexStatLinha('Sp. Atk', spa)}
+        ${dexStatLinha('Sp. Def', spd)}
+        ${dexStatLinha('Velocidade', sp.speed)}
+        <div class="dex-stat total">
+          <span class="dex-stat-nome">Total</span>
+          <span class="dex-stat-num">${total}</span>
+          <span></span>
+        </div>
+      </div>
+      ${ehMewtwo ? '<button class="btn secondary" onclick="fecharPokedexFicha();openMewtwoLoanInfoModal()">🧬 Empréstimo do Mewtwo</button>' : ''}
+      <button class="btn primary" onclick="fecharPokedexFicha()">Fechar</button>
     </div>
   </div>`;
 }
@@ -13365,7 +13456,7 @@ function renderPokedex(){
           // no modo shiny, "capturado" é especificamente "já pegou ESSA espécie brilhando" -- não tem
           // a lógica especial do Mewtwo aqui (desafio de captura normal, não tem uma versão shiny dele)
           const isShinyCaught = shinyCaught.has(s.id);
-          return `<div class="pokedex-cell ${isShinyCaught?'caught':'unknown'}" title="${isShinyCaught?s.name+' ✨':'???'}">
+          return `<div class="pokedex-cell ${isShinyCaught?'caught abrivel':'unknown'}" title="${isShinyCaught?s.name+' ✨':'???'}" ${isShinyCaught?`onclick="abrirPokedexFicha('${s.id}',true)"`:''}>
             ${isShinyCaught ? spriteHtml(s.id,'sprite-sm',true) : `<span class="pokedex-number">#${String(s.dex).padStart(3,'0')}</span>`}
           </div>`;
         }
@@ -13375,11 +13466,13 @@ function renderPokedex(){
           // registradas -- antes disso, é só mais uma célula "???" travada, igual as demais
           const canChallenge = !isCaught && otherSpeciesCaught;
           const canOpenLoanInfo = isCaught && game.mewtwoLoanUnlocked;
-          return `<div class="pokedex-cell ${isCaught?'caught':(canChallenge?'mystery':'unknown')}${canOpenLoanInfo?' clickable':''}" title="${isCaught?s.name:'???'}" ${canChallenge?'onclick="openMewtwoChallenge()"':(canOpenLoanInfo?'onclick="openMewtwoLoanInfoModal()"':'')}>
+          // capturado abre a FICHA, não o empréstimo direto: o botão do empréstimo foi pra dentro dela,
+          // assim o Mewtwo também mostra os atributos como qualquer outro e nada se perde
+          return `<div class="pokedex-cell ${isCaught?'caught abrivel':(canChallenge?'mystery':'unknown')}${canOpenLoanInfo?' clickable':''}" title="${isCaught?s.name:'???'}" ${canChallenge?'onclick="openMewtwoChallenge()"':(isCaught?`onclick="abrirPokedexFicha('${s.id}',false)"`:'')}>
             ${isCaught ? spriteHtml(s.id,'sprite-sm') : (canChallenge ? `<span class="pokedex-mystery">❓</span>` : `<span class="pokedex-number">#${String(s.dex).padStart(3,'0')}</span>`)}
           </div>`;
         }
-        return `<div class="pokedex-cell ${isCaught?'caught':'unknown'}" title="${isCaught?s.name:'???'}">
+        return `<div class="pokedex-cell ${isCaught?'caught abrivel':'unknown'}" title="${isCaught?s.name:'???'}" ${isCaught?`onclick="abrirPokedexFicha('${s.id}',false)"`:''}>
           ${isCaught ? spriteHtml(s.id,'sprite-sm') : `<span class="pokedex-number">#${String(s.dex).padStart(3,'0')}</span>`}
         </div>`;
       }).join('')}
@@ -13710,6 +13803,9 @@ function render(){
   // anexados, e o perfil é aberto A PARTIR do título do modal de time -- se viesse antes, abriria
   // atrás dele. Fica antes do de trocar nome, que por sua vez é aberto a partir do perfil
   if(game.pokedexModal){ html += renderPokedexModal(); }
+  // DEPOIS do modal da Pokédex de propósito: os modais empilham na ordem em que são anexados, e a
+  // ficha é aberta a partir de dentro dele -- se viesse antes, abriria atrás
+  if(game.pokedexFicha){ html += renderPokedexFicha(); }
   if(game.onlinePendente){ html += renderConviteModal(); }   // aparece por cima de qualquer tela
   if(game.candyPicker){ html += renderCandyPickerModal(); }
   if(game.towerOrder){ html += renderTowerOrderModal(); }
