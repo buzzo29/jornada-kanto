@@ -9647,16 +9647,24 @@ function renderSpecialResult(){
     ${spriteHtml(game.rocketSleepStolenMon.speciesId,'sprite-md',game.rocketSleepStolenMon.shiny)}
     <p><strong>${escapeHtmlSafe(game.rocketSleepStolenMon.name)}</strong> Lv.${game.rocketSleepStolenMon.level}</p>
   </div>` : ''}
-  ${r ? `
+  ${/* Cada quadro sai da tela quando não tem o que mostrar, em vez de aparecer como uma caixa vazia
+       com título. Acontece de verdade na emboscada da Jigglypuff: quando ela é a PRIMEIRA inimiga,
+       triggerRocketSleepAmbush corta os confrontos em cutIndex=0 -- ninguém chegou a lutar, então
+       matchups fica vazio e os dois status, que são derivados dele, também. Antes bastava existir um
+       specialBattleResult pros três quadros entrarem, e a tela do pokémon roubado vinha com
+       "Log da batalha", "Seu time" e "Time adversário" em branco embaixo. */''}
+  ${r && r.matchups && r.matchups.length ? `
   <div class="box">
     <h2>Log da batalha</h2>
     <div class="status-list">${renderMatchupLog(r.matchups)}</div>
-  </div>
+  </div>` : ''}
+  ${r && r.playerStatus && r.playerStatus.length ? `
   <div class="box">
     <h2>Seu time</h2>
     ${r.leveledUpFromFaint ? `<p class="faint-xp-note">💪 Pokémons que desmaiaram ganharam <strong>+1 level</strong> pela experiência da batalha!</p>` : ''}
     <div class="status-list">${renderPlayerStatus(r.playerStatus)}</div>
-  </div>
+  </div>` : ''}
+  ${r && r.brockStatus && r.brockStatus.length ? `
   <div class="box">
     <h2>Time adversário</h2>
     <div class="status-list">${renderEnemyStatus(r.brockStatus)}</div>
