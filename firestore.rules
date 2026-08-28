@@ -16,6 +16,12 @@ service cloud.firestore {
       allow read, write: if request.auth != null;
     }
 
+    // configuração das Ligas customizadas (criadas pelo painel admin) -- qualquer conta logada pode
+    // ler (o jogo precisa listar as ligas disponíveis pra todo mundo) e também criar/editar
+    match /leagueTypes/{typeId} {
+      allow read, write: if request.auth != null;
+    }
+
     // detalhe de cada ciclo da Liga (chaveamentos) e a subcoleção de inscritos
     match /leagueCycles/{cycleId} {
       allow read, write: if request.auth != null;

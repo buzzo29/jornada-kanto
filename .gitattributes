@@ -1,0 +1,6 @@
+# O index.html é servido byte a byte pelo Firebase Hosting, e esta máquina tem
+# core.autocrlf=true: sem isso o git converteria LF->CRLF no checkout e um clone novo
+# reescreveria as ~14 mil linhas do arquivo de uma vez, enterrando qualquer diff real
+# no meio da conversão. `-text` desliga toda conversão -- o git guarda e devolve
+# exatamente os bytes que estão no disco.
+* -text

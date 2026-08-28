@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jornada Kanto — Painel Admin (Ligas)</title>
+<meta name="robots" content="noindex, nofollow">
+
+<!-- ==========================================================
+     FIREBASE — troque os dados abaixo pelos do SEU projeto
+     (os mesmos usados no jogo principal, pokemon-ginasio.html)
+     ========================================================== -->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyC3xcRdMQWMfyj6ng_4l9dxtx2Oh5y72WY",
+    authDomain: "jornada-kanto.firebaseapp.com",
+    projectId: "jornada-kanto",
+    storageBucket: "jornada-kanto.firebasestorage.app",
+    messagingSenderId: "492255022607",
+    appId: "1:492255022607:web:d68f06f2e075ce9eb71d7a",
+    measurementId: "G-SFD7WQM690"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+  const auth = firebase.auth();
+</script>
+
+<style>
+  :root{
+    --ink:#1c1c28; --box:#fefbf0; --box-border:#1c1c28; --muted:#6b6f8c;
+    --blue:#3b5bdb; --blue-dark:#22348a; --red:#e0453f; --red-dark:#9c2b26;
+    --green:#3fae5c; --green-dark:#1f6b2f; --bg:#0e0e1a;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; padding:16px; background:var(--bg); color:var(--ink);
+    font-family:'Inter',-apple-system,sans-serif; min-height:100vh;
+  }
+  .wrap{max-width:720px; margin:0 auto;}
+  h1{
+    font-family:'Courier New',monospace; color:#ffd23f; text-align:center;
+    font-size:1.3rem; letter-spacing:1px; margin:6px 0 2px;
+  }
+  .tagline{text-align:center; color:#9aa0c8; font-size:.8rem; margin-bottom:18px;}
+  .box{
+    background:var(--box); border:3px solid var(--box-border); border-radius:4px;
+    box-shadow:4px 4px 0 rgba(0,0,0,.4); padding:16px; margin-bottom:14px;
+  }
+  .box h2{margin:0 0 10px; font-size:1.05rem;}
+  label{display:block; font-weight:700; font-size:.82rem; margin:12px 0 4px;}
+  input[type=text], textarea{
+    width:100%; padding:9px 11px; border:2px solid var(--box-border); border-radius:3px;
+    font-family:inherit; font-size:.9rem; background:#fff;
+  }
+  textarea{min-height:70px; resize:vertical;}
+  .hint{font-size:.72rem; color:var(--muted); margin-top:3px;}
+  .chip-grid{display:flex; flex-wrap:wrap; gap:6px; margin-top:6px;}
+  .chip{
+    padding:6px 12px; border:2px solid var(--box-border); border-radius:16px;
+    font-size:.78rem; font-weight:700; cursor:pointer; background:#fff; user-select:none;
+  }
+  .chip.on{background:var(--blue); color:#fff; border-color:var(--blue-dark);}
+  .terrain-chip{display:flex; align-items:center; gap:4px;}
+  .terrain-chip .types-sub{font-size:.62rem; font-weight:600; opacity:.75;}
+  button{
+    font-family:inherit; font-weight:800; font-size:.85rem; cursor:pointer;
+    border:2px solid var(--box-border); border-radius:3px; padding:10px 18px;
+    box-shadow:2px 2px 0 var(--box-border);
+  }
+  button:active{transform:translate(1px,1px); box-shadow:1px 1px 0 var(--box-border);}
+  .btn-primary{background:var(--blue); color:#fff; width:100%; margin-top:14px;}
+  .btn-danger{background:var(--red); color:#fff;}
+  .btn-secondary{background:#eee; color:var(--ink);}
+  .btn-small{padding:6px 10px; font-size:.72rem;}
+  .error-text{color:var(--red-dark); font-weight:700; font-size:.82rem; margin-top:8px;}
+  .success-text{color:var(--green-dark); font-weight:700; font-size:.82rem; margin-top:8px;}
+  .league-row{
+    display:flex; justify-content:space-between; align-items:center; gap:10px;
+    padding:10px 0; border-bottom:1px dashed #ddd7c2;
+  }
+  .league-row:last-child{border-bottom:none;}
+  .league-row-name{font-weight:800; font-size:.9rem;}
+  .league-row-sub{font-size:.72rem; color:var(--muted); margin-top:2px;}
+  .league-row-actions{display:flex; gap:6px; flex-shrink:0; flex-wrap:wrap; justify-content:flex-end;}
+  .status-pill{
+    font-size:.65rem; font-weight:800; padding:2px 8px; border-radius:8px;
+    display:inline-block; margin-left:6px;
+  }
+  .status-pill.active{background:#dcf3e3; color:var(--green-dark);}
+  .status-pill.inactive{background:#eee; color:var(--muted);}
+  #signInBox{text-align:center; padding:40px 16px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>⚙️ PAINEL ADMIN — LIGAS ⚙️</h1>
+  <div class="tagline">Jornada Kanto — Centro de controle de Ligas Pokémon</div>
+  <div id="app"></div>
+</div>
+
+<script>
+const CLASSIC_LEAGUE_TYPE = 'classic';
+
+const TYPE_NAMES_PT = {
+  Normal:'Normal', Fire:'Fogo', Water:'Água', Grass:'Planta', Poison:'Veneno',
+  Flying:'Voador', Bug:'Inseto', Fighting:'Lutador', Rock:'Pedra', Ground:'Terra',
+  Psychic:'Psíquico', Electric:'Elétrico', Ghost:'Fantasma', Dragon:'Dragão', Ice:'Gelo'
+};
+const ALL_TYPES = Object.keys(TYPE_NAMES_PT);
+
+const TERRAINS = [
+  { id:'vulcao', name:'Vulcão', icon:'🌋', types:['Fire','Ground'] },
+  { id:'arena_suspensa', name:'Arena Suspensa', icon:'☁️', types:['Flying','Dragon'] },
+  { id:'pantano', name:'Pântano', icon:'🐍', types:['Poison','Grass','Ghost'] },
+  { id:'recifes_coral', name:'Recifes de Coral', icon:'🪸', types:['Water','Ice'] },
+  { id:'caverna_cristais', name:'Caverna de Cristais', icon:'💎', types:['Rock','Psychic'] },
+  { id:'usina_eletrica', name:'Usina Elétrica', icon:'⚡', types:['Electric'] },
+  { id:'floresta_ancestral', name:'Floresta Ancestral', icon:'🌳', types:['Grass','Bug'] },
+  { id:'deserto', name:'Deserto', icon:'🏜️', types:['Ground'] },
+  { id:'montanha_nevada', name:'Montanha Nevada', icon:'🏔️', types:['Ice'] },
+  { id:'dojo_tradicional', name:'Dojo Tradicional', icon:'🥋', types:['Fighting'] },
+  { id:'campo_aberto', name:'Campo Aberto', icon:'🌾', types:['Normal','Dragon'] },
+  { id:'mina_subterranea', name:'Mina Subterrânea', icon:'⛏️', types:['Rock','Ground'] },
+  { id:'castelo_assombrado', name:'Castelo Assombrado', icon:'🏰', types:['Ghost','Poison'] },
+  { id:'templo_mistico', name:'Templo Místico', icon:'🔮', types:['Psychic'] },
+  { id:'jardim_venenoso', name:'Jardim Venenoso', icon:'☠️', types:['Grass','Poison'] },
+  { id:'cachoeira_congelada', name:'Cachoeira Congelada', icon:'🧊', types:['Water','Ice'] },
+  { id:'pico_tempestade', name:'Pico da Tempestade', icon:'⛈️', types:['Electric','Flying'] },
+  { id:'caverna_dragao', name:'Caverna do Dragão', icon:'🐉', types:['Dragon','Rock'] },
+  { id:'tundra', name:'Tundra', icon:'❄️', types:['Ice','Normal'] },
+  { id:'ilha_vulcanica', name:'Ilha Vulcânica', icon:'🌋', types:['Fire','Rock','Ground'] },
+  { id:'navio_fantasma', name:'Navio Fantasma', icon:'👻', types:['Water','Ghost'] },
+  { id:'mansao_incendiada', name:'Mansão Incendiada', icon:'🔥', types:['Ghost','Fire'] },
+  { id:'arena_subterranea', name:'Arena Subterrânea', icon:'🕳️', types:['Fighting','Ground'] },
+  { id:'jardim_zen', name:'Jardim Zen', icon:'🧘', types:['Psychic','Grass'] },
+  { id:'colmeia_chamas', name:'Colmeia em Chamas', icon:'🐝', types:['Fire','Bug'] },
+  { id:'torre_toxica', name:'Torre Tóxica', icon:'☣️', types:['Flying','Poison'] },
+  { id:'cidade_iluminada', name:'Cidade Iluminada', icon:'🌆', types:['Normal','Electric'] },
+  { id:'arena_campeoes', name:'Arena dos Campeões', icon:'🏆', types:['Normal','Fighting'] },
+  { id:'falesias_glaciais', name:'Falésias Glaciais', icon:'🧊', types:['Ice','Flying'] },
+  { id:'santuario_draconico', name:'Santuário Dracônico', icon:'🐲', types:['Dragon','Psychic'] },
+  { id:'termas_vulcanicas', name:'Termas Vulcânicas', icon:'♨️', types:['Fire','Water'] },
+  { id:'canion_rochoso', name:'Cânion Rochoso', icon:'🏞️', types:['Rock','Fighting'] },
+  { id:'reserva_natural', name:'Reserva Natural', icon:'🌲', types:['Normal','Grass'] },
+  { id:'porto_abandonado', name:'Porto Abandonado', icon:'⚓', types:['Water','Ghost'] },
+  { id:'jardim_borboletas', name:'Jardim das Borboletas', icon:'🦋', types:['Bug','Flying'] },
+  { id:'templo_monges', name:'Templo dos Monges', icon:'🙏', types:['Fighting','Psychic'] },
+  { id:'pantano_radioativo', name:'Pântano Radioativo', icon:'☢️', types:['Poison','Electric'] },
+  { id:'ninho_ancestral', name:'Ninho Ancestral', icon:'🥚', types:['Dragon','Bug'] },
+  { id:'floresta_eletrificada', name:'Floresta Eletrificada', icon:'🌩️', types:['Electric','Bug'] }
+];
+
+function leagueTypesCollRef(){ return db.collection('leagueTypes'); }
+
+let state = {
+  authUser: null,
+  authChecked: false,
+  leagueTypes: null,
+  formName: '',
+  formIcon: '🏆',
+  formDescription: '',
+  formTypes: [],
+  formTerrains: [],
+  formBotFill: false,
+  classicBotFill: false,
+  classicConfigLoaded: false,
+  formError: null,
+  formSuccess: null,
+  submitting: false
+};
+
+function slugify(name){
+  return name.trim().toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'') // remove acentos
+    .replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'').slice(0,40) || ('liga_'+Date.now());
+}
+function escapeHtml(s){
+  return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function toggleFormType(t){
+  const i = state.formTypes.indexOf(t);
+  if(i>=0){ state.formTypes.splice(i,1); } else { state.formTypes.push(t); }
+  render();
+}
+function toggleFormTerrain(id){
+  const i = state.formTerrains.indexOf(id);
+  if(i>=0){ state.formTerrains.splice(i,1); } else { state.formTerrains.push(id); }
+  render();
+}
+function selectAllTerrains(){ state.formTerrains = TERRAINS.map(t=>t.id); render(); }
+function clearAllTerrains(){ state.formTerrains = []; render(); }
+function toggleBotFill(){ state.formBotFill = !state.formBotFill; render(); }
+
+async function createLeagueType(){
+  const nameInput = document.getElementById('f-name');
+  const iconInput = document.getElementById('f-icon');
+  const descInput = document.getElementById('f-desc');
+  state.formName = nameInput ? nameInput.value.trim() : '';
+  state.formIcon = iconInput ? iconInput.value.trim() : '🏆';
+  state.formDescription = descInput ? descInput.value.trim() : '';
+  state.formError = null;
+  state.formSuccess = null;
+
+  if(!state.formName){ state.formError = 'Digite um nome pra liga.'; render(); return; }
+  if(state.formTypes.length===0){ state.formError = 'Escolha pelo menos 1 tipo de pokémon permitido.'; render(); return; }
+  if(state.formTerrains.length===0){ state.formError = 'Escolha pelo menos 1 terreno permitido.'; render(); return; }
+
+  const id = slugify(state.formName);
+  state.submitting = true;
+  render();
+  try{
+    const existing = await leagueTypesCollRef().doc(id).get();
+    if(existing.exists){ throw new Error('ID_TAKEN'); }
+    await leagueTypesCollRef().doc(id).set({
+      name: state.formName,
+      icon: state.formIcon || '🏆',
+      description: state.formDescription,
+      allowedTypes: state.formTypes,
+      allowedTerrains: state.formTerrains,
+      botFillEnabled: !!state.formBotFill,
+      active: true,
+      createdAt: Date.now()
+    });
+    state.formSuccess = `Liga "${state.formName}" criada! Já aparece na lista de Ligas do jogo.`;
+    state.formName = ''; state.formIcon = '🏆'; state.formDescription = '';
+    state.formTypes = []; state.formTerrains = []; state.formBotFill = false;
+    state.submitting = false;
+    await loadLeagueTypes();
+  } catch(e){
+    state.submitting = false;
+    if(e.message==='ID_TAKEN'){ state.formError = 'Já existe uma liga com um nome parecido. Tente um nome diferente.'; }
+    else { console.error(e); state.formError = 'Erro ao criar a liga. Confira sua conexão e tente de novo.'; }
+    render();
+  }
+}
+
+async function toggleLeagueActive(id, current){
+  try{
+    await leagueTypesCollRef().doc(id).set({ active: !current }, { merge:true });
+    await loadLeagueTypes();
+  } catch(e){ console.error(e); alert('Erro ao atualizar a liga.'); }
+}
+
+async function toggleLeagueBotFill(id, current){
+  try{
+    await leagueTypesCollRef().doc(id).set({ botFillEnabled: !current }, { merge:true });
+    await loadLeagueTypes();
+  } catch(e){ console.error(e); alert('Erro ao atualizar o preenchimento por bots.'); }
+}
+
+async function deleteLeagueType(id, name){
+  if(!confirm(`Apagar a liga "${name}" de vez? Isso não apaga o histórico de ciclos já jogados, só tira a liga da lista e impede novas inscrições.`)) return;
+  try{
+    await leagueTypesCollRef().doc(id).delete();
+    await loadLeagueTypes();
+  } catch(e){ console.error(e); alert('Erro ao apagar a liga.'); }
+}
+
+async function loadLeagueTypes(){
+  try{
+    const snap = await leagueTypesCollRef().get();
+    const types = [];
+    snap.forEach(doc=>types.push({ id: doc.id, ...doc.data() }));
+    types.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+    state.leagueTypes = types;
+  } catch(e){ console.error(e); state.leagueTypes = []; }
+  render();
+}
+
+function signIn(){
+  const provider = new firebase.auth.GoogleAuthProvider();
+  auth.signInWithPopup(provider).catch(e=>{ console.error(e); alert('Erro ao entrar: '+e.message); });
+}
+function signOut(){ auth.signOut(); }
+
+async function loadClassicConfig(){
+  try{
+    const doc = await leagueTypesCollRef().doc(CLASSIC_LEAGUE_TYPE).get();
+    state.classicBotFill = doc.exists ? !!doc.data().botFillEnabled : false;
+  } catch(e){ console.error(e); state.classicBotFill = false; }
+  state.classicConfigLoaded = true;
+  render();
+}
+async function toggleClassicBotFill(){
+  const newValue = !state.classicBotFill;
+  try{
+    await leagueTypesCollRef().doc(CLASSIC_LEAGUE_TYPE).set({ botFillEnabled: newValue }, { merge:true });
+    state.classicBotFill = newValue;
+    render();
+  } catch(e){ console.error(e); alert('Erro ao atualizar a configuração da Liga Clássica.'); }
+}
+function renderClassicConfig(){
+  return `
+  <div class="box">
+    <h2>⚔️ Liga Clássica</h2>
+    <div class="hint">A Liga Clássica não é criada por esse painel (ela já existe fixa no jogo), mas o preenchimento por bots dela pode ser controlado aqui.</div>
+    <label>Preencher com bots quando faltar gente</label>
+    <div class="chip-grid">
+      <span class="chip ${state.classicBotFill?'on':''}" onclick="toggleClassicBotFill()">${!state.classicConfigLoaded?'Carregando...':(state.classicBotFill?'✅ Ligado':'⬜ Desligado')}</span>
+    </div>
+  </div>`;
+}
+
+function renderForm(){
+  return `
+  <div class="box">
+    <h2>➕ Criar nova Liga</h2>
+    <label>Nome da liga</label>
+    <input type="text" id="f-name" oninput="state.formName=this.value" placeholder="Ex: Liga Fogo/Água" value="${escapeHtml(state.formName)}" maxlength="40">
+
+    <label>Ícone (emoji, opcional)</label>
+    <input type="text" id="f-icon" oninput="state.formIcon=this.value" placeholder="🏆" value="${escapeHtml(state.formIcon)}" maxlength="4">
+
+    <label>Descrição (aparece pros jogadores dentro da liga)</label>
+    <textarea id="f-desc" oninput="state.formDescription=this.value" placeholder="Ex: Só pokémons de Fogo e Água podem competir. Terrenos vulcânicos e aquáticos no sorteio.">${escapeHtml(state.formDescription)}</textarea>
+
+    <label>Tipos de pokémon permitidos (${state.formTypes.length} selecionado${state.formTypes.length===1?'':'s'})</label>
+    <div class="hint">Só pokémons que tenham pelo menos um desses tipos podem entrar no time dessa liga.</div>
+    <div class="chip-grid">
+      ${ALL_TYPES.map(t=>`<span class="chip ${state.formTypes.includes(t)?'on':''}" onclick="toggleFormType('${t}')">${TYPE_NAMES_PT[t]}</span>`).join('')}
+    </div>
+
+    <label>Terrenos permitidos no sorteio (${state.formTerrains.length}/${TERRAINS.length} selecionados)
+      <button class="btn-small btn-secondary" style="margin-left:8px;" onclick="selectAllTerrains()" type="button">Marcar todos</button>
+      <button class="btn-small btn-secondary" onclick="clearAllTerrains()" type="button">Limpar</button>
+    </label>
+    <div class="chip-grid">
+      ${TERRAINS.map(t=>`<span class="chip terrain-chip ${state.formTerrains.includes(t.id)?'on':''}" onclick="toggleFormTerrain('${t.id}')">${t.icon} ${t.name} <span class="types-sub">(${t.types.map(ty=>TYPE_NAMES_PT[ty]).join('/')})</span></span>`).join('')}
+    </div>
+
+    <label>Preencher com bots quando faltar gente</label>
+    <div class="hint">Se ligado: quando chegar o horário da partida e não tiver jogadores suficientes pra fechar uma Liga (8) ou Grande Liga (16), o sistema cria "Bot 1", "Bot 2" etc. com times aleatórios (pokémons de última evolução, nível 45, respeitando os tipos permitidos acima) só pra completar aquela rodada. Os bots não entram no ranking nem no histórico de ninguém.</div>
+    <div class="chip-grid">
+      <span class="chip ${state.formBotFill?'on':''}" onclick="toggleBotFill()">${state.formBotFill?'✅ Ligado':'⬜ Desligado'}</span>
+    </div>
+
+    ${state.formError ? `<p class="error-text">${escapeHtml(state.formError)}</p>` : ''}
+    ${state.formSuccess ? `<p class="success-text">${escapeHtml(state.formSuccess)}</p>` : ''}
+    <button class="btn-primary" ${state.submitting?'disabled':''} onclick="createLeagueType()">${state.submitting?'Criando...':'Criar Liga ⚔️'}</button>
+  </div>`;
+}
+
+function renderList(){
+  const types = state.leagueTypes;
+  return `
+  <div class="box">
+    <h2>📋 Ligas customizadas existentes</h2>
+    ${types===null ? '<p class="hint">Carregando...</p>' : ''}
+    ${types && types.length===0 ? '<p class="hint">Nenhuma liga customizada criada ainda. A Liga Clássica não aparece aqui porque não é criada por esse painel.</p>' : ''}
+    ${(types||[]).map(t=>`
+      <div class="league-row">
+        <div>
+          <div class="league-row-name">${t.icon||'🏆'} ${escapeHtml(t.name)} <span class="status-pill ${t.active?'active':'inactive'}">${t.active?'ATIVA':'INATIVA'}</span> <span class="status-pill ${t.botFillEnabled?'active':'inactive'}">${t.botFillEnabled?'🤖 BOTS ON':'🤖 BOTS OFF'}</span></div>
+          <div class="league-row-sub">${(t.allowedTypes||[]).map(ty=>TYPE_NAMES_PT[ty]||ty).join(', ')} · ${(t.allowedTerrains||[]).length} terreno(s) permitido(s)</div>
+        </div>
+        <div class="league-row-actions">
+          <button class="btn-small btn-secondary" onclick="toggleLeagueBotFill('${t.id}', ${!!t.botFillEnabled})">${t.botFillEnabled?'Desligar bots':'Ligar bots'}</button>
+          <button class="btn-small btn-secondary" onclick="toggleLeagueActive('${t.id}', ${!!t.active})">${t.active?'Desativar':'Ativar'}</button>
+          <button class="btn-small btn-danger" onclick="deleteLeagueType('${t.id}', '${t.name.replace(/'/g,"\\'")}')">Apagar</button>
+        </div>
+      </div>
+    `).join('')}
+  </div>`;
+}
+
+function render(){
+  const app = document.getElementById('app');
+  if(!state.authChecked){
+    app.innerHTML = `<div id="signInBox"><p>Carregando...</p></div>`;
+    return;
+  }
+  if(!state.authUser){
+    app.innerHTML = `
+    <div id="signInBox">
+      <p style="margin-bottom:16px;">Entre com a conta de administrador pra gerenciar as Ligas.</p>
+      <button class="btn-primary" style="width:auto;" onclick="signIn()">Entrar com Google</button>
+    </div>`;
+    return;
+  }
+  app.innerHTML = `
+    <div class="box" style="display:flex; justify-content:space-between; align-items:center;">
+      <span style="font-size:.82rem;">Logado como <strong>${escapeHtml(state.authUser.email||state.authUser.uid)}</strong></span>
+      <button class="btn-small btn-secondary" onclick="signOut()">Sair</button>
+    </div>
+    ${renderClassicConfig()}
+    ${renderForm()}
+    ${renderList()}
+  `;
+}
+
+auth.onAuthStateChanged((user)=>{
+  state.authUser = user;
+  state.authChecked = true;
+  render();
+  if(user){ loadLeagueTypes(); loadClassicConfig(); }
+});
+render();
+</script>
+</body>
+</html>

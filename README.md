@@ -5,24 +5,40 @@ Jogo de desafio de ginásios estilo Gen 1 Pokémon, em um único arquivo HTML, c
 ## Estrutura do projeto
 
 ```
-├── public/
-│   └── index.html      → o jogo inteiro (front-end + lógica)
+├── index.html           → o jogo inteiro (front-end + lógica)
+├── admin-panel.html     → painel de gestão das Ligas
 ├── functions/
-│   ├── index.js         → Cloud Function que avança a Liga Pokémon a cada minuto
+│   ├── index.js         → Cloud Functions: Ligas, Torre, Ginásio da Cidade, batalha online
 │   └── package.json
-└── firestore.rules      → regras de segurança do Firestore
+├── tools/               → simuladores em Node (rodam o motor sem navegador)
+├── firestore.rules      → regras de segurança do Firestore
+├── firebase.json        → config de Hosting e Functions
+└── CLAUDE.md            → decisões de projeto e armadilhas conhecidas
 ```
 
-> **Falta nesse repositório**: `firebase.json` e `.firebaserc`, que já existem no projeto Firebase de quem criou o projeto originalmente. Quem tiver esses dois arquivos localmente deve adicioná-los na raiz antes do primeiro `firebase deploy` (veja o Passo 4 abaixo).
+> O jogo saiu de `public/index.html` para `index.html` na raiz — o `firebase.json` publica a
+> raiz (`"public": "."`). Se você tem um clone antigo, é a mesma coisa em lugar novo.
 
 ## Como rodar/publicar
 
 1. Instale o [Firebase CLI](https://firebase.google.com/docs/cli): `npm install -g firebase-tools`
 2. Instale as dependências da função: `cd functions && npm install`
 3. Faça login: `firebase login`
-4. Se você não tiver `firebase.json`/`.firebaserc` ainda, rode `firebase init` na raiz do projeto (escolha Hosting apontando pra pasta `public`, e Functions apontando pra pasta `functions`, usando o projeto Firebase já existente)
-5. Publique: `firebase deploy --only hosting,functions`
-6. As regras do Firestore ficam em `firestore.rules` — publique com `firebase deploy --only firestore:rules`, ou cole o conteúdo manualmente em Firestore Database → Regras no console
+4. Publique: `firebase deploy --only hosting,functions` (`firebase.json` e `.firebaserc` já estão no repositório, então não é preciso rodar `firebase init`)
+5. As regras do Firestore ficam em `firestore.rules` — publique com `firebase deploy --only firestore:rules`, ou cole o conteúdo manualmente em Firestore Database → Regras no console
+
+Quando cliente e servidor mudam juntos, suba os dois na mesma leva — ver `CLAUDE.md`.
+
+## Simuladores
+
+O motor de batalha é JS puro e determinístico, então dá pra medir balanceamento sem abrir o navegador:
+
+```
+node tools/sim-balanceamento.js --n 200      # winrate por espécie
+node tools/sim-balanceamento.js --ginasios   # winrate contra cada líder
+```
+
+`tools/sim-economia.js` e `tools/smoke-jornada.js` estão desatualizados (referenciam um fluxo de jornada que o jogo não tem mais) — ver o aviso no topo de cada um.
 
 ## Fluxo de trabalho entre colaboradores
 
