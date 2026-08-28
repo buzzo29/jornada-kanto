@@ -99,7 +99,11 @@ function createSandbox(htmlPath){
     'effectiveBaseHp','effectiveAttack','effectiveDefense','effectiveSpAtk','effectiveSpDef','effectiveSpeed','gen1MaxHp',
     // lista de amigos: as telas sao HTML puro a partir do estado, entao dao pra renderizar aqui e
     // conferir que nenhum caminho quebra ou deixa escapar nome sem escape (ver test-amigos.js)
-    'renderFriendsScreen','renderFriendCompareModal','vistoPorUltimo','friendRivalryHtml'
+    'renderFriendsScreen','renderFriendCompareModal','vistoPorUltimo','friendRivalryHtml',
+    // mapa de Kanto: o SVG sai de uma função pura (estado -> markup), entao da pra renderizar
+    // aqui e conferir a geografia num screenshot em vez de no olho
+    'kantoMapSvg','kantoTrailHtml','renderKantoIntro','renderKantoMapScreen',
+    'KANTO_PLACES','KANTO_JOURNEY','KANTO_GYM_CITIES','kantoCurva','renderWalkNext','renderWalk'
   ];
   const epilogue = '\n;globalThis.render = function(){};\n' +
     EXPORTS.map(n=>`try{ globalThis[${JSON.stringify(n)}] = ${n}; }catch(e){}`).join('\n') +

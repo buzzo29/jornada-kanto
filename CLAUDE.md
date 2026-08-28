@@ -155,6 +155,28 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
   fechava o atributo e executava. Quem chamar `escJs` **não deve** passar `escapeHtmlSafe` por
   cima: escaparia o `&` das entidades de novo.
 
+## Mapa de Kanto
+
+- SVG desenhado no próprio arquivo, **nenhuma imagem de fora**. Já houve dois episódios de imagem
+  hotlinkada que funcionava local e morria publicada (ver `GYM_BADGE_VISUALS`).
+- **Só o caminho já percorrido é desenhado**, mais o trecho atual pontilhado. Desenhar a jornada
+  inteira virava espaguete: o trajeto real de Kanto se cruza várias vezes (Celadon → Fuchsia →
+  Saffron → Cinnabar → Viridian) e num celular isso lia como rabisco. A visão linear do que falta
+  é a **trilha de insígnias** (`kantoTrailHtml`), que é outra coisa e fica em outro lugar da tela.
+- `game.routeHistory` guarda a rota escolhida por trecho. É estado de **exibição** — nenhuma regra
+  lê. `currentRoute` sozinho não servia: ele é sobrescrito no trecho seguinte, e o mapa perdia a
+  memória de por onde a pessoa passou. Save antigo sem o campo desenha normal, só sem o passado.
+- Cada lugar tem um `lp` (posição do rótulo). Com todos em cima, "Saffron City" caía sobre o ícone
+  da rota e "Vermilion City" sobre a linha do trecho. Os nomes usam halo (`paint-order:stroke`),
+  não caixinha: 11 caixas por trás dos nomes somem com o mapa.
+- Cidade não descoberta é um ponto **pequeno**. Com o mesmo raio das outras, a abertura da jornada
+  mostrava nove círculos escuros e o mapa parecia furado.
+- A trilha vive FORA de qualquer `.box`, direto sobre o fundo escuro — por isso a legenda usa tons
+  claros. Com `var(--muted)`/`var(--ink)` ela sumia no próprio fundo.
+- Mexer numa coordenada de `KANTO_PLACES` move a cidade **e** as linhas do trajeto, que saem dali.
+  `node tools/test-mapa.js` confere que toda cidade continua dentro da moldura e que o mapa não
+  revela cidade antes da hora — os dois erros que somem em silêncio.
+
 ## Frontend
 
 - **Não redesenhar a tela durante animações.** Cada `render()` recria o HTML e mata a transição

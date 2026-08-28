@@ -45,6 +45,7 @@ node tools/sim-balanceamento.js --ginasios   # winrate contra cada líder
 ```
 node tools/test-amigos.js            # telas da lista de amigos (render, escape, presença)
 node tools/test-amigos-servidor.js   # máquina de estados da amizade, com Firestore em memória
+node tools/test-mapa.js              # mapa de Kanto nos 9 estados da jornada
 ```
 
 O segundo carrega `functions/index.js` com `firebase-admin` e `firebase-functions` trocados por
