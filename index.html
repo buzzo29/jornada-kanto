@@ -8367,33 +8367,46 @@ function showJourneyEnd(){
   game.screen = 'journeyEnd';
   render();
 }
+/* Campos que são da CONTA, não do save: têm que sobreviver ao freshGameDefaults, tanto ao
+   reiniciar a jornada quanto ao começar um save novo.
+
+   Estão nesta lista ÚNICA porque antes eram um punhado de `const keepX = game.x` repetido nos
+   dois lugares -- e bastava esquecer um nome numa das cópias pro campo sumir sem ninguém notar.
+   Foi exatamente o que aconteceu com dois deles:
+
+     permanentShinyDex  a Pokédex shiny voltava VAZIA ao entrar numa jornada. O jogador via todos
+                        os slots em branco no botão "Consultar Pokédex" da tela de selvagens, e os
+                        shiny só reapareciam depois de passar pela Pokédex da home -- que é a única
+                        tela que recarregava tudo do servidor (openPokedex -> loadPermanentUserData).
+                        De quebra, o marcador "já tenho" sumia dos shiny selvagens, que é justamente
+                        onde ele mais importa.
+     specialties        pior, porque o efeito era mecânico e invisível: quem era especialista jogava
+                        a jornada nova INTEIRA sem o +1%, já que applySpecialtyBuff cai em
+                        game.specialties e o syncSpecialties só dispara quando alguém do time chega
+                        ao nível da especialidade. */
+const CAMPOS_DA_CONTA = [
+  'authUser','saveSlots','trainerName','permanentPokedex','permanentShinyDex',
+  'accountEliteChampion','leagueWinsTotal','leagueLeaderboard','trainerBestStreak','trainerLastStreak',
+  'shinyBonusExpiresAt','shinyPityCount','specialties','specialtyCounts',
+  'mewtwoLoanActive','mewtwoLoanCooldownUntil','mewtwoLoanUnlocked','mewtwoLoanReadyToClaim',
+  'userTest','neighborhoodGymLocation'
+];
+function snapshotDaConta(){
+  const o = {};
+  for(const k of CAMPOS_DA_CONTA){ o[k] = game[k]; }
+  return o;
+}
+function restauraDadosDaConta(dados){
+  for(const k of CAMPOS_DA_CONTA){ game[k] = dados[k]; }
+}
 function resetGame(){
   stopLeaguePolling();
+  const conta = snapshotDaConta();
   const keepUser = game.authUser;
   const keepSlot = game.currentSaveSlot;
-  const keepSlots = game.saveSlots;
-  const keepName = game.trainerName;
-  const keepPokedex = game.permanentPokedex;
-  const keepWinsTotal = game.leagueWinsTotal;
-  const keepBestStreak = game.trainerBestStreak;
-  const keepLastStreak = game.trainerLastStreak;
-  const keepLeaderboard = game.leagueLeaderboard;
-  // o bônus de shiny é da CONTA, não do save -- reiniciar a jornada não pode fazer a pessoa perder
-  // uma hora de bônus que ela ganhou vencendo uma liga (mesma lógica da Pokédex/vitórias acima)
-  const keepShinyExpires = game.shinyBonusExpiresAt;
-  const keepShinyPity = game.shinyPityCount;
   game = freshGameDefaults();
-  game.authUser = keepUser;
+  restauraDadosDaConta(conta);
   game.currentSaveSlot = keepSlot;
-  game.saveSlots = keepSlots;
-  game.trainerName = keepName;
-  game.permanentPokedex = keepPokedex;
-  game.leagueWinsTotal = keepWinsTotal;
-  game.trainerBestStreak = keepBestStreak;
-  game.trainerLastStreak = keepLastStreak;
-  game.leagueLeaderboard = keepLeaderboard;
-  game.shinyBonusExpiresAt = keepShinyExpires;
-  game.shinyPityCount = keepShinyPity;
   game.pendingNewSaveSlot = keepSlot;
   // reiniciar a jornada zera o rival tambem (novo desafio, novo rival) -- por isso volta pra tela de
   // nome do rival em vez de ir direto pra escolha de inicial, senao o rival ficaria sem nome
@@ -8652,25 +8665,14 @@ async function confirmNewSaveName(){
   game.rivalNameError = null;
   if(!rivalName){ game.rivalNameError = 'Digite um nome pro seu rival.'; render(); return; }
   const slot = game.pendingNewSaveSlot;
-  const keepUser = game.authUser, keepSlots = game.saveSlots, keepPokedex = game.permanentPokedex, keepWinsTotal = game.leagueWinsTotal, keepTrainerName = game.trainerName, keepBestStreak = game.trainerBestStreak, keepLastStreak = game.trainerLastStreak, keepEliteChampion = game.accountEliteChampion;
-  // bônus de shiny é da CONTA -- começar um save novo com o bônus ativo é justamente um dos usos mais
-  // naturais dele (jornada nova, caçando shiny desde o início), então não pode ser perdido aqui
-  const keepShinyExpires = game.shinyBonusExpiresAt, keepShinyPity = game.shinyPityCount;
+  // tudo que é da conta (Pokédex normal E shiny, especialidades, bônus...) sobrevive junto -- ver CAMPOS_DA_CONTA
+  const conta = snapshotDaConta();
   // a dificuldade foi escolhida na tela anterior; precisa sobreviver ao freshGameDefaults
   const modoEscolhido = (game.pendingGameMode === 'hard') ? 'hard' : 'normal';
   game = freshGameDefaults();
+  restauraDadosDaConta(conta);
   game.gameMode = modoEscolhido;
-  game.authUser = keepUser;
-  game.saveSlots = keepSlots;
-  game.permanentPokedex = keepPokedex;
-  game.leagueWinsTotal = keepWinsTotal;
-  game.trainerBestStreak = keepBestStreak;
-  game.trainerLastStreak = keepLastStreak;
-  game.shinyBonusExpiresAt = keepShinyExpires;
-  game.shinyPityCount = keepShinyPity;
   game.currentSaveSlot = slot;
-  game.trainerName = keepTrainerName;
-  game.accountEliteChampion = keepEliteChampion;
   game.rivalName = rivalName;
   // sorteia shiny pra CADA inicial de forma independente, com a MESMA chance de um encontro
   // selvagem -- inclusive a 4x do modo difícil. Antes isso usava SHINY_CHANCE fixo e o inicial
