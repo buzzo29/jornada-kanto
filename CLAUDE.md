@@ -124,6 +124,37 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
 - No lobby cada treinador aparece com a **faixa** de nível dos times dele (`Lv.62–70`), não com uma
   média só: qual time vai entrar nem ele decidiu ainda.
 
+## Lista de amigos
+
+- Amizade é **mútua e por aceite**, gravada nos DOIS lados (`users/{a}/friends/{b}` e o espelho).
+  Duplicar é de propósito: ler "meus amigos" vira uma consulta só. O preço é que remover apaga
+  dois documentos — e `removeFriend` apaga os dois mesmo que um já não exista, que é o conserto de
+  uma amizade que ficou pela metade.
+- **Pedidos cruzados viram aceite direto.** Se A pede pra B e B pede pra A, o segundo pedido firma
+  a amizade em vez de abrir outro pendente. Sem isso os dois ficariam esperando o aceite um do
+  outro e nada na tela explicaria por quê.
+- **O retrospecto NÃO mora na amizade.** Fica em `rivalries/{par}`, escrito por `battleApplyStats`
+  pra TODA batalha online. Se ficasse no documento de amizade, desfazer e refazer zeraria o
+  histórico, e quem vira amigo depois de já ter batalhado começaria em 0×0 — que é mentira.
+- **Presença não tem batimento.** `touchLastSeen` pega carona nas chamadas que já acontecem
+  (`getMyNotifications`, lobby, fila), com folga de 5 minutos. Por isso "agora há pouco" na tela
+  cobre 10 minutos e não 1: um batimento a cada 4s como o do lobby custaria ~21 mil escritas por
+  jogador ativo por dia. Se um dia precisar de "online agora" de verdade, esse é o custo a pagar.
+- **O desafio de amigo é assíncrono** (3 min), ao contrário do desafio do lobby (15s): o amigo pode
+  estar em qualquer tela. O que impede uma batalha contra aba fechada é o `aliveAt` — o desafiante
+  renova enquanto a tela dele está aberta, e o aceite recusa se o carimbo estiver velho. Melhor
+  recusar na hora que criar uma batalha que morre por inatividade minutos depois.
+- Batalha nasce em `montarBatalhaOnline()`, usada pelos DOIS caminhos (aceite do lobby/fila e
+  aceite de desafio de amigo). Duas cópias desse objeto divergiriam num campo — foi o que já
+  aconteceu com `specialties` no desafio do lobby.
+- `searchTrainers` busca por `trainerNameLower`, campo que **não tem backfill**: cada conta ganha
+  na primeira vez que passa por `touchLastSeen`. A segunda consulta (`trainerName ==` exato) é a
+  rede de segurança pra quem ainda não abriu o jogo depois do deploy.
+- `escJs()` escapa as DUAS camadas (string JS e atributo HTML). Antes escapava só a aspa simples,
+  e como nome de treinador não filtra caractere nenhum (só corta em 20), um `Ash" onmouseover=…`
+  fechava o atributo e executava. Quem chamar `escJs` **não deve** passar `escapeHtmlSafe` por
+  cima: escaparia o `&` das entidades de novo.
+
 ## Frontend
 
 - **Não redesenhar a tela durante animações.** Cada `render()` recria o HTML e mata a transição

@@ -40,6 +40,17 @@ node tools/sim-balanceamento.js --ginasios   # winrate contra cada líder
 
 `tools/sim-economia.js` e `tools/smoke-jornada.js` estão desatualizados (referenciam um fluxo de jornada que o jogo não tem mais) — ver o aviso no topo de cada um.
 
+## Testes
+
+```
+node tools/test-amigos.js            # telas da lista de amigos (render, escape, presença)
+node tools/test-amigos-servidor.js   # máquina de estados da amizade, com Firestore em memória
+```
+
+O segundo carrega `functions/index.js` com `firebase-admin` e `firebase-functions` trocados por
+stubs (`tools/fake-firestore.js`), então roda o fluxo inteiro — pedir, aceitar, desafiar, criar a
+batalha — sem emulador e sem rede. É onde dá pra ver se o banco ficou num estado meio-gravado.
+
 ## Fluxo de trabalho entre colaboradores
 
 - Cada um trabalha na própria cópia local (`git clone` → branch própria ou direto na `main`, como preferirem)

@@ -96,7 +96,10 @@ function createSandbox(htmlPath){
     // terreno, buffs e atributos: sem eles nao da pra medir o efeito de terreno/shiny,
     // que e justamente onde cliente e servidor ja divergiram
     'TERRAINS','TERRAIN_BUFF_MULT','SHINY_BUFF_MULT','applyTerrainBuff','applySpecialtyBuff','withBuffs',
-    'effectiveBaseHp','effectiveAttack','effectiveDefense','effectiveSpAtk','effectiveSpDef','effectiveSpeed','gen1MaxHp'
+    'effectiveBaseHp','effectiveAttack','effectiveDefense','effectiveSpAtk','effectiveSpDef','effectiveSpeed','gen1MaxHp',
+    // lista de amigos: as telas sao HTML puro a partir do estado, entao dao pra renderizar aqui e
+    // conferir que nenhum caminho quebra ou deixa escapar nome sem escape (ver test-amigos.js)
+    'renderFriendsScreen','renderFriendCompareModal','vistoPorUltimo','friendRivalryHtml'
   ];
   const epilogue = '\n;globalThis.render = function(){};\n' +
     EXPORTS.map(n=>`try{ globalThis[${JSON.stringify(n)}] = ${n}; }catch(e){}`).join('\n') +

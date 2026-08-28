@@ -2571,7 +2571,17 @@ exports.getMyNotifications = onCall(async (request) => {
     .sort((a,b) => (b.createdAt||0) - (a.createdAt||0))
     .slice(0, 50);
   const unreadCount = notifications.filter(n=>!n.read).length;
-  return { notifications, unreadCount };
+  /* O selo de pedidos de amizade e o carimbo de presença pegam carona aqui porque esta chamada já
+     acontece toda vez que a home abre. Um endpoint próprio pra cada um seriam duas chamadas a mais
+     por abertura de tela, pra dois números que cabem nesta resposta. */
+  let friendRequests = 0;
+  try{ friendRequests = (await friendRequestsColl(uid).get()).size; }
+  catch(e){ logger.error('Erro ao contar pedidos de amizade:', e); }
+  try{
+    const u = await db.collection('users').doc(uid).get();
+    await touchLastSeen(uid, u.exists ? u.data() : null);
+  } catch(e){ logger.error('Erro ao carimbar presença:', e); }
+  return { notifications, unreadCount, friendRequests };
 });
 
 exports.markNotificationsRead = onCall(async (request) => {
@@ -2953,14 +2963,11 @@ async function gymLeadershipHistory(uid){
   } catch(e){ logger.error('Erro ao montar histórico de ginásios:', e); return []; }
 }
 
-exports.getTrainerProfile = onCall(async (request) => {
-  if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
-  const askedUid = typeof request.data?.uid === 'string' ? request.data.uid.trim() : '';
-  const askedName = typeof request.data?.name === 'string' ? request.data.name.trim().slice(0, 60) : '';
-  if(!askedUid && !askedName){
-    throw new HttpsError('invalid-argument', 'Informe o treinador.');
-  }
-
+/* O corpo do perfil vive numa função à parte porque MAIS DE UMA chamada precisa dele: a
+   getTrainerProfile (cartão de um treinador) e a compareTrainers (dois cartões lado a lado, da
+   lista de amigos). Duplicar essa varredura de saves seria duas implementações do mesmo número
+   divergindo com o tempo -- o erro que o CLAUDE.md já aponta no motor de batalha. */
+async function buildTrainerProfile(askedUid, askedName){
   let uid = askedUid;
   let userData = null;
 
@@ -3037,6 +3044,16 @@ exports.getTrainerProfile = onCall(async (request) => {
     gymsList: gymsHistory,
     mewtwoUnlocked: !!userData.mewtwoLoanUnlocked
   };
+}
+
+exports.getTrainerProfile = onCall(async (request) => {
+  if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
+  const askedUid = typeof request.data?.uid === 'string' ? request.data.uid.trim() : '';
+  const askedName = typeof request.data?.name === 'string' ? request.data.name.trim().slice(0, 60) : '';
+  if(!askedUid && !askedName){
+    throw new HttpsError('invalid-argument', 'Informe o treinador.');
+  }
+  return await buildTrainerProfile(askedUid, askedName);
 });
 
 /* ============================================================================
@@ -3914,6 +3931,7 @@ exports.joinBattleQueue = onCall(async (request) => {
 
   const userSnap = await db.collection('users').doc(uid).get();
   const userData = userSnap.exists ? userSnap.data() : {};
+  await touchLastSeen(uid, userData);
   const eu = { uid, name: userData.trainerName || 'Treinador', codes,
                specialties: userData.specialties || [],
                stats: battleStatsFrom(userData),
@@ -3951,6 +3969,35 @@ exports.joinBattleQueue = onCall(async (request) => {
   });
 });
 
+/* Monta o estado inicial de uma batalha online a partir dos dois lados. Cada lado é o mesmo
+   objeto que a fila e o lobby já gravam: { uid, name, codes, specialties, stats }.
+   Extraído porque agora existem DOIS caminhos que criam batalha -- o aceite do pareamento/lobby
+   e o aceite de um desafio de amigo. Duas cópias desse objeto divergiriam num campo qualquer
+   (foi o que aconteceu com specialties no desafio do lobby) e a batalha sairia diferente
+   dependendo de por onde os dois se encontraram. */
+function montarBatalhaOnline(aSide, bSide){
+  const agora = Date.now();
+  const battleId = 'ob_' + agora + '_' + Math.random().toString(36).slice(2,8);
+  return {
+    id: battleId, players: [aSide.uid, bSide.uid],
+    a: { uid: aSide.uid, name: aSide.name }, b: { uid: bSide.uid, name: bSide.name },
+    /* Os times ainda NÃO existem: a batalha nasce na escolha de time. aCodes/bCodes são as
+       opções que cada um mandou ao entrar na fila (ou no lobby); aTeam/bTeam são montados
+       quando a janela fecha, em battleAdvance. */
+    aCodes: aSide.codes || [], bCodes: bSide.codes || [],
+    aTeam: [], bTeam: [], aTeamChoice: null, bTeamChoice: null,
+    aSpecialties: aSide.specialties || [], bSpecialties: bSide.specialties || [],
+    aStats: aSide.stats || { wins:0, losses:0, favorito:null },
+    bStats: bSide.stats || { wins:0, losses:0, favorito:null },
+    aCurrent: 0, bCurrent: 0, aChoice: null, bChoice: null,
+    matchups: [], phase: 'teamPick',
+    teamUntil: agora + BATTLE_TEAM_PICK_MS,   // depois dela: apresentação, inicial e contagem
+    introUntil: 0,
+    countdownDone: false,
+    deadline: agora, winnerUid: null, createdAt: agora, updatedAt: agora
+  };
+}
+
 /* Aceita a partida. Quando os DOIS aceitam, a batalha é criada aqui mesmo, na transação. */
 exports.acceptOnlineMatch = onCall(async (request) => {
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
@@ -3969,25 +4016,8 @@ exports.acceptOnlineMatch = onCall(async (request) => {
       return { waiting: true };
     }
     const agora = Date.now();
-    const battleId = 'ob_' + agora + '_' + Math.random().toString(36).slice(2,8);
-    const estado = {
-      id: battleId, players: pend.players,
-      a: { uid: pend.a.uid, name: pend.a.name }, b: { uid: pend.b.uid, name: pend.b.name },
-      /* Os times ainda NÃO existem: a batalha nasce na escolha de time. aCodes/bCodes são as
-         opções que cada um mandou ao entrar na fila (ou no lobby); aTeam/bTeam são montados
-         quando a janela fecha, em battleAdvance. */
-      aCodes: pend.a.codes || [], bCodes: pend.b.codes || [],
-      aTeam: [], bTeam: [], aTeamChoice: null, bTeamChoice: null,
-      aSpecialties: pend.a.specialties || [], bSpecialties: pend.b.specialties || [],
-      aStats: pend.a.stats || { wins:0, losses:0, favorito:null },
-      bStats: pend.b.stats || { wins:0, losses:0, favorito:null },
-      aCurrent: 0, bCurrent: 0, aChoice: null, bChoice: null,
-      matchups: [], phase: 'teamPick',
-      teamUntil: agora + BATTLE_TEAM_PICK_MS,   // depois dela: apresentação, inicial e contagem
-      introUntil: 0,
-      countdownDone: false,
-      deadline: agora, winnerUid: null, createdAt: agora, updatedAt: agora
-    };
+    const estado = montarBatalhaOnline(pend.a, pend.b);
+    const battleId = estado.id;
     tx.set(onlineBattleRef(battleId), estado);
     tx.delete(pendingMatchRef(matchId));
     pend.players.forEach(p => {
@@ -4205,6 +4235,21 @@ async function battleApplyStats(estado){
       const novo = [registro(meuTime, deleTime, outro, venceu), ...atual].slice(0, 10);
       await ref.set({ onlineHistory: novo }, { merge:true });
     }
+    /* Retrospecto do par (o "placar entre vocês" da lista de amigos). Gravado para TODA batalha
+       online, não só entre amigos: quem vira amigo depois quer ver os confrontos que já teve, e
+       reconstruir isso mais tarde seria impossível -- o histórico pessoal guarda só 10 partidas.
+       Um documento por par, id com os dois uids ordenados, então a mesma dupla sempre cai no
+       mesmo lugar independente de quem foi o A da batalha. Empate (winnerUid null, abandono)
+       conta no total e não move o placar. */
+    await rivalryRef(estado.a.uid, estado.b.uid).set({
+      players: [estado.a.uid, estado.b.uid].sort(),
+      total: admin.firestore.FieldValue.increment(1),
+      ['wins_' + estado.a.uid]: admin.firestore.FieldValue.increment(venceuA ? 1 : 0),
+      ['wins_' + estado.b.uid]: admin.firestore.FieldValue.increment(venceuB ? 1 : 0),
+      lastAt: Date.now(),
+      lastWinnerUid: estado.winnerUid || null,
+      lastBattleId: estado.id
+    }, { merge:true });
   } catch(e){ logger.error('Erro ao aplicar estatísticas da batalha online:', e); }
 }
 
@@ -4296,6 +4341,7 @@ exports.joinBattleLobby = onCall(async (request) => {
   }
   const userSnap = await db.collection('users').doc(uid).get();
   const userData = userSnap.exists ? userSnap.data() : {};
+  await touchLastSeen(uid, userData);
   const stats = battleStatsFrom(userData);
   const agora = Date.now();
   /* As especialidades entram AQUI, no documento do lobby, porque é dele que challengeLobbyPlayer
@@ -4387,4 +4433,528 @@ exports.challengeLobbyPlayer = onCall(async (request) => {
     tx.set(matchPointerRef(alvo), { matchId, createdAt: agora });
     return { matchId, deadline: pend.deadline, oponente: alvoDados.name, aceitei: true, desafio: true };
   });
+});
+
+/* ============================================================================
+   LISTA DE AMIGOS
+   ----------------------------------------------------------------------------
+   Amizade é MÚTUA e por aceite: quem pede não entra na lista de ninguém até o
+   outro aceitar. O pedido vive em users/{alvo}/friendRequests/{quemPediu} --
+   documento com o id de quem pediu, então dois pedidos da mesma pessoa são o
+   mesmo documento e não existe fila de pedidos repetidos pra limpar depois.
+
+   A amizade em si é gravada NOS DOIS lados (users/{a}/friends/{b} e o espelho).
+   Duplicar assim é de propósito: ler "meus amigos" vira uma consulta só, sem
+   varrer uma coleção global de pares. O preço é que remover exige apagar dois
+   documentos -- e é por isso que removeFriend apaga os dois mesmo que um deles
+   já não exista.
+
+   O que NÃO fica aqui: o retrospecto de batalhas. Ele mora em rivalries/{par},
+   escrito por battleApplyStats pra toda batalha online. Se ficasse no documento
+   de amizade, desfazer e refazer a amizade zeraria o histórico dos dois, e quem
+   vira amigo depois de já ter batalhado começaria em 0x0 -- que é mentira.
+   ============================================================================ */
+const MAX_FRIENDS = 50;
+const MAX_PEDIDOS_ENVIADOS = 20;
+const FRIEND_CHALLENGE_MS = 3 * 60 * 1000;      // janela pra aceitar um desafio de amigo
+const FRIEND_CHALLENGE_ALIVE_MS = 35 * 1000;    // sem sinal do desafiante nesse tempo, o desafio morre
+const LAST_SEEN_THROTTLE_MS = 5 * 60 * 1000;
+
+function friendsColl(uid){ return db.collection('users').doc(uid).collection('friends'); }
+function friendRequestsColl(uid){ return db.collection('users').doc(uid).collection('friendRequests'); }
+function friendChallengeRef(id){ return db.collection('friendChallenges').doc(id); }
+function friendChallengePointerRef(uid){ return db.collection('friendChallengePointer').doc(uid); }
+function rivalryRef(a, b){ return db.collection('rivalries').doc([a,b].sort().join('__')); }
+
+/* Carimbo de presença. Não existe batimento próprio: o carimbo pega carona nas chamadas que a
+   pessoa já faz de qualquer jeito (abrir a home, entrar no lobby, entrar na fila). Isso dá um
+   "visto por último" com granularidade de minutos sem UMA escrita a mais por jogador ativo --
+   um batimento a cada 4s, como o do lobby, custaria 21 mil escritas por jogador por dia.
+   A gravação é jogada fora quando o carimbo é recente: quem abre 6 telas em 2 minutos escreve
+   uma vez só.
+   O trainerNameLower vai junto porque é o índice da busca de treinadores (searchTrainers) e não
+   existe backfill: cada conta ganha o campo na primeira vez que aparecer online depois do deploy. */
+async function touchLastSeen(uid, userData){
+  try{
+    const agora = Date.now();
+    const d = userData || {};
+    const nomeLower = (d.trainerName || '').toLowerCase();
+    const precisaNome = nomeLower && d.trainerNameLower !== nomeLower;
+    if(!precisaNome && agora - (d.lastSeenAt || 0) < LAST_SEEN_THROTTLE_MS) return;
+    const patch = { lastSeenAt: agora };
+    if(precisaNome) patch.trainerNameLower = nomeLower;
+    await db.collection('users').doc(uid).set(patch, { merge: true });
+  } catch(e){ logger.error('Erro ao carimbar presença de '+uid+':', e); }
+}
+
+// resumo de um treinador pra lista/busca -- o mínimo que a linha da lista precisa desenhar
+function friendCardFrom(uid, userData){
+  const d = userData || {};
+  return {
+    uid,
+    name: d.trainerName || 'Treinador',
+    lastSeenAt: d.lastSeenAt || 0,
+    eliteChampion: !!d.eliteChampion,
+    pokedex: (d.pokedexCaught || []).length,
+    onlineWins: d.onlineWins || 0,
+    onlineLosses: d.onlineLosses || 0,
+    specialties: d.specialties || []
+  };
+}
+
+/* Retrospecto entre duas pessoas, na perspectiva de quem perguntou. */
+async function rivalryFor(meuUid, outroUid){
+  try{
+    const snap = await rivalryRef(meuUid, outroUid).get();
+    if(!snap.exists) return { total:0, wins:0, losses:0, lastAt:0, lastWon:null, lastBattleId:null };
+    const d = snap.data();
+    const meus = d['wins_' + meuUid] || 0;
+    const dele = d['wins_' + outroUid] || 0;
+    return {
+      total: d.total || 0, wins: meus, losses: dele,
+      lastAt: d.lastAt || 0,
+      // null = empate/abandono, e o cliente mostra "—" em vez de V ou D
+      lastWon: d.lastWinnerUid ? (d.lastWinnerUid === meuUid) : null,
+      lastBattleId: d.lastBattleId || null
+    };
+  } catch(e){ logger.error('Erro ao ler retrospecto:', e); return { total:0, wins:0, losses:0, lastAt:0, lastWon:null, lastBattleId:null }; }
+}
+
+/* --------------------------------------------------------------------------
+   BUSCA DE TREINADORES
+   Nomes NÃO são únicos no jogo (getTrainerProfile já convive com isso), então a
+   busca devolve TODOS os homônimos e a lista mostra o que distingue um do outro:
+   pokédex, vitórias online e quando foi visto. Escolher pelo nome só seria adivinhar.
+   -------------------------------------------------------------------------- */
+exports.searchTrainers = onCall(async (request) => {
+  if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
+  const uid = request.auth.uid;
+  const bruto = String(request.data?.q || '').trim().slice(0, 40);
+  if(bruto.length < 2) throw new HttpsError('invalid-argument', 'Digite pelo menos 2 letras.');
+  const q = bruto.toLowerCase();
+
+  /* Duas consultas de propósito. A por trainerNameLower é a boa -- prefixo, sem diferenciar
+     maiúscula. A por trainerName é a rede de segurança pras contas que ainda não passaram pelo
+     touchLastSeen depois do deploy e portanto não têm o campo minúsculo: sem ela, um jogador
+     antigo simplesmente não seria encontrável até abrir o jogo uma vez. */
+  const [porLower, porExato] = await Promise.all([
+    // \uf8ff é o maior caractere da faixa privada do Unicode: o intervalo [q, q+\uf8ff] pega tudo
+    // que COMEÇA com q. É como se faz busca por prefixo no Firestore, que não tem LIKE
+    db.collection('users').where('trainerNameLower', '>=', q).where('trainerNameLower', '<=', q + '').limit(20).get(),
+    db.collection('users').where('trainerName', '==', bruto).limit(10).get()
+  ]);
+
+  const vistos = new Set([uid]);
+  const achados = [];
+  for(const doc of [...porLower.docs, ...porExato.docs]){
+    if(vistos.has(doc.id)) continue;
+    vistos.add(doc.id);
+    const d = doc.data() || {};
+    if(!d.trainerName) continue;   // conta sem nome ainda: não existe pra busca
+    achados.push(friendCardFrom(doc.id, d));
+  }
+
+  // marca o estado de cada um em relação a mim, senão a tela ofereceria "adicionar" pra quem já é amigo
+  const [amigosSnap, pedidosRecebidos] = await Promise.all([
+    friendsColl(uid).get(),
+    friendRequestsColl(uid).get()
+  ]);
+  const amigos = new Set(amigosSnap.docs.map(d=>d.id));
+  const meRecebeu = new Set(pedidosRecebidos.docs.map(d=>d.id));
+  const enviados = await Promise.all(achados.map(a => friendRequestsColl(a.uid).doc(uid).get()));
+
+  achados.forEach((a, i) => {
+    a.jaAmigo = amigos.has(a.uid);
+    a.pedidoEnviado = enviados[i].exists;
+    a.pedidoRecebido = meRecebeu.has(a.uid);
+  });
+  achados.sort((a,b)=> (b.lastSeenAt||0) - (a.lastSeenAt||0));
+  return { trainers: achados.slice(0, 15) };
+});
+
+/* --------------------------------------------------------------------------
+   PEDIDO DE AMIZADE
+   -------------------------------------------------------------------------- */
+exports.sendFriendRequest = onCall(async (request) => {
+  if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
+  const uid = request.auth.uid;
+  const alvo = String(request.data?.targetUid || '').trim();
+  if(!alvo) throw new HttpsError('invalid-argument', 'Treinador não informado.');
+  if(alvo === uid) throw new HttpsError('invalid-argument', 'Você já é seu melhor amigo.');
+
+  const [meuSnap, alvoSnap] = await Promise.all([
+    db.collection('users').doc(uid).get(),
+    db.collection('users').doc(alvo).get()
+  ]);
+  if(!alvoSnap.exists) throw new HttpsError('not-found', 'Esse treinador não existe mais.');
+  const meuDados = meuSnap.exists ? meuSnap.data() : {};
+  const alvoDados = alvoSnap.data();
+  const meuNome = meuDados.trainerName || 'Treinador';
+
+  const jaAmigo = await friendsColl(uid).doc(alvo).get();
+  if(jaAmigo.exists) throw new HttpsError('already-exists', 'Vocês já são amigos.');
+
+  /* Ele já tinha me mandado pedido? Então isso aqui é um aceite, não um pedido novo. Sem esse
+     atalho, dois amigos que se adicionam ao mesmo tempo ficariam cada um esperando o aceite do
+     outro, com dois pedidos abertos e nenhuma amizade -- e nada na tela explicaria por quê. */
+  const cruzado = await friendRequestsColl(uid).doc(alvo).get();
+  if(cruzado.exists){
+    await firmarAmizade(uid, meuDados, alvo, alvoDados);
+    return { ok:true, aceitoDireto:true, friend: friendCardFrom(alvo, alvoDados) };
+  }
+
+  // lista inteira em vez de count(): o teto é 50 documentos de 3 campos, e ler os dois caminhos
+  // (agregado com fallback) seria mais código que a leitura direta economiza
+  const nAmigos = (await friendsColl(uid).get()).size;
+  if(nAmigos >= MAX_FRIENDS) throw new HttpsError('resource-exhausted', `Sua lista já tem ${MAX_FRIENDS} amigos.`);
+  if((meuDados.friendRequestsSent || 0) >= MAX_PEDIDOS_ENVIADOS){
+    throw new HttpsError('resource-exhausted', 'Você tem pedidos demais esperando resposta.');
+  }
+
+  const jaPedi = await friendRequestsColl(alvo).doc(uid).get();
+  if(jaPedi.exists) return { ok:true, jaPedido:true };
+
+  await friendRequestsColl(alvo).doc(uid).set({ uid, name: meuNome, createdAt: Date.now() });
+  await db.collection('users').doc(uid).set(
+    { friendRequestsSent: admin.firestore.FieldValue.increment(1) }, { merge:true });
+  await createNotification(alvo, 'friend_request',
+    'Pedido de amizade',
+    `${meuNome} quer entrar na sua lista de amigos.`,
+    { fromUid: uid, fromName: meuNome });
+  return { ok:true };
+});
+
+/* Grava a amizade dos dois lados e limpa os pedidos pendentes entre eles.
+   Em lote: metade de uma amizade (um lado vê o outro, o outro não vê ninguém) é pior que
+   nenhuma -- daria uma lista onde desafiar funciona só numa direção. */
+async function firmarAmizade(uidA, dadosA, uidB, dadosB){
+  const agora = Date.now();
+  const lote = db.batch();
+  lote.set(friendsColl(uidA).doc(uidB), { uid: uidB, name: dadosB.trainerName || 'Treinador', since: agora });
+  lote.set(friendsColl(uidB).doc(uidA), { uid: uidA, name: dadosA.trainerName || 'Treinador', since: agora });
+  lote.delete(friendRequestsColl(uidA).doc(uidB));
+  lote.delete(friendRequestsColl(uidB).doc(uidA));
+  await lote.commit();
+  // o contador de pedidos em aberto é aproximado de propósito: nunca desce abaixo de zero e não
+  // vale uma transação -- ele existe só pra travar o spam de pedidos
+  await db.collection('users').doc(uidB).set(
+    { friendRequestsSent: admin.firestore.FieldValue.increment(-1) }, { merge:true }).catch(()=>{});
+}
+
+exports.respondFriendRequest = onCall(async (request) => {
+  if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
+  const uid = request.auth.uid;
+  const de = String(request.data?.fromUid || '').trim();
+  const aceitar = !!request.data?.accept;
+  if(!de) throw new HttpsError('invalid-argument', 'Pedido não informado.');
+
+  const pedido = await friendRequestsColl(uid).doc(de).get();
+  if(!pedido.exists) throw new HttpsError('not-found', 'Esse pedido não existe mais.');
+
+  if(!aceitar){
+    await friendRequestsColl(uid).doc(de).delete();
+    await db.collection('users').doc(de).set(
+      { friendRequestsSent: admin.firestore.FieldValue.increment(-1) }, { merge:true }).catch(()=>{});
+    // recusa NÃO notifica quem pediu, de propósito: "fulano recusou você" não melhora o jogo de
+    // ninguém e transforma um não em um aviso
+    return { ok:true, aceito:false };
+  }
+
+  const [meuSnap, deleSnap] = await Promise.all([
+    db.collection('users').doc(uid).get(),
+    db.collection('users').doc(de).get()
+  ]);
+  if(!deleSnap.exists) throw new HttpsError('not-found', 'Esse treinador não existe mais.');
+  const meuDados = meuSnap.exists ? meuSnap.data() : {};
+  const deleDados = deleSnap.data();
+
+  const nAmigos = (await friendsColl(uid).get()).size;
+  if(nAmigos >= MAX_FRIENDS) throw new HttpsError('resource-exhausted', `Sua lista já tem ${MAX_FRIENDS} amigos.`);
+
+  await firmarAmizade(uid, meuDados, de, deleDados);
+  await createNotification(de, 'friend_accepted',
+    'Pedido aceito',
+    `${meuDados.trainerName || 'Um treinador'} aceitou seu pedido de amizade.`,
+    { fromUid: uid });
+  return { ok:true, aceito:true, friend: friendCardFrom(de, deleDados) };
+});
+
+exports.removeFriend = onCall(async (request) => {
+  if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
+  const uid = request.auth.uid;
+  const alvo = String(request.data?.targetUid || '').trim();
+  if(!alvo) throw new HttpsError('invalid-argument', 'Treinador não informado.');
+  // apaga os DOIS lados mesmo que um já não exista -- é o que conserta uma amizade que ficou pela
+  // metade por um commit interrompido
+  const lote = db.batch();
+  lote.delete(friendsColl(uid).doc(alvo));
+  lote.delete(friendsColl(alvo).doc(uid));
+  await lote.commit();
+  return { ok:true };
+});
+
+/* --------------------------------------------------------------------------
+   A LISTA
+   Uma chamada só: amigos (com presença e retrospecto), pedidos recebidos, e o
+   desafio em aberto -- se cada bloco fosse uma chamada, a tela abriria em três
+   tempos e o contador do desafio começaria atrasado.
+   -------------------------------------------------------------------------- */
+exports.getMyFriends = onCall(async (request) => {
+  if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
+  const uid = request.auth.uid;
+  const meuSnap = await db.collection('users').doc(uid).get();
+  await touchLastSeen(uid, meuSnap.exists ? meuSnap.data() : null);
+
+  const [amigosSnap, pedidosSnap] = await Promise.all([
+    friendsColl(uid).get(),
+    friendRequestsColl(uid).get()
+  ]);
+
+  /* O documento de amizade guarda só uid/nome/desde. Tudo que muda -- nome trocado, pokédex,
+     presença -- é lido do documento do usuário AGORA. Copiar esses campos pra dentro da amizade
+     deixaria a lista mostrando o nome antigo de quem se renomeou, e não existe caminho que
+     atualize as duas cópias. */
+  const uids = amigosSnap.docs.map(d=>d.id);
+  const [perfis, retrospectos] = await Promise.all([
+    Promise.all(uids.map(u => db.collection('users').doc(u).get())),
+    Promise.all(uids.map(u => rivalryFor(uid, u)))
+  ]);
+
+  const friends = uids.map((u, i) => {
+    const d = perfis[i].exists ? perfis[i].data() : {};
+    const card = friendCardFrom(u, d);
+    card.since = (amigosSnap.docs[i].data() || {}).since || 0;
+    card.rivalry = retrospectos[i];
+    // conta apagada: o documento some, mas a amizade fica. Mostra o nome guardado e marca o card
+    if(!perfis[i].exists){ card.name = (amigosSnap.docs[i].data() || {}).name || 'Treinador'; card.sumiu = true; }
+    return card;
+  });
+  // quem foi visto mais recentemente primeiro: é a ordem que responde "com quem dá pra jogar agora"
+  friends.sort((a,b)=> (b.lastSeenAt||0) - (a.lastSeenAt||0));
+
+  const requests = pedidosSnap.docs.map(d => {
+    const x = d.data() || {};
+    return { uid: d.id, name: x.name || 'Treinador', createdAt: x.createdAt || 0 };
+  }).sort((a,b)=> (b.createdAt||0) - (a.createdAt||0));
+
+  return { friends, requests, max: MAX_FRIENDS, serverNow: Date.now(),
+           challenge: await meuDesafioAtual(uid) };
+});
+
+/* Só a contagem de pedidos, pro selo do botão na home -- a tela inteira é cara demais pra isso. */
+exports.getFriendRequestCount = onCall(async (request) => {
+  if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
+  const snap = await friendRequestsColl(request.auth.uid).get();
+  return { count: snap.size };
+});
+
+/* --------------------------------------------------------------------------
+   COMPARAR CONQUISTAS
+   Os dois cartões numa chamada só. Poderia ser o cliente pedindo getTrainerProfile
+   duas vezes, mas aí a tela abriria com metade da tabela preenchida enquanto a
+   outra metade carrega -- e comparação com um lado vazio não compara nada.
+   -------------------------------------------------------------------------- */
+exports.compareTrainers = onCall(async (request) => {
+  if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
+  const uid = request.auth.uid;
+  const alvo = String(request.data?.uid || '').trim();
+  if(!alvo) throw new HttpsError('invalid-argument', 'Treinador não informado.');
+  const [eu, ele, retro] = await Promise.all([
+    buildTrainerProfile(uid, ''),
+    buildTrainerProfile(alvo, ''),
+    rivalryFor(uid, alvo)
+  ]);
+  return { me: eu, them: ele, rivalry: retro };
+});
+
+/* --------------------------------------------------------------------------
+   DESAFIO DIRETO A UM AMIGO
+   ----------------------------------------------------------------------------
+   O desafio do LOBBY dura 15 segundos porque os dois estão olhando a mesma tela
+   naquele instante. Aqui não: o amigo pode estar na Torre, numa jornada, ou com
+   o jogo fechado. Por isso o desafio de amigo é assíncrono -- vale 3 minutos,
+   chega como notificação, e quem aceita é que dispara a batalha.
+
+   O que impede o desafio de virar uma batalha contra uma aba fechada: o
+   desafiante renova um carimbo (aliveAt) enquanto a tela dele está aberta. Sem
+   sinal por FRIEND_CHALLENGE_ALIVE_MS o desafio é dado como abandonado no
+   momento do aceite -- melhor recusar na hora do que criar uma batalha que vai
+   morrer sozinha por inatividade dali a alguns minutos.
+   -------------------------------------------------------------------------- */
+function desafioView(d, uid){
+  if(!d) return null;
+  const souEu = d.from.uid === uid;
+  return {
+    id: d.id,
+    sou: souEu ? 'desafiante' : 'desafiado',
+    oponente: souEu ? d.to.name : d.from.name,
+    oponenteUid: souEu ? d.to.uid : d.from.uid,
+    expiresAt: d.expiresAt,
+    createdAt: d.createdAt
+  };
+}
+
+async function meuDesafioAtual(uid){
+  try{
+    const ptr = await friendChallengePointerRef(uid).get();
+    if(!ptr.exists) return null;
+    const snap = await friendChallengeRef(ptr.data().challengeId).get();
+    if(!snap.exists){ await friendChallengePointerRef(uid).delete().catch(()=>{}); return null; }
+    const d = snap.data();
+    if(Date.now() > d.expiresAt){ await encerrarDesafio(d); return null; }
+    return desafioView(d, uid);
+  } catch(e){ logger.error('Erro ao ler desafio de amigo:', e); return null; }
+}
+
+async function encerrarDesafio(d){
+  const lote = db.batch();
+  lote.delete(friendChallengeRef(d.id));
+  lote.delete(friendChallengePointerRef(d.from.uid));
+  lote.delete(friendChallengePointerRef(d.to.uid));
+  await lote.commit().catch(e=>logger.error('Erro ao encerrar desafio:', e));
+}
+
+exports.challengeFriend = onCall(async (request) => {
+  if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
+  const uid = request.auth.uid;
+  const alvo = String(request.data?.targetUid || '').trim();
+  const codes = battleCodes(request.data);
+  if(!alvo || alvo === uid) throw new HttpsError('invalid-argument', 'Treinador inválido.');
+
+  /* A amizade é conferida ANTES do time, e a ordem é o que a pessoa lê na tela: quem tenta
+     desafiar alguém que não está na lista precisa ouvir isso, não "você precisa de um time com
+     as 8 insígnias" -- que manda conferir a coisa errada. */
+  const amizade = await friendsColl(uid).doc(alvo).get();
+  if(!amizade.exists) throw new HttpsError('permission-denied', 'Só dá pra desafiar quem está na sua lista.');
+  if(!codes.length) throw new HttpsError('failed-precondition', 'Você precisa de um time com as 8 insígnias.');
+
+  const [meuSnap, alvoSnap] = await Promise.all([
+    db.collection('users').doc(uid).get(),
+    db.collection('users').doc(alvo).get()
+  ]);
+  if(!alvoSnap.exists) throw new HttpsError('not-found', 'Esse treinador não existe mais.');
+  const meuDados = meuSnap.exists ? meuSnap.data() : {};
+  const alvoDados = alvoSnap.data();
+
+  // um desafio por vez de cada lado: dois desafios abertos entre as mesmas pessoas viram duas
+  // batalhas, e a segunda nasce órfã porque o cliente só sabe entrar numa
+  const [ptrMeu, ptrAlvo] = await Promise.all([
+    friendChallengePointerRef(uid).get(), friendChallengePointerRef(alvo).get()
+  ]);
+  for(const [ptr, msg] of [[ptrMeu, 'Você já tem um desafio em aberto.'], [ptrAlvo, 'Esse treinador já tem um desafio em aberto.']]){
+    if(!ptr.exists) continue;
+    const s = await friendChallengeRef(ptr.data().challengeId).get();
+    if(s.exists && Date.now() <= s.data().expiresAt) throw new HttpsError('failed-precondition', msg);
+    if(s.exists) await encerrarDesafio(s.data());   // vencido: limpa e segue
+    else await friendChallengePointerRef(ptr.id).delete().catch(()=>{});
+  }
+
+  const agora = Date.now();
+  const id = 'fc_' + agora + '_' + Math.random().toString(36).slice(2,8);
+  const meuNome = meuDados.trainerName || 'Treinador';
+  const desafio = {
+    id, players: [uid, alvo],
+    from: { uid, name: meuNome, codes, specialties: meuDados.specialties || [], stats: battleStatsFrom(meuDados) },
+    to:   { uid: alvo, name: alvoDados.trainerName || 'Treinador' },
+    createdAt: agora, expiresAt: agora + FRIEND_CHALLENGE_MS, aliveAt: agora
+  };
+  const lote = db.batch();
+  lote.set(friendChallengeRef(id), desafio);
+  lote.set(friendChallengePointerRef(uid), { challengeId: id, createdAt: agora });
+  lote.set(friendChallengePointerRef(alvo), { challengeId: id, createdAt: agora });
+  await lote.commit();
+
+  await createNotification(alvo, 'friend_challenge',
+    'Desafio de batalha',
+    `${meuNome} está te chamando pra uma batalha online. Você tem 3 minutos pra responder.`,
+    { fromUid: uid, fromName: meuNome, challengeId: id, expiresAt: desafio.expiresAt });
+
+  return { challenge: desafioView(desafio, uid) };
+});
+
+/* Sinal de vida do desafiante + porta de entrada da batalha quando o outro aceita.
+   Mesmo desenho do pollBattleQueue: sem cron, quem está esperando é quem faz o trabalho. */
+exports.pollFriendChallenge = onCall(async (request) => {
+  if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
+  const uid = request.auth.uid;
+  const desde = Number(request.data?.since) || 0;
+
+  const ponteiro = await db.collection('onlineBattlePointer').doc(uid).get();
+  if(ponteiro.exists && (ponteiro.data().createdAt || 0) > desde){
+    return { battleId: ponteiro.data().battleId };
+  }
+  const ptr = await friendChallengePointerRef(uid).get();
+  if(!ptr.exists) return { challenge: null };
+  const snap = await friendChallengeRef(ptr.data().challengeId).get();
+  if(!snap.exists){ await friendChallengePointerRef(uid).delete().catch(()=>{}); return { challenge: null }; }
+  const d = snap.data();
+  if(Date.now() > d.expiresAt){ await encerrarDesafio(d); return { challenge: null, expirou: true }; }
+  // só o desafiante renova o carimbo -- é a presença DELE que o aceite vai conferir
+  if(d.from.uid === uid){
+    await friendChallengeRef(d.id).set({ aliveAt: Date.now() }, { merge:true }).catch(()=>{});
+  }
+  return { challenge: desafioView(d, uid) };
+});
+
+exports.cancelFriendChallenge = onCall(async (request) => {
+  if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
+  const uid = request.auth.uid;
+  const ptr = await friendChallengePointerRef(uid).get();
+  if(!ptr.exists) return { ok:true };
+  const snap = await friendChallengeRef(ptr.data().challengeId).get();
+  if(snap.exists) await encerrarDesafio(snap.data());
+  else await friendChallengePointerRef(uid).delete().catch(()=>{});
+  return { ok:true };
+});
+
+/* Aceite: é AQUI que a batalha nasce. Quem aceita manda os próprios times -- o desafiante já
+   mandou os dele na hora de desafiar, e o servidor nunca aceita códigos novos depois disso
+   (mesma regra do lobby: montar time depois de ver o adversário é o que a escolha às cegas
+   existe pra impedir). */
+exports.respondFriendChallenge = onCall(async (request) => {
+  if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
+  const uid = request.auth.uid;
+  const id = String(request.data?.challengeId || '').trim();
+  const aceitar = !!request.data?.accept;
+  if(!id) throw new HttpsError('invalid-argument', 'Desafio não informado.');
+
+  const snap = await friendChallengeRef(id).get();
+  if(!snap.exists) throw new HttpsError('not-found', 'Esse desafio não existe mais.');
+  const d = snap.data();
+  if(d.to.uid !== uid) throw new HttpsError('permission-denied', 'Esse desafio não é seu.');
+  if(Date.now() > d.expiresAt){ await encerrarDesafio(d); throw new HttpsError('deadline-exceeded', 'O desafio expirou.'); }
+
+  if(!aceitar){
+    await encerrarDesafio(d);
+    await createNotification(d.from.uid, 'friend_challenge_declined',
+      'Desafio recusado', `${d.to.name} não pode batalhar agora.`, { fromUid: uid });
+    return { ok:true, aceito:false };
+  }
+
+  // o desafiante ainda está na tela? Ver comentário do bloco: batalha contra aba fechada morre
+  // por inatividade minutos depois, e o placar dela não conta pra ninguém
+  if(Date.now() - (d.aliveAt || d.createdAt) > FRIEND_CHALLENGE_ALIVE_MS){
+    await encerrarDesafio(d);
+    throw new HttpsError('failed-precondition', `${d.from.name} saiu da tela do desafio.`);
+  }
+
+  const codes = battleCodes(request.data);
+  if(!codes.length) throw new HttpsError('failed-precondition', 'Você precisa de um time com as 8 insígnias.');
+  const meuSnap = await db.collection('users').doc(uid).get();
+  const meuDados = meuSnap.exists ? meuSnap.data() : {};
+
+  const estado = montarBatalhaOnline(d.from, {
+    uid, name: meuDados.trainerName || d.to.name,
+    codes, specialties: meuDados.specialties || [], stats: battleStatsFrom(meuDados)
+  });
+  const agora = Date.now();
+  const lote = db.batch();
+  lote.set(onlineBattleRef(estado.id), estado);
+  lote.delete(friendChallengeRef(d.id));
+  lote.delete(friendChallengePointerRef(d.from.uid));
+  lote.delete(friendChallengePointerRef(d.to.uid));
+  estado.players.forEach(p => lote.set(db.collection('onlineBattlePointer').doc(p), { battleId: estado.id, createdAt: agora }));
+  await lote.commit();
+
+  return { ok:true, aceito:true, battleId: estado.id };
 });
