@@ -530,14 +530,17 @@ function doExchange(active, enemy, rng){
   }
   first.hp = Math.max(0, first.hp - counter);
   // EMPATE NÃO EXISTE: se o golpe moribundo também derrubaria o primeiro, fica de pé quem tinha o
-  // MAIOR percentual de HP entrando na troca, com 1%-3% do HP máximo (sorteado). Percentual igual
+  // MAIOR percentual de HP entrando na troca, com 1%-10% do HP máximo (sorteado). Percentual igual
   // (ex: os dois cheios na primeira troca) favorece quem conectou primeiro.
+  // A faixa era 1%-3%, o que no nível 50 dava 3 a 10 HP -- o sobrevivente saía praticamente morto e
+  // caía no confronto seguinte quase de graça. Em 1%-10% ele ainda sai machucado (é um empate que
+  // ele venceu no critério de desempate, não uma vitória), mas com chance real de continuar.
   if(first.hp <= 0 && second.hp <= 0){
     const pctFirst = firstHpBefore / first.maxHp;
     const pctSecond = secondHpBefore / second.maxHp;
     const survivor = pctSecond > pctFirst ? second : first;
     const survivorHpBefore = (survivor === first) ? firstHpBefore : secondHpBefore;
-    const pct = 0.01 + rng()*0.02;
+    const pct = 0.01 + rng()*0.09;
     survivor.hp = Math.max(1, Math.min(survivorHpBefore, Math.round(survivor.maxHp * pct)));
   }
 }
