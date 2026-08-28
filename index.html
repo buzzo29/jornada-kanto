@@ -1338,19 +1338,23 @@
   .dex-ficha-num{font-size:.7rem;font-weight:800;color:var(--muted);}
   .dex-ficha-tipos{display:flex;gap:5px;justify-content:center;margin:8px 0 12px;flex-wrap:wrap;}
   .dex-ficha-shiny{font-size:.62rem;font-weight:800;color:var(--yellow-dark);}
-  .dex-stats{text-align:left;margin-bottom:14px;}
-  .dex-stat{display:grid;grid-template-columns:58px 30px 1fr;align-items:center;gap:6px;margin-bottom:5px;}
+  /* sprite à esquerda, atributos à direita. align-items:center mantém os dois lados
+     equilibrados quando a lista é mais alta que a sprite */
+  .dex-ficha-corpo{display:flex;align-items:center;gap:14px;margin:4px 0 14px;}
+  .dex-ficha-sprite{flex-shrink:0;}
+  .dex-stats{flex:1;min-width:0;text-align:left;}
+  /* rótulo à esquerda e número à direita, na mesma linha, com os números alinhados entre si */
+  .dex-stat{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:4px;}
   .dex-stat-nome{font-size:.62rem;font-weight:800;color:var(--muted);}
-  .dex-stat-num{font-size:.68rem;font-weight:800;text-align:right;}
-  .dex-stat-barra{height:9px;background:#e8e4d0;border:1px solid var(--box-border);border-radius:2px;overflow:hidden;}
-  .dex-stat-fill{height:100%;}
-  .dex-stat-fill.baixo{background:var(--red);}
-  .dex-stat-fill.medio{background:var(--yellow-dark);}
-  .dex-stat-fill.alto{background:var(--green);}
-  .dex-stat.total{border-top:2px solid var(--box-border);margin-top:8px;padding-top:7px;}
+  .dex-stat-num{font-size:.72rem;font-weight:800;font-variant-numeric:tabular-nums;}
+  .dex-stat.total{border-top:2px solid var(--box-border);margin-top:7px;padding-top:6px;}
   .dex-stat.total .dex-stat-nome,.dex-stat.total .dex-stat-num{color:var(--ink);}
-  /* 320px: a coluna do nome do atributo encolhe pra barra não sumir */
-  @media (max-width:340px){ .dex-stat{grid-template-columns:48px 28px 1fr;gap:4px;} .dex-stat-nome{font-size:.56rem;} }
+  /* 320px: a sprite cede espaço pra lista, em vez de espremer os números */
+  @media (max-width:340px){
+    .dex-ficha-corpo{gap:10px;}
+    .dex-ficha-corpo .sprite-lg .sprite-img{width:84px;height:84px;}
+    .dex-stat-nome{font-size:.58rem;}
+  }
 
   .achievement-row{align-items:flex-start;}
   .achievement-row.locked{opacity:.45;}
@@ -13372,11 +13376,7 @@ function renderPokedexModal(){
    Os atributos vêm do SPECIES, não de uma instância: aqui é a ficha da ESPÉCIE, sem nível, buff de
    shiny/terreno ou especialidade. Mostrar o valor de um pokémon específico daria números diferentes
    pra mesma espécie dependendo do save aberto.
-
-   A escala das barras é 0-150, com clamp: quase todo atributo de Kanto cabe aí, e os poucos que
-   estouram (o HP 250 da Chansey) mostram a barra cheia com o número exato do lado -- que é o que
-   importa. Uma escala até 250 deixaria todas as outras barras curtas e ilegíveis. */
-const DEX_ESCALA_STAT = 150;
+ */
 function abrirPokedexFicha(speciesId, shiny){
   if(!SPECIES[speciesId]) return;
   game.pokedexFicha = { id: speciesId, shiny: !!shiny };
@@ -13387,12 +13387,9 @@ function fecharPokedexFicha(){
   render();
 }
 function dexStatLinha(rotulo, valor){
-  const pct = Math.min(100, Math.round((valor / DEX_ESCALA_STAT) * 100));
-  const faixa = valor >= 100 ? 'alto' : (valor >= 60 ? 'medio' : 'baixo');
   return `<div class="dex-stat">
     <span class="dex-stat-nome">${rotulo}</span>
     <span class="dex-stat-num">${valor}</span>
-    <span class="dex-stat-barra"><span class="dex-stat-fill ${faixa}" style="width:${pct}%"></span></span>
   </div>`;
 }
 function renderPokedexFicha(){
@@ -13409,22 +13406,23 @@ function renderPokedexFicha(){
   return `
   <div class="modal-overlay" onclick="fecharPokedexFicha()">
     <div class="modal-box dex-ficha" onclick="event.stopPropagation()">
-      ${spriteHtml(id,'sprite-lg',shiny)}
       <div class="dex-ficha-num">#${String(sp.dex).padStart(3,'0')}</div>
       <div class="dex-ficha-nome">${escapeHtmlSafe(sp.name)}</div>
       ${shiny ? '<div class="dex-ficha-shiny">🌟 SHINY</div>' : ''}
       <div class="dex-ficha-tipos">${typesHtml(sp.types)}</div>
-      <div class="dex-stats">
-        ${dexStatLinha('HP', sp.hp)}
-        ${dexStatLinha('Ataque', sp.attack)}
-        ${dexStatLinha('Defesa', sp.defense)}
-        ${dexStatLinha('Sp. Atk', spa)}
-        ${dexStatLinha('Sp. Def', spd)}
-        ${dexStatLinha('Velocidade', sp.speed)}
-        <div class="dex-stat total">
-          <span class="dex-stat-nome">Total</span>
-          <span class="dex-stat-num">${total}</span>
-          <span></span>
+      <div class="dex-ficha-corpo">
+        <div class="dex-ficha-sprite">${spriteHtml(id,'sprite-lg',shiny)}</div>
+        <div class="dex-stats">
+          ${dexStatLinha('HP', sp.hp)}
+          ${dexStatLinha('Ataque', sp.attack)}
+          ${dexStatLinha('Defesa', sp.defense)}
+          ${dexStatLinha('Sp. Atk', spa)}
+          ${dexStatLinha('Sp. Def', spd)}
+          ${dexStatLinha('Velocidade', sp.speed)}
+          <div class="dex-stat total">
+            <span class="dex-stat-nome">Total</span>
+            <span class="dex-stat-num">${total}</span>
+          </div>
         </div>
       </div>
       ${ehMewtwo ? '<button class="btn secondary" onclick="fecharPokedexFicha();openMewtwoLoanInfoModal()">🧬 Empréstimo do Mewtwo</button>' : ''}
