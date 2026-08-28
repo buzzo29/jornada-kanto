@@ -355,7 +355,7 @@ const SHINY_BUFF_MULT = 1.20;   // +20% em TODOS os atributos (TERRAIN_BUFF_MULT
    assim é impossível somar duas vezes por engano, mesmo que alguém chame a função repetido.
 
    Estes três valores precisam bater com os do pokemon-ginasio.html. */
-const SPECIALTY_LEVEL = 60;      // nível a partir do qual um pokémon conta pro tipo dele
+const SPECIALTY_LEVEL = 65;      // nível a partir do qual um pokémon conta pro tipo dele
 const SPECIALTY_THRESHOLD = 50;  // quantos pokémon do tipo pra virar especialista
 const SPECIALTY_BUFF = 1.01;     // +1% em todos os atributos
 function applySpecialtyBuff(team, specialties){

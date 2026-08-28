@@ -2601,7 +2601,7 @@ function freshGameDefaults(){
     candyPicker:null,    // modal de gastar o Doce Raro
     towerBattlePending:false,
     specialties:[], // tipos em que o treinador é especialista (calculado pelo servidor)
-    specialtyCounts:{}, // tipo -> quantos pokémon já levados ao nível 60 (pro progresso no perfil)
+    specialtyCounts:{}, // tipo -> quantos pokémon já levados ao nível SPECIALTY_LEVEL (pro progresso no perfil)
     userTest:false, // conta de teste. Já foi o interruptor do A/B do motor de batalha e depois da Torre; hoje não libera nada -- mantido pro próximo recurso em avaliação
     mewtwoLoanReadyToClaim:false,
     showMewtwoLoanInfoModal:false,
@@ -2843,7 +2843,7 @@ const SHINY_BUFF_MULT = 1.20;     // +20% em TODOS os atributos (TERRAIN_BUFF_MU
    por isso é aplicado no fim de cada effective*, fora dos ifs de motor.
 
    Os três valores precisam bater com os do index.js (o servidor calcula as ligas com eles). */
-const SPECIALTY_LEVEL = 60;
+const SPECIALTY_LEVEL = 65;
 const SPECIALTY_THRESHOLD = 50;
 const SPECIALTY_BUFF = 1.01;
 // marca quais pokémon do time recebem o bônus. Chamada antes de cada batalha local, com as
