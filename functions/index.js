@@ -240,7 +240,7 @@ function pickTerrain(rng, allowedIds){
    dos atributos mais abaixo. Idêntica à do cliente, inclusive em atribuir false a quem não casa.
 
    Esta função mutava os atributos direto (baseHp/attack/defense/special/speed x1.15) E marcava a
-   flag, enquanto effectiveAttack/effectiveSpecial JÁ multiplicavam de novo por causa da flag. O
+   flag, enquanto effectiveAttack/effectiveSpAtk JÁ multiplicavam de novo por causa da flag. O
    resultado era 1.15 x 1.15 = 1.32x em ataque e especial, contra 1.15x no resto -- ou seja, o
    terreno valia mais no ataque do que devia, e a MESMA partida com a MESMA seed dava vencedor
    diferente aqui e no cliente em 12,6% dos casos (medido em 30 mil batalhas).
@@ -298,8 +298,8 @@ function bestAttackType(attacker, defender){
     (defender.types || []).forEach(d => { mult *= typeVsType(t, d); });
     const especial = isSpecialType(t);
     const proprio = proprios.includes(t);
-    const atk = especial ? effectiveSpecial(attacker) : effectiveAttack(attacker);
-    const def = especial ? effectiveSpecial(defender) : effectiveDefense(defender);
+    const atk = especial ? effectiveSpAtk(attacker) : effectiveAttack(attacker);
+    const def = especial ? effectiveSpDef(defender) : effectiveDefense(defender);
     // ^0.6 igual ao dano: se a escolha usasse o multiplicador cru e o dano o comprimido, o motor
     // escolheria um tipo e aplicaria outro -- foi essa diferença que fez cliente e servidor
     // discordarem do melhor golpe em 4% dos confrontos
@@ -319,10 +319,63 @@ function bestMultiplier(atkTypes, defTypes){
   });
   return { mult: best, type: bestType };
 }
+/* ---- Sp.Atk / Sp.Def separados (Gen 2) ----------------------------------------------------
+   Ate aqui o jogo tinha UM atributo 'special', como na Gen 1: o mesmo numero era o poder do
+   golpe especial E a resistencia contra ele. A Gen 2 separou os dois. Valores oficiais da
+   Geracao II, conferidos na Bulbapedia e casados por numero da Pokedex.
+
+   O detalhe que inverte a intuicao: na divisao, o Special da Gen 1 virou o Sp.DEF na maioria
+   das especies, e quem foi reajustado foi o Sp.Atk (43 especies mudam de valor, contra 68 no
+   Sp.Def). Nao da pra deduzir um campo a partir do outro -- por isso os dois entram na tabela.
+
+   Fica em bloco separado, e nao dentro do SPECIES, de proposito: o SPECIES e duplicado entre
+   index.html e functions/index.js, e este bloco e IDENTICO nos dois arquivos -- conferir que
+   nao divergiram vira um diff de um bloco so. Divergir aqui = a mesma batalha com resultado
+   diferente no cliente e no servidor. */
+const GEN2_SPECIAL = {
+  bulbasaur:[65,65], ivysaur:[80,80], venusaur:[100,100], charmander:[60,50], charmeleon:[80,65],
+  charizard:[109,85], squirtle:[50,64], wartortle:[65,80], blastoise:[85,105], caterpie:[20,20],
+  metapod:[25,25], butterfree:[80,80], weedle:[20,20], kakuna:[25,25], beedrill:[45,80],
+  pidgey:[35,35], pidgeotto:[50,50], pidgeot:[70,70], ratata:[25,35], raticate:[50,70],
+  spearow:[31,31], fearow:[61,61], ekans:[40,54], arbok:[65,79], pikachu:[50,40], raichu:[90,80],
+  sandshrew:[20,30], sandslash:[45,55], nidoranf:[40,40], nidorina:[55,55], nidoqueen:[75,85],
+  nidoranm:[40,40], nidorino:[55,55], nidoking:[85,75], clefairy:[60,65], clefable:[85,90],
+  vulpix:[50,65], ninetales:[81,100], jigglypuff:[45,25], wigglytuff:[75,50], zubat:[30,40],
+  golbat:[65,75], oddish:[75,65], gloom:[85,75], vileplume:[100,90], paras:[45,55],
+  parasect:[60,80], venonat:[40,55], venomoth:[90,75], diglett:[35,45], dugtrio:[50,70],
+  meowth:[40,40], persian:[65,65], psyduck:[65,50], golduck:[95,80], mankey:[35,45],
+  primeape:[60,70], growlithe:[70,50], arcanine:[100,80], poliwag:[40,40], poliwhirl:[50,50],
+  poliwrath:[70,90], abra:[105,55], kadabra:[120,70], alakazam:[135,85], machop:[35,35],
+  machoke:[50,60], machamp:[65,85], bellsprout:[70,30], weepinbell:[85,45], victreebel:[100,60],
+  tentacool:[50,100], tentacruel:[80,120], geodude:[30,30], graveler:[45,45], golem:[55,65],
+  ponyta:[65,65], rapidash:[80,80], slowpoke:[40,40], slowbro:[100,80], magnemite:[95,55],
+  magneton:[120,70], farfetchd:[58,62], doduo:[35,35], dodrio:[60,60], seel:[45,70],
+  dewgong:[70,95], grimer:[40,50], muk:[65,100], shellder:[45,25], cloyster:[85,45],
+  gastly:[100,35], haunter:[115,55], gengar:[130,75], onix:[30,45], drowzee:[43,90],
+  hypno:[73,115], krabby:[25,25], kingler:[50,50], voltorb:[55,55], electrode:[80,80],
+  exeggcute:[60,45], exeggutor:[125,65], cubone:[40,50], marowak:[50,80], hitmonlee:[35,110],
+  hitmonchan:[35,110], lickitung:[60,75], koffing:[60,45], weezing:[85,70], rhyhorn:[30,30],
+  rhydon:[45,45], chansey:[35,105], tangela:[100,40], kangaskhan:[40,80], horsea:[70,25],
+  seadra:[95,45], goldeen:[35,50], seaking:[65,80], staryu:[70,55], starmie:[100,85],
+  mrmime:[100,120], scyther:[55,80], jynx:[115,95], electabuzz:[95,85], magmar:[100,85],
+  pinsir:[55,70], tauros:[40,70], magikarp:[15,20], gyarados:[60,100], lapras:[85,95],
+  ditto:[48,48], eevee:[45,65], vaporeon:[110,95], jolteon:[110,95], flareon:[95,110],
+  porygon:[85,75], omanyte:[90,55], omastar:[115,70], kabuto:[55,45], kabutops:[65,70],
+  aerodactyl:[60,75], snorlax:[65,110], articuno:[95,125], zapdos:[125,90], moltres:[125,85],
+  dratini:[50,50], dragonair:[70,70], dragonite:[100,100], mewtwo:[154,90]
+};
+(function aplicaSplitEspecial(){
+  for(const id in GEN2_SPECIAL){
+    const sp = SPECIES[id];
+    if(!sp) continue;
+    sp.spAtk = GEN2_SPECIAL[id][0];
+    sp.spDef = GEN2_SPECIAL[id][1];
+  }
+})();
 function createInstance(speciesId, level){
   const sp = SPECIES[speciesId];
   if(!sp) return null;
-  return { speciesId, name:sp.name, types:sp.types, baseHp:sp.hp, attack:sp.attack, defense:sp.defense, special:sp.special, speed:sp.speed, level, maxHp:0, hp:0 };
+  return { speciesId, name:sp.name, types:sp.types, baseHp:sp.hp, attack:sp.attack, defense:sp.defense, special:sp.special, spAtk:sp.spAtk, spDef:sp.spDef, speed:sp.speed, level, maxHp:0, hp:0 };
 }
 /* MOTOR ALINHADO COM O CLIENTE
    Até aqui o servidor usava o motor LEGADO e o cliente o motor Gen 1 novo. Isso fazia a mesma
@@ -389,8 +442,21 @@ function effectiveDefense(p){
   const v = (typeof p.defense==='number') ? p.defense : ((SPECIES[p.speciesId]&&SPECIES[p.speciesId].defense)||50);
   return withSpecialty(withBuffs(v, p), p);
 }
-function effectiveSpecial(p){
-  const v = (typeof p.special==='number') ? p.special : ((SPECIES[p.speciesId]&&SPECIES[p.speciesId].special)||50);
+/* Sp.Atk e Sp.Def entram aqui separados (Gen 2). Instancia gravada ANTES do split nao tem os
+   campos -- cai no valor da especie, mesma migracao ja usada pela velocidade. O special antigo
+   fica so como ultimo recurso, pra nenhum save velho quebrar. */
+function effectiveSpAtk(p){
+  const sp = SPECIES[p.speciesId];
+  const v = (typeof p.spAtk === 'number') ? p.spAtk
+          : (sp && typeof sp.spAtk === 'number') ? sp.spAtk
+          : (typeof p.special === 'number') ? p.special : 50;
+  return withSpecialty(withBuffs(v, p), p);
+}
+function effectiveSpDef(p){
+  const sp = SPECIES[p.speciesId];
+  const v = (typeof p.spDef === 'number') ? p.spDef
+          : (sp && typeof sp.spDef === 'number') ? sp.spDef
+          : (typeof p.special === 'number') ? p.special : 50;
   return withSpecialty(withBuffs(v, p), p);
 }
 function effectiveSpeed(p){
@@ -406,9 +472,13 @@ const MOVE_POWER = 60;
 const DMG_CAP_PCT = 0.65;
 const DMG_CAP_PCT_CRIT = 0.70;
 function statAtLevel(base, level){ return Math.floor(2*base*level/100) + 5; }
-/* MOTOR LEGADO -- o servidor usa SÓ ele: ligas e ginásio da cidade são multiplayer, e uma partida
-   entre um tester (userTest=true) e um jogador comum precisa de UMA regra só, igual pros dois lados.
-   O motor novo (Gen 1 fiel) existe apenas no cliente, ativado por conta, nas batalhas locais */
+/* MOTOR ÚNICO -- é ESTA a fórmula que roda em tudo: ligas, Ginásio da Cidade e, espelhada no
+   index.html, também as batalhas locais do cliente.
+   Este cabeçalho já dizia "MOTOR LEGADO -- o servidor usa só ele" e que o motor Gen 1 existia
+   "apenas no cliente". Era falso, e contradizia o bloco MOTOR ALINHADO COM O CLIENTE logo acima:
+   o corpo aqui embaixo É o motor novo. Conferido numericamente -- 6556 golpes com as mesmas
+   seeds nos dois arquivos, zero divergências. Mantenha assim: um lado só mudado = a mesma
+   batalha com dois vencedores. */
 function calcDamage(attacker, defender, rng){
   rng = rng || Math.random;   // as ligas passam um rng com seed; fora delas cai no padrão
   // considera tipos próprios E subtipos, igual ao cliente (ver SUBTYPES).
@@ -419,8 +489,8 @@ function calcDamage(attacker, defender, rng){
   // STAB só pro tipo próprio; subtipo perde o bônus e ainda leva o redutor
   const STAB = best.stab ? 1.5 : SUBTYPE_PENALTY;
   // ---- fórmula oficial da Gen 1, idêntica ao calcDamageNew do cliente ----
-  const atkBase = special ? effectiveSpecial(attacker) : effectiveAttack(attacker);   // COM buffs (ofensivo)
-  const defBase = special ? effectiveSpecial(defender) : effectiveDefense(defender);  // SEM buffs (defensivo)
+  const atkBase = special ? effectiveSpAtk(attacker) : effectiveAttack(attacker);   // COM buffs (ofensivo)
+  const defBase = special ? effectiveSpDef(defender) : effectiveDefense(defender);  // Gen 2: defesa especial propria
   const A = statAtLevel(atkBase, attacker.level);
   const D = statAtLevel(defBase, defender.level);
   const isCrit = rng() < (effectiveSpeed(attacker) / 512);  // crítico oficial da Gen 1

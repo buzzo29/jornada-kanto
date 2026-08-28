@@ -34,11 +34,22 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
 
 ## Motor de batalha
 
-- Fórmula fiel à Gen 1, com dano calculado como fração da vida e reescalado.
+- Fórmula fiel à Gen 1, com dano calculado como fração da vida e reescalado. A base do dano é a
+  mesma nas duas gerações, então isso também vale como Gen 2.
+- **Especial é separado em Sp.Atk e Sp.Def (Gen 2)**, valores oficiais da Geração II na tabela
+  `GEN2_SPECIAL`, idêntica nos dois arquivos. Contra-intuitivo e já custou uma análise errada: na
+  divisão, o Special da Gen 1 virou o **Sp.Def** na maioria das espécies, e quem foi reajustado
+  foi o Sp.Atk. Não dá pra deduzir um campo do outro. O campo `special` continua no SPECIES por
+  compatibilidade com saves antigos e porque `bstOf` (raridade dos encontros) ainda usa ele —
+  trocar ali mexeria na distribuição de selvagens, que é outra discussão.
+- **Crítico ainda é Gen 1** (`velocidade/512`, e o crítico dobra o nível na fórmula). A Gen 2 usa
+  1/16 fixo com multiplicador ×2. É o maior desvio que resta: hoje a taxa média é 13,4% e 138 das
+  150 espécies criticam mais do que criticariam na Gen 2 (Electrode 27,3%, 4,4× a taxa oficial).
+  Decisão em aberto — foi medido e apresentado, não escolhido.
 - **Multiplicador de tipo é comprimido (`^0.6`)**: 2× vira ~1,52×. Decisão consciente — não dá pra
   trocar de pokémon no meio do confronto, e tipo puro viraria sentença de morte.
 - **Imunidades valem 0,25, não 0.** Consequência da mesma decisão. Normal acerta Fantasma.
-- Crítico depende da velocidade (Gen 1). Velocidade alta é mais valiosa do que parece.
+- Velocidade alta é mais valiosa do que parece, porque entra na taxa de crítico (ver acima).
 - Buffs: **shiny 1,20× e terreno 1,15×, em TODOS os atributos** — ataque, especial, defesa,
   velocidade e HP. Multiplicam entre si: um shiny no terreno do tipo dele fica 1,38× em tudo.
   Houve uma fase em que foram só ofensivos (1,15 e 1,10); acabou, por decisão de design.

@@ -2789,6 +2789,8 @@ function hydrateTeamMember(p){
   if(typeof p.attack !== 'number') p.attack = sp.attack;
   if(typeof p.defense !== 'number') p.defense = sp.defense;
   if(typeof p.special !== 'number') p.special = sp.special;
+  if(typeof p.spAtk !== 'number') p.spAtk = sp.spAtk;   // split do Especial (Gen 2): instancia velha nao tem
+  if(typeof p.spDef !== 'number') p.spDef = sp.spDef;
   if(typeof p.speed !== 'number') p.speed = sp.speed;
   if(typeof p.maxHp !== 'number') p.maxHp = 0;
   if(typeof p.hp !== 'number') p.hp = 0;
@@ -2796,9 +2798,62 @@ function hydrateTeamMember(p){
 }
 function hydrateTeam(team){ return (team||[]).map(hydrateTeamMember); }
 
+/* ---- Sp.Atk / Sp.Def separados (Gen 2) ----------------------------------------------------
+   Ate aqui o jogo tinha UM atributo 'special', como na Gen 1: o mesmo numero era o poder do
+   golpe especial E a resistencia contra ele. A Gen 2 separou os dois. Valores oficiais da
+   Geracao II, conferidos na Bulbapedia e casados por numero da Pokedex.
+
+   O detalhe que inverte a intuicao: na divisao, o Special da Gen 1 virou o Sp.DEF na maioria
+   das especies, e quem foi reajustado foi o Sp.Atk (43 especies mudam de valor, contra 68 no
+   Sp.Def). Nao da pra deduzir um campo a partir do outro -- por isso os dois entram na tabela.
+
+   Fica em bloco separado, e nao dentro do SPECIES, de proposito: o SPECIES e duplicado entre
+   index.html e functions/index.js, e este bloco e IDENTICO nos dois arquivos -- conferir que
+   nao divergiram vira um diff de um bloco so. Divergir aqui = a mesma batalha com resultado
+   diferente no cliente e no servidor. */
+const GEN2_SPECIAL = {
+  bulbasaur:[65,65], ivysaur:[80,80], venusaur:[100,100], charmander:[60,50], charmeleon:[80,65],
+  charizard:[109,85], squirtle:[50,64], wartortle:[65,80], blastoise:[85,105], caterpie:[20,20],
+  metapod:[25,25], butterfree:[80,80], weedle:[20,20], kakuna:[25,25], beedrill:[45,80],
+  pidgey:[35,35], pidgeotto:[50,50], pidgeot:[70,70], ratata:[25,35], raticate:[50,70],
+  spearow:[31,31], fearow:[61,61], ekans:[40,54], arbok:[65,79], pikachu:[50,40], raichu:[90,80],
+  sandshrew:[20,30], sandslash:[45,55], nidoranf:[40,40], nidorina:[55,55], nidoqueen:[75,85],
+  nidoranm:[40,40], nidorino:[55,55], nidoking:[85,75], clefairy:[60,65], clefable:[85,90],
+  vulpix:[50,65], ninetales:[81,100], jigglypuff:[45,25], wigglytuff:[75,50], zubat:[30,40],
+  golbat:[65,75], oddish:[75,65], gloom:[85,75], vileplume:[100,90], paras:[45,55],
+  parasect:[60,80], venonat:[40,55], venomoth:[90,75], diglett:[35,45], dugtrio:[50,70],
+  meowth:[40,40], persian:[65,65], psyduck:[65,50], golduck:[95,80], mankey:[35,45],
+  primeape:[60,70], growlithe:[70,50], arcanine:[100,80], poliwag:[40,40], poliwhirl:[50,50],
+  poliwrath:[70,90], abra:[105,55], kadabra:[120,70], alakazam:[135,85], machop:[35,35],
+  machoke:[50,60], machamp:[65,85], bellsprout:[70,30], weepinbell:[85,45], victreebel:[100,60],
+  tentacool:[50,100], tentacruel:[80,120], geodude:[30,30], graveler:[45,45], golem:[55,65],
+  ponyta:[65,65], rapidash:[80,80], slowpoke:[40,40], slowbro:[100,80], magnemite:[95,55],
+  magneton:[120,70], farfetchd:[58,62], doduo:[35,35], dodrio:[60,60], seel:[45,70],
+  dewgong:[70,95], grimer:[40,50], muk:[65,100], shellder:[45,25], cloyster:[85,45],
+  gastly:[100,35], haunter:[115,55], gengar:[130,75], onix:[30,45], drowzee:[43,90],
+  hypno:[73,115], krabby:[25,25], kingler:[50,50], voltorb:[55,55], electrode:[80,80],
+  exeggcute:[60,45], exeggutor:[125,65], cubone:[40,50], marowak:[50,80], hitmonlee:[35,110],
+  hitmonchan:[35,110], lickitung:[60,75], koffing:[60,45], weezing:[85,70], rhyhorn:[30,30],
+  rhydon:[45,45], chansey:[35,105], tangela:[100,40], kangaskhan:[40,80], horsea:[70,25],
+  seadra:[95,45], goldeen:[35,50], seaking:[65,80], staryu:[70,55], starmie:[100,85],
+  mrmime:[100,120], scyther:[55,80], jynx:[115,95], electabuzz:[95,85], magmar:[100,85],
+  pinsir:[55,70], tauros:[40,70], magikarp:[15,20], gyarados:[60,100], lapras:[85,95],
+  ditto:[48,48], eevee:[45,65], vaporeon:[110,95], jolteon:[110,95], flareon:[95,110],
+  porygon:[85,75], omanyte:[90,55], omastar:[115,70], kabuto:[55,45], kabutops:[65,70],
+  aerodactyl:[60,75], snorlax:[65,110], articuno:[95,125], zapdos:[125,90], moltres:[125,85],
+  dratini:[50,50], dragonair:[70,70], dragonite:[100,100], mewtwo:[154,90]
+};
+(function aplicaSplitEspecial(){
+  for(const id in GEN2_SPECIAL){
+    const sp = SPECIES[id];
+    if(!sp) continue;
+    sp.spAtk = GEN2_SPECIAL[id][0];
+    sp.spDef = GEN2_SPECIAL[id][1];
+  }
+})();
 function createInstance(speciesId, level){
   const sp = SPECIES[speciesId];
-  return {id:'mon'+(nextInstanceId++), speciesId, name:sp.name, types:sp.types, baseHp:sp.hp, attack:sp.attack, defense:sp.defense, special:sp.special, speed:sp.speed, level:level, maxHp:0, hp:0};
+  return {id:'mon'+(nextInstanceId++), speciesId, name:sp.name, types:sp.types, baseHp:sp.hp, attack:sp.attack, defense:sp.defense, special:sp.special, spAtk:sp.spAtk, spDef:sp.spDef, speed:sp.speed, level:level, maxHp:0, hp:0};
 }
 // O motor NOVO (fórmula oficial da Gen 1) é o padrão de TODOS os jogadores desde a migração.
 // Antes disso houve um período de teste A/B em que só contas com userTest=true no Firestore usavam
@@ -2881,8 +2936,21 @@ function effectiveDefense(p){
   const v = (typeof p.defense === 'number') ? p.defense : ((SPECIES[p.speciesId] && SPECIES[p.speciesId].defense) || 50);
   return withSpecialty(withBuffs(v, p), p);
 }
-function effectiveSpecial(p){
-  const v = (typeof p.special === 'number') ? p.special : ((SPECIES[p.speciesId] && SPECIES[p.speciesId].special) || 50);
+/* Sp.Atk e Sp.Def entram aqui separados (Gen 2). Instancia gravada ANTES do split nao tem os
+   campos -- cai no valor da especie, mesma migracao ja usada pela velocidade. O special antigo
+   fica so como ultimo recurso, pra nenhum save velho quebrar. */
+function effectiveSpAtk(p){
+  const sp = SPECIES[p.speciesId];
+  const v = (typeof p.spAtk === 'number') ? p.spAtk
+          : (sp && typeof sp.spAtk === 'number') ? sp.spAtk
+          : (typeof p.special === 'number') ? p.special : 50;
+  return withSpecialty(withBuffs(v, p), p);
+}
+function effectiveSpDef(p){
+  const sp = SPECIES[p.speciesId];
+  const v = (typeof p.spDef === 'number') ? p.spDef
+          : (sp && typeof sp.spDef === 'number') ? sp.spDef
+          : (typeof p.special === 'number') ? p.special : 50;
   return withSpecialty(withBuffs(v, p), p);
 }
 function effectiveSpeed(p){
@@ -3720,6 +3788,8 @@ function tryEvolve(p){
     p.attack = newSp.attack;
     p.defense = newSp.defense;
     p.special = newSp.special;
+    p.spAtk = newSp.spAtk;
+    p.spDef = newSp.spDef;
   }
   return events;
 }
@@ -3791,8 +3861,8 @@ function bestAttackType(attacker, defender){
     (defender.types || []).forEach(d => { mult *= typeVsType(t, d); });
     const especial = isSpecialType(t);
     const proprio = proprios.includes(t);
-    const atk = especial ? effectiveSpecial(attacker) : effectiveAttack(attacker);
-    const def = especial ? effectiveSpecial(defender) : effectiveDefense(defender);
+    const atk = especial ? effectiveSpAtk(attacker) : effectiveAttack(attacker);
+    const def = especial ? effectiveSpDef(defender) : effectiveDefense(defender);
     // mesma compressão de tipo do motor (^0.6), pra a escolha refletir o dano que sai de verdade
     const nota = Math.pow(mult, 0.6) * (proprio ? 1.5 : SUBTYPE_PENALTY) * (atk / Math.max(1, def));
     if(!melhor || nota > melhor.nota) melhor = { mult, type: t, stab: proprio, nota };
@@ -3830,9 +3900,12 @@ function calcDamage(attacker, defender, rng){
 }
 /* ===== MOTOR LEGADO -- APOSENTADO no cliente (mantido aqui como referência) =====
    Esta era a fórmula que o jogo usou até a migração pro motor Gen 1. Está comentada, não deletada,
-   por dois motivos: (1) é o plano B se o motor novo se mostrar ruim em produção -- basta descomentar
-   e apontar calcDamage de volta pra cá; (2) é EXATAMENTE o que o servidor (index.js) ainda roda nas
-   ligas e no Ginásio da Cidade, então serve de referência pra comparar as duas matemáticas.
+   porque é o plano B se o motor novo se mostrar ruim em produção -- basta descomentar e apontar
+   calcDamage de volta pra cá.
+   ATENÇÃO: este comentário já afirmou que o servidor ainda rodava esta fórmula. Não roda, e já
+   não rodava quando isso foi escrito. Cliente e servidor usam o MESMO motor (o de baixo), e isso
+   foi conferido numericamente: 6556 golpes com as mesmas seeds, zero divergências. Se você veio
+   aqui atrás de uma diferença cliente/servidor pra corrigir, ela não existe -- não "conserte".
    Os dois problemas que motivaram a aposentadoria estão visíveis abaixo: os buffs de shiny/terreno
    entravam também na DEFESA e no HP (via effective*), e a vulnerabilidade por sequência de vitórias
    (o bloco `wins`) dobrava o dano recebido por quem estava ganhando -- a "morte súbita" que os
@@ -3844,8 +3917,8 @@ function calcDamageLegacy(attacker, defender, rng){
   const mult = best.mult;
   const special = isSpecialType(best.type);
   const STAB = 1.5;
-  const atkStat = special ? effectiveSpecial(attacker) : effectiveAttack(attacker);
-  const defStat = special ? effectiveSpecial(defender) : effectiveDefense(defender);
+  const atkStat = special ? effectiveSpAtk(attacker) : effectiveAttack(attacker);
+  const defStat = special ? effectiveSpDef(defender) : effectiveDefense(defender);   // era effectiveSpecial nos dois lados; o split da Gen 2 aposentou aquela funcao
   const levelWeight = Math.pow(attacker.level/defender.level, (mult > 1 ? -0.4 : 0.5));
   const base = attacker.level*2.5 * ((atkStat*attacker.level) / (defStat*defender.level)) * levelWeight;
   let defense = 1;
@@ -3870,8 +3943,8 @@ function calcDamageNew(attacker, defender, rng){
   // STAB só quando o tipo escolhido é PRÓPRIO do atacante. Subtipo não só perde o bônus como
   // ainda leva o redutor -- é isso que impede o subtipo de virar poder de graça
   const STAB = best.stab ? 1.5 : SUBTYPE_PENALTY;
-  const atkBase = special ? effectiveSpecial(attacker) : effectiveAttack(attacker); // COM buffs (ofensivo)
-  const defBase = special ? effectiveSpecial(defender) : effectiveDefense(defender); // SEM buffs (defensivo) -- Gen 1: Especial cobre ataque E defesa especial
+  const atkBase = special ? effectiveSpAtk(attacker) : effectiveAttack(attacker); // COM buffs (ofensivo)
+  const defBase = special ? effectiveSpDef(defender) : effectiveDefense(defender); // Gen 2: quem defende usa o Sp.Def, nao o mesmo numero do ataque
   const A = statAtLevel(atkBase, attacker.level);
   const D = statAtLevel(defBase, defender.level);
   const isCrit = rng() < (effectiveSpeed(attacker) / 512); // crítico oficial da Gen 1
@@ -4259,6 +4332,8 @@ function chooseEeveeEvolution(choice){
       eevee.attack = newSp.attack;
       eevee.defense = newSp.defense;
       eevee.special = newSp.special;
+      eevee.spAtk = newSp.spAtk;
+      eevee.spDef = newSp.spDef;
       markCaught(choice, !!eevee.shiny);
     }
   }
