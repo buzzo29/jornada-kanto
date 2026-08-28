@@ -5340,6 +5340,7 @@ function startTrainerBattle(){
 }
 function runTrainerBattle(opponentTeam){
   game.trainerBattleOpponentName = null;   // batalha comum: a tela mostra só "Adversário"
+  game.trainerBattlePlayerName = null;     // e o lado esquerdo é você mesmo (ver renderTrainerBattling)
   game.towerBattlePending = false;
   // mesmo cuidado da luta do Mewtwo: createInstance não traz a flag de shiny, e sem ela um shiny
   // do jogador lutaria como comum aqui -- sem a estrela na tela e sem o buff ofensivo
@@ -9829,7 +9830,12 @@ function renderTrainerBattling(){
   <div class="eyebrow">${game.towerBattlePending ? '🗼 TORRE DOS TREINADORES' : '🤝 BATALHA ENTRE TREINADORES'}</div>
   <div class="box cursor">
     <div class="team-alive-row">
-      <span class="team-alive-chip">🎒 ${escapeHtmlSafe(game.trainerName||'Você')}: ${(loading||animating)?m.playerAliveBefore:m.playerAliveAfter}/${m.playerTeamSize}</span>
+      <!-- o lado esquerdo NEM SEMPRE é quem está logado: na reprise de um desafio do Ginásio da
+           Cidade quem aparece aqui é o DESAFIANTE daquela luta, que quase nunca é você (o servidor
+           grava os confrontos na perspectiva de quem atacou o ginásio). Por isso o nome vem de
+           trainerBattlePlayerName quando existe, e só cai pro seu quando não existe -- jornada,
+           Torre e reprise da Online são sempre batalhas suas e deixam esse campo nulo -->
+      <span class="team-alive-chip">🎒 ${escapeHtmlSafe(game.trainerBattlePlayerName||game.trainerName||'Você')}: ${(loading||animating)?m.playerAliveBefore:m.playerAliveAfter}/${m.playerTeamSize}</span>
       <span class="team-alive-chip">🥊 ${escapeHtmlSafe(game.trainerBattleOpponentName||'Adversário')}: ${(loading||animating)?m.enemyAliveBefore:m.enemyAliveAfter}/${m.enemyTeamSize}</span>
     </div>
     <div class="battle-vs">
@@ -10305,6 +10311,9 @@ function reverDesafioGinasio(idx){
   if(!entry || !entry.matchups || !entry.matchups.length) return;
   game.trainerBattleResult = { matchups: entry.matchups, win: !!entry.challengerWon };
   game.trainerBattleOpponentName = entry.defenderName;
+  // ÚNICO lugar que preenche isso: aqui a luta é de outra pessoa, então o lado esquerdo tem que
+  // levar o nome do desafiante daquele desafio, e não o de quem está assistindo
+  game.trainerBattlePlayerName = entry.challengerName;
   game.gymReplayPending = true;
   game.towerBattlePending = false;
   game.onlineBattlePending = false;
@@ -12052,6 +12061,7 @@ async function fightTowerFloor(){
     // entra na MESMA tela de revelação das outras batalhas (ver finishTrainerBattle)
     game.trainerBattleResult = { matchups: r.data.matchups, win: r.data.win };
     game.trainerBattleOpponentName = r.data.npcName;
+    game.trainerBattlePlayerName = null;   // a subida da Torre é sua: o lado esquerdo é você
     game.towerBattlePending = true;
     game.trainerRevealIndex = 0;
     game.trainerRevealPhase = 'loading';
@@ -12527,6 +12537,8 @@ async function reverPartidaOnline(battleId){
     const meus = d.souA ? d.matchups : d.matchups.map(virarMatchup);
     game.trainerBattleResult = { matchups: meus, win: d.venci };
     game.trainerBattleOpponentName = d.oponente;
+    // o servidor já vira os confrontos pela sua perspectiva (souA), então o lado esquerdo é você
+    game.trainerBattlePlayerName = null;
     game.onlineReplayPending = true;
     game.towerBattlePending = false;
     game.onlineBattlePending = false;
