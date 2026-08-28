@@ -13138,6 +13138,14 @@ function renderOnlineFight(){
      a janela fechar entregaria a escolha do adversário -- e a graça é escolher sem saber o que
      vem do outro lado. Depois da contagem, os dois aparecem juntos. */
   const ocultarLutadores = st.primeiraEscolha && st.phase === 'choosing';
+  /* Mesma ideia depois de um desmaio: o lado que CAIU some enquanto o dono escolhe o próximo.
+     Deixar o pokémon desmaiado em campo com a barra zerada parecia que ele ia voltar pra luta --
+     e é justamente a hora em que ninguém sabe o que vem do outro lado.
+     Durante a animação NÃO vale: é ali que a barra dele desce até zero, e sumir com o sprite no
+     meio da queda tiraria da tela exatamente o golpe que a pessoa está esperando ver. */
+  const janelaDeTroca = st.phase === 'choosing' && !anim && !st.primeiraEscolha;
+  const meuCaiu  = janelaDeTroca && meu  && meu.hp  <= 0;
+  const deleCaiu = janelaDeTroca && dele && dele.hp <= 0;
 
   /* A tela final só entra DEPOIS da animação do último confronto.
      Antes eu checava 'done' primeiro, e o golpe que decidia a batalha nunca era mostrado: a tela
@@ -13213,9 +13221,9 @@ function renderOnlineFight(){
     <div class="battle-vs">
       ${ocultarLutadores
         ? `${fighterOcultoHtml()}<span class="vs-swords">⚔️</span>${fighterOcultoHtml()}`
-        : `${fighterOnlineHtml(meu,'eu', anim ? anim.meuHp : undefined)}
+        : `${meuCaiu ? fighterOcultoHtml() : fighterOnlineHtml(meu,'eu', anim ? anim.meuHp : undefined)}
            <span class="vs-swords">⚔️</span>
-           ${fighterOnlineHtml(dele,'ele', anim ? anim.deleHp : undefined)}`}
+           ${deleCaiu ? fighterOcultoHtml() : fighterOnlineHtml(dele,'ele', anim ? anim.deleHp : undefined)}`}
     </div>
     ${anim
       ? (anim.anuncio ? `<p class="loading-text online-vai-linha">Vai ${escapeHtmlSafe(anim.anuncio)}!</p>` : `<p class="loading-text">⚔️ Trocando golpes...</p>`)
