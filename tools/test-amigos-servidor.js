@@ -181,6 +181,20 @@ if(desafioOk){
      b.phase === 'teamPick' && b.aCodes.length === 1 && b.bCodes.length === 1);
   ok('desafio e ponteiros limpos depois da batalha criada',
      !doc('friendChallenges/' + id3) && !doc('friendChallengePointer/ash'));
+
+  /* PONTEIRO DE BATALHA VELHO -- o bug que fazia a tela de amigos abrir sozinha uma partida da
+     noite anterior: o ponteiro fica gravado, e um poll com "since" pequeno recebia o battleId
+     dela de volta. */
+  await db.collection('onlineBattlePointer').doc('ash')
+    .set({ battleId: 'ob_de_ontem', createdAt: Date.now() - 12*60*60*1000 });
+  const velho = await chamar(fns.pollFriendChallenge, 'ash', { since: 0 });
+  ok('poll com since:0 NÃO devolve a batalha de ontem', !velho.battleId,
+     'devolveu ' + JSON.stringify(velho.battleId));
+
+  await db.collection('onlineBattlePointer').doc('ash')
+    .set({ battleId: 'ob_agorinha', createdAt: Date.now() });
+  const novo = await chamar(fns.pollFriendChallenge, 'ash', { since: Date.now() - 5000 });
+  ok('mas devolve a batalha que acabou de nascer', novo.battleId === 'ob_agorinha');
 }
 
 console.log(`\n${casos - falhas}/${casos} casos passaram.`);

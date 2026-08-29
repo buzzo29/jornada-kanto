@@ -4282,6 +4282,12 @@ async function battleApplyStats(estado){
       lastWinnerUid: estado.winnerUid || null,
       lastBattleId: estado.id
     }, { merge:true });
+    /* Ponteiros da batalha: some com eles agora que ela acabou. Enquanto ficavam gravados, uma
+       consulta com "since" pequeno recebia o battleId de uma partida já encerrada e o cliente
+       entrava nela de novo -- o bug da tela de amigos. */
+    for(const lado of [estado.a, estado.b]){
+      await db.collection('onlineBattlePointer').doc(lado.uid).delete().catch(()=>{});
+    }
   } catch(e){ logger.error('Erro ao aplicar estatísticas da batalha online:', e); }
 }
 
@@ -4906,13 +4912,22 @@ exports.challengeFriend = onCall(async (request) => {
 
 /* Sinal de vida do desafiante + porta de entrada da batalha quando o outro aceita.
    Mesmo desenho do pollBattleQueue: sem cron, quem está esperando é quem faz o trabalho. */
+/* Ponteiro de batalha velho não pode arrastar ninguém pra dentro de uma partida.
+   O ponteiro fica gravado depois que a batalha acaba (agora é apagado em battleApplyStats, mas
+   os que já existem em produção continuam lá), e quem consultasse com um "since" pequeno recebia
+   o battleId da ÚLTIMA partida jogada. Foi assim que a tela de amigos passou a abrir sozinha uma
+   batalha da noite anterior. Ninguém deveria entrar numa batalha criada minutos atrás: se ela
+   fosse sua e estivesse viva, você já estaria nela. */
+const PONTEIRO_BATALHA_TTL_MS = 5 * 60 * 1000;
+
 exports.pollFriendChallenge = onCall(async (request) => {
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   const uid = request.auth.uid;
   const desde = Number(request.data?.since) || 0;
 
   const ponteiro = await db.collection('onlineBattlePointer').doc(uid).get();
-  if(ponteiro.exists && (ponteiro.data().createdAt || 0) > desde){
+  const criadoEm = ponteiro.exists ? (ponteiro.data().createdAt || 0) : 0;
+  if(criadoEm > desde && Date.now() - criadoEm < PONTEIRO_BATALHA_TTL_MS){
     return { battleId: ponteiro.data().battleId };
   }
   const ptr = await friendChallengePointerRef(uid).get();

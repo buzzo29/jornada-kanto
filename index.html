@@ -14138,6 +14138,10 @@ function pararPollDesafio(){
 
 async function openFriends(){
   game.screen = 'friends';
+  /* "só me interessa batalha criada DAQUI PRA FRENTE". Sem isso o poll do desafio ia com
+     since:0, e o servidor respondia com o ponteiro da ÚLTIMA batalha jogada -- a tela de amigos
+     abria e caía sozinha numa partida de ontem. A fila e o lobby já faziam isso; só aqui faltava. */
+  game.onlineSince = Date.now();
   game.friendsData = null;
   game.friendsError = null;
   game.friendsBusy = null;
@@ -14307,7 +14311,7 @@ function agendarPollDesafio(){
   friendChallengeTimer = setTimeout(async ()=>{
     if(game.screen !== 'friends') return;
     try{
-      const r = await functionsClient.httpsCallable('pollFriendChallenge')({ since: game.onlineSince || 0 });
+      const r = await functionsClient.httpsCallable('pollFriendChallenge')({ since: game.onlineSince || Date.now() });
       if(r.data.battleId){ pararPollDesafio(); game.friendChallenge = null; entrarNaBatalha(r.data.battleId); return; }
       const antes = game.friendChallenge && game.friendChallenge.id;
       game.friendChallenge = r.data.challenge || null;
