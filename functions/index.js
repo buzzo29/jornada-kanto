@@ -498,6 +498,7 @@ function calcDamage(attacker, defender, rng){
   const A = statAtLevel(atkBase, attacker.level);
   const D = statAtLevel(defBase, defender.level);
   const isCrit = rng() < (effectiveSpeed(attacker) / 512);  // crítico oficial da Gen 1
+  attacker.lastCrit = isCrit;   // registro pro log, como o lastMoveType acima
   const Leff = isCrit ? attacker.level*2 : attacker.level;  // crítico dobra o nível na fórmula
   const core = Math.floor(Math.floor(2*Leff/5 + 2) * MOVE_POWER * A / D / 50) + 2;
   // multiplicador de tipo COMPRIMIDO (^0.6): 2x vira ~1.5x. Aqui não se troca de pokémon no meio
@@ -512,7 +513,13 @@ function calcDamage(attacker, defender, rng){
   return Math.max(1, Math.round(pct * defMaxHp));
 }
 const DYING_BLOW_FACTOR = 0.5; // golpe moribundo: quem cai ainda conecta o contra-golpe, só que enfraquecido
-function doExchange(active, enemy, rng){
+/* O 4º parâmetro é o DIÁRIO da luta: um registro por golpe, na ordem em que aconteceram, pro log
+   conseguir contar o passo a passo. É só escrita -- nada aqui é lido de volta pelo motor, e passar
+   ou não passar o array não muda um ponto de dano.
+   Chaves curtas porque isso é gravado no Firestore junto com a batalha:
+   q = quem bateu ('p' = o lado do jogador no confronto, 'e' = o outro), d = dano,
+   hp = como o alvo ficou, c = foi crítico, m = foi golpe moribundo (o contra-golpe de quem caiu). */
+function doExchange(active, enemy, rng, diario){
   // Os DOIS sempre atacam em toda troca -- a velocidade (Gen 1 real) só decide QUEM conecta primeiro.
   // Se o primeiro golpe nocauteia, o caído ainda responde com o "golpe moribundo" (reduzido, nunca
   // cancelado). Isso impede que um pokémon raspando de HP varra uma fila inteira só por ser mais rápido.
@@ -533,6 +540,14 @@ function doExchange(active, enemy, rng){
     counter = Math.max(1, Math.round(counter * DYING_BLOW_FACTOR));
   }
   first.hp = Math.max(0, first.hp - counter);
+  if(diario){
+    /* O dano registrado é o que SAIU DE VERDADE da vida do alvo, não o número que a fórmula
+       sorteou: um golpe de 101 num pokémon com 54 de HP tira 54. Gravar o valor cru fazia o log
+       não fechar -- somando as linhas dava mais dano do que o pokémon tinha de vida. */
+    const moribundo = counter !== dmgBySecond;
+    diario.push({ q: activeFirst?'p':'e', d: secondHpBefore - second.hp, hp: second.hp, c: first.lastCrit?1:0, m:0 });
+    diario.push({ q: activeFirst?'e':'p', d: firstHpBefore  - first.hp,  hp: first.hp,  c: second.lastCrit?1:0, m: moribundo?1:0 });
+  }
   // EMPATE NÃO EXISTE: se o golpe moribundo também derrubaria o primeiro, fica de pé quem tinha o
   // MAIOR percentual de HP entrando na troca, com 1%-10% do HP máximo (sorteado). Percentual igual
   // (ex: os dois cheios na primeira troca) favorece quem conectou primeiro.
@@ -546,6 +561,13 @@ function doExchange(active, enemy, rng){
     const survivorHpBefore = (survivor === first) ? firstHpBefore : secondHpBefore;
     const pct = 0.01 + rng()*0.09;
     survivor.hp = Math.max(1, Math.min(survivorHpBefore, Math.round(survivor.maxHp * pct)));
+    /* O desempate ressuscita quem sobrou DEPOIS dos dois golpes. Sem corrigir o diário, a última
+       linha do log diria 0 de HP e a barra do mesmo cartão mostraria outro número. */
+    if(diario){
+      const linha = (survivor === second) ? diario[diario.length-2] : diario[diario.length-1];
+      const antes = (survivor === second) ? secondHpBefore : firstHpBefore;
+      if(linha){ linha.hp = survivor.hp; linha.d = antes - survivor.hp; linha.dz = 1; }
+    }
   }
 }
 function simulateGymBattle(team, enemyTeam, rng){
@@ -568,7 +590,8 @@ function simulateGymBattle(team, enemyTeam, rng){
       const enemyHpBefore = enemy.hp;
       const playerAliveBefore = alive.length;
       const enemyAliveBefore = enemyTeam.length - enemyIndex;
-      while(active.hp>0 && enemy.hp>0){ doExchange(active, enemy, rng); }
+      const diario = [];
+      while(active.hp>0 && enemy.hp>0){ doExchange(active, enemy, rng, diario); }
       const enemyFainted = enemy.hp<=0;
       const activeFainted = active.hp<=0;
       // doExchange garante um único sobrevivente por troca -- empate/morte súbita não existem mais
@@ -587,6 +610,7 @@ function simulateGymBattle(team, enemyTeam, rng){
         playerWon,
         // tipo do golpe de cada lado -- o cliente traduz em nome de golpe no log
         playerMove: active.lastMoveType || null, enemyMove: enemy.lastMoveType || null,
+        golpes: diario,   // passo a passo do confronto, na ordem em que aconteceu
         playerHpBefore, playerHpAfter: active.hp, playerMaxHp: active.maxHp,
         enemyHpBefore, enemyHpAfter: enemy.hp, enemyMaxHp: enemy.maxHp,
         playerAliveBefore, playerAliveAfter, playerTeamSize: team.length,
@@ -3774,7 +3798,8 @@ function battleResolveMatchup(estado, rng){
   const aHpAntes = a.hp, bHpAntes = b.hp;
   const aVivosAntes = estado.aTeam.filter(p=>p.hp>0).length;
   const bVivosAntes = estado.bTeam.filter(p=>p.hp>0).length;
-  while(a.hp>0 && b.hp>0){ doExchange(a, b, rng); }
+  const diario = [];
+  while(a.hp>0 && b.hp>0){ doExchange(a, b, rng, diario); }
   // grava o HP de volta no estado
   estado.aTeam[estado.aCurrent].hp = Math.max(0, a.hp);
   estado.bTeam[estado.bCurrent].hp = Math.max(0, b.hp);
@@ -3790,7 +3815,8 @@ function battleResolveMatchup(estado, rng){
     enemyHpBefore:bHpAntes, enemyHpAfter:Math.max(0,b.hp), enemyMaxHp:b.maxHp,
     playerAliveBefore:aVivosAntes, playerAliveAfter: aCaiu?aVivosAntes-1:aVivosAntes, playerTeamSize:estado.aTeam.length,
     enemyAliveBefore:bVivosAntes, enemyAliveAfter: bCaiu?bVivosAntes-1:bVivosAntes, enemyTeamSize:estado.bTeam.length,
-    playerMove: a.lastMoveType || null, enemyMove: b.lastMoveType || null
+    playerMove: a.lastMoveType || null, enemyMove: b.lastMoveType || null,
+    golpes: diario   // passo a passo do confronto, na ordem em que aconteceu
   };
 }
 

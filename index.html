@@ -836,33 +836,56 @@
      Empilhado, cada lado cabe em duas linhas e o cartão fica em ~80px (era ~150).
      Sem linha de fulano venceu: quem caiu está apagado e com a barra no zero, o que já diz. */
   .matchup-row.mlog{border-bottom:none;background:rgba(26,26,46,.035);border-radius:6px;
-    padding:6px;margin-bottom:6px;}
-  .mlog-lado{display:flex;align-items:center;gap:6px;min-width:0;}
-  .mlog-lado + .mlog-lado{border-top:1px dashed #ddd7c2;margin-top:4px;padding-top:4px;}
+    padding:7px 5px;margin-bottom:6px;}
+  /* os dois de FRENTE UM PRO OUTRO, com o × no meio, como na tela de batalha */
+  .mlog-grade{display:grid;grid-template-columns:1fr auto 1fr;align-items:start;gap:4px;}
+  .mlog-lado{text-align:center;min-width:0;}
   .mlog-lado.caiu{opacity:.45;}
-  .mlog-spr{flex:0 0 auto;line-height:0;}
+  .mlog-spr{line-height:0;}
   /* três seletores porque .sprite-sm .sprite-img vem DEPOIS neste arquivo: com dois, a regra de
      lá (48px) ganhava por empate de especificidade e o cartão ficava 30px mais alto */
-  .mlog-lado .mlog-spr .sprite-img{width:34px;height:34px;}
-  .mlog-info{flex:1;min-width:0;}
-  .mlog-l1{display:flex;align-items:baseline;gap:4px;min-width:0;}
-  .mlog-l2{display:flex;align-items:center;gap:5px;margin-top:2px;min-width:0;}
-  .mlog-nome{font-size:.7rem;font-weight:800;color:var(--ink);line-height:1.2;
+  .mlog-lado .mlog-spr .sprite-img{width:40px;height:40px;}
+  .mlog-nome{font-size:.66rem;font-weight:800;color:var(--ink);line-height:1.2;
     overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .mlog-lv{font-size:.58rem;font-weight:800;color:var(--muted);flex:0 0 auto;}
-  .mlog-hp{margin-left:auto;font-size:.58rem;font-weight:800;color:var(--muted);flex:0 0 auto;}
+  .mlog-lv{font-size:.56rem;font-weight:800;color:var(--muted);}
+  .mlog-hp{font-size:.56rem;font-weight:800;color:var(--muted);}
+  .mlog-x{align-self:center;font-size:.8rem;color:var(--muted);font-weight:800;padding-top:14px;}
   .mlog-res{text-align:center;font-size:.66rem;margin-top:3px;}
-  /* barra curta ao lado do golpe -- mesma marcação e mesmas classes de cor de sempre
-     (renderHpBar). O número fica na linha de cima, então o rótulo dela sai de cena. */
-  .mlog-l2 .hp-bar-wrap{margin:0;flex:0 0 52px;width:52px;}
-  .mlog-l2 .hp-bar-track{height:8px;border-width:1px;border-radius:4px;}
-  .mlog-l2 .hp-bar-label{display:none;}
+  /* barra curta com o número ao lado -- mesma marcação e mesmas classes de cor de sempre
+     (renderHpBar); o rótulo dela sai de cena porque o número já está aqui do lado */
+  .mlog-vida{display:flex;align-items:center;justify-content:center;gap:4px;margin-top:1px;}
+  .mlog-vida .hp-bar-wrap{margin:0;flex:0 0 44px;width:44px;}
+  .mlog-vida .hp-bar-track{height:7px;border-width:1px;border-radius:4px;}
+  .mlog-vida .hp-bar-label{display:none;}
   /* O nome do golpe vai DENTRO do selo do tipo: a cor já diz o tipo, e economiza uma linha.
      Sem o CAIXA ALTA do selo normal: "AVALANCHE DE PEDRAS" quebrava em duas linhas e esticava
      o cartão, e nome de golpe em maiúscula grita. Nome de tipo é rótulo, nome de golpe é nome. */
-  .mlog-l2 .type-pill{font-size:.56rem;padding:2px 6px;margin-right:0;
-    text-transform:none;letter-spacing:0;white-space:nowrap;}
+  .mlog-golpe{display:flex;align-items:center;justify-content:center;gap:4px;
+    margin-top:3px;flex-wrap:wrap;}
+  .mlog-golpe .type-pill{font-size:.55rem;padding:2px 6px;margin-right:0;max-width:100%;
+    text-transform:none;letter-spacing:0;line-height:1.25;}
   .mlog-dano{font-size:.6rem;font-weight:800;color:var(--red-dark);flex:0 0 auto;}
+  /* PASSO A PASSO: uma FRASE por golpe, na ordem em que aconteceram de verdade (matchup.golpes).
+     A primeira versão era em colunas (quem bateu à esquerda, alvo e HP na ponta direita) e ficou
+     ilegível: os dois lados da linha não pareciam ter relação um com o outro. Frase resolve.
+     82% dos confrontos terminam em 4 golpes e 97% em até 6, então a lista quase nunca passa de
+     quatro frases. */
+  .mlog-passos{margin-top:6px;border-top:1px dashed #ddd7c2;padding-top:5px;
+    display:flex;flex-direction:column;gap:3px;}
+  /* Todas as frases centralizadas. A versão anterior encostava cada uma no lado de quem bateu;
+     a alternância mostrava a troca de golpes, mas deixava o bloco em ziguezague. Quem diz de que
+     lado é o golpe continua sendo a COR do nome (verde você, vermelho o adversário). */
+  .mlog-passo{font-size:.62rem;font-weight:600;color:var(--ink);line-height:1.45;text-align:center;}
+  .mlog-passo + .mlog-passo{border-top:1px dotted rgba(26,26,46,.09);padding-top:3px;}
+  /* cada pokémon tem sempre a MESMA cor nas frases -- é o que deixa acompanhar a troca de golpes
+     sem reler o nome inteiro a cada linha */
+  .mlog-quem{font-weight:800;}
+  .mlog-quem.p{color:var(--green-dark);}
+  .mlog-quem.e{color:var(--red-dark);}
+  .mlog-tira{font-weight:800;color:var(--red-dark);}
+  .mlog-passos .type-pill{font-size:.55rem;padding:1px 5px;margin:0;
+    text-transform:none;letter-spacing:0;}
+
   .win-text{color:var(--green-dark);font-weight:800;}
   .lose-text{color:var(--red-dark);font-weight:800;}
   .status-row{
@@ -4209,6 +4232,7 @@ function calcDamageNew(attacker, defender, rng){
   const A = statAtLevel(atkBase, attacker.level);
   const D = statAtLevel(defBase, defender.level);
   const isCrit = rng() < (effectiveSpeed(attacker) / 512); // crítico oficial da Gen 1
+  attacker.lastCrit = isCrit;   // registro pro log, como o lastMoveType acima
   const Leff = isCrit ? attacker.level*2 : attacker.level; // crítico dobra o nível na fórmula (regra oficial)
   const core = Math.floor(Math.floor(2*Leff/5 + 2) * MOVE_POWER * A / D / 50) + 2;
   const typeMult = Math.pow(best.mult, 0.6);
@@ -4229,7 +4253,13 @@ function effText(mult){
 }
 
 const DYING_BLOW_FACTOR = 0.5; // golpe moribundo: quem cai ainda conecta o contra-golpe, só que enfraquecido
-function doExchange(active, enemy, rng){
+/* O 4º parâmetro é o DIÁRIO da luta: um registro por golpe, na ordem em que aconteceram, pro log
+   conseguir contar o passo a passo. É só escrita -- nada aqui é lido de volta pelo motor, e passar
+   ou não passar o array não muda um ponto de dano.
+   Chaves curtas porque isso é gravado no Firestore junto com a batalha:
+   q = quem bateu ('p' = o lado do jogador no confronto, 'e' = o outro), d = dano,
+   hp = como o alvo ficou, c = foi crítico, m = foi golpe moribundo (o contra-golpe de quem caiu). */
+function doExchange(active, enemy, rng, diario){
   rng = rng || Math.random;
   // Os DOIS sempre atacam em toda troca -- a velocidade (Gen 1 real) só decide QUEM conecta primeiro.
   // Se o primeiro golpe nocauteia, o caído ainda responde com o "golpe moribundo" (reduzido, nunca
@@ -4252,6 +4282,14 @@ function doExchange(active, enemy, rng){
     counter = Math.max(1, Math.round(counter * DYING_BLOW_FACTOR));
   }
   first.hp = Math.max(0, first.hp - counter);
+  if(diario){
+    /* O dano registrado é o que SAIU DE VERDADE da vida do alvo, não o número que a fórmula
+       sorteou: um golpe de 101 num pokémon com 54 de HP tira 54. Gravar o valor cru fazia o log
+       não fechar -- somando as linhas dava mais dano do que o pokémon tinha de vida. */
+    const moribundo = counter !== dmgBySecond;
+    diario.push({ q: activeFirst?'p':'e', d: secondHpBefore - second.hp, hp: second.hp, c: first.lastCrit?1:0, m:0 });
+    diario.push({ q: activeFirst?'e':'p', d: firstHpBefore  - first.hp,  hp: first.hp,  c: second.lastCrit?1:0, m: moribundo?1:0 });
+  }
   // EMPATE NÃO EXISTE: se o golpe moribundo também derrubaria o primeiro, fica de pé quem tinha o
   // MAIOR percentual de HP entrando na troca, com 1%-10% do HP máximo (sorteado). Percentual igual
   // (ex: os dois cheios na primeira troca) favorece quem conectou primeiro.
@@ -4265,6 +4303,13 @@ function doExchange(active, enemy, rng){
     const survivorHpBefore = (survivor === first) ? firstHpBefore : secondHpBefore;
     const pct = 0.01 + rng()*0.09;
     survivor.hp = Math.max(1, Math.min(survivorHpBefore, Math.round(survivor.maxHp * pct)));
+    /* O desempate ressuscita quem sobrou DEPOIS dos dois golpes. Sem corrigir o diário, a última
+       linha do log diria 0 de HP e a barra do mesmo cartão mostraria outro número. */
+    if(diario){
+      const linha = (survivor === second) ? diario[diario.length-2] : diario[diario.length-1];
+      const antes = (survivor === second) ? secondHpBefore : firstHpBefore;
+      if(linha){ linha.hp = survivor.hp; linha.d = antes - survivor.hp; linha.dz = 1; }
+    }
   }
 }
 
@@ -4314,7 +4359,8 @@ function simulateGymBattle(team, brockTeam, rng, opts){
       const enemyHpBefore = enemy.hp;
       const playerAliveBefore = alive.length;
       const enemyAliveBefore = brockTeam.length - brockIndex;
-      while(active.hp>0 && enemy.hp>0){ doExchange(active, enemy, rng); }
+      const diario = [];
+      while(active.hp>0 && enemy.hp>0){ doExchange(active, enemy, rng, diario); }
       const enemyFainted = enemy.hp<=0 || Number.isNaN(enemy.hp); // NaN nunca é <=0 -- sem esse OR, um hp corrompido travaria a batalha pra sempre (ninguém nunca "desmaia")
       const activeFainted = active.hp<=0 || Number.isNaN(active.hp);
       // doExchange garante um único sobrevivente por troca -- empate/morte súbita não existem mais
@@ -4333,6 +4379,7 @@ function simulateGymBattle(team, brockTeam, rng, opts){
         playerWon,
         // tipo do golpe de cada lado -- vira nome de golpe no log (ver nomeDoGolpe)
         playerMove: active.lastMoveType || null, enemyMove: enemy.lastMoveType || null,
+        golpes: diario,   // passo a passo do confronto, na ordem em que aconteceu
         playerHpBefore, playerHpAfter: active.hp, playerMaxHp: active.maxHp,
         enemyHpBefore, enemyHpAfter: enemy.hp, enemyMaxHp: enemy.maxHp,
         playerAliveBefore, playerAliveAfter, playerTeamSize: team.length,
@@ -10722,17 +10769,12 @@ function renderMatchupLog(matchups){
     const hp = Math.max(0, m.hp || 0);
     return `<div class="mlog-lado ${hp<=0?'caiu':''}">
       <div class="mlog-spr">${SPECIES[m.sp] ? spriteHtml(m.sp,'sprite-sm',!!m.shiny) : '❔'}</div>
-      <div class="mlog-info">
-        <div class="mlog-l1">
-          <span class="mlog-nome">${escapeHtmlSafe(m.nome||'')}${m.shiny?' 🌟':''}</span>
-          ${m.lvl?`<span class="mlog-lv">Lv.${m.lvl}</span>`:''}
-          <span class="mlog-hp">${hp}/${maxHp} HP</span>
-        </div>
-        <div class="mlog-l2">
-          ${renderHpBar(hp, maxHp, 'mlog-f-'+id, 'mlog-l-'+id)}
-          ${golpeSeloHtml(m.sp, m.tipo)}<span class="mlog-dano">−${m.dano}</span>
-        </div>
+      <div class="mlog-nome">${escapeHtmlSafe(m.nome||'')}${m.shiny?' 🌟':''}${m.lvl?` <span class="mlog-lv">Lv.${m.lvl}</span>`:''}</div>
+      <div class="mlog-vida">
+        ${renderHpBar(hp, maxHp, 'mlog-f-'+id, 'mlog-l-'+id)}
+        <span class="mlog-hp">${hp}/${maxHp}</span>
       </div>
+      ${m.semPassos ? `<div class="mlog-golpe">${golpeSeloHtml(m.sp, m.tipo)}<span class="mlog-dano">−${m.dano}</span></div>` : ''}
     </div>`;
   };
   return matchups.map((m, i)=>{
@@ -10740,16 +10782,64 @@ function renderMatchupLog(matchups){
     const danoDoPlayer = Math.max(0, (m.enemyHpBefore||0) - (m.enemyHpAfter||0));
     const danoDoEnemy  = Math.max(0, (m.playerHpBefore||0) - (m.playerHpAfter||0));
     const aviso = suddenDeathNote(m);
+    /* Com o passo a passo embaixo, o selo do golpe no cabeçalho vira repetição: o golpe aparece
+       em toda frase. Ele só continua aparecendo em confronto ANTIGO, gravado antes do diário
+       existir -- ali é a única forma de saber com o que cada um bateu. */
+    const semPassos = !(m.golpes && m.golpes.length);
     return `<div class="matchup-row mlog">
-      ${lado({ nome:m.player, sp:m.playerSpecies, lvl:m.playerLevel, shiny:m.playerShiny,
-               hp:m.playerHpAfter, hpBefore:m.playerHpBefore, maxHp:m.playerMaxHp,
-               tipo:m.playerMove, dano:danoDoPlayer }, i+'a')}
-      ${lado({ nome:m.enemy, sp:m.enemySpecies, lvl:m.enemyLevel, shiny:m.enemyShiny,
-               hp:m.enemyHpAfter, hpBefore:m.enemyHpBefore, maxHp:m.enemyMaxHp,
-               tipo:m.enemyMove, dano:danoDoEnemy }, i+'b')}
+      <div class="mlog-grade">
+        ${lado({ nome:m.player, sp:m.playerSpecies, lvl:m.playerLevel, shiny:m.playerShiny,
+                 hp:m.playerHpAfter, hpBefore:m.playerHpBefore, maxHp:m.playerMaxHp,
+                 tipo:m.playerMove, dano:danoDoPlayer, semPassos }, i+'a')}
+        <span class="mlog-x">×</span>
+        ${lado({ nome:m.enemy, sp:m.enemySpecies, lvl:m.enemyLevel, shiny:m.enemyShiny,
+                 hp:m.enemyHpAfter, hpBefore:m.enemyHpBefore, maxHp:m.enemyMaxHp,
+                 tipo:m.enemyMove, dano:danoDoEnemy, semPassos }, i+'b')}
+      </div>
+      ${passosHtml(m)}
       ${aviso ? `<div class="mlog-res">${aviso}</div>` : ''}
     </div>`;
   }).join('');
+}
+/* O passo a passo do confronto, na ordem real em que os golpes aconteceram.
+   Vem de matchup.golpes, escrito pelo motor durante a luta -- não é reconstrução.
+   ATENÇÃO: a ANIMAÇÃO da batalha usa outra coisa (buildAnimatedHitSequence, que inventa até 3
+   golpes a partir do HP antes/depois). Então o número de golpes aqui pode não bater com o que a
+   animação mostrou. Confronto antigo, gravado antes disso, não tem a lista e o bloco some. */
+/* O GOLPE MORIBUNDO NÃO VIRA LINHA.
+   Regra do motor: na troca os dois atacam, e quem cai ainda conecta o contra-golpe pela metade
+   (DYING_BLOW_FACTOR). Isso é real e o dano conta -- mas a ANIMAÇÃO nunca mostra um pokémon
+   desmaiado batendo, e no log, escrito como linha própria, parecia defunto atacando.
+   Aqui o dano dele é somado ao golpe ANTERIOR do mesmo pokémon: o log passa a ter as mesmas
+   linhas que a animação mostrou e continua fechando com o HP do cartão (a soma das linhas
+   permanece igual ao HP perdido). Se não existir golpe anterior (o pokémon entrou e caiu na
+   mesma troca), ele entra como golpe normal ANTES do que derrubou -- os dois trocaram golpes
+   na mesma troca, então essa é a ordem que a tela mostrou. */
+function passosVisiveis(golpes){
+  const saida = [];
+  for(const g of golpes){
+    if(!g.m){ saida.push(Object.assign({}, g)); continue; }
+    const anterior = [...saida].reverse().find(x => x.q === g.q);
+    if(anterior){ anterior.d += g.d; continue; }
+    const derrubou = saida.pop();
+    saida.push(Object.assign({}, g, { m: 0 }));
+    if(derrubou) saida.push(derrubou);
+  }
+  return saida;
+}
+function passosHtml(m){
+  const golpes = passosVisiveis(m.golpes || []);
+  if(!golpes.length) return '';
+  const nomeP = escapeHtmlSafe(m.player||''), nomeE = escapeHtmlSafe(m.enemy||'');
+  return `<div class="mlog-passos">${golpes.map(g=>{
+    const doJogador = g.q === 'p';
+    const quem  = `<span class="mlog-quem ${doJogador?'p':'e'}">${doJogador?nomeP:nomeE}</span>`;
+    const alvo  = `<span class="mlog-quem ${doJogador?'e':'p'}">${doJogador?nomeE:nomeP}</span>`;
+    const golpe = golpeSeloHtml(doJogador?m.playerSpecies:m.enemySpecies, doJogador?m.playerMove:m.enemyMove);
+    return `<div class="mlog-passo ${doJogador?'p':'e'}">
+      ${quem} atacou ${alvo}${golpe?` com ${golpe}`:''} e tirou <span class="mlog-tira">−${g.d}</span> de HP.
+    </div>`;
+  }).join('')}</div>`;
 }
 
 function renderHpBar(hp, maxHp, fillId, labelId){
@@ -13445,6 +13535,8 @@ function virarMatchup(m){
     enemyHpBefore:m.playerHpBefore, enemyHpAfter:m.playerHpAfter, enemyMaxHp:m.playerMaxHp,
     enemyAliveBefore:m.playerAliveBefore, enemyAliveAfter:m.playerAliveAfter,
     enemyTeamSize:m.playerTeamSize,
+    // o passo a passo também troca de lado: 'p' e 'e' são relativos a quem está lendo
+    golpes: (m.golpes||[]).map(g => Object.assign({}, g, { q: g.q==='p'?'e':'p' })),
     playerWon: m.isTrade ? false : !m.playerWon
   });
 }

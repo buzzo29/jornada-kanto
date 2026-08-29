@@ -69,6 +69,27 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
   redutor 0,85.
 - Teto de nível: **99** (`MAX_POKEMON_LEVEL`).
 
+## Log de batalha
+
+- O matchup carrega **`golpes`**: o diário do confronto, um registro por golpe na ordem real,
+  escrito por `doExchange`. Não é reconstrução — o motor anota enquanto luta. Só apresentação:
+  passar ou não o array não muda um ponto de dano (conferido por hash, 14.645 confrontos).
+- **O dano gravado é o EFETIVO, não o sorteado.** Golpe de 101 em quem tem 54 de HP entra como 54.
+  Com o valor cru o log não fechava: somando as linhas dava mais dano do que o pokémon tinha.
+- O **golpe moribundo** (quem cai ainda conecta o contra-golpe, enfraquecido) **não vira linha**:
+  o dano dele é somado ao golpe anterior do mesmo pokémon (`passosVisiveis`, só no cliente). A
+  animação nunca mostra desmaiado batendo, então uma linha própria pra ele — em qualquer redação —
+  lia como bug. Foi reportado duas vezes. A soma das linhas continua igual ao HP perdido; sem
+  golpe anterior (entrou e caiu na mesma troca, 15% dos casos), ele entra como golpe normal ANTES
+  do que derrubou, que é a ordem que a tela mostrou.
+- **A ANIMAÇÃO não usa esse diário.** Ela reconstrói até 3 golpes a partir do HP antes/depois
+  (`buildAnimatedHitSequence`), então mostra outra coisa: medido em 3.847 confrontos, a contagem
+  de golpes bate em só **31%** dos casos (real 3,52 de média; animação 2,62). Sincronizar exige
+  aumentar o `BATTLE_ANIM_MS` da batalha online (5,2s hoje, calibrado pro teto de 3 golpes).
+- Nomes de golpe (`MOVE_BY_TYPE` + `MOVE_OVERRIDES`, 150 espécies / 294 combinações) vivem **só no
+  cliente**. O servidor manda o TIPO; o cliente escolhe a palavra. É o que evita mais uma tabela
+  duplicada pra sair de sincronia.
+
 ## Progressão da jornada
 
 - Distribuição de níveis trava em **55**; acima disso só desmaio, Bônus de Kanto e Doce Raro.
