@@ -3402,22 +3402,37 @@ exports.startTrainerTowerRun = onCall(async (request) => {
     const s = doc.data() || {};
     const badges = (typeof s.badgeCount === 'number') ? s.badgeCount : ((s.badgesEarned||[]).length);
     if(badges < 8) return;                       // só time que terminou a jornada
-    for(const p of (s.team || [])) disponiveis.push(p);
+    // guarda DE ONDE veio: é isso que separa dois xarás de mesmo nível em saves diferentes
+    (s.team || []).forEach((p, i) => disponiveis.push({ slot: doc.id, idx: i, mon: p }));
   });
   if(!disponiveis.length){
     throw new HttpsError('failed-precondition', 'Você precisa de pelo menos um save com as 8 insígnias.');
   }
 
+  /* Achar O POKÉMON escolhido, não um xará. A busca por espécie+nível pegava o PRIMEIRO que
+     casasse: quem tinha o mesmo pokémon no mesmo nível em dois saves, um shiny e um normal,
+     escolhia o shiny e entrava na torre com o normal -- o shiny sumia na hora da batalha.
+     Agora vai do mais específico pro mais genérico, e os dois últimos níveis existem só pra
+     não quebrar quem estiver com o cliente antigo em cache (ele manda só espécie e nível). */
   const time = [];
   const jaUsados = new Set();
+  const procurar = (teste) => disponiveis.findIndex((d, i) => !jaUsados.has(i) && d.mon && teste(d));
   for(const pedido of escolhidos){
-    const idx = disponiveis.findIndex((p, i) =>
-      !jaUsados.has(i) && p && p.speciesId === pedido.speciesId && p.level === pedido.level);
+    const mesmaEspecie = (d) => d.mon.speciesId === pedido.speciesId && d.mon.level === pedido.level;
+    let idx = -1;
+    if(pedido.monId) idx = procurar(d => d.mon.id === pedido.monId);
+    if(idx < 0 && pedido.slot != null && Number.isInteger(pedido.idx)){
+      idx = procurar(d => String(d.slot) === String(pedido.slot) && d.idx === pedido.idx && mesmaEspecie(d));
+    }
+    if(idx < 0 && typeof pedido.shiny === 'boolean'){
+      idx = procurar(d => mesmaEspecie(d) && !!d.mon.shiny === pedido.shiny);
+    }
+    if(idx < 0) idx = procurar(mesmaEspecie);
     if(idx < 0){
       throw new HttpsError('failed-precondition', 'Um dos pokémon escolhidos não está em nenhum time seu com 8 insígnias.');
     }
     jaUsados.add(idx);
-    const real = disponiveis[idx];
+    const real = disponiveis[idx].mon;
     time.push({ speciesId: real.speciesId, level: real.level, shiny: !!real.shiny });
   }
 

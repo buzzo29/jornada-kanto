@@ -126,6 +126,12 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
 - Times de 6 evoluções finais, níveis espalhados ±3 com os dois extremos garantidos.
 - Mewtwo e Eevee fora do pool.
 - Recompensa: 1 Doce Raro por torre vencida (+1 nível num pokémon). Creditado no servidor.
+- **O time da subida é procurado por IDENTIDADE, não por espécie+nível.** A busca antiga pegava o
+  primeiro que casasse: quem tinha o mesmo pokémon no mesmo nível em dois saves (um shiny, um
+  normal) escolhia o shiny e subia com o normal — perdendo o visual E o buff de 1,20×. O cliente
+  manda `monId`/`slot`/`idx`/`shiny` e o servidor vai do mais específico pro mais genérico;
+  os dois últimos níveis existem só pra não quebrar cliente antigo em cache.
+  `node tools/test-torre.js` cobre os dois lados (escolher o shiny e escolher o normal).
 
 ## Batalha Online
 

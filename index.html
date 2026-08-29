@@ -12993,7 +12993,9 @@ function towerEligiblePokemon(){
     if(!s) continue;
     const badges = (typeof s.badgeCount==='number') ? s.badgeCount : ((s.badgesEarned||[]).length);
     if(badges < 8) continue;
-    (s.team||[]).forEach((p, i) => out.push({ slot, idx:i, speciesId:p.speciesId, level:p.level, shiny:!!p.shiny, teamName: s.customName || ('Time '+(slot+1)) }));
+    // monId identifica O POKÉMON, não a espécie: é ele que o servidor usa pra achar exatamente
+    // este bicho, e não um xará de mesmo nível guardado em outro save
+    (s.team||[]).forEach((p, i) => out.push({ slot, idx:i, monId: p.id || null, speciesId:p.speciesId, level:p.level, shiny:!!p.shiny, teamName: s.customName || ('Time '+(slot+1)) }));
   }
   return out;
 }
@@ -13014,7 +13016,11 @@ async function startTowerRun(){
   game.towerLoading = true; game.towerError = null; render();
   try{
     const r = await functionsClient.httpsCallable('startTrainerTowerRun')({
-      team: game.towerPick.map(p => ({ speciesId:p.speciesId, level:p.level }))
+      /* Manda a identidade completa, não só espécie+nível: com dois saves tendo o MESMO pokémon
+         no MESMO nível, o servidor pegava o primeiro que casasse -- e quem escolheu o shiny
+         entrava na torre com o normal. */
+      team: game.towerPick.map(p => ({ speciesId:p.speciesId, level:p.level,
+                                       slot:p.slot, idx:p.idx, monId:p.monId, shiny:!!p.shiny }))
     });
     game.tower.run = r.data.run;
     game.towerPick = [];

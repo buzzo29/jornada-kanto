@@ -71,7 +71,9 @@ function collRef(parts, filtros, limite){
         if(ok) docs.push({ id, ref: docRef(parts.concat([id])), data(){ return clone(dados); }, exists:true });
       }
       if(limite) docs = docs.slice(0, limite);
-      return { docs, size: docs.length, empty: docs.length === 0 };
+      // forEach existe no QuerySnapshot de verdade e o código de produção usa (startTrainerTowerRun)
+      return { docs, size: docs.length, empty: docs.length === 0,
+               forEach(fn){ docs.forEach(fn); } };
     }
   };
 }
