@@ -4125,7 +4125,7 @@ const USE_SUBTYPES = true;
    Vale tanto na ESCOLHA do tipo quanto no dano final -- se entrasse só num dos dois, o motor
    escolheria um golpe e aplicaria outro. */
 const SUBTYPE_PENALTY = 0.85;
-const SUBTYPES = {"charmander":["Normal"],"charmeleon":["Normal"],"squirtle":["Normal"],"wartortle":["Normal"],"blastoise":["Normal"],"butterfree":["Psychic"],"pikachu":["Normal"],"sandshrew":["Poison"],"sandslash":["Poison"],"nidoranf":["Fighting"],"nidorina":["Fighting"],"nidoqueen":["Fighting"],"nidoranm":["Fighting"],"nidorino":["Fighting"],"nidoking":["Fighting"],"vulpix":["Normal"],"ninetales":["Normal"],"zubat":["Bug"],"golbat":["Bug"],"venonat":["Psychic"],"venomoth":["Psychic"],"psyduck":["Normal","Psychic"],"golduck":["Normal","Psychic"],"growlithe":["Normal"],"arcanine":["Normal"],"poliwag":["Normal"],"poliwhirl":["Normal"],"ponyta":["Normal"],"rapidash":["Normal"],"slowpoke":["Normal"],"slowbro":["Normal"],"magnemite":["Normal"],"magneton":["Normal"],"seel":["Ice","Normal"],"dewgong":["Normal"],"shellder":["Ice","Normal"],"cloyster":["Normal"],"gastly":["Psychic"],"haunter":["Psychic"],"gengar":["Psychic"],"drowzee":["Normal"],"hypno":["Normal"],"krabby":["Normal"],"kingler":["Normal"],"voltorb":["Normal"],"electrode":["Normal"],"exeggcute":["Normal"],"exeggutor":["Normal"],"hitmonchan":["Electric","Fire","Ice"],"tangela":["Normal"],"goldeen":["Flying","Normal"],"seaking":["Flying","Normal"],"staryu":["Normal"],"starmie":["Normal"],"mrmime":["Normal"],"jynx":["Ghost","Normal"],"electabuzz":["Normal"],"magmar":["Poison"],"magikarp":["Normal"],"lapras":["Normal"],"vaporeon":["Ice","Normal"],"jolteon":["Bug","Fighting","Normal"],"flareon":["Normal","Poison"],"porygon":["Psychic"],"kabuto":["Grass"],"kabutops":["Grass"],"dratini":["Normal"],"dragonair":["Normal"],"mewtwo":["Normal"]};
+const SUBTYPES = {"charmander":["Normal"],"charmeleon":["Normal"],"squirtle":["Normal"],"wartortle":["Normal"],"blastoise":["Normal"],"butterfree":["Psychic"],"pikachu":["Normal"],"raichu":["Normal"],"sandshrew":["Poison"],"sandslash":["Poison"],"nidoranf":["Fighting"],"nidorina":["Fighting"],"nidoqueen":["Fighting"],"nidoranm":["Fighting"],"nidorino":["Fighting"],"nidoking":["Fighting"],"vulpix":["Normal"],"ninetales":["Normal"],"zubat":["Bug"],"golbat":["Bug"],"venonat":["Psychic"],"venomoth":["Psychic"],"psyduck":["Normal","Psychic"],"golduck":["Normal","Psychic"],"growlithe":["Normal"],"arcanine":["Normal"],"poliwag":["Normal"],"poliwhirl":["Normal"],"ponyta":["Normal"],"rapidash":["Normal"],"slowpoke":["Normal"],"slowbro":["Normal"],"magnemite":["Normal"],"magneton":["Normal"],"seel":["Ice","Normal"],"dewgong":["Normal"],"shellder":["Ice","Normal"],"cloyster":["Normal"],"gastly":["Psychic"],"haunter":["Psychic"],"gengar":["Psychic"],"drowzee":["Normal"],"hypno":["Normal"],"krabby":["Normal"],"kingler":["Normal"],"voltorb":["Normal"],"electrode":["Normal"],"exeggcute":["Normal"],"exeggutor":["Normal"],"hitmonchan":["Electric","Fire","Ice"],"tangela":["Normal"],"goldeen":["Flying","Normal"],"seaking":["Flying","Normal"],"staryu":["Normal"],"starmie":["Normal"],"mrmime":["Normal"],"jynx":["Ghost","Normal"],"electabuzz":["Normal"],"magmar":["Poison"],"magikarp":["Normal"],"lapras":["Normal"],"vaporeon":["Ice","Normal"],"jolteon":["Bug","Fighting","Normal"],"flareon":["Normal","Poison"],"porygon":["Psychic"],"kabuto":["Grass"],"kabutops":["Grass"],"dratini":["Normal"],"dragonair":["Normal"],"mewtwo":["Normal"]};
 function subtiposDe(p){
   if(!USE_SUBTYPES) return [];
   return SUBTYPES[p.speciesId] || [];
@@ -5592,6 +5592,20 @@ function animatePartialHpBars(){
   if(label){ label.textContent = `${Math.max(0,currentHp)}/${maxHp} HP`; }
 }
 function buildAnimatedHitSequence(m){
+  /* SE O CONFRONTO TROUXE O DIÁRIO, a animação mostra A LUTA QUE ACONTECEU -- os mesmos golpes,
+     na mesma ordem, que o log lista embaixo. Passa pelo passosVisiveis pra o golpe moribundo ser
+     dobrado igual lá: animação e log contando histórias diferentes é pior que qualquer uma das
+     duas sozinha.
+     Antes isso aqui INVENTAVA até 3 golpes a partir do HP antes/depois. Medido em 3.847
+     confrontos: batia com a realidade em 31% deles -- o jogador via 3 golpes e lia 7 linhas.
+     Confronto gravado ANTES do diário (ligas e reprises antigas) continua caindo na
+     reconstrução, que segue logo abaixo. */
+  const reais = passosVisiveis(m.golpes || []);
+  if(reais.length){
+    // no diário 'q' é QUEM BATEU; aqui 'side' é QUEM APANHA -- por isso a troca
+    return reais.map(g => ({ side: g.q === 'p' ? 'enemy' : 'player', amount: g.d }));
+  }
+  // ---- daqui pra baixo: reconstrução, só pra confronto sem diário ----
   // já sabemos o resultado final (quem vence e com quanto HP fica) -- essa função só decide COMO
   // chegar visualmente até lá, usando no máximo 3 golpes na animação:
   //   1) o vencedor acerta uma parte do perdedor (entre 1% e 99% do dano total que o perdedor vai
@@ -10641,7 +10655,7 @@ const MOVE_OVERRIDES = {
   fearow:{Normal:'Ataque Fúria', Flying:'Bicada Broca'},
   ekans:{Poison:'Ferrão Venenoso'}, arbok:{Poison:'Ácido'},
   pikachu:{Electric:'Choque do Trovão', Normal:'Ataque Rápido'},
-  raichu:{Electric:'Raio'},
+  raichu:{Electric:'Raio', Normal:'Golpe de Corpo'},
   sandshrew:{Ground:'Cavar', Poison:'Ferrão Venenoso'},
   sandslash:{Ground:'Fissura', Poison:'Ferrão Venenoso'},
   nidoranf:{Poison:'Ferrão Venenoso', Fighting:'Chute Duplo'},
@@ -13442,9 +13456,21 @@ function iniciarAnimacaoOnline(m){
     playerWon: !m.playerWon && !m.isTrade, isTrade: m.isTrade
   };
   const meuNome = (st.eu.time[st.eu.atual] || {}).name || 'seu pokémon';
+  const seq = buildAnimatedHitSequence(meuM);
+  /* ORÇAMENTO DE TEMPO -- só no online. O servidor reserva BATTLE_ANIM_MS (5,2s) antes de abrir a
+     janela de escolha, e desde que a animação passou a mostrar a luta REAL ela pode ser longa:
+     medido em 2.888 confrontos, a mediana é 2,1s, mas a cauda chega a 10,7s (0,2% passam de 5,2s).
+     Estourando o tempo, o painel de escolha aparece com o cronômetro no fim e a pessoa perde a
+     escolha. Quando não cabe, cada golpe anima proporcionalmente mais rápido -- a luta continua
+     sendo a mesma, só passa depressa. Na jornada não existe esse limite: lá ninguém está esperando. */
+  const previsto = seq.reduce((acc,h)=>{
+    const maxHp = h.side==='player' ? meuM.playerMaxHp : meuM.enemyMaxHp;
+    return acc + hpBarTransitionMs((h.amount/Math.max(1,maxHp))*100) + 260;
+  }, 0);
   game.onlineAnim = {
     m: meuM,
-    seq: buildAnimatedHitSequence(meuM),
+    seq,
+    fator: previsto > ORCAMENTO_ANIM_ONLINE_MS ? ORCAMENTO_ANIM_ONLINE_MS/previsto : 1,
     passo: 0,
     meuHp: meuM.playerHpBefore,
     deleHp: meuM.enemyHpBefore,
@@ -13461,6 +13487,7 @@ function iniciarAnimacaoOnline(m){
   }, ANUNCIO_MS);
 }
 const ANUNCIO_MS = 1000;
+const ORCAMENTO_ANIM_ONLINE_MS = 4500;   // cabe nos 5,2s que o servidor reserva, com folga
 function proximoGolpeOnline(){
   const a = game.onlineAnim;
   if(!a || game.screen !== 'onlineFight') return;
@@ -13478,9 +13505,10 @@ function proximoGolpeOnline(){
   else a.deleHp = Math.max(0, a.deleHp - hit.amount);
   const maxHp = meuLevaDano ? a.m.playerMaxHp : a.m.enemyMaxHp;
   const hpAgora = meuLevaDano ? a.meuHp : a.deleHp;
-  const dur = hpBarTransitionMs((hit.amount / maxHp) * 100);   // mesma curva de tempo do jogo
+  // mesma curva de tempo do jogo, encolhida pelo fator quando a luta é longa demais pra janela
+  const dur = Math.max(60, Math.round(hpBarTransitionMs((hit.amount / maxHp) * 100) * (a.fator||1)));
   atualizaBarra(meuLevaDano ? 'eu' : 'ele', hpAgora, maxHp, dur);
-  onlineAnimTimer = setTimeout(proximoGolpeOnline, dur + 260);
+  onlineAnimTimer = setTimeout(proximoGolpeOnline, dur + Math.round(260 * (a.fator||1)));
 }
 // atualiza só a barra, direto no DOM e com transição CSS -- igual às outras batalhas.
 // Redesenhar a tela a cada golpe faria os sprites piscarem

@@ -79,8 +79,10 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
 - Os buffs entram por `withBuffs()`, chamada pelas cinco `effective*`. **Existe uma cópia em cada
   arquivo e elas têm que ser idênticas, inclusive na ordem de arredondamento** (shiny → terreno).
   `applyTerrainBuff` só marca a flag — nunca mutar atributo, senão o bônus aplica duas vezes.
-- Subtipos: 69 espécies atacam por um tipo alternativo quando rende mais dano. Sem STAB, com
-  redutor 0,85.
+- Subtipos: 70 espécies atacam por um tipo alternativo quando rende mais dano. Sem STAB, com
+  redutor 0,85. O Raichu entrou na lista quando a imunidade voltou a valer 0: Elétrico é o único
+  tipo com imunidade cujo dono não tinha alternativa, e sem Normal ele ficava com 1 de dano por
+  golpe contra qualquer pokémon de Terra.
 - Teto de nível: **99** (`MAX_POKEMON_LEVEL`).
 
 ## Log de batalha
@@ -96,10 +98,15 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
   lia como bug. Foi reportado duas vezes. A soma das linhas continua igual ao HP perdido; sem
   golpe anterior (entrou e caiu na mesma troca, 15% dos casos), ele entra como golpe normal ANTES
   do que derrubou, que é a ordem que a tela mostrou.
-- **A ANIMAÇÃO não usa esse diário.** Ela reconstrói até 3 golpes a partir do HP antes/depois
-  (`buildAnimatedHitSequence`), então mostra outra coisa: medido em 3.847 confrontos, a contagem
-  de golpes bate em só **31%** dos casos (real 3,52 de média; animação 2,62). Sincronizar exige
-  aumentar o `BATTLE_ANIM_MS` da batalha online (5,2s hoje, calibrado pro teto de 3 golpes).
+- **A animação mostra o mesmo diário.** `buildAnimatedHitSequence` devolve os golpes reais (pelo
+  `passosVisiveis`, pra dobrar o moribundo igual ao log); a reconstrução antiga — até 3 golpes
+  inventados a partir do HP antes/depois — virou fallback pra confronto gravado antes do diário.
+  Enquanto as duas coexistiram, a contagem batia em só 31% dos confrontos, e o jogador via 3
+  golpes na tela e lia 7 linhas no log.
+- **A animação ONLINE tem orçamento de tempo** (`ORCAMENTO_ANIM_ONLINE_MS`, 4,5s): o servidor
+  reserva 5,2s antes de abrir a janela de escolha, e luta real longa estourava isso — medido, a
+  mediana é 2,1s mas a cauda ia a 18s. Passando do orçamento, cada golpe anima proporcionalmente
+  mais rápido. Na jornada não existe orçamento: lá ninguém está esperando o outro lado.
 - Nomes de golpe (`MOVE_BY_TYPE` + `MOVE_OVERRIDES`, 150 espécies / 294 combinações) vivem **só no
   cliente**. O servidor manda o TIPO; o cliente escolhe a palavra. É o que evita mais uma tabela
   duplicada pra sair de sincronia.
