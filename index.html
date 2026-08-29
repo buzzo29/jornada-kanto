@@ -983,6 +983,197 @@
   }
   .home-menu-card.pokedex{border-top-color:var(--red);}
   .home-menu-card.achievements{border-top-color:var(--yellow);}
+  .home-menu-card.friends{border-top-color:var(--blue,#3b6ef2);}
+  /* Com o terceiro card a linha aperta: em 320px o padding lateral de 8px sobrava mais que o
+     texto. Testar em 320, não só em 390 -- "Conquistas" é a palavra que estoura primeiro. */
+  .home-menu-card{padding-left:4px;padding-right:4px;}
+  .home-menu-card .home-menu-icon{position:relative;}
+  @media (max-width:360px){
+    .home-menu-row{gap:6px;}
+    .home-menu-title{font-size:.55rem;}
+    .home-menu-stat{font-size:.56rem;line-height:1.25;}
+  }
+
+  /* ---- MAPA DE KANTO ---- */
+  .kanto-moldura{ padding:8px; background:#0d1f30; border-color:#22405c; }
+  .kanto-map{ display:block; width:100%; height:auto; border-radius:3px; }
+  .km-terra{ fill:#2e6b46; stroke:#8fd6a6; stroke-width:2; }
+  /* trecho percorrido: linha cheia e discreta. O trecho ATUAL é pontilhado e anda --
+     é o único elemento animado do mapa, então o olho vai direto pra ele */
+  .km-trecho{ fill:none; stroke:#ffd76e; stroke-width:3; stroke-linecap:round; opacity:.85; }
+  .km-trecho.km-atual{ stroke:#fff; stroke-dasharray:7 7; opacity:1; animation:km-anda 1.1s linear infinite; }
+  @keyframes km-anda{ to{ stroke-dashoffset:-28; } }
+  .km-rota-disco{ fill:#12283d; stroke:#ffd76e; stroke-width:1.5; }
+  .km-ponto{ stroke:#0d1f30; stroke-width:2.5; }
+  /* cidade por descobrir é um ponto PEQUENO. Com o mesmo raio das outras, o começo da jornada
+     mostrava nove círculos escuros no meio do verde e o mapa parecia furado. */
+  .km-cidade.km-longe .km-ponto{ stroke-width:1.5; }
+  .km-nome{
+    font-family:var(--font-ui); font-size:9px; font-weight:800; fill:#e8f2ff;
+    /* halo escuro desenhado ATRÁS do preenchimento -- sem paint-order o contorno cobre a letra */
+    stroke:#0b1a28; stroke-width:2.5; paint-order:stroke fill;
+  }
+  .km-cidade.km-longe .km-nome{ fill:#6d829a; }
+  .km-cidade.km-longe{ opacity:.65; }
+  .km-alvo .km-ponto{ stroke:#fff; stroke-width:3; }
+  /* o pulso é o "você está indo pra cá". Sem ele, a cidade atual some no meio das outras */
+  .km-pulso{ opacity:.35; transform-origin:center; animation:km-pulsa 1.6s ease-out infinite; }
+  @keyframes km-pulsa{ 0%{ opacity:.45; r:11; } 100%{ opacity:0; r:20; } }
+  @media (prefers-reduced-motion:reduce){
+    .km-trecho.km-atual, .km-pulso{ animation:none; }
+    .km-pulso{ opacity:.3; }
+  }
+  .kanto-abertura h2{ margin-top:0; }
+
+  /* trilha de insígnias: a leitura linear que o mapa não dá */
+  .kanto-trilha{ margin:0 0 14px; }
+  .kanto-trilha.compacta{ margin-bottom:10px; }
+  .kt-selos{ display:flex; align-items:center; justify-content:center; gap:2px; }
+  .kt-selo{
+    width:28px; height:28px; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center;
+    font-size:.8rem; border-radius:50%;
+    background:var(--kt-cor); border:2px solid var(--box-border);
+  }
+  /* insígnia que falta some pra escala de cinza em vez de sumir: o lugar dela continua
+     na fila, então dá pra contar quantas faltam sem ler número nenhum */
+  .kt-selo.falta{ filter:grayscale(1); opacity:.35; }
+  .kt-selo.atual{ box-shadow:0 0 0 3px #fff; transform:scale(1.12); }
+  .kt-liga{ width:8px; height:3px; background:var(--box-border); opacity:.5; flex-shrink:0; }
+  /* a trilha fica FORA de qualquer .box, direto sobre o fundo escuro do app -- por isso a
+     legenda usa tons claros. Com var(--muted)/var(--ink) ela sumia no próprio fundo. */
+  .kt-legenda{ text-align:center; margin-top:6px; font-size:.62rem; font-weight:700; color:#9db4cc; }
+  .kt-legenda strong{ color:var(--yellow); }
+  @media (max-width:360px){
+    .kt-selo{ width:24px; height:24px; font-size:.7rem; }
+    .kt-liga{ width:5px; }
+  }
+  .kanto-abrir{ margin-top:4px; }
+
+  .kanto-diario{ margin-top:10px; }
+  .kanto-diario-l{ font-size:.55rem; font-weight:800; color:var(--muted); letter-spacing:.05em; margin-bottom:5px; }
+  .kanto-diario-linha{
+    display:flex; align-items:center; gap:7px; padding:4px 0;
+    font-size:.65rem; font-weight:700; border-top:2px solid var(--box-border);
+  }
+  .kd-icone{ font-size:.9rem; }
+  .kd-nome{ flex:1; min-width:0; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .kd-destino{ color:var(--muted); font-size:.6rem; white-space:nowrap; }
+
+  /* ---- LISTA DE AMIGOS ---- */
+  /* Uma linha por treinador, como no lobby e pelo mesmo motivo: a lista só serve se der pra ver
+     quem está lá sem rolar. A diferença é que aqui a linha tem 4 ações, então elas são quadradas
+     e do tamanho do dedo (34px) em vez de rótulos escritos. */
+  .friend-lista{display:flex;flex-direction:column;gap:6px;}
+  .friend-row{
+    display:flex;align-items:center;gap:8px;
+    padding:8px 10px;
+    background:var(--box);
+    border:3px solid var(--box-border);
+    border-radius:4px;
+  }
+  .friend-row.enviando{opacity:.55;}
+  .friend-row.pedido{border-left-width:7px;border-left-color:var(--green);}
+  .friend-row.confirmando{border-left-width:7px;border-left-color:var(--red);background:#ffefef;}
+  .friend-row-info{flex:1;min-width:0;}
+  .friend-nome{
+    font-family:var(--font-pixel);font-size:.62rem;color:var(--ink);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  .friend-sub{
+    display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;
+    margin-top:4px;font-size:.6rem;font-weight:700;color:var(--muted);
+  }
+  .friend-sumiu{font-family:var(--font-ui);font-size:.55rem;color:var(--muted);font-weight:700;}
+  .friend-presenca.on{color:var(--green);}
+  .friend-presenca.recente{color:var(--ink);}
+  .friend-presenca.off{opacity:.7;}
+  /* O retrospecto é o número que decide se vale desafiar, então ganha cor: verde quando você está
+     na frente, vermelho quando está atrás. Sem confronto nenhum ele fica apagado em vez de "0×0",
+     que se lê como empate e não como "nunca jogaram". */
+  .fr-h2h{font-weight:800;color:var(--ink);}
+  .fr-h2h.ganhando{color:var(--green);}
+  .fr-h2h.perdendo{color:var(--red);}
+  .fr-h2h.vazio{opacity:.6;font-weight:700;}
+  .friend-acoes{display:flex;gap:4px;flex-shrink:0;}
+  .friend-btn{
+    width:34px;height:34px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:.95rem;line-height:1;
+    background:var(--box);
+    border:3px solid var(--box-border);
+    border-radius:4px;
+    box-shadow:2px 2px 0 rgba(0,0,0,.35);
+    cursor:pointer;font-family:inherit;
+  }
+  .friend-btn:active{transform:translate(1px,1px);box-shadow:1px 1px 0 rgba(0,0,0,.35);}
+  .friend-btn[disabled]{opacity:.4;cursor:default;box-shadow:none;transform:none;}
+  .friend-btn.desafiar{background:#7038f8;color:#fff;}
+  .friend-btn.aceitar{background:var(--green);color:#fff;}
+  .friend-btn.recusar,.friend-btn.remover{background:#f6dede;}
+  .friend-btn.adicionar{background:var(--green);color:#fff;}
+  .friend-tag{font-size:.6rem;font-weight:800;color:var(--muted);white-space:nowrap;}
+  .friend-tag.ok{color:var(--green);}
+
+  .friend-busca-row{display:flex;gap:6px;margin-bottom:8px;}
+  .friend-search-input{
+    flex:1;min-width:0;
+    padding:9px 10px;
+    font-family:var(--font-ui);font-size:.8rem;font-weight:700;
+    border:3px solid var(--box-border);border-radius:4px;background:#fff;
+  }
+  .friend-search-btn{flex:0 0 52px;margin:0;padding:9px 0;}
+
+  /* Desafio: é o único bloco da tela com prazo correndo, então é o único com borda grossa e cor */
+  .friend-challenge{border-left-width:8px;}
+  .friend-challenge.esperando{border-left-color:#7038f8;}
+  .friend-challenge.recebido{border-left-color:var(--green);background:#f0fff0;}
+  .fr-challenge-top{
+    display:flex;align-items:center;justify-content:space-between;gap:8px;
+    font-family:var(--font-pixel);font-size:.62rem;color:var(--ink);margin-bottom:6px;
+  }
+  .friend-challenge-timer{
+    font-family:var(--font-pixel);font-size:.72rem;color:var(--red);
+    flex-shrink:0;font-variant-numeric:tabular-nums;
+  }
+  .fr-challenge-acoes{display:flex;gap:8px;}
+  .fr-challenge-acoes .btn{flex:1;margin:0;}
+
+  /* ---- COMPARAÇÃO ---- */
+  .friend-compare-box{max-width:420px;}
+  .fc-head{display:flex;align-items:center;gap:6px;margin-bottom:10px;}
+  .fc-head-cell{
+    flex:1;min-width:0;
+    font-family:var(--font-pixel);font-size:.58rem;color:var(--ink);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  .fc-head-cell.eu{text-align:left;}
+  .fc-head-cell:not(.eu){text-align:right;}
+  .fc-head-vs{font-weight:800;color:var(--muted);}
+  .fc-h2h{
+    padding:8px;margin-bottom:10px;text-align:center;
+    background:#fff8e0;border:3px solid var(--yellow-dark);border-radius:4px;
+  }
+  .fc-h2h.vazio{background:var(--box);border-color:var(--box-border);}
+  .fc-h2h-l{font-size:.55rem;font-weight:800;color:var(--muted);letter-spacing:.05em;}
+  .fc-h2h-v{font-family:var(--font-pixel);font-size:1.05rem;color:var(--ink);margin:4px 0;}
+  .fc-h2h-v span{color:var(--muted);}
+  .fc-h2h-sub{font-size:.6rem;font-weight:700;color:var(--muted);}
+  .fc-linhas{display:flex;flex-direction:column;gap:3px;}
+  .fc-linha{
+    display:flex;align-items:center;gap:8px;
+    padding:5px 8px;background:var(--box);border:2px solid var(--box-border);border-radius:3px;
+  }
+  .fc-rot{flex:1;text-align:center;font-size:.6rem;font-weight:700;color:var(--muted);}
+  .fc-v{
+    min-width:38px;text-align:center;
+    font-family:var(--font-pixel);font-size:.66rem;color:var(--ink);opacity:.55;
+  }
+  /* só o lado que está na frente fica opaco e colorido -- é o que deixa a coluna vencedora saltar
+     sem precisar ler número por número */
+  .fc-v.ganha{opacity:1;color:var(--green);}
+  .fc-v.perde{opacity:.5;}
+  .fc-resumo{text-align:center;margin-top:10px;}
   .home-menu-card:active{transform:translate(2px,2px);box-shadow:2px 2px 0 rgba(0,0,0,.4);}
   .home-menu-icon{font-size:1.7rem;line-height:1;}
   .home-menu-title{font-family:var(--font-pixel);font-size:.62rem;color:var(--ink);}
@@ -2616,6 +2807,7 @@ function freshGameDefaults(){
 
     // --- rotas / rival / equipe rocket / shiny (portados da versão do amigo) ---
     currentRoute:null,
+    routeHistory:[],       // rota escolhida por trecho -- só o mapa lê (ver registrarRotaEscolhida)
     routeCards:null,
     rivalName:'',
     rivalNameError:null,
@@ -3169,6 +3361,7 @@ async function loadNotificationsUnreadCount(){
   try{
     const result = await functionsClient.httpsCallable('getMyNotifications')();
     game.notificationsUnreadCount = result.data.unreadCount || 0;
+    game.friendRequestCount = result.data.friendRequests || 0;
   } catch(e){ console.error('Erro ao buscar notificações:', e); game.notificationsUnreadCount = 0; }
   if(game.screen==='saveSelect'){ render(); }
 }
@@ -4198,7 +4391,11 @@ function chooseStarter(id){
   game.routeCards = routesForLeg(game.gymIndex).map(r=>r.id);
   game.gymApproachRocketChecked = false;
   game.gymApproachRivalChecked = false;
-  game.screen = 'walk';
+  game.routeHistory = [];
+  /* A jornada abre no mapa, não na primeira escolha de caminho. É um beat de tela só, e é o que
+     dá a Kanto o tamanho que o texto sozinho não dava: a pessoa vê de onde sai, quantas paradas
+     tem pela frente e onde fica o Planalto Índigo antes de dar o primeiro passo. */
+  game.screen = 'kantoIntro';
   render();
 }
 const LEGENDARY_BIRDS = ['moltres','zapdos','articuno'];
@@ -4548,10 +4745,18 @@ function confirmOrder(){
    ROTAS -- escolha de caminho antes de cada ginásio (portado da versão
    do amigo, sem os eventos/minijogos extras que ele adicionou)
    ===================================================================== */
+/* O histórico de rotas existe só pro mapa: ele guarda, por trecho, qual caminho a pessoa pegou.
+   `currentRoute` sozinho não servia -- ele é sobrescrito no trecho seguinte, e aí o mapa não teria
+   como lembrar que no trecho 2 você foi pelo Monte Lua. É estado de EXIBIÇÃO: nenhuma regra lê. */
+function registrarRotaEscolhida(id){
+  if(!Array.isArray(game.routeHistory)) game.routeHistory = [];
+  game.routeHistory[game.gymIndex] = id;
+}
 function chooseRoute(id){
   const route = routeById(id);
   if(!route) return;
   game.currentRoute = id;
+  registrarRotaEscolhida(id);
   game.routeCards = null;
   goToWildEncounter();
 }
@@ -8878,6 +9083,7 @@ function serializeGame(){
     caughtSpecies: game.caughtSpecies || [],
     battleResult: game.battleResult || null,
     currentRoute: game.currentRoute || null,
+    routeHistory: game.routeHistory || [],
     rivalName: game.rivalName || '',
     rivalPool: game.rivalPool || [],
     rivalStarterId: game.rivalStarterId || null,
@@ -8968,6 +9174,8 @@ function applySavedState(data){
   game.caughtSpecies = data.caughtSpecies || [];
   game.battleResult = data.battleResult || null;
   game.currentRoute = data.currentRoute || null;
+  // save antigo não tem histórico: começa vazio e o mapa desenha só os trechos daqui pra frente
+  game.routeHistory = Array.isArray(data.routeHistory) ? data.routeHistory : [];
   game.rivalName = data.rivalName || RIVAL_NAME_DEFAULT;
   game.rivalPool = data.rivalPool || [];
   game.rivalStarterId = data.rivalStarterId || null;
@@ -9581,16 +9789,251 @@ function renderStart(){
   </div>`;
 }
 
+/* ============================================================================
+   O MAPA DE KANTO
+   ----------------------------------------------------------------------------
+   Desenhado em SVG aqui mesmo -- nenhuma imagem de fora. Já houve dois episódios
+   neste projeto de imagem hotlinkada que funcionava local e morria publicada
+   (ver GYM_BADGE_VISUALS), e um mapa quebrado é pior que mapa nenhum.
+
+   O que ele mostra, e por quê:
+   - Só o caminho JÁ PERCORRIDO é desenhado, mais o trecho atual pontilhado até
+     a próxima cidade. Desenhar a jornada inteira de uma vez virava espaguete: o
+     trajeto real de Kanto se cruza várias vezes (Celadon → Fuchsia → Saffron →
+     Cinnabar → Viridian), e num celular isso lia como rabisco. Quem quiser a
+     visão linear do que falta tem a trilha de insígnias, que é outra coisa.
+   - Cada trecho concluído leva no meio o ÍCONE DA ROTA que a pessoa escolheu.
+     É o que transforma o mapa em memória da jornada: dá pra olhar e lembrar que
+     naquele trecho você foi pelo Monte Lua e não pela costa.
+   - A cidade do ginásio atual pulsa; as vencidas mostram o selo da insígnia; as
+     que ainda não chegaram ficam apagadas, sem nome. Saber o nome da cidade do
+     8º ginásio antes de chegar lá não acrescenta nada.
+   ============================================================================ */
+
+/* Coordenadas no viewBox 300x420 (retrato, que é como o jogo é jogado).
+   A geografia é a do Kanto de verdade -- relativa, não a escala. Mexer num
+   ponto aqui move a cidade E as linhas do trajeto, que saem daqui. */
+/* `lp` = onde o rótulo fica em relação ao ponto. Não é enfeite: com todos em cima,
+   "Saffron City" caía por cima do ícone da rota e "Vermilion City" por cima da linha
+   do trecho. Cada cidade tem o lado que sobra livre no desenho. */
+const KANTO_PLACES = {
+  indigo:   { x: 44,  y: 44,  name:'Planalto Índigo', icon:'🏛️', lp:'dir' },
+  pewter:   { x: 70,  y: 106, name:'Pewter City',   lp:'dir' },
+  cerulean: { x: 204, y: 66,  name:'Cerulean City', lp:'cima' },
+  celadon:  { x: 110, y: 180, name:'Celadon City',  lp:'esq' },
+  saffron:  { x: 192, y: 166, name:'Saffron City',  lp:'cima' },
+  lavender: { x: 244, y: 190, name:'Lavender Town', icon:'👻', lp:'baixo' },
+  vermilion:{ x: 198, y: 254, name:'Vermilion City',lp:'dir' },
+  viridian: { x: 58,  y: 248, name:'Viridian City', lp:'dir' },
+  pallet:   { x: 50,  y: 300, name:'Pallet Town',   icon:'🏠', lp:'dir' },
+  fuchsia:  { x: 136, y: 344, name:'Fuchsia City',  lp:'dir' },
+  cinnabar: { x: 62,  y: 396, name:'Ilha Cinnabar', lp:'esq', ilha:true }
+};
+// a ordem da jornada: casa, os 8 ginásios na ordem do GYMS, e a Liga no fim
+const KANTO_GYM_CITIES = ['pewter','cerulean','vermilion','celadon','fuchsia','saffron','cinnabar','viridian'];
+const KANTO_JOURNEY = ['pallet', ...KANTO_GYM_CITIES, 'indigo'];
+
+/* Silhueta de Kanto. Não é o contorno exato -- é uma forma que evoca o continente
+   (massa vertical a oeste, baía ao sul, Cinnabar solta no mar). Contorno fiel em
+   300px de largura vira ruído: no celular o que se lê são as cidades e a linha
+   entre elas, não os recortes da costa. */
+const KANTO_SILHUETA = `M 46 20
+  C 96 6, 152 18, 190 14 C 232 10, 258 32, 268 62
+  C 278 92, 266 120, 250 140 C 272 160, 278 196, 258 216
+  C 240 234, 214 228, 202 244 C 214 264, 210 290, 194 302
+  C 182 314, 172 316, 170 332 C 176 354, 158 374, 132 374
+  C 110 374, 98 358, 100 338 C 102 326, 92 316, 80 318
+  C 68 320, 62 336, 52 342 C 38 348, 26 334, 26 312
+  C 26 292, 36 272, 40 256 C 24 232, 30 200, 40 180
+  C 24 156, 24 122, 36 100 C 24 74, 28 40, 46 20 Z`;
+
+// a cidade de cada ginásio, pelo índice dele no GYMS
+function kantoCityOfGym(i){ return KANTO_PLACES[KANTO_GYM_CITIES[i]] || null; }
+
+/* O rótulo com um halo escuro por baixo (paint-order:stroke) em vez de uma caixinha: caixa
+   por trás de 11 nomes some com o mapa, e o halo mantém o texto legível mesmo passando por
+   cima da linha do trajeto. */
+function kantoRotuloSvg(p){
+  const lp = p.lp || 'cima';
+  const off = 15;
+  let x = p.x, y = p.y - off, anchor = 'middle';
+  if(lp === 'baixo'){ y = p.y + off + 4; }
+  else if(lp === 'esq'){ x = p.x - 13; y = p.y + 3.5; anchor = 'end'; }
+  else if(lp === 'dir'){ x = p.x + 13; y = p.y + 3.5; anchor = 'start'; }
+  return `<text x="${x}" y="${y}" text-anchor="${anchor}" class="km-nome">${p.icon?p.icon+' ':''}${escapeHtmlSafe(p.name)}</text>`;
+}
+
+/* Curva suave entre dois pontos. Uma reta entre cidades fica dura e, quando dois
+   trechos saem do mesmo ponto, colam um no outro. O desvio é perpendicular ao
+   segmento, então a curva sempre "abre" pro mesmo lado independente da direção. */
+function kantoCurva(a, b, forca){
+  const mx = (a.x+b.x)/2, my = (a.y+b.y)/2;
+  const dx = b.x-a.x, dy = b.y-a.y;
+  const comp = Math.sqrt(dx*dx + dy*dy) || 1;
+  const f = (forca==null ? 0.16 : forca);
+  const cx = mx + (-dy/comp) * comp * f;
+  const cy = my + ( dx/comp) * comp * f;
+  return { d:`M ${a.x} ${a.y} Q ${cx} ${cy} ${b.x} ${b.y}`, mx:(mx+cx)/2, my:(my+cy)/2 };
+}
+
+/* O SVG. `ateGinasio` = quantos ginásios já foram vencidos (= índice do atual).
+   `rotas` = ids de rota escolhidos por trecho, na ordem (game.routeHistory). */
+function kantoMapSvg(ateGinasio, rotas, rotaAtual){
+  const venc = Math.max(0, Math.min(8, ateGinasio|0));
+  const hist = rotas || [];
+  let trechos = '', cidades = '';
+
+  // trechos concluídos + o atual
+  for(let i = 0; i <= venc && i < KANTO_JOURNEY.length-1; i++){
+    const a = KANTO_PLACES[KANTO_JOURNEY[i]], b = KANTO_PLACES[KANTO_JOURNEY[i+1]];
+    if(!a || !b) continue;
+    const atual = (i === venc);
+    const c = kantoCurva(a, b);
+    const rota = routeById(atual ? rotaAtual : hist[i]);
+    trechos += `<path d="${c.d}" class="km-trecho ${atual?'km-atual':''}" />`;
+    // o ícone da rota só entra quando ela JÁ foi escolhida -- no trecho atual, antes
+    // da escolha, um ícone ali seria adiantar o que a pessoa ainda vai decidir
+    if(rota){
+      trechos += `<g class="km-rota-icone" transform="translate(${c.mx.toFixed(1)} ${c.my.toFixed(1)})">
+        <circle r="11" class="km-rota-disco"/><text y="4.5" text-anchor="middle" font-size="12">${rota.icon}</text></g>`;
+    }
+  }
+
+  KANTO_JOURNEY.forEach((id, i)=>{
+    const p = KANTO_PLACES[id];
+    if(!p) return;
+    const gymIdx = KANTO_GYM_CITIES.indexOf(id);
+    const gym = gymIdx >= 0 ? GYMS[gymIdx] : null;
+    const conquistada = gymIdx >= 0 && gymIdx < venc;
+    const atual = (i === venc + 1);          // a próxima parada da jornada
+    const revelada = i <= venc + 1;
+    const cor = gym ? (GYM_BADGE_VISUALS[gym.id]||{}).color || '#888' : '#7a8fa6';
+    const classe = conquistada ? 'km-ok' : (atual ? 'km-alvo' : (revelada ? '' : 'km-longe'));
+    cidades += `<g class="km-cidade ${classe}">
+      ${atual ? `<circle cx="${p.x}" cy="${p.y}" r="15" class="km-pulso" fill="${cor}"/>` : ''}
+      <circle cx="${p.x}" cy="${p.y}" r="${revelada?9:4.5}" fill="${revelada?cor:'#54697f'}" class="km-ponto"/>
+      ${conquistada ? `<text x="${p.x}" y="${p.y+3.5}" text-anchor="middle" font-size="9" fill="#fff">✓</text>` : ''}
+      ${revelada ? kantoRotuloSvg(p) : ''}
+    </g>`;
+  });
+
+  // Lavender não é ginásio nem parada obrigatória, mas é uma das rotas do trecho 4 --
+  // aparece sempre, apagada, pra o mapa não ter um buraco no leste
+  const lav = KANTO_PLACES.lavender;
+  const enfeite = `<g class="km-cidade km-longe">
+    <circle cx="${lav.x}" cy="${lav.y}" r="4.5" fill="#54697f"/>
+    ${kantoRotuloSvg(lav)}</g>`;
+
+  const cin = KANTO_PLACES.cinnabar;
+  return `<svg class="kanto-map" viewBox="0 0 300 420" role="img" aria-label="Mapa de Kanto">
+    <defs>
+      <pattern id="km-onda" width="18" height="18" patternUnits="userSpaceOnUse">
+        <path d="M0 12 q4.5 -4 9 0 t9 0" fill="none" stroke="#1d3a55" stroke-width="1.2"/>
+      </pattern>
+    </defs>
+    <rect width="300" height="420" fill="#12283d"/>
+    <rect width="300" height="420" fill="url(#km-onda)"/>
+    <path d="${KANTO_SILHUETA}" class="km-terra"/>
+    <ellipse cx="${cin.x}" cy="${cin.y}" rx="24" ry="16" class="km-terra"/>
+    ${enfeite}${trechos}${cidades}
+  </svg>`;
+}
+
+/* Trilha de insígnias -- a visão LINEAR, que o mapa de propósito não dá. Oito selos
+   na ordem: os ganhos acesos, o atual destacado, os que faltam apagados. Cabe no
+   topo de qualquer tela da jornada e responde "quanto falta" num relance. */
+function kantoTrailHtml(compacta){
+  const venc = Math.max(0, Math.min(8, game.gymIndex|0));
+  const gym = GYMS[venc];
+  return `<div class="kanto-trilha ${compacta?'compacta':''}">
+    <div class="kt-selos">${GYMS.map((g,i)=>{
+      const v = GYM_BADGE_VISUALS[g.id] || {};
+      const estado = i < venc ? 'ok' : (i === venc ? 'atual' : 'falta');
+      return `<span class="kt-selo ${estado}" style="--kt-cor:${v.color||'#888'}"
+        title="${escapeHtmlSafe(g.leaderName)} — ${escapeHtmlSafe(g.city)}">${v.emoji||'🏅'}</span>`;
+    }).join('<span class="kt-liga"></span>')}</div>
+    ${gym ? `<div class="kt-legenda">TRECHO ${venc+1}/8 · rumo a <strong>${escapeHtmlSafe(gym.city)}</strong></div>`
+          : `<div class="kt-legenda">8/8 · <strong>Planalto Índigo</strong></div>`}
+  </div>`;
+}
+// botão que reabre o mapa de qualquer tela da jornada
+function kantoMapBotaoHtml(){
+  return `<button class="btn secondary kanto-abrir" onclick="openKantoMap()">🗺️ Ver o mapa de Kanto</button>`;
+}
+
+/* --------------------------------------------------------------------------
+   TELAS
+   O mapa aparece em dois momentos com a MESMA função e molduras diferentes:
+   na abertura da jornada ('kantoIntro'), onde ele é o assunto, e sob demanda
+   ('kantoMap'), onde é consulta e tem um "voltar" pra tela de onde veio.
+   -------------------------------------------------------------------------- */
+function openKantoMap(){
+  if(game.screen === 'kantoMap' || game.screen === 'kantoIntro') return;
+  game.kantoMapVoltarPara = game.screen;
+  game.screen = 'kantoMap';
+  render();
+}
+function closeKantoMap(){
+  game.screen = game.kantoMapVoltarPara || 'walk';
+  game.kantoMapVoltarPara = null;
+  render();
+}
+function comecarJornadaDoMapa(){
+  game.screen = 'walk';
+  render();
+}
+function renderKantoIntro(){
+  const sp = SPECIES[game.starterId];
+  const gym = GYMS[0];
+  return `
+  <div class="eyebrow">🗺️ KANTO</div>
+  <div class="box kanto-abertura">
+    <h2>${sp ? spriteHtml(game.starterId,'sprite-sm') : ''} Kanto se abre à sua frente</h2>
+    <p>Você sai de <strong>Pallet Town</strong>${sp ? ` com <strong>${escapeHtmlSafe(sp.name)}</strong> do lado` : ''}.
+    Oito ginásios entre você e o Planalto Índigo — o primeiro é o de <strong>${escapeHtmlSafe(gym.leaderName)}</strong>, na ${escapeHtmlSafe(gym.city)}.</p>
+  </div>
+  <div class="box kanto-moldura">${kantoMapSvg(0, [], null)}</div>
+  ${kantoTrailHtml()}
+  <button class="btn success" onclick="comecarJornadaDoMapa()">Começar a jornada ➜</button>`;
+}
+function renderKantoMapScreen(){
+  const venc = Math.max(0, Math.min(8, game.gymIndex|0));
+  const hist = game.routeHistory || [];
+  const gym = GYMS[venc];
+  return `
+  <div class="eyebrow">🗺️ MAPA DE KANTO</div>
+  <div class="box kanto-moldura">${kantoMapSvg(venc, hist, game.currentRoute)}</div>
+  ${kantoTrailHtml()}
+  <div class="box">
+    <h2>${venc}/8 insígnias</h2>
+    <p>${gym ? `Próxima parada: <strong>${escapeHtmlSafe(gym.city)}</strong>, onde ${escapeHtmlSafe(gym.leaderName)} lidera o Ginásio ${escapeHtmlSafe(gym.gymTypeName)}.`
+             : `Todas as insígnias na mão. O Planalto Índigo espera.`}</p>
+    ${hist.length ? `<div class="kanto-diario">
+      <div class="kanto-diario-l">POR ONDE VOCÊ PASSOU</div>
+      ${hist.map((rid, i)=>{
+        const r = routeById(rid); if(!r) return '';
+        const g = GYMS[i];
+        return `<div class="kanto-diario-linha"><span class="kd-icone">${r.icon}</span>
+          <span class="kd-nome">${escapeHtmlSafe(r.name)}</span>
+          <span class="kd-destino">→ ${escapeHtmlSafe(g ? g.city : '')}</span></div>`;
+      }).join('')}
+    </div>` : ''}
+  </div>
+  <button class="btn secondary" onclick="closeKantoMap()">⬅ Voltar</button>`;
+}
+
 function renderWalk(){
   const sp = SPECIES[game.starterId];
   const gym = GYMS[game.gymIndex];
   const cards = (game.routeCards||[]).map(routeById).filter(Boolean);
   return `
+  ${kantoTrailHtml(true)}
   <div class="box cursor">
     <h2>${spriteHtml(game.starterId,'sprite-sm')} Você escolheu ${sp.name}!</h2>
     <p>Com seu companheiro ao seu lado, você deixa o laboratório e começa a caminhar em direção ao Ginásio ${gym.gymTypeName}, na ${gym.city}, onde ${gym.leaderName} te espera.</p>
   </div>
-  ${renderRouteCardsBlock(cards)}`;
+  ${renderRouteCardsBlock(cards)}
+  ${kantoMapBotaoHtml()}`;
 }
 
 function renderWalkNext(){
@@ -9598,11 +10041,13 @@ function renderWalkNext(){
   const gym = GYMS[game.gymIndex];
   const cards = (game.routeCards||[]).map(routeById).filter(Boolean);
   return `
+  ${kantoTrailHtml(true)}
   <div class="box cursor">
     <h2>🚶 Rumo à ${gym.city}</h2>
     <p>Com a <strong>${prevGym.badge}</strong> guardada com carinho, você deixa ${prevGym.city} para trás e segue viagem até ${gym.city}, onde ${gym.leaderName} te espera no Ginásio ${gym.gymTypeName}.</p>
   </div>
-  ${renderRouteCardsBlock(cards)}`;
+  ${renderRouteCardsBlock(cards)}
+  ${kantoMapBotaoHtml()}`;
 }
 
 function renderRouteCardsBlock(cards){
@@ -9615,7 +10060,7 @@ function renderRouteCardsBlock(cards){
     maybeAutoSave(); // salva a recuperação, pra não precisar regenerar de novo no próximo carregamento
   }
   return `
-  <div class="eyebrow">🗺️ ESCOLHA DO CAMINHO — TRECHO ${game.gymIndex+1}/8</div>
+  <div class="eyebrow">🗺️ ESCOLHA DO CAMINHO</div>
   <div class="box cursor">
     <h2>Por onde você segue?</h2>
     <p>À frente está o Ginásio <strong>${gym.gymTypeName}</strong> de <strong>${gym.leaderName}</strong>. Cada caminho tem seus próprios Pokémons.</p>
@@ -10612,6 +11057,9 @@ function notificationIcon(type){
   if(type==='match_played') return '⚔️';
   if(type==='gym_leadership_lost') return '🚪';
   if(type==='mewtwo_loan_unlocked' || type==='mewtwo_loan_ended') return '🧬';
+  if(type==='friend_request') return '👋';
+  if(type==='friend_accepted') return '👥';
+  if(type==='friend_challenge' || type==='friend_challenge_declined') return '⚔️';
   return '🔔';
 }
 function renderNotificationsScreen(){
@@ -10631,6 +11079,17 @@ function renderNotificationsScreen(){
         cta = activated
           ? `<p class="u-mt8 win-text">✅ Bônus já ativado</p>`
           : `<button class="btn success u-mt8" onclick="activateShinyBonus('${n.id}')">✨ Ativar bônus Shiny</button>`;
+      } else if(n.type==='friend_request'){
+        // o botão leva pra lista, onde o pedido aparece com nome, presença e o que mais ajuda a
+        // decidir -- aceitar de dentro da notificação seria aceitar às cegas
+        cta = `<button class="btn primary u-mt8" onclick="openFriends()">👥 Ver na lista de amigos</button>`;
+      } else if(n.type==='friend_challenge'){
+        // desafio tem prazo de 3 minutos: uma notificação de ontem não vale mais nada, e oferecer
+        // "aceitar" nela só produziria um erro na cara de quem clicasse
+        const vencido = !n.meta || !n.meta.expiresAt || Date.now() > n.meta.expiresAt;
+        cta = vencido
+          ? `<p class="u-mt8 hint-text">⏳ Esse desafio já expirou.</p>`
+          : `<button class="btn success u-mt8" onclick="openFriends()">⚔️ Responder o desafio</button>`;
       } else if(n.type==='mewtwo_loan_unlocked'){
         // 3 estados possíveis nesse momento: nunca usou ainda, já tem um emprestado em algum time
         // agora, ou está no cooldown de 7 dias depois do último uso -- cada um com sua própria mensagem
@@ -11131,10 +11590,10 @@ function renderJourneyEnd(){
 function trainerProfileLink(inner, uid, name){
   const id = uid ? `uid:${uid}` : (name ? `name:${name}` : '');
   if(!id) return inner;
-  // ordem importa: escJs primeiro (protege a string JS), escapeHtmlSafe depois (protege o atributo).
-  // O navegador desfaz o escape HTML ANTES do JS ler o onclick, então fazer o inverso deixaria um
-  // nome com apóstrofo (ex: "D'Angelo") quebrar a chamada
-  const idAttr = escapeHtmlSafe(escJs(id));
+  // as DUAS camadas (string JS e atributo HTML) agora são responsabilidade do próprio escJs -- ver
+  // o comentário lá. Passar escapeHtmlSafe por cima escaparia o & do &#39; de novo e quebraria
+  // justamente o nome com apóstrofo que este trecho existia pra proteger
+  const idAttr = escJs(id);
   return `<span class="trainer-link" onclick="openTrainerProfile('${idAttr}')" role="button" tabindex="0" title="Ver perfil de ${escapeHtmlSafe(name||'treinador')}">${inner}</span>`;
 }
 // plain=true devolve o nome SEM virar link. Usado nas linhas de partida, onde o nome já é clicável
@@ -11182,8 +11641,19 @@ function closeTrainerProfile(){
   game.trainerProfile = null;
   render();
 }
+/* Texto que vai virar um argumento de string dentro de um onclick="..." -- ou seja, texto que
+   passa por DOIS parsers: o de atributo HTML primeiro, o de JavaScript depois. Escapar só as
+   aspas simples cobria o segundo e deixava o primeiro aberto: nome de treinador não filtra
+   caractere nenhum (só corta em 20), então um `Ash" onmouseover="...` fechava o atributo e
+   executava. O navegador desfaz as entidades ANTES de entregar o texto ao parser de JS, então as
+   duas camadas convivem: \' vira &#39; no HTML e volta a \' na hora de virar código.
+   A ordem importa -- o & tem que sair primeiro, senão um &#39; digitado no nome seria decodificado
+   como aspa de verdade. */
 function escJs(str){
-  return String(str).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  return String(str)
+    .replace(/\\/g,'\\\\').replace(/'/g,"\\'")
+    .replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))
+    .replace(/'/g,'&#39;');
 }
 function leagueMatchRow(match, roundLabel, ct, li, rk, mi, leagueRounds, phaseTimes, typeId){
   const isMyMatch = match.a && match.b && game.authUser && (match.a.uid===game.authUser.uid || match.b.uid===game.authUser.uid);
@@ -13551,6 +14021,492 @@ function painelTimesHtml(st, anim, precisaEscolher, restam, padraoOnline){
   </div>`;
 }
 
+/* ============================================================================
+   LISTA DE AMIGOS
+   ----------------------------------------------------------------------------
+   Uma tela só, com três blocos: o desafio em aberto (quando existe), os pedidos
+   recebidos, e a lista. A busca de treinador fica no rodapé -- adicionar amigo
+   é o que menos acontece aqui, e ocupar o topo com ela empurraria a lista pra
+   baixo em toda visita.
+
+   Presença: o servidor NÃO tem batimento próprio (ver touchLastSeen). O carimbo
+   é atualizado nas chamadas que a pessoa já faz, com folga de 5 minutos, então
+   "agora há pouco" aqui significa "visto nos últimos 10 minutos" -- e é por isso
+   que a faixa verde começa em 10min e não em 1. Prometer "online agora" com esse
+   dado seria mentira metade das vezes.
+   ============================================================================ */
+const FRIEND_POLL_MS = 3000;
+let friendChallengeTimer = null;
+let friendCountdownTimer = null;
+
+function pararPollDesafio(){
+  if(friendChallengeTimer){ clearTimeout(friendChallengeTimer); friendChallengeTimer = null; }
+  if(friendCountdownTimer){ clearTimeout(friendCountdownTimer); friendCountdownTimer = null; }
+}
+
+async function openFriends(){
+  game.screen = 'friends';
+  game.friendsData = null;
+  game.friendsError = null;
+  game.friendsBusy = null;
+  game.friendsConfirmRemove = null;
+  render();
+  await carregarAmigos();
+  agendarPollDesafio();
+}
+async function carregarAmigos(){
+  try{
+    const r = await functionsClient.httpsCallable('getMyFriends')();
+    game.friendsData = r.data;
+    game.friendChallenge = r.data.challenge || null;
+    game.friendRequestCount = (r.data.requests || []).length;
+  } catch(e){
+    console.error('Erro ao carregar amigos:', e);
+    game.friendsError = (e && e.message) || 'Não foi possível carregar sua lista agora.';
+    game.friendsData = { friends: [], requests: [] };
+  }
+  if(game.screen==='friends') render();
+}
+function sairDosAmigos(){
+  pararPollDesafio();
+  game.friendsSearchResults = null;
+  goToSaveMenu();
+}
+
+/* "visto por último" em texto. A granularidade é grossa de propósito: o carimbo do servidor tem
+   folga de 5 minutos, então mostrar "há 3 min" seria precisão inventada. */
+function vistoPorUltimo(ms){
+  if(!ms) return { texto:'nunca visto', classe:'off' };
+  const dif = Date.now() - ms;
+  if(dif < 10*60000) return { texto:'agora há pouco', classe:'on' };
+  if(dif < 60*60000) return { texto:'há ' + Math.round(dif/60000) + ' min', classe:'recente' };
+  if(dif < 24*3600000) return { texto:'há ' + Math.round(dif/3600000) + 'h', classe:'' };
+  const dias = Math.round(dif/86400000);
+  if(dias < 30) return { texto:'há ' + dias + (dias===1?' dia':' dias'), classe:'off' };
+  return { texto:formatDateShort(ms), classe:'off' };
+}
+
+/* --------------------------------------------------------------------------
+   PEDIDOS
+   -------------------------------------------------------------------------- */
+async function enviarPedidoAmizade(alvoUid){
+  game.friendsError = null;
+  game.friendsBusy = alvoUid;
+  render();
+  try{
+    const r = await functionsClient.httpsCallable('sendFriendRequest')({ targetUid: alvoUid });
+    // marca o resultado no card da BUSCA, que é de onde o clique veio -- sem isso o botão volta
+    // ao estado inicial e parece que o pedido não foi
+    const achado = (game.friendsSearchResults||[]).find(t=>t.uid===alvoUid);
+    if(achado){
+      if(r.data.aceitoDireto){ achado.jaAmigo = true; }
+      else { achado.pedidoEnviado = true; }
+    }
+    if(r.data.aceitoDireto) await carregarAmigos();   // ele já tinha pedido: viraram amigos agora
+  } catch(e){
+    console.error('Erro ao pedir amizade:', e);
+    game.friendsError = (e && e.message) || 'Não foi possível enviar o pedido.';
+  }
+  game.friendsBusy = null;
+  render();
+}
+async function responderPedidoAmizade(deUid, aceitar){
+  game.friendsError = null;
+  game.friendsBusy = deUid;
+  render();
+  try{
+    await functionsClient.httpsCallable('respondFriendRequest')({ fromUid: deUid, accept: !!aceitar });
+    await carregarAmigos();
+  } catch(e){
+    console.error('Erro ao responder pedido:', e);
+    game.friendsError = (e && e.message) || 'Não foi possível responder agora.';
+  }
+  game.friendsBusy = null;
+  render();
+}
+function pedirRemocaoAmigo(uid){ game.friendsConfirmRemove = uid; render(); }
+function cancelarRemocaoAmigo(){ game.friendsConfirmRemove = null; render(); }
+async function removerAmigo(uid){
+  game.friendsBusy = uid;
+  game.friendsConfirmRemove = null;
+  render();
+  try{
+    await functionsClient.httpsCallable('removeFriend')({ targetUid: uid });
+    await carregarAmigos();
+  } catch(e){
+    console.error('Erro ao remover amigo:', e);
+    game.friendsError = (e && e.message) || 'Não foi possível remover agora.';
+  }
+  game.friendsBusy = null;
+  render();
+}
+
+/* --------------------------------------------------------------------------
+   BUSCA
+   O texto digitado NÃO passa por render() a cada tecla: recriar o HTML embaixo
+   do teclado tira o foco do campo no meio da palavra. O valor só é lido na hora
+   de buscar, e reposto no campo depois do render (ver reporValorBuscaAmigo).
+   -------------------------------------------------------------------------- */
+function anotarBuscaAmigo(valor){ game.friendsSearchQuery = valor; }
+function reporValorBuscaAmigo(){
+  const el = document.getElementById('friend-search-input');
+  if(el && game.friendsSearchQuery != null && el.value !== game.friendsSearchQuery){
+    el.value = game.friendsSearchQuery;
+  }
+}
+async function buscarTreinadores(){
+  const q = String(game.friendsSearchQuery || '').trim();
+  game.friendsError = null;
+  if(q.length < 2){
+    game.friendsError = 'Digite pelo menos 2 letras do nome.';
+    render(); return;
+  }
+  game.friendsSearching = true;
+  game.friendsSearchResults = null;
+  render();
+  try{
+    const r = await functionsClient.httpsCallable('searchTrainers')({ q });
+    game.friendsSearchResults = r.data.trainers || [];
+  } catch(e){
+    console.error('Erro na busca:', e);
+    game.friendsError = (e && e.message) || 'Não foi possível buscar agora.';
+    game.friendsSearchResults = [];
+  }
+  game.friendsSearching = false;
+  render();
+}
+function limparBuscaAmigos(){
+  game.friendsSearchResults = null;
+  game.friendsSearchQuery = '';
+  render();
+}
+
+/* --------------------------------------------------------------------------
+   COMPARAR CONQUISTAS
+   -------------------------------------------------------------------------- */
+async function abrirComparacao(uid, nome){
+  game.friendCompare = { loading:true, data:null, error:null, nome };
+  render();
+  try{
+    const r = await functionsClient.httpsCallable('compareTrainers')({ uid });
+    if(!game.friendCompare) return;
+    game.friendCompare = { loading:false, data:r.data, error:null, nome };
+  } catch(e){
+    console.error('Erro ao comparar:', e);
+    if(!game.friendCompare) return;
+    game.friendCompare = { loading:false, data:null, error:(e && e.message) || 'Não foi possível comparar agora.', nome };
+  }
+  render();
+}
+function fecharComparacao(){ game.friendCompare = null; render(); }
+
+/* --------------------------------------------------------------------------
+   DESAFIO DIRETO
+   Assíncrono, ao contrário do desafio do lobby: são 3 minutos, porque o amigo
+   pode estar em qualquer tela (ou com o jogo fechado). Enquanto o desafio está
+   de pé, esta tela consulta o servidor a cada 3s -- e é essa consulta que serve
+   de sinal de vida pro outro lado (ver FRIEND_CHALLENGE_ALIVE_MS no servidor).
+   Fechar a tela mata o desafio na prática: sem sinal, o aceite é recusado com
+   "fulano saiu da tela" em vez de criar uma batalha contra ninguém.
+   -------------------------------------------------------------------------- */
+function agendarPollDesafio(){
+  pararPollDesafio();
+  if(game.screen !== 'friends') return;
+  friendChallengeTimer = setTimeout(async ()=>{
+    if(game.screen !== 'friends') return;
+    try{
+      const r = await functionsClient.httpsCallable('pollFriendChallenge')({ since: game.onlineSince || 0 });
+      if(r.data.battleId){ pararPollDesafio(); game.friendChallenge = null; entrarNaBatalha(r.data.battleId); return; }
+      const antes = game.friendChallenge && game.friendChallenge.id;
+      game.friendChallenge = r.data.challenge || null;
+      // o desafio sumiu (recusado, cancelado ou vencido): a lista de amigos precisa voltar ao normal
+      if(antes && !game.friendChallenge) render();
+    } catch(e){ console.error('Erro no poll do desafio:', e); }
+    agendarPollDesafio();
+  }, FRIEND_POLL_MS);
+}
+async function desafiarAmigo(uid, nome){
+  const codes = codigosElegiveisOnline();
+  if(!codes.length){
+    game.friendsError = 'Você ainda não tem nenhum time com as 8 insígnias.';
+    render(); return;
+  }
+  prepararAudio();   // gesto do usuário: é aqui que dá pra liberar o som do convite
+  game.friendsError = null;
+  game.friendsBusy = uid;
+  game.onlineSince = Date.now() - 1000;
+  render();
+  try{
+    const r = await functionsClient.httpsCallable('challengeFriend')({ targetUid: uid, codes });
+    game.friendChallenge = r.data.challenge;
+  } catch(e){
+    console.error('Erro ao desafiar amigo:', e);
+    game.friendsError = (e && e.message) || 'Não foi possível desafiar agora.';
+  }
+  game.friendsBusy = null;
+  render();
+  agendarPollDesafio();
+}
+async function cancelarDesafioAmigo(){
+  try{ await functionsClient.httpsCallable('cancelFriendChallenge')(); }
+  catch(e){ console.error('Erro ao cancelar desafio:', e); }
+  game.friendChallenge = null;
+  render();
+}
+async function responderDesafioAmigo(challengeId, aceitar){
+  game.friendsError = null;
+  game.friendsBusy = 'desafio';
+  if(aceitar) prepararAudio();
+  game.onlineSince = Date.now() - 1000;
+  render();
+  try{
+    const payload = { challengeId, accept: !!aceitar };
+    if(aceitar) payload.codes = codigosElegiveisOnline();
+    const r = await functionsClient.httpsCallable('respondFriendChallenge')(payload);
+    game.friendsBusy = null;
+    game.friendChallenge = null;
+    if(r.data.battleId){ pararPollDesafio(); entrarNaBatalha(r.data.battleId); return; }
+  } catch(e){
+    console.error('Erro ao responder desafio:', e);
+    game.friendsError = (e && e.message) || 'Não foi possível responder agora.';
+    game.friendsBusy = null;
+    game.friendChallenge = null;   // qualquer erro aqui encerrou o desafio no servidor
+  }
+  render();
+}
+/* Aceitar um desafio a partir da NOTIFICAÇÃO -- o caminho mais provável, já que é lá que ele chega.
+   Passa pela tela de amigos em vez de responder direto: o cronômetro e o "quem é esse treinador"
+   estão lá, e aceitar às cegas um desafio de 3 minutos atrás não é o que a pessoa quer. */
+function irParaDesafioAmigo(){ openFriends(); }
+
+/* Cronômetro do desafio por DOM, não por render(): um render por segundo recriaria a lista de
+   amigos inteira debaixo do dedo de quem vai clicar em "aceitar". Mesma decisão da contagem da
+   batalha online. */
+function tickDesafioAmigo(){
+  if(friendCountdownTimer) clearTimeout(friendCountdownTimer);
+  friendCountdownTimer = setTimeout(function tick(){
+    if(game.screen!=='friends' || !game.friendChallenge) return;
+    const el = document.querySelector('.friend-challenge-timer');
+    if(el){
+      const restam = Math.max(0, Math.ceil((game.friendChallenge.expiresAt - Date.now())/1000));
+      const txt = Math.floor(restam/60) + ':' + String(restam%60).padStart(2,'0');
+      if(el.textContent !== txt) el.textContent = txt;
+      if(restam <= 0){ game.friendChallenge = null; render(); return; }
+    }
+    friendCountdownTimer = setTimeout(tick, 500);
+  }, 500);
+}
+
+/* --------------------------------------------------------------------------
+   TELA
+   -------------------------------------------------------------------------- */
+function friendRivalryHtml(r){
+  if(!r || !r.total) return `<span class="fr-h2h vazio">sem confrontos</span>`;
+  const classe = r.wins > r.losses ? 'ganhando' : (r.wins < r.losses ? 'perdendo' : '');
+  return `<span class="fr-h2h ${classe}" title="Retrospecto em batalhas online">${r.wins} <b>×</b> ${r.losses}</span>`;
+}
+function renderFriendsScreen(){
+  const d = game.friendsData;
+  let out = `<div class="result-banner win">👥 Amigos</div>`;
+  if(game.friendsError){ out += `<div class="box"><p class="error-text">⚠️ ${escapeHtmlSafe(game.friendsError)}</p></div>`; }
+
+  // 1) desafio em aberto -- sempre no topo, é o único bloco com prazo correndo
+  const c = game.friendChallenge;
+  if(c){
+    const restam = Math.max(0, Math.ceil((c.expiresAt - Date.now())/1000));
+    const relogio = Math.floor(restam/60) + ':' + String(restam%60).padStart(2,'0');
+    out += c.sou === 'desafiante'
+      ? `<div class="box friend-challenge esperando">
+           <div class="fr-challenge-top">⚔️ Desafio enviado <span class="friend-challenge-timer">${relogio}</span></div>
+           <p>Esperando <strong>${escapeHtmlSafe(c.oponente)}</strong> responder.</p>
+           <p class="hint-text">Fique nesta tela: se você sair, o desafio cai. Assim que ele aceitar, a batalha começa aqui mesmo.</p>
+           <button class="btn danger" onclick="cancelarDesafioAmigo()">✖ Cancelar desafio</button>
+         </div>`
+      : `<div class="box friend-challenge recebido">
+           <div class="fr-challenge-top">⚔️ ${escapeHtmlSafe(c.oponente)} te desafiou <span class="friend-challenge-timer">${relogio}</span></div>
+           <p class="hint-text">O time você escolhe depois, com os dois já conectados.</p>
+           <div class="fr-challenge-acoes">
+             <button class="btn success" ${game.friendsBusy?'disabled':''} onclick="responderDesafioAmigo('${escJs(c.id)}',true)">⚔️ Aceitar</button>
+             <button class="btn secondary" ${game.friendsBusy?'disabled':''} onclick="responderDesafioAmigo('${escJs(c.id)}',false)">Agora não</button>
+           </div>
+         </div>`;
+    tickDesafioAmigo();
+  }
+
+  if(!d){ return out + `<div class="box"><p class="loading-text">Carregando sua lista...</p></div>
+    <button class="btn secondary" onclick="sairDosAmigos()">⬅ Voltar</button>`; }
+
+  // 2) pedidos recebidos
+  const pedidos = d.requests || [];
+  if(pedidos.length){
+    out += `<div class="box">
+      <h2>Pedidos de amizade <span class="lobby-contador">${pedidos.length}</span></h2>
+      ${pedidos.map(p=>`<div class="friend-row pedido">
+        <div class="friend-row-info">
+          <div class="friend-nome">${escapeHtmlSafe(p.name)}</div>
+          <div class="friend-sub">${formatDateShort(p.createdAt)}</div>
+        </div>
+        <div class="friend-acoes">
+          <button class="friend-btn aceitar" ${game.friendsBusy?'disabled':''} onclick="responderPedidoAmizade('${escJs(p.uid)}',true)" aria-label="Aceitar">✔</button>
+          <button class="friend-btn recusar" ${game.friendsBusy?'disabled':''} onclick="responderPedidoAmizade('${escJs(p.uid)}',false)" aria-label="Recusar">✕</button>
+        </div>
+      </div>`).join('')}
+    </div>`;
+  }
+
+  // 3) a lista
+  const amigos = d.friends || [];
+  const desafioAberto = !!c;
+  out += `<div class="box">
+    <h2>Sua lista ${amigos.length ? `<span class="lobby-contador">${amigos.length}/${d.max||50}</span>` : ''}</h2>`;
+  if(!amigos.length){
+    out += `<div class="lobby-vazio">
+      <div class="lobby-vazio-icon">👋</div>
+      <p>Sua lista está vazia.</p>
+      <p class="hint-text">Busque um treinador pelo nome aqui embaixo e mande um pedido. Quando ele aceitar, vocês podem se desafiar direto, sem depender do lobby.</p>
+    </div>`;
+  } else {
+    out += `<div class="friend-lista">${amigos.map(a=>{
+      const visto = vistoPorUltimo(a.lastSeenAt);
+      const confirmando = game.friendsConfirmRemove === a.uid;
+      if(confirmando){
+        return `<div class="friend-row confirmando">
+          <div class="friend-row-info">
+            <div class="friend-nome">Remover ${escapeHtmlSafe(a.name)}?</div>
+            <div class="friend-sub">O retrospecto de vocês continua guardado.</div>
+          </div>
+          <div class="friend-acoes">
+            <button class="friend-btn recusar" onclick="removerAmigo('${escJs(a.uid)}')" aria-label="Confirmar remoção">✔</button>
+            <button class="friend-btn" onclick="cancelarRemocaoAmigo()" aria-label="Cancelar">✕</button>
+          </div>
+        </div>`;
+      }
+      /* A linha do amigo mostra SÓ presença e retrospecto. A pokédex saiu daqui: com 4 botões de
+         ação sobram ~180px, e o terceiro número fazia metade das linhas quebrar numa altura
+         diferente das outras -- a lista virava um serrote. Ela continua na busca (onde é o que
+         separa dois homônimos) e no quadro de comparação. */
+      return `<div class="friend-row ${game.friendsBusy===a.uid?'enviando':''}">
+        <div class="friend-row-info">
+          <div class="friend-nome">${a.eliteChampion?'🏆 ':''}${escapeHtmlSafe(a.name)}${a.sumiu?' <span class="friend-sumiu">conta apagada</span>':''}</div>
+          <div class="friend-sub">
+            <span class="friend-presenca ${visto.classe}">${visto.classe==='on'?'●':'○'} ${visto.texto}</span>
+            ${friendRivalryHtml(a.rivalry)}
+          </div>
+        </div>
+        <div class="friend-acoes">
+          <button class="friend-btn desafiar" ${(desafioAberto||game.friendsBusy||a.sumiu)?'disabled':''} onclick="desafiarAmigo('${escJs(a.uid)}','${escJs(a.name)}')" aria-label="Desafiar ${escapeHtmlSafe(a.name)}" title="Desafiar pra uma batalha">⚔️</button>
+          <button class="friend-btn" onclick="abrirComparacao('${escJs(a.uid)}','${escJs(a.name)}')" aria-label="Comparar conquistas" title="Comparar conquistas">📊</button>
+          <button class="friend-btn" onclick="openTrainerProfile('uid:${escJs(a.uid)}')" aria-label="Ver perfil" title="Ver perfil">👤</button>
+          <button class="friend-btn remover" onclick="pedirRemocaoAmigo('${escJs(a.uid)}')" aria-label="Remover amigo" title="Remover">🗑</button>
+        </div>
+      </div>`;
+    }).join('')}</div>`;
+  }
+  out += `</div>`;
+
+  // 4) busca -- no rodapé de propósito: adicionar amigo é o que menos acontece nesta tela
+  const res = game.friendsSearchResults;
+  out += `<div class="box friend-busca">
+    <h2>Adicionar amigo</h2>
+    <div class="friend-busca-row">
+      <input id="friend-search-input" class="friend-search-input" type="text" maxlength="40"
+             placeholder="Nome do treinador" autocomplete="off"
+             oninput="anotarBuscaAmigo(this.value)"
+             onkeydown="if(event.key==='Enter'){event.preventDefault();buscarTreinadores();}">
+      <button class="btn primary friend-search-btn" ${game.friendsSearching?'disabled':''} onclick="buscarTreinadores()">${game.friendsSearching?'⏳':'🔎'}</button>
+    </div>`;
+  if(res){
+    if(!res.length){
+      out += `<p class="hint-text">Nenhum treinador com esse nome. O nome tem que ser exatamente como ele escreveu na conta.</p>`;
+    } else {
+      out += `<div class="friend-lista">${res.map(t=>{
+        const visto = vistoPorUltimo(t.lastSeenAt);
+        let acao;
+        if(t.jaAmigo) acao = `<span class="friend-tag ok">✔ amigo</span>`;
+        else if(t.pedidoEnviado) acao = `<span class="friend-tag">⏳ enviado</span>`;
+        else if(t.pedidoRecebido) acao = `<button class="friend-btn aceitar" onclick="responderPedidoAmizade('${escJs(t.uid)}',true)" aria-label="Aceitar pedido">✔</button>`;
+        else acao = `<button class="friend-btn adicionar" ${game.friendsBusy===t.uid?'disabled':''} onclick="enviarPedidoAmizade('${escJs(t.uid)}')" aria-label="Pedir amizade">${game.friendsBusy===t.uid?'⏳':'➕'}</button>`;
+        /* Homônimos existem (nada no jogo impede) e é por isso que a linha da busca mostra pokédex,
+           placar online e presença: sem esses números, escolher entre dois "Ash" seria sorteio. */
+        return `<div class="friend-row">
+          <div class="friend-row-info">
+            <div class="friend-nome">${t.eliteChampion?'🏆 ':''}${escapeHtmlSafe(t.name)}</div>
+            <div class="friend-sub">
+              <span class="friend-presenca ${visto.classe}">${visto.classe==='on'?'●':'○'} ${visto.texto}</span>
+              <span class="friend-dex">📕 ${t.pokedex||0}</span>
+              <span class="friend-dex">⚔️ ${t.onlineWins||0}V ${t.onlineLosses||0}D</span>
+            </div>
+          </div>
+          <div class="friend-acoes">
+            <button class="friend-btn" onclick="openTrainerProfile('uid:${escJs(t.uid)}')" aria-label="Ver perfil">👤</button>
+            ${acao}
+          </div>
+        </div>`;
+      }).join('')}</div>
+      <button class="btn secondary u-mt8" onclick="limparBuscaAmigos()">Limpar busca</button>`;
+    }
+  }
+  out += `</div>
+  <button class="btn secondary" onclick="sairDosAmigos()">⬅ Voltar</button>`;
+  return out;
+}
+
+/* Modal de comparação. Uma linha por conquista, com o maior lado destacado -- a leitura que
+   interessa é "quem está na frente em quê", e um número maior sem marcação nenhuma obriga a
+   comparar de cabeça linha por linha. */
+function renderFriendCompareModal(){
+  const st = game.friendCompare;
+  if(!st) return '';
+  let corpo;
+  if(st.loading){
+    corpo = `<div class="modal-icon">📊</div><h2>Comparando...</h2>
+      <p class="hint-text">Buscando as conquistas dos dois.</p>`;
+  } else if(st.error){
+    corpo = `<div class="modal-icon">⚠️</div><h2>Não deu</h2>
+      <p class="error-text">${escapeHtmlSafe(st.error)}</p>`;
+  } else {
+    const me = st.data.me || {}, el = st.data.them || {};
+    const tMe = me.titles || {total:0, classic:0, trainers:0, custom:0};
+    const tEl = el.titles || {total:0, classic:0, trainers:0, custom:0};
+    const r = st.data.rivalry || {total:0, wins:0, losses:0};
+    const linhas = [
+      ['Títulos de liga', tMe.total, tEl.total],
+      ['Pokédex', me.pokedex||0, el.pokedex||0],
+      ['Shinies', me.shinyDex||0, el.shinyDex||0],
+      ['Elite 4', me.eliteWins||0, el.eliteWins||0],
+      ['Torres vencidas', me.towerClears||0, el.towerClears||0],
+      ['Melhor sequência', me.bestStreak||0, el.bestStreak||0],
+      ['Ginásios liderados', me.gymsLed||0, el.gymsLed||0],
+      ['Especialidades', (me.specialties||[]).length, (el.specialties||[]).length]
+    ];
+    const ganhos = linhas.filter(l=>l[1]>l[2]).length;
+    const perdidos = linhas.filter(l=>l[1]<l[2]).length;
+    corpo = `<div class="fc-head">
+        <div class="fc-head-cell eu">VOCÊ</div>
+        <div class="fc-head-vs">×</div>
+        <div class="fc-head-cell">${escapeHtmlSafe(el.name || st.nome || 'Treinador')}</div>
+      </div>
+      ${r.total ? `<div class="fc-h2h">
+        <div class="fc-h2h-l">EM BATALHA ONLINE</div>
+        <div class="fc-h2h-v">${r.wins} <span>×</span> ${r.losses}</div>
+        <div class="fc-h2h-sub">${r.total} confronto${r.total===1?'':'s'}${r.lastAt?` · último ${formatDateShort(r.lastAt)}`:''}</div>
+      </div>` : `<div class="fc-h2h vazio"><div class="fc-h2h-sub">Vocês nunca se enfrentaram online.</div></div>`}
+      <div class="fc-linhas">${linhas.map(([rot, a, b])=>`
+        <div class="fc-linha">
+          <span class="fc-v ${a>b?'ganha':(a<b?'perde':'')}">${a}</span>
+          <span class="fc-rot">${rot}</span>
+          <span class="fc-v ${b>a?'ganha':(b<a?'perde':'')}">${b}</span>
+        </div>`).join('')}</div>
+      <p class="hint-text fc-resumo">Você está na frente em <strong>${ganhos}</strong> de ${linhas.length} e atrás em <strong>${perdidos}</strong>.</p>`;
+  }
+  return `<div class="modal-overlay" onclick="if(event.target===this)fecharComparacao()">
+    <div class="modal-box friend-compare-box">
+      ${corpo}
+      <button class="btn secondary" onclick="fecharComparacao()">Fechar</button>
+    </div>
+  </div>`;
+}
+
 function openSaveCard(slot){
   const s = game.saveSlots[slot];
   if(!s) return;
@@ -13572,6 +14528,12 @@ function shinyBonusCounterHtml(){
 function renderSaveSelect(){
   const caughtCount = getAllCaughtSpecies().size;
   const totalSpecies = Object.keys(SPECIES).length;
+  /* O card de Amigos mostra o que a pessoa PRECISA fazer, não o tamanho da lista: um pedido
+     esperando resposta é a única coisa aqui que fica parada até alguém agir. */
+  const pedidosPend = game.friendRequestCount || 0;
+  const friendsTeaser = pedidosPend > 0
+    ? `${pedidosPend} pedido${pedidosPend===1?'':'s'} esperando`
+    : 'Desafie quem você conhece';
   let achievementsTeaser = `${ACHIEVEMENTS.length} desafios pra completar`;
   if(game.achievementsExtra){
     const agg = getAchievementAggregate();
@@ -13600,6 +14562,11 @@ function renderSaveSelect(){
       <span class="home-menu-icon">${icone('conquistas','menu')}</span>
       <span class="home-menu-title">Conquistas</span>
       <span class="home-menu-stat">${achievementsTeaser}</span>
+    </button>
+    <button class="home-menu-card friends" onclick="openFriends()">
+      <span class="home-menu-icon">👥${(game.friendRequestCount||0)>0 ? `<span class="notif-badge">${game.friendRequestCount>9?'9+':game.friendRequestCount}</span>` : ''}</span>
+      <span class="home-menu-title">Amigos</span>
+      <span class="home-menu-stat">${friendsTeaser}</span>
     </button>
   </div>
   <div class="home-modes-row">
@@ -14034,6 +15001,8 @@ function render(){
   switch(game.screen){
     case 'start': html = renderStart(); break;
     case 'walk': html = renderWalk(); break;
+    case 'kantoIntro': html = renderKantoIntro(); break;
+    case 'kantoMap': html = renderKantoMapScreen(); break;
     case 'walkNext': html = renderWalkNext(); break;
     case 'wild': html = renderWild(); break;
     case 'wildDisguiseReveal': html = renderWildDisguiseReveal(); break;
@@ -14052,6 +15021,7 @@ function render(){
     case 'trainerTower': html = renderTrainerTower(); break;
     case 'onlineBattle': html = renderOnlineBattle(); break;
     case 'battleLobby': html = renderBattleLobby(); break;
+    case 'friends': html = renderFriendsScreen(); break;
     case 'onlineFight': html = renderOnlineFight(); break;
     case 'neighborhoodGymLeaderboard': html = renderNeighborhoodGymLeaderboard(); break;
     case 'notifications': html = renderNotificationsScreen(); break;
@@ -14132,11 +15102,16 @@ function render(){
   if(game.towerOrder){ html += renderTowerOrderModal(); }
   if(game.towerRanking){ html += renderTowerRankingModal(); }
   if(game.trainerProfile){ html += renderTrainerProfileModal(); }
+  if(game.friendCompare){ html += renderFriendCompareModal(); }
   if(game.showTeamOrderModal){ html += renderRegisteredTeamOrderModal(); }
   if(game.renameSlotTarget!=null){ html += renderRenameSlotModal(); }
   if(game.editTrainerName){ html += renderEditTrainerNameModal(); }
   if(game.terrainInfoTarget){ html += renderTerrainInfoModal(); }
   app.innerHTML = html;
+  /* O campo de busca de amigo é recriado a cada render (innerHTML apaga o DOM inteiro), então o
+     que a pessoa digitou é reposto aqui. Guardar o valor em game e repor depois é mais simples que
+     evitar o render -- e é o que mantém a busca utilizável enquanto o poll do desafio roda. */
+  if(game.screen==='friends') reporValorBuscaAmigo();
   maybeAutoSave();
 }
 

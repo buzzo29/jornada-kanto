@@ -124,6 +124,59 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
 - No lobby cada treinador aparece com a **faixa** de nível dos times dele (`Lv.62–70`), não com uma
   média só: qual time vai entrar nem ele decidiu ainda.
 
+## Lista de amigos
+
+- Amizade é **mútua e por aceite**, gravada nos DOIS lados (`users/{a}/friends/{b}` e o espelho).
+  Duplicar é de propósito: ler "meus amigos" vira uma consulta só. O preço é que remover apaga
+  dois documentos — e `removeFriend` apaga os dois mesmo que um já não exista, que é o conserto de
+  uma amizade que ficou pela metade.
+- **Pedidos cruzados viram aceite direto.** Se A pede pra B e B pede pra A, o segundo pedido firma
+  a amizade em vez de abrir outro pendente. Sem isso os dois ficariam esperando o aceite um do
+  outro e nada na tela explicaria por quê.
+- **O retrospecto NÃO mora na amizade.** Fica em `rivalries/{par}`, escrito por `battleApplyStats`
+  pra TODA batalha online. Se ficasse no documento de amizade, desfazer e refazer zeraria o
+  histórico, e quem vira amigo depois de já ter batalhado começaria em 0×0 — que é mentira.
+- **Presença não tem batimento.** `touchLastSeen` pega carona nas chamadas que já acontecem
+  (`getMyNotifications`, lobby, fila), com folga de 5 minutos. Por isso "agora há pouco" na tela
+  cobre 10 minutos e não 1: um batimento a cada 4s como o do lobby custaria ~21 mil escritas por
+  jogador ativo por dia. Se um dia precisar de "online agora" de verdade, esse é o custo a pagar.
+- **O desafio de amigo é assíncrono** (3 min), ao contrário do desafio do lobby (15s): o amigo pode
+  estar em qualquer tela. O que impede uma batalha contra aba fechada é o `aliveAt` — o desafiante
+  renova enquanto a tela dele está aberta, e o aceite recusa se o carimbo estiver velho. Melhor
+  recusar na hora que criar uma batalha que morre por inatividade minutos depois.
+- Batalha nasce em `montarBatalhaOnline()`, usada pelos DOIS caminhos (aceite do lobby/fila e
+  aceite de desafio de amigo). Duas cópias desse objeto divergiriam num campo — foi o que já
+  aconteceu com `specialties` no desafio do lobby.
+- `searchTrainers` busca por `trainerNameLower`, campo que **não tem backfill**: cada conta ganha
+  na primeira vez que passa por `touchLastSeen`. A segunda consulta (`trainerName ==` exato) é a
+  rede de segurança pra quem ainda não abriu o jogo depois do deploy.
+- `escJs()` escapa as DUAS camadas (string JS e atributo HTML). Antes escapava só a aspa simples,
+  e como nome de treinador não filtra caractere nenhum (só corta em 20), um `Ash" onmouseover=…`
+  fechava o atributo e executava. Quem chamar `escJs` **não deve** passar `escapeHtmlSafe` por
+  cima: escaparia o `&` das entidades de novo.
+
+## Mapa de Kanto
+
+- SVG desenhado no próprio arquivo, **nenhuma imagem de fora**. Já houve dois episódios de imagem
+  hotlinkada que funcionava local e morria publicada (ver `GYM_BADGE_VISUALS`).
+- **Só o caminho já percorrido é desenhado**, mais o trecho atual pontilhado. Desenhar a jornada
+  inteira virava espaguete: o trajeto real de Kanto se cruza várias vezes (Celadon → Fuchsia →
+  Saffron → Cinnabar → Viridian) e num celular isso lia como rabisco. A visão linear do que falta
+  é a **trilha de insígnias** (`kantoTrailHtml`), que é outra coisa e fica em outro lugar da tela.
+- `game.routeHistory` guarda a rota escolhida por trecho. É estado de **exibição** — nenhuma regra
+  lê. `currentRoute` sozinho não servia: ele é sobrescrito no trecho seguinte, e o mapa perdia a
+  memória de por onde a pessoa passou. Save antigo sem o campo desenha normal, só sem o passado.
+- Cada lugar tem um `lp` (posição do rótulo). Com todos em cima, "Saffron City" caía sobre o ícone
+  da rota e "Vermilion City" sobre a linha do trecho. Os nomes usam halo (`paint-order:stroke`),
+  não caixinha: 11 caixas por trás dos nomes somem com o mapa.
+- Cidade não descoberta é um ponto **pequeno**. Com o mesmo raio das outras, a abertura da jornada
+  mostrava nove círculos escuros e o mapa parecia furado.
+- A trilha vive FORA de qualquer `.box`, direto sobre o fundo escuro — por isso a legenda usa tons
+  claros. Com `var(--muted)`/`var(--ink)` ela sumia no próprio fundo.
+- Mexer numa coordenada de `KANTO_PLACES` move a cidade **e** as linhas do trajeto, que saem dali.
+  `node tools/test-mapa.js` confere que toda cidade continua dentro da moldura e que o mapa não
+  revela cidade antes da hora — os dois erros que somem em silêncio.
+
 ## Frontend
 
 - **Não redesenhar a tela durante animações.** Cada `render()` recria o HTML e mata a transição
