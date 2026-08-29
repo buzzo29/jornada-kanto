@@ -9210,11 +9210,17 @@ const CONFIRMA_SAVE_MS = 12000;
 function limparParaFirestore(valor, caminho, achados){
   if(valor === undefined) return undefined;
   if(Array.isArray(valor)){
-    return valor.map((v, i)=>{
-      const limpo = limparParaFirestore(v, caminho+'['+i+']', achados);
-      if(limpo === undefined){ achados.push(caminho+'['+i+']'); return null; }  // array não aceita buraco
-      return limpo;
-    });
+    /* Laço por ÍNDICE, não .map(): map PULA buraco de array e o mantém no resultado -- e buraco,
+       pro Firestore, é undefined igual. Foi esse o ponto cego da primeira versão: `Object.keys`
+       também não lista buraco, então a varredura passava direto e a gravação continuava sendo
+       recusada. Buraco vira null, que o Firestore aceita. */
+    const saida = [];
+    for(let i = 0; i < valor.length; i++){
+      const limpo = limparParaFirestore(valor[i], caminho+'['+i+']', achados);
+      if(limpo === undefined){ achados.push(caminho+'['+i+']'); saida.push(null); }
+      else saida.push(limpo);
+    }
+    return saida;
   }
   if(valor && typeof valor === 'object'){
     const saida = {};
@@ -9242,7 +9248,11 @@ async function saveCurrentGame(){
     // qualquer salvamento normal do jogo (autosave, fim de batalha, cura da Elite) apagava o nome
     // customizado e o favorito de volta pro padrão ("Time N", desfavoritado)
     const removidos = [];
-    const dados = limparParaFirestore(serializeGame(), '', removidos);
+    /* Duas passadas de propósito. A primeira NOMEIA o que estava indefinido (é o diagnóstico que
+       vai gravado no documento); a segunda é o cinto de segurança: JSON.stringify some com
+       undefined em objeto e transforma buraco de array em null, sem depender da minha varredura
+       acertar todos os cantos. Perder progresso de novo por um canto esquecido não é aceitável. */
+    const dados = JSON.parse(JSON.stringify(limparParaFirestore(serializeGame(), '', removidos)));
     if(removidos.length){
       console.warn('Campos indefinidos removidos do save:', removidos);
       dados.saveCamposRemovidos = removidos.slice(0, 12);
