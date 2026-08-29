@@ -1470,6 +1470,8 @@
      disponível, fica CORTADO em vez de vazar visualmente pra fora do quadro */
   .save-slot-team-row.spread{ display:grid; grid-template-columns:repeat(6, 1fr); gap:3px; overflow-x:visible; }
   .save-slot-team-row.spread .save-slot-mon{ min-width:0; overflow:hidden; }
+  /* quem desmaiou fica apagado -- é o que substituiu o selo de "Desmaiou" no fim da batalha */
+  .save-slot-mon.caiu{opacity:.35;filter:grayscale(.5);}
   .save-slot-mon{
     flex:0 0 auto;
     text-align:center;
@@ -2629,20 +2631,21 @@ const GYMS = [
 
 const TYPE_CHART = {
   // as 5 imunidades totais do Gen 1 (Normal/Lutador vs Fantasma, Fantasma vs Normal, Terra vs Voador,
-  // Elétrico vs Terra) viraram 0.25 em vez de 0 -- nada é mais 100% imune, sempre passa alguma coisa
-  Normal:{Rock:0.5, Ghost:0.25},
+  // Elétrico vs Terra) valem 0 de novo, como na Gen 1 de verdade. Elas valeram 0.25 por um tempo,
+  // pra nada ser 100% imune -- ver a nota de imunidade no CLAUDE.md pro que essa volta custa.
+  Normal:{Rock:0.5, Ghost:0},
   Fire:{Grass:2,Bug:2,Rock:0.5,Water:0.5,Fire:0.5,Ice:2,Dragon:0.5},
   Water:{Fire:2,Rock:2,Ground:2,Water:0.5,Grass:0.5,Dragon:0.5},
   Grass:{Water:2,Rock:2,Ground:2,Fire:0.5,Grass:0.5,Poison:0.5,Flying:0.5,Bug:0.5,Dragon:0.5},
   Poison:{Grass:2,Bug:2,Rock:0.5,Ground:0.5,Poison:0.5,Ghost:0.5},
   Flying:{Grass:2,Fighting:2,Bug:2,Rock:0.5,Electric:0.5},
   Bug:{Grass:2,Poison:2,Fighting:0.5,Flying:0.5,Fire:0.5,Psychic:2,Ghost:0.5},
-  Fighting:{Normal:2,Rock:2,Poison:0.5,Flying:0.5,Bug:0.5,Psychic:0.5,Ghost:0.25,Ice:2},
+  Fighting:{Normal:2,Rock:2,Poison:0.5,Flying:0.5,Bug:0.5,Psychic:0.5,Ghost:0,Ice:2},
   Rock:{Fire:2,Flying:2,Bug:2,Fighting:0.5,Ground:0.5,Ice:2},
-  Ground:{Fire:2,Rock:2,Poison:2,Grass:0.5,Bug:0.5,Electric:2,Flying:0.25},
+  Ground:{Fire:2,Rock:2,Poison:2,Grass:0.5,Bug:0.5,Electric:2,Flying:0},
   Psychic:{Fighting:2,Poison:2,Psychic:0.5},
-  Electric:{Water:2,Flying:2,Grass:0.5,Electric:0.5,Ground:0.25,Dragon:0.5},
-  Ghost:{Ghost:2,Psychic:2,Normal:0.25},
+  Electric:{Water:2,Flying:2,Grass:0.5,Electric:0.5,Ground:0,Dragon:0.5},
+  Ghost:{Ghost:2,Psychic:2,Normal:0},
   Dragon:{Dragon:2},
   Ice:{Grass:2,Ground:2,Flying:2,Dragon:2,Water:0.5,Ice:0.5}
 };
@@ -4233,6 +4236,10 @@ function calcDamageNew(attacker, defender, rng){
   const D = statAtLevel(defBase, defender.level);
   const isCrit = rng() < (effectiveSpeed(attacker) / 512); // crítico oficial da Gen 1
   attacker.lastCrit = isCrit;   // registro pro log, como o lastMoveType acima
+  /* Imunidade: o multiplicador é 0, mas o dano tem piso de 1 -- dano 0 dos dois lados travaria
+     o laço da luta pra sempre. O log precisa saber a diferença entre "tirou 1" e "não teve
+     efeito", senão o jogador vê um -1 sem explicação. */
+  attacker.lastMoveNulo = (best.mult === 0);
   const Leff = isCrit ? attacker.level*2 : attacker.level; // crítico dobra o nível na fórmula (regra oficial)
   const core = Math.floor(Math.floor(2*Leff/5 + 2) * MOVE_POWER * A / D / 50) + 2;
   const typeMult = Math.pow(best.mult, 0.6);
@@ -4287,8 +4294,8 @@ function doExchange(active, enemy, rng, diario){
        sorteou: um golpe de 101 num pokémon com 54 de HP tira 54. Gravar o valor cru fazia o log
        não fechar -- somando as linhas dava mais dano do que o pokémon tinha de vida. */
     const moribundo = counter !== dmgBySecond;
-    diario.push({ q: activeFirst?'p':'e', d: secondHpBefore - second.hp, hp: second.hp, c: first.lastCrit?1:0, m:0 });
-    diario.push({ q: activeFirst?'e':'p', d: firstHpBefore  - first.hp,  hp: first.hp,  c: second.lastCrit?1:0, m: moribundo?1:0 });
+    diario.push({ q: activeFirst?'p':'e', d: secondHpBefore - second.hp, hp: second.hp, c: first.lastCrit?1:0, m:0, z: first.lastMoveNulo?1:0 });
+    diario.push({ q: activeFirst?'e':'p', d: firstHpBefore  - first.hp,  hp: first.hp,  c: second.lastCrit?1:0, m: moribundo?1:0, z: second.lastMoveNulo?1:0 });
   }
   // EMPATE NÃO EXISTE: se o golpe moribundo também derrubaria o primeiro, fica de pé quem tinha o
   // MAIOR percentual de HP entrando na troca, com 1%-10% do HP máximo (sorteado). Percentual igual
@@ -10566,26 +10573,25 @@ function renderTrainerBattleResult(){
   <button class="btn primary" onclick="backFromTrainerBattle()">⬅ Voltar</button>`;
 }
 
-function renderPlayerStatus(list){
-  return list.map(p=>{
+/* Time no fim da batalha: a MESMA fileira horizontal de sprite + nível da home, em vez de uma
+   linha de texto por pokémon. Os selos de "Desmaiou/Sobreviveu/Derrotado" saíram: com o sprite
+   de quem caiu apagado, o selo era só ruído repetindo o que a imagem já diz -- e o time inteiro
+   passou a caber numa olhada, em vez de seis linhas de rolagem.
+   O time adversário aproveita a mesma função: antes ele nem sprite tinha, só nome. */
+function teamStatusRowHtml(list){
+  return `<div class="save-slot-team-row spread">${(list||[]).map(p=>{
     const sp = SPECIES[p.speciesId];
-    const cls = p.fainted ? 'fainted' : '';
-    return `<div class="status-row ${cls}">
-      <span class="icon">${p.fainted?'❌':'✅'}</span>
-      <span>${sp?spriteHtml(p.speciesId,'sprite-sm',p.shiny):''} ${p.name}${p.shiny?' 🌟':''} — Lv.${p.level}</span>
-      <span class="tag ${p.fainted?'dead':'alive'}">${p.fainted?'Desmaiou':'Sobreviveu'}</span>
+    return `<div class="save-slot-mon ${p.fainted?'caiu':''}">
+      <div class="save-slot-mon-sprite large">${sp?spriteHtml(p.speciesId,'sprite-md',p.shiny):'❔'}</div>
+      <div class="save-slot-mon-level">${p.shiny?'🌟 ':''}Lv.${p.level}</div>
     </div>`;
-  }).join('');
+  }).join('')}</div>`;
+}
+function renderPlayerStatus(list){
+  return teamStatusRowHtml(list);
 }
 function renderEnemyStatus(list){
-  return list.map(p=>{
-    const cls = p.fainted ? 'fainted' : '';
-    return `<div class="status-row ${cls}">
-      <span class="icon">${p.fainted?'❌':'🟢'}</span>
-      <span>${p.name} — Lv.${p.level}</span>
-      <span class="tag ${p.fainted?'dead':'alive'}">${p.fainted?'Derrotado':'De pé'}</span>
-    </div>`;
-  }).join('');
+  return teamStatusRowHtml(list);
 }
 
 /* ============================================================================
@@ -10849,9 +10855,12 @@ function passosHtml(m){
     const quem  = `<span class="mlog-quem ${doJogador?'p':'e'}">${doJogador?nomeP:nomeE}</span>`;
     const alvo  = `<span class="mlog-quem ${doJogador?'e':'p'}">${doJogador?nomeE:nomeP}</span>`;
     const golpe = golpeSeloHtml(doJogador?m.playerSpecies:m.enemySpecies, doJogador?m.playerMove:m.enemyMove);
-    return `<div class="mlog-passo ${doJogador?'p':'e'}">
-      ${quem} atacou ${alvo}${golpe?` com ${golpe}`:''} e tirou <span class="mlog-tira">−${g.d}</span> de HP.
-    </div>`;
+    /* Imunidade: o multiplicador é 0 e sobra o piso de 1 de dano do motor. Dizer "tirou −1" sem
+       mais nada faria o jogador procurar bug onde é regra. */
+    const frase = g.z
+      ? `${quem} atacou ${alvo}${golpe?` com ${golpe}`:''}, mas <strong>não teve efeito</strong>: <span class="mlog-tira">−${g.d}</span> de HP.`
+      : `${quem} atacou ${alvo}${golpe?` com ${golpe}`:''} e tirou <span class="mlog-tira">−${g.d}</span> de HP.`;
+    return `<div class="mlog-passo ${doJogador?'p':'e'}">${frase}</div>`;
   }).join('')}</div>`;
 }
 
@@ -13997,15 +14006,10 @@ function renderOnlineFight(){
        nível e golpe de cada lado, e a virada parcial mostrava o nome do meu pokémon com o
        sprite e o golpe do adversário. */
     const logDaMinhaVista = st.matchups.map(m => souA ? m : virarMatchup(m));
-    const statusTime = (time) => time.map(p=>{
-      const sp = SPECIES[p.speciesId];
-      const caiu = p.hp <= 0;
-      return `<div class="status-row ${caiu?'fainted':''}">
-        <span class="icon">${caiu?'❌':'✅'}</span>
-        <span>${sp?spriteHtml(p.speciesId,'sprite-sm',p.shiny):''} ${escapeHtmlSafe(p.name)}${p.shiny?' 🌟':''} — Lv.${p.level}</span>
-        <span class="tag ${caiu?'dead':'alive'}">${caiu?'Desmaiou':`${p.hp}/${p.maxHp} HP`}</span>
-      </div>`;
-    }).join('');
+    // mesma fileira das outras batalhas (teamStatusRowHtml): sprite, nível e quem caiu apagado
+    const statusTime = (time) => teamStatusRowHtml((time||[]).map(p=>({
+      speciesId: p.speciesId, level: p.level, shiny: p.shiny, fainted: p.hp <= 0
+    })));
     return `
     <div class="result-banner ${st.venci?'win':'lose'}">${st.venci ? '🏆 VOCÊ VENCEU A BATALHA!' : '💥 VOCÊ PERDEU A BATALHA'}</div>
     <div class="box">

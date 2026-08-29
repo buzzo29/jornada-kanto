@@ -48,7 +48,16 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
   Decisão em aberto — foi medido e apresentado, não escolhido.
 - **Multiplicador de tipo é comprimido (`^0.6`)**: 2× vira ~1,52×. Decisão consciente — não dá pra
   trocar de pokémon no meio do confronto, e tipo puro viraria sentença de morte.
-- **Imunidades valem 0,25, não 0.** Consequência da mesma decisão. Normal acerta Fantasma.
+- **Imunidades valem 0 de novo** (eram 0,25). Voltou a ser fiel à Gen 1: Normal não acerta
+  Fantasma, Elétrico não acerta Terra, Terra não acerta Voador. Medido na volta: **0,7% dos
+  22.500 confrontos possíveis** ficam sem golpe útil (o motor tem piso de 1 de dano por golpe,
+  senão dois imunes travariam o laço), **2,7% das batalhas mudam de vencedor** e a taxa de
+  vitória geral quase não se move (51,4% → 51,1%).
+  Quem mais perde com isso: Diglett/Dugtrio/Cubone/Marowak (Terra puro, 19 espécies voadoras que
+  eles não alcançam), Raichu (14) e os Normal puros contra os três Fantasmas. O subtipo é o que
+  salva o resto — 69 espécies têm um tipo alternativo pra recorrer.
+  No log isso aparece como "**mas não teve efeito**", com o −1 do piso: sem essa frase o jogador
+  vê um −1 solto e procura bug onde é regra.
 - Velocidade alta é mais valiosa do que parece, porque entra na taxa de crítico (ver acima).
 - **Todo modo aplica os mesmos buffs.** Shiny e especialidade valem em TODA batalha (liga, liga dos
   treinadores, ginásio do bairro, torre e online); terreno só existe onde há terreno escolhido

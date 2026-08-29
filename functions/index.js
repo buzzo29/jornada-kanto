@@ -167,20 +167,21 @@ const SPECIES = {
 
 const TYPE_CHART = {
   // as 5 imunidades totais do Gen 1 (Normal/Lutador vs Fantasma, Fantasma vs Normal, Terra vs Voador,
-  // Elétrico vs Terra) viraram 0.25 em vez de 0 -- nada é mais 100% imune, sempre passa alguma coisa
-  Normal:{Rock:0.5, Ghost:0.25},
+  // Elétrico vs Terra) valem 0 de novo, como na Gen 1 de verdade. Elas valeram 0.25 por um tempo,
+  // pra nada ser 100% imune -- ver a nota de imunidade no CLAUDE.md pro que essa volta custa.
+  Normal:{Rock:0.5, Ghost:0},
   Fire:{Grass:2,Bug:2,Rock:0.5,Water:0.5,Fire:0.5,Ice:2,Dragon:0.5},
   Water:{Fire:2,Rock:2,Ground:2,Water:0.5,Grass:0.5,Dragon:0.5},
   Grass:{Water:2,Rock:2,Ground:2,Fire:0.5,Grass:0.5,Poison:0.5,Flying:0.5,Bug:0.5,Dragon:0.5},
   Poison:{Grass:2,Bug:2,Rock:0.5,Ground:0.5,Poison:0.5,Ghost:0.5},
   Flying:{Grass:2,Fighting:2,Bug:2,Rock:0.5,Electric:0.5},
   Bug:{Grass:2,Poison:2,Fighting:0.5,Flying:0.5,Fire:0.5,Psychic:2,Ghost:0.5},
-  Fighting:{Normal:2,Rock:2,Poison:0.5,Flying:0.5,Bug:0.5,Psychic:0.5,Ghost:0.25,Ice:2},
+  Fighting:{Normal:2,Rock:2,Poison:0.5,Flying:0.5,Bug:0.5,Psychic:0.5,Ghost:0,Ice:2},
   Rock:{Fire:2,Flying:2,Bug:2,Fighting:0.5,Ground:0.5,Ice:2},
-  Ground:{Fire:2,Rock:2,Poison:2,Grass:0.5,Bug:0.5,Electric:2,Flying:0.25},
+  Ground:{Fire:2,Rock:2,Poison:2,Grass:0.5,Bug:0.5,Electric:2,Flying:0},
   Psychic:{Fighting:2,Poison:2,Psychic:0.5},
-  Electric:{Water:2,Flying:2,Grass:0.5,Electric:0.5,Ground:0.25,Dragon:0.5},
-  Ghost:{Ghost:2,Psychic:2,Normal:0.25},
+  Electric:{Water:2,Flying:2,Grass:0.5,Electric:0.5,Ground:0,Dragon:0.5},
+  Ghost:{Ghost:2,Psychic:2,Normal:0},
   Dragon:{Dragon:2},
   Ice:{Grass:2,Ground:2,Flying:2,Dragon:2,Water:0.5,Ice:0.5}
 };
@@ -499,6 +500,10 @@ function calcDamage(attacker, defender, rng){
   const D = statAtLevel(defBase, defender.level);
   const isCrit = rng() < (effectiveSpeed(attacker) / 512);  // crítico oficial da Gen 1
   attacker.lastCrit = isCrit;   // registro pro log, como o lastMoveType acima
+  /* Imunidade: o multiplicador é 0, mas o dano tem piso de 1 -- dano 0 dos dois lados travaria
+     o laço da luta pra sempre. O log precisa saber a diferença entre "tirou 1" e "não teve
+     efeito", senão o jogador vê um -1 sem explicação. */
+  attacker.lastMoveNulo = (best.mult === 0);
   const Leff = isCrit ? attacker.level*2 : attacker.level;  // crítico dobra o nível na fórmula
   const core = Math.floor(Math.floor(2*Leff/5 + 2) * MOVE_POWER * A / D / 50) + 2;
   // multiplicador de tipo COMPRIMIDO (^0.6): 2x vira ~1.5x. Aqui não se troca de pokémon no meio
@@ -545,8 +550,8 @@ function doExchange(active, enemy, rng, diario){
        sorteou: um golpe de 101 num pokémon com 54 de HP tira 54. Gravar o valor cru fazia o log
        não fechar -- somando as linhas dava mais dano do que o pokémon tinha de vida. */
     const moribundo = counter !== dmgBySecond;
-    diario.push({ q: activeFirst?'p':'e', d: secondHpBefore - second.hp, hp: second.hp, c: first.lastCrit?1:0, m:0 });
-    diario.push({ q: activeFirst?'e':'p', d: firstHpBefore  - first.hp,  hp: first.hp,  c: second.lastCrit?1:0, m: moribundo?1:0 });
+    diario.push({ q: activeFirst?'p':'e', d: secondHpBefore - second.hp, hp: second.hp, c: first.lastCrit?1:0, m:0, z: first.lastMoveNulo?1:0 });
+    diario.push({ q: activeFirst?'e':'p', d: firstHpBefore  - first.hp,  hp: first.hp,  c: second.lastCrit?1:0, m: moribundo?1:0, z: second.lastMoveNulo?1:0 });
   }
   // EMPATE NÃO EXISTE: se o golpe moribundo também derrubaria o primeiro, fica de pé quem tinha o
   // MAIOR percentual de HP entrando na troca, com 1%-10% do HP máximo (sorteado). Percentual igual
