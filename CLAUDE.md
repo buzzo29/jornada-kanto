@@ -238,6 +238,19 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
   `node tools/test-mapa.js` confere que toda cidade continua dentro da moldura e que o mapa não
   revela cidade antes da hora — os dois erros que somem em silêncio.
 
+## Salvamento
+
+- **`set()` do Firestore NÃO significa que salvou.** Ele resolve quando o SDK aceita a gravação
+  localmente; sem rede ela vai pra uma fila em memória (não habilitamos persistência), o `await`
+  volta sem erro e a fila morre com a aba. Por isso todo salvamento espera o
+  **`waitForPendingWrites()`**, que só resolve com a confirmação do SERVIDOR — e uma tarja sobe na
+  tela se não confirmar em 12s. Sem isso o jogador joga uma hora e perde tudo em silêncio.
+- Diagnóstico que já foi usado: `readTime` do Firestore lê o documento como ele estava em qualquer
+  instante da última hora. Amostrar de 5 em 5 minutos mostra se o save **avança** ou se está sendo
+  regravado idêntico — foi o que separou "não grava" de "grava sempre o mesmo estado".
+- O autosave é debounced em 800ms e **re-armado a cada `render()`**: uma tela que se redesenhe mais
+  rápido que isso adia a gravação pra sempre. Ele também só roda nas telas de `SAFE_SAVE_SCREENS`.
+
 ## Frontend
 
 - **Não redesenhar a tela durante animações.** Cada `render()` recria o HTML e mata a transição

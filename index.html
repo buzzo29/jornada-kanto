@@ -830,6 +830,16 @@
   }
   .matchup-row:last-child{border-bottom:none;}
   .matchup-row .vs{color:var(--muted);font-weight:800;margin:0 2px;}
+  /* tarja de salvamento -- fixa no alto, por cima de tudo */
+  .save-aviso{position:fixed;top:0;left:0;right:0;z-index:200;display:flex;align-items:center;
+    gap:8px;padding:7px 10px;background:var(--yellow-dark);color:#fff;font-size:.66rem;
+    font-weight:700;line-height:1.3;box-shadow:0 2px 6px rgba(0,0,0,.35);}
+  .save-aviso.erro{background:var(--red-dark);}
+  .save-aviso-txt{flex:1;min-width:0;}
+  .save-aviso-cod{opacity:.85;font-weight:400;}
+  .save-aviso-btn{flex:0 0 auto;background:rgba(255,255,255,.92);color:var(--ink);border:none;
+    border-radius:4px;padding:5px 9px;font-family:var(--font-ui);font-size:.62rem;font-weight:800;
+    cursor:pointer;}
   /* Cartão de confronto: os dois lados EMPILHADOS, cada um com a largura inteira.
      Lado a lado não serve: em 320px cada coluna fica com ~140px e o nome do golpe é cortado
      (Chicote de Cipó virava C...), que é justamente a informação que o log existe pra dar.
@@ -9181,6 +9191,20 @@ function serializeGame(){
     updatedAt: Date.now()
   };
 }
+/* SALVAMENTO NÃO CONFIRMADO -- por que isso existe.
+   `set()` resolve assim que o SDK aceita a gravação LOCALMENTE. Sem rede, ela vai pra uma fila em
+   memória (não habilitamos persistência), o `await` volta sem erro nenhum, a tela segue como se
+   tivesse salvado -- e a fila morre junto com a aba. O jogador joga uma hora e perde tudo sem um
+   aviso sequer. Foi exatamente esse o sintoma reportado: o save no servidor congelado no estado
+   do carregamento, regravado idêntico a cada vez que abria.
+   `waitForPendingWrites()` só resolve quando o SERVIDOR confirma. É o único jeito de saber que o
+   save chegou. Se não confirmar em CONFIRMA_SAVE_MS, o aviso sobe na tela. */
+const CONFIRMA_SAVE_MS = 12000;
+function avisoDeSave(estado, detalhe){
+  const antes = game.saveAviso && game.saveAviso.estado;
+  game.saveAviso = estado ? { estado, detalhe: detalhe||'', quando: Date.now() } : null;
+  if(antes !== estado) render();   // só redesenha quando o aviso muda de estado
+}
 async function saveCurrentGame(){
   if(!game.authUser || game.currentSaveSlot==null) return;
   try{
@@ -9190,10 +9214,38 @@ async function saveCurrentGame(){
     // qualquer salvamento normal do jogo (autosave, fim de batalha, cura da Elite) apagava o nome
     // customizado e o favorito de volta pro padrão ("Time N", desfavoritado)
     await saveDocRef(game.authUser.uid, game.currentSaveSlot).set(serializeGame(), { merge: true });
+    const confirmou = await Promise.race([
+      db.waitForPendingWrites().then(()=>true),
+      new Promise(r=>setTimeout(()=>r(false), CONFIRMA_SAVE_MS))
+    ]);
+    avisoDeSave(confirmou ? null : 'semConfirmacao');
     // um pokémon pode ter cruzado o nível 60 nessa jogada -- reconta em segundo plano, sem travar nada.
     // Só vale a pena chamar se alguém do time já está no limiar; senão é chamada desperdiçada
     if(game.team.some(p=>p.level >= SPECIALTY_LEVEL)){ syncSpecialties(); }
-  } catch(e){ console.error('Erro ao salvar:', e); }
+  } catch(e){
+    console.error('Erro ao salvar:', e);
+    avisoDeSave('erro', (e && (e.code || e.message)) || '');
+  }
+}
+/* A tarja de salvamento fica FIXA no alto, por cima de qualquer tela. Perder progresso em
+   silêncio é o pior defeito possível num jogo de jornada longa -- melhor uma tarja incômoda
+   agora do que uma hora de jogo perdida depois. */
+function renderAvisoDeSaveHtml(){
+  const a = game.saveAviso;
+  if(!a) return '';
+  const erro = a.estado === 'erro';
+  return `<div class="save-aviso ${erro?'erro':''}">
+    <span class="save-aviso-txt">${erro
+      ? '⚠️ <strong>Erro ao salvar.</strong> Seu progresso pode não estar sendo gravado.'
+      : '⚠️ <strong>Sem confirmação do servidor.</strong> O que você jogar agora pode se perder ao fechar o jogo.'}
+      ${a.detalhe ? `<span class="save-aviso-cod">(${escapeHtmlSafe(String(a.detalhe))})</span>` : ''}</span>
+    <button class="save-aviso-btn" onclick="tentarSalvarAgora()">Tentar salvar</button>
+  </div>`;
+}
+async function tentarSalvarAgora(){
+  avisoDeSave(null);
+  await saveCurrentGame();
+  if(!game.saveAviso){ game.saveAvisoOk = Date.now(); render(); }
 }
 let autoSaveDebounceTimer = null;
 function maybeAutoSave(){
@@ -15345,6 +15397,7 @@ function render(){
   if(game.pokedexFicha){ html += renderPokedexFicha(); }
   if(game.onlinePendente){ html += renderConviteModal(); }   // aparece por cima de qualquer tela
   if(game.desafioAviso){ html += renderAvisoDesafioModal(); }   // desafio de amigo, idem
+  html += renderAvisoDeSaveHtml();   // "não estou conseguindo salvar" -- por cima de tudo
   if(game.candyPicker){ html += renderCandyPickerModal(); }
   if(game.towerOrder){ html += renderTowerOrderModal(); }
   if(game.towerRanking){ html += renderTowerRankingModal(); }
