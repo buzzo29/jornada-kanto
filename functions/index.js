@@ -4936,8 +4936,11 @@ exports.pollFriendChallenge = onCall(async (request) => {
   if(!snap.exists){ await friendChallengePointerRef(uid).delete().catch(()=>{}); return { challenge: null }; }
   const d = snap.data();
   if(Date.now() > d.expiresAt){ await encerrarDesafio(d); return { challenge: null, expirou: true }; }
-  // só o desafiante renova o carimbo -- é a presença DELE que o aceite vai conferir
-  if(d.from.uid === uid){
+  /* Só o desafiante renova o carimbo -- é a presença DELE que o aceite vai conferir.
+     E só a partir da TELA DE AMIGOS: a consulta de fundo (o aviso que aparece em qualquer tela)
+     manda passivo:true justamente pra não renovar nada. Sem isso, quem desafiasse e saísse da
+     tela manteria o desafio vivo pelo próprio aviso, que é o oposto do que ele existe pra fazer. */
+  if(d.from.uid === uid && !request.data?.passivo){
     await friendChallengeRef(d.id).set({ aliveAt: Date.now() }, { merge:true }).catch(()=>{});
   }
   return { challenge: desafioView(d, uid) };

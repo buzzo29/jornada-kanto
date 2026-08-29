@@ -171,6 +171,19 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
 - `searchTrainers` busca por `trainerNameLower`, campo que **não tem backfill**: cada conta ganha
   na primeira vez que passa por `touchLastSeen`. A segunda consulta (`trainerName ==` exato) é a
   rede de segurança pra quem ainda não abriu o jogo depois do deploy.
+- **O desafio avisa em qualquer tela**: um laço solto consulta a cada 10s e levanta modal com som
+  e vibração (`agendarAvisoDesafio`). Ele vai com **`passivo:true`**, que impede o servidor de
+  renovar o `aliveAt` — senão o próprio aviso manteria vivo o desafio de quem desafiou e saiu da
+  tela, que é exatamente o que o `aliveAt` existe pra evitar. Aceitar continua sendo na tela de
+  amigos: é lá que estão o cronômetro e o "quem é esse treinador".
+- 10s e não 3s como na tela de amigos: esse laço roda o tempo todo, pra todo jogador com o jogo
+  aberto. 3s custaria 4× mais leitura o dia inteiro pra ganhar 7 segundos num prazo de 3 minutos.
+- O áudio do aviso é liberado no **primeiro clique em qualquer lugar** do jogo. Navegador só
+  destrava som a partir de um gesto, e quem é desafiado pode nunca ter passado pela busca de
+  oponente (o único lugar que destravava antes) — aí o aviso chegava mudo.
+- **`pararPollDesafio()` derruba o cronômetro junto.** Quem só quer parar a consulta tem que
+  limpar apenas o `friendChallengeTimer`: `agendarPollDesafio` chamava a função inteira a cada 3s
+  e congelava a contagem do card na primeira volta.
 - `escJs()` escapa as DUAS camadas (string JS e atributo HTML). Antes escapava só a aspa simples,
   e como nome de treinador não filtra caractere nenhum (só corta em 20), um `Ash" onmouseover=…`
   fechava o atributo e executava. Quem chamar `escJs` **não deve** passar `escapeHtmlSafe` por

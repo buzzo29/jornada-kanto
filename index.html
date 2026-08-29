@@ -13132,6 +13132,13 @@ function prepararAudio(){
     if(audioCtx.state === 'suspended') audioCtx.resume();
   } catch(e){ console.error('Áudio indisponível:', e); }
 }
+/* O aviso de desafio de amigo pode chegar em qualquer tela, inclusive numa sessão em que a pessoa
+   nunca passou pela busca de oponente -- e aí o audioCtx nem existia, então o som não saía.
+   Navegador só libera áudio a partir de um gesto, então o primeiro toque em qualquer lugar do
+   jogo serve de gesto. Uma vez só: depois disso o contexto fica liberado pelo resto da sessão. */
+try{
+  document.addEventListener('click', ()=>{ if(somLigado()) prepararAudio(); }, { once:true });
+} catch(e){}
 function tocarAvisoOponente(){
   if(!somLigado() || !audioCtx) return;
   try{
@@ -14306,7 +14313,10 @@ function fecharComparacao(){ game.friendCompare = null; render(); }
    "fulano saiu da tela" em vez de criar uma batalha contra ninguém.
    -------------------------------------------------------------------------- */
 function agendarPollDesafio(){
-  pararPollDesafio();
+  /* Para só o POLL, nunca o cronômetro. Antes chamava pararPollDesafio(), que mata os dois --
+     e como esta função se reagenda a cada 3s, o cronômetro do desafio morria na primeira volta
+     e ficava congelado no valor em que estava. Só voltava a andar se algo redesenhasse a tela. */
+  if(friendChallengeTimer){ clearTimeout(friendChallengeTimer); friendChallengeTimer = null; }
   if(game.screen !== 'friends') return;
   friendChallengeTimer = setTimeout(async ()=>{
     if(game.screen !== 'friends') return;
@@ -14315,8 +14325,11 @@ function agendarPollDesafio(){
       if(r.data.battleId){ pararPollDesafio(); game.friendChallenge = null; entrarNaBatalha(r.data.battleId); return; }
       const antes = game.friendChallenge && game.friendChallenge.id;
       game.friendChallenge = r.data.challenge || null;
-      // o desafio sumiu (recusado, cancelado ou vencido): a lista de amigos precisa voltar ao normal
-      if(antes && !game.friendChallenge) render();
+      const agora = game.friendChallenge && game.friendChallenge.id;
+      /* Redesenha quando o desafio MUDA de identidade -- apareceu, sumiu ou é outro.
+         Antes só redesenhava quando sumia, então um desafio que chegava com a tela já aberta
+         não aparecia até alguma outra coisa redesenhar a tela. */
+      if(antes !== agora) render();
     } catch(e){ console.error('Erro no poll do desafio:', e); }
     agendarPollDesafio();
   }, FRIEND_POLL_MS);
@@ -14374,6 +14387,92 @@ async function responderDesafioAmigo(challengeId, aceitar){
    Passa pela tela de amigos em vez de responder direto: o cronômetro e o "quem é esse treinador"
    estão lá, e aceitar às cegas um desafio de 3 minutos atrás não é o que a pessoa quer. */
 function irParaDesafioAmigo(){ openFriends(); }
+
+/* --------------------------------------------------------------------------
+   AVISO DE DESAFIO EM QUALQUER TELA
+   O desafio dura 3 minutos e chega quando o amigo clica -- quem foi desafiado pode estar em
+   qualquer canto do jogo. Esta consulta roda solta, FORA da tela de amigos, e quando acha um
+   desafio novo levanta o mesmo tipo de aviso do pareamento online: modal por cima da tela, som
+   e vibração. Aceitar é na tela de amigos, que é onde estão o cronômetro e o "quem é esse".
+
+   Duas decisões que não dá pra deduzir do código:
+   - vai com `passivo:true`: consultar não pode manter vivo o desafio de quem desafiou e SAIU da
+     tela -- o desafio morrer quando o desafiante fecha a tela é a regra que impede batalha
+     contra aba fechada;
+   - o intervalo é 10s, e não os 3s da tela de amigos. Aqui isso roda o tempo todo, pra todo
+     jogador com o jogo aberto: 3s custaria 4x mais leitura o dia inteiro pra ganhar 7 segundos
+     num prazo de 3 minutos.
+   -------------------------------------------------------------------------- */
+const DESAFIO_AVISO_MS = 10000;
+let desafioAvisoTimer = null;
+let desafioAvisoVisto = null;   // id do último desafio já avisado -- não avisa o mesmo duas vezes
+function pararAvisoDesafio(){ if(desafioAvisoTimer){ clearTimeout(desafioAvisoTimer); desafioAvisoTimer = null; } }
+function agendarAvisoDesafio(){
+  pararAvisoDesafio();
+  desafioAvisoTimer = setTimeout(async ()=>{
+    const pular = !game.authUser || game.desafioAviso ||
+                  game.screen === 'friends' ||      // lá o poll é mais rápido e cuida disso
+                  game.screen === 'onlineFight';    // no meio de uma batalha, não
+    if(pular){ agendarAvisoDesafio(); return; }
+    try{
+      const r = await functionsClient.httpsCallable('pollFriendChallenge')({ since: Date.now(), passivo: true });
+      const c = r.data.challenge;
+      if(c && c.sou === 'desafiado' && c.id !== desafioAvisoVisto){
+        desafioAvisoVisto = c.id;
+        game.desafioAviso = c;
+        tocarAvisoOponente();
+        // vibra também: em celular no bolso o som pode estar no silencioso
+        try{ if(navigator.vibrate) navigator.vibrate([120, 60, 120]); } catch(e){}
+        render();
+      }
+    } catch(e){ console.error('Erro no aviso de desafio:', e); }
+    agendarAvisoDesafio();
+  }, DESAFIO_AVISO_MS);
+}
+function verDesafioDoAviso(){ game.desafioAviso = null; openFriends(); }
+async function recusarDesafioDoAviso(){
+  const c = game.desafioAviso;
+  game.desafioAviso = null;
+  render();
+  if(!c) return;
+  try{ await functionsClient.httpsCallable('respondFriendChallenge')({ challengeId: c.id, accept:false }); }
+  catch(e){ console.error('Erro ao recusar desafio:', e); }
+}
+function renderAvisoDesafioModal(){
+  const c = game.desafioAviso;
+  if(!c) return '';
+  const restam = Math.max(0, Math.ceil((c.expiresAt - Date.now())/1000));
+  const relogio = Math.floor(restam/60) + ':' + String(restam%60).padStart(2,'0');
+  /* cronômetro por DOM, com laço próprio: o modal fica por cima de telas que quase não
+     redesenham (a jornada, a pokédex), então depender de render() deixaria ele parado */
+  clearTimeout(avisoDesafioTick);
+  avisoDesafioTick = setTimeout(function tick(){
+    const cc = game.desafioAviso;
+    if(!cc) return;
+    const el = document.querySelector('.aviso-desafio-timer');
+    const s = Math.max(0, Math.ceil((cc.expiresAt - Date.now())/1000));
+    if(el){
+      const txt = Math.floor(s/60) + ':' + String(s%60).padStart(2,'0');
+      if(el.textContent !== txt) el.textContent = txt;
+    }
+    if(s <= 0){ game.desafioAviso = null; render(); return; }   // venceu sozinho
+    avisoDesafioTick = setTimeout(tick, 500);
+  }, 500);
+  return `
+  <div class="modal-overlay convite-overlay">
+    <div class="modal-box convite-box">
+      <div class="modal-icon">⚔️</div>
+      <h2>Você foi desafiado!</h2>
+      <p><strong>${escapeHtmlSafe(c.oponente||'Um amigo')}</strong> quer batalhar com você.</p>
+      <div class="convite-timer aviso-desafio-timer">${relogio}</div>
+      <p class="hint-text">Aceite na tela de amigos. O time você escolhe depois, com os dois já conectados.</p>
+      <button class="btn success" onclick="verDesafioDoAviso()">⚔️ Ver desafio</button>
+      <button class="btn secondary" onclick="recusarDesafioDoAviso()">Agora não</button>
+      <button class="convite-som" onclick="alternarSom()" title="${somLigado()?'Silenciar aviso':'Ativar aviso sonoro'}">${somLigado()?'🔊 Som ligado':'🔇 Som desligado'}</button>
+    </div>
+  </div>`;
+}
+let avisoDesafioTick = null;
 
 /* Cronômetro do desafio por DOM, não por render(): um render por segundo recriaria a lista de
    amigos inteira debaixo do dedo de quem vai clicar em "aceitar". Mesma decisão da contagem da
@@ -15194,6 +15293,7 @@ function render(){
   // ficha é aberta a partir de dentro dele -- se viesse antes, abriria atrás
   if(game.pokedexFicha){ html += renderPokedexFicha(); }
   if(game.onlinePendente){ html += renderConviteModal(); }   // aparece por cima de qualquer tela
+  if(game.desafioAviso){ html += renderAvisoDesafioModal(); }   // desafio de amigo, idem
   if(game.candyPicker){ html += renderCandyPickerModal(); }
   if(game.towerOrder){ html += renderTowerOrderModal(); }
   if(game.towerRanking){ html += renderTowerRankingModal(); }
@@ -15218,9 +15318,11 @@ auth.onAuthStateChanged((user)=>{
     game.authUser = { uid:user.uid, email:user.email, displayName:user.displayName };
     game.authBusy = false;
     if(game.screen==='auth'){ openSaveSelect(); }
+    agendarAvisoDesafio();   // desafio de amigo pode chegar em qualquer tela, a partir de agora
   } else {
     game.authUser = null;
     game.currentSaveSlot = null;
+    pararAvisoDesafio();
     if(game.screen!=='auth'){ game.screen = 'auth'; render(); }
   }
   resolveAuthChecked();
