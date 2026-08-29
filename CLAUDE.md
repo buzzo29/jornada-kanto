@@ -62,6 +62,11 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
   Houve uma fase em que foram só ofensivos (1,15 e 1,10); acabou, por decisão de design.
   O custo é conhecido e aceito: 1 contra 1 da mesma espécie, um shiny no terreno dele em nível 60
   ganha de um normal de nível 70 em 90% das vezes. O buff vale ~15 níveis.
+- **O buff de terreno mexe no TETO de HP**, não só no dano — ele entra em todos os atributos, e o
+  HP base é um deles. Um Gyarados nível 73 tem teto 490 fora d'água e 504 dentro. Onde o HP
+  carrega de uma luta pra outra (Elite 4, `preservePlayerHp`), o que carrega é a **fração de
+  vida**, nunca o número cru: cru, ele entrava na luta da Lorelei com 490/504, machucado sem ter
+  apanhado, e na luta seguinte — sem o terreno — ficava com 504 de HP num teto de 490.
 - Os buffs entram por `withBuffs()`, chamada pelas cinco `effective*`. **Existe uma cópia em cada
   arquivo e elas têm que ser idênticas, inclusive na ordem de arredondamento** (shiny → terreno).
   `applyTerrainBuff` só marca a flag — nunca mutar atributo, senão o bônus aplica duas vezes.

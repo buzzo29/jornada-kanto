@@ -4326,10 +4326,23 @@ function simulateGymBattle(team, brockTeam, rng, opts){
   rng = rng || Math.random;
   opts = opts || {};
   if(opts.preservePlayerHp){
-    // Elite 4: o HP do time do jogador CARREGA de uma batalha pra outra -- só recalcula o teto
-    // (níveis podem ter subido) e respeita o HP atual; quem está com 0 continua desmaiado e o loop
-    // de batalha pula ele naturalmente (alive = team.filter(p=>p.hp>0))
-    team.forEach(p=>{ p.maxHp=calcMaxHp(p); p.hp=Math.max(0, Math.min(p.hp!=null?p.hp:p.maxHp, p.maxHp)); });
+    /* Elite 4: o HP do time do jogador CARREGA de uma batalha pra outra. O que carrega é a
+       FRAÇÃO de vida, não o número cru -- porque o TETO muda entre uma luta e outra: cada membro
+       da Elite tem seu terreno, e o buff de terreno entra em todos os atributos, HP inclusive.
+       Um Gyarados nível 73 tem teto 490 fora d'água e 504 dentro. Carregando o número cru, ele
+       entrava na luta da Lorelei com 490/504 -- machucado sem ter apanhado (foi assim que o bug
+       apareceu). E na luta seguinte, sem o terreno de Água, o teto voltava pra 490 com o HP cru
+       em 504: mais vida que o máximo.
+       Com a fração: cheio continua cheio, metade continua metade, desmaiado continua desmaiado. */
+    team.forEach(p=>{
+      const tetoAntigo = p.maxHp || 0;
+      p.maxHp = calcMaxHp(p);
+      const atual = (p.hp != null) ? p.hp : p.maxHp;
+      const carregado = (tetoAntigo > 0 && tetoAntigo !== p.maxHp)
+        ? Math.round(atual * p.maxHp / tetoAntigo)
+        : atual;
+      p.hp = Math.max(0, Math.min(carregado, p.maxHp));
+    });
   } else {
     team.forEach(p=>{ p.maxHp=calcMaxHp(p); p.hp=p.maxHp; });
   }
