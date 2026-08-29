@@ -830,6 +830,39 @@
   }
   .matchup-row:last-child{border-bottom:none;}
   .matchup-row .vs{color:var(--muted);font-weight:800;margin:0 2px;}
+  /* Cartão de confronto: os dois lados EMPILHADOS, cada um com a largura inteira.
+     Lado a lado não serve: em 320px cada coluna fica com ~140px e o nome do golpe é cortado
+     (Chicote de Cipó virava C...), que é justamente a informação que o log existe pra dar.
+     Empilhado, cada lado cabe em duas linhas e o cartão fica em ~80px (era ~150).
+     Sem linha de fulano venceu: quem caiu está apagado e com a barra no zero, o que já diz. */
+  .matchup-row.mlog{border-bottom:none;background:rgba(26,26,46,.035);border-radius:6px;
+    padding:6px;margin-bottom:6px;}
+  .mlog-lado{display:flex;align-items:center;gap:6px;min-width:0;}
+  .mlog-lado + .mlog-lado{border-top:1px dashed #ddd7c2;margin-top:4px;padding-top:4px;}
+  .mlog-lado.caiu{opacity:.45;}
+  .mlog-spr{flex:0 0 auto;line-height:0;}
+  /* três seletores porque .sprite-sm .sprite-img vem DEPOIS neste arquivo: com dois, a regra de
+     lá (48px) ganhava por empate de especificidade e o cartão ficava 30px mais alto */
+  .mlog-lado .mlog-spr .sprite-img{width:34px;height:34px;}
+  .mlog-info{flex:1;min-width:0;}
+  .mlog-l1{display:flex;align-items:baseline;gap:4px;min-width:0;}
+  .mlog-l2{display:flex;align-items:center;gap:5px;margin-top:2px;min-width:0;}
+  .mlog-nome{font-size:.7rem;font-weight:800;color:var(--ink);line-height:1.2;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .mlog-lv{font-size:.58rem;font-weight:800;color:var(--muted);flex:0 0 auto;}
+  .mlog-hp{margin-left:auto;font-size:.58rem;font-weight:800;color:var(--muted);flex:0 0 auto;}
+  .mlog-res{text-align:center;font-size:.66rem;margin-top:3px;}
+  /* barra curta ao lado do golpe -- mesma marcação e mesmas classes de cor de sempre
+     (renderHpBar). O número fica na linha de cima, então o rótulo dela sai de cena. */
+  .mlog-l2 .hp-bar-wrap{margin:0;flex:0 0 52px;width:52px;}
+  .mlog-l2 .hp-bar-track{height:8px;border-width:1px;border-radius:4px;}
+  .mlog-l2 .hp-bar-label{display:none;}
+  /* O nome do golpe vai DENTRO do selo do tipo: a cor já diz o tipo, e economiza uma linha.
+     Sem o CAIXA ALTA do selo normal: "AVALANCHE DE PEDRAS" quebrava em duas linhas e esticava
+     o cartão, e nome de golpe em maiúscula grita. Nome de tipo é rótulo, nome de golpe é nome. */
+  .mlog-l2 .type-pill{font-size:.56rem;padding:2px 6px;margin-right:0;
+    text-transform:none;letter-spacing:0;white-space:nowrap;}
+  .mlog-dano{font-size:.6rem;font-weight:800;color:var(--red-dark);flex:0 0 auto;}
   .win-text{color:var(--green-dark);font-weight:800;}
   .lose-text{color:var(--red-dark);font-weight:800;}
   .status-row{
@@ -3970,6 +4003,10 @@ function calcDamageNew(attacker, defender, rng){
   // considera tipos próprios E subtipos (ver SUBTYPES). Com USE_SUBTYPES=false isso vira
   // exatamente o bestMultiplier de antes, que continua ali intacto
   const best = bestAttackType(attacker, defender);
+  /* Registro pro LOG: qual tipo este golpe usou. É só leitura -- nada daqui volta pra conta.
+     O tipo escolhido não depende de HP (só de atributos e tipos, que não mudam durante o
+     confronto), então na prática ele é o mesmo do começo ao fim da luta entre esses dois. */
+  attacker.lastMoveType = best.type;
   const special = isSpecialType(best.type); // o tipo do golpe decide se é físico ou especial (tabela oficial Gen 1)
   // STAB só quando o tipo escolhido é PRÓPRIO do atacante. Subtipo não só perde o bônus como
   // ainda leva o redutor -- é isso que impede o subtipo de virar poder de graça
@@ -4101,6 +4138,8 @@ function simulateGymBattle(team, brockTeam, rng, opts){
         isTrade,
         suddenDeath, suddenDeathMessage,
         playerWon,
+        // tipo do golpe de cada lado -- vira nome de golpe no log (ver nomeDoGolpe)
+        playerMove: active.lastMoveType || null, enemyMove: enemy.lastMoveType || null,
         playerHpBefore, playerHpAfter: active.hp, playerMaxHp: active.maxHp,
         enemyHpBefore, enemyHpAfter: enemy.hp, enemyMaxHp: enemy.maxHp,
         playerAliveBefore, playerAliveAfter, playerTeamSize: team.length,
@@ -10044,6 +10083,171 @@ function renderEnemyStatus(list){
   }).join('');
 }
 
+/* ============================================================================
+   NOMES DOS GOLPES -- apresentação, e SÓ apresentação
+   ----------------------------------------------------------------------------
+   O motor não conhece golpes: ele escolhe um TIPO por confronto (bestAttackType) e calcula o
+   dano com ele. Estas tabelas dão um nome de Gen 1 a esse tipo, pra o log dizer "Chicote de
+   Cipó" em vez de "Planta". Trocar qualquer nome aqui não muda um ponto de dano -- e por isso
+   elas vivem só no cliente, sem cópia no servidor pra sair de sincronia.
+
+   Padrão por tipo + exceções por espécie: sem as exceções, Pikachu e Jolteon dariam o mesmo
+   golpe, que é justamente a graça que se perde.
+   ============================================================================ */
+const MOVE_BY_TYPE = {
+  Normal:'Cabeçada', Fire:'Lança-Chamas', Water:'Surf', Grass:'Chicote de Cipó',
+  Electric:'Choque do Trovão', Ice:'Raio Congelante', Fighting:'Golpe de Karatê',
+  Poison:'Bomba de Lodo', Ground:'Terremoto', Flying:'Ataque de Asa', Psychic:'Confusão',
+  Bug:'Picada', Rock:'Avalanche de Pedras', Ghost:'Lambida', Dragon:'Fúria do Dragão'
+};
+/* Uma entrada por espécie, em ordem de Pokédex, cobrindo TODO tipo que ela consegue usar
+   (tipos próprios + subtipos). MOVE_BY_TYPE virou só rede de segurança.
+   Por que a tabela inteira e não só os famosos: com o padrão por tipo, Bulbasaur e Bellsprout
+   davam o mesmo Chicote de Cipó no mesmo log, e Geodude e Onix a mesma Avalanche de Pedras --
+   o log ficava repetitivo justamente na batalha de ginásio, que é onde ele mais é lido.
+   Os nomes seguem o golpe que combina com a espécie na Gen 1. Alguns tipos têm pouquíssimos
+   golpes de dano na geração (Pedra tem 2, Dragão tem 1), então repetição ali é do jogo. */
+const MOVE_OVERRIDES = {
+  bulbasaur:{Grass:'Chicote de Cipó', Poison:'Ácido'},
+  ivysaur:{Grass:'Folha Navalha', Poison:'Ácido'},
+  venusaur:{Grass:'Raio Solar', Poison:'Bomba de Lodo'},
+  charmander:{Fire:'Brasa', Normal:'Arranhão'},
+  charmeleon:{Fire:'Roda de Fogo', Normal:'Garra Afiada'},
+  charizard:{Fire:'Lança-Chamas', Flying:'Ataque de Asa'},
+  squirtle:{Water:'Jato de Água', Normal:'Investida'},
+  wartortle:{Water:'Raio de Bolhas', Normal:'Mordida'},
+  blastoise:{Water:'Hidro Bomba', Normal:'Golpe de Corpo'},
+  caterpie:{Bug:'Picada'}, metapod:{Bug:'Picada'},
+  butterfree:{Bug:'Sanguessuga', Flying:'Rajada de Vento', Psychic:'Confusão'},
+  weedle:{Bug:'Picada', Poison:'Ferrão Venenoso'},
+  kakuna:{Bug:'Picada', Poison:'Ferrão Venenoso'},
+  beedrill:{Bug:'Agulha Dupla', Poison:'Ferrão Venenoso'},
+  pidgey:{Normal:'Investida', Flying:'Rajada de Vento'},
+  pidgeotto:{Normal:'Ataque Fúria', Flying:'Ataque de Asa'},
+  pidgeot:{Normal:'Ataque Fúria', Flying:'Ataque Aéreo'},
+  ratata:{Normal:'Ataque Rápido'}, raticate:{Normal:'Presa Hiper'},
+  spearow:{Normal:'Fúria', Flying:'Bicada'},
+  fearow:{Normal:'Ataque Fúria', Flying:'Bicada Broca'},
+  ekans:{Poison:'Ferrão Venenoso'}, arbok:{Poison:'Ácido'},
+  pikachu:{Electric:'Choque do Trovão', Normal:'Ataque Rápido'},
+  raichu:{Electric:'Raio'},
+  sandshrew:{Ground:'Cavar', Poison:'Ferrão Venenoso'},
+  sandslash:{Ground:'Fissura', Poison:'Ferrão Venenoso'},
+  nidoranf:{Poison:'Ferrão Venenoso', Fighting:'Chute Duplo'},
+  nidorina:{Poison:'Ácido', Fighting:'Chute Duplo'},
+  nidoqueen:{Poison:'Bomba de Lodo', Ground:'Terremoto', Fighting:'Chute Duplo'},
+  nidoranm:{Poison:'Ferrão Venenoso', Fighting:'Chute Duplo'},
+  nidorino:{Poison:'Ácido', Fighting:'Chute Duplo'},
+  nidoking:{Poison:'Bomba de Lodo', Ground:'Fissura', Fighting:'Chute Duplo'},
+  clefairy:{Normal:'Bofetada Dupla'}, clefable:{Normal:'Golpe de Corpo'},
+  vulpix:{Fire:'Brasa', Normal:'Ataque Rápido'},
+  ninetales:{Fire:'Rajada de Fogo', Normal:'Investida Poderosa'},
+  jigglypuff:{Normal:'Golpe'}, wigglytuff:{Normal:'Golpe Duplo'},
+  zubat:{Poison:'Ferrão Venenoso', Flying:'Ataque de Asa', Bug:'Sanguessuga'},
+  golbat:{Poison:'Ácido', Flying:'Ataque de Asa', Bug:'Sanguessuga'},
+  oddish:{Grass:'Absorver', Poison:'Ácido'},
+  gloom:{Grass:'Mega Dreno', Poison:'Ácido'},
+  vileplume:{Grass:'Dança das Pétalas', Poison:'Ácido'},
+  paras:{Bug:'Sanguessuga', Grass:'Absorver'},
+  parasect:{Bug:'Sanguessuga', Grass:'Mega Dreno'},
+  venonat:{Bug:'Picada', Poison:'Ferrão Venenoso', Psychic:'Confusão'},
+  venomoth:{Bug:'Sanguessuga', Poison:'Fumaça Tóxica', Psychic:'Raio Psíquico'},
+  diglett:{Ground:'Cavar'}, dugtrio:{Ground:'Fissura'},
+  meowth:{Normal:'Arranhão'}, persian:{Normal:'Cortar'},
+  psyduck:{Water:'Jato de Água', Psychic:'Confusão', Normal:'Fúria'},
+  golduck:{Water:'Surf', Psychic:'Confusão', Normal:'Investida Poderosa'},
+  mankey:{Fighting:'Chute Baixo'}, primeape:{Fighting:'Chute Giratório'},
+  growlithe:{Fire:'Brasa', Normal:'Investida'},
+  arcanine:{Fire:'Lança-Chamas', Normal:'Mordida'},
+  poliwag:{Water:'Bolha', Normal:'Bofetada Dupla'},
+  poliwhirl:{Water:'Raio de Bolhas', Normal:'Golpe de Corpo'},
+  poliwrath:{Water:'Hidro Bomba', Fighting:'Submissão'},
+  abra:{Psychic:'Confusão'}, kadabra:{Psychic:'Raio Psíquico'}, alakazam:{Psychic:'Psíquico'},
+  machop:{Fighting:'Golpe de Karatê'}, machoke:{Fighting:'Arremesso Sísmico'}, machamp:{Fighting:'Submissão'},
+  bellsprout:{Grass:'Folha Navalha', Poison:'Ácido'},
+  weepinbell:{Grass:'Chicote de Cipó', Poison:'Ácido'},
+  victreebel:{Grass:'Dança das Pétalas', Poison:'Ácido'},
+  tentacool:{Water:'Bolha', Poison:'Ferrão Venenoso'},
+  tentacruel:{Water:'Hidro Bomba', Poison:'Ácido'},
+  geodude:{Rock:'Jogar Pedra', Ground:'Cavar'},
+  graveler:{Rock:'Avalanche de Pedras', Ground:'Cavar'},
+  golem:{Rock:'Avalanche de Pedras', Ground:'Terremoto'},
+  ponyta:{Fire:'Roda de Fogo', Normal:'Pisão'},
+  rapidash:{Fire:'Rajada de Fogo', Normal:'Chifrada'},
+  slowpoke:{Water:'Jato de Água', Psychic:'Confusão', Normal:'Cabeçada'},
+  slowbro:{Water:'Surf', Psychic:'Psíquico', Normal:'Investida Poderosa'},
+  magnemite:{Electric:'Choque do Trovão', Normal:'Investida'},
+  magneton:{Electric:'Raio', Normal:'Estrelas Cadentes'},
+  farfetchd:{Normal:'Cortar', Flying:'Bicada'},
+  doduo:{Normal:'Ataque Fúria', Flying:'Bicada'},
+  dodrio:{Normal:'Ataque Fúria', Flying:'Bicada Broca'},
+  seel:{Water:'Jato de Água', Ice:'Raio Aurora', Normal:'Cabeçada'},
+  dewgong:{Water:'Surf', Ice:'Nevasca', Normal:'Investida Poderosa'},
+  grimer:{Poison:'Fumaça Tóxica'}, muk:{Poison:'Bomba de Lodo'},
+  shellder:{Water:'Bolha', Ice:'Raio Aurora', Normal:'Chicotada'},
+  cloyster:{Water:'Hidro Bomba', Ice:'Raio Congelante', Normal:'Estrelas Cadentes'},
+  gastly:{Ghost:'Lambida', Poison:'Fumaça Tóxica', Psychic:'Confusão'},
+  haunter:{Ghost:'Lambida', Poison:'Bomba de Lodo', Psychic:'Devorador de Sonhos'},
+  gengar:{Ghost:'Sombra Noturna', Poison:'Bomba de Lodo', Psychic:'Psíquico'},
+  onix:{Rock:'Avalanche de Pedras', Ground:'Terremoto'},
+  drowzee:{Psychic:'Confusão', Normal:'Bofetada Dupla'},
+  hypno:{Psychic:'Psíquico', Normal:'Cabeçada'},
+  krabby:{Water:'Bolha', Normal:'Constrição'},
+  kingler:{Water:'Martelo Caranguejo', Normal:'Garra Afiada'},
+  voltorb:{Electric:'Choque do Trovão', Normal:'Autodestruição'},
+  electrode:{Electric:'Trovão', Normal:'Explosão'},
+  exeggcute:{Grass:'Absorver', Psychic:'Confusão', Normal:'Ovo Bomba'},
+  exeggutor:{Grass:'Raio Solar', Psychic:'Psíquico', Normal:'Pisão'},
+  cubone:{Ground:'Osso Clava'}, marowak:{Ground:'Osso Bumerangue'},
+  hitmonlee:{Fighting:'Chute Voador'},
+  // o Hitmonchan é o caso mais bonito da tabela: os três subtipos dele são os três socos
+  hitmonchan:{Fighting:'Soco Cometa', Electric:'Soco Trovão', Fire:'Soco de Fogo', Ice:'Soco de Gelo'},
+  lickitung:{Normal:'Chicotada'},
+  koffing:{Poison:'Fumaça Tóxica'}, weezing:{Poison:'Bomba de Lodo'},
+  rhyhorn:{Ground:'Terremoto', Rock:'Jogar Pedra'},
+  rhydon:{Ground:'Fissura', Rock:'Avalanche de Pedras'},
+  chansey:{Normal:'Ovo Bomba'},
+  tangela:{Grass:'Chicote de Cipó', Normal:'Amarra'},
+  kangaskhan:{Normal:'Golpe de Corpo'},
+  horsea:{Water:'Bolha'}, seadra:{Water:'Hidro Bomba'},
+  goldeen:{Water:'Jato de Água', Flying:'Bicada', Normal:'Chifrada'},
+  seaking:{Water:'Surf', Flying:'Ataque de Asa', Normal:'Broca de Chifre'},
+  staryu:{Water:'Bolha', Normal:'Estrelas Cadentes'},
+  starmie:{Water:'Hidro Bomba', Psychic:'Confusão', Normal:'Ataque Rápido'},
+  mrmime:{Psychic:'Confusão', Normal:'Bofetada Dupla'},
+  scyther:{Bug:'Tesourada', Flying:'Ataque de Asa'},
+  jynx:{Ice:'Nevasca', Psychic:'Confusão', Ghost:'Lambida', Normal:'Bofetada Dupla'},
+  electabuzz:{Electric:'Soco Trovão', Normal:'Golpe de Corpo'},
+  magmar:{Fire:'Lança-Chamas', Poison:'Fumaça Tóxica'},
+  pinsir:{Bug:'Tesourada'}, tauros:{Normal:'Investida Poderosa'},
+  magikarp:{Water:'Jato de Água', Normal:'Investida'},
+  gyarados:{Water:'Hidro Bomba', Flying:'Ataque de Asa'},
+  lapras:{Water:'Surf', Ice:'Nevasca', Normal:'Golpe de Corpo'},
+  ditto:{Normal:'Investida'}, eevee:{Normal:'Mordida'},
+  vaporeon:{Water:'Hidro Bomba', Ice:'Raio Congelante', Normal:'Ataque Rápido'},
+  jolteon:{Electric:'Raio', Bug:'Míssil Agulha', Fighting:'Chute Duplo', Normal:'Ataque Rápido'},
+  flareon:{Fire:'Lança-Chamas', Poison:'Fumaça Tóxica', Normal:'Mordida'},
+  porygon:{Normal:'Tri-Ataque', Psychic:'Raio Psíquico'},   // o Psybeam citado nos SUBTYPES
+  omanyte:{Rock:'Jogar Pedra', Water:'Bolha'},
+  omastar:{Rock:'Avalanche de Pedras', Water:'Hidro Bomba'},
+  kabuto:{Rock:'Jogar Pedra', Water:'Bolha', Grass:'Absorver'},
+  kabutops:{Rock:'Avalanche de Pedras', Water:'Surf', Grass:'Mega Dreno'},
+  aerodactyl:{Rock:'Avalanche de Pedras', Flying:'Ataque Aéreo'},
+  snorlax:{Normal:'Golpe de Corpo'},
+  articuno:{Ice:'Nevasca', Flying:'Ataque Aéreo'},
+  zapdos:{Electric:'Trovão', Flying:'Bicada Broca'},
+  moltres:{Fire:'Rajada de Fogo', Flying:'Ataque Aéreo'},
+  dratini:{Dragon:'Fúria do Dragão', Normal:'Investida'},
+  dragonair:{Dragon:'Fúria do Dragão', Normal:'Chicotada'},
+  dragonite:{Dragon:'Fúria do Dragão', Flying:'Ataque de Asa'},
+  mewtwo:{Psychic:'Psíquico', Normal:'Estrelas Cadentes'}
+};
+function nomeDoGolpe(speciesId, tipo){
+  if(!tipo) return null;
+  const ov = MOVE_OVERRIDES[speciesId];
+  if(ov && ov[tipo]) return ov[tipo];
+  return MOVE_BY_TYPE[tipo] || null;
+}
 function matchupResultLine(m){
   if(m.isTrade){
     return `<span class="lose-text">${m.player} e ${m.enemy} caíram juntos</span>`;
@@ -10055,9 +10259,51 @@ function suddenDeathNote(m){
   if(!m.suddenDeath || !m.suddenDeathMessage) return '';
   return `<br><span class="sudden-death-note">💥 ${m.suddenDeathMessage}</span>`;
 }
+/* Cartão de confronto: os dois sprites, como cada um terminou de HP, e o golpe + dano de cada lado.
+   O DANO sai da subtração dos HP que o matchup sempre guardou -- do motor só veio o TIPO do
+   golpe (playerMove/enemyMove). Confrontos gravados ANTES disso (ligas e reprises antigas) não
+   têm o tipo: ali o cartão mostra só o dano, em vez de inventar um nome.
+   Não tem linha de "fulano venceu": quem caiu aparece apagado e com a barra no zero. */
+function golpeSeloHtml(speciesId, tipo){
+  const nome = nomeDoGolpe(speciesId, tipo);
+  if(!nome) return '';
+  // o selo do tipo com o NOME DO GOLPE dentro -- a cor já entrega o tipo
+  return `<span class="type-pill" style="background:${TYPE_COLORS[tipo]||'#888'}">${nome}</span>`;
+}
 function renderMatchupLog(matchups){
-  return matchups.map(m=>{
-    return `<div class="matchup-row">${m.player} <span class="vs">×</span> ${m.enemy}: ${matchupResultLine(m)}${suddenDeathNote(m)}</div>`;
+  const lado = (m, id) => {
+    // maxHp faltando (log antigo, gravado antes de o campo existir): cai no HP de entrada
+    const maxHp = m.maxHp || Math.max(1, m.hpBefore || 1);
+    const hp = Math.max(0, m.hp || 0);
+    return `<div class="mlog-lado ${hp<=0?'caiu':''}">
+      <div class="mlog-spr">${SPECIES[m.sp] ? spriteHtml(m.sp,'sprite-sm',!!m.shiny) : '❔'}</div>
+      <div class="mlog-info">
+        <div class="mlog-l1">
+          <span class="mlog-nome">${escapeHtmlSafe(m.nome||'')}${m.shiny?' 🌟':''}</span>
+          ${m.lvl?`<span class="mlog-lv">Lv.${m.lvl}</span>`:''}
+          <span class="mlog-hp">${hp}/${maxHp} HP</span>
+        </div>
+        <div class="mlog-l2">
+          ${renderHpBar(hp, maxHp, 'mlog-f-'+id, 'mlog-l-'+id)}
+          ${golpeSeloHtml(m.sp, m.tipo)}<span class="mlog-dano">−${m.dano}</span>
+        </div>
+      </div>
+    </div>`;
+  };
+  return matchups.map((m, i)=>{
+    // quanto CADA UM tirou: o dano do jogador é o que sumiu do HP do inimigo, e vice-versa
+    const danoDoPlayer = Math.max(0, (m.enemyHpBefore||0) - (m.enemyHpAfter||0));
+    const danoDoEnemy  = Math.max(0, (m.playerHpBefore||0) - (m.playerHpAfter||0));
+    const aviso = suddenDeathNote(m);
+    return `<div class="matchup-row mlog">
+      ${lado({ nome:m.player, sp:m.playerSpecies, lvl:m.playerLevel, shiny:m.playerShiny,
+               hp:m.playerHpAfter, hpBefore:m.playerHpBefore, maxHp:m.playerMaxHp,
+               tipo:m.playerMove, dano:danoDoPlayer }, i+'a')}
+      ${lado({ nome:m.enemy, sp:m.enemySpecies, lvl:m.enemyLevel, shiny:m.enemyShiny,
+               hp:m.enemyHpAfter, hpBefore:m.enemyHpBefore, maxHp:m.enemyMaxHp,
+               tipo:m.enemyMove, dano:danoDoEnemy }, i+'b')}
+      ${aviso ? `<div class="mlog-res">${aviso}</div>` : ''}
+    </div>`;
   }).join('');
 }
 
@@ -12721,12 +12967,14 @@ function virarMatchup(m){
     playerShiny:m.enemyShiny, playerBuffed:m.enemyBuffed,
     playerHpBefore:m.enemyHpBefore, playerHpAfter:m.enemyHpAfter, playerMaxHp:m.enemyMaxHp,
     playerAliveBefore:m.enemyAliveBefore, playerAliveAfter:m.enemyAliveAfter,
-    playerTeamSize:m.enemyTeamSize, playerMove:m.enemyMove,
+    playerTeamSize:m.enemyTeamSize,
+    // os golpes também trocam de lado, senão o log do jogador B mostra o golpe do adversário
+    playerMove:m.enemyMove, enemyMove:m.playerMove,
     enemy:m.player, enemySpecies:m.playerSpecies, enemyLevel:m.playerLevel,
     enemyShiny:m.playerShiny, enemyBuffed:m.playerBuffed,
     enemyHpBefore:m.playerHpBefore, enemyHpAfter:m.playerHpAfter, enemyMaxHp:m.playerMaxHp,
     enemyAliveBefore:m.playerAliveBefore, enemyAliveAfter:m.playerAliveAfter,
-    enemyTeamSize:m.playerTeamSize, enemyMove:m.playerMove,
+    enemyTeamSize:m.playerTeamSize,
     playerWon: m.isTrade ? false : !m.playerWon
   });
 }
@@ -13157,11 +13405,10 @@ function renderOnlineFight(){
        partida que a pessoa acabou de jogar. */
     const souA = st.souA;
     // os confrontos vêm na perspectiva do A; pra o log, viro os nomes quando eu sou o B
-    const logDaMinhaVista = st.matchups.map(m => souA ? m : Object.assign({}, m, {
-      player: m.enemy, enemy: m.player,
-      playerWon: m.isTrade ? false : !m.playerWon,
-      winner: m.winner
-    }));
+    /* virarMatchup (o mesmo da reprise) em vez de trocar só os nomes: agora o log tem sprite,
+       nível e golpe de cada lado, e a virada parcial mostrava o nome do meu pokémon com o
+       sprite e o golpe do adversário. */
+    const logDaMinhaVista = st.matchups.map(m => souA ? m : virarMatchup(m));
     const statusTime = (time) => time.map(p=>{
       const sp = SPECIES[p.speciesId];
       const caiu = p.hp <= 0;

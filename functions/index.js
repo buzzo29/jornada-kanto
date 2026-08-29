@@ -484,6 +484,10 @@ function calcDamage(attacker, defender, rng){
   // considera tipos próprios E subtipos, igual ao cliente (ver SUBTYPES).
   // Com USE_SUBTYPES=false volta a ser o bestMultiplier de antes, que segue ali intacto
   const best = bestAttackType(attacker, defender);
+  /* Registro pro LOG: qual tipo este golpe usou. É só leitura -- nada daqui volta pra conta.
+     O tipo escolhido não depende de HP (só de atributos e tipos, que não mudam durante o
+     confronto), então na prática ele é o mesmo do começo ao fim da luta entre esses dois. */
+  attacker.lastMoveType = best.type;
   const mult = best.mult;
   const special = isSpecialType(best.type);
   // STAB só pro tipo próprio; subtipo perde o bônus e ainda leva o redutor
@@ -581,6 +585,8 @@ function simulateGymBattle(team, enemyTeam, rng){
         isTrade,
         suddenDeath, suddenDeathMessage,
         playerWon,
+        // tipo do golpe de cada lado -- o cliente traduz em nome de golpe no log
+        playerMove: active.lastMoveType || null, enemyMove: enemy.lastMoveType || null,
         playerHpBefore, playerHpAfter: active.hp, playerMaxHp: active.maxHp,
         enemyHpBefore, enemyHpAfter: enemy.hp, enemyMaxHp: enemy.maxHp,
         playerAliveBefore, playerAliveAfter, playerTeamSize: team.length,
@@ -3767,7 +3773,7 @@ function battleResolveMatchup(estado, rng){
     enemyHpBefore:bHpAntes, enemyHpAfter:Math.max(0,b.hp), enemyMaxHp:b.maxHp,
     playerAliveBefore:aVivosAntes, playerAliveAfter: aCaiu?aVivosAntes-1:aVivosAntes, playerTeamSize:estado.aTeam.length,
     enemyAliveBefore:bVivosAntes, enemyAliveAfter: bCaiu?bVivosAntes-1:bVivosAntes, enemyTeamSize:estado.bTeam.length,
-    playerMove: a.lastMove || null, enemyMove: b.lastMove || null
+    playerMove: a.lastMoveType || null, enemyMove: b.lastMoveType || null
   };
 }
 
