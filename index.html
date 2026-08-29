@@ -9200,6 +9200,34 @@ function serializeGame(){
    `waitForPendingWrites()` só resolve quando o SERVIDOR confirma. É o único jeito de saber que o
    save chegou. Se não confirmar em CONFIRMA_SAVE_MS, o aviso sobe na tela. */
 const CONFIRMA_SAVE_MS = 12000;
+/* UM `undefined` EM QUALQUER CANTO DERRUBA O SAVE INTEIRO.
+   O Firestore recusa o documento todo com "Unsupported field value: undefined" -- e a mensagem
+   dele não diz QUAL campo. Foi assim que um save ficou dias sem gravar: o jogador jogava, o
+   documento no servidor continuava congelado, e o erro morria no console.
+   Aqui a gravação passa a limpar esses campos (o save ANDA, que é o que importa pro jogador) e a
+   anotar no próprio documento quais foram, em `saveCamposRemovidos`. É autodiagnóstico: basta ler
+   o save depois pra saber exatamente onde nasceu o undefined, em vez de adivinhar. */
+function limparParaFirestore(valor, caminho, achados){
+  if(valor === undefined) return undefined;
+  if(Array.isArray(valor)){
+    return valor.map((v, i)=>{
+      const limpo = limparParaFirestore(v, caminho+'['+i+']', achados);
+      if(limpo === undefined){ achados.push(caminho+'['+i+']'); return null; }  // array não aceita buraco
+      return limpo;
+    });
+  }
+  if(valor && typeof valor === 'object'){
+    const saida = {};
+    for(const k of Object.keys(valor)){
+      const sub = caminho ? caminho+'.'+k : k;
+      const limpo = limparParaFirestore(valor[k], sub, achados);
+      if(limpo === undefined){ achados.push(sub); continue; }
+      saida[k] = limpo;
+    }
+    return saida;
+  }
+  return valor;
+}
 function avisoDeSave(estado, detalhe){
   const antes = game.saveAviso && game.saveAviso.estado;
   game.saveAviso = estado ? { estado, detalhe: detalhe||'', quando: Date.now() } : null;
@@ -9213,7 +9241,14 @@ async function saveCurrentGame(){
     // Esses dois só são escritos pelas telas de renomear/favoritar, nunca por aqui -- sem merge,
     // qualquer salvamento normal do jogo (autosave, fim de batalha, cura da Elite) apagava o nome
     // customizado e o favorito de volta pro padrão ("Time N", desfavoritado)
-    await saveDocRef(game.authUser.uid, game.currentSaveSlot).set(serializeGame(), { merge: true });
+    const removidos = [];
+    const dados = limparParaFirestore(serializeGame(), '', removidos);
+    if(removidos.length){
+      console.warn('Campos indefinidos removidos do save:', removidos);
+      dados.saveCamposRemovidos = removidos.slice(0, 12);
+      dados.saveCamposRemovidosEm = Date.now();
+    }
+    await saveDocRef(game.authUser.uid, game.currentSaveSlot).set(dados, { merge: true });
     const confirmou = await Promise.race([
       db.waitForPendingWrites().then(()=>true),
       new Promise(r=>setTimeout(()=>r(false), CONFIRMA_SAVE_MS))
