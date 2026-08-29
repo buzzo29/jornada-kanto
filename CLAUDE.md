@@ -48,6 +48,14 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
   Decisão em aberto — foi medido e apresentado, não escolhido.
 - **Multiplicador de tipo é comprimido (`^0.6`)**: 2× vira ~1,52×. Decisão consciente — não dá pra
   trocar de pokémon no meio do confronto, e tipo puro viraria sentença de morte.
+- **Golpe teimoso (`IMUNIDADE_TEIMOSA = 0,10`)**: quando NENHUM tipo do atacante machuca o alvo,
+  o melhor golpe sai com multiplicador 0,10 em vez do piso de 1 de dano. É o que impede confronto
+  matematicamente perdido — Hitmonlee (Lutador puro) contra Fantasma, Dugtrio (Terra puro) contra
+  Voador: 25 espécies, 139 confrontos, ninguém com jogada possível, e aqui não dá pra trocar de
+  pokémon no meio. **A imunidade continua absoluta quando existe alternativa**: o Raichu troca o
+  Raio pelo golpe Normal contra Terra e não passa nem perto do teimoso.
+  Medido: 139 confrontos impossíveis → 0; 1% das batalhas mudam de vencedor.
+  Atenção: dar subtipo **Normal** a um Lutador NÃO resolve — Normal também é 0 contra Fantasma.
 - **Imunidades valem 0 de novo** (eram 0,25). Voltou a ser fiel à Gen 1: Normal não acerta
   Fantasma, Elétrico não acerta Terra, Terra não acerta Voador. Medido na volta: **0,7% dos
   22.500 confrontos possíveis** ficam sem golpe útil (o motor tem piso de 1 de dano por golpe,

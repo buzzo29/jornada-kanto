@@ -4126,6 +4126,7 @@ function typeVsType(atk, def){
    PRA DESLIGAR: USE_SUBTYPES = false. O motor volta a considerar só os tipos próprios.
    ============================================================================ */
 const USE_SUBTYPES = true;
+const IMUNIDADE_TEIMOSA = 0.10;   // ver GOLPE TEIMOSO em bestAttackType
 /* Redutor do subtipo. Atacar por um subtipo rende SUBTYPE_PENALTY do dano normal.
    Existe porque o subtipo, mesmo sem STAB, ainda era escolhido em situações apertadas -- e
    nas simulações isso virava reviravolta grande demais em confrontos específicos (Gastly
@@ -4159,6 +4160,28 @@ function bestAttackType(attacker, defender){
     // mesma compressão de tipo do motor (^0.6), pra a escolha refletir o dano que sai de verdade
     const nota = Math.pow(mult, 0.6) * (proprio ? 1.5 : SUBTYPE_PENALTY) * (atk / Math.max(1, def));
     if(!melhor || nota > melhor.nota) melhor = { mult, type: t, stab: proprio, nota };
+  }
+  /* GOLPE TEIMOSO -- quando NADA que o atacante tem machuca o alvo.
+     Imunidade vale 0, e isso é o certo enquanto sobra alternativa: o Raichu simplesmente troca o
+     Raio pelo golpe Normal contra um pokémon de Terra. Mas quem só tem o tipo imune (Hitmonlee
+     Lutador puro contra Fantasma, Dugtrio Terra puro contra Voador) ficava com o piso de 1 de
+     dano por golpe -- ou seja, perdia o confronto sem jogada possível, e aqui não dá pra trocar
+     de pokémon no meio. Nesses casos o melhor golpe sai com multiplicador reduzido.
+     A escolha é refeita aqui porque com tudo zerado todas as notas empatam em 0 e o laço acima
+     ficaria com o primeiro candidato, não com o que rende mais. */
+  if(melhor && melhor.mult === 0){
+    let teimoso = null;
+    for(const t of candidatos){
+      const especial = isSpecialType(t);
+      const proprio = proprios.includes(t);
+      const atk = especial ? effectiveSpAtk(attacker) : effectiveAttack(attacker);
+      const def = especial ? effectiveSpDef(defender) : effectiveDefense(defender);
+      const nota = Math.pow(IMUNIDADE_TEIMOSA, 0.6) * (proprio ? 1.5 : SUBTYPE_PENALTY) * (atk / Math.max(1, def));
+      if(!teimoso || nota > teimoso.nota){
+        teimoso = { mult: IMUNIDADE_TEIMOSA, type: t, stab: proprio, nota, nulo: true };
+      }
+    }
+    if(teimoso) return teimoso;
   }
   return melhor || { mult: 1, type: proprios[0], stab: true, nota: 0 };
 }
@@ -4249,7 +4272,7 @@ function calcDamageNew(attacker, defender, rng){
   /* Imunidade: o multiplicador é 0, mas o dano tem piso de 1 -- dano 0 dos dois lados travaria
      o laço da luta pra sempre. O log precisa saber a diferença entre "tirou 1" e "não teve
      efeito", senão o jogador vê um -1 sem explicação. */
-  attacker.lastMoveNulo = (best.mult === 0);
+  attacker.lastMoveNulo = !!best.nulo;
   const Leff = isCrit ? attacker.level*2 : attacker.level; // crítico dobra o nível na fórmula (regra oficial)
   const core = Math.floor(Math.floor(2*Leff/5 + 2) * MOVE_POWER * A / D / 50) + 2;
   const typeMult = Math.pow(best.mult, 0.6);
@@ -10968,8 +10991,11 @@ function passosHtml(m){
     const golpe = golpeSeloHtml(doJogador?m.playerSpecies:m.enemySpecies, doJogador?m.playerMove:m.enemyMove);
     /* Imunidade: o multiplicador é 0 e sobra o piso de 1 de dano do motor. Dizer "tirou −1" sem
        mais nada faria o jogador procurar bug onde é regra. */
+    /* g.z = o golpe teimoso: nenhum tipo do atacante pega no alvo, e ele bateu assim mesmo com
+       multiplicador reduzido. Sem essa frase o jogador vê um dano estranhamente baixo e procura
+       bug onde é regra. */
     const frase = g.z
-      ? `${quem} atacou ${alvo}${golpe?` com ${golpe}`:''}, mas <strong>não teve efeito</strong>: <span class="mlog-tira">−${g.d}</span> de HP.`
+      ? `${quem} atacou ${alvo}${golpe?` com ${golpe}`:''}, mas <strong>o tipo não pega nele</strong>: <span class="mlog-tira">−${g.d}</span> de HP.`
       : `${quem} atacou ${alvo}${golpe?` com ${golpe}`:''} e tirou <span class="mlog-tira">−${g.d}</span> de HP.`;
     return `<div class="mlog-passo ${doJogador?'p':'e'}">${frase}</div>`;
   }).join('')}</div>`;

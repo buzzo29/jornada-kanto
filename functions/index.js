@@ -284,6 +284,7 @@ function isSpecialType(type){ return SPECIAL_TYPES.has(type); }
      Elétrico, Psíquico, Gelo, Dragão) -- nesses o lado físico ficaria inacessível
    ============================================================================ */
 const USE_SUBTYPES = true;
+const IMUNIDADE_TEIMOSA = 0.10;   // ver GOLPE TEIMOSO em bestAttackType
 const SUBTYPE_PENALTY = 0.85;
 const SUBTYPES = {"charmander":["Normal"],"charmeleon":["Normal"],"squirtle":["Normal"],"wartortle":["Normal"],"blastoise":["Normal"],"butterfree":["Psychic"],"pikachu":["Normal"],"raichu":["Normal"],"sandshrew":["Poison"],"sandslash":["Poison"],"nidoranf":["Fighting"],"nidorina":["Fighting"],"nidoqueen":["Fighting"],"nidoranm":["Fighting"],"nidorino":["Fighting"],"nidoking":["Fighting"],"vulpix":["Normal"],"ninetales":["Normal"],"zubat":["Bug"],"golbat":["Bug"],"venonat":["Psychic"],"venomoth":["Psychic"],"psyduck":["Normal","Psychic"],"golduck":["Normal","Psychic"],"growlithe":["Normal"],"arcanine":["Normal"],"poliwag":["Normal"],"poliwhirl":["Normal"],"ponyta":["Normal"],"rapidash":["Normal"],"slowpoke":["Normal"],"slowbro":["Normal"],"magnemite":["Normal"],"magneton":["Normal"],"seel":["Ice","Normal"],"dewgong":["Normal"],"shellder":["Ice","Normal"],"cloyster":["Normal"],"gastly":["Psychic"],"haunter":["Psychic"],"gengar":["Psychic"],"drowzee":["Normal"],"hypno":["Normal"],"krabby":["Normal"],"kingler":["Normal"],"voltorb":["Normal"],"electrode":["Normal"],"exeggcute":["Normal"],"exeggutor":["Normal"],"hitmonchan":["Electric","Fire","Ice"],"tangela":["Normal"],"goldeen":["Flying","Normal"],"seaking":["Flying","Normal"],"staryu":["Normal"],"starmie":["Normal"],"mrmime":["Normal"],"jynx":["Ghost","Normal"],"electabuzz":["Normal"],"magmar":["Poison"],"magikarp":["Normal"],"lapras":["Normal"],"vaporeon":["Ice","Normal"],"jolteon":["Bug","Fighting","Normal"],"flareon":["Normal","Poison"],"porygon":["Psychic"],"kabuto":["Grass"],"kabutops":["Grass"],"dratini":["Normal"],"dragonair":["Normal"],"mewtwo":["Normal"]};
 function subtiposDe(p){
@@ -306,6 +307,28 @@ function bestAttackType(attacker, defender){
     // discordarem do melhor golpe em 4% dos confrontos
     const nota = Math.pow(mult, 0.6) * (proprio ? 1.5 : SUBTYPE_PENALTY) * (atk / Math.max(1, def));
     if(!melhor || nota > melhor.nota) melhor = { mult, type: t, stab: proprio, nota };
+  }
+  /* GOLPE TEIMOSO -- quando NADA que o atacante tem machuca o alvo.
+     Imunidade vale 0, e isso é o certo enquanto sobra alternativa: o Raichu simplesmente troca o
+     Raio pelo golpe Normal contra um pokémon de Terra. Mas quem só tem o tipo imune (Hitmonlee
+     Lutador puro contra Fantasma, Dugtrio Terra puro contra Voador) ficava com o piso de 1 de
+     dano por golpe -- ou seja, perdia o confronto sem jogada possível, e aqui não dá pra trocar
+     de pokémon no meio. Nesses casos o melhor golpe sai com multiplicador reduzido.
+     A escolha é refeita aqui porque com tudo zerado todas as notas empatam em 0 e o laço acima
+     ficaria com o primeiro candidato, não com o que rende mais. */
+  if(melhor && melhor.mult === 0){
+    let teimoso = null;
+    for(const t of candidatos){
+      const especial = isSpecialType(t);
+      const proprio = proprios.includes(t);
+      const atk = especial ? effectiveSpAtk(attacker) : effectiveAttack(attacker);
+      const def = especial ? effectiveSpDef(defender) : effectiveDefense(defender);
+      const nota = Math.pow(IMUNIDADE_TEIMOSA, 0.6) * (proprio ? 1.5 : SUBTYPE_PENALTY) * (atk / Math.max(1, def));
+      if(!teimoso || nota > teimoso.nota){
+        teimoso = { mult: IMUNIDADE_TEIMOSA, type: t, stab: proprio, nota, nulo: true };
+      }
+    }
+    if(teimoso) return teimoso;
   }
   return melhor || { mult: 1, type: proprios[0], stab: true, nota: 0 };
 }
@@ -503,7 +526,7 @@ function calcDamage(attacker, defender, rng){
   /* Imunidade: o multiplicador é 0, mas o dano tem piso de 1 -- dano 0 dos dois lados travaria
      o laço da luta pra sempre. O log precisa saber a diferença entre "tirou 1" e "não teve
      efeito", senão o jogador vê um -1 sem explicação. */
-  attacker.lastMoveNulo = (best.mult === 0);
+  attacker.lastMoveNulo = !!best.nulo;
   const Leff = isCrit ? attacker.level*2 : attacker.level;  // crítico dobra o nível na fórmula
   const core = Math.floor(Math.floor(2*Leff/5 + 2) * MOVE_POWER * A / D / 50) + 2;
   // multiplicador de tipo COMPRIMIDO (^0.6): 2x vira ~1.5x. Aqui não se troca de pokémon no meio
