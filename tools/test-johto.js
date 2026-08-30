@@ -90,15 +90,27 @@ ok('todo destino é de Johto', Object.keys(EVO).every(id=>!!J[EVO[id].into]));
 ok('nível entre 1 e 99', Object.keys(EVO).every(id=>EVO[id].level >= 1 && EVO[id].level <= 99));
 ok('ninguém evolui pra si mesmo', Object.keys(EVO).every(id=>EVO[id].into !== id));
 
-console.log('\nO QUE AINDA TRAVA O USO (esperado -- ver o comentário em SPECIES_JOHTO)');
+/* O JOGO CONTINUA SÓ KANTO. Estas duas checagens são o que garante que a base de Johto entrou
+   como dado parado e não mudou nada em jogo. */
+console.log('\nO JOGO CONTINUA SÓ KANTO');
+const KANTO_EVO = tabela('index.html', 'EVOLUTIONS').valor;
+const INTOCADAS = { gloom:'vileplume', poliwhirl:'poliwrath', slowpoke:'slowbro' };
+const mexidas = Object.keys(INTOCADAS).filter(id=>!KANTO_EVO[id] || KANTO_EVO[id].into !== INTOCADAS[id]);
+ok('Gloom, Poliwhirl e Slowpoke ainda evoluem pro destino de Kanto', mexidas.length === 0,
+   mexidas.map(id=>id + ' -> ' + (KANTO_EVO[id] ? KANTO_EVO[id].into : 'sumiu')).join(', ') || '');
+ok('nenhuma espécie de Johto entrou na tabela em uso', !Object.keys(KANTO).some(id=>J[id]));
+
+console.log('\nO QUE VAI PRECISAR SER RESOLVIDO PRA LIGAR (esperado -- ver o comentário em SPECIES_JOHTO)');
 const TIPOS_DO_MOTOR = Object.keys(tabela('index.html', 'TYPE_CHART').valor);
 const semTipo = ids.filter(id=>J[id].types.some(t=>!TIPOS_DO_MOTOR.includes(t)));
 console.log('  · ' + semTipo.length + ' espécies com tipo que o TYPE_CHART não conhece: ' +
             semTipo.map(id=>J[id].name).join(', '));
-const KANTO_EVO = tabela('index.html', 'EVOLUTIONS').valor;
-const conflito = Object.keys(EVO).filter(id=>KANTO_EVO[id]);
-console.log('  · ' + conflito.length + ' evoluções disputam um id que Kanto já usa: ' +
-            conflito.map(id=>KANTO[id].name + ' (' + KANTO_EVO[id].into + ' ou ' + EVO[id].into + ')').join(', '));
+/* Não é disputa de número de Pokédex: Vileplume é #45 e Bellossom é #182, cada uma com a sua
+   vaga. O que colidiria é a CHAVE da tabela -- quem evolui -- se as duas fossem fundidas. */
+const doisDestinos = Object.keys(EVO).filter(id=>KANTO_EVO[id]);
+console.log('  · ' + doisDestinos.length + ' pokémons de Kanto ganhariam um segundo destino de evolução: ' +
+            doisDestinos.map(id=>KANTO[id].name + ' (hoje ' + KANTO_EVO[id].into + ', ou ' + EVO[id].into + ')').join(', '));
+console.log('    a chave repetida seria ' + doisDestinos.join(', ') + ' -- em JS a última apaga a primeira, sem erro');
 
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
 process.exit(falhas ? 1 : 0);

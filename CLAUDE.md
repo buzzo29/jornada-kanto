@@ -117,6 +117,9 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
 
 ## Johto (#152-251) — base de dados, ainda desligada
 
+- **O jogo continua sendo só Kanto.** Nada de Johto aparece, é capturável ou entra em batalha, e
+  Gloom, Poliwhirl e Slowpoke continuam evoluindo só pro que sempre evoluíram (Vileplume,
+  Poliwrath, Slowbro). Isto aqui é base de dados pra uma implementação futura, não uma feature.
 - `SPECIES_JOHTO`, `GEN2_SPECIAL_JOHTO` e `EVOLUTIONS_JOHTO`, **duplicadas nos dois arquivos**
   como todas as outras. Não entram em `SPECIES`/`EVOLUTIONS` de propósito: `Object.keys(SPECIES)`
   define o total da Pokédex, o "capturou tudo" que libera o Mewtwo, o pool da Torre
@@ -131,8 +134,15 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
   1. **TYPE_CHART é da Gen 1** — 15 tipos, sem Sombrio e Aço. 10 espécies daqui têm um dos dois
      (Umbreon, Murkrow, Forretress, Steelix, Scizor, Sneasel, Skarmory, Houndour, Houndoom,
      Tyranitar). Acrescentar os dois mexe no `EXPOENTE_TIPO`, o parâmetro mais sensível do motor.
-  2. **Três evoluções disputam um id que Kanto já usa** e a tabela mapeia um destino só: Gloom
-     (Vileplume ou Bellossom), Poliwhirl (Poliwrath ou Politoed), Slowpoke (Slowbro ou Slowking).
+  2. **Três pokémons de Kanto ganhariam um segundo destino de evolução**: Gloom (Vileplume ou
+     Bellossom), Poliwhirl (Poliwrath ou Politoed), Slowpoke (Slowbro ou Slowking). Não é
+     disputa de número de Pokédex — Vileplume é #45, Bellossom é #182, cada uma com a sua vaga.
+     O que colide é a **chave** da tabela de evolução, que é quem evolui: `gloom` do lado
+     esquerdo, escrito duas vezes. Em JavaScript isso não dá erro — a última linha apaga a
+     primeira, e o Gloom para de virar Vileplume no jogo inteiro, em silêncio. E juntar as
+     tabelas não resolveria: `tryEvolve` evolui sozinho por nível e não tem como escolher entre
+     dois destinos. No original quem decide é a pedra (Folha ou Solar); aqui não há itens, então
+     precisaria de uma tela de escolha, como a do Eevee.
   3. **Espeon e Umbreon** são do Eevee, que não passa por `EVOLUTIONS` — tem tela própria.
 - Efeito colateral já medido, pra quando a decisão vier: o pool da Torre (evoluções finais)
   passaria de **81 pra 150** espécies.

@@ -2422,9 +2422,13 @@ const EVOLUTIONS = {
 /* =====================================================================
    JOHTO (#152-251) -- DADOS BRUTOS, AINDA NÃO LIGADOS AO JOGO
    ---------------------------------------------------------------------
+   HOJE O JOGO É SÓ KANTO. Nada aqui está em uso: nenhum pokémon de Johto aparece, é capturável ou
+   entra em batalha, e Gloom, Poliwhirl e Slowpoke continuam evoluindo só pro que sempre evoluíram
+   (Vileplume, Poliwrath e Slowbro). Isto é base de dados pra uma implementação futura.
+
    Tabelas paralelas de propósito. Elas NÃO entram em SPECIES/GEN2_SPECIAL/EVOLUTIONS, porque
    `Object.keys(SPECIES)` é o que define o total da Pokédex, o "capturou tudo" que libera o desafio
-   do Mewtwo, o pool da Torre dos Treinadores (`!EVOLUTIONS[k]`) e a raridade dos encontros
+   do Mewtwo, o pool da Torre dos Treinadores (`!EVOLUTIONS[k]`) e a força que o rival persegue
    (`bstOf`). Despejar 100 espécies lá dentro mudaria as quatro coisas em silêncio, sem uma linha
    de código nova. Ligar isso é uma decisão separada, e tem três problemas em aberto:
 
@@ -2433,10 +2437,15 @@ const EVOLUTIONS = {
       Houndoom e Tyranitar. Hoje o motor trataria os dois como tipo desconhecido (multiplicador
       neutro em tudo). Acrescentar os dois tipos mexe no EXPOENTE_TIPO, que é o parâmetro mais
       sensível do motor -- tem que ser medido antes.
-   2. Três evoluções de Johto saem de um pokémon de Kanto que JÁ evolui pra outra coisa, e a
-      tabela mapeia um id pra um destino só: Gloom (→Vileplume / →Bellossom), Poliwhirl
-      (→Poliwrath / →Politoed) e Slowpoke (→Slowbro / →Slowking). Alguém tem que escolher, ou a
-      tabela precisa passar a aceitar dois destinos.
+   2. Três pokémons de Kanto ganhariam um SEGUNDO destino de evolução: Gloom (Vileplume ou
+      Bellossom), Poliwhirl (Poliwrath ou Politoed) e Slowpoke (Slowbro ou Slowking). Nada a ver
+      com número de Pokédex -- Vileplume é #45 e Bellossom é #182, cada uma com a sua vaga. O que
+      colide é a CHAVE da tabela de evolução, que é quem evolui: `gloom` do lado esquerdo,
+      escrito duas vezes. Em JavaScript isso não dá erro -- a última linha apaga a primeira, e o
+      Gloom para de virar Vileplume no jogo inteiro, em silêncio.
+      E juntar as duas tabelas não resolveria: `tryEvolve` evolui sozinho por nível, e não tem
+      como escolher entre dois destinos. No jogo original quem decide é a pedra (Folha ou Solar),
+      e aqui não existem itens -- precisaria de uma tela de escolha, como a do Eevee.
    3. Espeon e Umbreon são evoluções do Eevee, que aqui não passa por EVOLUTIONS -- tem tela
       própria (`chooseEeveeEvolution`). Entrariam lá, não aqui.
 
