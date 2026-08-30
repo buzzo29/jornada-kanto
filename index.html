@@ -6296,11 +6296,14 @@ function finishTrainerBattle(){
     return;
   }
   if(game.bossBattlePending){
-    // volta pra tela da raide, que já mostra a barra nova -- o servidor devolveu o HP atualizado
-    // junto com o resultado, então não precisa consultar de novo
     game.bossBattlePending = false;
+    game.bossEscolhendoTime = false;   // a investida acabou: volta pro estado de leitura
     game.screen = 'sundayBoss';
     render();
+    /* O resultado da luta já trouxe o HP e a SUA contribuição, mas não o ranking -- e é logo
+       depois de bater que o jogador quer ver a posição dele. Consulta na hora em vez de esperar
+       a próxima volta do laço, e religa o laço, que tinha morrido ao sair da tela. */
+    atualizarEstadoDoBoss().then(agendarPollDoBoss);
     return;
   }
   if(game.onlineReplayPending){
@@ -13584,6 +13587,56 @@ function saveStatusLabel(s){
    seis pokémon nível 99 inventados no console, e aqui o estrago não ficaria no save de quem
    trapaceou -- ficaria na barra que todo mundo vê.
    ============================================================================ */
+/* A raide é COLETIVA: enquanto você olha a tela, outros treinadores estão batendo. Sem esse laço a
+   barra e o ranking congelavam no que existia na hora que a tela abriu -- duas contas abertas lado
+   a lado mostravam números diferentes, e mesmo depois da SUA investida o ranking continuava velho.
+   Laço próprio, não preso ao render(): esta tela redesenha raramente (ver CLAUDE.md). */
+const BOSS_POLL_MS = 5000;
+let bossPollTimer = null;
+function agendarPollDoBoss(){
+  pararPollDoBoss();
+  bossPollTimer = setTimeout(async ()=>{
+    if(game.screen !== 'sundayBoss'){ pararPollDoBoss(); return; }   // saiu da tela: o laço morre
+    await atualizarEstadoDoBoss();
+    if(game.screen === 'sundayBoss') agendarPollDoBoss();
+  }, BOSS_POLL_MS);
+}
+function pararPollDoBoss(){
+  if(bossPollTimer){ clearTimeout(bossPollTimer); bossPollTimer = null; }
+}
+async function atualizarEstadoDoBoss(){
+  if(!game.bossState) return;
+  let d;
+  try{
+    const r = await functionsClient.httpsCallable('getSundayBoss')({ resumo:true });
+    d = r.data;
+  }catch(e){ return; }   // falha de rede no laço não vira tarja na tela: a próxima volta resolve
+  if(game.screen !== 'sundayBoss') return;
+  const antes = assinaturaDoBoss();
+  game.bossState.boss = d.boss;
+  game.bossState.meu = d.meu;
+  game.bossState.ranking = d.ranking;
+  if(assinaturaDoBoss() === antes) return;               // nada mudou: não redesenha à toa
+  /* Com a lista de times aberta, um render() inteiro pode inserir uma linha no ranking e EMPURRAR
+     os cards no instante do toque. Aí só a barra é atualizada no lugar, direto no DOM -- é a mesma
+     regra das animações de batalha (ver CLAUDE.md). */
+  if(game.bossEscolhendoTime){ atualizarBarraDoBossNoDom(); return; }
+  render();
+}
+function assinaturaDoBoss(){
+  const b = game.bossState.boss || {}, r = game.bossState.ranking || [];
+  return [b.hp, b.batalhas, r.map(e=>e.uid+':'+e.dano).join(',')].join('|');
+}
+function atualizarBarraDoBossNoDom(){
+  const b = game.bossState.boss || {};
+  const fill = document.getElementById('boss-hp-fill');
+  const label = document.getElementById('boss-hp-label');
+  if(!fill || !label) return;
+  const pct = Math.max(0, Math.min(100, (b.hp / b.maxHp) * 100));
+  fill.style.transform = `scaleX(${pct/100})`;
+  fill.className = 'hp-bar-fill ' + hpBarClass(pct);
+  label.textContent = `${Math.max(0,b.hp)}/${b.maxHp} HP`;
+}
 async function openSundayBoss(){
   game.screen = 'sundayBoss';
   game.bossError = null;
@@ -13591,6 +13644,11 @@ async function openSundayBoss(){
   game.bossLoading = true;
   render();
   await carregarSundayBoss();
+  agendarPollDoBoss();
+}
+function sairDoBoss(){
+  pararPollDoBoss();
+  goToSaveMenu();
 }
 /* A escolha do time é o SEGUNDO passo. Antes a lista já vinha aberta e empurrava a barra de vida
    e o ranking pra fora da tela em 320px -- o estado da raide, que é a razão da tela existir,
@@ -13654,7 +13712,7 @@ function renderSundayBoss(){
   if(game.bossError && !game.bossState){
     return `<div class="eyebrow">✨ BOSS DE DOMINGO</div>
       <div class="box cursor"><p class="lose-text">${escapeHtmlSafe(game.bossError)}</p></div>
-      <button class="btn" onclick="goHome()">⬅ Voltar</button>`;
+      <button class="btn" onclick="sairDoBoss()">⬅ Voltar</button>`;
   }
   const st = game.bossState || {};
   const b = st.boss || { hp:0, maxHp:1, level:999 };
@@ -13711,7 +13769,7 @@ function renderSundayBoss(){
     </button>`;}).join('')
     : `<div class="box cursor"><p>Você ainda não tem nenhum time. Comece uma jornada primeiro.</p></div>`}
   <button class="btn secondary" onclick="fecharEscolhaDeTimeDoBoss()">Cancelar</button>`}
-  <button class="btn" onclick="goHome()">⬅ Voltar</button>`;
+  <button class="btn" onclick="sairDoBoss()">⬅ Voltar</button>`;
 }
 /* Top 10 de quem mais machucou o Mew. Mesma marcação dos rankings das ligas (leaderboard-list) --
    é o mesmo tipo de informação e não tem por que se parecer com outra coisa. */

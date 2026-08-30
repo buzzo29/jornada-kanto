@@ -358,6 +358,20 @@ Duas artimanhas medidas e fechadas — em ambas o jogador reiniciava até vir sh
 - A tela tem **dois passos**: estado da raide + ranking, e só depois do "Atacar Mew" a lista de
   times. Com a lista aberta de saída, a barra de vida e o ranking — que são a razão da tela
   existir — ficavam atrás de uma rolagem em 320px.
+- **A tela se atualiza sozinha a cada 5s** (`BOSS_POLL_MS`), com laço próprio — não preso ao
+  `render()`, que aqui é raro. É obrigatório numa raide coletiva: sem isso duas contas abertas lado
+  a lado mostravam vidas diferentes, e mesmo depois da SUA investida o ranking continuava velho
+  (o resultado da luta traz o HP e a sua contribuição, mas não a lista). Ao voltar da batalha ele
+  consulta na hora, sem esperar a volta do laço.
+  Dois cuidados que a tela tem: **só redesenha se algo mudou** (compara uma assinatura de
+  hp+batalhas+ranking), e **com a lista de times aberta não redesenha nunca** — atualiza a barra
+  direto no DOM, porque uma linha nova no ranking empurraria os cards no instante do toque. É a
+  mesma regra das animações de batalha.
+  **Custo:** a consulta leve (`{resumo:true}`, sem a lista de times) são ~13 leituras — conta,
+  Mew, top 10 e o documento do jogador. A 5s isso dá ~156 leituras/minuto **por tela aberta**, ou
+  ~9,4 mil por hora. Com dois testadores é irrelevante; se a raide abrir pra todo mundo, o
+  caminho é guardar o top 10 já pronto num documento à parte (não no documento do Mew, que já é
+  disputado pelas investidas) e derrubar a consulta pra ~4 leituras.
 - **Top 10 por dano**, mesma marcação dos rankings das ligas (`leaderboard-list`). O nome do
   treinador fica **gravado no documento do jogador** e é atualizado a cada investida: sem isso o
   ranking custaria 10 leituras extras em `users/` toda vez que alguém abrisse a tela. O preço é

@@ -5459,6 +5459,15 @@ exports.getSundayBoss = onCall(async (request) => {
   const ranking = await bossRanking();
   const meuSnap = await bossPlayerRef(uid).get();
   const meu = meuSnap.exists ? meuSnap.data() : { dano:0, batalhas:0 };
+  /* A tela consulta de 5 em 5 segundos pra acompanhar a barra e o ranking ao vivo. Nessas
+     consultas o `resumo` corta a lista de times: ela nao muda enquanto a tela esta aberta, e
+     buscar os saves de novo a cada 5s seria leitura jogada fora. */
+  if(request.data && request.data.resumo){
+    return { boss: { hp:estado.hp, maxHp:estado.maxHp, level:estado.level, golpes:estado.golpes||0,
+                     batalhas:estado.batalhas||0, derrotadoEm:estado.derrotadoEm || null },
+             meu: { dano: meu.dano||0, batalhas: meu.batalhas||0 },
+             ranking, serverNow: Date.now() };
+  }
   const savesSnap = await db.collection('users').doc(uid).collection('saves').get();
   const times = [];
   savesSnap.forEach(doc => {

@@ -214,5 +214,37 @@ async function ranking(){
   const meu = (await chamar('getSundayBoss','r12')).meu;
   ok('a contribuicao pessoal bate com a linha do ranking',
      r.find(e=>e.uid==='r12').dano === meu.dano, r.find(e=>e.uid==='r12').dano+' = '+meu.dano);
+  await resumo();
+}
+
+/* Quarta bateria: o RESUMO, que e o que a tela consulta de 5 em 5 segundos. */
+async function resumo(){
+  fake.reset();
+  for(const uid of ['s1','s2']){
+    await db.collection('users').doc(uid).set({ userTest:true, trainerName:'T-'+uid });
+    await db.collection('users').doc(uid).collection('saves').doc('0')
+            .set({ customName:'Time', badgeCount:8, team:TIME });
+  }
+  console.log('\nCONSULTA DE 5 EM 5 SEGUNDOS (resumo)');
+  const cheio = await chamar('getSundayBoss','s1');
+  const leve  = await chamar('getSundayBoss','s1',{ resumo:true });
+  ok('o resumo traz a vida do Mew', leve.boss && leve.boss.hp === cheio.boss.hp);
+  ok('o resumo traz o ranking', Array.isArray(leve.ranking));
+  ok('o resumo traz a minha contribuicao', !!leve.meu);
+  ok('o resumo NAO traz a lista de times (e leitura jogada fora)', leve.times === undefined);
+  ok('a porta do userTest vale no resumo tambem',
+     await recusa('getSundayBoss','naotem',{resumo:true}) === 'permission-denied');
+
+  /* O caso do print: duas contas abertas, so uma ataca. A outra tem que enxergar. */
+  const antes = (await chamar('getSundayBoss','s2',{resumo:true}));
+  const r = await chamar('fightSundayBoss','s1',{ slot:'0' });
+  const depois = (await chamar('getSundayBoss','s2',{resumo:true}));
+  ok('a outra conta ve a vida nova', depois.boss.hp === antes.boss.hp - r.dano,
+     antes.boss.hp+' -> '+depois.boss.hp);
+  ok('a outra conta ve o ranking novo',
+     depois.ranking.length === 1 && depois.ranking[0].uid === 's1' && depois.ranking[0].dano === r.dano,
+     JSON.stringify(depois.ranking.map(e=>e.uid+':'+e.dano)));
+  ok('quem atacou ve a propria contribuicao atualizada',
+     (await chamar('getSundayBoss','s1',{resumo:true})).meu.dano === r.dano);
   fim();
 }
