@@ -25,10 +25,19 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
 
 ## Deploy
 
-- `firebase deploy` — tudo (regras → functions → hosting)
+- `firebase deploy` — functions + hosting. **NÃO publica as regras** (ver abaixo).
 - `firebase deploy --only hosting` — só o HTML
 - `firebase deploy --only functions` — só o servidor
 - Quando cliente e servidor mudam juntos, **subir os dois na mesma leva**.
+- **`firestore.rules` não é publicado por nada.** O `firebase.json` só declara `hosting` e
+  `functions` — não existe seção `firestore`. As regras que valem são as do console, e o arquivo
+  do repo é a cópia versionada delas. Este arquivo dizia que `firebase deploy` subia as regras;
+  não sobe, e essa crença era perigosa: em 30/08/2026 a cópia do repo estava **70 linhas atrás**
+  da produção (47 contra 117) e publicá-la teria apagado a trava dos campos de especialidade
+  (sem ela, uma linha no console declara o jogador especialista em todos os tipos), a trava do
+  ranking da Trainers League, os `matchLogs`, os `neighborhoodGyms` e o `leagueTypes` fechado.
+  O arquivo foi reescrito a partir do que estava no ar. **Antes de ligar isso ao deploy, ler as
+  regras no ar** (`firebase_get_security_rules` pelo MCP): publicar substitui, não mescla.
 
 ---
 

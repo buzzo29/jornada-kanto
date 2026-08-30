@@ -1,46 +1,146 @@
+/* ============================================================================
+   REGRAS DO FIRESTORE
+
+   ATENCAO: este arquivo NAO e publicado pelo `firebase deploy`. O firebase.json so declara
+   hosting e functions -- nao existe secao "firestore" nele. As regras que valem sao as que estao
+   no console, e este arquivo e a copia versionada delas.
+
+   Ate 30/08/2026 essa copia estava 70 linhas ATRAS da producao: faltavam a trava dos campos de
+   especialidade (sem ela, uma linha no console declara o jogador especialista em todos os tipos),
+   a trava do ranking da Trainers League, os matchLogs, os neighborhoodGyms e o leagueTypes
+   fechado. Publicar o arquivo daquele jeito teria APAGADO tudo isso. Foi reescrito a partir do
+   que estava no ar.
+
+   Se um dia isto for ligado ao deploy: LEIA AS REGRAS NO AR ANTES
+   (`firebase_get_security_rules` pelo MCP), porque quem publica substitui, nao mescla.
+   ============================================================================ */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
     // usuários e seus saves -- só o próprio dono acessa
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read: if request.auth != null && request.auth.uid == userId;
+      // ESCRITA: o dono escreve no próprio documento, MENOS nos campos de especialidade de tipo.
+      // Esses campos só as Cloud Functions gravam (o Admin SDK ignora estas regras): as especialidades
+      // pela syncTrainerSpecialties, e rareCandies pela Torre -- doce contado no cliente seria nível de graça,
+      // porque a especialidade dá +1% em todos os atributos e vale NAS LIGAS -- se o cliente pudesse
+      // escrever, bastava uma linha no console pra se declarar especialista em todos os tipos.
+      // O resto do documento (nome, pokédex, conquistas) continua livre pro dono como sempre foi.
+      allow write: if request.auth != null && request.auth.uid == userId
+        && !request.resource.data.diff(resource.data).affectedKeys()
+             .hasAny(['specialties', 'specialtyCounts', 'specialtyCounted', 'rareCandies']);
+      // criação do documento: não há resource.data pra comparar, então checa direto que os campos
+      // protegidos não vêm no payload inicial
+      allow create: if request.auth != null && request.auth.uid == userId
+        && !request.resource.data.keys().hasAny(['specialties', 'specialtyCounts', 'specialtyCounted', 'rareCandies']);
       match /saves/{saveId} {
         allow read, write: if request.auth != null && request.auth.uid == userId;
       }
     }
-
-    // ranking global de campeões e agenda da Liga -- leitura livre pra qualquer logado,
-    // escrita também livre pra qualquer logado (a Cloud Function usa Admin SDK e ignora essa regra)
+    // ranking global de campeões e agenda da Liga -- continua liberado pra qualquer logado ESCREVER
+    // (a Liga Clássica ainda depende de escrita cooperativa do cliente aqui -- ver mais abaixo).
+    // A ÚNICA exceção é o ranking da Trainers League: como ela virou avanço 100% pela Cloud Function
+    // (ver trainersLeagueCycles), o cliente nunca mais precisa gravar aí -- trava específica, sem
+    // afetar o resto da coleção que a Liga Clássica ainda usa
     match /leagues/{document} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && document != 'champions_alltime_trainers_league';
+    }
+    // configuração das Ligas customizadas -- o cliente NUNCA escreve aqui (só lê, pra listar as ligas
+    // disponíveis pra todo mundo); criação/edição é sempre manual, direto no console do Firebase.
+    // Travado de verdade agora -- nenhuma função do jogo precisa de escrita aqui
+    match /leagueTypes/{typeId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+    // detalhe de cada ciclo da Liga (chaveamentos) -- continua liberado pra qualquer logado: múltiplos
+    // clientes legitimamente ajudam a avançar esse documento compartilhado (não tem um "dono" único).
+    // Fechar essa parte de vez exigiria tirar a escrita do cliente por completo e depender só da Cloud
+    // Function -- decisão em aberto, não uma correção de baixo risco como as outras
+    match /leagueCycles/{cycleId} {
       allow read, write: if request.auth != null;
+      // cada inscrito só pode escrever no PRÓPRIO registro -- o id do documento é o uid, mas passado
+      // por sanitizeForDocId (que deixa em minúsculo) antes de virar o nome do documento, por isso o
+      // .lower() aqui -- sem isso, a comparação direta falharia pra qualquer uid com letra maiúscula
+      match /registrants/{registrantId} {
+        allow read: if request.auth != null;
+        allow write: if request.auth != null && registrantId == request.auth.uid.lower();
+      }
+      // logs de batalha extraídos das partidas (formato novo) -- só o servidor grava, todo mundo lê
+      match /matchLogs/{logId} {
+        allow read: if request.auth != null;
+        allow write: if false;
+      }
     }
 
-    // BOSS DE DOMINGO -- raide global. Leitura livre pra qualquer logado (todo mundo vê a mesma
-    // barra de vida); escrita NEGADA a todo mundo, inclusive ao dono da conta. Quem escreve é a
-    // Cloud Function pelo Admin SDK, que ignora estas regras. É o oposto das coleções acima:
-    // ali um jogador só pode estragar o que é dele, aqui uma escrita solta estragaria a raide
-    // do jogo inteiro -- inclusive "matando" o Mew com um hp:0 escrito na mão.
+    // detalhe de cada ciclo da Trainers League (chaveamento, rodadas) -- diferente da Liga Clássica,
+    // AQUI dá pra travar de vez: mapeei toda escrita do cliente nesse documento (trainersLeagueEnsureCycleDoc,
+    // trainersLeagueClaim, trainersLeagueDoLock, trainersLeagueAdvanceRounds) e nenhuma delas é uma
+    // ação legítima de um jogador específico -- são todas parte do sistema de "avanço cooperativo" que
+    // o cliente não faz mais (só a Cloud Function avança, via Admin SDK, que ignora essa regra).
+    // Fecha de vez a brecha de qualquer um reescrever o chaveamento inteiro ou se declarar campeão à força
+    match /trainersLeagueCycles/{cycleId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+      // aqui o id do documento é o uid SEM nenhuma transformação -- comparação direta, sem .lower()
+      match /registrants/{registrantId} {
+        allow read: if request.auth != null;
+        allow write: if request.auth != null && registrantId == request.auth.uid;
+      }
+      // escolha de terreno do mandante por rodada -- 1 doc por jogador (picks.{roundIndex} = terrainId)
+      match /terrainPicks/{pickerId} {
+        allow read: if request.auth != null;
+        allow write: if request.auth != null && pickerId == request.auth.uid;
+      }
+      // troca de time por rodada -- 1 doc por jogador (overrides.{roundIndex} = código do time)
+      match /teamPicks/{pickerId} {
+        allow read: if request.auth != null;
+        allow write: if request.auth != null && pickerId == request.auth.uid;
+      }
+      // logs de batalha extraídos das partidas (formato novo) -- só o servidor grava, todo mundo lê
+      match /matchLogs/{logId} {
+        allow read: if request.auth != null;
+        allow write: if false;
+      }
+    }
+
+    // Ginásio do Bairro (feature em teste) -- quem é o líder de cada bairro curado. Só o servidor
+    // escreve (via challengeNeighborhoodGym, que resolve a disputa em transação); o cliente nunca
+    // reporta resultado nem troca o líder direto -- exatamente pra evitar alguém se autoproclamar
+    // líder sem realmente vencer. Leitura aberta pra qualquer logado ver quem lidera onde
+    match /neighborhoodGyms/{gymId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+      match /challengeLogs/{logId} {
+        allow read: if request.auth != null;
+        allow write: if false;
+      }
+      // melhor marca histórica de cada treinador nesse ginásio -- só lida pela Cloud Function do
+      // ranking (getNeighborhoodGymLeaderboard, que já soma o líder atual ao vivo); não precisa de
+      // leitura direta do cliente
+      match /leaderRecords/{uid} {
+        allow read, write: if false;
+      }
+    }
+    // índice reverso uid_slot -> qual ginásio esse time defende. Só o servidor escreve; leitura só
+    // pro próprio dono (é informação sobre os times DELE, não precisa ser pública como o ginásio em si)
+    match /neighborhoodGymActiveDefenses/{docId} {
+      allow read: if request.auth != null && docId.split('_')[0] == request.auth.uid;
+      allow write: if false;
+    }
+
+    // BOSS DE DOMINGO -- raide global (em avaliacao, so contas userTest). Leitura livre pra
+    // qualquer logado, escrita NEGADA a todos, inclusive ao dono da conta: quem escreve e a Cloud
+    // Function pelo Admin SDK. E o oposto de users/{uid}, onde o jogador so estraga o que e dele --
+    // aqui uma escrita solta mataria o Mew do jogo inteiro com um hp:0 escrito na mao.
+    // Hoje nada do cliente le este documento direto (a tela passa pelo getSundayBoss), mas a regra
+    // fica explicita: sem ela vale o "negado por padrao", que protege igual mas nao explica nada.
     match /globalBoss/{bossId} {
       allow read: if request.auth != null;
       allow write: if false;
       match /players/{playerId} {
         allow read: if request.auth != null && request.auth.uid == playerId;
         allow write: if false;
-      }
-    }
-
-    // configuração das Ligas customizadas (criadas pelo painel admin) -- qualquer conta logada pode
-    // ler (o jogo precisa listar as ligas disponíveis pra todo mundo) e também criar/editar
-    match /leagueTypes/{typeId} {
-      allow read, write: if request.auth != null;
-    }
-
-    // detalhe de cada ciclo da Liga (chaveamentos) e a subcoleção de inscritos
-    match /leagueCycles/{cycleId} {
-      allow read, write: if request.auth != null;
-      match /registrants/{registrantId} {
-        allow read, write: if request.auth != null;
       }
     }
   }
