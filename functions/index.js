@@ -5384,8 +5384,17 @@ async function bossRequireTester(uid){
 /* TOP 10 de dano. O nome do treinador fica GRAVADO no documento do jogador (denormalizado) e e
    atualizado a cada investida: sem isso o ranking precisaria de 10 leituras extras em users/ toda
    vez que alguem abrisse a tela. O preco e que quem troca de nome so aparece com o nome novo
-   depois da proxima investida -- barato perto de 10 leituras por abertura de tela. */
-async function bossRanking(){
+   depois da proxima investida -- barato perto de 10 leituras por abertura de tela.
+
+   O RESULTADO FICA GUARDADO PRONTO em globalBoss/mewRank, e e de la que a tela le. Assim:
+   - a consulta da tela custa 1 leitura em vez de 10, e
+   - o cliente pode ESCUTAR esse documento em tempo real (as regras liberam leitura de
+     globalBoss/{id} pra qualquer logado), o que dispensa consultar de tempos em tempos.
+   Ele mora num documento SEPARADO, e nao dentro do documento do Mew, de proposito: o do Mew ja e
+   disputado por toda investida, e o Firestore sustenta ~1 gravacao por segundo por documento --
+   somar mais uma gravacao ali pioraria justamente o ponto mais quente da raide. */
+function bossRankDocRef(){ return db.collection('globalBoss').doc(BOSS_ID + 'Rank'); }
+async function bossCalcularRanking(){
   const snap = await bossDocRef().collection('players').orderBy('dano','desc').limit(10).get();
   const lista = [];
   snap.forEach(doc => {
@@ -5395,6 +5404,19 @@ async function bossRanking(){
                  dano: d.dano || 0, batalhas: d.batalhas || 0 });
   });
   return lista;
+}
+async function bossRanking(){
+  const snap = await bossRankDocRef().get();
+  if(snap.exists && Array.isArray(snap.data().lista)) return snap.data().lista;
+  return await bossCalcularRanking();          // ainda nao existe: cai na consulta viva
+}
+/* Recalcula e grava o top 10. Best-effort de proposito: e so apresentacao, e falhar aqui nao pode
+   derrubar uma investida que ja foi contabilizada. Fica FORA da transacao -- dentro dela a
+   consulta de 10 documentos entraria no caminho critico de toda luta. */
+async function bossAtualizarRanking(){
+  try{
+    await bossRankDocRef().set({ lista: await bossCalcularRanking(), em: Date.now() });
+  }catch(e){ logger.error('Boss: falha ao atualizar o ranking', e); }
 }
 async function bossGetEstado(){
   const snap = await bossDocRef().get();
@@ -5459,9 +5481,9 @@ exports.getSundayBoss = onCall(async (request) => {
   const ranking = await bossRanking();
   const meuSnap = await bossPlayerRef(uid).get();
   const meu = meuSnap.exists ? meuSnap.data() : { dano:0, batalhas:0 };
-  /* A tela consulta de 5 em 5 segundos pra acompanhar a barra e o ranking ao vivo. Nessas
-     consultas o `resumo` corta a lista de times: ela nao muda enquanto a tela esta aberta, e
-     buscar os saves de novo a cada 5s seria leitura jogada fora. */
+  /* A tela normalmente ESCUTA os dois documentos em tempo real e nao chama mais nada. Este resumo
+     e a rede de seguranca: se a escuta nao subir (regra, rede, navegador), o cliente volta a
+     consultar de 5 em 5 segundos. Corta a lista de times, que nao muda com a tela aberta. */
   if(request.data && request.data.resumo){
     return { boss: { hp:estado.hp, maxHp:estado.maxHp, level:estado.level, golpes:estado.golpes||0,
                      batalhas:estado.batalhas||0, derrotadoEm:estado.derrotadoEm || null },
@@ -5550,6 +5572,7 @@ exports.fightSundayBoss = onCall(async (request) => {
              meuDano: (meu.dano||0) + aplicado, meusAtaques: (meu.batalhas||0) + 1 };
   });
 
+  await bossAtualizarRanking();   // o top 10 fica pronto pra tela ler numa leitura so
   return { matchups: luta.matchups, win: luta.derrubou,
            dano: resultado.aplicado,          // o que saiu da barra de verdade
            danoSimulado: luta.dano,           // o que a luta deu; maior quando outro chegou antes

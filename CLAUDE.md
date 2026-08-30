@@ -358,20 +358,29 @@ Duas artimanhas medidas e fechadas — em ambas o jogador reiniciava até vir sh
 - A tela tem **dois passos**: estado da raide + ranking, e só depois do "Atacar Mew" a lista de
   times. Com a lista aberta de saída, a barra de vida e o ranking — que são a razão da tela
   existir — ficavam atrás de uma rolagem em 320px.
-- **A tela se atualiza sozinha a cada 5s** (`BOSS_POLL_MS`), com laço próprio — não preso ao
-  `render()`, que aqui é raro. É obrigatório numa raide coletiva: sem isso duas contas abertas lado
-  a lado mostravam vidas diferentes, e mesmo depois da SUA investida o ranking continuava velho
-  (o resultado da luta traz o HP e a sua contribuição, mas não a lista). Ao voltar da batalha ele
-  consulta na hora, sem esperar a volta do laço.
-  Dois cuidados que a tela tem: **só redesenha se algo mudou** (compara uma assinatura de
-  hp+batalhas+ranking), e **com a lista de times aberta não redesenha nunca** — atualiza a barra
-  direto no DOM, porque uma linha nova no ranking empurraria os cards no instante do toque. É a
-  mesma regra das animações de batalha.
-  **Custo:** a consulta leve (`{resumo:true}`, sem a lista de times) são ~13 leituras — conta,
-  Mew, top 10 e o documento do jogador. A 5s isso dá ~156 leituras/minuto **por tela aberta**, ou
-  ~9,4 mil por hora. Com dois testadores é irrelevante; se a raide abrir pra todo mundo, o
-  caminho é guardar o top 10 já pronto num documento à parte (não no documento do Mew, que já é
-  disputado pelas investidas) e derrubar a consulta pra ~4 leituras.
+- **A tela ESCUTA os dois documentos em tempo real** (`onSnapshot`), não consulta de tempos em
+  tempos. É obrigatório numa raide coletiva: sem acompanhar, duas contas abertas lado a lado
+  mostravam vidas diferentes, e nem a própria investida atualizava o ranking (o resultado da luta
+  traz o HP e a sua contribuição, mas não a lista).
+  As regras liberam leitura de `globalBoss/{id}` pra qualquer logado, então dá pra assinar direto.
+  Medido: **2 telas abertas por 1h com 20 investidas = 80 leituras**, contra **4.320** consultando
+  de 5 em 5s — e a barra anda no instante em que o outro bate, não até 5s depois.
+- **O top 10 fica pronto em `globalBoss/mewRank`**, reescrito a cada investida (best-effort, fora
+  da transação). É o que faz a leitura custar 1 em vez de 10 e o que permite escutar o ranking.
+  Mora num documento SEPARADO de propósito: o do Mew já é disputado por toda investida, e o limite
+  é ~1 gravação por segundo por documento — somar outra ali pioraria o ponto mais quente da raide.
+  `bossRanking()` cai na consulta viva se o documento ainda não existir.
+- O **polling de 5s continua no código como rede de segurança**: se a escuta não subir (regra,
+  rede, navegador), o `onSnapshot` chama o callback de erro e a tela cai pro laço. Ficar em
+  silêncio seria pior — a tela pararia de andar sem nada explicando.
+- Dois cuidados da tela: **só redesenha se algo mudou** (assinatura de hp+batalhas+ranking), e
+  **com a lista de times aberta não redesenha nunca** — atualiza a barra direto no DOM, porque uma
+  linha nova no ranking empurraria os cards no instante do toque. Mesma regra das animações.
+- `tools/test-boss-tela.js` exercita isso fora do navegador: o `onSnapshot` do sandbox passou a
+  **guardar os callbacks** em vez de devolver um noop, então dá pra disparar "outro treinador
+  bateu" na mão e ver a tela reagir. O sandbox também ganhou `functionsClient` — ele nasce num
+  `<script>` separado da página, que o sandbox não carrega, e sem ele qualquer tela que chame uma
+  Cloud Function derrubava o teste com um ReferenceError sem relação com o que estava sendo testado.
 - **Top 10 por dano**, mesma marcação dos rankings das ligas (`leaderboard-list`). O nome do
   treinador fica **gravado no documento do jogador** e é atualizado a cada investida: sem isso o
   ranking custaria 10 leituras extras em `users/` toda vez que alguém abrisse a tela. O preço é

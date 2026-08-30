@@ -6300,10 +6300,10 @@ function finishTrainerBattle(){
     game.bossEscolhendoTime = false;   // a investida acabou: volta pro estado de leitura
     game.screen = 'sundayBoss';
     render();
-    /* O resultado da luta já trouxe o HP e a SUA contribuição, mas não o ranking -- e é logo
-       depois de bater que o jogador quer ver a posição dele. Consulta na hora em vez de esperar
-       a próxima volta do laço, e religa o laço, que tinha morrido ao sair da tela. */
-    atualizarEstadoDoBoss().then(agendarPollDoBoss);
+    /* Religa o acompanhamento: as escutas foram canceladas ao sair pra tela de batalha. A
+       primeira notificação do onSnapshot já vem com o estado atual, então o HP e o ranking se
+       corrigem sozinhos -- inclusive a investida que acabou de acontecer. */
+    ligarEscutaDoBoss();
     return;
   }
   if(game.onlineReplayPending){
@@ -13587,12 +13587,58 @@ function saveStatusLabel(s){
    seis pokémon nível 99 inventados no console, e aqui o estrago não ficaria no save de quem
    trapaceou -- ficaria na barra que todo mundo vê.
    ============================================================================ */
-/* A raide é COLETIVA: enquanto você olha a tela, outros treinadores estão batendo. Sem esse laço a
-   barra e o ranking congelavam no que existia na hora que a tela abriu -- duas contas abertas lado
-   a lado mostravam números diferentes, e mesmo depois da SUA investida o ranking continuava velho.
-   Laço próprio, não preso ao render(): esta tela redesenha raramente (ver CLAUDE.md). */
+/* A raide é COLETIVA: enquanto você olha a tela, outros treinadores estão batendo. Sem acompanhar,
+   a barra e o ranking congelam no que existia quando a tela abriu -- duas contas abertas lado a
+   lado mostravam números diferentes, e nem a própria investida atualizava o ranking.
+
+   ESCUTA EM TEMPO REAL, não consulta de tempos em tempos. Os dois documentos são de leitura
+   liberada nas regras (`globalBoss/{id}`), então o cliente assina os dois e o Firestore avisa
+   quando mudam. É mais barato E mais rápido que perguntar de 5 em 5 segundos:
+
+     consultando 5/5s   2 telas abertas por 1h = 2 x 720 x 3 leituras = 4.320
+     escutando          2 telas abertas por 1h com 20 investidas = 2 x 20 x 2 = 80 (+4 na abertura)
+
+   e a barra anda no instante em que o outro treinador bate, em vez de até 5s depois.
+   O polling continua no código como REDE: se a escuta não subir (regra, rede, navegador antigo),
+   `onSnapshot` chama o callback de erro e a tela cai pro laço de 5s -- ficar em silêncio seria
+   pior, porque a tela pararia de andar sem nada explicando. */
 const BOSS_POLL_MS = 5000;
 let bossPollTimer = null;
+let bossEscutas = [];
+function ligarEscutaDoBoss(){
+  pararEscutaDoBoss();
+  if(!db || !game.authUser){ agendarPollDoBoss(); return; }
+  const aoMudar = (aplica) => (snap)=>{
+    if(game.screen !== 'sundayBoss' || !game.bossState) return;
+    const antes = assinaturaDoBoss();
+    aplica(snap.exists ? snap.data() : null);
+    if(assinaturaDoBoss() === antes) return;
+    if(game.bossEscolhendoTime){ atualizarBarraDoBossNoDom(); return; }
+    render();
+  };
+  const aoFalhar = (e) => {
+    console.error('Boss: escuta em tempo real falhou, caindo pro polling', e);
+    pararEscutaDoBoss();
+    agendarPollDoBoss();
+  };
+  try{
+    bossEscutas.push(db.collection('globalBoss').doc('mew').onSnapshot(
+      aoMudar(d => { if(d) game.bossState.boss = {
+        hp:d.hp, maxHp:d.maxHp, level:d.level, golpes:d.golpes||0,
+        batalhas:d.batalhas||0, derrotadoEm:d.derrotadoEm||null }; }), aoFalhar));
+    bossEscutas.push(db.collection('globalBoss').doc('mewRank').onSnapshot(
+      aoMudar(d => {
+        game.bossState.ranking = (d && Array.isArray(d.lista)) ? d.lista : [];
+        // a minha contribuição sai de graça do ranking quando eu estou nele -- sem leitura extra
+        const eu = game.bossState.ranking.find(x=>x.uid === (game.authUser||{}).uid);
+        if(eu) game.bossState.meu = { dano: eu.dano, batalhas: eu.batalhas };
+      }), aoFalhar));
+  }catch(e){ aoFalhar(e); }
+}
+function pararEscutaDoBoss(){
+  bossEscutas.forEach(fn=>{ try{ fn(); }catch(e){} });   // onSnapshot devolve a função que cancela
+  bossEscutas = [];
+}
 function agendarPollDoBoss(){
   pararPollDoBoss();
   bossPollTimer = setTimeout(async ()=>{
@@ -13604,6 +13650,7 @@ function agendarPollDoBoss(){
 function pararPollDoBoss(){
   if(bossPollTimer){ clearTimeout(bossPollTimer); bossPollTimer = null; }
 }
+function pararAcompanhamentoDoBoss(){ pararEscutaDoBoss(); pararPollDoBoss(); }
 async function atualizarEstadoDoBoss(){
   if(!game.bossState) return;
   let d;
@@ -13644,10 +13691,10 @@ async function openSundayBoss(){
   game.bossLoading = true;
   render();
   await carregarSundayBoss();
-  agendarPollDoBoss();
+  ligarEscutaDoBoss();
 }
 function sairDoBoss(){
-  pararPollDoBoss();
+  pararAcompanhamentoDoBoss();
   goToSaveMenu();
 }
 /* A escolha do time é o SEGUNDO passo. Antes a lista já vinha aberta e empurrava a barra de vida
@@ -13693,6 +13740,7 @@ async function lutarSundayBoss(slot){
     game.trainerHitSequence = [];
     game.trainerHitStep = 0;
     game.trainerMoveShown = false;
+    pararAcompanhamentoDoBoss();   // nada de redesenhar por trás da animação (ver CLAUDE.md)
     game.screen = 'trainerBattling';
     game.bossLoading = false;
     render();

@@ -195,11 +195,23 @@ async function ranking(){
      ordenar por dano, cortar em 10 e trazer o nome gravado. Por isso os placares entram direto --
      91 investidas de verdade matariam o Mew (5125 de vida) muito antes do decimo terceiro
      jogador atacar. Uma investida real de cada um confirma que a funcao escreve no mesmo lugar. */
+  const rank = () => db.collection('globalBoss').doc('mewRank').get().then(s=>s.exists?s.data():null);
   for(let i=0;i<N;i++){
     await chamar('fightSundayBoss','r'+i,{slot:'0'});
     await db.collection('globalBoss').doc('mew').collection('players').doc('r'+i)
             .set({ dano: (i+1)*100, batalhas: i+1, trainerName:'Treinador '+i }, { merge:true });
   }
+  // 1) sem o top 10 guardado, cai na consulta viva
+  await db.collection('globalBoss').doc('mewRank').delete();
+  const vivo = (await chamar('getSundayBoss','r0')).ranking;
+  ok('sem cache, a consulta viva responde', vivo.length === 10 && vivo[0].uid === 'r'+(N-1), vivo[0].uid);
+  // 2) uma investida reconstroi o top 10 guardado
+  await chamar('fightSundayBoss','r0',{slot:'0'});
+  const guardado = await rank();
+  ok('a investida grava o top 10 pronto', !!guardado && Array.isArray(guardado.lista), guardado?'sim':'nao');
+  ok('o guardado tem no maximo 10', guardado.lista.length === 10, String(guardado.lista.length));
+  ok('a tela le do guardado, nao da colecao',
+     JSON.stringify((await chamar('getSundayBoss','r0')).ranking) === JSON.stringify(guardado.lista));
   const r = (await chamar('getSundayBoss','r0')).ranking;
   ok('devolve no maximo 10', r.length === 10, r.length + '');
   ok('vem em ordem decrescente de dano', r.every((e,i)=> i===0 || r[i-1].dano >= e.dano),

@@ -33,12 +33,19 @@ function makeElementStub(){
 function createSandbox(htmlPath){
   const code = extractGameScript(htmlPath || path.join(__dirname, '..', 'index.html'));
   const noop = ()=>{};
-  const firestoreStub = () => ({
-    collection(){ return firestoreStub(); },
-    doc(){ return firestoreStub(); },
+  /* onSnapshot guarda os callbacks em vez de ignorá-los: é o que permite testar fora do navegador
+     uma tela que ESCUTA o Firestore (o Boss de Domingo) -- dispara `sandbox.__snapshots.mew(...)`
+     e vê o que a tela faz. Antes devolvia um noop e a escuta era invisível pro teste. */
+  const escutas = {};
+  const firestoreStub = (caminho) => ({
+    collection(nome){ return firestoreStub(nome); },
+    doc(id){ return firestoreStub(id); },
     get(){ return Promise.resolve({ exists:false, data(){ return {}; } }); },
     set(){ return Promise.resolve(); },
-    onSnapshot(){ return noop; },
+    onSnapshot(ok, err){
+      escutas[caminho] = { ok, err, ativo:true };
+      return ()=>{ if(escutas[caminho]) escutas[caminho].ativo = false; };
+    },
     runTransaction(){ return Promise.resolve(); }
   });
   const sandbox = {
@@ -67,7 +74,13 @@ function createSandbox(htmlPath){
     TextEncoder, crypto,
     firebase:{ initializeApp(){}, auth(){ return {}; }, firestore(){ return firestoreStub(); } },
     auth:{ onAuthStateChanged(){}, signOut(){ return Promise.resolve(); } },
-    db: firestoreStub()
+    db: firestoreStub(),
+    /* `db`, `auth` e `functionsClient` nascem num <script> SEPARADO da página (o da config do
+       Firebase), e o sandbox só carrega o bloco maior -- o do jogo. Por isso eles entram aqui na
+       mão. Sem o functionsClient, qualquer tela que chame uma Cloud Function derruba o teste com
+       um ReferenceError que não tem nada a ver com o que estava sendo testado. */
+    functionsClient: { httpsCallable(){ return ()=>Promise.resolve({ data:{} }); } },
+    __escutas: escutas   // ver o onSnapshot acima
   };
   sandbox.window = sandbox;
   sandbox.globalThis = sandbox;
@@ -96,6 +109,9 @@ function createSandbox(htmlPath){
     // anti-artimanha: encontro selvagem preso ao contador do save e sorteio dos iniciais preso
     // ao slot (ver test-artimanha.js)
     'goToWildEncounter','montaOfertaSelvagem','currentShinyChance',
+    // Boss de Domingo: a tela escuta o Firestore, e isso da pra exercitar aqui (ver __escutas)
+    'ligarEscutaDoBoss','pararEscutaDoBoss','pararAcompanhamentoDoBoss','agendarPollDoBoss',
+    'assinaturaDoBoss','renderSundayBoss','sairDoBoss','BOSS_POLL_MS',
     'sorteioDosIniciais','chaveDoSorteio','limparSorteioDosIniciais','HARD_SHINY_CHANCE',
     // terreno, buffs e atributos: sem eles nao da pra medir o efeito de terreno/shiny,
     // que e justamente onde cliente e servidor ja divergiram
