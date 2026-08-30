@@ -306,33 +306,52 @@ Duas artimanhas medidas e fechadas — em ambas o jogador reiniciava até vir sh
 
 ## Boss de Domingo (raide global)
 
-- **Em avaliação: só conta com `userTest = true`.** O botão da home é escondido no cliente, mas
-  quem fecha a porta é o `bossRequireTester` no servidor — o estado é GLOBAL e uma Cloud Function
-  é chamável direto, sem passar pela tela. Mesma lição da Torre.
-- Um Mew **nível 999**, um só pro jogo inteiro (`globalBoss/mew`). A vida **nunca regenera**: o que
+- **Aberto pra todos** desde 30/08/2026 (nasceu restrito a `userTest`; o `bossRequireTester` ficou
+  como gancho, sem efeito). O que limita é o CALENDÁRIO: o botão da home só existe **aos domingos**,
+  pelo relógio do jogador. O servidor não checa o dia de propósito — checar obrigaria a escolher um
+  fuso pro mundo inteiro, e quem vê "domingo" no celular não entenderia o botão sumir. Abrir a tela
+  fora de domingo pelo console não quebra nada: é a mesma raide, só não anunciada.
+- O botão ocupa as **duas colunas** da grade de modos (`.home-btn-largo`): é um evento de um dia por
+  semana, e dividir espaço o faria passar despercebido justamente no dia dele.
+- Um Mew **nível 4999**, um só pro jogo inteiro (`globalBoss/mew`). A vida **nunca regenera**: o que
   um jogador tirou fica tirado pro próximo. Nas regras do Firestore o documento é **leitura livre e
   escrita negada a todos** — inclusive ao dono da conta. É o oposto das outras coleções: ali um
   jogador só estraga o que é dele; aqui uma escrita solta mataria o Mew de todo mundo com um `hp:0`.
 - **O servidor nunca aceita um time do cliente**, só o `slot` — o time sai do save gravado. Aceitar
   um time montado na hora seria aceitar seis pokémon nível 99 inventados no console, e o estrago
   não ficaria no save de quem trapaceou: ficaria na barra que o jogo inteiro vê.
-- O desconto vai numa **transação**: duas investidas simultâneas leem o mesmo HP, e sem isso a
+- O desconto vai numa **transação**: duos ataques simultâneas leem o mesmo HP, e sem isso a
   segunda grava por cima da primeira e metade do dano some. (`tools/fake-firestore.js` ganhou
   transações serializadas por causa disto — antes rodavam sem isolamento nenhum.)
 - **O HP NÃO dimensiona a raide.** Contra-intuitivo e já quase custou uma escolha errada: o motor
   calcula dano como fração da vida do alvo (`pct = dmgGen1 / gen1MaxHp(alvo)`) e só projeta na
-  escala no fim (`pct * maxHp`). Medido: com 5.125, 10.000, 20.000 ou 100.000 de HP, uma investida
-  tira sempre **~2,44% da barra**. Dobrar o HP dobra o dano por golpe e o número de investidas não
-  muda. Quem controla a duração é o **nível** do Mew (entra no divisor): nível 200 → 3 investidas,
+  escala no fim (`pct * maxHp`). Medido: com 5.125, 10.000, 20.000 ou 100.000 de HP, um ataque
+  tira sempre **~2,44% da barra**. Dobrar o HP dobra o dano por golpe e o número de ataques não
+  muda. Quem controla a duração é o **nível** do Mew (entra no divisor): nível 200 → 3 ataques,
   500 → 13, 999 → 41, 2000 → 118 (time nível 70).
-- O HP **sai da fórmula do jogo**, não é escolhido: `BOSS_MAX_HP = calcMaxHp({level:999, baseHp:100})`
-  = `round(30 + 999*5 + 100)` = **5125**. Mew é 100 em todos os atributos (oficial da Gen 2), o que
-  em nível 999 dá 2003 de ataque, defesa, Sp.Atk, Sp.Def e velocidade (`statAtLevel`), e 3007 de HP
-  na escala Gen 1 (o divisor do dano). Foi 10000 por um dia, como exemplo.
-  **Trocar esse número exige apagar `globalBoss/mew`**: o `maxHp` fica gravado no documento, e o
-  documento antigo continuaria valendo o valor velho.
-- Calibragem atual: **~41 investidas** de um time nível 70. Um time de 6 sempre dá **24 golpes** por
-  investida: o Mew mata cada pokémon em 2 golpes (teto de 65% por golpe), 6 × 2 trocas × 2.
+- O HP **sai da fórmula do jogo**, não é escolhido: `BOSS_MAX_HP = calcMaxHp({level:4999, baseHp:100})`
+  = `round(30 + 4999*5 + 100)` = **25125**. Mew é 100 em todos os atributos (oficial da Gen 2).
+  **Trocar o nível (ou o HP) exige apagar `globalBoss/mew`, `globalBoss/mewRank` e a subcoleção
+  `players`**: o `maxHp` fica gravado no documento e o dano acumulado está na escala antiga. Já foi
+  feito duas vezes — 10000 fixo → 5125 (nível 999) → 25125 (nível 4999).
+- Calibragem: **~399 ataques** de um time nível 70 (era ~41 no nível 999). Um time de 6 sempre dá
+  **24 golpes** por ataque: o Mew mata cada pokémon em 2 golpes (teto de 65% por golpe).
+  Efeito colateral medido e aceito da subida pra 4999: com a defesa tão alta o dano de quase todo
+  mundo desce pro piso, e a força do time quase não importa mais — time nível 50 leva **411**
+  ataques, nível 99 leva **340** (1,2× de diferença, contra 2× que havia no nível 999). A raide
+  virou uma conta de QUANTA GENTE bate, não de quão forte cada um é.
+- **Derrubar o Mew premia o Top 10**: 1 hora de chance de shiny aumentada (`shinyBonusExpiresAt`,
+  o mesmo campo do prêmio da Elite) + notificação com a posição e o dano. O bônus é gravado
+  DIRETO, sem passar por notificação-cupom como o da Elite: aqui não há o que escolher, todo mundo
+  do top 10 ganha igual, e um cupom a ativar só criaria um jeito de perder o prêmio.
+  Marca também `bossTop10` na conta dos dez e `bossKiller` em quem deu o golpe final — que **não é
+  necessariamente do top 10**: pode ter chegado no fim e tirado os últimos 20 de HP.
+- Três conquistas novas: **Caçada Coletiva** (top 10 numa raide vencida), **Golpe Final** (derrubar
+  o Mew) e **Mestre do Disfarce** (vencer a Elite 4 com um Ditto no time). As duas primeiras vêm de
+  flags da CONTA, gravadas pelo servidor — não dá pra derivar do save, porque a raide é coletiva.
+  A terceira usa `eliteDittoWin`, gravada **no instante da vitória** (mesmo motivo do
+  `everComeback`): olhar o time do save depois daria a conquista pra quem só pôs o Ditto no time
+  DEPOIS de ser campeão, e tiraria de quem venceu com ele e trocou em seguida.
 - **Transação: as leituras TODAS antes das escritas.** O Firestore recusa a transação inteira se um
   `get` vier depois de um `set`, e o erro só existe em produção — chega no cliente como um
   `INTERNAL` seco. A função nasceu assim: 24 checagens verdes no teste, 500 no ar. O
@@ -346,7 +365,7 @@ Duas artimanhas medidas e fechadas — em ambas o jogador reiniciava até vir sh
 - **Limite de escrita do Firestore: ~1 gravação por segundo por documento** (sustentada). A raide
   inteira passa por um documento só, então concorrência alta vira retentativa e latência, e num
   pico longo o suficiente vira `ABORTED` depois de esgotar as tentativas do SDK — o jogador
-  perderia a investida. Isso é propriedade documentada do Firestore, **não** algo medido aqui: o
+  perderia o ataque. Isso é propriedade documentada do Firestore, **não** algo medido aqui: o
   `fake-firestore` serializa as transações e não modela contenção. Se a raide abrir pra todo
   mundo, a saída conhecida é fragmentar o contador (N documentos, soma na leitura).
 - O Mew **não entra em `SPECIES`** — tudo que está lá conta pro total da Pokédex e pro "capturou
@@ -360,14 +379,14 @@ Duas artimanhas medidas e fechadas — em ambas o jogador reiniciava até vir sh
   existir — ficavam atrás de uma rolagem em 320px.
 - **A tela ESCUTA os dois documentos em tempo real** (`onSnapshot`), não consulta de tempos em
   tempos. É obrigatório numa raide coletiva: sem acompanhar, duas contas abertas lado a lado
-  mostravam vidas diferentes, e nem a própria investida atualizava o ranking (o resultado da luta
+  mostravam vidas diferentes, e nem o próprio ataque atualizava o ranking (o resultado da luta
   traz o HP e a sua contribuição, mas não a lista).
   As regras liberam leitura de `globalBoss/{id}` pra qualquer logado, então dá pra assinar direto.
-  Medido: **2 telas abertas por 1h com 20 investidas = 80 leituras**, contra **4.320** consultando
+  Medido: **2 telas abertas por 1h com 20 ataques = 80 leituras**, contra **4.320** consultando
   de 5 em 5s — e a barra anda no instante em que o outro bate, não até 5s depois.
-- **O top 10 fica pronto em `globalBoss/mewRank`**, reescrito a cada investida (best-effort, fora
+- **O top 10 fica pronto em `globalBoss/mewRank`**, reescrito a cada ataque (best-effort, fora
   da transação). É o que faz a leitura custar 1 em vez de 10 e o que permite escutar o ranking.
-  Mora num documento SEPARADO de propósito: o do Mew já é disputado por toda investida, e o limite
+  Mora num documento SEPARADO de propósito: o do Mew já é disputado por todo ataque, e o limite
   é ~1 gravação por segundo por documento — somar outra ali pioraria o ponto mais quente da raide.
   `bossRanking()` cai na consulta viva se o documento ainda não existir.
 - O **polling de 5s continua no código como rede de segurança**: se a escuta não subir (regra,
@@ -382,14 +401,14 @@ Duas artimanhas medidas e fechadas — em ambas o jogador reiniciava até vir sh
   `<script>` separado da página, que o sandbox não carrega, e sem ele qualquer tela que chame uma
   Cloud Function derrubava o teste com um ReferenceError sem relação com o que estava sendo testado.
 - **Top 10 por dano**, mesma marcação dos rankings das ligas (`leaderboard-list`). O nome do
-  treinador fica **gravado no documento do jogador** e é atualizado a cada investida: sem isso o
+  treinador fica **gravado no documento do jogador** e é atualizado a cada ataque: sem isso o
   ranking custaria 10 leituras extras em `users/` toda vez que alguém abrisse a tela. O preço é
-  que quem troca de nome só aparece com o nome novo depois da próxima investida.
+  que quem troca de nome só aparece com o nome novo depois do próximo ataque.
   (`tools/fake-firestore.js` ganhou `orderBy` de verdade por causa disto — era um no-op, então um
   teste de ranking passaria sem conferir ordem nenhuma e o `limit(10)` cortaria dez QUAISQUER.)
-- Em aberto, não implementado: recompensa por derrubar, limite de investidas por jogador (hoje é
-  livre — de propósito, senão não dá pra testar) e o que acontece depois que ele cai (hoje fica
-  derrubado e a tela diz isso).
+- Em aberto, não implementado: **limite de ataques por jogador** (hoje é livre — sem isso, uma
+  conta sozinha derruba a raide em ~399 ataques) e o que acontece depois que ele cai (hoje fica
+  derrubado e a tela diz isso; não renasce no domingo seguinte).
 
 ## Lista de amigos
 

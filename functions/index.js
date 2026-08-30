@@ -5332,9 +5332,9 @@ exports.respondFriendChallenge = onCall(async (request) => {
    Um Mew so pro jogo inteiro. Todo mundo ve a MESMA barra de vida, e ela nunca regenera: o que
    um jogador tirou fica tirado pro proximo. E uma luta coletiva -- ninguem derruba sozinho.
 
-   EM AVALIACAO: so contas com userTest=true entram. Esconder o botao no cliente nao basta -- as
-   Cloud Functions sao chamaveis direto, e quem chamasse na mao mexeria no estado GLOBAL, que
-   todo mundo ve. A porta tem que ser fechada aqui. (Mesma licao da Torre, ver towerRequireTester.)
+   ABERTA PRA TODO MUNDO desde 30/08/2026. Nasceu restrita a userTest -- a funcao bossRequireTester
+   continua aqui, agora sem efeito, como gancho pronto caso algum modo futuro precise fechar de
+   novo. Quem controla QUANDO ela aparece e o cliente: o botao so existe aos domingos.
 
    O SERVIDOR NUNCA ACEITA UM TIME DO CLIENTE. O cliente manda so o SLOT; o time sai do save
    gravado no Firestore. Aceitar um time montado na hora seria aceitar um time de nivel 99
@@ -5347,7 +5347,14 @@ exports.respondFriendChallenge = onCall(async (request) => {
    Mew (entram no divisor); o HP so decide a escala dos numeros que aparecem na tela.
    ===================================================================== */
 const BOSS_ID = 'mew';
-const BOSS_LEVEL = 999;
+/* Nivel 4999. Medido na subida (time nivel 70): 999 dava 5.125 de vida e ~41 ataques pra
+   derrubar; 4999 da 25.125 e ~399. O nivel entra no divisor do dano, entao ele -- e nao o HP --
+   e quem dimensiona a raide.
+   Efeito colateral medido e aceito: com a defesa tao alta, o dano de quase todo mundo desce pro
+   piso, e a forca do time quase nao importa mais (time nivel 50 leva 411 ataques, nivel 99 leva
+   340 -- 1,2x de diferenca, contra 2x que havia no nivel 999). A raide vira uma conta de QUANTA
+   GENTE bate, nao de quao forte cada um e -- que e o que se quer de uma luta coletiva. */
+const BOSS_LEVEL = 4999;
 /* Mew: 100 em TODOS os atributos, oficial da Gen 2 (hp, ataque, defesa, Sp.Atk, Sp.Def, velocidade).
    Ele NAO entra em SPECIES de proposito -- `Object.keys(SPECIES)` e o que define o total da Pokedex
    e o "capturou tudo" que libera o desafio do Mewtwo, e um Mew que ninguem captura nao pode contar
@@ -5357,7 +5364,7 @@ const BOSS_BASE = { baseHp:100, attack:100, defense:100, spAtk:100, spDef:100, s
 /* O HP e o que a FORMULA DO JOGO da pra um Mew nivel 999, nao um numero escolhido:
    calcMaxHp = round(30 + nivel*5 + baseHp) = 30 + 4995 + 100 = 5125.
    Trocar este numero NAO muda a duracao da raide -- o dano e fracao da vida do alvo, entao a
-   barra sempre cai ~2,44% por investida (medido com 10 mil, 20 mil e 100 mil). Quem controla a
+   barra sempre cai ~2,44% por ataque (medido com 10 mil, 20 mil e 100 mil). Quem controla a
    duracao e o BOSS_LEVEL. Mas trocar EXIGE apagar globalBoss/mew: o maxHp fica gravado no
    documento, e o doc antigo continuaria valendo o valor velho. */
 const BOSS_MAX_HP = calcMaxHp({ level: BOSS_LEVEL, baseHp: BOSS_BASE.baseHp });
@@ -5376,22 +5383,19 @@ function bossEstadoInicial(){
    duas vezes na mesma chamada seria desperdicio. */
 async function bossRequireTester(uid){
   const snap = await db.collection('users').doc(uid).get();
-  if(!snap.exists || snap.data().userTest !== true){
-    throw new HttpsError('permission-denied', 'O Boss de Domingo está em avaliação.');
-  }
-  return snap.data();
+  return snap.exists ? snap.data() : {};
 }
 /* TOP 10 de dano. O nome do treinador fica GRAVADO no documento do jogador (denormalizado) e e
-   atualizado a cada investida: sem isso o ranking precisaria de 10 leituras extras em users/ toda
+   atualizado a cada ataque: sem isso o ranking precisaria de 10 leituras extras em users/ toda
    vez que alguem abrisse a tela. O preco e que quem troca de nome so aparece com o nome novo
-   depois da proxima investida -- barato perto de 10 leituras por abertura de tela.
+   depois do proximo ataque -- barato perto de 10 leituras por abertura de tela.
 
    O RESULTADO FICA GUARDADO PRONTO em globalBoss/mewRank, e e de la que a tela le. Assim:
    - a consulta da tela custa 1 leitura em vez de 10, e
    - o cliente pode ESCUTAR esse documento em tempo real (as regras liberam leitura de
      globalBoss/{id} pra qualquer logado), o que dispensa consultar de tempos em tempos.
    Ele mora num documento SEPARADO, e nao dentro do documento do Mew, de proposito: o do Mew ja e
-   disputado por toda investida, e o Firestore sustenta ~1 gravacao por segundo por documento --
+   disputado por todo ataque, e o Firestore sustenta ~1 gravacao por segundo por documento --
    somar mais uma gravacao ali pioraria justamente o ponto mais quente da raide. */
 function bossRankDocRef(){ return db.collection('globalBoss').doc(BOSS_ID + 'Rank'); }
 async function bossCalcularRanking(){
@@ -5411,12 +5415,42 @@ async function bossRanking(){
   return await bossCalcularRanking();          // ainda nao existe: cai na consulta viva
 }
 /* Recalcula e grava o top 10. Best-effort de proposito: e so apresentacao, e falhar aqui nao pode
-   derrubar uma investida que ja foi contabilizada. Fica FORA da transacao -- dentro dela a
-   consulta de 10 documentos entraria no caminho critico de toda luta. */
+   derrubar um ataque que ja foi contabilizado. Fica FORA da transacao -- dentro dela a consulta
+   de 10 documentos entraria no caminho critico de toda luta. */
 async function bossAtualizarRanking(){
   try{
     await bossRankDocRef().set({ lista: await bossCalcularRanking(), em: Date.now() });
   }catch(e){ logger.error('Boss: falha ao atualizar o ranking', e); }
+}
+/* O Mew caiu: os 10 que mais machucaram ganham 1 hora de chance de shiny aumentada, e as duas
+   conquistas da raide ficam marcadas na conta.
+   Roda UMA vez, no ataque que derrubou -- quem derruba e exatamente um (o hpDepois so passa de
+   >0 pra 0 uma vez, dentro da transacao). O bonus e gravado direto, sem passar por notificacao-
+   cupom como o da Elite: aqui nao ha o que escolher, todo mundo do top 10 ganha igual, e um cupom
+   que precisa ser ativado so criaria um jeito de perder o premio.
+   As gravacoes vao em lote -- sao ate 10 contas de uma vez. */
+async function bossPremiarTop10(uidQueDerrubou){
+  try{
+    const top = await bossCalcularRanking();
+    const expiraEm = Date.now() + SHINY_BONUS_DURATION_MS;
+    const lote = db.batch();
+    top.forEach(e => {
+      lote.set(db.collection('users').doc(e.uid),
+               { shinyBonusExpiresAt: expiraEm, bossTop10: true }, { merge:true });
+    });
+    /* Quem deu o GOLPE FINAL nao e necessariamente do top 10 -- pode ter chegado no fim e tirado
+       os ultimos 20 de HP. Marca a parte, e sem `undefined` no meio de um set do top 10: o
+       Firestore recusa o documento inteiro se um campo vier undefined. */
+    if(uidQueDerrubou){
+      lote.set(db.collection('users').doc(uidQueDerrubou), { bossKiller: true }, { merge:true });
+    }
+    await lote.commit();
+    await Promise.all(top.map((e, i) => createNotification(e.uid, 'boss_top10',
+      '✨ Mew derrotado!',
+      `Você terminou em ${i+1}º lugar com ${e.dano} de dano no Mew. Sua chance de encontrar shiny ` +
+      `está aumentada pela próxima 1 hora!`,
+      { rank: i+1, dano: e.dano })));
+  }catch(e){ logger.error('Boss: falha ao premiar o top 10', e); }
 }
 async function bossGetEstado(){
   const snap = await bossDocRef().get();
@@ -5508,8 +5542,8 @@ exports.getSundayBoss = onCall(async (request) => {
            ranking, times, serverNow: Date.now() };
 });
 
-/* Uma investida. O cliente manda só o SLOT -- o time sai do save gravado, nunca do que ele diz
-   ter. O desconto no Mew vai numa TRANSAÇÃO: a raide é global e várias investidas chegam ao mesmo
+/* Um ataque. O cliente manda só o SLOT -- o time sai do save gravado, nunca do que ele diz
+   ter. O desconto no Mew vai numa TRANSAÇÃO: a raide é global e vários ataques chegam ao mesmo
    tempo; sem transação duas leituras do mesmo HP gravariam o dano por cima uma da outra e parte
    do estrago sumiria. */
 exports.fightSundayBoss = onCall(async (request) => {
@@ -5573,6 +5607,7 @@ exports.fightSundayBoss = onCall(async (request) => {
   });
 
   await bossAtualizarRanking();   // o top 10 fica pronto pra tela ler numa leitura so
+  if(resultado.derrubou) await bossPremiarTop10(uid);
   return { matchups: luta.matchups, win: luta.derrubou,
            dano: resultado.aplicado,          // o que saiu da barra de verdade
            danoSimulado: luta.dano,           // o que a luta deu; maior quando outro chegou antes

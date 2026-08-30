@@ -63,24 +63,25 @@ function fim(){
 (async () => {
   await preparar();
 
-  console.log('\nA PORTA DO userTest (o estado e global -- fechar so no cliente nao vale)');
-  ok('conta sem userTest nao le a raide', await recusa('getSundayBoss','comum') === 'permission-denied');
-  ok('conta sem userTest nao ataca',      await recusa('fightSundayBoss','comum',{slot:'0'}) === 'permission-denied');
+  console.log('\nQUEM PODE ENTRAR (a raide abriu pra todos; so login continua obrigatorio)');
   let semLogin = null;
   try{ await fns.getSundayBoss({ data:{} }); }catch(e){ semLogin = e.code; }
   ok('sem login nao passa', semLogin === 'unauthenticated');
+  ok('conta comum (sem userTest) le a raide', !!(await chamar('getSundayBoss','comum')).boss);
 
   console.log('\nO MEW E UM SO, E A VIDA NAO VOLTA');
   const inicial = await chamar('getSundayBoss','tester');
   ok('nasce com a vida cheia', inicial.boss.hp === inicial.boss.maxHp, inicial.boss.hp+'/'+inicial.boss.maxHp);
-  ok('e nivel 999', inicial.boss.level === 999);
+  ok('e nivel 4999', inicial.boss.level === 4999);
+  ok('o HP sai da formula do jogo', inicial.boss.maxHp === Math.round(30 + 4999*5 + 100),
+     String(inicial.boss.maxHp));
   const r1 = await chamar('fightSundayBoss','tester',{ slot:'0' });
   ok('a investida tira vida', r1.dano > 0 && r1.hpDepois === r1.hpAntes - r1.dano,
      r1.hpAntes+' -> '+r1.hpDepois+' (-'+r1.dano+')');
   ok('o time inteiro cai (e um Lv.999)', r1.win === false);
   ok('o log traz os confrontos do time', r1.matchups.length >= 6, r1.matchups.length+' confrontos');
-  ok('o adversario do log e o Mew Lv.999',
-     r1.matchups.every(m => m.enemySpecies === 'mew' && m.enemyLevel === 999));
+  ok('o adversario do log e o Mew Lv.4999',
+     r1.matchups.every(m => m.enemySpecies === 'mew' && m.enemyLevel === 4999));
   ok('a barra do log e a barra global',
      r1.matchups[0].enemyMaxHp === inicial.boss.maxHp && r1.matchups[0].enemyHpBefore === r1.hpAntes);
 
@@ -110,18 +111,36 @@ function fim(){
 
   console.log('\nDERRUBANDO O MEW');
   let voltas = 0, ultimo = null;
-  while(voltas < 500){
+  while(voltas < 900){          // Lv.4999 = 25.125 de vida, ~400 ataques de um time Lv.70
     const est = await chamar('getSundayBoss','tester');
     if(est.boss.hp <= 0) break;
     ultimo = await chamar('fightSundayBoss','tester',{ slot:'0' });
     voltas++;
   }
   const fim2 = await chamar('getSundayBoss','tester');
-  ok('a raide termina (o Mew cai)', fim2.boss.hp === 0, voltas+' investidas de um time Lv.70');
+  ok('a raide termina (o Mew cai)', fim2.boss.hp === 0, voltas+' ataques de um time Lv.70');
   ok('a vida nunca fica negativa', fim2.boss.hp >= 0, String(fim2.boss.hp));
   ok('a ultima investida marca a derrubada', !!(ultimo && ultimo.derrubou));
   ok('derrubado, nao da pra atacar de novo',
      await recusa('fightSundayBoss','tester',{slot:'0'}) === 'failed-precondition');
+
+  console.log('\nO PREMIO DE DERRUBAR O MEW');
+  const conta = uid => db.collection('users').doc(uid).get().then(s=>s.data()||{});
+  const topo = (await chamar('getSundayBoss','tester')).ranking;
+  const premiados = await Promise.all(topo.map(e => conta(e.uid)));
+  ok('todo mundo do top 10 ganha 1h de bonus shiny',
+     premiados.every(c => c.shinyBonusExpiresAt > Date.now() &&
+                          c.shinyBonusExpiresAt <= Date.now() + 60*60*1000 + 5000),
+     premiados.length + ' contas');
+  ok('todo mundo do top 10 leva a conquista', premiados.every(c => c.bossTop10 === true));
+  ok('quem deu o golpe final leva a conquista do golpe', (await conta('tester')).bossKiller === true);
+  ok('quem NAO derrubou nao leva a do golpe', (await conta('tester2')).bossKiller !== true);
+  const notifs = await db.collection('users').doc('tester').collection('notifications').get();
+  const daRaide = notifs.docs.map(d=>d.data()).filter(n=>n.type==='boss_top10');
+  ok('o premiado e avisado por notificacao', daRaide.length === 1, daRaide.length+' notificacao(oes)');
+  ok('a notificacao diz a posicao e o dano',
+     !!daRaide[0] && daRaide[0].meta.rank === 1 && daRaide[0].meta.dano > 0,
+     daRaide[0] ? daRaide[0].meta.rank+'o com '+daRaide[0].meta.dano : '');
 
   console.log('\nCONTRIBUICAO DE CADA UM');
   const meu = (await chamar('getSundayBoss','tester')).meu;
@@ -244,8 +263,8 @@ async function resumo(){
   ok('o resumo traz o ranking', Array.isArray(leve.ranking));
   ok('o resumo traz a minha contribuicao', !!leve.meu);
   ok('o resumo NAO traz a lista de times (e leitura jogada fora)', leve.times === undefined);
-  ok('a porta do userTest vale no resumo tambem',
-     await recusa('getSundayBoss','naotem',{resumo:true}) === 'permission-denied');
+  ok('o resumo tambem exige login',
+     (await (async()=>{ try{ await fns.getSundayBoss({data:{resumo:true}}); return null; }catch(e){ return e.code; } })()) === 'unauthenticated');
 
   /* O caso do print: duas contas abertas, so uma ataca. A outra tem que enxergar. */
   const antes = (await chamar('getSundayBoss','s2',{resumo:true}));

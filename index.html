@@ -1873,6 +1873,9 @@
     gap:8px;
     margin:4px 0 14px;
   }
+  /* ocupa as DUAS colunas da grade -- o Boss de Domingo é um evento, e só aparece um dia por
+     semana; dividir espaço com outro botão o faria passar despercebido justamente no dia dele */
+  .home-modes-row .home-btn-largo{ grid-column:1 / -1; }
   .home-modes-row .leagues-big-btn{
     min-width:0;
     margin:0;
@@ -2997,6 +3000,7 @@ function freshGameDefaults(){
                      // vencido, então não serve pra medir o desempenho geral -- e é isso que o
                      // Bônus de Kanto usa no fim (ver KANTO_BONUS_TIERS)
     everComeback:false,
+    eliteDittoWin:false,   // venceu a Elite com um Ditto no time (ver a conquista "Mestre do Disfarce")
     evolutions:[],
     battleResult:null,
     revealIndex:0,
@@ -4216,6 +4220,9 @@ async function loadPermanentUserData(){
     game.trainerLastStreak = d.trainerLastStreak || 0;
     game.shinyBonusExpiresAt = d.shinyBonusExpiresAt || 0; // se a pessoa recarregar o app com o bônus ainda ativo, continua valendo
     game.startersSorteados = d.startersSorteados || {};    // ver sorteioDosIniciais
+    // marcas da raide do Mew, gravadas pelo servidor quando o boss cai (ver bossPremiarTop10)
+    game.bossTop10 = !!d.bossTop10;
+    game.bossKiller = !!d.bossKiller;
     game.mewtwoLoanActive = !!d.mewtwoLoanActive;
     game.mewtwoLoanCooldownUntil = d.mewtwoLoanCooldownUntil || 0;
     game.mewtwoLoanUnlocked = !!d.mewtwoLoanUnlocked;
@@ -5720,6 +5727,11 @@ function finishSpecialBattle(){
         // venceu a FINAL contra o rival -- campeão da Liga Pokémon
         game.eliteStatus = 'champion';
         game.accountEliteChampion = true;
+        /* Conquista "Mestre do Disfarce": vencer a Elite COM UM DITTO NO TIME. Flag permanente,
+           gravada no instante da vitória -- mesmo motivo do everComeback. Olhar o time do save
+           depois não serve: ele muda, e daria a conquista pra quem só colocou o Ditto no time
+           DEPOIS de ser campeão (e tiraria de quem venceu com ele e trocou em seguida). */
+        if((game.team||[]).some(p=>p && p.speciesId==='ditto')) game.eliteDittoWin = true;
         if(game.authUser){
           userDocRef(game.authUser.uid).set({ eliteChampion: true }, { merge: true })
             .catch(e=>console.error('Erro ao gravar o título da Elite na conta:', e));
@@ -6297,12 +6309,12 @@ function finishTrainerBattle(){
   }
   if(game.bossBattlePending){
     game.bossBattlePending = false;
-    game.bossEscolhendoTime = false;   // a investida acabou: volta pro estado de leitura
+    game.bossEscolhendoTime = false;   // o ataque acabou: volta pro estado de leitura
     game.screen = 'sundayBoss';
     render();
     /* Religa o acompanhamento: as escutas foram canceladas ao sair pra tela de batalha. A
        primeira notificação do onSnapshot já vem com o estado atual, então o HP e o ranking se
-       corrigem sozinhos -- inclusive a investida que acabou de acontecer. */
+       corrigem sozinhos -- inclusive o ataque que acabou de acontecer. */
     ligarEscutaDoBoss();
     return;
   }
@@ -9219,7 +9231,7 @@ const CAMPOS_DA_CONTA = [
   'accountEliteChampion','leagueWinsTotal','leagueLeaderboard','trainerBestStreak','trainerLastStreak',
   'shinyBonusExpiresAt','shinyPityCount','specialties','specialtyCounts',
   'mewtwoLoanActive','mewtwoLoanCooldownUntil','mewtwoLoanUnlocked','mewtwoLoanReadyToClaim',
-  'userTest','neighborhoodGymLocation','startersSorteados'
+  'userTest','neighborhoodGymLocation','startersSorteados','bossTop10','bossKiller'
 ];
 function snapshotDaConta(){
   const o = {};
@@ -9592,6 +9604,7 @@ function serializeGame(){
     gameMode: game.gameMode || 'normal',
     kantoBonusLevels: game.kantoBonusLevels||0,
     everComeback: game.everComeback || false,
+    eliteDittoWin: game.eliteDittoWin || false,
     pendingGymVictoryPool: game.pendingGymVictoryPool,
     gymTerrain: game.gymTerrain,
     eliteTerrain: game.eliteTerrain,
@@ -9772,6 +9785,7 @@ function applySavedState(data){
   game.gameMode = data.gameMode === 'hard' ? 'hard' : 'normal';
   game.kantoBonusLevels = data.kantoBonusLevels || 0;
   game.everComeback = data.everComeback || false;
+  game.eliteDittoWin = data.eliteDittoWin || false;
   game.pendingGymVictoryPool = data.pendingGymVictoryPool || null;
   game.gymTerrain = data.gymTerrain || null;
   game.eliteTerrain = data.eliteTerrain || null;
@@ -10174,6 +10188,9 @@ function getAchievementAggregate(){
     // sinais das conquistas novas -- tudo derivado do que os saves e a conta já guardam hoje
     hasMewtwo: caught.has('mewtwo'),
     hasDitto: caught.has('ditto'),
+    // marcas da raide do Mew -- vêm da CONTA, não dos saves (ver loadPermanentUserData)
+    bossTop10: !!game.bossTop10,
+    bossKiller: !!game.bossKiller,
     hasDragonite: caught.has('dragonite'),
     allBirds: ['moltres','zapdos','articuno'].every(id=>caught.has(id)),
     allEeveeEvos: ['vaporeon','jolteon','flareon'].every(id=>caught.has(id)),
@@ -10198,6 +10215,7 @@ function getAchievementAggregate(){
       return Math.max(max, avg);
     }, 0),
     anyEliteChampion: slots.some(s=> s.eliteStatus==='champion'),
+    anyEliteDittoWin: slots.some(s=> s.eliteDittoWin),
     savesEliteChampion: slots.filter(s=> s.eliteStatus==='champion').length,
     // shinies: contagem na pokédex shiny da conta
     shinyCount: (game.permanentShinyDex||[]).length,
@@ -10309,6 +10327,11 @@ const ACHIEVEMENTS = [
   { id:'league_runnerup', icon:'🥈', name:'Vice-Campeão', desc:'Termine uma Liga em segundo lugar.', check:(a,x)=>x.anyRunnerUp },
   { id:'league_champion', icon:'🏆', name:'Campeão da Liga', desc:'Vença uma Liga Pokémon inteira.', check:(a,x)=>x.anyChampion },
   { id:'legend_of_kanto', icon:'🐉', name:'Lenda de Kanto', desc:'Vença os 8 ginásios em um save E seja campeão de uma Liga.', check:(a,x)=>a.anyJourneyEnd && x.anyChampion },
+  /* Boss de Domingo. As duas marcas são gravadas pelo SERVIDOR no instante em que o Mew cai (ver
+     bossPremiarTop10) -- não dá pra derivar do save, porque a raide é da conta e coletiva. */
+  { id:'boss_top10', icon:'✨', name:'Caçada Coletiva', desc:'Termine no Top 10 de dano numa raide em que o Mew foi derrotado.', check:a=>a.bossTop10 },
+  { id:'boss_killer', icon:'💥', name:'Golpe Final', desc:'Dê o golpe que derruba o Mew do Boss de Domingo.', check:a=>a.bossKiller },
+  { id:'elite_ditto', icon:'🎭', name:'Mestre do Disfarce', desc:'Vença a Elite 4 com um Ditto no time.', check:a=>a.anyEliteDittoWin },
   // ---- conquistas novas (20), baseadas em recursos que já existem no jogo hoje ----
   { id:'catch_149', icon:'📖', name:'Pokédex Clássica', desc:'Capture 149 espécies -- todas menos o Mewtwo.', check:a=>a.caughtCount>=149 },
   { id:'mewtwo_caught', icon:'🧬', name:'O Desafio Final', desc:'Capture o Mewtwo.', check:a=>a.hasMewtwo },
@@ -13589,19 +13612,24 @@ function saveStatusLabel(s){
    ============================================================================ */
 /* A raide é COLETIVA: enquanto você olha a tela, outros treinadores estão batendo. Sem acompanhar,
    a barra e o ranking congelam no que existia quando a tela abriu -- duas contas abertas lado a
-   lado mostravam números diferentes, e nem a própria investida atualizava o ranking.
+   lado mostravam números diferentes, e nem o próprio ataque atualizava o ranking.
 
    ESCUTA EM TEMPO REAL, não consulta de tempos em tempos. Os dois documentos são de leitura
    liberada nas regras (`globalBoss/{id}`), então o cliente assina os dois e o Firestore avisa
    quando mudam. É mais barato E mais rápido que perguntar de 5 em 5 segundos:
 
      consultando 5/5s   2 telas abertas por 1h = 2 x 720 x 3 leituras = 4.320
-     escutando          2 telas abertas por 1h com 20 investidas = 2 x 20 x 2 = 80 (+4 na abertura)
+     escutando          2 telas abertas por 1h com 20 ataques = 2 x 20 x 2 = 80 (+4 na abertura)
 
    e a barra anda no instante em que o outro treinador bate, em vez de até 5s depois.
    O polling continua no código como REDE: se a escuta não subir (regra, rede, navegador antigo),
    `onSnapshot` chama o callback de erro e a tela cai pro laço de 5s -- ficar em silêncio seria
    pior, porque a tela pararia de andar sem nada explicando. */
+/* Domingo pelo relógio DO JOGADOR. O servidor não checa o dia: se alguém abrir a tela numa
+   segunda pelo console, não quebra nada -- a raide é a mesma, só não estaria anunciada. Fechar
+   isso no servidor obrigaria a escolher um fuso pro mundo inteiro, e o jogador que vê "domingo"
+   no celular dele não entenderia por que o botão sumiu. */
+function ehDomingo(){ return new Date().getDay() === 0; }
 const BOSS_POLL_MS = 5000;
 let bossPollTimer = null;
 let bossEscutas = [];
@@ -13746,7 +13774,7 @@ async function lutarSundayBoss(slot){
     render();
     setTimeout(advanceTrainerReveal, 700);
   }catch(e){
-    console.error('Erro na investida contra o Mew:', e);
+    console.error('Erro no ataque contra o Mew:', e);
     game.bossError = (e && e.message) || 'Não foi possível atacar agora.';
     game.bossLoading = false;
     render();
@@ -13773,20 +13801,19 @@ function renderSundayBoss(){
   <div class="box cursor" style="text-align:center;">
     ${spriteHtml('mew','sprite-lg')}
     <h2>Mew <span class="fighter-level">Lv.${b.level}</span></h2>
-    <p>Um só pro jogo inteiro. A vida dele <strong>não regenera</strong> — o que você tirar fica
-       tirado para o próximo treinador. ${caiu ? '' : 'Ninguém derruba sozinho.'}</p>
+    <p>Um <strong>Mew selvagem</strong> apareceu! Os treinadores devem se juntar para derrotá-lo!</p>
     ${renderHpBar(b.hp, b.maxHp, 'boss-hp-fill', 'boss-hp-label')}
-    <p class="mon-sub">${pct.toFixed(1)}% de vida — ${(b.batalhas||0)} investida(s) de todos os treinadores</p>
+    <p class="mon-sub">${pct.toFixed(1)}% de vida — ${(b.batalhas||0)} ataque(s) de todos os treinadores</p>
   </div>
   ${caiu ? `<div class="box cursor"><h2>🎉 O Mew foi derrotado!</h2>
-    <p>A raide acabou. Foram ${(b.batalhas||0)} investidas até derrubar.</p></div>` : ''}
+    <p>A raide acabou. Foram ${(b.batalhas||0)} ataques até derrubar.</p></div>` : ''}
   <div class="box cursor">
-    ${ultimo ? `<p>Sua última investida tirou <strong>${ultimo.dano}</strong> de HP
+    ${ultimo ? `<p>Seu último ataque tirou <strong>${ultimo.dano}</strong> de HP
        (${ultimo.hpAntes} → ${ultimo.hpDepois}).</p>` : ''}
-    ${ultimo && ultimo.chegouTarde ? `<p class="mon-sub">Sua luta valeu ${ultimo.danoSimulado} de
+    ${ultimo && ultimo.chegouTarde ? `<p class="mon-sub">Seu ataque valeu ${ultimo.danoSimulado} de
        dano, mas o Mew já estava com ${ultimo.hpAntes} quando ela foi contabilizada — outros
        treinadores bateram no mesmo instante. Só conta o que realmente saiu da barra.</p>` : ''}
-    <p class="mon-sub">No total você já tirou <strong>${meu.dano}</strong> de HP em ${meu.batalhas} investida(s).</p>
+    <p class="mon-sub">No total você já tirou <strong>${meu.dano}</strong> de HP em ${meu.batalhas} ataque(s).</p>
   </div>
   ${game.bossError ? `<div class="box cursor"><p class="lose-text">${escapeHtmlSafe(game.bossError)}</p></div>` : ''}
   ${rankingDoBossHtml(st.ranking)}
@@ -15676,8 +15703,8 @@ function renderSaveSelect(){
       <span class="home-mode-icon">${icone('torre','modo')}</span><span>Torre dos Treinadores</span></button>
     <button class="home-nav-btn leagues-big-btn" style="background:#7038f8;" onclick="openOnlineBattle()">
       <span class="home-mode-icon">${icone('batalha','modo')}</span><span>Batalha Online</span></button>
-    ${game.userTest ? `
-    <button class="home-nav-btn leagues-big-btn" style="background:#c2185b;" onclick="openSundayBoss()">
+    ${ehDomingo() ? `
+    <button class="home-nav-btn leagues-big-btn home-btn-largo" style="background:#c2185b;" onclick="openSundayBoss()">
       <span class="home-mode-icon">✨</span><span>Boss de Domingo</span></button>` : ''}
   </div>
   <div class="home-section-row">
