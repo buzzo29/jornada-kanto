@@ -46,10 +46,19 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
   1/16 fixo com multiplicador ×2. É o maior desvio que resta: hoje a taxa média é 13,4% e 138 das
   150 espécies criticam mais do que criticariam na Gen 2 (Electrode 27,3%, 4,4× a taxa oficial).
   Decisão em aberto — foi medido e apresentado, não escolhido.
-- **Multiplicador de tipo é comprimido (`^0.6`)**: 2× vira ~1,52×. Decisão consciente — não dá pra
-  trocar de pokémon no meio do confronto, e tipo puro viraria sentença de morte.
-- **Golpe teimoso (`IMUNIDADE_TEIMOSA = 0,10`)**: quando NENHUM tipo do atacante machuca o alvo,
-  o melhor golpe sai com multiplicador 0,10 em vez do piso de 1 de dano. É o que impede confronto
+- **Multiplicador de tipo: expoente 1.0** (`EXPOENTE_TIPO`), ou seja, a tabela oficial — 2× é 2×.
+  Ele já foi `0.6` (comprimido: 2× virava 1,52×), pra tipo não virar sentença de morte num jogo
+  onde não dá pra trocar de pokémon no meio do confronto. Voltou pra 1.0 em 30/08/2026, medido:
+  **4,1% das batalhas mudam de vencedor**, taxa de vitória geral igual (50,7% → 50,5%) e a
+  dificuldade dos ginásios praticamente não se move (maior variação: Erika +8 pontos, Sabrina −3).
+  É o parâmetro mais sensível do motor: ele define o quanto o jogo é "sobre tipo" e o quanto é
+  "sobre atributo". **Entra em DOIS lugares — o dano e a escolha do golpe** — e os dois têm que
+  usar o mesmo valor: quando a escolha usava o cru e o dano o comprimido, o motor escolhia um tipo
+  e aplicava outro, e cliente e servidor discordavam do melhor golpe em 4% dos confrontos.
+- **Golpe teimoso (`IMUNIDADE_TEIMOSA = 0,25`)**: quando NENHUM tipo do atacante machuca o alvo,
+  o melhor golpe sai com multiplicador 0,25 em vez do piso de 1 de dano. A constante depende do
+  `EXPOENTE_TIPO`: com o expoente em 0,6 ela era 0,10 (que virava 0,25 depois da compressão). O
+  que se quer manter é o EFEITO — o atacante sem saída tira ~15% da vida por golpe. É o que impede confronto
   matematicamente perdido — Hitmonlee (Lutador puro) contra Fantasma, Dugtrio (Terra puro) contra
   Voador: 25 espécies, 139 confrontos, ninguém com jogada possível, e aqui não dá pra trocar de
   pokémon no meio. **A imunidade continua absoluta quando existe alternativa**: o Raichu troca o

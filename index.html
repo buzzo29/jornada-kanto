@@ -4126,7 +4126,17 @@ function typeVsType(atk, def){
    PRA DESLIGAR: USE_SUBTYPES = false. O motor volta a considerar só os tipos próprios.
    ============================================================================ */
 const USE_SUBTYPES = true;
-const IMUNIDADE_TEIMOSA = 0.10;   // ver GOLPE TEIMOSO em bestAttackType
+/* 0,25 e não 0,10 porque o EXPOENTE_TIPO passou a ser 1.0: com o expoente em 0,6, a constante
+   0,10 virava 0,25 depois da compressão -- que é a força escolhida (Hitmonlee tira ~15% da vida
+   do Gengar). Deixar 0,10 com o expoente em 1.0 cortaria isso pela metade em silêncio. */
+const IMUNIDADE_TEIMOSA = 0.25;   // ver GOLPE TEIMOSO em bestAttackType
+/* EXPOENTE DO MULTIPLICADOR DE TIPO -- o parâmetro mais sensível do motor.
+   1.0 = tabela oficial (2x é 2x). Abaixo de 1 comprime: em 0.6, um 2x virava 1,52x.
+   Ele define o quanto o jogo é "sobre tipo" e o quanto é "sobre atributo", e entra em DOIS
+   lugares: no dano e na escolha do golpe. Os dois têm que usar o mesmo valor -- quando a
+   escolha usava o cru e o dano o comprimido, o motor escolhia um tipo e aplicava outro, e
+   cliente e servidor discordavam do melhor golpe em 4% dos confrontos. */
+const EXPOENTE_TIPO = 1.0;
 /* Redutor do subtipo. Atacar por um subtipo rende SUBTYPE_PENALTY do dano normal.
    Existe porque o subtipo, mesmo sem STAB, ainda era escolhido em situações apertadas -- e
    nas simulações isso virava reviravolta grande demais em confrontos específicos (Gastly
@@ -4158,7 +4168,7 @@ function bestAttackType(attacker, defender){
     const atk = especial ? effectiveSpAtk(attacker) : effectiveAttack(attacker);
     const def = especial ? effectiveSpDef(defender) : effectiveDefense(defender);
     // mesma compressão de tipo do motor (^0.6), pra a escolha refletir o dano que sai de verdade
-    const nota = Math.pow(mult, 0.6) * (proprio ? 1.5 : SUBTYPE_PENALTY) * (atk / Math.max(1, def));
+    const nota = Math.pow(mult, EXPOENTE_TIPO) * (proprio ? 1.5 : SUBTYPE_PENALTY) * (atk / Math.max(1, def));
     if(!melhor || nota > melhor.nota) melhor = { mult, type: t, stab: proprio, nota };
   }
   /* GOLPE TEIMOSO -- quando NADA que o atacante tem machuca o alvo.
@@ -4176,7 +4186,7 @@ function bestAttackType(attacker, defender){
       const proprio = proprios.includes(t);
       const atk = especial ? effectiveSpAtk(attacker) : effectiveAttack(attacker);
       const def = especial ? effectiveSpDef(defender) : effectiveDefense(defender);
-      const nota = Math.pow(IMUNIDADE_TEIMOSA, 0.6) * (proprio ? 1.5 : SUBTYPE_PENALTY) * (atk / Math.max(1, def));
+      const nota = Math.pow(IMUNIDADE_TEIMOSA, EXPOENTE_TIPO) * (proprio ? 1.5 : SUBTYPE_PENALTY) * (atk / Math.max(1, def));
       if(!teimoso || nota > teimoso.nota){
         teimoso = { mult: IMUNIDADE_TEIMOSA, type: t, stab: proprio, nota, nulo: true };
       }
@@ -4275,7 +4285,7 @@ function calcDamageNew(attacker, defender, rng){
   attacker.lastMoveNulo = !!best.nulo;
   const Leff = isCrit ? attacker.level*2 : attacker.level; // crítico dobra o nível na fórmula (regra oficial)
   const core = Math.floor(Math.floor(2*Leff/5 + 2) * MOVE_POWER * A / D / 50) + 2;
-  const typeMult = Math.pow(best.mult, 0.6);
+  const typeMult = Math.pow(best.mult, EXPOENTE_TIPO);
   const dmgGen1 = Math.round(core * STAB * typeMult * (0.85 + rng()*0.15)); // variação 85-100%, igual ao jogo oficial
   // converte pra FRAÇÃO da vida na escala Gen 1 (onde o balanceamento foi calibrado), aplica o teto
   // por golpe, e projeta essa fração na escala de HP real do jogo -- cada golpe tira exatamente a
@@ -5634,7 +5644,12 @@ function buildAnimatedHitSequence(m){
      Confronto gravado ANTES do diário (ligas e reprises antigas) continua caindo na
      reconstrução, que segue logo abaixo. */
   const reais = passosVisiveis(m.golpes || []);
-  if(reais.length){
+  /* TETO DE 3 GOLPES NA ANIMAÇÃO. A luta real pode ter 7, 8, 26 golpes -- assistir a isso a cada
+     confronto cansa, e a batalha inteira arrasta. Quando a sequência real cabe em 3, ela é usada
+     como está (é a maioria dos confrontos, e aí animação e log contam a mesma coisa). Passando
+     disso, cai na reconstrução de 3 golpes logo abaixo: o log embaixo continua com o passo a
+     passo completo pra quem quiser conferir. */
+  if(reais.length && reais.length <= 3){
     // no diário 'q' é QUEM BATEU; aqui 'side' é QUEM APANHA -- por isso a troca
     return reais.map(g => ({ side: g.q === 'p' ? 'enemy' : 'player', amount: g.d }));
   }
