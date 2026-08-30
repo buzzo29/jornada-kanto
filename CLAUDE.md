@@ -109,12 +109,19 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
   passar ou não o array não muda um ponto de dano (conferido por hash, 14.645 confrontos).
 - **O dano gravado é o EFETIVO, não o sorteado.** Golpe de 101 em quem tem 54 de HP entra como 54.
   Com o valor cru o log não fechava: somando as linhas dava mais dano do que o pokémon tinha.
-- O **golpe moribundo** (quem cai ainda conecta o contra-golpe, enfraquecido) **não vira linha**:
-  o dano dele é somado ao golpe anterior do mesmo pokémon (`passosVisiveis`, só no cliente). A
-  animação nunca mostra desmaiado batendo, então uma linha própria pra ele — em qualquer redação —
-  lia como bug. Foi reportado duas vezes. A soma das linhas continua igual ao HP perdido; sem
-  golpe anterior (entrou e caiu na mesma troca, 15% dos casos), ele entra como golpe normal ANTES
-  do que derrubou, que é a ordem que a tela mostrou.
+- **Log e animação leem a MESMA lista** (`sequenciaDoConfronto`, teto de 3 golpes). Enquanto eram
+  montadas em separado, o jogador via 3 golpes na tela e lia 4, 7 linhas no log — reportado três
+  vezes. A reconstrução de 3 golpes é **determinística** (semente tirada do próprio confronto):
+  com `Math.random()`, log e animação sorteavam divisões diferentes e cada redesenho trocava os
+  números.
+- O **golpe moribundo** (quem cai ainda conecta o contra-golpe) entra **ANTES** do golpe que o
+  derrubou. Não é distorção — os dois são do mesmo instante, e o motor só os aplica em sequência
+  porque código roda em sequência. Qualquer outra ordem faz o log dizer que alguém atacou depois
+  de cair, e isso já foi reportado como bug três vezes (inclusive na forma "somar o revide numa
+  linha anterior", que fazia a linha antiga parecer fatal).
+- A linha do log tem **uma forma só**: "X atacou Y com GOLPE e tirou −N de HP". Já passaram por
+  ali selo de crítico, de moribundo e de "o tipo não pega nele" — todos saíram: viravam ruído numa
+  linha que se lê de relance.
 - **A animação mostra o mesmo diário.** `buildAnimatedHitSequence` devolve os golpes reais (pelo
   `passosVisiveis`, pra dobrar o moribundo igual ao log); a reconstrução antiga — até 3 golpes
   inventados a partir do HP antes/depois — virou fallback pra confronto gravado antes do diário.

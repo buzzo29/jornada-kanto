@@ -5634,31 +5634,13 @@ function animatePartialHpBars(){
   }
   if(label){ label.textContent = `${Math.max(0,currentHp)}/${maxHp} HP`; }
 }
+/* A animação lê a MESMA sequência do log (sequenciaDoConfronto) e só traduz o vocabulário:
+   lá 'q' é quem BATE, aqui 'side' é quem APANHA. Enquanto as duas listas eram montadas em
+   separado, o jogador via 3 golpes na tela e lia 4 linhas no log. */
 function buildAnimatedHitSequence(m){
-  /* SE O CONFRONTO TROUXE O DIÁRIO, a animação mostra A LUTA QUE ACONTECEU -- os mesmos golpes,
-     na mesma ordem, que o log lista embaixo. Passa pelo passosVisiveis pra o golpe moribundo ser
-     dobrado igual lá: animação e log contando histórias diferentes é pior que qualquer uma das
-     duas sozinha.
-     Antes isso aqui INVENTAVA até 3 golpes a partir do HP antes/depois. Medido em 3.847
-     confrontos: batia com a realidade em 31% deles -- o jogador via 3 golpes e lia 7 linhas.
-     Confronto gravado ANTES do diário (ligas e reprises antigas) continua caindo na
-     reconstrução, que segue logo abaixo. */
-  /* A troca simultânea vira dois golpes na animação (as duas barras descem), mas continua sendo
-     uma linha só no log -- lá o que importa é não parecer que alguém atacou depois de cair. */
-  const reais = [];
-  for(const g of passosVisiveis(m.golpes || [])){
-    if(g.troca){ reais.push(g.a, g.b); } else reais.push(g);
-  }
-  /* TETO DE 3 GOLPES NA ANIMAÇÃO. A luta real pode ter 7, 8, 26 golpes -- assistir a isso a cada
-     confronto cansa, e a batalha inteira arrasta. Quando a sequência real cabe em 3, ela é usada
-     como está (é a maioria dos confrontos, e aí animação e log contam a mesma coisa). Passando
-     disso, cai na reconstrução de 3 golpes logo abaixo: o log embaixo continua com o passo a
-     passo completo pra quem quiser conferir. */
-  if(reais.length && reais.length <= 3){
-    // no diário 'q' é QUEM BATEU; aqui 'side' é QUEM APANHA -- por isso a troca
-    return reais.map(g => ({ side: g.q === 'p' ? 'enemy' : 'player', amount: g.d }));
-  }
-  // ---- daqui pra baixo: reconstrução, só pra confronto sem diário ----
+  return sequenciaDoConfronto(m).map(g => ({ side: g.q === 'p' ? 'enemy' : 'player', amount: g.d }));
+}
+function reconstruirSequencia(m){
   // já sabemos o resultado final (quem vence e com quanto HP fica) -- essa função só decide COMO
   // chegar visualmente até lá, usando no máximo 3 golpes na animação:
   //   1) o vencedor acerta uma parte do perdedor (entre 1% e 99% do dano total que o perdedor vai
@@ -5702,7 +5684,12 @@ function buildAnimatedHitSequence(m){
      golpe abaixo de 15% do dano -- um arranhao seguido de um tranco que derrubava os outros 85%+ de
      uma vez. Ficava com cara de bug, embora o resultado estivesse certo. Estreitar mantem a variacao
      (nenhuma luta sai igual a outra) e tira os dois extremos. */
-  const firstHitPct = 0.30 + Math.random()*0.40;
+  /* DETERMINÍSTICO, não Math.random(). O log e a animação chamam esta função em momentos
+     diferentes e precisam receber a MESMA divisão -- com sorteio, a linha do log mostrava um
+     número e a barra descia outro, e cada redesenho da tela trocava os valores de novo.
+     A semente sai do próprio confronto, então o mesmo confronto sempre divide igual. */
+  const semente = (Math.abs(m.playerHpBefore*31 + m.enemyHpBefore*17 + playerDmg*7 + enemyDmg*3)) % 41;
+  const firstHitPct = 0.30 + (semente/40)*0.40;
   const firstHitAmount = Math.max(1, Math.min(loserTotalDmg-1, Math.round(loserTotalDmg*firstHitPct)));
   const finishingHitAmount = loserTotalDmg - firstHitAmount;
 
@@ -10992,52 +10979,43 @@ function passosVisiveis(golpes){
   const saida = [];
   for(const g of golpes){
     if(!g.m){ saida.push(Object.assign({}, g)); continue; }
-    const anterior = [...saida].reverse().find(x => x.q === g.q && !x.troca);
-    /* Só dobra se a linha antiga CONTINUAR fazendo sentido depois de somar. Se o revide for maior
-       do que o alvo ainda tinha de vida naquele momento (g.d >= anterior.hp), a linha passaria a
-       mostrar um dano fatal que não foi fatal -- e o log ficaria dizendo que alguém atacou depois
-       de já ter levado o golpe que o mataria. Foi assim que apareceu "Nidoqueen tirou 380 (o HP
-       inteiro do Gengar)" seguido de "Gengar atacou".
-       Nesse caso os dois golpes viram UMA linha de troca simultânea, que é o que de fato
-       aconteceu: os dois se acertaram na mesma troca. */
-    if(anterior && g.d < anterior.hp){ anterior.d += g.d; continue; }
+    /* GOLPE MORIBUNDO -- quem cai ainda revida, na mesma troca. Ele entra ANTES do golpe que o
+       derrubou: assim ninguém aparece atacando depois de já ter caído, e a leitura fica na ordem
+       que faz sentido -- quem morreu bateu primeiro, o outro respondeu e matou.
+       Trocar a ordem não distorce nada: os dois golpes são do mesmo instante, e o motor só os
+       aplica em sequência porque código roda em sequência. */
     const derrubou = saida.pop();
-    if(derrubou) saida.push({ troca: true, q: derrubou.q, a: derrubou, b: g });
-    else saida.push(Object.assign({}, g, { m: 0 }));
+    saida.push(Object.assign({}, g, { m: 0 }));
+    if(derrubou) saida.push(derrubou);
   }
   return saida;
 }
+/* A MESMA sequência serve o LOG e a ANIMAÇÃO -- é isso que garante que as duas contem a mesma
+   história, com o mesmo número de golpes. Quando a luta real cabe no teto, é ela que vale; acima
+   disso as duas usam a reconstrução de 3 golpes.
+   Os golpes reais vêm sempre em par (os dois atacam em toda troca), então "cabe no teto" na
+   prática significa uma troca só. */
+const TETO_GOLPES = 3;
+function sequenciaDoConfronto(m){
+  const reais = passosVisiveis(m.golpes || []);
+  if(reais.length && reais.length <= TETO_GOLPES) return reais;
+  // a reconstrução fala em QUEM APANHA (side); aqui a lista é de QUEM BATE (q)
+  return reconstruirSequencia(m).map(h => ({ q: h.side === 'player' ? 'e' : 'p', d: h.amount }));
+}
 function passosHtml(m){
-  const golpes = passosVisiveis(m.golpes || []);
+  const golpes = sequenciaDoConfronto(m);   // a MESMA lista que a animação vai reproduzir
   if(!golpes.length) return '';
   const nomeP = escapeHtmlSafe(m.player||''), nomeE = escapeHtmlSafe(m.enemy||'');
   const ladoHtml = (doJogador) => `<span class="mlog-quem ${doJogador?'p':'e'}">${doJogador?nomeP:nomeE}</span>`;
   const seloDe = (doJogador) => golpeSeloHtml(doJogador?m.playerSpecies:m.enemySpecies, doJogador?m.playerMove:m.enemyMove);
+  /* Uma frase só, sempre na mesma forma: "X atacou Y com GOLPE e tirou -N de HP."
+     Já passaram por aqui marcação de crítico, de golpe moribundo e de "o tipo não pega nele" --
+     cada uma virava ruído numa linha que se lê de relance. O número conta a história. */
   return `<div class="mlog-passos">${golpes.map(g=>{
-    /* TROCA SIMULTÂNEA: os dois se acertaram na mesma troca de golpes e pelo menos um caiu.
-       Vira uma linha só porque foi um instante só -- em duas linhas, a segunda parecia um
-       pokémon atacando depois de morrer. */
-    if(g.troca){
-      const p1 = g.a.q === 'p', p2 = g.b.q === 'p';
-      const dano = (x)=>`<span class="mlog-tira">−${x.d}</span>`;
-      return `<div class="mlog-passo">
-        ${ladoHtml(p1)} e ${ladoHtml(p2)} se acertaram no mesmo instante:
-        ${seloDe(p1)} ${dano(g.a)} e ${seloDe(p2)} ${dano(g.b)} de HP.
-      </div>`;
-    }
     const doJogador = g.q === 'p';
-    const quem  = ladoHtml(doJogador);
-    const alvo  = ladoHtml(!doJogador);
-    const golpe = seloDe(doJogador);
-    /* Imunidade: o multiplicador é 0 e sobra o piso de 1 de dano do motor. Dizer "tirou −1" sem
-       mais nada faria o jogador procurar bug onde é regra. */
-    /* g.z = o golpe teimoso: nenhum tipo do atacante pega no alvo, e ele bateu assim mesmo com
-       multiplicador reduzido. Sem essa frase o jogador vê um dano estranhamente baixo e procura
-       bug onde é regra. */
-    const frase = g.z
-      ? `${quem} atacou ${alvo}${golpe?` com ${golpe}`:''}, mas <strong>o tipo não pega nele</strong>: <span class="mlog-tira">−${g.d}</span> de HP.`
-      : `${quem} atacou ${alvo}${golpe?` com ${golpe}`:''} e tirou <span class="mlog-tira">−${g.d}</span> de HP.`;
-    return `<div class="mlog-passo ${doJogador?'p':'e'}">${frase}</div>`;
+    return `<div class="mlog-passo ${doJogador?'p':'e'}">
+      ${ladoHtml(doJogador)} atacou ${ladoHtml(!doJogador)}${seloDe(doJogador)?` com ${seloDe(doJogador)}`:''} e tirou <span class="mlog-tira">−${g.d}</span> de HP.
+    </div>`;
   }).join('')}</div>`;
 }
 
