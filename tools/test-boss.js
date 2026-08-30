@@ -131,5 +131,50 @@ function fim(){
   ok('a soma dos dois e a vida do Mew', meu.dano + dele.dano === fim2.boss.maxHp,
      meu.dano+' + '+dele.dano+' = '+(meu.dano+dele.dano)+' de '+fim2.boss.maxHp);
 
-  fim();
+  await multidao();
 })();
+
+/* Segunda bateria: MUITA GENTE AO MESMO TEMPO. Roda depois da primeira, com o banco limpo.
+   A raide e o unico lugar do jogo onde varios jogadores escrevem no MESMO documento, e o erro
+   dessa familia nao aparece em teste sequencial. */
+async function multidao(){
+  fake.reset();
+  const N = 10;
+  for(let i=0;i<N;i++){
+    await db.collection('users').doc('m'+i).set({ userTest:true, trainerName:'m'+i });
+    await db.collection('users').doc('m'+i).collection('saves').doc('0')
+            .set({ saveName:'Time 1', badgeCount:8, team:TIME });
+  }
+  const doc = () => db.collection('globalBoss').doc('mew').get().then(s=>s.data());
+  const todos = () => Promise.all([...Array(N)].map((_,i)=>chamar('fightSundayBoss','m'+i,{slot:'0'})));
+  await chamar('getSundayBoss','m0');
+
+  console.log('\n' + N + ' CONTAS ATACANDO AO MESMO TEMPO -- MEW CHEIO');
+  let antes = (await doc()).hp;
+  let r = await todos();
+  let depois = (await doc()).hp;
+  const soma = r.reduce((s,x)=>s+x.dano, 0);
+  ok('nenhum dano some', depois === antes - soma, antes+' - '+soma+' = '+(antes-soma)+', gravado '+depois);
+  ok('as ' + N + ' investidas sao contadas', (await doc()).batalhas === N);
+  ok('ninguem derruba um Mew cheio', r.every(x=>!x.derrubou));
+
+  console.log('\n' + N + ' AO MESMO TEMPO -- MEW A UM FIO DE VIDA');
+  // deixa menos vida do que UMA investida tira: e aqui que a conta estourava
+  while((await doc()).hp > 250){ await chamar('fightSundayBoss','m0',{slot:'0'}); }
+  antes = (await doc()).hp;
+  r = await todos();
+  const max = (await doc()).maxHp;
+  ok('o Mew cai e nao fica negativo', (await doc()).hp === 0);
+  ok('exatamente UM jogador derruba', r.filter(x=>x.derrubou).length === 1,
+     r.filter(x=>x.derrubou).length + ' de ' + N);
+  ok('a soma do dano reportado nao passa da vida que havia',
+     r.reduce((s,x)=>s+x.dano,0) === antes, r.reduce((s,x)=>s+x.dano,0)+' de '+antes);
+  ok('quem chegou tarde e avisado',
+     r.filter(x=>x.chegouTarde).every(x=>x.danoSimulado > x.dano));
+  const contrib = await Promise.all([...Array(N)].map((_,i)=>chamar('getSundayBoss','m'+i).then(x=>x.meu.dano)));
+  const total = contrib.reduce((a,b)=>a+b,0);
+  ok('a soma das contribuicoes bate com a vida do Mew', total === max,
+     total + ' de ' + max);
+  ok('ninguem fica com dano negativo ou zerado a toa', contrib.every(d=>d >= 0));
+  fim();
+}

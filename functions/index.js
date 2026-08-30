@@ -5499,21 +5499,31 @@ exports.fightSundayBoss = onCall(async (request) => {
     const [snap, meuSnap] = await Promise.all([tx.get(ref), tx.get(meuRef)]);
     const atual = snap.exists ? snap.data() : bossEstadoInicial();
     const meu = meuSnap.exists ? meuSnap.data() : { dano:0, batalhas:0 };
-    const hpDepois = Math.max(0, (atual.hp || 0) - luta.dano);
+    /* O dano SIMULADO pode ser maior que a vida que sobrou: a luta foi calculada sobre o HP lido
+       ANTES da transação, e nesse meio-tempo outros treinadores podem ter batido. Descontar o
+       simulado deixava o HP certo (o Math.max segura), mas creditava ao jogador um dano que nunca
+       existiu -- medido com 10 contas simultâneas num Mew com 251 de vida: as contribuições
+       somaram 6322 de uma barra de 5125. O que vale é o que REALMENTE saiu da barra. */
+    const aplicado = Math.min(luta.dano, atual.hp || 0);
+    const hpDepois = Math.max(0, (atual.hp || 0) - aplicado);
     const derrubou = hpDepois === 0 && (atual.hp || 0) > 0;
     tx.set(ref, { hp: hpDepois, maxHp: atual.maxHp || BOSS_MAX_HP, level: atual.level || BOSS_LEVEL,
                   golpes: (atual.golpes || 0) + luta.matchups.reduce((s,m)=>s+(m.golpes||[]).length, 0),
                   batalhas: (atual.batalhas || 0) + 1,
-                  danoTotal: (atual.danoTotal || 0) + luta.dano,
+                  danoTotal: (atual.danoTotal || 0) + aplicado,
                   derrotadoEm: hpDepois === 0 ? (atual.derrotadoEm || Date.now()) : null,
                   criadoEm: atual.criadoEm || Date.now() }, { merge:true });
-    tx.set(meuRef, { dano: (meu.dano||0) + luta.dano, batalhas: (meu.batalhas||0) + 1,
+    tx.set(meuRef, { dano: (meu.dano||0) + aplicado, batalhas: (meu.batalhas||0) + 1,
                      ultimaEm: Date.now() }, { merge:true });
-    return { hpDepois, derrubou, meuDano: (meu.dano||0) + luta.dano, meusAtaques: (meu.batalhas||0) + 1 };
+    return { hpDepois, derrubou, aplicado, hpNaHora: (atual.hp || 0),
+             meuDano: (meu.dano||0) + aplicado, meusAtaques: (meu.batalhas||0) + 1 };
   });
 
   return { matchups: luta.matchups, win: luta.derrubou,
-           dano: luta.dano, hpAntes: antes, hpDepois: resultado.hpDepois,
+           dano: resultado.aplicado,          // o que saiu da barra de verdade
+           danoSimulado: luta.dano,           // o que a luta deu; maior quando outro chegou antes
+           chegouTarde: resultado.aplicado < luta.dano,
+           hpAntes: resultado.hpNaHora, hpDepois: resultado.hpDepois,
            maxHp: BOSS_MAX_HP, derrubou: resultado.derrubou,
            meu: { dano: resultado.meuDano, batalhas: resultado.meusAtaques } };
 });

@@ -337,6 +337,18 @@ Duas artimanhas medidas e fechadas — em ambas o jogador reiniciava até vir sh
   `get` vier depois de um `set`, e o erro só existe em produção — chega no cliente como um
   `INTERNAL` seco. A função nasceu assim: 24 checagens verdes no teste, 500 no ar. O
   `fake-firestore` passou a impor a mesma regra, então esse erro agora quebra o teste.
+- **O dano que vale é o APLICADO, não o simulado.** A luta é calculada sobre o HP lido ANTES da
+  transação; entre a leitura e a gravação outros treinadores podem ter batido. Descontar o
+  simulado deixava o HP certo (o `Math.max` segurava), mas creditava dano que nunca existiu —
+  medido com 10 contas simultâneas num Mew com 251 de vida: as contribuições somaram **6322 de uma
+  barra de 5125**. Hoje o desconto é `min(simulado, hp atual)` e quem chegou tarde é avisado na
+  tela. Com 10 simultâneas no Mew cheio nada disso aparece: o dano fecha exato e as 10 contam.
+- **Limite de escrita do Firestore: ~1 gravação por segundo por documento** (sustentada). A raide
+  inteira passa por um documento só, então concorrência alta vira retentativa e latência, e num
+  pico longo o suficiente vira `ABORTED` depois de esgotar as tentativas do SDK — o jogador
+  perderia a investida. Isso é propriedade documentada do Firestore, **não** algo medido aqui: o
+  `fake-firestore` serializa as transações e não modela contenção. Se a raide abrir pra todo
+  mundo, a saída conhecida é fragmentar o contador (N documentos, soma na leitura).
 - O Mew **não entra em `SPECIES`** — tudo que está lá conta pro total da Pokédex e pro "capturou
   tudo" que libera o Mewtwo, e um Mew que ninguém captura abriria uma vaga #151 impossível. A tela
   o encontra por `SPECIES_FORA_DA_DEX` / `especieParaTela()`; os atributos vivem só no servidor.

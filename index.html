@@ -13610,7 +13610,9 @@ async function lutarSundayBoss(slot){
   try{
     const r = await functionsClient.httpsCallable('fightSundayBoss')({ slot: String(slot) });
     game.bossUltimo = { dano:r.data.dano, hpAntes:r.data.hpAntes, hpDepois:r.data.hpDepois,
-                        maxHp:r.data.maxHp, derrubou:!!r.data.derrubou };
+                        maxHp:r.data.maxHp, derrubou:!!r.data.derrubou,
+                        // outro treinador derrubou o Mew enquanto esta luta era resolvida
+                        chegouTarde: !!r.data.chegouTarde, danoSimulado: r.data.danoSimulado };
     if(game.bossState){
       game.bossState.boss.hp = r.data.hpDepois;
       game.bossState.meu = r.data.meu;
@@ -13668,6 +13670,9 @@ function renderSundayBoss(){
   <div class="box cursor">
     ${ultimo ? `<p>Sua última investida tirou <strong>${ultimo.dano}</strong> de HP
        (${ultimo.hpAntes} → ${ultimo.hpDepois}).</p>` : ''}
+    ${ultimo && ultimo.chegouTarde ? `<p class="mon-sub">Sua luta valeu ${ultimo.danoSimulado} de
+       dano, mas o Mew já estava com ${ultimo.hpAntes} quando ela foi contabilizada — outros
+       treinadores bateram no mesmo instante. Só conta o que realmente saiu da barra.</p>` : ''}
     <p class="mon-sub">No total você já tirou <strong>${meu.dano}</strong> de HP em ${meu.batalhas} investida(s).</p>
   </div>
   ${game.bossError ? `<div class="box cursor"><p class="lose-text">${escapeHtmlSafe(game.bossError)}</p></div>` : ''}
