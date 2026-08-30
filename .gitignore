@@ -76,3 +76,6 @@ node_modules/
 
 # preview de telas gerado pelo tools/gerar-preview.js -- e um artefato, nao fonte
 preview-telas.html
+
+# capturas do Playwright durante os testes de tela -- artefato, nao fonte
+.playwright-mcp/

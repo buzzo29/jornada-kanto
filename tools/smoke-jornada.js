@@ -25,8 +25,13 @@ function act(g, log){
   const game = g.__getGame();
   switch(game.screen){
     case 'start':        g.chooseStarter(g.STARTERS[Math.floor(Math.random()*3)]); return true;
+    // a jornada passou a abrir no mapa de Kanto: sem este passo o bot parava na 2ª tela e
+    // as 20 jornadas do smoke morriam antes do primeiro encontro
+    case 'kantoIntro':   g.comecarJornadaDoMapa(); return true;
+    // 'walk' e 'walkNext' já mostram os caminhos (antes passavam por um startLeg e uma tela
+    // 'routeChoice' separada, que não existem mais)
     case 'walk':
-    case 'walkNext':     g.startLeg(); return true;
+    case 'walkNext':
     case 'routeChoice':  g.chooseRoute(game.routeCards[Math.floor(Math.random()*game.routeCards.length)]); return true;
     case 'routeEvent':   Math.random()<0.5 ? g.crossTunnelBlind() : g.crossTunnelSlow(); return true;
     case 'fossil':       Math.random()<0.8 ? g.chooseFossil(Math.random()<0.5?'omanyte':'kabuto') : g.skipFossil(); return true;
@@ -39,6 +44,17 @@ function act(g, log){
     case 'npcTrade':     Math.random()<0.6 ? g.acceptNpcTrade(game.npcTradeOffer.eligibleIds[0]) : g.declineNpcTrade(); return true;
     case 'dayCare':      Math.random()<0.3 ? g.leaveAtDayCare(game.team[game.team.length-1].id) : g.skipDayCare(); return true;
     case 'rocketHideout':Math.random()<0.7 ? g.enterHideout() : g.skipHideout(); return true;
+    // batalha especial (Rocket, rival): mesma mecânica das outras -- sem setTimeout no sandbox,
+    // a revelação é avançada na mão
+    case 'specialIntro': {
+      g.runSpecialBattle();
+      let guard=0; while(g.__getGame().screen==='specialBattling' && guard++<200){ g.advanceSpecialReveal(); }
+      return true;
+    }
+    case 'specialBattling': g.advanceSpecialReveal(); return true;
+    case 'specialResult':   g.continueAfterSpecial(); return true;
+    // o "Mew"/"Mewtwo" da rota é um Ditto disfarçado; a revelação é uma tela só
+    case 'wildDisguiseReveal': g.continueAfterWildDisguiseReveal(); return true;
     case 'casino':
       if(game.casinoReels){ g.leaveCasino(); }
       else if(Math.random()<0.7){ g.setCasinoBet(2); g.spinCasino(); }
@@ -86,15 +102,8 @@ function act(g, log){
     case 'evolution':    g.continueFromEvolution(); return true;
     case 'teamOrder':    g.confirmOrder(); return true;
     case 'preBattle': {
-      // desafio declarado é risco REAL: um bot que declara em metade das batalhas se suicida.
-      // Aqui ele arrisca só quando está confortável (time cheio e sem derrotas no ginásio).
-      const viable = g.DECLARED_CHALLENGES.filter(c=>g.challengeIsViable(c.id));
-      const confortavel = game.team.length >= 5 && (game.losses||0) === 0;
-      if(viable.length && confortavel && Math.random()<0.35){
-        g.declareChallenge(viable[Math.floor(Math.random()*viable.length)].id);
-      }
-      if(Math.random()<0.5 && game.team.length) g.setMvpBet(game.team[0].id);
-      if(Math.random()<0.4) g.toggleScoreBet();
+      // os desafios declarados e as apostas (MVP, placar) saíram do jogo; o que restou aqui é
+      // entrar na luta
       g.runBattle();
       // o sandbox não tem setTimeout: a revelação é avançada na mão até o fim
       let guard=0; while(g.__getGame().screen==='battling' && guard++<200){ g.advanceReveal(); }
@@ -107,11 +116,10 @@ function act(g, log){
     }
     case 'eventResult':  g.closeEventResult(); return true;
     case 'emergency':    Math.random()<0.7 ? g.takeEmergencyMon(game.emergencyOffer[0]) : g.skipEmergency(); return true;
-    case 'victory':      g.goToRouletteOrContinue(); return true;
-    case 'roulette':
-      if(game.roulette.picked == null){ g.pickRouletteCard(Math.floor(Math.random()*3)); }
-      else if((game.rareCandyPending||0) > 0){ g.useRareCandy(game.team[0].id); }
-      else { g.closeRoulette(); }
+    // a roleta de prêmios saiu do jogo: a vitória vai direto pra próxima etapa (ou pro resumo,
+    // quando foi a última insígnia)
+    case 'victory':
+      if(game.gymIndex < g.GYMS.length - 1) g.continueJourney(); else g.showJourneyEnd();
       return true;
     case 'defeat':       g.prepareRetry(); return true;
     case 'gameover':

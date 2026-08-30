@@ -162,6 +162,28 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
 - **O bolo é do TIME; cada pokémon recebe no máximo metade dele.** Bolo 5 = teto 3 por pokémon.
   Fonte de confusão recorrente — a mensagem na tela diz os dois números.
 
+## Anti save scumming
+
+Duas artimanhas medidas e fechadas — em ambas o jogador reiniciava até vir shiny:
+
+- **Encontro selvagem**: saía do save na tela do encontro e voltava, e a rota sorteava tudo de novo.
+  A oferta agora vem de uma **semente presa ao contador de encontros do save**
+  (`wildEncounterSeq`, na semente junto com slot, rival, inicial e rota). Sair e voltar — ou matar o
+  app antes da gravação chegar — devolve a MESMA oferta; só sortear de novo consumindo o encontro.
+  `goToWildEncounter` **troca `Math.random` por um rng semeado** durante a montagem (`finally`
+  restaura): `buildOfferFromPool`, `rollWildLevel` e `currentShinyChance` sorteiam por dentro e não
+  recebem rng por parâmetro. Tudo ali é síncrono, então nada mais do app cai na janela.
+  A gravação imediata continua, mas virou conveniência — a defesa é a semente.
+- **Iniciais**: apagava o save e criava de novo até um dos três vir shiny (2,3% por tentativa no
+  normal = ~43 saves por shiny; 9,1% no difícil = 11). O resultado agora fica **na conta, por slot
+  E por modo** (`startersSorteados`, chave `"slot:modo"`), sobrevive ao delete, e só é liberado
+  quando aquele slot ganha a **1ª insígnia**. O modo entra na chave porque o difícil tem 4× a
+  chance — sem isso dava pra sortear no difícil e recriar no normal levando o shiny.
+  Sobra um teto de 6 sorteios sem jogar (3 slots × 2 modos) = 13% de chance de arrancar um inicial
+  shiny. Bounded, e quem joga limpo não perde nada: a chance por jornada continua a mesma.
+
+`tools/test-artimanha.js` cobre as duas.
+
 ## Modo difícil (`gameMode: 'hard'`)
 
 - Bolo de vitória pela metade **a partir do 3º ginásio**. Os dois primeiros ficam normais porque

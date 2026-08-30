@@ -93,6 +93,10 @@ function createSandbox(htmlPath){
     'takeEmergencyMon','skipEmergency','goToRouletteOrContinue','pickRouletteCard','useRareCandy',
     'closeRoulette','prepareRetry','declareChallenge','setMvpBet','toggleScoreBet','challengeIsViable',
     'advanceJourney','startWildEncounter','rematchLevelBump','NPC_TRADES,'.slice(0,-1),
+    // anti-artimanha: encontro selvagem preso ao contador do save e sorteio dos iniciais preso
+    // ao slot (ver test-artimanha.js)
+    'goToWildEncounter','montaOfertaSelvagem','currentShinyChance',
+    'sorteioDosIniciais','chaveDoSorteio','limparSorteioDosIniciais','HARD_SHINY_CHANCE',
     // terreno, buffs e atributos: sem eles nao da pra medir o efeito de terreno/shiny,
     // que e justamente onde cliente e servidor ja divergiram
     'TERRAINS','TERRAIN_BUFF_MULT','SHINY_BUFF_MULT','applyTerrainBuff','applySpecialtyBuff','withBuffs',
@@ -103,7 +107,10 @@ function createSandbox(htmlPath){
     // mapa de Kanto: o SVG sai de uma função pura (estado -> markup), entao da pra renderizar
     // aqui e conferir a geografia num screenshot em vez de no olho
     'kantoMapSvg','kantoTrailHtml','renderKantoIntro','renderKantoMapScreen',
-    'KANTO_PLACES','KANTO_JOURNEY','KANTO_GYM_CITIES','kantoCurva','renderWalkNext','renderWalk'
+    'KANTO_PLACES','KANTO_JOURNEY','KANTO_GYM_CITIES','kantoCurva','renderWalkNext','renderWalk',
+    'comecarJornadaDoMapa','abrirMapaDeKanto','fecharMapaDeKanto',
+    'continueJourney','showJourneyEnd',
+    'runSpecialBattle','advanceSpecialReveal','continueAfterSpecial','continueAfterWildDisguiseReveal'
   ];
   const epilogue = '\n;globalThis.render = function(){};\n' +
     EXPORTS.map(n=>`try{ globalThis[${JSON.stringify(n)}] = ${n}; }catch(e){}`).join('\n') +

@@ -2832,6 +2832,7 @@ function freshGameDefaults(){
     authBusy:false,
     saveSlots: new Array(MAX_SAVE_SLOTS).fill(null),
     currentSaveSlot:null,
+    startersSorteados:{},   // {"slot:modo": {bulbasaur:bool,...}} -- vem da conta, ver sorteioDosIniciais
     newSaveNameError:null,
     accountNameError:null,
     accountNameChecking:false,
@@ -2892,6 +2893,7 @@ function freshGameDefaults(){
     shinyBonusExpiresAt:0, // timestamp -- enquanto Date.now() < isso, encontros selvagens usam SHINY_CHANCE_BONUS em vez do normal
     shinyPityCount:0, // encontros selvagens seguidos sem capturar nenhum shiny, desde a última captura (ou desde ativar o bônus) -- sobe a chance a cada um
     shinyFoundThisSave:false, // ESTE save já conseguiu um shiny? Trava a escalada do bônus na base (ver currentShinyChance). É por save, não por conta
+    wildEncounterSeq:0,       // nº do encontro selvagem deste save -- é a semente da oferta (ver goToWildEncounter)
     mewtwoLoanActive:false,
     mewtwoLoanUnlocked:false,
     tower:null,          // {dateId, floors, run} da Torre dos Treinadores, vindo do servidor
@@ -3984,6 +3986,7 @@ async function loadPermanentUserData(){
     game.trainerBestStreak = d.trainerBestStreak || 0;
     game.trainerLastStreak = d.trainerLastStreak || 0;
     game.shinyBonusExpiresAt = d.shinyBonusExpiresAt || 0; // se a pessoa recarregar o app com o bônus ainda ativo, continua valendo
+    game.startersSorteados = d.startersSorteados || {};    // ver sorteioDosIniciais
     game.mewtwoLoanActive = !!d.mewtwoLoanActive;
     game.mewtwoLoanCooldownUntil = d.mewtwoLoanCooldownUntil || 0;
     game.mewtwoLoanUnlocked = !!d.mewtwoLoanUnlocked;
@@ -4602,6 +4605,39 @@ function buildOfferFromPool(pool, offerCount){
   return offer;
 }
 function goToWildEncounter(){
+  /* A OFERTA É SORTEADA POR SEMENTE, NÃO PELO ACASO DO MOMENTO.
+     Motivo: jogadores saíam do save na tela do encontro e voltavam até sair um shiny. Gravar o
+     encontro assim que ele aparece (lá embaixo) resolve o caso normal, mas não o de quem mata o
+     app antes da gravação chegar ao servidor -- o Firestore aqui não tem persistência offline,
+     então uma escrita em trânsito morre com a aba.
+     Com a semente presa ao CONTADOR de encontros do save, perder a gravação não adianta: o save
+     volta com o contador antigo e o mesmo contador devolve exatamente a mesma oferta. Sortear de
+     novo passa a exigir consumir o encontro -- ou seja, jogar.
+     O contador sobe ANTES do sorteio pra que o primeiro encontro do save já tenha semente própria.
+     A troca de Math.random é um empréstimo temporário: buildOfferFromPool, rollWildLevel e
+     currentShinyChance sorteiam por dentro e não recebem rng por parâmetro. Tudo aqui é síncrono
+     até o finally, então nada mais do app cai dentro da janela. */
+  game.wildEncounterSeq = (game.wildEncounterSeq || 0) + 1;
+  // a rota entra na semente pra que cada rota tenha SEU encontro fixo naquele ponto da jornada --
+  // escolher outra rota é uma decisão do jogo, não um jeito de re-sortear a mesma rota
+  const semente = [game.currentSaveSlot, game.rivalName||'', game.starterId||'',
+                   'selvagem', game.wildEncounterSeq, game.currentRoute||''].join('|');
+  const sorteioOriginal = Math.random;
+  Math.random = makeSeededRng(semente);
+  try{
+    montaOfertaSelvagem();
+  } finally {
+    Math.random = sorteioOriginal;
+  }
+  game.wildSelected = [];
+  game.wildDisguiseAcknowledged = false;
+  game.screen = 'wild';
+  render();
+  /* GRAVA NA HORA, sem esperar o autosave (debounced em 800ms). Não é mais a única defesa -- a
+     semente acima é --, mas mantém o contador no servidor o quanto antes. */
+  saveCurrentGame();
+}
+function montaOfertaSelvagem(){
   const leg = LEGS[game.gymIndex];
   const route = routeById(game.currentRoute);
   const pool = (route && route.pool && route.pool.length) ? route.pool : leg.pool;
@@ -4672,10 +4708,6 @@ function goToWildEncounter(){
     }
   }
   game.wildOffer = offer;
-  game.wildSelected = [];
-  game.wildDisguiseAcknowledged = false;
-  game.screen = 'wild';
-  render();
 }
 function toggleWild(id){
   const idx = game.wildSelected.indexOf(id);
@@ -5813,6 +5845,9 @@ function finishBattle(){
   result.leveledUpFromFaint = anyLeveledUp;
   if(result.win){
     game.badgesEarned.push(GYMS[game.gymIndex].badge);
+    // 1ª insígnia = a jornada saiu do papel; aquele slot ganha direito a um sorteio novo de
+    // iniciais na PRÓXIMA vez que for recriado (ver sorteioDosIniciais)
+    if(game.badgesEarned.length === 1) limparSorteioDosIniciais(game.currentSaveSlot);
     game.screen = 'victory';
   } else {
     game.losses++;
@@ -8940,7 +8975,7 @@ const CAMPOS_DA_CONTA = [
   'accountEliteChampion','leagueWinsTotal','leagueLeaderboard','trainerBestStreak','trainerLastStreak',
   'shinyBonusExpiresAt','shinyPityCount','specialties','specialtyCounts',
   'mewtwoLoanActive','mewtwoLoanCooldownUntil','mewtwoLoanUnlocked','mewtwoLoanReadyToClaim',
-  'userTest','neighborhoodGymLocation'
+  'userTest','neighborhoodGymLocation','startersSorteados'
 ];
 function snapshotDaConta(){
   const o = {};
@@ -9210,6 +9245,59 @@ function renderNewSaveMode(){
     <p class="mode-card-reward">✨ Em troca: <strong>4x mais chance</strong> de encontrar shiny selvagem.</p>
   </button>`;
 }
+/* SORTEIO DOS INICIAIS -- PRESO AO SLOT, não à tentativa.
+   O que estava acontecendo: quem não gostava do resultado apagava o save e criava de novo. Sai
+   barato -- recomeçar não custa nada -- e compensa: no modo normal são ~43 saves criados até um
+   dos três vir shiny (2,3% por tentativa), 11 no difícil (9,1%).
+   Agora o resultado fica gravado NA CONTA, por slot, e sobrevive ao delete: recriar no mesmo slot
+   traz exatamente os mesmos iniciais. Um sorteio novo só acontece quando aquele slot conquista a
+   1ª insígnia (ver limparSorteioDosIniciais) -- ou seja, pra rolar de novo tem que jogar de verdade.
+   Quem joga limpo não perde nada: a chance por JORNADA continua a mesma.
+
+   A chave inclui o MODO porque o difícil tem 4x a chance. Sem isso dava pra sortear no difícil,
+   ver o resultado e recriar no normal levando o shiny -- trocando uma artimanha por outra. */
+function chaveDoSorteio(slot, modo){ return String(slot) + ':' + (modo === 'hard' ? 'hard' : 'normal'); }
+function sorteioDosIniciais(slot, modo){
+  const chave = chaveDoSorteio(slot, modo);
+  const guardado = game.startersSorteados && game.startersSorteados[chave];
+  if(guardado){
+    // só os iniciais conhecidos: se a lista de STARTERS mudar, o que falta é sorteado agora
+    const resultado = {};
+    let faltou = false;
+    STARTERS.forEach(id=>{
+      if(typeof guardado[id] === 'boolean') resultado[id] = guardado[id];
+      else { resultado[id] = Math.random() < (modo==='hard' ? HARD_SHINY_CHANCE : SHINY_CHANCE); faltou = true; }
+    });
+    if(faltou) gravarSorteioDosIniciais(chave, resultado);
+    return resultado;
+  }
+  const chance = (modo === 'hard') ? HARD_SHINY_CHANCE : SHINY_CHANCE;
+  const resultado = {};
+  STARTERS.forEach(id=>{ resultado[id] = Math.random() < chance; });
+  gravarSorteioDosIniciais(chave, resultado);
+  return resultado;
+}
+function gravarSorteioDosIniciais(chave, resultado){
+  game.startersSorteados = game.startersSorteados || {};
+  game.startersSorteados[chave] = resultado;
+  if(!game.authUser) return;
+  userDocRef(game.authUser.uid)
+    .set({ startersSorteados: { [chave]: resultado } }, { merge: true })
+    .catch(e=>console.error('Erro ao gravar o sorteio dos iniciais:', e));
+}
+/* Chamado quando o slot conquista a PRIMEIRA insígnia: a tentativa contou, então o próximo save
+   naquele slot tem direito a um sorteio novo. Limpa os dois modos -- a jornada seguinte pode ser
+   em qualquer um deles. */
+function limparSorteioDosIniciais(slot){
+  if(slot == null) return;
+  const chaves = [chaveDoSorteio(slot,'normal'), chaveDoSorteio(slot,'hard')];
+  chaves.forEach(k => { if(game.startersSorteados) delete game.startersSorteados[k]; });
+  if(!game.authUser) return;
+  const apagar = {};
+  chaves.forEach(k => { apagar['startersSorteados.'+k] = firebase.firestore.FieldValue.delete(); });
+  userDocRef(game.authUser.uid).update(apagar)
+    .catch(e=>console.error('Erro ao liberar o sorteio dos iniciais:', e));
+}
 async function confirmNewSaveName(){
   const rivalInput = document.getElementById('rival-name-input');
   const rivalName = rivalInput ? rivalInput.value.trim() : '';
@@ -9230,9 +9318,7 @@ async function confirmNewSaveName(){
   // era o único encontro do jogo que ignorava o modo escolhido.
   // Feito aqui (uma vez só, ao entrar na tela) e não dentro do render: senão re-renderizar a
   // mesma tela sortearia de novo, fazendo o resultado "piscar" entre shiny e normal à toa
-  const chanceInicial = (modoEscolhido === 'hard') ? HARD_SHINY_CHANCE : SHINY_CHANCE;
-  game.startersShiny = {};
-  STARTERS.forEach(id=>{ game.startersShiny[id] = Math.random() < chanceInicial; });
+  game.startersShiny = sorteioDosIniciais(slot, modoEscolhido);
   game.screen = 'start';
   render();
   saveCurrentGame();
@@ -9244,6 +9330,7 @@ function serializeGame(){
     routeCards: game.routeCards,
     gymIndex: game.gymIndex,
     shinyFoundThisSave: !!game.shinyFoundThisSave, // trava a escalada do bônus (ver currentShinyChance)
+    wildEncounterSeq: game.wildEncounterSeq || 0,  // semente do encontro selvagem (ver goToWildEncounter)
     starterId: game.starterId,
     wildOffer: game.wildOffer,
     wildSelected: game.wildSelected,
@@ -9424,6 +9511,7 @@ function applySavedState(data){
     ? data.shinyFoundThisSave
     : (data.team||[]).some(p=>p && p.shiny);
   game.starterId = data.starterId || null;
+  game.wildEncounterSeq = data.wildEncounterSeq || 0;
   game.wildOffer = data.wildOffer || [];
   game.wildSelected = data.wildSelected || [];
   game.team = hydrateTeam(data.team);
@@ -9771,6 +9859,8 @@ async function confirmDeleteSave(){
   await loadSaveSlots();
 }
 function goToSaveMenu(){
+  // o que estava pendente no autosave vai AGORA -- sair da tela não pode desfazer o que aconteceu
+  flushPendingAutoSave();
   /* A busca de oponente NÃO é cancelada ao sair da tela -- é justamente o ponto: dá pra jogar um
      save enquanto procura. Ninguém é jogado numa batalha sem confirmar, porque o convite de 15
      segundos aparece por cima de onde a pessoa estiver. */
