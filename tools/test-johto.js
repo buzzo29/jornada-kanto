@@ -50,13 +50,13 @@ ok('a ordem da tabela segue o número da Pokédex',
    ids.every((id,i)=> i === 0 || J[ids[i-1]].dex < J[id].dex));
 
 console.log('\nCAMPOS');
-const CAMPOS = ['dex','name','types','hp','attack','defense','special','speed','emoji'];
+const CAMPOS = ['dex','name','types','hp','attack','defense','speed','emoji'];
 const molde = Object.keys(KANTO.bulbasaur);
 ok('o formato é o mesmo do SPECIES de Kanto', JSON.stringify(molde) === JSON.stringify(CAMPOS),
    molde.join(','));
 const incompletos = ids.filter(id=>CAMPOS.some(c=>J[id][c] === undefined));
 ok('nenhum campo faltando', incompletos.length === 0, incompletos.join(',') || '');
-const forasDeFaixa = ids.filter(id=>['hp','attack','defense','special','speed']
+const forasDeFaixa = ids.filter(id=>['hp','attack','defense','speed']
   .some(c=>!Number.isInteger(J[id][c]) || J[id][c] < 1 || J[id][c] > 255));
 ok('todos os atributos são inteiros de 1 a 255', forasDeFaixa.length === 0, forasDeFaixa.join(',') || '');
 ok('todo mundo tem 1 ou 2 tipos', ids.every(id=>J[id].types.length >= 1 && J[id].types.length <= 2));
@@ -66,9 +66,19 @@ ok('toda espécie tem entrada no GEN2_SPECIAL_JOHTO',
    ids.every(id=>Array.isArray(SPECIAL[id]) && SPECIAL[id].length === 2),
    ids.filter(id=>!SPECIAL[id]).join(',') || '');
 ok('não sobra entrada sem espécie', Object.keys(SPECIAL).every(id=>J[id]));
-const desalinhados = ids.filter(id=>J[id].special !== Math.round((SPECIAL[id][0] + SPECIAL[id][1]) / 2));
-ok('o campo `special` é a média de Sp.Atk e Sp.Def', desalinhados.length === 0,
-   desalinhados.slice(0,5).join(',') || '');
+ok('os pares são inteiros de 1 a 255',
+   ids.every(id=>SPECIAL[id].every(v=>Number.isInteger(v) && v >= 1 && v <= 255)));
+// o `special` único da Gen 1 saiu do jogo: Sp.Atk e Sp.Def são a única fonte de atributo especial
+ok('nenhuma espécie de Johto carrega o `special` da Gen 1', !ids.some(id=>'special' in J[id]));
+ok('nenhuma espécie de Kanto carrega o `special` da Gen 1', !Object.keys(KANTO).some(id=>'special' in KANTO[id]));
+/* Volta pelo TEXTO dos dois arquivos: as três formas que significariam o campo de volta. A
+   variável local `special` (a classe físico/especial do golpe) é outra coisa e continua valendo. */
+const VOLTOU = /\bsp\.special\b|\bp\.special\b|\bspecial:\s*\d/;
+['index.html','functions/index.js'].forEach(arq=>{
+  const t = fs.readFileSync(path.join(RAIZ, arq), 'utf8');
+  const m = t.match(VOLTOU);
+  ok('o campo não voltou em ' + arq, !m, m ? 'achei "' + m[0] + '"' : '');
+});
 
 console.log('\nEVOLUÇÕES');
 const conhece = id => !!(J[id] || KANTO[id]);

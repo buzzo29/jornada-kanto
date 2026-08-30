@@ -37,11 +37,24 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
 - Fórmula fiel à Gen 1, com dano calculado como fração da vida e reescalado. A base do dano é a
   mesma nas duas gerações, então isso também vale como Gen 2.
 - **Especial é separado em Sp.Atk e Sp.Def (Gen 2)**, valores oficiais da Geração II na tabela
-  `GEN2_SPECIAL`, idêntica nos dois arquivos. Contra-intuitivo e já custou uma análise errada: na
-  divisão, o Special da Gen 1 virou o **Sp.Def** na maioria das espécies, e quem foi reajustado
-  foi o Sp.Atk. Não dá pra deduzir um campo do outro. O campo `special` continua no SPECIES por
-  compatibilidade com saves antigos e porque `bstOf` (raridade dos encontros) ainda usa ele —
-  trocar ali mexeria na distribuição de selvagens, que é outra discussão.
+  `GEN2_SPECIAL`, idêntica nos dois arquivos, e ela é a **única fonte de atributo especial no
+  jogo**. O campo `special` único da Gen 1 **não existe mais** — foi removido de SPECIES,
+  SPECIES_JOHTO, `createInstance`, da migração de save e do fallback das `effective*` em
+  30/08/2026. Não sobrou nada de Gen 1 em atributo. (A remoção não tocou em uma casa decimal:
+  impressão do motor idêntica antes e depois. O fallback era código morto — só seria alcançado
+  por instância de espécie desconhecida.)
+  Não dá pra deduzir um campo do outro, e a intuição erra aqui: medido nas 150 de Kanto, o Special
+  da Gen 1 é sempre **exatamente um dos dois** valores novos, nunca um meio-termo — em 39 espécies
+  os dois são iguais, em **68 ele virou o Sp.Atk** e em 43 o Sp.Def. (Este arquivo afirmava o
+  contrário, "virou o Sp.Def na maioria", até ser medido.)
+- **`bstOf` é o BST oficial da Gen 2**, os seis atributos — o mesmo número que a ficha da Pokédex
+  mostra ao jogador. Era a soma de quatro (hp+ataque+defesa+`special`), que ignorava a defesa
+  especial E a velocidade. Ele serve só pra escolher os 5 que o rival leva entre os recusados;
+  `rarityWeight` não existe mais no projeto (este arquivo dizia que `bstOf` alimentava a raridade
+  dos encontros — não alimenta). Medido na troca: a identidade dos 5 escolhidos muda em **63%**
+  dos casos, mas a força real do time do rival sobe só **1,2%** (BST médio 488,1 → 494,1), e em
+  400 jornadas simuladas de cada lado a conclusão fica em **274 contra 271** — dentro do ruído.
+  Ele escolhe melhor, não escolhe mais forte.
 - **Crítico ainda é Gen 1** (`velocidade/512`, e o crítico dobra o nível na fórmula). A Gen 2 usa
   1/16 fixo com multiplicador ×2. É o maior desvio que resta: hoje a taxa média é 13,4% e 138 das
   150 espécies criticam mais do que criticariam na Gen 2 (Electrode 27,3%, 4,4× a taxa oficial).
@@ -107,12 +120,13 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
 - `SPECIES_JOHTO`, `GEN2_SPECIAL_JOHTO` e `EVOLUTIONS_JOHTO`, **duplicadas nos dois arquivos**
   como todas as outras. Não entram em `SPECIES`/`EVOLUTIONS` de propósito: `Object.keys(SPECIES)`
   define o total da Pokédex, o "capturou tudo" que libera o Mewtwo, o pool da Torre
-  (`!EVOLUTIONS[k]`) e a raridade dos encontros (`bstOf`) — despejar 100 espécies lá mudaria as
-  quatro em silêncio, sem uma linha de código nova.
+  (`!EVOLUTIONS[k]`) e a força que o rival persegue (`bstOf`) — despejar 100 espécies lá mudaria
+  as quatro em silêncio, sem uma linha de código nova.
 - Números reconstruídos dos dados do Pokémon Showdown aplicando os mods gen8→gen2 sobre os valores
   atuais. **Método conferido: bate 150/150 com o `GEN2_SPECIAL` de Kanto que já estava aqui.**
-- O campo `special` é a **média de Sp.Atk e Sp.Def**. Johto nasceu com o Special já dividido, não
-  tem stat único pra herdar; a média mantém o BST na mesma escala de Kanto (média 338 contra 342).
+- **Não existe campo `special` aqui** — nem em Johto nem em Kanto (ver a seção do motor). Johto
+  nasceu já com o Especial dividido; Sp.Atk e Sp.Def oficiais, e só. A primeira versão desta
+  tabela trazia um `special` sintético (a média dos dois); ele foi removido junto com o de Kanto.
 - Três coisas travam o uso, e nenhuma é pequena:
   1. **TYPE_CHART é da Gen 1** — 15 tipos, sem Sombrio e Aço. 10 espécies daqui têm um dos dois
      (Umbreon, Murkrow, Forretress, Steelix, Scizor, Sneasel, Skarmory, Houndour, Houndoom,
