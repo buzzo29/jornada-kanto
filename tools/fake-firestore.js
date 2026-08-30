@@ -102,11 +102,19 @@ function makeDb(){
       let liberar;
       filaDeTransacoes = new Promise(r => { liberar = r; });
       await minhaVez;
+      /* LEITURA DEPOIS DE ESCRITA e proibida no Firestore de verdade, e o fake precisa recusar
+         igual: sem isso um `tx.get` depois de um `tx.set` passa aqui e so quebra em producao,
+         onde chega no cliente como um INTERNAL seco. Foi exatamente o que aconteceu com o
+         fightSundayBoss -- 24 checagens verdes aqui, 500 no ar. */
+      let jaEscreveu = false;
       try{
         return await fn({
-          get: (ref)=>ref.get(),
-          set: (ref, v, o)=>{ ref.set(v, o); },
-          delete: (ref)=>{ ref.delete(); }
+          get: (ref)=>{
+            if(jaEscreveu) throw new Error('Firestore transactions require all reads to be executed before all writes.');
+            return ref.get();
+          },
+          set: (ref, v, o)=>{ jaEscreveu = true; ref.set(v, o); },
+          delete: (ref)=>{ jaEscreveu = true; ref.delete(); }
         });
       } finally { liberar(); }
     }

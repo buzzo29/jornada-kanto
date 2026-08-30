@@ -321,13 +321,22 @@ Duas artimanhas medidas e fechadas — em ambas o jogador reiniciava até vir sh
   transações serializadas por causa disto — antes rodavam sem isolamento nenhum.)
 - **O HP NÃO dimensiona a raide.** Contra-intuitivo e já quase custou uma escolha errada: o motor
   calcula dano como fração da vida do alvo (`pct = dmgGen1 / gen1MaxHp(alvo)`) e só projeta na
-  escala no fim (`pct * maxHp`). Medido: com 10.000, 20.000 ou 100.000 de HP, uma investida tira
-  sempre **~2,44% da barra**. Dobrar o HP dobra o dano por golpe e o número de investidas não muda.
-  Quem controla a duração é o **nível** do Mew (entra no divisor): nível 200 → 3 investidas,
+  escala no fim (`pct * maxHp`). Medido: com 5.125, 10.000, 20.000 ou 100.000 de HP, uma investida
+  tira sempre **~2,44% da barra**. Dobrar o HP dobra o dano por golpe e o número de investidas não
+  muda. Quem controla a duração é o **nível** do Mew (entra no divisor): nível 200 → 3 investidas,
   500 → 13, 999 → 41, 2000 → 118 (time nível 70).
-- Calibragem atual: `BOSS_MAX_HP = 10000`, nível 999 → **~41 investidas** de um time nível 70
-  (199 de dano com time nível 60, 394 com nível 99). Um time de 6 sempre dá **24 golpes** por
+- O HP **sai da fórmula do jogo**, não é escolhido: `BOSS_MAX_HP = calcMaxHp({level:999, baseHp:100})`
+  = `round(30 + 999*5 + 100)` = **5125**. Mew é 100 em todos os atributos (oficial da Gen 2), o que
+  em nível 999 dá 2003 de ataque, defesa, Sp.Atk, Sp.Def e velocidade (`statAtLevel`), e 3007 de HP
+  na escala Gen 1 (o divisor do dano). Foi 10000 por um dia, como exemplo.
+  **Trocar esse número exige apagar `globalBoss/mew`**: o `maxHp` fica gravado no documento, e o
+  documento antigo continuaria valendo o valor velho.
+- Calibragem atual: **~41 investidas** de um time nível 70. Um time de 6 sempre dá **24 golpes** por
   investida: o Mew mata cada pokémon em 2 golpes (teto de 65% por golpe), 6 × 2 trocas × 2.
+- **Transação: as leituras TODAS antes das escritas.** O Firestore recusa a transação inteira se um
+  `get` vier depois de um `set`, e o erro só existe em produção — chega no cliente como um
+  `INTERNAL` seco. A função nasceu assim: 24 checagens verdes no teste, 500 no ar. O
+  `fake-firestore` passou a impor a mesma regra, então esse erro agora quebra o teste.
 - O Mew **não entra em `SPECIES`** — tudo que está lá conta pro total da Pokédex e pro "capturou
   tudo" que libera o Mewtwo, e um Mew que ninguém captura abriria uma vaga #151 impossível. A tela
   o encontra por `SPECIES_FORA_DA_DEX` / `especieParaTela()`; os atributos vivem só no servidor.

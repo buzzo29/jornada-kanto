@@ -5348,15 +5348,23 @@ exports.respondFriendChallenge = onCall(async (request) => {
    ===================================================================== */
 const BOSS_ID = 'mew';
 const BOSS_LEVEL = 999;
-const BOSS_MAX_HP = 10000;
-/* Mew: 100 em tudo, oficial da Gen 2. Ele NAO entra em SPECIES de proposito -- `Object.keys(SPECIES)`
-   e o que define o total da Pokedex e o "capturou tudo" que libera o desafio do Mewtwo, e um Mew
-   que ninguem captura nao pode contar pra isso (mesma razao do DISGUISE_DISPLAY no cliente).
-   Como a instancia abaixo carrega TODOS os atributos, nenhuma effective* precisa consultar SPECIES. */
+/* Mew: 100 em TODOS os atributos, oficial da Gen 2 (hp, ataque, defesa, Sp.Atk, Sp.Def, velocidade).
+   Ele NAO entra em SPECIES de proposito -- `Object.keys(SPECIES)` e o que define o total da Pokedex
+   e o "capturou tudo" que libera o desafio do Mewtwo, e um Mew que ninguem captura nao pode contar
+   pra isso (mesma razao do DISGUISE_DISPLAY no cliente).
+   Como a instancia carrega TODOS os atributos, nenhuma effective* precisa consultar SPECIES. */
+const BOSS_BASE = { baseHp:100, attack:100, defense:100, spAtk:100, spDef:100, speed:100 };
+/* O HP e o que a FORMULA DO JOGO da pra um Mew nivel 999, nao um numero escolhido:
+   calcMaxHp = round(30 + nivel*5 + baseHp) = 30 + 4995 + 100 = 5125.
+   Trocar este numero NAO muda a duracao da raide -- o dano e fracao da vida do alvo, entao a
+   barra sempre cai ~2,44% por investida (medido com 10 mil, 20 mil e 100 mil). Quem controla a
+   duracao e o BOSS_LEVEL. Mas trocar EXIGE apagar globalBoss/mew: o maxHp fica gravado no
+   documento, e o doc antigo continuaria valendo o valor velho. */
+const BOSS_MAX_HP = calcMaxHp({ level: BOSS_LEVEL, baseHp: BOSS_BASE.baseHp });
 function bossInstance(hpAtual){
-  return { id:'boss-mew', speciesId:BOSS_ID, name:'Mew', types:['Psychic'],
-           baseHp:100, attack:100, defense:100, spAtk:100, spDef:100, speed:100,
-           level:BOSS_LEVEL, maxHp:BOSS_MAX_HP, hp:hpAtual, shiny:false };
+  return Object.assign({ id:'boss-mew', speciesId:BOSS_ID, name:'Mew', types:['Psychic'],
+                         level:BOSS_LEVEL, maxHp:BOSS_MAX_HP, hp:hpAtual, shiny:false },
+                       BOSS_BASE);
 }
 function bossDocRef(){ return db.collection('globalBoss').doc(BOSS_ID); }
 function bossPlayerRef(uid){ return bossDocRef().collection('players').doc(uid); }
@@ -5484,9 +5492,13 @@ exports.fightSundayBoss = onCall(async (request) => {
   /* O dano foi calculado sobre o HP que a leitura viu. Se outro jogador bateu no meio do caminho,
      o que vale é o dano -- ele é descontado do HP atual, não do que foi lido. */
   const resultado = await db.runTransaction(async (tx) => {
-    const ref = bossDocRef();
-    const snap = await tx.get(ref);
+    const ref = bossDocRef(), meuRef = bossPlayerRef(uid);
+    /* AS DUAS LEITURAS PRIMEIRO. O Firestore recusa a transação inteira se um get vier depois de
+       um set ("all reads to be executed before all writes"), e o erro só aparece em produção --
+       chega no cliente como um INTERNAL seco. Foi assim que esta função nasceu quebrada. */
+    const [snap, meuSnap] = await Promise.all([tx.get(ref), tx.get(meuRef)]);
     const atual = snap.exists ? snap.data() : bossEstadoInicial();
+    const meu = meuSnap.exists ? meuSnap.data() : { dano:0, batalhas:0 };
     const hpDepois = Math.max(0, (atual.hp || 0) - luta.dano);
     const derrubou = hpDepois === 0 && (atual.hp || 0) > 0;
     tx.set(ref, { hp: hpDepois, maxHp: atual.maxHp || BOSS_MAX_HP, level: atual.level || BOSS_LEVEL,
@@ -5495,9 +5507,6 @@ exports.fightSundayBoss = onCall(async (request) => {
                   danoTotal: (atual.danoTotal || 0) + luta.dano,
                   derrotadoEm: hpDepois === 0 ? (atual.derrotadoEm || Date.now()) : null,
                   criadoEm: atual.criadoEm || Date.now() }, { merge:true });
-    const meuRef = bossPlayerRef(uid);
-    const meuSnap = await tx.get(meuRef);
-    const meu = meuSnap.exists ? meuSnap.data() : { dano:0, batalhas:0 };
     tx.set(meuRef, { dano: (meu.dano||0) + luta.dano, batalhas: (meu.batalhas||0) + 1,
                      ultimaEm: Date.now() }, { merge:true });
     return { hpDepois, derrubou, meuDano: (meu.dano||0) + luta.dano, meusAtaques: (meu.batalhas||0) + 1 };
