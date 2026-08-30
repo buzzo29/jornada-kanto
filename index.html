@@ -1497,10 +1497,11 @@
      sprite porque a fileira de time é o lugar onde a pessoa compara os seis de relance -- um selo
      embaixo do nível empurraria a linha e mudaria a altura de todas as telas que usam a fileira. */
   .save-slot-mon-sprite{position:relative;}
+  /* só a seta, sem moldura: ela já é vermelha e chapada, e um círculo em volta virava um segundo
+     elemento competindo com o sprite. O contorno branco resolve a leitura sobre sprite escuro. */
   .mon-terreno-selo{
-    position:absolute; top:-2px; right:-2px; font-size:.72rem; line-height:1;
-    background:var(--box); border:2px solid var(--green-dark); border-radius:50%;
-    padding:1px 2px; box-shadow:0 1px 2px rgba(0,0,0,.3);
+    position:absolute; top:-1px; right:-1px; font-size:.7rem; line-height:1;
+    filter:drop-shadow(0 0 1px #fff) drop-shadow(0 1px 1px rgba(0,0,0,.45));
   }
   .terreno-legenda{font-size:.62rem;color:var(--muted);font-weight:700;margin:6px 0 0;}
   .save-slot-mon-sprite.large .sprite-wrap{ display:block; width:100%; }
@@ -11558,7 +11559,7 @@ function timeComTerrenoHtml(lista, terrain){
     const buff = ganhaBuffDeTerreno(p.speciesId, terrain);
     return `<div class="save-slot-mon">
       <div class="save-slot-mon-sprite large">${sp?spriteHtml(p.speciesId,'sprite-md',p.shiny):'❔'}${
-        buff ? `<span class="mon-terreno-selo" title="Ganha bônus no terreno ${escapeHtmlSafe(terrain.name)}">${terrain.icon}</span>` : ''}</div>
+        buff ? `<span class="mon-terreno-selo" title="Ganha bônus no terreno ${escapeHtmlSafe(terrain.name)}">🔺</span>` : ''}</div>
       <div class="save-slot-mon-level">${p.shiny?'🌟 ':''}Lv.${p.level}</div>
     </div>`;
   }).join('')}</div>`;
@@ -11566,7 +11567,7 @@ function timeComTerrenoHtml(lista, terrain){
 function legendaTerrenoHtml(lista, terrain){
   if(!terrain) return '';
   const n = (lista||[]).filter(p=>ganhaBuffDeTerreno(p.speciesId, terrain)).length;
-  return `<p class="terreno-legenda">${terrain.icon} ${n===0
+  return `<p class="terreno-legenda">🔺 ${n===0
     ? `Nenhum pokémon desse time ganha bônus no terreno ${escapeHtmlSafe(terrain.name)}.`
     : `<strong>${n}</strong> ${n===1?'pokémon ganha':'pokémon ganham'} bônus de terreno (${escapeHtmlSafe(terrain.name)}).`}</p>`;
 }
@@ -11693,7 +11694,7 @@ function renderNeighborhoodGymDefenseOrder(){
   <div class="result-banner win">📋 Ordem do time de defesa</div>
   <div class="box">
     <p class="hint-text">O primeiro da lista enfrenta o desafiante primeiro; quando ele cair, entra o próximo.</p>
-    ${terreno ? `<p class="hint-text">🗺️ Terreno: <button class="terrain-inline-badge" style="background:${terrainColor(terreno)}" onclick="event.stopPropagation();openTerrainInfoModal('${terreno.id}')">${terreno.name}</button> — quem tem o selo ${terreno.icon} luta com bônus.</p>` : ''}
+    ${terreno ? `<p class="hint-text">🗺️ Terreno: <button class="terrain-inline-badge" style="background:${terrainColor(terreno)}" onclick="event.stopPropagation();openTerrainInfoModal('${terreno.id}')">${terreno.name}</button> — quem tem 🔺 luta com bônus.</p>` : ''}
   </div>
   ${game.neighborhoodGymOrderError ? `<div class="box"><p class="error-text">${escapeHtmlSafe(game.neighborhoodGymOrderError)}</p></div>` : ''}
   <div class="box">
@@ -11703,7 +11704,7 @@ function renderNeighborhoodGymDefenseOrder(){
       return `<div class="order-row">
         <div class="order-num">${idx+1}º</div>
         <div class="order-info">
-          <span class="mon-name">${spriteHtml(p.speciesId,'sprite-sm',p.shiny)} ${escapeHtmlSafe(sp?sp.name:'?')}${p.shiny?' 🌟':''} — Lv.${p.level}${buff?` ${terreno.icon}`:''}</span>
+          <span class="mon-name">${spriteHtml(p.speciesId,'sprite-sm',p.shiny)} ${escapeHtmlSafe(sp?sp.name:'?')}${p.shiny?' 🌟':''} — Lv.${p.level}${buff?' 🔺':''}</span>
           <span class="mon-sub">${sp?typesHtml(sp.types):''}</span>
         </div>
         <div class="order-controls">
@@ -11727,7 +11728,7 @@ function renderNeighborhoodGymChallengeTeamPicker(){
   <div class="result-banner win">⚔️ Desafiar Ginásio — escolha o time</div>
   <div class="box">
     <p class="hint-text">Toque no time que vai desafiar. Cada time só pode desafiar esse ginásio a cada 10 minutos.</p>
-    ${terreno ? `<p class="hint-text">🗺️ O ginásio luta em <button class="terrain-inline-badge" style="background:${terrainColor(terreno)}" onclick="event.stopPropagation();openTerrainInfoModal('${terreno.id}')">${terreno.name}</button> — quem tem o selo ${terreno.icon} ganha bônus lá.</p>` : ''}
+    ${terreno ? `<p class="hint-text">🗺️ O ginásio luta em <button class="terrain-inline-badge" style="background:${terrainColor(terreno)}" onclick="event.stopPropagation();openTerrainInfoModal('${terreno.id}')">${terreno.name}</button> — quem tem 🔺 ganha bônus lá.</p>` : ''}
     ${cooldowns===null
       ? `<p class="hint-text">Verificando disponibilidade dos times...</p>`
       : eligibleSlots.length===0
