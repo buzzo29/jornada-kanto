@@ -5446,8 +5446,9 @@ exports.getSundayBoss = onCall(async (request) => {
     const s = doc.data() || {};
     const team = (s.team || []).filter(p => p && p.speciesId);
     if(!team.length) return;
-    times.push({ slot: doc.id, nome: s.saveName || ('Time ' + (Number(doc.id)+1)),
-                 badges: (typeof s.badgeCount === 'number') ? s.badgeCount : ((s.badgesEarned||[]).length),
+    // `customName` e o mesmo campo que a home usa. Estava lendo `saveName`, que nao existe --
+    // por isso todo time aparecia como "Time 1", "Time 2", ignorando o nome que o jogador deu
+    times.push({ slot: doc.id, nome: s.customName || ('Time ' + (Number(doc.id)+1)),
                  team: team.map(p => ({ speciesId:p.speciesId, level:p.level, shiny: !!p.shiny })) });
   });
   times.sort((a,b) => Number(a.slot) - Number(b.slot));

@@ -13678,21 +13678,27 @@ function renderSundayBoss(){
   ${game.bossError ? `<div class="box cursor"><p class="lose-text">${escapeHtmlSafe(game.bossError)}</p></div>` : ''}
   ${caiu ? '' : `
   <div class="home-section-row"><span class="home-section-label">💾 ESCOLHA O TIME</span></div>
-  ${(st.times||[]).length ? (st.times||[]).map(t=>`
-    <button class="save-slot-card" ${game.bossLoading?'disabled':''} onclick="lutarSundayBoss('${escJs(t.slot)}')">
+  ${(st.times||[]).length ? (st.times||[]).map(t=>{
+    // MESMO card da home, de propósito: mesma estrela de média, mesmo nome, mesmas sprites.
+    // O jogador reconhece o time pela cara dele -- inventar uma variação aqui só obrigaria a
+    // reaprender a mesma informação. Insígnias e selo de shiny saíram: na home também não estão.
+    const media = t.team.length
+      ? Math.round(t.team.reduce((s,p)=> s + (p.level||0), 0) / t.team.length) : 0;
+    return `
+    <button class="save-slot-card has-avg-star" ${game.bossLoading?'disabled':''} onclick="lutarSundayBoss('${escJs(t.slot)}')">
       <div class="save-slot-top">
-        <span class="save-slot-name">✨ ${escapeHtmlSafe(t.nome)}</span>
-        <span class="save-slot-name">${t.badges}/8 🏅</span>
+        <span class="team-avg-star" title="Média de nível do time">${STAR_SVG}<span class="team-avg-star-num">${media}</span></span>
+        <span class="save-slot-name"><span class="team-avg-star-name">${escapeHtmlSafe(t.nome)}</span></span>
       </div>
       <!-- spread, e nao a linha rolavel: dentro de um button a rolagem horizontal nao funciona
            direito, e um time de 6 estourava a largura do card -- o sexto ficava fora da tela em
            320px, sem nenhum indício de que existia -->
       <div class="save-slot-team-row spread">${t.team.map(p=>`
         <div class="save-slot-mon">
-          <div class="save-slot-mon-sprite">${spriteHtml(p.speciesId,'sprite-sm',p.shiny)}</div>
+          <div class="save-slot-mon-sprite large">${spriteHtml(p.speciesId,'sprite-md',p.shiny)}</div>
           <div class="save-slot-mon-level">Lv.${p.level}</div>
         </div>`).join('')}</div>
-    </button>`).join('')
+    </button>`;}).join('')
     : `<div class="box cursor"><p>Você ainda não tem nenhum time. Comece uma jornada primeiro.</p></div>`}`}
   <button class="btn" onclick="goHome()">⬅ Voltar</button>`;
 }
