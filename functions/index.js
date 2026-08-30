@@ -5372,11 +5372,29 @@ function bossEstadoInicial(){
   return { hp: BOSS_MAX_HP, maxHp: BOSS_MAX_HP, level: BOSS_LEVEL, golpes: 0, batalhas: 0,
            danoTotal: 0, derrotadoEm: null, criadoEm: Date.now() };
 }
+/* Devolve os dados da conta -- o nome vem junto porque o ranking precisa dele, e ler o documento
+   duas vezes na mesma chamada seria desperdicio. */
 async function bossRequireTester(uid){
   const snap = await db.collection('users').doc(uid).get();
   if(!snap.exists || snap.data().userTest !== true){
     throw new HttpsError('permission-denied', 'O Boss de Domingo está em avaliação.');
   }
+  return snap.data();
+}
+/* TOP 10 de dano. O nome do treinador fica GRAVADO no documento do jogador (denormalizado) e e
+   atualizado a cada investida: sem isso o ranking precisaria de 10 leituras extras em users/ toda
+   vez que alguem abrisse a tela. O preco e que quem troca de nome so aparece com o nome novo
+   depois da proxima investida -- barato perto de 10 leituras por abertura de tela. */
+async function bossRanking(){
+  const snap = await bossDocRef().collection('players').orderBy('dano','desc').limit(10).get();
+  const lista = [];
+  snap.forEach(doc => {
+    const d = doc.data() || {};
+    if(!(d.dano > 0)) return;                  // quem ainda nao tirou nada nao entra no ranking
+    lista.push({ uid: doc.id, name: d.trainerName || 'Treinador',
+                 dano: d.dano || 0, batalhas: d.batalhas || 0 });
+  });
+  return lista;
 }
 async function bossGetEstado(){
   const snap = await bossDocRef().get();
@@ -5438,6 +5456,7 @@ exports.getSundayBoss = onCall(async (request) => {
   const uid = request.auth.uid;
   await bossRequireTester(uid);
   const estado = await bossGetEstado();
+  const ranking = await bossRanking();
   const meuSnap = await bossPlayerRef(uid).get();
   const meu = meuSnap.exists ? meuSnap.data() : { dano:0, batalhas:0 };
   const savesSnap = await db.collection('users').doc(uid).collection('saves').get();
@@ -5455,7 +5474,7 @@ exports.getSundayBoss = onCall(async (request) => {
   return { boss: { hp:estado.hp, maxHp:estado.maxHp, level:estado.level, golpes:estado.golpes||0,
                    batalhas:estado.batalhas||0, derrotadoEm:estado.derrotadoEm || null },
            meu: { dano: meu.dano||0, batalhas: meu.batalhas||0 },
-           times, serverNow: Date.now() };
+           ranking, times, serverNow: Date.now() };
 });
 
 /* Uma investida. O cliente manda só o SLOT -- o time sai do save gravado, nunca do que ele diz
@@ -5465,7 +5484,7 @@ exports.getSundayBoss = onCall(async (request) => {
 exports.fightSundayBoss = onCall(async (request) => {
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   const uid = request.auth.uid;
-  await bossRequireTester(uid);
+  const conta = await bossRequireTester(uid);
   const slot = String(request.data?.slot ?? '');
   if(!slot){ throw new HttpsError('invalid-argument', 'Escolha um time.'); }
 
@@ -5515,6 +5534,8 @@ exports.fightSundayBoss = onCall(async (request) => {
                   derrotadoEm: hpDepois === 0 ? (atual.derrotadoEm || Date.now()) : null,
                   criadoEm: atual.criadoEm || Date.now() }, { merge:true });
     tx.set(meuRef, { dano: (meu.dano||0) + aplicado, batalhas: (meu.batalhas||0) + 1,
+                     // nome gravado junto: e o que faz o ranking sair numa consulta so (ver bossRanking)
+                     trainerName: conta.trainerName || 'Treinador',
                      ultimaEm: Date.now() }, { merge:true });
     return { hpDepois, derrubou, aplicado, hpNaHora: (atual.hp || 0),
              meuDano: (meu.dano||0) + aplicado, meusAtaques: (meu.batalhas||0) + 1 };

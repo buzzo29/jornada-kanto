@@ -355,6 +355,15 @@ Duas artimanhas medidas e fechadas — em ambas o jogador reiniciava até vir sh
 - A luta reaproveita **inteira** a tela de revelação da Torre (`trainerBattling`), trocando só o
   destino no fim (`bossBattlePending`). O nome do golpe do Mew cai no `MOVE_BY_TYPE` — ele não
   tem entrada no `MOVE_OVERRIDES` e não precisa.
+- A tela tem **dois passos**: estado da raide + ranking, e só depois do "Atacar Mew" a lista de
+  times. Com a lista aberta de saída, a barra de vida e o ranking — que são a razão da tela
+  existir — ficavam atrás de uma rolagem em 320px.
+- **Top 10 por dano**, mesma marcação dos rankings das ligas (`leaderboard-list`). O nome do
+  treinador fica **gravado no documento do jogador** e é atualizado a cada investida: sem isso o
+  ranking custaria 10 leituras extras em `users/` toda vez que alguém abrisse a tela. O preço é
+  que quem troca de nome só aparece com o nome novo depois da próxima investida.
+  (`tools/fake-firestore.js` ganhou `orderBy` de verdade por causa disto — era um no-op, então um
+  teste de ranking passaria sem conferir ordem nenhuma e o `limit(10)` cortaria dez QUAISQUER.)
 - Em aberto, não implementado: recompensa por derrubar, limite de investidas por jogador (hoje é
   livre — de propósito, senão não dá pra testar) e o que acontece depois que ele cai (hoje fica
   derrubado e a tela diz isso).

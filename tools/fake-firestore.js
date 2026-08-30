@@ -46,14 +46,16 @@ function docRef(parts){
   };
 }
 
-function collRef(parts, filtros, limite){
+function collRef(parts, filtros, limite, ordem){
   filtros = filtros || [];
   const prefixo = pathOf(parts) + '/';
   return {
     doc(id){ return docRef(parts.concat([id])); },
-    where(campo, op, valor){ return collRef(parts, filtros.concat([[campo, op, valor]]), limite); },
-    orderBy(){ return collRef(parts, filtros, limite); },
-    limit(n){ return collRef(parts, filtros, n); },
+    where(campo, op, valor){ return collRef(parts, filtros.concat([[campo, op, valor]]), limite, ordem); },
+    /* ORDENA DE VERDADE. Era um no-op que so devolvia a colecao: um teste de ranking passava sem
+       nunca conferir a ordem, e o limit(10) cortava dez QUALQUER em vez dos dez primeiros. */
+    orderBy(campo, dir){ return collRef(parts, filtros, limite, [campo, dir === 'desc' ? -1 : 1]); },
+    limit(n){ return collRef(parts, filtros, n, ordem); },
     async get(){
       let docs = [];
       for(const [caminho, dados] of store){
@@ -69,7 +71,17 @@ function collRef(parts, filtros, limite){
           if(op === '>')  return v !== undefined && v > valor;
           return true;
         });
-        if(ok) docs.push({ id, ref: docRef(parts.concat([id])), data(){ return clone(dados); }, exists:true });
+        if(ok) docs.push({ id, bruto: dados, ref: docRef(parts.concat([id])), data(){ return clone(dados); }, exists:true });
+      }
+      if(ordem){
+        const [campo, dir] = ordem;
+        docs.sort((a,b)=>{
+          const x = a.bruto[campo], y = b.bruto[campo];
+          if(x === y) return a.id < b.id ? -1 : 1;      // desempate estável, como o Firestore (pelo id)
+          if(x === undefined) return 1;
+          if(y === undefined) return -1;
+          return (x < y ? -1 : 1) * dir;
+        });
       }
       if(limite) docs = docs.slice(0, limite);
       // forEach existe no QuerySnapshot de verdade e o código de produção usa (startTrainerTowerRun)

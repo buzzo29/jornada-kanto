@@ -176,5 +176,43 @@ async function multidao(){
   ok('a soma das contribuicoes bate com a vida do Mew', total === max,
      total + ' de ' + max);
   ok('ninguem fica com dano negativo ou zerado a toa', contrib.every(d=>d >= 0));
+  await ranking();
+}
+
+/* Terceira bateria: o TOP 10. */
+async function ranking(){
+  fake.reset();
+  const N = 13;   // mais que 10, pra provar que corta nos 10 primeiros e nao em 10 quaisquer
+  for(let i=0;i<N;i++){
+    await db.collection('users').doc('r'+i).set({ userTest:true, trainerName:'Treinador '+i });
+    await db.collection('users').doc('r'+i).collection('saves').doc('0')
+            .set({ customName:'Time', badgeCount:8, team:TIME });
+  }
+  console.log('\nTOP 10 DE DANO');
+  const vazio = await chamar('getSundayBoss','r0');
+  ok('comeca vazio', Array.isArray(vazio.ranking) && vazio.ranking.length === 0);
+  /* O acumulo de dano ja e coberto pelas outras baterias. Aqui o que esta em teste e a CONSULTA:
+     ordenar por dano, cortar em 10 e trazer o nome gravado. Por isso os placares entram direto --
+     91 investidas de verdade matariam o Mew (5125 de vida) muito antes do decimo terceiro
+     jogador atacar. Uma investida real de cada um confirma que a funcao escreve no mesmo lugar. */
+  for(let i=0;i<N;i++){
+    await chamar('fightSundayBoss','r'+i,{slot:'0'});
+    await db.collection('globalBoss').doc('mew').collection('players').doc('r'+i)
+            .set({ dano: (i+1)*100, batalhas: i+1, trainerName:'Treinador '+i }, { merge:true });
+  }
+  const r = (await chamar('getSundayBoss','r0')).ranking;
+  ok('devolve no maximo 10', r.length === 10, r.length + '');
+  ok('vem em ordem decrescente de dano', r.every((e,i)=> i===0 || r[i-1].dano >= e.dano),
+     r.map(e=>e.dano).join(' > '));
+  ok('a investida real escreve no mesmo documento do ranking',
+     (await chamar('getSundayBoss','r0')).meu.batalhas >= 1);
+  ok('o 1o lugar e quem mais atacou', r[0].uid === 'r'+(N-1), r[0].uid);
+  ok('sao os 10 MAIORES, nao 10 quaisquer',
+     !r.some(e=>['r0','r1','r2'].includes(e.uid)), r.map(e=>e.uid).join(','));
+  ok('cada linha tem nome e dano', r.every(e=>e.name && e.name !== 'Treinador' && e.dano > 0));
+  ok('o nome vem gravado no documento do jogador', r[0].name === 'Treinador ' + (N-1), r[0].name);
+  const meu = (await chamar('getSundayBoss','r12')).meu;
+  ok('a contribuicao pessoal bate com a linha do ranking',
+     r.find(e=>e.uid==='r12').dano === meu.dano, r.find(e=>e.uid==='r12').dano+' = '+meu.dano);
   fim();
 }
