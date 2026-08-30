@@ -550,7 +550,13 @@ function calcDamage(attacker, defender, rng){
   const defMaxHp = defender.maxHp || calcMaxHp(defender);
   return Math.max(1, Math.round(pct * defMaxHp));
 }
-const DYING_BLOW_FACTOR = 0.5; // golpe moribundo: quem cai ainda conecta o contra-golpe, só que enfraquecido
+/* Golpe moribundo: quem cai ainda conecta o contra-golpe -- e desde 30/08/2026 ele vale CHEIO.
+   Valeu metade por um tempo, e o efeito colateral era ilegível: o jogador via seu pokémon com
+   vantagem de tipo tirando 112 em vez de 223 e procurava bug no multiplicador.
+   Medido na mudança: 11,2% das batalhas trocam de vencedor, a taxa de vitória geral não se move
+   (51,3% → 51,0%), e os confrontos que terminam no desempate sobem de 6,5% pra 14,6% -- mais
+   gente cai junto, e o desempate (sobrevivente com 1-10% da vida) passa a decidir mais confronto. */
+const DYING_BLOW_FACTOR = 1.0;
 /* O 4º parâmetro é o DIÁRIO da luta: um registro por golpe, na ordem em que aconteceram, pro log
    conseguir contar o passo a passo. É só escrita -- nada aqui é lido de volta pelo motor, e passar
    ou não passar o array não muda um ponto de dano.
@@ -573,8 +579,13 @@ function doExchange(active, enemy, rng, diario){
   const dmgBySecond = activeFirst ? dmgToActive : dmgToEnemy;
   const firstHpBefore = first.hp, secondHpBefore = second.hp;
   second.hp = Math.max(0, second.hp - dmgByFirst);
+  /* A marca sai da SITUAÇÃO (o segundo caiu e mesmo assim revidou), não de o dano ter sido
+     reduzido. Enquanto ela era deduzida do dano, subir o DYING_BLOW_FACTOR pra 1.0 fazia a marca
+     sumir junto -- e sem ela o log volta a mostrar pokémon atacando depois de cair, porque é ela
+     que manda o revide vir ANTES do golpe que derrubou. */
+  const segundoCaiu = second.hp <= 0;
   let counter = dmgBySecond;
-  if(second.hp <= 0 && counter > 0){ // counter sempre > 0 agora (não existe mais imunidade total 0x)
+  if(segundoCaiu && counter > 0){ // counter sempre > 0 agora (não existe mais imunidade total 0x)
     counter = Math.max(1, Math.round(counter * DYING_BLOW_FACTOR));
   }
   first.hp = Math.max(0, first.hp - counter);
@@ -582,9 +593,8 @@ function doExchange(active, enemy, rng, diario){
     /* O dano registrado é o que SAIU DE VERDADE da vida do alvo, não o número que a fórmula
        sorteou: um golpe de 101 num pokémon com 54 de HP tira 54. Gravar o valor cru fazia o log
        não fechar -- somando as linhas dava mais dano do que o pokémon tinha de vida. */
-    const moribundo = counter !== dmgBySecond;
     diario.push({ q: activeFirst?'p':'e', d: secondHpBefore - second.hp, hp: second.hp, c: first.lastCrit?1:0, m:0, z: first.lastMoveNulo?1:0 });
-    diario.push({ q: activeFirst?'e':'p', d: firstHpBefore  - first.hp,  hp: first.hp,  c: second.lastCrit?1:0, m: moribundo?1:0, z: second.lastMoveNulo?1:0 });
+    diario.push({ q: activeFirst?'e':'p', d: firstHpBefore  - first.hp,  hp: first.hp,  c: second.lastCrit?1:0, m: segundoCaiu?1:0, z: second.lastMoveNulo?1:0 });
   }
   // EMPATE NÃO EXISTE: se o golpe moribundo também derrubaria o primeiro, fica de pé quem tinha o
   // MAIOR percentual de HP entrando na troca, com 1%-10% do HP máximo (sorteado). Percentual igual

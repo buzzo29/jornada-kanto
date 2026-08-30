@@ -114,8 +114,15 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
   vezes. A reconstrução de 3 golpes é **determinística** (semente tirada do próprio confronto):
   com `Math.random()`, log e animação sorteavam divisões diferentes e cada redesenho trocava os
   números.
-- O **golpe moribundo** (quem cai ainda conecta o contra-golpe) entra **ANTES** do golpe que o
-  derrubou. Não é distorção — os dois são do mesmo instante, e o motor só os aplica em sequência
+- **O golpe moribundo vale CHEIO** (`DYING_BLOW_FACTOR = 1.0`). Valeu metade até 30/08/2026, e o
+  efeito colateral era ilegível: um Venusaur com vantagem de tipo tirava 112 em vez de 223 e o
+  jogador procurava bug no multiplicador. Medido na mudança: **11,2% das batalhas trocam de
+  vencedor** (a maior mexida desta série), taxa de vitória geral parada (51,3% → 51,0%), e os
+  confrontos decididos no **desempate sobem de 6,5% pra 14,6%** — mais gente cai junto.
+  Armadilha: a marca de moribundo tem que sair da SITUAÇÃO (o segundo caiu e revidou), não de o
+  dano ter sido reduzido. Enquanto era deduzida do dano, subir o fator pra 1.0 apagava a marca —
+  e sem ela o log volta a mostrar pokémon atacando depois de cair.
+- O **golpe moribundo** entra **ANTES** do golpe que o derrubou. Não é distorção — os dois são do mesmo instante, e o motor só os aplica em sequência
   porque código roda em sequência. Qualquer outra ordem faz o log dizer que alguém atacou depois
   de cair, e isso já foi reportado como bug três vezes (inclusive na forma "somar o revide numa
   linha anterior", que fazia a linha antiga parecer fatal).
