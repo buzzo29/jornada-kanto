@@ -1,18 +1,18 @@
 /* ============================================================================
    REGRAS DO FIRESTORE
 
-   ATENCAO: este arquivo NAO e publicado pelo `firebase deploy`. O firebase.json so declara
-   hosting e functions -- nao existe secao "firestore" nele. As regras que valem sao as que estao
-   no console, e este arquivo e a copia versionada delas.
+   ESTE ARQUIVO E A FONTE DA VERDADE. Desde 30/08/2026 o firebase.json tem secao "firestore", e
+   o `firebase deploy` publica estas regras junto com functions e hosting. Editar no console e
+   editar do lado errado: o proximo deploy sobrescreve.
 
-   Ate 30/08/2026 essa copia estava 70 linhas ATRAS da producao: faltavam a trava dos campos de
-   especialidade (sem ela, uma linha no console declara o jogador especialista em todos os tipos),
-   a trava do ranking da Trainers League, os matchLogs, os neighborhoodGyms e o leagueTypes
-   fechado. Publicar o arquivo daquele jeito teria APAGADO tudo isso. Foi reescrito a partir do
-   que estava no ar.
+   PUBLICAR SUBSTITUI, NAO MESCLA. Antes disto ser ligado ao deploy, o arquivo passou anos
+   parado -- 47 linhas contra 117 no ar -- e publica-lo teria APAGADO da producao a trava dos
+   campos de especialidade (sem ela, uma linha no console declara o jogador especialista em todos
+   os tipos), a trava do ranking da Trainers League, os matchLogs, os neighborhoodGyms e o
+   leagueTypes fechado. Foi reescrito a partir do que estava no ar antes de ligar.
 
-   Se um dia isto for ligado ao deploy: LEIA AS REGRAS NO AR ANTES
-   (`firebase_get_security_rules` pelo MCP), porque quem publica substitui, nao mescla.
+   Se alguem mexer no console mesmo assim, o jeito de nao perder e ler as regras no ar
+   (`firebase_get_security_rules` pelo MCP) e trazer pra ca ANTES do proximo deploy.
    ============================================================================ */
 rules_version = '2';
 service cloud.firestore {

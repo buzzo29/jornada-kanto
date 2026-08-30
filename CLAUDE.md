@@ -25,19 +25,24 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
 
 ## Deploy
 
-- `firebase deploy` — functions + hosting. **NÃO publica as regras** (ver abaixo).
+- `firebase deploy` — regras → functions → hosting
 - `firebase deploy --only hosting` — só o HTML
 - `firebase deploy --only functions` — só o servidor
+- `firebase deploy --only firestore` — só as regras
 - Quando cliente e servidor mudam juntos, **subir os dois na mesma leva**.
-- **`firestore.rules` não é publicado por nada.** O `firebase.json` só declara `hosting` e
-  `functions` — não existe seção `firestore`. As regras que valem são as do console, e o arquivo
-  do repo é a cópia versionada delas. Este arquivo dizia que `firebase deploy` subia as regras;
-  não sobe, e essa crença era perigosa: em 30/08/2026 a cópia do repo estava **70 linhas atrás**
-  da produção (47 contra 117) e publicá-la teria apagado a trava dos campos de especialidade
-  (sem ela, uma linha no console declara o jogador especialista em todos os tipos), a trava do
-  ranking da Trainers League, os `matchLogs`, os `neighborhoodGyms` e o `leagueTypes` fechado.
-  O arquivo foi reescrito a partir do que estava no ar. **Antes de ligar isso ao deploy, ler as
-  regras no ar** (`firebase_get_security_rules` pelo MCP): publicar substitui, não mescla.
+- **`firestore.rules` é a fonte da verdade desde 30/08/2026**, quando o `firebase.json` ganhou a
+  seção `firestore`. Antes disso ele não era publicado por nada e o console era quem mandava —
+  então o arquivo derrapou até ficar **70 linhas atrás** da produção (47 contra 117). Publicá-lo
+  naquele estado teria apagado a trava dos campos de especialidade (sem ela, uma linha no console
+  declara o jogador especialista em todos os tipos), a trava do ranking da Trainers League, os
+  `matchLogs`, os `neighborhoodGyms` e o `leagueTypes` fechado. Foi reescrito a partir do que
+  estava no ar **antes** de ligar, e a publicação foi conferida linha a linha: só acrescentou o
+  `globalBoss`, não removeu nada.
+  **Publicar SUBSTITUI, não mescla.** Editar no console agora é editar do lado errado — o próximo
+  deploy sobrescreve. Se acontecer mesmo assim, ler as regras no ar
+  (`firebase_get_security_rules` pelo MCP) e trazer pra cá antes do deploy seguinte.
+  O `hosting.ignore` passou a excluir o arquivo: o site publica a raiz do repo, e a cópia das
+  regras não precisa ficar baixável em `jornadakanto.com/firestore.rules`.
 
 ---
 
