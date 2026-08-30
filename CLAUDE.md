@@ -290,6 +290,40 @@ Duas artimanhas medidas e fechadas — em ambas o jogador reiniciava até vir sh
 - No lobby cada treinador aparece com a **faixa** de nível dos times dele (`Lv.62–70`), não com uma
   média só: qual time vai entrar nem ele decidiu ainda.
 
+## Boss de Domingo (raide global)
+
+- **Em avaliação: só conta com `userTest = true`.** O botão da home é escondido no cliente, mas
+  quem fecha a porta é o `bossRequireTester` no servidor — o estado é GLOBAL e uma Cloud Function
+  é chamável direto, sem passar pela tela. Mesma lição da Torre.
+- Um Mew **nível 999**, um só pro jogo inteiro (`globalBoss/mew`). A vida **nunca regenera**: o que
+  um jogador tirou fica tirado pro próximo. Nas regras do Firestore o documento é **leitura livre e
+  escrita negada a todos** — inclusive ao dono da conta. É o oposto das outras coleções: ali um
+  jogador só estraga o que é dele; aqui uma escrita solta mataria o Mew de todo mundo com um `hp:0`.
+- **O servidor nunca aceita um time do cliente**, só o `slot` — o time sai do save gravado. Aceitar
+  um time montado na hora seria aceitar seis pokémon nível 99 inventados no console, e o estrago
+  não ficaria no save de quem trapaceou: ficaria na barra que o jogo inteiro vê.
+- O desconto vai numa **transação**: duas investidas simultâneas leem o mesmo HP, e sem isso a
+  segunda grava por cima da primeira e metade do dano some. (`tools/fake-firestore.js` ganhou
+  transações serializadas por causa disto — antes rodavam sem isolamento nenhum.)
+- **O HP NÃO dimensiona a raide.** Contra-intuitivo e já quase custou uma escolha errada: o motor
+  calcula dano como fração da vida do alvo (`pct = dmgGen1 / gen1MaxHp(alvo)`) e só projeta na
+  escala no fim (`pct * maxHp`). Medido: com 10.000, 20.000 ou 100.000 de HP, uma investida tira
+  sempre **~2,44% da barra**. Dobrar o HP dobra o dano por golpe e o número de investidas não muda.
+  Quem controla a duração é o **nível** do Mew (entra no divisor): nível 200 → 3 investidas,
+  500 → 13, 999 → 41, 2000 → 118 (time nível 70).
+- Calibragem atual: `BOSS_MAX_HP = 10000`, nível 999 → **~41 investidas** de um time nível 70
+  (199 de dano com time nível 60, 394 com nível 99). Um time de 6 sempre dá **24 golpes** por
+  investida: o Mew mata cada pokémon em 2 golpes (teto de 65% por golpe), 6 × 2 trocas × 2.
+- O Mew **não entra em `SPECIES`** — tudo que está lá conta pro total da Pokédex e pro "capturou
+  tudo" que libera o Mewtwo, e um Mew que ninguém captura abriria uma vaga #151 impossível. A tela
+  o encontra por `SPECIES_FORA_DA_DEX` / `especieParaTela()`; os atributos vivem só no servidor.
+- A luta reaproveita **inteira** a tela de revelação da Torre (`trainerBattling`), trocando só o
+  destino no fim (`bossBattlePending`). O nome do golpe do Mew cai no `MOVE_BY_TYPE` — ele não
+  tem entrada no `MOVE_OVERRIDES` e não precisa.
+- Em aberto, não implementado: recompensa por derrubar, limite de investidas por jogador (hoje é
+  livre — de propósito, senão não dá pra testar) e o que acontece depois que ele cai (hoje fica
+  derrubado e a tela diz isso).
+
 ## Lista de amigos
 
 - Amizade é **mútua e por aceite**, gravada nos DOIS lados (`users/{a}/friends/{b}` e o espelho).

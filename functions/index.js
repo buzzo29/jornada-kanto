@@ -5325,3 +5325,186 @@ exports.respondFriendChallenge = onCall(async (request) => {
 
   return { ok:true, aceito:true, battleId: estado.id };
 });
+
+/* =====================================================================
+   BOSS DE DOMINGO -- raide GLOBAL contra um Mew nivel 999
+   ---------------------------------------------------------------------
+   Um Mew so pro jogo inteiro. Todo mundo ve a MESMA barra de vida, e ela nunca regenera: o que
+   um jogador tirou fica tirado pro proximo. E uma luta coletiva -- ninguem derruba sozinho.
+
+   EM AVALIACAO: so contas com userTest=true entram. Esconder o botao no cliente nao basta -- as
+   Cloud Functions sao chamaveis direto, e quem chamasse na mao mexeria no estado GLOBAL, que
+   todo mundo ve. A porta tem que ser fechada aqui. (Mesma licao da Torre, ver towerRequireTester.)
+
+   O SERVIDOR NUNCA ACEITA UM TIME DO CLIENTE. O cliente manda so o SLOT; o time sai do save
+   gravado no Firestore. Aceitar um time montado na hora seria aceitar um time de nivel 99
+   inventado no console -- e aqui o estrago e global, nao fica no save de quem trapaceou.
+
+   O DIMENSIONAMENTO NAO VEM DO HP. Contra-intuitivo e importante: o motor calcula dano como
+   FRACAO da vida do alvo (`pct = dmgGen1 / gen1MaxHp(alvo)`) e so no fim projeta na escala de HP
+   (`pct * maxHp`). Ou seja, dobrar BOSS_MAX_HP dobra tambem o dano por golpe -- o numero de
+   GOLPES ate derrubar nao muda em nada. Quem controla a duracao da raide e o NIVEL e a defesa do
+   Mew (entram no divisor); o HP so decide a escala dos numeros que aparecem na tela.
+   ===================================================================== */
+const BOSS_ID = 'mew';
+const BOSS_LEVEL = 999;
+const BOSS_MAX_HP = 10000;
+/* Mew: 100 em tudo, oficial da Gen 2. Ele NAO entra em SPECIES de proposito -- `Object.keys(SPECIES)`
+   e o que define o total da Pokedex e o "capturou tudo" que libera o desafio do Mewtwo, e um Mew
+   que ninguem captura nao pode contar pra isso (mesma razao do DISGUISE_DISPLAY no cliente).
+   Como a instancia abaixo carrega TODOS os atributos, nenhuma effective* precisa consultar SPECIES. */
+function bossInstance(hpAtual){
+  return { id:'boss-mew', speciesId:BOSS_ID, name:'Mew', types:['Psychic'],
+           baseHp:100, attack:100, defense:100, spAtk:100, spDef:100, speed:100,
+           level:BOSS_LEVEL, maxHp:BOSS_MAX_HP, hp:hpAtual, shiny:false };
+}
+function bossDocRef(){ return db.collection('globalBoss').doc(BOSS_ID); }
+function bossPlayerRef(uid){ return bossDocRef().collection('players').doc(uid); }
+function bossEstadoInicial(){
+  return { hp: BOSS_MAX_HP, maxHp: BOSS_MAX_HP, level: BOSS_LEVEL, golpes: 0, batalhas: 0,
+           danoTotal: 0, derrotadoEm: null, criadoEm: Date.now() };
+}
+async function bossRequireTester(uid){
+  const snap = await db.collection('users').doc(uid).get();
+  if(!snap.exists || snap.data().userTest !== true){
+    throw new HttpsError('permission-denied', 'O Boss de Domingo está em avaliação.');
+  }
+}
+async function bossGetEstado(){
+  const snap = await bossDocRef().get();
+  if(snap.exists) return snap.data();
+  const inicial = bossEstadoInicial();
+  await bossDocRef().set(inicial);
+  return inicial;
+}
+
+/* Time contra UM alvo que nao recupera vida entre confrontos.
+   Nao da pra usar o simulateGymBattle: a primeira coisa que ele faz e devolver vida cheia aos dois
+   lados, e o Mew tem que entrar com a vida que sobrou da ultima batalha de OUTRO jogador. O resto
+   do laco e o mesmo -- inclusive o doExchange, que e quem escreve o diario do log. */
+function simulateBossFight(team, boss){
+  team.forEach(p => { p.maxHp = calcMaxHp(p); p.hp = p.maxHp; });
+  const matchups = [];
+  let playerStreak = 0, enemyStreak = 0;
+  const hpInicialDoBoss = boss.hp;
+  while(boss.hp > 0){
+    const vivos = team.filter(p => p.hp > 0);
+    if(!vivos.length) break;                     // time acabou: o Mew fica com a vida que sobrou
+    const active = vivos[0];
+    active.winsThisBattle = playerStreak;
+    boss.winsThisBattle = enemyStreak;
+    const playerHpBefore = active.hp, enemyHpBefore = boss.hp;
+    const playerAliveBefore = vivos.length;
+    const diario = [];
+    while(active.hp > 0 && boss.hp > 0){ doExchange(active, boss, Math.random, diario); }
+    const bossCaiu = boss.hp <= 0, activeCaiu = active.hp <= 0;
+    matchups.push({
+      player:active.name, playerSpecies:active.speciesId, playerLevel:active.level,
+      playerShiny: !!active.shiny, playerBuffed:false,
+      enemy:boss.name, enemySpecies:boss.speciesId, enemyLevel:boss.level,
+      enemyShiny:false, enemyBuffed:false,
+      playerTrainerStreak: playerStreak, enemyTrainerStreak: enemyStreak,
+      winner: (bossCaiu && activeCaiu) ? null : (bossCaiu ? active.name : boss.name),
+      isTrade: bossCaiu && activeCaiu, suddenDeath:false, suddenDeathMessage:null,
+      playerWon: bossCaiu && !activeCaiu,
+      playerMove: active.lastMoveType || null, enemyMove: boss.lastMoveType || null,
+      golpes: diario,
+      playerHpBefore, playerHpAfter: active.hp, playerMaxHp: active.maxHp,
+      enemyHpBefore, enemyHpAfter: Math.max(0, boss.hp), enemyMaxHp: boss.maxHp,
+      playerAliveBefore, playerAliveAfter: activeCaiu ? playerAliveBefore-1 : playerAliveBefore,
+      playerTeamSize: team.length,
+      enemyAliveBefore:1, enemyAliveAfter: bossCaiu ? 0 : 1, enemyTeamSize:1
+    });
+    if(bossCaiu && activeCaiu){ playerStreak = 0; enemyStreak = 0; }
+    else if(bossCaiu){ playerStreak++; enemyStreak = 0; }
+    else { enemyStreak++; playerStreak = 0; }
+  }
+  return { matchups, dano: Math.max(0, hpInicialDoBoss - Math.max(0, boss.hp)),
+           derrubou: boss.hp <= 0, hpDepois: Math.max(0, boss.hp) };
+}
+
+/* Estado da raide + o que ESTE jogador já tirou. Também devolve os times elegíveis (todos os
+   saves da conta), pra tela não precisar de uma segunda ida ao servidor. */
+exports.getSundayBoss = onCall(async (request) => {
+  if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
+  const uid = request.auth.uid;
+  await bossRequireTester(uid);
+  const estado = await bossGetEstado();
+  const meuSnap = await bossPlayerRef(uid).get();
+  const meu = meuSnap.exists ? meuSnap.data() : { dano:0, batalhas:0 };
+  const savesSnap = await db.collection('users').doc(uid).collection('saves').get();
+  const times = [];
+  savesSnap.forEach(doc => {
+    const s = doc.data() || {};
+    const team = (s.team || []).filter(p => p && p.speciesId);
+    if(!team.length) return;
+    times.push({ slot: doc.id, nome: s.saveName || ('Time ' + (Number(doc.id)+1)),
+                 badges: (typeof s.badgeCount === 'number') ? s.badgeCount : ((s.badgesEarned||[]).length),
+                 team: team.map(p => ({ speciesId:p.speciesId, level:p.level, shiny: !!p.shiny })) });
+  });
+  times.sort((a,b) => Number(a.slot) - Number(b.slot));
+  return { boss: { hp:estado.hp, maxHp:estado.maxHp, level:estado.level, golpes:estado.golpes||0,
+                   batalhas:estado.batalhas||0, derrotadoEm:estado.derrotadoEm || null },
+           meu: { dano: meu.dano||0, batalhas: meu.batalhas||0 },
+           times, serverNow: Date.now() };
+});
+
+/* Uma investida. O cliente manda só o SLOT -- o time sai do save gravado, nunca do que ele diz
+   ter. O desconto no Mew vai numa TRANSAÇÃO: a raide é global e várias investidas chegam ao mesmo
+   tempo; sem transação duas leituras do mesmo HP gravariam o dano por cima uma da outra e parte
+   do estrago sumiria. */
+exports.fightSundayBoss = onCall(async (request) => {
+  if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
+  const uid = request.auth.uid;
+  await bossRequireTester(uid);
+  const slot = String(request.data?.slot ?? '');
+  if(!slot){ throw new HttpsError('invalid-argument', 'Escolha um time.'); }
+
+  const saveSnap = await db.collection('users').doc(uid).collection('saves').doc(slot).get();
+  if(!saveSnap.exists){ throw new HttpsError('failed-precondition', 'Esse time não existe na sua conta.'); }
+  const guardado = (saveSnap.data().team || []).filter(p => p && p.speciesId);
+  if(!guardado.length){ throw new HttpsError('failed-precondition', 'Esse time está vazio.'); }
+
+  const estado = await bossGetEstado();
+  if(estado.hp <= 0){ throw new HttpsError('failed-precondition', 'O Mew já foi derrotado.'); }
+
+  /* Monta as instâncias a partir do que está GRAVADO. hydrateTeam não existe aqui; os campos que
+     faltarem caem no SPECIES pelas effective*, que é a mesma migração de save de sempre. */
+  const time = guardado.map((p, i) => ({
+    id: 'boss-p' + i, speciesId: p.speciesId, name: (SPECIES[p.speciesId] || {}).name || p.speciesId,
+    types: (SPECIES[p.speciesId] || {}).types || ['Normal'],
+    level: Math.max(1, Math.min(MAX_POKEMON_LEVEL, p.level || 1)), shiny: !!p.shiny,
+    maxHp: 0, hp: 0
+  }));
+
+  const antes = estado.hp;
+  const boss = bossInstance(antes);
+  const luta = simulateBossFight(time, boss);
+
+  /* O dano foi calculado sobre o HP que a leitura viu. Se outro jogador bateu no meio do caminho,
+     o que vale é o dano -- ele é descontado do HP atual, não do que foi lido. */
+  const resultado = await db.runTransaction(async (tx) => {
+    const ref = bossDocRef();
+    const snap = await tx.get(ref);
+    const atual = snap.exists ? snap.data() : bossEstadoInicial();
+    const hpDepois = Math.max(0, (atual.hp || 0) - luta.dano);
+    const derrubou = hpDepois === 0 && (atual.hp || 0) > 0;
+    tx.set(ref, { hp: hpDepois, maxHp: atual.maxHp || BOSS_MAX_HP, level: atual.level || BOSS_LEVEL,
+                  golpes: (atual.golpes || 0) + luta.matchups.reduce((s,m)=>s+(m.golpes||[]).length, 0),
+                  batalhas: (atual.batalhas || 0) + 1,
+                  danoTotal: (atual.danoTotal || 0) + luta.dano,
+                  derrotadoEm: hpDepois === 0 ? (atual.derrotadoEm || Date.now()) : null,
+                  criadoEm: atual.criadoEm || Date.now() }, { merge:true });
+    const meuRef = bossPlayerRef(uid);
+    const meuSnap = await tx.get(meuRef);
+    const meu = meuSnap.exists ? meuSnap.data() : { dano:0, batalhas:0 };
+    tx.set(meuRef, { dano: (meu.dano||0) + luta.dano, batalhas: (meu.batalhas||0) + 1,
+                     ultimaEm: Date.now() }, { merge:true });
+    return { hpDepois, derrubou, meuDano: (meu.dano||0) + luta.dano, meusAtaques: (meu.batalhas||0) + 1 };
+  });
+
+  return { matchups: luta.matchups, win: luta.derrubou,
+           dano: luta.dano, hpAntes: antes, hpDepois: resultado.hpDepois,
+           maxHp: BOSS_MAX_HP, derrubou: resultado.derrubou,
+           meu: { dano: resultado.meuDano, batalhas: resultado.meusAtaques } };
+});

@@ -10,6 +10,7 @@
  */
 const INCREMENT = Symbol('increment');
 const store = new Map();   // 'caminho/do/doc' -> objeto
+let filaDeTransacoes = Promise.resolve();   // ver runTransaction
 
 function pathOf(parts){ return parts.join('/'); }
 function clone(o){ return o === undefined ? undefined : JSON.parse(JSON.stringify(o)); }
@@ -90,14 +91,24 @@ function makeDb(){
         async commit(){ for(const op of ops) await op(); }
       };
     },
-    /* Transação sem isolamento nenhum: as funções de amizade não dependem de retry, e o único
-       caminho que realmente precisa dele (a criação de batalha) não é exercitado aqui. */
+    /* Transações SERIALIZADAS -- uma de cada vez, na fila.
+       Antes rodavam soltas, e o comentário aqui dizia que nenhum caminho testado precisava de
+       isolamento. O Boss de Domingo precisa: a raide é global e duas investidas simultâneas leem
+       o mesmo HP; sem serializar, a segunda grava por cima da primeira e metade do dano some.
+       Não é o algoritmo do Firestore (não há retry por conflito), mas reproduz o que importa:
+       quem entra depois enxerga o que o anterior gravou. */
     async runTransaction(fn){
-      return await fn({
-        get: (ref)=>ref.get(),
-        set: (ref, v, o)=>{ ref.set(v, o); },
-        delete: (ref)=>{ ref.delete(); }
-      });
+      const minhaVez = filaDeTransacoes;
+      let liberar;
+      filaDeTransacoes = new Promise(r => { liberar = r; });
+      await minhaVez;
+      try{
+        return await fn({
+          get: (ref)=>ref.get(),
+          set: (ref, v, o)=>{ ref.set(v, o); },
+          delete: (ref)=>{ ref.delete(); }
+        });
+      } finally { liberar(); }
     }
   };
 }

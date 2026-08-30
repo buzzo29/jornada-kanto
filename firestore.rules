@@ -16,6 +16,20 @@ service cloud.firestore {
       allow read, write: if request.auth != null;
     }
 
+    // BOSS DE DOMINGO -- raide global. Leitura livre pra qualquer logado (todo mundo vê a mesma
+    // barra de vida); escrita NEGADA a todo mundo, inclusive ao dono da conta. Quem escreve é a
+    // Cloud Function pelo Admin SDK, que ignora estas regras. É o oposto das coleções acima:
+    // ali um jogador só pode estragar o que é dele, aqui uma escrita solta estragaria a raide
+    // do jogo inteiro -- inclusive "matando" o Mew com um hp:0 escrito na mão.
+    match /globalBoss/{bossId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+      match /players/{playerId} {
+        allow read: if request.auth != null && request.auth.uid == playerId;
+        allow write: if false;
+      }
+    }
+
     // configuração das Ligas customizadas (criadas pelo painel admin) -- qualquer conta logada pode
     // ler (o jogo precisa listar as ligas disponíveis pra todo mundo) e também criar/editar
     match /leagueTypes/{typeId} {
