@@ -170,6 +170,17 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
 - 50% dos pokémon dos líderes vêm shiny. **Efeito mecânico pequeno** — é sinalização visual.
 - Chance de shiny selvagem 4× (1/32). Vale também para os iniciais.
 
+## Ginásio da Cidade
+
+- O **selo de terreno** nas fileiras de time (`timeComTerrenoHtml`) usa a MESMA regra do
+  `applyTerrainBuff` — se as duas divergirem, a tela promete um bônus que a batalha não dá.
+  Aparece na tela do ginásio, na escolha de time do desafio e nas duas telas de ordem.
+- **Reordenar a defesa é uma função à parte** (`reorderNeighborhoodGymDefense`), e não um modo do
+  `setNeighborhoodGymDefense`: aquele resolve reivindicação de ginásio vago, exclusividade do time
+  entre ginásios e troca de terreno, e nada disso vale numa permutação.
+- Ela permuta o **código guardado**, não o time do save: o save pode ter mudado de ordem ou de
+  nível desde que a defesa foi montada, e o líder está reordenando o que ele vê defendendo.
+
 ## Torre dos Treinadores
 
 - 10 andares, médias **58, 61, 64, 67, 70, 73, 76, 79, 82, 85** (linear, +3 por andar).

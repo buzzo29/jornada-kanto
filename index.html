@@ -1493,6 +1493,16 @@
   /* maior só na prévia do time do líder do Ginásio da Cidade -- as OUTRAS listas de time (seletores
      de time, Trainers League etc.) continuam do tamanho normal, sem essa classe */
   .save-slot-mon-sprite.large{ width:100%; }
+  /* selo de terreno: marca o pokémon que ganha o buff no terreno daquele ginásio. Fica na quina do
+     sprite porque a fileira de time é o lugar onde a pessoa compara os seis de relance -- um selo
+     embaixo do nível empurraria a linha e mudaria a altura de todas as telas que usam a fileira. */
+  .save-slot-mon-sprite{position:relative;}
+  .mon-terreno-selo{
+    position:absolute; top:-2px; right:-2px; font-size:.72rem; line-height:1;
+    background:var(--box); border:2px solid var(--green-dark); border-radius:50%;
+    padding:1px 2px; box-shadow:0 1px 2px rgba(0,0,0,.3);
+  }
+  .terreno-legenda{font-size:.62rem;color:var(--muted);font-weight:700;margin:6px 0 0;}
   .save-slot-mon-sprite.large .sprite-wrap{ display:block; width:100%; }
   .save-slot-mon-sprite.large .sprite-img{ display:block; margin:0 auto; width:100%; height:auto; max-width:68px; aspect-ratio:1/1; }
   .save-slot-mon-sprite.large .sprite-fallback{font-size:2.6rem;}
@@ -3767,6 +3777,49 @@ async function startNeighborhoodGymChallenge(){
 }
 // escolheu o time -- copia pra um array próprio (não mexe no game.team, que é o save carregado
 // agora mesmo) e vai pra tela de ordem, onde também mostra o time do líder de novo como referência
+/* ORDEM DO TIME DE DEFESA -- só pro líder.
+   `_idx` guarda a posição ORIGINAL de cada pokémon: é ela que vai pro servidor, que permuta o
+   código guardado. Mesmo padrão da ordem da Torre. */
+function openNeighborhoodGymDefenseOrder(){
+  const detail = game.neighborhoodGymDetail;
+  if(!detail || !(detail.leaderTeamPreview||[]).length) return;
+  game.neighborhoodGymDefenseOrder = detail.leaderTeamPreview.map((p,i)=>({ ...p, _idx:i }));
+  game.neighborhoodGymOrderError = null;
+  game.screen = 'neighborhoodGymDefenseOrder';
+  render();
+}
+function moveNeighborhoodGymDefenseOrder(pos, dir){
+  const lista = game.neighborhoodGymDefenseOrder;
+  if(!lista) return;
+  const alvo = pos + dir;
+  if(alvo < 0 || alvo >= lista.length) return;
+  const tmp = lista[pos]; lista[pos] = lista[alvo]; lista[alvo] = tmp;
+  render();
+}
+async function confirmNeighborhoodGymDefenseOrder(){
+  const lista = game.neighborhoodGymDefenseOrder;
+  const loc = game.neighborhoodGymLocation;
+  if(!lista || !loc) return;
+  game.neighborhoodGymOrderSaving = true;
+  game.neighborhoodGymOrderError = null;
+  render();
+  try{
+    const r = await functionsClient.httpsCallable('reorderNeighborhoodGymDefense')({
+      city: loc.city, countryCode: loc.countryCode, order: lista.map(p=>p._idx)
+    });
+    // atualiza a prévia local com a ordem que o servidor confirmou, sem recarregar a tela inteira
+    if(game.neighborhoodGymDetail && r.data && r.data.team){
+      game.neighborhoodGymDetail.leaderTeamPreview = r.data.team;
+    }
+    game.neighborhoodGymOrderSaving = false;
+    game.screen = 'neighborhoodGym';
+  } catch(e){
+    console.error('Erro ao reordenar a defesa:', e);
+    game.neighborhoodGymOrderSaving = false;
+    game.neighborhoodGymOrderError = (e && e.message) || 'Não foi possível salvar a ordem agora.';
+  }
+  render();
+}
 function pickNeighborhoodGymChallengeTeam(slot){
   const s = game.saveSlots[slot];
   if(!s || !s.team) return;
@@ -11490,6 +11543,33 @@ function renderNeighborhoodGymChallengeHistory(){
   out += `<button class="btn secondary" onclick="game.screen='neighborhoodGym';render();">⬅ Voltar</button>`;
   return out;
 }
+/* Um pokémon ganha o buff quando algum tipo dele é do terreno -- MESMA regra do applyTerrainBuff,
+   que é quem manda na batalha. Se as duas divergirem, a tela promete um bônus que a luta não dá. */
+function ganhaBuffDeTerreno(speciesId, terrain){
+  if(!terrain) return false;
+  const sp = SPECIES[speciesId];
+  return !!sp && (sp.types||[]).some(t => (terrain.types||[]).includes(t));
+}
+/* Fileira de time com o selo do terreno em quem se beneficia. Usada na tela do ginásio, na
+   escolha de time do desafio e na ordem de batalha -- as três mostram o mesmo terreno. */
+function timeComTerrenoHtml(lista, terrain){
+  return `<div class="save-slot-team-row spread">${(lista||[]).map(p=>{
+    const sp = SPECIES[p.speciesId];
+    const buff = ganhaBuffDeTerreno(p.speciesId, terrain);
+    return `<div class="save-slot-mon">
+      <div class="save-slot-mon-sprite large">${sp?spriteHtml(p.speciesId,'sprite-md',p.shiny):'❔'}${
+        buff ? `<span class="mon-terreno-selo" title="Ganha bônus no terreno ${escapeHtmlSafe(terrain.name)}">${terrain.icon}</span>` : ''}</div>
+      <div class="save-slot-mon-level">${p.shiny?'🌟 ':''}Lv.${p.level}</div>
+    </div>`;
+  }).join('')}</div>`;
+}
+function legendaTerrenoHtml(lista, terrain){
+  if(!terrain) return '';
+  const n = (lista||[]).filter(p=>ganhaBuffDeTerreno(p.speciesId, terrain)).length;
+  return `<p class="terreno-legenda">${terrain.icon} ${n===0
+    ? `Nenhum pokémon desse time ganha bônus no terreno ${escapeHtmlSafe(terrain.name)}.`
+    : `<strong>${n}</strong> ${n===1?'pokémon ganha':'pokémon ganham'} bônus de terreno (${escapeHtmlSafe(terrain.name)}).`}</p>`;
+}
 function renderNeighborhoodGym(){
   const state = game.neighborhoodGymScreenState;
   const header = `<div class="result-banner win">🏙️ GINÁSIO DA CIDADE</div>`;
@@ -11554,15 +11634,8 @@ function renderNeighborhoodGym(){
         </div>
       </div>
       <div class="save-slot-card" style="margin-top:0;">
-        <div class="save-slot-team-row spread">
-          ${detail.leaderTeamPreview.map(p=>{
-            const sp = SPECIES[p.speciesId];
-            return `<div class="save-slot-mon">
-              <div class="save-slot-mon-sprite large">${sp?spriteHtml(p.speciesId,'sprite-md',p.shiny):'❔'}</div>
-              <div class="save-slot-mon-level">Lv.${p.level}</div>
-            </div>`;
-          }).join('')}
-        </div>
+        ${timeComTerrenoHtml(detail.leaderTeamPreview, detail.leaderTerrain)}
+        ${legendaTerrenoHtml(detail.leaderTeamPreview, detail.leaderTerrain)}
       </div>
       ${/* o selo é botão, como em todas as outras telas: abre o modal com os tipos que o terreno
            favorece. Aqui tinha ficado <span>, então era o único selo do jogo que não respondia ao toque */''}
@@ -11571,6 +11644,9 @@ function renderNeighborhoodGym(){
       if(iAmLeader){
         actionSquares.push(`<button class="gym-action-square gym-btn-team" onclick="openNeighborhoodGymTeamPicker()">
             <span class="gym-action-icon">🔄</span><span>Alterar time</span>
+          </button>`);
+        actionSquares.push(`<button class="gym-action-square gym-btn-team" onclick="openNeighborhoodGymDefenseOrder()">
+            <span class="gym-action-icon">📋</span><span>Ordem do time</span>
           </button>`);
         actionSquares.push(`<button class="gym-action-square gym-btn-terrain" onclick="openNeighborhoodGymTerrainPicker()">
             <span class="gym-action-icon">🗺️</span><span>${detail.leaderTerrain?'Alterar':'Escolher'} terreno</span>
@@ -11610,14 +11686,48 @@ function renderNeighborhoodGym(){
   return out;
 }
 // timer visível em qualquer tela do fluxo de desafio -- mesmo componente nos dois passos
+function renderNeighborhoodGymDefenseOrder(){
+  const lista = game.neighborhoodGymDefenseOrder || [];
+  const terreno = game.neighborhoodGymDetail && game.neighborhoodGymDetail.leaderTerrain;
+  return `
+  <div class="result-banner win">📋 Ordem do time de defesa</div>
+  <div class="box">
+    <p class="hint-text">O primeiro da lista enfrenta o desafiante primeiro; quando ele cair, entra o próximo.</p>
+    ${terreno ? `<p class="hint-text">🗺️ Terreno: <button class="terrain-inline-badge" style="background:${terrainColor(terreno)}" onclick="event.stopPropagation();openTerrainInfoModal('${terreno.id}')">${terreno.name}</button> — quem tem o selo ${terreno.icon} luta com bônus.</p>` : ''}
+  </div>
+  ${game.neighborhoodGymOrderError ? `<div class="box"><p class="error-text">${escapeHtmlSafe(game.neighborhoodGymOrderError)}</p></div>` : ''}
+  <div class="box">
+    ${lista.map((p,idx)=>{
+      const sp = SPECIES[p.speciesId];
+      const buff = ganhaBuffDeTerreno(p.speciesId, terreno);
+      return `<div class="order-row">
+        <div class="order-num">${idx+1}º</div>
+        <div class="order-info">
+          <span class="mon-name">${spriteHtml(p.speciesId,'sprite-sm',p.shiny)} ${escapeHtmlSafe(sp?sp.name:'?')}${p.shiny?' 🌟':''} — Lv.${p.level}${buff?` ${terreno.icon}`:''}</span>
+          <span class="mon-sub">${sp?typesHtml(sp.types):''}</span>
+        </div>
+        <div class="order-controls">
+          <button class="circle-btn" onclick="moveNeighborhoodGymDefenseOrder(${idx}, -1)" ${idx===0?'disabled':''}>▲</button>
+          <button class="circle-btn" onclick="moveNeighborhoodGymDefenseOrder(${idx}, 1)" ${idx===lista.length-1?'disabled':''}>▼</button>
+        </div>
+      </div>`;
+    }).join('')}
+  </div>
+  <button class="btn success" ${game.neighborhoodGymOrderSaving?'disabled':''} onclick="confirmNeighborhoodGymDefenseOrder()">${game.neighborhoodGymOrderSaving?'Salvando...':'✔ Salvar ordem'}</button>
+  <button class="btn secondary" onclick="game.screen='neighborhoodGym';render();">⬅ Voltar</button>`;
+}
 function renderNeighborhoodGymChallengeTeamPicker(){
   const eligibleSlots = Array.from({length:MAX_SAVE_SLOTS}, (_, i) => i)
     .filter(i => game.saveSlots[i] && (game.saveSlots[i].badgeCount||0) >= 8);
   const cooldowns = game.neighborhoodGymCooldowns;
+  // o terreno é do LÍDER e vale pros dois lados -- por isso a escolha do time já mostra quem seu
+  // lá vai lutar em casa
+  const terreno = game.neighborhoodGymDetail && game.neighborhoodGymDetail.leaderTerrain;
   return `
   <div class="result-banner win">⚔️ Desafiar Ginásio — escolha o time</div>
   <div class="box">
-    <p class="hint-text">Cada time só pode desafiar esse ginásio a cada 10 minutos.</p>
+    <p class="hint-text">Toque no time que vai desafiar. Cada time só pode desafiar esse ginásio a cada 10 minutos.</p>
+    ${terreno ? `<p class="hint-text">🗺️ O ginásio luta em <button class="terrain-inline-badge" style="background:${terrainColor(terreno)}" onclick="event.stopPropagation();openTerrainInfoModal('${terreno.id}')">${terreno.name}</button> — quem tem o selo ${terreno.icon} ganha bônus lá.</p>` : ''}
     ${cooldowns===null
       ? `<p class="hint-text">Verificando disponibilidade dos times...</p>`
       : eligibleSlots.length===0
@@ -11628,20 +11738,17 @@ function renderNeighborhoodGymChallengeTeamPicker(){
           const displayName = s.customName || `Time ${i+1}`;
           const cooldownMs = cooldowns[i];
           const onCooldown = cooldownMs > 0;
-          return `<div class="save-slot-card">
-            <div class="save-slot-top"><span class="save-slot-name">${s.favorite?'⭐ ':''}${escapeHtmlSafe(displayName)}</span></div>
-            <div class="save-slot-team-row spread">
-              ${team.map(p=>{
-                const sp = SPECIES[p.speciesId];
-                return `<div class="save-slot-mon">
-                  <div class="save-slot-mon-sprite large">${sp?spriteHtml(p.speciesId,'sprite-md',p.shiny):'❔'}</div>
-                  <div class="save-slot-mon-level">Lv.${p.level}</div>
-                </div>`;
-              }).join('')}
+          /* O CARD INTEIRO é o botão, como na home. Um botão vermelho dentro de cada card criava
+             dois alvos pra a mesma ação e empurrava a lista pra baixo. Em espera continua sem
+             clique, com o tempo restante no lugar. */
+          return `<div class="save-slot-card ${onCooldown?'':'clickable'}"
+                       ${onCooldown?'':`onclick="pickNeighborhoodGymChallengeTeam(${i})"`}>
+            <div class="save-slot-top">
+              <span class="save-slot-name">${s.favorite?'⭐ ':''}${escapeHtmlSafe(displayName)}</span>
+              ${onCooldown ? `<span class="save-slot-actions"><span class="save-slot-mewtwo">⏳ ${Math.ceil(cooldownMs/60000)}min</span></span>` : ''}
             </div>
-            ${onCooldown
-              ? `<button class="btn secondary" disabled>⏳ Disponível em ${Math.ceil(cooldownMs/60000)}min</button>`
-              : `<button class="btn danger" onclick="pickNeighborhoodGymChallengeTeam(${i})">⚔️ Usar esse time</button>`}
+            ${timeComTerrenoHtml(team, terreno)}
+            ${legendaTerrenoHtml(team, terreno)}
           </div>`;
         }).join('')}
   </div>
@@ -11655,15 +11762,7 @@ function renderNeighborhoodGymChallengeOrderPicker(){
   <div class="box">
     <h2>👑 Time do líder</h2>
     <p class="hint-text">É contra isso que você vai lutar -- organize sua ordem pensando nele.</p>
-    <div class="save-slot-team-row spread">
-      ${(detail && detail.leaderTeamPreview ? detail.leaderTeamPreview : []).map(p=>{
-        const sp = SPECIES[p.speciesId];
-        return `<div class="save-slot-mon">
-          <div class="save-slot-mon-sprite large">${sp?spriteHtml(p.speciesId,'sprite-md',p.shiny):'❔'}</div>
-          <div class="save-slot-mon-level">Lv.${p.level}</div>
-        </div>`;
-      }).join('')}
-    </div>
+    ${timeComTerrenoHtml((detail && detail.leaderTeamPreview) || [], detail && detail.leaderTerrain)}
     ${detail && detail.leaderTerrain ? `<p class="hint-text">🗺️ Terreno: <button class="terrain-inline-badge" style="background:${terrainColor(detail.leaderTerrain)}" onclick="event.stopPropagation();openTerrainInfoModal('${detail.leaderTerrain.id}')">${detail.leaderTerrain.name}</button></p>` : ''}
   </div>
   <div class="box">
@@ -15426,6 +15525,7 @@ function render(){
     case 'notifications': html = renderNotificationsScreen(); break;
     case 'neighborhoodGymChallengeHistory': html = renderNeighborhoodGymChallengeHistory(); break;
     case 'neighborhoodGymChallengeTeamPicker': html = renderNeighborhoodGymChallengeTeamPicker(); break;
+    case 'neighborhoodGymDefenseOrder': html = renderNeighborhoodGymDefenseOrder(); break;
     case 'neighborhoodGymChallengeOrderPicker': html = renderNeighborhoodGymChallengeOrderPicker(); break;
     case 'neighborhoodGymTeamPicker': html = renderNeighborhoodGymTeamPicker(); break;
     case 'neighborhoodGymTerrainPicker': html = renderNeighborhoodGymTerrainPicker(); break;

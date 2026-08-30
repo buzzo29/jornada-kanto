@@ -2254,6 +2254,42 @@ exports.setNeighborhoodGymDefense = onCall(async (request) => {
 // nem reporta um resultado; só manda QUEM está desafiando e QUAL bairro). O terreno usado é sempre o
 // que o LÍDER escolheu como defesa -- vantagem de mandante, igual às ligas
 const NEIGHBORHOOD_GYM_CHALLENGE_COOLDOWN_MS = 10 * 60 * 1000; // 10min -- por time (uid+slot), por ginásio
+/* Reordenar o time de defesa. Fica FORA do setNeighborhoodGymDefense de propósito: aquele resolve
+   reivindicação de ginásio vago, exclusividade do time entre ginásios e troca de terreno, e nada
+   disso vale aqui -- reordenar é só permutar o código que já está guardado.
+   Permuta o CÓDIGO, e não o time do save: o save pode ter mudado de ordem (ou de nível) desde que
+   a defesa foi montada, e o líder está reordenando o que ele vê defendendo. */
+exports.reorderNeighborhoodGymDefense = onCall(async (request) => {
+  if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
+  const uid = request.auth.uid;
+  const { city, countryCode } = request.data || {};
+  const ordem = Array.isArray(request.data?.order) ? request.data.order : null;
+  if(!city || !ordem){ throw new HttpsError('invalid-argument', 'Ordem não informada.'); }
+  const gymRef = neighborhoodGymRef(city, countryCode);
+  return await db.runTransaction(async (tx) => {
+    const snap = await tx.get(gymRef);
+    const d = snap.exists ? snap.data() : null;
+    if(!d || !d.leaderUid){ throw new HttpsError('failed-precondition', 'Esse ginásio não tem líder.'); }
+    if(d.leaderUid !== uid){ throw new HttpsError('permission-denied', 'Você não é o líder desse ginásio.'); }
+    const time = decodeTeamCode(d.leaderTeamCode) || [];
+    if(!time.length){ throw new HttpsError('failed-precondition', 'Esse ginásio ainda não tem time de defesa.'); }
+    // permutação dos MESMOS índices -- sem repetir, sem faltar, sem inventar posição
+    if(ordem.length !== time.length){ throw new HttpsError('invalid-argument', 'Ordem inválida.'); }
+    const vistos = new Set();
+    for(const i of ordem){
+      if(!Number.isInteger(i) || i < 0 || i >= time.length || vistos.has(i)){
+        throw new HttpsError('invalid-argument', 'Ordem inválida.');
+      }
+      vistos.add(i);
+    }
+    const novoTime = ordem.map(i => time[i]);
+    const code = sanitizeTeamCode(encodeTeamCode(novoTime));
+    if(!code){ throw new HttpsError('failed-precondition', 'Time inválido.'); }
+    tx.set(gymRef, { leaderTeamCode: code }, { merge: true });
+    return { team: novoTime.map(p => ({ speciesId:p.speciesId, level:p.level, shiny:!!p.shiny })) };
+  });
+});
+
 function neighborhoodGymCooldownRef(gymRef, uid, slot){
   return gymRef.collection('challengeCooldowns').doc(`${uid}_${slot}`);
 }
