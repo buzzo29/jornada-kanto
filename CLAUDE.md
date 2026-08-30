@@ -102,6 +102,32 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
   golpe contra qualquer pokémon de Terra.
 - Teto de nível: **99** (`MAX_POKEMON_LEVEL`).
 
+## Johto (#152-251) — base de dados, ainda desligada
+
+- `SPECIES_JOHTO`, `GEN2_SPECIAL_JOHTO` e `EVOLUTIONS_JOHTO`, **duplicadas nos dois arquivos**
+  como todas as outras. Não entram em `SPECIES`/`EVOLUTIONS` de propósito: `Object.keys(SPECIES)`
+  define o total da Pokédex, o "capturou tudo" que libera o Mewtwo, o pool da Torre
+  (`!EVOLUTIONS[k]`) e a raridade dos encontros (`bstOf`) — despejar 100 espécies lá mudaria as
+  quatro em silêncio, sem uma linha de código nova.
+- Números reconstruídos dos dados do Pokémon Showdown aplicando os mods gen8→gen2 sobre os valores
+  atuais. **Método conferido: bate 150/150 com o `GEN2_SPECIAL` de Kanto que já estava aqui.**
+- O campo `special` é a **média de Sp.Atk e Sp.Def**. Johto nasceu com o Special já dividido, não
+  tem stat único pra herdar; a média mantém o BST na mesma escala de Kanto (média 338 contra 342).
+- Três coisas travam o uso, e nenhuma é pequena:
+  1. **TYPE_CHART é da Gen 1** — 15 tipos, sem Sombrio e Aço. 10 espécies daqui têm um dos dois
+     (Umbreon, Murkrow, Forretress, Steelix, Scizor, Sneasel, Skarmory, Houndour, Houndoom,
+     Tyranitar). Acrescentar os dois mexe no `EXPOENTE_TIPO`, o parâmetro mais sensível do motor.
+  2. **Três evoluções disputam um id que Kanto já usa** e a tabela mapeia um destino só: Gloom
+     (Vileplume ou Bellossom), Poliwhirl (Poliwrath ou Politoed), Slowpoke (Slowbro ou Slowking).
+  3. **Espeon e Umbreon** são do Eevee, que não passa por `EVOLUTIONS` — tem tela própria.
+- Efeito colateral já medido, pra quando a decisão vier: o pool da Torre (evoluções finais)
+  passaria de **81 pra 150** espécies.
+- `node tools/test-johto.js` cobre a tabela (as duas cópias idênticas, 152–251 sem buraco, o
+  `special` batendo com o par, origem e destino de toda evolução existindo). Ele já pegou dois
+  erros: bebês de gerações posteriores entrando como origem (Azurill, Wynaut, Bonsly, Mantyke) e
+  formas regionais entrando como destino — Typhlosion-Hisui é **#157** e sobrescrevia o
+  Typhlosion de verdade na chave repetida.
+
 ## Log de batalha
 
 - O matchup carrega **`golpes`**: o diário do confronto, um registro por golpe na ordem real,
