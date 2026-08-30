@@ -119,6 +119,10 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
   jogador procurava bug no multiplicador. Medido na mudança: **11,2% das batalhas trocam de
   vencedor** (a maior mexida desta série), taxa de vitória geral parada (51,3% → 51,0%), e os
   confrontos decididos no **desempate sobem de 6,5% pra 14,6%** — mais gente cai junto.
+  Quem sobra no desempate volta com **5%-15%** da vida (já foi 1%-3% e 1%-10%). Subir a faixa
+  mexe pouco: 0,5% das batalhas mudam de vencedor, e o sobrevivente passa a vencer o confronto
+  seguinte em 0,6% das vezes, contra 0,2% — continua sendo um empate que ele ganhou no critério,
+  não uma vitória.
   Armadilha: a marca de moribundo tem que sair da SITUAÇÃO (o segundo caiu e revidou), não de o
   dano ter sido reduzido. Enquanto era deduzida do dano, subir o fator pra 1.0 apagava a marca —
   e sem ela o log volta a mostrar pokémon atacando depois de cair.
