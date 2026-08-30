@@ -5643,7 +5643,12 @@ function buildAnimatedHitSequence(m){
      confrontos: batia com a realidade em 31% deles -- o jogador via 3 golpes e lia 7 linhas.
      Confronto gravado ANTES do diário (ligas e reprises antigas) continua caindo na
      reconstrução, que segue logo abaixo. */
-  const reais = passosVisiveis(m.golpes || []);
+  /* A troca simultânea vira dois golpes na animação (as duas barras descem), mas continua sendo
+     uma linha só no log -- lá o que importa é não parecer que alguém atacou depois de cair. */
+  const reais = [];
+  for(const g of passosVisiveis(m.golpes || [])){
+    if(g.troca){ reais.push(g.a, g.b); } else reais.push(g);
+  }
   /* TETO DE 3 GOLPES NA ANIMAÇÃO. A luta real pode ter 7, 8, 26 golpes -- assistir a isso a cada
      confronto cansa, e a batalha inteira arrasta. Quando a sequência real cabe em 3, ela é usada
      como está (é a maioria dos confrontos, e aí animação e log contam a mesma coisa). Passando
@@ -10987,11 +10992,18 @@ function passosVisiveis(golpes){
   const saida = [];
   for(const g of golpes){
     if(!g.m){ saida.push(Object.assign({}, g)); continue; }
-    const anterior = [...saida].reverse().find(x => x.q === g.q);
-    if(anterior){ anterior.d += g.d; continue; }
+    const anterior = [...saida].reverse().find(x => x.q === g.q && !x.troca);
+    /* Só dobra se a linha antiga CONTINUAR fazendo sentido depois de somar. Se o revide for maior
+       do que o alvo ainda tinha de vida naquele momento (g.d >= anterior.hp), a linha passaria a
+       mostrar um dano fatal que não foi fatal -- e o log ficaria dizendo que alguém atacou depois
+       de já ter levado o golpe que o mataria. Foi assim que apareceu "Nidoqueen tirou 380 (o HP
+       inteiro do Gengar)" seguido de "Gengar atacou".
+       Nesse caso os dois golpes viram UMA linha de troca simultânea, que é o que de fato
+       aconteceu: os dois se acertaram na mesma troca. */
+    if(anterior && g.d < anterior.hp){ anterior.d += g.d; continue; }
     const derrubou = saida.pop();
-    saida.push(Object.assign({}, g, { m: 0 }));
-    if(derrubou) saida.push(derrubou);
+    if(derrubou) saida.push({ troca: true, q: derrubou.q, a: derrubou, b: g });
+    else saida.push(Object.assign({}, g, { m: 0 }));
   }
   return saida;
 }
@@ -10999,11 +11011,24 @@ function passosHtml(m){
   const golpes = passosVisiveis(m.golpes || []);
   if(!golpes.length) return '';
   const nomeP = escapeHtmlSafe(m.player||''), nomeE = escapeHtmlSafe(m.enemy||'');
+  const ladoHtml = (doJogador) => `<span class="mlog-quem ${doJogador?'p':'e'}">${doJogador?nomeP:nomeE}</span>`;
+  const seloDe = (doJogador) => golpeSeloHtml(doJogador?m.playerSpecies:m.enemySpecies, doJogador?m.playerMove:m.enemyMove);
   return `<div class="mlog-passos">${golpes.map(g=>{
+    /* TROCA SIMULTÂNEA: os dois se acertaram na mesma troca de golpes e pelo menos um caiu.
+       Vira uma linha só porque foi um instante só -- em duas linhas, a segunda parecia um
+       pokémon atacando depois de morrer. */
+    if(g.troca){
+      const p1 = g.a.q === 'p', p2 = g.b.q === 'p';
+      const dano = (x)=>`<span class="mlog-tira">−${x.d}</span>`;
+      return `<div class="mlog-passo">
+        ${ladoHtml(p1)} e ${ladoHtml(p2)} se acertaram no mesmo instante:
+        ${seloDe(p1)} ${dano(g.a)} e ${seloDe(p2)} ${dano(g.b)} de HP.
+      </div>`;
+    }
     const doJogador = g.q === 'p';
-    const quem  = `<span class="mlog-quem ${doJogador?'p':'e'}">${doJogador?nomeP:nomeE}</span>`;
-    const alvo  = `<span class="mlog-quem ${doJogador?'e':'p'}">${doJogador?nomeE:nomeP}</span>`;
-    const golpe = golpeSeloHtml(doJogador?m.playerSpecies:m.enemySpecies, doJogador?m.playerMove:m.enemyMove);
+    const quem  = ladoHtml(doJogador);
+    const alvo  = ladoHtml(!doJogador);
+    const golpe = seloDe(doJogador);
     /* Imunidade: o multiplicador é 0 e sobra o piso de 1 de dano do motor. Dizer "tirou −1" sem
        mais nada faria o jogador procurar bug onde é regra. */
     /* g.z = o golpe teimoso: nenhum tipo do atacante pega no alvo, e ele bateu assim mesmo com
