@@ -16,6 +16,9 @@ const { createSandbox } = require('./game-sandbox');
 const args = process.argv.slice(2);
 const RUNS = (()=>{ const i=args.indexOf('--runs'); return i>=0 ? Number(args[i+1]) : 20; })();
 const NUZ = !args.includes('--sem-nuzlocke');
+/* --regiao kanto|johto força o caminho nas 8 etapas. Serve pra comparar os dois lados com o mesmo
+   bot: se um deles for mais fácil, a diferença aparece na taxa de conclusão. */
+const REGIAO_FORCADA = (()=>{ const i=args.indexOf('--regiao'); return i>=0 ? args[i+1] : null; })();
 
 const TERMINAL = new Set(['journeyEnd','gameover']);
 const MAX_STEPS = 4000;
@@ -28,6 +31,10 @@ function act(g, log){
     // a jornada passou a abrir no mapa de Kanto: sem este passo o bot parava na 2ª tela e
     // as 20 jornadas do smoke morriam antes do primeiro encontro
     case 'kantoIntro':   g.comecarJornadaDoMapa(); return true;
+    /* A BIFURCAÇÃO: a cada etapa o jogo pergunta Kanto ou Johto. O bot sorteia, de propósito --
+       é o que faz o smoke exercitar os dois lados (líderes, rotas e pools de Johto inclusive)
+       em vez de percorrer sempre o caminho original. */
+    case 'gymChoice':    g.escolherGinasio(REGIAO_FORCADA || (Math.random()<0.5 ? 'kanto' : 'johto')); return true;
     // 'walk' e 'walkNext' já mostram os caminhos (antes passavam por um startLeg e uma tela
     // 'routeChoice' separada, que não existem mais)
     case 'walk':
@@ -61,8 +68,9 @@ function act(g, log){
       else { g.skipCasino(); }
       return true;
     case 'wild': {
-      // o bot joga com um mínimo de cabeça: prefere quem tem vantagem contra o próximo líder
-      const gymTeam = g.GYMS[game.gymIndex].team;
+      // o bot joga com um mínimo de cabeça: prefere quem tem vantagem contra o próximo líder --
+      // que agora depende do caminho escolhido nesta etapa, e por isso vem do gymAtual()
+      const gymTeam = g.gymAtual().team;
       const score = id => {
         const sp = g.SPECIES[id];
         const adv = gymTeam.some(b=>g.bestMultiplier(sp.types, g.SPECIES[b.species].types) > 1) ? 1000 : 0;
@@ -119,7 +127,7 @@ function act(g, log){
     // a roleta de prêmios saiu do jogo: a vitória vai direto pra próxima etapa (ou pro resumo,
     // quando foi a última insígnia)
     case 'victory':
-      if(game.gymIndex < g.GYMS.length - 1) g.continueJourney(); else g.showJourneyEnd();
+      if(game.gymIndex < g.numGinasios() - 1) g.continueJourney(); else g.showJourneyEnd();
       return true;
     case 'defeat':       g.prepareRetry(); return true;
     case 'gameover':

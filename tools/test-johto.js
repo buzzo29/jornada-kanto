@@ -1,10 +1,10 @@
 /**
- * Confere a base de dados de Johto (#152-251).
+ * JOHTO DENTRO DO JOGO (#152-251).
  *
- * Ela ainda não está ligada ao jogo (ver o comentário em SPECIES_JOHTO), então nenhum outro teste
- * passa por aqui. Este existe pra que a tabela não apodreça em silêncio até a hora de usar: se
- * alguém editar um número na mão e esquecer o outro arquivo, ou quebrar a relação entre o
- * `special` e o GEN2_SPECIAL, quem avisa é isto.
+ * Ate 30/08/2026 Johto vivia em tabelas paralelas e este teste garantia que ele NAO encostava em
+ * nada. Agora ele esta em uso, e o que precisa de trava mudou: as tabelas continuam duplicadas
+ * entre cliente e servidor (a armadilha nº1 do projeto), as evolucoes de Kanto nao podem ter sido
+ * sequestradas pelas de Johto, e os dois tipos novos precisam estar completos nos dois arquivos.
  *
  *   node tools/test-johto.js
  */
@@ -12,105 +12,87 @@ const fs = require('fs');
 const path = require('path');
 const RAIZ = path.join(__dirname, '..');
 
-function tabela(arquivo, nome){
+function tabela(arquivo, nome, abre){
   const t = fs.readFileSync(path.join(RAIZ, arquivo), 'utf8');
-  const i = t.indexOf('const ' + nome + ' = {');
+  const i = t.indexOf('const ' + nome + ' = ' + abre);
   if(i < 0) throw new Error(nome + ' não existe em ' + arquivo);
-  const corpo = t.slice(t.indexOf('{', i), t.indexOf('\n};', i) + 2);
-  return { texto: t.slice(i, t.indexOf('\n};', i) + 3), valor: eval('(' + corpo + ')') };
+  const fecha = abre === '{' ? '\n};' : '\n];';
+  const corpo = t.slice(t.indexOf(abre, i), t.indexOf(fecha, i) + 2);
+  return { texto: t.slice(i, t.indexOf(fecha, i) + 3), valor: eval('(' + corpo + ')') };
 }
-
 let falhas = 0;
 function ok(nome, cond, extra){
   console.log((cond ? '  OK   ' : '  FALHA') + '  ' + nome + (extra ? '   ' + extra : ''));
   if(!cond) falhas++;
 }
+const S  = tabela('index.html','SPECIES','{').valor;
+const Ss = tabela('functions/index.js','SPECIES','{').valor;
+const G  = tabela('index.html','GEN2_SPECIAL','{');
+const Gs = tabela('functions/index.js','GEN2_SPECIAL','{');
+const E  = tabela('index.html','EVOLUTIONS','{');
+const Es = tabela('functions/index.js','EVOLUTIONS','{');
+const T  = tabela('index.html','TYPE_CHART','{');
+const Ts = tabela('functions/index.js','TYPE_CHART','{');
+const johto = Object.keys(S).filter(id=>S[id].dex >= 152 && S[id].dex <= 251);
 
-const NOMES = ['SPECIES_JOHTO', 'GEN2_SPECIAL_JOHTO', 'EVOLUTIONS_JOHTO'];
-const cliente = {}, servidor = {};
-NOMES.forEach(n=>{ cliente[n] = tabela('index.html', n); servidor[n] = tabela('functions/index.js', n); });
-
-console.log('\nAS DUAS CÓPIAS');
-NOMES.forEach(n=>ok(n + ' idêntica nos dois arquivos', cliente[n].texto === servidor[n].texto));
-
-const J = cliente.SPECIES_JOHTO.valor;
-const SPECIAL = cliente.GEN2_SPECIAL_JOHTO.valor;
-const EVO = cliente.EVOLUTIONS_JOHTO.valor;
-const KANTO = tabela('index.html', 'SPECIES').valor;
-const ids = Object.keys(J);
-
-console.log('\nCOBERTURA');
-ok('100 espécies', ids.length === 100, ids.length + '');
-const dexes = ids.map(id=>J[id].dex).sort((a,b)=>a-b);
+console.log('\nJOHTO ESTA NA TABELA EM USO');
+ok('100 especies de Johto no SPECIES', johto.length === 100, String(johto.length));
+ok('a Pokedex tem 250 (o #151 Mew fica de fora -- e o chefe da raide)',
+   Object.keys(S).length === 250, String(Object.keys(S).length));
 const faltando = [];
-for(let d=152; d<=251; d++) if(!dexes.includes(d)) faltando.push(d);
-ok('a numeração vai de 152 a 251 sem buraco', faltando.length === 0, faltando.length ? 'faltam ' + faltando.join(',') : '');
-ok('nenhum id colide com Kanto', !ids.some(id=>KANTO[id]), ids.filter(id=>KANTO[id]).join(',') || '');
-ok('a ordem da tabela segue o número da Pokédex',
-   ids.every((id,i)=> i === 0 || J[ids[i-1]].dex < J[id].dex));
+for(let d=152; d<=251; d++) if(!johto.some(id=>S[id].dex===d)) faltando.push(d);
+ok('a numeracao vai de 152 a 251 sem buraco', faltando.length === 0, faltando.join(','));
+ok('Kanto continua inteiro', Object.keys(S).filter(id=>S[id].dex<=150).length === 150);
 
-console.log('\nCAMPOS');
-const CAMPOS = ['dex','name','types','hp','attack','defense','speed','emoji'];
-const molde = Object.keys(KANTO.bulbasaur);
-ok('o formato é o mesmo do SPECIES de Kanto', JSON.stringify(molde) === JSON.stringify(CAMPOS),
-   molde.join(','));
-const incompletos = ids.filter(id=>CAMPOS.some(c=>J[id][c] === undefined));
-ok('nenhum campo faltando', incompletos.length === 0, incompletos.join(',') || '');
-const forasDeFaixa = ids.filter(id=>['hp','attack','defense','speed']
-  .some(c=>!Number.isInteger(J[id][c]) || J[id][c] < 1 || J[id][c] > 255));
-ok('todos os atributos são inteiros de 1 a 255', forasDeFaixa.length === 0, forasDeFaixa.join(',') || '');
-ok('todo mundo tem 1 ou 2 tipos', ids.every(id=>J[id].types.length >= 1 && J[id].types.length <= 2));
-
-console.log('\nSp.Atk / Sp.Def');
-ok('toda espécie tem entrada no GEN2_SPECIAL_JOHTO',
-   ids.every(id=>Array.isArray(SPECIAL[id]) && SPECIAL[id].length === 2),
-   ids.filter(id=>!SPECIAL[id]).join(',') || '');
-ok('não sobra entrada sem espécie', Object.keys(SPECIAL).every(id=>J[id]));
-ok('os pares são inteiros de 1 a 255',
-   ids.every(id=>SPECIAL[id].every(v=>Number.isInteger(v) && v >= 1 && v <= 255)));
-// o `special` único da Gen 1 saiu do jogo: Sp.Atk e Sp.Def são a única fonte de atributo especial
-ok('nenhuma espécie de Johto carrega o `special` da Gen 1', !ids.some(id=>'special' in J[id]));
-ok('nenhuma espécie de Kanto carrega o `special` da Gen 1', !Object.keys(KANTO).some(id=>'special' in KANTO[id]));
-/* Volta pelo TEXTO dos dois arquivos: as três formas que significariam o campo de volta. A
-   variável local `special` (a classe físico/especial do golpe) é outra coisa e continua valendo. */
-const VOLTOU = /\bsp\.special\b|\bp\.special\b|\bspecial:\s*\d/;
-['index.html','functions/index.js'].forEach(arq=>{
-  const t = fs.readFileSync(path.join(RAIZ, arq), 'utf8');
-  const m = t.match(VOLTOU);
-  ok('o campo não voltou em ' + arq, !m, m ? 'achei "' + m[0] + '"' : '');
+console.log('\nAS DUAS COPIAS (armadilha nº1 do projeto)');
+/* Compara o VALOR, não o texto: os dois arquivos têm comentários próprios em algumas linhas
+   (o servidor carrega o registro de uma divergência antiga do Voltorb, por exemplo), e comparar
+   caractere a caractere acusaria diferença onde a tabela é a mesma. O que não pode divergir é o
+   dado -- é ele que faz a mesma batalha ter dois vencedores. */
+/* Ordena as chaves antes de comparar. Um JSON.stringify direto é sensível à ORDEM, e as duas
+   tabelas legitimamente listam as espécies em ordens diferentes -- acusava divergência onde os
+   dados são idênticos. O que importa é o conteúdo. */
+const ordenado = o => JSON.stringify(Object.keys(o).sort().map(k=>[k, o[k]]));
+const mesmoValor = (a,b)=>ordenado(a)===ordenado(b);
+ok('GEN2_SPECIAL igual nos dois arquivos', mesmoValor(G.valor, Gs.valor));
+ok('EVOLUTIONS igual nos dois arquivos', mesmoValor(E.valor, Es.valor));
+ok('TYPE_CHART igual nos dois arquivos', mesmoValor(T.valor, Ts.valor));
+const dif = [];
+Object.keys(S).forEach(id=>{ const a=S[id], b=Ss[id];
+  if(!b){ dif.push(id+' falta no servidor'); return; }
+  ['hp','attack','defense','speed'].forEach(k=>{ if(a[k]!==b[k]) dif.push(id+'.'+k); });
+  if(JSON.stringify(a.types)!==JSON.stringify(b.types)) dif.push(id+'.types');
 });
+ok('os atributos batem entre cliente e servidor', dif.length === 0, dif.slice(0,5).join(', '));
+ok('nenhuma especie sem Sp.Atk/Sp.Def', Object.keys(S).every(id=>Array.isArray(G.valor[id])),
+   Object.keys(S).filter(id=>!G.valor[id]).join(','));
 
-console.log('\nEVOLUÇÕES');
-const conhece = id => !!(J[id] || KANTO[id]);
-const origemRuim = Object.keys(EVO).filter(id=>!conhece(id));
-const destinoRuim = Object.keys(EVO).filter(id=>!conhece(EVO[id].into));
-ok('toda origem existe', origemRuim.length === 0, origemRuim.join(',') || '');
-ok('todo destino existe', destinoRuim.length === 0, destinoRuim.join(',') || '');
-ok('todo destino é de Johto', Object.keys(EVO).every(id=>!!J[EVO[id].into]));
-ok('nível entre 1 e 99', Object.keys(EVO).every(id=>EVO[id].level >= 1 && EVO[id].level <= 99));
-ok('ninguém evolui pra si mesmo', Object.keys(EVO).every(id=>EVO[id].into !== id));
+console.log('\nOS DOIS TIPOS NOVOS');
+['Dark','Steel'].forEach(t=>{
+  ok(t + ' ataca (linha propria no TYPE_CHART)', !!T.valor[t]);
+  const defendem = Object.keys(T.valor).filter(a=>T.valor[a][t] !== undefined).length;
+  ok(t + ' defende (aparece na linha dos outros tipos)', defendem >= 5, defendem + ' tipos o afetam');
+});
+ok('Aço ainda resiste a Fantasma e Sombrio (regra da Gen 2, mudou na Gen 6)',
+   T.valor.Ghost.Steel === 0.5 && T.valor.Dark.Steel === 0.5);
+ok('Psiquico nao afeta Sombrio', T.valor.Psychic.Dark === 0);
+ok('Veneno nao afeta Aço', T.valor.Poison.Steel === 0);
+const tiposUsados = new Set(Object.values(S).flatMap(s=>s.types));
+const semChart = [...tiposUsados].filter(t=>!T.valor[t]);
+ok('todo tipo usado por alguma especie existe no TYPE_CHART', semChart.length === 0, semChart.join(','));
 
-/* O JOGO CONTINUA SÓ KANTO. Estas duas checagens são o que garante que a base de Johto entrou
-   como dado parado e não mudou nada em jogo. */
-console.log('\nO JOGO CONTINUA SÓ KANTO');
-const KANTO_EVO = tabela('index.html', 'EVOLUTIONS').valor;
-const INTOCADAS = { gloom:'vileplume', poliwhirl:'poliwrath', slowpoke:'slowbro' };
-const mexidas = Object.keys(INTOCADAS).filter(id=>!KANTO_EVO[id] || KANTO_EVO[id].into !== INTOCADAS[id]);
-ok('Gloom, Poliwhirl e Slowpoke ainda evoluem pro destino de Kanto', mexidas.length === 0,
-   mexidas.map(id=>id + ' -> ' + (KANTO_EVO[id] ? KANTO_EVO[id].into : 'sumiu')).join(', ') || '');
-ok('nenhuma espécie de Johto entrou na tabela em uso', !Object.keys(KANTO).some(id=>J[id]));
-
-console.log('\nO QUE VAI PRECISAR SER RESOLVIDO PRA LIGAR (esperado -- ver o comentário em SPECIES_JOHTO)');
-const TIPOS_DO_MOTOR = Object.keys(tabela('index.html', 'TYPE_CHART').valor);
-const semTipo = ids.filter(id=>J[id].types.some(t=>!TIPOS_DO_MOTOR.includes(t)));
-console.log('  · ' + semTipo.length + ' espécies com tipo que o TYPE_CHART não conhece: ' +
-            semTipo.map(id=>J[id].name).join(', '));
-/* Não é disputa de número de Pokédex: Vileplume é #45 e Bellossom é #182, cada uma com a sua
-   vaga. O que colidiria é a CHAVE da tabela -- quem evolui -- se as duas fossem fundidas. */
-const doisDestinos = Object.keys(EVO).filter(id=>KANTO_EVO[id]);
-console.log('  · ' + doisDestinos.length + ' pokémons de Kanto ganhariam um segundo destino de evolução: ' +
-            doisDestinos.map(id=>KANTO[id].name + ' (hoje ' + KANTO_EVO[id].into + ', ou ' + EVO[id].into + ')').join(', '));
-console.log('    a chave repetida seria ' + doisDestinos.join(', ') + ' -- em JS a última apaga a primeira, sem erro');
+console.log('\nAS EVOLUCOES DE KANTO NAO FORAM SEQUESTRADAS');
+const INTOCADAS = { gloom:'vileplume', poliwhirl:'poliwrath', slowpoke:'slowbro', eevee:undefined };
+ok('Gloom continua virando Vileplume', E.valor.gloom.into === 'vileplume', E.valor.gloom.into);
+ok('Poliwhirl continua virando Poliwrath', E.valor.poliwhirl.into === 'poliwrath', E.valor.poliwhirl.into);
+ok('Slowpoke continua virando Slowbro', E.valor.slowpoke.into === 'slowbro', E.valor.slowpoke.into);
+ok('Bellossom, Politoed e Slowking ficaram de fora (sem tela de escolha ainda)',
+   !Object.values(E.valor).some(e=>['bellossom','politoed','slowking'].includes(e.into)));
+ok('o Eevee continua fora do EVOLUTIONS (tem tela propria)', !E.valor.eevee);
+const destinoRuim = Object.keys(E.valor).filter(id=>!S[E.valor[id].into]);
+ok('toda evolucao aponta pra especie existente', destinoRuim.length === 0, destinoRuim.join(','));
+const origemRuim = Object.keys(E.valor).filter(id=>!S[id]);
+ok('toda origem existe', origemRuim.length === 0, origemRuim.join(','));
 
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
 process.exit(falhas ? 1 : 0);

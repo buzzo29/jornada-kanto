@@ -162,28 +162,145 @@ const SPECIES = {
   vaporeon:{name:'Vaporeon', types:['Water'], hp:130, attack:65, defense:60, speed:65},
   jolteon:{name:'Jolteon', types:['Electric'], hp:65, attack:65, defense:60, speed:130},
   flareon:{name:'Flareon', types:['Fire'], hp:65, attack:130, defense:60, speed:65},
-  mewtwo:{name:'Mewtwo', types:['Psychic'], hp:106, attack:110, defense:90, speed:130}
+  mewtwo:{name:'Mewtwo', types:['Psychic'], hp:106, attack:110, defense:90, speed:130},
+
+  /* ---- JOHTO (#152-251) ----------------------------------------------------------------
+     Entraram na tabela em uso em 30/08/2026, quando a jornada passou a poder seguir por Johto.
+     Ate ali viviam numa tabela paralela (SPECIES_JOHTO), justamente pra NAO contar pro total da
+     Pokedex nem pro pool da Torre antes da hora. Agora contam: a Pokedex vai a 250 (o #151, Mew,
+     continua de fora -- e o chefe da raide, ninguem captura). */
+  chikorita:{name:'Chikorita', types:['Grass'], hp:45, attack:49, defense:65, speed:45},
+  bayleef:{name:'Bayleef', types:['Grass'], hp:60, attack:62, defense:80, speed:60},
+  meganium:{name:'Meganium', types:['Grass'], hp:80, attack:82, defense:100, speed:80},
+  cyndaquil:{name:'Cyndaquil', types:['Fire'], hp:39, attack:52, defense:43, speed:65},
+  quilava:{name:'Quilava', types:['Fire'], hp:58, attack:64, defense:58, speed:80},
+  typhlosion:{name:'Typhlosion', types:['Fire'], hp:78, attack:84, defense:78, speed:100},
+  totodile:{name:'Totodile', types:['Water'], hp:50, attack:65, defense:64, speed:43},
+  croconaw:{name:'Croconaw', types:['Water'], hp:65, attack:80, defense:80, speed:58},
+  feraligatr:{name:'Feraligatr', types:['Water'], hp:85, attack:105, defense:100, speed:78},
+  sentret:{name:'Sentret', types:['Normal'], hp:35, attack:46, defense:34, speed:20},
+  furret:{name:'Furret', types:['Normal'], hp:85, attack:76, defense:64, speed:90},
+  hoothoot:{name:'Hoothoot', types:['Normal','Flying'], hp:60, attack:30, defense:30, speed:50},
+  noctowl:{name:'Noctowl', types:['Normal','Flying'], hp:100, attack:50, defense:50, speed:70},
+  ledyba:{name:'Ledyba', types:['Bug','Flying'], hp:40, attack:20, defense:30, speed:55},
+  ledian:{name:'Ledian', types:['Bug','Flying'], hp:55, attack:35, defense:50, speed:85},
+  spinarak:{name:'Spinarak', types:['Bug','Poison'], hp:40, attack:60, defense:40, speed:30},
+  ariados:{name:'Ariados', types:['Bug','Poison'], hp:70, attack:90, defense:70, speed:40},
+  crobat:{name:'Crobat', types:['Poison','Flying'], hp:85, attack:90, defense:80, speed:130},
+  chinchou:{name:'Chinchou', types:['Water','Electric'], hp:75, attack:38, defense:38, speed:67},
+  lanturn:{name:'Lanturn', types:['Water','Electric'], hp:125, attack:58, defense:58, speed:67},
+  pichu:{name:'Pichu', types:['Electric'], hp:20, attack:40, defense:15, speed:60},
+  cleffa:{name:'Cleffa', types:['Normal'], hp:50, attack:25, defense:28, speed:15},
+  igglybuff:{name:'Igglybuff', types:['Normal'], hp:90, attack:30, defense:15, speed:15},
+  togepi:{name:'Togepi', types:['Normal'], hp:35, attack:20, defense:65, speed:20},
+  togetic:{name:'Togetic', types:['Normal','Flying'], hp:55, attack:40, defense:85, speed:40},
+  natu:{name:'Natu', types:['Psychic','Flying'], hp:40, attack:50, defense:45, speed:70},
+  xatu:{name:'Xatu', types:['Psychic','Flying'], hp:65, attack:75, defense:70, speed:95},
+  mareep:{name:'Mareep', types:['Electric'], hp:55, attack:40, defense:40, speed:35},
+  flaaffy:{name:'Flaaffy', types:['Electric'], hp:70, attack:55, defense:55, speed:45},
+  ampharos:{name:'Ampharos', types:['Electric'], hp:90, attack:75, defense:75, speed:55},
+  bellossom:{name:'Bellossom', types:['Grass'], hp:75, attack:80, defense:85, speed:50},
+  marill:{name:'Marill', types:['Water'], hp:70, attack:20, defense:50, speed:40},
+  azumarill:{name:'Azumarill', types:['Water'], hp:100, attack:50, defense:80, speed:50},
+  sudowoodo:{name:'Sudowoodo', types:['Rock'], hp:70, attack:100, defense:115, speed:30},
+  politoed:{name:'Politoed', types:['Water'], hp:90, attack:75, defense:75, speed:70},
+  hoppip:{name:'Hoppip', types:['Grass','Flying'], hp:35, attack:35, defense:40, speed:50},
+  skiploom:{name:'Skiploom', types:['Grass','Flying'], hp:55, attack:45, defense:50, speed:80},
+  jumpluff:{name:'Jumpluff', types:['Grass','Flying'], hp:75, attack:55, defense:70, speed:110},
+  aipom:{name:'Aipom', types:['Normal'], hp:55, attack:70, defense:55, speed:85},
+  sunkern:{name:'Sunkern', types:['Grass'], hp:30, attack:30, defense:30, speed:30},
+  sunflora:{name:'Sunflora', types:['Grass'], hp:75, attack:75, defense:55, speed:30},
+  yanma:{name:'Yanma', types:['Bug','Flying'], hp:65, attack:65, defense:45, speed:95},
+  wooper:{name:'Wooper', types:['Water','Ground'], hp:55, attack:45, defense:45, speed:15},
+  quagsire:{name:'Quagsire', types:['Water','Ground'], hp:95, attack:85, defense:85, speed:35},
+  espeon:{name:'Espeon', types:['Psychic'], hp:65, attack:65, defense:60, speed:110},
+  umbreon:{name:'Umbreon', types:['Dark'], hp:95, attack:65, defense:110, speed:65},
+  murkrow:{name:'Murkrow', types:['Dark','Flying'], hp:60, attack:85, defense:42, speed:91},
+  slowking:{name:'Slowking', types:['Water','Psychic'], hp:95, attack:75, defense:80, speed:30},
+  misdreavus:{name:'Misdreavus', types:['Ghost'], hp:60, attack:60, defense:60, speed:85},
+  unown:{name:'Unown', types:['Psychic'], hp:48, attack:72, defense:48, speed:48},
+  wobbuffet:{name:'Wobbuffet', types:['Psychic'], hp:190, attack:33, defense:58, speed:33},
+  girafarig:{name:'Girafarig', types:['Normal','Psychic'], hp:70, attack:80, defense:65, speed:85},
+  pineco:{name:'Pineco', types:['Bug'], hp:50, attack:65, defense:90, speed:15},
+  forretress:{name:'Forretress', types:['Bug','Steel'], hp:75, attack:90, defense:140, speed:40},
+  dunsparce:{name:'Dunsparce', types:['Normal'], hp:100, attack:70, defense:70, speed:45},
+  gligar:{name:'Gligar', types:['Ground','Flying'], hp:65, attack:75, defense:105, speed:85},
+  steelix:{name:'Steelix', types:['Steel','Ground'], hp:75, attack:85, defense:200, speed:30},
+  snubbull:{name:'Snubbull', types:['Normal'], hp:60, attack:80, defense:50, speed:30},
+  granbull:{name:'Granbull', types:['Normal'], hp:90, attack:120, defense:75, speed:45},
+  qwilfish:{name:'Qwilfish', types:['Water','Poison'], hp:65, attack:95, defense:75, speed:85},
+  scizor:{name:'Scizor', types:['Bug','Steel'], hp:70, attack:130, defense:100, speed:65},
+  shuckle:{name:'Shuckle', types:['Bug','Rock'], hp:20, attack:10, defense:230, speed:5},
+  heracross:{name:'Heracross', types:['Bug','Fighting'], hp:80, attack:125, defense:75, speed:85},
+  sneasel:{name:'Sneasel', types:['Dark','Ice'], hp:55, attack:95, defense:55, speed:115},
+  teddiursa:{name:'Teddiursa', types:['Normal'], hp:60, attack:80, defense:50, speed:40},
+  ursaring:{name:'Ursaring', types:['Normal'], hp:90, attack:130, defense:75, speed:55},
+  slugma:{name:'Slugma', types:['Fire'], hp:40, attack:40, defense:40, speed:20},
+  magcargo:{name:'Magcargo', types:['Fire','Rock'], hp:50, attack:50, defense:120, speed:30},
+  swinub:{name:'Swinub', types:['Ice','Ground'], hp:50, attack:50, defense:40, speed:50},
+  piloswine:{name:'Piloswine', types:['Ice','Ground'], hp:100, attack:100, defense:80, speed:50},
+  corsola:{name:'Corsola', types:['Water','Rock'], hp:55, attack:55, defense:85, speed:35},
+  remoraid:{name:'Remoraid', types:['Water'], hp:35, attack:65, defense:35, speed:65},
+  octillery:{name:'Octillery', types:['Water'], hp:75, attack:105, defense:75, speed:45},
+  delibird:{name:'Delibird', types:['Ice','Flying'], hp:45, attack:55, defense:45, speed:75},
+  mantine:{name:'Mantine', types:['Water','Flying'], hp:65, attack:40, defense:70, speed:70},
+  skarmory:{name:'Skarmory', types:['Steel','Flying'], hp:65, attack:80, defense:140, speed:70},
+  houndour:{name:'Houndour', types:['Dark','Fire'], hp:45, attack:60, defense:30, speed:65},
+  houndoom:{name:'Houndoom', types:['Dark','Fire'], hp:75, attack:90, defense:50, speed:95},
+  kingdra:{name:'Kingdra', types:['Water','Dragon'], hp:75, attack:95, defense:95, speed:85},
+  phanpy:{name:'Phanpy', types:['Ground'], hp:90, attack:60, defense:60, speed:40},
+  donphan:{name:'Donphan', types:['Ground'], hp:90, attack:120, defense:120, speed:50},
+  porygon2:{name:'Porygon2', types:['Normal'], hp:85, attack:80, defense:90, speed:60},
+  stantler:{name:'Stantler', types:['Normal'], hp:73, attack:95, defense:62, speed:85},
+  smeargle:{name:'Smeargle', types:['Normal'], hp:55, attack:20, defense:35, speed:75},
+  tyrogue:{name:'Tyrogue', types:['Fighting'], hp:35, attack:35, defense:35, speed:35},
+  hitmontop:{name:'Hitmontop', types:['Fighting'], hp:50, attack:95, defense:95, speed:70},
+  smoochum:{name:'Smoochum', types:['Ice','Psychic'], hp:45, attack:30, defense:15, speed:65},
+  elekid:{name:'Elekid', types:['Electric'], hp:45, attack:63, defense:37, speed:95},
+  magby:{name:'Magby', types:['Fire'], hp:45, attack:75, defense:37, speed:83},
+  miltank:{name:'Miltank', types:['Normal'], hp:95, attack:80, defense:105, speed:100},
+  blissey:{name:'Blissey', types:['Normal'], hp:255, attack:10, defense:10, speed:55},
+  raikou:{name:'Raikou', types:['Electric'], hp:90, attack:85, defense:75, speed:115},
+  entei:{name:'Entei', types:['Fire'], hp:115, attack:115, defense:85, speed:100},
+  suicune:{name:'Suicune', types:['Water'], hp:100, attack:75, defense:115, speed:85},
+  larvitar:{name:'Larvitar', types:['Rock','Ground'], hp:50, attack:64, defense:50, speed:41},
+  pupitar:{name:'Pupitar', types:['Rock','Ground'], hp:70, attack:84, defense:70, speed:51},
+  tyranitar:{name:'Tyranitar', types:['Rock','Dark'], hp:100, attack:134, defense:110, speed:61},
+  lugia:{name:'Lugia', types:['Psychic','Flying'], hp:106, attack:90, defense:130, speed:110},
+  hooh:{name:'Ho-Oh', types:['Fire','Flying'], hp:106, attack:130, defense:90, speed:90},
+  celebi:{name:'Celebi', types:['Psychic','Grass'], hp:100, attack:100, defense:100, speed:100}
 };
 
 const TYPE_CHART = {
   // as 5 imunidades totais do Gen 1 (Normal/Lutador vs Fantasma, Fantasma vs Normal, Terra vs Voador,
   // Elétrico vs Terra) valem 0 de novo, como na Gen 1 de verdade. Elas valeram 0.25 por um tempo,
   // pra nada ser 100% imune -- ver a nota de imunidade no CLAUDE.md pro que essa volta custa.
-  Normal:{Rock:0.5, Ghost:0},
-  Fire:{Grass:2,Bug:2,Rock:0.5,Water:0.5,Fire:0.5,Ice:2,Dragon:0.5},
+  Normal:{Rock:0.5, Ghost:0, Steel:0.5},
+  Fire:{Grass:2,Bug:2,Rock:0.5,Water:0.5,Fire:0.5,Ice:2,Dragon:0.5,Steel:2},
   Water:{Fire:2,Rock:2,Ground:2,Water:0.5,Grass:0.5,Dragon:0.5},
-  Grass:{Water:2,Rock:2,Ground:2,Fire:0.5,Grass:0.5,Poison:0.5,Flying:0.5,Bug:0.5,Dragon:0.5},
-  Poison:{Grass:2,Bug:2,Rock:0.5,Ground:0.5,Poison:0.5,Ghost:0.5},
-  Flying:{Grass:2,Fighting:2,Bug:2,Rock:0.5,Electric:0.5},
-  Bug:{Grass:2,Poison:2,Fighting:0.5,Flying:0.5,Fire:0.5,Psychic:2,Ghost:0.5},
-  Fighting:{Normal:2,Rock:2,Poison:0.5,Flying:0.5,Bug:0.5,Psychic:0.5,Ghost:0,Ice:2},
-  Rock:{Fire:2,Flying:2,Bug:2,Fighting:0.5,Ground:0.5,Ice:2},
-  Ground:{Fire:2,Rock:2,Poison:2,Grass:0.5,Bug:0.5,Electric:2,Flying:0},
-  Psychic:{Fighting:2,Poison:2,Psychic:0.5},
-  Electric:{Water:2,Flying:2,Grass:0.5,Electric:0.5,Ground:0,Dragon:0.5},
-  Ghost:{Ghost:2,Psychic:2,Normal:0},
-  Dragon:{Dragon:2},
-  Ice:{Grass:2,Ground:2,Flying:2,Dragon:2,Water:0.5,Ice:0.5}
+  Grass:{Water:2,Rock:2,Ground:2,Fire:0.5,Grass:0.5,Poison:0.5,Flying:0.5,Bug:0.5,Dragon:0.5,Steel:0.5},
+  Poison:{Grass:2,Bug:2,Rock:0.5,Ground:0.5,Poison:0.5,Ghost:0.5,Steel:0},
+  Flying:{Grass:2,Fighting:2,Bug:2,Rock:0.5,Electric:0.5,Steel:0.5},
+  Bug:{Grass:2,Poison:2,Fighting:0.5,Flying:0.5,Fire:0.5,Psychic:2,Ghost:0.5,Dark:2,Steel:0.5},
+  Fighting:{Normal:2,Rock:2,Poison:0.5,Flying:0.5,Bug:0.5,Psychic:0.5,Ghost:0,Ice:2,Dark:2,Steel:2},
+  Rock:{Fire:2,Flying:2,Bug:2,Fighting:0.5,Ground:0.5,Ice:2,Steel:0.5},
+  Ground:{Fire:2,Rock:2,Poison:2,Grass:0.5,Bug:0.5,Electric:2,Flying:0,Steel:2},
+  Psychic:{Fighting:2,Poison:2,Psychic:0.5,Dark:0,Steel:0.5},
+  Electric:{Water:2,Flying:2,Grass:0.5,Electric:0.5,Ground:0,Dragon:0.5,Steel:0.5},
+  Ghost:{Ghost:2,Psychic:2,Normal:0,Dark:0.5,Steel:0.5},
+  Dragon:{Dragon:2,Steel:0.5},
+  Ice:{Grass:2,Ground:2,Flying:2,Dragon:2,Water:0.5,Ice:0.5,Steel:0.5},
+  /* SOMBRIO e AÇO -- os dois tipos que a Gen 2 trouxe, e sem eles metade de Johto não funciona
+     (Umbreon, Houndoom, Tyranitar, Scizor, Steelix, Skarmory, o ginásio da Jasmine...).
+     Valores da Geração II, que diferem dos modernos em dois pontos: o Aço ainda resiste a
+     Fantasma e a Sombrio (só perdeu isso na Gen 6), e o Sombrio ainda não é fraco contra Fada,
+     que não existe aqui.
+     Acrescentar tipo NOVO não mexe em nada do que já existia: nenhuma das 150 espécies de Kanto é
+     Sombrio ou Aço (o jogo usa a tipagem da Gen 1, então Magnemite/Magneton continuam só
+     Elétrico), então toda linha nova só entra em confronto que envolve um pokémon de Johto.
+     Conferido: a impressão do motor não muda. */
+  Dark:{Psychic:2,Ghost:2,Fighting:0.5,Dark:0.5,Steel:0.5},
+  Steel:{Rock:2,Ice:2,Steel:0.5,Fire:0.5,Water:0.5,Electric:0.5}
 };
 
 /* -------------------------------------------------------------------
@@ -397,7 +514,28 @@ const GEN2_SPECIAL = {
   ditto:[48,48], eevee:[45,65], vaporeon:[110,95], jolteon:[110,95], flareon:[95,110],
   porygon:[85,75], omanyte:[90,55], omastar:[115,70], kabuto:[55,45], kabutops:[65,70],
   aerodactyl:[60,75], snorlax:[65,110], articuno:[95,125], zapdos:[125,90], moltres:[125,85],
-  dratini:[50,50], dragonair:[70,70], dragonite:[100,100], mewtwo:[154,90]
+  dratini:[50,50], dragonair:[70,70], dragonite:[100,100], mewtwo:[154,90],
+  // ---- Johto (#152-251) ----
+  chikorita:[49,65], bayleef:[63,80], meganium:[83,100], cyndaquil:[60,50], quilava:[80,65],
+  typhlosion:[109,85], totodile:[44,48], croconaw:[59,63], feraligatr:[79,83], sentret:[35,45],
+  furret:[45,55], hoothoot:[36,56], noctowl:[76,96], ledyba:[40,80], ledian:[55,110],
+  spinarak:[40,40], ariados:[60,60], crobat:[70,80], chinchou:[56,56], lanturn:[76,76],
+  pichu:[35,35], cleffa:[45,55], igglybuff:[40,20], togepi:[40,65], togetic:[80,105],
+  natu:[70,45], xatu:[95,70], mareep:[65,45], flaaffy:[80,60], ampharos:[115,90],
+  bellossom:[90,100], marill:[20,50], azumarill:[50,80], sudowoodo:[30,65], politoed:[90,100],
+  hoppip:[35,55], skiploom:[45,65], jumpluff:[55,85], aipom:[40,55], sunkern:[30,30],
+  sunflora:[105,85], yanma:[75,45], wooper:[25,25], quagsire:[65,65], espeon:[130,95],
+  umbreon:[60,130], murkrow:[85,42], slowking:[100,110], misdreavus:[85,85], unown:[72,48],
+  wobbuffet:[33,58], girafarig:[90,65], pineco:[35,35], forretress:[60,60], dunsparce:[65,65],
+  gligar:[35,65], steelix:[55,65], snubbull:[40,40], granbull:[60,60], qwilfish:[55,55],
+  scizor:[55,80], shuckle:[10,230], heracross:[40,95], sneasel:[35,75], teddiursa:[50,50],
+  ursaring:[75,75], slugma:[70,40], magcargo:[80,80], swinub:[30,30], piloswine:[60,60],
+  corsola:[65,85], remoraid:[65,35], octillery:[105,75], delibird:[65,45], mantine:[80,140],
+  skarmory:[40,70], houndour:[80,50], houndoom:[110,80], kingdra:[95,95], phanpy:[40,40],
+  donphan:[60,60], porygon2:[105,95], stantler:[85,65], smeargle:[20,45], tyrogue:[35,35],
+  hitmontop:[35,110], smoochum:[85,65], elekid:[65,55], magby:[70,55], miltank:[40,70],
+  blissey:[75,135], raikou:[115,100], entei:[90,75], suicune:[90,115], larvitar:[45,50],
+  pupitar:[65,70], tyranitar:[95,100], lugia:[90,154], hooh:[110,154], celebi:[100,100]
 };
 (function aplicaSplitEspecial(){
   for(const id in GEN2_SPECIAL){
@@ -765,189 +903,15 @@ const EVOLUTIONS = {
   nidorina:{level:40, into:'nidoqueen'},
   nidorino:{level:40, into:'nidoking'},
   pikachu:{level:40, into:'raichu'},
-  staryu:{level:40, into:'starmie'}
-};
-
-/* =====================================================================
-   JOHTO (#152-251) -- DADOS BRUTOS, AINDA NÃO LIGADOS AO JOGO
-   ---------------------------------------------------------------------
-   HOJE O JOGO É SÓ KANTO. Nada aqui está em uso: nenhum pokémon de Johto aparece, é capturável ou
-   entra em batalha, e Gloom, Poliwhirl e Slowpoke continuam evoluindo só pro que sempre evoluíram
-   (Vileplume, Poliwrath e Slowbro). Isto é base de dados pra uma implementação futura.
-
-   Tabelas paralelas de propósito. Elas NÃO entram em SPECIES/GEN2_SPECIAL/EVOLUTIONS, porque
-   `Object.keys(SPECIES)` é o que define o total da Pokédex, o "capturou tudo" que libera o desafio
-   do Mewtwo, o pool da Torre dos Treinadores (`!EVOLUTIONS[k]`) e a força que o rival persegue
-   (`bstOf`). Despejar 100 espécies lá dentro mudaria as quatro coisas em silêncio, sem uma linha
-   de código nova. Ligar isso é uma decisão separada, e tem três problemas em aberto:
-
-   1. O TYPE_CHART é da Gen 1 -- 15 tipos, sem Sombrio (Dark) nem Aço (Steel). 10 espécies daqui
-      têm um desses: Umbreon, Murkrow, Forretress, Steelix, Scizor, Sneasel, Skarmory, Houndour,
-      Houndoom e Tyranitar. Hoje o motor trataria os dois como tipo desconhecido (multiplicador
-      neutro em tudo). Acrescentar os dois tipos mexe no EXPOENTE_TIPO, que é o parâmetro mais
-      sensível do motor -- tem que ser medido antes.
-   2. Três pokémons de Kanto ganhariam um SEGUNDO destino de evolução: Gloom (Vileplume ou
-      Bellossom), Poliwhirl (Poliwrath ou Politoed) e Slowpoke (Slowbro ou Slowking). Nada a ver
-      com número de Pokédex -- Vileplume é #45 e Bellossom é #182, cada uma com a sua vaga. O que
-      colide é a CHAVE da tabela de evolução, que é quem evolui: `gloom` do lado esquerdo,
-      escrito duas vezes. Em JavaScript isso não dá erro -- a última linha apaga a primeira, e o
-      Gloom para de virar Vileplume no jogo inteiro, em silêncio.
-      E juntar as duas tabelas não resolveria: `tryEvolve` evolui sozinho por nível, e não tem
-      como escolher entre dois destinos. No jogo original quem decide é a pedra (Folha ou Solar),
-      e aqui não existem itens -- precisaria de uma tela de escolha, como a do Eevee.
-   3. Espeon e Umbreon são evoluções do Eevee, que aqui não passa por EVOLUTIONS -- tem tela
-      própria (`chooseEeveeEvolution`). Entrariam lá, não aqui.
-
-   Procedência dos números: reconstruídos a partir dos dados do Pokémon Showdown, aplicando os
-   mods gen8→gen2 em cima dos valores atuais (é assim que o próprio Showdown monta cada geração).
-   O método foi conferido contra o que já existe aqui: bate 150/150 com o GEN2_SPECIAL de Kanto.
-
-   Aqui NÃO existe um campo `special` único. Ele foi removido do jogo inteiro: era da Gen 1, e a
-   Gen 1 não é mais a referência de atributo em lugar nenhum. Johto, aliás, nunca teve um --
-   nasceu já com o Especial dividido. Sp.Atk e Sp.Def, e só.
-   ===================================================================== */
-const SPECIES_JOHTO = {
-  chikorita:{dex:152, name:'Chikorita', types:['Grass'], hp:45, attack:49, defense:65, speed:45, emoji:'🌿'},
-  bayleef:{dex:153, name:'Bayleef', types:['Grass'], hp:60, attack:62, defense:80, speed:60, emoji:'🌿'},
-  meganium:{dex:154, name:'Meganium', types:['Grass'], hp:80, attack:82, defense:100, speed:80, emoji:'🌿'},
-  cyndaquil:{dex:155, name:'Cyndaquil', types:['Fire'], hp:39, attack:52, defense:43, speed:65, emoji:'🔥'},
-  quilava:{dex:156, name:'Quilava', types:['Fire'], hp:58, attack:64, defense:58, speed:80, emoji:'🔥'},
-  typhlosion:{dex:157, name:'Typhlosion', types:['Fire'], hp:78, attack:84, defense:78, speed:100, emoji:'🔥'},
-  totodile:{dex:158, name:'Totodile', types:['Water'], hp:50, attack:65, defense:64, speed:43, emoji:'💧'},
-  croconaw:{dex:159, name:'Croconaw', types:['Water'], hp:65, attack:80, defense:80, speed:58, emoji:'💧'},
-  feraligatr:{dex:160, name:'Feraligatr', types:['Water'], hp:85, attack:105, defense:100, speed:78, emoji:'💧'},
-  sentret:{dex:161, name:'Sentret', types:['Normal'], hp:35, attack:46, defense:34, speed:20, emoji:'🐭'},
-  furret:{dex:162, name:'Furret', types:['Normal'], hp:85, attack:76, defense:64, speed:90, emoji:'🐭'},
-  hoothoot:{dex:163, name:'Hoothoot', types:['Normal','Flying'], hp:60, attack:30, defense:30, speed:50, emoji:'🦉'},
-  noctowl:{dex:164, name:'Noctowl', types:['Normal','Flying'], hp:100, attack:50, defense:50, speed:70, emoji:'🦉'},
-  ledyba:{dex:165, name:'Ledyba', types:['Bug','Flying'], hp:40, attack:20, defense:30, speed:55, emoji:'🐛'},
-  ledian:{dex:166, name:'Ledian', types:['Bug','Flying'], hp:55, attack:35, defense:50, speed:85, emoji:'🐛'},
-  spinarak:{dex:167, name:'Spinarak', types:['Bug','Poison'], hp:40, attack:60, defense:40, speed:30, emoji:'🐛'},
-  ariados:{dex:168, name:'Ariados', types:['Bug','Poison'], hp:70, attack:90, defense:70, speed:40, emoji:'🐛'},
-  crobat:{dex:169, name:'Crobat', types:['Poison','Flying'], hp:85, attack:90, defense:80, speed:130, emoji:'🟣'},
-  chinchou:{dex:170, name:'Chinchou', types:['Water','Electric'], hp:75, attack:38, defense:38, speed:67, emoji:'💧'},
-  lanturn:{dex:171, name:'Lanturn', types:['Water','Electric'], hp:125, attack:58, defense:58, speed:67, emoji:'💧'},
-  pichu:{dex:172, name:'Pichu', types:['Electric'], hp:20, attack:40, defense:15, speed:60, emoji:'⚡'},
-  cleffa:{dex:173, name:'Cleffa', types:['Normal'], hp:50, attack:25, defense:28, speed:15, emoji:'🪄'},
-  igglybuff:{dex:174, name:'Igglybuff', types:['Normal'], hp:90, attack:30, defense:15, speed:15, emoji:'🎈'},
-  togepi:{dex:175, name:'Togepi', types:['Normal'], hp:35, attack:20, defense:65, speed:20, emoji:'🥚'},
-  togetic:{dex:176, name:'Togetic', types:['Normal','Flying'], hp:55, attack:40, defense:85, speed:40, emoji:'😇'},
-  natu:{dex:177, name:'Natu', types:['Psychic','Flying'], hp:40, attack:50, defense:45, speed:70, emoji:'🔮'},
-  xatu:{dex:178, name:'Xatu', types:['Psychic','Flying'], hp:65, attack:75, defense:70, speed:95, emoji:'🔮'},
-  mareep:{dex:179, name:'Mareep', types:['Electric'], hp:55, attack:40, defense:40, speed:35, emoji:'🐑'},
-  flaaffy:{dex:180, name:'Flaaffy', types:['Electric'], hp:70, attack:55, defense:55, speed:45, emoji:'🐑'},
-  ampharos:{dex:181, name:'Ampharos', types:['Electric'], hp:90, attack:75, defense:75, speed:55, emoji:'💡'},
-  bellossom:{dex:182, name:'Bellossom', types:['Grass'], hp:75, attack:80, defense:85, speed:50, emoji:'💐'},
-  marill:{dex:183, name:'Marill', types:['Water'], hp:70, attack:20, defense:50, speed:40, emoji:'💦'},
-  azumarill:{dex:184, name:'Azumarill', types:['Water'], hp:100, attack:50, defense:80, speed:50, emoji:'💦'},
-  sudowoodo:{dex:185, name:'Sudowoodo', types:['Rock'], hp:70, attack:100, defense:115, speed:30, emoji:'🌳'},
-  politoed:{dex:186, name:'Politoed', types:['Water'], hp:90, attack:75, defense:75, speed:70, emoji:'🐸'},
-  hoppip:{dex:187, name:'Hoppip', types:['Grass','Flying'], hp:35, attack:35, defense:40, speed:50, emoji:'🌿'},
-  skiploom:{dex:188, name:'Skiploom', types:['Grass','Flying'], hp:55, attack:45, defense:50, speed:80, emoji:'🌿'},
-  jumpluff:{dex:189, name:'Jumpluff', types:['Grass','Flying'], hp:75, attack:55, defense:70, speed:110, emoji:'🌿'},
-  aipom:{dex:190, name:'Aipom', types:['Normal'], hp:55, attack:70, defense:55, speed:85, emoji:'🐭'},
-  sunkern:{dex:191, name:'Sunkern', types:['Grass'], hp:30, attack:30, defense:30, speed:30, emoji:'🌿'},
-  sunflora:{dex:192, name:'Sunflora', types:['Grass'], hp:75, attack:75, defense:55, speed:30, emoji:'🌿'},
-  yanma:{dex:193, name:'Yanma', types:['Bug','Flying'], hp:65, attack:65, defense:45, speed:95, emoji:'🐛'},
-  wooper:{dex:194, name:'Wooper', types:['Water','Ground'], hp:55, attack:45, defense:45, speed:15, emoji:'🐟'},
-  quagsire:{dex:195, name:'Quagsire', types:['Water','Ground'], hp:95, attack:85, defense:85, speed:35, emoji:'🐟'},
-  espeon:{dex:196, name:'Espeon', types:['Psychic'], hp:65, attack:65, defense:60, speed:110, emoji:'☀️'},
-  umbreon:{dex:197, name:'Umbreon', types:['Dark'], hp:95, attack:65, defense:110, speed:65, emoji:'🌙'},
-  murkrow:{dex:198, name:'Murkrow', types:['Dark','Flying'], hp:60, attack:85, defense:42, speed:91, emoji:'🌑'},
-  slowking:{dex:199, name:'Slowking', types:['Water','Psychic'], hp:95, attack:75, defense:80, speed:30, emoji:'👑'},
-  misdreavus:{dex:200, name:'Misdreavus', types:['Ghost'], hp:60, attack:60, defense:60, speed:85, emoji:'👻'},
-  unown:{dex:201, name:'Unown', types:['Psychic'], hp:48, attack:72, defense:48, speed:48, emoji:'🔤'},
-  wobbuffet:{dex:202, name:'Wobbuffet', types:['Psychic'], hp:190, attack:33, defense:58, speed:33, emoji:'🪩'},
-  girafarig:{dex:203, name:'Girafarig', types:['Normal','Psychic'], hp:70, attack:80, defense:65, speed:85, emoji:'🐭'},
-  pineco:{dex:204, name:'Pineco', types:['Bug'], hp:50, attack:65, defense:90, speed:15, emoji:'🐛'},
-  forretress:{dex:205, name:'Forretress', types:['Bug','Steel'], hp:75, attack:90, defense:140, speed:40, emoji:'🐛'},
-  dunsparce:{dex:206, name:'Dunsparce', types:['Normal'], hp:100, attack:70, defense:70, speed:45, emoji:'🪱'},
-  gligar:{dex:207, name:'Gligar', types:['Ground','Flying'], hp:65, attack:75, defense:105, speed:85, emoji:'🦔'},
-  steelix:{dex:208, name:'Steelix', types:['Steel','Ground'], hp:75, attack:85, defense:200, speed:30, emoji:'🐍'},
-  snubbull:{dex:209, name:'Snubbull', types:['Normal'], hp:60, attack:80, defense:50, speed:30, emoji:'🐭'},
-  granbull:{dex:210, name:'Granbull', types:['Normal'], hp:90, attack:120, defense:75, speed:45, emoji:'🐭'},
-  qwilfish:{dex:211, name:'Qwilfish', types:['Water','Poison'], hp:65, attack:95, defense:75, speed:85, emoji:'💧'},
-  scizor:{dex:212, name:'Scizor', types:['Bug','Steel'], hp:70, attack:130, defense:100, speed:65, emoji:'🦀'},
-  shuckle:{dex:213, name:'Shuckle', types:['Bug','Rock'], hp:20, attack:10, defense:230, speed:5, emoji:'🥛'},
-  heracross:{dex:214, name:'Heracross', types:['Bug','Fighting'], hp:80, attack:125, defense:75, speed:85, emoji:'🪲'},
-  sneasel:{dex:215, name:'Sneasel', types:['Dark','Ice'], hp:55, attack:95, defense:55, speed:115, emoji:'🌑'},
-  teddiursa:{dex:216, name:'Teddiursa', types:['Normal'], hp:60, attack:80, defense:50, speed:40, emoji:'🐭'},
-  ursaring:{dex:217, name:'Ursaring', types:['Normal'], hp:90, attack:130, defense:75, speed:55, emoji:'🐭'},
-  slugma:{dex:218, name:'Slugma', types:['Fire'], hp:40, attack:40, defense:40, speed:20, emoji:'🔥'},
-  magcargo:{dex:219, name:'Magcargo', types:['Fire','Rock'], hp:50, attack:50, defense:120, speed:30, emoji:'🔥'},
-  swinub:{dex:220, name:'Swinub', types:['Ice','Ground'], hp:50, attack:50, defense:40, speed:50, emoji:'❄️'},
-  piloswine:{dex:221, name:'Piloswine', types:['Ice','Ground'], hp:100, attack:100, defense:80, speed:50, emoji:'❄️'},
-  corsola:{dex:222, name:'Corsola', types:['Water','Rock'], hp:55, attack:55, defense:85, speed:35, emoji:'🪸'},
-  remoraid:{dex:223, name:'Remoraid', types:['Water'], hp:35, attack:65, defense:35, speed:65, emoji:'💧'},
-  octillery:{dex:224, name:'Octillery', types:['Water'], hp:75, attack:105, defense:75, speed:45, emoji:'💧'},
-  delibird:{dex:225, name:'Delibird', types:['Ice','Flying'], hp:45, attack:55, defense:45, speed:75, emoji:'🎁'},
-  mantine:{dex:226, name:'Mantine', types:['Water','Flying'], hp:65, attack:40, defense:70, speed:70, emoji:'🦺'},
-  skarmory:{dex:227, name:'Skarmory', types:['Steel','Flying'], hp:65, attack:80, defense:140, speed:70, emoji:'🛡️'},
-  houndour:{dex:228, name:'Houndour', types:['Dark','Fire'], hp:45, attack:60, defense:30, speed:65, emoji:'🌑'},
-  houndoom:{dex:229, name:'Houndoom', types:['Dark','Fire'], hp:75, attack:90, defense:50, speed:95, emoji:'🌑'},
-  kingdra:{dex:230, name:'Kingdra', types:['Water','Dragon'], hp:75, attack:95, defense:95, speed:85, emoji:'🐎'},
-  phanpy:{dex:231, name:'Phanpy', types:['Ground'], hp:90, attack:60, defense:60, speed:40, emoji:'🦔'},
-  donphan:{dex:232, name:'Donphan', types:['Ground'], hp:90, attack:120, defense:120, speed:50, emoji:'🐘'},
-  porygon2:{dex:233, name:'Porygon2', types:['Normal'], hp:85, attack:80, defense:90, speed:60, emoji:'🐭'},
-  stantler:{dex:234, name:'Stantler', types:['Normal'], hp:73, attack:95, defense:62, speed:85, emoji:'🐭'},
-  smeargle:{dex:235, name:'Smeargle', types:['Normal'], hp:55, attack:20, defense:35, speed:75, emoji:'🎨'},
-  tyrogue:{dex:236, name:'Tyrogue', types:['Fighting'], hp:35, attack:35, defense:35, speed:35, emoji:'💪'},
-  hitmontop:{dex:237, name:'Hitmontop', types:['Fighting'], hp:50, attack:95, defense:95, speed:70, emoji:'💪'},
-  smoochum:{dex:238, name:'Smoochum', types:['Ice','Psychic'], hp:45, attack:30, defense:15, speed:65, emoji:'❄️'},
-  elekid:{dex:239, name:'Elekid', types:['Electric'], hp:45, attack:63, defense:37, speed:95, emoji:'⚡'},
-  magby:{dex:240, name:'Magby', types:['Fire'], hp:45, attack:75, defense:37, speed:83, emoji:'🔥'},
-  miltank:{dex:241, name:'Miltank', types:['Normal'], hp:95, attack:80, defense:105, speed:100, emoji:'🐮'},
-  blissey:{dex:242, name:'Blissey', types:['Normal'], hp:255, attack:10, defense:10, speed:55, emoji:'🥚'},
-  raikou:{dex:243, name:'Raikou', types:['Electric'], hp:90, attack:85, defense:75, speed:115, emoji:'⚡'},
-  entei:{dex:244, name:'Entei', types:['Fire'], hp:115, attack:115, defense:85, speed:100, emoji:'🔥'},
-  suicune:{dex:245, name:'Suicune', types:['Water'], hp:100, attack:75, defense:115, speed:85, emoji:'💧'},
-  larvitar:{dex:246, name:'Larvitar', types:['Rock','Ground'], hp:50, attack:64, defense:50, speed:41, emoji:'🥚'},
-  pupitar:{dex:247, name:'Pupitar', types:['Rock','Ground'], hp:70, attack:84, defense:70, speed:51, emoji:'🗿'},
-  tyranitar:{dex:248, name:'Tyranitar', types:['Rock','Dark'], hp:100, attack:134, defense:110, speed:61, emoji:'🦖'},
-  lugia:{dex:249, name:'Lugia', types:['Psychic','Flying'], hp:106, attack:90, defense:130, speed:110, emoji:'🌊'},
-  hooh:{dex:250, name:'Ho-Oh', types:['Fire','Flying'], hp:106, attack:130, defense:90, speed:90, emoji:'🌈'},
-  celebi:{dex:251, name:'Celebi', types:['Psychic','Grass'], hp:100, attack:100, defense:100, speed:100, emoji:'🍃'}
-};
-
-/* Sp.Atk e Sp.Def oficiais da Geração II, mesmo formato do GEN2_SPECIAL de Kanto. */
-const GEN2_SPECIAL_JOHTO = {
-  chikorita:[49,65], bayleef:[63,80], meganium:[83,100], cyndaquil:[60,50], quilava:[80,65],
-  typhlosion:[109,85], totodile:[44,48], croconaw:[59,63], feraligatr:[79,83], sentret:[35,45],
-  furret:[45,55], hoothoot:[36,56], noctowl:[76,96], ledyba:[40,80], ledian:[55,110],
-  spinarak:[40,40], ariados:[60,60], crobat:[70,80], chinchou:[56,56], lanturn:[76,76],
-  pichu:[35,35], cleffa:[45,55], igglybuff:[40,20], togepi:[40,65], togetic:[80,105],
-  natu:[70,45], xatu:[95,70], mareep:[65,45], flaaffy:[80,60], ampharos:[115,90],
-  bellossom:[90,100], marill:[20,50], azumarill:[50,80], sudowoodo:[30,65], politoed:[90,100],
-  hoppip:[35,55], skiploom:[45,65], jumpluff:[55,85], aipom:[40,55], sunkern:[30,30],
-  sunflora:[105,85], yanma:[75,45], wooper:[25,25], quagsire:[65,65], espeon:[130,95],
-  umbreon:[60,130], murkrow:[85,42], slowking:[100,110], misdreavus:[85,85], unown:[72,48],
-  wobbuffet:[33,58], girafarig:[90,65], pineco:[35,35], forretress:[60,60], dunsparce:[65,65],
-  gligar:[35,65], steelix:[55,65], snubbull:[40,40], granbull:[60,60], qwilfish:[55,55],
-  scizor:[55,80], shuckle:[10,230], heracross:[40,95], sneasel:[35,75], teddiursa:[50,50],
-  ursaring:[75,75], slugma:[70,40], magcargo:[80,80], swinub:[30,30], piloswine:[60,60],
-  corsola:[65,85], remoraid:[65,35], octillery:[105,75], delibird:[65,45], mantine:[80,140],
-  skarmory:[40,70], houndour:[80,50], houndoom:[110,80], kingdra:[95,95], phanpy:[40,40],
-  donphan:[60,60], porygon2:[105,95], stantler:[85,65], smeargle:[20,45], tyrogue:[35,35],
-  hitmontop:[35,110], smoochum:[85,65], elekid:[65,55], magby:[70,55], miltank:[40,70],
-  blissey:[75,135], raikou:[115,100], entei:[90,75], suicune:[90,115], larvitar:[45,50],
-  pupitar:[65,70], tyranitar:[95,100], lugia:[90,154], hooh:[110,154], celebi:[100,100]
-};
-
-/* Evoluções que CHEGAM em Johto -- inclui as que partem de um pokémon de Kanto (Golbat→Crobat,
-   Onix→Steelix, Chansey→Blissey, Seadra→Kingdra, Scyther→Scizor, Porygon→Porygon2 e as três em
-   conflito citadas acima). Segue a regra que Kanto já usa: o que não evolui por nível (pedra,
-   troca, amizade) entra como nível 40. */
-const EVOLUTIONS_JOHTO = {
+  staryu:{level:40, into:'starmie'},
+  /* ---- Johto. Gloom, Poliwhirl e Slowpoke NAO entram: em Kanto eles ja evoluem pra
+     Vileplume, Poliwrath e Slowbro, e a tabela mapeia um destino so. Bellossom, Politoed e
+     Slowking ficam de fora ate existir uma tela de escolha, como a do Eevee. ---- */
   golbat:{level:40, into:'crobat'},
-  gloom:{level:40, into:'bellossom'},
-  poliwhirl:{level:40, into:'politoed'},
-  slowpoke:{level:40, into:'slowking'},
   onix:{level:40, into:'steelix'},
   chansey:{level:40, into:'blissey'},
   seadra:{level:40, into:'kingdra'},
   scyther:{level:40, into:'scizor'},
-  eevee:{level:40, into:'espeon'},
-  eevee:{level:40, into:'umbreon'},
   porygon:{level:40, into:'porygon2'},
   chikorita:{level:16, into:'bayleef'},
   bayleef:{level:32, into:'meganium'},
@@ -981,6 +945,10 @@ const EVOLUTIONS_JOHTO = {
   larvitar:{level:30, into:'pupitar'},
   pupitar:{level:55, into:'tyranitar'}
 };
+
+
+
+
 
 function encodeTeamCode(team){
   const payload = team.map(p=>`${p.speciesId}:${p.level}${p.shiny?':1':''}`).join(',');

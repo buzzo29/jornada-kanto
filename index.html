@@ -1335,6 +1335,20 @@
   /* o card INTEIRO é o botão de abrir o save (ver openSaveCard). Os controles internos -- renomear,
      favoritar, apagar, ver ginásio -- chamam event.stopPropagation() pra não dispararem a abertura */
   .save-slot-card.clickable{cursor:pointer;}
+  /* Cartão da escolha de ginásio. Reaproveita o card de save (mesma moldura, mesmo toque) porque
+     é a mesma leitura: um bloco grande e clicável com uma decisão dentro. */
+  .gym-choice-card{ padding:11px 13px; }
+  .gym-choice-selo{
+    display:inline-flex; align-items:center; justify-content:center;
+    width:26px; height:26px; border-radius:50%; flex-shrink:0;
+    background:var(--kt-cor); font-size:.85rem; box-shadow:0 0 0 2px rgba(0,0,0,.25) inset;
+  }
+  .gym-choice-regiao{
+    margin-left:auto; font-family:var(--font-pixel); font-size:.55rem;
+    letter-spacing:.05em; color:var(--muted); flex-shrink:0;
+  }
+  .gym-choice-cidade{ font-size:.78rem; font-weight:800; color:var(--blue-dark); margin-top:5px; }
+  .gym-choice-rotas{ font-size:.72rem; color:var(--muted); margin-top:3px; }
   .save-slot-card.clickable:active{transform:translate(2px,2px);box-shadow:2px 2px 0 rgba(0,0,0,.4);}
   .save-slot-empty-team{font-size:.75rem;color:var(--muted);margin:2px 0 0;}
   /* Faixa de estado no rodapé do card. As cores são as MESMAS dos antigos botões de continuar
@@ -2340,127 +2354,13 @@ const SPECIES = {
   vaporeon:{dex:134, name:'Vaporeon', types:['Water'], hp:130, attack:65, defense:60, speed:65, emoji:'💧'},
   jolteon:{dex:135, name:'Jolteon', types:['Electric'], hp:65, attack:65, defense:60, speed:130, emoji:'⚡'},
   flareon:{dex:136, name:'Flareon', types:['Fire'], hp:65, attack:130, defense:60, speed:65, emoji:'🔥'},
-  mewtwo:{dex:150, name:'Mewtwo', types:['Psychic'], hp:106, attack:110, defense:90, speed:130, emoji:'🧬'}
-};
+  mewtwo:{dex:150, name:'Mewtwo', types:['Psychic'], hp:106, attack:110, defense:90, speed:130, emoji:'🧬'},
 
-const EVOLUTIONS = {
-  bulbasaur:{level:16, into:'ivysaur'},
-  ivysaur:{level:32, into:'venusaur'},
-  charmander:{level:16, into:'charmeleon'},
-  charmeleon:{level:36, into:'charizard'},
-  squirtle:{level:16, into:'wartortle'},
-  wartortle:{level:36, into:'blastoise'},
-  weedle:{level:7, into:'kakuna'},
-  kakuna:{level:10, into:'beedrill'},
-  caterpie:{level:7, into:'metapod'},
-  metapod:{level:10, into:'butterfree'},
-  ratata:{level:20, into:'raticate'},
-  pidgey:{level:18, into:'pidgeotto'},
-  pidgeotto:{level:36, into:'pidgeot'},
-  mankey:{level:28, into:'primeape'},
-  spearow:{level:20, into:'fearow'},
-  nidoranm:{level:16, into:'nidorino'},
-  oddish:{level:21, into:'gloom'},
-
-  sandshrew:{level:22, into:'sandslash'},
-  zubat:{level:22, into:'golbat'},
-  paras:{level:24, into:'parasect'},
-  meowth:{level:28, into:'persian'},
-  bellsprout:{level:21, into:'weepinbell'},
-  abra:{level:16, into:'kadabra'},
-
-  ekans:{level:22, into:'arbok'},
-  diglett:{level:26, into:'dugtrio'},
-  magnemite:{level:30, into:'magneton'},
-  drowzee:{level:26, into:'hypno'},
-  nidoranf:{level:16, into:'nidorina'},
-  venonat:{level:31, into:'venomoth'},
-  voltorb:{level:40, into:'electrode'},
-
-  poliwag:{level:25, into:'poliwhirl'},
-  tentacool:{level:30, into:'tentacruel'},
-  machop:{level:28, into:'machoke'},
-  doduo:{level:31, into:'dodrio'},
-  ponyta:{level:40, into:'rapidash'},
-  slowpoke:{level:37, into:'slowbro'},
-  magikarp:{level:20, into:'gyarados'},
-  grimer:{level:38, into:'muk'},
-
-  psyduck:{level:33, into:'golduck'},
-  krabby:{level:28, into:'kingler'},
-  horsea:{level:32, into:'seadra'},
-  goldeen:{level:33, into:'seaking'},
-  cubone:{level:28, into:'marowak'},
-
-  gastly:{level:25, into:'haunter'},
-  rhyhorn:{level:42, into:'rhydon'},
-  seel:{level:34, into:'dewgong'},
-  omanyte:{level:40, into:'omastar'},
-  kabuto:{level:40, into:'kabutops'},
-
-  geodude:{level:25, into:'graveler'},
-  dratini:{level:30, into:'dragonair'},
-  dragonair:{level:50, into:'dragonite'},
-
-  exeggcute:{level:40, into:'exeggutor'},
-  clefairy:{level:40, into:'clefable'},
-  jigglypuff:{level:40, into:'wigglytuff'},
-  vulpix:{level:40, into:'ninetales'},
-  growlithe:{level:40, into:'arcanine'},
-  poliwhirl:{level:40, into:'poliwrath'},
-  weepinbell:{level:40, into:'victreebel'},
-  gloom:{level:40, into:'vileplume'},
-  shellder:{level:40, into:'cloyster'},
-  kadabra:{level:40, into:'alakazam'},
-  machoke:{level:40, into:'machamp'},
-  graveler:{level:40, into:'golem'},
-  haunter:{level:40, into:'gengar'},
-  koffing:{level:40, into:'weezing'},
-  nidorina:{level:40, into:'nidoqueen'},
-  nidorino:{level:40, into:'nidoking'},
-  pikachu:{level:40, into:'raichu'},
-  staryu:{level:40, into:'starmie'}
-};
-
-/* =====================================================================
-   JOHTO (#152-251) -- DADOS BRUTOS, AINDA NÃO LIGADOS AO JOGO
-   ---------------------------------------------------------------------
-   HOJE O JOGO É SÓ KANTO. Nada aqui está em uso: nenhum pokémon de Johto aparece, é capturável ou
-   entra em batalha, e Gloom, Poliwhirl e Slowpoke continuam evoluindo só pro que sempre evoluíram
-   (Vileplume, Poliwrath e Slowbro). Isto é base de dados pra uma implementação futura.
-
-   Tabelas paralelas de propósito. Elas NÃO entram em SPECIES/GEN2_SPECIAL/EVOLUTIONS, porque
-   `Object.keys(SPECIES)` é o que define o total da Pokédex, o "capturou tudo" que libera o desafio
-   do Mewtwo, o pool da Torre dos Treinadores (`!EVOLUTIONS[k]`) e a força que o rival persegue
-   (`bstOf`). Despejar 100 espécies lá dentro mudaria as quatro coisas em silêncio, sem uma linha
-   de código nova. Ligar isso é uma decisão separada, e tem três problemas em aberto:
-
-   1. O TYPE_CHART é da Gen 1 -- 15 tipos, sem Sombrio (Dark) nem Aço (Steel). 10 espécies daqui
-      têm um desses: Umbreon, Murkrow, Forretress, Steelix, Scizor, Sneasel, Skarmory, Houndour,
-      Houndoom e Tyranitar. Hoje o motor trataria os dois como tipo desconhecido (multiplicador
-      neutro em tudo). Acrescentar os dois tipos mexe no EXPOENTE_TIPO, que é o parâmetro mais
-      sensível do motor -- tem que ser medido antes.
-   2. Três pokémons de Kanto ganhariam um SEGUNDO destino de evolução: Gloom (Vileplume ou
-      Bellossom), Poliwhirl (Poliwrath ou Politoed) e Slowpoke (Slowbro ou Slowking). Nada a ver
-      com número de Pokédex -- Vileplume é #45 e Bellossom é #182, cada uma com a sua vaga. O que
-      colide é a CHAVE da tabela de evolução, que é quem evolui: `gloom` do lado esquerdo,
-      escrito duas vezes. Em JavaScript isso não dá erro -- a última linha apaga a primeira, e o
-      Gloom para de virar Vileplume no jogo inteiro, em silêncio.
-      E juntar as duas tabelas não resolveria: `tryEvolve` evolui sozinho por nível, e não tem
-      como escolher entre dois destinos. No jogo original quem decide é a pedra (Folha ou Solar),
-      e aqui não existem itens -- precisaria de uma tela de escolha, como a do Eevee.
-   3. Espeon e Umbreon são evoluções do Eevee, que aqui não passa por EVOLUTIONS -- tem tela
-      própria (`chooseEeveeEvolution`). Entrariam lá, não aqui.
-
-   Procedência dos números: reconstruídos a partir dos dados do Pokémon Showdown, aplicando os
-   mods gen8→gen2 em cima dos valores atuais (é assim que o próprio Showdown monta cada geração).
-   O método foi conferido contra o que já existe aqui: bate 150/150 com o GEN2_SPECIAL de Kanto.
-
-   Aqui NÃO existe um campo `special` único. Ele foi removido do jogo inteiro: era da Gen 1, e a
-   Gen 1 não é mais a referência de atributo em lugar nenhum. Johto, aliás, nunca teve um --
-   nasceu já com o Especial dividido. Sp.Atk e Sp.Def, e só.
-   ===================================================================== */
-const SPECIES_JOHTO = {
+  /* ---- JOHTO (#152-251) ----------------------------------------------------------------
+     Entraram na tabela em uso em 30/08/2026, quando a jornada passou a poder seguir por Johto.
+     Ate ali viviam numa tabela paralela (SPECIES_JOHTO), justamente pra NAO contar pro total da
+     Pokedex nem pro pool da Torre antes da hora. Agora contam: a Pokedex vai a 250 (o #151, Mew,
+     continua de fora -- e o chefe da raide, ninguem captura). */
   chikorita:{dex:152, name:'Chikorita', types:['Grass'], hp:45, attack:49, defense:65, speed:45, emoji:'🌿'},
   bayleef:{dex:153, name:'Bayleef', types:['Grass'], hp:60, attack:62, defense:80, speed:60, emoji:'🌿'},
   meganium:{dex:154, name:'Meganium', types:['Grass'], hp:80, attack:82, defense:100, speed:80, emoji:'🌿'},
@@ -2563,45 +2463,91 @@ const SPECIES_JOHTO = {
   celebi:{dex:251, name:'Celebi', types:['Psychic','Grass'], hp:100, attack:100, defense:100, speed:100, emoji:'🍃'}
 };
 
-/* Sp.Atk e Sp.Def oficiais da Geração II, mesmo formato do GEN2_SPECIAL de Kanto. */
-const GEN2_SPECIAL_JOHTO = {
-  chikorita:[49,65], bayleef:[63,80], meganium:[83,100], cyndaquil:[60,50], quilava:[80,65],
-  typhlosion:[109,85], totodile:[44,48], croconaw:[59,63], feraligatr:[79,83], sentret:[35,45],
-  furret:[45,55], hoothoot:[36,56], noctowl:[76,96], ledyba:[40,80], ledian:[55,110],
-  spinarak:[40,40], ariados:[60,60], crobat:[70,80], chinchou:[56,56], lanturn:[76,76],
-  pichu:[35,35], cleffa:[45,55], igglybuff:[40,20], togepi:[40,65], togetic:[80,105],
-  natu:[70,45], xatu:[95,70], mareep:[65,45], flaaffy:[80,60], ampharos:[115,90],
-  bellossom:[90,100], marill:[20,50], azumarill:[50,80], sudowoodo:[30,65], politoed:[90,100],
-  hoppip:[35,55], skiploom:[45,65], jumpluff:[55,85], aipom:[40,55], sunkern:[30,30],
-  sunflora:[105,85], yanma:[75,45], wooper:[25,25], quagsire:[65,65], espeon:[130,95],
-  umbreon:[60,130], murkrow:[85,42], slowking:[100,110], misdreavus:[85,85], unown:[72,48],
-  wobbuffet:[33,58], girafarig:[90,65], pineco:[35,35], forretress:[60,60], dunsparce:[65,65],
-  gligar:[35,65], steelix:[55,65], snubbull:[40,40], granbull:[60,60], qwilfish:[55,55],
-  scizor:[55,80], shuckle:[10,230], heracross:[40,95], sneasel:[35,75], teddiursa:[50,50],
-  ursaring:[75,75], slugma:[70,40], magcargo:[80,80], swinub:[30,30], piloswine:[60,60],
-  corsola:[65,85], remoraid:[65,35], octillery:[105,75], delibird:[65,45], mantine:[80,140],
-  skarmory:[40,70], houndour:[80,50], houndoom:[110,80], kingdra:[95,95], phanpy:[40,40],
-  donphan:[60,60], porygon2:[105,95], stantler:[85,65], smeargle:[20,45], tyrogue:[35,35],
-  hitmontop:[35,110], smoochum:[85,65], elekid:[65,55], magby:[70,55], miltank:[40,70],
-  blissey:[75,135], raikou:[115,100], entei:[90,75], suicune:[90,115], larvitar:[45,50],
-  pupitar:[65,70], tyranitar:[95,100], lugia:[90,154], hooh:[110,154], celebi:[100,100]
-};
+const EVOLUTIONS = {
+  bulbasaur:{level:16, into:'ivysaur'},
+  ivysaur:{level:32, into:'venusaur'},
+  charmander:{level:16, into:'charmeleon'},
+  charmeleon:{level:36, into:'charizard'},
+  squirtle:{level:16, into:'wartortle'},
+  wartortle:{level:36, into:'blastoise'},
+  weedle:{level:7, into:'kakuna'},
+  kakuna:{level:10, into:'beedrill'},
+  caterpie:{level:7, into:'metapod'},
+  metapod:{level:10, into:'butterfree'},
+  ratata:{level:20, into:'raticate'},
+  pidgey:{level:18, into:'pidgeotto'},
+  pidgeotto:{level:36, into:'pidgeot'},
+  mankey:{level:28, into:'primeape'},
+  spearow:{level:20, into:'fearow'},
+  nidoranm:{level:16, into:'nidorino'},
+  oddish:{level:21, into:'gloom'},
 
-/* Evoluções que CHEGAM em Johto -- inclui as que partem de um pokémon de Kanto (Golbat→Crobat,
-   Onix→Steelix, Chansey→Blissey, Seadra→Kingdra, Scyther→Scizor, Porygon→Porygon2 e as três em
-   conflito citadas acima). Segue a regra que Kanto já usa: o que não evolui por nível (pedra,
-   troca, amizade) entra como nível 40. */
-const EVOLUTIONS_JOHTO = {
+  sandshrew:{level:22, into:'sandslash'},
+  zubat:{level:22, into:'golbat'},
+  paras:{level:24, into:'parasect'},
+  meowth:{level:28, into:'persian'},
+  bellsprout:{level:21, into:'weepinbell'},
+  abra:{level:16, into:'kadabra'},
+
+  ekans:{level:22, into:'arbok'},
+  diglett:{level:26, into:'dugtrio'},
+  magnemite:{level:30, into:'magneton'},
+  drowzee:{level:26, into:'hypno'},
+  nidoranf:{level:16, into:'nidorina'},
+  venonat:{level:31, into:'venomoth'},
+  voltorb:{level:40, into:'electrode'},
+
+  poliwag:{level:25, into:'poliwhirl'},
+  tentacool:{level:30, into:'tentacruel'},
+  machop:{level:28, into:'machoke'},
+  doduo:{level:31, into:'dodrio'},
+  ponyta:{level:40, into:'rapidash'},
+  slowpoke:{level:37, into:'slowbro'},
+  magikarp:{level:20, into:'gyarados'},
+  grimer:{level:38, into:'muk'},
+
+  psyduck:{level:33, into:'golduck'},
+  krabby:{level:28, into:'kingler'},
+  horsea:{level:32, into:'seadra'},
+  goldeen:{level:33, into:'seaking'},
+  cubone:{level:28, into:'marowak'},
+
+  gastly:{level:25, into:'haunter'},
+  rhyhorn:{level:42, into:'rhydon'},
+  seel:{level:34, into:'dewgong'},
+  omanyte:{level:40, into:'omastar'},
+  kabuto:{level:40, into:'kabutops'},
+
+  geodude:{level:25, into:'graveler'},
+  dratini:{level:30, into:'dragonair'},
+  dragonair:{level:50, into:'dragonite'},
+
+  exeggcute:{level:40, into:'exeggutor'},
+  clefairy:{level:40, into:'clefable'},
+  jigglypuff:{level:40, into:'wigglytuff'},
+  vulpix:{level:40, into:'ninetales'},
+  growlithe:{level:40, into:'arcanine'},
+  poliwhirl:{level:40, into:'poliwrath'},
+  weepinbell:{level:40, into:'victreebel'},
+  gloom:{level:40, into:'vileplume'},
+  shellder:{level:40, into:'cloyster'},
+  kadabra:{level:40, into:'alakazam'},
+  machoke:{level:40, into:'machamp'},
+  graveler:{level:40, into:'golem'},
+  haunter:{level:40, into:'gengar'},
+  koffing:{level:40, into:'weezing'},
+  nidorina:{level:40, into:'nidoqueen'},
+  nidorino:{level:40, into:'nidoking'},
+  pikachu:{level:40, into:'raichu'},
+  staryu:{level:40, into:'starmie'},
+  /* ---- Johto. Gloom, Poliwhirl e Slowpoke NAO entram: em Kanto eles ja evoluem pra
+     Vileplume, Poliwrath e Slowbro, e a tabela mapeia um destino so. Bellossom, Politoed e
+     Slowking ficam de fora ate existir uma tela de escolha, como a do Eevee. ---- */
   golbat:{level:40, into:'crobat'},
-  gloom:{level:40, into:'bellossom'},
-  poliwhirl:{level:40, into:'politoed'},
-  slowpoke:{level:40, into:'slowking'},
   onix:{level:40, into:'steelix'},
   chansey:{level:40, into:'blissey'},
   seadra:{level:40, into:'kingdra'},
   scyther:{level:40, into:'scizor'},
-  eevee:{level:40, into:'espeon'},
-  eevee:{level:40, into:'umbreon'},
   porygon:{level:40, into:'porygon2'},
   chikorita:{level:16, into:'bayleef'},
   bayleef:{level:32, into:'meganium'},
@@ -2635,6 +2581,10 @@ const EVOLUTIONS_JOHTO = {
   larvitar:{level:30, into:'pupitar'},
   pupitar:{level:55, into:'tyranitar'}
 };
+
+
+
+
 
 // pra cada espécie que É uma evolução (ex: 'dugtrio'), o nível mínimo em que ela existe de verdade --
 // ninguém evolui pra Dugtrio antes do nível 26, então nenhum Dugtrio selvagem deveria aparecer abaixo
@@ -2699,73 +2649,175 @@ const ROUTE_MAP = [
   [ // antes de Brock (Pedra)
     { id:'viridian_forest', name:'Floresta de Viridian', icon:'🌲', types:['Bug','Grass'],
       rumor:'Dizem que uma faísca amarela se esconde entre as árvores…',
-      pool:['caterpie','weedle','oddish','pidgey','bellsprout','paras','tangela'], rare:['pikachu'] },
+      pool:['caterpie','weedle','oddish','pidgey','bellsprout','paras','tangela','ledyba','spinarak','pineco'], rare:['pikachu'] },
     { id:'route_22', name:'Rota 22', icon:'🌾', types:['Normal','Fighting'],
       rumor:'Treinadores contam de um macaco furioso que quebra pedras.',
-      pool:['ratata','spearow','mankey','nidoranm','nidoranf','meowth','sandshrew','farfetchd'], rare:['growlithe'] }
+      pool:['ratata','spearow','mankey','nidoranm','nidoranf','meowth','sandshrew','farfetchd','sentret','hoothoot'], rare:['growlithe'] }
   ],
   [ // antes de Misty (Água)
     { id:'mt_moon', name:'Monte Lua', icon:'🌙', types:['Rock','Poison'],
       rumor:'Há fósseis antigos enterrados nas cavernas — e Rockets cavando.',
-      pool:['geodude','zubat','clefairy','paras','sandshrew','jigglypuff'], rare:['onix'] },
+      pool:['geodude','zubat','clefairy','paras','sandshrew','jigglypuff','teddiursa','dunsparce','cleffa'], rare:['onix'] },
     { id:'coast_24_25', name:'Rotas 24/25 (Costa)', icon:'🌊', types:['Water','Electric'],
       rumor:'Pescadores juram ter visto um roedor elétrico na margem.',
-      pool:['bellsprout','oddish','psyduck','poliwag','abra','pidgey','goldeen','magikarp','slowpoke','butterfree'], rare:['pikachu'] }
+      pool:['bellsprout','oddish','psyduck','poliwag','abra','pidgey','goldeen','magikarp','slowpoke','butterfree','marill','wooper','chinchou'], rare:['pikachu'] }
   ],
   [ // antes de Lt. Surge (Elétrico)
     { id:'diglett_cave', name:'Caverna Diglett', icon:'🕳️', types:['Ground'],
       rumor:'O chão inteiro se mexe. O counter do Surge mora aqui embaixo.',
-      pool:['diglett','zubat','sandshrew','geodude','ekans','machop','cubone','spearow','mankey'], rare:['dugtrio'] },
+      pool:['diglett','zubat','sandshrew','geodude','ekans','machop','cubone','spearow','mankey','phanpy','dunsparce'], rare:['dugtrio'] },
     { id:'ss_anne', name:'S.S. Anne', icon:'🚢', types:['Normal','Water'],
       rumor:'Um navio de luxo ancorado no porto — dizem que tem gente rica embarcando com pokémons raros.',
-      pool:['krabby','shellder','staryu','tentacool','goldeen','magikarp','horsea','meowth'], rare:['lapras'] }
+      pool:['krabby','shellder','staryu','tentacool','goldeen','magikarp','horsea','meowth','chinchou','mantine'], rare:['lapras'] }
   ],
   [ // antes de Erika (Planta)
     { id:'rock_tunnel', name:'Túnel de Pedra', icon:'⛏️', types:['Rock','Fighting'],
       rumor:'Escuro demais pra enxergar o time. Quem passa, passa às cegas.',
-      pool:['geodude','onix','machop','zubat','graveler','cubone'], rare:['golbat'] },
+      pool:['geodude','onix','machop','zubat','graveler','cubone','teddiursa','larvitar'], rare:['golbat'] },
     { id:'lavender_detour', name:'Desvio por Lavender', icon:'👻', types:['Ghost','Ground'],
       rumor:'A torre chora à noite. Alguma coisa lá dentro não é sólida.',
-      pool:['gastly','cubone','ratata','zubat','drowzee','growlithe','exeggcute'], rare:['haunter'] }
+      pool:['gastly','cubone','ratata','zubat','drowzee','growlithe','exeggcute','misdreavus','murkrow'], rare:['haunter'] }
   ],
   [ // antes de Koga (Veneno)
     { id:'cycling_road', name:'Estrada Ciclável', icon:'🚴', types:['Poison','Electric'],
       rumor:'Rápido, plano e cheio de fumaça. Dá pra atravessar correndo.',
-      pool:['grimer','koffing','doduo','voltorb','magnemite','ekans','fearow','beedrill'], rare:['muk'] },
+      pool:['grimer','koffing','doduo','voltorb','magnemite','ekans','fearow','beedrill','hoppip','skiploom'], rare:['muk'] },
     { id:'safari_zone', name:'Zona de Safári', icon:'🦓', types:['Normal','Dragon'],
       rumor:'Oito ofertas raríssimas — e cada uma pode fugir na sua cara.',
-      pool:['chansey','kangaskhan','tauros','exeggcute','nidoranf','paras','venonat','rhyhorn','pinsir','lickitung','butterfree','beedrill','nidorino','nidorina','doduo'], rare:['dratini'] }
+      pool:['chansey','kangaskhan','tauros','exeggcute','nidoranf','paras','venonat','rhyhorn','pinsir','lickitung','butterfree','beedrill','nidorino','nidorina','doduo','heracross','stantler','girafarig','miltank','aipom'], rare:['dratini'] }
   ],
   [ // antes de Sabrina (Psíquico)
     { id:'fighting_dojo', name:'Dojo Lutador', icon:'🥋', types:['Fighting'],
       rumor:'O mestre entrega um discípulo pra quem vencer. Mas lutador não gosta de psíquico…',
-      pool:['machop','machoke','primeape','mankey','poliwhirl','hitmonlee','hitmonchan'], rare:[] },
+      pool:['machop','machoke','primeape','mankey','poliwhirl','hitmonlee','hitmonchan','tyrogue','hitmontop'], rare:[] },
     { id:'silph_co', name:'Silph Co.', icon:'🏢', types:['Poison','Psychic'],
       rumor:'Onze andares tomados pela Rocket. Dizem que há um experimento estranho guardado no cofre.',
-      pool:['zubat','grimer','koffing','drowzee','abra','mrmime','kadabra','magneton','electabuzz','eevee'], rare:['ditto'] }
+      pool:['zubat','grimer','koffing','drowzee','abra','mrmime','kadabra','magneton','electabuzz','eevee','natu','porygon2','smoochum'], rare:['ditto'] }
   ],
   [ // antes de Blaine (Fogo)
     { id:'seafoam', name:'Ilhas Seafoam', icon:'❄️', types:['Water','Ice'],
       rumor:'Um vento congelante sopra do fundo da caverna. Algo bate asas lá dentro.',
-      pool:['seel','shellder','staryu','dewgong','horsea','goldeen','krabby','golduck','cloyster','jynx','seadra','kingler','tentacruel','vaporeon'], rare:[{species:'articuno',chance:0.05},'kabuto','omanyte','slowbro','gyarados','aerodactyl'] },
+      pool:['seel','shellder','staryu','dewgong','horsea','goldeen','krabby','golduck','cloyster','jynx','seadra','kingler','tentacruel','vaporeon','swinub','delibird','mantine','corsola'], rare:[{species:'articuno',chance:0.05},'kabuto','omanyte','slowbro','gyarados','aerodactyl'] },
     { id:'pokemon_mansion', name:'Mansão Pokémon', icon:'🏚️', types:['Fire','Normal'],
       rumor:'Diários queimados falam de um experimento chamado… Mewtwo.',
-      pool:['growlithe','ponyta','vulpix','magmar','rapidash','koffing','weezing','golbat','eevee','flareon','dodrio'], rare:['ditto','ninetales','arcanine'] }
+      pool:['growlithe','ponyta','vulpix','magmar','rapidash','koffing','weezing','golbat','eevee','flareon','dodrio','houndour','magby','slugma'], rare:['ditto','ninetales','arcanine'] }
   ],
   [ // antes de Giovanni (Terra)
     { id:'power_plant', name:'Usina de Força', icon:'⚡', types:['Electric'],
       rumor:'A usina abandonada ainda tem energia. E ela tem asas.',
-      pool:['magnemite','electabuzz','voltorb','magneton','electrode','raichu','jolteon','porygon'], rare:[{species:'zapdos',chance:0.05}, {species:'dragonite',chance:0.10}] },
+      pool:['magnemite','electabuzz','voltorb','magneton','electrode','raichu','jolteon','porygon','mareep','flaaffy','elekid'], rare:[{species:'zapdos',chance:0.05}, {species:'dragonite',chance:0.10}] },
     { id:'victory_road', name:'Victory Road', icon:'🏔️', types:['Rock','Fighting'],
       rumor:'Só passa quem merece. Uma chama vive no topo da montanha.',
-      pool:['onix','machoke','graveler','rhyhorn','primeape','golbat','snorlax','golem','marowak','dragonair'], rare:[{species:'moltres',chance:0.05}, {species:'dragonite',chance:0.10}] }
+      pool:['onix','machoke','graveler','rhyhorn','primeape','golbat','snorlax','golem','marowak','dragonair','pupitar','ursaring','donphan'], rare:[{species:'moltres',chance:0.05}, {species:'dragonite',chance:0.10}] }
   ]
 ];
+/* Rotas de Johto -- duas por etapa, seguindo o caminho real do Crystal até cada ginásio.
+   Os pools misturam Johto e Kanto, como no jogo original (a maior parte das rotas de Johto tem
+   espécies das duas gerações). Os níveis NÃO ficam aqui: saem do LEGS, os mesmos das rotas de
+   Kanto -- é o que garante que escolher Johto não seja mais fácil nem mais difícil. */
+const JOHTO_ROUTE_MAP = [
+  [ // antes do Falkner (Voador) -- Rotas 29/30 e a Caverna Escura
+    { id:'route_29_30', name:'Rotas 29/30', icon:'🌱', types:['Normal','Bug'],
+      rumor:'O caminho de casa até Cherrygrove. Tudo aqui é pequeno, rápido e curioso.',
+      pool:['sentret','hoothoot','pidgey','ledyba','spinarak','caterpie','weedle','ratata'], rare:['mareep'] },
+    { id:'dark_cave', name:'Caverna Escura', icon:'🕯️', types:['Rock','Ground'],
+      rumor:'Sem lanterna não se enxerga nada — e tem coisa se arrastando no escuro.',
+      pool:['geodude','zubat','dunsparce','teddiursa','wooper','machop','onix'], rare:['phanpy'] }
+  ],
+  [ // antes do Bugsy (Inseto) -- Rota 32 e a Caverna União
+    { id:'route_32', name:'Rota 32', icon:'🎣', types:['Electric','Water'],
+      rumor:'Pescadores na ponte o dia inteiro. Alguém viu uma ovelha elétrica no capim.',
+      pool:['mareep','bellsprout','hoppip','wooper','ratata','zubat','magikarp','ekans'], rare:['quagsire'] },
+    { id:'union_cave', name:'Caverna União', icon:'🪨', types:['Rock','Water'],
+      rumor:'Nas sextas-feiras, dizem que algo enorme e gentil aparece no lago do fundo.',
+      pool:['geodude','zubat','onix','ratata','sandshrew','wooper','slowpoke','marill'], rare:[{species:'lapras', chance:0.08}] }
+  ],
+  [ // antes da Whitney (Normal) -- Floresta Ilex e Rota 34
+    { id:'ilex_forest', name:'Floresta Ilex', icon:'🌳', types:['Bug','Grass'],
+      rumor:'A floresta guardiã. Batendo nas árvores certas, algo grande cai lá de cima.',
+      pool:['caterpie','metapod','weedle','kakuna','paras','oddish','psyduck','zubat','pineco'], rare:['heracross'] },
+    { id:'route_34', name:'Rota 34', icon:'🏙️', types:['Normal','Psychic'],
+      rumor:'O caminho da creche até Goldenrod. Passa de tudo por aqui.',
+      pool:['ratata','abra','drowzee','snubbull','magikarp','tentacool','hoppip','meowth'], rare:['ditto'] }
+  ],
+  [ // antes do Morty (Fantasma) -- Parque Nacional e Rotas 36/37
+    { id:'national_park', name:'Parque Nacional', icon:'🦋', types:['Bug','Grass'],
+      rumor:'Todo domingo tem concurso de captura. Hoje o parque está vazio — e barulhento.',
+      pool:['caterpie','metapod','pidgey','sunkern','hoothoot','psyduck','venonat','ledian','butterfree'], rare:['scyther','pinsir'] },
+    { id:'route_36_37', name:'Rotas 36/37', icon:'🍂', types:['Fire','Normal'],
+      rumor:'Uma árvore no meio do caminho não sai do lugar. E não é uma árvore.',
+      pool:['growlithe','vulpix','stantler','hoppip','ledyba','spinarak','nidoranm','nidoranf'], rare:['sudowoodo'] }
+  ],
+  [ // antes do Chuck (Lutador) -- Ilhas Redemoinho e Rotas 40/41
+    { id:'whirl_islands', name:'Ilhas Redemoinho', icon:'🌀', types:['Water','Flying'],
+      rumor:'Quatro ilhas em volta de um redemoinho. Lá no fundo, algo prateado bate as asas.',
+      pool:['tentacool','krabby','horsea','seel','golbat','zubat','staryu','chinchou'], rare:[{species:'lugia', chance:0.05}] },
+    { id:'route_40_41', name:'Rotas 40/41 (Mar)', icon:'🌊', types:['Water'],
+      rumor:'Mar aberto entre Olivine e Cianwood. Só se atravessa nadando.',
+      pool:['tentacool','krabby','horsea','magikarp','shellder','chinchou','lanturn','goldeen'], rare:['mantine'] }
+  ],
+  [ // antes da Jasmine (Aço) -- Farol de Olivine e Rotas 38/39
+    { id:'olivine_lighthouse', name:'Farol de Olivine', icon:'🗼', types:['Electric','Poison'],
+      rumor:'A luz do farol apagou. Tem um pokémon doente lá em cima — e é ele a lâmpada.',
+      pool:['zubat','golbat','voltorb','magnemite','grimer','koffing','staryu','krabby'], rare:['ampharos'] },
+    { id:'route_38_39', name:'Rotas 38/39', icon:'🐄', types:['Normal'],
+      rumor:'Pasto da Fazenda Moomoo. Leite fresco e bichos grandes demais pro capim.',
+      pool:['miltank','tauros','meowth','magnemite','farfetchd','ratata','snubbull','growlithe'], rare:['girafarig'] }
+  ],
+  [ // antes do Pryce (Gelo) -- Monte Mortar e Lago da Fúria
+    { id:'mt_mortar', name:'Monte Mortar', icon:'🥊', types:['Fighting','Rock'],
+      rumor:'Um mestre de karatê treina sozinho na caverna dos fundos há anos.',
+      pool:['machop','machoke','geodude','graveler','ratata','zubat','golbat','marill'], rare:['tyrogue'] },
+    { id:'lake_of_rage', name:'Lago da Fúria', icon:'🔴', types:['Water','Dragon'],
+      rumor:'O lago inteiro está agitado. No meio dele, um Gyarados da cor errada.',
+      pool:['magikarp','poliwag','wooper','quagsire','slowpoke','marill','goldeen','dratini'], rare:[{species:'gyarados', chance:0.12}] }
+  ],
+  [ // antes da Clair (Dragão) -- Caminho de Gelo e Covil do Dragão
+    { id:'ice_path', name:'Caminho de Gelo', icon:'🧊', types:['Ice','Poison'],
+      rumor:'O chão é escorregadio e só se anda em linha reta. Algo com garras observa.',
+      pool:['swinub','delibird','jynx','golbat','zubat','piloswine','seel','dewgong'], rare:['sneasel'] },
+    { id:'dragons_den', name:'Covil do Dragão', icon:'🐲', types:['Dragon','Water'],
+      rumor:'Atrás do ginásio, uma caverna alagada onde os dragões são criados.',
+      pool:['dratini','dragonair','magikarp','horsea','seadra','poliwag','goldeen','gyarados'], rare:[{species:'kingdra', chance:0.10}, {species:'dragonite', chance:0.08}] }
+  ]
+];
+
+/* ============================================================================
+   O CAMINHO ESCOLHIDO -- Kanto ou Johto, etapa por etapa
+
+   `game.gymPath` guarda a região escolhida em CADA uma das 8 etapas: ['kanto','johto',...].
+   É estado de JOGO, não de exibição: o ginásio enfrentado, a insígnia ganha e as rotas oferecidas
+   saem daí. Save antigo não tem o campo -- `regiaoDaEtapa` devolve 'kanto' nesse caso, e a jornada
+   dele continua exatamente como era.
+   ============================================================================ */
+const REGIOES = ['kanto','johto'];
+function regiaoDaEtapa(legIndex){
+  const p = (game.gymPath || [])[legIndex];
+  return p === 'johto' ? 'johto' : 'kanto';   // padrão e fallback de save antigo
+}
+function gymOf(legIndex){
+  const lista = regiaoDaEtapa(legIndex) === 'johto' ? JOHTO_GYMS : KANTO_GYMS;
+  return lista[legIndex] || lista[lista.length-1];
+}
+function gymAtual(){ return gymOf(game.gymIndex); }
+/* Os 16 líderes. Serve pra procurar por insígnia: o save guarda o NOME da insígnia ganha, e ela
+   pode ser de qualquer uma das duas regiões. */
+function todosOsGinasios(){ return KANTO_GYMS.concat(JOHTO_GYMS); }
+/* Funcao, e nao const: estes ajudantes ficam ANTES das tabelas de ginasio no arquivo, e um
+   const avaliado na carga cairia na zona morta do KANTO_GYMS. Dentro de funcao, so roda depois. */
+function numGinasios(){ return KANTO_GYMS.length; }
+/* Os dois ginásios em disputa numa etapa -- é o que a tela de escolha mostra. */
+function opcoesDeGinasio(legIndex){
+  return [ { regiao:'kanto', gym: KANTO_GYMS[legIndex] },
+           { regiao:'johto', gym: JOHTO_GYMS[legIndex] } ];
+}
 function routesForLeg(legIndex){
-  return ROUTE_MAP[legIndex] || ROUTE_MAP[ROUTE_MAP.length-1];
+  const mapa = regiaoDaEtapa(legIndex) === 'johto' ? JOHTO_ROUTE_MAP : ROUTE_MAP;
+  return mapa[legIndex] || mapa[mapa.length-1];
 }
 function routeById(routeId){
   for(const pair of ROUTE_MAP){ const found = pair.find(r=>r.id===routeId); if(found) return found; }
+  for(const pair of JOHTO_ROUTE_MAP){ const found = pair.find(r=>r.id===routeId); if(found) return found; }
   return null;
 }
 
@@ -2818,7 +2870,23 @@ function currentShinyChance(){
   return Math.min(1, SHINY_CHANCE_BONUS + (game.shinyPityCount||0) * SHINY_PITY_STEP);
 }
 
-const GYMS = [
+/* ============================================================================
+   OS DOIS CAMINHOS -- KANTO E JOHTO
+
+   A jornada tem 8 etapas, e em CADA uma o treinador escolhe se enfrenta o ginásio de Kanto ou o
+   de Johto daquela altura. Os dois jogos originais têm 8 ginásios, então os pares saem naturais:
+   Brock/Falkner, Misty/Bugsy, Surge/Whitney, Erika/Morty, Koga/Chuck, Sabrina/Jasmine,
+   Blaine/Pryce, Giovanni/Clair.
+
+   OS TIMES DE JOHTO FORAM REESCALADOS. Os níveis originais do Crystal não servem aqui -- os
+   líderes de Kanto deste jogo já foram subidos por balanceamento, e o Falkner original (Pidgey 7,
+   Pidgeotto 9) seria atropelado por um time que passa fácil do nível 15. Cada líder de Johto tem
+   o MESMO NÚMERO DE POKÉMON e a MESMA MÉDIA DE NÍVEL do líder de Kanto da mesma etapa, para que a
+   escolha seja de TIPO e não de dificuldade. `node tools/test-jornada.js` confere isso.
+   As espécies são as do jogo original sempre que possível; onde faltou pokémon pra fechar o time,
+   entrou algo do mesmo tipo e da mesma região.
+   ============================================================================ */
+const KANTO_GYMS = [
   {
     id:'brock', leaderName:'Brock', gymTypeName:'Pedra', badge:'Insígnia Pedra',
     city:'Pewter City', adviceTypes:'Planta, Água e Lutador',
@@ -2867,26 +2935,99 @@ const GYMS = [
     team:[{species:'rhyhorn', level: 58}, {species:'dugtrio', level: 55}, {species:'persian', level: 56}, {species:'nidoqueen', level: 57}, {species:'nidoking', level: 58}, {species:'rhydon', level: 63}]
   }
 ];
+/* Johto. Mesma quantidade de pokémon e mesma média de nível do líder de Kanto da mesma etapa. */
+const JOHTO_GYMS = [
+  {
+    id:'falkner', leaderName:'Falkner', gymTypeName:'Voador', badge:'Insígnia Zéfiro',
+    city:'Violet City', adviceTypes:'Elétrico, Pedra e Gelo',
+    /* O Hoothoot saiu e entrou o Noctowl. Medido: com Hoothoot, o Falkner não matava NENHUMA das
+       300 jornadas simuladas, contra 60 do Brock -- o primeiro ginásio é a peneira da jornada
+       (ver a nota do Brock no CLAUDE.md) e um Falkner de brinquedo tirava isso do caminho de Johto.
+       O Noctowl (100 de HP, 96 de Sp.Def) faz o papel de muralha que o Onix faz do outro lado. */
+    /* A Skarmory faz aqui o que o Onix faz no Brock: uma parede que o time de nível 17 não fura.
+       Medido: com Hoothoot o Falkner não matava NENHUMA das 300 jornadas simuladas, contra 60 do
+       Brock -- e o primeiro ginásio é a peneira da jornada (ver a nota do Brock no CLAUDE.md).
+       O Noctowl também não bastou: 100 de HP não compensam 50 de Defesa.
+       Ela é Aço/Voador, então o espelho com o Brock é bonito: lá o Bulbasaur passa fácil e o
+       Charmander sofre; aqui é o contrário. */
+    team:[{species:'pidgey', level: 17}, {species:'pidgeotto', level: 19}, {species:'skarmory', level: 19}]
+  },
+  {
+    id:'bugsy', leaderName:'Bugsy', gymTypeName:'Inseto', badge:'Insígnia Colmeia',
+    city:'Azalea Town', adviceTypes:'Fogo, Voador e Pedra',
+    team:[{species:'metapod', level: 25}, {species:'kakuna', level: 26}, {species:'ledian', level: 27}, {species:'scyther', level: 30}]
+  },
+  {
+    id:'whitney', leaderName:'Whitney', gymTypeName:'Normal', badge:'Insígnia Planície',
+    city:'Goldenrod City', adviceTypes:'Lutador',
+    // a Miltank é a assinatura dela e o pesadelo clássico do jogo original: entra por último e
+    // com o nível mais alto do time, como lá
+    team:[{species:'clefairy', level: 29}, {species:'clefable', level: 30}, {species:'furret', level: 33}, {species:'miltank', level: 36}]
+  },
+  {
+    id:'morty', leaderName:'Morty', gymTypeName:'Fantasma', badge:'Insígnia Névoa',
+    city:'Ecruteak City', adviceTypes:'Fantasma e Psíquico',
+    team:[{species:'gastly', level: 31}, {species:'haunter', level: 34}, {species:'misdreavus', level: 37}, {species:'haunter', level: 39}, {species:'gengar', level: 39}]
+  },
+  {
+    id:'chuck', leaderName:'Chuck', gymTypeName:'Lutador', badge:'Insígnia Tempestade',
+    city:'Cianwood City', adviceTypes:'Psíquico e Voador',
+    team:[{species:'machop', level: 45}, {species:'mankey', level: 49}, {species:'primeape', level: 49}, {species:'machoke', level: 51}, {species:'poliwrath', level: 55}]
+  },
+  {
+    id:'jasmine', leaderName:'Jasmine', gymTypeName:'Aço', badge:'Insígnia Mineral',
+    city:'Olivine City', adviceTypes:'Fogo, Lutador e Terra',
+    // Magnemite e Magneton continuam só Elétrico aqui (o jogo usa a tipagem da Gen 1). Quem
+    // carrega o Aço de verdade no time são a Skarmory e o Steelix, a assinatura dela
+    team:[{species:'magnemite', level: 49}, {species:'magnemite', level: 50}, {species:'magneton', level: 50}, {species:'magneton', level: 52}, {species:'steelix', level: 55}]
+  },
+  {
+    id:'pryce', leaderName:'Pryce', gymTypeName:'Gelo', badge:'Insígnia Geleira',
+    city:'Mahogany Town', adviceTypes:'Fogo, Lutador e Pedra',
+    team:[{species:'swinub', level: 53}, {species:'seel', level: 55}, {species:'dewgong', level: 55}, {species:'piloswine', level: 56}, {species:'cloyster', level: 60}]
+  },
+  {
+    id:'clair', leaderName:'Clair', gymTypeName:'Dragão', badge:'Insígnia Ascensão',
+    city:'Blackthorn City', adviceTypes:'Gelo e Dragão',
+    // 6 pokémon, como o Giovanni: é o último ginásio da jornada dos dois lados
+    /* Três Dragonair, como no jogo original. O Dratini que estava aqui era presente de graça no
+       último ginásio da jornada: 300 de BST no nível 55, contra o Rhyhorn do Giovanni que tem 95
+       de Defesa. Medido, a Clair matava 10 jornadas em 300 contra 56 do Giovanni. */
+    team:[{species:'dragonair', level: 55}, {species:'dragonair', level: 56}, {species:'dragonair', level: 57}, {species:'gyarados', level: 58}, {species:'kingdra', level: 58}, {species:'dragonite', level: 63}]
+  }
+];
+
 
 const TYPE_CHART = {
   // as 5 imunidades totais do Gen 1 (Normal/Lutador vs Fantasma, Fantasma vs Normal, Terra vs Voador,
   // Elétrico vs Terra) valem 0 de novo, como na Gen 1 de verdade. Elas valeram 0.25 por um tempo,
   // pra nada ser 100% imune -- ver a nota de imunidade no CLAUDE.md pro que essa volta custa.
-  Normal:{Rock:0.5, Ghost:0},
-  Fire:{Grass:2,Bug:2,Rock:0.5,Water:0.5,Fire:0.5,Ice:2,Dragon:0.5},
+  Normal:{Rock:0.5, Ghost:0, Steel:0.5},
+  Fire:{Grass:2,Bug:2,Rock:0.5,Water:0.5,Fire:0.5,Ice:2,Dragon:0.5,Steel:2},
   Water:{Fire:2,Rock:2,Ground:2,Water:0.5,Grass:0.5,Dragon:0.5},
-  Grass:{Water:2,Rock:2,Ground:2,Fire:0.5,Grass:0.5,Poison:0.5,Flying:0.5,Bug:0.5,Dragon:0.5},
-  Poison:{Grass:2,Bug:2,Rock:0.5,Ground:0.5,Poison:0.5,Ghost:0.5},
-  Flying:{Grass:2,Fighting:2,Bug:2,Rock:0.5,Electric:0.5},
-  Bug:{Grass:2,Poison:2,Fighting:0.5,Flying:0.5,Fire:0.5,Psychic:2,Ghost:0.5},
-  Fighting:{Normal:2,Rock:2,Poison:0.5,Flying:0.5,Bug:0.5,Psychic:0.5,Ghost:0,Ice:2},
-  Rock:{Fire:2,Flying:2,Bug:2,Fighting:0.5,Ground:0.5,Ice:2},
-  Ground:{Fire:2,Rock:2,Poison:2,Grass:0.5,Bug:0.5,Electric:2,Flying:0},
-  Psychic:{Fighting:2,Poison:2,Psychic:0.5},
-  Electric:{Water:2,Flying:2,Grass:0.5,Electric:0.5,Ground:0,Dragon:0.5},
-  Ghost:{Ghost:2,Psychic:2,Normal:0},
-  Dragon:{Dragon:2},
-  Ice:{Grass:2,Ground:2,Flying:2,Dragon:2,Water:0.5,Ice:0.5}
+  Grass:{Water:2,Rock:2,Ground:2,Fire:0.5,Grass:0.5,Poison:0.5,Flying:0.5,Bug:0.5,Dragon:0.5,Steel:0.5},
+  Poison:{Grass:2,Bug:2,Rock:0.5,Ground:0.5,Poison:0.5,Ghost:0.5,Steel:0},
+  Flying:{Grass:2,Fighting:2,Bug:2,Rock:0.5,Electric:0.5,Steel:0.5},
+  Bug:{Grass:2,Poison:2,Fighting:0.5,Flying:0.5,Fire:0.5,Psychic:2,Ghost:0.5,Dark:2,Steel:0.5},
+  Fighting:{Normal:2,Rock:2,Poison:0.5,Flying:0.5,Bug:0.5,Psychic:0.5,Ghost:0,Ice:2,Dark:2,Steel:2},
+  Rock:{Fire:2,Flying:2,Bug:2,Fighting:0.5,Ground:0.5,Ice:2,Steel:0.5},
+  Ground:{Fire:2,Rock:2,Poison:2,Grass:0.5,Bug:0.5,Electric:2,Flying:0,Steel:2},
+  Psychic:{Fighting:2,Poison:2,Psychic:0.5,Dark:0,Steel:0.5},
+  Electric:{Water:2,Flying:2,Grass:0.5,Electric:0.5,Ground:0,Dragon:0.5,Steel:0.5},
+  Ghost:{Ghost:2,Psychic:2,Normal:0,Dark:0.5,Steel:0.5},
+  Dragon:{Dragon:2,Steel:0.5},
+  Ice:{Grass:2,Ground:2,Flying:2,Dragon:2,Water:0.5,Ice:0.5,Steel:0.5},
+  /* SOMBRIO e AÇO -- os dois tipos que a Gen 2 trouxe, e sem eles metade de Johto não funciona
+     (Umbreon, Houndoom, Tyranitar, Scizor, Steelix, Skarmory, o ginásio da Jasmine...).
+     Valores da Geração II, que diferem dos modernos em dois pontos: o Aço ainda resiste a
+     Fantasma e a Sombrio (só perdeu isso na Gen 6), e o Sombrio ainda não é fraco contra Fada,
+     que não existe aqui.
+     Acrescentar tipo NOVO não mexe em nada do que já existia: nenhuma das 150 espécies de Kanto é
+     Sombrio ou Aço (o jogo usa a tipagem da Gen 1, então Magnemite/Magneton continuam só
+     Elétrico), então toda linha nova só entra em confronto que envolve um pokémon de Johto.
+     Conferido: a impressão do motor não muda. */
+  Dark:{Psychic:2,Ghost:2,Fighting:0.5,Dark:0.5,Steel:0.5},
+  Steel:{Rock:2,Ice:2,Steel:0.5,Fire:0.5,Water:0.5,Electric:0.5}
 };
 
 /* -------------------------------------------------------------------
@@ -3001,6 +3142,7 @@ function freshGameDefaults(){
                      // Bônus de Kanto usa no fim (ver KANTO_BONUS_TIERS)
     everComeback:false,
     eliteDittoWin:false,   // venceu a Elite com um Ditto no time (ver a conquista "Mestre do Disfarce")
+    gymPath:[],            // região escolhida em cada etapa: ['kanto','johto',...] -- ver regiaoDaEtapa
     evolutions:[],
     battleResult:null,
     revealIndex:0,
@@ -3292,10 +3434,20 @@ const GYM_BADGE_VISUALS = {
   koga:{ color:'#9C27B0', emoji:'☠️', img:'https://archives.bulbagarden.net/media/upload/thumb/7/7d/Soul_Badge.png/50px-Soul_Badge.png' },
   sabrina:{ color:'#8D6E63', emoji:'🔮', img:'https://archives.bulbagarden.net/media/upload/thumb/6/6b/Marsh_Badge.png/50px-Marsh_Badge.png' },
   blaine:{ color:'#E64A19', emoji:'🌋', img:'https://archives.bulbagarden.net/media/upload/thumb/1/12/Volcano_Badge.png/50px-Volcano_Badge.png' },
-  giovanni:{ color:'#43A047', emoji:'🌍', img:'https://archives.bulbagarden.net/media/upload/thumb/7/78/Earth_Badge.png/50px-Earth_Badge.png' }
+  giovanni:{ color:'#43A047', emoji:'🌍', img:'https://archives.bulbagarden.net/media/upload/thumb/7/78/Earth_Badge.png/50px-Earth_Badge.png' },
+  // Johto. Mesma fonte de imagem e a mesma reserva de cor/símbolo -- se o Bulbagarden mudar de
+  // ideia sobre hotlink, os 16 selos caem juntos pro plano B, não só metade
+  falkner:{ color:'#9FC5E8', emoji:'🪶', img:'https://archives.bulbagarden.net/media/upload/thumb/1/1a/Zephyr_Badge.png/50px-Zephyr_Badge.png' },
+  bugsy:{ color:'#A8C64A', emoji:'🐝', img:'https://archives.bulbagarden.net/media/upload/thumb/9/9a/Hive_Badge.png/50px-Hive_Badge.png' },
+  whitney:{ color:'#F48FB1', emoji:'🐄', img:'https://archives.bulbagarden.net/media/upload/thumb/8/8e/Plain_Badge.png/50px-Plain_Badge.png' },
+  morty:{ color:'#7E57C2', emoji:'👻', img:'https://archives.bulbagarden.net/media/upload/thumb/0/06/Fog_Badge.png/50px-Fog_Badge.png' },
+  chuck:{ color:'#D84315', emoji:'🥊', img:'https://archives.bulbagarden.net/media/upload/thumb/6/6f/Storm_Badge.png/50px-Storm_Badge.png' },
+  jasmine:{ color:'#B0BEC5', emoji:'⚙️', img:'https://archives.bulbagarden.net/media/upload/thumb/4/4a/Mineral_Badge.png/50px-Mineral_Badge.png' },
+  pryce:{ color:'#81D4FA', emoji:'❄️', img:'https://archives.bulbagarden.net/media/upload/thumb/2/2e/Glacier_Badge.png/50px-Glacier_Badge.png' },
+  clair:{ color:'#5C6BC0', emoji:'🐉', img:'https://archives.bulbagarden.net/media/upload/thumb/e/e6/Rising_Badge.png/50px-Rising_Badge.png' }
 };
 function badgeVisualByName(badgeName){
-  const gym = GYMS.find(g=>g.badge===badgeName);
+  const gym = todosOsGinasios().find(g=>g.badge===badgeName);
   return (gym && GYM_BADGE_VISUALS[gym.id]) || { color:'#999', emoji:'🏅', img:'' };
 }
 // imagem real com fallback pro selo colorido -- se a imagem falhar por qualquer motivo, troca pro
@@ -3379,7 +3531,28 @@ const GEN2_SPECIAL = {
   ditto:[48,48], eevee:[45,65], vaporeon:[110,95], jolteon:[110,95], flareon:[95,110],
   porygon:[85,75], omanyte:[90,55], omastar:[115,70], kabuto:[55,45], kabutops:[65,70],
   aerodactyl:[60,75], snorlax:[65,110], articuno:[95,125], zapdos:[125,90], moltres:[125,85],
-  dratini:[50,50], dragonair:[70,70], dragonite:[100,100], mewtwo:[154,90]
+  dratini:[50,50], dragonair:[70,70], dragonite:[100,100], mewtwo:[154,90],
+  // ---- Johto (#152-251) ----
+  chikorita:[49,65], bayleef:[63,80], meganium:[83,100], cyndaquil:[60,50], quilava:[80,65],
+  typhlosion:[109,85], totodile:[44,48], croconaw:[59,63], feraligatr:[79,83], sentret:[35,45],
+  furret:[45,55], hoothoot:[36,56], noctowl:[76,96], ledyba:[40,80], ledian:[55,110],
+  spinarak:[40,40], ariados:[60,60], crobat:[70,80], chinchou:[56,56], lanturn:[76,76],
+  pichu:[35,35], cleffa:[45,55], igglybuff:[40,20], togepi:[40,65], togetic:[80,105],
+  natu:[70,45], xatu:[95,70], mareep:[65,45], flaaffy:[80,60], ampharos:[115,90],
+  bellossom:[90,100], marill:[20,50], azumarill:[50,80], sudowoodo:[30,65], politoed:[90,100],
+  hoppip:[35,55], skiploom:[45,65], jumpluff:[55,85], aipom:[40,55], sunkern:[30,30],
+  sunflora:[105,85], yanma:[75,45], wooper:[25,25], quagsire:[65,65], espeon:[130,95],
+  umbreon:[60,130], murkrow:[85,42], slowking:[100,110], misdreavus:[85,85], unown:[72,48],
+  wobbuffet:[33,58], girafarig:[90,65], pineco:[35,35], forretress:[60,60], dunsparce:[65,65],
+  gligar:[35,65], steelix:[55,65], snubbull:[40,40], granbull:[60,60], qwilfish:[55,55],
+  scizor:[55,80], shuckle:[10,230], heracross:[40,95], sneasel:[35,75], teddiursa:[50,50],
+  ursaring:[75,75], slugma:[70,40], magcargo:[80,80], swinub:[30,30], piloswine:[60,60],
+  corsola:[65,85], remoraid:[65,35], octillery:[105,75], delibird:[65,45], mantine:[80,140],
+  skarmory:[40,70], houndour:[80,50], houndoom:[110,80], kingdra:[95,95], phanpy:[40,40],
+  donphan:[60,60], porygon2:[105,95], stantler:[85,65], smeargle:[20,45], tyrogue:[35,35],
+  hitmontop:[35,110], smoochum:[85,65], elekid:[65,55], magby:[70,55], miltank:[40,70],
+  blissey:[75,135], raikou:[115,100], entei:[90,75], suicune:[90,115], larvitar:[45,50],
+  pupitar:[65,70], tyranitar:[95,100], lugia:[90,154], hooh:[110,154], celebi:[100,100]
 };
 (function aplicaSplitEspecial(){
   for(const id in GEN2_SPECIAL){
@@ -5854,7 +6027,7 @@ function runBattle(){
      precisa ser o mesmo em todas as tentativas. Sorteando na hora, um Sandshrew shiny na primeira
      tentativa sumia na segunda -- o adversário mudava no meio da disputa, o que é confuso e
      injusto (o buff de shiny altera o dano). Mesma semente = mesmo time, sempre. */
-  const base = GYMS[game.gymIndex].team;
+  const base = gymAtual().team;
   /* Quais pokémon do líder são shiny: METADE DO TIME, quantidade exata -- não 50% de chance por
      pokémon. Sorteando por pokémon, um time de 3 saía com 0 ou 3 shinies em 1 de cada 4 batalhas,
      e "metade do time" virava só uma média.
@@ -6089,7 +6262,7 @@ function finishBattle(){
   });
   result.leveledUpFromFaint = anyLeveledUp;
   if(result.win){
-    game.badgesEarned.push(GYMS[game.gymIndex].badge);
+    game.badgesEarned.push(gymAtual().badge);
     // 1ª insígnia = a jornada saiu do papel; aquele slot ganha direito a um sorteio novo de
     // iniciais na PRÓXIMA vez que for recriado (ver sorteioDosIniciais)
     if(game.badgesEarned.length === 1) limparSorteioDosIniciais(game.currentSaveSlot);
@@ -9180,10 +9353,11 @@ function continueJourney(){
   game.gymIndex++;
   game.losses = 0;
   game.gymTerrain = null; // sorteia de novo pro próximo ginásio, não reaproveita o do anterior
-  game.routeCards = routesForLeg(game.gymIndex).map(r=>r.id);
   game.gymApproachRocketChecked = false;
   game.gymApproachRivalChecked = false;
-  game.screen = 'walkNext';
+  // as rotas saem de dentro do escolherGinasio: até a região da etapa nova ser decidida, não dá
+  // pra saber quais duas rotas oferecer
+  irParaEscolhaDeGinasio();
   render();
 }
 function showJourneyEnd(){
@@ -9605,6 +9779,7 @@ function serializeGame(){
     kantoBonusLevels: game.kantoBonusLevels||0,
     everComeback: game.everComeback || false,
     eliteDittoWin: game.eliteDittoWin || false,
+    gymPath: Array.isArray(game.gymPath) ? game.gymPath : [],
     pendingGymVictoryPool: game.pendingGymVictoryPool,
     gymTerrain: game.gymTerrain,
     eliteTerrain: game.eliteTerrain,
@@ -9786,6 +9961,9 @@ function applySavedState(data){
   game.kantoBonusLevels = data.kantoBonusLevels || 0;
   game.everComeback = data.everComeback || false;
   game.eliteDittoWin = data.eliteDittoWin || false;
+  // save anterior à bifurcação não tem o campo: fica vazio e regiaoDaEtapa devolve 'kanto' em tudo,
+  // então a jornada dele continua idêntica ao que era
+  game.gymPath = Array.isArray(data.gymPath) ? data.gymPath : [];
   game.pendingGymVictoryPool = data.pendingGymVictoryPool || null;
   game.gymTerrain = data.gymTerrain || null;
   game.eliteTerrain = data.eliteTerrain || null;
@@ -10188,6 +10366,9 @@ function getAchievementAggregate(){
     // sinais das conquistas novas -- tudo derivado do que os saves e a conta já guardam hoje
     hasMewtwo: caught.has('mewtwo'),
     hasDitto: caught.has('ditto'),
+    // com Johto na tabela a Pokédex foi a 250; "completar Kanto" virou um marco próprio
+    kantoCaught: [...caught].filter(id=>SPECIES[id] && SPECIES[id].dex <= 151).length,
+    kantoTotal: Object.keys(SPECIES).filter(id=>SPECIES[id].dex <= 151).length,
     // marcas da raide do Mew -- vêm da CONTA, não dos saves (ver loadPermanentUserData)
     bossTop10: !!game.bossTop10,
     bossKiller: !!game.bossKiller,
@@ -10333,7 +10514,9 @@ const ACHIEVEMENTS = [
   { id:'boss_killer', icon:'💥', name:'Golpe Final', desc:'Dê o golpe que derruba o Mew do Boss de Domingo.', check:a=>a.bossKiller },
   { id:'elite_ditto', icon:'🎭', name:'Mestre do Disfarce', desc:'Vença a Elite 4 com um Ditto no time.', check:a=>a.anyEliteDittoWin },
   // ---- conquistas novas (20), baseadas em recursos que já existem no jogo hoje ----
-  { id:'catch_149', icon:'📖', name:'Pokédex Clássica', desc:'Capture 149 espécies -- todas menos o Mewtwo.', check:a=>a.caughtCount>=149 },
+  /* Era "149 espécies -- todas menos o Mewtwo", de quando a Pokédex tinha 150. Com Johto ela foi a
+     250, e "149" deixou de significar coisa alguma. Virou o marco de fechar KANTO. */
+  { id:'catch_149', icon:'📖', name:'Pokédex de Kanto', desc:'Capture todas as espécies de Kanto (#001 a #150).', check:a=>a.kantoCaught>=a.kantoTotal },
   { id:'mewtwo_caught', icon:'🧬', name:'O Desafio Final', desc:'Capture o Mewtwo.', check:a=>a.hasMewtwo },
   { id:'mewtwo_reward', icon:'🔮', name:'Arma Secreta', desc:'Utilize o Mewtwo em uma liga.', check:a=>a.anyMewtwoUsed },
   { id:'all_birds', icon:'🌪️', name:'Trindade Alada', desc:'Capture as 3 aves lendárias: Moltres, Zapdos e Articuno.', check:a=>a.allBirds },
@@ -10534,7 +10717,7 @@ function kantoMapSvg(ateGinasio, rotas, rotaAtual){
     const p = KANTO_PLACES[id];
     if(!p) return;
     const gymIdx = KANTO_GYM_CITIES.indexOf(id);
-    const gym = gymIdx >= 0 ? GYMS[gymIdx] : null;
+    const gym = gymIdx >= 0 ? gymOf(gymIdx) : null;
     const conquistada = gymIdx >= 0 && gymIdx < venc;
     const atual = (i === venc + 1);          // a próxima parada da jornada
     const revelada = i <= venc + 1;
@@ -10575,9 +10758,13 @@ function kantoMapSvg(ateGinasio, rotas, rotaAtual){
    topo de qualquer tela da jornada e responde "quanto falta" num relance. */
 function kantoTrailHtml(compacta){
   const venc = Math.max(0, Math.min(8, game.gymIndex|0));
-  const gym = GYMS[venc];
+  const gym = gymOf(venc);
   return `<div class="kanto-trilha ${compacta?'compacta':''}">
-    <div class="kt-selos">${GYMS.map((g,i)=>{
+    <!-- gymOf(i), não KANTO_GYMS: cada selo mostra o líder REALMENTE enfrentado naquela etapa.
+         Nas etapas que ainda faltam, regiaoDaEtapa devolve 'kanto' e o selo é o de Kanto --
+         é uma previsão, e ela muda assim que a pessoa escolher o outro caminho. -->
+    <div class="kt-selos">${KANTO_GYMS.map((_,i)=>{
+      const g = gymOf(i);
       const v = GYM_BADGE_VISUALS[g.id] || {};
       const estado = i < venc ? 'ok' : (i === venc ? 'atual' : 'falta');
       return `<span class="kt-selo ${estado}" style="--kt-cor:${v.color||'#888'}"
@@ -10610,12 +10797,64 @@ function closeKantoMap(){
   render();
 }
 function comecarJornadaDoMapa(){
-  game.screen = 'walk';
+  irParaEscolhaDeGinasio();
   render();
+}
+/* ============================================================================
+   "QUAL GINÁSIO VAMOS?" -- a bifurcação, uma vez por etapa
+
+   Antes de ver as rotas, o treinador escolhe a REGIÃO daquela etapa. A escolha decide três coisas
+   de uma vez: qual líder espera no fim, qual insígnia entra no cinturão e quais duas rotas
+   aparecem em seguida. Por isso ela vem ANTES de `routeCards` ser calculado -- as rotas de Johto
+   não existem até a região estar decidida.
+   Os dois lados são equivalentes de propósito (mesmo número de pokémon e mesma média de nível no
+   líder, mesmos níveis de selvagem vindos do LEGS): a escolha é de TIPO, não de dificuldade.
+   ============================================================================ */
+function irParaEscolhaDeGinasio(){
+  // etapa já decidida (voltou pra tela, ou save antigo no meio da jornada): não pergunta de novo
+  if((game.gymPath||[])[game.gymIndex]){ game.screen = game.gymIndex === 0 ? 'walk' : 'walkNext'; return; }
+  game.screen = 'gymChoice';
+}
+function escolherGinasio(regiao){
+  if(!REGIOES.includes(regiao)) return;
+  if(!Array.isArray(game.gymPath)) game.gymPath = [];
+  game.gymPath[game.gymIndex] = regiao;
+  // as rotas só podem ser sorteadas AGORA: elas dependem da região que acabou de ser escolhida
+  game.routeCards = routesForLeg(game.gymIndex).map(r=>r.id);
+  game.screen = game.gymIndex === 0 ? 'walk' : 'walkNext';
+  render();
+}
+function renderGymChoice(){
+  const etapa = game.gymIndex;
+  const opcoes = opcoesDeGinasio(etapa);
+  return `
+  ${kantoTrailHtml(true)}
+  <div class="eyebrow">🧭 ESCOLHA DO CAMINHO</div>
+  <div class="box cursor">
+    <h2>Qual ginásio vamos?</h2>
+    <p>Você está no <strong>trecho ${etapa+1} de 8</strong>. Os dois caminhos valem uma insígnia e
+       são igualmente difíceis — o que muda é o <strong>tipo</strong> que espera no fim, e os
+       pokémons que aparecem no caminho.</p>
+  </div>
+  ${opcoes.map(o=>{
+    const v = GYM_BADGE_VISUALS[o.gym.id] || {};
+    const rotas = (o.regiao === 'johto' ? JOHTO_ROUTE_MAP : ROUTE_MAP)[etapa] || [];
+    return `
+    <button class="save-slot-card clickable gym-choice-card" onclick="escolherGinasio('${escJs(o.regiao)}')">
+      <div class="save-slot-top">
+        <span class="gym-choice-selo" style="--kt-cor:${v.color||'#888'}">${v.emoji||'🏅'}</span>
+        <span class="save-slot-name">${escapeHtmlSafe(o.gym.leaderName)} — ${escapeHtmlSafe(o.gym.gymTypeName)}</span>
+        <span class="gym-choice-regiao">${o.regiao === 'johto' ? 'JOHTO' : 'KANTO'}</span>
+      </div>
+      <div class="gym-choice-cidade">${escapeHtmlSafe(o.gym.city)} · ${o.gym.team.length} pokémon · ${escapeHtmlSafe(o.gym.badge)}</div>
+      <div class="gym-choice-rotas">Caminhos: ${rotas.map(r=>escapeHtmlSafe(r.icon+' '+r.name)).join(' ou ')}</div>
+    </button>`;
+  }).join('')}
+  ${kantoMapBotaoHtml()}`;
 }
 function renderKantoIntro(){
   const sp = SPECIES[game.starterId];
-  const gym = GYMS[0];
+  const gym = gymOf(0);
   return `
   <div class="eyebrow">🗺️ KANTO</div>
   <div class="box kanto-abertura">
@@ -10630,7 +10869,7 @@ function renderKantoIntro(){
 function renderKantoMapScreen(){
   const venc = Math.max(0, Math.min(8, game.gymIndex|0));
   const hist = game.routeHistory || [];
-  const gym = GYMS[venc];
+  const gym = gymOf(venc);
   return `
   <div class="eyebrow">🗺️ MAPA DE KANTO</div>
   <div class="box kanto-moldura">${kantoMapSvg(venc, hist, game.currentRoute)}</div>
@@ -10643,7 +10882,7 @@ function renderKantoMapScreen(){
       <div class="kanto-diario-l">POR ONDE VOCÊ PASSOU</div>
       ${hist.map((rid, i)=>{
         const r = routeById(rid); if(!r) return '';
-        const g = GYMS[i];
+        const g = gymOf(i);
         return `<div class="kanto-diario-linha"><span class="kd-icone">${r.icon}</span>
           <span class="kd-nome">${escapeHtmlSafe(r.name)}</span>
           <span class="kd-destino">→ ${escapeHtmlSafe(g ? g.city : '')}</span></div>`;
@@ -10655,7 +10894,7 @@ function renderKantoMapScreen(){
 
 function renderWalk(){
   const sp = SPECIES[game.starterId];
-  const gym = GYMS[game.gymIndex];
+  const gym = gymAtual();
   const cards = (game.routeCards||[]).map(routeById).filter(Boolean);
   return `
   ${kantoTrailHtml(true)}
@@ -10668,8 +10907,8 @@ function renderWalk(){
 }
 
 function renderWalkNext(){
-  const prevGym = GYMS[game.gymIndex-1];
-  const gym = GYMS[game.gymIndex];
+  const prevGym = gymOf(game.gymIndex-1);
+  const gym = gymAtual();
   const cards = (game.routeCards||[]).map(routeById).filter(Boolean);
   return `
   ${kantoTrailHtml(true)}
@@ -10682,7 +10921,7 @@ function renderWalkNext(){
 }
 
 function renderRouteCardsBlock(cards){
-  const gym = GYMS[game.gymIndex];
+  const gym = gymAtual();
   if(!cards || cards.length===0){
     // auto-recuperação: saves antigos (de antes do routeCards ser salvo) ou qualquer outro estado
     // inesperado sem cartas de rota -- gera de novo em vez de deixar a tela sem opção nenhuma
@@ -10920,7 +11159,7 @@ function renderRelease(){
 }
 
 function renderLevels(){
-  const gym = GYMS[game.gymIndex];
+  const gym = gymAtual();
   const maxPer = getMaxPerPokemon();
   let message;
   if(game.levelsFromRocket){
@@ -11009,13 +11248,13 @@ function renderTeamOrder(){
 }
 
 function renderPreBattle(){
-  const gym = GYMS[game.gymIndex];
+  const gym = gymAtual();
   if(!gym){
     // rede de segurança: preBattle pressupõe um ginásio atual válido -- se por qualquer motivo
     // (recarregar em cima de estado antigo/inesperado, por exemplo) o gymIndex apontar além dos 8
     // ginásios (típico de quem já terminou a jornada, na fase da Elite), isso quebraria o render()
     // inteiro e travaria a tela em branco. Manda pra um lugar sempre seguro em vez de crashar
-    game.screen = (game.badgesEarned||[]).length>=GYMS.length ? 'journeyEnd' : 'start';
+    game.screen = (game.badgesEarned||[]).length>=numGinasios() ? 'journeyEnd' : 'start';
     return game.screen==='journeyEnd' ? renderJourneyEnd() : renderStart();
   }
   if(!game.gymTerrain){ game.gymTerrain = pickGymTerrain(gym); }
@@ -11456,7 +11695,7 @@ function renderHpBar(hp, maxHp, fillId, labelId){
 
 function renderBattling(){
   const isNeighborhoodGym = game.battleResultContext === 'neighborhoodGym';
-  const gym = isNeighborhoodGym ? null : GYMS[game.gymIndex];
+  const gym = isNeighborhoodGym ? null : gymAtual();
   const matchups = game.battleResult.matchups;
   const m = matchups[game.revealIndex];
   const loading = game.revealPhase === 'loading';
@@ -11501,9 +11740,9 @@ function renderBattling(){
 }
 
 function renderBattleResult(win){
-  const gym = GYMS[game.gymIndex];
+  const gym = gymAtual();
   const r = game.battleResult;
-  const hasNextGym = win && (game.gymIndex+1 < GYMS.length);
+  const hasNextGym = win && (game.gymIndex+1 < numGinasios());
   return `
   <div class="result-banner ${win?'win':'lose'}">${win? `🏅 VITÓRIA CONTRA ${gym.leaderName.toUpperCase()}!` : '💥 VOCÊ PERDEU A BATALHA'}</div>
   ${win ? `
@@ -11545,7 +11784,7 @@ function renderBattleResult(win){
 }
 
 function renderGameOver(){
-  const gym = GYMS[game.gymIndex];
+  const gym = gymAtual();
   const r = game.battleResult;
   return `
   <div class="result-banner lose">☠️ FIM DE JOGO</div>
@@ -12259,7 +12498,7 @@ function renderNeighborhoodGymResult(){
   <button class="btn success" onclick="openNeighborhoodGymScreen()">⬅ Voltar pro Ginásio da Cidade</button>`;
 }
 function renderJourneyEnd(){
-  const won = game.badgesEarned.length === GYMS.length;
+  const won = game.badgesEarned.length === numGinasios();
   /* A caixa do Bônus de Kanto aparece só NESTA renderização e é marcada como vista logo em seguida.
      O marcador só é gravado depois do render, num setTimeout: marcar antes esconderia a caixa
      justamente na vez em que ela deveria aparecer. Da próxima vez que a tela abrir, ela não vem
@@ -16146,6 +16385,7 @@ function render(){
     case 'journeyEnd': html = renderJourneyEnd(); break;
     case 'neighborhoodGym': html = renderNeighborhoodGym(); break;
     case 'trainerTower': html = renderTrainerTower(); break;
+    case 'gymChoice': html = renderGymChoice(); break;
     case 'sundayBoss': html = renderSundayBoss(); break;
     case 'onlineBattle': html = renderOnlineBattle(); break;
     case 'battleLobby': html = renderBattleLobby(); break;

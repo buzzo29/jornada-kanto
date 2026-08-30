@@ -52,8 +52,7 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
   mesma nas duas gerações, então isso também vale como Gen 2.
 - **Especial é separado em Sp.Atk e Sp.Def (Gen 2)**, valores oficiais da Geração II na tabela
   `GEN2_SPECIAL`, idêntica nos dois arquivos, e ela é a **única fonte de atributo especial no
-  jogo**. O campo `special` único da Gen 1 **não existe mais** — foi removido de SPECIES,
-  SPECIES_JOHTO, `createInstance`, da migração de save e do fallback das `effective*` em
+  jogo**. O campo `special` único da Gen 1 **não existe mais** — foi removido do `SPECIES` (Kanto e Johto), do `createInstance`, da migração de save e do fallback das `effective*` em
   30/08/2026. Não sobrou nada de Gen 1 em atributo. (A remoção não tocou em uma casa decimal:
   impressão do motor idêntica antes e depois. O fallback era código morto — só seria alcançado
   por instância de espécie desconhecida.)
@@ -129,42 +128,31 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
   golpe contra qualquer pokémon de Terra.
 - Teto de nível: **99** (`MAX_POKEMON_LEVEL`).
 
-## Johto (#152-251) — base de dados, ainda desligada
+## Johto (#152-251) — em uso desde 30/08/2026
 
-- **O jogo continua sendo só Kanto.** Nada de Johto aparece, é capturável ou entra em batalha, e
-  Gloom, Poliwhirl e Slowpoke continuam evoluindo só pro que sempre evoluíram (Vileplume,
-  Poliwrath, Slowbro). Isto aqui é base de dados pra uma implementação futura, não uma feature.
-- `SPECIES_JOHTO`, `GEN2_SPECIAL_JOHTO` e `EVOLUTIONS_JOHTO`, **duplicadas nos dois arquivos**
-  como todas as outras. Não entram em `SPECIES`/`EVOLUTIONS` de propósito: `Object.keys(SPECIES)`
-  define o total da Pokédex, o "capturou tudo" que libera o Mewtwo, o pool da Torre
-  (`!EVOLUTIONS[k]`) e a força que o rival persegue (`bstOf`) — despejar 100 espécies lá mudaria
-  as quatro em silêncio, sem uma linha de código nova.
+- As 100 espécies entraram nas tabelas EM USO (`SPECIES`, `GEN2_SPECIAL`, `EVOLUTIONS`), nos dois
+  arquivos. Até então viviam em tabelas paralelas justamente pra não contar antes da hora.
+  **A Pokédex foi a 250** — o #151 (Mew) continua de fora: é o chefe da raide e ninguém o captura.
+  O pool da Torre (evoluções finais) foi de 81 pra **143**.
 - Números reconstruídos dos dados do Pokémon Showdown aplicando os mods gen8→gen2 sobre os valores
   atuais. **Método conferido: bate 150/150 com o `GEN2_SPECIAL` de Kanto que já estava aqui.**
-- **Não existe campo `special` aqui** — nem em Johto nem em Kanto (ver a seção do motor). Johto
-  nasceu já com o Especial dividido; Sp.Atk e Sp.Def oficiais, e só. A primeira versão desta
-  tabela trazia um `special` sintético (a média dos dois); ele foi removido junto com o de Kanto.
-- Três coisas travam o uso, e nenhuma é pequena:
-  1. **TYPE_CHART é da Gen 1** — 15 tipos, sem Sombrio e Aço. 10 espécies daqui têm um dos dois
-     (Umbreon, Murkrow, Forretress, Steelix, Scizor, Sneasel, Skarmory, Houndour, Houndoom,
-     Tyranitar). Acrescentar os dois mexe no `EXPOENTE_TIPO`, o parâmetro mais sensível do motor.
-  2. **Três pokémons de Kanto ganhariam um segundo destino de evolução**: Gloom (Vileplume ou
-     Bellossom), Poliwhirl (Poliwrath ou Politoed), Slowpoke (Slowbro ou Slowking). Não é
-     disputa de número de Pokédex — Vileplume é #45, Bellossom é #182, cada uma com a sua vaga.
-     O que colide é a **chave** da tabela de evolução, que é quem evolui: `gloom` do lado
-     esquerdo, escrito duas vezes. Em JavaScript isso não dá erro — a última linha apaga a
-     primeira, e o Gloom para de virar Vileplume no jogo inteiro, em silêncio. E juntar as
-     tabelas não resolveria: `tryEvolve` evolui sozinho por nível e não tem como escolher entre
-     dois destinos. No original quem decide é a pedra (Folha ou Solar); aqui não há itens, então
-     precisaria de uma tela de escolha, como a do Eevee.
-  3. **Espeon e Umbreon** são do Eevee, que não passa por `EVOLUTIONS` — tem tela própria.
-- Efeito colateral já medido, pra quando a decisão vier: o pool da Torre (evoluções finais)
-  passaria de **81 pra 150** espécies.
-- `node tools/test-johto.js` cobre a tabela (as duas cópias idênticas, 152–251 sem buraco, o
-  `special` batendo com o par, origem e destino de toda evolução existindo). Ele já pegou dois
-  erros: bebês de gerações posteriores entrando como origem (Azurill, Wynaut, Bonsly, Mantyke) e
-  formas regionais entrando como destino — Typhlosion-Hisui é **#157** e sobrescrevia o
-  Typhlosion de verdade na chave repetida.
+- **Sombrio e Aço entraram no `TYPE_CHART`**, com os valores da Gen 2 (o Aço ainda resiste a
+  Fantasma e a Sombrio — isso só mudou na Gen 6). Acrescentar tipo NOVO não mexeu em nada do que
+  já existia: nenhuma das 150 de Kanto é Sombrio ou Aço (o jogo usa a tipagem da Gen 1, então
+  Magnemite e Magneton seguem só Elétrico), então toda linha nova só entra em confronto que
+  envolve um pokémon de Johto. **Conferido: a impressão do motor não mudou.**
+- **As três evoluções em conflito ficaram de fora**: Gloom, Poliwhirl e Slowpoke continuam virando
+  Vileplume, Poliwrath e Slowbro. Bellossom, Politoed e Slowking só entram quando existir uma tela
+  de escolha, como a do Eevee — a tabela mapeia um destino só, e a chave repetida faria o segundo
+  apagar o primeiro em silêncio.
+- **Armadilha que quase passou**: Espeon e Umbreon estavam na tabela de evoluções de Johto como
+  destino do `eevee`. Ao fundir, o Eevee passou a evoluir sozinho pra Umbreon no nível 40 —
+  atropelando a tela de escolha dele. Pego pelo `tools/test-johto.js`, que hoje trava isso.
+- A conquista "Pokédex Clássica" (149 espécies) virou **"Pokédex de Kanto"**: com 250 espécies,
+  "149" não significava mais nada. "Mestre Pokémon" passou a exigir as 250.
+- `node tools/test-johto.js` cobre a fusão: as duas cópias iguais (comparando VALOR, não texto —
+  os dois arquivos têm comentários próprios e listam em ordens diferentes), 152–251 sem buraco, os
+  dois tipos novos completos, e as evoluções de Kanto intactas.
 
 ## Log de batalha
 
@@ -209,6 +197,40 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
 - Nomes de golpe (`MOVE_BY_TYPE` + `MOVE_OVERRIDES`, 150 espécies / 294 combinações) vivem **só no
   cliente**. O servidor manda o TIPO; o cliente escolhe a palavra. É o que evita mais uma tabela
   duplicada pra sair de sincronia.
+
+## Bifurcação Kanto / Johto
+
+- A jornada continua com **8 etapas**, mas em cada uma o treinador escolhe entre o ginásio de
+  Kanto e o de Johto daquela altura (tela `gymChoice`, "Qual ginásio vamos?"). A escolha decide o
+  líder, a insígnia e **quais duas rotas** aparecem em seguida — por isso ela vem ANTES de
+  `routeCards` ser calculado: as rotas de Johto não existem até a região estar decidida.
+- `game.gymPath` guarda a região de cada etapa (`['kanto','johto',...]`). Save antigo não tem o
+  campo: `regiaoDaEtapa` devolve `'kanto'` e a jornada dele continua idêntica ao que era.
+  `GYMS` virou `KANTO_GYMS` + `JOHTO_GYMS`, e quem responde "qual ginásio agora" é `gymOf(etapa)`.
+- **Os dois lados têm o mesmo número de pokémon e a mesma média de nível em cada etapa**, e os
+  selvagens saem do mesmo `LEGS` — a escolha é de TIPO, não de dificuldade. `tools/test-jornada.js`
+  tranca isso.
+- **Parear nível e quantidade NÃO bastou** — as espécies têm forças muito diferentes. Medido com o
+  smoke (`--regiao kanto|johto`, 1.200 jornadas de cada lado), a primeira versão dava **67% x 87%**
+  a favor de Johto. Três ajustes fecharam a conta:
+  1. **Falkner** não matava NENHUMA jornada, contra 60 do Brock. O primeiro ginásio é a peneira
+     (ver a nota do Brock abaixo) e um Falkner de brinquedo tirava isso do caminho de Johto. O
+     Hoothoot virou **Skarmory** — a Aço/Voador faz o papel de muralha que o Onix faz do outro
+     lado, e o espelho fica bonito: no Brock o Bulbasaur passa fácil e o Charmander sofre, aqui é
+     o contrário. (Noctowl foi tentado antes e não bastou: 100 de HP não compensam 50 de Defesa.)
+  2. **Jasmine** matava 38 em 300, contra 0 da Sabrina — a Skarmory dela virou Magneton.
+  3. **Clair** tinha um Dratini (300 de BST) no último ginásio da jornada. Viraram três Dragonair,
+     como no jogo original. Uma versão com duas Kingdra foi longe demais (Johto caiu pra 52%).
+  Resultado, com 1.500 jornadas de cada lado: **66,0% x 68,4%** — 1,4σ, dentro do ruído.
+- 16 rotas de Johto (`JOHTO_ROUTE_MAP`), duas por etapa, seguindo o caminho real do Crystal até
+  cada ginásio. Pools de 7 a 9 espécies misturando as duas gerações, como no original. Alguns
+  encontros são piscadelas pro jogo: Lapras na Caverna União, Lugia nas Ilhas Redemoinho,
+  Sudowoodo nas Rotas 36/37, o Gyarados do Lago da Fúria.
+- 16 rotas de Kanto ganharam espécies de Johto onde cabiam (Ledyba na Floresta de Viridian,
+  Heracross na Zona de Safári, Sentret na Rota 22, Houndour na Mansão…).
+- **O mapa de Kanto continua sendo de Kanto.** `KANTO_PLACES`/`KANTO_JOURNEY` são indexados pela
+  etapa, então numa etapa de Johto ele desenha a cidade de Kanto correspondente. A trilha de
+  insígnias já segue o caminho certo (`gymOf(i)`); o mapa é o que falta.
 
 ## Progressão da jornada
 

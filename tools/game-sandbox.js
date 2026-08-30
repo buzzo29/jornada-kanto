@@ -126,6 +126,9 @@ function createSandbox(htmlPath){
     'kantoMapSvg','kantoTrailHtml','renderKantoIntro','renderKantoMapScreen',
     'KANTO_PLACES','KANTO_JOURNEY','KANTO_GYM_CITIES','kantoCurva','renderWalkNext','renderWalk',
     'comecarJornadaDoMapa','abrirMapaDeKanto','fecharMapaDeKanto',
+    // bifurcação Kanto/Johto (ver renderGymChoice)
+    'escolherGinasio','gymOf','gymAtual','regiaoDaEtapa','opcoesDeGinasio','todosOsGinasios',
+    'KANTO_GYMS','JOHTO_GYMS','JOHTO_ROUTE_MAP','renderGymChoice','numGinasios','GYM_BADGE_VISUALS','routesForLeg','ROUTE_MAP',
     'continueJourney','showJourneyEnd',
     'runSpecialBattle','advanceSpecialReveal','continueAfterSpecial','continueAfterWildDisguiseReveal'
   ];
