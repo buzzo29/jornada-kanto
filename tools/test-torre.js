@@ -70,6 +70,40 @@ const antigo = time1.map(p=>({ speciesId:p.speciesId, level:p.level }));
 const r3 = await chamar(fns.startTrainerTowerRun, 'ash', { team: antigo });
 ok('cliente antigo continua conseguindo montar o time', r3.run.team.length === 6);
 
+
+/* O SHINY TEM QUE CHEGAR NA BATALHA -- nao basta ele estar no time gravado.
+   Reclamacao real: "o shiny aparece como pokemon normal na hora da batalha". A conta e o desenho
+   saem do MESMO campo (playerShiny em cada confronto), entao se ele se perder no caminho o jogador
+   perde as duas coisas: a estrela na tela e o buff de 1,20x em todos os atributos. */
+await db.collection('trainerTowerRuns').doc('ash').delete();
+const escolhaShiny = time1.map((p,i)=>({ speciesId:p.speciesId, level:p.level, slot:'0', idx:i, monId:p.id, shiny:!!p.shiny }));
+const rS = await chamar(fns.startTrainerTowerRun, 'ash', { team: escolhaShiny });
+const shinysNoTime = rS.run.team.filter(p=>p.shiny).map(p=>p.speciesId);
+ok('o time da subida guarda quem e shiny', shinysNoTime.length > 0, 'shinys: ' + shinysNoTime.join(', '));
+const rF = await chamar(fns.fightTrainerTowerFloor, 'ash', {});
+const brilhouNaLuta = new Set(rF.matchups.filter(m=>m.playerShiny).map(m=>m.playerSpecies));
+const esperados = new Set(shinysNoTime);
+const faltando = [...esperados].filter(id => rF.matchups.some(m=>m.playerSpecies===id) && !brilhouNaLuta.has(id));
+ok('e cada confronto carrega o brilho de quem lutou', faltando.length === 0,
+   faltando.length ? 'sem brilho: ' + faltando.join(', ') : '');
+const semBrilhoAtoa = rF.matchups.filter(m=>m.playerShiny && !esperados.has(m.playerSpecies));
+ok('e nao inventa brilho em quem nao e shiny', semBrilhoAtoa.length === 0);
+
+/* OS QUATRO INTOCAVEIS NAO ENTRAM NO TIME DOS NPCs.
+   Encontrar num andar comum da torre um bicho que o jogador nunca vai poder ter esvazia o que eles
+   sao -- e ate 31/08/2026 Celebi e Ho-Oh saiam mesmo (conferido na torre gerada do dia). */
+const PROIBIDOS = ['mewtwo','lugia','hooh','celebi'];
+let achadosNaTorre = [];
+for(let dia = 1; dia <= 60; dia++){
+  const torre = fns._towerGenerate ? fns._towerGenerate('2026-01-' + String(dia).padStart(2,'0')) : null;
+  if(!torre) break;
+  torre.floors.forEach(f => f.team.forEach(p => {
+    if(PROIBIDOS.includes(p.speciesId)) achadosNaTorre.push('dia ' + dia + ' andar ' + f.floor + ': ' + p.speciesId);
+  }));
+}
+ok('nenhum intocavel no time dos NPCs (60 torres)', achadosNaTorre.length === 0,
+   achadosNaTorre.slice(0,4).join(' | '));
+
 console.log(`\n${casos - falhas}/${casos} casos passaram.`);
 if(falhas){ console.log(`${falhas} FALHA(S).`); process.exit(1); }
 })().catch(e=>{ console.error('\nERRO NAO TRATADO:', e); process.exit(1); });

@@ -93,13 +93,22 @@ ok('campeao sem nenhuma derrota na Elite', acendeu('elite_first_try', [campeao({
 ok('com uma derrota no caminho, nao', !acendeu('elite_first_try', [campeao({ eliteAttemptsUsed: 1 })]));
 
 console.log('\nOS BURACOS QUE JOHTO DEIXOU');
-const todasDeJohto = Object.keys(S.SPECIES).filter(id=>S.SPECIES[id].dex>=152);
-ok('Pokedex de Johto completa', acendeu('catch_johto', [], todasDeJohto), todasDeJohto.length + ' especies');
-ok('faltando uma, nao acende', !acendeu('catch_johto', [], todasDeJohto.slice(0,-1)));
+/* Os intocaveis (Lugia, Ho-Oh, Celebi) nao entram na conta: nao da pra capturar nenhum, e uma
+   conquista impossivel e pior que conquista nenhuma. */
+const INTOCAVEIS = ['lugia','hooh','celebi'];
+const johtoCapturavel = Object.keys(S.SPECIES).filter(id=>S.SPECIES[id].dex>=152 && !INTOCAVEIS.includes(id));
+ok('Pokedex de Johto completa sem os intocaveis', acendeu('catch_johto', [], johtoCapturavel),
+   johtoCapturavel.length + ' de ' + (johtoCapturavel.length + INTOCAVEIS.length) + ' especies de Johto');
+ok('faltando uma capturavel, nao acende', !acendeu('catch_johto', [], johtoCapturavel.slice(0,-1)));
+ok('e os intocaveis nao fazem falta', acendeu('catch_johto', [], johtoCapturavel));
+/* Mestre Pokemon idem: a Pokedex mostra 250, mas o que se cobra e o que da pra ter. */
+const tudoCapturavel = Object.keys(S.SPECIES).filter(id=>!INTOCAVEIS.includes(id));
+ok('Mestre Pokemon acende sem os intocaveis', acendeu('catch_all', [], tudoCapturavel));
+ok('e nao acende faltando uma capturavel', !acendeu('catch_all', [], tudoCapturavel.slice(0,-1)));
 ok('as tres bestas', acendeu('all_beasts', [], ['raikou','entei','suicune']));
 ok('duas bestas nao bastam', !acendeu('all_beasts', [], ['raikou','entei']));
-ok('Lugia e Ho-Oh', acendeu('tower_duo', [], ['lugia','hooh']));
-ok('so o Lugia nao basta', !acendeu('tower_duo', [], ['lugia']));
+/* A conquista de capturar Lugia e Ho-Oh saiu junto com eles das rotas: ninguem os captura mais. */
+ok('nao existe mais conquista de capturar Lugia e Ho-Oh', !S.ACHIEVEMENTS.some(c=>c.id==='tower_duo'));
 
 console.log('\nE AS ANTIGAS CONTINUAM DE PE');
 ok('Pokedex de Kanto ainda exige as 150', !acendeu('catch_149', [], ['pikachu']));

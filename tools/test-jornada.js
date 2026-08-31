@@ -71,7 +71,7 @@ ok('cada etapa guarda a SUA escolha',
    S.gymOf(0).id==='falkner' && S.gymOf(1).id==='misty' && S.gymOf(2).id==='whitney',
    [0,1,2].map(i=>S.gymOf(i).id).join(','));
 
-console.log('\nOS LENDARIOS SAO 5% -- TODOS OS OITO');
+console.log('\nOS LENDARIOS SAO 5% -- OS SEIS QUE DA PRA CAPTURAR');
 /* Cada lendario mora numa rota so e sai a 5% POR ENCONTRO ali. Ja saiu errado: existia um sorteio
    extra de 5% no trecho 8 (de quando as aves nao tinham rota propria) que SOMAVA com o da rota, e
    Zapdos e Moltres apareciam a 6,6%. E os cinco de Johto nem eram reconhecidos como lendarios:
@@ -80,11 +80,21 @@ console.log('\nOS LENDARIOS SAO 5% -- TODOS OS OITO');
    um Raikou nível 35 no trecho 4 resolve sozinho metade da jornada. */
 const CASOS_LEND = [['raikou','mt_mortar',6],['suicune','lake_of_rage',6],['entei','pokemon_mansion',6],
   ['articuno','seafoam',6],
-  ['lugia','ice_path',7],['hooh','dragons_den',7],['zapdos','power_plant',7],['moltres','victory_road',7]];
+  ['zapdos','power_plant',7],['moltres','victory_road',7]];
 ok('nenhum lendario mora em trecho abaixo do 7', CASOS_LEND.every(c=>c[2] >= 6),
    CASOS_LEND.filter(c=>c[2] < 6).map(c=>c[0]+' no trecho '+(c[2]+1)).join(', '));
-ok('os 8 lendarios estao na lista de lendarios',
+ok('os 6 capturaveis estao na lista de lendarios',
    CASOS_LEND.every(c=>S.ehLendario(c[0])), CASOS_LEND.filter(c=>!S.ehLendario(c[0])).map(c=>c[0]).join(','));
+/* Os INTOCAVEIS nao podem estar em rota nenhuma -- nem no pool, nem como raro. Lugia e Ho-Oh eram
+   raros de 5% no Caminho de Gelo e no Covil do Dragao ate 31/08/2026; o Celebi nunca esteve. */
+ok('nenhum intocavel aparece em rota nenhuma', (()=>{
+  let achou = [];
+  [S.ROUTE_MAP, S.JOHTO_ROUTE_MAP].forEach(m=>m.forEach(par=>par.forEach(r=>{
+    (r.rare||[]).concat(r.pool).forEach(x=>{ const id = typeof x==='object'?x.species:x;
+      if(['lugia','hooh','celebi','mewtwo'].includes(id)) achou.push(id+' em '+r.name); });
+  })));
+  return achou.length === 0 || (console.log('        ' + achou.join(', ')), false);
+})());
 const N_LEND = 8000;
 const foraDaFaixa = [], nivelRuim = [];
 CASOS_LEND.forEach(([id, rota, etapa])=>{
@@ -233,7 +243,10 @@ if(alcancavel.has('eevee')) ['vaporeon','jolteon','flareon','espeon','umbreon'].
      chefe da raide do Boss de Domingo).
    Qualquer OUTRA espécie fora da lista é vaga impossível na Pokédex, e a Pokédex completa é o que
    libera o Mewtwo. */
-const FORA = ['mewtwo','celebi'];
+/* Alem do Mewtwo (que vem do desafio proprio), os INTOCAVEIS: Lugia, Ho-Oh e Celebi existem na
+   Pokedex e lutam, mas nao ha como capturar nenhum -- decisao de design de 31/08/2026. Quem
+   desconta isso na conta do desafio do Mewtwo e o ESPECIES_INTOCAVEIS. */
+const FORA = ['mewtwo','celebi','lugia','hooh'];
 const orfaos = Object.keys(S.SPECIES).filter(id => !alcancavel.has(id) && !FORA.includes(id));
 ok('nenhuma especie fica sem como capturar', orfaos.length === 0,
    orfaos.map(id=>S.SPECIES[id].name).slice(0,10).join(', '));

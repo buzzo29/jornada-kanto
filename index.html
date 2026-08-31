@@ -2953,10 +2953,10 @@ const JOHTO_ROUTE_MAP = [
   [ // antes da Clair (Dragão) -- Caminho de Gelo e Covil do Dragão
     { id:'ice_path', name:'Caminho de Gelo', icon:'🧊', types:['Ice','Poison'],
       rumor:'O chão é escorregadio e só se anda em linha reta. Algo com garras observa.',
-      pool:['swinub','delibird','jynx','golbat','zubat','piloswine','seel','dewgong'], rare:['sneasel',{species:'lugia', chance:0.05}] },
+      pool:['swinub','delibird','jynx','golbat','zubat','piloswine','seel','dewgong'], rare:['sneasel'] },
     { id:'dragons_den', name:'Covil do Dragão', icon:'🐲', types:['Dragon','Water'],
       rumor:'Atrás do ginásio, uma caverna alagada onde os dragões são criados.',
-      pool:['dratini','dragonair','magikarp','horsea','seadra','poliwag','goldeen','gyarados'], rare:[{species:'kingdra', chance:0.10},{species:'dragonite', chance:0.08},{species:'hooh', chance:0.05}] }
+      pool:['dratini','dragonair','magikarp','horsea','seadra','poliwag','goldeen','gyarados'], rare:[{species:'kingdra', chance:0.10},{species:'dragonite', chance:0.08}] }
   ]
 ];
 
@@ -3658,6 +3658,17 @@ const DISGUISE_DISPLAY = {
 const SPECIES_FORA_DA_DEX = {
   mew: { dex:151, name:'Mew', types:['Psychic'], emoji:'✨' }
 };
+/* OS INTOCÁVEIS: existem na Pokédex e lutam, mas não há como capturar nenhum deles -- nem em rota,
+   nem por evolução, nem por desafio. Decisão de design de 31/08/2026: Lugia e Ho-Oh saíram das
+   rotas onde eram raros de 5% (Caminho de Gelo e Covil do Dragão) e o Celebi nunca esteve em uma.
+   O MEWTWO também não aparece em rota nenhuma, mas ele TEM caminho -- o desafio da Pokédex --,
+   então entra só na lista do selvagem.
+   POR QUE ISSO PRECISA SER UMA LISTA: tudo que está no SPECIES conta pro total da Pokédex, e o que
+   LIBERA o desafio do Mewtwo é "capturou todo o resto". Sem descontar os intocáveis o desafio fica
+   impossível PRA SEMPRE -- e já estava desde que Johto entrou, por causa do Celebi. Ninguém tinha
+   esbarrado nisso porque exige 249 espécies. */
+const ESPECIES_INTOCAVEIS = ['lugia','hooh','celebi'];
+const SEM_CAPTURA_SELVAGEM = ESPECIES_INTOCAVEIS.concat('mewtwo');
 function especieParaTela(id){ return SPECIES[id] || SPECIES_FORA_DA_DEX[id] || null; }
 function battleSpriteHtml(ownSpeciesId, opponentSpeciesId, sizeClass, isShiny, flip){
   // Ditto usa Transformar: na tela de batalha mostra o sprite do adversário, mas o nome continua "Ditto"
@@ -5466,6 +5477,12 @@ function montaOfertaSelvagem(){
      todos por aqui, então nenhum caminho novo escapa da regra por esquecimento. O disfarçado é
      Ditto por baixo, que não evolui, e os lendários também não -- ninguém precisa de exceção. */
   offer = offer.map(o => ({ ...o, speciesId: especieNoNivel(o.speciesId, o.level) }));
+  /* Rede de segurança dos intocáveis: eles não estão em pool nenhum (ver ESPECIES_INTOCAVEIS), mas
+     se um dia alguém puser um por engano, a tela não pode oferecer. Cai no pool da etapa, que
+     nunca tem lendário. */
+  offer = offer.map(o => SEM_CAPTURA_SELVAGEM.includes(o.speciesId)
+    ? { ...o, speciesId: buildOfferFromPool(leg.pool, 1)[0] || 'ratata' }
+    : o);
   offer.forEach(o=>{ o.shiny = Math.random() < currentShinyChance(); }); // shiny (1 em 128, ou a chance crescente do bônus, se estiver ativo)
   // registra que esse encontro rodou, PRA VALER na próxima chamada -- é isso que faz a chance subir
   // encontro após encontro enquanto a pessoa não captura nenhum shiny (currentShinyChance lê esse
@@ -10993,7 +11010,11 @@ function getAchievementAggregate(){
     kantoCaught: [...caught].filter(id=>SPECIES[id] && SPECIES[id].dex <= 151).length,
     kantoTotal: Object.keys(SPECIES).filter(id=>SPECIES[id].dex <= 151).length,
     johtoCaught: [...caught].filter(id=>SPECIES[id] && SPECIES[id].dex >= 152).length,
-    johtoTotal: Object.keys(SPECIES).filter(id=>SPECIES[id].dex >= 152).length,
+    /* Os intocáveis (Lugia, Ho-Oh, Celebi) não entram nas metas de "completar": eles CONTAM na
+       Pokédex (a tela mostra 250) mas não dá pra capturar nenhum, e uma conquista impossível é
+       pior que conquista nenhuma -- ninguém consegue nem saber por que não acendeu. */
+    johtoTotal: Object.keys(SPECIES).filter(id=>SPECIES[id].dex >= 152 && !ESPECIES_INTOCAVEIS.includes(id)).length,
+    totalCapturavel: Object.keys(SPECIES).filter(id=>!ESPECIES_INTOCAVEIS.includes(id)).length,
     // os lendários de Johto: as três bestas e a dupla dos céus (ver LENDARIOS)
     allBeasts: ['raikou','entei','suicune'].every(id=>caught.has(id)),
     allTowerDuo: ['lugia','hooh'].every(id=>caught.has(id)),
@@ -11134,7 +11155,8 @@ const ACHIEVEMENTS = [
   { id:'catch_30', icon:'📦', name:'Colecionador Dedicado', desc:'Capture 30 espécies diferentes.', check:a=>a.caughtCount>=30 },
   { id:'catch_60', icon:'🗂️', name:'Colecionador Avançado', desc:'Capture 60 espécies diferentes.', check:a=>a.caughtCount>=60 },
   { id:'catch_100', icon:'🗃️', name:'Quase Completo', desc:'Capture 100 espécies diferentes.', check:a=>a.caughtCount>=100 },
-  { id:'catch_all', icon:'🌟', name:'Mestre Pokémon', desc:'Complete a Pokédex inteira.', check:a=>a.caughtCount>=a.totalSpecies },
+  { id:'catch_all', icon:'🌟', name:'Mestre Pokémon', desc:'Capture tudo que dá pra capturar (Lugia, Ho-Oh e Celebi não se deixam pegar).',
+    check:a=>a.caughtCount>=a.totalCapturavel },
   { id:'evolve_1', icon:'✨', name:'Evolucionista', desc:'Evolua um Pokémon pela primeira vez.', check:a=>a.anyEvolution },
   { id:'eevee_choice', icon:'💧', name:'Escolha Dourada', desc:'Evolua um Eevee para uma de suas formas.', check:a=>a.anyEeveeEvo },
   { id:'legendary', icon:'🦅', name:'Caçador de Lendas', desc:'Capture uma das aves lendárias (Moltres, Zapdos ou Articuno).', check:a=>a.anyLegendary },
@@ -11215,10 +11237,9 @@ const ACHIEVEMENTS = [
   { id:'elite_first_try', icon:'🎩', name:'De Primeira', desc:'Vença a Elite dos 4 sem gastar nenhuma tentativa (de primeira).',
     check:a=>a.eliteFirstTry },
   /* ---- os buracos que Johto deixou: a Pokédex e os lendários de lá ---- */
-  { id:'catch_johto', icon:'📗', name:'Pokédex de Johto', desc:'Capture todas as espécies de Johto (#152 a #251).',
+  { id:'catch_johto', icon:'📗', name:'Pokédex de Johto', desc:'Capture as espécies de Johto que dá pra capturar (#152 a #251).',
     check:a=>a.johtoCaught>=a.johtoTotal },
   { id:'all_beasts', icon:'🐾', name:'As Três Bestas', desc:'Capture Raikou, Entei e Suicune.', check:a=>a.allBeasts },
-  { id:'tower_duo', icon:'🌈', name:'Mar e Céu', desc:'Capture Lugia e Ho-Oh.', check:a=>a.allTowerDuo },
   // ---- força do time ----
   { id:'team_avg_60', icon:'📊', name:'Time Sólido', desc:'Tenha um time com média de nível 60.', check:a=>a.bestTeamAvg>=60 },
   { id:'team_avg_70', icon:'📐', name:'Time de Elite', desc:'Tenha um time com média de nível 70.', check:a=>a.bestTeamAvg>=70 },
@@ -17195,7 +17216,10 @@ function renderPokedex(){
   const totalSpecies = Object.keys(SPECIES).length; // inclui o Mewtwo
   const caughtCount = caught.size;
   const shinyCount = shinyCaught.size;
-  const otherSpeciesCaught = allSpecies.filter(s=>s.id!=='mewtwo').every(s=>caught.has(s.id));
+  // "capturou todo o resto" desconta os intocáveis: sem isso o desafio nunca abre (ver ESPECIES_INTOCAVEIS)
+  const otherSpeciesCaught = allSpecies
+    .filter(s=> s.id!=='mewtwo' && !ESPECIES_INTOCAVEIS.includes(s.id))
+    .every(s=>caught.has(s.id));
   return `
   <div class="box">
     <h2>${isShinyView ? '✨ Pokédex Shiny' : '📖 Pokédex'}</h2>

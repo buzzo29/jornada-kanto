@@ -3562,7 +3562,11 @@ const TOWER_NPC_NAMES = [
 // Mewtwo fica de fora: ele é o desafio de fim de jogo do save, e encontrar um num andar comum
 // da torre esvazia esse momento. Eevee sai porque evolui por PEDRA -- o jogo não modela isso, então
 // ele não aparece no EVOLUTIONS e passaria como "final"; Vaporeon, Jolteon e Flareon já estão no pool
-const TOWER_EXCLUDED = new Set(['eevee', 'mewtwo']);
+/* Os quatro que ninguém captura (Mewtwo, Lugia, Ho-Oh e Celebi) também não aparecem no time dos
+   NPCs: encontrar num andar comum da torre um bicho que o jogador nunca vai poder ter esvazia o
+   que eles são. O Eevee sai por outro motivo -- evolui por PEDRA, o jogo não modela isso, então
+   ele não aparece no EVOLUTIONS e passaria como "final"; Vaporeon, Jolteon e Flareon já estão. */
+const TOWER_EXCLUDED = new Set(['eevee', 'mewtwo', 'lugia', 'hooh', 'celebi']);
 function towerFinalEvolutions(){
   return Object.keys(SPECIES).filter(k => !EVOLUTIONS[k] && !TOWER_EXCLUDED.has(k));
 }
@@ -3617,6 +3621,8 @@ function towerBuildTeam(rng, mediaNivel, pool){
   return escolhidas.map((sp, i) => ({ speciesId: sp, level: niveis[i], shiny: false }));
 }
 
+// exportado só pro teste: é o sorteio dos times dos NPCs (ver tools/test-torre.js)
+exports._towerGenerate = (dateId)=>towerGenerate(dateId);
 function towerDocRef(dateId){ return db.collection('trainerTower').doc(dateId); }
 function towerRunRef(uid){ return db.collection('trainerTowerRuns').doc(uid); }
 

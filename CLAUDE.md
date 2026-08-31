@@ -246,7 +246,26 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
   Sudowoodo nas Rotas 36/37, o Gyarados do Lago da Fúria.
 - 16 rotas de Kanto ganharam espécies de Johto onde cabiam (Ledyba na Floresta de Viridian,
   Heracross na Zona de Safári, Sentret na Rota 22, Houndour na Mansão…).
-- **Os oito lendários são 5% por encontro, na única rota onde cada um mora.** Isso vale pras três
+- **QUATRO INTOCÁVEIS: Mewtwo, Lugia, Ho-Oh e Celebi não aparecem como selvagem** (decisão de
+  31/08/2026). Lugia e Ho-Oh eram raros de 5% no Caminho de Gelo e no Covil do Dragão e saíram;
+  o Celebi nunca esteve em rota; o Mewtwo vem do desafio próprio. `ESPECIES_INTOCAVEIS` (os três
+  que NINGUÉM captura) e `SEM_CAPTURA_SELVAGEM` (os três + Mewtwo) existem porque essa regra tem
+  consequência em cascata:
+  - **O desafio do Mewtwo estava impossível e ninguém tinha notado.** Ele abre quando "todo o resto"
+    foi capturado, e o Celebi entrou com Johto sem estar em rota nenhuma — ou seja, desde 30/08 a
+    condição não fechava mais. Só não estourou porque exige 249 espécies. Hoje a conta desconta os
+    intocáveis.
+  - **"Mestre Pokémon" e "Pokédex de Johto"** passaram a cobrar o que dá pra ter, não o total da
+    tela (que continua mostrando 250 — eles são entradas de verdade da Pokédex). Conquista
+    impossível é pior que conquista nenhuma: ninguém consegue nem saber por que não acendeu.
+  - **A conquista "Mar e Céu"** (capturar Lugia e Ho-Oh) foi removida no mesmo movimento — ela tinha
+    nascido horas antes e a regra nova a tornou impossível.
+  - **A Torre não sorteia nenhum dos quatro** pro time dos NPCs (`TOWER_EXCLUDED`): encontrar num
+    andar comum um bicho que o jogador nunca vai poder ter esvazia o que eles são. Conferido: antes
+    disso saíam mesmo — Celebi e Ho-Oh apareceram na torre gerada do dia.
+  A oferta selvagem ainda tem uma rede de segurança: se um deles voltar pra um pool por engano, a
+  tela troca por um pokémon do pool da etapa em vez de oferecê-lo.
+- **Os seis lendários capturáveis são 5% por encontro, na única rota onde cada um mora.** Isso vale pras três
   aves de Kanto e pros cinco de Johto (as três bestas, Lugia e Ho-Oh) — `LENDARIOS` e
   `ehLendario()` existem pra que os oito sejam tratados igual. Medido: 4,95% a 5,21%.
   Duas coisas estavam erradas antes disso:
@@ -257,6 +276,7 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
      etapa — um **Lugia nível 23**, um Raikou nível 20. Agora `nivelDeLendario(leg)` dá
      `min(50, teto da etapa + 12)` pra todos: os 12 vêm do que as aves de Kanto já faziam na
      prática (Articuno aparecia no nível 50 numa etapa cujo selvagem ia até 38).
+  (Lugia e Ho-Oh saíram desta conta em 31/08/2026 — viraram intocáveis, ver acima.)
   **5% por encontro não é 5% por jornada**: cada lendário mora numa rota só, o treinador só faz um
   encontro por trecho e ainda escolhe entre duas rotas. Medido em 20 mil jornadas com escolhas
   aleatórias: **1,2% a 1,4% por lendário**, 9,8% de ver algum e **0,28% de ver dois**. Quem escolhe
