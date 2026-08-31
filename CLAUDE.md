@@ -289,6 +289,11 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
   essa tela e não ao aceitar o desafio: ela ANUNCIA os cinco adversários, e sortear depois faria o
   jogador ler uma fila e enfrentar outra. As mensagens que diziam "recomeça da Lorelei" passaram a
   nomear o primeiro da fila dele.
+- **O botão "Seu time" está nas TRÊS telas onde se decide alguma coisa sobre o time**: o encontro
+  selvagem, a escolha de ginásio e a escolha de rota (`botaoSeuTimeHtml`). Nas duas últimas a
+  pergunta é a mesma do encontro — "que tipo falta no meu time?" — e a resposta estava a duas telas
+  de distância. O modal já é anexado pelo render principal, então serve em qualquer tela sem mais
+  nada.
 - Na tela do encontro selvagem: botão **"Seu time"** (modal com o time atual) e uma **lupa por
   pokémon**, que abre a mesma ficha de atributos da Pokédex. A lupa PARECE estar dentro do card,
   mas no HTML ela é **irmã** dele e volta pra cima por `position:absolute` — `<button>` dentro de
@@ -393,6 +398,30 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
   finais, nível 70, 1.200 batalhas) **Kanto vence 51,4%**, dentro do ruído. E Johto tem MENOS
   confrontos ruins (12,4% contra 14,7%) e menos casos sem golpe útil (114 contra 195). Dar subtipo
   a Johto seria mexer em balanceamento sem problema medido pra resolver.
+- **A ESPÉCIE TEM QUE BATER COM O NÍVEL** (`especieNoNivel`). Um Caterpie nível 17 não existe: aos
+  7 ele virou Metapod e aos 10, Butterfree. O encontro sorteia a espécie do pool e o nível do
+  TRECHO, e os dois discordavam — foi reportado com um Caterpie Lv.17 e um Weedle Lv.13 na mesma
+  tela. A regra é a MESMA do `tryEvolve`, inclusive parando nos pontos de bifurcação (Gloom,
+  Poliwhirl, Slowpoke) e no Eevee: escolher por ele ali seria tirar a escolha ANTES da captura.
+  Aplicada num lugar só, depois da oferta montada, então pool, raros e pré-evolução de inicial
+  passam todos por ela.
+  O piso de nível (`EVOLVED_MIN_LEVEL`, que impede uma evolução de aparecer cedo demais) ganhou um
+  TETO junto: sem ele o piso empurrava a espécie pra fora da própria janela — um Metapod, que existe
+  do 7 ao 9, saía com nível até 10 num trecho de 3-6, e a regra acima o apagava do jogo virando
+  Butterfree na hora.
+  **O preço, medido: a jornada concluída sobe de 51,7% pra 58,5%** (5.000 jornadas de cada lado,
+  6,8σ). É consequência direta e esperada — quem você captura agora é a forma evoluída, com os
+  atributos dela, no mesmo nível. Não foi compensado em nada: se incomodar, os lugares de mexer são
+  a faixa de nível dos trechos ou o bolo de derrota.
+  **Oito espécies só moravam em rota de nível alto demais pra elas** e viraram buraco na Pokédex na
+  hora em que a regra entrou (Porygon, Natu, Swinub, Houndour, Tyrogue, Smoochum, Elekid, Magby —
+  um Elekid só existia na Usina, nível 50-55, ou seja, sempre Electabuzz). Cada uma ganhou uma casa
+  onde cabe: Tyrogue na Rota 22, Smoochum no Monte Lua (que já é a casa dos bebês, com Cleffa e
+  Igglybuff), Elekid na Rota 32, Natu na Rota 34, Houndour e Magby nas Rotas 36/37, Swinub nas
+  Rotas 38/39 e Porygon na Silph Co. (onde o Porygon2 já morava).
+  `tools/test-jornada.js` **passou a considerar o nível** na conta de "todo pokémon tem como ser
+  capturado": estar num pool não basta mais — o teste calcula que FORMAS cada entrada consegue
+  produzir dentro da faixa do trecho. Sem isso ele daria verde com os oito buracos abertos.
 - **O tipo da rota PESA no sorteio do encontro** (`PESO_DO_TIPO_DA_ROTA = 2`): quem é do tipo dela
   entra com o dobro de peso no embaralhamento. É o que faz a rota fantasma parecer uma rota
   fantasma — medido no Desvio por Lavender (Fantasma/Terra, 3 do tipo num pool de 9): a oferta

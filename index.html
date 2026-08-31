@@ -2747,7 +2747,26 @@ function rollWildLevel(speciesId, minLevel, maxLevel){
   const floor = EVOLVED_MIN_LEVEL[speciesId];
   if(!floor || floor <= minLevel) return randomInt(minLevel, maxLevel);
   const spread = maxLevel - minLevel;
-  return randomInt(floor, floor + spread);
+  /* O deslocamento pra cima não pode passar do nível em que ela PRÓPRIA evolui, senão o piso
+     empurrava o bicho pra fora da própria janela: um Metapod (que existe do 7 ao 9) num trecho de
+     3-6 saía com nível até 10 -- e aí, pela regra de coerência abaixo, viraria Butterfree na hora,
+     apagando o Metapod do jogo. */
+  const teto = EVOLUTIONS[speciesId] ? EVOLUTIONS[speciesId].level - 1 : Infinity;
+  return randomInt(floor, Math.max(floor, Math.min(floor + spread, teto)));
+}
+/* A ESPÉCIE TEM QUE BATER COM O NÍVEL. Um Caterpie nível 17 não existe: aos 7 ele virou Metapod e
+   aos 10, Butterfree. O encontro sorteia a espécie do pool e o nível do TRECHO, e os dois podiam
+   discordar -- foi reportado com um Caterpie Lv.17 e um Weedle Lv.13 na mesma tela.
+   É a MESMA regra do tryEvolve, inclusive parando nos pontos de bifurcação (Gloom, Poliwhirl,
+   Slowpoke): quem escolhe entre Vileplume e Bellossom é o jogador, e escolher por ele aqui seria
+   tirar a escolha ANTES mesmo da captura. Ele decide no primeiro nível que subir depois de pegar. */
+function especieNoNivel(id, nivel){
+  let cur = id, guarda = 0;
+  while(EVOLUTIONS[cur] && nivel >= EVOLUTIONS[cur].level && guarda++ < 10){
+    if(EVOLUTION_CHOICES[cur]) break;
+    cur = EVOLUTIONS[cur].into;
+  }
+  return cur;
 }
 
 /* SEIS iniciais desde 30/08/2026: os três de Kanto e os três de Johto. A jornada agora se bifurca
@@ -2795,12 +2814,12 @@ const ROUTE_MAP = [
       pool:['caterpie','weedle','oddish','pidgey','bellsprout','paras','tangela','ledyba','spinarak','pineco'], rare:['pikachu'] },
     { id:'route_22', name:'Rota 22', icon:'🌾', types:['Normal','Fighting'],
       rumor:'Treinadores contam de um macaco furioso que quebra pedras.',
-      pool:['ratata','spearow','mankey','nidoranm','nidoranf','meowth','sandshrew','farfetchd','sentret','hoothoot'], rare:['growlithe'] }
+      pool:['ratata','spearow','mankey','nidoranm','nidoranf','meowth','sandshrew','farfetchd','sentret','hoothoot','tyrogue'], rare:['growlithe'] }
   ],
   [ // antes de Misty (Água)
     { id:'mt_moon', name:'Monte Lua', icon:'🌙', types:['Rock','Poison'],
       rumor:'Há fósseis antigos enterrados nas cavernas — e Rockets cavando.',
-      pool:['geodude','zubat','clefairy','paras','sandshrew','jigglypuff','teddiursa','dunsparce','cleffa','igglybuff'], rare:['onix'] },
+      pool:['geodude','zubat','clefairy','paras','sandshrew','jigglypuff','teddiursa','dunsparce','cleffa','igglybuff','smoochum'], rare:['onix'] },
     { id:'coast_24_25', name:'Rotas 24/25 (Costa)', icon:'🌊', types:['Water','Electric'],
       rumor:'Pescadores juram ter visto um roedor elétrico na margem.',
       pool:['bellsprout','oddish','psyduck','poliwag','abra','pidgey','goldeen','magikarp','slowpoke','butterfree','marill','wooper','chinchou'], rare:['pikachu'] }
@@ -2835,7 +2854,7 @@ const ROUTE_MAP = [
       pool:['machop','machoke','primeape','mankey','poliwhirl','hitmonlee','hitmonchan','tyrogue','hitmontop'], rare:[] },
     { id:'silph_co', name:'Silph Co.', icon:'🏢', types:['Poison','Psychic'],
       rumor:'Onze andares tomados pela Rocket. Dizem que há um experimento estranho guardado no cofre.',
-      pool:['zubat','grimer','koffing','drowzee','abra','mrmime','kadabra','magneton','electabuzz','eevee','natu','porygon2','smoochum'], rare:['ditto'] }
+      pool:['zubat','grimer','koffing','drowzee','abra','mrmime','kadabra','magneton','electabuzz','eevee','natu','porygon2','smoochum','porygon'], rare:['ditto'] }
   ],
   [ // antes de Blaine (Fogo)
     { id:'seafoam', name:'Ilhas Seafoam', icon:'❄️', types:['Water','Ice'],
@@ -2870,7 +2889,7 @@ const JOHTO_ROUTE_MAP = [
   [ // antes do Bugsy (Inseto) -- Rota 32 e a Caverna União
     { id:'route_32', name:'Rota 32', icon:'🎣', types:['Electric','Water'],
       rumor:'Pescadores na ponte o dia inteiro. Alguém viu uma ovelha elétrica no capim.',
-      pool:['mareep','bellsprout','hoppip','wooper','ratata','zubat','magikarp','ekans'], rare:['quagsire'] },
+      pool:['mareep','bellsprout','hoppip','wooper','ratata','zubat','magikarp','ekans','elekid'], rare:['quagsire'] },
     { id:'union_cave', name:'Caverna União', icon:'🪨', types:['Rock','Water'],
       rumor:'Nas sextas-feiras, dizem que algo enorme e gentil aparece no lago do fundo.',
       pool:['geodude','zubat','onix','ratata','sandshrew','wooper','slowpoke','marill'], rare:[{species:'lapras', chance:0.08},'unown'] }
@@ -2881,7 +2900,7 @@ const JOHTO_ROUTE_MAP = [
       pool:['caterpie','metapod','weedle','kakuna','paras','oddish','psyduck','zubat','pineco'], rare:['heracross'] },
     { id:'route_34', name:'Rota 34', icon:'🏙️', types:['Normal','Psychic'],
       rumor:'O caminho da creche até Goldenrod. Passa de tudo por aqui.',
-      pool:['ratata','abra','drowzee','snubbull','magikarp','tentacool','hoppip','meowth','togepi','yanma'], rare:['ditto'] }
+      pool:['ratata','abra','drowzee','snubbull','magikarp','tentacool','hoppip','meowth','togepi','yanma','natu'], rare:['ditto'] }
   ],
   [ // antes do Morty (Fantasma) -- Parque Nacional e Rotas 36/37
     { id:'national_park', name:'Parque Nacional', icon:'🦋', types:['Bug','Grass'],
@@ -2889,7 +2908,7 @@ const JOHTO_ROUTE_MAP = [
       pool:['caterpie','metapod','pidgey','sunkern','hoothoot','psyduck','venonat','ledian','butterfree','smeargle','yanma'], rare:['scyther','pinsir'] },
     { id:'route_36_37', name:'Rotas 36/37', icon:'🍂', types:['Fire','Normal'],
       rumor:'Uma árvore no meio do caminho não sai do lugar. E não é uma árvore.',
-      pool:['growlithe','vulpix','stantler','hoppip','ledyba','spinarak','nidoranm','nidoranf','bellossom'], rare:['sudowoodo'] }
+      pool:['growlithe','vulpix','stantler','hoppip','ledyba','spinarak','nidoranm','nidoranf','bellossom','houndour','magby'], rare:['sudowoodo'] }
   ],
   [ // antes do Chuck (Lutador) -- Ilhas Redemoinho e Rotas 40/41
     { id:'whirl_islands', name:'Ilhas Redemoinho', icon:'🌀', types:['Water','Flying'],
@@ -2905,7 +2924,7 @@ const JOHTO_ROUTE_MAP = [
       pool:['zubat','golbat','voltorb','magnemite','grimer','koffing','staryu','krabby'], rare:['ampharos'] },
     { id:'route_38_39', name:'Rotas 38/39', icon:'🐄', types:['Normal'],
       rumor:'Pasto da Fazenda Moomoo. Leite fresco e bichos grandes demais pro capim.',
-      pool:['miltank','tauros','meowth','magnemite','farfetchd','ratata','snubbull','growlithe','skarmory'], rare:['girafarig'] }
+      pool:['miltank','tauros','meowth','magnemite','farfetchd','ratata','snubbull','growlithe','skarmory','swinub'], rare:['girafarig'] }
   ],
   [ // antes do Pryce (Gelo) -- Monte Mortar e Lago da Fúria
     { id:'mt_mortar', name:'Monte Mortar', icon:'🥊', types:['Fighting','Rock'],
@@ -5418,6 +5437,10 @@ function montaOfertaSelvagem(){
       }
     }
   }
+  /* Num lugar só, depois de tudo: o pool, os raros da rota e a pré-evolução de inicial passam
+     todos por aqui, então nenhum caminho novo escapa da regra por esquecimento. O disfarçado é
+     Ditto por baixo, que não evolui, e os lendários também não -- ninguém precisa de exceção. */
+  offer = offer.map(o => ({ ...o, speciesId: especieNoNivel(o.speciesId, o.level) }));
   offer.forEach(o=>{ o.shiny = Math.random() < currentShinyChance(); }); // shiny (1 em 128, ou a chance crescente do bônus, se estiver ativo)
   // registra que esse encontro rodou, PRA VALER na próxima chamada -- é isso que faz a chance subir
   // encontro após encontro enquanto a pessoa não captura nenhum shiny (currentShinyChance lê esse
@@ -11499,6 +11522,7 @@ function renderGymChoice(){
       </div>
     </button>`;
   }).join('')}
+  ${botaoSeuTimeHtml()}
   ${kantoMapBotaoHtml()}`;
 }
 function renderKantoIntro(){
@@ -11605,7 +11629,8 @@ function renderRouteCardsBlock(cards){
       <span class="mon-name">${r.icon} ${r.name}</span>
       <span class="mon-sub">${typesHtml(r.types)}</span>
       <span class="route-rumor">💬 ${r.rumor}</span>
-    </button>`).join('')}`;
+    </button>`).join('')}
+  ${botaoSeuTimeHtml()}`;
 }
 
 // selo do terreno da luta atual da Elite. Devolve vazio pras batalhas sem terreno (rival, Rocket e a
@@ -11778,12 +11803,19 @@ function renderWild(){
     }).join('')}
   </div>
   <button class="btn success" onclick="confirmWild()">Confirmar equipe ✔</button>
-  <button class="btn secondary" onclick="abrirTimeModal()">👥 Seu time (${(game.team||[]).length})</button>
+  ${botaoSeuTimeHtml()}
   <button class="btn secondary" onclick="abrirPokedexModal()">${pokedexIcon('grande')} Consultar Pokédex</button>`;
 }
-/* O time atual, sem sair da tela do encontro. A decisão de capturar depende de quem já está no
-   time (tipo que falta, nível de quem está atrás), e antes disso exigia sair e voltar -- o que,
-   desde a semente anti-artimanha, devolve a MESMA oferta mas custa a viagem. */
+/* O time atual, sem sair da tela. A decisão de capturar depende de quem já está no time (tipo que
+   falta, nível de quem está atrás), e antes disso exigia sair e voltar -- o que, desde a semente
+   anti-artimanha, devolve a MESMA oferta mas custa a viagem.
+   O botão é o MESMO nas três telas onde se decide alguma coisa sobre o time: o encontro selvagem,
+   a escolha de ginásio e a escolha de rota. Nas duas últimas a pergunta é a mesma -- "que tipo
+   falta no meu time?" -- e a resposta estava a duas telas de distância. O modal em si já é
+   anexado no render principal, então serve em qualquer tela sem mais nada. */
+function botaoSeuTimeHtml(){
+  return `<button class="btn secondary" onclick="abrirTimeModal()">👥 Seu time (${(game.team||[]).length})</button>`;
+}
 function abrirTimeModal(){ game.timeModal = true; render(); }
 function fecharTimeModal(){ game.timeModal = false; render(); }
 function renderTimeModal(){

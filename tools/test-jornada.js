@@ -191,10 +191,30 @@ console.log('\nTODO POKEMON TEM COMO SER CAPTURADO');
 /* Uma especie na tabela que nao esta em rota nenhuma nem evolui de nada e uma vaga impossivel na
    Pokedex -- e a Pokedex completa e o que libera o desafio do Mewtwo. Quando Johto entrou, DEZESSETE
    nao-lendarios ficaram assim (Pichu, Togepi, Slowking, Skarmory, Unown...) e nada acusava. */
+/* Estar num pool NAO basta desde que a especie bate com o nivel: uma entrada de Tyrogue num trecho
+   de nivel 33 nunca produz um Tyrogue -- produz um Hitmontop. O que cada entrada realmente
+   entrega e o conjunto de formas que ela assume dentro da faixa de nivel daquele trecho. */
+function formasPossiveis(id, leg){
+  const L = S.LEGS[leg];
+  const piso = S.EVOLVED_MIN_LEVEL[id];
+  let de = L.minLevel, ate = L.maxLevel;
+  if(piso && piso > L.minLevel){
+    const teto = S.EVOLUTIONS[id] ? S.EVOLUTIONS[id].level - 1 : Infinity;
+    de = piso; ate = Math.max(piso, Math.min(piso + (L.maxLevel - L.minLevel), teto));
+  }
+  const formas = new Set();
+  for(let n = de; n <= ate; n++) formas.add(S.especieNoNivel(id, n));
+  return formas;
+}
 const alcancavel = new Set();
-[S.ROUTE_MAP, S.JOHTO_ROUTE_MAP].forEach(mapa => mapa.forEach(par => par.forEach(r => {
-  r.pool.forEach(id => alcancavel.add(id));
-  (r.rare || []).forEach(x => alcancavel.add(typeof x === 'object' ? x.species : x));
+[S.ROUTE_MAP, S.JOHTO_ROUTE_MAP].forEach(mapa => mapa.forEach((par, leg) => par.forEach(r => {
+  r.pool.forEach(id => formasPossiveis(id, leg).forEach(f => alcancavel.add(f)));
+  (r.rare || []).forEach(x => {
+    const id = typeof x === 'object' ? x.species : x;
+    // lendário tem nível próprio (nivelDeLendario) e nenhum deles evolui -- entra como está
+    if(S.ehLendario(id)) alcancavel.add(id);
+    else formasPossiveis(id, leg).forEach(f => alcancavel.add(f));
+  });
 })));
 S.STARTERS.forEach(id => alcancavel.add(id));
 for(let mudou = true; mudou; ){                       // fecho transitivo das evoluções
@@ -476,6 +496,42 @@ ok('sem tipo declarado, o sorteio continua uniforme',
    chances.every(c => Math.abs(c - alvo) < 0.04),
    'entre ' + (Math.min(...chances)*100).toFixed(1) + '% e ' + (Math.max(...chances)*100).toFixed(1) +
    '% (uniforme seria ' + (alvo*100).toFixed(1) + '%)');
+
+
+console.log('\nA ESPECIE TEM QUE BATER COM O NIVEL');
+/* O que foi reportado: um Caterpie Lv.17 e um Weedle Lv.13 na mesma tela. Nenhum dos dois existe
+   nesse nivel -- aos 7 viram Metapod/Kakuna e aos 10, Butterfree/Beedrill. */
+const eh = (id, n) => S.SPECIES[S.especieNoNivel(id, n)].name;
+ok('Caterpie Lv.17 e um Butterfree', eh('caterpie',17) === 'Butterfree', eh('caterpie',17));
+ok('Weedle Lv.13 e um Beedrill', eh('weedle',13) === 'Beedrill', eh('weedle',13));
+ok('mas Caterpie Lv.8 ainda e um Metapod', eh('caterpie',8) === 'Metapod', eh('caterpie',8));
+ok('e Caterpie Lv.6 continua Caterpie', eh('caterpie',6) === 'Caterpie', eh('caterpie',6));
+ok('Oddish Lv.16 continua Oddish (so evolui no 21)', eh('oddish',16) === 'Oddish', eh('oddish',16));
+ok('a cadeia anda mais de um passo de uma vez', eh('charmander',40) === 'Charizard', eh('charmander',40));
+/* Nos pontos de bifurcacao quem escolhe e o JOGADOR (tela evoChoice). Escolher por ele aqui seria
+   tirar a escolha antes mesmo da captura -- ele decide no primeiro nivel que subir depois de pegar. */
+ok('Gloom Lv.45 continua Gloom: a escolha e do jogador', eh('gloom',45) === 'Gloom', eh('gloom',45));
+ok('Poliwhirl e Slowpoke idem',
+   eh('poliwhirl',45) === 'Poliwhirl' && eh('slowpoke',45) === 'Slowpoke');
+ok('o Eevee tambem nao evolui sozinho', eh('eevee',45) === 'Eevee', eh('eevee',45));
+/* O piso de nivel (pra uma evolucao nao aparecer cedo demais) nao pode empurrar a especie pra fora
+   da propria janela: o Metapod existe do 7 ao 9, e a faixa deslocada chegava a 10. */
+let foraDaJanela = 0;
+for(let i=0;i<3000;i++){
+  const n = S.rollWildLevel('metapod', 3, 6);
+  if(n < 7 || n > 9) foraDaJanela++;
+}
+ok('o piso nao empurra o Metapod pra fora da janela dele (7-9)', foraDaJanela === 0,
+   foraDaJanela + ' de 3000 fora');
+
+console.log('\nO BOTAO "SEU TIME" ONDE SE DECIDE ALGO SOBRE O TIME');
+g.gymIndex = 3; g.gymPath = []; g.starterId = 'charmander';
+g.team = [{ speciesId:'charmander', level:16, types: S.SPECIES['charmander'].types }];
+g.routeCards = null; S.__setGame(g);
+ok('na escolha de ginasio', S.renderGymChoice().includes('abrirTimeModal()'));
+ok('na escolha de rota (inicio da jornada)', S.renderWalk().includes('abrirTimeModal()'));
+ok('e na escolha de rota dos trechos seguintes', S.renderWalkNext().includes('abrirTimeModal()'));
+ok('com a contagem do time no rotulo', S.renderGymChoice().includes('Seu time (1)'));
 
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
 process.exit(falhas ? 1 : 0);
