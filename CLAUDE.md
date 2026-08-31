@@ -272,8 +272,14 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
 - Na tela de escolha de ginásio, o **tipo é o selo colorido** (`typePill`), não a palavra ao lado do
   nome — é o mesmo selo da Pokédex e da batalha, então se reconhece pela cor antes de ler. A
   insígnia fica grande à esquerda com o nome dela embaixo, o líder ao centro, e a contagem de
-  pokémon saiu (não ajudava a escolher: os dois lados têm sempre o mesmo número), e a lista de
-  caminhos saiu junto — nome de rota que o jogador ainda não conhece não ajuda a decidir.
+  pokémon saiu (não ajudava a escolher: os dois lados têm sempre o mesmo número).
+  **Os dois caminhos do trecho aparecem DENTRO da coluna centralizada**, um por linha, embaixo da
+  cidade. Como linha própria embaixo do corpo — a primeira versão — eles viravam um rodapé solto
+  encostado na borda esquerda e a insígnia deixava de cobrir a altura do card. Um por linha, e não
+  "A ou B" na mesma linha, porque a coluna tem 132px a 320px e a frase inteira mede ~200: quebraria
+  no meio de um nome. Medido: o mais largo dos 32 caminhos ("Desvio por Lavender") dá 126px, todos
+  cabem numa linha. `tools/test-jornada.js` conta as tags que fecham entre a cidade e os caminhos
+  (1 dentro da coluna, 3 se voltarem a ser rodapé).
   **O nome do líder é centrado no CARD, não no espaço que sobrou dele.** Como a insígnia ocupa uma
   coluna à esquerda, centralizar dentro do que restava punha o nome 37px à direita do centro, e
   isso se vê a olho. O conserto é a margem espelho em `.gym-choice-info`: ela repete à direita a
@@ -701,6 +707,36 @@ Duas artimanhas medidas e fechadas — em ambas o jogador reiniciava até vir sh
 - Mexer numa coordenada de `KANTO_PLACES` move a cidade **e** as linhas do trajeto, que saem dali.
   `node tools/test-mapa.js` confere que toda cidade continua dentro da moldura e que o mapa não
   revela cidade antes da hora — os dois erros que somem em silêncio.
+
+## Conta e login
+
+- **O rival padrão mora na CONTA** (`users/{uid}.rivalNameDefault`), não no save: a tela de nome do
+  rival já vem preenchida com ele, e trocar ali troca o padrão das próximas jornadas. Não existe
+  outra tela pra editar, de propósito — o lugar natural de mexer no nome do rival é a tela que
+  pergunta o nome do rival. A precedência é conta → rival de um save que já exista → o
+  `RIVAL_NAME_DEFAULT` do jogo. O passo do meio é pra conta anterior ao campo: oferecer "Rafael"
+  pra quem tem rival há três jornadas seria pior que aproveitar o que já está lá (save não tem
+  carimbo de tempo, então é o primeiro slot que tiver um). O campo precisa estar em
+  `CAMPOS_DA_CONTA`: sem isso o `freshGameDefaults()` de dentro do `confirmNewSaveName` o apaga no
+  meio do caminho. A gravação é best-effort — se falhar, a jornada não para, o nome já está no save.
+- **"Esqueci minha senha" é um MODO da mesma caixa** (`authMode: 'login' | 'register' | 'reset'`), e
+  não uma tela nova: o campo de e-mail é o mesmo e o de senha some — pedir senha na tela de
+  "esqueci a senha" faz a pessoa achar que clicou no botão errado. O e-mail digitado atravessa a
+  troca de modo (`game.authEmail`) e sobrevive ao erro: antes, errar a senha redesenhava a tela e
+  apagava o e-mail junto.
+- **E-mail desconhecido NÃO vira erro na tela.** O Firebase devolve `auth/user-not-found`, e
+  repassar isso transforma o formulário num oráculo — dá pra descobrir quem tem conta no jogo
+  testando e-mails um a um. A resposta é a mesma nos dois casos, e `tools/test-conta.js` tranca
+  isso (com o defeito, a tela chega a responder "E-mail ou senha incorretos" a quem só digitou um
+  e-mail).
+- O link do e-mail abre a página do **próprio Firebase** — o template fica no console, em
+  Authentication → Templates, e não há nada pra guardar do nosso lado. O `continue URL` que traz a
+  pessoa de volta pro jogo só é aceito se o domínio estiver nos autorizados do Auth, e o SDK recusa
+  a chamada INTEIRA quando não está: daí a segunda tentativa sem ele. Melhor um e-mail sem link de
+  volta do que e-mail nenhum.
+- **Sair da conta devolve o formulário ao estado inicial** (modo, erro, recado e e-mail). Sem isso
+  quem saiu com a tela em "criar conta" reencontrava aquele formulário no lugar do login, e o
+  e-mail da conta anterior ficava preenchido num aparelho que pode não ser só dele.
 
 ## Salvamento
 

@@ -1400,6 +1400,15 @@
   .gym-choice-lider{ font-family:var(--font-pixel); font-size:.82rem; color:var(--ink); line-height:1.3; }
   .gym-choice-tipo{ margin:5px 0 3px; }
   .gym-choice-cidade{ font-size:.75rem; font-weight:800; color:var(--blue-dark); }
+  /* Os dois caminhos do trecho, um por linha, DENTRO da coluna centralizada. Como linha própria
+     embaixo do corpo (a primeira versão) eles viravam um rodapé solto encostado na borda esquerda,
+     e a insígnia deixava de cobrir a altura do card.
+     Um por linha, e não "A ou B" na mesma linha: a coluna tem 132px a 320px e a frase inteira mede
+     ~200, então quebraria no meio de um nome. Medido: o mais largo dos 32 caminhos ("Desvio por
+     Lavender") dá 126px -- todos cabem numa linha só. */
+  .gym-choice-rotas{ margin-top:7px; }
+  .gym-choice-rotas-titulo{ display:block; font-size:.55rem; font-weight:800; letter-spacing:.06em; color:var(--muted); }
+  .gym-choice-rota{ display:block; font-size:.68rem; font-weight:600; color:var(--muted); line-height:1.35; }
   /* insígnia da tela de escolha: maior que a do cinturão, menor que a da vitória */
   .badge-visual.gc{ width:52px; height:52px; }
   .badge-visual.gc .badge-visual-img, .badge-visual.gc .badge-visual-fallback{ width:52px; height:52px; font-size:1.5rem; }
@@ -2928,6 +2937,19 @@ const ROCKET_NAMES = ['Recruta Rocket', 'Agente Rocket', 'Capanga Rocket', 'Exec
 ------------------------------------------------------------------- */
 const RIVAL_LEGS = [2, 4, 6];
 const RIVAL_NAME_DEFAULT = 'Rafael';
+/* O rival padrão mora na CONTA (users/{uid}.rivalNameDefault) e é ele que preenche a tela de nome
+   do rival. Quem joga várias jornadas costuma manter o mesmo rival, e digitar o mesmo nome toda vez
+   era pedágio. Trocar na tela troca o padrão -- não existe outro lugar pra editar, de propósito: o
+   lugar natural de mexer no nome do rival é a tela que pergunta o nome do rival. */
+function nomeDoRivalPadrao(){
+  const daConta = (game.rivalNameDefault || '').trim();
+  if(daConta) return daConta;
+  /* Conta anterior ao padrão: em vez de oferecer 'Rafael' pra quem já tem rival há três jornadas,
+     aproveita o nome que já está num save. Save não tem carimbo de tempo, então é o primeiro slot
+     que tiver um -- e vira padrão de verdade quando a pessoa confirmar. */
+  const doSave = (game.saveSlots || []).map(s => s && s.rivalName).find(n => n && n.trim());
+  return (doSave || '').trim() || RIVAL_NAME_DEFAULT;
+}
 // o rival pega o inicial que TEM VANTAGEM sobre o seu, dentro do mesmo triângulo -- Johto tem o
 // dele, igual a Kanto (planta < fogo < água < planta)
 const RIVAL_STARTER_COUNTER = {
@@ -3314,9 +3336,12 @@ function freshGameDefaults(){
     myLeagueHistory:[],
 
     trainerName:'',
+    rivalNameDefault:'',    // rival padrão da CONTA (não do save) -- ver nomeDoRivalPadrao
     authUser:null,
-    authMode:'login',
+    authMode:'login',       // 'login' | 'register' | 'reset' (recuperar senha)
     authError:null,
+    authNotice:null,        // recado bom (o link de recuperação saiu): azul, não vermelho
+    authEmail:'',           // e-mail digitado -- sobrevive à troca de modo e ao render de erro
     authBusy:false,
     saveSlots: new Array(MAX_SAVE_SLOTS).fill(null),
     currentSaveSlot:null,
@@ -4521,6 +4546,7 @@ async function loadPermanentUserData(){
     game.permanentPokedex = [...permanent];
     game.permanentShinyDex = [...permanentShiny];
     game.trainerName = d.trainerName || '';
+    game.rivalNameDefault = d.rivalNameDefault || '';   // preenche a tela de nome do rival (ver nomeDoRivalPadrao)
     game.accountEliteChampion = !!d.eliteChampion;
     game.leagueWinsTotal = d.leagueWinsTotal || 0;
     game.trainerBestStreak = d.trainerBestStreak || 0;
@@ -9732,7 +9758,7 @@ function showJourneyEnd(){
                         game.specialties e o syncSpecialties só dispara quando alguém do time chega
                         ao nível da especialidade. */
 const CAMPOS_DA_CONTA = [
-  'authUser','saveSlots','trainerName','permanentPokedex','permanentShinyDex',
+  'authUser','saveSlots','trainerName','rivalNameDefault','permanentPokedex','permanentShinyDex',
   'accountEliteChampion','leagueWinsTotal','leagueLeaderboard','trainerBestStreak','trainerLastStreak',
   'shinyBonusExpiresAt','shinyPityCount','specialties','specialtyCounts',
   'mewtwoLoanActive','mewtwoLoanCooldownUntil','mewtwoLoanUnlocked','mewtwoLoanReadyToClaim',
@@ -9777,8 +9803,13 @@ function confirmReset(){
    AUTENTICAÇÃO (Firebase Auth)
 --------------------------------------------------- */
 function switchAuthMode(mode){
+  /* leva junto o e-mail já digitado: sem isso, ir de "Entrar" pra "Criar conta" -- ou pro
+     "Esqueci minha senha" -- limpava o campo e a pessoa digitava tudo de novo */
+  const campo = document.getElementById('auth-email-input');
+  if(campo) game.authEmail = campo.value;
   game.authMode = mode;
   game.authError = null;
+  game.authNotice = null;
   render();
 }
 function authErrorMessage(e){
@@ -9788,6 +9819,9 @@ function authErrorMessage(e){
   if(code==='auth/weak-password') return 'Senha muito fraca (mínimo 6 caracteres).';
   if(code==='auth/wrong-password' || code==='auth/user-not-found' || code==='auth/invalid-credential') return 'E-mail ou senha incorretos.';
   if(code==='auth/popup-closed-by-user') return 'Login cancelado.';
+  if(code==='auth/too-many-requests') return 'Muitas tentativas seguidas. Espere alguns minutos e tente de novo.';
+  if(code==='auth/missing-email') return 'Digite o e-mail da sua conta.';
+  if(code==='auth/user-disabled') return 'Essa conta está desativada.';
   console.error(e);
   return 'Algo deu errado. Tente de novo.';
 }
@@ -9805,8 +9839,9 @@ async function signInWithGoogle(){
 async function loginWithEmail(){
   const email = document.getElementById('auth-email-input')?.value.trim();
   const password = document.getElementById('auth-password-input')?.value;
+  game.authEmail = email || '';   // o render do erro recria o campo: sem isso, errar a senha apagava o e-mail junto
   if(!email || !password){ game.authError = 'Preencha e-mail e senha.'; render(); return; }
-  game.authBusy = true; game.authError = null; render();
+  game.authBusy = true; game.authError = null; game.authNotice = null; render();
   try{
     await auth.signInWithEmailAndPassword(email, password);
   } catch(e){
@@ -9818,15 +9853,62 @@ async function loginWithEmail(){
 async function registerWithEmail(){
   const email = document.getElementById('auth-email-input')?.value.trim();
   const password = document.getElementById('auth-password-input')?.value;
+  game.authEmail = email || '';
   if(!email || !password){ game.authError = 'Preencha e-mail e senha.'; render(); return; }
   if(password.length<6){ game.authError = 'A senha precisa ter pelo menos 6 caracteres.'; render(); return; }
-  game.authBusy = true; game.authError = null; render();
+  game.authBusy = true; game.authError = null; game.authNotice = null; render();
   try{
     await auth.createUserWithEmailAndPassword(email, password);
   } catch(e){
     game.authError = authErrorMessage(e);
     game.authBusy = false;
     render();
+  }
+}
+/* Recuperação de senha.
+
+   E-MAIL DESCONHECIDO NÃO É ERRO AQUI. O Firebase devolve auth/user-not-found, e repassar isso pra
+   tela transforma o formulário num oráculo: qualquer um descobre quais e-mails têm conta no jogo
+   testando um por um. A resposta é a mesma nos dois casos -- por isso a mensagem diz "se existir
+   conta com esse e-mail".
+
+   O resto do fluxo é do Firebase: o link do e-mail abre a página de troca de senha hospedada por
+   ele, e a senha nova já vale no próximo login. Não há nada pra guardar do nosso lado. */
+async function sendPasswordReset(){
+  const campo = document.getElementById('auth-email-input');
+  const email = campo ? campo.value.trim() : '';
+  game.authEmail = email;
+  if(!email){ game.authError = 'Digite o e-mail da sua conta.'; render(); return; }
+  game.authBusy = true; game.authError = null; game.authNotice = null; render();
+  try{
+    await enviarEmailDeRecuperacao(email);
+  } catch(e){
+    if(!(e && e.code === 'auth/user-not-found')){   // ver o comentário acima
+      game.authError = authErrorMessage(e);
+      game.authBusy = false;
+      render();
+      return;
+    }
+  }
+  game.authBusy = false;
+  game.authMode = 'login';   // o próximo passo é entrar com a senha nova -- a tela já espera por isso
+  game.authNotice = 'Se existir conta com esse e-mail, o link pra criar uma senha nova acabou de sair. Olhe também o spam. Se você sempre entrou com o 🔵 Google, pode continuar entrando por lá.';
+  render();
+}
+/* O link volta pro jogo depois da troca (continue URL). Ele só é aceito se o domínio estiver na
+   lista de autorizados do Firebase Auth -- e o SDK recusa a chamada INTEIRA quando não está, em vez
+   de ignorar o extra. Daí a segunda tentativa pelada: melhor um e-mail sem link de volta do que
+   e-mail nenhum. */
+async function enviarEmailDeRecuperacao(email){
+  try{
+    await auth.sendPasswordResetEmail(email, { url: window.location.origin + '/', handleCodeInApp: false });
+  } catch(e){
+    const code = e && e.code;
+    if(code==='auth/unauthorized-continue-uri' || code==='auth/invalid-continue-uri' || code==='auth/missing-continue-uri'){
+      await auth.sendPasswordResetEmail(email);
+      return;
+    }
+    throw e;
   }
 }
 /* ---------------------------------------------------
@@ -10078,6 +10160,7 @@ async function confirmNewSaveName(){
   game.gameMode = modoEscolhido;
   game.currentSaveSlot = slot;
   game.rivalName = rivalName;
+  gravarRivalPadrao(rivalName);   // o que foi digitado aqui vira o padrão das próximas jornadas
   // sorteia shiny pra CADA inicial de forma independente, com a MESMA chance de um encontro
   // selvagem -- inclusive a 4x do modo difícil. Antes isso usava SHINY_CHANCE fixo e o inicial
   // era o único encontro do jogo que ignorava o modo escolhido.
@@ -10087,6 +10170,16 @@ async function confirmNewSaveName(){
   game.screen = 'start';
   render();
   saveCurrentGame();
+}
+/* Best-effort de propósito: se a escrita falhar, a jornada que está começando não pode parar por
+   causa disso -- o nome já está no save, e o padrão é conveniência. */
+function gravarRivalPadrao(nome){
+  const limpo = (nome || '').trim();
+  if(!limpo || !game.authUser) return;
+  if((game.rivalNameDefault || '') === limpo) return;
+  game.rivalNameDefault = limpo;
+  userDocRef(game.authUser.uid).set({ rivalNameDefault: limpo }, { merge: true })
+    .catch(e=>console.error('Erro ao gravar o rival padrão da conta:', e));
 }
 function serializeGame(){
   return {
@@ -11288,6 +11381,7 @@ function renderGymChoice(){
        batalha usam, então o jogador reconhece "Pedra" pela cor antes de ler. O gymTypeName está
        em português e o typePill trabalha em inglês -- daí a tradução. */
     const tipoEn = englishTypeFromPortuguese(o.gym.gymTypeName);
+    const rotas = (o.regiao === 'johto' ? JOHTO_ROUTE_MAP : ROUTE_MAP)[etapa] || [];
     return `
     <button class="save-slot-card clickable gym-choice-card" onclick="escolherGinasio('${escJs(o.regiao)}')">
       <span class="gym-choice-regiao">${o.regiao === 'johto' ? 'JOHTO' : 'KANTO'}</span>
@@ -11302,6 +11396,10 @@ function renderGymChoice(){
           <div class="gym-choice-lider">${escapeHtmlSafe(o.gym.leaderName)}</div>
           <div class="gym-choice-tipo">${tipoEn ? typePill(tipoEn) : escapeHtmlSafe(o.gym.gymTypeName)}</div>
           <div class="gym-choice-cidade">${escapeHtmlSafe(o.gym.city)}</div>
+          <div class="gym-choice-rotas">
+            <span class="gym-choice-rotas-titulo">CAMINHOS</span>
+            ${rotas.map(r=>`<span class="gym-choice-rota">${escapeHtmlSafe(r.icon+' '+r.name)}</span>`).join('')}
+          </div>
         </div>
       </div>
     </button>`;
@@ -14425,6 +14523,11 @@ function renderSaveBlockedModal(){
 }
 
 function renderAuth(){
+  /* A recuperação de senha é um MODO da mesma caixa, não uma tela nova: o campo de e-mail é o
+     mesmo, e o de senha some -- pedir senha na tela de "esqueci a senha" é o tipo de coisa que faz
+     a pessoa achar que clicou no botão errado. */
+  const modo = game.authMode;
+  const titulo = modo==='reset' ? 'Recuperar senha' : (modo==='login' ? 'Entrar com e-mail' : 'Criar conta');
   return `
   <div class="jornada-title">JORNADA<br>KANTO</div>
   <div class="eyebrow">★ JORNADA POKÉMON ★</div>
@@ -14436,12 +14539,18 @@ function renderAuth(){
     <button class="btn primary" ${game.authBusy?'disabled':''} onclick="signInWithGoogle()">🔵 Entrar com Google</button>
   </div>
   <div class="box">
-    <h2>${game.authMode==='login' ? 'Entrar com e-mail' : 'Criar conta'}</h2>
-    <input type="email" id="auth-email-input" class="code-input u-auto-h" placeholder="E-mail">
-    <input type="password" id="auth-password-input" class="code-input u-auto-h" placeholder="Senha (mín. 6 caracteres)">
+    <h2>${titulo}</h2>
+    ${modo==='reset' ? '<p>Digite o e-mail da sua conta. Vamos mandar um link pra você criar uma senha nova.</p>' : ''}
+    <input type="email" id="auth-email-input" class="code-input u-auto-h" placeholder="E-mail" value="${escapeHtmlSafe(game.authEmail||'')}">
+    ${modo==='reset' ? '' : '<input type="password" id="auth-password-input" class="code-input u-auto-h" placeholder="Senha (mín. 6 caracteres)">'}
     ${game.authError ? `<p class="error-text">${game.authError}</p>` : ''}
-    ${game.authMode==='login'
+    ${game.authNotice ? `<p class="hint-text">${game.authNotice}</p>` : ''}
+    ${modo==='reset'
+      ? `<button class="btn danger" ${game.authBusy?'disabled':''} onclick="sendPasswordReset()">${game.authBusy?'Enviando...':'Enviar link de recuperação'}</button>
+         <button class="btn secondary" ${game.authBusy?'disabled':''} onclick="switchAuthMode('login')">⬅ Voltar pro login</button>`
+      : modo==='login'
       ? `<button class="btn danger" ${game.authBusy?'disabled':''} onclick="loginWithEmail()">${game.authBusy?'Entrando...':'Entrar'}</button>
+         <button class="btn secondary" onclick="switchAuthMode('reset')">🔑 Esqueci minha senha</button>
          <button class="btn secondary" onclick="switchAuthMode('register')">Não tenho conta — Criar uma</button>`
       : `<button class="btn danger" ${game.authBusy?'disabled':''} onclick="registerWithEmail()">${game.authBusy?'Criando...':'Criar conta'}</button>
          <button class="btn secondary" onclick="switchAuthMode('login')">Já tenho conta — Entrar</button>`}
@@ -16999,7 +17108,8 @@ function renderNewSaveName(){
     <p>E o seu rival, como se chama? Ele vai aparecer pelo caminho pra te desafiar de vez em quando — e o time dele vai ser feito dos Pokémons que <strong>você recusar</strong> pela jornada.</p>
   </div>
   <div class="box">
-    <input type="text" id="rival-name-input" class="code-input u-auto-h" placeholder="Nome do Rival" maxlength="20">
+    <input type="text" id="rival-name-input" class="code-input u-auto-h" placeholder="Nome do Rival" maxlength="20" value="${escapeHtmlSafe(nomeDoRivalPadrao())}">
+    <p class="hint-text">Esse é o rival padrão da sua conta — trocar aqui vale pras próximas jornadas também.</p>
     ${game.rivalNameError ? `<p class="error-text">${game.rivalNameError}</p>` : ''}
     <button class="btn success" onclick="confirmNewSaveName()">Começar jornada ⚔️</button>
   </div>
@@ -17145,6 +17255,10 @@ auth.onAuthStateChanged((user)=>{
     game.authUser = null;
     game.currentSaveSlot = null;
     pararAvisoDesafio();
+    /* devolve o formulário ao estado inicial: sem isso, quem sai da conta com a tela em "criar
+       conta" ou "esqueci minha senha" reencontra aquele formulário no lugar do login -- e o e-mail
+       da conta anterior continua preenchido num aparelho que pode não ser só dele */
+    game.authMode = 'login'; game.authError = null; game.authNotice = null; game.authEmail = '';
     if(game.screen!=='auth'){ game.screen = 'auth'; render(); }
   }
   resolveAuthChecked();

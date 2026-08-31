@@ -383,9 +383,17 @@ console.log('\nA TELA DE ESCOLHA');
 g.gymIndex = 3; g.gymPath = []; g.starterId='charmander'; S.__setGame(g);
 const html = S.renderGymChoice();
 ok('mostra os dois ginasios da etapa', html.includes('Erika') && html.includes('Morty'));
-/* A tela NAO lista as rotas: a escolha é pelo tipo que espera no fim, e a lista de caminhos
-   ocupava uma linha inteira com nome que o jogador ainda não tem como avaliar. */
-ok('nao lista as rotas de cada lado', !html.includes('Caminhos:') && !html.includes('Túnel de Pedra'));
+/* Os dois caminhos ficam DENTRO da coluna centralizada, um por linha. Como linha propria embaixo
+   do corpo (a primeira versao) viravam um rodape solto encostado na borda esquerda, e a insignia
+   deixava de cobrir a altura do card. */
+ok('mostra os dois caminhos de cada lado',
+   (html.match(/class="gym-choice-rota"/g)||[]).length === 4 &&
+   html.includes('Túnel de Pedra') && html.includes('Parque Nacional'),
+   (html.match(/class="gym-choice-rota"/g)||[]).length + ' caminhos');
+const entreCidadeERotas = html.slice(html.indexOf('gym-choice-cidade'), html.indexOf('gym-choice-rotas'));
+const fechamentos = (entreCidadeERotas.match(/<[/]div>/g) || []).length;
+ok('e eles ficam na coluna do lider, logo abaixo da cidade -- nao num rodape',
+   fechamentos === 1, fechamentos + ' tag(s) fechando entre a cidade e os caminhos');
 ok('os dois botoes escolhem regioes diferentes',
    html.includes("escolherGinasio('kanto')") && html.includes("escolherGinasio('johto')"));
 ok('mostra a INSIGNIA de verdade, nao o emoji num circulo',
