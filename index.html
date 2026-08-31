@@ -1349,20 +1349,25 @@
   .save-slot-card.clickable{cursor:pointer;}
   /* Cartão da escolha de ginásio. Reaproveita o card de save (mesma moldura, mesmo toque) porque
      é a mesma leitura: um bloco grande e clicável com uma decisão dentro. */
-  /* linha do encontro selvagem: o card de escolher e, ao lado, o botão que abre a ficha */
-  /* `center` e altura fixa: com `stretch` o botão da ficha virava uma coluna alta e vazia do
-     tamanho do card. A margem embaixo é a mesma do card (.btn), então os dois centram na mesma
-     caixa e ficam alinhados. */
-  .wild-lv{ font-weight:800; color:var(--blue-dark); margin-right:5px; }
-  .wild-linha{ display:flex; align-items:center; gap:5px; }
-  .wild-linha .wild-card{ flex:1; min-width:0; margin-bottom:8px; }
+  /* Linha do encontro selvagem. A lupa fica DENTRO do card, flutuando sobre ele: como o card é um
+     <button>, ela não pode ser FILHA dele -- <button> dentro de <button> é HTML inválido e o clique
+     de dentro se perde. Então ela continua IRMÃ no HTML e volta pra cima do card no position.
+     De quebra o clique nela sobrevive ao card desabilitado: descendente de button desabilitado não
+     recebe clique nenhum, e é justamente com 2 já escolhidos que dá vontade de consultar o terceiro. */
+  .wild-linha{ position:relative; display:flex; flex-direction:column; }  /* flex: impede a margem do card de colapsar pra fora e desalinhar o top:50% */
+  .wild-linha .wild-card{ padding-right:46px; }   /* espaço reservado: sem ele, nome comprido passa por baixo da lupa */
+  /* O nível anda junto com o travessão. A 320px o nome comprido quebra de linha (já quebrava
+     antes da lupa, com os maiores), e sem o nowrap a quebra caía DENTRO do "— Lv.16": sobrava um
+     travessão pendurado no fim da primeira linha e um "Lv.16" órfão na segunda. */
+  .wild-lv{ white-space:nowrap; }   /* sem fonte nem cor próprias: herda a linha do nome, que é como sempre foi */
   .wild-dex{
-    flex-shrink:0; width:40px; height:40px; margin:9px 0 8px;   /* as MESMAS margens do .btn ao lado, senão os dois não centram juntos */
-    background:var(--box); border:3px solid var(--box-border); border-radius:4px;
-    box-shadow:4px 4px 0 rgba(0,0,0,.4); cursor:pointer;
+    position:absolute; right:9px; top:50%; margin-top:-16px;   /* margem negativa e não translate: o :active já usa o transform */
+    width:32px; height:32px; font-size:.95rem; line-height:1;
+    background:#fff; border:3px solid var(--box-border); border-radius:3px;
+    box-shadow:3px 3px 0 var(--box-border); cursor:pointer;
     display:flex; align-items:center; justify-content:center;
   }
-  .wild-dex:active{ transform:translate(2px,2px); box-shadow:2px 2px 0 rgba(0,0,0,.4); }
+  .wild-dex:active{ transform:translate(2px,2px); box-shadow:1px 1px 0 var(--box-border); }
   .time-modal-lista{ display:flex; flex-direction:column; gap:6px; margin:8px 0 12px; }
   .time-modal-linha{
     display:flex; align-items:center; gap:8px;
@@ -1384,14 +1389,17 @@
     position:absolute; top:9px; right:11px;
     font-family:var(--font-pixel); font-size:.55rem; letter-spacing:.05em; color:var(--muted);
   }
-  .gym-choice-corpo{ display:flex; align-items:center; gap:12px; }
-  .gym-choice-selo-col{ display:flex; flex-direction:column; align-items:center; gap:3px; flex-shrink:0; width:74px; }
+  .gym-choice-corpo{ display:flex; align-items:center; gap:8px; }
+  /* 58px pra insígnia de 52: cada pixel a mais aqui sai do nome do líder, que é centrado
+     reservando o MESMO espaço do outro lado. Com 64 o "Lt. Surge" quebrava em duas linhas a 320px. */
+  .gym-choice-selo-col{ display:flex; flex-direction:column; align-items:center; gap:3px; flex-shrink:0; width:58px; }
   .gym-choice-selo-nome{ font-size:.6rem; font-weight:800; color:var(--muted); text-align:center; line-height:1.15; }
-  .gym-choice-info{ flex:1; min-width:0; text-align:center; }
+  /* a margem da direita espelha a coluna da insígnia (58 + 8 de gap): sem ela o "centro" é o
+     centro do espaço que SOBROU, e o nome nascia 37px à direita do centro do card */
+  .gym-choice-info{ flex:1; min-width:0; text-align:center; margin-right:66px; }
   .gym-choice-lider{ font-family:var(--font-pixel); font-size:.82rem; color:var(--ink); line-height:1.3; }
   .gym-choice-tipo{ margin:5px 0 3px; }
   .gym-choice-cidade{ font-size:.75rem; font-weight:800; color:var(--blue-dark); }
-  .gym-choice-rotas{ font-size:.72rem; color:var(--muted); margin-top:7px; text-align:center; }
   /* insígnia da tela de escolha: maior que a do cinturão, menor que a da vitória */
   .badge-visual.gc{ width:52px; height:52px; }
   .badge-visual.gc .badge-visual-img, .badge-visual.gc .badge-visual-fallback{ width:52px; height:52px; font-size:1.5rem; }
@@ -11276,7 +11284,6 @@ function renderGymChoice(){
        pokémons que aparecem no caminho.</p>
   </div>
   ${opcoes.map(o=>{
-    const rotas = (o.regiao === 'johto' ? JOHTO_ROUTE_MAP : ROUTE_MAP)[etapa] || [];
     /* O tipo do ginásio vira SELO, não texto: é o mesmo selo colorido que a Pokédex e a tela de
        batalha usam, então o jogador reconhece "Pedra" pela cor antes de ler. O gymTypeName está
        em português e o typePill trabalha em inglês -- daí a tradução. */
@@ -11297,7 +11304,6 @@ function renderGymChoice(){
           <div class="gym-choice-cidade">${escapeHtmlSafe(o.gym.city)}</div>
         </div>
       </div>
-      <div class="gym-choice-rotas">Caminhos: ${rotas.map(r=>escapeHtmlSafe(r.icon+' '+r.name)).join(' ou ')}</div>
     </button>`;
   }).join('')}
   ${kantoMapBotaoHtml()}`;
@@ -11565,20 +11571,16 @@ function renderWild(){
       const isCaught = entry.disguise ? false
         : (entry.shiny ? (game.permanentShinyDex||[]).includes(id) : caught.has(id));
       const disabled = (!isSel && game.wildSelected.length>=2) ? 'disabled' : '';
-      /* Dois botões IRMÃOS, não um dentro do outro: aninhar <button> em <button> é HTML inválido
-         e o clique no de dentro se perde. O de fora escolhe; o de fora-direita abre a ficha.
-         O disfarçado (Ditto fingindo de Mew) não ganha botão de ficha: a ficha entregaria a
-         pegadinha, porque ela lê o SPECIES de verdade. */
+      /* A lupa é IRMÃ do card e não filha (ver .wild-dex no CSS: <button> dentro de <button> é
+         HTML inválido). O disfarçado (Ditto fingindo de Mew) não ganha lupa: a ficha lê o SPECIES
+         de verdade e entregaria a pegadinha. */
       return `<div class="wild-linha">
         <button class="btn wild-card ${isSel?'selected':''}" ${disabled} onclick="toggleWild('${id}')">
-          <!-- o nível desceu pra linha de baixo, junto dos tipos: com o botão da ficha ao lado o
-               card ficou 45px mais estreito, e "Nome — Lv.16" quebrava deixando um travessão
-               pendurado sozinho na segunda linha -->
-          <span class="mon-name">${spriteMarkup} ${sp.name} ${isSel?'✓':''} ${isLegendary?'✨':''} ${entry.shiny?'<span class="shiny-badge" title="Shiny! 1 em 128">🌟 SHINY</span>':''} ${isCaught?`<span class="pokedex-owned-badge" title="${entry.shiny?'Já está na sua Pokédex Shiny':'Já está na sua Pokédex'}">${pokedexIcon()}</span>`:''}</span>
-          <span class="mon-sub"><span class="wild-lv">Lv.${entry.level}</span> ${typesHtml(sp.types)}</span>
+          <span class="mon-name">${spriteMarkup} ${sp.name} <span class="wild-lv">— Lv.${entry.level}</span> ${isSel?'✓':''} ${isLegendary?'✨':''} ${entry.shiny?'<span class="shiny-badge" title="Shiny! 1 em 128">🌟 SHINY</span>':''} ${isCaught?`<span class="pokedex-owned-badge" title="${entry.shiny?'Já está na sua Pokédex Shiny':'Já está na sua Pokédex'}">${pokedexIcon()}</span>`:''}</span>
+          <span class="mon-sub">${typesHtml(sp.types)}</span>
         </button>
         ${disguiseInfo ? '' : `<button class="wild-dex" onclick="abrirPokedexFicha('${escJs(id)}', ${entry.shiny?'true':'false'})"
-          aria-label="Ver a ficha de ${escapeHtmlSafe(sp.name)}" title="Ver os atributos">${pokedexIcon()}</button>`}
+          aria-label="Ver a ficha de ${escapeHtmlSafe(sp.name)}" title="Ver os atributos">🔍</button>`}
       </div>`;
     }).join('')}
   </div>

@@ -272,16 +272,30 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
 - Na tela de escolha de ginásio, o **tipo é o selo colorido** (`typePill`), não a palavra ao lado do
   nome — é o mesmo selo da Pokédex e da batalha, então se reconhece pela cor antes de ler. A
   insígnia fica grande à esquerda com o nome dela embaixo, o líder ao centro, e a contagem de
-  pokémon saiu (não ajudava a escolher: os dois lados têm sempre o mesmo número).
+  pokémon saiu (não ajudava a escolher: os dois lados têm sempre o mesmo número), e a lista de
+  caminhos saiu junto — nome de rota que o jogador ainda não conhece não ajuda a decidir.
+  **O nome do líder é centrado no CARD, não no espaço que sobrou dele.** Como a insígnia ocupa uma
+  coluna à esquerda, centralizar dentro do que restava punha o nome 37px à direita do centro, e
+  isso se vê a olho. O conserto é a margem espelho em `.gym-choice-info`: ela repete à direita a
+  largura da coluna da insígnia mais o gap. Cada pixel dessa coluna sai do nome do líder — é por
+  isso que ela é 58 e não 64: com 64, "Lt. Surge" quebrava em duas linhas a 320px.
 - A tela que lista a Elite 4 usa a **fila sorteada**, não a de Kanto. O sorteio acontece ao ABRIR
   essa tela e não ao aceitar o desafio: ela ANUNCIA os cinco adversários, e sortear depois faria o
   jogador ler uma fila e enfrentar outra. As mensagens que diziam "recomeça da Lorelei" passaram a
   nomear o primeiro da fila dele.
-- Na tela do encontro selvagem: botão **"Seu time"** (modal com o time atual) e um **botão de ficha
-  por pokémon**, que abre a mesma ficha de atributos da Pokédex. Os dois botões de cada linha são
-  IRMÃOS e não aninhados — `<button>` dentro de `<button>` é HTML inválido e o clique de dentro se
-  perde. O disfarçado (Ditto fingindo de Mew) não ganha botão de ficha: ela lê o `SPECIES` de
-  verdade e entregaria a pegadinha.
+- Na tela do encontro selvagem: botão **"Seu time"** (modal com o time atual) e uma **lupa por
+  pokémon**, que abre a mesma ficha de atributos da Pokédex. A lupa PARECE estar dentro do card,
+  mas no HTML ela é **irmã** dele e volta pra cima por `position:absolute` — `<button>` dentro de
+  `<button>` é HTML inválido e o clique de dentro se perde. De quebra ela sobrevive ao card
+  desabilitado (o de quem já escolheu 2), e é justamente aí que dá vontade de consultar o terceiro:
+  descendente de button desabilitado não recebe clique nenhum.
+  O disfarçado (Ditto fingindo de Mew) não ganha lupa: a ficha lê o `SPECIES` de verdade e
+  entregaria a pegadinha.
+  **O nível fica na linha do NOME**, na fonte e na cor de lá. Passou uma versão com ele na linha de
+  baixo, menor e azul, pra abrir espaço pra lupa — não é o mesmo texto e se nota na hora. O espaço
+  sai mesmo é do card: a lupa come 46px e a 320px o nome comprido quebra de linha. Por isso o
+  "— Lv.16" vive num `.wild-lv` com `nowrap` — a quebra cai ANTES do travessão e não no meio dele,
+  senão sobra um travessão pendurado no fim de uma linha e um "Lv.16" órfão na outra.
 - **Todo pokémon tem que ter como ser capturado.** Uma espécie que não está em rota nenhuma e não
   evolui de nada é uma vaga impossível na Pokédex — e a Pokédex completa é o que libera o desafio
   do Mewtwo. Quando Johto entrou, **17 não-lendários ficaram assim** (Pichu, Togepi, Togetic,

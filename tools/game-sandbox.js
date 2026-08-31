@@ -120,7 +120,7 @@ function createSandbox(htmlPath){
     // lista de amigos: as telas sao HTML puro a partir do estado, entao dao pra renderizar aqui e
     // conferir que nenhum caminho quebra ou deixa escapar nome sem escape (ver test-amigos.js)
     'renderFriendsScreen','renderFriendCompareModal','vistoPorUltimo','friendRivalryHtml',
-    'renderSaveSelect','renderSundayBoss','nomeDoGolpe','passosHtml','openSundayBoss','especieParaTela','renderTrainerBattling',
+    'renderSaveSelect','renderSundayBoss','renderWild','nomeDoGolpe','passosHtml','openSundayBoss','especieParaTela','renderTrainerBattling',
     // mapa de Kanto: o SVG sai de uma função pura (estado -> markup), entao da pra renderizar
     // aqui e conferir a geografia num screenshot em vez de no olho
     'kantoMapSvg','kantoTrailHtml','renderKantoIntro','renderKantoMapScreen',

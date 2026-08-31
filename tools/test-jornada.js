@@ -383,7 +383,9 @@ console.log('\nA TELA DE ESCOLHA');
 g.gymIndex = 3; g.gymPath = []; g.starterId='charmander'; S.__setGame(g);
 const html = S.renderGymChoice();
 ok('mostra os dois ginasios da etapa', html.includes('Erika') && html.includes('Morty'));
-ok('mostra as rotas de cada lado', html.includes('Túnel de Pedra') && html.includes('Parque Nacional'));
+/* A tela NAO lista as rotas: a escolha é pelo tipo que espera no fim, e a lista de caminhos
+   ocupava uma linha inteira com nome que o jogador ainda não tem como avaliar. */
+ok('nao lista as rotas de cada lado', !html.includes('Caminhos:') && !html.includes('Túnel de Pedra'));
 ok('os dois botoes escolhem regioes diferentes',
    html.includes("escolherGinasio('kanto')") && html.includes("escolherGinasio('johto')"));
 ok('mostra a INSIGNIA de verdade, nao o emoji num circulo',
@@ -395,6 +397,32 @@ ok('o tipo do ginasio vira selo, nao texto no titulo',
    !html.includes('Brock — Pedra') && (html.match(/class="type-pill/g)||[]).length >= 2,
    (html.match(/class="type-pill/g)||[]).length + ' selos de tipo');
 ok('nao anuncia mais a quantidade de pokemon', !/\d+ pokémon/.test(html));
+
+
+console.log('\nA TELA DO ENCONTRO SELVAGEM');
+g.screen = 'wild'; g.currentRoute = 'route_1'; g.wildSelected = [];
+g.team = [{ speciesId:'charmander', level:16, types: S.SPECIES['charmander'].types }];
+g.wildOffer = [{ speciesId:'kangaskhan', level:20, shiny:false },
+               { speciesId:'nidorino',   level:15, shiny:true  },
+               { speciesId:'ditto',      level:14, shiny:false, disguise:'mew' }];
+S.__setGame(g);
+const wild = S.renderWild();
+/* A lupa e IRMA do card, nunca filha: <button> dentro de <button> e HTML invalido e o clique de
+   dentro se perde. Ela so PARECE estar dentro, por position:absolute (ver .wild-dex no CSS). */
+ok('a lupa nao esta aninhada dentro do card',
+   !/<button class="btn wild-card(?:(?!<\/button>)[\s\S])*<button/.test(wild));
+ok('cada card tem a sua lupa, menos o disfarcado',
+   (wild.match(/class="wild-dex"/g) || []).length === 2,
+   (wild.match(/class="wild-dex"/g) || []).length + ' lupas para 3 cards');
+ok('a lupa e uma lupa, nao o icone da pokedex', wild.includes('>🔍</button>'));
+/* O nivel mora na linha do NOME. Na linha de baixo ele saia menor e azul -- outra fonte, outra
+   cor, outro texto. */
+const primeiroCard = wild.split('mon-sub')[0];
+ok('o nivel fica na linha do nome', /mon-name[\s\S]*— Lv\.20/.test(primeiroCard));
+ok('o nivel nao se separa do travessao na quebra de linha', wild.includes('class="wild-lv">— Lv.'));
+ok('o disfarcado nao ganha lupa: a ficha entregaria a pegadinha',
+   !/Mew(?:(?!<\/div>)[\s\S])*wild-dex/.test(wild));
+ok('a lupa abre a ficha da pokedex de verdade', wild.includes("abrirPokedexFicha('kangaskhan'"));
 
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
 process.exit(falhas ? 1 : 0);
