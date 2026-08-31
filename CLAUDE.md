@@ -688,6 +688,28 @@ Duas artimanhas medidas e fechadas — em ambas o jogador reiniciava até vir sh
   conta sozinha derruba a raide em ~399 ataques) e o que acontece depois que ele cai (hoje fica
   derrubado e a tela diz isso; não renasce no domingo seguinte).
 
+## Conquistas
+
+- **O time da vitória da Elite fica CONGELADO no save** (`eliteWinTeam`, gravado no instante em que
+  a final é vencida). É o mesmo motivo do `eliteDittoWin`: o time do save continua mudando depois
+  (o Mewtwo emprestado entra por 24h), e as conquistas de COMPOSIÇÃO mentiriam nos dois sentidos —
+  dariam a conquista pra quem montou o time depois de campeão e tirariam de quem venceu e trocou.
+  As conquistas que já liam `eliteTeams` (Venusaur, Charizard, lendário, sem lendário…) passaram a
+  usar o congelado também; **save campeão anterior ao campo cai no time atual**, que é como sempre
+  foi, pra ninguém perder o que já tinha.
+- **O CAMINHO da jornada sai do `gymPath`** (uma região por etapa), que não muda mais depois da
+  jornada — não precisa congelar nada. Save anterior à bifurcação não tem o campo e conta como oito
+  de Kanto: naquele tempo só existia Kanto, e é o mesmo padrão do `regiaoDaEtapa`.
+- Dez conquistas entraram em 31/08/2026: **Puro Kanto**, **Puro Johto** e **Entre Dois Mundos**
+  (4+4) pelo caminho; **Turma dos Clássicos** (time todo de Kanto), **A Nova Geração** (todo de
+  Johto) e **Especialista Absoluto** (todos com um tipo em comum — num time de tipagem dupla basta
+  existir UM tipo que todos tenham) pela composição; **De Primeira** (vencer a Elite sem gastar
+  tentativa — `eliteAttemptsUsed` só conta derrotas, então zero é passar direto); e três que Johto
+  tinha deixado em aberto: **Pokédex de Johto**, **As Três Bestas** e **Mar e Céu** (Lugia e Ho-Oh).
+  `tools/test-conquistas.js` monta o save de cada caso e confere que cada uma acende SÓ quando devia
+  — conquista que nunca acende é o defeito mais silencioso do jogo, porque ninguém consegue reclamar
+  do que não viu.
+
 ## Liga Clássica (e as customizadas)
 
 - **A inscrição guarda um CÓDIGO do time, congelado na hora da inscrição** — de propósito: ninguém

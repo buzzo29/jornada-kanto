@@ -3375,6 +3375,7 @@ function freshGameDefaults(){
                      // Bônus de Kanto usa no fim (ver KANTO_BONUS_TIERS)
     everComeback:false,
     eliteDittoWin:false,   // venceu a Elite com um Ditto no time (ver a conquista "Mestre do Disfarce")
+    eliteWinTeam:null,     // as espécies do time NO INSTANTE da vitória da Elite (ver as conquistas de composição)
     gymPath:[],            // região escolhida em cada etapa: ['kanto','johto',...] -- ver regiaoDaEtapa
     evolutions:[],
     battleResult:null,
@@ -6383,6 +6384,11 @@ function finishSpecialBattle(){
            depois não serve: ele muda, e daria a conquista pra quem só colocou o Ditto no time
            DEPOIS de ser campeão (e tiraria de quem venceu com ele e trocou em seguida). */
         if((game.team||[]).some(p=>p && p.speciesId==='ditto')) game.eliteDittoWin = true;
+        /* O TIME DA VITÓRIA, congelado. Mesmo motivo do eliteDittoWin: o time do save continua
+           mudando depois (o Mewtwo emprestado entra por 24h, por exemplo), e as conquistas de
+           COMPOSIÇÃO -- time todo de Kanto, todo de Johto, monotipo -- mentiriam nos dois sentidos:
+           dariam pra quem montou o time depois de campeão e tirariam de quem venceu e trocou. */
+        game.eliteWinTeam = (game.team||[]).filter(p=>p && p.speciesId).map(p=>p.speciesId);
         if(game.authUser){
           userDocRef(game.authUser.uid).set({ eliteChampion: true }, { merge: true })
             .catch(e=>console.error('Erro ao gravar o título da Elite na conta:', e));
@@ -10347,6 +10353,7 @@ function serializeGame(){
     kantoBonusLevels: game.kantoBonusLevels||0,
     everComeback: game.everComeback || false,
     eliteDittoWin: game.eliteDittoWin || false,
+    eliteWinTeam: game.eliteWinTeam || null,
     gymPath: Array.isArray(game.gymPath) ? game.gymPath : [],
     pendingGymVictoryPool: game.pendingGymVictoryPool,
     gymTerrain: game.gymTerrain,
@@ -10530,6 +10537,7 @@ function applySavedState(data){
   game.kantoBonusLevels = data.kantoBonusLevels || 0;
   game.everComeback = data.everComeback || false;
   game.eliteDittoWin = data.eliteDittoWin || false;
+  game.eliteWinTeam = data.eliteWinTeam || null;
   // save anterior à bifurcação não tem o campo: fica vazio e regiaoDaEtapa devolve 'kanto' em tudo,
   // então a jornada dele continua idêntica ao que era
   game.gymPath = Array.isArray(data.gymPath) ? data.gymPath : [];
@@ -10954,6 +10962,11 @@ function getAchievementAggregate(){
     // com Johto na tabela a Pokédex foi a 250; "completar Kanto" virou um marco próprio
     kantoCaught: [...caught].filter(id=>SPECIES[id] && SPECIES[id].dex <= 151).length,
     kantoTotal: Object.keys(SPECIES).filter(id=>SPECIES[id].dex <= 151).length,
+    johtoCaught: [...caught].filter(id=>SPECIES[id] && SPECIES[id].dex >= 152).length,
+    johtoTotal: Object.keys(SPECIES).filter(id=>SPECIES[id].dex >= 152).length,
+    // os lendários de Johto: as três bestas e a dupla dos céus (ver LENDARIOS)
+    allBeasts: ['raikou','entei','suicune'].every(id=>caught.has(id)),
+    allTowerDuo: ['lugia','hooh'].every(id=>caught.has(id)),
     // marcas da raide do Mew -- vêm da CONTA, não dos saves (ver loadPermanentUserData)
     bossTop10: !!game.bossTop10,
     bossKiller: !!game.bossKiller,
@@ -10972,8 +10985,18 @@ function getAchievementAggregate(){
     bestStreak: game.trainerBestStreak || 0,
     leagueWinsTotal: game.leagueWinsTotal || 0,
     // --- sinais das conquistas novas ---
-    // 'champion' é gravado no save quando a Elite 4 é vencida; olhamos o TIME desse save
-    eliteTeams: slots.filter(s=> s.eliteStatus==='champion').map(s=> (s.team||[]).map(p=>p.speciesId)),
+    /* 'champion' é gravado no save quando a Elite 4 é vencida. O time que vale é o CONGELADO na
+       vitória (eliteWinTeam); save de antes desse campo cai no time atual, que é o que sempre foi
+       usado -- assim ninguém perde uma conquista que já tinha. */
+    eliteTeams: slots.filter(s=> s.eliteStatus==='champion')
+      .map(s=> (s.eliteWinTeam && s.eliteWinTeam.length) ? s.eliteWinTeam : (s.team||[]).map(p=>p.speciesId)),
+    /* O CAMINHO de cada jornada campeã: uma região por etapa. Save anterior à bifurcação não tem o
+       campo -- e naquele tempo só existia Kanto, então conta como oito de Kanto (mesmo padrão do
+       regiaoDaEtapa). */
+    eliteGymPaths: slots.filter(s=> s.eliteStatus==='champion')
+      .map(s=> (s.gymPath && s.gymPath.length) ? s.gymPath : new Array(8).fill('kanto')),
+    // eliteAttemptsUsed só conta DERROTAS: zero quer dizer que passou de primeira
+    eliteFirstTry: slots.some(s=> s.eliteStatus==='champion' && (s.eliteAttemptsUsed||0)===0),
     // média do time: usa o time mais forte entre todos os saves
     bestTeamAvg: allTeams.reduce((max,team)=>{
       if(!team.length) return max;
@@ -11137,6 +11160,35 @@ const ACHIEVEMENTS = [
     check:a=>a.eliteTeams.some(t=>['moltres','zapdos','articuno'].some(b=>t.includes(b))) },
   { id:'elite_no_legendary', icon:'🤝', name:'Sem Atalhos', desc:'Vença a Elite dos 4 sem nenhum lendário no time.',
     check:a=>a.eliteTeams.some(t=>!['moltres','zapdos','articuno','mewtwo'].some(b=>t.includes(b))) },
+  /* ---- Elite 4: o CAMINHO da jornada e a COMPOSIÇÃO do time ----
+     O caminho sai do gymPath (uma região por etapa, imutável depois da jornada). A composição sai
+     do time congelado na vitória -- ver eliteWinTeam. */
+  { id:'elite_path_kanto', icon:'🗾', name:'Puro Kanto', desc:'Vença a Elite dos 4 tendo enfrentado só ginásios de Kanto.',
+    check:a=>a.eliteGymPaths.some(p=>p.length>0 && p.every(r=>r!=='johto')) },
+  { id:'elite_path_johto', icon:'🌾', name:'Puro Johto', desc:'Vença a Elite dos 4 tendo enfrentado só ginásios de Johto.',
+    check:a=>a.eliteGymPaths.some(p=>p.length>0 && p.every(r=>r==='johto')) },
+  { id:'elite_path_split', icon:'🌉', name:'Entre Dois Mundos', desc:'Vença a Elite dos 4 com 4 insígnias de Kanto e 4 de Johto.',
+    check:a=>a.eliteGymPaths.some(p=>p.filter(r=>r==='johto').length===4 && p.filter(r=>r!=='johto').length===4) },
+  { id:'elite_team_kanto', icon:'🧢', name:'Turma dos Clássicos', desc:'Vença a Elite dos 4 com o time inteiro de Pokémons de Kanto.',
+    check:a=>a.eliteTeams.some(t=>t.length>0 && t.every(id=>SPECIES[id] && SPECIES[id].dex<=151)) },
+  { id:'elite_team_johto', icon:'🌟', name:'A Nova Geração', desc:'Vença a Elite dos 4 com o time inteiro de Pokémons de Johto.',
+    check:a=>a.eliteTeams.some(t=>t.length>0 && t.every(id=>SPECIES[id] && SPECIES[id].dex>=152)) },
+  /* Monotipo: todo mundo do time compartilhando UM tipo -- num time de tipagem dupla, basta existir
+     um tipo que todos tenham. É a conquista mais difícil da lista: os oito ginásios são de tipos
+     diferentes, então não dá pra só levar o que é bom contra o próximo. */
+  { id:'elite_monotype', icon:'🎯', name:'Especialista Absoluto', desc:'Vença a Elite dos 4 com um time inteiro do mesmo tipo.',
+    check:a=>a.eliteTeams.some(t=>{
+      if(!t.length) return false;
+      const tipos = t.map(id=> (SPECIES[id] && SPECIES[id].types) || []);
+      return tipos[0].some(tipo => tipos.every(ts => ts.includes(tipo)));
+    }) },
+  { id:'elite_first_try', icon:'🎩', name:'De Primeira', desc:'Vença a Elite dos 4 sem gastar nenhuma tentativa (de primeira).',
+    check:a=>a.eliteFirstTry },
+  /* ---- os buracos que Johto deixou: a Pokédex e os lendários de lá ---- */
+  { id:'catch_johto', icon:'📗', name:'Pokédex de Johto', desc:'Capture todas as espécies de Johto (#152 a #251).',
+    check:a=>a.johtoCaught>=a.johtoTotal },
+  { id:'all_beasts', icon:'🐾', name:'As Três Bestas', desc:'Capture Raikou, Entei e Suicune.', check:a=>a.allBeasts },
+  { id:'tower_duo', icon:'🌈', name:'Mar e Céu', desc:'Capture Lugia e Ho-Oh.', check:a=>a.allTowerDuo },
   // ---- força do time ----
   { id:'team_avg_60', icon:'📊', name:'Time Sólido', desc:'Tenha um time com média de nível 60.', check:a=>a.bestTeamAvg>=60 },
   { id:'team_avg_70', icon:'📐', name:'Time de Elite', desc:'Tenha um time com média de nível 70.', check:a=>a.bestTeamAvg>=70 },
