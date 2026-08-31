@@ -27,7 +27,7 @@ const MAX_STEPS = 4000;
 function act(g, log){
   const game = g.__getGame();
   switch(game.screen){
-    case 'start':        g.chooseStarter(g.STARTERS[Math.floor(Math.random()*3)]); return true;
+    case 'start':        g.chooseStarter(g.STARTERS[Math.floor(Math.random()*g.STARTERS.length)]); return true;
     // a jornada passou a abrir no mapa de Kanto: sem este passo o bot parava na 2ª tela e
     // as 20 jornadas do smoke morriam antes do primeiro encontro
     case 'kantoIntro':   g.comecarJornadaDoMapa(); return true;

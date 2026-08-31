@@ -142,9 +142,12 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
   Magnemite e Magneton seguem só Elétrico), então toda linha nova só entra em confronto que
   envolve um pokémon de Johto. **Conferido: a impressão do motor não mudou.**
 - **As três evoluções em conflito ficaram de fora**: Gloom, Poliwhirl e Slowpoke continuam virando
-  Vileplume, Poliwrath e Slowbro. Bellossom, Politoed e Slowking só entram quando existir uma tela
-  de escolha, como a do Eevee — a tabela mapeia um destino só, e a chave repetida faria o segundo
+  Vileplume, Poliwrath e Slowbro. A tabela mapeia um destino só, e a chave repetida faria o segundo
   apagar o primeiro em silêncio.
+  Bellossom, Politoed e Slowking, portanto, **não têm como aparecer por evolução** — e por isso
+  entraram direto no pool de rotas (Rotas 36/37 e Lago da Fúria). É uma solução de contorno
+  honesta, não a definitiva: a definitiva é uma tela de escolha na hora da evolução, como a do
+  Eevee, e aí eles saem das rotas.
 - **Armadilha que quase passou**: Espeon e Umbreon estavam na tabela de evoluções de Johto como
   destino do `eevee`. Ao fundir, o Eevee passou a evoluir sozinho pra Umbreon no nível 40 —
   atropelando a tela de escolha dele. Pego pelo `tools/test-johto.js`, que hoje trava isso.
@@ -200,6 +203,21 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
 
 ## Bifurcação Kanto / Johto
 
+- **Seis iniciais**: os três de Kanto e os três de Johto, agrupados por região na tela de escolha.
+  Qualquer um atravessa qualquer caminho — a escolha de ginásio vem depois, e a cada trecho.
+  `RIVAL_STARTER_COUNTER` e `STARTER_EVOLUTIONS` ganharam o triângulo de Johto.
+  **Custo medido:** o sorteio de shiny corre POR INICIAL, então dobrar a lista dobra a chance de
+  aparecer um shiny na tela — **2,3% → 4,5%** no normal, **9,1% → 17,3%** no difícil. O teto da
+  artimanha (6 sorteios presos, 3 slots × 2 modos, sem jogar nada) vai de **13% pra 25%**. Se um
+  dia isso incomodar, o conserto é sortear só entre os três da região escolhida — mas hoje a
+  região só é escolhida DEPOIS do inicial.
+- **As insígnias são a imagem real** em toda tela, inclusive na escolha de caminho e na vitória.
+  Os caminhos do Bulbagarden Archives **não se inventam**: é um MediaWiki, e a pasta é o MD5 do
+  NOME DO ARQUIVO — `md5("Zephyr_Badge.png")` começa em `4a`, daí `/thumb/4/4a/…`. As oito de
+  Johto foram escritas de cabeça na primeira versão e **as oito deram 404 em silêncio**: o
+  `onerror` do `badgeMarkup` caía no selo colorido e o jogo parecia funcionar.
+  Pra conferir: `printf '%s' Nome_Badge.png | md5sum | cut -c1-2`. `tools/test-jornada.js` trava
+  isso recalculando o MD5 das 16.
 - A jornada continua com **8 etapas**, mas em cada uma o treinador escolhe entre o ginásio de
   Kanto e o de Johto daquela altura (tela `gymChoice`, "Qual ginásio vamos?"). A escolha decide o
   líder, a insígnia e **quais duas rotas** aparecem em seguida — por isso ela vem ANTES de
@@ -228,6 +246,70 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
   Sudowoodo nas Rotas 36/37, o Gyarados do Lago da Fúria.
 - 16 rotas de Kanto ganharam espécies de Johto onde cabiam (Ledyba na Floresta de Viridian,
   Heracross na Zona de Safári, Sentret na Rota 22, Houndour na Mansão…).
+- **Todo pokémon tem que ter como ser capturado.** Uma espécie que não está em rota nenhuma e não
+  evolui de nada é uma vaga impossível na Pokédex — e a Pokédex completa é o que libera o desafio
+  do Mewtwo. Quando Johto entrou, **17 não-lendários ficaram assim** (Pichu, Togepi, Togetic,
+  Slowking, Bellossom, Politoed, Skarmory, Unown, Wobbuffet, Yanma, Gligar, Qwilfish, Shuckle,
+  Remoraid, Octillery, Smeargle, Igglybuff) e nada acusava. Foram distribuídos pelas rotas onde
+  aparecem no jogo original. As três bestas e o Ho-Oh entraram como raros de 5%, o mesmo
+  tratamento que as aves lendárias de Kanto já tinham.
+  Sobram **duas exceções legítimas, uma por região**: o Mewtwo (vem do desafio próprio, não de
+  rota) e o Celebi (o "impossível" de Johto, como o Mew é o de Kanto). `tools/test-jornada.js`
+  calcula o fecho transitivo das evoluções e falha se aparecer uma terceira.
+- **Espeon e Umbreon dependem do RELÓGIO DO CELULAR**: dia das 6h às 17h59 traz o Espeon, noite das
+  18h às 5h59 traz o Umbreon — a mesma faixa do Gold/Silver/Crystal. É a única mecânica do jogo que
+  olha a hora. O relógio é o do aparelho e não o do servidor de propósito: quem joga às 22h no
+  Brasil espera Umbreon, e um fuso escolhido por nós faria a tela discordar do celular na mão da
+  pessoa. Dá pra adiantar o relógio e pegar o outro — é o mesmo "custo" que o jogo original tinha.
+  As duas nunca aparecem juntas; as outras quatro opções (manter, Vaporeon, Jolteon, Flareon)
+  continuam sempre disponíveis.
+- **Terrenos: 51, seis de CADA um dos 17 tipos.** A conta importa porque o terreno é sorteado da
+  lista e quem for do tipo dele ganha 1,15× em todos os atributos (~15 níveis, ver acima) — um tipo
+  com mais terrenos ganha o buff com mais frequência. A tabela tinha 39 terrenos, exatos 5 por
+  tipo, e quando Sombrio e Aço entraram com Johto eles ficaram com **zero**: um Umbreon, um
+  Houndoom ou um Steelix nunca ganhava bônus de terreno, em partida nenhuma, e nada no jogo
+  indicava isso. Os 12 novos levam os dezessete tipos a 6 cada.
+  `tools/test-terrenos.js` confere a contagem e que a tabela continua idêntica nos dois arquivos.
+- **A dica do ginásio (`adviceTypes`) tem que ser verdade.** Ela é a frase "leve pokémon do tipo X",
+  e o jogador tem 5 tentativas por ginásio — uma dica errada custa uma delas. A Jasmine dizia
+  "Fogo, Lutador e Terra", copiado do time dela no jogo original: só que aqui os Magnemite/Magneton
+  são **Elétrico puro** (tipagem da Gen 1, eles ainda não eram Aço), e Fogo/Lutador acertavam
+  **1 de 5**. Virou só "Terra", que pega os cinco e ainda é imune ao ataque deles. O Pryce tinha o
+  mesmo problema (Fogo 2/5, Pedra 2/5) e virou "Planta, Lutador e Elétrico".
+  `tools/test-jornada.js` recalcula a cobertura das 16 dicas contra o TYPE_CHART.
+- Evoluções que vinham de troca no jogo original seguem a regra que Kanto já usava: **viram nível
+  40**. Vale pro Seadra→Kingdra, Onix→Steelix, Scyther→Scizor, Golbat→Crobat, Chansey→Blissey e
+  Porygon→Porygon2, exatamente como Machoke→Machamp e Haunter→Gengar já faziam.
+- **O `game.startersShiny` vazava entre saves** — e furava a trava anti save-scumming inteira. Ele
+  é escrito só na criação do save, **não está no `serializeGame` nem no `freshGameDefaults`**, e o
+  `applySavedState` não o toca. Então ele atravessava de um save pro outro, nos dois sentidos:
+  criar no slot 0 em **difícil** (4× a chance), ver o shiny, ir pra home e abrir um save parado na
+  tela `start` do slot 1 dava um inicial shiny num save **normal**, com o sorteio de outro slot —
+  e o sorteio do slot 1 continuava intacto pra ser usado depois. Na direção inversa, depois de um
+  F5 o campo sumia e um save que TINHA shiny guardado voltava sem estrela nenhuma.
+  Conserto: `continueSave` recompõe pelo `startersSorteados` (que é da conta e sobrevive ao F5).
+  Achado por revisão adversarial, não por teste — o defeito é anterior aos 6 iniciais, que só
+  dobraram a superfície. Hoje `tools/test-artimanha.js` cobre os dois sentidos.
+- **Seis bebês da Gen 2 eram becos sem saída**: Pichu, Cleffa, Igglybuff, Smoochum, Elekid e Magby
+  entraram no `SPECIES` sem entrada no `EVOLUTIONS`. A causa foi o filtro da fusão, que só aceitava
+  evolução cujo DESTINO estava em Johto — e esses seis apontam pra adultos de Kanto (Pikachu,
+  Clefairy, Jigglypuff, Jynx, Electabuzz, Magmar). Togepi e Tyrogue, que apontam pra Johto,
+  passaram. Entraram no **nível 20**: são evolução por amizade no original, e 40 (a regra da casa
+  pro que não é por nível) seria tarde demais pra um bebê que nasce fraco.
+- **`TYPE_COLORS` e `TYPE_NAMES_PT` ficaram pra trás** quando Sombrio e Aço entraram no
+  `TYPE_CHART`: o selo de um Umbreon saía escrito "Dark", em inglês, num cinza genérico. Pior, o
+  `englishTypeFromPortuguese` não achava "Aço", então o `pickGymTerrain` da Jasmine caía na rede de
+  segurança e sorteava um terreno qualquer em vez de um do domínio dela. As **três** tabelas têm
+  que andar juntas — `tools/test-terrenos.js` confere isso e mais: que o tipo de todo ginásio volta
+  do português pro inglês e tem terreno próprio.
+- **O mapa pintava a cidade errada.** Ele desenha cidades de Kanto mas colorizava o ponto com
+  `gymOf(i)` — o líder realmente enfrentado —, então Pewter City aparecia com a cor da Insígnia
+  Zéfiro quando o trecho 1 tinha sido jogado em Johto. Voltou pro `KANTO_GYMS` (a cor da cidade que
+  está escrita ali) e ganhou um aviso dizendo quantos trechos foram em Johto, apontando pra trilha
+  de insígnias, que é quem mostra o caminho real. Mentir em silêncio era pior que admitir o limite.
+- **`gymChoice` entrou no `SAFE_SAVE_SCREENS`.** Sem isso a tela "Qual ginásio vamos?" não era
+  ponto seguro de gravação: a insígnia recém-ganha ficava pendente enquanto o jogador pensava, e
+  fechar a aba ali perdia a vitória.
 - **O mapa de Kanto continua sendo de Kanto.** `KANTO_PLACES`/`KANTO_JOURNEY` são indexados pela
   etapa, então numa etapa de Johto ele desenha a cidade de Kanto correspondente. A trilha de
   insígnias já segue o caminho certo (`gymOf(i)`); o mapa é o que falta.
@@ -260,13 +342,17 @@ Duas artimanhas medidas e fechadas — em ambas o jogador reiniciava até vir sh
   restaura): `buildOfferFromPool`, `rollWildLevel` e `currentShinyChance` sorteiam por dentro e não
   recebem rng por parâmetro. Tudo ali é síncrono, então nada mais do app cai na janela.
   A gravação imediata continua, mas virou conveniência — a defesa é a semente.
-- **Iniciais**: apagava o save e criava de novo até um dos três vir shiny (2,3% por tentativa no
-  normal = ~43 saves por shiny; 9,1% no difícil = 11). O resultado agora fica **na conta, por slot
-  E por modo** (`startersSorteados`, chave `"slot:modo"`), sobrevive ao delete, e só é liberado
-  quando aquele slot ganha a **1ª insígnia**. O modo entra na chave porque o difícil tem 4× a
-  chance — sem isso dava pra sortear no difícil e recriar no normal levando o shiny.
-  Sobra um teto de 6 sorteios sem jogar (3 slots × 2 modos) = 13% de chance de arrancar um inicial
-  shiny. Bounded, e quem joga limpo não perde nada: a chance por jornada continua a mesma.
+- **Iniciais**: apagava o save e criava de novo até um dos iniciais vir shiny. O resultado agora
+  fica **na conta, por slot E por modo** (`startersSorteados`, chave `"slot:modo"`), sobrevive ao
+  delete, e só é liberado quando aquele slot ganha a **1ª insígnia**. O modo entra na chave porque
+  o difícil tem 4× a chance — sem isso dava pra sortear no difícil e recriar no normal levando o
+  shiny.
+  Sobra um teto de 6 sorteios sem jogar (3 slots × 2 modos). Bounded, e quem joga limpo não perde
+  nada: a chance por jornada continua a mesma.
+  **A conta mudou quando os iniciais passaram de 3 pra 6** (Johto entrou na tela): o sorteio corre
+  por inicial, então a chance de ver um shiny foi de **2,3% pra 4,5%** por tentativa no normal
+  (9,1% → 17,3% no difícil), e o teto da artimanha de **13% pra 25%**. Se incomodar, o conserto é
+  sortear só entre os três da região escolhida — mas hoje a região só é escolhida DEPOIS do inicial.
 
 `tools/test-artimanha.js` cobre as duas.
 

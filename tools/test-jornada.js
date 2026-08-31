@@ -71,6 +71,119 @@ ok('cada etapa guarda a SUA escolha',
    S.gymOf(0).id==='falkner' && S.gymOf(1).id==='misty' && S.gymOf(2).id==='whitney',
    [0,1,2].map(i=>S.gymOf(i).id).join(','));
 
+console.log('\nTODO POKEMON TEM COMO SER CAPTURADO');
+/* Uma especie na tabela que nao esta em rota nenhuma nem evolui de nada e uma vaga impossivel na
+   Pokedex -- e a Pokedex completa e o que libera o desafio do Mewtwo. Quando Johto entrou, DEZESSETE
+   nao-lendarios ficaram assim (Pichu, Togepi, Slowking, Skarmory, Unown...) e nada acusava. */
+const alcancavel = new Set();
+[S.ROUTE_MAP, S.JOHTO_ROUTE_MAP].forEach(mapa => mapa.forEach(par => par.forEach(r => {
+  r.pool.forEach(id => alcancavel.add(id));
+  (r.rare || []).forEach(x => alcancavel.add(typeof x === 'object' ? x.species : x));
+})));
+S.STARTERS.forEach(id => alcancavel.add(id));
+for(let mudou = true; mudou; ){                       // fecho transitivo das evoluções
+  mudou = false;
+  for(const de in S.EVOLUTIONS){
+    const para = S.EVOLUTIONS[de].into;
+    if(alcancavel.has(de) && !alcancavel.has(para)){ alcancavel.add(para); mudou = true; }
+  }
+}
+// o Eevee não passa por EVOLUTIONS: tem tela própria, e Espeon/Umbreon dependem da hora
+if(alcancavel.has('eevee')) ['vaporeon','jolteon','flareon','espeon','umbreon'].forEach(id=>alcancavel.add(id));
+/* As DUAS exceções legítimas, uma por região:
+   - Mewtwo não vem de rota nenhuma: vem do desafio próprio, liberado por completar a Pokédex
+     (ver mewtwoReward / checkMewtwoLoanUnlock).
+   - Celebi é o "impossível" de Johto, como o Mew é o de Kanto (o Mew nem está no SPECIES -- é o
+     chefe da raide do Boss de Domingo).
+   Qualquer OUTRA espécie fora da lista é vaga impossível na Pokédex, e a Pokédex completa é o que
+   libera o Mewtwo. */
+const FORA = ['mewtwo','celebi'];
+const orfaos = Object.keys(S.SPECIES).filter(id => !alcancavel.has(id) && !FORA.includes(id));
+ok('nenhuma especie fica sem como capturar', orfaos.length === 0,
+   orfaos.map(id=>S.SPECIES[id].name).slice(0,10).join(', '));
+const johtoT = Object.keys(S.SPECIES).filter(id=>S.SPECIES[id].dex>151);
+console.log('         Johto: '+johtoT.filter(id=>alcancavel.has(id)).length+'/'+johtoT.length+' alcancaveis');
+const kantoT = Object.keys(S.SPECIES).filter(id=>S.SPECIES[id].dex<=151);
+console.log('         Kanto: '+kantoT.filter(id=>alcancavel.has(id)).length+'/'+kantoT.length+' alcancaveis');
+
+console.log('\nO EEVEE OLHA O RELOGIO');
+ok('existe a regra de dia/noite', typeof S.ehDeDia === 'function' && typeof S.eeveeDoHorario === 'function');
+const RealDate = Date;
+function comHora(h, fn){
+  global.Date = class extends RealDate { constructor(){ super(2026,7,30,h,0,0); }
+                                          static now(){ return new RealDate(2026,7,30,h,0,0).getTime(); } };
+  S.Date = global.Date;
+  try { return fn(); } finally { global.Date = RealDate; S.Date = RealDate; }
+}
+const faixas = [[0,'umbreon'],[5,'umbreon'],[6,'espeon'],[12,'espeon'],[17,'espeon'],[18,'umbreon'],[23,'umbreon']];
+const faixasErradas = faixas.filter(([h,esperado]) => comHora(h, ()=>S.eeveeDoHorario().id) !== esperado);
+ok('dia das 6h as 17h59 (Espeon), noite das 18h as 5h59 (Umbreon)', faixasErradas.length === 0,
+   faixasErradas.map(([h,e])=>h+'h deveria dar '+e).join(', '));
+ok('a tela mostra a opcao do turno certo',
+   comHora(3, ()=>{ const g=S.freshGameDefaults();
+     g.team=[{speciesId:'eevee',id:'m',name:'Eevee',types:['Normal'],level:30}]; S.__setGame(g);
+     const h=S.renderEeveeChoice();
+     return h.includes("chooseEeveeEvolution('umbreon')") && !h.includes("chooseEeveeEvolution('espeon')"); }));
+
+console.log('\nOS SEIS INICIAIS');
+ok('sao 6 iniciais', S.STARTERS.length === 6, S.STARTERS.join(','));
+ok('3 de Kanto e 3 de Johto',
+   S.STARTERS.filter(id=>S.SPECIES[id].dex<=151).length === 3 &&
+   S.STARTERS.filter(id=>S.SPECIES[id].dex>151).length === 3);
+const semSp = S.STARTERS.filter(id=>!S.SPECIES[id]);
+ok('todo inicial existe no SPECIES', semSp.length === 0, semSp.join(','));
+ok('todo inicial tem contra-inicial pro rival',
+   S.STARTERS.every(id=>S.STARTERS.includes(S.RIVAL_STARTER_COUNTER[id])),
+   S.STARTERS.filter(id=>!S.STARTERS.includes(S.RIVAL_STARTER_COUNTER[id])).join(','));
+ok('o contra-inicial nunca e o proprio', S.STARTERS.every(id=>S.RIVAL_STARTER_COUNTER[id] !== id));
+ok('todo inicial tem evolucao mapeada',
+   S.STARTERS.every(id=>S.SPECIES[S.STARTER_EVOLUTIONS[id]]),
+   S.STARTERS.filter(id=>!S.SPECIES[S.STARTER_EVOLUTIONS[id]]).join(','));
+ok('a evolucao mapeada e a que o EVOLUTIONS diz',
+   S.STARTERS.every(id=>S.EVOLUTIONS[id] && S.EVOLUTIONS[id].into === S.STARTER_EVOLUTIONS[id]),
+   S.STARTERS.filter(id=>!S.EVOLUTIONS[id] || S.EVOLUTIONS[id].into !== S.STARTER_EVOLUTIONS[id]).join(','));
+
+console.log('\nA DICA DE CADA GINASIO TEM QUE SER VERDADE');
+/* `adviceTypes` é a frase "leve pokémon de tipo X". Se ela citar um tipo que mal acerta o time, o
+   jogador gasta uma das 5 tentativas do ginásio seguindo o conselho do próprio jogo. Já aconteceu:
+   a Jasmine dizia "Fogo, Lutador e Terra" copiando o time do jogo original -- só que aqui os
+   Magnemite são Elétrico puro (tipagem da Gen 1) e Fogo/Lutador acertavam 1 de 5. */
+const PT_EN = { Normal:'Normal', Fire:'Fogo', Water:'Água', Grass:'Planta', Electric:'Elétrico',
+  Ice:'Gelo', Fighting:'Lutador', Poison:'Veneno', Ground:'Terra', Flying:'Voador',
+  Psychic:'Psíquico', Bug:'Inseto', Rock:'Pedra', Ghost:'Fantasma', Dragon:'Dragão',
+  Dark:'Sombrio', Steel:'Aço' };
+const EN_PT = {}; Object.entries(PT_EN).forEach(([e,p]) => EN_PT[p] = e);
+const multi = (atk, def) => def.reduce((m,d) => m * ((S.TYPE_CHART[atk]||{})[d] ?? 1), 1);
+const dicaRuim = [], dicaInvalida = [];
+todos.forEach(g => {
+  g.adviceTypes.split(/,| e /).map(s=>s.trim()).filter(Boolean).forEach(p => {
+    const t = EN_PT[p];
+    if(!t){ dicaInvalida.push(g.leaderName + ': "' + p + '"'); return; }
+    const n = g.team.filter(m => multi(t, S.SPECIES[m.species].types) > 1).length;
+    if(n * 2 < g.team.length) dicaRuim.push(g.leaderName + ': ' + p + ' pega ' + n + '/' + g.team.length);
+  });
+});
+ok('todo tipo citado na dica existe', dicaInvalida.length === 0, dicaInvalida.join(', '));
+ok('todo tipo citado acerta ao menos metade do time', dicaRuim.length === 0, dicaRuim.join(' | '));
+
+console.log('\nAS 16 INSIGNIAS SAO IMAGEM DE VERDADE');
+const V = S.GYM_BADGE_VISUALS;
+const semImg = todos.filter(g=>!V[g.id] || !V[g.id].img);
+ok('todo ginasio tem URL de imagem', semImg.length === 0, semImg.map(g=>g.id).join(','));
+/* A pasta do Archives e o MD5 do nome do arquivo. Conferir isso pega a classe de erro que ja
+   aconteceu: as 8 URLs de Johto foram escritas de cabeca e deram 404 EM SILENCIO -- o onerror
+   caia no emoji e ninguem via erro nenhum. */
+const crypto = require('crypto');
+const erradas = todos.filter(g=>{
+  const arq = decodeURIComponent(V[g.id].img.split('/').pop().replace(/^50px-/, ''));
+  const h = crypto.createHash('md5').update(arq).digest('hex').slice(0,2);
+  return !V[g.id].img.includes('/thumb/'+h[0]+'/'+h+'/'+arq+'/');
+});
+ok('o caminho bate com o MD5 do nome do arquivo (regra do MediaWiki)', erradas.length === 0,
+   erradas.map(g=>g.id).join(','));
+ok('nenhuma URL repetida entre ginasios',
+   new Set(todos.map(g=>V[g.id].img)).size === 16);
+
 console.log('\nA TELA DE ESCOLHA');
 g.gymIndex = 3; g.gymPath = []; g.starterId='charmander'; S.__setGame(g);
 const html = S.renderGymChoice();
@@ -78,6 +191,9 @@ ok('mostra os dois ginasios da etapa', html.includes('Erika') && html.includes('
 ok('mostra as rotas de cada lado', html.includes('Túnel de Pedra') && html.includes('Parque Nacional'));
 ok('os dois botoes escolhem regioes diferentes',
    html.includes("escolherGinasio('kanto')") && html.includes("escolherGinasio('johto')"));
+ok('mostra a INSIGNIA de verdade, nao o emoji num circulo',
+   (html.match(/badge-visual-img/g)||[]).length === 2 && !html.includes('gym-choice-selo'),
+   (html.match(/badge-visual-img/g)||[]).length + ' imagens');
 
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
 process.exit(falhas ? 1 : 0);

@@ -1338,11 +1338,7 @@
   /* Cartão da escolha de ginásio. Reaproveita o card de save (mesma moldura, mesmo toque) porque
      é a mesma leitura: um bloco grande e clicável com uma decisão dentro. */
   .gym-choice-card{ padding:11px 13px; }
-  .gym-choice-selo{
-    display:inline-flex; align-items:center; justify-content:center;
-    width:26px; height:26px; border-radius:50%; flex-shrink:0;
-    background:var(--kt-cor); font-size:.85rem; box-shadow:0 0 0 2px rgba(0,0,0,.25) inset;
-  }
+
   .gym-choice-regiao{
     margin-left:auto; font-family:var(--font-pixel); font-size:.55rem;
     letter-spacing:.05em; color:var(--muted); flex-shrink:0;
@@ -1725,6 +1721,15 @@
     color:#000;
     line-height:1.4;
   }
+  /* a opção que só existe naquele turno do dia (Espeon/Umbreon) -- moldura destacada pra ficar
+     claro que ela não é uma das quatro de sempre */
+  .btn.eevee-horario{ border-color:var(--yellow-dark); background:#fff8e0; }
+  /* separador das duas regiões na escolha do inicial -- seis botões seguidos viram uma parede */
+  .starter-regiao{
+    font-family:var(--font-pixel); font-size:.55rem; letter-spacing:.08em;
+    color:var(--muted); margin:9px 0 4px; padding-left:2px;
+  }
+  .starter-regiao:first-of-type{ margin-top:2px; }
   .badge-visual{display:inline-block;}
   .badge-visual-img{display:block;object-fit:contain;}
   .badge-visual-fallback{border-radius:50%;align-items:center;justify-content:center;border:2px solid rgba(0,0,0,.25);}
@@ -2178,15 +2183,21 @@
 /* ---------------------------------------------------
    DADOS DO JOGO
 --------------------------------------------------- */
+/* As DUAS tabelas precisam ter TODO tipo do TYPE_CHART. Quando Sombrio e Aço entraram com Johto,
+   elas ficaram pra trás: o selo de tipo de um Umbreon saía escrito "Dark", em inglês, num cinza
+   genérico -- e nada quebrava, então não havia como perceber sem olhar a tela.
+   `tools/test-terrenos.js` confere que as três (chart, cores, nomes) andam juntas. */
 const TYPE_COLORS = {
   Normal:'#A8A878', Fire:'#F08030', Water:'#6890F0', Grass:'#78C850', Poison:'#A040A0',
   Flying:'#A890F0', Bug:'#A8B820', Fighting:'#C03028', Rock:'#B8A038', Ground:'#E0C068',
-  Psychic:'#F85888', Electric:'#F8D030', Ghost:'#705898', Dragon:'#7038F8', Ice:'#98D8D8'
+  Psychic:'#F85888', Electric:'#F8D030', Ghost:'#705898', Dragon:'#7038F8', Ice:'#98D8D8',
+  Dark:'#705848', Steel:'#B8B8D0'
 };
 const TYPE_NAMES_PT = {
   Normal:'Normal', Fire:'Fogo', Water:'Água', Grass:'Planta', Poison:'Veneno',
   Flying:'Voador', Bug:'Inseto', Fighting:'Lutador', Rock:'Pedra', Ground:'Terra',
-  Psychic:'Psíquico', Electric:'Elétrico', Ghost:'Fantasma', Dragon:'Dragão', Ice:'Gelo'
+  Psychic:'Psíquico', Electric:'Elétrico', Ghost:'Fantasma', Dragon:'Dragão', Ice:'Gelo',
+  Dark:'Sombrio', Steel:'Aço'
 };
 
 const SPECIES = {
@@ -2579,7 +2590,14 @@ const EVOLUTIONS = {
   phanpy:{level:25, into:'donphan'},
   tyrogue:{level:20, into:'hitmontop'},
   larvitar:{level:30, into:'pupitar'},
-  pupitar:{level:55, into:'tyranitar'}
+  pupitar:{level:55, into:'tyranitar'},
+  /* bebes da Gen 2 que evoluem pra um adulto de Kanto -- ver a nota no CLAUDE.md */
+  pichu:{level:20, into:'pikachu'},
+  cleffa:{level:20, into:'clefairy'},
+  igglybuff:{level:20, into:'jigglypuff'},
+  smoochum:{level:20, into:'jynx'},
+  elekid:{level:20, into:'electabuzz'},
+  magby:{level:20, into:'magmar'}
 };
 
 
@@ -2616,7 +2634,13 @@ function rollWildLevel(speciesId, minLevel, maxLevel){
   return randomInt(floor, floor + spread);
 }
 
-const STARTERS = ['bulbasaur','charmander','squirtle'];
+/* SEIS iniciais desde 30/08/2026: os três de Kanto e os três de Johto. A jornada agora se bifurca
+   a cada etapa (ver a seção da bifurcação no CLAUDE.md), então prender o começo a Kanto não fazia
+   mais sentido -- quem quer atravessar Johto inteiro começa com um pokémon de lá.
+   O sorteio de shiny dos iniciais corre POR INICIAL (ver sorteioDosIniciais), então dobrar a
+   lista dobra a chance de aparecer um shiny na tela de escolha: de 2,3% pra 4,6% no modo normal.
+   É consequência conhecida e aceita -- ver a nota em "Anti save scumming". */
+const STARTERS = ['bulbasaur','charmander','squirtle','chikorita','cyndaquil','totodile'];
 
 const WILD_POOL_LEG1 = ['weedle','caterpie','ratata','pidgey','mankey','spearow','nidoranm','oddish','pikachu','sandshrew','meowth','growlithe'];
 const WILD_POOL_LEG2 = ['sandshrew','clefairy','jigglypuff','zubat','paras','meowth','bellsprout','abra','geodude','pidgey','oddish','diglett'];
@@ -2657,7 +2681,7 @@ const ROUTE_MAP = [
   [ // antes de Misty (Água)
     { id:'mt_moon', name:'Monte Lua', icon:'🌙', types:['Rock','Poison'],
       rumor:'Há fósseis antigos enterrados nas cavernas — e Rockets cavando.',
-      pool:['geodude','zubat','clefairy','paras','sandshrew','jigglypuff','teddiursa','dunsparce','cleffa'], rare:['onix'] },
+      pool:['geodude','zubat','clefairy','paras','sandshrew','jigglypuff','teddiursa','dunsparce','cleffa','igglybuff'], rare:['onix'] },
     { id:'coast_24_25', name:'Rotas 24/25 (Costa)', icon:'🌊', types:['Water','Electric'],
       rumor:'Pescadores juram ter visto um roedor elétrico na margem.',
       pool:['bellsprout','oddish','psyduck','poliwag','abra','pidgey','goldeen','magikarp','slowpoke','butterfree','marill','wooper','chinchou'], rare:['pikachu'] }
@@ -2719,10 +2743,10 @@ const JOHTO_ROUTE_MAP = [
   [ // antes do Falkner (Voador) -- Rotas 29/30 e a Caverna Escura
     { id:'route_29_30', name:'Rotas 29/30', icon:'🌱', types:['Normal','Bug'],
       rumor:'O caminho de casa até Cherrygrove. Tudo aqui é pequeno, rápido e curioso.',
-      pool:['sentret','hoothoot','pidgey','ledyba','spinarak','caterpie','weedle','ratata'], rare:['mareep'] },
+      pool:['sentret','hoothoot','pidgey','ledyba','spinarak','caterpie','weedle','ratata','pichu'], rare:['mareep'] },
     { id:'dark_cave', name:'Caverna Escura', icon:'🕯️', types:['Rock','Ground'],
       rumor:'Sem lanterna não se enxerga nada — e tem coisa se arrastando no escuro.',
-      pool:['geodude','zubat','dunsparce','teddiursa','wooper','machop','onix'], rare:['phanpy'] }
+      pool:['geodude','zubat','dunsparce','teddiursa','wooper','machop','onix','wobbuffet'], rare:['phanpy'] }
   ],
   [ // antes do Bugsy (Inseto) -- Rota 32 e a Caverna União
     { id:'route_32', name:'Rota 32', icon:'🎣', types:['Electric','Water'],
@@ -2730,7 +2754,7 @@ const JOHTO_ROUTE_MAP = [
       pool:['mareep','bellsprout','hoppip','wooper','ratata','zubat','magikarp','ekans'], rare:['quagsire'] },
     { id:'union_cave', name:'Caverna União', icon:'🪨', types:['Rock','Water'],
       rumor:'Nas sextas-feiras, dizem que algo enorme e gentil aparece no lago do fundo.',
-      pool:['geodude','zubat','onix','ratata','sandshrew','wooper','slowpoke','marill'], rare:[{species:'lapras', chance:0.08}] }
+      pool:['geodude','zubat','onix','ratata','sandshrew','wooper','slowpoke','marill'], rare:[{species:'lapras', chance:0.08},'unown'] }
   ],
   [ // antes da Whitney (Normal) -- Floresta Ilex e Rota 34
     { id:'ilex_forest', name:'Floresta Ilex', icon:'🌳', types:['Bug','Grass'],
@@ -2738,15 +2762,15 @@ const JOHTO_ROUTE_MAP = [
       pool:['caterpie','metapod','weedle','kakuna','paras','oddish','psyduck','zubat','pineco'], rare:['heracross'] },
     { id:'route_34', name:'Rota 34', icon:'🏙️', types:['Normal','Psychic'],
       rumor:'O caminho da creche até Goldenrod. Passa de tudo por aqui.',
-      pool:['ratata','abra','drowzee','snubbull','magikarp','tentacool','hoppip','meowth'], rare:['ditto'] }
+      pool:['ratata','abra','drowzee','snubbull','magikarp','tentacool','hoppip','meowth','togepi','yanma'], rare:['ditto'] }
   ],
   [ // antes do Morty (Fantasma) -- Parque Nacional e Rotas 36/37
     { id:'national_park', name:'Parque Nacional', icon:'🦋', types:['Bug','Grass'],
       rumor:'Todo domingo tem concurso de captura. Hoje o parque está vazio — e barulhento.',
-      pool:['caterpie','metapod','pidgey','sunkern','hoothoot','psyduck','venonat','ledian','butterfree'], rare:['scyther','pinsir'] },
+      pool:['caterpie','metapod','pidgey','sunkern','hoothoot','psyduck','venonat','ledian','butterfree','smeargle','yanma'], rare:['scyther','pinsir'] },
     { id:'route_36_37', name:'Rotas 36/37', icon:'🍂', types:['Fire','Normal'],
       rumor:'Uma árvore no meio do caminho não sai do lugar. E não é uma árvore.',
-      pool:['growlithe','vulpix','stantler','hoppip','ledyba','spinarak','nidoranm','nidoranf'], rare:['sudowoodo'] }
+      pool:['growlithe','vulpix','stantler','hoppip','ledyba','spinarak','nidoranm','nidoranf','bellossom'], rare:['sudowoodo',{species:'raikou', chance:0.05}] }
   ],
   [ // antes do Chuck (Lutador) -- Ilhas Redemoinho e Rotas 40/41
     { id:'whirl_islands', name:'Ilhas Redemoinho', icon:'🌀', types:['Water','Flying'],
@@ -2754,7 +2778,7 @@ const JOHTO_ROUTE_MAP = [
       pool:['tentacool','krabby','horsea','seel','golbat','zubat','staryu','chinchou'], rare:[{species:'lugia', chance:0.05}] },
     { id:'route_40_41', name:'Rotas 40/41 (Mar)', icon:'🌊', types:['Water'],
       rumor:'Mar aberto entre Olivine e Cianwood. Só se atravessa nadando.',
-      pool:['tentacool','krabby','horsea','magikarp','shellder','chinchou','lanturn','goldeen'], rare:['mantine'] }
+      pool:['tentacool','krabby','horsea','magikarp','shellder','chinchou','lanturn','goldeen','qwilfish','remoraid'], rare:['mantine'] }
   ],
   [ // antes da Jasmine (Aço) -- Farol de Olivine e Rotas 38/39
     { id:'olivine_lighthouse', name:'Farol de Olivine', icon:'🗼', types:['Electric','Poison'],
@@ -2762,20 +2786,20 @@ const JOHTO_ROUTE_MAP = [
       pool:['zubat','golbat','voltorb','magnemite','grimer','koffing','staryu','krabby'], rare:['ampharos'] },
     { id:'route_38_39', name:'Rotas 38/39', icon:'🐄', types:['Normal'],
       rumor:'Pasto da Fazenda Moomoo. Leite fresco e bichos grandes demais pro capim.',
-      pool:['miltank','tauros','meowth','magnemite','farfetchd','ratata','snubbull','growlithe'], rare:['girafarig'] }
+      pool:['miltank','tauros','meowth','magnemite','farfetchd','ratata','snubbull','growlithe','skarmory'], rare:['girafarig',{species:'entei', chance:0.05}] }
   ],
   [ // antes do Pryce (Gelo) -- Monte Mortar e Lago da Fúria
     { id:'mt_mortar', name:'Monte Mortar', icon:'🥊', types:['Fighting','Rock'],
       rumor:'Um mestre de karatê treina sozinho na caverna dos fundos há anos.',
-      pool:['machop','machoke','geodude','graveler','ratata','zubat','golbat','marill'], rare:['tyrogue'] },
+      pool:['machop','machoke','geodude','graveler','ratata','zubat','golbat','marill','shuckle','gligar'], rare:['tyrogue'] },
     { id:'lake_of_rage', name:'Lago da Fúria', icon:'🔴', types:['Water','Dragon'],
       rumor:'O lago inteiro está agitado. No meio dele, um Gyarados da cor errada.',
-      pool:['magikarp','poliwag','wooper','quagsire','slowpoke','marill','goldeen','dratini'], rare:[{species:'gyarados', chance:0.12}] }
+      pool:['magikarp','poliwag','wooper','quagsire','slowpoke','marill','goldeen','dratini','politoed','slowking'], rare:[{species:'gyarados', chance:0.12},{species:'suicune', chance:0.05}] }
   ],
   [ // antes da Clair (Dragão) -- Caminho de Gelo e Covil do Dragão
     { id:'ice_path', name:'Caminho de Gelo', icon:'🧊', types:['Ice','Poison'],
       rumor:'O chão é escorregadio e só se anda em linha reta. Algo com garras observa.',
-      pool:['swinub','delibird','jynx','golbat','zubat','piloswine','seel','dewgong'], rare:['sneasel'] },
+      pool:['swinub','delibird','jynx','golbat','zubat','piloswine','seel','dewgong'], rare:['sneasel',{species:'hooh', chance:0.05}] },
     { id:'dragons_den', name:'Covil do Dragão', icon:'🐲', types:['Dragon','Water'],
       rumor:'Atrás do ginásio, uma caverna alagada onde os dragões são criados.',
       pool:['dratini','dragonair','magikarp','horsea','seadra','poliwag','goldeen','gyarados'], rare:[{species:'kingdra', chance:0.10}, {species:'dragonite', chance:0.08}] }
@@ -2838,7 +2862,12 @@ const ROCKET_NAMES = ['Recruta Rocket', 'Agente Rocket', 'Capanga Rocket', 'Exec
 ------------------------------------------------------------------- */
 const RIVAL_LEGS = [2, 4, 6];
 const RIVAL_NAME_DEFAULT = 'Rafael';
-const RIVAL_STARTER_COUNTER = { bulbasaur:'charmander', charmander:'squirtle', squirtle:'bulbasaur' };
+// o rival pega o inicial que TEM VANTAGEM sobre o seu, dentro do mesmo triângulo -- Johto tem o
+// dele, igual a Kanto (planta < fogo < água < planta)
+const RIVAL_STARTER_COUNTER = {
+  bulbasaur:'charmander', charmander:'squirtle', squirtle:'bulbasaur',
+  chikorita:'cyndaquil', cyndaquil:'totodile', totodile:'chikorita'
+};
 const RIVAL_TAUNTS = [
   'Ainda treinando esses fracotes?',
   'Eu já passei por essa rota há dias. Devagar assim não vai longe.',
@@ -2976,14 +3005,22 @@ const JOHTO_GYMS = [
   },
   {
     id:'jasmine', leaderName:'Jasmine', gymTypeName:'Aço', badge:'Insígnia Mineral',
-    city:'Olivine City', adviceTypes:'Fogo, Lutador e Terra',
+    /* A dica é só TERRA, e isso é medido, não estimado: Fogo e Lutador acertam APENAS o Steelix
+       (1 de 5). Os quatro Magnemite/Magneton são Elétrico PURO aqui -- o jogo usa a tipagem da
+       Gen 1, em que eles ainda não eram Aço -- e nem Fogo nem Lutador são super-efetivos contra
+       Elétrico. Terra pega os cinco, e de quebra é imune ao ataque Elétrico deles.
+       A dica anterior ("Fogo, Lutador e Terra") vinha do time da Jasmine no jogo original, onde
+       eles SÃO Aço. Aqui ela mandava o jogador gastar uma das 5 tentativas do ginásio. */
+    city:'Olivine City', adviceTypes:'Terra',
     // Magnemite e Magneton continuam só Elétrico aqui (o jogo usa a tipagem da Gen 1). Quem
     // carrega o Aço de verdade no time são a Skarmory e o Steelix, a assinatura dela
     team:[{species:'magnemite', level: 49}, {species:'magnemite', level: 50}, {species:'magneton', level: 50}, {species:'magneton', level: 52}, {species:'steelix', level: 55}]
   },
   {
     id:'pryce', leaderName:'Pryce', gymTypeName:'Gelo', badge:'Insígnia Geleira',
-    city:'Mahogany Town', adviceTypes:'Fogo, Lutador e Pedra',
+    // medido no time real: Planta pega os 5, Lutador 4 e Elétrico 3. Fogo e Pedra, que estavam
+    // aqui antes, pegam 2 de 5 -- o Seel é Água pura e os Water/Ice não sentem fogo
+    city:'Mahogany Town', adviceTypes:'Planta, Lutador e Elétrico',
     team:[{species:'swinub', level: 53}, {species:'seel', level: 55}, {species:'dewgong', level: 55}, {species:'piloswine', level: 56}, {species:'cloyster', level: 60}]
   },
   {
@@ -3080,7 +3117,28 @@ const TERRAINS = [
   { id:'templo_monges', name:'Templo dos Monges', icon:'🙏', types:['Fighting','Psychic'] },
   { id:'pantano_radioativo', name:'Pântano Radioativo', icon:'☢️', types:['Poison','Electric'] },
   { id:'ninho_ancestral', name:'Cripta do Dragão', icon:'⚰️', types:['Dragon','Ghost'] },
-  { id:'floresta_eletrificada', name:'Floresta Eletrificada', icon:'🌩️', types:['Electric','Bug'] }
+  { id:'floresta_eletrificada', name:'Floresta Eletrificada', icon:'🌩️', types:['Electric','Bug'] },
+  /* ---- SOMBRIO e AÇO, e o acerto de contas dos outros 15 ----------------------------------
+     Os dois tipos que Johto trouxe não tinham terreno nenhum, o que significa: um Umbreon, um
+     Houndoom ou um Steelix NUNCA ganhavam o bônus de terreno, em nenhuma partida. Como o buff
+     vale 1,15× em TODOS os atributos (ver CLAUDE.md), isso era uma desvantagem permanente e
+     invisível pra 10 espécies.
+     A tabela tinha 5 terrenos por tipo, exatos. Os 12 daqui levam os DEZESSETE tipos a 6 cada --
+     os seis primeiros trazem o Sombrio e de quebra dão o sexto a nove tipos antigos; os seis
+     últimos fazem o mesmo pelo Aço com os seis tipos que sobraram. `tools/test-terrenos.js`
+     confere a contagem, que é o que garante que ninguém foi favorecido no sorteio. */
+  { id:'beco_sombrio', name:'Beco Sombrio', icon:'🌑', types:['Dark','Poison'] },
+  { id:'torre_queimada', name:'Torre Queimada', icon:'🕯️', types:['Dark','Ghost','Fire'] },
+  { id:'mata_fechada', name:'Mata Fechada', icon:'🌲', types:['Dark','Bug','Grass'] },
+  { id:'gruta_sem_luz', name:'Gruta Sem Luz', icon:'🦇', types:['Dark','Rock'] },
+  { id:'noite_lua_cheia', name:'Noite de Lua Cheia', icon:'🌕', types:['Dark','Psychic'] },
+  { id:'covil_dos_lobos', name:'Covil dos Lobos', icon:'🐺', types:['Dark','Fighting','Normal'] },
+  { id:'ferro_velho', name:'Ferro-Velho', icon:'⚙️', types:['Steel','Electric'] },
+  { id:'fortaleza_ferro', name:'Fortaleza de Ferro', icon:'🏯', types:['Steel','Ground'] },
+  { id:'submarino_afundado', name:'Submarino Afundado', icon:'🛳️', types:['Steel','Water'] },
+  { id:'hangar_gelado', name:'Hangar Gelado', icon:'🧊', types:['Steel','Ice'] },
+  { id:'torre_de_radio', name:'Torre de Rádio', icon:'📡', types:['Steel','Flying'] },
+  { id:'ninho_blindado', name:'Ninho Blindado', icon:'🐲', types:['Steel','Dragon'] }
 ];
 function hexToRgba(hex, alpha){
   const clean = hex.replace('#','');
@@ -3435,16 +3493,22 @@ const GYM_BADGE_VISUALS = {
   sabrina:{ color:'#8D6E63', emoji:'🔮', img:'https://archives.bulbagarden.net/media/upload/thumb/6/6b/Marsh_Badge.png/50px-Marsh_Badge.png' },
   blaine:{ color:'#E64A19', emoji:'🌋', img:'https://archives.bulbagarden.net/media/upload/thumb/1/12/Volcano_Badge.png/50px-Volcano_Badge.png' },
   giovanni:{ color:'#43A047', emoji:'🌍', img:'https://archives.bulbagarden.net/media/upload/thumb/7/78/Earth_Badge.png/50px-Earth_Badge.png' },
-  // Johto. Mesma fonte de imagem e a mesma reserva de cor/símbolo -- se o Bulbagarden mudar de
-  // ideia sobre hotlink, os 16 selos caem juntos pro plano B, não só metade
-  falkner:{ color:'#9FC5E8', emoji:'🪶', img:'https://archives.bulbagarden.net/media/upload/thumb/1/1a/Zephyr_Badge.png/50px-Zephyr_Badge.png' },
-  bugsy:{ color:'#A8C64A', emoji:'🐝', img:'https://archives.bulbagarden.net/media/upload/thumb/9/9a/Hive_Badge.png/50px-Hive_Badge.png' },
-  whitney:{ color:'#F48FB1', emoji:'🐄', img:'https://archives.bulbagarden.net/media/upload/thumb/8/8e/Plain_Badge.png/50px-Plain_Badge.png' },
-  morty:{ color:'#7E57C2', emoji:'👻', img:'https://archives.bulbagarden.net/media/upload/thumb/0/06/Fog_Badge.png/50px-Fog_Badge.png' },
-  chuck:{ color:'#D84315', emoji:'🥊', img:'https://archives.bulbagarden.net/media/upload/thumb/6/6f/Storm_Badge.png/50px-Storm_Badge.png' },
-  jasmine:{ color:'#B0BEC5', emoji:'⚙️', img:'https://archives.bulbagarden.net/media/upload/thumb/4/4a/Mineral_Badge.png/50px-Mineral_Badge.png' },
-  pryce:{ color:'#81D4FA', emoji:'❄️', img:'https://archives.bulbagarden.net/media/upload/thumb/2/2e/Glacier_Badge.png/50px-Glacier_Badge.png' },
-  clair:{ color:'#5C6BC0', emoji:'🐉', img:'https://archives.bulbagarden.net/media/upload/thumb/e/e6/Rising_Badge.png/50px-Rising_Badge.png' }
+  /* Johto. Mesma fonte de imagem e a mesma reserva de cor/símbolo -- se o Bulbagarden mudar de
+     ideia sobre hotlink, os 16 selos caem juntos pro plano B, não só metade.
+     ESTES CAMINHOS NÃO SE INVENTAM. O Archives é um MediaWiki: a pasta é o MD5 do NOME DO ARQUIVO
+     -- `md5("Zephyr_Badge.png")` começa em `4a`, daí `/thumb/4/4a/Zephyr_Badge.png/50px-...`.
+     A primeira versão daqui foi escrita de cabeça e as OITO deram 404 em silêncio: o `onerror` do
+     badgeMarkup caía no selo colorido e ninguém via erro nenhum, só um ícone genérico.
+     Pra conferir ou acrescentar: `printf '%s' Nome_Badge.png | md5sum | cut -c1-2`. As 16 foram
+     verificadas com HTTP 200 antes de entrar. */
+  falkner:{ color:'#9FC5E8', emoji:'🪶', img:'https://archives.bulbagarden.net/media/upload/thumb/4/4a/Zephyr_Badge.png/50px-Zephyr_Badge.png' },
+  bugsy:{ color:'#A8C64A', emoji:'🐝', img:'https://archives.bulbagarden.net/media/upload/thumb/0/08/Hive_Badge.png/50px-Hive_Badge.png' },
+  whitney:{ color:'#F48FB1', emoji:'🐄', img:'https://archives.bulbagarden.net/media/upload/thumb/a/a7/Plain_Badge.png/50px-Plain_Badge.png' },
+  morty:{ color:'#7E57C2', emoji:'👻', img:'https://archives.bulbagarden.net/media/upload/thumb/4/48/Fog_Badge.png/50px-Fog_Badge.png' },
+  chuck:{ color:'#D84315', emoji:'🥊', img:'https://archives.bulbagarden.net/media/upload/thumb/b/b9/Storm_Badge.png/50px-Storm_Badge.png' },
+  jasmine:{ color:'#B0BEC5', emoji:'⚙️', img:'https://archives.bulbagarden.net/media/upload/thumb/7/7b/Mineral_Badge.png/50px-Mineral_Badge.png' },
+  pryce:{ color:'#81D4FA', emoji:'❄️', img:'https://archives.bulbagarden.net/media/upload/thumb/e/e6/Glacier_Badge.png/50px-Glacier_Badge.png' },
+  clair:{ color:'#5C6BC0', emoji:'🐉', img:'https://archives.bulbagarden.net/media/upload/thumb/5/58/Rising_Badge.png/50px-Rising_Badge.png' }
 };
 function badgeVisualByName(badgeName){
   const gym = todosOsGinasios().find(g=>g.badge===badgeName);
@@ -4986,7 +5050,10 @@ function chooseStarter(id){
   render();
 }
 const LEGENDARY_BIRDS = ['moltres','zapdos','articuno'];
-const STARTER_EVOLUTIONS = { bulbasaur:'ivysaur', charmander:'charmeleon', squirtle:'wartortle' };
+const STARTER_EVOLUTIONS = {
+  bulbasaur:'ivysaur', charmander:'charmeleon', squirtle:'wartortle',
+  chikorita:'bayleef', cyndaquil:'quilava', totodile:'croconaw'
+};
 function finalEvolutionOf(id){
   let cur = id;
   while(EVOLUTIONS[cur]){ cur = EVOLUTIONS[cur].into; }
@@ -9573,7 +9640,11 @@ async function logout(){
 /* ---------------------------------------------------
    SAVES (3 slots por usuário no Firestore)
 --------------------------------------------------- */
-const SAFE_SAVE_SCREENS = new Set(['start','walk','walkNext','wild','release','levels','evolution','eeveeChoice','teamOrder','preBattle','victory','defeat','gameover','journeyEnd','specialIntro','specialResult','rocketHideout','eliteIntro','eliteHeal']);
+/* 'gymChoice' entrou aqui junto com a bifurcação. Sem ela, a tela "Qual ginásio vamos?" não era
+   um ponto seguro de gravação: o autosave não rodava e o flushPendingAutoSave do beforeunload
+   também não -- então a insígnia que o jogador ACABOU de ganhar ficava pendente enquanto ele
+   pensava na escolha, e fechar a aba ali perdia a vitória. */
+const SAFE_SAVE_SCREENS = new Set(['start','walk','walkNext','gymChoice','wild','release','levels','evolution','eeveeChoice','teamOrder','preBattle','victory','defeat','gameover','journeyEnd','specialIntro','specialResult','rocketHideout','eliteIntro','eliteHeal']);
 function saveDocRef(uid, slot){
   return db.collection('users').doc(uid).collection('saves').doc(String(slot));
 }
@@ -10054,6 +10125,19 @@ async function continueSave(slot){
     if(!snap.exists) return;
     applySavedState(snap.data());
     game.currentSaveSlot = slot;
+    /* O SORTEIO DOS INICIAIS É POR SLOT E POR MODO -- tem que ser refeito ao trocar de save.
+       `game.startersShiny` é escrito só na criação do save (confirmNewSaveName) e não está no
+       serializeGame nem no freshGameDefaults, então o `applySavedState` acima NÃO o toca. Sem esta
+       linha ele atravessa de um save pro outro, e isso furava a trava anti save-scumming pelos
+       dois lados:
+         - criar no slot 0 em DIFÍCIL (4x a chance), ver o shiny, ir pra home e abrir um save
+           parado na tela 'start' do slot 1 -> o inicial saía shiny num save NORMAL, com o sorteio
+           de outro slot, e o sorteio do slot 1 continuava intacto pra ser usado depois;
+         - e ao contrário: depois de um F5 o campo some, e um save parado em 'start' cujo sorteio
+           TINHA shiny voltava sem estrela nenhuma -- perdia em silêncio o que tinha direito.
+       Recompor pelo `startersSorteados` (que é da conta e sobrevive ao F5) resolve os dois. */
+    game.startersShiny = (game.screen === 'start')
+      ? sorteioDosIniciais(slot, game.gameMode) : {};
     reconcileInstanceIdCounter();
     render();
   } catch(e){ console.error(e); }
@@ -10070,6 +10154,7 @@ async function continueCompleteSave(slot){
     if(!snap.exists) return;
     applySavedState(snap.data());
     game.currentSaveSlot = slot;
+    game.startersShiny = {};   // jornada terminada nunca volta pra escolha de inicial (ver continueSave)
     reconcileInstanceIdCounter();
     game.screen = 'journeyEnd';
     render();
@@ -10592,13 +10677,20 @@ function renderStart(){
   </div>
   <div class="box">
     <h2>Escolha seu inicial</h2>
-    ${STARTERS.map(id=>{
-      const sp = SPECIES[id];
-      const shiny = game.startersShiny && game.startersShiny[id];
-      return `<button class="btn" onclick="chooseStarter('${id}')">
-        <span class="mon-name">${spriteHtml(id,'sprite-sm',shiny)} ${sp.name}${shiny?' ✨':''}</span>
-        <span class="mon-sub">${typesHtml(sp.types)}</span>
-      </button>`;
+    <p class="hint-text">Os três de Kanto e os três de Johto. Qualquer um atravessa qualquer
+       caminho — a escolha do ginásio vem depois, e a cada trecho.</p>
+    ${['kanto','johto'].map(regiao=>{
+      const doGrupo = STARTERS.filter(id => (SPECIES[id].dex <= 151) === (regiao === 'kanto'));
+      return `
+      <div class="starter-regiao">${regiao === 'kanto' ? 'KANTO' : 'JOHTO'}</div>
+      ${doGrupo.map(id=>{
+        const sp = SPECIES[id];
+        const shiny = game.startersShiny && game.startersShiny[id];
+        return `<button class="btn" onclick="chooseStarter('${id}')">
+          <span class="mon-name">${spriteHtml(id,'sprite-sm',shiny)} ${sp.name}${shiny?' ✨':''}</span>
+          <span class="mon-sub">${typesHtml(sp.types)}</span>
+        </button>`;
+      }).join('')}`;
     }).join('')}
   </div>`;
 }
@@ -10717,7 +10809,14 @@ function kantoMapSvg(ateGinasio, rotas, rotaAtual){
     const p = KANTO_PLACES[id];
     if(!p) return;
     const gymIdx = KANTO_GYM_CITIES.indexOf(id);
-    const gym = gymIdx >= 0 ? gymOf(gymIdx) : null;
+    /* KANTO_GYMS, e não gymOf(): este mapa desenha CIDADES DE KANTO, e o ponto tem que ter a cor
+       da insígnia da cidade que está escrita ali. Com gymOf() ele pintava Pewter City com a cor
+       da Insígnia Zéfiro quando o trecho 1 tinha sido jogado em Johto -- a mesma tela dizendo
+       duas coisas.
+       Quem mostra o caminho REALMENTE percorrido é a trilha de insígnias (kantoTrailHtml), que
+       usa gymOf e fica logo acima. O mapa de Johto ainda não existe; enquanto não existir, o
+       rótulo abaixo avisa quando a jornada saiu de Kanto, em vez de mentir em silêncio. */
+    const gym = gymIdx >= 0 ? KANTO_GYMS[gymIdx] : null;
     const conquistada = gymIdx >= 0 && gymIdx < venc;
     const atual = (i === venc + 1);          // a próxima parada da jornada
     const revelada = i <= venc + 1;
@@ -10837,12 +10936,14 @@ function renderGymChoice(){
        pokémons que aparecem no caminho.</p>
   </div>
   ${opcoes.map(o=>{
-    const v = GYM_BADGE_VISUALS[o.gym.id] || {};
     const rotas = (o.regiao === 'johto' ? JOHTO_ROUTE_MAP : ROUTE_MAP)[etapa] || [];
     return `
     <button class="save-slot-card clickable gym-choice-card" onclick="escolherGinasio('${escJs(o.regiao)}')">
       <div class="save-slot-top">
-        <span class="gym-choice-selo" style="--kt-cor:${v.color||'#888'}">${v.emoji||'🏅'}</span>
+        <!-- badgeMarkup, e não o emoji do GYM_BADGE_VISUALS: é a insígnia de verdade, a mesma
+             imagem que a tela de vitória e o cinturão mostram. O emoji continua existindo como
+             reserva, dentro do próprio badgeMarkup, se a imagem não carregar. -->
+        ${badgeMarkup(o.gym.badge, 'sm')}
         <span class="save-slot-name">${escapeHtmlSafe(o.gym.leaderName)} — ${escapeHtmlSafe(o.gym.gymTypeName)}</span>
         <span class="gym-choice-regiao">${o.regiao === 'johto' ? 'JOHTO' : 'KANTO'}</span>
       </div>
@@ -10876,6 +10977,17 @@ function renderKantoMapScreen(){
   ${kantoTrailHtml()}
   <div class="box">
     <h2>${venc}/8 insígnias</h2>
+    ${(()=>{
+      /* O mapa é de Kanto e desenha cidades de Kanto. Se a jornada passou por Johto em algum
+         trecho, ele não tem como mostrar isso -- então DIZ, em vez de deixar o jogador achar que
+         o desenho é o caminho dele. A trilha logo acima já mostra os líderes certos. */
+      const emJohto = (game.gymPath||[]).map((r,i)=>({r,i})).filter(x=>x.r==='johto' && x.i < venc);
+      if(!emJohto.length) return '';
+      return `<p class="hint-text">🧭 ${emJohto.length} ${emJohto.length===1?'trecho seu foi':'trechos seus foram'}
+        em <strong>Johto</strong> (${emJohto.map(x=>escapeHtmlSafe(gymOf(x.i).city)).join(', ')}).
+        Este mapa só desenha Kanto — quem mostra o caminho que você fez de verdade é a trilha de
+        insígnias aqui em cima.</p>`;
+    })()}
     <p>${gym ? `Próxima parada: <strong>${escapeHtmlSafe(gym.city)}</strong>, onde ${escapeHtmlSafe(gym.leaderName)} lidera o Ginásio ${escapeHtmlSafe(gym.gymTypeName)}.`
              : `Todas as insígnias na mão. O Planalto Índigo espera.`}</p>
     ${hist.length ? `<div class="kanto-diario">
@@ -11109,27 +11221,44 @@ function renderWild(){
   <button class="btn secondary" onclick="abrirPokedexModal()">${pokedexIcon('grande')} Consultar Pokédex</button>`;
 }
 
+/* DIA OU NOITE, pelo relógio DO CELULAR do jogador -- é assim que Espeon e Umbreon se separam no
+   jogo original, e é a única mecânica daqui que olha a hora.
+   Dia das 6h às 17h59, noite das 18h às 5h59: a mesma faixa do Gold/Silver/Crystal.
+   O relógio é o do aparelho, não o do servidor, de propósito: quem joga às 22h no Brasil espera
+   Umbreon, e um fuso escolhido por mim faria a tela discordar do celular na mão da pessoa. Dá pra
+   adiantar o relógio pra pegar o outro? Dá -- e é o mesmo "custo" que o jogo original tinha. */
+function ehDeDia(){ const h = new Date().getHours(); return h >= 6 && h < 18; }
+function eeveeDoHorario(){
+  return ehDeDia()
+    ? { id:'espeon', quando:'É dia', porque:'O sol está alto — o Eevee responde à luz.' }
+    : { id:'umbreon', quando:'É noite', porque:'A lua está no céu — o Eevee responde à escuridão.' };
+}
 function renderEeveeChoice(){
   const eevee = game.team.find(p=>p.speciesId==='eevee' && !p.eeveeResolved);
   if(!eevee) return `<div class="box"><p>Carregando...</p></div>`;
   const caught = getAllCaughtSpecies();
+  const hora = eeveeDoHorario();
   const options = [
     {id:'keep', sp:SPECIES.eevee, label:'Manter como Eevee'},
     {id:'vaporeon', sp:SPECIES.vaporeon, label:'Evoluir para Vaporeon'},
     {id:'jolteon', sp:SPECIES.jolteon, label:'Evoluir para Jolteon'},
-    {id:'flareon', sp:SPECIES.flareon, label:'Evoluir para Flareon'}
+    {id:'flareon', sp:SPECIES.flareon, label:'Evoluir para Flareon'},
+    {id:hora.id, sp:SPECIES[hora.id], label:'Evoluir para '+SPECIES[hora.id].name, horario:true}
   ];
   return `
   <div class="box cursor">
     <h2>🦊 Seu Eevee está pronto!</h2>
-    <p>O Eevee pode evoluir de três formas diferentes, ou continuar como está. Essa escolha é definitiva.</p>
+    <p>O Eevee pode evoluir de várias formas, ou continuar como está. Essa escolha é definitiva.</p>
+    <p class="hint-text">${hora.id === 'espeon' ? '☀️' : '🌙'} <strong>${hora.quando}</strong> no seu
+       relógio. ${hora.porque} Por isso a opção de <strong>${SPECIES[hora.id].name}</strong> está
+       aberta agora — a outra aparece no outro turno do dia.</p>
   </div>
   <div class="box">
     ${options.map(o=>{
       const realId = o.id==='keep' ? 'eevee' : o.id;
       const isCaught = caught.has(realId);
-      return `<button class="btn" onclick="chooseEeveeEvolution('${o.id}')">
-      <span class="mon-name">${spriteHtml(realId,'sprite-sm')} ${o.label} ${isCaught?`<span class="pokedex-owned-badge">${pokedexIcon()}</span>`:''}</span>
+      return `<button class="btn${o.horario?' eevee-horario':''}" onclick="chooseEeveeEvolution('${o.id}')">
+      <span class="mon-name">${spriteHtml(realId,'sprite-sm')} ${o.label} ${o.horario?(hora.id==='espeon'?'☀️':'🌙'):''} ${isCaught?`<span class="pokedex-owned-badge">${pokedexIcon()}</span>`:''}</span>
       <span class="mon-sub">${typesHtml(o.sp.types)}</span>
     </button>`;
     }).join('')}

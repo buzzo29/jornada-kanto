@@ -115,7 +115,7 @@ function createSandbox(htmlPath){
     'sorteioDosIniciais','chaveDoSorteio','limparSorteioDosIniciais','HARD_SHINY_CHANCE',
     // terreno, buffs e atributos: sem eles nao da pra medir o efeito de terreno/shiny,
     // que e justamente onde cliente e servidor ja divergiram
-    'TERRAINS','TERRAIN_BUFF_MULT','SHINY_BUFF_MULT','applyTerrainBuff','applySpecialtyBuff','withBuffs',
+    'TYPE_CHART','TYPE_NAMES_PT','TYPE_COLORS','englishTypeFromPortuguese','TERRAINS','TERRAIN_BUFF_MULT','SHINY_BUFF_MULT','applyTerrainBuff','applySpecialtyBuff','withBuffs',
     'effectiveBaseHp','effectiveAttack','effectiveDefense','effectiveSpAtk','effectiveSpDef','effectiveSpeed','gen1MaxHp',
     // lista de amigos: as telas sao HTML puro a partir do estado, entao dao pra renderizar aqui e
     // conferir que nenhum caminho quebra ou deixa escapar nome sem escape (ver test-amigos.js)
@@ -128,7 +128,7 @@ function createSandbox(htmlPath){
     'comecarJornadaDoMapa','abrirMapaDeKanto','fecharMapaDeKanto',
     // bifurcação Kanto/Johto (ver renderGymChoice)
     'escolherGinasio','gymOf','gymAtual','regiaoDaEtapa','opcoesDeGinasio','todosOsGinasios',
-    'KANTO_GYMS','JOHTO_GYMS','JOHTO_ROUTE_MAP','renderGymChoice','numGinasios','GYM_BADGE_VISUALS','routesForLeg','ROUTE_MAP',
+    'KANTO_GYMS','JOHTO_GYMS','JOHTO_ROUTE_MAP','renderGymChoice','numGinasios','GYM_BADGE_VISUALS','routesForLeg','ROUTE_MAP','RIVAL_STARTER_COUNTER','STARTER_EVOLUTIONS','renderStart',
     'continueJourney','showJourneyEnd',
     'runSpecialBattle','advanceSpecialReveal','continueAfterSpecial','continueAfterWildDisguiseReveal'
   ];

@@ -347,7 +347,28 @@ const TERRAINS = [
   { id:'templo_monges', name:'Templo dos Monges', icon:'🙏', types:['Fighting','Psychic'] },
   { id:'pantano_radioativo', name:'Pântano Radioativo', icon:'☢️', types:['Poison','Electric'] },
   { id:'ninho_ancestral', name:'Cripta do Dragão', icon:'⚰️', types:['Dragon','Ghost'] },
-  { id:'floresta_eletrificada', name:'Floresta Eletrificada', icon:'🌩️', types:['Electric','Bug'] }
+  { id:'floresta_eletrificada', name:'Floresta Eletrificada', icon:'🌩️', types:['Electric','Bug'] },
+  /* ---- SOMBRIO e AÇO, e o acerto de contas dos outros 15 ----------------------------------
+     Os dois tipos que Johto trouxe não tinham terreno nenhum, o que significa: um Umbreon, um
+     Houndoom ou um Steelix NUNCA ganhavam o bônus de terreno, em nenhuma partida. Como o buff
+     vale 1,15× em TODOS os atributos (ver CLAUDE.md), isso era uma desvantagem permanente e
+     invisível pra 10 espécies.
+     A tabela tinha 5 terrenos por tipo, exatos. Os 12 daqui levam os DEZESSETE tipos a 6 cada --
+     os seis primeiros trazem o Sombrio e de quebra dão o sexto a nove tipos antigos; os seis
+     últimos fazem o mesmo pelo Aço com os seis tipos que sobraram. `tools/test-terrenos.js`
+     confere a contagem, que é o que garante que ninguém foi favorecido no sorteio. */
+  { id:'beco_sombrio', name:'Beco Sombrio', icon:'🌑', types:['Dark','Poison'] },
+  { id:'torre_queimada', name:'Torre Queimada', icon:'🕯️', types:['Dark','Ghost','Fire'] },
+  { id:'mata_fechada', name:'Mata Fechada', icon:'🌲', types:['Dark','Bug','Grass'] },
+  { id:'gruta_sem_luz', name:'Gruta Sem Luz', icon:'🦇', types:['Dark','Rock'] },
+  { id:'noite_lua_cheia', name:'Noite de Lua Cheia', icon:'🌕', types:['Dark','Psychic'] },
+  { id:'covil_dos_lobos', name:'Covil dos Lobos', icon:'🐺', types:['Dark','Fighting','Normal'] },
+  { id:'ferro_velho', name:'Ferro-Velho', icon:'⚙️', types:['Steel','Electric'] },
+  { id:'fortaleza_ferro', name:'Fortaleza de Ferro', icon:'🏯', types:['Steel','Ground'] },
+  { id:'submarino_afundado', name:'Submarino Afundado', icon:'🛳️', types:['Steel','Water'] },
+  { id:'hangar_gelado', name:'Hangar Gelado', icon:'🧊', types:['Steel','Ice'] },
+  { id:'torre_de_radio', name:'Torre de Rádio', icon:'📡', types:['Steel','Flying'] },
+  { id:'ninho_blindado', name:'Ninho Blindado', icon:'🐲', types:['Steel','Dragon'] }
 ];
 function pickTerrain(rng, allowedIds){
   const pool = (allowedIds && allowedIds.length>0) ? TERRAINS.filter(t=>allowedIds.includes(t.id)) : TERRAINS;
@@ -943,7 +964,14 @@ const EVOLUTIONS = {
   phanpy:{level:25, into:'donphan'},
   tyrogue:{level:20, into:'hitmontop'},
   larvitar:{level:30, into:'pupitar'},
-  pupitar:{level:55, into:'tyranitar'}
+  pupitar:{level:55, into:'tyranitar'},
+  /* bebes da Gen 2 que evoluem pra um adulto de Kanto -- ver a nota no CLAUDE.md */
+  pichu:{level:20, into:'pikachu'},
+  cleffa:{level:20, into:'clefairy'},
+  igglybuff:{level:20, into:'jigglypuff'},
+  smoochum:{level:20, into:'jynx'},
+  elekid:{level:20, into:'electabuzz'},
+  magby:{level:20, into:'magmar'}
 };
 
 
