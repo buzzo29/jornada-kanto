@@ -3079,6 +3079,24 @@ exports.deleteNotification = onCall(async (request) => {
   return { ok: true };
 });
 
+/* Apagar em LOTE. Dava pra chamar o deleteNotification N vezes do cliente, mas o caso que fez
+   isso existir é justamente o de 21 notificações iguais (o defeito da Trainers League de
+   31/08/2026): N chamadas de rede pra uma ação que é uma só. Um batch do Firestore resolve numa
+   ida. Teto de 400 porque o batch do Firestore vai até 500 operações -- e a tela nunca lista mais
+   que 50 de qualquer jeito. */
+exports.deleteNotifications = onCall(async (request) => {
+  if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
+  const uid = request.auth.uid;
+  const { ids } = request.data || {};
+  if(!Array.isArray(ids) || ids.length===0){ throw new HttpsError('invalid-argument', 'Nenhuma notificação informada.'); }
+  if(ids.length > 400){ throw new HttpsError('invalid-argument', 'Notificações demais de uma vez.'); }
+  const coll = db.collection('users').doc(uid).collection('notifications');
+  const batch = db.batch();
+  for(const id of ids){ batch.delete(coll.doc(String(id))); }
+  await batch.commit();
+  return { ok: true, deleted: ids.length };
+});
+
 /* =====================================================================
    EMPRÉSTIMO DE MEWTWO -- diferente do prêmio de 1 uso já existente
    (mewtwoReward, usado só numa inscrição de Liga). Esse aqui é um Mewtwo

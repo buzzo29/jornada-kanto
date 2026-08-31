@@ -132,6 +132,7 @@ function createSandbox(htmlPath){
     'continueJourney','showJourneyEnd',
     // caixa de entrada (ver test-notificacoes.js)
     'renderNotificationsScreen','ctaDaNotificacao','abrirNotificacao','notificationIcon',
+    'entrarNoModoSelecao','sairDoModoSelecao','alternarSelecaoNotificacao','marcarTodasNotificacoes','pedirApagarSelecionadas','cancelarApagarSelecionadas','confirmarApagarSelecionadas','renderDeleteNotificationsBulkModal','notificationPendingReward',
     // conta: rival padrao e recuperacao de senha (ver test-conta.js)
     'nomeDoRivalPadrao','gravarRivalPadrao','RIVAL_NAME_DEFAULT','renderNewSaveName','renderAuth','switchAuthMode','sendPasswordReset','confirmNewSaveName',
     'runSpecialBattle','advanceSpecialReveal','continueAfterSpecial','continueAfterWildDisguiseReveal'

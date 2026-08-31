@@ -809,6 +809,16 @@ Duas artimanhas medidas e fechadas — em ambas o jogador reiniciava até vir sh
   O título do corpo usa a fonte de TEXTO, não a de pixel dos títulos de seção: é conteúdo, e a de
   pixel gastava três linhas a 320px. `tools/test-notificacoes.js` cobre os três estados da tela, a
   seleção, o selo e o CTA de cada tipo de notificação.
+  **Dá pra marcar várias e apagar de uma vez** (botão "Selecionar"): no modo de seleção a linha
+  MARCA em vez de abrir e o corpo some da tela — ninguém está lendo uma notificação enquanto separa
+  dez pra apagar, e sem ele a lista inteira cabe na tela. A caixinha de marcar é um span dentro do
+  botão da linha, não um `<input type=checkbox>`: a linha toda já é o alvo do toque, e mirar num
+  quadradinho de 16px num celular é pedir erro.
+  O lote vai numa chamada só (`deleteNotifications`, um batch do Firestore com teto de 400) — quem
+  motivou o pedido foram 21 notificações iguais de um defeito, e 21 chamadas de rede pra uma ação
+  que é uma só seria trocar um incômodo por outro. A confirmação NOMEIA o que tem prêmio dentro
+  (bônus shiny não ativado, empréstimo do Mewtwo): apagar isso é perda definitiva, e num lote é
+  ainda mais fácil levar junto sem ver.
 - **Não redesenhar a tela durante animações.** Cada `render()` recria o HTML e mata a transição
   CSS da barra de HP no meio. Animações atualizam o DOM diretamente. Já causou três bugs.
 - Timers que dependem de `render()` param quando o render fica raro. Cronômetros têm laço próprio.

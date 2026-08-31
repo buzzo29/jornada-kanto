@@ -966,6 +966,28 @@
      cada notificação era um card inteiro aberto, e com quatro ou cinco a tela virava uma parede de
      texto onde nem dava pra ver quantas eram. */
   .notif-caixa{ padding:0; overflow:hidden; }   /* a lista encosta na borda da caixa */
+  /* Barra de cima da caixa: conta quantas são e liga o modo de escolher várias. */
+  .notif-barra{
+    display:flex; align-items:center; gap:6px; flex-wrap:wrap;
+    padding:7px 9px; background:#efe7cf; border-bottom:2px solid var(--box-border);
+  }
+  .notif-barra-conta{ flex:1; min-width:0; font-size:.68rem; font-weight:800; color:var(--muted); }
+  .notif-barra-btn{
+    flex-shrink:0; padding:5px 8px; font-size:.68rem; font-weight:800;
+    font-family:var(--font-ui); color:var(--ink);
+    background:var(--box); border:2px solid var(--box-border); border-radius:3px; cursor:pointer;
+  }
+  .notif-barra-btn:disabled{ opacity:.45; cursor:not-allowed; }
+  .notif-barra-btn.perigo:not(:disabled){ background:var(--red); border-color:var(--red-dark); color:#fff; }
+  /* a caixinha de marcar é um SPAN dentro do botão da linha, não um <input type=checkbox>: a linha
+     inteira já é o alvo do toque (num celular, mirar num quadradinho de 16px é pedir erro) */
+  .notif-check{
+    flex-shrink:0; width:17px; height:17px; line-height:15px; text-align:center;
+    font-size:.7rem; font-weight:800; color:#fff;
+    background:#fff; border:2px solid var(--box-border); border-radius:3px;
+  }
+  .notif-item.marcada{ background:var(--yellow); }
+  .notif-item.marcada .notif-check{ background:var(--green); }
   .notif-lista{ display:flex; flex-direction:column; max-height:42vh; overflow-y:auto; }
   .notif-item{
     display:flex; align-items:center; gap:8px; width:100%; text-align:left;
@@ -3465,6 +3487,9 @@ function freshGameDefaults(){
     notificationsActionError:null,
     notificationSelected:null,   // id da notificação aberta na caixa de entrada
     notificationsNovas:[],       // as que estavam por ler quando a tela abriu (selo NOVA)
+    notifModoSelecao:false,      // caixa de entrada em modo "escolher várias"
+    notifSelecionadas:[],        // ids marcados nesse modo
+    deleteNotifBulk:null,        // {ids, avisos} -- confirmação de apagar as marcadas
     notificationsList:null,
     neighborhoodGymLeaderboardData:null, // {byWins:[...], byDays:[...]}
     neighborhoodGymChallengeHistoryData:null,
@@ -4017,6 +4042,7 @@ async function openNotificationsScreen(){
   game.notificationsActionError = null;
   game.notificationSelected = null;   // sem escolha ainda: a tela abre a mais recente
   game.notificationsNovas = [];
+  game.notifModoSelecao = false; game.notifSelecionadas = []; game.deleteNotifBulk = null;
   render();
   try{
     const result = await functionsClient.httpsCallable('getMyNotifications')();
@@ -12844,6 +12870,53 @@ function abrirNotificacao(id){
   game.notificationSelected = id;
   render();
 }
+function entrarNoModoSelecao(){ game.notifModoSelecao = true; game.notifSelecionadas = []; render(); }
+function sairDoModoSelecao(){ game.notifModoSelecao = false; game.notifSelecionadas = []; render(); }
+function alternarSelecaoNotificacao(id){
+  const sel = game.notifSelecionadas || [];
+  game.notifSelecionadas = sel.includes(id) ? sel.filter(x=>x!==id) : sel.concat(id);
+  render();
+}
+// o mesmo botão faz os dois: marcar todas e, quando já estão todas, desmarcar
+function marcarTodasNotificacoes(){
+  const todas = (game.notificationsList||[]).map(n=>n.id);
+  game.notifSelecionadas = (game.notifSelecionadas||[]).length === todas.length ? [] : todas;
+  render();
+}
+/* A MESMA pergunta do apagar avulso, em lote: se alguma das marcadas ainda guarda um prêmio pra
+   resgatar (bônus shiny não ativado, empréstimo do Mewtwo), ela é NOMEADA na confirmação. Apagar o
+   bônus sem ativar é perda definitiva, e num lote é ainda mais fácil levar junto sem ver. */
+function pedirApagarSelecionadas(){
+  const ids = game.notifSelecionadas || [];
+  if(!ids.length) return;
+  const avisos = (game.notificationsList||[])
+    .filter(n=>ids.includes(n.id))
+    .map(n=>({ n, premio: notificationPendingReward(n) }))
+    .filter(x=>x.premio)
+    .map(x=>({ titulo:x.premio.titulo, aviso:x.premio.aviso }));
+  game.deleteNotifBulk = { ids, avisos };
+  render();
+}
+function cancelarApagarSelecionadas(){ game.deleteNotifBulk = null; render(); }
+// apaga otimista, igual ao avulso: some da tela na hora e volta se o servidor recusar
+async function confirmarApagarSelecionadas(){
+  const alvo = game.deleteNotifBulk;
+  game.deleteNotifBulk = null;
+  if(!alvo || !alvo.ids.length){ render(); return; }
+  const anterior = game.notificationsList;
+  game.notificationsList = (game.notificationsList||[]).filter(n=>!alvo.ids.includes(n.id));
+  game.notifSelecionadas = [];
+  game.notifModoSelecao = false;
+  render();
+  try{
+    await functionsClient.httpsCallable('deleteNotifications')({ ids: alvo.ids });
+  } catch(e){
+    console.error('Erro ao apagar notificações:', e);
+    game.notificationsList = anterior;
+    game.notificationsActionError = (e && e.message) || 'Não foi possível apagar essas notificações agora.';
+    render();
+  }
+}
 /* Caixa de entrada: títulos em cima, corpo do que estiver aberto embaixo.
    Abre a mais recente sozinha -- a tela existe pra ler a notificação, e uma tela que abre com o
    painel de baixo vazio pede um clique só pra chegar onde a pessoa já queria chegar.
@@ -12863,24 +12936,43 @@ function renderNotificationsScreen(){
     // a selecionada pode ter sido apagada: cai na mais recente sem precisar de tratamento à parte
     const aberta = list.find(n=>n.id===game.notificationSelected) || list[0];
     const novas = game.notificationsNovas || [];
+    /* Modo de escolher várias: a linha passa a MARCAR em vez de abrir, e o corpo some da tela --
+       ninguém está lendo uma notificação enquanto separa dez pra apagar, e sem ele a lista inteira
+       cabe na tela. Foi pedido depois de um defeito encher a caixa de 21 avisos iguais. */
+    const modo = !!game.notifModoSelecao;
+    const marcadas = game.notifSelecionadas || [];
+    const todasMarcadas = marcadas.length === list.length && list.length > 0;
     out += `<div class="box notif-caixa">
+      <div class="notif-barra">
+        ${modo
+          ? `<span class="notif-barra-conta">${marcadas.length} de ${list.length}</span>
+             <button class="notif-barra-btn" onclick="marcarTodasNotificacoes()">${todasMarcadas?'Nenhuma':'Todas'}</button>
+             <button class="notif-barra-btn perigo" ${marcadas.length?'':'disabled'} onclick="pedirApagarSelecionadas()">🗑️ Apagar</button>
+             <button class="notif-barra-btn" onclick="sairDoModoSelecao()">Cancelar</button>`
+          : `<span class="notif-barra-conta">${list.length} notificaç${list.length===1?'ão':'ões'}</span>
+             <button class="notif-barra-btn" onclick="entrarNoModoSelecao()">☑️ Selecionar</button>`}
+      </div>
       <div class="notif-lista">
-        ${list.map(n=>`<button class="notif-item${n.id===aberta.id?' aberta':''}${novas.includes(n.id)?' nova':''}"
-            onclick="abrirNotificacao('${escJs(n.id)}')">
+        ${list.map(n=>{
+          const marcada = marcadas.includes(n.id);
+          const classes = 'notif-item' + (modo ? (marcada?' marcada':'') : (n.id===aberta.id?' aberta':'')) + (novas.includes(n.id)?' nova':'');
+          return `<button class="${classes}" onclick="${modo?'alternarSelecaoNotificacao':'abrirNotificacao'}('${escJs(n.id)}')">
+          ${modo ? `<span class="notif-check">${marcada?'✔':''}</span>` : ''}
           <span class="notif-item-icone">${notificationIcon(n.type)}</span>
           <span class="notif-item-titulo">${escapeHtmlSafe(n.title)}</span>
           ${novas.includes(n.id) ? '<span class="notif-nova">NOVA</span>' : ''}
           <span class="notif-item-data">${formatDateShort(n.createdAt)}</span>
-        </button>`).join('')}
+        </button>`;
+        }).join('')}
       </div>
     </div>
-    <div class="box">
+    ${modo ? '' : `<div class="box">
       <h2 class="notif-corpo-titulo">${notificationIcon(aberta.type)} ${escapeHtmlSafe(aberta.title)}</h2>
       <p class="hint-text u-m0">${formatDateShort(aberta.createdAt)} às ${formatClock(aberta.createdAt)}</p>
       <p class="notif-corpo-texto">${escapeHtmlSafe(aberta.body)}</p>
       ${ctaDaNotificacao(aberta)}
       <button class="btn secondary u-mt8" onclick="requestDeleteNotification('${escJs(aberta.id)}')">🗑️ Apagar esta notificação</button>
-    </div>`;
+    </div>`}`;
   }
   out += `<button class="btn secondary" onclick="goToSaveMenu()">⬅ Voltar</button>`;
   return out;
@@ -14566,6 +14658,24 @@ function renderDeleteNotificationModal(){
       <p class="error-text">⚠️ ${alvo.aviso}</p>
       <button class="btn danger" onclick="confirmDeleteNotification()">Sim, apagar</button>
       <button class="btn secondary" onclick="cancelDeleteNotification()">Cancelar</button>
+    </div>
+  </div>`;
+}
+function renderDeleteNotificationsBulkModal(){
+  const alvo = game.deleteNotifBulk;
+  if(!alvo) return '';
+  const n = alvo.ids.length;
+  return `
+  <div class="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-icon">🗑️</div>
+      <h2>Apagar ${n} notificaç${n===1?'ão':'ões'}?</h2>
+      ${alvo.avisos.length ? `
+        <p>${alvo.avisos.length===1 ? 'Uma delas guarda' : alvo.avisos.length+' delas guardam'} algo pra resgatar:</p>
+        ${alvo.avisos.map(a=>`<p class="error-text">⚠️ <strong>${escapeHtmlSafe(a.titulo)}</strong> -- ${a.aviso}</p>`).join('')}
+      ` : '<p>Elas somem da sua caixa de entrada pra sempre.</p>'}
+      <button class="btn danger" onclick="confirmarApagarSelecionadas()">Sim, apagar</button>
+      <button class="btn secondary" onclick="cancelarApagarSelecionadas()">Cancelar</button>
     </div>
   </div>`;
 }
@@ -17305,6 +17415,7 @@ function render(){
   if(game.showResetConfirm){ html += renderResetModal(); }
   if(game.deleteSaveTarget!=null){ html += renderDeleteSaveModal(); }
   if(game.deleteNotifTarget){ html += renderDeleteNotificationModal(); }
+  if(game.deleteNotifBulk){ html += renderDeleteNotificationsBulkModal(); }
   if(game.neighborhoodGymLeaveConfirm){ html += renderLeaveNeighborhoodGymModal(); }
   if(game.showMewtwoLoanInfoModal){ html += renderMewtwoLoanInfoModal(); }
   if(game.showIosInstallModal){ html += renderIosInstallModal(); }
