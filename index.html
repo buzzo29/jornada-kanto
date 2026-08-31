@@ -9150,6 +9150,18 @@ function renderTrainersLeagueScreen(){
     const nextRoundIdx = (data.scheduleRounds||[]).findIndex(round => round.matches.some(m=>!m.resolved));
     const prevRoundIdx = nextRoundIdx===-1 ? data.scheduleRounds.length-1 : nextRoundIdx-1;
     const champion = data.status==='complete' && standings.length>0 ? standings.filter(s=>s.rank===1) : null;
+    /* Dia que não formou liga (ninguém ou uma pessoa só se inscreveu): a tela precisa DIZER isso.
+       Antes ela caía no ramo de 'locking' e anunciava "Chaveamento sorteado -- a primeira rodada é
+       às 11h30" sem chaveamento nenhum, e não mostrava mais nada. */
+    if(data.noLeagueReason){
+      return `${header}
+      <div class="box">
+        <h2>😴 Hoje não teve liga</h2>
+        <p>Não apareceu gente suficiente pra formar uma Trainers League hoje${data.noLeagueCount ? ` (só ${data.noLeagueCount} inscrito${data.noLeagueCount===1?'':'s'})` : ''}. Quem estava inscrito já entrou na fila da próxima, com prioridade.</p>
+      </div>
+      <button class="btn secondary" onclick="openTrainersLeagueHistory()">📜 Ver ligas anteriores</button>
+      <button class="btn secondary" onclick="leaveTrainersLeague()">⬅ Voltar</button>`;
+    }
     return `${header}
     ${data.status==='complete' ? `
     ${champion ? `<div class="box tl-champion-box">

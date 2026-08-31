@@ -659,6 +659,33 @@ Duas artimanhas medidas e fechadas — em ambas o jogador reiniciava até vir sh
   conta sozinha derruba a raide em ~399 ataques) e o que acontece depois que ele cai (hoje fica
   derrubado e a tela diz isso; não renasce no domingo seguinte).
 
+## Trainers League
+
+- **O "mínimo pra formar" vale só pro RESTO, e resto só existe quando outra liga já se formou.**
+  A regra divide os inscritos em grupos de 16 e manda o último grupo pra amanhã se ele tiver
+  `TRAINERS_LEAGUE_MIN_TO_FORM` (4) ou menos. A condição era `groups.length > 0`, então um dia com
+  4 inscritos dissolvia o ÚNICO grupo e cancelava o dia — e no dia seguinte repetiria com os
+  mesmos 4, pra sempre. Hoje é `groups.length > 1`, e com um grupo só o mínimo não vale: 2 pessoas
+  já são uma liga (com 1 não dá, o round-robin sai com 0 rodadas).
+- **Nenhum caminho pode deixar o ciclo num estado transitório.** Quem grava `status:'locked'` é o
+  `trainersLeagueLockGroupInto`, chamado uma vez por grupo — com ZERO grupos ele nunca roda, e o
+  ciclo ficava parado no `'locking'` que a própria trava tinha acabado de gravar. Efeito em
+  cascata, medido na produção de **31/08/2026**: a tela caía no ramo de 'locking' e anunciava
+  *"Chaveamento sorteado — a primeira rodada é às 11h30"* sem chaveamento nenhum; o agendador
+  (roda de minuto em minuto) via 'locking' + hora passada e re-travava a cada ~2 minutos, porque
+  trava vencida é roubável (`TRAINERS_LEAGUE_CLAIM_LEASE_MS`); e cada volta mandava OUTRA
+  notificação de adiamento pros mesmos inscritos — **21 notificações iguais** pra dois deles em
+  1h30. Hoje, sem nenhum grupo, o ciclo vai pra `'complete'` com `noLeagueReason`, que é o que a
+  tela usa pra dizer "hoje não teve liga" em vez de anunciar um chaveamento que não existe.
+- A divisão em grupos virou uma função PURA (`trainersLeagueSplitGroups`) exportada pro teste: sem
+  isso ela só era alcançável através do relógio (a trava só roda depois das 11h) e do Firestore.
+  `tools/test-liga-treinadores.js` tranca as duas coisas — a tabela de quem forma liga (0, 1, 2, 4,
+  16, 17, 20, 21, 30, 34 inscritos), que ninguém some entre "joga hoje" e "fica pra amanhã", e que
+  o ciclo nunca termina em estado transitório.
+- **O horário de início se ajusta pra frente**: `startTime = max(11h30, agora)`. É o que permitiu
+  destravar o dia 31/08 às 11h56 e ainda jogar as 3 rodadas (11h56, 12h26, 12h56) em vez de perder
+  o dia.
+
 ## Lista de amigos
 
 - Amizade é **mútua e por aceite**, gravada nos DOIS lados (`users/{a}/friends/{b}` e o espelho).

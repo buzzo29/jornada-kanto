@@ -1989,6 +1989,38 @@ async function trainersLeagueLockGroupInto(cycleId, group, dateId){
   }
 }
 
+/* Divide os inscritos do dia nas ligas do dia. PURA de propósito: foi um erro aqui que derrubou a
+   liga de 31/08/2026, e separada ela dá pra testar sem relógio e sem Firestore (ver
+   tools/test-liga-treinadores.js).
+
+   Regra: grupos de até 16, na ordem de inscrição. O último grupo -- o "resto" -- só é dissolvido
+   pro dia seguinte quando OUTRA liga já se formou. Ex: 34 inscritos -> 2 ligas de 16 e 2 pessoas
+   pra amanhã; 30 -> uma de 16 e uma de 14.
+
+   O QUE DEU ERRADO EM 31/08/2026: a condição era `groups.length>0`, então um dia com 4 inscritos
+   dissolvia o ÚNICO grupo e não formava liga nenhuma. Pior que perder o dia: como nenhum grupo é
+   gravado, ninguém chama o trainersLeagueLockGroupInto (é ele quem grava 'locked'), e o ciclo ficou
+   parado em 'locking'. A tela anunciava "Chaveamento sorteado" sem chaveamento, o agendador
+   re-travava a cada 2 minutos (trava vencida é roubável) e cada volta mandava outra notificação de
+   adiamento pros mesmos 4 -- e no dia seguinte repetiria, pra sempre.
+   Com um grupo só, o mínimo não vale: 2 pessoas já são uma liga. */
+function trainersLeagueSplitGroups(ordered){
+  const groups = [];
+  let idx = 0;
+  while(idx < ordered.length){
+    groups.push(ordered.slice(idx, idx+TRAINERS_LEAGUE_MAX_PLAYERS));
+    idx += TRAINERS_LEAGUE_MAX_PLAYERS;
+  }
+  let leftover = [];
+  if(groups.length>1 && groups[groups.length-1].length <= TRAINERS_LEAGUE_MIN_TO_FORM){
+    leftover = groups.pop();
+  }
+  // um grupo de 1 não é liga: o round-robin sai com 0 rodadas. Esse fica pra amanhã de verdade.
+  if(groups.length===1 && groups[0].length < 2){
+    leftover = groups.pop();
+  }
+  return { groups, leftover };
+}
 async function trainersLeagueDoLock(dateId){
   const claimed = await trainersLeagueClaim(dateId, 'registering', 'locking');
   if(!claimed) return false;
@@ -1997,19 +2029,7 @@ async function trainersLeagueDoLock(dateId){
     const registrants = regSnap.docs.map(d=>d.data());
     const ordered = registrants.slice().sort((a,b)=>(a.registeredAt||0)-(b.registeredAt||0));
 
-    // divide em grupos de até 16 -- o último grupo (o "resto") só vira liga se tiver mais de
-    // TRAINERS_LEAGUE_MIN_TO_FORM pessoas. Ex: 30 inscritos -> grupo de 16 + grupo de 14 (14>4, forma
-    // liga); 34 inscritos -> 2 grupos de 16 + resto de 2 (2<=4, NÃO forma liga, esses 2 ficam pra amanhã)
-    const groups = [];
-    let idx = 0;
-    while(idx < ordered.length){
-      groups.push(ordered.slice(idx, idx+TRAINERS_LEAGUE_MAX_PLAYERS));
-      idx += TRAINERS_LEAGUE_MAX_PLAYERS;
-    }
-    let leftover = [];
-    if(groups.length>0 && groups[groups.length-1].length <= TRAINERS_LEAGUE_MIN_TO_FORM){
-      leftover = groups.pop();
-    }
+    const { groups, leftover } = trainersLeagueSplitGroups(ordered);
 
     // o PRIMEIRO grupo sempre usa o ciclo principal do dia (dateId) -- mantém 100% de compatibilidade
     // com tudo que já assume "o ciclo de hoje é só esse documento". Cada grupo ADICIONAL vira um
@@ -2022,6 +2042,16 @@ async function trainersLeagueDoLock(dateId){
       await trainersLeagueLockGroupInto(cycleId, groups[g], dateId);
     }
     await trainersLeagueCycleRef(dateId).set({ siblingCycleIds: siblingIds }, { merge:true });
+    /* SEM NENHUM GRUPO o ciclo tem que ir pra um estado FINAL aqui mesmo. Quem grava 'locked' é o
+       trainersLeagueLockGroupInto, que nesse caso não roda -- e um ciclo parado em 'locking' faz o
+       agendador voltar aqui a cada 2 minutos pra sempre, mandando notificação nova a cada volta.
+       O noLeagueReason é o que deixa a tela dizer a verdade em vez de "chaveamento sorteado". */
+    if(groups.length===0){
+      await trainersLeagueCycleRef(dateId).set({
+        status: 'complete', players: [], scheduleRounds: [], roundTimes: [], currentRound: 0,
+        noLeagueReason: 'poucos-inscritos', noLeagueCount: leftover.length, updatedAt: Date.now()
+      }, { merge:true });
+    }
 
     const nextDateId = trainersLeagueDateStrPlusDays(dateId, 1);
     await trainersLeagueEnsureCycleDoc(nextDateId);
@@ -2256,6 +2286,8 @@ async function checkAndAdvanceTrainersLeague(dateId){
   return false;
 }
 
+// exportado só pro teste: é a regra que decide se o dia tem liga (ver tools/test-liga-treinadores.js)
+exports._trainersLeagueSplitGroups = trainersLeagueSplitGroups;
 exports.advanceTrainersLeague = onSchedule('every 1 minutes', async (event) => {
   try{
     const todayStr = trainersLeagueTodayDateStr();
