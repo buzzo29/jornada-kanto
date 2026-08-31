@@ -124,7 +124,7 @@ function createSandbox(htmlPath){
     // mapa de Kanto: o SVG sai de uma função pura (estado -> markup), entao da pra renderizar
     // aqui e conferir a geografia num screenshot em vez de no olho
     'kantoMapSvg','kantoTrailHtml','renderKantoIntro','renderKantoMapScreen',
-    'KANTO_PLACES','KANTO_JOURNEY','KANTO_GYM_CITIES','MAP_PLACES','JOHTO_PLACES','JOHTO_GYM_CITIES','jornadaDoTreinador','cidadeDaEtapa','JOHTO_OFFSET_Y','kantoCurva','renderWalkNext','renderWalk',
+    'KANTO_PLACES','KANTO_JOURNEY','KANTO_GYM_CITIES','MAP_PLACES','JOHTO_PLACES','JOHTO_GYM_CITIES','jornadaDoTreinador','cidadeDaEtapa','etapaEscolhida','JOHTO_OFFSET_Y','kantoCurva','renderWalkNext','renderWalk',
     'comecarJornadaDoMapa','abrirMapaDeKanto','fecharMapaDeKanto',
     // bifurcação Kanto/Johto (ver renderGymChoice)
     'escolherGinasio','gymOf','gymAtual','regiaoDaEtapa','opcoesDeGinasio','todosOsGinasios',

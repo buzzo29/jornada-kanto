@@ -358,6 +358,22 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
   largura e, numa tela de 320, cada cidade e cada nome sairiam pela metade do tamanho. Empilhado, a
   largura continua 300 e cada região tem a mesma área que tinha sozinha. A silhueta já era
   assumidamente uma evocação e não o contorno exato; a posição relativa segue a mesma licença.
+- **Nada na tela nomeia o líder de uma etapa antes da escolha.**  existe
+  pra isso:  devolve 'kanto' como padrão (é o que mantém save antigo funcionando),
+  então quem exibe precisa perguntar ANTES. Sem isso a abertura da jornada anunciava o líder de
+  Kanto e o mapa já traçava a linha até a cidade dele — na tela ANTERIOR à da escolha, que virava
+  encenação. Hoje a trilha mostra  e "escolha o caminho", o mapa não desenha trecho nem
+  aponta cidade, e a tela do mapa diz os dois destinos possíveis.
+  Cuidado ao comentar esse trecho: o comentário vai junto no HTML da página, então citar nome de
+  líder ali faz um teste que procura nome de líder na tela acusar o próprio comentário.
+- **Nada na tela nomeia o líder de uma etapa antes da escolha.** `etapaEscolhida(i)` existe pra
+  isso: `regiaoDaEtapa` devolve `'kanto'` como padrão (é o que mantém save antigo funcionando),
+  então quem exibe precisa perguntar ANTES. Sem isso a abertura da jornada anunciava o líder de
+  Kanto e o mapa já traçava a linha até a cidade dele — na tela ANTERIOR à da escolha, que virava
+  encenação. Hoje a trilha mostra `?` e "escolha o caminho", o mapa não desenha trecho nem aponta
+  cidade, e a tela do mapa diz os dois destinos possíveis do trecho.
+  Cuidado ao comentar esse trecho: o comentário vai junto no HTML da página, então citar nome de
+  líder ali faz um teste que procura nome de líder na tela acusar o próprio comentário.
 - **O traço segue as cidades que o treinador escolheu** (`jornadaDoTreinador()` lê o `gymPath`), e
   não uma jornada de Kanto que ele não fez. Quando a jornada troca de região, a linha atravessa de
   um continente pro outro — o zigue-zague É a jornada. As cidades não escolhidas continuam

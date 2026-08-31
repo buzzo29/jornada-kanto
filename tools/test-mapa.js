@@ -64,6 +64,28 @@ ok('o mapa de uma jornada misturada renderiza', svgMix.length > 2000 && svgMix.i
 ok('e mostra as duas regiões', svgMix.includes('KANTO') && svgMix.includes('JOHTO'));
 ok('e desenha a ponte entre elas', svgMix.includes('km-elo'));
 
+/* O CASO DA ABERTURA: o jogador ainda não escolheu entre Brock e Falkner, e nada na tela pode
+   dizer qual dos dois é. Foi um defeito real -- o mapa desenhava o traço até Pewter City e o
+   texto anunciava o Brock, na tela ANTERIOR à da escolha. */
+const gAb = sb.freshGameDefaults();
+gAb.gymIndex = 0; gAb.gymPath = []; gAb.starterId = 'pichu';
+gAb.team = [{speciesId:'pichu', level:5, id:'m', name:'Pichu', types:['Electric']}];
+sb.__setGame(gAb);
+const svgAb = sb.kantoMapSvg(0, [], null);
+ok('sem escolha, o mapa nao aponta nenhuma cidade de ginasio',
+   !svgAb.includes(sb.KANTO_PLACES.pewter.name) && !svgAb.includes(sb.MAP_PLACES.violet.name));
+ok('sem escolha, o mapa nao desenha trecho nenhum', !svgAb.includes('km-atual'));
+ok('a abertura da jornada nao nomeia o primeiro lider',
+   !sb.renderKantoIntro().includes('Brock') && !sb.renderKantoIntro().includes('Falkner'));
+ok('a trilha marca o trecho como aberto em vez de adivinhar',
+   sb.kantoTrailHtml().includes('kt-aberto') && sb.kantoTrailHtml().includes('escolha o caminho'));
+// e depois de escolher, tudo aparece
+gAb.gymPath = ['johto']; sb.__setGame(gAb);
+const svgDep = sb.kantoMapSvg(0, [], null);
+ok('escolhido Johto, o mapa aponta Violet City',
+   svgDep.includes(sb.MAP_PLACES.violet.name) && !svgDep.includes(sb.KANTO_PLACES.pewter.name));
+ok('e a trilha passa a nomear o destino', sb.kantoTrailHtml().includes('Violet City'));
+
 for(const [id, p] of Object.entries(sb.KANTO_PLACES)){
   ok(`${id} dentro da moldura`, p.x >= 20 && p.x <= 280 && p.y >= 20 && p.y <= 400, `(${p.x},${p.y})`);
 }
@@ -82,11 +104,15 @@ for(let venc = 0; venc <= 8; venc++){
   if(/undefined|NaN/.test(svg)) erros.push('tem "undefined" ou "NaN"');
   // os ícones das rotas percorridas: um por trecho concluído, mais o atual quando já escolhido
   const icones = hist.map(r=>sb.__getGame() && r);
-  // a cidade do último ginásio não pode aparecer nomeada antes da hora
+  /* A cidade do próximo ginásio só é revelada depois de o caminho daquele trecho ser ESCOLHIDO.
+     Antes disso o mapa não pode nomear nem apontar nada: ele estaria adivinhando Kanto (o padrão
+     do regiaoDaEtapa) e prometendo o Brock antes de o jogador escolher entre ele e o Falkner.
+     Este laço roda sem gymPath, então nenhum trecho está escolhido -- é exatamente o estado da
+     abertura da jornada. */
   const nomeUltimo = sb.KANTO_PLACES[sb.KANTO_GYM_CITIES[7]].name;
-  const revelaUltimo = svg.includes('>'+nomeUltimo+'<') || svg.includes(nomeUltimo);
-  if(venc < 7 && revelaUltimo) erros.push('revelou a cidade do 8º ginásio cedo demais');
-  if(venc >= 7 && !revelaUltimo) erros.push('não revelou a cidade do 8º ginásio na hora certa');
+  const revelaUltimo = svg.includes(nomeUltimo);
+  // no trecho 8 a jornada acabou e a cidade JÁ foi conquistada -- aí ela aparece, com o ✓
+  if(venc < 8 && revelaUltimo) erros.push('revelou a cidade do 8º ginásio sem o caminho ter sido escolhido');
   if(erros.length){ casos++; falhas++; console.log(`  ✗ trecho ${venc}: ${erros.join('; ')}`); }
   else { casos++; console.log(`  ✓ trecho ${venc} (${hist.length} percorridos)`); }
 }

@@ -1037,9 +1037,11 @@
      não como um trecho da jornada */
   .km-elo{ fill:none; stroke:#3d5a75; stroke-width:1.6; stroke-dasharray:3 5; stroke-linecap:round; }
   .km-elo-nome{ font-family:var(--font-pixel); font-size:7px; fill:#3d5a75; letter-spacing:.08em; }
+  /* halo igual ao dos nomes de cidade: o rótulo da região passa por cima da terra e da água, e
+     sem o contorno ele sumia dentro do verde */
   .km-regiao{
-    font-family:var(--font-pixel); font-size:9px; fill:#3d5a75;
-    letter-spacing:.16em;
+    font-family:var(--font-pixel); font-size:9px; fill:#9db4cc;
+    letter-spacing:.16em; stroke:#0b1a28; stroke-width:3.5; paint-order:stroke fill;
   }
   .km-trecho{ fill:none; stroke:#ffd76e; stroke-width:3; stroke-linecap:round; opacity:.85; }
   .km-trecho.km-atual{ stroke:#fff; stroke-dasharray:7 7; opacity:1; animation:km-anda 1.1s linear infinite; }
@@ -1081,6 +1083,8 @@
   .kt-selo.falta{ filter:grayscale(1); opacity:.35; }
   .kt-selo.atual{ box-shadow:0 0 0 3px #fff; transform:scale(1.12); }
   .kt-liga{ width:8px; height:3px; background:var(--box-border); opacity:.5; flex-shrink:0; }
+  /* etapa cujo caminho ainda não foi escolhido: sem cor de insígnia e com "?" no lugar do símbolo */
+  .kt-selo.kt-aberto{ opacity:.55; font-weight:700; }
   /* a trilha fica FORA de qualquer .box, direto sobre o fundo escuro do app -- por isso a
      legenda usa tons claros. Com var(--muted)/var(--ink) ela sumia no próprio fundo. */
   .kt-legenda{ text-align:center; margin-top:6px; font-size:.62rem; font-weight:700; color:#9db4cc; }
@@ -2826,6 +2830,11 @@ const JOHTO_ROUTE_MAP = [
    dele continua exatamente como era.
    ============================================================================ */
 const REGIOES = ['kanto','johto'];
+/* A etapa já teve o caminho escolhido? Enquanto NÃO teve, nada na tela pode nomear o líder, a
+   cidade ou o traço daquele trecho -- senão o jogo promete o Brock antes de o jogador escolher
+   entre ele e o Falkner, e a escolha vira encenação. `regiaoDaEtapa` devolve 'kanto' como padrão
+   (o que mantém save antigo funcionando), então é preciso perguntar ANTES de exibir. */
+function etapaEscolhida(legIndex){ return !!(game.gymPath || [])[legIndex]; }
 function regiaoDaEtapa(legIndex){
   const p = (game.gymPath || [])[legIndex];
   return p === 'johto' ? 'johto' : 'kanto';   // padrão e fallback de save antigo
@@ -11036,8 +11045,11 @@ function kantoMapSvg(ateGinasio, rotas, rotaAtual){
   const JORNADA = jornadaDoTreinador();   // as cidades que ESTE treinador escolheu
   let trechos = '', cidades = '';
 
-  // trechos concluídos + o atual
-  for(let i = 0; i <= venc && i < JORNADA.length-1; i++){
+  /* Trechos concluídos + o atual -- mas o ATUAL só entra depois de a etapa ter sido escolhida.
+     Antes disso o traço apontava pra cidade de Kanto (o padrão do regiaoDaEtapa) e a tela
+     prometia o Brock antes de o jogador escolher entre ele e o Falkner. */
+  const ateOnde = etapaEscolhida(venc) ? venc : venc - 1;
+  for(let i = 0; i <= ateOnde && i < JORNADA.length-1; i++){
     const a = MAP_PLACES[JORNADA[i]], b = MAP_PLACES[JORNADA[i+1]];
     if(!a || !b) continue;
     const atual = (i === venc);
@@ -11069,8 +11081,9 @@ function kantoMapSvg(ateGinasio, rotas, rotaAtual){
       ? (JOHTO_GYM_CITIES.indexOf(id) >= 0 ? JOHTO_GYMS[etapa] : KANTO_GYMS[etapa])
       : null;
     const conquistada = naJornada && etapa >= 0 && etapa < venc;
-    const atual = naJornada && (i === venc + 1);   // a próxima parada da jornada
-    const revelada = naJornada && i <= venc + 1;
+    // a próxima parada só é apontada depois de escolhida -- ver a nota do `ateOnde` acima
+    const atual = naJornada && (i === venc + 1) && etapaEscolhida(venc);
+    const revelada = naJornada && i <= (etapaEscolhida(venc) ? venc + 1 : venc);
     const cor = gym ? (GYM_BADGE_VISUALS[gym.id]||{}).color || '#888' : '#7a8fa6';
     const classe = conquistada ? 'km-ok' : (atual ? 'km-alvo' : (revelada ? '' : 'km-longe'));
     cidades += `<g class="km-cidade ${classe}">
@@ -11119,18 +11132,23 @@ function kantoTrailHtml(compacta){
   const venc = Math.max(0, Math.min(8, game.gymIndex|0));
   const gym = gymOf(venc);
   return `<div class="kanto-trilha ${compacta?'compacta':''}">
-    <!-- gymOf(i), não KANTO_GYMS: cada selo mostra o líder REALMENTE enfrentado naquela etapa.
-         Nas etapas que ainda faltam, regiaoDaEtapa devolve 'kanto' e o selo é o de Kanto --
-         é uma previsão, e ela muda assim que a pessoa escolher o outro caminho. -->
+    <!-- Cada selo mostra o líder REALMENTE enfrentado naquela etapa. Etapa ainda não escolhida
+         não tem líder: vira um selo neutro, sem cor e sem nome. Antes ela caía no padrão de
+         Kanto e a trilha adiantava o líder de uma etapa que o jogador ainda ia decidir.
+         (O comentário não cita nome de líder de propósito: ele vai junto no HTML da página, e
+         um teste que procura nome de líder na tela acusaria este texto.) -->
     <div class="kt-selos">${KANTO_GYMS.map((_,i)=>{
-      const g = gymOf(i);
-      const v = GYM_BADGE_VISUALS[g.id] || {};
+      const decidida = etapaEscolhida(i);
+      const g = decidida ? gymOf(i) : null;
+      const v = g ? (GYM_BADGE_VISUALS[g.id] || {}) : {};
       const estado = i < venc ? 'ok' : (i === venc ? 'atual' : 'falta');
-      return `<span class="kt-selo ${estado}" style="--kt-cor:${v.color||'#888'}"
-        title="${escapeHtmlSafe(g.leaderName)} — ${escapeHtmlSafe(g.city)}">${v.emoji||'🏅'}</span>`;
+      return `<span class="kt-selo ${estado} ${g?'':'kt-aberto'}" style="--kt-cor:${v.color||'#4a5b6e'}"
+        title="${g ? escapeHtmlSafe(g.leaderName)+' — '+escapeHtmlSafe(g.city) : 'Trecho '+(i+1)+' — caminho ainda não escolhido'}">${g ? (v.emoji||'🏅') : '?'}</span>`;
     }).join('<span class="kt-liga"></span>')}</div>
-    ${gym ? `<div class="kt-legenda">TRECHO ${venc+1}/8 · rumo a <strong>${escapeHtmlSafe(gym.city)}</strong></div>`
-          : `<div class="kt-legenda">8/8 · <strong>Planalto Índigo</strong></div>`}
+    ${venc >= numGinasios() ? `<div class="kt-legenda">8/8 · <strong>Planalto Índigo</strong></div>`
+      : etapaEscolhida(venc)
+        ? `<div class="kt-legenda">TRECHO ${venc+1}/8 · rumo a <strong>${escapeHtmlSafe(gymOf(venc).city)}</strong></div>`
+        : `<div class="kt-legenda">TRECHO ${venc+1}/8 · <strong>escolha o caminho</strong></div>`}
   </div>`;
 }
 // botão que reabre o mapa de qualquer tela da jornada
@@ -11215,13 +11233,15 @@ function renderGymChoice(){
 }
 function renderKantoIntro(){
   const sp = SPECIES[game.starterId];
-  const gym = gymOf(0);
+  /* NÃO nomeia o primeiro líder: a escolha entre Kanto e Johto vem na tela seguinte, e dizer
+     "o primeiro é o Brock" aqui tornava a escolha uma formalidade. */
   return `
-  <div class="eyebrow">🗺️ KANTO</div>
+  <div class="eyebrow">🗺️ KANTO E JOHTO</div>
   <div class="box kanto-abertura">
-    <h2>${sp ? spriteHtml(game.starterId,'sprite-sm') : ''} Kanto se abre à sua frente</h2>
+    <h2>${sp ? spriteHtml(game.starterId,'sprite-sm') : ''} Dois continentes</h2>
     <p>Você sai de <strong>Pallet Town</strong>${sp ? ` com <strong>${escapeHtmlSafe(sp.name)}</strong> do lado` : ''}.
-    Oito ginásios entre você e o Planalto Índigo — o primeiro é o de <strong>${escapeHtmlSafe(gym.leaderName)}</strong>, na ${escapeHtmlSafe(gym.city)}.</p>
+    Oito ginásios entre você e o Planalto Índigo — e em cada um deles você escolhe se segue por
+    <strong>Kanto</strong> ou por <strong>Johto</strong>.</p>
   </div>
   <div class="box kanto-moldura">${kantoMapSvg(0, [], null)}</div>
   ${kantoTrailHtml()}
@@ -11248,8 +11268,11 @@ function renderKantoMapScreen(){
       return `<p class="hint-text">🧭 Sua jornada cruzou os dois continentes: <strong>${nK}</strong>
         ${nK===1?'trecho':'trechos'} em Kanto e <strong>${nJ}</strong> em Johto.</p>`;
     })()}
-    <p>${gym ? `Próxima parada: <strong>${escapeHtmlSafe(gym.city)}</strong>, onde ${escapeHtmlSafe(gym.leaderName)} lidera o Ginásio ${escapeHtmlSafe(gym.gymTypeName)}.`
-             : `Todas as insígnias na mão. O Planalto Índigo espera.`}</p>
+    <p>${venc >= numGinasios() ? `Todas as insígnias na mão. O Planalto Índigo espera.`
+        : etapaEscolhida(venc)
+          ? `Próxima parada: <strong>${escapeHtmlSafe(gymOf(venc).city)}</strong>, onde ${escapeHtmlSafe(gymOf(venc).leaderName)} lidera o Ginásio ${escapeHtmlSafe(gymOf(venc).gymTypeName)}.`
+          : `Próxima parada: <strong>ainda não escolhida</strong> — o trecho ${venc+1} pode seguir por
+             ${escapeHtmlSafe(KANTO_GYMS[venc].city)} (Kanto) ou por ${escapeHtmlSafe(JOHTO_GYMS[venc].city)} (Johto).`}</p>
     ${hist.length ? `<div class="kanto-diario">
       <div class="kanto-diario-l">POR ONDE VOCÊ PASSOU</div>
       ${hist.map((rid, i)=>{
