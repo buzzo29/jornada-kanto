@@ -24,6 +24,46 @@ const ROTAS = ['viridian_forest','coast_24_25','ss_anne','lavender_detour','safa
 
 console.log('\nCOORDENADAS');
 // margem de 20: um ponto a 5px da borda tem o rótulo cortado, que é o mesmo defeito
+/* AS DUAS REGIÕES. O mapa passou a desenhar Kanto e Johto empilhadas, e o traço segue as cidades
+   que o treinador REALMENTE escolheu -- então o que precisa de trava mudou: toda cidade de ginásio
+   das duas listas tem que existir e caber na moldura, e a jornada desenhada tem que acompanhar o
+   gymPath em vez de ser sempre a de Kanto. */
+const ALTURA = sb.JOHTO_OFFSET_Y + 420;
+for(const [id, p] of Object.entries(sb.MAP_PLACES)){
+  ok('«'+p.name+'» cabe na moldura', p.x >= 10 && p.x <= 290 && p.y >= 10 && p.y <= ALTURA-10,
+     '('+p.x+','+p.y+')');
+}
+ok('as 8 cidades de ginásio de Johto existem no mapa',
+   sb.JOHTO_GYM_CITIES.every(id=>!!sb.MAP_PLACES[id]),
+   sb.JOHTO_GYM_CITIES.filter(id=>!sb.MAP_PLACES[id]).join(','));
+ok('nenhuma cidade de Johto colide com uma de Kanto',
+   sb.JOHTO_GYM_CITIES.every(id=>!sb.KANTO_GYM_CITIES.includes(id)));
+ok('as duas regiões não se sobrepõem no desenho',
+   Object.values(sb.KANTO_PLACES).every(p=>p.y < sb.JOHTO_OFFSET_Y) &&
+   Object.values(sb.JOHTO_PLACES).every(p=>p.y >= sb.JOHTO_OFFSET_Y));
+// a jornada desenhada acompanha o caminho escolhido
+const gm = sb.freshGameDefaults();
+gm.gymPath = ['johto','kanto','johto','kanto','johto','kanto','johto','kanto'];
+sb.__setGame(gm);
+const jor = sb.jornadaDoTreinador();
+ok('a jornada desenhada tem 10 paradas', jor.length === 10, String(jor.length));
+ok('a jornada segue o gymPath',
+   jor[1] === sb.JOHTO_GYM_CITIES[0] && jor[2] === sb.KANTO_GYM_CITIES[1] && jor[3] === sb.JOHTO_GYM_CITIES[2],
+   jor.join(' > '));
+ok('toda parada da jornada existe no mapa', jor.every(id=>!!sb.MAP_PLACES[id]),
+   jor.filter(id=>!sb.MAP_PLACES[id]).join(','));
+gm.gymPath = [];
+sb.__setGame(gm);
+ok('save sem gymPath desenha a jornada de Kanto (como antes)',
+   sb.jornadaDoTreinador().slice(1,9).join(',') === sb.KANTO_GYM_CITIES.join(','));
+// o SVG de uma jornada misturada tem que sair inteiro
+gm.gymPath = ['johto','kanto','johto','kanto'];
+gm.gymIndex = 4; sb.__setGame(gm);
+const svgMix = sb.kantoMapSvg(4, [], null);
+ok('o mapa de uma jornada misturada renderiza', svgMix.length > 2000 && svgMix.includes('</svg>'));
+ok('e mostra as duas regiões', svgMix.includes('KANTO') && svgMix.includes('JOHTO'));
+ok('e desenha a ponte entre elas', svgMix.includes('km-elo'));
+
 for(const [id, p] of Object.entries(sb.KANTO_PLACES)){
   ok(`${id} dentro da moldura`, p.x >= 20 && p.x <= 280 && p.y >= 20 && p.y <= 400, `(${p.x},${p.y})`);
 }

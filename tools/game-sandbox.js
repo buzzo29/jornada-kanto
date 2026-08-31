@@ -124,11 +124,11 @@ function createSandbox(htmlPath){
     // mapa de Kanto: o SVG sai de uma função pura (estado -> markup), entao da pra renderizar
     // aqui e conferir a geografia num screenshot em vez de no olho
     'kantoMapSvg','kantoTrailHtml','renderKantoIntro','renderKantoMapScreen',
-    'KANTO_PLACES','KANTO_JOURNEY','KANTO_GYM_CITIES','kantoCurva','renderWalkNext','renderWalk',
+    'KANTO_PLACES','KANTO_JOURNEY','KANTO_GYM_CITIES','MAP_PLACES','JOHTO_PLACES','JOHTO_GYM_CITIES','jornadaDoTreinador','cidadeDaEtapa','JOHTO_OFFSET_Y','kantoCurva','renderWalkNext','renderWalk',
     'comecarJornadaDoMapa','abrirMapaDeKanto','fecharMapaDeKanto',
     // bifurcação Kanto/Johto (ver renderGymChoice)
     'escolherGinasio','gymOf','gymAtual','regiaoDaEtapa','opcoesDeGinasio','todosOsGinasios',
-    'KANTO_GYMS','JOHTO_GYMS','JOHTO_ROUTE_MAP','renderGymChoice','numGinasios','GYM_BADGE_VISUALS','routesForLeg','ROUTE_MAP','RIVAL_STARTER_COUNTER','STARTER_EVOLUTIONS','renderStart','STARTERS','ehDeDia','eeveeDoHorario','renderEeveeChoice','EVOLUTION_CHOICES','escolherEvolucao','evolucoesPendentes','renderEvoChoice','resolverEvolucoes','TYPE_NAMES_PT','TYPE_COLORS','englishTypeFromPortuguese','ELITE_FOUR','JOHTO_ELITE','eliteOpponentForStage','sortearCaminhoDaElite','eliteMembroDaEtapa','startEliteChallenge',
+    'KANTO_GYMS','JOHTO_GYMS','JOHTO_ROUTE_MAP','renderGymChoice','numGinasios','GYM_BADGE_VISUALS','routesForLeg','ROUTE_MAP','RIVAL_STARTER_COUNTER','STARTER_EVOLUTIONS','renderStart','STARTERS','ehDeDia','eeveeDoHorario','renderEeveeChoice','EVOLUTION_CHOICES','raizDaLinha','linhasDoTime','buildOfferFromPool','escolherEvolucao','evolucoesPendentes','renderEvoChoice','resolverEvolucoes','TYPE_NAMES_PT','TYPE_COLORS','englishTypeFromPortuguese','ELITE_FOUR','JOHTO_ELITE','eliteOpponentForStage','sortearCaminhoDaElite','eliteMembroDaEtapa','startEliteChallenge',
     'continueJourney','showJourneyEnd',
     'runSpecialBattle','advanceSpecialReveal','continueAfterSpecial','continueAfterWildDisguiseReveal'
   ];

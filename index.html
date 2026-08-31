@@ -1027,12 +1027,20 @@
     .home-menu-stat{font-size:.56rem;line-height:1.25;}
   }
 
-  /* ---- MAPA DE KANTO ---- */
+  /* ---- MAPA DE KANTO E JOHTO ---- */
   .kanto-moldura{ padding:8px; background:#0d1f30; border-color:#22405c; }
   .kanto-map{ display:block; width:100%; height:auto; border-radius:3px; }
   .km-terra{ fill:#2e6b46; stroke:#8fd6a6; stroke-width:2; }
   /* trecho percorrido: linha cheia e discreta. O trecho ATUAL é pontilhado e anda --
      é o único elemento animado do mapa, então o olho vai direto pra ele */
+  /* a ponte entre as duas regiões: pontilhada e apagada, pra ler como "existe caminho aqui" e
+     não como um trecho da jornada */
+  .km-elo{ fill:none; stroke:#3d5a75; stroke-width:1.6; stroke-dasharray:3 5; stroke-linecap:round; }
+  .km-elo-nome{ font-family:var(--font-pixel); font-size:7px; fill:#3d5a75; letter-spacing:.08em; }
+  .km-regiao{
+    font-family:var(--font-pixel); font-size:9px; fill:#3d5a75;
+    letter-spacing:.16em;
+  }
   .km-trecho{ fill:none; stroke:#ffd76e; stroke-width:3; stroke-linecap:round; opacity:.85; }
   .km-trecho.km-atual{ stroke:#fff; stroke-dasharray:7 7; opacity:1; animation:km-anda 1.1s linear infinite; }
   @keyframes km-anda{ to{ stroke-dashoffset:-28; } }
@@ -2640,7 +2648,10 @@ function rollWildLevel(speciesId, minLevel, maxLevel){
    O sorteio de shiny dos iniciais corre POR INICIAL (ver sorteioDosIniciais), então dobrar a
    lista dobra a chance de aparecer um shiny na tela de escolha: de 2,3% pra 4,6% no modo normal.
    É consequência conhecida e aceita -- ver a nota em "Anti save scumming". */
-const STARTERS = ['bulbasaur','charmander','squirtle','chikorita','cyndaquil','totodile'];
+/* O Pichu entra como sétimo, fora do triângulo planta/fogo/água -- é o inicial "de fora", como o
+   Pikachu foi no Yellow. Ele é o único que já começa com uma evolução pra frente (Pichu -> Pikachu
+   -> Raichu), então nasce mais fraco e cresce mais. */
+const STARTERS = ['bulbasaur','charmander','squirtle','chikorita','cyndaquil','totodile','pichu'];
 
 const WILD_POOL_LEG1 = ['weedle','caterpie','ratata','pidgey','mankey','spearow','nidoranm','oddish','pikachu','sandshrew','meowth','growlithe'];
 const WILD_POOL_LEG2 = ['sandshrew','clefairy','jigglypuff','zubat','paras','meowth','bellsprout','abra','geodude','pidgey','oddish','diglett'];
@@ -2866,7 +2877,10 @@ const RIVAL_NAME_DEFAULT = 'Rafael';
 // dele, igual a Kanto (planta < fogo < água < planta)
 const RIVAL_STARTER_COUNTER = {
   bulbasaur:'charmander', charmander:'squirtle', squirtle:'bulbasaur',
-  chikorita:'cyndaquil', cyndaquil:'totodile', totodile:'chikorita'
+  chikorita:'cyndaquil', cyndaquil:'totodile', totodile:'chikorita',
+  // o Pichu está fora do triângulo: o rival responde com o Totodile, que é Água -- o único dos
+  // seis que resiste ao Elétrico e bate de volta
+  pichu:'totodile'
 };
 const RIVAL_TAUNTS = [
   'Ainda treinando esses fracotes?',
@@ -5071,12 +5085,40 @@ function chooseStarter(id){
 const LEGENDARY_BIRDS = ['moltres','zapdos','articuno'];
 const STARTER_EVOLUTIONS = {
   bulbasaur:'ivysaur', charmander:'charmeleon', squirtle:'wartortle',
-  chikorita:'bayleef', cyndaquil:'quilava', totodile:'croconaw'
+  chikorita:'bayleef', cyndaquil:'quilava', totodile:'croconaw',
+  pichu:'pikachu'
 };
 function finalEvolutionOf(id){
   let cur = id;
   while(EVOLUTIONS[cur]){ cur = EVOLUTIONS[cur].into; }
   return cur;
+}
+/* A RAIZ da linha evolutiva -- a chave que identifica "é o mesmo bicho".
+   `finalEvolutionOf` não serve pra isso desde que as evoluções se dividiram: Slowbro e Slowking
+   têm finais diferentes mas são o MESMO Slowpoke, e Vileplume e Bellossom o mesmo Oddish. A raiz
+   junta os dois lados da bifurcação, que é o que interessa pra não repetir espécie no time.
+   O mapa é montado uma vez e guardado: são 250 espécies e isso roda a cada oferta selvagem. */
+let _raizDaLinha = null;
+function raizDaLinha(id){
+  if(!_raizDaLinha){
+    const pai = {};
+    for(const de in EVOLUTIONS){ pai[EVOLUTIONS[de].into] = de; }
+    // os destinos da bifurcação não aparecem como `into` no EVOLUTIONS -- entram aqui
+    for(const de in EVOLUTION_CHOICES){ EVOLUTION_CHOICES[de].forEach(dest=>{ pai[dest] = de; }); }
+    _raizDaLinha = {};
+    Object.keys(SPECIES).forEach(sp=>{
+      let cur = sp, guarda = 0;
+      while(pai[cur] && guarda++ < 10) cur = pai[cur];
+      _raizDaLinha[sp] = cur;
+    });
+  }
+  return _raizDaLinha[id] || id;
+}
+/* As linhas que o time JÁ tem. É o que impede a oferta selvagem de repetir espécie -- e o motivo
+   de ser por LINHA e não por espécie: dois Magikarp viram dois Gyarados, e era assim que gente
+   chegava na liga com o time duplicado. Um Gyarados no time também bloqueia o Magikarp. */
+function linhasDoTime(){
+  return new Set((game.team||[]).filter(p=>p && p.speciesId).map(p=>raizDaLinha(p.speciesId)));
 }
 function buildOfferFromPool(pool, offerCount){
   // sorteia sem deixar duas fases da MESMA linha evolutiva aparecerem JUNTAS na mesma oferta (ex:
@@ -5088,13 +5130,31 @@ function buildOfferFromPool(pool, offerCount){
   // evolutiva dentro da MESMA oferta -- numa próxima oferta, a fase mais fraca tem a mesma chance
   const shuffled = shuffle(pool);
   const offer = [];
-  const usedFamilies = new Set();
+  /* Começa já com as linhas do time: assim a oferta não repete o que o jogador tem, pelo mesmo
+     mecanismo que já impedia duas fases da mesma linha na MESMA oferta.
+     Se sobrar pouca coisa (pool curto, time cheio de linhas dali), o laço de reserva lá embaixo
+     completa ignorando o time -- ficar sem oferta seria pior que oferecer um repetido. */
+  const usedFamilies = linhasDoTime();
   for(const id of shuffled){
     if(offer.length >= offerCount) break;
-    const family = finalEvolutionOf(id);
+    const family = raizDaLinha(id);
     if(usedFamilies.has(family)) continue;
     usedFamilies.add(family);
     offer.push(id);
+  }
+  /* RESERVA: se o filtro do time deixou a oferta curta, completa ignorando o que o time já tem.
+     Uma rota de 7 espécies com um time de 6 linhas dali pode não ter 3 sobrando, e uma tela de
+     encontro vazia (ou com uma opção só) é pior que oferecer um repetido. Continua sem repetir
+     linha DENTRO da própria oferta. */
+  if(offer.length < offerCount){
+    const naOferta = new Set(offer.map(raizDaLinha));
+    for(const id of shuffled){
+      if(offer.length >= offerCount) break;
+      const family = raizDaLinha(id);
+      if(naOferta.has(family)) continue;
+      naOferta.add(family);
+      offer.push(id);
+    }
   }
   return offer;
 }
@@ -10824,7 +10884,7 @@ function renderStart(){
 }
 
 /* ============================================================================
-   O MAPA DE KANTO
+   O MAPA DE KANTO E JOHTO
    ----------------------------------------------------------------------------
    Desenhado em SVG aqui mesmo -- nenhuma imagem de fora. Já houve dois episódios
    neste projeto de imagem hotlinkada que funcionava local e morria publicada
@@ -10866,6 +10926,64 @@ const KANTO_PLACES = {
 // a ordem da jornada: casa, os 8 ginásios na ordem do GYMS, e a Liga no fim
 const KANTO_GYM_CITIES = ['pewter','cerulean','vermilion','celadon','fuchsia','saffron','cinnabar','viridian'];
 const KANTO_JOURNEY = ['pallet', ...KANTO_GYM_CITIES, 'indigo'];
+
+/* ---------------------------------------------------------------------------
+   JOHTO NO MAPA
+
+   As duas regiões num SVG só, empilhadas: Kanto em cima (coordenadas intocadas, de quando o mapa
+   era só dela) e Johto embaixo, deslocada em JOHTO_OFFSET_Y.
+
+   Por que empilhado e não lado a lado, já que Johto fica a OESTE de Kanto: o jogo é jogado em
+   retrato num celular. Lado a lado o viewBox iria a 620 de largura e, numa tela de 320, cada
+   cidade e cada nome sairiam pela metade do tamanho -- o mapa vira enfeite ilegível. Empilhado, a
+   largura continua 300 e cada região tem a mesma área que tinha sozinha.
+   A silhueta já era assumidamente uma EVOCAÇÃO e não o contorno exato (ver a nota do
+   KANTO_SILHUETA); a posição relativa das duas regiões segue a mesma licença.
+
+   A ligação entre elas existe no jogo original -- Rotas 26/27 e as Quedas Tohjo, entre o oeste de
+   Kanto e o leste de Johto -- e aparece aqui como um traço pontilhado permanente, pra explicar por
+   que a jornada consegue pular de uma pra outra.
+   --------------------------------------------------------------------------- */
+const JOHTO_OFFSET_Y = 430;
+const JOHTO_PLACES_BASE = {
+  newbark:   { x: 252, y: 252, name:'Vila Broto Branco', icon:'🏠', lp:'dir' },
+  blackthorn:{ x: 250, y: 96,  name:'Blackthorn City',  lp:'dir' },
+  mahogany:  { x: 192, y: 56,  name:'Mahogany Town',    lp:'cima' },
+  violet:    { x: 190, y: 130, name:'Violet City',      lp:'dir' },
+  ecruteak:  { x: 120, y: 116, name:'Ecruteak City',    lp:'cima' },
+  goldenrod: { x: 126, y: 212, name:'Goldenrod City',   lp:'dir' },
+  azalea:    { x: 156, y: 306, name:'Azalea Town',      lp:'baixo' },
+  olivine:   { x: 60,  y: 208, name:'Olivine City',     lp:'esq' },
+  cianwood:  { x: 38,  y: 306, name:'Cianwood City',    lp:'esq', ilha:true },
+  lakerage:  { x: 246, y: 30,  name:'Lago da Fúria', icon:'🔴', lp:'esq' }
+};
+/* Silhueta de Johto. Mesma licença da de Kanto: evoca a forma (massa larga a leste, braço que
+   desce pro sul, Cianwood solta no mar a oeste) em vez de copiar o contorno. */
+const JOHTO_SILHUETA = `M 96 18
+  C 140 6, 196 10, 236 16 C 268 22, 280 46, 274 74
+  C 270 100, 276 124, 272 148 C 268 176, 276 208, 266 238
+  C 258 262, 240 274, 220 272 C 200 270, 190 284, 186 302
+  C 182 326, 162 342, 138 338 C 116 334, 106 316, 110 296
+  C 114 274, 100 262, 84 262 C 62 262, 48 248, 46 228
+  C 44 208, 54 190, 50 172 C 44 148, 52 120, 68 104
+  C 60 76, 70 34, 96 18 Z`;
+const JOHTO_PLACES = Object.fromEntries(Object.entries(JOHTO_PLACES_BASE)
+  .map(([id, p]) => [id, { ...p, y: p.y + JOHTO_OFFSET_Y, johto:true }]));
+const JOHTO_GYM_CITIES = ['violet','azalea','goldenrod','ecruteak','cianwood','olivine','mahogany','blackthorn'];
+// as duas tabelas viram uma só -- daqui pra baixo o mapa não precisa saber de qual região é o ponto
+const MAP_PLACES = { ...KANTO_PLACES, ...JOHTO_PLACES };
+
+/* A cidade de cada etapa DEPENDE DO CAMINHO ESCOLHIDO -- é isso que faz o traço do mapa seguir a
+   jornada de verdade, e não uma jornada de Kanto que o jogador não fez. */
+function cidadeDaEtapa(i){
+  return (regiaoDaEtapa(i) === 'johto' ? JOHTO_GYM_CITIES : KANTO_GYM_CITIES)[i] || null;
+}
+/* A jornada DESTE treinador: casa, as oito cidades que ele escolheu, e a Liga.
+   Etapas ainda não jogadas entram com a previsão de Kanto (o mesmo que regiaoDaEtapa devolve),
+   e o desenho só mostra até a etapa atual -- então a previsão nunca chega a ser desenhada. */
+function jornadaDoTreinador(){
+  return ['pallet', ...KANTO_GYM_CITIES.map((_, i) => cidadeDaEtapa(i)), 'indigo'];
+}
 
 /* Silhueta de Kanto. Não é o contorno exato -- é uma forma que evoca o continente
    (massa vertical a oeste, baía ao sul, Cinnabar solta no mar). Contorno fiel em
@@ -10915,11 +11033,12 @@ function kantoCurva(a, b, forca){
 function kantoMapSvg(ateGinasio, rotas, rotaAtual){
   const venc = Math.max(0, Math.min(8, ateGinasio|0));
   const hist = rotas || [];
+  const JORNADA = jornadaDoTreinador();   // as cidades que ESTE treinador escolheu
   let trechos = '', cidades = '';
 
   // trechos concluídos + o atual
-  for(let i = 0; i <= venc && i < KANTO_JOURNEY.length-1; i++){
-    const a = KANTO_PLACES[KANTO_JOURNEY[i]], b = KANTO_PLACES[KANTO_JOURNEY[i+1]];
+  for(let i = 0; i <= venc && i < JORNADA.length-1; i++){
+    const a = MAP_PLACES[JORNADA[i]], b = MAP_PLACES[JORNADA[i+1]];
     if(!a || !b) continue;
     const atual = (i === venc);
     const c = kantoCurva(a, b);
@@ -10933,21 +11052,25 @@ function kantoMapSvg(ateGinasio, rotas, rotaAtual){
     }
   }
 
-  KANTO_JOURNEY.forEach((id, i)=>{
-    const p = KANTO_PLACES[id];
+  /* Desenha TODAS as cidades das duas regiões, não só as da jornada deste treinador: as que ele
+     não escolheu ficam apagadas, como as que ele ainda não alcançou. Um mapa que só mostra o
+     caminho tomado esconde que havia outro. */
+  const TODAS = ['pallet','indigo', ...KANTO_GYM_CITIES, ...JOHTO_GYM_CITIES, 'lavender', 'newbark', 'lakerage'];
+  TODAS.forEach(id=>{
+    const p = MAP_PLACES[id];
     if(!p) return;
-    const gymIdx = KANTO_GYM_CITIES.indexOf(id);
-    /* KANTO_GYMS, e não gymOf(): este mapa desenha CIDADES DE KANTO, e o ponto tem que ter a cor
-       da insígnia da cidade que está escrita ali. Com gymOf() ele pintava Pewter City com a cor
-       da Insígnia Zéfiro quando o trecho 1 tinha sido jogado em Johto -- a mesma tela dizendo
-       duas coisas.
-       Quem mostra o caminho REALMENTE percorrido é a trilha de insígnias (kantoTrailHtml), que
-       usa gymOf e fica logo acima. O mapa de Johto ainda não existe; enquanto não existir, o
-       rótulo abaixo avisa quando a jornada saiu de Kanto, em vez de mentir em silêncio. */
-    const gym = gymIdx >= 0 ? KANTO_GYMS[gymIdx] : null;
-    const conquistada = gymIdx >= 0 && gymIdx < venc;
-    const atual = (i === venc + 1);          // a próxima parada da jornada
-    const revelada = i <= venc + 1;
+    const i = JORNADA.indexOf(id);           // -1 = cidade fora da jornada deste treinador
+    const naJornada = i >= 0;
+    const etapa = KANTO_GYM_CITIES.indexOf(id) >= 0 ? KANTO_GYM_CITIES.indexOf(id)
+                : JOHTO_GYM_CITIES.indexOf(id) >= 0 ? JOHTO_GYM_CITIES.indexOf(id) : -1;
+    // a cor é a da insígnia DESTA cidade -- cada ponto pinta o próprio ginásio, então nunca
+    // aparece Pewter City com a cor de uma insígnia de Johto
+    const gym = etapa >= 0
+      ? (JOHTO_GYM_CITIES.indexOf(id) >= 0 ? JOHTO_GYMS[etapa] : KANTO_GYMS[etapa])
+      : null;
+    const conquistada = naJornada && etapa >= 0 && etapa < venc;
+    const atual = naJornada && (i === venc + 1);   // a próxima parada da jornada
+    const revelada = naJornada && i <= venc + 1;
     const cor = gym ? (GYM_BADGE_VISUALS[gym.id]||{}).color || '#888' : '#7a8fa6';
     const classe = conquistada ? 'km-ok' : (atual ? 'km-alvo' : (revelada ? '' : 'km-longe'));
     cidades += `<g class="km-cidade ${classe}">
@@ -10958,25 +11081,34 @@ function kantoMapSvg(ateGinasio, rotas, rotaAtual){
     </g>`;
   });
 
-  // Lavender não é ginásio nem parada obrigatória, mas é uma das rotas do trecho 4 --
-  // aparece sempre, apagada, pra o mapa não ter um buraco no leste
-  const lav = KANTO_PLACES.lavender;
-  const enfeite = `<g class="km-cidade km-longe">
-    <circle cx="${lav.x}" cy="${lav.y}" r="4.5" fill="#54697f"/>
-    ${kantoRotuloSvg(lav)}</g>`;
-
-  const cin = KANTO_PLACES.cinnabar;
-  return `<svg class="kanto-map" viewBox="0 0 300 420" role="img" aria-label="Mapa de Kanto">
+  const cin = KANTO_PLACES.cinnabar, cia = MAP_PLACES.cianwood;
+  const ALTURA = JOHTO_OFFSET_Y + 420;
+  /* A ponte entre as duas regiões -- Rotas 26/27 e as Quedas Tohjo no jogo original. Fica sempre
+     visível, pontilhada, e não faz parte da jornada: existe pra explicar por que o traço do
+     treinador consegue pular de um continente pro outro. */
+  const pw = KANTO_PLACES.pallet, nb = MAP_PLACES.newbark;
+  const ligacao = `<path d="M ${pw.x} ${pw.y+14} C ${pw.x-30} ${pw.y+70}, ${nb.x+40} ${nb.y-90}, ${nb.x} ${nb.y-14}"
+    class="km-elo"/>
+    <text x="150" y="${JOHTO_OFFSET_Y-8}" text-anchor="middle" class="km-elo-nome">~ Quedas Tohjo ~</text>`;
+  const rotulo = (id, cls) => { const p = MAP_PLACES[id];
+    return `<g class="km-cidade ${cls}"><circle cx="${p.x}" cy="${p.y}" r="4.5" fill="#54697f"/>${kantoRotuloSvg(p)}</g>`; };
+  return `<svg class="kanto-map" viewBox="0 0 300 ${ALTURA}" role="img" aria-label="Mapa de Kanto e Johto">
     <defs>
       <pattern id="km-onda" width="18" height="18" patternUnits="userSpaceOnUse">
         <path d="M0 12 q4.5 -4 9 0 t9 0" fill="none" stroke="#1d3a55" stroke-width="1.2"/>
       </pattern>
     </defs>
-    <rect width="300" height="420" fill="#12283d"/>
-    <rect width="300" height="420" fill="url(#km-onda)"/>
+    <rect width="300" height="${ALTURA}" fill="#12283d"/>
+    <rect width="300" height="${ALTURA}" fill="url(#km-onda)"/>
     <path d="${KANTO_SILHUETA}" class="km-terra"/>
     <ellipse cx="${cin.x}" cy="${cin.y}" rx="24" ry="16" class="km-terra"/>
-    ${enfeite}${trechos}${cidades}
+    <g transform="translate(0 ${JOHTO_OFFSET_Y})"><path d="${JOHTO_SILHUETA}" class="km-terra"/></g>
+    <ellipse cx="${cia.x}" cy="${cia.y}" rx="22" ry="15" class="km-terra"/>
+    <text x="150" y="16" text-anchor="middle" class="km-regiao">KANTO</text>
+    <text x="150" y="${JOHTO_OFFSET_Y+16}" text-anchor="middle" class="km-regiao">JOHTO</text>
+    ${ligacao}
+    ${rotulo('lavender','km-longe')}${rotulo('lakerage','km-longe')}
+    ${trechos}${cidades}
   </svg>`;
 }
 
@@ -11003,7 +11135,7 @@ function kantoTrailHtml(compacta){
 }
 // botão que reabre o mapa de qualquer tela da jornada
 function kantoMapBotaoHtml(){
-  return `<button class="btn secondary kanto-abrir" onclick="openKantoMap()">🗺️ Ver o mapa de Kanto</button>`;
+  return `<button class="btn secondary kanto-abrir" onclick="openKantoMap()">🗺️ Ver o mapa</button>`;
 }
 
 /* --------------------------------------------------------------------------
@@ -11100,21 +11232,21 @@ function renderKantoMapScreen(){
   const hist = game.routeHistory || [];
   const gym = gymOf(venc);
   return `
-  <div class="eyebrow">🗺️ MAPA DE KANTO</div>
+  <div class="eyebrow">🗺️ MAPA DE KANTO E JOHTO</div>
   <div class="box kanto-moldura">${kantoMapSvg(venc, hist, game.currentRoute)}</div>
   ${kantoTrailHtml()}
   <div class="box">
     <h2>${venc}/8 insígnias</h2>
     ${(()=>{
-      /* O mapa é de Kanto e desenha cidades de Kanto. Se a jornada passou por Johto em algum
-         trecho, ele não tem como mostrar isso -- então DIZ, em vez de deixar o jogador achar que
-         o desenho é o caminho dele. A trilha logo acima já mostra os líderes certos. */
-      const emJohto = (game.gymPath||[]).map((r,i)=>({r,i})).filter(x=>x.r==='johto' && x.i < venc);
-      if(!emJohto.length) return '';
-      return `<p class="hint-text">🧭 ${emJohto.length} ${emJohto.length===1?'trecho seu foi':'trechos seus foram'}
-        em <strong>Johto</strong> (${emJohto.map(x=>escapeHtmlSafe(gymOf(x.i).city)).join(', ')}).
-        Este mapa só desenha Kanto — quem mostra o caminho que você fez de verdade é a trilha de
-        insígnias aqui em cima.</p>`;
+      // resumo de quantos trechos foram de cada lado -- o mapa já desenha os dois, isto é só a
+      // leitura rápida de "que jornada foi a minha"
+      const feitos = (game.gymPath||[]).slice(0, venc);
+      if(!feitos.length) return '';
+      const nJ = feitos.filter(r=>r==='johto').length, nK = feitos.length - nJ;
+      if(!nJ) return `<p class="hint-text">🧭 Sua jornada até aqui foi inteira por <strong>Kanto</strong>.</p>`;
+      if(!nK) return `<p class="hint-text">🧭 Sua jornada até aqui foi inteira por <strong>Johto</strong>.</p>`;
+      return `<p class="hint-text">🧭 Sua jornada cruzou os dois continentes: <strong>${nK}</strong>
+        ${nK===1?'trecho':'trechos'} em Kanto e <strong>${nJ}</strong> em Johto.</p>`;
     })()}
     <p>${gym ? `Próxima parada: <strong>${escapeHtmlSafe(gym.city)}</strong>, onde ${escapeHtmlSafe(gym.leaderName)} lidera o Ginásio ${escapeHtmlSafe(gym.gymTypeName)}.`
              : `Todas as insígnias na mão. O Planalto Índigo espera.`}</p>

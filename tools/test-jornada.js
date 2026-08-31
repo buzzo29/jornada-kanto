@@ -71,6 +71,45 @@ ok('cada etapa guarda a SUA escolha',
    S.gymOf(0).id==='falkner' && S.gymOf(1).id==='misty' && S.gymOf(2).id==='whitney',
    [0,1,2].map(i=>S.gymOf(i).id).join(','));
 
+console.log('\nNENHUMA ESPECIE REPETIDA NO TIME');
+/* A oferta selvagem não pode trazer o que o jogador já tem -- e a checagem é por LINHA, não por
+   espécie: dois Magikarp viram dois Gyarados, e era assim que gente chegava na liga com o time
+   duplicado. Um Gyarados no time bloqueia o Magikarp, e a bifurcação conta como uma linha só
+   (Slowbro e Slowking são o mesmo Slowpoke). */
+ok('a raiz junta Magikarp e Gyarados', S.raizDaLinha('magikarp') === S.raizDaLinha('gyarados'));
+ok('a raiz junta os dois lados da bifurcacao',
+   S.raizDaLinha('slowbro') === S.raizDaLinha('slowking') &&
+   S.raizDaLinha('bellossom') === S.raizDaLinha('vileplume') &&
+   S.raizDaLinha('politoed') === S.raizDaLinha('poliwrath'));
+ok('linhas diferentes continuam diferentes',
+   S.raizDaLinha('bulbasaur') !== S.raizDaLinha('charmander'));
+const gW = S.freshGameDefaults();
+gW.team = [{speciesId:'gyarados'},{speciesId:'slowking'},{speciesId:'bellossom'}];
+S.__setGame(gW);
+const poolT = ['magikarp','gyarados','slowpoke','slowbro','oddish','gloom','pikachu','geodude','zubat','onix'];
+let repetiuW = 0;
+for(let i=0;i<400;i++){
+  if(S.buildOfferFromPool(poolT,3).some(id=>S.linhasDoTime().has(S.raizDaLinha(id)))) repetiuW++;
+}
+ok('a oferta nunca traz uma linha que o time ja tem', repetiuW === 0, repetiuW + ' de 400');
+/* RESERVA: com o pool curto e o time cobrindo tudo, é melhor oferecer um repetido do que deixar a
+   tela de encontro vazia. */
+gW.team = [{speciesId:'geodude'},{speciesId:'zubat'},{speciesId:'onix'}]; S.__setGame(gW);
+ok('pool esgotado ainda devolve oferta cheia',
+   S.buildOfferFromPool(['geodude','zubat','onix'],3).length === 3);
+// pior caso real: time montado só com bichos da própria rota
+let curtas = 0, totalW = 0;
+[S.ROUTE_MAP, S.JOHTO_ROUTE_MAP].forEach(m=>m.forEach(par=>par.forEach(r=>{
+  for(let t=0;t<12;t++){
+    const time=[]; while(time.length<6){ const id=r.pool[Math.floor(Math.random()*r.pool.length)];
+      if(!time.some(p=>p.speciesId===id)) time.push({speciesId:id}); }
+    gW.team = time; S.__setGame(gW);
+    totalW++;
+    if(S.buildOfferFromPool(r.pool,3).length < 3) curtas++;
+  }
+})));
+ok('nenhuma rota real fica sem 3 opcoes', curtas === 0, curtas + ' de ' + totalW);
+
 console.log('\nTODO POKEMON TEM COMO SER CAPTURADO');
 /* Uma especie na tabela que nao esta em rota nenhuma nem evolui de nada e uma vaga impossivel na
    Pokedex -- e a Pokedex completa e o que libera o desafio do Mewtwo. Quando Johto entrou, DEZESSETE
@@ -160,11 +199,17 @@ ok('o log da evolucao registra as duas',
    fim2.evolutions.filter(e=>e.escolhida).length === 2,
    fim2.evolutions.map(e=>e.fromName+'->'+e.toName).join(', '));
 
-console.log('\nOS SEIS INICIAIS');
-ok('sao 6 iniciais', S.STARTERS.length === 6, S.STARTERS.join(','));
-ok('3 de Kanto e 3 de Johto',
+console.log('\nOS INICIAIS');
+ok('sao 7 iniciais', S.STARTERS.length === 7, S.STARTERS.join(','));
+ok('3 de Kanto, 3 de Johto e o Pichu',
    S.STARTERS.filter(id=>S.SPECIES[id].dex<=151).length === 3 &&
-   S.STARTERS.filter(id=>S.SPECIES[id].dex>151).length === 3);
+   S.STARTERS.filter(id=>S.SPECIES[id].dex>151).length === 4 &&
+   S.STARTERS.includes('pichu'));
+/* O Pichu é o único inicial que já nasce com uma evolução pra frente (Pichu -> Pikachu -> Raichu).
+   O triângulo dos outros seis não vale pra ele, e o rival responde com o Totodile. */
+ok('o Pichu evolui, ao contrario dos outros seis',
+   !!S.EVOLUTIONS.pichu && !S.STARTERS.filter(id=>id!=='pichu').some(id=>S.raizDaLinha(id)!==id),
+   'raiz do pichu: ' + S.raizDaLinha('pichu'));
 const semSp = S.STARTERS.filter(id=>!S.SPECIES[id]);
 ok('todo inicial existe no SPECIES', semSp.length === 0, semSp.join(','));
 ok('todo inicial tem contra-inicial pro rival',

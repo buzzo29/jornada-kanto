@@ -202,12 +202,13 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
 
 ## Bifurcação Kanto / Johto
 
-- **Seis iniciais**: os três de Kanto e os três de Johto, agrupados por região na tela de escolha.
+- **Sete iniciais**: os três de Kanto, os três de Johto e o Pichu, agrupados por região na tela.
   Qualquer um atravessa qualquer caminho — a escolha de ginásio vem depois, e a cada trecho.
   `RIVAL_STARTER_COUNTER` e `STARTER_EVOLUTIONS` ganharam o triângulo de Johto.
-  **Custo medido:** o sorteio de shiny corre POR INICIAL, então dobrar a lista dobra a chance de
-  aparecer um shiny na tela — **2,3% → 4,5%** no normal, **9,1% → 17,3%** no difícil. O teto da
-  artimanha (6 sorteios presos, 3 slots × 2 modos, sem jogar nada) vai de **13% pra 25%**. Se um
+  **Custo medido:** o sorteio de shiny corre POR INICIAL, então crescer a lista cresce a chance de
+  aparecer um shiny na tela — de 3 pra 7 iniciais foi de **2,3% → 5,3%** no normal e de
+  **9,1% → 19,9%** no difícil. O teto da
+  artimanha (6 sorteios presos, 3 slots × 2 modos, sem jogar nada) vai de **13% pra 28%**. Se um
   dia isso incomodar, o conserto é sortear só entre os três da região escolhida — mas hoje a
   região só é escolhida DEPOIS do inicial.
 - **As insígnias são a imagem real** em toda tela, inclusive na escolha de caminho e na vitória.
@@ -337,9 +338,34 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
   finais, nível 70, 1.200 batalhas) **Kanto vence 51,4%**, dentro do ruído. E Johto tem MENOS
   confrontos ruins (12,4% contra 14,7%) e menos casos sem golpe útil (114 contra 195). Dar subtipo
   a Johto seria mexer em balanceamento sem problema medido pra resolver.
-- **O mapa de Kanto continua sendo de Kanto.** `KANTO_PLACES`/`KANTO_JOURNEY` são indexados pela
-  etapa, então numa etapa de Johto ele desenha a cidade de Kanto correspondente. A trilha de
-  insígnias já segue o caminho certo (`gymOf(i)`); o mapa é o que falta.
+- **O encontro selvagem nunca oferece uma linha que o time já tem.** Não é por espécie, é pela
+  **raiz da linha evolutiva** — dois Magikarp viram dois Gyarados, e era assim que gente chegava na
+  liga com o time duplicado. Um Gyarados no time também bloqueia o Magikarp.
+  `raizDaLinha()` sobe até o começo da linha considerando o `EVOLUTIONS` **e** o
+  `EVOLUTION_CHOICES`: sem a segunda parte, Slowbro e Slowking seriam linhas diferentes (têm finais
+  diferentes) e o jogador ficaria com os dois. O mapa é montado uma vez e guardado — são 250
+  espécies e isso roda a cada encontro.
+  Tem **reserva**: se o filtro deixar a oferta curta (pool pequeno, time cheio de linhas dali), ela
+  é completada ignorando o time. Uma tela de encontro com uma opção só é pior que oferecer um
+  repetido. Medido no pior caso (time montado só com bichos da própria rota, 384 combinações):
+  **nenhuma oferta ficou com menos de 3**.
+- **O Pichu é o sétimo inicial**, fora do triângulo planta/fogo/água — o "de fora", como o Pikachu
+  no Yellow. É o único que já nasce com evolução pra frente (Pichu → Pikachu → Raichu): começa mais
+  fraco e cresce mais. O rival responde com o Totodile, o único dos outros que resiste a Elétrico.
+- **O mapa passou a desenhar Kanto E Johto**, empilhadas: Kanto em cima (coordenadas intocadas) e
+  Johto embaixo, deslocada em `JOHTO_OFFSET_Y`. **Por que empilhado e não lado a lado**, já que
+  Johto fica a oeste: o jogo é jogado em retrato num celular. Lado a lado o viewBox iria a 620 de
+  largura e, numa tela de 320, cada cidade e cada nome sairiam pela metade do tamanho. Empilhado, a
+  largura continua 300 e cada região tem a mesma área que tinha sozinha. A silhueta já era
+  assumidamente uma evocação e não o contorno exato; a posição relativa segue a mesma licença.
+- **O traço segue as cidades que o treinador escolheu** (`jornadaDoTreinador()` lê o `gymPath`), e
+  não uma jornada de Kanto que ele não fez. Quando a jornada troca de região, a linha atravessa de
+  um continente pro outro — o zigue-zague É a jornada. As cidades não escolhidas continuam
+  desenhadas, apagadas: um mapa que só mostra o caminho tomado esconde que havia outro.
+  Cada ponto pinta a insígnia do PRÓPRIO ginásio, então nunca aparece Pewter City com a cor de uma
+  insígnia de Johto (foi um defeito real, pego na revisão anterior).
+  A ponte entre as duas — Rotas 26/27 e as Quedas Tohjo no original — fica sempre visível,
+  pontilhada, pra explicar por que a jornada consegue pular de um continente pro outro.
 
 ## Progressão da jornada
 
@@ -377,8 +403,8 @@ Duas artimanhas medidas e fechadas — em ambas o jogador reiniciava até vir sh
   Sobra um teto de 6 sorteios sem jogar (3 slots × 2 modos). Bounded, e quem joga limpo não perde
   nada: a chance por jornada continua a mesma.
   **A conta mudou quando os iniciais passaram de 3 pra 6** (Johto entrou na tela): o sorteio corre
-  por inicial, então a chance de ver um shiny foi de **2,3% pra 4,5%** por tentativa no normal
-  (9,1% → 17,3% no difícil), e o teto da artimanha de **13% pra 25%**. Se incomodar, o conserto é
+  por inicial, então a chance de ver um shiny foi de **2,3% pra 5,3%** por tentativa no normal
+  (9,1% → 19,9% no difícil), e o teto da artimanha de **13% pra 28%**. Se incomodar, o conserto é
   sortear só entre os três da região escolhida — mas hoje a região só é escolhida DEPOIS do inicial.
 
 `tools/test-artimanha.js` cobre as duas.
