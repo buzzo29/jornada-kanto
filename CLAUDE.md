@@ -688,6 +688,22 @@ Duas artimanhas medidas e fechadas — em ambas o jogador reiniciava até vir sh
   conta sozinha derruba a raide em ~399 ataques) e o que acontece depois que ele cai (hoje fica
   derrubado e a tela diz isso; não renasce no domingo seguinte).
 
+## Liga Clássica (e as customizadas)
+
+- **A inscrição guarda um CÓDIGO do time, congelado na hora da inscrição** — de propósito: ninguém
+  troca de time no meio de uma competição. Mas subir um nível com o Doce Raro não é trocar de time,
+  é o mesmo time mais forte, e o servidor repropaga sozinho (`atualizarInscricoesComTime`, chamado
+  dentro do próprio `useRareCandy`; só mexe em ciclos ainda em `registering`).
+- **O que ficava velho era a CÓPIA na memória da aba.** A tela lê `game.registeredTeam`, e ele só
+  era relido ao ABRIR a tela da Liga — então cancelar a inscrição e entrar com outro time deixava a
+  lista do time ANTIGO na tela, e um Doce Raro deixava o nível antigo, até sair da Liga e voltar.
+  `refreshLeagueView` não resolvia: ele cuida do ciclo e do ranking, não da sua inscrição — quem
+  relê é o `checkLeagueRegistrationStatus`. Hoje inscrever manda reler, cancelar limpa na hora, e o
+  Doce Raro invalida a cópia (e relê, se a Liga estiver aberta).
+  `tools/test-liga-inscricao.js` dirige os três caminhos com os colaboradores trocados por espiões —
+  o que ele tranca não é o que vai pro Firestore (isso o servidor já faz), é a tela não continuar
+  mostrando uma inscrição que não existe mais.
+
 ## Trainers League
 
 - **O "mínimo pra formar" vale só pro RESTO, e resto só existe quando outra liga já se formou.**
@@ -856,6 +872,18 @@ Duas artimanhas medidas e fechadas — em ambas o jogador reiniciava até vir sh
 - Ícones da home são pixel art em base64 na constante `ICONES`. **Diagonais finas não sobrevivem
   à redução** — usar formas sólidas.
 - Testar layout em 320px, não só 390px.
+- **`touch-action: manipulation` no `html` e no `body`.** Tocar rápido várias vezes no mesmo botão
+  (o "+" da distribuição de níveis é o caso clássico) fazia o celular entender toque duplo e dar
+  zoom, e daí em diante mexer no jogo virava um transtorno. `manipulation` desliga SÓ o toque
+  duplo — o pinça-pra-ampliar continua, que é o que importa pra quem depende dele. O
+  `maximum-scale=1` que já existia no viewport **não resolve**: o Safari do iPhone ignora esse
+  atributo desde o iOS 10, de propósito.
+- **A faixa branca do atalho-app** era o fundo do `<html>`, que não tinha cor: em modo standalone,
+  puxar além do fim da página revelava o branco por baixo. Hoje o `html` tem o fundo escuro do jogo
+  e `overscroll-behavior:none`.
+- **A rolagem é preservada quando a MESMA tela é redesenhada.** O `render()` troca o `innerHTML`
+  inteiro a cada toque, e no atalho-app a rolagem escorregava a cada "+" até mostrar o vazio embaixo
+  do conteúdo. Trocar de tela não foi tocado — continua como sempre foi.
 
 ## Armadilhas conhecidas
 

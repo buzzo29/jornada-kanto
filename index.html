@@ -36,7 +36,23 @@
     --font-pixel:'Press Start 2P', monospace;
   }
   *{box-sizing:border-box;}
+  /* ZOOM POR TOQUE DUPLO: no celular, tocar rápido várias vezes no mesmo botão -- o "+" da
+     distribuição de níveis é o caso clássico -- fazia o navegador entender toque duplo e dar zoom,
+     e daí em diante mexer no jogo virava um transtorno. `manipulation` desliga SÓ o toque duplo; o
+     pinça-pra-ampliar continua funcionando, que é o que importa pra quem precisa dele.
+     O `maximum-scale=1` que já existe no viewport não resolve: o Safari do iPhone ignora esse
+     atributo desde o iOS 10, de propósito.
+     FAIXA BRANCA no atalho-app: em modo standalone, puxar além do fim da página revelava o fundo do
+     <html>, que era transparente -- ou seja, branco. Com o fundo escuro aqui e o overscroll contido,
+     a borracha não revela mais nada. */
+  html{
+    touch-action:manipulation;
+    background:var(--bg);
+    overscroll-behavior:none;
+  }
   body{
+    touch-action:manipulation;
+    overscroll-behavior:none;
     margin:0;
     min-height:100vh;
     background:
@@ -8038,6 +8054,11 @@ async function registerForLeague(typeId, slot, useMewtwo){
     game.leagueSubmitting = false;
     game.screen = 'league';
     render();
+    /* A lista do time inscrito sai do game.registeredTeam, e ele só era lido ao ABRIR a tela.
+       Resultado: cancelar a inscrição e entrar com OUTRO time deixava o time antigo na tela até
+       sair da Liga e voltar. O refreshLeagueView não resolve -- ele cuida do ciclo e do ranking,
+       não da sua inscrição. */
+    checkLeagueRegistrationStatus(typeId);
     refreshLeagueView(typeId, false); // atualiza a tela na hora, sem esperar o próximo tick de 5s
   } catch(e){
     game.leagueSubmitting = false;
@@ -8096,6 +8117,7 @@ async function cancelLeagueRegistration(typeId){
     const cycleEntry = scheduleSnap.exists ? (scheduleSnap.data().cycles||[]).find(c=>c.status==='registering') : null;
     if(cycleEntry){ await registrantDocRef(typeId, cycleEntry.id, game.authUser.uid).delete(); }
     game.accountLeagueSlots = { ...(game.accountLeagueSlots||{}), [typeId]: null };
+    game.registeredTeam = null;   // senão a lista do time que acabou de sair continua na tela
     game.leagueSubmitting = false;
     render();
     if(game.screen==='league'){ refreshLeagueView(typeId, false); }
@@ -14252,6 +14274,11 @@ async function useRareCandyOn(slot, monId){
     game.tower.rareCandies = r.data.rareCandies;
     // o save mudou no servidor; recarrega os slots pra a home e a torre mostrarem o nível novo
     await loadSaveSlots();
+    /* O doce sobe o nível no save E nas inscrições de liga -- quem repropaga é o servidor, no
+       próprio useRareCandy (ver atualizarInscricoesComTime). O que ficava velho era a cópia na
+       memória DESTA aba: a tela da Liga lê game.registeredTeam, lido só na abertura da tela. */
+    game.registeredTeam = null;
+    if(game.currentLeagueTypeId){ checkLeagueRegistrationStatus(game.currentLeagueTypeId); }
     game.candyPicker = r.data.rareCandies > 0 ? { erro:null } : null;
   } catch(e){
     console.error('Erro ao usar o doce:', e);
@@ -17353,6 +17380,7 @@ function renderNewSaveName(){
   <button class="btn secondary" onclick="openSaveSelect()">⬅ Voltar</button>`;
 }
 
+let telaDoUltimoRender = null;   // ver o fim do render: a rolagem só é preservada na MESMA tela
 function render(){
   const app = document.getElementById('app');
   let html = '';
@@ -17473,7 +17501,15 @@ function render(){
   if(game.renameSlotTarget!=null){ html += renderRenameSlotModal(); }
   if(game.editTrainerName){ html += renderEditTrainerNameModal(); }
   if(game.terrainInfoTarget){ html += renderTerrainInfoModal(); }
+  /* A tela inteira é redesenhada a cada toque (innerHTML novo). Quando o redesenho é da MESMA tela
+     -- tocar várias vezes no "+" da distribuição de níveis, por exemplo --, a rolagem tem que ficar
+     onde estava: no atalho-app ela escorregava pra baixo a cada toque e acabava mostrando a faixa
+     vazia embaixo do conteúdo. Trocar de tela não mexe em nada (fica como sempre foi). */
+  const mesmaTela = game.screen === telaDoUltimoRender;
+  const rolagemAntes = window.scrollY;
   app.innerHTML = html;
+  telaDoUltimoRender = game.screen;
+  if(mesmaTela && window.scrollY !== rolagemAntes){ window.scrollTo(0, rolagemAntes); }
   /* O campo de busca de amigo é recriado a cada render (innerHTML apaga o DOM inteiro), então o
      que a pessoa digitou é reposto aqui. Guardar o valor em game e repor depois é mais simples que
      evitar o render -- e é o que mantém a busca utilizável enquanto o poll do desafio roda. */
