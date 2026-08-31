@@ -393,6 +393,23 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
   finais, nível 70, 1.200 batalhas) **Kanto vence 51,4%**, dentro do ruído. E Johto tem MENOS
   confrontos ruins (12,4% contra 14,7%) e menos casos sem golpe útil (114 contra 195). Dar subtipo
   a Johto seria mexer em balanceamento sem problema medido pra resolver.
+- **O tipo da rota PESA no sorteio do encontro** (`PESO_DO_TIPO_DA_ROTA = 2`): quem é do tipo dela
+  entra com o dobro de peso no embaralhamento. É o que faz a rota fantasma parecer uma rota
+  fantasma — medido no Desvio por Lavender (Fantasma/Terra, 3 do tipo num pool de 9): a oferta
+  trazia **1,00** do tipo e em **23,5%** das vezes nenhum; agora são **1,42** e **9,3%**.
+  Dobro de peso NÃO é dobro de chance: o sorteio é sem reposição e a oferta tem 3 vagas, então na
+  média das 32 rotas a fatia do tipo vai de **68,8% pra 77,8%** da oferta. Rota que já é quase toda
+  do próprio tipo (Seafoam, Lago da Fúria) não muda — não há do que tirar.
+  **O preço foi medido e é real, não ruído:** a jornada concluída cai de **56,4% pra 54,0%**
+  (5.800 jornadas de cada lado, 2,6σ). A causa é o time ficar menos variado em tipo, e são 8
+  ginásios de tipos diferentes. Baixar o peso pra 1,5 **não devolve** isso (54,5%, dentro do ruído
+  contra 54,0%): o custo vem de EXISTIR o viés, não do tamanho dele — por isso ficou em 2, que é
+  onde o efeito se vê.
+  Ninguém some da rota: a menor chance entre as 156 espécies em rota vai de 13,8% pra 10,1%, e o
+  caso extremo é o Porygon (só mora na Usina, Elétrico): 29,9% → 16,5% por oferta.
+  O sorteio com peso é o de Efraimidis-Spirakis (chave = `U^(1/peso)`, maior primeiro) — com peso 1
+  pra todo mundo ele É um embaralhamento uniforme, então rota sem tipo declarado continua idêntica,
+  e a semente anti-artimanha continua devolvendo a MESMA oferta (conferido).
 - **O encontro selvagem nunca oferece uma linha que o time já tem.** Não é por espécie, é pela
   **raiz da linha evolutiva** — dois Magikarp viram dois Gyarados, e era assim que gente chegava na
   liga com o time duplicado. Um Gyarados no time também bloqueia o Magikarp.
@@ -753,6 +770,18 @@ Duas artimanhas medidas e fechadas — em ambas o jogador reiniciava até vir sh
 
 ## Frontend
 
+- **A tela de notificações é uma caixa de entrada**: lista de títulos em cima, corpo do que está
+  aberto embaixo. Antes cada notificação era um card inteiro aberto — com quatro ou cinco, a tela
+  virava uma parede de texto onde nem dava pra ver quantas eram. A mais recente abre sozinha (a
+  tela existe pra LER a notificação; abrir com o painel de baixo vazio cobraria um clique só pra
+  chegar onde a pessoa já queria chegar), e a seleção cai nela sozinha quando a aberta é apagada.
+  **A marcação de lida continua sendo em bloco, na abertura da tela.** Marcar uma a uma seria o
+  natural num e-mail, mas deixaria o sino da home aceso enquanto sobrasse uma não aberta — e a
+  decisão antiga era não cobrar um clique por notificação. O selo **NOVA** devolve a informação que
+  a marcação em bloco apaga: ele marca as que estavam por ler AO ABRIR a tela.
+  O título do corpo usa a fonte de TEXTO, não a de pixel dos títulos de seção: é conteúdo, e a de
+  pixel gastava três linhas a 320px. `tools/test-notificacoes.js` cobre os três estados da tela, a
+  seleção, o selo e o CTA de cada tipo de notificação.
 - **Não redesenhar a tela durante animações.** Cada `render()` recria o HTML e mata a transição
   CSS da barra de HP no meio. Animações atualizam o DOM diretamente. Já causou três bugs.
 - Timers que dependem de `render()` param quando o render fica raro. Cronômetros têm laço próprio.

@@ -130,6 +130,8 @@ function createSandbox(htmlPath){
     'escolherGinasio','gymOf','gymAtual','regiaoDaEtapa','opcoesDeGinasio','todosOsGinasios',
     'KANTO_GYMS','JOHTO_GYMS','JOHTO_ROUTE_MAP','renderGymChoice','numGinasios','GYM_BADGE_VISUALS','routesForLeg','ROUTE_MAP','RIVAL_STARTER_COUNTER','STARTER_EVOLUTIONS','renderStart','STARTERS','ehDeDia','eeveeDoHorario','renderEeveeChoice','EVOLUTION_CHOICES','raizDaLinha','linhasDoTime','buildOfferFromPool','escolherEvolucao','evolucoesPendentes','renderEvoChoice','resolverEvolucoes','TYPE_NAMES_PT','TYPE_COLORS','englishTypeFromPortuguese','ELITE_FOUR','JOHTO_ELITE','eliteOpponentForStage','sortearCaminhoDaElite','eliteMembroDaEtapa','startEliteChallenge','openEliteIntro','renderEliteIntro',
     'continueJourney','showJourneyEnd',
+    // caixa de entrada (ver test-notificacoes.js)
+    'renderNotificationsScreen','ctaDaNotificacao','abrirNotificacao','notificationIcon',
     // conta: rival padrao e recuperacao de senha (ver test-conta.js)
     'nomeDoRivalPadrao','gravarRivalPadrao','RIVAL_NAME_DEFAULT','renderNewSaveName','renderAuth','switchAuthMode','sendPasswordReset','confirmNewSaveName',
     'runSpecialBattle','advanceSpecialReveal','continueAfterSpecial','continueAfterWildDisguiseReveal'

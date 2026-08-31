@@ -962,6 +962,33 @@
   .trainer-name-box:active{ transform:translate(2px,2px); box-shadow:3px 3px 0 rgba(0,0,0,.45); }
   .home-header-row{ display:flex; align-items:stretch; gap:8px; margin-bottom:14px; }
   .home-header-row .trainer-name-box{ margin-bottom:0; flex:1; min-width:0; }
+  /* Caixa de entrada: a lista de títulos em cima, o corpo do que estiver aberto embaixo. Antes
+     cada notificação era um card inteiro aberto, e com quatro ou cinco a tela virava uma parede de
+     texto onde nem dava pra ver quantas eram. */
+  .notif-caixa{ padding:0; overflow:hidden; }   /* a lista encosta na borda da caixa */
+  .notif-lista{ display:flex; flex-direction:column; max-height:42vh; overflow-y:auto; }
+  .notif-item{
+    display:flex; align-items:center; gap:8px; width:100%; text-align:left;
+    padding:9px 11px; background:var(--box); color:var(--ink);
+    border:0; border-bottom:2px solid var(--box-border);
+    font-family:var(--font-ui); cursor:pointer;
+  }
+  .notif-item:last-child{ border-bottom:0; }
+  .notif-item.aberta{ background:var(--yellow); }
+  .notif-item-icone{ font-size:1rem; flex-shrink:0; }
+  /* o título trunca em vez de quebrar: numa lista, o que importa é a contagem de linhas ser
+     previsível -- é ela que deixa a caixa de entrada legível de relance */
+  .notif-item-titulo{ flex:1; min-width:0; font-size:.78rem; font-weight:700;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .notif-item.nova .notif-item-titulo{ font-weight:800; }
+  .notif-nova{ flex-shrink:0; background:var(--red); color:#fff; font-size:.5rem; font-weight:800;
+    letter-spacing:.04em; padding:2px 4px; border-radius:3px; }
+  .notif-item-data{ flex-shrink:0; font-size:.6rem; font-weight:700; color:var(--muted); }
+  /* fonte de TEXTO, não a de pixel dos títulos de seção: o título aqui é conteúdo, e a de
+     pixel gastava três linhas a 320px. É a mesma do card antigo de notificação (.save-slot-name),
+     então a tela não muda de cara -- muda de arrumação. */
+  .notif-corpo-titulo{ font-family:var(--font-ui); font-size:.9rem; font-weight:800; color:var(--ink); margin:0; line-height:1.3; }
+  .notif-corpo-texto{ margin:8px 0 0; }
   .notif-bell-btn{
     position:relative;
     flex-shrink:0;
@@ -3436,6 +3463,8 @@ function freshGameDefaults(){
     mewtwoLoanError:null,
     mewtwoLoanSubmitting:false,
     notificationsActionError:null,
+    notificationSelected:null,   // id da notificação aberta na caixa de entrada
+    notificationsNovas:[],       // as que estavam por ler quando a tela abriu (selo NOVA)
     notificationsList:null,
     neighborhoodGymLeaderboardData:null, // {byWins:[...], byDays:[...]}
     neighborhoodGymChallengeHistoryData:null,
@@ -3986,11 +4015,15 @@ async function openNotificationsScreen(){
   game.screen = 'notifications';
   game.notificationsList = null;
   game.notificationsActionError = null;
+  game.notificationSelected = null;   // sem escolha ainda: a tela abre a mais recente
+  game.notificationsNovas = [];
   render();
   try{
     const result = await functionsClient.httpsCallable('getMyNotifications')();
     game.notificationsList = result.data.notifications || [];
     const unreadIds = game.notificationsList.filter(n=>!n.read).map(n=>n.id);
+    // guarda quais estavam por ler ANTES de marcar tudo como lido -- é o que sobra pro selo NOVA
+    game.notificationsNovas = unreadIds;
     if(unreadIds.length>0){
       functionsClient.httpsCallable('markNotificationsRead')({ ids: unreadIds }).catch(e=>console.error('Erro ao marcar notificações como lidas:', e));
       game.notificationsList = game.notificationsList.map(n=>({ ...n, read:true }));
@@ -5213,7 +5246,31 @@ function raizDaLinha(id){
 function linhasDoTime(){
   return new Set((game.team||[]).filter(p=>p && p.speciesId).map(p=>raizDaLinha(p.speciesId)));
 }
-function buildOfferFromPool(pool, offerCount){
+/* O TIPO DA ROTA PESA NO SORTEIO: quem é do tipo dela entra com o dobro de peso.
+   É o que faz a rota fantasma parecer uma rota fantasma. Medido no Desvio por Lavender
+   (Fantasma/Terra, 3 do tipo num pool de 9): a oferta trazia 1,00 do tipo e em 23,9% das vezes
+   NENHUM; com o peso são 1,42 e 8,8%.
+   "Dobro de peso" não é "dobro de chance" -- o sorteio é sem reposição e a oferta tem 3 vagas,
+   então o efeito no conjunto é bem menor: na média das 32 rotas a fatia do tipo da rota vai de
+   68,8% pra 77,8% da oferta. As rotas que já são quase todas do próprio tipo (Seafoam, Lago da
+   Fúria) não mudam nada -- não há do que tirar.
+   O PREÇO, medido: quem é de fora do tipo perde chance na rota. O caso extremo é o Porygon, que
+   só mora na Usina (Elétrico): 29,9% -> 16,5% por oferta. Ninguém zera -- a menor chance entre as
+   156 espécies em rota vai de 13,8% pra 10,1%, e o pior caso segue sendo a Zona de Safári, que é
+   grande demais (20 espécies) pra 3 vagas.
+   O sorteio com peso é o de Efraimidis-Spirakis: chave = U^(1/peso), maior primeiro. Com peso 1
+   pra todo mundo ele É um embaralhamento uniforme -- por isso rota sem tipo declarado continua
+   exatamente como era. */
+const PESO_DO_TIPO_DA_ROTA = 2;
+function embaralhaFavorecendoOTipo(pool, tiposDaRota){
+  if(!tiposDaRota || !tiposDaRota.length) return shuffle(pool);
+  return pool.map(id=>{
+    const tipos = (SPECIES[id] && SPECIES[id].types) || [];
+    const peso = tipos.some(x=>tiposDaRota.includes(x)) ? PESO_DO_TIPO_DA_ROTA : 1;
+    return { id, chave: Math.pow(Math.random(), 1/peso) };
+  }).sort((a,b)=>b.chave-a.chave).map(x=>x.id);
+}
+function buildOfferFromPool(pool, offerCount, tiposDaRota){
   // sorteia sem deixar duas fases da MESMA linha evolutiva aparecerem JUNTAS na mesma oferta (ex:
   // Gastly e Haunter) -- mas sem remover nenhuma espécie do pool permanentemente. A versão antiga
   // (dedupePoolByHighestEvolution) removia a fase mais fraca do pool inteiro pra sempre sempre que a
@@ -5221,7 +5278,7 @@ function buildOfferFromPool(pool, offerCount){
   // aparecerem na Usina de Força, já que Magneton e Electrode estavam no mesmo pool e "venciam" sempre.
   // Agora cada oferta sorteia livremente entre TODAS as fases, só evitando repetir a mesma linha
   // evolutiva dentro da MESMA oferta -- numa próxima oferta, a fase mais fraca tem a mesma chance
-  const shuffled = shuffle(pool);
+  const shuffled = embaralhaFavorecendoOTipo(pool, tiposDaRota);
   const offer = [];
   /* Começa já com as linhas do time: assim a oferta não repete o que o jogador tem, pelo mesmo
      mecanismo que já impedia duas fases da mesma linha na MESMA oferta.
@@ -5288,7 +5345,7 @@ function montaOfertaSelvagem(){
   const leg = LEGS[game.gymIndex];
   const route = routeById(game.currentRoute);
   const pool = (route && route.pool && route.pool.length) ? route.pool : leg.pool;
-  let speciesOffer = buildOfferFromPool(pool, leg.offerCount);
+  let speciesOffer = buildOfferFromPool(pool, leg.offerCount, route && route.types);
   let offer = speciesOffer.map(id=>({ speciesId:id, level: id==='eevee' ? 45 : rollWildLevel(id, leg.minLevel, leg.maxLevel) }));
   // todos os mecanismos de "encontro especial" abaixo (pássaro lendário, pré-evolução de outro inicial,
   // raros da rota) disputam os MESMOS espaços da oferta -- usar uma lista compartilhada de espaços ainda
@@ -12735,6 +12792,53 @@ function notificationIcon(type){
   if(type==='friend_challenge' || type==='friend_challenge_declined') return '⚔️';
   return '🔔';
 }
+/* O que cada notificação oferece pra FAZER. Fica separado do desenho da tela porque é a única
+   parte que depende do estado do jogo (empréstimo ativo, desafio vencido, bônus já ativado). */
+function ctaDaNotificacao(n){
+  if(n.type==='league_champion'){
+    return (n.meta && n.meta.activated)
+      ? `<p class="u-mt8 win-text">✅ Bônus já ativado</p>`
+      : `<button class="btn success u-mt8" onclick="activateShinyBonus('${escJs(n.id)}')">✨ Ativar bônus Shiny</button>`;
+  }
+  if(n.type==='friend_request'){
+    // o botão leva pra lista, onde o pedido aparece com nome, presença e o que mais ajuda a
+    // decidir -- aceitar de dentro da notificação seria aceitar às cegas
+    return `<button class="btn primary u-mt8" onclick="openFriends()">👥 Ver na lista de amigos</button>`;
+  }
+  if(n.type==='friend_challenge'){
+    // desafio tem prazo de 3 minutos: uma notificação de ontem não vale mais nada, e oferecer
+    // "aceitar" nela só produziria um erro na cara de quem clicasse
+    const vencido = !n.meta || !n.meta.expiresAt || Date.now() > n.meta.expiresAt;
+    return vencido
+      ? `<p class="u-mt8 hint-text">⏳ Esse desafio já expirou.</p>`
+      : `<button class="btn success u-mt8" onclick="openFriends()">⚔️ Responder o desafio</button>`;
+  }
+  if(n.type==='mewtwo_loan_unlocked'){
+    // 3 estados possíveis nesse momento: nunca usou ainda, já tem um emprestado em algum time
+    // agora, ou está no cooldown de 7 dias depois do último uso -- cada um com sua própria mensagem
+    if(game.mewtwoLoanActive){
+      return `<p class="u-mt8 hint-text">🧬 Você já tem um Mewtwo emprestado agora.</p>`;
+    }
+    if(game.mewtwoLoanCooldownUntil && Date.now() < game.mewtwoLoanCooldownUntil){
+      return `<p class="u-mt8 hint-text">🧬 Em cooldown -- disponível ${formatDateShort(game.mewtwoLoanCooldownUntil)} às ${formatClock(game.mewtwoLoanCooldownUntil)}.</p>`;
+    }
+    return `<button class="btn success mewtwo-loan-cta u-mt8" onclick="openMewtwoLoanTeamPicker()">
+      ${spriteHtml('mewtwo','sprite-md',false)} Colocar Mewtwo no time
+    </button>`;
+  }
+  return '';
+}
+function abrirNotificacao(id){
+  game.notificationSelected = id;
+  render();
+}
+/* Caixa de entrada: títulos em cima, corpo do que estiver aberto embaixo.
+   Abre a mais recente sozinha -- a tela existe pra ler a notificação, e uma tela que abre com o
+   painel de baixo vazio pede um clique só pra chegar onde a pessoa já queria chegar.
+   O selo NOVA marca as que estavam por ler AO ABRIR a tela. A marcação de lida continua sendo em
+   bloco, na abertura (ver openNotificationsScreen): se fosse uma a uma, o sino da home ficaria
+   aceso enquanto sobrasse uma não aberta -- e a decisão antiga era não cobrar um clique por
+   notificação. O selo é o que devolve a informação que a marcação em bloco apaga. */
 function renderNotificationsScreen(){
   const list = game.notificationsList;
   let out = `<div class="result-banner win">🔔 Notificações</div>`;
@@ -12744,48 +12848,27 @@ function renderNotificationsScreen(){
   } else if(list.length===0){
     out += `<div class="box"><p>Nenhuma notificação ainda. Assim que sua liga começar, seu time jogar, ou você perder a liderança de um ginásio, aparece aqui.</p></div>`;
   } else {
-    out += list.map(n=>{
-      const isChampion = n.type==='league_champion';
-      const activated = isChampion && n.meta && n.meta.activated;
-      let cta = '';
-      if(isChampion){
-        cta = activated
-          ? `<p class="u-mt8 win-text">✅ Bônus já ativado</p>`
-          : `<button class="btn success u-mt8" onclick="activateShinyBonus('${n.id}')">✨ Ativar bônus Shiny</button>`;
-      } else if(n.type==='friend_request'){
-        // o botão leva pra lista, onde o pedido aparece com nome, presença e o que mais ajuda a
-        // decidir -- aceitar de dentro da notificação seria aceitar às cegas
-        cta = `<button class="btn primary u-mt8" onclick="openFriends()">👥 Ver na lista de amigos</button>`;
-      } else if(n.type==='friend_challenge'){
-        // desafio tem prazo de 3 minutos: uma notificação de ontem não vale mais nada, e oferecer
-        // "aceitar" nela só produziria um erro na cara de quem clicasse
-        const vencido = !n.meta || !n.meta.expiresAt || Date.now() > n.meta.expiresAt;
-        cta = vencido
-          ? `<p class="u-mt8 hint-text">⏳ Esse desafio já expirou.</p>`
-          : `<button class="btn success u-mt8" onclick="openFriends()">⚔️ Responder o desafio</button>`;
-      } else if(n.type==='mewtwo_loan_unlocked'){
-        // 3 estados possíveis nesse momento: nunca usou ainda, já tem um emprestado em algum time
-        // agora, ou está no cooldown de 7 dias depois do último uso -- cada um com sua própria mensagem
-        if(game.mewtwoLoanActive){
-          cta = `<p class="u-mt8 hint-text">🧬 Você já tem um Mewtwo emprestado agora.</p>`;
-        } else if(game.mewtwoLoanCooldownUntil && Date.now() < game.mewtwoLoanCooldownUntil){
-          cta = `<p class="u-mt8 hint-text">🧬 Em cooldown -- disponível ${formatDateShort(game.mewtwoLoanCooldownUntil)} às ${formatClock(game.mewtwoLoanCooldownUntil)}.</p>`;
-        } else {
-          cta = `<button class="btn success mewtwo-loan-cta u-mt8" onclick="openMewtwoLoanTeamPicker()">
-            ${spriteHtml('mewtwo','sprite-md',false)} Colocar Mewtwo no time
-          </button>`;
-        }
-      }
-      return `<div class="save-slot-card">
-      <div class="save-slot-top" style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
-        <span class="save-slot-name">${notificationIcon(n.type)} ${escapeHtmlSafe(n.title)}</span>
-        <button class="circle-btn notif-delete-btn" onclick="requestDeleteNotification('${n.id}')" aria-label="Apagar notificação">✕</button>
+    // a selecionada pode ter sido apagada: cai na mais recente sem precisar de tratamento à parte
+    const aberta = list.find(n=>n.id===game.notificationSelected) || list[0];
+    const novas = game.notificationsNovas || [];
+    out += `<div class="box notif-caixa">
+      <div class="notif-lista">
+        ${list.map(n=>`<button class="notif-item${n.id===aberta.id?' aberta':''}${novas.includes(n.id)?' nova':''}"
+            onclick="abrirNotificacao('${escJs(n.id)}')">
+          <span class="notif-item-icone">${notificationIcon(n.type)}</span>
+          <span class="notif-item-titulo">${escapeHtmlSafe(n.title)}</span>
+          ${novas.includes(n.id) ? '<span class="notif-nova">NOVA</span>' : ''}
+          <span class="notif-item-data">${formatDateShort(n.createdAt)}</span>
+        </button>`).join('')}
       </div>
-      <p style="margin:4px 0;">${escapeHtmlSafe(n.body)}</p>
-      <p class="hint-text u-m0">${formatDateShort(n.createdAt)} às ${formatClock(n.createdAt)}</p>
-      ${cta}
+    </div>
+    <div class="box">
+      <h2 class="notif-corpo-titulo">${notificationIcon(aberta.type)} ${escapeHtmlSafe(aberta.title)}</h2>
+      <p class="hint-text u-m0">${formatDateShort(aberta.createdAt)} às ${formatClock(aberta.createdAt)}</p>
+      <p class="notif-corpo-texto">${escapeHtmlSafe(aberta.body)}</p>
+      ${ctaDaNotificacao(aberta)}
+      <button class="btn secondary u-mt8" onclick="requestDeleteNotification('${escJs(aberta.id)}')">🗑️ Apagar esta notificação</button>
     </div>`;
-    }).join('');
   }
   out += `<button class="btn secondary" onclick="goToSaveMenu()">⬅ Voltar</button>`;
   return out;

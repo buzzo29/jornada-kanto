@@ -432,5 +432,50 @@ ok('o disfarcado nao ganha lupa: a ficha entregaria a pegadinha',
    !/Mew(?:(?!<\/div>)[\s\S])*wild-dex/.test(wild));
 ok('a lupa abre a ficha da pokedex de verdade', wild.includes("abrirPokedexFicha('kangaskhan'"));
 
+
+console.log('\nO TIPO DA ROTA PESA, MAS NAO DECIDE');
+/* A rota citada pelo Matheus: Desvio por Lavender, Fantasma/Terra, com 3 do tipo num pool de 9.
+   Sem peso ela dava 1,00 do tipo por oferta e em 23,5% das vezes NENHUM -- uma rota fantasma que
+   nao parecia uma rota fantasma. O peso e 2 (dobro no sorteio, que nao e dobro de chance: o
+   sorteio e sem reposicao e a oferta tem 3 vagas). */
+const AMOSTRA = 4000;
+g.team = []; S.__setGame(g);
+const rotaLavender = S.ROUTE_MAP.flat().find(r => /Lavender/.test(r.name));
+const tiposLav = rotaLavender.types;
+const ehDoTipo = id => (S.SPECIES[id].types || []).some(x => tiposLav.includes(x));
+let semPeso = 0, comPeso = 0, zeroComPeso = 0;
+const vistas = new Set();
+for(let i = 0; i < AMOSTRA; i++){
+  semPeso += S.buildOfferFromPool(rotaLavender.pool, 3).filter(ehDoTipo).length;
+  const of = S.buildOfferFromPool(rotaLavender.pool, 3, tiposLav);
+  of.forEach(id => vistas.add(id));
+  const q = of.filter(ehDoTipo).length;
+  comPeso += q;
+  if(q === 0) zeroComPeso++;
+}
+const mediaSem = semPeso / AMOSTRA, mediaCom = comPeso / AMOSTRA;
+ok('o tipo da rota aparece mais', mediaCom > mediaSem + 0.2,
+   mediaSem.toFixed(2) + ' -> ' + mediaCom.toFixed(2) + ' do tipo por oferta');
+/* "mas nao muito": a oferta continua tendo mais de um pokemon de fora do tipo em media -- uma
+   rota que so oferece o proprio tipo deixa de ser um encontro e vira uma loja. */
+ok('mas a oferta continua mista', mediaCom < 2.0, mediaCom.toFixed(2) + ' de 3');
+ok('e quase nunca sai uma oferta sem nenhum do tipo', zeroComPeso / AMOSTRA < 0.15,
+   (zeroComPeso / AMOSTRA * 100).toFixed(1) + '% das ofertas');
+/* Ninguem pode SUMIR da rota: uma especie que so mora aqui viraria uma vaga impossivel na
+   Pokedex, e a Pokedex completa e o que libera o desafio do Mewtwo. */
+ok('ninguem de fora do tipo some da rota', vistas.size === rotaLavender.pool.length,
+   vistas.size + ' das ' + rotaLavender.pool.length + ' especies apareceram');
+/* Rota sem tipo declarado tem que sortear exatamente como antes -- o peso 1 pra todo mundo E o
+   embaralhamento uniforme. */
+const poolLiso = S.ROUTE_MAP[0][0].pool;
+const conta = {};
+for(let i = 0; i < AMOSTRA; i++) for(const id of S.buildOfferFromPool(poolLiso, 3, [])) conta[id] = (conta[id]||0)+1;
+const chances = poolLiso.map(id => (conta[id]||0) / AMOSTRA);
+const alvo = 3 / poolLiso.length;
+ok('sem tipo declarado, o sorteio continua uniforme',
+   chances.every(c => Math.abs(c - alvo) < 0.04),
+   'entre ' + (Math.min(...chances)*100).toFixed(1) + '% e ' + (Math.max(...chances)*100).toFixed(1) +
+   '% (uniforme seria ' + (alvo*100).toFixed(1) + '%)');
+
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
 process.exit(falhas ? 1 : 0);
