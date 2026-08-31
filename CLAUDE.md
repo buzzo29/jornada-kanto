@@ -259,9 +259,29 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
      prática (Articuno aparecia no nível 50 numa etapa cujo selvagem ia até 38).
   **5% por encontro não é 5% por jornada**: cada lendário mora numa rota só, o treinador só faz um
   encontro por trecho e ainda escolhe entre duas rotas. Medido em 20 mil jornadas com escolhas
-  aleatórias: **1,2% a 1,4% por lendário**, 9,8% de ver algum e **0,38% de ver dois**. Quem escolhe
+  aleatórias: **1,2% a 1,4% por lendário**, 9,8% de ver algum e **0,28% de ver dois**. Quem escolhe
   a rota de propósito chega a 2,5% por lendário. `tools/test-jornada.js` tranca os 5%, o nível, e
   que nenhum lendário apareça em duas rotas nem num pool (onde não haveria chance própria).
+- **Todo lendário mora em trecho 7 ou 8, um por rota.** Antes Raikou saía no trecho 4, Lugia no 5 e
+  Entei no 6 — e como lendário vem 12 níveis acima do teto do trecho, um Raikou nível 35 no trecho
+  4 resolvia sozinho metade da jornada. Hoje: Monte Mortar (Raikou), Lago da Fúria (Suicune),
+  Mansão Pokémon (Entei), Ilhas Seafoam (Articuno) no trecho 7; Caminho de Gelo (Lugia), Covil do
+  Dragão (Ho-Oh), Usina (Zapdos), Victory Road (Moltres) no 8. Com todos em trecho 7-8, o
+  `nivelDeLendario` bate no teto e os oito nascem no **nível 50**.
+  `tools/test-jornada.js` falha se algum voltar pra trecho baixo ou se dois dividirem uma rota.
+- Na tela de escolha de ginásio, o **tipo é o selo colorido** (`typePill`), não a palavra ao lado do
+  nome — é o mesmo selo da Pokédex e da batalha, então se reconhece pela cor antes de ler. A
+  insígnia fica grande à esquerda com o nome dela embaixo, o líder ao centro, e a contagem de
+  pokémon saiu (não ajudava a escolher: os dois lados têm sempre o mesmo número).
+- A tela que lista a Elite 4 usa a **fila sorteada**, não a de Kanto. O sorteio acontece ao ABRIR
+  essa tela e não ao aceitar o desafio: ela ANUNCIA os cinco adversários, e sortear depois faria o
+  jogador ler uma fila e enfrentar outra. As mensagens que diziam "recomeça da Lorelei" passaram a
+  nomear o primeiro da fila dele.
+- Na tela do encontro selvagem: botão **"Seu time"** (modal com o time atual) e um **botão de ficha
+  por pokémon**, que abre a mesma ficha de atributos da Pokédex. Os dois botões de cada linha são
+  IRMÃOS e não aninhados — `<button>` dentro de `<button>` é HTML inválido e o clique de dentro se
+  perde. O disfarçado (Ditto fingindo de Mew) não ganha botão de ficha: ela lê o `SPECIES` de
+  verdade e entregaria a pegadinha.
 - **Todo pokémon tem que ter como ser capturado.** Uma espécie que não está em rota nenhuma e não
   evolui de nada é uma vaga impossível na Pokédex — e a Pokédex completa é o que libera o desafio
   do Mewtwo. Quando Johto entrou, **17 não-lendários ficaram assim** (Pichu, Togepi, Togetic,

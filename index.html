@@ -1349,14 +1349,52 @@
   .save-slot-card.clickable{cursor:pointer;}
   /* Cartão da escolha de ginásio. Reaproveita o card de save (mesma moldura, mesmo toque) porque
      é a mesma leitura: um bloco grande e clicável com uma decisão dentro. */
-  .gym-choice-card{ padding:11px 13px; }
-
-  .gym-choice-regiao{
-    margin-left:auto; font-family:var(--font-pixel); font-size:.55rem;
-    letter-spacing:.05em; color:var(--muted); flex-shrink:0;
+  /* linha do encontro selvagem: o card de escolher e, ao lado, o botão que abre a ficha */
+  /* `center` e altura fixa: com `stretch` o botão da ficha virava uma coluna alta e vazia do
+     tamanho do card. A margem embaixo é a mesma do card (.btn), então os dois centram na mesma
+     caixa e ficam alinhados. */
+  .wild-lv{ font-weight:800; color:var(--blue-dark); margin-right:5px; }
+  .wild-linha{ display:flex; align-items:center; gap:5px; }
+  .wild-linha .wild-card{ flex:1; min-width:0; margin-bottom:8px; }
+  .wild-dex{
+    flex-shrink:0; width:40px; height:40px; margin:9px 0 8px;   /* as MESMAS margens do .btn ao lado, senão os dois não centram juntos */
+    background:var(--box); border:3px solid var(--box-border); border-radius:4px;
+    box-shadow:4px 4px 0 rgba(0,0,0,.4); cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
   }
-  .gym-choice-cidade{ font-size:.78rem; font-weight:800; color:var(--blue-dark); margin-top:5px; }
-  .gym-choice-rotas{ font-size:.72rem; color:var(--muted); margin-top:3px; }
+  .wild-dex:active{ transform:translate(2px,2px); box-shadow:2px 2px 0 rgba(0,0,0,.4); }
+  .time-modal-lista{ display:flex; flex-direction:column; gap:6px; margin:8px 0 12px; }
+  .time-modal-linha{
+    display:flex; align-items:center; gap:8px;
+    border-bottom:1px dashed var(--box-border); padding-bottom:6px;
+  }
+  .time-modal-linha:last-child{ border-bottom:none; padding-bottom:0; }
+  .time-modal-pos{ font-family:var(--font-pixel); font-size:.6rem; color:var(--blue-dark); width:22px; flex-shrink:0; }
+  .time-modal-sprite{ flex-shrink:0; }
+  /* text-align:left explicito: o .modal-box centraliza, e o nome ficava centralizado sobre
+     uma linha de baixo alinhada a esquerda */
+  .time-modal-info{ flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; text-align:left; }
+  .time-modal-nome{ font-weight:800; font-size:.8rem; }
+  .time-modal-sub{ display:flex; align-items:center; gap:4px; flex-wrap:wrap; }
+  .time-modal-lv{ color:var(--muted); font-weight:700; font-size:.72rem; }
+  .gym-choice-card{ padding:11px 13px; position:relative; }
+  /* a região fica no canto, fora do fluxo: é etiqueta, não conteúdo -- e assim o nome do líder
+     pode ficar centralizado de verdade, sem ser empurrado por ela */
+  .gym-choice-regiao{
+    position:absolute; top:9px; right:11px;
+    font-family:var(--font-pixel); font-size:.55rem; letter-spacing:.05em; color:var(--muted);
+  }
+  .gym-choice-corpo{ display:flex; align-items:center; gap:12px; }
+  .gym-choice-selo-col{ display:flex; flex-direction:column; align-items:center; gap:3px; flex-shrink:0; width:74px; }
+  .gym-choice-selo-nome{ font-size:.6rem; font-weight:800; color:var(--muted); text-align:center; line-height:1.15; }
+  .gym-choice-info{ flex:1; min-width:0; text-align:center; }
+  .gym-choice-lider{ font-family:var(--font-pixel); font-size:.82rem; color:var(--ink); line-height:1.3; }
+  .gym-choice-tipo{ margin:5px 0 3px; }
+  .gym-choice-cidade{ font-size:.75rem; font-weight:800; color:var(--blue-dark); }
+  .gym-choice-rotas{ font-size:.72rem; color:var(--muted); margin-top:7px; text-align:center; }
+  /* insígnia da tela de escolha: maior que a do cinturão, menor que a da vitória */
+  .badge-visual.gc{ width:52px; height:52px; }
+  .badge-visual.gc .badge-visual-img, .badge-visual.gc .badge-visual-fallback{ width:52px; height:52px; font-size:1.5rem; }
   .save-slot-card.clickable:active{transform:translate(2px,2px);box-shadow:2px 2px 0 rgba(0,0,0,.4);}
   .save-slot-empty-team{font-size:.75rem;color:var(--muted);margin:2px 0 0;}
   /* Faixa de estado no rodapé do card. As cores são as MESMAS dos antigos botões de continuar
@@ -2739,7 +2777,7 @@ const ROUTE_MAP = [
       pool:['seel','shellder','staryu','dewgong','horsea','goldeen','krabby','golduck','cloyster','jynx','seadra','kingler','tentacruel','vaporeon','swinub','delibird','mantine','corsola'], rare:[{species:'articuno',chance:0.05},'kabuto','omanyte','slowbro','gyarados','aerodactyl'] },
     { id:'pokemon_mansion', name:'Mansão Pokémon', icon:'🏚️', types:['Fire','Normal'],
       rumor:'Diários queimados falam de um experimento chamado… Mewtwo.',
-      pool:['growlithe','ponyta','vulpix','magmar','rapidash','koffing','weezing','golbat','eevee','flareon','dodrio','houndour','magby','slugma'], rare:['ditto','ninetales','arcanine'] }
+      pool:['growlithe','ponyta','vulpix','magmar','rapidash','koffing','weezing','golbat','eevee','flareon','dodrio','houndour','magby','slugma'], rare:['ditto','ninetales','arcanine',{species:'entei', chance:0.05}] }
   ],
   [ // antes de Giovanni (Terra)
     { id:'power_plant', name:'Usina de Força', icon:'⚡', types:['Electric'],
@@ -2785,12 +2823,12 @@ const JOHTO_ROUTE_MAP = [
       pool:['caterpie','metapod','pidgey','sunkern','hoothoot','psyduck','venonat','ledian','butterfree','smeargle','yanma'], rare:['scyther','pinsir'] },
     { id:'route_36_37', name:'Rotas 36/37', icon:'🍂', types:['Fire','Normal'],
       rumor:'Uma árvore no meio do caminho não sai do lugar. E não é uma árvore.',
-      pool:['growlithe','vulpix','stantler','hoppip','ledyba','spinarak','nidoranm','nidoranf','bellossom'], rare:['sudowoodo',{species:'raikou', chance:0.05}] }
+      pool:['growlithe','vulpix','stantler','hoppip','ledyba','spinarak','nidoranm','nidoranf','bellossom'], rare:['sudowoodo'] }
   ],
   [ // antes do Chuck (Lutador) -- Ilhas Redemoinho e Rotas 40/41
     { id:'whirl_islands', name:'Ilhas Redemoinho', icon:'🌀', types:['Water','Flying'],
       rumor:'Quatro ilhas em volta de um redemoinho. Lá no fundo, algo prateado bate as asas.',
-      pool:['tentacool','krabby','horsea','seel','golbat','zubat','staryu','chinchou'], rare:[{species:'lugia', chance:0.05}] },
+      pool:['tentacool','krabby','horsea','seel','golbat','zubat','staryu','chinchou'], rare:[] },
     { id:'route_40_41', name:'Rotas 40/41 (Mar)', icon:'🌊', types:['Water'],
       rumor:'Mar aberto entre Olivine e Cianwood. Só se atravessa nadando.',
       pool:['tentacool','krabby','horsea','magikarp','shellder','chinchou','lanturn','goldeen','qwilfish','remoraid'], rare:['mantine'] }
@@ -2801,12 +2839,12 @@ const JOHTO_ROUTE_MAP = [
       pool:['zubat','golbat','voltorb','magnemite','grimer','koffing','staryu','krabby'], rare:['ampharos'] },
     { id:'route_38_39', name:'Rotas 38/39', icon:'🐄', types:['Normal'],
       rumor:'Pasto da Fazenda Moomoo. Leite fresco e bichos grandes demais pro capim.',
-      pool:['miltank','tauros','meowth','magnemite','farfetchd','ratata','snubbull','growlithe','skarmory'], rare:['girafarig',{species:'entei', chance:0.05}] }
+      pool:['miltank','tauros','meowth','magnemite','farfetchd','ratata','snubbull','growlithe','skarmory'], rare:['girafarig'] }
   ],
   [ // antes do Pryce (Gelo) -- Monte Mortar e Lago da Fúria
     { id:'mt_mortar', name:'Monte Mortar', icon:'🥊', types:['Fighting','Rock'],
       rumor:'Um mestre de karatê treina sozinho na caverna dos fundos há anos.',
-      pool:['machop','machoke','geodude','graveler','ratata','zubat','golbat','marill','shuckle','gligar'], rare:['tyrogue'] },
+      pool:['machop','machoke','geodude','graveler','ratata','zubat','golbat','marill','shuckle','gligar'], rare:['tyrogue',{species:'raikou', chance:0.05}] },
     { id:'lake_of_rage', name:'Lago da Fúria', icon:'🔴', types:['Water','Dragon'],
       rumor:'O lago inteiro está agitado. No meio dele, um Gyarados da cor errada.',
       pool:['magikarp','poliwag','wooper','quagsire','slowpoke','marill','goldeen','dratini','politoed','slowking'], rare:[{species:'gyarados', chance:0.12},{species:'suicune', chance:0.05}] }
@@ -2814,10 +2852,10 @@ const JOHTO_ROUTE_MAP = [
   [ // antes da Clair (Dragão) -- Caminho de Gelo e Covil do Dragão
     { id:'ice_path', name:'Caminho de Gelo', icon:'🧊', types:['Ice','Poison'],
       rumor:'O chão é escorregadio e só se anda em linha reta. Algo com garras observa.',
-      pool:['swinub','delibird','jynx','golbat','zubat','piloswine','seel','dewgong'], rare:['sneasel',{species:'hooh', chance:0.05}] },
+      pool:['swinub','delibird','jynx','golbat','zubat','piloswine','seel','dewgong'], rare:['sneasel',{species:'lugia', chance:0.05}] },
     { id:'dragons_den', name:'Covil do Dragão', icon:'🐲', types:['Dragon','Water'],
       rumor:'Atrás do ginásio, uma caverna alagada onde os dragões são criados.',
-      pool:['dratini','dragonair','magikarp','horsea','seadra','poliwag','goldeen','gyarados'], rare:[{species:'kingdra', chance:0.10}, {species:'dragonite', chance:0.08}] }
+      pool:['dratini','dragonair','magikarp','horsea','seadra','poliwag','goldeen','gyarados'], rare:[{species:'kingdra', chance:0.10},{species:'dragonite', chance:0.08},{species:'hooh', chance:0.05}] }
   ]
 ];
 
@@ -5884,6 +5922,13 @@ function eliteHealPick(monId){
   render();
 }
 function openEliteIntro(){
+  /* Sorteia a fila AQUI, e não no startEliteChallenge: esta tela LISTA os cinco adversários, e
+     sortear depois dela faria o jogador ler uma fila e enfrentar outra.
+     Continua sendo uma vez só por save -- quem já tem elitePath mantém o dele, inclusive entre
+     tentativas (ver sortearCaminhoDaElite). */
+  if(!Array.isArray(game.elitePath) || game.elitePath.length !== ELITE_FOUR.length){
+    game.elitePath = sortearCaminhoDaElite();
+  }
   game.screen = 'eliteIntro';
   render();
 }
@@ -6200,7 +6245,8 @@ function finishSpecialBattle(){
         game.eliteStage = 0;
         game.eliteHealsLeft = 0;
         const foeName = cfg.meta.opponentName;
-        msg = `💀 <strong>Derrota.</strong> ${escapeHtmlSafe(foeName)} foi forte demais dessa vez — e como cada tentativa é o desafio completo, é preciso recomeçar do zero, contra a Lorelei. Essa foi sua tentativa <strong>${game.eliteAttemptsUsed} de ${ELITE_MAX_ATTEMPTS}</strong>. Ainda restam <strong>${attemptsLeft}</strong>.`;
+        // "o primeiro da fila" e não um nome fixo: a fila é sorteada por save (ver elitePath)
+        msg = `💀 <strong>Derrota.</strong> ${escapeHtmlSafe(foeName)} foi forte demais dessa vez — e como cada tentativa é o desafio completo, é preciso recomeçar do zero, contra ${escapeHtmlSafe(eliteMembroDaEtapa(0).name)}. Essa foi sua tentativa <strong>${game.eliteAttemptsUsed} de ${ELITE_MAX_ATTEMPTS}</strong>. Ainda restam <strong>${attemptsLeft}</strong>.`;
       } else {
         // essa era a última -- agora sim, game over definitivo desse save
         game.eliteStatus = 'defeated';
@@ -11231,17 +11277,26 @@ function renderGymChoice(){
   </div>
   ${opcoes.map(o=>{
     const rotas = (o.regiao === 'johto' ? JOHTO_ROUTE_MAP : ROUTE_MAP)[etapa] || [];
+    /* O tipo do ginásio vira SELO, não texto: é o mesmo selo colorido que a Pokédex e a tela de
+       batalha usam, então o jogador reconhece "Pedra" pela cor antes de ler. O gymTypeName está
+       em português e o typePill trabalha em inglês -- daí a tradução. */
+    const tipoEn = englishTypeFromPortuguese(o.gym.gymTypeName);
     return `
     <button class="save-slot-card clickable gym-choice-card" onclick="escolherGinasio('${escJs(o.regiao)}')">
-      <div class="save-slot-top">
-        <!-- badgeMarkup, e não o emoji do GYM_BADGE_VISUALS: é a insígnia de verdade, a mesma
-             imagem que a tela de vitória e o cinturão mostram. O emoji continua existindo como
-             reserva, dentro do próprio badgeMarkup, se a imagem não carregar. -->
-        ${badgeMarkup(o.gym.badge, 'sm')}
-        <span class="save-slot-name">${escapeHtmlSafe(o.gym.leaderName)} — ${escapeHtmlSafe(o.gym.gymTypeName)}</span>
-        <span class="gym-choice-regiao">${o.regiao === 'johto' ? 'JOHTO' : 'KANTO'}</span>
+      <span class="gym-choice-regiao">${o.regiao === 'johto' ? 'JOHTO' : 'KANTO'}</span>
+      <div class="gym-choice-corpo">
+        <!-- coluna da insígnia: badgeMarkup é a imagem de verdade, a mesma da tela de vitória e do
+             cinturão; o emoji colorido continua como reserva dentro dele -->
+        <div class="gym-choice-selo-col">
+          ${badgeMarkup(o.gym.badge, 'gc')}
+          <span class="gym-choice-selo-nome">${escapeHtmlSafe(o.gym.badge)}</span>
+        </div>
+        <div class="gym-choice-info">
+          <div class="gym-choice-lider">${escapeHtmlSafe(o.gym.leaderName)}</div>
+          <div class="gym-choice-tipo">${tipoEn ? typePill(tipoEn) : escapeHtmlSafe(o.gym.gymTypeName)}</div>
+          <div class="gym-choice-cidade">${escapeHtmlSafe(o.gym.city)}</div>
+        </div>
       </div>
-      <div class="gym-choice-cidade">${escapeHtmlSafe(o.gym.city)} · ${o.gym.team.length} pokémon · ${escapeHtmlSafe(o.gym.badge)}</div>
       <div class="gym-choice-rotas">Caminhos: ${rotas.map(r=>escapeHtmlSafe(r.icon+' '+r.name)).join(' ou ')}</div>
     </button>`;
   }).join('')}
@@ -11510,14 +11565,56 @@ function renderWild(){
       const isCaught = entry.disguise ? false
         : (entry.shiny ? (game.permanentShinyDex||[]).includes(id) : caught.has(id));
       const disabled = (!isSel && game.wildSelected.length>=2) ? 'disabled' : '';
-      return `<button class="btn ${isSel?'selected':''}" ${disabled} onclick="toggleWild('${id}')">
-        <span class="mon-name">${spriteMarkup} ${sp.name} — Lv.${entry.level} ${isSel?'✓':''} ${isLegendary?'✨':''} ${entry.shiny?'<span class="shiny-badge" title="Shiny! 1 em 128">🌟 SHINY</span>':''} ${isCaught?`<span class="pokedex-owned-badge" title="${entry.shiny?'Já está na sua Pokédex Shiny':'Já está na sua Pokédex'}">${pokedexIcon()}</span>`:''}</span>
-        <span class="mon-sub">${typesHtml(sp.types)}</span>
-      </button>`;
+      /* Dois botões IRMÃOS, não um dentro do outro: aninhar <button> em <button> é HTML inválido
+         e o clique no de dentro se perde. O de fora escolhe; o de fora-direita abre a ficha.
+         O disfarçado (Ditto fingindo de Mew) não ganha botão de ficha: a ficha entregaria a
+         pegadinha, porque ela lê o SPECIES de verdade. */
+      return `<div class="wild-linha">
+        <button class="btn wild-card ${isSel?'selected':''}" ${disabled} onclick="toggleWild('${id}')">
+          <!-- o nível desceu pra linha de baixo, junto dos tipos: com o botão da ficha ao lado o
+               card ficou 45px mais estreito, e "Nome — Lv.16" quebrava deixando um travessão
+               pendurado sozinho na segunda linha -->
+          <span class="mon-name">${spriteMarkup} ${sp.name} ${isSel?'✓':''} ${isLegendary?'✨':''} ${entry.shiny?'<span class="shiny-badge" title="Shiny! 1 em 128">🌟 SHINY</span>':''} ${isCaught?`<span class="pokedex-owned-badge" title="${entry.shiny?'Já está na sua Pokédex Shiny':'Já está na sua Pokédex'}">${pokedexIcon()}</span>`:''}</span>
+          <span class="mon-sub"><span class="wild-lv">Lv.${entry.level}</span> ${typesHtml(sp.types)}</span>
+        </button>
+        ${disguiseInfo ? '' : `<button class="wild-dex" onclick="abrirPokedexFicha('${escJs(id)}', ${entry.shiny?'true':'false'})"
+          aria-label="Ver a ficha de ${escapeHtmlSafe(sp.name)}" title="Ver os atributos">${pokedexIcon()}</button>`}
+      </div>`;
     }).join('')}
   </div>
   <button class="btn success" onclick="confirmWild()">Confirmar equipe ✔</button>
+  <button class="btn secondary" onclick="abrirTimeModal()">👥 Seu time (${(game.team||[]).length})</button>
   <button class="btn secondary" onclick="abrirPokedexModal()">${pokedexIcon('grande')} Consultar Pokédex</button>`;
+}
+/* O time atual, sem sair da tela do encontro. A decisão de capturar depende de quem já está no
+   time (tipo que falta, nível de quem está atrás), e antes disso exigia sair e voltar -- o que,
+   desde a semente anti-artimanha, devolve a MESMA oferta mas custa a viagem. */
+function abrirTimeModal(){ game.timeModal = true; render(); }
+function fecharTimeModal(){ game.timeModal = false; render(); }
+function renderTimeModal(){
+  if(!game.timeModal) return '';
+  const time = game.team || [];
+  return `
+  <div class="modal-overlay" onclick="fecharTimeModal()">
+    <div class="modal-box" onclick="event.stopPropagation()">
+      <h2>👥 Seu time</h2>
+      ${time.length ? `<div class="time-modal-lista">${time.map((p,i)=>{
+        const sp = SPECIES[p.speciesId];
+        if(!sp) return '';
+        /* Duas linhas na coluna da direita, e não tudo numa fileira só: em 320px os selos de dois
+           tipos (Água + Voador) não cabiam ao lado do nome e passavam por cima dele. */
+        return `<div class="time-modal-linha">
+          <span class="time-modal-pos">${i+1}º</span>
+          <span class="time-modal-sprite">${spriteHtml(p.speciesId,'sprite-sm',p.shiny)}</span>
+          <span class="time-modal-info">
+            <span class="time-modal-nome">${escapeHtmlSafe(sp.name)}${p.shiny?' 🌟':''}</span>
+            <span class="time-modal-sub"><span class="time-modal-lv">Lv.${p.level}</span>${typesHtml(sp.types)}</span>
+          </span>
+        </div>`;
+      }).join('')}</div>` : `<p class="hint-text">Seu time está vazio.</p>`}
+      <button class="btn" onclick="fecharTimeModal()">Fechar</button>
+    </div>
+  </div>`;
 }
 
 /* DIA OU NOITE, pelo relógio DO CELULAR do jogador -- é assim que Espeon e Umbreon se separam no
@@ -12451,7 +12548,16 @@ function eliteJourneyBoxHtml(){
   </div>`;
 }
 function renderEliteIntro(){
-  const memberList = ELITE_FOUR.map(m=>`<div class="order-row"><div class="order-info"><span class="mon-name">${m.icon} ${m.name} — ${m.title}</span><span class="mon-sub">${typePill(m.type)}</span></div></div>`).join('');
+  /* A fila SORTEADA deste treinador, não a de Kanto. Com a Elite misturada, listar sempre os
+     quatro de Kanto anunciava adversários que ele não vai enfrentar -- e escondia os de Johto que
+     ele VAI. A fila é sorteada ao ABRIR esta tela e não muda entre tentativas, então esta lista é
+     a mesma nas cinco batalhas.
+     (O comentário não cita nome de membro de propósito: ele vai junto no HTML da página, e um
+     teste que procura nome de membro na tela acusaria este texto.) */
+  const memberList = ELITE_FOUR.map((_, i)=>{
+    const m = eliteMembroDaEtapa(i) || ELITE_FOUR[i];
+    return `<div class="order-row"><div class="order-info"><span class="mon-name">${m.icon} ${m.name} — ${m.title}</span><span class="mon-sub">${typePill(m.type)}</span></div></div>`;
+  }).join('');
   const attemptsLeft = ELITE_MAX_ATTEMPTS - (game.eliteAttemptsUsed||0);
   return `
   <div class="result-banner win">⚔️ A ELITE 4</div>
@@ -12465,7 +12571,7 @@ function renderEliteIntro(){
     <h2>⚠️ As regras são diferentes aqui</h2>
     <p>• Seu time <strong>NÃO se recupera</strong> entre as batalhas dentro de uma mesma tentativa — o HP carrega de uma pra outra, e quem desmaiar segue desmaiado.</p>
     <p>• Após vencer cada membro, você escolhe <strong>2 pokémons</strong> pra reviver ou recuperar a vida.</p>
-    <p>• Você tem <strong>${ELITE_MAX_ATTEMPTS} tentativas no total</strong>, e cada uma é o desafio <strong>completo</strong> — perder pra qualquer um deles (inclusive na final) reseta tudo e recomeça da Lorelei, não continua de onde parou.</p>
+    <p>• Você tem <strong>${ELITE_MAX_ATTEMPTS} tentativas no total</strong>, e cada uma é o desafio <strong>completo</strong> — perder pra qualquer um deles (inclusive na final) reseta tudo e recomeça do primeiro da fila, não continua de onde parou.</p>
     <p>• Só depois de esgotar as ${ELITE_MAX_ATTEMPTS} tentativas é que vira <strong>GAME OVER definitivo</strong> desse save.</p>
     <p>• Mesmo com game over, o time <strong>continua valendo nas ligas online</strong>, com tudo que conquistou.</p>
     <p>• Quem vencer ganha o título e o <strong>🏆 permanente na frente do nome</strong> em todas as ligas.</p>
@@ -17003,6 +17109,7 @@ function render(){
   if(game.pokedexModal){ html += renderPokedexModal(); }
   // DEPOIS do modal da Pokédex de propósito: os modais empilham na ordem em que são anexados, e a
   // ficha é aberta a partir de dentro dele -- se viesse antes, abriria atrás
+  if(game.timeModal){ html += renderTimeModal(); }
   if(game.pokedexFicha){ html += renderPokedexFicha(); }
   if(game.onlinePendente){ html += renderConviteModal(); }   // aparece por cima de qualquer tela
   if(game.desafioAviso){ html += renderAvisoDesafioModal(); }   // desafio de amigo, idem

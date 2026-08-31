@@ -76,9 +76,13 @@ console.log('\nOS LENDARIOS SAO 5% -- TODOS OS OITO');
    extra de 5% no trecho 8 (de quando as aves nao tinham rota propria) que SOMAVA com o da rota, e
    Zapdos e Moltres apareciam a 6,6%. E os cinco de Johto nem eram reconhecidos como lendarios:
    entravam no nivel da etapa, o que dava um Lugia nivel 23. */
-const CASOS_LEND = [['raikou','route_36_37',3],['entei','route_38_39',5],['suicune','lake_of_rage',6],
-  ['lugia','whirl_islands',4],['hooh','ice_path',7],
-  ['articuno','seafoam',6],['zapdos','power_plant',7],['moltres','victory_road',7]];
+/* TODOS moram em trecho 7 ou 8 (índice 6 ou 7). Lendário em trecho baixo era um problema real:
+   um Raikou nível 35 no trecho 4 resolve sozinho metade da jornada. */
+const CASOS_LEND = [['raikou','mt_mortar',6],['suicune','lake_of_rage',6],['entei','pokemon_mansion',6],
+  ['articuno','seafoam',6],
+  ['lugia','ice_path',7],['hooh','dragons_den',7],['zapdos','power_plant',7],['moltres','victory_road',7]];
+ok('nenhum lendario mora em trecho abaixo do 7', CASOS_LEND.every(c=>c[2] >= 6),
+   CASOS_LEND.filter(c=>c[2] < 6).map(c=>c[0]+' no trecho '+(c[2]+1)).join(', '));
 ok('os 8 lendarios estao na lista de lendarios',
    CASOS_LEND.every(c=>S.ehLendario(c[0])), CASOS_LEND.filter(c=>!S.ehLendario(c[0])).map(c=>c[0]).join(','));
 const N_LEND = 8000;
@@ -118,6 +122,31 @@ ok('nenhum lendario esta num POOL (la nao ha chance propria)', (()=>{
     if(r.pool.some(id=>S.ehLendario(id))) noPool = true; })));
   return !noPool;
 })());
+
+console.log('\nA TELA DA ELITE LISTA A FILA SORTEADA');
+/* Ela anuncia os cinco adversarios ANTES da primeira luta. Com a Elite misturada, listar sempre
+   Lorelei/Bruno/Agatha/Lance anunciava quem o treinador nao vai enfrentar -- e escondia os de
+   Johto que ele VAI. Por isso o sorteio acontece ao ABRIR essa tela, nao ao aceitar o desafio:
+   sortear depois faria ele ler uma fila e enfrentar outra. */
+const gEl = S.freshGameDefaults();
+gEl.rivalName = 'Rafael'; gEl.eliteAttemptsUsed = 0; gEl.elitePath = null;
+gEl.badgesEarned = [1,2,3,4,5,6,7,8]; gEl.team = [S.createInstance('typhlosion', 60)];
+S.__setGame(gEl);
+S.openEliteIntro();
+ok('abrir a tela ja sorteia a fila', Array.isArray(gEl.elitePath) && gEl.elitePath.length === 4,
+   (gEl.elitePath||[]).join(','));
+const filaTela = [0,1,2,3].map(i=>S.eliteMembroDaEtapa(i).name);
+ok('a fila nao repete adversario', new Set(filaTela).size === 4, filaTela.join(' -> '));
+S.startEliteChallenge();
+ok('aceitar o desafio nao re-sorteia',
+   [0,1,2,3].map(i=>S.eliteMembroDaEtapa(i).name).join(',') === filaTela.join(','));
+gEl.elitePath = ['johto','kanto','kanto','johto']; S.__setGame(gEl);
+const htmlEl = S.renderEliteIntro ? S.renderEliteIntro() : null;
+if(htmlEl){
+  ok('a tela mostra os nomes da fila sorteada',
+     htmlEl.includes('Will') && htmlEl.includes('Karen') && !htmlEl.includes('Lorelei'),
+     [S.JOHTO_ELITE[0].name, S.ELITE_FOUR[1].name, S.ELITE_FOUR[2].name, S.JOHTO_ELITE[3].name].join(' -> '));
+}
 
 console.log('\nNENHUMA ESPECIE REPETIDA NO TIME');
 /* A oferta selvagem não pode trazer o que o jogador já tem -- e a checagem é por LINHA, não por
@@ -358,8 +387,14 @@ ok('mostra as rotas de cada lado', html.includes('Túnel de Pedra') && html.incl
 ok('os dois botoes escolhem regioes diferentes',
    html.includes("escolherGinasio('kanto')") && html.includes("escolherGinasio('johto')"));
 ok('mostra a INSIGNIA de verdade, nao o emoji num circulo',
-   (html.match(/badge-visual-img/g)||[]).length === 2 && !html.includes('gym-choice-selo'),
+   (html.match(/badge-visual-img/g)||[]).length === 2,
    (html.match(/badge-visual-img/g)||[]).length + ' imagens');
+ok('e o nome da insignia embaixo dela', (html.match(/gym-choice-selo-nome/g)||[]).length === 2);
+/* O tipo tem que ser o SELO colorido, não a palavra solta ao lado do nome do líder. */
+ok('o tipo do ginasio vira selo, nao texto no titulo',
+   !html.includes('Brock — Pedra') && (html.match(/class="type-pill/g)||[]).length >= 2,
+   (html.match(/class="type-pill/g)||[]).length + ' selos de tipo');
+ok('nao anuncia mais a quantidade de pokemon', !/\d+ pokémon/.test(html));
 
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
 process.exit(falhas ? 1 : 0);
