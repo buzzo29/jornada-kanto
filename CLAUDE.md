@@ -246,13 +246,28 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
   Sudowoodo nas Rotas 36/37, o Gyarados do Lago da Fúria.
 - 16 rotas de Kanto ganharam espécies de Johto onde cabiam (Ledyba na Floresta de Viridian,
   Heracross na Zona de Safári, Sentret na Rota 22, Houndour na Mansão…).
+- **Os oito lendários são 5% por encontro, na única rota onde cada um mora.** Isso vale pras três
+  aves de Kanto e pros cinco de Johto (as três bestas, Lugia e Ho-Oh) — `LENDARIOS` e
+  `ehLendario()` existem pra que os oito sejam tratados igual. Medido: 4,95% a 5,21%.
+  Duas coisas estavam erradas antes disso:
+  1. **Um sorteio extra de 5% no trecho 8** dava uma ave qualquer, de quando as aves não tinham
+     rota própria. Hoje têm, e ele SOMAVA com o da rota: Zapdos e Moltres saíam a **6,6%** por
+     encontro, contra os 5% de todos os outros. Removido.
+  2. **Os cinco de Johto não eram reconhecidos como lendários** e entravam no nível normal da
+     etapa — um **Lugia nível 23**, um Raikou nível 20. Agora `nivelDeLendario(leg)` dá
+     `min(50, teto da etapa + 12)` pra todos: os 12 vêm do que as aves de Kanto já faziam na
+     prática (Articuno aparecia no nível 50 numa etapa cujo selvagem ia até 38).
+  **5% por encontro não é 5% por jornada**: cada lendário mora numa rota só, o treinador só faz um
+  encontro por trecho e ainda escolhe entre duas rotas. Medido em 20 mil jornadas com escolhas
+  aleatórias: **1,2% a 1,4% por lendário**, 9,8% de ver algum e **0,38% de ver dois**. Quem escolhe
+  a rota de propósito chega a 2,5% por lendário. `tools/test-jornada.js` tranca os 5%, o nível, e
+  que nenhum lendário apareça em duas rotas nem num pool (onde não haveria chance própria).
 - **Todo pokémon tem que ter como ser capturado.** Uma espécie que não está em rota nenhuma e não
   evolui de nada é uma vaga impossível na Pokédex — e a Pokédex completa é o que libera o desafio
   do Mewtwo. Quando Johto entrou, **17 não-lendários ficaram assim** (Pichu, Togepi, Togetic,
   Slowking, Bellossom, Politoed, Skarmory, Unown, Wobbuffet, Yanma, Gligar, Qwilfish, Shuckle,
   Remoraid, Octillery, Smeargle, Igglybuff) e nada acusava. Foram distribuídos pelas rotas onde
-  aparecem no jogo original. As três bestas e o Ho-Oh entraram como raros de 5%, o mesmo
-  tratamento que as aves lendárias de Kanto já tinham.
+  aparecem no jogo original. As três bestas e o Ho-Oh entraram como raros de 5% (ver a nota dos lendários acima).
   Sobram **duas exceções legítimas, uma por região**: o Mewtwo (vem do desafio próprio, não de
   rota) e o Celebi (o "impossível" de Johto, como o Mew é o de Kanto). `tools/test-jornada.js`
   calcula o fecho transitivo das evoluções e falha se aparecer uma terceira.

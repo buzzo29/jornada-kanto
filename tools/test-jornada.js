@@ -71,6 +71,54 @@ ok('cada etapa guarda a SUA escolha',
    S.gymOf(0).id==='falkner' && S.gymOf(1).id==='misty' && S.gymOf(2).id==='whitney',
    [0,1,2].map(i=>S.gymOf(i).id).join(','));
 
+console.log('\nOS LENDARIOS SAO 5% -- TODOS OS OITO');
+/* Cada lendario mora numa rota so e sai a 5% POR ENCONTRO ali. Ja saiu errado: existia um sorteio
+   extra de 5% no trecho 8 (de quando as aves nao tinham rota propria) que SOMAVA com o da rota, e
+   Zapdos e Moltres apareciam a 6,6%. E os cinco de Johto nem eram reconhecidos como lendarios:
+   entravam no nivel da etapa, o que dava um Lugia nivel 23. */
+const CASOS_LEND = [['raikou','route_36_37',3],['entei','route_38_39',5],['suicune','lake_of_rage',6],
+  ['lugia','whirl_islands',4],['hooh','ice_path',7],
+  ['articuno','seafoam',6],['zapdos','power_plant',7],['moltres','victory_road',7]];
+ok('os 8 lendarios estao na lista de lendarios',
+   CASOS_LEND.every(c=>S.ehLendario(c[0])), CASOS_LEND.filter(c=>!S.ehLendario(c[0])).map(c=>c[0]).join(','));
+const N_LEND = 8000;
+const foraDaFaixa = [], nivelRuim = [];
+CASOS_LEND.forEach(([id, rota, etapa])=>{
+  const gL = S.freshGameDefaults();
+  gL.currentSaveSlot = 0; gL.rivalName = 'R'; gL.starterId = 'cyndaquil';
+  gL.team = [S.createInstance('cyndaquil', 5)];
+  gL.gymIndex = etapa; gL.currentRoute = rota; gL.gymPath = [];
+  gL.gymPath[etapa] = S.JOHTO_ROUTE_MAP[etapa].some(r=>r.id===rota) ? 'johto' : 'kanto';
+  S.__setGame(gL);
+  let saiu = 0, nivel = null;
+  for(let i=0;i<N_LEND;i++){
+    gL.wildEncounterSeq = i*7;
+    S.goToWildEncounter();
+    const o = (gL.wildOffer||[]).find(x=>x.speciesId===id);
+    if(o){ saiu++; nivel = o.level; }
+  }
+  const pct = 100*saiu/N_LEND;
+  if(Math.abs(pct - 5) > 1.2) foraDaFaixa.push(id+' '+pct.toFixed(1)+'%');
+  const esperado = S.nivelDeLendario(S.LEGS[etapa]);
+  if(nivel !== esperado) nivelRuim.push(id+' nv'+nivel+' (esperado '+esperado+')');
+});
+ok('cada lendario sai a ~5% por encontro na rota dele', foraDaFaixa.length === 0, foraDaFaixa.join(', '));
+ok('e sempre 12 acima do teto da etapa, com teto em 50', nivelRuim.length === 0, nivelRuim.join(', '));
+ok('nenhum lendario aparece em mais de uma rota', (()=>{
+  const onde = {};
+  [S.ROUTE_MAP, S.JOHTO_ROUTE_MAP].forEach(m=>m.forEach(par=>par.forEach(r=>{
+    (r.rare||[]).concat(r.pool).forEach(x=>{ const id = typeof x==='object'?x.species:x;
+      if(S.ehLendario(id)) onde[id] = (onde[id]||0) + 1; });
+  })));
+  return Object.values(onde).every(n=>n===1);
+})());
+ok('nenhum lendario esta num POOL (la nao ha chance propria)', (()=>{
+  let noPool = false;
+  [S.ROUTE_MAP, S.JOHTO_ROUTE_MAP].forEach(m=>m.forEach(par=>par.forEach(r=>{
+    if(r.pool.some(id=>S.ehLendario(id))) noPool = true; })));
+  return !noPool;
+})());
+
 console.log('\nNENHUMA ESPECIE REPETIDA NO TIME');
 /* A oferta selvagem não pode trazer o que o jogador já tem -- e a checagem é por LINHA, não por
    espécie: dois Magikarp viram dois Gyarados, e era assim que gente chegava na liga com o time

@@ -5092,6 +5092,18 @@ function chooseStarter(id){
   render();
 }
 const LEGENDARY_BIRDS = ['moltres','zapdos','articuno'];
+/* TODOS os lendários do jogo, das duas regiões. Existe pra que os oito sejam tratados igual:
+   mesma chance (5% na rota onde moram) e o mesmo nível relativo.
+   Antes só as três aves de Kanto eram reconhecidas como lendárias, e os cinco de Johto entravam
+   como pokémon comum de rota -- o Lugia aparecia no NÍVEL DA ETAPA, ou seja, nível 23. */
+const LENDARIOS = [...LEGENDARY_BIRDS, 'raikou', 'entei', 'suicune', 'lugia', 'hooh'];
+function ehLendario(id){ return LENDARIOS.includes(id); }
+/* O nível de um lendário selvagem: 12 acima do teto da etapa, com teto em 50.
+   Os 12 vêm do que as aves de Kanto já faziam na prática (Articuno aparecia no nível 50 numa
+   etapa cujo selvagem ia até 38) -- é o "achado raro que vale a etapa inteira" sem virar um
+   pokémon que resolve o resto da jornada sozinho. O teto de 50 impede que um lendário do trecho 8
+   nasça acima do time. */
+function nivelDeLendario(leg){ return Math.min(50, (leg ? leg.maxLevel : 38) + 12); }
 const STARTER_EVOLUTIONS = {
   bulbasaur:'ivysaur', charmander:'charmeleon', squirtle:'wartortle',
   chikorita:'bayleef', cyndaquil:'quilava', totodile:'croconaw',
@@ -5216,11 +5228,10 @@ function montaOfertaSelvagem(){
     const pick = Math.floor(Math.random()*availableSlots.length);
     return availableSlots.splice(pick, 1)[0];
   }
-  if(game.gymIndex===7 && Math.random()<0.05){
-    const bird = LEGENDARY_BIRDS[Math.floor(Math.random()*LEGENDARY_BIRDS.length)];
-    const slot = claimRandomSlot();
-    if(slot>=0){ offer[slot] = { speciesId: bird, level: 45 }; }
-  }
+  /* SAIU um sorteio extra de 5% que dava uma ave qualquer no trecho 8. Ele é de quando as aves não
+     tinham rota própria; hoje têm (Articuno nas Seafoam, Zapdos na Usina, Moltres na Victory Road,
+     cada uma a 5%), e o sorteio antigo SOMAVA com o da rota: medido, Zapdos e Moltres apareciam a
+     6,6% por encontro no trecho 8, contra os 5% de todos os outros. */
   if(game.gymIndex===4 && Math.random()<0.15){
     // rota 5 (antes do Koga): chance de achar a pré-evolução de outro inicial (nunca o do próprio jogador)
     const ownEvolution = STARTER_EVOLUTIONS[game.starterId];
@@ -5246,7 +5257,8 @@ function montaOfertaSelvagem(){
       if(Math.random() < chance){
         const slotPick = Math.floor(Math.random()*availableSlots.length);
         const offerIdx = availableSlots.splice(slotPick, 1)[0];
-        const rareLevel = LEGENDARY_BIRDS.includes(species) ? 50 : (species==='eevee' ? 45 : rollWildLevel(species, leg.minLevel, leg.maxLevel));
+        const rareLevel = ehLendario(species) ? nivelDeLendario(leg)
+                        : (species==='eevee' ? 45 : rollWildLevel(species, leg.minLevel, leg.maxLevel));
         offer[offerIdx] = { speciesId: species, level: rareLevel };
       }
     }
@@ -5317,7 +5329,11 @@ function confirmWild(){
   });
   game.wildSelected.forEach(id=>{
     const offerEntry = game.wildOffer.find(o=>o.speciesId===id);
-    const level = LEGENDARY_BIRDS.includes(id) ? 50 : (id==='eevee' ? 45 : (offerEntry ? offerEntry.level : LEGS[game.gymIndex].minLevel));
+    // o nível vem da OFERTA (que já aplicou o nivelDeLendario); o fallback só existe pra oferta
+    // gravada antes disso existir
+    const level = (offerEntry && offerEntry.level) ? offerEntry.level
+                : ehLendario(id) ? nivelDeLendario(LEGS[game.gymIndex])
+                : (id==='eevee' ? 45 : LEGS[game.gymIndex].minLevel);
     const mon = createInstance(id, level);
     mon.shiny = !!(offerEntry && offerEntry.shiny);
     if(mon.shiny){
@@ -11485,7 +11501,7 @@ function renderWild(){
       const spriteMarkup = disguiseInfo
         ? spriteMarkupByDex(disguiseInfo.dex, disguiseInfo.name, disguiseInfo.emoji, 'sprite-sm', entry.shiny)
         : spriteHtml(id,'sprite-sm',entry.shiny);
-      const isLegendary = LEGENDARY_BIRDS.includes(id) || !!entry.disguise;
+      const isLegendary = ehLendario(id) || !!entry.disguise;
       const isSel = game.wildSelected.includes(id);
       /* O marcador respeita a pokédex CERTA: um shiny inédito não pode herdar o "já tenho" da
          versão normal -- era o que acontecia, e o jogador deixava passar um shiny que faltava.

@@ -108,7 +108,7 @@ function createSandbox(htmlPath){
     'advanceJourney','startWildEncounter','rematchLevelBump','NPC_TRADES,'.slice(0,-1),
     // anti-artimanha: encontro selvagem preso ao contador do save e sorteio dos iniciais preso
     // ao slot (ver test-artimanha.js)
-    'goToWildEncounter','montaOfertaSelvagem','currentShinyChance',
+    'goToWildEncounter','montaOfertaSelvagem','currentShinyChance','ehLendario','nivelDeLendario','LENDARIOS','LEGS',
     // Boss de Domingo: a tela escuta o Firestore, e isso da pra exercitar aqui (ver __escutas)
     'ligarEscutaDoBoss','pararEscutaDoBoss','pararAcompanhamentoDoBoss','agendarPollDoBoss',
     'assinaturaDoBoss','renderSundayBoss','sairDoBoss','BOSS_POLL_MS',
