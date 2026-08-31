@@ -524,7 +524,22 @@ Duas artimanhas medidas e fechadas — em ambas o jogador reiniciava até vir sh
   (9,1% → 19,9% no difícil), e o teto da artimanha de **13% pra 28%**. Se incomodar, o conserto é
   sortear só entre os três da região escolhida — mas hoje a região só é escolhida DEPOIS do inicial.
 
-`tools/test-artimanha.js` cobre as duas.
+**A TRAVA SOLTA QUANDO A TENTATIVA CONTA — e o GAME OVER conta** (`encerrarTentativaDoSlot`, chamado
+na 1ª insígnia e nas 5 derrotas). Isso vale pras DUAS coisas presas ao slot: o sorteio dos iniciais
+e a **geração**, que entra na semente do encontro selvagem. Sem a geração, a semente era
+slot+rival+inicial — e como o nome do rival hoje já vem preenchido com o padrão da conta, recriar no
+mesmo slot repetia **encontro por encontro** a jornada anterior. Quem tomava game over antes do
+Brock revivia a mesma jornada, com os mesmos iniciais e os mesmos selvagens em cada rota.
+O game over ficava de fora porque a trava foi escrita pensando em quem apaga o save pra rolar o dado
+de novo — e quem perde 5 vezes não está fazendo isso: a jornada dele acabou. Abusar disso de
+propósito custa jogar o trecho inteiro e perder cinco batalhas, ordens de grandeza acima dos dois
+cliques que a trava existe pra impedir.
+A geração é **congelada no save** (`saveGen`) no momento em que ele nasce: a que muda é a do slot, na
+conta, pro PRÓXIMO save. E ela avança por `increment` no Firestore, não gravando o número lido —
+duas abas do mesmo jogador não podem se atropelar aí.
+
+`tools/test-artimanha.js` cobre as duas travas, e o game over ponta a ponta: perde a 5ª batalha de
+verdade, cai no game over, e o teste confere que a trava soltou dos dois lados.
 
 ## Modo difícil (`gameMode: 'hard'`)
 

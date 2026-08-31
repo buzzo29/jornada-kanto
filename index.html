@@ -3431,6 +3431,7 @@ function freshGameDefaults(){
     saveSlots: new Array(MAX_SAVE_SLOTS).fill(null),
     currentSaveSlot:null,
     startersSorteados:{},   // {"slot:modo": {bulbasaur:bool,...}} -- vem da conta, ver sorteioDosIniciais
+    geracaoDosSlots:{},     // {"0": 3} -- quantas tentativas daquele slot já CONTARAM (ver encerrarTentativaDoSlot)
     newSaveNameError:null,
     accountNameError:null,
     accountNameChecking:false,
@@ -3493,6 +3494,7 @@ function freshGameDefaults(){
     shinyPityCount:0, // encontros selvagens seguidos sem capturar nenhum shiny, desde a última captura (ou desde ativar o bônus) -- sobe a chance a cada um
     shinyFoundThisSave:false, // ESTE save já conseguiu um shiny? Trava a escalada do bônus na base (ver currentShinyChance). É por save, não por conta
     wildEncounterSeq:0,       // nº do encontro selvagem deste save -- é a semente da oferta (ver goToWildEncounter)
+    saveGen:0,                // a geração do slot quando ESTE save nasceu -- entra na semente do encontro
     mewtwoLoanActive:false,
     mewtwoLoanUnlocked:false,
     tower:null,          // {dateId, floors, run} da Torre dos Treinadores, vindo do servidor
@@ -4648,6 +4650,7 @@ async function loadPermanentUserData(){
     game.trainerLastStreak = d.trainerLastStreak || 0;
     game.shinyBonusExpiresAt = d.shinyBonusExpiresAt || 0; // se a pessoa recarregar o app com o bônus ainda ativo, continua valendo
     game.startersSorteados = d.startersSorteados || {};    // ver sorteioDosIniciais
+    game.geracaoDosSlots = d.geracaoDosSlots || {};        // ver encerrarTentativaDoSlot
     // marcas da raide do Mew, gravadas pelo servidor quando o boss cai (ver bossPremiarTop10)
     game.bossTop10 = !!d.bossTop10;
     game.bossKiller = !!d.bossKiller;
@@ -5386,7 +5389,12 @@ function goToWildEncounter(){
   game.wildEncounterSeq = (game.wildEncounterSeq || 0) + 1;
   // a rota entra na semente pra que cada rota tenha SEU encontro fixo naquele ponto da jornada --
   // escolher outra rota é uma decisão do jogo, não um jeito de re-sortear a mesma rota
-  const semente = [game.currentSaveSlot, game.rivalName||'', game.starterId||'',
+  /* A GERAÇÃO entra aqui. Sem ela a semente era slot+rival+inicial, e o nome do rival hoje já vem
+     preenchido com o padrão da conta -- então recriar o save no mesmo slot repetia encontro por
+     encontro a jornada anterior. Ela só avança quando a tentativa CONTA (1ª insígnia ou game over,
+     ver encerrarTentativaDoSlot), então apagar e recriar sem jogar continua devolvendo a mesma
+     oferta, que é o ponto da trava. */
+  const semente = [game.currentSaveSlot, game.saveGen||0, game.rivalName||'', game.starterId||'',
                    'selvagem', game.wildEncounterSeq, game.currentRoute||''].join('|');
   const sorteioOriginal = Math.random;
   Math.random = makeSeededRng(semente);
@@ -6749,12 +6757,17 @@ function finishBattle(){
   if(result.win){
     game.badgesEarned.push(gymAtual().badge);
     // 1ª insígnia = a jornada saiu do papel; aquele slot ganha direito a um sorteio novo de
-    // iniciais na PRÓXIMA vez que for recriado (ver sorteioDosIniciais)
-    if(game.badgesEarned.length === 1) limparSorteioDosIniciais(game.currentSaveSlot);
+    // iniciais E a encontros novos na PRÓXIMA vez que for recriado (ver encerrarTentativaDoSlot)
+    if(game.badgesEarned.length === 1) encerrarTentativaDoSlot(game.currentSaveSlot);
     game.screen = 'victory';
   } else {
     game.losses++;
     game.lossesTotal = (game.lossesTotal||0) + 1;   // acumula pra jornada toda; nunca é zerado
+    if(game.losses>=5){
+      /* Game over: o save morreu aqui. A tentativa contou tanto quanto uma insígnia -- soltar a
+         trava é o que permite recomeçar de verdade em vez de reviver a mesma jornada. */
+      encerrarTentativaDoSlot(game.currentSaveSlot);
+    }
     game.screen = game.losses>=5 ? 'gameover' : 'defeat';
   }
   render();
@@ -9908,7 +9921,7 @@ const CAMPOS_DA_CONTA = [
   'accountEliteChampion','leagueWinsTotal','leagueLeaderboard','trainerBestStreak','trainerLastStreak',
   'shinyBonusExpiresAt','shinyPityCount','specialties','specialtyCounts',
   'mewtwoLoanActive','mewtwoLoanCooldownUntil','mewtwoLoanUnlocked','mewtwoLoanReadyToClaim',
-  'userTest','neighborhoodGymLocation','startersSorteados','bossTop10','bossKiller'
+  'userTest','neighborhoodGymLocation','startersSorteados','geracaoDosSlots','bossTop10','bossKiller'
 ];
 function snapshotDaConta(){
   const o = {};
@@ -10244,7 +10257,7 @@ function renderNewSaveMode(){
    dos três vir shiny (2,3% por tentativa), 11 no difícil (9,1%).
    Agora o resultado fica gravado NA CONTA, por slot, e sobrevive ao delete: recriar no mesmo slot
    traz exatamente os mesmos iniciais. Um sorteio novo só acontece quando aquele slot conquista a
-   1ª insígnia (ver limparSorteioDosIniciais) -- ou seja, pra rolar de novo tem que jogar de verdade.
+   1ª insígnia ou o game over (ver encerrarTentativaDoSlot) -- ou seja, pra rolar de novo tem que jogar.
    Quem joga limpo não perde nada: a chance por JORNADA continua a mesma.
 
    A chave inclui o MODO porque o difícil tem 4x a chance. Sem isso dava pra sortear no difícil,
@@ -10278,18 +10291,32 @@ function gravarSorteioDosIniciais(chave, resultado){
     .set({ startersSorteados: { [chave]: resultado } }, { merge: true })
     .catch(e=>console.error('Erro ao gravar o sorteio dos iniciais:', e));
 }
-/* Chamado quando o slot conquista a PRIMEIRA insígnia: a tentativa contou, então o próximo save
-   naquele slot tem direito a um sorteio novo. Limpa os dois modos -- a jornada seguinte pode ser
-   em qualquer um deles. */
-function limparSorteioDosIniciais(slot){
+/* A TENTATIVA DAQUELE SLOT CONTOU -- e a trava anti-artimanha se solta.
+   Duas coisas ficam presas ao slot justamente pra apagar-e-recriar não valer nada: o sorteio de
+   shiny dos iniciais (startersSorteados) e a semente dos encontros selvagens (a geração, que entra
+   na semente em goToWildEncounter). Sem soltar nenhuma das duas, recriar traz os mesmos iniciais e
+   os MESMOS pokémons selvagens do save anterior.
+   Solta nos dois finais possíveis de uma tentativa de verdade:
+     - a 1ª INSÍGNIA (a jornada saiu do papel), e
+     - o GAME OVER (5 derrotas no mesmo ginásio -- o save morreu ali, não dá pra continuar).
+   O game over ficava de fora, e era um buraco: quem perdia antes do Brock apagava, recriava, e
+   revivia a mesma jornada -- mesmos iniciais, mesmos selvagens em cada rota. O custo de abusar
+   disso de propósito é jogar o trecho inteiro e perder cinco batalhas, o que é muito mais caro que
+   os dois cliques que a trava foi criada pra impedir.
+   Limpa os dois modos -- a jornada seguinte pode ser em qualquer um deles. */
+function encerrarTentativaDoSlot(slot){
   if(slot == null) return;
   const chaves = [chaveDoSorteio(slot,'normal'), chaveDoSorteio(slot,'hard')];
   chaves.forEach(k => { if(game.startersSorteados) delete game.startersSorteados[k]; });
+  game.geracaoDosSlots = game.geracaoDosSlots || {};
+  game.geracaoDosSlots[String(slot)] = (game.geracaoDosSlots[String(slot)] || 0) + 1;
   if(!game.authUser) return;
   const apagar = {};
   chaves.forEach(k => { apagar['startersSorteados.'+k] = firebase.firestore.FieldValue.delete(); });
+  // increment em vez de gravar o número lido: duas abas do mesmo jogador não podem se atropelar aqui
+  apagar['geracaoDosSlots.'+slot] = firebase.firestore.FieldValue.increment(1);
   userDocRef(game.authUser.uid).update(apagar)
-    .catch(e=>console.error('Erro ao liberar o sorteio dos iniciais:', e));
+    .catch(e=>console.error('Erro ao encerrar a tentativa do slot:', e));
 }
 async function confirmNewSaveName(){
   const rivalInput = document.getElementById('rival-name-input');
@@ -10305,6 +10332,8 @@ async function confirmNewSaveName(){
   restauraDadosDaConta(conta);
   game.gameMode = modoEscolhido;
   game.currentSaveSlot = slot;
+  // congela a geração do slot NESTE save: ela só muda pro próximo, quando esta tentativa contar
+  game.saveGen = (game.geracaoDosSlots||{})[String(slot)] || 0;
   game.rivalName = rivalName;
   gravarRivalPadrao(rivalName);   // o que foi digitado aqui vira o padrão das próximas jornadas
   // sorteia shiny pra CADA inicial de forma independente, com a MESMA chance de um encontro
@@ -10335,6 +10364,7 @@ function serializeGame(){
     gymIndex: game.gymIndex,
     shinyFoundThisSave: !!game.shinyFoundThisSave, // trava a escalada do bônus (ver currentShinyChance)
     wildEncounterSeq: game.wildEncounterSeq || 0,  // semente do encontro selvagem (ver goToWildEncounter)
+    saveGen: game.saveGen || 0,                    // a geração do slot quando este save nasceu
     starterId: game.starterId,
     wildOffer: game.wildOffer,
     wildSelected: game.wildSelected,

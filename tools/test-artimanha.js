@@ -114,13 +114,74 @@ ok('e o save legitimo recupera o shiny que era dele',
 
 g.startersSorteados = {};
 S.sorteioDosIniciais(0,'normal'); S.sorteioDosIniciais(0,'hard');
-S.limparSorteioDosIniciais(0);
+S.encerrarTentativaDoSlot(0);
 ok('a 1ª insígnia libera o slot pro próximo sorteio',
    !g.startersSorteados['0:normal'] && !g.startersSorteados['0:hard']);
 g.startersSorteados = {};
 for(let s=0;s<3;s++) for(const m of ['normal','hard']) S.sorteioDosIniciais(s,m);
 ok('sorteios disponíveis sem jogar nada ficam limitados', Object.keys(g.startersSorteados).length===6,
    Object.keys(g.startersSorteados).length+' (3 slots x 2 modos)');
+
+
+console.log('\n3) O GAME OVER ENCERRA A TENTATIVA');
+/* A trava prende DUAS coisas ao slot: o sorteio de shiny dos iniciais e a semente dos encontros.
+   Isso e o que faz apagar-e-recriar nao valer nada. Mas quem toma game over antes do primeiro
+   ginasio NAO estava apagando pra trapacear -- a jornada dele acabou --, e recriar trazia os mesmos
+   iniciais e os MESMOS selvagens em cada rota, jornada por jornada. */
+const g0 = S.freshGameDefaults();
+g0.authUser = null; g0.startersSorteados = {}; g0.geracaoDosSlots = {};
+S.__setGame(g0);
+const antesDoSorteio = JSON.stringify(S.sorteioDosIniciais(0, 'normal'));
+const geracaoAntes = (S.__getGame().geracaoDosSlots||{})['0'] || 0;
+S.encerrarTentativaDoSlot(0);
+const est = S.__getGame();
+ok('encerrar a tentativa libera o sorteio dos iniciais',
+   !(est.startersSorteados||{})[S.chaveDoSorteio(0,'normal')]);
+ok('e avanca a geracao do slot', ((est.geracaoDosSlots||{})['0']||0) === geracaoAntes + 1,
+   geracaoAntes + ' -> ' + ((est.geracaoDosSlots||{})['0']||0));
+ok('o slot vizinho nao e tocado', ((est.geracaoDosSlots||{})['1']||0) === 0);
+
+/* O encontro de uma geracao nova tem que ser OUTRO -- e o da mesma geracao, o MESMO. */
+function ofertaCom(geracao){
+  const g = S.freshGameDefaults();
+  g.currentSaveSlot = 0; g.rivalName = 'Gary'; g.starterId = 'charmander';
+  g.gymIndex = 2; g.currentRoute = S.ROUTE_MAP[2][0].id; g.team = [];
+  g.wildEncounterSeq = 3; g.saveGen = geracao;
+  S.__setGame(g);
+  S.goToWildEncounter();
+  return resumo(S.__getGame().wildOffer);
+}
+const g1a = ofertaCom(0), g1b = ofertaCom(0), g2 = ofertaCom(1), g3 = ofertaCom(2);
+ok('mesma geracao, mesma oferta (a trava continua de pe)', g1a === g1b);
+ok('geracao nova traz encontro novo', g1a !== g2 && g2 !== g3, [g1a, g2, g3].join('  |  '));
+
+/* O save nasce com a geracao CONGELADA: o proximo save daquele slot e que pega a seguinte. */
+const gConta = S.freshGameDefaults();
+gConta.geracaoDosSlots = { '0': 4 };
+gConta.authUser = null;
+S.__setGame(gConta);
+ok('a geracao guardada na conta e a que o proximo save vai usar',
+   ((S.__getGame().geracaoDosSlots||{})['0']) === 4);
+
+
+/* Ponta a ponta, pelo caminho de verdade: uma batalha PERDIDA com o contador em 4 tem que
+   terminar em game over E encerrar a tentativa do slot. E a checagem que pega alguem mexer no
+   fluxo de derrota sem lembrar da trava. */
+const gFim = S.freshGameDefaults();
+gFim.currentSaveSlot = 0; gFim.authUser = null; gFim.gymIndex = 0; gFim.badgesEarned = [];
+gFim.losses = 4;                                  // a próxima derrota é o game over
+gFim.startersSorteados = { '0:normal': { charmander:false } };
+gFim.geracaoDosSlots = {};
+gFim.gameMode = 'normal'; gFim.starterId = 'charmander'; gFim.rivalName = 'Gary';
+gFim.team = [S.createInstance('magikarp', 1)];    // nível 1 contra o 1º ginásio: derrota garantida
+S.__setGame(gFim);
+S.runBattle();
+for(let i=0; i<80 && S.__getGame().screen==='battling'; i++){ S.advanceReveal(); }
+const fim = S.__getGame();
+ok('perder a 5ª leva ao game over', fim.screen==='gameover', 'tela: ' + fim.screen);
+ok('e o game over libera o sorteio dos iniciais', !(fim.startersSorteados||{})['0:normal']);
+ok('e troca os encontros do slot', ((fim.geracaoDosSlots||{})['0']||0) === 1,
+   'geração: ' + ((fim.geracaoDosSlots||{})['0']||0));
 
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
 process.exit(falhas ? 1 : 0);

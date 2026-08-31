@@ -113,7 +113,7 @@ function createSandbox(htmlPath){
     // Boss de Domingo: a tela escuta o Firestore, e isso da pra exercitar aqui (ver __escutas)
     'ligarEscutaDoBoss','pararEscutaDoBoss','pararAcompanhamentoDoBoss','agendarPollDoBoss',
     'assinaturaDoBoss','renderSundayBoss','sairDoBoss','BOSS_POLL_MS',
-    'sorteioDosIniciais','chaveDoSorteio','limparSorteioDosIniciais','HARD_SHINY_CHANCE',
+    'sorteioDosIniciais','chaveDoSorteio','encerrarTentativaDoSlot','HARD_SHINY_CHANCE',
     // terreno, buffs e atributos: sem eles nao da pra medir o efeito de terreno/shiny,
     // que e justamente onde cliente e servidor ja divergiram
     'TYPE_CHART','TYPE_NAMES_PT','TYPE_COLORS','englishTypeFromPortuguese','TERRAINS','TERRAIN_BUFF_MULT','SHINY_BUFF_MULT','applyTerrainBuff','applySpecialtyBuff','withBuffs',
