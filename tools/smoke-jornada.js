@@ -88,6 +88,14 @@ function act(g, log){
       g.confirmRelease();
       return true;
     }
+    /* bifurcacao de evolucao (Gloom/Poliwhirl/Slowpoke): o bot sorteia um dos dois destinos,
+       de proposito -- e o que faz o smoke exercitar Bellossom, Politoed e Slowking */
+    case 'evoChoice': {
+      const p = g.evolucoesPendentes()[0];
+      const op = g.EVOLUTION_CHOICES[p.pendingEvoChoice];
+      g.escolherEvolucao(p.id, op[Math.floor(Math.random()*op.length)]);
+      return true;
+    }
     case 'eeveeChoice':  g.chooseEeveeEvolution(['keep','vaporeon','jolteon','flareon'][Math.floor(Math.random()*4)]); return true;
     case 'levels': {
       // um bot que espalha pontos aleatoriamente perde em Brock e nunca vê o resto do jogo.

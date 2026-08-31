@@ -3296,6 +3296,7 @@ function freshGameDefaults(){
     specialBattle:null,
     // --- Elite 4 ---
     eliteStage:null,       // 0-3 = índice do PRÓXIMO oponente (0-2 membros, 3 = final contra o rival)
+    elitePath:null,        // ['kanto','johto',...] -- a fila sorteada da Elite (ver sortearCaminhoDaElite)
     eliteStatus:null,      // null | 'inProgress' | 'champion' | 'defeated'
     eliteHealsLeft:0,      // escolhas de cura/revive disponíveis entre batalhas (2 após cada vitória)
     eliteAttemptsUsed:0,   // quantas das ELITE_MAX_ATTEMPTS tentativas (rush completo cada uma) já foram gastas em derrotas
@@ -4591,10 +4592,28 @@ async function loadLeagueLeaderboard(typeId){
       .slice(0,10);
   } catch(e){ console.error('Erro ao carregar ranking da Liga:', e); return []; }
 }
+/* EVOLUÇÕES COM BIFURCAÇÃO -- as três que a Gen 2 criou em cima de linhas de Kanto.
+   No jogo original o que decide é a pedra (Folha ou Solar) ou o item de troca; aqui não existem
+   itens, então quem decide é o jogador, na hora, como já acontece com o Eevee.
+   A entrada em EVOLUTIONS continua existindo pro destino de Kanto: é o que `finalEvolutionOf`
+   usa pra montar time de NPC (rival, Torre), onde não há ninguém pra escolher. O jogador nunca
+   passa por ela -- o tryEvolve intercepta antes. */
+const EVOLUTION_CHOICES = {
+  gloom:     ['vileplume','bellossom'],
+  poliwhirl: ['poliwrath','politoed'],
+  slowpoke:  ['slowbro','slowking']
+};
 function tryEvolve(p){
   const events = [];
   let currentId = p.speciesId;
   while(EVOLUTIONS[currentId] && p.level >= EVOLUTIONS[currentId].level){
+    /* Chegou num ponto de bifurcação: para aqui e deixa marcado. Quem resolve é a tela de
+       escolha (ver evolucoesPendentes), e o tryEvolve roda de novo depois -- por isso a marca
+       fica no pokémon e não numa variável solta. */
+    if(EVOLUTION_CHOICES[currentId] && !p.evoChoiceResolved){
+      p.pendingEvoChoice = currentId;
+      break;
+    }
     const step = EVOLUTIONS[currentId];
     const fromSp = SPECIES[currentId];
     const toSp = SPECIES[step.into];
@@ -5264,6 +5283,64 @@ function confirmRelease(){
 function hasUnresolvedEevee(){
   return game.team.some(p=>p.speciesId==='eevee' && !p.eeveeResolved);
 }
+function evolucoesPendentes(){
+  return game.team.filter(p=>p.pendingEvoChoice && EVOLUTION_CHOICES[p.pendingEvoChoice]);
+}
+/* Aplica a escolha e segue: pode haver mais de um pokémon esperando na mesma distribuição de
+   níveis, e o escolhido pode ainda ter evolução depois (hoje não tem, mas o tryEvolve no fim
+   cobre isso sem depender da tabela de hoje). */
+function escolherEvolucao(monId, destino){
+  const p = game.team.find(x=>x.id===monId);
+  if(!p || !p.pendingEvoChoice) return;
+  const opcoes = EVOLUTION_CHOICES[p.pendingEvoChoice] || [];
+  if(!opcoes.includes(destino)) return;
+  const de = SPECIES[p.pendingEvoChoice], para = SPECIES[destino];
+  p.pendingEvoChoice = null;
+  p.evoChoiceResolved = true;
+  p.speciesId = destino;
+  p.name = para.name;
+  p.types = para.types;
+  p.baseHp = para.hp;
+  p.attack = para.attack;
+  p.defense = para.defense;
+  p.spAtk = para.spAtk;
+  p.spDef = para.spDef;
+  markCaught(destino, !!p.shiny);
+  game.evolutions = (game.evolutions||[]).concat([{
+    fromName: de.name, toName: para.name, atLevel: p.level,
+    toSpeciesId: destino, shiny: !!p.shiny, escolhida: true }]);
+  // a escolha destrava o resto da linha, se houver
+  game.evolutions = game.evolutions.concat(tryEvolve(p));
+  resolverEvolucoes();
+}
+function resolverEvolucoes(){
+  if(evolucoesPendentes().length){ game.screen = 'evoChoice'; render(); return; }
+  game.screen = (game.evolutions||[]).length ? 'evolution' : 'teamOrder';
+  render();
+}
+function renderEvoChoice(){
+  const p = evolucoesPendentes()[0];
+  if(!p) return `<div class="box"><p>Carregando...</p></div>`;
+  const de = SPECIES[p.pendingEvoChoice];
+  const caught = getAllCaughtSpecies();
+  const restantes = evolucoesPendentes().length - 1;
+  return `
+  <div class="eyebrow">✨ EVOLUÇÃO</div>
+  <div class="box cursor">
+    <h2>${spriteHtml(p.pendingEvoChoice,'sprite-sm',p.shiny)} Seu ${escapeHtmlSafe(de.name)} está evoluindo!</h2>
+    <p>Essa linha evolutiva se divide em <strong>duas</strong>. A escolha é definitiva.</p>
+    ${restantes ? `<p class="hint-text">Mais ${restantes} pokémon ${restantes===1?'espera':'esperam'} escolha depois deste.</p>` : ''}
+  </div>
+  <div class="box">
+    ${EVOLUTION_CHOICES[p.pendingEvoChoice].map(destino=>{
+      const sp = SPECIES[destino];
+      return `<button class="btn" onclick="escolherEvolucao('${escJs(p.id)}','${escJs(destino)}')">
+        <span class="mon-name">${spriteHtml(destino,'sprite-sm',p.shiny)} ${sp.name}${caught.has(destino)?` <span class="pokedex-owned-badge">${pokedexIcon()}</span>`:''}</span>
+        <span class="mon-sub">${typesHtml(sp.types)}</span>
+      </button>`;
+    }).join('')}
+  </div>`;
+}
 function proceedAfterTeamLocked(){
   if(hasUnresolvedEevee()){
     game.screen = 'eeveeChoice';
@@ -5357,13 +5434,10 @@ function confirmLevels(){
   game.team.forEach(p=>{ p.level += (game.alloc[p.id]||0); });
   let evs = [];
   game.team.forEach(p=>{ evs = evs.concat(tryEvolve(p)); });
-  if(evs.length>0){
-    game.evolutions = evs;
-    game.screen = 'evolution';
-  } else {
-    game.screen = 'teamOrder';
-  }
-  render();
+  game.evolutions = evs;
+  // resolverEvolucoes decide a tela: escolha pendente -> 'evoChoice'; senão 'evolution' ou direto
+  // pro 'teamOrder'. Antes isso era um if aqui, mas agora a escolha pode acrescentar eventos
+  resolverEvolucoes();
 }
 function continueFromEvolution(){
   game.screen = 'teamOrder';
@@ -5593,6 +5667,51 @@ const ELITE_FOUR = [
     intro:'«Dragões são criaturas míticas — e eu sou o último mestre deles. Mostre que você merece chegar à final.»',
     team:[{speciesId:'dragonair',level:59},{speciesId:'dragonair',level:59},{speciesId:'gyarados',level:60},{speciesId:'aerodactyl',level:60},{speciesId:'dragonite',level:62}] }
 ];
+/* A Elite de Johto. Cada um pareado com o de Kanto da MESMA POSIÇÃO: mesmo número de pokémon e
+   mesma média de nível, exatamente como foi feito com os 16 ginásios. A escolha é de tipo, não de
+   dificuldade.
+   O Koga aparece aqui porque é isso que acontece no jogo original: ele deixa o ginásio de Fuchsia
+   e sobe pra Elite na Gen 2. O Bruno está nas duas listas porque está nos dois jogos -- e é por
+   isso que o sorteio nunca repete um adversário (ver sortearCaminhoDaElite). */
+const JOHTO_ELITE = [
+  { id:'will', name:'Will', icon:'🔮', title:'Mente Alada', type:'Psychic',
+    intro:'«Treinei a vida toda pra dominar os pokémons psíquicos... e agora estou pronto pra você.» Tudo aqui voa e lê a sua próxima jogada.',
+    team:[{speciesId:'xatu',level:56},{speciesId:'jynx',level:56},{speciesId:'exeggutor',level:57},{speciesId:'slowbro',level:57},{speciesId:'xatu',level:59}] },
+  { id:'koga_elite', name:'Koga', icon:'☠️', title:'Mestre do Veneno', type:'Poison',
+    intro:'«Nos encontramos de novo — mas não como líder de ginásio. Aqui eu não me seguro.» O veneno dele corrói mais devagar do que parece.',
+    team:[{speciesId:'ariados',level:57},{speciesId:'venomoth',level:58},{speciesId:'forretress',level:58},{speciesId:'muk',level:59},{speciesId:'crobat',level:61}] },
+  { id:'bruno_johto', name:'Bruno', icon:'🥊', title:'Punho de Aço', type:'Fighting',
+    intro:'«Você de novo? Ótimo. Meus punhos não esqueceram.» Músculos e pedra, nada mais.',
+    team:[{speciesId:'hitmontop',level:58},{speciesId:'hitmonlee',level:58},{speciesId:'hitmonchan',level:59},{speciesId:'onix',level:59},{speciesId:'machamp',level:61}] },
+  { id:'karen', name:'Karen', icon:'🌑', title:'Dama Sombria', type:'Dark',
+    intro:'«Pokémon fortes. Pokémon fracos. Isso é só a opinião egoísta das pessoas.» O que ela traz não se intimida com nada.',
+    team:[{speciesId:'umbreon',level:59},{speciesId:'murkrow',level:59},{speciesId:'vileplume',level:60},{speciesId:'gengar',level:60},{speciesId:'houndoom',level:62}] }
+];
+/* Qual dos dois em cada posição -- sorteado UMA VEZ, na primeira tentativa, e guardado no save.
+   As tentativas seguintes enfrentam a mesma fila: perder e voltar não pode virar um jeito de
+   re-sortear até cair um caminho fácil, e refazer a fila a cada tentativa apagaria o que o
+   jogador aprendeu sobre ela.
+   O Bruno está nas duas listas (está nos dois jogos), então o sorteio evita repetir adversário:
+   se ele já saiu, a posição seguinte fica com o outro lado. */
+function sortearCaminhoDaElite(){
+  const vistos = new Set();
+  const caminho = [];
+  for(let i = 0; i < ELITE_FOUR.length; i++){
+    const k = ELITE_FOUR[i], j = JOHTO_ELITE[i];
+    const podeK = !vistos.has(k.name), podeJ = !vistos.has(j.name);
+    let lado;
+    if(podeK && podeJ) lado = Math.random() < 0.5 ? 'kanto' : 'johto';
+    else lado = podeK ? 'kanto' : 'johto';
+    caminho.push(lado);
+    vistos.add(lado === 'kanto' ? k.name : j.name);
+  }
+  return caminho;
+}
+function eliteMembroDaEtapa(stage){
+  const lado = (game.elitePath || [])[stage];
+  return (lado === 'johto' ? JOHTO_ELITE : ELITE_FOUR)[stage];
+}
+
 function buildEliteRivalTeam(){
   // o time do rival na final: os melhores pokémons que VOCÊ recusou pelo caminho, totalmente
   // evoluídos e no auge -- e o inicial dele (vantagem de tipo contra o seu) como carta final
@@ -5626,7 +5745,7 @@ function buildEliteRivalTeam(){
 }
 function eliteOpponentForStage(stage){
   if(stage < ELITE_FOUR.length){
-    const m = ELITE_FOUR[stage];
+    const m = eliteMembroDaEtapa(stage);
     return { team: m.team.map(t=>({ speciesId:t.speciesId, level:t.level })),
       meta: { opponentName: m.name, icon: m.icon, type: m.type,
         title: `${m.icon} ${m.name} — ${m.title}`, intro: m.intro } };
@@ -5638,6 +5757,12 @@ function eliteOpponentForStage(stage){
 }
 function startEliteChallenge(){
   if((game.eliteAttemptsUsed||0) >= ELITE_MAX_ATTEMPTS) return; // sem tentativa sobrando -- não deveria nem chegar aqui pelo botão, mas protege contra clique repetido/atrasado
+  /* A fila da Elite é sorteada UMA VEZ e vale pro save inteiro. Sortear a cada tentativa faria
+     perder e voltar virar um jeito de re-sortear até cair um caminho fácil -- e apagaria o que o
+     jogador aprendeu sobre a fila dele. */
+  if(!Array.isArray(game.elitePath) || game.elitePath.length !== ELITE_FOUR.length){
+    game.elitePath = sortearCaminhoDaElite();
+  }
   game.eliteStatus = 'inProgress';
   game.eliteStage = 0;
   game.eliteHealsLeft = 0;
@@ -9644,7 +9769,7 @@ async function logout(){
    um ponto seguro de gravação: o autosave não rodava e o flushPendingAutoSave do beforeunload
    também não -- então a insígnia que o jogador ACABOU de ganhar ficava pendente enquanto ele
    pensava na escolha, e fechar a aba ali perdia a vitória. */
-const SAFE_SAVE_SCREENS = new Set(['start','walk','walkNext','gymChoice','wild','release','levels','evolution','eeveeChoice','teamOrder','preBattle','victory','defeat','gameover','journeyEnd','specialIntro','specialResult','rocketHideout','eliteIntro','eliteHeal']);
+const SAFE_SAVE_SCREENS = new Set(['start','walk','walkNext','gymChoice','wild','release','levels','evolution','evoChoice','eeveeChoice','teamOrder','preBattle','victory','defeat','gameover','journeyEnd','specialIntro','specialResult','rocketHideout','eliteIntro','eliteHeal']);
 function saveDocRef(uid, slot){
   return db.collection('users').doc(uid).collection('saves').doc(String(slot));
 }
@@ -9870,6 +9995,7 @@ function serializeGame(){
     hideoutAttemptsLeft: game.hideoutAttemptsLeft!=null ? game.hideoutAttemptsLeft : 3,
     hideoutFoeLevel: game.hideoutFoeLevel!=null ? game.hideoutFoeLevel : null,
     eliteStage: game.eliteStage!=null ? game.eliteStage : null,
+    elitePath: Array.isArray(game.elitePath) ? game.elitePath : null,   // ver sortearCaminhoDaElite
     eliteStatus: game.eliteStatus || null,
     eliteHealsLeft: game.eliteHealsLeft || 0,
     eliteAttemptsUsed: game.eliteAttemptsUsed || 0,
@@ -10054,6 +10180,8 @@ function applySavedState(data){
   game.hideoutAttemptsLeft = data.hideoutAttemptsLeft!=null ? data.hideoutAttemptsLeft : 3;
   game.hideoutFoeLevel = data.hideoutFoeLevel!=null ? data.hideoutFoeLevel : null;
   game.eliteStage = data.eliteStage!=null ? data.eliteStage : null;
+  // save anterior ao sorteio não tem o campo: fica null e a próxima tentativa sorteia a fila dele
+  game.elitePath = Array.isArray(data.elitePath) ? data.elitePath : null;
   game.eliteStatus = data.eliteStatus || null;
   game.eliteHealsLeft = data.eliteHealsLeft || 0;
   game.eliteAttemptsUsed = data.eliteAttemptsUsed || 0;
@@ -11542,7 +11670,10 @@ const MOVE_BY_TYPE = {
   Normal:'Cabeçada', Fire:'Lança-Chamas', Water:'Surf', Grass:'Chicote de Cipó',
   Electric:'Choque do Trovão', Ice:'Raio Congelante', Fighting:'Golpe de Karatê',
   Poison:'Bomba de Lodo', Ground:'Terremoto', Flying:'Ataque de Asa', Psychic:'Confusão',
-  Bug:'Picada', Rock:'Avalanche de Pedras', Ghost:'Lambida', Dragon:'Fúria do Dragão'
+  Bug:'Picada', Rock:'Avalanche de Pedras', Ghost:'Lambida', Dragon:'Fúria do Dragão',
+  // os dois tipos que Johto trouxe. Sem eles, nomeDoGolpe devolvia null e a linha do log saía
+  // sem nome nenhum: "Umbreon atacou Gengar e tirou -40 de HP"
+  Dark:'Golpe Sombrio', Steel:'Garra de Metal'
 };
 /* Uma entrada por espécie, em ordem de Pokédex, cobrindo TODO tipo que ela consegue usar
    (tipos próprios + subtipos). MOVE_BY_TYPE virou só rede de segurança.
@@ -11684,7 +11815,113 @@ const MOVE_OVERRIDES = {
   dratini:{Dragon:'Fúria do Dragão', Normal:'Investida'},
   dragonair:{Dragon:'Fúria do Dragão', Normal:'Chicotada'},
   dragonite:{Dragon:'Fúria do Dragão', Flying:'Ataque de Asa'},
-  mewtwo:{Psychic:'Psíquico', Normal:'Estrelas Cadentes'}
+  mewtwo:{Psychic:'Psíquico', Normal:'Estrelas Cadentes'},
+  /* ---- Johto (#152-251) ------------------------------------------------------------------
+     Uma entrada por espécie, cobrindo TODO tipo que ela consegue usar. Sem isto o log cai no
+     MOVE_BY_TYPE e as 100 espécies novas atacavam todas com o mesmo punhado de nomes genéricos --
+     e as de Sombrio e Aço, que nem estavam no MOVE_BY_TYPE, apareciam SEM nome de golpe.
+     Nomes reais da Geração II sempre que possível, e a linha evolutiva progride (Brasa ->
+     Roda de Fogo -> Explosão de Chamas), como já era feito em Kanto. */
+  chikorita:{Grass:'Chicote de Cipó'},
+  bayleef:{Grass:'Folha Navalha'},
+  meganium:{Grass:'Tempestade de Pétalas'},
+  cyndaquil:{Fire:'Brasa'},
+  quilava:{Fire:'Roda de Fogo'},
+  typhlosion:{Fire:'Explosão de Chamas'},
+  totodile:{Water:'Jato de Água'},
+  croconaw:{Water:'Mordida d Água'},
+  feraligatr:{Water:'Hidro Bomba'},
+  sentret:{Normal:'Arranhão Rápido'},
+  furret:{Normal:'Ataque Veloz'},
+  hoothoot:{Normal:'Bicada', Flying:'Rajada de Vento'},
+  noctowl:{Normal:'Investida Noturna', Flying:'Ataque de Asa'},
+  ledyba:{Bug:'Rajada de Socos', Flying:'Voo Rasante'},
+  ledian:{Bug:'Punho Cometa', Flying:'Ataque de Asa'},
+  spinarak:{Bug:'Teia Viscosa', Poison:'Picada Venenosa'},
+  ariados:{Bug:'Sanguessuga', Poison:'Presa Venenosa'},
+  crobat:{Poison:'Presa Venenosa', Flying:'Asa do Crepúsculo'},
+  chinchou:{Water:'Jato de Bolhas', Electric:'Faísca'},
+  lanturn:{Water:'Hidro Pulso', Electric:'Descarga Elétrica'},
+  pichu:{Electric:'Faísca Travessa'},
+  mareep:{Electric:'Choque do Trovão'},
+  flaaffy:{Electric:'Onda de Choque'},
+  ampharos:{Electric:'Trovão'},
+  cleffa:{Normal:'Encontrão'},
+  igglybuff:{Normal:'Rolamento'},
+  togepi:{Normal:'Investida Doce'},
+  togetic:{Normal:'Beijo Angelical', Flying:'Ataque de Asa'},
+  natu:{Psychic:'Confusão', Flying:'Bicada'},
+  xatu:{Psychic:'Psíquico', Flying:'Ataque de Asa'},
+  bellossom:{Grass:'Dança de Pétalas'},
+  marill:{Water:'Jato de Bolhas'},
+  azumarill:{Water:'Hidro Bomba'},
+  sudowoodo:{Rock:'Pedrada'},
+  politoed:{Water:'Surf'},
+  hoppip:{Grass:'Semente Absorvente', Flying:'Rajada de Vento'},
+  skiploom:{Grass:'Folha Navalha', Flying:'Rajada de Vento'},
+  jumpluff:{Grass:'Tempestade de Folhas', Flying:'Vendaval'},
+  aipom:{Normal:'Chicote de Cauda'},
+  sunkern:{Grass:'Absorver'},
+  sunflora:{Grass:'Raio Solar'},
+  yanma:{Bug:'Zumbido Cortante', Flying:'Vento Cortante'},
+  wooper:{Water:'Jato de Lama', Ground:'Bomba de Lama'},
+  quagsire:{Water:'Surf', Ground:'Terremoto'},
+  espeon:{Psychic:'Psíquico'},
+  umbreon:{Dark:'Investida Sombria'},
+  murkrow:{Dark:'Bico Sombrio', Flying:'Ataque de Asa'},
+  slowking:{Water:'Surf', Psychic:'Psíquico'},
+  misdreavus:{Ghost:'Rancor'},
+  unown:{Psychic:'Força Oculta'},
+  wobbuffet:{Psychic:'Contra-Ataque'},
+  girafarig:{Normal:'Encontrão', Psychic:'Psicorraio'},
+  pineco:{Bug:'Investida com Casca'},
+  forretress:{Bug:'Broca Giratória', Steel:'Garra de Metal'},
+  dunsparce:{Normal:'Fúria'},
+  gligar:{Ground:'Terremoto', Flying:'Ataque de Asa'},
+  steelix:{Steel:'Cauda de Ferro', Ground:'Terremoto'},
+  snubbull:{Normal:'Mordida'},
+  granbull:{Normal:'Presa Feroz'},
+  qwilfish:{Water:'Jato de Água', Poison:'Espinho Venenoso'},
+  scizor:{Bug:'Broca Giratória', Steel:'Garra de Metal'},
+  shuckle:{Bug:'Investida com Casca', Rock:'Pedrada'},
+  heracross:{Bug:'Megachifre', Fighting:'Golpe Cruzado'},
+  sneasel:{Dark:'Golpe Traiçoeiro', Ice:'Garra Congelante'},
+  teddiursa:{Normal:'Arranhão'},
+  ursaring:{Normal:'Investida Furiosa'},
+  slugma:{Fire:'Brasa'},
+  magcargo:{Fire:'Jato de Lava', Rock:'Avalanche de Pedras'},
+  swinub:{Ice:'Vento Gelado', Ground:'Jato de Lama'},
+  piloswine:{Ice:'Presa de Gelo', Ground:'Terremoto'},
+  corsola:{Water:'Jato de Bolhas', Rock:'Ponta de Coral'},
+  remoraid:{Water:'Tiro d Água'},
+  octillery:{Water:'Canhão de Tinta'},
+  delibird:{Ice:'Presente Congelante', Flying:'Rajada de Vento'},
+  mantine:{Water:'Hidro Bomba', Flying:'Voo Rasante'},
+  skarmory:{Steel:'Asa de Aço', Flying:'Vendaval'},
+  houndour:{Dark:'Mordida Sombria', Fire:'Brasa'},
+  houndoom:{Dark:'Presa Sombria', Fire:'Lança-Chamas'},
+  kingdra:{Water:'Hidro Bomba', Dragon:'Pulso do Dragão'},
+  phanpy:{Ground:'Jato de Lama'},
+  donphan:{Ground:'Terremoto'},
+  porygon2:{Normal:'Triraio'},
+  stantler:{Normal:'Encontrão'},
+  smeargle:{Normal:'Pincelada'},
+  tyrogue:{Fighting:'Golpe de Karatê'},
+  hitmontop:{Fighting:'Chute Giratório'},
+  smoochum:{Ice:'Sopro Gelado', Psychic:'Confusão'},
+  elekid:{Electric:'Choque do Trovão'},
+  magby:{Fire:'Brasa'},
+  miltank:{Normal:'Rolamento'},
+  blissey:{Normal:'Investida Dupla'},
+  raikou:{Electric:'Trovão'},
+  entei:{Fire:'Explosão de Fogo'},
+  suicune:{Water:'Hidro Bomba'},
+  larvitar:{Rock:'Pedrada', Ground:'Jato de Lama'},
+  pupitar:{Rock:'Avalanche de Pedras', Ground:'Terremoto'},
+  tyranitar:{Rock:'Deslizamento de Rochas', Dark:'Mandíbula Sombria'},
+  lugia:{Psychic:'Aeroblast', Flying:'Vendaval'},
+  hooh:{Fire:'Fogo Sagrado', Flying:'Vendaval'},
+  celebi:{Psychic:'Psíquico', Grass:'Folha Mágica'}
 };
 function nomeDoGolpe(speciesId, tipo){
   if(!tipo) return null;
@@ -16515,6 +16752,7 @@ function render(){
     case 'neighborhoodGym': html = renderNeighborhoodGym(); break;
     case 'trainerTower': html = renderTrainerTower(); break;
     case 'gymChoice': html = renderGymChoice(); break;
+    case 'evoChoice': html = renderEvoChoice(); break;
     case 'sundayBoss': html = renderSundayBoss(); break;
     case 'onlineBattle': html = renderOnlineBattle(); break;
     case 'battleLobby': html = renderBattleLobby(); break;

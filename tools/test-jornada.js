@@ -125,6 +125,41 @@ ok('a tela mostra a opcao do turno certo',
      const h=S.renderEeveeChoice();
      return h.includes("chooseEeveeEvolution('umbreon')") && !h.includes("chooseEeveeEvolution('espeon')"); }));
 
+console.log('\nEVOLUCAO COM ESCOLHA (as tres linhas que a Gen 2 dividiu)');
+const CH = S.EVOLUTION_CHOICES;
+ok('as tres bifurcacoes existem', Object.keys(CH).length === 3, Object.keys(CH).join(','));
+const destinos = Object.values(CH).flat();
+ok('todo destino existe no SPECIES', destinos.every(id=>S.SPECIES[id]),
+   destinos.filter(id=>!S.SPECIES[id]).join(','));
+ok('cada bifurcacao tem 2 destinos distintos',
+   Object.values(CH).every(v=>v.length===2 && v[0]!==v[1]));
+ok('a origem de cada bifurcacao evolui por nivel (o gatilho)',
+   Object.keys(CH).every(id=>S.EVOLUTIONS[id]),
+   Object.keys(CH).filter(id=>!S.EVOLUTIONS[id]).join(','));
+ok('o destino de Kanto continua no EVOLUTIONS (e o que os NPCs usam)',
+   Object.keys(CH).every(id=>CH[id].includes(S.EVOLUTIONS[id].into)));
+// fluxo: sobe de nivel, para na bifurcacao, escolhe, aplica
+const gEv = S.freshGameDefaults();
+gEv.team = [S.createInstance('oddish',41), S.createInstance('slowpoke',38)];
+gEv.team.forEach((p,i)=>p.id='ev'+i);
+gEv.evolutions = []; S.__setGame(gEv);
+let evsT = []; gEv.team.forEach(p=>{ evsT = evsT.concat(S.tryEvolve(p)); });
+gEv.evolutions = evsT;
+ok('o Oddish evolui sozinho ate a bifurcacao e PARA',
+   gEv.team[0].speciesId === 'gloom' && gEv.team[0].pendingEvoChoice === 'gloom');
+ok('as duas esperam escolha', S.evolucoesPendentes().length === 2);
+S.escolherEvolucao('ev0','bellossom');
+S.escolherEvolucao('ev1','slowking');
+const fim2 = S.__getGame();
+ok('a escolha aplica especie e atributos',
+   fim2.team[0].speciesId === 'bellossom' && fim2.team[0].baseHp === S.SPECIES.bellossom.hp &&
+   fim2.team[1].speciesId === 'slowking' && fim2.team[1].spAtk === S.SPECIES.slowking.spAtk);
+ok('nao sobra escolha pendente', S.evolucoesPendentes().length === 0);
+ok('a tela avanca sozinha quando acaba', fim2.screen === 'evolution', fim2.screen);
+ok('o log da evolucao registra as duas',
+   fim2.evolutions.filter(e=>e.escolhida).length === 2,
+   fim2.evolutions.map(e=>e.fromName+'->'+e.toName).join(', '));
+
 console.log('\nOS SEIS INICIAIS');
 ok('sao 6 iniciais', S.STARTERS.length === 6, S.STARTERS.join(','));
 ok('3 de Kanto e 3 de Johto',
@@ -142,6 +177,44 @@ ok('todo inicial tem evolucao mapeada',
 ok('a evolucao mapeada e a que o EVOLUTIONS diz',
    S.STARTERS.every(id=>S.EVOLUTIONS[id] && S.EVOLUTIONS[id].into === S.STARTER_EVOLUTIONS[id]),
    S.STARTERS.filter(id=>!S.EVOLUTIONS[id] || S.EVOLUTIONS[id].into !== S.STARTER_EVOLUTIONS[id]).join(','));
+
+console.log('\nA ELITE 4 SORTEADA');
+ok('Johto tem os mesmos 4 postos', S.JOHTO_ELITE.length === S.ELITE_FOUR.length);
+const medE = m => m.team.reduce((s,p)=>s+p.level,0) / m.team.length;
+const eliteDif = S.ELITE_FOUR.map((k,i)=>[k,S.JOHTO_ELITE[i]])
+  .filter(([k,j]) => k.team.length !== j.team.length || Math.abs(medE(k)-medE(j)) > 0.06);
+ok('mesmo numero de pokemon e mesma media em cada posto', eliteDif.length === 0,
+   eliteDif.map(([k,j])=>k.name+' x '+j.name).join(', '));
+S.ELITE_FOUR.forEach((k,i)=>console.log('         posto '+(i+1)+': '+k.name.padEnd(9)+' x '+
+  S.JOHTO_ELITE[i].name.padEnd(9)+'  '+k.team.length+' pokemon, media '+medE(k).toFixed(1)));
+const semSpE = S.ELITE_FOUR.concat(S.JOHTO_ELITE).flatMap(m=>m.team.map(t=>t.speciesId)).filter(id=>!S.SPECIES[id]);
+ok('todo pokemon da Elite existe', semSpE.length === 0, [...new Set(semSpE)].join(','));
+ok('nenhum id de membro repetido',
+   new Set(S.ELITE_FOUR.concat(S.JOHTO_ELITE).map(m=>m.id)).size === 8);
+/* O Bruno está nos dois jogos e por isso nas duas listas. O sorteio não pode escalá-lo duas
+   vezes na mesma fila -- o jogador enfrentaria o mesmo adversário em dois postos. */
+let filaRepetida = 0, distintas = new Set();
+for(let i = 0; i < 300; i++){
+  const caminho = S.sortearCaminhoDaElite();
+  const nomes = caminho.map((lado,s)=>(lado==='johto'?S.JOHTO_ELITE:S.ELITE_FOUR)[s].name);
+  if(new Set(nomes).size !== nomes.length) filaRepetida++;
+  distintas.add(nomes.join(','));
+}
+ok('o sorteio nunca repete adversario na mesma fila', filaRepetida === 0, filaRepetida + ' de 300');
+ok('o sorteio varia de verdade', distintas.size >= 6, distintas.size + ' filas distintas em 300');
+/* A fila é sorteada UMA VEZ: perder e voltar não pode ser um jeito de re-sortear até cair um
+   caminho fácil. */
+const gE = S.freshGameDefaults(); S.__setGame(gE);
+gE.elitePath = null; gE.eliteAttemptsUsed = 0; gE.eliteStatus = null;
+S.startEliteChallenge();
+const filaInicial = (gE.elitePath||[]).join(',');
+for(let tent = 1; tent <= 4; tent++){ gE.eliteAttemptsUsed = tent; S.startEliteChallenge(); }
+ok('a fila NAO muda nas retentativas', gE.elitePath.join(',') === filaInicial,
+   filaInicial + ' -> ' + gE.elitePath.join(','));
+gE.elitePath = ['johto','kanto','johto','kanto'];
+ok('o oponente da etapa segue a fila sorteada',
+   S.eliteMembroDaEtapa(0).name === S.JOHTO_ELITE[0].name &&
+   S.eliteMembroDaEtapa(1).name === S.ELITE_FOUR[1].name);
 
 console.log('\nA DICA DE CADA GINASIO TEM QUE SER VERDADE');
 /* `adviceTypes` é a frase "leve pokémon de tipo X". Se ela citar um tipo que mal acerta o time, o

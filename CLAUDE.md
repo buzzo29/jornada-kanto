@@ -144,10 +144,9 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
 - **As três evoluções em conflito ficaram de fora**: Gloom, Poliwhirl e Slowpoke continuam virando
   Vileplume, Poliwrath e Slowbro. A tabela mapeia um destino só, e a chave repetida faria o segundo
   apagar o primeiro em silêncio.
-  Bellossom, Politoed e Slowking, portanto, **não têm como aparecer por evolução** — e por isso
-  entraram direto no pool de rotas (Rotas 36/37 e Lago da Fúria). É uma solução de contorno
-  honesta, não a definitiva: a definitiva é uma tela de escolha na hora da evolução, como a do
-  Eevee, e aí eles saem das rotas.
+  Bellossom, Politoed e Slowking chegam pela **tela de escolha** (`EVOLUTION_CHOICES`, ver a seção
+  da bifurcação) — o `tryEvolve` intercepta antes de usar a tabela. Eles seguem também no pool de
+  rotas, o que é de propósito: dá pra encontrar um selvagem sem depender de criar a linha inteira.
 - **Armadilha que quase passou**: Espeon e Umbreon estavam na tabela de evoluções de Johto como
   destino do `eevee`. Ao fundir, o Eevee passou a evoluir sozinho pra Umbreon no nível 40 —
   atropelando a tela de escolha dele. Pego pelo `tools/test-johto.js`, que hoje trava isso.
@@ -310,6 +309,34 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
 - **`gymChoice` entrou no `SAFE_SAVE_SCREENS`.** Sem isso a tela "Qual ginásio vamos?" não era
   ponto seguro de gravação: a insígnia recém-ganha ficava pendente enquanto o jogador pensava, e
   fechar a aba ali perdia a vitória.
+- **Três evoluções agora perguntam pro jogador** (`EVOLUTION_CHOICES`, tela `evoChoice`): Gloom vira
+  Vileplume **ou** Bellossom, Poliwhirl vira Poliwrath **ou** Politoed, Slowpoke vira Slowbro **ou**
+  Slowking. No original quem decide é a pedra ou o item de troca; aqui não há itens, então decide o
+  jogador, como já era com o Eevee.
+  O `tryEvolve` PARA no ponto de bifurcação e marca `pendingEvoChoice` — por isso um Oddish que
+  chega ao nível 41 vira Gloom sozinho e só então pergunta. A entrada no `EVOLUTIONS` continua
+  apontando pro destino de Kanto: é dela que `finalEvolutionOf` monta time de NPC (rival, Torre),
+  onde não há ninguém pra escolher. O jogador nunca passa por ela.
+- **A fila da Elite 4 é sorteada, posto a posto**: Lorelei ou Will, Bruno ou Koga, Agatha ou Bruno,
+  Lance ou Karen. Cada posto de Johto tem o mesmo número de pokémon e a mesma média de nível do de
+  Kanto — a escolha é de tipo, não de dificuldade.
+  **Sorteada UMA VEZ e guardada no save** (`game.elitePath`). Refazer a cada tentativa transformaria
+  perder-e-voltar num jeito de re-sortear até cair um caminho fácil, e apagaria o que o jogador
+  aprendeu sobre a fila dele.
+  O Koga aparece na Elite porque é o que acontece no jogo original: ele sai do ginásio de Fuchsia e
+  sobe na Gen 2. **O Bruno está nas duas listas** (está nos dois jogos), então o sorteio nunca
+  repete adversário: se ele saiu no posto 2 pelo lado de Kanto, o posto 3 fica com a Agatha.
+- **Os 100 de Johto ganharam nome de golpe próprio** (`MOVE_OVERRIDES`). Sem isso caíam todos no
+  `MOVE_BY_TYPE` e atacavam com o mesmo punhado de nomes genéricos. Pior: **Sombrio e Aço nem
+  estavam no `MOVE_BY_TYPE`**, então `nomeDoGolpe` devolvia `null` e a linha do log saía sem golpe
+  nenhum — "Umbreon atacou Gengar e tirou −40 de HP". As 250 espécies agora têm nome pra todo tipo
+  que conseguem usar.
+- **Johto NÃO tem subtipos, e isso foi medido, não esquecido.** As 70 espécies de Kanto com subtipo
+  ganham um segundo tipo de ataque (com redutor 0,85) quando ele rende mais. Johto tem zero — mas a
+  tipagem dupla nativa dele já compensa: num duelo de times só-Kanto contra só-Johto (evoluções
+  finais, nível 70, 1.200 batalhas) **Kanto vence 51,4%**, dentro do ruído. E Johto tem MENOS
+  confrontos ruins (12,4% contra 14,7%) e menos casos sem golpe útil (114 contra 195). Dar subtipo
+  a Johto seria mexer em balanceamento sem problema medido pra resolver.
 - **O mapa de Kanto continua sendo de Kanto.** `KANTO_PLACES`/`KANTO_JOURNEY` são indexados pela
   etapa, então numa etapa de Johto ele desenha a cidade de Kanto correspondente. A trilha de
   insígnias já segue o caminho certo (`gymOf(i)`); o mapa é o que falta.
