@@ -796,6 +796,7 @@ const CHANCE_AUTODESTRUICAO = 0.15;
 const CHANCE_SONO = 0.05;
 const CHANCE_METRONOMO_EFEITO = 0.10;   // por efeito: 10% cada um dos três, 70% golpe comum
 const CHANCE_DISABLE = 0.10;
+const CHANCE_RECUPERAR = 0.10;
 const IMUNES_A_ESPECIAL = ['mew','mewtwo'];
 /* Aprendem Autodestruição por nível na Gen 1/2. */
 const AUTODESTRUICAO = ['geodude','graveler','golem','voltorb','electrode','koffing','weezing','pineco','forretress'];
@@ -825,6 +826,15 @@ const METRONOMO = ['togepi','togetic','cleffa','snubbull'];
 const DISABLE = ['psyduck','golduck','kadabra','alakazam','slowpoke','slowbro','slowking',
                  'grimer','muk','lickitung','jigglypuff','wigglytuff','venonat','venomoth',
                  'drowzee','hypno'];
+/* Aprendem Recuperar por nível na Gen 1/2. Recover não é TM em geração nenhuma das duas e não sai
+   por reprodução -- então esta lista é a lista inteira, sem recorte.
+   Lugia, Ho-Oh e Celebi estão aqui por serem o que os dados dizem, mesmo sendo os INTOCÁVEIS: hoje
+   ninguém os tem e nenhum NPC os usa, então a entrada não roda -- mas ela é VERDADE, e no dia em
+   que algum modo puser um deles em campo já estará certa.
+   O Mewtwo aprende e mesmo assim ficou de fora: ele e o Mew são imunes ao bloco INTEIRO
+   (IMUNES_A_ESPECIAL corta antes de sortear), então ali a entrada seria letra morta de verdade. */
+const RECUPERACAO = ['kadabra','alakazam','staryu','starmie','porygon','porygon2','corsola',
+                     'lugia','hooh','celebi'];
 /* Quem explodiu no confronto que está sendo resolvido: true = foi o primeiro argumento do
    doExchange (o "nosso" lado em todos os laços), false = o segundo, null = ninguém.
    É o que deixa os laços decidirem "os dois últimos caíram, quem ganha?" sem mudar assinatura.
@@ -968,6 +978,26 @@ function doExchange(active, enemy, rng, diario){
       const linha = (survivor === second) ? diario[diario.length-2] : diario[diario.length-1];
       const antes = (survivor === second) ? secondHpBefore : firstHpBefore;
       if(linha){ linha.hp = survivor.hp; linha.d = antes - survivor.hp; linha.dz = 1; }
+    }
+  }
+  /* RECUPERAR -- o único especial que acontece DEPOIS da luta, e não antes dela.
+     Vive aqui, no fim do doExchange, pelo mesmo motivo de todos os outros: são QUATRO laços de
+     batalha (jornada no cliente, jornada no servidor, online e raide do Mew) e eles teriam que
+     combinar entre si. O laço chama o doExchange até alguém cair, então "um caiu e o outro está de
+     pé" é exatamente o fim do confronto, visto de dentro daqui.
+     Só sorteia se ele TOMOU dano: com a vida cheia não há o que recuperar, e a frase apareceria
+     anunciando um efeito que não aconteceu.
+     Vale também pra quem sobrou do desempate (aquele bloco acima ressuscita um dos dois): ele
+     venceu o confronto, e a regra é sobre vencer. É raro e é o que a mecânica diz. */
+  const venceuOConfronto = (first.hp > 0 && second.hp <= 0) ? first
+                         : ((second.hp > 0 && first.hp <= 0) ? second : null);
+  if(venceuOConfronto && venceuOConfronto.hp < venceuOConfronto.maxHp &&
+     !ehImuneAEspecial(venceuOConfronto) && RECUPERACAO.includes(venceuOConfronto.speciesId) &&
+     rng() < CHANCE_RECUPERAR){
+    venceuOConfronto.hp = venceuOConfronto.maxHp;
+    if(diario){
+      diario.push({ q: (venceuOConfronto === active) ? 'p' : 'e', d: 0, hp: venceuOConfronto.hp,
+                    c:0, m:0, z:0, x:'recover', g:'Recuperar' });
     }
   }
 }

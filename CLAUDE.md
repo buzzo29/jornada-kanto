@@ -174,7 +174,7 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
   os dois arquivos têm comentários próprios e listam em ordens diferentes), 152–251 sem buraco, os
   dois tipos novos completos, e as evoluções de Kanto intactas.
 
-## Golpes especiais (autodestruição, sono, metrônomo e Disable)
+## Golpes especiais (autodestruição, sono, metrônomo, Disable e Recuperar)
 
 São os **primeiros efeitos do jogo que não são dano** — até aqui todo confronto se resolvia por
 troca de golpes e desempate. Entram no `doExchange`, nos DOIS motores, e o teste que garante que os
@@ -240,6 +240,32 @@ de golpes.
   reconstrução, perdendo os golpes de verdade. A linha dele é montada à parte e vem **antes** de
   tudo no log: a anulação acontece na abertura, e a luta que se lê embaixo já é a luta com o golpe
   anulado.
+- **Recuperar (`RECUPERACAO`, 10%): 10 espécies**, e é o **único que acontece DEPOIS da luta**.
+  Quem vence o confronto e ainda está de pé tem 10% de voltar com a vida cheia. Isso importa de
+  verdade porque o HP carrega de um confronto pro outro: sair de uma vitória apertada com a barra
+  cheia é o que decide o confronto seguinte.
+  Mora no **fim do `doExchange`**, e não nos laços de batalha, pelo mesmo motivo de todos os
+  outros: são QUATRO laços (jornada no cliente, jornada no servidor, online e raide do Mew) e eles
+  teriam que combinar entre si. O laço chama o `doExchange` até alguém cair, então "um caiu e o
+  outro está de pé" é exatamente o fim do confronto, visto de dentro dali.
+  **Só sorteia se ele TOMOU dano**: com a vida cheia não há o que recuperar, e a frase anunciaria um
+  efeito que não aconteceu. Por isso a taxa real fica um pouco ABAIXO de 10% das vitórias — medido,
+  10,2%.
+  Vale também pra quem sobrou do **desempate** (aquele bloco ressuscita um dos dois com 5%-15%):
+  ele venceu o confronto, e a regra é sobre vencer.
+  A lista sai do aprendizado por nível: Kadabra/Alakazam, Staryu/Starmie, Porygon/Porygon2 (Gen 1 +
+  Gen 2), mais Corsola, Lugia, Ho-Oh e Celebi da Gen 2. **Recover não é TM em nenhuma das duas
+  gerações e não sai por reprodução**, então aqui a lista de "quem aprende por nível" é a lista
+  inteira, sem recorte. Lugia, Ho-Oh e Celebi ficam mesmo sendo os intocáveis — hoje ninguém os tem
+  e nenhum NPC os usa, então a entrada não roda, mas ela é VERDADE. O **Mewtwo** aprende e ficou de
+  fora pelo motivo de sempre: ele e o Mew são imunes ao bloco inteiro, e ali seria letra morta.
+  **A linha dele no log vem por ÚLTIMO** — a luta já acabou quando isso acontece, o oposto da
+  anulação, que abre o confronto e vem primeiro.
+  **Medido:** um time com um recuperador ganha **~0,8 ponto** num 6x6 (Alakazam 54,6% → 55,6%,
+  Starmie 60,9% → 61,6%, Porygon2 55,0% → 55,8%, Corsola 52,7% → 53,5%, com os MESMOS times dos
+  dois lados). O controle -- time sem nenhum -- fica em 50,05% → 50,13%, que é o que valida a
+  medição. Na jornada não se move: 62,2% → 62,7% em 20.000 de cada lado (1,1σ; a primeira leva de
+  10.000 deu 1,8σ e dobrar a amostra trouxe pra média).
 - **Quem explodiu VENCE quando os dois últimos caem.** Foi o pedido, e sem essa regra acontecia o
   contrário do que a tela mostra: o laço só olha "sobrou alguém do meu lado?", então o jogador
   perdia justamente a batalha que decidiu explodindo. Vive no `explosaoDoAtivo`, que é por BATALHA

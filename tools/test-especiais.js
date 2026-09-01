@@ -315,6 +315,94 @@ const todasComEspecial = new Set([...S.AUTODESTRUICAO, ...Object.keys(S.SONIFERO
 const semFicha = [...todasComEspecial].filter(id => S.especiaisDaEspecie(id).length === 0);
 ok('e toda especie das quatro listas aparece', semFicha.length === 0,
    semFicha.join(',') || todasComEspecial.size + ' especies');
+console.log('\nRECUPERAR: O UNICO QUE ACONTECE DEPOIS DA LUTA');
+/* Recover nao e TM em nenhuma das duas geracoes e nao sai por reproducao -- entao a lista de quem
+   aprende por nivel e a lista inteira, sem recorte. */
+ok('10 especies aprendem Recuperar', S.RECUPERACAO.length === 10, S.RECUPERACAO.join(', '));
+ok('as da Gen 1 estao la', ['kadabra','alakazam','staryu','starmie','porygon']
+   .every(id => S.RECUPERACAO.includes(id)));
+ok('e as que so a Gen 2 deu', ['porygon2','corsola','lugia','hooh','celebi']
+   .every(id => S.RECUPERACAO.includes(id)));
+/* O Mewtwo aprende e mesmo assim fica de fora: ele e o Mew sao imunes ao bloco inteiro, entao a
+   entrada seria letra morta. (Lugia, Ho-Oh e Celebi ficam porque sao o que os dados dizem -- hoje
+   ninguem os tem, mas a entrada e verdade e ja estara certa no dia em que algum modo os usar.) */
+ok('o Mewtwo nao entra (e imune ao bloco inteiro)', !S.RECUPERACAO.includes('mewtwo'));
+ok('nenhuma esta fora do SPECIES', S.RECUPERACAO.filter(id => !S.SPECIES[id]).length === 0);
+
+/* O EFEITO, medido em batalha de verdade: quem cura tem que ser quem VENCEU o confronto, e tem que
+   ficar com a vida CHEIA. Um recover num perdedor seria o defeito silencioso aqui -- ele sairia no
+   log de um pokemon que caiu. */
+(function(){
+  const pool = Object.keys(S.SPECIES).filter(id => S.SPECIES[id].dex <= 251);
+  function timeCom(id, semente){
+    const rng = S.makeSeededRng(semente);
+    const t = [inst(id, 60)];
+    while(t.length < 6){ const x = pool[Math.floor(rng()*pool.length)];
+      if(!t.some(p=>p.speciesId===x)) t.push(inst(x, 60)); }
+    return t;
+  }
+  let curas = 0, curasDele = 0, vitorias = 0, curouSemVencer = 0, curouSemEncher = 0, curaDeQuemNaoTem = 0;
+  for(let i=0;i<1500;i++){
+    const r = S.simulateGymBattle(timeCom('alakazam','a'+i), timeCom('onix','b'+i), Math.random);
+    (r.matchups||[]).forEach(m => {
+      const meu = m.playerSpecies === 'alakazam';
+      if(meu && m.playerWon) vitorias++;
+      (m.golpes||[]).forEach(g => {
+        if(g.x !== 'recover') return;
+        const doJogador = g.q === 'p';
+        curas++;
+        if(doJogador && meu) curasDele++;
+        const especie = doJogador ? m.playerSpecies : m.enemySpecies;
+        if(!S.RECUPERACAO.includes(especie)) curaDeQuemNaoTem++;
+        // quem curou tem que ser o vencedor do confronto
+        const venceu = doJogador ? m.playerWon : (!m.playerWon && !m.isTrade);
+        if(!venceu) curouSemVencer++;
+        const hpDepois = doJogador ? m.playerHpAfter : m.enemyHpAfter;
+        const maxHp = doJogador ? m.playerMaxHp : m.enemyMaxHp;
+        if(hpDepois !== maxHp) curouSemEncher++;
+      });
+    });
+  }
+  ok('a cura acontece de verdade', curasDele > 0, curasDele + ' curas dele em ' + vitorias + ' vitorias');
+  ok('e SEMPRE em quem venceu o confronto', curouSemVencer === 0, curouSemVencer + ' curas de perdedor');
+  ok('deixando a vida CHEIA', curouSemEncher === 0, curouSemEncher + ' curas que nao encheram');
+  ok('e so quem tem o golpe cura', curaDeQuemNaoTem === 0, curaDeQuemNaoTem + ' curas de quem nao tem');
+  /* ~10% das vitorias EM QUE ELE TOMOU DANO -- vitoria sem arranhao nao sorteia nada, porque nao ha
+     o que recuperar e a frase anunciaria um efeito que nao aconteceu. */
+  const taxa = 100*curasDele/Math.max(1,vitorias);
+  /* Abaixo de 10% de proposito: vitoria sem arranhao nao sorteia nada (nao ha o que recuperar). */
+  ok('perto de 10% das vitorias dele', taxa > 5 && taxa < 12, taxa.toFixed(1) + '%');
+})();
+/* Quem nao esta na lista nunca cura, por mais que venca. */
+(function(){
+  let curas = 0;
+  for(let i=0;i<800;i++){
+    const r = S.simulateGymBattle([inst('pikachu',60)], [inst('caterpie',30)], Math.random);
+    (r.matchups||[]).forEach(m => (m.golpes||[]).forEach(g => { if(g.x==='recover') curas++; }));
+  }
+  ok('quem nao tem o golpe nunca cura', curas === 0, curas + ' de 800');
+})();
+
+console.log('\nA FRASE DA RECUPERACAO');
+const mRec = { player:'Alakazam', enemy:'Onix', playerSpecies:'alakazam', enemySpecies:'onix',
+  playerHpBefore:200, playerHpAfter:200, playerMaxHp:200, enemyHpBefore:210, enemyHpAfter:0, enemyMaxHp:210,
+  playerMove:'Psychic', enemyMove:'Rock',
+  golpes:[{ q:'p', d:210, hp:0 }, { q:'e', d:90, hp:110 }, { q:'p', d:0, hp:200, x:'recover', g:'Recuperar' }] };
+ok('e a pedida: "Alakazam usou Recuperar e restaurou seu HP"',
+   S.avisoDoConfronto(mRec) === '💚 Alakazam usou Recuperar e restaurou seu HP!', S.avisoDoConfronto(mRec));
+ok('no log ela vem com o selo do tipo (Recover e Normal)',
+   S.passosHtml(mRec).includes('usou <span class="type-pill" style="background:' + S.TYPE_COLORS['Normal'] + '">Recuperar</span> e restaurou'));
+/* Ela vem por ULTIMO: a luta ja acabou quando isso acontece -- o oposto da anulacao, que abre o
+   confronto e por isso vem primeiro. */
+const htmlRec = S.passosHtml(mRec);
+ok('e vem por ULTIMO no log', htmlRec.indexOf('Recuperar') > htmlRec.lastIndexOf('atacou'));
+/* Nao tira HP: nao pode virar um passo de dano 0 na animacao nem gastar vaga do TETO_GOLPES. */
+ok('e fica fora da sequencia de golpes', S.sequenciaDoConfronto(mRec).length === 2 &&
+   !S.sequenciaDoConfronto(mRec).some(g => g.x === 'recover'));
+ok('a ficha da Pokedex mostra ele', S.especiaisDaEspecie('starmie').some(e => e.nome === 'Recuperar'));
+ok('e quem tem dois aparece com os dois',
+   S.especiaisDaEspecie('alakazam').map(e=>e.nome).join(' + ') === 'Anulação + Recuperar',
+   S.especiaisDaEspecie('alakazam').map(e=>e.nome).join(' + '));
 console.log('\nOS DOIS MOTORES DAO O MESMO RESULTADO');
 /* O motor e duplicado (cliente e servidor). Uma diferenca aqui faz a liga decidir uma coisa e a
    animacao mostrar outra -- e o jogador so descobre quando perde uma final. */

@@ -5191,6 +5191,7 @@ const CHANCE_AUTODESTRUICAO = 0.15;
 const CHANCE_SONO = 0.05;
 const CHANCE_METRONOMO_EFEITO = 0.10;   // por efeito: 10% cada um dos três, 70% golpe comum
 const CHANCE_DISABLE = 0.10;
+const CHANCE_RECUPERAR = 0.10;
 const IMUNES_A_ESPECIAL = ['mew','mewtwo'];
 /* Aprendem Autodestruição por nível na Gen 1/2. */
 const AUTODESTRUICAO = ['geodude','graveler','golem','voltorb','electrode','koffing','weezing','pineco','forretress'];
@@ -5220,6 +5221,15 @@ const METRONOMO = ['togepi','togetic','cleffa','snubbull'];
 const DISABLE = ['psyduck','golduck','kadabra','alakazam','slowpoke','slowbro','slowking',
                  'grimer','muk','lickitung','jigglypuff','wigglytuff','venonat','venomoth',
                  'drowzee','hypno'];
+/* Aprendem Recuperar por nível na Gen 1/2. Recover não é TM em geração nenhuma das duas e não sai
+   por reprodução -- então esta lista é a lista inteira, sem recorte.
+   Lugia, Ho-Oh e Celebi estão aqui por serem o que os dados dizem, mesmo sendo os INTOCÁVEIS: hoje
+   ninguém os tem e nenhum NPC os usa, então a entrada não roda -- mas ela é VERDADE, e no dia em
+   que algum modo puser um deles em campo já estará certa.
+   O Mewtwo aprende e mesmo assim ficou de fora: ele e o Mew são imunes ao bloco INTEIRO
+   (IMUNES_A_ESPECIAL corta antes de sortear), então ali a entrada seria letra morta de verdade. */
+const RECUPERACAO = ['kadabra','alakazam','staryu','starmie','porygon','porygon2','corsola',
+                     'lugia','hooh','celebi'];
 /* Quem explodiu no confronto que está sendo resolvido: true = foi o primeiro argumento do
    doExchange (o "nosso" lado em todos os laços), false = o segundo, null = ninguém.
    É o que deixa os laços decidirem "os dois últimos caíram, quem ganha?" sem mudar assinatura.
@@ -5365,6 +5375,26 @@ function doExchange(active, enemy, rng, diario){
       const linha = (survivor === second) ? diario[diario.length-2] : diario[diario.length-1];
       const antes = (survivor === second) ? secondHpBefore : firstHpBefore;
       if(linha){ linha.hp = survivor.hp; linha.d = antes - survivor.hp; linha.dz = 1; }
+    }
+  }
+  /* RECUPERAR -- o único especial que acontece DEPOIS da luta, e não antes dela.
+     Vive aqui, no fim do doExchange, pelo mesmo motivo de todos os outros: são QUATRO laços de
+     batalha (jornada no cliente, jornada no servidor, online e raide do Mew) e eles teriam que
+     combinar entre si. O laço chama o doExchange até alguém cair, então "um caiu e o outro está de
+     pé" é exatamente o fim do confronto, visto de dentro daqui.
+     Só sorteia se ele TOMOU dano: com a vida cheia não há o que recuperar, e a frase apareceria
+     anunciando um efeito que não aconteceu.
+     Vale também pra quem sobrou do desempate (aquele bloco acima ressuscita um dos dois): ele
+     venceu o confronto, e a regra é sobre vencer. É raro e é o que a mecânica diz. */
+  const venceuOConfronto = (first.hp > 0 && second.hp <= 0) ? first
+                         : ((second.hp > 0 && first.hp <= 0) ? second : null);
+  if(venceuOConfronto && venceuOConfronto.hp < venceuOConfronto.maxHp &&
+     !ehImuneAEspecial(venceuOConfronto) && RECUPERACAO.includes(venceuOConfronto.speciesId) &&
+     rng() < CHANCE_RECUPERAR){
+    venceuOConfronto.hp = venceuOConfronto.maxHp;
+    if(diario){
+      diario.push({ q: (venceuOConfronto === active) ? 'p' : 'e', d: 0, hp: venceuOConfronto.hp,
+                    c:0, m:0, z:0, x:'recover', g:'Recuperar' });
     }
   }
 }
@@ -12913,7 +12943,7 @@ function sequenciaDoConfronto(m){
      sequência por dois motivos -- viraria um passo de dano 0 na animação, e consumiria uma vaga
      do TETO_GOLPES, o que jogaria uma troca real de 2 golpes na reconstrução e perderia os golpes
      de verdade. A frase dele é montada à parte, no passosHtml. */
-  const reais = passosVisiveis((m.golpes || []).filter(g => g.x !== 'disable'));
+  const reais = passosVisiveis((m.golpes || []).filter(g => g.x !== 'disable' && g.x !== 'recover'));
   if(reais.length && reais.length <= TETO_GOLPES) return reais;
   // a reconstrução fala em QUEM APANHA (side); aqui a lista é de QUEM BATE (q)
   return reconstruirSequencia(m).map(h => ({ q: h.side === 'player' ? 'e' : 'p', d: h.amount }));
@@ -12925,7 +12955,7 @@ function sequenciaDoConfronto(m){
    'quem' é sempre quem USOU o golpe; 'alvo' é quem sofreu. Repare que a frase do Disable começa
    pelo ALVO ("Gengar teve seu melhor ataque anulado por Alakazam"): quem interessa ali é o
    prejudicado, e é o nome dele que o jogador procura na tela. */
-const ICONES_ESPECIAIS = { boom:'💥', sono:'😴', disable:'🚫' };
+const ICONES_ESPECIAIS = { boom:'💥', sono:'😴', disable:'🚫', recover:'💚' };
 /* O TIPO de cada golpe especial, pro selo colorido do log. Vive só no CLIENTE, como o
    MOVE_BY_TYPE: o motor manda o que aconteceu, o cliente escolhe a palavra e a cor -- é o que
    evita mais uma tabela duplicada pra sair de sincronia.
@@ -12935,7 +12965,7 @@ const TIPO_DO_ESPECIAL = {
   'auto-destruição':'Normal',
   'Pó do Sono':'Grass', 'Esporo':'Grass', 'Hipnose':'Psychic',
   'Canto':'Normal', 'Beijo Adorável':'Normal',
-  'Anulação':'Normal', 'Metrônomo':'Normal',
+  'Anulação':'Normal', 'Metrônomo':'Normal', 'Recuperar':'Normal',
   'Metrônomo (auto-destruição)':'Normal', 'Metrônomo (sonífero)':'Normal', 'Metrônomo (anulação)':'Normal'
 };
 /* O selo colorido com o nome do golpe dentro -- a cor já entrega o tipo. */
@@ -12943,7 +12973,7 @@ function seloDeGolpe(nome, tipo){
   if(!nome) return '';
   return `<span class="type-pill" style="background:${TYPE_COLORS[tipo]||'#888'}">${escapeHtmlSafe(nome)}</span>`;
 }
-function ehGolpeEspecial(g){ return g && (g.x === 'boom' || g.x === 'sono' || g.x === 'disable'); }
+function ehGolpeEspecial(g){ return g && (g.x === 'boom' || g.x === 'sono' || g.x === 'disable' || g.x === 'recover'); }
 function fraseDoEspecial(g, quem, alvo, op){
   op = op || {};
   const golpe = g.g ? String(g.g) : '';
@@ -12961,6 +12991,11 @@ function fraseDoEspecial(g, quem, alvo, op){
   if(g.x === 'sono'){
     if(!(op.comGolpe && golpe)) return quem + ' fez ' + alvo + ' dormir';
     return quem + ' fez ' + alvo + ' dormir com ' + comoGolpe(golpe, TIPO_DO_ESPECIAL[golpe] || 'Normal');
+  }
+  if(g.x === 'recover'){
+    /* Acontece DEPOIS do confronto, então a frase é sobre quem sobrou -- e o nome do golpe entra
+       nos dois lugares (log e aviso), ao contrário do sono: aqui ele É o efeito, não um detalhe. */
+    return quem + ' usou ' + comoGolpe(golpe || 'Recuperar', 'Normal') + ' e restaurou seu HP';
   }
   if(g.x === 'disable'){
     /* Nomeia o golpe ANULADO, não a anulação: o que interessa é o que o pokémon PERDEU. O motor
@@ -12982,6 +13017,7 @@ function especiaisDaEspecie(id){
   if(DISABLE.includes(id))        out.push({ nome:'Anulação',        chance: CHANCE_DISABLE });
   // o metrônomo sai em algum efeito em 3 das 10 vezes (explosão, sono ou anulação)
   if(METRONOMO.includes(id))      out.push({ nome:'Metrônomo',       chance: CHANCE_METRONOMO_EFEITO*3 });
+  if(RECUPERACAO.includes(id))    out.push({ nome:'Recuperar',       chance: CHANCE_RECUPERAR });
   return out.map(e => Object.assign({}, e, { tipo: TIPO_DO_ESPECIAL[e.nome] || 'Normal' }));
 }
 /* O aviso que aparece NO MEIO DA BATALHA, na mesma linha onde se lê "Trocando golpes...".
@@ -13021,6 +13057,9 @@ function passosHtml(m){
   /* As anulações vêm ANTES de tudo: o Disable acontece na abertura do confronto e a luta inteira
      que se lê embaixo já é a luta com o golpe anulado. */
   const anulacoes = (m.golpes || []).filter(g => g.x === 'disable').map(linhaEspecial).join('');
+  /* A recuperação vem por ÚLTIMO: ela acontece depois de tudo, com o confronto já decidido --
+     o oposto da anulação, que abre o confronto. */
+  const recuperacoes = (m.golpes || []).filter(g => g.x === 'recover').map(linhaEspecial).join('');
   return `<div class="mlog-passos">${anulacoes}${golpes.map(g=>{
     const doJogador = g.q === 'p';
     if(g.x === 'boomself') return '';   // a linha da explosão (acima) já contou os dois lados
@@ -13028,7 +13067,7 @@ function passosHtml(m){
     return `<div class="mlog-passo ${doJogador?'p':'e'}">
       ${ladoHtml(doJogador)} atacou ${ladoHtml(!doJogador)}${seloDe(doJogador)?` com ${seloDe(doJogador)}`:''} e tirou <span class="mlog-tira">−${g.d}</span> de HP.
     </div>`;
-  }).join('')}</div>`;
+  }).join('')}${recuperacoes}</div>`;
 }
 
 function renderHpBar(hp, maxHp, fillId, labelId){
