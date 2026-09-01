@@ -1,5 +1,5 @@
 /**
- * A TELA DA BATALHA ONLINE E O QUADRO #151 DA POKEDEX.
+ * TELAS: a Batalha Online, o quadro #151 da Pokedex e a espera do Ginasio da Cidade.
  *
  * Duas coisas que nao tem como um teste de motor pegar: elas moram na TELA, e o defeito de cada
  * uma era ficar parada dizendo a coisa errada -- que e o tipo de falha que ninguem consegue
@@ -104,6 +104,57 @@ g = S.__getGame(); g.pokedexView = 'normal'; S.__setGame(g);
 /* E ele NAO abre ficha: nao ha ficha pra um pokemon que ninguem descobriu. */
 S.abrirPokedexFicha('mew', false);
 ok('e o #151 nao abre ficha nenhuma', S.renderPokedexFicha() === '');
+
+
+console.log('\nA ESPERA DO GINASIO CHEGA ATE A TELA');
+/* POR QUE ESTE TESTE EXISTE: a espera por pokemon foi implementada e conferida NA TELA, com o
+   campo escrito a mao no formato final -- e o carregador guardava so `result.data.cooldowns` (o
+   campo da espera por TIME, que ficou vazio), jogando fora o `mons`. Resultado: nenhum pokemon
+   aparecia apagado e ninguem tinha como saber quem podia usar. A conferencia do desenho passou; o
+   caminho do dado ate ele e que estava quebrado.
+   Por isso aqui se roda o CARREGADOR de verdade, com so a chamada de rede trocada. */
+{
+  let g = S.__getGame();
+  const time = (pref, esp) => esp.map((e,i)=>({ id:pref+i, speciesId:e, level:70+i, shiny:false }));
+  g.authUser = { uid:'u1' };
+  g.saveSlots = [
+    { customName:'Kanto', badgeCount:8, team: time('a', ['gyarados','alakazam','snorlax','arcanine','gengar','lapras']) },
+    { customName:'Johto', badgeCount:8, team: time('b', ['typhlosion','ampharos','steelix','umbreon','kingdra','tyranitar']) }
+  ];
+  g.neighborhoodGymLocation = { city:'Sorocaba', countryCode:'BR' };
+  g.neighborhoodGymDetail = { hasLeader:true, leaderTeamPreview:[{speciesId:'onix',level:70}], leaderTerrain:null };
+  S.__setGame(g);
+  /* A RESPOSTA DO SERVIDOR, na forma exata em que ele responde -- e ela que o carregador tem que
+     saber guardar. Os tres primeiros do save Kanto acabaram de lutar. */
+  const resposta = { mons: { 'm_a0': 8*60*1000, 'm_a1': 8*60*1000, 'm_a2': 8*60*1000 }, cooldowns: {} };
+  espiaChamadas(resposta);
+  await S.startNeighborhoodGymChallenge();
+  await espera(60);
+
+  const esperas = S.esperaDosPokemon();
+  ok('o carregador guarda quem esta descansando', Object.keys(esperas).length === 3,
+     JSON.stringify(S.__getGame().neighborhoodGymCooldowns));
+  const tela = S.renderNeighborhoodGymChallengeTeamPicker();
+  ok('e a tela apaga os tres', (tela.match(/tower-pick[^"]*descansando/g)||[]).length === 3,
+     (tela.match(/tower-pick[^"]*descansando/g)||[]).length + ' apagados');
+  ok('com o TEMPO em minutos em cima de cada um', (tela.match(/⏳8min/g)||[]).length === 3,
+     (tela.match(/⏳\d+min/g)||[]).join(', '));
+  ok('e desabilitados de verdade', (tela.match(/descansando"[^>]*\n?[^>]*disabled/g)||[]).length > 0 ||
+     tela.split('descansando').slice(1).every(t => t.slice(0, 200).includes('disabled')));
+  ok('e a tela avisa quantos estao descansando', /3 pokémon estão descansando/.test(tela));
+  /* Os OUTROS NOVE continuam livres -- e o ponto da regra: so quem lutou descansa. */
+  const livres = S.towerEligiblePokemon().filter(p => !esperas[S.chaveDoPokemon(p)]).length;
+  ok('e os outros nove continuam livres', livres === 9, livres + ' livres');
+  /* A CHAVE tem que ser a mesma dos dois lados: se o cliente calculasse outra, a tela liberaria
+     justamente quem o servidor recusa. */
+  const doPrimeiro = S.chaveDoPokemon(S.towerEligiblePokemon()[0]);
+  ok('e a chave do cliente bate com a do servidor', doPrimeiro === 'm_a0', doPrimeiro);
+  /* Clicar num que esta descansando nao pode marcar. */
+  S.gymChallengeTogglePick(0, 0);
+  ok('clicar num descansando nao marca nada', (S.__getGame().neighborhoodGymChallengePick||[]).length === 0);
+  S.gymChallengeTogglePick(0, 4);
+  ok('e num livre marca', (S.__getGame().neighborhoodGymChallengePick||[]).length === 1);
+}
 
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
 process.exit(falhas ? 1 : 0);

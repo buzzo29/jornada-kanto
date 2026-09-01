@@ -4481,10 +4481,16 @@ async function startNeighborhoodGymChallenge(){
   const loc = game.neighborhoodGymLocation;
   try{
     const result = await functionsClient.httpsCallable('getNeighborhoodGymChallengeCooldowns')({ city: loc.city, countryCode: loc.countryCode });
-    game.neighborhoodGymCooldowns = result.data.cooldowns || {};
+    /* Guarda a RESPOSTA INTEIRA. Guardava só o campo "cooldowns" -- a espera por TIME, que ficou
+       vazia quando ela virou por pokémon --, e jogava fora o "mons", que é onde está quem está
+       descansando. Efeito: nenhum pokémon aparecia apagado e ninguém tinha como saber quem podia
+       usar. Reportado em 01/09/2026, no mesmo dia em que a espera mudou.
+       A conferência da tela não pegou porque ela escrevia o campo já no formato final, à mão --
+       testava o desenho, não o caminho do dado até ele. */
+    game.neighborhoodGymCooldowns = result.data || {};
   } catch(e){
     console.error('Erro ao consultar cooldown de desafio:', e);
-    game.neighborhoodGymCooldowns = {}; // falhou a consulta -- não trava a tela, só não mostra cooldown nenhum
+    game.neighborhoodGymCooldowns = {}; // falhou a consulta -- não trava a tela, só não mostra espera nenhuma
   }
   render();
 }

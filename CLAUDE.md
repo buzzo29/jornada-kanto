@@ -795,6 +795,14 @@ verdade, cai no game over, e o teste confere que a trava soltou dos dois lados.
   **A recusa NOMEIA quem está descansando**: um "espere 7 minutos" sem dizer por causa de quem faria
   a pessoa remontar o time no escuro. E a tela de montar mostra os descansando **apagados, com o
   tempo no lugar do nível** — sumir com eles faria parecer que o jogador perdeu o pokémon.
+  **O timer não aparecia**, e o defeito não estava na tela: o carregador guardava só
+  `result.data.cooldowns` — o campo da espera por TIME, que ficou vazio quando ela virou por
+  pokémon — e jogava fora o `mons`, que é onde está quem está descansando. Nenhum pokémon aparecia
+  apagado e não havia como saber quem podia usar. Reportado no mesmo dia em que a espera mudou.
+  **A conferência da tela não pegou porque ela escrevia o campo já no formato final, à mão**:
+  testava o desenho, não o caminho do dado até ele. Hoje `tools/test-online-dex.js` roda o
+  CARREGADOR de verdade, com só a chamada de rede trocada, e confere o que chega na tela — apagados,
+  minutos em cima de cada um, desabilitados, e os outros continuando livres.
   Marca vencendo ou perdendo. Na prática só pesa na derrota (vencendo ele vira líder e não desafia
   mais), mas marcar sempre evita retomar o ginásio no mesmo minuto com o mesmo time.
 - **"Ginásios liderados"**: a lista dos ginásios que você lidera, de qualquer lugar
