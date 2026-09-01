@@ -757,10 +757,34 @@ verdade, cai no game over, e o teste confere que a trava soltou dos dois lados.
   normal.
   **A ordem da escolha é a ordem de batalha**; a tela de ordem continua existindo pra reordenar
   vendo o time do líder.
+- **A espera de 10 minutos é POR POKÉMON** (`neighborhoodGymMonCooldownRef`, 01/09/2026). Quem
+  desafia fica 10 minutos sem poder usar **aqueles** pokémon nesse ginásio; o resto do bicharedo
+  continua livre pra montar outro time e tentar de novo. Já foi por TIME (uid+slot) e por JOGADOR:
+  por time não segurava nada — quem tinha 3 saves desafiava 3 vezes seguidas, uma com cada — e por
+  jogador segurava demais, travava a conta inteira por causa de um time que perdeu.
+  **A chave sai do pokémon que o SERVIDOR achou**, nunca do que o cliente mandou: senão daria pra
+  fugir da espera inventando um `monId`. É `m_<id do bicho>`, ou `p_<save>_<posição>` pra save
+  antigo, de antes do campo existir — e o cliente calcula a MESMA chave (`chaveDoPokemon`). Se as
+  duas divergirem, a tela libera quem o desafio recusa.
+  **A recusa NOMEIA quem está descansando**: um "espere 7 minutos" sem dizer por causa de quem faria
+  a pessoa remontar o time no escuro. E a tela de montar mostra os descansando **apagados, com o
+  tempo no lugar do nível** — sumir com eles faria parecer que o jogador perdeu o pokémon.
+  Marca vencendo ou perdendo. Na prática só pesa na derrota (vencendo ele vira líder e não desafia
+  mais), mas marcar sempre evita retomar o ginásio no mesmo minuto com o mesmo time.
+- **"Ginásios liderados"**: a lista dos ginásios que você lidera, de qualquer lugar
+  (`listMyNeighborhoodGyms`, consulta por `leaderUid` — índice de campo único, que o Firestore cria
+  sozinho). Liderar vale à distância; só CONQUISTAR um ginásio novo exige estar na cidade dele.
+  Sem isso, quem virou líder em São Paulo e voltou pra São José não tinha como abrir aquele ginásio
+  de novo — a tela só sabia mostrar o ginásio de onde a pessoa está.
+  O `openNeighborhoodGymRemote` **já existia, escrito exatamente pra isso, e nenhum caminho o
+  chamava**: a tela remota funcionava desde sempre, faltava a porta.
+  O botão aparece em TODOS os estados da tela do ginásio, inclusive quando a localização falha — é
+  justamente aí que ele mais serve. E a lista avisa quando falta escolher o terreno: sem terreno o
+  ginásio não aceita desafio, e o líder não tinha como saber disso sem abrir.
 - **Três regras estavam presas ao slot e tiveram que mudar junto.** Nenhuma foi escolha de gosto —
   sem "o time do slot N" elas deixam de ter o que contar:
-  1. **A espera de 10 min virou POR JOGADOR**, não por time. De quebra fecha uma brecha: quem tinha
-     3 saves desafiava 3 vezes seguidas, uma com cada, e a espera não segurava nada.
+  1. **A espera de 10 min deixou de ser por time** -- passou por "por jogador" e hoje é **por
+     pokémon** (ver a nota acima, que é a versão que vale).
   2. **Quem vence defende com o time que venceu.** Antes um sorteio escolhia um save LIVRE do
      vencedor (`pickAutoDefenseTeamForWinner`, removido) — fazia sentido quando a defesa era um save
      inteiro. Agora ele montou um time, ganhou com ele, e é com ele que fica.

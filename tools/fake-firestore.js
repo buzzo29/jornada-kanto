@@ -94,6 +94,11 @@ function collRef(parts, filtros, limite, ordem){
 function makeDb(){
   return {
     collection(nome){ return collRef([nome]); },
+    /* getAll: le varios documentos de uma vez. O Firestore de verdade tem, e o servidor usa pra
+       checar a espera de todos os pokemon de um time numa ida so -- seis leituras soltas seriam
+       seis idas de rede. Aqui e so um map, mas sem ele o teste morre com "db.getAll is not a
+       function" num ponto que nao tem nada a ver com o que estava sendo testado. */
+    async getAll(...refs){ return Promise.all(refs.map(r => r.get())); },
     batch(){
       const ops = [];
       return {

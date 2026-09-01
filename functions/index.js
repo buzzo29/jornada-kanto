@@ -2734,12 +2734,14 @@ exports.reorderNeighborhoodGymDefense = onCall(async (request) => {
   });
 });
 
-/* POR JOGADOR, não por time: com a defesa e o desafio montados à mão não existe mais "o time do
-   slot N" pra contar o tempo. De quebra fecha uma brecha -- quem tinha 3 saves desafiava 3 vezes
-   seguidas, uma com cada, e a espera de 10 minutos não segurava nada.
-   Os documentos antigos (uid_slot) ficam órfãos e inofensivos: ninguém mais lê eles. */
-function neighborhoodGymCooldownRef(gymRef, uid){
-  return gymRef.collection('challengeCooldowns').doc(String(uid));
+/* A ESPERA É POR POKÉMON. Quem desafia e perde fica 10 minutos sem poder usar AQUELES pokémon
+   nesse ginásio -- o resto do bicharedo dele continua livre pra montar outro time e tentar de novo.
+   Já foi por time (uid+slot) e por jogador; por time não segurava nada (quem tinha 3 saves
+   desafiava 3 vezes seguidas, uma com cada) e por jogador segurava demais -- travava a conta
+   inteira por causa de um time que perdeu.
+   Os documentos das duas versões antigas ficam órfãos e inofensivos: ninguém mais lê eles. */
+function neighborhoodGymMonCooldownRef(gymRef, uid, chave){
+  return gymRef.collection('challengeCooldowns').doc(String(uid) + '__' + String(chave));
 }
 exports.challengeNeighborhoodGym = onCall(async (request) => {
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
@@ -2773,15 +2775,6 @@ exports.challengeNeighborhoodGym = onCall(async (request) => {
 
   // cooldown de 10min por time (uid+slot) NESSE ginásio -- evita spam de desafio repetido com o mesmo
   // time. Checado ANTES da transação principal (não precisa ser atômico com a troca de liderança)
-  const cooldownRef = neighborhoodGymCooldownRef(gymRef, uid);
-  const cooldownSnap = await cooldownRef.get();
-  if(cooldownSnap.exists){
-    const elapsed = Date.now() - (cooldownSnap.data().lastChallengeAt||0);
-    if(elapsed < NEIGHBORHOOD_GYM_CHALLENGE_COOLDOWN_MS){
-      const remainingMs = NEIGHBORHOOD_GYM_CHALLENGE_COOLDOWN_MS - elapsed;
-      throw new HttpsError('resource-exhausted', `Você precisa esperar mais ${Math.ceil(remainingMs/1000)}s pra desafiar esse ginásio de novo.`);
-    }
-  }
 
   /* O time do desafiante é MONTADO com pokémon de qualquer save dele com 8 insígnias, sem repetir
      espécie -- a mesma regra da Torre e a mesma do líder. A ORDEM é a que ele escolheu.
@@ -2791,6 +2784,26 @@ exports.challengeNeighborhoodGym = onCall(async (request) => {
   const timeDoDesafiante = await resolverTimeDosSaves(uid, team, NEIGHBORHOOD_GYM_TEAM_SIZE, 'time do desafio', 1);
   const realTeamCode = sanitizeTeamCode(encodeTeamCode(timeDoDesafiante));
   if(!realTeamCode){ throw new HttpsError('failed-precondition', 'Time inválido.'); }
+
+  /* A ESPERA, POKÉMON A POKÉMON. Checada DEPOIS de resolver o time porque a chave sai do pokémon
+     que o servidor achou, não do que o cliente mandou. Recusa nomeando quem está de castigo: um
+     "espere 7 minutos" sem dizer por causa de quem faria a pessoa remontar o time no escuro. */
+  const refsDeEspera = timeDoDesafiante.map(p => neighborhoodGymMonCooldownRef(gymRef, uid, p.chave));
+  const snapsDeEspera = await db.getAll(...refsDeEspera);
+  const emEspera = [];
+  snapsDeEspera.forEach((snap, i) => {
+    if(!snap.exists) return;
+    const passou = Date.now() - (snap.data().lastChallengeAt||0);
+    if(passou < NEIGHBORHOOD_GYM_CHALLENGE_COOLDOWN_MS){
+      emEspera.push({ p: timeDoDesafiante[i], falta: NEIGHBORHOOD_GYM_CHALLENGE_COOLDOWN_MS - passou });
+    }
+  });
+  if(emEspera.length){
+    const maior = Math.max(...emEspera.map(e => e.falta));
+    const nomes = emEspera.map(e => (SPECIES[e.p.speciesId] && SPECIES[e.p.speciesId].name) || e.p.speciesId).join(', ');
+    throw new HttpsError('resource-exhausted',
+      `${nomes} ${emEspera.length===1?'acabou':'acabaram'} de desafiar esse ginásio. ${emEspera.length===1?'Ele precisa':'Eles precisam'} de mais ${Math.ceil(maior/60000)}min de descanso -- monte um time com outros pokémon.`);
+  }
   // especialidades do desafiante, lidas FORA da transação de propósito: transação do Firestore exige
   // todas as leituras antes de qualquer escrita, e essa é pesada (simula a batalha inteira dentro).
   // Buscar aqui deixa a transação enxuta. As do LÍDER ficam gravadas no próprio ginásio (snapshot de
@@ -2844,7 +2857,14 @@ exports.challengeNeighborhoodGym = onCall(async (request) => {
       challengerUid: uid, challengerName, defenderName: gymData.leaderName,
       matchups: match.matchups, challengerWon, at: Date.now()
     });
-    tx.set(cooldownRef, { lastChallengeAt: Date.now() });
+    /* Marca CADA pokémon que entrou na luta. Vencendo ou perdendo: na prática só pesa quando
+       perde (vencendo ele vira líder e não desafia mais), mas marcar sempre evita o vai-e-vem de
+       retomar o ginásio no mesmo minuto com o mesmo time. */
+    const agoraDaEspera = Date.now();
+    timeDoDesafiante.forEach(p => {
+      tx.set(neighborhoodGymMonCooldownRef(gymRef, uid, p.chave),
+             { lastChallengeAt: agoraDaEspera, speciesId: p.speciesId });
+    });
 
     // calculado ANTES do if/else pra ficar disponível tanto ali dentro quanto no return mais embaixo
     // (só faz sentido de verdade quando challengerWon, mas não custa nada calcular sempre)
@@ -2909,31 +2929,66 @@ exports.challengeNeighborhoodGym = onCall(async (request) => {
 
 // devolve, pra cada save elegível (8 insígnias) da conta, quanto tempo falta de cooldown NESSE
 // ginásio específico -- o cliente usa isso pra mostrar a contagem regressiva de 10min por time
+/* OS GINÁSIOS QUE EU LIDERO, onde quer que eles fiquem.
+   Liderar vale à distância -- só CONQUISTAR um ginásio novo exige estar no bairro (ver
+   openNeighborhoodGymRemote no cliente). Sem esta lista, quem virou líder em São Paulo e voltou
+   pra São José não tinha como abrir aquele ginásio de novo: a tela só sabia mostrar o ginásio de
+   onde a pessoa está.
+   A consulta é por `leaderUid`, que o Firestore indexa sozinho (índice de campo único) -- não
+   precisa de índice composto porque não há ordenação junto. Ordenar aqui em memória é barato: um
+   jogador lidera poucos ginásios, e o teto abaixo garante isso. */
+const MAX_GINASIOS_LIDERADOS = 50;
+exports.listMyNeighborhoodGyms = onCall(async (request) => {
+  if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
+  const uid = request.auth.uid;
+  const snap = await db.collection('neighborhoodGyms').where('leaderUid', '==', uid).limit(MAX_GINASIOS_LIDERADOS).get();
+  const gyms = [];
+  snap.forEach(doc => {
+    const d = doc.data() || {};
+    gyms.push({
+      city: d.city || doc.id,
+      countryCode: d.countryCode || null,
+      defenseCount: d.defenseCount || 0,
+      becameLeaderAt: d.becameLeaderAt || null,
+      // a tela usa isso pra avisar "falta escolher o terreno" -- um ginásio sem terreno não aceita
+      // desafio, então o líder precisa saber que ele está parado
+      hasTerrain: !!d.leaderTerrain,
+      hasTeam: !!d.leaderTeamCode
+    });
+  });
+  gyms.sort((a,b) => (b.becameLeaderAt||0) - (a.becameLeaderAt||0));
+  return { gyms };
+});
 exports.getNeighborhoodGymChallengeCooldowns = onCall(async (request) => {
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   const uid = request.auth.uid;
   const { city, countryCode } = request.data || {};
   if(!city){ throw new HttpsError('invalid-argument', 'Cidade não informada.'); }
   const gymRef = neighborhoodGymRef(city, countryCode);
-  /* UM número, não um por save: a espera é do JOGADOR nesse ginásio (ver
-     neighborhoodGymCooldownRef). O cliente continua recebendo o campo `cooldowns` com a mesma
-     forma de antes pra não quebrar quem estiver com a página velha em cache -- ali dentro vai a
-     mesma espera repetida pra todo save elegível. */
-  const snap = await neighborhoodGymCooldownRef(gymRef, uid).get();
-  let restante = 0;
-  if(snap.exists){
-    const passou = Date.now() - (snap.data().lastChallengeAt||0);
-    restante = Math.max(0, NEIGHBORHOOD_GYM_CHALLENGE_COOLDOWN_MS - passou);
-  }
+  /* Devolve QUAIS POKÉMON estão de castigo nesse ginásio, com quanto falta pra cada um. É isso que
+     deixa a tela de montar time mostrar o bicho apagado com o tempo em cima, em vez de deixar o
+     jogador montar o time inteiro e só descobrir no clique do desafio.
+     As chaves são calculadas do mesmo jeito que o resolverTimeDosSaves calcula (id do bicho, ou
+     save+posição pra save antigo) -- se as duas divergirem, a tela libera quem o desafio recusa. */
   const savesSnap = await db.collection('users').doc(uid).collection('saves').get();
-  const cooldowns = {};
-  if(restante > 0){
-    savesSnap.docs.forEach(d => {
-      const n = parseInt(d.id, 10);
-      if(Number.isFinite(n) && d.data().team && (d.data().badgeCount||0) >= 8) cooldowns[n] = restante;
+  const chaves = [];
+  savesSnap.forEach(doc => {
+    const s = doc.data() || {};
+    const badges = (typeof s.badgeCount === 'number') ? s.badgeCount : ((s.badgesEarned||[]).length);
+    if(badges < 8) return;
+    (s.team || []).forEach((p, i) => chaves.push(p.id ? ('m_' + p.id) : ('p_' + doc.id + '_' + i)));
+  });
+  const mons = {};
+  if(chaves.length){
+    const snaps = await db.getAll(...chaves.map(c => neighborhoodGymMonCooldownRef(gymRef, uid, c)));
+    snaps.forEach((snap, i) => {
+      if(!snap.exists) return;
+      const falta = NEIGHBORHOOD_GYM_CHALLENGE_COOLDOWN_MS - (Date.now() - (snap.data().lastChallengeAt||0));
+      if(falta > 0) mons[chaves[i]] = falta;
     });
   }
-  return { cooldowns, cooldown: restante };
+  // `cooldowns` continua no retorno, vazio, só pra não quebrar quem estiver com a página velha em cache
+  return { mons, cooldowns: {} };
 });
 // checa se um save específico está defendendo ALGUM ginásio agora -- usado pelo cliente antes de
 // confirmar a exclusão de um save, pra avisar "esse ginásio vai ficar sem líder" em vez da pessoa
@@ -3962,8 +4017,14 @@ async function resolverTimeDosSaves(uid, escolhidos, tamanho, ondeErro, minimo){
       throw new HttpsError('failed-precondition', 'Um dos pokémon escolhidos não está em nenhum time seu com 8 insígnias.');
     }
     jaUsados.add(idx);
-    const real = disponiveis[idx].mon;
-    time.push({ speciesId: real.speciesId, level: real.level, shiny: !!real.shiny });
+    const achado = disponiveis[idx];
+    const real = achado.mon;
+    /* A CHAVE identifica ESTE pokémon na conta, e sai do que o servidor achou -- nunca do que o
+       cliente mandou, senão daria pra fugir da espera do ginásio inventando um monId.
+       O id do bicho é o ideal (sobrevive a reordenar o time); save+posição é a rede pra save
+       antigo, de antes do campo existir. */
+    time.push({ speciesId: real.speciesId, level: real.level, shiny: !!real.shiny,
+                chave: real.id ? ('m_' + real.id) : ('p_' + achado.slot + '_' + achado.idx) });
   }
   return time;
 }

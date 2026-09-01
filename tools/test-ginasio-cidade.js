@@ -102,44 +102,91 @@ gym = (await db.collection('neighborhoodGyms').doc(GYM_ID).get()).data();
 ok('e escolhendo o normal, vem o normal',
    lerTime(gym.leaderTeamCode).startsWith('gyarados:73,'), lerTime(gym.leaderTeamCode));
 
-/* O ginasio so aceita desafio com terreno configurado (senao quem desafiasse ganharia de graca). */
+/* 4) O DESAFIANTE TAMBEM MONTA -- e a ESPERA E POR POKEMON.
+   Pra isso a defesa do Ash precisa ser esmagadora: o que interessa aqui e o caminho da DERROTA,
+   que e quando a espera pesa. */
+console.log('');
+console.log('O DESAFIO E A ESPERA POR POKEMON');
+const muralha = [mon('m1','mewtwo',99), mon('m2','lugia',99), mon('m3','hooh',99),
+                 mon('m4','tyranitar',99), mon('m5','dragonite',99), mon('m6','blissey',99)];
+await db.collection('users').doc('ash').collection('saves').doc('2').set({ badgeCount:8, team:muralha });
+await chamar(fns.setNeighborhoodGymDefense, 'ash', Object.assign({ team: escolher(muralha, 2, [0,1,2,3,4,5]) }, CIDADE));
 await chamar(fns.setNeighborhoodGymDefense, 'ash', Object.assign({ terrainId: fns._TERRAINS[0].id }, CIDADE));
-gym = (await db.collection('neighborhoodGyms').doc(GYM_ID).get()).data();
-ok('o lider configura o terreno sem mexer no time', !!gym.leaderTerrain && !!gym.leaderTeamCode, 'terreno: ' + gym.leaderTerrain);
 
-/* 4) O DESAFIANTE TAMBEM MONTA. */
-console.log('\nO DESAFIO');
-const desafio = escolher(garyA, 0, [0,1,2,3,4,5]);
-const r1 = await chamar(fns.challengeNeighborhoodGym, 'gary', Object.assign({ team: desafio }, CIDADE));
+/* O Gary tem DOZE pokemon em dois saves -- e isso que deixa testar "os outros continuam livres". */
+const garyB = [mon('k1','feraligatr',70), mon('k2','meganium',70), mon('k3','typhlosion',70),
+               mon('k4','ampharos',70), mon('k5','umbreon',70), mon('k6','scizor',70)];
+await db.collection('users').doc('gary').collection('saves').doc('1').set({ badgeCount:8, team:garyB });
+
+const primeiroTime = escolher(garyA, 0, [0,1,2,3,4,5]);
+const r1 = await chamar(fns.challengeNeighborhoodGym, 'gary', Object.assign({ team: primeiroTime }, CIDADE));
 ok('o desafio aceita time montado', r1 && Array.isArray(r1.matchups) && r1.matchups.length > 0,
    'matchups: ' + (r1 && r1.matchups && r1.matchups.length));
-ok('e responde quem venceu', typeof r1.win === 'boolean', 'win: ' + (r1 && r1.win));
+ok('e contra a muralha ele perde', r1.win === false, 'win: ' + r1.win);
 
-/* A ESPERA E DO JOGADOR, nao de um time: com o time montado nao existe mais "o time do slot N".
-   De quebra fecha a brecha antiga -- quem tinha 3 saves desafiava 3 vezes seguidas. */
-const outroTime = escolher(garyA, 0, [1,2,3]);
-const erro = await recusa(fns.challengeNeighborhoodGym, 'gary', Object.assign({ team: outroTime }, CIDADE));
-ok('e desafiar de novo com OUTRO time nao escapa da espera', /esperar mais/.test(erro || ''), erro);
+/* A REGRA NOVA: quem lutou descansa 10 minutos; o resto do bicharedo continua livre. */
+const deNovo = await recusa(fns.challengeNeighborhoodGym, 'gary', Object.assign({ team: primeiroTime }, CIDADE));
+ok('os MESMOS pokemon nao podem voltar na hora', /descanso/.test(deNovo || ''), deNovo);
+ok('e a recusa DIZ quem esta descansando', /Dragonite/.test(deNovo || ''), deNovo);
+/* Um so repetido ja basta pra barrar -- e a mensagem nomeia so ele. */
+const umRepetido = escolher(garyB, 1, [0,1,2,3,4]).concat(escolher(garyA, 0, [0]));
+const soUm = await recusa(fns.challengeNeighborhoodGym, 'gary', Object.assign({ team: umRepetido }, CIDADE));
+ok('um repetido no meio ja barra, e a mensagem nomeia so ele',
+   /Dragonite/.test(soUm || '') && !/Blissey/.test(soUm || ''), soUm);
+
+/* E O QUE O PEDIDO QUER: com OUTROS pokemon, desafia de novo na hora. */
+/* Falha LIMPA se a espera voltar a ser do jogador: sem o try, o teste morre com um throw e o
+   relatorio nao mostra qual regra quebrou. */
+let r2 = null, erroDoOutroTime = null;
+try { r2 = await chamar(fns.challengeNeighborhoodGym, 'gary', Object.assign({ team: escolher(garyB, 1, [0,1,2,3,4,5]) }, CIDADE)); }
+catch(e){ erroDoOutroTime = e.message; }
+ok('mas com OUTROS pokemon ele desafia na hora', !!(r2 && Array.isArray(r2.matchups)), erroDoOutroTime || ('matchups: ' + (r2 && r2.matchups && r2.matchups.length)));
+if(!r2) { console.log(String.fromCharCode(10) + (casos - falhas) + "/" + casos + " casos passaram.  " + falhas + " FALHA(S)"); process.exit(1); }
+
+/* A tela precisa saber QUEM esta descansando, senao o jogador monta o time todo e so descobre no
+   clique do desafio. */
+const espera = await chamar(fns.getNeighborhoodGymChallengeCooldowns, 'gary', CIDADE);
+const descansando = Object.keys(espera.mons || {});
+ok('a consulta devolve os 12 descansando', descansando.length === 12, descansando.length + ' pokemon');
+ok('com o tempo que falta pra cada um', Object.values(espera.mons).every(ms => ms > 0 && ms <= 10*60*1000));
+/* A chave tem que ser a MESMA que o cliente calcula (id do bicho), senao a tela libera quem o
+   desafio recusa. */
+ok('e a chave e o id do pokemon', descansando.every(k => k.startsWith('m_')), descansando.slice(0,2).join(', '));
 
 /* 5) QUEM VENCE DEFENDE COM O TIME QUE VENCEU.
-   Antes um sorteio escolhia um save LIVRE do vencedor -- fazia sentido quando a defesa era um
-   save inteiro, e nao faz mais nenhum: ele montou um time, ganhou com ele, e e com ele que fica. */
-console.log("");
-console.log("A VITORIA");
+   Antes um sorteio escolhia um save LIVRE do vencedor -- fazia sentido quando a defesa era um save
+   inteiro, e nao faz mais nenhum: ele montou um time, ganhou com ele, e e com ele que fica. */
+console.log('');
+console.log('A VITORIA');
+/* Troca a muralha por um time fraco e da ao Gary pokemon descansados. */
+await chamar(fns.setNeighborhoodGymDefense, 'ash', Object.assign({ team: escolher(ashA, 0, [0,1,2]) }, CIDADE));
+const vencedor = [mon('v1','mewtwo',99), mon('v2','lugia',99), mon('v3','hooh',99),
+                  mon('v4','tyranitar',99), mon('v5','dragonite',99), mon('v6','blissey',99)];
+await db.collection('users').doc('gary').collection('saves').doc('2').set({ badgeCount:8, team:vencedor });
+const timeVencedor = escolher(vencedor, 2, [0,1,2,3,4,5]);
+const r3 = await chamar(fns.challengeNeighborhoodGym, 'gary', Object.assign({ team: timeVencedor }, CIDADE));
 gym = (await db.collection('neighborhoodGyms').doc(GYM_ID).get()).data();
-if(r1.win){
-  ok('vencendo, o desafiante vira lider', gym.leaderUid === 'gary', 'lider: ' + gym.leaderUid);
-  const especiesNoGinasio = especiesDe(gym.leaderTeamCode);
-  ok('e defende com o MESMO time que venceu',
-     desafio.every(p => especiesNoGinasio.includes(p.speciesId)), lerTime(gym.leaderTeamCode));
-  ok('e essa defesa tambem nao fica presa a save nenhum', gym.leaderTeamSlot === null);
-  /* Assumindo, o terreno volta a ficar pendente: o novo lider escolhe o dele. */
-  ok('e o terreno fica pendente pro novo lider escolher', gym.leaderTerrain === null,
-     'terreno: ' + JSON.stringify(gym.leaderTerrain));
-} else {
-  ok('perdendo, o lider antigo continua', gym.leaderUid === 'ash', 'lider: ' + gym.leaderUid);
-  ok('e a defesa dele nao mudou', especiesDe(gym.leaderTeamCode).includes('gyarados'), lerTime(gym.leaderTeamCode));
-}
+ok('vencendo, o desafiante vira lider', r3.win === true && gym.leaderUid === 'gary',
+   'win: ' + r3.win + ', lider: ' + gym.leaderUid);
+const especiesNoGinasio = especiesDe(gym.leaderTeamCode);
+ok('e defende com o MESMO time que venceu',
+   timeVencedor.every(p => especiesNoGinasio.includes(p.speciesId)), lerTime(gym.leaderTeamCode));
+ok('e essa defesa tambem nao fica presa a save nenhum', gym.leaderTeamSlot === null);
+/* Assumindo, o terreno volta a ficar pendente: o novo lider escolhe o dele. */
+ok('e o terreno fica pendente pro novo lider escolher', gym.leaderTerrain === null,
+   'terreno: ' + JSON.stringify(gym.leaderTerrain));
+
+/* 6) OS GINASIOS QUE EU LIDERO -- liderar vale a distancia, so conquistar exige estar na cidade. */
+console.log('');
+console.log('GINASIOS LIDERADOS');
+const meus = await chamar(fns.listMyNeighborhoodGyms, 'gary', {});
+ok('a lista traz o ginasio que ele acabou de tomar',
+   (meus.gyms||[]).some(g => g.city === 'Sorocaba'), JSON.stringify(meus.gyms));
+ok('e avisa que falta escolher o terreno', (meus.gyms||[]).every(g => g.hasTerrain === false),
+   JSON.stringify((meus.gyms||[]).map(g=>g.hasTerrain)));
+const doAsh = await chamar(fns.listMyNeighborhoodGyms, 'ash', {});
+ok('e o lider antigo some da lista dele', (doAsh.gyms||[]).length === 0, JSON.stringify(doAsh.gyms));
+
 console.log('\n' + (casos - falhas) + '/' + casos + ' casos passaram.' + (falhas ? '  ' + falhas + ' FALHA(S)' : ''));
 process.exit(falhas ? 1 : 0);
 })().catch(e => { console.error('\nEXPLODIU:', e); process.exit(1); });
