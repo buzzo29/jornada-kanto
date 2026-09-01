@@ -570,7 +570,7 @@ ok('sem time com 8 insignias, nao oferece busca', S.botaoBuscaOnlineHtml() === '
 gB.saveSlots = [{ badgeCount:8, team:[{speciesId:'venusaur', level:70}] }, null, null];
 S.__setGame(gB);
 const parado = S.botaoBuscaOnlineHtml();
-ok('com time pronto, o botao aparece', parado.includes('Buscar partida online'));
+ok('com time pronto, o botao aparece', parado.includes('Ativar busca de partida online'));
 ok('e ele liga a busca SEM sair da tela', parado.includes('startOnlineSearchAqui()'),
    parado.includes('startOnlineSearch()') ? 'esta chamando a versao que troca de tela' : '');
 gB.onlineSearching = true; S.__setGame(gB);

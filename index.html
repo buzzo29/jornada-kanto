@@ -1319,6 +1319,9 @@
   @keyframes shiny-bonus-pulse{ 0%,100%{opacity:1;} 50%{opacity:.55;} }
   /* Aviso da Liga nas telas de batalha da jornada -- mesmo pulso do Bônus Shiny da home, porque é
      a mesma ideia: uma janela de tempo que expira. */
+  /* "Classic League" e nome proprio: quebrando no meio dele a frase fica com "Classic" numa
+     linha e "League" na outra, que se le como duas coisas. A quebra cai ANTES do par. */
+  .aviso-liga-jornada .nao-quebra{ white-space:nowrap; }
   .aviso-liga-jornada{
     font-family:var(--font-pixel); font-size:.55rem; line-height:1.5;
     color:var(--yellow); text-align:center; margin:2px 4px 10px; letter-spacing:.3px;
@@ -15805,7 +15808,7 @@ function botaoBuscaOnlineHtml(){
   <!-- verde quando ligado, cinza quando parado: a ação PRINCIPAL da tela é a jornada, e essa
        aqui não pode competir com ela em cor -->
   <button class="btn ${buscando ? 'success' : 'secondary'}" onclick="${buscando ? 'cancelOnlineSearch()' : 'startOnlineSearchAqui()'}">
-    ${buscando ? '🔎 Buscando oponente... (cancelar)' : '🔎 Buscar partida online'}
+    ${buscando ? '🔎 Buscando oponente... (cancelar)' : '🔎 Ativar busca de partida online'}
   </button>
   ${avisoLigaHtml()}`;
 }
@@ -15816,7 +15819,7 @@ function botaoBuscaOnlineHtml(){
 function avisoLigaHtml(){
   const aviso = game.avisoLiga;
   if(!aviso) return '';
-  return `<div class="aviso-liga-jornada">🏆 Inscrições abertas pra Liga Clássica das <strong>${formatClock(aviso.hora)}</strong></div>`;
+  return `<div class="aviso-liga-jornada">🏆 Inscreva-se para a <span class="nao-quebra">Classic League</span> das <strong>${formatClock(aviso.hora)}</strong></div>`;
 }
 /* Lê o ciclo aberto e a sua inscrição: duas leituras, no MÁXIMO uma a cada 5 minutos. O ciclo vira
    de hora em hora, então essa folga não atrasa nada que importe.
