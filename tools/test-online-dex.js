@@ -88,20 +88,22 @@ const grade = S.renderPokedex();
 const celulas = (grade.match(/class="pokedex-cell/g) || []).length;
 ok('a grade tem uma celula a mais que o SPECIES', celulas === 251, celulas + ' células');
 ok('e a conta na tela continua dizendo 250', /de 250 espécies/.test(grade));
-ok('o #151 esta la, com estilo proprio', /pokedex-cell raide/.test(grade) && grade.includes('#151'));
+/* Celula COMUM de nao-descoberto: nada nela promete que da pra conseguir, e nada nela chama
+   atencao -- e a mesma coisa que o jogador ve em qualquer espécie que ele ainda nao capturou. */
+ok('o #151 esta la, como um quadro comum de nao-descoberto', grade.includes('#151'));
+ok('e sem estilo proprio nem clique', !/pokedex-cell raide/.test(grade) && !/<div class="pokedex-cell[^"]*"[^>]*onclick[^>]*>\s*<span class="pokedex-number">#151/.test(grade));
 /* Ordem: ele tem que cair ENTRE o #150 e o #152, senao a numeracao continua pulando. */
 const ordem = (grade.match(/#1(4[89]|5[0-2])/g) || []);
 ok('e cai entre o #150 e o #152', ordem.join(',').includes('#150,#151,#152'), ordem.join(','));
 /* A visao shiny mostra a mesma grade -- um buraco la seria o mesmo defeito. */
 g = S.__getGame(); g.pokedexView = 'shiny'; S.__setGame(g);
-ok('a visao shiny tambem tem o #151', /pokedex-cell raide/.test(S.renderPokedex()));
+const gradeShiny = S.renderPokedex();
+ok('a visao shiny tambem tem o #151', gradeShiny.includes('#151') &&
+   (gradeShiny.match(/class="pokedex-cell/g)||[]).length === 251);
 g = S.__getGame(); g.pokedexView = 'normal'; S.__setGame(g);
-/* E a ficha dele abre, com os atributos oficiais da Gen 2 e dizendo por que ele esta ali. */
+/* E ele NAO abre ficha: nao ha ficha pra um pokemon que ninguem descobriu. */
 S.abrirPokedexFicha('mew', false);
-const ficha = S.renderPokedexFicha();
-ok('a ficha do #151 abre', ficha.includes('Mew') && ficha.includes('#151'));
-ok('com os 100 da Gen 2 e total 600', ficha.includes('600'));
-ok('e explicando que ninguem o captura', ficha.includes('raide') && ficha.includes('não conta no total'));
+ok('e o #151 nao abre ficha nenhuma', S.renderPokedexFicha() === '');
 
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
 process.exit(falhas ? 1 : 0);

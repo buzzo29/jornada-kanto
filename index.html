@@ -1746,10 +1746,6 @@
     box-shadow:0 0 8px rgba(155,107,214,.6);
   }
   .pokedex-mystery{font-size:1.2rem;color:#e8d9ff;}
-  /* O #151: nem "travado" (não há como destravar) nem "capturado". Rosa da raide, pra ler como
-     outra coisa antes de qualquer clique. */
-  .pokedex-cell.raide{ background:linear-gradient(135deg,#f7d5ea,#e9b7dd); border-color:#c96fb0; }
-  .pokedex-number.raide{ color:#8c2f6d; }
   .pokedex-owned-badge{font-size:.85rem;}
   .pokedex-cell.caught{background:#fff;}
   .pokedex-cell.clickable{
@@ -3678,11 +3674,7 @@ const DISGUISE_DISPLAY = {
    uma vaga #151 impossível de completar. Só o que a TELA precisa -- os atributos dele vivem no
    servidor, que é quem calcula a luta. */
 const SPECIES_FORA_DA_DEX = {
-  /* Os atributos existem aqui só pra FICHA da Pokédex -- 100 em tudo, os oficiais da Gen 2. Quem
-     calcula a luta da raide é o servidor, com os dele; estes nunca entram no motor. Continuam
-     fora do SPECIES pelo motivo de sempre: lá dentro contariam pro total e pro "capturou tudo". */
-  mew: { dex:151, name:'Mew', types:['Psychic'], emoji:'✨',
-         hp:100, attack:100, defense:100, spAtk:100, spDef:100, speed:100 }
+  mew: { dex:151, name:'Mew', types:['Psychic'], emoji:'✨' }
 };
 /* OS INTOCÁVEIS: existem na Pokédex e lutam, mas não há como capturar nenhum deles -- nem em rota,
    nem por evolução, nem por desafio. Decisão de design de 31/08/2026: Lugia e Ho-Oh saíram das
@@ -4955,13 +4947,41 @@ function tipoDoGolpe(attacker, defender, rng){
 /* Os tipos que o pokémon consegue usar pra atacar: os próprios (com STAB) mais o subtipo.
    Vive numa função porque o Disable precisa da MESMA lista pra saber se sobra um segundo golpe --
    se as duas divergirem, ele anula um tipo que a escolha nem considerava. */
-function tiposDeAtaque(p){
-  const proprios = p.types || [];
+/* DITTO USA TRANSFORMAR -- e agora o GOLPE acompanha o disfarce.
+   A tela já mostrava o sprite do adversário desde sempre (ver battleSpriteHtml); o que faltava era
+   o ataque: virou cópia de um Charizard, ataca com fogo. Copia SÓ isso -- os atributos, a defesa e
+   os tipos que ele APRESENTA continuam sendo os dele. Copiar os atributos faria dele um segundo
+   Charizard, e não é o que ele é: é um Ditto de 48 em tudo brigando com a arma do outro.
+   Os tipos copiados valem como PRÓPRIOS (STAB, sem o redutor de subtipo): ele É a cópia, e cobrar
+   dele o redutor de "tipo alternativo" seria tratar a transformação como um improviso.
+   E ISSO NÃO É SEMPRE UM UPGRADE -- ele luta com a arma do dono dela, e no espelho Fogo contra
+   Fogo é 0,5x, Água contra Água é 0,5x, Aço contra Aço é 0,5x. Contra Fantasma e Dragão, aí sim,
+   é 2x. Antes ele batia sempre de Normal, que é 1x em quase tudo e 0 em Fantasma. */
+function ehDittoTransformado(p, alvo){
+  return !!(p && p.speciesId === 'ditto' && alvo && (alvo.types || []).length);
+}
+function tiposProprios(p, alvo){
+  const meus = p.types || [];
+  if(!ehDittoTransformado(p, alvo)) return meus;
+  /* SOMA, não troca. Trocar foi medido e sai pela culatra: o Normal do Ditto é 1x em quase tudo,
+     e no ESPELHO um monte de tipo resiste a si mesmo (Fogo contra Fogo é 0,5x, Água contra Água
+     também). Só com o tipo copiado ele passava de 151 pra 163 espécies contra as quais nunca
+     ganha -- a mudança pioraria justamente o pokémon mais fraco do jogo. Somando, ele escolhe o
+     que render mais e nunca fica pior do que era.
+     Os copiados valem como PRÓPRIOS (STAB, sem o redutor de subtipo): ele É a cópia.
+     OS COPIADOS VÊM PRIMEIRO porque o bestAttackType guarda o PRIMEIRO de nota máxima: no empate,
+     ganha a cópia. Sem isso, contra um Charizard ele atacava de Investida -- Voador e Normal dão
+     exatamente o mesmo dano ali, e o jogador via a transformação não fazer nada. Não custa um
+     ponto de dano: só desempata a favor do que a tela está mostrando. */
+  return alvo.types.concat(meus.filter(t => !alvo.types.includes(t)));
+}
+function tiposDeAtaque(p, alvo){
+  const proprios = tiposProprios(p, alvo);
   return proprios.concat(subtiposDe(p).filter(t => !proprios.includes(t)));
 }
 function bestAttackType(attacker, defender){
-  const proprios = attacker.types || [];
-  let candidatos = tiposDeAtaque(attacker);
+  const proprios = tiposProprios(attacker, defender);
+  let candidatos = tiposDeAtaque(attacker, defender);
   /* DISABLE: o melhor golpe deste atacante contra ESTE adversário saiu de cena, e ele cai no
      segundo melhor. Vale só contra quem anulou -- adversário novo, confronto novo. O golpe
      teimoso lá embaixo reusa esta mesma lista, então já sai filtrado também. */
@@ -5233,7 +5253,7 @@ function tentarGolpeEspecial(active, enemy, rng, diario){
          2) SÓ sai quando o alvo TEM um segundo golpe. Quem é de um tipo só e sem subtipo (um
             Onix, um Hitmonlee) não tem o que anular, e inventar uma punição pra ele seria
             outra regra, não esta. O sorteio simplesmente não vale contra ele. */
-      if(tiposDeAtaque(alvo).length < 2) continue;
+      if(tiposDeAtaque(alvo, quem).length < 2) continue;
       alvo._anulado = { tipo: bestAttackType(alvo, quem).type, contra: quem };
       if(diario){
         diario.push({ q: marca, d: 0, hp: alvo.hp, c:0, m:0, z:0, x:'disable', g: especial.golpe });
@@ -17523,7 +17543,7 @@ function renderPokedexModal(){
    pra mesma espécie dependendo do save aberto.
  */
 function abrirPokedexFicha(speciesId, shiny){
-  if(!especieParaTela(speciesId)) return;   // inclui o #151, que tem ficha mas não tem vaga
+  if(!SPECIES[speciesId]) return;
   game.pokedexFicha = { id: speciesId, shiny: !!shiny };
   render();
 }
@@ -17540,9 +17560,8 @@ function dexStatLinha(rotulo, valor){
 function renderPokedexFicha(){
   if(!game.pokedexFicha) return '';
   const { id, shiny } = game.pokedexFicha;
-  const sp = especieParaTela(id);
-  if(!sp || sp.hp == null) return '';
-  const foraDaDex = !SPECIES[id];   // o #151: tem ficha, não tem vaga a preencher
+  const sp = SPECIES[id];
+  if(!sp) return '';
   // spAtk/spDef são o split da Gen 2 (ver GEN2_SPECIAL) -- os únicos atributos especiais que
   // existem no jogo desde que o `special` único da Gen 1 foi removido
   const spa = sp.spAtk, spd = sp.spDef;
@@ -17570,7 +17589,6 @@ function renderPokedexFicha(){
           </div>
         </div>
       </div>
-      ${foraDaDex ? `<p class="hint-text dex-ficha-nota">Chefe da raide de domingo. Ninguém captura o Mew — ele aparece aqui pra fechar a numeração, e não conta no total da Pokédex.</p>` : ''}
       ${ehMewtwo ? '<button class="btn secondary" onclick="fecharPokedexFicha();openMewtwoLoanInfoModal()">🧬 Empréstimo do Mewtwo</button>' : ''}
       <button class="btn primary" onclick="fecharPokedexFicha()">Fechar</button>
     </div>
@@ -17607,16 +17625,15 @@ function renderPokedex(){
   <div class="box">
     <div class="pokedex-grid">
       ${naGrade.map(s=>{
-        /* O #151 NÃO É UMA VAGA A PREENCHER. Ele entra na grade só pra numeração não pular do
-           #150 pro #152 -- ler a Pokédex e achar um buraco justo onde todo mundo sabe que mora o
-           Mew parece defeito do jogo. Mas ele NÃO entra na conta (o "X de 250" acima vem do
-           SPECIES, onde o Mew não está), e isso é o que impede de quebrar o desafio do Mewtwo e a
-           conquista "Mestre Pokémon", que cobram "capturou todo o resto".
-           Estilo próprio de propósito: com a cara das outras células travadas, ele viraria uma
-           caça sem fim. Aqui ele é o chefe da raide, e clicar diz isso com todas as letras. */
+        /* O #151 entra na grade só pra numeração não pular do #150 pro #152 -- ler a Pokédex e
+           achar uma falha justo onde todo mundo sabe que mora o Mew parece defeito do jogo. É uma
+           célula COMUM de não-descoberto: nada nela promete que dá pra conseguir, e nada nela
+           chama atenção. Mas ele NÃO entra na CONTA (o "X de 250" acima vem do SPECIES, onde o Mew
+           não está), e é isso que impede de quebrar o desafio do Mewtwo e a conquista "Mestre
+           Pokémon", que cobram "capturou todo o resto". */
         if(s.foraDaDex){
-          return `<div class="pokedex-cell raide abrivel" title="${escapeHtmlSafe(s.name)} — chefe da raide de domingo" onclick="abrirPokedexFicha('${escJs(s.id)}',false)">
-            <span class="pokedex-number raide">#${String(s.dex).padStart(3,'0')}</span>
+          return `<div class="pokedex-cell unknown" title="???">
+            <span class="pokedex-number">#${String(s.dex).padStart(3,'0')}</span>
           </div>`;
         }
         if(isShinyView){

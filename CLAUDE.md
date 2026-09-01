@@ -122,6 +122,24 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
 - Os buffs entram por `withBuffs()`, chamada pelas cinco `effective*`. **Existe uma cópia em cada
   arquivo e elas têm que ser idênticas, inclusive na ordem de arredondamento** (shiny → terreno).
   `applyTerrainBuff` só marca a flag — nunca mutar atributo, senão o bônus aplica duas vezes.
+- **O Ditto ataca com o tipo de quem ele copiou** (`tiposProprios`/`ehDittoTransformado`). A tela já
+  mostrava o sprite do adversário desde sempre; o golpe passou a acompanhar em 01/09/2026 — virou
+  cópia de um Gengar, ataca de Fantasma. Copia **só o ataque**: os atributos (48 em tudo), a defesa
+  e o tipo que ele APRESENTA continuam sendo dele. Copiar os atributos faria dele um segundo
+  Gengar, e não é o que ele é.
+  **SOMA os tipos do alvo aos dele, não troca** — e isso foi medido, não escolhido no gosto:
+  trocando, ele passava de 151 pra **163** espécies contra as quais nunca ganha, porque o Normal
+  dele é 1× em quase tudo e no ESPELHO um monte de tipo resiste a si mesmo (Fogo contra Fogo é
+  0,5×). A mudança pioraria justamente o pokémon mais fraco do jogo. Somando: **16,8% → 22,1%** de
+  vitória média no 1x1 contra as 249, e **15 confrontos impossíveis a menos**. Na jornada não se
+  move (63,0% → 62,7%, 0,45σ): é uma espécie em 250.
+  Os tipos copiados valem como **próprios** (STAB, sem o redutor de subtipo) e vêm **primeiro na
+  lista de candidatos**, porque o `bestAttackType` guarda o primeiro de nota máxima: no empate ganha
+  a cópia. Sem isso, contra um Charizard ele atacava de Investida — Voador e Normal dão o mesmo
+  dano ali — e a transformação não aparecia na tela. Não custa um ponto de dano, só desempata a
+  favor do que a tela está mostrando.
+  O nome do golpe sai do `MOVE_BY_TYPE` (o `MOVE_OVERRIDES` do Ditto só tem Normal), e os 17 tipos
+  têm nome lá — conferido no teste, senão a linha do log sairia sem golpe.
 - Subtipos: 70 espécies atacam por um tipo alternativo quando rende mais dano. Sem STAB, com
   redutor 0,85. O Raichu entrou na lista quando a imunidade voltou a valer 0: Elétrico é o único
   tipo com imunidade cujo dono não tinha alternativa, e sem Normal ele ficava com 1 de dano por
@@ -858,12 +876,11 @@ verdade, cai no game over, e o teste confere que a trava soltou dos dois lados.
   não pode estar: o desafio do Mewtwo e a conquista "Mestre Pokémon" cobram "capturou todo o
   resto", e uma vaga que ninguém consegue preencher deixaria os dois impossíveis pra sempre — o
   que já aconteceu neste jogo, com o Celebi, e ficou dias sem ninguém notar.
-  A célula tem **estilo próprio** (`.pokedex-cell.raide`, rosa): com a cara das outras travadas,
-  ela viraria uma caça sem fim. Clicar abre a ficha, com os atributos oficiais da Gen 2 (100 em
-  tudo, total 600) e a frase dizendo que ele é o chefe da raide e não conta no total.
-  Os atributos entraram no `SPECIES_FORA_DA_DEX` **só pra ficha** — quem calcula a luta da raide é
-  o servidor, com os dele. `tools/test-online-dex.js` tranca as duas metades: que o #151 está na
-  grade E que o total continua 250.
+  A célula é **comum, de não-descoberto** — igual a qualquer espécie que o jogador ainda não pegou:
+  sem estilo próprio, sem clique, sem ficha. Chegou a ter os dois (destaque rosa e ficha com os
+  atributos da Gen 2) e saiu por decisão de design em 01/09/2026: qualquer marca ali promete alguma
+  coisa, e não há nada a prometer. `tools/test-online-dex.js` tranca as duas metades — que o #151
+  está na grade E que o total continua 250 — e mais: que ele não ganhou clique de volta.
 - O Mew **não entra em `SPECIES`** — tudo que está lá conta pro total da Pokédex e pro "capturou
   tudo" que libera o Mewtwo, e um Mew que ninguém captura abriria uma vaga #151 impossível. A tela
   o encontra por `SPECIES_FORA_DA_DEX` / `especieParaTela()`; os atributos vivem só no servidor.

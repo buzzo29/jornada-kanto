@@ -229,6 +229,41 @@ ok('confronto comum nao ganha aviso', S.avisoDoConfronto({ player:'A', enemy:'B'
 ok('e a pausa de leitura so existe quando ha o que ler',
    S.pausaDoEspecial(mBoom) === 1000 && S.pausaDoEspecial({ golpes:[{q:'p',d:10}] }) === 0);
 
+console.log('\nDITTO: O GOLPE ACOMPANHA A TRANSFORMACAO');
+/* A tela ja mostrava o sprite do adversario desde sempre; o golpe passou a acompanhar. Ele SOMA os
+   tipos do alvo aos dele em vez de trocar -- trocar foi medido e saia pela culatra (o Normal e 1x
+   em quase tudo, e no espelho um monte de tipo resiste a si mesmo), piorando justamente o pokemon
+   mais fraco do jogo. */
+(function(){
+  const alvo = (id) => inst(id);
+  const golpe = (id) => S.bestAttackType(inst('ditto'), alvo(id));
+  const g1 = golpe('gengar');
+  ok('contra um Fantasma ele ataca de Fantasma', g1.type === 'Ghost' && g1.mult === 2, g1.type + ' x' + g1.mult);
+  const g2 = golpe('onix');
+  ok('contra Pedra/Terra ele ataca de Terra', g2.type === 'Ground' && g2.mult === 2, g2.type + ' x' + g2.mult);
+  const g3 = golpe('dragonite');
+  ok('contra Dragao ele ataca de Dragao', g3.type === 'Dragon', g3.type + ' x' + g3.mult);
+  /* O tipo copiado vale como PROPRIO: ele E a copia, entao tem STAB e nao paga redutor de subtipo. */
+  ok('e o golpe copiado tem STAB', g1.stab && g2.stab && g3.stab);
+  /* NAO TROCA, SOMA: contra um Psiquico, Psiquico seria 0,5x e o Normal dele rende mais. */
+  const g4 = golpe('alakazam');
+  ok('mas ele mantem o golpe dele quando o copiado e pior', g4.type === 'Normal', g4.type + ' x' + g4.mult);
+  /* No EMPATE ganha a copia -- senao contra um Charizard ele atacava de Investida (Voador e Normal
+     dao o mesmo dano ali) e a transformacao nao aparecia na tela. */
+  const g5 = golpe('charizard');
+  ok('no empate ganha o golpe da copia', g5.type !== 'Normal', g5.type);
+  /* O nome do golpe existe pra todo tipo que ele possa copiar -- senao a linha do log sai sem golpe. */
+  const semNome = Object.keys(S.TYPE_CHART).filter(tp => !S.nomeDoGolpe('ditto', tp));
+  ok('e todo tipo copiado tem nome de golpe', semNome.length === 0, semNome.join(',') || 'todos tem');
+  /* Ninguem mais copia nada: a regra e do Ditto, e so. */
+  const outro = S.bestAttackType(inst('pikachu'), alvo('gengar'));
+  ok('e so o Ditto copia', S.tiposDeAtaque(inst('pikachu'), alvo('gengar')).join(',') ===
+     S.tiposDeAtaque(inst('pikachu')).join(','), outro.type);
+  /* Ele copia SO o ataque: atributos e o tipo que ele apresenta continuam sendo dele. */
+  const d = inst('ditto');
+  ok('os atributos continuam sendo os dele', d.attack === 48 && (d.types||[]).join(',') === 'Normal',
+     'atk ' + d.attack + ', tipo ' + (d.types||[]).join(','));
+})();
 console.log('\nOS DOIS MOTORES DAO O MESMO RESULTADO');
 /* O motor e duplicado (cliente e servidor). Uma diferenca aqui faz a liga decidir uma coisa e a
    animacao mostrar outra -- e o jogador so descobre quando perde uma final. */

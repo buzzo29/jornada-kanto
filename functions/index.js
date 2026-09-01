@@ -454,13 +454,41 @@ function tipoDoGolpe(attacker, defender, rng){
 /* Os tipos que o pokémon consegue usar pra atacar: os próprios (com STAB) mais o subtipo.
    Vive numa função porque o Disable precisa da MESMA lista pra saber se sobra um segundo golpe --
    se as duas divergirem, ele anula um tipo que a escolha nem considerava. */
-function tiposDeAtaque(p){
-  const proprios = p.types || [];
+/* DITTO USA TRANSFORMAR -- e agora o GOLPE acompanha o disfarce.
+   A tela já mostrava o sprite do adversário desde sempre (ver battleSpriteHtml); o que faltava era
+   o ataque: virou cópia de um Charizard, ataca com fogo. Copia SÓ isso -- os atributos, a defesa e
+   os tipos que ele APRESENTA continuam sendo os dele. Copiar os atributos faria dele um segundo
+   Charizard, e não é o que ele é: é um Ditto de 48 em tudo brigando com a arma do outro.
+   Os tipos copiados valem como PRÓPRIOS (STAB, sem o redutor de subtipo): ele É a cópia, e cobrar
+   dele o redutor de "tipo alternativo" seria tratar a transformação como um improviso.
+   E ISSO NÃO É SEMPRE UM UPGRADE -- ele luta com a arma do dono dela, e no espelho Fogo contra
+   Fogo é 0,5x, Água contra Água é 0,5x, Aço contra Aço é 0,5x. Contra Fantasma e Dragão, aí sim,
+   é 2x. Antes ele batia sempre de Normal, que é 1x em quase tudo e 0 em Fantasma. */
+function ehDittoTransformado(p, alvo){
+  return !!(p && p.speciesId === 'ditto' && alvo && (alvo.types || []).length);
+}
+function tiposProprios(p, alvo){
+  const meus = p.types || [];
+  if(!ehDittoTransformado(p, alvo)) return meus;
+  /* SOMA, não troca. Trocar foi medido e sai pela culatra: o Normal do Ditto é 1x em quase tudo,
+     e no ESPELHO um monte de tipo resiste a si mesmo (Fogo contra Fogo é 0,5x, Água contra Água
+     também). Só com o tipo copiado ele passava de 151 pra 163 espécies contra as quais nunca
+     ganha -- a mudança pioraria justamente o pokémon mais fraco do jogo. Somando, ele escolhe o
+     que render mais e nunca fica pior do que era.
+     Os copiados valem como PRÓPRIOS (STAB, sem o redutor de subtipo): ele É a cópia.
+     OS COPIADOS VÊM PRIMEIRO porque o bestAttackType guarda o PRIMEIRO de nota máxima: no empate,
+     ganha a cópia. Sem isso, contra um Charizard ele atacava de Investida -- Voador e Normal dão
+     exatamente o mesmo dano ali, e o jogador via a transformação não fazer nada. Não custa um
+     ponto de dano: só desempata a favor do que a tela está mostrando. */
+  return alvo.types.concat(meus.filter(t => !alvo.types.includes(t)));
+}
+function tiposDeAtaque(p, alvo){
+  const proprios = tiposProprios(p, alvo);
   return proprios.concat(subtiposDe(p).filter(t => !proprios.includes(t)));
 }
 function bestAttackType(attacker, defender){
-  const proprios = attacker.types || [];
-  let candidatos = tiposDeAtaque(attacker);
+  const proprios = tiposProprios(attacker, defender);
+  let candidatos = tiposDeAtaque(attacker, defender);
   /* DISABLE: o melhor golpe deste atacante contra ESTE adversário saiu de cena, e ele cai no
      segundo melhor. Vale só contra quem anulou -- adversário novo, confronto novo. O golpe
      teimoso lá embaixo reusa esta mesma lista, então já sai filtrado também. */
@@ -857,7 +885,7 @@ function tentarGolpeEspecial(active, enemy, rng, diario){
          2) SÓ sai quando o alvo TEM um segundo golpe. Quem é de um tipo só e sem subtipo (um
             Onix, um Hitmonlee) não tem o que anular, e inventar uma punição pra ele seria
             outra regra, não esta. O sorteio simplesmente não vale contra ele. */
-      if(tiposDeAtaque(alvo).length < 2) continue;
+      if(tiposDeAtaque(alvo, quem).length < 2) continue;
       alvo._anulado = { tipo: bestAttackType(alvo, quem).type, contra: quem };
       if(diario){
         diario.push({ q: marca, d: 0, hp: alvo.hp, c:0, m:0, z:0, x:'disable', g: especial.golpe });
