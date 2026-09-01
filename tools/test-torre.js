@@ -221,6 +221,50 @@ ok('e os ultimos passam do nivel 99', torreHoje.floors.filter(f=>f.avgLevel > 99
   ok('dia sem ninguem fecha sem premiar', vazio && vazio.topFloor === 0 && vazio.vencedores === 0, JSON.stringify(vazio));
 }
 
+
+console.log('');
+console.log('QUEM ZEROU A TORRE ANTIGA NAO PODE FICAR TRAVADO');
+/* A torre do dia ja estava gravada com 10 andares quando ela virou 20. Duas consequencias, as duas
+   reportadas em 02/09/2026:
+   1) a mudanca so valeria no dia seguinte -- a torre do dia continuava com 10 andares;
+   2) quem tinha ZERADO os 10 travava no "voce ja venceu a torre hoje" e nao jogava mais nada.
+   O fixture recria exatamente esse estado: torre velha gravada e subida marcada como zerada. */
+{
+  const hoje = (await chamar(fns.getTrainerTower, 'ivy', {})).dateId;
+  const timeDoRex = [mon('r1','mewtwo',99), mon('r2','lugia',99), mon('r3','hooh',99),
+                     mon('r4','tyranitar',99), mon('r5','dragonite',99), mon('r6','blissey',99)];
+  /* Regrava a torre do dia no formato ANTIGO, com 10 andares. */
+  const velha = fns._towerGenerate(hoje);
+  velha.floors = velha.floors.slice(0, 10);
+  await db.collection('trainerTower').doc(hoje).set(velha);
+  /* E um jogador que zerou aqueles 10. */
+  await db.collection('trainerTowerRuns').doc('rex').set({
+    dateId: hoje, floor: 10, bestFloor: 10, cleared: true,
+    team: timeDoRex.map(p=>({ speciesId:p.speciesId, level:p.level, shiny:false })),
+    startedAt: Date.now(), lastAt: Date.now()
+  });
+  await db.collection('users').doc('rex').set({ trainerName:'Rex' });
+  await db.collection('users').doc('rex').collection('saves').doc('0').set({ badgeCount:8, team:timeDoRex });
+
+  const vista = await chamar(fns.getTrainerTower, 'rex', {});
+  ok('a torre do dia e refeita com o formato de hoje', (vista.floors||[]).length === 20,
+     (vista.floors||[]).length + ' andares');
+  ok('e a subida dele volta a ficar ativa', vista.run.cleared === false, 'cleared: ' + vista.run.cleared);
+  ok('no andar seguinte ao ultimo que ele venceu', vista.run.floor === 11, 'andar: ' + vista.run.floor);
+  ok('sem perder os 10 que ja tinha vencido', (vista.run.bestFloor||0) >= 10, 'bestFloor: ' + vista.run.bestFloor);
+  /* E o principal: ele consegue LUTAR de novo. */
+  const luta = await chamar(fns.fightTrainerTowerFloor, 'rex', {});
+  ok('e ele consegue jogar de novo hoje mesmo', !!luta && typeof luta.win === 'boolean',
+     'win: ' + (luta && luta.win));
+  /* Quem zerou a torre de HOJE (20 andares) continua zerado -- a destrava e so pra torre menor. */
+  await db.collection('trainerTowerRuns').doc('rex').set({
+    dateId: hoje, floor: 20, bestFloor: 20, cleared: true, team: null, startedAt: Date.now(), lastAt: Date.now()
+  });
+  const zerouHoje = await chamar(fns.getTrainerTower, 'rex', {});
+  ok('mas quem zerou a torre DE HOJE continua zerado', zerouHoje.run.cleared === true,
+     'cleared: ' + zerouHoje.run.cleared);
+}
+
 console.log(`\n${casos - falhas}/${casos} casos passaram.`);
 if(falhas){ console.log(`${falhas} FALHA(S).`); process.exit(1); }
 })().catch(e=>{ console.error('\nERRO NAO TRATADO:', e); process.exit(1); });

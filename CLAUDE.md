@@ -878,6 +878,22 @@ verdade, cai no game over, e o teste confere que a trava soltou dos dois lados.
   (02/09/2026). Os oito últimos passam do nível 99 — o teto do JOGADOR — de propósito: o que a
   torre mede agora é **até onde cada um chega**, não quem termina. Eram 10 andares de 58 a 85,
   calibrados pra ser vencível todo dia.
+- **O TOTAL DE ANDARES NÃO APARECE EM LUGAR NENHUM.** A tela diz "Andar 7", nunca "Andar 7 de 20", e
+  a abertura fala em "a média começa em 65 e sobe de 3 em 3, sem parar". A torre tem que parecer não
+  ter fim: dizer o total transforma uma subida sem teto numa barra de progresso, e o jogador troca
+  "até onde eu consigo ir?" por "quanto falta?". Os 20 existem porque alguma hora ela precisa
+  acabar, não porque alguém deva chegar lá.
+- **Mudar o número de andares REFAZ a torre do dia** (`towerGetToday` compara o que está gravado com
+  o `TOWER_FLOORS` de agora). Sem isso a mudança só valeria no dia seguinte — a torre de hoje já
+  estava gravada com o formato antigo — e, pior, **quem tinha ZERADO a torre de 10 andares ficava
+  travado** no "você já venceu a torre hoje", sem poder jogar mais nada no dia. Reportado em
+  02/09/2026, horas depois da mudança.
+  A semente é a mesma (`torre-<data>`), então a torre refeita é a MESMA torre ampliada, não um
+  sorteio novo.
+  **E a subida também se destrava** (`towerGetRun`): subida marcada como zerada numa torre MENOR que
+  a de hoje volta a ficar ativa, no andar seguinte ao último que ela venceu. Ela não perde nada — os
+  10 vencidos continuam vencidos, ela só passa a ter pra onde ir. Quem zerou a torre DE HOJE
+  continua zerado.
 - **Perder não volta pro começo.** O jogador fica no MESMO andar e tenta de novo; o time não é
   apagado. Refazer oito andares já vencidos pra chegar de novo onde parou não media nada, e era o
   que a torre cobrava a cada derrota.

@@ -3944,9 +3944,18 @@ async function towerGetToday(){
   const dateId = trainersLeagueTodayDateStr();
   const ref = towerDocRef(dateId);
   const snap = await ref.get();
-  if(snap.exists) return snap.data();
+  const guardada = snap.exists ? snap.data() : null;
+  /* TORRE DE OUTRA VERSÃO DO MODO É REFEITA NA HORA. Sem isso, mudar o número de andares só valia
+     no dia seguinte -- a torre de hoje já estava gravada com o formato antigo. E era pior que
+     esperar: quem tinha ZERADO a torre de 10 andares ficava travado no "você já venceu hoje", sem
+     poder subir os andares novos. Reportado em 02/09/2026, na subida de 10 pra 20.
+     A semente é a mesma (torre-<data>), então a torre refeita é a MESMA torre ampliada -- os
+     adversários dos andares que já existiam continuam sendo os mesmos treinadores, com o nível da
+     escala nova. */
+  if(guardada && (guardada.floors || []).length === TOWER_FLOORS) return guardada;
   const gerada = towerGenerate(dateId);
   await ref.set(gerada);
+  if(guardada) logger.info('Torre de ' + dateId + ' refeita: ' + (guardada.floors||[]).length + ' -> ' + TOWER_FLOORS + ' andares.');
   return gerada;
 }
 
@@ -3963,6 +3972,13 @@ async function towerGetRun(uid, dateId){
   const snap = await towerRunRef(uid).get();
   const d = snap.exists ? snap.data() : null;
   if(!d || d.dateId !== dateId) return towerFreshRun(dateId);
+  /* SUBIDA ZERADA NUMA TORRE MENOR QUE A DE HOJE volta a ficar ativa, no andar seguinte ao último
+     que ele venceu. Quem zerou os 10 andares antes da torre virar 20 travava no "você já venceu a
+     torre hoje" e não conseguia jogar mais nada no dia. Ele não perde nada: os 10 que venceu
+     continuam vencidos, ele só passa a ter pra onde ir. */
+  if(d.cleared && (d.floor || 1) < TOWER_FLOORS){
+    return Object.assign({}, d, { cleared: false, floor: Math.min(TOWER_FLOORS, (d.floor || 1) + 1) });
+  }
   return d;
 }
 
@@ -4277,8 +4293,8 @@ async function towerRegisterClear(uid, dateId){
   /* O DOCE NÃO É PAGO AQUI. Ele virou o prêmio de quem foi MAIS LONGE no dia (towerFecharDia), e
      quem zera os 20 andares certamente está no topo -- pagar aqui também seria pagar duas vezes.
      A notificação fica: zerar 20 andares com média 122 no último merece ser dito na hora. */
-  await createNotification(uid, 'tower_cleared', '🗼 Torre dos Treinadores ZERADA!',
-    'Você derrotou os 20 treinadores da torre de hoje -- o último com média de nível 122. Ninguém vai passar disso: o prêmio de quem foi mais longe sai na virada do dia. Volte amanhã: 20 adversários novos te esperam.');
+  await createNotification(uid, 'tower_cleared', '🗼 Você chegou ao TOPO da Torre!',
+    'Você subiu a torre inteira de hoje -- o último treinador tinha média de nível 122. Ninguém vai passar disso: o prêmio de quem foi mais longe sai na virada do dia. Volte amanhã, a torre é outra.');
 }
 
 /* Reordena o time da subida em andamento. A ordem importa: o primeiro da lista enfrenta o

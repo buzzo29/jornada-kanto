@@ -15021,7 +15021,7 @@ function renderTrainerTower(){
   } else {
     const f = (t.floors||[])[run.floor-1];
     acao = `<div class="box">
-      <h2>Andar ${run.floor} de ${(t.floors||[]).length}</h2>
+      <h2>Andar ${run.floor}</h2>
       <p>Seu adversário é <strong>${escapeHtmlSafe(f?f.name:'???')}</strong>.</p>
     </div>
     <div class="save-slot-card">
@@ -15055,8 +15055,8 @@ function renderTrainerTower(){
   <div class="eyebrow">🗼 TORRE DOS TREINADORES</div>
   ${candyHtml}
   <div class="box tower-intro">
-    <p><strong>${(t.floors||[]).length}</strong> andares, um treinador em cada. Eles trocam <strong>todo dia</strong> depois da meia-noite.</p>
-    <p class="hint-text">A média de nível sobe de 3 em 3 a cada andar — do 65 no primeiro ao 122 no último. Não é pra zerar: é pra ver até onde você chega.</p>
+    <p>Um treinador por andar, e eles trocam <strong>todo dia</strong> depois da meia-noite.</p>
+    <p class="hint-text">A média de nível começa em 65 e sobe de 3 em 3 a cada andar, sem parar. <strong>Não é pra zerar</strong> — é pra ver até onde você chega.</p>
     <p class="hint-text">Vencer um andar cura e revive seu time. Perder <strong>não</strong> devolve você ao começo — você fica no mesmo andar e pode trocar de time.</p>
     <p class="hint-text">🍬 Quem chegar no andar mais alto do dia ganha um Doce Raro e um ponto no ranking. Empate premia todos.</p>
     <button class="btn secondary" onclick="openTowerRanking()">🏅 Ranking da Torre</button>
