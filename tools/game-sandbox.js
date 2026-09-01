@@ -116,6 +116,8 @@ function createSandbox(htmlPath){
     'sorteioDosIniciais','chaveDoSorteio','encerrarTentativaDoSlot','HARD_SHINY_CHANCE',
     // terreno, buffs e atributos: sem eles nao da pra medir o efeito de terreno/shiny,
     // que e justamente onde cliente e servidor ja divergiram
+    // golpes especiais (ver test-especiais.js)
+    'AUTODESTRUICAO','SONIFEROS','METRONOMO','tentarGolpeEspecial','sorteiaGolpeEspecial','tipoDoGolpe','passosHtml','CHANCE_AUTODESTRUICAO','CHANCE_SONO','calcMaxHp','makeSeededRng','simulateGymBattle','createInstance',
     'TYPE_CHART','TYPE_NAMES_PT','TYPE_COLORS','englishTypeFromPortuguese','TERRAINS','TERRAIN_BUFF_MULT','SHINY_BUFF_MULT','applyTerrainBuff','applySpecialtyBuff','withBuffs',
     'effectiveBaseHp','effectiveAttack','effectiveDefense','effectiveSpAtk','effectiveSpDef','effectiveSpeed','gen1MaxHp',
     // lista de amigos: as telas sao HTML puro a partir do estado, entao dao pra renderizar aqui e

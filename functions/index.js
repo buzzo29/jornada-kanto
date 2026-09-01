@@ -439,6 +439,18 @@ function subtiposDe(p){
   if(!USE_SUBTYPES) return [];
   return SUBTYPES[p.speciesId] || [];
 }
+/* O Metrônomo não escolhe: chama um golpe qualquer. Aqui isso é o TIPO saindo no sorteio, e
+   não da conta de qual rende mais -- é o que faz dele uma aposta, e não um upgrade. Todo o resto
+   do jogo continua escolhendo o melhor golpe disponível. */
+function tipoDoGolpe(attacker, defender, rng){
+  if(!METRONOMO.includes(attacker.speciesId)) return bestAttackType(attacker, defender);
+  const tipos = Object.keys(TYPE_CHART);
+  const t = tipos[Math.floor((rng || Math.random)() * tipos.length)];
+  let mult = 1;
+  (defender.types || []).forEach(d => { mult *= typeVsType(t, d); });
+  // imunidade continua valendo 0, com o mesmo piso de 1 de dano e a mesma marca do log
+  return { mult, type: t, stab: (attacker.types||[]).includes(t), nulo: mult === 0 };
+}
 function bestAttackType(attacker, defender){
   const proprios = attacker.types || [];
   const candidatos = proprios.concat(subtiposDe(attacker).filter(t => !proprios.includes(t)));
@@ -677,7 +689,7 @@ function calcDamage(attacker, defender, rng){
   rng = rng || Math.random;   // as ligas passam um rng com seed; fora delas cai no padrão
   // considera tipos próprios E subtipos, igual ao cliente (ver SUBTYPES).
   // Com USE_SUBTYPES=false volta a ser o bestMultiplier de antes, que segue ali intacto
-  const best = bestAttackType(attacker, defender);
+  const best = tipoDoGolpe(attacker, defender, rng);
   /* Registro pro LOG: qual tipo este golpe usou. É só leitura -- nada daqui volta pra conta.
      O tipo escolhido não depende de HP (só de atributos e tipos, que não mudam durante o
      confronto), então na prática ele é o mesmo do começo ao fim da luta entre esses dois. */
@@ -723,7 +735,111 @@ const DYING_BLOW_FACTOR = 1.0;
    Chaves curtas porque isso é gravado no Firestore junto com a batalha:
    q = quem bateu ('p' = o lado do jogador no confronto, 'e' = o outro), d = dano,
    hp = como o alvo ficou, c = foi crítico, m = foi golpe moribundo (o contra-golpe de quem caiu). */
+/* ===== GOLPES ESPECIAIS: AUTODESTRUIÇÃO, SONO E METRÔNOMO =====
+   Três efeitos que não são dano. São resolvidos UMA VEZ POR CONFRONTO -- não por troca -- antes do
+   primeiro golpe, e quando acontecem o confronto acaba ali.
+
+   AS LISTAS SAEM DO APRENDIZADO POR NÍVEL da Gen 1/2 (pesquisado em 01/09/2026 no PokémonDB), e não
+   das TMs: por TM meia Pokédex aprendia autodestruição, e a graça é que o golpe seja característica
+   da espécie -- o jogador reconhece "ih, é um Geodude" e pesa o risco.
+
+   POR QUE FICA DENTRO DO doExchange, e não nos laços de batalha: são QUATRO laços (jornada no
+   cliente, jornada no servidor, batalha online e raide do Mew) e eles teriam que combinar entre si.
+   O marcador é o próprio adversário: quando o oponente muda, é outro confronto e as chances valem
+   de novo. Assim a regra vale nos quatro sem tocar em nenhum.
+
+   MEW E MEWTWO SÃO IMUNES. Sem isso um Geodude nível 20 derrubaria o Mew de 25.125 de HP da raide
+   com 15% de chance, e o desafio final da Pokédex viraria uma aposta de moeda. Os dois são os
+   chefes do jogo -- não caem por um golpe só. */
+const CHANCE_AUTODESTRUICAO = 0.15;
+const CHANCE_SONO = 0.05;
+const CHANCE_METRONOMO_EFEITO = 0.10;   // por efeito: 10% autodestruição, 10% sono, 80% golpe comum
+const IMUNES_A_ESPECIAL = ['mew','mewtwo'];
+/* Aprendem Autodestruição por nível na Gen 1/2. */
+const AUTODESTRUICAO = ['geodude','graveler','golem','voltorb','electrode','koffing','weezing','pineco','forretress'];
+/* Aprendem um golpe de SONO por nível na Gen 1/2 -- o valor é o nome que aparece no log. */
+const SONIFEROS = {
+  bulbasaur:'Pó do Sono', ivysaur:'Pó do Sono', venusaur:'Pó do Sono', butterfree:'Pó do Sono',
+  oddish:'Pó do Sono', gloom:'Pó do Sono', vileplume:'Pó do Sono', bellossom:'Pó do Sono',
+  venonat:'Pó do Sono', venomoth:'Pó do Sono',
+  bellsprout:'Pó do Sono', weepinbell:'Pó do Sono', victreebel:'Pó do Sono',
+  hoppip:'Pó do Sono', skiploom:'Pó do Sono', jumpluff:'Pó do Sono',
+  paras:'Esporo', parasect:'Esporo',
+  poliwag:'Hipnose', poliwhirl:'Hipnose', poliwrath:'Hipnose',
+  gastly:'Hipnose', haunter:'Hipnose', gengar:'Hipnose',
+  drowzee:'Hipnose', hypno:'Hipnose', exeggcute:'Hipnose', exeggutor:'Hipnose',
+  clefairy:'Canto', jigglypuff:'Canto', wigglytuff:'Canto', chansey:'Canto', blissey:'Canto',
+  lapras:'Canto', cleffa:'Canto', igglybuff:'Canto',
+  jynx:'Beijo Adorável'
+};
+/* Metrônomo: chama um golpe qualquer. Aqui isso quer dizer que o TIPO do ataque sai no sorteio
+   (ver tipoDoGolpe) e que os dois efeitos especiais podem sair também. */
+const METRONOMO = ['togepi','togetic','cleffa','snubbull'];
+/* Quem explodiu no confronto que está sendo resolvido: true = foi o primeiro argumento do
+   doExchange (o "nosso" lado em todos os laços), false = o segundo, null = ninguém.
+   É o que deixa os laços decidirem "os dois últimos caíram, quem ganha?" sem mudar assinatura.
+   Módulo-level dá certo porque uma batalha é síncrona do começo ao fim: não existem duas rodando
+   ao mesmo tempo nem no navegador nem numa invocação da função. */
+let explosaoDoAtivo = null;
+function ehImuneAEspecial(p){ return IMUNES_A_ESPECIAL.includes(p.speciesId); }
+function sorteiaGolpeEspecial(p, rng){
+  if(METRONOMO.includes(p.speciesId)){
+    const r = rng();
+    if(r < CHANCE_METRONOMO_EFEITO) return { efeito:'explosao', golpe:'Metrônomo (Autodestruição)' };
+    if(r < CHANCE_METRONOMO_EFEITO*2) return { efeito:'sono', golpe:'Metrônomo (Sonífero)' };
+    return null;   // o resto é ataque comum -- com o tipo sorteado (ver tipoDoGolpe)
+  }
+  if(AUTODESTRUICAO.includes(p.speciesId) && rng() < CHANCE_AUTODESTRUICAO){
+    return { efeito:'explosao', golpe:'Autodestruição' };
+  }
+  if(SONIFEROS[p.speciesId] && rng() < CHANCE_SONO){
+    return { efeito:'sono', golpe: SONIFEROS[p.speciesId] };
+  }
+  return null;
+}
+/* Devolve true quando o confronto foi RESOLVIDO aqui (e o doExchange não deve nem começar). */
+function tentarGolpeEspecial(active, enemy, rng, diario){
+  explosaoDoAtivo = null;
+  if(ehImuneAEspecial(active) || ehImuneAEspecial(enemy)) return false;
+  // o mais rápido tenta primeiro -- mesma regra que decide quem conecta antes numa troca normal
+  const spdA = effectiveSpeed(active), spdE = effectiveSpeed(enemy);
+  const ativoPrimeiro = spdA > spdE || (spdA === spdE && rng() < 0.5);
+  const ordem = ativoPrimeiro ? [[active, enemy, true], [enemy, active, false]]
+                              : [[enemy, active, false], [active, enemy, true]];
+  for(const [quem, alvo, ehAtivo] of ordem){
+    const especial = sorteiaGolpeEspecial(quem, rng);
+    if(!especial) continue;
+    const marca = ehAtivo ? 'p' : 'e';
+    if(especial.efeito === 'explosao'){
+      /* Os dois caem na hora -- e é o único caminho do jogo em que isso acontece: o doExchange
+         normal sempre deixa um de pé (ver o desempate lá embaixo). */
+      const danoNoAlvo = alvo.hp, danoEmSi = quem.hp;
+      alvo.hp = 0; quem.hp = 0;
+      explosaoDoAtivo = ehAtivo;
+      if(diario){
+        diario.push({ q: marca, d: danoNoAlvo, hp: 0, c:0, m:0, z:0, x:'boom', g: especial.golpe });
+        diario.push({ q: marca === 'p' ? 'e' : 'p', d: danoEmSi, hp: 0, c:0, m:0, z:0, x:'boomself' });
+      }
+      return true;
+    }
+    /* SONO: o alvo dorme e não revida. Quem usou ataca até derrubar, sem tomar nada -- é isso que
+       o pedido descreve, e é o que torna 5% um número alto de propósito. */
+    const danoNoAlvo = alvo.hp;
+    alvo.hp = 0;
+    if(diario){
+      diario.push({ q: marca, d: danoNoAlvo, hp: 0, c:0, m:0, z:0, x:'sono', g: especial.golpe });
+    }
+    return true;
+  }
+  return false;
+}
 function doExchange(active, enemy, rng, diario){
+  /* Golpe especial: só na PRIMEIRA troca de cada confronto. O marcador é o próprio
+     adversário -- oponente novo, confronto novo, e as chances valem de novo. */
+  if(active._especialContra !== enemy){
+    active._especialContra = enemy;
+    if(tentarGolpeEspecial(active, enemy, rng || Math.random, diario)) return;
+  }
   // Os DOIS sempre atacam em toda troca -- a velocidade (Gen 1 real) só decide QUEM conecta primeiro.
   // Se o primeiro golpe nocauteia, o caído ainda responde com o "golpe moribundo" (reduzido, nunca
   // cancelado). Isso impede que um pokémon raspando de HP varra uma fila inteira só por ser mais rápido.
@@ -782,6 +898,7 @@ function doExchange(active, enemy, rng, diario){
 }
 function simulateGymBattle(team, enemyTeam, rng){
   team.forEach(p=>{ p.maxHp=calcMaxHp(p); p.hp=p.maxHp; });
+  explosaoDoAtivo = null;   // o marcador da autodestruição é por BATALHA (ver tentarGolpeEspecial)
   enemyTeam.forEach(p=>{ p.maxHp=calcMaxHp(p); p.hp=p.maxHp; });
 
   const matchups = [];
@@ -832,7 +949,10 @@ function simulateGymBattle(team, enemyTeam, rng){
     }
     enemyIndex++;
   }
-  const teamStillAlive = team.some(p=>p.hp>0);
+  /* AUTODESTRUIÇÃO NO ÚLTIMO DE CADA LADO: quem explodiu leva a batalha. É o único jeito de os
+     dois times zerarem no mesmo instante (o doExchange normal sempre deixa um de pé), e sem esta
+     linha o jogador perderia justamente a batalha que ele decidiu explodindo. */
+  const teamStillAlive = team.some(p=>p.hp>0) || explosaoDoAtivo === true;
   return { win: teamStillAlive, matchups };
 }
 function makeSeededRng(seedStr){
@@ -2287,6 +2407,13 @@ async function checkAndAdvanceTrainersLeague(dateId){
 }
 
 // exportado só pro teste: é a regra que decide se o dia tem liga (ver tools/test-liga-treinadores.js)
+/* exportados só pro teste que compara os DOIS motores golpe a golpe (ver
+   scratchpad/confere-motores.js e tools/test-especiais.js): cliente e servidor precisam dar o
+   mesmo resultado com a mesma semente, senão a liga decide uma coisa e a animação mostra outra. */
+exports._simulateGymBattle = simulateGymBattle;
+exports._createInstance = createInstance;
+exports._makeSeededRng = makeSeededRng;
+exports._golpesEspeciais = { AUTODESTRUICAO, SONIFEROS, METRONOMO, CHANCE_AUTODESTRUICAO, CHANCE_SONO };
 exports._trainersLeagueSplitGroups = trainersLeagueSplitGroups;
 exports.advanceTrainersLeague = onSchedule('every 1 minutes', async (event) => {
   try{
@@ -4267,7 +4394,13 @@ function battleAdvance(estado){
     const bVivos = estado.bTeam.filter(p=>p.hp>0).length;
     if(aVivos===0 || bVivos===0){
       estado.phase = 'done';
-      estado.winnerUid = (bVivos===0 && aVivos>0) ? estado.a.uid : ((aVivos===0 && bVivos>0) ? estado.b.uid : null);
+      /* Os DOIS zerados só acontece por autodestruição, e aí quem explodiu leva a partida --
+         mesma regra da jornada. Fora isso continua sem vencedor (não deveria acontecer). */
+      const zeraramJuntos = aVivos===0 && bVivos===0;
+      estado.winnerUid = (bVivos===0 && aVivos>0) ? estado.a.uid
+        : ((aVivos===0 && bVivos>0) ? estado.b.uid
+        : (zeraramJuntos && explosaoDoAtivo === true ? estado.a.uid
+        : (zeraramJuntos && explosaoDoAtivo === false ? estado.b.uid : null)));
     } else {
       estado.phase = 'choosing';
       // a animação roda primeiro; só depois dela os 5 segundos de escolha começam

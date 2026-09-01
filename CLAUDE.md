@@ -156,6 +156,49 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
   os dois arquivos têm comentários próprios e listam em ordens diferentes), 152–251 sem buraco, os
   dois tipos novos completos, e as evoluções de Kanto intactas.
 
+## Golpes especiais (autodestruição, sono e metrônomo)
+
+São os **primeiros efeitos do jogo que não são dano** — até aqui todo confronto se resolvia por
+troca de golpes e desempate. Entram no `doExchange`, nos DOIS motores, e o teste que garante que os
+dois continuam idênticos é `tools/test-especiais.js` (300 batalhas com a mesma semente, comparadas
+golpe a golpe).
+
+- **As listas saem do aprendizado por NÍVEL da Gen 1/2**, não da "quem pode aprender de algum jeito".
+  Autodestruição são **9** (Geodude/Graveler/Golem, Voltorb/Electrode, Koffing/Weezing,
+  Pineco/Forretress). Sono são **37**, cada uma com o nome do golpe dela (`SONIFEROS` guarda o par
+  espécie→golpe: Pó do Sono, Esporo, Hipnose, Canto, Beijo Adorável) — sem isso o Paras dormiria o
+  adversário com "Hipnose" e quem conhece o jogo notaria na hora.
+  Metrônomo são os **4 pedidos** (Togepi, Togetic, Cleffa, Snubbull). Clefairy, Clefable e Snorlax
+  também aprendem Metrônomo por nível no original e ficaram **de fora de propósito**: são espécies
+  comuns em time de jogador e de líder, e o metrônomo é o golpe mais aleatório dos três.
+- **Chance por CONFRONTO, não por golpe**: 15% autodestruição, 5% sono. O marcador é o próprio
+  adversário (`active._especialContra !== enemy`) — oponente novo, confronto novo. Se fosse por
+  golpe, um Geodude explodiria em ~40% dos confrontos e a lista viraria o jogo inteiro.
+- **Metrônomo é 10% explosão / 10% sono / 80% golpe comum**, e o golpe comum sai com o **tipo
+  sorteado** (`tipoDoGolpe`) em vez do melhor disponível. É o que faz dele uma aposta e não um
+  upgrade: medido 1x1 contra Onix, o Togepi vai de 0% pra 26,3% de vitória — o resto do jogo
+  continua usando `bestAttackType`, e o `tipoDoGolpe` só desvia pra quem está no `METRONOMO`.
+- **Quem explodiu VENCE quando os dois últimos caem.** Foi o pedido, e sem essa regra acontecia o
+  contrário do que a tela mostra: o laço só olha "sobrou alguém do meu lado?", então o jogador
+  perdia justamente a batalha que decidiu explodindo. Vive no `explosaoDoAtivo`, que é por BATALHA
+  (zerado na entrada do `simulateGymBattle`) e entra na regra de vitória dos dois motores E no
+  `winnerUid` do online. Medido com a regra desligada: **0 de 451** explosões viravam vitória.
+- **Mew e Mewtwo são imunes** (`IMUNES_A_ESPECIAL`). O Mew é o chefe da raide global, com 25.125 de
+  HP calibrados pra ~399 ataques: um Geodude nível 20 com 15% de chance de derrubá-lo num golpe
+  acabaria com a raide da semana. O Mewtwo é o desafio de fim de jogo pelo mesmo motivo. Medido com
+  a imunidade desligada: **472 explosões em 3.000 batalhas** contra o Mewtwo.
+- **A linha do log tem forma própria aqui.** A regra do log é "uma forma só" (ver a seção acima), e
+  estas são as **duas exceções**: não são dano, são o confronto inteiro decidido de uma vez, e o
+  jogador precisa ler por quê. Um `−0` solto faria procurar bug onde é regra — o mesmo motivo do
+  "mas não teve efeito" da imunidade. A explosão gera DUAS entradas no diário (`boom` + `boomself`,
+  porque os dois caem) e o `passosHtml` desenha **uma linha só**: a segunda existe pro cálculo, não
+  pra tela.
+- **Custo medido na jornada: conclusão sobe de 58,3% pra 63,7%** (2.000 jornadas de cada lado).
+  Sobe porque a autodestruição e o sono são atalhos que resolvem um confronto ruim — e o jogador
+  encontra mais espécies dessas listas do que os líderes. Está dentro do que o jogo já tolera, mas
+  é a maior variação de dificuldade desde o golpe moribundo. Se incomodar, o parâmetro a mexer é a
+  chance da autodestruição (`CHANCE_AUTODESTRUICAO`), que é a que mais aparece.
+
 ## Log de batalha
 
 - O matchup carrega **`golpes`**: o diário do confronto, um registro por golpe na ordem real,
@@ -186,7 +229,9 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
   linha anterior", que fazia a linha antiga parecer fatal).
 - A linha do log tem **uma forma só**: "X atacou Y com GOLPE e tirou −N de HP". Já passaram por
   ali selo de crítico, de moribundo e de "o tipo não pega nele" — todos saíram: viravam ruído numa
-  linha que se lê de relance.
+  linha que se lê de relance. As **únicas duas exceções** são a autodestruição e o
+  sono (seção acima): ali não há número pra contar a história, e sem a frase o jogador vê dois
+  pokémon caindo juntos sem explicação.
 - **A animação mostra o mesmo diário.** `buildAnimatedHitSequence` devolve os golpes reais (pelo
   `passosVisiveis`, pra dobrar o moribundo igual ao log); a reconstrução antiga — até 3 golpes
   inventados a partir do HP antes/depois — virou fallback pra confronto gravado antes do diário.
