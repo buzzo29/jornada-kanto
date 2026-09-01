@@ -793,6 +793,11 @@ const DYING_BLOW_FACTOR = 1.0;
    com 15% de chance, e o desafio final da Pokédex viraria uma aposta de moeda. Os dois são os
    chefes do jogo -- não caem por um golpe só. */
 const CHANCE_AUTODESTRUICAO = 0.15;
+/* A autodestruição só sai contra alvo com MAIS da metade da vida. Explodir num adversário já
+   machucado é trocar o pokémon inteiro por um abate que a troca de golpes ia entregar de graça --
+   e no laço de batalha o inimigo carrega o HP de um confronto pro outro, então isso acontecia de
+   verdade. Com a trava ela vira o que devia ser: o recurso de quem está diante de um alvo cheio. */
+const BOOM_MINIMO_DO_ALVO = 0.5;
 const CHANCE_SONO = 0.05;
 const CHANCE_METRONOMO_EFEITO = 0.10;   // por efeito: 10% cada um dos três, 70% golpe comum
 const CHANCE_DISABLE = 0.10;
@@ -875,6 +880,9 @@ function tentarGolpeEspecial(active, enemy, rng, diario){
     if(!especial) continue;
     const marca = ehAtivo ? 'p' : 'e';
     if(especial.efeito === 'explosao'){
+      /* Alvo já machucado: não vale o preço. Sai sem golpe especial nenhum -- e sem consumir a
+         chance, porque quem decide isso é a SITUAÇÃO do alvo, não o sorteio. */
+      if(alvo.hp <= alvo.maxHp * BOOM_MINIMO_DO_ALVO) continue;
       /* Os dois caem na hora -- e é o único caminho do jogo em que isso acontece: o doExchange
          normal sempre deixa um de pé (ver o desempate lá embaixo). */
       const danoNoAlvo = alvo.hp, danoEmSi = quem.hp;
@@ -3795,7 +3803,13 @@ exports.syncTrainerSpecialties = onCall(async (request) => {
    entrada: o andar 1 já exigia mais do que a jornada inteira entrega (~67 com o Bônus de Kanto e
    a Elite vencida). Agora um campeão recém-formado vence os primeiros andares e sente o aperto
    subindo -- que é o que uma torre deveria fazer. */
-const TOWER_FLOOR_LEVELS = [58, 61, 64, 67, 70, 73, 76, 79, 82, 85];
+/* VINTE andares, média começando em 65 e subindo de 3 em 3 -- do 65 ao 122. Os últimos passam do
+   nível 99 (o teto do JOGADOR) de propósito: a torre deixou de ser algo pra zerar e virou uma
+   medida de até ONDE cada um chega. Ninguém precisa chegar no 20, e é isso que faz o prêmio do dia
+   ter sentido -- ele vai pra quem foi mais longe, não pra quem terminou.
+   Eram 10 andares de 58 a 85, calibrados pra um campeão da Elite (~67) entrar no andar 5 e a torre
+   ser vencível todo dia. */
+const TOWER_FLOOR_LEVELS = Array.from({ length: 20 }, (_, i) => 65 + i * 3);
 const TOWER_FLOORS = TOWER_FLOOR_LEVELS.length;
 const TOWER_TEAM_SIZE = 6;
 
@@ -3909,6 +3923,10 @@ exports.generateTrainerTower = onSchedule('every 60 minutes', async () => {
   if(snap.exists) return null;
   await ref.set(towerGenerate(dateId));
   logger.info('Torre dos Treinadores gerada para ' + dateId);
+  /* Torre nova = dia anterior acabou. Fecha ele aqui em vez de criar outra função agendada: é o
+     único instante em que dá pra ter certeza da virada, e o awarded garante que rodar de novo
+     não paga ninguém duas vezes. */
+  await towerFecharDia(trainersLeagueDateStrPlusDays(dateId, -1)).catch(e => logger.error('Falha ao fechar a torre do dia anterior', e));
   return null;
 });
 
@@ -4092,14 +4110,18 @@ exports.startTrainerTowerRun = onCall(async (request) => {
   if(run.cleared){
     throw new HttpsError('failed-precondition', 'Você já venceu a torre hoje. Volte amanhã.');
   }
-  const novo = { dateId: torre.dateId, floor: 1, bestFloor: Math.max(1, run.bestFloor||1),
-                 team: time, cleared: false, startedAt: Date.now(), lastAt: Date.now() };
+  /* MANTEM O ANDAR. Esta funcao passou a ser tambem o 'trocar de time' -- e mandar o jogador de
+     volta pro andar 1 ao trocar anularia a regra de que perder nao volta pro comeco. Ela zerava o
+     andar porque, no modelo antigo, so era chamada no comeco da subida. */
+  const novo = { dateId: torre.dateId, floor: run.floor || 1, bestFloor: Math.max(run.floor || 1, run.bestFloor || 1),
+                 team: time, cleared: false, startedAt: run.startedAt || Date.now(), lastAt: Date.now() };
   await towerRunRef(uid).set(novo);
   return { run: novo };
 });
 
-/* Enfrenta o andar atual. Vencer sobe um andar e CURA o time (o próximo andar começa cheio);
-   perder apaga o time e devolve pro andar 1, onde é preciso montar outro. */
+/* Enfrenta o andar atual. Vencer sobe um andar e CURA o time (o proximo andar comeca cheio);
+   perder deixa o jogador NO MESMO ANDAR, com o time intacto -- ele tenta de novo, com o mesmo
+   time ou com outro. */
 exports.fightTrainerTowerFloor = onCall(async (request) => {
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   const uid = request.auth.uid;
@@ -4145,12 +4167,19 @@ exports.fightTrainerTowerFloor = onCall(async (request) => {
       await towerRegisterClear(uid, torre.dateId);
     }
   } else {
-    // derrota: perde o time e volta pro começo
-    // derrota: perde o time e volta pro começo, MAS o bestFloor fica -- os times já vistos continuam visíveis
-    novo = { dateId: torre.dateId, floor: 1, bestFloor: Math.max(1, run.bestFloor||1),
-             team: null, cleared: false, startedAt: null, lastAt: Date.now() };
+    /* PERDER NÃO VOLTA PRO COMEÇO. Antes a derrota zerava a subida, e o jogador refazia oito
+       andares que ele já tinha vencido pra chegar de novo onde parou -- refazer o caminho não mede
+       nada, e o que a torre mede é ATÉ ONDE ele vai. Ele fica no mesmo andar e tenta de novo.
+       O time NÃO é apagado: quem quiser repetir não precisa remontar 6 pokémon a cada derrota, e
+       quem quiser trocar tem o botão na tela. */
+    novo = { dateId: torre.dateId, floor: run.floor, bestFloor: Math.max(run.floor, run.bestFloor||1),
+             team: run.team, cleared: false, startedAt: run.startedAt, lastAt: Date.now() };
   }
   await towerRunRef(uid).set(novo);
+  /* Registra ATE ONDE ele chegou hoje, ganhando ou perdendo -- e este documento que o fechamento
+     do dia le pra saber quem foi mais longe. O da subida (trainerTowerRuns) e sobrescrito na
+     virada do dia, entao ele nao serve pra isso. */
+  await towerRegistrarDia(uid, torre.dateId, novo.bestFloor);
   // devolve a lista INTEIRA de andares já com a máscara nova. Antes eu mandava só o time do andar
   // enfrentado, e o andar SEGUINTE continuava como "time desconhecido" até a pessoa sair e voltar --
   // era o mesmo bug, um andar adiante. Mandando a lista toda, a tela nunca fica atrasada
@@ -4173,6 +4202,63 @@ exports.fightTrainerTowerFloor = onCall(async (request) => {
    99 é o nível do Mewtwo do desafio, o mais forte que o jogo já mostra. */
 const MAX_POKEMON_LEVEL = 99;
 
+/* ATÉ ONDE VOCÊ FOI HOJE, guardado por DIA e por jogador.
+   Precisa ser um documento à parte porque o da subida (trainerTowerRuns/{uid}) é sobrescrito no dia
+   seguinte -- sem esta cópia, fechar o dia depois da virada não teria o que ler.
+   Grava em toda mudança de andar: são no máximo 20 escritas por jogador por dia. */
+async function towerRegistrarDia(uid, dateId, bestFloor){
+  const userSnap = await db.collection('users').doc(uid).get();
+  const nome = (userSnap.exists && userSnap.data().trainerName) || 'Treinador';
+  await db.collection('trainerTowerDays').doc(dateId).collection('players').doc(uid)
+    .set({ uid, name: nome, bestFloor, updatedAt: Date.now() }, { merge: true });
+}
+/* FECHA O DIA: quem foi MAIS LONGE leva o Doce Raro e o ponto no ranking.
+   EMPATE PREMIA TODOS -- se dois pararam no andar 14 e ninguém passou disso, os dois ganham. É o
+   que o modo pede: a torre não tem que ser vencida, tem que ser subida mais que os outros.
+   Roda junto com a geração da torre do dia seguinte: é o instante em que se sabe que o dia anterior
+   acabou, e evita mais uma função agendada. Idempotente pelo campo awarded -- o cron roda de hora
+   em hora e não pode pagar duas vezes. */
+async function towerFecharDia(dateId){
+  const diaRef = db.collection('trainerTowerDays').doc(dateId);
+  const diaSnap = await diaRef.get();
+  if(diaSnap.exists && diaSnap.data().awarded) return null;
+  const jogadores = await diaRef.collection('players').get();
+  if(jogadores.empty){
+    await diaRef.set({ awarded: true, topFloor: 0, winners: [], closedAt: Date.now() }, { merge: true });
+    return { topFloor: 0, vencedores: 0 };
+  }
+  let topFloor = 0;
+  jogadores.forEach(d => { topFloor = Math.max(topFloor, d.data().bestFloor || 0); });
+  const vencedores = jogadores.docs.map(d => d.data()).filter(x => (x.bestFloor || 0) === topFloor);
+  await diaRef.set({ awarded: true, topFloor,
+                     winners: vencedores.map(v => ({ uid: v.uid, name: v.name })),
+                     closedAt: Date.now() }, { merge: true });
+  for(const v of vencedores){ await towerPremiarTopo(v.uid, v.name, dateId, topFloor, vencedores.length); }
+  logger.info('Torre ' + dateId + ' fechada: andar ' + topFloor + ', ' + vencedores.length + ' premiado(s).');
+  return { topFloor, vencedores: vencedores.length };
+}
+/* O prêmio: um Doce Raro e um ponto no ranking. O ranking passou a contar EM QUANTOS DIAS o
+   treinador ficou no andar mais alto -- é o que o modo mede agora. O campo antigo (clears, dias
+   em que ele zerou os 10 andares) fica no documento como história, mas não ordena mais nada:
+   com 20 andares e média 122 no topo, zerar deixou de ser o objetivo. */
+async function towerPremiarTopo(uid, nome, dateId, topFloor, quantos){
+  const ref = db.collection('trainerTowerRanking').doc(uid);
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const d = snap.exists ? snap.data() : {};
+    if(d.lastTopDate === dateId) return;   // trava dupla contra pagar o mesmo dia 2x
+    tx.set(ref, { uid, name: nome || d.name || 'Treinador',
+                  topDays: (d.topDays || 0) + 1,
+                  lastTopDate: dateId, bestFloorEver: Math.max(d.bestFloorEver || 0, topFloor),
+                  updatedAt: Date.now() }, { merge: true });
+  });
+  await db.collection('users').doc(uid).set({
+    rareCandies: admin.firestore.FieldValue.increment(1)
+  }, { merge: true });
+  const dividido = quantos > 1 ? ` Você dividiu o topo com mais ${quantos-1} treinador${quantos-1===1?'':'es'}.` : '';
+  await createNotification(uid, 'tower_top', '🗼 Você foi o mais longe na Torre!',
+    `Ninguém passou do andar ${topFloor} na torre de ontem, e você chegou lá.${dividido} Ganhou um 🍬 Doce Raro e mais um ponto no ranking da Torre.`);
+}
 async function towerRegisterClear(uid, dateId){
   const userSnap = await db.collection('users').doc(uid).get();
   const nome = (userSnap.exists && userSnap.data().trainerName) || 'Treinador';
@@ -4188,13 +4274,11 @@ async function towerRegisterClear(uid, dateId){
       updatedAt: Date.now()
     }, { merge: true });
   });
-  // o Doce Raro é creditado AQUI, no servidor, junto com o registro da vitória. Fica na mesma
-  // transação lógica: quem zerou a torre ganhou o doce, sem depender de o cliente pedir
-  await db.collection('users').doc(uid).set({
-    rareCandies: admin.firestore.FieldValue.increment(1)
-  }, { merge: true });
-  await createNotification(uid, 'tower_cleared', '🗼 Torre dos Treinadores vencida!',
-    'Você derrotou os 10 treinadores da torre de hoje e ganhou um 🍬 Doce Raro! Use na Torre pra subir 1 nível de qualquer pokémon seu. Volte amanhã: 10 adversários novos te esperam.');
+  /* O DOCE NÃO É PAGO AQUI. Ele virou o prêmio de quem foi MAIS LONGE no dia (towerFecharDia), e
+     quem zera os 20 andares certamente está no topo -- pagar aqui também seria pagar duas vezes.
+     A notificação fica: zerar 20 andares com média 122 no último merece ser dito na hora. */
+  await createNotification(uid, 'tower_cleared', '🗼 Torre dos Treinadores ZERADA!',
+    'Você derrotou os 20 treinadores da torre de hoje -- o último com média de nível 122. Ninguém vai passar disso: o prêmio de quem foi mais longe sai na virada do dia. Volte amanhã: 20 adversários novos te esperam.');
 }
 
 /* Reordena o time da subida em andamento. A ordem importa: o primeiro da lista enfrenta o
@@ -4309,10 +4393,14 @@ exports.useRareCandy = onCall(async (request) => {
 exports.getTrainerTowerRanking = onCall(async (request) => {
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   await towerRequireTester(request.auth.uid);
-  const snap = await db.collection('trainerTowerRanking').orderBy('clears', 'desc').limit(10).get();
+  /* Ordena por DIAS NO TOPO -- quantas vezes o treinador chegou no andar mais alto do dia. O
+     clears antigo (dias em que ele zerou os 10 andares) continua no documento como história, mas
+     não ordena mais: com 20 andares e média 122 no último, zerar deixou de ser o objetivo. */
+  const snap = await db.collection('trainerTowerRanking').orderBy('topDays', 'desc').limit(10).get();
   return { top: snap.docs.map(d => {
     const x = d.data();
-    return { uid: x.uid, name: x.name, clears: x.clears || 0 };
+    return { uid: x.uid, name: x.name, topDays: x.topDays || 0, bestFloorEver: x.bestFloorEver || 0,
+             clears: x.clears || 0 };
   })};
 });
 
@@ -5974,3 +6062,5 @@ exports.fightSundayBoss = onCall(async (request) => {
 
 exports._TERRAINS = TERRAINS;   // so pro teste do ginasio escolher um terreno valido
 
+
+exports._towerFecharDia = towerFecharDia;   // o fechamento do dia e testado direto: no ar ele roda dentro do cron

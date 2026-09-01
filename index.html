@@ -5194,6 +5194,11 @@ const DYING_BLOW_FACTOR = 1.0;
    com 15% de chance, e o desafio final da Pokédex viraria uma aposta de moeda. Os dois são os
    chefes do jogo -- não caem por um golpe só. */
 const CHANCE_AUTODESTRUICAO = 0.15;
+/* A autodestruição só sai contra alvo com MAIS da metade da vida. Explodir num adversário já
+   machucado é trocar o pokémon inteiro por um abate que a troca de golpes ia entregar de graça --
+   e no laço de batalha o inimigo carrega o HP de um confronto pro outro, então isso acontecia de
+   verdade. Com a trava ela vira o que devia ser: o recurso de quem está diante de um alvo cheio. */
+const BOOM_MINIMO_DO_ALVO = 0.5;
 const CHANCE_SONO = 0.05;
 const CHANCE_METRONOMO_EFEITO = 0.10;   // por efeito: 10% cada um dos três, 70% golpe comum
 const CHANCE_DISABLE = 0.10;
@@ -5276,6 +5281,9 @@ function tentarGolpeEspecial(active, enemy, rng, diario){
     if(!especial) continue;
     const marca = ehAtivo ? 'p' : 'e';
     if(especial.efeito === 'explosao'){
+      /* Alvo já machucado: não vale o preço. Sai sem golpe especial nenhum -- e sem consumir a
+         chance, porque quem decide isso é a SITUAÇÃO do alvo, não o sorteio. */
+      if(alvo.hp <= alvo.maxHp * BOOM_MINIMO_DO_ALVO) continue;
       /* Os dois caem na hora -- e é o único caminho do jogo em que isso acontece: o doExchange
          normal sempre deixa um de pé (ver o desempate lá embaixo). */
       const danoNoAlvo = alvo.hp, danoEmSi = quem.hp;
@@ -14912,7 +14920,9 @@ function renderTowerOrderModal(){
 function renderTrainerTower(){
   const t = game.tower;
   const run = t && t.run;
-  const escolhendo = run && !run.team && !run.cleared;
+  /* O time SOBREVIVE à derrota (o servidor não apaga mais), então o montador só abre quando não há
+     time nenhum ou quando o jogador pediu pra trocar. */
+  const escolhendo = run && !run.cleared && (!run.team || !!game.towerTrocandoTime);
 
   if(game.towerLoading && !t){
     return `<div class="eyebrow">🗼 TORRE DOS TREINADORES</div>
@@ -14925,20 +14935,24 @@ function renderTrainerTower(){
 `;
   }
 
-  // A vitória de andar não tem painel próprio: a batalha inteira já foi mostrada na tela de
-  // revelação, e o andar seguinte aparece logo abaixo. Só a DERROTA avisa, porque ela apaga o
-  // time e a pessoa precisa entender por que voltou pro começo
+  /* A vitória de andar não tem painel próprio: a batalha inteira já foi mostrada na tela de
+     revelação, e o andar seguinte aparece logo abaixo. Só a DERROTA avisa -- mas o recado mudou:
+     ela não volta mais pro começo, o jogador continua no mesmo andar e pode trocar o time. */
   let resultadoHtml = '';
   if(game.towerBattle && !game.towerBattle.win){
     const b = game.towerBattle;
     resultadoHtml = `<div class="box tower-result lose">
       <h2>💀 Derrota no andar ${b.floor}</h2>
-      <p>${escapeHtmlSafe(b.npcName)} foi forte demais. A subida acabou — monte um time novo e recomece do primeiro andar.</p>
+      <p>${escapeHtmlSafe(b.npcName)} foi forte demais. Você continua no andar ${b.floor} — tente de novo, com o mesmo time ou com outro.</p>
     </div>`;
   }
 
-  // ---- torre desenhada de cima pra baixo (andar 10 no topo) ----
-  const andares = (t.floors||[]).slice().reverse().map(f => {
+  /* SÓ OS ANDARES JÁ ALCANÇADOS APARECEM. São 20, e mostrar 13 cartões apagados de "???" no topo
+     transformava a tela numa lista de coisas que o jogador não pode fazer. O servidor já esconde o
+     time dos andares não alcançados (towerVisibleFloors), então "tem time" É "já cheguei aqui".
+     A torre desenha de cima pra baixo: o andar mais alto que ele viu fica no topo da pilha. */
+  const revelados = (t.floors||[]).filter(f => !!f.team);
+  const andares = revelados.slice().reverse().map(f => {
     // o andar atual fica destacado mesmo antes de montar o time -- é o próximo adversário, e saber
     // quem é ajuda a escolher. Antes eu exigia run.team, e o andar 1 aparecia bloqueado justo na
     // tela em que a pessoa está decidindo o time
@@ -14996,7 +15010,7 @@ function renderTrainerTower(){
       const listas = montadorDeTimeHtml(escolhidos, 'towerTogglePick', 6);
       acao = `<div class="box">
         <h2>Monte seu time</h2>
-        <p class="hint-text">6 pokémon de qualquer time com as 8 insígnias. <strong>Sem repetir espécie.</strong> O time escolhido vale a subida inteira — se perder, recomeça do primeiro andar.</p>
+        <p class="hint-text">6 pokémon de qualquer time com as 8 insígnias. <strong>Sem repetir espécie.</strong> Dá pra trocar o time a qualquer momento, inclusive depois de perder um andar.</p>
         <div class="tower-pick-counter ${escolhidos.length===6?'ok':''}">${escolhidos.length} de 6 escolhidos</div>
         ${listas}
         <button class="btn success" ${escolhidos.length!==6||game.towerLoading?'disabled':''} onclick="startTowerRun()">
@@ -15007,7 +15021,7 @@ function renderTrainerTower(){
   } else {
     const f = (t.floors||[])[run.floor-1];
     acao = `<div class="box">
-      <h2>Andar ${run.floor} de 10</h2>
+      <h2>Andar ${run.floor} de ${(t.floors||[]).length}</h2>
       <p>Seu adversário é <strong>${escapeHtmlSafe(f?f.name:'???')}</strong>.</p>
     </div>
     <div class="save-slot-card">
@@ -15015,6 +15029,7 @@ function renderTrainerTower(){
         <span class="save-slot-name"><span class="team-avg-star-name">Seu time</span></span>
         <span class="save-slot-actions">
           <button class="btn secondary tower-order-btn" onclick="openTowerOrder()">🔀 Ordem</button>
+          <button class="btn secondary tower-order-btn" onclick="trocarTimeDaTorre()">🔄 Trocar</button>
         </span>
       </div>
       ${towerTeamRowHtml(run.team)}
@@ -15040,8 +15055,10 @@ function renderTrainerTower(){
   <div class="eyebrow">🗼 TORRE DOS TREINADORES</div>
   ${candyHtml}
   <div class="box tower-intro">
-    <p>10 andares, 10 treinadores. Eles trocam <strong>todo dia</strong> depois da meia-noite.</p>
-    <p class="hint-text">Vencer um andar cura e revive seu time. Perder devolve você ao primeiro andar.</p>
+    <p><strong>${(t.floors||[]).length}</strong> andares, um treinador em cada. Eles trocam <strong>todo dia</strong> depois da meia-noite.</p>
+    <p class="hint-text">A média de nível sobe de 3 em 3 a cada andar — do 65 no primeiro ao 122 no último. Não é pra zerar: é pra ver até onde você chega.</p>
+    <p class="hint-text">Vencer um andar cura e revive seu time. Perder <strong>não</strong> devolve você ao começo — você fica no mesmo andar e pode trocar de time.</p>
+    <p class="hint-text">🍬 Quem chegar no andar mais alto do dia ganha um Doce Raro e um ponto no ranking. Empate premia todos.</p>
     <button class="btn secondary" onclick="openTowerRanking()">🏅 Ranking da Torre</button>
   </div>
   ${game.towerError ? `<div class="box"><p class="error-text">${escapeHtmlSafe(game.towerError)}</p></div>` : ''}
@@ -15054,13 +15071,13 @@ function renderTowerRankingModal(){
   if(!r) return '';
   let corpo;
   if(r.loading){ corpo = `<p class="loading-text">Carregando...</p>`; }
-  else if(!r.top || !r.top.length){ corpo = `<p class="hint-text">Ninguém venceu a torre ainda. Pode ser você.</p>`; }
+  else if(!r.top || !r.top.length){ corpo = `<p class="hint-text">Ninguém pontuou ainda — o primeiro ponto sai na virada do dia. Pode ser o seu.</p>`; }
   else {
     corpo = `<div class="tower-rank-list">${r.top.map((x,i)=>`
       <div class="tower-rank-row ${i===0?'ouro':''}">
         <span class="tower-rank-pos">${i+1}º</span>
         <span class="tower-rank-name">${trainerProfileLink(escapeHtmlSafe(x.name), x.uid, x.name)}</span>
-        <span class="tower-rank-count">${x.clears}<span class="tower-rank-x">🗼</span></span>
+        <span class="tower-rank-count">${x.topDays||0}<span class="tower-rank-x">🗼</span></span>
       </div>`).join('')}</div>`;
   }
   return `
@@ -15068,7 +15085,7 @@ function renderTowerRankingModal(){
     <div class="modal-box" onclick="event.stopPropagation()">
       <div class="modal-icon">🏅</div>
       <h2>Ranking da Torre</h2>
-      <p class="hint-text">Quantas vezes cada treinador venceu os 10 andares. Só dá pra vencer uma vez por dia.</p>
+      <p class="hint-text">Quantas vezes cada treinador chegou no <strong>andar mais alto do dia</strong>. Um ponto por dia, e o empate pontua todo mundo que empatou.</p>
       ${corpo}
       <button class="btn secondary" onclick="closeTowerRanking()">Fechar</button>
     </div>
@@ -15769,6 +15786,16 @@ function esperaDosPokemon(){
   const c = game.neighborhoodGymCooldowns;
   return (c && c.mons) || {};
 }
+/* TROCAR O TIME NO MEIO DA SUBIDA. Desde que perder deixou de voltar pro comeco, o time sobrevive
+   a derrota -- entao trocar virou uma DECISAO, e nao uma consequencia. E so estado de TELA: o time
+   no servidor so muda quando o novo for enviado (startTowerRun).
+   Comeca vazio de proposito: o run.team guarda especie/nivel/shiny, sem o save de origem, entao
+   remarcar os 6 na grade seria adivinhacao -- e marcar o pokemon errado e pior que marcar nenhum. */
+function trocarTimeDaTorre(){
+  game.towerTrocandoTime = true;
+  game.towerPick = [];
+  render();
+}
 function towerTogglePick(slot, idx){
   game.towerPick = alternarEscolhaDeTime(game.towerPick, slot, idx, 6);
   render();
@@ -15786,6 +15813,7 @@ async function startTowerRun(){
     });
     game.tower.run = r.data.run;
     game.towerPick = [];
+    game.towerTrocandoTime = false;   // o time novo foi pro servidor: sai do modo de troca
   } catch(e){
     console.error('Erro ao começar a subida:', e);
     game.towerError = (e && e.message) || 'Não foi possível começar agora.';

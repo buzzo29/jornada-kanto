@@ -69,11 +69,15 @@ for(let i=0;i<2000;i++){ if(S.tentarGolpeEspecial(inst('pidgey'), inst('onix'), 
 ok('quem nao tem o golpe nunca usa', nenhum === 0, nenhum + ' de 2000');
 
 console.log('\nAS CHANCES SAO AS PEDIDAS');
+/* O ALVO PRECISA TER VIDA DE VERDADE: a autodestruicao so sai contra alvo com mais de 50% do HP,
+   e o createInstance devolve maxHp/hp zerados (quem enche e o simulateGymBattle). Sem encher aqui,
+   a medicao da explosao dava 0% -- e o zero seria lido como 'a lista quebrou'. */
+function cheio(p){ p.maxHp = S.calcMaxHp(p); p.hp = p.maxHp; return p; }
 function frequencia(id, alvo, n){
   let boom = 0, sono = 0;
   for(let i=0;i<n;i++){
     const d = [];
-    S.tentarGolpeEspecial(inst(id), inst(alvo), Math.random, d);
+    S.tentarGolpeEspecial(cheio(inst(id)), cheio(inst(alvo)), Math.random, d);
     if(d.some(g=>g.x==='boom')) boom++;
     if(d.some(g=>g.x==='sono')) sono++;
   }
@@ -403,6 +407,35 @@ ok('a ficha da Pokedex mostra ele', S.especiaisDaEspecie('starmie').some(e => e.
 ok('e quem tem dois aparece com os dois',
    S.especiaisDaEspecie('alakazam').map(e=>e.nome).join(' + ') === 'Anulação + Recuperar',
    S.especiaisDaEspecie('alakazam').map(e=>e.nome).join(' + '));
+console.log('\nA AUTODESTRUICAO SO SAI CONTRA ALVO COM MAIS DE METADE DA VIDA');
+/* Explodir num adversario ja machucado e trocar o pokemon inteiro por um abate que a troca de
+   golpes ia entregar de graca -- e no laco de batalha o inimigo carrega o HP de um confronto pro
+   outro, entao isso acontecia de verdade. */
+(function(){
+  function comAlvoEm(pct, n){
+    let boom = 0;
+    for(let i=0;i<n;i++){
+      const a = cheio(inst('geodude'));
+      const b = inst('onix'); b.maxHp = S.calcMaxHp(b); b.hp = Math.floor(b.maxHp*pct);
+      const d = []; S.tentarGolpeEspecial(a, b, Math.random, d);
+      if(d.some(g=>g.x==='boom')) boom++;
+    }
+    return 100*boom/n;
+  }
+  ok('alvo com a vida cheia: explode normalmente', comAlvoEm(1.0, 3000) > 12, comAlvoEm(1.0, 3000).toFixed(1) + '%');
+  ok('alvo com 60%: ainda explode', comAlvoEm(0.6, 3000) > 12, comAlvoEm(0.6, 3000).toFixed(1) + '%');
+  ok('alvo com 40%: NAO explode', comAlvoEm(0.4, 3000) === 0, comAlvoEm(0.4, 3000).toFixed(1) + '%');
+  ok('alvo quase morto: NAO explode', comAlvoEm(0.05, 3000) === 0, comAlvoEm(0.05, 3000).toFixed(1) + '%');
+  /* A trava e do ALVO, nao do sorteio: o sono continua saindo contra alvo machucado. */
+  let sono = 0;
+  for(let i=0;i<4000;i++){
+    const a = cheio(inst('paras'));
+    const b = inst('onix'); b.maxHp = S.calcMaxHp(b); b.hp = Math.floor(b.maxHp*0.2);
+    const d = []; S.tentarGolpeEspecial(a, b, Math.random, d);
+    if(d.some(g=>g.x==='sono')) sono++;
+  }
+  ok('e o sono continua valendo contra alvo machucado', sono > 100, (100*sono/4000).toFixed(1) + '%');
+})();
 console.log('\nOS DOIS MOTORES DAO O MESMO RESULTADO');
 /* O motor e duplicado (cliente e servidor). Uma diferenca aqui faz a liga decidir uma coisa e a
    animacao mostrar outra -- e o jogador so descobre quando perde uma final. */

@@ -190,7 +190,13 @@ de golpes.
   Metrônomo são os **4 pedidos** (Togepi, Togetic, Cleffa, Snubbull). Clefairy, Clefable e Snorlax
   também aprendem Metrônomo por nível no original e ficaram **de fora de propósito**: são espécies
   comuns em time de jogador e de líder, e o metrônomo é o golpe mais aleatório dos três.
-- **Chance por CONFRONTO, não por golpe**: 15% autodestruição, 5% sono. O marcador é o próprio
+- **Chance por CONFRONTO, não por golpe**: 15% autodestruição, 5% sono.
+  **Só sai contra alvo com MAIS da metade da vida** (`BOOM_MINIMO_DO_ALVO = 0,5`, 02/09/2026).
+  Explodir num adversário já machucado é trocar o pokémon inteiro por um abate que a troca de golpes
+  ia entregar de graça — e isso acontecia de verdade, porque no laço de batalha o inimigo carrega o
+  HP de um confronto pro outro. Medido: **9,7% das explosões** eram assim, e a trava as remove sem
+  mexer no resto (taxa de vitória do time com um Golem: 60,7% → 60,5%). Quem decide é a SITUAÇÃO do
+  alvo, não o sorteio -- a chance continua sendo 15%. O marcador é o próprio
   adversário (`active._especialContra !== enemy`) — oponente novo, confronto novo. Se fosse por
   golpe, um Geodude explodiria em ~40% dos confrontos e a lista viraria o jogo inteiro.
 - **Metrônomo é 10% explosão / 10% sono / 10% anulação / 70% golpe comum** -- ele chama
@@ -868,11 +874,39 @@ verdade, cai no game over, e o teste confere que a trava soltou dos dois lados.
 
 ## Torre dos Treinadores
 
-- 10 andares, médias **58, 61, 64, 67, 70, 73, 76, 79, 82, 85** (linear, +3 por andar).
-  Escala escolhida pra ter porta de entrada: um campeão da Elite (~67) chega ao andar 5.
+- **20 andares, média do 65 ao 122 (+3 por andar), e a torre deixou de ser algo pra ZERAR**
+  (02/09/2026). Os oito últimos passam do nível 99 — o teto do JOGADOR — de propósito: o que a
+  torre mede agora é **até onde cada um chega**, não quem termina. Eram 10 andares de 58 a 85,
+  calibrados pra ser vencível todo dia.
+- **Perder não volta pro começo.** O jogador fica no MESMO andar e tenta de novo; o time não é
+  apagado. Refazer oito andares já vencidos pra chegar de novo onde parou não media nada, e era o
+  que a torre cobrava a cada derrota.
+  **Armadilha que o teste pegou:** o `startTrainerTowerRun` zerava o andar, porque no modelo antigo
+  ele só era chamado no começo da subida. Como ele virou também o "trocar de time", trocar mandava
+  o jogador de volta pro andar 1 — anulando a regra inteira. Hoje ele MANTÉM o andar.
+- **Só aparecem os andares já alcançados.** São 20; mostrar 13 cartões apagados de "???" no topo
+  transformava a tela numa lista do que o jogador não pode fazer. O servidor já escondia o time dos
+  não alcançados (`towerVisibleFloors`), então "tem time" É "já cheguei aqui" — o cliente só passou
+  a filtrar por isso.
+- **O prêmio é de quem foi MAIS LONGE no dia, e o empate premia todos.** Se dois pararam no andar 14
+  e ninguém passou disso, os dois ganham o Doce Raro e o ponto. O ranking passou a contar **em
+  quantos dias o treinador ficou no andar mais alto** (`topDays`); o `clears` antigo (dias em que
+  zerou os 10 andares) fica no documento como história e não ordena mais nada.
+  **Zerar os 20 não paga doce sozinho** — quem zera está no topo por definição, e pagar nos dois
+  lugares seria pagar duas vezes.
+  **Por que existe um documento por DIA** (`trainerTowerDays/{dateId}/players/{uid}`): o da subida
+  (`trainerTowerRuns/{uid}`) é sobrescrito na virada, então depois da meia-noite não haveria o que
+  ler pra saber quem foi mais longe ontem. São no máximo 20 escritas por jogador por dia.
+  **O fechamento roda dentro do cron que gera a torre do dia seguinte** — é o único instante em que
+  se sabe que o dia anterior acabou, e evita mais uma função agendada. É idempotente pelo campo
+  `awarded`, porque o cron roda de hora em hora. A conta do "dia anterior" usa o
+  `trainersLeagueDateStrPlusDays` que já existia: uma segunda regra de data (a minha, em UTC) ia
+  discordar da do jogo em algum fuso.
+- (Histórico: eram 10 andares, médias 58 a 85, escala escolhida pra um campeão da Elite (~67)
+  chegar ao andar 5. Ver a nota acima pro modelo de hoje.)
 - Times de 6 evoluções finais, níveis espalhados ±3 com os dois extremos garantidos.
 - Mewtwo e Eevee fora do pool.
-- Recompensa: 1 Doce Raro por torre vencida (+1 nível num pokémon). Creditado no servidor.
+- (Histórico: a recompensa era 1 Doce Raro por torre VENCIDA. Hoje é de quem vai mais longe no dia.)
 - **O time da subida é procurado por IDENTIDADE, não por espécie+nível.** A busca antiga pegava o
   primeiro que casasse: quem tinha o mesmo pokémon no mesmo nível em dois saves (um shiny, um
   normal) escolhia o shiny e subia com o normal — perdendo o visual E o buff de 1,20×. O cliente
