@@ -733,6 +733,21 @@ verdade, cai no game over, e o teste confere que a trava soltou dos dois lados.
   LIGAR sem ir até a Batalha Online, e aí a jornada ficava pra trás. `startOnlineSearchAqui` é a
   mesma `entrarNaFilaOnline`, só que sem trocar de tela.
   Fica fora da Torre e das ligas de propósito: ali o jogador já está numa disputa organizada.
+- **O histórico carrega SEMPRE, inclusive com uma busca rodando.** Ele ficava depois do `return` da
+  busca no `openOnlineBattle`, e o resultado era uma tela morta: quem tinha busca em segundo plano
+  abria a Batalha Online, via "Procurando oponente", cancelava — e a tela dizia *"Carregando seu
+  histórico..."* **pra sempre**, porque ninguém mais ia buscar. `onlineHistorico` só é escrito num
+  lugar e nunca é limpo, então a tela ficava assim até recarregar a página. Reportado em
+  01/09/2026, e o botão de buscar partida das telas de batalha da jornada (30/08) foi o que tornou
+  busca em segundo plano comum o bastante pra alguém esbarrar nisso.
+- **Nenhuma tela pode ficar "Carregando..." pra sempre.** O erro do `carregarHistoricoOnline` era
+  só um `console.error`, e o jogador ficava olhando a frase sem saber se era a internet dele, se
+  era o jogo, nem o que fazer — e sem nada no log do servidor, porque a falha nem chegava lá. Hoje
+  ele **tenta duas vezes** (essa função COLD-STARTA a cada chamada — é rara, a instância já
+  morreu —, então a primeira tentativa é a mais frágil: rede de celular oscilando ou deploy em
+  rollout derrubam ela), tem **prazo próprio de 12s** (o SDK espera 70, e 70 segundos de
+  "Carregando..." é indistinguível de travado) e, se ainda assim não vier, a tela **diz o que
+  houve** e oferece "Tentar de novo".
 - **Aceitar um convite no meio da revelação CONCLUI a batalha da jornada antes de sair.** O
   resultado já foi calculado pelo `runBattle`, mas quem aplica (insígnia, derrota, nível de quem
   desmaiou) é o `finishBattle`, no fim da revelação — sair antes dele deixava a luta sem efeito
@@ -837,6 +852,18 @@ verdade, cai no game over, e o teste confere que a trava soltou dos dois lados.
   perderia o ataque. Isso é propriedade documentada do Firestore, **não** algo medido aqui: o
   `fake-firestore` serializa as transações e não modela contenção. Se a raide abrir pra todo
   mundo, a saída conhecida é fragmentar o contador (N documentos, soma na leitura).
+- **O quadro #151 (Mew) aparece na Pokédex, mas NÃO na conta.** A grade some com o buraco entre o
+  #150 e o #152 — ler a Pokédex e achar uma falha justo onde todo mundo sabe que mora o Mew parece
+  defeito do jogo. A contagem ("X de 250") continua saindo do `SPECIES`, onde o Mew **não está** e
+  não pode estar: o desafio do Mewtwo e a conquista "Mestre Pokémon" cobram "capturou todo o
+  resto", e uma vaga que ninguém consegue preencher deixaria os dois impossíveis pra sempre — o
+  que já aconteceu neste jogo, com o Celebi, e ficou dias sem ninguém notar.
+  A célula tem **estilo próprio** (`.pokedex-cell.raide`, rosa): com a cara das outras travadas,
+  ela viraria uma caça sem fim. Clicar abre a ficha, com os atributos oficiais da Gen 2 (100 em
+  tudo, total 600) e a frase dizendo que ele é o chefe da raide e não conta no total.
+  Os atributos entraram no `SPECIES_FORA_DA_DEX` **só pra ficha** — quem calcula a luta da raide é
+  o servidor, com os dele. `tools/test-online-dex.js` tranca as duas metades: que o #151 está na
+  grade E que o total continua 250.
 - O Mew **não entra em `SPECIES`** — tudo que está lá conta pro total da Pokédex e pro "capturou
   tudo" que libera o Mewtwo, e um Mew que ninguém captura abriria uma vaga #151 impossível. A tela
   o encontra por `SPECIES_FORA_DA_DEX` / `especieParaTela()`; os atributos vivem só no servidor.
