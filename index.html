@@ -3511,7 +3511,9 @@ function freshGameDefaults(){
     neighborhoodGymScreenState:null, // estado transitório da tela (não salvo): 'locating'|'ready'|'error'|'noGeolocation'
     neighborhoodGymError:null,
     neighborhoodGymDetail:null, // detalhe do ginásio da cidade detectada: líder, prévia do time, terreno
-    neighborhoodGymPendingClaimSlot:null, // time escolhido numa reivindicação, ainda não gravado -- só confirma junto com o terreno
+    neighborhoodGymPendingClaimSlot:null, // time MONTADO numa reivindicação, ainda não gravado -- só confirma junto com o terreno
+    neighborhoodGymDefensePick:[],   // o time que está sendo montado pra DEFENDER (pokémon de qualquer save)
+    neighborhoodGymChallengePick:[], // e o que está sendo montado pra DESAFIAR
     neighborhoodGymLeaveConfirm:false,
     myActiveGymDefenses:null, // {slot: {city,countryCode}} -- carregado na home, pra mostrar o botão "Ver ginásio" nos times que defendem algo
     notificationsUnreadCount:0,
@@ -3560,7 +3562,6 @@ function freshGameDefaults(){
     neighborhoodGymDetailLoading:false,
     neighborhoodGymChallenging:false,
     neighborhoodGymLastWin:null,
-    neighborhoodGymChallengeSlot:null,
     neighborhoodGymChallengeTeam:null, // cópia reordenável do time escolhido -- não é game.team
     neighborhoodGymCooldowns:null, // {slot: msRestantes} -- quanto falta pra cada time poder desafiar de novo NESSE ginásio
     neighborhoodGymBattleOpponentName:null,
@@ -4394,6 +4395,7 @@ async function openNeighborhoodGymChallengeHistory(){
 // abre o seletor de TIME -- serve tanto pra reivindicar um ginásio vago (nesse caso só pede o time
 // mesmo) quanto pra um líder trocar só o time depois, sem mexer no terreno que já tinha escolhido
 function openNeighborhoodGymTeamPicker(){
+  game.neighborhoodGymDefensePick = [];   // sempre monta do zero: reaproveitar a escolha anterior faria a tela abrir já preenchida com um time que talvez nem seja mais o dele
   game.screen = 'neighborhoodGymTeamPicker';
   render();
 }
@@ -4407,11 +4409,13 @@ function isNeighborhoodGymClaimInProgress(){
   const detail = game.neighborhoodGymDetail;
   return !detail || !detail.hasLeader || (detail.leaderTeamPreview||[]).length===0;
 }
-async function submitNeighborhoodGymTeam(slot){
+async function submitNeighborhoodGymTeam(){
   const loc = game.neighborhoodGymLocation;
-  if(!loc) return;
+  const escolhidos = game.neighborhoodGymDefensePick || [];
+  if(!loc || !escolhidos.length) return;
   if(isNeighborhoodGymClaimInProgress()){
-    game.neighborhoodGymPendingClaimSlot = slot;
+    // reivindicação: o time fica pendente e vai junto com o terreno, numa chamada só
+    game.neighborhoodGymPendingClaimSlot = timeEscolhidoPraServidor(escolhidos);
     game.screen = 'neighborhoodGymTerrainPicker';
     render();
     return;
@@ -4419,7 +4423,7 @@ async function submitNeighborhoodGymTeam(slot){
   game.neighborhoodGymChallenging = true;
   render();
   try{
-    await functionsClient.httpsCallable('setNeighborhoodGymDefense')({ city: loc.city, countryCode: loc.countryCode, slot });
+    await functionsClient.httpsCallable('setNeighborhoodGymDefense')({ city: loc.city, countryCode: loc.countryCode, team: timeEscolhidoPraServidor(escolhidos) });
     game.neighborhoodGymChallenging = false;
     game.screen = 'neighborhoodGym';
     await loadNeighborhoodGymDetail();
@@ -4442,12 +4446,12 @@ function openNeighborhoodGymTerrainPicker(){
 async function submitNeighborhoodGymTerrain(terrainId){
   const loc = game.neighborhoodGymLocation;
   if(!loc) return;
-  const pendingSlot = game.neighborhoodGymPendingClaimSlot;
+  const timePendente = game.neighborhoodGymPendingClaimSlot;   // guarda o TIME montado, não um slot
   game.neighborhoodGymChallenging = true;
   render();
   try{
     const payload = { city: loc.city, countryCode: loc.countryCode, terrainId };
-    if(pendingSlot!=null){ payload.slot = pendingSlot; } // reivindicação: time+terreno na MESMA chamada
+    if(timePendente){ payload.team = timePendente; } // reivindicação: time+terreno na MESMA chamada
     await functionsClient.httpsCallable('setNeighborhoodGymDefense')(payload);
     game.neighborhoodGymChallenging = false;
     game.neighborhoodGymPendingClaimSlot = null;
@@ -4465,7 +4469,8 @@ async function submitNeighborhoodGymTerrain(terrainId){
 // completar a escolha, que só criaria uma expiração silenciosa e confusa
 async function startNeighborhoodGymChallenge(){
   game.neighborhoodGymError = null;
-  game.neighborhoodGymCooldowns = null; // {slot: msRestantes} -- carrega antes de mostrar a lista
+  game.neighborhoodGymCooldowns = null;   // carrega antes de mostrar o montador
+  game.neighborhoodGymChallengePick = [];
   game.screen = 'neighborhoodGymChallengeTeamPicker';
   render();
   const loc = game.neighborhoodGymLocation;
@@ -4523,13 +4528,16 @@ async function confirmNeighborhoodGymDefenseOrder(){
   }
   render();
 }
-function pickNeighborhoodGymChallengeTeam(slot){
-  const s = game.saveSlots[slot];
-  if(!s || !s.team) return;
-  game.neighborhoodGymChallengeSlot = slot;
-  game.neighborhoodGymChallengeTeam = s.team.map(p=>{
+function pickNeighborhoodGymChallengeTeam(){
+  const escolhidos = game.neighborhoodGymChallengePick || [];
+  if(!escolhidos.length) return;
+  /* Vira instâncias pra tela de ordem poder mostrar tipo, sprite e nível como nas outras telas --
+     e guarda a ESCOLHA original junto, porque é ela (com slot/idx/monId) que o servidor precisa
+     pra achar o pokémon certo e não um xará. */
+  game.neighborhoodGymChallengeTeam = escolhidos.map(p=>{
     const inst = createInstance(p.speciesId, p.level);
     if(p.shiny){ inst.shiny = true; }
+    inst._escolha = p;
     return inst;
   });
   game.screen = 'neighborhoodGymChallengeOrderPicker';
@@ -4548,13 +4556,18 @@ function moveNeighborhoodGymChallengeOrder(id, dir){
 // League) pra exibir a batalha animada igual a uma batalha normal, em vez de só mostrar o resultado
 async function confirmNeighborhoodGymChallenge(){
   const loc = game.neighborhoodGymLocation;
-  const slot = game.neighborhoodGymChallengeSlot;
-  if(!loc || slot==null) return;
+  const time = game.neighborhoodGymChallengeTeam || [];
+  if(!loc || !time.length) return;
   game.neighborhoodGymChallenging = true;
   render();
   try{
-    const orderedTeamCode = encodeTeamCode(game.neighborhoodGymChallengeTeam);
-    const result = await functionsClient.httpsCallable('challengeNeighborhoodGym')({ city: loc.city, countryCode: loc.countryCode, slot, orderedTeamCode });
+    /* Manda a escolha NA ORDEM DA TELA -- ela É a ordem de batalha agora. Some o antigo
+       orderedTeamCode: não existe mais um "time real do slot" pra o servidor conferir por
+       assinatura, e o resolvedor de lá já recusa pokémon que a conta não tem. */
+    const result = await functionsClient.httpsCallable('challengeNeighborhoodGym')({
+      city: loc.city, countryCode: loc.countryCode,
+      team: time.map(p => p._escolha).filter(Boolean)
+    });
     game.neighborhoodGymChallenging = false;
     // alimenta o MESMO sistema de revelação animada usado nas batalhas normais -- só muda a origem
     // do resultado (calculado no servidor, não aqui), o resto do fluxo é idêntico
@@ -13749,41 +13762,35 @@ function renderNeighborhoodGymDefenseOrder(){
   <button class="btn secondary" onclick="game.screen='neighborhoodGym';render();">⬅ Voltar</button>`;
 }
 function renderNeighborhoodGymChallengeTeamPicker(){
-  const eligibleSlots = Array.from({length:MAX_SAVE_SLOTS}, (_, i) => i)
-    .filter(i => game.saveSlots[i] && (game.saveSlots[i].badgeCount||0) >= 8);
   const cooldowns = game.neighborhoodGymCooldowns;
-  // o terreno é do LÍDER e vale pros dois lados -- por isso a escolha do time já mostra quem seu
-  // lá vai lutar em casa
+  /* O terreno é do LÍDER e vale pros dois lados -- por isso a montagem do time já mostra quem
+     lá vai lutar em casa. */
   const terreno = game.neighborhoodGymDetail && game.neighborhoodGymDetail.leaderTerrain;
+  const escolhidos = game.neighborhoodGymChallengePick || [];
+  const temElegivel = towerEligiblePokemon().length > 0;
+  /* A espera é do JOGADOR nesse ginásio, não de um time (ver neighborhoodGymCooldownRef no
+     servidor). O cliente antigo recebia um número por save; hoje é um só. */
+  const espera = cooldowns && (typeof cooldowns.cooldown === 'number'
+    ? cooldowns.cooldown
+    : Math.max(0, ...Object.values(cooldowns.porSlot || {}), 0));
   return `
-  <div class="result-banner win">⚔️ Desafiar Ginásio — escolha o time</div>
+  <div class="result-banner win">⚔️ Desafiar Ginásio — monte o time</div>
   <div class="box">
-    <p class="hint-text">Toque no time que vai desafiar. Cada time só pode desafiar esse ginásio a cada 10 minutos.</p>
+    <p class="hint-text">Até ${TIME_DO_GINASIO_MAX} pokémon de qualquer time seu com as 8 insígnias. <strong>Sem repetir espécie.</strong> Você pode desafiar esse ginásio a cada 10 minutos.</p>
     ${terreno ? `<p class="hint-text">🗺️ O ginásio luta em <button class="terrain-inline-badge" style="background:${terrainColor(terreno)}" onclick="event.stopPropagation();openTerrainInfoModal('${terreno.id}')">${terreno.name}</button> — quem tem 🔺 ganha bônus lá.</p>` : ''}
-    ${cooldowns===null
-      ? `<p class="hint-text">Verificando disponibilidade dos times...</p>`
-      : eligibleSlots.length===0
-      ? `<p>Você precisa de um time com as 8 insígnias.</p>`
-      : eligibleSlots.map(i=>{
-          const s = game.saveSlots[i];
-          const team = s.team||[];
-          const displayName = s.customName || `Time ${i+1}`;
-          const cooldownMs = cooldowns[i];
-          const onCooldown = cooldownMs > 0;
-          /* O CARD INTEIRO é o botão, como na home. Um botão vermelho dentro de cada card criava
-             dois alvos pra a mesma ação e empurrava a lista pra baixo. Em espera continua sem
-             clique, com o tempo restante no lugar. */
-          return `<div class="save-slot-card ${onCooldown?'':'clickable'}"
-                       ${onCooldown?'':`onclick="pickNeighborhoodGymChallengeTeam(${i})"`}>
-            <div class="save-slot-top">
-              <span class="save-slot-name">${s.favorite?'⭐ ':''}${escapeHtmlSafe(displayName)}</span>
-              ${onCooldown ? `<span class="save-slot-actions"><span class="save-slot-mewtwo">⏳ ${Math.ceil(cooldownMs/60000)}min</span></span>` : ''}
-            </div>
-            ${timeComTerrenoHtml(team, terreno)}
-            ${legendaTerrenoHtml(team, terreno)}
-          </div>`;
-        }).join('')}
   </div>
+  ${cooldowns===null
+    ? `<div class="box"><p class="hint-text">Verificando disponibilidade...</p></div>`
+    : !temElegivel
+    ? `<div class="box"><p>Você precisa de um time com as 8 insígnias.</p></div>`
+    : espera > 0
+    ? `<div class="box"><p>Você desafiou esse ginásio há pouco. Faltam <strong>${Math.ceil(espera/60000)}min</strong> pra poder desafiar de novo.</p></div>`
+    : `<div class="box">
+        <h2>Escolha quem vai lutar</h2>
+        <div class="tower-pick-counter ${escolhidos.length?'ok':''}">${escolhidos.length} de ${TIME_DO_GINASIO_MAX} escolhidos</div>
+        ${montadorDeTimeHtml(escolhidos, 'gymChallengeTogglePick', TIME_DO_GINASIO_MAX)}
+        <button class="btn danger" ${escolhidos.length?'':'disabled'} onclick="pickNeighborhoodGymChallengeTeam()">➡️ Escolher a ordem</button>
+      </div>`}
   <button class="btn secondary" onclick="game.screen='neighborhoodGym';render();">⬅ Desistir do desafio</button>`;
 }
 function renderNeighborhoodGymChallengeOrderPicker(){
@@ -13819,35 +13826,22 @@ function renderNeighborhoodGymTeamPicker(){
   const loc = game.neighborhoodGymLocation;
   const detail = game.neighborhoodGymDetail;
   const isClaim = !detail || !detail.hasLeader || (detail.leaderTeamPreview||[]).length===0;
-  const eligibleSlots = Array.from({length:MAX_SAVE_SLOTS}, (_, i) => i)
-    .filter(i => game.saveSlots[i] && (game.saveSlots[i].badgeCount||0) >= 8);
+  const escolhidos = game.neighborhoodGymDefensePick || [];
+  const temElegivel = towerEligiblePokemon().length > 0;
   return `
-  <div class="result-banner win">🛡️ ${isClaim ? 'Escolher time' : 'Alterar time'} — Ginásio ${escapeHtmlSafe(loc?loc.city:'')}</div>
+  <div class="result-banner win">🛡️ ${isClaim ? 'Montar time' : 'Alterar time'} — Ginásio ${escapeHtmlSafe(loc?loc.city:'')}</div>
   <div class="box">
-    ${isClaim ? `<p>Esse é o time que vai defender o ginásio. Na próxima tela você escolhe o terreno pra confirmar de vez -- até lá, o ginásio continua vago.</p>` : `<p>Trocar o time não mexe no terreno que você já tinha escolhido.</p>`}
+    ${isClaim ? `<p>Monte o time que vai defender o ginásio. Na próxima tela você escolhe o terreno pra confirmar de vez — até lá, o ginásio continua vago.</p>` : `<p>Trocar o time não mexe no terreno que você já tinha escolhido.</p>`}
   </div>
-  <div class="box">
-    ${eligibleSlots.length===0
-      ? `<p>Você precisa de um time com as 8 insígnias.</p>`
-      : eligibleSlots.map(i=>{
-          const s = game.saveSlots[i];
-          const team = s.team||[];
-          const displayName = s.customName || `Time ${i+1}`;
-          return `<div class="save-slot-card">
-            <div class="save-slot-top"><span class="save-slot-name">${s.favorite?'⭐ ':''}${escapeHtmlSafe(displayName)}</span></div>
-            <div class="save-slot-team-row spread">
-              ${team.map(p=>{
-                const sp = SPECIES[p.speciesId];
-                return `<div class="save-slot-mon">
-                  <div class="save-slot-mon-sprite large">${sp?spriteHtml(p.speciesId,'sprite-md',p.shiny):'❔'}</div>
-                  <div class="save-slot-mon-level">Lv.${p.level}</div>
-                </div>`;
-              }).join('')}
-            </div>
-            <button class="btn danger" ${game.neighborhoodGymChallenging?'disabled':''} onclick="submitNeighborhoodGymTeam(${i})">${game.neighborhoodGymChallenging?'Salvando...':'⚔️ Usar esse time'}</button>
-          </div>`;
-        }).join('')}
-  </div>
+  ${!temElegivel
+    ? `<div class="box"><p>Você precisa de um time com as 8 insígnias.</p></div>`
+    : `<div class="box">
+        <h2>Escolha quem defende</h2>
+        <p class="hint-text">Até ${TIME_DO_GINASIO_MAX} pokémon de qualquer time seu com as 8 insígnias. <strong>Sem repetir espécie.</strong> A ordem da escolha é a ordem da defesa — dá pra reordenar depois.</p>
+        <div class="tower-pick-counter ${escolhidos.length?'ok':''}">${escolhidos.length} de ${TIME_DO_GINASIO_MAX} escolhidos</div>
+        ${montadorDeTimeHtml(escolhidos, 'gymDefenseTogglePick', TIME_DO_GINASIO_MAX)}
+        <button class="btn danger" ${(!escolhidos.length||game.neighborhoodGymChallenging)?'disabled':''} onclick="submitNeighborhoodGymTeam()">${game.neighborhoodGymChallenging?'Salvando...':'⚔️ Usar esse time'}</button>
+      </div>`}
   <button class="btn secondary" onclick="game.screen='neighborhoodGym';render();">⬅ Voltar sem salvar</button>`;
 }
 /* Filtro por tipo na escolha de terreno. São 39 terrenos numa lista só: quem quer favorecer um
@@ -14890,26 +14884,7 @@ function renderTrainerTower(){
     if(!elegiveis.length){
       acao = `<div class="box"><p class="error-text">Você precisa de pelo menos um save com as <strong>8 insígnias</strong> pra entrar na Torre.</p></div>`;
     } else {
-      // agrupa por time de origem
-      const porTime = {};
-      elegiveis.forEach(p => { (porTime[p.teamName] ||= []).push(p); });
-      const listas = Object.entries(porTime).map(([nome, mons]) => `
-        <div class="tower-pick-group">
-          <div class="tower-pick-group-name">${escapeHtmlSafe(nome)}</div>
-          <div class="tower-pick-row">${mons.map(p=>{
-            const sp = SPECIES[p.speciesId];
-            const sel = escolhidos.some(x=>x.slot===p.slot && x.idx===p.idx);
-            const bloqueado = !sel && (escolhidos.length>=6 || especiesUsadas.has(p.speciesId));
-            return `<button class="tower-pick ${sel?'sel':''} ${bloqueado?'off':''}"
-              onclick="towerTogglePick(${p.slot},${p.idx})"
-              ${bloqueado?'disabled':''}
-              title="${escapeHtmlSafe(sp?sp.name:'?')} Lv.${p.level}${bloqueado&&especiesUsadas.has(p.speciesId)?' -- espécie já escolhida':''}">
-              ${sp?spriteHtml(p.speciesId,'sprite-sm',p.shiny):'❔'}
-              <span class="tower-pick-lv">${p.shiny?'🌟':''}Lv.${p.level}</span>
-              ${sel?`<span class="tower-pick-check">${escolhidos.findIndex(x=>x.slot===p.slot&&x.idx===p.idx)+1}</span>`:''}
-            </button>`;
-          }).join('')}</div>
-        </div>`).join('');
+      const listas = montadorDeTimeHtml(escolhidos, 'towerTogglePick', 6);
       acao = `<div class="box">
         <h2>Monte seu time</h2>
         <p class="hint-text">6 pokémon de qualquer time com as 8 insígnias. <strong>Sem repetir espécie.</strong> O time escolhido vale a subida inteira — se perder, recomeça do primeiro andar.</p>
@@ -15608,16 +15583,65 @@ function towerEligiblePokemon(){
   }
   return out;
 }
+/* O MONTADOR DE TIME -- a grade com os pokémon de TODOS os saves com 8 insígnias, agrupada pelo
+   time de origem. Nasceu dentro da Torre e virou função quando o Ginásio da Cidade passou a montar
+   time do mesmo jeito (01/09/2026): três cópias divergiriam na regra de "não repetir espécie", que
+   é justamente a parte que o jogador percebe na tela.
+   `nomeDoToggle` entra como texto porque o onclick é montado no HTML -- cada tela tem a sua lista
+   de escolhidos, e passar a função por referência exigiria um registro global de callbacks. */
+function montadorDeTimeHtml(escolhidos, nomeDoToggle, max){
+  const elegiveis = towerEligiblePokemon();
+  if(!elegiveis.length) return '';
+  const especiesUsadas = new Set(escolhidos.map(p=>p.speciesId));
+  const porTime = {};
+  elegiveis.forEach(p => { (porTime[p.teamName] ||= []).push(p); });
+  return Object.entries(porTime).map(([nome, mons]) => `
+    <div class="tower-pick-group">
+      <div class="tower-pick-group-name">${escapeHtmlSafe(nome)}</div>
+      <div class="tower-pick-row">${mons.map(p=>{
+        const sp = SPECIES[p.speciesId];
+        const sel = escolhidos.some(x=>x.slot===p.slot && x.idx===p.idx);
+        const bloqueado = !sel && (escolhidos.length>=max || especiesUsadas.has(p.speciesId));
+        return `<button class="tower-pick ${sel?'sel':''} ${bloqueado?'off':''}"
+          onclick="${nomeDoToggle}(${p.slot},${p.idx})"
+          ${bloqueado?'disabled':''}
+          title="${escapeHtmlSafe(sp?sp.name:'?')} Lv.${p.level}${bloqueado&&especiesUsadas.has(p.speciesId)?' -- espécie já escolhida':''}">
+          ${sp?spriteHtml(p.speciesId,'sprite-sm',p.shiny):'❔'}
+          <span class="tower-pick-lv">${p.shiny?'🌟':''}Lv.${p.level}</span>
+          ${sel?`<span class="tower-pick-check">${escolhidos.findIndex(x=>x.slot===p.slot&&x.idx===p.idx)+1}</span>`:''}
+        </button>`;
+      }).join('')}</div>
+    </div>`).join('');
+}
+/* Marca ou desmarca um pokémon na lista, com as DUAS regras da casa: teto de 6 e sem repetir
+   espécie. Devolve a própria lista (mutada) pra quem chamou só ter que renderizar. */
+function alternarEscolhaDeTime(lista, slot, idx, max){
+  const alvo = towerEligiblePokemon().find(p => p.slot===slot && p.idx===idx);
+  if(!alvo) return lista;
+  const ja = lista.findIndex(p => p.slot===slot && p.idx===idx);
+  if(ja >= 0){ lista.splice(ja, 1); return lista; }
+  if(lista.length >= max) return lista;
+  if(lista.some(p => p.speciesId === alvo.speciesId)) return lista;
+  lista.push(alvo);
+  return lista;
+}
+/* O que vai pro servidor: a IDENTIDADE de cada escolhido, não só espécie e nível. Com dois saves
+   tendo o mesmo pokémon no mesmo nível (um shiny, um normal), espécie+nível pega o primeiro que
+   casar -- e quem escolheu o shiny entra com o normal. */
+const timeEscolhidoPraServidor = (lista) => lista.map(p => ({
+  speciesId:p.speciesId, level:p.level, slot:p.slot, idx:p.idx, monId:p.monId, shiny:!!p.shiny
+}));
+const TIME_DO_GINASIO_MAX = 6;
+function gymDefenseTogglePick(slot, idx){
+  game.neighborhoodGymDefensePick = alternarEscolhaDeTime(game.neighborhoodGymDefensePick||[], slot, idx, TIME_DO_GINASIO_MAX);
+  render();
+}
+function gymChallengeTogglePick(slot, idx){
+  game.neighborhoodGymChallengePick = alternarEscolhaDeTime(game.neighborhoodGymChallengePick||[], slot, idx, TIME_DO_GINASIO_MAX);
+  render();
+}
 function towerTogglePick(slot, idx){
-  const todos = towerEligiblePokemon();
-  const alvo = todos.find(p => p.slot===slot && p.idx===idx);
-  if(!alvo) return;
-  const jaIdx = game.towerPick.findIndex(p => p.slot===slot && p.idx===idx);
-  if(jaIdx >= 0){ game.towerPick.splice(jaIdx, 1); render(); return; }
-  if(game.towerPick.length >= 6) return;
-  // regra do jogo: não pode repetir espécie
-  if(game.towerPick.some(p => p.speciesId === alvo.speciesId)) return;
-  game.towerPick.push(alvo);
+  game.towerPick = alternarEscolhaDeTime(game.towerPick, slot, idx, 6);
   render();
 }
 async function startTowerRun(){

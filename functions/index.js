@@ -2624,22 +2624,23 @@ exports.getNeighborhoodGymDetail = onCall(async (request) => {
 exports.setNeighborhoodGymDefense = onCall(async (request) => {
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   const uid = request.auth.uid;
-  const { city, countryCode, slot, terrainId } = request.data || {};
+  const { city, countryCode, team, terrainId } = request.data || {};
   // time e terreno agora são independentes: dá pra mandar só um dos dois. Reivindicar um ginásio vago
   // pela primeira vez exige pelo menos o time (checado mais abaixo, depois de saber se já tem líder)
-  if(!city || (typeof slot !== 'number' && !terrainId)){
+  if(!city || (!Array.isArray(team) && !terrainId)){
     throw new HttpsError('invalid-argument', 'Informe pelo menos o time ou o terreno.');
   }
   if(terrainId && !TERRAINS.some(t=>t.id===terrainId)){ throw new HttpsError('invalid-argument', 'Terreno inválido.'); }
   const userSnap = await db.collection('users').doc(uid).get();
 
+  /* O TIME É MONTADO, não é mais um save inteiro (01/09/2026). O jogador escolhe entre TODOS os
+     pokémon dos saves dele com 8 insígnias, sem repetir espécie -- a mesma regra da Torre.
+     O que fica guardado no ginásio continua sendo um CÓDIGO congelado: depois de montada, a defesa
+     não depende mais dos saves, então mexer no save (ou apagá-lo) não muda quem defende. */
   let newTeamCode = null;
-  if(typeof slot === 'number'){
-    const saveSnap = await db.collection('users').doc(uid).collection('saves').doc(String(slot)).get();
-    if(!saveSnap.exists || !saveSnap.data().team || (saveSnap.data().badgeCount||0) < 8){
-      throw new HttpsError('failed-precondition', 'Esse time precisa ter as 8 insígnias.');
-    }
-    newTeamCode = sanitizeTeamCode(encodeTeamCode(saveSnap.data().team));
+  if(Array.isArray(team)){
+    const resolvido = await resolverTimeDosSaves(uid, team, NEIGHBORHOOD_GYM_TEAM_SIZE, 'time de defesa', 1);
+    newTeamCode = sanitizeTeamCode(encodeTeamCode(resolvido));
     if(!newTeamCode){ throw new HttpsError('failed-precondition', 'Time inválido.'); }
   }
   const leaderName = (userSnap.exists && userSnap.data().trainerName) || 'Treinador';
@@ -2647,13 +2648,16 @@ exports.setNeighborhoodGymDefense = onCall(async (request) => {
 
   const gymRef = neighborhoodGymRef(city, countryCode);
   const thisGymId = neighborhoodGymId(city, countryCode);
-  const newDefenseIndexRef = (newTeamCode !== null) ? neighborhoodGymDefenseIndexRef(uid, slot) : null;
+  /* A EXCLUSIVIDADE POR TIME ACABOU e não foi esquecimento: ela dizia "um time (uid+slot) só
+     defende UM ginásio", e com a defesa montada à mão não existe mais "o time do slot N" pra
+     travar. Ficou o índice antigo, que continua sendo LIMPO abaixo, pra não deixar lixo apontando
+     pra ginásio nenhum. Se um dia incomodar alguém liderar vários ginásios, o lugar de resolver é
+     aqui, e a regra que cabe é "um ginásio por líder". */
   return await db.runTransaction(async (tx) => {
     // TODAS as leituras da transação vêm antes de qualquer escrita (regra do Firestore) -- por isso lê
     // o índice do time novo aqui em cima, mesmo só indo usar o resultado mais abaixo
     const gymSnap = await tx.get(gymRef);
     const gymData = gymSnap.exists ? gymSnap.data() : null;
-    const newIndexSnap = newDefenseIndexRef ? await tx.get(newDefenseIndexRef) : null;
 
     const hasOtherLeader = gymData && gymData.leaderUid && gymData.leaderUid !== uid;
     if(hasOtherLeader){
@@ -2663,15 +2667,10 @@ exports.setNeighborhoodGymDefense = onCall(async (request) => {
     if(isNewClaim && newTeamCode===null){
       throw new HttpsError('failed-precondition', 'Escolha um time pra se tornar líder desse ginásio.');
     }
-    // exclusividade: um time (uid+slot) só pode defender UM ginásio de cada vez -- se já está registrado
-    // em outro, recusa (reatribuir ao MESMO ginásio que ele já defende é permitido, é só confirmar de novo)
-    if(newIndexSnap && newIndexSnap.exists && newIndexSnap.data().gymId !== thisGymId){
-      const other = newIndexSnap.data();
-      throw new HttpsError('failed-precondition', `Esse time já está defendendo o Ginásio ${other.city} -- escolha outro time ou troque a defesa de lá primeiro.`);
-    }
-    // trocando de time nesse MESMO ginásio -- libera o índice do time ANTIGO (senão ele ficaria
-    // preso pra sempre "em uso" mesmo sem defender nada)
-    if(newTeamCode !== null && gymData && gymData.leaderTeamSlot != null && gymData.leaderTeamSlot !== slot){
+    // defesa antiga, presa a um save: ao montar time à mão o índice dela some (senão ficaria pra
+    // sempre marcando "esse save defende alguma coisa", e é ele que faz a tela avisar antes de
+    // apagar um save)
+    if(newTeamCode !== null && gymData && gymData.leaderTeamSlot != null){
       tx.delete(neighborhoodGymDefenseIndexRef(uid, gymData.leaderTeamSlot));
     }
 
@@ -2684,14 +2683,12 @@ exports.setNeighborhoodGymDefense = onCall(async (request) => {
       // e o Firestore de verdade REJEITA escrever undefined (só aceita null), quebrando a transação
       // inteira com "Cannot use undefined as a Firestore value" se isso vazar pro payload
       leaderTeamCode: newTeamCode!==null ? newTeamCode : ((gymData && gymData.leaderTeamCode!=null) ? gymData.leaderTeamCode : null),
-      leaderTeamSlot: newTeamCode!==null ? slot : ((gymData && gymData.leaderTeamSlot!=null) ? gymData.leaderTeamSlot : null),
+      // null quando a defesa foi MONTADA (não vem de um save); documento antigo mantém o que tinha
+      leaderTeamSlot: newTeamCode!==null ? null : ((gymData && gymData.leaderTeamSlot!=null) ? gymData.leaderTeamSlot : null),
       leaderTerrain: terrainId ? terrainId : ((gymData && gymData.leaderTerrain!=null) ? gymData.leaderTerrain : null),
       becameLeaderAt: isNewClaim ? Date.now() : (gymData.becameLeaderAt||Date.now()),
       defenseCount: isNewClaim ? 0 : (gymData.defenseCount||0)
     });
-    if(newDefenseIndexRef){
-      tx.set(newDefenseIndexRef, { uid, slot, gymId: thisGymId, city, countryCode: countryCode||null, assignedAt: Date.now() });
-    }
     return { ok:true, isNewClaim };
   });
 });
@@ -2699,6 +2696,7 @@ exports.setNeighborhoodGymDefense = onCall(async (request) => {
 // desafio de um ginásio de bairro COM líder -- resolvido inteiramente aqui (o cliente nunca calcula
 // nem reporta um resultado; só manda QUEM está desafiando e QUAL bairro). O terreno usado é sempre o
 // que o LÍDER escolheu como defesa -- vantagem de mandante, igual às ligas
+const NEIGHBORHOOD_GYM_TEAM_SIZE = 6;
 const NEIGHBORHOOD_GYM_CHALLENGE_COOLDOWN_MS = 10 * 60 * 1000; // 10min -- por time (uid+slot), por ginásio
 /* Reordenar o time de defesa. Fica FORA do setNeighborhoodGymDefense de propósito: aquele resolve
    reivindicação de ginásio vago, exclusividade do time entre ginásios e troca de terreno, e nada
@@ -2736,37 +2734,18 @@ exports.reorderNeighborhoodGymDefense = onCall(async (request) => {
   });
 });
 
-function neighborhoodGymCooldownRef(gymRef, uid, slot){
-  return gymRef.collection('challengeCooldowns').doc(`${uid}_${slot}`);
+/* POR JOGADOR, não por time: com a defesa e o desafio montados à mão não existe mais "o time do
+   slot N" pra contar o tempo. De quebra fecha uma brecha -- quem tinha 3 saves desafiava 3 vezes
+   seguidas, uma com cada, e a espera de 10 minutos não segurava nada.
+   Os documentos antigos (uid_slot) ficam órfãos e inofensivos: ninguém mais lê eles. */
+function neighborhoodGymCooldownRef(gymRef, uid){
+  return gymRef.collection('challengeCooldowns').doc(String(uid));
 }
-// escolhe um time ELEGÍVEL e de preferência LIVRE (não defendendo outro ginásio) do desafiante, pra
-// atribuir automaticamente se ele vencer -- assim o ginásio NUNCA fica sem time, mesmo que a pessoa
-// feche o app antes de escolher manualmente depois. Prioriza o time que ele usou pra desafiar, se
-// esse estiver livre; senão sorteia entre os livres; e só usa um já-em-uso-em-outro-lugar no caso
-// extremo de TODOS os times elegíveis já estarem ocupados (o "nunca fica sem time" vale mais que a
-// exclusividade nesse caso raro)
-async function pickAutoDefenseTeamForWinner(uid, preferredSlot){
-  const savesSnap = await db.collection('users').doc(uid).collection('saves').get();
-  const eligible = savesSnap.docs
-    .filter(d => d.data().team && (d.data().badgeCount||0) >= 8)
-    .map(d => ({ slot: parseInt(d.id,10), team: d.data().team }))
-    .filter(e => Number.isFinite(e.slot));
-  if(eligible.length===0) return null;
-  const indexRefs = eligible.map(e => neighborhoodGymDefenseIndexRef(uid, e.slot));
-  const indexSnaps = await db.getAll(...indexRefs);
-  const free = eligible.filter((e,i) => !indexSnaps[i].exists);
-  const pool = free.length > 0 ? free : eligible;
-  const preferred = pool.find(e => e.slot === preferredSlot);
-  const chosen = preferred || pool[Math.floor(Math.random()*pool.length)];
-  const code = sanitizeTeamCode(encodeTeamCode(chosen.team));
-  return code ? { slot: chosen.slot, code } : null;
-}
-
 exports.challengeNeighborhoodGym = onCall(async (request) => {
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   const uid = request.auth.uid;
-  const { city, countryCode, slot, orderedTeamCode } = request.data || {};
-  if(!city || typeof slot !== 'number'){
+  const { city, countryCode, team } = request.data || {};
+  if(!city || !Array.isArray(team)){
     throw new HttpsError('invalid-argument', 'Dados do desafio incompletos.');
   }
   const userSnap = await db.collection('users').doc(uid).get();
@@ -2794,21 +2773,23 @@ exports.challengeNeighborhoodGym = onCall(async (request) => {
 
   // cooldown de 10min por time (uid+slot) NESSE ginásio -- evita spam de desafio repetido com o mesmo
   // time. Checado ANTES da transação principal (não precisa ser atômico com a troca de liderança)
-  const cooldownRef = neighborhoodGymCooldownRef(gymRef, uid, slot);
+  const cooldownRef = neighborhoodGymCooldownRef(gymRef, uid);
   const cooldownSnap = await cooldownRef.get();
   if(cooldownSnap.exists){
     const elapsed = Date.now() - (cooldownSnap.data().lastChallengeAt||0);
     if(elapsed < NEIGHBORHOOD_GYM_CHALLENGE_COOLDOWN_MS){
       const remainingMs = NEIGHBORHOOD_GYM_CHALLENGE_COOLDOWN_MS - elapsed;
-      throw new HttpsError('resource-exhausted', `Esse time precisa esperar mais ${Math.ceil(remainingMs/1000)}s pra desafiar de novo.`);
+      throw new HttpsError('resource-exhausted', `Você precisa esperar mais ${Math.ceil(remainingMs/1000)}s pra desafiar esse ginásio de novo.`);
     }
   }
 
-  const saveSnap = await db.collection('users').doc(uid).collection('saves').doc(String(slot)).get();
-  if(!saveSnap.exists || !saveSnap.data().team || (saveSnap.data().badgeCount||0) < 8){
-    throw new HttpsError('failed-precondition', 'Esse time precisa ter as 8 insígnias.');
-  }
-  const realTeamCode = sanitizeTeamCode(encodeTeamCode(saveSnap.data().team));
+  /* O time do desafiante é MONTADO com pokémon de qualquer save dele com 8 insígnias, sem repetir
+     espécie -- a mesma regra da Torre e a mesma do líder. A ORDEM é a que ele escolheu.
+     Some o antigo orderedTeamCode (o código alternativo conferido por assinatura): não existe mais
+     um "time real do slot" pra comparar, e o resolvedor já recusa pokémon que ele não tem -- que é
+     a mesma proteção, feita antes em vez de depois. */
+  const timeDoDesafiante = await resolverTimeDosSaves(uid, team, NEIGHBORHOOD_GYM_TEAM_SIZE, 'time do desafio', 1);
+  const realTeamCode = sanitizeTeamCode(encodeTeamCode(timeDoDesafiante));
   if(!realTeamCode){ throw new HttpsError('failed-precondition', 'Time inválido.'); }
   // especialidades do desafiante, lidas FORA da transação de propósito: transação do Firestore exige
   // todas as leituras antes de qualquer escrita, e essa é pesada (simula a batalha inteira dentro).
@@ -2819,21 +2800,15 @@ exports.challengeNeighborhoodGym = onCall(async (request) => {
   // se o jogador escolheu uma ORDEM diferente antes de desafiar, só aceita se o CONJUNTO de pokémon
   // bater com o time que ele realmente possui (mesmo padrão anti-forja da Trainers League) -- a ordem
   // escolhida é respeitada, mas não dá pra mandar um time que ele nunca teve
-  let challengerCode = realTeamCode;
-  if(orderedTeamCode){
-    const orderedClean = sanitizeTeamCode(orderedTeamCode);
-    if(orderedClean && teamCodeSignature(orderedClean) === teamCodeSignature(realTeamCode)){
-      challengerCode = orderedClean;
-    } else {
-      logger.warn(`Ordem de desafio rejeitada (não bate com o time real) -- uid=${uid} slot=${slot}`);
-    }
-  }
+  const challengerCode = realTeamCode;
   const challengerName = (userSnap.exists && userSnap.data().trainerName) || 'Treinador';
   const thisGymId = neighborhoodGymId(city, countryCode);
   // descoberto ANTES da transação (precisa ler saves + índice de vários times) -- só é de fato usado
   // se o desafiante vencer, mas calcular aqui evita ter que fazer leitura no meio da transação depois
   // de já ter começado a escrever nela
-  const autoDefenseTeam = await pickAutoDefenseTeamForWinner(uid, slot);
+  /* Vencendo, o desafiante assume defendendo com o MESMO time que acabou de vencer. Antes um
+     sorteio escolhia um save livre dele -- fazia sentido quando a defesa era um save inteiro, e
+     não faz mais nenhum: ele montou um time, ganhou com ele, e é com ele que fica. */
 
   const result = await db.runTransaction(async (tx) => {
     const gymSnap = await tx.get(gymRef);
@@ -2901,21 +2876,16 @@ exports.challengeNeighborhoodGym = onCall(async (request) => {
         city, countryCode: countryCode||null,
         leaderUid: uid, leaderName: challengerName,
         leaderSpecialties: challengerSpecialties, // congelado ao assumir: quem defende o ginásio defende com o que tinha
-        leaderTeamCode: autoDefenseTeam ? autoDefenseTeam.code : null,
-        leaderTeamSlot: autoDefenseTeam ? autoDefenseTeam.slot : null,
+        leaderTeamCode: challengerCode,
+        leaderTeamSlot: null,   // defesa montada à mão não vem de save nenhum
         leaderTerrain: null,
         becameLeaderAt: Date.now(), defenseCount: 0
       });
-      if(autoDefenseTeam){
-        tx.set(neighborhoodGymDefenseIndexRef(uid, autoDefenseTeam.slot), {
-          uid, slot: autoDefenseTeam.slot, gymId: thisGymId, city, countryCode: countryCode||null, assignedAt: Date.now()
-        });
-      }
     } else {
       tx.set(gymRef, { defenseCount: (gymData.defenseCount||0) + 1 }, { merge:true });
     }
     return {
-      win: challengerWon, matchups: match.matchups, opponentName: gymData.leaderName, autoAssignedTeamSlot: challengerWon ? (autoDefenseTeam?autoDefenseTeam.slot:null) : null,
+      win: challengerWon, matchups: match.matchups, opponentName: gymData.leaderName,
       // só preenchido quando alguém É destronado -- usado logo abaixo pra notificar ele, DEPOIS que a
       // transação já confirmou de verdade (notificação não precisa ser atômica com a troca de líder)
       dethronedInfo: challengerWon ? { uid: gymData.leaderUid, name: gymData.leaderName, wins: gymData.defenseCount||0, days: dethronedDays } : null
@@ -2945,24 +2915,25 @@ exports.getNeighborhoodGymChallengeCooldowns = onCall(async (request) => {
   const { city, countryCode } = request.data || {};
   if(!city){ throw new HttpsError('invalid-argument', 'Cidade não informada.'); }
   const gymRef = neighborhoodGymRef(city, countryCode);
+  /* UM número, não um por save: a espera é do JOGADOR nesse ginásio (ver
+     neighborhoodGymCooldownRef). O cliente continua recebendo o campo `cooldowns` com a mesma
+     forma de antes pra não quebrar quem estiver com a página velha em cache -- ali dentro vai a
+     mesma espera repetida pra todo save elegível. */
+  const snap = await neighborhoodGymCooldownRef(gymRef, uid).get();
+  let restante = 0;
+  if(snap.exists){
+    const passou = Date.now() - (snap.data().lastChallengeAt||0);
+    restante = Math.max(0, NEIGHBORHOOD_GYM_CHALLENGE_COOLDOWN_MS - passou);
+  }
   const savesSnap = await db.collection('users').doc(uid).collection('saves').get();
-  const eligibleSlots = savesSnap.docs
-    .filter(d => d.data().team && (d.data().badgeCount||0) >= 8)
-    .map(d => parseInt(d.id, 10))
-    .filter(n => Number.isFinite(n));
-  if(eligibleSlots.length===0){ return { cooldowns: {} }; }
-  const refs = eligibleSlots.map(slot => neighborhoodGymCooldownRef(gymRef, uid, slot));
-  const snaps = await db.getAll(...refs);
   const cooldowns = {};
-  eligibleSlots.forEach((slot, i) => {
-    const snap = snaps[i];
-    if(snap.exists){
-      const elapsed = Date.now() - (snap.data().lastChallengeAt||0);
-      const remaining = NEIGHBORHOOD_GYM_CHALLENGE_COOLDOWN_MS - elapsed;
-      if(remaining > 0){ cooldowns[slot] = remaining; }
-    }
-  });
-  return { cooldowns };
+  if(restante > 0){
+    savesSnap.docs.forEach(d => {
+      const n = parseInt(d.id, 10);
+      if(Number.isFinite(n) && d.data().team && (d.data().badgeCount||0) >= 8) cooldowns[n] = restante;
+    });
+  }
+  return { cooldowns, cooldown: restante };
 });
 // checa se um save específico está defendendo ALGUM ginásio agora -- usado pelo cliente antes de
 // confirmar a exclusão de um save, pra avisar "esse ginásio vai ficar sem líder" em vez da pessoa
@@ -3938,20 +3909,29 @@ exports.getTrainerTower = onCall(async (request) => {
    - sem espécie repetida
    - cada um tem que EXISTIR num save da conta com as 8 insígnias, na espécie e nível informados
    O último ponto é o que impede alguém de mandar 6 Mewtwo nível 99 pelo console. */
-exports.startTrainerTowerRun = onCall(async (request) => {
-  if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
-  const uid = request.auth.uid;
-  await towerRequireTester(uid);
-  const escolhidos = Array.isArray(request.data?.team) ? request.data.team : [];
-  if(escolhidos.length !== TOWER_TEAM_SIZE){
-    throw new HttpsError('invalid-argument', `O time da torre precisa de ${TOWER_TEAM_SIZE} pokémon.`);
+/* MONTAR UM TIME COM POKÉMON DE QUALQUER SAVE.
+   Nasceu na Torre dos Treinadores e virou função à parte quando o Ginásio da Cidade passou a montar
+   time do mesmo jeito (01/09/2026): duas cópias disso divergiriam na regra de identidade, que é
+   justamente a parte que já deu defeito uma vez.
+   ACHA O POKÉMON ESCOLHIDO, NÃO UM XARÁ. A busca por espécie+nível pegava o PRIMEIRO que casasse:
+   quem tinha o mesmo pokémon no mesmo nível em dois saves, um shiny e um normal, escolhia o shiny e
+   entrava com o normal -- o shiny sumia na hora da batalha. Vai do mais específico pro mais
+   genérico, e os dois últimos níveis existem só pra não quebrar cliente antigo em cache (ele manda
+   só espécie e nível).
+   O time volta na ORDEM ESCOLHIDA: no ginásio e na torre a ordem é do jogador, e reordenar depois é
+   outra tela. */
+async function resolverTimeDosSaves(uid, escolhidos, tamanho, ondeErro, minimo){
+  const onde = ondeErro || 'time';
+  const min = (typeof minimo === 'number') ? minimo : tamanho;
+  if(!Array.isArray(escolhidos) || escolhidos.length > tamanho || escolhidos.length < min){
+    throw new HttpsError('invalid-argument', min === tamanho
+      ? `O ${onde} precisa de ${tamanho} pokémon.`
+      : `O ${onde} precisa de 1 a ${tamanho} pokémon.`);
   }
   const especies = new Set(escolhidos.map(p => p && p.speciesId));
-  if(especies.size !== TOWER_TEAM_SIZE){
-    throw new HttpsError('invalid-argument', 'Não pode repetir espécie no time da torre.');
+  if(especies.size !== escolhidos.length){
+    throw new HttpsError('invalid-argument', `Não pode repetir espécie no ${onde}.`);
   }
-
-  // junta tudo que a conta tem em saves com 8 insígnias
   const savesSnap = await db.collection('users').doc(uid).collection('saves').get();
   const disponiveis = [];
   savesSnap.forEach(doc => {
@@ -3964,12 +3944,6 @@ exports.startTrainerTowerRun = onCall(async (request) => {
   if(!disponiveis.length){
     throw new HttpsError('failed-precondition', 'Você precisa de pelo menos um save com as 8 insígnias.');
   }
-
-  /* Achar O POKÉMON escolhido, não um xará. A busca por espécie+nível pegava o PRIMEIRO que
-     casasse: quem tinha o mesmo pokémon no mesmo nível em dois saves, um shiny e um normal,
-     escolhia o shiny e entrava na torre com o normal -- o shiny sumia na hora da batalha.
-     Agora vai do mais específico pro mais genérico, e os dois últimos níveis existem só pra
-     não quebrar quem estiver com o cliente antigo em cache (ele manda só espécie e nível). */
   const time = [];
   const jaUsados = new Set();
   const procurar = (teste) => disponiveis.findIndex((d, i) => !jaUsados.has(i) && d.mon && teste(d));
@@ -3991,6 +3965,13 @@ exports.startTrainerTowerRun = onCall(async (request) => {
     const real = disponiveis[idx].mon;
     time.push({ speciesId: real.speciesId, level: real.level, shiny: !!real.shiny });
   }
+  return time;
+}
+exports.startTrainerTowerRun = onCall(async (request) => {
+  if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
+  const uid = request.auth.uid;
+  await towerRequireTester(uid);
+  const time = await resolverTimeDosSaves(uid, request.data?.team, TOWER_TEAM_SIZE, 'time da torre');
 
   const torre = await towerGetToday();
   const run = await towerGetRun(uid, torre.dateId);
@@ -5876,3 +5857,5 @@ exports.fightSundayBoss = onCall(async (request) => {
            maxHp: BOSS_MAX_HP, derrubou: resultado.derrubou,
            meu: { dano: resultado.meuDano, batalhas: resultado.meusAtaques } };
 });
+
+exports._TERRAINS = TERRAINS;   // so pro teste do ginasio escolher um terreno valido

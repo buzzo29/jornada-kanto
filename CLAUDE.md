@@ -744,6 +744,40 @@ verdade, cai no game over, e o teste confere que a trava soltou dos dois lados.
 
 ## Ginásio da Cidade
 
+- **O time dos DOIS lados é MONTADO, não é mais um save** (01/09/2026). Líder e desafiante escolhem
+  até 6 pokémon entre TODOS os saves com 8 insígnias, sem repetir espécie — a mesma regra da Torre,
+  e literalmente a mesma tela: `montadorDeTimeHtml` e `alternarEscolhaDeTime` nasceram dentro da
+  Torre e viraram função quando o ginásio passou a usá-las. Três cópias divergiriam na regra de
+  "não repetir espécie", que é a parte que o jogador vê.
+  O cliente manda a **identidade** de cada escolhido (`monId`/`slot`/`idx`/`shiny`), nunca um código
+  de time: o servidor resolve pelo `resolverTimeDosSaves` (extraído da Torre pelo mesmo motivo) e
+  recusa pokémon que a conta não tem. É o que substitui o antigo `orderedTeamCode` conferido por
+  assinatura — a mesma proteção, feita antes em vez de depois. E é o que impede o defeito do shiny
+  que some: quem tem o mesmo pokémon no mesmo nível em dois saves escolhia o shiny e entrava com o
+  normal.
+  **A ordem da escolha é a ordem de batalha**; a tela de ordem continua existindo pra reordenar
+  vendo o time do líder.
+- **Três regras estavam presas ao slot e tiveram que mudar junto.** Nenhuma foi escolha de gosto —
+  sem "o time do slot N" elas deixam de ter o que contar:
+  1. **A espera de 10 min virou POR JOGADOR**, não por time. De quebra fecha uma brecha: quem tinha
+     3 saves desafiava 3 vezes seguidas, uma com cada, e a espera não segurava nada.
+  2. **Quem vence defende com o time que venceu.** Antes um sorteio escolhia um save LIVRE do
+     vencedor (`pickAutoDefenseTeamForWinner`, removido) — fazia sentido quando a defesa era um save
+     inteiro. Agora ele montou um time, ganhou com ele, e é com ele que fica.
+  3. **A exclusividade "um time só defende um ginásio" acabou.** Ela travava `uid+slot`, e não
+     existe mais o que travar. **Consequência: um treinador pode liderar vários ginásios**, com os
+     mesmos pokémon. Se um dia incomodar, o lugar de resolver é o `setNeighborhoodGymDefense` e a
+     regra que cabe é "um ginásio por líder" — não dá pra voltar à antiga.
+  O índice antigo (`neighborhoodGymActiveDefenses`) continua sendo **limpo** quando um líder monta
+  time à mão, pra não deixar lixo apontando pra ginásio nenhum. Defesa montada grava
+  `leaderTeamSlot: null`; documento antigo mantém o que tinha.
+- **A defesa é um código CONGELADO**, e agora isso importa mais: como ela não vem de um save, mexer
+  no save (ou apagá-lo) não muda quem defende o ginásio. O aviso de "esse ginásio vai ficar sem
+  líder" ao apagar um save (`checkNeighborhoodGymDefenseForSlot`) só vale pras defesas antigas,
+  presas a slot — pras novas ele não tem o que avisar, porque nada acontece.
+  `tools/test-ginasio-cidade.js` cobre os dois lados: time misturando saves, as duas recusas
+  (espécie repetida e pokémon que não é seu), o shiny que sumia, a espera por jogador e o time do
+  vencedor.
 - O **selo de terreno** nas fileiras de time (`timeComTerrenoHtml`) usa a MESMA regra do
   `applyTerrainBuff` — se as duas divergirem, a tela promete um bônus que a batalha não dá.
   Aparece na tela do ginásio, na escolha de time do desafio e nas duas telas de ordem.
