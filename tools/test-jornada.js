@@ -677,5 +677,57 @@ ok('e a jornada continua (nao volta pro esconderijo)', e.screen !== 'rocketHideo
    'tela: ' + e.screen);
 ok('o marcador foi consumido', !e.releaseDepois);
 
+
+/* A OFERTA SELVAGEM NUNCA REPETE UMA LINHA EVOLUTIVA.
+   Um jogador viu DOIS Kingdra na mesma tela do Covil do Dragao (01/09/2026), e como a selecao e
+   por especie (game.wildSelected guarda o id), clicar num marcava os dois. A causa nao estava no
+   buildOfferFromPool -- ele ja evita isso no que sorteia -- e sim em quem entra DEPOIS dele: o
+   raro da rota reivindica a vaga sem olhar pro resto, e um Seadra Lv.51 vira Kingdra pela regra
+   de especie-por-nivel. Medido antes do conserto: 8,2% das ofertas de la, 0,88% do jogo, 9 rotas.
+   Este teste roda TODAS as rotas das duas regioes porque o defeito nasceu numa so: quem escreve
+   uma rota nova com um raro que ja mora no pool nao tem como lembrar disso sozinho. */
+console.log('\n=== A OFERTA SELVAGEM ===');
+(function(){
+  let ofertas = 0, repetidas = 0, curtas = 0;
+  const exemplos = [];
+  [S.ROUTE_MAP, S.JOHTO_ROUTE_MAP].forEach(mapa => mapa.forEach((par, leg) => par.forEach(rota => {
+    for(let i=0;i<400;i++){
+      const g = S.__getGame();
+      g.gymIndex = leg; g.team = []; g.starterId = 'bulbasaur'; g.gameMode = 'normal';
+      g.currentRoute = rota.id;
+      S.montaOfertaSelvagem();
+      const oferta = S.__getGame().wildOffer || [];
+      ofertas++;
+      if(oferta.length < S.LEGS[leg].offerCount) curtas++;
+      const raizes = oferta.map(o => S.raizDaLinha(o.speciesId));
+      if(raizes.some((r, idx) => raizes.indexOf(r) !== idx)){
+        repetidas++;
+        if(exemplos.length < 3){
+          exemplos.push(rota.name + ': ' + oferta.map(o => S.SPECIES[o.speciesId].name + ' Lv.' + o.level).join(' + '));
+        }
+      }
+    }
+  })));
+  ok('nenhuma oferta traz duas da mesma linha', repetidas === 0,
+     repetidas + ' de ' + ofertas + (exemplos.length ? '  |  ' + exemplos.join('  |  ') : ''));
+  ok('e nenhuma oferta encolheu por causa disso', curtas === 0, curtas + ' de ' + ofertas);
+})();
+/* A troca da repetida sorteia -- entao ela nao pode furar a trava anti save-scumming: a mesma
+   semente tem que devolver a mesma oferta, sempre. */
+(function(){
+  function ofertaCom(semente){
+    const g = S.__getGame();
+    g.gymIndex = 7; g.team = []; g.starterId = 'bulbasaur'; g.gameMode = 'normal';
+    g.currentRoute = 'dragons_den';
+    const orig = Math.random;
+    Math.random = S.makeSeededRng(semente);
+    try { S.montaOfertaSelvagem(); } finally { Math.random = orig; }
+    return (S.__getGame().wildOffer || []).map(o => o.speciesId + ':' + o.level).join(',');
+  }
+  let iguais = 0;
+  for(let i=0;i<200;i++){ if(ofertaCom('sem-' + i) === ofertaCom('sem-' + i)) iguais++; }
+  ok('a mesma semente devolve a mesma oferta', iguais === 200, iguais + ' de 200');
+})();
+
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
 process.exit(falhas ? 1 : 0);

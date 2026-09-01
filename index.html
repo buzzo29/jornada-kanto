@@ -5608,6 +5608,36 @@ function goToWildEncounter(){
      semente acima é --, mas mantém o contador no servidor o quanto antes. */
   saveCurrentGame();
 }
+/* NENHUMA LINHA REPETIDA NA OFERTA -- conferido no fim, depois de todo mundo passar.
+   O buildOfferFromPool já cuida disso no que ELE sorteia, mas quem entra DEPOIS dele -- o raro da
+   rota, a pré-evolução de inicial, a rede dos intocáveis -- reivindica a vaga sem olhar pro resto
+   da oferta. No Covil do Dragão, que tem Kingdra e Dragonite como raros e Seadra e Dragonair no
+   pool, um Seadra Lv.51 virava Kingdra pela regra de nível e a tela mostrava DOIS Kingdra. Pior:
+   a seleção é por ESPÉCIE (game.wildSelected guarda o id), então clicar num marcava os dois.
+   Reportado em 01/09/2026; medido antes do conserto: 8,2% das ofertas de lá e 0,88% do jogo, em
+   9 rotas.
+   É por LINHA e não por espécie, a mesma régua do resto do encontro: Diglett e Dugtrio na mesma
+   tela é oferecer dois Dugtrio a quem escolhe os dois. A raiz não muda com o nível, então dá na
+   mesma conferir antes ou depois da regra de espécie-por-nível.
+   QUEM SAI é a entrada mais à direita, e não importa se ela é a comum ou a rara: o que o raro
+   promete é um Kingdra NA TELA, e com a repetida trocada o jogador continua vendo exatamente um.
+   Só sorteia quando ACHA repetida -- assim as ofertas que já estavam certas continuam idênticas,
+   semente por semente. */
+function semLinhaRepetida(offer, pool, leg){
+  const vistas = new Set();
+  return offer.map(o => {
+    const raiz = raizDaLinha(o.speciesId);
+    if(!vistas.has(raiz)){ vistas.add(raiz); return o; }
+    const livres = pool.filter(id => !vistas.has(raizDaLinha(id)) && !SEM_CAPTURA_SELVAGEM.includes(id));
+    /* Pool sem nenhuma linha livre: a repetida fica. Uma tela de encontro com duas opções é pior
+       que uma com uma repetida -- a mesma decisão que a reserva do buildOfferFromPool já toma. */
+    if(!livres.length) return o;
+    const sub = livres[Math.floor(Math.random()*livres.length)];
+    vistas.add(raizDaLinha(sub));
+    const nivel = rollWildLevel(sub, leg.minLevel, leg.maxLevel);
+    return { speciesId: especieNoNivel(sub, nivel), level: nivel };
+  });
+}
 function montaOfertaSelvagem(){
   const leg = LEGS[game.gymIndex];
   const route = routeById(game.currentRoute);
@@ -5669,6 +5699,7 @@ function montaOfertaSelvagem(){
   offer = offer.map(o => SEM_CAPTURA_SELVAGEM.includes(o.speciesId)
     ? { ...o, speciesId: buildOfferFromPool(leg.pool, 1)[0] || 'ratata' }
     : o);
+  offer = semLinhaRepetida(offer, pool, leg);
   offer.forEach(o=>{ o.shiny = Math.random() < currentShinyChance(); }); // shiny (1 em 128, ou a chance crescente do bônus, se estiver ativo)
   // registra que esse encontro rodou, PRA VALER na próxima chamada -- é isso que faz a chance subir
   // encontro após encontro enquanto a pessoa não captura nenhum shiny (currentShinyChance lê esse

@@ -556,6 +556,24 @@ de golpes.
   O sorteio com peso é o de Efraimidis-Spirakis (chave = `U^(1/peso)`, maior primeiro) — com peso 1
   pra todo mundo ele É um embaralhamento uniforme, então rota sem tipo declarado continua idêntica,
   e a semente anti-artimanha continua devolvendo a MESMA oferta (conferido).
+- **A oferta nunca traz duas entradas da MESMA LINHA** (`semLinhaRepetida`, conferido no fim, depois
+  de todo mundo passar). O `buildOfferFromPool` já cuidava disso no que ELE sorteia — o furo era
+  quem entra DEPOIS dele: o **raro da rota**, a pré-evolução de inicial e a rede dos intocáveis
+  reivindicam a vaga sem olhar pro resto. No Covil do Dragão (Kingdra e Dragonite como raros,
+  Seadra e Dragonair no pool) um Seadra Lv.51 virava Kingdra pela regra de espécie-por-nível e a
+  tela mostrava **dois Kingdra** — e, como `game.wildSelected` guarda o **id da espécie**, clicar
+  num marcava os dois. Reportado em 01/09/2026.
+  Medido antes do conserto: **8,2% das ofertas do Covil do Dragão**, 0,88% do jogo, em 9 rotas
+  (Desvio por Lavender 3,4%, Rota 32 3,3%, Lago da Fúria 3,1%, Mansão 2,8%, Caverna Diglett 2,2%,
+  Túnel de Pedra 2,1%, Estrada Ciclável 2,0%, Victory Road 1,1%).
+  **Sai a entrada mais à direita, e não importa se é a comum ou a rara**: o que o raro promete é um
+  Kingdra NA TELA, e com a repetida trocada o jogador continua vendo exatamente um — medido,
+  71,5% → 72,2% de ofertas com Kingdra no Covil. Só sorteia quando ACHA repetida, então as ofertas
+  que já estavam certas continuam idênticas semente por semente (a trava anti save-scumming
+  continua valendo: `tools/test-jornada.js` confere as duas coisas em todas as 32 rotas).
+  **A seleção por espécie continua como está** — ela funciona porque a oferta não repete linha. Se
+  um dia alguém precisar mexer nisso, o campo é serializado (`wildSelected` está no save), então
+  trocar pra índice quebra quem estiver com a tela do encontro aberta na hora do deploy.
 - **O encontro selvagem nunca oferece uma linha que o time já tem.** Não é por espécie, é pela
   **raiz da linha evolutiva** — dois Magikarp viram dois Gyarados, e era assim que gente chegava na
   liga com o time duplicado. Um Gyarados no time também bloqueia o Magikarp.
