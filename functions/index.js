@@ -2998,15 +2998,15 @@ exports.getNeighborhoodGymChallengeCooldowns = onCall(async (request) => {
   /* Devolve QUAIS POKÉMON estão de castigo nesse ginásio, com quanto falta pra cada um. É isso que
      deixa a tela de montar time mostrar o bicho apagado com o tempo em cima, em vez de deixar o
      jogador montar o time inteiro e só descobrir no clique do desafio.
-     As chaves são calculadas do mesmo jeito que o resolverTimeDosSaves calcula (id do bicho, ou
-     save+posição pra save antigo) -- se as duas divergirem, a tela libera quem o desafio recusa. */
+     A chave sai da MESMA função que o desafio usa (chaveDoPokemonNaConta) -- duas contas diferentes
+     da mesma coisa foi exatamente o defeito de 01/09/2026. */
   const savesSnap = await db.collection('users').doc(uid).collection('saves').get();
   const chaves = [];
   savesSnap.forEach(doc => {
     const s = doc.data() || {};
     const badges = (typeof s.badgeCount === 'number') ? s.badgeCount : ((s.badgesEarned||[]).length);
     if(badges < 8) return;
-    (s.team || []).forEach((p, i) => chaves.push(p.id ? ('m_' + p.id) : ('p_' + doc.id + '_' + i)));
+    (s.team || []).forEach(p => chaves.push(chaveDoPokemonNaConta(doc.id, p)));
   });
   const mons = {};
   if(chaves.length){
@@ -4005,6 +4005,17 @@ exports.getTrainerTower = onCall(async (request) => {
    só espécie e nível).
    O time volta na ORDEM ESCOLHIDA: no ginásio e na torre a ordem é do jogador, e reordenar depois é
    outra tela. */
+/* SAVE + ESPÉCIE, e NÃO o id do bicho. O id (`mon7`, `mon12`...) vem de um contador que recomeça
+   do 1 a cada carregamento de página e só é reconciliado com o save CARREGADO -- então dois saves
+   diferentes têm `mon7` cada um. Usando o id como chave, a espera de um pokémon caía em cima do
+   xará de outro save: o jogador desafiou com 6 e viu 8 apagados, um Golem e uma Meganium que ele
+   nem tinha usado. Reportado em 01/09/2026.
+   Save+espécie é único na conta porque um save não tem duas da mesma espécie (o encontro selvagem
+   nunca oferece uma linha que o time já tem, e o montador de time recusa espécie repetida), e é
+   melhor que save+POSIÇÃO por sobreviver ao jogador reordenar o próprio time.
+   O cliente calcula esta MESMA chave (`chaveDoPokemon`). Se as duas divergirem, a tela libera
+   quem o desafio recusa -- ou apaga quem podia lutar, que foi o defeito relatado. */
+function chaveDoPokemonNaConta(slot, mon){ return 'g_' + slot + '_' + mon.speciesId; }
 async function resolverTimeDosSaves(uid, escolhidos, tamanho, ondeErro, minimo){
   const onde = ondeErro || 'time';
   const min = (typeof minimo === 'number') ? minimo : tamanho;
@@ -4035,10 +4046,24 @@ async function resolverTimeDosSaves(uid, escolhidos, tamanho, ondeErro, minimo){
   for(const pedido of escolhidos){
     const mesmaEspecie = (d) => d.mon.speciesId === pedido.speciesId && d.mon.level === pedido.level;
     let idx = -1;
-    if(pedido.monId) idx = procurar(d => d.mon.id === pedido.monId);
-    if(idx < 0 && pedido.slot != null && Number.isInteger(pedido.idx)){
+    /* SAVE + POSIÇÃO + ESPÉCIE primeiro. O id do bicho vinha antes, e era um erro grave: ele
+       (`mon7`, `mon12`...) sai de um contador que recomeça do 1 a cada carregamento de página e só
+       é reconciliado com o save CARREGADO -- então dois saves têm `mon7` cada um. Procurando o id
+       na conta INTEIRA, o primeiro save vencia sempre, e o jogador entrava na luta com o xará do
+       outro save no lugar do pokémon que ele escolheu. Reportado em 01/09/2026: escolheu 6 de um
+       save e viu um Golem e uma Meganium de outro entrarem na conta.
+       A posição no save é a identidade que o cliente sabe e que não confunde xará nenhum. */
+    if(pedido.slot != null && Number.isInteger(pedido.idx)){
       idx = procurar(d => String(d.slot) === String(pedido.slot) && d.idx === pedido.idx && mesmaEspecie(d));
     }
+    /* O time pode ter sido reordenado desde que a tela carregou -- aí a posição não bate mais. O
+       id resolve isso, mas SÓ DENTRO DO MESMO SAVE, que é onde ele é confiável. */
+    if(idx < 0 && pedido.monId && pedido.slot != null){
+      idx = procurar(d => String(d.slot) === String(pedido.slot) && d.mon.id === pedido.monId);
+    }
+    /* Os dois últimos níveis existem só pra não quebrar cliente antigo em cache, que manda apenas
+       espécie e nível. Ali xará é xará mesmo: sem save nem posição, não há como distinguir --
+       o shiny pelo menos separa os dois casos que mais doem. */
     if(idx < 0 && typeof pedido.shiny === 'boolean'){
       idx = procurar(d => mesmaEspecie(d) && !!d.mon.shiny === pedido.shiny);
     }
@@ -4050,11 +4075,9 @@ async function resolverTimeDosSaves(uid, escolhidos, tamanho, ondeErro, minimo){
     const achado = disponiveis[idx];
     const real = achado.mon;
     /* A CHAVE identifica ESTE pokémon na conta, e sai do que o servidor achou -- nunca do que o
-       cliente mandou, senão daria pra fugir da espera do ginásio inventando um monId.
-       O id do bicho é o ideal (sobrevive a reordenar o time); save+posição é a rede pra save
-       antigo, de antes do campo existir. */
+       cliente mandou, senão daria pra fugir da espera do ginásio inventando um id. */
     time.push({ speciesId: real.speciesId, level: real.level, shiny: !!real.shiny,
-                chave: real.id ? ('m_' + real.id) : ('p_' + achado.slot + '_' + achado.idx) });
+                chave: chaveDoPokemonNaConta(achado.slot, real) });
   }
   return time;
 }
@@ -5950,3 +5973,4 @@ exports.fightSundayBoss = onCall(async (request) => {
 });
 
 exports._TERRAINS = TERRAINS;   // so pro teste do ginasio escolher um terreno valido
+

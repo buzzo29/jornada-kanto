@@ -151,7 +151,8 @@ ok('a consulta devolve os 12 descansando', descansando.length === 12, descansand
 ok('com o tempo que falta pra cada um', Object.values(espera.mons).every(ms => ms > 0 && ms <= 10*60*1000));
 /* A chave tem que ser a MESMA que o cliente calcula (id do bicho), senao a tela libera quem o
    desafio recusa. */
-ok('e a chave e o id do pokemon', descansando.every(k => k.startsWith('m_')), descansando.slice(0,2).join(', '));
+/* A chave e SAVE + ESPECIE, nao o id do bicho: o id repete entre saves (ver a secao 7). */
+ok('e a chave e save + especie', descansando.every(k => /^g_\d+_[a-z0-9]+$/.test(k)), descansando.slice(0,2).join(', '));
 
 /* 5) QUEM VENCE DEFENDE COM O TIME QUE VENCEU.
    Antes um sorteio escolhia um save LIVRE do vencedor -- fazia sentido quando a defesa era um save
@@ -186,6 +187,43 @@ ok('e avisa que falta escolher o terreno', (meus.gyms||[]).every(g => g.hasTerra
    JSON.stringify((meus.gyms||[]).map(g=>g.hasTerrain)));
 const doAsh = await chamar(fns.listMyNeighborhoodGyms, 'ash', {});
 ok('e o lider antigo some da lista dele', (doAsh.gyms||[]).length === 0, JSON.stringify(doAsh.gyms));
+
+
+/* 7) A ESPERA NAO PODE PEGAR O XARA DE OUTRO SAVE.
+   O id de um pokemon (`mon7`, `mon12`...) vem de um contador que recomeca do 1 a cada carregamento
+   de pagina e so e reconciliado com o save CARREGADO -- entao dois saves tem `mon7` cada um. Com o
+   id como chave, a espera de um caia em cima do xara do outro save: o jogador desafiou com 6 e viu
+   8 apagados, um Golem e uma Meganium que ele nem tinha usado. Reportado em 01/09/2026.
+   O fixture aqui REPETE os ids de proposito -- e exatamente assim que os saves de verdade sao, e e
+   por os fixtures anteriores usarem ids distintos que o defeito passou. */
+console.log('');
+console.log('A ESPERA E DO POKEMON, NAO DO XARA DE OUTRO SAVE');
+const saveUm  = [mon('mon1','golem',70), mon('mon2','meganium',70), mon('mon3','pidgeot',70),
+                 mon('mon4','arcanine',70), mon('mon5','lapras',70), mon('mon6','machamp',70)];
+const saveDois = [mon('mon1','gengar',70), mon('mon2','starmie',70), mon('mon3','nidoking',70),
+                  mon('mon4','victreebel',70), mon('mon5','rhydon',70), mon('mon6','jolteon',70)];
+await db.collection('users').doc('may').set({ trainerName:'May', specialties:[] });
+await db.collection('users').doc('may').collection('saves').doc('0').set({ badgeCount:8, team:saveUm });
+await db.collection('users').doc('may').collection('saves').doc('1').set({ badgeCount:8, team:saveDois });
+/* O ginasio precisa de um lider forte pra ela perder -- o Gary acabou de assumir; da a ele a muralha. */
+await chamar(fns.setNeighborhoodGymDefense, 'gary', Object.assign({ team: escolher(vencedor, 2, [0,1,2,3,4,5]) }, CIDADE));
+await chamar(fns.setNeighborhoodGymDefense, 'gary', Object.assign({ terrainId: fns._TERRAINS[0].id }, CIDADE));
+
+await chamar(fns.challengeNeighborhoodGym, 'may', Object.assign({ team: escolher(saveDois, 1, [0,1,2,3,4,5]) }, CIDADE));
+const esperaDaMay = await chamar(fns.getNeighborhoodGymChallengeCooldowns, 'may', CIDADE);
+const descansandoMay = Object.keys(esperaDaMay.mons || {});
+ok('desafiou com 6 e SEIS estao descansando', descansandoMay.length === 6,
+   descansandoMay.length + ': ' + descansandoMay.join(', '));
+/* O Golem e a Meganium do OUTRO save dividem o id com dois que lutaram -- e nao podem estar aqui. */
+const chaveDoSaveUm = (esp) => 'g_0_' + esp;
+ok('e o Golem do outro save NAO esta', !descansandoMay.includes(chaveDoSaveUm('golem')),
+   descansandoMay.join(', '));
+ok('nem a Meganium', !descansandoMay.includes(chaveDoSaveUm('meganium')));
+ok('os seis descansando sao os que lutaram de verdade',
+   saveDois.every(p => descansandoMay.includes('g_1_' + p.speciesId)), descansandoMay.join(', '));
+/* E o time do outro save desafia na hora: e o ponto inteiro da regra. */
+const comOOutroSave = await chamar(fns.challengeNeighborhoodGym, 'may', Object.assign({ team: escolher(saveUm, 0, [0,1,2,3,4,5]) }, CIDADE));
+ok('e o time do outro save desafia na hora', !!(comOOutroSave && comOOutroSave.matchups));
 
 console.log('\n' + (casos - falhas) + '/' + casos + ' casos passaram.' + (falhas ? '  ' + falhas + ' FALHA(S)' : ''));
 process.exit(falhas ? 1 : 0);

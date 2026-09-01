@@ -126,7 +126,7 @@ console.log('\nA ESPERA DO GINASIO CHEGA ATE A TELA');
   S.__setGame(g);
   /* A RESPOSTA DO SERVIDOR, na forma exata em que ele responde -- e ela que o carregador tem que
      saber guardar. Os tres primeiros do save Kanto acabaram de lutar. */
-  const resposta = { mons: { 'm_a0': 8*60*1000, 'm_a1': 8*60*1000, 'm_a2': 8*60*1000 }, cooldowns: {} };
+  const resposta = { mons: { 'g_0_gyarados': 8*60*1000, 'g_0_alakazam': 8*60*1000, 'g_0_snorlax': 8*60*1000 }, cooldowns: {} };
   espiaChamadas(resposta);
   await S.startNeighborhoodGymChallenge();
   await espera(60);
@@ -148,7 +148,7 @@ console.log('\nA ESPERA DO GINASIO CHEGA ATE A TELA');
   /* A CHAVE tem que ser a mesma dos dois lados: se o cliente calculasse outra, a tela liberaria
      justamente quem o servidor recusa. */
   const doPrimeiro = S.chaveDoPokemon(S.towerEligiblePokemon()[0]);
-  ok('e a chave do cliente bate com a do servidor', doPrimeiro === 'm_a0', doPrimeiro);
+  ok('e a chave do cliente bate com a do servidor (save + especie)', doPrimeiro === 'g_0_gyarados', doPrimeiro);
   /* Clicar num que esta descansando nao pode marcar. */
   S.gymChallengeTogglePick(0, 0);
   ok('clicar num descansando nao marca nada', (S.__getGame().neighborhoodGymChallengePick||[]).length === 0);

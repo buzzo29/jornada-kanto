@@ -76,7 +76,11 @@ ok('cliente antigo continua conseguindo montar o time', r3.run.team.length === 6
    saem do MESMO campo (playerShiny em cada confronto), entao se ele se perder no caminho o jogador
    perde as duas coisas: a estrela na tela e o buff de 1,20x em todos os atributos. */
 await db.collection('trainerTowerRuns').doc('ash').delete();
-const escolhaShiny = time1.map((p,i)=>({ speciesId:p.speciesId, level:p.level, slot:'0', idx:i, monId:p.id, shiny:!!p.shiny }));
+/* O slot tem que ser o DE VERDADE (time1 mora no save 1). Ele dizia '0', e o teste passava
+   porque a busca comecava pelo id do bicho, que atravessava saves -- justamente o defeito que
+   fez um jogador entrar na luta com o xara de outro save (ver test-ginasio-cidade). Com a busca
+   comecando por save+posicao, um slot mentido acha o pokemon daquele slot, que e o certo. */
+const escolhaShiny = time1.map((p,i)=>({ speciesId:p.speciesId, level:p.level, slot:'1', idx:i, monId:p.id, shiny:!!p.shiny }));
 const rS = await chamar(fns.startTrainerTowerRun, 'ash', { team: escolhaShiny });
 const shinysNoTime = rS.run.team.filter(p=>p.shiny).map(p=>p.speciesId);
 ok('o time da subida guarda quem e shiny', shinysNoTime.length > 0, 'shinys: ' + shinysNoTime.join(', '));
@@ -103,6 +107,27 @@ for(let dia = 1; dia <= 60; dia++){
 }
 ok('nenhum intocavel no time dos NPCs (60 torres)', achadosNaTorre.length === 0,
    achadosNaTorre.slice(0,4).join(' | '));
+
+
+/* O ID DE POKEMON REPETE ENTRE SAVES -- e por isso ele nao pode mandar na busca.
+   `mon7`, `mon12`... saem de um contador que recomeca do 1 a cada carregamento de pagina e so e
+   reconciliado com o save CARREGADO. Dois saves tem `mon1` cada um. Enquanto a busca comecava pelo
+   id, ela varria a conta inteira e o PRIMEIRO save vencia sempre: o jogador escolhia da lista de um
+   save e subia com o xara do outro. Foi assim que um jogador entrou num ginasio com um Golem e uma
+   Meganium que ele nao tinha escolhido (01/09/2026).
+   O fixture repete os ids de proposito -- e assim que os saves de verdade sao. */
+await db.collection('trainerTowerRuns').doc('may').delete();
+const casa0 = [mon('mon1','golem',70), mon('mon2','meganium',70), mon('mon3','pidgeot',70),
+               mon('mon4','arcanine',70), mon('mon5','lapras',70), mon('mon6','machamp',70)];
+const casa1 = [mon('mon1','gengar',70), mon('mon2','starmie',70), mon('mon3','nidoking',70),
+               mon('mon4','victreebel',70), mon('mon5','rhydon',70), mon('mon6','jolteon',70)];
+await db.collection('users').doc('may').collection('saves').doc('0').set({ badgeCount:8, team:casa0 });
+await db.collection('users').doc('may').collection('saves').doc('1').set({ badgeCount:8, team:casa1 });
+const doSave1 = casa1.map((p,i)=>({ speciesId:p.speciesId, level:p.level, slot:'1', idx:i, monId:p.id, shiny:false }));
+const rX = await chamar(fns.startTrainerTowerRun, 'may', { team: doSave1 });
+const subiuCom = rX.run.team.map(p=>p.speciesId).sort().join(',');
+ok('escolhendo do save 1, sobe com o time do save 1 (e nao com os xaras do save 0)',
+   subiuCom === casa1.map(p=>p.speciesId).sort().join(','), subiuCom);
 
 console.log(`\n${casos - falhas}/${casos} casos passaram.`);
 if(falhas){ console.log(`${falhas} FALHA(S).`); process.exit(1); }

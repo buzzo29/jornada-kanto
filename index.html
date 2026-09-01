@@ -15698,10 +15698,13 @@ function towerEligiblePokemon(){
    é justamente a parte que o jogador percebe na tela.
    `nomeDoToggle` entra como texto porque o onclick é montado no HTML -- cada tela tem a sua lista
    de escolhidos, e passar a função por referência exigiria um registro global de callbacks. */
-/* A CHAVE de um pokémon na conta. Tem que ser calculada IGUAL à do servidor (id do bicho, ou
-   save+posição pra save antigo, de antes do campo existir): se as duas divergirem, a tela libera
-   quem o desafio recusa. */
-function chaveDoPokemon(p){ return p.monId ? ('m_' + p.monId) : ('p_' + p.slot + '_' + p.idx); }
+/* A CHAVE de um pokémon na conta: SAVE + ESPÉCIE. Tem que ser calculada IGUAL à do servidor (lá é
+   `chaveDoPokemonNaConta`) -- se as duas divergirem, a tela apaga quem podia lutar.
+   NÃO usa o id do bicho: ele vem de um contador que recomeça do 1 a cada carregamento e só é
+   reconciliado com o save CARREGADO, então dois saves têm `mon7` cada um -- e a espera de um caía
+   em cima do xará do outro save. Reportado em 01/09/2026 com um Golem e uma Meganium apagados sem
+   terem lutado. */
+function chaveDoPokemon(p){ return 'g_' + p.slot + '_' + p.speciesId; }
 function montadorDeTimeHtml(escolhidos, nomeDoToggle, max, esperas){
   const elegiveis = towerEligiblePokemon();
   if(!elegiveis.length) return '';

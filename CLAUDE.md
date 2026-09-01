@@ -783,15 +783,36 @@ verdade, cai no game over, e o teste confere que a trava soltou dos dois lados.
   normal.
   **A ordem da escolha é a ordem de batalha**; a tela de ordem continua existindo pra reordenar
   vendo o time do líder.
+- **O ID DE UM POKÉMON REPETE ENTRE SAVES — ele nunca pode ser chave de nada na conta.** O `id`
+  (`mon7`, `mon12`…) sai do `nextInstanceId`, um contador que **recomeça do 1 a cada carregamento de
+  página** e que o `reconcileInstanceIdCounter` só acerta com o save **CARREGADO**. Dois saves têm
+  `mon7` cada um, e o mesmo save pode ter dois `mon7` se foram capturados em sessões diferentes.
+  Isso derrubou duas coisas de uma vez, e as duas foram reportadas juntas em 01/09/2026 — o jogador
+  escolheu 6 pokémon de um save pra desafiar um ginásio e viu **oito** apagados, um Golem e uma
+  Meganium de outro save que ele não usou:
+  1. **O `resolverTimeDosSaves` procurava pelo id na conta INTEIRA, antes de qualquer outra coisa.**
+     O primeiro save vencia sempre, então o jogador **entrava na luta com o xará do outro save** —
+     não era só a marcação que estava errada, era o time. Hoje a ordem é **save+posição+espécie**
+     primeiro; o id só desempata **dentro do mesmo save** (é lá que ele é confiável, e serve pra
+     quando o jogador reordenou o time depois que a tela carregou).
+  2. **A espera do ginásio era gravada com a chave `m_<id>`**, então marcava todo xará. Hoje é
+     `chaveDoPokemonNaConta` = **save + espécie**: único na conta (um save não tem duas da mesma
+     espécie — o encontro selvagem nunca oferece uma linha que o time já tem, e o montador recusa
+     repetida) e melhor que save+posição por sobreviver ao jogador reordenar o time. O cliente
+     calcula a MESMA chave em `chaveDoPokemon`.
+  **Por que os testes não pegaram antes:** os fixtures davam ids distintos entre saves (`a1`, `b1`),
+  que é justamente o que a vida real NÃO faz. Hoje `test-torre.js` e `test-ginasio-cidade.js` têm
+  fixtures que REPETEM os ids de propósito. Um deles também mentia o slot (mandava `slot:'0'` pra
+  pokémon do save 1) e passava porque a busca pelo id atravessava saves e "consertava" a mentira.
 - **A espera de 10 minutos é POR POKÉMON** (`neighborhoodGymMonCooldownRef`, 01/09/2026). Quem
   desafia fica 10 minutos sem poder usar **aqueles** pokémon nesse ginásio; o resto do bicharedo
   continua livre pra montar outro time e tentar de novo. Já foi por TIME (uid+slot) e por JOGADOR:
   por time não segurava nada — quem tinha 3 saves desafiava 3 vezes seguidas, uma com cada — e por
   jogador segurava demais, travava a conta inteira por causa de um time que perdeu.
   **A chave sai do pokémon que o SERVIDOR achou**, nunca do que o cliente mandou: senão daria pra
-  fugir da espera inventando um `monId`. É `m_<id do bicho>`, ou `p_<save>_<posição>` pra save
-  antigo, de antes do campo existir — e o cliente calcula a MESMA chave (`chaveDoPokemon`). Se as
-  duas divergirem, a tela libera quem o desafio recusa.
+  fugir da espera inventando uma identidade. É **save + espécie** (ver a nota acima sobre o id que
+  repete entre saves), e o cliente calcula a MESMA chave. Se as duas divergirem, a tela libera quem
+  o desafio recusa -- ou apaga quem podia lutar.
   **A recusa NOMEIA quem está descansando**: um "espere 7 minutos" sem dizer por causa de quem faria
   a pessoa remontar o time no escuro. E a tela de montar mostra os descansando **apagados, com o
   tempo no lugar do nível** — sumir com eles faria parecer que o jogador perdeu o pokémon.
