@@ -136,7 +136,7 @@ function createSandbox(htmlPath){
     // conquistas (ver test-conquistas.js)
     'ACHIEVEMENTS','getAchievementAggregate','getAllCaughtSpecies',
     // inscricao na Liga (ver test-liga-inscricao.js)
-    'registerForLeague','cancelLeagueRegistration','checkLeagueRegistrationStatus','useRareCandyOn','loadSaveSlots','refreshLeagueView','ensureRegisteringCycle','isAccountActiveInLeague','registrantDocRef','scheduleDocRef','encodeTeamCode','decodeTeamCode',
+    'registerForLeague','cancelLeagueRegistration','renderLeagueTeamPicker','atualizarAvisoDaLiga','isAccountActiveInLeague','STAR_SVG','checkLeagueRegistrationStatus','useRareCandyOn','loadSaveSlots','refreshLeagueView','ensureRegisteringCycle','isAccountActiveInLeague','registrantDocRef','scheduleDocRef','encodeTeamCode','decodeTeamCode',
     // caixa de entrada (ver test-notificacoes.js)
     'renderNotificationsScreen','ctaDaNotificacao','abrirNotificacao','notificationIcon',
     'entrarNoModoSelecao','sairDoModoSelecao','alternarSelecaoNotificacao','marcarTodasNotificacoes','pedirApagarSelecionadas','cancelarApagarSelecionadas','confirmarApagarSelecionadas','renderDeleteNotificationsBulkModal','notificationPendingReward',

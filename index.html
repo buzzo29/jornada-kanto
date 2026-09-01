@@ -3553,7 +3553,8 @@ function freshGameDefaults(){
     specialRevealIndex:0,
     specialRevealPhase:'loading',
     specialResultMsg:'',
-    avisoLiga:null         // {hora} da Liga Clássica com inscrição aberta -- ver atualizarAvisoDaLiga
+    avisoLiga:null,        // {hora} da Liga Clássica com inscrição aberta -- ver atualizarAvisoDaLiga
+    ultimaChecagemDaLiga:0 // folga de 5min da checagem acima
   };
 }
 let game = freshGameDefaults();
@@ -4810,10 +4811,16 @@ async function loadLeagueLeaderboard(typeId){
    A entrada em EVOLUTIONS continua existindo pro destino de Kanto: é o que `finalEvolutionOf`
    usa pra montar time de NPC (rival, Torre), onde não há ninguém pra escolher. O jogador nunca
    passa por ela -- o tryEvolve intercepta antes. */
+/* Linhas que se DIVIDEM: quem escolhe é o jogador, na tela evoChoice. No original quem decide é a
+   pedra (Gloom), o item de troca (Poliwhirl, Slowpoke) ou os atributos do bichinho (Tyrogue) --
+   aqui não há nada disso, então decide quem está jogando.
+   O Tyrogue é o único com TRÊS destinos; a tela monta um botão por destino, então três funciona
+   sem tratamento especial. */
 const EVOLUTION_CHOICES = {
   gloom:     ['vileplume','bellossom'],
   poliwhirl: ['poliwrath','politoed'],
-  slowpoke:  ['slowbro','slowking']
+  slowpoke:  ['slowbro','slowking'],
+  tyrogue:   ['hitmonlee','hitmonchan','hitmontop']
 };
 function tryEvolve(p){
   const events = [];
@@ -5641,7 +5648,7 @@ function renderEvoChoice(){
   <div class="eyebrow">✨ EVOLUÇÃO</div>
   <div class="box cursor">
     <h2>${spriteHtml(p.pendingEvoChoice,'sprite-sm',p.shiny)} Seu ${escapeHtmlSafe(de.name)} está evoluindo!</h2>
-    <p>Essa linha evolutiva se divide em <strong>duas</strong>. A escolha é definitiva.</p>
+    <p>Essa linha evolutiva se divide em <strong>${EVOLUTION_CHOICES[p.pendingEvoChoice].length === 3 ? 'três' : 'duas'}</strong>. A escolha é definitiva.</p>
     ${restantes ? `<p class="hint-text">Mais ${restantes} pokémon ${restantes===1?'espera':'esperam'} escolha depois deste.</p>` : ''}
   </div>
   <div class="box">
@@ -8096,6 +8103,11 @@ async function registerForLeague(typeId, slot, useMewtwo){
       } catch(e){ console.error('Erro ao marcar o Mewtwo como usado:', e); }
     }
     game.accountLeagueSlots = { ...(game.accountLeagueSlots||{}), [typeId]: slot };
+    /* O aviso "inscrições abertas" vive numa cópia em memória com folga de 5 minutos (ver
+       atualizarAvisoDaLiga). Sem apagar aqui, quem acabou de se inscrever continuava vendo o
+       convite nas batalhas seguintes -- foi exatamente o que aconteceu. */
+    if(typeId === CLASSIC_LEAGUE_TYPE){ game.avisoLiga = null; }
+    game.ultimaChecagemDaLiga = 0;   // a próxima checagem relê de verdade, sem esperar a folga
     game.leagueSubmitting = false;
     game.screen = 'league';
     render();
@@ -8163,6 +8175,7 @@ async function cancelLeagueRegistration(typeId){
     if(cycleEntry){ await registrantDocRef(typeId, cycleEntry.id, game.authUser.uid).delete(); }
     game.accountLeagueSlots = { ...(game.accountLeagueSlots||{}), [typeId]: null };
     game.registeredTeam = null;   // senão a lista do time que acabou de sair continua na tela
+    game.ultimaChecagemDaLiga = 0;     // saiu da liga: o aviso pode voltar a valer, então relê na próxima
     game.leagueSubmitting = false;
     render();
     if(game.screen==='league'){ refreshLeagueView(typeId, false); }
@@ -9667,9 +9680,20 @@ function renderLeagueTeamPicker(){
     const team = s.team||[];
     const displayName = s.customName || `Time ${slot+1}`;
     const mewtwoReady = s.mewtwoReward && s.mewtwoReward.earned && !s.mewtwoReward.used;
-    return `<div class="save-slot-card">
-      <div class="save-slot-top"><span class="save-slot-name">🏆 ${escapeHtmlSafe(displayName)}</span></div>
-      <div class="save-slot-team-row">
+    // a MESMA estrela da home (e da tela do Boss): a média do time no meio dela. O jogador
+    // reconhece o time por ela, então repetir aqui é o que evita reaprender a mesma informação
+    const media = team.length ? Math.round(team.reduce((a,p)=>a+(p.level||0),0)/team.length) : 0;
+    /* O CARD INTEIRO é o botão -- não havia motivo pra um botão vermelho separado embaixo de um
+       card que já era a coisa clicável em todo o resto do jogo. O botão do Mewtwo fica FORA dele:
+       <button> dentro de <button> é HTML inválido e o clique de dentro se perde (mesma lição do
+       card do encontro selvagem). */
+    return `<button class="save-slot-card ${team.length?'has-avg-star':''} clickable" ${game.leagueSubmitting?'disabled':''}
+        onclick="registerForLeague(game.currentLeagueTypeId, ${slot})">
+      <div class="save-slot-top">
+        <span class="team-avg-star" title="Média de nível do time">${STAR_SVG}<span class="team-avg-star-num">${media}</span></span>
+        <span class="save-slot-name"><span class="team-avg-star-name">${escapeHtmlSafe(displayName)}</span></span>
+      </div>
+      <div class="save-slot-team-row spread">
         ${team.map(p=>{
           const sp = SPECIES[p.speciesId];
           return `<div class="save-slot-mon">
@@ -9678,9 +9702,8 @@ function renderLeagueTeamPicker(){
           </div>`;
         }).join('')}
       </div>
-      <button class="btn danger" ${game.leagueSubmitting?'disabled':''} onclick="registerForLeague(game.currentLeagueTypeId, ${slot})">${game.leagueSubmitting?'Inscrevendo...':'Inscrever esse time ⚔️'}</button>
-      ${mewtwoReady ? `<button class="btn secondary" ${game.leagueSubmitting?'disabled':''} onclick="registerForLeagueWithMewtwo(game.currentLeagueTypeId, ${slot})">🔮 Inscrever COM o Mewtwo Lv.${MEWTWO_LOAN_LEVEL} (só 1x)</button>` : ''}
-    </div>`;
+    </button>
+    ${mewtwoReady ? `<button class="btn secondary" ${game.leagueSubmitting?'disabled':''} onclick="registerForLeagueWithMewtwo(game.currentLeagueTypeId, ${slot})">🔮 Inscrever ${escapeHtmlSafe(displayName)} COM o Mewtwo Lv.${MEWTWO_LOAN_LEVEL} (só 1x)</button>` : ''}`;
   }).join('')}
   <button class="btn secondary" onclick="game.screen='league';render();">⬅ Voltar</button>`;
 }
@@ -15525,17 +15548,20 @@ function avisoLigaHtml(){
    NÃO chama render() de propósito: isso roda em segundo plano e as telas de batalha estão no meio
    de animações -- um render ali mata a transição da barra de vida (ver CLAUDE.md). O aviso entra no
    próximo desenho natural da tela. */
-let ultimaChecagemDaLiga = 0;
 async function atualizarAvisoDaLiga(){
   if(!game.authUser) return;
-  if(Date.now() - ultimaChecagemDaLiga < 5*60*1000) return;
-  ultimaChecagemDaLiga = Date.now();
+  // a folga mora no game (e nao numa variavel solta) pra reiniciar junto com o save e ser testavel
+  if(Date.now() - (game.ultimaChecagemDaLiga||0) < 5*60*1000) return;
+  game.ultimaChecagemDaLiga = Date.now();
   try{
     const snap = await scheduleDocRef(CLASSIC_LEAGUE_TYPE).get();
     const ciclo = snap.exists ? (snap.data().cycles||[]).find(c=>c.status==='registering') : null;
     if(!ciclo){ game.avisoLiga = null; return; }
-    const reg = await registrantDocRef(CLASSIC_LEAGUE_TYPE, ciclo.id, game.authUser.uid).get();
-    game.avisoLiga = reg.exists ? null : { hora: ciclo.scheduledTime };
+    /* "Já está dentro" é mais do que estar inscrito NESTE ciclo: quem está disputando um ciclo já
+       sorteado não consegue se inscrever no próximo (a própria tela da Liga bloqueia), e avisar
+       seria convidar pra uma porta fechada. O isAccountActiveInLeague cobre os dois casos. */
+    const jaEstaNaLiga = await isAccountActiveInLeague(CLASSIC_LEAGUE_TYPE, game.authUser.uid);
+    game.avisoLiga = jaEstaNaLiga ? null : { hora: ciclo.scheduledTime };
   } catch(e){ /* é um aviso: falhar aqui não pode atrapalhar a jornada */ }
 }
 function agendarBuscaGlobal(){

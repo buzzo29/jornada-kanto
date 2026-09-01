@@ -393,8 +393,13 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
   fechar a aba ali perdia a vitória.
 - **Três evoluções agora perguntam pro jogador** (`EVOLUTION_CHOICES`, tela `evoChoice`): Gloom vira
   Vileplume **ou** Bellossom, Poliwhirl vira Poliwrath **ou** Politoed, Slowpoke vira Slowbro **ou**
-  Slowking. No original quem decide é a pedra ou o item de troca; aqui não há itens, então decide o
-  jogador, como já era com o Eevee.
+  Slowking, e o **Tyrogue vira Hitmonlee, Hitmonchan OU Hitmontop** -- o único com TRÊS destinos.
+  A tela já montava um botão por destino, então três funcionou sem tratamento especial (só o texto
+  passou a contar quantos são). No original quem decide é a pedra, o item de troca ou os atributos
+  do bichinho; aqui não há nada disso, então decide o jogador, como já era com o Eevee.
+  Efeito colateral conhecido do Tyrogue: `raizDaLinha` passa a tratar Hitmonlee, Hitmonchan e
+  Hitmontop como a MESMA linha, então o encontro selvagem não oferece dois deles pro mesmo time --
+  a mesma regra que já vale pra Slowbro e Slowking.
   O `tryEvolve` PARA no ponto de bifurcação e marca `pendingEvoChoice` — por isso um Oddish que
   chega ao nível 41 vira Gloom sozinho e só então pergunta. A entrada no `EVOLUTIONS` continua
   apontando pro destino de Kanto: é dela que `finalEvolutionOf` monta time de NPC (rival, Torre),

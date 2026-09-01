@@ -274,14 +274,25 @@ ok('a tela mostra a opcao do turno certo',
      const h=S.renderEeveeChoice();
      return h.includes("chooseEeveeEvolution('umbreon')") && !h.includes("chooseEeveeEvolution('espeon')"); }));
 
-console.log('\nEVOLUCAO COM ESCOLHA (as tres linhas que a Gen 2 dividiu)');
+console.log('\nEVOLUCAO COM ESCOLHA (as linhas que se dividem)');
 const CH = S.EVOLUTION_CHOICES;
-ok('as tres bifurcacoes existem', Object.keys(CH).length === 3, Object.keys(CH).join(','));
+/* Gloom, Poliwhirl e Slowpoke se dividem em duas; o Tyrogue em TRES (Hitmonlee, Hitmonchan e
+   Hitmontop). No original quem decide e a pedra, o item de troca ou os atributos -- aqui, o jogador. */
+ok('as quatro bifurcacoes existem', Object.keys(CH).length === 4, Object.keys(CH).join(','));
+ok('o Tyrogue se divide em tres', (CH.tyrogue||[]).length === 3, (CH.tyrogue||[]).join(','));
 const destinos = Object.values(CH).flat();
 ok('todo destino existe no SPECIES', destinos.every(id=>S.SPECIES[id]),
    destinos.filter(id=>!S.SPECIES[id]).join(','));
-ok('cada bifurcacao tem 2 destinos distintos',
-   Object.values(CH).every(v=>v.length===2 && v[0]!==v[1]));
+ok('nenhuma bifurcacao repete destino',
+   Object.values(CH).every(v=>v.length >= 2 && new Set(v).size === v.length));
+/* A tela monta um botao por destino e o texto conta quantos sao -- com tres, precisa dizer tres. */
+const gTy = S.freshGameDefaults();
+gTy.team = [{ speciesId:'tyrogue', id:'t1', name:'Tyrogue', types:['Fighting'], level:20, pendingEvoChoice:'tyrogue' }];
+S.__setGame(gTy);
+const telaTy = S.renderEvoChoice();
+ok('a tela do Tyrogue oferece os tres',
+   ['hitmonlee','hitmonchan','hitmontop'].every(id=>telaTy.includes("escolherEvolucao('t1','"+id+"')")));
+ok('e diz que a linha se divide em tres', telaTy.includes('<strong>três</strong>'));
 ok('a origem de cada bifurcacao evolui por nivel (o gatilho)',
    Object.keys(CH).every(id=>S.EVOLUTIONS[id]),
    Object.keys(CH).filter(id=>!S.EVOLUTIONS[id]).join(','));

@@ -100,6 +100,61 @@ relidas = [];
 await S.useRareCandyOn(0, 'a1');
 ok('nenhuma leitura extra quando a Liga nem foi aberta', relidas.length === 0, JSON.stringify(relidas));
 
+
+console.log('\nA ESCOLHA DE TIME PRA LIGA');
+estadoBase();
+g.currentLeagueTypeConfig = null;
+g.saveSlots = [
+  { badgeCount:8, customName:'Os Clássicos', team:[{speciesId:'venusaur',level:70},{speciesId:'charizard',level:72}],
+    mewtwoReward:{ earned:true, used:false } },
+  { badgeCount:8, customName:'Time 2', team:[{speciesId:'blastoise',level:60}] },
+  { badgeCount:3, customName:'Inacabado', team:[{speciesId:'pidgey',level:20}] }
+];
+S.__setGame(g);
+const picker = S.renderLeagueTeamPicker();
+/* O card inteiro é o botão -- não havia motivo pra um botão vermelho separado embaixo de um card
+   que já é a coisa clicável em todo o resto do jogo. */
+ok('o card e o proprio botao',
+   /<button class="save-slot-card[^"]*"[^>]*onclick="registerForLeague/.test(picker));
+ok('sumiu o botao vermelho de inscrever', !picker.includes('Inscrever esse time'));
+ok('so os times com 8 insignias aparecem',
+   picker.includes('Os Clássicos') && picker.includes('Time 2') && !picker.includes('Inacabado'));
+/* A MESMA estrela da home: o jogador reconhece o time por ela. */
+ok('cada card traz a estrela com a media do time',
+   (picker.match(/team-avg-star-num/g)||[]).length === 2 && picker.includes('>71<'),
+   'medias esperadas: 71 e 60');
+ok('e o trofeu saiu de perto do nome', !picker.includes('🏆'));
+/* O botão do Mewtwo fica FORA do card: <button> dentro de <button> é HTML inválido e o clique de
+   dentro se perde (a mesma lição do card do encontro selvagem). */
+ok('o botao do Mewtwo nao fica dentro do card',
+   !/<button class="save-slot-card(?:(?!<\/button>)[\s\S])*<button/.test(picker));
+ok('e ele diz de que time e', picker.includes('Inscrever Os Clássicos COM o Mewtwo'));
+
+console.log('\nO AVISO DA LIGA SOME PRA QUEM JA ESTA DENTRO');
+/* Reportado: inscrito na liga e o aviso "inscrições abertas" continuava aparecendo nas batalhas.
+   O aviso vive numa cópia em memória com folga de 5 minutos -- quem acabou de se inscrever
+   continuava vendo o convite até a folga passar. */
+estadoBase();
+g.avisoLiga = { hora: Date.now() + 600000 };
+S.__setGame(g);
+await S.registerForLeague(TIPO, 1, false);
+ok('inscrever apaga o aviso na hora', S.__getGame().avisoLiga === null,
+   JSON.stringify(S.__getGame().avisoLiga));
+/* E quem está DISPUTANDO um ciclo já sorteado também não pode ver o convite: a tela da Liga não
+   deixa se inscrever no próximo enquanto o atual não acabar. */
+estadoBase();
+g.avisoLiga = null; S.__setGame(g);
+S.isAccountActiveInLeague = () => Promise.resolve(true);
+S.scheduleDocRef = () => ({ get: () => Promise.resolve({ exists:true,
+  data: () => ({ cycles:[{ id:'c9', status:'registering', scheduledTime: Date.now()+600000 }] }) }) });
+await S.atualizarAvisoDaLiga();
+ok('quem ja esta na liga nao ve o convite', S.__getGame().avisoLiga === null);
+S.isAccountActiveInLeague = () => Promise.resolve(false);
+g.ultimaChecagemDaLiga = 0;   // a folga de 5min ja tinha sido gasta pela checagem acima
+S.__setGame(g);
+await S.atualizarAvisoDaLiga();
+ok('e quem esta de fora ve', !!S.__getGame().avisoLiga, JSON.stringify(S.__getGame().avisoLiga));
+
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
 process.exit(falhas ? 1 : 0);
 
