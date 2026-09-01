@@ -3366,6 +3366,8 @@ function freshGameDefaults(){
     wildSelected:[],
     team:[],
     releaseSelected:[],
+    releaseDepois:null,    // pra onde ir depois do Prof. Carvalho ('gymApproach' no resgate da Rocket)
+    resgatadoSemVaga:null, // resgatado da Rocket esperando a tela do Prof. Carvalho (time já com 6)
     pool:20,
     poolTotal:20,
     alloc:{},
@@ -5598,6 +5600,12 @@ function confirmRelease(){
   if(game.releaseSelected.length!==excess) return;
   game.team = game.team.filter(p=>!game.releaseSelected.includes(p.id));
   game.releaseSelected = [];
+  /* De onde se veio decide pra onde se vai: o encontro selvagem segue pro Eevee/distribuição, o
+     resgate da Rocket segue pra chegada no ginásio. O marcador é gravado no save porque 'release'
+     é ponto seguro de gravação -- fechar a aba ali e voltar não pode perder o caminho de volta. */
+  const depois = game.releaseDepois;
+  game.releaseDepois = null;
+  if(depois === 'gymApproach'){ proceedToGymApproach(); return; }
   proceedAfterTeamLocked();
 }
 function hasUnresolvedEevee(){
@@ -6380,8 +6388,23 @@ function finishSpecialBattle(){
     if(win){
       const mon = game.stolenMon;
       game.stolenMon = null; game.hideoutStage = 0; game.hideoutFoeLevel = null;
-      if(mon && game.team.length < 6){ game.team.push(mon); msg = `Resgate concluído! <strong>${mon.name}</strong> voltou pro time.`; }
-      else if(mon){ game.stolenMon = mon; msg = `${mon.name} foi resgatado, mas seu time está cheio — ele espera na próxima vaga.`; }
+      /* O resgatado ENTRA no time mesmo que ele já tenha 6 -- fica com 7 e a tela do Prof.
+         Carvalho resolve, igual a um encontro selvagem com o time cheio.
+         Antes, com o time cheio, ele voltava pro stolenMon "esperando uma vaga" -- e stolenMon
+         pendente é o que reabre o esconderijo (ver proceedToGymApproach). O jogador entrava num
+         laço sem fim: vencia a Rocket, não recebia o pokémon de volta, e podia desafiar de novo,
+         pra sempre. Reportado em 01/09/2026. */
+      if(mon && game.team.length < 6){
+        game.team.push(mon);
+        msg = `Resgate concluído! <strong>${mon.name}</strong> voltou pro time.`;
+      } else if(mon){
+        /* Time cheio: o resgatado espera AQUI, num campo próprio, e entra na hora de abrir a tela
+           do Prof. Carvalho (ver continueAfterSpecial). Não pode voltar pro stolenMon -- é ele que
+           reabre o esconderijo -- nem entrar no time agora, porque 'specialResult' é ponto seguro
+           de gravação e um time de 7 seria GRAVADO assim. */
+        game.resgatadoSemVaga = mon;
+        msg = `Resgate concluído! <strong>${mon.name}</strong> voltou, mas seu time já tem 6 — escolha quem vai pro Prof. Carvalho.`;
+      }
       else { msg = 'Resgate concluído!'; }
     } else {
       game.hideoutAttemptsLeft = Math.max(0, (game.hideoutAttemptsLeft||1) - 1);
@@ -6493,6 +6516,18 @@ function continueAfterSpecial(){
   }
   if((context==='rocket' || context==='hideout1' || context==='hideout2') && game.stolenMon){
     game.screen = 'rocketHideout';
+    render();
+    return;
+  }
+  /* Resgate com o time cheio: o pokémon entra AGORA (o time fica com 7) e a MESMA tela do encontro
+     selvagem decide quem vai pro Prof. Carvalho. O marcador diz pra onde voltar depois -- daqui a
+     continuação é a chegada no ginásio, e não o fluxo do encontro. */
+  if(game.resgatadoSemVaga){
+    game.team.push(game.resgatadoSemVaga);
+    game.resgatadoSemVaga = null;
+    game.releaseSelected = [];
+    game.releaseDepois = 'gymApproach';
+    game.screen = 'release';
     render();
     return;
   }
@@ -6815,19 +6850,14 @@ function encodeTeamCode(team){
   catch(e){ return ''; }
 }
 // monta o código de time especial com o Mewtwo emprestado do prêmio -- substitui o pokémon que foi banido
-// pro Prof. Carvalho no momento da vitória (ou só adiciona, se o time tinha menos de 6 quando venceu).
-// NUNCA mexe no save de verdade -- o time salvo continua intacto, só esse código derivado muda
-function buildMewtwoTeamCode(saveData){
-  const team = (saveData.team || []).slice();
-  const reward = saveData.mewtwoReward;
-  const mewtwoEntry = { speciesId:'mewtwo', level:MEWTWO_LOAN_LEVEL, shiny:false };
-  if(reward && typeof reward.benchIndex === 'number' && reward.benchIndex >= 0 && reward.benchIndex < team.length){
-    team[reward.benchIndex] = mewtwoEntry;
-  } else {
-    team.push(mewtwoEntry);
-  }
-  return encodeTeamCode(team);
-}
+/* O PRÊMIO DE "1 USO" NA LIGA NÃO EXISTE MAIS (31/08/2026 -> 01/09/2026).
+   Ele era anterior ao empréstimo do Mewtwo e vinha da ideia oposta: um código de time DERIVADO,
+   com o Mewtwo substituindo quem tinha ido pro Prof. Carvalho, gasto numa inscrição só.
+   O empréstimo cobre isso e não restringe nada -- o Mewtwo entra DE VERDADE no time salvo por 24h,
+   então qualquer código montado a partir do save (Liga, Trainers League, Torre, ginásio da cidade)
+   já sai com ele dentro, quantas vezes o jogador quiser, sem botão especial em lugar nenhum.
+   O campo mewtwoReward CONTINUA -- é o que marca "venceu o Mewtwo" e é o que libera o empréstimo
+   (ver checkMewtwoLoanUnlock no servidor). O que saiu foi o consumo dele. */
 function decodeTeamCode(code){
   if(!code) return null;
   let padded = code.trim();
@@ -8057,7 +8087,7 @@ async function countRegistrants(typeId, cycleId){
     return snap.size;
   } catch(e){ console.error('Erro ao contar inscritos:', e); return 0; }
 }
-async function registerForLeague(typeId, slot, useMewtwo){
+async function registerForLeague(typeId, slot){
   if(!game.authUser){ game.leagueError = 'Você precisa estar logado.'; render(); return; }
   const name = (game.trainerName || '').trim();
   if(!name){ game.leagueError = 'Sua conta não tem um nome de treinador definido.'; render(); return; }
@@ -8067,17 +8097,12 @@ async function registerForLeague(typeId, slot, useMewtwo){
     render();
     return;
   }
-  const mewtwoReady = saveData.mewtwoReward && saveData.mewtwoReward.earned && !saveData.mewtwoReward.used;
-  if(useMewtwo && !mewtwoReady){
-    game.leagueError = 'Esse time não tem um Mewtwo disponível pra usar.';
-    render();
-    return;
-  }
   game.leagueSubmitting = true;
   game.leagueError = null;
   render();
   const uid = game.authUser.uid;
-  const code = useMewtwo ? buildMewtwoTeamCode(saveData) : encodeTeamCode(saveData.team);
+  // o time do save, e ponto: se o Mewtwo emprestado estiver nele, ele vai junto como qualquer outro
+  const code = encodeTeamCode(saveData.team);
   try{
     const cycleEntry = await ensureRegisteringCycle(typeId);
     const activeElsewhere = await isAccountActiveInLeague(typeId, uid);
@@ -8088,20 +8113,6 @@ async function registerForLeague(typeId, slot, useMewtwo){
       if(snap.exists){ throw new Error('DUPLICATE'); }
       tx.set(regRef, { name, code, uid, slot, specialties: game.specialties||[], elite: !!game.accountEliteChampion, registeredAt: Date.now() });
     });
-    if(useMewtwo){
-      // gasta o prêmio AGORA -- "1 uso" é por chaveamento/dia inteiro, então vale a partir da
-      // inscrição, mesmo que a Liga ainda tenha várias rodadas pela frente
-      try{
-        const saveRef = saveDocRef(uid, slot);
-        const freshSnap = await saveRef.get();
-        if(freshSnap.exists){
-          const freshSave = freshSnap.data();
-          const spentReward = { ...(freshSave.mewtwoReward||{}), used:true };
-          await saveRef.set({ ...freshSave, mewtwoReward: spentReward }, { merge:true });
-          game.saveSlots[slot] = { ...freshSave, mewtwoReward: spentReward };
-        }
-      } catch(e){ console.error('Erro ao marcar o Mewtwo como usado:', e); }
-    }
     game.accountLeagueSlots = { ...(game.accountLeagueSlots||{}), [typeId]: slot };
     /* O aviso "inscrições abertas" vive numa cópia em memória com folga de 5 minutos (ver
        atualizarAvisoDaLiga). Sem apagar aqui, quem acabou de se inscrever continuava vendo o
@@ -8121,46 +8132,6 @@ async function registerForLeague(typeId, slot, useMewtwo){
     game.leagueSubmitting = false;
     if(e.message==='DUPLICATE' || e.message==='ACTIVE_ELSEWHERE') game.leagueError = 'Sua conta já está inscrita nessa Liga em outra rodada.';
     else { console.error(e); game.leagueError = 'Erro ao se inscrever. Confira sua conexão e tente de novo.'; }
-    render();
-  }
-}
-function registerForLeagueWithMewtwo(typeId, slot){
-  registerForLeague(typeId, slot, true);
-}
-async function includeMewtwoInTrainersLeague(slot){
-  if(!game.authUser) return;
-  const saveData = game.saveSlots[slot];
-  if(!saveData || !saveData.mewtwoReward || !saveData.mewtwoReward.earned || saveData.mewtwoReward.used){
-    game.trainersLeagueError = 'Esse Mewtwo não está mais disponível.';
-    render();
-    return;
-  }
-  // usa o ciclo JÁ RESOLVIDO (pode ser uma liga-irmã, se foi pra lá que essa conta caiu na hora da
-  // trava) -- escrever no ciclo principal por engano faria essa ativação não valer pra rodada nenhuma
-  // de verdade, já que a resolução de rodada lê a elegibilidade do registrante do ciclo CERTO
-  const dateId = game.trainersLeagueActiveCycleId || trainersLeagueDisplayDateId();
-  game.trainersLeagueSubmitting = true;
-  render();
-  const uid = game.authUser.uid;
-  const mewtwoCode = buildMewtwoTeamCode(saveData);
-  try{
-    // ativa o Mewtwo pro DIA inteiro -- a partir de agora ele entra no sorteio automático de qualquer
-    // rodada, e também aparece como opção manual na troca de time de cada rodada
-    await trainersLeagueRegistrantRef(dateId, uid).set({ mewtwoTeamCode: mewtwoCode }, { merge:true });
-    const saveRef = saveDocRef(uid, slot);
-    const freshSnap = await saveRef.get();
-    if(freshSnap.exists){
-      const freshSave = freshSnap.data();
-      const spentReward = { ...(freshSave.mewtwoReward||{}), used:true };
-      await saveRef.set({ ...freshSave, mewtwoReward: spentReward }, { merge:true });
-      game.saveSlots[slot] = { ...freshSave, mewtwoReward: spentReward };
-    }
-    game.trainersLeagueSubmitting = false;
-    await refreshTrainersLeagueView();
-  } catch(e){
-    console.error('Erro ao ativar o Mewtwo:', e);
-    game.trainersLeagueSubmitting = false;
-    game.trainersLeagueError = 'Erro ao ativar o Mewtwo. Confira sua conexão e tente de novo.';
     render();
   }
 }
@@ -9238,12 +9209,7 @@ function renderTrainersLeagueScreen(){
       ${myReg ? `
         <p>Você está inscrito como <strong>${escapeHtmlSafe(myReg.name)}</strong>.</p>
         <p class="hint-text">Selecione um time até 5 minutos antes de cada partida. Caso não selecione, um time seu será sorteado automaticamente -- seus times elegíveis são atualizados sozinhos antes de cada rodada.</p>
-        ${myReg.mewtwoTeamCode ? `<p class="hint-text">🔮 Mewtwo Lv.${MEWTWO_LOAN_LEVEL} ativado pra hoje -- pode entrar em qualquer rodada (por sorteio ou escolha manual).</p>` : (
-          Array.from({length:MAX_SAVE_SLOTS}, (_,i)=>i).filter(i=>{
-            const s = game.saveSlots[i];
-            return s && s.mewtwoReward && s.mewtwoReward.earned && !s.mewtwoReward.used;
-          }).map(i=>`<button class="btn secondary" ${game.trainersLeagueSubmitting?'disabled':''} onclick="includeMewtwoInTrainersLeague(${i})">🔮 Ativar Mewtwo Lv.${MEWTWO_LOAN_LEVEL} de ${escapeHtmlSafe(game.saveSlots[i].customName||('Time '+(i+1)))} pra hoje (só 1x)</button>`).join('')
-        )}
+        ${myReg.mewtwoTeamCode ? `<p class="hint-text">🔮 Mewtwo Lv.${MEWTWO_LOAN_LEVEL} ativado pra hoje -- pode entrar em qualquer rodada (por sorteio ou escolha manual).</p>` : ''}
       ` : `
         <p class="hint-text">Não precisa escolher um time agora. Antes de cada partida (até 5min antes) você pode escolher qual time usar; sem escolha, sorteamos um dos seus times prontos automaticamente.</p>
         <button class="btn danger" ${game.trainersLeagueSubmitting?'disabled':''} onclick="registerForTrainersLeague()">${game.trainersLeagueSubmitting?'Inscrevendo...':'Inscrever-se ⚔️'}</button>
@@ -9679,7 +9645,6 @@ function renderLeagueTeamPicker(){
     const s = game.saveSlots[slot];
     const team = s.team||[];
     const displayName = s.customName || `Time ${slot+1}`;
-    const mewtwoReady = s.mewtwoReward && s.mewtwoReward.earned && !s.mewtwoReward.used;
     // a MESMA estrela da home (e da tela do Boss): a média do time no meio dela. O jogador
     // reconhece o time por ela, então repetir aqui é o que evita reaprender a mesma informação
     const media = team.length ? Math.round(team.reduce((a,p)=>a+(p.level||0),0)/team.length) : 0;
@@ -9703,7 +9668,7 @@ function renderLeagueTeamPicker(){
         }).join('')}
       </div>
     </button>
-    ${mewtwoReady ? `<button class="btn secondary" ${game.leagueSubmitting?'disabled':''} onclick="registerForLeagueWithMewtwo(game.currentLeagueTypeId, ${slot})">🔮 Inscrever ${escapeHtmlSafe(displayName)} COM o Mewtwo Lv.${MEWTWO_LOAN_LEVEL} (só 1x)</button>` : ''}`;
+`;
   }).join('')}
   <button class="btn secondary" onclick="game.screen='league';render();">⬅ Voltar</button>`;
 }
@@ -10419,6 +10384,8 @@ function serializeGame(){
     wildSelected: game.wildSelected,
     team: game.team,
     releaseSelected: game.releaseSelected,
+    releaseDepois: game.releaseDepois || null,
+    resgatadoSemVaga: game.resgatadoSemVaga || null,
     pool: game.pool,
     poolTotal: game.poolTotal,
     alloc: game.alloc,
@@ -10603,6 +10570,8 @@ function applySavedState(data){
   game.wildSelected = data.wildSelected || [];
   game.team = hydrateTeam(data.team);
   game.releaseSelected = data.releaseSelected || [];
+  game.releaseDepois = data.releaseDepois || null;
+  game.resgatadoSemVaga = data.resgatadoSemVaga || null;
   game.pool = data.pool || 0;
   game.poolTotal = data.poolTotal || 0;
   game.alloc = data.alloc || {};
@@ -11064,7 +11033,11 @@ function getAchievementAggregate(){
     totalBadges: slots.reduce((sum,s)=> sum + (s.badgeCount||0), 0),
     maxCaughtOneSave: slots.reduce((max,s)=> Math.max(max, (s.caughtSpecies||[]).length), 0),
     anyMewtwoReward: slots.some(s=> s.mewtwoReward && s.mewtwoReward.earned),
-    anyMewtwoUsed: slots.some(s=> s.mewtwoReward && s.mewtwoReward.used),
+    /* Era "gastou o prêmio de 1 uso numa liga" -- esse prêmio não existe mais. Vale o EMPRÉSTIMO:
+       ter chamado o Mewtwo pro time alguma vez (ativo agora, ou o cooldown que ele deixou). Quem
+       já tinha a conquista pelo caminho antigo continua com ela. */
+    anyMewtwoUsed: slots.some(s=> s.mewtwoReward && s.mewtwoReward.used)
+      || !!game.mewtwoLoanActive || (game.mewtwoLoanCooldownUntil||0) > 0,
     bestStreak: game.trainerBestStreak || 0,
     leagueWinsTotal: game.leagueWinsTotal || 0,
     // --- sinais das conquistas novas ---
@@ -11210,7 +11183,7 @@ const ACHIEVEMENTS = [
      250, e "149" deixou de significar coisa alguma. Virou o marco de fechar KANTO. */
   { id:'catch_149', icon:'📖', name:'Pokédex de Kanto', desc:'Capture todas as espécies de Kanto (#001 a #150).', check:a=>a.kantoCaught>=a.kantoTotal },
   { id:'mewtwo_caught', icon:'🧬', name:'O Desafio Final', desc:'Capture o Mewtwo.', check:a=>a.hasMewtwo },
-  { id:'mewtwo_reward', icon:'🔮', name:'Arma Secreta', desc:'Utilize o Mewtwo em uma liga.', check:a=>a.anyMewtwoUsed },
+  { id:'mewtwo_reward', icon:'🔮', name:'Arma Secreta', desc:'Chame o Mewtwo emprestado pro seu time.', check:a=>a.anyMewtwoUsed },
   { id:'all_birds', icon:'🌪️', name:'Trindade Alada', desc:'Capture as 3 aves lendárias: Moltres, Zapdos e Articuno.', check:a=>a.allBirds },
   { id:'shiny_team', icon:'💫', name:'Brilho Raro', desc:'Tenha um Pokémon shiny no seu time.', check:a=>a.anyShinyTeam },
   { id:'ditto_caught', icon:'🎭', name:'Era um Ditto!', desc:'Capture um Ditto. Talvez ele não fosse o que parecia ser...', check:a=>a.hasDitto },

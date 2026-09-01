@@ -128,7 +128,9 @@ ok('e o trofeu saiu de perto do nome', !picker.includes('🏆'));
    dentro se perde (a mesma lição do card do encontro selvagem). */
 ok('o botao do Mewtwo nao fica dentro do card',
    !/<button class="save-slot-card(?:(?!<\/button>)[\s\S])*<button/.test(picker));
-ok('e ele diz de que time e', picker.includes('Inscrever Os Clássicos COM o Mewtwo'));
+/* O premio de '1 uso' do Mewtwo saiu (01/09/2026): o emprestimo poe o Mewtwo NO time salvo por
+   24h, entao qualquer codigo montado a partir do save ja sai com ele -- sem botao especial. */
+ok('nao existe mais botao de inscrever COM o Mewtwo', !picker.includes('COM o Mewtwo'));
 
 console.log('\nO AVISO DA LIGA SOME PRA QUEM JA ESTA DENTRO');
 /* Reportado: inscrito na liga e o aviso "inscrições abertas" continuava aparecendo nas batalhas.

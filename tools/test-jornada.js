@@ -625,5 +625,57 @@ ok('faltando uma de Kanto, nao abre', !S.renderPokedex().includes('openMewtwoCha
 gB.permanentPokedex = kanto149; S.__setGame(gB);
 ok('e Johto nao faz falta nenhuma', S.renderPokedex().includes('openMewtwoChallenge()'));
 
+
+console.log('\nO RESGATE DA ROCKET COM O TIME CHEIO');
+/* Reportado: se a Rocket rouba um pokemon, o treinador enche o time com 6 e SO DEPOIS resgata, o
+   resgatado nao cabia -- e voltava pro stolenMon "esperando uma vaga". Como stolenMon pendente e o
+   que reabre o esconderijo, dava um laco sem fim: vencia a Rocket, nao recebia o pokemon, e podia
+   desafiar de novo, pra sempre. */
+function estadoResgate(tamanhoDoTime){
+  const g = S.freshGameDefaults();
+  g.gymIndex = 2; g.gymPath = []; g.starterId = 'charmander';
+  g.team = Array.from({length: tamanhoDoTime}, (_,i)=>{
+    const p = S.createInstance(['pidgey','ratata','oddish','zubat','geodude','machop'][i], 20+i);
+    p.id = 'p'+i; return p;
+  });
+  g.stolenMon = Object.assign(S.createInstance('gyarados', 30), { id:'roubado' });
+  g.hideoutStage = 1; g.hideoutAttemptsLeft = 3;
+  g.specialBattle = { context:'hideout2', meta:{ opponentName:'Chefe Rocket' } };
+  g.specialBattleResult = { win:true, matchups:[], playerStatus: g.team.map(()=>({})) };
+  g.gymApproachRocketChecked = true; g.gymApproachRivalChecked = true;
+  S.__setGame(g);
+  return g;
+}
+// time com 4: o resgatado volta direto, como sempre foi
+estadoResgate(4);
+S.finishSpecialBattle();
+let e = S.__getGame();
+ok('com vaga, o resgatado volta pro time', e.team.length === 5 && e.team.some(p=>p.id==='roubado'));
+ok('e o sequestro se encerra', e.stolenMon === null);
+
+// time com 6: o buraco do relato
+estadoResgate(6);
+S.finishSpecialBattle();
+e = S.__getGame();
+/* Nao entra no time AGORA: 'specialResult' e ponto seguro de gravacao, e um time de 7 seria
+   gravado assim. Ele espera num campo proprio ate a tela do Prof. Carvalho. */
+ok('com o time cheio, o resgatado espera a vez', e.team.length === 6 && e.resgatadoSemVaga && e.resgatadoSemVaga.id === 'roubado');
+ok('e o sequestro se encerra do mesmo jeito (fim do laco)', e.stolenMon === null,
+   'stolenMon: ' + JSON.stringify(e.stolenMon && e.stolenMon.name));
+S.continueAfterSpecial();
+e = S.__getGame();
+ok('a tela do Prof. Carvalho e quem resolve', e.screen === 'release', 'tela: ' + e.screen);
+ok('e ai sim o time fica com 7', e.team.length === 7 && !e.resgatadoSemVaga);
+ok('e ela sabe pra onde voltar depois', e.releaseDepois === 'gymApproach');
+/* Escolhido quem sai, a jornada segue pra chegada no ginasio -- e nao pro fluxo do encontro
+   selvagem, que e o outro caminho que usa essa mesma tela. */
+e.releaseSelected = ['p0']; S.__setGame(e);
+S.confirmRelease();
+e = S.__getGame();
+ok('sai um e o time volta a 6', e.team.length === 6 && !e.team.some(p=>p.id==='p0'));
+ok('e a jornada continua (nao volta pro esconderijo)', e.screen !== 'rocketHideout' && !e.stolenMon,
+   'tela: ' + e.screen);
+ok('o marcador foi consumido', !e.releaseDepois);
+
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
 process.exit(falhas ? 1 : 0);

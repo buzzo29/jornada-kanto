@@ -510,6 +510,22 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
   A ponte entre as duas — Rotas 26/27 e as Quedas Tohjo no original — fica sempre visível,
   pontilhada, pra explicar por que a jornada consegue pular de um continente pro outro.
 
+## Equipe Rocket
+
+- **O resgate com o time cheio virava um LAÇO SEM FIM.** Se a Rocket rouba um pokémon, o treinador
+  enche o time até 6 e só então vence o esconderijo, o resgatado não cabia — e voltava pro
+  `stolenMon` "esperando uma vaga". Só que `stolenMon` pendente é justamente o que reabre o
+  esconderijo (ver `proceedToGymApproach`): o jogador vencia a Rocket, não recebia o pokémon, e
+  podia desafiar de novo, pra sempre. Reportado em 01/09/2026.
+  Hoje ele espera num campo próprio (`resgatadoSemVaga`) e entra na hora de abrir a tela do **Prof.
+  Carvalho** — a MESMA do encontro selvagem com o time cheio.
+  **Por que um campo próprio e não empurrar direto pro time:** `specialResult` é ponto seguro de
+  gravação, então um time de 7 seria GRAVADO ali. O smoke pegou isso na hora — ele tranca "time > 6
+  fora da tela de release".
+  `game.releaseDepois` diz pra onde voltar depois do Prof. Carvalho: o encontro selvagem segue pro
+  Eevee/distribuição, o resgate segue pra chegada no ginásio. Ele é gravado no save porque
+  'release' também é ponto seguro — fechar a aba ali não pode perder o caminho de volta.
+
 ## Progressão da jornada
 
 - Distribuição de níveis trava em **55**; acima disso só desmaio, Bônus de Kanto e Doce Raro.
@@ -616,7 +632,12 @@ verdade, cai no game over, e o teste confere que a trava soltou dos dois lados.
   alguém esperando. Segurar até o fim da revelação (que dura mais que isso) faria a partida expirar
   pros dois.
 - **O aviso "inscrições abertas pra Liga Clássica das XXh"** aparece embaixo desse botão, e só pra
-  quem AINDA NÃO se inscreveu. Pisca no mesmo ritmo do Bônus Shiny da home (`shiny-bonus-pulse`):
+  quem AINDA NÃO ESTÁ NA LIGA — o que é mais que "não inscrito neste ciclo": quem está disputando um
+  ciclo já sorteado não consegue se inscrever no próximo (a própria tela bloqueia), e avisar seria
+  convidar pra uma porta fechada. Quem responde isso é o `isAccountActiveInLeague`.
+  **Inscrever-se apaga o aviso na hora e zera a folga** (`game.ultimaChecagemDaLiga`): sem isso quem
+  acabava de se inscrever continuava vendo o convite nas batalhas seguintes, porque a cópia em
+  memória só era relida 5 minutos depois — reportado em 01/09/2026. Pisca no mesmo ritmo do Bônus Shiny da home (`shiny-bonus-pulse`):
   as duas coisas são janelas de tempo que expiram. Os dados vêm de duas leituras
   (`atualizarAvisoDaLiga`), no máximo uma vez a cada 5 minutos e disparadas do `runBattle` — e ela
   **nunca chama render()**: rodaria no meio da animação da batalha e mataria a transição da barra
@@ -773,6 +794,21 @@ verdade, cai no game over, e o teste confere que a trava soltou dos dois lados.
 
 ## Liga Clássica (e as customizadas)
 
+- **Na escolha de time, o CARD é o botão.** Havia um botão vermelho "Inscrever esse time" embaixo de
+  um card que já é a coisa clicável em todo o resto do jogo. O card traz a MESMA estrela de média da
+  home (o jogador reconhece o time por ela, então repetir aqui evita reaprender a mesma informação),
+  e o troféu ao lado do nome saiu.
+- **O MEWTWO EMPRESTADO NÃO RESTRINGE NADA.** Ele é um pokémon normal que fica no time salvo por 24h
+  (e depois 7 dias de espera): qualquer código de time montado a partir do save — Liga, Trainers
+  League, Torre, Ginásio da Cidade — já sai com ele dentro, quantas vezes o jogador quiser. Por isso
+  **saiu o prêmio de "1 uso"** (01/09/2026): ele era anterior ao empréstimo e vinha da ideia oposta
+  — um código DERIVADO, com o Mewtwo no lugar de quem tinha ido pro Prof. Carvalho, gasto numa
+  inscrição só. Saíram os dois botões ("Inscrever COM o Mewtwo" na Liga e "Ativar Mewtwo pra hoje"
+  na Trainers League), o `buildMewtwoTeamCode` e o consumo do prêmio.
+  **O campo `mewtwoReward` CONTINUA** — é ele que marca "venceu o Mewtwo" e é o que libera o
+  empréstimo (ver `checkMewtwoLoanUnlock` no servidor). O que acabou foi o gasto dele. A conquista
+  "Arma Secreta" passou a valer o EMPRÉSTIMO, senão ficaria impossível; quem já a tinha pelo caminho
+  antigo continua com ela.
 - **A inscrição guarda um CÓDIGO do time, congelado na hora da inscrição** — de propósito: ninguém
   troca de time no meio de uma competição. Mas subir um nível com o Doce Raro não é trocar de time,
   é o mesmo time mais forte, e o servidor repropaga sozinho (`atualizarInscricoesComTime`, chamado

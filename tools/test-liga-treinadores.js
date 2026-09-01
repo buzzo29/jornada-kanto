@@ -85,18 +85,16 @@ ok('nenhum inscrito some no caminho (0 a 40)', somaErrada === 0, somaErrada + ' 
   const hoje = ids[0];
   const cycleRef = db.collection('trainersLeagueCycles').doc(hoje);
   const antes = (await cycleRef.get()).data();
-  if(antes.status !== 'registering'){
-    console.log('  (pulado: fora da janela -- a trava so roda depois das 11h, e o ciclo ja esta em "' + antes.status + '")');
-  } else {
-    console.log('  (pulado: ainda nao passou da hora da trava)');
-  }
+  console.log('  (ciclo do dia comecou em "' + antes.status + '" -- a trava so roda depois das 11h)');
   // com 1 inscrito o dia nao forma liga: o ciclo TEM que terminar num estado final, com motivo
   await cycleRef.set({ status:'registering' }, { merge:true });
   await cycleRef.collection('registrants').doc('u0').set({ uid:'u0', name:'T0', registeredAt: 1 });
   await fns.advanceTrainersLeague({});
   const depois = (await cycleRef.get()).data();
-  const terminou = depois.status === 'complete' || depois.status === 'locked' || depois.status === 'active';
-  ok('depois de tentar travar, o ciclo nao fica em locking/advancing', terminou, 'status: ' + depois.status);
+  /* 'registering' e um estado de REPOUSO legitimo (antes da hora da trava). O que nao pode
+     acontecer nunca e ficar num estado TRANSITORIO, que e onde o ciclo de 31/08 ficou preso. */
+  const preso = depois.status === 'locking' || depois.status === 'advancing';
+  ok('o ciclo nunca fica preso num estado transitorio', !preso, 'status: ' + depois.status);
   if(depois.status === 'complete'){
     ok('e a tela tem como dizer por que nao teve liga', !!depois.noLeagueReason, 'motivo: ' + depois.noLeagueReason);
   }
