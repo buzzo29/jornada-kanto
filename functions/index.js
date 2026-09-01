@@ -886,9 +886,14 @@ function tentarGolpeEspecial(active, enemy, rng, diario){
             Onix, um Hitmonlee) não tem o que anular, e inventar uma punição pra ele seria
             outra regra, não esta. O sorteio simplesmente não vale contra ele. */
       if(tiposDeAtaque(alvo, quem).length < 2) continue;
-      alvo._anulado = { tipo: bestAttackType(alvo, quem).type, contra: quem };
+      const tipoAnulado = bestAttackType(alvo, quem).type;
+      alvo._anulado = { tipo: tipoAnulado, contra: quem };
       if(diario){
-        diario.push({ q: marca, d: 0, hp: alvo.hp, c:0, m:0, z:0, x:'disable', g: especial.golpe });
+        /* Grava o TIPO anulado (`a`) porque é ele que deixa o log dizer QUAL golpe se perdeu --
+           "teve o ataque Nevasca anulado" em vez de "teve seu melhor ataque anulado". O nome sai
+           do tipo no cliente, como em todo o resto do log: o motor manda o tipo, o cliente escolhe
+           a palavra (ver nomeDoGolpe). */
+        diario.push({ q: marca, d: 0, hp: alvo.hp, c:0, m:0, z:0, x:'disable', g: especial.golpe, a: tipoAnulado });
       }
       continue;
     }

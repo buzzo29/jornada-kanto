@@ -1763,6 +1763,12 @@
   .pokedex-cell.abrivel{cursor:pointer;transition:transform .08s;}
   .pokedex-cell.abrivel:hover{transform:translateY(-2px);}
   .dex-ficha{max-width:340px;}
+  /* Os golpes especiais na ficha: fica DEPOIS dos atributos e antes dos botões, com uma linha de
+     separação -- é informação de outra natureza (o que ele FAZ, não o quanto ele tem). */
+  .dex-especiais{ border-top:2px solid var(--box-border); margin-top:10px; padding-top:10px; }
+  .dex-especiais-tit{ font-size:.55rem; font-weight:800; color:var(--muted); letter-spacing:.04em; margin-bottom:6px; }
+  .dex-especial{ display:flex; align-items:center; justify-content:center; gap:8px; margin-bottom:4px; flex-wrap:wrap; }
+  .dex-especial-chance{ font-size:.6rem; color:var(--muted); }
   .dex-ficha-nome{font-family:var(--font-pixel);font-size:.8rem;margin:8px 0 2px;line-height:1.5;}
   .dex-ficha-num{font-size:.7rem;font-weight:800;color:var(--muted);}
   .dex-ficha-tipos{display:flex;gap:5px;justify-content:center;margin:8px 0 12px;flex-wrap:wrap;}
@@ -5257,9 +5263,14 @@ function tentarGolpeEspecial(active, enemy, rng, diario){
             Onix, um Hitmonlee) não tem o que anular, e inventar uma punição pra ele seria
             outra regra, não esta. O sorteio simplesmente não vale contra ele. */
       if(tiposDeAtaque(alvo, quem).length < 2) continue;
-      alvo._anulado = { tipo: bestAttackType(alvo, quem).type, contra: quem };
+      const tipoAnulado = bestAttackType(alvo, quem).type;
+      alvo._anulado = { tipo: tipoAnulado, contra: quem };
       if(diario){
-        diario.push({ q: marca, d: 0, hp: alvo.hp, c:0, m:0, z:0, x:'disable', g: especial.golpe });
+        /* Grava o TIPO anulado (`a`) porque é ele que deixa o log dizer QUAL golpe se perdeu --
+           "teve o ataque Nevasca anulado" em vez de "teve seu melhor ataque anulado". O nome sai
+           do tipo no cliente, como em todo o resto do log: o motor manda o tipo, o cliente escolhe
+           a palavra (ver nomeDoGolpe). */
+        diario.push({ q: marca, d: 0, hp: alvo.hp, c:0, m:0, z:0, x:'disable', g: especial.golpe, a: tipoAnulado });
       }
       continue;
     }
@@ -12803,10 +12814,7 @@ function suddenDeathNote(m){
    têm o tipo: ali o cartão mostra só o dano, em vez de inventar um nome.
    Não tem linha de "fulano venceu": quem caiu aparece apagado e com a barra no zero. */
 function golpeSeloHtml(speciesId, tipo){
-  const nome = nomeDoGolpe(speciesId, tipo);
-  if(!nome) return '';
-  // o selo do tipo com o NOME DO GOLPE dentro -- a cor já entrega o tipo
-  return `<span class="type-pill" style="background:${TYPE_COLORS[tipo]||'#888'}">${nome}</span>`;
+  return seloDeGolpe(nomeDoGolpe(speciesId, tipo), tipo);
 }
 function renderMatchupLog(matchups){
   const lado = (m, id) => {
@@ -12900,16 +12908,63 @@ function sequenciaDoConfronto(m){
    pelo ALVO ("Gengar teve seu melhor ataque anulado por Alakazam"): quem interessa ali é o
    prejudicado, e é o nome dele que o jogador procura na tela. */
 const ICONES_ESPECIAIS = { boom:'💥', sono:'😴', disable:'🚫' };
+/* O TIPO de cada golpe especial, pro selo colorido do log. Vive só no CLIENTE, como o
+   MOVE_BY_TYPE: o motor manda o que aconteceu, o cliente escolhe a palavra e a cor -- é o que
+   evita mais uma tabela duplicada pra sair de sincronia.
+   Pesquisado no aprendizado da Gen 1, e a intuição erra aqui: **autodestruição é NORMAL**, não
+   Terra nem Pedra. Só os dois pós são Planta e a Hipnose é Psíquico; todo o resto é Normal. */
+const TIPO_DO_ESPECIAL = {
+  'auto-destruição':'Normal',
+  'Pó do Sono':'Grass', 'Esporo':'Grass', 'Hipnose':'Psychic',
+  'Canto':'Normal', 'Beijo Adorável':'Normal',
+  'Anulação':'Normal', 'Metrônomo':'Normal',
+  'Metrônomo (auto-destruição)':'Normal', 'Metrônomo (sonífero)':'Normal', 'Metrônomo (anulação)':'Normal'
+};
+/* O selo colorido com o nome do golpe dentro -- a cor já entrega o tipo. */
+function seloDeGolpe(nome, tipo){
+  if(!nome) return '';
+  return `<span class="type-pill" style="background:${TYPE_COLORS[tipo]||'#888'}">${escapeHtmlSafe(nome)}</span>`;
+}
 function ehGolpeEspecial(g){ return g && (g.x === 'boom' || g.x === 'sono' || g.x === 'disable'); }
-function fraseDoEspecial(g, quem, alvo, comNomeDoGolpe){
+function fraseDoEspecial(g, quem, alvo, op){
+  op = op || {};
   const golpe = g.g ? String(g.g) : '';
-  if(g.x === 'boom')    return quem + ' usou ' + (golpe || 'auto-destruição');
-  /* O nome do golpe (Esporo, Canto, Hipnose...) entra só no LOG. Ele é por espécie de propósito --
-     o Paras dorme com Esporo e a Jigglypuff com Canto -- mas no aviso do meio da batalha, que se lê
-     em um segundo, a frase curta é a que chega. */
-  if(g.x === 'sono')    return quem + ' fez ' + alvo + ' dormir' + (comNomeDoGolpe && golpe ? ' com ' + golpe : '');
-  if(g.x === 'disable') return alvo + ' teve seu melhor ataque anulado por ' + quem;
+  /* No LOG o nome do golpe sai no selo do tipo, igual aos golpes comuns; no aviso do meio da
+     batalha sai em texto puro -- ali a frase se lê em um segundo e um selo colorido no meio dela
+     seria mais uma coisa pra o olho parar. */
+  const comoGolpe = (nome, tipo) => op.selo ? seloDeGolpe(nome, tipo) : escapeHtmlSafe(nome);
+  if(g.x === 'boom'){
+    const n = golpe || 'auto-destruição';
+    return quem + ' usou ' + comoGolpe(n, TIPO_DO_ESPECIAL[n] || 'Normal');
+  }
+  /* O nome do golpe de sono (Esporo, Canto, Hipnose...) entra só no LOG. Ele é por espécie de
+     propósito -- o Paras dorme com Esporo e a Jigglypuff com Canto -- mas no aviso do meio da
+     batalha a frase curta é a que chega. */
+  if(g.x === 'sono'){
+    if(!(op.comGolpe && golpe)) return quem + ' fez ' + alvo + ' dormir';
+    return quem + ' fez ' + alvo + ' dormir com ' + comoGolpe(golpe, TIPO_DO_ESPECIAL[golpe] || 'Normal');
+  }
+  if(g.x === 'disable'){
+    /* Nomeia o golpe ANULADO, não a anulação: o que interessa é o que o pokémon PERDEU. O motor
+       manda o tipo (g.a) e o cliente vira em palavra, como no resto do log -- e o selo aqui é o do
+       golpe perdido, então um Nevasca sai no azul do Gelo.
+       Confronto gravado ANTES do campo existir cai na frase genérica: log velho não pode sumir. */
+    const nomeAnulado = g.a ? nomeDoGolpe(op.especieDoAlvo, g.a) : null;
+    if(!nomeAnulado) return alvo + ' teve seu melhor ataque anulado por ' + quem;
+    return alvo + ' teve o ataque ' + comoGolpe(nomeAnulado, g.a) + ' anulado por ' + quem;
+  }
   return '';
+}
+/* Os golpes especiais que uma espécie tem, pra ficha da Pokédex. É LISTA porque dá pra ter mais de
+   um: a Jigglypuff canta E anula, o Venomoth dorme E anula. */
+function especiaisDaEspecie(id){
+  const out = [];
+  if(AUTODESTRUICAO.includes(id)) out.push({ nome:'auto-destruição', chance: CHANCE_AUTODESTRUICAO });
+  if(SONIFEROS[id])               out.push({ nome: SONIFEROS[id],    chance: CHANCE_SONO });
+  if(DISABLE.includes(id))        out.push({ nome:'Anulação',        chance: CHANCE_DISABLE });
+  // o metrônomo sai em algum efeito em 3 das 10 vezes (explosão, sono ou anulação)
+  if(METRONOMO.includes(id))      out.push({ nome:'Metrônomo',       chance: CHANCE_METRONOMO_EFEITO*3 });
+  return out.map(e => Object.assign({}, e, { tipo: TIPO_DO_ESPECIAL[e.nome] || 'Normal' }));
 }
 /* O aviso que aparece NO MEIO DA BATALHA, na mesma linha onde se lê "Trocando golpes...".
    Devolve '' quando o confronto não teve nada especial -- é isso que as telas usam pra decidir
@@ -12920,7 +12975,8 @@ function avisoDoConfronto(m){
   const nomeP = escapeHtmlSafe(m.player || ''), nomeE = escapeHtmlSafe(m.enemy || '');
   const doJogador = g.q === 'p';
   return (ICONES_ESPECIAIS[g.x] || '') + ' ' +
-         fraseDoEspecial(g, doJogador ? nomeP : nomeE, doJogador ? nomeE : nomeP, false) + '!';
+         fraseDoEspecial(g, doJogador ? nomeP : nomeE, doJogador ? nomeE : nomeP,
+                         { especieDoAlvo: doJogador ? m.enemySpecies : m.playerSpecies }) + '!';
 }
 /* PAUSA PRA LER. Sem ela a frase aparece e some junto com o primeiro golpe, e num confronto
    resolvido por autodestruição (que dura um golpe só) ela mal pisca. Um segundo é o mesmo tempo
@@ -12941,7 +12997,8 @@ function passosHtml(m){
   const linhaEspecial = (g) => {
     const doJogador = g.q === 'p';
     return `<div class="mlog-passo especial ${doJogador?'p':'e'}">${ICONES_ESPECIAIS[g.x]||''} ${
-      fraseDoEspecial(g, ladoHtml(doJogador), ladoHtml(!doJogador), true)}.</div>`;
+      fraseDoEspecial(g, ladoHtml(doJogador), ladoHtml(!doJogador),
+        { comGolpe:true, selo:true, especieDoAlvo: doJogador ? m.enemySpecies : m.playerSpecies })}.</div>`;
   };
   /* As anulações vêm ANTES de tudo: o Disable acontece na abertura do confronto e a luta inteira
      que se lê embaixo já é a luta com o golpe anulado. */
@@ -17592,6 +17649,19 @@ function renderPokedexFicha(){
           </div>
         </div>
       </div>
+      ${(() => {
+        /* GOLPE ESPECIAL na ficha: é a única coisa que uma espécie faz em batalha que os seis
+           números não contam. Um Geodude e um Graveler de atributo parecido jogam diferente
+           porque um deles explode, e sem isso o jogador só descobre isso perdendo.
+           A chance é POR CONFRONTO (ver a seção dos especiais no CLAUDE.md) -- dizer só o nome
+           deixaria o jogador achar que sai todo golpe. */
+        const esp = especiaisDaEspecie(id);
+        if(!esp.length) return '';
+        return `<div class="dex-especiais">
+          <div class="dex-especiais-tit">${esp.length>1?'Golpes especiais':'Golpe especial'}</div>
+          ${esp.map(e=>`<div class="dex-especial">${seloDeGolpe(e.nome, e.tipo)}<span class="dex-especial-chance">${Math.round(e.chance*100)}% por confronto</span></div>`).join('')}
+        </div>`;
+      })()}
       ${ehMewtwo ? '<button class="btn secondary" onclick="fecharPokedexFicha();openMewtwoLoanInfoModal()">🧬 Empréstimo do Mewtwo</button>' : ''}
       <button class="btn primary" onclick="fecharPokedexFicha()">Fechar</button>
     </div>

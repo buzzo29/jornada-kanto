@@ -199,7 +199,7 @@ console.log('\nAS FRASES SAO AS PEDIDAS');
 const mBoom = { player:'Golem', enemy:'Raichu', playerSpecies:'golem', enemySpecies:'raichu',
   golpes:[{ q:'p', d:100, hp:0, x:'boom', g:'auto-destruição' }, { q:'e', d:80, hp:0, x:'boomself' }] };
 const htmlBoom = S.passosHtml(mBoom);
-ok('explosao: "Golem usou auto-destruicao"', /Golem<\/span> usou auto-destruição/.test(htmlBoom), '');
+ok('explosao: "Golem usou auto-destruicao"', /usou <span class="type-pill"[^>]*>auto-destruição</.test(htmlBoom), '');
 ok('e uma linha so (o "caiu junto" nao vira outra)', (htmlBoom.match(/class="mlog-passo /g)||[]).length === 1);
 ok('o aviso do meio da batalha diz o mesmo',
    S.avisoDoConfronto(mBoom) === '💥 Golem usou auto-destruição!', S.avisoDoConfronto(mBoom));
@@ -209,7 +209,7 @@ const mSono = { player:'Butterfree', enemy:'Arbok', playerSpecies:'butterfree', 
 ok('sono: "Butterfree fez Arbok dormir"',
    S.avisoDoConfronto(mSono) === '😴 Butterfree fez Arbok dormir!', S.avisoDoConfronto(mSono));
 /* No log cabe o nome do golpe -- ele e por especie de proposito (o Paras dorme com Esporo). */
-ok('e no log ainda da pra ver com que golpe', /fez .*Arbok<\/span> dormir com Pó do Sono/.test(S.passosHtml(mSono)));
+ok('e no log ainda da pra ver com que golpe', /dormir com <span class="type-pill"[^>]*>Pó do Sono</.test(S.passosHtml(mSono)));
 
 const mDis = { player:'Alakazam', enemy:'Gengar', playerSpecies:'alakazam', enemySpecies:'gengar',
   golpes:[{ q:'p', d:0, hp:120, x:'disable', g:'Anulação' }, { q:'p', d:40, hp:80 }, { q:'e', d:30, hp:90 }] };
@@ -264,6 +264,57 @@ console.log('\nDITTO: O GOLPE ACOMPANHA A TRANSFORMACAO');
   ok('os atributos continuam sendo os dele', d.attack === 48 && (d.types||[]).join(',') === 'Normal',
      'atk ' + d.attack + ', tipo ' + (d.types||[]).join(','));
 })();
+console.log('\nO SELO DO TIPO NO NOME DO GOLPE');
+/* O tipo foi PESQUISADO no aprendizado da Gen 1, e a intuicao erra aqui: autodestruicao e NORMAL,
+   nao Terra nem Pedra. So os dois pos sao Planta e a Hipnose e Psiquico. */
+ok('a autodestruicao sai no selo de Normal', S.TIPO_DO_ESPECIAL['auto-destruição'] === 'Normal');
+ok('os dois pos saem no de Planta',
+   S.TIPO_DO_ESPECIAL['Pó do Sono'] === 'Grass' && S.TIPO_DO_ESPECIAL['Esporo'] === 'Grass');
+ok('e a Hipnose no de Psiquico', S.TIPO_DO_ESPECIAL['Hipnose'] === 'Psychic');
+/* Todo golpe que o motor sabe gerar precisa de tipo -- sem ele o selo sai num cinza generico e
+   ninguem percebe, porque so aparece no confronto que teve aquele golpe. */
+const nomesPossiveis = [...new Set(['auto-destruição', ...Object.values(S.SONIFEROS), 'Anulação',
+  'Metrônomo', 'Metrônomo (auto-destruição)', 'Metrônomo (sonífero)', 'Metrônomo (anulação)'])];
+const semTipo = nomesPossiveis.filter(n => !S.TIPO_DO_ESPECIAL[n]);
+ok('todo golpe especial tem tipo declarado', semTipo.length === 0, semTipo.join(',') || nomesPossiveis.length + ' golpes');
+
+console.log('\nO DISABLE NOMEIA O GOLPE ANULADO');
+/* O que interessa e o que o pokemon PERDEU, nao o nome da anulacao. O motor manda o TIPO e o
+   cliente vira em palavra, como no resto do log -- e o selo e o do golpe perdido, entao um
+   Nevasca sai no azul do Gelo e nao no bege do Normal. */
+const mAnul = { player:'Venomoth', enemy:'Jynx', playerSpecies:'venomoth', enemySpecies:'jynx',
+  playerHpBefore:180, playerHpAfter:140, playerMaxHp:180, enemyHpBefore:200, enemyHpAfter:0, enemyMaxHp:200,
+  playerMove:'Bug', enemyMove:'Ice',
+  golpes:[{ q:'p', d:0, hp:200, x:'disable', g:'Anulação', a:'Ice' }, { q:'p', d:200, hp:0 }, { q:'e', d:40, hp:140 }] };
+ok('o aviso diz QUAL golpe foi anulado',
+   S.avisoDoConfronto(mAnul) === '🚫 Jynx teve o ataque Nevasca anulado por Venomoth!', S.avisoDoConfronto(mAnul));
+ok('e no log ele vem no selo do tipo DELE',
+   S.passosHtml(mAnul).includes('teve o ataque <span class="type-pill" style="background:' +
+                                S.TYPE_COLORS['Ice'] + '">Nevasca</span> anulado'));
+/* Confronto gravado ANTES do campo existir cai na frase generica -- log velho nao pode sumir. */
+const semCampo = mAnul.golpes.map(g => { const c = Object.assign({}, g); delete c.a; return c; });
+const mVelho = Object.assign({}, mAnul, { golpes: semCampo });
+ok('e log antigo, sem o campo, cai na frase generica',
+   S.avisoDoConfronto(mVelho) === '🚫 Jynx teve seu melhor ataque anulado por Venomoth!', S.avisoDoConfronto(mVelho));
+
+console.log('\nA FICHA DA POKEDEX DIZ QUE ESPECIAL A ESPECIE TEM');
+/* E a unica coisa que uma especie faz em batalha que os seis numeros nao contam: um Geodude e um
+   Graveler de atributo parecido jogam diferente porque um deles explode. */
+ok('lista o especial da especie',
+   S.especiaisDaEspecie('golem').map(e=>e.nome).join(',') === 'auto-destruição' &&
+   S.especiaisDaEspecie('paras').map(e=>e.nome).join(',') === 'Esporo');
+ok('e os DOIS de quem tem dois',
+   S.especiaisDaEspecie('jigglypuff').map(e=>e.nome).join(' + ') === 'Canto + Anulação',
+   S.especiaisDaEspecie('jigglypuff').map(e=>e.nome).join(' + '));
+ok('quem nao tem nenhum nao ganha linha nenhuma', S.especiaisDaEspecie('pikachu').length === 0);
+/* A chance vem junto porque ela e POR CONFRONTO: so o nome deixaria o jogador achar que sai todo golpe. */
+ok('com a chance junto', S.especiaisDaEspecie('golem')[0].chance === S.CHANCE_AUTODESTRUICAO);
+ok('e com o tipo, pro selo', S.especiaisDaEspecie('paras')[0].tipo === 'Grass');
+/* Ninguem das quatro listas pode ficar de fora da ficha -- seria um golpe invisivel. */
+const todasComEspecial = new Set([...S.AUTODESTRUICAO, ...Object.keys(S.SONIFEROS), ...S.DISABLE, ...S.METRONOMO]);
+const semFicha = [...todasComEspecial].filter(id => S.especiaisDaEspecie(id).length === 0);
+ok('e toda especie das quatro listas aparece', semFicha.length === 0,
+   semFicha.join(',') || todasComEspecial.size + ' especies');
 console.log('\nOS DOIS MOTORES DAO O MESMO RESULTADO');
 /* O motor e duplicado (cliente e servidor). Uma diferenca aqui faz a liga decidir uma coisa e a
    animacao mostrar outra -- e o jogador so descobre quando perde uma final. */

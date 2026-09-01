@@ -249,6 +249,30 @@ de golpes.
   HP calibrados pra ~399 ataques: um Geodude nível 20 com 15% de chance de derrubá-lo num golpe
   acabaria com a raide da semana. O Mewtwo é o desafio de fim de jogo pelo mesmo motivo. Medido com
   a imunidade desligada: **472 explosões em 3.000 batalhas** contra o Mewtwo.
+- **O nome do golpe especial sai no SELO DO TIPO**, igual aos golpes comuns (`seloDeGolpe`, e o
+  `golpeSeloHtml` passou a usar a mesma função — uma forma só pro selo). O tipo vive no
+  `TIPO_DO_ESPECIAL`, **só no cliente**, como o `MOVE_BY_TYPE`: o motor manda o que aconteceu, o
+  cliente escolhe a palavra e a cor.
+  **Pesquisado, e a intuição erra: autodestruição é NORMAL**, não Terra nem Pedra. Só os dois pós
+  (Pó do Sono, Esporo) são Planta e a Hipnose é Psíquico; Canto, Beijo Adorável, Anulação e
+  Metrônomo são Normal.
+  No **aviso do meio da batalha** o nome sai em texto puro, sem selo: ali a frase se lê em um
+  segundo e um selo colorido no meio dela é mais uma coisa pra o olho parar.
+- **O Disable nomeia o golpe ANULADO, não a anulação**: *"Jynx teve o ataque Nevasca anulado por
+  Venomoth"*. O que interessa é o que o pokémon PERDEU. Pra isso o motor grava o **tipo** anulado
+  no diário (campo `a`) e o cliente vira em palavra pelo `nomeDoGolpe` — o mesmo caminho de todo o
+  resto do log, e é o que evita mais uma tabela duplicada. O selo é o do golpe perdido, então o
+  Nevasca sai no azul do Gelo e bate com o selo da linha onde a Jynx ataca com ele.
+  Confronto gravado ANTES do campo existir cai na frase genérica ("seu melhor ataque"): log velho
+  não pode sumir.
+- **A ficha da Pokédex diz que especial a espécie tem** (`especiaisDaEspecie`), com o selo e a
+  chance. É a única coisa que uma espécie faz em batalha que os seis números não contam — um
+  Geodude e um Graveler de atributo parecido jogam diferente porque um deles explode, e sem isso o
+  jogador só descobre perdendo. A chance vai junto porque é **por confronto**: só o nome deixaria
+  ele achar que sai todo golpe. É lista porque dá pra ter dois (a Jigglypuff canta E anula).
+  `tools/test-especiais.js` confere que **as 59 espécies das quatro listas** aparecem e que todo
+  golpe que o motor sabe gerar tem tipo declarado — sem isso o selo sairia num cinza genérico, e só
+  no confronto que teve aquele golpe.
 - **A linha do log tem forma própria aqui.** A regra do log é "uma forma só" (ver a seção acima), e
   estes três são as **exceções**: não são dano, são o confronto inteiro decidido de uma vez, e o
   jogador precisa ler por quê. Um `−0` solto faria procurar bug onde é regra — o mesmo motivo do
