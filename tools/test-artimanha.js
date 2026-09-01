@@ -97,10 +97,14 @@ ok('e o resultado completado fica gravado (nao re-sorteia toda vez)',
    slot 0 em DIFÍCIL (4x a chance), ver o shiny, ir pra home e abrir um save parado na tela 'start'
    do slot 1 dava um inicial shiny num save NORMAL -- e o sorteio do slot 1 continuava intacto pra
    ser usado depois. É o que a linha nova do continueSave conserta. */
-g.startersSorteados = {
-  '0:hard':   { bulbasaur:false, charmander:false, squirtle:false, chikorita:false, cyndaquil:false, totodile:true },
-  '1:normal': { bulbasaur:false, charmander:false, squirtle:false, chikorita:false, cyndaquil:false, totodile:false }
+/* O fixture sai da lista VIVA de iniciais, nunca de nomes escritos na mão. Escrito na mão ele
+   listava os seis de antes do Pichu, e aí o sétimo entrava pela migração acima -- sorteado de
+   verdade, na hora. Uma vez a cada ~60 rodadas ele saía shiny e o teste acusava vazamento onde
+   não havia nenhum. Teste que falha sozinho é pior que teste que não existe: ensina a ignorar. */
+const sorteioSemShiny = (comShiny) => {
+  const r = {}; S.STARTERS.forEach(id => { r[id] = id === comShiny; }); return r;
 };
+g.startersSorteados = { '0:hard': sorteioSemShiny('totodile'), '1:normal': sorteioSemShiny(null) };
 g.startersShiny = S.sorteioDosIniciais(0,'hard');
 ok('o sorteio do dificil traz o shiny dele', g.startersShiny.totodile === true);
 // o que o continueSave faz ao abrir OUTRO save parado na escolha do inicial

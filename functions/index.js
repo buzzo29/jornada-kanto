@@ -451,9 +451,22 @@ function tipoDoGolpe(attacker, defender, rng){
   // imunidade continua valendo 0, com o mesmo piso de 1 de dano e a mesma marca do log
   return { mult, type: t, stab: (attacker.types||[]).includes(t), nulo: mult === 0 };
 }
+/* Os tipos que o pokémon consegue usar pra atacar: os próprios (com STAB) mais o subtipo.
+   Vive numa função porque o Disable precisa da MESMA lista pra saber se sobra um segundo golpe --
+   se as duas divergirem, ele anula um tipo que a escolha nem considerava. */
+function tiposDeAtaque(p){
+  const proprios = p.types || [];
+  return proprios.concat(subtiposDe(p).filter(t => !proprios.includes(t)));
+}
 function bestAttackType(attacker, defender){
   const proprios = attacker.types || [];
-  const candidatos = proprios.concat(subtiposDe(attacker).filter(t => !proprios.includes(t)));
+  let candidatos = tiposDeAtaque(attacker);
+  /* DISABLE: o melhor golpe deste atacante contra ESTE adversário saiu de cena, e ele cai no
+     segundo melhor. Vale só contra quem anulou -- adversário novo, confronto novo. O golpe
+     teimoso lá embaixo reusa esta mesma lista, então já sai filtrado também. */
+  if(attacker._anulado && attacker._anulado.contra === defender && candidatos.length > 1){
+    candidatos = candidatos.filter(t => t !== attacker._anulado.tipo);
+  }
   let melhor = null;
   for(const t of candidatos){
     let mult = 1;
@@ -753,7 +766,8 @@ const DYING_BLOW_FACTOR = 1.0;
    chefes do jogo -- não caem por um golpe só. */
 const CHANCE_AUTODESTRUICAO = 0.15;
 const CHANCE_SONO = 0.05;
-const CHANCE_METRONOMO_EFEITO = 0.10;   // por efeito: 10% autodestruição, 10% sono, 80% golpe comum
+const CHANCE_METRONOMO_EFEITO = 0.10;   // por efeito: 10% cada um dos três, 70% golpe comum
+const CHANCE_DISABLE = 0.10;
 const IMUNES_A_ESPECIAL = ['mew','mewtwo'];
 /* Aprendem Autodestruição por nível na Gen 1/2. */
 const AUTODESTRUICAO = ['geodude','graveler','golem','voltorb','electrode','koffing','weezing','pineco','forretress'];
@@ -775,6 +789,14 @@ const SONIFEROS = {
 /* Metrônomo: chama um golpe qualquer. Aqui isso quer dizer que o TIPO do ataque sai no sorteio
    (ver tipoDoGolpe) e que os dois efeitos especiais podem sair também. */
 const METRONOMO = ['togepi','togetic','cleffa','snubbull'];
+/* Aprendem Disable por nível na Gen 1/2. Vulpix, Ninetales, a linha do Nidoran, Seel, Kangaskhan,
+   Horsea, Spinarak e Stantler aprendem só por REPRODUÇÃO e ficaram de fora -- a regra das listas
+   deste bloco é aprendizado por nível, sempre.
+   O Mewtwo aprende Disable nas duas gerações e mesmo assim não está aqui: ele e o Mew são imunes
+   ao bloco INTEIRO (IMUNES_A_ESPECIAL corta antes de sortear), então a entrada seria letra morta. */
+const DISABLE = ['psyduck','golduck','kadabra','alakazam','slowpoke','slowbro','slowking',
+                 'grimer','muk','lickitung','jigglypuff','wigglytuff','venonat','venomoth',
+                 'drowzee','hypno'];
 /* Quem explodiu no confronto que está sendo resolvido: true = foi o primeiro argumento do
    doExchange (o "nosso" lado em todos os laços), false = o segundo, null = ninguém.
    É o que deixa os laços decidirem "os dois últimos caíram, quem ganha?" sem mudar assinatura.
@@ -785,15 +807,19 @@ function ehImuneAEspecial(p){ return IMUNES_A_ESPECIAL.includes(p.speciesId); }
 function sorteiaGolpeEspecial(p, rng){
   if(METRONOMO.includes(p.speciesId)){
     const r = rng();
-    if(r < CHANCE_METRONOMO_EFEITO) return { efeito:'explosao', golpe:'Metrônomo (Autodestruição)' };
-    if(r < CHANCE_METRONOMO_EFEITO*2) return { efeito:'sono', golpe:'Metrônomo (Sonífero)' };
+    if(r < CHANCE_METRONOMO_EFEITO) return { efeito:'explosao', golpe:'Metrônomo (auto-destruição)' };
+    if(r < CHANCE_METRONOMO_EFEITO*2) return { efeito:'sono', golpe:'Metrônomo (sonífero)' };
+    if(r < CHANCE_METRONOMO_EFEITO*3) return { efeito:'anula', golpe:'Metrônomo (anulação)' };
     return null;   // o resto é ataque comum -- com o tipo sorteado (ver tipoDoGolpe)
   }
   if(AUTODESTRUICAO.includes(p.speciesId) && rng() < CHANCE_AUTODESTRUICAO){
-    return { efeito:'explosao', golpe:'Autodestruição' };
+    return { efeito:'explosao', golpe:'auto-destruição' };
   }
   if(SONIFEROS[p.speciesId] && rng() < CHANCE_SONO){
     return { efeito:'sono', golpe: SONIFEROS[p.speciesId] };
+  }
+  if(DISABLE.includes(p.speciesId) && rng() < CHANCE_DISABLE){
+    return { efeito:'anula', golpe:'Anulação' };
   }
   return null;
 }
@@ -821,6 +847,22 @@ function tentarGolpeEspecial(active, enemy, rng, diario){
         diario.push({ q: marca === 'p' ? 'e' : 'p', d: danoEmSi, hp: 0, c:0, m:0, z:0, x:'boomself' });
       }
       return true;
+    }
+    if(especial.efeito === 'anula'){
+      /* DISABLE: o melhor golpe do alvo contra QUEM anulou sai de cena e ele passa a atacar pelo
+         segundo melhor -- que é o pedido ("desconsidera o que tira mais dano, usa o outro").
+         Duas diferenças em relação aos outros dois especiais:
+         1) NÃO resolve o confronto. A luta acontece inteira, com o alvo mais fraco -- por isso
+            aqui é 'continue' e não 'return true', e por isso o outro lado ainda pode explodir.
+         2) SÓ sai quando o alvo TEM um segundo golpe. Quem é de um tipo só e sem subtipo (um
+            Onix, um Hitmonlee) não tem o que anular, e inventar uma punição pra ele seria
+            outra regra, não esta. O sorteio simplesmente não vale contra ele. */
+      if(tiposDeAtaque(alvo).length < 2) continue;
+      alvo._anulado = { tipo: bestAttackType(alvo, quem).type, contra: quem };
+      if(diario){
+        diario.push({ q: marca, d: 0, hp: alvo.hp, c:0, m:0, z:0, x:'disable', g: especial.golpe });
+      }
+      continue;
     }
     /* SONO: o alvo dorme e não revida. Quem usou ataca até derrubar, sem tomar nada -- é isso que
        o pedido descreve, e é o que torna 5% um número alto de propósito. */

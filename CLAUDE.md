@@ -156,12 +156,13 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
   os dois arquivos têm comentários próprios e listam em ordens diferentes), 152–251 sem buraco, os
   dois tipos novos completos, e as evoluções de Kanto intactas.
 
-## Golpes especiais (autodestruição, sono e metrônomo)
+## Golpes especiais (autodestruição, sono, metrônomo e Disable)
 
 São os **primeiros efeitos do jogo que não são dano** — até aqui todo confronto se resolvia por
 troca de golpes e desempate. Entram no `doExchange`, nos DOIS motores, e o teste que garante que os
 dois continuam idênticos é `tools/test-especiais.js` (300 batalhas com a mesma semente, comparadas
-golpe a golpe).
+golpe a golpe). Ele tranca também as três frases exatas e que o Disable não entra na sequência
+de golpes.
 
 - **As listas saem do aprendizado por NÍVEL da Gen 1/2**, não da "quem pode aprender de algum jeito".
   Autodestruição são **9** (Geodude/Graveler/Golem, Voltorb/Electrode, Koffing/Weezing,
@@ -174,10 +175,53 @@ golpe a golpe).
 - **Chance por CONFRONTO, não por golpe**: 15% autodestruição, 5% sono. O marcador é o próprio
   adversário (`active._especialContra !== enemy`) — oponente novo, confronto novo. Se fosse por
   golpe, um Geodude explodiria em ~40% dos confrontos e a lista viraria o jogo inteiro.
-- **Metrônomo é 10% explosão / 10% sono / 80% golpe comum**, e o golpe comum sai com o **tipo
+- **Metrônomo é 10% explosão / 10% sono / 10% anulação / 70% golpe comum** -- ele chama
+  "qualquer poder existente no jogo", então cada efeito novo entra no bolo dele também, e o golpe comum sai com o **tipo
   sorteado** (`tipoDoGolpe`) em vez do melhor disponível. É o que faz dele uma aposta e não um
   upgrade: medido 1x1 contra Onix, o Togepi vai de 0% pra 26,3% de vitória — o resto do jogo
   continua usando `bestAttackType`, e o `tipoDoGolpe` só desvia pra quem está no `METRONOMO`.
+- **Disable (`DISABLE`, 10%): 16 espécies**, e é o único dos quatro que **não resolve o confronto** —
+  ele tira o melhor golpe do adversário e a luta acontece inteira, com ele mais fraco. O tipo que
+  renderia mais dano contra QUEM anulou sai da escolha (`_anulado`, casado por identidade com o
+  oponente: adversário novo, confronto novo) e entra o segundo melhor.
+  **Só vale contra quem TEM um segundo golpe**: 157 das 250 espécies (62,8%). Quem é de um tipo só
+  e sem subtipo — Onix, Hitmonlee — não tem o que anular, e inventar uma punição pra ele seria
+  outra regra, não esta; o sorteio simplesmente não vale contra ele.
+  A lista sai do aprendizado por nível, como as outras: Psyduck/Golduck, Kadabra/Alakazam,
+  Slowpoke/Slowbro/Slowking, Grimer/Muk, Lickitung (Gen 1) + Jigglypuff/Wigglytuff,
+  Venonat/Venomoth, Drowzee/Hypno (a Gen 2 deu Disable a eles). Vulpix, Ninetales, a linha do
+  Nidoran, Seel, Kangaskhan, Horsea, Spinarak e Stantler aprendem **só por reprodução** e ficaram
+  de fora. **O Mewtwo aprende nas duas gerações e mesmo assim não está na lista**: ele e o Mew são
+  imunes ao bloco INTEIRO, então a entrada seria letra morta — o tipo de coisa que fica anos no
+  código sem nunca rodar.
+  `bestAttackType` e o Disable leem a MESMA lista de tipos (`tiposDeAtaque`): separadas, ele
+  anularia um tipo que a escolha nem considerava.
+  **Medido:** aparece em 8,7% das batalhas e em 1,0% dos confrontos, mas quando pega é pesado —
+  1x1, o Slowbro vai de 20,2% pra 87,0% contra um Venusaur anulado, o Alakazam de 28,7% pra 73,3%
+  contra o Gengar. Na jornada isso **não se move**: conclusão 62,1% → 62,8% em 20.000 jornadas de
+  cada lado (1,3σ, ruído). Faz sentido — 1% dos confrontos, e cai dos dois lados igual.
+- **A frase aparece NO MEIO DA BATALHA, não só no log**, na mesma linha onde se lê "Trocando
+  golpes..." — é onde o jogador já está olhando, então não precisou de caixa nova. São três, e a
+  do Disable começa pelo ALVO porque é o nome dele que a pessoa procura:
+  *"Golem usou auto-destruição"*, *"Butterfree fez Arbok dormir"*, *"Gengar teve seu melhor ataque
+  anulado por Alakazam"*. Elas vivem numa função só (`fraseDoEspecial`), lida pelo log E pelo aviso:
+  montadas em separado divergiriam no primeiro ajuste de texto, que é exatamente o que já aconteceu
+  entre o log e a animação.
+  O **nome do golpe de sono entra só no log** ("dormir com Esporo"): ele é por espécie de propósito,
+  mas o aviso se lê em um segundo e ali a frase curta é a que chega.
+- **Pausa de 1s pra ler** (`PAUSA_LEITURA_ESPECIAL_MS`). Sem ela a frase some junto com o primeiro
+  golpe, e num confronto resolvido por autodestruição — que dura um golpe só — ela mal pisca. Entra
+  nas quatro telas de revelação, somada aos 550ms que já existiam antes do primeiro golpe.
+  **No online ela não custa nada**: lá já existe uma parada de 1s (`ANUNCIO_MS`, o "Vai Fulano!") e
+  o aviso ocupa o lugar dela, então o `ORCAMENTO_ANIM_ONLINE_MS` continua intocado. Os matchups do
+  online vêm na perspectiva do A, e quem é o B **vira os lados do diário junto** — sem isso a frase
+  troca quem anulou por quem foi anulado.
+- **O Disable fica FORA da `sequenciaDoConfronto`.** Ele não tira HP e a luta continua depois dele,
+  então viraria um passo de dano 0 na animação — e, pior, consumiria uma vaga do `TETO_GOLPES`:
+  com ele contando, uma troca real de 2 golpes estourava o teto e o log inteiro caía na
+  reconstrução, perdendo os golpes de verdade. A linha dele é montada à parte e vem **antes** de
+  tudo no log: a anulação acontece na abertura, e a luta que se lê embaixo já é a luta com o golpe
+  anulado.
 - **Quem explodiu VENCE quando os dois últimos caem.** Foi o pedido, e sem essa regra acontecia o
   contrário do que a tela mostra: o laço só olha "sobrou alguém do meu lado?", então o jogador
   perdia justamente a batalha que decidiu explodindo. Vive no `explosaoDoAtivo`, que é por BATALHA
@@ -188,7 +232,7 @@ golpe a golpe).
   acabaria com a raide da semana. O Mewtwo é o desafio de fim de jogo pelo mesmo motivo. Medido com
   a imunidade desligada: **472 explosões em 3.000 batalhas** contra o Mewtwo.
 - **A linha do log tem forma própria aqui.** A regra do log é "uma forma só" (ver a seção acima), e
-  estas são as **duas exceções**: não são dano, são o confronto inteiro decidido de uma vez, e o
+  estes três são as **exceções**: não são dano, são o confronto inteiro decidido de uma vez, e o
   jogador precisa ler por quê. Um `−0` solto faria procurar bug onde é regra — o mesmo motivo do
   "mas não teve efeito" da imunidade. A explosão gera DUAS entradas no diário (`boom` + `boomself`,
   porque os dois caem) e o `passosHtml` desenha **uma linha só**: a segunda existe pro cálculo, não
@@ -229,9 +273,11 @@ golpe a golpe).
   linha anterior", que fazia a linha antiga parecer fatal).
 - A linha do log tem **uma forma só**: "X atacou Y com GOLPE e tirou −N de HP". Já passaram por
   ali selo de crítico, de moribundo e de "o tipo não pega nele" — todos saíram: viravam ruído numa
-  linha que se lê de relance. As **únicas duas exceções** são a autodestruição e o
-  sono (seção acima): ali não há número pra contar a história, e sem a frase o jogador vê dois
-  pokémon caindo juntos sem explicação.
+  linha que se lê de relance. As **exceções são os três golpes especiais** (autodestruição,
+  sono e Disable, seção acima): ali não há número pra contar a história, e sem a frase o jogador
+  vê dois pokémon caindo juntos -- ou um deles batendo mais fraco do resto da luta -- sem
+  explicação nenhuma. As frases vivem no `fraseDoEspecial`, e o aviso do meio da batalha lê a
+  mesma função.
 - **A animação mostra o mesmo diário.** `buildAnimatedHitSequence` devolve os golpes reais (pelo
   `passosVisiveis`, pra dobrar o moribundo igual ao log); a reconstrução antiga — até 3 golpes
   inventados a partir do HP antes/depois — virou fallback pra confronto gravado antes do diário.

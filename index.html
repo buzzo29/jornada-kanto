@@ -769,6 +769,10 @@
     text-align:center;
   }
 
+  /* O aviso do golpe especial é a MESMA linha do "Trocando golpes...", só que acesa: ela já é
+     onde o jogador olha durante a luta, então não precisa de caixa nova nem de outro lugar. */
+  .loading-text.aviso-especial{ color:var(--ink); font-weight:700; animation:aviso-especial-entra .28s ease-out; }
+  @keyframes aviso-especial-entra{ from{ opacity:0; transform:translateY(-4px); } to{ opacity:1; transform:none; } }
   .battle-vs{
     display:flex;
     align-items:center;
@@ -4940,9 +4944,22 @@ function tipoDoGolpe(attacker, defender, rng){
   // imunidade continua valendo 0, com o mesmo piso de 1 de dano e a mesma marca do log
   return { mult, type: t, stab: (attacker.types||[]).includes(t), nulo: mult === 0 };
 }
+/* Os tipos que o pokémon consegue usar pra atacar: os próprios (com STAB) mais o subtipo.
+   Vive numa função porque o Disable precisa da MESMA lista pra saber se sobra um segundo golpe --
+   se as duas divergirem, ele anula um tipo que a escolha nem considerava. */
+function tiposDeAtaque(p){
+  const proprios = p.types || [];
+  return proprios.concat(subtiposDe(p).filter(t => !proprios.includes(t)));
+}
 function bestAttackType(attacker, defender){
   const proprios = attacker.types || [];
-  const candidatos = proprios.concat(subtiposDe(attacker).filter(t => !proprios.includes(t)));
+  let candidatos = tiposDeAtaque(attacker);
+  /* DISABLE: o melhor golpe deste atacante contra ESTE adversário saiu de cena, e ele cai no
+     segundo melhor. Vale só contra quem anulou -- adversário novo, confronto novo. O golpe
+     teimoso lá embaixo reusa esta mesma lista, então já sai filtrado também. */
+  if(attacker._anulado && attacker._anulado.contra === defender && candidatos.length > 1){
+    candidatos = candidatos.filter(t => t !== attacker._anulado.tipo);
+  }
   let melhor = null;
   for(const t of candidatos){
     let mult = 1;
@@ -5117,7 +5134,8 @@ const DYING_BLOW_FACTOR = 1.0;
    chefes do jogo -- não caem por um golpe só. */
 const CHANCE_AUTODESTRUICAO = 0.15;
 const CHANCE_SONO = 0.05;
-const CHANCE_METRONOMO_EFEITO = 0.10;   // por efeito: 10% autodestruição, 10% sono, 80% golpe comum
+const CHANCE_METRONOMO_EFEITO = 0.10;   // por efeito: 10% cada um dos três, 70% golpe comum
+const CHANCE_DISABLE = 0.10;
 const IMUNES_A_ESPECIAL = ['mew','mewtwo'];
 /* Aprendem Autodestruição por nível na Gen 1/2. */
 const AUTODESTRUICAO = ['geodude','graveler','golem','voltorb','electrode','koffing','weezing','pineco','forretress'];
@@ -5139,6 +5157,14 @@ const SONIFEROS = {
 /* Metrônomo: chama um golpe qualquer. Aqui isso quer dizer que o TIPO do ataque sai no sorteio
    (ver tipoDoGolpe) e que os dois efeitos especiais podem sair também. */
 const METRONOMO = ['togepi','togetic','cleffa','snubbull'];
+/* Aprendem Disable por nível na Gen 1/2. Vulpix, Ninetales, a linha do Nidoran, Seel, Kangaskhan,
+   Horsea, Spinarak e Stantler aprendem só por REPRODUÇÃO e ficaram de fora -- a regra das listas
+   deste bloco é aprendizado por nível, sempre.
+   O Mewtwo aprende Disable nas duas gerações e mesmo assim não está aqui: ele e o Mew são imunes
+   ao bloco INTEIRO (IMUNES_A_ESPECIAL corta antes de sortear), então a entrada seria letra morta. */
+const DISABLE = ['psyduck','golduck','kadabra','alakazam','slowpoke','slowbro','slowking',
+                 'grimer','muk','lickitung','jigglypuff','wigglytuff','venonat','venomoth',
+                 'drowzee','hypno'];
 /* Quem explodiu no confronto que está sendo resolvido: true = foi o primeiro argumento do
    doExchange (o "nosso" lado em todos os laços), false = o segundo, null = ninguém.
    É o que deixa os laços decidirem "os dois últimos caíram, quem ganha?" sem mudar assinatura.
@@ -5149,15 +5175,19 @@ function ehImuneAEspecial(p){ return IMUNES_A_ESPECIAL.includes(p.speciesId); }
 function sorteiaGolpeEspecial(p, rng){
   if(METRONOMO.includes(p.speciesId)){
     const r = rng();
-    if(r < CHANCE_METRONOMO_EFEITO) return { efeito:'explosao', golpe:'Metrônomo (Autodestruição)' };
-    if(r < CHANCE_METRONOMO_EFEITO*2) return { efeito:'sono', golpe:'Metrônomo (Sonífero)' };
+    if(r < CHANCE_METRONOMO_EFEITO) return { efeito:'explosao', golpe:'Metrônomo (auto-destruição)' };
+    if(r < CHANCE_METRONOMO_EFEITO*2) return { efeito:'sono', golpe:'Metrônomo (sonífero)' };
+    if(r < CHANCE_METRONOMO_EFEITO*3) return { efeito:'anula', golpe:'Metrônomo (anulação)' };
     return null;   // o resto é ataque comum -- com o tipo sorteado (ver tipoDoGolpe)
   }
   if(AUTODESTRUICAO.includes(p.speciesId) && rng() < CHANCE_AUTODESTRUICAO){
-    return { efeito:'explosao', golpe:'Autodestruição' };
+    return { efeito:'explosao', golpe:'auto-destruição' };
   }
   if(SONIFEROS[p.speciesId] && rng() < CHANCE_SONO){
     return { efeito:'sono', golpe: SONIFEROS[p.speciesId] };
+  }
+  if(DISABLE.includes(p.speciesId) && rng() < CHANCE_DISABLE){
+    return { efeito:'anula', golpe:'Anulação' };
   }
   return null;
 }
@@ -5185,6 +5215,22 @@ function tentarGolpeEspecial(active, enemy, rng, diario){
         diario.push({ q: marca === 'p' ? 'e' : 'p', d: danoEmSi, hp: 0, c:0, m:0, z:0, x:'boomself' });
       }
       return true;
+    }
+    if(especial.efeito === 'anula'){
+      /* DISABLE: o melhor golpe do alvo contra QUEM anulou sai de cena e ele passa a atacar pelo
+         segundo melhor -- que é o pedido ("desconsidera o que tira mais dano, usa o outro").
+         Duas diferenças em relação aos outros dois especiais:
+         1) NÃO resolve o confronto. A luta acontece inteira, com o alvo mais fraco -- por isso
+            aqui é 'continue' e não 'return true', e por isso o outro lado ainda pode explodir.
+         2) SÓ sai quando o alvo TEM um segundo golpe. Quem é de um tipo só e sem subtipo (um
+            Onix, um Hitmonlee) não tem o que anular, e inventar uma punição pra ele seria
+            outra regra, não esta. O sorteio simplesmente não vale contra ele. */
+      if(tiposDeAtaque(alvo).length < 2) continue;
+      alvo._anulado = { tipo: bestAttackType(alvo, quem).type, contra: quem };
+      if(diario){
+        diario.push({ q: marca, d: 0, hp: alvo.hp, c:0, m:0, z:0, x:'disable', g: especial.golpe });
+      }
+      continue;
     }
     /* SONO: o alvo dorme e não revida. Quem usou ataca até derrubar, sem tomar nada -- é isso que
        o pedido descreve, e é o que torna 5% um número alto de propósito. */
@@ -6364,7 +6410,7 @@ function advanceSpecialReveal(){
     if(game.specialHitSequence.length > 0){
       game.specialRevealPhase = 'animating';
       render();
-      setTimeout(advanceSpecialReveal, 550);
+      setTimeout(advanceSpecialReveal, 550 + pausaDoEspecial(m));   // a frase do golpe especial precisa de tempo pra ser lida
     } else {
       game.specialRevealPhase = 'result';
       render();
@@ -6757,7 +6803,7 @@ function advanceReveal(){
     if(game.revealHitSequence.length > 0){
       game.revealPhase = 'animating';
       render();
-      setTimeout(advanceReveal, 550);
+      setTimeout(advanceReveal, 550 + pausaDoEspecial(m));   // a frase do golpe especial precisa de tempo pra ser lida
     } else {
       game.revealPhase = 'result';
       render();
@@ -7068,7 +7114,7 @@ function advanceTrainerReveal(){
     if(game.trainerHitSequence.length > 0){
       game.trainerRevealPhase = 'animating';
       render();
-      setTimeout(advanceTrainerReveal, 550);
+      setTimeout(advanceTrainerReveal, 550 + pausaDoEspecial(m));   // a frase do golpe especial precisa de tempo pra ser lida
     } else {
       game.trainerRevealPhase = 'result';
       render();
@@ -11947,7 +11993,7 @@ function renderSpecialBattling(){
     <div class="battle-status-area">${loading
       ? `<div class="loading-dots"><span></span><span></span><span></span></div><p class="loading-text">Aguardando o resultado da batalha...</p>`
       : (animating
-        ? `<p class="loading-text">⚔️ Trocando golpes...</p>`
+        ? `<p class="loading-text${avisoDoConfronto(m)?' aviso-especial':''}">${avisoDoConfronto(m) || '⚔️ Trocando golpes...'}</p>`
         : `<p class="battle-result-line">${matchupResultLine(m)}!${suddenDeathNote(m)}</p>`)
     }</div>
   </div>`;
@@ -12358,7 +12404,7 @@ function renderTrainerBattling(){
     <div class="battle-status-area">${loading
       ? `<div class="loading-dots"><span></span><span></span><span></span></div><p class="loading-text">Aguardando o resultado da batalha...</p>`
       : (animating
-        ? `<p class="loading-text">⚔️ Trocando golpes...</p>`
+        ? `<p class="loading-text${avisoDoConfronto(m)?' aviso-especial':''}">${avisoDoConfronto(m) || '⚔️ Trocando golpes...'}</p>`
         : `<p class="battle-result-line">${matchupResultLine(m)}!${suddenDeathNote(m)}</p>`)
     }</div>
   </div>`;
@@ -12775,11 +12821,50 @@ function passosVisiveis(golpes){
    prática significa uma troca só. */
 const TETO_GOLPES = 3;
 function sequenciaDoConfronto(m){
-  const reais = passosVisiveis(m.golpes || []);
+  /* O Disable não é um golpe na tela: não tira HP e a luta continua depois dele. Fica fora da
+     sequência por dois motivos -- viraria um passo de dano 0 na animação, e consumiria uma vaga
+     do TETO_GOLPES, o que jogaria uma troca real de 2 golpes na reconstrução e perderia os golpes
+     de verdade. A frase dele é montada à parte, no passosHtml. */
+  const reais = passosVisiveis((m.golpes || []).filter(g => g.x !== 'disable'));
   if(reais.length && reais.length <= TETO_GOLPES) return reais;
   // a reconstrução fala em QUEM APANHA (side); aqui a lista é de QUEM BATE (q)
   return reconstruirSequencia(m).map(h => ({ q: h.side === 'player' ? 'e' : 'p', d: h.amount }));
 }
+/* AS FRASES DOS GOLPES ESPECIAIS VIVEM AQUI, num lugar só.
+   O log da batalha e o aviso do meio da luta leem desta função. Montadas em separado, as duas
+   divergiriam no primeiro ajuste de texto -- foi exatamente o que já aconteceu entre o log e a
+   animação, que contavam o mesmo confronto com números diferentes (ver sequenciaDoConfronto).
+   'quem' é sempre quem USOU o golpe; 'alvo' é quem sofreu. Repare que a frase do Disable começa
+   pelo ALVO ("Gengar teve seu melhor ataque anulado por Alakazam"): quem interessa ali é o
+   prejudicado, e é o nome dele que o jogador procura na tela. */
+const ICONES_ESPECIAIS = { boom:'💥', sono:'😴', disable:'🚫' };
+function ehGolpeEspecial(g){ return g && (g.x === 'boom' || g.x === 'sono' || g.x === 'disable'); }
+function fraseDoEspecial(g, quem, alvo, comNomeDoGolpe){
+  const golpe = g.g ? String(g.g) : '';
+  if(g.x === 'boom')    return quem + ' usou ' + (golpe || 'auto-destruição');
+  /* O nome do golpe (Esporo, Canto, Hipnose...) entra só no LOG. Ele é por espécie de propósito --
+     o Paras dorme com Esporo e a Jigglypuff com Canto -- mas no aviso do meio da batalha, que se lê
+     em um segundo, a frase curta é a que chega. */
+  if(g.x === 'sono')    return quem + ' fez ' + alvo + ' dormir' + (comNomeDoGolpe && golpe ? ' com ' + golpe : '');
+  if(g.x === 'disable') return alvo + ' teve seu melhor ataque anulado por ' + quem;
+  return '';
+}
+/* O aviso que aparece NO MEIO DA BATALHA, na mesma linha onde se lê "Trocando golpes...".
+   Devolve '' quando o confronto não teve nada especial -- é isso que as telas usam pra decidir
+   entre a frase e o texto de sempre. */
+function avisoDoConfronto(m){
+  const g = ((m && m.golpes) || []).find(ehGolpeEspecial);
+  if(!g) return '';
+  const nomeP = escapeHtmlSafe(m.player || ''), nomeE = escapeHtmlSafe(m.enemy || '');
+  const doJogador = g.q === 'p';
+  return (ICONES_ESPECIAIS[g.x] || '') + ' ' +
+         fraseDoEspecial(g, doJogador ? nomeP : nomeE, doJogador ? nomeE : nomeP, false) + '!';
+}
+/* PAUSA PRA LER. Sem ela a frase aparece e some junto com o primeiro golpe, e num confronto
+   resolvido por autodestruição (que dura um golpe só) ela mal pisca. Um segundo é o mesmo tempo
+   que o online já dá pro "Vai Fulano!" antes de começar a luta. */
+const PAUSA_LEITURA_ESPECIAL_MS = 1000;
+function pausaDoEspecial(m){ return avisoDoConfronto(m) ? PAUSA_LEITURA_ESPECIAL_MS : 0; }
 function passosHtml(m){
   const golpes = sequenciaDoConfronto(m);   // a MESMA lista que a animação vai reproduzir
   if(!golpes.length) return '';
@@ -12789,21 +12874,20 @@ function passosHtml(m){
   /* Uma frase só, sempre na mesma forma: "X atacou Y com GOLPE e tirou -N de HP."
      Já passaram por aqui marcação de crítico, de golpe moribundo e de "o tipo não pega nele" --
      cada uma virava ruído numa linha que se lê de relance. O número conta a história.
-     As DUAS exceções são os golpes especiais: autodestruição e sono não são dano, são o confronto
-     inteiro decidido de uma vez, e a linha precisa dizer isso com todas as letras. */
-  return `<div class="mlog-passos">${golpes.map(g=>{
+     As exceções são os golpes especiais (fraseDoEspecial): ali não há número que conte o que
+     aconteceu, e sem a frase o jogador vê dois pokémon caindo juntos sem explicação. */
+  const linhaEspecial = (g) => {
+    const doJogador = g.q === 'p';
+    return `<div class="mlog-passo especial ${doJogador?'p':'e'}">${ICONES_ESPECIAIS[g.x]||''} ${
+      fraseDoEspecial(g, ladoHtml(doJogador), ladoHtml(!doJogador), true)}.</div>`;
+  };
+  /* As anulações vêm ANTES de tudo: o Disable acontece na abertura do confronto e a luta inteira
+     que se lê embaixo já é a luta com o golpe anulado. */
+  const anulacoes = (m.golpes || []).filter(g => g.x === 'disable').map(linhaEspecial).join('');
+  return `<div class="mlog-passos">${anulacoes}${golpes.map(g=>{
     const doJogador = g.q === 'p';
     if(g.x === 'boomself') return '';   // a linha da explosão (acima) já contou os dois lados
-    if(g.x === 'boom'){
-      return `<div class="mlog-passo especial ${doJogador?'p':'e'}">
-        💥 ${ladoHtml(doJogador)} usou <strong>${escapeHtmlSafe(g.g||'Autodestruição')}</strong> — ${ladoHtml(!doJogador)} e ${ladoHtml(doJogador)} caíram na hora.
-      </div>`;
-    }
-    if(g.x === 'sono'){
-      return `<div class="mlog-passo especial ${doJogador?'p':'e'}">
-        😴 ${ladoHtml(doJogador)} usou <strong>${escapeHtmlSafe(g.g||'um golpe de sono')}</strong> — ${ladoHtml(!doJogador)} dormiu e não revidou.
-      </div>`;
-    }
+    if(g.x === 'boom' || g.x === 'sono') return linhaEspecial(g);
     return `<div class="mlog-passo ${doJogador?'p':'e'}">
       ${ladoHtml(doJogador)} atacou ${ladoHtml(!doJogador)}${seloDe(doJogador)?` com ${seloDe(doJogador)}`:''} e tirou <span class="mlog-tira">−${g.d}</span> de HP.
     </div>`;
@@ -12860,7 +12944,7 @@ function renderBattling(){
     <div class="battle-status-area">${loading
       ? `<div class="loading-dots"><span></span><span></span><span></span></div><p class="loading-text">Aguardando o resultado da batalha...</p>`
       : (animating
-        ? `<p class="loading-text">⚔️ Trocando golpes...</p>`
+        ? `<p class="loading-text${avisoDoConfronto(m)?' aviso-especial':''}">${avisoDoConfronto(m) || '⚔️ Trocando golpes...'}</p>`
         : `<p class="battle-result-line">${matchupResultLine(m)}!${suddenDeathNote(m)}</p>`)
     }</div>
   </div>
@@ -14040,7 +14124,7 @@ function advanceLeagueWatch(){
     if(game.leagueWatchHitSequence.length > 0){
       game.leagueWatchPhase = 'animating';
       render();
-      setTimeout(advanceLeagueWatch, 550);
+      setTimeout(advanceLeagueWatch, 550 + pausaDoEspecial(m));   // a frase do golpe especial precisa de tempo pra ser lida
     } else {
       game.leagueWatchPhase = 'result';
       render();
@@ -14173,7 +14257,7 @@ function renderLeagueWatch(){
     <div class="battle-status-area">${loading
       ? `<div class="loading-dots"><span></span><span></span><span></span></div><p class="loading-text">Aguardando o resultado da batalha...</p>`
       : (animating
-        ? `<p class="loading-text">⚔️ Trocando golpes...</p>`
+        ? `<p class="loading-text${avisoDoConfronto(m)?' aviso-especial':''}">${avisoDoConfronto(m) || '⚔️ Trocando golpes...'}</p>`
         : `<p class="battle-result-line">${matchupResultLine(m)}!${suddenDeathNote(m)}</p>`)
     }</div>
   </div>
@@ -15919,7 +16003,17 @@ function iniciarAnimacaoOnline(m){
     deleHp: meuM.enemyHpBefore,
     // "Vai Gengar!" fica 1 segundo antes de o primeiro golpe sair. Sem essa pausa, o confronto
     // começava no mesmo instante em que o pokémon aparecia -- não dava tempo de ver quem entrou
-    anuncio: meuNome
+    anuncio: meuNome,
+    /* O aviso do golpe especial ocupa o lugar do "Vai Fulano!" e fica até o fim do confronto.
+       Aqui ele não custa NADA de tempo: o online já para 1s neste ponto (ANUNCIO_MS) antes do
+       primeiro golpe, que é exatamente a pausa de leitura que as outras telas precisaram criar --
+       o orçamento da animação (ORCAMENTO_ANIM_ONLINE_MS) continua intocado.
+       Os matchups vêm na perspectiva do A, então quem é o B vira os lados do diário junto: sem
+       isso a frase troca quem anulou por quem foi anulado. */
+    avisoEspecial: avisoDoConfronto(souA ? m : {
+      player: m.enemy, enemy: m.player,
+      golpes: (m.golpes || []).map(g => Object.assign({}, g, { q: g.q === 'p' ? 'e' : 'p' }))
+    })
   };
   render();
   setTimeout(()=>{
@@ -16536,7 +16630,9 @@ function renderOnlineFight(){
            ${deleCaiu ? fighterOcultoHtml() : fighterOnlineHtml(dele,'ele', anim ? anim.deleHp : undefined)}`}
     </div>
     ${anim
-      ? (anim.anuncio ? `<p class="loading-text online-vai-linha">Vai ${escapeHtmlSafe(anim.anuncio)}!</p>` : `<p class="loading-text">⚔️ Trocando golpes...</p>`)
+      ? (anim.avisoEspecial
+          ? `<p class="loading-text aviso-especial">${anim.avisoEspecial}</p>`
+          : (anim.anuncio ? `<p class="loading-text online-vai-linha">Vai ${escapeHtmlSafe(anim.anuncio)}!</p>` : `<p class="loading-text">⚔️ Trocando golpes...</p>`))
       : (ultimo ? `<p class="online-last">${escapeHtmlSafe(ultimo.player)} × ${escapeHtmlSafe(ultimo.enemy)} — ${ultimo.winner ? escapeHtmlSafe(ultimo.winner)+' venceu' : 'os dois caíram'}</p>` : '')}
   </div>
   ${painelTimesHtml(st, anim, precisaEscolher, restam, padraoOnline)}`;
