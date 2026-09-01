@@ -546,5 +546,73 @@ ok('na escolha de rota (inicio da jornada)', S.renderWalk().includes('abrirTimeM
 ok('e na escolha de rota dos trechos seguintes', S.renderWalkNext().includes('abrirTimeModal()'));
 ok('com a contagem do time no rotulo', S.renderGymChoice().includes('Seu time (1)'));
 
+
+console.log('\nBUSCAR PARTIDA ONLINE DE DENTRO DA JORNADA');
+/* A busca ja era global (roda em qualquer tela e o convite aparece por cima). O que faltava era
+   poder LIGAR ela sem ir ate a Batalha Online -- e ai a jornada ficava pra tras. */
+const gB = S.freshGameDefaults();
+gB.authUser = { uid:'u1' };
+gB.saveSlots = [null, null, null];
+gB.avisoLiga = null;
+S.__setGame(gB);
+ok('sem time com 8 insignias, nao oferece busca', S.botaoBuscaOnlineHtml() === '');
+gB.saveSlots = [{ badgeCount:8, team:[{speciesId:'venusaur', level:70}] }, null, null];
+S.__setGame(gB);
+const parado = S.botaoBuscaOnlineHtml();
+ok('com time pronto, o botao aparece', parado.includes('Buscar partida online'));
+ok('e ele liga a busca SEM sair da tela', parado.includes('startOnlineSearchAqui()'),
+   parado.includes('startOnlineSearch()') ? 'esta chamando a versao que troca de tela' : '');
+gB.onlineSearching = true; S.__setGame(gB);
+const buscando = S.botaoBuscaOnlineHtml();
+ok('buscando, o mesmo botao cancela', buscando.includes('cancelOnlineSearch()') && buscando.includes('Buscando oponente'));
+gB.onlineSearching = false; S.__setGame(gB);
+/* Sem login nao ha fila nenhuma pra entrar. */
+gB.authUser = null; S.__setGame(gB);
+ok('deslogado nao ve o botao', S.botaoBuscaOnlineHtml() === '');
+gB.authUser = { uid:'u1' }; S.__setGame(gB);
+
+console.log('\nO AVISO DA LIGA CLASSICA');
+ok('sem inscricao aberta, nao aparece nada', !S.botaoBuscaOnlineHtml().includes('aviso-liga-jornada'));
+gB.avisoLiga = { hora: new Date(2026, 7, 31, 14, 0, 0).getTime() };
+S.__setGame(gB);
+const comAviso = S.botaoBuscaOnlineHtml();
+ok('com inscricao aberta, avisa a hora', comAviso.includes('aviso-liga-jornada') && comAviso.includes('14:00'),
+   comAviso.includes('14:00') ? '' : 'a hora nao saiu no texto');
+/* Pisca no mesmo ritmo do Bonus Shiny da home: mesma ideia, uma janela que expira. */
+ok('e usa a classe que pisca', comAviso.includes('class="aviso-liga-jornada"'));
+
+console.log('\nONDE O BOTAO APARECE (e onde NAO)');
+gB.avisoLiga = null;
+gB.team = [S.createInstance('charmander', 20)];
+gB.gymIndex = 0; gB.gymPath = []; gB.losses = 0;
+gB.battleResult = { win:true, matchups:[], playerStatus:[], brockStatus:[], leveledUpFromFaint:false };
+S.__setGame(gB);
+ok('na tela de antes da batalha', S.renderPreBattle().includes('startOnlineSearchAqui()'));
+ok('e na tela de resultado', S.renderBattleResult(true).includes('startOnlineSearchAqui()'));
+/* A Torre e as ligas ficam de FORA: la o jogador ja esta numa disputa organizada. */
+gB.trainerBattleResult = { win:true, matchups:[{ player:'A', playerSpecies:'venusaur', playerLevel:70, playerShiny:false,
+  enemy:'B', enemySpecies:'charizard', enemyLevel:70, enemyShiny:false, golpes:[], playerHpBefore:100, playerHpAfter:50,
+  playerMaxHp:100, enemyHpBefore:100, enemyHpAfter:0, enemyMaxHp:100, playerAliveBefore:1, playerAliveAfter:1,
+  playerTeamSize:1, enemyAliveBefore:1, enemyAliveAfter:0, enemyTeamSize:1, winner:'A' }] };
+gB.trainerRevealIndex = 0; gB.trainerRevealPhase = 'done'; gB.trainerHitSequence = []; gB.trainerHitStep = 0;
+gB.trainerBattleOpponentName = 'NPC'; gB.trainerBattlePlayerName = null;
+S.__setGame(gB);
+ok('a tela de batalha da Torre NAO oferece a busca', !S.renderTrainerBattling().includes('startOnlineSearchAqui()'));
+
+console.log('\nO DESAFIO DO MEWTWO ABRE COM KANTO FECHADO');
+/* Era "a Pokedex inteira menos o Mewtwo" -- com Johto isso virou 249 especies, tres delas
+   impossiveis (Lugia, Ho-Oh, Celebi). Agora sao as 149 de Kanto. */
+const kanto149 = Object.keys(S.SPECIES).filter(id => S.SPECIES[id].dex <= 151 && id !== 'mewtwo');
+gB.permanentPokedex = kanto149; gB.permanentShinyDex = []; gB.saveSlots = [null,null,null];
+gB.pokedexView = 'normal';
+S.__setGame(gB);
+ok('com as 149 de Kanto, o desafio abre', S.renderPokedex().includes('openMewtwoChallenge()'),
+   kanto149.length + ' especies de Kanto');
+gB.permanentPokedex = kanto149.slice(0, -1); S.__setGame(gB);
+ok('faltando uma de Kanto, nao abre', !S.renderPokedex().includes('openMewtwoChallenge()'));
+/* E Johto nao entra na conta: quem fechou Kanto nao precisa de Johto pra desafiar. */
+gB.permanentPokedex = kanto149; S.__setGame(gB);
+ok('e Johto nao faz falta nenhuma', S.renderPokedex().includes('openMewtwoChallenge()'));
+
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
 process.exit(falhas ? 1 : 0);

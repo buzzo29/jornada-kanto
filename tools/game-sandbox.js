@@ -131,6 +131,8 @@ function createSandbox(htmlPath){
     'escolherGinasio','gymOf','gymAtual','regiaoDaEtapa','opcoesDeGinasio','todosOsGinasios',
     'KANTO_GYMS','JOHTO_GYMS','JOHTO_ROUTE_MAP','renderGymChoice','numGinasios','GYM_BADGE_VISUALS','routesForLeg','ROUTE_MAP','RIVAL_STARTER_COUNTER','STARTER_EVOLUTIONS','renderStart','STARTERS','ehDeDia','eeveeDoHorario','renderEeveeChoice','EVOLUTION_CHOICES','raizDaLinha','linhasDoTime','buildOfferFromPool','escolherEvolucao','evolucoesPendentes','renderEvoChoice','resolverEvolucoes','TYPE_NAMES_PT','TYPE_COLORS','englishTypeFromPortuguese','ELITE_FOUR','JOHTO_ELITE','eliteOpponentForStage','sortearCaminhoDaElite','eliteMembroDaEtapa','startEliteChallenge','openEliteIntro','renderEliteIntro',
     'continueJourney','showJourneyEnd',
+    // busca online dentro da jornada e aviso da liga (ver test-jornada.js)
+    'botaoBuscaOnlineHtml','avisoLigaHtml','startOnlineSearchAqui','entrarNaFilaOnline','timeElegiveisOnline','renderPreBattle','renderBattleResult','renderPokedex','renderBattling',
     // conquistas (ver test-conquistas.js)
     'ACHIEVEMENTS','getAchievementAggregate','getAllCaughtSpecies',
     // inscricao na Liga (ver test-liga-inscricao.js)

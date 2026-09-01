@@ -1310,6 +1310,13 @@
     animation:shiny-bonus-pulse 2.4s ease-in-out infinite;
   }
   @keyframes shiny-bonus-pulse{ 0%,100%{opacity:1;} 50%{opacity:.55;} }
+  /* Aviso da Liga nas telas de batalha da jornada -- mesmo pulso do Bônus Shiny da home, porque é
+     a mesma ideia: uma janela de tempo que expira. */
+  .aviso-liga-jornada{
+    font-family:var(--font-pixel); font-size:.55rem; line-height:1.5;
+    color:var(--yellow); text-align:center; margin:2px 4px 10px; letter-spacing:.3px;
+    animation:shiny-bonus-pulse 2.4s ease-in-out infinite;
+  }
   .league-wins-total-box{display:flex;align-items:center;gap:14px;}
   .league-wins-total-icon{font-size:2.2rem;flex-shrink:0;}
   .league-wins-total-num{font-family:var(--font-pixel);font-size:1.5rem;color:var(--blue-dark);line-height:1;}
@@ -3545,7 +3552,8 @@ function freshGameDefaults(){
     specialHpBeforeBattle:null,
     specialRevealIndex:0,
     specialRevealPhase:'loading',
-    specialResultMsg:''
+    specialResultMsg:'',
+    avisoLiga:null         // {hora} da Liga Clássica com inscrição aberta -- ver atualizarAvisoDaLiga
   };
 }
 let game = freshGameDefaults();
@@ -6532,6 +6540,7 @@ async function updateTrainerStreakForUid(uid, won){
   } catch(e){ console.error('Erro ao atualizar sequência do treinador:', e); }
 }
 function runBattle(){
+  atualizarAvisoDaLiga();   // em segundo plano: o botão da busca online mostra o aviso se couber
   /* No difícil, metade do time do líder vem shiny.
      O sorteio é SEMEADO pela jornada + ginásio, não aleatório a cada batalha: o time do líder
      precisa ser o mesmo em todas as tentativas. Sorteando na hora, um Sandshrew shiny na primeira
@@ -12166,7 +12175,8 @@ function renderPreBattle(){
   </div>
   <button class="btn secondary" onclick="maybeOpenHideout()">🕵️ Tentar resgatar ${game.stolenMon.name}</button>` : ''}
   <button class="btn danger" onclick="runBattle()">Entrar na batalha!</button>
-  <button class="btn primary" onclick="game.screen='teamOrder';render();">← Voltar</button>`;
+  <button class="btn primary" onclick="game.screen='teamOrder';render();">← Voltar</button>
+  ${botaoBuscaOnlineHtml()}`;
 }
 
 function renderTrainerBattle(){
@@ -12722,7 +12732,8 @@ function renderBattling(){
         : `<p class="battle-result-line">${matchupResultLine(m)}!${suddenDeathNote(m)}</p>`)
     }</div>
   </div>
-  </div>`;
+  </div>
+  ${botaoBuscaOnlineHtml()}`;
 }
 
 function renderBattleResult(win){
@@ -12766,7 +12777,8 @@ function renderBattleResult(win){
     ? (hasNextGym
         ? `<button class="btn primary" onclick="continueJourney()">Continuar jornada ➜</button>`
         : `<button class="btn success" onclick="showJourneyEnd()">Ver resumo da jornada ➜</button>`)
-    : `<button class="btn primary" onclick="prepareRetry()">Distribuir levels e tentar de novo</button>`}`;
+    : `<button class="btn primary" onclick="prepareRetry()">Distribuir levels e tentar de novo</button>`}
+  ${botaoBuscaOnlineHtml()}`;
 }
 
 function renderGameOver(){
@@ -15455,7 +15467,11 @@ function pararBuscaGlobal(){ if(buscaTimer){ clearTimeout(buscaTimer); buscaTime
 function codigosElegiveisOnline(){
   return timeElegiveisOnline().map(slot => encodeTeamCode(game.saveSlots[slot].team));
 }
-async function startOnlineSearch(){
+function startOnlineSearch(){ return entrarNaFilaOnline(true); }
+/* A MESMA busca, mas sem sair da tela -- é a do botão que aparece nas batalhas da jornada. Quem
+   liga a procura no meio de uma jornada quer continuar jogando, não ser levado pra outra tela. */
+function startOnlineSearchAqui(){ return entrarNaFilaOnline(false); }
+async function entrarNaFilaOnline(irParaTelaOnline){
   const codes = codigosElegiveisOnline();
   if(!codes.length) return;
   prepararAudio();   // AQUI existe gesto do usuário: é o único momento em que dá pra liberar o áudio
@@ -15464,7 +15480,7 @@ async function startOnlineSearch(){
   game.onlineSince = Date.now() - 1000;
   game.onlinePendente = null;
   // o estado "procurando..." é desenhado na própria tela da Batalha Online
-  game.screen = 'onlineBattle';
+  if(irParaTelaOnline) game.screen = 'onlineBattle';
   render();
   try{
     const r = await functionsClient.httpsCallable('joinBattleQueue')({ codes });
@@ -15476,6 +15492,51 @@ async function startOnlineSearch(){
     game.onlineSearching = false;
     render();
   }
+}
+/* O BOTÃO DA JORNADA -- ligar a busca online sem largar a jornada.
+   A busca já era global (ver agendarBuscaGlobal): ela roda em qualquer tela e o convite aparece por
+   cima do que estiver aberto. O que faltava era poder LIGAR daqui -- antes era preciso ir até a
+   Batalha Online, e aí a jornada ficava pra trás.
+   Só nas telas de batalha da JORNADA: na Torre e nas ligas o jogador já está numa disputa
+   organizada, e chamar pra outra no meio dela não faz sentido. */
+function botaoBuscaOnlineHtml(){
+  if(!game.authUser) return '';
+  if(!timeElegiveisOnline().length) return '';   // sem time com 8 insígnias não há o que buscar
+  const buscando = !!game.onlineSearching;
+  return `
+  <!-- verde quando ligado, cinza quando parado: a ação PRINCIPAL da tela é a jornada, e essa
+       aqui não pode competir com ela em cor -->
+  <button class="btn ${buscando ? 'success' : 'secondary'}" onclick="${buscando ? 'cancelOnlineSearch()' : 'startOnlineSearchAqui()'}">
+    ${buscando ? '🔎 Buscando oponente... (cancelar)' : '🔎 Buscar partida online'}
+  </button>
+  ${avisoLigaHtml()}`;
+}
+/* O aviso da Liga Clássica pisca no MESMO ritmo do Bônus Shiny da home (shiny-bonus-pulse): as duas
+   coisas são janelas de tempo que expiram, e repetir o pulso faz reconhecer a ideia sem ler.
+   Só aparece pra quem AINDA NÃO se inscreveu -- pra quem já está dentro seria só ruído no meio de
+   uma batalha. */
+function avisoLigaHtml(){
+  const aviso = game.avisoLiga;
+  if(!aviso) return '';
+  return `<div class="aviso-liga-jornada">🏆 Inscrições abertas pra Liga Clássica das <strong>${formatClock(aviso.hora)}</strong></div>`;
+}
+/* Lê o ciclo aberto e a sua inscrição: duas leituras, no MÁXIMO uma a cada 5 minutos. O ciclo vira
+   de hora em hora, então essa folga não atrasa nada que importe.
+   NÃO chama render() de propósito: isso roda em segundo plano e as telas de batalha estão no meio
+   de animações -- um render ali mata a transição da barra de vida (ver CLAUDE.md). O aviso entra no
+   próximo desenho natural da tela. */
+let ultimaChecagemDaLiga = 0;
+async function atualizarAvisoDaLiga(){
+  if(!game.authUser) return;
+  if(Date.now() - ultimaChecagemDaLiga < 5*60*1000) return;
+  ultimaChecagemDaLiga = Date.now();
+  try{
+    const snap = await scheduleDocRef(CLASSIC_LEAGUE_TYPE).get();
+    const ciclo = snap.exists ? (snap.data().cycles||[]).find(c=>c.status==='registering') : null;
+    if(!ciclo){ game.avisoLiga = null; return; }
+    const reg = await registrantDocRef(CLASSIC_LEAGUE_TYPE, ciclo.id, game.authUser.uid).get();
+    game.avisoLiga = reg.exists ? null : { hora: ciclo.scheduledTime };
+  } catch(e){ /* é um aviso: falhar aqui não pode atrapalhar a jornada */ }
 }
 function agendarBuscaGlobal(){
   pararBuscaGlobal();
@@ -15563,7 +15624,15 @@ async function aceitarConvite(){
   if(!p) return;
   try{
     const r = await functionsClient.httpsCallable('acceptOnlineMatch')({ matchId: p.matchId });
-    if(r.data.battleId){ game.onlinePendente = null; entrarNaBatalha(r.data.battleId); return; }
+    if(r.data.battleId){
+      /* Aceitar no MEIO da revelação de uma batalha da jornada não pode apagar a batalha: o
+         resultado já foi calculado pelo runBattle, mas quem APLICA (insígnia, derrota, nível de
+         quem desmaiou) é o finishBattle, no fim da revelação. Sair antes dele deixava a luta sem
+         efeito nenhum, e o ginásio tinha que ser enfrentado de novo. Conclui antes de ir.
+         Só vale pra jornada: Torre e ligas resolvem tudo no servidor. */
+      if(game.screen === 'battling') finishBattle();
+      game.onlinePendente = null; entrarNaBatalha(r.data.battleId); return;
+    }
     p.aceitei = true;   // esperando o outro
     render();
   } catch(e){
@@ -17216,9 +17285,12 @@ function renderPokedex(){
   const totalSpecies = Object.keys(SPECIES).length; // inclui o Mewtwo
   const caughtCount = caught.size;
   const shinyCount = shinyCaught.size;
-  // "capturou todo o resto" desconta os intocáveis: sem isso o desafio nunca abre (ver ESPECIES_INTOCAVEIS)
+  /* O desafio abre com KANTO FECHADO: as 149 espécies de #001 a #149 (o #150 é o próprio Mewtwo e
+     o #151 nem está no SPECIES). Era "a Pokédex inteira menos o Mewtwo", o que com Johto virou 249
+     -- e três delas (Lugia, Ho-Oh, Celebi) ninguém captura, então a condição não fechava pra
+     ninguém. Kanto fechado é o marco que este desafio sempre quis marcar. */
   const otherSpeciesCaught = allSpecies
-    .filter(s=> s.id!=='mewtwo' && !ESPECIES_INTOCAVEIS.includes(s.id))
+    .filter(s=> s.id!=='mewtwo' && SPECIES[s.id].dex <= 151)
     .every(s=>caught.has(s.id));
   return `
   <div class="box">

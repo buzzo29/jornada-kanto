@@ -251,10 +251,11 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
   o Celebi nunca esteve em rota; o Mewtwo vem do desafio próprio. `ESPECIES_INTOCAVEIS` (os três
   que NINGUÉM captura) e `SEM_CAPTURA_SELVAGEM` (os três + Mewtwo) existem porque essa regra tem
   consequência em cascata:
-  - **O desafio do Mewtwo estava impossível e ninguém tinha notado.** Ele abre quando "todo o resto"
-    foi capturado, e o Celebi entrou com Johto sem estar em rota nenhuma — ou seja, desde 30/08 a
-    condição não fechava mais. Só não estourou porque exige 249 espécies. Hoje a conta desconta os
-    intocáveis.
+  - **O desafio do Mewtwo abre com KANTO FECHADO** — as 149 de #001 a #149 (o #150 é o próprio
+    Mewtwo, o #151 nem está no `SPECIES`). Era "toda a Pokédex menos o Mewtwo", o que com Johto
+    virou 249 espécies — e três delas ninguém captura, então **a condição não fechava mais pra
+    ninguém desde 30/08** e nada acusava, porque exige quase tudo. Kanto fechado é o marco que esse
+    desafio sempre quis marcar, e Johto não entra na conta.
   - **"Mestre Pokémon" e "Pokédex de Johto"** passaram a cobrar o que dá pra ter, não o total da
     tela (que continua mostrando 250 — eles são entradas de verdade da Pokédex). Conquista
     impossível é pior que conquista nenhuma: ninguém consegue nem saber por que não acendeu.
@@ -595,6 +596,26 @@ verdade, cai no game over, e o teste confere que a trava soltou dos dois lados.
   `node tools/test-torre.js` cobre os dois lados (escolher o shiny e escolher o normal).
 
 ## Batalha Online
+
+- **Dá pra ligar a busca de dentro da jornada** (`botaoBuscaOnlineHtml`, nas telas `preBattle`,
+  `battling`, `victory` e `defeat`). A busca em si SEMPRE foi global — ela roda em qualquer tela e o
+  convite aparece por cima do que estiver aberto (ver `agendarBuscaGlobal`); o que faltava era poder
+  LIGAR sem ir até a Batalha Online, e aí a jornada ficava pra trás. `startOnlineSearchAqui` é a
+  mesma `entrarNaFilaOnline`, só que sem trocar de tela.
+  Fica fora da Torre e das ligas de propósito: ali o jogador já está numa disputa organizada.
+- **Aceitar um convite no meio da revelação CONCLUI a batalha da jornada antes de sair.** O
+  resultado já foi calculado pelo `runBattle`, mas quem aplica (insígnia, derrota, nível de quem
+  desmaiou) é o `finishBattle`, no fim da revelação — sair antes dele deixava a luta sem efeito
+  nenhum, e o ginásio tinha que ser enfrentado de novo.
+- **O convite NÃO espera a batalha terminar**: ele tem 15 segundos de prazo, e do outro lado há
+  alguém esperando. Segurar até o fim da revelação (que dura mais que isso) faria a partida expirar
+  pros dois.
+- **O aviso "inscrições abertas pra Liga Clássica das XXh"** aparece embaixo desse botão, e só pra
+  quem AINDA NÃO se inscreveu. Pisca no mesmo ritmo do Bônus Shiny da home (`shiny-bonus-pulse`):
+  as duas coisas são janelas de tempo que expiram. Os dados vêm de duas leituras
+  (`atualizarAvisoDaLiga`), no máximo uma vez a cada 5 minutos e disparadas do `runBattle` — e ela
+  **nunca chama render()**: rodaria no meio da animação da batalha e mataria a transição da barra
+  de vida. O aviso entra no próximo desenho natural da tela.
 
 - **Não é turno a turno.** É confronto a confronto: o motor resolve uma dupla de cada vez, e entre
   confrontos abre janela de escolha (10s no inicial, 5s nas trocas).
