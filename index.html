@@ -284,6 +284,11 @@
   .tower-cleared{text-align:center;border-color:var(--yellow-dark);background:#fff8e0;}
   .tower-cleared-icon{font-size:2.4rem;line-height:1;margin-bottom:4px;}
   /* ranking */
+  /* Duas listas no mesmo modal: o título separa sem precisar de abas, que num modal de 320px
+     custariam mais toque do que economizam rolagem. */
+  .tower-rank-tit{ font-family:var(--font-pixel); font-size:.62rem; margin:14px 0 4px; text-align:left; }
+  .tower-rank-tit:first-of-type{ margin-top:4px; }
+  .tower-rank-box{ max-height:80vh; overflow-y:auto; }
   .tower-rank-list{text-align:left;margin-bottom:12px;}
   .tower-rank-row{display:flex;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid rgba(26,26,46,.12);}
   .tower-rank-row:last-child{border-bottom:none;}
@@ -15069,23 +15074,34 @@ function renderTrainerTower(){
 function renderTowerRankingModal(){
   const r = game.towerRanking;
   if(!r) return '';
-  let corpo;
-  if(r.loading){ corpo = `<p class="loading-text">Carregando...</p>`; }
-  else if(!r.top || !r.top.length){ corpo = `<p class="hint-text">Ninguém pontuou ainda — o primeiro ponto sai na virada do dia. Pode ser o seu.</p>`; }
-  else {
-    corpo = `<div class="tower-rank-list">${r.top.map((x,i)=>`
+  /* DUAS listas, e a de HOJE vem primeiro: é a disputa que ainda dá pra mudar. O geral, embaixo,
+     é histórico -- ele não muda com o que o jogador fizer nos próximos minutos. */
+  const lista = (linhas, valorDe, sufixo) => `<div class="tower-rank-list">${linhas.map((x,i)=>`
       <div class="tower-rank-row ${i===0?'ouro':''}">
         <span class="tower-rank-pos">${i+1}º</span>
         <span class="tower-rank-name">${trainerProfileLink(escapeHtmlSafe(x.name), x.uid, x.name)}</span>
-        <span class="tower-rank-count">${x.topDays||0}<span class="tower-rank-x">🗼</span></span>
+        <span class="tower-rank-count">${valorDe(x)}<span class="tower-rank-x">${sufixo}</span></span>
       </div>`).join('')}</div>`;
+  let corpo;
+  if(r.loading){ corpo = `<p class="loading-text">Carregando...</p>`; }
+  else {
+    const hoje = r.hoje || [];
+    const geral = r.top || [];
+    corpo = `
+      <h3 class="tower-rank-tit">🔥 Hoje</h3>
+      <p class="hint-text">O andar mais alto que cada um alcançou na torre de hoje. Quem terminar o dia no topo leva o Doce Raro e o ponto — <strong>empate premia todos</strong>.</p>
+      ${hoje.length ? lista(hoje, x=>x.bestFloor, '🏢')
+                    : `<p class="hint-text">Ninguém subiu nenhum andar hoje ainda. O primeiro nome da lista pode ser o seu.</p>`}
+      <h3 class="tower-rank-tit">🏅 Geral</h3>
+      <p class="hint-text">Quantas vezes cada treinador terminou o dia no andar mais alto.</p>
+      ${geral.length ? lista(geral, x=>x.topDays||0, '🗼')
+                     : `<p class="hint-text">Ninguém pontuou ainda — o primeiro ponto sai na virada do dia.</p>`}`;
   }
   return `
   <div class="modal-overlay" onclick="closeTowerRanking()">
-    <div class="modal-box" onclick="event.stopPropagation()">
+    <div class="modal-box tower-rank-box" onclick="event.stopPropagation()">
       <div class="modal-icon">🏅</div>
       <h2>Ranking da Torre</h2>
-      <p class="hint-text">Quantas vezes cada treinador chegou no <strong>andar mais alto do dia</strong>. Um ponto por dia, e o empate pontua todo mundo que empatou.</p>
       ${corpo}
       <button class="btn secondary" onclick="closeTowerRanking()">Fechar</button>
     </div>
@@ -15857,9 +15873,9 @@ async function openTowerRanking(){
   render();
   try{
     const r = await functionsClient.httpsCallable('getTrainerTowerRanking')();
-    game.towerRanking = { loading:false, top: r.data.top || [] };
+    game.towerRanking = { loading:false, top: r.data.top || [], hoje: r.data.hoje || [] };
   } catch(e){
-    game.towerRanking = { loading:false, top: [], erro:true };
+    game.towerRanking = { loading:false, top: [], hoje: [], erro:true };
   }
   render();
 }

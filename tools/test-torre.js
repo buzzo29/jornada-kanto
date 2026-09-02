@@ -265,6 +265,34 @@ console.log('QUEM ZEROU A TORRE ANTIGA NAO PODE FICAR TRAVADO');
      'cleared: ' + zerouHoje.run.cleared);
 }
 
+
+console.log('');
+console.log('O RANKING DO DIA');
+/* Duas coisas diferentes e as duas importam: o GERAL diz quem e bom nisso ha tempo, e o de HOJE diz
+   quem esta na frente AGORA -- que e o que faz o jogador voltar antes da virada pra tentar passar
+   alguem. Os dois saem na MESMA chamada: sao a mesma tela. */
+{
+  const hoje = (await chamar(fns.getTrainerTower, 'ivy', {})).dateId;
+  const players = db.collection('trainerTowerDays').doc(hoje).collection('players');
+  await players.doc('p1').set({ uid:'p1', name:'Ana',   bestFloor:12 });
+  await players.doc('p2').set({ uid:'p2', name:'Bruno', bestFloor:9  });
+  await players.doc('p3').set({ uid:'p3', name:'Caio',  bestFloor:15 });
+  await players.doc('p4').set({ uid:'p4', name:'Duda',  bestFloor:3  });
+  const r = await chamar(fns.getTrainerTowerRanking, 'p1', {});
+  ok('a chamada devolve os dois rankings', Array.isArray(r.hoje) && Array.isArray(r.top));
+  /* Ordem decrescente, sem assumir QUEM esta na lista: os blocos anteriores deste teste tambem
+     jogaram hoje, e travar a lista exata deixaria o teste refem da ordem dos blocos. */
+  ok('e o de hoje vem ordenado do andar mais alto pro mais baixo',
+     r.hoje.every((x,i) => i === 0 || x.bestFloor <= r.hoje[i-1].bestFloor),
+     r.hoje.map(x=>x.name+':'+x.bestFloor).join(' '));
+  ok('com o mais longe do dia no topo', r.hoje[0].bestFloor === 15, JSON.stringify(r.hoje[0]));
+  ok('com o nome de cada treinador', r.hoje[0].name === 'Caio', JSON.stringify(r.hoje[0]));
+  /* Quem nao jogou hoje nao aparece -- a lista sai do documento DO DIA. */
+  const nomes = r.hoje.map(x=>x.name);
+  ok('e os quatro que joguei aparecem', ['Ana','Bruno','Caio','Duda'].every(n=>nomes.includes(n)), nomes.join(', '));
+  ok('e ninguem de fora do dia entra', r.hoje.length <= 10, r.hoje.length + ' (o teto e 10)');
+}
+
 console.log(`\n${casos - falhas}/${casos} casos passaram.`);
 if(falhas){ console.log(`${falhas} FALHA(S).`); process.exit(1); }
 })().catch(e=>{ console.error('\nERRO NAO TRATADO:', e); process.exit(1); });

@@ -904,6 +904,17 @@ verdade, cai no game over, e o teste confere que a trava soltou dos dois lados.
   transformava a tela numa lista do que o jogador não pode fazer. O servidor já escondia o time dos
   não alcançados (`towerVisibleFloors`), então "tem time" É "já cheguei aqui" — o cliente só passou
   a filtrar por isso.
+- **Dois rankings, numa chamada só.** O **de HOJE** mostra o andar mais alto que cada treinador
+  alcançou na torre do dia; o **GERAL** conta em quantos dias cada um terminou no topo. São coisas
+  diferentes e as duas importam: o geral diz quem é bom nisso há tempo, o de hoje diz quem está na
+  frente AGORA — e é ele que faz o jogador voltar antes da virada pra tentar passar alguém.
+  O de hoje sai do MESMO documento que o fechamento do dia lê (`trainerTowerDays/{dia}/players`),
+  ordenado por `bestFloor` — nenhuma estrutura nova, e nenhum campo a manter em sincronia.
+  No modal o de hoje vem **primeiro**: é a disputa que ainda dá pra mudar; o geral é histórico e não
+  muda com o que a pessoa fizer nos próximos minutos. Sem abas, porque num modal de 320px elas
+  custariam mais toque do que economizam rolagem — os dois títulos separam, e a caixa rola por
+  dentro (`max-height:80vh`) quando as duas listas vêm cheias (medido: 20 linhas cabem em 608px,
+  com o botão Fechar sempre alcançável).
 - **O prêmio é de quem foi MAIS LONGE no dia, e o empate premia todos.** Se dois pararam no andar 14
   e ninguém passou disso, os dois ganham o Doce Raro e o ponto. O ranking passou a contar **em
   quantos dias o treinador ficou no andar mais alto** (`topDays`); o `clears` antigo (dias em que

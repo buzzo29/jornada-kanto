@@ -4413,11 +4413,25 @@ exports.getTrainerTowerRanking = onCall(async (request) => {
      clears antigo (dias em que ele zerou os 10 andares) continua no documento como história, mas
      não ordena mais: com 20 andares e média 122 no último, zerar deixou de ser o objetivo. */
   const snap = await db.collection('trainerTowerRanking').orderBy('topDays', 'desc').limit(10).get();
-  return { top: snap.docs.map(d => {
-    const x = d.data();
-    return { uid: x.uid, name: x.name, topDays: x.topDays || 0, bestFloorEver: x.bestFloorEver || 0,
-             clears: x.clears || 0 };
-  })};
+  /* O RANKING DE HOJE vem junto, na MESMA chamada. São duas coisas diferentes e as duas importam:
+     o geral diz quem é bom nisso há tempo, e o de hoje diz quem está na frente AGORA -- que é o que
+     faz o jogador voltar antes da virada do dia pra tentar passar alguém.
+     Sai do mesmo documento que o fechamento do dia lê (trainerTowerDays), então não custa uma
+     estrutura nova; é só ordenar por bestFloor. */
+  const dateId = trainersLeagueTodayDateStr();
+  const hojeSnap = await db.collection('trainerTowerDays').doc(dateId).collection('players')
+    .orderBy('bestFloor', 'desc').limit(10).get();
+  return {
+    top: snap.docs.map(d => {
+      const x = d.data();
+      return { uid: x.uid, name: x.name, topDays: x.topDays || 0, bestFloorEver: x.bestFloorEver || 0,
+               clears: x.clears || 0 };
+    }),
+    hoje: hojeSnap.docs.map(d => {
+      const x = d.data();
+      return { uid: x.uid, name: x.name, bestFloor: x.bestFloor || 0 };
+    })
+  };
 });
 
 
