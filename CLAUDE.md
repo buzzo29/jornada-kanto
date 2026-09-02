@@ -934,6 +934,70 @@ verdade, cai no game over, e o teste confere que a trava soltou dos dois lados.
 - Ela permuta o **código guardado**, não o time do save: o save pode ter mudado de ordem ou de
   nível desde que a defesa foi montada, e o líder está reordenando o que ele vê defendendo.
 
+## Mochila (inventário) e Loja
+
+- **O ESTOQUE NÃO É UMA LISTA GRAVADA.** É uma leitura do que a conta já tem:
+  **Doce Raro** = o contador `rareCandies` do documento da conta (o servidor escreve na Torre, o
+  `useRareCandy` desconta); **Bônus Shiny** = os CUPONS ainda não ativados, que são o save que
+  venceu a Elite (`eliteShinyGranted` sem `eliteShinyUsed`) e a notificação de campeão de liga.
+  Inventar um armazém no cliente seria pior de duas formas: as **regras do Firestore não deixam o
+  cliente escrever campo de prêmio** — e não podem deixar, uma linha no console viraria doce
+  infinito, que é nível infinito —, e os prêmios passariam a existir em dois lugares, com duas
+  contas que divergem no primeiro erro. **Um inventário de verdade (com itens compráveis) exige
+  escrita no servidor, e é aí que a Loja vai precisar de uma Cloud Function.**
+- **`game.rareCandies` é a única fonte do doce.** Ele era lido de `game.tower.rareCandies` — o que
+  dava no mesmo enquanto o doce só existia na tela da Torre. Aberta pela Mochila, `game.tower` é
+  **null**, e a tela de gastar o doce não abriria nunca. Hoje o campo vem do documento da conta no
+  carregamento e as respostas da Torre e do `useRareCandy` o atualizam.
+- **O prêmio mudou de lugar, e a notificação parou de ser o cofre.** A notificação de campeão e a
+  tela de campeão da jornada continuam sendo **onde a pessoa descobre que ganhou**; o que elas
+  deixaram de fazer é guardar e ativar. Um prêmio guardado em três telas diferentes era o motivo de
+  ninguém achar o que tinha. As funções `activateShinyBonus` e `activateEliteShiny` do cliente foram
+  removidas — quem ativa é o `usarItem`, e ele fala direto com as mesmas Cloud Functions.
+  **Cuidado que continua valendo:** apagar a notificação de campeão apaga o cupom, porque é ela que
+  o servidor lê. É o mesmo comportamento de antes, e é por isso que a confirmação de apagar
+  notificação nomeia as que têm prêmio dentro.
+- **A pilha:** cinco doces são **UM** slot com "5x", não cinco slots.
+- **A grade tem piso de 12 slots e mora dentro de uma `.box`**, como a da Pokédex — e o slot tem a
+  MESMA medida da célula de lá (52px, quadrado). Solta sobre o fundo escuro da página, o slot vazio
+  (creme com `opacity:.6`) virava um bloco **cinza**: parecia item bloqueado, não espaço livre.
+  Slot vazio é `<div>` e não `<button>` desabilitado: não há o que fazer nele, e um botão vazio
+  ainda recebe foco pelo teclado.
+- **"Excluir" só vale pro que dá pra jogar fora de verdade.** O cupom de liga é uma notificação, e
+  apagá-la é apagar o cupom. O **Doce Raro não pode ser descartado** — é um contador que só o
+  servidor mexe, e não existe função pra devolver um; o botão fica desabilitado **dizendo por quê**.
+  Um botão que falha é pior que um botão apagado com o motivo do lado.
+- **A Mochila volta pra tela de ONDE VEIO** (`inventarioVoltarPara`). Ela é aberta de três lugares, e
+  dois estão DENTRO de um save carregado (a notificação e a tela de campeão): um "Voltar" fixo pra
+  home tirava o jogador da jornada toda vez que ele fosse buscar o prêmio — que é exatamente o que
+  aqueles botões mandam fazer. Vindo da home ela sai pelo `openSaveSelect`, que recarrega os dados
+  da conta e é o que faz o contador de moedas e o de doces chegarem atualizados.
+- **A LOJA ainda não vende nada, e mostra isso em vez de ficar vazia.** Mesma grade e mesmo quadro de
+  cima da Mochila (são a mesma leitura: um monte de quadradinhos, clico num e leio o que é). Os itens
+  aparecem com preço e o **botão Comprar desabilitado** — um botão apagado não promete nada; um botão
+  vivo que não compra, sim.
+- **`moedas` é um contador da conta que ainda não tem como subir nem descer.** Existe pra tela e pra
+  Loja; quando houver como ganhar, quem escreve tem que ser o servidor, pelo mesmo motivo do doce.
+
+## Home
+
+- **Cinco cards numa linha só**: Pokédex, Conquistas, Amigos, Mochila e Loja. A linha virou
+  `grid-template-columns:repeat(5,minmax(0,1fr))` — com `1fr` (que é `minmax(auto,1fr)`) a coluna não
+  encolhe abaixo do conteúdo, e "Conquistas" empurrava a linha inteira pra fora dos 320px.
+- **O preço medido de caber cinco:** a 320px cada card fica com **43px** de texto, e "Conquistas" na
+  fonte de pixel mede **99px**. Duas coisas cederam: o título passou pra fonte de TEXTO (mede 56px
+  na mesma palavra) e a **contagem de baixo some abaixo de 420px** — "0/250 registrados" quebrava em
+  três linhas e o card virava uma parede. Mesmo assim "Conquistas" não cabe numa linha: ela **quebra
+  em duas** (`hyphens:auto` com `overflow-wrap` de rede de segurança), e o título tem altura fixa de
+  duas linhas pra os cinco cards ficarem do mesmo tamanho. É o único ponto feio da linha de cinco —
+  se incomodar, as saídas são encurtar o rótulo ou aceitar duas fileiras.
+- **O nome do treinador ficou à ESQUERDA e o contador de moedas à direita**, no mesmo card.
+  Centralizado, o nome mudaria de posição conforme o número de moedas crescesse — dançaria de lugar
+  a cada compra. O contador não encolhe nunca: quem cede espaço é o nome, que já trunca.
+- `.btn.danger:disabled` ganhou o mesmo tratamento que o `.btn.success` já tinha: **botão
+  desabilitado precisa parecer desabilitado**, e o vermelho cheio do "Excluir" convidava a clicar em
+  algo que não responde.
+
 ## Montador de time (Torre e Ginásio da Cidade)
 
 A tela onde se escolhe pokémon de QUALQUER save pra montar um time. Uma função só
@@ -944,8 +1008,11 @@ que é justamente a parte que o jogador percebe.
 - **Virou LISTA, uma linha por pokémon** (02/09/2026). Era uma grade de quadradinhos agrupada por
   save: dava pra ver o sprite e o nível, e mais nada. Com três saves cheios são 18 quadros iguais, e
   a pergunta que se faz ali — "quem eu ponho contra um time de Pedra?" — não se responde olhando
-  sprite. Cada linha traz **sprite, nome, nível, os selos de tipo, de que time o bicho é** e uma
-  **lupa** que abre a mesma ficha da Pokédex do encontro selvagem. A lista é **paginada de 10 em 10**.
+  sprite. Cada linha traz **sprite, nome, nível, os selos de tipo, de que time o bicho é** e o
+  **ícone da Pokédex** (o mesmo `pokedexIcon()` do resto do jogo), que abre a ficha da espécie — era
+  uma lupa 🔍 até 02/09/2026. A lista é **paginada de 10 em 10**.
+  Atenção: o botão continua se chamando `.wild-dex`, a classe que nasceu no encontro selvagem, e lá
+  ele **ainda é a lupa**. Se um dia as duas telas tiverem que combinar, é o `renderWild` que muda.
 - **Paginada de 10 em 10** (`MONT_POR_PAGINA`). São **10 saves** possíveis, então a lista chega a 60
   linhas — e 60 numa tela de 320px é rolagem demais pra uma decisão que se toma olhando poucos de
   cada vez. Os botões de página ficam **depois** da lista (num celular, quem chega ao fim das dez já

@@ -74,8 +74,10 @@ ok('titulo escapado', !htmlVeneno.includes('<img src=x') && htmlVeneno.includes(
 ok('corpo escapado', !htmlVeneno.includes('<b>corpo</b>'));
 
 console.log('\nCADA TIPO OFERECE A SUA ACAO');
-ok('campeao sem ativar: botao de ativar o bonus',
-   S.ctaDaNotificacao(notif('1','league_champion')).includes('activateShinyBonus'));
+ok('campeao sem ativar: manda pra mochila, que e onde o premio mora agora',
+   S.ctaDaNotificacao(notif('1','league_champion')).includes('openInventario()'));
+ok('e nao ativa mais dentro da notificacao',
+   !S.ctaDaNotificacao(notif('1','league_champion')).includes('activateShinyBonus'));
 ok('campeao ja ativado: so o aviso',
    S.ctaDaNotificacao(notif('2','league_champion',{meta:{activated:true}})).includes('já ativado'));
 ok('pedido de amizade leva pra lista',

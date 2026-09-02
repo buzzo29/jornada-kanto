@@ -271,6 +271,8 @@
      que não responde */
   .btn.success:disabled{background:#9bb3a1;border-color:#7d9183;color:#eef2ee;cursor:not-allowed;box-shadow:none;}
   .btn.success:disabled:active{transform:none;}
+  .btn.danger:disabled{background:#b09a97;border-color:#8d7d7b;color:#f2eeee;cursor:not-allowed;box-shadow:none;}
+  .btn.danger:disabled:active{transform:none;}
   /* resultado do andar */
   .tower-result h2{margin:0 0 6px;}
   .tower-result.win{border-color:var(--green-dark);background:#eef8f0;}
@@ -962,13 +964,19 @@
   }
   .home-tagline{font-size:.8rem;color:#b8bcd9;font-weight:600;}
 
-  .home-menu-row{display:flex;gap:10px;margin-bottom:20px;}
+  /* CINCO cards numa linha só (Pokédex, Conquistas, Amigos, Mochila e Loja). Grade e não flex:
+     com flex:1 os cards ficavam com larguras diferentes conforme o texto de dentro, e a linha
+     desandava. Cinco colunas iguais a 320px dão ~56px cada -- ver o que isso custou no
+     .home-menu-title logo abaixo. */
+  .home-menu-row{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin-bottom:20px;}
   /* O nome do treinador é a identidade da conta e o atalho pro perfil -- ganha o mesmo tratamento
      dourado do 1º lugar e do box de campeão, com a faixa superior grossa dos cards do menu */
   .trainer-name-box{
     display:flex;
     align-items:center;
-    justify-content:center;
+    /* nome à esquerda e moedas à direita. Centralizado, o nome mudaria de posição conforme o
+       número de moedas crescesse -- dançaria de lugar a cada compra. */
+    justify-content:space-between;
     gap:8px;
     padding:11px 14px;
     margin-bottom:14px;
@@ -979,7 +987,19 @@
     font-family:inherit;
     width:100%;
     cursor:pointer;
-    text-align:center;
+    text-align:left;
+  }
+  /* O contador não encolhe nunca: quem cede espaço é o nome, que já trunca com reticências. */
+  .moeda-conta{
+    flex-shrink:0;
+    font-family:var(--font-ui);
+    font-size:.78rem;
+    font-weight:800;
+    color:var(--ink);
+    background:#fff;
+    border:2px solid var(--yellow-dark);
+    border-radius:3px;
+    padding:3px 6px;
   }
   .trainer-name-box:active{ transform:translate(2px,2px); box-shadow:3px 3px 0 rgba(0,0,0,.45); }
   .home-header-row{ display:flex; align-items:stretch; gap:8px; margin-bottom:14px; }
@@ -1088,14 +1108,27 @@
   .home-menu-card.pokedex{border-top-color:var(--red);}
   .home-menu-card.achievements{border-top-color:var(--yellow);}
   .home-menu-card.friends{border-top-color:var(--blue,#3b6ef2);}
+  .home-menu-card.inventario{border-top-color:var(--green);}
+  .home-menu-card.loja{border-top-color:#7038f8;}
   /* Com o terceiro card a linha aperta: em 320px o padding lateral de 8px sobrava mais que o
      texto. Testar em 320, não só em 390 -- "Conquistas" é a palavra que estoura primeiro. */
   .home-menu-card{padding-left:4px;padding-right:4px;}
   .home-menu-card .home-menu-icon{position:relative;}
+  /* A CONTAGEM SÓ CABE EM TELA LARGA. Com cinco cards a 320px, "0/250 registrados" quebra em três
+     linhas e o card vira uma parede -- o título e o ícone bastam pra saber onde se está clicando.
+     Some por padrão e volta a partir de 420px, que é onde ela cabe em duas linhas. */
+  .home-menu-stat{display:none;}
+  .home-menu-card{padding-top:12px;padding-bottom:11px;gap:4px;}
+  .home-menu-icon{font-size:1.45rem;}
+  @media (min-width:420px){
+    .home-menu-stat{display:block;}
+    .home-menu-card{padding-top:16px;padding-bottom:14px;gap:5px;}
+    .home-menu-icon{font-size:1.7rem;}
+  }
   @media (max-width:360px){
-    .home-menu-row{gap:6px;}
-    .home-menu-title{font-size:.55rem;}
-    .home-menu-stat{font-size:.56rem;line-height:1.25;}
+    .home-menu-row{gap:4px;}
+    .home-menu-title{font-size:.6rem;}
+    .home-menu-card{padding-left:2px;padding-right:2px;}
   }
 
   /* ---- MAPA DE KANTO E JOHTO ---- */
@@ -1292,8 +1325,21 @@
   .fc-resumo{text-align:center;margin-top:10px;}
   .home-menu-card:active{transform:translate(2px,2px);box-shadow:2px 2px 0 rgba(0,0,0,.4);}
   .home-menu-icon{font-size:1.7rem;line-height:1;}
-  .home-menu-title{font-family:var(--font-pixel);font-size:.62rem;color:var(--ink);}
-  .home-menu-stat{font-size:.62rem;font-weight:700;color:var(--muted);}
+  .home-menu-title{
+    font-family:var(--font-ui); font-weight:800; font-size:.62rem; color:var(--ink);
+    line-height:1.15; text-align:center; max-width:100%;
+    /* A 320px o card tem 43px de texto e "Conquistas" mede 56 -- ela PRECISA quebrar. Com a
+       página em lang="pt-BR", hyphens:auto quebra em "Con-quistas", que se lê; o overflow-wrap
+       é a rede de segurança pra navegador que não hifeniza, e quebra sem o hífen em vez de
+       deixar a palavra vazar por cima do card do lado. */
+    hyphens:auto; -webkit-hyphens:auto; overflow-wrap:break-word;
+    /* Altura de DUAS linhas sempre: sem isso o card da Conquistas fica mais alto que os outros
+       quatro e a linha inteira desalinha.
+       BLOCO, e não flex: num container flex o texto vira um item anônimo e para de quebrar do
+       jeito normal -- a palavra volta a vazar por cima do card do lado. */
+    display:block; min-height:2.3em;
+  }
+  .home-menu-stat{font-size:.62rem;font-weight:700;color:var(--muted);text-align:center;}
 
   .home-section-label{
     font-family:var(--font-pixel);
@@ -1494,6 +1540,9 @@
   .mont-sub{ display:flex; align-items:center; gap:4px; flex-wrap:wrap; }
   .mont-time{ font-size:.58rem; font-weight:800; color:var(--muted); }
   .mont-linha .wild-dex{ right:6px; }
+  /* O ícone da Pokédex ocupa o botão inteiro: no tamanho padrão do .dex-icon ele ficava perdido
+     no meio de um quadrado de 32px. */
+  .mont-linha .wild-dex .dex-icon{ width:20px; height:20px; }
   /* A navegação fica DEPOIS da lista: numa tela de celular quem chega ao fim das dez linhas já está
      embaixo, e é ali que a mão está. Os números embrulham sozinhos -- com dez saves dá seis páginas
      e a 320px eles não caberiam numa fileira só. */
@@ -1796,6 +1845,48 @@
     background:#fff;
   }
   .pokedex-cell.unknown{background:#e8e4d0;opacity:.6;}
+  /* ---- MOCHILA E LOJA ----
+     O slot tem a MESMA medida da célula da Pokédex (52px mínimo, quadrado): as duas telas são a
+     mesma leitura -- uma grade de quadradinhos onde se clica pra ler o que é --, e um tamanho
+     próprio aqui faria a mochila parecer outra coisa sem nenhum motivo.
+     O quadro de cima é o que muda entre elas: na mochila ele tem Usar/Excluir, na loja, Comprar. */
+  .item-grade{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(52px,1fr));
+    gap:6px;
+  }
+  .item-slot{
+    aspect-ratio:1;
+    position:relative;
+    display:flex; align-items:center; justify-content:center;
+    border:2px solid var(--box-border); border-radius:3px;
+    background:#fff; cursor:pointer; font-family:inherit; padding:0;
+  }
+  /* Slot vazio é um <div>, não um <button> desabilitado: não há nada pra fazer nele, e um botão
+     que não faz nada ainda recebe foco pelo teclado e atrapalha quem navega assim. */
+  .item-slot.vazio{ background:#e8e4d0; opacity:.6; cursor:default; }
+  .item-slot.sel{ border-color:var(--green-dark); background:#eef8f0; box-shadow:0 0 0 2px var(--green-dark) inset; }
+  .item-slot-icone{ font-size:1.5rem; line-height:1; }
+  /* A quantidade fica no canto, sobre o ícone: cinco doces são UM slot com "5x", e o número tem
+     que caber sem empurrar o desenho. */
+  .item-slot-qtd{
+    position:absolute; right:2px; bottom:1px;
+    font-family:var(--font-ui); font-size:.58rem; font-weight:800;
+    color:var(--ink); background:var(--yellow); border:1px solid var(--box-border);
+    border-radius:3px; padding:0 3px;
+  }
+  .item-detalhe{ margin-bottom:10px; }
+  .item-detalhe-topo{ display:flex; align-items:center; gap:10px; }
+  .item-detalhe-icone{ font-size:2.2rem; line-height:1; flex-shrink:0; }
+  .item-detalhe-nome{ display:flex; flex-direction:column; gap:2px; min-width:0; }
+  .item-detalhe-nome strong{ font-size:1rem; }
+  .item-detalhe-qtd{ font-size:.68rem; font-weight:800; color:var(--muted); }
+  .item-detalhe-texto{ margin:8px 0 0; font-size:.82rem; line-height:1.45; }
+  .item-detalhe-vazio{ margin:0; font-size:.82rem; line-height:1.45; color:var(--muted); }
+  /* Os dois botões dividem a linha: são a mesma decisão ("o que eu faço com isso?"), e empilhados
+     o Excluir ficava longe do item que ele apaga. */
+  .item-acoes{ display:flex; gap:8px; margin-top:10px; }
+  .item-acoes .btn{ flex:1; margin:0; }
   .pokedex-cell.mystery{
     background:linear-gradient(135deg,#2b2f5c,#4a2f6b);
     border-color:#9b6bd6;
@@ -3593,6 +3684,8 @@ function freshGameDefaults(){
     myActiveGymDefenses:null, // {slot: {city,countryCode}} -- carregado na home, pra mostrar o botão "Ver ginásio" nos times que defendem algo
     notificationsUnreadCount:0,
     shinyBonusExpiresAt:0, // timestamp -- enquanto Date.now() < isso, encontros selvagens usam SHINY_CHANCE_BONUS em vez do normal
+  rareCandies:0,         // doces da CONTA (ver ITENS/inventário); quem escreve é o servidor
+  moedas:0,              // moedas da CONTA -- ainda não há como ganhar nem gastar, só o contador
     shinyPityCount:0, // encontros selvagens seguidos sem capturar nenhum shiny, desde a última captura (ou desde ativar o bônus) -- sobe a chance a cada um
     shinyFoundThisSave:false, // ESTE save já conseguiu um shiny? Trava a escalada do bônus na base (ver currentShinyChance). É por save, não por conta
     wildEncounterSeq:0,       // nº do encontro selvagem deste save -- é a semente da oferta (ver goToWildEncounter)
@@ -4219,25 +4312,6 @@ async function openNotificationsScreen(){
   }
   render();
 }
-// ativa o bônus de shiny (1h de 5% em vez de 1/128) a partir de uma notificação de campeão específica.
-// Usa o expiresAt que a própria chamada já devolve, sem precisar recarregar os dados da conta inteiros
-async function activateShinyBonus(notificationId){
-  game.notificationsActionError = null;
-  try{
-    const result = await functionsClient.httpsCallable('activateShinyBonus')({ notificationId });
-    game.shinyBonusExpiresAt = result.data.expiresAt;
-    game.shinyPityCount = 0; // janela nova -- a chance recomeça em 5%, subindo dali a cada encontro
-    if(game.notificationsList){
-      game.notificationsList = game.notificationsList.map(n =>
-        n.id===notificationId ? { ...n, meta: { ...n.meta, activated:true } } : n
-      );
-    }
-  } catch(e){
-    console.error('Erro ao ativar bônus shiny:', e);
-    game.notificationsActionError = (e && e.message) || 'Não foi possível ativar o bônus agora.';
-  }
-  render();
-}
 // Nem toda notificação é só um aviso: algumas são a PORTA de acesso a um item que ainda não foi
 // resgatado (o bônus shiny do campeão, o empréstimo do Mewtwo). Apagar uma dessas por engano faz a
 // pessoa perder o item -- e no caso do bônus shiny não existe outra porta, ele vive só aqui. Por isso
@@ -4789,6 +4863,10 @@ async function loadPermanentUserData(){
     game.trainerBestStreak = d.trainerBestStreak || 0;
     game.trainerLastStreak = d.trainerLastStreak || 0;
     game.shinyBonusExpiresAt = d.shinyBonusExpiresAt || 0; // se a pessoa recarregar o app com o bônus ainda ativo, continua valendo
+    /* O contador de Doces Raros é da CONTA e sempre foi -- o que faltava era o cliente lê-lo fora
+       da Torre. Sem isso o inventário só saberia dos doces depois de a pessoa passar pela Torre. */
+    game.rareCandies = d.rareCandies || 0;
+    game.moedas = d.moedas || 0;
     game.startersSorteados = d.startersSorteados || {};    // ver sorteioDosIniciais
     game.geracaoDosSlots = d.geracaoDosSlots || {};        // ver encerrarTentativaDoSlot
     // marcas da raide do Mew, gravadas pelo servidor quando o boss cai (ver bossPremiarTop10)
@@ -10347,7 +10425,7 @@ function showJourneyEnd(){
 const CAMPOS_DA_CONTA = [
   'authUser','saveSlots','trainerName','rivalNameDefault','permanentPokedex','permanentShinyDex',
   'accountEliteChampion','leagueWinsTotal','leagueLeaderboard','trainerBestStreak','trainerLastStreak',
-  'shinyBonusExpiresAt','shinyPityCount','specialties','specialtyCounts',
+  'shinyBonusExpiresAt','shinyPityCount','specialties','specialtyCounts','rareCandies','moedas',
   'mewtwoLoanActive','mewtwoLoanCooldownUntil','mewtwoLoanUnlocked','mewtwoLoanReadyToClaim',
   'userTest','neighborhoodGymLocation','startersSorteados','geracaoDosSlots','bossTop10','bossKiller'
 ];
@@ -13378,26 +13456,6 @@ async function claimEliteShiny(){
     console.error('Erro ao reclamar o bônus da Elite:', e);
   }
 }
-async function activateEliteShiny(){
-  if(game.currentSaveSlot === null || game.currentSaveSlot === undefined) return;
-  game.eliteShinyError = null;
-  try{
-    // vai direto pelo save, sem depender de notificação -- ver activateEliteShinyBonus no index.js
-    const r = await functionsClient.httpsCallable('activateEliteShinyBonus')({ slot: String(game.currentSaveSlot) });
-    game.shinyBonusExpiresAt = r.data.expiresAt;
-    game.eliteShinyUsed = true;
-    maybeAutoSave();
-    loadNotificationsUnreadCount();   // o sino precisa refletir o cupom novo
-    render();
-  } catch(e){
-    console.error('Erro ao ativar o bônus da Elite:', e);
-    // mostra a mensagem REAL do servidor. A versão anterior engolia o motivo num aviso genérico,
-    // e ficava impossível saber se o problema era cupom já usado, id inválido ou função desatualizada
-    const motivo = (e && e.message) ? e.message : 'erro desconhecido';
-    game.eliteShinyError = motivo;
-    render();
-  }
-}
 function eliteJourneyBoxHtml(){
   const status = game.eliteStatus;
   if(status==='champion'){
@@ -13409,9 +13467,8 @@ function eliteJourneyBoxHtml(){
       premioHtml = `<p class="elite-shiny-done">✨ Bônus shiny já ativado nesta jornada.</p>`;
     } else {
       premioHtml = `<div class="elite-shiny-block">
-        <p class="hint-text">Sua vitória rendeu <strong>1 hora de bônus shiny</strong>: chance bem maior de encontrar shiny nos encontros selvagens.</p>
-        ${game.eliteShinyError ? `<p class="error-text">${escapeHtmlSafe(game.eliteShinyError)}</p>` : ''}
-        <button class="btn success" onclick="activateEliteShiny()">✨ Ativar bônus Shiny</button>
+        <p class="hint-text">Sua vitória rendeu <strong>1 hora de bônus shiny</strong>: chance bem maior de encontrar shiny nos encontros selvagens. Ele está guardado na sua <strong>mochila</strong> — use quando for jogar.</p>
+        <button class="btn success" onclick="openInventario()">🎒 Abrir a mochila</button>
       </div>`;
     }
     return `<div class="box gold-highlight">
@@ -13556,7 +13613,8 @@ function ctaDaNotificacao(n){
   if(n.type==='league_champion'){
     return (n.meta && n.meta.activated)
       ? `<p class="u-mt8 win-text">✅ Bônus já ativado</p>`
-      : `<button class="btn success u-mt8" onclick="activateShinyBonus('${escJs(n.id)}')">✨ Ativar bônus Shiny</button>`;
+      : `<p class="u-mt8 hint-text">O <strong>Bônus Shiny</strong> está guardado na sua mochila.</p>
+         <button class="btn success u-mt8" onclick="openInventario()">🎒 Abrir a mochila</button>`;
   }
   if(n.type==='friend_request'){
     // o botão leva pra lista, onde o pedido aparece com nome, presença e o que mais ajuda a
@@ -14968,8 +15026,11 @@ async function confirmTowerOrder(){
 /* Gastar um Doce Raro: escolhe UM pokémon de qualquer save e sobe 1 nível.
    Diferente da seleção de time da torre, aqui vale QUALQUER save -- o doce é da conta, não da
    subida, e limitar a saves com 8 insígnias puniria quem está no meio de uma jornada nova. */
+/* A CONTAGEM VEM DA CONTA, não da Torre. Enquanto o doce só era usado na tela da Torre, ler
+   game.tower.rareCandies dava no mesmo; agora ele também é um item do inventário, que abre sem
+   nunca ter passado pela Torre -- e ali game.tower é null. */
 function openCandyPicker(){
-  if(!(game.tower && game.tower.rareCandies > 0)) return;
+  if(!(game.rareCandies > 0)) return;
   game.candyPicker = { erro:null };
   render();
 }
@@ -14979,7 +15040,8 @@ async function useRareCandyOn(slot, monId){
   render();
   try{
     const r = await functionsClient.httpsCallable('useRareCandy')({ slot:String(slot), monId });
-    game.tower.rareCandies = r.data.rareCandies;
+    game.rareCandies = r.data.rareCandies;
+    if(game.tower) game.tower.rareCandies = r.data.rareCandies;   // a tela da Torre lê a cópia dela
     // o save mudou no servidor; recarrega os slots pra a home e a torre mostrarem o nível novo
     await loadSaveSlots();
     /* O doce sobe o nível no save E nas inscrições de liga -- quem repropaga é o servidor, no
@@ -14988,6 +15050,12 @@ async function useRareCandyOn(slot, monId){
     game.registeredTeam = null;
     if(game.currentLeagueTypeId){ checkLeagueRegistrationStatus(game.currentLeagueTypeId); }
     game.candyPicker = r.data.rareCandies > 0 ? { erro:null } : null;
+    if(game.screen === 'inventario' && !(game.rareCandies > 0)){
+      /* Gastou o último doce: a pilha some da grade, e a escolha tem que sair de cima dela --
+         senão o quadro de cima fica descrevendo um item que não está mais no inventário. */
+      const p = pilhasDoInventario();
+      game.inventarioSel = p.length ? p[0].item : null;
+    }
   } catch(e){
     console.error('Erro ao usar o doce:', e);
     game.candyPicker = { erro: (e && e.message) || 'Não foi possível usar o doce agora.' };
@@ -14997,7 +15065,7 @@ async function useRareCandyOn(slot, monId){
 function renderCandyPickerModal(){
   const st = game.candyPicker;
   if(!st) return '';
-  const restantes = (game.tower && game.tower.rareCandies) || 0;
+  const restantes = game.rareCandies || 0;
   let corpo;
   if(st.usando){
     corpo = `<p class="loading-text">Usando o doce...</p>`;
@@ -15844,6 +15912,7 @@ async function openTrainerTower(){
   try{
     const r = await functionsClient.httpsCallable('getTrainerTower')();
     game.tower = r.data;
+    if(typeof r.data.rareCandies === 'number') game.rareCandies = r.data.rareCandies;
     abrirMontador();
     game.towerPick = [];
   } catch(e){
@@ -15866,6 +15935,288 @@ function towerEligiblePokemon(){
     (s.team||[]).forEach((p, i) => out.push({ slot, idx:i, monId: p.id || null, speciesId:p.speciesId, level:p.level, shiny:!!p.shiny, teamName: s.customName || ('Time '+(slot+1)) }));
   }
   return out;
+}
+/* ============================ INVENTÁRIO E LOJA ============================
+   O CATÁLOGO. Cada item diz o que é e o que faz -- o "usar" de cada um continua sendo o caminho
+   que já existia antes de haver inventário, e é de propósito: o Doce Raro já tinha a tela de
+   escolher o pokémon, e o Bônus Shiny já tinha a função que ativa o cupom. O inventário é onde
+   eles PASSARAM A APARECER, não um mecanismo novo por baixo.
+
+   O ESTOQUE NÃO É UMA LISTA GRAVADA -- é uma leitura do que a conta já tem:
+     Doce Raro   -> o contador `rareCandies` do documento da conta, que o servidor escreve quando
+                    alguém vence a Torre e o `useRareCandy` desconta ao usar.
+     Bônus Shiny -> os CUPONS ainda não ativados: a notificação de campeão de liga e o save que
+                    venceu a Elite e ainda não gastou o prêmio.
+   Inventar um armazém novo no cliente seria pior de duas formas: as regras do Firestore não
+   deixam o cliente escrever campo de prêmio (e não podem deixar -- uma linha no console viraria
+   doce infinito, que é nível infinito), e os dois prêmios continuariam existindo nos dois lugares,
+   com duas contas que divergem no primeiro erro. */
+const ITENS = {
+  doce_raro: {
+    nome: 'Doce Raro',
+    icone: '🍬',
+    descricao: 'Sobe 1 nível de um pokémon seu, na hora. Vale acima do teto de distribuição da jornada — é a única coisa, junto do desmaio e do Bônus de Kanto, que passa do nível 55.',
+    comoGanhar: 'Chegando mais longe que todo mundo na Torre dos Treinadores no dia.',
+    preco: 300
+  },
+  bonus_shiny: {
+    nome: 'Bônus Shiny',
+    icone: '✨',
+    descricao: '1 hora de chance bem maior de encontrar shiny nos encontros selvagens. O contador aparece na home enquanto estiver valendo.',
+    comoGanhar: 'Vencendo a Elite dos 4 ou uma liga online.',
+    preco: 800
+  }
+};
+/* O QUE A CONTA TEM, em pilhas. Uma pilha é um item + quantos, e é ela que vira um quadradinho da
+   grade -- cinco doces são UM slot com "5x", não cinco slots.
+   `fontes` guarda de onde veio cada unidade do Bônus Shiny (a notificação ou o save), porque é
+   isso que a ativação precisa mandar pro servidor. O Doce Raro não precisa: o contador é um só. */
+function pilhasDoInventario(){
+  const pilhas = [];
+  const doces = game.rareCandies || 0;
+  if(doces > 0) pilhas.push({ item:'doce_raro', quantidade:doces, fontes:[] });
+  const cupons = cuponsDeBonusShiny();
+  if(cupons.length) pilhas.push({ item:'bonus_shiny', quantidade:cupons.length, fontes:cupons });
+  return pilhas;
+}
+/* Os cupons de Bônus Shiny que ainda não foram ativados, das DUAS origens.
+   O da Elite mora no SAVE (`eliteShinyGranted` sem `eliteShinyUsed`) e sobrevive a apagar
+   notificação; o da liga mora na notificação, e por isso a lista de notificações é carregada ao
+   abrir o inventário. Save que ainda não recebeu o prêmio não conta: quem entrega é o
+   `claimEliteShiny`, que roda ao abrir a tela de campeão. */
+function cuponsDeBonusShiny(){
+  const fontes = [];
+  (game.saveSlots||[]).forEach((s, slot) => {
+    if(s && s.eliteShinyGranted && !s.eliteShinyUsed){
+      fontes.push({ origem:'save', slot, rotulo:(s.customName || ('Time '+(slot+1))) });
+    }
+  });
+  (game.inventarioNotificacoes||[]).forEach(n => {
+    if(n.type === 'league_champion' && !(n.meta && n.meta.activated)){
+      fontes.push({ origem:'notificacao', id:n.id, rotulo:'Campeão de liga' });
+    }
+  });
+  return fontes;
+}
+/* Quantos slots a grade desenha. Ela mostra as pilhas e completa com vazios: um inventário que
+   encolhe até caber no que você tem não parece um inventário, parece uma lista. O piso de 12 é o
+   que preenche a tela a 320px (4 colunas x 3 linhas). */
+const INVENTARIO_SLOTS_MINIMOS = 12;
+function slotsDaGrade(pilhas){
+  const total = Math.max(INVENTARIO_SLOTS_MINIMOS, Math.ceil((pilhas.length + 1) / 4) * 4);
+  return Array.from({ length: total }, (_, i) => pilhas[i] || null);
+}
+async function openInventario(){
+  if(game.screen !== 'inventario') game.inventarioVoltarPara = game.screen;
+  game.screen = 'inventario';
+  game.inventarioSel = null;
+  game.inventarioErro = null;
+  game.inventarioCarregando = true;
+  render();
+  /* As notificações entram na conta do Bônus Shiny, então o inventário precisa da lista. NÃO marca
+     como lida: quem faz isso é a tela de notificações, e o sino não pode apagar sozinho porque
+     alguém passou pelo inventário. */
+  try{
+    const r = await functionsClient.httpsCallable('getMyNotifications')();
+    game.inventarioNotificacoes = r.data.notifications || [];
+  } catch(e){
+    console.error('Erro ao carregar as notificações do inventário:', e);
+    game.inventarioNotificacoes = [];
+    game.inventarioErro = 'Não deu pra conferir os prêmios de liga agora. O resto do inventário está aqui.';
+  }
+  game.inventarioCarregando = false;
+  /* Abre já com a primeira pilha escolhida: o quadro de cima existe pra ser lido, e abrir vazio
+     cobraria um clique pra chegar onde a pessoa já queria chegar -- a mesma decisão da caixa de
+     notificações. */
+  const pilhas = pilhasDoInventario();
+  game.inventarioSel = pilhas.length ? pilhas[0].item : null;
+  render();
+}
+function escolherItem(id){ game.inventarioSel = id; game.inventarioErro = null; render(); }
+/* A home passa pelo openSaveSelect, que recarrega os dados da conta -- é ele que faz o contador de
+   moedas e o dos doces chegarem atualizados depois de usar um item. Qualquer outra tela é uma volta
+   simples: o estado dela continua em memória, não foi a lugar nenhum. */
+function sairDaMochila(){
+  const volta = game.inventarioVoltarPara;
+  game.inventarioVoltarPara = null;
+  if(!volta || volta === 'saveSelect'){ openSaveSelect(); return; }
+  game.screen = volta;
+  render();
+}
+/* USAR. Cada item volta pro caminho que já era o dele: o Doce Raro abre a tela de escolher o
+   pokémon, o Bônus Shiny ativa UM cupom -- o do save primeiro, porque ele é o que não corre risco
+   de sumir junto com uma notificação apagada. */
+async function usarItem(id){
+  game.inventarioErro = null;
+  if(id === 'doce_raro'){
+    if(!(game.rareCandies > 0)) return;
+    openCandyPicker();
+    return;
+  }
+  if(id === 'bonus_shiny'){
+    const fonte = cuponsDeBonusShiny()[0];
+    if(!fonte) return;
+    game.inventarioUsando = true; render();
+    try{
+      const r = fonte.origem === 'save'
+        ? await functionsClient.httpsCallable('activateEliteShinyBonus')({ slot: String(fonte.slot) })
+        : await functionsClient.httpsCallable('activateShinyBonus')({ notificationId: fonte.id });
+      game.shinyBonusExpiresAt = r.data.expiresAt;
+      /* Marca a origem como gasta na cópia local: sem isso o item continuaria na grade até a
+         próxima leitura do servidor, e a pessoa clicaria de novo num cupom que já foi. */
+      if(fonte.origem === 'save' && game.saveSlots[fonte.slot]){
+        game.saveSlots[fonte.slot] = { ...game.saveSlots[fonte.slot], eliteShinyUsed: true };
+        if(game.currentSaveSlot === fonte.slot) game.eliteShinyUsed = true;
+      } else {
+        game.inventarioNotificacoes = (game.inventarioNotificacoes||[]).map(n =>
+          n.id === fonte.id ? { ...n, meta: { ...(n.meta||{}), activated:true } } : n);
+      }
+      maybeAutoSave();
+      loadNotificationsUnreadCount();   // o cupom gasto muda o que o sino tem pra mostrar
+      const restantes = pilhasDoInventario();
+      if(!restantes.some(p => p.item === 'bonus_shiny')) game.inventarioSel = restantes.length ? restantes[0].item : null;
+    } catch(e){
+      console.error('Erro ao usar o Bônus Shiny:', e);
+      game.inventarioErro = (e && e.message) || 'Não deu pra ativar o bônus agora.';
+    }
+    game.inventarioUsando = false;
+    render();
+  }
+}
+/* EXCLUIR. Só vale pro que dá pra jogar fora de verdade: o cupom de liga é uma notificação, e
+   apagar a notificação é apagar o cupom -- é o que já acontece hoje na tela de notificações, com o
+   mesmo aviso.
+   O Doce Raro NÃO tem como ser descartado: ele é um contador que só o servidor mexe, e não existe
+   função pra devolver um. Em vez de um botão que falha, ele fica desabilitado dizendo por quê --
+   inventar uma "exclusão" que na verdade gasta o doce seria pior que não ter o botão. */
+function podeExcluir(id){
+  if(id !== 'bonus_shiny') return false;
+  return cuponsDeBonusShiny().some(f => f.origem === 'notificacao');
+}
+function motivoDeNaoExcluir(id){
+  if(id === 'doce_raro') return 'O Doce Raro não pode ser jogado fora — ele só sai daqui quando você usa.';
+  if(id === 'bonus_shiny') return 'Esse bônus veio da sua jornada e fica guardado até você usar.';
+  return '';
+}
+function pedirExclusaoDeItem(id){ game.inventarioExcluir = id; render(); }
+function fecharExclusaoDeItem(){ game.inventarioExcluir = null; render(); }
+async function excluirItem(id){
+  const fonte = cuponsDeBonusShiny().find(f => f.origem === 'notificacao');
+  game.inventarioExcluir = null;
+  if(!fonte) return;
+  game.inventarioUsando = true; render();
+  try{
+    await functionsClient.httpsCallable('deleteNotification')({ id: fonte.id });
+    game.inventarioNotificacoes = (game.inventarioNotificacoes||[]).filter(n => n.id !== fonte.id);
+    const restantes = pilhasDoInventario();
+    if(!restantes.some(p => p.item === id)) game.inventarioSel = restantes.length ? restantes[0].item : null;
+  } catch(e){
+    console.error('Erro ao excluir o item:', e);
+    game.inventarioErro = (e && e.message) || 'Não deu pra excluir agora.';
+  }
+  game.inventarioUsando = false;
+  render();
+}
+/* A GRADE, compartilhada pelo inventário e pela loja: os quadradinhos são os mesmos, o que muda é
+   o que cada um representa (o que você tem x o que está à venda) e o quadro de cima. Duas cópias
+   divergiriam no tamanho do slot, que é justamente o que faz as duas telas parecerem a mesma
+   coisa. */
+function gradeDeItensHtml(slots, selecionado, aoClicar){
+  return `<div class="box"><div class="item-grade">${slots.map((p, i) => {
+    if(!p) return `<div class="item-slot vazio" aria-hidden="true"></div>`;
+    const it = ITENS[p.item];
+    return `<button class="item-slot ${selecionado===p.item?'sel':''}" onclick="${aoClicar}('${escJs(p.item)}')"
+      title="${escapeHtmlSafe(it.nome)}${p.quantidade>1?' (x'+p.quantidade+')':''}">
+      <span class="item-slot-icone">${it.icone}</span>
+      ${p.quantidade > 1 ? `<span class="item-slot-qtd">${p.quantidade}x</span>` : ''}
+    </button>`;
+  }).join('')}</div></div>`;
+}
+function renderInventario(){
+  const pilhas = pilhasDoInventario();
+  const sel = pilhas.find(p => p.item === game.inventarioSel) || null;
+  const it = sel ? ITENS[sel.item] : null;
+  const podeUsar = !!sel && !game.inventarioUsando;
+  const detalhe = it ? `
+    <div class="item-detalhe-topo">
+      <span class="item-detalhe-icone">${it.icone}</span>
+      <div class="item-detalhe-nome">
+        <strong>${escapeHtmlSafe(it.nome)}</strong>
+        <span class="item-detalhe-qtd">${sel.quantidade > 1 ? sel.quantidade + ' no inventário' : '1 no inventário'}</span>
+      </div>
+    </div>
+    <p class="item-detalhe-texto">${escapeHtmlSafe(it.descricao)}</p>
+    ${game.inventarioErro ? `<p class="error-text">${escapeHtmlSafe(game.inventarioErro)}</p>` : ''}
+    <div class="item-acoes">
+      <button class="btn success" ${podeUsar?'':'disabled'} onclick="usarItem('${escJs(sel.item)}')">
+        ${game.inventarioUsando ? 'Usando...' : '✔ Usar'}
+      </button>
+      <button class="btn danger" ${podeExcluir(sel.item) && !game.inventarioUsando ?'':'disabled'}
+        onclick="pedirExclusaoDeItem('${escJs(sel.item)}')">🗑️ Excluir</button>
+    </div>
+    ${podeExcluir(sel.item) ? '' : `<p class="hint-text">${escapeHtmlSafe(motivoDeNaoExcluir(sel.item))}</p>`}`
+  : `<p class="item-detalhe-vazio">${game.inventarioCarregando
+      ? 'Abrindo a mochila...'
+      : 'Sua mochila está vazia. Doces Raros vêm da Torre dos Treinadores; o Bônus Shiny, de vencer a Elite dos 4 ou uma liga.'}</p>
+     ${game.inventarioErro ? `<p class="error-text">${escapeHtmlSafe(game.inventarioErro)}</p>` : ''}`;
+  return `
+  <div class="eyebrow">🎒 INVENTÁRIO</div>
+  <div class="box item-detalhe">${detalhe}</div>
+  ${gradeDeItensHtml(slotsDaGrade(pilhas), game.inventarioSel, 'escolherItem')}
+  <button class="btn secondary u-mt8" onclick="sairDaMochila()">⬅ Voltar</button>
+  ${renderExcluirItemModal()}`;
+}
+function renderExcluirItemModal(){
+  if(!game.inventarioExcluir) return '';
+  const it = ITENS[game.inventarioExcluir];
+  if(!it) return '';
+  return `
+  <div class="modal-overlay" onclick="fecharExclusaoDeItem()">
+    <div class="modal-box" onclick="event.stopPropagation()">
+      <h2>Jogar fora o ${escapeHtmlSafe(it.nome)}?</h2>
+      <p class="hint-text">Isso não tem volta — o prêmio some da conta e não dá pra recuperar.</p>
+      <button class="btn danger" onclick="excluirItem('${escJs(game.inventarioExcluir)}')">🗑️ Jogar fora</button>
+      <button class="btn secondary" onclick="fecharExclusaoDeItem()">Cancelar</button>
+    </div>
+  </div>`;
+}
+/* A LOJA. Mesma grade e mesmo quadro de cima do inventário -- de propósito: são a mesma leitura
+   ("um monte de quadradinhos, clico num e leio o que é"), e o que muda é o botão do quadro.
+   AINDA NÃO VENDE NADA. Os itens aparecem com o preço e o botão DESABILITADO em vez de a tela
+   ficar vazia: assim dá pra ver o que a loja vai ser, e um botão apagado não promete nada. */
+function openLoja(){
+  game.screen = 'loja';
+  game.lojaSel = Object.keys(ITENS)[0] || null;
+  render();
+}
+function escolherItemDaLoja(id){ game.lojaSel = id; render(); }
+function renderLoja(){
+  const aVenda = Object.keys(ITENS).map(id => ({ item:id, quantidade:0, fontes:[] }));
+  const sel = aVenda.find(p => p.item === game.lojaSel) || null;
+  const it = sel ? ITENS[sel.item] : null;
+  const moedas = game.moedas || 0;
+  return `
+  <div class="eyebrow">🛒 LOJA</div>
+  <div class="box item-detalhe">
+    ${it ? `
+      <div class="item-detalhe-topo">
+        <span class="item-detalhe-icone">${it.icone}</span>
+        <div class="item-detalhe-nome">
+          <strong>${escapeHtmlSafe(it.nome)}</strong>
+          <span class="item-detalhe-qtd">🪙 ${it.preco}</span>
+        </div>
+      </div>
+      <p class="item-detalhe-texto">${escapeHtmlSafe(it.descricao)}</p>
+      <p class="hint-text">Por enquanto só dá pra conseguir jogando: ${escapeHtmlSafe(it.comoGanhar)}</p>
+      <div class="item-acoes">
+        <button class="btn success" disabled>🪙 Comprar</button>
+      </div>
+      <p class="hint-text">A loja ainda não abriu — nada aqui está à venda.</p>`
+    : `<p class="item-detalhe-vazio">A loja ainda não abriu.</p>`}
+  </div>
+  ${gradeDeItensHtml(slotsDaGrade(aVenda), game.lojaSel, 'escolherItemDaLoja')}
+  <div class="box"><p class="hint-text">Você tem <strong>🪙 ${moedas}</strong>.</p></div>
+  <button class="btn secondary u-mt8" onclick="openSaveSelect()">⬅ Voltar</button>`;
 }
 /* O MONTADOR DE TIME -- a lista com os pokémon de TODOS os saves com 8 insígnias. Nasceu dentro da
    Torre e virou função quando o Ginásio da Cidade passou a montar time do mesmo jeito (01/09/2026):
@@ -16006,7 +16357,7 @@ function montadorDeTimeHtml(escolhidos, nomeDoToggle, max, esperas){
         </span>
       </button>
       <button class="wild-dex" onclick="abrirPokedexFicha('${escJs(p.speciesId)}', ${p.shiny?'true':'false'})"
-        aria-label="Ver a ficha de ${escapeHtmlSafe(sp?sp.name:'?')}" title="Ver os atributos">🔍</button>
+        aria-label="Ver a ficha de ${escapeHtmlSafe(sp?sp.name:'?')}" title="Ver os atributos">${pokedexIcon()}</button>
     </div>`;
   }).join('')}</div>` + navegacao;
 }
@@ -16088,7 +16439,7 @@ async function fightTowerFloor(){
     // o servidor devolve a lista de andares já atualizada (com o andar enfrentado e o próximo
     // revelados), então basta substituir -- sem remendo local nem nova ida ao servidor
     if(r.data.floors) game.tower.floors = r.data.floors;
-    if(typeof r.data.rareCandies === 'number') game.tower.rareCandies = r.data.rareCandies;
+    if(typeof r.data.rareCandies === 'number'){ game.tower.rareCandies = r.data.rareCandies; game.rareCandies = r.data.rareCandies; }
     preloadBattleSprites(r.data.matchups||[]);
     // entra na MESMA tela de revelação das outras batalhas (ver finishTrainerBattle)
     game.trainerBattleResult = { matchups: r.data.matchups, win: r.data.win };
@@ -17909,6 +18260,8 @@ function renderSaveSelect(){
   const friendsTeaser = pedidosPend > 0
     ? `${pedidosPend} pedido${pedidosPend===1?'':'s'} esperando`
     : 'Desafie quem você conhece';
+  const doces = game.rareCandies || 0;
+  const itensTeaser = doces > 0 ? `${doces} Doce${doces===1?'':'s'} Raro${doces===1?'':'s'}` : 'Seus itens';
   let achievementsTeaser = `${ACHIEVEMENTS.length} desafios pra completar`;
   if(game.achievementsExtra){
     const agg = getAchievementAggregate();
@@ -17922,6 +18275,7 @@ function renderSaveSelect(){
   <div class="home-header-row">
     <button class="box trainer-name-box" onclick="openMyTrainerProfile()" aria-label="Ver meu perfil de treinador">
       <span class="trainer-name-value">${escapeHtmlSafe(game.trainerName||'')}</span>
+      <span class="moeda-conta" title="Suas moedas">🪙 ${game.moedas||0}</span>
     </button>
     <button class="notif-bell-btn" onclick="openNotificationsScreen()" aria-label="Notificações">
       🔔${(game.notificationsUnreadCount||0)>0 ? `<span class="notif-badge">${game.notificationsUnreadCount>9?'9+':game.notificationsUnreadCount}</span>` : ''}
@@ -17942,6 +18296,16 @@ function renderSaveSelect(){
       <span class="home-menu-icon">👥${(game.friendRequestCount||0)>0 ? `<span class="notif-badge">${game.friendRequestCount>9?'9+':game.friendRequestCount}</span>` : ''}</span>
       <span class="home-menu-title">Amigos</span>
       <span class="home-menu-stat">${friendsTeaser}</span>
+    </button>
+    <button class="home-menu-card inventario" onclick="openInventario()">
+      <span class="home-menu-icon">🎒</span>
+      <span class="home-menu-title">Mochila</span>
+      <span class="home-menu-stat">${itensTeaser}</span>
+    </button>
+    <button class="home-menu-card loja" onclick="openLoja()">
+      <span class="home-menu-icon">🛒</span>
+      <span class="home-menu-title">Loja</span>
+      <span class="home-menu-stat">Em breve</span>
     </button>
   </div>
   <div class="home-modes-row">
@@ -18442,6 +18806,8 @@ function render(){
     case 'onlineFight': html = renderOnlineFight(); break;
     case 'neighborhoodGymLeaderboard': html = renderNeighborhoodGymLeaderboard(); break;
     case 'notifications': html = renderNotificationsScreen(); break;
+    case 'inventario': html = renderInventario(); break;
+    case 'loja': html = renderLoja(); break;
     case 'neighborhoodGymChallengeHistory': html = renderNeighborhoodGymChallengeHistory(); break;
     case 'neighborhoodGymChallengeTeamPicker': html = renderNeighborhoodGymChallengeTeamPicker(); break;
     case 'neighborhoodGymDefenseOrder': html = renderNeighborhoodGymDefenseOrder(); break;
