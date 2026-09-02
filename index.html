@@ -13008,10 +13008,23 @@ function sequenciaDoConfronto(m){
   const reais = passosVisiveis((m.golpes || []).filter(g => g.x !== 'disable'));
   /* O teto conta GOLPES. A cura não é golpe -- deixá-la contar jogaria uma troca real de 3 golpes
      na reconstrução, que é justamente o que o teto existe pra evitar. */
+  const cura = reais.find(g => g.x === 'recover') || null;
   const golpesDeDano = reais.filter(g => g.x !== 'recover').length;
   if(reais.length && golpesDeDano <= TETO_GOLPES) return reais;
+  /* PASSOU DO TETO: a luta vira a reconstrução de 3 golpes. E aí a cura precisa de tratamento,
+     porque a reconstrução se baseia no HP do FIM -- e com a cura o "fim" é a vida CHEIA. Ela
+     concluía que o vencedor não tinha tomado dano nenhum, desenhava só a barra do perdedor caindo,
+     e a cura sumia da tela E do log. Era o "não aparece animação nenhuma" do relato de 02/09/2026,
+     e só aparece em confronto LONGO -- que é a maioria dos confrontos de verdade.
+     O conserto: reconstruir com o HP de ANTES da cura (o próprio registro guarda os dois -- hp é
+     depois, d é quanto subiu) e recolocar a cura no fim. */
+  const antesDaCura = cura
+    ? Object.assign({}, m, cura.q === 'p' ? { playerHpAfter: cura.hp - cura.d }
+                                          : { enemyHpAfter: cura.hp - cura.d })
+    : m;
   // a reconstrução fala em QUEM APANHA (side); aqui a lista é de QUEM BATE (q)
-  return reconstruirSequencia(m).map(h => ({ q: h.side === 'player' ? 'e' : 'p', d: h.amount }));
+  const reconstruida = reconstruirSequencia(antesDaCura).map(h => ({ q: h.side === 'player' ? 'e' : 'p', d: h.amount }));
+  return cura ? reconstruida.concat([cura]) : reconstruida;
 }
 /* AS FRASES DOS GOLPES ESPECIAIS VIVEM AQUI, num lugar só.
    O log da batalha e o aviso do meio da luta leem desta função. Montadas em separado, as duas

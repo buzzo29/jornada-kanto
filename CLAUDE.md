@@ -279,6 +279,15 @@ de golpes.
     **negativo**, porque os laços fazem `hp - amount` e o `hpBarTransitionMs` usa o módulo;
   - o HP da cura **não é aplicado quando o passo é lido**, só depois da frase — aplicando antes, o
     render que desenha a frase já sairia com a vida cheia e a barra não teria pra onde subir.
+  **E ela sobrevive ao TETO_GOLPES.** Passando de 3 golpes, a luta vira a reconstrução — que se
+  baseia no HP do FIM. Com a cura, o "fim" é a vida CHEIA: a reconstrução concluía que o vencedor
+  não tinha tomado dano nenhum, desenhava só a barra do perdedor caindo, e a cura sumia da tela E do
+  log. **Era esse o "não aparece animação nenhuma" do relato**, e ele só aparece em confronto LONGO
+  — que é a maioria dos confrontos de verdade, e por isso o teste feito com um confronto de dois
+  golpes montado à mão não pegava. Hoje a reconstrução usa o HP de ANTES da cura (o registro guarda
+  os dois: `hp` é depois, `d` é quanto subiu) e a cura volta no fim.
+  `tools/test-especiais.js` procura um confronto REAL de mais de 3 golpes com cura e confere que a
+  barra do vencedor DESCE durante a luta — com o defeito, ela fica parada em 100% do começo ao fim.
   A cura **não gasta vaga do `TETO_GOLPES`**: o teto conta GOLPES, e uma troca real de 3 golpes com
   cura cairia na reconstrução, que é justamente o que o teto existe pra evitar.
   E ela tem aviso PRÓPRIO (`avisoDaCura`, na faixa do resultado) em vez de entrar no

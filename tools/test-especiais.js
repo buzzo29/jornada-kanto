@@ -431,6 +431,36 @@ const tresGolpesMaisCura = { player:'Starmie', enemy:'Onix', playerSpecies:'star
 const seq3 = S.sequenciaDoConfronto(tresGolpesMaisCura);
 ok('tres golpes + cura continuam sendo os golpes REAIS', seq3.length === 4 && seq3.filter(g=>!g.x).length === 3,
    seq3.length + ' passos, ' + seq3.filter(g=>!g.x).length + ' de dano');
+
+/* CONFRONTO LONGO E DE VERDADE -- o caso que o fixture feito a mao nao pegava.
+   Passando do TETO_GOLPES, a luta vira a reconstrucao de 3 golpes, que se baseia no HP do FIM. E
+   com a cura o "fim" e a vida CHEIA: a reconstrucao concluia que o vencedor nao tinha tomado dano
+   nenhum, desenhava so a barra do perdedor caindo, e a cura sumia da tela E do log. Era o "nao
+   aparece animacao nenhuma" do relato -- e so acontece em confronto longo, que e a maioria. */
+(function(){
+  let m = null;
+  for(let i=0;i<20000 && !m;i++){
+    const r = S.simulateGymBattle([inst('alakazam',70)], [inst('zapdos',68)], Math.random);
+    const c = (r.matchups||[])[0];
+    if(c && (c.golpes||[]).some(g=>g.x==='recover') && (c.golpes||[]).filter(g=>!g.x).length > 3) m = c;
+  }
+  ok('achei um confronto longo com cura', !!m, m ? (m.golpes.filter(g=>!g.x).length + ' golpes') : 'nenhum em 20.000');
+  if(!m) return;
+  const seq = S.sequenciaDoConfronto(m);
+  ok('a cura sobrevive ao teto de golpes', seq.some(g=>g.x==='recover'),
+     seq.map(g=>g.x||'golpe').join(','));
+  ok('e continua sendo o ultimo passo', seq.slice(-1)[0].x === 'recover');
+  /* O QUE MAIS IMPORTA: a barra do vencedor tem que MEXER. Antes ela ficava parada em 100% o
+     confronto inteiro, porque a reconstrucao lia o HP ja curado como "HP do fim". */
+  const anim = S.buildAnimatedHitSequence(m);
+  let hp = m.playerHpBefore, menor = hp;
+  anim.forEach(h => { if(h.side==='player'){ hp = Math.max(0, hp - h.amount); menor = Math.min(menor, hp); } });
+  ok('a barra do vencedor DESCE durante a luta', menor < m.playerMaxHp,
+     'menor HP na animacao: ' + menor + '/' + m.playerMaxHp);
+  ok('e termina cheia depois da cura', hp === m.playerMaxHp, hp + '/' + m.playerMaxHp);
+  /* E o log tem que contar a mesma coisa que a tela mostrou. */
+  ok('e o log fala da cura', /restaurou seu HP/.test(S.passosHtml(m)));
+})();
 /* Nao tira HP: nao pode virar um passo de dano 0 na animacao nem gastar vaga do TETO_GOLPES. */
 
 ok('a ficha da Pokedex mostra ele', S.especiaisDaEspecie('starmie').some(e => e.nome === 'Recuperar'));
