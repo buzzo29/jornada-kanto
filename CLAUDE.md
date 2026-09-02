@@ -674,6 +674,24 @@ de golpes.
   O sorteio com peso é o de Efraimidis-Spirakis (chave = `U^(1/peso)`, maior primeiro) — com peso 1
   pra todo mundo ele É um embaralhamento uniforme, então rota sem tipo declarado continua idêntica,
   e a semente anti-artimanha continua devolvendo a MESMA oferta (conferido).
+- **A oferta traz QUATRO selvagens, não três** (`offerCount`, 02/09/2026). O jogador continua
+  escolhendo até 2 — o que cresce é a ESCOLHA, não o time.
+  **É a maior mexida de dificuldade desde os golpes especiais: a jornada concluída sobe de 60,51%
+  pra 65,20%** (20.000 jornadas de cada lado, **9,7σ** — não é ruído).
+  E ela não cai onde se imaginaria: **a peneira do Brock não se move** (1.381 contra 1.401 game
+  overs em 6.000 jornadas), porque no primeiro ginásio o time ainda é o inicial mais um encontro e
+  uma carta a mais não salva ninguém. Quem afrouxa é o FIM — **Giovanni vai de 615 pra 395** game
+  overs, Koga de 199 pra 178. Faz sentido: escolher os 2 melhores entre 4 rende mais quanto mais
+  tempo o time tem pra compor. Não foi compensado em nada; se incomodar, os lugares de mexer são a
+  faixa de nível dos trechos e o bolo de derrota — os mesmos da regra de espécie-por-nível.
+  O resto ficou parado, conferido nas 32 rotas: **nenhuma oferta fica curta** nem no pior caso
+  (time com seis linhas da própria rota), os **lendários seguem a 5%** por encontro e a fatia do
+  tipo da rota quase não se move (77,3% → 76,3%). O que sobe é a chance de cada espécie aparecer —
+  o Porygon, que só mora na Usina, vai de 12,9% pra **16,3%** por oferta.
+  Em 320px o quarto card não aperta nada (a lista é uma coluna, um card por linha): conferido no
+  navegador, sem quebra de nome e sem rolagem horizontal, a página vai de ~963 pra 1.062px.
+  O número vive **por etapa** no `LEGS`, e não numa constante: cada trecho já tem faixa de nível
+  própria, então é ali que se mexeria se um dia um trecho precisasse de oferta maior que os outros.
 - **A oferta nunca traz duas entradas da MESMA LINHA** (`semLinhaRepetida`, conferido no fim, depois
   de todo mundo passar). O `buildOfferFromPool` já cuidava disso no que ELE sorteia — o furo era
   quem entra DEPOIS dele: o **raro da rota**, a pré-evolução de inicial e a rede dos intocáveis

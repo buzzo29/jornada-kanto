@@ -2835,17 +2835,33 @@ const WILD_POOL_LEG5 = ['tauros','psyduck','krabby','horsea','goldeen','shellder
 const WILD_POOL_LEG6 = ['gastly','ditto','lickitung','rhyhorn','seel','farfetchd','kangaskhan','scyther','abra','drowzee','venonat','grimer','dratini','kingler','weepinbell','primeape','poliwhirl','dugtrio'];
 const WILD_POOL_LEG7 = ['omanyte','kabuto','electrode','magmar','lapras','porygon','eevee','dratini','jynx','mrmime','growlithe','vulpix','pikachu','dewgong','haunter','graveler','hypno','seaking','tentacruel'];
 const WILD_POOL_LEG8 = ['snorlax','chansey','hitmonlee','hitmonchan','pinsir','electabuzz','aerodactyl','rhyhorn','sandshrew','onix','fearow','pidgeot','persian','tauros','weezing','poliwrath','arcanine','rapidash','cloyster','wigglytuff','starmie','clefable'];
+/* QUATRO selvagens por encontro, não três (02/09/2026). O jogador continua escolhendo até 2 -- o
+   que cresce é a ESCOLHA, não o time.
+   O preço foi medido e é o maior desta série: a jornada concluída sobe de 60,51% pra 65,20%
+   (20.000 jornadas de cada lado, 9,7 sigma -- não é ruído). E ele não cai onde se imaginaria:
+   a peneira do Brock NÃO se move (1.381 contra 1.401 game overs em 6.000 jornadas), porque no
+   primeiro ginásio o time ainda é o inicial mais um encontro e uma carta a mais não salva ninguém.
+   Quem afrouxa é o FIM: o Giovanni vai de 615 pra 395 game overs e o Koga de 199 pra 178. Faz
+   sentido -- escolher os 2 melhores entre 4 rende mais quanto mais tempo o time tem pra compor.
+   Se um dia incomodar, os lugares de mexer são a faixa de nível dos trechos e o bolo de derrota,
+   os mesmos da regra de espécie-por-nível.
+   O resto ficou parado, e isso foi conferido nas 32 rotas: nenhuma oferta fica curta nem com o
+   pior time possível (seis linhas da própria rota), os lendários seguem a 5% por encontro e a
+   fatia do tipo da rota quase não se move (77,3% -> 76,3%). O que sobe é a chance de cada espécie
+   aparecer -- o Porygon, que só mora na Usina, vai de 12,9% pra 16,3% por oferta.
+   O número está aqui por ETAPA e não numa constante porque cada trecho já tem faixa de nível
+   própria: se um dia um trecho precisar de oferta maior que os outros, é aqui que se mexe. */
 const LEGS = [
-  { pool: WILD_POOL_LEG1, offerCount: 3, minLevel: 3, maxLevel: 6 },
-  { pool: WILD_POOL_LEG2, offerCount: 3, minLevel: 8, maxLevel: 13 },
-  { pool: WILD_POOL_LEG3, offerCount: 3, minLevel: 13, maxLevel: 17 },
-  { pool: WILD_POOL_LEG4, offerCount: 3, minLevel: 18, maxLevel: 23 },
-  { pool: WILD_POOL_LEG5, offerCount: 3, minLevel: 23, maxLevel: 28 },
-  { pool: WILD_POOL_LEG6, offerCount: 3, minLevel: 28, maxLevel: 33 },
-  { pool: WILD_POOL_LEG7, offerCount: 3, minLevel: 33, maxLevel: 38 },
+  { pool: WILD_POOL_LEG1, offerCount: 4, minLevel: 3, maxLevel: 6 },
+  { pool: WILD_POOL_LEG2, offerCount: 4, minLevel: 8, maxLevel: 13 },
+  { pool: WILD_POOL_LEG3, offerCount: 4, minLevel: 13, maxLevel: 17 },
+  { pool: WILD_POOL_LEG4, offerCount: 4, minLevel: 18, maxLevel: 23 },
+  { pool: WILD_POOL_LEG5, offerCount: 4, minLevel: 23, maxLevel: 28 },
+  { pool: WILD_POOL_LEG6, offerCount: 4, minLevel: 28, maxLevel: 33 },
+  { pool: WILD_POOL_LEG7, offerCount: 4, minLevel: 33, maxLevel: 38 },
   // trecho 8: o caminho até o Giovanni, último ginásio. Era 45-50; subiu pra 50-55 pra os selvagens
   // do fim da jornada acompanharem o time do jogador, que a essa altura já está por volta do 55
-  { pool: WILD_POOL_LEG8, offerCount: 3, minLevel: 50, maxLevel: 55 }
+  { pool: WILD_POOL_LEG8, offerCount: 4, minLevel: 50, maxLevel: 55 }
 ];
 
 /* -------------------------------------------------------------------
