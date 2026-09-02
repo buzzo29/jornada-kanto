@@ -53,15 +53,69 @@ ok('explodiu: o confronto se resolve ali', S.tentarGolpeEspecial(a, b, rngFixo(0
 ok('e os dois caem na hora', a.hp === 0 && b.hp === 0, 'a=' + a.hp + ' b=' + b.hp);
 ok('o log ganha a linha da explosao', diario.some(g => g.x === 'boom' && g.g === 'auto-destruição'));
 
-/* SONO: o alvo dorme e nao revida -- quem usou nao toma nada. */
+/* SONO: o alvo passa DUAS TROCAS sem revidar e depois acorda -- a luta segue normal.
+   Ja foi abate instantaneo, e os jogadores reclamaram com razao: nao era o numero que pesava
+   (medido, valia +1,4 ponto de vitoria contra +0,8 do Recuperar), era a FORMA -- perder um pokemon
+   inteiro pra um sorteio de 5%, sem jogada possivel e sem tomar um golpe.
+   Medido depois da mudanca: o ganho cai de +1,4 pra +0,7 ponto. */
 a = inst('jigglypuff'); b = inst('onix');
 a.maxHp = S.calcMaxHp(a); a.hp = a.maxHp; b.maxHp = S.calcMaxHp(b); b.hp = b.maxHp;
 const hpAntes = a.hp;
 diario = [];
-ok('dormiu: o confronto se resolve ali', S.tentarGolpeEspecial(a, b, rngFixo(0.01), diario) === true);
-ok('o alvo cai e quem usou nao perde nada', b.hp === 0 && a.hp === hpAntes, 'a=' + a.hp + '/' + hpAntes + ' b=' + b.hp);
+ok('dormiu: o confronto NAO se resolve ali', S.tentarGolpeEspecial(a, b, rngFixo(0.01), diario) === false);
+ok('ninguem cai por causa do sono', b.hp === b.maxHp && a.hp === hpAntes, 'a=' + a.hp + ' b=' + b.hp);
+ok('e o alvo fica marcado por 2 trocas', b._dormindoPor === 2, 'dormindoPor: ' + b._dormindoPor);
 ok('e o log diz qual golpe foi', diario.some(g => g.x === 'sono' && g.g === 'Canto'));
-
+/* QUEM DORME NAO ATACA -- e nao vira linha no log. Uma linha de "-0 de HP" faria o log dizer que
+   ele atacou e nao machucou, quando o que aconteceu foi ele nao ter atacado. */
+(function(){
+  let comSono = null;
+  for(let i=0;i<30000 && !comSono;i++){
+    const r = S.simulateGymBattle([inst('paras',60)], [inst('onix',60)], Math.random);
+    const m = (r.matchups||[])[0];
+    if(m && (m.golpes||[]).some(g=>g.x==='sono')) comSono = m;
+  }
+  ok('achei um confronto com sono', !!comSono);
+  if(!comSono) return;
+  const golpes = comSono.golpes.filter(g=>!g.x);
+  ok('nenhuma linha de dano zero no registro', golpes.every(g=>g.d > 0),
+     golpes.map(g=>g.d).join(','));
+  /* As DUAS primeiras trocas depois do sono sao so do lado de quem usou. */
+  const doisPrimeiros = golpes.slice(0,2);
+  ok('os dois primeiros golpes sao de quem usou o sono',
+     doisPrimeiros.every(g => g.q === 'p'), doisPrimeiros.map(g=>g.q).join(','));
+})();
+/* E o alvo pode SOBREVIVER e ganhar -- o que antes era impossivel. */
+(function(){
+  let venceuDepoisDeDormir = 0, total = 0;
+  for(let i=0;i<20000;i++){
+    const r = S.simulateGymBattle([inst('jigglypuff',60)], [inst('snorlax',60)], Math.random);
+    const m = (r.matchups||[])[0];
+    if(!m || !(m.golpes||[]).some(g=>g.x==='sono')) continue;
+    total++;
+    if(!m.playerWon) venceuDepoisDeDormir++;
+  }
+  ok('quem dorme pode acordar e VENCER o confronto', total > 0 && venceuDepoisDeDormir > 0,
+     venceuDepoisDeDormir + ' de ' + total + ' (antes era 0 -- o sono matava na hora)');
+})();
+/* O LOG NAO PODE SE CONTRADIZER: em confronto longo a reconstrucao nao sabe do sono e comecava
+   pelo golpe de quem tinha acabado de dormir. */
+(function(){
+  let longo = null;
+  for(let i=0;i<30000 && !longo;i++){
+    const r = S.simulateGymBattle([inst('jigglypuff',60)], [inst('snorlax',60)], Math.random);
+    const m = (r.matchups||[])[0];
+    if(m && (m.golpes||[]).some(g=>g.x==='sono') && (m.golpes||[]).filter(g=>!g.x).length > 3) longo = m;
+  }
+  ok('achei um confronto longo com sono', !!longo);
+  if(!longo) return;
+  const seq = S.sequenciaDoConfronto(longo);
+  const sono = seq.find(g=>g.x==='sono');
+  ok('o sono sobrevive ao teto de golpes', !!sono);
+  ok('e vem primeiro', seq[0].x === 'sono');
+  ok('e quem dormiu NAO ataca logo depois de dormir', seq[1] && seq[1].q === sono.q,
+     seq.map(g=>(g.x||'golpe')+':'+g.q).join(' '));
+})();
 /* Quem nao tem golpe especial nunca cai nesse caminho. */
 a = inst('pidgey'); b = inst('onix');
 let nenhum = 0;

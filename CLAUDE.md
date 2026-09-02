@@ -190,6 +190,29 @@ de golpes.
   Metrônomo são os **4 pedidos** (Togepi, Togetic, Cleffa, Snubbull). Clefairy, Clefable e Snorlax
   também aprendem Metrônomo por nível no original e ficaram **de fora de propósito**: são espécies
   comuns em time de jogador e de líder, e o metrônomo é o golpe mais aleatório dos três.
+- **O sono dá DUAS TROCAS livres, não mata mais** (`SONO_EM_TROCAS = 2`, 02/09/2026). O alvo apanha
+  sem revidar por duas trocas e então acorda; a luta segue normal. Como o Disable e a Recuperação, é
+  `continue` e não `return true` — o confronto acontece inteiro.
+  **Mudou por reclamação dos jogadores, e a medição explicou por quê**: não era o NÚMERO que pesava
+  (valia **+1,4 ponto** de vitória, contra +0,8 do Recuperar — nem de longe o mais forte do jogo),
+  era a FORMA. Perder um pokémon inteiro pra um sorteio de 5%, sem jogada possível e sem sequer
+  tomar um golpe, é ruim mesmo valendo pouco. Baixar a chance seria o remédio errado: o golpe ficaria
+  mais raro e igualmente injusto quando saísse.
+  **Medido depois:** o ganho cai de **+1,4 pra +0,7 ponto** (mesmos times dos dois lados, 8.000
+  batalhas; o controle sem sonífero fica parado em 49,7%, o que valida a medição). Na jornada não se
+  move: 60,8% → 60,2%, 1,0σ.
+  Efeito colateral bonito: quem aproveita bem quase não perde poder (Gengar, rápido e forte, vai de
+  +1,47 pra +1,31), e quem não aproveita perde muito (Paras, de +1,54 pra +0,53). O golpe passou a
+  premiar quem consegue capitalizar em vez de ser um botão de deletar pokémon igual pra todo mundo.
+- **Quem dorme não vira linha no log.** O golpe do adormecido não entra no diário — uma linha de
+  "−0 de HP" faria o log dizer que ele atacou e não machucou, quando o que aconteceu foi ele não ter
+  atacado.
+- **E a reconstrução não pode contradizer o sono.** Ela não sabe do golpe (só interpola HP) e
+  começava pelo golpe de quem tinha acabado de dormir — o log se contradizia na cara do jogador:
+  "fez dormir" e, na linha seguinte, o adormecido batendo. Hoje o golpe de quem USOU o sono vem pra
+  frente. Não mexe em número nenhum: a soma dos golpes é a mesma, só a ordem muda.
+  Isso passou a importar mais do que antes: com a luta continuando depois do sono, **mais confrontos
+  passam do `TETO_GOLPES`** e caem na reconstrução.
 - **Chance por CONFRONTO, não por golpe**: 15% autodestruição, 5% sono.
   **Só sai contra alvo com MAIS da metade da vida** (`BOOM_MINIMO_DO_ALVO = 0,5`, 02/09/2026).
   Explodir num adversário já machucado é trocar o pokémon inteiro por um abate que a troca de golpes

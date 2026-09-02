@@ -799,6 +799,14 @@ const CHANCE_AUTODESTRUICAO = 0.15;
    verdade. Com a trava ela vira o que devia ser: o recurso de quem está diante de um alvo cheio. */
 const BOOM_MINIMO_DO_ALVO = 0.5;
 const CHANCE_SONO = 0.05;
+/* Quantas TROCAS o alvo passa sem revidar. O sono já foi abate instantâneo -- o alvo ia a 0 de HP
+   sem tocar em ninguém -- e os jogadores reclamaram, com razão: não era o número que pesava (medido,
+   valia +1,4 ponto de vitória, contra +0,8 do Recuperar), era a FORMA. Perder um pokémon inteiro
+   pra um sorteio de 5%, sem jogada possível e sem tomar um golpe, é ruim mesmo valendo pouco.
+   Com trocas livres ele vira vantagem de tempo em vez de execução: o alvo apanha duas vezes de
+   graça e depois acorda. Medido: o ganho cai de +1,4 pra +0,7 ponto, e quem aproveita bem (Gengar,
+   rápido e forte) quase não perde poder -- o golpe passa a premiar quem consegue capitalizar. */
+const SONO_EM_TROCAS = 2;
 const CHANCE_METRONOMO_EFEITO = 0.10;   // por efeito: 10% cada um dos três, 70% golpe comum
 const CHANCE_DISABLE = 0.10;
 const CHANCE_RECUPERAR = 0.10;
@@ -936,14 +944,14 @@ function tentarGolpeEspecial(active, enemy, rng, diario){
       }
       continue;
     }
-    /* SONO: o alvo dorme e não revida. Quem usou ataca até derrubar, sem tomar nada -- é isso que
-       o pedido descreve, e é o que torna 5% um número alto de propósito. */
-    const danoNoAlvo = alvo.hp;
-    alvo.hp = 0;
+    /* SONO: o alvo passa SONO_EM_TROCAS trocas sem revidar e depois acorda -- a luta segue normal.
+       Como o Disable e a Recuperação, é 'continue' e não 'return true': o confronto acontece
+       inteiro, só que com o adversário de mãos atadas no começo. */
+    alvo._dormindoPor = SONO_EM_TROCAS;
     if(diario){
-      diario.push({ q: marca, d: danoNoAlvo, hp: 0, c:0, m:0, z:0, x:'sono', g: especial.golpe });
+      diario.push({ q: marca, d: 0, hp: alvo.hp, c:0, m:0, z:0, x:'sono', g: especial.golpe });
     }
-    return true;
+    continue;
   }
   return false;
 }
@@ -957,8 +965,13 @@ function doExchange(active, enemy, rng, diario){
   // Os DOIS sempre atacam em toda troca -- a velocidade (Gen 1 real) só decide QUEM conecta primeiro.
   // Se o primeiro golpe nocauteia, o caído ainda responde com o "golpe moribundo" (reduzido, nunca
   // cancelado). Isso impede que um pokémon raspando de HP varra uma fila inteira só por ser mais rápido.
-  const dmgToEnemy = calcDamage(active, enemy, rng);
-  const dmgToActive = calcDamage(enemy, active, rng);
+  /* Quem está dormindo não ataca nesta troca, e o contador anda. O golpe dele não sai NEM no
+     diário: uma linha de "-0 de HP" faria o log dizer que ele atacou e não machucou, quando o que
+     aconteceu foi ele não ter atacado. O log tem que contar a mesma coisa que a tela mostra. */
+  const acorda = (p) => { if(!(p._dormindoPor > 0)) return false; p._dormindoPor--; return true; };
+  const activeDorme = acorda(active), enemyDorme = acorda(enemy);
+  const dmgToEnemy = activeDorme ? 0 : calcDamage(active, enemy, rng);
+  const dmgToActive = enemyDorme ? 0 : calcDamage(enemy, active, rng);
   const spdActive = effectiveSpeed(active);
   const spdEnemy = effectiveSpeed(enemy);
   // empate de velocidade: sorteio -- rng com seed fixa nas Ligas, então continua determinístico
@@ -983,8 +996,14 @@ function doExchange(active, enemy, rng, diario){
     /* O dano registrado é o que SAIU DE VERDADE da vida do alvo, não o número que a fórmula
        sorteou: um golpe de 101 num pokémon com 54 de HP tira 54. Gravar o valor cru fazia o log
        não fechar -- somando as linhas dava mais dano do que o pokémon tinha de vida. */
-    diario.push({ q: activeFirst?'p':'e', d: secondHpBefore - second.hp, hp: second.hp, c: first.lastCrit?1:0, m:0, z: first.lastMoveNulo?1:0 });
-    diario.push({ q: activeFirst?'e':'p', d: firstHpBefore  - first.hp,  hp: first.hp,  c: second.lastCrit?1:0, m: segundoCaiu?1:0, z: second.lastMoveNulo?1:0 });
+    const primeiroDormiu = (first === active) ? activeDorme : enemyDorme;
+    const segundoDormiu  = (second === active) ? activeDorme : enemyDorme;
+    if(!primeiroDormiu){
+      diario.push({ q: activeFirst?'p':'e', d: secondHpBefore - second.hp, hp: second.hp, c: first.lastCrit?1:0, m:0, z: first.lastMoveNulo?1:0 });
+    }
+    if(!segundoDormiu){
+      diario.push({ q: activeFirst?'e':'p', d: firstHpBefore  - first.hp,  hp: first.hp,  c: second.lastCrit?1:0, m: segundoCaiu?1:0, z: second.lastMoveNulo?1:0 });
+    }
   }
   // EMPATE NÃO EXISTE: se o golpe moribundo também derrubaria o primeiro, fica de pé quem tinha o
   // MAIOR percentual de HP entrando na troca, com 1%-10% do HP máximo (sorteado). Percentual igual
