@@ -1002,9 +1002,12 @@ function doExchange(active, enemy, rng, diario){
   if(venceuOConfronto && venceuOConfronto.hp < venceuOConfronto.maxHp &&
      !ehImuneAEspecial(venceuOConfronto) && RECUPERACAO.includes(venceuOConfronto.speciesId) &&
      rng() < CHANCE_RECUPERAR){
+    /* Grava QUANTO foi curado. A animação precisa disso pra desenhar a barra subindo: sem o
+       número ela só via o valor final e a vida aparecia cheia do nada, sem passo nenhum. */
+    const curado = venceuOConfronto.maxHp - venceuOConfronto.hp;
     venceuOConfronto.hp = venceuOConfronto.maxHp;
     if(diario){
-      diario.push({ q: (venceuOConfronto === active) ? 'p' : 'e', d: 0, hp: venceuOConfronto.hp,
+      diario.push({ q: (venceuOConfronto === active) ? 'p' : 'e', d: curado, hp: venceuOConfronto.hp,
                     c:0, m:0, z:0, x:'recover', g:'Recuperar' });
     }
   }

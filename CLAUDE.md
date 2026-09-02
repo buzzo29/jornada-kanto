@@ -265,6 +265,25 @@ de golpes.
   inteira, sem recorte. Lugia, Ho-Oh e Celebi ficam mesmo sendo os intocáveis — hoje ninguém os tem
   e nenhum NPC os usa, então a entrada não roda, mas ela é VERDADE. O **Mewtwo** aprende e ficou de
   fora pelo motivo de sempre: ele e o Mew são imunes ao bloco inteiro, e ali seria letra morta.
+  **A CURA É UM PASSO DA ANIMAÇÃO, e o ÚLTIMO.** Ela chegou errada na primeira versão: ficava fora
+  da `sequenciaDoConfronto` (junto com o Disable), então a animação só via o valor final — a barra
+  do vencedor pulava pra cheia no mesmo instante do golpe que derrubou o adversário, sem nunca
+  mostrar o dano que ele tinha tomado, e a frase aparecia no COMEÇO da luta, entregando o resultado.
+  Reportado em 02/09/2026 como "enche, volta e enche de novo".
+  Hoje a ordem é: os golpes descem as barras → **o adversário fica parado em 0** → a frase entra →
+  **e só então a barra do vencedor sobe**. O texto é a EXPLICAÇÃO da barra subindo; invertendo, o
+  jogador vê a vida encher sozinha e só depois entende por quê.
+  Três detalhes que fazem isso funcionar:
+  - o motor grava **quanto** foi curado (`d` do registro), senão a animação não teria o que desenhar;
+  - o passo da cura mexe na barra de **quem curou** (as outras linhas dizem quem APANHA) e com valor
+    **negativo**, porque os laços fazem `hp - amount` e o `hpBarTransitionMs` usa o módulo;
+  - o HP da cura **não é aplicado quando o passo é lido**, só depois da frase — aplicando antes, o
+    render que desenha a frase já sairia com a vida cheia e a barra não teria pra onde subir.
+  A cura **não gasta vaga do `TETO_GOLPES`**: o teto conta GOLPES, e uma troca real de 3 golpes com
+  cura cairia na reconstrução, que é justamente o que o teto existe pra evitar.
+  E ela tem aviso PRÓPRIO (`avisoDaCura`, na faixa do resultado) em vez de entrar no
+  `avisoDoConfronto`: autodestruição e sono decidem o confronto de uma vez e a frase deles acompanha
+  a luta inteira; a cura acontece depois que a luta acabou.
   **A linha dele no log vem por ÚLTIMO** — a luta já acabou quando isso acontece, o oposto da
   anulação, que abre o confronto e vem primeiro.
   **Medido:** um time com um recuperador ganha **~0,8 ponto** num 6x6 (Alakazam 54,6% → 55,6%,

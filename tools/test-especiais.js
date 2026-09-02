@@ -391,18 +391,48 @@ console.log('\nA FRASE DA RECUPERACAO');
 const mRec = { player:'Alakazam', enemy:'Onix', playerSpecies:'alakazam', enemySpecies:'onix',
   playerHpBefore:200, playerHpAfter:200, playerMaxHp:200, enemyHpBefore:210, enemyHpAfter:0, enemyMaxHp:210,
   playerMove:'Psychic', enemyMove:'Rock',
-  golpes:[{ q:'p', d:210, hp:0 }, { q:'e', d:90, hp:110 }, { q:'p', d:0, hp:200, x:'recover', g:'Recuperar' }] };
+  golpes:[{ q:'p', d:210, hp:0 }, { q:'e', d:90, hp:110 }, { q:'p', d:90, hp:200, x:'recover', g:'Recuperar' }] };
 ok('e a pedida: "Alakazam usou Recuperar e restaurou seu HP"',
-   S.avisoDoConfronto(mRec) === '💚 Alakazam usou Recuperar e restaurou seu HP!', S.avisoDoConfronto(mRec));
+   S.avisoDaCura(mRec) === '💚 Alakazam usou Recuperar e restaurou seu HP!', S.avisoDaCura(mRec));
 ok('no log ela vem com o selo do tipo (Recover e Normal)',
    S.passosHtml(mRec).includes('usou <span class="type-pill" style="background:' + S.TYPE_COLORS['Normal'] + '">Recuperar</span> e restaurou'));
 /* Ela vem por ULTIMO: a luta ja acabou quando isso acontece -- o oposto da anulacao, que abre o
    confronto e por isso vem primeiro. */
 const htmlRec = S.passosHtml(mRec);
 ok('e vem por ULTIMO no log', htmlRec.indexOf('Recuperar') > htmlRec.lastIndexOf('atacou'));
+/* A ANIMACAO DA CURA. Ela chegou errada na primeira versao: a cura ficava FORA da sequencia, entao
+   a animacao so via o valor final -- a barra do vencedor pulava pra cheia no mesmo instante do
+   golpe que derrubou o adversario, e a frase aparecia no COMECO da luta, entregando o resultado.
+   Reportado em 02/09/2026 como "enche, volta e enche de novo". */
+ok('a cura E um passo da sequencia', S.sequenciaDoConfronto(mRec).some(g => g.x === 'recover'));
+ok('e e o ULTIMO -- ela acontece depois da luta',
+   S.sequenciaDoConfronto(mRec).slice(-1)[0].x === 'recover');
+const seqAnim = S.buildAnimatedHitSequence(mRec);
+/* Nas outras linhas 'side' e quem APANHA; na cura e quem CUROU, e o valor e negativo pra a barra
+   subir (os lacos fazem hp - amount). */
+ok('a barra que mexe e a de QUEM CUROU', seqAnim.slice(-1)[0].side === 'player');
+ok('e ela SOBE (valor negativo)', seqAnim.slice(-1)[0].amount === -90, seqAnim.slice(-1)[0].amount + '');
+ok('marcada como cura, pro laco saber a ordem', seqAnim.slice(-1)[0].cura === true);
+/* A frase NAO aparece durante a luta -- so no resultado, quando a barra sobe. */
+ok('nao aparece durante a troca de golpes', S.avisoDoConfronto(mRec) === '', S.avisoDoConfronto(mRec));
+ok('e aparece no resultado', S.avisoDaCura(mRec) === '💚 Alakazam usou Recuperar e restaurou seu HP!',
+   S.avisoDaCura(mRec));
+/* Autodestruicao e sono sao o contrario: eles decidem o confronto de uma vez, entao a frase deles
+   acompanha a luta inteira. */
+ok('e a explosao continua avisando durante a luta', S.avisoDoConfronto(mBoom) !== '');
+ok('sem virar aviso de cura', S.avisoDaCura(mBoom) === '');
+/* A cura nao pode gastar vaga do TETO_GOLPES: com ela contando, uma troca real de 3 golpes cairia
+   na reconstrucao e os golpes de verdade se perderiam. */
+const tresGolpesMaisCura = { player:'Starmie', enemy:'Onix', playerSpecies:'starmie', enemySpecies:'onix',
+  playerHpBefore:200, playerHpAfter:200, playerMaxHp:200, enemyHpBefore:210, enemyHpAfter:0, enemyMaxHp:210,
+  playerMove:'Water', enemyMove:'Rock',
+  golpes:[{q:'p',d:70,hp:140},{q:'e',d:60,hp:140},{q:'p',d:140,hp:0},
+          {q:'p',d:60,hp:200,x:'recover',g:'Recuperar'}] };
+const seq3 = S.sequenciaDoConfronto(tresGolpesMaisCura);
+ok('tres golpes + cura continuam sendo os golpes REAIS', seq3.length === 4 && seq3.filter(g=>!g.x).length === 3,
+   seq3.length + ' passos, ' + seq3.filter(g=>!g.x).length + ' de dano');
 /* Nao tira HP: nao pode virar um passo de dano 0 na animacao nem gastar vaga do TETO_GOLPES. */
-ok('e fica fora da sequencia de golpes', S.sequenciaDoConfronto(mRec).length === 2 &&
-   !S.sequenciaDoConfronto(mRec).some(g => g.x === 'recover'));
+
 ok('a ficha da Pokedex mostra ele', S.especiaisDaEspecie('starmie').some(e => e.nome === 'Recuperar'));
 ok('e quem tem dois aparece com os dois',
    S.especiaisDaEspecie('alakazam').map(e=>e.nome).join(' + ') === 'Anulação + Recuperar',
