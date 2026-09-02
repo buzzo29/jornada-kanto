@@ -971,6 +971,16 @@ verdade, cai no game over, e o teste confere que a trava soltou dos dois lados.
 - **Cobra primeiro, sorteia depois.** Sortear antes de cobrar daria a oferta de graça pra quem
   fechasse a aba no meio. Se a cobrança falhar (moeda de menos, rede), nada muda na tela e o motivo
   aparece nela.
+- **O botão fica ENTRE o contador de selecionados e a caixa dos selvagens**, não no rodapé: é ali
+  que a decisão é tomada. Embaixo dos cards e do "Confirmar equipe" ele chegava tarde -- quem
+  rolou até o fim da lista já escolheu.
+  Ele carrega os dois textos: **"🪙 3 - Sortear novamente"** à esquerda e **"Possui: 🪙 N"** à
+  direita, dentro do mesmo botão. Por isso a fonte dele é menor que a dos outros botões, e isso foi
+  medido: a 320px sobram ~170px pra ação depois do saldo, e a frase no corpo normal (14,4px) mede
+  200 -- quebrava em duas linhas. Quem tem que caber com folga é o SALDO, que cresce com 4 dígitos;
+  a ação é texto fixo.
+  A frase que explicava tudo isso em texto ("Você tem X. O re-sorteio troca as espécies E os
+  níveis") saiu a pedido em 02/09/2026: o botão já diz o preço e o saldo.
 - **A recusa diz quanto falta** ("Você tem 1 moeda — o re-sorteio custa 3"), senão o botão parece
   quebrado. Ele também já nasce desabilitado abaixo de 3.
 - **O PREÇO MEDIDO, e é a maior mexida de dificuldade desta série.** Com as 70 moedas de uma jornada

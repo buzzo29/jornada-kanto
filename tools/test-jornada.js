@@ -768,6 +768,34 @@ console.log('\n=== A OFERTA SELVAGEM ===');
   ok('encontro novo zera os re-sorteios', (S.__getGame().wildRerolls || 0) === 0,
      String(S.__getGame().wildRerolls));
 })();
+/* O BOTAO DE RE-SORTEAR fica ENTRE o contador de selecionados e a caixa dos selvagens -- e onde a
+   decisao e tomada. Embaixo dos cards e do "Confirmar equipe" ele chegava tarde: quem rolou ate o
+   fim da lista ja escolheu. */
+(function(){
+  const g = S.__getGame();
+  g.currentSaveSlot = 0; g.saveGen = 0; g.rivalName = 'Gary'; g.starterId = 'bulbasaur';
+  g.gymIndex = 6; g.team = []; g.gameMode = 'normal'; g.currentRoute = 'lavender_detour';
+  g.wildEncounterSeq = 3; g.wildRerolls = 0; g.authUser = null; g.moedas = 1000;
+  S.__setGame(g);
+  S.goToWildEncounter();
+  const tela = S.renderWild();
+  const posContador = tela.indexOf('pool-badge');
+  const posBotao = tela.indexOf('wild-reroll');
+  const posCards = tela.indexOf('wild-linha');
+  ok('o botao fica entre o contador e os cards', posContador < posBotao && posBotao < posCards,
+     'contador ' + posContador + ', botao ' + posBotao + ', cards ' + posCards);
+  ok('com o texto pedido', tela.includes('🪙 3 - Sortear novamente'),
+     (tela.match(/Sortear[^<]*/g)||[]).join(' | '));
+  ok('e o saldo do lado direito, dentro do mesmo botao',
+     /wild-reroll[^>]*>[\s\S]*?Possui: 🪙 1000[\s\S]*?<\/button>/.test(tela),
+     (tela.match(/Possui: 🪙 \d+/g)||[]).join(' '));
+  /* A frase que explicava o re-sorteio saiu a pedido: o botao ja diz o preco e o saldo. */
+  ok('e a frase antiga do saldo saiu', !/O re-sorteio troca as espécies/.test(tela));
+  /* Abaixo do preco ele nasce desabilitado -- um botao que so recusa quando clicado e pior. */
+  const g2 = S.__getGame(); g2.moedas = 2; S.__setGame(g2);
+  const semMoeda = (S.renderWild().match(/<button[^>]*wild-reroll[^>]*>/)||[''])[0];
+  ok('com menos de 3 moedas ele ja nasce desabilitado', semMoeda.includes('disabled'), semMoeda.slice(0, 70));
+})();
 /* E ele tem que SOBREVIVER AO SAVE: se nao fosse gravado, recarregar zeraria a contagem e a oferta
    voltaria a ser a original -- um re-sorteio pago que se desfaz sozinho. */
 (function(){

@@ -1487,6 +1487,19 @@
      antes da lupa, com os maiores), e sem o nowrap a quebra caía DENTRO do "— Lv.16": sobrava um
      travessão pendurado no fim da primeira linha e um "Lv.16" órfão na segunda. */
   .wild-lv{ white-space:nowrap; }   /* sem fonte nem cor próprias: herda a linha do nome, que é como sempre foi */
+  /* O botão de re-sortear tem DOIS textos: a ação à esquerda e o saldo à direita. O saldo não
+     encolhe -- quem cede espaço é a ação, que é a parte que se lê primeiro. A 320px os dois cabem
+     numa linha só; o saldo vai um pouco menor pra isso continuar valendo com 4 dígitos de moeda. */
+  .wild-reroll{
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+    text-align:left; padding-left:10px; padding-right:10px;
+    /* MENOR que o resto dos botões, e medido: a 320px sobram ~170px pra ação depois do saldo, e
+       "🪙 3 - Sortear novamente" no corpo normal (14,4px) mede 200 -- quebrava em duas linhas.
+       O saldo é a parte que pode crescer (4 dígitos de moeda), então quem tem que caber com folga
+       é ele; a ação é texto fixo. */
+    font-size:.78rem;
+  }
+  .wild-reroll-saldo{ flex-shrink:0; font-size:.68rem; opacity:.85; white-space:nowrap; }
   .wild-dex{
     position:absolute; right:9px; top:50%; margin-top:-16px;   /* margem negativa e não translate: o :active já usa o transform */
     width:32px; height:32px; font-size:.95rem; line-height:1;
@@ -12440,6 +12453,12 @@ function renderWild(){
     <p>No meio do caminho, alguns Pokémons selvagens aparecem. Escolha até <strong>2</strong> para se juntarem ao seu time — se não quiser nenhum, pode seguir em frente também.</p>
   </div>
   <div class="pool-badge">SELECIONADOS: ${game.wildSelected.length}/2</div>
+  <button class="btn secondary wild-reroll" ${(game.moedas||0) < MOEDAS_RESSORTEIO || game.rerolando ? 'disabled' : ''}
+    onclick="resortearEncontro()">
+    <span>${game.rerolando ? 'Re-sorteando...' : `🪙 ${MOEDAS_RESSORTEIO} - Sortear novamente`}</span>
+    <span class="wild-reroll-saldo">Possui: 🪙 ${game.moedas||0}</span>
+  </button>
+  ${game.rerollErro ? `<div class="box"><p class="error-text">${escapeHtmlSafe(game.rerollErro)}</p></div>` : ''}
   <div class="box">
     ${game.wildOffer.map(entry=>{
       const id = entry.speciesId;
@@ -12470,15 +12489,7 @@ function renderWild(){
       </div>`;
     }).join('')}
   </div>
-  ${game.rerollErro ? `<div class="box"><p class="error-text">${escapeHtmlSafe(game.rerollErro)}</p></div>` : ''}
   <button class="btn success" onclick="confirmWild()">Confirmar equipe ✔</button>
-  <button class="btn secondary" ${(game.moedas||0) < MOEDAS_RESSORTEIO || game.rerolando ? 'disabled' : ''}
-    onclick="resortearEncontro()">
-    ${game.rerolando ? 'Re-sorteando...' : `🪙 ${MOEDAS_RESSORTEIO} — Sortear outros pokémon`}
-  </button>
-  ${/* DENTRO de uma .box: esta linha fica FORA de qualquer caixa se solta, direto sobre o fundo
-      escuro da página, e a cor de texto do jogo some ali -- a mesma armadilha da legenda do mapa. */''}
-  <div class="box"><p class="hint-text">Você tem <strong>🪙 ${game.moedas||0}</strong>. O re-sorteio troca as espécies E os níveis desta rota.</p></div>
   ${botaoSeuTimeHtml()}
   <button class="btn secondary" onclick="abrirPokedexModal()">${pokedexIcon('grande')} Consultar Pokédex</button>`;
 }
