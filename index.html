@@ -5208,6 +5208,9 @@ const CHANCE_SONO = 0.05;
 const CHANCE_METRONOMO_EFEITO = 0.10;   // por efeito: 10% cada um dos três, 70% golpe comum
 const CHANCE_DISABLE = 0.10;
 const CHANCE_RECUPERAR = 0.10;
+/* A cura só sai com a vida ABAIXO disso. Com o pokémon quase cheio não há o que recuperar, e a
+   frase anunciaria um efeito que mal se vê na barra. */
+const CURA_MAXIMO_DO_HP = 0.7;
 const IMUNES_A_ESPECIAL = ['mew','mewtwo'];
 /* Aprendem Autodestruição por nível na Gen 1/2. */
 const AUTODESTRUICAO = ['geodude','graveler','golem','voltorb','electrode','koffing','weezing','pineco','forretress'];
@@ -5270,6 +5273,9 @@ function sorteiaGolpeEspecial(p, rng){
   if(DISABLE.includes(p.speciesId) && rng() < CHANCE_DISABLE){
     return { efeito:'anula', golpe:'Anulação' };
   }
+  if(RECUPERACAO.includes(p.speciesId) && rng() < CHANCE_RECUPERAR){
+    return { efeito:'cura', golpe:'Recuperar' };
+  }
   return null;
 }
 /* Devolve true quando o confronto foi RESOLVIDO aqui (e o doExchange não deve nem começar). */
@@ -5299,6 +5305,21 @@ function tentarGolpeEspecial(active, enemy, rng, diario){
         diario.push({ q: marca === 'p' ? 'e' : 'p', d: danoEmSi, hp: 0, c:0, m:0, z:0, x:'boomself' });
       }
       return true;
+    }
+    if(especial.efeito === 'cura'){
+      /* RECUPERAR ACONTECE ANTES DA LUTA. O pokémon que sobreviveu ao confronto anterior entra
+         machucado; se ele tem o golpe e está abaixo de 70% da vida, se cura ANTES de o novo
+         adversário atacar -- e aí o confronto acontece inteiro, com ele cheio.
+         Ficava no FIM do doExchange (o vencedor se curava depois de ganhar), e o efeito era o
+         mesmo número com metade da graça: a cura chegava quando a luta já tinha sido decidida.
+         Como o Disable, NÃO resolve o confronto: é 'continue', não 'return true'. */
+      if(quem.hp >= quem.maxHp * CURA_MAXIMO_DO_HP) continue;
+      const curado = quem.maxHp - quem.hp;
+      quem.hp = quem.maxHp;
+      if(diario){
+        diario.push({ q: marca, d: curado, hp: quem.hp, c:0, m:0, z:0, x:'recover', g: especial.golpe });
+      }
+      continue;
     }
     if(especial.efeito === 'anula'){
       /* DISABLE: o melhor golpe do alvo contra QUEM anulou sai de cena e ele passa a atacar pelo
@@ -5394,29 +5415,6 @@ function doExchange(active, enemy, rng, diario){
       const linha = (survivor === second) ? diario[diario.length-2] : diario[diario.length-1];
       const antes = (survivor === second) ? secondHpBefore : firstHpBefore;
       if(linha){ linha.hp = survivor.hp; linha.d = antes - survivor.hp; linha.dz = 1; }
-    }
-  }
-  /* RECUPERAR -- o único especial que acontece DEPOIS da luta, e não antes dela.
-     Vive aqui, no fim do doExchange, pelo mesmo motivo de todos os outros: são QUATRO laços de
-     batalha (jornada no cliente, jornada no servidor, online e raide do Mew) e eles teriam que
-     combinar entre si. O laço chama o doExchange até alguém cair, então "um caiu e o outro está de
-     pé" é exatamente o fim do confronto, visto de dentro daqui.
-     Só sorteia se ele TOMOU dano: com a vida cheia não há o que recuperar, e a frase apareceria
-     anunciando um efeito que não aconteceu.
-     Vale também pra quem sobrou do desempate (aquele bloco acima ressuscita um dos dois): ele
-     venceu o confronto, e a regra é sobre vencer. É raro e é o que a mecânica diz. */
-  const venceuOConfronto = (first.hp > 0 && second.hp <= 0) ? first
-                         : ((second.hp > 0 && first.hp <= 0) ? second : null);
-  if(venceuOConfronto && venceuOConfronto.hp < venceuOConfronto.maxHp &&
-     !ehImuneAEspecial(venceuOConfronto) && RECUPERACAO.includes(venceuOConfronto.speciesId) &&
-     rng() < CHANCE_RECUPERAR){
-    /* Grava QUANTO foi curado. A animação precisa disso pra desenhar a barra subindo: sem o
-       número ela só via o valor final e a vida aparecia cheia do nada, sem passo nenhum. */
-    const curado = venceuOConfronto.maxHp - venceuOConfronto.hp;
-    venceuOConfronto.hp = venceuOConfronto.maxHp;
-    if(diario){
-      diario.push({ q: (venceuOConfronto === active) ? 'p' : 'e', d: curado, hp: venceuOConfronto.hp,
-                    c:0, m:0, z:0, x:'recover', g:'Recuperar' });
     }
   }
 }
@@ -6563,13 +6561,8 @@ function advanceSpecialReveal(){
   } else if(game.specialRevealPhase === 'animating'){
     const m = game.specialBattleResult.matchups[game.specialRevealIndex];
     const hit = game.specialHitSequence[game.specialHitStep];
-    /* A CURA fica de fora daqui: ela só entra na barra DEPOIS da frase (ver o ramo do isLastHit).
-       Aplicando o valor agora, o render que desenha a frase já sairia com a vida cheia -- e a barra
-       não teria pra onde subir. */
-    if(!hit.cura){
-      if(hit.side==='player'){ game.specialCurrentPlayerHp = Math.max(0, game.specialCurrentPlayerHp - hit.amount); }
-      else { game.specialCurrentEnemyHp = Math.max(0, game.specialCurrentEnemyHp - hit.amount); }
-    }
+    if(hit.side==='player'){ game.specialCurrentPlayerHp = Math.max(0, game.specialCurrentPlayerHp - hit.amount); }
+    else { game.specialCurrentEnemyHp = Math.max(0, game.specialCurrentEnemyHp - hit.amount); }
     game.specialLastHit = hit;
     game.specialHitStep++;
     const isLastHit = game.specialHitStep >= game.specialHitSequence.length;
@@ -6577,16 +6570,13 @@ function advanceSpecialReveal(){
     const hitDuration = hpBarTransitionMs((hit.amount / hitMaxHp) * 100);
     if(isLastHit){
       game.specialRevealPhase = 'result';
-      if(hit.cura){
-        render();                                            // a frase entra, com a barra ainda no valor da luta
-        setTimeout(animateSpecialHpBars, PAUSA_LEITURA_ESPECIAL_MS);   // e só então ela sobe
-      } else {
-        animateSpecialHpBars();
-        setTimeout(render, hitDuration + 50);
-      }
-      setTimeout(advanceSpecialReveal, hitDuration + 800 + pausaDaCura(m)*2);   // a frase (1s) + a barra subindo + a folga pra ler
+      animateSpecialHpBars();
+      setTimeout(render, hitDuration + 50);
+      setTimeout(advanceSpecialReveal, hitDuration + 800);
     } else {
       animatePartialSpecialHpBars();
+      // a frase da cura ja cumpriu o papel: troca ela pelo "Trocando golpes..." assim que a barra sobe
+      if(hit.cura) setTimeout(render, hitDuration + 50);
       setTimeout(advanceSpecialReveal, hitDuration + 150);
     }
   } else {
@@ -6970,13 +6960,8 @@ function advanceReveal(){
     // causava um "piscar" visual perceptível toda vez que a barra atualizava
     const m = game.battleResult.matchups[game.revealIndex];
     const hit = game.revealHitSequence[game.revealHitStep];
-    /* A CURA fica de fora daqui: ela só entra na barra DEPOIS da frase (ver o ramo do isLastHit).
-       Aplicando o valor agora, o render que desenha a frase já sairia com a vida cheia -- e a barra
-       não teria pra onde subir. */
-    if(!hit.cura){
-      if(hit.side==='player'){ game.revealCurrentPlayerHp = Math.max(0, game.revealCurrentPlayerHp - hit.amount); }
-      else { game.revealCurrentEnemyHp = Math.max(0, game.revealCurrentEnemyHp - hit.amount); }
-    }
+    if(hit.side==='player'){ game.revealCurrentPlayerHp = Math.max(0, game.revealCurrentPlayerHp - hit.amount); }
+    else { game.revealCurrentEnemyHp = Math.max(0, game.revealCurrentEnemyHp - hit.amount); }
     game.revealLastHit = hit;
     game.revealHitStep++;
     const isLastHit = game.revealHitStep >= game.revealHitSequence.length;
@@ -6990,16 +6975,13 @@ function advanceReveal(){
       // presa em "Trocando golpes..." até a próxima luta, mesmo com a barra já toda zerada. Esse render()
       // só acontece UMA VEZ (na virada pro resultado), não a cada golpe, então não causa o piscar
       game.revealPhase = 'result';
-      if(hit.cura){
-        render();                                            // a frase entra, com a barra ainda no valor da luta
-        setTimeout(animateHpBars, PAUSA_LEITURA_ESPECIAL_MS);   // e só então ela sobe
-      } else {
-        animateHpBars();
-        setTimeout(render, hitDuration + 50);
-      } // espera a transição da barra terminar de verdade, pra não dar salto visual
-      setTimeout(advanceReveal, hitDuration + 800 + pausaDaCura(m)*2);   // a frase (1s) + a barra subindo + a folga pra ler
+      animateHpBars();
+      setTimeout(render, hitDuration + 50); // espera a transição da barra terminar de verdade, pra não dar salto visual
+      setTimeout(advanceReveal, hitDuration + 800);
     } else {
       animatePartialHpBars();
+      // a frase da cura ja cumpriu o papel: troca ela pelo "Trocando golpes..." assim que a barra sobe
+      if(hit.cura) setTimeout(render, hitDuration + 50);
       setTimeout(advanceReveal, hitDuration + 150); // só avança pro próximo golpe depois que esse terminou de descer
     }
   } else {
@@ -7293,13 +7275,8 @@ function advanceTrainerReveal(){
   } else if(game.trainerRevealPhase === 'animating'){
     const m = game.trainerBattleResult.matchups[game.trainerRevealIndex];
     const hit = game.trainerHitSequence[game.trainerHitStep];
-    /* A CURA fica de fora daqui: ela só entra na barra DEPOIS da frase (ver o ramo do isLastHit).
-       Aplicando o valor agora, o render que desenha a frase já sairia com a vida cheia -- e a barra
-       não teria pra onde subir. */
-    if(!hit.cura){
-      if(hit.side==='player'){ game.trainerCurrentPlayerHp = Math.max(0, game.trainerCurrentPlayerHp - hit.amount); }
-      else { game.trainerCurrentEnemyHp = Math.max(0, game.trainerCurrentEnemyHp - hit.amount); }
-    }
+    if(hit.side==='player'){ game.trainerCurrentPlayerHp = Math.max(0, game.trainerCurrentPlayerHp - hit.amount); }
+    else { game.trainerCurrentEnemyHp = Math.max(0, game.trainerCurrentEnemyHp - hit.amount); }
     game.trainerLastHit = hit;
     game.trainerHitStep++;
     const isLastHit = game.trainerHitStep >= game.trainerHitSequence.length;
@@ -7307,16 +7284,13 @@ function advanceTrainerReveal(){
     const hitDuration = hpBarTransitionMs((hit.amount / hitMaxHp) * 100);
     if(isLastHit){
       game.trainerRevealPhase = 'result';
-      if(hit.cura){
-        render();                                            // a frase entra, com a barra ainda no valor da luta
-        setTimeout(animateTrainerHpBars, PAUSA_LEITURA_ESPECIAL_MS);   // e só então ela sobe
-      } else {
-        animateTrainerHpBars();
-        setTimeout(render, hitDuration + 50);
-      }
-      setTimeout(advanceTrainerReveal, hitDuration + 800 + pausaDaCura(m)*2);   // a frase (1s) + a barra subindo + a folga pra ler
+      animateTrainerHpBars();
+      setTimeout(render, hitDuration + 50);
+      setTimeout(advanceTrainerReveal, hitDuration + 800);
     } else {
       animatePartialTrainerHpBars();
+      // a frase da cura ja cumpriu o papel: troca ela pelo "Trocando golpes..." assim que a barra sobe
+      if(hit.cura) setTimeout(render, hitDuration + 50);
       setTimeout(advanceTrainerReveal, hitDuration + 150);
     }
   } else {
@@ -12172,8 +12146,8 @@ function renderSpecialBattling(){
     <div class="battle-status-area">${loading
       ? `<div class="loading-dots"><span></span><span></span><span></span></div><p class="loading-text">Aguardando o resultado da batalha...</p>`
       : (animating
-        ? `<p class="loading-text${avisoDoConfronto(m)?' aviso-especial':''}">${avisoDoConfronto(m) || '⚔️ Trocando golpes...'}</p>`
-        : `${avisoDaCura(m) ? `<p class="loading-text aviso-especial">${avisoDaCura(m)}</p>` : ''}<p class="battle-result-line">${matchupResultLine(m)}!${suddenDeathNote(m)}</p>`)
+        ? `<p class="loading-text${avisoDoConfronto(m, game.specialHitStep)?' aviso-especial':''}">${avisoDoConfronto(m, game.specialHitStep) || '⚔️ Trocando golpes...'}</p>`
+        : `<p class="battle-result-line">${matchupResultLine(m)}!${suddenDeathNote(m)}</p>`)
     }</div>
   </div>`;
 }
@@ -12583,8 +12557,8 @@ function renderTrainerBattling(){
     <div class="battle-status-area">${loading
       ? `<div class="loading-dots"><span></span><span></span><span></span></div><p class="loading-text">Aguardando o resultado da batalha...</p>`
       : (animating
-        ? `<p class="loading-text${avisoDoConfronto(m)?' aviso-especial':''}">${avisoDoConfronto(m) || '⚔️ Trocando golpes...'}</p>`
-        : `${avisoDaCura(m) ? `<p class="loading-text aviso-especial">${avisoDaCura(m)}</p>` : ''}<p class="battle-result-line">${matchupResultLine(m)}!${suddenDeathNote(m)}</p>`)
+        ? `<p class="loading-text${avisoDoConfronto(m, game.trainerHitStep)?' aviso-especial':''}">${avisoDoConfronto(m, game.trainerHitStep) || '⚔️ Trocando golpes...'}</p>`
+        : `<p class="battle-result-line">${matchupResultLine(m)}!${suddenDeathNote(m)}</p>`)
     }</div>
   </div>`;
 }
@@ -13001,30 +12975,27 @@ function sequenciaDoConfronto(m){
      sequência por dois motivos -- viraria um passo de dano 0 na animação, e consumiria uma vaga
      do TETO_GOLPES, o que jogaria uma troca real de 2 golpes na reconstrução e perderia os golpes
      de verdade. A frase dele é montada à parte, no passosHtml.
-     A CURA FICA. Ela É um passo: a barra tem que subir na tela, depois da luta acabar. Enquanto
-     ela ficava de fora, a animação só via o valor final -- e a barra do vencedor pulava pra cheia
-     no mesmo instante do golpe que derrubou o adversário, sem nunca mostrar o dano que ele tinha
-     tomado. Reportado em 02/09/2026. */
+     A CURA FICA. Ela É um passo, e o PRIMEIRO: o pokémon entra machucado do confronto anterior, se
+     cura, e só então a luta começa. Enquanto ela ficava de fora da sequência, a animação só via o
+     valor final e a barra aparecia cheia do nada. */
   const reais = passosVisiveis((m.golpes || []).filter(g => g.x !== 'disable'));
   /* O teto conta GOLPES. A cura não é golpe -- deixá-la contar jogaria uma troca real de 3 golpes
      na reconstrução, que é justamente o que o teto existe pra evitar. */
   const cura = reais.find(g => g.x === 'recover') || null;
   const golpesDeDano = reais.filter(g => g.x !== 'recover').length;
   if(reais.length && golpesDeDano <= TETO_GOLPES) return reais;
-  /* PASSOU DO TETO: a luta vira a reconstrução de 3 golpes. E aí a cura precisa de tratamento,
-     porque a reconstrução se baseia no HP do FIM -- e com a cura o "fim" é a vida CHEIA. Ela
-     concluía que o vencedor não tinha tomado dano nenhum, desenhava só a barra do perdedor caindo,
-     e a cura sumia da tela E do log. Era o "não aparece animação nenhuma" do relato de 02/09/2026,
-     e só aparece em confronto LONGO -- que é a maioria dos confrontos de verdade.
-     O conserto: reconstruir com o HP de ANTES da cura (o próprio registro guarda os dois -- hp é
-     depois, d é quanto subiu) e recolocar a cura no fim. */
-  const antesDaCura = cura
-    ? Object.assign({}, m, cura.q === 'p' ? { playerHpAfter: cura.hp - cura.d }
-                                          : { enemyHpAfter: cura.hp - cura.d })
+  /* PASSOU DO TETO: a luta vira a reconstrução de 3 golpes, que interpola entre o HP do COMEÇO e o
+     do FIM. A cura acontece ANTES da luta, então o começo dela é a vida CHEIA -- reconstruir a
+     partir do HP machucado desenharia a barra caindo de um valor que a luta nunca teve.
+     Sem esse cuidado a cura também sumia da tela e do log em confronto longo (o "não aparece
+     animação nenhuma" de 02/09/2026), porque a reconstrução descarta o diário inteiro. */
+  const depoisDaCura = cura
+    ? Object.assign({}, m, cura.q === 'p' ? { playerHpBefore: cura.hp }
+                                          : { enemyHpBefore: cura.hp })
     : m;
   // a reconstrução fala em QUEM APANHA (side); aqui a lista é de QUEM BATE (q)
-  const reconstruida = reconstruirSequencia(antesDaCura).map(h => ({ q: h.side === 'player' ? 'e' : 'p', d: h.amount }));
-  return cura ? reconstruida.concat([cura]) : reconstruida;
+  const reconstruida = reconstruirSequencia(depoisDaCura).map(h => ({ q: h.side === 'player' ? 'e' : 'p', d: h.amount }));
+  return cura ? [cura].concat(reconstruida) : reconstruida;
 }
 /* AS FRASES DOS GOLPES ESPECIAIS VIVEM AQUI, num lugar só.
    O log da batalha e o aviso do meio da luta leem desta função. Montadas em separado, as duas
@@ -13101,21 +13072,14 @@ function especiaisDaEspecie(id){
 /* O aviso que aparece NO MEIO DA BATALHA, na mesma linha onde se lê "Trocando golpes...".
    Devolve '' quando o confronto não teve nada especial -- é isso que as telas usam pra decidir
    entre a frase e o texto de sempre. */
-/* A CURA TEM MOMENTO PRÓPRIO. Autodestruição e sono decidem o confronto de uma vez, então a frase
-   deles acompanha a luta inteira; a cura acontece DEPOIS que a luta acabou, e anunciá-la no começo
-   entregava o resultado e não explicava a barra subindo lá na frente. Por isso ela sai do
-   avisoDoConfronto (que roda durante a troca de golpes) e ganhou a sua: esta aqui é desenhada na
-   faixa do RESULTADO, no mesmo instante em que a barra sobe. */
-function avisoDaCura(m){
-  const g = ((m && m.golpes) || []).find(x => x && x.x === 'recover');
-  if(!g) return '';
-  const nomeP = escapeHtmlSafe(m.player || ''), nomeE = escapeHtmlSafe(m.enemy || '');
-  const doJogador = g.q === 'p';
-  return (ICONES_ESPECIAIS.recover || '') + ' ' +
-         fraseDoEspecial(g, doJogador ? nomeP : nomeE, doJogador ? nomeE : nomeP, {}) + '!';
-}
-function avisoDoConfronto(m){
-  const g = ((m && m.golpes) || []).find(x => ehGolpeEspecial(x) && x.x !== 'recover');
+function avisoDoConfronto(m, passo){
+  /* A CURA SÓ VALE ENQUANTO ELA NÃO ACONTECEU. Ela é o primeiro passo do confronto, então a frase
+     anuncia a barra que está prestes a subir -- e quando a barra já subiu, ela vira uma frase velha
+     ocupando o lugar do "Trocando golpes..." pelo resto da luta.
+     Autodestruição e sono são o contrário: ali o confronto INTEIRO é aquilo, e a frase acompanha
+     até o fim. Por isso a checagem é só pra cura. */
+  const especiais = ((m && m.golpes) || []).filter(ehGolpeEspecial);
+  const g = especiais.find(x => x.x !== 'recover' || !(passo > 0));
   if(!g) return '';
   const nomeP = escapeHtmlSafe(m.player || ''), nomeE = escapeHtmlSafe(m.enemy || '');
   const doJogador = g.q === 'p';
@@ -13128,8 +13092,6 @@ function avisoDoConfronto(m){
    que o online já dá pro "Vai Fulano!" antes de começar a luta. */
 const PAUSA_LEITURA_ESPECIAL_MS = 1000;
 function pausaDoEspecial(m){ return avisoDoConfronto(m) ? PAUSA_LEITURA_ESPECIAL_MS : 0; }
-/* A cura precisa da mesma folga, mas no FIM: sem ela a barra sobe e a tela já troca de confronto. */
-function pausaDaCura(m){ return avisoDaCura(m) ? PAUSA_LEITURA_ESPECIAL_MS : 0; }
 function passosHtml(m){
   const golpes = sequenciaDoConfronto(m);   // a MESMA lista que a animação vai reproduzir
   if(!golpes.length) return '';
@@ -13210,8 +13172,8 @@ function renderBattling(){
     <div class="battle-status-area">${loading
       ? `<div class="loading-dots"><span></span><span></span><span></span></div><p class="loading-text">Aguardando o resultado da batalha...</p>`
       : (animating
-        ? `<p class="loading-text${avisoDoConfronto(m)?' aviso-especial':''}">${avisoDoConfronto(m) || '⚔️ Trocando golpes...'}</p>`
-        : `${avisoDaCura(m) ? `<p class="loading-text aviso-especial">${avisoDaCura(m)}</p>` : ''}<p class="battle-result-line">${matchupResultLine(m)}!${suddenDeathNote(m)}</p>`)
+        ? `<p class="loading-text${avisoDoConfronto(m, game.revealHitStep)?' aviso-especial':''}">${avisoDoConfronto(m, game.revealHitStep) || '⚔️ Trocando golpes...'}</p>`
+        : `<p class="battle-result-line">${matchupResultLine(m)}!${suddenDeathNote(m)}</p>`)
     }</div>
   </div>
   </div>
@@ -14439,13 +14401,8 @@ function advanceLeagueWatch(){
     }
   } else if(game.leagueWatchPhase === 'animating'){
     const hit = game.leagueWatchHitSequence[game.leagueWatchHitStep];
-    /* A CURA fica de fora daqui: ela só entra na barra DEPOIS da frase (ver o ramo do isLastHit).
-       Aplicando o valor agora, o render que desenha a frase já sairia com a vida cheia -- e a barra
-       não teria pra onde subir. */
-    if(!hit.cura){
-      if(hit.side==='player'){ game.leagueWatchCurrentPlayerHp = Math.max(0, game.leagueWatchCurrentPlayerHp - hit.amount); }
-      else { game.leagueWatchCurrentEnemyHp = Math.max(0, game.leagueWatchCurrentEnemyHp - hit.amount); }
-    }
+    if(hit.side==='player'){ game.leagueWatchCurrentPlayerHp = Math.max(0, game.leagueWatchCurrentPlayerHp - hit.amount); }
+    else { game.leagueWatchCurrentEnemyHp = Math.max(0, game.leagueWatchCurrentEnemyHp - hit.amount); }
     game.leagueWatchLastHit = hit;
     game.leagueWatchHitStep++;
     const isLastHit = game.leagueWatchHitStep >= game.leagueWatchHitSequence.length;
@@ -14454,16 +14411,13 @@ function advanceLeagueWatch(){
     const hitDuration = hpBarTransitionMs((hit.amount / hitMaxHp) * 100);
     if(isLastHit){
       game.leagueWatchPhase = 'result';
-      if(hit.cura){
-        render();                                            // a frase entra, com a barra ainda no valor da luta
-        setTimeout(animateLeagueWatchHpBars, PAUSA_LEITURA_ESPECIAL_MS);   // e só então ela sobe
-      } else {
-        animateLeagueWatchHpBars();
-        setTimeout(render, hitDuration + 50);
-      }
-      setTimeout(advanceLeagueWatch, hitDuration + 800 + pausaDaCura(m)*2);   // a frase (1s) + a barra subindo + a folga pra ler
+      animateLeagueWatchHpBars();
+      setTimeout(render, hitDuration + 50);
+      setTimeout(advanceLeagueWatch, hitDuration + 800);
     } else {
       animatePartialLeagueWatchHpBars();
+      // a frase da cura ja cumpriu o papel: troca ela pelo "Trocando golpes..." assim que a barra sobe
+      if(hit.cura) setTimeout(render, hitDuration + 50);
       setTimeout(advanceLeagueWatch, hitDuration + 150);
     }
   } else if(game.leagueWatchIndex < w.matchups.length - 1){
@@ -14573,8 +14527,8 @@ function renderLeagueWatch(){
     <div class="battle-status-area">${loading
       ? `<div class="loading-dots"><span></span><span></span><span></span></div><p class="loading-text">Aguardando o resultado da batalha...</p>`
       : (animating
-        ? `<p class="loading-text${avisoDoConfronto(m)?' aviso-especial':''}">${avisoDoConfronto(m) || '⚔️ Trocando golpes...'}</p>`
-        : `${avisoDaCura(m) ? `<p class="loading-text aviso-especial">${avisoDaCura(m)}</p>` : ''}<p class="battle-result-line">${matchupResultLine(m)}!${suddenDeathNote(m)}</p>`)
+        ? `<p class="loading-text${avisoDoConfronto(m, game.leagueWatchHitStep)?' aviso-especial':''}">${avisoDoConfronto(m, game.leagueWatchHitStep) || '⚔️ Trocando golpes...'}</p>`
+        : `<p class="battle-result-line">${matchupResultLine(m)}!${suddenDeathNote(m)}</p>`)
     }</div>
   </div>
   ${(!loading && !animating && isLast) ? `

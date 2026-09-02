@@ -246,65 +246,37 @@ de golpes.
   reconstrução, perdendo os golpes de verdade. A linha dele é montada à parte e vem **antes** de
   tudo no log: a anulação acontece na abertura, e a luta que se lê embaixo já é a luta com o golpe
   anulado.
-- **Recuperar (`RECUPERACAO`, 10%): 10 espécies**, e é o **único que acontece DEPOIS da luta**.
-  Quem vence o confronto e ainda está de pé tem 10% de voltar com a vida cheia. Isso importa de
-  verdade porque o HP carrega de um confronto pro outro: sair de uma vitória apertada com a barra
-  cheia é o que decide o confronto seguinte.
-  Mora no **fim do `doExchange`**, e não nos laços de batalha, pelo mesmo motivo de todos os
-  outros: são QUATRO laços (jornada no cliente, jornada no servidor, online e raide do Mew) e eles
-  teriam que combinar entre si. O laço chama o `doExchange` até alguém cair, então "um caiu e o
-  outro está de pé" é exatamente o fim do confronto, visto de dentro dali.
-  **Só sorteia se ele TOMOU dano**: com a vida cheia não há o que recuperar, e a frase anunciaria um
-  efeito que não aconteceu. Por isso a taxa real fica um pouco ABAIXO de 10% das vitórias — medido,
-  10,2%.
-  Vale também pra quem sobrou do **desempate** (aquele bloco ressuscita um dos dois com 5%-15%):
-  ele venceu o confronto, e a regra é sobre vencer.
-  A lista sai do aprendizado por nível: Kadabra/Alakazam, Staryu/Starmie, Porygon/Porygon2 (Gen 1 +
-  Gen 2), mais Corsola, Lugia, Ho-Oh e Celebi da Gen 2. **Recover não é TM em nenhuma das duas
-  gerações e não sai por reprodução**, então aqui a lista de "quem aprende por nível" é a lista
-  inteira, sem recorte. Lugia, Ho-Oh e Celebi ficam mesmo sendo os intocáveis — hoje ninguém os tem
-  e nenhum NPC os usa, então a entrada não roda, mas ela é VERDADE. O **Mewtwo** aprende e ficou de
-  fora pelo motivo de sempre: ele e o Mew são imunes ao bloco inteiro, e ali seria letra morta.
-  **A CURA É UM PASSO DA ANIMAÇÃO, e o ÚLTIMO.** Ela chegou errada na primeira versão: ficava fora
-  da `sequenciaDoConfronto` (junto com o Disable), então a animação só via o valor final — a barra
-  do vencedor pulava pra cheia no mesmo instante do golpe que derrubou o adversário, sem nunca
-  mostrar o dano que ele tinha tomado, e a frase aparecia no COMEÇO da luta, entregando o resultado.
-  Reportado em 02/09/2026 como "enche, volta e enche de novo".
-  Hoje a ordem é: os golpes descem as barras → **o adversário fica parado em 0** → a frase entra →
-  **e só então a barra do vencedor sobe**. O texto é a EXPLICAÇÃO da barra subindo; invertendo, o
-  jogador vê a vida encher sozinha e só depois entende por quê.
-  Três detalhes que fazem isso funcionar:
+- **Recuperar (`RECUPERACAO`, 10%): 10 espécies, e acontece ANTES da luta.** O pokémon que sobreviveu
+  ao confronto anterior entra machucado; se ele tem o golpe e está **abaixo de 70% da vida**
+  (`CURA_MAXIMO_DO_HP`), se cura ANTES de o novo adversário atacar — e aí o confronto acontece
+  inteiro, com ele cheio.
+  Ela **não resolve o confronto**, igual ao Disable: é `continue`, não `return true`.
+  **Já esteve no FIM do `doExchange`** (o vencedor se curava depois de ganhar). Era o mesmo número
+  com metade da graça — a cura chegava quando a luta já tinha sido decidida. Mudou por feedback dos
+  jogadores em 02/09/2026.
+  A trava dos 70% existe porque com a vida quase cheia não há o que recuperar, e a frase anunciaria
+  um efeito que mal se vê na barra.
+  A lista sai do aprendizado por nível: Kadabra/Alakazam, Staryu/Starmie, Porygon/Porygon2, mais
+  Corsola, Lugia, Ho-Oh e Celebi. **Recover não é TM em nenhuma das duas gerações e não sai por
+  reprodução**, então a lista de "quem aprende por nível" é a lista inteira. O **Mewtwo** aprende e
+  ficou de fora: ele e o Mew são imunes ao bloco inteiro, e ali seria letra morta.
+  **Quem tem Disable E Recuperar** (Kadabra, Alakazam) cai na chance composta: o Disable é sorteado
+  primeiro, então o Recuperar sai em 0,9 × 10% = 9%. Medido, 9,2%.
+- **NA TELA: a frase primeiro, a barra depois, e a luta por último.** A cura é o PRIMEIRO passo da
+  animação. O jogador vê o pokémon entrar machucado, lê a frase, vê a barra subir, e só então a luta
+  começa. Medido no navegador (Alakazam entrando com 30% contra uma Rapidash cheia):
+  `0ms` frase + 30% · `1650ms` barra em 100% · `2400ms` a frase sai e a luta começa · `4200ms` resultado.
+  Três coisas fazem isso funcionar:
   - o motor grava **quanto** foi curado (`d` do registro), senão a animação não teria o que desenhar;
-  - o passo da cura mexe na barra de **quem curou** (as outras linhas dizem quem APANHA) e com valor
+  - o passo mexe na barra de **quem curou** (as outras linhas dizem quem APANHA) e com valor
     **negativo**, porque os laços fazem `hp - amount` e o `hpBarTransitionMs` usa o módulo;
-  - o HP da cura **não é aplicado quando o passo é lido**, só depois da frase — aplicando antes, o
-    render que desenha a frase já sairia com a vida cheia e a barra não teria pra onde subir.
-  **E ela sobrevive ao TETO_GOLPES.** Passando de 3 golpes, a luta vira a reconstrução — que se
-  baseia no HP do FIM. Com a cura, o "fim" é a vida CHEIA: a reconstrução concluía que o vencedor
-  não tinha tomado dano nenhum, desenhava só a barra do perdedor caindo, e a cura sumia da tela E do
-  log. **Era esse o "não aparece animação nenhuma" do relato**, e ele só aparece em confronto LONGO
-  — que é a maioria dos confrontos de verdade, e por isso o teste feito com um confronto de dois
-  golpes montado à mão não pegava. Hoje a reconstrução usa o HP de ANTES da cura (o registro guarda
-  os dois: `hp` é depois, `d` é quanto subiu) e a cura volta no fim.
-  `tools/test-especiais.js` procura um confronto REAL de mais de 3 golpes com cura e confere que a
-  barra do vencedor DESCE durante a luta — com o defeito, ela fica parada em 100% do começo ao fim.
-  A cura **não gasta vaga do `TETO_GOLPES`**: o teto conta GOLPES, e uma troca real de 3 golpes com
-  cura cairia na reconstrução, que é justamente o que o teto existe pra evitar.
-  E ela tem aviso PRÓPRIO (`avisoDaCura`, na faixa do resultado) em vez de entrar no
-  `avisoDoConfronto`: autodestruição e sono decidem o confronto de uma vez e a frase deles acompanha
-  a luta inteira; a cura acontece depois que a luta acabou.
-  **A linha dele no log vem por ÚLTIMO** — a luta já acabou quando isso acontece, o oposto da
-  anulação, que abre o confronto e vem primeiro.
-  **Medido:** um time com um recuperador ganha **~0,8 ponto** num 6x6 (Alakazam 54,6% → 55,6%,
-  Starmie 60,9% → 61,6%, Porygon2 55,0% → 55,8%, Corsola 52,7% → 53,5%, com os MESMOS times dos
-  dois lados). O controle -- time sem nenhum -- fica em 50,05% → 50,13%, que é o que valida a
-  medição. Na jornada não se move: 62,2% → 62,7% em 20.000 de cada lado (1,1σ; a primeira leva de
-  10.000 deu 1,8σ e dobrar a amostra trouxe pra média).
-- **Quem explodiu VENCE quando os dois últimos caem.** Foi o pedido, e sem essa regra acontecia o
-  contrário do que a tela mostra: o laço só olha "sobrou alguém do meu lado?", então o jogador
-  perdia justamente a batalha que decidiu explodindo. Vive no `explosaoDoAtivo`, que é por BATALHA
-  (zerado na entrada do `simulateGymBattle`) e entra na regra de vitória dos dois motores E no
-  `winnerUid` do online. Medido com a regra desligada: **0 de 451** explosões viravam vitória.
+  - **o aviso sabe em que passo a animação está** (`avisoDoConfronto(m, passo)`): a frase da cura
+    anuncia a barra que VAI subir, então ela sai assim que a barra subiu. Sem isso ela ficava na
+    tela o confronto inteiro, ocupando o lugar do "Trocando golpes...". Autodestruição e sono são o
+    contrário: ali o confronto INTEIRO é aquilo, e a frase acompanha até o fim.
+  A cura **não gasta vaga do `TETO_GOLPES`** (o teto conta GOLPES), e quando o confronto passa do
+  teto a **reconstrução parte da vida CHEIA** — a luta começa depois da cura, e reconstruir a partir
+  do HP machucado desenharia a barra caindo de um valor que a luta nunca teve.
 - **Mew e Mewtwo são imunes** (`IMUNES_A_ESPECIAL`). O Mew é o chefe da raide global, com 25.125 de
   HP calibrados pra ~399 ataques: um Geodude nível 20 com 15% de chance de derrubá-lo num golpe
   acabaria com a raide da semana. O Mewtwo é o desafio de fim de jogo pelo mesmo motivo. Medido com

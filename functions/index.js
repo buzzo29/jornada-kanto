@@ -802,6 +802,9 @@ const CHANCE_SONO = 0.05;
 const CHANCE_METRONOMO_EFEITO = 0.10;   // por efeito: 10% cada um dos três, 70% golpe comum
 const CHANCE_DISABLE = 0.10;
 const CHANCE_RECUPERAR = 0.10;
+/* A cura só sai com a vida ABAIXO disso. Com o pokémon quase cheio não há o que recuperar, e a
+   frase anunciaria um efeito que mal se vê na barra. */
+const CURA_MAXIMO_DO_HP = 0.7;
 const IMUNES_A_ESPECIAL = ['mew','mewtwo'];
 /* Aprendem Autodestruição por nível na Gen 1/2. */
 const AUTODESTRUICAO = ['geodude','graveler','golem','voltorb','electrode','koffing','weezing','pineco','forretress'];
@@ -864,6 +867,9 @@ function sorteiaGolpeEspecial(p, rng){
   if(DISABLE.includes(p.speciesId) && rng() < CHANCE_DISABLE){
     return { efeito:'anula', golpe:'Anulação' };
   }
+  if(RECUPERACAO.includes(p.speciesId) && rng() < CHANCE_RECUPERAR){
+    return { efeito:'cura', golpe:'Recuperar' };
+  }
   return null;
 }
 /* Devolve true quando o confronto foi RESOLVIDO aqui (e o doExchange não deve nem começar). */
@@ -893,6 +899,21 @@ function tentarGolpeEspecial(active, enemy, rng, diario){
         diario.push({ q: marca === 'p' ? 'e' : 'p', d: danoEmSi, hp: 0, c:0, m:0, z:0, x:'boomself' });
       }
       return true;
+    }
+    if(especial.efeito === 'cura'){
+      /* RECUPERAR ACONTECE ANTES DA LUTA. O pokémon que sobreviveu ao confronto anterior entra
+         machucado; se ele tem o golpe e está abaixo de 70% da vida, se cura ANTES de o novo
+         adversário atacar -- e aí o confronto acontece inteiro, com ele cheio.
+         Ficava no FIM do doExchange (o vencedor se curava depois de ganhar), e o efeito era o
+         mesmo número com metade da graça: a cura chegava quando a luta já tinha sido decidida.
+         Como o Disable, NÃO resolve o confronto: é 'continue', não 'return true'. */
+      if(quem.hp >= quem.maxHp * CURA_MAXIMO_DO_HP) continue;
+      const curado = quem.maxHp - quem.hp;
+      quem.hp = quem.maxHp;
+      if(diario){
+        diario.push({ q: marca, d: curado, hp: quem.hp, c:0, m:0, z:0, x:'recover', g: especial.golpe });
+      }
+      continue;
     }
     if(especial.efeito === 'anula'){
       /* DISABLE: o melhor golpe do alvo contra QUEM anulou sai de cena e ele passa a atacar pelo
@@ -986,29 +1007,6 @@ function doExchange(active, enemy, rng, diario){
       const linha = (survivor === second) ? diario[diario.length-2] : diario[diario.length-1];
       const antes = (survivor === second) ? secondHpBefore : firstHpBefore;
       if(linha){ linha.hp = survivor.hp; linha.d = antes - survivor.hp; linha.dz = 1; }
-    }
-  }
-  /* RECUPERAR -- o único especial que acontece DEPOIS da luta, e não antes dela.
-     Vive aqui, no fim do doExchange, pelo mesmo motivo de todos os outros: são QUATRO laços de
-     batalha (jornada no cliente, jornada no servidor, online e raide do Mew) e eles teriam que
-     combinar entre si. O laço chama o doExchange até alguém cair, então "um caiu e o outro está de
-     pé" é exatamente o fim do confronto, visto de dentro daqui.
-     Só sorteia se ele TOMOU dano: com a vida cheia não há o que recuperar, e a frase apareceria
-     anunciando um efeito que não aconteceu.
-     Vale também pra quem sobrou do desempate (aquele bloco acima ressuscita um dos dois): ele
-     venceu o confronto, e a regra é sobre vencer. É raro e é o que a mecânica diz. */
-  const venceuOConfronto = (first.hp > 0 && second.hp <= 0) ? first
-                         : ((second.hp > 0 && first.hp <= 0) ? second : null);
-  if(venceuOConfronto && venceuOConfronto.hp < venceuOConfronto.maxHp &&
-     !ehImuneAEspecial(venceuOConfronto) && RECUPERACAO.includes(venceuOConfronto.speciesId) &&
-     rng() < CHANCE_RECUPERAR){
-    /* Grava QUANTO foi curado. A animação precisa disso pra desenhar a barra subindo: sem o
-       número ela só via o valor final e a vida aparecia cheia do nada, sem passo nenhum. */
-    const curado = venceuOConfronto.maxHp - venceuOConfronto.hp;
-    venceuOConfronto.hp = venceuOConfronto.maxHp;
-    if(diario){
-      diario.push({ q: (venceuOConfronto === active) ? 'p' : 'e', d: curado, hp: venceuOConfronto.hp,
-                    c:0, m:0, z:0, x:'recover', g:'Recuperar' });
     }
   }
 }
