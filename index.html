@@ -15060,10 +15060,9 @@ function renderTrainerTower(){
   <div class="eyebrow">🗼 TORRE DOS TREINADORES</div>
   ${candyHtml}
   <div class="box tower-intro">
-    <p>Um treinador por andar, e eles trocam <strong>todo dia</strong> depois da meia-noite.</p>
-    <p class="hint-text">A média de nível começa em 65 e sobe de 3 em 3 a cada andar, sem parar. <strong>Não é pra zerar</strong> — é pra ver até onde você chega.</p>
+    <p>Um treinador por andar, e eles trocam <strong>todo dia</strong>.</p>
     <p class="hint-text">Vencer um andar cura e revive seu time. Perder <strong>não</strong> devolve você ao começo — você fica no mesmo andar e pode trocar de time.</p>
-    <p class="hint-text">🍬 Quem chegar no andar mais alto do dia ganha um Doce Raro e um ponto no ranking. Empate premia todos.</p>
+    <p class="hint-text">Os que chegarem nos andares mais distante no final do dia, serão recompensados.</p>
     <button class="btn secondary" onclick="openTowerRanking()">🏅 Ranking da Torre</button>
   </div>
   ${game.towerError ? `<div class="box"><p class="error-text">${escapeHtmlSafe(game.towerError)}</p></div>` : ''}
@@ -15089,7 +15088,7 @@ function renderTowerRankingModal(){
     const geral = r.top || [];
     corpo = `
       <h3 class="tower-rank-tit">🔥 Hoje</h3>
-      <p class="hint-text">O andar mais alto que cada um alcançou na torre de hoje. Quem terminar o dia no topo leva o Doce Raro e o ponto — <strong>empate premia todos</strong>.</p>
+      <p class="hint-text">O andar mais alto alcançado pelos treinadores no dia de hoje.</p>
       ${hoje.length ? lista(hoje, x=>x.bestFloor, '🏢')
                     : `<p class="hint-text">Ninguém subiu nenhum andar hoje ainda. O primeiro nome da lista pode ser o seu.</p>`}
       <h3 class="tower-rank-tit">🏅 Geral</h3>
