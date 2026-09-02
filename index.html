@@ -1494,6 +1494,16 @@
   .mont-sub{ display:flex; align-items:center; gap:4px; flex-wrap:wrap; }
   .mont-time{ font-size:.58rem; font-weight:800; color:var(--muted); }
   .mont-linha .wild-dex{ right:6px; }
+  /* A navegação fica DEPOIS da lista: numa tela de celular quem chega ao fim das dez linhas já está
+     embaixo, e é ali que a mão está. Os números embrulham sozinhos -- com dez saves dá seis páginas
+     e a 320px eles não caberiam numa fileira só. */
+  .mont-paginas{ display:flex; flex-wrap:wrap; gap:5px; align-items:center; margin-top:8px; }
+  .mont-pag{
+    font-family:inherit; font-size:.62rem; font-weight:800; min-width:26px; padding:5px 6px; color:var(--ink);
+    background:var(--box); border:2px solid var(--box-border); border-radius:4px; cursor:pointer;
+  }
+  .mont-pag.ativa{ background:var(--green-dark); border-color:var(--green-dark); color:#fff; }
+  .mont-pag-conta{ font-size:.58rem; font-weight:800; color:var(--muted); margin-left:2px; }
   .time-modal-lista{ display:flex; flex-direction:column; gap:6px; margin:8px 0 12px; }
   .time-modal-linha{
     display:flex; align-items:center; gap:8px;
@@ -15879,9 +15889,27 @@ const MONT_ORDENS = [
   ['az',    'A–Z'],
   ['time',  'Time']
 ];
-function abrirMontador(){ game.montadorOrdem = 'nivel'; game.montadorTipo = null; }
-function montadorOrdenar(ordem){ game.montadorOrdem = ordem; render(); }
-function montadorFiltrarTipo(tipo){ game.montadorTipo = tipo || null; render(); }
+/* DEZ POR PÁGINA. Com dez saves de seis, a lista chega a 60 linhas -- e uma lista de 60 numa tela
+   de 320px é rolagem demais pra uma decisão que se toma olhando poucos de cada vez. */
+const MONT_POR_PAGINA = 10;
+function abrirMontador(){ game.montadorOrdem = 'nivel'; game.montadorTipo = null; game.montadorPagina = 0; }
+/* ORDENAR OU FILTRAR VOLTA PRA PRIMEIRA PÁGINA. Sem isso, filtrar por Fogo estando na página 3
+   deixaria a tela vazia -- a lista encolheu e a página 3 não existe mais. */
+function montadorOrdenar(ordem){ game.montadorOrdem = ordem; game.montadorPagina = 0; render(); }
+function montadorFiltrarTipo(tipo){ game.montadorTipo = tipo || null; game.montadorPagina = 0; render(); }
+function montadorIrPara(pagina){ game.montadorPagina = pagina; render(); }
+/* A página guardada pode ficar velha mesmo com os dois acima zerando: desmarcar um escolhido que
+   estava fora do filtro encolhe a lista em uma linha, e isso é capaz de apagar a última página
+   debaixo de quem está nela. Por isso quem manda é sempre a página VÁLIDA, calculada na hora.
+   E ela GRAVA o valor corrigido: deixar o guardado velho faria a página ressurgir sozinha quando a
+   lista voltasse a crescer -- o jogador desmarca um, fica na página 1, marca outro e a tela pula
+   pra página 2 sem ele ter pedido. O que está guardado tem que ser o que está na tela. */
+function montadorPaginaValida(quantos){
+  const ultima = Math.max(0, Math.ceil(quantos / MONT_POR_PAGINA) - 1);
+  const valida = Math.min(Math.max(0, game.montadorPagina || 0), ultima);
+  game.montadorPagina = valida;
+  return valida;
+}
 function nomeDaEspecie(p){ const sp = SPECIES[p.speciesId]; return sp ? sp.name : '?'; }
 /* Nível DECRESCENTE por padrão: quem monta time pra lutar procura o mais forte primeiro. Todas as
    ordens têm desempate explícito -- sem ele, dois pokémon de mesmo nível trocariam de lugar entre
@@ -15937,7 +15965,21 @@ function montadorDeTimeHtml(escolhidos, nomeDoToggle, max, esperas){
         ${tipos.map(t=>`<option value="${t.tipo}" ${filtro===t.tipo?'selected':''}>${TYPE_NAMES_PT[t.tipo]||t.tipo} (${t.quantos})</option>`).join('')}
       </select>
     </div>`;
-  return controles + `<div class="mont-lista">${visiveis.map(p=>{
+  /* A ordem de escolha (1º, 2º...) continua sendo a da ESCOLHA e não a da página: paginar é só uma
+     janela sobre a mesma lista ordenada. */
+  const pagina = montadorPaginaValida(visiveis.length);
+  const paginas = Math.max(1, Math.ceil(visiveis.length / MONT_POR_PAGINA));
+  const daPagina = visiveis.slice(pagina*MONT_POR_PAGINA, (pagina+1)*MONT_POR_PAGINA);
+  /* COM UMA PÁGINA SÓ, os botões não aparecem. Quem tem um save tem seis pokémon -- e um "1 de 1"
+     embaixo da lista é um controle que não controla nada. */
+  const navegacao = paginas <= 1 ? '' : `
+    <div class="mont-paginas">
+      ${Array.from({length: paginas}, (_, i) =>
+        `<button class="mont-pag ${i===pagina?'ativa':''}" onclick="montadorIrPara(${i})"
+          aria-label="Página ${i+1} de ${paginas}">${i+1}</button>`).join('')}
+      <span class="mont-pag-conta">${pagina*MONT_POR_PAGINA+1}–${pagina*MONT_POR_PAGINA+daPagina.length} de ${visiveis.length}</span>
+    </div>`;
+  return controles + `<div class="mont-lista">${daPagina.map(p=>{
     const sp = SPECIES[p.speciesId];
     const posicao = escolhidos.findIndex(x=>x.slot===p.slot && x.idx===p.idx);
     const sel = posicao >= 0;
@@ -15966,7 +16008,7 @@ function montadorDeTimeHtml(escolhidos, nomeDoToggle, max, esperas){
       <button class="wild-dex" onclick="abrirPokedexFicha('${escJs(p.speciesId)}', ${p.shiny?'true':'false'})"
         aria-label="Ver a ficha de ${escapeHtmlSafe(sp?sp.name:'?')}" title="Ver os atributos">🔍</button>
     </div>`;
-  }).join('')}</div>`;
+  }).join('')}</div>` + navegacao;
 }
 /* Marca ou desmarca um pokémon na lista, com as DUAS regras da casa: teto de 6 e sem repetir
    espécie. Devolve a própria lista (mutada) pra quem chamou só ter que renderizar. */

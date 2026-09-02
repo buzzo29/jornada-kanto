@@ -135,10 +135,16 @@ console.log('\nA ESPERA DO GINASIO CHEGA ATE A TELA');
   ok('o carregador guarda quem esta descansando', Object.keys(esperas).length === 3,
      JSON.stringify(S.__getGame().neighborhoodGymCooldowns));
   const tela = S.renderNeighborhoodGymChallengeTeamPicker();
-  ok('e a tela apaga os tres', (tela.match(/mont-card[^"]*descansando/g)||[]).length === 3,
-     (tela.match(/mont-card[^"]*descansando/g)||[]).length + ' apagados');
-  ok('com o TEMPO em minutos em cima de cada um', (tela.match(/⏳8min/g)||[]).length === 3,
-     (tela.match(/⏳\d+min/g)||[]).join(', '));
+  /* A LISTA E PAGINADA de dez em dez, e os doze deste caso ocupam duas paginas -- entao o que se
+     confere aqui e a tela INTEIRA, atravessando as paginas. Olhar so a primeira acusaria dois
+     descansando de tres e o defeito seria do teste, nao do jogo. */
+  S.montadorIrPara(1);
+  const paginado = tela + S.renderNeighborhoodGymChallengeTeamPicker();
+  S.montadorIrPara(0);
+  ok('e a tela apaga os tres', (paginado.match(/mont-card[^"]*descansando/g)||[]).length === 3,
+     (paginado.match(/mont-card[^"]*descansando/g)||[]).length + ' apagados');
+  ok('com o TEMPO em minutos em cima de cada um', (paginado.match(/⏳8min/g)||[]).length === 3,
+     (paginado.match(/⏳\d+min/g)||[]).join(', '));
   ok('e desabilitados de verdade', (tela.match(/descansando"[^>]*\n?[^>]*disabled/g)||[]).length > 0 ||
      tela.split('descansando').slice(1).every(t => t.slice(0, 200).includes('disabled')));
   ok('e a tela avisa quantos estao descansando', /3 pokémon estão descansando/.test(tela));

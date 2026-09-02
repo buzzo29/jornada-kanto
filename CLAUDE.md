@@ -945,7 +945,29 @@ que é justamente a parte que o jogador percebe.
   save: dava pra ver o sprite e o nível, e mais nada. Com três saves cheios são 18 quadros iguais, e
   a pergunta que se faz ali — "quem eu ponho contra um time de Pedra?" — não se responde olhando
   sprite. Cada linha traz **sprite, nome, nível, os selos de tipo, de que time o bicho é** e uma
-  **lupa** que abre a mesma ficha da Pokédex do encontro selvagem.
+  **lupa** que abre a mesma ficha da Pokédex do encontro selvagem. A lista é **paginada de 10 em 10**.
+- **Paginada de 10 em 10** (`MONT_POR_PAGINA`). São **10 saves** possíveis, então a lista chega a 60
+  linhas — e 60 numa tela de 320px é rolagem demais pra uma decisão que se toma olhando poucos de
+  cada vez. Os botões de página ficam **depois** da lista (num celular, quem chega ao fim das dez já
+  está embaixo, e é ali que a mão está), com a conta do que se está vendo (`11–18 de 18`).
+  **Com uma página só eles não aparecem**: quem tem um save tem seis pokémon, e um "1 de 1" é um
+  controle que não controla nada.
+- **Ordenar ou filtrar volta pra primeira página.** Filtrar por Fogo estando na página 3 deixaria a
+  tela vazia — a lista encolheu e a página 3 não existe mais.
+- **E a página guardada é clampada na hora de desenhar, GRAVANDO a correção.** Ela fica velha por um
+  caminho que não passa por ordenar nem filtrar: desmarcar um escolhido que estava fora do filtro
+  encolhe a lista em uma linha, e isso apaga a última página debaixo de quem está nela. Se o clamp
+  só corrigisse o que é desenhado, o valor velho **ressurgiria** quando a lista voltasse a crescer —
+  o jogador desmarca um, fica na página 1, marca outro e a tela pula pra página 2 sem ele ter
+  pedido. O que está guardado tem que ser o que está na tela.
+- **Escolher não troca de página.** A ordem da lista não depende de quem está escolhido, então a
+  linha tocada fica onde estava; se a tela pulasse pro topo a cada toque, montar seis viraria um
+  exercício.
+- **A ordem de escolha continua sendo a da ESCOLHA, não a da página** — paginar é só uma janela
+  sobre a mesma lista ordenada. Um `1º` na página 1 e um `2º` na página 2 é o normal.
+- Cuidado ao mexer em teste que leia esta tela: `tools/test-online-dex.js` confere os três pokémon
+  descansando e **eles não cabem numa página só** — ele atravessa as duas. Olhar só a primeira
+  acusaria dois de três, e o defeito seria do teste.
 - **Ordenação (Nível ⬇, A–Z, Time) e filtro por tipo num `<select>`.** O padrão é **nível
   decrescente**: quem monta time pra lutar procura o mais forte primeiro. "Time" reproduz o
   agrupamento antigo, pra quem pensa em "meu time principal".
