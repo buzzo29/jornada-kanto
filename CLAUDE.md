@@ -874,10 +874,17 @@ verdade, cai no game over, e o teste confere que a trava soltou dos dois lados.
 
 ## Torre dos Treinadores
 
-- **20 andares, média do 65 ao 122 (+3 por andar), e a torre deixou de ser algo pra ZERAR**
-  (02/09/2026). Os oito últimos passam do nível 99 — o teto do JOGADOR — de propósito: o que a
-  torre mede agora é **até onde cada um chega**, não quem termina. Eram 10 andares de 58 a 85,
-  calibrados pra ser vencível todo dia.
+- **30 andares, média do 65 ao 152 (+3 por andar), e a torre deixou de ser algo pra ZERAR**
+  (02/09/2026). Os dezoito últimos passam do nível 99 — o teto do JOGADOR — de propósito: o que a
+  torre mede é **até onde cada um chega**, não quem termina.
+  **O teto tem que ficar sempre longe o bastante pra ninguém encostar nele**: começou em 10 andares
+  (58 a 85, calibrado pra ser vencível todo dia), foi a 20 (65 a 122) e no mesmo dia gente já
+  chegava no 20 — daí os 30. Mudar esse número é seguro e não precisa de nada além de trocá-lo: a
+  torre do dia se refaz sozinha e quem tinha zerado a menor continua do andar seguinte.
+  **A lista de nomes de NPC precisa de FOLGA sobre o número de andares.** Com 30 nomes e 30
+  andares, todo dia usaria todos e só a ordem mudaria — a torre pareceria a mesma torre
+  reembaralhada. São 45 nomes pra 30 andares, e  confere que o elenco muda de
+  um dia pro outro.
 - **O TOTAL DE ANDARES NÃO APARECE EM LUGAR NENHUM.** A tela diz "Andar 7", nunca "Andar 7 de 20", e
   a abertura fala em "a média começa em 65 e sobe de 3 em 3, sem parar". A torre tem que parecer não
   ter fim: dizer o total transforma uma subida sem teto numa barra de progresso, e o jogador troca

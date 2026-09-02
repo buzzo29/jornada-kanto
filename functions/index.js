@@ -3805,11 +3805,14 @@ exports.syncTrainerSpecialties = onCall(async (request) => {
    subindo -- que é o que uma torre deveria fazer. */
 /* VINTE andares, média começando em 65 e subindo de 3 em 3 -- do 65 ao 122. Os últimos passam do
    nível 99 (o teto do JOGADOR) de propósito: a torre deixou de ser algo pra zerar e virou uma
-   medida de até ONDE cada um chega. Ninguém precisa chegar no 20, e é isso que faz o prêmio do dia
+   medida de até ONDE cada um chega. Ninguém precisa chegar no fim, e é isso que faz o prêmio do dia
    ter sentido -- ele vai pra quem foi mais longe, não pra quem terminou.
-   Eram 10 andares de 58 a 85, calibrados pra um campeão da Elite (~67) entrar no andar 5 e a torre
-   ser vencível todo dia. */
-const TOWER_FLOOR_LEVELS = Array.from({ length: 20 }, (_, i) => 65 + i * 3);
+   Já foram 10 andares (58 a 85, calibrados pra a torre ser vencível todo dia) e 20 (65 a 122). Foi
+   pra 30 em 02/09/2026, quando gente começou a chegar no 20 no mesmo dia -- o teto tem que ficar
+   sempre longe o bastante pra ninguém encostar nele. Mudar este número é seguro: a torre do dia se
+   refaz sozinha e quem tinha zerado a menor continua do andar seguinte (ver towerGetToday e
+   towerGetRun). */
+const TOWER_FLOOR_LEVELS = Array.from({ length: 30 }, (_, i) => 65 + i * 3);
 const TOWER_FLOORS = TOWER_FLOOR_LEVELS.length;
 const TOWER_TEAM_SIZE = 6;
 
@@ -3822,7 +3825,12 @@ const TOWER_NPC_NAMES = [
   'Montanhista','Nadador','Faixa Preta','Domador','Criador de Aves','Malabarista','Roqueiro',
   'Médium','Cientista','Engenheiro','Super Nerd','Cavalheiro','Beldade','Jogador','Ladrão',
   'Garotinho','Garotinha','Treinador Jr.','Aprendiz de Elite','Recruta Rocket','Vidente',
-  'Enfermeira Joy','Policial Jenny'
+  'Enfermeira Joy','Policial Jenny',
+  /* A partir daqui os nomes existem pra dar FOLGA ao sorteio. Com 30 nomes e 30 andares, todo dia
+     usaria todos e só a ordem mudaria -- a torre pareceria a mesma torre reembaralhada. Com folga,
+     cada dia traz um elenco diferente. */
+  'Treinador Ás','Brigão','Sábio','Ancião','Colegial','Gêmeos','Casal','Guitarrista',
+  'Executivo Rocket','Colecionador','Mestre Kimono','Fã de Pokémon','Esquiador','Cavalheira','Veterano'
 ];
 
 /* Espécies de evolução final: as que não evoluem em mais nada. Inclui tanto o fim de uma linha
@@ -4294,7 +4302,7 @@ async function towerRegisterClear(uid, dateId){
      quem zera os 20 andares certamente está no topo -- pagar aqui também seria pagar duas vezes.
      A notificação fica: zerar 20 andares com média 122 no último merece ser dito na hora. */
   await createNotification(uid, 'tower_cleared', '🗼 Você chegou ao TOPO da Torre!',
-    'Você subiu a torre inteira de hoje -- o último treinador tinha média de nível 122. Ninguém vai passar disso: o prêmio de quem foi mais longe sai na virada do dia. Volte amanhã, a torre é outra.');
+    'Você subiu a torre inteira de hoje. Ninguém vai passar disso: o prêmio de quem foi mais longe sai na virada do dia. Volte amanhã, a torre é outra.');
 }
 
 /* Reordena o time da subida em andamento. A ordem importa: o primeiro da lista enfrenta o

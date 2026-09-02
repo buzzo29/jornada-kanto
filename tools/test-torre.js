@@ -136,13 +136,19 @@ console.log('A TORRE NOVA: 20 andares, derrota nao volta pro comeco, premio de q
 /* 20 andares, media do 65 ao 122, de 3 em 3. Os ultimos passam do nivel 99 (teto do JOGADOR) de
    proposito: a torre deixou de ser algo pra zerar e virou uma medida de ate onde cada um chega. */
 const torreHoje = fns._towerGenerate('2026-09-02');
-ok('sao 20 andares', torreHoje.floors.length === 20, torreHoje.floors.length + '');
+ok('sao 30 andares', torreHoje.floors.length === 30, torreHoje.floors.length + '');
 ok('o primeiro tem media 65', torreHoje.floors[0].avgLevel === 65, torreHoje.floors[0].avgLevel + '');
-ok('o ultimo tem media 122', torreHoje.floors[19].avgLevel === 122, torreHoje.floors[19].avgLevel + '');
+ok('o ultimo tem media 152', torreHoje.floors[29].avgLevel === 152, torreHoje.floors[29].avgLevel + '');
 ok('e sobem de 3 em 3', torreHoje.floors.every((f,i) => i === 0 || f.avgLevel - torreHoje.floors[i-1].avgLevel === 3));
-ok('com nome diferente em cada um', new Set(torreHoje.floors.map(f=>f.name)).size === 20);
+ok('com nome diferente em cada um', new Set(torreHoje.floors.map(f=>f.name)).size === 30);
+/* E o sorteio precisa de FOLGA: com tantos nomes quanto andares, todo dia usaria todos e so a
+   ordem mudaria -- a torre pareceria a mesma torre reembaralhada. */
+const elenco1 = fns._towerGenerate('2026-09-10').floors.map(f=>f.name).join(',');
+const elenco2 = fns._towerGenerate('2026-09-11').floors.map(f=>f.name).join(',');
+ok('e o elenco muda de um dia pro outro', elenco1.split(',').filter(n=>!elenco2.includes(n)).length > 0,
+   elenco1.split(',').filter(n=>!elenco2.includes(n)).length + ' nomes so aparecem num dos dias');
 /* Os andares altos passam do teto do jogador -- e o ponto do modo. */
-ok('e os ultimos passam do nivel 99', torreHoje.floors.filter(f=>f.avgLevel > 99).length === 8,
+ok('e os ultimos passam do nivel 99', torreHoje.floors.filter(f=>f.avgLevel > 99).length === 18,
    torreHoje.floors.filter(f=>f.avgLevel > 99).length + ' andares acima de 99');
 
 /* PERDER NAO VOLTA PRO COMECO -- e o time nao e apagado. */
@@ -235,7 +241,7 @@ console.log('QUEM ZEROU A TORRE ANTIGA NAO PODE FICAR TRAVADO');
                      mon('r4','tyranitar',99), mon('r5','dragonite',99), mon('r6','blissey',99)];
   /* Regrava a torre do dia no formato ANTIGO, com 10 andares. */
   const velha = fns._towerGenerate(hoje);
-  velha.floors = velha.floors.slice(0, 10);
+  velha.floors = velha.floors.slice(0, 10);   // formato antigo, com 10
   await db.collection('trainerTower').doc(hoje).set(velha);
   /* E um jogador que zerou aqueles 10. */
   await db.collection('trainerTowerRuns').doc('rex').set({
@@ -247,7 +253,7 @@ console.log('QUEM ZEROU A TORRE ANTIGA NAO PODE FICAR TRAVADO');
   await db.collection('users').doc('rex').collection('saves').doc('0').set({ badgeCount:8, team:timeDoRex });
 
   const vista = await chamar(fns.getTrainerTower, 'rex', {});
-  ok('a torre do dia e refeita com o formato de hoje', (vista.floors||[]).length === 20,
+  ok('a torre do dia e refeita com o formato de hoje', (vista.floors||[]).length === 30,
      (vista.floors||[]).length + ' andares');
   ok('e a subida dele volta a ficar ativa', vista.run.cleared === false, 'cleared: ' + vista.run.cleared);
   ok('no andar seguinte ao ultimo que ele venceu', vista.run.floor === 11, 'andar: ' + vista.run.floor);
@@ -258,7 +264,7 @@ console.log('QUEM ZEROU A TORRE ANTIGA NAO PODE FICAR TRAVADO');
      'win: ' + (luta && luta.win));
   /* Quem zerou a torre de HOJE (20 andares) continua zerado -- a destrava e so pra torre menor. */
   await db.collection('trainerTowerRuns').doc('rex').set({
-    dateId: hoje, floor: 20, bestFloor: 20, cleared: true, team: null, startedAt: Date.now(), lastAt: Date.now()
+    dateId: hoje, floor: 30, bestFloor: 30, cleared: true, team: null, startedAt: Date.now(), lastAt: Date.now()
   });
   const zerouHoje = await chamar(fns.getTrainerTower, 'rex', {});
   ok('mas quem zerou a torre DE HOJE continua zerado', zerouHoje.run.cleared === true,
