@@ -934,6 +934,56 @@ verdade, cai no game over, e o teste confere que a trava soltou dos dois lados.
 - Ela permuta o **código guardado**, não o time do save: o save pode ter mudado de ordem ou de
   nível desde que a defesa foi montada, e o líder está reordenando o que ele vê defendendo.
 
+## Montador de time (Torre e Ginásio da Cidade)
+
+A tela onde se escolhe pokémon de QUALQUER save pra montar um time. Uma função só
+(`montadorDeTimeHtml`) desenha as TRÊS telas que fazem isso — a Torre, o desafio do Ginásio da
+Cidade e a defesa do Ginásio da Cidade. Três cópias divergiriam na regra de "não repetir espécie",
+que é justamente a parte que o jogador percebe.
+
+- **Virou LISTA, uma linha por pokémon** (02/09/2026). Era uma grade de quadradinhos agrupada por
+  save: dava pra ver o sprite e o nível, e mais nada. Com três saves cheios são 18 quadros iguais, e
+  a pergunta que se faz ali — "quem eu ponho contra um time de Pedra?" — não se responde olhando
+  sprite. Cada linha traz **sprite, nome, nível, os selos de tipo, de que time o bicho é** e uma
+  **lupa** que abre a mesma ficha da Pokédex do encontro selvagem.
+- **Ordenação (Nível ⬇, A–Z, Time) e filtro por tipo num `<select>`.** O padrão é **nível
+  decrescente**: quem monta time pra lutar procura o mais forte primeiro. "Time" reproduz o
+  agrupamento antigo, pra quem pensa em "meu time principal".
+  Todas as ordens têm **desempate explícito** — sem ele dois pokémon de mesmo nível trocam de lugar
+  entre um render e outro, e a lista pisca debaixo do dedo de quem vai clicar.
+- **O combo só oferece tipo que ALGUÉM tem**, com a contagem (`Fogo (3)`). Como o filtro corre sobre
+  a mesma lista, tipo escolhido nele nunca devolve vazio — **não existe estado de "nenhum
+  resultado", e isso é de propósito**: chegou a ter uma mensagem de lista vazia, que era código
+  inalcançável. O que pode sobrar é um filtro VELHO de outra tela, e aí ele é **ignorado** e a lista
+  volta inteira; mostrar tudo é melhor que mostrar nada.
+- **O filtro NUNCA esconde um escolhido.** Marcar um Charizard e filtrar por Água o tiraria da tela
+  — e como desmarcar é clicar nele de novo, o pokémon ficaria preso no time sem como sair.
+- **A lupa é IRMÃ do card, nunca filha** — a mesma armadilha do encontro selvagem: `<button>` dentro
+  de `<button>` é HTML inválido, o navegador fecha o de fora sozinho e o clique de dentro se perde,
+  com a tela continuando a PARECER certa. De quebra ela sobrevive ao card desabilitado (descendente
+  de button desabilitado não recebe clique nenhum), e é justamente com o time cheio que dá vontade
+  de ver a ficha de quem ficou de fora.
+- **A ordem de escolha é a ordem de batalha, e agora ela tem coluna própria** (`1º`, `2º`…), de
+  largura fixa mesmo vazia: sem isso a linha inteira pula pro lado no instante do toque. Alinhados
+  numa coluna, os números viram o que são de verdade.
+- **Ordenação e filtro são estado de TELA** — não entram no `serializeGame`, e `abrirMontador()` zera
+  os dois em toda entrada. Sem isso um filtro de Fogo ligado na Torre chegaria no ginásio parecendo
+  que metade do bicharedo sumiu.
+- **O combo fica em linha PRÓPRIA.** Dividindo espaço com os três botões, a 320px ele ficava tão
+  estreito que o próprio rótulo saía cortado ("Todos os tipos (12" sem fechar o parêntese). O texto
+  de dentro de um `<select>` é desenhado pelo sistema e não dá pra medir, então a saída é não
+  disputar largura.
+- **A Batalha Online NÃO usa este montador, e não é esquecimento.** Lá o time é escolhido por
+  ÍNDICE, entre códigos que o cliente mandou ao entrar na fila, e o servidor **recusa um código
+  novo** na hora da escolha — aceitar seria deixar montar time depois de ver o adversário. Trocar
+  aquela tela por um montador exigiria derrubar essa trava.
+- O `.tower-pick-check` (o numerinho da grade) saiu junto: virou a coluna `.mont-num` e ficou sem
+  nenhum uso. As classes `.tower-pick*` **continuam vivas** — o modal do Doce Raro e a escolha de
+  pokémon do online ainda usam a grade.
+- `tools/test-montador.js` cobre as três telas, o aninhamento da lupa, a lupa clicável com o card
+  desabilitado, as três ordenações, o filtro (inclusive o escolhido que não some e o filtro velho
+  ignorado), a espécie repetida entre saves e o teto de 6.
+
 ## Torre dos Treinadores
 
 - **30 andares, média do 65 ao 152 (+3 por andar), e a torre deixou de ser algo pra ZERAR**

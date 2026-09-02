@@ -267,16 +267,10 @@
     font-size:.8rem;font-weight:800;margin-top:3px;
     display:flex;align-items:center;justify-content:center;gap:3px;  /* separa a estrela do "Lv." */
   }
-  .candy-pick-row .tower-pick-check{width:20px;height:20px;font-size:.62rem;}
   /* botão desabilitado precisa PARECER desabilitado: o verde cheio convidava a clicar em algo
      que não responde */
   .btn.success:disabled{background:#9bb3a1;border-color:#7d9183;color:#eef2ee;cursor:not-allowed;box-shadow:none;}
   .btn.success:disabled:active{transform:none;}
-  .tower-pick-check{
-    position:absolute;top:-6px;right:-6px;background:var(--green-dark);color:#fff;
-    font-size:.55rem;font-weight:800;width:17px;height:17px;border-radius:50%;
-    display:flex;align-items:center;justify-content:center;border:2px solid var(--box-border);
-  }
   /* resultado do andar */
   .tower-result h2{margin:0 0 6px;}
   .tower-result.win{border-color:var(--green-dark);background:#eef8f0;}
@@ -1455,6 +1449,51 @@
     display:flex; align-items:center; justify-content:center;
   }
   .wild-dex:active{ transform:translate(2px,2px); box-shadow:1px 1px 0 var(--box-border); }
+  /* O MONTADOR DE TIME EM LISTA (Torre, Ginásio da Cidade -- ver montadorDeTimeHtml).
+     Era uma grade de quadradinhos agrupada por save: dava pra ver o sprite e o nível, e mais nada.
+     Com três saves cheios são 18 quadros iguais, e a pergunta que se faz aqui -- "quem eu ponho
+     contra um time de Pedra?" -- não se responde olhando sprite. Em lista cada linha diz o nome, o
+     nível, os tipos e de que time o bicho é; a ordenação e o filtro fazem o trabalho que na grade
+     ficava por conta do olho.
+     A COLUNA DA ESQUERDA é a ordem de escolha, e ela tem largura fixa mesmo vazia: sem isso a linha
+     inteira pula pro lado no instante do toque. Alinhados numa coluna, os números viram o que eles
+     são de verdade -- a ordem de batalha. */
+  .mont-controles{ display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-bottom:8px; }
+  .mont-ord{
+    font-family:inherit; font-size:.62rem; font-weight:800; padding:5px 8px; color:var(--ink);
+    background:var(--box); border:2px solid var(--box-border); border-radius:4px; cursor:pointer;
+  }
+  .mont-ord.ativa{ background:var(--green-dark); border-color:var(--green-dark); color:#fff; }
+  .mont-tipo{
+    font-family:inherit; font-size:.62rem; font-weight:800; padding:5px 6px; color:var(--ink);
+    /* LINHA PRÓPRIA, sempre: a 320px o combo dividindo espaço com os três botões ficava tão
+       estreito que o próprio rótulo saía cortado -- "Todos os tipos (12" sem o fecha-parêntese.
+       Como o texto de dentro é do sistema e não dá pra medir, a saída é não disputar largura. */
+    flex:1 1 100%; min-width:0;
+    background:var(--box); border:2px solid var(--box-border); border-radius:4px; cursor:pointer;
+  }
+  .mont-lista{ display:flex; flex-direction:column; gap:5px; }
+  /* position:relative + flex column pela MESMA razão do .wild-linha: a lupa é irmã do card e volta
+     pra cima dele no position, porque <button> dentro de <button> é HTML inválido. */
+  .mont-linha{ position:relative; display:flex; flex-direction:column; }
+  .mont-card{
+    display:flex; align-items:center; gap:7px; width:100%; text-align:left; font-family:inherit;
+    padding:6px 44px 6px 6px;   /* a folga da direita é da lupa: sem ela o nome comprido passa por baixo */
+    background:var(--box); border:2px solid var(--box-border); border-radius:4px; cursor:pointer;
+  }
+  .mont-card.sel{ border-color:var(--green-dark); background:#eef8f0; }
+  .mont-card.off{ opacity:.35; cursor:not-allowed; }
+  .mont-card.descansando{ opacity:.45; filter:grayscale(1); }
+  .mont-card .sprite-img{ width:34px; height:34px; flex:none; }
+  .mont-num{
+    flex:none; width:18px; font-size:.62rem; font-weight:800; color:var(--green-dark); text-align:center;
+  }
+  .mont-info{ display:flex; flex-direction:column; gap:2px; min-width:0; flex:1; }
+  .mont-nome{ font-size:.8rem; font-weight:800; color:var(--ink); }
+  .mont-lv{ white-space:nowrap; }   /* mesma razão do .wild-lv: a quebra não pode cair dentro do "— Lv.70" */
+  .mont-sub{ display:flex; align-items:center; gap:4px; flex-wrap:wrap; }
+  .mont-time{ font-size:.58rem; font-weight:800; color:var(--muted); }
+  .mont-linha .wild-dex{ right:6px; }
   .time-modal-lista{ display:flex; flex-direction:column; gap:6px; margin:8px 0 12px; }
   .time-modal-linha{
     display:flex; align-items:center; gap:8px;
@@ -4427,6 +4466,7 @@ async function openNeighborhoodGymChallengeHistory(){
 // abre o seletor de TIME -- serve tanto pra reivindicar um ginásio vago (nesse caso só pede o time
 // mesmo) quanto pra um líder trocar só o time depois, sem mexer no terreno que já tinha escolhido
 function openNeighborhoodGymTeamPicker(){
+  abrirMontador();   // ordenação e filtro sempre do zero -- ver montadorDeTimeHtml
   game.neighborhoodGymDefensePick = [];   // sempre monta do zero: reaproveitar a escolha anterior faria a tela abrir já preenchida com um time que talvez nem seja mais o dele
   game.screen = 'neighborhoodGymTeamPicker';
   render();
@@ -4502,6 +4542,7 @@ async function submitNeighborhoodGymTerrain(terrainId){
 async function startNeighborhoodGymChallenge(){
   game.neighborhoodGymError = null;
   game.neighborhoodGymCooldowns = null;   // carrega antes de mostrar o montador
+  abrirMontador();
   game.neighborhoodGymChallengePick = [];
   game.screen = 'neighborhoodGymChallengeTeamPicker';
   render();
@@ -15793,6 +15834,7 @@ async function openTrainerTower(){
   try{
     const r = await functionsClient.httpsCallable('getTrainerTower')();
     game.tower = r.data;
+    abrirMontador();
     game.towerPick = [];
   } catch(e){
     console.error('Erro ao abrir a Torre:', e);
@@ -15815,10 +15857,10 @@ function towerEligiblePokemon(){
   }
   return out;
 }
-/* O MONTADOR DE TIME -- a grade com os pokémon de TODOS os saves com 8 insígnias, agrupada pelo
-   time de origem. Nasceu dentro da Torre e virou função quando o Ginásio da Cidade passou a montar
-   time do mesmo jeito (01/09/2026): três cópias divergiriam na regra de "não repetir espécie", que
-   é justamente a parte que o jogador percebe na tela.
+/* O MONTADOR DE TIME -- a lista com os pokémon de TODOS os saves com 8 insígnias. Nasceu dentro da
+   Torre e virou função quando o Ginásio da Cidade passou a montar time do mesmo jeito (01/09/2026):
+   três cópias divergiriam na regra de "não repetir espécie", que é justamente a parte que o jogador
+   percebe na tela.
    `nomeDoToggle` entra como texto porque o onclick é montado no HTML -- cada tela tem a sua lista
    de escolhidos, e passar a função por referência exigiria um registro global de callbacks. */
 /* A CHAVE de um pokémon na conta: SAVE + ESPÉCIE. Tem que ser calculada IGUAL à do servidor (lá é
@@ -15828,35 +15870,103 @@ function towerEligiblePokemon(){
    em cima do xará do outro save. Reportado em 01/09/2026 com um Golem e uma Meganium apagados sem
    terem lutado. */
 function chaveDoPokemon(p){ return 'g_' + p.slot + '_' + p.speciesId; }
+/* ORDENAÇÃO E FILTRO. São estado de TELA e não entram no save (não estão no serializeGame): ninguém
+   volta amanhã querendo o filtro de Fogo que deixou ligado. `abrirMontador` zera os dois em toda
+   entrada, senão um filtro ligado na Torre chegaria no ginásio parecendo que metade do bicharedo
+   sumiu. */
+const MONT_ORDENS = [
+  ['nivel', '⬇ Nível'],
+  ['az',    'A–Z'],
+  ['time',  'Time']
+];
+function abrirMontador(){ game.montadorOrdem = 'nivel'; game.montadorTipo = null; }
+function montadorOrdenar(ordem){ game.montadorOrdem = ordem; render(); }
+function montadorFiltrarTipo(tipo){ game.montadorTipo = tipo || null; render(); }
+function nomeDaEspecie(p){ const sp = SPECIES[p.speciesId]; return sp ? sp.name : '?'; }
+/* Nível DECRESCENTE por padrão: quem monta time pra lutar procura o mais forte primeiro. Todas as
+   ordens têm desempate explícito -- sem ele, dois pokémon de mesmo nível trocariam de lugar entre
+   um render e outro e a lista piscaria debaixo do dedo. */
+function montadorOrdenados(lista){
+  const ordem = game.montadorOrdem || 'nivel';
+  const porNome = (a,b) => nomeDaEspecie(a).localeCompare(nomeDaEspecie(b));
+  const porOrigem = (a,b) => (a.slot - b.slot) || (a.idx - b.idx);
+  return lista.slice().sort(
+    ordem === 'az'   ? ((a,b) => porNome(a,b) || porOrigem(a,b))
+  : ordem === 'time' ? porOrigem
+  :                    ((a,b) => (b.level - a.level) || porNome(a,b) || porOrigem(a,b))
+  );
+}
+/* Só os tipos que EXISTEM no bicharedo do jogador, com quantos são. Oferecer os 17 sempre deixaria
+   o combo cheio de filtros que devolvem lista vazia. */
+function montadorTiposDisponiveis(lista){
+  const conta = {};
+  lista.forEach(p => (((SPECIES[p.speciesId]||{}).types)||[]).forEach(t => { conta[t] = (conta[t]||0) + 1; }));
+  return Object.keys(conta)
+    .sort((a,b) => (TYPE_NAMES_PT[a]||a).localeCompare(TYPE_NAMES_PT[b]||b))
+    .map(t => ({ tipo:t, quantos:conta[t] }));
+}
 function montadorDeTimeHtml(escolhidos, nomeDoToggle, max, esperas){
   const elegiveis = towerEligiblePokemon();
   if(!elegiveis.length) return '';
   const especiesUsadas = new Set(escolhidos.map(p=>p.speciesId));
   const espera = esperas || {};
-  const porTime = {};
-  elegiveis.forEach(p => { (porTime[p.teamName] ||= []).push(p); });
-  return Object.entries(porTime).map(([nome, mons]) => `
-    <div class="tower-pick-group">
-      <div class="tower-pick-group-name">${escapeHtmlSafe(nome)}</div>
-      <div class="tower-pick-row">${mons.map(p=>{
-        const sp = SPECIES[p.speciesId];
-        const sel = escolhidos.some(x=>x.slot===p.slot && x.idx===p.idx);
-        /* DESCANSANDO: esse pokémon acabou de desafiar este ginásio e ainda não pode voltar.
-           Continua na grade, apagado e com o tempo no lugar do nível -- sumir faria parecer que o
-           jogador perdeu o bicho. */
-        const falta = espera[chaveDoPokemon(p)] || 0;
-        const bloqueado = !sel && (falta > 0 || escolhidos.length>=max || especiesUsadas.has(p.speciesId));
-        const porque = falta > 0 ? ' -- descansando' : (especiesUsadas.has(p.speciesId) ? ' -- espécie já escolhida' : '');
-        return `<button class="tower-pick ${sel?'sel':''} ${bloqueado?'off':''} ${falta>0?'descansando':''}"
-          onclick="${nomeDoToggle}(${p.slot},${p.idx})"
-          ${bloqueado?'disabled':''}
-          title="${escapeHtmlSafe(sp?sp.name:'?')} Lv.${p.level}${bloqueado?porque:''}">
-          ${sp?spriteHtml(p.speciesId,'sprite-sm',p.shiny):'❔'}
-          <span class="tower-pick-lv">${falta>0 ? '⏳'+Math.ceil(falta/60000)+'min' : (p.shiny?'🌟':'')+'Lv.'+p.level}</span>
-          ${sel?`<span class="tower-pick-check">${escolhidos.findIndex(x=>x.slot===p.slot&&x.idx===p.idx)+1}</span>`:''}
-        </button>`;
-      }).join('')}</div>
-    </div>`).join('');
+  const tipos = montadorTiposDisponiveis(elegiveis);
+
+  /* Não existe estado de "nenhum resultado" pra desenhar, e isso é consequência de como o combo é
+     montado: ele só oferece tipo que ALGUÉM tem, e o filtro corre sobre a mesma lista. Chegou a ter
+     uma mensagem de lista vazia -- código que nunca rodaria, do tipo que fica anos ali sem ninguém
+     notar. A linha abaixo é o que garante isso: filtro que não bate com nenhum tipo do combo (uma
+     sobra de outra tela) é IGNORADO e a lista volta inteira, porque mostrar tudo é melhor que
+     mostrar nada. */
+  const filtro = game.montadorTipo && tipos.some(t=>t.tipo===game.montadorTipo) ? game.montadorTipo : null;
+  const ordem = game.montadorOrdem || 'nivel';
+  /* O FILTRO NUNCA ESCONDE UM ESCOLHIDO. Marcar um Charizard e filtrar por Água o tiraria da tela
+     -- e como desmarcar é clicar nele de novo, o jogador ficaria com um pokémon no time sem ter
+     como tirá-lo. */
+  const visiveis = montadorOrdenados(elegiveis).filter(p => {
+    if(escolhidos.some(x=>x.slot===p.slot && x.idx===p.idx)) return true;
+    if(!filtro) return true;
+    return (((SPECIES[p.speciesId]||{}).types)||[]).includes(filtro);
+  });
+  const controles = `
+    <div class="mont-controles">
+      ${MONT_ORDENS.map(([id, rotulo]) =>
+        `<button class="mont-ord ${ordem===id?'ativa':''}" onclick="montadorOrdenar('${id}')">${rotulo}</button>`).join('')}
+      <select class="mont-tipo" onchange="montadorFiltrarTipo(this.value)" aria-label="Filtrar por tipo">
+        <option value="" ${filtro?'':'selected'}>Todos os tipos (${elegiveis.length})</option>
+        ${tipos.map(t=>`<option value="${t.tipo}" ${filtro===t.tipo?'selected':''}>${TYPE_NAMES_PT[t.tipo]||t.tipo} (${t.quantos})</option>`).join('')}
+      </select>
+    </div>`;
+  return controles + `<div class="mont-lista">${visiveis.map(p=>{
+    const sp = SPECIES[p.speciesId];
+    const posicao = escolhidos.findIndex(x=>x.slot===p.slot && x.idx===p.idx);
+    const sel = posicao >= 0;
+    /* DESCANSANDO: esse pokémon acabou de desafiar este ginásio e ainda não pode voltar.
+       Continua na lista, apagado e com o tempo no lugar do nível -- sumir faria parecer que o
+       jogador perdeu o bicho. */
+    const falta = espera[chaveDoPokemon(p)] || 0;
+    const bloqueado = !sel && (falta > 0 || escolhidos.length>=max || especiesUsadas.has(p.speciesId));
+    const porque = falta > 0 ? ' -- descansando' : (especiesUsadas.has(p.speciesId) ? ' -- espécie já escolhida' : '');
+    /* A lupa é IRMÃ do card e não filha (ver .mont-linha no CSS: <button> dentro de <button> é HTML
+       inválido e o clique de dentro se perde). De quebra ela sobrevive ao card desabilitado --
+       descendente de button desabilitado não recebe clique nenhum, e é justamente com o time cheio
+       que dá vontade de conferir os atributos de quem ficou de fora. */
+    return `<div class="mont-linha">
+      <button class="mont-card ${sel?'sel':''} ${bloqueado?'off':''} ${falta>0?'descansando':''}"
+        onclick="${nomeDoToggle}(${p.slot},${p.idx})"
+        ${bloqueado?'disabled':''}
+        title="${escapeHtmlSafe(sp?sp.name:'?')} Lv.${p.level}${bloqueado?porque:''}">
+        <span class="mont-num">${sel ? (posicao+1)+'º' : ''}</span>
+        ${sp?spriteHtml(p.speciesId,'sprite-sm',p.shiny):'❔'}
+        <span class="mont-info">
+          <span class="mont-nome">${escapeHtmlSafe(sp?sp.name:'?')}${p.shiny?' 🌟':''} <span class="mont-lv">— ${falta>0 ? '⏳'+Math.ceil(falta/60000)+'min' : 'Lv.'+p.level}</span></span>
+          <span class="mont-sub">${sp?typesHtml(sp.types):''}<span class="mont-time">${escapeHtmlSafe(p.teamName)}</span></span>
+        </span>
+      </button>
+      <button class="wild-dex" onclick="abrirPokedexFicha('${escJs(p.speciesId)}', ${p.shiny?'true':'false'})"
+        aria-label="Ver a ficha de ${escapeHtmlSafe(sp?sp.name:'?')}" title="Ver os atributos">🔍</button>
+    </div>`;
+  }).join('')}</div>`;
 }
 /* Marca ou desmarca um pokémon na lista, com as DUAS regras da casa: teto de 6 e sem repetir
    espécie. Devolve a própria lista (mutada) pra quem chamou só ter que renderizar. */
@@ -15899,6 +16009,7 @@ function esperaDosPokemon(){
    remarcar os 6 na grade seria adivinhacao -- e marcar o pokemon errado e pior que marcar nenhum. */
 function trocarTimeDaTorre(){
   game.towerTrocandoTime = true;
+  abrirMontador();
   game.towerPick = [];
   render();
 }

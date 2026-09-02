@@ -135,8 +135,8 @@ console.log('\nA ESPERA DO GINASIO CHEGA ATE A TELA');
   ok('o carregador guarda quem esta descansando', Object.keys(esperas).length === 3,
      JSON.stringify(S.__getGame().neighborhoodGymCooldowns));
   const tela = S.renderNeighborhoodGymChallengeTeamPicker();
-  ok('e a tela apaga os tres', (tela.match(/tower-pick[^"]*descansando/g)||[]).length === 3,
-     (tela.match(/tower-pick[^"]*descansando/g)||[]).length + ' apagados');
+  ok('e a tela apaga os tres', (tela.match(/mont-card[^"]*descansando/g)||[]).length === 3,
+     (tela.match(/mont-card[^"]*descansando/g)||[]).length + ' apagados');
   ok('com o TEMPO em minutos em cima de cada um', (tela.match(/⏳8min/g)||[]).length === 3,
      (tela.match(/⏳\d+min/g)||[]).join(', '));
   ok('e desabilitados de verdade', (tela.match(/descansando"[^>]*\n?[^>]*disabled/g)||[]).length > 0 ||
