@@ -657,7 +657,13 @@ const SHINY_BUFF_MULT = 1.20;   // +20% em TODOS os atributos (TERRAIN_BUFF_MULT
    Estes três valores precisam bater com os do pokemon-ginasio.html. */
 const SPECIALTY_LEVEL = 65;      // nível a partir do qual um pokémon conta pro tipo dele
 const SPECIALTY_THRESHOLD = 50;  // quantos pokémon do tipo pra virar especialista
-const SPECIALTY_BUFF = 1.01;     // +1% em todos os atributos
+/* 1,05. Era 1,01, e a conta não fechava com o preço: 50 pokémon levados ao nível 65 são meses de
+   jogo, e o retorno era +1 ponto de ataque num Nidoking nível 60 (92 -> 93). Medido antes da
+   mudança, quem conquistava a especialidade ganhava 0,2 ponto de vitória num time misto -- ou seja,
+   nada, e os jogadores reclamaram com razão de "não mudou nada".
+   Fica ABAIXO do terreno (1,15) e do shiny (1,20) de propósito: a especialidade cobre um TIPO
+   inteiro do time, não um pokémon. */
+const SPECIALTY_BUFF = 1.05;     // +1% em todos os atributos
 function applySpecialtyBuff(team, specialties){
   const set = new Set(specialties || []);
   if(set.size === 0) return;
@@ -1061,8 +1067,8 @@ function simulateGymBattle(team, enemyTeam, rng){
       const playerAliveAfter = activeFainted ? playerAliveBefore - 1 : playerAliveBefore;
       const enemyAliveAfter = enemyFainted ? enemyAliveBefore - 1 : enemyAliveBefore;
       matchups.push({
-        player:active.name, playerSpecies:active.speciesId, playerLevel:active.level, playerShiny: !!active.shiny, playerBuffed: !!active.terrainBuffed,
-        enemy:enemy.name, enemySpecies:enemy.speciesId, enemyLevel:enemy.level, enemyShiny: !!enemy.shiny, enemyBuffed: !!enemy.terrainBuffed,
+        player:active.name, playerSpecies:active.speciesId, playerLevel:active.level, playerShiny: !!active.shiny, playerBuffed: !!active.terrainBuffed, playerSpecialty: !!active.specialtyBuffed,
+        enemy:enemy.name, enemySpecies:enemy.speciesId, enemyLevel:enemy.level, enemyShiny: !!enemy.shiny, enemyBuffed: !!enemy.terrainBuffed, enemySpecialty: !!enemy.specialtyBuffed,
         playerTrainerStreak: playerStreak, enemyTrainerStreak: enemyStreak,
         winner: isTrade ? null : (playerWon ? active.name : enemy.name),
         isTrade,
@@ -4759,8 +4765,14 @@ function battleView(estado, uid){
     euStats: (estado.a.uid === uid) ? (estado.aStats||null) : (estado.bStats||null),
     oponenteStats: (estado.a.uid === uid) ? (estado.bStats||null) : (estado.aStats||null),
     souA,
-    eu: { nome: souA ? estado.a.name : estado.b.name, time: meu, atual: souA ? estado.aCurrent : estado.bCurrent },
-    oponente: { nome: souA ? estado.b.name : estado.a.name, time: dele, atual: souA ? estado.bCurrent : estado.aCurrent },
+    /* As especialidades dos DOIS lados vão junto. O buff já era aplicado aqui no servidor
+       (applySpecialtyBuff no confronto), mas a tela desenhava o time a partir do estado e não
+       tinha como saber quem estava com o bônus -- então o selo não aparecia na única batalha em
+       que o adversário é outro jogador de verdade. */
+    eu: { nome: souA ? estado.a.name : estado.b.name, time: meu, atual: souA ? estado.aCurrent : estado.bCurrent,
+          especialidades: (souA ? estado.aSpecialties : estado.bSpecialties) || [] },
+    oponente: { nome: souA ? estado.b.name : estado.a.name, time: dele, atual: souA ? estado.bCurrent : estado.aCurrent,
+                especialidades: (souA ? estado.bSpecialties : estado.aSpecialties) || [] },
     matchups: estado.matchups,
     escolhi: (souA ? estado.aChoice : estado.bChoice) !== null && (souA ? estado.aChoice : estado.bChoice) !== undefined,
     // o índice escolhido, pra a tela marcar QUAL pokémon vai entrar
@@ -6071,6 +6083,10 @@ exports.fightSundayBoss = onCall(async (request) => {
     maxHp: 0, hp: 0
   }));
 
+  /* A ESPECIALIDADE VALE AQUI TAMBÉM. A raide era a única batalha do jogo que não aplicava o buff
+     -- o shiny valia (a flag vem na instância), a especialidade não. Ninguém tinha como notar:
+     ela valia 1% e não aparecia em lugar nenhum. Conferido em 02/09/2026, ao subir pra 5%. */
+  applySpecialtyBuff(time, conta.specialties || []);
   const antes = estado.hp;
   const boss = bossInstance(antes);
   const luta = simulateBossFight(time, boss);

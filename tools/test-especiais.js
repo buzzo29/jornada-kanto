@@ -498,6 +498,56 @@ ok('tres golpes + cura continuam sendo os golpes REAIS', seq3.length === 4 && se
   ok('e o log fala da cura', /restaurou seu HP/.test(S.passosHtml(m)));
 })();
 
+console.log('\nO BUFF DE ESPECIALIDADE ENTRA EM TODA BATALHA');
+/* A raide do Mew era a UNICA que nao aplicava -- e ninguem tinha como notar, porque o buff valia
+   1% e nao aparecia em lugar nenhum. Achado em 02/09/2026, ao subir pra 5%.
+   Este teste le o CODIGO: toda chamada que simula uma batalha tem que ter um applySpecialtyBuff
+   perto. E chato de escrever e e o unico jeito de pegar a proxima omissao -- a anterior passou
+   despercebida por semanas. */
+(function(){
+  const fs = require('fs');
+  const arquivos = [
+    ['cliente',  fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8')],
+    ['servidor', fs.readFileSync(path.join(__dirname, '..', 'functions', 'index.js'), 'utf8')]
+  ];
+  const semBuff = [];
+  for(const [nome, texto] of arquivos){
+    const linhas = texto.split('\n');
+    linhas.forEach((l, i) => {
+      // as CHAMADAS (nao a definicao) de quem simula uma batalha
+      if(!/(simulateGymBattle|simulateBossFight)\s*\(/.test(l)) return;
+      if(/^\s*(function|exports\.)/.test(l)) return;
+      /* Olha as 12 linhas anteriores: e onde o time e montado e o buff, aplicado. */
+      const antes = linhas.slice(Math.max(0, i-12), i).join('\n');
+      if(!/applySpecialtyBuff/.test(antes)) semBuff.push(nome + ':' + (i+1) + '  ' + l.trim().slice(0, 60));
+    });
+  }
+  ok('toda batalha simulada aplica a especialidade', semBuff.length === 0, semBuff.join('  |  '));
+})();
+/* E o valor: 5%, abaixo do terreno (1,15) e do shiny (1,20) de proposito -- a especialidade cobre
+   um TIPO inteiro do time, nao um pokemon. */
+ok('o buff e de 5%', S.SPECIALTY_BUFF === 1.05, S.SPECIALTY_BUFF + '');
+ok('e fica abaixo do terreno e do shiny', S.SPECIALTY_BUFF < 1.15);
+/* O confronto carrega a marca, pros dois lados -- e dela que sai o selo na tela. */
+(function(){
+  const a = inst('nidoking', 60), b = inst('onix', 60);
+  S.applySpecialtyBuff([a], ['Poison']);
+  const r = S.simulateGymBattle([a], [b], Math.random);
+  const m = (r.matchups||[])[0];
+  ok('o confronto diz quem estava com a especialidade', m.playerSpecialty === true && m.enemySpecialty === false,
+     'jogador: ' + m.playerSpecialty + ', inimigo: ' + m.enemySpecialty);
+})();
+/* E o buff MUDA os atributos de verdade -- so de quem e do tipo. */
+(function(){
+  const semBuffPk = inst('nidoking', 60);
+  const comBuffPk = inst('nidoking', 60);
+  S.applySpecialtyBuff([comBuffPk], ['Poison']);
+  const deFora = inst('pikachu', 60);
+  S.applySpecialtyBuff([deFora], ['Poison']);
+  ok('quem e do tipo fica mais forte', S.effectiveAttack(comBuffPk) > S.effectiveAttack(semBuffPk),
+     S.effectiveAttack(semBuffPk) + ' -> ' + S.effectiveAttack(comBuffPk));
+  ok('e quem nao e, nao muda', !deFora.specialtyBuffed);
+})();
 console.log('\nOS DOIS MOTORES DAO O MESMO RESULTADO');
 /* O motor e duplicado (cliente e servidor). Uma diferenca aqui faz a liga decidir uma coisa e a
    animacao mostrar outra -- e o jogador so descobre quando perde uma final. */

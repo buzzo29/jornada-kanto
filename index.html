@@ -3911,7 +3911,13 @@ const SHINY_BUFF_MULT = 1.20;     // +20% em TODOS os atributos (TERRAIN_BUFF_MU
    Os três valores precisam bater com os do index.js (o servidor calcula as ligas com eles). */
 const SPECIALTY_LEVEL = 65;
 const SPECIALTY_THRESHOLD = 50;
-const SPECIALTY_BUFF = 1.01;
+/* 1,05. Era 1,01, e a conta não fechava com o preço: 50 pokémon levados ao nível 65 são meses de
+   jogo, e o retorno era +1 ponto de ataque num Nidoking nível 60 (92 -> 93). Medido antes da
+   mudança, quem conquistava a especialidade ganhava 0,2 ponto de vitória num time misto -- ou seja,
+   nada, e os jogadores reclamaram com razão de "não mudou nada".
+   Fica ABAIXO do terreno (1,15) e do shiny (1,20) de propósito: a especialidade cobre um TIPO
+   inteiro do time, não um pokémon. */
+const SPECIALTY_BUFF = 1.05;
 // marca quais pokémon do time recebem o bônus. Chamada antes de cada batalha local, com as
 // especialidades da conta -- a marca é descartada junto com a instância no fim da batalha
 function applySpecialtyBuff(team, specialties){
@@ -5509,8 +5515,8 @@ function simulateGymBattle(team, brockTeam, rng, opts){
       const playerAliveAfter = activeFainted ? playerAliveBefore - 1 : playerAliveBefore;
       const enemyAliveAfter = enemyFainted ? enemyAliveBefore - 1 : enemyAliveBefore;
       matchups.push({
-        player:active.name, playerSpecies:active.speciesId, playerLevel:active.level, playerShiny: !!active.shiny, playerBuffed: !!active.terrainBuffed,
-        enemy:enemy.name, enemySpecies:enemy.speciesId, enemyLevel:enemy.level, enemyShiny: !!enemy.shiny, enemyBuffed: !!enemy.terrainBuffed,
+        player:active.name, playerSpecies:active.speciesId, playerLevel:active.level, playerShiny: !!active.shiny, playerBuffed: !!active.terrainBuffed, playerSpecialty: !!active.specialtyBuffed,
+        enemy:enemy.name, enemySpecies:enemy.speciesId, enemyLevel:enemy.level, enemyShiny: !!enemy.shiny, enemyBuffed: !!enemy.terrainBuffed, enemySpecialty: !!enemy.specialtyBuffed,
         playerTrainerStreak: playerStreak, enemyTrainerStreak: enemyStreak,
         winner: isTrade ? null : (playerWon ? active.name : enemy.name),
         isTrade,
@@ -12151,13 +12157,13 @@ function renderSpecialBattling(){
     </div>
     <div class="battle-vs">
       <div class="fighter">
-        <div class="fighter-emoji">${playerSp?battleSpriteHtml(m.playerSpecies, m.enemySpecies, 'sprite-lg', m.playerShiny, true):''}</div>${m.player}${m.playerShiny?' 🌟':''} <span class="fighter-level">Lv.${m.playerLevel}</span>
+        <div class="fighter-emoji">${playerSp?battleSpriteHtml(m.playerSpecies, m.enemySpecies, 'sprite-lg', m.playerShiny, true):''}</div>${m.player}${m.playerShiny?' 🌟':''}${m.playerSpecialty?' 🎖️':''} <span class="fighter-level">Lv.${m.playerLevel}</span>
         <div class="fighter-types">${playerSp?typesHtml(playerSp.types):''}</div>
         ${renderHpBar(displayPlayerHp, m.playerMaxHp, 'hp-fill-player', 'hp-label-player')}
       </div>
       <span class="vs-swords ${(loading||animating)?'spin':''}">⚔️</span>
       <div class="fighter">
-        <div class="fighter-emoji">${enemySp?battleSpriteHtml(m.enemySpecies, m.playerSpecies, 'sprite-lg', m.enemyShiny):''}</div>${m.enemy}${m.enemyShiny?' 🌟':''} <span class="fighter-level">Lv.${m.enemyLevel}</span>
+        <div class="fighter-emoji">${enemySp?battleSpriteHtml(m.enemySpecies, m.playerSpecies, 'sprite-lg', m.enemyShiny):''}</div>${m.enemy}${m.enemyShiny?' 🌟':''}${m.enemySpecialty?' 🎖️':''} <span class="fighter-level">Lv.${m.enemyLevel}</span>
         <div class="fighter-types">${enemySp?typesHtml(enemySp.types):''}</div>
         ${renderHpBar(displayEnemyHp, m.enemyMaxHp, 'hp-fill-enemy', 'hp-label-enemy')}
       </div>
@@ -12562,13 +12568,13 @@ function renderTrainerBattling(){
     </div>
     <div class="battle-vs">
       <div class="fighter">
-        <div class="fighter-emoji">${playerSp?battleSpriteHtml(m.playerSpecies, m.enemySpecies, 'sprite-lg', m.playerShiny, true):''}</div>${m.player}${m.playerShiny?' 🌟':''} <span class="fighter-level">Lv.${m.playerLevel}</span>
+        <div class="fighter-emoji">${playerSp?battleSpriteHtml(m.playerSpecies, m.enemySpecies, 'sprite-lg', m.playerShiny, true):''}</div>${m.player}${m.playerShiny?' 🌟':''}${m.playerSpecialty?' 🎖️':''} <span class="fighter-level">Lv.${m.playerLevel}</span>
         <div class="fighter-types">${playerSp?typesHtml(playerSp.types):''}</div>
         ${renderHpBar(displayPlayerHp, m.playerMaxHp, 'hp-fill-player', 'hp-label-player')}
       </div>
       <span class="vs-swords ${(loading||animating)?'spin':''}">⚔️</span>
       <div class="fighter">
-        <div class="fighter-emoji">${enemySp?battleSpriteHtml(m.enemySpecies, m.playerSpecies, 'sprite-lg', m.enemyShiny):''}</div>${m.enemy}${m.enemyShiny?' 🌟':''} <span class="fighter-level">Lv.${m.enemyLevel}</span>
+        <div class="fighter-emoji">${enemySp?battleSpriteHtml(m.enemySpecies, m.playerSpecies, 'sprite-lg', m.enemyShiny):''}</div>${m.enemy}${m.enemyShiny?' 🌟':''}${m.enemySpecialty?' 🎖️':''} <span class="fighter-level">Lv.${m.enemyLevel}</span>
         <div class="fighter-types">${enemySp?typesHtml(enemySp.types):''}</div>
         ${renderHpBar(displayEnemyHp, m.enemyMaxHp, 'hp-fill-enemy', 'hp-label-enemy')}
       </div>
@@ -13192,13 +13198,13 @@ function renderBattling(){
     </div>
     <div class="battle-vs">
       <div class="fighter">
-        <div class="fighter-emoji">${playerSp?battleSpriteHtml(m.playerSpecies, m.enemySpecies, 'sprite-lg', m.playerShiny, true):''}</div>${m.player}${m.playerShiny?' 🌟':''}${m.playerBuffed?' 🔺':''} <span class="fighter-level">Lv.${m.playerLevel}</span>
+        <div class="fighter-emoji">${playerSp?battleSpriteHtml(m.playerSpecies, m.enemySpecies, 'sprite-lg', m.playerShiny, true):''}</div>${m.player}${m.playerShiny?' 🌟':''}${m.playerBuffed?' 🔺':''}${m.playerSpecialty?' 🎖️':''} <span class="fighter-level">Lv.${m.playerLevel}</span>
         <div class="fighter-types">${playerSp?typesHtml(playerSp.types):''}</div>
         ${renderHpBar(displayPlayerHp, m.playerMaxHp, 'hp-fill-player', 'hp-label-player')}
       </div>
       <span class="vs-swords ${(loading||animating)?'spin':''}">⚔️</span>
       <div class="fighter">
-        <div class="fighter-emoji">${enemySp?battleSpriteHtml(m.enemySpecies, m.playerSpecies, 'sprite-lg', m.enemyShiny):''}</div>${m.enemy}${m.enemyShiny?' 🌟':''}${m.enemyBuffed?' 🔺':''} <span class="fighter-level">Lv.${m.enemyLevel}</span>
+        <div class="fighter-emoji">${enemySp?battleSpriteHtml(m.enemySpecies, m.playerSpecies, 'sprite-lg', m.enemyShiny):''}</div>${m.enemy}${m.enemyShiny?' 🌟':''}${m.enemyBuffed?' 🔺':''}${m.enemySpecialty?' 🎖️':''} <span class="fighter-level">Lv.${m.enemyLevel}</span>
         <div class="fighter-types">${enemySp?typesHtml(enemySp.types):''}</div>
         ${renderHpBar(displayEnemyHp, m.enemyMaxHp, 'hp-fill-enemy', 'hp-label-enemy')}
       </div>
@@ -14547,13 +14553,13 @@ function renderLeagueWatch(){
     </div>
     <div class="battle-vs">
       <div class="fighter">
-        <div class="fighter-emoji">${playerSp?battleSpriteHtml(m.playerSpecies, m.enemySpecies, 'sprite-lg', m.playerShiny, true):''}</div>${m.player}${m.playerShiny?' 🌟':''}${w.terrain && playerSp && playerSp.types.some(t=>w.terrain.types.includes(t))?' 🔺':''} <span class="fighter-level">Lv.${m.playerLevel}</span>
+        <div class="fighter-emoji">${playerSp?battleSpriteHtml(m.playerSpecies, m.enemySpecies, 'sprite-lg', m.playerShiny, true):''}</div>${m.player}${m.playerShiny?' 🌟':''}${w.terrain && playerSp && playerSp.types.some(t=>w.terrain.types.includes(t))?' 🔺':''}${m.playerSpecialty?' 🎖️':''} <span class="fighter-level">Lv.${m.playerLevel}</span>
         <div class="fighter-types">${playerSp?typesHtml(playerSp.types):''}</div>
         ${renderHpBar(displayPlayerHp, m.playerMaxHp, 'hp-fill-player', 'hp-label-player')}
       </div>
       <span class="vs-swords ${(loading||animating)?'spin':''}">⚔️</span>
       <div class="fighter">
-        <div class="fighter-emoji">${enemySp?battleSpriteHtml(m.enemySpecies, m.playerSpecies, 'sprite-lg', m.enemyShiny):''}</div>${m.enemy}${m.enemyShiny?' 🌟':''}${w.terrain && enemySp && enemySp.types.some(t=>w.terrain.types.includes(t))?' 🔺':''} <span class="fighter-level">Lv.${m.enemyLevel}</span>
+        <div class="fighter-emoji">${enemySp?battleSpriteHtml(m.enemySpecies, m.playerSpecies, 'sprite-lg', m.enemyShiny):''}</div>${m.enemy}${m.enemyShiny?' 🌟':''}${w.terrain && enemySp && enemySp.types.some(t=>w.terrain.types.includes(t))?' 🔺':''}${m.enemySpecialty?' 🎖️':''} <span class="fighter-level">Lv.${m.enemyLevel}</span>
         <div class="fighter-types">${enemySp?typesHtml(enemySp.types):''}</div>
         ${renderHpBar(displayEnemyHp, m.enemyMaxHp, 'hp-fill-enemy', 'hp-label-enemy')}
       </div>
@@ -15253,7 +15259,7 @@ function renderTrainerProfileModal(){
       <div class="tp-spec-label">ESPECIALIDADES</div>
       ${espec.length>0
         ? `<div class="tp-spec-pills">${espec.map(t=>typePill(t)).join('')}</div>
-           <p class="tp-spec-hint">+1% em todos os atributos pros pokémon desses tipos.</p>`
+           <p class="tp-spec-hint">+5% em todos os atributos pros pokémon desses tipos — e o selo 🎖️ na batalha.</p>`
         : `<p class="tp-spec-hint">Nenhuma ainda — leve ${limiar} pokémon de um tipo ao nível ${d.specialtyLevel||SPECIALTY_LEVEL}.</p>`}
       ${emProgresso.length>0 ? `<div class="tp-spec-progress">
         ${emProgresso.map(([t,n])=>`<div class="tp-spec-row">
@@ -16825,14 +16831,18 @@ function renderOnlineBattle(){
   </div>` : (h ? `<div class="box"><p class="hint-text">Você ainda não batalhou online. Que tal a primeira?</p></div>` : '')}`;
 }
 
-function fighterOnlineHtml(mon, lado, hpMostrado){
+function fighterOnlineHtml(mon, lado, hpMostrado, especialidades){
   if(!mon) return '';
   const sp = SPECIES[mon.speciesId];
+  /* O selo da especialidade sai do TIPO do pokémon contra a lista do treinador -- é a mesma regra
+     do applySpecialtyBuff no servidor, que é quem de fato aplica o bônus aqui. */
+  const comEspecialidade = !!(especialidades && especialidades.length && sp &&
+                              sp.types.some(x => especialidades.includes(x)));
   // durante a animação a barra parte do HP ANTERIOR; fora dela, mostra o valor atual
   const hp = (typeof hpMostrado === 'number') ? hpMostrado : mon.hp;
   return `<div class="fighter online-fighter-${lado}">
     <div class="fighter-emoji">${sp?spriteHtml(mon.speciesId,'sprite-lg',mon.shiny):'❔'}</div>
-    ${escapeHtmlSafe(mon.name)}${mon.shiny?' 🌟':''} <span class="fighter-level">Lv.${mon.level}</span>
+    ${escapeHtmlSafe(mon.name)}${mon.shiny?' 🌟':''}${comEspecialidade?' 🎖️':''} <span class="fighter-level">Lv.${mon.level}</span>
     <div class="fighter-types">${sp?typesHtml(sp.types):''}</div>
     ${renderHpBar(hp, mon.maxHp, 'online-hp-'+lado, 'online-hplabel-'+lado)}
   </div>`;
@@ -17036,9 +17046,9 @@ function renderOnlineFight(){
     <div class="battle-vs">
       ${ocultarLutadores
         ? `${fighterOcultoHtml()}<span class="vs-swords">⚔️</span>${fighterOcultoHtml()}`
-        : `${meuCaiu ? fighterOcultoHtml() : fighterOnlineHtml(meu,'eu', anim ? anim.meuHp : undefined)}
+        : `${meuCaiu ? fighterOcultoHtml() : fighterOnlineHtml(meu,'eu', anim ? anim.meuHp : undefined, st.eu.especialidades)}
            <span class="vs-swords">⚔️</span>
-           ${deleCaiu ? fighterOcultoHtml() : fighterOnlineHtml(dele,'ele', anim ? anim.deleHp : undefined)}`}
+           ${deleCaiu ? fighterOcultoHtml() : fighterOnlineHtml(dele,'ele', anim ? anim.deleHp : undefined, st.oponente.especialidades)}`}
     </div>
     ${anim
       ? (anim.avisoEspecial

@@ -102,13 +102,34 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
   No log isso aparece como "**mas não teve efeito**", com o −1 do piso: sem essa frase o jogador
   vê um −1 solto e procura bug onde é regra.
 - Velocidade alta é mais valiosa do que parece, porque entra na taxa de crítico (ver acima).
+- **A especialidade vale 1,05× em todos os atributos, e agora tem selo.** Era **1,01×**, e a conta
+  não fechava com o preço: 50 pokémon levados ao nível 65 são meses de jogo, e o retorno era **+1
+  ponto de ataque** num Nidoking nível 60 (92 → 93). Os jogadores reclamaram que "não mudou nada" e
+  estavam certos — medido, quem conquistava a especialidade ganhava **0,2 ponto** de vitória num
+  time misto. Hoje ganha **0,9**, e um time inteiro do tipo vai de +1,45 pra **+7,1 pontos**
+  (40,95% → 48,02%).
+  Fica **abaixo do terreno (1,15) e do shiny (1,20)** de propósito: a especialidade cobre um TIPO
+  inteiro do time, não um pokémon.
+  **O CLAUDE.md dizia que o buff valia "~13 pontos percentuais"** — medido agora, é 7,1 no melhor
+  caso possível (time todo do tipo) e 0,9 no caso real. O número velho vinha de outra época e
+  sobreviveu à mudança do valor.
+- **O selo 🎖️** aparece ao lado do 🌟 (shiny) e do 🔺 (terreno) nas CINCO telas de batalha: jornada,
+  ginásio, torre, Rocket, liga assistida e online. O confronto passou a carregar
+  `playerSpecialty`/`enemySpecialty`; no online, que desenha o time a partir do estado e não de um
+  confronto, o servidor manda as especialidades dos dois lados no payload.
+  **Metade da reclamação era isso**: sem selo, o jogador não tinha como saber que o bônus estava
+  valendo — e com 1% ele também não sentia.
+- **A raide do Mew era a ÚNICA batalha que não aplicava o buff.** O shiny valia (a flag vem na
+  instância), a especialidade não. Ninguém tinha como notar, porque ela valia 1% e era invisível.
+  `tools/test-especiais.js` passou a LER O CÓDIGO e falhar se alguma chamada de `simulateGymBattle`
+  ou `simulateBossFight` não tiver um `applySpecialtyBuff` por perto. É chato e é o único jeito de
+  pegar a próxima omissão — esta passou despercebida por semanas.
 - **Todo modo aplica os mesmos buffs.** Shiny e especialidade valem em TODA batalha (liga, liga dos
   treinadores, ginásio do bairro, torre e online); terreno só existe onde há terreno escolhido
   (liga, liga dos treinadores e ginásio do bairro — na torre e no online não existe terreno).
   Um caminho que esquecia o buff já aconteceu: desafio do lobby criava batalha com `specialties: []`
-  porque `joinBattleLobby` não gravava o campo. Medido antes de corrigir: num confronto parelho o
-  buff de especialidade cobrindo o time todo vale **~13 pontos percentuais** de vitória (53,7% →
-  66,6%), e **~19** num espelho. "+1% em tudo" engana — em batalha parelha decide.
+  porque `joinBattleLobby` não gravava o campo. Medido em 02/09/2026, com o buff em 1,05: um time todo do tipo vale **+7,1 pontos** de
+  vitória (40,95% → 48,02%) e um time misto, **+0,9**. "+1% em tudo" engana — em batalha parelha decide.
 - Buffs: **shiny 1,20× e terreno 1,15×, em TODOS os atributos** — ataque, especial, defesa,
   velocidade e HP. Multiplicam entre si: um shiny no terreno do tipo dele fica 1,38× em tudo.
   Houve uma fase em que foram só ofensivos (1,15 e 1,10); acabou, por decisão de design.
