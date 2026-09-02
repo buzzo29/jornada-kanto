@@ -130,6 +130,14 @@ function makeDb(){
             if(jaEscreveu) throw new Error('Firestore transactions require all reads to be executed before all writes.');
             return ref.get();
           },
+          /* getAll DENTRO da transacao: o Transaction do Firestore tem, e sem ele aqui qualquer
+             funcao que leia dois documentos de uma vez morre com "tx.getAll is not a function" --
+             um erro do harness, nao do codigo testado. Passa pela MESMA trava de leitura depois
+             de escrita. */
+          getAll: (...refs)=>{
+            if(jaEscreveu) throw new Error('Firestore transactions require all reads to be executed before all writes.');
+            return Promise.all(refs.map(r => r.get()));
+          },
           set: (ref, v, o)=>{ jaEscreveu = true; ref.set(v, o); },
           delete: (ref)=>{ jaEscreveu = true; ref.delete(); }
         });

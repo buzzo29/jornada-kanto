@@ -20,19 +20,23 @@ service cloud.firestore {
     // usuários e seus saves -- só o próprio dono acessa
     match /users/{userId} {
       allow read: if request.auth != null && request.auth.uid == userId;
-      // ESCRITA: o dono escreve no próprio documento, MENOS nos campos de especialidade de tipo.
+      // ESCRITA: o dono escreve no próprio documento, MENOS nos campos de PRÊMIO e de especialidade.
       // Esses campos só as Cloud Functions gravam (o Admin SDK ignora estas regras): as especialidades
       // pela syncTrainerSpecialties, e rareCandies pela Torre -- doce contado no cliente seria nível de graça,
       // porque a especialidade dá +1% em todos os atributos e vale NAS LIGAS -- se o cliente pudesse
       // escrever, bastava uma linha no console pra se declarar especialista em todos os tipos.
+      // 'moedas' entrou em 02/09/2026 pelo mesmo motivo elevado ao quadrado: moeda é poder de compra,
+      // e o que ela compra hoje é RE-SORTEIO do encontro selvagem. Cliente escrevendo moeda é shiny à
+      // vontade -- exatamente a artimanha que a semente do encontro (ver goToWildEncounter) fecha.
+      // Quem paga é o claimJourneyCoins e quem cobra é o rerollWildOffer.
       // O resto do documento (nome, pokédex, conquistas) continua livre pro dono como sempre foi.
       allow write: if request.auth != null && request.auth.uid == userId
         && !request.resource.data.diff(resource.data).affectedKeys()
-             .hasAny(['specialties', 'specialtyCounts', 'specialtyCounted', 'rareCandies']);
+             .hasAny(['specialties', 'specialtyCounts', 'specialtyCounted', 'rareCandies', 'moedas']);
       // criação do documento: não há resource.data pra comparar, então checa direto que os campos
       // protegidos não vêm no payload inicial
       allow create: if request.auth != null && request.auth.uid == userId
-        && !request.resource.data.keys().hasAny(['specialties', 'specialtyCounts', 'specialtyCounted', 'rareCandies']);
+        && !request.resource.data.keys().hasAny(['specialties', 'specialtyCounts', 'specialtyCounted', 'rareCandies', 'moedas']);
       match /saves/{saveId} {
         allow read, write: if request.auth != null && request.auth.uid == userId;
       }

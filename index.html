@@ -1875,6 +1875,10 @@
     color:var(--ink); background:var(--yellow); border:1px solid var(--box-border);
     border-radius:3px; padding:0 3px;
   }
+  /* O aviso de moeda ganha, na tela de vitória e na de campeão. Dourado como o resto do que é
+     prêmio no jogo (o card do nome na home, o 1º lugar dos rankings). */
+  .moeda-premio{ background:#fff8e0; border-color:var(--yellow-dark); text-align:center; }
+  .moeda-premio p{ margin:0; font-size:.92rem; }
   .item-detalhe{ margin-bottom:10px; }
   .item-detalhe-topo{ display:flex; align-items:center; gap:10px; }
   .item-detalhe-icone{ font-size:2.2rem; line-height:1; flex-shrink:0; }
@@ -3684,11 +3688,15 @@ function freshGameDefaults(){
     myActiveGymDefenses:null, // {slot: {city,countryCode}} -- carregado na home, pra mostrar o botão "Ver ginásio" nos times que defendem algo
     notificationsUnreadCount:0,
     shinyBonusExpiresAt:0, // timestamp -- enquanto Date.now() < isso, encontros selvagens usam SHINY_CHANCE_BONUS em vez do normal
+  /* O preço do re-sorteio vive no cliente E no servidor (MOEDAS_RESSORTEIO nos dois): o cliente
+     precisa dele pra desabilitar o botão, e o servidor é quem cobra de verdade. Se os dois
+     divergirem, a tela promete um preço que a cobrança não pratica. */
   rareCandies:0,         // doces da CONTA (ver ITENS/inventário); quem escreve é o servidor
   moedas:0,              // moedas da CONTA -- ainda não há como ganhar nem gastar, só o contador
     shinyPityCount:0, // encontros selvagens seguidos sem capturar nenhum shiny, desde a última captura (ou desde ativar o bônus) -- sobe a chance a cada um
     shinyFoundThisSave:false, // ESTE save já conseguiu um shiny? Trava a escalada do bônus na base (ver currentShinyChance). É por save, não por conta
     wildEncounterSeq:0,       // nº do encontro selvagem deste save -- é a semente da oferta (ver goToWildEncounter)
+    wildRerolls:0,            // re-sorteios PAGOS do encontro atual -- entra na mesma semente
     saveGen:0,                // a geração do slot quando ESTE save nasceu -- entra na semente do encontro
     mewtwoLoanActive:false,
     mewtwoLoanUnlocked:false,
@@ -5871,8 +5879,8 @@ function goToWildEncounter(){
      encontro a jornada anterior. Ela só avança quando a tentativa CONTA (1ª insígnia ou game over,
      ver encerrarTentativaDoSlot), então apagar e recriar sem jogar continua devolvendo a mesma
      oferta, que é o ponto da trava. */
-  const semente = [game.currentSaveSlot, game.saveGen||0, game.rivalName||'', game.starterId||'',
-                   'selvagem', game.wildEncounterSeq, game.currentRoute||''].join('|');
+  game.wildRerolls = 0;   // encontro novo, contagem de re-sorteios do zero
+  const semente = sementeDoEncontro();
   const sorteioOriginal = Math.random;
   Math.random = makeSeededRng(semente);
   try{
@@ -5882,11 +5890,43 @@ function goToWildEncounter(){
   }
   game.wildSelected = [];
   game.wildDisguiseAcknowledged = false;
+  game.rerollErro = null;
   game.screen = 'wild';
   render();
   /* GRAVA NA HORA, sem esperar o autosave (debounced em 800ms). Não é mais a única defesa -- a
      semente acima é --, mas mantém o contador no servidor o quanto antes. */
   saveCurrentGame();
+}
+/* A SEMENTE DO ENCONTRO, num lugar só -- o primeiro sorteio e o re-sorteio pago têm que usar a
+   MESMA regra, senão pagar 3 moedas devolveria uma oferta montada por outro caminho. */
+function sementeDoEncontro(){
+  return [game.currentSaveSlot, game.saveGen||0, game.rivalName||'', game.starterId||'',
+          'selvagem', game.wildEncounterSeq, game.currentRoute||'', game.wildRerolls||0].join('|');
+}
+/* RE-SORTEIO PAGO. O servidor cobra (rerollWildOffer) e só depois a oferta é refeita: se a cobrança
+   falhar -- moeda de menos, rede caindo --, nada muda na tela e o motivo aparece nela.
+   A ordem importa e é essa: sortear antes de cobrar daria a oferta de graça pra quem fechasse a
+   aba no meio. */
+async function resortearEncontro(){
+  if(game.rerolando) return;
+  game.rerollErro = null;
+  game.rerolando = true; render();
+  try{
+    const r = await functionsClient.httpsCallable('rerollWildOffer')();
+    game.moedas = r.data.moedas;
+    game.wildRerolls = (game.wildRerolls || 0) + 1;
+    const sorteioOriginal = Math.random;
+    Math.random = makeSeededRng(sementeDoEncontro());
+    try{ montaOfertaSelvagem(); } finally { Math.random = sorteioOriginal; }
+    game.wildSelected = [];        // a oferta é outra: o que estava marcado não existe mais
+    game.wildDisguiseAcknowledged = false;
+    saveCurrentGame();             // o contador de re-sorteios precisa chegar ao servidor
+  } catch(e){
+    console.error('Erro ao re-sortear o encontro:', e);
+    game.rerollErro = (e && e.message) || 'Não deu pra re-sortear agora.';
+  }
+  game.rerolando = false;
+  render();
 }
 /* NENHUMA LINHA REPETIDA NA OFERTA -- conferido no fim, depois de todo mundo passar.
    O buildOfferFromPool já cuida disso no que ELE sorteia, mas quem entra DEPOIS dele -- o raro da
@@ -6938,6 +6978,8 @@ function finishSpecialBattle(){
           userDocRef(game.authUser.uid).set({ eliteChampion: true }, { merge: true })
             .catch(e=>console.error('Erro ao gravar o título da Elite na conta:', e));
         }
+        game.moedasGanhasAgora = 0;
+        receberMoedasDaJornada();   // +20 pela Elite
         msg = `🏆 <strong>VOCÊ É O NOVO CAMPEÃO DA LIGA POKÉMON!</strong> ${escapeHtmlSafe(cfg.meta.opponentName)} não teve resposta. «...Você mereceu. Dessa vez.» De agora em diante, seu nome carrega o troféu <strong>🏆</strong> em todas as ligas online.`;
       }
     } else {
@@ -7318,6 +7360,8 @@ function finishBattle(){
     // iniciais E a encontros novos na PRÓXIMA vez que for recriado (ver encerrarTentativaDoSlot)
     if(game.badgesEarned.length === 1) encerrarTentativaDoSlot(game.currentSaveSlot);
     game.screen = 'victory';
+    game.moedasGanhasAgora = 0;
+    receberMoedasDaJornada();   // 5 pela insígnia, +10 se esta foi a oitava
   } else {
     game.losses++;
     game.lossesTotal = (game.lossesTotal||0) + 1;   // acumula pra jornada toda; nunca é zerado
@@ -10870,6 +10914,7 @@ function serializeGame(){
     gymIndex: game.gymIndex,
     shinyFoundThisSave: !!game.shinyFoundThisSave, // trava a escalada do bônus (ver currentShinyChance)
     wildEncounterSeq: game.wildEncounterSeq || 0,  // semente do encontro selvagem (ver goToWildEncounter)
+    wildRerolls: game.wildRerolls || 0,            // idem -- sem ele, voltar ao save desfaz o re-sorteio pago
     saveGen: game.saveGen || 0,                    // a geração do slot quando este save nasceu
     starterId: game.starterId,
     wildOffer: game.wildOffer,
@@ -11058,6 +11103,7 @@ function applySavedState(data){
     : (data.team||[]).some(p=>p && p.shiny);
   game.starterId = data.starterId || null;
   game.wildEncounterSeq = data.wildEncounterSeq || 0;
+  game.wildRerolls = data.wildRerolls || 0;
   game.wildOffer = data.wildOffer || [];
   game.wildSelected = data.wildSelected || [];
   game.team = hydrateTeam(data.team);
@@ -12424,7 +12470,15 @@ function renderWild(){
       </div>`;
     }).join('')}
   </div>
+  ${game.rerollErro ? `<div class="box"><p class="error-text">${escapeHtmlSafe(game.rerollErro)}</p></div>` : ''}
   <button class="btn success" onclick="confirmWild()">Confirmar equipe ✔</button>
+  <button class="btn secondary" ${(game.moedas||0) < MOEDAS_RESSORTEIO || game.rerolando ? 'disabled' : ''}
+    onclick="resortearEncontro()">
+    ${game.rerolando ? 'Re-sorteando...' : `🪙 ${MOEDAS_RESSORTEIO} — Sortear outros pokémon`}
+  </button>
+  ${/* DENTRO de uma .box: esta linha fica FORA de qualquer caixa se solta, direto sobre o fundo
+      escuro da página, e a cor de texto do jogo some ali -- a mesma armadilha da legenda do mapa. */''}
+  <div class="box"><p class="hint-text">Você tem <strong>🪙 ${game.moedas||0}</strong>. O re-sorteio troca as espécies E os níveis desta rota.</p></div>
   ${botaoSeuTimeHtml()}
   <button class="btn secondary" onclick="abrirPokedexModal()">${pokedexIcon('grande')} Consultar Pokédex</button>`;
 }
@@ -13365,6 +13419,14 @@ function renderBattling(){
   ${botaoBuscaOnlineHtml()}`;
 }
 
+/* A linha de moeda da tela de vitória. Só aparece quando ALGO foi pago: a chamada é assíncrona, e
+   até ela voltar o número é 0 -- anunciar "+0 moedas" enquanto a rede responde seria pior que
+   esperar meio segundo pela linha certa. */
+function moedasGanhasHtml(){
+  const n = game.moedasGanhasAgora || 0;
+  if(n <= 0) return '';
+  return `<div class="box moeda-premio"><p>🪙 <strong>+${n} moeda${n===1?'':'s'}</strong> — já estão na sua conta.</p></div>`;
+}
 function renderBattleResult(win){
   const gym = gymAtual();
   const r = game.battleResult;
@@ -13375,7 +13437,8 @@ function renderBattleResult(win){
   <div class="badge-earned">
     ${badgeMarkup(gym.badge,'lg')}
     <div class="badge-text">Você ganhou a<br><strong>${gym.badge}</strong>!</div>
-  </div>` : ''}
+  </div>
+  ${moedasGanhasHtml()}` : ''}
   <div class="box">
     <h2>Log da batalha</h2>
     <div class="status-list">${renderMatchupLog(r.matchups)}</div>
@@ -13471,7 +13534,8 @@ function eliteJourneyBoxHtml(){
         <button class="btn success" onclick="openInventario()">🎒 Abrir a mochila</button>
       </div>`;
     }
-    return `<div class="box gold-highlight">
+    return `${moedasGanhasHtml()}
+    <div class="box gold-highlight">
       <h2>🏆 CAMPEÃO DA LIGA POKÉMON</h2>
       <p>Esse time venceu a Elite 4 e a final contra <strong>${escapeHtmlSafe(game.rivalName)}</strong>. Seu nome agora carrega o <strong>🏆</strong> permanente em todas as ligas online.</p>
       ${premioHtml}
@@ -16006,6 +16070,28 @@ function slotsDaGrade(pilhas){
   const total = Math.max(INVENTARIO_SLOTS_MINIMOS, Math.ceil((pilhas.length + 1) / 4) * 4);
   return Array.from({ length: total }, (_, i) => pilhas[i] || null);
 }
+/* AS MOEDAS DA JORNADA. Quem calcula e paga é o servidor (claimJourneyCoins), lendo o SAVE: 5 por
+   insígnia, +10 pelas 8 e +20 pela Elite. Aqui só se avisa que houve vitória.
+
+   O SAVE VAI PRIMEIRO. A função lê o save GRAVADO -- chamar antes de o servidor ter a insígnia
+   nova pagaria a vitória anterior e a de agora só na próxima vez. Por isso o await no
+   saveCurrentGame, e não um maybeAutoSave (que é debounced em 800ms e pode nem ter rodado).
+
+   Não paga em dobro nem perde vitória: o servidor conta do zero a partir do save e paga a
+   DIFERENÇA pro que já foi pago. Uma chamada que morre na rede não custa moeda nenhuma -- a
+   próxima cobre as duas. Por isso aqui o erro é só logado: não há o que refazer na hora. */
+async function receberMoedasDaJornada(){
+  if(!game.authUser || game.currentSaveSlot === null || game.currentSaveSlot === undefined) return;
+  try{
+    await saveCurrentGame();
+    const r = await functionsClient.httpsCallable('claimJourneyCoins')({ slot: String(game.currentSaveSlot) });
+    game.moedas = r.data.moedas;
+    game.moedasGanhasAgora = r.data.ganhou || 0;   // o que a tela de vitória mostra
+    render();
+  } catch(e){
+    console.error('Erro ao receber as moedas da jornada:', e);
+  }
+}
 async function openInventario(){
   if(game.screen !== 'inventario') game.inventarioVoltarPara = game.screen;
   game.screen = 'inventario';
@@ -16207,11 +16293,9 @@ function renderLoja(){
         </div>
       </div>
       <p class="item-detalhe-texto">${escapeHtmlSafe(it.descricao)}</p>
-      <p class="hint-text">Por enquanto só dá pra conseguir jogando: ${escapeHtmlSafe(it.comoGanhar)}</p>
       <div class="item-acoes">
         <button class="btn success" disabled>🪙 Comprar</button>
-      </div>
-      <p class="hint-text">A loja ainda não abriu — nada aqui está à venda.</p>`
+      </div>`
     : `<p class="item-detalhe-vazio">A loja ainda não abriu.</p>`}
   </div>
   ${gradeDeItensHtml(slotsDaGrade(aVenda), game.lojaSel, 'escolherItemDaLoja')}
@@ -16242,6 +16326,7 @@ const MONT_ORDENS = [
 ];
 /* DEZ POR PÁGINA. Com dez saves de seis, a lista chega a 60 linhas -- e uma lista de 60 numa tela
    de 320px é rolagem demais pra uma decisão que se toma olhando poucos de cada vez. */
+const MOEDAS_RESSORTEIO = 3;   // tem que bater com o do servidor (ver rerollWildOffer)
 const MONT_POR_PAGINA = 10;
 function abrirMontador(){ game.montadorOrdem = 'nivel'; game.montadorTipo = null; game.montadorPagina = 0; }
 /* ORDENAR OU FILTRAR VOLTA PRA PRIMEIRA PÁGINA. Sem isso, filtrar por Fogo estando na página 3

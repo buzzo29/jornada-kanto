@@ -934,6 +934,67 @@ verdade, cai no game over, e o teste confere que a trava soltou dos dois lados.
 - Ela permuta o **código guardado**, não o time do save: o save pode ter mudado de ordem ou de
   nível desde que a defesa foi montada, e o líder está reordenando o que ele vê defendendo.
 
+## Moedas
+
+- **A jornada paga: 5 por insígnia, +10 pelas oito, +20 pela Elite — 70 por jornada completa**
+  (02/09/2026). Quem calcula e paga é o servidor (`claimJourneyCoins`), lendo o SAVE gravado.
+- **O pagamento é por DIFERENÇA, não por evento.** A função conta do zero quanto aquele save já
+  rendeu e paga o que falta, guardando o total no campo `coinsPaid` do próprio save. É o que faz as
+  duas coisas ao mesmo tempo: chamar duas vezes não paga em dobro (F5 na tela de vitória, duas abas),
+  e uma chamada que morreu na rede não custa vitória nenhuma — a próxima cobre as duas.
+- **O SAVE VAI PRIMEIRO.** A função lê o save do servidor, então o cliente dá `await
+  saveCurrentGame()` antes de chamar — com `maybeAutoSave` (debounced em 800ms) a insígnia nova
+  podia nem estar lá, e a vitória só seria paga na chamada seguinte.
+- **Save antigo NÃO leva retroativo, e essa é a decisão irreversível daqui.** Na primeira vez que um
+  save passa pela função sem `coinsPaid`, o campo nasce valendo o que ele já teria rendido e **nada
+  é pago**. Um campeão de antes do sistema receberia 70 moedas de uma vez — 23 re-sorteios de
+  encontro caídos do céu. Se um dia se decidir pagar retroativo, é trocar esse ramo por um
+  `jaPago = 0`; o contrário — tirar moeda que já foi paga — não tem volta.
+- **`moedas` está na trava do `firestore.rules`, junto do `rareCandies`.** Não é opcional: moeda é
+  poder de compra, e o que ela compra hoje é re-sorteio do encontro selvagem. Cliente escrevendo
+  moeda é **shiny à vontade** — exatamente a artimanha que a semente do encontro existe pra fechar.
+- **O prêmio APARECE** (`moedasGanhasHtml`), na tela de vitória e na de campeão. Prêmio que o jogador
+  não vê é o erro da especialidade de novo: valia 1%, não tinha selo, e a conclusão foi "não mudou
+  nada". A linha só sai quando algo foi pago — a chamada é assíncrona, e anunciar "+0 moedas"
+  enquanto a rede responde seria pior que esperar meio segundo pela linha certa.
+
+## Re-sorteio pago do encontro selvagem
+
+- **3 moedas trocam a oferta INTEIRA — espécies e níveis** da rota atual (`MOEDAS_RESSORTEIO`, no
+  cliente e no servidor; se os dois divergirem, a tela promete um preço que a cobrança não pratica).
+- **O contador de re-sorteios entra na MESMA semente do encontro** (`sementeDoEncontro`, um lugar só
+  pro primeiro sorteio e pro re-sorteio). É isso que mantém a trava anti save-scumming de pé: sem
+  pagar, a oferta é sempre a mesma (sair do save e voltar não muda nada); pagando, ela muda; e voltar
+  ao contador anterior devolve a oferta anterior, então não há vaivém de graça entre duas ofertas.
+  **`wildRerolls` é gravado no save** — sem isso, recarregar zeraria a contagem e desfaria um
+  re-sorteio já pago.
+- **Cobra primeiro, sorteia depois.** Sortear antes de cobrar daria a oferta de graça pra quem
+  fechasse a aba no meio. Se a cobrança falhar (moeda de menos, rede), nada muda na tela e o motivo
+  aparece nela.
+- **A recusa diz quanto falta** ("Você tem 1 moeda — o re-sorteio custa 3"), senão o botão parece
+  quebrado. Ele também já nasce desabilitado abaixo de 3.
+- **O PREÇO MEDIDO, e é a maior mexida de dificuldade desta série.** Com as 70 moedas de uma jornada
+  completa gastas na jornada seguinte são ~23 re-sorteios, ou 2 a 3 por encontro. Medido em 4.000
+  jornadas de cada caso, a chance de ver um shiny numa jornada:
+
+  | re-sorteios por encontro | ofertas na jornada | jornadas com shiny |
+  |---|---|---|
+  | 0 (hoje) | 8 | **22,6%** |
+  | 1 | 16 | 39,0% |
+  | 2 | 24 | 52,2% |
+  | 3 | 32 | **62,5%** |
+
+  Ou seja: gastar tudo em re-sorteio quase **triplica** a chance de shiny por jornada. Não foi
+  compensado em nada — se incomodar, os lugares de mexer são o **preço** (`MOEDAS_RESSORTEIO`) e o
+  **pagamento** (`MOEDAS_POR_GINASIO` e companhia), e o mais direto é o preço.
+- O servidor **não sorteia a oferta** — ele só cobra. Quem sorteia é o cliente, com a semente dele:
+  o servidor não conhece rota nem pool, e mandar a oferta de lá duplicaria as tabelas de encontro,
+  que é justamente o que o projeto evita.
+- `tools/fake-firestore.js` ganhou **`getAll` dentro da transação** por causa disto: o `Transaction`
+  do Firestore tem, e sem ele qualquer função que leia dois documentos de uma vez morre com
+  "tx.getAll is not a function" — erro do harness, não do código testado. Passa pela mesma trava de
+  leitura-depois-de-escrita.
+
 ## Mochila (inventário) e Loja
 
 - **O ESTOQUE NÃO É UMA LISTA GRAVADA.** É uma leitura do que a conta já tem:
@@ -975,9 +1036,11 @@ verdade, cai no game over, e o teste confere que a trava soltou dos dois lados.
 - **A LOJA ainda não vende nada, e mostra isso em vez de ficar vazia.** Mesma grade e mesmo quadro de
   cima da Mochila (são a mesma leitura: um monte de quadradinhos, clico num e leio o que é). Os itens
   aparecem com preço e o **botão Comprar desabilitado** — um botão apagado não promete nada; um botão
-  vivo que não compra, sim.
-- **`moedas` é um contador da conta que ainda não tem como subir nem descer.** Existe pra tela e pra
-  Loja; quando houver como ganhar, quem escreve tem que ser o servidor, pelo mesmo motivo do doce.
+  vivo que não compra, sim. As duas frases que explicavam isso em texto saíram a pedido em
+  02/09/2026: o botão desabilitado já diz o que elas diziam, e duas linhas azuis em cima da grade
+  viravam parede.
+- **`moedas` é escrito SÓ pelo servidor** (ver a seção Moedas): a jornada paga e o re-sorteio do
+  encontro selvagem cobra. A Loja ainda não gasta nada.
 
 ## Home
 

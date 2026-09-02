@@ -729,5 +729,53 @@ console.log('\n=== A OFERTA SELVAGEM ===');
   ok('a mesma semente devolve a mesma oferta', iguais === 200, iguais + ' de 200');
 })();
 
+/* O RE-SORTEIO PAGO NÃO PODE FURAR A TRAVA ANTI SAVE-SCUMMING.
+   O contador de re-sorteios entra na MESMA semente do encontro. Duas coisas têm que valer ao mesmo
+   tempo: pagar troca a oferta (senão a moeda não comprou nada) e NÃO pagar devolve sempre a mesma
+   (senão sair do save e voltar vira re-sorteio de graça, que é a artimanha inteira de volta). */
+(function(){
+  function preparar(){
+    const g = S.__getGame();
+    g.currentSaveSlot = 0; g.saveGen = 0; g.rivalName = 'Gary'; g.starterId = 'bulbasaur';
+    g.gymIndex = 7; g.team = []; g.gameMode = 'normal';
+    g.currentRoute = 'dragons_den'; g.wildEncounterSeq = 4;
+    S.__setGame(g);
+  }
+  function ofertaComRerolls(n){
+    const g = S.__getGame(); g.wildRerolls = n; S.__setGame(g);
+    const orig = Math.random;
+    Math.random = S.makeSeededRng(S.sementeDoEncontro());
+    try { S.montaOfertaSelvagem(); } finally { Math.random = orig; }
+    return (S.__getGame().wildOffer || []).map(o => o.speciesId + ':' + o.level).join(',');
+  }
+  preparar();
+  const zero = ofertaComRerolls(0);
+  ok('sem pagar, a oferta e sempre a mesma', ofertaComRerolls(0) === zero, zero.slice(0, 60));
+  const um = ofertaComRerolls(1);
+  ok('pagando, ela muda', um !== zero, zero.slice(0,40) + '  ->  ' + um.slice(0,40));
+  ok('e o re-sorteio pago tambem e estavel', ofertaComRerolls(1) === um);
+  /* Voltar ao contador anterior devolve a oferta anterior -- e o que garante que sair do save e
+     voltar no meio de um re-sorteio nao inventa uma terceira oferta. */
+  ok('e voltar ao contador antigo devolve a oferta antiga', ofertaComRerolls(0) === zero);
+  /* Cada re-sorteio e uma oferta NOVA, nao um vaivem entre duas. */
+  const varias = [0,1,2,3,4].map(ofertaComRerolls);
+  ok('cinco re-sorteios dao cinco ofertas distintas', new Set(varias).size === 5,
+     new Set(varias).size + ' distintas');
+  /* ENCONTRO NOVO zera a contagem: o que foi pago valeu pra AQUELE encontro, nao pro proximo. */
+  preparar();
+  const g = S.__getGame(); g.wildRerolls = 3; g.authUser = null; S.__setGame(g);
+  S.goToWildEncounter();
+  ok('encontro novo zera os re-sorteios', (S.__getGame().wildRerolls || 0) === 0,
+     String(S.__getGame().wildRerolls));
+})();
+/* E ele tem que SOBREVIVER AO SAVE: se nao fosse gravado, recarregar zeraria a contagem e a oferta
+   voltaria a ser a original -- um re-sorteio pago que se desfaz sozinho. */
+(function(){
+  const g = S.__getGame();
+  g.currentSaveSlot = 0; g.wildRerolls = 2; S.__setGame(g);
+  const gravado = S.serializeGame();
+  ok('o contador de re-sorteios vai pro save', gravado.wildRerolls === 2, String(gravado.wildRerolls));
+})();
+
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
 process.exit(falhas ? 1 : 0);

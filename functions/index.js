@@ -4408,6 +4408,89 @@ async function atualizarInscricoesComTime(uid, slot, team){
 /* Gasta um Doce Raro: +1 nível num pokémon específico de um save específico.
    Tudo validado no servidor -- as regras do Firestore deixam o dono escrever no próprio documento,
    então um doce contado no cliente seria níveis de graça pra quem abrisse o console. */
+/* ============================ MOEDAS ============================
+   QUEM PAGA É O SERVIDOR, sempre. As regras do Firestore não deixam o cliente escrever `moedas`
+   pelo mesmo motivo do `rareCandies`: moeda é poder de compra, e hoje ela compra re-sorteio do
+   encontro selvagem -- uma linha no console viraria shiny à vontade, que é exatamente a artimanha
+   que a semente do encontro existe pra fechar. */
+const MOEDAS_POR_GINASIO = 5;
+const MOEDAS_JORNADA_COMPLETA = 10;   // as 8 insígnias
+const MOEDAS_ELITE = 20;
+const MOEDAS_RESSORTEIO = 3;
+
+/* O QUE UM SAVE JÁ RENDEU. Conta do zero toda vez, a partir do estado do save -- não é um contador
+   que incrementa. Assim uma chamada perdida (rede caindo na hora da vitória) não custa moeda
+   nenhuma: a próxima chamada vê a diferença e paga tudo. */
+function moedasDevidasDoSave(save){
+  const s = save || {};
+  const insignias = (typeof s.badgeCount === 'number') ? s.badgeCount : ((s.badgesEarned || []).length);
+  let total = insignias * MOEDAS_POR_GINASIO;
+  if(insignias >= 8) total += MOEDAS_JORNADA_COMPLETA;
+  if(s.eliteStatus === 'champion') total += MOEDAS_ELITE;
+  return total;
+}
+
+/* PAGA O QUE O SAVE DEVE. Idempotente pelo campo `coinsPaid`, gravado no próprio save: ele guarda
+   quanto aquele save JÁ rendeu, e o que se paga é a diferença.
+
+   SAVE ANTIGO NÃO RECEBE RETROATIVO. Na primeira vez que um save passa por aqui sem `coinsPaid`,
+   o campo nasce valendo o que ele já teria rendido -- e nada é pago. É a escolha reversível: quem
+   estava com 8 insígnias e a Elite vencida receberia 70 moedas de uma vez, ou seja, 23 re-sorteios
+   de encontro selvagem caídos do céu. Se um dia se decidir pagar retroativo, é trocar este ramo
+   por um `jaPago = 0`; o contrário -- tirar moeda que já foi paga -- não tem volta. */
+exports.claimJourneyCoins = onCall(async (request) => {
+  if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
+  const uid = request.auth.uid;
+  const slot = String(request.data?.slot ?? '');
+  if(!slot) throw new HttpsError('invalid-argument', 'Save não informado.');
+
+  const userRef = db.collection('users').doc(uid);
+  const saveRef = userRef.collection('saves').doc(slot);
+  /* Transação porque duas abas do mesmo jogador podem reivindicar a mesma vitória ao mesmo tempo:
+     sem ela, as duas leem o mesmo `coinsPaid` e pagam duas vezes.
+     TODAS as leituras antes de qualquer escrita -- o Firestore recusa a transação inteira se um get
+     vier depois de um set, e esse erro só aparece em produção (ver o Boss de Domingo). */
+  return db.runTransaction(async (tx) => {
+    const [userSnap, saveSnap] = await tx.getAll(userRef, saveRef);
+    if(!saveSnap.exists) throw new HttpsError('failed-precondition', 'Save não encontrado.');
+    const save = saveSnap.data() || {};
+    const conta = userSnap.exists ? (userSnap.data() || {}) : {};
+    const moedasAgora = conta.moedas || 0;
+    const devido = moedasDevidasDoSave(save);
+
+    if(typeof save.coinsPaid !== 'number'){
+      tx.set(saveRef, { coinsPaid: devido }, { merge: true });
+      return { moedas: moedasAgora, ganhou: 0, base: devido };
+    }
+    const ganhou = Math.max(0, devido - save.coinsPaid);
+    if(ganhou > 0){
+      tx.set(userRef, { moedas: admin.firestore.FieldValue.increment(ganhou) }, { merge: true });
+      tx.set(saveRef, { coinsPaid: devido }, { merge: true });
+    }
+    return { moedas: moedasAgora + ganhou, ganhou };
+  });
+});
+
+/* COBRA O RE-SORTEIO do encontro selvagem. Só desconta -- quem sorteia é o cliente, com a semente
+   dele (ver goToWildEncounter): o servidor não conhece rota nem pool, e mandar a oferta daqui
+   duplicaria as tabelas de encontro, que é justamente o que o projeto evita.
+   O que o servidor garante é o que importa: que a moeda existia e saiu. */
+exports.rerollWildOffer = onCall(async (request) => {
+  if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
+  const uid = request.auth.uid;
+  const userRef = db.collection('users').doc(uid);
+  return db.runTransaction(async (tx) => {
+    const [userSnap] = await tx.getAll(userRef);
+    const moedas = (userSnap.exists && userSnap.data().moedas) || 0;
+    if(moedas < MOEDAS_RESSORTEIO){
+      throw new HttpsError('failed-precondition',
+        `Você tem ${moedas} moeda${moedas===1?'':'s'} — o re-sorteio custa ${MOEDAS_RESSORTEIO}.`);
+    }
+    tx.set(userRef, { moedas: admin.firestore.FieldValue.increment(-MOEDAS_RESSORTEIO) }, { merge: true });
+    return { moedas: moedas - MOEDAS_RESSORTEIO, custo: MOEDAS_RESSORTEIO };
+  });
+});
+
 exports.useRareCandy = onCall(async (request) => {
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   const uid = request.auth.uid;

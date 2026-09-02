@@ -160,7 +160,11 @@ console.log('\n=== A LOJA ===');
   /* NADA A VENDA AINDA: o botao existe e fica DESABILITADO, e a tela diz isso em texto. Um botao
      apagado nao promete nada; um botao vivo que nao compra, sim. */
   ok('e o Comprar fica desabilitado', /<button class="btn success" disabled>🪙 Comprar<\/button>/.test(t));
-  ok('com a tela dizendo que a loja nao abriu', /loja ainda não abriu/.test(t));
+  /* AS DUAS FRASES SAIRAM (02/09/2026, a pedido): a de "por enquanto so da pra conseguir jogando"
+     e a de "a loja ainda nao abriu". O botao desabilitado ja diz que nao da pra comprar, e duas
+     frases em azul explicando o mesmo viravam parede de texto em cima da grade. */
+  ok('e sem as duas frases que sairam', !/só dá pra conseguir jogando/.test(t) && !/loja ainda não abriu/.test(t),
+     (t.match(/hint-text">[^<]*/g)||[]).join(' | ') || 'nenhuma hint-text');
   ok('e mostrando quantas moedas voce tem', /Você tem <strong>🪙 0<\/strong>/.test(t));
 }
 
