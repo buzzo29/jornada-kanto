@@ -372,38 +372,42 @@ de golpes.
   passar ou não o array não muda um ponto de dano (conferido por hash, 14.645 confrontos).
 - **O dano gravado é o EFETIVO, não o sorteado.** Golpe de 101 em quem tem 54 de HP entra como 54.
   Com o valor cru o log não fechava: somando as linhas dava mais dano do que o pokémon tinha.
-- **O LOG MOSTRA O DIÁRIO INTEIRO, e a animação mostra o mesmo.** As duas leem a MESMA lista
-  (`sequenciaDoConfronto`) — enquanto eram montadas em separado, o jogador via 3 golpes na tela e
-  lia 7 linhas no log, e isso foi reportado três vezes.
-  **Havia um teto de 3 golpes (`TETO_GOLPES`) e ele estava errado por um número:** medido em 3.944
-  confrontos, a mediana é **4** golpes de dano, 90% vão até 6, 99% até 12 e o maior foi 28 — ou seja,
-  **99,4% dos confrontos passavam do teto**, e quase todo log que o jogador lia era uma divisão
-  INVENTADA pela reconstrução, não a luta dele. Os golpes especiais pioraram isso: o sono faz a luta
-  continuar depois das trocas livres, então os confrontos ficaram mais longos.
-  **O custo de mostrar tudo foi medido e é pequeno**, porque a barra já dura proporcional ao dano
-  (`hpBarTransitionMs`): dez golpinhos custam quase o mesmo que três golpaços. Animação por
-  confronto: mediana **2.043 → 2.282ms**, 99% 2.558 → 3.874ms, pior caso 2.865 → 10.200ms. Na
-  jornada ninguém está esperando o outro lado; no online o `ORCAMENTO_ANIM_ONLINE_MS` já comprime o
-  que passar de 4,5s. Removido em 03/09/2026, a pedido ("não tem problema colocar mais linhas no
-  log, o importante é que a batalha visualmente seja igual ao log").
-- **A reconstrução virou o que ela sempre foi por escrito: o fallback pra confronto gravado ANTES do
-  diário existir.** Com isso saiu uma classe inteira de defeito — ela não conhece os golpes
-  especiais, e contradizia o sono ora invertendo a ordem, ora esmagando os golpes livres de quem
-  dormiu o outro num golpe só (reportado duas vezes em 03/09/2026). Todo o remendo que reordenava e
-  reescrevia a sequência por causa do sono **saiu junto**: era código que não tinha mais como rodar,
-  porque sono e cura só existem COMO registro do diário, e um confronto sem diário nunca os teve.
-- **GOLPE DE DANO ZERO NÃO É GOLPE, e o teto escondia isso.** Ele existe no diário: quando o alvo já
-  está em 0, o dano EFETIVO é 0 — é o revide de quem caiu contra quem já tinha caído. Mostrando o
-  diário inteiro ele aparecia em **0,50%** dos confrontos e virava um "**−0 de HP**" na tela, que é
-  exatamente o que faz o jogador procurar bug onde é regra (mesmo motivo do "mas não teve efeito" da
-  imunidade). As **aberturas** (sono, cura) têm `d=0` de propósito e ficam: elas não são dano, são o
-  passo.
-- **Alguém sempre vai parecer agir depois de cair, e a regra escolhe quem.** Medido nos 4.000
-  confrontos: 205 casos são o **golpe moribundo** (que entra ANTES do golpe que derrubou quem o deu
-  — os dois são do mesmo instante) e 52 são a **explosão** (um evento só, com duas entradas, porque
-  os dois caem juntos). Fora esses dois, **zero**. `tools/test-especiais.js` tranca isso, junto com
-  "a animação tem os mesmos passos do log", "a soma de dano de cada lado fecha" e "nenhum golpe de
-  dano zero na tela".
+- **Log e animação leem a MESMA lista** (`sequenciaDoConfronto`). Enquanto eram montadas em separado,
+  o jogador via 3 golpes na tela e lia 4, 7 linhas no log — reportado três vezes.
+- **O TETO DE 3 GOLPES VALE, e vale por leitura: uma luta comum tem que caber em duas ou três
+  linhas.** Medido, 99,4% dos confrontos passam de 3 golpes REAIS (mediana 4, 90% até 6, maior 28 em
+  3.944), então o teto não é um detalhe — é ele que decide o que a tela mostra quase sempre.
+  **Ele chegou a sair inteiro por um dia** (03/09/2026), pra o log mostrar o diário: uma troca banal
+  de Gloom contra Miltank virou **seis linhas** e foi reportado com print. Voltou no mesmo dia.
+- **A EXCEÇÃO É O SONO, e só ele.** As trocas livres que ele compra são o que o golpe É, e esmagá-las
+  na reconstrução foi a origem dos dois defeitos reportados naquele dia ("um golpe dele, dois dela").
+  Elas entram **reais, uma linha cada**, e só o RESTO da luta é reconstruído.
+  Medido: **sem sono, 98,6% dos confrontos ficam em 3 linhas e 1,4% em 2** — a leitura de sempre.
+  **Com sono: 4 linhas em 19,5%, 5 em 41,5%, 6 em 5,9%** (as seis são quando quem usou o sono é o
+  mais rápido e ganha 3 golpes livres) e 2 linhas em 33,2% (o confronto acabou dentro do teto).
+- **Quantas trocas livres sai do DIÁRIO, não de `SONO_EM_TROCAS`.** Os dois números não são iguais: o
+  sono compra 2 trocas, mas quem usou, se for o mais rápido, ainda bate primeiro na troca em que o
+  outro acorda — e aí são 3. Ler do diário acerta os dois casos, acerta o **sono DUPLO** (os dois se
+  dormem, os contadores correm juntos e ninguém ganha troca livre) e continua certo se a duração do
+  sono mudar.
+- **A reconstrução pega só o que SOBROU.** Ela interpola entre o HP do começo e o do fim, então o
+  "começo" dela tem que ser depois da cura E depois das trocas livres — senão ela recontaria o dano
+  que as linhas de cima já mostraram, e a soma do log passaria do HP que o pokémon tinha. É o mesmo
+  ajuste que a cura já fazia sozinha desde 02/09/2026.
+- **GOLPE DE DANO ZERO NÃO É GOLPE.** Ele existe no diário: quando o alvo já está em 0, o dano
+  EFETIVO é 0 — é o revide de quem caiu contra quem já tinha caído. Vira um "**−0 de HP**" na tela,
+  que é o que faz procurar bug onde é regra (mesmo motivo do "mas não teve efeito" da imunidade).
+  Fica fora da sequência. As **aberturas** (sono, cura) têm `d=0` de propósito e ficam: não são dano,
+  são o passo.
+- **Alguém sempre vai parecer agir depois de cair, e a regra escolhe quem.** Medido em 4.000
+  confrontos: 205 são o **golpe moribundo** (que entra ANTES do golpe que derrubou quem o deu — os
+  dois são do mesmo instante) e 52 são a **explosão** (um evento só, duas entradas). Fora esses dois,
+  **zero**.
+- `tools/test-especiais.js` tranca tudo isso junto: a animação tem os MESMOS passos do log, a soma de
+  dano de cada lado fecha, não há golpe de dano zero na tela, ninguém ataca depois de cair fora dos
+  dois casos, o sono mostra as trocas livres que compra, **luta sem golpe especial não passa de 3
+  linhas** e a com sono passa. Conferido que ele falha ao tirar o teto (3.870 de 3.925) e ao tirar a
+  exceção do sono.
 - **O golpe moribundo vale CHEIO** (`DYING_BLOW_FACTOR = 1.0`). Valeu metade até 30/08/2026, e o
   efeito colateral era ilegível: um Venusaur com vantagem de tipo tirava 112 em vez de 223 e o
   jogador procurava bug no multiplicador. Medido na mudança: **11,2% das batalhas trocam de

@@ -13202,39 +13202,61 @@ function passosVisiveis(golpes){
 /* A MESMA sequência serve o LOG e a ANIMAÇÃO -- é isso que garante que as duas contem a mesma
    história, com o mesmo número de golpes. Enquanto eram montadas em separado, o jogador via 3
    golpes na tela e lia 7 linhas no log, e isso foi reportado três vezes.
-   O QUE VALE É O DIÁRIO, INTEIRO. A reconstrução ficou como o que ela sempre foi por escrito: o
-   fallback pra confronto gravado ANTES do diário existir.
-   Havia um teto de 3 golpes, e ele estava errado por um número: **99,4% dos confrontos passam de
-   3** (mediana 4, 90% até 6, 99% até 12, maior 28 em 3.944 medidos) -- ou seja, quase todo log que
-   o jogador lia era uma divisão inventada, não a luta dele. Os golpes especiais pioraram isso: o
-   sono faz a luta continuar depois das trocas livres, então os confrontos ficaram mais longos.
-   O CUSTO FOI MEDIDO e é pequeno, porque a barra já dura proporcional ao dano (hpBarTransitionMs):
-   dez golpinhos custam quase o mesmo que três golpaços. Animação por confronto: mediana 2.043 ->
-   2.264ms, 99% 2.558 -> 3.873ms, pior caso 2.865 -> 8.400ms. Na jornada ninguém está esperando o
-   outro lado; no online o ORCAMENTO_ANIM_ONLINE_MS já comprime o que passar de 4,5s.
-   E some junto uma classe inteira de defeito: como a reconstrução não conhece os golpes especiais,
-   ela contradizia o sono -- ora invertendo a ordem, ora esmagando os golpes livres de quem dormiu o
-   outro num só (reportado duas vezes em 03/09/2026). Mostrando o diário, não há o que contradizer. */
+   O TETO DE 3 GOLPES VALE, e vale por um motivo de leitura: uma luta comum tem que caber em duas ou
+   três linhas. Medido, 99,4% dos confrontos passam de 3 golpes reais (mediana 4, maior 28) -- sem
+   teto, uma troca banal de Gloom contra Miltank virava seis linhas, que foi o que apareceu na tela
+   quando ele saiu por um dia (03/09/2026).
+   A EXCEÇÃO É O SONO, e só ele: as trocas livres que ele compra são o que o golpe É, e esmagá-las
+   na reconstrução foi a origem dos dois defeitos reportados naquele mesmo dia ("um golpe dele, dois
+   dela"). Então elas entram REAIS, uma linha cada, e só o RESTO da luta é reconstruído -- ou seja,
+   o confronto com sono fica em quatro ou cinco linhas de golpe, não em três nem em oito. */
+const TETO_GOLPES = 3;
 function sequenciaDoConfronto(m){
   /* O Disable não é um golpe na tela: não tira HP e a luta continua depois dele -- viraria um passo
      de dano 0 na animação. A frase dele é montada à parte, no passosHtml.
+     GOLPE DE DANO ZERO TAMBÉM NÃO É GOLPE: ele existe no diário (o revide de quem caiu contra quem
+     já tinha caído, com dano EFETIVO 0) e viraria um "−0 de HP" na tela, que é o que faz procurar
+     bug onde é regra -- o mesmo motivo do "mas não teve efeito" da imunidade.
      A CURA FICA. Ela É um passo, e o PRIMEIRO: o pokémon entra machucado do confronto anterior, se
      cura, e só então a luta começa. Enquanto ela ficava de fora da sequência, a animação só via o
      valor final e a barra aparecia cheia do nada. */
-  /* GOLPE DE DANO ZERO NÃO É GOLPE. Ele existe no diário: quando o alvo já está em 0, o dano
-     EFETIVO é 0 -- é o revide de quem caiu contra quem já tinha caído. Enquanto o log era uma
-     reconstrução de 3 golpes isso nunca aparecia; mostrando o diário inteiro, aparece em 0,50%
-     dos confrontos, e vira um "−0 de HP" na tela -- exatamente o que faz o jogador procurar bug
-     onde é regra (o mesmo motivo do "mas não teve efeito" da imunidade).
-     As ABERTURAS (sono, cura) têm d=0 de propósito e ficam: elas não são dano, são o passo. */
   const reais = passosVisiveis((m.golpes || []).filter(g => g.x !== 'disable' && (g.x || g.d > 0)));
-  if(reais.length) return reais;
-  /* SEM DIÁRIO -- confronto gravado antes de ele existir. Aí sim a reconstrução, que interpola
-     entre o HP do começo e o do fim em até 3 golpes. Log velho não pode sumir.
-     Nada de sono ou cura precisa de tratamento aqui: os dois só existem COMO registro do diário,
-     então um confronto sem diário nunca os teve. O remendo que reordenava o sono na reconstrução
-     saiu junto -- era código que não tinha mais como rodar. */
-  return reconstruirSequencia(m).map(h => ({ q: h.side === 'player' ? 'e' : 'p', d: h.amount }));
+  const aberturas = reais.filter(g => g.x === 'recover' || g.x === 'sono');
+  const cura = reais.find(g => g.x === 'recover') || null;
+  const ehDano = g => !g.x || g.x === 'boom' || g.x === 'boomself';
+  const golpesDeDano = reais.filter(ehDano).length;
+  /* O teto conta GOLPES. As aberturas (cura e sono) não são dano -- deixá-las contar jogaria uma
+     troca real de 2 golpes na reconstrução, perdendo os golpes de verdade. */
+  if(reais.length && golpesDeDano <= TETO_GOLPES) return reais;
+
+  /* AS TROCAS LIVRES DO SONO, reais. São os golpes que quem usou o sono deu ANTES do primeiro do
+     adormecido -- lidos do diário, não de SONO_EM_TROCAS: o sono compra 2 trocas, mas quem usou,
+     se for o mais rápido, ainda bate primeiro na troca em que o outro acorda, e aí são 3. Ler do
+     diário acerta os dois casos, acerta o sono DUPLO (os dois se dormem e ninguém ganha troca
+     livre) e continua certo se a duração do sono mudar. */
+  const sono = reais.find(g => g.x === 'sono') || null;
+  const soDano = reais.filter(ehDano);
+  const iOutro = sono ? soDano.findIndex(g => g.q !== sono.q) : 0;
+  const livres = (sono && iOutro !== 0) ? soDano.slice(0, iOutro < 0 ? soDano.length : iOutro) : [];
+  const danoLivre = livres.reduce((a, g) => a + (g.d || 0), 0);
+
+  /* A RECONSTRUÇÃO PEGA SÓ O QUE SOBROU. Ela interpola entre o HP do começo e o do fim, então o
+     "começo" dela tem que ser depois da cura E depois das trocas livres -- senão ela recontaria o
+     dano que as linhas de cima já mostraram, e a soma do log passaria do HP que o pokémon tinha.
+     É o mesmo ajuste que a cura já fazia sozinha desde 02/09/2026. */
+  let base = m;
+  if(cura) base = Object.assign({}, base, cura.q === 'p' ? { playerHpBefore: cura.hp }
+                                                         : { enemyHpBefore: cura.hp });
+  if(danoLivre > 0){
+    /* Os golpes livres batem todos no MESMO alvo: quem dormiu. Um golpe com q='p' tira HP do
+       inimigo, então quem cede vida aqui é o lado oposto ao de quem usou o sono. */
+    base = (sono.q === 'p')
+      ? Object.assign({}, base, { enemyHpBefore: Math.max(base.enemyHpAfter, base.enemyHpBefore - danoLivre) })
+      : Object.assign({}, base, { playerHpBefore: Math.max(base.playerHpAfter, base.playerHpBefore - danoLivre) });
+  }
+  // a reconstrução fala em QUEM APANHA (side); aqui a lista é de QUEM BATE (q)
+  const resto = reconstruirSequencia(base).map(h => ({ q: h.side === 'player' ? 'e' : 'p', d: h.amount }));
+  return aberturas.concat(livres, resto);
 }
 /* AS FRASES DOS GOLPES ESPECIAIS VIVEM AQUI, num lugar só.
    O log da batalha e o aviso do meio da luta leem desta função. Montadas em separado, as duas

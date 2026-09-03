@@ -128,8 +128,10 @@ ok('e o log diz qual golpe foi', diario.some(g => g.x === 'sono' && g.g === 'Can
   const POOL = Object.keys(S.SPECIES).filter(id => S.SPECIES[id].dex <= 251);
   const rng = S.makeSeededRng('log-diario');
   const ehDano = x => !x.x || x.x === 'boom' || x.x === 'boomself';
+  const TETO_ESPERADO = 3;
   let confrontos = 0, animDif = 0, somaErrada = 0, comZero = 0, caiuDefeito = 0;
   let comSono = 0, sonoOk = 0, exZero = null, exAnim = null, exCaiu = null;
+  let passouDoTeto = 0, maiorComSono = 0, exTeto = null;
   for(let i = 0; i < 4000; i++){
     const a = POOL[Math.floor(rng()*POOL.length)], b = POOL[Math.floor(rng()*POOL.length)];
     const r = S.simulateGymBattle([inst(a, 30 + Math.floor(rng()*40))], [inst(b, 30 + Math.floor(rng()*40))], Math.random);
@@ -190,6 +192,14 @@ ok('e o log diz qual golpe foi', diario.some(g => g.x === 'sono' && g.g === 'Can
         const livresReais = iR < 0 ? real.length : iR, livresLog = iL < 0 ? log.length : iL;
         if(livresLog >= Math.min(livresReais, S.SONO_EM_TROCAS || 2)) sonoOk++;
       }
+      /* 6) QUANTAS LINHAS. Luta comum tem que caber em duas ou tres -- e a leitura que o jogo
+            sempre teve. Sem teto, uma troca banal de Gloom contra Miltank virava seis linhas, e foi
+            o que apareceu na tela no dia em que o teto saiu inteiro (03/09/2026).
+            COM SONO pode passar, e so por causa das trocas livres: elas sao o que o golpe E, e
+            esmaga-las na reconstrucao foi a origem dos dois defeitos reportados naquele dia. */
+      const linhas = lista.length;
+      if(sono){ if(linhas > maiorComSono) maiorComSono = linhas; }
+      else if(linhas > TETO_ESPERADO){ passouDoTeto++; if(!exTeto) exTeto = desc(); }
       break;
     }
   }
@@ -200,6 +210,10 @@ ok('e o log diz qual golpe foi', diario.some(g => g.x === 'sono' && g.g === 'Can
   ok('ninguem ataca depois de cair (fora explosao e moribundo)', caiuDefeito === 0,
      caiuDefeito + ' de ' + confrontos + (exCaiu ? '  |  ' + exCaiu : ''));
   ok('o sono mostra as trocas livres que ele compra', sonoOk === comSono, sonoOk + ' de ' + comSono);
+  ok('luta SEM golpe especial nao passa de 3 linhas', passouDoTeto === 0,
+     passouDoTeto + ' de ' + (confrontos - comSono) + (exTeto ? '  |  ' + exTeto : ''));
+  ok('e a com sono passa, que e o motivo da excecao', maiorComSono > TETO_ESPERADO,
+     'maior confronto com sono: ' + maiorComSono + ' linhas');
 })();
 
 /* Quem nao tem golpe especial nunca cai nesse caminho. */
