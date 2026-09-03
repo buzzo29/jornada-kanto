@@ -161,22 +161,95 @@ console.log('\n=== A LOJA ===');
      String(S.__getGame().lojaSel));
   ok('mesma grade de quadradinhos da mochila', t.includes('class="item-grade"') && slots(t) >= S.INVENTARIO_SLOTS_MINIMOS,
      slots(t) + ' slots');
-  ok('a grade so mostra o que esta a venda', (t.match(/item-slot-icone/g)||[]).length === 3,
+  /* A LOJA VENDE OS CINCO. O Doce Raro e o Bonus Shiny voltaram a ser vendidos em 03/09/2026 --
+     eles continuam vindo de jogar tambem, e e por isso que a mochila le cada um de uma fonte
+     propria (contador / cupom+estoque) em vez de derivar tudo do inventario. */
+  ok('a grade mostra os cinco a venda', (t.match(/item-slot-icone/g)||[]).length === 5,
      (t.match(/item-slot-icone/g)||[]).length + ' itens');
+  ok('e todo item do catalogo esta a venda',
+     Object.keys(S.ITENS).every(id => S.ITENS[id].comprável),
+     Object.keys(S.ITENS).filter(id => !S.ITENS[id].comprável).join(', ') || 'todos');
   ok('o quadro de cima traz preco e descricao', /🪙 \d+/.test(t) && t.includes('item-detalhe-texto'));
   /* SEM MOEDA o botao ja NASCE desabilitado -- um botao que so recusa depois do toque e pior. */
   ok('sem moeda o Comprar nasce desabilitado',
-     /<button class="btn success" disabled[\s\S]{0,80}onclick="comprarItem/.test(t),
+     /<button class="btn success" disabled[\s\S]{0,80}onclick="abrirCompra/.test(t),
      (t.match(/<button class="btn success"[^>]*/g)||[]).join(' | '));
+  ok('e a tela diz quanto falta', /Faltam 🪙 \d+/.test(t), (t.match(/Faltam[^<]*/g)||[]).join(' | '));
   /* COM MOEDA ele acende. */
   const g = S.__getGame(); g.moedas = 999; S.__setGame(g);
   const rico = S.renderLoja();
-  ok('com moeda ele acende', /onclick="comprarItem/.test(rico) && !/disabled[\s\S]{0,80}onclick="comprarItem/.test(rico));
+  ok('com moeda ele acende', /onclick="abrirCompra/.test(rico) && !/disabled[\s\S]{0,80}onclick="abrirCompra/.test(rico));
   ok('e mostrando quantas moedas voce tem', /Você tem <strong>🪙 999<\/strong>/.test(rico));
   /* OS PRECOS da tela tem que ser os mesmos que o servidor cobra -- se divergirem, a tela promete
      um preco que a cobranca nao pratica. */
   ok('os precos sao os pedidos', S.ITENS.awakening.preco === 50 && S.ITENS.hyperpotion.preco === 30 && S.ITENS.potion.preco === 15,
      [S.ITENS.awakening.preco, S.ITENS.hyperpotion.preco, S.ITENS.potion.preco].join('/'));
+  ok('e os dois de jogar tambem tem preco', S.ITENS.doce_raro.preco === 300 && S.ITENS.bonus_shiny.preco === 800,
+     S.ITENS.doce_raro.preco + '/' + S.ITENS.bonus_shiny.preco);
+}
+
+console.log('\n=== O POPUP DE QUANTIDADE ===');
+{
+  /* O TETO E O QUE O DINHEIRO COMPRA. Ele e so conveniencia da tela: quem manda e o servidor, que
+     refaz a conta contra o saldo lido na transacao -- o saldo pode ter mudado em outra aba entre
+     abrir o popup e confirmar. */
+  conta({ doces: 0 });
+  const g = S.__getGame(); g.moedas = 100; S.__setGame(g);
+  ok('o maximo sai do saldo', S.maximoQueCabe('potion') === 6, String(S.maximoQueCabe('potion')));   // 100/15
+  ok('e arredonda pra baixo', S.maximoQueCabe('awakening') === 2, String(S.maximoQueCabe('awakening'))); // 100/50
+  ok('sem dinheiro pra um, o maximo e zero', S.maximoQueCabe('doce_raro') === 0, String(S.maximoQueCabe('doce_raro')));
+
+  /* Abrir com saldo insuficiente nao pode montar um popup de "compre 0". */
+  S.abrirCompra('doce_raro');
+  ok('e nem abre o popup', !S.__getGame().compraItem, String(S.__getGame().compraItem));
+
+  S.abrirCompra('potion');
+  ok('o popup abre em 1', S.__getGame().compraQtd === 1, String(S.__getGame().compraQtd));
+  const m = S.renderCompraModal();
+  ok('e diz o teto', /até <strong>6<\/strong>/.test(m), (m.match(/até[^<]*<strong>[^<]*/g)||[]).join(' | '));
+  ok('e o total de 1', /Total: <strong>🪙 15<\/strong>/.test(m), (m.match(/Total:[^<]*<strong>[^<]*/g)||[]).join(' | '));
+  ok('o menos nasce travado em 1', /disabled[^>]*onclick="mudarQtdCompra\(-1\)"/.test(m),
+     (m.match(/<button[^>]*mudarQtdCompra\(-1\)[^>]*/g)||[]).join(' | '));
+
+  S.mudarQtdCompra(1); S.mudarQtdCompra(1);
+  ok('o + sobe', S.__getGame().compraQtd === 3, String(S.__getGame().compraQtd));
+  ok('e o total acompanha', /Total: <strong>🪙 45<\/strong>/.test(S.renderCompraModal()));
+  /* NAO PASSA DO TETO, nem apertando muito: o + para no maximo. */
+  for(let i = 0; i < 20; i++) S.mudarQtdCompra(1);
+  ok('o + nunca passa do que o dinheiro compra', S.__getGame().compraQtd === 6, String(S.__getGame().compraQtd));
+  ok('e ai ele trava', /disabled[^>]*onclick="mudarQtdCompra\(1\)"/.test(S.renderCompraModal()));
+  /* E nao desce abaixo de 1: comprar zero nao e uma compra. */
+  for(let i = 0; i < 20; i++) S.mudarQtdCompra(-1);
+  ok('e o - nunca desce abaixo de 1', S.__getGame().compraQtd === 1, String(S.__getGame().compraQtd));
+
+  /* O MAX e o caminho de verdade num toque -- ninguem aperta o + vinte vezes. */
+  S.qtdCompraMax();
+  ok('o Max vai direto ao teto', S.__getGame().compraQtd === 6, String(S.__getGame().compraQtd));
+  ok('e o botao de comprar diz quantos', /Comprar 6 unidades/.test(S.renderCompraModal()),
+     (S.renderCompraModal().match(/Comprar [^<]*/g)||[]).join(' | '));
+  S.fecharCompra();
+  ok('fechar limpa o popup', S.renderCompraModal() === '');
+}
+
+console.log('\n=== A MOCHILA LE CADA ITEM DA FONTE DELE ===');
+{
+  /* Nao da pra derivar de um campo so: o Doce Raro e um CONTADOR da conta, o Bonus Shiny e cupom
+     (save campeao / notificacao) MAIS estoque comprado, e os tres de batalha sao armazem. */
+  conta({ doces: 3 });
+  const g = S.__getGame();
+  g.inventario = { potion: 2, bonus_shiny: 1 };
+  S.__setGame(g);
+  ok('o Doce Raro vem do contador', S.quantoTenho('doce_raro') === 3, String(S.quantoTenho('doce_raro')));
+  ok('a pocao vem do armazem', S.quantoTenho('potion') === 2, String(S.quantoTenho('potion')));
+  ok('e o Bonus Shiny soma cupom com comprado',
+     S.quantoTenho('bonus_shiny') === S.cuponsDeBonusShiny().length + 1,
+     S.quantoTenho('bonus_shiny') + ' (cupons: ' + S.cuponsDeBonusShiny().length + ')');
+  const p = S.pilhasDoInventario();
+  ok('e a mochila mostra UMA pilha por item, nao duas',
+     p.filter(x => x.item === 'bonus_shiny').length === 1,
+     p.map(x => x.item + ':' + x.quantidade).join(', '));
+  ok('sem nenhum, o item nao aparece', !p.some(x => x.item === 'awakening'),
+     p.map(x => x.item).join(', '));
 }
 
 console.log('\n=== OS ITENS COMPRADOS NA MOCHILA ===');

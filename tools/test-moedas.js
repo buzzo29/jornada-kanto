@@ -165,6 +165,52 @@ console.log('\n=== A LOJA: COMPRAR E USAR ===');
   ok('e nao cobra nada na recusa', await moedasDe('g') === 5, String(await moedasDe('g')));
   ok('item que nao existe e recusado', await recusa('buyItem', 'g', { item:'masterball' }) === 'invalid-argument');
 
+  /* COMPRAR VARIOS DE UMA VEZ. Quem valida a quantidade e o servidor, contra o saldo lido NA
+     TRANSACAO -- o teto do popup e conveniencia da tela, nao a regra. */
+  await conta('q', jaVisto(), 100);
+  const q = await chamar('buyItem', 'q', { item:'potion', quantidade: 4 });
+  ok('compra 4 pocoes de uma vez', q.inventario.potion === 4, JSON.stringify(q.inventario));
+  ok('e cobra as 4', q.moedas === 40 && q.gastou === 60, q.moedas + ' moedas, gastou ' + q.gastou);
+  /* PEDIR MAIS DO QUE CABE LEVA O QUE CABE. Recusar a compra inteira porque o saldo mudou entre a
+     tela e a transacao (outra aba, um re-sorteio) seria pior que entregar o que da -- e a resposta
+     diz quantos foram. */
+  const q2 = await chamar('buyItem', 'q', { item:'potion', quantidade: 99 });
+  ok('pedir 99 com dinheiro pra 2 leva 2', q2.comprou === 2, q2.comprou + ' comprados');
+  ok('e sobra o troco, nao saldo negativo', q2.moedas === 10, String(q2.moedas));
+  ok('quantidade zero e recusada', await recusa('buyItem', 'q', { item:'potion', quantidade: 0 }) === 'invalid-argument');
+  ok('e quantidade negativa tambem', await recusa('buyItem', 'q', { item:'potion', quantidade: -5 }) === 'invalid-argument');
+  /* Sem o campo, compra 1 -- e o que o cliente antigo em cache manda. */
+  await userRef('q').set({ moedas: 100 }, { merge:true });
+  const q3 = await chamar('buyItem', 'q', { item:'potion' });
+  ok('sem quantidade, compra uma so', q3.comprou === 1, String(q3.comprou));
+
+  /* O DOCE RARO NAO MORA NO INVENTARIO: ele e o contador rareCandies da conta, o mesmo que a Torre
+     escreve e o useRareCandy desconta. Comprar e somar nele -- senao o doce passaria a existir em
+     dois lugares, com duas contas que divergem no primeiro erro. */
+  await userRef('q').set({ moedas: 1000, rareCandies: 2 }, { merge:true });
+  const dc = await chamar('buyItem', 'q', { item:'doce_raro', quantidade: 3 });
+  ok('o Doce Raro vai pro contador da conta', dc.rareCandies === 5, String(dc.rareCandies));
+  ok('e nao pro inventario', !dc.inventario.doce_raro, JSON.stringify(dc.inventario));
+  ok('cobrando 300 cada', dc.moedas === 100, String(dc.moedas));
+  ok('e o contador gravado bate', ((await userRef('q').get()).data() || {}).rareCandies === 5);
+
+  /* O BONUS SHINY COMPRADO e estoque de verdade, e tem funcao propria pra ativar: os outros dois
+     caminhos leem um CUPOM (save campeao / notificacao), que e marca de premio e nao estoque. */
+  await conta('q', jaVisto(), 1600);
+  const bs = await chamar('buyItem', 'q', { item:'bonus_shiny', quantidade: 2 });
+  ok('o Bonus Shiny comprado vira estoque', bs.inventario.bonus_shiny === 2, JSON.stringify(bs.inventario));
+  const a1 = await chamar('activateBoughtShinyBonus', 'q', {});
+  ok('ativar gasta um do armazem', a1.inventario.bonus_shiny === 1, JSON.stringify(a1.inventario));
+  ok('e liga a janela de 1 hora', a1.expiresAt > Date.now() + 59*60*1000 && a1.expiresAt <= Date.now() + 60*60*1000 + 500,
+     'faltam ' + Math.round((a1.expiresAt - Date.now())/60000) + ' min');
+  /* O SEGUNDO SOMA no que sobrou, em vez de reiniciar: reiniciar jogaria fora o tempo restante e o
+     jogador nao teria como saber que perdeu. */
+  const a2 = await chamar('activateBoughtShinyBonus', 'q', {});
+  ok('o segundo SOMA o tempo, nao reinicia', a2.expiresAt > a1.expiresAt + 59*60*1000,
+     Math.round((a2.expiresAt - a1.expiresAt)/60000) + ' min a mais');
+  ok('sem nenhum no armazem, ativar e recusado',
+     await recusa('activateBoughtShinyBonus', 'q', {}) === 'failed-precondition');
+
   /* EQUIPAR: o item sai do armazem e vai num pokemon ESPECIFICO. A chave e a ESPECIE porque um save
      nao tem duas da mesma -- o id da instancia repete entre saves e ja fez o jogador ver oito
      pokemon marcados por causa de seis. */
@@ -185,8 +231,10 @@ console.log('\n=== A LOJA: COMPRAR E USAR ===');
   ok('e o novo e o que fica no pokemon', e2.equipados.squirtle === 'potion', JSON.stringify(e2.equipados));
 
   /* DESEQUIPAR devolve. O item so se PERDE quando trabalha. */
+  const antesDeTirar = ((await userRef('g').get()).data().inventario || {}).potion || 0;
   const d1 = await chamar('unequipItem', 'g', { speciesId:'blastoise' });
-  ok('tirar o item devolve pro armazem', d1.inventario.potion === 1, JSON.stringify(d1.inventario));
+  ok('tirar o item devolve pro armazem', d1.inventario.potion === antesDeTirar + 1,
+     antesDeTirar + ' -> ' + d1.inventario.potion);
   ok('e o pokemon fica sem nada', !d1.equipados.blastoise, JSON.stringify(d1.equipados));
   ok('tirar de quem nao tem nada e recusado',
      await recusa('unequipItem', 'g', { speciesId:'blastoise' }) === 'failed-precondition');

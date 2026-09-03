@@ -4542,7 +4542,13 @@ async function atualizarInscricoesComTime(uid, slot, team){
 const LOJA = {
   awakening:   { preco: 50 },
   hyperpotion: { preco: 30 },
-  potion:      { preco: 15 }
+  potion:      { preco: 15 },
+  /* OS DOIS QUE NÃO MORAM NO INVENTÁRIO. O Doce Raro é um CONTADOR da conta (rareCandies), escrito
+     pela Torre e descontado pelo useRareCandy -- comprar é somar nele, e a mochila continua lendo
+     de um lugar só. O Bônus Shiny comprado vira estoque em inventario.bonus_shiny e é ativado pelo
+     activateBoughtShinyBonus; o ganho de jogar continua vindo do cupom do save/da notificação. */
+  doce_raro:   { preco: 300, contador: 'rareCandies' },
+  bonus_shiny: { preco: 800 }
 };
 /* Quais itens se equipam num pokémon. Os outros dois do catálogo (Doce Raro, Bônus Shiny) não são
    de batalha -- vêm de jogar e se usam na mochila. */
@@ -4620,6 +4626,13 @@ exports.buyItem = onCall(async (request) => {
   const item = String(request.data?.item ?? '');
   const daLoja = LOJA[item];
   if(!daLoja) throw new HttpsError('invalid-argument', 'Item desconhecido.');
+  /* QUANTIDADE. O cliente pergunta quantos e manda o número; quem valida é aqui, contra o SALDO
+     LIDO NA TRANSAÇÃO -- o teto da tela é uma conveniência, não a regra. Não há teto artificial:
+     o limite é o que o dinheiro compra, e um pedido absurdo é cortado pelo próprio saldo. */
+  const pedido = Math.floor(Number(request.data?.quantidade ?? 1));
+  if(!Number.isFinite(pedido) || pedido < 1){
+    throw new HttpsError('invalid-argument', 'Quantidade inválida.');
+  }
   const userRef = db.collection('users').doc(uid);
   /* Transação porque duas abas do mesmo jogador podem comprar ao mesmo tempo: sem ela, as duas leem
      o mesmo saldo e as duas passam -- dois itens pelo preço de um. Mesmo cuidado do re-sorteio. */
@@ -4631,13 +4644,54 @@ exports.buyItem = onCall(async (request) => {
       throw new HttpsError('failed-precondition',
         `Você tem ${moedas} moeda${moedas===1?'':'s'} — esse item custa ${daLoja.preco}.`);
     }
+    /* COMPRA O QUE COUBER, não menos. Pedir 10 com dinheiro pra 4 leva 4: recusar a compra inteira
+       porque o saldo mudou entre a tela e a transação (outra aba, um re-sorteio) seria pior que
+       entregar o que dá -- e o jogador vê o que gastou na resposta. */
+    const cabem = Math.floor(moedas / daLoja.preco);
+    const qtd = Math.min(pedido, cabem);
+    const custo = qtd * daLoja.preco;
+    /* O DESTINO depende do item: contador da conta (Doce Raro) ou armazém (o resto). */
+    const patch = { moedas: admin.firestore.FieldValue.increment(-custo) };
+    if(daLoja.contador){ patch[daLoja.contador] = admin.firestore.FieldValue.increment(qtd); }
+    else { patch.inventario = { [item]: admin.firestore.FieldValue.increment(qtd) }; }
+    tx.set(userRef, patch, { merge: true });
+    const inv = Object.assign({}, d.inventario || {});
+    if(!daLoja.contador) inv[item] = (inv[item] || 0) + qtd;
+    return {
+      moedas: moedas - custo,
+      inventario: inv,
+      rareCandies: (d.rareCandies || 0) + (daLoja.contador === 'rareCandies' ? qtd : 0),
+      comprou: qtd,
+      gastou: custo
+    };
+  });
+});
+
+/* ATIVA UM BÔNUS SHINY COMPRADO. Os outros dois caminhos (activateEliteShinyBonus e
+   activateShinyBonus) leem um CUPOM -- o save campeão e a notificação de liga --, que é uma marca
+   de "você ganhou isso" e não um estoque. O comprado é estoque de verdade, no inventário, e por
+   isso precisa da própria função: gastar um do armazém e ligar a mesma janela de 1 hora. */
+exports.activateBoughtShinyBonus = onCall(async (request) => {
+  if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
+  const uid = request.auth.uid;
+  const userRef = db.collection('users').doc(uid);
+  return db.runTransaction(async (tx) => {
+    const [snap] = await tx.getAll(userRef);
+    const d = snap.exists ? (snap.data() || {}) : {};
+    const quantos = (d.inventario && d.inventario.bonus_shiny) || 0;
+    if(quantos <= 0) throw new HttpsError('failed-precondition', 'Você não tem nenhum Bônus Shiny comprado.');
+    /* SOMA no que já estiver valendo, em vez de reiniciar: ativar o segundo em cima do primeiro
+       jogaria fora o tempo que sobrou, e o jogador não teria como saber que perdeu. */
+    const agora = Date.now();
+    const base = (d.shinyBonusExpiresAt && d.shinyBonusExpiresAt > agora) ? d.shinyBonusExpiresAt : agora;
+    const expiresAt = base + SHINY_BONUS_DURATION_MS;
     tx.set(userRef, {
-      moedas: admin.firestore.FieldValue.increment(-daLoja.preco),
-      inventario: { [item]: admin.firestore.FieldValue.increment(1) }
+      shinyBonusExpiresAt: expiresAt,
+      inventario: { bonus_shiny: admin.firestore.FieldValue.increment(-1) }
     }, { merge: true });
     const inv = Object.assign({}, d.inventario || {});
-    inv[item] = (inv[item] || 0) + 1;
-    return { moedas: moedas - daLoja.preco, inventario: inv };
+    inv.bonus_shiny = quantos - 1;
+    return { expiresAt, inventario: inv };
   });
 });
 

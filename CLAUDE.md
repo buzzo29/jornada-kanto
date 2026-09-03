@@ -862,12 +862,59 @@ de golpes.
   carregava devolve o antigo — perder um item por ter clicado no botão errado seria pior que a troca
   não acontecer. Tudo em transação: sem ela duas abas leem o mesmo estoque e as duas passam, e um
   Despertar protege dois pokémon.
-- **Preços: Despertar 50, Super Poção 30, Poção 15.** O número vive no cliente (`ITENS`) E no
-  servidor (`LOJA`): o cliente precisa dele pra desabilitar o botão, o servidor é quem cobra. Se os
-  dois divergirem, a tela promete um preço que a cobrança não pratica.
-- **A LOJA ABRE NO PRIMEIRO ITEM QUE ELA VENDE**, e não no primeiro do catálogo — o Doce Raro e o
-  Bônus Shiny estão no `ITENS` mas vêm de jogar. Abrindo por eles, o quadro de cima ficava VAZIO.
-  Pego pelo teste no dia em que a loja passou a vender.
+- **Preços: Bônus Shiny 800, Doce Raro 300, Despertar 50, Super Poção 30, Poção 15.** O número vive
+  no cliente (`ITENS`) E no servidor (`LOJA`): o cliente precisa dele pra desabilitar o botão, o
+  servidor é quem cobra. Se os dois divergirem, a tela promete um preço que a cobrança não pratica.
+- **A loja vende os CINCO desde 03/09/2026.** O Doce Raro e o Bônus Shiny voltaram a ter preço; eles
+  continuam vindo de jogar também, e é por isso que **cada um lê de uma fonte própria**
+  (`quantoTenho`) em vez de sair de um campo só:
+  o Doce Raro do contador `rareCandies`, o Bônus Shiny dos CUPONS (save campeão + notificação de liga)
+  **mais** o estoque comprado, e os três de batalha do armazém. Derivar tudo do `inventario` faria a
+  mochila mostrar **duas pilhas** do mesmo item.
+- **O Doce Raro comprado vai pro CONTADOR, não pro armazém.** É o mesmo `rareCandies` que a Torre
+  escreve e o `useRareCandy` desconta — pôr o comprado noutro lugar faria o doce existir em dois
+  lugares, com duas contas que divergem no primeiro erro.
+- **O Bônus Shiny comprado tem função própria pra ativar** (`activateBoughtShinyBonus`): os outros
+  dois caminhos leem um CUPOM (o save campeão, a notificação), que é marca de prêmio e não estoque.
+  **Na mochila o CUPOM é gasto primeiro**, porque é ele que pode sumir sem ser usado — apagar a
+  notificação apaga o cupom. O comprado está no armazém e não corre risco.
+  **Ativar um com outro valendo SOMA o tempo**, não reinicia: reiniciar jogaria fora o que sobrou e
+  o jogador não teria como saber que perdeu.
+- **A LOJA ABRE NO PRIMEIRO ITEM QUE ELA VENDE.** Hoje ela vende tudo, então o cuidado ficou sem
+  efeito prático — mas ele existe porque um item sem preço no catálogo deixava o quadro de cima
+  VAZIO, e foi pego pelo teste no dia em que a loja passou a vender.
+
+### O popup de quantidade
+- **Comprar abre um popup** com −/+, um botão **Máx** e o total. O teto é **o que o dinheiro
+  compra** (`maximoQueCabe` = `moedas / preço`, arredondado pra baixo).
+- **O teto da tela é conveniência; quem valida é o SERVIDOR**, contra o saldo lido DENTRO da
+  transação — o saldo pode ter mudado em outra aba entre abrir o popup e confirmar.
+- **Pedir mais do que cabe leva o que cabe**, não recusa a compra inteira: pedir 10 com dinheiro pra
+  4 leva 4, e a resposta diz quantos foram (`comprou`/`gastou`). Recusar tudo porque o saldo mudou
+  seria pior que entregar o que dá. Quantidade ausente compra 1 — é o que um cliente antigo em
+  cache manda.
+- **Não há teto artificial**: o limite é o dinheiro, e um pedido absurdo é cortado pelo próprio
+  saldo dentro da transação.
+- **O Máx fica na MESMA linha do −/+**, e não escondido: num toque, ele é o único caminho real pra
+  comprar 20 — ninguém aperta o + vinte vezes.
+- **O número vai na fonte de TEXTO, não na de pixel.** Medido na tela: "83" na fonte de pixel se lê
+  como outra coisa; ela é de título curto, e aqui o número É a informação.
+  A 320px o popup mede 265px e o stepper 223 — cabe numa linha, sem rolagem.
+
+### O preço das duas vendas novas, medido
+- A moeda vem de jogar: **70 por jornada completa**. Então o preço de cada item é, na prática,
+  **quantas jornadas ele custa**: Poção 0,21 · Super Poção 0,43 · Despertar 0,71 ·
+  **Doce Raro 4,3** · **Bônus Shiny 11,4**.
+- **O Doce Raro é +1 nível, e um nível sozinho quase não se vê**: medido em 8.000 batalhas 6x6
+  nível 60 (1σ = 0,79 ponto), +1 nível no líder do time vale **+0,54 ponto** — dentro do ruído.
+  O que ele compra é ACÚMULO: +5 níveis valem **+4,25** (5,4σ) e +10 valem **+8,19** (10,4σ).
+  A 4,3 jornadas por doce, subir um pokémon 10 níveis custa **43 jornadas completas**. É lento de
+  propósito, e o teto de nível 99 continua valendo.
+- **O Bônus Shiny é o item mais forte da loja, e de longe.** A chance dele não é fixa: começa em 5%
+  e sobe **+10 pontos por encontro sem shiny** enquanto durar (`SHINY_PITY_STEP`). Calculado:
+  39% de já ter um shiny no 3º encontro, **78% no 5º, 99% no 8º** — ou seja, uma jornada inteira sob
+  o bônus é praticamente um shiny garantido, contra **6,1%** sem ele no modo normal.
+  As 11,4 jornadas de preço são o que segura isso; se um dia incomodar, o lugar de mexer é o preço.
 
 ### O + DA TELA DE ORDEM (onde o item entra no pokémon)
 - **Está nas QUATRO telas de ordem** onde o jogador entra em batalha: jornada, desafio do ginásio da

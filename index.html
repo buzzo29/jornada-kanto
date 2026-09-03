@@ -1910,6 +1910,15 @@
      pendurado embaixo. Não havia largura de botão que resolvesse: a folga era de 2px.
      Aqui ele custa zero horizontal (a coluna já tem 28px e a linha já é mais alta que o número).
      QUADRADO e não redondo pra não se confundir com as setas de mover, que são as redondas. */
+  /* O contador do popup de compra. O Máx fica na MESMA linha do +/- de propósito: num toque, ele é
+     o caminho de verdade pra comprar 20 -- ninguém vai apertar o + vinte vezes. */
+  .compra-stepper{ display:flex; align-items:center; justify-content:center; gap:10px; margin:12px 0 4px; }
+  /* O numero vai na fonte de TEXTO, nao na de pixel: 83 na de pixel se le como outra coisa --
+     ela foi feita pra titulo curto, e aqui o numero e a informacao. O min-width segura a largura
+     de tres digitos pra os botoes nao pularem de lugar quando a quantidade cresce. */
+  .compra-qtd{ font-weight:800; font-size:1.3rem; min-width:56px; text-align:center; }
+  .compra-max{ width:auto; margin:0; padding:8px 12px; font-size:.75rem; text-align:center; }
+  .compra-total{ text-align:center; font-weight:800; margin:4px 0 10px; }
   .order-item{
     width:28px; height:28px; margin:0; padding:0;
     font-size:.9rem; line-height:1; font-family:inherit;
@@ -16235,19 +16244,22 @@ function towerEligiblePokemon(){
    doce infinito, que é nível infinito), e os dois prêmios continuariam existindo nos dois lugares,
    com duas contas que divergem no primeiro erro. */
 const ITENS = {
+  /* ESTES DOIS TÊM DUAS ORIGENS: vêm de jogar (Torre, Elite, liga) E se compram. Por isso a
+     mochila lê cada um de um lugar próprio -- o Doce Raro do contador rareCandies, o Bônus Shiny
+     dos cupons MAIS o estoque comprado -- em vez de derivar tudo do inventario. */
   doce_raro: {
     nome: 'Doce Raro',
     icone: '🍬',
+    comprável: true, preco: 300,
     descricao: 'Sobe 1 nível de um pokémon seu, na hora. Vale acima do teto de distribuição da jornada — é a única coisa, junto do desmaio e do Bônus de Kanto, que passa do nível 55.',
-    comoGanhar: 'Chegando mais longe que todo mundo na Torre dos Treinadores no dia.',
-    preco: 300
+    comoGanhar: 'Chegando mais longe que todo mundo na Torre dos Treinadores no dia, ou na loja.'
   },
   bonus_shiny: {
     nome: 'Bônus Shiny',
     icone: '✨',
-    descricao: '1 hora de chance bem maior de encontrar shiny nos encontros selvagens. O contador aparece na home enquanto estiver valendo.',
-    comoGanhar: 'Vencendo a Elite dos 4 ou uma liga online.',
-    preco: 800
+    comprável: true, preco: 800,
+    descricao: '1 hora de chance bem maior de encontrar shiny nos encontros selvagens. O contador aparece na home enquanto estiver valendo. Ativando um com outro já valendo, o tempo SOMA.',
+    comoGanhar: 'Vencendo a Elite dos 4 ou uma liga online, ou na loja.'
   },
   /* OS COMPRÁVEIS. Estes têm ARMAZÉM de verdade (o campo inventario da conta, escrito só pelo
      servidor) -- diferente dos dois de cima, que são uma leitura do que a conta já tinha. O preço
@@ -16279,19 +16291,25 @@ const ITENS = {
    grade -- cinco doces são UM slot com "5x", não cinco slots.
    `fontes` guarda de onde veio cada unidade do Bônus Shiny (a notificação ou o save), porque é
    isso que a ativação precisa mandar pro servidor. O Doce Raro não precisa: o contador é um só. */
+/* QUANTOS DE CADA ITEM A CONTA TEM. Cada um lê de um lugar diferente, e é de propósito -- não dá
+   pra derivar de um campo só:
+   - Doce Raro: o contador rareCandies, que só o servidor escreve (Torre, useRareCandy, compra);
+   - Bônus Shiny: os CUPONS de jogar (save campeão + notificação de liga) MAIS o estoque comprado;
+   - os três de batalha: o armazém (inventario).
+   Inventar um armazém único no cliente seria pior: as regras do Firestore não deixam o cliente
+   escrever campo de prêmio, e o mesmo prêmio passaria a existir em dois lugares com duas contas
+   que divergem no primeiro erro. */
+function quantoTenho(id){
+  if(id === 'doce_raro') return game.rareCandies || 0;
+  if(id === 'bonus_shiny') return cuponsDeBonusShiny().length + ((game.inventario||{}).bonus_shiny || 0);
+  return (game.inventario || {})[id] || 0;
+}
 function pilhasDoInventario(){
-  const pilhas = [];
-  const doces = game.rareCandies || 0;
-  if(doces > 0) pilhas.push({ item:'doce_raro', quantidade:doces, fontes:[] });
-  const cupons = cuponsDeBonusShiny();
-  if(cupons.length) pilhas.push({ item:'bonus_shiny', quantidade:cupons.length, fontes:cupons });
-  /* Os comprados vêm do armazém de verdade. Ordem fixa (a do catálogo) pra a grade não dançar a
-     cada compra. */
-  const inv = game.inventario || {};
-  Object.keys(ITENS).filter(id => ITENS[id].comprável).forEach(id => {
-    if((inv[id] || 0) > 0) pilhas.push({ item:id, quantidade:inv[id], fontes:[] });
-  });
-  return pilhas;
+  /* Ordem fixa (a do catálogo) pra a grade não dançar a cada compra. */
+  return Object.keys(ITENS)
+    .filter(id => quantoTenho(id) > 0)
+    .map(id => ({ item:id, quantidade:quantoTenho(id),
+                  fontes: id === 'bonus_shiny' ? cuponsDeBonusShiny() : [] }));
 }
 /* O + DA TELA DE ORDEM. Fica à ESQUERDA das setas, na mesma linha do pokémon: é ali que se decide
    quem entra primeiro, e decidir quem leva o quê é a mesma conversa -- uma tela nova só pra isso
@@ -16486,17 +16504,24 @@ async function usarItem(id){
     return;
   }
   if(id === 'bonus_shiny'){
+    /* O CUPOM VAI PRIMEIRO, o comprado depois. O cupom é o que pode SUMIR sem ser usado -- o da
+       liga mora numa notificação, e apagar a notificação apaga o cupom. O comprado fica no
+       armazém e não corre risco nenhum, então gastar ele antes seria gastar o seguro na frente. */
     const fonte = cuponsDeBonusShiny()[0];
-    if(!fonte) return;
+    if(!fonte && !((game.inventario||{}).bonus_shiny > 0)) return;
     game.inventarioUsando = true; render();
     try{
-      const r = fonte.origem === 'save'
+      const r = !fonte
+        ? await functionsClient.httpsCallable('activateBoughtShinyBonus')({})
+        : fonte.origem === 'save'
         ? await functionsClient.httpsCallable('activateEliteShinyBonus')({ slot: String(fonte.slot) })
         : await functionsClient.httpsCallable('activateShinyBonus')({ notificationId: fonte.id });
       game.shinyBonusExpiresAt = r.data.expiresAt;
       /* Marca a origem como gasta na cópia local: sem isso o item continuaria na grade até a
          próxima leitura do servidor, e a pessoa clicaria de novo num cupom que já foi. */
-      if(fonte.origem === 'save' && game.saveSlots[fonte.slot]){
+      if(!fonte){
+        game.inventario = r.data.inventario || {};
+      } else if(fonte.origem === 'save' && game.saveSlots[fonte.slot]){
         game.saveSlots[fonte.slot] = { ...game.saveSlots[fonte.slot], eliteShinyUsed: true };
         if(game.currentSaveSlot === fonte.slot) game.eliteShinyUsed = true;
       } else {
@@ -16527,7 +16552,7 @@ function podeExcluir(id){
 }
 function motivoDeNaoExcluir(id){
   if(id === 'doce_raro') return 'O Doce Raro não pode ser jogado fora — ele só sai daqui quando você usa.';
-  if(id === 'bonus_shiny') return 'Esse bônus veio da sua jornada e fica guardado até você usar.';
+  if(id === 'bonus_shiny') return 'Esse bônus fica guardado até você usar.';
   return '';
 }
 function pedirExclusaoDeItem(id){ game.inventarioExcluir = id; render(); }
@@ -16625,13 +16650,72 @@ function openLoja(){
   render();
 }
 function escolherItemDaLoja(id){ game.lojaSel = id; game.lojaErro = null; render(); }
+/* QUANTOS DÁ PRA COMPRAR com o que está no bolso. É o teto do popup -- e é só isso: quem manda é
+   o servidor, que refaz a conta contra o saldo lido na transação (o saldo pode ter mudado em outra
+   aba entre abrir o popup e confirmar). */
+function maximoQueCabe(id){
+  const preco = (ITENS[id] || {}).preco || 0;
+  if(preco <= 0) return 0;
+  return Math.floor((game.moedas || 0) / preco);
+}
+function abrirCompra(id){
+  const max = maximoQueCabe(id);
+  if(max < 1) return;
+  game.compraItem = id;
+  game.compraQtd = 1;
+  game.lojaErro = null;
+  render();
+}
+function fecharCompra(){ game.compraItem = null; render(); }
+/* O passo do +/-. Segurar o botão não existe aqui (é toque, não teclado), então o caminho pra
+   comprar 20 poções é o "Máx" -- por isso ele está ao lado e não escondido. */
+function mudarQtdCompra(delta){
+  const max = maximoQueCabe(game.compraItem);
+  game.compraQtd = Math.min(max, Math.max(1, (game.compraQtd || 1) + delta));
+  render();
+}
+function qtdCompraMax(){ game.compraQtd = Math.max(1, maximoQueCabe(game.compraItem)); render(); }
+function renderCompraModal(){
+  const id = game.compraItem;
+  if(!id) return '';
+  const it = ITENS[id];
+  if(!it) return '';
+  const max = maximoQueCabe(id);
+  const qtd = Math.min(max, Math.max(1, game.compraQtd || 1));
+  const total = qtd * it.preco;
+  return `
+  <div class="modal-overlay" onclick="fecharCompra()">
+    <div class="modal-box" onclick="event.stopPropagation()">
+      <div class="modal-icon">${it.icone}</div>
+      <h2>${escapeHtmlSafe(it.nome)}</h2>
+      <p class="hint-text">🪙 ${it.preco} cada. Você tem 🪙 ${game.moedas||0} — dá pra levar até <strong>${max}</strong>.</p>
+      <div class="compra-stepper">
+        <button class="circle-btn" ${qtd<=1||game.comprando?'disabled':''} onclick="mudarQtdCompra(-1)">−</button>
+        <span class="compra-qtd">${qtd}</span>
+        <button class="circle-btn" ${qtd>=max||game.comprando?'disabled':''} onclick="mudarQtdCompra(1)">+</button>
+        <button class="btn secondary compra-max" ${qtd>=max||game.comprando?'disabled':''} onclick="qtdCompraMax()">Máx</button>
+      </div>
+      <p class="compra-total">Total: <strong>🪙 ${total}</strong></p>
+      ${game.lojaErro ? `<p class="error-text">${escapeHtmlSafe(game.lojaErro)}</p>` : ''}
+      <button class="btn success" ${game.comprando?'disabled':''} onclick="comprarItem('${escJs(id)}')">
+        ${game.comprando ? 'Comprando...' : 'Comprar ' + qtd + (qtd>1?' unidades':' unidade')}
+      </button>
+      <button class="btn secondary" ${game.comprando?'disabled':''} onclick="fecharCompra()">Cancelar</button>
+    </div>
+  </div>`;
+}
 async function comprarItem(id){
   if(game.comprando) return;
+  const qtd = Math.min(maximoQueCabe(id), Math.max(1, game.compraQtd || 1));
+  if(qtd < 1) return;
   game.lojaErro = null; game.comprando = true; render();
   try{
-    const r = await functionsClient.httpsCallable('buyItem')({ item: id });
+    const r = await functionsClient.httpsCallable('buyItem')({ item: id, quantidade: qtd });
     game.moedas = r.data.moedas;
     game.inventario = r.data.inventario || {};
+    /* O Doce Raro não mora no inventário: o servidor devolve o contador junto. */
+    if(typeof r.data.rareCandies === 'number' && id === 'doce_raro') game.rareCandies = r.data.rareCandies;
+    game.compraItem = null;
   } catch(e){
     console.error('Erro ao comprar:', e);
     game.lojaErro = (e && e.message) || 'Não deu pra comprar agora.';
@@ -16640,10 +16724,10 @@ async function comprarItem(id){
   render();
 }
 function renderLoja(){
-  /* Só o que TEM preço de verdade. O Doce Raro e o Bônus Shiny não se compram -- eles vêm de
-     jogar, e pôr um botão apagado do lado deles prometeria uma loja que não existe. */
+  /* A grade mostra quanto você JÁ TEM de cada um -- e isso vem do quantoTenho, não do inventario:
+     o Doce Raro mora no contador da conta e o Bônus Shiny soma cupom com estoque comprado. */
   const aVenda = Object.keys(ITENS).filter(id => ITENS[id].comprável)
-    .map(id => ({ item:id, quantidade:(game.inventario||{})[id] || 0, fontes:[] }));
+    .map(id => ({ item:id, quantidade:quantoTenho(id), fontes:[] }));
   const sel = aVenda.find(p => p.item === game.lojaSel) || null;
   const it = sel ? ITENS[sel.item] : null;
   const moedas = game.moedas || 0;
@@ -16662,8 +16746,9 @@ function renderLoja(){
       ${game.lojaErro ? `<p class="error-text">${escapeHtmlSafe(game.lojaErro)}</p>` : ''}
       <div class="item-acoes">
         <button class="btn success" ${(game.moedas||0) < it.preco || game.comprando ? 'disabled' : ''}
-          onclick="comprarItem('${escJs(sel.item)}')">${game.comprando ? 'Comprando...' : '🪙 Comprar'}</button>
-      </div>`
+          onclick="abrirCompra('${escJs(sel.item)}')">${game.comprando ? 'Comprando...' : '🪙 Comprar'}</button>
+      </div>
+      ${(game.moedas||0) < it.preco ? `<p class="hint-text">Faltam 🪙 ${it.preco - (game.moedas||0)} pra comprar um.</p>` : ''}`
     : `<p class="item-detalhe-vazio">A loja ainda não abriu.</p>`}
   </div>
   ${gradeDeItensHtml(slotsDaGrade(aVenda), game.lojaSel, 'escolherItemDaLoja')}
@@ -19347,6 +19432,7 @@ function render(){
   /* DEPOIS do modal da Torre: a escolha de item é aberta de DENTRO dele, e os modais empilham na
      ordem em que são anexados -- vindo antes, ela abriria atrás. */
   if(game.escolhaDeItem){ html += renderEscolhaDeItemModal(); }
+  if(game.compraItem){ html += renderCompraModal(); }
   if(game.towerRanking){ html += renderTowerRankingModal(); }
   if(game.trainerProfile){ html += renderTrainerProfileModal(); }
   if(game.friendCompare){ html += renderFriendCompareModal(); }

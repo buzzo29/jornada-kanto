@@ -76,6 +76,15 @@ add('Jornada', 'Escolha de caminho (trecho 4)', ()=>sb.renderWalkNext());
   game.inventario = { awakening: 2, potion: 1 };
   sb.escolherItem('awakening');
   add('Itens', 'A mochila: o item de equipar', ()=>sb.renderInventario());
+  /* A LOJA e o popup de quantidade. Vale ver a 320px: o stepper e o Max dividem uma linha so. */
+  game.moedas = 1250; game.rareCandies = 3; game.compraItem = null;
+  sb.openLoja();
+  add('Itens', 'A loja com os cinco itens', ()=>sb.renderLoja());
+  sb.abrirCompra('potion'); sb.qtdCompraMax();
+  add('Itens', 'O popup de quantidade (no Max)', ()=>sb.renderLoja() + sb.renderCompraModal());
+  game.compraItem = 'doce_raro'; game.compraQtd = 1;
+  add('Itens', 'Popup de um item caro', ()=>sb.renderCompraModal());
+  game.compraItem = null;
 }
 
 /* ---- amigos ---- */
