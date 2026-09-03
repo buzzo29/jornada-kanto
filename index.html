@@ -1920,7 +1920,6 @@
   /* Carregando alguma coisa, ele acende: a tela responde "o que este aqui leva?" sem cobrar toque. */
   .order-item.com-item{ background:#fff8e0; border-color:var(--yellow-dark); }
   .order-item:active{ transform:translate(2px,2px); box-shadow:none; }
-  .release-travado{ font-size:.6rem; font-weight:800; color:var(--muted); white-space:nowrap; }
   .item-detalhe{ margin-bottom:10px; }
   .item-detalhe-topo{ display:flex; align-items:center; gap:10px; }
   .item-detalhe-icone{ font-size:2.2rem; line-height:1; flex-shrink:0; }
@@ -6226,8 +6225,6 @@ function confirmWild(){
   }
 }
 function toggleRelease(id){
-  const alvo = (game.team||[]).find(p => p.id === id);
-  if(alvo && !podeDispensar(alvo)) return;
   const excess = game.team.length - 6;
   const idx = game.releaseSelected.indexOf(id);
   if(idx>=0){ game.releaseSelected.splice(idx,1); }
@@ -12718,53 +12715,30 @@ function renderEeveeChoice(){
   </div>`;
 }
 
-/* NO DIFÍCIL, A TROCA COM O PROF. CARVALHO TEM QUE SER JUSTA (03/09/2026).
-   O time cheio + um selvagem novo obriga a mandar um embora, e sem regra isso virava upgrade de
-   graça: captura um selvagem forte e dispensa o coitado de nível 12 que ficou pra trás.
-   Só dá pra dispensar quem está a até DIFERENCA_RELEASE_DIFICIL níveis do que está chegando.
-   VÁLVULA: se NINGUÉM do time passa na régua, ela não vale -- senão o jogador ficaria com 7 pokémon
-   e sem saída, já que a tela de release não tem como ser pulada. Acontece quando o time inteiro está
-   muito abaixo do recém-chegado (um lendário de nível 50 num time de 35, por exemplo). */
-const DIFERENCA_RELEASE_DIFICIL = 10;
-function nivelDoRecemChegado(){
-  /* Quem chegou são os ÚLTIMOS da lista: o confirmWild empurra os capturados pro fim do time. */
-  const time = game.team || [];
-  const sobrando = Math.max(0, time.length - 6);
-  if(sobrando <= 0) return null;
-  return Math.max.apply(null, time.slice(-sobrando).map(p => p.level || 0));
-}
-function podeDispensar(p){
-  if(game.gameMode !== 'hard') return true;
-  const chegando = nivelDoRecemChegado();
-  if(chegando == null) return true;
-  const recemChegados = new Set((game.team || []).slice(-Math.max(0, (game.team||[]).length - 6)).map(x => x.id));
-  if(recemChegados.has(p.id)) return true;   // o recém-chegado sempre pode ser devolvido
-  const elegiveis = (game.team || []).filter(x => !recemChegados.has(x.id) &&
-    Math.abs((x.level || 0) - chegando) <= DIFERENCA_RELEASE_DIFICIL);
-  if(!elegiveis.length) return true;         // a válvula: ninguém passa na régua, então a régua não vale
-  return Math.abs((p.level || 0) - chegando) <= DIFERENCA_RELEASE_DIFICIL;
-}
+/* QUALQUER UM DO TIME PODE IR PRO PROF. CARVALHO, inclusive no difícil (03/09/2026).
+   Houve uma trava de 10 níveis de diferença aqui: no difícil, só dava pra dispensar quem estava
+   perto do nível de quem tinha acabado de chegar, pra a troca não virar upgrade de graça (captura
+   um selvagem forte e manda embora o coitado de nível 12). Saiu a pedido no mesmo dia em que
+   entrou. Ela obrigava uma VÁLVULA -- se ninguém do time passasse na régua a régua não valia,
+   senão o jogador ficava com 7 pokémon e sem saída, porque esta tela não tem como ser pulada.
+   Se um dia voltar, a válvula volta junto: sem ela o jogo trava com um lendário (que chega 12
+   níveis acima do teto do trecho) num time atrasado. */
 function renderRelease(){
   const excess = game.team.length - 6;
   return `
   <div class="box">
     <h2>📦 PC do Prof. Carvalho</h2>
     <p>Seu time passou de <strong>6 Pokémons</strong>! Escolha <strong>${excess}</strong> para enviar ao Prof. Carvalho antes de continuar — não é permitido levar mais de 6 na equipe.</p>
-    ${game.gameMode === 'hard' && (game.team||[]).some(p => !podeDispensar(p))
-      ? `<p class="hint-text">🔒 No modo difícil só dá pra dispensar quem está a até <strong>${DIFERENCA_RELEASE_DIFICIL} níveis</strong> de quem acabou de chegar (Lv.${nivelDoRecemChegado()}) — trocar um pokémon atrasado por um selvagem forte seria upgrade de graça.</p>`
-      : ''}
   </div>
   <div class="pool-badge">SELECIONADOS PARA ENVIAR: ${game.releaseSelected.length}/${excess}</div>
   <div class="box">
     ${game.team.map(p=>{
       const sp = SPECIES[p.speciesId];
       const isSel = game.releaseSelected.includes(p.id);
-      const travado = !podeDispensar(p);
-      const disabled = (travado || (!isSel && game.releaseSelected.length>=excess)) ? 'disabled' : '';
-      return `<button class="btn ${isSel?'selected':''} ${travado?'off':''}" ${disabled} onclick="toggleRelease('${p.id}')"
-        title="${travado?'Muito longe do nível de quem chegou':''}">
+      const disabled = (!isSel && game.releaseSelected.length>=excess) ? 'disabled' : '';
+      return `<button class="btn ${isSel?'selected':''}" ${disabled} onclick="toggleRelease('${p.id}')">
         <span class="mon-name">${spriteHtml(p.speciesId,'sprite-sm',p.shiny)} ${p.name}${p.shiny?' 🌟':''} — Lv.${p.level} ${isSel?'📦':''}</span>
-        <span class="mon-sub">${typesHtml(p.types)}${travado?' <span class="release-travado">🔒 diferença de nível</span>':''}</span>
+        <span class="mon-sub">${typesHtml(p.types)}</span>
       </button>`;
     }).join('')}
   </div>

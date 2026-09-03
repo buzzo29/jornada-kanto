@@ -979,22 +979,22 @@ de golpes.
   nunca no `set`: no `set` o Firestore de verdade trata o ponto como parte do NOME do campo, e um
   fake que resolvesse nos dois deixaria passar exatamente esse erro.
 
-## Modo difícil: a troca com o Prof. Carvalho tem que ser justa
+## O Prof. Carvalho aceita qualquer um, nos dois modos
 
-- Time cheio + um selvagem novo obriga a mandar um embora, e sem regra isso era **upgrade de graça**:
-  captura um selvagem forte e dispensa o coitado de nível 12 que ficou pra trás. No difícil, só dá
-  pra dispensar quem está a até **10 níveis** (`DIFERENCA_RELEASE_DIFICIL`) de quem acabou de chegar.
-- **A régua é de DIFERENÇA, não de "abaixo"** — o enunciado do pedido fala nos dois sentidos ("10
-  levels abaixo" e "10 levels ou menos de diferença"), e a diferença absoluta atende os dois. Se a
-  intenção era só travar o que está ABAIXO, é trocar o `Math.abs` por uma subtração.
-- **O recém-chegado sempre pode ser devolvido**: recusar o próprio selvagem seria obrigar a ficar
-  com ele.
-- **A VÁLVULA é obrigatória.** Se NINGUÉM do time passa na régua, ela não vale — senão o jogador
-  ficaria com 7 pokémon e sem saída, porque a tela do Prof. Carvalho não tem como ser pulada.
-  Acontece de verdade: um lendário chega 12 níveis acima do teto do trecho, e num time atrasado
-  todos ficariam travados.
-- **O clique recusa junto com a tela.** O card apagado é a apresentação da regra; a regra em si está
-  no `toggleRelease`, pra valer mesmo se alguém chamar a função por fora.
+- Time cheio + um selvagem novo obriga a mandar um embora, e **quem vai é escolha do jogador, sem
+  régua** — no normal e no difícil.
+- **Houve uma trava de 10 níveis no difícil** (`DIFERENCA_RELEASE_DIFICIL`, 03/09/2026): só dava pra
+  dispensar quem estava perto do nível de quem tinha acabado de chegar, pra a troca não virar
+  upgrade de graça (captura um selvagem forte, manda embora o coitado de nível 12). **Saiu a pedido
+  no mesmo dia em que entrou.** O efeito medido nunca chegou a ser levantado; o que se sabe é o
+  desenho: ela mordia justamente o time atrasado, que é quem mais precisa da troca.
+- **Se um dia voltar, a VÁLVULA volta junto.** Se NINGUÉM do time passasse na régua ela não valia —
+  senão o jogador ficava com 7 pokémon e sem saída, porque esta tela não tem como ser pulada.
+  Acontecia de verdade: um lendário chega 12 níveis acima do teto do trecho, e num time atrasado
+  todos ficariam travados. `tools/test-jornada.js` guarda esse caso (lendário Lv.50 num time de ~21)
+  justamente pra uma volta sem válvula falhar em vez de travar o jogo em produção.
+- **A regra viveria no `toggleRelease`, não só na tela.** O card apagado é a apresentação; a função é
+  quem tem que recusar, pra valer se alguém a chamar por fora.
 
 ## Progressão da jornada
 
