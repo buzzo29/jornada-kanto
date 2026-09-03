@@ -823,11 +823,26 @@ de golpes.
 
 ## A loja de verdade: Despertar, Poção e Super Poção
 
+- **OS TRÊS SÃO DE EQUIPAR, num pokémon específico** (03/09/2026). Nasceram como interruptor da
+  CONTA — usava na mochila e o efeito valia pro time inteiro, em qualquer save, por 10 minutos ou
+  até a poção disparar. Hoje o item vai num pokémon: o + da tela de ordem de batalha, e ele protege
+  ou cura **aquele**. Vira escolha ("quem eu protejo do sono?") em vez de um botão ligado por fora.
+  **O que isso custou está medido, e é grande:** ver "O preço da mudança", no fim desta seção.
 - **Agora existe ARMAZÉM.** Até aqui a mochila era uma leitura do que a conta já tinha (o contador de
   doces e os cupons de bônus shiny). Item comprável precisa de estoque, e ele é do SERVIDOR pelo
   mesmo motivo das moedas: uma linha no console viraria Despertar infinito — e Despertar infinito
-  **desliga um golpe do jogo inteiro**. `inventario`, `awakeningUntil` e `pocaoArmada` entraram na
-  trava do `firestore.rules` junto de `moedas` e `rareCandies`. Quem escreve é `buyItem`/`useItem`.
+  **desliga um golpe do jogo inteiro**. `inventario` (item → quantos) e `equipados` (espécie → item)
+  entraram na trava do `firestore.rules` junto de `moedas` e `rareCandies`. Quem escreve é
+  `buyItem`/`equipItem`/`unequipItem`/`consumeEquipped`.
+- **A chave dos equipados é a ESPÉCIE, nunca o id da instância.** O `id` (`mon7`) vem de um contador
+  que recomeça do 1 a cada carregamento de página e **repete entre saves** — foi assim que um jogador
+  viu oito pokémon marcados por causa de seis (ver a seção do Ginásio da Cidade). Espécie é única na
+  conta pra este fim: um save não tem duas da mesma, porque o encontro selvagem nunca oferece uma
+  linha que o time já tem e o montador recusa repetida.
+- **Equipar TIRA do armazém; desequipar DEVOLVE; trabalhar PERDE.** Trocar o que o pokémon já
+  carregava devolve o antigo — perder um item por ter clicado no botão errado seria pior que a troca
+  não acontecer. Tudo em transação: sem ela duas abas leem o mesmo estoque e as duas passam, e um
+  Despertar protege dois pokémon.
 - **Preços: Despertar 50, Super Poção 30, Poção 15.** O número vive no cliente (`ITENS`) E no
   servidor (`LOJA`): o cliente precisa dele pra desabilitar o botão, o servidor é quem cobra. Se os
   dois divergirem, a tela promete um preço que a cobrança não pratica.
@@ -835,21 +850,54 @@ de golpes.
   Bônus Shiny estão no `ITENS` mas vêm de jogar. Abrindo por eles, o quadro de cima ficava VAZIO.
   Pego pelo teste no dia em que a loja passou a vender.
 
-### Despertar (10 minutos, `awakeningUntil`)
-- **Nenhum golpe de sono do ADVERSÁRIO pega no time do jogador**, em qualquer save e em qualquer
-  modo — o campo é da conta, não do save. Os pokémon do jogador **continuam podendo** fazer o
-  adversário dormir: o item protege quem o usou, não desliga o golpe.
+### O + DA TELA DE ORDEM (onde o item entra no pokémon)
+- **Está nas QUATRO telas de ordem** onde o jogador entra em batalha: jornada, desafio do ginásio da
+  cidade, defesa do ginásio e Torre. **NÃO está nas três das ligas** (Clássica, customizadas e
+  Trainers League) — item equipado não vale lá (ver "Onde os itens valem"), e um + que promete um
+  efeito que a partida não aplica é o mesmo defeito do selo de terreno prometendo bônus que a
+  batalha não dá.
+- **Ele mora na COLUNA DO NÚMERO, embaixo do "1º", e isso foi medido — não é gosto.** Como bloco
+  próprio na faixa do meio (que é onde o pedido o colocava, ao lado das setas) ele custa a largura
+  dele MAIS o gap: 50px. A 320px o nome do pokémon precisa de **180px** numa coluna que tem **182** —
+  ou seja, os seis nomes passavam a quebrar em duas linhas, cada um com um "— Lv.62" pendurado
+  embaixo. **Não há largura de botão que resolva**: testado de 34px a 20px, todos quebravam; a folga
+  era de 2px. Na coluna do número ele custa **zero** horizontal (ela já tem 28px e a linha já é mais
+  alta que o número). A 390px o + ao lado das setas caberia; a 320px, não.
+- **Quadrado, não redondo**: as redondas são as setas de mover, e duas formas iguais lado a lado na
+  mesma linha se confundem.
+- **Carregando alguma coisa, o botão vira o ÍCONE do item** (⏰ 🧪 💊) e acende em amarelo, em vez do
+  +. A tela responde "o que este aqui está levando?" sem cobrar um toque.
+- **A caixa de escolha lista o que a mochila TEM *mais* o que ele já carrega.** O equipado já saiu do
+  armazém, então filtrando só por estoque ele sumia da lista — a caixa dizia "está carregando
+  Despertar" e o Despertar não aparecia em lugar nenhum pra ver marcado. Quem tem 1 e equipou fica
+  com 0, que é o caso mais comum de todos. A linha dele fica **amarela e travada** (reequipar não
+  mudaria nada e o servidor recusaria com estoque 0), mas **não cinza**: cinza diz "indisponível" e
+  o que se quer dizer é "é este" — daí o `.btn.selected:disabled` próprio.
+- **A mochila deixou de ter "Usar" pros três**, e no lugar diz onde eles se usam. O botão existia pra
+  ligar um efeito na conta e não há mais efeito de conta pra ligar; sumir em silêncio deixaria a
+  pessoa procurando.
+
+### Despertar (equipado, anula um sono)
+- **O golpe de sono do adversário não pega em QUEM CARREGA o item.** Não é mais o time inteiro: o
+  vizinho de time continua dormindo normal, e é isso que faz da compra uma escolha. Os pokémon do
+  jogador **continuam podendo** fazer o adversário dormir — o item protege quem o carrega, não
+  desliga o golpe.
 - **A chance do adversário é CONSUMIDA**: ele tentou e falhou. E isso vira **linha no log**
   ("Jynx tentou fazer Machop dormir com Hipnose, mas o Despertar segurou") — sem ela o jogador não
   teria como saber que as 50 moedas trabalharam, que é o erro da especialidade de novo.
-- Medido: **praticamente zero** de vitória por batalha num confronto genérico (49,7% → 49,6%, dentro do ruído). Parece pouco
-  e é: o sono é 5% por confronto. O que ele compra não é taxa de vitória, é **não perder um pokémon
-  inteiro pra um sorteio** — que foi exatamente a reclamação que fez o sono ser reescrito.
+- **O item é UM: depois de segurar um sono, ele acabou.** Um segundo adversário que tente de novo
+  pega. O teste cobra isso na forma certa — "nunca dorme ENQUANTO o item não foi gasto" —, e a
+  primeira versão dele, que cobrava proteção eterna, falhou 1 vez em 6.000 confrontos exatamente por
+  esse motivo.
+- Medido no modelo de hoje: **+0,1 ponto** de vitória por batalha 6x6 (50,48% → 50,59%, 0,2σ — ruído),
+  e ele trabalha em **1,5%** das batalhas. Parece pouco e é: o sono é 5% por confronto e agora
+  protege um pokémon só. O que ele compra não é taxa de vitória, é **não perder aquele pokémon pra
+  um sorteio** — que foi exatamente a reclamação que fez o sono ser reescrito.
 
 ### Poção (55%) e Super Poção (80%)
-- **MESMA MECÂNICA DO RECUPERAR: a cura acontece ANTES da luta.** O pokémon entra machucado do
-  confronto anterior; se está com **25% ou menos**, ele se cura e só então o novo adversário ataca.
-  Uma por batalha, e ela fica **ARMADA** (`pocaoArmada`) até disparar.
+- **MESMA MECÂNICA DO RECUPERAR: a cura acontece ANTES da luta.** O pokémon que carrega a poção entra
+  machucado do confronto anterior; se está com **25% ou menos**, ele se cura e só então o novo
+  adversário ataca. Uma por poção, e ela some depois de trabalhar.
 - **Chegou a disparar na VITÓRIA do confronto, e estava errado** — reportado em 03/09/2026 com um
   "ele nem tinha tomado hit ainda". A cena não fazia sentido: o pokémon matava o adversário sem
   levar um golpe e tomava a poção logo em seguida. A vida que ele carregava era do confronto
@@ -862,40 +910,74 @@ de golpes.
   (`team.forEach(p => p.hp = p.maxHp)`), então não há o que curar. É também o motivo de a poção não
   poder disparar "no fim da batalha": ali a cura não mudaria nada, porque a luta seguinte já começa
   com todo mundo cheio.
-- **UMA ARMADA POR VEZ**: armar a segunda por cima da primeira gastaria as duas e entregaria uma, e
-  o jogador não teria como saber que perdeu.
 - **QUEM LIMPA depende de onde a luta rodou.** Na Torre, no Ginásio da Cidade e na raide é a própria
   função da batalha, sem depender de ninguém. Na jornada quem viu a luta foi o CLIENTE, então é ele
-  que avisa (`consumePotion`) — e o pior caso de a chamada se perder é o jogador FICAR com a poção,
-  que é o lado certo pra errar.
-- **O PREÇO MEDIDO, e é o maior desta leva** (4.000 batalhas, mesmos times dos dois lados): a taxa de
-  vitória por batalha vai de **49,7%** pra **56,9% com a Poção** (+7,2) e **61,1% com a Super Poção**
-  (+11,4). São os itens mais fortes do jogo por moeda gasta — e o preço deixa a **Poção mais
-  eficiente que a Super**: 0,48 ponto por moeda contra 0,38. Se um dia incomodar, é aí que se mexe.
+  que avisa (`consumeEquipped`) — e o pior caso de a chamada se perder é o jogador FICAR com o item
+  equipado, que é o lado certo pra errar.
+- **Quem sabe o que foi gasto é o MOTOR** (`itensGastos` / `itensGastosDaBatalha()`): ele anota espécie
+  e item no instante em que o efeito acontece, e quem chamou a batalha limpa. O motor não fala com o
+  banco. É função e não a variável direto porque ela é **reatribuída** a cada batalha — quem tivesse
+  guardado a lista antiga ficaria olhando pra uma batalha que já acabou.
+- **O PREÇO MEDIDO, e continua sendo o maior desta leva** (12.000 batalhas 6x6 nível 60, mesmos times
+  e mesma semente dos dois lados, 1σ = 0,65 ponto): **50,48%** sem item, **52,59% com a Poção**
+  (+2,11) e **53,63% com a Super Poção** (+3,15). Onde o item é equipado quase não muda (líder do
+  time ou pokémon sorteado dão o mesmo, dentro do ruído): o que decide é ele estar no pokémon que
+  vai precisar, e isso o jogador não sabe de antemão.
+
+### O preço da mudança: de item da conta pra item do pokémon
+- **O item ficou ~3× mais fraco, e o número é esse** (mesmas 12.000 batalhas, Super Poção). O modelo
+  velho foi reproduzido honesto: roda a batalha SEM item, vê quem seria o primeiro a entrar com 25%
+  ou menos, e equipa **justamente ele** — até a primeira cura as duas trajetórias são idênticas,
+  então isso É o modelo velho.
+
+  | | vitória | ganho | disparou em |
+  |---|---|---|---|
+  | sem item | 50,48% | — | — |
+  | **modelo VELHO** (da conta) | 61,63% | **+11,14** (17,3σ) | **80,7%** das batalhas |
+  | modelo NOVO, no líder | 53,63% | +3,15 (4,9σ) | 24,8% |
+  | modelo NOVO, num sorteado | 53,76% | +3,27 (5,1σ) | 22,1% |
+
+  A causa não é a cura ter mudado — ela é a mesma. É a **frequência**: armada na conta, a poção
+  disparava em 4 de 5 batalhas, porque bastava QUALQUER um dos seis chegar machucado. Presa num
+  pokémon, ela só sai quando **aquele** chega machucado: 1 em 4.
+- **Os preços NÃO foram mexidos** (Poção 15, Super Poção 30). A eficiência por moeda caiu junto:
+  a Poção sai de 0,48 pra **0,14 ponto por moeda** e a Super de 0,38 pra **0,11**. Continuam sendo os
+  itens mais fortes do jogo por moeda, mas com folga bem menor. Se a intenção era manter o poder de
+  compra, o lugar de mexer é o preço — e a conta pra devolver o que era antes seria dividir por ~3.
+  Ficou como está por não ter sido pedido.
 
 ### Onde os itens valem
-- **TODA chamada de batalha passa o campo, sem exceção** -- inclusive as ligas, que mandam vazio.
+- **TODA chamada de batalha passa pelo `equiparItens`, sem exceção** -- inclusive as ligas, que passam
+  a lista VAZIA.
   Exceção em lista é onde a próxima omissão se esconde, e ela já aconteceu: quando os itens
   entraram, **cinco dos oito caminhos de batalha ficaram de fora**, entre eles o do LÍDER DE
   GINÁSIO, que é A batalha da jornada. O jogador usou a poção, foi lutar e não aconteceu nada --
   reportado em 03/09/2026, horas depois de a loja subir. Os outros quatro eram o desafio do Mewtwo,
   a batalha por código de treinador e as duas resoluções de liga do cliente.
   `tools/test-especiais.js` **lê o código** e falha se alguma chamada de `simulateGymBattle` ou
-  `simulateBossFight` não tiver `itens` na chamada — a mesma trava que já existia pro
-  `applySpecialtyBuff`, que foi criada depois de a raide do Mew passar semanas sem o buff.
+  `simulateBossFight` não tiver um `equiparItens` nas 12 linhas anteriores — a mesma trava que já
+  existia pro `applySpecialtyBuff`, criada depois de a raide do Mew passar semanas sem o buff.
   Ela não cobria os itens; agora cobre, e foi conferido que ela falha ao tirar os itens do ginásio
   da jornada.
 - **Valem:** jornada (cliente), Torre, Ginásio da Cidade e raide do Mew (só o Despertar — a raide é
   um ataque só, sem confronto seguinte pra o curado aproveitar).
 - **NÃO valem nas ligas**, e é de propósito: elas são resolvidas por cron, às vezes horas depois da
-  inscrição, e um item de 10 minutos não teria como estar "valendo" ali. O `resolveLeagueMatch`
-  recebe os itens **dentro do match**, como a especialidade já viaja — no Ginásio da Cidade o lado A
-  é o DESAFIANTE (quem está jogando agora); nas ligas ninguém manda nada.
+  inscrição, e um item equipado agora não pode decidir uma partida sorteada ontem — pior, ele sumiria
+  da mochila sem a pessoa ver a luta. O `resolveLeagueMatch` recebe os equipados **dentro do match**,
+  como a especialidade já viaja — no Ginásio da Cidade o lado A é o DESAFIANTE (quem está jogando
+  agora) e o líder está dormindo do outro lado do mundo; nas ligas ninguém manda nada. É também por
+  isso que o + não aparece nas telas de ordem delas.
 - **NÃO valem na batalha online**: aquele caminho resolve confronto a confronto (`battleResolveMatchup`)
   e daria vantagem a um lado só numa partida PvP. Fica em aberto.
 - `tools/fake-firestore.js` ganhou **`increment` dentro de mapa aninhado** por causa disto: é assim
   que o inventário é escrito (`set({ inventario: { potion: increment(1) } }, {merge:true})`), o
   Firestore de verdade faz, e sem isso a função passava no teste e quebrava só em produção.
+  Com os equipados ele ganhou mais três, pelo mesmo motivo: **`FieldValue.delete()`**, **caminho com
+  ponto no `update()`** (`update({'equipados.blastoise': delete()})` apaga UMA chave do mapa, e sem
+  isso o fake criava um campo literal chamado "equipados.blastoise" — o teste diria verde com o item
+  nunca saindo do pokémon) e **`update` dentro da transação**. O ponto só é resolvido no `update`,
+  nunca no `set`: no `set` o Firestore de verdade trata o ponto como parte do NOME do campo, e um
+  fake que resolvesse nos dois deixaria passar exatamente esse erro.
 
 ## Modo difícil: a troca com o Prof. Carvalho tem que ser justa
 

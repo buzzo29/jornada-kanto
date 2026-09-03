@@ -624,24 +624,25 @@ console.log('\nO BUFF DE ESPECIALIDADE ENTRA EM TODA BATALHA');
   }
   ok('toda batalha simulada aplica a especialidade', semBuff.length === 0, semBuff.join('  |  '));
 
-  /* E O MESMO VALE PROS ITENS DA MOCHILA, pela mesma razao e pelo mesmo defeito: quando eles
+  /* E O MESMO VALE PROS ITENS EQUIPADOS, pela mesma razao e pelo mesmo defeito: quando eles
      entraram, um dos DOIS caminhos de batalha do cliente ficou de fora -- o do rival/Rocket/Elite
      recebeu e o do LIDER DE GINASIO, que e A batalha da jornada, nao. O jogador usou a pocao, foi
      lutar e nao aconteceu nada. Reportado em 03/09/2026, horas depois de a loja subir.
-     A regra aqui e SEM EXCECAO: toda chamada passa o campo, ate a Trainers League, que nunca manda
-     item nenhum. Excecao em lista e onde a proxima omissao se esconde. */
+     A regra aqui e SEM EXCECAO: toda chamada passa pelo equiparItens, inclusive a das ligas, que
+     passa a lista VAZIA de proposito (item equipado hoje nao decide partida sorteada ontem).
+     Excecao em lista e onde a proxima omissao se esconde. */
   const semItens = [];
   for(const [nome, texto] of arquivos){
     const linhas = texto.split(String.fromCharCode(10));
     linhas.forEach((l, i) => {
       if(!/(simulateGymBattle|simulateBossFight)\s*\(/.test(l)) return;
       if(/^\s*(function|exports\.)/.test(l)) return;
-      /* A chamada pode quebrar em duas linhas -- olha ela e a seguinte. */
-      const chamada = l + String.fromCharCode(10) + (linhas[i+1] || "");
-      if(!/itens\s*:/.test(chamada)) semItens.push(nome + ":" + (i+1) + "  " + l.trim().slice(0, 60));
+      /* As mesmas 12 linhas do applySpecialtyBuff: e ali que o time e montado e as flags, postas. */
+      const antes = linhas.slice(Math.max(0, i-12), i).join(String.fromCharCode(10));
+      if(!/equiparItens/.test(antes)) semItens.push(nome + ":" + (i+1) + "  " + l.trim().slice(0, 60));
     });
   }
-  ok('e toda batalha simulada recebe os itens da mochila', semItens.length === 0, semItens.join('  |  '));
+  ok('e toda batalha simulada passa pelo equiparItens', semItens.length === 0, semItens.join('  |  '));
 })();
 /* E o valor: 5%, abaixo do terreno (1,15) e do shiny (1,20) de proposito -- a especialidade cobre
    um TIPO inteiro do time, nao um pokemon. */
@@ -715,14 +716,23 @@ for(let i=0;i<300;i++){
 ok('300 batalhas com a mesma semente, golpe a golpe', divergencias === 0,
    divergencias + ' divergencias | ' + comEspecial + ' batalhas tiveram golpe especial');
 
-console.log('\n=== OS ITENS DA MOCHILA DENTRO DA BATALHA ===');
-/* DESPERTAR: o sono do ADVERSARIO nao pega no time do jogador. Protege quem usou o item, nao
-   desliga o golpe do jogo -- os pokemon do jogador continuam podendo dormir o adversario, que e
-   exatamente o que foi pedido. */
+console.log('\n=== OS ITENS EQUIPADOS DENTRO DA BATALHA ===');
+/* O item e DO POKEMON, nao da conta: quem carrega o Despertar e o Machop, e a protecao vale pra
+   ele. Foi assim que a mecanica virou escolha ("quem eu protejo do sono?") em vez de um interruptor
+   ligado por fora, valendo pro time inteiro em qualquer save.
+   DESPERTAR: o sono do ADVERSARIO nao pega em quem carrega o item. Nao desliga o golpe do jogo --
+   os pokemon do jogador continuam podendo dormir o adversario, que e exatamente o que foi pedido. */
+/* Monta um time ja com o item posto. Passa pelo equiparItens DE VERDADE (e nao escrevendo p.item na
+   mao) porque e ele que a batalha usa: escrever o campo direto testaria o desenho e nao o caminho
+   do dado ate ele -- o mesmo erro que deixou o timer do ginasio da cidade passar. */
+function comItem(instancia, item){
+  S.equiparItens([instancia], { [instancia.speciesId]: item });
+  return [instancia];
+}
 (function(){
   let bloqueios = 0, jogadorDormiu = 0;
   for(let i = 0; i < 3000; i++){
-    const r = S.simulateGymBattle([inst('machop',45)], [inst('jynx',45)], Math.random, { itens:{ semSono:true } });
+    const r = S.simulateGymBattle(comItem(inst('machop',45),'awakening'), [inst('jynx',45)], Math.random);
     const m = (r.matchups||[])[0];
     if(!m) continue;
     if((m.golpes||[]).some(x => x.x === 'semSono')) bloqueios++;
@@ -740,11 +750,48 @@ console.log('\n=== OS ITENS DA MOCHILA DENTRO DA BATALHA ===');
   /* O jogador continua podendo dormir o adversario. */
   let meuSono = 0;
   for(let i = 0; i < 3000; i++){
-    const r = S.simulateGymBattle([inst('jynx',45)], [inst('machop',45)], Math.random, { itens:{ semSono:true } });
+    const r = S.simulateGymBattle(comItem(inst('jynx',45),'awakening'), [inst('machop',45)], Math.random);
     const m = (r.matchups||[])[0];
     if(m && (m.golpes||[]).some(x => x.x === 'sono' && x.q === 'p')) meuSono++;
   }
   ok('e o MEU pokemon continua dormindo o adversario', meuSono > 50, meuSono + ' de 3000');
+  /* O MOTOR ANOTA O GASTO. Sem a anotacao o item nunca sai da conta e o Despertar viraria eterno --
+     e o defeito nao apareceria em batalha nenhuma, so num saldo que nunca desce. */
+  let anotou = 0, semBloqueio = 0;
+  for(let i = 0; i < 2000; i++){
+    const r = S.simulateGymBattle(comItem(inst('machop',45),'awakening'), [inst('jynx',45)], Math.random);
+    const m = (r.matchups||[])[0];
+    const bloqueou = !!(m && (m.golpes||[]).some(x => x.x === 'semSono'));
+    const gastos = S.itensGastosDaBatalha().filter(g => g.dono === 'p' && g.item === 'awakening');
+    if(bloqueou && gastos.length === 1 && gastos[0].especie === 'machop') anotou++;
+    if(!bloqueou && gastos.length) semBloqueio++;
+  }
+  ok('e o motor anota o gasto quando o item trabalha', anotou > 30, anotou + ' anotacoes em 2000');
+  ok('e nao anota quando ele nao trabalhou', semBloqueio === 0, semBloqueio + ' anotacoes a toa');
+  /* O ITEM E DE QUEM CARREGA, NAO DO TIME. Esta e a diferenca entre o modelo velho (interruptor da
+     conta) e o de hoje, e e a parte que o jogador escolhe: o Machop protegido, o Geodude ao lado
+     dele nao. Sem esta checagem, um equiparItens que espalhasse o item pelo time passaria batido. */
+  let vizinhoDormiu = 0, donoDormiuComItem = 0, donoDormiuGasto = 0;
+  for(let i = 0; i < 3000; i++){
+    const time = [inst('machop',45), inst('geodude',45)];
+    S.equiparItens(time, { machop:'awakening' });
+    const r = S.simulateGymBattle(time, [inst('jynx',45), inst('jynx',45)], Math.random);
+    /* O item e UM: depois de segurar um sono ele acabou, e o proximo pega. Por isso a conta
+       acompanha se ele JA trabalhou -- sem isso o teste cobraria protecao eterna, que nao e a regra
+       (falhou 1 vez em 6000 confrontos exatamente por isso, com o Machop enfrentando duas Jynx). */
+    let gasto = false;
+    (r.matchups||[]).forEach(m => {
+      const g = m.golpes || [];
+      const doDono = m.playerSpecies === 'machop';
+      if(doDono && g.some(x => x.x === 'semSono')) gasto = true;
+      if(!g.some(x => x.x === 'sono' && x.q === 'e')) return;
+      if(!doDono){ vizinhoDormiu++; return; }
+      if(gasto) donoDormiuGasto++; else donoDormiuComItem++;
+    });
+  }
+  ok('quem NAO carrega o item continua dormindo', vizinhoDormiu > 30, vizinhoDormiu + ' vezes');
+  ok('e quem carrega, nunca -- enquanto o item nao foi gasto', donoDormiuComItem === 0,
+     donoDormiuComItem + ' com o item na mao, ' + donoDormiuGasto + ' depois de gasto');
   /* A frase tem que existir: item invisivel e o erro da especialidade de novo. */
   const g = { x:'semSono', q:'e', g:'Hipnose' };
   const frase = S.fraseDoEspecial(g, 'Jynx', 'Machop', {});
@@ -758,8 +805,8 @@ console.log('\n=== OS ITENS DA MOCHILA DENTRO DA BATALHA ===');
 (function(){
   let disparos = 0, entrouCheio = 0, noPrimeiro = 0, foraDoComeco = 0, curaErrada = 0, doisNaBatalha = 0;
   for(let i = 0; i < 3000; i++){
-    const r = S.simulateGymBattle([inst('machamp',60)], [inst('onix',58), inst('golem',58), inst('rhydon',58)],
-                                  Math.random, { itens:{ pocao:{ id:'hyperpotion', cura:0.80 } } });
+    const r = S.simulateGymBattle(comItem(inst('machamp',60),'hyperpotion'),
+                                  [inst('onix',58), inst('golem',58), inst('rhydon',58)], Math.random);
     let naBatalha = 0;
     (r.matchups||[]).forEach((m, idx) => {
       const g = m.golpes || [];
@@ -797,8 +844,8 @@ console.log('\n=== OS ITENS DA MOCHILA DENTRO DA BATALHA ===');
      pra cima de 70% o Recuperar nao dispara mais -- a ordem resolve sozinha, sem regra extra. */
   let juntos = 0, comRec = 0;
   for(let i = 0; i < 4000; i++){
-    const r = S.simulateGymBattle([inst('alakazam',60)], [inst('onix',58), inst('golem',58)], Math.random,
-                                  { itens:{ pocao:{ id:'hyperpotion', cura:0.80 } } });
+    const r = S.simulateGymBattle(comItem(inst('alakazam',60),'hyperpotion'),
+                                  [inst('onix',58), inst('golem',58)], Math.random);
     for(const m of (r.matchups||[])){
       const g = m.golpes || [];
       if(g.some(x => x.x === 'recover')) comRec++;

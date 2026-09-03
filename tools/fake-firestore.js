@@ -9,6 +9,7 @@
  * fica pendurado depois de recusado -- e nenhum deles aparece num teste de tela.
  */
 const INCREMENT = Symbol('increment');
+const DELETE = Symbol('delete');
 const store = new Map();   // 'caminho/do/doc' -> objeto
 let filaDeTransacoes = Promise.resolve();   // ver runTransaction
 
@@ -21,7 +22,9 @@ function ehMapaSimples(v){
 function aplicar(alvo, patch, merge){
   const base = merge ? Object.assign({}, alvo || {}) : {};
   for(const [k, v] of Object.entries(patch)){
-    if(v && typeof v === 'object' && v.__op === INCREMENT){
+    if(v && typeof v === 'object' && v.__op === DELETE){
+      delete base[k];
+    } else if(v && typeof v === 'object' && v.__op === INCREMENT){
       base[k] = (typeof base[k] === 'number' ? base[k] : 0) + v.n;
     } else if(merge && ehMapaSimples(v)){
       /* MAPA DENTRO DE MAPA. O Firestore de verdade MESCLA mapa aninhado num set({merge:true}) e
@@ -34,6 +37,23 @@ function aplicar(alvo, patch, merge){
     }
   }
   return base;
+}
+
+/* {'a.b': v} vira {a: {b: v}}, que e o que o update() do Firestore faz com dot notation. Monta
+   mapa aninhado pra o aplicar() mesclar com o que ja existe, em vez de trocar o mapa inteiro. */
+function expandirPontos(patch){
+  const out = {};
+  for(const [k, v] of Object.entries(patch)){
+    if(k.indexOf('.') < 0){ out[k] = v; continue; }
+    const partes = k.split('.');
+    let no = out;
+    for(let i = 0; i < partes.length - 1; i++){
+      if(!ehMapaSimples(no[partes[i]])) no[partes[i]] = {};
+      no = no[partes[i]];
+    }
+    no[partes[partes.length - 1]] = v;
+  }
+  return out;
 }
 
 function docRef(parts){
@@ -49,7 +69,7 @@ function docRef(parts){
     async set(patch, opts){ store.set(caminho, aplicar(store.get(caminho), patch, !!(opts && opts.merge))); },
     async update(patch){
       if(!store.has(caminho)) throw new Error('NOT_FOUND: ' + caminho);
-      store.set(caminho, aplicar(store.get(caminho), patch, true));
+      store.set(caminho, aplicar(store.get(caminho), expandirPontos(patch), true));
     },
     async delete(){ store.delete(caminho); }
   };
@@ -148,6 +168,11 @@ function makeDb(){
             return Promise.all(refs.map(r => r.get()));
           },
           set: (ref, v, o)=>{ jaEscreveu = true; ref.set(v, o); },
+          /* update DENTRO da transacao. O Transaction do Firestore tem, e o unequipItem usa: ele
+             precisa apagar UMA chave do mapa de equipados sem reescrever o mapa inteiro (duas abas
+             tirando itens de pokemon diferentes se atropelariam). Igual ao de fora, ele RECUSA
+             documento que nao existe -- que e o que o Firestore de verdade faz. */
+          update: (ref, v)=>{ jaEscreveu = true; return ref.update(v); },
           delete: (ref)=>{ jaEscreveu = true; ref.delete(); }
         });
       } finally { liberar(); }
@@ -155,7 +180,10 @@ function makeDb(){
   };
 }
 
-const FieldValue = { increment: (n)=>({ __op: INCREMENT, n }) };
+const FieldValue = {
+  increment: (n)=>({ __op: INCREMENT, n }),
+  delete: ()=>({ __op: DELETE })
+};
 
 module.exports = {
   makeDb, FieldValue, store,

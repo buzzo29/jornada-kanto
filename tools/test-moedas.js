@@ -165,28 +165,43 @@ console.log('\n=== A LOJA: COMPRAR E USAR ===');
   ok('e nao cobra nada na recusa', await moedasDe('g') === 5, String(await moedasDe('g')));
   ok('item que nao existe e recusado', await recusa('buyItem', 'g', { item:'masterball' }) === 'invalid-argument');
 
-  /* USAR o Despertar: liga um cronometro na CONTA, nao no save -- vale em qualquer save e em
-     qualquer modo, que foi o pedido. */
-  const u = await chamar('useItem', 'g', { item:'awakening' });
-  ok('usar o Despertar gasta um do armazem', u.inventario.awakening === 0, JSON.stringify(u.inventario));
-  ok('e liga o cronometro por 10 minutos', u.awakeningUntil > Date.now() + 9*60*1000 && u.awakeningUntil <= Date.now() + 10*60*1000 + 500,
-     'faltam ' + Math.round((u.awakeningUntil - Date.now())/1000) + 's');
-  ok('sem ter o item, usar e recusado',
-     await recusa('useItem', 'g', { item:'awakening' }) === 'failed-precondition');
+  /* EQUIPAR: o item sai do armazem e vai num pokemon ESPECIFICO. A chave e a ESPECIE porque um save
+     nao tem duas da mesma -- o id da instancia repete entre saves e ja fez o jogador ver oito
+     pokemon marcados por causa de seis. */
+  const e1 = await chamar('equipItem', 'g', { speciesId:'blastoise', item:'awakening' });
+  ok('equipar tira o item do armazem', e1.inventario.awakening === 0, JSON.stringify(e1.inventario));
+  ok('e poe no pokemon', e1.equipados.blastoise === 'awakening', JSON.stringify(e1.equipados));
+  ok('sem ter o item, equipar e recusado',
+     await recusa('equipItem', 'g', { speciesId:'charizard', item:'awakening' }) === 'failed-precondition');
+  ok('item que nao se equipa e recusado',
+     await recusa('equipItem', 'g', { speciesId:'blastoise', item:'doce_raro' }) === 'invalid-argument');
+  ok('e sem dizer o pokemon tambem',
+     await recusa('equipItem', 'g', { item:'potion' }) === 'invalid-argument');
 
-  /* A POCAO fica ARMADA esperando. Uma por vez: armar a segunda por cima da primeira gastaria as
-     duas e entregaria uma, e o jogador nao teria como saber que perdeu. */
-  const u2 = await chamar('useItem', 'g', { item:'potion' });
-  ok('a pocao fica armada', u2.pocaoArmada === 'potion', String(u2.pocaoArmada));
-  ok('e a segunda e recusada enquanto a primeira espera',
-     await recusa('useItem', 'g', { item:'hyperpotion' }) === 'failed-precondition');
-  ok('sem gastar a que estava no armazem',
-     ((await userRef('g').get()).data().inventario || {}).hyperpotion === 1);
+  /* TROCAR O QUE ELE JA CARREGAVA DEVOLVE O ANTIGO. Perder um item por ter clicado no botao errado
+     seria pior que a troca nao acontecer. */
+  const e2 = await chamar('equipItem', 'g', { speciesId:'blastoise', item:'potion' });
+  ok('trocar de item devolve o antigo pro armazem', e2.inventario.awakening === 1, JSON.stringify(e2.inventario));
+  ok('e o novo e o que fica no pokemon', e2.equipados.blastoise === 'potion');
 
-  /* Quando ela dispara, sai da conta. */
-  await chamar('consumePotion', 'g', {});
-  ok('depois de disparar ela some', ((await userRef('g').get()).data() || {}).pocaoArmada === null);
-  ok('e ai da pra armar outra', (await chamar('useItem', 'g', { item:'hyperpotion' })).pocaoArmada === 'hyperpotion');
+  /* DESEQUIPAR devolve. O item so se PERDE quando trabalha. */
+  const d1 = await chamar('unequipItem', 'g', { speciesId:'blastoise' });
+  ok('tirar o item devolve pro armazem', d1.inventario.potion === 1, JSON.stringify(d1.inventario));
+  ok('e o pokemon fica sem nada', !d1.equipados.blastoise, JSON.stringify(d1.equipados));
+  ok('tirar de quem nao tem nada e recusado',
+     await recusa('unequipItem', 'g', { speciesId:'blastoise' }) === 'failed-precondition');
+
+  /* O ITEM TRABALHOU: o cliente avisa e ele some. So sai o que a conta REALMENTE tinha equipado --
+     o cliente diz o que gastou, mas nao escolhe o que some. */
+  await chamar('equipItem', 'g', { speciesId:'blastoise', item:'awakening' });
+  await chamar('consumeEquipped', 'g', { especies:['blastoise'] });
+  const dep = (await userRef('g').get()).data() || {};
+  ok('depois de trabalhar o item some do pokemon', !(dep.equipados||{}).blastoise, JSON.stringify(dep.equipados));
+  ok('e NAO volta pro armazem', ((dep.inventario||{}).awakening || 0) === 0, JSON.stringify(dep.inventario));
+  /* Uma especie que nao tinha nada equipado nao pode virar escrita nenhuma. */
+  await chamar('consumeEquipped', 'g', { especies:['mewtwo'] });
+  ok('e consumir quem nao tinha item nao quebra nem inventa nada',
+     !((await userRef('g').get()).data().equipados || {}).mewtwo);
 }
 
 console.log('\n=== DUAS ABAS NAO COMPRAM O MESMO ITEM DUAS VEZES ===');
@@ -201,6 +216,18 @@ console.log('\n=== DUAS ABAS NAO COMPRAM O MESMO ITEM DUAS VEZES ===');
   ok('so uma das duas passa', passaram === 1, passaram + ' passaram');
   ok('e sobra zero, nao negativo', await moedasDe('h') === 0, String(await moedasDe('h')));
   ok('e um item so no armazem', ((await userRef('h').get()).data().inventario || {}).awakening === 1);
+
+  /* E NEM EQUIPAR O MESMO ITEM EM DOIS POKEMON. Mesmo motivo, mesma transacao: sem ela as duas leem
+     o mesmo armazem e as duas passam -- dois pokemon protegidos por um Despertar so. */
+  const re = await Promise.allSettled([
+    chamar('equipItem', 'h', { speciesId:'blastoise', item:'awakening' }),
+    chamar('equipItem', 'h', { speciesId:'charizard', item:'awakening' })
+  ]);
+  const equiparam = re.filter(x => x.status === 'fulfilled').length;
+  ok('so um dos dois equipa', equiparam === 1, equiparam + ' passaram');
+  const dh = (await userRef('h').get()).data();
+  ok('e o armazem zera, nao fica negativo', (dh.inventario||{}).awakening === 0, JSON.stringify(dh.inventario));
+  ok('com um pokemon so carregando', Object.keys(dh.equipados||{}).length === 1, JSON.stringify(dh.equipados));
 }
 
 console.log('\n=== AS RECUSAS BÁSICAS ===');

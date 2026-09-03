@@ -52,6 +52,32 @@ game.routeHistory = ROTAS.slice(0, 3);
 game.routeCards = ['rock_tunnel','lavender_detour'];
 add('Jornada', 'Escolha de caminho (trecho 4)', ()=>sb.renderWalkNext());
 
+/* ---- itens equipados ---- */
+/* A tela de ordem é onde o item entra num pokémon: o + fica na linha dele, à esquerda das setas.
+   Vale ver a 320px, que é onde a linha aperta -- são quatro elementos disputando a mesma faixa
+   (sprite+nome, tipos, o + e as duas setas). */
+{
+  const timeExemplo = ['blastoise','gengar','dragonite','alakazam','snorlax','arcanine']
+    .map((id, i) => sb.createInstance(id, 62 + i));
+  game.team = timeExemplo;
+  /* O que esta EQUIPADO ja saiu do armazem -- e assim que o servidor grava, e uma fixture que
+     mentisse isso esconderia justamente o caso mais comum (ter 1, equipar, ficar com 0). */
+  game.inventario = { hyperpotion: 1, potion: 2 };
+  game.equipados = { blastoise: 'awakening', snorlax: 'potion' };
+  game.escolhaDeItem = null;
+  add('Itens', 'Ordem de batalha — com o + de item', ()=>sb.renderTeamOrder());
+  game.escolhaDeItem = 'gengar';
+  add('Itens', 'A caixa de escolher o item', ()=>sb.renderTeamOrder() + sb.renderEscolhaDeItemModal());
+  game.escolhaDeItem = 'blastoise';
+  add('Itens', 'Caixa de quem JA carrega um item', ()=>sb.renderEscolhaDeItemModal());
+  game.inventario = {};
+  add('Itens', 'Caixa com a mochila vazia', ()=>sb.renderEscolhaDeItemModal());
+  game.escolhaDeItem = null;
+  game.inventario = { awakening: 2, potion: 1 };
+  sb.escolherItem('awakening');
+  add('Itens', 'A mochila: o item de equipar', ()=>sb.renderInventario());
+}
+
 /* ---- amigos ---- */
 const amigo = (o)=>Object.assign({
   uid:'u1', name:'Misty', lastSeenAt: agora-60000, pokedex:120, eliteChampion:false,

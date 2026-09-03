@@ -190,17 +190,63 @@ console.log('\n=== OS ITENS COMPRADOS NA MOCHILA ===');
   ok('e empilhado', (p.find(x=>x.item==='awakening')||{}).quantidade === 2);
   S.escolherItem('awakening');
   const tela = S.renderInventario();
-  ok('o quadro descreve o item', tela.includes('Despertar') && tela.includes('10 minutos'));
-  ok('e o Usar esta la', /onclick="usarItem\('awakening'\)"/.test(tela));
+  ok('o quadro descreve o item', tela.includes('Despertar') && tela.includes('dormir'));
+  /* O "Usar" SUMIU pros tres de equipar: ele existia pra ligar um efeito na CONTA, e nao ha mais
+     efeito de conta pra ligar. Sumir em silencio deixaria a pessoa procurando -- por isso a linha
+     dizendo onde o item se usa tem que estar ali no lugar dele. */
+  ok('e o Usar NAO esta la (o item vai num pokemon)', !/onclick="usarItem\('awakening'\)"/.test(tela));
+  ok('mas a tela diz onde ele se usa', /ordem de batalha/.test(tela) && /toque no \+/.test(tela));
+  /* O Doce Raro nao e de equipar e continua com o botao. */
+  const g0 = S.__getGame(); g0.rareCandies = 2; S.__setGame(g0);
+  S.escolherItem('doce_raro');
+  ok('e o que NAO e de equipar continua com o Usar', /onclick="usarItem\('doce_raro'\)"/.test(S.renderInventario()));
+}
 
-  /* O QUE ESTA VALENDO AGORA, que e o que as batalhas leem. A mesma conta do servidor. */
-  const g2 = S.__getGame();
-  g2.awakeningUntil = Date.now() + 60000; g2.pocaoArmada = 'hyperpotion'; S.__setGame(g2);
-  const ativos = S.itensAtivos();
-  ok('o Despertar ligado vira semSono', ativos.semSono === true);
-  ok('e a pocao armada vira a cura certa', ativos.pocao && ativos.pocao.cura === 0.80, JSON.stringify(ativos.pocao));
-  const g3 = S.__getGame(); g3.awakeningUntil = Date.now() - 1000; S.__setGame(g3);
-  ok('Despertar vencido nao vale mais', !S.itensAtivos().semSono);
+console.log('\n=== O + DA TELA DE ORDEM ===');
+{
+  /* O item e do POKEMON: o + fica na linha dele, a esquerda das setas de mover -- e ali que se
+     decide quem entra primeiro, e decidir quem leva o que e a mesma conversa. */
+  conta({ doces: 0 });
+  const g = S.__getGame();
+  g.inventario = { awakening: 1, potion: 2 };
+  g.equipados = { blastoise: 'awakening' };
+  S.__setGame(g);
+  const semItem = S.botaoDeItemHtml('charizard');
+  ok('quem nao carrega nada mostra o +', />\+<\/button>/.test(semItem), semItem);
+  ok('e abre a escolha pra AQUELE pokemon', /abrirEscolhaDeItem\('charizard'\)/.test(semItem), semItem);
+  const comItem = S.botaoDeItemHtml('blastoise');
+  ok('quem carrega mostra o icone do item', comItem.includes('⏰') && !/>\+<\/button>/.test(comItem), comItem);
+  ok('e fica destacado', /com-item/.test(comItem), comItem);
+
+  /* A CAIXA lista so o que a mochila TEM: oferecer o que a pessoa nao tem seria uma fileira de
+     botoes que nao clicam. */
+  S.abrirEscolhaDeItem('blastoise');
+  const modal = S.renderEscolhaDeItemModal();
+  ok('a caixa nomeia o pokemon', /Blastoise/.test(modal));
+  ok('e lista os itens da mochila com a quantidade', /Despertar/.test(modal) && /Poção/.test(modal) && /2x/.test(modal), modal.slice(0,400));
+  ok('mas nao o que nao esta na mochila', !/Super Poção/.test(modal));
+  ok('nem o que nao e de batalha', !/Doce Raro/.test(modal));
+  ok('marca o que ele ja carrega', /btn selected[\s\S]{0,120}awakening/.test(modal), (modal.match(/btn selected[^"]*/g)||[]).join(' | '));
+  ok('e oferece tirar', /desequiparItem\('blastoise'\)/.test(modal));
+
+  /* O QUE ELE CARREGA JA SAIU DO ARMAZEM (equipar tira de la), entao o caso mais comum de todos e
+     ter 1, equipar e ficar com 0. Filtrando so por estoque, o item DELE sumia da lista: a caixa
+     dizia "esta carregando Despertar" e o Despertar nao aparecia em lugar nenhum. */
+  const g3 = S.__getGame(); g3.inventario = { potion: 1 }; g3.equipados = { blastoise:'awakening' }; S.__setGame(g3);
+  const zerado = S.renderEscolhaDeItemModal();
+  ok('o item equipado aparece mesmo com 0 no armazem', /Despertar/.test(zerado), zerado.slice(0,600));
+  ok('e diz "equipado" no lugar da quantidade', /Despertar — equipado/.test(zerado));
+  /* E nao da pra reequipar o que ele ja tem: gastaria uma ida ao servidor pra nao mudar nada, e
+     com 0 no armazem o servidor recusaria com "voce nao tem esse item". */
+  ok('e ele nao e clicavel de novo', /btn selected[^>]*disabled/.test(zerado), (zerado.match(/btn selected[^>]*/g)||[]).join(' | '));
+  /* Sem nada na mochila, a caixa diz DE ONDE os itens vem -- tela que responde "nao da" tem que
+     dizer o que fazer a respeito. */
+  const g2 = S.__getGame(); g2.inventario = {}; g2.equipados = {}; S.__setGame(g2);
+  const vazio = S.renderEscolhaDeItemModal();
+  ok('mochila vazia diz de onde os itens vem', /vêm da Loja/.test(vazio), vazio.slice(0,400));
+  ok('e nao oferece tirar nada', !/desequiparItem/.test(vazio));
+  S.fecharEscolhaDeItem();
+  ok('fechar limpa a escolha', S.renderEscolhaDeItemModal() === '');
 }
 
 console.log('\n=== A HOME ===');

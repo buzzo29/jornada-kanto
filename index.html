@@ -153,6 +153,11 @@
   .btn.success{background:var(--green);color:#fff;}
   .btn.secondary{background:#e2e2e2;color:var(--ink);}
   .btn.selected{background:var(--yellow);border-color:var(--box-border);}
+  /* ESCOLHIDO E TRAVADO não é o mesmo que INDISPONÍVEL. O item que o pokémon já carrega fica
+     desabilitado (reequipar não mudaria nada, e o armazém dele está em 0 justamente porque ele
+     está equipado), mas o cinza do :disabled diz "não dá" quando o que se quer dizer é "é este".
+     Mantém o amarelo e a tinta cheia; só o toque é que não faz nada. */
+  .btn.selected:disabled{background:var(--yellow);color:var(--ink);box-shadow:4px 4px 0 var(--box-border);}
   .btn .mon-name{font-size:1rem;font-weight:800;display:block;}
   .btn .mon-sub{font-size:.7rem;font-weight:600;opacity:.85;display:block;margin-top:3px;}
 
@@ -828,6 +833,8 @@
     width:28px;
     flex-shrink:0;
     text-align:center;
+    /* Pilha: a posição em cima, o botão de item embaixo (ver .order-item). */
+    display:flex; flex-direction:column; align-items:center; gap:4px;
   }
   .order-info{flex:1;min-width:0;}
   .order-info .mon-name{font-weight:800;font-size:.9rem;display:block;}
@@ -1896,6 +1903,23 @@
      prêmio no jogo (o card do nome na home, o 1º lugar dos rankings). */
   .moeda-premio{ background:#fff8e0; border-color:var(--yellow-dark); text-align:center; }
   .moeda-premio p{ margin:0; font-size:.92rem; }
+  /* O + DA TELA DE ORDEM, embaixo do número da posição. Ele é o botão de item DAQUELA linha, e
+     mora na coluna do número por medida, não por gosto: como bloco próprio na faixa do meio ele
+     custa a largura dele MAIS o gap (50px), e a 320px o nome do pokémon precisa de 180px numa
+     coluna que tem 182 -- os seis nomes quebravam em duas linhas, cada um com um "— Lv.62"
+     pendurado embaixo. Não havia largura de botão que resolvesse: a folga era de 2px.
+     Aqui ele custa zero horizontal (a coluna já tem 28px e a linha já é mais alta que o número).
+     QUADRADO e não redondo pra não se confundir com as setas de mover, que são as redondas. */
+  .order-item{
+    width:28px; height:28px; margin:0; padding:0;
+    font-size:.9rem; line-height:1; font-family:inherit;
+    background:var(--box); color:var(--ink);
+    border:2px solid var(--box-border); border-radius:4px;
+    box-shadow:2px 2px 0 var(--box-border); cursor:pointer;
+  }
+  /* Carregando alguma coisa, ele acende: a tela responde "o que este aqui leva?" sem cobrar toque. */
+  .order-item.com-item{ background:#fff8e0; border-color:var(--yellow-dark); }
+  .order-item:active{ transform:translate(2px,2px); box-shadow:none; }
   .release-travado{ font-size:.6rem; font-weight:800; color:var(--muted); white-space:nowrap; }
   .item-detalhe{ margin-bottom:10px; }
   .item-detalhe-topo{ display:flex; align-items:center; gap:10px; }
@@ -3712,8 +3736,7 @@ function freshGameDefaults(){
   rareCandies:0,         // doces da CONTA (ver ITENS/inventário); quem escreve é o servidor
   moedas:0,              // moedas da CONTA -- a jornada paga, o re-sorteio e a loja gastam
   inventario:{},         // {item: quantos} -- armazém de verdade, escrito só pelo servidor
-  awakeningUntil:0,      // enquanto Date.now() < isso, sono do adversário não pega
-  pocaoArmada:null,      // 'potion' | 'hyperpotion' -- dispara na 1ª vitória de confronto com pouco HP
+  equipados:{},          // {espécie: item} -- o que cada pokémon da conta está carregando
     shinyPityCount:0, // encontros selvagens seguidos sem capturar nenhum shiny, desde a última captura (ou desde ativar o bônus) -- sobe a chance a cada um
     shinyFoundThisSave:false, // ESTE save já conseguiu um shiny? Trava a escalada do bônus na base (ver currentShinyChance). É por save, não por conta
     wildEncounterSeq:0,       // nº do encontro selvagem deste save -- é a semente da oferta (ver goToWildEncounter)
@@ -4897,8 +4920,7 @@ async function loadPermanentUserData(){
     game.rareCandies = d.rareCandies || 0;
     game.moedas = d.moedas || 0;
     game.inventario = d.inventario || {};        // o armazém de verdade (ver ITENS/comprável)
-    game.awakeningUntil = d.awakeningUntil || 0; // imunidade a sono, com hora pra acabar
-    game.pocaoArmada = d.pocaoArmada || null;
+    game.equipados = d.equipados || {};  // espécie -> item que ela carrega; só o servidor escreve
     game.startersSorteados = d.startersSorteados || {};    // ver sorteioDosIniciais
     game.geracaoDosSlots = d.geracaoDosSlots || {};        // ver encerrarTentativaDoSlot
     // marcas da raide do Mew, gravadas pelo servidor quando o boss cai (ver bossPremiarTop10)
@@ -5470,14 +5492,32 @@ function sorteiaGolpeEspecial(p, rng){
   return null;
 }
 /* Devolve true quando o confronto foi RESOLVIDO aqui (e o doExchange não deve nem começar). */
-/* ITENS DA MOCHILA QUE VALEM DENTRO DA BATALHA. São da CONTA e não do save -- quem escreve é o
-   servidor --, e chegam aqui pelo opts do simulateGymBattle.
+/* ITENS EQUIPADOS. O item vive NO POKÉMON (p.item), não na batalha: quem equipa escolhe em QUEM,
+   na tela de ordem, e o efeito é só daquele bicho. Antes era um efeito da conta inteira -- um
+   Despertar de 10 minutos protegia o time todo -- e virou item equipado em 03/09/2026, a pedido.
+   Quem põe o campo nas instâncias é o equiparItens, chamado antes de cada batalha do mesmo jeito
+   que o applySpecialtyBuff. Quem SÓ o servidor escreve é a lista de equipados da conta; o p.item da
+   instância é uma cópia de trabalho.
    Ficam em variável de módulo pelo mesmo motivo do explosaoDoAtivo: as funções do motor são
    compartilhadas por quatro laços de batalha, e enfiar mais um parâmetro em todas seria pior que
    um estado zerado no começo de cada batalha. */
-let sonoBloqueado = false;      // Despertar ativo: sono do ADVERSÁRIO não pega no time do jogador
-let pocaoArmada = null;         // { id, cura } -- a primeira vitória de confronto com pouco HP dispara
-let pocaoJaUsada = false;       // uma por batalha: o item é um só
+/* Quanto cada poção cura, em fração do HP máximo. Vive aqui porque é o motor que aplica. */
+const CURA_DA_POCAO = { potion: 0.55, hyperpotion: 0.80 };
+/* O QUE FOI GASTO nesta batalha: [{ dono:'p'|'e', especie, item }]. Quem chamou a batalha usa isso
+   pra tirar o item da conta -- o motor não fala com o banco. */
+let itensGastos = [];
+/* Quem chamou a batalha lê isto pra tirar da conta o que foi gasto. É função e não a variável
+   direto porque ela é REATRIBUÍDA a cada batalha (itensGastos = []), e quem tivesse guardado a
+   lista antiga ficaria olhando pra uma batalha que já acabou. */
+function itensGastosDaBatalha(){ return itensGastos; }
+/* Põe o item equipado em cada instância do time. equipados é o mapa da conta (espécie -> item),
+   montado por quem chama a partir do que o servidor gravou. O parametro equipados e um mapa
+   especie -> item. Fica junto do applySpecialtyBuff nas
+   chamadas de batalha de propósito: são a mesma coisa -- estado da conta virando flag na instância. */
+function equiparItens(team, equipados){
+  if(!team) return;
+  team.forEach(p => { if(p) p.item = (equipados && equipados[p.speciesId]) || null; });
+}
 /* Abaixo disso (25%) a poção dispara. É "sobrou raspando", não "levou um arranhão". */
 const POCAO_GATILHO_HP = 0.25;
 function tentarGolpeEspecial(active, enemy, rng, diario){
@@ -5549,7 +5589,14 @@ function tentarGolpeEspecial(active, enemy, rng, diario){
        A chance do adversário É CONSUMIDA (o marcador _especialContra já foi posto pelo doExchange):
        ele tentou e falhou, e é isso que a linha do log conta. Sem essa linha o jogador não teria
        como saber que as 50 moedas trabalharam -- é o erro da especialidade de novo. */
-    if(!ehAtivo && sonoBloqueado){
+    if(alvo.item === 'awakening'){
+      /* O DESPERTAR É DO ALVO: ele segura o sono que viria em cima DELE, venha de quem vier. Não
+         importa de que lado o alvo está -- um Despertar equipado num pokémon do jogador segura a
+         Jynx adversária, e é isso que foi pedido.
+         O item é GASTO aqui: ele serviu. E vira linha no log, senão o jogador não teria como saber
+         que ele trabalhou -- o erro da especialidade de novo. */
+      alvo.item = null;
+      itensGastos.push({ dono: marca === 'p' ? 'e' : 'p', especie: alvo.speciesId, item: 'awakening' });
       if(diario){
         diario.push({ q: marca, d: 0, hp: alvo.hp, c:0, m:0, z:0, x:'semSono', g: especial.golpe });
       }
@@ -5656,12 +5703,9 @@ function simulateGymBattle(team, brockTeam, rng, opts){
   rng = rng || Math.random;
   explosaoDoAtivo = null;   // o marcador da autodestruição é por BATALHA (ver tentarGolpeEspecial)
   opts = opts || {};
-  /* Os itens da mochila valem por BATALHA e são zerados aqui -- se ficassem de uma pra outra, um
-     Despertar de 10 minutos viraria permanente na primeira batalha que o ligasse. */
-  const itens = opts.itens || {};
-  sonoBloqueado = !!itens.semSono;
-  pocaoArmada = itens.pocao || null;
-  pocaoJaUsada = false;
+  /* A LISTA DO QUE FOI GASTO zera a cada batalha: ela é o recado pra quem chamou tirar o item da
+     conta, e um recado de uma batalha anterior faria gastar item que ninguém usou. */
+  itensGastos = [];
   if(opts.preservePlayerHp){
     /* Elite 4: o HP do time do jogador CARREGA de uma batalha pra outra. O que carrega é a
        FRAÇÃO de vida, não o número cru -- porque o TETO muda entre uma luta e outra: cada membro
@@ -5721,12 +5765,14 @@ function simulateGymBattle(team, brockTeam, rng, opts){
          normal. Nunca os dois.
          O playerHpBefore já foi lido lá em cima, então a barra começa no valor machucado e SOBE --
          é o que faz a cura aparecer na tela em vez de a vida surgir do nada. */
-      if(pocaoArmada && !pocaoJaUsada && active.hp > 0 && active.hp <= active.maxHp * POCAO_GATILHO_HP){
-        const curado = Math.min(active.maxHp - active.hp, Math.round(active.maxHp * pocaoArmada.cura));
+      if(active.item && CURA_DA_POCAO[active.item] && active.hp > 0 && active.hp <= active.maxHp * POCAO_GATILHO_HP){
+        const item = active.item;
+        const curado = Math.min(active.maxHp - active.hp, Math.round(active.maxHp * CURA_DA_POCAO[item]));
         if(curado > 0){
           active.hp += curado;
-          pocaoJaUsada = true;
-          diario.push({ q:'p', d: curado, hp: active.hp, c:0, m:0, z:0, x:'pocao', g: pocaoArmada.id });
+          active.item = null;   // gasta: o item é um só
+          itensGastos.push({ dono:'p', especie: active.speciesId, item });
+          diario.push({ q:'p', d: curado, hp: active.hp, c:0, m:0, z:0, x:'pocao', g: item });
         }
       }
       while(active.hp>0 && enemy.hp>0){ doExchange(active, enemy, rng, diario); }
@@ -6810,18 +6856,10 @@ function runSpecialBattle(){
   // TODA luta seguinte e subiria o nível dele repetidamente à toa
   game.specialHpBeforeBattle = game.team.map(p=>p.hp);
   applySpecialtyBuff(game.team); // especialidade do treinador vale na jornada também
+  equiparItens(game.team, game.equipados);
   const result = simulateGymBattle(game.team, foeTeam, undefined,
-    { preservePlayerHp: cfg.context==='elite', itens: itensAtivos() });
-  /* A POÇÃO É UMA: se disparou, sai da conta. Quem viu a luta foi o cliente -- a jornada roda aqui
-     --, então é ele que avisa. O pior caso de a chamada se perder é o jogador FICAR com a poção,
-     que é o lado certo pra errar. */
-  if((result.matchups || []).some(m => ((m.golpes)||[]).some(g => g.x === 'pocao'))){
-    game.pocaoArmada = null;
-    if(game.authUser){
-      functionsClient.httpsCallable('consumePotion')({})
-        .catch(e => console.error('Erro ao consumir a poção:', e));
-    }
-  }
+    { preservePlayerHp: cfg.context==='elite' });
+  gastarItensQueTrabalharam();
   updateStreakRecord(result);
   preloadBattleSprites(result.matchups);
   game.specialBattleResult = result;
@@ -7225,20 +7263,14 @@ function runBattle(){
     applyTerrainBuff(gymTeam, game.gymTerrain);
   }
   applySpecialtyBuff(game.team);
-  /* OS ITENS DA MOCHILA VALEM AQUI TAMBÉM -- e esta é A batalha da jornada, a do líder de ginásio.
+  /* OS ITENS EQUIPADOS VALEM AQUI TAMBÉM -- e esta é A batalha da jornada, a do líder de ginásio.
      Ficou de fora quando os itens entraram: o outro caminho (rival, Rocket, Elite) recebeu e este
      não, e o jogador usou a poção, foi lutar e não aconteceu nada. Mesma omissão que a raide do Mew
      teve com a especialidade. Hoje o teste LÊ O CÓDIGO e falha se alguma chamada de batalha não
-     tiver o campo `itens` por perto. */
-  const result = simulateGymBattle(game.team, gymTeam, undefined, { itens: itensAtivos() });
-  /* A poção é UMA: se disparou, sai da conta (ver o mesmo trecho no runBattle). */
-  if((result.matchups || []).some(m => ((m.golpes)||[]).some(g => g.x === 'pocao'))){
-    game.pocaoArmada = null;
-    if(game.authUser){
-      functionsClient.httpsCallable('consumePotion')({})
-        .catch(e => console.error('Erro ao consumir a poção:', e));
-    }
-  }
+     tiver um `equiparItens` por perto. */
+  equiparItens(game.team, game.equipados);
+  const result = simulateGymBattle(game.team, gymTeam);
+  gastarItensQueTrabalharam();
   updateStreakRecord(result);
   preloadBattleSprites(result.matchups);
   game.battleResult = result;
@@ -7559,8 +7591,9 @@ function runTrainerBattle(opponentTeam){
     return inst;
   });
   applySpecialtyBuff(myTeamClone);
-  const result = simulateGymBattle(myTeamClone, opponentTeam, undefined, { itens: itensAtivos() });
-  gastarPocaoSeDisparou(result);
+  equiparItens(myTeamClone, game.equipados);
+  const result = simulateGymBattle(myTeamClone, opponentTeam);
+  gastarItensQueTrabalharam();
   updateStreakRecord(result);
   preloadBattleSprites(result.matchups);
   game.trainerBattleResult = result;
@@ -7967,7 +8000,11 @@ function resolveTrainersLeagueMatch(match, seedStr){
      O campo vai VAZIO de propósito -- com toda chamada de batalha do jogo passando por ele, o teste
      que lê o código pode exigir isso sem exceção, e exceção em lista é onde a próxima omissão se
      esconde. */
-  const result = simulateGymBattle(teamA, teamB, rng, { itens: (match.a && match.a.itens) || {} });
+  /* A liga NÃO usa item equipado: ela é resolvida longe de quem jogou, às vezes horas depois. Passa
+     pelo equiparItens com a lista VAZIA pra toda batalha do jogo passar por ele -- exceção em lista
+     é onde a próxima omissão se esconde (ver a seção dos itens no CLAUDE.md). */
+  equiparItens(teamA, null); equiparItens(teamB, null);
+  const result = simulateGymBattle(teamA, teamB, rng);
   match.matchups = result.matchups;
   match.winner = result.win ? match.a : match.b;
   match.resolved = true;
@@ -8658,7 +8695,11 @@ function resolveLeagueMatch(match, seedStr, allowedTerrainIds){
      O campo vai VAZIO de propósito -- com toda chamada de batalha do jogo passando por ele, o teste
      que lê o código pode exigir isso sem exceção, e exceção em lista é onde a próxima omissão se
      esconde. */
-  const result = simulateGymBattle(teamA, teamB, rng, { itens: (match.a && match.a.itens) || {} });
+  /* A liga NÃO usa item equipado: ela é resolvida longe de quem jogou, às vezes horas depois. Passa
+     pelo equiparItens com a lista VAZIA pra toda batalha do jogo passar por ele -- exceção em lista
+     é onde a próxima omissão se esconde (ver a seção dos itens no CLAUDE.md). */
+  equiparItens(teamA, null); equiparItens(teamB, null);
+  const result = simulateGymBattle(teamA, teamB, rng);
   // diferente dos ginásios, os níveis ficam CONGELADOS na Liga -- depois da 8ª insígnia, o time do
   // treinador não sobe mais de nível, então nem precisa re-codificar/sincronizar nada aqui
   match.matchups = result.matchups;
@@ -10580,7 +10621,7 @@ const CAMPOS_DA_CONTA = [
   'authUser','saveSlots','trainerName','rivalNameDefault','permanentPokedex','permanentShinyDex',
   'accountEliteChampion','leagueWinsTotal','leagueLeaderboard','trainerBestStreak','trainerLastStreak',
   'shinyBonusExpiresAt','shinyPityCount','specialties','specialtyCounts','rareCandies','moedas',
-  'inventario','awakeningUntil','pocaoArmada',
+  'inventario','equipados',
   'mewtwoLoanActive','mewtwoLoanCooldownUntil','mewtwoLoanUnlocked','mewtwoLoanReadyToClaim',
   'userTest','neighborhoodGymLocation','startersSorteados','geracaoDosSlots','bossTop10','bossKiller'
 ];
@@ -12804,7 +12845,7 @@ function renderTeamOrder(){
     ${game.team.map((p,idx)=>{
       const sp = SPECIES[p.speciesId];
       return `<div class="order-row">
-        <div class="order-num">${idx+1}º</div>
+        <div class="order-num">${idx+1}º${botaoDeItemHtml(p.speciesId)}</div>
         <div class="order-info">
           <span class="mon-name">${spriteHtml(p.speciesId,'sprite-sm',p.shiny)} ${p.name}${p.shiny?" 🌟":""} — Lv.${p.level}</span>
           <span class="mon-sub">${typesHtml(p.types)}</span>
@@ -14309,7 +14350,7 @@ function renderNeighborhoodGymDefenseOrder(){
       const sp = SPECIES[p.speciesId];
       const buff = ganhaBuffDeTerreno(p.speciesId, terreno);
       return `<div class="order-row">
-        <div class="order-num">${idx+1}º</div>
+        <div class="order-num">${idx+1}º${botaoDeItemHtml(p.speciesId)}</div>
         <div class="order-info">
           <span class="mon-name">${spriteHtml(p.speciesId,'sprite-sm',p.shiny)} ${escapeHtmlSafe(sp?sp.name:'?')}${p.shiny?' 🌟':''} — Lv.${p.level}${buff?' 🔺':''}</span>
           <span class="mon-sub">${sp?typesHtml(sp.types):''}</span>
@@ -14371,7 +14412,7 @@ function renderNeighborhoodGymChallengeOrderPicker(){
     <h2>⚔️ Seu time — escolha a ordem</h2>
     <p class="hint-text">O primeiro da lista luta primeiro; quando ele desmaiar, o próximo entra.</p>
     ${team.map((p,idx)=>`<div class="order-row">
-      <div class="order-num">${idx+1}º</div>
+      <div class="order-num">${idx+1}º${botaoDeItemHtml(p.speciesId)}</div>
       <div class="order-info">
         <span class="mon-name">${spriteHtml(p.speciesId,'sprite-sm',p.shiny)} ${p.name}${p.shiny?" 🌟":""} — Lv.${p.level}</span>
         <span class="mon-sub">${typesHtml(p.types)}</span>
@@ -15359,7 +15400,7 @@ function renderTowerOrderModal(){
         ${arr.map((p,idx)=>{
           const sp = SPECIES[p.speciesId];
           return `<div class="order-row">
-            <div class="order-num">${idx+1}º</div>
+            <div class="order-num">${idx+1}º${botaoDeItemHtml(p.speciesId)}</div>
             <div class="order-info">
               <span class="mon-name">${sp?spriteHtml(p.speciesId,'sprite-sm',p.shiny):'❔'} ${escapeHtmlSafe(sp?sp.name:'?')}${p.shiny?' 🌟':''} — Lv.${p.level}</span>
             </div>
@@ -16213,20 +16254,26 @@ const ITENS = {
      servidor) -- diferente dos dois de cima, que são uma leitura do que a conta já tinha. O preço
      vive aqui E no servidor (LOJA): o cliente precisa dele pra desabilitar o botão, e o servidor é
      quem cobra. Se os dois divergirem, a tela promete um preço que a cobrança não pratica. */
+  /* OS TRÊS DE EQUIPAR. Não se usam na mochila: vão num pokémon ESPECÍFICO, pelo botão + da tela
+     de ordem de batalha. O item é de quem carrega, não da conta -- foi assim que a mecânica virou
+     escolha ("quem eu protejo do sono?") em vez de um interruptor ligado no lado de fora. */
   awakening: {
-    nome: 'Despertar', icone: '⏰', comprável: true, preco: 50,
-    descricao: 'Por 10 minutos, nenhum golpe de sono do adversário pega no seu time — em qualquer save e em qualquer modo. Os SEUS pokémon continuam podendo fazer o adversário dormir.',
-    comoGanhar: 'Na loja.'
+    nome: 'Despertar', icone: '⏰', comprável: true, equipável: true, preco: 50,
+    resumo: 'Anula o sono do adversário neste pokémon.',
+    descricao: 'Equipe num pokémon. Quando o adversário tentar fazer ele dormir, o sono falha e a luta segue normal. Os SEUS pokémon continuam podendo fazer o adversário dormir. O item some depois de trabalhar.',
+    comoGanhar: 'Na loja. Equipa-se pelo + da tela de ordem de batalha.'
   },
   hyperpotion: {
-    nome: 'Super Poção', icone: '🧪', comprável: true, preco: 30,
-    descricao: 'Fica guardada esperando. O primeiro pokémon seu que vencer um confronto e sobrar com 25% ou menos de HP recupera 80% da vida na hora e segue lutando.',
-    comoGanhar: 'Na loja.'
+    nome: 'Super Poção', icone: '🧪', comprável: true, equipável: true, preco: 30,
+    resumo: 'Cura 80% quando ele entra com 25% ou menos.',
+    descricao: 'Equipe num pokémon. Quando ele for começar um confronto com 25% ou menos de HP, recupera 80% da vida ANTES de a luta começar — a mesma hora em que o Recuperar acontece. O item some depois de trabalhar.',
+    comoGanhar: 'Na loja. Equipa-se pelo + da tela de ordem de batalha.'
   },
   potion: {
-    nome: 'Poção', icone: '💊', comprável: true, preco: 15,
-    descricao: 'Fica guardada esperando. O primeiro pokémon seu que vencer um confronto e sobrar com 25% ou menos de HP recupera 55% da vida na hora e segue lutando.',
-    comoGanhar: 'Na loja.'
+    nome: 'Poção', icone: '💊', comprável: true, equipável: true, preco: 15,
+    resumo: 'Cura 55% quando ele entra com 25% ou menos.',
+    descricao: 'Equipe num pokémon. Quando ele for começar um confronto com 25% ou menos de HP, recupera 55% da vida ANTES de a luta começar — a mesma hora em que o Recuperar acontece. O item some depois de trabalhar.',
+    comoGanhar: 'Na loja. Equipa-se pelo + da tela de ordem de batalha.'
   }
 };
 /* O QUE A CONTA TEM, em pilhas. Uma pilha é um item + quantos, e é ela que vira um quadradinho da
@@ -16247,28 +16294,101 @@ function pilhasDoInventario(){
   });
   return pilhas;
 }
-/* A POÇÃO É UMA: se disparou nesta batalha, sai da conta. Quem viu a luta foi o CLIENTE (a jornada
-   e os desafios rodam aqui), então é ele que avisa -- e o pior caso de a chamada se perder é o
-   jogador FICAR com a poção, que é o lado certo pra errar. Nas batalhas do servidor (Torre, ginásio
-   da cidade, raide) quem limpa é a própria função de lá.
+/* O + DA TELA DE ORDEM. Fica à ESQUERDA das setas, na mesma linha do pokémon: é ali que se decide
+   quem entra primeiro, e decidir quem leva o quê é a mesma conversa -- uma tela nova só pra isso
+   seria mais um lugar pra ir antes de lutar.
+   Quando o pokémon já carrega alguma coisa, o botão mostra o ÍCONE do item em vez do +: a tela
+   responde "o que este aqui está levando?" sem cobrar um toque. */
+function botaoDeItemHtml(speciesId){
+  const item = (game.equipados || {})[speciesId] || null;
+  const it = item ? ITENS[item] : null;
+  const rotulo = it ? 'Item: ' + it.nome : 'Equipar um item';
+  return '<button class="order-item' + (item ? ' com-item' : '') + '"' +
+    ' onclick="abrirEscolhaDeItem(\'' + escJs(speciesId) + '\')"' +
+    ' title="' + escapeHtmlSafe(rotulo) + '" aria-label="' + escapeHtmlSafe(rotulo) + '">' +
+    (it ? it.icone : '+') + '</button>';
+}
+function abrirEscolhaDeItem(speciesId){ game.escolhaDeItem = speciesId; game.escolhaDeItemErro = null; render(); }
+function fecharEscolhaDeItem(){ game.escolhaDeItem = null; game.escolhaDeItemErro = null; render(); }
+/* Quem escreve é o SERVIDOR -- o mesmo motivo das moedas: se o armazém fosse do cliente, equipar
+   Despertar em seis pokémon seria uma linha no console. A resposta traz a mochila e os equipados
+   já atualizados, então a tela não precisa de uma segunda leitura pra ficar certa. */
+async function equiparItemNoPokemon(speciesId, item){
+  game.escolhaDeItemErro = null; game.equipando = true; render();
+  try{
+    const r = await functionsClient.httpsCallable('equipItem')({ speciesId, item });
+    game.inventario = r.data.inventario || {};
+    game.equipados = r.data.equipados || {};
+    game.escolhaDeItem = null;
+  } catch(e){
+    console.error('Erro ao equipar o item:', e);
+    game.escolhaDeItemErro = (e && e.message) || 'Não deu pra equipar agora.';
+  }
+  game.equipando = false;
+  render();
+}
+async function desequiparItem(speciesId){
+  game.escolhaDeItemErro = null; game.equipando = true; render();
+  try{
+    const r = await functionsClient.httpsCallable('unequipItem')({ speciesId });
+    game.inventario = r.data.inventario || {};
+    game.equipados = r.data.equipados || {};
+    game.escolhaDeItem = null;
+  } catch(e){
+    console.error('Erro ao tirar o item:', e);
+    game.escolhaDeItemErro = (e && e.message) || 'Não deu pra tirar agora.';
+  }
+  game.equipando = false;
+  render();
+}
+/* A CAIXA DE ESCOLHA. Lista só o que a mochila TEM: oferecer o que a pessoa não tem seria uma
+   fileira de botões que não clicam. Sem nada na mochila, ela diz de onde os itens vêm -- a tela
+   que responde "não dá" tem que dizer o que fazer a respeito. */
+function renderEscolhaDeItemModal(){
+  const especie = game.escolhaDeItem;
+  if(!especie) return '';
+  const sp = SPECIES[especie];
+  const inv = game.inventario || {};
+  const atual = (game.equipados || {})[especie] || null;
+  /* A lista é o que a MOCHILA tem MAIS o que ele já carrega. O que ele carrega já saiu do armazém
+     (equipar tira de lá), então filtrando só por estoque o item dele sumia da lista -- a caixa
+     dizia "está carregando Despertar" e o Despertar não aparecia em lugar nenhum pra ver marcado.
+     Quem tem 1 e equipou fica com 0, que é o caso mais comum de todos. */
+  const disponiveis = Object.keys(ITENS).filter(id => ITENS[id].equipável && ((inv[id] || 0) > 0 || id === atual));
+  return `
+  <div class="modal-overlay" onclick="fecharEscolhaDeItem()">
+    <div class="modal-box" onclick="event.stopPropagation()">
+      <h2>${sp ? spriteHtml(especie,'sprite-sm') : ''} Item de ${escapeHtmlSafe(sp ? sp.name : '?')}</h2>
+      ${atual ? `<p class="hint-text">Está carregando <strong>${escapeHtmlSafe(ITENS[atual].nome)}</strong>. Escolher outro devolve este pra mochila.</p>` : ''}
+      ${game.escolhaDeItemErro ? `<p class="error-text">${escapeHtmlSafe(game.escolhaDeItemErro)}</p>` : ''}
+      ${disponiveis.length ? disponiveis.map(id => `
+        <button class="btn ${atual===id?'selected':''}" ${(game.equipando || atual===id)?'disabled':''}
+          onclick="equiparItemNoPokemon('${escJs(especie)}','${escJs(id)}')">
+          <span class="mon-name">${ITENS[id].icone} ${escapeHtmlSafe(ITENS[id].nome)} — ${atual===id ? 'equipado' : (inv[id] || 0) + 'x'}</span>
+          <span class="mon-sub">${escapeHtmlSafe(ITENS[id].resumo || '')}</span>
+        </button>`).join('')
+        : '<p class="hint-text">Sua mochila não tem nenhum item de batalha. Eles vêm da Loja.</p>'}
+      ${atual ? `<button class="btn danger" ${game.equipando?'disabled':''} onclick="desequiparItem('${escJs(especie)}')">Tirar o item</button>` : ''}
+      <button class="btn secondary" onclick="fecharEscolhaDeItem()">Fechar</button>
+    </div>
+  </div>`;
+}
+/* O ITEM TRABALHOU: sai do pokémon. Quem viu a luta foi o CLIENTE (a jornada e os desafios rodam
+   aqui), então é ele que avisa -- e o pior caso de a chamada se perder é o jogador FICAR com o item
+   equipado, que é o lado certo pra errar. Nas batalhas do servidor (Torre, ginásio da cidade,
+   raide) quem limpa é a própria função de lá, sem depender de ninguém.
+   Quem sabe o que foi gasto é o MOTOR (`itensGastos`): ele anota espécie e item no instante em que o
+   efeito acontece, então não é preciso reinterpretar o diário aqui.
    É função e não código repetido porque são CINCO caminhos de batalha no cliente -- duas cópias
    divergem no primeiro ajuste, e foi o que já aconteceu com o objeto da batalha online. */
-function gastarPocaoSeDisparou(result){
-  if(!((result && result.matchups) || []).some(m => ((m.golpes)||[]).some(g => g.x === 'pocao'))) return;
-  game.pocaoArmada = null;
+function gastarItensQueTrabalharam(){
+  const meus = itensGastosDaBatalha().filter(g => g && g.dono === 'p' && g.especie);
+  if(!meus.length) return;
+  meus.forEach(g => { if(game.equipados) delete game.equipados[g.especie]; });
   if(game.authUser){
-    functionsClient.httpsCallable('consumePotion')({})
-      .catch(e => console.error('Erro ao consumir a poção:', e));
+    functionsClient.httpsCallable('consumeEquipped')({ especies: meus.map(g => g.especie) })
+      .catch(e => console.error('Erro ao consumir o item equipado:', e));
   }
-}
-/* O que está VALENDO agora, pra tela e pras batalhas do cliente. Mesma conta do servidor
-   (itensAtivosDaConta) -- se as duas divergirem, a jornada aplica um item que o ginásio não aplica. */
-function itensAtivos(){
-  const out = {};
-  if(game.awakeningUntil && Date.now() < game.awakeningUntil) out.semSono = true;
-  const armada = game.pocaoArmada;
-  if(armada && ITENS[armada]) out.pocao = { id: armada, cura: armada === 'hyperpotion' ? 0.80 : 0.55 };
-  return out;
 }
 /* Os cupons de Bônus Shiny que ainda não foram ativados, das DUAS origens.
    O da Elite mora no SAVE (`eliteShinyGranted` sem `eliteShinyUsed`) e sobrevive a apagar
@@ -16366,23 +16486,6 @@ async function usarItem(id){
     openCandyPicker();
     return;
   }
-  if(ITENS[id] && ITENS[id].comprável){
-    game.inventarioUsando = true; render();
-    try{
-      const r = await functionsClient.httpsCallable('useItem')({ item: id });
-      game.inventario = r.data.inventario || {};
-      game.awakeningUntil = r.data.awakeningUntil || 0;
-      game.pocaoArmada = r.data.pocaoArmada || null;
-      const restantes = pilhasDoInventario();
-      if(!restantes.some(x => x.item === id)) game.inventarioSel = restantes.length ? restantes[0].item : null;
-    } catch(e){
-      console.error('Erro ao usar o item:', e);
-      game.inventarioErro = (e && e.message) || 'Não deu pra usar agora.';
-    }
-    game.inventarioUsando = false;
-    render();
-    return;
-  }
   if(id === 'bonus_shiny'){
     const fonte = cuponsDeBonusShiny()[0];
     if(!fonte) return;
@@ -16477,10 +16580,11 @@ function renderInventario(){
     </div>
     <p class="item-detalhe-texto">${escapeHtmlSafe(it.descricao)}</p>
     ${game.inventarioErro ? `<p class="error-text">${escapeHtmlSafe(game.inventarioErro)}</p>` : ''}
+    ${it.equipável ? '<p class="hint-text">Este item não se usa daqui: ele vai num pokémon. Abra a ordem de batalha do seu time e toque no + da linha dele.</p>' : ''}
     <div class="item-acoes">
-      <button class="btn success" ${podeUsar?'':'disabled'} onclick="usarItem('${escJs(sel.item)}')">
+      ${it.equipável ? '' : `<button class="btn success" ${podeUsar?'':'disabled'} onclick="usarItem('${escJs(sel.item)}')">
         ${game.inventarioUsando ? 'Usando...' : '✔ Usar'}
-      </button>
+      </button>`}
       <button class="btn danger" ${podeExcluir(sel.item) && !game.inventarioUsando ?'':'disabled'}
         onclick="pedirExclusaoDeItem('${escJs(sel.item)}')">🗑️ Excluir</button>
     </div>
@@ -19047,8 +19151,9 @@ async function startMewtwoBattle(slot){
   const mewtwoTeam = [createInstance('mewtwo', 99)];
   mewtwoTeam[0].shiny = mewtwoIsShiny; // só afeta a exibição NESSA luta -- o servidor decide, a partir do mesmo sorteio, se o Mewtwo que entra no time depois vem shiny
   applySpecialtyBuff(team);
-  const result = simulateGymBattle(team, mewtwoTeam, undefined, { itens: itensAtivos() });
-  gastarPocaoSeDisparou(result);
+  equiparItens(team, game.equipados);
+  const result = simulateGymBattle(team, mewtwoTeam);
+  gastarItensQueTrabalharam();
   if(result.win && game.authUser){
     try{
       const ref = saveDocRef(game.authUser.uid, slot);
@@ -19240,6 +19345,9 @@ function render(){
   html += renderAvisoDeSaveHtml();   // "não estou conseguindo salvar" -- por cima de tudo
   if(game.candyPicker){ html += renderCandyPickerModal(); }
   if(game.towerOrder){ html += renderTowerOrderModal(); }
+  /* DEPOIS do modal da Torre: a escolha de item é aberta de DENTRO dele, e os modais empilham na
+     ordem em que são anexados -- vindo antes, ela abriria atrás. */
+  if(game.escolhaDeItem){ html += renderEscolhaDeItemModal(); }
   if(game.towerRanking){ html += renderTowerRankingModal(); }
   if(game.trainerProfile){ html += renderTrainerProfileModal(); }
   if(game.friendCompare){ html += renderFriendCompareModal(); }

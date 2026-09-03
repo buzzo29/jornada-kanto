@@ -36,11 +36,11 @@ service cloud.firestore {
       // O resto do documento (nome, pokédex, conquistas) continua livre pro dono como sempre foi.
       allow write: if request.auth != null && request.auth.uid == userId
         && !request.resource.data.diff(resource.data).affectedKeys()
-             .hasAny(['specialties', 'specialtyCounts', 'specialtyCounted', 'rareCandies', 'moedas', 'inventario', 'awakeningUntil', 'pocaoArmada']);
+             .hasAny(['specialties', 'specialtyCounts', 'specialtyCounted', 'rareCandies', 'moedas', 'inventario', 'equipados']);
       // criação do documento: não há resource.data pra comparar, então checa direto que os campos
       // protegidos não vêm no payload inicial
       allow create: if request.auth != null && request.auth.uid == userId
-        && !request.resource.data.keys().hasAny(['specialties', 'specialtyCounts', 'specialtyCounted', 'rareCandies', 'moedas', 'inventario', 'awakeningUntil', 'pocaoArmada']);
+        && !request.resource.data.keys().hasAny(['specialties', 'specialtyCounts', 'specialtyCounted', 'rareCandies', 'moedas', 'inventario', 'equipados']);
       match /saves/{saveId} {
         allow read, write: if request.auth != null && request.auth.uid == userId;
       }

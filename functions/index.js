@@ -887,14 +887,32 @@ function sorteiaGolpeEspecial(p, rng){
   return null;
 }
 /* Devolve true quando o confronto foi RESOLVIDO aqui (e o doExchange não deve nem começar). */
-/* ITENS DA MOCHILA QUE VALEM DENTRO DA BATALHA. São da CONTA e não do save -- quem escreve é o
-   servidor --, e chegam aqui pelo opts do simulateGymBattle.
+/* ITENS EQUIPADOS. O item vive NO POKÉMON (p.item), não na batalha: quem equipa escolhe em QUEM,
+   na tela de ordem, e o efeito é só daquele bicho. Antes era um efeito da conta inteira -- um
+   Despertar de 10 minutos protegia o time todo -- e virou item equipado em 03/09/2026, a pedido.
+   Quem põe o campo nas instâncias é o equiparItens, chamado antes de cada batalha do mesmo jeito
+   que o applySpecialtyBuff. Quem SÓ o servidor escreve é a lista de equipados da conta; o p.item da
+   instância é uma cópia de trabalho.
    Ficam em variável de módulo pelo mesmo motivo do explosaoDoAtivo: as funções do motor são
    compartilhadas e enfiar mais um parâmetro em todas seria pior que um estado zerado no começo de
    cada batalha. */
-let sonoBloqueado = false;      // Despertar ativo: sono do ADVERSÁRIO não pega no time do jogador
-let pocaoArmada = null;         // { id, cura } -- a primeira vitória de confronto com pouco HP dispara
-let pocaoJaUsada = false;       // uma por batalha: o item é um só
+/* Quanto cada poção cura, em fração do HP máximo. Vive aqui porque é o motor que aplica. */
+const CURA_DA_POCAO = { potion: 0.55, hyperpotion: 0.80 };
+/* O QUE FOI GASTO nesta batalha: [{ dono:'p'|'e', especie, item }]. Quem chamou a batalha usa isso
+   pra tirar o item da conta -- o motor não fala com o banco. */
+let itensGastos = [];
+/* Quem chamou a batalha lê isto pra tirar da conta o que foi gasto. É função e não a variável
+   direto porque ela é REATRIBUÍDA a cada batalha (itensGastos = []), e quem tivesse guardado a
+   lista antiga ficaria olhando pra uma batalha que já acabou. */
+function itensGastosDaBatalha(){ return itensGastos; }
+/* Põe o item equipado em cada instância do time. equipados é o mapa da conta (espécie -> item),
+   montado por quem chama a partir do que o servidor gravou. O parametro equipados e um mapa
+   especie -> item. Fica junto do applySpecialtyBuff nas
+   chamadas de batalha de propósito: são a mesma coisa -- estado da conta virando flag na instância. */
+function equiparItens(team, equipados){
+  if(!team) return;
+  team.forEach(p => { if(p) p.item = (equipados && equipados[p.speciesId]) || null; });
+}
 /* Abaixo disso (25%) a poção dispara. É "sobrou raspando", não "levou um arranhão". */
 const POCAO_GATILHO_HP = 0.25;
 function tentarGolpeEspecial(active, enemy, rng, diario){
@@ -964,7 +982,14 @@ function tentarGolpeEspecial(active, enemy, rng, diario){
        desliga o golpe do jogo -- os pokémon do jogador continuam podendo dormir o adversário.
        A chance do adversário É CONSUMIDA: ele tentou e falhou, e é isso que a linha do log conta.
        Sem essa linha o jogador não teria como saber que as 50 moedas trabalharam. */
-    if(!ehAtivo && sonoBloqueado){
+    if(alvo.item === 'awakening'){
+      /* O DESPERTAR É DO ALVO: ele segura o sono que viria em cima DELE, venha de quem vier. Não
+         importa de que lado o alvo está -- um Despertar equipado num pokémon do jogador segura a
+         Jynx adversária, e é isso que foi pedido.
+         O item é GASTO aqui: ele serviu. E vira linha no log, senão o jogador não teria como saber
+         que ele trabalhou -- o erro da especialidade de novo. */
+      alvo.item = null;
+      itensGastos.push({ dono: marca === 'p' ? 'e' : 'p', especie: alvo.speciesId, item: 'awakening' });
       if(diario){
         diario.push({ q: marca, d: 0, hp: alvo.hp, c:0, m:0, z:0, x:'semSono', g: especial.golpe });
       }
@@ -1058,12 +1083,9 @@ function doExchange(active, enemy, rng, diario){
 function simulateGymBattle(team, enemyTeam, rng, opts){
   team.forEach(p=>{ p.maxHp=calcMaxHp(p); p.hp=p.maxHp; });
   explosaoDoAtivo = null;   // o marcador da autodestruição é por BATALHA (ver tentarGolpeEspecial)
-  /* Os itens da mochila valem por BATALHA e são zerados aqui -- se ficassem de uma pra outra, um
-     Despertar de 10 minutos viraria permanente na primeira batalha que o ligasse. */
-  const itens = (opts && opts.itens) || {};
-  sonoBloqueado = !!itens.semSono;
-  pocaoArmada = itens.pocao || null;
-  pocaoJaUsada = false;
+  /* A LISTA DO QUE FOI GASTO zera a cada batalha: ela é o recado pra quem chamou tirar o item da
+     conta, e um recado de uma batalha anterior faria gastar item que ninguém usou. */
+  itensGastos = [];
   enemyTeam.forEach(p=>{ p.maxHp=calcMaxHp(p); p.hp=p.maxHp; });
 
   const matchups = [];
@@ -1094,12 +1116,14 @@ function simulateGymBattle(team, enemyTeam, rng, opts){
          normal. Nunca os dois.
          O playerHpBefore já foi lido lá em cima, então a barra começa no valor machucado e SOBE --
          é o que faz a cura aparecer na tela em vez de a vida surgir do nada. */
-      if(pocaoArmada && !pocaoJaUsada && active.hp > 0 && active.hp <= active.maxHp * POCAO_GATILHO_HP){
-        const curado = Math.min(active.maxHp - active.hp, Math.round(active.maxHp * pocaoArmada.cura));
+      if(active.item && CURA_DA_POCAO[active.item] && active.hp > 0 && active.hp <= active.maxHp * POCAO_GATILHO_HP){
+        const item = active.item;
+        const curado = Math.min(active.maxHp - active.hp, Math.round(active.maxHp * CURA_DA_POCAO[item]));
         if(curado > 0){
           active.hp += curado;
-          pocaoJaUsada = true;
-          diario.push({ q:'p', d: curado, hp: active.hp, c:0, m:0, z:0, x:'pocao', g: pocaoArmada.id });
+          active.item = null;   // gasta: o item é um só
+          itensGastos.push({ dono:'p', especie: active.speciesId, item });
+          diario.push({ q:'p', d: curado, hp: active.hp, c:0, m:0, z:0, x:'pocao', g: item });
         }
       }
       while(active.hp>0 && enemy.hp>0){ doExchange(active, enemy, rng, diario); }
@@ -1503,10 +1527,17 @@ function resolveLeagueMatch(match, seedStr, allowedTerrainIds){
   // e o cron que resolve rodadas não precisa ler o perfil de todo mundo a cada partida
   applySpecialtyBuff(teamA, match.a && match.a.specialties);
   applySpecialtyBuff(teamB, match.b && match.b.specialties);
-  /* Os itens viajam no match, como a especialidade -- e só o lado A tem: no ginásio da cidade A é o
-     DESAFIANTE, que é quem está jogando agora. O líder está dormindo do outro lado do mundo. Nas
-     ligas ninguém manda itens, então isto fica vazio. */
-  const result = simulateGymBattle(teamA, teamB, rng, { itens: (match.a && match.a.itens) || {} });
+  /* OS ITENS EQUIPADOS VIAJAM NO MATCH, como a especialidade -- e na prática só o lado A tem: este
+     resolvedor é compartilhado pelas ligas e pelo ginásio da cidade, e lá o A é o DESAFIANTE, que é
+     quem está jogando agora. O líder está dormindo do outro lado do mundo e não entra com item.
+     AS LIGAS NÃO MANDAM NENHUM, de propósito: elas são resolvidas longe de quem jogou, às vezes
+     horas depois da inscrição, e um item equipado agora não pode decidir uma partida sorteada
+     ontem -- pior, ele sumiria da mochila sem a pessoa ver a luta. Passam pelo equiparItens do
+     mesmo jeito, com a lista vazia: toda batalha do jogo passa por ele, e exceção em lista é onde a
+     próxima omissão se esconde (foi assim que a raide do Mew ficou sem a especialidade). */
+  equiparItens(teamA, (match.a && match.a.equipados) || null);
+  equiparItens(teamB, (match.b && match.b.equipados) || null);
+  const result = simulateGymBattle(teamA, teamB, rng);
   // diferente dos ginásios, os níveis ficam CONGELADOS na Liga -- depois da 8ª insígnia, o time do
   // treinador não sobe mais de nível, então nem precisa re-codificar/sincronizar nada aqui
   match.matchups = result.matchups; // mantém o log completo, pro botão "Assistir batalha" funcionar mesmo quando quem resolve é a Cloud Function
@@ -2151,10 +2182,12 @@ function resolveTrainersLeagueMatch(match, seedStr){
   }
   applySpecialtyBuff(teamA, match.a && match.a.specialties); // idem: snapshot, ver resolveLeagueMatch
   applySpecialtyBuff(teamB, match.b && match.b.specialties);
-  /* Passa o campo `itens` como o outro resolvedor, ainda que a Trainers League nunca mande nenhum: com
-     TODA chamada de batalha passando o campo, o teste que lê o código pode exigir isso sem exceção
-     -- e exceção em lista é onde a próxima omissão se esconde. */
-  const result = simulateGymBattle(teamA, teamB, rng, { itens: (match.a && match.a.itens) || {} });
+  /* Passa pelo equiparItens como o outro resolvedor, ainda que a Trainers League nunca mande item
+     nenhum (ver o porquê lá): com TODA chamada de batalha passando por ele, o teste que lê o código
+     pode exigir isso sem exceção -- e exceção em lista é onde a próxima omissão se esconde. */
+  equiparItens(teamA, (match.a && match.a.equipados) || null);
+  equiparItens(teamB, (match.b && match.b.equipados) || null);
+  const result = simulateGymBattle(teamA, teamB, rng);
   match.matchups = result.matchups;
   match.winner = result.win ? match.a : match.b;
   match.resolved = true;
@@ -2939,7 +2972,8 @@ exports.challengeNeighborhoodGym = onCall(async (request) => {
   // quando ele assumiu) -- ver leaderSpecialties abaixo
   const challengerUserSnap = await db.collection('users').doc(uid).get();
   const challengerSpecialties = (challengerUserSnap.exists && challengerUserSnap.data().specialties) || [];
-  const challengerItens = itensAtivosDaConta(challengerUserSnap.exists ? challengerUserSnap.data() : null);
+  const challengerEquipados = equipadosDaConta(challengerUserSnap.exists ? challengerUserSnap.data() : null);
+  let gastosDoDesafio = [];   // preenchido dentro da transacao, gasto depois dela
   // se o jogador escolheu uma ORDEM diferente antes de desafiar, só aceita se o CONJUNTO de pokémon
   // bater com o time que ele realmente possui (mesmo padrão anti-forja da Trainers League) -- a ordem
   // escolhida é respeitada, mas não dá pra mandar um time que ele nunca teve
@@ -2975,12 +3009,17 @@ exports.challengeNeighborhoodGym = onCall(async (request) => {
     }
     const terrain = TERRAINS.find(t=>t.id===gymData.leaderTerrain) || null;
     const match = {
-      a: { uid, name: challengerName, code: challengerCode, specialties: challengerSpecialties },
+      /* Os itens equipados do DESAFIANTE viajam aqui, como a especialidade: quem esta jogando
+         agora e ele. O LIDER esta dormindo do outro lado do mundo e nao entra com item. */
+      a: { uid, name: challengerName, code: challengerCode, specialties: challengerSpecialties, equipados: challengerEquipados },
       b: { uid: gymData.leaderUid, name: gymData.leaderName, code: gymData.leaderTeamCode, specialties: gymData.leaderSpecialties || [] },
       winner:null, matchups:null, resolved:false, terrain // terreno do líder = vantagem de mandante
     };
     resolveLeagueMatch(match, `cidade-${city}-${uid}-${Date.now()}`, null);
     const challengerWon = match.winner === match.a;
+    /* O que o motor gastou sai da conta. Fica pra depois da transacao (linha marcada abaixo):
+       escrita de outro documento no meio dela seria leitura-depois-de-escrita. */
+    gastosDoDesafio = itensGastosDaBatalha().slice();
 
     const logId = `${Date.now()}_${uid}`;
     tx.set(gymRef.collection('challengeLogs').doc(logId), {
@@ -3049,6 +3088,9 @@ exports.challengeNeighborhoodGym = onCall(async (request) => {
       { city, countryCode: countryCode||null, days: d.days, wins: d.wins, defeatedBy: challengerName }
     );
   }
+  /* O item que trabalhou sai da conta. Depois da transacao de proposito: escrever outro
+     documento dentro dela seria leitura-depois-de-escrita, que o Firestore recusa inteira. */
+  await gastarItensEquipados(uid, gastosDoDesafio);
   return result;
   } finally {
     // libera SEMPRE, sucesso ou erro -- senão o próximo desafiante ficaria esperando até o timeout
@@ -4263,13 +4305,12 @@ exports.fightTrainerTowerFloor = onCall(async (request) => {
 
   /* OS ITENS DA MOCHILA valem aqui como valem na jornada. O mesmo userSnap que já foi lido pra
      especialidade serve -- não custa leitura nova. */
-  const itensDaConta = itensAtivosDaConta(userSnap.exists ? userSnap.data() : null);
-  const resultado = simulateGymBattle(meuTime, timeNpc, Math.random, { itens: itensDaConta });
+  const equipadosDaConta_ = equipadosDaConta(userSnap.exists ? userSnap.data() : null);
+  equiparItens(meuTime, equipadosDaConta_);
+  const resultado = simulateGymBattle(meuTime, timeNpc, Math.random);
   /* A poção é UMA: se disparou, sai da conta agora. Aqui quem limpa é a própria batalha, sem
      depender de o cliente avisar. */
-  if(pocaoDisparou(resultado)){
-    await db.collection('users').doc(uid).set({ pocaoArmada: null }, { merge: true });
-  }
+  await gastarItensEquipados(uid, itensGastosDaBatalha());
   const venceu = !!resultado.win;
 
   let novo;
@@ -4486,29 +4527,33 @@ async function atualizarInscricoesComTime(uid, slot, team){
    Até aqui a mochila era uma LEITURA do que a conta já tinha (o contador de doces e os cupons de
    bônus shiny). Item comprável precisa de armazém de verdade, e ele tem que ser do SERVIDOR pelo
    mesmo motivo das moedas: uma linha no console viraria Despertar infinito.
-   `inventario` é um mapa item -> quantos, no documento da conta, e está na trava do firestore.rules
-   junto de `moedas`, `awakeningUntil` e `pocaoArmada`. */
+   `inventario` é um mapa item -> quantos e `equipados` é um mapa espécie -> item; os dois estão na
+   trava do firestore.rules junto de `moedas`. */
 const LOJA = {
   awakening:   { preco: 50 },
   hyperpotion: { preco: 30 },
   potion:      { preco: 15 }
 };
-const AWAKENING_MS = 10 * 60 * 1000;          // 10 minutos, tempo de relógio
-const POCAO_CURA = { potion: 0.55, hyperpotion: 0.80 };
+/* Quais itens se equipam num pokémon. Os outros dois do catálogo (Doce Raro, Bônus Shiny) não são
+   de batalha -- vêm de jogar e se usam na mochila. */
+const EQUIPAVEIS = ['awakening', 'hyperpotion', 'potion'];
 
-/* O QUE ESTÁ VALENDO AGORA, lido do documento da conta. Devolve exatamente o `opts.itens` que o
-   simulateGymBattle espera -- assim quem chama não precisa saber como o efeito é guardado. */
-function itensAtivosDaConta(d){
-  const out = {};
-  if(d && d.awakeningUntil && Date.now() < d.awakeningUntil) out.semSono = true;
-  const armada = d && d.pocaoArmada;
-  if(armada && POCAO_CURA[armada]) out.pocao = { id: armada, cura: POCAO_CURA[armada] };
-  return out;
-}
-/* A poção é UMA: some assim que dispara. Quem sabe que ela disparou é o diário do confronto -- o
-   motor grava um passo `x:'pocao'` --, então não é preciso inventar outro canal. */
-function pocaoDisparou(resultado){
-  return ((resultado && resultado.matchups) || []).some(m => ((m.golpes)||[]).some(g => g.x === 'pocao'));
+/* O QUE CADA POKÉMON DA CONTA ESTÁ CARREGANDO. É um mapa espécie -> item, e a chave é a ESPÉCIE
+   porque um save não tem duas da mesma (o encontro selvagem nunca oferece uma linha que o time já
+   tem, e o montador recusa repetida). O id da instância NÃO serve: ele vem de um contador que
+   recomeça do 1 a cada carregamento de página, e dois saves têm `mon7` cada um -- foi assim que um
+   jogador viu oito pokémon marcados por causa de seis. */
+function equipadosDaConta(d){ return (d && d.equipados) || {}; }
+
+/* TIRA DA CONTA o que o motor gastou na batalha. O motor não fala com o banco: ele anota em
+   `itensGastos` quem usou o quê, e quem chamou a batalha limpa. Só o lado do JOGADOR ('p'): o item
+   do adversário, quando existir, é problema do dono dele. */
+async function gastarItensEquipados(uid, gastos){
+  const meus = (gastos || []).filter(g => g && g.dono === 'p' && g.especie);
+  if(!meus.length) return;
+  const patch = {};
+  meus.forEach(g => { patch['equipados.' + g.especie] = admin.firestore.FieldValue.delete(); });
+  await db.collection('users').doc(uid).update(patch).catch(e => logger.error('Erro ao gastar item equipado:', e));
 }
 
 exports.buyItem = onCall(async (request) => {
@@ -4538,48 +4583,81 @@ exports.buyItem = onCall(async (request) => {
   });
 });
 
-exports.useItem = onCall(async (request) => {
+/* EQUIPAR: tira um do armazém e põe no pokémon. A conta guarda espécie -> item, e é ela que as
+   batalhas leem -- o save também carrega uma cópia pra desenhar a tela, mas ela não decide nada.
+   Tem que ser o servidor porque o save é escrito pelo cliente: se a batalha lesse o save, dar item
+   a todo mundo seria uma linha no console. */
+exports.equipItem = onCall(async (request) => {
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   const uid = request.auth.uid;
   const item = String(request.data?.item ?? '');
-  if(!LOJA[item]) throw new HttpsError('invalid-argument', 'Item desconhecido.');
+  const especie = String(request.data?.speciesId ?? '');
+  if(EQUIPAVEIS.indexOf(item) < 0) throw new HttpsError('invalid-argument', 'Esse item não se equipa.');
+  if(!especie) throw new HttpsError('invalid-argument', 'Pokémon não informado.');
   const userRef = db.collection('users').doc(uid);
+  /* Transação porque duas abas podem equipar ao mesmo tempo: sem ela as duas leem o mesmo estoque e
+     as duas passam -- dois pokémon equipados com um item só. */
   return db.runTransaction(async (tx) => {
     const [snap] = await tx.getAll(userRef);
     const d = snap.exists ? (snap.data() || {}) : {};
     const quantos = (d.inventario && d.inventario[item]) || 0;
     if(quantos <= 0) throw new HttpsError('failed-precondition', 'Você não tem esse item.');
-    /* UMA POÇÃO ARMADA POR VEZ. Armar a segunda por cima da primeira gastaria as duas e entregaria
-       uma -- e o jogador não teria como saber que perdeu. */
-    if(POCAO_CURA[item] && d.pocaoArmada){
-      throw new HttpsError('failed-precondition', 'Você já tem uma poção esperando — ela vale na próxima batalha.');
-    }
-    const patch = { inventario: { [item]: admin.firestore.FieldValue.increment(-1) } };
-    let ate = 0;
-    if(item === 'awakening'){
-      /* O tempo corre a partir de AGORA e vale em qualquer save e em qualquer modo -- o campo é da
-         conta, não do save. Usar de novo com um ainda valendo estende a partir de agora, que é o
-         que a pessoa espera de um cronômetro. */
-      ate = Date.now() + AWAKENING_MS;
-      patch.awakeningUntil = ate;
-    } else {
-      patch.pocaoArmada = item;
-    }
+    const equipados = Object.assign({}, d.equipados || {});
+    /* UM ITEM POR POKÉMON. Trocar o que ele já carregava DEVOLVE o antigo pro armazém: perder um
+       item porque se clicou no botão errado seria pior que a troca não acontecer. */
+    const antigo = equipados[especie] || null;
+    const patch = { inventario: { [item]: admin.firestore.FieldValue.increment(-1) },
+                    equipados: { [especie]: item } };
+    if(antigo) patch.inventario[antigo] = admin.firestore.FieldValue.increment(1);
     tx.set(userRef, patch, { merge: true });
     const inv = Object.assign({}, d.inventario || {});
     inv[item] = quantos - 1;
-    return { inventario: inv, awakeningUntil: ate || (d.awakeningUntil || 0),
-             pocaoArmada: POCAO_CURA[item] ? item : (d.pocaoArmada || null) };
+    if(antigo) inv[antigo] = (inv[antigo] || 0) + 1;
+    equipados[especie] = item;
+    return { inventario: inv, equipados, devolvido: antigo };
   });
 });
 
-/* A POÇÃO DISPAROU NUMA BATALHA DO CLIENTE (a jornada roda lá). O servidor não viu a luta, então
-   quem avisa é o cliente -- e o pior caso de a chamada se perder é o jogador GANHAR a poção de
-   volta, que é o lado certo pra errar. Nas batalhas do servidor (Torre, ginásio da cidade, raide)
-   quem limpa é a própria função da batalha, sem depender de ninguém. */
-exports.consumePotion = onCall(async (request) => {
+/* DESEQUIPAR devolve pro armazém. O item só se perde quando ele TRABALHA. */
+exports.unequipItem = onCall(async (request) => {
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
-  await db.collection('users').doc(request.auth.uid).set({ pocaoArmada: null }, { merge: true });
+  const uid = request.auth.uid;
+  const especie = String(request.data?.speciesId ?? '');
+  if(!especie) throw new HttpsError('invalid-argument', 'Pokémon não informado.');
+  const userRef = db.collection('users').doc(uid);
+  return db.runTransaction(async (tx) => {
+    const [snap] = await tx.getAll(userRef);
+    const d = snap.exists ? (snap.data() || {}) : {};
+    const equipados = Object.assign({}, d.equipados || {});
+    const item = equipados[especie];
+    if(!item) throw new HttpsError('failed-precondition', 'Esse pokémon não está com item nenhum.');
+    tx.update(userRef, { ['equipados.' + especie]: admin.firestore.FieldValue.delete(),
+                         ['inventario.' + item]: admin.firestore.FieldValue.increment(1) });
+    const inv = Object.assign({}, d.inventario || {});
+    inv[item] = (inv[item] || 0) + 1;
+    delete equipados[especie];
+    return { inventario: inv, equipados };
+  });
+});
+
+/* O ITEM TRABALHOU NUMA BATALHA DO CLIENTE (a jornada e os desafios rodam lá). O servidor não viu a
+   luta, então quem avisa é o cliente -- e o pior caso de a chamada se perder é o jogador FICAR com
+   o item equipado, que é o lado certo pra errar. Nas batalhas do servidor (Torre, ginásio da
+   cidade, raide) quem limpa é a própria função da batalha, sem depender de ninguém.
+   Só aceita tirar item que a conta REALMENTE tinha equipado naquela espécie: o cliente diz o que
+   gastou, mas não escolhe o que some. */
+exports.consumeEquipped = onCall(async (request) => {
+  if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
+  const uid = request.auth.uid;
+  const especies = Array.isArray(request.data?.especies) ? request.data.especies.map(String).slice(0, 12) : [];
+  if(!especies.length) return { ok: true };
+  const userRef = db.collection('users').doc(uid);
+  const snap = await userRef.get();
+  const equipados = (snap.exists && snap.data().equipados) || {};
+  const patch = {};
+  especies.forEach(e => { if(equipados[e]) patch['equipados.' + e] = admin.firestore.FieldValue.delete(); });
+  if(!Object.keys(patch).length) return { ok: true };
+  await userRef.update(patch);
   return { ok: true };
 });
 
@@ -6241,13 +6319,8 @@ async function bossGetEstado(){
    do laco e o mesmo -- inclusive o doExchange, que e quem escreve o diario do log. */
 function simulateBossFight(team, boss, opts){
   team.forEach(p => { p.maxHp = calcMaxHp(p); p.hp = p.maxHp; });
-  /* Mesmo estado de itens do simulateGymBattle -- zerado por batalha. A raide so usa o Despertar
-     (ver o comentario em fightSundayBoss), mas zerar os tres aqui e o que impede um Despertar de
-     uma batalha anterior vazar pra ca. */
-  const itensDaRaide = (opts && opts.itens) || {};
-  sonoBloqueado = !!itensDaRaide.semSono;
-  pocaoArmada = null;
-  pocaoJaUsada = false;
+  /* Mesma lista do simulateGymBattle, zerada por batalha. */
+  itensGastos = [];
   const matchups = [];
   let playerStreak = 0, enemyStreak = 0;
   const hpInicialDoBoss = boss.hp;
@@ -6359,10 +6432,15 @@ exports.fightSundayBoss = onCall(async (request) => {
   /* O Despertar vale aqui também -- o Mew dorme como qualquer um. A poção NÃO: a raide é um
      ataque só, sem confronto seguinte pra o pokémon curado aproveitar, e gastar o item nisso seria
      jogá-lo fora sem o jogador entender por quê. */
-  const itensDaConta = itensAtivosDaConta(conta);
+  const equipadosDaRaide = equipadosDaConta(conta);
   const antes = estado.hp;
   const boss = bossInstance(antes);
-  const luta = simulateBossFight(time, boss, { itens: { semSono: !!itensDaConta.semSono } });
+  equiparItens(time, equipadosDaRaide);
+  const luta = simulateBossFight(time, boss);
+  /* O que o Despertar segurou sai da conta. A raide nao usa pocao -- ela e um ataque so, sem
+     confronto seguinte pra o curado aproveitar --, mas gastar pelo que o motor ANOTOU vale pros
+     dois: se um dia a pocao entrar aqui, nao ha nada pra lembrar de mudar. */
+  const gastosDaRaide = itensGastosDaBatalha().slice();
 
   /* O dano foi calculado sobre o HP que a leitura viu. Se outro jogador bateu no meio do caminho,
      o que vale é o dano -- ele é descontado do HP atual, não do que foi lido. */
@@ -6396,6 +6474,7 @@ exports.fightSundayBoss = onCall(async (request) => {
              meuDano: (meu.dano||0) + aplicado, meusAtaques: (meu.batalhas||0) + 1 };
   });
 
+  await gastarItensEquipados(uid, gastosDaRaide);
   await bossAtualizarRanking();   // o top 10 fica pronto pra tela ler numa leitura so
   if(resultado.derrubou) await bossPremiarTop10(uid);
   return { matchups: luta.matchups, win: luta.derrubou,
