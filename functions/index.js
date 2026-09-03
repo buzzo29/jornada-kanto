@@ -2151,7 +2151,10 @@ function resolveTrainersLeagueMatch(match, seedStr){
   }
   applySpecialtyBuff(teamA, match.a && match.a.specialties); // idem: snapshot, ver resolveLeagueMatch
   applySpecialtyBuff(teamB, match.b && match.b.specialties);
-  const result = simulateGymBattle(teamA, teamB, rng);
+  /* Passa o campo `itens` como o outro resolvedor, ainda que a Trainers League nunca mande nenhum: com
+     TODA chamada de batalha passando o campo, o teste que lê o código pode exigir isso sem exceção
+     -- e exceção em lista é onde a próxima omissão se esconde. */
+  const result = simulateGymBattle(teamA, teamB, rng, { itens: (match.a && match.a.itens) || {} });
   match.matchups = result.matchups;
   match.winner = result.win ? match.a : match.b;
   match.resolved = true;

@@ -623,6 +623,25 @@ console.log('\nO BUFF DE ESPECIALIDADE ENTRA EM TODA BATALHA');
     });
   }
   ok('toda batalha simulada aplica a especialidade', semBuff.length === 0, semBuff.join('  |  '));
+
+  /* E O MESMO VALE PROS ITENS DA MOCHILA, pela mesma razao e pelo mesmo defeito: quando eles
+     entraram, um dos DOIS caminhos de batalha do cliente ficou de fora -- o do rival/Rocket/Elite
+     recebeu e o do LIDER DE GINASIO, que e A batalha da jornada, nao. O jogador usou a pocao, foi
+     lutar e nao aconteceu nada. Reportado em 03/09/2026, horas depois de a loja subir.
+     A regra aqui e SEM EXCECAO: toda chamada passa o campo, ate a Trainers League, que nunca manda
+     item nenhum. Excecao em lista e onde a proxima omissao se esconde. */
+  const semItens = [];
+  for(const [nome, texto] of arquivos){
+    const linhas = texto.split(String.fromCharCode(10));
+    linhas.forEach((l, i) => {
+      if(!/(simulateGymBattle|simulateBossFight)\s*\(/.test(l)) return;
+      if(/^\s*(function|exports\.)/.test(l)) return;
+      /* A chamada pode quebrar em duas linhas -- olha ela e a seguinte. */
+      const chamada = l + String.fromCharCode(10) + (linhas[i+1] || "");
+      if(!/itens\s*:/.test(chamada)) semItens.push(nome + ":" + (i+1) + "  " + l.trim().slice(0, 60));
+    });
+  }
+  ok('e toda batalha simulada recebe os itens da mochila', semItens.length === 0, semItens.join('  |  '));
 })();
 /* E o valor: 5%, abaixo do terreno (1,15) e do shiny (1,20) de proposito -- a especialidade cobre
    um TIPO inteiro do time, nao um pokemon. */

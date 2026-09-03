@@ -7225,7 +7225,20 @@ function runBattle(){
     applyTerrainBuff(gymTeam, game.gymTerrain);
   }
   applySpecialtyBuff(game.team);
-  const result = simulateGymBattle(game.team, gymTeam);
+  /* OS ITENS DA MOCHILA VALEM AQUI TAMBÉM -- e esta é A batalha da jornada, a do líder de ginásio.
+     Ficou de fora quando os itens entraram: o outro caminho (rival, Rocket, Elite) recebeu e este
+     não, e o jogador usou a poção, foi lutar e não aconteceu nada. Mesma omissão que a raide do Mew
+     teve com a especialidade. Hoje o teste LÊ O CÓDIGO e falha se alguma chamada de batalha não
+     tiver o campo `itens` por perto. */
+  const result = simulateGymBattle(game.team, gymTeam, undefined, { itens: itensAtivos() });
+  /* A poção é UMA: se disparou, sai da conta (ver o mesmo trecho no runBattle). */
+  if((result.matchups || []).some(m => ((m.golpes)||[]).some(g => g.x === 'pocao'))){
+    game.pocaoArmada = null;
+    if(game.authUser){
+      functionsClient.httpsCallable('consumePotion')({})
+        .catch(e => console.error('Erro ao consumir a poção:', e));
+    }
+  }
   updateStreakRecord(result);
   preloadBattleSprites(result.matchups);
   game.battleResult = result;
@@ -7546,7 +7559,8 @@ function runTrainerBattle(opponentTeam){
     return inst;
   });
   applySpecialtyBuff(myTeamClone);
-  const result = simulateGymBattle(myTeamClone, opponentTeam);
+  const result = simulateGymBattle(myTeamClone, opponentTeam, undefined, { itens: itensAtivos() });
+  gastarPocaoSeDisparou(result);
   updateStreakRecord(result);
   preloadBattleSprites(result.matchups);
   game.trainerBattleResult = result;
@@ -7949,7 +7963,11 @@ function resolveTrainersLeagueMatch(match, seedStr){
   // mesma regra do servidor: especialidade vem CONGELADA no registro do jogador, não lida agora
   applySpecialtyBuff(teamA, (match.a && match.a.specialties) || []);
   applySpecialtyBuff(teamB, (match.b && match.b.specialties) || []);
-  const result = simulateGymBattle(teamA, teamB, rng);
+  /* A liga NÃO usa item: ela é resolvida longe de quem jogou (ver a seção dos itens no CLAUDE.md).
+     O campo vai VAZIO de propósito -- com toda chamada de batalha do jogo passando por ele, o teste
+     que lê o código pode exigir isso sem exceção, e exceção em lista é onde a próxima omissão se
+     esconde. */
+  const result = simulateGymBattle(teamA, teamB, rng, { itens: (match.a && match.a.itens) || {} });
   match.matchups = result.matchups;
   match.winner = result.win ? match.a : match.b;
   match.resolved = true;
@@ -8636,7 +8654,11 @@ function resolveLeagueMatch(match, seedStr, allowedTerrainIds){
   applyTerrainBuff(teamB, terrain);
   applySpecialtyBuff(teamA, (match.a && match.a.specialties) || []); // idem: snapshot da inscrição
   applySpecialtyBuff(teamB, (match.b && match.b.specialties) || []);
-  const result = simulateGymBattle(teamA, teamB, rng);
+  /* A liga NÃO usa item: ela é resolvida longe de quem jogou (ver a seção dos itens no CLAUDE.md).
+     O campo vai VAZIO de propósito -- com toda chamada de batalha do jogo passando por ele, o teste
+     que lê o código pode exigir isso sem exceção, e exceção em lista é onde a próxima omissão se
+     esconde. */
+  const result = simulateGymBattle(teamA, teamB, rng, { itens: (match.a && match.a.itens) || {} });
   // diferente dos ginásios, os níveis ficam CONGELADOS na Liga -- depois da 8ª insígnia, o time do
   // treinador não sobe mais de nível, então nem precisa re-codificar/sincronizar nada aqui
   match.matchups = result.matchups;
@@ -16225,6 +16247,20 @@ function pilhasDoInventario(){
   });
   return pilhas;
 }
+/* A POÇÃO É UMA: se disparou nesta batalha, sai da conta. Quem viu a luta foi o CLIENTE (a jornada
+   e os desafios rodam aqui), então é ele que avisa -- e o pior caso de a chamada se perder é o
+   jogador FICAR com a poção, que é o lado certo pra errar. Nas batalhas do servidor (Torre, ginásio
+   da cidade, raide) quem limpa é a própria função de lá.
+   É função e não código repetido porque são CINCO caminhos de batalha no cliente -- duas cópias
+   divergem no primeiro ajuste, e foi o que já aconteceu com o objeto da batalha online. */
+function gastarPocaoSeDisparou(result){
+  if(!((result && result.matchups) || []).some(m => ((m.golpes)||[]).some(g => g.x === 'pocao'))) return;
+  game.pocaoArmada = null;
+  if(game.authUser){
+    functionsClient.httpsCallable('consumePotion')({})
+      .catch(e => console.error('Erro ao consumir a poção:', e));
+  }
+}
 /* O que está VALENDO agora, pra tela e pras batalhas do cliente. Mesma conta do servidor
    (itensAtivosDaConta) -- se as duas divergirem, a jornada aplica um item que o ginásio não aplica. */
 function itensAtivos(){
@@ -19011,7 +19047,8 @@ async function startMewtwoBattle(slot){
   const mewtwoTeam = [createInstance('mewtwo', 99)];
   mewtwoTeam[0].shiny = mewtwoIsShiny; // só afeta a exibição NESSA luta -- o servidor decide, a partir do mesmo sorteio, se o Mewtwo que entra no time depois vem shiny
   applySpecialtyBuff(team);
-  const result = simulateGymBattle(team, mewtwoTeam);
+  const result = simulateGymBattle(team, mewtwoTeam, undefined, { itens: itensAtivos() });
+  gastarPocaoSeDisparou(result);
   if(result.win && game.authUser){
     try{
       const ref = saveDocRef(game.authUser.uid, slot);
