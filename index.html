@@ -13241,9 +13241,28 @@ function sequenciaDoConfronto(m){
      Trazer o golpe de quem USOU o sono pra frente resolve sem mexer em número nenhum: a soma dos
      golpes é a mesma, só a ordem muda -- e a ordem passa a contar a história certa. */
   const sono = reais.find(g => g.x === 'sono') || null;
-  if(sono && reconstruida.length > 1 && reconstruida[0].q !== sono.q){
-    const i = reconstruida.findIndex(g => g.q === sono.q);
-    if(i > 0) reconstruida.unshift(reconstruida.splice(i, 1)[0]);
+  if(sono){
+    /* QUANTOS GOLPES SEGUIDOS quem usou o sono deu antes do primeiro do adormecido -- lido do
+       DIÁRIO, não do SONO_EM_TROCAS. Os dois números não são iguais: o sono compra 2 trocas, mas
+       se quem usou for o mais RÁPIDO ele ainda bate primeiro na troca em que o outro acorda, e aí
+       são 3 golpes seguidos. Ler do diário acerta os dois casos e continua certo se a duração do
+       sono mudar. */
+    const danoReal = reais.filter(g => !g.x || g.x === 'boom' || g.x === 'boomself');
+    const iReal = danoReal.findIndex(g => g.q !== sono.q);
+    const livres = iReal < 0 ? danoReal.length : iReal;
+    /* TRAZ ESSES GOLPES PRA FRENTE, e não só o primeiro. Trazendo um, o log dizia "fez dormir",
+       mostrava UM golpe de quem dormiu o outro e em seguida DOIS do adormecido -- lido de fora,
+       parecia que quem dormiu tinha atacado mais vezes que quem estava acordado. Reportado em
+       03/09/2026 com um Poliwrath que dormiu a Vileplume e apanhou duas vezes seguidas; medido
+       depois: acontecia em 99,6% dos confrontos com sono.
+       Não mexe em número nenhum -- cada golpe leva o próprio dano e o próprio dono, então a soma
+       de cada lado é a mesma. Só a ordem muda, e passa a contar a história certa. */
+    for(let k = 0; k < livres && k < reconstruida.length; k++){
+      if(reconstruida[k].q === sono.q) continue;
+      const i = reconstruida.findIndex((g, idx) => idx > k && g.q === sono.q);
+      if(i < 0) break;   // não há mais golpe dele pra trazer: mostra o que dá
+      reconstruida.splice(k, 0, reconstruida.splice(i, 1)[0]);
+    }
   }
   return aberturas.length ? aberturas.concat(reconstruida) : reconstruida;
 }

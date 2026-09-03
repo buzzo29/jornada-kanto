@@ -116,6 +116,51 @@ ok('e o log diz qual golpe foi', diario.some(g => g.x === 'sono' && g.g === 'Can
   ok('e quem dormiu NAO ataca logo depois de dormir', seq[1] && seq[1].q === sono.q,
      seq.map(g=>(g.x||'golpe')+':'+g.q).join(' '));
 })();
+/* E NAO BASTA UM GOLPE NA FRENTE -- essa era a versao anterior, e ela deixava passar o defeito que
+   foi reportado em 03/09/2026: um Poliwrath dormiu a Vileplume, o log mostrou UM golpe dele e em
+   seguida DOIS dela. Lido de fora, parecia que quem estava dormindo tinha atacado mais vezes que
+   quem estava acordado.
+   O sono compra SONO_EM_TROCAS trocas livres -- e TRES golpes seguidos quando quem usou e o mais
+   rapido, porque ele ainda bate primeiro na troca em que o outro acorda. O log tem que mostrar
+   tantos golpes livres quantos a luta teve, limitado pelas vagas da reconstrucao (que sao 3).
+   Medido antes do conserto: 99,6% dos confrontos com sono mostravam menos do que a luta teve. */
+(function(){
+  const POOL = ['poliwrath','vileplume','gengar','snorlax','alakazam','jynx','butterfree','venusaur','arbok','paras'];
+  let casos = 0, contradiz = 0, duplos = 0, exemplo = null;
+  for(let i = 0; i < 20000; i++){
+    const a = POOL[i % POOL.length], b = POOL[(i*7+3) % POOL.length];
+    const r = S.simulateGymBattle([inst(a, 50 + (i%20))], [inst(b, 45 + (i%15))], Math.random);
+    for(const m of (r.matchups || [])){
+      const g = m.golpes || [];
+      const sonos = g.filter(x => x.x === 'sono');
+      if(!sonos.length) continue;
+      casos++;
+      /* SONO DUPLO existe: os dois se dormem, e ai NINGUEM tem troca livre -- os dois contadores
+         correm juntos. O log mostrando zero golpe livre esta certo nesses, e por isso o esperado
+         sai do DIARIO e nao de SONO_EM_TROCAS. */
+      if(sonos.length > 1) duplos++;
+      const sono = sonos[0];
+      const seq = S.sequenciaDoConfronto(m);
+      const dano = seq.filter(x => !x.x);
+      const iLog = dano.findIndex(x => x.q !== sono.q);
+      const livresLog = iLog < 0 ? dano.length : iLog;
+      const danoReal = g.filter(x => !x.x);
+      const iReal = danoReal.findIndex(x => x.q !== sono.q);
+      const livresReais = iReal < 0 ? danoReal.length : iReal;
+      const disponiveis = dano.filter(x => x.q === sono.q).length;
+      const ideal = Math.min(livresReais, disponiveis);
+      if(livresLog < ideal){
+        contradiz++;
+        if(!exemplo) exemplo = 'luta: ' + g.map(x=>(x.x?'['+x.x+']':'')+x.q).join(' ')
+          + '  |  log: ' + seq.map(x=>(x.x?'['+x.x+']':'')+x.q).join(' ');
+      }
+      break;
+    }
+  }
+  ok('achei confrontos com sono de sobra pra medir', casos > 500, casos + ' confrontos (' + duplos + ' com os dois dormindo)');
+  ok('o log mostra todos os golpes livres que cabem na reconstrucao', contradiz === 0,
+     contradiz + ' de ' + casos + (exemplo ? '   |  ' + exemplo : ''));
+})();
 /* Quem nao tem golpe especial nunca cai nesse caminho. */
 a = inst('pidgey'); b = inst('onix');
 let nenhum = 0;
