@@ -635,6 +635,21 @@ de golpes.
 - **`gymChoice` entrou no `SAFE_SAVE_SCREENS`.** Sem isso a tela "Qual ginásio vamos?" não era
   ponto seguro de gravação: a insígnia recém-ganha ficava pendente enquanto o jogador pensava, e
   fechar a aba ali perdia a vitória.
+- **A LUPA DA POKÉDEX está nas DUAS telas de escolha de evolução** (a bifurcação e a do Eevee),
+  além do encontro selvagem. É a mesma pergunta — "qual dos dois é melhor?" — e nas telas de
+  evolução ela pesa mais: ali **a escolha é definitiva**, e a resposta estava a duas telas de
+  distância (sair, abrir a Pokédex, achar a espécie, voltar).
+  A do Eevee entrou junto de propósito: as duas são a mesma decisão, e deixar só uma com o atalho
+  seria a inconsistência que este projeto costuma evitar.
+- **A lupa é IRMÃ do card, nunca filha** — `<button>` dentro de `<button>` é HTML inválido: o
+  navegador "conserta" fechando o de fora e o clique de dentro se perde, com a tela continuando a
+  PARECER certa. É a mesma armadilha do encontro selvagem, e `tools/test-jornada.js` tranca as duas
+  telas (conferido que ele falha com a lupa aninhada).
+  A moldura é a `.evo-linha`: mesma ideia da `.wild-linha`, com regra própria porque ali o card é o
+  `.wild-card` e aqui é um `.btn` comum.
+- **O preço, medido a 320px:** a folga de 46px da lupa custa **uma linha a mais em 2 das 5 opções**
+  da tela do Eevee ("Manter como Eevee" e "Evoluir para Flareon" passam de 2 pra 3 linhas). As
+  outras três já quebravam sem ela — os rótulos são frases, não nomes.
 - **Três evoluções agora perguntam pro jogador** (`EVOLUTION_CHOICES`, tela `evoChoice`): Gloom vira
   Vileplume **ou** Bellossom, Poliwhirl vira Poliwrath **ou** Politoed, Slowpoke vira Slowbro **ou**
   Slowking, e o **Tyrogue vira Hitmonlee, Hitmonchan OU Hitmontop** -- o único com TRÊS destinos.

@@ -1508,6 +1508,10 @@
     display:flex; align-items:center; justify-content:center;
   }
   .wild-dex:active{ transform:translate(2px,2px); box-shadow:1px 1px 0 var(--box-border); }
+  /* A escolha de evolução usa a MESMA lupa do encontro selvagem -- é a mesma pergunta, e ali a
+     escolha nem é definitiva. O card dela é um .btn comum, então a folga da direita vai aqui. */
+  .evo-linha{ position:relative; display:flex; flex-direction:column; }
+  .evo-linha > .btn{ padding-right:46px; }
   /* O MONTADOR DE TIME EM LISTA (Torre, Ginásio da Cidade -- ver montadorDeTimeHtml).
      Era uma grade de quadradinhos agrupada por save: dava pra ver o sprite e o nível, e mais nada.
      Com três saves cheios são 18 quadros iguais, e a pergunta que se faz aqui -- "quem eu ponho
@@ -6195,10 +6199,14 @@ function renderEvoChoice(){
   <div class="box">
     ${EVOLUTION_CHOICES[p.pendingEvoChoice].map(destino=>{
       const sp = SPECIES[destino];
-      return `<button class="btn" onclick="escolherEvolucao('${escJs(p.id)}','${escJs(destino)}')">
-        <span class="mon-name">${spriteHtml(destino,'sprite-sm',p.shiny)} ${sp.name}${caught.has(destino)?` <span class="pokedex-owned-badge">${pokedexIcon()}</span>`:''}</span>
-        <span class="mon-sub">${typesHtml(sp.types)}</span>
-      </button>`;
+      return `<div class="evo-linha">
+        <button class="btn" onclick="escolherEvolucao('${escJs(p.id)}','${escJs(destino)}')">
+          <span class="mon-name">${spriteHtml(destino,'sprite-sm',p.shiny)} ${sp.name}${caught.has(destino)?` <span class="pokedex-owned-badge">${pokedexIcon()}</span>`:''}</span>
+          <span class="mon-sub">${typesHtml(sp.types)}</span>
+        </button>
+        <button class="wild-dex" onclick="abrirPokedexFicha('${escJs(destino)}', ${p.shiny?'true':'false'})"
+          aria-label="Ver a ficha de ${escapeHtmlSafe(sp.name)}" title="Ver os atributos">🔍</button>
+      </div>`;
     }).join('')}
   </div>`;
 }
@@ -12567,10 +12575,14 @@ function renderEeveeChoice(){
     ${options.map(o=>{
       const realId = o.id==='keep' ? 'eevee' : o.id;
       const isCaught = caught.has(realId);
-      return `<button class="btn${o.horario?' eevee-horario':''}" onclick="chooseEeveeEvolution('${o.id}')">
-      <span class="mon-name">${spriteHtml(realId,'sprite-sm')} ${o.label} ${o.horario?(hora.id==='espeon'?'☀️':'🌙'):''} ${isCaught?`<span class="pokedex-owned-badge">${pokedexIcon()}</span>`:''}</span>
-      <span class="mon-sub">${typesHtml(o.sp.types)}</span>
-    </button>`;
+      return `<div class="evo-linha">
+        <button class="btn${o.horario?' eevee-horario':''}" onclick="chooseEeveeEvolution('${o.id}')">
+          <span class="mon-name">${spriteHtml(realId,'sprite-sm')} ${o.label} ${o.horario?(hora.id==='espeon'?'☀️':'🌙'):''} ${isCaught?`<span class="pokedex-owned-badge">${pokedexIcon()}</span>`:''}</span>
+          <span class="mon-sub">${typesHtml(o.sp.types)}</span>
+        </button>
+        <button class="wild-dex" onclick="abrirPokedexFicha('${escJs(realId)}', false)"
+          aria-label="Ver a ficha de ${escapeHtmlSafe(o.sp.name)}" title="Ver os atributos">🔍</button>
+      </div>`;
     }).join('')}
   </div>`;
 }

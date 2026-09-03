@@ -293,6 +293,38 @@ const telaTy = S.renderEvoChoice();
 ok('a tela do Tyrogue oferece os tres',
    ['hitmonlee','hitmonchan','hitmontop'].every(id=>telaTy.includes("escolherEvolucao('t1','"+id+"')")));
 ok('e diz que a linha se divide em tres', telaTy.includes('<strong>três</strong>'));
+/* A LUPA DA POKEDEX nas duas telas de escolha de evolucao (03/09/2026). E a mesma pergunta do
+   encontro selvagem -- "qual dos dois e melhor?" -- e ali a resposta esta a um toque; aqui a
+   escolha e DEFINITIVA e a resposta estava a duas telas de distancia.
+   O QUE ESTE TESTE PEGA e o aninhamento: <button> dentro de <button> e HTML invalido, o navegador
+   "conserta" fechando o de fora e o clique de dentro se perde -- com a tela continuando a PARECER
+   certa. Por isso a lupa e IRMA do card, e nao filha. Ja aconteceu no encontro selvagem. */
+(function(){
+  const telas = { 'escolha de evolucao': telaTy, 'escolha do Eevee': null };
+  const g = S.__getGame();
+  const antes = g.team;
+  g.team = [{ id:'e0', speciesId:'eevee', level:40, shiny:false, types:['Normal'] }];
+  S.__setGame(g);
+  telas['escolha do Eevee'] = S.renderEeveeChoice();
+  g.team = antes; S.__setGame(g);
+
+  for(const [nome, tela] of Object.entries(telas)){
+    const linhas = (tela.match(/class="evo-linha"/g)||[]).length;
+    const lupas = (tela.match(/class="wild-dex"/g)||[]).length;
+    ok(nome + ': uma lupa por opcao', linhas > 0 && lupas === linhas, linhas + ' opcoes, ' + lupas + ' lupas');
+    ok(nome + ': e ela abre a ficha da especie daquela opcao',
+       (tela.match(/onclick="abrirPokedexFicha\(/g)||[]).length === linhas);
+    /* Nenhum <button> dentro do <button> do card. */
+    const dentro = tela.split('<button class="btn').slice(1)
+      .map(p => p.slice(0, p.indexOf('</button>')))
+      .filter(p => p.includes('<button'));
+    ok(nome + ': nenhuma lupa dentro do botao da opcao', dentro.length === 0, dentro.length + ' aninhadas');
+  }
+  /* E a ficha abre de verdade a partir dali -- ela e anexada pelo render principal. */
+  S.abrirPokedexFicha('vileplume', false);
+  ok('a ficha abre a partir da escolha de evolucao', /Vileplume/.test(S.renderPokedexFicha()));
+  S.__setGame(Object.assign(S.__getGame(), { pokedexFicha: null }));
+})();
 ok('a origem de cada bifurcacao evolui por nivel (o gatilho)',
    Object.keys(CH).every(id=>S.EVOLUTIONS[id]),
    Object.keys(CH).filter(id=>!S.EVOLUTIONS[id]).join(','));
