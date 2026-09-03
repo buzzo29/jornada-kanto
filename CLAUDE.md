@@ -804,8 +804,10 @@ Duas artimanhas medidas e fechadas — em ambas o jogador reiniciava até vir sh
   delete, e só é liberado quando aquele slot ganha a **1ª insígnia**. O modo entra na chave porque
   o difícil tem 4× a chance — sem isso dava pra sortear no difícil e recriar no normal levando o
   shiny.
-  Sobra um teto de 6 sorteios sem jogar (3 slots × 2 modos). Bounded, e quem joga limpo não perde
-  nada: a chance por jornada continua a mesma.
+  Sobra uma franquia de sorteios sem jogar: **um por slot, por modo** -- com 20 slots, 40. Ela
+  cresce com o número de slots por construção (um slot é uma jornada), e recarregar cada um custa
+  uma tentativa de verdade. Quem joga limpo não perde nada: a chance por jornada continua a mesma.
+  (Este arquivo dizia "teto de 6 (3 slots × 2 modos)" -- número de quando o teto era 3.)
   **A conta mudou quando os iniciais passaram de 3 pra 6** (Johto entrou na tela): o sorteio corre
   por inicial, então a chance de ver um shiny foi de **2,3% pra 5,3%** por tentativa no normal
   (9,1% → 19,9% no difícil), e o teto da artimanha de **13% pra 28%**. Se incomodar, o conserto é
@@ -933,6 +935,53 @@ verdade, cai no game over, e o teste confere que a trava soltou dos dois lados.
   entre ginásios e troca de terreno, e nada disso vale numa permutação.
 - Ela permuta o **código guardado**, não o time do save: o save pode ter mudado de ordem ou de
   nível desde que a defesa foi montada, e o líder está reordenando o que ele vê defendendo.
+
+## Slots de save
+
+- **São 20** (`MAX_SAVE_SLOTS`, 03/09/2026 — eram 10). O número é espelhado no servidor em DOIS
+  lugares, e os três têm que andar juntos:
+  `TRAINERS_LEAGUE_MAX_SAVE_SLOTS` (o servidor não carrega o `index.html`, só o valor) e
+  **`MAX_BATTLE_CODES`**, que corta a lista de times elegíveis da batalha online. Esse último é o
+  que morde em silêncio: o cliente manda todos os times e depois escolhe **por índice** nessa lista,
+  então com o corte em 10 quem tem time no slot 12 nunca conseguiria escolhê-lo — e a lista que a
+  tela desenha vem de lá, então ele sumiria sem explicação.
+- **Custo medido antes de subir** (o mesmo jogo rodando com os dois tetos):
+  - **Banco: praticamente zero.** Quase todo caminho lê `collection('saves').get()`, que cobra por
+    documento devolvido — quem tem 1 save custa 1 leitura, com teto 10 ou 20. Subir o teto não custa
+    nada até alguém criar save de verdade. Um save cheio tem ~2,9 KB, então 20 saves são ~59 KB por
+    conta; o limite de 1 MiB do Firestore é por DOCUMENTO e cada save é um documento.
+  - **Tela: dobra pra quem enche.** Home com 20 saves contra 10: 51 → 94 KB de HTML, 552 → 1.052 nós,
+    66 → 126 sprites, 2.307 → 4.117px de altura, e **3,8ms → 7,0ms** pra desenhar (mediana de 20
+    desenhos). Continua dentro dos 16ms de um quadro, mas o `render()` recria o `innerHTML` inteiro a
+    cada toque e a home é a tela que mais redesenha.
+  - **Conta nova:** 20 cards vazios de 41px = 1.570px, ~2,8 telas a 320×568. É o preço de ter os
+    slots à mostra; se um dia incomodar, o lugar de mexer é `renderSaveSelect` (mostrar só o próximo
+    slot vazio, por exemplo).
+  - **O montador de time não sente:** vai de 60 pra 120 elegíveis, mas ele é paginado de 10 em 10 —
+    são 6 → 12 páginas, sempre 10 linhas desenhadas.
+- **A trava anti save-scumming continua valendo igual, e é por SLOT.** Cada slot guarda o próprio
+  sorteio de iniciais e a própria geração de encontros; a franquia de "primeiras olhadas" sem jogar
+  cresce com o número de slots por construção, porque um slot é uma jornada. No difícil ela já era
+  ~89% com 10 slots e vai a ~99% com 20 — não é brecha nova, é o mesmo teto arredondado.
+  (O CLAUDE.md dizia "teto de 6 sorteios (3 slots × 2 modos)": era um número velho de quando o teto
+  era 3. Com 10 já eram 20; com 20 são 40.)
+
+## A Trainers League parou de ler slot vazio
+
+- `trainersLeagueGatherEligibleCodesForUid` montava **uma referência por slot e lia todas**,
+  existindo ou não: um jogador com 1 save custava o teto inteiro em leituras, e isso roda **uma vez
+  por inscrito** a cada travamento de liga (mais uma vez por Doce Raro usado). Com o teto em 20 isso
+  dobraria sozinho. Hoje lê a coleção: **1 save = 1 leitura**.
+- **O RISCO DA TROCA É A ORDEM, e é o motivo de existir teste pra isso.** O Firestore devolve os
+  documentos por ID em ordem de **TEXTO**, então com 20 slots o `"10"` cai **entre** o `"1"` e o
+  `"2"`. O time de cada rodada é sorteado por ÍNDICE nessa lista, com semente, e o CLIENTE refaz o
+  mesmo sorteio pra mostrar quem vai lutar (`resolveTrainersLeagueTeamCodeForRound`) — ordens
+  diferentes fazem **a tela mostrar um time e a batalha usar outro**. Por isso a lista é reordenada
+  na mão pelo slot numérico, que é a ordem que o cliente usa.
+  O defeito só apareceria pra quem tem mais de 10 saves — ou seja, exatamente depois de subir o teto,
+  e não no dia em que a troca foi feita. `tools/test-liga-treinadores.js` grava os saves fora de
+  ordem de propósito e confere a ordem pela espécie de cada time; conferido que ele FALHA sem o
+  `sort`.
 
 ## Moedas
 

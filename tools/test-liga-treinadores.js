@@ -99,6 +99,51 @@ ok('nenhum inscrito some no caminho (0 a 40)', somaErrada === 0, somaErrada + ' 
     ok('e a tela tem como dizer por que nao teve liga', !!depois.noLeagueReason, 'motivo: ' + depois.noLeagueReason);
   }
 
-  console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
+  console.log('\n=== OS TIMES ELEGIVEIS: ORDEM DE SLOT E LEITURA SO DO QUE EXISTE ===');
+/* Esta funcao lia UMA REFERENCIA POR SLOT, existindo ou nao: com o teto em 20, um jogador com 1
+   save custava 20 leituras por travamento de liga -- e isso roda uma vez por inscrito. Passou a ler
+   a colecao, que cobra por documento devolvido.
+   O RISCO DA TROCA e a ORDEM. O Firestore devolve por ID de documento em ordem de TEXTO, e ai o
+   slot "10" cai ENTRE o "1" e o "2". O time de cada rodada e sorteado por INDICE nesta lista, com
+   semente, e o cliente refaz o mesmo sorteio pra mostrar quem vai lutar -- ordens diferentes fazem
+   a tela mostrar um time e a batalha usar outro. So aparece pra quem tem mais de 10 saves, ou seja,
+   exatamente depois de subir o teto. */
+/* O arquivo inteiro ja roda dentro de um async: sem o await aqui, este bloco terminaria DEPOIS
+   do resumo -- imprimia o titulo e nenhuma checagem, e o teste passava sem testar. */
+await (async function(){
+  const TIME = (esp) => [{ id:'m0', speciesId:esp, level:70, shiny:false }];
+  const saves = db.collection('users').doc('ordem').collection('saves');
+  /* Grava FORA de ordem de proposito -- se a funcao devolvesse na ordem de gravacao, isso passaria
+     despercebido. */
+  for(const slot of [12, 3, 0, 10, 1, 2]){
+    await saves.doc(String(slot)).set({ badgeCount:8, team: TIME('charizard') });
+  }
+  const codes = await fns._trainersLeagueGatherEligibleCodes('ordem');
+  ok('devolve um codigo por save elegivel', codes.length === 6, codes.length + ' codigos');
+  /* A prova da ordem: cada save recebe uma especie diferente, e a lista tem que sair na ordem
+     NUMERICA do slot. Com a ordem de texto do Firestore, o slot 10 e o 12 viriam depois do 1. */
+  const ESPECIES = { 0:'bulbasaur', 1:'charmander', 2:'squirtle', 3:'pikachu', 10:'snorlax', 12:'gyarados' };
+  for(const slot of Object.keys(ESPECIES)){
+    await saves.doc(String(slot)).set({ badgeCount:8, team: TIME(ESPECIES[slot]) });
+  }
+  const codes2 = await fns._trainersLeagueGatherEligibleCodes('ordem');
+  const ordem = codes2.map(c => (fns._decodeTeamCode ? fns._decodeTeamCode(c) : [{speciesId:c}])[0].speciesId);
+  const esperada = [0,1,2,3,10,12].map(s => ESPECIES[s]);
+  ok('e na ordem NUMERICA do slot, nao na de texto do Firestore',
+     JSON.stringify(ordem) === JSON.stringify(esperada), ordem.join(',') + '   (esperado ' + esperada.join(',') + ')');
+
+  /* Save sem as 8 insignias nao entra, e slot fora do teto tambem nao. */
+  await saves.doc('4').set({ badgeCount:3, team: TIME('onix') });
+  await saves.doc('99').set({ badgeCount:8, team: TIME('mewtwo') });
+  const codes3 = await fns._trainersLeagueGatherEligibleCodes('ordem');
+  ok('save sem as 8 insignias fica de fora', codes3.length === 6, codes3.length + ' codigos');
+  ok('e slot acima do teto tambem', codes3.length === 6);
+
+  /* Conta sem save nenhum: antes isso custava o teto inteiro em leituras. */
+  const vazio = await fns._trainersLeagueGatherEligibleCodes('nao-existe');
+  ok('conta sem save devolve lista vazia', Array.isArray(vazio) && vazio.length === 0);
+})();
+
+console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
   process.exit(falhas ? 1 : 0);
 })();

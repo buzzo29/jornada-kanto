@@ -124,7 +124,7 @@ ok('a 1ª insígnia libera o slot pro próximo sorteio',
 g.startersSorteados = {};
 for(let s=0;s<3;s++) for(const m of ['normal','hard']) S.sorteioDosIniciais(s,m);
 ok('sorteios disponíveis sem jogar nada ficam limitados', Object.keys(g.startersSorteados).length===6,
-   Object.keys(g.startersSorteados).length+' (3 slots x 2 modos)');
+   Object.keys(g.startersSorteados).length+' (3 slots x 2 modos NESTE teste; no jogo a franquia e MAX_SAVE_SLOTS x 2)');
 
 
 console.log('\n3) O GAME OVER ENCERRA A TENTATIVA');

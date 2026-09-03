@@ -1883,7 +1883,7 @@ function trainersLeagueTerrainPickRef(dateId, uid){ return trainersLeagueTerrain
 function trainersLeagueTeamPicksRef(dateId){ return trainersLeagueCycleRef(dateId).collection('teamPicks'); }
 function trainersLeagueTeamPickRef(dateId, uid){ return trainersLeagueTeamPicksRef(dateId).doc(uid); }
 const TRAINERS_LEAGUE_TEAM_SWAP_DEADLINE_MS = 5 * 60 * 1000;
-const TRAINERS_LEAGUE_MAX_SAVE_SLOTS = 10; // espelha MAX_SAVE_SLOTS do cliente -- servidor não carrega esse arquivo, só o valor
+const TRAINERS_LEAGUE_MAX_SAVE_SLOTS = 20; // espelha MAX_SAVE_SLOTS do cliente -- servidor não carrega esse arquivo, só o valor
 const TRAINERS_LEAGUE_MAX_LEVEL = 99; // maior nível legítimo do jogo (Mewtwo do desafio) -- acima disso é save/código forjado
 // reconstrói um código de time do zero a partir só de espécie+nível+shiny, com o nível LIMITADO ao
 // teto legítimo -- qualquer stat forjado morre aqui (decodeTeamCode já recria os stats da espécie),
@@ -1909,12 +1909,24 @@ function teamCodeSignature(code){
 // lê os saves de UM jogador (privilégio de admin -- o cliente só pode ler os próprios) e monta a lista
 // de times elegíveis (8 insígnias) exatamente com o mesmo critério do registerForTrainersLeague no cliente
 async function trainersLeagueGatherEligibleCodesForUid(uid){
-  const slotRefs = Array.from({length:TRAINERS_LEAGUE_MAX_SAVE_SLOTS}, (_,i)=> db.collection('users').doc(uid).collection('saves').doc(String(i)));
-  const snaps = await Promise.all(slotRefs.map(ref=> ref.get().catch(()=>({exists:false}))));
+  /* LÊ SÓ OS SAVES QUE EXISTEM. Antes montava uma referência por slot e lia TODAS, existindo ou
+     não: um jogador com 1 save custava o teto inteiro em leituras, e isso rodava uma vez por
+     inscrito a cada travamento de liga (mais uma vez por Doce Raro usado). Com o teto em 20 isso
+     dobraria de graça. O get da COLEÇÃO cobra por documento devolvido.
+
+     A ORDEM TEM QUE SER A NUMÉRICA DO SLOT, e não a que o Firestore devolve: ele ordena por ID de
+     documento em ordem de TEXTO, então com 20 slots o "10" vem entre o "1" e o "2". O time de cada
+     rodada é sorteado por ÍNDICE nesta lista, com semente, e o CLIENTE refaz o mesmo sorteio pra
+     mostrar quem vai lutar (ver resolveTrainersLeagueTeamCodeForRound) -- se as duas ordens
+     divergirem, a tela mostra um time e a batalha usa outro. O cliente monta a lista em ordem de
+     slot; aqui é a mesma ordem, na mão. */
+  const snap = await db.collection('users').doc(uid).collection('saves').get();
+  const porSlot = snap.docs
+    .map(doc => ({ slot: parseInt(doc.id, 10), dados: doc.data() }))
+    .filter(x => Number.isInteger(x.slot) && x.slot >= 0 && x.slot < TRAINERS_LEAGUE_MAX_SAVE_SLOTS)
+    .sort((a, b) => a.slot - b.slot);
   const codes = [];
-  for(const snap of snaps){
-    if(!snap.exists) continue;
-    const s = snap.data();
+  for(const { dados: s } of porSlot){
     if(s && s.team && (s.badgeCount||0) >= 8){
       // sanitiza na origem: reconstrói do zero (espécie+nível+shiny), nível limitado ao teto -- um save
       // adulterado com stats/níveis impossíveis entra na liga como um time normalizado, não como monstro
@@ -2554,6 +2566,8 @@ exports._createInstance = createInstance;
 exports._makeSeededRng = makeSeededRng;
 exports._golpesEspeciais = { AUTODESTRUICAO, SONIFEROS, METRONOMO, CHANCE_AUTODESTRUICAO, CHANCE_SONO };
 exports._trainersLeagueSplitGroups = trainersLeagueSplitGroups;
+exports._trainersLeagueGatherEligibleCodes = trainersLeagueGatherEligibleCodesForUid;
+exports._decodeTeamCode = decodeTeamCode;   // o teste da liga confere a ORDEM da lista pela especie de cada time
 exports.advanceTrainersLeague = onSchedule('every 1 minutes', async (event) => {
   try{
     const todayStr = trainersLeagueTodayDateStr();
@@ -4601,7 +4615,11 @@ const BATTLE_ACCEPT_MS = 15000;
    fechar a aba), o servidor entra com o primeiro da lista sozinho -- ele não tem os times salvos,
    só o que o cliente enviou. */
 const BATTLE_TEAM_PICK_MS = 15000;
-const MAX_BATTLE_CODES = 10;   // mesmo teto de saves do cliente (MAX_SAVE_SLOTS)
+/* MESMO TETO DE SAVES DO CLIENTE (MAX_SAVE_SLOTS). Tem que acompanhar: o cliente manda todos os
+   times elegíveis e depois escolhe por ÍNDICE nessa lista -- se o servidor cortar em 10, quem tem
+   time no slot 12 nunca consegue escolhê-lo, e a lista que a tela desenha (que vem daqui) some com
+   ele sem explicação. */
+const MAX_BATTLE_CODES = 20;
 
 function battleQueueColl(){ return db.collection('onlineBattleQueue'); }
 function pendingMatchRef(id){ return db.collection('onlinePendingMatch').doc(id); }
