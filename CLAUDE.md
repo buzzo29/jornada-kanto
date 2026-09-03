@@ -880,10 +880,11 @@ de golpes.
   GINÁSIO, que é A batalha da jornada. O jogador usou a poção, foi lutar e não aconteceu nada --
   reportado em 03/09/2026, horas depois de a loja subir. Os outros quatro eram o desafio do Mewtwo,
   a batalha por código de treinador e as duas resoluções de liga do cliente.
-   **lê o código** e falha se alguma chamada de  ou
-   não tiver  na chamada -- a mesma trava que já existia pro
-  , que foi criada depois de a raide do Mew passar semanas sem o buff.
-  Ela não cobria os itens; agora cobre.
+  `tools/test-especiais.js` **lê o código** e falha se alguma chamada de `simulateGymBattle` ou
+  `simulateBossFight` não tiver `itens` na chamada — a mesma trava que já existia pro
+  `applySpecialtyBuff`, que foi criada depois de a raide do Mew passar semanas sem o buff.
+  Ela não cobria os itens; agora cobre, e foi conferido que ela falha ao tirar os itens do ginásio
+  da jornada.
 - **Valem:** jornada (cliente), Torre, Ginásio da Cidade e raide do Mew (só o Despertar — a raide é
   um ataque só, sem confronto seguinte pra o curado aproveitar).
 - **NÃO valem nas ligas**, e é de propósito: elas são resolvidas por cron, às vezes horas depois da
