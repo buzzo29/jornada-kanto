@@ -237,12 +237,12 @@ de golpes.
   dela. Lido de fora, parecia que quem estava dormindo tinha atacado mais vezes que quem estava
   acordado. O sono compra duas trocas livres -- e **três golpes seguidos** quando quem usou é o
   mais RÁPIDO, porque ele ainda bate primeiro na troca em que o outro acorda.
-  Hoje o número de golpes livres sai do DIÁRIO (e não do ), e é ele que a
+  Hoje o número de golpes livres sai do DIÁRIO (e não do `SONO_EM_TROCAS`), e é ele que a
   reconstrução traz pra frente, limitado pelas 3 vagas dela. Medido: **99,6% dos confrontos com
   sono** mostravam menos golpes livres do que a luta teve; hoje é 0 em 1.399 confrontos.
   **Ler do diário também acerta o SONO DUPLO**, que existe: os dois se dormem, os dois contadores
   correm juntos e NINGUÉM ganha troca livre -- ali o certo é o log não mostrar golpe livre nenhum,
-  e um  fixo teria inventado dois.
+  e um `SONO_EM_TROCAS` fixo teria inventado dois.
   Isso passou a importar mais do que antes: com a luta continuando depois do sono, **mais confrontos
   passam do `TETO_GOLPES`** e caem na reconstrução.
 - **Chance por CONFRONTO, não por golpe**: 15% autodestruição, 5% sono.
