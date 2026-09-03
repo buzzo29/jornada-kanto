@@ -842,28 +842,36 @@ de golpes.
 - **A chance do adversário é CONSUMIDA**: ele tentou e falhou. E isso vira **linha no log**
   ("Jynx tentou fazer Machop dormir com Hipnose, mas o Despertar segurou") — sem ela o jogador não
   teria como saber que as 50 moedas trabalharam, que é o erro da especialidade de novo.
-- Medido: **+0,9 ponto** de vitória por batalha num confronto genérico (49,1% → 50,0%). Parece pouco
+- Medido: **praticamente zero** de vitória por batalha num confronto genérico (49,7% → 49,6%, dentro do ruído). Parece pouco
   e é: o sono é 5% por confronto. O que ele compra não é taxa de vitória, é **não perder um pokémon
   inteiro pra um sorteio** — que foi exatamente a reclamação que fez o sono ser reescrito.
 
 ### Poção (55%) e Super Poção (80%)
-- **Ficam ARMADAS esperando** (`pocaoArmada`). O primeiro pokémon do jogador que **VENCE um
-  confronto** e sobra com **25% ou menos** de HP se cura na hora e segue lutando contra o próximo.
-  Uma por batalha.
-- **Por que na vitória do confronto e não no fim da batalha:** fora da Elite 4, **cada batalha começa
-  com o time cheio** (`team.forEach(p => p.hp = p.maxHp)`), então curar no fim não mudaria nada — a
-  poção seria dinheiro jogado fora. Dentro da batalha o HP carrega de um confronto pro outro, e é
-  ali que ela decide alguma coisa. Escolhido com o custo medido na mesa.
+- **MESMA MECÂNICA DO RECUPERAR: a cura acontece ANTES da luta.** O pokémon entra machucado do
+  confronto anterior; se está com **25% ou menos**, ele se cura e só então o novo adversário ataca.
+  Uma por batalha, e ela fica **ARMADA** (`pocaoArmada`) até disparar.
+- **Chegou a disparar na VITÓRIA do confronto, e estava errado** — reportado em 03/09/2026 com um
+  "ele nem tinha tomado hit ainda". A cena não fazia sentido: o pokémon matava o adversário sem
+  levar um golpe e tomava a poção logo em seguida. A vida que ele carregava era do confronto
+  ANTERIOR, e a tela não contava isso. O Recuperar já tinha resolvido esse mesmo problema em
+  02/09 (ele também vivia no fim do confronto), e a poção passou a seguir o mesmo caminho.
+- **Ela vem ANTES do `doExchange`, e isso resolve sozinho a ordem com o Recuperar:** se a poção
+  subiu o HP pra cima de 70%, o Recuperar não dispara mais; se ela não disparou, ele sai normal.
+  Medido: **0 confrontos com os dois** em 4.000 batalhas de um Alakazam com poção armada.
+- **Nunca no primeiro confronto de uma batalha**: fora da Elite 4 o time entra cheio
+  (`team.forEach(p => p.hp = p.maxHp)`), então não há o que curar. É também o motivo de a poção não
+  poder disparar "no fim da batalha": ali a cura não mudaria nada, porque a luta seguinte já começa
+  com todo mundo cheio.
 - **UMA ARMADA POR VEZ**: armar a segunda por cima da primeira gastaria as duas e entregaria uma, e
   o jogador não teria como saber que perdeu.
 - **QUEM LIMPA depende de onde a luta rodou.** Na Torre, no Ginásio da Cidade e na raide é a própria
   função da batalha, sem depender de ninguém. Na jornada quem viu a luta foi o CLIENTE, então é ele
   que avisa (`consumePotion`) — e o pior caso de a chamada se perder é o jogador FICAR com a poção,
   que é o lado certo pra errar.
-- **O PREÇO MEDIDO, e é o maior desta leva** (4.000 batalhas, mesmos times dos dois lados):
-  taxa de vitória por batalha vai de **49,1%** pra **57,5% com a Poção** (+8,4) e **60,9% com a Super
-  Poção** (+11,8). São os itens mais fortes do jogo por moeda gasta — e o preço deixa a **Poção mais
-  eficiente que a Super**: 0,56 ponto por moeda contra 0,39. Se um dia incomodar, é aí que se mexe.
+- **O PREÇO MEDIDO, e é o maior desta leva** (4.000 batalhas, mesmos times dos dois lados): a taxa de
+  vitória por batalha vai de **49,7%** pra **56,9% com a Poção** (+7,2) e **61,1% com a Super Poção**
+  (+11,4). São os itens mais fortes do jogo por moeda gasta — e o preço deixa a **Poção mais
+  eficiente que a Super**: 0,48 ponto por moeda contra 0,38. Se um dia incomodar, é aí que se mexe.
 
 ### Onde os itens valem
 - **Valem:** jornada (cliente), Torre, Ginásio da Cidade e raide do Mew (só o Despertar — a raide é

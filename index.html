@@ -5710,21 +5710,18 @@ function simulateGymBattle(team, brockTeam, rng, opts){
       const playerAliveBefore = alive.length;
       const enemyAliveBefore = brockTeam.length - brockIndex;
       const diario = [];
-      while(active.hp>0 && enemy.hp>0){ doExchange(active, enemy, rng, diario); }
-      const enemyFainted = enemy.hp<=0 || Number.isNaN(enemy.hp); // NaN nunca é <=0 -- sem esse OR, um hp corrompido travaria a batalha pra sempre (ninguém nunca "desmaia")
-      const activeFainted = active.hp<=0 || Number.isNaN(active.hp);
-      // doExchange garante um único sobrevivente por troca -- empate/morte súbita não existem mais
-      const suddenDeath = false, suddenDeathMessage = null;
-      const isTrade = enemyFainted && activeFainted; // os dois caíram juntos — ninguém "venceu" esse confronto
-      const playerWon = enemyFainted && !activeFainted;
-      /* POÇÃO: o primeiro pokémon do jogador que VENCE um confronto e sobra com 25% ou menos se
-         cura na hora e segue lutando contra o próximo. É aqui que ela tem efeito -- fora da Elite
-         4, cada batalha começa com o time cheio (ver o preservePlayerHp lá em cima), então curar no
-         FIM da batalha não mudaria nada. Uma por batalha.
-         Entra ANTES do matchups.push de propósito: o playerHpAfter tem que sair já curado, senão a
-         barra da tela termina no valor de antes e a cura some. */
-      if(playerWon && pocaoArmada && !pocaoJaUsada && active.hp > 0 &&
-         active.hp <= active.maxHp * POCAO_GATILHO_HP){
+      /* POÇÃO: MESMA MECÂNICA DO RECUPERAR -- acontece ANTES da luta, não depois.
+         O pokémon entra machucado do confronto anterior; se está com 25% ou menos, se cura e só
+         então o novo adversário ataca. Ficava no fim do confronto (curava quem tinha acabado de
+         vencer), e dava uma cena sem sentido: o pokémon matava o adversário sem tomar um golpe e
+         tomava a poção logo em seguida -- reportado em 03/09/2026 com um "ele nem tinha tomado hit
+         ainda". A vida que ele carrega é do confronto ANTERIOR, e é isso que a tela não conta.
+         Vem antes do doExchange de propósito, e isso resolve sozinho a ordem com o Recuperar: se a
+         poção subiu o HP pra cima de 70%, o Recuperar não sai mais; se ela não disparou, ele sai
+         normal. Nunca os dois.
+         O playerHpBefore já foi lido lá em cima, então a barra começa no valor machucado e SOBE --
+         é o que faz a cura aparecer na tela em vez de a vida surgir do nada. */
+      if(pocaoArmada && !pocaoJaUsada && active.hp > 0 && active.hp <= active.maxHp * POCAO_GATILHO_HP){
         const curado = Math.min(active.maxHp - active.hp, Math.round(active.maxHp * pocaoArmada.cura));
         if(curado > 0){
           active.hp += curado;
@@ -5732,6 +5729,13 @@ function simulateGymBattle(team, brockTeam, rng, opts){
           diario.push({ q:'p', d: curado, hp: active.hp, c:0, m:0, z:0, x:'pocao', g: pocaoArmada.id });
         }
       }
+      while(active.hp>0 && enemy.hp>0){ doExchange(active, enemy, rng, diario); }
+      const enemyFainted = enemy.hp<=0 || Number.isNaN(enemy.hp); // NaN nunca é <=0 -- sem esse OR, um hp corrompido travaria a batalha pra sempre (ninguém nunca "desmaia")
+      const activeFainted = active.hp<=0 || Number.isNaN(active.hp);
+      // doExchange garante um único sobrevivente por troca -- empate/morte súbita não existem mais
+      const suddenDeath = false, suddenDeathMessage = null;
+      const isTrade = enemyFainted && activeFainted; // os dois caíram juntos — ninguém "venceu" esse confronto
+      const playerWon = enemyFainted && !activeFainted;
       const playerAliveAfter = activeFainted ? playerAliveBefore - 1 : playerAliveBefore;
       const enemyAliveAfter = enemyFainted ? enemyAliveBefore - 1 : enemyAliveBefore;
       matchups.push({
@@ -13328,12 +13332,12 @@ function sequenciaDoConfronto(m){
      cura, e só então a luta começa. Enquanto ela ficava de fora da sequência, a animação só via o
      valor final e a barra aparecia cheia do nada. */
   const reais = passosVisiveis((m.golpes || []).filter(g => g.x !== 'disable' && (g.x || g.d > 0)));
-  /* O sono BLOQUEADO é abertura como o sono: acontece antes da luta e não é dano. A POÇÃO é o
-     contrário -- ela fecha, porque dispara na vitória do confronto --, e por isso vem separada:
-     concatenada nas aberturas ela apareceria antes da luta que a provocou. */
-  const aberturas = reais.filter(g => g.x === 'recover' || g.x === 'sono' || g.x === 'semSono');
-  const fechamento = reais.filter(g => g.x === 'pocao');
-  const cura = reais.find(g => g.x === 'recover') || null;
+  /* TODAS AS ABERTURAS: acontecem antes da luta e não são dano. A poção entrou aqui quando passou a
+     funcionar como o Recuperar -- ela era um FECHAMENTO enquanto disparava na vitória do confronto. */
+  const aberturas = reais.filter(g => g.x === 'recover' || g.x === 'sono' || g.x === 'semSono' || g.x === 'pocao');
+  /* A vida de onde a reconstrução parte. Cura e poção mexem no MESMO ponto (o começo), e só uma das
+     duas sai por confronto -- se a poção subiu o HP pra cima de 70%, o Recuperar não dispara. */
+  const cura = reais.find(g => g.x === 'recover' || g.x === 'pocao') || null;
   const ehDano = g => !g.x || g.x === 'boom' || g.x === 'boomself';
   const golpesDeDano = reais.filter(ehDano).length;
   /* O teto conta GOLPES. As aberturas (cura e sono) não são dano -- deixá-las contar jogaria uma
@@ -13367,7 +13371,7 @@ function sequenciaDoConfronto(m){
   }
   // a reconstrução fala em QUEM APANHA (side); aqui a lista é de QUEM BATE (q)
   const resto = reconstruirSequencia(base).map(h => ({ q: h.side === 'player' ? 'e' : 'p', d: h.amount }));
-  return aberturas.concat(livres, resto, fechamento);
+  return aberturas.concat(livres, resto);
 }
 /* AS FRASES DOS GOLPES ESPECIAIS VIVEM AQUI, num lugar só.
    O log da batalha e o aviso do meio da luta leem desta função. Montadas em separado, as duas
@@ -13471,7 +13475,7 @@ function avisoDoConfronto(m, passo){
      Autodestruição e sono são o contrário: ali o confronto INTEIRO é aquilo, e a frase acompanha
      até o fim. Por isso a checagem é só pra cura. */
   const especiais = ((m && m.golpes) || []).filter(ehGolpeEspecial);
-  const g = especiais.find(x => x.x !== 'recover' || !(passo > 0));
+  const g = especiais.find(x => (x.x !== 'recover' && x.x !== 'pocao') || !(passo > 0));
   if(!g) return '';
   const nomeP = escapeHtmlSafe(m.player || ''), nomeE = escapeHtmlSafe(m.enemy || '');
   const doJogador = g.q === 'p';

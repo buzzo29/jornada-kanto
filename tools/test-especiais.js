@@ -731,30 +731,41 @@ console.log('\n=== OS ITENS DA MOCHILA DENTRO DA BATALHA ===');
   const frase = S.fraseDoEspecial(g, 'Jynx', 'Machop', {});
   ok('a frase diz que o Despertar segurou', /Despertar segurou/.test(frase), frase);
 })();
-/* POCAO: o primeiro pokemon que VENCE um confronto e sobra com 25% ou menos se cura na hora. */
+/* POCAO: MESMA MECANICA DO RECUPERAR -- ANTES da luta, nao depois.
+   Ficava no fim do confronto (curava quem tinha acabado de vencer) e dava uma cena sem sentido: o
+   pokemon matava o adversario sem tomar um golpe e tomava a pocao logo em seguida. Reportado em
+   03/09/2026 com um "ele nem tinha tomado hit ainda" -- a vida que ele carregava era do confronto
+   ANTERIOR, e a tela nao contava isso. */
 (function(){
-  let disparos = 0, forade25 = 0, doisNaMesmaBatalha = 0, curaErrada = 0;
+  let disparos = 0, entrouCheio = 0, noPrimeiro = 0, foraDoComeco = 0, curaErrada = 0, doisNaBatalha = 0;
   for(let i = 0; i < 3000; i++){
-    const r = S.simulateGymBattle([inst('machamp',60)], [inst('onix',58), inst('golem',58)], Math.random,
-                                  { itens:{ pocao:{ id:'hyperpotion', cura:0.80 } } });
+    const r = S.simulateGymBattle([inst('machamp',60)], [inst('onix',58), inst('golem',58), inst('rhydon',58)],
+                                  Math.random, { itens:{ pocao:{ id:'hyperpotion', cura:0.80 } } });
     let naBatalha = 0;
-    for(const m of (r.matchups||[])){
-      const p = (m.golpes||[]).find(x => x.x === 'pocao');
-      if(!p) continue;
+    (r.matchups||[]).forEach((m, idx) => {
+      const g = m.golpes || [];
+      const p = g.find(x => x.x === 'pocao');
+      if(!p) return;
       naBatalha++; disparos++;
-      /* So dispara com 25% ou menos: o HP ANTES da cura e o hp gravado menos o que ela curou. */
-      const antes = p.hp - p.d;
-      if(antes > m.playerMaxHp * 0.25) forade25++;
-      /* Cura 80% do maximo, sem passar do teto. */
-      const esperado = Math.min(m.playerMaxHp - antes, Math.round(m.playerMaxHp * 0.80));
+      /* 1) SO com o pokemon entrando machucado -- o gatilho e o HP DE ENTRADA. */
+      if(m.playerHpBefore > m.playerMaxHp * 0.25) entrouCheio++;
+      /* 2) NUNCA no primeiro confronto: ali o time entra cheio (fora da Elite 4 toda batalha
+            comeca curada), entao nao ha o que curar. */
+      if(idx === 0) noPrimeiro++;
+      /* 3) E E O PRIMEIRO PASSO, antes de qualquer golpe -- e isso que o pedido descreve. */
+      if(g.indexOf(p) !== 0) foraDoComeco++;
+      /* 4) Cura 80% do maximo, sem passar do teto. */
+      const esperado = Math.min(m.playerMaxHp - m.playerHpBefore, Math.round(m.playerMaxHp * 0.80));
       if(p.d !== esperado) curaErrada++;
-    }
-    if(naBatalha > 1) doisNaMesmaBatalha++;
+    });
+    if(naBatalha > 1) doisNaBatalha++;
   }
   ok('a pocao dispara', disparos > 100, disparos + ' vezes em 3000 batalhas');
-  ok('so com 25% de HP ou menos', forade25 === 0, forade25 + ' fora da faixa');
+  ok('so com o pokemon entrando com 25% ou menos', entrouCheio === 0, entrouCheio + ' com vida demais');
+  ok('nunca no primeiro confronto (o time entra cheio)', noPrimeiro === 0, noPrimeiro + ' no primeiro');
+  ok('e sempre como PRIMEIRO passo, antes da luta', foraDoComeco === 0, foraDoComeco + ' fora do comeco');
   ok('curando 80% do maximo (sem passar do teto)', curaErrada === 0, curaErrada + ' com cura errada');
-  ok('e UMA por batalha', doisNaMesmaBatalha === 0, doisNaMesmaBatalha + ' batalhas com duas');
+  ok('e UMA por batalha', doisNaBatalha === 0, doisNaBatalha + ' batalhas com duas');
   /* Sem o item, nada acontece -- a medida de controle. */
   let semItem = 0;
   for(let i = 0; i < 1000; i++){
@@ -762,18 +773,34 @@ console.log('\n=== OS ITENS DA MOCHILA DENTRO DA BATALHA ===');
     if((r.matchups||[]).some(m => (m.golpes||[]).some(x => x.x === 'pocao'))) semItem++;
   }
   ok('sem o item ela nunca dispara', semItem === 0, semItem + ' de 1000');
-  /* E a cura aparece na tela: passo da animacao com a barra SUBINDO. */
-  const m = { player:'Machamp', enemy:'Onix', playerSpecies:'machamp', enemySpecies:'onix',
-    playerHpBefore:280, playerHpAfter:224, playerMaxHp:280, enemyHpBefore:250, enemyHpAfter:0, enemyMaxHp:250,
-    playerMove:'Fighting', enemyMove:'Rock',
-    golpes:[{q:'p',d:250,hp:0},{q:'e',d:240,hp:40},{q:'p',d:184,hp:224,x:'pocao',g:'hyperpotion'}] };
+
+  /* POCAO E RECUPERAR NUNCA SAEM JUNTOS. A pocao vem ANTES do doExchange, entao se ela subiu o HP
+     pra cima de 70% o Recuperar nao dispara mais -- a ordem resolve sozinha, sem regra extra. */
+  let juntos = 0, comRec = 0;
+  for(let i = 0; i < 4000; i++){
+    const r = S.simulateGymBattle([inst('alakazam',60)], [inst('onix',58), inst('golem',58)], Math.random,
+                                  { itens:{ pocao:{ id:'hyperpotion', cura:0.80 } } });
+    for(const m of (r.matchups||[])){
+      const g = m.golpes || [];
+      if(g.some(x => x.x === 'recover')) comRec++;
+      if(g.some(x => x.x === 'pocao') && g.some(x => x.x === 'recover')) juntos++;
+    }
+  }
+  ok('o Recuperar continua saindo com a pocao armada', comRec > 50, comRec + ' vezes');
+  ok('mas nunca os dois no mesmo confronto', juntos === 0, juntos + ' confrontos com os dois');
+
+  /* NA TELA: a cura e o primeiro passo e a barra SOBE, igual a do Recuperar. */
+  const m = { player:'Machamp', enemy:'Rhydon', playerSpecies:'machamp', enemySpecies:'rhydon',
+    playerHpBefore:40, playerHpAfter:0, playerMaxHp:420, enemyHpBefore:400, enemyHpAfter:0, enemyMaxHp:400,
+    playerMove:'Fighting', enemyMove:'Ground',
+    golpes:[{q:'p',d:336,hp:376,x:'pocao',g:'hyperpotion'},{q:'e',d:120,hp:256},{q:'p',d:400,hp:0},{q:'e',d:256,hp:0}] };
   const seq = S.sequenciaDoConfronto(m);
-  ok('a pocao fecha a sequencia, nao abre', seq[seq.length-1].x === 'pocao',
-     seq.map(x=>x.x||'golpe').join(','));
+  ok('a pocao ABRE a sequencia', seq[0].x === 'pocao', seq.map(x=>x.x||'golpe').join(','));
   const anim = S.buildAnimatedHitSequence(m);
-  ok('e a barra SOBE na animacao', anim[anim.length-1].amount === -184 && anim[anim.length-1].cura === true,
-     JSON.stringify(anim[anim.length-1]));
-  ok('e o log fala dela', /recuperou HP/.test(S.passosHtml(m)), S.passosHtml(m).replace(/<[^>]+>/g,'').trim().split('\n').pop());
+  ok('e a barra SOBE nela', anim[0].amount === -336 && anim[0].cura === true, JSON.stringify(anim[0]));
+  ok('o log fala dela', /recuperou HP/.test(S.passosHtml(m)));
+  ok('e a frase sai antes da luta e some depois', S.avisoDoConfronto(m, 0) !== '' && S.avisoDoConfronto(m, 1) === '',
+     JSON.stringify([S.avisoDoConfronto(m,0), S.avisoDoConfronto(m,1)]));
 })();
 
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');

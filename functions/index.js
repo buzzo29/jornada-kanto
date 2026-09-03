@@ -1083,20 +1083,18 @@ function simulateGymBattle(team, enemyTeam, rng, opts){
       const playerAliveBefore = alive.length;
       const enemyAliveBefore = enemyTeam.length - enemyIndex;
       const diario = [];
-      while(active.hp>0 && enemy.hp>0){ doExchange(active, enemy, rng, diario); }
-      const enemyFainted = enemy.hp<=0;
-      const activeFainted = active.hp<=0;
-      // doExchange garante um único sobrevivente por troca -- empate/morte súbita não existem mais
-      const suddenDeath = false, suddenDeathMessage = null;
-      const isTrade = enemyFainted && activeFainted;
-      const playerWon = enemyFainted && !activeFainted;
-      /* POÇÃO: o primeiro pokémon do jogador que VENCE um confronto e sobra com 25% ou menos se
-         cura na hora e segue lutando contra o próximo. É aqui que ela tem efeito -- cada batalha
-         começa com o time cheio, então curar no FIM da batalha não mudaria nada. Uma por batalha.
-         Entra ANTES do matchups.push de propósito: o playerHpAfter tem que sair já curado, senão a
-         barra da tela termina no valor de antes e a cura some. */
-      if(playerWon && pocaoArmada && !pocaoJaUsada && active.hp > 0 &&
-         active.hp <= active.maxHp * POCAO_GATILHO_HP){
+      /* POÇÃO: MESMA MECÂNICA DO RECUPERAR -- acontece ANTES da luta, não depois.
+         O pokémon entra machucado do confronto anterior; se está com 25% ou menos, se cura e só
+         então o novo adversário ataca. Ficava no fim do confronto (curava quem tinha acabado de
+         vencer), e dava uma cena sem sentido: o pokémon matava o adversário sem tomar um golpe e
+         tomava a poção logo em seguida -- reportado em 03/09/2026 com um "ele nem tinha tomado hit
+         ainda". A vida que ele carrega é do confronto ANTERIOR, e é isso que a tela não conta.
+         Vem antes do doExchange de propósito, e isso resolve sozinho a ordem com o Recuperar: se a
+         poção subiu o HP pra cima de 70%, o Recuperar não sai mais; se ela não disparou, ele sai
+         normal. Nunca os dois.
+         O playerHpBefore já foi lido lá em cima, então a barra começa no valor machucado e SOBE --
+         é o que faz a cura aparecer na tela em vez de a vida surgir do nada. */
+      if(pocaoArmada && !pocaoJaUsada && active.hp > 0 && active.hp <= active.maxHp * POCAO_GATILHO_HP){
         const curado = Math.min(active.maxHp - active.hp, Math.round(active.maxHp * pocaoArmada.cura));
         if(curado > 0){
           active.hp += curado;
@@ -1104,6 +1102,13 @@ function simulateGymBattle(team, enemyTeam, rng, opts){
           diario.push({ q:'p', d: curado, hp: active.hp, c:0, m:0, z:0, x:'pocao', g: pocaoArmada.id });
         }
       }
+      while(active.hp>0 && enemy.hp>0){ doExchange(active, enemy, rng, diario); }
+      const enemyFainted = enemy.hp<=0;
+      const activeFainted = active.hp<=0;
+      // doExchange garante um único sobrevivente por troca -- empate/morte súbita não existem mais
+      const suddenDeath = false, suddenDeathMessage = null;
+      const isTrade = enemyFainted && activeFainted;
+      const playerWon = enemyFainted && !activeFainted;
       const playerAliveAfter = activeFainted ? playerAliveBefore - 1 : playerAliveBefore;
       const enemyAliveAfter = enemyFainted ? enemyAliveBefore - 1 : enemyAliveBefore;
       matchups.push({
