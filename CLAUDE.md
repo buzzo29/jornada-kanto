@@ -232,17 +232,29 @@ de golpes.
   começava pelo golpe de quem tinha acabado de dormir — o log se contradizia na cara do jogador:
   "fez dormir" e, na linha seguinte, o adormecido batendo. Hoje o golpe de quem USOU o sono vem pra
   frente. Não mexe em número nenhum: a soma dos golpes é a mesma, só a ordem muda.
-  **E não basta UM golpe na frente** -- foi assim até 03/09/2026 e o defeito foi reportado com
-  print: um Poliwrath dormiu a Vileplume, e o log mostrou **um** golpe dele seguido de **dois**
-  dela. Lido de fora, parecia que quem estava dormindo tinha atacado mais vezes que quem estava
-  acordado. O sono compra duas trocas livres -- e **três golpes seguidos** quando quem usou é o
-  mais RÁPIDO, porque ele ainda bate primeiro na troca em que o outro acorda.
-  Hoje o número de golpes livres sai do DIÁRIO (e não do `SONO_EM_TROCAS`), e é ele que a
-  reconstrução traz pra frente, limitado pelas 3 vagas dela. Medido: **99,6% dos confrontos com
-  sono** mostravam menos golpes livres do que a luta teve; hoje é 0 em 1.399 confrontos.
-  **Ler do diário também acerta o SONO DUPLO**, que existe: os dois se dormem, os dois contadores
-  correm juntos e NINGUÉM ganha troca livre -- ali o certo é o log não mostrar golpe livre nenhum,
-  e um `SONO_EM_TROCAS` fixo teria inventado dois.
+  **E NÃO BASTA UM GOLPE NA FRENTE, NEM SÓ REORDENAR** — foi assim até 03/09/2026, e o defeito foi
+  reportado DUAS vezes com print: um Poliwrath dormiu a Vileplume e o log mostrou **um** golpe dele
+  seguido de **dois** dela; depois um Poliwag com uma Goldeen, igual. Lido de fora, parecia que quem
+  estava **dormindo** tinha atacado mais vezes que quem estava acordado.
+  **A causa não era ordem, era CONTAGEM.** A reconstrução é um molde fixo — "vencedor acerta uma
+  parte, PERDEDOR solta tudo num golpe só, vencedor termina" —, então **quem perde fica sempre com
+  UM golpe**. Quando quem usou o sono é justamente quem morreu, os quatro golpinhos livres dele
+  viravam um só, e o outro lado ficava com dois. Reordenar só mudava a ordem de um golpe que
+  continuava sendo um só.
+  Hoje, nesse caso, a sequência é **reescrita**: os golpes livres na frente (quantos a luta teve,
+  lidos do DIÁRIO) e o outro lado respondendo com tudo — que é também o golpe que mata.
+  **SÃO DOIS INVARIANTES AO MESMO TEMPO**, e o segundo foi quebrado pela primeira tentativa de
+  conserto (23,7% dos confrontos passaram a terminar com o golpe de quem morreu — o "atacou depois
+  de cair" que já foi reportado três vezes aqui):
+    1. quem usou o sono aparece com os golpes livres que a luta teve, até onde as vagas permitem;
+    2. o **ÚLTIMO golpe é sempre o de quem matou**.
+  **Quando quem usou o sono VENCE, os dois não cabem em 3 vagas** — e ali o molde continua valendo,
+  porque ele já dá DOIS golpes a quem venceu contra um do outro: ninguém lê "o adormecido atacou
+  mais". É por isso que a reescrita só vale pro caso em que quem dormiu o outro morreu.
+  Medido em 25.000 batalhas (14 espécies, níveis 10-55, ~1.600 confrontos com sono): os dois
+  invariantes em **0 falhas**, e a soma de dano de cada lado intacta — a reescrita muda em quantos
+  pedaços o dano aparece, nunca o total. `tools/test-especiais.js` tranca os dois, e foi conferido
+  que ele falha com cada um dos dois defeitos reintroduzido em separado (453 e 352 casos).
   Isso passou a importar mais do que antes: com a luta continuando depois do sono, **mais confrontos
   passam do `TETO_GOLPES`** e caem na reconstrução.
 - **Chance por CONFRONTO, não por golpe**: 15% autodestruição, 5% sono.

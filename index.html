@@ -13243,25 +13243,55 @@ function sequenciaDoConfronto(m){
   const sono = reais.find(g => g.x === 'sono') || null;
   if(sono){
     /* QUANTOS GOLPES SEGUIDOS quem usou o sono deu antes do primeiro do adormecido -- lido do
-       DIÁRIO, não do SONO_EM_TROCAS. Os dois números não são iguais: o sono compra 2 trocas, mas
-       se quem usou for o mais RÁPIDO ele ainda bate primeiro na troca em que o outro acorda, e aí
-       são 3 golpes seguidos. Ler do diário acerta os dois casos e continua certo se a duração do
-       sono mudar. */
+       DIÁRIO, não do SONO_EM_TROCAS. Os dois números não são iguais: o sono compra 2 trocas, mas se
+       quem usou for o mais RÁPIDO ele ainda bate primeiro na troca em que o outro acorda, e aí são
+       3 golpes seguidos. Ler do diário acerta esses dois casos, acerta o SONO DUPLO (os dois se
+       dormem, os contadores correm juntos e NINGUÉM ganha troca livre) e continua certo se a
+       duração do sono mudar. */
     const danoReal = reais.filter(g => !g.x || g.x === 'boom' || g.x === 'boomself');
     const iReal = danoReal.findIndex(g => g.q !== sono.q);
     const livres = iReal < 0 ? danoReal.length : iReal;
-    /* TRAZ ESSES GOLPES PRA FRENTE, e não só o primeiro. Trazendo um, o log dizia "fez dormir",
-       mostrava UM golpe de quem dormiu o outro e em seguida DOIS do adormecido -- lido de fora,
-       parecia que quem dormiu tinha atacado mais vezes que quem estava acordado. Reportado em
-       03/09/2026 com um Poliwrath que dormiu a Vileplume e apanhou duas vezes seguidas; medido
-       depois: acontecia em 99,6% dos confrontos com sono.
-       Não mexe em número nenhum -- cada golpe leva o próprio dano e o próprio dono, então a soma
-       de cada lado é a mesma. Só a ordem muda, e passa a contar a história certa. */
-    for(let k = 0; k < livres && k < reconstruida.length; k++){
-      if(reconstruida[k].q === sono.q) continue;
-      const i = reconstruida.findIndex((g, idx) => idx > k && g.q === sono.q);
-      if(i < 0) break;   // não há mais golpe dele pra trazer: mostra o que dá
-      reconstruida.splice(k, 0, reconstruida.splice(i, 1)[0]);
+    const meus = reconstruida.filter(g => g.q === sono.q);
+    const meuTotal = meus.reduce((a, g) => a + (g.d || 0), 0);
+    const outroTotal = reconstruida.filter(g => g.q !== sono.q).reduce((a, g) => a + (g.d || 0), 0);
+    /* Uma vaga fica pro outro lado: o ÚLTIMO golpe tem que ser o de quem matou, sempre. Sem isso o
+       log mostra alguém atacando depois de ter caído -- defeito já reportado três vezes aqui. */
+    const vagas = Math.min(livres, TETO_GOLPES - 1);
+    const usouOSonoPerdeu = (sono.q === 'p') ? !m.playerWon : !!m.playerWon;
+
+    if(usouOSonoPerdeu && !m.isTrade && vagas > meus.length && outroTotal > 0 && meuTotal >= vagas){
+      /* NÃO BASTA REORDENAR: A CONTAGEM É QUE ESTÁ ERRADA, e só quando quem dormiu o outro MORRE.
+         A reconstrução é um molde fixo -- "vencedor acerta uma parte, PERDEDOR solta tudo num golpe
+         só, vencedor termina" --, então quem perde fica sempre com UM golpe. Quando quem usou o
+         sono é justamente quem morreu, o log mostrava um golpe dele e dois do adormecido: lido de
+         fora, parecia que quem estava DORMINDO tinha atacado mais vezes que quem estava acordado.
+         Reportado duas vezes em 03/09/2026 (um Poliwrath, depois um Poliwag). Reordenar só mudava
+         a ordem de um golpe que continuava sendo um só.
+         Aqui a sequência é reescrita com a forma que o sono impõe: os golpes livres na frente e o
+         outro lado respondendo com tudo -- que é também o golpe que mata, e por isso fica por
+         último. Continua no TETO_GOLPES e continua somando o mesmo de cada lado; o que muda é em
+         quantos pedaços o dano de quem dormiu o outro aparece, e a reconstrução já é uma divisão
+         inventada (ela nunca teve os golpes reais).
+         QUANDO QUEM USOU O SONO VENCE não há o que consertar: o molde já dá DOIS golpes a ele
+         contra um do adversário, então ninguém lê "o adormecido atacou mais". E aí a forma tem que
+         continuar sendo a do molde -- golpe dele, resposta do outro, golpe dele -- porque o último
+         precisa ser o que derruba. */
+      const parte = Math.floor(meuTotal / vagas);
+      const nova = [];
+      let resto = meuTotal;
+      for(let k = 0; k < vagas; k++){
+        const d = (k === vagas - 1) ? resto : parte;
+        nova.push({ q: sono.q, d });
+        resto -= d;
+      }
+      nova.push({ q: sono.q === 'p' ? 'e' : 'p', d: outroTotal });
+      reconstruida.length = 0;
+      reconstruida.push(...nova);
+    } else if(reconstruida.length > 1 && reconstruida[0].q !== sono.q){
+      /* O básico, que vale pros outros casos: o adormecido não pode abrir o log atacando. Mexe só
+         no PRIMEIRO golpe -- puxar mais de um empurraria o golpe que mata pra fora do fim. */
+      const i = reconstruida.findIndex(g => g.q === sono.q);
+      if(i > 0) reconstruida.unshift(reconstruida.splice(i, 1)[0]);
     }
   }
   return aberturas.length ? aberturas.concat(reconstruida) : reconstruida;

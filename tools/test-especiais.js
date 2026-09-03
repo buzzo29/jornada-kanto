@@ -116,51 +116,73 @@ ok('e o log diz qual golpe foi', diario.some(g => g.x === 'sono' && g.g === 'Can
   ok('e quem dormiu NAO ataca logo depois de dormir', seq[1] && seq[1].q === sono.q,
      seq.map(g=>(g.x||'golpe')+':'+g.q).join(' '));
 })();
-/* E NAO BASTA UM GOLPE NA FRENTE -- essa era a versao anterior, e ela deixava passar o defeito que
-   foi reportado em 03/09/2026: um Poliwrath dormiu a Vileplume, o log mostrou UM golpe dele e em
-   seguida DOIS dela. Lido de fora, parecia que quem estava dormindo tinha atacado mais vezes que
-   quem estava acordado.
-   O sono compra SONO_EM_TROCAS trocas livres -- e TRES golpes seguidos quando quem usou e o mais
-   rapido, porque ele ainda bate primeiro na troca em que o outro acorda. O log tem que mostrar
-   tantos golpes livres quantos a luta teve, limitado pelas vagas da reconstrucao (que sao 3).
-   Medido antes do conserto: 99,6% dos confrontos com sono mostravam menos do que a luta teve. */
+/* E NAO BASTA UM GOLPE NA FRENTE, NEM SO REORDENAR.
+   Reportado duas vezes em 03/09/2026, com print: um Poliwrath dormiu a Vileplume e o log mostrou UM
+   golpe dele seguido de DOIS dela; depois um Poliwag com a Goldeen, igual. Lido de fora, parecia
+   que quem estava DORMINDO tinha atacado mais vezes que quem estava acordado.
+   A causa nao era ordem, era CONTAGEM: a reconstrucao e um molde fixo -- "vencedor acerta uma
+   parte, PERDEDOR solta tudo num golpe so, vencedor termina" --, entao quem perde fica sempre com
+   UM golpe. Quando quem usou o sono e justamente quem morreu, os quatro golpinhos livres dele
+   viravam um so.
+   SAO DOIS INVARIANTES AO MESMO TEMPO, e o segundo foi quebrado pela primeira tentativa de
+   conserto (23,7% dos confrontos passaram a terminar com o golpe de quem morreu):
+     1) quem usou o sono aparece com os golpes livres que a luta teve, ate onde as vagas permitem;
+     2) o ULTIMO golpe e sempre o de quem matou -- senao o log mostra alguem atacando depois de
+        cair, defeito ja reportado tres vezes neste projeto.
+   Quando quem usou o sono VENCE os dois nao cabem em 3 vagas, e ali o molde continua valendo: ele
+   ja da DOIS golpes a quem venceu contra um do outro, entao ninguem le "o adormecido atacou mais". */
 (function(){
-  const POOL = ['poliwrath','vileplume','gengar','snorlax','alakazam','jynx','butterfree','venusaur','arbok','paras'];
-  let casos = 0, contradiz = 0, duplos = 0, exemplo = null;
-  for(let i = 0; i < 20000; i++){
-    const a = POOL[i % POOL.length], b = POOL[(i*7+3) % POOL.length];
-    const r = S.simulateGymBattle([inst(a, 50 + (i%20))], [inst(b, 45 + (i%15))], Math.random);
+  const POOL = ['poliwag','goldeen','poliwrath','vileplume','gengar','snorlax','alakazam','jynx',
+                'butterfree','venusaur','arbok','paras','oddish','psyduck'];
+  let casos = 0, perdedorRuim = 0, ultimoErrado = 0, somaErrada = 0, duplos = 0, ex1 = null, ex2 = null;
+  for(let i = 0; i < 25000; i++){
+    const a = POOL[i % POOL.length], b = POOL[(i*5+2) % POOL.length];
+    const r = S.simulateGymBattle([inst(a, 10 + (i%45))], [inst(b, 10 + (i%40))], Math.random);
     for(const m of (r.matchups || [])){
       const g = m.golpes || [];
       const sonos = g.filter(x => x.x === 'sono');
       if(!sonos.length) continue;
       casos++;
-      /* SONO DUPLO existe: os dois se dormem, e ai NINGUEM tem troca livre -- os dois contadores
-         correm juntos. O log mostrando zero golpe livre esta certo nesses, e por isso o esperado
-         sai do DIARIO e nao de SONO_EM_TROCAS. */
       if(sonos.length > 1) duplos++;
       const sono = sonos[0];
       const seq = S.sequenciaDoConfronto(m);
       const dano = seq.filter(x => !x.x);
+      if(!dano.length) break;
+      const desc = () => 'luta: ' + g.map(x=>(x.x?'[s]':'')+x.q+(x.d?':'+x.d:'')).join(' ')
+                       + '  |  log: ' + seq.map(x=>(x.x?'[s]':'')+x.q+(x.d?':'+x.d:'')).join(' ');
+
+      /* 1) OS GOLPES LIVRES, no caso que foi reportado: quem usou o sono e MORREU. */
+      const usouPerdeu = (sono.q === 'p') ? !m.playerWon : !!m.playerWon;
       const iLog = dano.findIndex(x => x.q !== sono.q);
       const livresLog = iLog < 0 ? dano.length : iLog;
       const danoReal = g.filter(x => !x.x);
       const iReal = danoReal.findIndex(x => x.q !== sono.q);
       const livresReais = iReal < 0 ? danoReal.length : iReal;
-      const disponiveis = dano.filter(x => x.q === sono.q).length;
-      const ideal = Math.min(livresReais, disponiveis);
-      if(livresLog < ideal){
-        contradiz++;
-        if(!exemplo) exemplo = 'luta: ' + g.map(x=>(x.x?'['+x.x+']':'')+x.q).join(' ')
-          + '  |  log: ' + seq.map(x=>(x.x?'['+x.x+']':'')+x.q).join(' ');
+      if(usouPerdeu && livresLog < Math.min(livresReais, 2)){
+        perdedorRuim++; if(!ex1) ex1 = desc();
       }
+      /* 2) O GOLPE QUE MATA POR ULTIMO. */
+      const matou = m.playerWon ? 'p' : 'e';
+      if(!m.isTrade && dano[dano.length-1].q !== matou){
+        ultimoErrado++; if(!ex2) ex2 = desc();
+      }
+      /* 3) E O CONTRATO DA RECONSTRUCAO: a soma de cada lado nao muda. Reescrever a sequencia
+            mexe em quantos pedacos o dano aparece, nunca no total. */
+      const soma = { p:0, e:0 };
+      dano.forEach(x => { soma[x.q] += x.d || 0; });
+      if(soma.p !== Math.max(0, m.enemyHpBefore - m.enemyHpAfter) ||
+         soma.e !== Math.max(0, m.playerHpBefore - m.playerHpAfter)) somaErrada++;
       break;
     }
   }
-  ok('achei confrontos com sono de sobra pra medir', casos > 500, casos + ' confrontos (' + duplos + ' com os dois dormindo)');
-  ok('o log mostra todos os golpes livres que cabem na reconstrucao', contradiz === 0,
-     contradiz + ' de ' + casos + (exemplo ? '   |  ' + exemplo : ''));
+  ok('confrontos com sono de sobra pra medir', casos > 800, casos + ' (' + duplos + ' com os dois dormindo)');
+  ok('quem usou o sono e MORREU aparece com os golpes livres dele', perdedorRuim === 0,
+     perdedorRuim + ' de ' + casos + (ex1 ? '   |  ' + ex1 : ''));
+  ok('e o ULTIMO golpe e sempre o de quem matou', ultimoErrado === 0,
+     ultimoErrado + ' de ' + casos + (ex2 ? '   |  ' + ex2 : ''));
+  ok('sem mexer na soma de dano de nenhum lado', somaErrada === 0, somaErrada + ' de ' + casos);
 })();
+
 /* Quem nao tem golpe especial nunca cai nesse caminho. */
 a = inst('pidgey'); b = inst('onix');
 let nenhum = 0;
