@@ -5515,7 +5515,7 @@ function itensGastosDaBatalha(){ return itensGastos; }
    chamadas de batalha de propósito: são a mesma coisa -- estado da conta virando flag na instância. */
 function equiparItens(team, equipados){
   if(!team) return;
-  team.forEach(p => { if(p) p.item = (equipados && equipados[p.speciesId]) || null; });
+  team.forEach(p => { if(p) p.item = itemEquipado(equipados, p.speciesId); });
 }
 /* Abaixo disso (25%) a poção dispara. É "sobrou raspando", não "levou um arranhão". */
 const POCAO_GATILHO_HP = 0.25;
@@ -5905,6 +5905,31 @@ function raizDaLinha(id){
     });
   }
   return _raizDaLinha[id] || id;
+}
+/* A CHAVE DE UM ITEM EQUIPADO É A RAIZ DA LINHA, NÃO A ESPÉCIE (03/09/2026).
+   Era a espécie, e um pokémon que EVOLUÍA perdia o item: a poção ficava presa em "charmeleon"
+   enquanto o bicho passava a se chamar "charizard", e nem a tela nem a batalha achavam mais. Não
+   sumia da conta -- ficava fora do armazém, invisível e sem como ser recuperada, porque a tela só
+   sabe pedir pela espécie que está vendo. Reportado em 03/09/2026: "coloquei uma poção no
+   charmeleon, ele nem entrou na luta, evoluiu, e a poção sumiu".
+   A raiz é tão única quanto a espécie pra este fim (um save não tem duas do mesmo bicho, e a raiz
+   junta os dois lados da bifurcação -- Slowbro e Slowking são o mesmo Slowpoke) e tem a
+   propriedade que faltava: ela NÃO MUDA quando o pokémon evolui.
+   A LEITURA aceita qualquer chave da mesma linha, e é isso que devolve o que já estava perdido:
+   uma poção presa em "charmeleon" volta a ser achada pelo Charizard, sem migração de dados. */
+function chaveDoEquipado(speciesId){ return raizDaLinha(speciesId); }
+function itemEquipado(equipados, speciesId){
+  if(!equipados || !speciesId) return null;
+  const raiz = raizDaLinha(speciesId);
+  if(equipados[raiz]) return equipados[raiz];
+  for(const k in equipados){ if(raizDaLinha(k) === raiz) return equipados[k]; }
+  return null;
+}
+/* Toda chave da linha, pra APAGAR. Deveria haver uma só; pode haver duas enquanto sobrar dado
+   gravado com a chave velha, e deixar a antiga pra trás faria o item ressuscitar na leitura. */
+function chavesDaLinha(equipados, speciesId){
+  const raiz = raizDaLinha(speciesId);
+  return Object.keys(equipados || {}).filter(k => raizDaLinha(k) === raiz);
 }
 /* As linhas que o time JÁ tem. É o que impede a oferta selvagem de repetir espécie -- e o motivo
    de ser por LINHA e não por espécie: dois Magikarp viram dois Gyarados, e era assim que gente
@@ -16274,7 +16299,7 @@ function pilhasDoInventario(){
    Quando o pokémon já carrega alguma coisa, o botão mostra o ÍCONE do item em vez do +: a tela
    responde "o que este aqui está levando?" sem cobrar um toque. */
 function botaoDeItemHtml(speciesId){
-  const item = (game.equipados || {})[speciesId] || null;
+  const item = itemEquipado(game.equipados, speciesId);
   const it = item ? ITENS[item] : null;
   const rotulo = it ? 'Item: ' + it.nome : 'Equipar um item';
   return '<button class="order-item' + (item ? ' com-item' : '') + '"' +
@@ -16323,7 +16348,7 @@ function renderEscolhaDeItemModal(){
   if(!especie) return '';
   const sp = SPECIES[especie];
   const inv = game.inventario || {};
-  const atual = (game.equipados || {})[especie] || null;
+  const atual = itemEquipado(game.equipados, especie);
   /* A lista é o que a MOCHILA tem MAIS o que ele já carrega. O que ele carrega já saiu do armazém
      (equipar tira de lá), então filtrando só por estoque o item dele sumia da lista -- a caixa
      dizia "está carregando Despertar" e o Despertar não aparecia em lugar nenhum pra ver marcado.
@@ -16358,7 +16383,7 @@ function renderEscolhaDeItemModal(){
 function gastarItensQueTrabalharam(){
   const meus = itensGastosDaBatalha().filter(g => g && g.dono === 'p' && g.especie);
   if(!meus.length) return;
-  meus.forEach(g => { if(game.equipados) delete game.equipados[g.especie]; });
+  meus.forEach(g => { chavesDaLinha(game.equipados, g.especie).forEach(k => { delete game.equipados[k]; }); });
   if(game.authUser){
     functionsClient.httpsCallable('consumeEquipped')({ especies: meus.map(g => g.especie) })
       .catch(e => console.error('Erro ao consumir o item equipado:', e));

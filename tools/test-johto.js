@@ -94,5 +94,26 @@ ok('toda evolucao aponta pra especie existente', destinoRuim.length === 0, desti
 const origemRuim = Object.keys(E.valor).filter(id=>!S[id]);
 ok('toda origem existe', origemRuim.length === 0, origemRuim.join(','));
 
+
+console.log('\n=== EVOLUTION_CHOICES: A QUINTA TABELA DUPLICADA ===');
+/* Ela entrou no servidor em 03/09/2026 porque o raizDaLinha precisa dela pra chegar na MESMA
+   raiz que o cliente -- e a raiz e a chave dos itens equipados. Divergindo, um lado procura o
+   item numa chave e o outro noutra, e o pokemon perde o item ao evoluir. Compara por VALOR: os
+   dois arquivos tem comentarios proprios. */
+(function(){
+  const pega = (texto) => {
+    const m = texto.match(/const EVOLUTION_CHOICES = \{[\s\S]*?\n\};/);
+    if(!m) return null;
+    const fn = new Function(m[0] + '; return EVOLUTION_CHOICES;');
+    return fn();
+  };
+  const fs2 = require('fs');
+  const cli = pega(fs2.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8'));
+  const srv = pega(fs2.readFileSync(path.join(__dirname, '..', 'functions', 'index.js'), 'utf8'));
+  ok('o servidor tem a tabela', !!srv);
+  ok('e ela e IDENTICA a do cliente (por valor)',
+     !!cli && !!srv && JSON.stringify(cli) === JSON.stringify(srv),
+     JSON.stringify(cli) + '  x  ' + JSON.stringify(srv));
+})();
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
 process.exit(falhas ? 1 : 0);

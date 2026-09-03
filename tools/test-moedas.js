@@ -170,7 +170,7 @@ console.log('\n=== A LOJA: COMPRAR E USAR ===');
      pokemon marcados por causa de seis. */
   const e1 = await chamar('equipItem', 'g', { speciesId:'blastoise', item:'awakening' });
   ok('equipar tira o item do armazem', e1.inventario.awakening === 0, JSON.stringify(e1.inventario));
-  ok('e poe no pokemon', e1.equipados.blastoise === 'awakening', JSON.stringify(e1.equipados));
+  ok('e poe no pokemon, sob a RAIZ da linha dele', e1.equipados.squirtle === 'awakening', JSON.stringify(e1.equipados));
   ok('sem ter o item, equipar e recusado',
      await recusa('equipItem', 'g', { speciesId:'charizard', item:'awakening' }) === 'failed-precondition');
   ok('item que nao se equipa e recusado',
@@ -182,7 +182,7 @@ console.log('\n=== A LOJA: COMPRAR E USAR ===');
      seria pior que a troca nao acontecer. */
   const e2 = await chamar('equipItem', 'g', { speciesId:'blastoise', item:'potion' });
   ok('trocar de item devolve o antigo pro armazem', e2.inventario.awakening === 1, JSON.stringify(e2.inventario));
-  ok('e o novo e o que fica no pokemon', e2.equipados.blastoise === 'potion');
+  ok('e o novo e o que fica no pokemon', e2.equipados.squirtle === 'potion', JSON.stringify(e2.equipados));
 
   /* DESEQUIPAR devolve. O item so se PERDE quando trabalha. */
   const d1 = await chamar('unequipItem', 'g', { speciesId:'blastoise' });
@@ -202,6 +202,36 @@ console.log('\n=== A LOJA: COMPRAR E USAR ===');
   await chamar('consumeEquipped', 'g', { especies:['mewtwo'] });
   ok('e consumir quem nao tinha item nao quebra nem inventa nada',
      !((await userRef('g').get()).data().equipados || {}).mewtwo);
+
+  /* A CHAVE E A RAIZ DA LINHA, NAO A ESPECIE -- senao o pokemon evolui e perde o item.
+     Reportado em 03/09/2026: pocao no Charmeleon, ele evoluiu, e ela sumiu da tela e da batalha. */
+  await userRef('g').set({ moedas: 100 }, { merge:true });   // recarrega: as compras acima zeraram o saldo
+  await chamar('buyItem', 'g', { item:'potion' });
+  const ev = await chamar('equipItem', 'g', { speciesId:'charmeleon', item:'potion' });
+  ok('equipar num Charmeleon grava sob a RAIZ (charmander)',
+     ev.equipados.charmander === 'potion' && !ev.equipados.charmeleon, JSON.stringify(ev.equipados));
+  /* E o Charizard, depois de evoluir, e o mesmo pokemon pro servidor. */
+  const antesDoUn = ((await userRef('g').get()).data().inventario || {}).potion || 0;
+  const un = await chamar('unequipItem', 'g', { speciesId:'charizard' });
+  ok('e o Charizard consegue tirar o item que o Charmeleon pos',
+     un.inventario.potion === antesDoUn + 1 && !un.equipados.charmander, JSON.stringify(un));
+
+  /* DADO JA ESTRAGADO, gravado com a chave velha: tem que ser resgatavel, senao o item fica preso
+     pra sempre -- a tela so sabe pedir pela especie que esta vendo. */
+  await userRef('g').set({ equipados: { charmeleon: 'potion' } }, { merge:true });
+  const antesDoResgate = ((await userRef('g').get()).data().inventario || {}).potion || 0;
+  const un2 = await chamar('unequipItem', 'g', { speciesId:'charizard' });
+  ok('o item preso na chave velha volta pro armazem',
+     un2.inventario.potion === antesDoResgate + 1, antesDoResgate + ' -> ' + un2.inventario.potion);
+  ok('e a chave velha e apagada junto', !un2.equipados.charmeleon, JSON.stringify(un2.equipados));
+
+  /* Equipar por cima de dado velho NAO pode deixar as duas chaves: a leitura aceita a linha
+     inteira, entao a antiga ressuscitaria o item. */
+  await userRef('g').set({ equipados: { charmeleon: 'awakening' } }, { merge:true });
+  const ev2 = await chamar('equipItem', 'g', { speciesId:'charizard', item:'potion' });
+  ok('equipar por cima da chave velha apaga a velha',
+     ev2.equipados.charmander === 'potion' && !ev2.equipados.charmeleon, JSON.stringify(ev2.equipados));
+  ok('e devolve o item que estava la', ev2.devolvido === 'awakening', String(ev2.devolvido));
 }
 
 console.log('\n=== DUAS ABAS NAO COMPRAM O MESMO ITEM DUAS VEZES ===');

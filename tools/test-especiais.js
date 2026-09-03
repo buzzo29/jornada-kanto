@@ -792,6 +792,33 @@ function comItem(instancia, item){
   ok('quem NAO carrega o item continua dormindo', vizinhoDormiu > 30, vizinhoDormiu + ' vezes');
   ok('e quem carrega, nunca -- enquanto o item nao foi gasto', donoDormiuComItem === 0,
      donoDormiuComItem + ' com o item na mao, ' + donoDormiuGasto + ' depois de gasto');
+  /* O ITEM SOBREVIVE A EVOLUCAO. A chave dos equipados e a RAIZ DA LINHA, nao a especie: era a
+     especie, e um Charmeleon que evoluia perdia a pocao -- ela ficava presa em "charmeleon"
+     enquanto o bicho passava a se chamar "charizard", e nem a tela nem a batalha achavam mais.
+     Reportado em 03/09/2026 ("coloquei uma pocao no charmeleon... evoluiu, e a pocao sumiu").
+     Nao era gasto indevido: o motor nao anotava nada. Era a chave que deixava de casar. */
+  {
+    const antes = S.createInstance('charmeleon', 35);
+    S.equiparItens([antes], { charmander: 'potion' });
+    ok('o Charmeleon acha o item pela raiz da linha', antes.item === 'potion', String(antes.item));
+    const depois = S.createInstance('charizard', 40);
+    S.equiparItens([depois], { charmander: 'potion' });
+    ok('e o Charizard acha o MESMO item', depois.item === 'potion', String(depois.item));
+    /* DADO JA ESTRAGADO: quem equipou antes do conserto tem a chave na especie do meio. A leitura
+       aceita qualquer chave da MESMA linha, e e isso que devolve o item sem migrar nada. */
+    const resgatado = S.createInstance('charizard', 40);
+    S.equiparItens([resgatado], { charmeleon: 'potion' });
+    ok('e o que ficou preso na especie velha volta a ser achado', resgatado.item === 'potion', String(resgatado.item));
+    /* E NAO PODE VAZAR PRA LINHA VIZINHA: a raiz e tao unica quanto a especie era. */
+    const outro = S.createInstance('blastoise', 40);
+    S.equiparItens([outro], { charmander: 'potion' });
+    ok('e nao vaza pra outra linha', outro.item === null, String(outro.item));
+    /* A BIFURCACAO conta como a MESMA linha: Slowbro e Slowking sao o mesmo Slowpoke, e e por isso
+       que o raizDaLinha le o EVOLUTION_CHOICES. Sem ele o Slowking seria raiz de si mesmo. */
+    const rei = S.createInstance('slowking', 40);
+    S.equiparItens([rei], { slowpoke: 'awakening' });
+    ok('a bifurcacao tambem e a mesma linha (Slowking <- Slowpoke)', rei.item === 'awakening', String(rei.item));
+  }
   /* A frase tem que existir: item invisivel e o erro da especialidade de novo. */
   const g = { x:'semSono', q:'e', g:'Hipnose' };
   const frase = S.fraseDoEspecial(g, 'Jynx', 'Machop', {});

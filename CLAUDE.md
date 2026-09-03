@@ -834,11 +834,30 @@ de golpes.
   **desliga um golpe do jogo inteiro**. `inventario` (item → quantos) e `equipados` (espécie → item)
   entraram na trava do `firestore.rules` junto de `moedas` e `rareCandies`. Quem escreve é
   `buyItem`/`equipItem`/`unequipItem`/`consumeEquipped`.
-- **A chave dos equipados é a ESPÉCIE, nunca o id da instância.** O `id` (`mon7`) vem de um contador
-  que recomeça do 1 a cada carregamento de página e **repete entre saves** — foi assim que um jogador
-  viu oito pokémon marcados por causa de seis (ver a seção do Ginásio da Cidade). Espécie é única na
-  conta pra este fim: um save não tem duas da mesma, porque o encontro selvagem nunca oferece uma
-  linha que o time já tem e o montador recusa repetida.
+- **A chave dos equipados é a RAIZ DA LINHA EVOLUTIVA** (`raizDaLinha`), **nunca o id da instância e
+  nunca a espécie.** O `id` (`mon7`) vem de um contador que recomeça do 1 a cada carregamento de
+  página e **repete entre saves** — foi assim que um jogador viu oito pokémon marcados por causa de
+  seis (ver a seção do Ginásio da Cidade).
+  **A ESPÉCIE foi a primeira tentativa e durou um dia**: o pokémon EVOLUI e a espécie muda. Uma
+  poção equipada num Charmeleon ficava presa na chave `charmeleon` enquanto o bicho passava a se
+  chamar `charizard` — a tela mostrava o + de "sem item" e a batalha não aplicava nada.
+  Reportado em 03/09/2026: *"coloquei uma poção no charmeleon, ele nem entrou na luta, evoluiu, e a
+  poção sumiu"*. **Ela não sumia da conta**: ficava fora do armazém, invisível e IRRECUPERÁVEL,
+  porque a tela só sabe pedir pela espécie que está vendo.
+  **As duas hipóteses do relato foram separadas por medição**: trocar de partida não mexe em nada (o
+  motor não anota gasto de quem não lutou, e o mapa sai intacto); a evolução, sozinha, causa tudo.
+  A raiz é tão única quanto a espécie era pra este fim (um save não tem duas do mesmo bicho — o
+  encontro selvagem nunca oferece uma linha que o time já tem e o montador recusa repetida) e junta
+  os dois lados da bifurcação, que é o que se quer: Slowbro e Slowking são o MESMO Slowpoke. E tem a
+  propriedade que faltava — **ela não muda quando o pokémon evolui**.
+- **A LEITURA aceita QUALQUER chave da mesma linha** (`itemEquipado`), e é isso que devolveu o que já
+  estava perdido **sem migração de dados**: uma poção gravada em `charmeleon` volta a ser achada pelo
+  Charizard. A ESCRITA grava na raiz e **apaga toda chave velha da linha** — deixar a antiga pra trás
+  faria o item ressuscitar na leitura seguinte.
+- **O `EVOLUTION_CHOICES` virou a QUINTA tabela duplicada** (com SPECIES, GEN2_SPECIAL, EVOLUTIONS e
+  TERRAINS): o `raizDaLinha` precisa dela pros dois lados chegarem na MESMA raiz, senão o servidor
+  procuraria o item do Slowking sob `slowking` e o cliente sob `slowpoke`. `tools/test-johto.js`
+  compara as duas por VALOR, como já fazia com as outras.
 - **Equipar TIRA do armazém; desequipar DEVOLVE; trabalhar PERDE.** Trocar o que o pokémon já
   carregava devolve o antigo — perder um item por ter clicado no botão errado seria pior que a troca
   não acontecer. Tudo em transação: sem ela duas abas leem o mesmo estoque e as duas passam, e um

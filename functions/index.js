@@ -911,7 +911,7 @@ function itensGastosDaBatalha(){ return itensGastos; }
    chamadas de batalha de propósito: são a mesma coisa -- estado da conta virando flag na instância. */
 function equiparItens(team, equipados){
   if(!team) return;
-  team.forEach(p => { if(p) p.item = (equipados && equipados[p.speciesId]) || null; });
+  team.forEach(p => { if(p) p.item = itemEquipado(equipados, p.speciesId); });
 }
 /* Abaixo disso (25%) a poção dispara. É "sobrou raspando", não "levou um arranhão". */
 const POCAO_GATILHO_HP = 0.25;
@@ -1176,6 +1176,16 @@ function makeSeededRng(seedStr){
     return (h >>> 0) / 4294967296;
   };
 }
+/* Linhas que se DIVIDEM. No cliente é a tela evoChoice que pergunta; aqui a tabela existe só pra
+   o raizDaLinha (abaixo) chegar na MESMA raiz que o cliente: sem ela, a raiz de um Slowking seria
+   ele mesmo em vez de slowpoke, e os dois lados procurariam o item equipado em chaves diferentes.
+   Tem que ficar idêntica à do index.html -- tools/test-johto.js compara por valor. */
+const EVOLUTION_CHOICES = {
+  gloom:     ['vileplume','bellossom'],
+  poliwhirl: ['poliwrath','politoed'],
+  slowpoke:  ['slowbro','slowking'],
+  tyrogue:   ['hitmonlee','hitmonchan','hitmontop']
+};
 const EVOLUTIONS = {
   bulbasaur:{level:16, into:'ivysaur'},
   ivysaur:{level:32, into:'venusaur'},
@@ -4543,6 +4553,49 @@ const EQUIPAVEIS = ['awakening', 'hyperpotion', 'potion'];
    tem, e o montador recusa repetida). O id da instância NÃO serve: ele vem de um contador que
    recomeça do 1 a cada carregamento de página, e dois saves têm `mon7` cada um -- foi assim que um
    jogador viu oito pokémon marcados por causa de seis. */
+/* A RAIZ da linha evolutiva -- a chave que identifica "é o mesmo bicho" mesmo depois de evoluir.
+   É a MESMA função do cliente, palavra por palavra, e pelo mesmo motivo: se as duas discordarem,
+   um lado procura o item equipado numa chave e o outro noutra. */
+let _raizDaLinha = null;
+function raizDaLinha(id){
+  if(!_raizDaLinha){
+    const pai = {};
+    for(const de in EVOLUTIONS){ pai[EVOLUTIONS[de].into] = de; }
+    for(const de in EVOLUTION_CHOICES){ EVOLUTION_CHOICES[de].forEach(dest=>{ pai[dest] = de; }); }
+    _raizDaLinha = {};
+    Object.keys(SPECIES).forEach(sp=>{
+      let cur = sp, guarda = 0;
+      while(pai[cur] && guarda++ < 10) cur = pai[cur];
+      _raizDaLinha[sp] = cur;
+    });
+  }
+  return _raizDaLinha[id] || id;
+}
+/* A CHAVE DE UM ITEM EQUIPADO É A RAIZ DA LINHA, NÃO A ESPÉCIE (03/09/2026).
+   Era a espécie, e um pokémon que EVOLUÍA perdia o item: a poção ficava presa em "charmeleon"
+   enquanto o bicho passava a se chamar "charizard", e nem a tela nem a batalha achavam mais. Não
+   sumia da conta -- ficava fora do armazém, invisível e sem como ser recuperada, porque a tela só
+   sabe pedir pela espécie que está vendo. Reportado em 03/09/2026: "coloquei uma poção no
+   charmeleon, ele nem entrou na luta, evoluiu, e a poção sumiu".
+   A raiz é tão única quanto a espécie pra este fim (um save não tem duas do mesmo bicho, e a raiz
+   junta os dois lados da bifurcação -- Slowbro e Slowking são o mesmo Slowpoke) e tem a
+   propriedade que faltava: ela NÃO MUDA quando o pokémon evolui.
+   A LEITURA aceita qualquer chave da mesma linha, e é isso que devolve o que já estava perdido:
+   uma poção presa em "charmeleon" volta a ser achada pelo Charizard, sem migração de dados. */
+function chaveDoEquipado(speciesId){ return raizDaLinha(speciesId); }
+function itemEquipado(equipados, speciesId){
+  if(!equipados || !speciesId) return null;
+  const raiz = raizDaLinha(speciesId);
+  if(equipados[raiz]) return equipados[raiz];
+  for(const k in equipados){ if(raizDaLinha(k) === raiz) return equipados[k]; }
+  return null;
+}
+/* Toda chave da linha, pra APAGAR. Deveria haver uma só; pode haver duas enquanto sobrar dado
+   gravado com a chave velha, e deixar a antiga pra trás faria o item ressuscitar na leitura. */
+function chavesDaLinha(equipados, speciesId){
+  const raiz = raizDaLinha(speciesId);
+  return Object.keys(equipados || {}).filter(k => raizDaLinha(k) === raiz);
+}
 function equipadosDaConta(d){ return (d && d.equipados) || {}; }
 
 /* TIRA DA CONTA o que o motor gastou na batalha. O motor não fala com o banco: ele anota em
@@ -4551,8 +4604,13 @@ function equipadosDaConta(d){ return (d && d.equipados) || {}; }
 async function gastarItensEquipados(uid, gastos){
   const meus = (gastos || []).filter(g => g && g.dono === 'p' && g.especie);
   if(!meus.length) return;
+  /* O motor anota a ESPÉCIE que estava lutando; a conta guarda pela RAIZ DA LINHA. Apaga toda
+     chave da linha -- inclusive a velha, de quando a chave era a espécie. */
+  const snap = await db.collection('users').doc(uid).get().catch(()=>null);
+  const equipados = (snap && snap.exists && snap.data().equipados) || {};
   const patch = {};
-  meus.forEach(g => { patch['equipados.' + g.especie] = admin.firestore.FieldValue.delete(); });
+  meus.forEach(g => { chavesDaLinha(equipados, g.especie).forEach(k => { patch['equipados.' + k] = admin.firestore.FieldValue.delete(); }); });
+  if(!Object.keys(patch).length) return;
   await db.collection('users').doc(uid).update(patch).catch(e => logger.error('Erro ao gastar item equipado:', e));
 }
 
@@ -4603,17 +4661,25 @@ exports.equipItem = onCall(async (request) => {
     const quantos = (d.inventario && d.inventario[item]) || 0;
     if(quantos <= 0) throw new HttpsError('failed-precondition', 'Você não tem esse item.');
     const equipados = Object.assign({}, d.equipados || {});
+    /* A chave é a RAIZ DA LINHA: assim o item continua no pokémon depois de ele evoluir. */
+    const chave = chaveDoEquipado(especie);
+    const antigas = chavesDaLinha(equipados, especie);
     /* UM ITEM POR POKÉMON. Trocar o que ele já carregava DEVOLVE o antigo pro armazém: perder um
        item porque se clicou no botão errado seria pior que a troca não acontecer. */
-    const antigo = equipados[especie] || null;
-    const patch = { inventario: { [item]: admin.firestore.FieldValue.increment(-1) },
-                    equipados: { [especie]: item } };
+    const antigo = itemEquipado(equipados, especie);
+    const patch = { inventario: { [item]: admin.firestore.FieldValue.increment(-1) } };
     if(antigo) patch.inventario[antigo] = admin.firestore.FieldValue.increment(1);
     tx.set(userRef, patch, { merge: true });
+    /* Apaga QUALQUER chave velha da linha antes de gravar a nova -- dado gravado com a chave antiga
+       (a espécie) ressuscitaria na leitura, que aceita a linha inteira. */
+    const upd = { ['equipados.' + chave]: item };
+    antigas.forEach(k => { if(k !== chave) upd['equipados.' + k] = admin.firestore.FieldValue.delete(); });
+    tx.update(userRef, upd);
     const inv = Object.assign({}, d.inventario || {});
     inv[item] = quantos - 1;
     if(antigo) inv[antigo] = (inv[antigo] || 0) + 1;
-    equipados[especie] = item;
+    antigas.forEach(k => { delete equipados[k]; });
+    equipados[chave] = item;
     return { inventario: inv, equipados, devolvido: antigo };
   });
 });
@@ -4629,13 +4695,16 @@ exports.unequipItem = onCall(async (request) => {
     const [snap] = await tx.getAll(userRef);
     const d = snap.exists ? (snap.data() || {}) : {};
     const equipados = Object.assign({}, d.equipados || {});
-    const item = equipados[especie];
+    const item = itemEquipado(equipados, especie);
     if(!item) throw new HttpsError('failed-precondition', 'Esse pokémon não está com item nenhum.');
-    tx.update(userRef, { ['equipados.' + especie]: admin.firestore.FieldValue.delete(),
-                         ['inventario.' + item]: admin.firestore.FieldValue.increment(1) });
+    /* Apaga TODA chave da linha: o pokémon pode ter evoluído, e o item estar guardado sob a espécie
+       de antes. Procurar só pela espécie de agora devolveria "não tem item" pra quem tem. */
+    const upd = { ['inventario.' + item]: admin.firestore.FieldValue.increment(1) };
+    chavesDaLinha(equipados, especie).forEach(k => { upd['equipados.' + k] = admin.firestore.FieldValue.delete(); });
+    tx.update(userRef, upd);
     const inv = Object.assign({}, d.inventario || {});
     inv[item] = (inv[item] || 0) + 1;
-    delete equipados[especie];
+    chavesDaLinha(equipados, especie).forEach(k => { delete equipados[k]; });
     return { inventario: inv, equipados };
   });
 });
@@ -4654,8 +4723,9 @@ exports.consumeEquipped = onCall(async (request) => {
   const userRef = db.collection('users').doc(uid);
   const snap = await userRef.get();
   const equipados = (snap.exists && snap.data().equipados) || {};
+  /* Pela RAIZ DA LINHA, não pela espécie: o pokémon pode ter evoluído entre equipar e gastar. */
   const patch = {};
-  especies.forEach(e => { if(equipados[e]) patch['equipados.' + e] = admin.firestore.FieldValue.delete(); });
+  especies.forEach(e => { chavesDaLinha(equipados, e).forEach(k => { patch['equipados.' + k] = admin.firestore.FieldValue.delete(); }); });
   if(!Object.keys(patch).length) return { ok: true };
   await userRef.update(patch);
   return { ok: true };
