@@ -228,35 +228,15 @@ de golpes.
 - **Quem dorme não vira linha no log.** O golpe do adormecido não entra no diário — uma linha de
   "−0 de HP" faria o log dizer que ele atacou e não machucou, quando o que aconteceu foi ele não ter
   atacado.
-- **E a reconstrução não pode contradizer o sono.** Ela não sabe do golpe (só interpola HP) e
-  começava pelo golpe de quem tinha acabado de dormir — o log se contradizia na cara do jogador:
-  "fez dormir" e, na linha seguinte, o adormecido batendo. Hoje o golpe de quem USOU o sono vem pra
-  frente. Não mexe em número nenhum: a soma dos golpes é a mesma, só a ordem muda.
-  **E NÃO BASTA UM GOLPE NA FRENTE, NEM SÓ REORDENAR** — foi assim até 03/09/2026, e o defeito foi
-  reportado DUAS vezes com print: um Poliwrath dormiu a Vileplume e o log mostrou **um** golpe dele
-  seguido de **dois** dela; depois um Poliwag com uma Goldeen, igual. Lido de fora, parecia que quem
-  estava **dormindo** tinha atacado mais vezes que quem estava acordado.
-  **A causa não era ordem, era CONTAGEM.** A reconstrução é um molde fixo — "vencedor acerta uma
-  parte, PERDEDOR solta tudo num golpe só, vencedor termina" —, então **quem perde fica sempre com
-  UM golpe**. Quando quem usou o sono é justamente quem morreu, os quatro golpinhos livres dele
-  viravam um só, e o outro lado ficava com dois. Reordenar só mudava a ordem de um golpe que
-  continuava sendo um só.
-  Hoje, nesse caso, a sequência é **reescrita**: os golpes livres na frente (quantos a luta teve,
-  lidos do DIÁRIO) e o outro lado respondendo com tudo — que é também o golpe que mata.
-  **SÃO DOIS INVARIANTES AO MESMO TEMPO**, e o segundo foi quebrado pela primeira tentativa de
-  conserto (23,7% dos confrontos passaram a terminar com o golpe de quem morreu — o "atacou depois
-  de cair" que já foi reportado três vezes aqui):
-    1. quem usou o sono aparece com os golpes livres que a luta teve, até onde as vagas permitem;
-    2. o **ÚLTIMO golpe é sempre o de quem matou**.
-  **Quando quem usou o sono VENCE, os dois não cabem em 3 vagas** — e ali o molde continua valendo,
-  porque ele já dá DOIS golpes a quem venceu contra um do outro: ninguém lê "o adormecido atacou
-  mais". É por isso que a reescrita só vale pro caso em que quem dormiu o outro morreu.
-  Medido em 25.000 batalhas (14 espécies, níveis 10-55, ~1.600 confrontos com sono): os dois
-  invariantes em **0 falhas**, e a soma de dano de cada lado intacta — a reescrita muda em quantos
-  pedaços o dano aparece, nunca o total. `tools/test-especiais.js` tranca os dois, e foi conferido
-  que ele falha com cada um dos dois defeitos reintroduzido em separado (453 e 352 casos).
-  Isso passou a importar mais do que antes: com a luta continuando depois do sono, **mais confrontos
-  passam do `TETO_GOLPES`** e caem na reconstrução.
+- **A reconstrução chegou a contradizer o sono, e hoje não tem como.** Ela não conhece os golpes
+  especiais — só interpola HP —, então ora começava pelo golpe de quem tinha acabado de dormir, ora
+  esmagava os golpes livres de quem dormiu o outro num golpe só ("um golpe dele, dois dela",
+  reportado duas vezes em 03/09/2026). Foram duas tentativas de remendo, e a segunda quebrou o
+  moribundo em 23,7% dos confrontos.
+  O conserto certo foi outro: **o log passou a mostrar o diário inteiro** (ver a seção do Log de
+  batalha), e a reconstrução virou o fallback que ela sempre foi por escrito. Sem ela no caminho não
+  há o que contradizer — e os remendos saíram.
+
 - **Chance por CONFRONTO, não por golpe**: 15% autodestruição, 5% sono.
   **Só sai contra alvo com MAIS da metade da vida** (`BOOM_MINIMO_DO_ALVO = 0,5`, 02/09/2026).
   Explodir num adversário já machucado é trocar o pokémon inteiro por um abate que a troca de golpes
@@ -308,9 +288,10 @@ de golpes.
   online vêm na perspectiva do A, e quem é o B **vira os lados do diário junto** — sem isso a frase
   troca quem anulou por quem foi anulado.
 - **O Disable fica FORA da `sequenciaDoConfronto`.** Ele não tira HP e a luta continua depois dele,
-  então viraria um passo de dano 0 na animação — e, pior, consumiria uma vaga do `TETO_GOLPES`:
-  com ele contando, uma troca real de 2 golpes estourava o teto e o log inteiro caía na
-  reconstrução, perdendo os golpes de verdade. A linha dele é montada à parte e vem **antes** de
+  então viraria um passo de dano 0 na animação. (Ele também gastava uma vaga do `TETO_GOLPES`, o
+  que jogava uma troca real de 2 golpes na reconstrução — esse motivo caducou em 03/09/2026, quando
+  o teto saiu e o log passou a mostrar o diário inteiro; o primeiro continua valendo.)
+  A linha dele é montada à parte e vem **antes** de
   tudo no log: a anulação acontece na abertura, e a luta que se lê embaixo já é a luta com o golpe
   anulado.
 - **Recuperar (`RECUPERACAO`, 10%): 10 espécies, e acontece ANTES da luta.** O pokémon que sobreviveu
@@ -341,9 +322,9 @@ de golpes.
     anuncia a barra que VAI subir, então ela sai assim que a barra subiu. Sem isso ela ficava na
     tela o confronto inteiro, ocupando o lugar do "Trocando golpes...". Autodestruição e sono são o
     contrário: ali o confronto INTEIRO é aquilo, e a frase acompanha até o fim.
-  A cura **não gasta vaga do `TETO_GOLPES`** (o teto conta GOLPES), e quando o confronto passa do
-  teto a **reconstrução parte da vida CHEIA** — a luta começa depois da cura, e reconstruir a partir
-  do HP machucado desenharia a barra caindo de um valor que a luta nunca teve.
+  (A cura não gastava vaga do `TETO_GOLPES`, e quando o confronto passava do teto a reconstrução
+  tinha de partir da vida CHEIA — senão a barra caía de um valor que a luta nunca teve. Isso caducou
+  em 03/09/2026 junto com o teto: o log mostra o diário, e a cura está nele.)
 - **Mew e Mewtwo são imunes** (`IMUNES_A_ESPECIAL`). O Mew é o chefe da raide global, com 25.125 de
   HP calibrados pra ~399 ataques: um Geodude nível 20 com 15% de chance de derrubá-lo num golpe
   acabaria com a raide da semana. O Mewtwo é o desafio de fim de jogo pelo mesmo motivo. Medido com
@@ -391,11 +372,38 @@ de golpes.
   passar ou não o array não muda um ponto de dano (conferido por hash, 14.645 confrontos).
 - **O dano gravado é o EFETIVO, não o sorteado.** Golpe de 101 em quem tem 54 de HP entra como 54.
   Com o valor cru o log não fechava: somando as linhas dava mais dano do que o pokémon tinha.
-- **Log e animação leem a MESMA lista** (`sequenciaDoConfronto`, teto de 3 golpes). Enquanto eram
-  montadas em separado, o jogador via 3 golpes na tela e lia 4, 7 linhas no log — reportado três
-  vezes. A reconstrução de 3 golpes é **determinística** (semente tirada do próprio confronto):
-  com `Math.random()`, log e animação sorteavam divisões diferentes e cada redesenho trocava os
-  números.
+- **O LOG MOSTRA O DIÁRIO INTEIRO, e a animação mostra o mesmo.** As duas leem a MESMA lista
+  (`sequenciaDoConfronto`) — enquanto eram montadas em separado, o jogador via 3 golpes na tela e
+  lia 7 linhas no log, e isso foi reportado três vezes.
+  **Havia um teto de 3 golpes (`TETO_GOLPES`) e ele estava errado por um número:** medido em 3.944
+  confrontos, a mediana é **4** golpes de dano, 90% vão até 6, 99% até 12 e o maior foi 28 — ou seja,
+  **99,4% dos confrontos passavam do teto**, e quase todo log que o jogador lia era uma divisão
+  INVENTADA pela reconstrução, não a luta dele. Os golpes especiais pioraram isso: o sono faz a luta
+  continuar depois das trocas livres, então os confrontos ficaram mais longos.
+  **O custo de mostrar tudo foi medido e é pequeno**, porque a barra já dura proporcional ao dano
+  (`hpBarTransitionMs`): dez golpinhos custam quase o mesmo que três golpaços. Animação por
+  confronto: mediana **2.043 → 2.282ms**, 99% 2.558 → 3.874ms, pior caso 2.865 → 10.200ms. Na
+  jornada ninguém está esperando o outro lado; no online o `ORCAMENTO_ANIM_ONLINE_MS` já comprime o
+  que passar de 4,5s. Removido em 03/09/2026, a pedido ("não tem problema colocar mais linhas no
+  log, o importante é que a batalha visualmente seja igual ao log").
+- **A reconstrução virou o que ela sempre foi por escrito: o fallback pra confronto gravado ANTES do
+  diário existir.** Com isso saiu uma classe inteira de defeito — ela não conhece os golpes
+  especiais, e contradizia o sono ora invertendo a ordem, ora esmagando os golpes livres de quem
+  dormiu o outro num golpe só (reportado duas vezes em 03/09/2026). Todo o remendo que reordenava e
+  reescrevia a sequência por causa do sono **saiu junto**: era código que não tinha mais como rodar,
+  porque sono e cura só existem COMO registro do diário, e um confronto sem diário nunca os teve.
+- **GOLPE DE DANO ZERO NÃO É GOLPE, e o teto escondia isso.** Ele existe no diário: quando o alvo já
+  está em 0, o dano EFETIVO é 0 — é o revide de quem caiu contra quem já tinha caído. Mostrando o
+  diário inteiro ele aparecia em **0,50%** dos confrontos e virava um "**−0 de HP**" na tela, que é
+  exatamente o que faz o jogador procurar bug onde é regra (mesmo motivo do "mas não teve efeito" da
+  imunidade). As **aberturas** (sono, cura) têm `d=0` de propósito e ficam: elas não são dano, são o
+  passo.
+- **Alguém sempre vai parecer agir depois de cair, e a regra escolhe quem.** Medido nos 4.000
+  confrontos: 205 casos são o **golpe moribundo** (que entra ANTES do golpe que derrubou quem o deu
+  — os dois são do mesmo instante) e 52 são a **explosão** (um evento só, com duas entradas, porque
+  os dois caem juntos). Fora esses dois, **zero**. `tools/test-especiais.js` tranca isso, junto com
+  "a animação tem os mesmos passos do log", "a soma de dano de cada lado fecha" e "nenhum golpe de
+  dano zero na tela".
 - **O golpe moribundo vale CHEIO** (`DYING_BLOW_FACTOR = 1.0`). Valeu metade até 30/08/2026, e o
   efeito colateral era ilegível: um Venusaur com vantagem de tipo tirava 112 em vez de 223 e o
   jogador procurava bug no multiplicador. Medido na mudança: **11,2% das batalhas trocam de

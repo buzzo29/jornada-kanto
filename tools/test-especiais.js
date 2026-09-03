@@ -116,71 +116,90 @@ ok('e o log diz qual golpe foi', diario.some(g => g.x === 'sono' && g.g === 'Can
   ok('e quem dormiu NAO ataca logo depois de dormir', seq[1] && seq[1].q === sono.q,
      seq.map(g=>(g.x||'golpe')+':'+g.q).join(' '));
 })();
-/* E NAO BASTA UM GOLPE NA FRENTE, NEM SO REORDENAR.
-   Reportado duas vezes em 03/09/2026, com print: um Poliwrath dormiu a Vileplume e o log mostrou UM
-   golpe dele seguido de DOIS dela; depois um Poliwag com a Goldeen, igual. Lido de fora, parecia
-   que quem estava DORMINDO tinha atacado mais vezes que quem estava acordado.
-   A causa nao era ordem, era CONTAGEM: a reconstrucao e um molde fixo -- "vencedor acerta uma
-   parte, PERDEDOR solta tudo num golpe so, vencedor termina" --, entao quem perde fica sempre com
-   UM golpe. Quando quem usou o sono e justamente quem morreu, os quatro golpinhos livres dele
-   viravam um so.
-   SAO DOIS INVARIANTES AO MESMO TEMPO, e o segundo foi quebrado pela primeira tentativa de
-   conserto (23,7% dos confrontos passaram a terminar com o golpe de quem morreu):
-     1) quem usou o sono aparece com os golpes livres que a luta teve, ate onde as vagas permitem;
-     2) o ULTIMO golpe e sempre o de quem matou -- senao o log mostra alguem atacando depois de
-        cair, defeito ja reportado tres vezes neste projeto.
-   Quando quem usou o sono VENCE os dois nao cabem em 3 vagas, e ali o molde continua valendo: ele
-   ja da DOIS golpes a quem venceu contra um do outro, entao ninguem le "o adormecido atacou mais". */
+/* O LOG MOSTRA O DIARIO INTEIRO -- e a animacao mostra o mesmo.
+   Havia um teto de 3 golpes, e ele estava errado por um numero: 99,4% dos confrontos passam de 3
+   (mediana 4, maior 28), entao quase todo log que o jogador lia era uma divisao INVENTADA pela
+   reconstrucao, nao a luta dele. Foi de la que sairam os dois defeitos de sono reportados em
+   03/09/2026: a reconstrucao nao conhece os golpes especiais, entao ora invertia a ordem, ora
+   esmagava os golpes livres de quem dormiu o outro num golpe so.
+   Mostrando o diario nao ha o que contradizer -- e este bloco tranca as consequencias disso, que
+   sao coisas que o teto escondia. */
 (function(){
-  const POOL = ['poliwag','goldeen','poliwrath','vileplume','gengar','snorlax','alakazam','jynx',
-                'butterfree','venusaur','arbok','paras','oddish','psyduck'];
-  let casos = 0, perdedorRuim = 0, ultimoErrado = 0, somaErrada = 0, duplos = 0, ex1 = null, ex2 = null;
-  for(let i = 0; i < 25000; i++){
-    const a = POOL[i % POOL.length], b = POOL[(i*5+2) % POOL.length];
-    const r = S.simulateGymBattle([inst(a, 10 + (i%45))], [inst(b, 10 + (i%40))], Math.random);
+  const POOL = Object.keys(S.SPECIES).filter(id => S.SPECIES[id].dex <= 251);
+  const rng = S.makeSeededRng('log-diario');
+  const ehDano = x => !x.x || x.x === 'boom' || x.x === 'boomself';
+  let confrontos = 0, animDif = 0, somaErrada = 0, comZero = 0, caiuDefeito = 0;
+  let comSono = 0, sonoOk = 0, exZero = null, exAnim = null, exCaiu = null;
+  for(let i = 0; i < 4000; i++){
+    const a = POOL[Math.floor(rng()*POOL.length)], b = POOL[Math.floor(rng()*POOL.length)];
+    const r = S.simulateGymBattle([inst(a, 30 + Math.floor(rng()*40))], [inst(b, 30 + Math.floor(rng()*40))], Math.random);
     for(const m of (r.matchups || [])){
-      const g = m.golpes || [];
-      const sonos = g.filter(x => x.x === 'sono');
-      if(!sonos.length) continue;
-      casos++;
-      if(sonos.length > 1) duplos++;
-      const sono = sonos[0];
+      if(!(m.golpes||[]).length) continue;
+      confrontos++;
       const seq = S.sequenciaDoConfronto(m);
-      const dano = seq.filter(x => !x.x);
-      if(!dano.length) break;
-      const desc = () => 'luta: ' + g.map(x=>(x.x?'[s]':'')+x.q+(x.d?':'+x.d:'')).join(' ')
-                       + '  |  log: ' + seq.map(x=>(x.x?'[s]':'')+x.q+(x.d?':'+x.d:'')).join(' ');
+      const desc = () => seq.map(x=>(x.x?'['+x.x+']':'')+x.q+':'+(x.d||0)).join(' ');
 
-      /* 1) OS GOLPES LIVRES, no caso que foi reportado: quem usou o sono e MORREU. */
-      const usouPerdeu = (sono.q === 'p') ? !m.playerWon : !!m.playerWon;
-      const iLog = dano.findIndex(x => x.q !== sono.q);
-      const livresLog = iLog < 0 ? dano.length : iLog;
-      const danoReal = g.filter(x => !x.x);
-      const iReal = danoReal.findIndex(x => x.q !== sono.q);
-      const livresReais = iReal < 0 ? danoReal.length : iReal;
-      if(usouPerdeu && livresLog < Math.min(livresReais, 2)){
-        perdedorRuim++; if(!ex1) ex1 = desc();
-      }
-      /* 2) O GOLPE QUE MATA POR ULTIMO. */
-      const matou = m.playerWon ? 'p' : 'e';
-      if(!m.isTrade && dano[dano.length-1].q !== matou){
-        ultimoErrado++; if(!ex2) ex2 = desc();
-      }
-      /* 3) E O CONTRATO DA RECONSTRUCAO: a soma de cada lado nao muda. Reescrever a sequencia
-            mexe em quantos pedacos o dano aparece, nunca no total. */
+      /* 1) O PEDIDO DO JOGADOR: a animacao tem que ter EXATAMENTE os passos do log, inclusive as
+            aberturas (sono e cura). Enquanto eram montadas em separado, ele via 3 golpes na tela e
+            lia 7 linhas -- reportado tres vezes. */
+      if(S.buildAnimatedHitSequence(m).length !== seq.length){ animDif++; if(!exAnim) exAnim = desc(); }
+
+      /* 2) A soma de cada lado bate com o HP perdido. E o contrato do log desde sempre: somando as
+            linhas nao pode dar mais dano do que o pokemon tinha. */
       const soma = { p:0, e:0 };
-      dano.forEach(x => { soma[x.q] += x.d || 0; });
+      seq.filter(ehDano).forEach(x => { soma[x.q] += x.d || 0; });
       if(soma.p !== Math.max(0, m.enemyHpBefore - m.enemyHpAfter) ||
          soma.e !== Math.max(0, m.playerHpBefore - m.playerHpAfter)) somaErrada++;
+
+      /* 3) NENHUM GOLPE DE DANO ZERO. Ele existe no diario -- e o revide de quem caiu contra quem
+            ja tinha caido, e o dano EFETIVO ali e 0 -- e viraria um "-0 de HP" na tela, que e
+            exatamente o que faz procurar bug onde e regra. O teto escondia: aparecia em 0,50% dos
+            confrontos. */
+      const zeros = seq.filter(g => ehDano(g) && !(g.d > 0));
+      if(zeros.length){ comZero++; if(!exZero) exZero = desc(); }
+
+      /* 4) NINGUEM ATACA DEPOIS DE CAIR, tirando os dois casos que a casa aceita: a EXPLOSAO (um
+            evento so, com duas entradas, porque os dois caem juntos) e o GOLPE MORIBUNDO, que entra
+            ANTES do golpe que derrubou quem o deu -- os dois sao do mesmo instante, e alguem sempre
+            vai parecer agir depois de cair; a regra escolhe que seja o golpe que MATOU. */
+      let hpP = m.playerHpBefore, hpE = m.enemyHpBefore;
+      const cura = seq.find(x => x.x === 'recover');
+      if(cura){ if(cura.q === 'p') hpP = cura.hp; else hpE = cura.hp; }
+      const lista = seq.filter(ehDano);
+      const caiuEm = { p:-1, e:-1 };
+      for(let k = 0; k < lista.length; k++){
+        const g = lista[k];
+        if((g.q === 'p' ? hpP : hpE) <= 0){
+          if(g.x === 'boomself') break;
+          if(caiuEm[g.q] === k - 1) break;    // o par do moribundo
+          caiuDefeito++; if(!exCaiu) exCaiu = desc();
+          break;
+        }
+        if(g.q === 'p'){ hpE = Math.max(0, hpE - (g.d||0)); if(hpE === 0 && caiuEm.e < 0) caiuEm.e = k; }
+        else { hpP = Math.max(0, hpP - (g.d||0)); if(hpP === 0 && caiuEm.p < 0) caiuEm.p = k; }
+      }
+
+      /* 5) O SONO: as trocas livres que ele compra aparecem. Nao se exige igualdade exata com o
+            diario porque o moribundo pode ser movido pra frente e cruzar a fronteira -- o que se
+            exige e o que o sono garante. */
+      const sono = (m.golpes||[]).find(x => x.x === 'sono');
+      if(sono){
+        comSono++;
+        const real = (m.golpes||[]).filter(ehDano), log = lista;
+        const iR = real.findIndex(x => x.q !== sono.q), iL = log.findIndex(x => x.q !== sono.q);
+        const livresReais = iR < 0 ? real.length : iR, livresLog = iL < 0 ? log.length : iL;
+        if(livresLog >= Math.min(livresReais, S.SONO_EM_TROCAS || 2)) sonoOk++;
+      }
       break;
     }
   }
-  ok('confrontos com sono de sobra pra medir', casos > 800, casos + ' (' + duplos + ' com os dois dormindo)');
-  ok('quem usou o sono e MORREU aparece com os golpes livres dele', perdedorRuim === 0,
-     perdedorRuim + ' de ' + casos + (ex1 ? '   |  ' + ex1 : ''));
-  ok('e o ULTIMO golpe e sempre o de quem matou', ultimoErrado === 0,
-     ultimoErrado + ' de ' + casos + (ex2 ? '   |  ' + ex2 : ''));
-  ok('sem mexer na soma de dano de nenhum lado', somaErrada === 0, somaErrada + ' de ' + casos);
+  ok('confrontos de sobra pra medir', confrontos > 2000, confrontos + ' (' + comSono + ' com sono)');
+  ok('a animacao tem os MESMOS passos do log', animDif === 0, animDif + ' de ' + confrontos + (exAnim ? '  |  ' + exAnim : ''));
+  ok('a soma de dano de cada lado fecha', somaErrada === 0, somaErrada + ' de ' + confrontos);
+  ok('nenhum golpe de dano zero na tela', comZero === 0, comZero + ' de ' + confrontos + (exZero ? '  |  ' + exZero : ''));
+  ok('ninguem ataca depois de cair (fora explosao e moribundo)', caiuDefeito === 0,
+     caiuDefeito + ' de ' + confrontos + (exCaiu ? '  |  ' + exCaiu : ''));
+  ok('o sono mostra as trocas livres que ele compra', sonoOk === comSono, sonoOk + ' de ' + comSono);
 })();
 
 /* Quem nao tem golpe especial nunca cai nesse caminho. */
