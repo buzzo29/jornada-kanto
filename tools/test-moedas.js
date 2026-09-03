@@ -148,6 +148,61 @@ console.log('\n=== DUAS ABAS NÃO GASTAM A MESMA MOEDA ===');
   ok('e a mesma insígnia não paga duas vezes', await moedasDe('f') === 5, String(await moedasDe('f')));
 }
 
+console.log('\n=== A LOJA: COMPRAR E USAR ===');
+{
+  /* A mochila deixou de ser uma leitura do que a conta ja tinha: item comprado precisa de armazem
+     de verdade, e ele e do SERVIDOR pelo mesmo motivo das moedas -- uma linha no console viraria
+     Despertar infinito, e Despertar infinito desliga um golpe do jogo inteiro. */
+  await conta('g', jaVisto(), 100);
+  const r = await chamar('buyItem', 'g', { item:'awakening' });
+  ok('comprar o Despertar custa 50', r.moedas === 50 && r.inventario.awakening === 1, JSON.stringify(r));
+  await chamar('buyItem', 'g', { item:'potion' });
+  const r3 = await chamar('buyItem', 'g', { item:'hyperpotion' });
+  ok('e os outros dois custam 15 e 30', r3.moedas === 5, r3.moedas + ' moedas sobrando');
+
+  ok('sem moeda suficiente ele recusa',
+     await recusa('buyItem', 'g', { item:'awakening' }) === 'failed-precondition');
+  ok('e nao cobra nada na recusa', await moedasDe('g') === 5, String(await moedasDe('g')));
+  ok('item que nao existe e recusado', await recusa('buyItem', 'g', { item:'masterball' }) === 'invalid-argument');
+
+  /* USAR o Despertar: liga um cronometro na CONTA, nao no save -- vale em qualquer save e em
+     qualquer modo, que foi o pedido. */
+  const u = await chamar('useItem', 'g', { item:'awakening' });
+  ok('usar o Despertar gasta um do armazem', u.inventario.awakening === 0, JSON.stringify(u.inventario));
+  ok('e liga o cronometro por 10 minutos', u.awakeningUntil > Date.now() + 9*60*1000 && u.awakeningUntil <= Date.now() + 10*60*1000 + 500,
+     'faltam ' + Math.round((u.awakeningUntil - Date.now())/1000) + 's');
+  ok('sem ter o item, usar e recusado',
+     await recusa('useItem', 'g', { item:'awakening' }) === 'failed-precondition');
+
+  /* A POCAO fica ARMADA esperando. Uma por vez: armar a segunda por cima da primeira gastaria as
+     duas e entregaria uma, e o jogador nao teria como saber que perdeu. */
+  const u2 = await chamar('useItem', 'g', { item:'potion' });
+  ok('a pocao fica armada', u2.pocaoArmada === 'potion', String(u2.pocaoArmada));
+  ok('e a segunda e recusada enquanto a primeira espera',
+     await recusa('useItem', 'g', { item:'hyperpotion' }) === 'failed-precondition');
+  ok('sem gastar a que estava no armazem',
+     ((await userRef('g').get()).data().inventario || {}).hyperpotion === 1);
+
+  /* Quando ela dispara, sai da conta. */
+  await chamar('consumePotion', 'g', {});
+  ok('depois de disparar ela some', ((await userRef('g').get()).data() || {}).pocaoArmada === null);
+  ok('e ai da pra armar outra', (await chamar('useItem', 'g', { item:'hyperpotion' })).pocaoArmada === 'hyperpotion');
+}
+
+console.log('\n=== DUAS ABAS NAO COMPRAM O MESMO ITEM DUAS VEZES ===');
+{
+  /* Sem transacao as duas leem o mesmo saldo e as duas passam -- dois itens pelo preco de um. */
+  await conta('h', jaVisto(), 50);
+  const rs = await Promise.allSettled([
+    chamar('buyItem', 'h', { item:'awakening' }),
+    chamar('buyItem', 'h', { item:'awakening' })
+  ]);
+  const passaram = rs.filter(x => x.status === 'fulfilled').length;
+  ok('so uma das duas passa', passaram === 1, passaram + ' passaram');
+  ok('e sobra zero, nao negativo', await moedasDe('h') === 0, String(await moedasDe('h')));
+  ok('e um item so no armazem', ((await userRef('h').get()).data().inventario || {}).awakening === 1);
+}
+
 console.log('\n=== AS RECUSAS BÁSICAS ===');
 {
   ok('sem login não paga', await recusa('claimJourneyCoins', null, { slot:'0' }) !== null);

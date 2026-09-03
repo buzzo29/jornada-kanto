@@ -696,5 +696,85 @@ for(let i=0;i<300;i++){
 ok('300 batalhas com a mesma semente, golpe a golpe', divergencias === 0,
    divergencias + ' divergencias | ' + comEspecial + ' batalhas tiveram golpe especial');
 
+console.log('\n=== OS ITENS DA MOCHILA DENTRO DA BATALHA ===');
+/* DESPERTAR: o sono do ADVERSARIO nao pega no time do jogador. Protege quem usou o item, nao
+   desliga o golpe do jogo -- os pokemon do jogador continuam podendo dormir o adversario, que e
+   exatamente o que foi pedido. */
+(function(){
+  let bloqueios = 0, jogadorDormiu = 0;
+  for(let i = 0; i < 3000; i++){
+    const r = S.simulateGymBattle([inst('machop',45)], [inst('jynx',45)], Math.random, { itens:{ semSono:true } });
+    const m = (r.matchups||[])[0];
+    if(!m) continue;
+    if((m.golpes||[]).some(x => x.x === 'semSono')) bloqueios++;
+    if((m.golpes||[]).some(x => x.x === 'sono' && x.q === 'e')) jogadorDormiu++;
+  }
+  ok('com o Despertar, o sono do adversario nunca pega', jogadorDormiu === 0, jogadorDormiu + ' de 3000');
+  ok('e a tentativa dele vira linha no log', bloqueios > 50, bloqueios + ' bloqueios em 3000');
+  let semItem = 0;
+  for(let i = 0; i < 3000; i++){
+    const r = S.simulateGymBattle([inst('machop',45)], [inst('jynx',45)], Math.random);
+    const m = (r.matchups||[])[0];
+    if(m && (m.golpes||[]).some(x => x.x === 'sono' && x.q === 'e')) semItem++;
+  }
+  ok('sem o item ele pega normal (a medida de controle)', semItem > 50, semItem + ' de 3000');
+  /* O jogador continua podendo dormir o adversario. */
+  let meuSono = 0;
+  for(let i = 0; i < 3000; i++){
+    const r = S.simulateGymBattle([inst('jynx',45)], [inst('machop',45)], Math.random, { itens:{ semSono:true } });
+    const m = (r.matchups||[])[0];
+    if(m && (m.golpes||[]).some(x => x.x === 'sono' && x.q === 'p')) meuSono++;
+  }
+  ok('e o MEU pokemon continua dormindo o adversario', meuSono > 50, meuSono + ' de 3000');
+  /* A frase tem que existir: item invisivel e o erro da especialidade de novo. */
+  const g = { x:'semSono', q:'e', g:'Hipnose' };
+  const frase = S.fraseDoEspecial(g, 'Jynx', 'Machop', {});
+  ok('a frase diz que o Despertar segurou', /Despertar segurou/.test(frase), frase);
+})();
+/* POCAO: o primeiro pokemon que VENCE um confronto e sobra com 25% ou menos se cura na hora. */
+(function(){
+  let disparos = 0, forade25 = 0, doisNaMesmaBatalha = 0, curaErrada = 0;
+  for(let i = 0; i < 3000; i++){
+    const r = S.simulateGymBattle([inst('machamp',60)], [inst('onix',58), inst('golem',58)], Math.random,
+                                  { itens:{ pocao:{ id:'hyperpotion', cura:0.80 } } });
+    let naBatalha = 0;
+    for(const m of (r.matchups||[])){
+      const p = (m.golpes||[]).find(x => x.x === 'pocao');
+      if(!p) continue;
+      naBatalha++; disparos++;
+      /* So dispara com 25% ou menos: o HP ANTES da cura e o hp gravado menos o que ela curou. */
+      const antes = p.hp - p.d;
+      if(antes > m.playerMaxHp * 0.25) forade25++;
+      /* Cura 80% do maximo, sem passar do teto. */
+      const esperado = Math.min(m.playerMaxHp - antes, Math.round(m.playerMaxHp * 0.80));
+      if(p.d !== esperado) curaErrada++;
+    }
+    if(naBatalha > 1) doisNaMesmaBatalha++;
+  }
+  ok('a pocao dispara', disparos > 100, disparos + ' vezes em 3000 batalhas');
+  ok('so com 25% de HP ou menos', forade25 === 0, forade25 + ' fora da faixa');
+  ok('curando 80% do maximo (sem passar do teto)', curaErrada === 0, curaErrada + ' com cura errada');
+  ok('e UMA por batalha', doisNaMesmaBatalha === 0, doisNaMesmaBatalha + ' batalhas com duas');
+  /* Sem o item, nada acontece -- a medida de controle. */
+  let semItem = 0;
+  for(let i = 0; i < 1000; i++){
+    const r = S.simulateGymBattle([inst('machamp',60)], [inst('onix',58), inst('golem',58)], Math.random);
+    if((r.matchups||[]).some(m => (m.golpes||[]).some(x => x.x === 'pocao'))) semItem++;
+  }
+  ok('sem o item ela nunca dispara', semItem === 0, semItem + ' de 1000');
+  /* E a cura aparece na tela: passo da animacao com a barra SUBINDO. */
+  const m = { player:'Machamp', enemy:'Onix', playerSpecies:'machamp', enemySpecies:'onix',
+    playerHpBefore:280, playerHpAfter:224, playerMaxHp:280, enemyHpBefore:250, enemyHpAfter:0, enemyMaxHp:250,
+    playerMove:'Fighting', enemyMove:'Rock',
+    golpes:[{q:'p',d:250,hp:0},{q:'e',d:240,hp:40},{q:'p',d:184,hp:224,x:'pocao',g:'hyperpotion'}] };
+  const seq = S.sequenciaDoConfronto(m);
+  ok('a pocao fecha a sequencia, nao abre', seq[seq.length-1].x === 'pocao',
+     seq.map(x=>x.x||'golpe').join(','));
+  const anim = S.buildAnimatedHitSequence(m);
+  ok('e a barra SOBE na animacao', anim[anim.length-1].amount === -184 && anim[anim.length-1].cura === true,
+     JSON.stringify(anim[anim.length-1]));
+  ok('e o log fala dela', /recuperou HP/.test(S.passosHtml(m)), S.passosHtml(m).replace(/<[^>]+>/g,'').trim().split('\n').pop());
+})();
+
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
 process.exit(falhas ? 1 : 0);

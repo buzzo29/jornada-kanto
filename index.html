@@ -1896,6 +1896,7 @@
      prêmio no jogo (o card do nome na home, o 1º lugar dos rankings). */
   .moeda-premio{ background:#fff8e0; border-color:var(--yellow-dark); text-align:center; }
   .moeda-premio p{ margin:0; font-size:.92rem; }
+  .release-travado{ font-size:.6rem; font-weight:800; color:var(--muted); white-space:nowrap; }
   .item-detalhe{ margin-bottom:10px; }
   .item-detalhe-topo{ display:flex; align-items:center; gap:10px; }
   .item-detalhe-icone{ font-size:2.2rem; line-height:1; flex-shrink:0; }
@@ -3709,7 +3710,10 @@ function freshGameDefaults(){
      precisa dele pra desabilitar o botão, e o servidor é quem cobra de verdade. Se os dois
      divergirem, a tela promete um preço que a cobrança não pratica. */
   rareCandies:0,         // doces da CONTA (ver ITENS/inventário); quem escreve é o servidor
-  moedas:0,              // moedas da CONTA -- ainda não há como ganhar nem gastar, só o contador
+  moedas:0,              // moedas da CONTA -- a jornada paga, o re-sorteio e a loja gastam
+  inventario:{},         // {item: quantos} -- armazém de verdade, escrito só pelo servidor
+  awakeningUntil:0,      // enquanto Date.now() < isso, sono do adversário não pega
+  pocaoArmada:null,      // 'potion' | 'hyperpotion' -- dispara na 1ª vitória de confronto com pouco HP
     shinyPityCount:0, // encontros selvagens seguidos sem capturar nenhum shiny, desde a última captura (ou desde ativar o bônus) -- sobe a chance a cada um
     shinyFoundThisSave:false, // ESTE save já conseguiu um shiny? Trava a escalada do bônus na base (ver currentShinyChance). É por save, não por conta
     wildEncounterSeq:0,       // nº do encontro selvagem deste save -- é a semente da oferta (ver goToWildEncounter)
@@ -4892,6 +4896,9 @@ async function loadPermanentUserData(){
        da Torre. Sem isso o inventário só saberia dos doces depois de a pessoa passar pela Torre. */
     game.rareCandies = d.rareCandies || 0;
     game.moedas = d.moedas || 0;
+    game.inventario = d.inventario || {};        // o armazém de verdade (ver ITENS/comprável)
+    game.awakeningUntil = d.awakeningUntil || 0; // imunidade a sono, com hora pra acabar
+    game.pocaoArmada = d.pocaoArmada || null;
     game.startersSorteados = d.startersSorteados || {};    // ver sorteioDosIniciais
     game.geracaoDosSlots = d.geracaoDosSlots || {};        // ver encerrarTentativaDoSlot
     // marcas da raide do Mew, gravadas pelo servidor quando o boss cai (ver bossPremiarTop10)
@@ -5463,6 +5470,16 @@ function sorteiaGolpeEspecial(p, rng){
   return null;
 }
 /* Devolve true quando o confronto foi RESOLVIDO aqui (e o doExchange não deve nem começar). */
+/* ITENS DA MOCHILA QUE VALEM DENTRO DA BATALHA. São da CONTA e não do save -- quem escreve é o
+   servidor --, e chegam aqui pelo opts do simulateGymBattle.
+   Ficam em variável de módulo pelo mesmo motivo do explosaoDoAtivo: as funções do motor são
+   compartilhadas por quatro laços de batalha, e enfiar mais um parâmetro em todas seria pior que
+   um estado zerado no começo de cada batalha. */
+let sonoBloqueado = false;      // Despertar ativo: sono do ADVERSÁRIO não pega no time do jogador
+let pocaoArmada = null;         // { id, cura } -- a primeira vitória de confronto com pouco HP dispara
+let pocaoJaUsada = false;       // uma por batalha: o item é um só
+/* Abaixo disso (25%) a poção dispara. É "sobrou raspando", não "levou um arranhão". */
+const POCAO_GATILHO_HP = 0.25;
 function tentarGolpeEspecial(active, enemy, rng, diario){
   explosaoDoAtivo = null;
   if(ehImuneAEspecial(active) || ehImuneAEspecial(enemy)) return false;
@@ -5523,6 +5540,18 @@ function tentarGolpeEspecial(active, enemy, rng, diario){
            do tipo no cliente, como em todo o resto do log: o motor manda o tipo, o cliente escolhe
            a palavra (ver nomeDoGolpe). */
         diario.push({ q: marca, d: 0, hp: alvo.hp, c:0, m:0, z:0, x:'disable', g: especial.golpe, a: tipoAnulado });
+      }
+      continue;
+    }
+    /* DESPERTAR: o sono do ADVERSÁRIO não pega no time do jogador. Protege quem usou o item, não
+       desliga o golpe do jogo -- os pokémon do jogador continuam podendo dormir o adversário, que
+       é exatamente o que foi pedido.
+       A chance do adversário É CONSUMIDA (o marcador _especialContra já foi posto pelo doExchange):
+       ele tentou e falhou, e é isso que a linha do log conta. Sem essa linha o jogador não teria
+       como saber que as 50 moedas trabalharam -- é o erro da especialidade de novo. */
+    if(!ehAtivo && sonoBloqueado){
+      if(diario){
+        diario.push({ q: marca, d: 0, hp: alvo.hp, c:0, m:0, z:0, x:'semSono', g: especial.golpe });
       }
       continue;
     }
@@ -5627,6 +5656,12 @@ function simulateGymBattle(team, brockTeam, rng, opts){
   rng = rng || Math.random;
   explosaoDoAtivo = null;   // o marcador da autodestruição é por BATALHA (ver tentarGolpeEspecial)
   opts = opts || {};
+  /* Os itens da mochila valem por BATALHA e são zerados aqui -- se ficassem de uma pra outra, um
+     Despertar de 10 minutos viraria permanente na primeira batalha que o ligasse. */
+  const itens = opts.itens || {};
+  sonoBloqueado = !!itens.semSono;
+  pocaoArmada = itens.pocao || null;
+  pocaoJaUsada = false;
   if(opts.preservePlayerHp){
     /* Elite 4: o HP do time do jogador CARREGA de uma batalha pra outra. O que carrega é a
        FRAÇÃO de vida, não o número cru -- porque o TETO muda entre uma luta e outra: cada membro
@@ -5682,6 +5717,21 @@ function simulateGymBattle(team, brockTeam, rng, opts){
       const suddenDeath = false, suddenDeathMessage = null;
       const isTrade = enemyFainted && activeFainted; // os dois caíram juntos — ninguém "venceu" esse confronto
       const playerWon = enemyFainted && !activeFainted;
+      /* POÇÃO: o primeiro pokémon do jogador que VENCE um confronto e sobra com 25% ou menos se
+         cura na hora e segue lutando contra o próximo. É aqui que ela tem efeito -- fora da Elite
+         4, cada batalha começa com o time cheio (ver o preservePlayerHp lá em cima), então curar no
+         FIM da batalha não mudaria nada. Uma por batalha.
+         Entra ANTES do matchups.push de propósito: o playerHpAfter tem que sair já curado, senão a
+         barra da tela termina no valor de antes e a cura some. */
+      if(playerWon && pocaoArmada && !pocaoJaUsada && active.hp > 0 &&
+         active.hp <= active.maxHp * POCAO_GATILHO_HP){
+        const curado = Math.min(active.maxHp - active.hp, Math.round(active.maxHp * pocaoArmada.cura));
+        if(curado > 0){
+          active.hp += curado;
+          pocaoJaUsada = true;
+          diario.push({ q:'p', d: curado, hp: active.hp, c:0, m:0, z:0, x:'pocao', g: pocaoArmada.id });
+        }
+      }
       const playerAliveAfter = activeFainted ? playerAliveBefore - 1 : playerAliveBefore;
       const enemyAliveAfter = enemyFainted ? enemyAliveBefore - 1 : enemyAliveBefore;
       matchups.push({
@@ -6126,6 +6176,8 @@ function confirmWild(){
   }
 }
 function toggleRelease(id){
+  const alvo = (game.team||[]).find(p => p.id === id);
+  if(alvo && !podeDispensar(alvo)) return;
   const excess = game.team.length - 6;
   const idx = game.releaseSelected.indexOf(id);
   if(idx>=0){ game.releaseSelected.splice(idx,1); }
@@ -6754,7 +6806,18 @@ function runSpecialBattle(){
   // TODA luta seguinte e subiria o nível dele repetidamente à toa
   game.specialHpBeforeBattle = game.team.map(p=>p.hp);
   applySpecialtyBuff(game.team); // especialidade do treinador vale na jornada também
-  const result = simulateGymBattle(game.team, foeTeam, undefined, { preservePlayerHp: cfg.context==='elite' });
+  const result = simulateGymBattle(game.team, foeTeam, undefined,
+    { preservePlayerHp: cfg.context==='elite', itens: itensAtivos() });
+  /* A POÇÃO É UMA: se disparou, sai da conta. Quem viu a luta foi o cliente -- a jornada roda aqui
+     --, então é ele que avisa. O pior caso de a chamada se perder é o jogador FICAR com a poção,
+     que é o lado certo pra errar. */
+  if((result.matchups || []).some(m => ((m.golpes)||[]).some(g => g.x === 'pocao'))){
+    game.pocaoArmada = null;
+    if(game.authUser){
+      functionsClient.httpsCallable('consumePotion')({})
+        .catch(e => console.error('Erro ao consumir a poção:', e));
+    }
+  }
   updateStreakRecord(result);
   preloadBattleSprites(result.matchups);
   game.specialBattleResult = result;
@@ -7266,7 +7329,7 @@ function buildAnimatedHitSequence(m){
     /* Na lista 'q' é quem BATE e 'side' é quem APANHA -- por isso a inversão. A CURA é o contrário
        de tudo isso: quem curou é quem MUDA de vida, e pra cima. Amount negativo faz a barra subir
        (os laços fazem hp - amount, e o hpBarTransitionMs usa o módulo pra a duração). */
-    if(g.x === 'recover') return { side: g.q === 'p' ? 'player' : 'enemy', amount: -g.d, cura: true };
+    if(g.x === 'recover' || g.x === 'pocao') return { side: g.q === 'p' ? 'player' : 'enemy', amount: -g.d, cura: true };
     return { side: g.q === 'p' ? 'enemy' : 'player', amount: g.d };
   });
 }
@@ -10491,6 +10554,7 @@ const CAMPOS_DA_CONTA = [
   'authUser','saveSlots','trainerName','rivalNameDefault','permanentPokedex','permanentShinyDex',
   'accountEliteChampion','leagueWinsTotal','leagueLeaderboard','trainerBestStreak','trainerLastStreak',
   'shinyBonusExpiresAt','shinyPityCount','specialties','specialtyCounts','rareCandies','moedas',
+  'inventario','awakeningUntil','pocaoArmada',
   'mewtwoLoanActive','mewtwoLoanCooldownUntil','mewtwoLoanUnlocked','mewtwoLoanReadyToClaim',
   'userTest','neighborhoodGymLocation','startersSorteados','geracaoDosSlots','bossTop10','bossKiller'
 ];
@@ -12587,22 +12651,53 @@ function renderEeveeChoice(){
   </div>`;
 }
 
+/* NO DIFÍCIL, A TROCA COM O PROF. CARVALHO TEM QUE SER JUSTA (03/09/2026).
+   O time cheio + um selvagem novo obriga a mandar um embora, e sem regra isso virava upgrade de
+   graça: captura um selvagem forte e dispensa o coitado de nível 12 que ficou pra trás.
+   Só dá pra dispensar quem está a até DIFERENCA_RELEASE_DIFICIL níveis do que está chegando.
+   VÁLVULA: se NINGUÉM do time passa na régua, ela não vale -- senão o jogador ficaria com 7 pokémon
+   e sem saída, já que a tela de release não tem como ser pulada. Acontece quando o time inteiro está
+   muito abaixo do recém-chegado (um lendário de nível 50 num time de 35, por exemplo). */
+const DIFERENCA_RELEASE_DIFICIL = 10;
+function nivelDoRecemChegado(){
+  /* Quem chegou são os ÚLTIMOS da lista: o confirmWild empurra os capturados pro fim do time. */
+  const time = game.team || [];
+  const sobrando = Math.max(0, time.length - 6);
+  if(sobrando <= 0) return null;
+  return Math.max.apply(null, time.slice(-sobrando).map(p => p.level || 0));
+}
+function podeDispensar(p){
+  if(game.gameMode !== 'hard') return true;
+  const chegando = nivelDoRecemChegado();
+  if(chegando == null) return true;
+  const recemChegados = new Set((game.team || []).slice(-Math.max(0, (game.team||[]).length - 6)).map(x => x.id));
+  if(recemChegados.has(p.id)) return true;   // o recém-chegado sempre pode ser devolvido
+  const elegiveis = (game.team || []).filter(x => !recemChegados.has(x.id) &&
+    Math.abs((x.level || 0) - chegando) <= DIFERENCA_RELEASE_DIFICIL);
+  if(!elegiveis.length) return true;         // a válvula: ninguém passa na régua, então a régua não vale
+  return Math.abs((p.level || 0) - chegando) <= DIFERENCA_RELEASE_DIFICIL;
+}
 function renderRelease(){
   const excess = game.team.length - 6;
   return `
   <div class="box">
     <h2>📦 PC do Prof. Carvalho</h2>
     <p>Seu time passou de <strong>6 Pokémons</strong>! Escolha <strong>${excess}</strong> para enviar ao Prof. Carvalho antes de continuar — não é permitido levar mais de 6 na equipe.</p>
+    ${game.gameMode === 'hard' && (game.team||[]).some(p => !podeDispensar(p))
+      ? `<p class="hint-text">🔒 No modo difícil só dá pra dispensar quem está a até <strong>${DIFERENCA_RELEASE_DIFICIL} níveis</strong> de quem acabou de chegar (Lv.${nivelDoRecemChegado()}) — trocar um pokémon atrasado por um selvagem forte seria upgrade de graça.</p>`
+      : ''}
   </div>
   <div class="pool-badge">SELECIONADOS PARA ENVIAR: ${game.releaseSelected.length}/${excess}</div>
   <div class="box">
     ${game.team.map(p=>{
       const sp = SPECIES[p.speciesId];
       const isSel = game.releaseSelected.includes(p.id);
-      const disabled = (!isSel && game.releaseSelected.length>=excess) ? 'disabled' : '';
-      return `<button class="btn ${isSel?'selected':''}" ${disabled} onclick="toggleRelease('${p.id}')">
+      const travado = !podeDispensar(p);
+      const disabled = (travado || (!isSel && game.releaseSelected.length>=excess)) ? 'disabled' : '';
+      return `<button class="btn ${isSel?'selected':''} ${travado?'off':''}" ${disabled} onclick="toggleRelease('${p.id}')"
+        title="${travado?'Muito longe do nível de quem chegou':''}">
         <span class="mon-name">${spriteHtml(p.speciesId,'sprite-sm',p.shiny)} ${p.name}${p.shiny?' 🌟':''} — Lv.${p.level} ${isSel?'📦':''}</span>
-        <span class="mon-sub">${typesHtml(p.types)}</span>
+        <span class="mon-sub">${typesHtml(p.types)}${travado?' <span class="release-travado">🔒 diferença de nível</span>':''}</span>
       </button>`;
     }).join('')}
   </div>
@@ -13233,7 +13328,11 @@ function sequenciaDoConfronto(m){
      cura, e só então a luta começa. Enquanto ela ficava de fora da sequência, a animação só via o
      valor final e a barra aparecia cheia do nada. */
   const reais = passosVisiveis((m.golpes || []).filter(g => g.x !== 'disable' && (g.x || g.d > 0)));
-  const aberturas = reais.filter(g => g.x === 'recover' || g.x === 'sono');
+  /* O sono BLOQUEADO é abertura como o sono: acontece antes da luta e não é dano. A POÇÃO é o
+     contrário -- ela fecha, porque dispara na vitória do confronto --, e por isso vem separada:
+     concatenada nas aberturas ela apareceria antes da luta que a provocou. */
+  const aberturas = reais.filter(g => g.x === 'recover' || g.x === 'sono' || g.x === 'semSono');
+  const fechamento = reais.filter(g => g.x === 'pocao');
   const cura = reais.find(g => g.x === 'recover') || null;
   const ehDano = g => !g.x || g.x === 'boom' || g.x === 'boomself';
   const golpesDeDano = reais.filter(ehDano).length;
@@ -13268,7 +13367,7 @@ function sequenciaDoConfronto(m){
   }
   // a reconstrução fala em QUEM APANHA (side); aqui a lista é de QUEM BATE (q)
   const resto = reconstruirSequencia(base).map(h => ({ q: h.side === 'player' ? 'e' : 'p', d: h.amount }));
-  return aberturas.concat(livres, resto);
+  return aberturas.concat(livres, resto, fechamento);
 }
 /* AS FRASES DOS GOLPES ESPECIAIS VIVEM AQUI, num lugar só.
    O log da batalha e o aviso do meio da luta leem desta função. Montadas em separado, as duas
@@ -13295,7 +13394,14 @@ function seloDeGolpe(nome, tipo){
   if(!nome) return '';
   return `<span class="type-pill" style="background:${TYPE_COLORS[tipo]||'#888'}">${escapeHtmlSafe(nome)}</span>`;
 }
-function ehGolpeEspecial(g){ return g && (g.x === 'boom' || g.x === 'sono' || g.x === 'disable' || g.x === 'recover'); }
+function ehGolpeEspecial(g){ return g && (g.x === 'boom' || g.x === 'sono' || g.x === 'disable' || g.x === 'recover' || g.x === 'semSono' || g.x === 'pocao'); }
+/* Os itens da mochila: o que cada um se chama na tela e quanto cura. O motor manda o id (g.g), o
+   cliente escolhe a palavra -- mesmo caminho do MOVE_BY_TYPE. */
+const ITENS_DE_BATALHA = {
+  awakening:   { nome: 'Despertar' },
+  potion:      { nome: 'Poção',        cura: 0.55 },
+  hyperpotion: { nome: 'Super Poção',  cura: 0.80 }
+};
 function fraseDoEspecial(g, quem, alvo, op){
   op = op || {};
   const golpe = g.g ? String(g.g) : '';
@@ -13318,6 +13424,19 @@ function fraseDoEspecial(g, quem, alvo, op){
     /* Acontece DEPOIS do confronto, então a frase é sobre quem sobrou -- e o nome do golpe entra
        nos dois lugares (log e aviso), ao contrário do sono: aqui ele É o efeito, não um detalhe. */
     return quem + ' usou ' + comoGolpe(golpe || 'Recuperar', 'Normal') + ' e restaurou seu HP';
+  }
+  if(g.x === 'semSono'){
+    /* O DESPERTAR SEGUROU. A frase começa por quem TENTOU, como a do sono -- é a mesma cena, com
+       outro fim. Sem ela o item seria invisível, e um item invisível é o erro da especialidade de
+       novo: quem pagou 50 moedas não teria como saber que elas trabalharam. */
+    const n = golpe ? comoGolpe(golpe, TIPO_DO_ESPECIAL[golpe] || 'Normal') : 'o golpe';
+    return quem + ' tentou fazer ' + alvo + ' dormir com ' + n + ', mas o Despertar segurou';
+  }
+  if(g.x === 'pocao'){
+    /* A POÇÃO. Acontece DEPOIS da vitória do confronto, então a frase é sobre quem sobrou -- igual
+       à do Recuperar, que é o mesmo tipo de evento. */
+    const it = ITENS_DE_BATALHA[golpe] || { nome: 'Poção' };
+    return quem + ' usou ' + escapeHtmlSafe(it.nome) + ' e recuperou HP';
   }
   if(g.x === 'disable'){
     /* Nomeia o golpe ANULADO, não a anulação: o que interessa é o que o pokémon PERDEU. O motor
@@ -13388,7 +13507,7 @@ function passosHtml(m){
   return `<div class="mlog-passos">${anulacoes}${golpes.map(g=>{
     const doJogador = g.q === 'p';
     if(g.x === 'boomself') return '';   // a linha da explosão (acima) já contou os dois lados
-    if(g.x === 'boom' || g.x === 'sono' || g.x === 'recover') return linhaEspecial(g);
+    if(g.x === 'boom' || g.x === 'sono' || g.x === 'recover' || g.x === 'semSono' || g.x === 'pocao') return linhaEspecial(g);
     return `<div class="mlog-passo ${doJogador?'p':'e'}">
       ${ladoHtml(doJogador)} atacou ${ladoHtml(!doJogador)}${seloDe(doJogador)?` com ${seloDe(doJogador)}`:''} e tirou <span class="mlog-tira">−${g.d}</span> de HP.
     </div>`;
@@ -16063,6 +16182,25 @@ const ITENS = {
     descricao: '1 hora de chance bem maior de encontrar shiny nos encontros selvagens. O contador aparece na home enquanto estiver valendo.',
     comoGanhar: 'Vencendo a Elite dos 4 ou uma liga online.',
     preco: 800
+  },
+  /* OS COMPRÁVEIS. Estes têm ARMAZÉM de verdade (o campo inventario da conta, escrito só pelo
+     servidor) -- diferente dos dois de cima, que são uma leitura do que a conta já tinha. O preço
+     vive aqui E no servidor (LOJA): o cliente precisa dele pra desabilitar o botão, e o servidor é
+     quem cobra. Se os dois divergirem, a tela promete um preço que a cobrança não pratica. */
+  awakening: {
+    nome: 'Despertar', icone: '⏰', comprável: true, preco: 50,
+    descricao: 'Por 10 minutos, nenhum golpe de sono do adversário pega no seu time — em qualquer save e em qualquer modo. Os SEUS pokémon continuam podendo fazer o adversário dormir.',
+    comoGanhar: 'Na loja.'
+  },
+  hyperpotion: {
+    nome: 'Super Poção', icone: '🧪', comprável: true, preco: 30,
+    descricao: 'Fica guardada esperando. O primeiro pokémon seu que vencer um confronto e sobrar com 25% ou menos de HP recupera 80% da vida na hora e segue lutando.',
+    comoGanhar: 'Na loja.'
+  },
+  potion: {
+    nome: 'Poção', icone: '💊', comprável: true, preco: 15,
+    descricao: 'Fica guardada esperando. O primeiro pokémon seu que vencer um confronto e sobrar com 25% ou menos de HP recupera 55% da vida na hora e segue lutando.',
+    comoGanhar: 'Na loja.'
   }
 };
 /* O QUE A CONTA TEM, em pilhas. Uma pilha é um item + quantos, e é ela que vira um quadradinho da
@@ -16075,7 +16213,22 @@ function pilhasDoInventario(){
   if(doces > 0) pilhas.push({ item:'doce_raro', quantidade:doces, fontes:[] });
   const cupons = cuponsDeBonusShiny();
   if(cupons.length) pilhas.push({ item:'bonus_shiny', quantidade:cupons.length, fontes:cupons });
+  /* Os comprados vêm do armazém de verdade. Ordem fixa (a do catálogo) pra a grade não dançar a
+     cada compra. */
+  const inv = game.inventario || {};
+  Object.keys(ITENS).filter(id => ITENS[id].comprável).forEach(id => {
+    if((inv[id] || 0) > 0) pilhas.push({ item:id, quantidade:inv[id], fontes:[] });
+  });
   return pilhas;
+}
+/* O que está VALENDO agora, pra tela e pras batalhas do cliente. Mesma conta do servidor
+   (itensAtivosDaConta) -- se as duas divergirem, a jornada aplica um item que o ginásio não aplica. */
+function itensAtivos(){
+  const out = {};
+  if(game.awakeningUntil && Date.now() < game.awakeningUntil) out.semSono = true;
+  const armada = game.pocaoArmada;
+  if(armada && ITENS[armada]) out.pocao = { id: armada, cura: armada === 'hyperpotion' ? 0.80 : 0.55 };
+  return out;
 }
 /* Os cupons de Bônus Shiny que ainda não foram ativados, das DUAS origens.
    O da Elite mora no SAVE (`eliteShinyGranted` sem `eliteShinyUsed`) e sobrevive a apagar
@@ -16171,6 +16324,23 @@ async function usarItem(id){
   if(id === 'doce_raro'){
     if(!(game.rareCandies > 0)) return;
     openCandyPicker();
+    return;
+  }
+  if(ITENS[id] && ITENS[id].comprável){
+    game.inventarioUsando = true; render();
+    try{
+      const r = await functionsClient.httpsCallable('useItem')({ item: id });
+      game.inventario = r.data.inventario || {};
+      game.awakeningUntil = r.data.awakeningUntil || 0;
+      game.pocaoArmada = r.data.pocaoArmada || null;
+      const restantes = pilhasDoInventario();
+      if(!restantes.some(x => x.item === id)) game.inventarioSel = restantes.length ? restantes[0].item : null;
+    } catch(e){
+      console.error('Erro ao usar o item:', e);
+      game.inventarioErro = (e && e.message) || 'Não deu pra usar agora.';
+    }
+    game.inventarioUsando = false;
+    render();
     return;
   }
   if(id === 'bonus_shiny'){
@@ -16306,12 +16476,31 @@ function renderExcluirItemModal(){
    ficar vazia: assim dá pra ver o que a loja vai ser, e um botão apagado não promete nada. */
 function openLoja(){
   game.screen = 'loja';
-  game.lojaSel = Object.keys(ITENS)[0] || null;
+  /* O PRIMEIRO QUE ELA VENDE, e nao o primeiro do catalogo: o Doce Raro e o Bonus Shiny estao no
+     ITENS mas nao estao a venda, e abrir escolhendo um deles deixava o quadro de cima VAZIO. */
+  game.lojaSel = Object.keys(ITENS).find(id => ITENS[id].comprável) || null;
   render();
 }
-function escolherItemDaLoja(id){ game.lojaSel = id; render(); }
+function escolherItemDaLoja(id){ game.lojaSel = id; game.lojaErro = null; render(); }
+async function comprarItem(id){
+  if(game.comprando) return;
+  game.lojaErro = null; game.comprando = true; render();
+  try{
+    const r = await functionsClient.httpsCallable('buyItem')({ item: id });
+    game.moedas = r.data.moedas;
+    game.inventario = r.data.inventario || {};
+  } catch(e){
+    console.error('Erro ao comprar:', e);
+    game.lojaErro = (e && e.message) || 'Não deu pra comprar agora.';
+  }
+  game.comprando = false;
+  render();
+}
 function renderLoja(){
-  const aVenda = Object.keys(ITENS).map(id => ({ item:id, quantidade:0, fontes:[] }));
+  /* Só o que TEM preço de verdade. O Doce Raro e o Bônus Shiny não se compram -- eles vêm de
+     jogar, e pôr um botão apagado do lado deles prometeria uma loja que não existe. */
+  const aVenda = Object.keys(ITENS).filter(id => ITENS[id].comprável)
+    .map(id => ({ item:id, quantidade:(game.inventario||{})[id] || 0, fontes:[] }));
   const sel = aVenda.find(p => p.item === game.lojaSel) || null;
   const it = sel ? ITENS[sel.item] : null;
   const moedas = game.moedas || 0;
@@ -16327,8 +16516,10 @@ function renderLoja(){
         </div>
       </div>
       <p class="item-detalhe-texto">${escapeHtmlSafe(it.descricao)}</p>
+      ${game.lojaErro ? `<p class="error-text">${escapeHtmlSafe(game.lojaErro)}</p>` : ''}
       <div class="item-acoes">
-        <button class="btn success" disabled>🪙 Comprar</button>
+        <button class="btn success" ${(game.moedas||0) < it.preco || game.comprando ? 'disabled' : ''}
+          onclick="comprarItem('${escJs(sel.item)}')">${game.comprando ? 'Comprando...' : '🪙 Comprar'}</button>
       </div>`
     : `<p class="item-detalhe-vazio">A loja ainda não abriu.</p>`}
   </div>

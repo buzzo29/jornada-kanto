@@ -154,18 +154,53 @@ console.log('\n=== A LOJA ===');
   S.openLoja();
   const t = S.renderLoja();
   ok('a loja abre com um item ja escolhido', !!S.__getGame().lojaSel, String(S.__getGame().lojaSel));
+  /* E TEM QUE SER UM QUE ELA VENDE. O Doce Raro e o Bonus Shiny estao no catalogo mas vem de
+     JOGAR -- abrir escolhendo um deles deixava o quadro de cima vazio, porque ele so desenha o
+     que esta na lista a venda. Defeito pego por este teste quando a loja passou a vender. */
+  ok('e e um item que ela realmente vende', !!S.ITENS[S.__getGame().lojaSel].comprável,
+     String(S.__getGame().lojaSel));
   ok('mesma grade de quadradinhos da mochila', t.includes('class="item-grade"') && slots(t) >= S.INVENTARIO_SLOTS_MINIMOS,
      slots(t) + ' slots');
+  ok('a grade so mostra o que esta a venda', (t.match(/item-slot-icone/g)||[]).length === 3,
+     (t.match(/item-slot-icone/g)||[]).length + ' itens');
   ok('o quadro de cima traz preco e descricao', /🪙 \d+/.test(t) && t.includes('item-detalhe-texto'));
-  /* NADA A VENDA AINDA: o botao existe e fica DESABILITADO, e a tela diz isso em texto. Um botao
-     apagado nao promete nada; um botao vivo que nao compra, sim. */
-  ok('e o Comprar fica desabilitado', /<button class="btn success" disabled>🪙 Comprar<\/button>/.test(t));
-  /* AS DUAS FRASES SAIRAM (02/09/2026, a pedido): a de "por enquanto so da pra conseguir jogando"
-     e a de "a loja ainda nao abriu". O botao desabilitado ja diz que nao da pra comprar, e duas
-     frases em azul explicando o mesmo viravam parede de texto em cima da grade. */
-  ok('e sem as duas frases que sairam', !/só dá pra conseguir jogando/.test(t) && !/loja ainda não abriu/.test(t),
-     (t.match(/hint-text">[^<]*/g)||[]).join(' | ') || 'nenhuma hint-text');
-  ok('e mostrando quantas moedas voce tem', /Você tem <strong>🪙 0<\/strong>/.test(t));
+  /* SEM MOEDA o botao ja NASCE desabilitado -- um botao que so recusa depois do toque e pior. */
+  ok('sem moeda o Comprar nasce desabilitado',
+     /<button class="btn success" disabled[\s\S]{0,80}onclick="comprarItem/.test(t),
+     (t.match(/<button class="btn success"[^>]*/g)||[]).join(' | '));
+  /* COM MOEDA ele acende. */
+  const g = S.__getGame(); g.moedas = 999; S.__setGame(g);
+  const rico = S.renderLoja();
+  ok('com moeda ele acende', /onclick="comprarItem/.test(rico) && !/disabled[\s\S]{0,80}onclick="comprarItem/.test(rico));
+  ok('e mostrando quantas moedas voce tem', /Você tem <strong>🪙 999<\/strong>/.test(rico));
+  /* OS PRECOS da tela tem que ser os mesmos que o servidor cobra -- se divergirem, a tela promete
+     um preco que a cobranca nao pratica. */
+  ok('os precos sao os pedidos', S.ITENS.awakening.preco === 50 && S.ITENS.hyperpotion.preco === 30 && S.ITENS.potion.preco === 15,
+     [S.ITENS.awakening.preco, S.ITENS.hyperpotion.preco, S.ITENS.potion.preco].join('/'));
+}
+
+console.log('\n=== OS ITENS COMPRADOS NA MOCHILA ===');
+{
+  /* Estes tem ARMAZEM de verdade (o campo inventario da conta), diferente do Doce Raro e do Bonus
+     Shiny, que sao uma leitura do que a conta ja tinha. */
+  conta({ doces: 0 });
+  const g = S.__getGame(); g.inventario = { awakening: 2, potion: 1 }; S.__setGame(g);
+  const p = S.pilhasDoInventario();
+  ok('o que foi comprado aparece na mochila', p.length === 2, JSON.stringify(p.map(x=>x.item+':'+x.quantidade)));
+  ok('e empilhado', (p.find(x=>x.item==='awakening')||{}).quantidade === 2);
+  S.escolherItem('awakening');
+  const tela = S.renderInventario();
+  ok('o quadro descreve o item', tela.includes('Despertar') && tela.includes('10 minutos'));
+  ok('e o Usar esta la', /onclick="usarItem\('awakening'\)"/.test(tela));
+
+  /* O QUE ESTA VALENDO AGORA, que e o que as batalhas leem. A mesma conta do servidor. */
+  const g2 = S.__getGame();
+  g2.awakeningUntil = Date.now() + 60000; g2.pocaoArmada = 'hyperpotion'; S.__setGame(g2);
+  const ativos = S.itensAtivos();
+  ok('o Despertar ligado vira semSono', ativos.semSono === true);
+  ok('e a pocao armada vira a cura certa', ativos.pocao && ativos.pocao.cura === 0.80, JSON.stringify(ativos.pocao));
+  const g3 = S.__getGame(); g3.awakeningUntil = Date.now() - 1000; S.__setGame(g3);
+  ok('Despertar vencido nao vale mais', !S.itensAtivos().semSono);
 }
 
 console.log('\n=== A HOME ===');

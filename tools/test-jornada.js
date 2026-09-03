@@ -837,5 +837,50 @@ console.log('\n=== A OFERTA SELVAGEM ===');
   ok('o contador de re-sorteios vai pro save', gravado.wildRerolls === 2, String(gravado.wildRerolls));
 })();
 
+console.log('\n=== NO DIFICIL, A TROCA COM O PROF. CARVALHO TEM QUE SER JUSTA ===');
+/* Time cheio + um selvagem novo obriga a mandar um embora, e sem regra isso virava upgrade de
+   graca: captura um selvagem forte e dispensa o coitado de nivel 12 que ficou pra tras. */
+(function(){
+  const mk = (id, esp, lvl) => { const p = S.createInstance(esp, lvl); p.id = id; return p; };
+  const time = (extra) => [mk('a','pidgey',12), mk('b','ratata',14), mk('c','geodude',30),
+                           mk('d','onix',32), mk('e','machop',31), mk('f','growlithe',33), extra];
+  const g = S.__getGame();
+  g.gameMode = 'hard';
+  g.team = time(mk('novo','gyarados',36));
+  g.releaseSelected = [];
+  S.__setGame(g);
+  ok('a regra olha o nivel de QUEM CHEGOU', S.nivelDoRecemChegado() === 36, String(S.nivelDoRecemChegado()));
+  const trava = S.__getGame().team.filter(p => !S.podeDispensar(p)).map(p => p.name + ' Lv.' + p.level);
+  ok('quem esta longe demais nao pode ser dispensado', trava.length === 2, trava.join(', '));
+  ok('e quem esta dentro dos 10 niveis pode',
+     S.__getGame().team.filter(p => S.podeDispensar(p)).length === 5);
+  /* O recem-chegado sempre pode voltar: recusar o proprio selvagem seria obrigar a ficar com ele. */
+  ok('o recem-chegado sempre pode ser devolvido',
+     S.podeDispensar(S.__getGame().team.find(p => p.id === 'novo')));
+  /* O clique tambem recusa, nao so a tela -- a regra tem que valer se alguem chamar por fora. */
+  S.toggleRelease('a');
+  ok('clicar num travado nao marca nada', (S.__getGame().releaseSelected || []).length === 0);
+  S.toggleRelease('c');
+  ok('e num liberado marca', (S.__getGame().releaseSelected || []).length === 1);
+  const tela = S.renderRelease();
+  ok('a tela mostra o cadeado e diz por que', /🔒/.test(tela) && /modo difícil/.test(tela));
+
+  /* NO NORMAL a regra nao existe: e uma trava do dificil. */
+  const g2 = S.__getGame(); g2.gameMode = 'normal'; g2.releaseSelected = []; S.__setGame(g2);
+  ok('no modo normal todos continuam liberados', S.__getGame().team.every(p => S.podeDispensar(p)));
+  ok('e a tela nao mostra cadeado nenhum', !/🔒/.test(S.renderRelease()));
+
+  /* A VALVULA. Se NINGUEM passa na regua ela nao vale -- senao o jogador ficaria com 7 pokemon e
+     sem saida, porque a tela de release nao tem como ser pulada. Acontece com lendario (que chega
+     12 niveis acima do trecho) num time atrasado. */
+  const g3 = S.__getGame(); g3.gameMode = 'hard'; g3.releaseSelected = [];
+  g3.team = [mk('a','pidgey',20), mk('b','ratata',22), mk('c','geodude',21), mk('d','onix',23),
+             mk('e','machop',20), mk('f','growlithe',22), mk('lenda','articuno',50)];
+  S.__setGame(g3);
+  ok('sem ninguem na regua, a regua nao vale (senao trava o jogo)',
+     S.__getGame().team.every(p => S.podeDispensar(p)),
+     'lendario Lv.50 num time de ~21');
+})();
+
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
 process.exit(falhas ? 1 : 0);

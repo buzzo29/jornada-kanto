@@ -821,6 +821,80 @@ de golpes.
   Eevee/distribuição, o resgate segue pra chegada no ginásio. Ele é gravado no save porque
   'release' também é ponto seguro — fechar a aba ali não pode perder o caminho de volta.
 
+## A loja de verdade: Despertar, Poção e Super Poção
+
+- **Agora existe ARMAZÉM.** Até aqui a mochila era uma leitura do que a conta já tinha (o contador de
+  doces e os cupons de bônus shiny). Item comprável precisa de estoque, e ele é do SERVIDOR pelo
+  mesmo motivo das moedas: uma linha no console viraria Despertar infinito — e Despertar infinito
+  **desliga um golpe do jogo inteiro**. `inventario`, `awakeningUntil` e `pocaoArmada` entraram na
+  trava do `firestore.rules` junto de `moedas` e `rareCandies`. Quem escreve é `buyItem`/`useItem`.
+- **Preços: Despertar 50, Super Poção 30, Poção 15.** O número vive no cliente (`ITENS`) E no
+  servidor (`LOJA`): o cliente precisa dele pra desabilitar o botão, o servidor é quem cobra. Se os
+  dois divergirem, a tela promete um preço que a cobrança não pratica.
+- **A LOJA ABRE NO PRIMEIRO ITEM QUE ELA VENDE**, e não no primeiro do catálogo — o Doce Raro e o
+  Bônus Shiny estão no `ITENS` mas vêm de jogar. Abrindo por eles, o quadro de cima ficava VAZIO.
+  Pego pelo teste no dia em que a loja passou a vender.
+
+### Despertar (10 minutos, `awakeningUntil`)
+- **Nenhum golpe de sono do ADVERSÁRIO pega no time do jogador**, em qualquer save e em qualquer
+  modo — o campo é da conta, não do save. Os pokémon do jogador **continuam podendo** fazer o
+  adversário dormir: o item protege quem o usou, não desliga o golpe.
+- **A chance do adversário é CONSUMIDA**: ele tentou e falhou. E isso vira **linha no log**
+  ("Jynx tentou fazer Machop dormir com Hipnose, mas o Despertar segurou") — sem ela o jogador não
+  teria como saber que as 50 moedas trabalharam, que é o erro da especialidade de novo.
+- Medido: **+0,9 ponto** de vitória por batalha num confronto genérico (49,1% → 50,0%). Parece pouco
+  e é: o sono é 5% por confronto. O que ele compra não é taxa de vitória, é **não perder um pokémon
+  inteiro pra um sorteio** — que foi exatamente a reclamação que fez o sono ser reescrito.
+
+### Poção (55%) e Super Poção (80%)
+- **Ficam ARMADAS esperando** (`pocaoArmada`). O primeiro pokémon do jogador que **VENCE um
+  confronto** e sobra com **25% ou menos** de HP se cura na hora e segue lutando contra o próximo.
+  Uma por batalha.
+- **Por que na vitória do confronto e não no fim da batalha:** fora da Elite 4, **cada batalha começa
+  com o time cheio** (`team.forEach(p => p.hp = p.maxHp)`), então curar no fim não mudaria nada — a
+  poção seria dinheiro jogado fora. Dentro da batalha o HP carrega de um confronto pro outro, e é
+  ali que ela decide alguma coisa. Escolhido com o custo medido na mesa.
+- **UMA ARMADA POR VEZ**: armar a segunda por cima da primeira gastaria as duas e entregaria uma, e
+  o jogador não teria como saber que perdeu.
+- **QUEM LIMPA depende de onde a luta rodou.** Na Torre, no Ginásio da Cidade e na raide é a própria
+  função da batalha, sem depender de ninguém. Na jornada quem viu a luta foi o CLIENTE, então é ele
+  que avisa (`consumePotion`) — e o pior caso de a chamada se perder é o jogador FICAR com a poção,
+  que é o lado certo pra errar.
+- **O PREÇO MEDIDO, e é o maior desta leva** (4.000 batalhas, mesmos times dos dois lados):
+  taxa de vitória por batalha vai de **49,1%** pra **57,5% com a Poção** (+8,4) e **60,9% com a Super
+  Poção** (+11,8). São os itens mais fortes do jogo por moeda gasta — e o preço deixa a **Poção mais
+  eficiente que a Super**: 0,56 ponto por moeda contra 0,39. Se um dia incomodar, é aí que se mexe.
+
+### Onde os itens valem
+- **Valem:** jornada (cliente), Torre, Ginásio da Cidade e raide do Mew (só o Despertar — a raide é
+  um ataque só, sem confronto seguinte pra o curado aproveitar).
+- **NÃO valem nas ligas**, e é de propósito: elas são resolvidas por cron, às vezes horas depois da
+  inscrição, e um item de 10 minutos não teria como estar "valendo" ali. O `resolveLeagueMatch`
+  recebe os itens **dentro do match**, como a especialidade já viaja — no Ginásio da Cidade o lado A
+  é o DESAFIANTE (quem está jogando agora); nas ligas ninguém manda nada.
+- **NÃO valem na batalha online**: aquele caminho resolve confronto a confronto (`battleResolveMatchup`)
+  e daria vantagem a um lado só numa partida PvP. Fica em aberto.
+- `tools/fake-firestore.js` ganhou **`increment` dentro de mapa aninhado** por causa disto: é assim
+  que o inventário é escrito (`set({ inventario: { potion: increment(1) } }, {merge:true})`), o
+  Firestore de verdade faz, e sem isso a função passava no teste e quebrava só em produção.
+
+## Modo difícil: a troca com o Prof. Carvalho tem que ser justa
+
+- Time cheio + um selvagem novo obriga a mandar um embora, e sem regra isso era **upgrade de graça**:
+  captura um selvagem forte e dispensa o coitado de nível 12 que ficou pra trás. No difícil, só dá
+  pra dispensar quem está a até **10 níveis** (`DIFERENCA_RELEASE_DIFICIL`) de quem acabou de chegar.
+- **A régua é de DIFERENÇA, não de "abaixo"** — o enunciado do pedido fala nos dois sentidos ("10
+  levels abaixo" e "10 levels ou menos de diferença"), e a diferença absoluta atende os dois. Se a
+  intenção era só travar o que está ABAIXO, é trocar o `Math.abs` por uma subtração.
+- **O recém-chegado sempre pode ser devolvido**: recusar o próprio selvagem seria obrigar a ficar
+  com ele.
+- **A VÁLVULA é obrigatória.** Se NINGUÉM do time passa na régua, ela não vale — senão o jogador
+  ficaria com 7 pokémon e sem saída, porque a tela do Prof. Carvalho não tem como ser pulada.
+  Acontece de verdade: um lendário chega 12 níveis acima do teto do trecho, e num time atrasado
+  todos ficariam travados.
+- **O clique recusa junto com a tela.** O card apagado é a apresentação da regra; a regra em si está
+  no `toggleRelease`, pra valer mesmo se alguém chamar a função por fora.
+
 ## Progressão da jornada
 
 - Distribuição de níveis trava em **55**; acima disso só desmaio, Bônus de Kanto e Doce Raro.

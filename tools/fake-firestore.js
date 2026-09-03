@@ -15,11 +15,20 @@ let filaDeTransacoes = Promise.resolve();   // ver runTransaction
 function pathOf(parts){ return parts.join('/'); }
 function clone(o){ return o === undefined ? undefined : JSON.parse(JSON.stringify(o)); }
 
+function ehMapaSimples(v){
+  return v && typeof v === 'object' && !Array.isArray(v) && !(v instanceof Date) && v.__op === undefined;
+}
 function aplicar(alvo, patch, merge){
   const base = merge ? Object.assign({}, alvo || {}) : {};
   for(const [k, v] of Object.entries(patch)){
     if(v && typeof v === 'object' && v.__op === INCREMENT){
       base[k] = (typeof base[k] === 'number' ? base[k] : 0) + v.n;
+    } else if(merge && ehMapaSimples(v)){
+      /* MAPA DENTRO DE MAPA. O Firestore de verdade MESCLA mapa aninhado num set({merge:true}) e
+         resolve increment la dentro -- e assim que o inventario da mochila e escrito
+         (set({ inventario: { potion: increment(1) } })). Sem isto o fake guardava o proprio objeto
+         do increment no lugar do numero, e a funcao passava aqui e quebrava so em producao. */
+      base[k] = aplicar(base[k], v, true);
     } else {
       base[k] = clone(v);
     }

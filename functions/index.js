@@ -887,6 +887,16 @@ function sorteiaGolpeEspecial(p, rng){
   return null;
 }
 /* Devolve true quando o confronto foi RESOLVIDO aqui (e o doExchange não deve nem começar). */
+/* ITENS DA MOCHILA QUE VALEM DENTRO DA BATALHA. São da CONTA e não do save -- quem escreve é o
+   servidor --, e chegam aqui pelo opts do simulateGymBattle.
+   Ficam em variável de módulo pelo mesmo motivo do explosaoDoAtivo: as funções do motor são
+   compartilhadas e enfiar mais um parâmetro em todas seria pior que um estado zerado no começo de
+   cada batalha. */
+let sonoBloqueado = false;      // Despertar ativo: sono do ADVERSÁRIO não pega no time do jogador
+let pocaoArmada = null;         // { id, cura } -- a primeira vitória de confronto com pouco HP dispara
+let pocaoJaUsada = false;       // uma por batalha: o item é um só
+/* Abaixo disso (25%) a poção dispara. É "sobrou raspando", não "levou um arranhão". */
+const POCAO_GATILHO_HP = 0.25;
 function tentarGolpeEspecial(active, enemy, rng, diario){
   explosaoDoAtivo = null;
   if(ehImuneAEspecial(active) || ehImuneAEspecial(enemy)) return false;
@@ -947,6 +957,16 @@ function tentarGolpeEspecial(active, enemy, rng, diario){
            do tipo no cliente, como em todo o resto do log: o motor manda o tipo, o cliente escolhe
            a palavra (ver nomeDoGolpe). */
         diario.push({ q: marca, d: 0, hp: alvo.hp, c:0, m:0, z:0, x:'disable', g: especial.golpe, a: tipoAnulado });
+      }
+      continue;
+    }
+    /* DESPERTAR: o sono do ADVERSÁRIO não pega no time do jogador. Protege quem usou o item, não
+       desliga o golpe do jogo -- os pokémon do jogador continuam podendo dormir o adversário.
+       A chance do adversário É CONSUMIDA: ele tentou e falhou, e é isso que a linha do log conta.
+       Sem essa linha o jogador não teria como saber que as 50 moedas trabalharam. */
+    if(!ehAtivo && sonoBloqueado){
+      if(diario){
+        diario.push({ q: marca, d: 0, hp: alvo.hp, c:0, m:0, z:0, x:'semSono', g: especial.golpe });
       }
       continue;
     }
@@ -1035,9 +1055,15 @@ function doExchange(active, enemy, rng, diario){
     }
   }
 }
-function simulateGymBattle(team, enemyTeam, rng){
+function simulateGymBattle(team, enemyTeam, rng, opts){
   team.forEach(p=>{ p.maxHp=calcMaxHp(p); p.hp=p.maxHp; });
   explosaoDoAtivo = null;   // o marcador da autodestruição é por BATALHA (ver tentarGolpeEspecial)
+  /* Os itens da mochila valem por BATALHA e são zerados aqui -- se ficassem de uma pra outra, um
+     Despertar de 10 minutos viraria permanente na primeira batalha que o ligasse. */
+  const itens = (opts && opts.itens) || {};
+  sonoBloqueado = !!itens.semSono;
+  pocaoArmada = itens.pocao || null;
+  pocaoJaUsada = false;
   enemyTeam.forEach(p=>{ p.maxHp=calcMaxHp(p); p.hp=p.maxHp; });
 
   const matchups = [];
@@ -1064,6 +1090,20 @@ function simulateGymBattle(team, enemyTeam, rng){
       const suddenDeath = false, suddenDeathMessage = null;
       const isTrade = enemyFainted && activeFainted;
       const playerWon = enemyFainted && !activeFainted;
+      /* POÇÃO: o primeiro pokémon do jogador que VENCE um confronto e sobra com 25% ou menos se
+         cura na hora e segue lutando contra o próximo. É aqui que ela tem efeito -- cada batalha
+         começa com o time cheio, então curar no FIM da batalha não mudaria nada. Uma por batalha.
+         Entra ANTES do matchups.push de propósito: o playerHpAfter tem que sair já curado, senão a
+         barra da tela termina no valor de antes e a cura some. */
+      if(playerWon && pocaoArmada && !pocaoJaUsada && active.hp > 0 &&
+         active.hp <= active.maxHp * POCAO_GATILHO_HP){
+        const curado = Math.min(active.maxHp - active.hp, Math.round(active.maxHp * pocaoArmada.cura));
+        if(curado > 0){
+          active.hp += curado;
+          pocaoJaUsada = true;
+          diario.push({ q:'p', d: curado, hp: active.hp, c:0, m:0, z:0, x:'pocao', g: pocaoArmada.id });
+        }
+      }
       const playerAliveAfter = activeFainted ? playerAliveBefore - 1 : playerAliveBefore;
       const enemyAliveAfter = enemyFainted ? enemyAliveBefore - 1 : enemyAliveBefore;
       matchups.push({
@@ -1458,7 +1498,10 @@ function resolveLeagueMatch(match, seedStr, allowedTerrainIds){
   // e o cron que resolve rodadas não precisa ler o perfil de todo mundo a cada partida
   applySpecialtyBuff(teamA, match.a && match.a.specialties);
   applySpecialtyBuff(teamB, match.b && match.b.specialties);
-  const result = simulateGymBattle(teamA, teamB, rng);
+  /* Os itens viajam no match, como a especialidade -- e só o lado A tem: no ginásio da cidade A é o
+     DESAFIANTE, que é quem está jogando agora. O líder está dormindo do outro lado do mundo. Nas
+     ligas ninguém manda itens, então isto fica vazio. */
+  const result = simulateGymBattle(teamA, teamB, rng, { itens: (match.a && match.a.itens) || {} });
   // diferente dos ginásios, os níveis ficam CONGELADOS na Liga -- depois da 8ª insígnia, o time do
   // treinador não sobe mais de nível, então nem precisa re-codificar/sincronizar nada aqui
   match.matchups = result.matchups; // mantém o log completo, pro botão "Assistir batalha" funcionar mesmo quando quem resolve é a Cloud Function
@@ -2888,6 +2931,7 @@ exports.challengeNeighborhoodGym = onCall(async (request) => {
   // quando ele assumiu) -- ver leaderSpecialties abaixo
   const challengerUserSnap = await db.collection('users').doc(uid).get();
   const challengerSpecialties = (challengerUserSnap.exists && challengerUserSnap.data().specialties) || [];
+  const challengerItens = itensAtivosDaConta(challengerUserSnap.exists ? challengerUserSnap.data() : null);
   // se o jogador escolheu uma ORDEM diferente antes de desafiar, só aceita se o CONJUNTO de pokémon
   // bater com o time que ele realmente possui (mesmo padrão anti-forja da Trainers League) -- a ordem
   // escolhida é respeitada, mas não dá pra mandar um time que ele nunca teve
@@ -4209,7 +4253,15 @@ exports.fightTrainerTowerFloor = onCall(async (request) => {
   const userSnap = await db.collection('users').doc(uid).get();
   applySpecialtyBuff(meuTime, (userSnap.exists && userSnap.data().specialties) || []);
 
-  const resultado = simulateGymBattle(meuTime, timeNpc, Math.random);
+  /* OS ITENS DA MOCHILA valem aqui como valem na jornada. O mesmo userSnap que já foi lido pra
+     especialidade serve -- não custa leitura nova. */
+  const itensDaConta = itensAtivosDaConta(userSnap.exists ? userSnap.data() : null);
+  const resultado = simulateGymBattle(meuTime, timeNpc, Math.random, { itens: itensDaConta });
+  /* A poção é UMA: se disparou, sai da conta agora. Aqui quem limpa é a própria batalha, sem
+     depender de o cliente avisar. */
+  if(pocaoDisparou(resultado)){
+    await db.collection('users').doc(uid).set({ pocaoArmada: null }, { merge: true });
+  }
   const venceu = !!resultado.win;
 
   let novo;
@@ -4422,6 +4474,107 @@ async function atualizarInscricoesComTime(uid, slot, team){
 /* Gasta um Doce Raro: +1 nível num pokémon específico de um save específico.
    Tudo validado no servidor -- as regras do Firestore deixam o dono escrever no próprio documento,
    então um doce contado no cliente seria níveis de graça pra quem abrisse o console. */
+/* ============================ A LOJA E A MOCHILA ============================
+   Até aqui a mochila era uma LEITURA do que a conta já tinha (o contador de doces e os cupons de
+   bônus shiny). Item comprável precisa de armazém de verdade, e ele tem que ser do SERVIDOR pelo
+   mesmo motivo das moedas: uma linha no console viraria Despertar infinito.
+   `inventario` é um mapa item -> quantos, no documento da conta, e está na trava do firestore.rules
+   junto de `moedas`, `awakeningUntil` e `pocaoArmada`. */
+const LOJA = {
+  awakening:   { preco: 50 },
+  hyperpotion: { preco: 30 },
+  potion:      { preco: 15 }
+};
+const AWAKENING_MS = 10 * 60 * 1000;          // 10 minutos, tempo de relógio
+const POCAO_CURA = { potion: 0.55, hyperpotion: 0.80 };
+
+/* O QUE ESTÁ VALENDO AGORA, lido do documento da conta. Devolve exatamente o `opts.itens` que o
+   simulateGymBattle espera -- assim quem chama não precisa saber como o efeito é guardado. */
+function itensAtivosDaConta(d){
+  const out = {};
+  if(d && d.awakeningUntil && Date.now() < d.awakeningUntil) out.semSono = true;
+  const armada = d && d.pocaoArmada;
+  if(armada && POCAO_CURA[armada]) out.pocao = { id: armada, cura: POCAO_CURA[armada] };
+  return out;
+}
+/* A poção é UMA: some assim que dispara. Quem sabe que ela disparou é o diário do confronto -- o
+   motor grava um passo `x:'pocao'` --, então não é preciso inventar outro canal. */
+function pocaoDisparou(resultado){
+  return ((resultado && resultado.matchups) || []).some(m => ((m.golpes)||[]).some(g => g.x === 'pocao'));
+}
+
+exports.buyItem = onCall(async (request) => {
+  if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
+  const uid = request.auth.uid;
+  const item = String(request.data?.item ?? '');
+  const daLoja = LOJA[item];
+  if(!daLoja) throw new HttpsError('invalid-argument', 'Item desconhecido.');
+  const userRef = db.collection('users').doc(uid);
+  /* Transação porque duas abas do mesmo jogador podem comprar ao mesmo tempo: sem ela, as duas leem
+     o mesmo saldo e as duas passam -- dois itens pelo preço de um. Mesmo cuidado do re-sorteio. */
+  return db.runTransaction(async (tx) => {
+    const [snap] = await tx.getAll(userRef);
+    const d = snap.exists ? (snap.data() || {}) : {};
+    const moedas = d.moedas || 0;
+    if(moedas < daLoja.preco){
+      throw new HttpsError('failed-precondition',
+        `Você tem ${moedas} moeda${moedas===1?'':'s'} — esse item custa ${daLoja.preco}.`);
+    }
+    tx.set(userRef, {
+      moedas: admin.firestore.FieldValue.increment(-daLoja.preco),
+      inventario: { [item]: admin.firestore.FieldValue.increment(1) }
+    }, { merge: true });
+    const inv = Object.assign({}, d.inventario || {});
+    inv[item] = (inv[item] || 0) + 1;
+    return { moedas: moedas - daLoja.preco, inventario: inv };
+  });
+});
+
+exports.useItem = onCall(async (request) => {
+  if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
+  const uid = request.auth.uid;
+  const item = String(request.data?.item ?? '');
+  if(!LOJA[item]) throw new HttpsError('invalid-argument', 'Item desconhecido.');
+  const userRef = db.collection('users').doc(uid);
+  return db.runTransaction(async (tx) => {
+    const [snap] = await tx.getAll(userRef);
+    const d = snap.exists ? (snap.data() || {}) : {};
+    const quantos = (d.inventario && d.inventario[item]) || 0;
+    if(quantos <= 0) throw new HttpsError('failed-precondition', 'Você não tem esse item.');
+    /* UMA POÇÃO ARMADA POR VEZ. Armar a segunda por cima da primeira gastaria as duas e entregaria
+       uma -- e o jogador não teria como saber que perdeu. */
+    if(POCAO_CURA[item] && d.pocaoArmada){
+      throw new HttpsError('failed-precondition', 'Você já tem uma poção esperando — ela vale na próxima batalha.');
+    }
+    const patch = { inventario: { [item]: admin.firestore.FieldValue.increment(-1) } };
+    let ate = 0;
+    if(item === 'awakening'){
+      /* O tempo corre a partir de AGORA e vale em qualquer save e em qualquer modo -- o campo é da
+         conta, não do save. Usar de novo com um ainda valendo estende a partir de agora, que é o
+         que a pessoa espera de um cronômetro. */
+      ate = Date.now() + AWAKENING_MS;
+      patch.awakeningUntil = ate;
+    } else {
+      patch.pocaoArmada = item;
+    }
+    tx.set(userRef, patch, { merge: true });
+    const inv = Object.assign({}, d.inventario || {});
+    inv[item] = quantos - 1;
+    return { inventario: inv, awakeningUntil: ate || (d.awakeningUntil || 0),
+             pocaoArmada: POCAO_CURA[item] ? item : (d.pocaoArmada || null) };
+  });
+});
+
+/* A POÇÃO DISPAROU NUMA BATALHA DO CLIENTE (a jornada roda lá). O servidor não viu a luta, então
+   quem avisa é o cliente -- e o pior caso de a chamada se perder é o jogador GANHAR a poção de
+   volta, que é o lado certo pra errar. Nas batalhas do servidor (Torre, ginásio da cidade, raide)
+   quem limpa é a própria função da batalha, sem depender de ninguém. */
+exports.consumePotion = onCall(async (request) => {
+  if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
+  await db.collection('users').doc(request.auth.uid).set({ pocaoArmada: null }, { merge: true });
+  return { ok: true };
+});
+
 /* ============================ MOEDAS ============================
    QUEM PAGA É O SERVIDOR, sempre. As regras do Firestore não deixam o cliente escrever `moedas`
    pelo mesmo motivo do `rareCandies`: moeda é poder de compra, e hoje ela compra re-sorteio do
@@ -6078,8 +6231,15 @@ async function bossGetEstado(){
    Nao da pra usar o simulateGymBattle: a primeira coisa que ele faz e devolver vida cheia aos dois
    lados, e o Mew tem que entrar com a vida que sobrou da ultima batalha de OUTRO jogador. O resto
    do laco e o mesmo -- inclusive o doExchange, que e quem escreve o diario do log. */
-function simulateBossFight(team, boss){
+function simulateBossFight(team, boss, opts){
   team.forEach(p => { p.maxHp = calcMaxHp(p); p.hp = p.maxHp; });
+  /* Mesmo estado de itens do simulateGymBattle -- zerado por batalha. A raide so usa o Despertar
+     (ver o comentario em fightSundayBoss), mas zerar os tres aqui e o que impede um Despertar de
+     uma batalha anterior vazar pra ca. */
+  const itensDaRaide = (opts && opts.itens) || {};
+  sonoBloqueado = !!itensDaRaide.semSono;
+  pocaoArmada = null;
+  pocaoJaUsada = false;
   const matchups = [];
   let playerStreak = 0, enemyStreak = 0;
   const hpInicialDoBoss = boss.hp;
@@ -6188,9 +6348,13 @@ exports.fightSundayBoss = onCall(async (request) => {
      -- o shiny valia (a flag vem na instância), a especialidade não. Ninguém tinha como notar:
      ela valia 1% e não aparecia em lugar nenhum. Conferido em 02/09/2026, ao subir pra 5%. */
   applySpecialtyBuff(time, conta.specialties || []);
+  /* O Despertar vale aqui também -- o Mew dorme como qualquer um. A poção NÃO: a raide é um
+     ataque só, sem confronto seguinte pra o pokémon curado aproveitar, e gastar o item nisso seria
+     jogá-lo fora sem o jogador entender por quê. */
+  const itensDaConta = itensAtivosDaConta(conta);
   const antes = estado.hp;
   const boss = bossInstance(antes);
-  const luta = simulateBossFight(time, boss);
+  const luta = simulateBossFight(time, boss, { itens: { semSono: !!itensDaConta.semSono } });
 
   /* O dano foi calculado sobre o HP que a leitura viu. Se outro jogador bateu no meio do caminho,
      o que vale é o dano -- ele é descontado do HP atual, não do que foi lido. */
