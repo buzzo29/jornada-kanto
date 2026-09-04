@@ -1204,6 +1204,22 @@ de golpes.
   invertida da cena. Vale também na explosão: a linha vai entre o `boom` e o `boomself`.
 - **Ela É um passo da animação, com movimento ZERO.** A barra já parou em 1 no golpe anterior, e é
   esse 1 que ela explica; sem o passo, a animação pularia do golpe que ia matar direto pro revide.
+- **A FRASE APARECE NO MEIO DA BATALHA TAMBÉM, com 1 segundo de pausa.** Ela é o **único aviso do
+  meio da luta**: todos os outros são de ABERTURA (sono, explosão, cura, poção, drenagem) e por isso
+  valem desde o começo do confronto. A Faixa não pode — mostrada desde o início ela entregaria o
+  desfecho e ainda ocuparia o lugar do "Trocando golpes..." a luta inteira.
+  Ela entra no passo dela e **sai no seguinte**. O `avisoDoConfronto` só a considera quando recebe o
+  `passo`; chamado sem ele (que é como o `pausaDoEspecial` decide a pausa ANTES do primeiro golpe)
+  ela não vale, porque a pausa dela é outra.
+- **A pausa dela é no MEIO do laço** (`pausaDaFaixa`), e não na abertura: o passo da Faixa não mexe
+  barra nenhuma — a barra já parou em 1 no golpe anterior —, então a duração dele é ZERO e sem a
+  pausa a frase apareceria e sumiria no mesmo quadro. É o mesmo segundo do `pausaDoEspecial`, pelo
+  mesmo motivo.
+- **Dois desenhos, não um.** O passo da Faixa força um `render` pra a frase APARECER (sem barra se
+  movendo, nenhum desenho aconteceria), e o passo seguinte força outro pra ela SAIR (`posFaixa`).
+  Sem o segundo ela ficaria no lugar do "Trocando golpes..." pelo resto da luta — que foi exatamente
+  o defeito que a cura teve quando nasceu.
+  Os quatro laços de revelação (jornada, ginásio, Torre/raide e liga assistida) receberam os dois.
 - **O preço em linhas, medido:** a luta comum continua em **3 linhas (100%)** — a regra da casa não
   se move. A com Faixa fica em **6 linhas em 66%** dos casos, 5 em 18%, 4 em 15%, e o **maior é 7**
   (era 14 na versão sem teto). Cabe na mesma leitura do sono, que vai até 6.

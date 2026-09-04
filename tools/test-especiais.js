@@ -576,6 +576,51 @@ console.log('\nA FAIXA DE FOCO NAO PODE SER FURADA POR CAMINHO NENHUM');
          'linha ' + iLinha + ' de ' + linhas.length);
     }
 
+    /* A MENSAGEM NO MEIO DA BATALHA, com a pausa de 1s. Pedido em 04/09/2026: o log ja contava a
+       historia, mas quem estava assistindo a animacao via a barra parar em 1 sem nada explicando.
+       A Faixa e o UNICO aviso do meio da luta -- todos os outros sao de abertura, e por isso valem
+       desde o comeco do confronto. Ela nao pode: mostrada desde o inicio, entregaria o desfecho e
+       ocuparia o lugar do "Trocando golpes..." a luta inteira. */
+    {
+      let m2 = null;
+      for(let i = 0; i < 6000 && !m2; i++){
+        const meu = [S.createInstance('charizard', 56)];
+        S.equiparItens(meu, { charmander:'faixa_foco' });
+        const r = S.simulateGymBattle(meu, [S.createInstance('electabuzz', 54)], Math.random);
+        const x = (r.matchups||[])[0];
+        if(!x) continue;
+        const s = S.sequenciaDoConfronto(x);
+        const i2 = s.findIndex(g => g.x === 'faixa');
+        if(i2 >= 0 && i2 < s.length - 1) m2 = x;   // a luta CONTINUA depois dela
+      }
+      ok('achei um confronto que continua depois da Faixa', !!m2);
+      if(m2){
+        const seq = S.sequenciaDoConfronto(m2);
+        const anim = S.buildAnimatedHitSequence(m2);
+        const iF = seq.findIndex(g => g.x === 'faixa');
+        /* ANTES dela a tela mostra o "Trocando golpes..." de sempre -- nada entregue. */
+        ok('antes dela nao ha aviso nenhum',
+           [0, 1, iF].every(p => S.avisoDoConfronto(m2, p) === ''),
+           [0,1,iF].map(p => p + ':' + (S.avisoDoConfronto(m2,p)||'(vazio)')).join(' | '));
+        /* NO PASSO DELA a frase aparece. O laco incrementa o passo depois de aplicar o golpe, entao
+           quando a barra parou em 1 o contador ja esta em iF+1. */
+        ok('a frase aparece no passo dela', /Faixa de Foco segurou/.test(S.avisoDoConfronto(m2, iF + 1)),
+           S.avisoDoConfronto(m2, iF + 1));
+        /* E SAI no seguinte -- senao ela ficaria no lugar do "Trocando golpes..." ate o fim. */
+        ok('e sai no passo seguinte', S.avisoDoConfronto(m2, iF + 2) === '', S.avisoDoConfronto(m2, iF + 2));
+        /* A PAUSA DE 1s. O passo da Faixa nao mexe barra nenhuma, entao a duracao dele e ZERO: sem
+           a pausa a frase apareceria e sumiria no mesmo quadro. */
+        ok('o passo dela nao mexe barra', anim[iF] && anim[iF].amount === 0, JSON.stringify(anim[iF]));
+        ok('e por isso ele pede a pausa de 1s',
+           anim[iF].faixa === true && S.pausaDaFaixa(anim[iF]) === S.PAUSA_LEITURA_ESPECIAL_MS,
+           S.pausaDaFaixa(anim[iF]) + 'ms');
+        ok('e golpe comum nao pausa nada', S.pausaDaFaixa(anim[0]) === 0);
+        /* O PASSO SEGUINTE pede um desenho, que e o que TIRA a frase da tela. */
+        ok('e o passo seguinte pede o desenho que limpa a frase', anim[iF+1] && anim[iF+1].posFaixa === true,
+           JSON.stringify(anim[iF+1]));
+      }
+    }
+
     /* O TAMANHO, que foi o motivo de a versao anterior (golpes reais, sem teto) ser desfeita: ela
        custava 7 linhas na maioria e ate 14 na cauda. Partido em duas metades, o teto volta a valer
        nas duas: no maximo 3 + a linha + 3. */

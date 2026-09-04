@@ -7125,9 +7125,12 @@ function advanceSpecialReveal(){
       setTimeout(advanceSpecialReveal, hitDuration + 800);
     } else {
       animatePartialSpecialHpBars();
-      // a frase da cura ja cumpriu o papel: troca ela pelo "Trocando golpes..." assim que a barra sobe
-      if(hit.cura) setTimeout(render, hitDuration + 50);
-      setTimeout(advanceSpecialReveal, hitDuration + 150);
+      /* A frase da cura ja cumpriu o papel: troca ela pelo "Trocando golpes..." assim que a barra
+         sobe. A da FAIXA e o contrario -- ela precisa do render pra APARECER, porque o passo dela
+         nao mexe barra nenhuma (a barra ja parou em 1 no golpe anterior) e sem um desenho a frase
+         nunca chegaria na tela. */
+      if(hit.cura || hit.faixa || hit.posFaixa) setTimeout(render, hitDuration + 50);
+      setTimeout(advanceSpecialReveal, hitDuration + 150 + pausaDaFaixa(hit));
     }
   } else {
     const matchups = game.specialBattleResult.matchups;
@@ -7539,9 +7542,12 @@ function advanceReveal(){
       setTimeout(advanceReveal, hitDuration + 800);
     } else {
       animatePartialHpBars();
-      // a frase da cura ja cumpriu o papel: troca ela pelo "Trocando golpes..." assim que a barra sobe
-      if(hit.cura) setTimeout(render, hitDuration + 50);
-      setTimeout(advanceReveal, hitDuration + 150); // só avança pro próximo golpe depois que esse terminou de descer
+      /* A frase da cura ja cumpriu o papel: troca ela pelo "Trocando golpes..." assim que a barra
+         sobe. A da FAIXA e o contrario -- ela precisa do render pra APARECER, porque o passo dela
+         nao mexe barra nenhuma (a barra ja parou em 1 no golpe anterior) e sem um desenho a frase
+         nunca chegaria na tela. */
+      if(hit.cura || hit.faixa || hit.posFaixa) setTimeout(render, hitDuration + 50);
+      setTimeout(advanceReveal, hitDuration + 150 + pausaDaFaixa(hit)); // só avança pro próximo golpe depois que esse terminou de descer
     }
   } else {
     const matchups = game.battleResult.matchups;
@@ -7588,7 +7594,7 @@ function animatePartialHpBars(){
    lá 'q' é quem BATE, aqui 'side' é quem APANHA. Enquanto as duas listas eram montadas em
    separado, o jogador via 3 golpes na tela e lia 4 linhas no log. */
 function buildAnimatedHitSequence(m){
-  return sequenciaDoConfronto(m).map(g => {
+  const seq = sequenciaDoConfronto(m).map(g => {
     /* Na lista 'q' é quem BATE e 'side' é quem APANHA -- por isso a inversão. A CURA é o contrário
        de tudo isso: quem curou é quem MUDA de vida, e pra cima. Amount negativo faz a barra subir
        (os laços fazem hp - amount, e o hpBarTransitionMs usa o módulo pra a duração). */
@@ -7599,6 +7605,13 @@ function buildAnimatedHitSequence(m){
     if(g.x === 'faixa') return { side: g.q === 'p' ? 'player' : 'enemy', amount: 0, faixa: true };
     return { side: g.q === 'p' ? 'enemy' : 'player', amount: g.d };
   });
+  /* O passo SEGUINTE ao da Faixa precisa de um DESENHO pra a frase dela sair da tela. Ela é a única
+     frase do meio da luta: as de abertura somem sozinhas porque a barra que elas anunciam se move e
+     o laço já redesenha ali, e as de confronto inteiro (explosão, sono) devem mesmo ficar até o
+     fim. Sem esta marca a frase da Faixa ocuparia o lugar do "Trocando golpes..." pelo resto da
+     luta -- que foi exatamente o defeito que a cura teve quando ela nasceu. */
+  seq.forEach((h, i) => { if(i > 0 && seq[i-1].faixa) h.posFaixa = true; });
+  return seq;
 }
 function reconstruirSequencia(m){
   // já sabemos o resultado final (quem vence e com quanto HP fica) -- essa função só decide COMO
@@ -7856,9 +7869,12 @@ function advanceTrainerReveal(){
       setTimeout(advanceTrainerReveal, hitDuration + 800);
     } else {
       animatePartialTrainerHpBars();
-      // a frase da cura ja cumpriu o papel: troca ela pelo "Trocando golpes..." assim que a barra sobe
-      if(hit.cura) setTimeout(render, hitDuration + 50);
-      setTimeout(advanceTrainerReveal, hitDuration + 150);
+      /* A frase da cura ja cumpriu o papel: troca ela pelo "Trocando golpes..." assim que a barra
+         sobe. A da FAIXA e o contrario -- ela precisa do render pra APARECER, porque o passo dela
+         nao mexe barra nenhuma (a barra ja parou em 1 no golpe anterior) e sem um desenho a frase
+         nunca chegaria na tela. */
+      if(hit.cura || hit.faixa || hit.posFaixa) setTimeout(render, hitDuration + 50);
+      setTimeout(advanceTrainerReveal, hitDuration + 150 + pausaDaFaixa(hit));
     }
   } else {
     const matchups = game.trainerBattleResult.matchups;
@@ -13809,6 +13825,25 @@ function especiaisDaEspecie(id){
    Devolve '' quando o confronto não teve nada especial -- é isso que as telas usam pra decidir
    entre a frase e o texto de sempre. */
 function avisoDoConfronto(m, passo){
+  /* A FAIXA É O ÚNICO AVISO DO MEIO DA LUTA. Todos os outros são de ABERTURA: eles acontecem antes
+     do primeiro golpe, então a frase pode valer desde o começo do confronto. A Faixa não -- ela
+     acontece quando a barra chega a 1, e mostrá-la desde o início entregaria o desfecho E ocuparia
+     o lugar do "Trocando golpes..." a luta inteira.
+     Ela aparece no passo SEGUINTE ao dela (o laço incrementa o passo depois de aplicar o golpe,
+     então quando a barra parou em 1 o contador já está em iFaixa+1) e sai no próximo.
+     Chamada SEM o passo -- que é como o pausaDoEspecial faz, pra decidir a pausa ANTES do primeiro
+     golpe -- ela não vale: a pausa dela é outra, no meio do laço. */
+  if(passo != null){
+    const seq = sequenciaDoConfronto(m);
+    const iFaixa = seq.findIndex(g => g.x === 'faixa');
+    if(iFaixa >= 0 && passo === iFaixa + 1){
+      const f = seq[iFaixa];
+      const nP = escapeHtmlSafe(m.player || ''), nE = escapeHtmlSafe(m.enemy || '');
+      const doJ = f.q === 'p';
+      return (ICONES_ESPECIAIS.faixa || '') + ' ' +
+             fraseDoEspecial(f, doJ ? nP : nE, doJ ? nE : nP, {}) + '!';
+    }
+  }
   /* A CURA SÓ VALE ENQUANTO ELA NÃO ACONTECEU. Ela é o primeiro passo do confronto, então a frase
      anuncia a barra que está prestes a subir -- e quando a barra já subiu, ela vira uma frase velha
      ocupando o lugar do "Trocando golpes..." pelo resto da luta.
@@ -13832,6 +13867,11 @@ function avisoDoConfronto(m, passo){
    que o online já dá pro "Vai Fulano!" antes de começar a luta. */
 const PAUSA_LEITURA_ESPECIAL_MS = 1000;
 function pausaDoEspecial(m){ return avisoDoConfronto(m) ? PAUSA_LEITURA_ESPECIAL_MS : 0; }
+/* A PAUSA DA FAIXA, no meio do laço. O passo dela não mexe barra nenhuma, então a duração dele é
+   ZERO -- sem esta pausa a frase apareceria e sumiria no mesmo quadro, e o jogador veria a barra
+   parar em 1 sem nada explicando por quê. É o mesmo segundo que o pausaDoEspecial dá pros golpes
+   de abertura, e pelo mesmo motivo. */
+function pausaDaFaixa(hit){ return (hit && hit.faixa) ? PAUSA_LEITURA_ESPECIAL_MS : 0; }
 function passosHtml(m){
   const golpes = sequenciaDoConfronto(m);   // a MESMA lista que a animação vai reproduzir
   if(!golpes.length) return '';
@@ -15148,9 +15188,12 @@ function advanceLeagueWatch(){
       setTimeout(advanceLeagueWatch, hitDuration + 800);
     } else {
       animatePartialLeagueWatchHpBars();
-      // a frase da cura ja cumpriu o papel: troca ela pelo "Trocando golpes..." assim que a barra sobe
-      if(hit.cura) setTimeout(render, hitDuration + 50);
-      setTimeout(advanceLeagueWatch, hitDuration + 150);
+      /* A frase da cura ja cumpriu o papel: troca ela pelo "Trocando golpes..." assim que a barra
+         sobe. A da FAIXA e o contrario -- ela precisa do render pra APARECER, porque o passo dela
+         nao mexe barra nenhuma (a barra ja parou em 1 no golpe anterior) e sem um desenho a frase
+         nunca chegaria na tela. */
+      if(hit.cura || hit.faixa || hit.posFaixa) setTimeout(render, hitDuration + 50);
+      setTimeout(advanceLeagueWatch, hitDuration + 150 + pausaDaFaixa(hit));
     }
   } else if(game.leagueWatchIndex < w.matchups.length - 1){
     game.leagueWatchIndex++;
