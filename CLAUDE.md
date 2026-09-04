@@ -438,6 +438,21 @@ de golpes.
   Medido: **sem sono, 98,6% dos confrontos ficam em 3 linhas e 1,4% em 2** — a leitura de sempre.
   **Com sono: 4 linhas em 19,5%, 5 em 41,5%, 6 em 5,9%** (as seis são quando quem usou o sono é o
   mais rápido e ganha 3 golpes livres) e 2 linhas em 33,2% (o confronto acabou dentro do teto).
+- **E SAI DA ORDEM DO DIÁRIO, não da lista já reordenada pelo `passosVisiveis`.** Ele move o golpe
+  MORIBUNDO pra antes do golpe que derrubou quem o deu — e na lista reordenada esse moribundo
+  aparecia ANTES do primeiro golpe do adormecido, entrando na conta como se fosse troca livre.
+  **Com o golpe que MATOU contado como livre, a reconstrução ficava sem nada pra mostrar do lado do
+  inimigo e emitia um "−0 de HP" na tela**, além de deixar o morto atacando.
+  Reportado em 04/09/2026 com print (um Paras que matava a Staryu, ela ainda atacava, e o Paras
+  fechava com um golpe de zero). **Raro — 1 em 21.556 confrontos — e ANTIGO**: não tem nada a ver
+  com a Faixa de Foco, que só o trouxe à tona por estar sendo olhada.
+- **A reconstrução também não pode emitir golpe de dano zero.** Ela devolve um lado com zero quando
+  o outro já levou tudo, e o filtro `(g.x || g.d > 0)` só vale pro DIÁRIO — a saída dela passava
+  direto. Os dois caminhos (sono e Faixa) filtram agora.
+- **O teste que deixou isso passar era pequeno demais.** Ele rodava 4.000 confrontos de uma lista
+  curta de espécies; o defeito aparece em 1 de 21.556. A varredura nova roda **13.000 confrontos
+  cobrindo todas as espécies**, sem item nenhum, e cobra as duas coisas: nenhum golpe de dano zero
+  na tela e ninguém atacando depois de cair. Amostra pequena não é teste de invariante raro.
 - **Quantas trocas livres sai do DIÁRIO, não de `SONO_EM_TROCAS`.** Os dois números não são iguais: o
   sono compra 2 trocas, mas quem usou, se for o mais rápido, ainda bate primeiro na troca em que o
   outro acorda — e aí são 3. Ler do diário acerta os dois casos, acerta o **sono DUPLO** (os dois se

@@ -13707,7 +13707,15 @@ function sequenciaDoConfronto(m){
      diário acerta os dois casos, acerta o sono DUPLO (os dois se dormem e ninguém ganha troca
      livre) e continua certo se a duração do sono mudar. */
   const sono = reais.find(g => g.x === 'sono') || null;
-  const soDano = reais.filter(ehDano);
+  /* AS TROCAS LIVRES SAEM DA ORDEM DO DIÁRIO, não da lista já reordenada pelo passosVisiveis.
+     Ele move o golpe MORIBUNDO pra antes do golpe que derrubou quem o deu -- e na lista reordenada
+     esse moribundo aparece ANTES do primeiro golpe do adormecido, então ele entrava na conta como
+     se fosse troca livre. Com o golpe que MATOU contado como livre, a reconstrução ficava sem nada
+     pra mostrar do lado do inimigo e emitia um golpe de dano ZERO na tela.
+     Reportado em 04/09/2026 com print (um Paras que matava a Staryu e ela ainda atacava, seguida de
+     um "-0 de HP" do Paras). Raro -- 1 em 21.556 confrontos --, e antigo: não tem a ver com a Faixa.
+     Na ordem do diário o moribundo está onde aconteceu, depois do golpe do outro, e a conta fecha. */
+  const soDano = (m.golpes || []).filter(g => (g.x || g.d > 0)).filter(ehDano);
   const iOutro = sono ? soDano.findIndex(g => g.q !== sono.q) : 0;
   const livres = (sono && iOutro !== 0) ? soDano.slice(0, iOutro < 0 ? soDano.length : iOutro) : [];
   const danoLivre = livres.reduce((a, g) => a + (g.d || 0), 0);
@@ -13724,7 +13732,11 @@ function sequenciaDoConfronto(m){
       : Object.assign({}, base, { playerHpBefore: Math.max(base.playerHpAfter, base.playerHpBefore - danoLivre) });
   }
   // a reconstrução fala em QUEM APANHA (side); aqui a lista é de QUEM BATE (q)
-  const resto = reconstruirSequencia(base).map(h => ({ q: h.side === 'player' ? 'e' : 'p', d: h.amount }));
+  /* GOLPE DE DANO ZERO NÃO É GOLPE, nem vindo da reconstrução: ela pode emitir um lado com zero
+     quando o outro já levou tudo (o caminho da Faixa filtra pelo mesmo motivo). Um "−0 de HP" na
+     tela é o que faz procurar bug onde é regra. */
+  const resto = reconstruirSequencia(base).map(h => ({ q: h.side === 'player' ? 'e' : 'p', d: h.amount }))
+                                          .filter(h => h.d > 0);
   return aberturas.concat(livres, resto);
 }
 /* AS FRASES DOS GOLPES ESPECIAIS VIVEM AQUI, num lugar só.

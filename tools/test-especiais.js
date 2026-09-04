@@ -660,9 +660,7 @@ console.log('\nA FAIXA DE FOCO NAO PODE SER FURADA POR CAMINHO NENHUM');
           0,16% dos confrontos com Faixa, todos com drenagem junto. Consertado partindo do 'base'.
        Este teste nao olha nenhum dos dois casos: ele PERCORRE a sequencia mostrada somando o dano e
        exige que ninguem bata com a barra ja em zero. E a forma que pega o terceiro jeito. */
-    {
-      const IDS3 = Object.keys(S.SPECIES);
-      /* O PAR DO MORIBUNDO E PERMITIDO, com a mesma regra do teste la de cima: quem caiu no passo
+    /* O PAR DO MORIBUNDO E PERMITIDO, com a mesma regra do teste la de cima: quem caiu no passo
          IMEDIATAMENTE anterior pode bater, porque os dois golpes sao do mesmo instante e o motor so
          os aplica em sequencia porque codigo roda em sequencia. Qualquer outro caso e defeito. */
       const percorre = (mm) => {
@@ -681,8 +679,10 @@ console.log('\nA FAIXA DE FOCO NAO PODE SER FURADA POR CAMINHO NENHUM');
           if(bate){ e = Math.max(0, e - g.d); if(e === 0 && caiuEm.e < 0) caiuEm.e = k; }
           else { p = Math.max(0, p - g.d); if(p === 0 && caiuEm.p < 0) caiuEm.p = k; }
         }
-        return null;
-      };
+      return null;
+    };
+    {
+      const IDS3 = Object.keys(S.SPECIES);
       let n3 = 0, mortos = 0, somaFora = 0, exemplo = '';
       for(let i = 0; i < 5000; i++){
         const meu = [S.createInstance(IDS3[(i*11) % IDS3.length], 40 + (i % 25))];
@@ -706,6 +706,36 @@ console.log('\nA FAIXA DE FOCO NAO PODE SER FURADA POR CAMINHO NENHUM');
       ok('ninguem ataca depois de cair, em nenhum confronto com Faixa', mortos === 0,
          mortos + ' de ' + n3 + (exemplo ? ' | ' + exemplo : ''));
       ok('e a soma do dano fecha, contando a cura da drenagem', somaFora === 0, somaFora + ' de ' + n3);
+    }
+
+    /* A MESMA VARREDURA, mas SEM item nenhum e com o time do jogo inteiro. O teste de cima roda
+       4.000 confrontos de uma lista curta; este roda 20.000 cobrindo todas as especies, e foi o que
+       pegou o defeito do SONO reportado em 04/09/2026 -- 1 em 21.556, invisivel numa amostra menor.
+       O defeito: o passosVisiveis move o golpe MORIBUNDO pra antes do golpe que derrubou quem o
+       deu, e na lista reordenada ele aparecia antes do primeiro golpe do adormecido -- entrando na
+       conta das trocas livres do sono. Com o golpe que MATOU contado como livre, a reconstrucao
+       ficava sem nada pra mostrar do lado do inimigo e emitia um "-0 de HP" na tela. */
+    {
+      const IDS4 = Object.keys(S.SPECIES);
+      let n4 = 0, zeros = 0, mortos = 0, exZ = '', exM = '';
+      for(let i = 0; i < 9000; i++){
+        const meu = [S.createInstance(IDS4[i % IDS4.length], 20 + (i % 40))];
+        S.equiparItens(meu, null);
+        const inim = [S.createInstance(IDS4[(i*7+3) % IDS4.length], 25 + (i % 35)),
+                      S.createInstance(IDS4[(i*13) % IDS4.length], 28 + (i % 30))];
+        S.equiparItens(inim, null);
+        const r = S.simulateGymBattle(meu, inim, Math.random);
+        for(const x of (r.matchups||[])){
+          n4++;
+          const s4 = S.sequenciaDoConfronto(x);
+          if(s4.some(g => !g.x && g.d === 0)){ zeros++; if(!exZ) exZ = x.playerSpecies + ' vs ' + x.enemySpecies; }
+          if(percorre(x)){ mortos++; if(!exM) exM = x.playerSpecies + ' vs ' + x.enemySpecies; }
+        }
+      }
+      ok('varredura ampla: nenhum golpe de dano ZERO na tela', zeros === 0,
+         zeros + ' de ' + n4 + (exZ ? '  |  ' + exZ : ''));
+      ok('e ninguem ataca depois de cair', mortos === 0,
+         mortos + ' de ' + n4 + (exM ? '  |  ' + exM : ''));
     }
   }
 
