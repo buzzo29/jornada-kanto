@@ -707,8 +707,14 @@ let divergencias = 0, comEspecial = 0;
 for(let i=0;i<300;i++){
   const rngMonta = S.makeSeededRng('monta-'+i);
   const t1 = timeAleatorio(rngMonta, 6), t2 = timeAleatorio(rngMonta, 6);
-  const rC = S.simulateGymBattle(t1.map(p=>inst(p.id,p.level)), t2.map(p=>inst(p.id,p.level)), S.makeSeededRng('m'+i));
-  const rS = srv._simulateGymBattle(t1.map(p=>srv._createInstance(p.id,p.level)),
+  /* Um item de atributo diferente a cada volta, sempre no primeiro do time -- assim as 300
+     batalhas cobrem os cinco, dos dois lados do motor. */
+  const itemDaVez = ['hp_up','atk_up','def_up','spatk_up','spdef_up'][i % 5];
+  const equipa = (time, fn) => { fn([time[0]], { [S.raizDaLinha(time[0].speciesId)]: itemDaVez }); return time; };
+  const timeC = equipa(t1.map(p=>inst(p.id,p.level)), S.equiparItens);
+  const timeS = equipa(t1.map(p=>srv._createInstance(p.id,p.level)), srv._equiparItens);
+  const rC = S.simulateGymBattle(timeC, t2.map(p=>inst(p.id,p.level)), S.makeSeededRng('m'+i));
+  const rS = srv._simulateGymBattle(timeS,
                                     t2.map(p=>srv._createInstance(p.id,p.level)), srv._makeSeededRng('m'+i));
   if((rC.matchups||[]).some(m=>(m.golpes||[]).some(g=>g.x))) comEspecial++;
   if(resumo(rC) !== resumo(rS)) divergencias++;
@@ -792,6 +798,44 @@ function comItem(instancia, item){
   ok('quem NAO carrega o item continua dormindo', vizinhoDormiu > 30, vizinhoDormiu + ' vezes');
   ok('e quem carrega, nunca -- enquanto o item nao foi gasto', donoDormiuComItem === 0,
      donoDormiuComItem + ' com o item na mao, ' + donoDormiuGasto + ' depois de gasto');
+  /* OS CINCO ITENS DE ATRIBUTO: +15 no que se comprou, o confronto inteiro.
+     O bonus e FLAT e entra POR ULTIMO -- depois de shiny, terreno e especialidade, que sao
+     multiplicadores. Entrando antes, eles o inflariam: +15 num shiny em terreno viraria +21, e
+     "+15 de atributo" deixaria de ser 15. */
+  {
+    const cru = (esp, item) => { const p = S.createInstance(esp, 60); S.equiparItens([p], item ? { [S.raizDaLinha(esp)]: item } : null); return p; };
+    const base = cru('charizard', null);
+    const PARES = [['atk_up','effectiveAttack'], ['def_up','effectiveDefense'],
+                   ['spatk_up','effectiveSpAtk'], ['spdef_up','effectiveSpDef'], ['hp_up','effectiveBaseHp']];
+    let erradas = [];
+    for(const [item, fn] of PARES){
+      const com = cru('charizard', item);
+      if(S[fn](com) - S[fn](base) !== 15) erradas.push(item + ':' + (S[fn](com) - S[fn](base)));
+      /* E NAO PODE VAZAR: quem compra Atk Up nao ganha defesa junto. */
+      for(const [, outra] of PARES){
+        if(outra === fn) continue;
+        if(S[outra](com) !== S[outra](base)) erradas.push(item + ' vazou em ' + outra);
+      }
+    }
+    ok('cada item de atributo da +15 SO no dele', erradas.length === 0, erradas.join(', '));
+    /* O HP Up mexe no TETO de vida, que e o que o jogador ve na barra. */
+    ok('o HP Up sobe o teto de vida em 15', S.calcMaxHp(cru('charizard','hp_up')) - S.calcMaxHp(base) === 15,
+       S.calcMaxHp(cru('charizard','hp_up')) + ' vs ' + S.calcMaxHp(base));
+    /* FLAT, nao multiplicado: num shiny em terreno o bonus continua sendo 15, nao 15x1.38. */
+    const shinyBase = S.createInstance('charizard', 60); shinyBase.shiny = true; S.applyTerrainBuff([shinyBase], { types:['Fire'] });
+    const shinyItem = S.createInstance('charizard', 60); shinyItem.shiny = true; S.applyTerrainBuff([shinyItem], { types:['Fire'] });
+    S.equiparItens([shinyBase], null); S.equiparItens([shinyItem], { charmander:'atk_up' });
+    ok('e o bonus e FLAT, nao multiplicado pelos buffs',
+       S.effectiveAttack(shinyItem) - S.effectiveAttack(shinyBase) === 15,
+       (S.effectiveAttack(shinyItem) - S.effectiveAttack(shinyBase)) + ' de diferenca');
+    /* ELES NAO SE GASTAM: o motor nao pode anotar gasto nenhum pra eles, senao o item sumiria da
+       conta depois da primeira batalha -- e o pedido e que ele valha enquanto estiver equipado. */
+    const time = [S.createInstance('charizard', 60)];
+    S.equiparItens(time, { charmander:'atk_up' });
+    S.simulateGymBattle(time, [S.createInstance('onix', 55), S.createInstance('golem', 55)], Math.random);
+    ok('e eles NAO se gastam na batalha', S.itensGastosDaBatalha().length === 0,
+       JSON.stringify(S.itensGastosDaBatalha()));
+  }
   /* O ITEM SOBREVIVE A EVOLUCAO. A chave dos equipados e a RAIZ DA LINHA, nao a especie: era a
      especie, e um Charmeleon que evoluia perdia a pocao -- ela ficava presa em "charmeleon"
      enquanto o bicho passava a se chamar "charizard", e nem a tela nem a batalha achavam mais.

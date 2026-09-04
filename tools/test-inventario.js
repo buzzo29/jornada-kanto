@@ -164,8 +164,12 @@ console.log('\n=== A LOJA ===');
   /* A LOJA VENDE OS CINCO. O Doce Raro e o Bonus Shiny voltaram a ser vendidos em 03/09/2026 --
      eles continuam vindo de jogar tambem, e e por isso que a mochila le cada um de uma fonte
      propria (contador / cupom+estoque) em vez de derivar tudo do inventario. */
-  ok('a grade mostra os cinco a venda', (t.match(/item-slot-icone/g)||[]).length === 5,
+  ok('a grade mostra os dez a venda', (t.match(/item-slot-icone/g)||[]).length === 10,
      (t.match(/item-slot-icone/g)||[]).length + ' itens');
+  /* Os cinco de atributo custam 30 cada, e o preco da tela tem que ser o que o servidor cobra. */
+  ok('e os cinco de atributo custam 30',
+     ['hp_up','atk_up','def_up','spatk_up','spdef_up'].every(id => S.ITENS[id].preco === 30),
+     ['hp_up','atk_up','def_up','spatk_up','spdef_up'].map(id => id + ':' + S.ITENS[id].preco).join(' '));
   ok('e todo item do catalogo esta a venda',
      Object.keys(S.ITENS).every(id => S.ITENS[id].comprável),
      Object.keys(S.ITENS).filter(id => !S.ITENS[id].comprável).join(', ') || 'todos');

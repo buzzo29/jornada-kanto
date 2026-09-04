@@ -1912,6 +1912,9 @@
      QUADRADO e não redondo pra não se confundir com as setas de mover, que são as redondas. */
   /* O contador do popup de compra. O Máx fica na MESMA linha do +/- de propósito: num toque, ele é
      o caminho de verdade pra comprar 20 -- ninguém vai apertar o + vinte vezes. */
+  /* O docinho do pódio, ao lado do nome. Pequeno de propósito: ele é uma marca, não uma coluna --
+     a informação principal da linha continua sendo o andar. */
+  .tower-rank-doce{ font-size:.8rem; }
   .compra-stepper{ display:flex; align-items:center; justify-content:center; gap:10px; margin:12px 0 4px; }
   /* O numero vai na fonte de TEXTO, nao na de pixel: 83 na de pixel se le como outra coisa --
      ela foi feita pra titulo curto, e aqui o numero e a informacao. O min-width segura a largura
@@ -4154,6 +4157,28 @@ function withSpecialty(v, p){ return p.specialtyBuffed ? Math.round(v * SPECIALT
 
    O arredondamento é por buff, na ordem shiny -> terreno. Os dois arquivos têm que arredondar na
    MESMA ordem, senão voltam a divergir por 1 ponto de atributo em alguns pokémon. */
+/* OS ITENS DE ATRIBUTO (+15 num atributo, o confronto inteiro).
+   O bônus é FLAT e entra POR ÚLTIMO, depois de shiny, terreno e especialidade -- que são
+   multiplicadores. Entrando antes, os multiplicadores o inflariam: +15 num shiny em terreno viraria
+   +21, e "+15 de atributo" deixaria de ser 15. Depois, ele é exatamente 15 pra todo mundo.
+   Consequência conhecida e aceita: ele vale PROPORCIONALMENTE MAIS pra quem tem o atributo baixo --
+   +15 num ataque de 60 é +25%, num de 120 é +12,5%.
+   O do HP entra no effectiveBaseHp, então mexe no TETO de vida (calcMaxHp) e também no gen1MaxHp,
+   que é o divisor do dano: mais vida também significa tomar uma fração menor por golpe, que é o
+   que mais vida tem que significar.
+   NÃO tem Velocidade: ela entra na taxa de crítico (velocidade/512, regra da Gen 1), e um item de
+   30 moedas mexendo na frequência de crítico é outro tipo de item -- não foi pedido. */
+const BONUS_DE_ATRIBUTO = 15;
+const ITENS_DE_ATRIBUTO = {
+  hp_up:    'baseHp',
+  atk_up:   'attack',
+  def_up:   'defense',
+  spatk_up: 'spAtk',
+  spdef_up: 'spDef'
+};
+function withItemStat(v, p, qual){
+  return (p.item && ITENS_DE_ATRIBUTO[p.item] === qual) ? v + BONUS_DE_ATRIBUTO : v;
+}
 function withBuffs(v, p){
   if(p.shiny){ v = Math.round(v * SHINY_BUFF_MULT); }
   if(p.terrainBuffed){ v = Math.round(v * TERRAIN_BUFF_MULT); }
@@ -4161,15 +4186,15 @@ function withBuffs(v, p){
 }
 function effectiveBaseHp(p){
   const v = (typeof p.baseHp === 'number') ? p.baseHp : ((SPECIES[p.speciesId] && SPECIES[p.speciesId].hp) || 50);
-  return withSpecialty(withBuffs(v, p), p);
+  return withItemStat(withSpecialty(withBuffs(v, p), p), p, 'baseHp');
 }
 function effectiveAttack(p){
   const v = (typeof p.attack === 'number') ? p.attack : ((SPECIES[p.speciesId] && SPECIES[p.speciesId].attack) || 50);
-  return withSpecialty(withBuffs(v, p), p);
+  return withItemStat(withSpecialty(withBuffs(v, p), p), p, 'attack');
 }
 function effectiveDefense(p){
   const v = (typeof p.defense === 'number') ? p.defense : ((SPECIES[p.speciesId] && SPECIES[p.speciesId].defense) || 50);
-  return withSpecialty(withBuffs(v, p), p);
+  return withItemStat(withSpecialty(withBuffs(v, p), p), p, 'defense');
 }
 /* Sp.Atk e Sp.Def, oficiais da Gen 2. Instancia gravada ANTES do split nao tem os campos -- cai no
    valor da especie, mesma migracao ja usada pela velocidade. O 50 no fim so pega instancia de
@@ -4180,13 +4205,13 @@ function effectiveSpAtk(p){
   const sp = SPECIES[p.speciesId];
   const v = (typeof p.spAtk === 'number') ? p.spAtk
           : (sp && typeof sp.spAtk === 'number') ? sp.spAtk : 50;
-  return withSpecialty(withBuffs(v, p), p);
+  return withItemStat(withSpecialty(withBuffs(v, p), p), p, 'spAtk');
 }
 function effectiveSpDef(p){
   const sp = SPECIES[p.speciesId];
   const v = (typeof p.spDef === 'number') ? p.spDef
           : (sp && typeof sp.spDef === 'number') ? sp.spDef : 50;
-  return withSpecialty(withBuffs(v, p), p);
+  return withItemStat(withSpecialty(withBuffs(v, p), p), p, 'spDef');
 }
 function effectiveSpeed(p){
   // instâncias salvas ANTES da velocidade existir não têm o campo -- cai pro valor da espécie.
@@ -4929,6 +4954,10 @@ async function loadPermanentUserData(){
     game.moedas = d.moedas || 0;
     game.inventario = d.inventario || {};        // o armazém de verdade (ver ITENS/comprável)
     game.equipados = d.equipados || {};  // espécie -> item que ela carrega; só o servidor escreve
+    /* O time em memória tem que refletir isso NA HORA: o HP Up mexe no teto de vida, e o calcMaxHp
+       roda fora da batalha (distribuição de níveis, Doce Raro). Sem sincronizar aqui, a barra
+       mudaria de tamanho sozinha ao entrar na luta. */
+    equiparItens(game.team, game.equipados);
     game.startersSorteados = d.startersSorteados || {};    // ver sorteioDosIniciais
     game.geracaoDosSlots = d.geracaoDosSlots || {};        // ver encerrarTentativaDoSlot
     // marcas da raide do Mew, gravadas pelo servidor quando o boss cai (ver bossPremiarTop10)
@@ -15577,12 +15606,22 @@ function renderTowerRankingModal(){
   if(!r) return '';
   /* DUAS listas, e a de HOJE vem primeiro: é a disputa que ainda dá pra mudar. O geral, embaixo,
      é histórico -- ele não muda com o que o jogador fizer nos próximos minutos. */
-  const lista = (linhas, valorDe, sufixo) => `<div class="tower-rank-list">${linhas.map((x,i)=>`
+  /* O PÓDIO É DE ANDAR, NÃO DE POSIÇÃO NA LISTA. Cinco treinadores empatados no andar 20 estão
+     todos no primeiro degrau, e o segundo degrau é o próximo andar que teve gente -- por isso a
+     marca sai dos TRÊS ANDARES distintos mais altos, e não de "os três primeiros da lista".
+     Mostrar isso importa: prêmio que o jogador não vê é o erro da especialidade de novo. */
+  const degraus = Array.from(new Set((r.hoje||[]).map(x=>x.bestFloor||0)))
+    .filter(f=>f>0).sort((a,b)=>b-a).slice(0, 3);
+  const medalhaDoAndar = (andar) => ['🥇','🥈','🥉'][degraus.indexOf(andar)] || '';
+  const lista = (linhas, valorDe, sufixo, comPodio) => `<div class="tower-rank-list">${linhas.map((x,i)=>{
+    const med = comPodio ? medalhaDoAndar(x.bestFloor||0) : '';
+    return `
       <div class="tower-rank-row ${i===0?'ouro':''}">
-        <span class="tower-rank-pos">${i+1}º</span>
-        <span class="tower-rank-name">${trainerProfileLink(escapeHtmlSafe(x.name), x.uid, x.name)}</span>
+        <span class="tower-rank-pos">${med || (i+1)+'º'}</span>
+        <span class="tower-rank-name">${trainerProfileLink(escapeHtmlSafe(x.name), x.uid, x.name)}${med?' <span class="tower-rank-doce" title="Ganha um Doce Raro na virada do dia">🍬</span>':''}</span>
         <span class="tower-rank-count">${valorDe(x)}<span class="tower-rank-x">${sufixo}</span></span>
-      </div>`).join('')}</div>`;
+      </div>`;
+  }).join('')}</div>`;
   let corpo;
   if(r.loading){ corpo = `<p class="loading-text">Carregando...</p>`; }
   else {
@@ -15590,12 +15629,12 @@ function renderTowerRankingModal(){
     const geral = r.top || [];
     corpo = `
       <h3 class="tower-rank-tit">🔥 Hoje</h3>
-      <p class="hint-text">O andar mais alto alcançado pelos treinadores no dia de hoje.</p>
-      ${hoje.length ? lista(hoje, x=>x.bestFloor, '🏢')
+      <p class="hint-text">O andar mais alto alcançado pelos treinadores no dia de hoje. Na virada, os <strong>3 andares mais altos</strong> levam 🍬 Doce Raro — e quem estiver no mais alto de todos leva também o ponto do ranking geral.</p>
+      ${hoje.length ? lista(hoje, x=>x.bestFloor, '🏢', true)
                     : `<p class="hint-text">Ninguém subiu nenhum andar hoje ainda. O primeiro nome da lista pode ser o seu.</p>`}
       <h3 class="tower-rank-tit">🏅 Geral</h3>
-      <p class="hint-text">Quantas vezes cada treinador terminou o dia no andar mais alto.</p>
-      ${geral.length ? lista(geral, x=>x.topDays||0, '🗼')
+      <p class="hint-text">Quantas vezes cada treinador terminou o dia no <strong>andar mais alto</strong>. Só ele pontua aqui: o pódio dá doce, o topo dá ponto.</p>
+      ${geral.length ? lista(geral, x=>x.topDays||0, '🗼', false)
                      : `<p class="hint-text">Ninguém pontuou ainda — o primeiro ponto sai na virada do dia.</p>`}`;
   }
   return `
@@ -16285,6 +16324,41 @@ const ITENS = {
     resumo: 'Cura 55% quando ele entra com 25% ou menos.',
     descricao: 'Equipe num pokémon. Quando ele for começar um confronto com 25% ou menos de HP, recupera 55% da vida ANTES de a luta começar — a mesma hora em que o Recuperar acontece. O item some depois de trabalhar.',
     comoGanhar: 'Na loja. Equipa-se pelo + da tela de ordem de batalha.'
+  },
+  /* OS CINCO DE ATRIBUTO. Diferentes dos três de cima em duas coisas, e as duas são de propósito:
+     eles valem O CONFRONTO INTEIRO (não são um efeito que dispara uma vez) e NÃO SE GASTAM -- o
+     pokémon fica com o bônus enquanto carregar o item. Continuam presos à regra de UM ITEM POR
+     POKÉMON, então não dá pra empilhar Atk Up com Def Up nem com uma poção: escolher qual é a
+     graça. Tirar o item devolve ele pra mochila, como os outros. */
+  hp_up: {
+    nome: 'HP Up', icone: '❤️', comprável: true, equipável: true, preco: 30,
+    resumo: '+15 de HP, o confronto inteiro.',
+    descricao: 'Equipe num pokémon: ele ganha +15 de HP enquanto estiver carregando, em toda batalha. Não se gasta — sai só quando você tira. Mais vida também significa tomar uma fração menor da barra por golpe.',
+    comoGanhar: 'Na loja. Equipa-se pelo + da tela de ordem de batalha.'
+  },
+  atk_up: {
+    nome: 'Atk Up', icone: '⚔️', comprável: true, equipável: true, preco: 30,
+    resumo: '+15 de Ataque, o confronto inteiro.',
+    descricao: 'Equipe num pokémon: ele ganha +15 de Ataque enquanto estiver carregando, em toda batalha. Não se gasta — sai só quando você tira.',
+    comoGanhar: 'Na loja. Equipa-se pelo + da tela de ordem de batalha.'
+  },
+  def_up: {
+    nome: 'Def Up', icone: '🛡️', comprável: true, equipável: true, preco: 30,
+    resumo: '+15 de Defesa, o confronto inteiro.',
+    descricao: 'Equipe num pokémon: ele ganha +15 de Defesa enquanto estiver carregando, em toda batalha. Não se gasta — sai só quando você tira.',
+    comoGanhar: 'Na loja. Equipa-se pelo + da tela de ordem de batalha.'
+  },
+  spatk_up: {
+    nome: 'Atk Special Up', icone: '🔮', comprável: true, equipável: true, preco: 30,
+    resumo: '+15 de Ataque Especial, o confronto inteiro.',
+    descricao: 'Equipe num pokémon: ele ganha +15 de Ataque Especial enquanto estiver carregando, em toda batalha. Não se gasta — sai só quando você tira.',
+    comoGanhar: 'Na loja. Equipa-se pelo + da tela de ordem de batalha.'
+  },
+  spdef_up: {
+    nome: 'Def Special Up', icone: '✴️', comprável: true, equipável: true, preco: 30,
+    resumo: '+15 de Defesa Especial, o confronto inteiro.',
+    descricao: 'Equipe num pokémon: ele ganha +15 de Defesa Especial enquanto estiver carregando, em toda batalha. Não se gasta — sai só quando você tira.',
+    comoGanhar: 'Na loja. Equipa-se pelo + da tela de ordem de batalha.'
   }
 };
 /* O QUE A CONTA TEM, em pilhas. Uma pilha é um item + quantos, e é ela que vira um quadradinho da
@@ -16336,6 +16410,7 @@ async function equiparItemNoPokemon(speciesId, item){
     const r = await functionsClient.httpsCallable('equipItem')({ speciesId, item });
     game.inventario = r.data.inventario || {};
     game.equipados = r.data.equipados || {};
+    equiparItens(game.team, game.equipados);   // ver a nota no carregamento da conta
     game.escolhaDeItem = null;
   } catch(e){
     console.error('Erro ao equipar o item:', e);
@@ -16350,6 +16425,7 @@ async function desequiparItem(speciesId){
     const r = await functionsClient.httpsCallable('unequipItem')({ speciesId });
     game.inventario = r.data.inventario || {};
     game.equipados = r.data.equipados || {};
+    equiparItens(game.team, game.equipados);   // ver a nota no carregamento da conta
     game.escolhaDeItem = null;
   } catch(e){
     console.error('Erro ao tirar o item:', e);
@@ -16402,6 +16478,7 @@ function gastarItensQueTrabalharam(){
   const meus = itensGastosDaBatalha().filter(g => g && g.dono === 'p' && g.especie);
   if(!meus.length) return;
   meus.forEach(g => { chavesDaLinha(game.equipados, g.especie).forEach(k => { delete game.equipados[k]; }); });
+  equiparItens(game.team, game.equipados);   // ver a nota no carregamento da conta
   if(game.authUser){
     functionsClient.httpsCallable('consumeEquipped')({ especies: meus.map(g => g.especie) })
       .catch(e => console.error('Erro ao consumir o item equipado:', e));

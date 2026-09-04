@@ -196,7 +196,10 @@ ok('e os ultimos passam do nivel 99', torreHoje.floors.filter(f=>f.avgLevel > 99
 
 }
 
-/* O PREMIO E DE QUEM FOI MAIS LONGE, e o empate premia TODOS. */
+/* O PODIO SAO OS 3 ANDARES MAIS ALTOS, e o empate premia TODOS.
+   O doce e o premio de PARTICIPACAO (os tres degraus); o ponto do ranking geral e o de VENCER (so
+   o degrau de cima). Sao perguntas diferentes -- "quem apareceu" e "quem chegou mais longe" --, e
+   por isso o ranking geral nao mudou de significado. */
 {
   const ontem = '2026-08-30';
   const players = db.collection('trainerTowerDays').doc(ontem).collection('players');
@@ -204,27 +207,65 @@ ok('e os ultimos passam do nivel 99', torreHoje.floors.filter(f=>f.avgLevel > 99
   await players.doc('b').set({ uid:'b', name:'Bruno', bestFloor:14 });
   await players.doc('c').set({ uid:'c', name:'Caio',  bestFloor:13 });
   await players.doc('d').set({ uid:'d', name:'Duda',  bestFloor:2  });
+  await players.doc('e').set({ uid:'e', name:'Edu',   bestFloor:1  });
   const r = await fns._towerFecharDia(ontem);
   ok('o topo do dia foi o andar 14', r && r.topFloor === 14, JSON.stringify(r));
-  ok('e os DOIS que empataram no 14 foram premiados', r.vencedores === 2, r.vencedores + '');
-  const doceA = ((await db.collection('users').doc('a').get()).data() || {});
-  const doceB = ((await db.collection('users').doc('b').get()).data() || {});
-  const doceC = ((await db.collection('users').doc('c').get()).data() || {});
-  ok('cada um ganhou um Doce Raro', (doceA.rareCandies||0) === 1 && (doceB.rareCandies||0) === 1);
-  ok('e quem parou no 13 nao ganhou nada', !doceC || !doceC.rareCandies, JSON.stringify(doceC));
-  const rankA = ((await db.collection('trainerTowerRanking').doc('a').get()).data() || {});
+  /* OS DEGRAUS SAO DE ANDAR, NAO DE PESSOA: com dois empatados no 14, o segundo degrau ainda e o
+     proximo ANDAR que teve gente (13), e o terceiro o seguinte (2). */
+  ok('os tres degraus sao os tres ANDARES mais altos', JSON.stringify(r.degraus) === JSON.stringify([14,13,2]),
+     JSON.stringify(r.degraus));
+  ok('e os DOIS que empataram no 14 estao no topo', r.vencedores === 2, r.vencedores + '');
+  ok('com quatro premiados no total (2 + 1 + 1)', r.premiados === 4, r.premiados + '');
+  const doce = async (uid) => (((await db.collection('users').doc(uid).get()).data() || {}).rareCandies || 0);
+  ok('os dois do topo ganharam Doce Raro', await doce('a') === 1 && await doce('b') === 1);
+  ok('o 2o degrau (andar 13) tambem', await doce('c') === 1, String(await doce('c')));
+  ok('e o 3o degrau (andar 2) tambem', await doce('d') === 1, String(await doce('d')));
+  /* QUEM FICOU DE FORA DO PODIO NAO GANHA NADA -- senao "pódio" nao quer dizer nada. */
+  ok('mas quem ficou fora do podio nao ganhou', await doce('e') === 0, String(await doce('e')));
+  const rank = async (uid) => ((await db.collection('trainerTowerRanking').doc(uid).get()).data() || {});
+  const rankA = await rank('a');
   ok('o ranking conta o DIA NO TOPO', rankA && rankA.topDays === 1, JSON.stringify(rankA));
   ok('e guarda o andar mais alto que ele ja alcancou', rankA.bestFloorEver === 14, rankA.bestFloorEver + '');
-  const rankB = ((await db.collection('trainerTowerRanking').doc('b').get()).data() || {});
+  const rankB = await rank('b');
   ok('e o SEGUNDO do empate tambem pontuou', rankB.topDays === 1, JSON.stringify(rankB));
+  /* SO O ANDAR MAIS ALTO PONTUA. O 2o e o 3o degrau ganham doce e entram no ranking (o documento
+     existe, com o bestFloorEver), mas com topDays ZERO -- e isso que mantem o ranking geral
+     medindo "quem chegou mais longe" e nao "quem apareceu". */
+  const rankC = await rank('c'), rankD = await rank('d');
+  ok('mas o 2o degrau NAO pontua no ranking geral', !(rankC.topDays > 0), JSON.stringify(rankC));
+  ok('nem o 3o', !(rankD.topDays > 0), JSON.stringify(rankD));
+  ok('e mesmo assim o andar deles fica registrado', rankC.bestFloorEver === 13 && rankD.bestFloorEver === 2,
+     rankC.bestFloorEver + '/' + rankD.bestFloorEver);
   /* O cron roda de hora em hora: fechar de novo nao pode pagar duas vezes. */
   const denovo = await fns._towerFecharDia(ontem);
-  const doceA2 = ((await db.collection('users').doc('a').get()).data() || {});
   ok('fechar o mesmo dia de novo nao paga ninguem duas vezes',
-     denovo === null && (doceA2.rareCandies||0) === 1, 'doces: ' + doceA2.rareCandies);
+     denovo === null && await doce('a') === 1 && await doce('c') === 1,
+     'doces: ' + await doce('a') + '/' + await doce('c'));
   /* Um dia sem ninguem fecha em silencio, sem premiar nada. */
   const vazio = await fns._towerFecharDia('2026-08-29');
   ok('dia sem ninguem fecha sem premiar', vazio && vazio.topFloor === 0 && vazio.vencedores === 0, JSON.stringify(vazio));
+
+  /* MENOS DE TRES ANDARES DISTINTOS: o podio simplesmente tem menos degraus, sem inventar um
+     terceiro nem quebrar. E o caso de um dia com pouca gente, que e o dia comum. */
+  const outro = '2026-08-28';
+  const p2 = db.collection('trainerTowerDays').doc(outro).collection('players');
+  await p2.doc('x').set({ uid:'x', name:'Xu', bestFloor:9 });
+  await p2.doc('y').set({ uid:'y', name:'Yan', bestFloor:9 });
+  const r2 = await fns._towerFecharDia(outro);
+  ok('com um andar so, o podio tem um degrau', JSON.stringify(r2.degraus) === JSON.stringify([9]),
+     JSON.stringify(r2.degraus));
+  ok('e os dois empatados levam doce e ponto', await doce('x') === 1 && await doce('y') === 1);
+
+  /* QUEM FOI 2o ONTEM E 1o HOJE tem que ganhar as DUAS coisas. As travas de dia sao separadas
+     (lastPrizeDate pro doce, lastTopDate pro ponto) exatamente por isso -- uma trava so faria o
+     ponto de hoje sumir em silencio porque o doce de ontem ja tinha marcado o treinador. */
+  const hojeD = '2026-08-31';
+  const p3 = db.collection('trainerTowerDays').doc(hojeD).collection('players');
+  await p3.doc('c').set({ uid:'c', name:'Caio', bestFloor:30 });
+  await fns._towerFecharDia(hojeD);
+  const rankC2 = await rank('c');
+  ok('quem foi 2o ontem e 1o hoje pontua hoje', rankC2.topDays === 1, JSON.stringify(rankC2));
+  ok('e ganha o segundo doce', await doce('c') === 2, String(await doce('c')));
 }
 
 

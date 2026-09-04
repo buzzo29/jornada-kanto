@@ -1012,6 +1012,53 @@ de golpes.
   compra, o lugar de mexer é o preço — e a conta pra devolver o que era antes seria dividir por ~3.
   Ficou como está por não ter sido pedido.
 
+### Os cinco de atributo (HP / Atk / Def / Atk Special / Def Special Up), 30 cada
+- **+15 no atributo comprado, o confronto inteiro, e NÃO se gastam.** Diferente dos três de cima em
+  duas coisas: eles não são um efeito que dispara uma vez, e o pokémon fica com o bônus **enquanto
+  carregar o item** — sai só quando o jogador tira. Por isso não aparecem no `itensGastos` nem no
+  `consumeEquipped`.
+- **A regra de UM ITEM POR POKÉMON continua valendo**, e é ela que faz disso uma escolha: não dá pra
+  empilhar Atk Up com Def Up, nem com uma poção.
+- **O bônus é FLAT e entra POR ÚLTIMO** (`withItemStat`), depois de shiny, terreno e especialidade —
+  que são multiplicadores. Entrando antes, eles o inflariam: +15 num shiny em terreno viraria +21, e
+  "+15 de atributo" deixaria de ser 15.
+- **Consequência conhecida e aceita: ele vale proporcionalmente MAIS pra quem tem o atributo baixo.**
+  +15 num ataque de 45 (Onix) é +33%; num de 110 (Snorlax) é +14%; num Magikarp de 10, +150%.
+- **O HP Up entra no `effectiveBaseHp`**, então mexe no TETO de vida (`calcMaxHp`) **e** no
+  `gen1MaxHp`, que é o divisor do dano: mais vida também significa tomar uma fração menor da barra
+  por golpe, que é o que mais vida tem que significar.
+- **NÃO existe Speed Up**, e não é esquecimento: a velocidade entra na taxa de crítico
+  (velocidade/512, regra da Gen 1), e um item de 30 moedas mexendo na frequência de crítico é outro
+  tipo de item. Não foi pedido.
+- **O time da jornada é sincronizado assim que os equipados mudam** (`equiparItens` no carregamento
+  da conta, ao equipar, ao tirar e ao gastar). Sem isso o `p.item` da instância só era escrito no
+  começo da batalha — e o `calcMaxHp` roda FORA dela (distribuição de níveis, Doce Raro), então a
+  barra do HP Up mudaria de tamanho sozinha ao entrar na luta.
+- **O PREÇO MEDIDO** (12.000 batalhas 6x6 nível 60, mesmos times e semente, 1σ = 0,65 ponto), com o
+  item no líder do time:
+
+  | | vitória | ganho |
+  |---|---|---|
+  | sem item | 50,48% | — |
+  | **HP Up** | 52,08% | **+1,59** (2,5σ) |
+  | **Atk Up** | 52,02% | **+1,53** (2,4σ) |
+  | **Def Up** | 51,84% | **+1,36** (2,1σ) |
+  | **Atk Special Up** | 51,75% | **+1,27** (2,0σ) |
+  | **Def Special Up** | 51,55% | **+1,07** (1,7σ) |
+
+  Os cinco ficam na mesma faixa; onde o item é equipado quase não muda (num sorteado o Atk Up dá
+  +1,36 e o HP Up +1,63, dentro do ruído).
+- **A COMPARAÇÃO QUE IMPORTA, e ela não é confortável: pelo MESMO preço de 30, a Super Poção dá
+  +3,15 UMA VEZ e o Atk Up dá +1,5 PRA SEMPRE.** O ponto de equilíbrio é ~2 batalhas; da terceira em
+  diante o item de atributo é estritamente melhor, e a distância só cresce. Se a intenção era que os
+  dois convivessem, o lugar de mexer é o preço dos de atributo (ou torná-los consumíveis, que é uma
+  linha no motor). Ficou como está por não ter sido pedido.
+- `tools/test-especiais.js` tranca os cinco (cada um dá +15 SÓ no atributo dele, o bônus é flat
+  mesmo num shiny em terreno, o HP Up sobe o teto de vida, e nenhum deles gera gasto na batalha), e
+  a comparação dos DOIS MOTORES passou a equipar um item de atributo diferente a cada volta — sem
+  isso ela não tocava no `withItemStat`, e uma divergência ali só apareceria em produção.
+  Conferido que ela falha com os dois motores discordando em 1 ponto de bônus (115 de 300).
+
 ### Onde os itens valem
 - **TODA chamada de batalha passa pelo `equiparItens`, sem exceção** -- inclusive as ligas, que passam
   a lista VAZIA.
@@ -1536,10 +1583,24 @@ que é justamente a parte que o jogador percebe.
   custariam mais toque do que economizam rolagem — os dois títulos separam, e a caixa rola por
   dentro (`max-height:80vh`) quando as duas listas vêm cheias (medido: 20 linhas cabem em 608px,
   com o botão Fechar sempre alcançável).
-- **O prêmio é de quem foi MAIS LONGE no dia, e o empate premia todos.** Se dois pararam no andar 14
-  e ninguém passou disso, os dois ganham o Doce Raro e o ponto. O ranking passou a contar **em
-  quantos dias o treinador ficou no andar mais alto** (`topDays`); o `clears` antigo (dias em que
-  zerou os 10 andares) fica no documento como história e não ordena mais nada.
+- **O PÓDIO SÃO OS TRÊS ANDARES MAIS ALTOS DO DIA, e todos eles levam Doce Raro** (`TORRE_PODIO`,
+  03/09/2026). **Mas só o mais alto pontua no ranking geral.** São perguntas diferentes: o doce é o
+  prêmio de participação, o ponto é o de vencer — dar ponto pro 2º e pro 3º misturaria "quem chegou
+  mais longe" com "quem apareceu", e o ranking geral deixaria de medir o que ele mede.
+- **Os degraus são de ANDAR, não de posição na lista.** Com cinco treinadores empatados no andar 20,
+  os cinco estão no PRIMEIRO degrau, e o segundo degrau é o próximo andar que teve gente. Dia com
+  menos de três andares distintos tem menos degraus — não se inventa um terceiro.
+- **O empate premia todos**, como sempre: se dois pararam no andar 14 e ninguém passou disso, os
+  dois ganham o doce e o ponto. O ranking geral conta **em quantos dias o treinador ficou no andar
+  mais alto** (`topDays`); o `clears` antigo (dias em que zerou os 10 andares) fica no documento
+  como história e não ordena mais nada.
+- **As duas travas de dia são SEPARADAS** (`lastPrizeDate` pro doce, `lastTopDate` pro ponto). Elas
+  marcam dias diferentes — quem sobe no pódio todo dia mas só às vezes chega ao topo tem uma
+  avançando e a outra não. Uma trava só faria o segundo prêmio sumir em silêncio, e
+  `tools/test-torre.js` cobre exatamente esse caso (2º ontem, 1º hoje).
+- **A tela do ranking de hoje MARCA o pódio** com 🥇🥈🥉 e um 🍬 ao lado do nome, e a medalha sai dos
+  três ANDARES distintos — não de "as três primeiras linhas". Prêmio que o jogador não vê é o erro
+  da especialidade de novo.
   **Zerar os 20 não paga doce sozinho** — quem zera está no topo por definição, e pagar nos dois
   lugares seria pagar duas vezes.
   **Por que existe um documento por DIA** (`trainerTowerDays/{dateId}/players/{uid}`): o da subida

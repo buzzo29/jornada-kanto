@@ -678,6 +678,28 @@ function withSpecialty(v, p){ return p.specialtyBuffed ? Math.round(v * SPECIALT
    Shiny e terreno entram em TODOS os atributos e multiplicam entre si: um shiny no terreno do tipo
    dele fica 1.20 x 1.15 = 1.38x em tudo. O arredondamento é por buff, na ordem shiny -> terreno;
    inverter a ordem num dos arquivos faz os dois divergirem por 1 ponto em alguns pokémon. */
+/* OS ITENS DE ATRIBUTO (+15 num atributo, o confronto inteiro).
+   O bônus é FLAT e entra POR ÚLTIMO, depois de shiny, terreno e especialidade -- que são
+   multiplicadores. Entrando antes, os multiplicadores o inflariam: +15 num shiny em terreno viraria
+   +21, e "+15 de atributo" deixaria de ser 15. Depois, ele é exatamente 15 pra todo mundo.
+   Consequência conhecida e aceita: ele vale PROPORCIONALMENTE MAIS pra quem tem o atributo baixo --
+   +15 num ataque de 60 é +25%, num de 120 é +12,5%.
+   O do HP entra no effectiveBaseHp, então mexe no TETO de vida (calcMaxHp) e também no gen1MaxHp,
+   que é o divisor do dano: mais vida também significa tomar uma fração menor por golpe, que é o
+   que mais vida tem que significar.
+   NÃO tem Velocidade: ela entra na taxa de crítico (velocidade/512, regra da Gen 1), e um item de
+   30 moedas mexendo na frequência de crítico é outro tipo de item -- não foi pedido. */
+const BONUS_DE_ATRIBUTO = 15;
+const ITENS_DE_ATRIBUTO = {
+  hp_up:    'baseHp',
+  atk_up:   'attack',
+  def_up:   'defense',
+  spatk_up: 'spAtk',
+  spdef_up: 'spDef'
+};
+function withItemStat(v, p, qual){
+  return (p.item && ITENS_DE_ATRIBUTO[p.item] === qual) ? v + BONUS_DE_ATRIBUTO : v;
+}
 function withBuffs(v, p){
   if(p.shiny){ v = Math.round(v * SHINY_BUFF_MULT); }
   if(p.terrainBuffed){ v = Math.round(v * TERRAIN_BUFF_MULT); }
@@ -685,15 +707,15 @@ function withBuffs(v, p){
 }
 function effectiveBaseHp(p){
   const v = (typeof p.baseHp==='number') ? p.baseHp : ((SPECIES[p.speciesId]&&SPECIES[p.speciesId].hp)||50);
-  return withSpecialty(withBuffs(v, p), p);
+  return withItemStat(withSpecialty(withBuffs(v, p), p), p, 'baseHp');
 }
 function effectiveAttack(p){
   const v = (typeof p.attack==='number') ? p.attack : ((SPECIES[p.speciesId]&&SPECIES[p.speciesId].attack)||50);
-  return withSpecialty(withBuffs(v, p), p);
+  return withItemStat(withSpecialty(withBuffs(v, p), p), p, 'attack');
 }
 function effectiveDefense(p){
   const v = (typeof p.defense==='number') ? p.defense : ((SPECIES[p.speciesId]&&SPECIES[p.speciesId].defense)||50);
-  return withSpecialty(withBuffs(v, p), p);
+  return withItemStat(withSpecialty(withBuffs(v, p), p), p, 'defense');
 }
 /* Sp.Atk e Sp.Def, oficiais da Gen 2. Instancia gravada ANTES do split nao tem os campos -- cai no
    valor da especie, mesma migracao ja usada pela velocidade. O 50 no fim so pega instancia de
@@ -704,13 +726,13 @@ function effectiveSpAtk(p){
   const sp = SPECIES[p.speciesId];
   const v = (typeof p.spAtk === 'number') ? p.spAtk
           : (sp && typeof sp.spAtk === 'number') ? sp.spAtk : 50;
-  return withSpecialty(withBuffs(v, p), p);
+  return withItemStat(withSpecialty(withBuffs(v, p), p), p, 'spAtk');
 }
 function effectiveSpDef(p){
   const sp = SPECIES[p.speciesId];
   const v = (typeof p.spDef === 'number') ? p.spDef
           : (sp && typeof sp.spDef === 'number') ? sp.spDef : 50;
-  return withSpecialty(withBuffs(v, p), p);
+  return withItemStat(withSpecialty(withBuffs(v, p), p), p, 'spDef');
 }
 function effectiveSpeed(p){
   // a velocidade buffada entra também na chance de crítico (rng < speed/512, regra da Gen 1):
@@ -2656,6 +2678,7 @@ async function checkAndAdvanceTrainersLeague(dateId){
    scratchpad/confere-motores.js e tools/test-especiais.js): cliente e servidor precisam dar o
    mesmo resultado com a mesma semente, senão a liga decide uma coisa e a animação mostra outra. */
 exports._simulateGymBattle = simulateGymBattle;
+exports._equiparItens = equiparItens;   // o teste dos dois motores compara com item equipado
 exports._createInstance = createInstance;
 exports._makeSeededRng = makeSeededRng;
 exports._golpesEspeciais = { AUTODESTRUICAO, SONIFEROS, METRONOMO, CHANCE_AUTODESTRUICAO, CHANCE_SONO };
@@ -4387,9 +4410,18 @@ async function towerRegistrarDia(uid, dateId, bestFloor){
   await db.collection('trainerTowerDays').doc(dateId).collection('players').doc(uid)
     .set({ uid, name: nome, bestFloor, updatedAt: Date.now() }, { merge: true });
 }
-/* FECHA O DIA: quem foi MAIS LONGE leva o Doce Raro e o ponto no ranking.
+/* Quantos ANDARES DISTINTOS levam Doce Raro no fim do dia. São os 3 mais altos que alguém
+   alcançou, não os 3 primeiros colocados: se cinco treinadores pararam no andar 20, os cinco estão
+   no primeiro degrau do pódio e os degraus 2 e 3 são os dois andares seguintes que tiveram gente.
+   É a mesma lógica de empate que a torre já usava, só que agora com três degraus. */
+const TORRE_PODIO = 3;
+
+/* FECHA O DIA: os TRÊS ANDARES MAIS ALTOS levam Doce Raro; só o MAIS ALTO pontua no ranking geral.
    EMPATE PREMIA TODOS -- se dois pararam no andar 14 e ninguém passou disso, os dois ganham. É o
    que o modo pede: a torre não tem que ser vencida, tem que ser subida mais que os outros.
+   O ranking geral continua contando UMA coisa só: em quantos dias o treinador ficou no andar mais
+   alto. Dar ponto pro 2º e pro 3º misturaria "quem chegou mais longe" com "quem apareceu", que são
+   perguntas diferentes -- o doce é o prêmio de participação, o ponto é o de vencer.
    Roda junto com a geração da torre do dia seguinte: é o instante em que se sabe que o dia anterior
    acabou, e evita mais uma função agendada. Idempotente pelo campo awarded -- o cron roda de hora
    em hora e não pode pagar duas vezes. */
@@ -4399,40 +4431,68 @@ async function towerFecharDia(dateId){
   if(diaSnap.exists && diaSnap.data().awarded) return null;
   const jogadores = await diaRef.collection('players').get();
   if(jogadores.empty){
-    await diaRef.set({ awarded: true, topFloor: 0, winners: [], closedAt: Date.now() }, { merge: true });
-    return { topFloor: 0, vencedores: 0 };
+    await diaRef.set({ awarded: true, topFloor: 0, winners: [], podium: [], closedAt: Date.now() }, { merge: true });
+    return { topFloor: 0, vencedores: 0, premiados: 0 };
   }
-  let topFloor = 0;
-  jogadores.forEach(d => { topFloor = Math.max(topFloor, d.data().bestFloor || 0); });
-  const vencedores = jogadores.docs.map(d => d.data()).filter(x => (x.bestFloor || 0) === topFloor);
+  const todos = jogadores.docs.map(d => d.data());
+  /* Os TRÊS andares distintos mais altos. Distintos porque o pódio é de ANDAR, não de pessoa: com
+     dez treinadores empatados no 20, o segundo degrau ainda é o andar abaixo que teve alguém. */
+  const degraus = Array.from(new Set(todos.map(x => x.bestFloor || 0)))
+    .filter(f => f > 0).sort((a, b) => b - a).slice(0, TORRE_PODIO);
+  const topFloor = degraus[0] || 0;
+  const vencedores = todos.filter(x => (x.bestFloor || 0) === topFloor);
+  const premiados = todos.filter(x => degraus.indexOf(x.bestFloor || 0) >= 0);
   await diaRef.set({ awarded: true, topFloor,
                      winners: vencedores.map(v => ({ uid: v.uid, name: v.name })),
+                     podium: degraus,
                      closedAt: Date.now() }, { merge: true });
-  for(const v of vencedores){ await towerPremiarTopo(v.uid, v.name, dateId, topFloor, vencedores.length); }
-  logger.info('Torre ' + dateId + ' fechada: andar ' + topFloor + ', ' + vencedores.length + ' premiado(s).');
-  return { topFloor, vencedores: vencedores.length };
+  for(const p of premiados){
+    const andar = p.bestFloor || 0;
+    const posicao = degraus.indexOf(andar) + 1;                       // 1, 2 ou 3
+    const juntos = todos.filter(x => (x.bestFloor || 0) === andar).length;
+    await towerPremiarPodio(p.uid, p.name, dateId, andar, posicao, juntos, posicao === 1);
+  }
+  logger.info('Torre ' + dateId + ' fechada: andares ' + degraus.join('/') + ', ' +
+              premiados.length + ' premiado(s), ' + vencedores.length + ' no topo.');
+  return { topFloor, vencedores: vencedores.length, premiados: premiados.length, degraus };
 }
-/* O prêmio: um Doce Raro e um ponto no ranking. O ranking passou a contar EM QUANTOS DIAS o
-   treinador ficou no andar mais alto -- é o que o modo mede agora. O campo antigo (clears, dias
-   em que ele zerou os 10 andares) fica no documento como história, mas não ordena mais nada:
-   com 20 andares e média 122 no topo, zerar deixou de ser o objetivo. */
-async function towerPremiarTopo(uid, nome, dateId, topFloor, quantos){
+/* O prêmio: um Doce Raro pros três degraus do pódio, e o ponto no ranking SÓ pro degrau de cima.
+   O ranking geral conta EM QUANTOS DIAS o treinador ficou no andar mais alto -- é o que o modo
+   mede. O campo antigo (clears, dias em que ele zerou os 10 andares) fica no documento como
+   história, mas não ordena mais nada: com 30 andares, zerar deixou de ser o objetivo.
+   As DUAS travas de dia são separadas de propósito: lastTopDate guarda o ponto e lastPrizeDate
+   guarda o doce. Elas marcam dias diferentes -- quem sobe no pódio todo dia mas só às vezes chega
+   ao topo tem uma avançando e a outra não; uma trava só confundiria as duas contas. */
+async function towerPremiarPodio(uid, nome, dateId, andar, posicao, juntos, pontua){
   const ref = db.collection('trainerTowerRanking').doc(uid);
+  let jaPago = false;
   await db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     const d = snap.exists ? snap.data() : {};
-    if(d.lastTopDate === dateId) return;   // trava dupla contra pagar o mesmo dia 2x
-    tx.set(ref, { uid, name: nome || d.name || 'Treinador',
-                  topDays: (d.topDays || 0) + 1,
-                  lastTopDate: dateId, bestFloorEver: Math.max(d.bestFloorEver || 0, topFloor),
-                  updatedAt: Date.now() }, { merge: true });
+    if(d.lastPrizeDate === dateId){ jaPago = true; return; }   // trava dupla contra pagar o mesmo dia 2x
+    const patch = { uid, name: nome || d.name || 'Treinador',
+                    lastPrizeDate: dateId,
+                    bestFloorEver: Math.max(d.bestFloorEver || 0, andar),
+                    updatedAt: Date.now() };
+    if(pontua && d.lastTopDate !== dateId){
+      patch.topDays = (d.topDays || 0) + 1;
+      patch.lastTopDate = dateId;
+    }
+    tx.set(ref, patch, { merge: true });
   });
+  if(jaPago) return;
   await db.collection('users').doc(uid).set({
     rareCandies: admin.firestore.FieldValue.increment(1)
   }, { merge: true });
-  const dividido = quantos > 1 ? ` Você dividiu o topo com mais ${quantos-1} treinador${quantos-1===1?'':'es'}.` : '';
-  await createNotification(uid, 'tower_top', '🗼 Você foi o mais longe na Torre!',
-    `Ninguém passou do andar ${topFloor} na torre de ontem, e você chegou lá.${dividido} Ganhou um 🍬 Doce Raro e mais um ponto no ranking da Torre.`);
+  const dividido = juntos > 1 ? ` Você dividiu esse andar com mais ${juntos-1} treinador${juntos-1===1?'':'es'}.` : '';
+  if(pontua){
+    await createNotification(uid, 'tower_top', '🗼 Você foi o mais longe na Torre!',
+      `Ninguém passou do andar ${andar} na torre de ontem, e você chegou lá.${dividido} Ganhou um 🍬 Doce Raro e mais um ponto no ranking da Torre.`);
+  } else {
+    const medalha = posicao === 2 ? '🥈' : '🥉';
+    await createNotification(uid, 'tower_top', medalha + ' Você ficou no pódio da Torre!',
+      `O andar ${andar} foi o ${posicao}º mais alto na torre de ontem, e você chegou lá.${dividido} Ganhou um 🍬 Doce Raro. O ponto no ranking geral é só de quem chega no andar mais alto do dia.`);
+  }
 }
 async function towerRegisterClear(uid, dateId){
   const userSnap = await db.collection('users').doc(uid).get();
@@ -4543,6 +4603,13 @@ const LOJA = {
   awakening:   { preco: 50 },
   hyperpotion: { preco: 30 },
   potion:      { preco: 15 },
+  /* Os cinco de atributo (+15, o confronto inteiro). Não se gastam: saem do pokémon só quando o
+     jogador tira. Por isso não aparecem em itensGastos nem no consumeEquipped. */
+  hp_up:       { preco: 30 },
+  atk_up:      { preco: 30 },
+  def_up:      { preco: 30 },
+  spatk_up:    { preco: 30 },
+  spdef_up:    { preco: 30 },
   /* OS DOIS QUE NÃO MORAM NO INVENTÁRIO. O Doce Raro é um CONTADOR da conta (rareCandies), escrito
      pela Torre e descontado pelo useRareCandy -- comprar é somar nele, e a mochila continua lendo
      de um lugar só. O Bônus Shiny comprado vira estoque em inventario.bonus_shiny e é ativado pelo
@@ -4552,7 +4619,8 @@ const LOJA = {
 };
 /* Quais itens se equipam num pokémon. Os outros dois do catálogo (Doce Raro, Bônus Shiny) não são
    de batalha -- vêm de jogar e se usam na mochila. */
-const EQUIPAVEIS = ['awakening', 'hyperpotion', 'potion'];
+const EQUIPAVEIS = ['awakening', 'hyperpotion', 'potion',
+                    'hp_up', 'atk_up', 'def_up', 'spatk_up', 'spdef_up'];
 
 /* O QUE CADA POKÉMON DA CONTA ESTÁ CARREGANDO. É um mapa espécie -> item, e a chave é a ESPÉCIE
    porque um save não tem duas da mesma (o encontro selvagem nunca oferece uma linha que o time já
