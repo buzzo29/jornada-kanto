@@ -1903,11 +1903,34 @@ que é justamente a parte que o jogador percebe.
   **Por que existe um documento por DIA** (`trainerTowerDays/{dateId}/players/{uid}`): o da subida
   (`trainerTowerRuns/{uid}`) é sobrescrito na virada, então depois da meia-noite não haveria o que
   ler pra saber quem foi mais longe ontem. São no máximo 20 escritas por jogador por dia.
-  **O fechamento roda dentro do cron que gera a torre do dia seguinte** — é o único instante em que
-  se sabe que o dia anterior acabou, e evita mais uma função agendada. É idempotente pelo campo
-  `awarded`, porque o cron roda de hora em hora. A conta do "dia anterior" usa o
-  `trainersLeagueDateStrPlusDays` que já existia: uma segunda regra de data (a minha, em UTC) ia
-  discordar da do jogo em algum fuso.
+  **O fechamento roda dentro do cron que gera a torre do dia** — evita mais uma função agendada. É
+  idempotente pelo campo `awarded`, porque o cron roda de hora em hora. A conta do "dia anterior"
+  usa o `trainersLeagueDateStrPlusDays` que já existia: uma segunda regra de data (a minha, em UTC)
+  ia discordar da do jogo em algum fuso.
+  **MAS ELE NÃO PODE DEPENDER DE QUEM CRIOU A TORRE DE HOJE, e dependia.** A chamada ficava depois
+  de um `if(snap.exists) return null` — o cron só fechava o dia anterior quando ELE mesmo criava a
+  torre do dia. Só que quem cria a torre do dia também é o `towerGetToday`, no primeiro jogador que
+  abre a tela: **o dia vira à meia-noite de São Paulo e o cron passa ~50 minutos depois**, e quem
+  abrisse a Torre nessa janela criava a torre de hoje. Na volta seguinte o cron saía pela porta de
+  cima, e o dia anterior **nunca** fechava.
+  Medido nos dados de produção: torre criada **00:20 em 02/09** e **00:03 em 04/09** (as duas fora
+  do cron — não há log de "Torre gerada" nesses dias), e os dias **01/09 e 03/09 ficaram sem
+  fechar**. Os dois tinham vencedor, e o ranking geral inteiro tinha **UM dia** contabilizado: o
+  02/09, o único em que o cron chegou primeiro. Reportado em 04/09/2026 ("ontem teve um vencedor da
+  torre e não foi distribuído o ponto").
+  **O cron passou a fechar sempre, e a varrer os últimos `TORRE_DIAS_A_FECHAR` (7) dias** em vez de
+  só ontem: um dia que ficou pra trás se recupera sozinho na hora seguinte, sem depender de alguém
+  reclamar — foi assim que o 01/09 e o 03/09 foram pagos. Custo: uma leitura por dia por hora, e o
+  `awarded` corta na primeira. Fecha do mais VELHO pro mais novo, pras notificações chegarem na
+  ordem em que os dias aconteceram, e a frase **nomeia a data quando o dia não é ontem** ("na torre
+  de 03/09") — com a varredura, dizer "ontem" ali seria mentira.
+  **O `awarded` passou a ser escrito DEPOIS de pagar**, não antes: marcar o dia como pago antes do
+  laço fazia um erro no meio dele apagar o resto do pódio pra sempre — a volta seguinte via o
+  `awarded` e ia embora. Pagar duas vezes não é o risco, quem trava isso é o `lastPrizeDate` de
+  cada treinador, dentro da transação.
+  `tools/test-torre.js` cobre isso do jeito que pega a próxima: o jogador abre a Torre ANTES do
+  cron (é o `getTrainerTower` que cria o dia), e o teste cobra que o cron feche o dia anterior
+  assim mesmo. Conferido que ele falha em 8 casos com o `if(snap.exists) return null` de volta.
 - (Histórico: eram 10 andares, médias 58 a 85, escala escolhida pra um campeão da Elite (~67)
   chegar ao andar 5. Ver a nota acima pro modelo de hoje.)
 - Times de 6 evoluções finais, níveis espalhados ±3 com os dois extremos garantidos.

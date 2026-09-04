@@ -4251,13 +4251,28 @@ exports.generateTrainerTower = onSchedule('every 60 minutes', async () => {
   const dateId = trainersLeagueTodayDateStr();
   const ref = towerDocRef(dateId);
   const snap = await ref.get();
-  if(snap.exists) return null;
-  await ref.set(towerGenerate(dateId));
-  logger.info('Torre dos Treinadores gerada para ' + dateId);
-  /* Torre nova = dia anterior acabou. Fecha ele aqui em vez de criar outra função agendada: é o
-     único instante em que dá pra ter certeza da virada, e o awarded garante que rodar de novo
-     não paga ninguém duas vezes. */
-  await towerFecharDia(trainersLeagueDateStrPlusDays(dateId, -1)).catch(e => logger.error('Falha ao fechar a torre do dia anterior', e));
+  if(!snap.exists){
+    await ref.set(towerGenerate(dateId));
+    logger.info('Torre dos Treinadores gerada para ' + dateId);
+  }
+  /* O FECHAMENTO NÃO PODE DEPENDER DE QUEM CRIOU A TORRE DE HOJE, e é exatamente isso que ele
+     dependia: a chamada ficava DEPOIS de um `if(snap.exists) return null`, então o dia anterior só
+     fechava quando o CRON chegava primeiro. Só que quem cria a torre do dia também é o
+     `towerGetToday`, no primeiro jogador que abre a tela -- o dia vira à meia-noite de São Paulo e
+     o cron passa ~50 minutos depois. Quem abrisse a Torre nessa janela criava a torre de hoje, o
+     cron saía pela porta de cima na volta seguinte, e o dia anterior NUNCA fechava.
+     Medido nos dados: torre criada 00:20 em 02/09 e 00:03 em 04/09 (as duas fora do cron -- não há
+     log de "Torre gerada" nesses dias), e os dois dias anteriores, 01/09 e 03/09, ficaram sem
+     fechar. Os dois tinham vencedor, e o ranking geral inteiro tinha UM dia contabilizado.
+     Reportado em 04/09/2026.
+     Agora ele roda sempre. E varre os últimos dias em vez de só ontem, porque um dia que não fecha
+     é um ponto que ninguém recebe e o único jeito de perceber é alguém reclamar: assim um dia que
+     ficou pra trás se recupera sozinho na hora seguinte. Do mais VELHO pro mais novo, pra as
+     notificações chegarem na ordem em que os dias aconteceram. */
+  for(let i = TORRE_DIAS_A_FECHAR; i >= 1; i--){
+    const dia = trainersLeagueDateStrPlusDays(dateId, -i);
+    await towerFecharDia(dia).catch(e => logger.error('Falha ao fechar a torre de ' + dia, e));
+  }
   return null;
 });
 
@@ -4578,6 +4593,11 @@ async function towerRegistrarDia(uid, dateId, bestFloor){
    no primeiro degrau do pódio e os degraus 2 e 3 são os dois andares seguintes que tiveram gente.
    É a mesma lógica de empate que a torre já usava, só que agora com três degraus. */
 const TORRE_PODIO = 3;
+/* QUANTOS DIAS PRA TRÁS o cron tenta fechar a cada volta. É idempotente -- o `awarded` corta na
+   primeira leitura --, então o custo de um dia já fechado é UMA leitura por hora. Sete dias é o que
+   faz o fechamento se recuperar sozinho de uma janela em que ele não rodou, sem depender de
+   ninguém reclamar. */
+const TORRE_DIAS_A_FECHAR = 7;
 
 /* FECHA O DIA: os TRÊS ANDARES MAIS ALTOS levam Doce Raro; só o MAIS ALTO pontua no ranking geral.
    EMPATE PREMIA TODOS -- se dois pararam no andar 14 e ninguém passou disso, os dois ganham. É o
@@ -4605,7 +4625,11 @@ async function towerFecharDia(dateId){
   const topFloor = degraus[0] || 0;
   const vencedores = todos.filter(x => (x.bestFloor || 0) === topFloor);
   const premiados = todos.filter(x => degraus.indexOf(x.bestFloor || 0) >= 0);
-  await diaRef.set({ awarded: true, topFloor,
+  /* O RESUMO vai primeiro, o AWARDED só no FIM. Marcar o dia como pago antes de pagar fazia um erro
+     no meio do laço apagar o resto do pódio pra sempre: a volta seguinte do cron via o awarded e ia
+     embora sem pagar ninguém. Pagar duas vezes não é o risco aqui -- quem trava isso é o
+     lastPrizeDate de cada treinador, dentro da transação. */
+  await diaRef.set({ topFloor,
                      winners: vencedores.map(v => ({ uid: v.uid, name: v.name })),
                      podium: degraus,
                      closedAt: Date.now() }, { merge: true });
@@ -4615,6 +4639,7 @@ async function towerFecharDia(dateId){
     const juntos = todos.filter(x => (x.bestFloor || 0) === andar).length;
     await towerPremiarPodio(p.uid, p.name, dateId, andar, posicao, juntos, posicao === 1);
   }
+  await diaRef.set({ awarded: true }, { merge: true });
   logger.info('Torre ' + dateId + ' fechada: andares ' + degraus.join('/') + ', ' +
               premiados.length + ' premiado(s), ' + vencedores.length + ' no topo.');
   return { topFloor, vencedores: vencedores.length, premiados: premiados.length, degraus };
@@ -4648,13 +4673,17 @@ async function towerPremiarPodio(uid, nome, dateId, andar, posicao, juntos, pont
     rareCandies: admin.firestore.FieldValue.increment(1)
   }, { merge: true });
   const dividido = juntos > 1 ? ` Você dividiu esse andar com mais ${juntos-1} treinador${juntos-1===1?'':'es'}.` : '';
+  /* "de ontem" SÓ quando é ontem mesmo. Com a varredura dos últimos dias, um dia que ficou pra trás
+     pode fechar dois ou três dias depois -- e aí "ontem" seria mentira na cara de quem lê. */
+  const quando = (dateId === trainersLeagueDateStrPlusDays(trainersLeagueTodayDateStr(), -1))
+               ? 'de ontem' : 'de ' + dateId.slice(8, 10) + '/' + dateId.slice(5, 7);
   if(pontua){
     await createNotification(uid, 'tower_top', '🗼 Você foi o mais longe na Torre!',
-      `Ninguém passou do andar ${andar} na torre de ontem, e você chegou lá.${dividido} Ganhou um 🍬 Doce Raro e mais um ponto no ranking da Torre.`);
+      `Ninguém passou do andar ${andar} na torre ${quando}, e você chegou lá.${dividido} Ganhou um 🍬 Doce Raro e mais um ponto no ranking da Torre.`);
   } else {
     const medalha = posicao === 2 ? '🥈' : '🥉';
     await createNotification(uid, 'tower_top', medalha + ' Você ficou no pódio da Torre!',
-      `O andar ${andar} foi o ${posicao}º mais alto na torre de ontem, e você chegou lá.${dividido} Ganhou um 🍬 Doce Raro. O ponto no ranking geral é só de quem chega no andar mais alto do dia.`);
+      `O andar ${andar} foi o ${posicao}º mais alto na torre ${quando}, e você chegou lá.${dividido} Ganhou um 🍬 Doce Raro. O ponto no ranking geral é só de quem chega no andar mais alto do dia.`);
   }
 }
 async function towerRegisterClear(uid, dateId){
@@ -6910,3 +6939,7 @@ exports._TERRAINS = TERRAINS;   // so pro teste do ginasio escolher um terreno v
 
 
 exports._towerFecharDia = towerFecharDia;   // o fechamento do dia e testado direto: no ar ele roda dentro do cron
+/* As duas contas de data saem daqui pro teste porque ele precisa falar do MESMO "hoje" que o cron:
+   o dia do jogo vira a meia-noite de Sao Paulo, nao a do relogio de quem roda o teste. */
+exports._trainersLeagueTodayDateStr = trainersLeagueTodayDateStr;
+exports._trainersLeagueDateStrPlusDays = trainersLeagueDateStrPlusDays;

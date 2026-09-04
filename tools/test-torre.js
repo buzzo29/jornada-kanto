@@ -268,6 +268,69 @@ ok('e os ultimos passam do nivel 99', torreHoje.floors.filter(f=>f.avgLevel > 99
   ok('e ganha o segundo doce', await doce('c') === 2, String(await doce('c')));
 }
 
+console.log('');
+console.log('O CRON FECHA O DIA ANTERIOR MESMO COM A TORRE DE HOJE JA CRIADA');
+/* O DEFEITO REPORTADO EM 04/09/2026: "ontem teve um vencedor da torre e nao foi distribuido o ponto
+   no ranking geral para ele".
+   A chamada de fechamento vivia DEPOIS de um `if(snap.exists) return null` -- entao o dia anterior
+   so fechava quando o CRON criava a torre de hoje. So que quem cria a torre do dia tambem e o
+   towerGetToday, no primeiro jogador que abre a tela: o dia vira a meia-noite de Sao Paulo e o cron
+   passa ~50 minutos depois. Quem abrisse a Torre nessa janela criava a torre de hoje, o cron saia
+   pela porta de cima e o dia anterior NUNCA fechava.
+   Nos dados de producao: torre criada 00:20 em 02/09 e 00:03 em 04/09, e os dias 01/09 e 03/09
+   ficaram sem fechar -- os dois com vencedor. */
+{
+  const doce = async (uid) => (((await db.collection('users').doc(uid).get()).data() || {}).rareCandies || 0);
+  const rank = async (uid) => ((await db.collection('trainerTowerRanking').doc(uid).get()).data() || {});
+  const dia = (d) => fns._trainersLeagueDateStrPlusDays(fns._trainersLeagueTodayDateStr(), d);
+
+  /* O jogador abre a tela ANTES do cron: e o towerGetToday que cria a torre de hoje. */
+  const hoje = (await chamar(fns.getTrainerTower, 'ivy', {})).dateId;
+  ok('a torre de hoje ja existe antes do cron', !!(await db.collection('trainerTower').doc(hoje).get()).data());
+
+  const ontem = dia(-1);
+  const pOntem = db.collection('trainerTowerDays').doc(ontem).collection('players');
+  await pOntem.doc('vencedor').set({ uid:'vencedor', name:'Yoshe', bestFloor:21 });
+  await pOntem.doc('segundo').set({ uid:'segundo',  name:'Red',   bestFloor:18 });
+  /* E um dia mais VELHO que ontem, que ficou pra tras porque o cron nao chegou nele na epoca: era
+     o caso do 01/09, perdido tres dias antes de alguem notar. A varredura tem que pegar os dois na
+     mesma volta -- senao ele so seria pago se alguem reclamasse. */
+  const atrasado = dia(-3);
+  await db.collection('trainerTowerDays').doc(atrasado).collection('players')
+    .doc('atrasado').set({ uid:'atrasado', name:'Koefiel', bestFloor:12 });
+
+  await fns.generateTrainerTower({});
+
+  ok('o cron fechou o dia de ontem assim mesmo',
+     ((await db.collection('trainerTowerDays').doc(ontem).get()).data() || {}).awarded === true,
+     JSON.stringify((await db.collection('trainerTowerDays').doc(ontem).get()).data()));
+  ok('e o ponto do ranking geral saiu', (await rank('vencedor')).topDays === 1,
+     JSON.stringify(await rank('vencedor')));
+  ok('com o doce junto', await doce('vencedor') === 1, String(await doce('vencedor')));
+  /* O 2o degrau leva doce e NAO leva ponto -- a regra do podio nao muda por causa disto. */
+  ok('o 2o degrau leva doce mas nao ponto',
+     await doce('segundo') === 1 && !((await rank('segundo')).topDays > 0),
+     await doce('segundo') + '/' + JSON.stringify(await rank('segundo')));
+
+  ok('e um dia de tres dias atras tambem fecha, na mesma volta', (await rank('atrasado')).topDays === 1,
+     JSON.stringify(await rank('atrasado')));
+  /* A notificacao de um dia atrasado NAO pode dizer "de ontem": ela nomeia a data. */
+  const notas = await db.collection('users').doc('atrasado').collection('notifications').get();
+  const corpo = notas.docs.map(d => d.data().body || '').join(' | ');
+  ok('e a notificacao dele nomeia o dia, nao diz "ontem"',
+     /torre de \d\d\/\d\d/.test(corpo) && !/torre de ontem/.test(corpo), corpo.slice(0, 160));
+  const nOntem = await db.collection('users').doc('vencedor').collection('notifications').get();
+  ok('mas a de ontem continua dizendo "de ontem"',
+     /torre de ontem/.test(nOntem.docs.map(d => d.data().body || '').join(' ')),
+     nOntem.docs.map(d => d.data().body || '').join(' ').slice(0, 160));
+
+  /* Rodar de hora em hora nao pode pagar de novo: o awarded corta na primeira leitura. */
+  await fns.generateTrainerTower({});
+  ok('e rodar o cron de novo nao paga ninguem duas vezes',
+     await doce('vencedor') === 1 && (await rank('vencedor')).topDays === 1,
+     await doce('vencedor') + '/' + (await rank('vencedor')).topDays);
+}
+
 
 console.log('');
 console.log('QUEM ZEROU A TORRE ANTIGA NAO PODE FICAR TRAVADO');
