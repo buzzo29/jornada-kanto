@@ -348,55 +348,91 @@ console.log('\n=== O + DA TELA DE ORDEM ===');
   ok('fechar limpa a escolha', S.renderEscolhaDeItemModal() === '');
 }
 
-console.log('\n=== FISICO OU ESPECIAL: A CAIXA AVISA QUANDO O ITEM NAO SERVE ===');
+console.log('\n=== A CAIXA DO + NOMEIA OS GOLPES QUE O ITEM FORTALECE ===');
 {
   /* No motor da Gen 1 quem decide se o golpe usa Ataque ou Ataque Especial e o TIPO dele -- Fogo,
      Agua, Planta, Eletrico, Psiquico, Gelo e Dragao sao especiais, o resto e fisico. Isso decide
      QUAL dos dois itens de ataque serve num pokemon, e sem dizer na tela metade das compras nao
      fazia nada. Reportado em 04/09/2026: "to colocando aqui em alguns pokemons e nao vejo nada de
-     diferente". Medido: 108 das 250 atacam SEMPRE fisico e 45 SEMPRE especial. */
-  ok('o perfil sai dos tipos da especie', S.perfilDeAtaque('machamp') === 'fisico' &&
-     S.perfilDeAtaque('alakazam') === 'especial', S.perfilDeAtaque('machamp') + '/' + S.perfilDeAtaque('alakazam'));
-  /* Quem tem os DOIS lados varia com o adversario -- o motor escolhe o que render mais. O Raichu e
-     o caso classico: Eletrico (especial) com subtipo Normal (fisico), pra alcancar os de Terra. */
-  ok('e quem tem os dois lados VARIA', S.perfilDeAtaque('charizard') === 'varia' &&
-     S.perfilDeAtaque('raichu') === 'varia', S.perfilDeAtaque('charizard') + '/' + S.perfilDeAtaque('raichu'));
-  /* O DITTO fica de fora: ele copia o tipo de quem esta na frente, entao prometer um lado seria
-     mentir na metade das lutas. */
-  ok('e o Ditto nunca promete um lado', S.perfilDeAtaque('ditto') === 'varia');
+     diferente".
+     A tela diz o NOME do golpe, nao a palavra "fisico"/"especial": a versao que falava em categoria
+     durou um dia e foi recusada por ser dificil de compreender. */
+  ok('o golpe fortalecido sai do tipo do golpe', S.golpesDoItem('spatk_up','venusaur').join() === 'Raio Solar' &&
+     S.golpesDoItem('atk_up','venusaur').join() === 'Bomba de Lodo',
+     JSON.stringify([S.golpesDoItem('atk_up','venusaur'), S.golpesDoItem('spatk_up','venusaur')]));
+  /* Os SUBTIPOS entram, que e a mesma lista que o bestAttackType escolhe: o Raichu e Eletrico
+     (especial) com subtipo Normal (fisico), pra alcancar os de Terra. */
+  ok('e os subtipos entram na conta', S.golpesDoItem('atk_up','raichu').length === 1 &&
+     S.golpesDoItem('spatk_up','raichu').length === 1, JSON.stringify(S.golpesDoItem('atk_up','raichu')));
+  /* Quem so tem golpe de um lado nao ganha nada com o item do outro -- e isso e o aviso. */
+  ok('quem so ataca especial nao tem golpe fisico', S.golpesDoItem('atk_up','alakazam').length === 0);
+  ok('e quem so ataca fisico nao tem especial', S.golpesDoItem('spatk_up','machamp').length === 0);
+  /* NULL = nao ha o que prometer: item que nao e de ataque (o HP Up sempre vale, e os de DEFESA
+     dependem de quem esta ATACANDO, nao do dono) e o Ditto, que copia o tipo de quem esta na frente. */
+  ok('item que nao e de ataque nao promete golpe', S.golpesDoItem('hp_up','venusaur') === null &&
+     S.golpesDoItem('def_up','venusaur') === null);
+  ok('e o Ditto nunca nomeia um golpe', S.golpesDoItem('atk_up','ditto') === null &&
+     S.golpesDoItem('spatk_up','ditto') === null);
+  /* TODA especie do jogo tem nome pra todo golpe que ela consegue usar -- senao a caixa diria
+     "Fortalece o ataque " e pararia ali. E toda uma tem golpe de algum lado. */
+  {
+    let semNome = 0, semLado = 0;
+    Object.keys(S.SPECIES).forEach(id => {
+      if(id === 'ditto') return;
+      const f = S.golpesDoItem('atk_up', id), e = S.golpesDoItem('spatk_up', id);
+      const tipos = S.tiposDeAtaqueDaEspecie(id);
+      if(f.length + e.length !== tipos.length) semNome++;
+      if(!f.length && !e.length) semLado++;
+    });
+    ok('as 250 especies tem nome pra todo golpe que usam', semNome === 0, semNome + ' sem nome');
+    ok('e nenhuma fica sem golpe dos dois lados', semLado === 0, semLado + ' sem lado');
+  }
+  ok('a lista vira frase', S.listaEmPortugues(['A']) === 'A' && S.listaEmPortugues(['A','B']) === 'A e B' &&
+     S.listaEmPortugues(['A','B','C']) === 'A, B e C');
 
   ok('o Atk Up NAO serve num atacante especial', S.itemServeNoPokemon('atk_up','alakazam') === 'nao');
   ok('e o Atk Special Up nao serve num fisico', S.itemServeNoPokemon('spatk_up','machamp') === 'nao');
-  /* O HP Up vale sempre; os de DEFESA dependem de quem esta ATACANDO, nao do dono do item, entao
-     sobre eles nao ha o que prometer a partir da especie. */
   ok('mas o HP Up vale em qualquer um', S.itemServeNoPokemon('hp_up','alakazam') === 'sim' &&
      S.itemServeNoPokemon('def_up','alakazam') === 'sim');
 
-  /* A CAIXA avisa, e o item continua CLICAVEL: e o pokemon do jogador e a escolha e dele -- o que a
-     tela deve e avisar, nao decidir. */
+  /* A CAIXA nomeia, e o item que nao serve continua CLICAVEL: e o pokemon do jogador e a escolha e
+     dele -- o que a tela deve e avisar, nao decidir. */
   conta({ doces: 0 });
   const gp = S.__getGame();
   gp.currentSaveSlot = 0; gp.inventario = { atk_up:1, spatk_up:1, hp_up:1 }; gp.equipados = {};
   S.__setGame(gp);
+  S.abrirEscolhaDeItem('0', 'venusaur');
+  const cv = S.renderEscolhaDeItemModal();
+  ok('a caixa diz o golpe que o Atk Special Up fortalece', cv.includes('Fortalece o ataque Raio Solar.'),
+     (cv.match(/Fortalece[^<]*/g)||[]).join(' | '));
+  ok('e o do Atk Up, que e outro', cv.includes('Fortalece o ataque Bomba de Lodo.'));
+  ok('e o HP Up nao promete golpe nenhum', !/de HP pela batalha inteira.<br>/.test(cv));
+
   S.abrirEscolhaDeItem('0', 'alakazam');
   const cx = S.renderEscolhaDeItemModal();
-  ok('a caixa avisa que o Atk Up nao vale ali', cx.includes('Não vale neste pokémon: ele ataca com golpes ESPECIAIS'),
-     (cx.match(/Não vale[^<]*/g)||[]).join(' | '));
+  ok('a caixa avisa que o Atk Up nao fortalece nada ali', cx.includes('Não fortalece nenhum ataque'),
+     (cx.match(/Não fortalece[^<]*/g)||[]).join(' | '));
   ok('e marca a linha do item que nao serve', /item-nao-serve/.test(cx));
-  ok('mas ele continua clicavel', /item-nao-serve[^>]*>[sS]{0,80}onclick="equiparItemNoPokemon/.test(cx) ||
-     !/item-nao-serve[^>]*disabled/.test(cx));
-  ok('e o item que SERVE nao leva aviso nenhum',
-     !/Atk Especial pela batalha inteira.<br>/.test(cx), 'o Atk Special Up saiu limpo');
+  ok('mas ele continua clicavel', !/item-nao-serve[^>]*disabled/.test(cx));
+  ok('e o item que SERVE leva o nome do golpe, nao o aviso',
+     cx.includes('Fortalece o ataque Psíquico.') && (cx.match(/Não fortalece/g)||[]).length === 1,
+     (cx.match(/item-nota">[^<]*/g)||[]).join(' | '));
 
-  /* A FICHA DA POKEDEX diz o mesmo, pra a decisao poder ser tomada antes de comprar. */
+  /* Quem tem MAIS DE UM golpe do mesmo lado lista os dois -- o Gengar ataca de Fantasma e de
+     Veneno, os dois fisicos. */
+  S.abrirEscolhaDeItem('0', 'gengar');
+  ok('e lista os dois quando sao dois', /Fortalece os ataques [^<]* e [^<]*\./.test(S.renderEscolhaDeItemModal()),
+     (S.renderEscolhaDeItemModal().match(/Fortalece[^<]*/g)||[]).join(' | '));
+
+  /* A FICHA DA POKEDEX nao fala mais de fisico/especial: e vocabulario de motor, e o jogador
+     recusou. Quem responde isso e a caixa do +, pelo nome do golpe. */
   S.abrirPokedexFicha('alakazam');
   const ficha = S.renderPokedexFicha();
-  ok('a ficha da Pokedex diz o perfil', ficha.includes('golpes <strong>ESPECIAIS</strong>'),
+  ok('a ficha nao fala em golpe fisico nem especial', !/ESPECIAIS<|FÍSICOS<|dois jeitos/.test(ficha),
      (ficha.match(/Ataca[^<]*/g)||[]).slice(0,1).join(''));
-  S.abrirPokedexFicha('machamp');
-  ok('e acerta o outro lado', S.renderPokedexFicha().includes('golpes <strong>FÍSICOS</strong>'));
-  S.abrirPokedexFicha('charizard');
-  ok('e diz quando varia', /dois jeitos/.test(S.renderPokedexFicha()));
+  /* O que a ficha continua contando e o que os seis numeros nao contam: os golpes especiais. */
+  ok('e continua dizendo os golpes especiais da especie', /Recuperar/.test(ficha),
+     (ficha.match(/dex-especiais[\s\S]{0,120}/)||[''])[0]);
 }
 
 console.log('\n=== A HOME ===');

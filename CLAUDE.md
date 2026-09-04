@@ -1148,17 +1148,29 @@ de golpes.
   Medido nas 250: **108 atacam SEMPRE físico**, **45 SEMPRE especial** e 97 variam conforme o
   adversário. Medido no dano: um Machamp com Atk Up bate **+18,8%**; um Alakazam com o mesmo item,
   **+0,1%**.
-- **A tela passou a avisar, e a mecânica NÃO mudou** (decisão de 04/09/2026). `perfilDeAtaque(id)`
-  classifica a espécie pelos tipos dela mais os subtipos, e `itemServeNoPokemon` diz se aquele item
-  ajuda aquele bicho. A caixa do + marca a linha com ⚠️ e diz o porquê; a ficha da Pokédex ganhou
-  uma linha dizendo se a espécie ataca com golpes físicos, especiais ou dos dois jeitos.
+- **A tela passou a avisar, e a mecânica NÃO mudou** (decisão de 04/09/2026). A caixa do + diz, em
+  cada item de ataque, **o NOME dos golpes que ele fortalece**: *"Fortalece o ataque Raio Solar."*
+  no Atk Special Up de um Venusaur, *"Fortalece o ataque Bomba de Lodo."* no Atk Up do mesmo bicho.
+  `golpesDoItem(item, especie)` cruza os tipos da espécie **mais os subtipos** (a mesma lista que o
+  `bestAttackType` escolhe) com o `isSpecialType`, e vira palavra pelo `nomeDoGolpe` — o mesmo
+  caminho do log, sem tabela nova. Quando não sobra golpe nenhum daquele lado, a linha vira
+  ⚠️ *"Não fortalece nenhum ataque deste pokémon"* e fica desbotada.
+  **A primeira versão dizia a CATEGORIA, e durou um dia.** Ela escrevia "ele ataca com golpes
+  ESPECIAIS" na caixa e pôs uma linha na ficha da Pokédex dizendo se a espécie ataca físico,
+  especial ou dos dois jeitos. Recusado no mesmo dia: *"ficou difícil de compreender"*. É
+  vocabulário de motor — o jogador não pensa em categoria de dano, ele pensa no golpe que lê no log.
+  **A linha da ficha da Pokédex saiu junto** e não volta: quem responde essa pergunta é a caixa do
+  +, na hora de equipar, que é onde a pergunta é feita.
   **O item continua CLICÁVEL**: é o pokémon do jogador e a escolha é dele — o que a tela deve é
   avisar, não decidir.
-  **O Ditto fica de fora do perfil**: ele copia o tipo de quem está na frente, então prometer um
-  lado seria mentir em metade das lutas.
-  **Os dois de DEFESA não têm perfil**, e não é esquecimento: quem decide se conta a Defesa ou a
+  **O Ditto não nomeia golpe**: ele copia o tipo de quem está na frente, então a linha dele diz
+  isso e mais nada — prometer um golpe seria mentir em metade das lutas.
+  **Os dois de DEFESA não nomeiam nada**, e não é esquecimento: quem decide se conta a Defesa ou a
   Defesa Especial é o tipo do golpe de QUEM ATACA, não do dono do item. Não há o que prometer a
   partir da espécie — o que dá pra dizer é que 59% dos golpes do jogo são físicos.
+  `tools/test-inventario.js` confere que **as 250 espécies têm nome pra todo golpe que conseguem
+  usar** (senão a caixa diria "Fortalece o ataque " e pararia ali) e que nenhuma fica sem golpe dos
+  dois lados.
 - **O TETO DE DANO ENGOLE O BÔNUS em 12,3% dos golpes.** `DMG_CAP_PCT = 0.65` limita cada golpe a
   65% do HP máximo do alvo (70% no crítico), e quem já bate no teto não ganha nada com mais ataque.
   Medido em 8.000 batalhas o A/B de subir pra 75%: os golpes no teto caem de 11,5% pra 6,6%, a taxa
