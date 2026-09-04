@@ -164,8 +164,9 @@ console.log('\n=== A LOJA ===');
   /* A LOJA VENDE OS CINCO. O Doce Raro e o Bonus Shiny voltaram a ser vendidos em 03/09/2026 --
      eles continuam vindo de jogar tambem, e e por isso que a mochila le cada um de uma fonte
      propria (contador / cupom+estoque) em vez de derivar tudo do inventario. */
-  ok('a grade mostra os dez a venda', (t.match(/item-slot-icone/g)||[]).length === 10,
+  ok('a grade mostra os onze a venda', (t.match(/item-slot-icone/g)||[]).length === 11,
      (t.match(/item-slot-icone/g)||[]).length + ' itens');
+  ok('e a Faixa de Foco custa 50', S.ITENS.faixa_foco.preco === 50, String(S.ITENS.faixa_foco.preco));
   /* Os cinco de atributo custam 30 cada, e o preco da tela tem que ser o que o servidor cobra. */
   ok('e os cinco de atributo custam 30',
      ['hp_up','atk_up','def_up','spatk_up','spdef_up'].every(id => S.ITENS[id].preco === 30),

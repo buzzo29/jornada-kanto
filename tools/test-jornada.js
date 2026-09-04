@@ -837,6 +837,36 @@ console.log('\n=== A OFERTA SELVAGEM ===');
   ok('o contador de re-sorteios vai pro save', gravado.wildRerolls === 2, String(gravado.wildRerolls));
 })();
 
+console.log('\n=== COM O BONUS SHINY, O RE-SORTEIO ENCARECE NA MESMA ROTA ===');
+/* A chance do Bonus Shiny ESCALA +10 pontos por encontro sem shiny (78% de ja ter um no 5o
+   encontro), entao re-sortear sob ele e quase comprar um shiny. Preco fixo de 3 faria das 70
+   moedas de uma jornada um shiny garantido. */
+(function(){
+  const g = S.__getGame();
+  g.shinyBonusExpiresAt = 0; g.wildRerolls = 0; S.__setGame(g);
+  ok('sem o bonus o preco e fixo', S.precoDoRessorteio() === S.MOEDAS_RESSORTEIO, String(S.precoDoRessorteio()));
+  const g2 = S.__getGame(); g2.wildRerolls = 5; S.__setGame(g2);
+  ok('e continua fixo depois de cinco re-sorteios', S.precoDoRessorteio() === S.MOEDAS_RESSORTEIO,
+     String(S.precoDoRessorteio()));
+
+  /* COM o bonus: 3, 6, 9... exatamente o que foi pedido. */
+  const g3 = S.__getGame(); g3.shinyBonusExpiresAt = Date.now() + 60000; S.__setGame(g3);
+  const precos = [0,1,2,3].map(n => { const x = S.__getGame(); x.wildRerolls = n; S.__setGame(x); return S.precoDoRessorteio(); });
+  ok('com o bonus ele sobe de 3 em 3', precos.join(',') === '3,6,9,12', precos.join(','));
+
+  /* A ROTA SEGUINTE volta a 3, porque o wildRerolls zera a cada encontro novo -- o que se quer
+     encarecer e insistir NA MESMA rota, nao jogar. */
+  const g4 = S.__getGame(); g4.wildRerolls = 4; g4.wildEncounterSeq = 1; S.__setGame(g4);
+  ok('antes do encontro novo o preco esta alto', S.precoDoRessorteio() === 15, String(S.precoDoRessorteio()));
+  S.goToWildEncounter();
+  ok('encontro novo zera o contador', (S.__getGame().wildRerolls || 0) === 0, String(S.__getGame().wildRerolls));
+  ok('e o preco volta pros 3', S.precoDoRessorteio() === S.MOEDAS_RESSORTEIO, String(S.precoDoRessorteio()));
+
+  /* BONUS VENCIDO nao encarece: e o mesmo teste do currentShinyChance. */
+  const g5 = S.__getGame(); g5.shinyBonusExpiresAt = Date.now() - 1000; g5.wildRerolls = 3; S.__setGame(g5);
+  ok('bonus vencido nao encarece nada', S.precoDoRessorteio() === S.MOEDAS_RESSORTEIO, String(S.precoDoRessorteio()));
+})();
+
 console.log('\n=== O PROF. CARVALHO ACEITA QUALQUER UM, NOS DOIS MODOS ===');
 /* Houve uma trava de 10 niveis de diferenca no dificil, pra a troca nao virar upgrade de graca.
    Saiu a pedido em 03/09/2026. O que este teste guarda e o que a remocao tem que garantir: a tela

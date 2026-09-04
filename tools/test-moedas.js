@@ -124,6 +124,45 @@ console.log('\n=== O RE-SORTEIO COBRA ===');
   ok('quem não tem moeda nenhuma também é recusado',
      await recusa('rerollWildOffer', 'd', {}) === 'failed-precondition');
   ok('e continua com zero, não fica negativo', await moedasDe('d') === 0, String(await moedasDe('d')));
+
+  /* COM O BONUS SHINY LIGADO o preco sobe a cada re-sorteio NA MESMA ROTA: 3, 6, 9... O contador
+     vem do SAVE, e isso e seguro por construcao -- ele entra na SEMENTE da oferta, entao mentir que
+     e zero devolve a MESMA oferta de antes. Quem falsifica pra pagar menos nao ganha nada. */
+  await conta('r', jaVisto(), 500);
+  await userRef('r').set({ shinyBonusExpiresAt: Date.now() + 60*60*1000 }, { merge:true });
+  await saveRef('r', 0).set({ wildRerolls: 0 }, { merge:true });
+  const p1 = await chamar('rerollWildOffer', 'r', { slot:'0' });
+  ok('com o bonus, o primeiro custa 3', p1.custo === 3, String(p1.custo));
+  await saveRef('r', 0).set({ wildRerolls: 1 }, { merge:true });
+  const p2 = await chamar('rerollWildOffer', 'r', { slot:'0' });
+  ok('o segundo custa 6', p2.custo === 6, String(p2.custo));
+  await saveRef('r', 0).set({ wildRerolls: 2 }, { merge:true });
+  const p3 = await chamar('rerollWildOffer', 'r', { slot:'0' });
+  ok('e o terceiro custa 9', p3.custo === 9, String(p3.custo));
+  ok('e o saldo desceu 3+6+9', p3.moedas === 500 - 18, String(p3.moedas));
+
+  /* SEM o bonus o preco nao sobe, por mais que ele tenha re-sorteado. */
+  await conta('s', jaVisto(), 500);
+  await saveRef('s', 0).set({ wildRerolls: 7 }, { merge:true });
+  const semBonus = await chamar('rerollWildOffer', 's', { slot:'0' });
+  ok('sem o bonus, sete re-sorteios depois, ainda custa 3', semBonus.custo === 3, String(semBonus.custo));
+
+  /* BONUS VENCIDO tambem nao encarece. */
+  await userRef('s').set({ shinyBonusExpiresAt: Date.now() - 1000 }, { merge:true });
+  ok('bonus vencido nao encarece', (await chamar('rerollWildOffer', 's', { slot:'0' })).custo === 3);
+
+  /* CLIENTE ANTIGO EM CACHE nao manda o slot: cai no preco de sempre, em vez de quebrar. */
+  await userRef('s').set({ shinyBonusExpiresAt: Date.now() + 60*60*1000 }, { merge:true });
+  ok('sem o slot, o preco e o de sempre', (await chamar('rerollWildOffer', 's', {})).custo === 3);
+
+  /* A RECUSA diz o preco CERTO, nao os 3 fixos -- senao o botao promete um preco e a cobranca
+     pratica outro. */
+  await conta('u', jaVisto(), 5);
+  await userRef('u').set({ shinyBonusExpiresAt: Date.now() + 60*60*1000 }, { merge:true });
+  await saveRef('u', 0).set({ wildRerolls: 2 }, { merge:true });
+  let msg = '';
+  try { await chamar('rerollWildOffer', 'u', { slot:'0' }); } catch(e){ msg = e.message || ''; }
+  ok('a recusa nomeia o preco escalonado', /custa 9/.test(msg), msg);
 }
 
 console.log('\n=== DUAS ABAS NÃO GASTAM A MESMA MOEDA ===');

@@ -460,19 +460,127 @@ console.log('\nA FICHA DA POKEDEX DIZ QUE ESPECIAL A ESPECIE TEM');
    Graveler de atributo parecido jogam diferente porque um deles explode. */
 ok('lista o especial da especie',
    S.especiaisDaEspecie('golem').map(e=>e.nome).join(',') === 'auto-destruição' &&
-   S.especiaisDaEspecie('paras').map(e=>e.nome).join(',') === 'Esporo');
+   S.especiaisDaEspecie('oddish').map(e=>e.nome).join(',') === 'Pó do Sono,Absorver',
+   S.especiaisDaEspecie('oddish').map(e=>e.nome).join(','));
 ok('e os DOIS de quem tem dois',
    S.especiaisDaEspecie('jigglypuff').map(e=>e.nome).join(' + ') === 'Canto + Anulação',
    S.especiaisDaEspecie('jigglypuff').map(e=>e.nome).join(' + '));
+/* O Paras tem Esporo E Sanguessuga -- ele aprende os dois por nivel na Gen 1. */
+ok('e o Paras, que dorme E drena',
+   S.especiaisDaEspecie('paras').map(e=>e.nome).join(' + ') === 'Esporo + Sanguessuga',
+   S.especiaisDaEspecie('paras').map(e=>e.nome).join(' + '));
 ok('quem nao tem nenhum nao ganha linha nenhuma', S.especiaisDaEspecie('pikachu').length === 0);
 /* A chance vem junto porque ela e POR CONFRONTO: so o nome deixaria o jogador achar que sai todo golpe. */
 ok('com a chance junto', S.especiaisDaEspecie('golem')[0].chance === S.CHANCE_AUTODESTRUICAO);
 ok('e com o tipo, pro selo', S.especiaisDaEspecie('paras')[0].tipo === 'Grass');
 /* Ninguem das quatro listas pode ficar de fora da ficha -- seria um golpe invisivel. */
-const todasComEspecial = new Set([...S.AUTODESTRUICAO, ...Object.keys(S.SONIFEROS), ...S.DISABLE, ...S.METRONOMO]);
+const todasComEspecial = new Set([...S.AUTODESTRUICAO, ...Object.keys(S.SONIFEROS), ...S.DISABLE,
+                                  ...S.METRONOMO, ...Object.keys(S.ABSORCAO)]);
 const semFicha = [...todasComEspecial].filter(id => S.especiaisDaEspecie(id).length === 0);
 ok('e toda especie das quatro listas aparece', semFicha.length === 0,
    semFicha.join(',') || todasComEspecial.size + ' especies');
+console.log('\nDRENAGEM: TIRA DO OUTRO E POE EM SI, ANTES DA LUTA');
+/* A LISTA SAI DO APRENDIZADO POR NIVEL DA GEN 1/2, conferida move a move no Bulbapedia -- e a
+   intuicao erra: Kabuto e Kabutops aprendem Absorb/Mega Drain por nivel (sao Pedra/Agua), e o
+   Bulbasaur NAO aprende nenhum dos tres (o que ele tem e Leech Seed, que e outra coisa). */
+(function(){
+  ok('23 especies drenam', Object.keys(S.ABSORCAO).length === 23, Object.keys(S.ABSORCAO).length + '');
+  ok('os de Absorb estao la', ['oddish','gloom','vileplume','exeggcute','exeggutor','tangela',
+      'kabuto','kabutops','bellossom','hoppip','skiploom','jumpluff','sunkern','sunflora']
+      .every(id => S.ABSORCAO[id]));
+  ok('e os de Leech Life tambem', ['zubat','golbat','crobat','venonat','venomoth',
+      'spinarak','ariados','paras','parasect'].every(id => S.ABSORCAO[id]));
+  ok('o Bulbasaur NAO drena (Leech Seed nao e drenagem)', !S.ABSORCAO.bulbasaur);
+  ok('nenhuma esta fora do SPECIES', Object.keys(S.ABSORCAO).filter(id => !S.SPECIES[id]).length === 0,
+     Object.keys(S.ABSORCAO).filter(id => !S.SPECIES[id]).join(','));
+  /* Cada especie com o NOME do golpe dela: sem isso um Zubat drenaria com "Absorver". */
+  ok('cada uma com o golpe dela', S.ABSORCAO.zubat === 'Sanguessuga' && S.ABSORCAO.oddish === 'Absorver' &&
+     S.ABSORCAO.vileplume === 'Mega Dreno', [S.ABSORCAO.zubat, S.ABSORCAO.oddish, S.ABSORCAO.vileplume].join('/'));
+  /* E TODO golpe que o motor gera precisa de tipo declarado, senao o selo sai num cinza generico. */
+  const semTipo = [...new Set(Object.values(S.ABSORCAO))].filter(n => !S.TIPO_DO_ESPECIAL[n]);
+  ok('e todos com tipo declarado, pro selo', semTipo.length === 0, semTipo.join(','));
+  ok('Sanguessuga e Inseto, nao Planta', S.TIPO_DO_ESPECIAL['Sanguessuga'] === 'Bug');
+
+  /* A MECANICA. Mesma hora do Recuperar (antes da luta) e a MESMA fracao dos dois lados, cada um do
+     proprio teto: o exemplo do pedido e um Vileplume de 47% que sobe pra 72% enquanto o Fearow cai
+     de 100% pra 75%. */
+  let saiu = 0, fracaoErrada = 0, curouCheio = 0, matou = 0, foraDaFaixa = 0, semDuasEntradas = 0;
+  for(let i = 0; i < 6000; i++){
+    const v = S.createInstance('vileplume', 60), f = S.createInstance('fearow', 60);
+    v.maxHp = S.calcMaxHp(v); f.maxHp = S.calcMaxHp(f);
+    v.hp = Math.round(v.maxHp * 0.47); f.hp = f.maxHp;
+    const antesV = v.hp, antesF = f.hp;
+    const diario = [];
+    S.tentarGolpeEspecial(v, f, Math.random, diario);
+    const a = diario.find(g => g.x === 'absorb');
+    if(!a) continue;
+    saiu++;
+    const d = diario.find(g => g.x === 'absorbdano');
+    if(!d) { semDuasEntradas++; continue; }
+    const fracaoCura = (v.hp - antesV) / v.maxHp, fracaoDano = (antesF - f.hp) / f.maxHp;
+    if(Math.abs(fracaoCura - fracaoDano) > 0.01) fracaoErrada++;
+    if(fracaoCura < 0.095 || fracaoCura > 0.305) foraDaFaixa++;
+    if(v.hp > v.maxHp) curouCheio++;
+    if(f.hp < 1) matou++;
+  }
+  ok('a drenagem dispara', saiu > 200, saiu + ' vezes em 6000');
+  ok('sempre com DUAS entradas no diario (uma barra cada)', semDuasEntradas === 0, semDuasEntradas + '');
+  ok('a MESMA fracao dos dois lados, cada um do proprio teto', fracaoErrada === 0, fracaoErrada + ' erradas');
+  ok('e a fracao fica entre 10% e 30%', foraDaFaixa === 0, foraDaFaixa + ' fora da faixa');
+  ok('a cura nunca passa do teto', curouCheio === 0, curouCheio + '');
+  /* NAO MATA: todas as aberturas deste motor deixam a luta acontecer. */
+  ok('e nunca mata o alvo (piso de 1 de HP)', matou === 0, matou + '');
+
+  /* A TRAVA DOS 70%, a mesma do Recuperar: com a vida quase cheia nao ha o que recuperar, e a
+     barra de quem drenou nao se moveria -- um passo de cura ZERO na animacao. */
+  let comVidaCheia = 0;
+  for(let i = 0; i < 6000; i++){
+    const v = S.createInstance('vileplume', 60), f = S.createInstance('fearow', 60);
+    v.maxHp = S.calcMaxHp(v); f.maxHp = S.calcMaxHp(f);
+    v.hp = v.maxHp; f.hp = f.maxHp;
+    const diario = [];
+    S.tentarGolpeEspecial(v, f, Math.random, diario);
+    if(diario.some(g => g.x === 'absorb')) comVidaCheia++;
+  }
+  ok('com a vida cheia ela nao sai', comVidaCheia === 0, comVidaCheia + ' de 6000');
+
+  /* QUEM NAO TEM O GOLPE nunca drena -- a medida de controle. */
+  let semGolpe = 0;
+  for(let i = 0; i < 4000; i++){
+    const a = S.createInstance('rhydon', 60), b = S.createInstance('fearow', 60);
+    a.maxHp = S.calcMaxHp(a); b.maxHp = S.calcMaxHp(b);
+    a.hp = Math.round(a.maxHp * 0.4); b.hp = b.maxHp;
+    const diario = [];
+    S.tentarGolpeEspecial(a, b, Math.random, diario);
+    if(diario.some(g => g.x === 'absorb')) semGolpe++;
+  }
+  ok('quem nao tem o golpe nunca drena', semGolpe === 0, semGolpe + ' de 4000');
+
+  /* NA TELA: as duas barras se movem, e a frase sobrevive aos DOIS passos. */
+  const m = { player:'Vileplume', enemy:'Fearow', playerSpecies:'vileplume', enemySpecies:'fearow',
+    playerHpBefore:190, playerHpAfter:0, playerMaxHp:404, enemyHpBefore:380, enemyHpAfter:0, enemyMaxHp:380,
+    playerMove:'Grass', enemyMove:'Flying',
+    golpes:[{q:'p',d:101,hp:291,x:'absorb',g:'Mega Dreno'},{q:'p',d:95,hp:285,x:'absorbdano'},
+            {q:'e',d:291,hp:0},{q:'p',d:285,hp:0}] };
+  const seq = S.sequenciaDoConfronto(m);
+  ok('a drenagem ABRE a sequencia', seq.slice(0,2).map(g=>g.x).join(',') === 'absorb,absorbdano',
+     seq.map(g=>g.x||'golpe').join(','));
+  const anim = S.buildAnimatedHitSequence(m);
+  ok('a barra de quem drenou SOBE', anim[0].side === 'player' && anim[0].amount === -101 && anim[0].cura === true,
+     JSON.stringify(anim[0]));
+  ok('e a do alvo DESCE', anim[1].side === 'enemy' && anim[1].amount === 95, JSON.stringify(anim[1]));
+  const log = S.passosHtml(m);
+  ok('o log fala da drenagem', /drenou a vida de/.test(log));
+  ok('numa linha SO (a segunda entrada e pro calculo)',
+     (log.match(/mlog-passo especial/g) || []).length === 1,
+     (log.match(/mlog-passo especial/g) || []).length + ' linhas especiais');
+  ok('com o selo do tipo do golpe', log.includes(S.TYPE_COLORS['Grass']));
+  /* A FRASE tem que durar os DOIS passos: sumindo no primeiro, a segunda barra anda sem explicacao. */
+  ok('a frase aparece no comeco', /drenou a vida de/.test(S.avisoDoConfronto(m, 0)), S.avisoDoConfronto(m, 0));
+  ok('e sobrevive ao segundo passo', /drenou a vida de/.test(S.avisoDoConfronto(m, 1)), S.avisoDoConfronto(m, 1));
+  ok('e some quando a luta comeca', S.avisoDoConfronto(m, 2) === '', S.avisoDoConfronto(m, 2));
+})();
+
 console.log('\nRECUPERAR: ANTES DA LUTA, E SO COM MENOS DE 70% DE VIDA');
 /* Recover nao e TM em nenhuma das duas geracoes e nao sai por reproducao -- entao a lista de quem
    aprende por nivel e a lista inteira, sem recorte. */

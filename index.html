@@ -5470,6 +5470,35 @@ const SONO_EM_TROCAS = 2;
 const CHANCE_METRONOMO_EFEITO = 0.10;   // por efeito: 10% cada um dos três, 70% golpe comum
 const CHANCE_DISABLE = 0.10;
 const CHANCE_RECUPERAR = 0.10;
+/* DRENAGEM (Absorb e companhia): tira vida do adversário e devolve pra si. 23 espécies.
+   A LISTA SAI DO APRENDIZADO POR NÍVEL DA GEN 1/2, como as outras -- conferida no Bulbapedia, move
+   a move, e não deduzida do tipo: Kabuto e Kabutops aprendem Absorb e Mega Drain por nível apesar
+   de serem Pedra/Água, e o Bulbasaur, que "devia" estar aqui, NÃO aprende nenhum dos três (o que
+   ele tem é Leech Seed, que é outra coisa).
+   Giga Drain ficou de fora porque na Gen 2 ele é TM19 -- ninguém o aprende por nível.
+   Cada espécie guarda o NOME do golpe dela, como no SONIFEROS: sem isso um Zubat drenaria com
+   "Absorver", e quem conhece o jogo notaria na hora. Os que aprendem Absorb E Mega Drain ficam com
+   o Mega Dreno, que é o que eles ganham depois. */
+const ABSORCAO = {
+  // Absorb por nível (Gen 1 e 2)
+  oddish:'Absorver', gloom:'Absorver', exeggcute:'Absorver', exeggutor:'Absorver',
+  hoppip:'Absorver', skiploom:'Absorver', jumpluff:'Absorver',
+  sunkern:'Absorver', sunflora:'Absorver',
+  // esses cinco também pegam Mega Drain por nível na Gen 2
+  vileplume:'Mega Dreno', bellossom:'Mega Dreno', tangela:'Mega Dreno',
+  kabuto:'Mega Dreno', kabutops:'Mega Dreno',
+  // Leech Life por nível (Gen 1 e 2) -- é drenagem também, e é o golpe deles
+  zubat:'Sanguessuga', golbat:'Sanguessuga', crobat:'Sanguessuga',
+  venonat:'Sanguessuga', venomoth:'Sanguessuga',
+  spinarak:'Sanguessuga', ariados:'Sanguessuga',
+  paras:'Sanguessuga', parasect:'Sanguessuga'
+};
+const CHANCE_ABSORVER = 0.10;
+/* Quanto ele drena, em fração do HP MÁXIMO -- de cada um o seu: o atacante recupera essa fração do
+   teto DELE e o alvo perde a mesma fração do teto DELE. Sorteado a cada uso.
+   O teto de 30% casa com a trava dos 70% (a mesma do Recuperar): abaixo de 70% de vida, +30% nunca
+   passa de 100%, então a cura nunca é desperdiçada. */
+const ABSORVER_MIN = 0.10, ABSORVER_MAX = 0.30;
 /* A cura só sai com a vida ABAIXO disso. Com o pokémon quase cheio não há o que recuperar, e a
    frase anunciaria um efeito que mal se vê na barra. */
 const CURA_MAXIMO_DO_HP = 0.7;
@@ -5537,6 +5566,11 @@ function sorteiaGolpeEspecial(p, rng){
   }
   if(RECUPERACAO.includes(p.speciesId) && rng() < CHANCE_RECUPERAR){
     return { efeito:'cura', golpe:'Recuperar' };
+  }
+  /* A drenagem vem por último. Quem tem dois especiais cai na chance composta, como o Kadabra
+     (Disable + Recuperar): um Vileplume, que também é sonífero, absorve em 0,95 x 10% = 9,5%. */
+  if(ABSORCAO[p.speciesId] && rng() < CHANCE_ABSORVER){
+    return { efeito:'drenar', golpe: ABSORCAO[p.speciesId] };
   }
   return null;
 }
@@ -5613,6 +5647,35 @@ function tentarGolpeEspecial(active, enemy, rng, diario){
       }
       continue;
     }
+    if(especial.efeito === 'drenar'){
+      /* DRENAGEM: mesma hora do Recuperar -- ANTES da luta. O pokémon que sobreviveu ao confronto
+         anterior entra machucado; se está abaixo de 70% da vida, ele tira uma fatia do adversário
+         e põe em si, e SÓ ENTÃO o confronto acontece, inteiro. É 'continue', não 'return true'.
+         A MESMA FRAÇÃO dos dois lados, mas cada um do próprio teto: 25% num Vileplume de 47% o
+         leva a 72%, e tira 25% do teto do Fearow, que entra com 75%.
+         A trava dos 70% é a do Recuperar, e aqui ela tem um segundo efeito: com o teto de 30%, um
+         pokémon abaixo de 70% nunca passa de 100% -- a cura jamais é desperdiçada. Sem a trava, um
+         pokémon cheio drenaria só pra machucar o outro, e a barra dele não se moveria: um passo de
+         cura ZERO na animação, que é o que o log deste jogo evita em toda regra.
+         NÃO MATA: o alvo fica com no mínimo 1 de HP. Todas as aberturas deste motor (Recuperar,
+         Disable, poção) deixam a luta acontecer, e um efeito de abertura que resolve o confronto
+         sozinho seria um confronto sem um único golpe na tela. */
+      if(quem.hp >= quem.maxHp * CURA_MAXIMO_DO_HP) continue;
+      const fatia = ABSORVER_MIN + rng() * (ABSORVER_MAX - ABSORVER_MIN);
+      const curado = Math.min(quem.maxHp - quem.hp, Math.round(quem.maxHp * fatia));
+      const drenado = Math.min(alvo.hp - 1, Math.round(alvo.maxHp * fatia));
+      if(curado <= 0 && drenado <= 0) continue;
+      quem.hp += curado;
+      alvo.hp -= drenado;
+      if(diario){
+        /* DUAS entradas, uma por barra -- como a explosão. A primeira sobe a vida de quem drenou
+           (o laço da animação trata 'absorb' como cura) e a segunda desce a do alvo. No LOG elas
+           viram UMA linha só: a segunda existe pro cálculo e pra barra, não pra leitura. */
+        diario.push({ q: marca, d: curado, hp: quem.hp, c:0, m:0, z:0, x:'absorb', g: especial.golpe });
+        diario.push({ q: marca, d: drenado, hp: alvo.hp, c:0, m:0, z:0, x:'absorbdano' });
+      }
+      continue;
+    }
     if(especial.efeito === 'anula'){
       /* DISABLE: o melhor golpe do alvo contra QUEM anulou sai de cena e ele passa a atacar pelo
          segundo melhor -- que é o pedido ("desconsidera o que tira mais dano, usa o outro").
@@ -5664,6 +5727,20 @@ function tentarGolpeEspecial(active, enemy, rng, diario){
   }
   return false;
 }
+/* FAIXA DE FOCO: o golpe que mataria deixa 1 de HP, o pokémon dá o revide dele e a LUTA CONTINUA.
+   Ela entra nos dois pontos do doExchange em que alguém chega a zero -- quem apanha primeiro e quem
+   apanha o revide --, porque o item vale nos dois.
+   NÃO é o golpe moribundo com outro nome: no moribundo o pokémon revida E CAI, aqui ele fica de pé.
+   Como a marca de moribundo sai da SITUAÇÃO ("o segundo caiu e revidou"), segurar em 1 já a desliga
+   sozinho -- e é isso que se quer, porque ele não caiu.
+   O item é UM: gasta ao segurar, e o segundo golpe fatal da mesma batalha leva o pokémon. */
+function faixaDeFoco(p, marca, diario){
+  if(!p || p.item !== 'faixa_foco') return false;
+  p.item = null;
+  itensGastos.push({ dono: marca, especie: p.speciesId, item: 'faixa_foco' });
+  if(diario) diario.push({ q: marca, d: 0, hp: 1, c:0, m:0, z:0, x:'faixa' });
+  return true;
+}
 function doExchange(active, enemy, rng, diario){
   /* Golpe especial: só na PRIMEIRA troca de cada confronto. O marcador é o próprio
      adversário -- oponente novo, confronto novo, e as chances valem de novo. */
@@ -5693,6 +5770,9 @@ function doExchange(active, enemy, rng, diario){
   const dmgBySecond = activeFirst ? dmgToActive : dmgToEnemy;
   const firstHpBefore = first.hp, secondHpBefore = second.hp;
   second.hp = Math.max(0, second.hp - dmgByFirst);
+  /* A Faixa segura ANTES de o diário ser escrito: assim o dano gravado é o EFETIVO (o que saiu de
+     verdade, parando em 1) e a barra da tela desce até 1, que é o que aconteceu. */
+  if(second.hp <= 0 && faixaDeFoco(second, (second === active) ? 'p' : 'e', diario)) second.hp = 1;
   /* A marca sai da SITUAÇÃO (o segundo caiu e mesmo assim revidou), não de o dano ter sido
      reduzido. Enquanto ela era deduzida do dano, subir o DYING_BLOW_FACTOR pra 1.0 fazia a marca
      sumir junto -- e sem ela o log volta a mostrar pokémon atacando depois de cair, porque é ela
@@ -5703,6 +5783,7 @@ function doExchange(active, enemy, rng, diario){
     counter = Math.max(1, Math.round(counter * DYING_BLOW_FACTOR));
   }
   first.hp = Math.max(0, first.hp - counter);
+  if(first.hp <= 0 && faixaDeFoco(first, (first === active) ? 'p' : 'e', diario)) first.hp = 1;
   if(diario){
     /* O dano registrado é o que SAIU DE VERDADE da vida do alvo, não o número que a fórmula
        sorteou: um golpe de 101 num pokémon com 54 de HP tira 54. Gravar o valor cru fazia o log
@@ -6107,7 +6188,13 @@ async function resortearEncontro(){
   game.rerollErro = null;
   game.rerolando = true; render();
   try{
-    const r = await functionsClient.httpsCallable('rerollWildOffer')();
+    /* O SAVE VAI PRIMEIRO, e é o que sustenta o preço escalonado: quem cobra é o servidor, e ele lê
+       o wildRerolls do save GRAVADO. Sem esta gravação, dois re-sorteios seguidos leriam o mesmo
+       contador velho e o segundo sairia pelo preço do primeiro.
+       Gravar o contador ANTES de cobrar não dá vantagem nenhuma: ele guarda quantos JÁ foram, e é
+       exatamente esse o número que define o preço deste. */
+    await saveCurrentGame();
+    const r = await functionsClient.httpsCallable('rerollWildOffer')({ slot: String(game.currentSaveSlot) });
     game.moedas = r.data.moedas;
     game.wildRerolls = (game.wildRerolls || 0) + 1;
     const sorteioOriginal = Math.random;
@@ -7454,7 +7541,7 @@ function buildAnimatedHitSequence(m){
     /* Na lista 'q' é quem BATE e 'side' é quem APANHA -- por isso a inversão. A CURA é o contrário
        de tudo isso: quem curou é quem MUDA de vida, e pra cima. Amount negativo faz a barra subir
        (os laços fazem hp - amount, e o hpBarTransitionMs usa o módulo pra a duração). */
-    if(g.x === 'recover' || g.x === 'pocao') return { side: g.q === 'p' ? 'player' : 'enemy', amount: -g.d, cura: true };
+    if(g.x === 'recover' || g.x === 'pocao' || g.x === 'absorb') return { side: g.q === 'p' ? 'player' : 'enemy', amount: -g.d, cura: true };
     return { side: g.q === 'p' ? 'enemy' : 'player', amount: g.d };
   });
 }
@@ -12668,11 +12755,14 @@ function renderWild(){
     <p>No meio do caminho, alguns Pokémons selvagens aparecem. Escolha até <strong>2</strong> para se juntarem ao seu time — se não quiser nenhum, pode seguir em frente também.</p>
   </div>
   <div class="pool-badge">SELECIONADOS: ${game.wildSelected.length}/2</div>
-  <button class="btn secondary wild-reroll" ${(game.moedas||0) < MOEDAS_RESSORTEIO || game.rerolando ? 'disabled' : ''}
+  <button class="btn secondary wild-reroll" ${(game.moedas||0) < precoDoRessorteio() || game.rerolando ? 'disabled' : ''}
     onclick="resortearEncontro()">
-    <span>${game.rerolando ? 'Re-sorteando...' : `🪙 ${MOEDAS_RESSORTEIO} - Sortear novamente`}</span>
+    <span>${game.rerolando ? 'Re-sorteando...' : `🪙 ${precoDoRessorteio()} - Sortear novamente`}</span>
     <span class="wild-reroll-saldo">Possui: 🪙 ${game.moedas||0}</span>
   </button>
+  ${bonusShinyAtivo() && (game.wildRerolls||0) > 0
+    ? `<div class="box"><p class="hint-text">✨ Com o Bônus Shiny ligado, cada re-sorteio nesta rota custa 🪙 ${MOEDAS_RESSORTEIO} a mais. Na próxima rota volta a ${MOEDAS_RESSORTEIO}.</p></div>`
+    : ''}
   ${game.rerollErro ? `<div class="box"><p class="error-text">${escapeHtmlSafe(game.rerollErro)}</p></div>` : ''}
   <div class="box">
     ${game.wildOffer.map(entry=>{
@@ -13447,13 +13537,14 @@ function sequenciaDoConfronto(m){
      A CURA FICA. Ela É um passo, e o PRIMEIRO: o pokémon entra machucado do confronto anterior, se
      cura, e só então a luta começa. Enquanto ela ficava de fora da sequência, a animação só via o
      valor final e a barra aparecia cheia do nada. */
-  const reais = passosVisiveis((m.golpes || []).filter(g => g.x !== 'disable' && (g.x || g.d > 0)));
+  /* A FAIXA sai junto com o Disable, e pelo mesmo motivo: ela não move barra nenhuma. O golpe que
+     ela segurou JÁ está no diário com o dano efetivo (parando em 1), então a barra desce até 1
+     sozinha -- um passo próprio seria um movimento de zero, e passo de dano zero não é passo. */
+  const reais = passosVisiveis((m.golpes || []).filter(g => g.x !== 'disable' && g.x !== 'faixa' && (g.x || g.d > 0)));
   /* TODAS AS ABERTURAS: acontecem antes da luta e não são dano. A poção entrou aqui quando passou a
      funcionar como o Recuperar -- ela era um FECHAMENTO enquanto disparava na vitória do confronto. */
-  const aberturas = reais.filter(g => g.x === 'recover' || g.x === 'sono' || g.x === 'semSono' || g.x === 'pocao');
-  /* A vida de onde a reconstrução parte. Cura e poção mexem no MESMO ponto (o começo), e só uma das
-     duas sai por confronto -- se a poção subiu o HP pra cima de 70%, o Recuperar não dispara. */
-  const cura = reais.find(g => g.x === 'recover' || g.x === 'pocao') || null;
+  const aberturas = reais.filter(g => g.x === 'recover' || g.x === 'sono' || g.x === 'semSono' ||
+                                      g.x === 'pocao' || g.x === 'absorb' || g.x === 'absorbdano');
   const ehDano = g => !g.x || g.x === 'boom' || g.x === 'boomself';
   const golpesDeDano = reais.filter(ehDano).length;
   /* O teto conta GOLPES. As aberturas (cura e sono) não são dano -- deixá-las contar jogaria uma
@@ -13475,9 +13566,17 @@ function sequenciaDoConfronto(m){
      "começo" dela tem que ser depois da cura E depois das trocas livres -- senão ela recontaria o
      dano que as linhas de cima já mostraram, e a soma do log passaria do HP que o pokémon tinha.
      É o mesmo ajuste que a cura já fazia sozinha desde 02/09/2026. */
+  /* TODA ABERTURA QUE MEXEU EM HP desloca o ponto de partida -- e a drenagem mexe nos DOIS lados,
+     por isso aqui é um laço e não um 'cura' só. Quem cede vida em cada caso não é o mesmo: a cura e
+     a poção sobem o HP de QUEM usou (q), e o dano da drenagem desce o do OUTRO lado. */
   let base = m;
-  if(cura) base = Object.assign({}, base, cura.q === 'p' ? { playerHpBefore: cura.hp }
-                                                         : { enemyHpBefore: cura.hp });
+  for(const g of reais){
+    if(g.x === 'recover' || g.x === 'pocao' || g.x === 'absorb'){
+      base = Object.assign({}, base, g.q === 'p' ? { playerHpBefore: g.hp } : { enemyHpBefore: g.hp });
+    } else if(g.x === 'absorbdano'){
+      base = Object.assign({}, base, g.q === 'p' ? { enemyHpBefore: g.hp } : { playerHpBefore: g.hp });
+    }
+  }
   if(danoLivre > 0){
     /* Os golpes livres batem todos no MESMO alvo: quem dormiu. Um golpe com q='p' tira HP do
        inimigo, então quem cede vida aqui é o lado oposto ao de quem usou o sono. */
@@ -13496,7 +13595,7 @@ function sequenciaDoConfronto(m){
    'quem' é sempre quem USOU o golpe; 'alvo' é quem sofreu. Repare que a frase do Disable começa
    pelo ALVO ("Gengar teve seu melhor ataque anulado por Alakazam"): quem interessa ali é o
    prejudicado, e é o nome dele que o jogador procura na tela. */
-const ICONES_ESPECIAIS = { boom:'💥', sono:'😴', disable:'🚫', recover:'💚' };
+const ICONES_ESPECIAIS = { boom:'💥', sono:'😴', disable:'🚫', recover:'💚', absorb:'🌿', faixa:'🎗️' };
 /* O TIPO de cada golpe especial, pro selo colorido do log. Vive só no CLIENTE, como o
    MOVE_BY_TYPE: o motor manda o que aconteceu, o cliente escolhe a palavra e a cor -- é o que
    evita mais uma tabela duplicada pra sair de sincronia.
@@ -13507,14 +13606,17 @@ const TIPO_DO_ESPECIAL = {
   'Pó do Sono':'Grass', 'Esporo':'Grass', 'Hipnose':'Psychic',
   'Canto':'Normal', 'Beijo Adorável':'Normal',
   'Anulação':'Normal', 'Metrônomo':'Normal', 'Recuperar':'Normal',
-  'Metrônomo (auto-destruição)':'Normal', 'Metrônomo (sonífero)':'Normal', 'Metrônomo (anulação)':'Normal'
+  'Metrônomo (auto-destruição)':'Normal', 'Metrônomo (sonífero)':'Normal', 'Metrônomo (anulação)':'Normal',
+  /* Os três de drenagem: Absorver e Mega Dreno são Planta, Sanguessuga é Inseto -- e é por isso
+     que o Zubat não pode drenar com "Absorver": sairia no verde de Planta num pokémon Voador. */
+  'Absorver':'Grass', 'Mega Dreno':'Grass', 'Sanguessuga':'Bug'
 };
 /* O selo colorido com o nome do golpe dentro -- a cor já entrega o tipo. */
 function seloDeGolpe(nome, tipo){
   if(!nome) return '';
   return `<span class="type-pill" style="background:${TYPE_COLORS[tipo]||'#888'}">${escapeHtmlSafe(nome)}</span>`;
 }
-function ehGolpeEspecial(g){ return g && (g.x === 'boom' || g.x === 'sono' || g.x === 'disable' || g.x === 'recover' || g.x === 'semSono' || g.x === 'pocao'); }
+function ehGolpeEspecial(g){ return g && (g.x === 'boom' || g.x === 'sono' || g.x === 'disable' || g.x === 'recover' || g.x === 'semSono' || g.x === 'pocao' || g.x === 'absorb'); }
 /* Os itens da mochila: o que cada um se chama na tela e quanto cura. O motor manda o id (g.g), o
    cliente escolhe a palavra -- mesmo caminho do MOVE_BY_TYPE. */
 const ITENS_DE_BATALHA = {
@@ -13558,6 +13660,19 @@ function fraseDoEspecial(g, quem, alvo, op){
     const it = ITENS_DE_BATALHA[golpe] || { nome: 'Poção' };
     return quem + ' usou ' + escapeHtmlSafe(it.nome) + ' e recuperou HP';
   }
+  if(g.x === 'absorb'){
+    /* DRENAGEM. Uma frase pros dois lados: "drenou a vida de" já diz que saiu de um e entrou no
+       outro, e as duas barras se movendo na tela contam o resto. Repetir os números aqui seria
+       dizer duas vezes o que a animação mostra. */
+    return quem + ' usou ' + comoGolpe(golpe || 'Absorver', TIPO_DO_ESPECIAL[golpe] || 'Grass') +
+           ' e drenou a vida de ' + alvo;
+  }
+  if(g.x === 'faixa'){
+    /* A FAIXA DE FOCO. Sem esta linha o jogador vê um pokémon sobreviver com 1 de HP a um golpe que
+       claramente o mataria, e procura bug onde é item -- o mesmo motivo do "mas não teve efeito" da
+       imunidade. Quem pagou 50 moedas tem que ver as moedas trabalhando. */
+    return quem + ' ia cair, mas a Faixa de Foco segurou com 1 de HP';
+  }
   if(g.x === 'disable'){
     /* Nomeia o golpe ANULADO, não a anulação: o que interessa é o que o pokémon PERDEU. O motor
        manda o tipo (g.a) e o cliente vira em palavra, como no resto do log -- e o selo aqui é o do
@@ -13579,6 +13694,7 @@ function especiaisDaEspecie(id){
   // o metrônomo sai em algum efeito em 3 das 10 vezes (explosão, sono ou anulação)
   if(METRONOMO.includes(id))      out.push({ nome:'Metrônomo',       chance: CHANCE_METRONOMO_EFEITO*3 });
   if(RECUPERACAO.includes(id))    out.push({ nome:'Recuperar',       chance: CHANCE_RECUPERAR });
+  if(ABSORCAO[id])                out.push({ nome: ABSORCAO[id],    chance: CHANCE_ABSORVER });
   return out.map(e => Object.assign({}, e, { tipo: TIPO_DO_ESPECIAL[e.nome] || 'Normal' }));
 }
 /* O aviso que aparece NO MEIO DA BATALHA, na mesma linha onde se lê "Trocando golpes...".
@@ -13591,7 +13707,11 @@ function avisoDoConfronto(m, passo){
      Autodestruição e sono são o contrário: ali o confronto INTEIRO é aquilo, e a frase acompanha
      até o fim. Por isso a checagem é só pra cura. */
   const especiais = ((m && m.golpes) || []).filter(ehGolpeEspecial);
-  const g = especiais.find(x => (x.x !== 'recover' && x.x !== 'pocao') || !(passo > 0));
+  /* Quantos PASSOS a abertura ocupa na animação: a cura e a poção mexem uma barra, a drenagem mexe
+     as DUAS. A frase tem que sobreviver até a última delas ter subido/descido -- some antes e o
+     jogador vê a segunda barra andar sem nada explicando. */
+  const passosDaAbertura = { recover:1, pocao:1, absorb:2 };
+  const g = especiais.find(x => !passosDaAbertura[x.x] || !(passo >= passosDaAbertura[x.x]));
   if(!g) return '';
   const nomeP = escapeHtmlSafe(m.player || ''), nomeE = escapeHtmlSafe(m.enemy || '');
   const doJogador = g.q === 'p';
@@ -13624,14 +13744,20 @@ function passosHtml(m){
   /* As anulações vêm ANTES de tudo: o Disable acontece na abertura do confronto e a luta inteira
      que se lê embaixo já é a luta com o golpe anulado. */
   const anulacoes = (m.golpes || []).filter(g => g.x === 'disable').map(linhaEspecial).join('');
+  /* A FAIXA vem DEPOIS dos golpes, ao contrário do Disable. Ela acontece no meio da luta, e a
+     sequência de golpes é reconstruída quando passa do teto -- encaixá-la "no lugar certo" seria
+     fingir uma precisão que a reconstrução não tem. No fim ela se lê como o que é: o desfecho. */
+  const faixas = (m.golpes || []).filter(g => g.x === 'faixa').map(linhaEspecial).join('');
   return `<div class="mlog-passos">${anulacoes}${golpes.map(g=>{
     const doJogador = g.q === 'p';
     if(g.x === 'boomself') return '';   // a linha da explosão (acima) já contou os dois lados
-    if(g.x === 'boom' || g.x === 'sono' || g.x === 'recover' || g.x === 'semSono' || g.x === 'pocao') return linhaEspecial(g);
+    if(g.x === 'absorbdano') return '';  // idem: a linha da drenagem conta a vida que saiu e a que entrou
+    if(g.x === 'boom' || g.x === 'sono' || g.x === 'recover' || g.x === 'semSono' ||
+       g.x === 'pocao' || g.x === 'absorb') return linhaEspecial(g);
     return `<div class="mlog-passo ${doJogador?'p':'e'}">
       ${ladoHtml(doJogador)} atacou ${ladoHtml(!doJogador)}${seloDe(doJogador)?` com ${seloDe(doJogador)}`:''} e tirou <span class="mlog-tira">−${g.d}</span> de HP.
     </div>`;
-  }).join('')}</div>`;
+  }).join('')}${faixas}</div>`;
 }
 
 function renderHpBar(hp, maxHp, fillId, labelId){
@@ -16371,6 +16497,14 @@ const ITENS = {
     descricao: 'Equipe num pokémon: ele luta a batalha inteira com +15 de Ataque Especial. O item some no fim da batalha, se ele tiver entrado — quem fica no banco continua com o dele.',
     comoGanhar: 'Na loja. Equipa-se pelo + da tela de ordem de batalha.'
   },
+  /* A FAIXA DE FOCO é o único item que age NO MEIO da luta -- os outros todos são abertura (poção,
+     despertar) ou um número somado antes dela (os cinco de atributo). Por isso ela é a mais cara. */
+  faixa_foco: {
+    nome: 'Faixa de Foco', icone: '🎗️', comprável: true, equipável: true, preco: 50,
+    resumo: 'Segura um golpe fatal com 1 de HP.',
+    descricao: 'Equipe num pokémon. Quando um golpe fosse derrubá-lo, ele fica com 1 de HP, revida e a luta continua. Vale uma vez: o próximo golpe fatal leva ele. O item some depois de segurar.',
+    comoGanhar: 'Na loja. Equipa-se pelo + da tela de ordem de batalha.'
+  },
   spdef_up: {
     nome: 'Def Special Up', icone: '✴️', comprável: true, equipável: true, preco: 30,
     resumo: '+15 de Def Especial pela batalha inteira.',
@@ -16874,6 +17008,19 @@ const MONT_ORDENS = [
 /* DEZ POR PÁGINA. Com dez saves de seis, a lista chega a 60 linhas -- e uma lista de 60 numa tela
    de 320px é rolagem demais pra uma decisão que se toma olhando poucos de cada vez. */
 const MOEDAS_RESSORTEIO = 3;   // tem que bater com o do servidor (ver rerollWildOffer)
+/* O PREÇO SOBE A CADA RE-SORTEIO NA MESMA ROTA, MAS SÓ COM O BÔNUS SHINY LIGADO: 3, 6, 9...
+   Sem o bônus ele fica nos 3 de sempre.
+   O motivo é a matemática do bônus: a chance dele ESCALA +10 pontos por encontro sem shiny, então
+   sob o bônus re-sortear é quase comprar um shiny -- 78% de já ter um no 5º encontro. Um preço fixo
+   de 3 transformaria as 70 moedas de uma jornada em shiny garantido.
+   Volta pra 3 na rota seguinte porque o wildRerolls zera a cada encontro novo, e é de propósito: o
+   que se quer encarecer é insistir NA MESMA rota, não jogar.
+   A mesma conta vive no servidor (precoDoRessorteio), que é quem cobra -- se as duas divergirem, a
+   tela promete um preço que a cobrança não pratica. */
+function bonusShinyAtivo(){ return !!(game.shinyBonusExpiresAt && Date.now() < game.shinyBonusExpiresAt); }
+function precoDoRessorteio(){
+  return bonusShinyAtivo() ? MOEDAS_RESSORTEIO * (1 + (game.wildRerolls || 0)) : MOEDAS_RESSORTEIO;
+}
 const MONT_POR_PAGINA = 10;
 function abrirMontador(){ game.montadorOrdem = 'nivel'; game.montadorTipo = null; game.montadorPagina = 0; }
 /* ORDENAR OU FILTRAR VOLTA PRA PRIMEIRA PÁGINA. Sem isso, filtrar por Fogo estando na página 3

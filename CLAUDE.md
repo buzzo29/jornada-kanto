@@ -325,6 +325,38 @@ de golpes.
   (A cura não gastava vaga do `TETO_GOLPES`, e quando o confronto passava do teto a reconstrução
   tinha de partir da vida CHEIA — senão a barra caía de um valor que a luta nunca teve. Isso caducou
   em 03/09/2026 junto com o teto: o log mostra o diário, e a cura está nele.)
+- **DRENAGEM (`ABSORCAO`, 10%): 23 espécies, e acontece ANTES da luta**, no mesmo lugar do Recuperar.
+  O pokémon que sobreviveu ao confronto anterior entra machucado; se está **abaixo de 70%**
+  (`CURA_MAXIMO_DO_HP`, a trava do Recuperar), ele tira uma fatia do adversário e põe em si — e só
+  então o confronto acontece, inteiro. É `continue`, não `return true`.
+- **A MESMA FRAÇÃO dos dois lados, mas cada um do PRÓPRIO teto** (`ABSORVER_MIN` 10% a
+  `ABSORVER_MAX` 30%, sorteada a cada uso). Um Vileplume de 47% que drena 25% vai a 72%, e o
+  Fearow cheio cai pra 75% — não é o mesmo número de HP nos dois, é a mesma porcentagem.
+- **A trava dos 70% tem um segundo efeito aqui, e ele é o motivo de ela ficar:** com o teto de 30%,
+  um pokémon abaixo de 70% **nunca passa de 100%** — a cura jamais é desperdiçada. Sem a trava, um
+  pokémon cheio drenaria só pra machucar o outro, e a barra DELE não se moveria: um passo de cura
+  zero na animação, que é o que este log evita em toda regra.
+- **NÃO MATA**: o alvo fica com no mínimo 1 de HP. Todas as aberturas deste motor (Recuperar,
+  Disable, poção) deixam a luta acontecer, e um efeito de abertura que resolvesse o confronto
+  sozinho seria um confronto sem um único golpe na tela.
+- **A LISTA SAI DO APRENDIZADO POR NÍVEL DA GEN 1/2**, conferida move a move no Bulbapedia — e a
+  intuição erra duas vezes: **Kabuto e Kabutops** aprendem Absorb e Mega Drain por nível apesar de
+  serem Pedra/Água, e o **Bulbasaur NÃO entra** (o que ele tem é Leech Seed, que é outra coisa).
+  **Giga Drain ficou de fora porque na Gen 2 ele é TM19** — ninguém o aprende por nível.
+  São três golpes: Absorver (9 espécies), Mega Dreno (5, que também aprendem Absorb e ficam com o
+  nome do que ganham depois) e **Sanguessuga** (9, do Leech Life). Cada espécie guarda o NOME do
+  golpe dela, como no `SONIFEROS`: sem isso um Zubat drenaria com "Absorver".
+  No selo, **Sanguessuga é INSETO** e os outros dois são Planta — um Zubat drenando no verde de
+  Planta estaria errado.
+- **DUAS entradas no diário, uma por barra** (`absorb` + `absorbdano`), como a explosão: a primeira
+  sobe a vida de quem drenou e a segunda desce a do alvo. **No log elas viram UMA linha só** — a
+  segunda existe pro cálculo e pra barra, não pra leitura.
+  Por isso o aviso do meio da batalha **dura DOIS passos** (`passosDaAbertura`): a cura e a poção
+  mexem uma barra, a drenagem mexe as duas, e a frase sumindo no primeiro deixaria a segunda barra
+  andando sem nada explicando.
+- **Medido: não move a jornada.** 2.500 jornadas de cada lado, **67,8% x 68,2%** de conclusão
+  (0,4σ, ruído). Faz sentido — ela vale 10% por confronto pras 23 espécies, e cai dos dois lados
+  igual: os líderes também têm Oddish, Zubat e Paras.
 - **Mew e Mewtwo são imunes** (`IMUNES_A_ESPECIAL`). O Mew é o chefe da raide global, com 25.125 de
   HP calibrados pra ~399 ataques: um Geodude nível 20 com 15% de chance de derrubá-lo num golpe
   acabaria com a raide da semana. O Mewtwo é o desafio de fim de jogo pelo mesmo motivo. Medido com
@@ -1082,6 +1114,34 @@ de golpes.
   isso ela não tocava no `withItemStat`, e uma divergência ali só apareceria em produção.
   Conferido que ela falha com os dois motores discordando em 1 ponto de bônus (115 de 300).
 
+### Faixa de Foco (50 moedas)
+- **O golpe que mataria deixa 1 de HP, o pokémon revida e a LUTA CONTINUA.** É o único item que age
+  NO MEIO da luta — os outros são abertura (poção, Despertar) ou um número somado antes dela (os
+  cinco de atributo). Vale uma vez: o próximo golpe fatal da mesma batalha leva o pokémon.
+- **Ela entra nos DOIS pontos do `doExchange` em que alguém chega a zero** — quem apanha primeiro e
+  quem apanha o revide. O item vale nos dois, e cobrir só um deixaria metade dos casos de fora.
+- **NÃO é o golpe moribundo com outro nome.** No moribundo o pokémon revida **e cai**; aqui ele fica
+  de pé. E como a marca de moribundo sai da SITUAÇÃO ("o segundo caiu e revidou"), segurar em 1 já a
+  desliga sozinho — que é o certo, porque ele não caiu.
+- **A Faixa segura ANTES de o diário ser escrito**, então o dano gravado é o EFETIVO (o que saiu de
+  verdade, parando em 1) e a barra da tela desce até 1. Um passo próprio na animação seria um
+  movimento de zero, e passo de dano zero não é passo — por isso ela sai da `sequenciaDoConfronto`
+  junto com o Disable.
+- **No log ela é linha própria, DEPOIS dos golpes** — ao contrário do Disable, que vem antes. Ela
+  acontece no meio da luta, e a sequência é reconstruída quando passa do teto: encaixá-la "no lugar
+  certo" seria fingir uma precisão que a reconstrução não tem. No fim ela se lê como o desfecho.
+- **É O ITEM MAIS FORTE DO JOGO, e por larga margem** (12.000 batalhas 6x6 nível 60, 1σ = 0,65):
+
+  | item | preço | ganho | trabalhou em |
+  |---|---|---|---|
+  | **Faixa de Foco** | 50 | **+4,98** (7,7σ) | **98,2%** das batalhas |
+  | Super Poção | 30 | +3,21 (5,0σ) | 25,4% |
+  | Atk Up | 30 | +1,53 (2,4σ) | 100% |
+
+  Ela junta as duas coisas que os outros têm separadas: dispara em quase toda batalha (como os de
+  atributo) E o efeito é grande (como a poção). Por moeda dá **0,100**, quase empatada com a Super
+  Poção (0,107) — o preço de 50 é o que a segura. Se um dia parecer forte demais, é ele que se mexe.
+
 ### Onde os itens valem
 - **TODA chamada de batalha passa pelo `equiparItens`, sem exceção** -- inclusive as ligas, que passam
   a lista VAZIA.
@@ -1391,8 +1451,22 @@ verdade, cai no game over, e o teste confere que a trava soltou dos dois lados.
   a ação é texto fixo.
   A frase que explicava tudo isso em texto ("Você tem X. O re-sorteio troca as espécies E os
   níveis") saiu a pedido em 02/09/2026: o botão já diz o preço e o saldo.
-- **A recusa diz quanto falta** ("Você tem 1 moeda — o re-sorteio custa 3"), senão o botão parece
-  quebrado. Ele também já nasce desabilitado abaixo de 3.
+- **COM O BÔNUS SHINY LIGADO O PREÇO SOBE A CADA RE-SORTEIO NA MESMA ROTA: 3, 6, 9...**
+  (`precoDoRessorteio`, no cliente e no servidor). Sem o bônus fica nos 3 de sempre.
+  O motivo é a matemática do bônus: a chance dele **escala +10 pontos por encontro sem shiny**
+  (78% de já ter um no 5º encontro), então re-sortear sob o bônus é quase comprar um shiny — a preço
+  fixo de 3, as 70 moedas de uma jornada virariam shiny garantido.
+  **Volta pros 3 na rota seguinte**, porque o `wildRerolls` zera a cada encontro novo: o que se
+  quer encarecer é insistir NA MESMA rota, não jogar.
+- **O contador vem do SAVE, e isso é seguro por construção.** O servidor lê `wildRerolls` do save
+  gravado — que o cliente escreve. Mentir que é zero não compensa: ele entra na **semente da
+  oferta**, então o re-sorteio barato devolve a MESMA oferta de antes. Quem falsifica o contador
+  não recebe pokémon novo nenhum.
+  Por isso o cliente faz `await saveCurrentGame()` **antes** de chamar a cobrança: sem ela, dois
+  re-sorteios seguidos leriam o mesmo contador velho e o segundo sairia pelo preço do primeiro.
+- **A recusa diz quanto falta E o preço CERTO** ("Você tem 5 moedas — o re-sorteio custa 9"), senão
+  o botão promete um preço e a cobrança pratica outro. Ele também já nasce desabilitado abaixo do
+  preço da vez.
 - **O PREÇO MEDIDO, e é a maior mexida de dificuldade desta série.** Com as 70 moedas de uma jornada
   completa gastas na jornada seguinte são ~23 re-sorteios, ou 2 a 3 por encontro. Medido em 4.000
   jornadas de cada caso, a chance de ver um shiny numa jornada:

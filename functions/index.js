@@ -850,6 +850,35 @@ const SONO_EM_TROCAS = 2;
 const CHANCE_METRONOMO_EFEITO = 0.10;   // por efeito: 10% cada um dos três, 70% golpe comum
 const CHANCE_DISABLE = 0.10;
 const CHANCE_RECUPERAR = 0.10;
+/* DRENAGEM (Absorb e companhia): tira vida do adversário e devolve pra si. 23 espécies.
+   A LISTA SAI DO APRENDIZADO POR NÍVEL DA GEN 1/2, como as outras -- conferida no Bulbapedia, move
+   a move, e não deduzida do tipo: Kabuto e Kabutops aprendem Absorb e Mega Drain por nível apesar
+   de serem Pedra/Água, e o Bulbasaur, que "devia" estar aqui, NÃO aprende nenhum dos três (o que
+   ele tem é Leech Seed, que é outra coisa).
+   Giga Drain ficou de fora porque na Gen 2 ele é TM19 -- ninguém o aprende por nível.
+   Cada espécie guarda o NOME do golpe dela, como no SONIFEROS: sem isso um Zubat drenaria com
+   "Absorver", e quem conhece o jogo notaria na hora. Os que aprendem Absorb E Mega Drain ficam com
+   o Mega Dreno, que é o que eles ganham depois. */
+const ABSORCAO = {
+  // Absorb por nível (Gen 1 e 2)
+  oddish:'Absorver', gloom:'Absorver', exeggcute:'Absorver', exeggutor:'Absorver',
+  hoppip:'Absorver', skiploom:'Absorver', jumpluff:'Absorver',
+  sunkern:'Absorver', sunflora:'Absorver',
+  // esses cinco também pegam Mega Drain por nível na Gen 2
+  vileplume:'Mega Dreno', bellossom:'Mega Dreno', tangela:'Mega Dreno',
+  kabuto:'Mega Dreno', kabutops:'Mega Dreno',
+  // Leech Life por nível (Gen 1 e 2) -- é drenagem também, e é o golpe deles
+  zubat:'Sanguessuga', golbat:'Sanguessuga', crobat:'Sanguessuga',
+  venonat:'Sanguessuga', venomoth:'Sanguessuga',
+  spinarak:'Sanguessuga', ariados:'Sanguessuga',
+  paras:'Sanguessuga', parasect:'Sanguessuga'
+};
+const CHANCE_ABSORVER = 0.10;
+/* Quanto ele drena, em fração do HP MÁXIMO -- de cada um o seu: o atacante recupera essa fração do
+   teto DELE e o alvo perde a mesma fração do teto DELE. Sorteado a cada uso.
+   O teto de 30% casa com a trava dos 70% (a mesma do Recuperar): abaixo de 70% de vida, +30% nunca
+   passa de 100%, então a cura nunca é desperdiçada. */
+const ABSORVER_MIN = 0.10, ABSORVER_MAX = 0.30;
 /* A cura só sai com a vida ABAIXO disso. Com o pokémon quase cheio não há o que recuperar, e a
    frase anunciaria um efeito que mal se vê na barra. */
 const CURA_MAXIMO_DO_HP = 0.7;
@@ -917,6 +946,11 @@ function sorteiaGolpeEspecial(p, rng){
   }
   if(RECUPERACAO.includes(p.speciesId) && rng() < CHANCE_RECUPERAR){
     return { efeito:'cura', golpe:'Recuperar' };
+  }
+  /* A drenagem vem por último. Quem tem dois especiais cai na chance composta, como o Kadabra
+     (Disable + Recuperar): um Vileplume, que também é sonífero, absorve em 0,95 x 10% = 9,5%. */
+  if(ABSORCAO[p.speciesId] && rng() < CHANCE_ABSORVER){
+    return { efeito:'drenar', golpe: ABSORCAO[p.speciesId] };
   }
   return null;
 }
@@ -993,6 +1027,35 @@ function tentarGolpeEspecial(active, enemy, rng, diario){
       }
       continue;
     }
+    if(especial.efeito === 'drenar'){
+      /* DRENAGEM: mesma hora do Recuperar -- ANTES da luta. O pokémon que sobreviveu ao confronto
+         anterior entra machucado; se está abaixo de 70% da vida, ele tira uma fatia do adversário
+         e põe em si, e SÓ ENTÃO o confronto acontece, inteiro. É 'continue', não 'return true'.
+         A MESMA FRAÇÃO dos dois lados, mas cada um do próprio teto: 25% num Vileplume de 47% o
+         leva a 72%, e tira 25% do teto do Fearow, que entra com 75%.
+         A trava dos 70% é a do Recuperar, e aqui ela tem um segundo efeito: com o teto de 30%, um
+         pokémon abaixo de 70% nunca passa de 100% -- a cura jamais é desperdiçada. Sem a trava, um
+         pokémon cheio drenaria só pra machucar o outro, e a barra dele não se moveria: um passo de
+         cura ZERO na animação, que é o que o log deste jogo evita em toda regra.
+         NÃO MATA: o alvo fica com no mínimo 1 de HP. Todas as aberturas deste motor (Recuperar,
+         Disable, poção) deixam a luta acontecer, e um efeito de abertura que resolve o confronto
+         sozinho seria um confronto sem um único golpe na tela. */
+      if(quem.hp >= quem.maxHp * CURA_MAXIMO_DO_HP) continue;
+      const fatia = ABSORVER_MIN + rng() * (ABSORVER_MAX - ABSORVER_MIN);
+      const curado = Math.min(quem.maxHp - quem.hp, Math.round(quem.maxHp * fatia));
+      const drenado = Math.min(alvo.hp - 1, Math.round(alvo.maxHp * fatia));
+      if(curado <= 0 && drenado <= 0) continue;
+      quem.hp += curado;
+      alvo.hp -= drenado;
+      if(diario){
+        /* DUAS entradas, uma por barra -- como a explosão. A primeira sobe a vida de quem drenou
+           (o laço da animação trata 'absorb' como cura) e a segunda desce a do alvo. No LOG elas
+           viram UMA linha só: a segunda existe pro cálculo e pra barra, não pra leitura. */
+        diario.push({ q: marca, d: curado, hp: quem.hp, c:0, m:0, z:0, x:'absorb', g: especial.golpe });
+        diario.push({ q: marca, d: drenado, hp: alvo.hp, c:0, m:0, z:0, x:'absorbdano' });
+      }
+      continue;
+    }
     if(especial.efeito === 'anula'){
       /* DISABLE: o melhor golpe do alvo contra QUEM anulou sai de cena e ele passa a atacar pelo
          segundo melhor -- que é o pedido ("desconsidera o que tira mais dano, usa o outro").
@@ -1042,6 +1105,20 @@ function tentarGolpeEspecial(active, enemy, rng, diario){
   }
   return false;
 }
+/* FAIXA DE FOCO: o golpe que mataria deixa 1 de HP, o pokémon dá o revide dele e a LUTA CONTINUA.
+   Ela entra nos dois pontos do doExchange em que alguém chega a zero -- quem apanha primeiro e quem
+   apanha o revide --, porque o item vale nos dois.
+   NÃO é o golpe moribundo com outro nome: no moribundo o pokémon revida E CAI, aqui ele fica de pé.
+   Como a marca de moribundo sai da SITUAÇÃO ("o segundo caiu e revidou"), segurar em 1 já a desliga
+   sozinho -- e é isso que se quer, porque ele não caiu.
+   O item é UM: gasta ao segurar, e o segundo golpe fatal da mesma batalha leva o pokémon. */
+function faixaDeFoco(p, marca, diario){
+  if(!p || p.item !== 'faixa_foco') return false;
+  p.item = null;
+  itensGastos.push({ dono: marca, especie: p.speciesId, item: 'faixa_foco' });
+  if(diario) diario.push({ q: marca, d: 0, hp: 1, c:0, m:0, z:0, x:'faixa' });
+  return true;
+}
 function doExchange(active, enemy, rng, diario){
   /* Golpe especial: só na PRIMEIRA troca de cada confronto. O marcador é o próprio
      adversário -- oponente novo, confronto novo, e as chances valem de novo. */
@@ -1069,6 +1146,9 @@ function doExchange(active, enemy, rng, diario){
   const dmgBySecond = activeFirst ? dmgToActive : dmgToEnemy;
   const firstHpBefore = first.hp, secondHpBefore = second.hp;
   second.hp = Math.max(0, second.hp - dmgByFirst);
+  /* A Faixa segura ANTES de o diário ser escrito: assim o dano gravado é o EFETIVO (o que saiu de
+     verdade, parando em 1) e a barra da tela desce até 1, que é o que aconteceu. */
+  if(second.hp <= 0 && faixaDeFoco(second, (second === active) ? 'p' : 'e', diario)) second.hp = 1;
   /* A marca sai da SITUAÇÃO (o segundo caiu e mesmo assim revidou), não de o dano ter sido
      reduzido. Enquanto ela era deduzida do dano, subir o DYING_BLOW_FACTOR pra 1.0 fazia a marca
      sumir junto -- e sem ela o log volta a mostrar pokémon atacando depois de cair, porque é ela
@@ -1079,6 +1159,7 @@ function doExchange(active, enemy, rng, diario){
     counter = Math.max(1, Math.round(counter * DYING_BLOW_FACTOR));
   }
   first.hp = Math.max(0, first.hp - counter);
+  if(first.hp <= 0 && faixaDeFoco(first, (first === active) ? 'p' : 'e', diario)) first.hp = 1;
   if(diario){
     /* O dano registrado é o que SAIU DE VERDADE da vida do alvo, não o número que a fórmula
        sorteou: um golpe de 101 num pokémon com 54 de HP tira 54. Gravar o valor cru fazia o log
@@ -4627,6 +4708,8 @@ const LOJA = {
   def_up:      { preco: 30 },
   spatk_up:    { preco: 30 },
   spdef_up:    { preco: 30 },
+  /* A Faixa age NO MEIO da luta (segura um golpe fatal), e não na abertura como os outros. */
+  faixa_foco:  { preco: 50 },
   /* OS DOIS QUE NÃO MORAM NO INVENTÁRIO. O Doce Raro é um CONTADOR da conta (rareCandies), escrito
      pela Torre e descontado pelo useRareCandy -- comprar é somar nele, e a mochila continua lendo
      de um lugar só. O Bônus Shiny comprado vira estoque em inventario.bonus_shiny e é ativado pelo
@@ -4637,7 +4720,8 @@ const LOJA = {
 /* Quais itens se equipam num pokémon. Os outros dois do catálogo (Doce Raro, Bônus Shiny) não são
    de batalha -- vêm de jogar e se usam na mochila. */
 const EQUIPAVEIS = ['awakening', 'hyperpotion', 'potion',
-                    'hp_up', 'atk_up', 'def_up', 'spatk_up', 'spdef_up'];
+                    'hp_up', 'atk_up', 'def_up', 'spatk_up', 'spdef_up',
+                    'faixa_foco'];
 
 /* O QUE CADA POKÉMON DA CONTA ESTÁ CARREGANDO. É um mapa espécie -> item, e a chave é a ESPÉCIE
    porque um save não tem duas da mesma (o encontro selvagem nunca oferece uma linha que o time já
@@ -4937,19 +5021,39 @@ exports.claimJourneyCoins = onCall(async (request) => {
    dele (ver goToWildEncounter): o servidor não conhece rota nem pool, e mandar a oferta daqui
    duplicaria as tabelas de encontro, que é justamente o que o projeto evita.
    O que o servidor garante é o que importa: que a moeda existia e saiu. */
+/* O PREÇO DO RE-SORTEIO SOBE A CADA UM NA MESMA ROTA, MAS SÓ COM O BÔNUS SHINY LIGADO: 3, 6, 9...
+   Sem o bônus são os 3 de sempre. A mesma conta vive no cliente (precoDoRessorteio), que precisa
+   dela pra desenhar o botão -- mas quem cobra é aqui.
+   O motivo é a matemática do bônus: a chance dele ESCALA +10 pontos por encontro sem shiny, então
+   re-sortear sob o bônus é quase comprar um shiny. Preço fixo de 3 faria das 70 moedas de uma
+   jornada um shiny garantido.
+   O wildRerolls VEM DO SAVE, que o cliente escreve -- e isso é seguro por construção: ele entra na
+   SEMENTE da oferta, então mentir que é zero devolve a MESMA oferta de antes. Quem falsifica o
+   contador pra pagar menos não recebe pokémon novo nenhum. */
+function precoDoRessorteio(jaFeitos, bonusAte){
+  const comBonus = !!(bonusAte && bonusAte > Date.now());
+  return comBonus ? MOEDAS_RESSORTEIO * (1 + Math.max(0, jaFeitos|0)) : MOEDAS_RESSORTEIO;
+}
 exports.rerollWildOffer = onCall(async (request) => {
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   const uid = request.auth.uid;
+  const slot = String(request.data?.slot ?? '');
   const userRef = db.collection('users').doc(uid);
+  /* Save opcional: cliente antigo em cache não manda o slot, e aí o preço é o de sempre. */
+  const saveRef = slot ? db.collection('users').doc(uid).collection('saves').doc(slot) : null;
   return db.runTransaction(async (tx) => {
-    const [userSnap] = await tx.getAll(userRef);
-    const moedas = (userSnap.exists && userSnap.data().moedas) || 0;
-    if(moedas < MOEDAS_RESSORTEIO){
+    const lidos = saveRef ? await tx.getAll(userRef, saveRef) : await tx.getAll(userRef);
+    const userSnap = lidos[0], saveSnap = lidos[1];
+    const d = (userSnap.exists && userSnap.data()) || {};
+    const moedas = d.moedas || 0;
+    const jaFeitos = (saveSnap && saveSnap.exists && saveSnap.data().wildRerolls) || 0;
+    const custo = precoDoRessorteio(jaFeitos, d.shinyBonusExpiresAt);
+    if(moedas < custo){
       throw new HttpsError('failed-precondition',
-        `Você tem ${moedas} moeda${moedas===1?'':'s'} — o re-sorteio custa ${MOEDAS_RESSORTEIO}.`);
+        `Você tem ${moedas} moeda${moedas===1?'':'s'} — o re-sorteio custa ${custo}.`);
     }
-    tx.set(userRef, { moedas: admin.firestore.FieldValue.increment(-MOEDAS_RESSORTEIO) }, { merge: true });
-    return { moedas: moedas - MOEDAS_RESSORTEIO, custo: MOEDAS_RESSORTEIO };
+    tx.set(userRef, { moedas: admin.firestore.FieldValue.increment(-custo) }, { merge: true });
+    return { moedas: moedas - custo, custo };
   });
 });
 
