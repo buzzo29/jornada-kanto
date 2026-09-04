@@ -547,20 +547,25 @@ console.log('\nA FAIXA DE FOCO NAO PODE SER FURADA POR CAMINHO NENHUM');
       const iFaixa = seq.findIndex(g => g.x === 'faixa');
       ok('a Faixa esta NO MEIO da sequencia, nao no fim', iFaixa > 0 && iFaixa < seq.length - 1,
          'posicao ' + iFaixa + ' de ' + seq.length);
-      /* O GOLPE ANTES DELA e o que ela segurou: ele tem que deixar o carregador com 1. */
-      ok('e logo DEPOIS do golpe que ela segurou', seq[iFaixa-1] && seq[iFaixa-1].hp === 1,
+      /* O ULTIMO GOLPE DA METADE 1 e o que ia matar: ele bate no carregador. */
+      ok('o golpe antes dela e contra o Charizard', seq[iFaixa-1] && seq[iFaixa-1].q === 'e',
          JSON.stringify(seq[iFaixa-1]));
-      /* E DEPOIS DELA o carregador ainda bate -- e isso que o item compra. */
-      const depois = seq.slice(iFaixa+1).filter(g => !g.x && g.q === 'p');
-      ok('e o Charizard ainda ataca depois dela', depois.length >= 1, depois.length + ' golpes depois');
-      /* A SOMA CONTINUA FECHANDO: o log nao pode dizer que ele tomou mais do que tinha. */
-      const tomou = seq.filter(g => !g.x && g.q === 'e').reduce((a, g) => a + g.d, 0);
+      /* E DEPOIS DELA e o CHARIZARD quem ataca primeiro -- a metade 2 e uma luta nova em que ele
+         entra fraco, e a reconstrucao da o primeiro golpe a quem entra abaixo de 50%. */
+      ok('e depois dela quem ataca primeiro e o Charizard',
+         seq[iFaixa+1] && seq[iFaixa+1].q === 'p', JSON.stringify(seq[iFaixa+1]));
+      /* A SOMA CONTINUA FECHANDO: o log nao pode dizer que ele tomou mais do que tinha. A explosao
+         conta junto (ela tem x='boom' mas E dano). */
+      const tomou = seq.filter(g => (!g.x || g.x === 'boom') && g.q === 'e').reduce((a, g) => a + g.d, 0);
       ok('e a soma do dano fecha com o HP dele', tomou === m.playerHpBefore - m.playerHpAfter,
          tomou + ' de ' + (m.playerHpBefore - m.playerHpAfter));
-      /* SAO OS GOLPES REAIS, nao a reconstrucao: o confronto com Faixa e a segunda excecao ao teto. */
-      const reaisDeDano = (m.golpes||[]).filter(g => !g.x && g.d > 0).length;
-      ok('sao os golpes REAIS (excecao ao teto, como o sono)',
-         seq.filter(g => !g.x).length === reaisDeDano, seq.filter(g=>!g.x).length + ' vs ' + reaisDeDano);
+      /* AS DUAS METADES RESPEITAM O TETO. E o pedido: a luta corre normal ate ele chegar a zero, a
+         Faixa o devolve a 1, e o que vem depois se le como uma luta nova -- cada uma com o mesmo
+         teto de 3 golpes de sempre. */
+      const metade1 = seq.slice(0, iFaixa).filter(g => !g.x).length;
+      const metade2 = seq.slice(iFaixa+1).filter(g => !g.x).length;
+      ok('a metade 1 cabe no teto de 3', metade1 <= 3 && metade1 >= 1, metade1 + ' golpes');
+      ok('e a metade 2 tambem', metade2 <= 3, metade2 + ' golpes');
       /* LOG E ANIMACAO CONTINUAM LENDO A MESMA LISTA -- a regra da casa. */
       ok('e a animacao tem os MESMOS passos', S.buildAnimatedHitSequence(m).length === seq.length,
          S.buildAnimatedHitSequence(m).length + ' vs ' + seq.length);
@@ -569,6 +574,34 @@ console.log('\nA FAIXA DE FOCO NAO PODE SER FURADA POR CAMINHO NENHUM');
       const iLinha = linhas.findIndex(l => /Faixa de Foco segurou/.test(l));
       ok('o log mostra a linha da Faixa no meio', iLinha > 0 && iLinha < linhas.length - 1,
          'linha ' + iLinha + ' de ' + linhas.length);
+    }
+
+    /* O TAMANHO, que foi o motivo de a versao anterior (golpes reais, sem teto) ser desfeita: ela
+       custava 7 linhas na maioria e ate 14 na cauda. Partido em duas metades, o teto volta a valer
+       nas duas: no maximo 3 + a linha + 3. */
+    {
+      const IDS2 = Object.keys(S.SPECIES);
+      let n = 0, maior = 0, somaErrada = 0, foraDePosicao = 0;
+      for(let i = 0; i < 3000; i++){
+        const meu = [S.createInstance(IDS2[(i*11) % IDS2.length], 58)];
+        S.equiparItens(meu, { [S.raizDaLinha(meu[0].speciesId)]:'faixa_foco' });
+        const r = S.simulateGymBattle(meu, [S.createInstance(IDS2[(i*17) % IDS2.length], 62)], Math.random);
+        for(const x of (r.matchups||[])){
+          if(!(x.golpes||[]).some(g => g.x === 'faixa')) continue;
+          n++;
+          const s = S.sequenciaDoConfronto(x);
+          maior = Math.max(maior, s.filter(g => g.x !== 'boomself' && g.x !== 'absorbdano').length);
+          const tomou = s.filter(g => (!g.x || g.x === 'boom') && g.q === 'e').reduce((a, g) => a + g.d, 0);
+          if(tomou !== x.playerHpBefore - x.playerHpAfter) somaErrada++;
+          if(s.findIndex(g => g.x === 'faixa') <= 0) foraDePosicao++;
+        }
+      }
+      ok('nenhum confronto com Faixa passa de 8 linhas', maior <= 8, 'maior: ' + maior + ' em ' + n);
+      /* A soma fecha SEMPRE -- inclusive quando a morte subita ressuscita quem carregava a Faixa
+         acima de 1, caso em que a metade 2 nao tem como mostrar vida subindo e o ultimo golpe
+         contra ele e aparado (o mesmo que o desempate ja faz no diario). */
+      ok('e a soma do dano fecha em TODOS', somaErrada === 0, somaErrada + ' de ' + n);
+      ok('e a Faixa nunca abre a sequencia', foraDePosicao === 0, foraDePosicao + '');
     }
   }
 

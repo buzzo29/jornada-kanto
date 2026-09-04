@@ -1160,13 +1160,30 @@ de golpes.
   desliga sozinho — que é o certo, porque ele não caiu.
 - **A Faixa segura ANTES de o diário ser escrito**, então o dano gravado é o EFETIVO (o que saiu de
   verdade, parando em 1) e a barra da tela desce até 1.
-- **ELA É A SEGUNDA EXCEÇÃO AO TETO DE 3 GOLPES, pelo mesmo motivo do sono: o que ela compra são os
-  golpes DEPOIS dela, e a reconstrução os esmaga.**
-  Reportado em 04/09/2026 com print, na segunda tentativa de acertar isto. O log dizia, em três
-  linhas reconstruídas, que o Charizard tomou **388 de 388 de HP** — e embaixo, que a Faixa o
-  segurou com 1. As duas coisas na mesma tela. No diário real ele foi segurado em 1 e ainda deu
-  **mais dois ataques**; nada disso aparecia.
-  Eram DUAS causas, e as duas tiveram que cair: a reconstrução (o teto) e a POSIÇÃO da linha.
+- **ELA PARTE O CONFRONTO EM DUAS LUTAS, e cada uma é reconstruída como qualquer outra — com o
+  mesmo teto de 3 golpes.** A luta corre normal até o pokémon chegar a zero, a Faixa o devolve a 1,
+  e o que vem depois se lê como uma luta nova em que ELE ataca primeiro. No log continua sendo um
+  confronto só.
+  **Três tentativas até acertar, e as duas primeiras estão registradas porque cada uma errou de um
+  jeito diferente:**
+  1. **A linha como rodapé, depois de UMA reconstrução do confronto inteiro.** O log dizia que o
+     Charizard tomou **388 de 388 de HP** e, embaixo, que a Faixa o segurou com 1 — as duas coisas
+     na mesma tela. Reportado com print.
+  2. **Os golpes REAIS, sem teto** (a "segunda exceção", como o sono). Contava a história certa, mas
+     custava **7 linhas em 61%** dos casos e até **14** na cauda: a luta virava uma parede.
+     Reportado de novo, e desfeito.
+  A METADE 1 termina com o pokémon em 1: ele é o "perdedor" dela, então o último golpe da
+  reconstrução é justamente o que ia matá-lo. A METADE 2 começa com ele em 1 — e como a reconstrução
+  dá o primeiro golpe a quem entra **abaixo de 50%**, ele ataca primeiro sem precisar de regra nova.
+- **A vida do ADVERSÁRIO no instante da Faixa vem do diário** (campo `ho` da marca): sem ela não há
+  como dividir, porque a reconstrução precisa dos dois lados em cada metade. Pro caso comum ela é a
+  vida do adversário ANTES do revide — de propósito: o revide é o primeiro golpe da luta nova.
+  Confronto gravado antes do campo existir cai na vida de entrada; log velho não pode sumir.
+- **A MORTE SÚBITA PODE RESSUSCITAR quem carregava a Faixa** (ela vale quando os dois chegam a zero,
+  e isso ainda acontece depois de a Faixa ter sido gasta): o sobrevivente volta com 5%-15%, ou seja
+  ACIMA do 1. A metade 2 não tem como mostrar vida subindo, então a soma das linhas passaria do que
+  ele perdeu — o log diria 388 de 388 e o cartão mostraria 40. O último golpe contra ele é **aparado**,
+  que é o que o próprio desempate já faz no diário. Medido: **1% dos confrontos com Faixa**.
 - **A linha vem logo DEPOIS do golpe que ela segurou**, e é por isso que ela não é escrita dentro do
   `faixaDeFoco` (`marcaDaFaixa` monta, quem chama empurra). Escrita lá, ela saía ANTES: o motor
   segura o HP no instante do golpe mas só escreve a linha dele no fim do `doExchange`, e o log
@@ -1175,9 +1192,8 @@ de golpes.
 - **Ela É um passo da animação, com movimento ZERO.** A barra já parou em 1 no golpe anterior, e é
   esse 1 que ela explica; sem o passo, a animação pularia do golpe que ia matar direto pro revide.
 - **O preço em linhas, medido:** a luta comum continua em **3 linhas (100%)** — a regra da casa não
-  se move. A luta com Faixa fica em **7 linhas em 61%** dos casos, 5 em 14%, 9 em 13%, e uma cauda
-  fina até 14. É mais que o sono (4-6), e é aceito pelo mesmo motivo: é o confronto em que o
-  pokémon enganou a morte, e ele só existe porque o jogador pagou 50 moedas pra isso acontecer.
+  se move. A com Faixa fica em **6 linhas em 66%** dos casos, 5 em 18%, 4 em 15%, e o **maior é 7**
+  (era 14 na versão sem teto). Cabe na mesma leitura do sono, que vai até 6.
 - **É O ITEM MAIS FORTE DO JOGO, e por larga margem** (12.000 batalhas 6x6 nível 60, 1σ = 0,65):
 
   | item | preço | ganho | trabalhou em |

@@ -5668,7 +5668,7 @@ function tentarGolpeEspecial(active, enemy, rng, diario){
       explosaoDoAtivo = salvou ? null : ehAtivo;
       if(diario){
         diario.push({ q: marca, d: danoNoAlvo, hp: alvo.hp, c:0, m:0, z:0, x:'boom', g: especial.golpe });
-        if(salvou) diario.push(marcaDaFaixa(marcaDoAlvo));   // depois do golpe que ela segurou
+        if(salvou) diario.push(marcaDaFaixa(marcaDoAlvo, 0));   // depois do golpe que ela segurou
         diario.push({ q: marca === 'p' ? 'e' : 'p', d: danoEmSi, hp: 0, c:0, m:0, z:0, x:'boomself' });
       }
       return true;
@@ -5786,7 +5786,7 @@ function faixaDeFoco(p, marca){
    escreve a linha dele no fim do doExchange. O log ficava "a Faixa segurou com 1 de HP" e só então
    "Electabuzz atacou e tirou -182", que é a ordem invertida da cena.
    Quem chama empurra esta marca logo depois da linha do golpe. */
-function marcaDaFaixa(marca){ return { q: marca, d: 0, hp: 1, c:0, m:0, z:0, x:'faixa' }; }
+function marcaDaFaixa(marca, hpDoOutro){ return { q: marca, d: 0, hp: 1, ho: hpDoOutro, c:0, m:0, z:0, x:'faixa' }; }
 function doExchange(active, enemy, rng, diario){
   /* Golpe especial: só na PRIMEIRA troca de cada confronto. O marcador é o próprio
      adversário -- oponente novo, confronto novo, e as chances valem de novo. */
@@ -5841,11 +5841,11 @@ function doExchange(active, enemy, rng, diario){
     const segundoDormiu  = (second === active) ? activeDorme : enemyDorme;
     if(!primeiroDormiu){
       diario.push({ q: activeFirst?'p':'e', d: secondHpBefore - second.hp, hp: second.hp, c: first.lastCrit?1:0, m:0, z: first.lastMoveNulo?1:0 });
-      if(faixaDoSegundo) diario.push(marcaDaFaixa((second === active) ? 'p' : 'e'));
+      if(faixaDoSegundo) diario.push(marcaDaFaixa((second === active) ? 'p' : 'e', firstHpBefore));
     }
     if(!segundoDormiu){
       diario.push({ q: activeFirst?'e':'p', d: firstHpBefore  - first.hp,  hp: first.hp,  c: second.lastCrit?1:0, m: segundoCaiu?1:0, z: second.lastMoveNulo?1:0 });
-      if(faixaDoPrimeiro) diario.push(marcaDaFaixa((first === active) ? 'p' : 'e'));
+      if(faixaDoPrimeiro) diario.push(marcaDaFaixa((first === active) ? 'p' : 'e', second.hp));
     }
   }
   // EMPATE NÃO EXISTE: se o golpe moribundo também derrubaria o primeiro, fica de pé quem tinha o
@@ -13603,17 +13603,61 @@ function sequenciaDoConfronto(m){
      troca real de 2 golpes na reconstrução, perdendo os golpes de verdade. */
   if(reais.length && golpesDeDano <= TETO_GOLPES) return reais;
 
-  /* A FAIXA DE FOCO É A SEGUNDA EXCEÇÃO AO TETO, pelo mesmo motivo do sono: o que ela compra são os
-     golpes DEPOIS dela, e a reconstrução os esmaga.
-     Reportado em 04/09/2026 com print. O log dizia, em três linhas reconstruídas, que o Charizard
-     tomou 388 de 388 de HP -- e embaixo, que a Faixa o segurou com 1. As duas coisas na mesma tela.
-     No diário real ele foi segurado em 1 e ainda deu MAIS DOIS ataques; nada disso aparecia, porque
-     a reconstrução só sabe interpolar entre o HP do começo e o do fim e a linha da Faixa era um
-     rodapé solto no fim.
-     Aqui os golpes entram REAIS, e a linha da Faixa cai no lugar onde ela aconteceu -- entre o
-     golpe que ia matar (o que para em 1) e o revide que ela comprou. Custa algumas linhas a mais
-     num confronto que é, por definição, o confronto em que algo fora do comum aconteceu. */
-  if(reais.some(g => g.x === 'faixa')) return reais;
+  /* A FAIXA PARTE O CONFRONTO EM DUAS LUTAS, e cada uma é reconstruída como qualquer outra -- com o
+     mesmo teto de 3 golpes. É o pedido, e é a leitura certa: a luta corre normal até o pokémon
+     chegar a zero, a Faixa o devolve a 1, e o que vem depois se lê como uma luta nova em que ELE
+     ataca primeiro. No log continua sendo um confronto só.
+     Duas tentativas antes desta falharam, e vale saber por quê:
+       1) a linha da Faixa como rodapé, depois de UMA reconstrução do confronto inteiro. O log dizia
+          que o Charizard tomou 388 de 388 de HP e, embaixo, que a Faixa o segurou com 1.
+       2) os golpes REAIS, sem teto. Contava a história, mas custava 7 linhas na maioria dos casos e
+          até 14 na cauda -- a luta virava uma parede.
+     Partindo em duas o teto volta a valer nas duas metades: no máximo 3 + a linha + 3.
+     A METADE 1 termina com o pokémon em 1: ele é o "perdedor" dela, então o último golpe da
+     reconstrução é justamente o que ia matá-lo. A METADE 2 começa com ele em 1 -- e como a
+     reconstrução dá o primeiro golpe ao perdedor quando ele entra fraco (abaixo de 50%), ele ataca
+     primeiro sem precisar de regra nova.
+     A vida do ADVERSÁRIO no instante da Faixa vem do diário (campo `ho`): sem ela não há como
+     dividir, porque a reconstrução precisa dos dois lados em cada metade. Confronto gravado ANTES
+     do campo existir cai na vida de entrada do adversário -- log velho não pode sumir. */
+  const faixa = reais.find(g => g.x === 'faixa') || null;
+  if(faixa){
+    const doJogador = faixa.q === 'p';
+    const outro = (typeof faixa.ho === 'number') ? faixa.ho
+                : (doJogador ? m.enemyHpBefore : m.playerHpBefore);
+    const meia1 = Object.assign({}, m, { isTrade:false, playerWon: !doJogador }, doJogador
+      ? { playerHpAfter: 1, enemyHpAfter: outro }
+      : { enemyHpAfter: 1, playerHpAfter: outro });
+    const meia2 = Object.assign({}, m, doJogador
+      ? { playerHpBefore: 1, enemyHpBefore: outro }
+      : { enemyHpBefore: 1, playerHpBefore: outro });
+    const conv = h => ({ q: h.side === 'player' ? 'e' : 'p', d: h.amount });
+    /* Golpe de dano ZERO não é golpe, nem vindo da reconstrução: uma metade pode não ter o que
+       mostrar (a Faixa segurou a explosão, e do outro lado já não havia ninguém de pé). */
+    const semZero = seq => seq.map(conv).filter(g => g.d > 0);
+    const partida = aberturas.concat(semZero(reconstruirSequencia(meia1)), [faixa],
+                                     semZero(reconstruirSequencia(meia2)));
+    /* A MORTE SÚBITA PODE RESSUSCITAR quem carregava a Faixa. Ela vale quando os DOIS chegam a
+       zero, e isso ainda acontece depois de a Faixa ter sido gasta -- o sobrevivente volta com
+       5%-15% do HP, ou seja, ACIMA do 1 em que ela o segurou.
+       A metade 2 não tem como mostrar vida subindo (a reconstrução só interpola pra baixo), então
+       a soma das linhas passaria do que ele perdeu de verdade: o log diria que ele tomou 388 de
+       388 e o cartão mostraria 40 de HP. Apara-se o último golpe contra ele -- que é exatamente o
+       que o próprio desempate já faz no diário quando corrige a última linha.
+       Medido: 1% dos confrontos com Faixa (28 em 2.671). */
+    const marcaDoDono = doJogador ? 'e' : 'p';       // quem BATE nele
+    const perdeuDeVerdade = doJogador ? (m.playerHpBefore - m.playerHpAfter)
+                                      : (m.enemyHpBefore - m.enemyHpAfter);
+    let excesso = partida.filter(g => !g.x && g.q === marcaDoDono).reduce((a, g) => a + g.d, 0) - perdeuDeVerdade;
+    for(let i = partida.length - 1; i >= 0 && excesso > 0; i--){
+      const g = partida[i];
+      if(g.x || g.q !== marcaDoDono) continue;
+      const tira = Math.min(excesso, g.d);
+      partida[i] = Object.assign({}, g, { d: g.d - tira });
+      excesso -= tira;
+    }
+    return partida.filter(g => g.x || g.d > 0);
+  }
 
   /* AS TROCAS LIVRES DO SONO, reais. São os golpes que quem usou o sono deu ANTES do primeiro do
      adormecido -- lidos do diário, não de SONO_EM_TROCAS: o sono compra 2 trocas, mas quem usou,

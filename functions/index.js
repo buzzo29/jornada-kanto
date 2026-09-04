@@ -1024,7 +1024,7 @@ function tentarGolpeEspecial(active, enemy, rng, diario){
       explosaoDoAtivo = salvou ? null : ehAtivo;
       if(diario){
         diario.push({ q: marca, d: danoNoAlvo, hp: alvo.hp, c:0, m:0, z:0, x:'boom', g: especial.golpe });
-        if(salvou) diario.push(marcaDaFaixa(marcaDoAlvo));   // depois do golpe que ela segurou
+        if(salvou) diario.push(marcaDaFaixa(marcaDoAlvo, 0));   // depois do golpe que ela segurou
         diario.push({ q: marca === 'p' ? 'e' : 'p', d: danoEmSi, hp: 0, c:0, m:0, z:0, x:'boomself' });
       }
       return true;
@@ -1140,7 +1140,7 @@ function faixaDeFoco(p, marca){
    escreve a linha dele no fim do doExchange. O log ficava "a Faixa segurou com 1 de HP" e só então
    "Electabuzz atacou e tirou -182", que é a ordem invertida da cena.
    Quem chama empurra esta marca logo depois da linha do golpe. */
-function marcaDaFaixa(marca){ return { q: marca, d: 0, hp: 1, c:0, m:0, z:0, x:'faixa' }; }
+function marcaDaFaixa(marca, hpDoOutro){ return { q: marca, d: 0, hp: 1, ho: hpDoOutro, c:0, m:0, z:0, x:'faixa' }; }
 function doExchange(active, enemy, rng, diario){
   /* Golpe especial: só na PRIMEIRA troca de cada confronto. O marcador é o próprio
      adversário -- oponente novo, confronto novo, e as chances valem de novo. */
@@ -1193,11 +1193,11 @@ function doExchange(active, enemy, rng, diario){
     const segundoDormiu  = (second === active) ? activeDorme : enemyDorme;
     if(!primeiroDormiu){
       diario.push({ q: activeFirst?'p':'e', d: secondHpBefore - second.hp, hp: second.hp, c: first.lastCrit?1:0, m:0, z: first.lastMoveNulo?1:0 });
-      if(faixaDoSegundo) diario.push(marcaDaFaixa((second === active) ? 'p' : 'e'));
+      if(faixaDoSegundo) diario.push(marcaDaFaixa((second === active) ? 'p' : 'e', firstHpBefore));
     }
     if(!segundoDormiu){
       diario.push({ q: activeFirst?'e':'p', d: firstHpBefore  - first.hp,  hp: first.hp,  c: second.lastCrit?1:0, m: segundoCaiu?1:0, z: second.lastMoveNulo?1:0 });
-      if(faixaDoPrimeiro) diario.push(marcaDaFaixa((first === active) ? 'p' : 'e'));
+      if(faixaDoPrimeiro) diario.push(marcaDaFaixa((first === active) ? 'p' : 'e', second.hp));
     }
   }
   // EMPATE NÃO EXISTE: se o golpe moribundo também derrubaria o primeiro, fica de pé quem tinha o
