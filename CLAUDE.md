@@ -1159,12 +1159,25 @@ de golpes.
   de pé. E como a marca de moribundo sai da SITUAÇÃO ("o segundo caiu e revidou"), segurar em 1 já a
   desliga sozinho — que é o certo, porque ele não caiu.
 - **A Faixa segura ANTES de o diário ser escrito**, então o dano gravado é o EFETIVO (o que saiu de
-  verdade, parando em 1) e a barra da tela desce até 1. Um passo próprio na animação seria um
-  movimento de zero, e passo de dano zero não é passo — por isso ela sai da `sequenciaDoConfronto`
-  junto com o Disable.
-- **No log ela é linha própria, DEPOIS dos golpes** — ao contrário do Disable, que vem antes. Ela
-  acontece no meio da luta, e a sequência é reconstruída quando passa do teto: encaixá-la "no lugar
-  certo" seria fingir uma precisão que a reconstrução não tem. No fim ela se lê como o desfecho.
+  verdade, parando em 1) e a barra da tela desce até 1.
+- **ELA É A SEGUNDA EXCEÇÃO AO TETO DE 3 GOLPES, pelo mesmo motivo do sono: o que ela compra são os
+  golpes DEPOIS dela, e a reconstrução os esmaga.**
+  Reportado em 04/09/2026 com print, na segunda tentativa de acertar isto. O log dizia, em três
+  linhas reconstruídas, que o Charizard tomou **388 de 388 de HP** — e embaixo, que a Faixa o
+  segurou com 1. As duas coisas na mesma tela. No diário real ele foi segurado em 1 e ainda deu
+  **mais dois ataques**; nada disso aparecia.
+  Eram DUAS causas, e as duas tiveram que cair: a reconstrução (o teto) e a POSIÇÃO da linha.
+- **A linha vem logo DEPOIS do golpe que ela segurou**, e é por isso que ela não é escrita dentro do
+  `faixaDeFoco` (`marcaDaFaixa` monta, quem chama empurra). Escrita lá, ela saía ANTES: o motor
+  segura o HP no instante do golpe mas só escreve a linha dele no fim do `doExchange`, e o log
+  ficava "a Faixa segurou com 1 de HP" e só então "Electabuzz atacou e tirou −182" — a ordem
+  invertida da cena. Vale também na explosão: a linha vai entre o `boom` e o `boomself`.
+- **Ela É um passo da animação, com movimento ZERO.** A barra já parou em 1 no golpe anterior, e é
+  esse 1 que ela explica; sem o passo, a animação pularia do golpe que ia matar direto pro revide.
+- **O preço em linhas, medido:** a luta comum continua em **3 linhas (100%)** — a regra da casa não
+  se move. A luta com Faixa fica em **7 linhas em 61%** dos casos, 5 em 14%, 9 em 13%, e uma cauda
+  fina até 14. É mais que o sono (4-6), e é aceito pelo mesmo motivo: é o confronto em que o
+  pokémon enganou a morte, e ele só existe porque o jogador pagou 50 moedas pra isso acontecer.
 - **É O ITEM MAIS FORTE DO JOGO, e por larga margem** (12.000 batalhas 6x6 nível 60, 1σ = 0,65):
 
   | item | preço | ganho | trabalhou em |

@@ -5658,7 +5658,8 @@ function tentarGolpeEspecial(active, enemy, rng, diario){
          for morrer" não pode ter exceção justamente no golpe mais fatal do jogo.
          SÓ O ALVO É SALVO, nunca quem explodiu: o dano que o explosor toma é dele mesmo, e salvá-lo
          faria da autodestruição um "mate o outro e sobreviva" -- ela deixaria de ter preço. */
-      const salvou = faixaDeFoco(alvo, marca === 'p' ? 'e' : 'p', diario);
+      const marcaDoAlvo = marca === 'p' ? 'e' : 'p';
+      const salvou = faixaDeFoco(alvo, marcaDoAlvo);
       const danoNoAlvo = salvou ? alvo.hp - 1 : alvo.hp, danoEmSi = quem.hp;
       alvo.hp = salvou ? 1 : 0;
       quem.hp = 0;
@@ -5667,6 +5668,7 @@ function tentarGolpeEspecial(active, enemy, rng, diario){
       explosaoDoAtivo = salvou ? null : ehAtivo;
       if(diario){
         diario.push({ q: marca, d: danoNoAlvo, hp: alvo.hp, c:0, m:0, z:0, x:'boom', g: especial.golpe });
+        if(salvou) diario.push(marcaDaFaixa(marcaDoAlvo));   // depois do golpe que ela segurou
         diario.push({ q: marca === 'p' ? 'e' : 'p', d: danoEmSi, hp: 0, c:0, m:0, z:0, x:'boomself' });
       }
       return true;
@@ -5773,13 +5775,18 @@ function tentarGolpeEspecial(active, enemy, rng, diario){
    Como a marca de moribundo sai da SITUAÇÃO ("o segundo caiu e revidou"), segurar em 1 já a desliga
    sozinho -- e é isso que se quer, porque ele não caiu.
    O item é UM: gasta ao segurar, e o segundo golpe fatal da mesma batalha leva o pokémon. */
-function faixaDeFoco(p, marca, diario){
+function faixaDeFoco(p, marca){
   if(!p || p.item !== 'faixa_foco') return false;
   p.item = null;
   itensGastos.push({ dono: marca, especie: p.speciesId, item: 'faixa_foco' });
-  if(diario) diario.push({ q: marca, d: 0, hp: 1, c:0, m:0, z:0, x:'faixa' });
   return true;
 }
+/* A LINHA DA FAIXA VEM DEPOIS DO GOLPE QUE ELA SEGUROU, e é por isso que ela não é escrita dentro
+   do faixaDeFoco: lá ela sairia ANTES, porque o motor segura o HP no instante do golpe mas só
+   escreve a linha dele no fim do doExchange. O log ficava "a Faixa segurou com 1 de HP" e só então
+   "Electabuzz atacou e tirou -182", que é a ordem invertida da cena.
+   Quem chama empurra esta marca logo depois da linha do golpe. */
+function marcaDaFaixa(marca){ return { q: marca, d: 0, hp: 1, c:0, m:0, z:0, x:'faixa' }; }
 function doExchange(active, enemy, rng, diario){
   /* Golpe especial: só na PRIMEIRA troca de cada confronto. O marcador é o próprio
      adversário -- oponente novo, confronto novo, e as chances valem de novo. */
@@ -5810,8 +5817,10 @@ function doExchange(active, enemy, rng, diario){
   const firstHpBefore = first.hp, secondHpBefore = second.hp;
   second.hp = Math.max(0, second.hp - dmgByFirst);
   /* A Faixa segura ANTES de o diário ser escrito: assim o dano gravado é o EFETIVO (o que saiu de
-     verdade, parando em 1) e a barra da tela desce até 1, que é o que aconteceu. */
-  if(second.hp <= 0 && faixaDeFoco(second, (second === active) ? 'p' : 'e', diario)) second.hp = 1;
+     verdade, parando em 1) e a barra da tela desce até 1, que é o que aconteceu. A LINHA dela é
+     empurrada mais abaixo, depois da linha do golpe -- ver marcaDaFaixa. */
+  const faixaDoSegundo = second.hp <= 0 && faixaDeFoco(second, (second === active) ? 'p' : 'e');
+  if(faixaDoSegundo) second.hp = 1;
   /* A marca sai da SITUAÇÃO (o segundo caiu e mesmo assim revidou), não de o dano ter sido
      reduzido. Enquanto ela era deduzida do dano, subir o DYING_BLOW_FACTOR pra 1.0 fazia a marca
      sumir junto -- e sem ela o log volta a mostrar pokémon atacando depois de cair, porque é ela
@@ -5822,7 +5831,8 @@ function doExchange(active, enemy, rng, diario){
     counter = Math.max(1, Math.round(counter * DYING_BLOW_FACTOR));
   }
   first.hp = Math.max(0, first.hp - counter);
-  if(first.hp <= 0 && faixaDeFoco(first, (first === active) ? 'p' : 'e', diario)) first.hp = 1;
+  const faixaDoPrimeiro = first.hp <= 0 && faixaDeFoco(first, (first === active) ? 'p' : 'e');
+  if(faixaDoPrimeiro) first.hp = 1;
   if(diario){
     /* O dano registrado é o que SAIU DE VERDADE da vida do alvo, não o número que a fórmula
        sorteou: um golpe de 101 num pokémon com 54 de HP tira 54. Gravar o valor cru fazia o log
@@ -5831,9 +5841,11 @@ function doExchange(active, enemy, rng, diario){
     const segundoDormiu  = (second === active) ? activeDorme : enemyDorme;
     if(!primeiroDormiu){
       diario.push({ q: activeFirst?'p':'e', d: secondHpBefore - second.hp, hp: second.hp, c: first.lastCrit?1:0, m:0, z: first.lastMoveNulo?1:0 });
+      if(faixaDoSegundo) diario.push(marcaDaFaixa((second === active) ? 'p' : 'e'));
     }
     if(!segundoDormiu){
       diario.push({ q: activeFirst?'e':'p', d: firstHpBefore  - first.hp,  hp: first.hp,  c: second.lastCrit?1:0, m: segundoCaiu?1:0, z: second.lastMoveNulo?1:0 });
+      if(faixaDoPrimeiro) diario.push(marcaDaFaixa((first === active) ? 'p' : 'e'));
     }
   }
   // EMPATE NÃO EXISTE: se o golpe moribundo também derrubaria o primeiro, fica de pé quem tinha o
@@ -7581,6 +7593,10 @@ function buildAnimatedHitSequence(m){
        de tudo isso: quem curou é quem MUDA de vida, e pra cima. Amount negativo faz a barra subir
        (os laços fazem hp - amount, e o hpBarTransitionMs usa o módulo pra a duração). */
     if(g.x === 'recover' || g.x === 'pocao' || g.x === 'absorb') return { side: g.q === 'p' ? 'player' : 'enemy', amount: -g.d, cura: true };
+    /* A FAIXA não move barra nenhuma: o golpe anterior já parou em 1, e é justamente esse 1 que ela
+       explica. Mas ela É um passo -- sem ele, a animação pularia direto do golpe que ia matar pro
+       revide, e a pausa que dá tempo de ler a mensagem não existiria. */
+    if(g.x === 'faixa') return { side: g.q === 'p' ? 'player' : 'enemy', amount: 0, faixa: true };
     return { side: g.q === 'p' ? 'enemy' : 'player', amount: g.d };
   });
 }
@@ -13576,10 +13592,7 @@ function sequenciaDoConfronto(m){
      A CURA FICA. Ela É um passo, e o PRIMEIRO: o pokémon entra machucado do confronto anterior, se
      cura, e só então a luta começa. Enquanto ela ficava de fora da sequência, a animação só via o
      valor final e a barra aparecia cheia do nada. */
-  /* A FAIXA sai junto com o Disable, e pelo mesmo motivo: ela não move barra nenhuma. O golpe que
-     ela segurou JÁ está no diário com o dano efetivo (parando em 1), então a barra desce até 1
-     sozinha -- um passo próprio seria um movimento de zero, e passo de dano zero não é passo. */
-  const reais = passosVisiveis((m.golpes || []).filter(g => g.x !== 'disable' && g.x !== 'faixa' && (g.x || g.d > 0)));
+  const reais = passosVisiveis((m.golpes || []).filter(g => g.x !== 'disable' && (g.x || g.d > 0)));
   /* TODAS AS ABERTURAS: acontecem antes da luta e não são dano. A poção entrou aqui quando passou a
      funcionar como o Recuperar -- ela era um FECHAMENTO enquanto disparava na vitória do confronto. */
   const aberturas = reais.filter(g => g.x === 'recover' || g.x === 'sono' || g.x === 'semSono' ||
@@ -13589,6 +13602,18 @@ function sequenciaDoConfronto(m){
   /* O teto conta GOLPES. As aberturas (cura e sono) não são dano -- deixá-las contar jogaria uma
      troca real de 2 golpes na reconstrução, perdendo os golpes de verdade. */
   if(reais.length && golpesDeDano <= TETO_GOLPES) return reais;
+
+  /* A FAIXA DE FOCO É A SEGUNDA EXCEÇÃO AO TETO, pelo mesmo motivo do sono: o que ela compra são os
+     golpes DEPOIS dela, e a reconstrução os esmaga.
+     Reportado em 04/09/2026 com print. O log dizia, em três linhas reconstruídas, que o Charizard
+     tomou 388 de 388 de HP -- e embaixo, que a Faixa o segurou com 1. As duas coisas na mesma tela.
+     No diário real ele foi segurado em 1 e ainda deu MAIS DOIS ataques; nada disso aparecia, porque
+     a reconstrução só sabe interpolar entre o HP do começo e o do fim e a linha da Faixa era um
+     rodapé solto no fim.
+     Aqui os golpes entram REAIS, e a linha da Faixa cai no lugar onde ela aconteceu -- entre o
+     golpe que ia matar (o que para em 1) e o revide que ela comprou. Custa algumas linhas a mais
+     num confronto que é, por definição, o confronto em que algo fora do comum aconteceu. */
+  if(reais.some(g => g.x === 'faixa')) return reais;
 
   /* AS TROCAS LIVRES DO SONO, reais. São os golpes que quem usou o sono deu ANTES do primeiro do
      adormecido -- lidos do diário, não de SONO_EM_TROCAS: o sono compra 2 trocas, mas quem usou,
@@ -13783,20 +13808,16 @@ function passosHtml(m){
   /* As anulações vêm ANTES de tudo: o Disable acontece na abertura do confronto e a luta inteira
      que se lê embaixo já é a luta com o golpe anulado. */
   const anulacoes = (m.golpes || []).filter(g => g.x === 'disable').map(linhaEspecial).join('');
-  /* A FAIXA vem DEPOIS dos golpes, ao contrário do Disable. Ela acontece no meio da luta, e a
-     sequência de golpes é reconstruída quando passa do teto -- encaixá-la "no lugar certo" seria
-     fingir uma precisão que a reconstrução não tem. No fim ela se lê como o que é: o desfecho. */
-  const faixas = (m.golpes || []).filter(g => g.x === 'faixa').map(linhaEspecial).join('');
   return `<div class="mlog-passos">${anulacoes}${golpes.map(g=>{
     const doJogador = g.q === 'p';
     if(g.x === 'boomself') return '';   // a linha da explosão (acima) já contou os dois lados
     if(g.x === 'absorbdano') return '';  // idem: a linha da drenagem conta a vida que saiu e a que entrou
     if(g.x === 'boom' || g.x === 'sono' || g.x === 'recover' || g.x === 'semSono' ||
-       g.x === 'pocao' || g.x === 'absorb') return linhaEspecial(g);
+       g.x === 'pocao' || g.x === 'absorb' || g.x === 'faixa') return linhaEspecial(g);
     return `<div class="mlog-passo ${doJogador?'p':'e'}">
       ${ladoHtml(doJogador)} atacou ${ladoHtml(!doJogador)}${seloDe(doJogador)?` com ${seloDe(doJogador)}`:''} e tirou <span class="mlog-tira">−${g.d}</span> de HP.
     </div>`;
-  }).join('')}${faixas}</div>`;
+  }).join('')}</div>`;
 }
 
 function renderHpBar(hp, maxHp, fillId, labelId){

@@ -525,6 +525,53 @@ console.log('\nA FAIXA DE FOCO NAO PODE SER FURADA POR CAMINHO NENHUM');
   ok('a Faixa segura a AUTODESTRUICAO', segurouBoom > 100, segurouBoom + ' explosoes seguradas');
   ok('e nunca deixa passar uma', morreuNoBoom === 0, morreuNoBoom + '');
 
+  /* O LOG TEM QUE CONTAR A HISTORIA -- e nao contava. REPORTADO em 04/09/2026 com print: o log
+     dizia, em tres linhas reconstruidas, que o Charizard tomou 388 de 388 de HP, e embaixo que a
+     Faixa o segurou com 1. As duas coisas na mesma tela.
+     A causa eram DUAS: a reconstrucao (teto de 3) esmagava os golpes DEPOIS da Faixa, que sao o que
+     ela compra; e a linha dela era um rodape solto no fim, longe do golpe que ela segurou.
+     Hoje o confronto com Faixa mostra os golpes REAIS (a segunda excecao ao teto, como o sono) e a
+     linha cai logo DEPOIS do golpe que ela segurou. */
+  {
+    let m = null;
+    for(let i = 0; i < 4000 && !m; i++){
+      const meu = [S.createInstance('charizard', 56)];
+      S.equiparItens(meu, { charmander:'faixa_foco' });
+      const r = S.simulateGymBattle(meu, [S.createInstance('electabuzz', 54)], Math.random);
+      const x = (r.matchups||[])[0];
+      if(x && (x.golpes||[]).some(g => g.x === 'faixa') && x.playerHpAfter <= 0) m = x;
+    }
+    ok('reproduzi o confronto do print (Faixa, e ele cai depois)', !!m);
+    if(m){
+      const seq = S.sequenciaDoConfronto(m);
+      const iFaixa = seq.findIndex(g => g.x === 'faixa');
+      ok('a Faixa esta NO MEIO da sequencia, nao no fim', iFaixa > 0 && iFaixa < seq.length - 1,
+         'posicao ' + iFaixa + ' de ' + seq.length);
+      /* O GOLPE ANTES DELA e o que ela segurou: ele tem que deixar o carregador com 1. */
+      ok('e logo DEPOIS do golpe que ela segurou', seq[iFaixa-1] && seq[iFaixa-1].hp === 1,
+         JSON.stringify(seq[iFaixa-1]));
+      /* E DEPOIS DELA o carregador ainda bate -- e isso que o item compra. */
+      const depois = seq.slice(iFaixa+1).filter(g => !g.x && g.q === 'p');
+      ok('e o Charizard ainda ataca depois dela', depois.length >= 1, depois.length + ' golpes depois');
+      /* A SOMA CONTINUA FECHANDO: o log nao pode dizer que ele tomou mais do que tinha. */
+      const tomou = seq.filter(g => !g.x && g.q === 'e').reduce((a, g) => a + g.d, 0);
+      ok('e a soma do dano fecha com o HP dele', tomou === m.playerHpBefore - m.playerHpAfter,
+         tomou + ' de ' + (m.playerHpBefore - m.playerHpAfter));
+      /* SAO OS GOLPES REAIS, nao a reconstrucao: o confronto com Faixa e a segunda excecao ao teto. */
+      const reaisDeDano = (m.golpes||[]).filter(g => !g.x && g.d > 0).length;
+      ok('sao os golpes REAIS (excecao ao teto, como o sono)',
+         seq.filter(g => !g.x).length === reaisDeDano, seq.filter(g=>!g.x).length + ' vs ' + reaisDeDano);
+      /* LOG E ANIMACAO CONTINUAM LENDO A MESMA LISTA -- a regra da casa. */
+      ok('e a animacao tem os MESMOS passos', S.buildAnimatedHitSequence(m).length === seq.length,
+         S.buildAnimatedHitSequence(m).length + ' vs ' + seq.length);
+      /* A linha aparece UMA vez, no meio do log. */
+      const linhas = S.passosHtml(m).split('</div>').filter(x => x.includes('mlog-passo'));
+      const iLinha = linhas.findIndex(l => /Faixa de Foco segurou/.test(l));
+      ok('o log mostra a linha da Faixa no meio', iLinha > 0 && iLinha < linhas.length - 1,
+         'linha ' + iLinha + ' de ' + linhas.length);
+    }
+  }
+
   /* QUEM EXPLODIU NAO E SALVO: o dano e dele mesmo, e salva-lo faria da autodestruicao um "mate o
      outro e sobreviva" -- ela deixaria de ter preco. */
   let explosorSobreviveu = 0;

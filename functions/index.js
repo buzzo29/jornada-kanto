@@ -1014,7 +1014,8 @@ function tentarGolpeEspecial(active, enemy, rng, diario){
          for morrer" não pode ter exceção justamente no golpe mais fatal do jogo.
          SÓ O ALVO É SALVO, nunca quem explodiu: o dano que o explosor toma é dele mesmo, e salvá-lo
          faria da autodestruição um "mate o outro e sobreviva" -- ela deixaria de ter preço. */
-      const salvou = faixaDeFoco(alvo, marca === 'p' ? 'e' : 'p', diario);
+      const marcaDoAlvo = marca === 'p' ? 'e' : 'p';
+      const salvou = faixaDeFoco(alvo, marcaDoAlvo);
       const danoNoAlvo = salvou ? alvo.hp - 1 : alvo.hp, danoEmSi = quem.hp;
       alvo.hp = salvou ? 1 : 0;
       quem.hp = 0;
@@ -1023,6 +1024,7 @@ function tentarGolpeEspecial(active, enemy, rng, diario){
       explosaoDoAtivo = salvou ? null : ehAtivo;
       if(diario){
         diario.push({ q: marca, d: danoNoAlvo, hp: alvo.hp, c:0, m:0, z:0, x:'boom', g: especial.golpe });
+        if(salvou) diario.push(marcaDaFaixa(marcaDoAlvo));   // depois do golpe que ela segurou
         diario.push({ q: marca === 'p' ? 'e' : 'p', d: danoEmSi, hp: 0, c:0, m:0, z:0, x:'boomself' });
       }
       return true;
@@ -1127,13 +1129,18 @@ function tentarGolpeEspecial(active, enemy, rng, diario){
    Como a marca de moribundo sai da SITUAÇÃO ("o segundo caiu e revidou"), segurar em 1 já a desliga
    sozinho -- e é isso que se quer, porque ele não caiu.
    O item é UM: gasta ao segurar, e o segundo golpe fatal da mesma batalha leva o pokémon. */
-function faixaDeFoco(p, marca, diario){
+function faixaDeFoco(p, marca){
   if(!p || p.item !== 'faixa_foco') return false;
   p.item = null;
   itensGastos.push({ dono: marca, especie: p.speciesId, item: 'faixa_foco' });
-  if(diario) diario.push({ q: marca, d: 0, hp: 1, c:0, m:0, z:0, x:'faixa' });
   return true;
 }
+/* A LINHA DA FAIXA VEM DEPOIS DO GOLPE QUE ELA SEGUROU, e é por isso que ela não é escrita dentro
+   do faixaDeFoco: lá ela sairia ANTES, porque o motor segura o HP no instante do golpe mas só
+   escreve a linha dele no fim do doExchange. O log ficava "a Faixa segurou com 1 de HP" e só então
+   "Electabuzz atacou e tirou -182", que é a ordem invertida da cena.
+   Quem chama empurra esta marca logo depois da linha do golpe. */
+function marcaDaFaixa(marca){ return { q: marca, d: 0, hp: 1, c:0, m:0, z:0, x:'faixa' }; }
 function doExchange(active, enemy, rng, diario){
   /* Golpe especial: só na PRIMEIRA troca de cada confronto. O marcador é o próprio
      adversário -- oponente novo, confronto novo, e as chances valem de novo. */
@@ -1162,8 +1169,10 @@ function doExchange(active, enemy, rng, diario){
   const firstHpBefore = first.hp, secondHpBefore = second.hp;
   second.hp = Math.max(0, second.hp - dmgByFirst);
   /* A Faixa segura ANTES de o diário ser escrito: assim o dano gravado é o EFETIVO (o que saiu de
-     verdade, parando em 1) e a barra da tela desce até 1, que é o que aconteceu. */
-  if(second.hp <= 0 && faixaDeFoco(second, (second === active) ? 'p' : 'e', diario)) second.hp = 1;
+     verdade, parando em 1) e a barra da tela desce até 1, que é o que aconteceu. A LINHA dela é
+     empurrada mais abaixo, depois da linha do golpe -- ver marcaDaFaixa. */
+  const faixaDoSegundo = second.hp <= 0 && faixaDeFoco(second, (second === active) ? 'p' : 'e');
+  if(faixaDoSegundo) second.hp = 1;
   /* A marca sai da SITUAÇÃO (o segundo caiu e mesmo assim revidou), não de o dano ter sido
      reduzido. Enquanto ela era deduzida do dano, subir o DYING_BLOW_FACTOR pra 1.0 fazia a marca
      sumir junto -- e sem ela o log volta a mostrar pokémon atacando depois de cair, porque é ela
@@ -1174,7 +1183,8 @@ function doExchange(active, enemy, rng, diario){
     counter = Math.max(1, Math.round(counter * DYING_BLOW_FACTOR));
   }
   first.hp = Math.max(0, first.hp - counter);
-  if(first.hp <= 0 && faixaDeFoco(first, (first === active) ? 'p' : 'e', diario)) first.hp = 1;
+  const faixaDoPrimeiro = first.hp <= 0 && faixaDeFoco(first, (first === active) ? 'p' : 'e');
+  if(faixaDoPrimeiro) first.hp = 1;
   if(diario){
     /* O dano registrado é o que SAIU DE VERDADE da vida do alvo, não o número que a fórmula
        sorteou: um golpe de 101 num pokémon com 54 de HP tira 54. Gravar o valor cru fazia o log
@@ -1183,9 +1193,11 @@ function doExchange(active, enemy, rng, diario){
     const segundoDormiu  = (second === active) ? activeDorme : enemyDorme;
     if(!primeiroDormiu){
       diario.push({ q: activeFirst?'p':'e', d: secondHpBefore - second.hp, hp: second.hp, c: first.lastCrit?1:0, m:0, z: first.lastMoveNulo?1:0 });
+      if(faixaDoSegundo) diario.push(marcaDaFaixa((second === active) ? 'p' : 'e'));
     }
     if(!segundoDormiu){
       diario.push({ q: activeFirst?'e':'p', d: firstHpBefore  - first.hp,  hp: first.hp,  c: second.lastCrit?1:0, m: segundoCaiu?1:0, z: second.lastMoveNulo?1:0 });
+      if(faixaDoPrimeiro) diario.push(marcaDaFaixa((first === active) ? 'p' : 'e'));
     }
   }
   // EMPATE NÃO EXISTE: se o golpe moribundo também derrubaria o primeiro, fica de pé quem tinha o
