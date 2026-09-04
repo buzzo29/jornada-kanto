@@ -30,6 +30,19 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
 - `firebase deploy --only functions` — só o servidor
 - `firebase deploy --only firestore` — só as regras
 - Quando cliente e servidor mudam juntos, **subir os dois na mesma leva**.
+- **O `index.html` vai com `Cache-Control: no-cache`** (a seção `headers` do `firebase.json`), e isso
+  não é detalhe. O padrão do Firebase Hosting pra HTML é **`max-age=3600`**: sem a seção, quem já
+  tinha a página aberta continuava com o jogo VELHO por até uma hora depois do deploy.
+  Descoberto em 04/09/2026, e ele já tinha custado um relatório de bug: o jogador mandou print de um
+  defeito que estava consertado, porque o navegador dele ainda servia a versão anterior. Como o jogo
+  INTEIRO é um arquivo só, uma hora de cache é uma hora de correção que não chega.
+  `no-cache` não quer dizer "não guarde": o navegador guarda e **revalida pelo ETag** a cada visita,
+  então o custo normal é um 304 vazio. O que muda é que o deploy passa a valer no próximo F5.
+- **Deploy que demora não é deploy que acabou.** As ~67 functions levam vários minutos e o hosting
+  entra no fim da leva: enquanto ela roda, o que está no ar ainda é a versão anterior. Testar nesse
+  intervalo devolve o comportamento velho -- foi exatamente o que aconteceu no print da Faixa.
+  Conferir com o `Deploy complete!` e, na dúvida, comparar o arquivo no ar com o local
+  (`curl -s https://jornadakanto.com/index.html | cmp - index.html`).
 - **`firestore.rules` é a fonte da verdade desde 30/08/2026**, quando o `firebase.json` ganhou a
   seção `firestore`. Antes disso ele não era publicado por nada e o console era quem mandava —
   então o arquivo derrapou até ficar **70 linhas atrás** da produção (47 contra 117). Publicá-lo
