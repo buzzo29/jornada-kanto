@@ -192,12 +192,14 @@ console.log('\n=== A LOJA: COMPRAR E USAR ===');
   /* A mochila deixou de ser uma leitura do que a conta ja tinha: item comprado precisa de armazem
      de verdade, e ele e do SERVIDOR pelo mesmo motivo das moedas -- uma linha no console viraria
      Despertar infinito, e Despertar infinito desliga um golpe do jogo inteiro. */
-  await conta('g', jaVisto(), 100);
+  /* Precos revisados em 04/09/2026: Super Pocao 30 -> 50 e Pocao 15 -> 30. O saldo do fixture subiu
+     junto, senao ele quebra na segunda compra em vez de testar o que devia. */
+  await conta('g', jaVisto(), 135);
   const r = await chamar('buyItem', 'g', { item:'awakening' });
-  ok('comprar o Despertar custa 50', r.moedas === 50 && r.inventario.awakening === 1, JSON.stringify(r));
-  await chamar('buyItem', 'g', { item:'potion' });
-  const r3 = await chamar('buyItem', 'g', { item:'hyperpotion' });
-  ok('e os outros dois custam 15 e 30', r3.moedas === 5, r3.moedas + ' moedas sobrando');
+  ok('comprar o Despertar custa 50', r.moedas === 85 && r.inventario.awakening === 1, JSON.stringify(r));
+  await chamar('buyItem', 'g', { item:'potion' });          // 30
+  const r3 = await chamar('buyItem', 'g', { item:'hyperpotion' });   // 50
+  ok('e os outros dois custam 30 e 50', r3.moedas === 5, r3.moedas + ' moedas sobrando');
 
   ok('sem moeda suficiente ele recusa',
      await recusa('buyItem', 'g', { item:'awakening' }) === 'failed-precondition');
@@ -206,22 +208,23 @@ console.log('\n=== A LOJA: COMPRAR E USAR ===');
 
   /* COMPRAR VARIOS DE UMA VEZ. Quem valida a quantidade e o servidor, contra o saldo lido NA
      TRANSACAO -- o teto do popup e conveniencia da tela, nao a regra. */
-  await conta('q', jaVisto(), 100);
+  /* A pocao custa 30 desde 04/09/2026, entao 200 moedas compram 6. */
+  await conta('q', jaVisto(), 200);
   const q = await chamar('buyItem', 'q', { item:'potion', quantidade: 4 });
   ok('compra 4 pocoes de uma vez', q.inventario.potion === 4, JSON.stringify(q.inventario));
-  ok('e cobra as 4', q.moedas === 40 && q.gastou === 60, q.moedas + ' moedas, gastou ' + q.gastou);
+  ok('e cobra as 4', q.moedas === 80 && q.gastou === 120, q.moedas + ' moedas, gastou ' + q.gastou);
   /* PEDIR MAIS DO QUE CABE LEVA O QUE CABE. Recusar a compra inteira porque o saldo mudou entre a
      tela e a transacao (outra aba, um re-sorteio) seria pior que entregar o que da -- e a resposta
      diz quantos foram. */
   const q2 = await chamar('buyItem', 'q', { item:'potion', quantidade: 99 });
   ok('pedir 99 com dinheiro pra 2 leva 2', q2.comprou === 2, q2.comprou + ' comprados');
-  ok('e sobra o troco, nao saldo negativo', q2.moedas === 10, String(q2.moedas));
+  ok('e sobra o troco, nao saldo negativo', q2.moedas === 20, String(q2.moedas));
   ok('quantidade zero e recusada', await recusa('buyItem', 'q', { item:'potion', quantidade: 0 }) === 'invalid-argument');
   ok('e quantidade negativa tambem', await recusa('buyItem', 'q', { item:'potion', quantidade: -5 }) === 'invalid-argument');
   /* Sem o campo, compra 1 -- e o que o cliente antigo em cache manda. */
   await userRef('q').set({ moedas: 100 }, { merge:true });
   const q3 = await chamar('buyItem', 'q', { item:'potion' });
-  ok('sem quantidade, compra uma so', q3.comprou === 1, String(q3.comprou));
+  ok('sem quantidade, compra uma so', q3.comprou === 1 && q3.gastou === 30, q3.comprou + '/' + q3.gastou);
 
   /* O DOCE RARO NAO MORA NO INVENTARIO: ele e o contador rareCandies da conta, o mesmo que a Torre
      escreve e o useRareCandy desconta. Comprar e somar nele -- senao o doce passaria a existir em

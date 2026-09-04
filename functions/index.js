@@ -887,6 +887,10 @@ const IMUNES_A_ESPECIAL = ['mew','mewtwo'];
 const AUTODESTRUICAO = ['geodude','graveler','golem','voltorb','electrode','koffing','weezing','pineco','forretress'];
 /* Aprendem um golpe de SONO por nível na Gen 1/2 -- o valor é o nome que aparece no log. */
 const SONIFEROS = {
+  /* Acrescentadas na auditoria de 04/09/2026 (o Politoed foi reportado por um jogador): a lista de
+     Hipnose era só a da Gen 1, e faltavam o Tangela e a Smoochum. */
+  politoed:'Hipnose', noctowl:'Hipnose', yanma:'Hipnose', misdreavus:'Hipnose',
+  tangela:'Pó do Sono', smoochum:'Canto',
   bulbasaur:'Pó do Sono', ivysaur:'Pó do Sono', venusaur:'Pó do Sono', butterfree:'Pó do Sono',
   oddish:'Pó do Sono', gloom:'Pó do Sono', vileplume:'Pó do Sono', bellossom:'Pó do Sono',
   venonat:'Pó do Sono', venomoth:'Pó do Sono',
@@ -910,7 +914,8 @@ const METRONOMO = ['togepi','togetic','cleffa','snubbull'];
    ao bloco INTEIRO (IMUNES_A_ESPECIAL corta antes de sortear), então a entrada seria letra morta. */
 const DISABLE = ['psyduck','golduck','kadabra','alakazam','slowpoke','slowbro','slowking',
                  'grimer','muk','lickitung','jigglypuff','wigglytuff','venonat','venomoth',
-                 'drowzee','hypno'];
+                 'drowzee','hypno',
+                 'igglybuff'];   // Gen 2, achada na auditoria de 04/09/2026
 /* Aprendem Recuperar por nível na Gen 1/2. Recover não é TM em geração nenhuma das duas e não sai
    por reprodução -- então esta lista é a lista inteira, sem recorte.
    Lugia, Ho-Oh e Celebi estão aqui por serem o que os dados dizem, mesmo sendo os INTOCÁVEIS: hoje
@@ -1002,12 +1007,22 @@ function tentarGolpeEspecial(active, enemy, rng, diario){
          chance, porque quem decide isso é a SITUAÇÃO do alvo, não o sorteio. */
       if(alvo.hp <= alvo.maxHp * BOOM_MINIMO_DO_ALVO) continue;
       /* Os dois caem na hora -- e é o único caminho do jogo em que isso acontece: o doExchange
-         normal sempre deixa um de pé (ver o desempate lá embaixo). */
-      const danoNoAlvo = alvo.hp, danoEmSi = quem.hp;
-      alvo.hp = 0; quem.hp = 0;
-      explosaoDoAtivo = ehAtivo;
+         normal sempre deixa um de pé (ver o desempate lá embaixo).
+         A FAIXA DE FOCO SEGURA A EXPLOSÃO TAMBÉM. Foi o furo da primeira versão dela (03/09/2026,
+         reportado): a Faixa vigiava os dois pontos do doExchange, e a explosão não passa por
+         nenhum deles -- ela zera o HP aqui, direto. Um item que promete segurar "quando o pokémon
+         for morrer" não pode ter exceção justamente no golpe mais fatal do jogo.
+         SÓ O ALVO É SALVO, nunca quem explodiu: o dano que o explosor toma é dele mesmo, e salvá-lo
+         faria da autodestruição um "mate o outro e sobreviva" -- ela deixaria de ter preço. */
+      const salvou = faixaDeFoco(alvo, marca === 'p' ? 'e' : 'p', diario);
+      const danoNoAlvo = salvou ? alvo.hp - 1 : alvo.hp, danoEmSi = quem.hp;
+      alvo.hp = salvou ? 1 : 0;
+      quem.hp = 0;
+      /* Só conta como "explodiu e levou o outro junto" se o outro FOI junto: com a Faixa segurando,
+         quem explodiu morreu sozinho, e o teamStillAlive não pode dar a batalha pra ele. */
+      explosaoDoAtivo = salvou ? null : ehAtivo;
       if(diario){
-        diario.push({ q: marca, d: danoNoAlvo, hp: 0, c:0, m:0, z:0, x:'boom', g: especial.golpe });
+        diario.push({ q: marca, d: danoNoAlvo, hp: alvo.hp, c:0, m:0, z:0, x:'boom', g: especial.golpe });
         diario.push({ q: marca === 'p' ? 'e' : 'p', d: danoEmSi, hp: 0, c:0, m:0, z:0, x:'boomself' });
       }
       return true;
@@ -4698,8 +4713,8 @@ async function atualizarInscricoesComTime(uid, slot, team){
    trava do firestore.rules junto de `moedas`. */
 const LOJA = {
   awakening:   { preco: 50 },
-  hyperpotion: { preco: 30 },
-  potion:      { preco: 15 },
+  hyperpotion: { preco: 50 },
+  potion:      { preco: 30 },
   /* Os cinco de atributo: +15 pela BATALHA inteira, e somem no fim dela se o pokémon tiver
      entrado. Quem ficou no banco continua com o dele -- o item sai quando TRABALHA, a mesma regra
      dos outros três. */

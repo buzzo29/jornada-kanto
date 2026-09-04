@@ -1933,6 +1933,30 @@
   .order-item.com-item{ background:#fff8e0; border-color:var(--yellow-dark); }
   .order-item:active{ transform:translate(2px,2px); box-shadow:none; }
   .item-detalhe{ margin-bottom:10px; }
+  /* O QUADRO DA LOJA FICA FIXO no topo enquanto a lista rola. É sticky e não fixed: fixed sairia do
+     fluxo e a lista subiria por baixo dele; sticky o mantém dentro da coluna do app, com a mesma
+     largura, e ele só "cola" quando o topo da página passa por ele. */
+  .loja-fixa{ position:sticky; top:0; z-index:5; box-shadow:0 6px 12px rgba(12,16,36,.45); }
+  .loja-saldo{ margin:10px 0 0; font-size:.8rem; color:var(--muted); }
+  .loja-lista{ padding:6px 10px; }
+  /* Uma linha por item: ícone, nome (com o que você já tem) e preço à direita. A grade de
+     quadradinhos mostrava só o ícone -- com 11 itens, metade deles são emojis parecidos e não dava
+     pra escolher sem clicar em cada um. */
+  .loja-linha{
+    display:flex; align-items:center; gap:10px; width:100%;
+    padding:10px 4px; margin:0; background:none; border:none;
+    border-bottom:2px dashed #ddd7c2; cursor:pointer; text-align:left;
+    font-family:var(--font-ui); color:var(--ink);
+  }
+  .loja-linha:last-child{ border-bottom:none; }
+  .loja-linha.sel{ background:var(--yellow); border-radius:4px; }
+  /* SEM DINHEIRO a linha desbota, mas continua clicável: ler o que o item faz é justamente o que
+     leva a pessoa a juntar as moedas. Desabilitar esconderia a descrição de quem ainda não pode. */
+  .loja-linha.caro .loja-preco{ color:var(--red); }
+  .loja-icone{ font-size:1.5rem; line-height:1; flex-shrink:0; width:28px; text-align:center; }
+  .loja-nome{ flex:1; min-width:0; font-weight:800; font-size:.85rem; display:flex; flex-direction:column; gap:2px; }
+  .loja-tem{ font-size:.65rem; font-weight:700; color:var(--muted); }
+  .loja-preco{ flex-shrink:0; font-weight:800; font-size:.85rem; }
   .item-detalhe-topo{ display:flex; align-items:center; gap:10px; }
   .item-detalhe-icone{ font-size:2.2rem; line-height:1; flex-shrink:0; }
   .item-detalhe-nome{ display:flex; flex-direction:column; gap:2px; min-width:0; }
@@ -5507,6 +5531,10 @@ const IMUNES_A_ESPECIAL = ['mew','mewtwo'];
 const AUTODESTRUICAO = ['geodude','graveler','golem','voltorb','electrode','koffing','weezing','pineco','forretress'];
 /* Aprendem um golpe de SONO por nível na Gen 1/2 -- o valor é o nome que aparece no log. */
 const SONIFEROS = {
+  /* Acrescentadas na auditoria de 04/09/2026 (o Politoed foi reportado por um jogador): a lista de
+     Hipnose era só a da Gen 1, e faltavam o Tangela e a Smoochum. */
+  politoed:'Hipnose', noctowl:'Hipnose', yanma:'Hipnose', misdreavus:'Hipnose',
+  tangela:'Pó do Sono', smoochum:'Canto',
   bulbasaur:'Pó do Sono', ivysaur:'Pó do Sono', venusaur:'Pó do Sono', butterfree:'Pó do Sono',
   oddish:'Pó do Sono', gloom:'Pó do Sono', vileplume:'Pó do Sono', bellossom:'Pó do Sono',
   venonat:'Pó do Sono', venomoth:'Pó do Sono',
@@ -5530,7 +5558,8 @@ const METRONOMO = ['togepi','togetic','cleffa','snubbull'];
    ao bloco INTEIRO (IMUNES_A_ESPECIAL corta antes de sortear), então a entrada seria letra morta. */
 const DISABLE = ['psyduck','golduck','kadabra','alakazam','slowpoke','slowbro','slowking',
                  'grimer','muk','lickitung','jigglypuff','wigglytuff','venonat','venomoth',
-                 'drowzee','hypno'];
+                 'drowzee','hypno',
+                 'igglybuff'];   // Gen 2, achada na auditoria de 04/09/2026
 /* Aprendem Recuperar por nível na Gen 1/2. Recover não é TM em geração nenhuma das duas e não sai
    por reprodução -- então esta lista é a lista inteira, sem recorte.
    Lugia, Ho-Oh e Celebi estão aqui por serem o que os dados dizem, mesmo sendo os INTOCÁVEIS: hoje
@@ -5622,12 +5651,22 @@ function tentarGolpeEspecial(active, enemy, rng, diario){
          chance, porque quem decide isso é a SITUAÇÃO do alvo, não o sorteio. */
       if(alvo.hp <= alvo.maxHp * BOOM_MINIMO_DO_ALVO) continue;
       /* Os dois caem na hora -- e é o único caminho do jogo em que isso acontece: o doExchange
-         normal sempre deixa um de pé (ver o desempate lá embaixo). */
-      const danoNoAlvo = alvo.hp, danoEmSi = quem.hp;
-      alvo.hp = 0; quem.hp = 0;
-      explosaoDoAtivo = ehAtivo;
+         normal sempre deixa um de pé (ver o desempate lá embaixo).
+         A FAIXA DE FOCO SEGURA A EXPLOSÃO TAMBÉM. Foi o furo da primeira versão dela (03/09/2026,
+         reportado): a Faixa vigiava os dois pontos do doExchange, e a explosão não passa por
+         nenhum deles -- ela zera o HP aqui, direto. Um item que promete segurar "quando o pokémon
+         for morrer" não pode ter exceção justamente no golpe mais fatal do jogo.
+         SÓ O ALVO É SALVO, nunca quem explodiu: o dano que o explosor toma é dele mesmo, e salvá-lo
+         faria da autodestruição um "mate o outro e sobreviva" -- ela deixaria de ter preço. */
+      const salvou = faixaDeFoco(alvo, marca === 'p' ? 'e' : 'p', diario);
+      const danoNoAlvo = salvou ? alvo.hp - 1 : alvo.hp, danoEmSi = quem.hp;
+      alvo.hp = salvou ? 1 : 0;
+      quem.hp = 0;
+      /* Só conta como "explodiu e levou o outro junto" se o outro FOI junto: com a Faixa segurando,
+         quem explodiu morreu sozinho, e o teamStillAlive não pode dar a batalha pra ele. */
+      explosaoDoAtivo = salvou ? null : ehAtivo;
       if(diario){
-        diario.push({ q: marca, d: danoNoAlvo, hp: 0, c:0, m:0, z:0, x:'boom', g: especial.golpe });
+        diario.push({ q: marca, d: danoNoAlvo, hp: alvo.hp, c:0, m:0, z:0, x:'boom', g: especial.golpe });
         diario.push({ q: marca === 'p' ? 'e' : 'p', d: danoEmSi, hp: 0, c:0, m:0, z:0, x:'boomself' });
       }
       return true;
@@ -16456,13 +16495,13 @@ const ITENS = {
     comoGanhar: 'Na loja. Equipa-se pelo + da tela de ordem de batalha.'
   },
   hyperpotion: {
-    nome: 'Super Poção', icone: '🧪', comprável: true, equipável: true, preco: 30,
+    nome: 'Super Poção', icone: '🧪', comprável: true, equipável: true, preco: 50,
     resumo: 'Cura 80% quando ele entra com 25% ou menos.',
     descricao: 'Equipe num pokémon. Quando ele for começar um confronto com 25% ou menos de HP, recupera 80% da vida ANTES de a luta começar — a mesma hora em que o Recuperar acontece. O item some depois de trabalhar.',
     comoGanhar: 'Na loja. Equipa-se pelo + da tela de ordem de batalha.'
   },
   potion: {
-    nome: 'Poção', icone: '💊', comprável: true, equipável: true, preco: 15,
+    nome: 'Poção', icone: '💊', comprável: true, equipável: true, preco: 30,
     resumo: 'Cura 55% quando ele entra com 25% ou menos.',
     descricao: 'Equipe num pokémon. Quando ele for começar um confronto com 25% ou menos de HP, recupera 55% da vida ANTES de a luta começar — a mesma hora em que o Recuperar acontece. O item some depois de trabalhar.',
     comoGanhar: 'Na loja. Equipa-se pelo + da tela de ordem de batalha.'
@@ -16497,18 +16536,18 @@ const ITENS = {
     descricao: 'Equipe num pokémon: ele luta a batalha inteira com +15 de Ataque Especial. O item some no fim da batalha, se ele tiver entrado — quem fica no banco continua com o dele.',
     comoGanhar: 'Na loja. Equipa-se pelo + da tela de ordem de batalha.'
   },
+  spdef_up: {
+    nome: 'Def Special Up', icone: '✴️', comprável: true, equipável: true, preco: 30,
+    resumo: '+15 de Def Especial pela batalha inteira.',
+    descricao: 'Equipe num pokémon: ele luta a batalha inteira com +15 de Defesa Especial. O item some no fim da batalha, se ele tiver entrado — quem fica no banco continua com o dele.',
+    comoGanhar: 'Na loja. Equipa-se pelo + da tela de ordem de batalha.'
+  },
   /* A FAIXA DE FOCO é o único item que age NO MEIO da luta -- os outros todos são abertura (poção,
      despertar) ou um número somado antes dela (os cinco de atributo). Por isso ela é a mais cara. */
   faixa_foco: {
     nome: 'Faixa de Foco', icone: '🎗️', comprável: true, equipável: true, preco: 50,
     resumo: 'Segura um golpe fatal com 1 de HP.',
     descricao: 'Equipe num pokémon. Quando um golpe fosse derrubá-lo, ele fica com 1 de HP, revida e a luta continua. Vale uma vez: o próximo golpe fatal leva ele. O item some depois de segurar.',
-    comoGanhar: 'Na loja. Equipa-se pelo + da tela de ordem de batalha.'
-  },
-  spdef_up: {
-    nome: 'Def Special Up', icone: '✴️', comprável: true, equipável: true, preco: 30,
-    resumo: '+15 de Def Especial pela batalha inteira.',
-    descricao: 'Equipe num pokémon: ele luta a batalha inteira com +15 de Defesa Especial. O item some no fim da batalha, se ele tiver entrado — quem fica no banco continua com o dele.',
     comoGanhar: 'Na loja. Equipa-se pelo + da tela de ordem de batalha.'
   }
 };
@@ -16961,7 +17000,10 @@ function renderLoja(){
   const moedas = game.moedas || 0;
   return `
   <div class="eyebrow">🛒 LOJA</div>
-  <div class="box item-detalhe">
+  <!-- O QUADRO DE CIMA É FIXO (position:sticky): só a lista rola. Com 11 itens a lista passa da
+       tela a 320px, e sem isto o jogador rolava até o item, clicava, e tinha que voltar pra cima
+       pra ler o que ele faz e comprar -- duas viagens pra uma decisão. -->
+  <div class="box item-detalhe loja-fixa">
     ${it ? `
       <div class="item-detalhe-topo">
         <span class="item-detalhe-icone">${it.icone}</span>
@@ -16976,11 +17018,19 @@ function renderLoja(){
         <button class="btn success" ${(game.moedas||0) < it.preco || game.comprando ? 'disabled' : ''}
           onclick="abrirCompra('${escJs(sel.item)}')">${game.comprando ? 'Comprando...' : '🪙 Comprar'}</button>
       </div>
-      ${(game.moedas||0) < it.preco ? `<p class="hint-text">Faltam 🪙 ${it.preco - (game.moedas||0)} pra comprar um.</p>` : ''}`
+      ${(game.moedas||0) < it.preco ? `<p class="hint-text">Faltam 🪙 ${it.preco - (game.moedas||0)} pra comprar um.</p>` : ''}
+      <p class="loja-saldo">Você tem <strong>🪙 ${moedas}</strong>.</p>`
     : `<p class="item-detalhe-vazio">A loja ainda não abriu.</p>`}
   </div>
-  ${gradeDeItensHtml(slotsDaGrade(aVenda), game.lojaSel, 'escolherItemDaLoja')}
-  <div class="box"><p class="hint-text">Você tem <strong>🪙 ${moedas}</strong>.</p></div>
+  <div class="box loja-lista">
+    ${aVenda.map(p => { const i = ITENS[p.item]; const cabe = moedas >= i.preco; return `
+      <button class="loja-linha ${p.item === game.lojaSel ? 'sel' : ''} ${cabe ? '' : 'caro'}"
+        onclick="escolherItemDaLoja('${escJs(p.item)}')">
+        <span class="loja-icone">${i.icone}</span>
+        <span class="loja-nome">${escapeHtmlSafe(i.nome)}${p.quantidade > 0 ? `<span class="loja-tem">você tem ${p.quantidade}</span>` : ''}</span>
+        <span class="loja-preco">🪙 ${i.preco}</span>
+      </button>`; }).join('')}
+  </div>
   <button class="btn secondary u-mt8" onclick="openSaveSelect()">⬅ Voltar</button>`;
 }
 /* O MONTADOR DE TIME -- a lista com os pokémon de TODOS os saves com 8 insígnias. Nasceu dentro da
@@ -19033,19 +19083,17 @@ function shinyBonusCounterHtml(){
 function renderSaveSelect(){
   const caughtCount = getAllCaughtSpecies().size;
   const totalSpecies = Object.keys(SPECIES).length;
-  /* O card de Amigos mostra o que a pessoa PRECISA fazer, não o tamanho da lista: um pedido
-     esperando resposta é a única coisa aqui que fica parada até alguém agir. */
-  const pedidosPend = game.friendRequestCount || 0;
-  const friendsTeaser = pedidosPend > 0
-    ? `${pedidosPend} pedido${pedidosPend===1?'':'s'} esperando`
-    : 'Desafie quem você conhece';
-  const doces = game.rareCandies || 0;
-  const itensTeaser = doces > 0 ? `${doces} Doce${doces===1?'':'s'} Raro${doces===1?'':'s'}` : 'Seus itens';
-  let achievementsTeaser = `${ACHIEVEMENTS.length} desafios pra completar`;
+  /* SÓ OS NÚMEROS, e só onde há número. As frases que ficavam aqui ("Desafie quem você conhece",
+     "Em breve") eram convites de quando os cards estavam nascendo; num card de 43px a 320px elas
+     são a parte mais longa e a que menos se lê. O número diz o que falta sem uma palavra -- e onde
+     não há número pra dizer, o card fica só com o nome.
+     O contador de conquistas só existe depois que o agregado carrega; até lá o card fica sem
+     linha de baixo, em vez de mostrar um total sem o "de quantas". */
+  let achievementsTeaser = '';
   if(game.achievementsExtra){
     const agg = getAchievementAggregate();
     const unlocked = ACHIEVEMENTS.filter(ach=>ach.check(agg, game.achievementsExtra)).length;
-    achievementsTeaser = `${unlocked}/${ACHIEVEMENTS.length} desbloqueadas`;
+    achievementsTeaser = `${unlocked}/${ACHIEVEMENTS.length}`;
   }
   return `
   <div class="home-header">
@@ -19064,27 +19112,24 @@ function renderSaveSelect(){
     <button class="home-menu-card pokedex" onclick="openPokedex()">
       <span class="home-menu-icon">${pokedexIcon('menu')}</span>
       <span class="home-menu-title">Pokédex</span>
-      <span class="home-menu-stat">${caughtCount}/${totalSpecies} registrados</span>
+      <span class="home-menu-stat">${caughtCount}/${totalSpecies}</span>
     </button>
     <button class="home-menu-card achievements" onclick="openAchievements()">
       <span class="home-menu-icon">${icone('conquistas','menu')}</span>
       <span class="home-menu-title">Conquistas</span>
-      <span class="home-menu-stat">${achievementsTeaser}</span>
+      ${achievementsTeaser ? `<span class="home-menu-stat">${achievementsTeaser}</span>` : ''}
     </button>
     <button class="home-menu-card friends" onclick="openFriends()">
       <span class="home-menu-icon">👥${(game.friendRequestCount||0)>0 ? `<span class="notif-badge">${game.friendRequestCount>9?'9+':game.friendRequestCount}</span>` : ''}</span>
       <span class="home-menu-title">Amigos</span>
-      <span class="home-menu-stat">${friendsTeaser}</span>
     </button>
     <button class="home-menu-card inventario" onclick="openInventario()">
       <span class="home-menu-icon">🎒</span>
       <span class="home-menu-title">Mochila</span>
-      <span class="home-menu-stat">${itensTeaser}</span>
     </button>
     <button class="home-menu-card loja" onclick="openLoja()">
       <span class="home-menu-icon">🛒</span>
       <span class="home-menu-title">Loja</span>
-      <span class="home-menu-stat">Em breve</span>
     </button>
   </div>
   <div class="home-modes-row">

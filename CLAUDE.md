@@ -203,6 +203,14 @@ dois continuam idênticos é `tools/test-especiais.js` (300 batalhas com a mesma
 golpe a golpe). Ele tranca também as três frases exatas e que o Disable não entra na sequência
 de golpes.
 
+- **AUDITORIA DE 04/09/2026: sete espécies faltavam, e a de Hipnose era literalmente só a lista da
+  Gen 1.** Um jogador reportou o **Politoed** (aprende Hipnose por nível na Gen 2) e pediu pra
+  conferir o resto; as seis listas foram revistas move a move no Bulbapedia. Entraram:
+  **Politoed, Noctowl, Yanma e Misdreavus** (Hipnose), **Tangela** (Pó do Sono, e essa era da Gen 1
+  mesmo), **Smoochum** (Canto) e **Igglybuff** (Disable). Autodestruição, Recuperar e drenagem já
+  estavam completas.
+  `tools/test-especiais.js` passou a NOMEAR as sete: a próxima omissão tem que ser barulhenta, e
+  uma contagem sozinha ("37 espécies") não diz QUAL está faltando.
 - **As listas saem do aprendizado por NÍVEL da Gen 1/2**, não da "quem pode aprender de algum jeito".
   Autodestruição são **9** (Geodude/Graveler/Golem, Voltorb/Electrode, Koffing/Weezing,
   Pineco/Forretress). Sono são **37**, cada uma com o nome do golpe dela (`SONIFEROS` guarda o par
@@ -894,9 +902,24 @@ de golpes.
   carregava devolve o antigo — perder um item por ter clicado no botão errado seria pior que a troca
   não acontecer. Tudo em transação: sem ela duas abas leem o mesmo estoque e as duas passam, e um
   Despertar protege dois pokémon.
-- **Preços: Bônus Shiny 800, Doce Raro 300, Despertar 50, Super Poção 30, Poção 15.** O número vive
-  no cliente (`ITENS`) E no servidor (`LOJA`): o cliente precisa dele pra desabilitar o botão, o
-  servidor é quem cobra. Se os dois divergirem, a tela promete um preço que a cobrança não pratica.
+- **Preços: Bônus Shiny 800, Doce Raro 300, Despertar 50, Super Poção 50, Faixa de Foco 50,
+  Poção 30, os cinco de atributo 30.** O número vive no cliente (`ITENS`) E no servidor (`LOJA`):
+  o cliente precisa dele pra desabilitar o botão, o servidor é quem cobra. Se os dois divergirem, a
+  tela promete um preço que a cobrança não pratica.
+  A Super Poção era 30 e a Poção 15; subiram em 04/09/2026. Pela medição anterior isso põe a Poção
+  em **0,070 ponto por moeda** (era 0,141) e a Super em **0,063** (era 0,105) — elas deixam de ser
+  as compras mais eficientes e passam a valer o mesmo que os de atributo.
+- **A LOJA É UMA LISTA, com o quadro de cima FIXO** (04/09/2026). Era a mesma grade de quadradinhos
+  da mochila, e com 11 itens ela parou de funcionar: o quadradinho mostra só o ÍCONE, e metade dos
+  ícones são emojis parecidos (❤️ ⚔️ 🛡️ 🔮 ✴️) — não dava pra escolher sem clicar em cada um.
+  A lista traz **ícone, nome, quanto você já tem e o preço**, sem cobrar um toque.
+  O quadro de cima é `position:sticky` e não `fixed`: fixed sairia do fluxo e a lista subiria por
+  baixo dele; sticky o mantém dentro da coluna do app, com a mesma largura, e ele só "cola" quando o
+  topo passa por ele. **Sem isso o jogador rolava até o item, clicava, e voltava pra cima pra ler o
+  que ele faz e comprar** — duas viagens pra uma decisão. Conferido a 320px: rolando 400px, o quadro
+  fica em `top:0` e só a lista anda.
+  A **mochila continua com a grade**: ela mostra o que você TEM (raramente mais que três ou quatro
+  pilhas), e ali o quadradinho ainda funciona.
 - **A loja vende os CINCO desde 03/09/2026.** O Doce Raro e o Bônus Shiny voltaram a ter preço; eles
   continuam vindo de jogar também, e é por isso que **cada um lê de uma fonte própria**
   (`quantoTenho`) em vez de sair de um campo só:
@@ -1119,7 +1142,19 @@ de golpes.
   NO MEIO da luta — os outros são abertura (poção, Despertar) ou um número somado antes dela (os
   cinco de atributo). Vale uma vez: o próximo golpe fatal da mesma batalha leva o pokémon.
 - **Ela entra nos DOIS pontos do `doExchange` em que alguém chega a zero** — quem apanha primeiro e
-  quem apanha o revide. O item vale nos dois, e cobrir só um deixaria metade dos casos de fora.
+  quem apanha o revide — **e também na AUTODESTRUIÇÃO**.
+- **A explosão foi o furo da primeira versão** (reportado em 04/09/2026: *"equipei o charizard com
+  Faixa de foco e ele morreu direto quando chegou com 0 de hp"*). Ela zera o HP dentro do
+  `tentarGolpeEspecial`, sem passar por nenhum dos dois pontos do `doExchange` — e é justamente o
+  golpe mais fatal do jogo, o último lugar onde um item que promete segurar a morte pode ter
+  exceção. Medido antes do conserto: **22 furos em 3.000 batalhas**, todos `boom,boomself`.
+- **SÓ O ALVO É SALVO, nunca quem explodiu**: o dano que o explosor toma é dele mesmo, e salvá-lo
+  faria da autodestruição um "mate o outro e sobreviva" — ela deixaria de ter preço.
+  E o `explosaoDoAtivo` só é marcado quando o alvo REALMENTE caiu: com a Faixa segurando, quem
+  explodiu morreu sozinho, e o `teamStillAlive` não pode dar a batalha pra ele.
+- **O TESTE NÃO OLHA CAMINHO, OLHA INVARIANTE**: quem carrega a Faixa nunca termina um confronto em
+  0 sem ela ter disparado antes. Qualquer caminho novo que zere HP — um golpe especial futuro, uma
+  regra nova — cai ali. É a forma que teria pego a explosão, e a que vai pegar a próxima.
 - **NÃO é o golpe moribundo com outro nome.** No moribundo o pokémon revida **e cai**; aqui ele fica
   de pé. E como a marca de moribundo sai da SITUAÇÃO ("o segundo caiu e revidou"), segurar em 1 já a
   desliga sozinho — que é o certo, porque ele não caiu.
@@ -1541,6 +1576,13 @@ verdade, cai no game over, e o teste confere que a trava soltou dos dois lados.
 - **Cinco cards numa linha só**: Pokédex, Conquistas, Amigos, Mochila e Loja. A linha virou
   `grid-template-columns:repeat(5,minmax(0,1fr))` — com `1fr` (que é `minmax(auto,1fr)`) a coluna não
   encolhe abaixo do conteúdo, e "Conquistas" empurrava a linha inteira pra fora dos 320px.
+- **OS CARDS FICARAM SÓ COM O NOME E OS NÚMEROS** (04/09/2026). A Pokédex mostra `175/250` e as
+  Conquistas `53/69`; Amigos, Mochila e Loja ficam **só com o nome**. As frases que viviam ali
+  ("Desafie quem você conhece", "Seus itens", "Em breve", "N desafios pra completar") eram convites
+  de quando os cards estavam nascendo — num card de 43px a 320px elas eram a parte mais longa e a
+  que menos se lia. O número diz o que falta sem uma palavra; onde não há número, o nome basta.
+  O contador de conquistas **só aparece depois que o agregado carrega** — até lá o card fica sem a
+  linha de baixo, em vez de mostrar um total sem o "de quantas".
 - **O preço medido de caber cinco:** a 320px cada card fica com **43px** de texto, e "Conquistas" na
   fonte de pixel mede **99px**. Duas coisas cederam: o título passou pra fonte de TEXTO (mede 56px
   na mesma palavra) e a **contagem de baixo some abaixo de 420px** — "0/250 registrados" quebrava em

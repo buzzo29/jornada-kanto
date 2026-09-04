@@ -159,13 +159,20 @@ console.log('\n=== A LOJA ===');
      que esta na lista a venda. Defeito pego por este teste quando a loja passou a vender. */
   ok('e e um item que ela realmente vende', !!S.ITENS[S.__getGame().lojaSel].comprável,
      String(S.__getGame().lojaSel));
-  ok('mesma grade de quadradinhos da mochila', t.includes('class="item-grade"') && slots(t) >= S.INVENTARIO_SLOTS_MINIMOS,
-     slots(t) + ' slots');
-  /* A LOJA VENDE OS CINCO. O Doce Raro e o Bonus Shiny voltaram a ser vendidos em 03/09/2026 --
-     eles continuam vindo de jogar tambem, e e por isso que a mochila le cada um de uma fonte
-     propria (contador / cupom+estoque) em vez de derivar tudo do inventario. */
-  ok('a grade mostra os onze a venda', (t.match(/item-slot-icone/g)||[]).length === 11,
-     (t.match(/item-slot-icone/g)||[]).length + ' itens');
+  /* A LOJA VIROU LISTA em 04/09/2026. A grade de quadradinhos mostrava so o icone, e com 11 itens
+     metade deles sao emojis parecidos -- nao dava pra escolher sem clicar em cada um. */
+  ok('a loja e uma LISTA, nao a grade de quadradinhos',
+     t.includes('loja-lista') && !t.includes('item-grade'));
+  ok('com uma linha por item a venda', (t.match(/class="loja-linha/g)||[]).length === 11,
+     (t.match(/class="loja-linha/g)||[]).length + ' linhas');
+  /* Cada linha traz o que a grade nao trazia: NOME e PRECO, sem precisar clicar. */
+  ok('e cada linha tem icone, nome e preco',
+     t.includes('loja-icone') && t.includes('loja-nome') && t.includes('loja-preco') &&
+     /loja-nome[^>]*>Faixa de Foco/.test(t), (t.match(/loja-nome[^>]*>[^<]*/g)||[]).slice(0,3).join(' | '));
+  /* O QUADRO DE CIMA E FIXO: so a lista rola. Com 11 itens a lista passa da tela a 320px, e sem
+     isso o jogador rolava ate o item, clicava, e voltava pra cima pra ler e comprar. */
+  ok('e o quadro de cima fica fixo (sticky)', t.includes('loja-fixa'));
+  ok('com o saldo dentro dele', /loja-saldo/.test(t));
   ok('e a Faixa de Foco custa 50', S.ITENS.faixa_foco.preco === 50, String(S.ITENS.faixa_foco.preco));
   /* Os cinco de atributo custam 30 cada, e o preco da tela tem que ser o que o servidor cobra. */
   ok('e os cinco de atributo custam 30',
@@ -187,7 +194,8 @@ console.log('\n=== A LOJA ===');
   ok('e mostrando quantas moedas voce tem', /Você tem <strong>🪙 999<\/strong>/.test(rico));
   /* OS PRECOS da tela tem que ser os mesmos que o servidor cobra -- se divergirem, a tela promete
      um preco que a cobranca nao pratica. */
-  ok('os precos sao os pedidos', S.ITENS.awakening.preco === 50 && S.ITENS.hyperpotion.preco === 30 && S.ITENS.potion.preco === 15,
+  /* Precos revisados em 04/09/2026: Super Pocao 30 -> 50 e Pocao 15 -> 30. */
+  ok('os precos sao os pedidos', S.ITENS.awakening.preco === 50 && S.ITENS.hyperpotion.preco === 50 && S.ITENS.potion.preco === 30,
      [S.ITENS.awakening.preco, S.ITENS.hyperpotion.preco, S.ITENS.potion.preco].join('/'));
   ok('e os dois de jogar tambem tem preco', S.ITENS.doce_raro.preco === 300 && S.ITENS.bonus_shiny.preco === 800,
      S.ITENS.doce_raro.preco + '/' + S.ITENS.bonus_shiny.preco);
@@ -200,7 +208,7 @@ console.log('\n=== O POPUP DE QUANTIDADE ===');
      abrir o popup e confirmar. */
   conta({ doces: 0 });
   const g = S.__getGame(); g.moedas = 100; S.__setGame(g);
-  ok('o maximo sai do saldo', S.maximoQueCabe('potion') === 6, String(S.maximoQueCabe('potion')));   // 100/15
+  ok('o maximo sai do saldo', S.maximoQueCabe('potion') === 3, String(S.maximoQueCabe('potion')));   // 100/30
   ok('e arredonda pra baixo', S.maximoQueCabe('awakening') === 2, String(S.maximoQueCabe('awakening'))); // 100/50
   ok('sem dinheiro pra um, o maximo e zero', S.maximoQueCabe('doce_raro') === 0, String(S.maximoQueCabe('doce_raro')));
 
@@ -211,17 +219,17 @@ console.log('\n=== O POPUP DE QUANTIDADE ===');
   S.abrirCompra('potion');
   ok('o popup abre em 1', S.__getGame().compraQtd === 1, String(S.__getGame().compraQtd));
   const m = S.renderCompraModal();
-  ok('e diz o teto', /até <strong>6<\/strong>/.test(m), (m.match(/até[^<]*<strong>[^<]*/g)||[]).join(' | '));
-  ok('e o total de 1', /Total: <strong>🪙 15<\/strong>/.test(m), (m.match(/Total:[^<]*<strong>[^<]*/g)||[]).join(' | '));
+  ok('e diz o teto', /até <strong>3<\/strong>/.test(m), (m.match(/até[^<]*<strong>[^<]*/g)||[]).join(' | '));
+  ok('e o total de 1', /Total: <strong>🪙 30<\/strong>/.test(m), (m.match(/Total:[^<]*<strong>[^<]*/g)||[]).join(' | '));
   ok('o menos nasce travado em 1', /disabled[^>]*onclick="mudarQtdCompra\(-1\)"/.test(m),
      (m.match(/<button[^>]*mudarQtdCompra\(-1\)[^>]*/g)||[]).join(' | '));
 
-  S.mudarQtdCompra(1); S.mudarQtdCompra(1);
-  ok('o + sobe', S.__getGame().compraQtd === 3, String(S.__getGame().compraQtd));
-  ok('e o total acompanha', /Total: <strong>🪙 45<\/strong>/.test(S.renderCompraModal()));
+  S.mudarQtdCompra(1);
+  ok('o + sobe', S.__getGame().compraQtd === 2, String(S.__getGame().compraQtd));
+  ok('e o total acompanha', /Total: <strong>🪙 60<\/strong>/.test(S.renderCompraModal()));
   /* NAO PASSA DO TETO, nem apertando muito: o + para no maximo. */
   for(let i = 0; i < 20; i++) S.mudarQtdCompra(1);
-  ok('o + nunca passa do que o dinheiro compra', S.__getGame().compraQtd === 6, String(S.__getGame().compraQtd));
+  ok('o + nunca passa do que o dinheiro compra', S.__getGame().compraQtd === 3, String(S.__getGame().compraQtd));
   ok('e ai ele trava', /disabled[^>]*onclick="mudarQtdCompra\(1\)"/.test(S.renderCompraModal()));
   /* E nao desce abaixo de 1: comprar zero nao e uma compra. */
   for(let i = 0; i < 20; i++) S.mudarQtdCompra(-1);
@@ -229,8 +237,8 @@ console.log('\n=== O POPUP DE QUANTIDADE ===');
 
   /* O MAX e o caminho de verdade num toque -- ninguem aperta o + vinte vezes. */
   S.qtdCompraMax();
-  ok('o Max vai direto ao teto', S.__getGame().compraQtd === 6, String(S.__getGame().compraQtd));
-  ok('e o botao de comprar diz quantos', /Comprar 6 unidades/.test(S.renderCompraModal()),
+  ok('o Max vai direto ao teto', S.__getGame().compraQtd === 3, String(S.__getGame().compraQtd));
+  ok('e o botao de comprar diz quantos', /Comprar 3 unidades/.test(S.renderCompraModal()),
      (S.renderCompraModal().match(/Comprar [^<]*/g)||[]).join(' | '));
   S.fecharCompra();
   ok('fechar limpa o popup', S.renderCompraModal() === '');
@@ -337,9 +345,16 @@ console.log('\n=== A HOME ===');
   ok('cinco cards na mesma linha', contaEm(home, /class="home-menu-card /g) === 5,
      contaEm(home, /class="home-menu-card /g) + ' cards');
   ok('mochila e loja entre eles', home.includes('openInventario()') && home.includes('openLoja()'));
-  ok('e a mochila conta os doces', /3 Doces Raros/.test(home), (home.match(/home-menu-stat">[^<]*/g)||[]).join(' | '));
-  conta({ doces: 0 });
-  ok('sem doce ela nao inventa numero', /home-menu-stat">Seus itens/.test(S.renderSaveSelect()));
+  /* OS CARDS FICARAM SO COM O NOME E OS NUMEROS (04/09/2026). As frases ("Desafie quem voce
+     conhece", "Em breve") eram convites de quando os cards estavam nascendo -- num card de 43px a
+     320px elas eram a parte mais longa e a que menos se lia. */
+  const stats = (home.match(/home-menu-stat">[^<]*/g)||[]).map(s => s.replace('home-menu-stat">',''));
+  ok('a Pokedex mostra so os numeros', stats.includes('0/250'), stats.join(' | '));
+  ok('e nenhuma frase sobrou nos cards',
+     stats.every(s => /^\d+\/\d+$/.test(s)), stats.join(' | '));
+  ok('Amigos, Mochila e Loja ficam so com o nome',
+     !/Desafie quem/.test(home) && !/Seus itens/.test(home) && !/Em breve/.test(home) &&
+     home.includes('>Amigos<') && home.includes('>Mochila<') && home.includes('>Loja<'));
 }
 
 console.log('\n=== O PREMIO APONTA PRA MOCHILA, NAO ATIVA NO LUGAR ===');

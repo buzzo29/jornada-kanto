@@ -34,7 +34,7 @@ ok('9 especies aprendem autodestruicao', S.AUTODESTRUICAO.length === 9, S.AUTODE
 ok('e sao as certas (Geodude/Voltorb/Koffing/Pineco e evolucoes)',
    ['geodude','graveler','golem','voltorb','electrode','koffing','weezing','pineco','forretress']
      .every(id => S.AUTODESTRUICAO.includes(id)));
-ok('37 especies tem golpe de sono', Object.keys(S.SONIFEROS).length === 37, Object.keys(S.SONIFEROS).length + '');
+ok('43 especies tem golpe de sono', Object.keys(S.SONIFEROS).length === 43, Object.keys(S.SONIFEROS).length + '');
 ok('cada uma com o NOME do golpe dela',
    S.SONIFEROS.paras === 'Esporo' && S.SONIFEROS.jigglypuff === 'Canto' &&
    S.SONIFEROS.gengar === 'Hipnose' && S.SONIFEROS.oddish === 'Pó do Sono' && S.SONIFEROS.jynx === 'Beijo Adorável');
@@ -275,7 +275,7 @@ ok('explodindo no ultimo de cada lado, quem explodiu vence',
    vitoriasPorExplosao + ' de ' + batalhas + ' explosoes viraram vitoria');
 
 console.log('\nDISABLE: O MELHOR GOLPE SAI DE CENA');
-ok('16 especies aprendem Disable por nivel', S.DISABLE.length === 16, S.DISABLE.length + '');
+ok('17 especies aprendem Disable por nivel', S.DISABLE.length === 17, S.DISABLE.length + '');
 ok('as do Gen 1 estao la (Psyduck, Kadabra, Slowpoke, Grimer, Lickitung)',
    ['psyduck','golduck','kadabra','alakazam','slowpoke','slowbro','grimer','muk','lickitung']
      .every(id => S.DISABLE.includes(id)));
@@ -479,6 +479,98 @@ const todasComEspecial = new Set([...S.AUTODESTRUICAO, ...Object.keys(S.SONIFERO
 const semFicha = [...todasComEspecial].filter(id => S.especiaisDaEspecie(id).length === 0);
 ok('e toda especie das quatro listas aparece', semFicha.length === 0,
    semFicha.join(',') || todasComEspecial.size + ' especies');
+console.log('\nA FAIXA DE FOCO NAO PODE SER FURADA POR CAMINHO NENHUM');
+/* REPORTADO em 04/09/2026: "equipei o charizard com Faixa de foco e ele morreu direto quando
+   chegou com 0 de hp". A causa era a AUTODESTRUICAO -- ela zera o HP dentro do
+   tentarGolpeEspecial, sem passar pelos dois pontos do doExchange onde a Faixa vigiava.
+   Este teste nao olha um caminho especifico: ele afirma o INVARIANTE. Quem carrega a Faixa nunca
+   pode terminar um confronto em 0 sem ela ter disparado antes. Qualquer caminho novo que zere HP
+   -- um golpe especial futuro, uma regra nova -- cai aqui. */
+(function(){
+  const IDS = Object.keys(S.SPECIES);
+  let furos = 0, disparou = 0, exemplos = [];
+  for(let i = 0; i < 6000; i++){
+    const meu = [S.createInstance('charizard', 55)];
+    for(let k = 0; k < 5; k++) meu.push(S.createInstance(IDS[(i*7+k) % IDS.length], 55));
+    S.equiparItens(meu, { charmander:'faixa_foco' });
+    /* O adversario e mais forte de proposito: e assim que a Faixa e posta a prova. */
+    const dele = [];
+    for(let k = 0; k < 6; k++) dele.push(S.createInstance(IDS[(i*13+k) % IDS.length], 62));
+    S.equiparItens(dele, null);
+    const r = S.simulateGymBattle(meu, dele, Math.random);
+    const usou = (r.matchups||[]).some(m => (m.golpes||[]).some(g => g.x === 'faixa'));
+    const caiu = (r.playerStatus||[]).some(p => p.speciesId === 'charizard' && p.fainted);
+    if(usou) disparou++;
+    if(caiu && !usou){
+      furos++;
+      if(exemplos.length < 3){
+        const m = (r.matchups||[]).find(x => x.playerSpecies === 'charizard' && x.playerHpAfter <= 0);
+        exemplos.push(m ? (m.golpes||[]).map(g => g.x || 'golpe').join(',') : 'sem matchup');
+      }
+    }
+  }
+  ok('a Faixa dispara quando o Charizard ia cair', disparou > 5000, disparou + ' de 6000');
+  ok('e NENHUM caminho a fura', furos === 0, furos + ' furos | ' + exemplos.join(' | '));
+
+  /* O CASO QUE FUROU: a autodestruicao. Isolado, pra a causa ficar nomeada no teste. */
+  let segurouBoom = 0, morreuNoBoom = 0;
+  for(let i = 0; i < 4000; i++){
+    const meu = [S.createInstance('charizard', 55)];
+    S.equiparItens(meu, { charmander:'faixa_foco' });
+    const r = S.simulateGymBattle(meu, [S.createInstance('golem', 60)], Math.random);
+    const g = ((r.matchups||[])[0]||{}).golpes || [];
+    if(!g.some(x => x.x === 'boom')) continue;
+    if(g.some(x => x.x === 'faixa')) segurouBoom++; else morreuNoBoom++;
+  }
+  ok('a Faixa segura a AUTODESTRUICAO', segurouBoom > 100, segurouBoom + ' explosoes seguradas');
+  ok('e nunca deixa passar uma', morreuNoBoom === 0, morreuNoBoom + '');
+
+  /* QUEM EXPLODIU NAO E SALVO: o dano e dele mesmo, e salva-lo faria da autodestruicao um "mate o
+     outro e sobreviva" -- ela deixaria de ter preco. */
+  let explosorSobreviveu = 0;
+  for(let i = 0; i < 4000; i++){
+    const meu = [S.createInstance('golem', 55)];
+    S.equiparItens(meu, { geodude:'faixa_foco' });
+    const r = S.simulateGymBattle(meu, [S.createInstance('rhydon', 60)], Math.random);
+    const g = ((r.matchups||[])[0]||{}).golpes || [];
+    /* boom com q='p' = fomos NOS que explodimos. */
+    if(g.some(x => x.x === 'boom' && x.q === 'p') && (r.matchups[0].playerHpAfter > 0)) explosorSobreviveu++;
+  }
+  ok('mas quem EXPLODIU nao e salvo pela propria Faixa', explosorSobreviveu === 0, explosorSobreviveu + '');
+})();
+
+console.log('\nA AUDITORIA DAS LISTAS (04/09/2026)');
+/* Um jogador reportou que o Politoed aprende Hipnose por nivel na Gen 2 e nao estava na lista. A
+   conferencia das SEIS listas, move a move no Bulbapedia, achou sete espécies faltando -- todas de
+   Gen 2, e a de Hipnose era literalmente so a lista da Gen 1.
+   Este teste existe pra a proxima omissao ser barulhenta: nomeia cada uma das sete. */
+(function(){
+  const esperado = {
+    politoed:'Hipnose', noctowl:'Hipnose', yanma:'Hipnose', misdreavus:'Hipnose',
+    tangela:'Pó do Sono', smoochum:'Canto'
+  };
+  const faltando = Object.keys(esperado).filter(id => S.SONIFEROS[id] !== esperado[id]);
+  ok('as seis que faltavam no sono estao la', faltando.length === 0,
+     faltando.map(id => id + ' (esperava ' + esperado[id] + ', tem ' + S.SONIFEROS[id] + ')').join(', '));
+  ok('e o Igglybuff entrou no Disable', S.DISABLE.includes('igglybuff'));
+  /* Todas tem que existir no SPECIES, senao a lista aponta pra fantasma. */
+  const fora = Object.keys(esperado).filter(id => !S.SPECIES[id]);
+  ok('e todas existem no SPECIES', fora.length === 0, fora.join(','));
+  /* O Mewtwo e o Mew continuam fora de TODAS: eles sao imunes ao bloco inteiro, e uma entrada pra
+     eles seria letra morta. */
+  const listas = { AUTODESTRUICAO:S.AUTODESTRUICAO, DISABLE:S.DISABLE, METRONOMO:S.METRONOMO,
+                   RECUPERACAO:S.RECUPERACAO };
+  const imunesNaLista = [];
+  for(const [nome, l] of Object.entries(listas)){
+    for(const id of ['mew','mewtwo']) if(l.includes(id)) imunesNaLista.push(nome + ':' + id);
+  }
+  for(const id of ['mew','mewtwo']){
+    if(S.SONIFEROS[id]) imunesNaLista.push('SONIFEROS:' + id);
+    if(S.ABSORCAO[id]) imunesNaLista.push('ABSORCAO:' + id);
+  }
+  ok('e os dois imunes nao estao em lista nenhuma', imunesNaLista.length === 0, imunesNaLista.join(', '));
+})();
+
 console.log('\nDRENAGEM: TIRA DO OUTRO E POE EM SI, ANTES DA LUTA');
 /* A LISTA SAI DO APRENDIZADO POR NIVEL DA GEN 1/2, conferida move a move no Bulbapedia -- e a
    intuicao erra: Kabuto e Kabutops aprendem Absorb/Mega Drain por nivel (sao Pedra/Agua), e o
