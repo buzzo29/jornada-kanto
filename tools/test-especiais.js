@@ -1099,6 +1099,17 @@ const srv = require(path.join(raiz, 'functions', 'index.js'));
 Module._load = loadOriginal;
 
 const esp = srv._golpesEspeciais;
+/* A RAIZ DA LINHA e a base da CHAVE do item equipado ("slot:linha"). Discordancia aqui faz o
+   cliente gravar numa chave e o servidor procurar noutra -- o item some sem ninguem entender.
+   Compara por VALOR nas 250, nao por texto: os dois arquivos tem comentarios proprios. */
+{
+  const dif = Object.keys(S.SPECIES).filter(id => S.raizDaLinha(id) !== srv._raizDaLinha(id));
+  ok('a raiz da linha e a MESMA nos dois motores, nas 250 especies', dif.length === 0,
+     dif.slice(0, 5).join(', ') || Object.keys(S.SPECIES).length + ' especies');
+  /* E a chave montada tambem, que e o que vai pro banco. */
+  const difC = Object.keys(S.SPECIES).filter(id => S.chaveDoEquipado(7, id) !== srv._chaveDoEquipado(7, id));
+  ok('e a chave "slot:linha" tambem', difC.length === 0, difC.slice(0, 5).join(', '));
+}
 ok('as listas sao IDENTICAS nos dois motores',
    esp.AUTODESTRUICAO.join(',') === S.AUTODESTRUICAO.join(',') &&
    esp.METRONOMO.join(',') === S.METRONOMO.join(',') &&

@@ -710,7 +710,7 @@ function withItemStat(v, p, qual){
 function anotarItemDeAtributo(p, marca){
   if(!p || !p.item || !ITENS_DE_ATRIBUTO[p.item] || p._itemGastoAnotado) return;
   p._itemGastoAnotado = true;
-  itensGastos.push({ dono: marca, especie: p.speciesId, item: p.item });
+  itensGastos.push({ dono: marca, especie: p.speciesId, slot: p.slotDaConta, item: p.item });
 }
 function withBuffs(v, p){
   if(p.shiny){ v = Math.round(v * SHINY_BUFF_MULT); }
@@ -982,11 +982,19 @@ function itensGastosDaBatalha(){ return itensGastos; }
    montado por quem chama a partir do que o servidor gravou. O parametro equipados e um mapa
    especie -> item. Fica junto do applySpecialtyBuff nas
    chamadas de batalha de propósito: são a mesma coisa -- estado da conta virando flag na instância. */
-function equiparItens(team, equipados){
+/* De qual SAVE cada pokémon veio. Na jornada o time é todo de um slot só (o slotPadrao); na Torre
+   e no Ginásio da Cidade ele MISTURA saves, e cada bicho traz o slot de onde saiu -- por isso o
+   slot é por POKÉMON e não por time. */
+function equiparItens(team, equipados, slotPadrao){
   if(!team) return;
   /* O _itemGastoAnotado zera junto: ele é por BATALHA (o item de atributo vale a batalha inteira e
      só depois some), e uma marca sobrando de uma batalha anterior faria o gasto não ser anotado. */
-  team.forEach(p => { if(p){ p.item = itemEquipado(equipados, p.speciesId); p._itemGastoAnotado = false; } });
+  team.forEach(p => {
+    if(!p) return;
+    if(p.slotDaConta == null) p.slotDaConta = (p.slot != null) ? String(p.slot) : (slotPadrao != null ? String(slotPadrao) : null);
+    p.item = itemEquipado(equipados, p.slotDaConta, p.speciesId);
+    p._itemGastoAnotado = false;
+  });
 }
 /* Abaixo disso (25%) a poção dispara. É "sobrou raspando", não "levou um arranhão". */
 const POCAO_GATILHO_HP = 0.25;
@@ -1105,7 +1113,7 @@ function tentarGolpeEspecial(active, enemy, rng, diario){
          O item é GASTO aqui: ele serviu. E vira linha no log, senão o jogador não teria como saber
          que ele trabalhou -- o erro da especialidade de novo. */
       alvo.item = null;
-      itensGastos.push({ dono: marca === 'p' ? 'e' : 'p', especie: alvo.speciesId, item: 'awakening' });
+      itensGastos.push({ dono: marca === 'p' ? 'e' : 'p', especie: alvo.speciesId, slot: alvo.slotDaConta, item: 'awakening' });
       if(diario){
         diario.push({ q: marca, d: 0, hp: alvo.hp, c:0, m:0, z:0, x:'semSono', g: especial.golpe });
       }
@@ -1132,7 +1140,7 @@ function tentarGolpeEspecial(active, enemy, rng, diario){
 function faixaDeFoco(p, marca){
   if(!p || p.item !== 'faixa_foco') return false;
   p.item = null;
-  itensGastos.push({ dono: marca, especie: p.speciesId, item: 'faixa_foco' });
+  itensGastos.push({ dono: marca, especie: p.speciesId, slot: p.slotDaConta, item: 'faixa_foco' });
   return true;
 }
 /* A LINHA DA FAIXA VEM DEPOIS DO GOLPE QUE ELA SEGUROU, e é por isso que ela não é escrita dentro
@@ -1268,7 +1276,7 @@ function simulateGymBattle(team, enemyTeam, rng, opts){
         if(curado > 0){
           active.hp += curado;
           active.item = null;   // gasta: o item é um só
-          itensGastos.push({ dono:'p', especie: active.speciesId, item });
+          itensGastos.push({ dono:'p', especie: active.speciesId, slot: active.slotDaConta, item });
           diario.push({ q:'p', d: curado, hp: active.hp, c:0, m:0, z:0, x:'pocao', g: item });
         }
       }
@@ -1668,6 +1676,14 @@ function resolveLeagueMatch(match, seedStr, allowedTerrainIds){
   const rng = makeSeededRng(seedStr);
   const teamA = decodeTeamCode(match.a.code);
   const teamB = decodeTeamCode(match.b.code);
+  /* O CÓDIGO DO TIME não carrega o slot de cada pokémon -- ele é compacto. Quem manda os slots é
+     quem montou o match (hoje só o Ginásio da Cidade; as ligas não usam item). Sem este carimbo o
+     item equipado seria procurado sem slot e cairia na chave velha, valendo pra qualquer save. */
+  const carimbaSlots = (time, lado) => {
+    if(!lado || !Array.isArray(lado.slots)) return;
+    time.forEach((p, i) => { if(p && lado.slots[i] != null) p.slotDaConta = String(lado.slots[i]); });
+  };
+  carimbaSlots(teamA, match.a); carimbaSlots(teamB, match.b);
   if(!teamA || !teamB){
     match.winner = teamA ? match.a : match.b;
     match.resolved = true;
@@ -2326,6 +2342,14 @@ function resolveTrainersLeagueMatch(match, seedStr){
   const rng = makeSeededRng(seedStr);
   const teamA = decodeTeamCode(match.a.code);
   const teamB = decodeTeamCode(match.b.code);
+  /* O CÓDIGO DO TIME não carrega o slot de cada pokémon -- ele é compacto. Quem manda os slots é
+     quem montou o match (hoje só o Ginásio da Cidade; as ligas não usam item). Sem este carimbo o
+     item equipado seria procurado sem slot e cairia na chave velha, valendo pra qualquer save. */
+  const carimbaSlots = (time, lado) => {
+    if(!lado || !Array.isArray(lado.slots)) return;
+    time.forEach((p, i) => { if(p && lado.slots[i] != null) p.slotDaConta = String(lado.slots[i]); });
+  };
+  carimbaSlots(teamA, match.a); carimbaSlots(teamB, match.b);
   if(!teamA || !teamB){
     match.winner = teamA ? match.a : match.b;
     match.resolved = true;
@@ -2803,6 +2827,11 @@ async function checkAndAdvanceTrainersLeague(dateId){
    mesmo resultado com a mesma semente, senão a liga decide uma coisa e a animação mostra outra. */
 exports._simulateGymBattle = simulateGymBattle;
 exports._equiparItens = equiparItens;   // o teste dos dois motores compara com item equipado
+/* O raizDaLinha e a base da CHAVE do item equipado ("slot:linha"). Se os dois motores discordarem
+   da raiz de uma especie, o cliente grava numa chave e o servidor procura noutra -- e o item some
+   sem ninguem entender. O teste compara as 250. */
+exports._raizDaLinha = raizDaLinha;
+exports._chaveDoEquipado = chaveDoEquipado;
 exports._createInstance = createInstance;
 exports._makeSeededRng = makeSeededRng;
 exports._golpesEspeciais = { AUTODESTRUICAO, SONIFEROS, METRONOMO, CHANCE_AUTODESTRUICAO, CHANCE_SONO };
@@ -3168,7 +3197,10 @@ exports.challengeNeighborhoodGym = onCall(async (request) => {
     const match = {
       /* Os itens equipados do DESAFIANTE viajam aqui, como a especialidade: quem esta jogando
          agora e ele. O LIDER esta dormindo do outro lado do mundo e nao entra com item. */
-      a: { uid, name: challengerName, code: challengerCode, specialties: challengerSpecialties, equipados: challengerEquipados },
+      /* Os SLOTS viajam junto: o código do time não os carrega (ele é compacto de propósito), e o
+         item equipado é por save -- sem eles o Venusaur do slot 11 usaria o item do slot 5. */
+      a: { uid, name: challengerName, code: challengerCode, specialties: challengerSpecialties,
+           equipados: challengerEquipados, slots: timeDoDesafiante.map(p => p.slotDaConta || null) },
       b: { uid: gymData.leaderUid, name: gymData.leaderName, code: gymData.leaderTeamCode, specialties: gymData.leaderSpecialties || [] },
       winner:null, matchups:null, resolved:false, terrain // terreno do líder = vantagem de mandante
     };
@@ -4409,7 +4441,10 @@ async function resolverTimeDosSaves(uid, escolhidos, tamanho, ondeErro, minimo){
     const real = achado.mon;
     /* A CHAVE identifica ESTE pokémon na conta, e sai do que o servidor achou -- nunca do que o
        cliente mandou, senão daria pra fugir da espera do ginásio inventando um id. */
+    /* O slotDaConta viaja junto: o item equipado é por SAVE, e este time MISTURA saves -- sem ele
+       o Venusaur do slot 11 usaria o item do Venusaur do slot 5. */
     time.push({ speciesId: real.speciesId, level: real.level, shiny: !!real.shiny,
+                slotDaConta: String(achado.slot),
                 chave: chaveDoPokemonNaConta(achado.slot, real) });
   }
   return time;
@@ -4452,6 +4487,10 @@ exports.fightTrainerTowerFloor = onCall(async (request) => {
   const meuTime = run.team.map(p => {
     const inst = createInstance(p.speciesId, p.level);
     inst.shiny = !!p.shiny;   // createInstance não traz a flag, e sem ela o buff de shiny sumiria
+    /* Nem o slot: o time da torre MISTURA saves, e sem ele o item do Venusaur de um save valeria
+       pro Venusaur de outro. Subida antiga (gravada antes do campo) fica sem -- aí o itemEquipado
+       cai na chave velha, sem slot, que é como ela sempre funcionou. */
+    inst.slotDaConta = (p.slotDaConta != null) ? String(p.slotDaConta) : null;
     return inst;
   });
   const timeNpc = andar.team.map(p => createInstance(p.speciesId, p.level));
@@ -4784,19 +4823,47 @@ function raizDaLinha(id){
    propriedade que faltava: ela NÃO MUDA quando o pokémon evolui.
    A LEITURA aceita qualquer chave da mesma linha, e é isso que devolve o que já estava perdido:
    uma poção presa em "charmeleon" volta a ser achada pelo Charizard, sem migração de dados. */
-function chaveDoEquipado(speciesId){ return raizDaLinha(speciesId); }
-function itemEquipado(equipados, speciesId){
+/* A CHAVE É "SLOT:LINHA", NÃO SÓ A LINHA (04/09/2026).
+   Era só a linha, e o item vazava entre saves: um Venusaur no slot 11 e outro no slot 5 são o mesmo
+   "venusaur" pra conta, então equipar num fazia o item aparecer no outro. Reportado.
+   O comentário que justificava a chave antiga dizia "espécie é única na conta pra este fim" -- ela
+   é única dentro de UM SAVE (o encontro selvagem nunca oferece uma linha que o time já tem, e o
+   montador recusa repetida), mas a conta tem até 20 saves e nada impede dois Venusaur.
+   É a mesma correção que a espera do Ginásio da Cidade já tinha feito, e pelo mesmo motivo: lá a
+   chave também virou save+espécie depois de um jogador ver oito pokémon marcados por causa de seis. */
+function chaveDoEquipado(slot, speciesId){ return String(slot) + ':' + raizDaLinha(speciesId); }
+/* A raiz de uma chave gravada. Chave NOVA é "slot:linha"; chave VELHA é só a linha, e ela tem que
+   continuar valendo -- quem já tinha item equipado não pode perdê-lo no deploy. A velha casa com
+   QUALQUER slot, que é como ela se comportava; a primeira vez que o jogador mexer naquele item ela
+   é apagada e nasce a nova, então o dado se conserta sozinho. */
+function linhaDaChave(k){ const i = String(k).indexOf(':'); return i < 0 ? String(k) : String(k).slice(i + 1); }
+function slotDaChave(k){ const i = String(k).indexOf(':'); return i < 0 ? null : String(k).slice(0, i); }
+function itemEquipado(equipados, slot, speciesId){
   if(!equipados || !speciesId) return null;
   const raiz = raizDaLinha(speciesId);
-  if(equipados[raiz]) return equipados[raiz];
-  for(const k in equipados){ if(raizDaLinha(k) === raiz) return equipados[k]; }
+  const exata = chaveDoEquipado(slot, speciesId);
+  if(equipados[exata]) return equipados[exata];
+  /* Chave do MESMO slot, linha equivalente (dado gravado com a espécie do meio, antes de evoluir). */
+  for(const k in equipados){
+    if(slotDaChave(k) === String(slot) && raizDaLinha(linhaDaChave(k)) === raiz) return equipados[k];
+  }
+  /* Só então a chave VELHA, sem slot. */
+  for(const k in equipados){
+    if(slotDaChave(k) === null && raizDaLinha(k) === raiz) return equipados[k];
+  }
   return null;
 }
 /* Toda chave da linha, pra APAGAR. Deveria haver uma só; pode haver duas enquanto sobrar dado
    gravado com a chave velha, e deixar a antiga pra trás faria o item ressuscitar na leitura. */
-function chavesDaLinha(equipados, speciesId){
+/* Toda chave que responde por ESTE pokémon: a do slot dele mais as velhas sem slot. Apagar as
+   velhas junto é o que faz o dado antigo se consertar sozinho -- deixá-las para trás faria o item
+   ressuscitar na leitura, que ainda as aceita. */
+function chavesDaLinha(equipados, slot, speciesId){
   const raiz = raizDaLinha(speciesId);
-  return Object.keys(equipados || {}).filter(k => raizDaLinha(k) === raiz);
+  return Object.keys(equipados || {}).filter(k => {
+    const s = slotDaChave(k);
+    return (s === null || s === String(slot)) && raizDaLinha(linhaDaChave(k)) === raiz;
+  });
 }
 function equipadosDaConta(d){ return (d && d.equipados) || {}; }
 
@@ -4811,7 +4878,7 @@ async function gastarItensEquipados(uid, gastos){
   const snap = await db.collection('users').doc(uid).get().catch(()=>null);
   const equipados = (snap && snap.exists && snap.data().equipados) || {};
   const patch = {};
-  meus.forEach(g => { chavesDaLinha(equipados, g.especie).forEach(k => { patch['equipados.' + k] = admin.firestore.FieldValue.delete(); }); });
+  meus.forEach(g => { chavesDaLinha(equipados, g.slot, g.especie).forEach(k => { patch['equipados.' + k] = admin.firestore.FieldValue.delete(); }); });
   if(!Object.keys(patch).length) return;
   await db.collection('users').doc(uid).update(patch).catch(e => logger.error('Erro ao gastar item equipado:', e));
 }
@@ -4900,8 +4967,11 @@ exports.equipItem = onCall(async (request) => {
   const uid = request.auth.uid;
   const item = String(request.data?.item ?? '');
   const especie = String(request.data?.speciesId ?? '');
+  /* O SLOT faz parte da identidade: dois saves podem ter o mesmo pokémon, e o item é de UM deles. */
+  const slot = String(request.data?.slot ?? '');
   if(EQUIPAVEIS.indexOf(item) < 0) throw new HttpsError('invalid-argument', 'Esse item não se equipa.');
   if(!especie) throw new HttpsError('invalid-argument', 'Pokémon não informado.');
+  if(!slot || slot === 'null' || slot === 'undefined') throw new HttpsError('invalid-argument', 'Save não informado.');
   const userRef = db.collection('users').doc(uid);
   /* Transação porque duas abas podem equipar ao mesmo tempo: sem ela as duas leem o mesmo estoque e
      as duas passam -- dois pokémon equipados com um item só. */
@@ -4912,11 +4982,11 @@ exports.equipItem = onCall(async (request) => {
     if(quantos <= 0) throw new HttpsError('failed-precondition', 'Você não tem esse item.');
     const equipados = Object.assign({}, d.equipados || {});
     /* A chave é a RAIZ DA LINHA: assim o item continua no pokémon depois de ele evoluir. */
-    const chave = chaveDoEquipado(especie);
-    const antigas = chavesDaLinha(equipados, especie);
+    const chave = chaveDoEquipado(slot, especie);
+    const antigas = chavesDaLinha(equipados, slot, especie);
     /* UM ITEM POR POKÉMON. Trocar o que ele já carregava DEVOLVE o antigo pro armazém: perder um
        item porque se clicou no botão errado seria pior que a troca não acontecer. */
-    const antigo = itemEquipado(equipados, especie);
+    const antigo = itemEquipado(equipados, slot, especie);
     const patch = { inventario: { [item]: admin.firestore.FieldValue.increment(-1) } };
     if(antigo) patch.inventario[antigo] = admin.firestore.FieldValue.increment(1);
     tx.set(userRef, patch, { merge: true });
@@ -4939,22 +5009,24 @@ exports.unequipItem = onCall(async (request) => {
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   const uid = request.auth.uid;
   const especie = String(request.data?.speciesId ?? '');
+  const slot = String(request.data?.slot ?? '');
   if(!especie) throw new HttpsError('invalid-argument', 'Pokémon não informado.');
+  if(!slot || slot === 'null' || slot === 'undefined') throw new HttpsError('invalid-argument', 'Save não informado.');
   const userRef = db.collection('users').doc(uid);
   return db.runTransaction(async (tx) => {
     const [snap] = await tx.getAll(userRef);
     const d = snap.exists ? (snap.data() || {}) : {};
     const equipados = Object.assign({}, d.equipados || {});
-    const item = itemEquipado(equipados, especie);
+    const item = itemEquipado(equipados, slot, especie);
     if(!item) throw new HttpsError('failed-precondition', 'Esse pokémon não está com item nenhum.');
     /* Apaga TODA chave da linha: o pokémon pode ter evoluído, e o item estar guardado sob a espécie
        de antes. Procurar só pela espécie de agora devolveria "não tem item" pra quem tem. */
     const upd = { ['inventario.' + item]: admin.firestore.FieldValue.increment(1) };
-    chavesDaLinha(equipados, especie).forEach(k => { upd['equipados.' + k] = admin.firestore.FieldValue.delete(); });
+    chavesDaLinha(equipados, slot, especie).forEach(k => { upd['equipados.' + k] = admin.firestore.FieldValue.delete(); });
     tx.update(userRef, upd);
     const inv = Object.assign({}, d.inventario || {});
     inv[item] = (inv[item] || 0) + 1;
-    chavesDaLinha(equipados, especie).forEach(k => { delete equipados[k]; });
+    chavesDaLinha(equipados, slot, especie).forEach(k => { delete equipados[k]; });
     return { inventario: inv, equipados };
   });
 });
@@ -4968,14 +5040,21 @@ exports.unequipItem = onCall(async (request) => {
 exports.consumeEquipped = onCall(async (request) => {
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   const uid = request.auth.uid;
-  const especies = Array.isArray(request.data?.especies) ? request.data.especies.map(String).slice(0, 12) : [];
-  if(!especies.length) return { ok: true };
+  /* Cada gasto vem com ESPÉCIE e SLOT: o item é de um pokémon de um save, e dois saves podem ter o
+     mesmo bicho. O campo antigo (só as espécies) continua aceito pra não quebrar cliente em cache;
+     sem slot, apaga a chave velha da linha, que é o que aquele cliente sabia gravar. */
+  const brutos = Array.isArray(request.data?.gastos) ? request.data.gastos
+               : (Array.isArray(request.data?.especies) ? request.data.especies.map(e => ({ especie: e })) : []);
+  const gastos = brutos.slice(0, 12)
+    .map(g => ({ especie: String((g && g.especie) || ''), slot: (g && g.slot != null) ? String(g.slot) : null }))
+    .filter(g => g.especie);
+  if(!gastos.length) return { ok: true };
   const userRef = db.collection('users').doc(uid);
   const snap = await userRef.get();
   const equipados = (snap.exists && snap.data().equipados) || {};
   /* Pela RAIZ DA LINHA, não pela espécie: o pokémon pode ter evoluído entre equipar e gastar. */
   const patch = {};
-  especies.forEach(e => { chavesDaLinha(equipados, e).forEach(k => { patch['equipados.' + k] = admin.firestore.FieldValue.delete(); }); });
+  gastos.forEach(g => { chavesDaLinha(equipados, g.slot, g.especie).forEach(k => { patch['equipados.' + k] = admin.firestore.FieldValue.delete(); }); });
   if(!Object.keys(patch).length) return { ok: true };
   await userRef.update(patch);
   return { ok: true };
@@ -6776,7 +6855,7 @@ exports.fightSundayBoss = onCall(async (request) => {
   const equipadosDaRaide = equipadosDaConta(conta);
   const antes = estado.hp;
   const boss = bossInstance(antes);
-  equiparItens(time, equipadosDaRaide);
+  equiparItens(time, equipadosDaRaide, slot);
   const luta = simulateBossFight(time, boss);
   /* O que o Despertar segurou sai da conta. A raide nao usa pocao -- ela e um ataque so, sem
      confronto seguinte pra o curado aproveitar --, mas gastar pelo que o motor ANOTOU vale pros

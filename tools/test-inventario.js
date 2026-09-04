@@ -292,28 +292,41 @@ console.log('\n=== O + DA TELA DE ORDEM ===');
 {
   /* O item e do POKEMON: o + fica na linha dele, a esquerda das setas de mover -- e ali que se
      decide quem entra primeiro, e decidir quem leva o que e a mesma conversa. */
+  /* O ITEM E POR POKEMON *E POR SAVE*: a chave e "slot:linha". Era so a linha, e o item vazava
+     entre saves -- um Venusaur no slot 11 e outro no slot 5 sao o mesmo "venusaur" pra conta.
+     Reportado em 04/09/2026. */
   conta({ doces: 0 });
   const g = S.__getGame();
+  g.currentSaveSlot = 3;
   g.inventario = { awakening: 1, potion: 2 };
-  g.equipados = { blastoise: 'awakening' };
+  g.equipados = { '3:squirtle': 'awakening' };
   S.__setGame(g);
-  const semItem = S.botaoDeItemHtml('charizard');
+  const semItem = S.botaoDeItemHtml({ speciesId:'charizard' });
   ok('quem nao carrega nada mostra o +', />\+<\/button>/.test(semItem), semItem);
-  ok('e abre a escolha pra AQUELE pokemon', /abrirEscolhaDeItem\('charizard'\)/.test(semItem), semItem);
-  const comItem = S.botaoDeItemHtml('blastoise');
+  ok('e abre a escolha pra AQUELE pokemon, com o slot',
+     /abrirEscolhaDeItem\('3','charizard'\)/.test(semItem), semItem);
+  const comItem = S.botaoDeItemHtml({ speciesId:'blastoise' });
   ok('quem carrega mostra o icone do item', comItem.includes('⏰') && !/>\+<\/button>/.test(comItem), comItem);
   ok('e fica destacado', /com-item/.test(comItem), comItem);
 
+  /* O MESMO POKEMON EM OUTRO SAVE NAO HERDA O ITEM -- e o defeito reportado em 04/09/2026: um
+     Venusaur no slot 11 e outro no slot 5 sao o mesmo "venusaur" pra conta, e equipar num fazia o
+     item aparecer no outro. A chave passou a ser "slot:linha". */
+  const outroSave = S.botaoDeItemHtml({ speciesId:'blastoise', slot:7 });
+  ok('o mesmo pokemon em OUTRO save nao herda o item', />\+<\/button>/.test(outroSave), outroSave);
+  ok('e o do save dele continua com ele',
+     /com-item/.test(S.botaoDeItemHtml({ speciesId:'blastoise', slot:3 })));
+
   /* A CAIXA lista so o que a mochila TEM: oferecer o que a pessoa nao tem seria uma fileira de
      botoes que nao clicam. */
-  S.abrirEscolhaDeItem('blastoise');
+  S.abrirEscolhaDeItem('3', 'blastoise');
   const modal = S.renderEscolhaDeItemModal();
   ok('a caixa nomeia o pokemon', /Blastoise/.test(modal));
   ok('e lista os itens da mochila com a quantidade', /Despertar/.test(modal) && /Poção/.test(modal) && /2x/.test(modal), modal.slice(0,400));
   ok('mas nao o que nao esta na mochila', !/Super Poção/.test(modal));
   ok('nem o que nao e de batalha', !/Doce Raro/.test(modal));
   ok('marca o que ele ja carrega', /btn selected[\s\S]{0,120}awakening/.test(modal), (modal.match(/btn selected[^"]*/g)||[]).join(' | '));
-  ok('e oferece tirar', /desequiparItem\('blastoise'\)/.test(modal));
+  ok('e oferece tirar', /desequiparItem\('3','blastoise'\)/.test(modal));
 
   /* O QUE ELE CARREGA JA SAIU DO ARMAZEM (equipar tira de la), entao o caso mais comum de todos e
      ter 1, equipar e ficar com 0. Filtrando so por estoque, o item DELE sumia da lista: a caixa

@@ -902,8 +902,35 @@ de golpes.
   **desliga um golpe do jogo inteiro**. `inventario` (item → quantos) e `equipados` (espécie → item)
   entraram na trava do `firestore.rules` junto de `moedas` e `rareCandies`. Quem escreve é
   `buyItem`/`equipItem`/`unequipItem`/`consumeEquipped`.
-- **A chave dos equipados é a RAIZ DA LINHA EVOLUTIVA** (`raizDaLinha`), **nunca o id da instância e
-  nunca a espécie.** O `id` (`mon7`) vem de um contador que recomeça do 1 a cada carregamento de
+- **A chave dos equipados é `"SLOT:RAIZ DA LINHA"`** — o save MAIS a linha evolutiva. Nunca o id da
+  instância, nunca a espécie sozinha, e nunca a linha sozinha.
+- **O SLOT entrou em 04/09/2026, reportado:** a chave era só a linha, e o item vazava entre saves.
+  Um Venusaur no slot 11 e outro no slot 5 são o mesmo `venusaur` pra conta, então equipar num fazia
+  o item aparecer no outro. O comentário que justificava a chave antiga dizia "espécie é única na
+  conta pra este fim" — ela é única dentro de UM SAVE (o encontro selvagem nunca oferece uma linha
+  que o time já tem, e o montador recusa repetida), mas a conta tem até 20 saves e nada impede dois
+  Venusaur. **É a mesma correção que a espera do Ginásio da Cidade já tinha feito**, e pelo mesmo
+  motivo: lá a chave também virou save+espécie depois de um jogador ver oito pokémon marcados por
+  causa de seis.
+- **O slot é por POKÉMON, não por time** (`p.slotDaConta`): na jornada o time é todo de um save, mas
+  na Torre e no Ginásio da Cidade ele MISTURA saves, e cada escolhido traz o slot de onde saiu.
+  `equiparItens(time, equipados, slotPadrao)` usa o do pokémon quando existe e o padrão quando não.
+- **Três caminhos precisaram carregar o slot até a batalha**, e cada um perdia de um jeito:
+  o `createInstance` da Torre monta do zero e não copia campo nenhum (o mesmo motivo pelo qual o
+  shiny já tinha que ser recopiado ali); a raide monta do save gravado e recebe o slot no pedido; e
+  o Ginásio da Cidade transforma o time num **CÓDIGO**, que é compacto e não carrega slot — ali os
+  slots viajam **dentro do match**, como a especialidade e os equipados já viajam, e são carimbados
+  logo depois do `decodeTeamCode`.
+  Cuidado ao mexer nisso: o carimbo tem que ficar **junto do decode**, não perto da chamada da
+  batalha — a trava que LÊ O CÓDIGO exige um `applySpecialtyBuff` nas 12 linhas anteriores, e
+  qualquer coisa empurrada pra ali a quebra.
+- **CHAVE VELHA (sem slot) CONTINUA VALENDO na leitura**, pra ninguém perder item no deploy: ela casa
+  com qualquer slot, que é como se comportava. Na primeira vez que o jogador mexer naquele item ela é
+  apagada e nasce a nova — o dado se conserta sozinho, sem migração.
+- **O `raizDaLinha` virou a base da CHAVE, então os dois motores têm que concordar sobre ele.**
+  Discordância ali faz o cliente gravar numa chave e o servidor procurar noutra, e o item some sem
+  ninguém entender. `tools/test-especiais.js` compara a raiz das **250 espécies** entre os dois — por
+  VALOR, não por texto: os dois arquivos têm comentários próprios. O `id` (`mon7`) vem de um contador que recomeça do 1 a cada carregamento de
   página e **repete entre saves** — foi assim que um jogador viu oito pokémon marcados por causa de
   seis (ver a seção do Ginásio da Cidade).
   **A ESPÉCIE foi a primeira tentativa e durou um dia**: o pokémon EVOLUI e a espécie muda. Uma

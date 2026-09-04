@@ -256,71 +256,71 @@ console.log('\n=== A LOJA: COMPRAR E USAR ===');
   /* EQUIPAR: o item sai do armazem e vai num pokemon ESPECIFICO. A chave e a ESPECIE porque um save
      nao tem duas da mesma -- o id da instancia repete entre saves e ja fez o jogador ver oito
      pokemon marcados por causa de seis. */
-  const e1 = await chamar('equipItem', 'g', { speciesId:'blastoise', item:'awakening' });
+  const e1 = await chamar('equipItem', 'g', { speciesId:'blastoise', item:'awakening', slot:'0' });
   ok('equipar tira o item do armazem', e1.inventario.awakening === 0, JSON.stringify(e1.inventario));
-  ok('e poe no pokemon, sob a RAIZ da linha dele', e1.equipados.squirtle === 'awakening', JSON.stringify(e1.equipados));
+  ok('e poe no pokemon, sob SLOT:RAIZ da linha dele', e1.equipados['0:squirtle'] === 'awakening', JSON.stringify(e1.equipados));
   ok('sem ter o item, equipar e recusado',
-     await recusa('equipItem', 'g', { speciesId:'charizard', item:'awakening' }) === 'failed-precondition');
+     await recusa('equipItem', 'g', { speciesId:'charizard', item:'awakening', slot:'0' }) === 'failed-precondition');
   ok('item que nao se equipa e recusado',
-     await recusa('equipItem', 'g', { speciesId:'blastoise', item:'doce_raro' }) === 'invalid-argument');
+     await recusa('equipItem', 'g', { speciesId:'blastoise', item:'doce_raro', slot:'0' }) === 'invalid-argument');
   ok('e sem dizer o pokemon tambem',
      await recusa('equipItem', 'g', { item:'potion' }) === 'invalid-argument');
 
   /* TROCAR O QUE ELE JA CARREGAVA DEVOLVE O ANTIGO. Perder um item por ter clicado no botao errado
      seria pior que a troca nao acontecer. */
-  const e2 = await chamar('equipItem', 'g', { speciesId:'blastoise', item:'potion' });
+  const e2 = await chamar('equipItem', 'g', { speciesId:'blastoise', item:'potion', slot:'0' });
   ok('trocar de item devolve o antigo pro armazem', e2.inventario.awakening === 1, JSON.stringify(e2.inventario));
-  ok('e o novo e o que fica no pokemon', e2.equipados.squirtle === 'potion', JSON.stringify(e2.equipados));
+  ok('e o novo e o que fica no pokemon', e2.equipados['0:squirtle'] === 'potion', JSON.stringify(e2.equipados));
 
   /* DESEQUIPAR devolve. O item so se PERDE quando trabalha. */
   const antesDeTirar = ((await userRef('g').get()).data().inventario || {}).potion || 0;
-  const d1 = await chamar('unequipItem', 'g', { speciesId:'blastoise' });
+  const d1 = await chamar('unequipItem', 'g', { speciesId:'blastoise', slot:'0' });
   ok('tirar o item devolve pro armazem', d1.inventario.potion === antesDeTirar + 1,
      antesDeTirar + ' -> ' + d1.inventario.potion);
-  ok('e o pokemon fica sem nada', !d1.equipados.blastoise, JSON.stringify(d1.equipados));
+  ok('e o pokemon fica sem nada', !d1.equipados['0:squirtle'], JSON.stringify(d1.equipados));
   ok('tirar de quem nao tem nada e recusado',
-     await recusa('unequipItem', 'g', { speciesId:'blastoise' }) === 'failed-precondition');
+     await recusa('unequipItem', 'g', { speciesId:'blastoise', slot:'0' }) === 'failed-precondition');
 
   /* O ITEM TRABALHOU: o cliente avisa e ele some. So sai o que a conta REALMENTE tinha equipado --
      o cliente diz o que gastou, mas nao escolhe o que some. */
-  await chamar('equipItem', 'g', { speciesId:'blastoise', item:'awakening' });
-  await chamar('consumeEquipped', 'g', { especies:['blastoise'] });
+  await chamar('equipItem', 'g', { speciesId:'blastoise', item:'awakening', slot:'0' });
+  await chamar('consumeEquipped', 'g', { gastos:[{ especie:'blastoise', slot:'0' }] });
   const dep = (await userRef('g').get()).data() || {};
-  ok('depois de trabalhar o item some do pokemon', !(dep.equipados||{}).blastoise, JSON.stringify(dep.equipados));
+  ok('depois de trabalhar o item some do pokemon', !(dep.equipados||{})['0:squirtle'], JSON.stringify(dep.equipados));
   ok('e NAO volta pro armazem', ((dep.inventario||{}).awakening || 0) === 0, JSON.stringify(dep.inventario));
   /* Uma especie que nao tinha nada equipado nao pode virar escrita nenhuma. */
-  await chamar('consumeEquipped', 'g', { especies:['mewtwo'] });
+  await chamar('consumeEquipped', 'g', { gastos:[{ especie:'mewtwo', slot:'0' }] });
   ok('e consumir quem nao tinha item nao quebra nem inventa nada',
-     !((await userRef('g').get()).data().equipados || {}).mewtwo);
+     !((await userRef('g').get()).data().equipados || {})['0:mewtwo']);
 
   /* A CHAVE E A RAIZ DA LINHA, NAO A ESPECIE -- senao o pokemon evolui e perde o item.
      Reportado em 03/09/2026: pocao no Charmeleon, ele evoluiu, e ela sumiu da tela e da batalha. */
   await userRef('g').set({ moedas: 100 }, { merge:true });   // recarrega: as compras acima zeraram o saldo
   await chamar('buyItem', 'g', { item:'potion' });
-  const ev = await chamar('equipItem', 'g', { speciesId:'charmeleon', item:'potion' });
-  ok('equipar num Charmeleon grava sob a RAIZ (charmander)',
-     ev.equipados.charmander === 'potion' && !ev.equipados.charmeleon, JSON.stringify(ev.equipados));
+  const ev = await chamar('equipItem', 'g', { speciesId:'charmeleon', item:'potion', slot:'0' });
+  ok('equipar num Charmeleon grava sob SLOT:RAIZ (0:charmander)',
+     ev.equipados['0:charmander'] === 'potion' && !ev.equipados['0:charmeleon'], JSON.stringify(ev.equipados));
   /* E o Charizard, depois de evoluir, e o mesmo pokemon pro servidor. */
   const antesDoUn = ((await userRef('g').get()).data().inventario || {}).potion || 0;
-  const un = await chamar('unequipItem', 'g', { speciesId:'charizard' });
+  const un = await chamar('unequipItem', 'g', { speciesId:'charizard', slot:'0' });
   ok('e o Charizard consegue tirar o item que o Charmeleon pos',
-     un.inventario.potion === antesDoUn + 1 && !un.equipados.charmander, JSON.stringify(un));
+     un.inventario.potion === antesDoUn + 1 && !un.equipados['0:charmander'], JSON.stringify(un));
 
   /* DADO JA ESTRAGADO, gravado com a chave velha: tem que ser resgatavel, senao o item fica preso
      pra sempre -- a tela so sabe pedir pela especie que esta vendo. */
   await userRef('g').set({ equipados: { charmeleon: 'potion' } }, { merge:true });
   const antesDoResgate = ((await userRef('g').get()).data().inventario || {}).potion || 0;
-  const un2 = await chamar('unequipItem', 'g', { speciesId:'charizard' });
+  const un2 = await chamar('unequipItem', 'g', { speciesId:'charizard', slot:'0' });
   ok('o item preso na chave velha volta pro armazem',
      un2.inventario.potion === antesDoResgate + 1, antesDoResgate + ' -> ' + un2.inventario.potion);
-  ok('e a chave velha e apagada junto', !un2.equipados.charmeleon, JSON.stringify(un2.equipados));
+  ok('e a chave velha (sem slot) e apagada junto', !un2.equipados.charmeleon, JSON.stringify(un2.equipados));
 
   /* Equipar por cima de dado velho NAO pode deixar as duas chaves: a leitura aceita a linha
      inteira, entao a antiga ressuscitaria o item. */
   await userRef('g').set({ equipados: { charmeleon: 'awakening' } }, { merge:true });
-  const ev2 = await chamar('equipItem', 'g', { speciesId:'charizard', item:'potion' });
+  const ev2 = await chamar('equipItem', 'g', { speciesId:'charizard', item:'potion', slot:'0' });
   ok('equipar por cima da chave velha apaga a velha',
-     ev2.equipados.charmander === 'potion' && !ev2.equipados.charmeleon, JSON.stringify(ev2.equipados));
+     ev2.equipados['0:charmander'] === 'potion' && !ev2.equipados.charmeleon, JSON.stringify(ev2.equipados));
   ok('e devolve o item que estava la', ev2.devolvido === 'awakening', String(ev2.devolvido));
 }
 
@@ -340,8 +340,8 @@ console.log('\n=== DUAS ABAS NAO COMPRAM O MESMO ITEM DUAS VEZES ===');
   /* E NEM EQUIPAR O MESMO ITEM EM DOIS POKEMON. Mesmo motivo, mesma transacao: sem ela as duas leem
      o mesmo armazem e as duas passam -- dois pokemon protegidos por um Despertar so. */
   const re = await Promise.allSettled([
-    chamar('equipItem', 'h', { speciesId:'blastoise', item:'awakening' }),
-    chamar('equipItem', 'h', { speciesId:'charizard', item:'awakening' })
+    chamar('equipItem', 'h', { speciesId:'blastoise', item:'awakening', slot:'0' }),
+    chamar('equipItem', 'h', { speciesId:'charizard', item:'awakening', slot:'0' })
   ]);
   const equiparam = re.filter(x => x.status === 'fulfilled').length;
   ok('so um dos dois equipa', equiparam === 1, equiparam + ' passaram');
