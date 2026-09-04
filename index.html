@@ -1922,6 +1922,12 @@
   .compra-qtd{ font-weight:800; font-size:1.3rem; min-width:56px; text-align:center; }
   .compra-max{ width:auto; margin:0; padding:8px 12px; font-size:.75rem; text-align:center; }
   .compra-total{ text-align:center; font-weight:800; margin:4px 0 10px; }
+  /* O item que NÃO serve naquele pokémon: desbotado, mas ainda clicável -- a escolha é do jogador,
+     a tela só avisa. Vermelho seria "erro"; isto é "atenção". */
+  .btn.item-nao-serve{ opacity:.72; }
+  .btn.item-nao-serve .mon-sub{ color:var(--red); opacity:1; }
+  .dex-perfil{ margin:8px 0 0; font-size:.72rem; line-height:1.4; color:var(--muted); }
+  .dex-perfil strong{ color:var(--ink); }
   .order-item{
     width:28px; height:28px; margin:0; padding:0;
     font-size:.9rem; line-height:1; font-family:inherit;
@@ -13873,6 +13879,36 @@ function fraseDoEspecial(g, quem, alvo, op){
 }
 /* Os golpes especiais que uma espécie tem, pra ficha da Pokédex. É LISTA porque dá pra ter mais de
    um: a Jigglypuff canta E anula, o Venomoth dorme E anula. */
+/* FÍSICO OU ESPECIAL? No motor da Gen 1 quem decide não é o golpe, é o TIPO dele: Fogo, Água,
+   Planta, Elétrico, Psíquico, Gelo e Dragão usam o Ataque Especial; todo o resto usa o Ataque.
+   Isso decide QUAL DOS DOIS itens de ataque serve num pokémon -- e sem dizer na tela, metade das
+   compras não fazia nada. Reportado em 04/09/2026 ("to colocando aqui em alguns pokemons e nao
+   vejo nada de diferente"): medido, 108 das 250 atacam SEMPRE físico e 45 SEMPRE especial, então o
+   item do lado errado é dinheiro fora e não havia como saber.
+   O perfil sai dos tipos da espécie MAIS os subtipos dela (o Raichu é Elétrico, especial, mas
+   ataca de Normal contra Terra -- e Normal é físico). Quem tem dos dois lados 'varia': o motor
+   escolhe o que render mais contra CADA adversário, e aí depende da luta.
+   O Ditto fica de fora da conta: ele copia o tipo de quem está na frente, então o perfil dele é o
+   do adversário -- prometer um lado seria mentir na metade das lutas. */
+function perfilDeAtaque(id){
+  if(id === 'ditto') return 'varia';
+  const sp = SPECIES[id];
+  if(!sp) return 'varia';
+  const tipos = (sp.types || []).concat((USE_SUBTYPES && SUBTYPES[id]) || []);
+  if(!tipos.length) return 'varia';
+  const temEsp = tipos.some(isSpecialType), temFis = tipos.some(x => !isSpecialType(x));
+  if(temEsp && temFis) return 'varia';
+  return temEsp ? 'especial' : 'fisico';
+}
+/* Se ESTE item ajuda ESTE pokémon. Só os dois de ataque dependem do perfil: o HP Up sempre vale, e
+   os de DEFESA dependem de quem está ATACANDO -- não do dono do item --, então sobre eles não há o
+   que prometer a partir da espécie. */
+function itemServeNoPokemon(itemId, speciesId){
+  const perfil = perfilDeAtaque(speciesId);
+  if(itemId === 'atk_up')   return perfil === 'especial' ? 'nao' : (perfil === 'varia' ? 'as vezes' : 'sim');
+  if(itemId === 'spatk_up') return perfil === 'fisico'   ? 'nao' : (perfil === 'varia' ? 'as vezes' : 'sim');
+  return 'sim';
+}
 function especiaisDaEspecie(id){
   const out = [];
   if(AUTODESTRUICAO.includes(id)) out.push({ nome:'auto-destruição', chance: CHANCE_AUTODESTRUICAO });
@@ -16826,12 +16862,24 @@ function renderEscolhaDeItemModal(){
       <h2>${sp ? spriteHtml(especie,'sprite-sm') : ''} Item de ${escapeHtmlSafe(sp ? sp.name : '?')}</h2>
       ${atual ? `<p class="hint-text">Está carregando <strong>${escapeHtmlSafe(ITENS[atual].nome)}</strong>. Escolher outro devolve este pra mochila.</p>` : ''}
       ${game.escolhaDeItemErro ? `<p class="error-text">${escapeHtmlSafe(game.escolhaDeItemErro)}</p>` : ''}
-      ${disponiveis.length ? disponiveis.map(id => `
-        <button class="btn ${atual===id?'selected':''}" ${(game.equipando || atual===id)?'disabled':''}
+      ${disponiveis.length ? disponiveis.map(id => {
+        /* O AVISO DE QUE O ITEM NÃO SERVE. Os dois de ataque valem por METADE dos pokémon (o tipo
+           do golpe decide se conta o Ataque ou o Ataque Especial), e sem dizer isso aqui a compra
+           virava sorte: um Atk Up num Alakazam não faz absolutamente nada.
+           Continua CLICÁVEL de propósito -- é o pokémon do jogador e a escolha é dele; o que a tela
+           deve é avisar, não decidir. */
+        const serve = itemServeNoPokemon(id, especie);
+        const nota = serve === 'nao' ? '⚠️ Não vale neste pokémon: ele ataca com golpes ' +
+                       (perfilDeAtaque(especie) === 'especial' ? 'ESPECIAIS' : 'FÍSICOS') + '.'
+                   : serve === 'as vezes' ? '≈ Vale só nos golpes ' +
+                       (id === 'atk_up' ? 'físicos' : 'especiais') + ' dele — ele usa os dois.'
+                   : '';
+        return `
+        <button class="btn ${atual===id?'selected':''} ${serve==='nao'?'item-nao-serve':''}" ${(game.equipando || atual===id)?'disabled':''}
           onclick="equiparItemNoPokemon('${escJs(slot)}','${escJs(especie)}','${escJs(id)}')">
           <span class="mon-name">${ITENS[id].icone} ${escapeHtmlSafe(ITENS[id].nome)} — ${atual===id ? 'equipado' : (inv[id] || 0) + 'x'}</span>
-          <span class="mon-sub">${escapeHtmlSafe(ITENS[id].resumo || '')}</span>
-        </button>`).join('')
+          <span class="mon-sub">${escapeHtmlSafe(ITENS[id].resumo || '')}${nota ? '<br>' + escapeHtmlSafe(nota) : ''}</span>
+        </button>`; }).join('')
         : '<p class="hint-text">Sua mochila não tem nenhum item de batalha. Eles vêm da Loja.</p>'}
       ${atual ? `<button class="btn danger" ${game.equipando?'disabled':''} onclick="desequiparItem('${escJs(slot)}','${escJs(especie)}')">Tirar o item</button>` : ''}
       <button class="btn secondary" onclick="fecharEscolhaDeItem()">Fechar</button>
@@ -19463,6 +19511,17 @@ function renderPokedexFicha(){
           </div>
         </div>
       </div>
+      ${(() => {
+        /* FÍSICO OU ESPECIAL. É a segunda coisa que a ficha conta e que os seis números não contam
+           (a primeira são os golpes especiais, logo abaixo): no motor da Gen 1 quem decide se o
+           golpe usa Ataque ou Ataque Especial é o TIPO dele, e sem isso na tela o jogador compra o
+           item de ataque errado sem ter como saber. Reportado em 04/09/2026. */
+        const perfil = perfilDeAtaque(id);
+        const texto = perfil === 'fisico'   ? 'Ataca com golpes <strong>FÍSICOS</strong> — quem conta pra ele é o Ataque.'
+                    : perfil === 'especial' ? 'Ataca com golpes <strong>ESPECIAIS</strong> — quem conta pra ele é o Atk Especial.'
+                    : 'Ataca dos <strong>dois jeitos</strong>, conforme o adversário — o Ataque conta nuns golpes e o Atk Especial noutros.';
+        return `<div class="dex-perfil">${perfil === 'fisico' ? '💪' : perfil === 'especial' ? '🔮' : '⚖️'} ${texto}</div>`;
+      })()}
       ${(() => {
         /* GOLPE ESPECIAL na ficha: é a única coisa que uma espécie faz em batalha que os seis
            números não contam. Um Geodude e um Graveler de atributo parecido jogam diferente

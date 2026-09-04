@@ -1140,6 +1140,33 @@ de golpes.
 - **O bônus é FLAT e entra POR ÚLTIMO** (`withItemStat`), depois de shiny, terreno e especialidade —
   que são multiplicadores. Entrando antes, eles o inflariam: +15 num shiny em terreno viraria +21, e
   "+15 de atributo" deixaria de ser 15.
+- **O TIPO DO GOLPE decide QUAL atributo conta, e por isso metade das compras não fazia nada.**
+  No motor da Gen 1 o que separa físico de especial não é o golpe, é o TIPO: Fogo, Água, Planta,
+  Elétrico, Psíquico, Gelo e Dragão usam o **Ataque Especial**; todo o resto usa o **Ataque**.
+  Um Atk Up num Alakazam é dinheiro fora, e um Atk Special Up num Machamp também.
+  Reportado em 04/09/2026: *"to colocando aqui em alguns pokemons e nao vejo nada de diferente"*.
+  Medido nas 250: **108 atacam SEMPRE físico**, **45 SEMPRE especial** e 97 variam conforme o
+  adversário. Medido no dano: um Machamp com Atk Up bate **+18,8%**; um Alakazam com o mesmo item,
+  **+0,1%**.
+- **A tela passou a avisar, e a mecânica NÃO mudou** (decisão de 04/09/2026). `perfilDeAtaque(id)`
+  classifica a espécie pelos tipos dela mais os subtipos, e `itemServeNoPokemon` diz se aquele item
+  ajuda aquele bicho. A caixa do + marca a linha com ⚠️ e diz o porquê; a ficha da Pokédex ganhou
+  uma linha dizendo se a espécie ataca com golpes físicos, especiais ou dos dois jeitos.
+  **O item continua CLICÁVEL**: é o pokémon do jogador e a escolha é dele — o que a tela deve é
+  avisar, não decidir.
+  **O Ditto fica de fora do perfil**: ele copia o tipo de quem está na frente, então prometer um
+  lado seria mentir em metade das lutas.
+  **Os dois de DEFESA não têm perfil**, e não é esquecimento: quem decide se conta a Defesa ou a
+  Defesa Especial é o tipo do golpe de QUEM ATACA, não do dono do item. Não há o que prometer a
+  partir da espécie — o que dá pra dizer é que 59% dos golpes do jogo são físicos.
+- **O TETO DE DANO ENGOLE O BÔNUS em 12,3% dos golpes.** `DMG_CAP_PCT = 0.65` limita cada golpe a
+  65% do HP máximo do alvo (70% no crítico), e quem já bate no teto não ganha nada com mais ataque.
+  Medido em 8.000 batalhas o A/B de subir pra 75%: os golpes no teto caem de 11,5% pra 6,6%, a taxa
+  de vitória não se move (50,64% → 50,80%), **3,6% das batalhas trocam de vencedor** e a jornada
+  concluída vai de 66,3% pra 69,0% (1,8σ — no limite do ruído, mas para o lado fácil).
+  **Ficou em 65%**: o teto é o que garante que one-shot não existe e que todo pokémon sempre
+  responde pelo menos uma vez, e mexer nele muda o jogo inteiro por causa de um efeito colateral
+  nos itens.
 - **Consequência conhecida e aceita: ele vale proporcionalmente MAIS pra quem tem o atributo baixo.**
   +15 num ataque de 45 (Onix) é +33%; num de 110 (Snorlax) é +14%; num Magikarp de 10, +150%.
 - **O HP Up entra no `effectiveBaseHp`**, então mexe no TETO de vida (`calcMaxHp`) **e** no

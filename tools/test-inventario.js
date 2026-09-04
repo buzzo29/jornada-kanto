@@ -348,6 +348,57 @@ console.log('\n=== O + DA TELA DE ORDEM ===');
   ok('fechar limpa a escolha', S.renderEscolhaDeItemModal() === '');
 }
 
+console.log('\n=== FISICO OU ESPECIAL: A CAIXA AVISA QUANDO O ITEM NAO SERVE ===');
+{
+  /* No motor da Gen 1 quem decide se o golpe usa Ataque ou Ataque Especial e o TIPO dele -- Fogo,
+     Agua, Planta, Eletrico, Psiquico, Gelo e Dragao sao especiais, o resto e fisico. Isso decide
+     QUAL dos dois itens de ataque serve num pokemon, e sem dizer na tela metade das compras nao
+     fazia nada. Reportado em 04/09/2026: "to colocando aqui em alguns pokemons e nao vejo nada de
+     diferente". Medido: 108 das 250 atacam SEMPRE fisico e 45 SEMPRE especial. */
+  ok('o perfil sai dos tipos da especie', S.perfilDeAtaque('machamp') === 'fisico' &&
+     S.perfilDeAtaque('alakazam') === 'especial', S.perfilDeAtaque('machamp') + '/' + S.perfilDeAtaque('alakazam'));
+  /* Quem tem os DOIS lados varia com o adversario -- o motor escolhe o que render mais. O Raichu e
+     o caso classico: Eletrico (especial) com subtipo Normal (fisico), pra alcancar os de Terra. */
+  ok('e quem tem os dois lados VARIA', S.perfilDeAtaque('charizard') === 'varia' &&
+     S.perfilDeAtaque('raichu') === 'varia', S.perfilDeAtaque('charizard') + '/' + S.perfilDeAtaque('raichu'));
+  /* O DITTO fica de fora: ele copia o tipo de quem esta na frente, entao prometer um lado seria
+     mentir na metade das lutas. */
+  ok('e o Ditto nunca promete um lado', S.perfilDeAtaque('ditto') === 'varia');
+
+  ok('o Atk Up NAO serve num atacante especial', S.itemServeNoPokemon('atk_up','alakazam') === 'nao');
+  ok('e o Atk Special Up nao serve num fisico', S.itemServeNoPokemon('spatk_up','machamp') === 'nao');
+  /* O HP Up vale sempre; os de DEFESA dependem de quem esta ATACANDO, nao do dono do item, entao
+     sobre eles nao ha o que prometer a partir da especie. */
+  ok('mas o HP Up vale em qualquer um', S.itemServeNoPokemon('hp_up','alakazam') === 'sim' &&
+     S.itemServeNoPokemon('def_up','alakazam') === 'sim');
+
+  /* A CAIXA avisa, e o item continua CLICAVEL: e o pokemon do jogador e a escolha e dele -- o que a
+     tela deve e avisar, nao decidir. */
+  conta({ doces: 0 });
+  const gp = S.__getGame();
+  gp.currentSaveSlot = 0; gp.inventario = { atk_up:1, spatk_up:1, hp_up:1 }; gp.equipados = {};
+  S.__setGame(gp);
+  S.abrirEscolhaDeItem('0', 'alakazam');
+  const cx = S.renderEscolhaDeItemModal();
+  ok('a caixa avisa que o Atk Up nao vale ali', cx.includes('Não vale neste pokémon: ele ataca com golpes ESPECIAIS'),
+     (cx.match(/Não vale[^<]*/g)||[]).join(' | '));
+  ok('e marca a linha do item que nao serve', /item-nao-serve/.test(cx));
+  ok('mas ele continua clicavel', /item-nao-serve[^>]*>[sS]{0,80}onclick="equiparItemNoPokemon/.test(cx) ||
+     !/item-nao-serve[^>]*disabled/.test(cx));
+  ok('e o item que SERVE nao leva aviso nenhum',
+     !/Atk Especial pela batalha inteira.<br>/.test(cx), 'o Atk Special Up saiu limpo');
+
+  /* A FICHA DA POKEDEX diz o mesmo, pra a decisao poder ser tomada antes de comprar. */
+  S.abrirPokedexFicha('alakazam');
+  const ficha = S.renderPokedexFicha();
+  ok('a ficha da Pokedex diz o perfil', ficha.includes('golpes <strong>ESPECIAIS</strong>'),
+     (ficha.match(/Ataca[^<]*/g)||[]).slice(0,1).join(''));
+  S.abrirPokedexFicha('machamp');
+  ok('e acerta o outro lado', S.renderPokedexFicha().includes('golpes <strong>FÍSICOS</strong>'));
+  S.abrirPokedexFicha('charizard');
+  ok('e diz quando varia', /dois jeitos/.test(S.renderPokedexFicha()));
+}
+
 console.log('\n=== A HOME ===');
 {
   conta({ doces: 3 });
