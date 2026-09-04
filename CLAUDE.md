@@ -1188,6 +1188,25 @@ de golpes.
   A METADE 1 termina com o pokémon em 1: ele é o "perdedor" dela, então o último golpe da
   reconstrução é justamente o que ia matá-lo. A METADE 2 começa com ele em 1 — e como a reconstrução
   dá o primeiro golpe a quem entra **abaixo de 50%**, ele ataca primeiro sem precisar de regra nova.
+- **QUEM CAIU NA METADE 1 decide o papel de cada um na reconstrução, e errar isso põe um pokémon
+  MORTO ATACANDO** — o defeito mais reportado deste log. Se o adversário TAMBÉM chegou a zero ali
+  (`outro === 0`), os dois caíram: é uma **TROCA**, e a reconstrução da troca dá um golpe a cada
+  lado, com o do adversário PRIMEIRO — ele bate e só então morre. Se o adversário sobreviveu, só o
+  carregador caiu, e aí ele É o perdedor da metade.
+  Reportado em 04/09/2026 com print: um Ivysaur matava o Geodude com o HP inteiro num golpe só e o
+  Geodude, já em 0, revidava na linha seguinte. A causa era declarar o carregador "perdedor" da
+  metade quando quem morreu ali foi o adversário.
+- **A divisão parte do HP DEPOIS das aberturas** (o `base`), não do HP de entrada. Se uma drenagem ou
+  uma cura abriu o confronto, as duas barras já se moveram antes do primeiro golpe, e dividir a
+  partir da entrada fazia a metade 1 gastar vida que a abertura já tinha gasto. Mesmo sintoma
+  (alguém batendo com o adversário em 0), em **0,16% dos confrontos com Faixa** — todos com drenagem
+  junto. O bloco que desloca o ponto de partida existia só pro caminho do sono e teve que subir.
+- **O teste não olha nenhum dos dois casos: ele PERCORRE a sequência mostrada e exige que ninguém
+  bata com a barra em zero.** Os dois defeitos acima passaram por testes que olhavam estrutura
+  (posição da linha, teto de golpes, soma do dano) — só um invariante sobre o resultado os pega, e é
+  ele que vai pegar o terceiro jeito. **O par do moribundo é permitido**, com a mesma regra do teste
+  que já existia: quem caiu no passo imediatamente anterior pode bater, porque os dois golpes são do
+  mesmo instante.
 - **A vida do ADVERSÁRIO no instante da Faixa vem do diário** (campo `ho` da marca): sem ela não há
   como dividir, porque a reconstrução precisa dos dois lados em cada metade. Pro caso comum ela é a
   vida do adversário ANTES do revide — de propósito: o revide é o primeiro golpe da luta nova.

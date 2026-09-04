@@ -648,6 +648,65 @@ console.log('\nA FAIXA DE FOCO NAO PODE SER FURADA POR CAMINHO NENHUM');
       ok('e a soma do dano fecha em TODOS', somaErrada === 0, somaErrada + ' de ' + n);
       ok('e a Faixa nunca abre a sequencia', foraDePosicao === 0, foraDePosicao + '');
     }
+
+    /* NINGUEM ATACA DEPOIS DE CAIR -- o defeito mais reportado deste log, e a divisao em duas
+       metades o reintroduziu de DOIS jeitos, os dois pegos com print em 04/09/2026:
+       1) quando o adversario TAMBEM morria na metade 1, os papeis ficavam invertidos: o carregador
+          era declarado "perdedor" da metade, e a reconstrucao punha a morte do adversario ANTES do
+          golpe dele. Um Ivysaur matava o Geodude com o HP inteiro num golpe so, e o Geodude, ja em
+          0, revidava na linha seguinte. Consertado tratando essa metade como TROCA.
+       2) quando uma ABERTURA (drenagem, cura) tinha mexido nas barras antes do primeiro golpe, a
+          divisao partia do HP de ENTRADA e a metade 1 gastava vida que a abertura ja tinha gasto.
+          0,16% dos confrontos com Faixa, todos com drenagem junto. Consertado partindo do 'base'.
+       Este teste nao olha nenhum dos dois casos: ele PERCORRE a sequencia mostrada somando o dano e
+       exige que ninguem bata com a barra ja em zero. E a forma que pega o terceiro jeito. */
+    {
+      const IDS3 = Object.keys(S.SPECIES);
+      /* O PAR DO MORIBUNDO E PERMITIDO, com a mesma regra do teste la de cima: quem caiu no passo
+         IMEDIATAMENTE anterior pode bater, porque os dois golpes sao do mesmo instante e o motor so
+         os aplica em sequencia porque codigo roda em sequencia. Qualquer outro caso e defeito. */
+      const percorre = (mm) => {
+        let p = mm.playerHpBefore, e = mm.enemyHpBefore;
+        const caiuEm = { p:-1, e:-1 };
+        const lista = S.sequenciaDoConfronto(mm);
+        for(let k = 0; k < lista.length; k++){
+          const g = lista[k];
+          if(g.x === 'faixa' || g.x === 'boomself') continue;
+          const bate = g.q === 'p';
+          if((bate ? p : e) <= 0 && caiuEm[g.q] !== k - 1){
+            return 'o ' + (bate ? 'jogador' : 'inimigo') + ' bateu com a barra em 0';
+          }
+          if(g.x === 'recover' || g.x === 'pocao' || g.x === 'absorb'){ if(bate) p += g.d; else e += g.d; continue; }
+          if(g.x === 'absorbdano'){ if(bate) e -= g.d; else p -= g.d; continue; }
+          if(bate){ e = Math.max(0, e - g.d); if(e === 0 && caiuEm.e < 0) caiuEm.e = k; }
+          else { p = Math.max(0, p - g.d); if(p === 0 && caiuEm.p < 0) caiuEm.p = k; }
+        }
+        return null;
+      };
+      let n3 = 0, mortos = 0, somaFora = 0, exemplo = '';
+      for(let i = 0; i < 5000; i++){
+        const meu = [S.createInstance(IDS3[(i*11) % IDS3.length], 40 + (i % 25))];
+        S.equiparItens(meu, { [S.raizDaLinha(meu[0].speciesId)]:'faixa_foco' });
+        const r = S.simulateGymBattle(meu, [S.createInstance(IDS3[(i*17) % IDS3.length], 45 + (i % 20)),
+                                            S.createInstance(IDS3[(i*23) % IDS3.length], 45)], Math.random);
+        for(const x of (r.matchups||[])){
+          if(!(x.golpes||[]).some(g => g.x === 'faixa')) continue;
+          n3++;
+          const erro = percorre(x);
+          if(erro){ mortos++; if(!exemplo) exemplo = erro; }
+          /* A SOMA fecha contando a CURA junto: a drenagem devolve vida, entao "tomou" nao e so a
+             variacao de HP -- e a variacao MAIS o que foi curado. */
+          const s3 = S.sequenciaDoConfronto(x);
+          const curou = s3.filter(g => (g.x === 'recover' || g.x === 'pocao' || g.x === 'absorb') && g.q === 'p')
+                          .reduce((a, g) => a + g.d, 0);
+          const tomou = s3.filter(g => (!g.x || g.x === 'boom') && g.q === 'e').reduce((a, g) => a + g.d, 0);
+          if(tomou !== (x.playerHpBefore - x.playerHpAfter) + curou) somaFora++;
+        }
+      }
+      ok('ninguem ataca depois de cair, em nenhum confronto com Faixa', mortos === 0,
+         mortos + ' de ' + n3 + (exemplo ? ' | ' + exemplo : ''));
+      ok('e a soma do dano fecha, contando a cura da drenagem', somaFora === 0, somaFora + ' de ' + n3);
+    }
   }
 
   /* QUEM EXPLODIU NAO E SALVO: o dano e dele mesmo, e salva-lo faria da autodestruicao um "mate o

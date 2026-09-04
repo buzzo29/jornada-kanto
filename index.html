@@ -13636,15 +13636,41 @@ function sequenciaDoConfronto(m){
      A vida do ADVERSÁRIO no instante da Faixa vem do diário (campo `ho`): sem ela não há como
      dividir, porque a reconstrução precisa dos dois lados em cada metade. Confronto gravado ANTES
      do campo existir cai na vida de entrada do adversário -- log velho não pode sumir. */
+  /* TODA ABERTURA QUE MEXEU EM HP desloca o ponto de partida -- e a drenagem mexe nos DOIS lados,
+     por isso aqui é um laço e não um 'cura' só. Quem cede vida em cada caso não é o mesmo: a cura e
+     a poção sobem o HP de QUEM usou (q), e o dano da drenagem desce o do OUTRO lado. */
+  let base = m;
+  for(const g of reais){
+    if(g.x === 'recover' || g.x === 'pocao' || g.x === 'absorb'){
+      base = Object.assign({}, base, g.q === 'p' ? { playerHpBefore: g.hp } : { enemyHpBefore: g.hp });
+    } else if(g.x === 'absorbdano'){
+      base = Object.assign({}, base, g.q === 'p' ? { enemyHpBefore: g.hp } : { playerHpBefore: g.hp });
+    }
+  }
   const faixa = reais.find(g => g.x === 'faixa') || null;
   if(faixa){
     const doJogador = faixa.q === 'p';
+    /* Parte do BASE, não do m: se uma drenagem ou uma cura abriu o confronto, as duas barras já se
+       moveram antes do primeiro golpe, e dividir a partir do HP de ENTRADA punha a metade 1
+       gastando vida que a abertura já tinha gasto. O sintoma era um pokémon batendo depois de o
+       adversário já estar em 0 -- 0,16% dos confrontos com Faixa, todos com drenagem junto. */
     const outro = (typeof faixa.ho === 'number') ? faixa.ho
-                : (doJogador ? m.enemyHpBefore : m.playerHpBefore);
-    const meia1 = Object.assign({}, m, { isTrade:false, playerWon: !doJogador }, doJogador
+                : (doJogador ? base.enemyHpBefore : base.playerHpBefore);
+    /* QUEM CAIU NA METADE 1 decide o papel de cada um na reconstrução -- e errar isso põe um pokémon
+       morto atacando, que é o defeito mais reportado deste log.
+       Se o adversário TAMBÉM chegou a zero ali (`outro === 0`), os dois caíram: é uma TROCA, e a
+       reconstrução da troca dá um golpe a cada lado, com o do adversário PRIMEIRO -- ele bate e só
+       então morre. Reportado em 04/09/2026 com print: um Ivysaur matava o Geodude com o HP inteiro
+       num golpe só e o Geodude, já em 0, revidava na linha seguinte. A causa era declarar o Ivysaur
+       "perdedor" da metade quando quem morreu ali foi o Geodude.
+       Se o adversário sobreviveu, só o carregador caiu: aí ele É o perdedor da metade, e o último
+       golpe da reconstrução é justamente o que ia matá-lo. */
+    const trocaNaMeia1 = outro <= 0;
+    const meia1 = Object.assign({}, base,
+      { isTrade: trocaNaMeia1, playerWon: !doJogador }, doJogador
       ? { playerHpAfter: 1, enemyHpAfter: outro }
       : { enemyHpAfter: 1, playerHpAfter: outro });
-    const meia2 = Object.assign({}, m, doJogador
+    const meia2 = Object.assign({}, base, doJogador
       ? { playerHpBefore: 1, enemyHpBefore: outro }
       : { enemyHpBefore: 1, playerHpBefore: outro });
     const conv = h => ({ q: h.side === 'player' ? 'e' : 'p', d: h.amount });
@@ -13662,8 +13688,8 @@ function sequenciaDoConfronto(m){
        que o próprio desempate já faz no diário quando corrige a última linha.
        Medido: 1% dos confrontos com Faixa (28 em 2.671). */
     const marcaDoDono = doJogador ? 'e' : 'p';       // quem BATE nele
-    const perdeuDeVerdade = doJogador ? (m.playerHpBefore - m.playerHpAfter)
-                                      : (m.enemyHpBefore - m.enemyHpAfter);
+    const perdeuDeVerdade = doJogador ? (base.playerHpBefore - base.playerHpAfter)
+                                      : (base.enemyHpBefore - base.enemyHpAfter);
     let excesso = partida.filter(g => !g.x && g.q === marcaDoDono).reduce((a, g) => a + g.d, 0) - perdeuDeVerdade;
     for(let i = partida.length - 1; i >= 0 && excesso > 0; i--){
       const g = partida[i];
@@ -13690,17 +13716,6 @@ function sequenciaDoConfronto(m){
      "começo" dela tem que ser depois da cura E depois das trocas livres -- senão ela recontaria o
      dano que as linhas de cima já mostraram, e a soma do log passaria do HP que o pokémon tinha.
      É o mesmo ajuste que a cura já fazia sozinha desde 02/09/2026. */
-  /* TODA ABERTURA QUE MEXEU EM HP desloca o ponto de partida -- e a drenagem mexe nos DOIS lados,
-     por isso aqui é um laço e não um 'cura' só. Quem cede vida em cada caso não é o mesmo: a cura e
-     a poção sobem o HP de QUEM usou (q), e o dano da drenagem desce o do OUTRO lado. */
-  let base = m;
-  for(const g of reais){
-    if(g.x === 'recover' || g.x === 'pocao' || g.x === 'absorb'){
-      base = Object.assign({}, base, g.q === 'p' ? { playerHpBefore: g.hp } : { enemyHpBefore: g.hp });
-    } else if(g.x === 'absorbdano'){
-      base = Object.assign({}, base, g.q === 'p' ? { enemyHpBefore: g.hp } : { playerHpBefore: g.hp });
-    }
-  }
   if(danoLivre > 0){
     /* Os golpes livres batem todos no MESMO alvo: quem dormiu. Um golpe com q='p' tira HP do
        inimigo, então quem cede vida aqui é o lado oposto ao de quem usou o sono. */
