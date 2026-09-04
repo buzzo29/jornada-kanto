@@ -700,6 +700,18 @@ const ITENS_DE_ATRIBUTO = {
 function withItemStat(v, p, qual){
   return (p.item && ITENS_DE_ATRIBUTO[p.item] === qual) ? v + BONUS_DE_ATRIBUTO : v;
 }
+/* O ITEM DE ATRIBUTO SOME NO FIM DA BATALHA -- se o pokémon tiver lutado. Ele vale a batalha
+   INTEIRA (não é um efeito de um confronto só), então o p.item continua posto até o fim e o que se
+   anota aqui é só o RECADO pra quem chamou a batalha tirar da conta.
+   Só conta quem ENTROU: um pokémon que ficou no banco e nunca lutou mantém o item, que é o que o
+   pedido diz. É a mesma regra da poção -- o item sai quando trabalha.
+   A marca evita anotar de novo a cada confronto do mesmo pokémon; ela é zerada pelo equiparItens,
+   que roda antes de toda batalha. */
+function anotarItemDeAtributo(p, marca){
+  if(!p || !p.item || !ITENS_DE_ATRIBUTO[p.item] || p._itemGastoAnotado) return;
+  p._itemGastoAnotado = true;
+  itensGastos.push({ dono: marca, especie: p.speciesId, item: p.item });
+}
 function withBuffs(v, p){
   if(p.shiny){ v = Math.round(v * SHINY_BUFF_MULT); }
   if(p.terrainBuffed){ v = Math.round(v * TERRAIN_BUFF_MULT); }
@@ -933,7 +945,9 @@ function itensGastosDaBatalha(){ return itensGastos; }
    chamadas de batalha de propósito: são a mesma coisa -- estado da conta virando flag na instância. */
 function equiparItens(team, equipados){
   if(!team) return;
-  team.forEach(p => { if(p) p.item = itemEquipado(equipados, p.speciesId); });
+  /* O _itemGastoAnotado zera junto: ele é por BATALHA (o item de atributo vale a batalha inteira e
+     só depois some), e uma marca sobrando de uma batalha anterior faria o gasto não ser anotado. */
+  team.forEach(p => { if(p){ p.item = itemEquipado(equipados, p.speciesId); p._itemGastoAnotado = false; } });
 }
 /* Abaixo disso (25%) a poção dispara. É "sobrou raspando", não "levou um arranhão". */
 const POCAO_GATILHO_HP = 0.25;
@@ -1120,6 +1134,8 @@ function simulateGymBattle(team, enemyTeam, rng, opts){
       const alive = team.filter(p=>p.hp>0);
       if(alive.length===0){ return { win:false, matchups }; }
       const active = alive[0];
+      anotarItemDeAtributo(active, 'p');   // entrou em confronto: o item de atributo será gasto
+      anotarItemDeAtributo(enemy, 'e');
       active.winsThisBattle = playerStreak;
       enemy.winsThisBattle = enemyStreak;
       const playerHpBefore = active.hp;
@@ -4603,8 +4619,9 @@ const LOJA = {
   awakening:   { preco: 50 },
   hyperpotion: { preco: 30 },
   potion:      { preco: 15 },
-  /* Os cinco de atributo (+15, o confronto inteiro). Não se gastam: saem do pokémon só quando o
-     jogador tira. Por isso não aparecem em itensGastos nem no consumeEquipped. */
+  /* Os cinco de atributo: +15 pela BATALHA inteira, e somem no fim dela se o pokémon tiver
+     entrado. Quem ficou no banco continua com o dele -- o item sai quando TRABALHA, a mesma regra
+     dos outros três. */
   hp_up:       { preco: 30 },
   atk_up:      { preco: 30 },
   def_up:      { preco: 30 },
@@ -6520,6 +6537,7 @@ function simulateBossFight(team, boss, opts){
     const vivos = team.filter(p => p.hp > 0);
     if(!vivos.length) break;                     // time acabou: o Mew fica com a vida que sobrou
     const active = vivos[0];
+    anotarItemDeAtributo(active, 'p');   // vale na raide também: entrou, gastou
     active.winsThisBattle = playerStreak;
     boss.winsThisBattle = enemyStreak;
     const playerHpBefore = active.hp, enemyHpBefore = boss.hp;

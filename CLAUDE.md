@@ -1013,10 +1013,18 @@ de golpes.
   Ficou como está por não ter sido pedido.
 
 ### Os cinco de atributo (HP / Atk / Def / Atk Special / Def Special Up), 30 cada
-- **+15 no atributo comprado, o confronto inteiro, e NÃO se gastam.** Diferente dos três de cima em
-  duas coisas: eles não são um efeito que dispara uma vez, e o pokémon fica com o bônus **enquanto
-  carregar o item** — sai só quando o jogador tira. Por isso não aparecem no `itensGastos` nem no
-  `consumeEquipped`.
+- **+15 no atributo comprado, a BATALHA inteira, e somem no fim dela.** Diferente dos três de cima
+  numa coisa só: não são um efeito que dispara uma vez — valem em TODO confronto daquele pokémon,
+  do primeiro ao último. Mas **se gastam pela mesma regra**: o item sai quando TRABALHA, e trabalhar
+  aqui é o pokémon **ter entrado em batalha**. Quem ficou no banco e não lutou continua com o dele.
+- **O bônus vale até o fim da batalha, mesmo já tendo sido "gasto".** O motor só anota o RECADO
+  (`itensGastos`) no instante em que o pokémon entra no primeiro confronto; quem tira da conta é
+  quem chamou a batalha, depois. Zerar o `p.item` na hora faria o bônus sumir no meio da luta.
+- **Uma anotação só por batalha** (`_itemGastoAnotado`, zerado pelo `equiparItens`): um pokémon que
+  enfrenta três adversários seguidos não pode gerar três gastos, senão o servidor tentaria apagar um
+  item que já não existe e a conta passaria a mentir.
+- **Esta seção já disse o contrário** ("NÃO se gastam"), por um dia. Era leitura errada do pedido, e
+  o número que ela levava junto — "+1,5 pra sempre contra +3,15 uma vez" — não vale mais.
 - **A regra de UM ITEM POR POKÉMON continua valendo**, e é ela que faz disso uma escolha: não dá pra
   empilhar Atk Up com Def Up, nem com uma poção.
 - **O bônus é FLAT e entra POR ÚLTIMO** (`withItemStat`), depois de shiny, terreno e especialidade —
@@ -1048,11 +1056,26 @@ de golpes.
 
   Os cinco ficam na mesma faixa; onde o item é equipado quase não muda (num sorteado o Atk Up dá
   +1,36 e o HP Up +1,63, dentro do ruído).
-- **A COMPARAÇÃO QUE IMPORTA, e ela não é confortável: pelo MESMO preço de 30, a Super Poção dá
-  +3,15 UMA VEZ e o Atk Up dá +1,5 PRA SEMPRE.** O ponto de equilíbrio é ~2 batalhas; da terceira em
-  diante o item de atributo é estritamente melhor, e a distância só cresce. Se a intenção era que os
-  dois convivessem, o lugar de mexer é o preço dos de atributo (ou torná-los consumíveis, que é uma
-  linha no motor). Ficou como está por não ter sido pedido.
+- **A COMPARAÇÃO QUE IMPORTA, e ela não é confortável: como consumíveis de 30, eles são a pior
+  compra da loja por moeda, tirando o Despertar.**
+
+  | item | preço | ganho por batalha | ponto por moeda |
+  |---|---|---|---|
+  | Poção | 15 | +2,11 | **0,141** |
+  | Super Poção | 30 | +3,15 | **0,105** |
+  | HP Up | 30 | +1,59 | 0,053 |
+  | Atk Up | 30 | +1,53 | 0,051 |
+  | Def Up | 30 | +1,36 | 0,045 |
+  | Atk Special Up | 30 | +1,27 | 0,042 |
+  | Def Special Up | 30 | +1,07 | 0,036 |
+  | Despertar | 50 | +0,11 | 0,002 |
+
+  Pelo MESMO preço de 30, a Super Poção dá o DOBRO; a Poção custa metade e ainda dá mais.
+  **A diferença de natureza é real e não aparece na tabela**: o item de atributo trabalha em
+  **100% das batalhas** (o líder sempre entra) e a poção em **~25%** — um é certeza pequena, o
+  outro é loteria grande. Mas o valor esperado ainda favorece a poção por 2×.
+  Se a intenção era que os cinco fossem competitivos, o lugar de mexer é o **preço** — 15 os poria
+  na faixa da Poção. Ficou em 30 porque foi o preço pedido.
 - `tools/test-especiais.js` tranca os cinco (cada um dá +15 SÓ no atributo dele, o bônus é flat
   mesmo num shiny em terreno, o HP Up sobe o teto de vida, e nenhum deles gera gasto na batalha), e
   a comparação dos DOIS MOTORES passou a equipar um item de atributo diferente a cada volta — sem

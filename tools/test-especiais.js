@@ -828,12 +828,40 @@ function comItem(instancia, item){
     ok('e o bonus e FLAT, nao multiplicado pelos buffs',
        S.effectiveAttack(shinyItem) - S.effectiveAttack(shinyBase) === 15,
        (S.effectiveAttack(shinyItem) - S.effectiveAttack(shinyBase)) + ' de diferenca');
-    /* ELES NAO SE GASTAM: o motor nao pode anotar gasto nenhum pra eles, senao o item sumiria da
-       conta depois da primeira batalha -- e o pedido e que ele valha enquanto estiver equipado. */
+    /* ELES SE GASTAM: valem a BATALHA inteira e somem no fim dela, se o pokemon tiver entrado.
+       O motor so anota o recado -- quem tira da conta e quem chamou a batalha. */
     const time = [S.createInstance('charizard', 60)];
     S.equiparItens(time, { charmander:'atk_up' });
     S.simulateGymBattle(time, [S.createInstance('onix', 55), S.createInstance('golem', 55)], Math.random);
-    ok('e eles NAO se gastam na batalha', S.itensGastosDaBatalha().length === 0,
+    const g1 = S.itensGastosDaBatalha().filter(x => x.item === 'atk_up');
+    ok('quem lutou gasta o item de atributo', g1.length === 1 && g1[0].especie === 'charizard',
+       JSON.stringify(S.itensGastosDaBatalha()));
+
+    /* MAS SO UMA VEZ POR BATALHA. O item vale a batalha INTEIRA: um pokemon que enfrenta tres
+       adversarios seguidos nao pode gerar tres gastos, senao o servidor apagaria um item que ja
+       nao existe e a conta ficaria mentindo. */
+    const soUm = [S.createInstance('venusaur', 70)];
+    S.equiparItens(soUm, { bulbasaur:'atk_up' });
+    S.simulateGymBattle(soUm, [S.createInstance('ratata',5), S.createInstance('pidgey',5), S.createInstance('ratata',6)], Math.random);
+    ok('e uma anotacao so, mesmo lutando varios confrontos',
+       S.itensGastosDaBatalha().filter(x => x.item === 'atk_up').length === 1,
+       JSON.stringify(S.itensGastosDaBatalha()));
+
+    /* E O BONUS VALE ATE O FIM: ele nao pode sumir no meio da batalha. O gasto e so o recado. */
+    const semItem = S.createInstance('venusaur', 70); S.equiparItens([semItem], null);
+    ok('e o +15 vale ate o ultimo confronto da batalha',
+       S.effectiveAttack(soUm[0]) - S.effectiveAttack(semItem) === 15,
+       '+' + (S.effectiveAttack(soUm[0]) - S.effectiveAttack(semItem)));
+
+    /* QUEM FICOU NO BANCO NAO GASTA. E o que o pedido diz -- gasta quem "for utilizado". */
+    const banco = [S.createInstance('venusaur', 70), S.createInstance('charizard', 70)];
+    S.equiparItens(banco, { bulbasaur:'atk_up', charmander:'hp_up' });
+    const rb = S.simulateGymBattle(banco, [S.createInstance('ratata', 5)], Math.random);
+    const entraram = new Set((rb.matchups||[]).map(m => m.playerSpecies));
+    ok('so o Venusaur entrou no confronto', entraram.size === 1 && entraram.has('venusaur'),
+       Array.from(entraram).join(', '));
+    ok('e quem ficou no banco NAO gasta o item',
+       !S.itensGastosDaBatalha().some(x => x.especie === 'charizard'),
        JSON.stringify(S.itensGastosDaBatalha()));
   }
   /* O ITEM SOBREVIVE A EVOLUCAO. A chave dos equipados e a RAIZ DA LINHA, nao a especie: era a

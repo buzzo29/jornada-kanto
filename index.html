@@ -4179,6 +4179,18 @@ const ITENS_DE_ATRIBUTO = {
 function withItemStat(v, p, qual){
   return (p.item && ITENS_DE_ATRIBUTO[p.item] === qual) ? v + BONUS_DE_ATRIBUTO : v;
 }
+/* O ITEM DE ATRIBUTO SOME NO FIM DA BATALHA -- se o pokémon tiver lutado. Ele vale a batalha
+   INTEIRA (não é um efeito de um confronto só), então o p.item continua posto até o fim e o que se
+   anota aqui é só o RECADO pra quem chamou a batalha tirar da conta.
+   Só conta quem ENTROU: um pokémon que ficou no banco e nunca lutou mantém o item, que é o que o
+   pedido diz. É a mesma regra da poção -- o item sai quando trabalha.
+   A marca evita anotar de novo a cada confronto do mesmo pokémon; ela é zerada pelo equiparItens,
+   que roda antes de toda batalha. */
+function anotarItemDeAtributo(p, marca){
+  if(!p || !p.item || !ITENS_DE_ATRIBUTO[p.item] || p._itemGastoAnotado) return;
+  p._itemGastoAnotado = true;
+  itensGastos.push({ dono: marca, especie: p.speciesId, item: p.item });
+}
 function withBuffs(v, p){
   if(p.shiny){ v = Math.round(v * SHINY_BUFF_MULT); }
   if(p.terrainBuffed){ v = Math.round(v * TERRAIN_BUFF_MULT); }
@@ -5553,7 +5565,9 @@ function itensGastosDaBatalha(){ return itensGastos; }
    chamadas de batalha de propósito: são a mesma coisa -- estado da conta virando flag na instância. */
 function equiparItens(team, equipados){
   if(!team) return;
-  team.forEach(p => { if(p) p.item = itemEquipado(equipados, p.speciesId); });
+  /* O _itemGastoAnotado zera junto: ele é por BATALHA (o item de atributo vale a batalha inteira e
+     só depois some), e uma marca sobrando de uma batalha anterior faria o gasto não ser anotado. */
+  team.forEach(p => { if(p){ p.item = itemEquipado(equipados, p.speciesId); p._itemGastoAnotado = false; } });
 }
 /* Abaixo disso (25%) a poção dispara. É "sobrou raspando", não "levou um arranhão". */
 const POCAO_GATILHO_HP = 0.25;
@@ -5782,6 +5796,8 @@ function simulateGymBattle(team, brockTeam, rng, opts){
         return defeatResult;
       }
       const active = alive[0]; // respeita a ordem do time escolhida pelo jogador
+      anotarItemDeAtributo(active, 'p');   // entrou em confronto: o item de atributo será gasto
+      anotarItemDeAtributo(enemy, 'e');
       // reflete a sequência ATUAL do treinador em cada pokémon -- calcDamage usa esse campo pra
       // decidir a vulnerabilidade, sem precisar mudar a assinatura da função
       active.winsThisBattle = playerStreak;
@@ -16325,39 +16341,40 @@ const ITENS = {
     descricao: 'Equipe num pokémon. Quando ele for começar um confronto com 25% ou menos de HP, recupera 55% da vida ANTES de a luta começar — a mesma hora em que o Recuperar acontece. O item some depois de trabalhar.',
     comoGanhar: 'Na loja. Equipa-se pelo + da tela de ordem de batalha.'
   },
-  /* OS CINCO DE ATRIBUTO. Diferentes dos três de cima em duas coisas, e as duas são de propósito:
-     eles valem O CONFRONTO INTEIRO (não são um efeito que dispara uma vez) e NÃO SE GASTAM -- o
-     pokémon fica com o bônus enquanto carregar o item. Continuam presos à regra de UM ITEM POR
-     POKÉMON, então não dá pra empilhar Atk Up com Def Up nem com uma poção: escolher qual é a
-     graça. Tirar o item devolve ele pra mochila, como os outros. */
+  /* OS CINCO DE ATRIBUTO. Diferentes dos três de cima numa coisa só: eles não são um efeito que
+     dispara uma vez -- valem a BATALHA INTEIRA, em todo confronto daquele pokémon. Mas se gastam
+     igual, e pela mesma regra: o item sai quando TRABALHA, e trabalhar aqui é o pokémon ter
+     entrado em batalha. Quem ficou no banco e não lutou continua com o dele.
+     Continuam presos à regra de UM ITEM POR POKÉMON, então não dá pra empilhar Atk Up com Def Up
+     nem com uma poção: escolher qual é a graça. Tirar o item devolve ele pra mochila. */
   hp_up: {
     nome: 'HP Up', icone: '❤️', comprável: true, equipável: true, preco: 30,
-    resumo: '+15 de HP, o confronto inteiro.',
-    descricao: 'Equipe num pokémon: ele ganha +15 de HP enquanto estiver carregando, em toda batalha. Não se gasta — sai só quando você tira. Mais vida também significa tomar uma fração menor da barra por golpe.',
+    resumo: '+15 de HP pela batalha inteira.',
+    descricao: 'Equipe num pokémon: ele luta a batalha inteira com +15 de HP. O item some no fim da batalha, se ele tiver entrado — quem fica no banco continua com o dele. Mais vida também significa tomar uma fração menor da barra por golpe.',
     comoGanhar: 'Na loja. Equipa-se pelo + da tela de ordem de batalha.'
   },
   atk_up: {
     nome: 'Atk Up', icone: '⚔️', comprável: true, equipável: true, preco: 30,
-    resumo: '+15 de Ataque, o confronto inteiro.',
-    descricao: 'Equipe num pokémon: ele ganha +15 de Ataque enquanto estiver carregando, em toda batalha. Não se gasta — sai só quando você tira.',
+    resumo: '+15 de Ataque pela batalha inteira.',
+    descricao: 'Equipe num pokémon: ele luta a batalha inteira com +15 de Ataque. O item some no fim da batalha, se ele tiver entrado — quem fica no banco continua com o dele.',
     comoGanhar: 'Na loja. Equipa-se pelo + da tela de ordem de batalha.'
   },
   def_up: {
     nome: 'Def Up', icone: '🛡️', comprável: true, equipável: true, preco: 30,
-    resumo: '+15 de Defesa, o confronto inteiro.',
-    descricao: 'Equipe num pokémon: ele ganha +15 de Defesa enquanto estiver carregando, em toda batalha. Não se gasta — sai só quando você tira.',
+    resumo: '+15 de Defesa pela batalha inteira.',
+    descricao: 'Equipe num pokémon: ele luta a batalha inteira com +15 de Defesa. O item some no fim da batalha, se ele tiver entrado — quem fica no banco continua com o dele.',
     comoGanhar: 'Na loja. Equipa-se pelo + da tela de ordem de batalha.'
   },
   spatk_up: {
     nome: 'Atk Special Up', icone: '🔮', comprável: true, equipável: true, preco: 30,
-    resumo: '+15 de Ataque Especial, o confronto inteiro.',
-    descricao: 'Equipe num pokémon: ele ganha +15 de Ataque Especial enquanto estiver carregando, em toda batalha. Não se gasta — sai só quando você tira.',
+    resumo: '+15 de Atk Especial pela batalha inteira.',
+    descricao: 'Equipe num pokémon: ele luta a batalha inteira com +15 de Ataque Especial. O item some no fim da batalha, se ele tiver entrado — quem fica no banco continua com o dele.',
     comoGanhar: 'Na loja. Equipa-se pelo + da tela de ordem de batalha.'
   },
   spdef_up: {
     nome: 'Def Special Up', icone: '✴️', comprável: true, equipável: true, preco: 30,
-    resumo: '+15 de Defesa Especial, o confronto inteiro.',
-    descricao: 'Equipe num pokémon: ele ganha +15 de Defesa Especial enquanto estiver carregando, em toda batalha. Não se gasta — sai só quando você tira.',
+    resumo: '+15 de Def Especial pela batalha inteira.',
+    descricao: 'Equipe num pokémon: ele luta a batalha inteira com +15 de Defesa Especial. O item some no fim da batalha, se ele tiver entrado — quem fica no banco continua com o dele.',
     comoGanhar: 'Na loja. Equipa-se pelo + da tela de ordem de batalha.'
   }
 };
