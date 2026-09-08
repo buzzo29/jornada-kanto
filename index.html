@@ -3263,7 +3263,12 @@ const JOHTO_ROUTE_MAP = [
     { id:'dragons_den', name:'Covil do Dragão', icon:'🐲', types:['Dragon','Water'],
       rumor:'Atrás do ginásio, uma caverna alagada onde os dragões são criados.',
       /* O Covil é uma caverna ALAGADA -- é por isso que os que entram são todos de Água. */
-      pool:['dratini','dragonair','magikarp','horsea','seadra','gyarados','psyduck','remoraid','staryu'], rare:[{species:'kingdra', chance:0.10},{species:'dragonite', chance:0.08}] }
+      /* CAVERNA ALAGADA E ANTIGA: o Lapras pelo bicho grande de agua funda, os dois fosseis pelo
+         que dorme em pedra ha muito tempo, e o Qwilfish pelo que vive no fundo.
+         A rota tinha 9 entradas mas so SEIS formas -- no nivel 50-55 o dratini e o dragonair viram
+         os dois Dragonite, o magikarp e o gyarados viram os dois Gyarados, e o horsea e o seadra
+         viram os dois Kingdra. Pool nao e o que aparece na tela. */
+      pool:['dratini','dragonair','magikarp','horsea','seadra','gyarados','psyduck','remoraid','staryu','lapras','kabutops','omastar','qwilfish'], rare:[{species:'kingdra', chance:0.10},{species:'dragonite', chance:0.08}] }
   ]
 ];
 

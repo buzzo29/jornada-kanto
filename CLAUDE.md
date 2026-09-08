@@ -794,6 +794,16 @@ de golpes.
   **E o piso de 12 por pool caiu junto**: os dois não cabem. Com o teto de 4, a média de pool foi
   de 11,8 pra **10,2** (menor 8, maior 17). Onde os dois pedidos colidiram, o teto de 4 ganhou,
   porque é ele que resolve o problema que foi relatado.
+- **POOL NÃO É O QUE APARECE NA TELA, e o Covil do Dragão é o caso extremo.** Ele tinha 9
+  entradas e entregava **6 formas**: no nível 50-55 o dratini e o dragonair viram os dois
+  Dragonite, o magikarp e o gyarados viram os dois Gyarados, e o horsea e o seadra viram os dois
+  Kingdra. Reportado em 09/09/2026 ("com apenas 6 espécies é muito pouco").
+  Entraram **Lapras, Kabutops, Omastar e Qwilfish** -- os quatro cabem no teto de 4 da linha deles,
+  são de Água (o tipo da rota) e combinam com uma caverna alagada e antiga. Agora são **10 formas**
+  em 13 entradas. Custo medido: conclusão 64,8% → 65,1% (8.000 jornadas de cada lado, 0,5σ).
+  **Quem contar rota por rota, conte FORMAS.** Ainda ficam abaixo de 10: Dojo Lutador (7), Usina de
+  Força (8), Estrada Ciclável (9) e Caminho de Gelo (9) -- as três primeiras pelo mesmo motivo, e o
+  Dojo porque a lista de Lutadores do jogo acabou.
 - **A OFERTA NÃO REPETE MAIS UMA LINHA QUE O TIME JÁ TEM — nem pela reserva.** Eram dois furos:
   o `semLinhaRepetida` escolhia o substituto olhando só pra oferta, e a reserva do
   `buildOfferFromPool` completava a oferta INTEIRA ignorando o time. Medido em jornada real:
