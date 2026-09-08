@@ -775,6 +775,33 @@ de golpes.
   `tools/test-jornada.js` **passou a considerar o nível** na conta de "todo pokémon tem como ser
   capturado": estar num pool não basta mais — o teste calcula que FORMAS cada entrada consegue
   produzir dentro da faixa do trecho. Sem isso ele daria verde com os oito buracos abertos.
+- **TETO DE 4 ROTAS POR LINHA EVOLUTIVA** (09/09/2026). A conta é da LINHA inteira, não da espécie:
+  Magikarp em 4 rotas mais Gyarados em 4 davam **8** pra uma linha só, e era isso que enchia os
+  times de Gyarados, Crobat e Onix. O pior caso era o **Zubat: 17 entradas** (Zubat 8 + Golbat 7 +
+  Crobat 2). Hoje nenhuma linha passa de 4, e a distribuição é **56 espécies em 1 rota, 104 em 2,
+  29 em 3 e 3 em 4**.
+  **O rebalanceamento foi feito por ferramenta, não à mão** (`tools/rebalancear-rotas.js`): são 32
+  pools e a conta é por linha, não por rota. Ela só REMOVE e só ACRESCENTA com afinidade de tipo —
+  duas versões anteriores foram descartadas por isto: a que trocava (sai um, entra outro na mesma
+  vaga) **oscilava**, 1.584 trocas sem convergir, e a primeira punha **iniciais em rota selvagem**
+  (Totodile, Charizard) porque nada a impedia. Hoje ela só considera quem JÁ era selvagem.
+  **Custo medido: nenhum.** Conclusão 64,8% → 65,0% (8.000 jornadas de cada lado, 0,3σ). Redistribuir
+  não é o mesmo que afrouxar — o que muda é QUEM aparece, não quanto.
+  **O que NÃO deu pra cumprir, e por quê:** o pedido também era "quem está em 1 rota vai pra 2".
+  **50 espécies continuam em 1**, e é aritmética: uma linha com três formas presentes e teto 4 só
+  consegue 2+1+1. São quase todas formas evoluídas (Machamp, Gengar, Kingdra, Tyranitar) — e elas
+  continuam alcançáveis evoluindo, que é como o jogo original entrega a maioria delas.
+  **E o piso de 12 por pool caiu junto**: os dois não cabem. Com o teto de 4, a média de pool foi
+  de 11,8 pra **10,2** (menor 8, maior 17). Onde os dois pedidos colidiram, o teto de 4 ganhou,
+  porque é ele que resolve o problema que foi relatado.
+- **A OFERTA NÃO REPETE MAIS UMA LINHA QUE O TIME JÁ TEM — nem pela reserva.** Eram dois furos:
+  o `semLinhaRepetida` escolhia o substituto olhando só pra oferta, e a reserva do
+  `buildOfferFromPool` completava a oferta INTEIRA ignorando o time. Medido em jornada real:
+  **2 ofertas em 5.009** traziam um repetido. Hoje o substituto olha o time e a reserva só entra
+  abaixo de `MIN_OFERTA_SEM_REPETIR` (**3**) cards — resultado: **0 em 9.703**.
+  O 3 não é gosto: com 2, o `tools/test-jornada.js` falhava no pior caso que ele já cobrava (time
+  montado só com bichos da própria rota, 384 combinações) — 26 delas caíam pra duas opções. Na
+  jornada real a diferença entre 2 e 3 é zero.
 - **DEZ ROTAS GANHARAM POOL MAIOR (mínimo 12), e o preço foi medido: −4,5 pontos de conclusão.**
   Pedido em 08/09/2026, com o critério de que cada acréscimo tivesse relação com o TIPO da rota ou
   com a lore. Floresta Ilex (+Farfetch'd, o da missão do carvoeiro no Gold/Silver), Túnel de Pedra,
