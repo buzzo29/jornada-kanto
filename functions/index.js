@@ -5192,6 +5192,27 @@ exports.rerollWildOffer = onCall(async (request) => {
   });
 });
 
+/* Espelha o tryEvolve do cliente: sobe a linha enquanto o nível der, e PARA na bifurcação -- ali
+   quem escolhe é o jogador (Gloom vira Vileplume ou Bellossom) e aqui não há ninguém pra perguntar.
+   Ele fica preso até a próxima distribuição de níveis daquele save, que é onde a tela de escolha
+   aparece.
+   A VELOCIDADE entra junto com os outros cinco: ela é lida da instância, não da espécie, e esquecê-la
+   deixava o pokémon evoluído correndo com a velocidade da forma anterior. */
+function evoluirNoSave(mon){
+  if(!mon || !mon.speciesId) return mon;
+  let atual = mon.speciesId;
+  while(EVOLUTIONS[atual] && (mon.level || 0) >= EVOLUTIONS[atual].level){
+    if(EVOLUTION_CHOICES[atual]) break;
+    atual = EVOLUTIONS[atual].into;
+  }
+  if(atual === mon.speciesId) return mon;
+  const sp = SPECIES[atual];
+  if(!sp) return mon;
+  return Object.assign({}, mon, { speciesId: atual, name: sp.name, types: sp.types,
+    baseHp: sp.hp, attack: sp.attack, defense: sp.defense,
+    spAtk: sp.spAtk, spDef: sp.spDef, speed: sp.speed });
+}
+exports._evoluirNoSave = evoluirNoSave;   // testado direto: no ar ele roda dentro do useRareCandy
 exports.useRareCandy = onCall(async (request) => {
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   const uid = request.auth.uid;
@@ -5215,6 +5236,12 @@ exports.useRareCandy = onCall(async (request) => {
   }
 
   time[idx] = Object.assign({}, time[idx], { level: (time[idx].level || 0) + 1 });
+  /* O DOCE SOBE NÍVEL, E NÍVEL PODE SER O DA EVOLUÇÃO -- e ele não evoluía ninguém. O save é
+     escrito aqui, no servidor, e pode nem ser o que está aberto no cliente, então quem tem que
+     evoluir é o servidor. Não dá pra deixar pro cliente consertar depois: a repropagação das
+     inscrições de liga acontece duas linhas abaixo, e ela levaria a espécie VELHA pra dentro do
+     chaveamento. Reportado em 08/09/2026 junto com o mesmo defeito no desmaio e no Bônus de Kanto. */
+  time[idx] = evoluirNoSave(time[idx]);
   await saveRef.set({ team: time }, { merge: true });
   await userRef.set({ rareCandies: admin.firestore.FieldValue.increment(-1) }, { merge: true });
   // sem isso, um time já inscrito numa liga continuaria competindo com o nível ANTIGO: a inscrição

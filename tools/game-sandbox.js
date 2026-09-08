@@ -37,11 +37,15 @@ function createSandbox(htmlPath){
      uma tela que ESCUTA o Firestore (o Boss de Domingo) -- dispara `sandbox.__snapshots.mew(...)`
      e vê o que a tela faz. Antes devolvia um noop e a escuta era invisível pro teste. */
   const escutas = {};
+  /* As GRAVACOES ficam anotadas, e nao jogadas fora. O reparo das evolucoes atrasadas escreve em
+     saves que o jogador nem abriu -- o teste precisa poder cobrar QUAIS saves foram regravados, e
+     principalmente quais NAO foram (o da bifurcacao, que ele nao pode resolver sozinho). */
+  const escritas = [];
   const firestoreStub = (caminho) => ({
     collection(nome){ return firestoreStub(nome); },
     doc(id){ return firestoreStub(id); },
     get(){ return Promise.resolve({ exists:false, data(){ return {}; } }); },
-    set(){ return Promise.resolve(); },
+    set(dados, opcoes){ escritas.push({ caminho, dados, opcoes }); return Promise.resolve(); },
     onSnapshot(ok, err){
       escutas[caminho] = { ok, err, ativo:true };
       return ()=>{ if(escutas[caminho]) escutas[caminho].ativo = false; };
@@ -159,6 +163,7 @@ function createSandbox(htmlPath){
     '\nglobalThis.__getGame = function(){ return game; };';
   vm.runInContext(code + epilogue, sandbox, { filename:'jornada-kanto.js' });
   sandbox.render = function(){};
+  sandbox.__escritas = escritas;
   return sandbox;
 }
 

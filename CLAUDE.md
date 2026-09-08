@@ -1423,6 +1423,57 @@ de golpes.
 - `tools/test-pos-batalha.js` tranca isso, e `tools/smoke-jornada.js` **aperta o botão de verdade**
   (`seguirDoResultado`) em vez de chamar o destino direto — sem isso o bot pularia a evolução e a
   medição não teria como enxergar a mudança.
+- **ERAM TRÊS OS CAMINHOS QUE SUBIAM NÍVEL SEM EVOLUIR, não um.** O desmaio foi o primeiro; a
+  varredura dos saves de produção (08/09/2026) mostrou os outros dois, e são eles que explicam a
+  maioria dos casos presos:
+  - **O Bônus de Kanto** (`showJourneyEnd`, +4/+3/+2/+1 no time todo). Ele é a **última coisa que
+    sobe nível na jornada** — depois dele não existe distribuição nenhuma, então a evolução que não
+    saísse ali não sairia nunca. Era assim que um Pupitar terminava a jornada no nível 59 sem virar
+    Tyranitar. Hoje ele roda o `tryEvolve` e sai pela tela de evolução (`evolucaoDepois: 'journeyEnd'`).
+  - **O Doce Raro** (`useRareCandy`, no SERVIDOR). O save é escrito lá e **pode nem ser o que está
+    aberto** no cliente, então quem evolui tem que ser o servidor: `evoluirNoSave`, espelho do
+    `tryEvolve`, parando na bifurcação igual. Não dá pra deixar o cliente consertar depois — a
+    repropagação das inscrições de liga (`atualizarInscricoesComTime`) acontece dentro da mesma
+    função e levaria a **espécie velha** pro chaveamento.
+    `tools/test-especiais.js` compara os dois motores em **24.750 casos** (250 espécies × 99 níveis,
+    7.684 com evolução): no que cada um vira e nos seis atributos da forma nova.
+- **A VELOCIDADE FICAVA PRA TRÁS EM TODA EVOLUÇÃO DO JOGO** — e era o único dos seis atributos que
+  ficava. O `effectiveSpeed` lê `p.speed`, o valor da **instância** (escrito pelo `createInstance`),
+  não o da espécie; o `tryEvolve` atualizava tipos, HP, ataque, defesa e os dois especiais, e
+  esquecia esse. Todo pokémon que evoluiu neste jogo lutava com a velocidade da forma anterior: um
+  Crobat a 90 em vez de 130, um Steelix a 70 em vez de 30.
+  **Atinge 107 dos 112 degraus de evolução (96%)**, desvio médio de 20,8 pontos, pior caso 70
+  (Sentret 20 → Furret 90). **101 degraus aceleram** (+20,5 em média) e só **6 desaceleram** (−25,0),
+  então o efeito é quase todo a favor do jogador — e a velocidade não decide só quem bate primeiro:
+  ela entra na taxa de crítico (velocidade/512, regra da Gen 1).
+  **Custo medido: +1,0 ponto de conclusão** (68,6% contra 67,6%, 12.000 jornadas de cada lado,
+  1,6σ) — dentro do ruído do simulador, e para o lado fácil, que é o esperado.
+  Achado varrendo os saves de produção, não por teste. Hoje `tools/test-pos-batalha.js` confere os
+  **seis** atributos em 7.684 evoluções.
+- **O REPARO DOS SAVES QUE JÁ ESTAVAM PRESOS** (`repararEvolucoesAtrasadas`). Fechar a torneira não
+  conserta o que já vazou: medido antes das correções, **22 pokémon presos em 17 saves de 15
+  treinadores** (1.103 pokémon em 194 saves) — Scyther Lv.62, Golbat Lv.68, Onix Lv.60, Pupitar
+  Lv.61. **14 dos 17 saves estão em `journeyEnd`**, com a jornada terminada: ali não roda
+  distribuição de níveis nunca mais, e aqueles pokémon ficariam errados pra sempre.
+  Roda no carregamento da **HOME** (`loadSaveSlots`), não na abertura do save: o montador da Torre e
+  do Ginásio da Cidade escolhe pokémon de QUALQUER save sem abrir nenhum — consertar só o save
+  aberto deixaria a lista de lá mostrando a forma velha.
+  **E ele não é só pro passado.** A tabela de evoluções já ganhou entradas depois de saves
+  existirem — as evoluções por troca viraram nível 40, Johto entrou em 30/08 — e é isso que explica
+  16 dos 22 casos (scyther, golbat, onix, seadra, chansey, todos de nível 40). Toda vez que a tabela
+  crescer, quem já passou daquele nível fica pra trás; com o reparo isso se conserta sozinho em vez
+  de virar um relato daqui a um mês.
+  **A BIFURCAÇÃO fica de fora**: escolher Vileplume ou Bellossom por alguém, num save que ele nem
+  abriu, seria decidir a coisa mais definitiva do jogo no lugar dele. Ele decide na tela de escolha,
+  na próxima distribuição daquele save.
+  **O `caughtSpecies` é devolvido ao que era** depois de cada save: o `tryEvolve` chama `markCaught`,
+  e ali não há save carregado — a Pokédex de um save receberia espécie de outro. O `permanentPokedex`
+  da CONTA continua recebendo, que é o certo: o jogador tem mesmo o bicho evoluído.
+  **E o jogador é avisado**, numa caixa na home: um Scyther que vira Scizor troca de tipo
+  (Inseto/Voador → Inseto/Aço) e de atributos, e achar que o pokémon sumiu é pior que o defeito.
+  A trava do teste **lê o código** e falha se o `loadSaveSlots` parar de chamar o reparo — os casos
+  chamam a função direto e passariam com ela órfã (conferido). É a mesma trava que já existe pro
+  `applySpecialtyBuff` e pro `equiparItens` nas chamadas de batalha.
 - **Bônus de Kanto**: ao vencer o Giovanni, +4/+3/+2/+1/0 níveis pro time todo conforme as derrotas
   totais (0-5 / 6-10 / 11-15 / 16-22 / 23+). Inverte o incentivo: hoje quem farma derrota termina
   ABAIXO de quem joga limpo.

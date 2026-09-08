@@ -1110,6 +1110,33 @@ const esp = srv._golpesEspeciais;
   const difC = Object.keys(S.SPECIES).filter(id => S.chaveDoEquipado(7, id) !== srv._chaveDoEquipado(7, id));
   ok('e a chave "slot:linha" tambem', difC.length === 0, difC.slice(0, 5).join(', '));
 }
+/* NO QUE UM POKEMON VIRA, os dois motores tem que concordar em TODO nivel. O Doce Raro sobe nivel
+   no SERVIDOR, direto no save (o save pode nem ser o que esta aberto), entao a evolucao acontece
+   la; o resto do jogo evolui no cliente. Se os dois discordarem, o mesmo pokemon vira uma coisa
+   quando o doce sobe o nivel e outra quando a distribuicao sobe.
+   Os dois param na BIFURCACAO pelo mesmo motivo: ali quem escolhe e o jogador. */
+{
+  let dif = 0, evoluiram = 0, atributo = 0, primeira = '';
+  Object.keys(S.SPECIES).forEach(id => {
+    for(let nivel = 1; nivel <= 99; nivel++){
+      const cli = S.createInstance(id, nivel); S.tryEvolve(cli);
+      const sv  = srv._evoluirNoSave({ speciesId:id, level:nivel });
+      if(sv.speciesId !== cli.speciesId){ dif++; if(!primeira) primeira = id+' Lv.'+nivel+': '+cli.speciesId+' x '+sv.speciesId; continue; }
+      if(sv.speciesId === id) continue;
+      evoluiram++;
+      const sp = S.SPECIES[sv.speciesId];
+      /* OS SEIS ATRIBUTOS, e a VELOCIDADE e o que mais importa aqui: ela e lida da INSTANCIA e nao
+         da especie, entao esquece-la deixava o evoluido correndo com a velocidade da forma antiga.
+         Atingia 107 dos 112 degraus (96%), com desvio medio de 20,8 pontos. */
+      if(cli.speed !== sp.speed || sv.speed !== sp.speed){ atributo++; if(!primeira) primeira = 'velocidade de '+sv.speciesId; }
+      if(sv.attack !== sp.attack || sv.defense !== sp.defense || sv.spAtk !== sp.spAtk ||
+         sv.spDef !== sp.spDef || sv.baseHp !== sp.hp){ atributo++; if(!primeira) primeira = 'atributo de '+sv.speciesId; }
+    }
+  });
+  ok('os dois motores concordam em no que cada especie vira, nivel a nivel', dif === 0,
+     primeira || (250*99) + ' casos, ' + evoluiram + ' com evolucao');
+  ok('e a forma nova leva os SEIS atributos, velocidade inclusive', atributo === 0, primeira);
+}
 ok('as listas sao IDENTICAS nos dois motores',
    esp.AUTODESTRUICAO.join(',') === S.AUTODESTRUICAO.join(',') &&
    esp.METRONOMO.join(',') === S.METRONOMO.join(',') &&

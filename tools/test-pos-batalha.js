@@ -175,6 +175,72 @@ console.log('=== A ELITE E A ROCKET TAMBEM (o caminho especial) ===');
 }
 
 console.log('');
+console.log('=== A EVOLUCAO LEVA A VELOCIDADE JUNTO ===');
+{
+  /* Achado em 08/09/2026 varrendo os saves de producao: o effectiveSpeed le p.speed -- o valor da
+     INSTANCIA, escrito pelo createInstance --, e o tryEvolve atualizava os outros cinco atributos e
+     esquecia esse. Todo pokemon que evoluiu neste jogo lutava com a velocidade da forma anterior.
+     Atinge 107 dos 112 degraus (96%), desvio medio de 20,8 e pior caso 70 (Sentret 20 -> Furret 90).
+     E ela nao decide so quem bate primeiro: entra na taxa de critico (velocidade/512, Gen 1). */
+  const p = S.createInstance('golbat', 39); p.level = 45;
+  S.tryEvolve(p);
+  ok('o Crobat corre como Crobat, nao como Golbat',
+     p.speciesId === 'crobat' && p.speed === S.SPECIES.crobat.speed,
+     p.speciesId + ' vel ' + p.speed + ' (Crobat ' + S.SPECIES.crobat.speed + ', Golbat ' + S.SPECIES.golbat.speed + ')');
+  /* Vale nos DOIS sentidos: ha 6 degraus que desaceleram, e o Scizor e o extremo (105 -> 65). */
+  const s = S.createInstance('scyther', 39); s.level = 45;
+  S.tryEvolve(s);
+  ok('e o Scizor desacelera de verdade', s.speed === S.SPECIES.scizor.speed,
+     'vel ' + s.speed + ' (Scizor ' + S.SPECIES.scizor.speed + ')');
+  /* Os SEIS atributos, nas 250 especies e em todo nivel -- e o unico jeito de a proxima omissao ser
+     barulhenta em vez de esperar alguem varrer os saves de novo. */
+  {
+    let erros = 0, quantos = 0, primeiro = '';
+    Object.keys(S.SPECIES).forEach(id => {
+      for(let n = 1; n <= 99; n++){
+        const m = S.createInstance(id, n); S.tryEvolve(m);
+        if(m.speciesId === id) continue;
+        quantos++;
+        const sp = S.SPECIES[m.speciesId];
+        if(m.speed!==sp.speed || m.attack!==sp.attack || m.defense!==sp.defense ||
+           m.spAtk!==sp.spAtk || m.spDef!==sp.spDef || m.baseHp!==sp.hp){
+          erros++; if(!primeiro) primeiro = id+' Lv.'+n+' -> '+m.speciesId;
+        }
+      }
+    });
+    ok('e nenhuma evolucao deixa atributo pra tras', erros === 0,
+       primeiro || quantos + ' evolucoes conferidas');
+  }
+}
+
+console.log('');
+console.log('=== O BONUS DE KANTO TAMBEM EVOLUI ===');
+{
+  /* Ele e a ULTIMA coisa que sobe nivel na jornada: depois dele nao existe distribuicao nenhuma, e
+     era o confirmLevels que evoluia o time. A evolucao que nao saisse ali nao sairia NUNCA -- foi
+     assim que um Pupitar terminou a jornada no nivel 59 sem virar Tyranitar. */
+  const g = S.__getGame();
+  g.authUser = null; g.currentSaveSlot = 0; g.gymIndex = 7;
+  g.team = [S.createInstance('pupitar', 53)];
+  g.team[0].maxHp = S.calcMaxHp(g.team[0]); g.team[0].hp = g.team[0].maxHp;
+  g.lossesTotal = 0;              // 0 derrotas = +4 niveis, o bolo cheio
+  g.kantoBonusApplied = false; g.badgesEarned = ['a','b','c','d','e','f','g','h'];
+  g.evolutions = []; g.evolucaoDepois = null; g.screen = 'victory';
+  S.__setGame(g);
+  S.showJourneyEnd();
+  ok('o bonus levou o Pupitar de 53 pra 57', jogo().team[0].level === 57, 'Lv.' + jogo().team[0].level);
+  ok('e ele virou Tyranitar', jogo().team[0].speciesId === 'tyranitar', jogo().team[0].speciesId);
+  ok('a tela mostra a evolucao antes do resumo', jogo().screen === 'evolution', jogo().screen);
+  S.continueFromEvolution();
+  ok('e dali vai pro resumo da jornada', jogo().screen === 'journeyEnd', jogo().screen);
+  /* Reabrir o resumo nao pode dar o bonus de novo nem reabrir a tela de evolucao (kantoBonusApplied). */
+  S.showJourneyEnd();
+  ok('e reabrir o resumo nao repete nada',
+     jogo().screen === 'journeyEnd' && jogo().team[0].level === 57,
+     jogo().screen + '/Lv.' + jogo().team[0].level);
+}
+
+console.log('');
 console.log('=== A TORRE PASSOU A TER LOG DEPOIS DA BATALHA ===');
 {
   const meu = S.createInstance('charizard', 70), npc = S.createInstance('onix', 68);
@@ -210,6 +276,82 @@ console.log('=== A TORRE PASSOU A TER LOG DEPOIS DA BATALHA ===');
   ok('quem zerou a torre le que chegou ao topo', /topo da torre/.test(S.renderTowerBattleResult()));
 }
 
-console.log('');
-console.log(falhas ? falhas + ' FALHA(S).' : 'Tudo certo.');
-process.exit(falhas ? 1 : 0);
+/* O REPARO E ASSINCRONO (ele regrava os saves), entao ele e o placar vao pro fim, num bloco so. */
+(async () => {
+  console.log('');
+  console.log('=== O REPARO DOS SAVES QUE JA ESTAVAM PRESOS ===');
+  /* Medido em 08/09/2026, antes das correcoes, varrendo a producao: 22 pokemon presos em 17 saves
+     de 15 treinadores (1.103 pokemon em 194 saves). 14 dos 17 saves estao em journeyEnd -- jornada
+     terminada, nenhuma distribuicao de niveis nunca mais. Fechar a torneira nao conserta o que ja
+     vazou, e por isso o reparo existe. */
+  const esp = (id) => S.SPECIES[id];
+  const monDe = (id, level) => ({ id:'m_'+id, speciesId:id, name:esp(id).name, level,
+    types:esp(id).types, baseHp:esp(id).hp, attack:esp(id).attack, defense:esp(id).defense,
+    spAtk:esp(id).spAtk, spDef:esp(id).spDef, speed:esp(id).speed, maxHp:0, hp:0 });
+
+  const g = S.__getGame();
+  g.authUser = { uid:'u1' };
+  g.currentSaveSlot = null;
+  g.caughtSpecies = ['pikachu'];
+  g.saveSlots = new Array(20).fill(null);
+  g.saveSlots[4] = { team:[ monDe('pupitar', 61), monDe('pikachu', 30) ], screen:'journeyEnd', badgeCount:8 };
+  /* Um save com BIFURCACAO pendente: o Gloom passou do 40 e ninguem pode escolher por ele. */
+  g.saveSlots[7] = { team:[ monDe('gloom', 52) ], screen:'journeyEnd', badgeCount:8 };
+  g.evolucoesReparadas = null;
+  S.__setGame(g);
+  S.__escritas.length = 0;
+
+  await S.repararEvolucoesAtrasadas();
+  const slotsGravados = S.__escritas.map(e => e.caminho);
+
+  const t4 = jogo().saveSlots[4].team;
+  ok('o Pupitar Lv.61 virou Tyranitar', t4[0].speciesId === 'tyranitar', t4[0].speciesId);
+  ok('com os atributos e a VELOCIDADE da forma nova',
+     t4[0].speed === S.SPECIES.tyranitar.speed && t4[0].attack === S.SPECIES.tyranitar.attack,
+     t4[0].speed + '/' + t4[0].attack);
+  ok('e o teto de vida recalculado', t4[0].maxHp === S.calcMaxHp(t4[0]), String(t4[0].maxHp));
+  ok('quem nao devia nada ficou como estava', t4[1].speciesId === 'pikachu' && t4[1].level === 30);
+  /* A BIFURCACAO fica de fora: escolher Vileplume ou Bellossom por alguem num save que ele nem
+     abriu seria decidir a coisa mais definitiva do jogo no lugar dele. */
+  ok('o Gloom da bifurcacao NAO foi resolvido sozinho',
+     jogo().saveSlots[7].team[0].speciesId === 'gloom', jogo().saveSlots[7].team[0].speciesId);
+  ok('e o save dele nao foi regravado a toa', slotsGravados.indexOf('7') < 0, JSON.stringify(slotsGravados));
+  ok('o save consertado FOI regravado', slotsGravados.indexOf('4') >= 0, JSON.stringify(slotsGravados));
+  /* O tryEvolve chama markCaught, que escreve na Pokedex do SAVE CARREGADO -- e aqui nao ha save
+     carregado. Sem devolver o campo, a Pokedex de um save receberia especie de outro. */
+  ok('e a Pokedex do save nao foi contaminada',
+     (jogo().caughtSpecies || []).join(',') === 'pikachu', (jogo().caughtSpecies||[]).join(','));
+  /* O jogador TEM que saber: um Scyther que vira Scizor troca de tipo (Inseto/Voador ->
+     Inseto/Aco) e de atributos. Achar que o pokemon sumiu e pior que o defeito. */
+  ok('o aviso guarda o que mudou', (jogo().evolucoesReparadas || []).length === 1 &&
+     jogo().evolucoesReparadas[0].para === 'Tyranitar', JSON.stringify(jogo().evolucoesReparadas));
+  const home = S.renderSaveSelect();
+  ok('e a home mostra', /Evolu\u00e7\u00f5es em atraso/.test(home) && /Tyranitar/.test(home),
+     (home.match(/virou <strong>[^<]*/)||[''])[0]);
+  S.fecharAvisoDeReparo();
+  ok('e o aviso sai quando o jogador fecha', !/Evolu\u00e7\u00f5es em atraso/.test(S.renderSaveSelect()));
+
+  /* Rodar de novo nao pode reescrever nada: nao ha mais o que consertar, e o reparo roda em TODO
+     carregamento da home. */
+  S.__escritas.length = 0;
+  await S.repararEvolucoesAtrasadas();
+  ok('rodar o reparo de novo nao regrava save nenhum', S.__escritas.length === 0,
+     String(S.__escritas.length));
+
+  /* E ELE PRECISA ESTAR LIGADO. Os casos acima chamam a funcao direto, entao passariam com ela
+     orfa -- conferido: tirar a chamada do loadSaveSlots nao quebrava nenhum deles. A trava le o
+     CODIGO, que e como este projeto ja garante o applySpecialtyBuff e o equiparItens nas chamadas
+     de batalha: e o unico jeito de a proxima remocao ser barulhenta. */
+  {
+    const fonte = require('fs').readFileSync(
+      require('path').join(__dirname, '..', 'index.html'), 'utf8');
+    const i = fonte.indexOf('async function loadSaveSlots(');
+    const corpo = i < 0 ? '' : fonte.slice(i, fonte.indexOf('\nasync function repararEvolucoesAtrasadas', i));
+    ok('e o loadSaveSlots CHAMA o reparo', /repararEvolucoesAtrasadas\(\)/.test(corpo),
+       corpo ? corpo.length + ' chars lidos' : 'nao achei o loadSaveSlots');
+  }
+
+  console.log('');
+  console.log(falhas ? falhas + ' FALHA(S).' : 'Tudo certo.');
+  process.exit(falhas ? 1 : 0);
+})();
