@@ -775,6 +775,47 @@ de golpes.
   `tools/test-jornada.js` **passou a considerar o nível** na conta de "todo pokémon tem como ser
   capturado": estar num pool não basta mais — o teste calcula que FORMAS cada entrada consegue
   produzir dentro da faixa do trecho. Sem isso ele daria verde com os oito buracos abertos.
+- **DEZ ROTAS GANHARAM POOL MAIOR (mínimo 12), e o preço foi medido: −4,5 pontos de conclusão.**
+  Pedido em 08/09/2026, com o critério de que cada acréscimo tivesse relação com o TIPO da rota ou
+  com a lore. Floresta Ilex (+Farfetch'd, o da missão do carvoeiro no Gold/Silver), Túnel de Pedra,
+  Ilhas Redemoinho (+Mantine, que é Água/Voador — os dois tipos da rota — e o Remoraid, parceiro
+  dele no original), Dojo Lutador, Farol de Olivine (+Chinchou, que vira **Lanturn**, o
+  peixe-lanterna), Monte Mortar, Lago da Fúria, Usina de Força, Caminho de Gelo e Covil do Dragão.
+  **O custo é grande e não é ruído: 69,4% → 64,9% de conclusão** (8.000 jornadas de cada lado,
+  6,1σ), e ele é TODO da diluição — os três cortes pedidos junto (ver abaixo) valem +0,6, dentro do
+  ruído. Quatro cartas sorteadas de um pool de 12 acham uma espécie específica muito menos que de
+  um pool de 8.
+  **E ele se concentra no ÚLTIMO ginásio**: os game overs no 8º vão de **267 para ~420** em 4.000
+  jornadas, contra ±4 em todos os outros. Faz sentido — três das dez rotas são da etapa 8 (Usina,
+  Caminho de Gelo, Covil do Dragão), que é a última captura antes do Giovanni/Clair: diluir ali é
+  reduzir a chance de sacar o finalizador (Dragonite, Kingdra, Tyranitar).
+  **A saída medida, se um dia incomodar, é a 5ª carta na etapa 8** (`offerCount` do `LEGS[7]`):
+  ela devolve metade — game overs no 8º de 398 pra **334**, conclusão de 65,5% pra 66,5%. Não foi
+  aplicada porque não foi pedida.
+  **Cuidado ao contar: pool não é o que aparece na tela.** A regra de espécie-por-nível junta
+  entradas diferentes na mesma forma — o Covil do Dragão tem **12 no pool e 9 formas distintas**
+  (dratini e dragonair dão Dragonair, magikarp e gyarados dão Gyarados, horsea e seadra dão
+  Kingdra). Dojo e Caminho de Gelo ficam em 10, a Usina em 11. Subir isso significa acrescentar
+  ainda mais nas rotas da etapa 8, que é exatamente onde a medição diz que dói.
+  **O Mareep ficou de fora do Farol de Olivine de propósito**: no nível 30 ele já sai Ampharos, e o
+  Ampharos é o raro de 10% daquela rota — pô-lo no pool esvaziaria o prêmio dela.
+- **O Monte Lua ficou só com os bebês** (Cleffa, Igglybuff, Smoochum): a Clefairy e a Jigglypuff
+  adultas saíam ao lado dos próprios bebês. As duas evoluem no nível 20, acima da faixa da etapa 2,
+  então quem as quer sobe o bebê. A Estrada Ciclável perdeu o raro Muk no mesmo pedido.
+- **`SEM_PISO_DE_NIVEL`: quem pode aparecer abaixo do piso da própria evolução.** O piso
+  (`EVOLVED_MIN_LEVEL`) é montado a partir do `EVOLUTIONS`, e a Gen 2 acrescentou BEBÊS a linhas
+  que já existiam — o Pikachu virou "evolução do Pichu" dez anos depois de ser um pokémon de nível
+  3 na Floresta de Viridian do jogo original. O piso então empurrava o raro dessas rotas pra 17
+  níveis acima de tudo em volta: **Pikachu Lv.20–23 numa rota de 3 a 6**. Hoje o Pikachu (Floresta
+  de Viridian, Rotas 24/25) e o Quagsire (Rota 32) saem na faixa da própria rota.
+  A lista é curta de propósito: só entra quem é a forma COMUM da linha e ganhou um bebê depois.
+- **O NÍVEL PODE SER DA ROTA, não da etapa** (`niveis` na entrada da rota, lido pelo
+  `nivelSelvagem`). Era um `id === 'eevee' ? 45` repetido em dois pontos da montagem da oferta, e
+  ele valia em QUALQUER rota — pôr um Eevee na Rota 34, que é de nível 13 a 17, daria um Eevee
+  **nível 45** ali. Hoje: **30–35 na Silph Co.**, **45 na Mansão** (como sempre foi) e a faixa da
+  etapa em qualquer outra rota, como todo mundo. O Eevee da Rota 34 entrou nesse pedido.
+  Sobrou um `eevee ? 45` no fallback de oferta gravada ANTES de o nível existir no save
+  (`confirmWild`): é código de dado antigo e não vale a pena mexer.
 - **O tipo da rota PESA no sorteio do encontro** (`PESO_DO_TIPO_DA_ROTA = 2`): quem é do tipo dela
   entra com o dobro de peso no embaralhamento. É o que faz a rota fantasma parecer uma rota
   fantasma — medido no Desvio por Lavender (Fantasma/Terra, 3 do tipo num pool de 9): a oferta

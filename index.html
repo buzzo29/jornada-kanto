@@ -3018,7 +3018,16 @@ function shinyChainSpeciesIds(speciesId){
 }
 // sorteia o nível de um pokémon selvagem respeitando esse mínimo -- preserva o "espalhamento" (a
 // diferença entre max e min) do trecho, só desloca a faixa inteira pra cima quando precisa
+/* QUEM PODE APARECER ABAIXO DO PISO DA PRÓPRIA EVOLUÇÃO.
+   O piso (EVOLVED_MIN_LEVEL) existe pra uma forma evoluída não sair antes do nível em que ela
+   existiria. Só que ele é montado a partir do EVOLUTIONS, e a Gen 2 acrescentou BEBÊS a linhas que
+   já existiam: o Pikachu virou "evolução do Pichu" dez anos depois de ser um pokémon de nível 3 na
+   Floresta de Viridian do jogo original. O piso então empurrava o raro dessas rotas pra 17 níveis
+   acima de tudo em volta -- um Pikachu Lv.20 numa rota de 3 a 6.
+   A lista é curta de propósito: só entra quem é a forma COMUM da linha e ganhou um bebê depois. */
+const SEM_PISO_DE_NIVEL = ['pikachu','quagsire'];
 function rollWildLevel(speciesId, minLevel, maxLevel){
+  if(SEM_PISO_DE_NIVEL.includes(speciesId)) return randomInt(minLevel, maxLevel);
   const floor = EVOLVED_MIN_LEVEL[speciesId];
   if(!floor || floor <= minLevel) return randomInt(minLevel, maxLevel);
   const spread = maxLevel - minLevel;
@@ -3110,7 +3119,10 @@ const ROUTE_MAP = [
   [ // antes de Misty (Água)
     { id:'mt_moon', name:'Monte Lua', icon:'🌙', types:['Rock','Poison'],
       rumor:'Há fósseis antigos enterrados nas cavernas — e Rockets cavando.',
-      pool:['geodude','zubat','clefairy','paras','sandshrew','jigglypuff','teddiursa','dunsparce','cleffa','igglybuff','smoochum'], rare:['onix'] },
+      /* SÓ AS PRÉ-EVOLUÇÕES: o Monte Lua é o berçário do jogo (Cleffa, Igglybuff, Smoochum), e a
+         Clefairy e a Jigglypuff adultas saíam ao lado dos próprios bebês. Quem quiser as adultas
+         sobe o bebê -- as duas evoluem no nível 20, acima da faixa desta etapa. */
+      pool:['geodude','zubat','paras','sandshrew','teddiursa','dunsparce','cleffa','igglybuff','smoochum'], rare:['onix'] },
     { id:'coast_24_25', name:'Rotas 24/25 (Costa)', icon:'🌊', types:['Water','Electric'],
       rumor:'Pescadores juram ter visto um roedor elétrico na margem.',
       pool:['bellsprout','oddish','psyduck','poliwag','abra','pidgey','goldeen','magikarp','slowpoke','butterfree','marill','wooper','chinchou'], rare:['pikachu'] }
@@ -3126,7 +3138,9 @@ const ROUTE_MAP = [
   [ // antes de Erika (Planta)
     { id:'rock_tunnel', name:'Túnel de Pedra', icon:'⛏️', types:['Rock','Fighting'],
       rumor:'Escuro demais pra enxergar o time. Quem passa, passa às cegas.',
-      pool:['geodude','onix','machop','zubat','graveler','cubone','teddiursa','larvitar'], rare:['golbat'] },
+      /* Os que CAVAM e os que socam pedra: é um túnel escavado, e o tipo da rota é Pedra/Lutador. */
+      pool:['geodude','onix','machop','zubat','graveler','cubone','teddiursa','larvitar',
+            'rhyhorn','diglett','mankey','sandshrew'], rare:['golbat'] },
     { id:'lavender_detour', name:'Desvio por Lavender', icon:'👻', types:['Ghost','Ground'],
       rumor:'A torre chora à noite. Alguma coisa lá dentro não é sólida.',
       pool:['gastly','cubone','ratata','zubat','drowzee','growlithe','exeggcute','misdreavus','murkrow'], rare:['haunter'] }
@@ -3134,7 +3148,7 @@ const ROUTE_MAP = [
   [ // antes de Koga (Veneno)
     { id:'cycling_road', name:'Estrada Ciclável', icon:'🚴', types:['Poison','Electric'],
       rumor:'Rápido, plano e cheio de fumaça. Dá pra atravessar correndo.',
-      pool:['grimer','koffing','doduo','voltorb','magnemite','ekans','fearow','beedrill','hoppip','skiploom'], rare:['muk'] },
+      pool:['grimer','koffing','doduo','voltorb','magnemite','ekans','fearow','beedrill','hoppip','skiploom'], rare:[] },
     { id:'safari_zone', name:'Zona de Safári', icon:'🦓', types:['Normal','Dragon'],
       rumor:'Oito ofertas raríssimas — e cada uma pode fugir na sua cara.',
       pool:['chansey','kangaskhan','tauros','exeggcute','nidoranf','paras','venonat','rhyhorn','pinsir','lickitung','butterfree','beedrill','nidorino','nidorina','doduo','heracross','stantler','girafarig','miltank','aipom'], rare:['dratini'] }
@@ -3142,10 +3156,14 @@ const ROUTE_MAP = [
   [ // antes de Sabrina (Psíquico)
     { id:'fighting_dojo', name:'Dojo Lutador', icon:'🥋', types:['Fighting'],
       rumor:'O mestre entrega um discípulo pra quem vencer. Mas lutador não gosta de psíquico…',
-      pool:['machop','machoke','primeape','mankey','poliwhirl','hitmonlee','hitmonchan','tyrogue','hitmontop'], rare:[] },
+      /* Os TRÊS Lutadores que faltavam no jogo inteiro: fora da linha do Machop, do Mankey e dos
+         Hitmon, sobram só estes. O Dojo é onde eles cabem -- e é o pool mais forte da etapa 6. */
+      pool:['machop','machoke','primeape','mankey','poliwhirl','hitmonlee','hitmonchan','tyrogue','hitmontop',
+            'heracross','poliwrath','machamp'], rare:[] },
     { id:'silph_co', name:'Silph Co.', icon:'🏢', types:['Poison','Psychic'],
       rumor:'Onze andares tomados pela Rocket. Dizem que há um experimento estranho guardado no cofre.',
-      pool:['zubat','grimer','koffing','drowzee','abra','mrmime','kadabra','magneton','electabuzz','eevee','natu','porygon2','smoochum','porygon'], rare:['ditto'] }
+      pool:['zubat','grimer','koffing','drowzee','abra','mrmime','kadabra','magneton','electabuzz','eevee','natu','porygon2','smoochum','porygon'],
+      niveis:{ eevee:[30,35] }, rare:['ditto'] }
   ],
   [ // antes de Blaine (Fogo)
     { id:'seafoam', name:'Ilhas Seafoam', icon:'❄️', types:['Water','Ice'],
@@ -3153,12 +3171,16 @@ const ROUTE_MAP = [
       pool:['seel','shellder','staryu','dewgong','horsea','goldeen','krabby','golduck','cloyster','jynx','seadra','kingler','tentacruel','vaporeon','swinub','delibird','mantine','corsola'], rare:[{species:'articuno',chance:0.05},'kabuto','omanyte','slowbro','gyarados','aerodactyl'] },
     { id:'pokemon_mansion', name:'Mansão Pokémon', icon:'🏚️', types:['Fire','Normal'],
       rumor:'Diários queimados falam de um experimento chamado… Mewtwo.',
-      pool:['growlithe','ponyta','vulpix','magmar','rapidash','koffing','weezing','golbat','eevee','flareon','dodrio','houndour','magby','slugma'], rare:['ditto','ninetales','arcanine',{species:'entei', chance:0.05}] }
+      pool:['growlithe','ponyta','vulpix','magmar','rapidash','koffing','weezing','golbat','eevee','flareon','dodrio','houndour','magby','slugma'],
+      niveis:{ eevee:[45,45] }, rare:['ditto','ninetales','arcanine',{species:'entei', chance:0.05}] }
   ],
   [ // antes de Giovanni (Terra)
     { id:'power_plant', name:'Usina de Força', icon:'⚡', types:['Electric'],
       rumor:'A usina abandonada ainda tem energia. E ela tem asas.',
-      pool:['magnemite','electabuzz','voltorb','magneton','electrode','raichu','jolteon','porygon','mareep','flaaffy','elekid'], rare:[{species:'zapdos',chance:0.05}, {species:'dragonite',chance:0.10}] },
+      /* Usina abandonada: o Lanturn pelo Elétrico e o Weezing pelo que apodrece num prédio parado
+         (é o mesmo motivo de o Grimer morar na usina do FireRed). */
+      pool:['magnemite','electabuzz','voltorb','magneton','electrode','raichu','jolteon','porygon','mareep','flaaffy','elekid',
+            'lanturn','weezing'], rare:[{species:'zapdos',chance:0.05}, {species:'dragonite',chance:0.10}] },
     { id:'victory_road', name:'Victory Road', icon:'🏔️', types:['Rock','Fighting'],
       rumor:'Só passa quem merece. Uma chama vive no topo da montanha.',
       pool:['onix','machoke','graveler','rhyhorn','primeape','golbat','snorlax','golem','marowak','dragonair','pupitar','ursaring','donphan'], rare:[{species:'moltres',chance:0.05}, {species:'dragonite',chance:0.10}] }
@@ -3188,10 +3210,13 @@ const JOHTO_ROUTE_MAP = [
   [ // antes da Whitney (Normal) -- Floresta Ilex e Rota 34
     { id:'ilex_forest', name:'Floresta Ilex', icon:'🌳', types:['Bug','Grass'],
       rumor:'A floresta guardiã. Batendo nas árvores certas, algo grande cai lá de cima.',
-      pool:['caterpie','metapod','weedle','kakuna','paras','oddish','psyduck','zubat','pineco'], rare:['heracross'] },
+      /* O FARFETCH'D é a lore da Ilex: no Gold/Silver a floresta é onde o carvoeiro perde o dele e
+         o jogador vai atrás. O resto é o bicharedo de mata fechada -- Inseto, o tipo da rota. */
+      pool:['caterpie','metapod','weedle','kakuna','paras','oddish','psyduck','zubat','pineco',
+            'farfetchd','spinarak','ledyba','venonat'], rare:['heracross'] },
     { id:'route_34', name:'Rota 34', icon:'🏙️', types:['Normal','Psychic'],
       rumor:'O caminho da creche até Goldenrod. Passa de tudo por aqui.',
-      pool:['ratata','abra','drowzee','snubbull','magikarp','tentacool','hoppip','meowth','togepi','yanma','natu'], rare:['ditto'] }
+      pool:['ratata','abra','drowzee','snubbull','magikarp','tentacool','hoppip','meowth','togepi','yanma','natu','eevee'], rare:['ditto'] }
   ],
   [ // antes do Morty (Fantasma) -- Parque Nacional e Rotas 36/37
     { id:'national_park', name:'Parque Nacional', icon:'🦋', types:['Bug','Grass'],
@@ -3204,7 +3229,10 @@ const JOHTO_ROUTE_MAP = [
   [ // antes do Chuck (Lutador) -- Ilhas Redemoinho e Rotas 40/41
     { id:'whirl_islands', name:'Ilhas Redemoinho', icon:'🌀', types:['Water','Flying'],
       rumor:'Quatro ilhas em volta de um redemoinho. Lá no fundo, algo prateado bate as asas.',
-      pool:['tentacool','krabby','horsea','seel','golbat','zubat','staryu','chinchou'], rare:[] },
+      /* Caverna marinha: o Mantine é Água/Voador, exatamente os dois tipos da rota, e o Remoraid
+         é o parceiro dele no jogo original. Corsola e Qwilfish completam o recife. */
+      pool:['tentacool','krabby','horsea','seel','golbat','zubat','staryu','chinchou',
+            'mantine','remoraid','qwilfish','corsola'], rare:[] },
     { id:'route_40_41', name:'Rotas 40/41 (Mar)', icon:'🌊', types:['Water'],
       rumor:'Mar aberto entre Olivine e Cianwood. Só se atravessa nadando.',
       pool:['tentacool','krabby','horsea','magikarp','shellder','chinchou','lanturn','goldeen','qwilfish','remoraid'], rare:['mantine'] }
@@ -3212,7 +3240,11 @@ const JOHTO_ROUTE_MAP = [
   [ // antes da Jasmine (Aço) -- Farol de Olivine e Rotas 38/39
     { id:'olivine_lighthouse', name:'Farol de Olivine', icon:'🗼', types:['Electric','Poison'],
       rumor:'A luz do farol apagou. Tem um pokémon doente lá em cima — e é ele a lâmpada.',
-      pool:['zubat','golbat','voltorb','magnemite','grimer','koffing','staryu','krabby'], rare:['ampharos'] },
+      /* O Chinchou vira LANTURN no nível da etapa -- o peixe-lanterna, que é o farol do mar.
+         O Mareep ficou de FORA de propósito: no nível 30 ele já sairia Ampharos, e o Ampharos é o
+         raro de 10% desta rota -- pô-lo no pool esvaziaria o prêmio dela. */
+      pool:['zubat','golbat','voltorb','magnemite','grimer','koffing','staryu','krabby',
+            'chinchou','elekid','weezing','arbok'], rare:['ampharos'] },
     { id:'route_38_39', name:'Rotas 38/39', icon:'🐄', types:['Normal'],
       rumor:'Pasto da Fazenda Moomoo. Leite fresco e bichos grandes demais pro capim.',
       pool:['miltank','tauros','meowth','magnemite','farfetchd','ratata','snubbull','growlithe','skarmory','swinub'], rare:['girafarig'] }
@@ -3220,18 +3252,28 @@ const JOHTO_ROUTE_MAP = [
   [ // antes do Pryce (Gelo) -- Monte Mortar e Lago da Fúria
     { id:'mt_mortar', name:'Monte Mortar', icon:'🥊', types:['Fighting','Rock'],
       rumor:'Um mestre de karatê treina sozinho na caverna dos fundos há anos.',
-      pool:['machop','machoke','geodude','graveler','ratata','zubat','golbat','marill','shuckle','gligar'], rare:['tyrogue',{species:'raikou', chance:0.05}] },
+      /* O Monte Mortar tem cachoeira por dentro (daí o Poliwag) e é a casa do Mestre do Caratê,
+         que dá um Tyrogue no jogo original -- ele já é o raro daqui. */
+      pool:['machop','machoke','geodude','graveler','ratata','zubat','golbat','marill','shuckle','gligar',
+            'onix','mankey','poliwag'], rare:['tyrogue',{species:'raikou', chance:0.05}] },
     { id:'lake_of_rage', name:'Lago da Fúria', icon:'🔴', types:['Water','Dragon'],
       rumor:'O lago inteiro está agitado. No meio dele, um Gyarados da cor errada.',
-      pool:['magikarp','poliwag','wooper','quagsire','slowpoke','marill','goldeen','dratini','politoed','slowking'], rare:[{species:'gyarados', chance:0.12},{species:'suicune', chance:0.05}] }
+      /* Peixe de água doce, que é o que um lago tem. O Gyarados vermelho continua sendo o raro. */
+      pool:['magikarp','poliwag','wooper','quagsire','slowpoke','marill','goldeen','dratini','politoed','slowking',
+            'remoraid','horsea','chinchou'], rare:[{species:'gyarados', chance:0.12},{species:'suicune', chance:0.05}] }
   ],
   [ // antes da Clair (Dragão) -- Caminho de Gelo e Covil do Dragão
     { id:'ice_path', name:'Caminho de Gelo', icon:'🧊', types:['Ice','Poison'],
       rumor:'O chão é escorregadio e só se anda em linha reta. Algo com garras observa.',
-      pool:['swinub','delibird','jynx','golbat','zubat','piloswine','seel','dewgong'], rare:['sneasel'] },
+      /* Gelo e Veneno, os dois tipos da rota: Cloyster e Lapras pelo gelo, Gastly e Weezing pelo
+         escuro da caverna. */
+      pool:['swinub','delibird','jynx','golbat','zubat','piloswine','seel','dewgong',
+            'cloyster','lapras','gastly','weezing'], rare:['sneasel'] },
     { id:'dragons_den', name:'Covil do Dragão', icon:'🐲', types:['Dragon','Water'],
       rumor:'Atrás do ginásio, uma caverna alagada onde os dragões são criados.',
-      pool:['dratini','dragonair','magikarp','horsea','seadra','poliwag','goldeen','gyarados'], rare:[{species:'kingdra', chance:0.10},{species:'dragonite', chance:0.08}] }
+      /* O Covil é uma caverna ALAGADA -- é por isso que os que entram são todos de Água. */
+      pool:['dratini','dragonair','magikarp','horsea','seadra','poliwag','goldeen','gyarados',
+            'psyduck','remoraid','wooper','staryu'], rare:[{species:'kingdra', chance:0.10},{species:'dragonite', chance:0.08}] }
   ]
 ];
 
@@ -6330,7 +6372,7 @@ async function resortearEncontro(){
    promete é um Kingdra NA TELA, e com a repetida trocada o jogador continua vendo exatamente um.
    Só sorteia quando ACHA repetida -- assim as ofertas que já estavam certas continuam idênticas,
    semente por semente. */
-function semLinhaRepetida(offer, pool, leg){
+function semLinhaRepetida(offer, pool, leg, route){
   const vistas = new Set();
   return offer.map(o => {
     const raiz = raizDaLinha(o.speciesId);
@@ -6341,16 +6383,26 @@ function semLinhaRepetida(offer, pool, leg){
     if(!livres.length) return o;
     const sub = livres[Math.floor(Math.random()*livres.length)];
     vistas.add(raizDaLinha(sub));
-    const nivel = rollWildLevel(sub, leg.minLevel, leg.maxLevel);
+    const nivel = nivelSelvagem(sub, route, leg);
     return { speciesId: especieNoNivel(sub, nivel), level: nivel };
   });
+}
+/* NÍVEL PRÓPRIO DE UMA ESPÉCIE NUMA ROTA (`niveis` na entrada da rota).
+   Era um `id === 'eevee' ? 45` repetido em dois pontos da montagem da oferta, e ele valia em
+   QUALQUER rota: pôr um Eevee na Rota 34, que é de nível 13 a 17, daria um Eevee nível 45 ali.
+   Agora quem manda é o LUGAR -- 30 a 35 na Silph Co., 45 na Mansão, e a faixa da etapa em
+   qualquer outra rota, como todo mundo. */
+function nivelSelvagem(id, route, leg){
+  const propria = route && route.niveis && route.niveis[id];
+  if(propria) return randomInt(propria[0], propria[1]);
+  return rollWildLevel(id, leg.minLevel, leg.maxLevel);
 }
 function montaOfertaSelvagem(){
   const leg = LEGS[game.gymIndex];
   const route = routeById(game.currentRoute);
   const pool = (route && route.pool && route.pool.length) ? route.pool : leg.pool;
   let speciesOffer = buildOfferFromPool(pool, leg.offerCount, route && route.types);
-  let offer = speciesOffer.map(id=>({ speciesId:id, level: id==='eevee' ? 45 : rollWildLevel(id, leg.minLevel, leg.maxLevel) }));
+  let offer = speciesOffer.map(id=>({ speciesId:id, level: nivelSelvagem(id, route, leg) }));
   // todos os mecanismos de "encontro especial" abaixo (pássaro lendário, pré-evolução de outro inicial,
   // raros da rota) disputam os MESMOS espaços da oferta -- usar uma lista compartilhada de espaços ainda
   // livres garante que um não sobrescreva o resultado do outro por acidente, o que fazia a chance real
@@ -6391,7 +6443,7 @@ function montaOfertaSelvagem(){
         const slotPick = Math.floor(Math.random()*availableSlots.length);
         const offerIdx = availableSlots.splice(slotPick, 1)[0];
         const rareLevel = ehLendario(species) ? nivelDeLendario(leg)
-                        : (species==='eevee' ? 45 : rollWildLevel(species, leg.minLevel, leg.maxLevel));
+                        : nivelSelvagem(species, route, leg);
         offer[offerIdx] = { speciesId: species, level: rareLevel };
       }
     }
@@ -6406,7 +6458,7 @@ function montaOfertaSelvagem(){
   offer = offer.map(o => SEM_CAPTURA_SELVAGEM.includes(o.speciesId)
     ? { ...o, speciesId: buildOfferFromPool(leg.pool, 1)[0] || 'ratata' }
     : o);
-  offer = semLinhaRepetida(offer, pool, leg);
+  offer = semLinhaRepetida(offer, pool, leg, route);
   offer.forEach(o=>{ o.shiny = Math.random() < currentShinyChance(); }); // shiny (1 em 128, ou a chance crescente do bônus, se estiver ativo)
   // registra que esse encontro rodou, PRA VALER na próxima chamada -- é isso que faz a chance subir
   // encontro após encontro enquanto a pessoa não captura nenhum shiny (currentShinyChance lê esse
