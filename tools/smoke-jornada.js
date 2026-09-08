@@ -1,7 +1,8 @@
 #!/usr/bin/env node
-// DESATUALIZADO (28/08/2026): quebra em g.startLeg, que nao existe mais no jogo -- o fluxo de
-// jornada com cassino/roleta que este script percorre foi substituido. Preservado porque a
-// estrutura (percorrer telas e validar que o estado nunca fica invalido) ainda serve de base.
+// VOLTOU A RODAR. O aviso de "desatualizado" (28/08/2026, quando ele quebrava em g.startLeg)
+// caducou: o bot foi ajustado ao fluxo de hoje e percorre a jornada inteira. Ele e a ferramenta de
+// medicao de dificuldade da casa -- o --html abaixo existe pra rodar o MESMO bot contra duas
+// versoes do index.html e comparar a taxa de conclusao.
 /**
  * SMOKE TEST DA JORNADA
  *
@@ -19,6 +20,9 @@ const NUZ = !args.includes('--sem-nuzlocke');
 /* --regiao kanto|johto força o caminho nas 8 etapas. Serve pra comparar os dois lados com o mesmo
    bot: se um deles for mais fácil, a diferença aparece na taxa de conclusão. */
 const REGIAO_FORCADA = (()=>{ const i=args.indexOf('--regiao'); return i>=0 ? args[i+1] : null; })();
+/* --html aponta pra OUTRA copia do index.html. E o que permite medir um A/B rodando o MESMO bot
+   contra as duas versoes do jogo, em vez de comparar com uma medicao antiga de outra epoca. */
+const HTML = (()=>{ const i=args.indexOf('--html'); return i>=0 ? args[i+1] : null; })();
 
 const TERMINAL = new Set(['journeyEnd','gameover']);
 const MAX_STEPS = 4000;
@@ -59,7 +63,9 @@ function act(g, log){
       return true;
     }
     case 'specialBattling': g.advanceSpecialReveal(); return true;
-    case 'specialResult':   g.continueAfterSpecial(); return true;
+    // o botao de verdade passa pelo seguirDoResultado: quem desmaiou pode ter batido no nivel
+    // da evolucao, e ela e anunciada entre o log e o destino. Chamar o destino direto pularia isso
+    case 'specialResult':   g.seguirDoResultado('special'); return true;
     // o "Mew"/"Mewtwo" da rota é um Ditto disfarçado; a revelação é uma tela só
     case 'wildDisguiseReveal': g.continueAfterWildDisguiseReveal(); return true;
     case 'casino':
@@ -135,9 +141,9 @@ function act(g, log){
     // a roleta de prêmios saiu do jogo: a vitória vai direto pra próxima etapa (ou pro resumo,
     // quando foi a última insígnia)
     case 'victory':
-      if(game.gymIndex < g.numGinasios() - 1) g.continueJourney(); else g.showJourneyEnd();
+      g.seguirDoResultado(game.gymIndex < g.numGinasios() - 1 ? 'continueJourney' : 'journeyEnd');
       return true;
-    case 'defeat':       g.prepareRetry(); return true;
+    case 'defeat':       g.seguirDoResultado('retry'); return true;
     case 'gameover':
     case 'journeyEnd':   return false;
     default:
@@ -152,7 +158,7 @@ const screensSeen = new Set();
 const eventsSeen = new Set();
 
 for(let run=0; run<RUNS; run++){
-  const g = createSandbox();
+  const g = createSandbox(HTML);
   const st = g.freshGameDefaults();
   st.screen = 'start';
   st.trainerName = 'Teste'+run;

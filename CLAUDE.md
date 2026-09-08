@@ -1391,6 +1391,38 @@ de golpes.
 - **Desmaiar dá +1 nível.** Isso já foi explorado: jogadores perdiam de propósito porque a
   distribuição tem teto e o desmaio não. Corrigido pelo Bônus de Kanto (abaixo), não removido —
   o desmaio ainda é a rede de quem está atrás.
+- **E esse +1 pode ser o nível da EVOLUÇÃO — e não evoluía ninguém.** O pokémon caía, subia de
+  nível e continuava na forma antiga. Quem evoluía o time era só o `confirmLevels`, no fim da
+  distribuição de níveis, então na DERROTA a evolução acontecia uma tela depois (a distribuição vem
+  logo em seguida) e na VITÓRIA só na etapa seguinte — **na do 8º ginásio, na Elite e no esconderijo
+  da Rocket, nunca**: ali não existe distribuição nenhuma depois. Reportado em 08/09/2026.
+  Hoje `evoluirQuemSubiuNoDesmaio` roda no MESMO lugar em que o nível é dado, nos **dois** caminhos
+  de batalha (`finishBattle` e `finishSpecialBattle`). Deixar num só era garantir que o outro
+  ficasse com o defeito — e a Elite, cinco lutas seguidas sem cura, é justamente o caminho especial.
+  **É comum: 1.415 evoluções em 1.500 jornadas simuladas, tocando 75,4% delas** (1.110 na derrota,
+  256 na vitória de ginásio, 49 em batalha especial).
+  **Custo medido: dentro do ruído.** Conclusão 68,3% com a correção (10.000 jornadas) contra 67,4%
+  sem ela (15.000) — +0,9 ponto, 1,5σ. E o próprio simulador varia mais que isso: três amostras de
+  5.000 do lado SEM deram 66,2%, 67,6% e 68,3%. A direção é a esperada (evoluir uma etapa antes só
+  ajuda), o tamanho não é mensurável aqui.
+- **A evolução é anunciada LOGO DEPOIS DO LOG**, na tela de evolução de sempre: o jogador lê o log,
+  aperta continuar, vê quem evoluiu, e só então segue. Sem evolução nenhuma ele vai direto pro
+  destino, sem tela a mais.
+  Uma caixa dentro da tela de resultado seria uma segunda apresentação pro mesmo evento — e deixaria
+  a **bifurcação** (Gloom, Poliwhirl, Slowpoke, Tyrogue) sem tela pra escolher: caixa não escolhe.
+  **Quem guarda pra onde ir é o `evolucaoDepois`**, uma CHAVE no save e não a função — a tela de
+  evolução é ponto seguro de gravação, e função não sobrevive ao save. É o mesmo desenho do
+  `releaseDepois`. Ela nasceu no fim da distribuição de níveis, onde o destino é sempre o
+  `teamOrder`; por isso ele era fixo até agora.
+  Tem rede pro F5: se o destino é o fluxo da batalha especial e o `specialBattle` não sobreviveu ao
+  recarregamento (ele não é salvo), o destino é descartado e a tela cai onde as outras telas
+  especiais já caíam. A evolução em si não se perde — ela é aplicada no time no instante em que o
+  nível sobe; o que se perde é o anúncio.
+- **O sprite do log NÃO acompanha a evolução**, de propósito: a batalha que o log conta aconteceu
+  com a forma antiga, e a nova é anunciada na tela seguinte.
+- `tools/test-pos-batalha.js` tranca isso, e `tools/smoke-jornada.js` **aperta o botão de verdade**
+  (`seguirDoResultado`) em vez de chamar o destino direto — sem isso o bot pularia a evolução e a
+  medição não teria como enxergar a mudança.
 - **Bônus de Kanto**: ao vencer o Giovanni, +4/+3/+2/+1/0 níveis pro time todo conforme as derrotas
   totais (0-5 / 6-10 / 11-15 / 16-22 / 23+). Inverte o incentivo: hoje quem farma derrota termina
   ABAIXO de quem joga limpo.
@@ -1931,6 +1963,16 @@ que é justamente a parte que o jogador percebe.
   `tools/test-torre.js` cobre isso do jeito que pega a próxima: o jogador abre a Torre ANTES do
   cron (é o `getTrainerTower` que cria o dia), e o teste cobra que o cron feche o dia anterior
   assim mesmo. Conferido que ele falha em 8 casos com o `if(snap.exists) return null` de volta.
+- **A batalha do andar tem LOG depois** (`towerBattleResult`, 08/09/2026). Ela voltava direto pra
+  torre quando a animação acabava: era a **única batalha do jogo sem log** — a jornada, a Elite, o
+  ginásio da cidade, o online e a raide todos têm o seu. A tela traz o log, os dois times e o botão
+  de volta pra torre.
+  Os dois times saem do LOG (`deriveTeamStatusFromMatchups`): a Torre devolve só os confrontos, sem
+  `playerStatus`/`brockStatus` prontos — reusar a tela do resultado de treinador sem derivar
+  deixaria os dois quadros vazios. É o mesmo caminho do resultado do Ginásio da Cidade.
+  O andar e o nome do NPC vêm do próprio retorno do servidor (`floor`, `npcName`), que já os
+  mandava. Quem zerou a torre lê uma frase própria: "o próximo andar já está esperando" seria
+  mentira ali.
 - (Histórico: eram 10 andares, médias 58 a 85, escala escolhida pra um campeão da Elite (~67)
   chegar ao andar 5. Ver a nota acima pro modelo de hoje.)
 - Times de 6 evoluções finais, níveis espalhados ±3 com os dois extremos garantidos.

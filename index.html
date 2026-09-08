@@ -3635,6 +3635,7 @@ function freshGameDefaults(){
     team:[],
     releaseSelected:[],
     releaseDepois:null,    // pra onde ir depois do Prof. Carvalho ('gymApproach' no resgate da Rocket)
+    evolucaoDepois:null,   // pra onde ir depois da tela de evolução (ver seguirDoResultado)
     resgatadoSemVaga:null, // resgatado da Rocket esperando a tela do Prof. Carvalho (time já com 6)
     pool:20,
     poolTotal:20,
@@ -6507,6 +6508,28 @@ function confirmRelease(){
 function hasUnresolvedEevee(){
   return game.team.some(p=>p.speciesId==='eevee' && !p.eeveeResolved);
 }
+/* O +1 NÍVEL DO DESMAIO PODE SER O NÍVEL DA EVOLUÇÃO -- e ele não estava evoluindo ninguém.
+   O pokémon caía, subia de nível e continuava na forma antiga: a evolução só saía na distribuição
+   de níveis da etapa SEGUINTE (é o `confirmLevels` que roda o tryEvolve no time todo), e depois da
+   vitória do último ginásio, da Elite ou de um esconderijo da Rocket não saía nunca -- ali não há
+   distribuição nenhuma depois. Reportado em 08/09/2026.
+   Roda no MESMO lugar em que o nível é dado, nos dois caminhos de batalha (ginásio e especial):
+   deixar num só era garantir que o outro ficasse com o defeito -- e a Elite, que é onde mais gente
+   desmaia, é justamente o caminho especial. */
+function evoluirQuemSubiuNoDesmaio(subiram){
+  let evs = [];
+  subiram.forEach(p => { evs = evs.concat(tryEvolve(p)); });
+  game.evolutions = evs;
+}
+/* O BOTÃO DA TELA DE RESULTADO PASSA PELA EVOLUÇÃO. O jogador lê o log, aperta continuar, vê quem
+   evoluiu, e só então segue -- que é onde a evolução cabe: logo depois do log.
+   A tela é a MESMA de sempre (renderEvolution). Uma caixa nova dentro do resultado seria uma
+   segunda apresentação pro mesmo evento, e ainda deixaria a bifurcação (Gloom, Poliwhirl, Slowpoke,
+   Tyrogue) sem tela pra escolher. */
+function seguirDoResultado(destino){
+  game.evolucaoDepois = destino;
+  resolverEvolucoes();
+}
 function evolucoesPendentes(){
   return game.team.filter(p=>p.pendingEvoChoice && EVOLUTION_CHOICES[p.pendingEvoChoice]);
 }
@@ -6539,8 +6562,8 @@ function escolherEvolucao(monId, destino){
 }
 function resolverEvolucoes(){
   if(evolucoesPendentes().length){ game.screen = 'evoChoice'; render(); return; }
-  game.screen = (game.evolutions||[]).length ? 'evolution' : 'teamOrder';
-  render();
+  if((game.evolutions||[]).length){ game.screen = 'evolution'; render(); return; }
+  continueFromEvolution();   // nada a anunciar: vai direto pro destino
 }
 function renderEvoChoice(){
   const p = evolucoesPendentes()[0];
@@ -6663,11 +6686,24 @@ function confirmLevels(){
   let evs = [];
   game.team.forEach(p=>{ evs = evs.concat(tryEvolve(p)); });
   game.evolutions = evs;
+  game.evolucaoDepois = null;   // este caminho termina no teamOrder, como sempre terminou
   // resolverEvolucoes decide a tela: escolha pendente -> 'evoChoice'; senão 'evolution' ou direto
   // pro 'teamOrder'. Antes isso era um if aqui, mas agora a escolha pode acrescentar eventos
   resolverEvolucoes();
 }
+/* PRA ONDE IR DEPOIS DA EVOLUÇÃO. A tela nasceu no fim da distribuição de níveis, onde o destino é
+   sempre o teamOrder -- por isso ele era fixo. Agora ela também é alcançada DEPOIS de uma batalha
+   (o +1 do desmaio pode ser o nível da evolução), e aí o destino é pra onde o botão do resultado ia.
+   É uma CHAVE e não a função: a tela de evolução é ponto seguro de gravação, e função não sobrevive
+   ao save -- o mesmo motivo do releaseDepois. */
 function continueFromEvolution(){
+  const depois = game.evolucaoDepois;
+  game.evolucaoDepois = null;
+  game.evolutions = [];   // já foram anunciadas; sem isso a próxima tela de resultado repetiria
+  if(depois === 'continueJourney'){ continueJourney(); return; }
+  if(depois === 'journeyEnd'){ showJourneyEnd(); return; }
+  if(depois === 'retry'){ prepareRetry(); return; }
+  if(depois === 'special'){ continueAfterSpecial(); return; }
   game.screen = 'teamOrder';
   render();
 }
@@ -7251,16 +7287,21 @@ function finishSpecialBattle(){
      que o pokémon termina caído. Agora o filtro fica restrito à Elite, que é de onde ele veio. */
   const hpBefore = (cfg.context === 'elite') ? (game.specialHpBeforeBattle || []) : [];
   let anyLeveledUp = false;
+  const subiram = [];
   game.team.forEach((p, idx)=>{
     const wasAlive = hpBefore[idx]==null || hpBefore[idx] > 0; // fora da Elite hpBefore é vazio, então isso é sempre true
     if(p.hp<=0 && wasAlive){
       p.level += 1;
       if(result.playerStatus[idx]){ result.playerStatus[idx].level = p.level; }
       anyLeveledUp = true;
+      subiram.push(p);
     }
   });
   game.specialHpBeforeBattle = null;
   result.leveledUpFromFaint = anyLeveledUp;
+  /* O sprite do playerStatus NÃO acompanha a evolução de propósito: a batalha que o log conta
+     aconteceu com a forma antiga, e a nova é anunciada na tela seguinte. */
+  evoluirQuemSubiuNoDesmaio(subiram);
   let msg = '';
   game.specialGrantsLevels = 0;
   if(cfg.context==='rocket'){
@@ -7753,14 +7794,17 @@ function finishBattle(){
   if(game.screen !== 'battling') return;
   const result = game.battleResult;
   let anyLeveledUp = false;
+  const subiram = [];
   game.team.forEach((p, idx)=>{
     if(p.hp<=0){
       p.level += 1;
       if(result.playerStatus[idx]){ result.playerStatus[idx].level = p.level; }
       anyLeveledUp = true;
+      subiram.push(p);
     }
   });
   result.leveledUpFromFaint = anyLeveledUp;
+  evoluirQuemSubiuNoDesmaio(subiram);
   if(result.win){
     game.badgesEarned.push(gymAtual().badge);
     // 1ª insígnia = a jornada saiu do papel; aquele slot ganha direito a um sorteio novo de
@@ -7980,12 +8024,14 @@ function animateTrainerHpBars(){
 }
 function finishTrainerBattle(){
   if(game.screen !== 'trainerBattling') return;
-  // A Torre reaproveita TODO o ciclo de revelação daqui (mesmo formato: resultado com matchups
-  // vindo pronto). Só o destino no fim é diferente -- em vez da tela de resultado do treinador,
-  // volta pra torre, que já mostra o andar novo. Reusar evitou duplicar ~120 linhas de animação.
+  /* A Torre reaproveita TODO o ciclo de revelação daqui (mesmo formato: resultado com matchups
+     vindo pronto). Reusar evitou duplicar ~120 linhas de animação.
+     Ela voltava DIRETO pra torre, sem log: a animação passava e o andar só dizia se venceu ou não.
+     Era a única batalha do jogo sem o log depois -- a jornada, a Elite, o ginásio da cidade, o
+     online e a raide todos têm o seu. Agora ela tem a mesma leitura, e o botão volta pra torre. */
   if(game.towerBattlePending){
     game.towerBattlePending = false;
-    game.screen = 'trainerTower';
+    game.screen = 'towerBattleResult';
     render();
     return;
   }
@@ -11351,6 +11397,7 @@ function serializeGame(){
     team: game.team,
     releaseSelected: game.releaseSelected,
     releaseDepois: game.releaseDepois || null,
+    evolucaoDepois: game.evolucaoDepois || null,
     resgatadoSemVaga: game.resgatadoSemVaga || null,
     pool: game.pool,
     poolTotal: game.poolTotal,
@@ -11538,6 +11585,7 @@ function applySavedState(data){
   game.team = hydrateTeam(data.team);
   game.releaseSelected = data.releaseSelected || [];
   game.releaseDepois = data.releaseDepois || null;
+  game.evolucaoDepois = data.evolucaoDepois || null;
   game.resgatadoSemVaga = data.resgatadoSemVaga || null;
   game.pool = data.pool || 0;
   game.poolTotal = data.poolTotal || 0;
@@ -11628,6 +11676,15 @@ function applySavedState(data){
   // rede de segurança: saves salvos antes dessa correção (ou qualquer dado corrompido) podem ter ficado
   // parados numa tela de resultado de batalha sem o resultado em si -- em vez de travar, volta pra uma
   // tela segura em que o jogador consegue seguir jogando normalmente
+  /* A tela de evolução passou a ser alcançada DEPOIS de uma batalha, e guarda no evolucaoDepois
+     pra onde ir. Quando esse destino é o fluxo da batalha especial, ele depende do specialBattle --
+     que não é salvo. Sem esta rede, um F5 ali levava o jogador pro teamOrder no meio da Elite.
+     A evolução em si não se perde: ela já foi aplicada no time no instante em que o nível subiu;
+     o que se perde é o anúncio. */
+  if(['evolution','evoChoice'].includes(data.screen) && game.evolucaoDepois === 'special' && !game.specialBattle){
+    game.evolucaoDepois = null;
+    game.screen = (game.eliteStatus==='inProgress') ? 'eliteHeal' : 'preBattle';
+  }
   const needsBattleResult = ['victory','defeat','gameover'].includes(game.screen);
   if(needsBattleResult && (!game.battleResult || !game.battleResult.matchups)){
     game.screen = 'preBattle';
@@ -12831,7 +12888,7 @@ function renderSpecialResult(){
     <h2>Time adversário</h2>
     <div class="status-list">${renderEnemyStatus(r.brockStatus)}</div>
   </div>` : ''}
-  <button class="btn primary" onclick="continueAfterSpecial()">Continuar ➜</button>`;
+  <button class="btn primary" onclick="seguirDoResultado('special')">Continuar ➜</button>`;
 }
 function renderRocketHideout(){
   const stage = game.hideoutStage||0;
@@ -13229,6 +13286,44 @@ function renderTrainerBattling(){
   </div>`;
 }
 
+/* O RESULTADO DE UM ANDAR DA TORRE. Mesma leitura das outras telas de resultado -- log, seu time,
+   time adversário --, com o andar e o nome do NPC no lugar do "adversário" genérico.
+   Os dois times saem do LOG (deriveTeamStatusFromMatchups): a Torre não devolve playerStatus nem
+   brockStatus prontos, só os confrontos. É o mesmo caminho do resultado do Ginásio da Cidade. */
+function renderTowerBattleResult(){
+  const r = game.trainerBattleResult;
+  const b = game.towerBattle || {};
+  const win = !!(r && r.win);
+  const andar = b.floor || (game.tower && game.tower.run ? game.tower.run.floor : 0);
+  const npc = b.npcName || game.trainerBattleOpponentName || 'Treinador';
+  const zerou = !!(b.run && b.run.cleared);
+  return `
+  <div class="result-banner ${win?'win':'lose'}">${win ? `🏆 ANDAR ${andar} VENCIDO!` : `💥 VOCÊ PAROU NO ANDAR ${andar}`}</div>
+  <div class="box">
+    <h2>Log da batalha</h2>
+    <div class="status-list">${renderMatchupLog(r.matchups)}</div>
+  </div>
+  <div class="box">
+    <h2>Seu time</h2>
+    <div class="status-list">${renderPlayerStatus(deriveTeamStatusFromMatchups(r.matchups, 'player'))}</div>
+  </div>
+  <div class="box">
+    <h2>Time de ${escapeHtmlSafe(npc)}</h2>
+    <div class="status-list">${renderEnemyStatus(deriveTeamStatusFromMatchups(r.matchups, 'enemy'))}</div>
+  </div>
+  <div class="box">
+    <p>${zerou
+      ? 'Você chegou ao topo da torre de hoje.'
+      : (win
+          ? `${escapeHtmlSafe(npc)} foi superado(a). O próximo andar já está esperando.`
+          : `${escapeHtmlSafe(npc)} foi demais dessa vez. Você continua no andar ${andar} — dá pra tentar de novo, com o mesmo time ou com outro.`)}</p>
+  </div>
+  <button class="btn primary" onclick="voltarDoAndarDaTorre()">⬅ Voltar pra Torre</button>`;
+}
+function voltarDoAndarDaTorre(){
+  game.screen = 'trainerTower';
+  render();
+}
 function renderTrainerBattleResult(){
   const r = game.trainerBattleResult;
   return `
@@ -14120,11 +14215,14 @@ function renderBattleResult(win){
           return `<p>Tentativa <strong>${game.losses}/5</strong> falhou. Você recebeu <strong>+${bolo} levels</strong> para distribuir no time — no máximo <strong>${teto}</strong> por pokémon.</p>`;
         })()}
   </div>
+  ${/* Os três passam pelo seguirDoResultado: quem desmaiou pode ter batido no nível da evolução, e
+        ela é anunciada AQUI, entre o log e o que vem depois. Sem evolução nenhuma ele segue direto
+        pro destino, sem tela a mais. */''}
   ${win
     ? (hasNextGym
-        ? `<button class="btn primary" onclick="continueJourney()">Continuar jornada ➜</button>`
-        : `<button class="btn success" onclick="showJourneyEnd()">Ver resumo da jornada ➜</button>`)
-    : `<button class="btn primary" onclick="prepareRetry()">Distribuir levels e tentar de novo</button>`}
+        ? `<button class="btn primary" onclick="seguirDoResultado('continueJourney')">Continuar jornada ➜</button>`
+        : `<button class="btn success" onclick="seguirDoResultado('journeyEnd')">Ver resumo da jornada ➜</button>`)
+    : `<button class="btn primary" onclick="seguirDoResultado('retry')">Distribuir levels e tentar de novo</button>`}
   ${botaoBuscaOnlineHtml()}`;
 }
 
@@ -19897,6 +19995,7 @@ function render(){
     case 'trainerBattle': html = renderTrainerBattle(); break;
     case 'trainerBattling': html = renderTrainerBattling(); break;
     case 'trainerBattleResult': html = renderTrainerBattleResult(); break;
+    case 'towerBattleResult': html = renderTowerBattleResult(); break;
     case 'specialIntro': html = renderSpecialIntro(); break;
     case 'specialBattling': html = renderSpecialBattling(); break;
     case 'specialResult': html = renderSpecialResult(); break;
