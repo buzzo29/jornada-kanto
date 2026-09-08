@@ -329,6 +329,14 @@
   .mode-card.hard{border-color:#8a1f1f;background:#fdeeee;}
   .mode-card.hard .mode-card-title{color:#8a1f1f;}
   .mode-card-reward{color:var(--green-dark);font-weight:800;}
+  /* O PREÇO fica no título, à direita: é a primeira coisa que se lê num card, e o custo faz parte
+     da identidade do modo agora. O saldo vem embaixo, junto do que falta -- um card desabilitado
+     sem dizer quanto falta manda a pessoa procurar o motivo. */
+  .mode-card-preco{float:right;font-family:var(--font-pixel);font-size:.66rem;color:#8a1f1f;}
+  .mode-card-saldo{font-size:.78rem;color:var(--muted);}
+  .mode-card-saldo.falta{color:#8a1f1f;font-weight:600;}
+  .mode-card.sem-moeda{opacity:.6;cursor:not-allowed;}
+  .mode-card.sem-moeda:active{transform:none;}
   .online-searching{text-align:center;}
   .online-radar{font-size:2.6rem;line-height:1;margin-bottom:6px;animation:online-pulse 1.4s ease-in-out infinite;}
   @keyframes online-pulse{0%,100%{transform:scale(1);opacity:1;}50%{transform:scale(1.15);opacity:.6;}}
@@ -10942,7 +10950,10 @@ const HARD_DEFEAT_POOL = 3;            // bolo por derrota no difícil, em TODOS
 const RIVAL_WIN_BONUS = 3;             // bônus por vencer o rival (era 5)
 const HARD_RIVAL_BONUS = 3;            // bônus por vencer o rival no difícil
 const HARD_LEADER_SHINY_RATIO = 0.5;   // fração do time do líder que vem shiny (quantidade exata)
-const HARD_SHINY_CHANCE = 1/32;        // 4x a chance normal (1/128)
+/* 1/16 desde 09/09/2026 -- era 1/32. O sorteio é POR POKÉMON, e a oferta tem quatro: na prática
+   isso leva a chance de ver um shiny numa tela de 11,9% pra 22,8%, e a de terminar uma jornada
+   com pelo menos um de 63,8% pra 87,3%. */
+const HARD_SHINY_CHANCE = 1/16;        // 8x a chance normal (1/128)
 
 function isHardMode(){ return game.gameMode === 'hard'; }
 // as regras do difícil só valem depois da Misty -- ver comentário acima
@@ -11390,8 +11401,17 @@ function startNewSave(slot){
   game.screen = 'newSaveMode';   // escolhe a dificuldade ANTES do nome do rival
   render();
 }
+/* O MODO DIFÍCIL É PAGO. O número vive aqui E no servidor (MOEDA_MODO_DIFICIL em functions):
+   o cliente precisa dele pra desabilitar o card, o servidor é quem cobra de verdade. Se os dois
+   divergirem, a tela promete um preço que a cobrança não pratica -- o mesmo cuidado do
+   re-sorteio e dos preços da loja. */
+const MOEDA_MODO_DIFICIL = 10;
 function pickGameMode(modo){
+  /* A COBRANÇA NÃO ACONTECE AQUI, e sim no confirmNewSaveName, junto da criação do save. Cobrar na
+     escolha faria quem desiste na tela do nome do rival pagar por uma jornada que não existe. */
+  if(modo === 'hard' && (game.moedas || 0) < MOEDA_MODO_DIFICIL) return;
   game.pendingGameMode = (modo === 'hard') ? 'hard' : 'normal';
+  game.novoSaveErro = null;
   game.screen = 'newSaveName';
   render();
 }
@@ -11406,10 +11426,17 @@ function renderNewSaveMode(){
     <div class="mode-card-title">🙂 Normal</div>
     <p>A jornada como sempre foi. Níveis cheios a cada ginásio e chance de shiny padrão.</p>
   </button>
-  <button class="box mode-card hard" onclick="pickGameMode('hard')">
-    <div class="mode-card-title">💀 Difícil</div>
+  ${(()=>{ const tem = game.moedas || 0, pode = tem >= MOEDA_MODO_DIFICIL;
+     /* O card diz o preço E o saldo. Um card desabilitado sem dizer quanto falta manda a pessoa
+        procurar o motivo -- é o mesmo erro que a recusa do re-sorteio já tinha corrigido. */
+     return `
+  <button class="box mode-card hard${pode?'':' sem-moeda'}" ${pode?'':'disabled'} onclick="pickGameMode('hard')">
+    <div class="mode-card-title">💀 Difícil <span class="mode-card-preco">🪙 ${MOEDA_MODO_DIFICIL}</span></div>`; })()}
     <p>Menos níveis a cada vitória, e só <strong>3 por derrota</strong> em vez de 5. A partir do <strong>3º ginásio</strong> os ganhos caem pela metade. Os líderes vêm com <strong>metade do time shiny</strong>.</p>
-    <p class="mode-card-reward">✨ Em troca: <strong>4x mais chance</strong> de encontrar shiny selvagem.</p>
+    <p class="mode-card-reward">✨ Em troca: <strong>8x mais chance</strong> de encontrar shiny selvagem.</p>
+    ${(game.moedas||0) >= MOEDA_MODO_DIFICIL
+      ? `<p class="mode-card-saldo">Custa <strong>🪙 ${MOEDA_MODO_DIFICIL}</strong> — você tem 🪙 ${game.moedas||0}.</p>`
+      : `<p class="mode-card-saldo falta">Faltam <strong>🪙 ${MOEDA_MODO_DIFICIL - (game.moedas||0)}</strong> — você tem 🪙 ${game.moedas||0}. Moeda vem de jogar: 5 por insígnia.</p>`}
   </button>`;
 }
 /* SORTEIO DOS INICIAIS -- PRESO AO SLOT, não à tentativa.
@@ -11421,7 +11448,7 @@ function renderNewSaveMode(){
    1ª insígnia ou o game over (ver encerrarTentativaDoSlot) -- ou seja, pra rolar de novo tem que jogar.
    Quem joga limpo não perde nada: a chance por JORNADA continua a mesma.
 
-   A chave inclui o MODO porque o difícil tem 4x a chance. Sem isso dava pra sortear no difícil,
+   A chave inclui o MODO porque o difícil tem 8x a chance. Sem isso dava pra sortear no difícil,
    ver o resultado e recriar no normal levando o shiny -- trocando uma artimanha por outra. */
 function chaveDoSorteio(slot, modo){ return String(slot) + ':' + (modo === 'hard' ? 'hard' : 'normal'); }
 function sorteioDosIniciais(slot, modo){
@@ -11484,11 +11511,28 @@ async function confirmNewSaveName(){
   const rivalName = rivalInput ? rivalInput.value.trim() : '';
   game.rivalNameError = null;
   if(!rivalName){ game.rivalNameError = 'Digite um nome pro seu rival.'; render(); return; }
+  if(game.criandoSave) return;   // a cobrança já está em curso: dois cliques não podem cobrar duas vezes
   const slot = game.pendingNewSaveSlot;
-  // tudo que é da conta (Pokédex normal E shiny, especialidades, bônus...) sobrevive junto -- ver CAMPOS_DA_CONTA
-  const conta = snapshotDaConta();
   // a dificuldade foi escolhida na tela anterior; precisa sobreviver ao freshGameDefaults
   const modoEscolhido = (game.pendingGameMode === 'hard') ? 'hard' : 'normal';
+  /* COBRA PRIMEIRO, CRIA DEPOIS -- a mesma ordem do re-sorteio pago. Criar o save antes de cobrar
+     daria a jornada de graça pra quem fechasse a aba no meio; e se a cobrança falhar (moeda de
+     menos, rede), nada muda na tela e o motivo aparece nela. */
+  if(modoEscolhido === 'hard'){
+    game.criandoSave = true; game.novoSaveErro = null; render();
+    try{
+      const r = await functionsClient.httpsCallable('payHardMode')({});
+      game.moedas = r.data.moedas;
+    }catch(e){
+      console.error('Erro ao cobrar o modo difícil:', e);
+      game.criandoSave = false;
+      game.novoSaveErro = (e && e.message) || 'Não foi possível cobrar as moedas agora.';
+      render(); return;
+    }
+    game.criandoSave = false;
+  }
+  // tudo que é da conta (Pokédex normal E shiny, especialidades, bônus...) sobrevive junto -- ver CAMPOS_DA_CONTA
+  const conta = snapshotDaConta();
   game = freshGameDefaults();
   restauraDadosDaConta(conta);
   game.gameMode = modoEscolhido;
@@ -11846,7 +11890,7 @@ async function continueSave(slot){
        serializeGame nem no freshGameDefaults, então o `applySavedState` acima NÃO o toca. Sem esta
        linha ele atravessa de um save pro outro, e isso furava a trava anti save-scumming pelos
        dois lados:
-         - criar no slot 0 em DIFÍCIL (4x a chance), ver o shiny, ir pra home e abrir um save
+         - criar no slot 0 em DIFÍCIL (8x a chance), ver o shiny, ir pra home e abrir um save
            parado na tela 'start' do slot 1 -> o inicial saía shiny num save NORMAL, com o sorteio
            de outro slot, e o sorteio do slot 1 continuava intacto pra ser usado depois;
          - e ao contrário: depois de um F5 o campo some, e um save parado em 'start' cujo sorteio
@@ -20088,7 +20132,10 @@ function renderNewSaveName(){
     <input type="text" id="rival-name-input" class="code-input u-auto-h" placeholder="Nome do Rival" maxlength="20" value="${escapeHtmlSafe(nomeDoRivalPadrao())}">
     <p class="hint-text">Esse é o rival padrão da sua conta — trocar aqui vale pras próximas jornadas também.</p>
     ${game.rivalNameError ? `<p class="error-text">${game.rivalNameError}</p>` : ''}
-    <button class="btn success" onclick="confirmNewSaveName()">Começar jornada ⚔️</button>
+    ${game.novoSaveErro ? `<p class="error-text">${escapeHtmlSafe(game.novoSaveErro)}</p>` : ''}
+    ${game.pendingGameMode === 'hard'
+      ? `<p class="hint-text">💀 Modo difícil: <strong>🪙 ${MOEDA_MODO_DIFICIL}</strong> serão cobrados ao começar.</p>` : ''}
+    <button class="btn success" ${game.criandoSave?'disabled':''} onclick="confirmNewSaveName()">${game.criandoSave?'Cobrando...':'Começar jornada ⚔️'}</button>
   </div>
   <button class="btn secondary" onclick="openSaveSelect()">⬅ Voltar</button>`;
 }

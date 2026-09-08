@@ -5169,6 +5169,35 @@ function precoDoRessorteio(jaFeitos, bonusAte){
   const comBonus = !!(bonusAte && bonusAte > Date.now());
   return comBonus ? MOEDAS_RESSORTEIO * (1 + Math.max(0, jaFeitos|0)) : MOEDAS_RESSORTEIO;
 }
+/* O MODO DIFÍCIL É PAGO (09/09/2026). Quem cobra é o servidor, pelo mesmo motivo de tudo que mexe
+   em moeda: o campo está na trava do firestore.rules, e cliente escrevendo moeda é chance de shiny
+   à vontade -- exatamente a artimanha que a semente do encontro existe pra fechar.
+   O valor vive aqui E no cliente (MOEDA_MODO_DIFICIL): o cliente precisa dele pra desabilitar o
+   botão, o servidor é quem cobra. Se os dois divergirem, a tela promete um preço que a cobrança
+   não pratica.
+   COBRA PRIMEIRO, CRIA DEPOIS -- a mesma ordem do re-sorteio. Criar o save antes de cobrar daria a
+   jornada de graça pra quem fechasse a aba no meio.
+   Efeito colateral bonito: apagar e recriar pra tentar um inicial shiny passou a CUSTAR. O sorteio
+   já era congelado por slot+modo (ver startersSorteados), então recriar devolvia os mesmos
+   iniciais; agora, além de não adiantar, sai 10 moedas. */
+const MOEDA_MODO_DIFICIL = 10;
+exports.payHardMode = onCall(async (request) => {
+  if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
+  const uid = request.auth.uid;
+  const userRef = db.collection('users').doc(uid);
+  return db.runTransaction(async (tx) => {
+    const [snap] = await tx.getAll(userRef);
+    const d = (snap.exists && snap.data()) || {};
+    const moedas = d.moedas || 0;
+    if(moedas < MOEDA_MODO_DIFICIL){
+      throw new HttpsError('failed-precondition',
+        `Você tem ${moedas} moeda${moedas===1?'':'s'} — o modo difícil custa ${MOEDA_MODO_DIFICIL}.`);
+    }
+    tx.set(userRef, { moedas: admin.firestore.FieldValue.increment(-MOEDA_MODO_DIFICIL) }, { merge: true });
+    return { moedas: moedas - MOEDA_MODO_DIFICIL, custo: MOEDA_MODO_DIFICIL };
+  });
+});
+exports._MOEDA_MODO_DIFICIL = MOEDA_MODO_DIFICIL;   // o teste confere que o cliente cobra o mesmo
 exports.rerollWildOffer = onCall(async (request) => {
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   const uid = request.auth.uid;

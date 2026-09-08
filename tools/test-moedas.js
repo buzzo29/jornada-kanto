@@ -359,6 +359,31 @@ console.log('\n=== AS RECUSAS BÁSICAS ===');
   ok('sem slot é recusado', await recusa('claimJourneyCoins', 'z', {}) === 'invalid-argument');
 }
 
+console.log('\n=== O MODO DIFICIL E PAGO ===');
+{
+  /* Quem cobra e o servidor, pelo mesmo motivo de tudo que mexe em moeda: o campo esta na trava do
+     firestore.rules, e cliente escrevendo moeda e chance de shiny a vontade. */
+  await conta('dif1', null, 25);
+  const r = await chamar('payHardMode', 'dif1');
+  ok('cobra o preco cheio', r.custo === fns._MOEDA_MODO_DIFICIL && r.moedas === 25 - fns._MOEDA_MODO_DIFICIL,
+     JSON.stringify(r));
+  ok('e o saldo no banco bate', await moedasDe('dif1') === 15, String(await moedasDe('dif1')));
+
+  /* COBRAR DE NOVO e o caso normal: cada jornada nova no dificil paga de novo. */
+  await chamar('payHardMode', 'dif1');
+  ok('duas jornadas custam duas vezes', await moedasDe('dif1') === 5, String(await moedasDe('dif1')));
+
+  /* Sem saldo, a recusa e limpa e NAO tira moeda nenhuma. */
+  const cod = await recusa('payHardMode', 'dif1');
+  ok('sem moeda suficiente, recusa', cod === 'failed-precondition', String(cod));
+  ok('e nao cobra nada na recusa', await moedasDe('dif1') === 5, String(await moedasDe('dif1')));
+
+  /* Conta nova comeca em ZERO: o dificil so abre depois de jogar. */
+  await conta('dif2', null, 0);
+  ok('conta zerada nao entra no dificil', await recusa('payHardMode', 'dif2') === 'failed-precondition');
+  ok('e continua com zero', await moedasDe('dif2') === 0);
+}
+
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
 process.exit(falhas ? 1 : 0);
 

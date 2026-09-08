@@ -187,5 +187,60 @@ ok('e o game over libera o sorteio dos iniciais', !(fim.startersSorteados||{})['
 ok('e troca os encontros do slot', ((fim.geracaoDosSlots||{})['0']||0) === 1,
    'geração: ' + ((fim.geracaoDosSlots||{})['0']||0));
 
+console.log('\n=== O PRECO DO MODO DIFICIL, E A CHANCE DE SHINY DELE ===');
+{
+  /* O PRECO VIVE NOS DOIS LADOS -- aqui pra desabilitar o card, no servidor pra cobrar. Divergindo,
+     a tela promete um preco que a cobranca nao pratica. O teste do servidor confere o outro lado. */
+  const fonte = require('fs').readFileSync(require('path').join(__dirname, '..', 'functions', 'index.js'), 'utf8');
+  const noServidor = (fonte.match(/const MOEDA_MODO_DIFICIL = (\d+);/) || [])[1];
+  ok('o preco e o MESMO no cliente e no servidor',
+     String(S.MOEDA_MODO_DIFICIL) === noServidor, S.MOEDA_MODO_DIFICIL + ' x ' + noServidor);
+
+  /* A CHANCE do dificil: 1/16, oito vezes a normal. O sorteio e POR POKEMON (ver o forEach da
+     oferta), entao o que o jogador ve numa tela de quatro e bem maior que a chance de um. */
+  ok('a chance do dificil e 1/16', S.HARD_SHINY_CHANCE === 1/16, String(S.HARD_SHINY_CHANCE));
+  ok('e e oito vezes a normal', Math.round(S.HARD_SHINY_CHANCE / S.SHINY_CHANCE) === 8,
+     (S.HARD_SHINY_CHANCE / S.SHINY_CHANCE).toFixed(1) + 'x');
+  {
+    const g = S.__getGame();
+    g.gameMode = 'hard'; g.shinyBonusExpiresAt = null; g.shinyFoundThisSave = false;
+    S.__setGame(g);
+    ok('e o currentShinyChance usa ela no dificil', S.currentShinyChance() === 1/16, String(S.currentShinyChance()));
+    g.gameMode = 'normal'; S.__setGame(g);
+    ok('e a normal continua 1/128', S.currentShinyChance() === 1/128, String(S.currentShinyChance()));
+  }
+
+  /* A TELA: abaixo do preco o card fica desabilitado e diz QUANTO FALTA. Um card apagado sem o
+     motivo manda a pessoa procurar por que nao clica. */
+  const g = S.__getGame();
+  const comMoedas = (n) => { g.moedas = n; g.pendingGameMode = null; g.criandoSave = false;
+                             g.novoSaveErro = null; S.__setGame(g); return S.renderNewSaveMode(); };
+  const pobre = comMoedas(3);
+  ok('sem moeda, o card do dificil sai desabilitado', /mode-card hard sem-moeda[^>]*disabled/.test(pobre));
+  ok('e diz quanto falta', /Faltam <strong>🪙 7<\/strong>/.test(pobre),
+     (pobre.match(/Faltam[^<]*<strong>[^<]*<\/strong>[^<]*/) || [''])[0]);
+  const rico = comMoedas(25);
+  ok('com moeda, ele volta a clicar', !/sem-moeda/.test(rico) && !/mode-card hard[^>]*disabled/.test(rico));
+  ok('e mostra o preco e o saldo', /Custa <strong>🪙 10<\/strong> — você tem 🪙 25/.test(rico),
+     (rico.match(/Custa[^<]*<strong>[^<]*<\/strong>[^<]*/) || [''])[0]);
+  ok('o preco aparece no titulo do card', /mode-card-preco">🪙 10</.test(rico));
+
+  /* E o pickGameMode RECUSA por fora da tela: a regra nao pode viver so no desenho. */
+  comMoedas(3);
+  S.pickGameMode('hard');
+  ok('e o pickGameMode recusa mesmo se alguem chamar por fora', S.__getGame().screen !== 'newSaveName',
+     S.__getGame().screen);
+  comMoedas(10);
+  S.pickGameMode('hard');
+  ok('mas passa com o saldo certo', S.__getGame().screen === 'newSaveName', S.__getGame().screen);
+  ok('e a tela do rival avisa que vai cobrar', /serão cobrados ao começar/.test(S.renderNewSaveName()),
+     (S.renderNewSaveName().match(/Modo difícil[^<]*/) || [''])[0]);
+  /* O modo NORMAL nao pode ter sido afetado por nada disso. */
+  comMoedas(0);
+  S.pickGameMode('normal');
+  ok('o modo normal continua de graca', S.__getGame().screen === 'newSaveName' &&
+     S.__getGame().pendingGameMode === 'normal', S.__getGame().screen);
+}
+
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
 process.exit(falhas ? 1 : 0);

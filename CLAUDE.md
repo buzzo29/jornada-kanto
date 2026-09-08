@@ -1611,7 +1611,40 @@ verdade, cai no game over, e o teste confere que a trava soltou dos dois lados.
   reduzir desde o início matava 100% das jornadas no Brock (medido).
 - Derrota vale 3 desde o 1º ginásio. Custo medido: 14% morrem no Brock, conclusão cai de 29% → 24%.
 - 50% dos pokémon dos líderes vêm shiny. **Efeito mecânico pequeno** — é sinalização visual.
-- Chance de shiny selvagem 4× (1/32). Vale também para os iniciais.
+- **Chance de shiny selvagem 8× (1/16)** desde 09/09/2026 — era 4× (1/32). Vale também para os
+  iniciais. O sorteio é **por pokémon**, e a oferta tem quatro, então o que o jogador sente é bem
+  maior que o número de um:
+
+  | | 1/32 (antes) | 1/16 (agora) |
+  |---|---|---|
+  | por pokémon | 3,13% | 6,25% |
+  | pelo menos um na oferta de 4 | 11,9% | **22,8%** |
+  | pelo menos um na jornada (32 sorteios) | 63,8% | **87,3%** |
+  | na tela dos 7 iniciais | 19,9% | **36,3%** |
+
+  **Custo medido na dificuldade: quase nada, e por um motivo interessante.** Com o bot padrão
+  (que escolhe por tipo e BST, ignorando shiny) a conclusão vai de 21,2% pra 22,8% — +1,6 ponto,
+  1,9σ. Com um bot que **prefere shiny**, como um jogador de verdade faria, ela vai de 22,6% pra
+  22,8%: **+0,2, ruído puro**. A explicação é que pegar o shiny custa deixar de pegar o pokémon
+  melhor da oferta, e o 1,20× quase empata com essa troca. O que a mudança compra não é
+  dificuldade, é **frequência de encontrar**.
+  (`tools/smoke-jornada.js` ganhou `--dificil` por causa desta medição: sem ele o bot só joga no
+  normal, e uma mudança que só existe no difícil fica invisível.)
+- **COMEÇAR NO DIFÍCIL CUSTA 🪙 10** (09/09/2026). Quem cobra é o servidor (`payHardMode`), pelo
+  mesmo motivo de tudo que mexe em moeda: o campo está na trava do `firestore.rules`, e cliente
+  escrevendo moeda é chance de shiny à vontade — exatamente a artimanha que a semente do encontro
+  existe pra fechar. O valor vive nos DOIS lados (`MOEDA_MODO_DIFICIL`): o cliente precisa dele pra
+  desabilitar o card, o servidor é quem cobra. `tools/test-artimanha.js` lê o servidor e confere
+  que os dois números são o mesmo.
+  **Cobra primeiro, cria depois** — a mesma ordem do re-sorteio pago. E a cobrança acontece no
+  `confirmNewSaveName`, não no `pickGameMode`: cobrar na escolha faria quem desiste na tela do nome
+  do rival pagar por uma jornada que não existe.
+  **Consequência que vale saber: conta nova começa com ZERO moedas**, e insígnia paga 5. Ou seja, o
+  difícil só abre depois de **duas insígnias no normal**. É um gate de fato, não só um preço.
+  **E ele fecha uma brecha de graça:** apagar e recriar atrás de um inicial shiny agora CUSTA. O
+  sorteio já era congelado por slot+modo (ver `startersSorteados`), então recriar devolvia os
+  mesmos iniciais; agora, além de não adiantar, sai 10 moedas por tentativa. Com o difícil em 1/16
+  a tela dos sete iniciais mostra shiny em 36,3% das vezes, então essa trava passou a valer mais.
 
 ## Ginásio da Cidade
 

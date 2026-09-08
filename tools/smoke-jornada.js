@@ -23,6 +23,9 @@ const REGIAO_FORCADA = (()=>{ const i=args.indexOf('--regiao'); return i>=0 ? ar
 /* --html aponta pra OUTRA copia do index.html. E o que permite medir um A/B rodando o MESMO bot
    contra as duas versoes do jogo, em vez de comparar com uma medicao antiga de outra epoca. */
 const HTML = (()=>{ const i=args.indexOf('--html'); return i>=0 ? args[i+1] : null; })();
+/* --dificil roda as jornadas no modo DIFICIL. Sem ele o bot so joga no normal, e uma mudanca que
+   so existe no dificil (a chance de shiny, o bolo de niveis) ficaria invisivel na medicao. */
+const DIFICIL = args.includes('--dificil');
 
 const TERMINAL = new Set(['journeyEnd','gameover']);
 const MAX_STEPS = 4000;
@@ -163,6 +166,7 @@ for(let run=0; run<RUNS; run++){
   st.screen = 'start';
   st.trainerName = 'Teste'+run;
   st.rivalName = 'Gary';
+  st.gameMode = DIFICIL ? 'hard' : 'normal';
   st.nuzlocke = NUZ ? (run % 5 === 0) : false;      // 1 em 5 jornadas testa o modo Nuzlocke
   st.dailyChallenge = (run % 7 === 0);
   st.dailySeed = '2026-08-11';
