@@ -593,13 +593,35 @@ console.log('\n=== O GOLPE NAO SOME NA EVOLUCAO ===');
   }
   ok('e a Bayleef termina COM ela', ck.ataques.indexOf('razorleaf') >= 0, ck.ataques.join('+'));
 
-  /* O resgate vale so pro que a forma NOVA tambem ensina. O Raichu nao ensina Trovao (o Pikachu
-     aprende no 41), e nao voltar a ensinar o que a forma anterior sabia e a regra da casa. */
+  /* O QUE DECIDE E SE ELE TERIA APRENDIDO ANTES DE EVOLUIR, e nao se a forma nova ensina.
+     Reportado em 09/09/2026: a Cleffa foi do 15 pro 20 de uma vez, evoluiu, e perdeu a Folha
+     Magica que ela aprende no 17. A Clefairy nao ensina esse golpe -- mas 17 e MENOR que o 20 da
+     evolucao, entao subindo de um em um ela teria a Folha Magica tres niveis antes de virar
+     Clefairy. Sao 26 golpes em 20 degraus nessa situacao. */
+  g.team = []; g.evolucaoDepois = null; g.aprenderAtaque = null; g.golpesAprendidos = [];
+  const cf = inst('cleffa', 15);
+  cf.ataques = []; cf.nivelDosAtaques = 15; cf.especieDosAtaques = 'cleffa';
+  g.team = [cf]; cf.level = 20; S.tryEvolve(cf);
+  ok('a Cleffa virou Clefairy pulando o nivel 17', cf.speciesId === 'clefairy');
+  ok('e a Folha Magica do 17 continua na fila -- ela e ANTERIOR a evolucao (20)',
+     S.aprendizadosPendentes().filter(x => x.p === cf && x.golpe === 'magicalleaf').length === 1,
+     S.aprendizadosPendentes().filter(x => x.p === cf).map(x => S.nomeDoAtaque(x.golpe)).join(', '));
+
+  /* O CONTRA-EXEMPLO, e ele e que faz a regra ser uma regra: o Trovao do Pikachu e nivel 41 e o
+     Pikachu evolui no 40 -- quem chega la ja e Raichu, e a Raichu nao ensina. Continua perdido, e
+     e assim no jogo original. Sao 22 golpes nessa situacao. */
   g.team = []; const pk = inst('pikachu', 40);
   pk.ataques = ['thunderbolt','quickattack']; pk.nivelDosAtaques = 40; pk.especieDosAtaques = 'pikachu';
   g.team = [pk]; pk.level = 41; S.tryEvolve(pk);
-  ok('mas o que a forma nova NAO ensina nao volta (Raichu sem Trovao)',
+  ok('mas o que vem DEPOIS da evolucao nao volta (Raichu sem Trovao)',
      S.aprendizadosPendentes().filter(x => x.p === pk && x.golpe === 'thunder').length === 0);
+  /* E a Batida, que o Pikachu aprende no 20 (antes do 40), ESSA volta. */
+  g.team = []; const pk2 = inst('pikachu', 19);
+  pk2.ataques = ['thundershock']; pk2.nivelDosAtaques = 19; pk2.especieDosAtaques = 'pikachu';
+  g.team = [pk2]; pk2.level = 40; S.tryEvolve(pk2);
+  ok('e a Batida do nivel 20 volta, porque e anterior a evolucao',
+     S.aprendizadosPendentes().filter(x => x.p === pk2 && x.golpe === 'slam').length === 1,
+     pk2.speciesId + ': ' + S.aprendizadosPendentes().filter(x => x.p === pk2).map(x => S.nomeDoAtaque(x.golpe)).join(', '));
 }
 
 console.log('\n=== O CARROSSEL QUE TRAVAVA O JOGO ===');

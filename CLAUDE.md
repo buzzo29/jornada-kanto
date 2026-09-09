@@ -232,9 +232,24 @@ de golpes.
   Metrônomo são os **4 pedidos** (Togepi, Togetic, Cleffa, Snubbull). Clefairy, Clefable e Snorlax
   também aprendem Metrônomo por nível no original e ficaram **de fora de propósito**: são espécies
   comuns em time de jogador e de líder, e o metrônomo é o golpe mais aleatório dos três.
-- **O sono dá DUAS TROCAS livres, não mata mais** (`SONO_EM_TROCAS = 2`, 02/09/2026). O alvo apanha
-  sem revidar por duas trocas e então acorda; a luta segue normal. Como o Disable e a Recuperação, é
-  `continue` e não `return true` — o confronto acontece inteiro.
+- **O sono dá UMA TROCA livre, não mata mais** (`SONO_EM_TROCAS = 1`). O alvo apanha sem revidar e
+  então acorda; a luta segue normal. Como o Disable e a Recuperação, é `continue` e não
+  `return true`: o confronto acontece inteiro.
+  **Eram DUAS até 09/09/2026** (a mudança de 02/09 que tirou a morte instantânea). Virou uma a
+  pedido — *"ao invés de dar 2 golpes em sequência, dê apenas 1 e depois volte a batalha como se
+  fosse uma nova"*.
+  **Medido com o sono FORÇADO (chance 100%)**, que é o único jeito de isolar o efeito: a 5% por
+  confronto ele se dilui e some no ruído de qualquer amostra que caiba num teste. 1x1, 16
+  soníferos × 8 adversários × 40 voltas: sem sono **23,0%** de vitória, com 2 trocas **52,8%**
+  (+29,8), com 1 troca **40,8%** (+17,8) — ou seja, **uma troca livre entrega 60% do que duas**.
+  **Na jornada não se move:** 76,15% → 76,81% de conclusão (8.000 jornadas de cada lado, +0,66
+  ponto, **1,0σ**). Faz sentido — os líderes também têm sonífero, e o corte cai dos dois lados
+  igual. (Os dois números estão altos porque a medição foi feita com o teto de dano desligado,
+  que é o experimento em curso; o que importa aqui é a diferença.)
+  **Quantas trocas livres SAEM na tela, medido:** antes eram 1× em 43%, 2× em 39% e 3× em 15%;
+  hoje são **1× em 75,5%** e 2× em 24,1% — a segunda só quando o adormecido é o mais lento e o
+  outro bate de novo na troca em que ele acorda. O log encurtou junto: o pior caso com sono vai
+  de **6 linhas para 5**.
   **Mudou por reclamação dos jogadores, e a medição explicou por quê**: não era o NÚMERO que pesava
   (valia **+1,4 ponto** de vitória, contra +0,8 do Recuperar — nem de longe o mais forte do jogo),
   era a FORMA. Perder um pokémon inteiro pra um sorteio de 5%, sem jogada possível e sem sequer
@@ -301,6 +316,33 @@ de golpes.
   entre o log e a animação.
   O **nome do golpe de sono entra só no log** ("dormir com Esporo"): ele é por espécie de propósito,
   mas o aviso se lê em um segundo e ali a frase curta é a que chega.
+- **QUEM MANDA NA LINHA DE STATUS, passo a passo** (`passosDaAbertura`). São duas famílias, e a
+  diferença é o que o confronto É:
+  - **a autodestruição ocupa a linha o confronto INTEIRO** — ali não há luta depois, o confronto
+    é aquilo (os dois caem no mesmo golpe);
+  - **sono, cura, poção, drenagem, anulação e Despertar são ABERTURA**: valem os passos que a
+    barra delas leva pra andar (a drenagem vale 2, que são as duas barras) e **cedem o lugar ao
+    nome do golpe** assim que a luta começa.
+  **O SONO ENTROU NA LISTA em 09/09/2026, junto com a troca livre virar uma só.** Reportado num
+  Haunter × Dunsparce: a luta inteira só se lia *"Haunter fez Dunsparce dormir"* enquanto a barra
+  do Dunsparce descia duas vezes, e o nome do golpe que batia nele — Devorador de Sonhos — nunca
+  aparecia. **O log estava certo**, trazia os dois golpes com nome e selo; o defeito era só do
+  aviso do meio da batalha. Com uma troca livre o confronto deixou de "ser" o sono, e a frase
+  passou a ceder.
+  Ele vale **2 e não 1 como a anulação** porque o sono **É um passo da animação**: o registro dele
+  entra na sequência com dano 0 (barra parada), então a frase precisa cobrir o passo 0 (a pausa de
+  leitura) **mais** o passo dele. Cede no golpe livre, que é o primeiro que mexe barra — e é
+  justamente o golpe cujo nome foi pedido. Perfil trancado no teste: `EEggg`.
+  **A anulação e o Despertar ficaram FORA dessa tabela até 09/09/2026, e sem entrada a frase vale
+  pra SEMPRE.** Reportado num Venusaur × Muk: durante a luta inteira só se lia *"Venusaur teve o
+  ataque Raio Solar anulado por Muk"* enquanto as barras desciam, e o nome de nenhum golpe
+  aparecia. **O log estava certo** — ele monta a linha da anulação à parte e não passa por aqui; o
+  defeito era só do aviso do meio da batalha. Elas são as únicas aberturas que **não mexem barra
+  nenhuma**, e foi justamente por isso que passaram despercebidas: as outras quatro têm uma barra
+  andando pra denunciar quantos passos elas precisam durar.
+  `tools/test-especiais.js` tranca o perfil das cinco passo a passo (`EEEE` pro sono, `Egg` pra
+  anulação) **e** que toda abertura esteja declarada na tabela — sem essa segunda parte, o próximo
+  especial de abertura nasce com o mesmo defeito e ninguém percebe.
 - **Pausa de 1s pra ler** (`PAUSA_LEITURA_ESPECIAL_MS`). Sem ela a frase some junto com o primeiro
   golpe, e num confronto resolvido por autodestruição — que dura um golpe só — ela mal pisca. Entra
   nas quatro telas de revelação, somada aos 550ms que já existiam antes do primeiro golpe.
@@ -901,6 +943,170 @@ dificuldade se inverte — o Brock cai de 419 pra **182** game overs e o **5º g
 172**. Faz sentido: com 2 golpes o time perde cobertura, e isso machuca mais o **líder mono-tipo**
 do que o time variado do jogador. Se um dia isso for feito, é aqui que o número está.
 
+## Golpes de VÁRIOS TAPAS: os primeiros com mecânica PRÓPRIA (09/09/2026)
+
+Até aqui todo golpe era um número: tipo e poder. Estes batem **de 2 a 5 vezes numa troca**, e são
+os primeiros que mudam o que o motor faz, não só quanto ele tira. São **NOVE**, pedidos em três
+levas, e todos com a MESMA distribuição — conferida na fonte golpe a golpe:
+
+| golpe | poder | efetivo | espécies |
+|---|---|---|---|
+| Tapa Duplo | 15 | 45 | 13 |
+| Arranhões Furiosos | 18 | 54 | 20 |
+| Ataque Fúria | 15 | 45 | 17 |
+| Soco Cometa | 18 | 54 | 4 |
+| Canhão de Espinhos | 20 | 60 | 3 |
+| Barragem | 15 | 45 | 2 |
+| Míssil Agulha | 14 | 42 | 6 |
+| Lança de Gelo | 10 | 30 | 1 (Shellder) |
+| Rajada de Rochas | 25 | 75 | 6 |
+
+**68 das 250 espécies (27%) têm pelo menos um deles**, contando as sobreposições (Rhyhorn e Rhydon
+têm Ataque Fúria e Rajada de Rochas; Corsola tem Canhão de Espinhos e Rajada).
+A **Lança de Gelo é a única com poder abaixo de 15** e a checagem dela na fonte pegou uma
+armadilha: hoje ela é poder 25, mas **na Gen 3 era 10** — que é o que a nossa tabela já tinha, e
+serviu de prova de que o gerador de golpes está lendo a geração certa.
+
+- **Pesos oficiais, e são os da Gen 2-4** (fontes: `pokemondb.net/move/double-slap` e
+  `/fury-swipes`): 2 tapas 3/8, 3 tapas 3/8, 4 tapas 1/8, 5 tapas 1/8 — média de **3,0 tapas
+  exatos**. A Gen 5 mudou pra 1/3, 1/3, 1/6, 1/6 e **não** é a que vale aqui: a base de golpes do
+  jogo é Gen 3 (FireRed).
+- **`MULTI_GOLPE` é a SÉTIMA tabela duplicada** entre `index.html` e `functions/index.js`, e ela já
+  provou que valia a pena ser tabela **duas vezes**: os Arranhões Furiosos entraram como UMA LINHA,
+  e os sete seguintes como sete linhas — sem tocar no motor, na tela nem no log.
+  **A distribuição é uma CONSTANTE compartilhada** (`TAPAS_2A5`) e não nove cópias do mesmo array:
+  nove cópias divergiriam no primeiro ajuste, e é o tipo de erro que ninguém vê. Golpe com
+  distribuição própria (o Chute Triplo bate 3 vezes com acerto crescente) ganharia o array dele ali
+  e mais nada mudaria.
+- **O MOTOR NÃO ESCOLHIA O GOLPE, e sem consertar isso a mecânica seria código morto.** O seletor
+  (`melhorAtaque`) compara PODER, e o tapa vale **15** — perde pra qualquer coisa. Medido: um
+  Clefairy com dois golpes usava o tapa em **0%** dos confrontos. O que eles valem de verdade é
+  poder × média de tapas: **45** o Tapa Duplo e **54** os Arranhões Furiosos, e é isso que o
+  `poderEfetivo` devolve pro seletor.
+  **QUANTO ELE PASSA A SER ESCOLHIDO DEPENDE DO OUTRO GOLPE, e o CLAUDE.md dizia "99,8%" — errado.**
+  Aquele número saiu de uma medição em que o pokémon carregava **só** o golpe múltiplo (`ataques`
+  montado com `ataquesDisponiveis(instancia)`, que recebe `(especieId, nivel)` e devolve lista
+  vazia se lhe passarem o objeto). Com um segundo golpe de verdade ao lado:
+
+  | | ao lado do golpe MAIS FORTE do bicho | ao lado de um MEDIANO |
+  |---|---|---|
+  | Tapa Duplo | 4,2% | 35,3% |
+  | Arranhões Furiosos | 5,7% | 81,8% |
+
+  Ou seja: quem leva o Talho (70) junto quase nunca vê o golpe múltiplo sair, e quem leva um golpe
+  médio vê o tempo todo. **Sem o `poderEfetivo` os mesmos pares dão 0% e 5,6%** — é ele que faz a
+  mecânica existir.
+- **⚠️ O PODER EFETIVO NÃO PODE ENCOSTAR NO DANO, e encostou — foi o defeito mais caro desta série.**
+  O `avalia` do `melhorAtaque` devolve um objeto com `poder`, e **o `calcDamageNew` lê exatamente
+  esse campo** (`const potencia = best.poder || MOVE_POWER`). Ao trocar `poder` pelo efetivo pra
+  consertar a ESCOLHA, o dano foi junto: cada tapa saía com **45 em vez de 15** e ainda batia de 2 a
+  5 vezes — a média de tapas contada **duas vezes**, ~9× o dano pretendido.
+  Reportado em 09/09/2026 com log: uma **Clefable Lv.42** matou um Dunsparce de 270 de HP com
+  **3 tapas** e um Eevee de 235 com **2**, enquanto a Folha Mágica dela (poder 60) tirava 88 no
+  mesmo log. Reproduzido no motor: **97 de dano por tapa** contra o Dunsparce e **124** contra o
+  Eevee; consertado, **37 e 50**.
+  Hoje o `poder` é sempre o CRU (`GOLPES[id][1]`) e o efetivo entra **só na `nota`**, que é a
+  comparação entre golpes. Conferido depois do conserto: uma troca de Tapa Duplo tira **232** e um
+  Pancada (poder 40, mesmo tipo, mesmo STAB) tira **201** — a razão de 1,15 bate com os 45/40 que o
+  poder efetivo promete. É esse o desenho.
+  **A BATERIA INTEIRA PASSAVA COM O DEFEITO**, e vale saber por quê: nenhum teste olhava o DANO
+  contra o poder, e a comparação dos dois motores não acusou porque o erro foi introduzido nos
+  **dois ao mesmo tempo** — ela compara um com o outro, não com a regra. Hoje há duas travas: uma
+  direta (`melhorAtaque(...).poder === GOLPES[id][1]`) e uma de COMPORTAMENTO (o dano de um tapa,
+  comparado ao de um golpe de poder conhecido, tem que ficar muito mais perto da razão dos poderes
+  CRUS que da dos efetivos). Conferido que as duas falham com o defeito religado.
+  **A TELA DE ESCOLHA continua anunciando 15**, o poder cru. É a mesma ressalva que este arquivo já
+  registra sobre STAB e subtipo ("Poder não é comparável entre dois golpes do mesmo pokémon"),
+  agora com um caso a mais e mais grosseiro — e não foi mexida porque não foi pedido. Se um dia
+  incomodar, o lugar é o `cartaoDeGolpe`.
+- **A TELA AVISA: `* Golpe repete entre 2-5x`**, pedido junto com a terceira leva. Sem ela o número
+  ao lado engana — ele é o poder de **UM tapa**, e o jogador compara um Míssil Agulha de 14 com um
+  Talho de 70 sem saber que um dos dois sai de 2 a 5 vezes. É justamente essa a informação que
+  decide a escolha.
+  **Ela mora no `cartaoDeGolpe`, não em cada tela**: as três telas de golpe (capturou, quer trocar,
+  aprendeu) dividem esse bloco, e escrever a frase em cada uma seria garantir que a próxima
+  divergisse no texto — que é o que já aconteceu com elas antes de virarem uma cópia só. O pedido
+  citava duas telas; ela sai nas três, e na terceira (a captura, onde se escolhe 2 entre N) é onde
+  ela mais serve.
+  **Sai da TABELA**, não de uma lista à parte: golpe novo no `MULTI_GOLPE` já ganha a observação.
+  **Medido a 320px:** uma linha (167px numa coluna de ~180), custa **15px de altura por cartão**, e
+  a tela do "quer aprender um golpe novo" fica em 651px, sem rolagem horizontal. O
+  `text-transform:none` é obrigatório — o `.golpe-cartao-nome` é uppercase, e a frase em maiúsculas
+  viraria um segundo título brigando com o nome do golpe.
+- **UMA ENTRADA POR TAPA NO DIÁRIO, UMA LINHA SÓ NO LOG.** É a regra da drenagem (duas entradas,
+  uma linha), e foi o pedido: na batalha o jogador lê *"Clefairy usou Tapa Duplo 1x"*, a barra
+  desce, *"2x"*, a barra desce de novo; no log fica *"Clefairy atacou Miltank com Tapa Duplo 2x e
+  tirou −151 de HP"*, com o total somado.
+  A contagem vai **DENTRO do selo** do golpe, que é o mesmo selo do log e da batalha — no meio da
+  luta ela é PROGRESSIVA (qual tapa está saindo) e no log é o TOTAL.
+- **OS TAPAS PARAM QUANDO O ALVO CAI.** O 4º tapa não sai num pokémon que caiu no 3º — é assim no
+  jogo original e é o que preserva o "todo pokémon responde pelo menos uma vez".
+- **UM GOLPE DE VÁRIOS TAPAS É UM GOLPE SÓ PRO TETO** (`TETO_GOLPES`): só o primeiro tapa ocupa
+  vaga. Sem isso um Tapa Duplo de 5 sozinho estouraria o teto de 3 e jogaria o confronto inteiro na
+  reconstrução. E eles **se movem juntos** no reordenamento do moribundo — reordenar entrada a
+  entrada partiria o golpe ao meio, com metade antes e metade depois do golpe que o derrubou.
+- **ELES SOBREVIVEM À RECONSTRUÇÃO, e isso é o que faz a feature existir.** A reconstrução devolve
+  golpes inteiros e não conhece tapa nenhum: medido, sem tratar isso os tapas só apareciam em
+  **28,8%** dos confrontos — nos outros a luta passava do teto e o mesmo golpe às vezes contava e às
+  vezes não, que é indistinguível de bug pra quem joga. Hoje o `expandirTapas` reparte o golpe
+  reconstruído no número de tapas que SAIU DE VERDADE naquele confronto (lido do diário, não é
+  sorteio novo) e a visibilidade vai a **100%**. O total não muda, então a soma das linhas continua
+  fechando. Golpe pequeno demais pra repartir (menos de 1 de dano por tapa) fica inteiro — passo de
+  dano 0 é o que este log evita em toda regra.
+- **NO ONLINE E NAS LIGAS ELE NÃO ACONTECE**, e não é exceção nova: lá o time vem de um CÓDIGO
+  (`especie:nivel:shiny`) e não carrega golpe escolhido, então `lastMove` é null e o motor cai no
+  de tipo. É a mesma regra que já valia pros golpes escolhidos.
+- **O PREÇO MEDIDO — na dificuldade, nada, nas três levas:** com os DOIS primeiros e o dano já
+  consertado, **76,41% → 76,37%** (−0,04, **0,1σ**); com os **NOVE**, **76,50% → 77,01%** (+0,51,
+  **0,8σ**) — 10 blocos de 1.000 jornadas de cada lado em cada medição. Nem com 27% das espécies
+  tendo um deles a conta se move: o golpe só sai quando é a melhor escolha do bicho, e os líderes
+  continuam no motor implícito de poder 60.
+  **AS MEDIÇÕES ANTERIORES FORAM FEITAS COM O DEFEITO DO PODER e não valem** — este arquivo chegou
+  a registrar "76,76% → 76,66%" e "76,51% → 76,38%". Elas davam ruído também, mas por acaso: um
+  golpe 9× mais forte na mão do jogador E na dos treinadores selvagens se cancelava na conta.
+  E aqui vale registrar o método, porque a primeira medição disse outra coisa: com o
+  σ BINOMIAL o mesmo A/B dava "−1,39 ponto, 2,1σ", o que pareceria efeito real. **O σ binomial não
+  serve pra este simulador** — jornadas dentro de uma mesma rodada compartilham estado, e o desvio
+  entre blocos de 1.000 é 1,6 a 1,8 ponto contra 1,3 do binomial. A medição boa é em BLOCOS
+  independentes, com o desvio tirado deles. (Este arquivo já tinha a pista: "o próprio simulador
+  varia mais que isso — três amostras de 5.000 deram 66,2%, 67,6% e 68,3%".)
+- **O PREÇO EM TEMPO É REAL, e é o que vale acompanhar:** cada tapa é um passo, e todo passo com
+  nome de golpe leva a pausa de 1s (`PAUSA_ANTES_DO_GOLPE_MS`). Num time em que os SEIS levam o
+  golpe, a batalha 6x6 vai de **38,8s para 49,1s** (+10,3s, **26%** mais lenta) e os passos por
+  confronto de 2,57 pra 3,21. Com um só carregando o golpe o custo é ~1/6 disso. Se incomodar, o
+  lugar de mexer é isentar o 2º tapa em diante da pausa — o nome já está na tela, só o número muda.
+  (Medido com o defeito do poder dava +23,5s e 61%: o dano inflado alonga a barra, e a barra é
+  metade do tempo do passo.)
+- **A contagem de espécies está na tabela lá em cima**, e ela sai do `APRENDIZADO` — não de uma
+  lista escrita à mão aqui, que envelheceria na primeira mexida na base de golpes.
+  Duas coisas que a intuição erra: **Marill NÃO aprende Tapa Duplo** por nível na Gen 3 (foi o
+  exemplo do pedido, e não acontece com ela), e a **Lança de Gelo tem UM dono só**, o Shellder —
+  o Cloyster não a herda, ele aprende Canhão de Espinhos no 41.
+- **TRÊS FALSOS POSITIVOS DO TESTE saíram junto, e vale saber por quê** — os três eram do jeito
+  mais perigoso: intermitentes, ~1 rodada em 10, sempre num confronto diferente.
+  1. **O scanner de cadáver ignorava a CURA de abertura**, então lia o pokémon com a vida de ANTES
+     dela e acusava "atacou morto" quem tinha acabado de se curar (um Lugia que entrou com 32 e
+     curou 279). Medido: 3 em 7.555 confrontos. Hoje ele aplica TODA entrada — e quando o campo
+     `hp` existe é ele a fonte, porque é a vida que o motor gravou; só a reconstrução, que não o
+     traz, cai na subtração.
+  2. **A trava das trocas livres do sono não previa o revide na PRIMEIRA linha.** Quando a troca
+     livre mata o adormecido ele revida, e o reordenamento põe o revide ANTES do golpe que o
+     derrubou — aí o índice 0 já é do outro lado e a conta de trocas livres dá zero, sem defeito
+     nenhum. Ficou visível quando o sono passou a comprar UMA troca.
+  3. **O teste da linha de status pegava confronto com DOIS especiais** (cura *e* sono, por
+     exemplo) e media o perfil do outro. Hoje ele exige confronto com um especial só.
+  **A lição é a de sempre neste log: teste que amostra confronto aleatório precisa de invariante,
+  não de contagem** — e os três só apareceram porque a mecânica nova mudou a semente e sorteou
+  confrontos que nunca tinham sido sorteados.
+- **`tools/test-especiais.js` VARRE A TABELA, não nomeia golpe** — golpe novo no `MULTI_GOLPE` já
+  nasce coberto, e um que saia derruba o teste em vez de sumir em silêncio. Ele tranca: os quatro
+  pesos de cada golpe, que o poder efetivo é 45 e 54 (e que TODO golpe da tabela vale mais que o
+  cru), que a tabela é igual nos dois motores, que os tapas aparecem em 100% dos confrontos que os
+  têm, que a frase numera cada um, que o log traz UMA linha com o total, e que nenhum tapa sai
+  depois de o alvo cair. Cada golpe tem um DONO declarado no teste, e falta de dono é assertiva.
+  **O dono leva o golpe múltiplo mais o MAIS FORTE que ele tem** — o caso duro. Emparelhar com um
+  golpe fraco de propósito inflaria a amostra e provaria menos.
+
 ## O nome do golpe DURANTE a batalha (09/09/2026)
 
 Pedido assim: *"se está descendo a barra de HP do pokémon X, é porque o pokémon Y usou um ataque —
@@ -927,9 +1133,11 @@ exiba na tela o nome desse ataque no mesmo momento que a barra se movimenta"*.
   `render()`, e ele só acontece onde a frase já cumpriu o papel.
 - **SÓ VALE PRA GOLPE COMUM** (`x` vazio). Explosão, sono, cura, drenagem, poção e Faixa já têm
   frase própria no `avisoDoConfronto`, e ali ela conta o confronto INTEIRO ou uma abertura —
-  escrever "Fulano usou X" por cima apagaria a explicação que o número não dá. Consequência
-  conhecida: num confronto resolvido por **sono**, as trocas livres saem sem nome de golpe, porque
-  a frase do sono está ocupando a linha. É o desenho, não esquecimento.
+  escrever "Fulano usou X" por cima apagaria a explicação que o número não dá.
+  **O SONO ERA A EXCEÇÃO e deixou de ser** (09/09/2026): as trocas livres dele saíam sem nome de
+  golpe porque a frase ocupava a linha o confronto inteiro. Foi reportado, e hoje ele é abertura
+  como a anulação — ver `passosDaAbertura`. Quem ainda ocupa a linha inteira é só a
+  **autodestruição**, e ali não há golpe seguinte pra nomear.
 - **SÃO CINCO LAÇOS DE ANIMAÇÃO, e todos os cinco pintam**: jornada/ginásio da cidade, batalha
   especial (Elite, Rocket, Mewtwo), Torre/raide, liga assistida e **online**. O online é o único com
   perspectiva — os matchups vêm do lado A —, então quem é o B vira **nome, espécie e golpe** junto
@@ -942,6 +1150,30 @@ exiba na tela o nome desse ataque no mesmo momento que a barra se movimenta"*.
   troca, e em negrito a linha piscaria a luta inteira.
 - **Medido:** numa amostra de 1.549 passos, **1.348 (87%) mostram o nome do golpe** e 190 mostram a
   frase especial. Nenhum passo fica sem nada.
+
+### O cadáver que atacava: o moribundo que VOLTA VIVO (09/09/2026)
+
+Reportado com print, durante o experimento do teto de dano desligado: **Ivysaur 0/180** contra um
+Geodude que terminou com **14**, e a linha do Ivysaur vinha **depois** da que o matou.
+
+- **A causa não era o log** -- era o reordenamento do golpe moribundo. Instrumentando o motor:
+  o Ivysaur bateu **295 num Geodude de 155**, o Geodude caiu, revidou moribundo e matou o Ivysaur.
+  **Os dois morreram** -- e aí o desempate por morte súbita ressuscitou o Geodude com 5%-15% da
+  vida. O diário é escrito DEPOIS disso, então grava −144 em vez de −295.
+- **O `m` marcava quem termina VIVO.** O reordenamento existe pra que ninguém apareça atacando
+  depois de cair, e ele puxa o golpe marcado pra frente. Só que ali o marcado era o Geodude, que
+  sobreviveu -- puxar o golpe dele jogou o Ivysaur, que morreu de verdade, pro fim.
+- **A regra nova:** o reordenamento **só vale se o moribundo tiver ficado morto**. Quando ele volta
+  vivo pelo desempate, a ordem natural do diário já é a legível -- quem estava vivo bate, o outro
+  revida, e o placar do cabeçalho confirma quem sobrou.
+- **ELE EXISTE EM PRODUÇÃO, e isso é o que mais importa aqui:** com o teto ligado são **4 casos em
+  4.280 confrontos (0,09%)**; sem o teto, **660 em 4.235 (15,6%)**. O experimento não criou o
+  defeito, só o tornou 165× mais frequente -- sem teto um golpe derruba de vida cheia e a troca
+  dupla vira rotina. Depois do conserto: **zero**, nos dois casos.
+- **O INVARIANTE que o teste cobra** é preciso: quem termina o confronto **morto** nunca aparece
+  atacando com a barra em zero; quem termina **vivo** pode -- é o par do moribundo, os dois golpes
+  são do mesmo instante. Conferido que, tirando a ressalva do `passosVisiveis`, ele acusa **194
+  cadáveres em 1.277 confrontos**.
 
 ### O golpe fantasma na abertura do confronto (09/09/2026)
 
@@ -1026,6 +1258,20 @@ pedido em 09/09/2026. `PAUSA_ANTES_DO_GOLPE_MS`.
   curta de espécies; o defeito aparece em 1 de 21.556. A varredura nova roda **13.000 confrontos
   cobrindo todas as espécies**, sem item nenhum, e cobra as duas coisas: nenhum golpe de dano zero
   na tela e ninguém atacando depois de cair. Amostra pequena não é teste de invariante raro.
+- **O MORIBUNDO DE QUEM DORMIU tem reordenamento PRÓPRIO, e ele faltava.** Quando a última troca
+  livre MATA o adormecido, ele ainda revida — e esse revide é do mesmo instante do golpe que o
+  derrubou, como todo moribundo. Só que este caminho **não passa pelo `passosVisiveis`**: as trocas
+  livres saem do diário cru de propósito (ver o item acima) e o revide cai na **reconstrução**, que
+  é montada DEPOIS delas. Resultado: o revide aparecia na última linha, com a barra do dono já em
+  zero — um cadáver atacando, o defeito mais reportado deste log, entrando pela porta do sono.
+  Hoje o revide é inserido **antes** da última troca livre e o dano dele sai da reconstrução, do
+  mesmo jeito que o das livres já saía. Medido: **0,15% dos confrontos** com o teto de dano ligado
+  e 0,19% sem ele — ou seja, é defeito de produção, **não** um efeito do experimento do teto (esse
+  é o outro caso, o do `passosVisiveis`, que ia de 0,09% pra 15,6%). O número de linhas na tela não
+  muda: o revide já era mostrado, só estava no lugar errado.
+  **Achado pelo teste, não por relato** — o do cadáver, quando o RNG mudou de semente e caiu num
+  Golem que dormiu, tomou três golpes e morreu no terceiro. Por isso o par Golem × Venomoth virou
+  fixture fixa dele: depender de sorte de semente pra cobrir um caminho é não cobrir.
 - **Quantas trocas livres sai do DIÁRIO, não de `SONO_EM_TROCAS`.** Os dois números não são iguais: o
   sono compra 2 trocas, mas quem usou, se for o mais rápido, ainda bate primeiro na troca em que o
   outro acorda — e aí são 3. Ler do diário acerta os dois casos, acerta o **sono DUPLO** (os dois se
@@ -1822,8 +2068,18 @@ pedido em 09/09/2026. `PAUSA_ANTES_DO_GOLPE_MS`.
   `tools/test-inventario.js` confere que **as 250 espécies têm nome pra todo golpe que conseguem
   usar** (senão a caixa diria "Fortalece o ataque " e pararia ali) e que nenhuma fica sem golpe dos
   dois lados.
-- **O TETO DE DANO ENGOLE O BÔNUS em 12,3% dos golpes.** `DMG_CAP_PCT = 0.65` limita cada golpe a
-  65% do HP máximo do alvo (70% no crítico), e quem já bate no teto não ganha nada com mais ataque.
+- **⚠️ O TETO DE DANO ESTÁ DESLIGADO desde 09/09/2026** (`DMG_CAP_PCT = Infinity` nos dois motores).
+  Ele valeu **0.65** (0.70 no crítico) por quase toda a vida do jogo: limitava cada golpe a 65% do
+  HP máximo do alvo, e era ele que garantia que **one-shot não existe** — nenhum golpe derrubava de
+  vida cheia, e todo pokémon respondia pelo menos uma vez. **Isso acabou.**
+  Saiu pra um experimento e o resultado foi aprovado pro ar. **Medido na retirada:** a jornada
+  concluída sobe ~**9 pontos** e a dificuldade **inverte de formato** — os game overs no Brock caem
+  de **799 pra 417** e os do Giovanni sobem de **171 pra 267**. O começo afrouxa (o time inicial
+  deixa de apanhar de graça) e o fim aperta (líder de nível alto derruba num golpe).
+  **Tudo que este arquivo diz sobre "o teto" abaixo está escrito na época em que ele valia**, e
+  vários números foram medidos com ele ligado. Se um dia voltar, é `0.65`/`0.70` nos DOIS motores.
+- **O que o teto fazia com os itens de atributo, medido quando ele ainda valia:** ele engolia o
+  bônus em 12,3% dos golpes — quem já batia no teto não ganhava nada com mais ataque.
   Medido em 8.000 batalhas o A/B de subir pra 75%: os golpes no teto caem de 11,5% pra 6,6%, a taxa
   de vitória não se move (50,64% → 50,80%), **3,6% das batalhas trocam de vencedor** e a jornada
   concluída vai de 66,3% pra 69,0% (1,8σ — no limite do ruído, mas para o lado fácil).

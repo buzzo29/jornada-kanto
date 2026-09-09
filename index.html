@@ -892,6 +892,13 @@
      nome quando era curto -- a posição dele dançava de card pra card, e é justamente entre dois
      cards que o olho compara. Ele sai menor que o padrão do jogo porque ali quem manda é o nome. */
   .golpe-cartao .type-pill{display:block;width:fit-content;margin:4px 0 0;font-size:.5rem;padding:1px 6px;letter-spacing:.2px;}
+  /* A observação dos golpes de vários tapas: linha própria embaixo do nome (e do selo, quando ele
+     aparece), em caixa baixa. O `text-transform:none` é obrigatório -- o .golpe-cartao-nome é
+     uppercase, e a frase em maiúsculas viraria um segundo título brigando com o nome do golpe. */
+  .golpe-cartao-obs{
+    display:block;margin-top:4px;font-size:.6rem;font-weight:700;text-transform:none;
+    letter-spacing:.2px;color:var(--muted);line-height:1.2;
+  }
   .golpe-cartao-poder{flex-shrink:0;text-align:center;padding-left:10px;border-left:2px solid rgba(26,26,46,.12);}
   .golpe-cartao-poder span{display:block;font-size:.5rem;font-weight:800;letter-spacing:.5px;color:var(--muted);}
   .golpe-cartao-poder b{display:block;font-size:1.25rem;font-weight:800;color:var(--ink);line-height:1.1;}
@@ -2091,6 +2098,10 @@
     padding:3px 0; border-bottom:1px dashed rgba(26,26,46,.15);
   }
   .dex-golpe:last-child{ border-bottom:0; }
+  /* O aviso do Metrônomo na ficha: fica ACIMA da lista porque ele muda o sentido dela inteira.
+     Embaixo, o jogador leria os seis golpes primeiro e a ressalva depois -- tarde demais. */
+  .dex-golpes-aviso{ font-size:.58rem; font-weight:700; color:var(--muted); text-align:left;
+    margin-bottom:6px; line-height:1.35; }
   .dex-golpe-nivel{ font-size:.55rem; font-weight:800; color:var(--muted); }
   .dex-golpe-nome{ font-size:.62rem; font-weight:800; color:var(--ink); overflow-wrap:anywhere; }
   .dex-golpe-poder{ font-size:.62rem; font-weight:800; color:var(--ink); }
@@ -5542,6 +5553,13 @@ function melhorAtaque(attacker, defender){
     if(sobra.length) candidatos = sobra;
   }
   const avalia = (id, multForcado) => {
+    /* O `poder` DAQUI VIRA O DANO -- o calcDamageNew lê `best.poder`. Então ele tem que ser o poder
+       REAL do golpe, sempre. Quem usa o poder EFETIVO (poder × média de tapas) é só a NOTA, que é a
+       comparação entre golpes.
+       ISSO JÁ FOI UM DEFEITO, e caro: enquanto o `poder` era o efetivo, cada tapa do Tapa Duplo saía
+       com 45 em vez de 15 E ainda batia de 2 a 5 vezes -- ~9× o dano pretendido. Apareceu num log
+       de Clefable Lv.42 que matou um Dunsparce de 270 de HP com 3 tapas e um Eevee de 235 com 2,
+       enquanto a Folha Mágica dela (poder 60) tirava 88. Reportado em 09/09/2026. */
     const tipo = GOLPES[id][0], poder = GOLPES[id][1];
     let mult = 1;
     (defender.types || []).forEach(d => { mult *= typeVsType(tipo, d); });
@@ -5554,7 +5572,7 @@ function melhorAtaque(attacker, defender){
        bestAttackType com o poder acrescentado -- e é ela que faz "o que tira mais dano" ser
        escolhido de verdade, e não "o melhor tipo". */
     return { golpe:id, type:tipo, poder:poder, mult:mult, stab:proprio,
-             nota: poder * Math.pow(mult, EXPOENTE_TIPO) * (proprio ? 1.5 : SUBTYPE_PENALTY)
+             nota: poderEfetivo(id) * Math.pow(mult, EXPOENTE_TIPO) * (proprio ? 1.5 : SUBTYPE_PENALTY)
                    * (atk / Math.max(1, def)) };
   };
   let melhor = null;
@@ -5899,8 +5917,23 @@ const APRENDIZADO = {
    (a causa do "estava no amarelo e foi pra zero do nada") -- anti-varredura é só dano persistente +
    golpe moribundo, gradual e previsível. */
 const MOVE_POWER = 60;
-const DMG_CAP_PCT = 0.65;
-const DMG_CAP_PCT_CRIT = 0.70;
+/* >>> EXPERIMENTO 09/09/2026: O TETO DE DANO ESTÁ DESLIGADO. <<<
+   Os valores de produção são 0.65 e 0.70 -- pra voltar, é trocar os dois Infinity de volta AQUI e
+   no outro motor (index.html e functions/index.js têm cópias, e elas têm que ficar idênticas).
+   O que o teto garantia, e que agora não vale mais: one-shot não existir, e todo pokémon sempre
+   responder pelo menos uma vez. Medido ao desligar -- ver a seção do CLAUDE.md. */
+/* TETO DE DANO POR GOLPE, DESLIGADO desde 09/09/2026 -- e isso é decisão, não experimento
+   esquecido: ele foi tirado pra um experimento e o resultado foi aprovado pro ar.
+   Valeu 0.65 (0.70 no crítico) por quase toda a vida do jogo, e era ele que garantia que
+   ONE-SHOT NÃO EXISTE: nenhum golpe derrubava de vida cheia, e todo pokémon respondia pelo menos
+   uma vez. Sem ele isso acabou.
+   MEDIDO na retirada: a jornada concluída sobe ~9 pontos e a dificuldade INVERTE de formato --
+   os game overs no Brock caem de 799 pra 417 e os do Giovanni sobem de 171 pra 267. O começo
+   afrouxa (o time inicial deixa de apanhar de graça) e o fim aperta (os líderes de nível alto
+   passam a derrubar num golpe).
+   Se um dia voltar, é aqui: 0.65 e 0.70. Os DOIS motores têm que voltar juntos. */
+const DMG_CAP_PCT = Infinity;
+const DMG_CAP_PCT_CRIT = Infinity;
 function statAtLevel(base, level){ return Math.floor(2*base*level/100) + 5; }
 function calcDamage(attacker, defender, rng){
   return calcDamageNew(attacker, defender, rng);
@@ -6027,10 +6060,75 @@ const CHANCE_SONO = 0.05;
    sem tocar em ninguém -- e os jogadores reclamaram, com razão: não era o número que pesava (medido,
    valia +1,4 ponto de vitória, contra +0,8 do Recuperar), era a FORMA. Perder um pokémon inteiro
    pra um sorteio de 5%, sem jogada possível e sem tomar um golpe, é ruim mesmo valendo pouco.
-   Com trocas livres ele vira vantagem de tempo em vez de execução: o alvo apanha duas vezes de
-   graça e depois acorda. Medido: o ganho cai de +1,4 pra +0,7 ponto, e quem aproveita bem (Gengar,
-   rápido e forte) quase não perde poder -- o golpe passa a premiar quem consegue capitalizar. */
-const SONO_EM_TROCAS = 2;
+   Com trocas livres ele vira vantagem de tempo em vez de execução: o alvo apanha de graça e
+   depois acorda. Medido na época: o ganho caiu de +1,4 pra +0,7 ponto, e quem aproveita bem
+   (Gengar, rápido e forte) quase não perdeu poder -- o golpe passou a premiar quem capitaliza.
+   PASSOU DE 2 PRA 1 EM 09/09/2026, a pedido: uma troca livre e a luta volta ao normal.
+   Medido com o sono FORÇADO (chance 100%, 1x1, 16 soníferos × 8 adversários × 40 voltas), que é
+   o jeito de isolar o efeito -- na chance real de 5% ele se dilui e some no ruído da amostra:
+   sem sono 23,0% de vitória, com 2 trocas 52,8% (+29,8), com 1 troca 40,8% (+17,8).
+   Ou seja, **uma troca livre entrega 60% do que duas entregavam**.
+   NA JORNADA NÃO SE MOVE: 76,15% → 76,81% de conclusão (8.000 jornadas de cada lado, +0,66
+   ponto, 1,0σ -- ruído). Faz sentido: os líderes também têm sonífero (Oddish, Paras, Venonat),
+   então enfraquecer o golpe cai dos dois lados igual.
+   O NÚMERO É DUPLICADO no index.html e no functions/index.js -- divergência aqui faz a mesma
+   batalha terminar diferente no cliente e no servidor. `tools/test-especiais.js` tranca os dois. */
+const SONO_EM_TROCAS = 1;
+/* GOLPES DE VÁRIOS TAPAS. Batem de 2 a 5 vezes numa troca, cada tapa com o próprio sorteio de dano
+   e de crítico -- é assim no jogo original, e é o que faz um golpe de poder baixo valer a pena: a
+   média de 3,0 tapas exatos põe o Tapa Duplo (15) em 45 de poder efetivo e os Arranhões Furiosos
+   (18) em 54.
+   PESOS OFICIAIS, e os DOIS golpes têm os mesmos (fontes: pokemondb.net/move/double-slap e
+   /fury-swipes): 2 tapas 3/8, 3 tapas 3/8, 4 tapas 1/8, 5 tapas 1/8. São os da Gen 2-4, que é a
+   geração da base de golpes daqui (Gen 3/FireRed) -- a Gen 5 mudou pra 1/3, 1/3, 1/6, 1/6 e NÃO é
+   a que vale aqui.
+   É TABELA e não um teste solto, e ela já provou que valia a pena: os Arranhões Furiosos entraram
+   como UMA LINHA daqui, sem tocar em mais nada. O jogo ainda tem outros (Soco Múltiplo, Ataque de
+   Fúria, Míssil de Agulha, Pedra Afiada) e eles não foram pedidos.
+   Ela é DUPLICADA nos dois motores, como a tabela GOLPES.
+   ATENÇÃO: o dano de cada tapa passa pelo teto normalmente, e os tapas PARAM quando o alvo cai --
+   tapa em cadáver não existe, e é isso que preserva o -todo pokémon responde pelo menos uma vez-. */
+/* A distribuição é a MESMA nos nove, conferida na fonte golpe a golpe -- por isso ela é uma
+   constante e não nove cópias: uma cópia divergiria no primeiro ajuste, e é exatamente o tipo de
+   erro que ninguém vê. Se um dia entrar um golpe com distribuição própria (o Chute Triplo bate 3
+   vezes com acerto crescente, por exemplo), ele ganha o array dele aqui e mais nada muda. */
+const TAPAS_2A5 = [[2,3],[3,3],[4,1],[5,1]];
+const MULTI_GOLPE = {
+  doubleslap:  TAPAS_2A5,   // Tapa Duplo          poder 15  -- 13 espécies
+  furyswipes:  TAPAS_2A5,   // Arranhões Furiosos  poder 18  -- 20
+  furyattack:  TAPAS_2A5,   // Ataque Fúria        poder 15  -- 17
+  cometpunch:  TAPAS_2A5,   // Soco Cometa         poder 18  -- 4
+  spikecannon: TAPAS_2A5,   // Canhão de Espinhos  poder 20  -- 3
+  barrage:     TAPAS_2A5,   // Barragem            poder 15  -- 2
+  pinmissile:  TAPAS_2A5,   // Míssil Agulha       poder 14  -- 6
+  iciclespear: TAPAS_2A5,   // Lança de Gelo       poder 10  -- 1 (Shellder)
+  rockblast:   TAPAS_2A5    // Rajada de Rochas    poder 25  -- 6
+};
+function tapasDoGolpe(golpeId, rng){
+  const tabela = MULTI_GOLPE[golpeId];
+  if(!tabela) return 1;
+  let total = 0;
+  for(const par of tabela) total += par[1];
+  let r = (rng || Math.random)() * total;
+  for(const par of tabela){ r -= par[1]; if(r < 0) return par[0]; }
+  return tabela[tabela.length - 1][0];
+}
+/* O PODER QUE O MOTOR COMPARA na hora de escolher o golpe. Num golpe de vários tapas o número da
+   tabela é o de UM tapa, e comparar 15 contra qualquer outra coisa faz o Tapa Duplo NUNCA ser
+   escolhido -- a mecânica inteira viraria código morto em quem tem dois golpes.
+   O que ele vale de verdade é poder × média de tapas: 15 × 3,0 = 45, que é o número certo pra
+   comparação. Medido: sem isto o tapa saía em 0% dos confrontos de um Clefairy com dois golpes.
+   ATENÇÃO: quem NÃO passa por aqui é a TELA DE ESCOLHA -- ela continua anunciando o poder cru (15)
+   pro jogador. É a mesma ressalva que o CLAUDE.md já registra sobre STAB e subtipo ("Poder não é
+   comparável entre dois golpes"), agora com um caso a mais. Não foi mexido porque não foi pedido. */
+function poderEfetivo(golpeId){
+  const base = (GOLPES[golpeId] || [])[1] || 0;
+  const tabela = MULTI_GOLPE[golpeId];
+  if(!tabela) return base;
+  let soma = 0, peso = 0;
+  for(const par of tabela){ soma += par[0] * par[1]; peso += par[1]; }
+  return base * (soma / peso);
+}
 const CHANCE_METRONOMO_EFEITO = 0.10;   // por efeito: 10% cada um dos três, 70% golpe comum
 const CHANCE_DISABLE = 0.10;
 const CHANCE_RECUPERAR = 0.10;
@@ -6335,6 +6433,17 @@ function faixaDeFoco(p, marca){
    "Electabuzz atacou e tirou -182", que é a ordem invertida da cena.
    Quem chama empurra esta marca logo depois da linha do golpe. */
 function marcaDaFaixa(marca, hpDoOutro){ return { q: marca, d: 0, hp: 1, ho: hpDoOutro, c:0, m:0, z:0, x:'faixa' }; }
+/* OS GOLPES QUE UM LADO DÁ NUMA TROCA. Quase sempre é um só; nos golpes de vários tapas são de 2
+   a 5, cada um com sorteio próprio de dano e de crítico. Devolve sempre LISTA -- o caso comum é
+   uma lista de um item, e isso é o que evita dois caminhos no doExchange.
+   O número de tapas é sorteado DEPOIS do primeiro calcDamage porque é ele quem escolhe o golpe e
+   grava o lastMove; antes dele não há id pra consultar na tabela. */
+function golpesDaTroca(atacante, alvo, rng){
+  const lista = [calcDamage(atacante, alvo, rng)];
+  const tapas = tapasDoGolpe(atacante.lastMove, rng);
+  for(let i = 1; i < tapas; i++) lista.push(calcDamage(atacante, alvo, rng));
+  return lista;
+}
 function doExchange(active, enemy, rng, diario){
   /* Golpe especial: só na PRIMEIRA troca de cada confronto. O marcador é o próprio
      adversário -- oponente novo, confronto novo, e as chances valem de novo. */
@@ -6352,8 +6461,8 @@ function doExchange(active, enemy, rng, diario){
      aconteceu foi ele não ter atacado. O log tem que contar a mesma coisa que a tela mostra. */
   const acorda = (p) => { if(!(p._dormindoPor > 0)) return false; p._dormindoPor--; return true; };
   const activeDorme = acorda(active), enemyDorme = acorda(enemy);
-  const dmgToEnemy = activeDorme ? 0 : calcDamage(active, enemy, rng);
-  const dmgToActive = enemyDorme ? 0 : calcDamage(enemy, active, rng);
+  const dmgToEnemy = activeDorme ? [] : golpesDaTroca(active, enemy, rng);
+  const dmgToActive = enemyDorme ? [] : golpesDaTroca(enemy, active, rng);
   const spdActive = effectiveSpeed(active);
   const spdEnemy = effectiveSpeed(enemy);
   // empate de velocidade: sorteio -- usa o mesmo rng da batalha, então nas Ligas (seed fixa) é determinístico
@@ -6363,36 +6472,63 @@ function doExchange(active, enemy, rng, diario){
   const dmgByFirst  = activeFirst ? dmgToEnemy : dmgToActive;
   const dmgBySecond = activeFirst ? dmgToActive : dmgToEnemy;
   const firstHpBefore = first.hp, secondHpBefore = second.hp;
-  second.hp = Math.max(0, second.hp - dmgByFirst);
+  /* APLICA OS GOLPES DE UMA TROCA, um a um, e PARA quando o alvo cai: o 4º tapa não sai num
+     pokémon que caiu no 3º. Devolve o que saiu DE VERDADE de cada golpe mais a vida que sobrou --
+     é desse par que saem a linha do diário e o passo da animação, uma barra por tapa. */
+  const aplicarGolpes = (alvo, golpes) => {
+    const saiu = [];
+    for(const d of golpes){
+      if(alvo.hp <= 0) break;
+      const antes = alvo.hp;
+      alvo.hp = Math.max(0, alvo.hp - d);
+      saiu.push({ d: antes - alvo.hp, hp: alvo.hp });
+    }
+    return saiu;
+  };
+  /* A FAIXA APARA O ÚLTIMO GOLPE que saiu, seja ele o único ou o último tapa. Sem aparar, a soma
+     das linhas do log passaria do que o pokémon perdeu de verdade -- ele foi a zero e voltou a 1. */
+  const aparaAFaixa = (saiu) => { const u = saiu[saiu.length - 1]; if(u){ u.d = Math.max(0, u.d - 1); u.hp = 1; } };
+  const saiuNoSegundo = aplicarGolpes(second, dmgByFirst);
   /* A Faixa segura ANTES de o diário ser escrito: assim o dano gravado é o EFETIVO (o que saiu de
      verdade, parando em 1) e a barra da tela desce até 1, que é o que aconteceu. A LINHA dela é
      empurrada mais abaixo, depois da linha do golpe -- ver marcaDaFaixa. */
   const faixaDoSegundo = second.hp <= 0 && faixaDeFoco(second, (second === active) ? 'p' : 'e');
-  if(faixaDoSegundo) second.hp = 1;
+  if(faixaDoSegundo){ second.hp = 1; aparaAFaixa(saiuNoSegundo); }
   /* A marca sai da SITUAÇÃO (o segundo caiu e mesmo assim revidou), não de o dano ter sido
      reduzido. Enquanto ela era deduzida do dano, subir o DYING_BLOW_FACTOR pra 1.0 fazia a marca
      sumir junto -- e sem ela o log volta a mostrar pokémon atacando depois de cair, porque é ela
      que manda o revide vir ANTES do golpe que derrubou. */
   const segundoCaiu = second.hp <= 0;
-  let counter = dmgBySecond;
-  if(segundoCaiu && counter > 0){ // counter sempre > 0 agora (não existe mais imunidade total 0x)
-    counter = Math.max(1, Math.round(counter * DYING_BLOW_FACTOR));
-  }
-  first.hp = Math.max(0, first.hp - counter);
+  /* O golpe moribundo vale por GOLPE, então num golpe de vários tapas cada tapa passa pelo fator.
+     Hoje ele é 1.0 e isso não muda um ponto -- mas no dia em que voltar a valer metade, valer
+     metade em cada tapa é o que mantém a regra sendo sobre o GOLPE e não sobre o número de tapas. */
+  const counter = dmgBySecond.map(d => (segundoCaiu && d > 0) ? Math.max(1, Math.round(d * DYING_BLOW_FACTOR)) : d);
+  const saiuNoPrimeiro = aplicarGolpes(first, counter);
   const faixaDoPrimeiro = first.hp <= 0 && faixaDeFoco(first, (first === active) ? 'p' : 'e');
-  if(faixaDoPrimeiro) first.hp = 1;
+  if(faixaDoPrimeiro){ first.hp = 1; aparaAFaixa(saiuNoPrimeiro); }
   if(diario){
     /* O dano registrado é o que SAIU DE VERDADE da vida do alvo, não o número que a fórmula
        sorteou: um golpe de 101 num pokémon com 54 de HP tira 54. Gravar o valor cru fazia o log
        não fechar -- somando as linhas dava mais dano do que o pokémon tinha de vida. */
     const primeiroDormiu = (first === active) ? activeDorme : enemyDorme;
     const segundoDormiu  = (second === active) ? activeDorme : enemyDorme;
+    /* UMA ENTRADA POR TAPA: a barra desce uma vez por tapa, e a animação lê o diário. No LOG elas
+       viram uma linha só, somadas -- a mesma regra da drenagem, que tem duas entradas e uma linha.
+       Os campos t (qual tapa) e tn (quantos ao todo) só existem quando há mais de um: assim o
+       confronto comum grava exatamente o que gravava antes, e log velho continua se lendo igual. */
+    const gravar = (q, saiu, quemBate, marcaM) => {
+      saiu.forEach((h, i) => {
+        const reg = { q: q, d: h.d, hp: h.hp, c: quemBate.lastCrit?1:0, m: marcaM, z: quemBate.lastMoveNulo?1:0 };
+        if(saiu.length > 1){ reg.t = i + 1; reg.tn = saiu.length; }
+        diario.push(reg);
+      });
+    };
     if(!primeiroDormiu){
-      diario.push({ q: activeFirst?'p':'e', d: secondHpBefore - second.hp, hp: second.hp, c: first.lastCrit?1:0, m:0, z: first.lastMoveNulo?1:0 });
+      gravar(activeFirst?'p':'e', saiuNoSegundo, first, 0);
       if(faixaDoSegundo) diario.push(marcaDaFaixa((second === active) ? 'p' : 'e', firstHpBefore));
     }
     if(!segundoDormiu){
-      diario.push({ q: activeFirst?'e':'p', d: firstHpBefore  - first.hp,  hp: first.hp,  c: second.lastCrit?1:0, m: segundoCaiu?1:0, z: second.lastMoveNulo?1:0 });
+      gravar(activeFirst?'e':'p', saiuNoPrimeiro, second, segundoCaiu?1:0);
       if(faixaDoPrimeiro) diario.push(marcaDaFaixa((first === active) ? 'p' : 'e', second.hp));
     }
   }
@@ -7262,11 +7398,29 @@ function aprendizadosPendentes(){
     if(!usaGolpesEscolhidos(p.speciesId)) return;   // o Metrônomo não aprende: ver ataquesDisponiveis
     const serve = id => p.ataques.indexOf(id) < 0 && (p.ataquesRecusados || []).indexOf(id) < 0;
     const janela = new Map();   // golpe -> o nível em que ele foi CRUZADO (o menor dos dois)
-    const varrer = (especie, soSeANovaTambemEnsina) => {
+    /* A VARREDURA DA FORMA ANTIGA tem uma regra a mais, e ela é o coração deste resgate: o que
+       importa é se o pokémon TERIA APRENDIDO o golpe antes de evoluir.
+       Se o nível do golpe é MENOR OU IGUAL ao nível da evolução, ele passaria por ali ainda na
+       forma antiga -- subindo de um em um, ele aprenderia e SÓ DEPOIS evoluiria. Que a forma nova
+       ensine ou não é irrelevante nesse caso: o golpe já seria dele.
+       Se o nível é MAIOR que o da evolução, ele já seria a forma nova quando chegasse lá, e aí
+       vale a tabela da forma nova -- é a regra do jogo original, que não volta pra ensinar o que a
+       forma anterior sabia.
+       Reportado em 09/09/2026: a Cleffa foi do 15 pro 20 de uma vez, evoluiu, e perdeu a Folha
+       Mágica que ela aprende no 17 -- a Clefairy não ensina esse golpe, e a versão anterior desta
+       regra descartava por isso. Mas 17 é MENOR que o 20 da evolução: subindo de um em um ela
+       teria a Folha Mágica três níveis antes de virar Clefairy.
+       O contra-exemplo que a regra tem que continuar respeitando é o Trovão do Pikachu: ele é
+       nível 41 e o Pikachu evolui no 40, então quem chega lá já é Raichu -- e a Raichu não ensina.
+       Esse continua sendo perdido, e é assim no jogo original.
+       Sem nível de evolução conhecido a regra cai na anterior (mais restrita), que é o lado
+       seguro: nunca inventa golpe. */
+    const varrer = (especie, comoFormaAntiga) => {
+      const nivelDaEvolucao = comoFormaAntiga ? ((EVOLUTIONS[especie] || {}).level || 0) : 0;
       (APRENDIZADO[especie] || []).forEach(par => {
         const nivel = par[0], id = GOLPES_IDS[par[1]];
         if(nivel <= (p.nivelDosAtaques || 0) || nivel > p.level) return;
-        if(soSeANovaTambemEnsina && nivelDoAtaque(p.speciesId, id) == null) return;
+        if(comoFormaAntiga && nivel > nivelDaEvolucao && nivelDoAtaque(p.speciesId, id) == null) return;
         if(!janela.has(id) || nivel < janela.get(id)) janela.set(id, nivel);
       });
     };
@@ -8643,7 +8797,9 @@ function buildAnimatedHitSequence(m){
     if(g.x === 'faixa') return { side: g.q === 'p' ? 'player' : 'enemy', amount: 0, faixa: true, q: g.q, x: g.x };
     /* q = quem BATE e x = o que o passo é (vazio quando é golpe comum). Os dois vêm do diário sem
        tradução porque é deles que sai a frase "Fulano usou GOLPE" -- ver fraseDoGolpeUsado. */
-    return { side: g.q === 'p' ? 'enemy' : 'player', amount: g.d, q: g.q, x: g.x || null };
+    /* t/tn viajam junto pelo mesmo motivo do q e do x: é deles que sai o "1x" da frase. Ausentes
+       no golpe comum, e aí o passo é exatamente o que era antes. */
+    return { side: g.q === 'p' ? 'enemy' : 'player', amount: g.d, q: g.q, x: g.x || null, t: g.t || 0, tn: g.tn || 0 };
   });
   /* O passo SEGUINTE ao da Faixa precisa de um DESENHO pra a frase dela sair da tela. Ela é a única
      frase do meio da luta: as de abertura somem sozinhas porque a barra que elas anunciam se move e
@@ -14752,8 +14908,14 @@ function suddenDeathNote(m){
 /* O SELO DO GOLPE. Quando o confronto trouxe o ID do golpe escolhido, é o nome DELE que sai -- o
    tipo continua mandando na COR, então um Raio segue azul-elétrico. Sem id (save antigo, ou pokémon
    sem golpe escolhido) cai no nomeDoGolpe, que deduz um nome a partir do tipo, como sempre fez. */
-function golpeSeloHtml(speciesId, tipo, golpeId){
-  const nome = (golpeId && GOLPES[golpeId]) ? nomeDoAtaque(golpeId) : nomeDoGolpe(speciesId, tipo);
+/* `vezes` é a contagem dos golpes de vários tapas, e ela vai DENTRO do selo: no meio da batalha é
+   qual tapa está saindo agora (1x, 2x, 3x...) e no log é quantos saíram ao todo. Dentro do selo e
+   não ao lado porque é o nome do golpe que está sendo qualificado -- "Tapa Duplo 3x" é o que o
+   pokémon fez, e a mesma palavra tem que aparecer nos dois lugares. Ausente (0/undefined) no golpe
+   comum, que é a esmagadora maioria: ali o selo sai idêntico ao que sempre saiu. */
+function golpeSeloHtml(speciesId, tipo, golpeId, vezes){
+  let nome = (golpeId && GOLPES[golpeId]) ? nomeDoAtaque(golpeId) : nomeDoGolpe(speciesId, tipo);
+  if(nome && vezes) nome = nome + ' ' + vezes + 'x';
   return seloDeGolpe(nome, (golpeId && GOLPES[golpeId]) ? GOLPES[golpeId][0] : tipo);
 }
 function renderMatchupLog(matchups){
@@ -14809,19 +14971,45 @@ function renderMatchupLog(matchups){
    permanece igual ao HP perdido). Se não existir golpe anterior (o pokémon entrou e caiu na
    mesma troca), ele entra como golpe normal ANTES do que derrubou -- os dois trocaram golpes
    na mesma troca, então essa é a ordem que a tela mostrou. */
-function passosVisiveis(golpes){
-  const saida = [];
+/* O m marca o GOLPE MORIBUNDO: quem caiu e mesmo assim revidou, na mesma troca.
+   O REORDENAMENTO SÓ VALE SE ELE TIVER FICADO MORTO, e essa ressalva custou um relato.
+   Quando os DOIS caem na mesma troca, o desempate por morte súbita ressuscita um deles com 5%-15%
+   da vida -- e aí o "moribundo" é justamente quem termina VIVO. Puxar o golpe dele pra frente joga
+   o outro (que morreu de verdade) pro fim, e o log passa a mostrar um cadáver atacando.
+   Reportado em 09/09/2026 com print: Ivysaur 0/180 contra um Geodude que terminou com 14, e a
+   linha do Ivysaur vinha DEPOIS da que o matou. O motor tinha feito o contrário do que o log
+   contava: o Ivysaur bateu 295 num Geodude de 155, os dois caíram, e o Geodude voltou no
+   desempate. Fica raro com o teto de dano ligado (1,3% dos confrontos) e comum sem ele (15,8%),
+   porque sem teto um golpe só derruba de vida cheia.
+   Quando o moribundo termina vivo, a ordem natural do diário já é a legível: quem estava vivo bate,
+   o outro revida e o placar do cabeçalho confirma quem sobrou. */
+function passosVisiveis(golpes, m){
+  const terminouVivo = q => !!m && (q === 'p' ? (m.playerHpAfter || 0) > 0 : (m.enemyHpAfter || 0) > 0);
+  /* OS TAPAS DE UM GOLPE MÚLTIPLO SÃO UM LANCE SÓ, e por isso se movem juntos: o reordenamento do
+     moribundo empurra o golpe inteiro pra antes do que o derrubou, não o 3º tapa sozinho. Por isso
+     a lista é agrupada ANTES de reordenar e desagrupada no fim -- reordenar entrada a entrada
+     partiria o Tapa Duplo ao meio, com metade antes e metade depois. */
+  const grupos = [];
   for(const g of golpes){
-    if(!g.m){ saida.push(Object.assign({}, g)); continue; }
+    const ultimo = grupos[grupos.length - 1];
+    if(g.t > 1 && ultimo && ultimo[0].q === g.q && ultimo[0].tn === g.tn) ultimo.push(g);
+    else grupos.push([g]);
+  }
+  const saidaG = [];
+  for(const grupo of grupos){
+    const g = grupo[0];
+    if(!g.m || terminouVivo(g.q)){ saidaG.push(grupo); continue; }
     /* GOLPE MORIBUNDO -- quem cai ainda revida, na mesma troca. Ele entra ANTES do golpe que o
        derrubou: assim ninguém aparece atacando depois de já ter caído, e a leitura fica na ordem
        que faz sentido -- quem morreu bateu primeiro, o outro respondeu e matou.
        Trocar a ordem não distorce nada: os dois golpes são do mesmo instante, e o motor só os
        aplica em sequência porque código roda em sequência. */
-    const derrubou = saida.pop();
-    saida.push(Object.assign({}, g, { m: 0 }));
-    if(derrubou) saida.push(derrubou);
+    const derrubou = saidaG.pop();
+    saidaG.push(grupo);
+    if(derrubou) saidaG.push(derrubou);
   }
+  const saida = [];
+  saidaG.forEach(grupo => grupo.forEach(g => saida.push(Object.assign({}, g, { m: 0 }))));
   return saida;
 }
 /* A MESMA sequência serve o LOG e a ANIMAÇÃO -- é isso que garante que as duas contem a mesma
@@ -14845,15 +15033,48 @@ function sequenciaDoConfronto(m){
      A CURA FICA. Ela É um passo, e o PRIMEIRO: o pokémon entra machucado do confronto anterior, se
      cura, e só então a luta começa. Enquanto ela ficava de fora da sequência, a animação só via o
      valor final e a barra aparecia cheia do nada. */
-  const reais = passosVisiveis((m.golpes || []).filter(g => g.x !== 'disable' && (g.x || g.d > 0)));
+  const reais = passosVisiveis((m.golpes || []).filter(g => g.x !== 'disable' && (g.x || g.d > 0)), m);
   /* TODAS AS ABERTURAS: acontecem antes da luta e não são dano. A poção entrou aqui quando passou a
      funcionar como o Recuperar -- ela era um FECHAMENTO enquanto disparava na vitória do confronto. */
   const aberturas = reais.filter(g => g.x === 'recover' || g.x === 'sono' || g.x === 'semSono' ||
                                       g.x === 'pocao' || g.x === 'absorb' || g.x === 'absorbdano');
   const ehDano = g => !g.x || g.x === 'boom' || g.x === 'boomself';
-  const golpesDeDano = reais.filter(ehDano).length;
-  /* O teto conta GOLPES. As aberturas (cura e sono) não são dano -- deixá-las contar jogaria uma
-     troca real de 2 golpes na reconstrução, perdendo os golpes de verdade. */
+  /* OS TAPAS SOBREVIVEM À RECONSTRUÇÃO. Ela devolve golpes inteiros (interpola o HP de entrada e o
+     de saída), e um golpe de vários tapas precisa virar N passos pra a barra descer N vezes -- que
+     é justamente o que se pediu pra o jogador ver.
+     Sem isto o Tapa Duplo só aparecia como tapa em 28,8% dos confrontos: nos outros a luta passava
+     do teto de 3 golpes, a reconstrução entrava, e ela não conhece tapa nenhum -- devolvia um golpe
+     só. Como o jogador não tem como saber se aquele confronto passou do teto, o que ele veria era
+     o mesmo golpe às vezes contando e às vezes não.
+     O TOTAL NÃO MUDA: o dano do golpe é repartido entre os tapas e o log volta a somá-los numa
+     linha só, então a soma das linhas continua fechando com o que o pokémon perdeu.
+     QUANTOS TAPAS saem dos que SAÍRAM DE VERDADE naquele confronto, lidos do diário na ordem -- não
+     é sorteio novo. E golpe pequeno demais pra repartir (menos de 1 por tapa) fica inteiro: um
+     passo de dano 0 é o que este log evita em toda regra. */
+  const expandirTapas = (lista) => {
+    const contagens = { p: [], e: [] };
+    (m.golpes || []).forEach(g => { if(g.t === 1 && g.tn > 1 && contagens[g.q]) contagens[g.q].push(g.tn); });
+    if(!contagens.p.length && !contagens.e.length) return lista;
+    const usados = { p: 0, e: 0 };
+    const saida = [];
+    lista.forEach(h => {
+      const fila = contagens[h.q];
+      if(h.x || !fila || !fila.length){ saida.push(h); return; }
+      const n = fila[Math.min(usados[h.q]++, fila.length - 1)];
+      if(!(n > 1) || h.d < n){ saida.push(h); return; }
+      const cada = Math.floor(h.d / n);
+      for(let i = 1; i <= n; i++){
+        saida.push(Object.assign({}, h, { d: (i === n) ? h.d - cada * (n - 1) : cada, t: i, tn: n }));
+      }
+    });
+    return saida;
+  };
+  /* O teto conta GOLPES, e um golpe de vários tapas é UM golpe: só o primeiro tapa ocupa vaga.
+     Sem isso um Tapa Duplo de 5 sozinho estouraria o teto de 3 e jogaria o confronto inteiro na
+     reconstrução -- que não conhece tapa nenhum e devolveria três golpes inventados no lugar. */
+  const golpesDeDano = reais.filter(ehDano).filter(g => !(g.t > 1)).length;
+  /* As aberturas (cura e sono) não são dano -- deixá-las contar jogaria uma troca real de 2 golpes
+     na reconstrução, perdendo os golpes de verdade. */
   if(reais.length && golpesDeDano <= TETO_GOLPES) return reais;
 
   /* A FAIXA PARTE O CONFRONTO EM DUAS LUTAS, e cada uma é reconstruída como qualquer outra -- com o
@@ -14913,7 +15134,7 @@ function sequenciaDoConfronto(m){
     const conv = h => ({ q: h.side === 'player' ? 'e' : 'p', d: h.amount });
     /* Golpe de dano ZERO não é golpe, nem vindo da reconstrução: uma metade pode não ter o que
        mostrar (a Faixa segurou a explosão, e do outro lado já não havia ninguém de pé). */
-    const semZero = seq => seq.map(conv).filter(g => g.d > 0);
+    const semZero = seq => expandirTapas(seq.map(conv).filter(g => g.d > 0));
     const partida = aberturas.concat(semZero(reconstruirSequencia(meia1)), [faixa],
                                      semZero(reconstruirSequencia(meia2)));
     /* A MORTE SÚBITA PODE RESSUSCITAR quem carregava a Faixa. Ela vale quando os DOIS chegam a
@@ -14954,8 +15175,34 @@ function sequenciaDoConfronto(m){
      Na ordem do diário o moribundo está onde aconteceu, depois do golpe do outro, e a conta fecha. */
   const soDano = (m.golpes || []).filter(g => (g.x || g.d > 0)).filter(ehDano);
   const iOutro = sono ? soDano.findIndex(g => g.q !== sono.q) : 0;
-  const livres = (sono && iOutro !== 0) ? soDano.slice(0, iOutro < 0 ? soDano.length : iOutro) : [];
+  let livres = (sono && iOutro !== 0) ? soDano.slice(0, iOutro < 0 ? soDano.length : iOutro) : [];
   const danoLivre = livres.reduce((a, g) => a + (g.d || 0), 0);
+
+  /* O MORIBUNDO DE QUEM DORMIU. Quando a última troca livre MATA o adormecido, ele ainda revida --
+     e esse revide é do MESMO instante do golpe que o derrubou (é o que o DYING_BLOW_FACTOR faz).
+     Na ordem crua ele vem DEPOIS, e o log mostra um cadáver atacando.
+     Este caminho não passa pelo `passosVisiveis` -- as trocas livres saem do diário cru de
+     propósito (ver o comentário logo acima) e o revide cai na RECONSTRUÇÃO, que é montada depois
+     delas. Ou seja, o reordenamento que existe pro caso comum não alcança aqui, e por isso ele é
+     refeito na mão: o revide entra ANTES da última troca livre, e o dano dele sai da reconstrução
+     como o das livres já saía.
+     Achado em 09/09/2026 pelo teste do cadáver (um Golem que dormiu, tomou três golpes, morreu no
+     terceiro e revidou 256 na linha seguinte). Raro e ANTIGO -- é o mesmo defeito que o
+     `passosVisiveis` conserta do outro lado, só que pelo caminho do sono. */
+  const golpeDoAdormecido = (sono && iOutro > 0) ? soDano[iOutro] : null;
+  /* `sono.q` é quem USOU o sono; o adormecido é o OUTRO lado -- o mesmo lado que o `danoLivre`
+     logo abaixo trata como quem cede vida nas trocas livres. */
+  const adormecidoMorreu = sono && (sono.q === 'p' ? base.enemyHpAfter <= 0 : base.playerHpAfter <= 0);
+  const moribundoDoSono = (golpeDoAdormecido && golpeDoAdormecido.m && adormecidoMorreu && livres.length)
+                          ? golpeDoAdormecido : null;
+  if(moribundoDoSono){
+    livres = livres.slice(0, -1).concat([Object.assign({}, moribundoDoSono, { m: 0 })], livres.slice(-1));
+    /* Ele bate no OUTRO lado (quem usou o sono), então quem cede vida aqui é esse lado -- o
+       espelho exato do ajuste que o `danoLivre` faz logo abaixo. */
+    base = (moribundoDoSono.q === 'p')
+      ? Object.assign({}, base, { enemyHpBefore: Math.max(base.enemyHpAfter, base.enemyHpBefore - moribundoDoSono.d) })
+      : Object.assign({}, base, { playerHpBefore: Math.max(base.playerHpAfter, base.playerHpBefore - moribundoDoSono.d) });
+  }
 
   /* A RECONSTRUÇÃO PEGA SÓ O QUE SOBROU. Ela interpola entre o HP do começo e o do fim, então o
      "começo" dela tem que ser depois da cura E depois das trocas livres -- senão ela recontaria o
@@ -14972,8 +15219,8 @@ function sequenciaDoConfronto(m){
   /* GOLPE DE DANO ZERO NÃO É GOLPE, nem vindo da reconstrução: ela pode emitir um lado com zero
      quando o outro já levou tudo (o caminho da Faixa filtra pelo mesmo motivo). Um "−0 de HP" na
      tela é o que faz procurar bug onde é regra. */
-  const resto = reconstruirSequencia(base).map(h => ({ q: h.side === 'player' ? 'e' : 'p', d: h.amount }))
-                                          .filter(h => h.d > 0);
+  const resto = expandirTapas(reconstruirSequencia(base).map(h => ({ q: h.side === 'player' ? 'e' : 'p', d: h.amount }))
+                                                        .filter(h => h.d > 0));
   return aberturas.concat(livres, resto);
 }
 /* AS FRASES DOS GOLPES ESPECIAIS VIVEM AQUI, num lugar só.
@@ -15009,8 +15256,17 @@ const TIPO_DO_ESPECIAL = {
    função em vez de recriar a cor é o que garante que Sombrio aqui seja o mesmo marrom de lá. */
 function cartaoDeGolpe(id, comTipo){
   const tipo = GOLPES[id][0], poder = GOLPES[id][1];
+  /* A OBSERVAÇÃO DOS GOLPES DE VÁRIOS TAPAS mora AQUI, no cartão, e não em cada tela: as três
+     telas de golpe (capturou, quer trocar, aprendeu) dividem este bloco, e escrever a frase em
+     cada uma seria garantir que a próxima divergisse no texto -- que é o que já aconteceu com
+     elas antes de virarem uma cópia só.
+     ELA É NECESSÁRIA porque o número ao lado é o poder de UM tapa: sem a linha, o jogador compara
+     um Míssil Agulha de 14 com um Talho de 70 sem saber que um deles sai de 2 a 5 vezes -- e é
+     justamente essa a informação que decide a escolha.
+     Sai da TABELA, não de uma lista à parte: golpe novo no MULTI_GOLPE já ganha a observação. */
+  const obs = MULTI_GOLPE[id] ? '<span class="golpe-cartao-obs">* Golpe repete entre 2-5x</span>' : '';
   return `<div class="golpe-cartao">
-    <span class="golpe-cartao-nome">${escapeHtmlSafe(nomeDoAtaque(id))}${comTipo ? typePill(tipo) : ''}</span>
+    <span class="golpe-cartao-nome">${escapeHtmlSafe(nomeDoAtaque(id))}${comTipo ? typePill(tipo) : ''}${obs}</span>
     <span class="golpe-cartao-poder"><span>PODER</span><b>${poder}</b></span>
   </div>`;
 }
@@ -15176,8 +15432,25 @@ function avisoDoConfronto(m, passo){
   const especiais = ((m && m.golpes) || []).filter(ehGolpeEspecial);
   /* Quantos PASSOS a abertura ocupa na animação: a cura e a poção mexem uma barra, a drenagem mexe
      as DUAS. A frase tem que sobreviver até a última delas ter subido/descido -- some antes e o
-     jogador vê a segunda barra andar sem nada explicando. */
-  const passosDaAbertura = { recover:1, pocao:1, absorb:2 };
+     jogador vê a segunda barra andar sem nada explicando.
+     A ANULAÇÃO E O DESPERTAR NÃO MEXEM BARRA NENHUMA, e mesmo assim são ABERTURA: eles acontecem
+     antes do primeiro golpe e a luta acontece inteira depois. Valem 1 -- ou seja, a frase é lida
+     na pausa que antecede o confronto e cede o lugar assim que o primeiro golpe sai.
+     Ficaram de fora desta lista até 09/09/2026, e por isso a frase da anulação ocupava a linha a
+     luta INTEIRA: reportado num Venusaur x Muk em que só se lia "Venusaur teve o ataque Raio Solar
+     anulado por Muk" enquanto as barras desciam, sem o nome de nenhum golpe. O log estava certo --
+     ele monta a linha da anulação à parte e não passa por aqui.
+     O SONO ENTROU EM 09/09/2026, quando ele passou a comprar UMA troca livre em vez de duas.
+     Reportado num Haunter x Dunsparce: a luta inteira só se lia "Haunter fez Dunsparce dormir"
+     enquanto a barra do Dunsparce descia duas vezes, e o nome do golpe que estava batendo nele --
+     Devorador de Sonhos -- nunca aparecia. O log estava certo, trazia os dois golpes com nome.
+     Ele vale 2 e não 1 porque, ao contrário da anulação, **o sono É um passo da animação**: o
+     registro dele entra na sequência com dano 0 (barra parada), então a frase precisa cobrir o
+     passo 0 (a pausa de leitura) MAIS o passo dele. Cede no golpe livre, que é o primeiro que
+     mexe barra -- e é justamente o golpe cujo nome foi pedido.
+     AUTODESTRUIÇÃO continua fora da lista de propósito: ali o confronto INTEIRO é aquilo (os dois
+     caem no mesmo golpe e não há luta depois), e a frase tem que acompanhar até o fim. */
+  const passosDaAbertura = { recover:1, pocao:1, absorb:2, disable:1, semSono:1, sono:2 };
   const g = especiais.find(x => !passosDaAbertura[x.x] || !(passo >= passosDaAbertura[x.x]));
   if(!g) return '';
   const nomeP = escapeHtmlSafe(m.player || ''), nomeE = escapeHtmlSafe(m.enemy || '');
@@ -15198,9 +15471,13 @@ function avisoDoConfronto(m, passo){
 function fraseDoGolpeUsado(m, hit){
   if(!hit || hit.x || hit.cura || hit.faixa) return '';
   const doJogador = hit.q === 'p';
+  /* NO MEIO DA BATALHA a contagem é PROGRESSIVA: "usou Tapa Duplo 1x", desce a barra, "2x", desce
+     de novo. É o pedido, e é o que casa com o que a tela está fazendo -- cada tapa é um passo com
+     a sua descida de barra. No LOG é o contrário: lá sai o TOTAL, numa linha só. */
   const selo = golpeSeloHtml(doJogador ? m.playerSpecies : m.enemySpecies,
                              doJogador ? m.playerMove : m.enemyMove,
-                             doJogador ? m.playerMoveId : m.enemyMoveId);
+                             doJogador ? m.playerMoveId : m.enemyMoveId,
+                             hit.tn > 1 ? hit.t : 0);
   if(!selo) return '';
   const quem = escapeHtmlSafe((doJogador ? m.player : m.enemy) || '');
   return '<span class="aviso-golpe-quem ' + (doJogador ? 'p' : 'e') + '">' + quem + '</span> usou ' + selo;
@@ -15273,7 +15550,7 @@ function passosHtml(m){
   if(!golpes.length) return '';
   const nomeP = escapeHtmlSafe(m.player||''), nomeE = escapeHtmlSafe(m.enemy||'');
   const ladoHtml = (doJogador) => `<span class="mlog-quem ${doJogador?'p':'e'}">${doJogador?nomeP:nomeE}</span>`;
-  const seloDe = (doJogador) => golpeSeloHtml(doJogador?m.playerSpecies:m.enemySpecies, doJogador?m.playerMove:m.enemyMove, doJogador?m.playerMoveId:m.enemyMoveId);
+  const seloDe = (doJogador, vezes) => golpeSeloHtml(doJogador?m.playerSpecies:m.enemySpecies, doJogador?m.playerMove:m.enemyMove, doJogador?m.playerMoveId:m.enemyMoveId, vezes);
   /* Uma frase só, sempre na mesma forma: "X atacou Y com GOLPE e tirou -N de HP."
      Já passaram por aqui marcação de crítico, de golpe moribundo e de "o tipo não pega nele" --
      cada uma virava ruído numa linha que se lê de relance. O número conta a história.
@@ -15288,14 +15565,24 @@ function passosHtml(m){
   /* As anulações vêm ANTES de tudo: o Disable acontece na abertura do confronto e a luta inteira
      que se lê embaixo já é a luta com o golpe anulado. */
   const anulacoes = (m.golpes || []).filter(g => g.x === 'disable').map(linhaEspecial).join('');
-  return `<div class="mlog-passos">${anulacoes}${golpes.map(g=>{
+  /* OS TAPAS VIRAM UMA LINHA SÓ, com o total somado -- a mesma regra da drenagem, que tem duas
+     entradas no diário e uma linha aqui. Na ANIMAÇÃO eles continuam sendo N passos, porque a barra
+     desce N vezes; no log o que interessa é quanto o golpe tirou, e cinco linhas de "−12 de HP"
+     seguidas seriam a parede que o teto de 3 golpes existe pra evitar. */
+  const linhas = [];
+  golpes.forEach(g => {
+    const ult = linhas[linhas.length - 1];
+    if(g.t > 1 && ult && ult.q === g.q && ult.tn === g.tn){ ult.d += g.d; return; }
+    linhas.push(Object.assign({}, g));
+  });
+  return `<div class="mlog-passos">${anulacoes}${linhas.map(g=>{
     const doJogador = g.q === 'p';
     if(g.x === 'boomself') return '';   // a linha da explosão (acima) já contou os dois lados
     if(g.x === 'absorbdano') return '';  // idem: a linha da drenagem conta a vida que saiu e a que entrou
     if(g.x === 'boom' || g.x === 'sono' || g.x === 'recover' || g.x === 'semSono' ||
        g.x === 'pocao' || g.x === 'absorb' || g.x === 'faixa') return linhaEspecial(g);
     return `<div class="mlog-passo ${doJogador?'p':'e'}">
-      ${ladoHtml(doJogador)} atacou ${ladoHtml(!doJogador)}${seloDe(doJogador)?` com ${seloDe(doJogador)}`:''} e tirou <span class="mlog-tira">−${g.d}</span> de HP.
+      ${ladoHtml(doJogador)} atacou ${ladoHtml(!doJogador)}${seloDe(doJogador)?` com ${seloDe(doJogador, g.tn > 1 ? g.tn : 0)}`:''} e tirou <span class="mlog-tira">−${g.d}</span> de HP.
     </div>`;
   }).join('')}</div>`;
 }
@@ -20919,8 +21206,24 @@ function renderPokedexFicha(){
             ${typePill(GOLPES[golpe][0])}
           </div>`;
         }).join('');
+        /* O AVISO DO METRÔNOMO. As 4 espécies do METRONOMO atacam com tipo SORTEADO e nunca usam
+           golpe escolhido (ver ataquesDisponiveis), então a lista aqui é o que a espécie APRENDE
+           e não o que ela leva pra batalha. Sem esta linha a ficha promete uma coisa que a luta
+           não entrega -- foi ela que fez o jogador esperar a Folha Mágica no nível 17 da Cleffa.
+           A lista FICA, e não é decoração: quando a Cleffa vira Clefairy e o Snubbull vira
+           Granbull, esses golpes passam a valer de verdade. O que faltava era dizer QUANDO. */
+        const soDepoisDeEvoluir = !usaGolpesEscolhidos(id);
         return `<div class="dex-golpes">
           <div class="dex-especiais-tit">Golpes por nível</div>
+          ${soDepoisDeEvoluir ? (() => {
+            /* A evolução só entra na frase se ela SAIR do Metrônomo. O Togegic também é do
+               METRONOMO, então dizer ao dono de um Togepi que os golpes valem "quando virar
+               Togetic" seria trocar uma promessa falsa por outra. */
+            const evo = EVOLUTIONS[id];
+            const sai = evo && usaGolpesEscolhidos(evo.into);
+            return `<div class="dex-golpes-aviso">Na batalha ele usa o Metrônomo, não estes golpes${
+              sai ? ` — eles passam a valer quando virar <strong>${escapeHtmlSafe(SPECIES[evo.into].name)}</strong>` : ''}.</div>`;
+          })() : ''}
           <div class="dex-golpes-lista">${linhas}</div>
         </div>`;
       })()}
