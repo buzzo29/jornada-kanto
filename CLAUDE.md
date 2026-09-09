@@ -418,51 +418,488 @@ de golpes.
   é a maior variação de dificuldade desde o golpe moribundo. Se incomodar, o parâmetro a mexer é a
   chance da autodestruição (`CHANCE_AUTODESTRUICAO`), que é a que mais aparece.
 
-## Golpes por nível (data/golpes.json) — cadastrada, ainda NÃO usada pelo motor
+## Golpes por nível (data/golpes.json) — a base da GEN 3 / FireRed
 
-Base criada em 09/09/2026 pra uma feature futura: o treinador escolher quais golpes o pokémon
-leva. **Nada no motor lê este arquivo ainda** — ele foi pedido como cadastro, e é isso que ele é.
+Base criada em 09/09/2026 e **trocada de geração no mesmo dia**: nasceu na Gen 2 e passou pra
+**Gen 3 (FireRed/LeafGreen)** a pedido. Ela alimenta os dois golpes que o jogador escolhe.
 
-- **250 espécies, 2.052 entradas (espécie × nível), 228 golpes distintos.** Cada golpe traz nome,
-  tipo, poder, PP e precisão **como eram na Gen 2**.
+- **250 espécies, 2.390 entradas (espécie × nível), 301 golpes distintos** (era 2.052 e 228 na
+  Gen 2). Cada golpe traz nome, tipo, poder, PP e precisão **como eram na Gen 3**.
+- **A FONTE DO APRENDIZADO MUDOU DE ARQUIVO, e isso é uma armadilha:** NÃO existe
+  `data/mods/gen3/learnsets.ts` no Showdown — o mod da Gen 3 só traz moves/abilities/items. O
+  aprendizado da Gen 3 vive no arquivo **principal** (`data/learnsets.ts`), na tag `3L<n>`. É
+  exatamente o arquivo que a versão Gen 2 desta seção dizia "não servir sozinho, foi podado e só
+  tem da Gen 3 pra frente" — agora é a faixa que interessa.
+  O `3L` é a **geração 3 inteira**: o Showdown não separa FRLG de RSE. Pras 250 daqui os dois
+  batem em quase tudo, mas onde divergirem o que está aqui é a união da geração.
+- **A CADEIA DE MODS PARA NA GEN 3** (8→3, não 8→2). Sem ela o Tackle sairia 40/100 em vez de
+  35/95 e o Crabhammer 100 em vez de 90. `tools/test-golpes.js` tranca esses dois.
+- **O QUE A GEN 3 TROUXE:** 71 golpes novos (Garra de Metal, Ás Aéreo, Vento Prateado, Pulso de
+  Água, Quebra-Telha, Rajada de Rochas, Cauda de Ferro, Onda de Calor...), 101 espécies ganharam
+  golpe de dano e 18 perderam. **Um golpe só mudou de ficha: o Low Kick**, que na Gen 3 passou a
+  ter poder por PESO — o Showdown grava isso como `basePower: 0`, que neste esquema significa
+  "status". Ele saiu da lista de dano junto com outros **21 golpes de poder variável** (Flail,
+  Guilhotina, Terremoto de Magnitude, Contra-Ataque, Bico Perfurante, Nível-dano como Investida
+  Sísmica e Sombra Noturna): nenhum deles cabe num motor de poder fixo, e deixá-los entrar com um
+  número inventado seria pior que deixá-los fora.
+- **TODO POKÉMON BATE COM O PRÓPRIO TIPO** (pedido em 09/09/2026: *"o Bulbasaur é Grama e Veneno,
+  porém no moveset dele não tem nenhum ataque que causa dano de veneno"* — e era verdade).
+  Medido na base da Gen 3 crua: **51 espécies e 58 lacunas** (Veneno 12, Inseto 11, Voador 9,
+  Terra 7, Água 6, Psíquico 5). A causa é que o jogo original resolve isso por TM — a Bomba de
+  Lodo do Bulbasaur é a TM36 do FireRed —, e esta base só cadastra aprendizado por NÍVEL.
+  **A regra é uma só, e nada foi escolhido à mão** (ver o passo 3 do `tools/gerar-golpes.js`):
+  1. o candidato sai do que a espécie REALMENTE aprende na Gen 3 por qualquer via (nível, TM,
+     tutor, reprodução) — isso cobre **44 das 58** lacunas com dado de verdade;
+  2. entre os candidatos ganha o de poder mais **próximo da mediana da própria espécie**, não o
+     mais forte: sem isso o Nidoking ganharia Terremoto (100) em vez de Tapa de Lama (20);
+  3. o **nível** é o do golpe de poder mais parecido que ela já tem, com **piso de poder/2** (teto
+     50). O piso existe por um caso concreto: o Abra não aprende UM golpe de dano por nível, então
+     "o nível mais alto dele" é 1 — e a regra entregava um Psíquico de 90 a um Abra nível 1;
+  4. onde a Gen 3 não oferece nada daquele tipo (**13 casos**), aí sim é invenção, e o candidato
+     passa a ser tudo que existe na Gen 3 — nunca a tabela moderna. A primeira versão errou aqui e
+     deu Ferrão Mortal (Gen 6), Marretada Colossal (Gen 8) e Feixe Duplo (Gen 9) ao FireRed,
+     porque os mods **sobrescrevem valores e não apagam golpes que ainda não existiam**.
+  **O DITTO É A ÚNICA EXCEÇÃO, e ela não é gosto:** ele ataca com o tipo de quem copiou, e essa
+  mecânica vive no `bestAttackType`, que só roda quando o `melhorAtaque` devolve null — ou seja,
+  quando ele NÃO tem golpe escolhido. Dar um golpe Normal ao Ditto desligaria a transformação em
+  silêncio, e ela está medida (16,8% → 22,1% de vitória, 15 confrontos impossíveis a menos).
+  Resultado: **57 golpes acrescentados em 50 espécies**, e a lacuna de tipo vai de 51 espécies
+  para **uma** (o Ditto).
+- **AS OITO QUE NÃO ATACAVAM VIRARAM UMA.** Kakuna, Metapod, Abra, Unown, Wobbuffet, Delibird e
+  Smeargle ganharam golpe pela regra acima; sobra o Ditto. Quem conta "espécies sem golpe" em
+  qualquer lugar do projeto precisa saber disso.
+- **O PREÇO MEDIDO: a jornada concluída sobe de 66,23% pra 68,13%** (6.000 jornadas de cada lado,
+  o MESMO bot contra as duas versões pelo `--html`) — **+1,90 ponto, 2,2σ**, ou seja fora do
+  ruído, para o lado fácil. E ela afrouxa no **FIM**, não no começo: o Brock não se move (1.292
+  contra 1.292 game overs), o Giovanni cai de **373 pra 311**, o 6º de 248 pra 221 e o 5º de 83
+  pra 62. Faz sentido — cobertura de tipo e movesets melhores rendem mais quanto mais o time
+  amadurece, o mesmo formato que a 4ª carta do encontro selvagem já tinha.
+- **A COBERTURA, medida no motor** (o par automático, 250 espécies nível 50):
+
+  | | Gen 2 | Gen 3 + cobertura |
+  |---|---|---|
+  | espécies com golpe escolhível | 238 | **245** |
+  | tipos de ataque por espécie | 1,56 | **1,62** |
+  | o par cobre pelo menos um tipo próprio | 80,7% | **88,2%** |
+  | o par cobre TODOS os tipos próprios | 55,9% | **69,0%** |
+  | confrontos sem golpe útil (o teimoso) | 0,9% | **0,7%** |
+  | confrontos só com golpe resistido | 13,7% | **12,5%** |
+
+  **Atenção ao que a regra promete e ao que ela não promete:** ela garante que o golpe do próprio
+  tipo EXISTE na lista da espécie, não que o pokémon vai levá-lo — são dois slots, e quem escolhe
+  é o jogador. Por isso "cobre todos os tipos próprios" é 69% e não 100%.
+- **A STARMIE DO RELATO DE 09/09 SE RESOLVEU POR OUTRO CAMINHO.** A resposta registrada era "o
+  Psychic que você espera dela é TM, e a base só tem nível" — continua verdade pelo nível, mas ela
+  é Água/Psíquico e não batia com o próprio tipo, então a regra de cobertura lhe deu **Psíquico**.
+- **AS NOVE DIVERGÊNCIAS VIRARAM SETE**, por dois motivos diferentes: `sono:yanma` caiu pela
+  FONTE (o Yanma aprende Hipnose no 23 na Gen 3 — a lista à mão estava certa, o dado é que estava
+  atrás), e `drenagem:exeggutor` caiu por ACRÉSCIMO NOSSO (o Giga Dreno que a cobertura de tipo
+  lhe deu por acaso é um golpe de drenagem). `tools/test-golpes.js` fixa as sete.
 - **A CATEGORIA físico/especial NÃO está no arquivo, e é de propósito.** Neste motor quem decide
   isso é o TIPO do golpe (`isSpecialType`, regra da Gen 1), não o golpe. Gravar a categoria moderna
   do Showdown (que é por golpe, da Gen 4 em diante) criaria uma segunda fonte de verdade
   discordando do motor. Golpe de status se identifica por `poder: 0`.
-- **A fonte é o Pokémon Showdown, com os mods gen8→gen2 aplicados** — o MESMO método que
-  reconstruiu o `GEN2_SPECIAL` de Johto. Sem a cadeia de mods o arquivo sairia com os valores de
-  hoje: o Bite viria NORMAL (virou Sombrio na Gen 2), o Tackle com 40/100 em vez de 35/95 e o
-  Crabhammer com 100 em vez de 90. `tools/test-golpes.js` tranca justamente esses quatro.
-  O arquivo moderno do Showdown **não serve sozinho**: ele foi podado e só tem da Gen 3 pra frente.
-  O aprendizado da Gen 1/2 vive em `data/mods/gen2/learnsets.ts`, no GitHub deles.
-- **O CURSE FICA FORA DO TYPE_CHART, e está certo:** na Gen 2 ele era literalmente SEM TIPO
+- **O CURSE FICA FORA DO TYPE_CHART, e está certo:** na Gen 3 ele ainda era literalmente SEM TIPO
   (`???`) — só virou Fantasma na Gen 5. Seis espécies o aprendem (Slowpoke, Slowbro, Slowking e a
-  linha do Gastly). Quem for montar a tela de golpes precisa decidir o que fazer com ele.
+  linha do Gastly). Ele é golpe de status aqui (poder 0), então não entra na escolha.
 - **O `ratata` é o único id que não bate com o da fonte** (o jogo escreve com um T só desde
   sempre). O teste confere que ele veio: se o mapa do gerador se perder, é o primeiro a sair vazio.
-- **A BASE AUDITOU AS LISTAS FEITAS À MÃO, e achou nove divergências.** As seis listas de golpe
-  especial foram conferidas move a move no Bulbapedia em 04/09/2026; agora existe uma segunda
-  fonte pra confrontar. **Autodestruição (9/9) e Recuperar (10/10) batem 100%.** O resto:
+- **A BASE AUDITOU AS LISTAS FEITAS À MÃO, e sobraram SETE divergências** (eram nove na Gen 2 —
+  ver a nota da troca de geração, acima). As seis listas de golpe especial foram conferidas move a
+  move no Bulbapedia em 04/09/2026. **Autodestruição (9/9) e Recuperar (10/10) batem 100%.**
+  O resto:
 
-  | divergência | o que a Gen 2 diz | veredito |
+  | divergência | o que a Gen 3 diz | veredito |
   |---|---|---|
   | Disable: **Igglybuff** | o bebê não aprende anulação; quem aprende é a Jigglypuff, no nível 14 | provável erro da lista |
-  | Drenagem: **Exeggcute, Exeggutor** | o que eles têm é Leech Seed | provável erro — foi a MESMA razão que já tirou o Bulbasaur |
+  | Drenagem: **Exeggcute** | o que ele tem é Leech Seed | provável erro — foi a MESMA razão que já tirou o Bulbasaur |
   | Metrônomo: **Cleffa, Snubbull** | nenhum aprende por nível (a Clefairy aprende no 34) | **de propósito**: os 4 do metrônomo foram PEDIDOS, não tirados do aprendizado |
-  | Sono: **Yanma, Misdreavus** | não aprendem Hipnose na Gen 2 (o Yanma só a partir da Gen 3) | provável erro da lista |
+  | Sono: **Misdreavus** | não aprende Hipnose por nível | provável erro da lista |
   | Sono: **Vileplume, Bellossom** | como Vileplume/Bellossom só têm quatro golpes, todos no nível 1 | **discutível**: eles HERDAM o Pó do Sono do Gloom, que aprende no 18 |
 
-  As nove ficam FIXADAS no teste: mudar qualquer um dos dois lados é barulhento, pra ninguém
+  As sete ficam FIXADAS no teste: mudar qualquer um dos dois lados é barulhento, pra ninguém
   consertar a lista e esquecer a base (ou o contrário). **Nada foi corrigido no jogo** — o pedido
   era cadastrar, não mexer.
 - **O arquivo fica em `data/`, e a raiz do repo é publicada** — quando um deploy subir, ele fica em
-  `jornadakanto.com/data/golpes.json`. Isso é conveniente de propósito: são 117 KB, e o
+  `jornadakanto.com/data/golpes.json`. Isso é conveniente de propósito: são 149 KB, e o
   `index.html` já tem 1,17 MB. Quando a feature existir, o caminho barato é o cliente BUSCAR o
   arquivo em vez de inchar o HTML — e aí a base não precisa virar a sexta tabela duplicada.
-- **Falta o nome em PORTUGUÊS dos 228 golpes.** Hoje o arquivo traz só o nome canônico em inglês.
-  Os nomes PT que o jogo já usa (`MOVE_BY_TYPE`, `MOVE_OVERRIDES`) são por TIPO, não por golpe,
-  então não dá pra casar automático — é uma passada à parte.
+- **O nome em PORTUGUÊS vive em `tools/golpes-pt.json`, e são 158.** O arquivo da base traz só o
+  nome canônico em inglês — os nomes PT que o jogo já usava (`MOVE_BY_TYPE`, `MOVE_OVERRIDES`)
+  são por TIPO e não por golpe, então a passada foi à mão, uma vez. A Gen 3 acrescentou **37**
+  (Ás Aéreo, Vento Prateado, Pulso de Água, Quebra-Telha, Cauda de Ferro...). Golpe de dano sem
+  nome ali sai no log e nas telas com o **id em inglês**, então o gerador de tabelas é quem tem
+  que gritar se faltar.
 - `node tools/gerar-golpes.js` regenera o arquivo (o cabeçalho dele traz os `curl` das fontes).
+
+## Os dois golpes do pokémon (escolhidos pelo jogador)
+
+Cada pokémon leva **até DOIS golpes**, escolhidos na captura e trocados quando o nível traz um
+golpe novo. É a **primeira vez que uma escolha do jogador entra na conta de DANO** — até aqui todo
+golpe valia 60 (`MOVE_POWER`) e o motor só escolhia o TIPO.
+
+- **Só golpe de DANO.** Status (Hipnose, Growl, Harden) fica de fora: os efeitos que não são dano já
+  são os **golpes especiais** do jogo, com mecânica própria e chance por confronto.
+  **Autodestruição e Explosão também ficam de fora**, e não é esquecimento: elas JÁ SÃO a mecânica de
+  autodestruição, nas mesmas 9 espécies. Como golpe comum de 200 e 250 de poder, **sem o custo de
+  cair junto**, seriam a escolha óbvia de todo mundo que as tem e ainda modelariam a mesma coisa
+  duas vezes.
+- **"Até dois", não "dois".** Medido: no **nível 5 só 16 das 250 espécies** têm mais de dois golpes de
+  dano — 176 têm menos de dois, e **8 não têm nenhum em nível nenhum** (Kakuna, Metapod, Abra, Ditto,
+  Unown, Wobbuffet, Delibird, Smeargle; o que elas aprendem é Harden, Teleport, Transform, Sketch).
+  Quem tem 2 ou menos disponíveis **não vê tela**: escolher 2 entre 2 não é escolha, e uma tela de
+  uma resposta só é pior que tela nenhuma.
+- **QUEM NÃO TEM GOLPE CAI NO MOTOR DE TIPO, e isso é o desenho, não migração preguiçosa.** Vale pras
+  8 espécies acima E pra todo save gravado antes desta feature. Sem a queda elas ficariam sem atacar.
+  `melhorAtaque` devolve **null** nesse caso, e é o null que faz o `bestAttackType` seguir pro motor
+  de sempre, logo abaixo. Um objeto vazio no lugar dele deixaria o pokémon sem golpe.
+- **A tabela `GOLPES` (id → [tipo, poder]) é a SEXTA duplicada** entre `index.html` e
+  `functions/index.js` — é o mínimo que o cálculo de dano precisa, e o dano roda dos dois lados.
+  `GOLPES_PT` (nome) e `APRENDIZADO` (quem aprende o quê) ficam **só no cliente**: nome é
+  apresentação — a mesma regra do `MOVE_BY_TYPE` — e o servidor nunca precisa saber quem aprende o
+  quê, porque os golpes escolhidos viajam na instância.
+  As três saem de `data/golpes.json` por `tools/gerar-tabelas-golpes.js`.
+- **A comparação dos DOIS MOTORES passou a equipar golpes**, em metade das voltas — sem isso ela
+  lutaria com o motor de tipo dos dois lados e uma divergência só apareceria em produção. É a mesma
+  lição do item de atributo. Conferido: com 0,1 de diferença no STAB de um dos lados, **25 das 300
+  batalhas divergem**. O `playerMoveId` entrou no resumo porque dois golpes de tipos diferentes
+  podem dar o mesmo dano — sem o id a comparação daria verde com um motor batendo de Raio e o outro
+  de Investida.
+
+### O fluxo: onde cada pergunta acontece
+- **Capturou → `escolhaDeAtaques`**, no topo do `startLevelDistribution`. É o funil por onde passam
+  os dois braços do encontro selvagem (`proceedAfterTeamLocked` e `chooseEeveeEvolution`), e vem
+  **antes** da distribuição de propósito: o jogador acabou de capturar, e é do bicho novo que ele
+  está pensando.
+- **Subiu de nível → `aprenderAtaque`**, no topo do `continueFromEvolution`. Fica **DEPOIS da
+  evolução** porque a evolução troca a espécie, e é a tabela da forma NOVA que vale daqui pra frente
+  — igual ao jogo original, que não volta pra ensinar o que a forma anterior sabia.
+- **A EVOLUÇÃO DESTRAVA O QUE É NOVO NA FORMA NOVA** (`golpesDaEvolucao`), e isso não é a mesma
+  coisa que reabrir a janela. A Gen 2 lista quase tudo de quem evolui por pedra **no nível 1**, e a
+  janela conta só nível — então esses golpes ficavam **inalcançáveis pra sempre**. Medido: **28 dos
+  112 degraus (25%)**, **38 golpes**, 1,4 por degrau afetado e no máximo 3. O Gyarados nunca
+  aprendia **Pancadaria (90)** nem Mordida, o Charizard nunca aprendia Ataque de Asa, o Exeggutor
+  nunca aprendia Bomba de Ovo (100), o Victreebel nunca aprendia Folha Navalha.
+  **O que NÃO se faz é zerar o `nivelDosAtaques`**: isso re-ofereceria tudo que a forma antiga já
+  tinha listado e o jogador já tinha recusado ou deixado passar — um Charmeleon que escolheu 2 entre
+  5 seria perguntado de novo sobre os outros 3 só por ter evoluído. A conta é a **diferença entre as
+  duas listas no nível de hoje**, e quem guarda qual era a forma antiga é o `especieDosAtaques`,
+  carimbado quando a fila esvazia. Sem esse carimbo os golpes da evolução voltariam em toda
+  distribuição de níveis dali pra frente.
+  **Medido:** a jornada concluída sobe de 63,41% pra **64,42%** (8.000 de cada lado, 1,0 ponto,
+  1,3σ) — e com isso a feature inteira fica em **0,80 ponto abaixo** do jogo sem golpes (1,1σ,
+  ruído), contra 1,81 antes.
+  **O `evolucaoDepois` só é consumido depois que a fila esvazia**: limpo antes, a volta da tela de
+  aprendizado cairia no `teamOrder` em vez de continuar a jornada.
+- **O Bônus de Kanto entrou na condição** (`aprendizadosPendentes()` ao lado de `evs.length`): ele é
+  a ÚLTIMA coisa que sobe nível na jornada, e sem isso um golpe cruzado ali só seria perguntado
+  depois da primeira luta da Elite.
+- As duas seguem o desenho do `evoChoice`: **a marca fica no POKÉMON** (`escolherAtaques`), a fila é
+  derivada por uma função, e a tela é só apresentação — quem valida é a ação. `confirmarAtaques`
+  revalida que os dois marcados são golpes que a espécie realmente aprende.
+- **A recusa é GRAVADA** (`ataquesRecusados`). Sem isso a pergunta voltaria no próximo nível, e
+  voltaria pra sempre.
+- **A base é aprendizado por NÍVEL, e só.** Reportado em 09/09/2026: uma Starmie que não foi
+  perguntada sobre o **Psychic**. Não é furo — **Psychic é TM nas duas gerações** (TM29), e a
+  Starmie, que evolui por pedra, não ensina **nenhum** golpe de dano novo por nível na Gen 2 (a
+  lista dela é Raio de Bolhas, Investida e Giro Rápido, todos nível 1, todos que o Staryu já tinha).
+  O mesmo vale pro Psychic do Alakazam e pro Terremoto de meio Kanto. Ensinar golpe por TM é outra
+  feature — precisa decidir quais TMs o jogador tem —, e o `data/golpes.json` só cadastra nível.
+- **`nivelDosAtaques` é a janela do que ele CRUZOU agora.** Sem ela, um pokémon nível 40 abrindo o
+  save receberia de uma vez a pergunta de tudo que aprendeu no caminho.
+- **Quem tem VAGA aprende sem perguntar** (menos de 2 golpes): não há o que trocar.
+- **As duas telas são ponto seguro de gravação.** O jogador PENSA nelas, e fechar a aba ali não pode
+  perder a captura nem repetir a pergunta.
+- **SAVE ANTIGO ESCOLHE, um pokémon por vez, ao ABRIR o save** (`escolhaDoSavePendente`, nos DOIS
+  caminhos: `continueSave` e `continueCompleteSave` — o segundo é o do save campeão, que é
+  justamente quem tem mais pokémon de nível alto esperando). O `hydrateTeamMember` **marca**
+  `escolherAtaques` em vez de preencher: escolher pelo jogador seria decidir no lugar dele a decisão
+  mais forte do jogo — medido, o par de golpes vale **79 pontos** de taxa de vitória entre o melhor e
+  o pior par.
+  Quem tem 2 ou menos disponíveis não vê tela (o resolvedor preenche sozinho), então um time de 6
+  costuma render 3 ou 4 telas, não 6.
+  **`game.escolhaDepois` guarda pra onde voltar** — a tela em que o save estava. É uma CHAVE no save
+  e não uma função, pelo mesmo motivo do `evolucaoDepois` e do `releaseDepois`: a tela de escolha é
+  ponto seguro de gravação, e função não sobrevive ao save. Fechar a aba no meio da fila volta pra
+  ela, e o destino não é sobrescrito pela própria tela de escolha.
+  **Consequência conhecida:** enquanto o dono não abrir aquele save, os pokémon dele continuam sem
+  golpe — então na Torre e no Ginásio da Cidade eles lutam no motor de tipo. É a mesma regra de
+  sempre ("quem não tem golpe cai no motor de tipo"), e se conserta sozinho na primeira abertura.
+- **O inicial não escolhe**: no nível 5 os sete têm UM golpe de dano só. Ele já sai com o dele e
+  passa a ser perguntado a partir do primeiro golpe novo.
+
+### Onde os golpes valem (e onde não)
+- **Valem**: jornada, Torre e Ginásio da Cidade — os três montam o time a partir dos SAVES, e o campo
+  viaja junto (`resolverTimeDosSaves` devolve `ataques`; o `createInstance` da Torre recola, pelo
+  mesmo motivo que já recolava o shiny).
+- **NÃO valem nas ligas nem no online**, e é de propósito: lá o time é um **código**
+  (`especie:nivel:shiny`), o `decodeTeamCode` recusa um quarto campo e o `sanitizeTeamCode` existe
+  justamente pra apagar o que não está no código. Ali a batalha continua exatamente como é hoje, no
+  motor de tipo. Mexer nisso é mexer na trava anti-falsificação do código de time.
+- **Os NPCs não têm golpe escolhido** — líder de ginásio, rival, treinador da Torre. Todos vêm do
+  `createInstance`, que não preenche o campo, então eles lutam no motor de tipo, com o poder
+  implícito de 60. **Isso é a maior consequência da feature, e o número está abaixo.**
+
+### O log
+- O confronto carrega `playerMoveId`/`enemyMoveId` ao lado do tipo. **O tipo continua mandando na
+  COR** do selo; o id só troca a PALAVRA. Sem id (log velho, pokémon sem golpe escolhido) o selo sai
+  **idêntico** ao que saía antes — conferido nas 250 espécies e em todos os tipos delas.
+  Sem isso, um Gyarados de Hidro Bomba aparecia batendo de "Jato d'Água".
+- **O jogador VÊ os dois golpes nas QUATRO telas de ordem** (`golpesDoTimeHtml`), as mesmas onde o +
+  de item aparece — sem isso ele escolhe dois golpes e não tem onde conferir o que escolheu.
+  Sai vazio pra quem não tem golpe, inclusive na **defesa do ginásio da cidade**, que vem de um
+  código de time e por isso nunca carrega golpe.
+  **Custo medido a 320px**: a fileira vai de **110px pra 127px** (2 linhas de golpe: 142px) e a tela
+  inteira de **968 pra 1.085px, +12%**. Sem rolagem lateral. Os selos de golpe são **menores que os
+  de tipo** (.5rem contra o padrão) porque são dois NOMES por linha — "Deslizamento de Rochas" tem 22
+  letras — numa coluna que a 320px mede 167px; no tamanho dos selos de tipo, um par comprido
+  quebrava em três linhas.
+
+### O PREÇO MEDIDO
+- **A jornada concluída cai de 65,22% pra 64,42%** (era 63,41% antes de a evolução destravar os
+  golpes da forma nova -- ver acima) — 8.000 jornadas de cada lado (4 × 2.000, o smoke
+  estoura a memória do Node acima disso), **0,80 ponto, 1,1σ** — ou seja, dentro do ruído. Sem o
+  destrave da evolução era 1,81 ponto e 2,4σ, o que já era pequeno; hoje não dá pra distinguir de
+  zero com esta amostra.
+- **O FORMATO da dificuldade muda mais que o total.** Em 2.000 jornadas, os game overs no **Brock
+  vão de 419 pra 404** e os do **Giovanni de 187 pra 148** -- o começo fica igual e o fim afrouxa um
+  pouco. Antes de a evolução destravar os golpes, o Brock ia a **447**: era ali que o time chegava
+  fraco, e é ali que o Gyarados com Pancadaria em vez de Investida se sente.
+  A causa é o PODER, e ela é direta: o melhor golpe disponível vale em média **40,5 no nível 5**
+  (contra os 60 implícitos de sempre) e **89,4 no nível 60**. Ou seja, **o jogador fica mais fraco
+  que os líderes no começo e mais forte no fim** — porque os NPCs continuam nos 60 fixos.
+- **A cobertura de tipo quase não muda**, e isso foi medido porque parecia o risco maior: os tipos de
+  ataque por espécie caem de **1,76 pra 1,56**, os confrontos com golpe resistido sobem de **11,1%
+  pra 12,9%**, e os **sem golpe útil (o teimoso) até caem** (1,0% → 0,8%) — porque um golpe pode ser
+  de um tipo que a espécie não tem.
+- **ESCOLHER BEM É A DECISÃO MAIS FORTE DO JOGO, e por muito.** 12.000 batalhas 6x6 nível 60, mesmos
+  times e mesma semente, só o par de golpes mudando: com os **dois melhores contra os dois piores do
+  adversário, 89,72%**; ao contrário, **10,51%**. São **79 pontos de amplitude** — o shiny (1,20×), o
+  terreno (1,15×) e a Faixa de Foco (+4,98) não chegam perto. Com os dois lados escolhendo bem a
+  batalha volta pro empate (50,37%, contra 50,52% do controle sem golpe nenhum).
+  A tela ordena por poder decrescente e mostra o poder de cada um justamente por isso.
+- **O TIPO do golpe sai por extenso, num selo próprio** (`linhaDeGolpe`), ao lado do nome e do poder.
+  A cor sozinha não diz qual é: o roxo do Fantasma e o do Psíquico se parecem, e é justamente entre
+  esses dois que a escolha costuma decidir. No cabeçalho da tela de aprendizado o nome fica numa
+  linha e o tipo + poder na de baixo (`.golpe-novo`) — inline os três quebravam no meio ("Poder" numa
+  linha, "55" na outra), porque ali o `.mon-sub` não está dentro de um `.btn` e não herda o
+  `display:block` de lá.
+  Os cards da tela de aprendizado **não dizem "Esquecer este"**: a pergunta já está no cabeçalho
+  ("Escolha qual retirar") e repeti-la em cada card é a mesma frase três vezes na mesma tela.
+
+### As quatro correções de 09/09/2026 (relatadas pelo jogador, e três achadas junto)
+
+O relato foi: *"a Chikorita tem Investida no level 1 e não está vindo; no level 12 ela aprendeu
+Folha Navalha e deveria aparecer uma tela dizendo isso; no level 22 ela aprendeu Investida e não
+perguntou qual tirar; e o Togepi deveria aparecer o Metrônomo, porém não exibe nada"*.
+
+- **A PREMISSA ESTAVA ERRADA E O INCÔMODO ESTAVA CERTO.** Rodando `chooseStarter` de verdade, os
+  sete iniciais recebem sim o golpe de nível 1 (a Chikorita sai com Investida, `nivelDosAtaques`=5)
+  — não existe caminho em que o inicial nasça sem golpe. O que o jogador não tinha era **como saber
+  disso**: o segundo golpe entrava em silêncio.
+  **O QUE O PRINT NÃO PROVA, e esta seção chegou a afirmar que provava:** que aquela Meganium tinha
+  Investida. `[Golpe de Corpo, Folha Navalha]` **não é assinatura de uma troca no slot 0** — é a
+  saída literal de `ataquesPadrao(Meganium Lv.32)`, que é justamente a função do pokémon que NUNCA
+  escolheu golpe (save gravado antes da feature), e é também o que sai da tela de escolha quando o
+  jogador clica os dois primeiros cards, porque ela lista por poder decrescente: Golpe de Corpo (85),
+  Folha Navalha (55), Investida (35). Os dois caminhos chegam ao print **sem a Investida ter
+  existido um segundo**, e nenhum dos dois exige que o relato esteja errado. O caminho "ele trocou
+  no 31" exige **uma tela de troca** — exatamente a que o jogador diz que não apareceu.
+  A lição é a de sempre aqui: reconstruir um estado final não identifica o caminho que levou a ele.
+- **O SILÊNCIO ERA O DEFEITO, e a tela nova é a correção pedida** (`golpeAprendido`,
+  `anunciarGolpesAprendidos`). Quem tem VAGA continua aprendendo **sem perguntar** — não há o que
+  trocar, e perguntar seria a tela de uma resposta só —, mas agora **avisa**. Segue o desenho da
+  tela de evolução: um ANÚNCIO, uma tela por passada listando tudo, e um "Continuar".
+  Medido em 300 jornadas: **859 anúncios, 2,86 por jornada** (mediana 3, maior 6), e **94% deles
+  trazem um golpe só**. É barato, e é o segundo golpe de **todos os sete iniciais**.
+  A 320px ela cabe em três linhas mais o botão, sem rolagem lateral.
+- **O GOLPE SUMIA NA EVOLUÇÃO, e esse era o defeito de verdade.** A Gen 2 re-lista no **nível 1**
+  quase tudo que a forma anterior ensinava mais tarde — Folha Navalha é 8 na Chikorita e **1** na
+  Bayleef, Trovão é 41 no Pikachu e a Raichu nem ensina. Como `aprendizadosPendentes` lia só a
+  tabela da forma NOVA, esses golpes caíam abaixo do `nivelDosAtaques` e ficavam **inalcançáveis
+  pra sempre** sempre que a evolução e o nível do golpe caíam na mesma distribuição de níveis.
+  `golpesDaEvolucao` não resgatava: ele só cobre o que a forma nova ensina e a antiga não.
+  Medido: **61 dos 117 degraus** perdiam pelo menos um golpe assim (76 golpes), e em 300 jornadas
+  simuladas isso aconteceu **90 vezes** — Trovão (120) do Raichu, Derrubada (90) do Donphan, Talho
+  (70) do Ursaring, Bomba de Ovo (100) da Blissey. Hoje a **janela vale pras duas formas**, e o
+  resgate só alcança golpe que a forma NOVA também ensina: **90 → 30**, e os 30 que sobram são os
+  que a forma nova realmente não sabe (Raichu sem Trovão, Donphan sem Derrubada, Scizor sem Ataque
+  de Asa) — que é a regra do jogo original e fica como está.
+- **TIRAR UM GOLPE TRAVAVA O JOGO NUM CARROSSEL INFINITO.** `responderAprendizado` punha o golpe
+  novo no lugar do escolhido e não anotava nada — e o retirado voltava pra fila no instante
+  seguinte, porque o nível dele ainda está DENTRO da janela sempre que os dois foram aprendidos na
+  mesma distribuição. Medido com um Nidoran♂ nível 30 (Chute Duplo no 12, Ferrão Venenoso no 17):
+  a tela reabria pros dois **alternadamente, 40 vezes em 40**, e a jornada parava ali sem saída.
+  **Tirar um golpe agora é recusar ele** (`ataquesRecusados`) — a mesma regra do "não aprender", e
+  o que o jogo original faz: golpe esquecido não volta sozinho. As mesmas 40 voltas viram 3 telas.
+- **O TOGEPI NÃO EXIBIA NADA PORQUE NÃO TEM O QUE EXIBIR — e agora exibe o que ele USA.**
+  `APRENDIZADO.togepi` é `[[38,'doubleedge']]`: um golpe de dano só, no nível 38. Mas o buraco
+  real é maior e vem de antes: **`tipoDoGolpe` — o caminho do DANO, nos dois motores — curto-circuita
+  pras 4 espécies do `METRONOMO`**, que atacam com tipo **sorteado** a cada golpe e nunca chegam no
+  `melhorAtaque`. Ou seja, o golpe escolhido delas **nunca valeu um ponto de dano**: o Snubbull via
+  a tela de escolha desde o nível 20 e exibia dois selos que o motor ignorava, e o Togepi ficava
+  mudo. A mesma fileira mentia nos dois sentidos.
+  Hoje `ataquesDisponiveis` devolve **lista vazia** pras quatro (o funil: tela, fila, `ataquesPadrao`
+  e `golpesDaEvolucao` param todos de considerá-las) e a fileira **anuncia o Metrônomo**, num selo
+  **tracejado** — os selos cheios ao lado querem dizer "escolhi estes", e o especial não é escolha.
+  **Conferido: a batalha não muda em um ponto sequer** (mesmo golpe com e sem golpe escolhido).
+  Quem não tem golpe **nem** especial (Abra, Ditto, Kakuna, save antigo, a defesa do ginásio da
+  cidade — que vem de código de time) continua saindo vazio: ali não há o que dizer.
+  A conta das "oito que não atacam" virou **8 + 4**: oito sem golpe de dano nenhum, mais as quatro
+  do Metrônomo, que têm e não escolhem.
+- **Três batalhas clonavam o time com `createInstance` e JOGAVAM FORA os golpes escolhidos** — o
+  mesmo defeito que o `shiny` já tinha tido nos mesmos três lugares, e o comentário dele estava
+  ali do lado: a batalha por **código de treinador**, o **desafio do Mewtwo** e a tela de ordem do
+  **desafio do Ginásio da Cidade**. Nos dois primeiros o time inteiro caía no motor de tipo com o
+  poder implícito de 60; no terceiro a fileira saía muda num modo em que os golpes VALEM.
+- **`game.escolhaDepois` vazava e roubava a distribuição de níveis seguinte.**
+  `escolhaDoSavePendente` gravava o destino ANTES de saber se a tela ia abrir — e a fila do save
+  antigo se resolve sozinha sempre que todo mundo tem 2 ou menos golpes disponíveis, que é a regra
+  no começo da jornada. O campo é serializado, então ficava gravado esperando: na PRÓXIMA captura, o
+  jogador confirmava os dois golpes do bicho novo e ia parar na tela em que o save estava semanas
+  antes, **pulando a distribuição de níveis daquele ginásio**. Hoje o destino é devolvido quando a
+  tela não abre.
+- **As telas de golpe entraram na rede do F5** (`aprenderAtaque` e `golpeAprendido`), junto das de
+  evolução: as quatro são ponto seguro de gravação e as quatro são alcançadas com
+  `evolucaoDepois:'special'` (Elite e esconderijo da Rocket). Sem isso o Continuar depois de um F5
+  largava o jogador no `preBattle` no meio da Elite.
+- **CUSTO MEDIDO DE TUDO ISSO JUNTO: nada.** Conclusão **64,33% → 65,43%** (6.000 jornadas de cada
+  lado, rodando o MESMO bot contra as duas versões pelo `--html`), **+1,10 ponto, 1,3σ** — dentro do
+  ruído, e para o lado esperado (recuperar golpe perdido só ajuda). O formato não se move: os game
+  overs no Brock vão de 1.358 pra 1.322 e no Giovanni de 400 pra 378.
+- `tools/test-ataques.js` tranca as quatro coisas: que o anúncio abre e é ANÚNCIO (não pergunta),
+  que a Folha Navalha sobrevive ao salto 5→16, que o que a forma nova não ensina **não** volta, que
+  o carrossel termina, e que as quatro do Metrônomo não escolhem e anunciam o que usam.
+
+### As TRÊS telas de golpe (o desenho, 09/09/2026)
+
+A da CAPTURA (escolher 2), a de TROCA e o ANÚNCIO **dividem os mesmos blocos**, e é uma cópia só:
+as três contam a mesma coisa, e enquanto eram montadas em separado já tinham divergido no texto e
+no tamanho da fonte. Os blocos são `golpe-cab` (o sprite num ladrilho + a frase) e
+`cartaoDeGolpe` (nome do golpe, selo do tipo, e o poder separado por um risco).
+
+- **QUEM É COLORIDO É O SELO DO TIPO, e só ele.** O cartão já teve um ladrilho com emoji do tipo à
+  esquerda e o fundo inteiro tingido; as duas coisas saíram no mesmo dia em que entraram — com o
+  cartão tingido E o selo colorido, a mesma cor aparecia duas vezes na mesma linha e nenhuma se
+  destacava. O cartão é neutro e o selo carrega a cor.
+- **O selo é o `typePill` DE VERDADE**, o mesmo da Pokédex, da fileira do time e da batalha. Usar
+  a função em vez de recriar a cor é o que garante que Sombrio aqui seja o mesmo marrom de lá — e
+  é isso que o teste tranca (ele compara com `TYPE_COLORS.Rock`, não com um hexadecimal escrito
+  à mão). Dentro do cartão ele sai menor (.5rem, padding 1px 6px); fora, no tamanho do jogo.
+- **O rótulo "Tipo:" saiu.** Ele era redundante ao lado de um selo que o jogo inteiro já usa pra
+  tipo — hoje se lê só "SOMBRIO".
+- **O selo fica EMBAIXO do nome do golpe, em linha própria.** Ao lado dele, a posição do selo
+  dançava de card pra card: era empurrado pra longe quando o nome era comprido ("Deslizamento de
+  Rochas") e colava no nome quando era curto — e é justamente entre dois cards que o olho compara.
+- **O sprite do cabeçalho fica SOLTO, sem ladrilho atrás.** Ele chegou a ter um quadrado cinza
+  claro de fundo e saiu: o sprite já é uma silhueta recortada sobre o creme da caixa, e o ladrilho
+  só acrescentava uma borda que se lia como moldura de imagem faltando.
+- **A frase não é negrito; só o NOME do pokémon é.** Ela inteira em 700 competia com o cartão logo
+  abaixo, que é onde a informação está.
+- **O "Nível N" saiu dos cards da captura.** Ele dizia em que nível a espécie ensina aquele golpe:
+  informação de tabela, e que não ajuda a escolher entre golpes que ele JÁ tem disponíveis.
+- **O texto da captura virou instrução**, não explicação de mecânica: era *"Ele já aprendeu 4
+  golpes até o nível 24, mas só leva 2. Na batalha ele usa sempre o que tirar mais dano dos dois"*
+  e hoje é *"Escolha 2 para permanecer com Qwilfish, o resto será esquecido"*. O que o jogador
+  precisa saber ali é o que fazer e o que ele perde, não como o motor escolhe.
+- **Saiu o `linhaDeGolpe`**, que era o formato antigo: as três telas usam o cartão, e uma função
+  de apresentação sem chamador é exatamente o tipo de coisa que fica anos no arquivo.
+
+### O golpe da forma anterior NÃO se perde na evolução (09/09/2026)
+
+Reportado com o caso exato: a **Staryu aprende Raio de Bolhas no 28 e a Starmie não ensina esse
+golpe em nível nenhum**. Quem evolui com ele tem que continuar com ele, e só dali pra frente passa
+a valer o moveset da forma nova.
+
+- **A evolução em si NUNCA tirou golpe** — medido: o `tryEvolve` troca espécie, tipos e os seis
+  atributos, e não encosta no campo `ataques`. A fila de aprendizado também não tira nada: ela só
+  OFERECE, e quem troca é o jogador na tela.
+- **Quem tirava era a TELA DE ESCOLHA, e só ela.** Ela montava a lista com `ataquesDisponiveis`,
+  que é o moveset da espécie ATUAL — então uma Starmie que passasse por ali veria quatro opções
+  sem o Raio de Bolhas, e o golpe herdado sumia por não estar na tabela da forma nova. O mesmo
+  valia pro auto-preenchimento silencioso (2 ou menos disponíveis), que sobrescrevia o campo.
+- **`ataquesEscolhiveis(p)`** é a lista certa: o que a espécie ensina até aquele nível **mais o
+  que o pokémon já carrega**. As três portas usam ela agora — a tela, o `confirmarAtaques` (que é
+  quem valida de verdade) e o auto-preenchimento.
+- Isso vale pra qualquer degrau, não só o da Staryu: são **13 golpes** que a forma antiga ensina
+  acima do nível da evolução e a nova nunca ensina (ver "O que foi medido e NÃO foi mexido").
+  Continuam inalcançáveis pra quem nunca os teve — o que muda é que quem OS TEM não os perde mais.
+
+### A lista de golpes na ficha da Pokédex (09/09/2026)
+
+Entre o **Total** e o botão Fechar, uma linha por golpe: **nível, nome, poder e tipo**.
+
+- **É a mesma tabela da tela de escolha** (`APRENDIZADO`), então só traz golpe de DANO — o que
+  está ali é exatamente o que ele pode LEVAR pra batalha, e não tudo que a espécie aprende.
+- **Por que ela merece espaço:** os seis números dizem o quanto ele TEM, o golpe especial diz o que
+  ele faz sozinho, e esta lista diz com o que ele bate. É a única das três que o jogador consulta
+  ANTES de capturar, porque é ela que responde "esse aqui cobre o tipo que falta no meu time?" —
+  e a lupa da Pokédex está justamente nas telas de encontro e de evolução.
+- **A lista ROLA POR DENTRO** (`max-height:190px`) em vez de esticar a ficha: sem o teto, o botão
+  Fechar ia parar fora da tela num celular. É o mesmo cuidado do modal de ranking da Torre.
+- **A linha é uma grade de quatro colunas**, não um flex livre: nível e poder alinhados em coluna
+  se comparam de relance, que é pra isso que a lista existe.
+- **Espécie sem golpe nenhum não ganha a seção** — hoje só o Ditto. Uma lista vazia diria menos
+  que nada.
+
+- **As frases são as pedidas, palavra por palavra:** *"Bulbasaur aprendeu um novo golpe!"* e
+  *"Kabuto quer aprender um golpe novo!"* + *"Escolha qual será substituído"*.
+- **A frase anuncia, o cartão informa.** O anúncio já foi uma linha corrida ("Fulano aprendeu
+  CHICOTE DE CIPÓ - Poder 35 - PLANTA") e durou algumas horas: a informação era a mesma, mas
+  espremida numa frase ela se lia como legenda, não como acontecimento.
+- **SAIU o "Aprendido no level N, porém ele já possui 2 golpes".** Ele existia pra justificar a
+  pergunta, e a pergunta se justifica sozinha com os dois golpes atuais logo abaixo. Some junto o
+  caso do golpe destravado pela EVOLUÇÃO, que era quem fazia a linha dizer "level 1" num pokémon
+  de 30 — e o campo `daEvolucao` deixou de ser lido por qualquer tela.
+- **O TIPO CONTINUA POR EXTENSO nos cards de escolha**, e isso é regra da casa que o redesenho
+  quase desfez: a cor sozinha não separa Fantasma de Psíquico, e é justamente entre esses dois que
+  a escolha decide. Ele vem no selo, ao lado do nome do golpe.
+- **Um emoji por tipo no cartão durou uma versão.** O ladrilho colorido com 🌿 / 🔥 / ☠️ à esquerda
+  do nome foi tirado a pedido no mesmo dia: com ele, o cartão tingido e o selo colorido, a cor do
+  tipo aparecia três vezes na mesma linha. Ficou o selo. (Se um dia voltar, o cuidado registrado
+  era: emoji sobrevive à redução, ao contrário da pixel art da home, que perde diagonal fina.)
+- **Os golpes atuais usam o MESMO cartão do golpe novo**, de propósito: é comparação lado a lado,
+  e um formato diferente em cima e embaixo obrigaria a reaprender a ler no meio da decisão.
+- **A 320px:** as três cabem sem rolagem lateral. O nome comprido quebra dentro do cartão
+  (`overflow-wrap:anywhere`) e o poder não se move, porque ele é a coluna que se compara.
+
+### O que foi medido e NÃO foi mexido (09/09/2026)
+
+Achados na mesma varredura, com número, e deixados como estão porque não foi o que se pediu:
+
+- **A tela de escolha ordena e anuncia por PODER CRU**, e o dano multiplica esse número por 1,5
+  (STAB) ou 0,85 (subtipo) — então "Poder" **não é comparável** entre dois golpes do mesmo pokémon,
+  e em **16% das espécies** o primeiro card não é o que mais bate. Este arquivo diz "a tela ordena
+  por poder decrescente justamente porque escolher bem vale 79 pontos"; a ordenação continua como
+  está, mas o número na tela é menos informativo do que parece.
+- **31% das espécies batem MENOS com o melhor par escolhido do que sem golpe nenhum**, porque o
+  motor implícito escolhia entre TODOS os tipos da espécie sempre com poder 60 e STAB 1,5. Como os
+  NPCs continuam no motor implícito, o mesmo Venusaur é ~23% mais forte do lado do líder. É a mesma
+  assimetria já registrada em "A decisão que ficou em aberto", agora com o número por espécie.
+- **O Ginásio da Cidade descarta os golpes na ida pro servidor**: `resolverTimeDosSaves` devolve
+  `ataques`, mas o time vira um **código** (`especie:nivel:shiny`) uma linha depois, e a batalha
+  decodifica dele. Ou seja, a linha deste arquivo que diz que os golpes valem lá **não é verdade
+  hoje**. O conserto tem precedente pronto: os `slots` já viajam **dentro do match** e são
+  carimbados depois do `decodeTeamCode` (`carimbaSlots`) — os golpes cabem no mesmo lugar, sem
+  tocar na trava anti-falsificação do código.
+- **O Doce Raro e a evolução no SERVIDOR sobem nível sem nunca oferecer o golpe novo.**
+  `evoluirNoSave` não conhece `nivelDosAtaques`/`especieDosAtaques`, o que deixa a pendência
+  CORRETA gravada — mas quem a resolve é só o `continueFromEvolution`, e abrir o save não passa por
+  ele (`escolhaDoSavePendente` só cuida da fila da CAPTURA). No save campeão, que é onde o Doce
+  Raro mais é usado, a pergunta nunca chega.
+- **13 golpes ficam inalcançáveis pra LINHA INTEIRA** porque a evolução aqui é sempre automática por
+  nível: o que a forma antiga ensinaria ACIMA do nível da evolução e a nova nunca ensina não tem
+  como ser aprendido (a Starmie é o caso mais duro). É fiel ao jogo original, que também não volta
+  atrás — mas lá existe Everstone.
+
+### A decisão que ficou em aberto
+**Dar golpes aos NPCs também** foi medido e NÃO foi aplicado — não foi o que se pediu, e muda o jogo
+mais do que a feature em si. Com os dois lados usando `ataquesPadrao`, a jornada concluída vai a
+**73,19%** (contra 65,22% do jogo sem golpes e 64,42% da versão implementada; medido antes de a
+evolução destravar, então o número da variante é um piso): **+8 pontos**, e o formato da
+dificuldade se inverte — o Brock cai de 419 pra **182** game overs e o **5º ginásio salta de 26 pra
+172**. Faz sentido: com 2 golpes o time perde cobertura, e isso machuca mais o **líder mono-tipo**
+do que o time variado do jogador. Se um dia isso for feito, é aqui que o número está.
 
 ## Log de batalha
 

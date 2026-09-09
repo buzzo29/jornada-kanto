@@ -106,6 +106,28 @@ function act(g, log){
       return true;
     }
     case 'eeveeChoice':  g.chooseEeveeEvolution(['keep','vaporeon','jolteon','flareon'][Math.floor(Math.random()*4)]); return true;
+    /* OS DOIS GOLPES DO RECEM-CAPTURADO. O bot leva OS DOIS QUE MAIS BATEM, que e o mesmo criterio
+       do ataquesPadrao -- e nao um sorteio: a medicao de dificuldade tem que refletir o jogador que
+       escolhe bem, senao ela mede a sorte do bot. */
+    case 'escolhaDeAtaques': {
+      const p = g.__getGame().team.find(x => x.id === g.__getGame().escolhaDeAtaques);
+      g.ataquesPadrao(p).forEach(id => g.marcarAtaque(id));
+      g.confirmarAtaques();
+      return true;
+    }
+    /* GOLPE NOVO PELO NIVEL: o bot aprende se o novo bater mais que o pior que ele tem, e recusa se
+       nao. E a decisao que um jogador razoavel toma, e ela exercita os dois ramos. */
+    /* A tela de ANUNCIO ('aprendeu um golpe') nao tem escolha: so um Continuar. Ela e nova em
+       09/09/2026 e sem este caso o bot para na primeira vaga livre -- que e o segundo golpe de
+       todos os sete iniciais, ou seja, quase toda jornada. */
+    case 'golpeAprendido': g.seguirDoGolpeAprendido(); return true;
+    case 'aprenderAtaque': {
+      const pend = g.__getGame().aprenderAtaque;
+      const p = g.__getGame().team.find(x => x.id === pend.id);
+      const pior = p.ataques.slice().sort((a,b)=> g.GOLPES[a][1] - g.GOLPES[b][1])[0];
+      g.responderAprendizado(g.GOLPES[pend.golpe][1] > g.GOLPES[pior][1] ? pior : null);
+      return true;
+    }
     case 'levels': {
       // um bot que espalha pontos aleatoriamente perde em Brock e nunca vê o resto do jogo.
       // Este aqui joga como gente: concentra nos primeiros da ordem até bater no teto.

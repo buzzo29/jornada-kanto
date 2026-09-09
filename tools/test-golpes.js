@@ -86,8 +86,16 @@ console.log('\n=== É MESMO A GEN 2, NÃO A GERAÇÃO DE HOJE ===');
 
 console.log('\n=== OS APRENDIZADOS FAMOSOS, CONFERIDOS UM A UM ===');
 {
-  ok('Bulbasaur', seq('bulbasaur') === '1:Tackle 4:Growl 7:Leech Seed 10:Vine Whip 15:Poison Powder 15:Sleep Powder 20:Razor Leaf 25:Sweet Scent 32:Growth 39:Synthesis 46:Solar Beam', seq('bulbasaur'));
-  ok('Charmander', seq('charmander') === '1:Growl 1:Scratch 7:Ember 13:Smokescreen 19:Rage 25:Scary Face 31:Flamethrower 37:Slash 43:Dragon Rage 49:Fire Spin', seq('charmander'));
+  /* O BULBASAUR carrega DUAS coisas de uma vez, e é por isso que ele é a primeira linha aqui:
+     o aprendizado da Gen 3 (Pó Venenoso e Sonífero no 15, Sweet Scent no 25) e a Bomba de Lodo no
+     46, que NÃO vem do aprendizado por nível -- ela foi acrescentada pela regra de cobertura de
+     tipo (ver o passo 3 do gerador). Ele é Grama/Veneno e não aprendia um só golpe de dano de
+     Veneno por nível em geração nenhuma; no FireRed isso se resolve pela TM36, e é dela que a
+     Bomba de Lodo saiu. Se esta linha cair, ou a fonte mudou ou a regra de cobertura parou. */
+  ok('Bulbasaur', seq('bulbasaur') === '1:Tackle 4:Growl 7:Leech Seed 10:Vine Whip 15:Poison Powder 15:Sleep Powder 20:Razor Leaf 25:Sweet Scent 32:Growth 39:Synthesis 46:Sludge Bomb 46:Solar Beam', seq('bulbasaur'));
+  /* O CHARMANDER é a prova de que a fonte é a GEN 3 e não a Gen 2: Garra de Metal no 13 não existe
+     antes da Gen 3 (o golpe é da Gen 2, mas o Charmander só passa a aprendê-lo no FireRed). */
+  ok('Charmander', seq('charmander') === '1:Growl 1:Scratch 7:Ember 13:Metal Claw 13:Smokescreen 19:Rage 25:Scary Face 31:Flamethrower 37:Slash 43:Dragon Rage 49:Fire Spin', seq('charmander'));
   ok('Squirtle', seq('squirtle') === '1:Tackle 4:Tail Whip 7:Bubble 10:Withdraw 13:Water Gun 18:Bite 23:Rapid Spin 28:Protect 33:Rain Dance 40:Skull Bash 47:Hydro Pump', seq('squirtle'));
   ok('Pikachu', seq('pikachu') === '1:Growl 1:Thunder Shock 6:Tail Whip 8:Thunder Wave 11:Quick Attack 15:Double Team 20:Slam 26:Thunderbolt 33:Agility 41:Thunder 50:Light Screen', seq('pikachu'));
   /* O RATATA é o único id que não bate com o do Showdown (o jogo escreve com um T só). Se o mapa
@@ -121,13 +129,20 @@ console.log('\n=== CRUZAMENTO COM AS LISTAS QUE O JOGO JÁ TINHA ===');
   /* AS DIVERGÊNCIAS CONHECIDAS, FIXADAS. Elas não são "erro do teste": são pontos em que a lista
      à mão do jogo e o aprendizado por nível da Gen 2 discordam, e cada uma tem um motivo diferente.
      Ficam aqui pra que MUDAR qualquer um dos dois lados seja barulhento. */
+  /* ERAM NOVE NA GEN 2 E VIRARAM SETE. As duas que sumiram valem por motivos DIFERENTES, e a
+     diferença importa:
+       - sono:yanma  -- resolvida pela FONTE. O comentário antigo aqui dizia "Hipnose só a partir
+         da Gen 3", e agora a base É a Gen 3: o Yanma aprende Hipnose no nível 23. A lista à mão
+         estava certa o tempo todo; quem estava atrás era o dado.
+       - drenagem:exeggutor -- resolvida por ACRÉSCIMO NOSSO, não pela Gen 3. O Exeggutor é
+         Grama/Psíquico e não tinha golpe de dano de Grama; a regra de cobertura de tipo lhe deu
+         Giga Dreno no 30, que por acaso é um golpe de drenagem. O Exeggcute continua divergindo,
+         porque ele é Grama/Psíquico também mas já tinha Grama coberto. */
   const divergencias = [
     'disable:igglybuff',        // o Jigglypuff aprende Disable no 14; o bebê não aprende nenhum
     'drenagem:exeggcute',       // o que ele tem é Leech Seed -- a mesma razão que já tirou o Bulbasaur
-    'drenagem:exeggutor',
     'metronomo:cleffa',         // os 4 do metrônomo foram PEDIDOS, não tirados do aprendizado
     'metronomo:snubbull',
-    'sono:yanma',               // Hipnose só a partir da Gen 3
     'sono:misdreavus',
     'sono:vileplume',           // herdam o Pó do Sono do Gloom; como Vileplume não aprendem nada
     'sono:bellossom'
@@ -136,7 +151,7 @@ console.log('\n=== CRUZAMENTO COM AS LISTAS QUE O JOGO JÁ TINHA ===');
     .concat(r.flatMap(x => x.faltam.map(id => x.nome.replace('ô','o').replace('ç','c').replace('ã','a') + ':' + id)))
     .concat(sonoRuim.map(x => 'sono:' + x[0]))
     .sort();
-  ok('as divergências são EXATAMENTE as nove conhecidas', achadas.join(' ') === divergencias.join(' '),
+  ok('as divergências são EXATAMENTE as sete conhecidas', achadas.join(' ') === divergencias.join(' '),
      achadas.length === divergencias.length ? achadas.length + ' divergências' : ('achei: ' + achadas.join(' ')));
 }
 

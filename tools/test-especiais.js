@@ -1152,8 +1152,12 @@ function timeAleatorio(rng, n){
   }
   return t;
 }
+/* O playerMoveId/enemyMoveId entra no resumo porque e ele que prova que os dois motores
+   ESCOLHERAM o mesmo golpe -- dois golpes de tipos diferentes podem dar o mesmo dano, e sem o id a
+   comparacao daria verde com o cliente batendo de Raio e o servidor de Investida. */
 const resumo = r => (r.win?'W':'L') + '|' + (r.matchups||[]).map(m =>
   m.playerSpecies+':'+m.playerHpAfter+'/'+m.enemySpecies+':'+m.enemyHpAfter+':' +
+  (m.playerMoveId||'-')+'/'+(m.enemyMoveId||'-')+':' +
   (m.golpes||[]).map(g=>(g.x||'')+g.d).join(',')).join(';');
 let divergencias = 0, comEspecial = 0;
 for(let i=0;i<300;i++){
@@ -1163,11 +1167,18 @@ for(let i=0;i<300;i++){
      batalhas cobrem os cinco, dos dois lados do motor. */
   const itemDaVez = ['hp_up','atk_up','def_up','spatk_up','spdef_up'][i % 5];
   const equipa = (time, fn) => { fn([time[0]], { [S.raizDaLinha(time[0].speciesId)]: itemDaVez }); return time; };
-  const timeC = equipa(t1.map(p=>inst(p.id,p.level)), S.equiparItens);
-  const timeS = equipa(t1.map(p=>srv._createInstance(p.id,p.level)), srv._equiparItens);
-  const rC = S.simulateGymBattle(timeC, t2.map(p=>inst(p.id,p.level)), S.makeSeededRng('m'+i));
+  /* OS GOLPES ESCOLHIDOS entram nos DOIS lados e nos DOIS motores. Sem isto a comparacao nunca
+     tocaria no melhorAtaque nem no poder por golpe: ela lutaria com o motor de tipo dos dois lados,
+     e uma divergencia ali so apareceria em producao -- o mesmo motivo pelo qual ela equipa um item
+     de atributo diferente a cada volta.
+     METADE DAS VOLTAS VAI SEM GOLPE de proposito: e o caminho do save antigo e das 8 especies que
+     nao aprendem golpe de dano nenhum, e os dois motores tem que bater nele tambem. */
+  const comGolpes = p => { if(i % 2 === 0) p.ataques = S.ataquesPadrao(p); return p; };
+  const timeC = equipa(t1.map(p=>comGolpes(inst(p.id,p.level))), S.equiparItens);
+  const timeS = equipa(t1.map(p=>comGolpes(srv._createInstance(p.id,p.level))), srv._equiparItens);
+  const rC = S.simulateGymBattle(timeC, t2.map(p=>comGolpes(inst(p.id,p.level))), S.makeSeededRng('m'+i));
   const rS = srv._simulateGymBattle(timeS,
-                                    t2.map(p=>srv._createInstance(p.id,p.level)), srv._makeSeededRng('m'+i));
+                                    t2.map(p=>comGolpes(srv._createInstance(p.id,p.level))), srv._makeSeededRng('m'+i));
   if((rC.matchups||[]).some(m=>(m.golpes||[]).some(g=>g.x))) comEspecial++;
   if(resumo(rC) !== resumo(rS)) divergencias++;
 }

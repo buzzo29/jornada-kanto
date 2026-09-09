@@ -486,7 +486,61 @@ function tiposDeAtaque(p, alvo){
   const proprios = tiposProprios(p, alvo);
   return proprios.concat(subtiposDe(p).filter(t => !proprios.includes(t)));
 }
+
+/* ===================== OS GOLPES DO POKÉMON =====================
+   Cada pokémon carrega até DOIS golpes escolhidos pelo jogador (p.ataques). Quem tem golpe usa a
+   escolha; quem NÃO tem cai no motor de sempre -- e isso não é migração preguiçosa, é o desenho:
+     - save antigo (todo pokémon que já existe hoje) continua lutando exatamente como lutava, e
+     - OITO espécies não aprendem UM ÚNICO golpe de dano por nível em nível nenhum (Kakuna,
+       Metapod, Abra, Ditto, Unown, Wobbuffet, Delibird, Smeargle -- o que elas têm é Harden,
+       Teleport, Transform, Sketch...). Sem a queda pro motor antigo elas ficariam sem atacar.
+   A diferença que o golpe traz é o PODER: hoje todo golpe vale 60 (MOVE_POWER). Com golpe
+   escolhido, vale o poder dele -- de 10 (Constrição) a 150 (Hiper Raio). */
+function melhorAtaque(attacker, defender){
+  const meus = attacker.ataques;
+  if(!Array.isArray(meus) || !meus.length) return null;
+  let candidatos = meus.filter(id => GOLPES[id]);
+  if(!candidatos.length) return null;
+  const proprios = tiposProprios(attacker, defender);
+  /* DISABLE tira o TIPO, não o golpe -- é como ele já funciona no resto do motor. Quem levou os
+     dois golpes do mesmo tipo perde os dois, e aí a anulação simplesmente não vale: a regra da
+     casa é que ela só morde quem TEM alternativa. */
+  if(attacker._anulado && attacker._anulado.contra === defender){
+    const sobra = candidatos.filter(id => GOLPES[id][0] !== attacker._anulado.tipo);
+    if(sobra.length) candidatos = sobra;
+  }
+  const avalia = (id, multForcado) => {
+    const tipo = GOLPES[id][0], poder = GOLPES[id][1];
+    let mult = 1;
+    (defender.types || []).forEach(d => { mult *= typeVsType(tipo, d); });
+    if(multForcado != null) mult = multForcado;
+    const especial = isSpecialType(tipo);
+    const proprio = proprios.indexOf(tipo) >= 0;
+    const atk = especial ? effectiveSpAtk(attacker) : effectiveAttack(attacker);
+    const def = especial ? effectiveSpDef(defender) : effectiveDefense(defender);
+    /* A NOTA é o dano relativo: poder × tipo × STAB × (ataque/defesa). É a mesma conta do
+       bestAttackType com o poder acrescentado -- e é ela que faz "o que tira mais dano" ser
+       escolhido de verdade, e não "o melhor tipo". */
+    return { golpe:id, type:tipo, poder:poder, mult:mult, stab:proprio,
+             nota: poder * Math.pow(mult, EXPOENTE_TIPO) * (proprio ? 1.5 : SUBTYPE_PENALTY)
+                   * (atk / Math.max(1, def)) };
+  };
+  let melhor = null;
+  for(const id of candidatos){ const n = avalia(id); if(!melhor || n.nota > melhor.nota) melhor = n; }
+  /* GOLPE TEIMOSO: quando NENHUM golpe dele machuca o alvo, o melhor sai com o multiplicador
+     reduzido em vez do piso de 1 de dano. Com tudo zerado as notas empatam em 0, então a escolha
+     é refeita -- exatamente como o bestAttackType já fazia pros tipos. */
+  if(melhor && melhor.mult === 0){
+    let teimoso = null;
+    for(const id of candidatos){ const n = avalia(id, IMUNIDADE_TEIMOSA); if(!teimoso || n.nota > teimoso.nota) teimoso = n; }
+    if(teimoso){ teimoso.nulo = true; return teimoso; }
+  }
+  return melhor;
+}
 function bestAttackType(attacker, defender){
+  /* Tem golpe escolhido? A escolha é entre ELES. Senão, o motor de tipo de sempre, logo abaixo. */
+  const doJogador = melhorAtaque(attacker, defender);
+  if(doJogador) return doJogador;
   const proprios = tiposProprios(attacker, defender);
   let candidatos = tiposDeAtaque(attacker, defender);
   /* DISABLE: o melhor golpe deste atacante contra ESTE adversário saiu de cena, e ele cai no
@@ -755,7 +809,55 @@ function effectiveSpeed(p){
 function calcMaxHp(p){ return Math.round(30 + p.level*5 + effectiveBaseHp(p)); }
 // HP na escala Gen 1 -- usado só internamente, pra converter o dano em fração da vida
 function gen1MaxHp(p){ return Math.floor(2 * effectiveBaseHp(p) * p.level / 100) + p.level + 10; }
-const MOVE_POWER = 60;
+/* GOLPES (id -> [tipo, poder]) -- a SEXTA tabela duplicada. A cópia do index.html tem que ser
+   IDÊNTICA a esta: o dano roda dos dois lados, e divergir aqui é a mesma batalha com resultado
+   diferente no cliente e no servidor. tools/test-golpes.js compara as duas.
+   O nome em português e o aprendizado por nível NÃO vêm pra cá: nome é apresentação, e o servidor
+   nunca precisa saber quem aprende o quê -- os golpes escolhidos viajam na instância. */
+const GOLPES = {
+  absorb:['Grass',20],acid:['Poison',40],aerialace:['Flying',60],aeroblast:['Flying',100],
+  aircutter:['Flying',55],ancientpower:['Rock',60],astonish:['Ghost',30],aurorabeam:['Ice',65],
+  barrage:['Normal',15],beatup:['Dark',10],bind:['Normal',15],bite:['Dark',60],
+  blizzard:['Ice',120],bodyslam:['Normal',85],boneclub:['Ground',65],bonemerang:['Ground',50],
+  bonerush:['Ground',25],bounce:['Flying',85],brickbreak:['Fighting',75],bubble:['Water',20],
+  bubblebeam:['Water',65],bulletseed:['Grass',10],clamp:['Water',35],cometpunch:['Normal',18],
+  confusion:['Psychic',50],constrict:['Normal',10],covet:['Normal',40],crabhammer:['Water',90],
+  crosschop:['Fighting',100],crunch:['Dark',80],dig:['Ground',60],dive:['Water',60],
+  dizzypunch:['Normal',70],doubleedge:['Normal',120],doublekick:['Fighting',30],
+  doubleslap:['Normal',15],dragonbreath:['Dragon',60],dreameater:['Psychic',100],
+  drillpeck:['Flying',80],dynamicpunch:['Fighting',100],earthquake:['Ground',100],
+  eggbomb:['Normal',100],ember:['Fire',40],extremespeed:['Normal',80],fakeout:['Normal',40],
+  falseswipe:['Normal',40],feintattack:['Dark',60],fireblast:['Fire',120],firepunch:['Fire',75],
+  firespin:['Fire',15],flamethrower:['Fire',95],flamewheel:['Fire',60],furyattack:['Normal',15],
+  furycutter:['Bug',10],furyswipes:['Normal',18],futuresight:['Psychic',80],gigadrain:['Grass',60],
+  gust:['Flying',40],headbutt:['Normal',70],heatwave:['Fire',100],highjumpkick:['Fighting',85],
+  hornattack:['Normal',65],hydropump:['Water',120],hyperbeam:['Normal',150],
+  hyperfang:['Normal',80],hypervoice:['Normal',90],iceball:['Ice',30],icebeam:['Ice',95],
+  icepunch:['Ice',75],iciclespear:['Ice',10],icywind:['Ice',55],irontail:['Steel',100],
+  jumpkick:['Fighting',70],karatechop:['Fighting',50],knockoff:['Dark',20],leechlife:['Bug',20],
+  lick:['Ghost',20],machpunch:['Fighting',40],magicalleaf:['Grass',60],megadrain:['Grass',40],
+  megahorn:['Bug',120],megakick:['Normal',120],megapunch:['Normal',80],metalclaw:['Steel',50],
+  meteormash:['Steel',100],mudshot:['Ground',55],mudslap:['Ground',20],octazooka:['Water',65],
+  outrage:['Dragon',90],payday:['Normal',40],peck:['Flying',35],petaldance:['Grass',70],
+  pinmissile:['Bug',14],poisonfang:['Poison',50],poisonsting:['Poison',15],pound:['Normal',40],
+  powdersnow:['Ice',40],psybeam:['Psychic',65],psychic:['Psychic',90],pursuit:['Dark',40],
+  quickattack:['Normal',40],rage:['Normal',20],rapidspin:['Normal',20],razorleaf:['Grass',55],
+  revenge:['Fighting',60],rockblast:['Rock',25],rockslide:['Rock',75],rockthrow:['Rock',50],
+  rollingkick:['Fighting',60],rollout:['Rock',30],sacredfire:['Fire',100],sandtomb:['Ground',15],
+  scratch:['Normal',40],shadowball:['Ghost',80],shadowpunch:['Ghost',60],signalbeam:['Bug',75],
+  silverwind:['Bug',60],skullbash:['Normal',100],skyattack:['Flying',140],
+  skyuppercut:['Fighting',85],slam:['Normal',80],slash:['Normal',70],sludge:['Poison',65],
+  sludgebomb:['Poison',90],smog:['Poison',20],snore:['Normal',40],solarbeam:['Grass',120],
+  spark:['Electric',65],spikecannon:['Normal',20],steelwing:['Steel',70],stomp:['Normal',65],
+  submission:['Fighting',80],superpower:['Fighting',120],swift:['Normal',60],tackle:['Normal',35],
+  takedown:['Normal',90],thrash:['Normal',90],thunder:['Electric',120],thunderbolt:['Electric',95],
+  thunderpunch:['Electric',75],thundershock:['Electric',40],triattack:['Normal',80],
+  triplekick:['Fighting',10],twineedle:['Bug',25],twister:['Dragon',40],uproar:['Normal',50],
+  vinewhip:['Grass',35],visegrip:['Normal',55],vitalthrow:['Fighting',70],waterfall:['Water',80],
+  watergun:['Water',40],waterpulse:['Water',60],wingattack:['Flying',60],wrap:['Normal',15],
+  zapcannon:['Electric',100]
+};
+const MOVE_POWER = 60;   // o poder de quem NÃO tem golpe escolhido (save antigo, e as 8 espécies sem golpe de dano)
 const DMG_CAP_PCT = 0.65;
 const DMG_CAP_PCT_CRIT = 0.70;
 function statAtLevel(base, level){ return Math.floor(2*base*level/100) + 5; }
@@ -775,6 +877,7 @@ function calcDamage(attacker, defender, rng){
      O tipo escolhido não depende de HP (só de atributos e tipos, que não mudam durante o
      confronto), então na prática ele é o mesmo do começo ao fim da luta entre esses dois. */
   attacker.lastMoveType = best.type;
+  attacker.lastMove = best.golpe || null;   // qual GOLPE saiu -- vai pro log
   const mult = best.mult;
   const special = isSpecialType(best.type);
   // STAB só pro tipo próprio; subtipo perde o bônus e ainda leva o redutor
@@ -791,7 +894,8 @@ function calcDamage(attacker, defender, rng){
      efeito", senão o jogador vê um -1 sem explicação. */
   attacker.lastMoveNulo = !!best.nulo;
   const Leff = isCrit ? attacker.level*2 : attacker.level;  // crítico dobra o nível na fórmula
-  const core = Math.floor(Math.floor(2*Leff/5 + 2) * MOVE_POWER * A / D / 50) + 2;
+  const potencia = best.poder || MOVE_POWER;   // o poder do GOLPE escolhido, ou o implícito de sempre
+  const core = Math.floor(Math.floor(2*Leff/5 + 2) * potencia * A / D / 50) + 2;
   // multiplicador de tipo COMPRIMIDO (^0.6): 2x vira ~1.5x. Aqui não se troca de pokémon no meio
   // do confronto, então tipo não pode ser sentença de morte
   const typeMult = Math.pow(mult, EXPOENTE_TIPO);
@@ -1299,6 +1403,11 @@ function simulateGymBattle(team, enemyTeam, rng, opts){
         playerWon,
         // tipo do golpe de cada lado -- o cliente traduz em nome de golpe no log
         playerMove: active.lastMoveType || null, enemyMove: enemy.lastMoveType || null,
+        /* O ID do golpe escolhido, quando existe. O tipo continua vindo junto e é ele que dá a COR
+           do selo; o id só troca a PALAVRA -- e ela some sozinha em confronto de quem não tem golpe
+           escolhido (save antigo, as 8 espécies sem golpe de dano), que aí cai no nomeDoGolpe de
+           sempre. Log gravado antes deste campo não perde nada. */
+        playerMoveId: active.lastMove || null, enemyMoveId: enemy.lastMove || null,
         golpes: diario,   // passo a passo do confronto, na ordem em que aconteceu
         playerHpBefore, playerHpAfter: active.hp, playerMaxHp: active.maxHp,
         enemyHpBefore, enemyHpAfter: enemy.hp, enemyMaxHp: enemy.maxHp,
@@ -4460,6 +4569,11 @@ async function resolverTimeDosSaves(uid, escolhidos, tamanho, ondeErro, minimo){
        o Venusaur do slot 11 usaria o item do Venusaur do slot 5. */
     time.push({ speciesId: real.speciesId, level: real.level, shiny: !!real.shiny,
                 slotDaConta: String(achado.slot),
+                /* OS GOLPES viajam junto: eles são escolha do jogador e vivem na instância do
+                   save. Sem esta linha, a Torre e o Ginásio da Cidade lutariam com o motor de
+                   tipo enquanto a jornada luta com os golpes escolhidos -- o mesmo pokémon com
+                   dois comportamentos. */
+                ataques: Array.isArray(real.ataques) ? real.ataques.slice(0, 2) : null,
                 chave: chaveDoPokemonNaConta(achado.slot, real) });
   }
   return time;
@@ -4506,6 +4620,9 @@ exports.fightTrainerTowerFloor = onCall(async (request) => {
        pro Venusaur de outro. Subida antiga (gravada antes do campo) fica sem -- aí o itemEquipado
        cai na chave velha, sem slot, que é como ela sempre funcionou. */
     inst.slotDaConta = (p.slotDaConta != null) ? String(p.slotDaConta) : null;
+    /* Nem os golpes: o createInstance monta do zero. Subida gravada antes desta feature fica sem,
+       e aí o motor cai no de tipo -- que é como ela sempre lutou. */
+    if(Array.isArray(p.ataques)) inst.ataques = p.ataques.slice(0, 2);
     return inst;
   });
   const timeNpc = andar.team.map(p => createInstance(p.speciesId, p.level));
@@ -5478,6 +5595,7 @@ function battleResolveMatchup(estado, rng){
     playerAliveBefore:aVivosAntes, playerAliveAfter: aCaiu?aVivosAntes-1:aVivosAntes, playerTeamSize:estado.aTeam.length,
     enemyAliveBefore:bVivosAntes, enemyAliveAfter: bCaiu?bVivosAntes-1:bVivosAntes, enemyTeamSize:estado.bTeam.length,
     playerMove: a.lastMoveType || null, enemyMove: b.lastMoveType || null,
+    playerMoveId: a.lastMove || null, enemyMoveId: b.lastMove || null,
     golpes: diario   // passo a passo do confronto, na ordem em que aconteceu
   };
 }
@@ -6850,6 +6968,7 @@ function simulateBossFight(team, boss, opts){
       isTrade: bossCaiu && activeCaiu, suddenDeath:false, suddenDeathMessage:null,
       playerWon: bossCaiu && !activeCaiu,
       playerMove: active.lastMoveType || null, enemyMove: boss.lastMoveType || null,
+      playerMoveId: active.lastMove || null, enemyMoveId: boss.lastMove || null,
       golpes: diario,
       playerHpBefore, playerHpAfter: active.hp, playerMaxHp: active.maxHp,
       enemyHpBefore, enemyHpAfter: Math.max(0, boss.hp), enemyMaxHp: boss.maxHp,

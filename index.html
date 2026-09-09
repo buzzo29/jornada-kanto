@@ -847,6 +847,64 @@
   .order-info{flex:1;min-width:0;}
   .order-info .mon-name{font-weight:800;font-size:.9rem;display:block;}
   .order-info .mon-sub{font-size:.7rem;display:block;margin-top:2px;}
+  /* Os selos de GOLPE saem menores que os de tipo: são dois NOMES por linha ("Deslizamento de
+     Rochas" tem 22 letras) numa coluna que a 320px mede ~180px. No tamanho dos selos de tipo, um
+     par de nomes compridos quebrava em três linhas e a fileira do time dobrava de altura. */
+  /* AS DUAS TELAS DE GOLPE NOVO (anúncio e troca) dividem os MESMOS três blocos -- cabeçalho,
+     cartão do golpe e selo do tipo. Uma cópia só: as duas telas contam a mesma coisa, e quando
+     eram montadas em separado a de troca já tinha divergido no texto e no tamanho da fonte.
+     O cartão é tingido pelo TIPO do golpe (mesma cor do selo do log e da fileira do time), então
+     a tela inteira muda de cor conforme o golpe -- é o que faz o tipo se ler antes da palavra. */
+  .golpe-cab{display:flex;align-items:center;gap:12px;}
+  /* O sprite fica SOLTO, sem ladrilho atrás. Ele chegou a ter um quadrado cinza claro de fundo e
+     saiu a pedido: o sprite já é uma silhueta recortada sobre o creme da caixa, e o ladrilho só
+     acrescentava uma borda que o olho lia como moldura de imagem faltando. */
+  .golpe-cab-sprite{
+    flex-shrink:0;width:76px;height:76px;
+    display:flex;align-items:center;justify-content:center;
+  }
+  /* A FRASE NÃO É NEGRITO -- só o NOME do pokémon é. Ela inteira em 700 competia com o cartão
+     logo abaixo, que é onde a informação está. */
+  .golpe-cab-txt{font-size:1rem;font-weight:400;line-height:1.35;color:var(--ink);}
+  .golpe-cab-txt strong{color:var(--blue);font-weight:800;}
+  /* O CARTÃO: ícone do tipo, nome do golpe, e o poder separado por um risco. O poder fica à
+     direita e não embaixo do nome porque é o número que se compara entre dois golpes -- alinhado
+     numa coluna, os dois cartões da tela de troca se leem de relance. */
+  .golpe-cartao{
+    display:flex;align-items:center;gap:10px;
+    border-radius:10px;padding:8px 10px;margin-top:14px;
+    background:rgba(26,26,46,.05);border:2px solid rgba(26,26,46,.12);
+  }
+  .golpe-cartao-nome{
+    flex:1;min-width:0;font-weight:800;font-size:.95rem;line-height:1.15;
+    text-transform:uppercase;color:var(--ink);overflow-wrap:anywhere;
+  }
+  /* O selo do tipo DENTRO do cartão fica EMBAIXO do nome, em linha própria: ao lado dele, o selo
+     era empurrado pra longe quando o nome era comprido ("Deslizamento de Rochas") e colava no
+     nome quando era curto -- a posição dele dançava de card pra card, e é justamente entre dois
+     cards que o olho compara. Ele sai menor que o padrão do jogo porque ali quem manda é o nome. */
+  .golpe-cartao .type-pill{display:block;width:fit-content;margin:4px 0 0;font-size:.5rem;padding:1px 6px;letter-spacing:.2px;}
+  .golpe-cartao-poder{flex-shrink:0;text-align:center;padding-left:10px;border-left:2px solid rgba(26,26,46,.12);}
+  .golpe-cartao-poder span{display:block;font-size:.5rem;font-weight:800;letter-spacing:.5px;color:var(--muted);}
+  .golpe-cartao-poder b{display:block;font-size:1.25rem;font-weight:800;color:var(--ink);line-height:1.1;}
+  /* O separador entre dois pokémon no mesmo anúncio -- a mesma linha tracejada que a fileira
+     do time e a caixa da Elite já usam. */
+  .golpe-sep{border:0;border-top:2px dashed rgba(26,26,46,.25);margin:16px 0 0;}
+  /* A pergunta da tela de troca: sem esta folga ela encosta no selo do tipo e os dois se leem
+     como um bloco só -- e ela é a única linha da tela que pede uma AÇÃO. */
+  .golpe-pergunta{margin:14px 0 0;font-weight:700;}
+  /* Os golpes que ele JÁ tem, na tela de troca: o mesmo cartão dentro de um botão. O .btn traz
+     centralização e fonte próprias, então o cartão precisa desligar as duas -- senão o nome sai
+     no meio e o número de poder herda o tamanho do botão. */
+  .btn.golpe-opcao{text-align:left;padding:6px 8px;font-size:1rem;}
+  .btn.golpe-opcao .golpe-cartao{margin-top:0;border:none;background:transparent !important;}
+  .btn.golpe-opcao .golpe-cartao-nome, .btn.golpe-opcao .golpe-cartao-poder b{color:var(--ink);}
+  .golpes-do-time{margin-top:2px;}
+  .golpes-do-time .type-pill{font-size:.5rem;padding:2px 5px;}
+  /* O selo do golpe ESPECIAL (Metrônomo) vai tracejado e um pouco apagado: os selos cheios ao lado
+     querem dizer "o jogador escolheu estes", e o especial não é escolha -- é o que a espécie faz
+     sozinha. Mesma largura e mesma altura, então não custa um pixel na fileira. */
+  .golpes-do-time .golpe-especial{border:1px dashed rgba(255,255,255,.85);opacity:.85;}
   .order-controls{display:flex;flex-direction:column;gap:4px;flex-shrink:0;}
   .order-controls .circle-btn{width:28px;height:28px;font-size:.85rem;}
   /* variante pra linhas com até 3 controles (setas + reviver/curar) -- em coluna única ficava alto
@@ -2013,6 +2071,22 @@
   .dex-especiais-tit{ font-size:.55rem; font-weight:800; color:var(--muted); letter-spacing:.04em; margin-bottom:6px; }
   .dex-especial{ display:flex; align-items:center; justify-content:center; gap:8px; margin-bottom:4px; flex-wrap:wrap; }
   .dex-especial-chance{ font-size:.6rem; color:var(--muted); }
+  /* A LISTA DE GOLPES da ficha. Ela ROLA POR DENTRO (max-height) em vez de esticar a ficha: um
+     Nidoking aprende 11 golpes de dano, e sem o teto o botão Fechar ia parar fora da tela num
+     celular -- o mesmo cuidado do modal de ranking da Torre.
+     A linha é uma grade de quatro colunas e não um flex livre: o nível e o poder alinhados em
+     coluna se comparam de relance, que é pra isso que a lista existe. */
+  .dex-golpes{ border-top:2px solid var(--box-border); margin-top:10px; padding-top:10px; }
+  .dex-golpes-lista{ max-height:190px; overflow-y:auto; text-align:left; }
+  .dex-golpe{
+    display:grid; grid-template-columns:38px 1fr auto auto; align-items:center; gap:6px;
+    padding:3px 0; border-bottom:1px dashed rgba(26,26,46,.15);
+  }
+  .dex-golpe:last-child{ border-bottom:0; }
+  .dex-golpe-nivel{ font-size:.55rem; font-weight:800; color:var(--muted); }
+  .dex-golpe-nome{ font-size:.62rem; font-weight:800; color:var(--ink); overflow-wrap:anywhere; }
+  .dex-golpe-poder{ font-size:.62rem; font-weight:800; color:var(--ink); }
+  .dex-golpe .type-pill{ font-size:.45rem; padding:1px 5px; margin-right:0; }
   .dex-ficha-nome{font-family:var(--font-pixel);font-size:.8rem;margin:8px 0 2px;line-height:1.5;}
   .dex-ficha-num{font-size:.7rem;font-weight:800;color:var(--muted);}
   .dex-ficha-tipos{display:flex;gap:5px;justify-content:center;margin:8px 0 12px;flex-wrap:wrap;}
@@ -3680,7 +3754,12 @@ function freshGameDefaults(){
     team:[],
     releaseSelected:[],
     releaseDepois:null,    // pra onde ir depois do Prof. Carvalho ('gymApproach' no resgate da Rocket)
-    evolucaoDepois:null,   // pra onde ir depois da tela de evolução (ver seguirDoResultado)
+    evolucaoDepois:null,
+    escolhaDeAtaques:null, // id do pokémon que está escolhendo os 2 golpes (ver resolverEscolhaDeAtaques)
+    escolhaDepois:null,    // pra qual tela voltar quando a fila de escolha esvaziar (save antigo)
+    ataquesMarcados:[],    // o que ele marcou na tela, antes de confirmar
+    aprenderAtaque:null,   // {id, golpe, nivel} -- o golpe novo esperando resposta   // pra onde ir depois da tela de evolução (ver seguirDoResultado)
+    golpesAprendidos:[],   // o que entrou de graça nesta passada, esperando o anúncio (ver anunciarGolpesAprendidos)
     resgatadoSemVaga:null, // resgatado da Rocket esperando a tela do Prof. Carvalho (time já com 6)
     pool:20,
     poolTotal:20,
@@ -4081,6 +4160,17 @@ function hydrateTeamMember(p){
   if(typeof p.speed !== 'number') p.speed = sp.speed;
   if(typeof p.maxHp !== 'number') p.maxHp = 0;
   if(typeof p.hp !== 'number') p.hp = 0;
+  /* OS GOLPES: quem vem de um save gravado ANTES desta feature não tem nenhum, e ELE ESCOLHE --
+     recebe a mesma tela da captura, uma por pokémon, ao abrir o save (ver escolhaDoSavePendente).
+     Escolher pelo jogador seria decidir no lugar dele a decisão mais forte do jogo: medido, o par
+     de golpes vale 79 pontos de taxa de vitória entre o melhor e o pior.
+     Quem tem 2 ou menos disponíveis não vê tela nenhuma -- o resolverEscolhaDeAtaques preenche
+     sozinho, porque ali não há escolha.
+     O nivelDosAtaques marca até onde já foi oferecido: sem ele, um pokémon nível 40 que abrisse o
+     save receberia de uma vez a pergunta de todos os golpes que aprendeu no caminho. */
+  if(!Array.isArray(p.ataques) && !p.escolherAtaques) p.escolherAtaques = true;
+  if(typeof p.nivelDosAtaques !== 'number') p.nivelDosAtaques = p.level;
+  if(typeof p.especieDosAtaques !== 'string') p.especieDosAtaques = p.speciesId;
   return p;
 }
 function hydrateTeam(team){ return (team||[]).map(hydrateTeamMember); }
@@ -4874,6 +4964,9 @@ function pickNeighborhoodGymChallengeTeam(){
   game.neighborhoodGymChallengeTeam = escolhidos.map(p=>{
     const inst = createInstance(p.speciesId, p.level);
     if(p.shiny){ inst.shiny = true; }
+    // os golpes vêm junto pela mesma razão do shiny: esta tela mostra a fileira com os selos de
+    // golpe, e sem o campo ela sairia muda num modo em que os golpes VALEM na batalha
+    if(Array.isArray(p.ataques)) inst.ataques = p.ataques.slice();
     inst._escolha = p;
     return inst;
   });
@@ -5358,7 +5451,120 @@ function tiposDeAtaque(p, alvo){
   const proprios = tiposProprios(p, alvo);
   return proprios.concat(subtiposDe(p).filter(t => !proprios.includes(t)));
 }
+
+/* ===================== OS GOLPES DO POKÉMON =====================
+   Cada pokémon carrega até DOIS golpes escolhidos pelo jogador (p.ataques). Quem tem golpe usa a
+   escolha; quem NÃO tem cai no motor de sempre -- e isso não é migração preguiçosa, é o desenho:
+     - save antigo (todo pokémon que já existe hoje) continua lutando exatamente como lutava, e
+     - OITO espécies não aprendem UM ÚNICO golpe de dano por nível em nível nenhum (Kakuna,
+       Metapod, Abra, Ditto, Unown, Wobbuffet, Delibird, Smeargle -- o que elas têm é Harden,
+       Teleport, Transform, Sketch...). Sem a queda pro motor antigo elas ficariam sem atacar.
+   A diferença que o golpe traz é o PODER: hoje todo golpe vale 60 (MOVE_POWER). Com golpe
+   escolhido, vale o poder dele -- de 10 (Constrição) a 150 (Hiper Raio). */
+/* Os golpes de DANO que esta espécie já aprendeu até este nível, do mais forte pro mais fraco.
+   A ordem é por poder e não por nível de propósito: quem escolhe quer ver primeiro o que bate mais.
+   Volta vazio pras oito espécies que não aprendem golpe de dano nenhum -- elas caem no motor de
+   tipo, e é por isso que o resto do código nunca precisa de um caso especial pra elas. */
+/* O METRÔNOMO NÃO ESCOLHE GOLPE, e isso não é regra nova: o tipoDoGolpe -- o caminho do DANO, nos
+   dois motores -- já curto-circuita pras 4 espécies do METRONOMO desde que os golpes especiais
+   existem. Elas atacam com um tipo SORTEADO a cada golpe, sempre, e nunca chegam no melhorAtaque.
+   Ou seja, o golpe escolhido delas nunca valeu um ponto de dano: o que havia era uma tela pedindo
+   uma decisão que o motor ignora e dois selos na fileira anunciando golpes que nunca saem -- o
+   mesmo defeito do selo de terreno prometendo um bônus que a batalha não dá. O Snubbull via a tela
+   desde o nível 20 e lutava de tipo sorteado; o Togepi, que não tem golpe de dano até o 38,
+   aparecia MUDO na fileira. A mesma fileira mentia nos dois sentidos.
+   Devolver lista vazia aqui é o funil: a tela de escolha, a fila de aprendizado, o ataquesPadrao e
+   o golpesDaEvolucao param todos de considerá-las, e o golpesDoTimeHtml passa a anunciar o
+   Metrônomo, que é o que elas usam de verdade. Conferido: a batalha não muda em um ponto sequer. */
+function usaGolpesEscolhidos(speciesId){ return !METRONOMO.includes(speciesId); }
+function ataquesDisponiveis(speciesId, nivel){
+  if(!usaGolpesEscolhidos(speciesId)) return [];
+  const lista = APRENDIZADO[speciesId];
+  if(!lista) return [];
+  const ids = [];
+  for(const par of lista){ if(par[0] <= nivel) ids.push(GOLPES_IDS[par[1]]); }
+  return ids.sort((a, b) => GOLPES[b][1] - GOLPES[a][1] || a.localeCompare(b));
+}
+/* O QUE A TELA DE ESCOLHA PODE OFERECER: o que a espécie aprende ATÉ AQUELE NÍVEL, mais o que o
+   pokémon JÁ CARREGA.
+   A segunda metade existe por causa da evolução, e o caso é o da Staryu (reportado em 09/09/2026):
+   ela aprende Raio de Bolhas no 28, a Starmie não ensina esse golpe em nível nenhum, e uma Starmie
+   que passasse pela tela de escolha veria uma lista sem ele -- ou seja, o golpe que ela trouxe da
+   forma anterior sumiria por não estar na tabela da forma nova.
+   A evolução em si NUNCA tira golpe: o tryEvolve troca espécie e atributos e não toca no
+   campo ataques. Quem tirava era esta tela, e só ela. Daqui pra frente o que conta é o moveset da
+   forma nova -- o que ele já trouxe fica. */
+function ataquesEscolhiveis(p){
+  const disp = ataquesDisponiveis(p.speciesId, p.level);
+  const jaTem = (Array.isArray(p.ataques) ? p.ataques : []).filter(id => GOLPES[id] && disp.indexOf(id) < 0);
+  if(!jaTem.length) return disp;
+  return disp.concat(jaTem).sort((a, b) => GOLPES[b][1] - GOLPES[a][1] || a.localeCompare(b));
+}
+/* O NÍVEL em que a espécie aprende aquele golpe -- pra tela dizer "aprendeu no 20". */
+function nivelDoAtaque(speciesId, golpe){
+  const lista = APRENDIZADO[speciesId] || [];
+  for(const par of lista){ if(GOLPES_IDS[par[1]] === golpe) return par[0]; }
+  return null;
+}
+/* A escolha AUTOMÁTICA: os dois que mais batem, com o próprio tipo na frente no empate.
+   Serve pra dois casos, e nenhum deles é o jogador escolhendo: o save ANTIGO (todo pokémon que já
+   existe hoje, que não pode ganhar seis telas de escolha ao ser aberto) e a rede de segurança de
+   quem fechou a aba no meio da escolha. */
+function ataquesPadrao(p){
+  const disp = ataquesDisponiveis(p.speciesId, p.level);
+  if(!disp.length) return [];
+  const sp = SPECIES[p.speciesId];
+  const nota = id => GOLPES[id][1] * (((sp && sp.types) || []).indexOf(GOLPES[id][0]) >= 0 ? 1.5 : 1);
+  return disp.slice().sort((a, b) => nota(b) - nota(a)).slice(0, 2);
+}
+/* O nome que o jogador lê. Vem do GOLPES_PT -- o motor manda o id, o cliente escolhe a palavra,
+   a mesma regra do MOVE_BY_TYPE. */
+function nomeDoAtaque(id){ return GOLPES_PT[id] || id; }
+function melhorAtaque(attacker, defender){
+  const meus = attacker.ataques;
+  if(!Array.isArray(meus) || !meus.length) return null;
+  let candidatos = meus.filter(id => GOLPES[id]);
+  if(!candidatos.length) return null;
+  const proprios = tiposProprios(attacker, defender);
+  /* DISABLE tira o TIPO, não o golpe -- é como ele já funciona no resto do motor. Quem levou os
+     dois golpes do mesmo tipo perde os dois, e aí a anulação simplesmente não vale: a regra da
+     casa é que ela só morde quem TEM alternativa. */
+  if(attacker._anulado && attacker._anulado.contra === defender){
+    const sobra = candidatos.filter(id => GOLPES[id][0] !== attacker._anulado.tipo);
+    if(sobra.length) candidatos = sobra;
+  }
+  const avalia = (id, multForcado) => {
+    const tipo = GOLPES[id][0], poder = GOLPES[id][1];
+    let mult = 1;
+    (defender.types || []).forEach(d => { mult *= typeVsType(tipo, d); });
+    if(multForcado != null) mult = multForcado;
+    const especial = isSpecialType(tipo);
+    const proprio = proprios.indexOf(tipo) >= 0;
+    const atk = especial ? effectiveSpAtk(attacker) : effectiveAttack(attacker);
+    const def = especial ? effectiveSpDef(defender) : effectiveDefense(defender);
+    /* A NOTA é o dano relativo: poder × tipo × STAB × (ataque/defesa). É a mesma conta do
+       bestAttackType com o poder acrescentado -- e é ela que faz "o que tira mais dano" ser
+       escolhido de verdade, e não "o melhor tipo". */
+    return { golpe:id, type:tipo, poder:poder, mult:mult, stab:proprio,
+             nota: poder * Math.pow(mult, EXPOENTE_TIPO) * (proprio ? 1.5 : SUBTYPE_PENALTY)
+                   * (atk / Math.max(1, def)) };
+  };
+  let melhor = null;
+  for(const id of candidatos){ const n = avalia(id); if(!melhor || n.nota > melhor.nota) melhor = n; }
+  /* GOLPE TEIMOSO: quando NENHUM golpe dele machuca o alvo, o melhor sai com o multiplicador
+     reduzido em vez do piso de 1 de dano. Com tudo zerado as notas empatam em 0, então a escolha
+     é refeita -- exatamente como o bestAttackType já fazia pros tipos. */
+  if(melhor && melhor.mult === 0){
+    let teimoso = null;
+    for(const id of candidatos){ const n = avalia(id, IMUNIDADE_TEIMOSA); if(!teimoso || n.nota > teimoso.nota) teimoso = n; }
+    if(teimoso){ teimoso.nulo = true; return teimoso; }
+  }
+  return melhor;
+}
 function bestAttackType(attacker, defender){
+  /* Tem golpe escolhido? A escolha é entre ELES. Senão, o motor de tipo de sempre, logo abaixo. */
+  const doJogador = melhorAtaque(attacker, defender);
+  if(doJogador) return doJogador;
   const proprios = tiposProprios(attacker, defender);
   let candidatos = tiposDeAtaque(attacker, defender);
   /* DISABLE: o melhor golpe deste atacante contra ESTE adversário saiu de cena, e ele cai no
@@ -5414,6 +5620,265 @@ function bestMultiplier(atkTypes, defTypes){
   });
   return { mult: best, type: bestType };
 }
+/* ===================== TABELAS DE GOLPE =====================
+   GOLPES (id -> [tipo, poder]) é a SEXTA tabela duplicada entre este arquivo e o functions/index.js
+   -- ela é o mínimo que o cálculo de dano precisa, e o dano roda dos dois lados. Divergir aqui é a
+   mesma batalha com resultado diferente no cliente e no servidor.
+   GOLPES_PT e APRENDIZADO ficam SÓ AQUI: nome é apresentação (a mesma regra do MOVE_BY_TYPE -- o
+   motor manda o id, o cliente escolhe a palavra), e o servidor nunca precisa saber QUEM aprende o
+   quê, porque os golpes escolhidos viajam dentro da instância.
+   Geradas por tools/gerar-tabelas-golpes.js a partir de data/golpes.json; tools/test-golpes.js
+   confere que as duas cópias do GOLPES são idênticas.
+   SÓ GOLPE DE DANO. Autodestruição e Explosão ficam de fora: elas JÁ SÃO a mecânica de
+   autodestruição do jogo (as mesmas 9 espécies), e como golpe comum de 200 e 250 de poder, sem o
+   custo de cair junto, seriam a escolha óbvia de todo mundo que as tem. */
+const GOLPES = {
+  absorb:['Grass',20],acid:['Poison',40],aerialace:['Flying',60],aeroblast:['Flying',100],
+  aircutter:['Flying',55],ancientpower:['Rock',60],astonish:['Ghost',30],aurorabeam:['Ice',65],
+  barrage:['Normal',15],beatup:['Dark',10],bind:['Normal',15],bite:['Dark',60],
+  blizzard:['Ice',120],bodyslam:['Normal',85],boneclub:['Ground',65],bonemerang:['Ground',50],
+  bonerush:['Ground',25],bounce:['Flying',85],brickbreak:['Fighting',75],bubble:['Water',20],
+  bubblebeam:['Water',65],bulletseed:['Grass',10],clamp:['Water',35],cometpunch:['Normal',18],
+  confusion:['Psychic',50],constrict:['Normal',10],covet:['Normal',40],crabhammer:['Water',90],
+  crosschop:['Fighting',100],crunch:['Dark',80],dig:['Ground',60],dive:['Water',60],
+  dizzypunch:['Normal',70],doubleedge:['Normal',120],doublekick:['Fighting',30],
+  doubleslap:['Normal',15],dragonbreath:['Dragon',60],dreameater:['Psychic',100],
+  drillpeck:['Flying',80],dynamicpunch:['Fighting',100],earthquake:['Ground',100],
+  eggbomb:['Normal',100],ember:['Fire',40],extremespeed:['Normal',80],fakeout:['Normal',40],
+  falseswipe:['Normal',40],feintattack:['Dark',60],fireblast:['Fire',120],firepunch:['Fire',75],
+  firespin:['Fire',15],flamethrower:['Fire',95],flamewheel:['Fire',60],furyattack:['Normal',15],
+  furycutter:['Bug',10],furyswipes:['Normal',18],futuresight:['Psychic',80],gigadrain:['Grass',60],
+  gust:['Flying',40],headbutt:['Normal',70],heatwave:['Fire',100],highjumpkick:['Fighting',85],
+  hornattack:['Normal',65],hydropump:['Water',120],hyperbeam:['Normal',150],
+  hyperfang:['Normal',80],hypervoice:['Normal',90],iceball:['Ice',30],icebeam:['Ice',95],
+  icepunch:['Ice',75],iciclespear:['Ice',10],icywind:['Ice',55],irontail:['Steel',100],
+  jumpkick:['Fighting',70],karatechop:['Fighting',50],knockoff:['Dark',20],leechlife:['Bug',20],
+  lick:['Ghost',20],machpunch:['Fighting',40],magicalleaf:['Grass',60],megadrain:['Grass',40],
+  megahorn:['Bug',120],megakick:['Normal',120],megapunch:['Normal',80],metalclaw:['Steel',50],
+  meteormash:['Steel',100],mudshot:['Ground',55],mudslap:['Ground',20],octazooka:['Water',65],
+  outrage:['Dragon',90],payday:['Normal',40],peck:['Flying',35],petaldance:['Grass',70],
+  pinmissile:['Bug',14],poisonfang:['Poison',50],poisonsting:['Poison',15],pound:['Normal',40],
+  powdersnow:['Ice',40],psybeam:['Psychic',65],psychic:['Psychic',90],pursuit:['Dark',40],
+  quickattack:['Normal',40],rage:['Normal',20],rapidspin:['Normal',20],razorleaf:['Grass',55],
+  revenge:['Fighting',60],rockblast:['Rock',25],rockslide:['Rock',75],rockthrow:['Rock',50],
+  rollingkick:['Fighting',60],rollout:['Rock',30],sacredfire:['Fire',100],sandtomb:['Ground',15],
+  scratch:['Normal',40],shadowball:['Ghost',80],shadowpunch:['Ghost',60],signalbeam:['Bug',75],
+  silverwind:['Bug',60],skullbash:['Normal',100],skyattack:['Flying',140],
+  skyuppercut:['Fighting',85],slam:['Normal',80],slash:['Normal',70],sludge:['Poison',65],
+  sludgebomb:['Poison',90],smog:['Poison',20],snore:['Normal',40],solarbeam:['Grass',120],
+  spark:['Electric',65],spikecannon:['Normal',20],steelwing:['Steel',70],stomp:['Normal',65],
+  submission:['Fighting',80],superpower:['Fighting',120],swift:['Normal',60],tackle:['Normal',35],
+  takedown:['Normal',90],thrash:['Normal',90],thunder:['Electric',120],thunderbolt:['Electric',95],
+  thunderpunch:['Electric',75],thundershock:['Electric',40],triattack:['Normal',80],
+  triplekick:['Fighting',10],twineedle:['Bug',25],twister:['Dragon',40],uproar:['Normal',50],
+  vinewhip:['Grass',35],visegrip:['Normal',55],vitalthrow:['Fighting',70],waterfall:['Water',80],
+  watergun:['Water',40],waterpulse:['Water',60],wingattack:['Flying',60],wrap:['Normal',15],
+  zapcannon:['Electric',100]
+};
+const GOLPES_IDS = ['absorb','acid','aerialace','aeroblast','aircutter','ancientpower','astonish','aurorabeam','barrage','beatup','bind','bite','blizzard','bodyslam','boneclub','bonemerang','bonerush','bounce','brickbreak','bubble','bubblebeam','bulletseed','clamp','cometpunch','confusion','constrict','covet','crabhammer','crosschop','crunch','dig','dive','dizzypunch','doubleedge','doublekick','doubleslap','dragonbreath','dreameater','drillpeck','dynamicpunch','earthquake','eggbomb','ember','extremespeed','fakeout','falseswipe','feintattack','fireblast','firepunch','firespin','flamethrower','flamewheel','furyattack','furycutter','furyswipes','futuresight','gigadrain','gust','headbutt','heatwave','highjumpkick','hornattack','hydropump','hyperbeam','hyperfang','hypervoice','iceball','icebeam','icepunch','iciclespear','icywind','irontail','jumpkick','karatechop','knockoff','leechlife','lick','machpunch','magicalleaf','megadrain','megahorn','megakick','megapunch','metalclaw','meteormash','mudshot','mudslap','octazooka','outrage','payday','peck','petaldance','pinmissile','poisonfang','poisonsting','pound','powdersnow','psybeam','psychic','pursuit','quickattack','rage','rapidspin','razorleaf','revenge','rockblast','rockslide','rockthrow','rollingkick','rollout','sacredfire','sandtomb','scratch','shadowball','shadowpunch','signalbeam','silverwind','skullbash','skyattack','skyuppercut','slam','slash','sludge','sludgebomb','smog','snore','solarbeam','spark','spikecannon','steelwing','stomp','submission','superpower','swift','tackle','takedown','thrash','thunder','thunderbolt','thunderpunch','thundershock','triattack','triplekick','twineedle','twister','uproar','vinewhip','visegrip','vitalthrow','waterfall','watergun','waterpulse','wingattack','wrap','zapcannon'];
+const GOLPES_PT = {
+  absorb:'Absorver',acid:'Ácido',aerialace:'Ás Aéreo',aeroblast:'Aerojato',aircutter:'Corte de Ar',
+  ancientpower:'Poder Ancestral',astonish:'Espanto',aurorabeam:'Raio Aurora',barrage:'Barragem',
+  beatup:'Surra',bind:'Amarrar',bite:'Mordida',blizzard:'Nevasca',bodyslam:'Golpe de Corpo',
+  boneclub:'Clava de Osso',bonemerang:'Ossomerangue',bonerush:'Investida de Ossos',bounce:'Salto',
+  brickbreak:'Quebra-Telha',bubble:'Bolha',bubblebeam:'Raio de Bolhas',bulletseed:'Semente-Bala',
+  clamp:'Mordaça',cometpunch:'Soco Cometa',confusion:'Confusão',constrict:'Constrição',
+  covet:'Cobiça',crabhammer:'Martelo de Caranguejo',crosschop:'Golpe Cruzado',crunch:'Triturar',
+  dig:'Escavar',dive:'Mergulho',dizzypunch:'Soco Tonto',doubleedge:'Investida Dupla',
+  doublekick:'Chute Duplo',doubleslap:'Tapa Duplo',dragonbreath:'Sopro do Dragão',
+  dreameater:'Comedor de Sonhos',drillpeck:'Bicada Broca',dynamicpunch:'Soco Dinâmico',
+  earthquake:'Terremoto',eggbomb:'Bomba de Ovo',ember:'Brasa',extremespeed:'Velocidade Extrema',
+  fakeout:'Finta',falseswipe:'Golpe Falso',feintattack:'Ataque Fingido',
+  fireblast:'Explosão de Fogo',firepunch:'Soco de Fogo',firespin:'Redemoinho de Fogo',
+  flamethrower:'Lança-Chamas',flamewheel:'Roda de Fogo',furyattack:'Ataque Fúria',
+  furycutter:'Cortador Furioso',furyswipes:'Arranhões Furiosos',futuresight:'Visão do Futuro',
+  gigadrain:'Giga Dreno',gust:'Rajada de Vento',headbutt:'Cabeçada',heatwave:'Onda de Calor',
+  highjumpkick:'Joelhaço Voador',hornattack:'Chifrada',hydropump:'Hidro Bomba',
+  hyperbeam:'Hiper Raio',hyperfang:'Presa Hiper',hypervoice:'Hipervoz',iceball:'Bola de Gelo',
+  icebeam:'Raio Congelante',icepunch:'Soco de Gelo',iciclespear:'Lança de Gelo',
+  icywind:'Vento Gélido',irontail:'Cauda de Ferro',jumpkick:'Chute Voador',
+  karatechop:'Golpe de Karatê',knockoff:'Nocaute',leechlife:'Sanguessuga',lick:'Lambida',
+  machpunch:'Soco Veloz',magicalleaf:'Folha Mágica',megadrain:'Mega Dreno',megahorn:'Megachifre',
+  megakick:'Mega Chute',megapunch:'Mega Soco',metalclaw:'Garra de Metal',
+  meteormash:'Golpe Meteoro',mudshot:'Tiro de Lama',mudslap:'Tapa de Lama',octazooka:'Octabazuca',
+  outrage:'Ultraje',payday:'Dia de Pagamento',peck:'Bicada',petaldance:'Dança das Pétalas',
+  pinmissile:'Míssil Agulha',poisonfang:'Presa Venenosa',poisonsting:'Ferrão Venenoso',
+  pound:'Pancada',powdersnow:'Pó de Neve',psybeam:'Psicoraio',psychic:'Psíquico',
+  pursuit:'Perseguição',quickattack:'Ataque Rápido',rage:'Fúria',rapidspin:'Giro Rápido',
+  razorleaf:'Folha Navalha',revenge:'Vingança',rockblast:'Rajada de Rochas',
+  rockslide:'Deslizamento de Rochas',rockthrow:'Lançar Pedra',rollingkick:'Chute Giratório',
+  rollout:'Rolamento',sacredfire:'Fogo Sagrado',sandtomb:'Tumba de Areia',scratch:'Arranhão',
+  shadowball:'Bola Sombria',shadowpunch:'Soco Sombrio',signalbeam:'Feixe de Sinal',
+  silverwind:'Vento Prateado',skullbash:'Quebra-Crânio',skyattack:'Ataque Celeste',
+  skyuppercut:'Cruzado Celeste',slam:'Batida',slash:'Corte',sludge:'Lodo',
+  sludgebomb:'Bomba de Lodo',smog:'Fumaça Tóxica',snore:'Ronco',solarbeam:'Raio Solar',
+  spark:'Faísca',spikecannon:'Canhão de Espinhos',steelwing:'Asa de Aço',stomp:'Pisão',
+  submission:'Submissão',superpower:'Superpoder',swift:'Rapidez',tackle:'Investida',
+  takedown:'Derrubada',thrash:'Pancadaria',thunder:'Trovão',thunderbolt:'Raio',
+  thunderpunch:'Soco Trovão',thundershock:'Choque do Trovão',triattack:'Triataque',
+  triplekick:'Chute Triplo',twineedle:'Agulha Dupla',twister:'Tornado',uproar:'Alvoroço',
+  vinewhip:'Chicote de Cipó',visegrip:'Torno',vitalthrow:'Arremesso Vital',waterfall:'Cachoeira',
+  watergun:'Jato d\'Água',waterpulse:'Pulso de Água',wingattack:'Ataque de Asa',wrap:'Enrolar',
+  zapcannon:'Canhão de Choque'
+};
+const APRENDIZADO = {
+  bulbasaur:[[1,134],[10,146],[20,103],[46,123],[46,126]],
+  charmander:[[1,112],[7,42],[13,83],[19,101],[31,50],[37,121],[49,49]],
+  squirtle:[[1,134],[7,19],[13,150],[18,11],[23,102],[40,117],[47,62]],weedle:[[1,94],[7,92]],
+  caterpie:[[1,134],[13,143]],ratata:[[1,134],[7,100],[13,64],[27,99]],pidgey:[[1,134],[9,57],[13,100],[25,152]],
+  mankey:[[1,112],[11,73],[16,54],[31,28],[46,136]],spearow:[[1,90],[13,52],[19,99],[25,2],[37,38]],
+  nidoranm:[[1,90],[12,34],[17,94],[20,61],[30,52]],oddish:[[1,0],[23,1],[39,91]],
+  geodude:[[1,134],[11,107],[26,109],[31,105],[36,40],[46,33]],
+  onix:[[1,134],[8,10],[12,107],[23,101],[30,36],[37,120],[45,71],[49,111],[56,33]],
+  ivysaur:[[1,134],[10,146],[22,103],[56,123],[56,126]],venusaur:[[1,134],[1,146],[22,103],[65,123],[65,126]],
+  charmeleon:[[1,42],[1,112],[13,83],[20,101],[34,50],[41,121],[55,49]],
+  charizard:[[1,42],[1,59],[1,83],[1,112],[20,101],[34,50],[36,152],[44,121],[64,49]],
+  wartortle:[[1,19],[1,134],[13,150],[19,11],[25,102],[45,117],[53,62]],
+  blastoise:[[1,19],[1,134],[13,150],[19,11],[25,102],[55,117],[68,62]],kakuna:[[13,143],[20,1]],
+  beedrill:[[1,52],[20,143],[25,101],[30,99],[35,92],[45,123]],metapod:[[13,143]],
+  butterfree:[[1,24],[28,57],[34,97],[47,116]],raticate:[[1,100],[1,134],[13,64],[30,99]],
+  pidgeotto:[[1,57],[1,134],[13,100],[27,152]],pidgeot:[[1,57],[1,100],[1,134],[27,152]],
+  primeape:[[1,101],[1,112],[11,73],[16,54],[35,28],[62,136]],fearow:[[1,52],[1,90],[26,99],[40,38]],
+  nidorino:[[1,90],[12,34],[18,94],[22,61],[34,52]],gloom:[[1,0],[24,1],[44,91]],
+  sandshrew:[[1,112],[17,94],[23,121],[30,133],[37,54],[45,111]],
+  sandslash:[[1,112],[17,94],[24,121],[33,133],[42,54],[52,111]],clefairy:[[1,95],[13,35],[45,84]],
+  jigglypuff:[[9,95],[19,109],[24,35],[34,13],[44,65],[49,33]],
+  zubat:[[1,75],[6,6],[16,11],[21,152],[31,4],[41,93]],golbat:[[1,6],[1,75],[16,11],[21,152],[35,4],[49,93]],
+  paras:[[1,112],[19,75],[31,121],[43,56]],parasect:[[1,112],[19,75],[35,121],[51,56]],
+  meowth:[[1,112],[10,11],[18,89],[25,46],[36,54],[40,121],[43,44]],
+  persian:[[1,11],[1,112],[18,89],[25,46],[42,54],[49,121],[55,44]],
+  bellsprout:[[1,146],[11,153],[23,1],[37,103],[45,120]],weepinbell:[[1,146],[1,153],[24,1],[42,103],[54,120]],
+  abra:[[45,98]],kadabra:[[1,24],[21,97],[30,55],[36,98]],
+  staryu:[[1,134],[6,150],[10,102],[24,133],[28,20],[46,62]],starmie:[[1,102],[1,133],[1,150],[45,98]],
+  growlithe:[[1,11],[7,42],[25,135],[31,51],[49,50]],vulpix:[[1,42],[13,100],[29,50],[41,49]],
+  ekans:[[1,153],[8,94],[13,11],[32,1]],arbok:[[1,11],[1,94],[1,153],[38,1]],
+  diglett:[[1,112],[17,30],[21,54],[25,86],[33,121],[41,40]],
+  dugtrio:[[1,112],[1,141],[17,30],[21,54],[25,86],[26,111],[38,121],[51,40]],
+  magnemite:[[1,134],[6,140],[26,127],[38,133],[50,154]],magneton:[[1,134],[1,140],[26,127],[44,141],[62,154]],
+  drowzee:[[1,95],[11,24],[17,58],[31,98],[45,55]],hypno:[[1,24],[1,95],[17,58],[35,98],[57,55]],
+  nidoranf:[[1,112],[12,34],[17,94],[20,11],[30,54],[47,29]],
+  nidorina:[[1,112],[12,34],[18,94],[22,11],[34,54],[53,29]],
+  venonat:[[1,134],[17,24],[25,75],[33,97],[41,98],[45,123]],
+  venomoth:[[1,116],[1,134],[17,24],[25,75],[31,57],[36,97],[52,98],[52,123]],
+  voltorb:[[1,134],[21,127],[32,109],[42,133]],pikachu:[[1,140],[11,100],[20,120],[26,138],[41,137]],
+  raichu:[[1,100],[1,138],[1,140]],poliwag:[[1,19],[13,150],[19,35],[31,13],[43,62]],
+  poliwhirl:[[1,19],[1,150],[19,35],[35,13],[51,62]],tentacool:[[1,94],[12,25],[19,1],[25,20],[30,153],[49,62]],
+  tentacruel:[[1,25],[1,94],[19,1],[25,20],[30,153],[55,62]],
+  machop:[[13,73],[25,104],[31,148],[37,131],[40,28],[49,39]],
+  machoke:[[13,73],[25,104],[33,148],[41,131],[46,28],[59,39]],
+  doduo:[[1,90],[9,99],[13,52],[21,141],[25,101],[33,145],[37,38]],
+  dodrio:[[1,52],[1,90],[1,99],[21,141],[25,101],[38,145],[47,38]],
+  ponyta:[[1,100],[1,134],[14,42],[19,130],[25,49],[31,135],[45,17],[53,47]],
+  rapidash:[[1,42],[1,100],[1,134],[19,130],[25,49],[31,135],[40,52],[50,17],[63,47]],
+  slowpoke:[[1,134],[13,150],[17,24],[29,58],[40,98]],slowbro:[[1,134],[13,150],[17,24],[29,58],[44,98]],
+  magikarp:[[15,134],[18,22]],gyarados:[[1,136],[20,11],[35,144],[40,62],[43,17],[55,63]],
+  grimer:[[1,95],[13,122],[43,123]],muk:[[1,95],[13,122],[47,123]],
+  tauros:[[1,134],[4,101],[8,61],[19,99],[43,136],[53,135]],psyduck:[[1,112],[16,24],[40,54],[50,62]],
+  golduck:[[1,112],[16,24],[44,54],[58,62]],krabby:[[1,19],[12,147],[23,85],[27,130],[45,27]],
+  kingler:[[1,19],[1,83],[1,147],[23,85],[27,130],[57,27]],horsea:[[1,19],[22,150],[29,144],[43,62]],
+  seadra:[[1,19],[1,150],[29,144],[51,62]],goldeen:[[1,90],[15,61],[29,52],[38,149],[57,80]],
+  seaking:[[1,90],[15,61],[29,52],[41,149],[69,80]],shellder:[[1,134],[8,69],[17,7],[41,22],[49,67]],
+  exeggcute:[[1,8],[1,145],[19,24],[43,126]],
+  cubone:[[9,14],[13,58],[25,15],[29,101],[33,45],[37,136],[41,16],[45,33]],
+  marowak:[[1,14],[1,58],[25,15],[32,101],[39,45],[46,136],[53,16],[61,33]],
+  victreebel:[[1,103],[1,146],[45,123]],tangela:[[1,25],[10,0],[22,146],[28,10],[31,79],[40,120]],
+  vileplume:[[1,0],[1,79],[44,91],[45,123]],koffing:[[1,134],[9,124],[21,122]],
+  weezing:[[1,124],[1,134],[21,122]],gastly:[[1,76],[28,37],[36,113],[45,123]],
+  haunter:[[1,76],[25,114],[31,37],[45,113],[45,123]],lickitung:[[1,76],[18,74],[23,130],[29,153],[40,120]],
+  rhyhorn:[[1,61],[10,130],[15,52],[29,105],[43,135],[52,40],[57,80]],
+  rhydon:[[1,52],[1,61],[1,130],[29,105],[46,135],[58,40],[66,80]],
+  seel:[[1,58],[17,70],[21,7],[30,31],[37,135],[41,67]],
+  dewgong:[[1,7],[1,58],[1,70],[1,115],[40,149],[42,135],[51,67]],
+  farfetchd:[[1,90],[16,52],[21,74],[26,53],[41,121],[46,45]],
+  kangaskhan:[[1,23],[7,11],[19,44],[25,82],[31,101],[43,32]],
+  scyther:[[1,100],[11,99],[16,45],[26,152],[31,121],[46,53]],
+  omanyte:[[1,25],[13,11],[19,150],[25,85],[49,5],[55,62]],
+  omastar:[[1,11],[1,25],[1,150],[25,85],[40,128],[55,5],[65,62]],
+  kabuto:[[1,112],[13,0],[25,85],[49,79],[55,5],[55,151]],
+  kabutops:[[1,0],[1,53],[1,112],[25,85],[40,121],[55,79],[65,5],[65,31]],
+  electrode:[[1,134],[21,127],[34,109],[48,133]],magmar:[[1,42],[1,48],[1,124],[41,50],[57,47]],
+  lapras:[[1,150],[13,13],[31,67],[49,62]],porygon:[[1,134],[12,97],[36,141],[48,154]],
+  eevee:[[1,134],[23,100],[30,11],[42,135]],snorlax:[[1,134],[17,58],[28,125],[33,13],[42,26],[46,109],[51,63]],
+  chansey:[[1,95],[17,35],[35,41],[57,33]],hitmonlee:[[1,34],[1,104],[11,108],[16,72],[20,18],[26,60],[46,81]],
+  hitmonchan:[[1,23],[1,104],[13,99],[20,77],[26,48],[26,68],[26,139],[32,119],[38,82]],
+  pinsir:[[1,147],[7,10],[7,53],[25,104],[31,18],[43,131]],
+  electabuzz:[[1,100],[1,139],[25,133],[47,138],[58,137]],aerodactyl:[[1,152],[15,11],[29,5],[43,135],[50,63]],
+  alakazam:[[1,24],[21,97],[30,55],[36,98]],mrmime:[[5,24],[15,35],[22,78],[29,97],[43,98]],
+  arcanine:[[1,11],[1,42],[49,43]],nidoqueen:[[1,34],[1,94],[1,112],[10,86],[22,13],[43,132]],
+  nidoking:[[1,34],[1,90],[1,94],[10,86],[22,136],[43,80]],
+  graveler:[[1,107],[1,134],[29,109],[37,105],[45,40],[62,33]],
+  dratini:[[1,153],[15,144],[29,120],[50,88],[57,63]],dragonair:[[1,144],[1,153],[29,120],[56,88],[65,63]],
+  dragonite:[[1,144],[1,153],[29,120],[55,152],[61,88],[75,63]],
+  jynx:[[1,76],[1,95],[1,96],[21,35],[25,68],[51,13],[51,98],[67,12]],
+  exeggutor:[[1,8],[1,24],[19,130],[30,56],[31,41]],clefable:[[1,35]],wigglytuff:[[1,35]],
+  ninetales:[[1,42],[1,100],[45,49]],poliwrath:[[1,35],[1,131],[1,150]],cloyster:[[1,7],[30,31],[41,128]],
+  machamp:[[13,73],[25,104],[33,148],[41,131],[46,28],[59,39]],
+  golem:[[1,107],[1,134],[29,109],[37,105],[45,40],[62,33]],gengar:[[1,76],[25,114],[31,37],[45,113],[45,123]],
+  moltres:[[1,42],[1,152],[13,49],[49,50],[73,59],[85,118]],zapdos:[[1,90],[1,140],[49,38],[85,137]],
+  articuno:[[1,57],[1,96],[49,67],[73,12]],vaporeon:[[1,134],[16,150],[23,100],[30,11],[36,7],[52,62]],
+  jolteon:[[1,134],[16,140],[23,100],[30,34],[36,92],[52,137]],
+  flareon:[[1,134],[16,42],[23,100],[30,11],[36,49],[42,124],[52,50]],mewtwo:[[1,24],[22,133],[44,55],[66,98]],
+  chikorita:[[1,134],[8,103],[29,13],[50,126]],bayleef:[[1,103],[1,134],[31,13],[55,126]],
+  meganium:[[1,103],[1,134],[31,13],[61,126]],cyndaquil:[[1,134],[12,42],[19,100],[27,51],[36,133],[46,50]],
+  quilava:[[1,134],[12,42],[21,100],[31,51],[42,133],[54,50]],
+  typhlosion:[[1,42],[1,134],[21,100],[31,51],[45,133],[60,50]],
+  totodile:[[1,112],[7,101],[13,150],[20,11],[35,121],[52,62]],
+  croconaw:[[1,101],[1,112],[13,150],[21,11],[37,121],[55,62]],
+  feraligatr:[[1,101],[1,112],[1,150],[21,11],[38,121],[58,62]],sentret:[[1,112],[7,100],[12,54],[24,120]],
+  furret:[[1,100],[1,112],[12,54],[28,120]],hoothoot:[[1,134],[11,90],[28,135],[34,24],[48,37]],
+  noctowl:[[1,90],[1,134],[33,135],[41,24],[57,37]],ledyba:[[1,134],[15,23],[36,2],[36,116],[36,133],[50,33]],
+  ledian:[[1,134],[15,23],[42,2],[42,116],[42,133],[60,33]],spinarak:[[1,94],[11,25],[23,75],[30,54],[53,98]],
+  ariados:[[1,25],[1,94],[25,75],[34,54],[63,98]],crobat:[[1,6],[1,75],[16,11],[21,152],[35,4],[49,93]],
+  chinchou:[[1,19],[17,150],[25,127],[37,135],[41,62]],lanturn:[[1,19],[17,150],[25,127],[43,135],[50,62]],
+  pichu:[[1,140]],cleffa:[[1,95],[17,78]],igglybuff:[[9,95]],togepi:[[21,5],[37,33]],
+  togetic:[[1,78],[21,5],[30,2],[37,33]],natu:[[1,90],[30,55],[50,98]],xatu:[[1,90],[35,55],[65,98]],
+  mareep:[[1,134],[9,140],[37,137]],flaaffy:[[1,134],[1,140],[45,137]],
+  ampharos:[[1,134],[1,140],[30,139],[57,137]],bellossom:[[1,0],[1,78],[44,91],[55,126]],
+  marill:[[1,134],[10,150],[15,109],[21,20],[28,33],[45,62]],
+  azumarill:[[1,134],[1,150],[15,109],[24,20],[34,33],[57,62]],
+  sudowoodo:[[1,107],[25,106],[41,46],[49,120],[57,33]],politoed:[[1,35],[1,150]],
+  hoppip:[[10,134],[30,2],[30,79]],skiploom:[[1,134],[36,2],[36,79]],jumpluff:[[1,134],[44,2],[44,79]],
+  aipom:[[1,112],[13,6],[31,54],[38,133]],sunkern:[[1,0],[13,79],[42,56]],
+  sunflora:[[1,0],[1,95],[13,103],[25,21],[37,91],[42,126]],yanma:[[1,134],[6,100],[34,145],[39,116],[39,152]],
+  wooper:[[1,150],[11,120],[16,85],[36,40]],quagsire:[[1,150],[11,120],[16,85],[42,40]],
+  espeon:[[1,134],[16,24],[23,100],[30,133],[36,97],[47,98]],umbreon:[[1,134],[16,99],[23,100],[36,46]],
+  murkrow:[[1,90],[9,6],[14,99],[35,46]],slowking:[[1,134],[13,150],[17,24],[29,58],[40,98]],
+  misdreavus:[[11,6],[30,97]],unown:[[25,24]],wobbuffet:[[25,24]],
+  girafarig:[[1,134],[7,6],[13,24],[19,130],[43,97],[49,29]],pineco:[[1,134],[15,135],[22,92],[22,102],[50,33]],
+  forretress:[[1,134],[15,135],[22,102],[31,154],[50,71],[59,33],[59,80]],
+  dunsparce:[[1,101],[21,109],[24,99],[34,135]],gligar:[[1,94],[20,100],[28,46],[30,2],[30,30],[36,121]],
+  steelix:[[1,134],[8,10],[12,107],[23,101],[30,30],[30,36],[37,120],[45,71],[49,29],[56,33]],
+  snubbull:[[1,134],[13,11],[19,76],[34,101],[43,135],[53,29]],
+  granbull:[[1,134],[13,11],[19,76],[38,101],[49,135],[61,29]],
+  qwilfish:[[1,94],[1,134],[13,150],[21,92],[25,104],[33,135],[37,62]],
+  scizor:[[1,100],[11,99],[16,45],[26,83],[31,121],[46,53]],shuckle:[[1,25],[9,92],[9,153],[37,109]],
+  heracross:[[1,134],[6,61],[17,52],[23,18],[37,135],[53,80]],
+  sneasel:[[1,112],[8,100],[22,46],[29,54],[43,70],[50,121],[57,9],[64,83]],
+  teddiursa:[[1,112],[7,76],[13,54],[25,46],[37,121],[43,125],[49,136]],
+  ursaring:[[1,54],[1,76],[1,112],[25,46],[37,121],[43,125],[49,136]],
+  slugma:[[1,124],[8,42],[15,107],[36,50],[43,106],[50,13]],
+  magcargo:[[1,42],[1,107],[1,124],[36,50],[48,106],[60,13]],swinub:[[1,134],[10,96],[28,135],[46,12],[50,40]],
+  piloswine:[[1,61],[1,96],[28,135],[30,30],[33,52],[56,12]],
+  corsola:[[1,134],[12,19],[23,20],[28,128],[34,105],[45,5]],
+  remoraid:[[1,150],[22,7],[22,20],[22,97],[44,67],[55,63]],
+  octillery:[[1,150],[11,25],[22,7],[22,20],[22,97],[25,87],[54,67],[70,63]],delibird:[[15,66],[30,2]],
+  mantine:[[1,19],[1,134],[15,20],[22,135],[36,152],[43,151]],skarmory:[[1,90],[13,133],[26,52],[29,4],[32,129]],
+  houndour:[[1,42],[13,124],[25,11],[37,46],[43,50],[49,29]],
+  houndoom:[[1,42],[13,124],[27,11],[43,46],[51,50],[59,29]],kingdra:[[1,19],[1,150],[29,144],[51,62]],
+  phanpy:[[1,134],[25,135],[33,109],[49,33],[50,40]],donphan:[[1,61],[25,52],[33,109],[41,102],[49,40]],
+  porygon2:[[1,134],[12,97],[36,141],[48,154]],stantler:[[1,134],[11,6],[21,130],[37,135]],smeargle:[[8,35]],
+  tyrogue:[[1,134],[20,77]],hitmontop:[[1,104],[1,108],[13,99],[19,100],[20,142],[25,102]],
+  smoochum:[[1,76],[1,95],[13,96],[21,24],[45,98],[57,12]],elekid:[[1,100],[9,139],[25,133],[41,138],[49,137]],
+  magby:[[1,42],[13,124],[19,48],[37,50],[49,47]],miltank:[[1,134],[13,130],[34,109],[43,13]],
+  blissey:[[1,95],[13,35],[28,41],[47,33]],raikou:[[1,11],[11,140],[31,100],[41,127],[61,29],[71,137]],
+  entei:[[1,11],[11,42],[31,49],[41,130],[51,50],[71,47]],suicune:[[1,11],[11,20],[31,57],[41,7],[71,62]],
+  larvitar:[[1,11],[22,106],[29,136],[43,29],[50,40],[57,63]],
+  pupitar:[[1,11],[22,106],[29,136],[47,29],[56,40],[65,63]],
+  tyranitar:[[1,11],[22,106],[29,136],[47,29],[61,40],[75,63]],
+  lugia:[[22,57],[44,62],[66,133],[77,3],[88,5],[99,55]],hooh:[[22,57],[44,47],[66,133],[77,110],[88,5],[99,55]],
+  celebi:[[1,24],[20,5],[30,55],[30,56]]
+};
+
 /* ===== MOTOR DE BATALHA -- fórmula oficial da Gen 1, adaptada pro formato do jogo =====
    Redesenhado do zero: o nível entra pelos ATRIBUTOS (2*base*L/100+5, como no jogo real), não por
    multiplicadores artificiais. Poder do golpe implícito reduzido (60) pra lutas mais longas --
@@ -5477,6 +5942,7 @@ function calcDamageNew(attacker, defender, rng){
      O tipo escolhido não depende de HP (só de atributos e tipos, que não mudam durante o
      confronto), então na prática ele é o mesmo do começo ao fim da luta entre esses dois. */
   attacker.lastMoveType = best.type;
+  attacker.lastMove = best.golpe || null;   // qual GOLPE saiu -- é o que o log nomeia
   const special = isSpecialType(best.type); // o tipo do golpe decide se é físico ou especial (tabela oficial Gen 1)
   // STAB só quando o tipo escolhido é PRÓPRIO do atacante. Subtipo não só perde o bônus como
   // ainda leva o redutor -- é isso que impede o subtipo de virar poder de graça
@@ -5492,7 +5958,10 @@ function calcDamageNew(attacker, defender, rng){
      efeito", senão o jogador vê um -1 sem explicação. */
   attacker.lastMoveNulo = !!best.nulo;
   const Leff = isCrit ? attacker.level*2 : attacker.level; // crítico dobra o nível na fórmula (regra oficial)
-  const core = Math.floor(Math.floor(2*Leff/5 + 2) * MOVE_POWER * A / D / 50) + 2;
+  /* O PODER agora vem do GOLPE quando existe um escolhido; o MOVE_POWER de 60 virou o fallback
+     de quem não tem (save antigo e as oito espécies sem golpe de dano). */
+  const potencia = best.poder || MOVE_POWER;
+  const core = Math.floor(Math.floor(2*Leff/5 + 2) * potencia * A / D / 50) + 2;
   const typeMult = Math.pow(best.mult, EXPOENTE_TIPO);
   const dmgGen1 = Math.round(core * STAB * typeMult * (0.85 + rng()*0.15)); // variação 85-100%, igual ao jogo oficial
   // converte pra FRAÇÃO da vida na escala Gen 1 (onde o balanceamento foi calibrado), aplica o teto
@@ -6050,6 +6519,11 @@ function simulateGymBattle(team, brockTeam, rng, opts){
         playerWon,
         // tipo do golpe de cada lado -- vira nome de golpe no log (ver nomeDoGolpe)
         playerMove: active.lastMoveType || null, enemyMove: enemy.lastMoveType || null,
+        /* O ID do golpe escolhido, quando existe. O tipo continua vindo junto e é ele que dá a COR
+           do selo; o id só troca a PALAVRA -- e ela some sozinha em confronto de quem não tem golpe
+           escolhido (save antigo, as 8 espécies sem golpe de dano), que aí cai no nomeDoGolpe de
+           sempre. Log gravado antes deste campo não perde nada. */
+        playerMoveId: active.lastMove || null, enemyMoveId: enemy.lastMove || null,
         golpes: diario,   // passo a passo do confronto, na ordem em que aconteceu
         playerHpBefore, playerHpAfter: active.hp, playerMaxHp: active.maxHp,
         enemyHpBefore, enemyHpAfter: enemy.hp, enemyMaxHp: enemy.maxHp,
@@ -6104,6 +6578,12 @@ function chooseStarter(id){
   const isShiny = !!(game.startersShiny && game.startersShiny[id]);
   const mon = createInstance(id, 5);
   mon.shiny = isShiny;
+  /* O INICIAL NÃO ESCOLHE, e não é esquecimento: no nível 5 os sete têm UM golpe de dano só, então
+     a tela seria uma pergunta de uma resposta. Ele recebe o que tem e passa a ser perguntado a
+     partir do primeiro golpe novo que aprender. */
+  mon.ataques = ataquesPadrao(mon);
+  mon.nivelDosAtaques = 5;
+  mon.especieDosAtaques = mon.speciesId;
   game.team = [mon];
   markCaught(id, isShiny);
   game.rivalStarterId = RIVAL_STARTER_COUNTER[id] || 'charmander';
@@ -6546,6 +7026,10 @@ function confirmWild(){
                 : (id==='eevee' ? 45 : LEGS[game.gymIndex].minLevel);
     const mon = createInstance(id, level);
     mon.shiny = !!(offerEntry && offerEntry.shiny);
+    /* CAPTUROU: ele escolhe os golpes. A marca fica na instância e a fila é derivada dela (ver
+       resolverEscolhaDeAtaques), então dois capturados na mesma leva viram duas telas em sequência
+       sem ninguém guardar ordem. */
+    mon.escolherAtaques = true;
     if(mon.shiny){
       game.shinyPityCount = 0;
       game.shinyFoundThisSave = true; // a partir daqui a escalada não volta neste save (ver currentShinyChance)
@@ -6641,6 +7125,362 @@ function resolverEvolucoes(){
   if((game.evolutions||[]).length){ game.screen = 'evolution'; render(); return; }
   continueFromEvolution();   // nada a anunciar: vai direto pro destino
 }
+/* ===================== A ESCOLHA DOS GOLPES =====================
+   Duas perguntas diferentes, e por isso duas telas:
+     1) CAPTUROU  -> escolhe 2 entre tudo que a espécie já aprendeu até aquele nível.
+     2) SUBIU DE NÍVEL e cruzou o nível de um golpe novo -> aprende? e no lugar de qual?
+   As duas seguem o desenho do evoChoice: a marca fica NO POKÉMON, a fila é derivada por uma
+   função, e a tela é só apresentação -- quem valida é a ação. */
+function escolhasDeAtaquePendentes(){
+  return (game.team || []).filter(p => p && p.escolherAtaques);
+}
+/* Roda a fila da CAPTURA. Devolve true se abriu tela (e aí quem chamou tem que devolver).
+   QUEM TEM 2 OU MENOS GOLPES DISPONÍVEIS NÃO VÊ TELA NENHUMA: escolher 2 entre 2 não é escolha, e
+   no começo da jornada isso é a regra e não a exceção -- no nível 5, 176 das 250 espécies têm
+   menos de dois golpes de dano. Uma tela que só tem uma resposta certa é pior que tela nenhuma. */
+function resolverEscolhaDeAtaques(){
+  let abriu = null;
+  for(const p of escolhasDeAtaquePendentes()){
+    const disp = ataquesEscolhiveis(p);
+    if(disp.length <= 2){
+      p.ataques = disp.slice(0, 2);
+      p.nivelDosAtaques = p.level;
+      p.especieDosAtaques = p.speciesId;
+      p.escolherAtaques = false;
+      continue;
+    }
+    abriu = p; break;
+  }
+  if(!abriu) return false;
+  game.escolhaDeAtaques = abriu.id;
+  game.ataquesMarcados = [];
+  game.screen = 'escolhaDeAtaques';
+  render();
+  return true;
+}
+function marcarAtaque(golpe){
+  const i = (game.ataquesMarcados || []).indexOf(golpe);
+  if(i >= 0) game.ataquesMarcados.splice(i, 1);
+  else if(game.ataquesMarcados.length < 2) game.ataquesMarcados.push(golpe);
+  render();
+}
+/* PRA ONDE IR quando a fila de escolha esvazia. No fluxo da captura é sempre a distribuição de
+   níveis (é o funil que abriu a fila); ao ABRIR UM SAVE ANTIGO é a tela em que o save estava.
+   É uma CHAVE no save e não uma função, pelo mesmo motivo do evolucaoDepois e do releaseDepois: a
+   tela de escolha é ponto seguro de gravação, e função não sobrevive ao save. */
+function seguirDaEscolhaDeAtaques(){
+  const depois = game.escolhaDepois;
+  game.escolhaDepois = null;
+  if(depois){ game.screen = depois; render(); return; }
+  startLevelDistribution();
+}
+function confirmarAtaques(){
+  const p = (game.team || []).find(x => x.id === game.escolhaDeAtaques);
+  if(!p){ game.escolhaDeAtaques = null; seguirDaEscolhaDeAtaques(); return; }
+  const disp = ataquesEscolhiveis(p);
+  /* A FUNÇÃO É A REGRA, a tela é a apresentação: revalida que os dois marcados são golpes que ele
+     realmente pode ter -- do mesmo jeito que o escolherEvolucao revalida o destino. */
+  const escolhidos = (game.ataquesMarcados || []).filter(g => disp.indexOf(g) >= 0).slice(0, 2);
+  if(escolhidos.length !== 2) return;
+  p.ataques = escolhidos;
+  p.nivelDosAtaques = p.level;
+  p.especieDosAtaques = p.speciesId;
+  p.escolherAtaques = false;
+  game.escolhaDeAtaques = null;
+  game.ataquesMarcados = [];
+  if(resolverEscolhaDeAtaques()) return;   // pode haver mais de um recém-capturado na mesma leva
+  seguirDaEscolhaDeAtaques();
+}
+/* Chamado ao ABRIR um save. Devolve true se abriu tela (e aí quem chamou não deve renderizar).
+   Guarda a tela do save pra voltar pra ela depois da última escolha -- inclusive quando o próprio
+   save já estava parado numa das telas de escolha (F5 no meio), caso em que o destino já veio
+   gravado e não pode ser sobrescrito pela própria tela de escolha. */
+function escolhaDoSavePendente(){
+  if(!escolhasDeAtaquePendentes().length) return false;
+  const anterior = game.escolhaDepois || null;
+  if(!game.escolhaDepois && game.screen !== 'escolhaDeAtaques' && game.screen !== 'aprenderAtaque'){
+    game.escolhaDepois = game.screen;
+  }
+  if(resolverEscolhaDeAtaques()) return true;
+  /* NÃO ABRIU TELA: o destino não é nosso, e deixá-lo gravado ROUBA a próxima escolha.
+     A fila do save antigo se resolve sozinha sempre que todo mundo tem 2 ou menos golpes
+     disponíveis -- o que é a regra no começo da jornada --, e aí este campo ficava gravado no save
+     (ele é serializado) esperando. Na PRÓXIMA captura, o seguirDaEscolhaDeAtaques consumia esse
+     destino velho em vez de chamar o startLevelDistribution: o jogador confirmava os dois golpes
+     do bicho novo e ia parar na tela em que o save estava semanas antes, PULANDO a distribuição de
+     níveis daquele ginásio. */
+  game.escolhaDepois = anterior;
+  return false;
+}
+
+/* A fila do APRENDIZADO: golpes que a espécie ensina num nível que o pokémon acabou de CRUZAR.
+   A janela é (nivelDosAtaques, level] -- e é o nivelDosAtaques que impede a enxurrada: sem ele um
+   pokémon nível 40 abrindo o save receberia de uma vez a pergunta de tudo que aprendeu no caminho.
+   Depois de evoluir, a espécie muda e vale a tabela da forma NOVA daqui pra frente -- igual ao jogo
+   original, que não volta pra ensinar o que a forma anterior sabia. */
+/* A EVOLUÇÃO DESTRAVA O QUE É NOVO NA FORMA NOVA, e isso não é a mesma coisa que reabrir a janela.
+   O problema é real e foi medido: em 28 dos 112 degraus de evolução (25%) a forma nova ensina um
+   golpe num nível ABAIXO do que o pokémon já tem -- quase sempre no nível 1, porque é assim que a
+   Gen 2 lista quem evolui por pedra. Com a janela contando só nível, esses golpes ficavam
+   INALCANÇÁVEIS pra sempre: o Gyarados nunca aprendia Pancadaria (90) nem Mordida, o Charizard
+   nunca aprendia Ataque de Asa, o Exeggutor nunca aprendia Bomba de Ovo (100).
+   São 38 golpes ao todo, 1,4 por degrau afetado e no máximo 3 -- ou seja, no pior caso a evolução
+   gera três telas, e só nas oito linhas que perdiam mais de um.
+   O que NÃO se faz aqui é zerar o nivelDosAtaques: isso re-ofereceria tudo que a forma antiga já
+   tinha listado e o jogador já tinha recusado ou deixado passar. A conta é a DIFERENÇA entre as
+   duas listas, no nível de hoje. */
+function golpesDaEvolucao(p){
+  const antiga = p.especieDosAtaques;
+  if(!antiga || antiga === p.speciesId) return [];
+  const tinha = new Set(ataquesDisponiveis(antiga, p.level));
+  return ataquesDisponiveis(p.speciesId, p.level).filter(id => !tinha.has(id));
+}
+/* A JANELA VALE PRAS DUAS FORMAS -- e é isso que impede um golpe de sumir na evolução.
+   Depois de evoluir, a tabela lida passa a ser a da forma NOVA, e a Gen 2 re-lista no nível 1
+   quase tudo que a forma anterior ensinava mais tarde: a Folha Navalha é nível 8 na Chikorita e
+   nível 1 na Bayleef, o Trovão é 41 no Pikachu e 1 no Raichu. Com a janela contando só a tabela
+   nova, esses golpes caíam ABAIXO do nivelDosAtaques e ficavam inalcançáveis PRA SEMPRE quando a
+   evolução e o nível do golpe caíam na mesma distribuição -- e o jogador não tinha como saber,
+   porque nada aparecia na tela.
+   Medido: 61 dos 117 degraus de evolução perdem pelo menos um golpe assim (76 golpes ao todo), e
+   em 300 jornadas simuladas isso aconteceu 90 vezes -- entre elas o Trovão (120) do Raichu, a
+   Derrubada (90) do Donphan, a Talho (70) do Ursaring e a Bomba de Ovo (100) da Blissey.
+   O resgate só vale pra golpe que a forma NOVA também ensina: a regra da casa é que depois de
+   evoluir vale a tabela da forma nova, e o que a forma antiga tinha de exclusivo não volta. */
+function aprendizadosPendentes(){
+  const out = [];
+  (game.team || []).forEach(p => {
+    if(!p || !Array.isArray(p.ataques)) return;
+    if(!usaGolpesEscolhidos(p.speciesId)) return;   // o Metrônomo não aprende: ver ataquesDisponiveis
+    const serve = id => p.ataques.indexOf(id) < 0 && (p.ataquesRecusados || []).indexOf(id) < 0;
+    const janela = new Map();   // golpe -> o nível em que ele foi CRUZADO (o menor dos dois)
+    const varrer = (especie, soSeANovaTambemEnsina) => {
+      (APRENDIZADO[especie] || []).forEach(par => {
+        const nivel = par[0], id = GOLPES_IDS[par[1]];
+        if(nivel <= (p.nivelDosAtaques || 0) || nivel > p.level) return;
+        if(soSeANovaTambemEnsina && nivelDoAtaque(p.speciesId, id) == null) return;
+        if(!janela.has(id) || nivel < janela.get(id)) janela.set(id, nivel);
+      });
+    };
+    varrer(p.speciesId, false);
+    if(p.especieDosAtaques && p.especieDosAtaques !== p.speciesId) varrer(p.especieDosAtaques, true);
+    janela.forEach((nivel, id) => { if(serve(id)) out.push({ p: p, golpe: id, nivel: nivel }); });
+    golpesDaEvolucao(p).forEach(id => {
+      if(!serve(id)) return;
+      if(out.some(x => x.p === p && x.golpe === id)) return;   // a janela já pegou este
+      out.push({ p: p, golpe: id, nivel: nivelDoAtaque(p.speciesId, id) || 1, daEvolucao: true });
+    });
+  });
+  return out.sort((a, b) => a.nivel - b.nivel);
+}
+/* Devolve true se abriu tela. QUEM TEM VAGA (menos de 2 golpes) APRENDE SEM PERGUNTAR: não há o
+   que trocar, e perguntar "quer aprender?" pra quem tem uma vaga vazia é a tela de uma resposta só
+   outra vez. O laço é limitado porque cada volta que não abre tela ou consome um golpe ou esvazia
+   a fila -- o teto é rede de segurança, não regra. */
+function resolverAprendizados(){
+  for(let volta = 0; volta < 200; volta++){
+    const fila = aprendizadosPendentes();
+    if(!fila.length) break;
+    const primeiro = fila[0];
+    if(primeiro.p.ataques.length < 2){
+      primeiro.p.ataques.push(primeiro.golpe);
+      /* ANOTA PRA ANUNCIAR. Aprender com vaga livre não precisa de pergunta -- não há o que trocar
+         --, mas precisa de AVISO: até aqui o jogo mudava o time do jogador sem dizer nada, e foi
+         exatamente isso que gerou o relato ("no level 12 ela aprendeu Folha Navalha, deveria
+         aparecer uma tela"). Medido em 300 jornadas: 859 anúncios, 2,86 por jornada (mediana 3,
+         maior 6) -- e 94% deles trazem um golpe só. É barato, e é o segundo golpe de TODOS os
+         sete iniciais. */
+      game.golpesAprendidos = (game.golpesAprendidos || []).concat([{ id: primeiro.p.id, golpe: primeiro.golpe }]);
+      continue;
+    }
+    /* O que entrou de graça é anunciado ANTES da tela de troca: a ordem na tela é a ordem em que
+       as coisas aconteceram, e perguntar "qual retirar" antes de dizer o que ele já ganhou faria
+       o jogador decidir sem a informação toda. */
+    if(anunciarGolpesAprendidos()) return true;
+    game.aprenderAtaque = { id: primeiro.p.id, golpe: primeiro.golpe, nivel: primeiro.nivel,
+                            daEvolucao: !!primeiro.daEvolucao };
+    game.screen = 'aprenderAtaque';
+    render();
+    return true;
+  }
+  /* Fila vazia: a marca alcança o nível E A ESPÉCIE de todo mundo, e o que ficou pra trás não volta
+     a ser perguntado. Sem a espécie, os golpes da evolução seriam re-oferecidos em toda distribuição
+     de níveis dali pra frente. */
+  (game.team || []).forEach(p => {
+    if(!p) return;
+    if(typeof p.nivelDosAtaques === 'number' && p.nivelDosAtaques < p.level) p.nivelDosAtaques = p.level;
+    if(Array.isArray(p.ataques)) p.especieDosAtaques = p.speciesId;
+  });
+  /* O anúncio vem DEPOIS de fechar a janela: o botão dele volta pelo continueFromEvolution, que
+     chama esta função de novo -- com a janela já fechada e a lista já vazia, a segunda passada
+     cai direto no destino em vez de repetir tudo. */
+  return anunciarGolpesAprendidos();
+}
+/* A TELA DE "APRENDEU UM GOLPE". Devolve true se abriu. É um ANÚNCIO, não uma pergunta: segue o
+   desenho da tela de evolução -- uma tela só listando tudo que aconteceu naquela passada, e um
+   "Continuar". Uma tela por golpe seria a enxurrada que este projeto evita; uma caixa dentro da
+   tela de resultado seria uma segunda apresentação pro mesmo evento. */
+function anunciarGolpesAprendidos(){
+  if(!(game.golpesAprendidos || []).length) return false;
+  game.screen = 'golpeAprendido';
+  render();
+  return true;
+}
+function seguirDoGolpeAprendido(){
+  game.golpesAprendidos = [];
+  continueFromEvolution();   // volta pro despachante: pode haver troca ou outro pokémon na fila
+}
+/* trocar = null é "não aprender". A RECUSA É GRAVADA (ataquesRecusados): sem isso a pergunta
+   voltaria no próximo nível, e voltaria pra sempre.
+   TIRAR UM GOLPE TAMBÉM É RECUSAR ELE, e sem essa linha o jogo TRAVAVA num carrossel infinito.
+   O golpe retirado volta pra fila no instante seguinte se o nível dele ainda estiver DENTRO da
+   janela -- e ele está sempre que os dois golpes foram aprendidos na mesma distribuição. Medido
+   com um Nidoran♂ nível 30 que aprende Chute Duplo (12) e Ferrão Venenoso (17) de uma vez: a tela
+   reabria pros dois alternadamente, 40 vezes em 40, sem fim e sem saída -- a jornada parava ali.
+   Gravar a retirada é a mesma regra do "não aprender", e é o que o jogo original faz: golpe
+   esquecido não volta sozinho. */
+function responderAprendizado(trocar){
+  const pend = game.aprenderAtaque;
+  if(!pend) return;
+  const p = (game.team || []).find(x => x.id === pend.id);
+  if(p){
+    if(trocar === null){
+      p.ataquesRecusados = (p.ataquesRecusados || []).concat([pend.golpe]);
+    } else {
+      const i = p.ataques.indexOf(trocar);
+      if(i < 0) return;                     // a tela mandou um golpe que ele não tem: não faz nada
+      p.ataques[i] = pend.golpe;
+      p.ataquesRecusados = (p.ataquesRecusados || []).concat([trocar]);
+    }
+  }
+  game.aprenderAtaque = null;
+  continueFromEvolution();                  // volta pro despachante, que reavalia a fila
+}
+
+/* OS DOIS GOLPES DO POKEMON, na fileira do time. Sem isto o jogador escolhe dois golpes e não tem
+   onde conferir o que escolheu -- a escolha de um pokémon capturado há cinco trechos não estaria em
+   lugar nenhum. Fica nas MESMAS quatro telas de ordem onde o + de item aparece, pelo mesmo motivo:
+   são as telas onde se decide o que vai pra batalha.
+   Sai VAZIO pra quem não tem golpe escolhido (save antigo, a defesa do ginásio -- que vem de um
+   código de time e não carrega golpe --, e as 8 espécies sem golpe de dano): ali não há o que
+   mostrar, e uma linha vazia em cada fileira seria pior que nenhuma. */
+function golpesDoTimeHtml(p){
+  if(!p) return '';
+  /* QUEM LUTA DE METRÔNOMO ANUNCIA O METRÔNOMO. Sem isto o Togepi -- que não tem um único golpe de
+     dano até o nível 38 -- aparecia com a fileira MUDA, e foi reportado: "o Togepi deveria aparecer
+     o Metrônomo, porém não está exibindo nada". Ele é o único caso em que a fileira ficava vazia
+     tendo o que dizer: são 2 espécies sem golpe de dano no nível 30 (Togepi e Togetic) e as duas
+     são do Metrônomo. O selo vai TRACEJADO porque não é uma escolha do jogador -- os dois cheios
+     ao lado querem dizer "escolhi estes", e um Metrônomo com a mesma cara diria o que não é.
+     Quem não tem golpe escolhido nem especial (Abra, Ditto, Kakuna, save antigo, a defesa do
+     ginásio da cidade -- que vem de um código de time) continua saindo vazio: ali não há o que
+     dizer, e uma linha em cada fileira seria pior que nenhuma. */
+  if(!usaGolpesEscolhidos(p.speciesId)){
+    const esp = especiaisDaEspecie(p.speciesId).filter(e => e.nome === 'Metrônomo');
+    if(!esp.length) return '';
+    return `<span class="mon-sub golpes-do-time">${esp.map(e =>
+      `<span class="type-pill golpe-especial" style="background:${TYPE_COLORS[e.tipo] || '#888'}">${escapeHtmlSafe(e.nome)}</span>`).join('')}</span>`;
+  }
+  const a = Array.isArray(p.ataques) ? p.ataques.filter(id => GOLPES[id]) : [];
+  if(!a.length) return '';
+  return `<span class="mon-sub golpes-do-time">${a.map(id => seloDeGolpe(nomeDoAtaque(id), GOLPES[id][0])).join('')}</span>`;
+}
+/* A TELA DA CAPTURA, no MESMO desenho das outras duas: cabeçalho com o sprite num ladrilho e a
+   frase, e um cartão por golpe.
+   O texto explicava a mecânica ("ele já aprendeu 4 golpes até o nível 24, mas só leva 2; na
+   batalha ele usa sempre o que tirar mais dano dos dois") e virou a instrução direta -- o que o
+   jogador precisa saber ali é o que fazer e o que ele perde, não como o motor escolhe.
+   SAIU O "Nível N" DE CADA CARD: ele dizia em que nível a espécie ensina aquele golpe, que é
+   informação de tabela e não ajuda a escolher entre dois golpes que ele JÁ tem disponíveis. */
+function renderEscolhaDeAtaques(){
+  const p = (game.team || []).find(x => x.id === game.escolhaDeAtaques);
+  if(!p) return `<div class="box"><p>Carregando...</p></div>`;
+  const disp = ataquesEscolhiveis(p);
+  const marcados = game.ataquesMarcados || [];
+  const faltam = escolhasDeAtaquePendentes().length - 1;
+  return `
+  <div class="eyebrow">GOLPES</div>
+  <div class="box cursor">
+    <div class="golpe-cab">
+      <span class="golpe-cab-sprite">${spriteHtml(p.speciesId,'sprite-md',p.shiny)}</span>
+      <span class="golpe-cab-txt">Escolha <strong>2</strong> para permanecer com <strong>${escapeHtmlSafe(p.name)}</strong>, o resto será esquecido</span>
+    </div>
+    ${faltam ? `<p class="hint-text">Mais ${faltam} pokémon ${faltam===1?'espera':'esperam'} escolha depois deste.</p>` : ''}
+  </div>
+  <div class="box">
+    ${disp.map(id=>{
+      const i = marcados.indexOf(id);
+      return `<button class="btn golpe-opcao ${i>=0?'selected':''}" onclick="marcarAtaque('${escJs(id)}')">
+        <span class="mont-num">${i>=0 ? (i+1)+'º' : ''}</span>
+        ${cartaoDeGolpe(id, true)}
+      </button>`;
+    }).join('')}
+  </div>
+  <button class="btn success" ${marcados.length===2?'':'disabled'} onclick="confirmarAtaques()">
+    ${marcados.length===2 ? 'Confirmar os 2 golpes' : `Escolha ${2-marcados.length} golpe${marcados.length===1?'':'s'}`}
+  </button>`;
+}
+/* O ANÚNCIO. A frase é "Fulano aprendeu um novo golpe!" e o QUE ele aprendeu vem embaixo, no
+   cartão -- nome, poder e tipo. Ela já foi uma linha só ("Fulano aprendeu CHICOTE DE CIPÓ - Poder
+   35 - PLANTA") e durou algumas horas: a informação era a mesma, mas espremida numa frase corrida
+   ela se lia como legenda, não como acontecimento. Separando as duas coisas, a frase anuncia e o
+   cartão informa.
+   AGRUPA POR POKÉMON: quando dois golpes entram na mesma passada -- 6% dos anúncios -- o cabeçalho
+   sai UMA vez e os cartões se empilham embaixo dele. Repetir "Fulano aprendeu um novo golpe!" duas
+   vezes seguidas leria como se fossem dois eventos. */
+function renderGolpeAprendido(){
+  const itens = (game.golpesAprendidos || []).filter(it => GOLPES[it.golpe]);
+  const porMon = [];
+  itens.forEach(it => {
+    const dono = (game.team || []).find(x => x.id === it.id);
+    if(!dono) return;
+    let g = porMon.find(x => x.p === dono);
+    if(!g){ g = { p: dono, golpes: [] }; porMon.push(g); }
+    g.golpes.push(it.golpe);
+  });
+  const blocos = porMon.map(g => `
+    <div class="golpe-cab">
+      <span class="golpe-cab-sprite">${spriteHtml(g.p.speciesId,'sprite-md',g.p.shiny)}</span>
+      <span class="golpe-cab-txt"><strong>${escapeHtmlSafe(g.p.name)}</strong> aprendeu ${g.golpes.length > 1 ? 'novos golpes!' : 'um novo golpe!'}</span>
+    </div>
+    ${g.golpes.map(id => cartaoDeGolpe(id) + '<div>' + seloDoTipoDoGolpe(id) + '</div>').join('')}`).join('<hr class="golpe-sep">');
+  return `
+  <div class="eyebrow">NOVO GOLPE</div>
+  <div class="box cursor">
+    ${blocos || '<p>Nada a mostrar.</p>'}
+  </div>
+  <button class="btn primary" onclick="seguirDoGolpeAprendido()">Continuar ➜</button>`;
+}
+/* A TELA DA TROCA. Os mesmos três blocos do anúncio -- cabeçalho, cartão e selo do tipo --, mais
+   a pergunta e os dois golpes que ele já leva.
+   Saiu daqui a frase que dizia em que nível o golpe é aprendido ("Aprendido no level 22, porém ele
+   já possui 2 golpes"): ela nasceu pra justificar a pergunta, e a pergunta se justifica sozinha
+   quando os dois golpes atuais estão logo abaixo. O caso do golpe destravado pela EVOLUÇÃO some
+   junto -- era ele que fazia a linha dizer "level 1" num pokémon de 30.
+   Os dois golpes atuais usam o MESMO cartão do golpe novo, de propósito: é comparação lado a lado,
+   e um formato diferente em cima e embaixo obrigaria a reaprender a ler no meio da decisão. */
+function renderAprenderAtaque(){
+  const pend = game.aprenderAtaque;
+  const p = pend && (game.team || []).find(x => x.id === pend.id);
+  if(!p || !GOLPES[pend.golpe]) return `<div class="box"><p>Carregando...</p></div>`;
+  return `
+  <div class="eyebrow">NOVO GOLPE</div>
+  <div class="box cursor">
+    <div class="golpe-cab">
+      <span class="golpe-cab-sprite">${spriteHtml(p.speciesId,'sprite-md',p.shiny)}</span>
+      <span class="golpe-cab-txt"><strong>${escapeHtmlSafe(p.name)}</strong> quer aprender um golpe novo!</span>
+    </div>
+    ${cartaoDeGolpe(pend.golpe)}
+    <div>${seloDoTipoDoGolpe(pend.golpe)}</div>
+    <p class="golpe-pergunta">Escolha qual será substituído</p>
+  </div>
+  <div class="box">
+    ${p.ataques.filter(id => GOLPES[id]).map(id=>`<button class="btn golpe-opcao" onclick="responderAprendizado('${escJs(id)}')">
+      ${cartaoDeGolpe(id, true)}
+    </button>`).join('')}
+  </div>
+  <button class="btn" onclick="responderAprendizado(null)">Não aprender ${escapeHtmlSafe(nomeDoAtaque(pend.golpe))}</button>`;
+}
 function renderEvoChoice(){
   const p = evolucoesPendentes()[0];
   if(!p) return `<div class="box"><p>Carregando...</p></div>`;
@@ -6700,6 +7540,11 @@ function chooseEeveeEvolution(choice){
   }
 }
 function startLevelDistribution(){
+  /* O RECÉM-CAPTURADO ESCOLHE ANTES. Este é o funil por onde passam os dois braços do encontro
+     selvagem (proceedAfterTeamLocked e chooseEeveeEvolution), então é aqui que a pergunta cabe --
+     e antes da distribuição de propósito: o jogador acabou de capturar, e é do bicho novo que ele
+     está pensando. */
+  if(resolverEscolhaDeAtaques()) return;
   game.pool = (game.gymIndex===0) ? 20 : (game.pendingGymVictoryPool || 10);
   game.poolTotal = game.pool;
   game.alloc = {};
@@ -6773,6 +7618,11 @@ function confirmLevels(){
    É uma CHAVE e não a função: a tela de evolução é ponto seguro de gravação, e função não sobrevive
    ao save -- o mesmo motivo do releaseDepois. */
 function continueFromEvolution(){
+  /* GOLPE NOVO PELO NÍVEL. Fica DEPOIS da evolução porque a evolução troca a espécie, e é a tabela
+     da forma nova que vale daqui pra frente.
+     O destino (evolucaoDepois) só é consumido DEPOIS que a fila esvazia -- limpo aqui em cima, a
+     volta da tela de aprendizado cairia no teamOrder em vez de continuar a jornada. */
+  if(resolverAprendizados()) return;
   const depois = game.evolucaoDepois;
   game.evolucaoDepois = null;
   game.evolutions = [];   // já foram anunciadas; sem isso a próxima tela de resultado repetiria
@@ -7978,10 +8828,14 @@ function runTrainerBattle(opponentTeam){
   game.trainerBattlePlayerName = null;     // e o lado esquerdo é você mesmo (ver renderTrainerBattling)
   game.towerBattlePending = false;
   // mesmo cuidado da luta do Mewtwo: createInstance não traz a flag de shiny, e sem ela um shiny
-  // do jogador lutaria como comum aqui -- sem a estrela na tela e sem o buff ofensivo
+  // do jogador lutaria como comum aqui -- sem a estrela na tela e sem o buff ofensivo.
+  // OS GOLPES ESCOLHIDOS têm o mesmo problema, e é a mesma linha que resolve: sem recolar o campo,
+  // o time inteiro cai no motor de tipo com o poder implícito de 60 e o jogador luta com um time
+  // que não é o dele -- medido, 6 de 6 perdiam os golpes.
   const myTeamClone = game.team.map(p=>{
     const inst = createInstance(p.speciesId, p.level);
     inst.shiny = !!p.shiny;
+    if(Array.isArray(p.ataques)) inst.ataques = p.ataques.slice();
     return inst;
   });
   applySpecialtyBuff(myTeamClone);
@@ -11006,7 +11860,10 @@ function showJourneyEnd(){
       let evs = [];
       game.team.forEach(p => { evs = evs.concat(tryEvolve(p)); });
       game.team.forEach(p => { p.maxHp = calcMaxHp(p); p.hp = p.maxHp; });   // a forma nova tem outro baseHp
-      if(evs.length || evolucoesPendentes().length){
+      /* O aprendizadosPendentes entra na condição porque o bônus pode cruzar o nível de um GOLPE
+         sem cruzar o de uma evolução -- e aí, sem ele, a pergunta só apareceria depois da primeira
+         luta da Elite. Quem resolve as três coisas é o continueFromEvolution, lá embaixo. */
+      if(evs.length || evolucoesPendentes().length || aprendizadosPendentes().length){
         game.evolutions = evs;
         game.evolucaoDepois = 'journeyEnd';
         resolverEvolucoes();
@@ -11268,7 +12125,7 @@ async function logout(){
    um ponto seguro de gravação: o autosave não rodava e o flushPendingAutoSave do beforeunload
    também não -- então a insígnia que o jogador ACABOU de ganhar ficava pendente enquanto ele
    pensava na escolha, e fechar a aba ali perdia a vitória. */
-const SAFE_SAVE_SCREENS = new Set(['start','walk','walkNext','gymChoice','wild','release','levels','evolution','evoChoice','eeveeChoice','teamOrder','preBattle','victory','defeat','gameover','journeyEnd','specialIntro','specialResult','rocketHideout','eliteIntro','eliteHeal']);
+const SAFE_SAVE_SCREENS = new Set(['start','walk','walkNext','gymChoice','wild','release','levels','evolution','evoChoice','eeveeChoice','escolhaDeAtaques','aprenderAtaque','golpeAprendido','teamOrder','preBattle','victory','defeat','gameover','journeyEnd','specialIntro','specialResult','rocketHideout','eliteIntro','eliteHeal']);
 function saveDocRef(uid, slot){
   return db.collection('users').doc(uid).collection('saves').doc(String(slot));
 }
@@ -11578,6 +12435,13 @@ function serializeGame(){
     releaseSelected: game.releaseSelected,
     releaseDepois: game.releaseDepois || null,
     evolucaoDepois: game.evolucaoDepois || null,
+    /* As duas telas de golpe são ponto seguro de gravação: o jogador PENSA nelas, e fechar a aba
+       ali não pode perder a captura nem repetir a pergunta. */
+    escolhaDeAtaques: game.escolhaDeAtaques || null,
+    escolhaDepois: game.escolhaDepois || null,
+    ataquesMarcados: game.ataquesMarcados || [],
+    aprenderAtaque: game.aprenderAtaque || null,
+    golpesAprendidos: game.golpesAprendidos || [],
     resgatadoSemVaga: game.resgatadoSemVaga || null,
     pool: game.pool,
     poolTotal: game.poolTotal,
@@ -11766,6 +12630,11 @@ function applySavedState(data){
   game.releaseSelected = data.releaseSelected || [];
   game.releaseDepois = data.releaseDepois || null;
   game.evolucaoDepois = data.evolucaoDepois || null;
+  game.escolhaDeAtaques = data.escolhaDeAtaques || null;
+  game.escolhaDepois = data.escolhaDepois || null;
+  game.ataquesMarcados = data.ataquesMarcados || [];
+  game.aprenderAtaque = data.aprenderAtaque || null;
+  game.golpesAprendidos = data.golpesAprendidos || [];
   game.resgatadoSemVaga = data.resgatadoSemVaga || null;
   game.pool = data.pool || 0;
   game.poolTotal = data.poolTotal || 0;
@@ -11861,7 +12730,14 @@ function applySavedState(data){
      que não é salvo. Sem esta rede, um F5 ali levava o jogador pro teamOrder no meio da Elite.
      A evolução em si não se perde: ela já foi aplicada no time no instante em que o nível subiu;
      o que se perde é o anúncio. */
-  if(['evolution','evoChoice'].includes(data.screen) && game.evolucaoDepois === 'special' && !game.specialBattle){
+  /* As telas de GOLPE entram na mesma rede que as de evolução, e pelo mesmo motivo: as quatro são
+     ponto seguro de gravação e as quatro são alcançadas com evolucaoDepois='special' (o caminho da
+     Elite e do esconderijo da Rocket). O specialBattle não é serializado, então depois do F5 o
+     Continuar cairia num continueAfterSpecial sem batalha nenhuma e largaria o jogador no
+     preBattle no meio da Elite. */
+  if(['evolution','evoChoice','aprenderAtaque','golpeAprendido'].includes(data.screen) && game.evolucaoDepois === 'special' && !game.specialBattle){
+    game.aprenderAtaque = null;
+    game.golpesAprendidos = [];
     game.evolucaoDepois = null;
     game.screen = (game.eliteStatus==='inProgress') ? 'eliteHeal' : 'preBattle';
   }
@@ -11899,6 +12775,8 @@ async function continueSave(slot){
     game.startersShiny = (game.screen === 'start')
       ? sorteioDosIniciais(slot, game.gameMode) : {};
     reconcileInstanceIdCounter();
+    /* SAVE ANTIGO: cada pokémon sem golpe escolhido ganha a tela da captura, uma por vez. */
+    if(escolhaDoSavePendente()) return;
     render();
   } catch(e){ console.error(e); }
 }
@@ -11917,6 +12795,7 @@ async function continueCompleteSave(slot){
     game.startersShiny = {};   // jornada terminada nunca volta pra escolha de inicial (ver continueSave)
     reconcileInstanceIdCounter();
     game.screen = 'journeyEnd';
+    if(escolhaDoSavePendente()) return;
     render();
   } catch(e){ console.error(e); }
 }
@@ -13343,6 +14222,7 @@ function renderTeamOrder(){
         <div class="order-info">
           <span class="mon-name">${spriteHtml(p.speciesId,'sprite-sm',p.shiny)} ${p.name}${p.shiny?" 🌟":""} — Lv.${p.level}</span>
           <span class="mon-sub">${typesHtml(p.types)}</span>
+          ${golpesDoTimeHtml(p)}
         </div>
         <div class="order-controls">
           <button class="circle-btn" onclick="moveOrder('${p.id}', -1)" ${idx===0?'disabled':''}>▲</button>
@@ -13834,8 +14714,12 @@ function suddenDeathNote(m){
    golpe (playerMove/enemyMove). Confrontos gravados ANTES disso (ligas e reprises antigas) não
    têm o tipo: ali o cartão mostra só o dano, em vez de inventar um nome.
    Não tem linha de "fulano venceu": quem caiu aparece apagado e com a barra no zero. */
-function golpeSeloHtml(speciesId, tipo){
-  return seloDeGolpe(nomeDoGolpe(speciesId, tipo), tipo);
+/* O SELO DO GOLPE. Quando o confronto trouxe o ID do golpe escolhido, é o nome DELE que sai -- o
+   tipo continua mandando na COR, então um Raio segue azul-elétrico. Sem id (save antigo, ou pokémon
+   sem golpe escolhido) cai no nomeDoGolpe, que deduz um nome a partir do tipo, como sempre fez. */
+function golpeSeloHtml(speciesId, tipo, golpeId){
+  const nome = (golpeId && GOLPES[golpeId]) ? nomeDoAtaque(golpeId) : nomeDoGolpe(speciesId, tipo);
+  return seloDeGolpe(nome, (golpeId && GOLPES[golpeId]) ? GOLPES[golpeId][0] : tipo);
 }
 function renderMatchupLog(matchups){
   const lado = (m, id) => {
@@ -13849,7 +14733,7 @@ function renderMatchupLog(matchups){
         ${renderHpBar(hp, maxHp, 'mlog-f-'+id, 'mlog-l-'+id)}
         <span class="mlog-hp">${hp}/${maxHp}</span>
       </div>
-      ${m.semPassos ? `<div class="mlog-golpe">${golpeSeloHtml(m.sp, m.tipo)}<span class="mlog-dano">−${m.dano}</span></div>` : ''}
+      ${m.semPassos ? `<div class="mlog-golpe">${golpeSeloHtml(m.sp, m.tipo, m.golpeId)}<span class="mlog-dano">−${m.dano}</span></div>` : ''}
     </div>`;
   };
   return matchups.map((m, i)=>{
@@ -13865,11 +14749,11 @@ function renderMatchupLog(matchups){
       <div class="mlog-grade">
         ${lado({ nome:m.player, sp:m.playerSpecies, lvl:m.playerLevel, shiny:m.playerShiny,
                  hp:m.playerHpAfter, hpBefore:m.playerHpBefore, maxHp:m.playerMaxHp,
-                 tipo:m.playerMove, dano:danoDoPlayer, semPassos }, i+'a')}
+                 tipo:m.playerMove, golpeId:m.playerMoveId, dano:danoDoPlayer, semPassos }, i+'a')}
         <span class="mlog-x">×</span>
         ${lado({ nome:m.enemy, sp:m.enemySpecies, lvl:m.enemyLevel, shiny:m.enemyShiny,
                  hp:m.enemyHpAfter, hpBefore:m.enemyHpBefore, maxHp:m.enemyMaxHp,
-                 tipo:m.enemyMove, dano:danoDoEnemy, semPassos }, i+'b')}
+                 tipo:m.enemyMove, golpeId:m.enemyMoveId, dano:danoDoEnemy, semPassos }, i+'b')}
       </div>
       ${passosHtml(m)}
       ${aviso ? `<div class="mlog-res">${aviso}</div>` : ''}
@@ -14080,6 +14964,24 @@ const TIPO_DO_ESPECIAL = {
      que o Zubat não pode drenar com "Absorver": sairia no verde de Planta num pokémon Voador. */
   'Absorver':'Grass', 'Mega Dreno':'Grass', 'Sanguessuga':'Bug'
 };
+/* O CARTÃO DO GOLPE -- usado pelas TRÊS telas de golpe (captura, aprendizado e anúncio), e por
+   isso mora aqui e não dentro de uma delas.
+   QUEM É COLORIDO É O SELO DO TIPO, e só ele: o cartão fica neutro. Ele já teve um ladrilho com
+   emoji do tipo à esquerda e o fundo inteiro tingido, e as duas coisas saíram a pedido em
+   09/09/2026 -- com o cartão tingido E o selo colorido, a mesma cor aparecia duas vezes na mesma
+   linha e nenhuma das duas se destacava.
+   O selo é o typePill DE VERDADE, o mesmo da Pokédex, da fileira do time e da batalha: usar a
+   função em vez de recriar a cor é o que garante que Sombrio aqui seja o mesmo marrom de lá. */
+function cartaoDeGolpe(id, comTipo){
+  const tipo = GOLPES[id][0], poder = GOLPES[id][1];
+  return `<div class="golpe-cartao">
+    <span class="golpe-cartao-nome">${escapeHtmlSafe(nomeDoAtaque(id))}${comTipo ? typePill(tipo) : ''}</span>
+    <span class="golpe-cartao-poder"><span>PODER</span><b>${poder}</b></span>
+  </div>`;
+}
+/* O tipo do golpe do cabeçalho, embaixo do cartão. Já disse "Tipo: Sombrio" e hoje diz só
+   "SOMBRIO": o rótulo era redundante ao lado de um selo que o jogo inteiro já usa pra tipo. */
+function seloDoTipoDoGolpe(id){ return typePill(GOLPES[id][0]); }
 /* O selo colorido com o nome do golpe dentro -- a cor já entrega o tipo. */
 function seloDeGolpe(nome, tipo){
   if(!nome) return '';
@@ -14264,7 +15166,7 @@ function passosHtml(m){
   if(!golpes.length) return '';
   const nomeP = escapeHtmlSafe(m.player||''), nomeE = escapeHtmlSafe(m.enemy||'');
   const ladoHtml = (doJogador) => `<span class="mlog-quem ${doJogador?'p':'e'}">${doJogador?nomeP:nomeE}</span>`;
-  const seloDe = (doJogador) => golpeSeloHtml(doJogador?m.playerSpecies:m.enemySpecies, doJogador?m.playerMove:m.enemyMove);
+  const seloDe = (doJogador) => golpeSeloHtml(doJogador?m.playerSpecies:m.enemySpecies, doJogador?m.playerMove:m.enemyMove, doJogador?m.playerMoveId:m.enemyMoveId);
   /* Uma frase só, sempre na mesma forma: "X atacou Y com GOLPE e tirou -N de HP."
      Já passaram por aqui marcação de crítico, de golpe moribundo e de "o tipo não pega nele" --
      cada uma virava ruído numa linha que se lê de relance. O número conta a história.
@@ -15067,6 +15969,7 @@ function renderNeighborhoodGymDefenseOrder(){
         <div class="order-info">
           <span class="mon-name">${spriteHtml(p.speciesId,'sprite-sm',p.shiny)} ${escapeHtmlSafe(sp?sp.name:'?')}${p.shiny?' 🌟':''} — Lv.${p.level}${buff?' 🔺':''}</span>
           <span class="mon-sub">${sp?typesHtml(sp.types):''}</span>
+          ${golpesDoTimeHtml(p)}
         </div>
         <div class="order-controls">
           <button class="circle-btn" onclick="moveNeighborhoodGymDefenseOrder(${idx}, -1)" ${idx===0?'disabled':''}>▲</button>
@@ -15129,6 +16032,7 @@ function renderNeighborhoodGymChallengeOrderPicker(){
       <div class="order-info">
         <span class="mon-name">${spriteHtml(p.speciesId,'sprite-sm',p.shiny)} ${p.name}${p.shiny?" 🌟":""} — Lv.${p.level}</span>
         <span class="mon-sub">${typesHtml(p.types)}</span>
+        ${golpesDoTimeHtml(p)}
       </div>
       <div class="order-controls">
         <button class="circle-btn" onclick="moveNeighborhoodGymChallengeOrder('${p.id}', -1)" ${idx===0?'disabled':''}>▲</button>
@@ -16119,6 +17023,7 @@ function renderTowerOrderModal(){
             <div class="order-num">${idx+1}º${botaoDeItemHtml(p)}</div>
             <div class="order-info">
               <span class="mon-name">${sp?spriteHtml(p.speciesId,'sprite-sm',p.shiny):'❔'} ${escapeHtmlSafe(sp?sp.name:'?')}${p.shiny?' 🌟':''} — Lv.${p.level}</span>
+              ${golpesDoTimeHtml(p)}
             </div>
             <div class="order-controls">
               <button class="circle-btn" onclick="moveTowerOrder(${idx},-1)" ${idx===0?'disabled':''}>▲</button>
@@ -18416,6 +19321,7 @@ function virarMatchup(m){
     playerTeamSize:m.enemyTeamSize,
     // os golpes também trocam de lado, senão o log do jogador B mostra o golpe do adversário
     playerMove:m.enemyMove, enemyMove:m.playerMove,
+    playerMoveId:m.enemyMoveId, enemyMoveId:m.playerMoveId,
     enemy:m.player, enemySpecies:m.playerSpecies, enemyLevel:m.playerLevel,
     enemyShiny:m.playerShiny, enemyBuffed:m.playerBuffed,
     enemyHpBefore:m.playerHpBefore, enemyHpAfter:m.playerHpAfter, enemyMaxHp:m.playerMaxHp,
@@ -19833,6 +20739,31 @@ function renderPokedexFicha(){
           ${esp.map(e=>`<div class="dex-especial">${seloDeGolpe(e.nome, e.tipo)}<span class="dex-especial-chance">${Math.round(e.chance*100)}% por confronto</span></div>`).join('')}
         </div>`;
       })()}
+      ${(() => {
+        /* OS GOLPES QUE ELE APRENDE, na ficha. Os seis números dizem o quanto ele TEM; o golpe
+           especial diz o que ele faz sozinho; esta lista diz com o que ele bate -- e é a única
+           das três que o jogador precisa ANTES de capturar, porque é ela que responde "esse aqui
+           cobre o tipo que falta no meu time?".
+           É a MESMA tabela que a tela de escolha usa (APRENDIZADO), então ela só traz golpe de
+           DANO: o que está aqui é exatamente o que ele pode levar pra batalha. Espécie sem golpe
+           nenhum (o Ditto) não ganha a seção -- uma lista vazia diria menos que nada. */
+        const lista = APRENDIZADO[id] || [];
+        if(!lista.length) return '';
+        const linhas = lista.map(par => {
+          const golpe = GOLPES_IDS[par[1]];
+          if(!GOLPES[golpe]) return '';
+          return `<div class="dex-golpe">
+            <span class="dex-golpe-nivel">Lv.${par[0]}</span>
+            <span class="dex-golpe-nome">${escapeHtmlSafe(nomeDoAtaque(golpe))}</span>
+            <span class="dex-golpe-poder">${GOLPES[golpe][1]}</span>
+            ${typePill(GOLPES[golpe][0])}
+          </div>`;
+        }).join('');
+        return `<div class="dex-golpes">
+          <div class="dex-especiais-tit">Golpes por nível</div>
+          <div class="dex-golpes-lista">${linhas}</div>
+        </div>`;
+      })()}
       ${ehMewtwo ? '<button class="btn secondary" onclick="fecharPokedexFicha();openMewtwoLoanInfoModal()">🧬 Empréstimo do Mewtwo</button>' : ''}
       <button class="btn primary" onclick="fecharPokedexFicha()">Fechar</button>
     </div>
@@ -20052,6 +20983,7 @@ async function startMewtwoBattle(slot){
   const team = saveData.team.map(p=>{
     const inst = createInstance(p.speciesId, p.level);
     inst.shiny = !!p.shiny;
+    if(Array.isArray(p.ataques)) inst.ataques = p.ataques.slice();   // mesmo motivo do shiny, ver acima
     return inst;
   });
   // 1/128 -- vale tanto na primeira vitória (a que completa a Pokédex) quanto em qualquer reencontro
@@ -20167,6 +21099,9 @@ function render(){
     case 'trainerTower': html = renderTrainerTower(); break;
     case 'gymChoice': html = renderGymChoice(); break;
     case 'evoChoice': html = renderEvoChoice(); break;
+    case 'escolhaDeAtaques': html = renderEscolhaDeAtaques(); break;
+    case 'aprenderAtaque': html = renderAprenderAtaque(); break;
+    case 'golpeAprendido': html = renderGolpeAprendido(); break;
     case 'sundayBoss': html = renderSundayBoss(); break;
     case 'onlineBattle': html = renderOnlineBattle(); break;
     case 'battleLobby': html = renderBattleLobby(); break;

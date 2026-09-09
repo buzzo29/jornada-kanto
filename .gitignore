@@ -79,3 +79,7 @@ preview-telas.html
 
 # capturas do Playwright durante os testes de tela -- artefato, nao fonte
 .playwright-mcp/
+
+# tabelas de golpe geradas pelo tools/gerar-tabelas-golpes.js -- sao coladas nos dois motores,
+# entao o que vale e o que esta no index.html e no functions/index.js. Este arquivo e a saida.
+tools/_tabelas-golpes.txt

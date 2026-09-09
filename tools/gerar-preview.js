@@ -52,13 +52,79 @@ game.routeHistory = ROTAS.slice(0, 3);
 game.routeCards = ['rock_tunnel','lavender_detour'];
 add('Jornada', 'Escolha de caminho (trecho 4)', ()=>sb.renderWalkNext());
 
+/* ---- os dois golpes do pokemon ---- */
+/* As duas telas de escolha de golpe. Valem a 320px porque o nome de golpe e longo ("Deslizamento de
+   Rochas") e cada linha carrega selo, poder e nivel. */
+{
+  const gy = sb.createInstance('gyarados', 40);
+  gy.id = 'prev1'; gy.escolherAtaques = true;
+  game.team = [gy];
+  game.escolhaDeAtaques = gy.id;
+  game.ataquesMarcados = [];
+  add('Golpes', 'Escolher os 2 golpes — nada marcado', ()=>sb.renderEscolhaDeAtaques());
+  game.ataquesMarcados = sb.ataquesDisponiveis('gyarados', 40).slice(0, 2);
+  add('Golpes', 'Escolher os 2 golpes — com os dois marcados', ()=>sb.renderEscolhaDeAtaques());
+
+  const kb = sb.createInstance('kabuto', 33);
+  kb.id = 'prev2'; kb.ataques = ['scratch','absorb']; kb.nivelDosAtaques = 30;
+  game.team = [kb];
+  game.escolhaDeAtaques = null;
+  game.aprenderAtaque = { id: kb.id, golpe: 'mudshot', nivel: 33 };
+  add('Golpes', 'Aprender um golpe novo (qual sai?)', ()=>sb.renderAprenderAtaque());
+  const gn = sb.createInstance('gengar', 45);
+  gn.id = 'prev2b'; gn.ataques = ['shadowball','sludgebomb'];
+  game.team = [gn];
+  game.aprenderAtaque = { id: gn.id, golpe: 'dreameater', nivel: 45 };
+  add('Golpes', 'Aprender — nome comprido e tipo escuro', ()=>sb.renderAprenderAtaque());
+  game.aprenderAtaque = null;
+
+  /* O ANUNCIO. Ele e a tela mais comum das tres -- 2,9 por jornada, contra 11 de troca -- e a que
+     o jogador pediu em 09/09/2026. Vale a 320px pelo mesmo motivo das outras: nome de golpe longo,
+     e aqui ele divide a linha com o sprite e o nome do pokemon. */
+  const bu = sb.createInstance('bulbasaur', 13);
+  bu.id = 'prev3'; bu.ataques = ['tackle','vinewhip'];
+  const gy2 = sb.createInstance('gyarados', 20);
+  gy2.id = 'prev4'; gy2.ataques = ['tackle','thrash'];
+  game.team = [bu, gy2];
+  game.golpesAprendidos = [{ id: bu.id, golpe: 'vinewhip' }];
+  add('Golpes', 'Aprendeu um golpe (o caso comum: 94% deles)', ()=>sb.renderGolpeAprendido());
+  game.golpesAprendidos = [{ id: bu.id, golpe: 'vinewhip' }, { id: gy2.id, golpe: 'thrash' }];
+  add('Golpes', 'Aprendeu dois na mesma passada', ()=>sb.renderGolpeAprendido());
+  game.golpesAprendidos = [];
+}
+
+/* ---- a fileira de quem nao escolhe golpe ---- */
+/* O Togepi nao tem UM golpe de dano ate o nivel 38 e as 4 especies do METRONOMO atacam de tipo
+   sorteado -- a fileira delas saia MUDA, e foi reportado. Agora ela anuncia o Metronomo, tracejado
+   pra nao se confundir com os dois golpes que o jogador escolheu. */
+{
+  const meg = sb.createInstance('meganium', 32); meg.id = 'prevA'; meg.ataques = ['bodyslam','razorleaf'];
+  const tog = sb.createInstance('togepi', 33);   tog.id = 'prevB';
+  const pol = sb.createInstance('poliwag', 16);  pol.id = 'prevC'; pol.ataques = ['bubble','watergun'];
+  const abr = sb.createInstance('abra', 20);     abr.id = 'prevD';
+  game.team = [meg, tog, pol, abr];
+  game.inventario = {}; game.equipados = {}; game.escolhaDeItem = null;
+  add('Golpes', 'Ordem de batalha — o Togepi anuncia o Metronomo', ()=>sb.renderTeamOrder());
+}
+
+/* ---- a ficha da Pokedex com a lista de golpes ---- */
+/* A lista rola por dentro: o Nidoking aprende 11 golpes de dano, e sem o teto o botao Fechar
+   ia parar fora da tela num celular. */
+{
+  game.pokedexFicha = { id:'nidoking', shiny:false };
+  add('Pokedex', 'Ficha com a lista de golpes (o pior caso: 11)', ()=>sb.renderPokedexFicha());
+  game.pokedexFicha = { id:'qwilfish', shiny:false };
+  add('Pokedex', 'Ficha — caso comum', ()=>sb.renderPokedexFicha());
+  game.pokedexFicha = null;
+}
+
 /* ---- itens equipados ---- */
 /* A tela de ordem é onde o item entra num pokémon: o + fica na linha dele, à esquerda das setas.
    Vale ver a 320px, que é onde a linha aperta -- são quatro elementos disputando a mesma faixa
    (sprite+nome, tipos, o + e as duas setas). */
 {
   const timeExemplo = ['blastoise','gengar','dragonite','alakazam','snorlax','arcanine']
-    .map((id, i) => sb.createInstance(id, 62 + i));
+    .map((id, i) => { const p = sb.createInstance(id, 62 + i); p.ataques = sb.ataquesPadrao(p); return p; });
   game.team = timeExemplo;
   /* O que esta EQUIPADO ja saiu do armazem -- e assim que o servidor grava, e uma fixture que
      mentisse isso esconderia justamente o caso mais comum (ter 1, equipar, ficar com 0). */

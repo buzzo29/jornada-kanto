@@ -117,7 +117,7 @@ function createSandbox(htmlPath){
     // anti-artimanha: encontro selvagem preso ao contador do save e sorteio dos iniciais preso
     // ao slot (ver test-artimanha.js)
     'goToWildEncounter','sementeDoEncontro','resortearEncontro','montaOfertaSelvagem','currentShinyChance','ehLendario','nivelDeLendario','LENDARIOS','LEGS',
-    'especieNoNivel','rollWildLevel','EVOLVED_MIN_LEVEL','SEM_PISO_DE_NIVEL','nivelSelvagem',
+    'especieNoNivel','rollWildLevel','EVOLVED_MIN_LEVEL','SEM_PISO_DE_NIVEL','nivelSelvagem','GOLPES','GOLPES_IDS','GOLPES_PT','APRENDIZADO','ataquesDisponiveis','ataquesEscolhiveis','ataquesPadrao','nomeDoAtaque','nivelDoAtaque','melhorAtaque','hydrateTeam','hydrateTeamMember','escolhasDeAtaquePendentes','resolverEscolhaDeAtaques','marcarAtaque','confirmarAtaques','aprendizadosPendentes','resolverAprendizados','responderAprendizado','renderEscolhaDeAtaques','renderAprenderAtaque','renderGolpeAprendido','anunciarGolpesAprendidos','seguirDoGolpeAprendido','aprendizadosPendentes','resolverAprendizados','responderAprendizado','ataquesDisponiveis','ataquesPadrao','melhorAtaque','golpesDoTimeHtml','golpesDaEvolucao','nivelDoAtaque','nomeDoAtaque','APRENDIZADO','GOLPES','GOLPES_IDS','GOLPES_PT','especiaisDaEspecie','cartaoDeGolpe','seloDoTipoDoGolpe','TYPE_COLORS','startLevelDistribution','continueFromEvolution','chooseStarter',
     // Boss de Domingo: a tela escuta o Firestore, e isso da pra exercitar aqui (ver __escutas)
     'ligarEscutaDoBoss','pararEscutaDoBoss','pararAcompanhamentoDoBoss','agendarPollDoBoss',
     'assinaturaDoBoss','renderSundayBoss','sairDoBoss','BOSS_POLL_MS',
