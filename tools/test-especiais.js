@@ -1431,5 +1431,122 @@ function comItem(instancia, item){
      JSON.stringify([S.avisoDoConfronto(m,0), S.avisoDoConfronto(m,1)]));
 })();
 
+console.log('\n=== O CONFRONTO NOVO NAO ABRE COM UM GOLPE FANTASMA ===');
+{
+  /* Reportado em 09/09/2026 com print: no Krabby x Machoke a tela mostrava o KRABBY atacando sem
+     tirar HP nenhum, trocava rapidamente pro Machoke, e so entao a luta acontecia -- enquanto o
+     log, na mesma tela, trazia os tres golpes certos (Machoke, Krabby, Machoke).
+     A CAUSA: game.revealLastHit guarda o ultimo passo animado e a linha de status le ele pra
+     escrever "Fulano usou GOLPE". Ele nao era zerado ao abrir um confronto novo, entao o render
+     de abertura pegava o q= do confronto ANTERIOR e cruzava com os NOMES do novo. O confronto
+     anterior tinha terminado com um golpe do Krabby, e era esse q= que sobrava.
+     O log nunca mostrou o fantasma porque ele nao le esse campo -- le a sequencia. Por isso o
+     teste olha o ESTADO no instante da abertura, e nao o log. */
+  const gg = S.freshGameDefaults(); S.__setGame(gg);
+  const meu = ['krabby','poliwag','staryu'].map(id => { const p = inst(id, 27); p.ataques = S.ataquesPadrao(p); return p; });
+  const dele = ['goldeen','machoke','onix'].map(id => inst(id, 30));
+  const rr = S.simulateGymBattle(meu, dele);
+  gg.battleResult = rr; gg.battleResultContext = 'neighborhoodGym';
+  gg.revealIndex = 0; gg.revealPhase = 'loading'; gg.screen = 'battling';
+  let fantasmas = 0, aberturas = 0;
+  for(let i = 0; i < 80 && gg.screen === 'battling'; i++){
+    const antes = gg.revealPhase;
+    S.advanceReveal();
+    if(antes === 'loading' && gg.revealPhase === 'animating'){
+      aberturas++;
+      const mm = rr.matchups[gg.revealIndex];
+      const linha = String(S.statusDoConfronto(mm, gg.revealHitStep, gg.revealLastHit).html)
+        .replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+      if(gg.revealLastHit || linha !== '⚔️ Trocando golpes...') fantasmas++;
+    }
+  }
+  ok('a revelacao abriu confrontos', aberturas >= 2, aberturas + ' aberturas');
+  ok('e NENHUM abre mostrando golpe de confronto anterior', fantasmas === 0, fantasmas + ' fantasmas');
+  /* A guarda de verdade: o LastHit tem que zerar junto com o passo. Conferido que, tirando esta
+     linha do index.html, o caso acima acusa 3 fantasmas em 4 aberturas. */
+  ok('o LastHit zera junto com o passo, em TODO lugar que volta o passo pra 0',
+     (function(){
+       const txt = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
+       const zeram = (txt.match(/game\.(special|reveal|trainer|leagueWatch)HitStep = 0;/g) || []).length;
+       const limpam = (txt.match(/game\.(special|reveal|trainer|leagueWatch)LastHit = null;/g) || []).length;
+       return zeram > 0 && limpam === zeram;
+     })());
+}
+
+console.log('\n=== O NOME DO GOLPE APARECE JUNTO COM A BARRA ===');
+{
+  /* Pedido em 09/09/2026: "se ta descendo a barra de hp do pokemon X, e porque o pokemon Y usou um
+     ataque, entao exiba na tela o nome desse ataque no mesmo momento que a barra se movimenta".
+     O INVARIANTE e esse: a barra que anda e a de quem APANHA (hit.side), e o nome exibido e o de
+     quem BATE (hit.q) -- os dois tem que ser lados OPOSTOS, sempre. Trocar um pelo outro faz a
+     tela dizer que o pokemon bateu em si mesmo, e isso nao aparece como erro: aparece como uma
+     frase plausivel e errada.
+     Nao ha render() no meio da animacao (ele mataria a transicao da barra), entao quem escreve a
+     linha e o pintarStatusDoConfronto, direto no DOM. */
+  const times = [
+    [['charizard','blastoise','venusaur','alakazam','snorlax','gengar'],
+     ['onix','arcanine','lapras','machamp','golem','starmie']],
+    [['oddish','vileplume','alakazam','golem','gengar','paras'],
+     ['starmie','electrode','butterfree','geodude','staryu','venomoth']]
+  ];
+  let passos = 0, comNome = 0, comAviso = 0, ladoErrado = 0, nomeErrado = 0;
+  const vistos = {};
+  for(let volta = 0; volta < 60; volta++){
+    const par = times[volta % times.length];
+    const a = par[0].map((id, i) => { const p = inst(id, 45 + i); p.ataques = S.ataquesPadrao(p); return p; });
+    const b = par[1].map((id, i) => inst(id, 45 + i));
+    S.simulateGymBattle(a, b).matchups.forEach(m => {
+      S.buildAnimatedHitSequence(m).forEach((hit, i) => {
+        passos++;
+        const st = S.statusDoConfronto(m, i + 1, hit);
+        if(st.classe === 'aviso-especial'){ comAviso++; (hit.x && (vistos[hit.x] = 1)); return; }
+        if(st.classe !== 'aviso-golpe') return;
+        comNome++;
+        const quemBate = hit.q === 'p' ? 'player' : 'enemy';
+        if(quemBate === hit.side) ladoErrado++;
+        const esperado = hit.q === 'p' ? m.player : m.enemy;
+        if(String(st.html).replace(/<[^>]+>/g, ' ').trim().indexOf(esperado) !== 0) nomeErrado++;
+      });
+    });
+  }
+  ok('a animacao mostra o nome do golpe na maioria dos passos', comNome > passos * 0.6,
+     comNome + ' de ' + passos + ' passos');
+  ok('e a barra que anda e SEMPRE a do outro lado', ladoErrado === 0, ladoErrado + ' invertidos');
+  ok('e o nome exibido e o de quem BATE', nomeErrado === 0, nomeErrado + ' errados');
+
+  /* A FRASE ESPECIAL GANHA DO NOME DO GOLPE. Ela conta o confronto inteiro (explosao, sono) ou uma
+     abertura (cura, drenagem, pocao, Faixa), e o numero sozinho nao conta isso. */
+  ok('e o aviso especial continua aparecendo', comAviso > 0, comAviso + ' passos com frase especial');
+
+  /* A DRENAGEM e o caso que obriga a guarda do pintor: ela mexe as DUAS barras, e o segundo passo
+     (absorbdano) e dano mas nao e golpe comum -- caia no texto generico e comia a explicacao. */
+  const comDreno = (() => {
+    for(let volta = 0; volta < 400; volta++){
+      const a = ['oddish','vileplume','paras','venomoth','gengar','golem'].map((id, i) => {
+        const p = inst(id, 40 + i); p.ataques = S.ataquesPadrao(p); return p; });
+      const b = ['starmie','butterfree','geodude','staryu','electrode','onix'].map((id, i) => inst(id, 40 + i));
+      const r = S.simulateGymBattle(a, b);
+      const m = r.matchups.find(x => (x.golpes || []).some(g => g.x === 'absorb'));
+      if(m) return m;
+    }
+    return null;
+  })();
+  if(comDreno){
+    const seq = S.buildAnimatedHitSequence(comDreno);
+    const el = { className:'', innerHTML:'', style:{}, offsetWidth:0 };
+    S.document.getElementById = id => (id === 'battle-status-txt' ? el : null);
+    el.className = 'loading-text'; el.innerHTML = 'generico';
+    S.pintarStatusDoConfronto(comDreno, 1, seq[0]);
+    const passo1 = el.innerHTML;
+    S.pintarStatusDoConfronto(comDreno, 2, seq[1]);
+    ok('a frase da drenagem sobrevive aos DOIS passos dela', el.innerHTML === passo1,
+       String(el.innerHTML).replace(/<[^>]+>/g, ' ').trim().slice(0, 46));
+    ok('e o pintor nunca rebaixa a linha pro texto generico',
+       String(el.innerHTML).indexOf('Trocando golpes') < 0);
+  } else {
+    ok('a frase da drenagem sobrevive aos DOIS passos dela', false, 'nenhuma drenagem na amostra');
+  }
+}
+
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
 process.exit(falhas ? 1 : 0);

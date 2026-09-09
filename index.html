@@ -786,6 +786,14 @@
   /* O aviso do golpe especial é a MESMA linha do "Trocando golpes...", só que acesa: ela já é
      onde o jogador olha durante a luta, então não precisa de caixa nova nem de outro lugar. */
   .loading-text.aviso-especial{ color:var(--ink); font-weight:700; animation:aviso-especial-entra .28s ease-out; }
+  /* O NOME DO GOLPE usa a MESMA linha e a MESMA entrada do aviso especial -- é onde o jogador já
+     está olhando durante a luta. O que muda é o peso: o especial é um acontecimento raro e vem
+     cheio; o golpe comum sai a cada troca, e em negrito a linha piscaria a luta inteira. */
+  .loading-text.aviso-golpe{ color:var(--ink); font-weight:600; animation:aviso-especial-entra .28s ease-out; }
+  .aviso-golpe-quem{ font-weight:800; }
+  .aviso-golpe-quem.p{ color:var(--blue); }
+  .aviso-golpe-quem.e{ color:var(--red); }
+  .loading-text.aviso-golpe .type-pill{ margin-right:0; }
   @keyframes aviso-especial-entra{ from{ opacity:0; transform:translateY(-4px); } to{ opacity:1; transform:none; } }
   .battle-vs{
     display:flex;
@@ -8101,6 +8109,7 @@ function advanceSpecialReveal(){
     }
     game.specialHitSequence = buildAnimatedHitSequence(m);
     game.specialHitStep = 0;
+    game.specialLastHit = null;
     game.specialCurrentPlayerHp = m.playerHpBefore;
     game.specialCurrentEnemyHp = m.enemyHpBefore;
     if(game.specialHitSequence.length > 0){
@@ -8120,22 +8129,26 @@ function advanceSpecialReveal(){
     else { game.specialCurrentEnemyHp = Math.max(0, game.specialCurrentEnemyHp - hit.amount); }
     game.specialLastHit = hit;
     game.specialHitStep++;
+    pintarStatusDoConfronto(m, game.specialHitStep, hit);   // o nome do golpe, no mesmo instante da barra
     const isLastHit = game.specialHitStep >= game.specialHitSequence.length;
     const hitMaxHp = hit.side==='player' ? m.playerMaxHp : m.enemyMaxHp;
     const hitDuration = hpBarTransitionMs((hit.amount / hitMaxHp) * 100);
+    /* O nome do golpe já está na tela (pintarStatusDoConfronto, acima). A barra e tudo que vem
+       depois dela deslizam um segundo, pra a frase ser lida antes de a vida começar a cair. */
+    const esperaNome = pausaDoNomeDoGolpe(m, hit);
     if(isLastHit){
       game.specialRevealPhase = 'result';
-      animateSpecialHpBars();
-      setTimeout(render, hitDuration + 50);
-      setTimeout(advanceSpecialReveal, hitDuration + 800);
+      setTimeout(animateSpecialHpBars, esperaNome);
+      setTimeout(render, esperaNome + hitDuration + 50);
+      setTimeout(advanceSpecialReveal, esperaNome + hitDuration + 800);
     } else {
-      animatePartialSpecialHpBars();
+      setTimeout(animatePartialSpecialHpBars, esperaNome);
       /* A frase da cura ja cumpriu o papel: troca ela pelo "Trocando golpes..." assim que a barra
          sobe. A da FAIXA e o contrario -- ela precisa do render pra APARECER, porque o passo dela
          nao mexe barra nenhuma (a barra ja parou em 1 no golpe anterior) e sem um desenho a frase
          nunca chegaria na tela. */
-      if(hit.cura || hit.faixa || hit.posFaixa) setTimeout(render, hitDuration + 50);
-      setTimeout(advanceSpecialReveal, hitDuration + 150 + pausaDaFaixa(hit));
+      if(hit.cura || hit.faixa || hit.posFaixa) setTimeout(render, esperaNome + hitDuration + 50);
+      setTimeout(advanceSpecialReveal, esperaNome + hitDuration + 150 + pausaDaFaixa(hit));
     }
   } else {
     const matchups = game.specialBattleResult.matchups;
@@ -8513,6 +8526,17 @@ function advanceReveal(){
     const m = game.battleResult.matchups[game.revealIndex];
     game.revealHitSequence = buildAnimatedHitSequence(m);
     game.revealHitStep = 0;
+    /* O LastHit ZERA JUNTO COM O PASSO -- e sem isso a tela abre o confronto novo já mostrando um
+       golpe que não aconteceu. Ele guarda o último passo animado, e a linha de status lê ele pra
+       escrever "Fulano usou GOLPE"; deixando ali o do confronto ANTERIOR, o render de abertura
+       pega o q= dele e cruza com os NOMES do confronto novo.
+       Reportado em 09/09/2026 com print: no Krabby x Machoke a tela mostrava o KRABBY atacando sem
+       tirar HP nenhum e só então passava pro Machoke, que era quem abria de verdade -- e o log, que
+       não lê este campo, mostrava os três golpes certos. O confronto anterior tinha terminado com
+       um golpe do Krabby, e era esse q= que sobrava.
+       A pausa de 1s do nome deixou o fantasma bem mais visível (~1,5s na tela), mas ele nasceu com
+       o nome do golpe, não com a pausa. */
+    game.revealLastHit = null;
     game.revealCurrentPlayerHp = m.playerHpBefore;
     game.revealCurrentEnemyHp = m.enemyHpBefore;
     if(game.revealHitSequence.length > 0){
@@ -8536,9 +8560,13 @@ function advanceReveal(){
     else { game.revealCurrentEnemyHp = Math.max(0, game.revealCurrentEnemyHp - hit.amount); }
     game.revealLastHit = hit;
     game.revealHitStep++;
+    pintarStatusDoConfronto(m, game.revealHitStep, hit);   // o nome do golpe, no mesmo instante da barra
     const isLastHit = game.revealHitStep >= game.revealHitSequence.length;
     const hitMaxHp = hit.side==='player' ? m.playerMaxHp : m.enemyMaxHp;
     const hitDuration = hpBarTransitionMs((hit.amount / hitMaxHp) * 100);
+    /* O nome do golpe já está na tela (pintarStatusDoConfronto, acima). A barra e tudo que vem
+       depois dela deslizam um segundo, pra a frase ser lida antes de a vida começar a cair. */
+    const esperaNome = pausaDoNomeDoGolpe(m, hit);
     if(isLastHit){
       // esse é o golpe que decide a luta -- muda pra fase 'result' JÁ AQUI, então precisa ser o
       // animador da fase 'result' (animateHpBars) a aplicar esse valor, e não o animatePartialHpBars
@@ -8547,17 +8575,17 @@ function advanceReveal(){
       // presa em "Trocando golpes..." até a próxima luta, mesmo com a barra já toda zerada. Esse render()
       // só acontece UMA VEZ (na virada pro resultado), não a cada golpe, então não causa o piscar
       game.revealPhase = 'result';
-      animateHpBars();
-      setTimeout(render, hitDuration + 50); // espera a transição da barra terminar de verdade, pra não dar salto visual
-      setTimeout(advanceReveal, hitDuration + 800);
+      setTimeout(animateHpBars, esperaNome);
+      setTimeout(render, esperaNome + hitDuration + 50); // espera a transição da barra terminar de verdade, pra não dar salto visual
+      setTimeout(advanceReveal, esperaNome + hitDuration + 800);
     } else {
-      animatePartialHpBars();
+      setTimeout(animatePartialHpBars, esperaNome);
       /* A frase da cura ja cumpriu o papel: troca ela pelo "Trocando golpes..." assim que a barra
          sobe. A da FAIXA e o contrario -- ela precisa do render pra APARECER, porque o passo dela
          nao mexe barra nenhuma (a barra ja parou em 1 no golpe anterior) e sem um desenho a frase
          nunca chegaria na tela. */
-      if(hit.cura || hit.faixa || hit.posFaixa) setTimeout(render, hitDuration + 50);
-      setTimeout(advanceReveal, hitDuration + 150 + pausaDaFaixa(hit)); // só avança pro próximo golpe depois que esse terminou de descer
+      if(hit.cura || hit.faixa || hit.posFaixa) setTimeout(render, esperaNome + hitDuration + 50);
+      setTimeout(advanceReveal, esperaNome + hitDuration + 150 + pausaDaFaixa(hit)); // só avança pro próximo golpe depois que esse terminou de descer
     }
   } else {
     const matchups = game.battleResult.matchups;
@@ -8608,12 +8636,14 @@ function buildAnimatedHitSequence(m){
     /* Na lista 'q' é quem BATE e 'side' é quem APANHA -- por isso a inversão. A CURA é o contrário
        de tudo isso: quem curou é quem MUDA de vida, e pra cima. Amount negativo faz a barra subir
        (os laços fazem hp - amount, e o hpBarTransitionMs usa o módulo pra a duração). */
-    if(g.x === 'recover' || g.x === 'pocao' || g.x === 'absorb') return { side: g.q === 'p' ? 'player' : 'enemy', amount: -g.d, cura: true };
+    if(g.x === 'recover' || g.x === 'pocao' || g.x === 'absorb') return { side: g.q === 'p' ? 'player' : 'enemy', amount: -g.d, cura: true, q: g.q, x: g.x };
     /* A FAIXA não move barra nenhuma: o golpe anterior já parou em 1, e é justamente esse 1 que ela
        explica. Mas ela É um passo -- sem ele, a animação pularia direto do golpe que ia matar pro
        revide, e a pausa que dá tempo de ler a mensagem não existiria. */
-    if(g.x === 'faixa') return { side: g.q === 'p' ? 'player' : 'enemy', amount: 0, faixa: true };
-    return { side: g.q === 'p' ? 'enemy' : 'player', amount: g.d };
+    if(g.x === 'faixa') return { side: g.q === 'p' ? 'player' : 'enemy', amount: 0, faixa: true, q: g.q, x: g.x };
+    /* q = quem BATE e x = o que o passo é (vazio quando é golpe comum). Os dois vêm do diário sem
+       tradução porque é deles que sai a frase "Fulano usou GOLPE" -- ver fraseDoGolpeUsado. */
+    return { side: g.q === 'p' ? 'enemy' : 'player', amount: g.d, q: g.q, x: g.x || null };
   });
   /* O passo SEGUINTE ao da Faixa precisa de um DESENHO pra a frase dela sair da tela. Ela é a única
      frase do meio da luta: as de abertura somem sozinhas porque a barra que elas anunciam se move e
@@ -8857,6 +8887,7 @@ function advanceTrainerReveal(){
     const m = game.trainerBattleResult.matchups[game.trainerRevealIndex];
     game.trainerHitSequence = buildAnimatedHitSequence(m);
     game.trainerHitStep = 0;
+    game.trainerLastHit = null;
     game.trainerCurrentPlayerHp = m.playerHpBefore;
     game.trainerCurrentEnemyHp = m.enemyHpBefore;
     if(game.trainerHitSequence.length > 0){
@@ -8876,22 +8907,26 @@ function advanceTrainerReveal(){
     else { game.trainerCurrentEnemyHp = Math.max(0, game.trainerCurrentEnemyHp - hit.amount); }
     game.trainerLastHit = hit;
     game.trainerHitStep++;
+    pintarStatusDoConfronto(m, game.trainerHitStep, hit);   // o nome do golpe, no mesmo instante da barra
     const isLastHit = game.trainerHitStep >= game.trainerHitSequence.length;
     const hitMaxHp = hit.side==='player' ? m.playerMaxHp : m.enemyMaxHp;
     const hitDuration = hpBarTransitionMs((hit.amount / hitMaxHp) * 100);
+    /* O nome do golpe já está na tela (pintarStatusDoConfronto, acima). A barra e tudo que vem
+       depois dela deslizam um segundo, pra a frase ser lida antes de a vida começar a cair. */
+    const esperaNome = pausaDoNomeDoGolpe(m, hit);
     if(isLastHit){
       game.trainerRevealPhase = 'result';
-      animateTrainerHpBars();
-      setTimeout(render, hitDuration + 50);
-      setTimeout(advanceTrainerReveal, hitDuration + 800);
+      setTimeout(animateTrainerHpBars, esperaNome);
+      setTimeout(render, esperaNome + hitDuration + 50);
+      setTimeout(advanceTrainerReveal, esperaNome + hitDuration + 800);
     } else {
-      animatePartialTrainerHpBars();
+      setTimeout(animatePartialTrainerHpBars, esperaNome);
       /* A frase da cura ja cumpriu o papel: troca ela pelo "Trocando golpes..." assim que a barra
          sobe. A da FAIXA e o contrario -- ela precisa do render pra APARECER, porque o passo dela
          nao mexe barra nenhuma (a barra ja parou em 1 no golpe anterior) e sem um desenho a frase
          nunca chegaria na tela. */
-      if(hit.cura || hit.faixa || hit.posFaixa) setTimeout(render, hitDuration + 50);
-      setTimeout(advanceTrainerReveal, hitDuration + 150 + pausaDaFaixa(hit));
+      if(hit.cura || hit.faixa || hit.posFaixa) setTimeout(render, esperaNome + hitDuration + 50);
+      setTimeout(advanceTrainerReveal, esperaNome + hitDuration + 150 + pausaDaFaixa(hit));
     }
   } else {
     const matchups = game.trainerBattleResult.matchups;
@@ -13907,7 +13942,7 @@ function renderSpecialBattling(){
     <div class="battle-status-area">${loading
       ? `<div class="loading-dots"><span></span><span></span><span></span></div><p class="loading-text">Aguardando o resultado da batalha...</p>`
       : (animating
-        ? `<p class="loading-text${avisoDoConfronto(m, game.specialHitStep)?' aviso-especial':''}">${avisoDoConfronto(m, game.specialHitStep) || '⚔️ Trocando golpes...'}</p>`
+        ? statusDoConfrontoHtml(m, game.specialHitStep, game.specialLastHit)
         : `<p class="battle-result-line">${matchupResultLine(m)}!${suddenDeathNote(m)}</p>`)
     }</div>
   </div>`;
@@ -14340,7 +14375,7 @@ function renderTrainerBattling(){
     <div class="battle-status-area">${loading
       ? `<div class="loading-dots"><span></span><span></span><span></span></div><p class="loading-text">Aguardando o resultado da batalha...</p>`
       : (animating
-        ? `<p class="loading-text${avisoDoConfronto(m, game.trainerHitStep)?' aviso-especial':''}">${avisoDoConfronto(m, game.trainerHitStep) || '⚔️ Trocando golpes...'}</p>`
+        ? statusDoConfrontoHtml(m, game.trainerHitStep, game.trainerLastHit)
         : `<p class="battle-result-line">${matchupResultLine(m)}!${suddenDeathNote(m)}</p>`)
     }</div>
   </div>`;
@@ -15151,6 +15186,78 @@ function avisoDoConfronto(m, passo){
          fraseDoEspecial(g, doJogador ? nomeP : nomeE, doJogador ? nomeE : nomeP,
                          { especieDoAlvo: doJogador ? m.enemySpecies : m.playerSpecies }) + '!';
 }
+/* O NOME DO GOLPE, NO MESMO INSTANTE EM QUE A BARRA DESCE.
+   A barra que se move é a de quem APANHA; quem usou o golpe é o OUTRO lado, e é o nome dele que a
+   frase traz. O selo é o MESMO golpeSeloHtml do log -- mesma palavra, mesma cor --, então o golpe
+   que ele lê durante a luta é o golpe que ele relê no diário depois.
+   SÓ VALE PRA GOLPE COMUM (x vazio). Explosão, sono, cura, drenagem, poção e Faixa já têm frase
+   própria no avisoDoConfronto, e ali a frase conta o confronto INTEIRO ou uma abertura -- pintar
+   "Fulano usou X" por cima delas apagaria justamente a explicação que o número não dá.
+   O absorbdano é o caso que obriga a checagem: ele É dano e mexe a barra, mas é o segundo passo da
+   drenagem, e a frase da drenagem tem que sobreviver aos dois. */
+function fraseDoGolpeUsado(m, hit){
+  if(!hit || hit.x || hit.cura || hit.faixa) return '';
+  const doJogador = hit.q === 'p';
+  const selo = golpeSeloHtml(doJogador ? m.playerSpecies : m.enemySpecies,
+                             doJogador ? m.playerMove : m.enemyMove,
+                             doJogador ? m.playerMoveId : m.enemyMoveId);
+  if(!selo) return '';
+  const quem = escapeHtmlSafe((doJogador ? m.player : m.enemy) || '');
+  return '<span class="aviso-golpe-quem ' + (doJogador ? 'p' : 'e') + '">' + quem + '</span> usou ' + selo;
+}
+/* A LINHA DE STATUS DA BATALHA, numa função só -- lida pelo render das QUATRO telas de revelação E
+   pelo pintor que atualiza o DOM no meio da animação. Montadas em separado, as duas divergiriam no
+   primeiro ajuste de texto, que é exatamente o que já aconteceu entre o log e a animação.
+   A ordem importa: o aviso especial ganha do nome do golpe, e o nome do golpe ganha do texto de
+   sempre. */
+function statusDoConfronto(m, passo, hit){
+  const aviso = avisoDoConfronto(m, passo);
+  if(aviso) return { classe: 'aviso-especial', html: aviso };
+  const golpe = fraseDoGolpeUsado(m, hit);
+  if(golpe) return { classe: 'aviso-golpe', html: golpe };
+  return { classe: '', html: '⚔️ Trocando golpes...' };
+}
+function statusDoConfrontoHtml(m, passo, hit){
+  const st = statusDoConfronto(m, passo, hit);
+  return '<p class="loading-text' + (st.classe ? ' ' + st.classe : '') +
+         '" id="battle-status-txt">' + st.html + '</p>';
+}
+/* PINTA A LINHA DIRETO NO DOM, sem render(). É obrigatório: um render() no meio da animação recria
+   o HTML inteiro e MATA a transição CSS da barra de HP -- a regra da casa, e ela já custou três
+   defeitos. O nome do golpe tem que aparecer no MESMO instante em que a barra começa a andar, e
+   este é o único jeito de fazer as duas coisas juntas.
+   O reflow no meio existe pra a animação de entrada rodar DE NOVO quando a classe não muda: dois
+   golpes seguidos do mesmo lado deixariam a frase parada e o jogador não veria que ela trocou. */
+function pintarStatusDoConfronto(m, passo, hit){
+  const el = document.getElementById('battle-status-txt');
+  if(!el) return;
+  const st = statusDoConfronto(m, passo, hit);
+  /* O PINTOR SÓ SOBE A LINHA, nunca a rebaixa pro texto genérico. Quem devolve o "Trocando
+     golpes..." é o render(), e ele só acontece nos pontos em que a frase já cumpriu o papel
+     (depois da barra da cura subir, depois do passo da Faixa).
+     Sem esta guarda o pintor apagava a frase da DRENAGEM no segundo passo dela: a drenagem mexe
+     as DUAS barras, a frase tem que sobreviver às duas, e o passo que desce a barra do alvo
+     (absorbdano) não é golpe comum nem abertura -- caía no genérico e comia a explicação. */
+  if(!st.classe) return;
+  el.className = 'loading-text' + (st.classe ? ' ' + st.classe : '');
+  el.innerHTML = st.html;
+  el.style.animation = 'none';
+  void el.offsetWidth;
+  el.style.animation = '';
+}
+/* O NOME VEM PRIMEIRO, A BARRA DEPOIS. Pedido em 09/09/2026: "aparece 'Venusaur usou FOLHA
+   NAVALHA', espera 1s, e aí começa a descer o HP do adversário".
+   O QUE ATRASA É SÓ O VISUAL. A vida e o passo continuam sendo aplicados na hora: o sandbox dos
+   testes tem setTimeout no-op de propósito (as animações não existem fora do navegador) e as
+   suites dirigem os laços chamando advanceX() na mão -- adiar a aplicação faria o passo nunca
+   avançar e o laço ler um hit indefinido. Adiar o desenho não muda nada disso.
+   SÓ VALE PRO PASSO QUE MOSTRA NOME. Cura, drenagem, poção, sono, explosão e Faixa já têm a pausa
+   delas (pausaDoEspecial na abertura, pausaDaFaixa no meio) -- somar mais um segundo ali seria
+   pausa em cima de pausa.
+   NO ONLINE ela entra no orçamento (ORCAMENTO_ANIM_ONLINE_MS) e encolhe junto com as barras
+   quando a luta não cabe na janela: o que se perde é tempo de leitura, nunca a escolha. */
+const PAUSA_ANTES_DO_GOLPE_MS = 1000;
+function pausaDoNomeDoGolpe(m, hit){ return fraseDoGolpeUsado(m, hit) ? PAUSA_ANTES_DO_GOLPE_MS : 0; }
 /* PAUSA PRA LER. Sem ela a frase aparece e some junto com o primeiro golpe, e num confronto
    resolvido por autodestruição (que dura um golpe só) ela mal pisca. Um segundo é o mesmo tempo
    que o online já dá pro "Vai Fulano!" antes de começar a luta. */
@@ -15243,7 +15350,7 @@ function renderBattling(){
     <div class="battle-status-area">${loading
       ? `<div class="loading-dots"><span></span><span></span><span></span></div><p class="loading-text">Aguardando o resultado da batalha...</p>`
       : (animating
-        ? `<p class="loading-text${avisoDoConfronto(m, game.revealHitStep)?' aviso-especial':''}">${avisoDoConfronto(m, game.revealHitStep) || '⚔️ Trocando golpes...'}</p>`
+        ? statusDoConfrontoHtml(m, game.revealHitStep, game.revealLastHit)
         : `<p class="battle-result-line">${matchupResultLine(m)}!${suddenDeathNote(m)}</p>`)
     }</div>
   </div>
@@ -15707,6 +15814,7 @@ function reverDesafioGinasio(idx){
   game.trainerRevealPhase = 'loading';
   game.trainerHitSequence = [];
   game.trainerHitStep = 0;
+  game.trainerLastHit = null;
   game.trainerMoveShown = false;
   preloadBattleSprites(entry.matchups);
   game.screen = 'trainerBattling';
@@ -16453,6 +16561,7 @@ function advanceLeagueWatch(){
     const m = w.matchups[game.leagueWatchIndex];
     game.leagueWatchHitSequence = buildAnimatedHitSequence(m);
     game.leagueWatchHitStep = 0;
+    game.leagueWatchLastHit = null;
     game.leagueWatchCurrentPlayerHp = m.playerHpBefore;
     game.leagueWatchCurrentEnemyHp = m.enemyHpBefore;
     if(game.leagueWatchHitSequence.length > 0){
@@ -16471,23 +16580,27 @@ function advanceLeagueWatch(){
     else { game.leagueWatchCurrentEnemyHp = Math.max(0, game.leagueWatchCurrentEnemyHp - hit.amount); }
     game.leagueWatchLastHit = hit;
     game.leagueWatchHitStep++;
+    pintarStatusDoConfronto(m, game.leagueWatchHitStep, hit);   // o nome do golpe, no mesmo instante da barra
     const isLastHit = game.leagueWatchHitStep >= game.leagueWatchHitSequence.length;
     const m = w.matchups[game.leagueWatchIndex];
     const hitMaxHp = hit.side==='player' ? m.playerMaxHp : m.enemyMaxHp;
     const hitDuration = hpBarTransitionMs((hit.amount / hitMaxHp) * 100);
+    /* O nome do golpe já está na tela (pintarStatusDoConfronto, acima). A barra e tudo que vem
+       depois dela deslizam um segundo, pra a frase ser lida antes de a vida começar a cair. */
+    const esperaNome = pausaDoNomeDoGolpe(m, hit);
     if(isLastHit){
       game.leagueWatchPhase = 'result';
-      animateLeagueWatchHpBars();
-      setTimeout(render, hitDuration + 50);
-      setTimeout(advanceLeagueWatch, hitDuration + 800);
+      setTimeout(animateLeagueWatchHpBars, esperaNome);
+      setTimeout(render, esperaNome + hitDuration + 50);
+      setTimeout(advanceLeagueWatch, esperaNome + hitDuration + 800);
     } else {
-      animatePartialLeagueWatchHpBars();
+      setTimeout(animatePartialLeagueWatchHpBars, esperaNome);
       /* A frase da cura ja cumpriu o papel: troca ela pelo "Trocando golpes..." assim que a barra
          sobe. A da FAIXA e o contrario -- ela precisa do render pra APARECER, porque o passo dela
          nao mexe barra nenhuma (a barra ja parou em 1 no golpe anterior) e sem um desenho a frase
          nunca chegaria na tela. */
-      if(hit.cura || hit.faixa || hit.posFaixa) setTimeout(render, hitDuration + 50);
-      setTimeout(advanceLeagueWatch, hitDuration + 150 + pausaDaFaixa(hit));
+      if(hit.cura || hit.faixa || hit.posFaixa) setTimeout(render, esperaNome + hitDuration + 50);
+      setTimeout(advanceLeagueWatch, esperaNome + hitDuration + 150 + pausaDaFaixa(hit));
     }
   } else if(game.leagueWatchIndex < w.matchups.length - 1){
     game.leagueWatchIndex++;
@@ -16596,7 +16709,7 @@ function renderLeagueWatch(){
     <div class="battle-status-area">${loading
       ? `<div class="loading-dots"><span></span><span></span><span></span></div><p class="loading-text">Aguardando o resultado da batalha...</p>`
       : (animating
-        ? `<p class="loading-text${avisoDoConfronto(m, game.leagueWatchHitStep)?' aviso-especial':''}">${avisoDoConfronto(m, game.leagueWatchHitStep) || '⚔️ Trocando golpes...'}</p>`
+        ? statusDoConfrontoHtml(m, game.leagueWatchHitStep, game.leagueWatchLastHit)
         : `<p class="battle-result-line">${matchupResultLine(m)}!${suddenDeathNote(m)}</p>`)
     }</div>
   </div>
@@ -17715,6 +17828,7 @@ async function lutarSundayBoss(slot){
     game.trainerRevealPhase = 'loading';
     game.trainerHitSequence = [];
     game.trainerHitStep = 0;
+    game.trainerLastHit = null;
     game.trainerMoveShown = false;
     pararAcompanhamentoDoBoss();   // nada de redesenhar por trás da animação (ver CLAUDE.md)
     game.screen = 'trainerBattling';
@@ -18708,6 +18822,7 @@ async function fightTowerFloor(){
     game.trainerRevealPhase = 'loading';
     game.trainerHitSequence = [];
     game.trainerHitStep = 0;
+    game.trainerLastHit = null;
     game.trainerMoveShown = false;
     game.screen = 'trainerBattling';
     game.towerLoading = false;
@@ -19175,15 +19290,31 @@ function iniciarAnimacaoOnline(m){
   };
   const meuNome = (st.eu.time[st.eu.atual] || {}).name || 'seu pokémon';
   const seq = buildAnimatedHitSequence(meuM);
+  /* O MATCHUP NA MINHA PERSPECTIVA, pra a frase "Fulano usou GOLPE". O meuM acima só carrega HP
+     -- é tudo que a animação da barra precisa --, e a frase precisa de NOME, ESPÉCIE e GOLPE dos
+     dois lados. Quem é o B vira os três junto, pelo mesmo motivo do aviso especial: sem isso a
+     tela diria que o adversário usou o golpe que fui eu quem usou.
+     Ele é montado AQUI EM CIMA porque o orçamento de tempo, logo abaixo, precisa perguntar a ele
+     quais passos vão mostrar nome -- e portanto quais vão custar a pausa de um segundo. */
+  const mFrase = souA ? m : {
+    player: m.enemy, enemy: m.player,
+    playerSpecies: m.enemySpecies, enemySpecies: m.playerSpecies,
+    playerMove: m.enemyMove, enemyMove: m.playerMove,
+    playerMoveId: m.enemyMoveId, enemyMoveId: m.playerMoveId
+  };
   /* ORÇAMENTO DE TEMPO -- só no online. O servidor reserva BATTLE_ANIM_MS (5,2s) antes de abrir a
      janela de escolha, e desde que a animação passou a mostrar a luta REAL ela pode ser longa:
      medido em 2.888 confrontos, a mediana é 2,1s, mas a cauda chega a 10,7s (0,2% passam de 5,2s).
      Estourando o tempo, o painel de escolha aparece com o cronômetro no fim e a pessoa perde a
      escolha. Quando não cabe, cada golpe anima proporcionalmente mais rápido -- a luta continua
      sendo a mesma, só passa depressa. Na jornada não existe esse limite: lá ninguém está esperando. */
+  /* A PAUSA DO NOME ENTRA NA CONTA. Sem ela aqui o orçamento subestimaria a animação em 1s por
+     golpe nomeado, o fator não encolheria o suficiente e a luta estouraria a janela de escolha --
+     que é exatamente o que o orçamento existe pra impedir. Com ela dentro, quando não cabe, a
+     pausa encolhe junto com as barras: a leitura fica mais curta, e não a escolha do jogador. */
   const previsto = seq.reduce((acc,h)=>{
     const maxHp = h.side==='player' ? meuM.playerMaxHp : meuM.enemyMaxHp;
-    return acc + hpBarTransitionMs((h.amount/Math.max(1,maxHp))*100) + 260;
+    return acc + hpBarTransitionMs((h.amount/Math.max(1,maxHp))*100) + 260 + pausaDoNomeDoGolpe(mFrase, h);
   }, 0);
   game.onlineAnim = {
     m: meuM,
@@ -19204,7 +19335,8 @@ function iniciarAnimacaoOnline(m){
     avisoEspecial: avisoDoConfronto(souA ? m : {
       player: m.enemy, enemy: m.player,
       golpes: (m.golpes || []).map(g => Object.assign({}, g, { q: g.q === 'p' ? 'e' : 'p' }))
-    })
+    }),
+    mFrase: mFrase
   };
   render();
   setTimeout(()=>{
@@ -19235,8 +19367,35 @@ function proximoGolpeOnline(){
   const hpAgora = meuLevaDano ? a.meuHp : a.deleHp;
   // mesma curva de tempo do jogo, encolhida pelo fator quando a luta é longa demais pra janela
   const dur = Math.max(60, Math.round(hpBarTransitionMs((hit.amount / maxHp) * 100) * (a.fator||1)));
-  atualizaBarra(meuLevaDano ? 'eu' : 'ele', hpAgora, maxHp, dur);
-  onlineAnimTimer = setTimeout(proximoGolpeOnline, dur + Math.round(260 * (a.fator||1)));
+  /* O NOME PRIMEIRO, A BARRA DEPOIS -- a mesma regra das outras quatro telas. A pausa encolhe pelo
+     FATOR junto com o resto: numa luta que não cabe no orçamento, o que se perde é tempo de
+     leitura, nunca a janela de escolha do jogador. */
+  pintarGolpeOnline(a, hit);
+  const esperaNome = Math.round(pausaDoNomeDoGolpe(a.mFrase, hit) * (a.fator||1));
+  const desceBarra = () => {
+    if(!game.onlineAnim || game.onlineAnim !== a || game.screen !== 'onlineFight') return;
+    atualizaBarra(meuLevaDano ? 'eu' : 'ele', hpAgora, maxHp, dur);
+    onlineAnimTimer = setTimeout(proximoGolpeOnline, dur + Math.round(260 * (a.fator||1)));
+  };
+  if(esperaNome) onlineAnimTimer = setTimeout(desceBarra, esperaNome); else desceBarra();
+}
+/* O NOME DO GOLPE NO ONLINE. É o quinto laço de animação do jogo e o único com perspectiva -- os
+   matchups vêm do lado A --, mas a regra é a mesma das outras quatro: a barra que anda é a de quem
+   APANHA e o nome exibido é o de quem BATE.
+   Deixá-lo de fora faria do online a única batalha muda, e exceção em lista é onde a próxima
+   omissão se esconde -- foi assim que a raide do Mew passou semanas sem o buff de especialidade.
+   O AVISO ESPECIAL GANHA: aqui ele ocupa o lugar do "Vai Fulano!" e vale o confronto inteiro. */
+function pintarGolpeOnline(a, hit){
+  if(!a || a.avisoEspecial) return;
+  const el = document.getElementById('battle-status-txt');
+  if(!el) return;
+  const frase = fraseDoGolpeUsado(a.mFrase, hit);
+  if(!frase) return;
+  el.className = 'loading-text aviso-golpe';
+  el.innerHTML = frase;
+  el.style.animation = 'none';
+  void el.offsetWidth;
+  el.style.animation = '';
 }
 // atualiza só a barra, direto no DOM e com transição CSS -- igual às outras batalhas.
 // Redesenhar a tela a cada golpe faria os sprites piscarem
@@ -19300,6 +19459,7 @@ async function reverPartidaOnline(battleId){
     game.trainerRevealPhase = 'loading';
     game.trainerHitSequence = [];
     game.trainerHitStep = 0;
+    game.trainerLastHit = null;
     game.trainerMoveShown = false;
     preloadBattleSprites(meus);
     game.screen = 'trainerBattling';
@@ -19832,7 +19992,7 @@ function renderOnlineFight(){
     ${anim
       ? (anim.avisoEspecial
           ? `<p class="loading-text aviso-especial">${anim.avisoEspecial}</p>`
-          : (anim.anuncio ? `<p class="loading-text online-vai-linha">Vai ${escapeHtmlSafe(anim.anuncio)}!</p>` : `<p class="loading-text">⚔️ Trocando golpes...</p>`))
+          : (anim.anuncio ? `<p class="loading-text online-vai-linha">Vai ${escapeHtmlSafe(anim.anuncio)}!</p>` : `<p class="loading-text" id="battle-status-txt">⚔️ Trocando golpes...</p>`))
       : (ultimo ? `<p class="online-last">${escapeHtmlSafe(ultimo.player)} × ${escapeHtmlSafe(ultimo.enemy)} — ${ultimo.winner ? escapeHtmlSafe(ultimo.winner)+' venceu' : 'os dois caíram'}</p>` : '')}
   </div>
   ${painelTimesHtml(st, anim, precisaEscolher, restam, padraoOnline)}`;

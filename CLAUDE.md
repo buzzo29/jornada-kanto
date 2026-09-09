@@ -901,6 +901,96 @@ dificuldade se inverte — o Brock cai de 419 pra **182** game overs e o **5º g
 172**. Faz sentido: com 2 golpes o time perde cobertura, e isso machuca mais o **líder mono-tipo**
 do que o time variado do jogador. Se um dia isso for feito, é aqui que o número está.
 
+## O nome do golpe DURANTE a batalha (09/09/2026)
+
+Pedido assim: *"se está descendo a barra de HP do pokémon X, é porque o pokémon Y usou um ataque —
+exiba na tela o nome desse ataque no mesmo momento que a barra se movimenta"*.
+
+- **O INVARIANTE, e é ele que o teste tranca:** a barra que anda é a de quem **APANHA**
+  (`hit.side`) e o nome exibido é o de quem **BATE** (`hit.q`) — sempre lados opostos. Trocar um
+  pelo outro não aparece como erro: aparece como uma frase plausível dizendo que o pokémon bateu em
+  si mesmo. `tools/test-especiais.js` percorre ~1.500 passos de animação e cobra os dois.
+- **O passo animado passou a carregar `q` e `x` do diário**, sem tradução. O
+  `buildAnimatedHitSequence` já invertia os lados (lá `q` é quem bate, aqui `side` é quem
+  apanha) e jogava o resto fora; é do `q` que sai o nome e do `x` que sai a decisão de mostrar.
+- **A LINHA É A MESMA do "Trocando golpes..."** — é onde o jogador já está olhando. `statusDoConfronto`
+  decide o que ela diz, com prioridade: **aviso especial > nome do golpe > texto de sempre**. Uma
+  função só, lida pelo render das telas E pelo pintor do DOM: montadas em separado divergiriam no
+  primeiro ajuste, que é exatamente o que já aconteceu entre o log e a animação.
+- **QUEM PINTA É O DOM, nunca o `render()`.** Um render no meio da animação recria o HTML e mata a
+  transição CSS da barra — a regra da casa, que já custou três defeitos. O nome tem que aparecer no
+  MESMO instante em que a barra começa a andar, e esse é o único jeito de fazer as duas coisas.
+- **O PINTOR SÓ SOBE A LINHA, nunca a rebaixa** pro texto genérico. Sem essa guarda ele apagava a
+  frase da **drenagem** no segundo passo dela: a drenagem mexe as DUAS barras, a frase tem que
+  sobreviver às duas, e o passo que desce a barra do alvo (`absorbdano`) não é golpe comum nem
+  abertura — caía no genérico e comia a explicação. Quem devolve o "Trocando golpes..." é o
+  `render()`, e ele só acontece onde a frase já cumpriu o papel.
+- **SÓ VALE PRA GOLPE COMUM** (`x` vazio). Explosão, sono, cura, drenagem, poção e Faixa já têm
+  frase própria no `avisoDoConfronto`, e ali ela conta o confronto INTEIRO ou uma abertura —
+  escrever "Fulano usou X" por cima apagaria a explicação que o número não dá. Consequência
+  conhecida: num confronto resolvido por **sono**, as trocas livres saem sem nome de golpe, porque
+  a frase do sono está ocupando a linha. É o desenho, não esquecimento.
+- **SÃO CINCO LAÇOS DE ANIMAÇÃO, e todos os cinco pintam**: jornada/ginásio da cidade, batalha
+  especial (Elite, Rocket, Mewtwo), Torre/raide, liga assistida e **online**. O online é o único com
+  perspectiva — os matchups vêm do lado A —, então quem é o B vira **nome, espécie e golpe** junto
+  (`mFrase`), pelo mesmo motivo pelo qual o aviso especial já virava os lados: sem isso a tela diz
+  que o adversário usou o golpe que fui eu quem usou. Deixar o online de fora faria dele a única
+  batalha muda, e exceção em lista é onde a próxima omissão se esconde.
+- **O selo é o `golpeSeloHtml` do log** — mesma palavra, mesma cor. O golpe que ele lê durante a
+  luta é o golpe que ele relê no diário depois. O nome do pokémon vai em **azul** (eu) ou
+  **vermelho** (adversário), e a frase sai em peso 600 e não 800: o golpe comum aparece a cada
+  troca, e em negrito a linha piscaria a luta inteira.
+- **Medido:** numa amostra de 1.549 passos, **1.348 (87%) mostram o nome do golpe** e 190 mostram a
+  frase especial. Nenhum passo fica sem nada.
+
+### O golpe fantasma na abertura do confronto (09/09/2026)
+
+Reportado com print: no **Krabby x Machoke** a tela mostrava o **Krabby atacando sem tirar HP
+nenhum**, trocava rapidamente pro Machoke, e só então a luta acontecia -- enquanto o log, na mesma
+tela, trazia os três golpes certos (Machoke, Krabby, Machoke).
+
+- **A causa:** `game.XLastHit` guarda o último passo animado, e a linha de status passou a ler ele
+  pra escrever "Fulano usou GOLPE". Ele **não era zerado ao abrir um confronto novo**, então o
+  render de abertura pegava o `q=` do confronto ANTERIOR e cruzava com os NOMES do novo. O
+  confronto anterior tinha terminado com um golpe do Krabby, e era esse `q=` que sobrava.
+- **O defeito nasceu com o nome do golpe, não com a pausa** -- mas a pausa de 1s o deixou bem mais
+  visível: ficava ~1,5s na tela em vez de 550ms.
+- **O log nunca mostrou o fantasma** porque ele não lê esse campo: lê a sequência. É por isso que o
+  print tinha três linhas certas e a animação, quatro passos -- exatamente a divergência entre log
+  e animação que esta seção já registrou duas vezes, agora por um caminho novo.
+- **O conserto é o LastHit zerar junto com o passo**, em TODO lugar que volta o passo pra 0 -- são
+  **8 pontos** (os quatro laços mais os setups da Torre, da raide e do desafio de treinador). O
+  teste conta os dois lados e falha se algum `HitStep = 0` ficar sem o `LastHit = null` do lado.
+- **O teste olha o ESTADO no instante da abertura, não o log** -- conferido que, tirando a linha do
+  `index.html`, ele acusa **3 fantasmas em 4 aberturas**.
+
+### A pausa de 1s entre o nome e a barra
+
+*"Aparece 'Venusaur usou FOLHA NAVALHA', espera 1s, e aí começa a descer o HP do adversário"* —
+pedido em 09/09/2026. `PAUSA_ANTES_DO_GOLPE_MS`.
+
+- **O QUE ATRASA É SÓ O VISUAL.** A vida e o passo continuam sendo aplicados na hora, e o que
+  desliza um segundo são os TIMERS (a animação da barra, o render e o avanço pro golpe seguinte).
+  Não é preferência: o sandbox dos testes tem `setTimeout` no-op de propósito ("as animações não
+  existem fora do navegador") e as suites dirigem os laços chamando `advanceX()` na mão. A
+  primeira versão movia a APLICAÇÃO pra dentro do timer, e o `test-artimanha` quebrou na hora —
+  o passo nunca avançava e o laço lia um `hit` indefinido. **Se um dia a pausa precisar mesmo
+  adiar a aplicação, o sandbox tem que passar a rodar os timers primeiro.**
+- **SÓ O PASSO QUE MOSTRA NOME ganha a pausa.** Cura, drenagem, poção, sono, explosão e Faixa já
+  têm as delas (`pausaDoEspecial` na abertura, `pausaDaFaixa` no meio) — somar mais um segundo
+  ali seria pausa em cima de pausa.
+- **O PREÇO, MEDIDO, e ele é grande:** são **2,41 golpes nomeados por confronto** (mediana 2, maior
+  6), e **97% dos passos** ganham a pausa. A animação de uma batalha 6x6 de ginásio vai de
+  **16,3s para 41,6s** — **+25,3s por batalha**, ou +2,4s por confronto. É 2,5× mais lenta.
+  Foi pedido assim e está assim; se um dia incomodar, o lugar de mexer é a constante, e meio
+  segundo cortaria metade do custo.
+- **NO ONLINE A PAUSA ENTRA NO ORÇAMENTO** (`ORCAMENTO_ANIM_ONLINE_MS`), e isso não é detalhe: o
+  servidor reserva 5,2s antes de abrir a janela de escolha, e sem a pausa dentro da conta o
+  `previsto` subestimaria a animação em 1s por golpe, o fator não encolheria e a luta estouraria a
+  janela — a pessoa perderia a escolha. Medido: **os confrontos que cabiam no orçamento eram 100% e
+  passaram a ser 58,6%**; nos 41% que não cabem, tudo encolhe pelo fator (média 0,93, menor 0,55),
+  e a pausa de 1s vira **545ms no pior caso**. O que se perde é tempo de leitura, nunca a escolha.
+
 ## Log de batalha
 
 - O matchup carrega **`golpes`**: o diário do confronto, um registro por golpe na ordem real,

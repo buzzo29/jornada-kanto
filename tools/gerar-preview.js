@@ -107,6 +107,20 @@ add('Jornada', 'Escolha de caminho (trecho 4)', ()=>sb.renderWalkNext());
   add('Golpes', 'Ordem de batalha — o Togepi anuncia o Metronomo', ()=>sb.renderTeamOrder());
 }
 
+/* ---- a linha de status da batalha ---- */
+/* Ela e a MESMA linha do "Trocando golpes...", so que dizendo o golpe que acabou de sair. Vale a
+   320px porque o nome do pokemon e o selo do golpe dividem uma linha so. */
+{
+  const a1 = ['charizard','gengar'].map(id => { const p = sb.createInstance(id, 55); p.ataques = sb.ataquesPadrao(p); return p; });
+  const b1 = ['onix','alakazam'].map(id => sb.createInstance(id, 55));
+  const r1 = sb.simulateGymBattle(a1, b1);
+  const m1 = r1.matchups[0];
+  const seq1 = sb.buildAnimatedHitSequence(m1);
+  add('Batalha', 'A linha de status: o golpe de cada passo', () =>
+    `<div class="box">${seq1.map((h, i) =>
+      `<div class="battle-status-area">${sb.statusDoConfrontoHtml(m1, i + 1, h)}</div>`).join('')}</div>`);
+}
+
 /* ---- a ficha da Pokedex com a lista de golpes ---- */
 /* A lista rola por dentro: o Nidoking aprende 11 golpes de dano, e sem o teto o botao Fechar
    ia parar fora da tela num celular. */
