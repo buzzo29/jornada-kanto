@@ -1,0 +1,10313 @@
+{
+ "_fonte": "Pokémon Showdown: data/moves.json com os mods gen8→gen2 aplicados, e data/mods/gen2/learnsets.ts",
+ "_gerado_por": "tools/gerar-golpes.js",
+ "_nota": "Aprendizado por NÍVEL da Gen 2 (tag 2L). A categoria físico/especial NÃO está aqui: neste motor quem decide é o TIPO do golpe (isSpecialType). poder 0 = golpe de status.",
+ "golpes": {
+  "absorb": {
+   "nome": "Absorb",
+   "tipo": "Grass",
+   "poder": 20,
+   "pp": 20,
+   "precisao": 100
+  },
+  "acid": {
+   "nome": "Acid",
+   "tipo": "Poison",
+   "poder": 40,
+   "pp": 30,
+   "precisao": 100
+  },
+  "acidarmor": {
+   "nome": "Acid Armor",
+   "tipo": "Poison",
+   "poder": 0,
+   "pp": 40,
+   "precisao": 100
+  },
+  "aeroblast": {
+   "nome": "Aeroblast",
+   "tipo": "Flying",
+   "poder": 100,
+   "pp": 5,
+   "precisao": 95
+  },
+  "agility": {
+   "nome": "Agility",
+   "tipo": "Psychic",
+   "poder": 0,
+   "pp": 30,
+   "precisao": 100
+  },
+  "amnesia": {
+   "nome": "Amnesia",
+   "tipo": "Psychic",
+   "poder": 0,
+   "pp": 20,
+   "precisao": 100
+  },
+  "ancientpower": {
+   "nome": "Ancient Power",
+   "tipo": "Rock",
+   "poder": 60,
+   "pp": 5,
+   "precisao": 100
+  },
+  "aurorabeam": {
+   "nome": "Aurora Beam",
+   "tipo": "Ice",
+   "poder": 65,
+   "pp": 20,
+   "precisao": 100
+  },
+  "barrage": {
+   "nome": "Barrage",
+   "tipo": "Normal",
+   "poder": 15,
+   "pp": 20,
+   "precisao": 85
+  },
+  "barrier": {
+   "nome": "Barrier",
+   "tipo": "Psychic",
+   "poder": 0,
+   "pp": 30,
+   "precisao": 100
+  },
+  "batonpass": {
+   "nome": "Baton Pass",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 40,
+   "precisao": 100
+  },
+  "beatup": {
+   "nome": "Beat Up",
+   "tipo": "Dark",
+   "poder": 10,
+   "pp": 10,
+   "precisao": 100
+  },
+  "bellydrum": {
+   "nome": "Belly Drum",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 10,
+   "precisao": 100
+  },
+  "bide": {
+   "nome": "Bide",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 10,
+   "precisao": 100
+  },
+  "bind": {
+   "nome": "Bind",
+   "tipo": "Normal",
+   "poder": 15,
+   "pp": 20,
+   "precisao": 75
+  },
+  "bite": {
+   "nome": "Bite",
+   "tipo": "Dark",
+   "poder": 60,
+   "pp": 25,
+   "precisao": 100
+  },
+  "blizzard": {
+   "nome": "Blizzard",
+   "tipo": "Ice",
+   "poder": 120,
+   "pp": 5,
+   "precisao": 70
+  },
+  "bodyslam": {
+   "nome": "Body Slam",
+   "tipo": "Normal",
+   "poder": 85,
+   "pp": 15,
+   "precisao": 100
+  },
+  "boneclub": {
+   "nome": "Bone Club",
+   "tipo": "Ground",
+   "poder": 65,
+   "pp": 20,
+   "precisao": 85
+  },
+  "bonemerang": {
+   "nome": "Bonemerang",
+   "tipo": "Ground",
+   "poder": 50,
+   "pp": 10,
+   "precisao": 90
+  },
+  "bonerush": {
+   "nome": "Bone Rush",
+   "tipo": "Ground",
+   "poder": 25,
+   "pp": 10,
+   "precisao": 80
+  },
+  "bubble": {
+   "nome": "Bubble",
+   "tipo": "Water",
+   "poder": 20,
+   "pp": 30,
+   "precisao": 100
+  },
+  "bubblebeam": {
+   "nome": "Bubble Beam",
+   "tipo": "Water",
+   "poder": 65,
+   "pp": 20,
+   "precisao": 100
+  },
+  "charm": {
+   "nome": "Charm",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 20,
+   "precisao": 100
+  },
+  "clamp": {
+   "nome": "Clamp",
+   "tipo": "Water",
+   "poder": 35,
+   "pp": 10,
+   "precisao": 75
+  },
+  "cometpunch": {
+   "nome": "Comet Punch",
+   "tipo": "Normal",
+   "poder": 18,
+   "pp": 15,
+   "precisao": 85
+  },
+  "confuseray": {
+   "nome": "Confuse Ray",
+   "tipo": "Ghost",
+   "poder": 0,
+   "pp": 10,
+   "precisao": 100
+  },
+  "confusion": {
+   "nome": "Confusion",
+   "tipo": "Psychic",
+   "poder": 50,
+   "pp": 25,
+   "precisao": 100
+  },
+  "constrict": {
+   "nome": "Constrict",
+   "tipo": "Normal",
+   "poder": 10,
+   "pp": 35,
+   "precisao": 100
+  },
+  "conversion": {
+   "nome": "Conversion",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 30,
+   "precisao": 100
+  },
+  "conversion2": {
+   "nome": "Conversion 2",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 30,
+   "precisao": 100
+  },
+  "cottonspore": {
+   "nome": "Cotton Spore",
+   "tipo": "Grass",
+   "poder": 0,
+   "pp": 40,
+   "precisao": 85
+  },
+  "counter": {
+   "nome": "Counter",
+   "tipo": "Fighting",
+   "poder": 0,
+   "pp": 20,
+   "precisao": 100
+  },
+  "crabhammer": {
+   "nome": "Crabhammer",
+   "tipo": "Water",
+   "poder": 90,
+   "pp": 10,
+   "precisao": 85
+  },
+  "crosschop": {
+   "nome": "Cross Chop",
+   "tipo": "Fighting",
+   "poder": 100,
+   "pp": 5,
+   "precisao": 80
+  },
+  "crunch": {
+   "nome": "Crunch",
+   "tipo": "Dark",
+   "poder": 80,
+   "pp": 15,
+   "precisao": 100
+  },
+  "curse": {
+   "nome": "Curse",
+   "tipo": "???",
+   "poder": 0,
+   "pp": 10,
+   "precisao": 100
+  },
+  "defensecurl": {
+   "nome": "Defense Curl",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 40,
+   "precisao": 100
+  },
+  "destinybond": {
+   "nome": "Destiny Bond",
+   "tipo": "Ghost",
+   "poder": 0,
+   "pp": 5,
+   "precisao": 100
+  },
+  "detect": {
+   "nome": "Detect",
+   "tipo": "Fighting",
+   "poder": 0,
+   "pp": 5,
+   "precisao": 100
+  },
+  "dig": {
+   "nome": "Dig",
+   "tipo": "Ground",
+   "poder": 60,
+   "pp": 10,
+   "precisao": 100
+  },
+  "disable": {
+   "nome": "Disable",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 20,
+   "precisao": 55
+  },
+  "dizzypunch": {
+   "nome": "Dizzy Punch",
+   "tipo": "Normal",
+   "poder": 70,
+   "pp": 10,
+   "precisao": 100
+  },
+  "doubleedge": {
+   "nome": "Double-Edge",
+   "tipo": "Normal",
+   "poder": 120,
+   "pp": 15,
+   "precisao": 100
+  },
+  "doublekick": {
+   "nome": "Double Kick",
+   "tipo": "Fighting",
+   "poder": 30,
+   "pp": 30,
+   "precisao": 100
+  },
+  "doubleslap": {
+   "nome": "Double Slap",
+   "tipo": "Normal",
+   "poder": 15,
+   "pp": 10,
+   "precisao": 85
+  },
+  "doubleteam": {
+   "nome": "Double Team",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 15,
+   "precisao": 100
+  },
+  "dragonrage": {
+   "nome": "Dragon Rage",
+   "tipo": "Dragon",
+   "poder": 0,
+   "pp": 10,
+   "precisao": 100
+  },
+  "dreameater": {
+   "nome": "Dream Eater",
+   "tipo": "Psychic",
+   "poder": 100,
+   "pp": 15,
+   "precisao": 100
+  },
+  "drillpeck": {
+   "nome": "Drill Peck",
+   "tipo": "Flying",
+   "poder": 80,
+   "pp": 20,
+   "precisao": 100
+  },
+  "earthquake": {
+   "nome": "Earthquake",
+   "tipo": "Ground",
+   "poder": 100,
+   "pp": 10,
+   "precisao": 100
+  },
+  "eggbomb": {
+   "nome": "Egg Bomb",
+   "tipo": "Normal",
+   "poder": 100,
+   "pp": 10,
+   "precisao": 75
+  },
+  "ember": {
+   "nome": "Ember",
+   "tipo": "Fire",
+   "poder": 40,
+   "pp": 25,
+   "precisao": 100
+  },
+  "encore": {
+   "nome": "Encore",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 5,
+   "precisao": 100
+  },
+  "endure": {
+   "nome": "Endure",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 10,
+   "precisao": 100
+  },
+  "explosion": {
+   "nome": "Explosion",
+   "tipo": "Normal",
+   "poder": 250,
+   "pp": 5,
+   "precisao": 100
+  },
+  "extremespeed": {
+   "nome": "Extreme Speed",
+   "tipo": "Normal",
+   "poder": 80,
+   "pp": 5,
+   "precisao": 100
+  },
+  "falseswipe": {
+   "nome": "False Swipe",
+   "tipo": "Normal",
+   "poder": 40,
+   "pp": 40,
+   "precisao": 100
+  },
+  "feintattack": {
+   "nome": "Feint Attack",
+   "tipo": "Dark",
+   "poder": 60,
+   "pp": 20,
+   "precisao": 100
+  },
+  "fireblast": {
+   "nome": "Fire Blast",
+   "tipo": "Fire",
+   "poder": 120,
+   "pp": 5,
+   "precisao": 85
+  },
+  "firepunch": {
+   "nome": "Fire Punch",
+   "tipo": "Fire",
+   "poder": 75,
+   "pp": 15,
+   "precisao": 100
+  },
+  "firespin": {
+   "nome": "Fire Spin",
+   "tipo": "Fire",
+   "poder": 15,
+   "pp": 15,
+   "precisao": 70
+  },
+  "fissure": {
+   "nome": "Fissure",
+   "tipo": "Ground",
+   "poder": 0,
+   "pp": 5,
+   "precisao": 30
+  },
+  "flail": {
+   "nome": "Flail",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 15,
+   "precisao": 100
+  },
+  "flamethrower": {
+   "nome": "Flamethrower",
+   "tipo": "Fire",
+   "poder": 95,
+   "pp": 15,
+   "precisao": 100
+  },
+  "flamewheel": {
+   "nome": "Flame Wheel",
+   "tipo": "Fire",
+   "poder": 60,
+   "pp": 25,
+   "precisao": 100
+  },
+  "focusenergy": {
+   "nome": "Focus Energy",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 30,
+   "precisao": 100
+  },
+  "foresight": {
+   "nome": "Foresight",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 40,
+   "precisao": 100
+  },
+  "furyattack": {
+   "nome": "Fury Attack",
+   "tipo": "Normal",
+   "poder": 15,
+   "pp": 20,
+   "precisao": 85
+  },
+  "furyswipes": {
+   "nome": "Fury Swipes",
+   "tipo": "Normal",
+   "poder": 18,
+   "pp": 15,
+   "precisao": 80
+  },
+  "futuresight": {
+   "nome": "Future Sight",
+   "tipo": "Psychic",
+   "poder": 80,
+   "pp": 15,
+   "precisao": 90
+  },
+  "gigadrain": {
+   "nome": "Giga Drain",
+   "tipo": "Grass",
+   "poder": 60,
+   "pp": 5,
+   "precisao": 100
+  },
+  "glare": {
+   "nome": "Glare",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 30,
+   "precisao": 75
+  },
+  "growl": {
+   "nome": "Growl",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 40,
+   "precisao": 100
+  },
+  "growth": {
+   "nome": "Growth",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 40,
+   "precisao": 100
+  },
+  "guillotine": {
+   "nome": "Guillotine",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 5,
+   "precisao": 30
+  },
+  "gust": {
+   "nome": "Gust",
+   "tipo": "Flying",
+   "poder": 40,
+   "pp": 35,
+   "precisao": 100
+  },
+  "harden": {
+   "nome": "Harden",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 30,
+   "precisao": 100
+  },
+  "haze": {
+   "nome": "Haze",
+   "tipo": "Ice",
+   "poder": 0,
+   "pp": 30,
+   "precisao": 100
+  },
+  "headbutt": {
+   "nome": "Headbutt",
+   "tipo": "Normal",
+   "poder": 70,
+   "pp": 15,
+   "precisao": 100
+  },
+  "healbell": {
+   "nome": "Heal Bell",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 5,
+   "precisao": 100
+  },
+  "hiddenpower": {
+   "nome": "Hidden Power",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 15,
+   "precisao": 100
+  },
+  "highjumpkick": {
+   "nome": "High Jump Kick",
+   "tipo": "Fighting",
+   "poder": 85,
+   "pp": 20,
+   "precisao": 90
+  },
+  "hornattack": {
+   "nome": "Horn Attack",
+   "tipo": "Normal",
+   "poder": 65,
+   "pp": 25,
+   "precisao": 100
+  },
+  "horndrill": {
+   "nome": "Horn Drill",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 5,
+   "precisao": 30
+  },
+  "hydropump": {
+   "nome": "Hydro Pump",
+   "tipo": "Water",
+   "poder": 120,
+   "pp": 5,
+   "precisao": 80
+  },
+  "hyperbeam": {
+   "nome": "Hyper Beam",
+   "tipo": "Normal",
+   "poder": 150,
+   "pp": 5,
+   "precisao": 90
+  },
+  "hyperfang": {
+   "nome": "Hyper Fang",
+   "tipo": "Normal",
+   "poder": 80,
+   "pp": 15,
+   "precisao": 90
+  },
+  "hypnosis": {
+   "nome": "Hypnosis",
+   "tipo": "Psychic",
+   "poder": 0,
+   "pp": 20,
+   "precisao": 60
+  },
+  "icebeam": {
+   "nome": "Ice Beam",
+   "tipo": "Ice",
+   "poder": 95,
+   "pp": 10,
+   "precisao": 100
+  },
+  "icepunch": {
+   "nome": "Ice Punch",
+   "tipo": "Ice",
+   "poder": 75,
+   "pp": 15,
+   "precisao": 100
+  },
+  "jumpkick": {
+   "nome": "Jump Kick",
+   "tipo": "Fighting",
+   "poder": 70,
+   "pp": 25,
+   "precisao": 95
+  },
+  "karatechop": {
+   "nome": "Karate Chop",
+   "tipo": "Fighting",
+   "poder": 50,
+   "pp": 25,
+   "precisao": 100
+  },
+  "kinesis": {
+   "nome": "Kinesis",
+   "tipo": "Psychic",
+   "poder": 0,
+   "pp": 15,
+   "precisao": 80
+  },
+  "leechlife": {
+   "nome": "Leech Life",
+   "tipo": "Bug",
+   "poder": 20,
+   "pp": 15,
+   "precisao": 100
+  },
+  "leechseed": {
+   "nome": "Leech Seed",
+   "tipo": "Grass",
+   "poder": 0,
+   "pp": 10,
+   "precisao": 90
+  },
+  "leer": {
+   "nome": "Leer",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 30,
+   "precisao": 100
+  },
+  "lick": {
+   "nome": "Lick",
+   "tipo": "Ghost",
+   "poder": 20,
+   "pp": 30,
+   "precisao": 100
+  },
+  "lightscreen": {
+   "nome": "Light Screen",
+   "tipo": "Psychic",
+   "poder": 0,
+   "pp": 30,
+   "precisao": 100
+  },
+  "lockon": {
+   "nome": "Lock-On",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 5,
+   "precisao": 100
+  },
+  "lovelykiss": {
+   "nome": "Lovely Kiss",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 10,
+   "precisao": 75
+  },
+  "lowkick": {
+   "nome": "Low Kick",
+   "tipo": "Fighting",
+   "poder": 50,
+   "pp": 20,
+   "precisao": 90
+  },
+  "machpunch": {
+   "nome": "Mach Punch",
+   "tipo": "Fighting",
+   "poder": 40,
+   "pp": 30,
+   "precisao": 100
+  },
+  "magnitude": {
+   "nome": "Magnitude",
+   "tipo": "Ground",
+   "poder": 0,
+   "pp": 30,
+   "precisao": 100
+  },
+  "meanlook": {
+   "nome": "Mean Look",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 5,
+   "precisao": 100
+  },
+  "meditate": {
+   "nome": "Meditate",
+   "tipo": "Psychic",
+   "poder": 0,
+   "pp": 40,
+   "precisao": 100
+  },
+  "megadrain": {
+   "nome": "Mega Drain",
+   "tipo": "Grass",
+   "poder": 40,
+   "pp": 10,
+   "precisao": 100
+  },
+  "megahorn": {
+   "nome": "Megahorn",
+   "tipo": "Bug",
+   "poder": 120,
+   "pp": 10,
+   "precisao": 85
+  },
+  "megakick": {
+   "nome": "Mega Kick",
+   "tipo": "Normal",
+   "poder": 120,
+   "pp": 5,
+   "precisao": 75
+  },
+  "megapunch": {
+   "nome": "Mega Punch",
+   "tipo": "Normal",
+   "poder": 80,
+   "pp": 20,
+   "precisao": 85
+  },
+  "metalclaw": {
+   "nome": "Metal Claw",
+   "tipo": "Steel",
+   "poder": 50,
+   "pp": 35,
+   "precisao": 95
+  },
+  "metronome": {
+   "nome": "Metronome",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 10,
+   "precisao": 100
+  },
+  "milkdrink": {
+   "nome": "Milk Drink",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 10,
+   "precisao": 100
+  },
+  "mimic": {
+   "nome": "Mimic",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 10,
+   "precisao": 100
+  },
+  "mindreader": {
+   "nome": "Mind Reader",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 5,
+   "precisao": 100
+  },
+  "minimize": {
+   "nome": "Minimize",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 20,
+   "precisao": 100
+  },
+  "mirrorcoat": {
+   "nome": "Mirror Coat",
+   "tipo": "Psychic",
+   "poder": 0,
+   "pp": 20,
+   "precisao": 100
+  },
+  "mirrormove": {
+   "nome": "Mirror Move",
+   "tipo": "Flying",
+   "poder": 0,
+   "pp": 20,
+   "precisao": 100
+  },
+  "mist": {
+   "nome": "Mist",
+   "tipo": "Ice",
+   "poder": 0,
+   "pp": 30,
+   "precisao": 100
+  },
+  "moonlight": {
+   "nome": "Moonlight",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 5,
+   "precisao": 100
+  },
+  "morningsun": {
+   "nome": "Morning Sun",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 5,
+   "precisao": 100
+  },
+  "nightshade": {
+   "nome": "Night Shade",
+   "tipo": "Ghost",
+   "poder": 0,
+   "pp": 15,
+   "precisao": 100
+  },
+  "octazooka": {
+   "nome": "Octazooka",
+   "tipo": "Water",
+   "poder": 65,
+   "pp": 10,
+   "precisao": 85
+  },
+  "outrage": {
+   "nome": "Outrage",
+   "tipo": "Dragon",
+   "poder": 90,
+   "pp": 15,
+   "precisao": 100
+  },
+  "painsplit": {
+   "nome": "Pain Split",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 20,
+   "precisao": 100
+  },
+  "payday": {
+   "nome": "Pay Day",
+   "tipo": "Normal",
+   "poder": 40,
+   "pp": 20,
+   "precisao": 100
+  },
+  "peck": {
+   "nome": "Peck",
+   "tipo": "Flying",
+   "poder": 35,
+   "pp": 35,
+   "precisao": 100
+  },
+  "perishsong": {
+   "nome": "Perish Song",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 5,
+   "precisao": 100
+  },
+  "petaldance": {
+   "nome": "Petal Dance",
+   "tipo": "Grass",
+   "poder": 70,
+   "pp": 20,
+   "precisao": 100
+  },
+  "pinmissile": {
+   "nome": "Pin Missile",
+   "tipo": "Bug",
+   "poder": 14,
+   "pp": 20,
+   "precisao": 85
+  },
+  "poisongas": {
+   "nome": "Poison Gas",
+   "tipo": "Poison",
+   "poder": 0,
+   "pp": 40,
+   "precisao": 55
+  },
+  "poisonpowder": {
+   "nome": "Poison Powder",
+   "tipo": "Poison",
+   "poder": 0,
+   "pp": 35,
+   "precisao": 75
+  },
+  "poisonsting": {
+   "nome": "Poison Sting",
+   "tipo": "Poison",
+   "poder": 15,
+   "pp": 35,
+   "precisao": 100
+  },
+  "pound": {
+   "nome": "Pound",
+   "tipo": "Normal",
+   "poder": 40,
+   "pp": 35,
+   "precisao": 100
+  },
+  "powdersnow": {
+   "nome": "Powder Snow",
+   "tipo": "Ice",
+   "poder": 40,
+   "pp": 25,
+   "precisao": 100
+  },
+  "present": {
+   "nome": "Present",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 15,
+   "precisao": 90
+  },
+  "protect": {
+   "nome": "Protect",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 10,
+   "precisao": 100
+  },
+  "psybeam": {
+   "nome": "Psybeam",
+   "tipo": "Psychic",
+   "poder": 65,
+   "pp": 20,
+   "precisao": 100
+  },
+  "psychic": {
+   "nome": "Psychic",
+   "tipo": "Psychic",
+   "poder": 90,
+   "pp": 10,
+   "precisao": 100
+  },
+  "psychup": {
+   "nome": "Psych Up",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 10,
+   "precisao": 100
+  },
+  "psywave": {
+   "nome": "Psywave",
+   "tipo": "Psychic",
+   "poder": 0,
+   "pp": 15,
+   "precisao": 80
+  },
+  "pursuit": {
+   "nome": "Pursuit",
+   "tipo": "Dark",
+   "poder": 40,
+   "pp": 20,
+   "precisao": 100
+  },
+  "quickattack": {
+   "nome": "Quick Attack",
+   "tipo": "Normal",
+   "poder": 40,
+   "pp": 30,
+   "precisao": 100
+  },
+  "rage": {
+   "nome": "Rage",
+   "tipo": "Normal",
+   "poder": 20,
+   "pp": 20,
+   "precisao": 100
+  },
+  "raindance": {
+   "nome": "Rain Dance",
+   "tipo": "Water",
+   "poder": 0,
+   "pp": 5,
+   "precisao": 100
+  },
+  "rapidspin": {
+   "nome": "Rapid Spin",
+   "tipo": "Normal",
+   "poder": 20,
+   "pp": 40,
+   "precisao": 100
+  },
+  "razorleaf": {
+   "nome": "Razor Leaf",
+   "tipo": "Grass",
+   "poder": 55,
+   "pp": 25,
+   "precisao": 95
+  },
+  "recover": {
+   "nome": "Recover",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 20,
+   "precisao": 100
+  },
+  "reflect": {
+   "nome": "Reflect",
+   "tipo": "Psychic",
+   "poder": 0,
+   "pp": 20,
+   "precisao": 100
+  },
+  "rest": {
+   "nome": "Rest",
+   "tipo": "Psychic",
+   "poder": 0,
+   "pp": 10,
+   "precisao": 100
+  },
+  "reversal": {
+   "nome": "Reversal",
+   "tipo": "Fighting",
+   "poder": 0,
+   "pp": 15,
+   "precisao": 100
+  },
+  "roar": {
+   "nome": "Roar",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 20,
+   "precisao": 100
+  },
+  "rockslide": {
+   "nome": "Rock Slide",
+   "tipo": "Rock",
+   "poder": 75,
+   "pp": 10,
+   "precisao": 90
+  },
+  "rockthrow": {
+   "nome": "Rock Throw",
+   "tipo": "Rock",
+   "poder": 50,
+   "pp": 15,
+   "precisao": 90
+  },
+  "rollingkick": {
+   "nome": "Rolling Kick",
+   "tipo": "Fighting",
+   "poder": 60,
+   "pp": 15,
+   "precisao": 85
+  },
+  "rollout": {
+   "nome": "Rollout",
+   "tipo": "Rock",
+   "poder": 30,
+   "pp": 20,
+   "precisao": 90
+  },
+  "sacredfire": {
+   "nome": "Sacred Fire",
+   "tipo": "Fire",
+   "poder": 100,
+   "pp": 5,
+   "precisao": 95
+  },
+  "safeguard": {
+   "nome": "Safeguard",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 25,
+   "precisao": 100
+  },
+  "sandattack": {
+   "nome": "Sand Attack",
+   "tipo": "Ground",
+   "poder": 0,
+   "pp": 15,
+   "precisao": 100
+  },
+  "sandstorm": {
+   "nome": "Sandstorm",
+   "tipo": "Rock",
+   "poder": 0,
+   "pp": 10,
+   "precisao": 100
+  },
+  "scaryface": {
+   "nome": "Scary Face",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 10,
+   "precisao": 90
+  },
+  "scratch": {
+   "nome": "Scratch",
+   "tipo": "Normal",
+   "poder": 40,
+   "pp": 35,
+   "precisao": 100
+  },
+  "screech": {
+   "nome": "Screech",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 40,
+   "precisao": 85
+  },
+  "seismictoss": {
+   "nome": "Seismic Toss",
+   "tipo": "Fighting",
+   "poder": 0,
+   "pp": 20,
+   "precisao": 100
+  },
+  "selfdestruct": {
+   "nome": "Self-Destruct",
+   "tipo": "Normal",
+   "poder": 200,
+   "pp": 5,
+   "precisao": 100
+  },
+  "sharpen": {
+   "nome": "Sharpen",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 30,
+   "precisao": 100
+  },
+  "sing": {
+   "nome": "Sing",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 15,
+   "precisao": 55
+  },
+  "sketch": {
+   "nome": "Sketch",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 1,
+   "precisao": 100
+  },
+  "skullbash": {
+   "nome": "Skull Bash",
+   "tipo": "Normal",
+   "poder": 100,
+   "pp": 15,
+   "precisao": 100
+  },
+  "skyattack": {
+   "nome": "Sky Attack",
+   "tipo": "Flying",
+   "poder": 140,
+   "pp": 5,
+   "precisao": 90
+  },
+  "slam": {
+   "nome": "Slam",
+   "tipo": "Normal",
+   "poder": 80,
+   "pp": 20,
+   "precisao": 75
+  },
+  "slash": {
+   "nome": "Slash",
+   "tipo": "Normal",
+   "poder": 70,
+   "pp": 20,
+   "precisao": 100
+  },
+  "sleeppowder": {
+   "nome": "Sleep Powder",
+   "tipo": "Grass",
+   "poder": 0,
+   "pp": 15,
+   "precisao": 75
+  },
+  "sludge": {
+   "nome": "Sludge",
+   "tipo": "Poison",
+   "poder": 65,
+   "pp": 20,
+   "precisao": 100
+  },
+  "sludgebomb": {
+   "nome": "Sludge Bomb",
+   "tipo": "Poison",
+   "poder": 90,
+   "pp": 10,
+   "precisao": 100
+  },
+  "smog": {
+   "nome": "Smog",
+   "tipo": "Poison",
+   "poder": 20,
+   "pp": 20,
+   "precisao": 70
+  },
+  "smokescreen": {
+   "nome": "Smokescreen",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 20,
+   "precisao": 100
+  },
+  "snore": {
+   "nome": "Snore",
+   "tipo": "Normal",
+   "poder": 40,
+   "pp": 15,
+   "precisao": 100
+  },
+  "softboiled": {
+   "nome": "Soft-Boiled",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 10,
+   "precisao": 100
+  },
+  "solarbeam": {
+   "nome": "Solar Beam",
+   "tipo": "Grass",
+   "poder": 120,
+   "pp": 10,
+   "precisao": 100
+  },
+  "sonicboom": {
+   "nome": "Sonic Boom",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 20,
+   "precisao": 90
+  },
+  "spark": {
+   "nome": "Spark",
+   "tipo": "Electric",
+   "poder": 65,
+   "pp": 20,
+   "precisao": 100
+  },
+  "spiderweb": {
+   "nome": "Spider Web",
+   "tipo": "Bug",
+   "poder": 0,
+   "pp": 10,
+   "precisao": 100
+  },
+  "spikecannon": {
+   "nome": "Spike Cannon",
+   "tipo": "Normal",
+   "poder": 20,
+   "pp": 15,
+   "precisao": 100
+  },
+  "spikes": {
+   "nome": "Spikes",
+   "tipo": "Ground",
+   "poder": 0,
+   "pp": 20,
+   "precisao": 100
+  },
+  "spite": {
+   "nome": "Spite",
+   "tipo": "Ghost",
+   "poder": 0,
+   "pp": 10,
+   "precisao": 100
+  },
+  "splash": {
+   "nome": "Splash",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 40,
+   "precisao": 100
+  },
+  "spore": {
+   "nome": "Spore",
+   "tipo": "Grass",
+   "poder": 0,
+   "pp": 15,
+   "precisao": 100
+  },
+  "steelwing": {
+   "nome": "Steel Wing",
+   "tipo": "Steel",
+   "poder": 70,
+   "pp": 25,
+   "precisao": 90
+  },
+  "stomp": {
+   "nome": "Stomp",
+   "tipo": "Normal",
+   "poder": 65,
+   "pp": 20,
+   "precisao": 100
+  },
+  "stringshot": {
+   "nome": "String Shot",
+   "tipo": "Bug",
+   "poder": 0,
+   "pp": 40,
+   "precisao": 95
+  },
+  "stunspore": {
+   "nome": "Stun Spore",
+   "tipo": "Grass",
+   "poder": 0,
+   "pp": 30,
+   "precisao": 75
+  },
+  "submission": {
+   "nome": "Submission",
+   "tipo": "Fighting",
+   "poder": 80,
+   "pp": 25,
+   "precisao": 80
+  },
+  "substitute": {
+   "nome": "Substitute",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 10,
+   "precisao": 100
+  },
+  "sunnyday": {
+   "nome": "Sunny Day",
+   "tipo": "Fire",
+   "poder": 0,
+   "pp": 5,
+   "precisao": 100
+  },
+  "superfang": {
+   "nome": "Super Fang",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 10,
+   "precisao": 90
+  },
+  "supersonic": {
+   "nome": "Supersonic",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 20,
+   "precisao": 55
+  },
+  "swagger": {
+   "nome": "Swagger",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 15,
+   "precisao": 90
+  },
+  "sweetkiss": {
+   "nome": "Sweet Kiss",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 10,
+   "precisao": 75
+  },
+  "sweetscent": {
+   "nome": "Sweet Scent",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 20,
+   "precisao": 100
+  },
+  "swift": {
+   "nome": "Swift",
+   "tipo": "Normal",
+   "poder": 60,
+   "pp": 20,
+   "precisao": 100
+  },
+  "swordsdance": {
+   "nome": "Swords Dance",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 30,
+   "precisao": 100
+  },
+  "synthesis": {
+   "nome": "Synthesis",
+   "tipo": "Grass",
+   "poder": 0,
+   "pp": 5,
+   "precisao": 100
+  },
+  "tackle": {
+   "nome": "Tackle",
+   "tipo": "Normal",
+   "poder": 35,
+   "pp": 35,
+   "precisao": 95
+  },
+  "tailwhip": {
+   "nome": "Tail Whip",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 30,
+   "precisao": 100
+  },
+  "takedown": {
+   "nome": "Take Down",
+   "tipo": "Normal",
+   "poder": 90,
+   "pp": 20,
+   "precisao": 85
+  },
+  "teleport": {
+   "nome": "Teleport",
+   "tipo": "Psychic",
+   "poder": 0,
+   "pp": 20,
+   "precisao": 100
+  },
+  "thrash": {
+   "nome": "Thrash",
+   "tipo": "Normal",
+   "poder": 90,
+   "pp": 20,
+   "precisao": 100
+  },
+  "thunder": {
+   "nome": "Thunder",
+   "tipo": "Electric",
+   "poder": 120,
+   "pp": 10,
+   "precisao": 70
+  },
+  "thunderbolt": {
+   "nome": "Thunderbolt",
+   "tipo": "Electric",
+   "poder": 95,
+   "pp": 15,
+   "precisao": 100
+  },
+  "thunderpunch": {
+   "nome": "Thunder Punch",
+   "tipo": "Electric",
+   "poder": 75,
+   "pp": 15,
+   "precisao": 100
+  },
+  "thundershock": {
+   "nome": "Thunder Shock",
+   "tipo": "Electric",
+   "poder": 40,
+   "pp": 30,
+   "precisao": 100
+  },
+  "thunderwave": {
+   "nome": "Thunder Wave",
+   "tipo": "Electric",
+   "poder": 0,
+   "pp": 20,
+   "precisao": 100
+  },
+  "transform": {
+   "nome": "Transform",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 10,
+   "precisao": 100
+  },
+  "triattack": {
+   "nome": "Tri Attack",
+   "tipo": "Normal",
+   "poder": 80,
+   "pp": 10,
+   "precisao": 100
+  },
+  "triplekick": {
+   "nome": "Triple Kick",
+   "tipo": "Fighting",
+   "poder": 10,
+   "pp": 10,
+   "precisao": 90
+  },
+  "twineedle": {
+   "nome": "Twineedle",
+   "tipo": "Bug",
+   "poder": 25,
+   "pp": 20,
+   "precisao": 100
+  },
+  "twister": {
+   "nome": "Twister",
+   "tipo": "Dragon",
+   "poder": 40,
+   "pp": 20,
+   "precisao": 100
+  },
+  "vinewhip": {
+   "nome": "Vine Whip",
+   "tipo": "Grass",
+   "poder": 35,
+   "pp": 10,
+   "precisao": 100
+  },
+  "visegrip": {
+   "nome": "Vise Grip",
+   "tipo": "Normal",
+   "poder": 55,
+   "pp": 30,
+   "precisao": 100
+  },
+  "vitalthrow": {
+   "nome": "Vital Throw",
+   "tipo": "Fighting",
+   "poder": 70,
+   "pp": 10,
+   "precisao": 100
+  },
+  "waterfall": {
+   "nome": "Waterfall",
+   "tipo": "Water",
+   "poder": 80,
+   "pp": 15,
+   "precisao": 100
+  },
+  "watergun": {
+   "nome": "Water Gun",
+   "tipo": "Water",
+   "poder": 40,
+   "pp": 25,
+   "precisao": 100
+  },
+  "whirlwind": {
+   "nome": "Whirlwind",
+   "tipo": "Normal",
+   "poder": 0,
+   "pp": 20,
+   "precisao": 100
+  },
+  "wingattack": {
+   "nome": "Wing Attack",
+   "tipo": "Flying",
+   "poder": 60,
+   "pp": 35,
+   "precisao": 100
+  },
+  "withdraw": {
+   "nome": "Withdraw",
+   "tipo": "Water",
+   "poder": 0,
+   "pp": 40,
+   "precisao": 100
+  },
+  "wrap": {
+   "nome": "Wrap",
+   "tipo": "Normal",
+   "poder": 15,
+   "pp": 20,
+   "precisao": 85
+  },
+  "zapcannon": {
+   "nome": "Zap Cannon",
+   "tipo": "Electric",
+   "poder": 100,
+   "pp": 5,
+   "precisao": 50
+  }
+ },
+ "porEspecie": {
+  "bulbasaur": [
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 4,
+    "g": "growl"
+   },
+   {
+    "n": 7,
+    "g": "leechseed"
+   },
+   {
+    "n": 10,
+    "g": "vinewhip"
+   },
+   {
+    "n": 15,
+    "g": "poisonpowder"
+   },
+   {
+    "n": 15,
+    "g": "sleeppowder"
+   },
+   {
+    "n": 20,
+    "g": "razorleaf"
+   },
+   {
+    "n": 25,
+    "g": "sweetscent"
+   },
+   {
+    "n": 32,
+    "g": "growth"
+   },
+   {
+    "n": 39,
+    "g": "synthesis"
+   },
+   {
+    "n": 46,
+    "g": "solarbeam"
+   }
+  ],
+  "charmander": [
+   {
+    "n": 1,
+    "g": "growl"
+   },
+   {
+    "n": 1,
+    "g": "scratch"
+   },
+   {
+    "n": 7,
+    "g": "ember"
+   },
+   {
+    "n": 13,
+    "g": "smokescreen"
+   },
+   {
+    "n": 19,
+    "g": "rage"
+   },
+   {
+    "n": 25,
+    "g": "scaryface"
+   },
+   {
+    "n": 31,
+    "g": "flamethrower"
+   },
+   {
+    "n": 37,
+    "g": "slash"
+   },
+   {
+    "n": 43,
+    "g": "dragonrage"
+   },
+   {
+    "n": 49,
+    "g": "firespin"
+   }
+  ],
+  "squirtle": [
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 4,
+    "g": "tailwhip"
+   },
+   {
+    "n": 7,
+    "g": "bubble"
+   },
+   {
+    "n": 10,
+    "g": "withdraw"
+   },
+   {
+    "n": 13,
+    "g": "watergun"
+   },
+   {
+    "n": 18,
+    "g": "bite"
+   },
+   {
+    "n": 23,
+    "g": "rapidspin"
+   },
+   {
+    "n": 28,
+    "g": "protect"
+   },
+   {
+    "n": 33,
+    "g": "raindance"
+   },
+   {
+    "n": 40,
+    "g": "skullbash"
+   },
+   {
+    "n": 47,
+    "g": "hydropump"
+   }
+  ],
+  "weedle": [
+   {
+    "n": 1,
+    "g": "poisonsting"
+   },
+   {
+    "n": 1,
+    "g": "stringshot"
+   }
+  ],
+  "caterpie": [
+   {
+    "n": 1,
+    "g": "stringshot"
+   },
+   {
+    "n": 1,
+    "g": "tackle"
+   }
+  ],
+  "ratata": [
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 1,
+    "g": "tailwhip"
+   },
+   {
+    "n": 7,
+    "g": "quickattack"
+   },
+   {
+    "n": 13,
+    "g": "hyperfang"
+   },
+   {
+    "n": 20,
+    "g": "focusenergy"
+   },
+   {
+    "n": 27,
+    "g": "pursuit"
+   },
+   {
+    "n": 34,
+    "g": "superfang"
+   }
+  ],
+  "pidgey": [
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 5,
+    "g": "sandattack"
+   },
+   {
+    "n": 9,
+    "g": "gust"
+   },
+   {
+    "n": 15,
+    "g": "quickattack"
+   },
+   {
+    "n": 21,
+    "g": "whirlwind"
+   },
+   {
+    "n": 29,
+    "g": "wingattack"
+   },
+   {
+    "n": 37,
+    "g": "agility"
+   },
+   {
+    "n": 47,
+    "g": "mirrormove"
+   }
+  ],
+  "mankey": [
+   {
+    "n": 1,
+    "g": "leer"
+   },
+   {
+    "n": 1,
+    "g": "scratch"
+   },
+   {
+    "n": 9,
+    "g": "lowkick"
+   },
+   {
+    "n": 15,
+    "g": "karatechop"
+   },
+   {
+    "n": 21,
+    "g": "furyswipes"
+   },
+   {
+    "n": 27,
+    "g": "focusenergy"
+   },
+   {
+    "n": 33,
+    "g": "seismictoss"
+   },
+   {
+    "n": 39,
+    "g": "crosschop"
+   },
+   {
+    "n": 45,
+    "g": "screech"
+   },
+   {
+    "n": 51,
+    "g": "thrash"
+   }
+  ],
+  "spearow": [
+   {
+    "n": 1,
+    "g": "growl"
+   },
+   {
+    "n": 1,
+    "g": "peck"
+   },
+   {
+    "n": 7,
+    "g": "leer"
+   },
+   {
+    "n": 13,
+    "g": "furyattack"
+   },
+   {
+    "n": 25,
+    "g": "pursuit"
+   },
+   {
+    "n": 31,
+    "g": "mirrormove"
+   },
+   {
+    "n": 37,
+    "g": "drillpeck"
+   },
+   {
+    "n": 43,
+    "g": "agility"
+   }
+  ],
+  "nidoranm": [
+   {
+    "n": 1,
+    "g": "leer"
+   },
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 8,
+    "g": "hornattack"
+   },
+   {
+    "n": 12,
+    "g": "doublekick"
+   },
+   {
+    "n": 17,
+    "g": "poisonsting"
+   },
+   {
+    "n": 23,
+    "g": "focusenergy"
+   },
+   {
+    "n": 30,
+    "g": "furyattack"
+   },
+   {
+    "n": 38,
+    "g": "horndrill"
+   }
+  ],
+  "oddish": [
+   {
+    "n": 1,
+    "g": "absorb"
+   },
+   {
+    "n": 7,
+    "g": "sweetscent"
+   },
+   {
+    "n": 14,
+    "g": "poisonpowder"
+   },
+   {
+    "n": 16,
+    "g": "stunspore"
+   },
+   {
+    "n": 18,
+    "g": "sleeppowder"
+   },
+   {
+    "n": 23,
+    "g": "acid"
+   },
+   {
+    "n": 32,
+    "g": "moonlight"
+   },
+   {
+    "n": 39,
+    "g": "petaldance"
+   }
+  ],
+  "geodude": [
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 6,
+    "g": "defensecurl"
+   },
+   {
+    "n": 11,
+    "g": "rockthrow"
+   },
+   {
+    "n": 16,
+    "g": "magnitude"
+   },
+   {
+    "n": 21,
+    "g": "selfdestruct"
+   },
+   {
+    "n": 26,
+    "g": "harden"
+   },
+   {
+    "n": 31,
+    "g": "rollout"
+   },
+   {
+    "n": 36,
+    "g": "earthquake"
+   },
+   {
+    "n": 41,
+    "g": "explosion"
+   }
+  ],
+  "onix": [
+   {
+    "n": 1,
+    "g": "screech"
+   },
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 10,
+    "g": "bind"
+   },
+   {
+    "n": 14,
+    "g": "rockthrow"
+   },
+   {
+    "n": 23,
+    "g": "harden"
+   },
+   {
+    "n": 27,
+    "g": "rage"
+   },
+   {
+    "n": 36,
+    "g": "sandstorm"
+   },
+   {
+    "n": 40,
+    "g": "slam"
+   }
+  ],
+  "ivysaur": [
+   {
+    "n": 1,
+    "g": "growl"
+   },
+   {
+    "n": 1,
+    "g": "leechseed"
+   },
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 10,
+    "g": "vinewhip"
+   },
+   {
+    "n": 15,
+    "g": "poisonpowder"
+   },
+   {
+    "n": 15,
+    "g": "sleeppowder"
+   },
+   {
+    "n": 22,
+    "g": "razorleaf"
+   },
+   {
+    "n": 29,
+    "g": "sweetscent"
+   },
+   {
+    "n": 38,
+    "g": "growth"
+   },
+   {
+    "n": 47,
+    "g": "synthesis"
+   },
+   {
+    "n": 56,
+    "g": "solarbeam"
+   }
+  ],
+  "venusaur": [
+   {
+    "n": 1,
+    "g": "growl"
+   },
+   {
+    "n": 1,
+    "g": "leechseed"
+   },
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 1,
+    "g": "vinewhip"
+   },
+   {
+    "n": 15,
+    "g": "poisonpowder"
+   },
+   {
+    "n": 15,
+    "g": "sleeppowder"
+   },
+   {
+    "n": 22,
+    "g": "razorleaf"
+   },
+   {
+    "n": 29,
+    "g": "sweetscent"
+   },
+   {
+    "n": 41,
+    "g": "growth"
+   },
+   {
+    "n": 53,
+    "g": "synthesis"
+   },
+   {
+    "n": 65,
+    "g": "solarbeam"
+   }
+  ],
+  "charmeleon": [
+   {
+    "n": 1,
+    "g": "ember"
+   },
+   {
+    "n": 1,
+    "g": "growl"
+   },
+   {
+    "n": 1,
+    "g": "scratch"
+   },
+   {
+    "n": 13,
+    "g": "smokescreen"
+   },
+   {
+    "n": 20,
+    "g": "rage"
+   },
+   {
+    "n": 27,
+    "g": "scaryface"
+   },
+   {
+    "n": 34,
+    "g": "flamethrower"
+   },
+   {
+    "n": 41,
+    "g": "slash"
+   },
+   {
+    "n": 48,
+    "g": "dragonrage"
+   },
+   {
+    "n": 55,
+    "g": "firespin"
+   }
+  ],
+  "charizard": [
+   {
+    "n": 1,
+    "g": "ember"
+   },
+   {
+    "n": 1,
+    "g": "growl"
+   },
+   {
+    "n": 1,
+    "g": "scratch"
+   },
+   {
+    "n": 1,
+    "g": "smokescreen"
+   },
+   {
+    "n": 20,
+    "g": "rage"
+   },
+   {
+    "n": 27,
+    "g": "scaryface"
+   },
+   {
+    "n": 34,
+    "g": "flamethrower"
+   },
+   {
+    "n": 36,
+    "g": "wingattack"
+   },
+   {
+    "n": 44,
+    "g": "slash"
+   },
+   {
+    "n": 54,
+    "g": "dragonrage"
+   },
+   {
+    "n": 64,
+    "g": "firespin"
+   }
+  ],
+  "wartortle": [
+   {
+    "n": 1,
+    "g": "bubble"
+   },
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 1,
+    "g": "tailwhip"
+   },
+   {
+    "n": 10,
+    "g": "withdraw"
+   },
+   {
+    "n": 13,
+    "g": "watergun"
+   },
+   {
+    "n": 19,
+    "g": "bite"
+   },
+   {
+    "n": 25,
+    "g": "rapidspin"
+   },
+   {
+    "n": 31,
+    "g": "protect"
+   },
+   {
+    "n": 37,
+    "g": "raindance"
+   },
+   {
+    "n": 45,
+    "g": "skullbash"
+   },
+   {
+    "n": 53,
+    "g": "hydropump"
+   }
+  ],
+  "blastoise": [
+   {
+    "n": 1,
+    "g": "bubble"
+   },
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 1,
+    "g": "tailwhip"
+   },
+   {
+    "n": 1,
+    "g": "withdraw"
+   },
+   {
+    "n": 13,
+    "g": "watergun"
+   },
+   {
+    "n": 19,
+    "g": "bite"
+   },
+   {
+    "n": 25,
+    "g": "rapidspin"
+   },
+   {
+    "n": 31,
+    "g": "protect"
+   },
+   {
+    "n": 42,
+    "g": "raindance"
+   },
+   {
+    "n": 55,
+    "g": "skullbash"
+   },
+   {
+    "n": 68,
+    "g": "hydropump"
+   }
+  ],
+  "kakuna": [
+   {
+    "n": 1,
+    "g": "harden"
+   }
+  ],
+  "beedrill": [
+   {
+    "n": 1,
+    "g": "furyattack"
+   },
+   {
+    "n": 15,
+    "g": "focusenergy"
+   },
+   {
+    "n": 20,
+    "g": "twineedle"
+   },
+   {
+    "n": 25,
+    "g": "rage"
+   },
+   {
+    "n": 30,
+    "g": "pursuit"
+   },
+   {
+    "n": 35,
+    "g": "pinmissile"
+   },
+   {
+    "n": 40,
+    "g": "agility"
+   }
+  ],
+  "metapod": [
+   {
+    "n": 1,
+    "g": "harden"
+   }
+  ],
+  "butterfree": [
+   {
+    "n": 1,
+    "g": "confusion"
+   },
+   {
+    "n": 13,
+    "g": "poisonpowder"
+   },
+   {
+    "n": 14,
+    "g": "stunspore"
+   },
+   {
+    "n": 15,
+    "g": "sleeppowder"
+   },
+   {
+    "n": 18,
+    "g": "supersonic"
+   },
+   {
+    "n": 23,
+    "g": "whirlwind"
+   },
+   {
+    "n": 28,
+    "g": "gust"
+   },
+   {
+    "n": 34,
+    "g": "psybeam"
+   },
+   {
+    "n": 40,
+    "g": "safeguard"
+   }
+  ],
+  "raticate": [
+   {
+    "n": 1,
+    "g": "quickattack"
+   },
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 1,
+    "g": "tailwhip"
+   },
+   {
+    "n": 13,
+    "g": "hyperfang"
+   },
+   {
+    "n": 20,
+    "g": "scaryface"
+   },
+   {
+    "n": 30,
+    "g": "pursuit"
+   },
+   {
+    "n": 40,
+    "g": "superfang"
+   }
+  ],
+  "pidgeotto": [
+   {
+    "n": 1,
+    "g": "gust"
+   },
+   {
+    "n": 1,
+    "g": "sandattack"
+   },
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 15,
+    "g": "quickattack"
+   },
+   {
+    "n": 23,
+    "g": "whirlwind"
+   },
+   {
+    "n": 33,
+    "g": "wingattack"
+   },
+   {
+    "n": 43,
+    "g": "agility"
+   },
+   {
+    "n": 55,
+    "g": "mirrormove"
+   }
+  ],
+  "pidgeot": [
+   {
+    "n": 1,
+    "g": "gust"
+   },
+   {
+    "n": 1,
+    "g": "quickattack"
+   },
+   {
+    "n": 1,
+    "g": "sandattack"
+   },
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 23,
+    "g": "whirlwind"
+   },
+   {
+    "n": 33,
+    "g": "wingattack"
+   },
+   {
+    "n": 46,
+    "g": "agility"
+   },
+   {
+    "n": 61,
+    "g": "mirrormove"
+   }
+  ],
+  "primeape": [
+   {
+    "n": 1,
+    "g": "leer"
+   },
+   {
+    "n": 1,
+    "g": "lowkick"
+   },
+   {
+    "n": 1,
+    "g": "rage"
+   },
+   {
+    "n": 1,
+    "g": "scratch"
+   },
+   {
+    "n": 15,
+    "g": "karatechop"
+   },
+   {
+    "n": 21,
+    "g": "furyswipes"
+   },
+   {
+    "n": 27,
+    "g": "focusenergy"
+   },
+   {
+    "n": 36,
+    "g": "seismictoss"
+   },
+   {
+    "n": 45,
+    "g": "crosschop"
+   },
+   {
+    "n": 54,
+    "g": "screech"
+   },
+   {
+    "n": 63,
+    "g": "thrash"
+   }
+  ],
+  "fearow": [
+   {
+    "n": 1,
+    "g": "furyattack"
+   },
+   {
+    "n": 1,
+    "g": "growl"
+   },
+   {
+    "n": 1,
+    "g": "leer"
+   },
+   {
+    "n": 1,
+    "g": "peck"
+   },
+   {
+    "n": 26,
+    "g": "pursuit"
+   },
+   {
+    "n": 32,
+    "g": "mirrormove"
+   },
+   {
+    "n": 40,
+    "g": "drillpeck"
+   },
+   {
+    "n": 47,
+    "g": "agility"
+   }
+  ],
+  "nidorino": [
+   {
+    "n": 1,
+    "g": "leer"
+   },
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 8,
+    "g": "hornattack"
+   },
+   {
+    "n": 12,
+    "g": "doublekick"
+   },
+   {
+    "n": 19,
+    "g": "poisonsting"
+   },
+   {
+    "n": 27,
+    "g": "focusenergy"
+   },
+   {
+    "n": 36,
+    "g": "furyattack"
+   },
+   {
+    "n": 46,
+    "g": "horndrill"
+   }
+  ],
+  "gloom": [
+   {
+    "n": 1,
+    "g": "absorb"
+   },
+   {
+    "n": 1,
+    "g": "poisonpowder"
+   },
+   {
+    "n": 1,
+    "g": "sweetscent"
+   },
+   {
+    "n": 16,
+    "g": "stunspore"
+   },
+   {
+    "n": 18,
+    "g": "sleeppowder"
+   },
+   {
+    "n": 24,
+    "g": "acid"
+   },
+   {
+    "n": 35,
+    "g": "moonlight"
+   },
+   {
+    "n": 44,
+    "g": "petaldance"
+   }
+  ],
+  "sandshrew": [
+   {
+    "n": 1,
+    "g": "scratch"
+   },
+   {
+    "n": 6,
+    "g": "defensecurl"
+   },
+   {
+    "n": 11,
+    "g": "sandattack"
+   },
+   {
+    "n": 17,
+    "g": "poisonsting"
+   },
+   {
+    "n": 23,
+    "g": "slash"
+   },
+   {
+    "n": 30,
+    "g": "swift"
+   },
+   {
+    "n": 37,
+    "g": "furyswipes"
+   },
+   {
+    "n": 45,
+    "g": "sandstorm"
+   }
+  ],
+  "sandslash": [
+   {
+    "n": 1,
+    "g": "defensecurl"
+   },
+   {
+    "n": 1,
+    "g": "sandattack"
+   },
+   {
+    "n": 1,
+    "g": "scratch"
+   },
+   {
+    "n": 17,
+    "g": "poisonsting"
+   },
+   {
+    "n": 24,
+    "g": "slash"
+   },
+   {
+    "n": 33,
+    "g": "swift"
+   },
+   {
+    "n": 42,
+    "g": "furyswipes"
+   },
+   {
+    "n": 52,
+    "g": "sandstorm"
+   }
+  ],
+  "clefairy": [
+   {
+    "n": 1,
+    "g": "growl"
+   },
+   {
+    "n": 1,
+    "g": "pound"
+   },
+   {
+    "n": 4,
+    "g": "encore"
+   },
+   {
+    "n": 8,
+    "g": "sing"
+   },
+   {
+    "n": 13,
+    "g": "doubleslap"
+   },
+   {
+    "n": 19,
+    "g": "minimize"
+   },
+   {
+    "n": 26,
+    "g": "defensecurl"
+   },
+   {
+    "n": 34,
+    "g": "metronome"
+   },
+   {
+    "n": 43,
+    "g": "moonlight"
+   },
+   {
+    "n": 53,
+    "g": "lightscreen"
+   }
+  ],
+  "jigglypuff": [
+   {
+    "n": 1,
+    "g": "sing"
+   },
+   {
+    "n": 4,
+    "g": "defensecurl"
+   },
+   {
+    "n": 9,
+    "g": "pound"
+   },
+   {
+    "n": 14,
+    "g": "disable"
+   },
+   {
+    "n": 19,
+    "g": "rollout"
+   },
+   {
+    "n": 24,
+    "g": "doubleslap"
+   },
+   {
+    "n": 29,
+    "g": "rest"
+   },
+   {
+    "n": 34,
+    "g": "bodyslam"
+   },
+   {
+    "n": 39,
+    "g": "doubleedge"
+   }
+  ],
+  "zubat": [
+   {
+    "n": 1,
+    "g": "leechlife"
+   },
+   {
+    "n": 6,
+    "g": "supersonic"
+   },
+   {
+    "n": 12,
+    "g": "bite"
+   },
+   {
+    "n": 19,
+    "g": "confuseray"
+   },
+   {
+    "n": 27,
+    "g": "wingattack"
+   },
+   {
+    "n": 36,
+    "g": "meanlook"
+   },
+   {
+    "n": 46,
+    "g": "haze"
+   }
+  ],
+  "golbat": [
+   {
+    "n": 1,
+    "g": "leechlife"
+   },
+   {
+    "n": 1,
+    "g": "screech"
+   },
+   {
+    "n": 1,
+    "g": "supersonic"
+   },
+   {
+    "n": 12,
+    "g": "bite"
+   },
+   {
+    "n": 19,
+    "g": "confuseray"
+   },
+   {
+    "n": 30,
+    "g": "wingattack"
+   },
+   {
+    "n": 42,
+    "g": "meanlook"
+   },
+   {
+    "n": 55,
+    "g": "haze"
+   }
+  ],
+  "paras": [
+   {
+    "n": 1,
+    "g": "scratch"
+   },
+   {
+    "n": 7,
+    "g": "stunspore"
+   },
+   {
+    "n": 13,
+    "g": "poisonpowder"
+   },
+   {
+    "n": 19,
+    "g": "leechlife"
+   },
+   {
+    "n": 25,
+    "g": "spore"
+   },
+   {
+    "n": 31,
+    "g": "slash"
+   },
+   {
+    "n": 37,
+    "g": "growth"
+   },
+   {
+    "n": 43,
+    "g": "gigadrain"
+   }
+  ],
+  "parasect": [
+   {
+    "n": 1,
+    "g": "poisonpowder"
+   },
+   {
+    "n": 1,
+    "g": "scratch"
+   },
+   {
+    "n": 1,
+    "g": "stunspore"
+   },
+   {
+    "n": 19,
+    "g": "leechlife"
+   },
+   {
+    "n": 28,
+    "g": "spore"
+   },
+   {
+    "n": 37,
+    "g": "slash"
+   },
+   {
+    "n": 46,
+    "g": "growth"
+   },
+   {
+    "n": 55,
+    "g": "gigadrain"
+   }
+  ],
+  "meowth": [
+   {
+    "n": 1,
+    "g": "growl"
+   },
+   {
+    "n": 1,
+    "g": "scratch"
+   },
+   {
+    "n": 11,
+    "g": "bite"
+   },
+   {
+    "n": 20,
+    "g": "payday"
+   },
+   {
+    "n": 28,
+    "g": "feintattack"
+   },
+   {
+    "n": 35,
+    "g": "screech"
+   },
+   {
+    "n": 41,
+    "g": "furyswipes"
+   },
+   {
+    "n": 46,
+    "g": "slash"
+   }
+  ],
+  "persian": [
+   {
+    "n": 1,
+    "g": "bite"
+   },
+   {
+    "n": 1,
+    "g": "growl"
+   },
+   {
+    "n": 1,
+    "g": "scratch"
+   },
+   {
+    "n": 20,
+    "g": "payday"
+   },
+   {
+    "n": 29,
+    "g": "feintattack"
+   },
+   {
+    "n": 38,
+    "g": "screech"
+   },
+   {
+    "n": 46,
+    "g": "furyswipes"
+   },
+   {
+    "n": 53,
+    "g": "slash"
+   }
+  ],
+  "bellsprout": [
+   {
+    "n": 1,
+    "g": "vinewhip"
+   },
+   {
+    "n": 6,
+    "g": "growth"
+   },
+   {
+    "n": 11,
+    "g": "wrap"
+   },
+   {
+    "n": 15,
+    "g": "sleeppowder"
+   },
+   {
+    "n": 17,
+    "g": "poisonpowder"
+   },
+   {
+    "n": 19,
+    "g": "stunspore"
+   },
+   {
+    "n": 23,
+    "g": "acid"
+   },
+   {
+    "n": 30,
+    "g": "sweetscent"
+   },
+   {
+    "n": 37,
+    "g": "razorleaf"
+   },
+   {
+    "n": 45,
+    "g": "slam"
+   }
+  ],
+  "weepinbell": [
+   {
+    "n": 1,
+    "g": "growth"
+   },
+   {
+    "n": 1,
+    "g": "vinewhip"
+   },
+   {
+    "n": 1,
+    "g": "wrap"
+   },
+   {
+    "n": 15,
+    "g": "sleeppowder"
+   },
+   {
+    "n": 17,
+    "g": "poisonpowder"
+   },
+   {
+    "n": 19,
+    "g": "stunspore"
+   },
+   {
+    "n": 24,
+    "g": "acid"
+   },
+   {
+    "n": 33,
+    "g": "sweetscent"
+   },
+   {
+    "n": 42,
+    "g": "razorleaf"
+   },
+   {
+    "n": 54,
+    "g": "slam"
+   }
+  ],
+  "abra": [
+   {
+    "n": 1,
+    "g": "teleport"
+   }
+  ],
+  "kadabra": [
+   {
+    "n": 1,
+    "g": "confusion"
+   },
+   {
+    "n": 1,
+    "g": "kinesis"
+   },
+   {
+    "n": 1,
+    "g": "teleport"
+   },
+   {
+    "n": 18,
+    "g": "disable"
+   },
+   {
+    "n": 21,
+    "g": "psybeam"
+   },
+   {
+    "n": 26,
+    "g": "recover"
+   },
+   {
+    "n": 31,
+    "g": "futuresight"
+   },
+   {
+    "n": 38,
+    "g": "psychic"
+   },
+   {
+    "n": 45,
+    "g": "reflect"
+   }
+  ],
+  "staryu": [
+   {
+    "n": 1,
+    "g": "harden"
+   },
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 7,
+    "g": "watergun"
+   },
+   {
+    "n": 13,
+    "g": "rapidspin"
+   },
+   {
+    "n": 19,
+    "g": "recover"
+   },
+   {
+    "n": 25,
+    "g": "swift"
+   },
+   {
+    "n": 31,
+    "g": "bubblebeam"
+   },
+   {
+    "n": 37,
+    "g": "minimize"
+   },
+   {
+    "n": 43,
+    "g": "lightscreen"
+   },
+   {
+    "n": 50,
+    "g": "hydropump"
+   }
+  ],
+  "starmie": [
+   {
+    "n": 1,
+    "g": "bubblebeam"
+   },
+   {
+    "n": 1,
+    "g": "rapidspin"
+   },
+   {
+    "n": 1,
+    "g": "recover"
+   },
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 37,
+    "g": "confuseray"
+   }
+  ],
+  "growlithe": [
+   {
+    "n": 1,
+    "g": "bite"
+   },
+   {
+    "n": 1,
+    "g": "roar"
+   },
+   {
+    "n": 9,
+    "g": "ember"
+   },
+   {
+    "n": 18,
+    "g": "leer"
+   },
+   {
+    "n": 26,
+    "g": "takedown"
+   },
+   {
+    "n": 34,
+    "g": "flamewheel"
+   },
+   {
+    "n": 42,
+    "g": "agility"
+   },
+   {
+    "n": 50,
+    "g": "flamethrower"
+   }
+  ],
+  "vulpix": [
+   {
+    "n": 1,
+    "g": "ember"
+   },
+   {
+    "n": 1,
+    "g": "tailwhip"
+   },
+   {
+    "n": 7,
+    "g": "quickattack"
+   },
+   {
+    "n": 13,
+    "g": "roar"
+   },
+   {
+    "n": 19,
+    "g": "confuseray"
+   },
+   {
+    "n": 25,
+    "g": "safeguard"
+   },
+   {
+    "n": 31,
+    "g": "flamethrower"
+   },
+   {
+    "n": 37,
+    "g": "firespin"
+   }
+  ],
+  "ekans": [
+   {
+    "n": 1,
+    "g": "leer"
+   },
+   {
+    "n": 1,
+    "g": "wrap"
+   },
+   {
+    "n": 9,
+    "g": "poisonsting"
+   },
+   {
+    "n": 15,
+    "g": "bite"
+   },
+   {
+    "n": 23,
+    "g": "glare"
+   },
+   {
+    "n": 29,
+    "g": "screech"
+   },
+   {
+    "n": 37,
+    "g": "acid"
+   },
+   {
+    "n": 43,
+    "g": "haze"
+   }
+  ],
+  "arbok": [
+   {
+    "n": 1,
+    "g": "bite"
+   },
+   {
+    "n": 1,
+    "g": "leer"
+   },
+   {
+    "n": 1,
+    "g": "poisonsting"
+   },
+   {
+    "n": 1,
+    "g": "wrap"
+   },
+   {
+    "n": 25,
+    "g": "glare"
+   },
+   {
+    "n": 33,
+    "g": "screech"
+   },
+   {
+    "n": 43,
+    "g": "acid"
+   },
+   {
+    "n": 51,
+    "g": "haze"
+   }
+  ],
+  "diglett": [
+   {
+    "n": 1,
+    "g": "scratch"
+   },
+   {
+    "n": 5,
+    "g": "growl"
+   },
+   {
+    "n": 9,
+    "g": "magnitude"
+   },
+   {
+    "n": 17,
+    "g": "dig"
+   },
+   {
+    "n": 25,
+    "g": "sandattack"
+   },
+   {
+    "n": 33,
+    "g": "slash"
+   },
+   {
+    "n": 41,
+    "g": "earthquake"
+   },
+   {
+    "n": 49,
+    "g": "fissure"
+   }
+  ],
+  "dugtrio": [
+   {
+    "n": 1,
+    "g": "growl"
+   },
+   {
+    "n": 1,
+    "g": "magnitude"
+   },
+   {
+    "n": 1,
+    "g": "scratch"
+   },
+   {
+    "n": 1,
+    "g": "triattack"
+   },
+   {
+    "n": 17,
+    "g": "dig"
+   },
+   {
+    "n": 25,
+    "g": "sandattack"
+   },
+   {
+    "n": 37,
+    "g": "slash"
+   },
+   {
+    "n": 49,
+    "g": "earthquake"
+   },
+   {
+    "n": 61,
+    "g": "fissure"
+   }
+  ],
+  "magnemite": [
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 6,
+    "g": "thundershock"
+   },
+   {
+    "n": 11,
+    "g": "supersonic"
+   },
+   {
+    "n": 16,
+    "g": "sonicboom"
+   },
+   {
+    "n": 21,
+    "g": "thunderwave"
+   },
+   {
+    "n": 27,
+    "g": "lockon"
+   },
+   {
+    "n": 33,
+    "g": "swift"
+   },
+   {
+    "n": 39,
+    "g": "screech"
+   },
+   {
+    "n": 45,
+    "g": "zapcannon"
+   }
+  ],
+  "magneton": [
+   {
+    "n": 1,
+    "g": "sonicboom"
+   },
+   {
+    "n": 1,
+    "g": "supersonic"
+   },
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 1,
+    "g": "thundershock"
+   },
+   {
+    "n": 21,
+    "g": "thunderwave"
+   },
+   {
+    "n": 27,
+    "g": "lockon"
+   },
+   {
+    "n": 35,
+    "g": "swift"
+   },
+   {
+    "n": 35,
+    "g": "triattack"
+   },
+   {
+    "n": 43,
+    "g": "screech"
+   },
+   {
+    "n": 53,
+    "g": "zapcannon"
+   }
+  ],
+  "drowzee": [
+   {
+    "n": 1,
+    "g": "hypnosis"
+   },
+   {
+    "n": 1,
+    "g": "pound"
+   },
+   {
+    "n": 10,
+    "g": "disable"
+   },
+   {
+    "n": 18,
+    "g": "confusion"
+   },
+   {
+    "n": 25,
+    "g": "headbutt"
+   },
+   {
+    "n": 31,
+    "g": "poisongas"
+   },
+   {
+    "n": 36,
+    "g": "meditate"
+   },
+   {
+    "n": 40,
+    "g": "psychic"
+   },
+   {
+    "n": 43,
+    "g": "psychup"
+   },
+   {
+    "n": 45,
+    "g": "futuresight"
+   }
+  ],
+  "hypno": [
+   {
+    "n": 1,
+    "g": "confusion"
+   },
+   {
+    "n": 1,
+    "g": "disable"
+   },
+   {
+    "n": 1,
+    "g": "hypnosis"
+   },
+   {
+    "n": 1,
+    "g": "pound"
+   },
+   {
+    "n": 25,
+    "g": "headbutt"
+   },
+   {
+    "n": 33,
+    "g": "poisongas"
+   },
+   {
+    "n": 40,
+    "g": "meditate"
+   },
+   {
+    "n": 49,
+    "g": "psychic"
+   },
+   {
+    "n": 55,
+    "g": "psychup"
+   },
+   {
+    "n": 60,
+    "g": "futuresight"
+   }
+  ],
+  "nidoranf": [
+   {
+    "n": 1,
+    "g": "growl"
+   },
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 8,
+    "g": "scratch"
+   },
+   {
+    "n": 12,
+    "g": "doublekick"
+   },
+   {
+    "n": 17,
+    "g": "poisonsting"
+   },
+   {
+    "n": 23,
+    "g": "tailwhip"
+   },
+   {
+    "n": 30,
+    "g": "bite"
+   },
+   {
+    "n": 38,
+    "g": "furyswipes"
+   }
+  ],
+  "nidorina": [
+   {
+    "n": 1,
+    "g": "growl"
+   },
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 8,
+    "g": "scratch"
+   },
+   {
+    "n": 12,
+    "g": "doublekick"
+   },
+   {
+    "n": 19,
+    "g": "poisonsting"
+   },
+   {
+    "n": 27,
+    "g": "tailwhip"
+   },
+   {
+    "n": 36,
+    "g": "bite"
+   },
+   {
+    "n": 46,
+    "g": "furyswipes"
+   }
+  ],
+  "venonat": [
+   {
+    "n": 1,
+    "g": "disable"
+   },
+   {
+    "n": 1,
+    "g": "foresight"
+   },
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 9,
+    "g": "supersonic"
+   },
+   {
+    "n": 17,
+    "g": "confusion"
+   },
+   {
+    "n": 20,
+    "g": "poisonpowder"
+   },
+   {
+    "n": 25,
+    "g": "leechlife"
+   },
+   {
+    "n": 28,
+    "g": "stunspore"
+   },
+   {
+    "n": 33,
+    "g": "psybeam"
+   },
+   {
+    "n": 36,
+    "g": "sleeppowder"
+   },
+   {
+    "n": 41,
+    "g": "psychic"
+   }
+  ],
+  "venomoth": [
+   {
+    "n": 1,
+    "g": "disable"
+   },
+   {
+    "n": 1,
+    "g": "foresight"
+   },
+   {
+    "n": 1,
+    "g": "supersonic"
+   },
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 17,
+    "g": "confusion"
+   },
+   {
+    "n": 20,
+    "g": "poisonpowder"
+   },
+   {
+    "n": 25,
+    "g": "leechlife"
+   },
+   {
+    "n": 28,
+    "g": "stunspore"
+   },
+   {
+    "n": 31,
+    "g": "gust"
+   },
+   {
+    "n": 36,
+    "g": "psybeam"
+   },
+   {
+    "n": 42,
+    "g": "sleeppowder"
+   },
+   {
+    "n": 52,
+    "g": "psychic"
+   }
+  ],
+  "voltorb": [
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 9,
+    "g": "screech"
+   },
+   {
+    "n": 17,
+    "g": "sonicboom"
+   },
+   {
+    "n": 23,
+    "g": "selfdestruct"
+   },
+   {
+    "n": 29,
+    "g": "rollout"
+   },
+   {
+    "n": 33,
+    "g": "lightscreen"
+   },
+   {
+    "n": 37,
+    "g": "swift"
+   },
+   {
+    "n": 39,
+    "g": "explosion"
+   },
+   {
+    "n": 41,
+    "g": "mirrorcoat"
+   }
+  ],
+  "pikachu": [
+   {
+    "n": 1,
+    "g": "growl"
+   },
+   {
+    "n": 1,
+    "g": "thundershock"
+   },
+   {
+    "n": 6,
+    "g": "tailwhip"
+   },
+   {
+    "n": 8,
+    "g": "thunderwave"
+   },
+   {
+    "n": 11,
+    "g": "quickattack"
+   },
+   {
+    "n": 15,
+    "g": "doubleteam"
+   },
+   {
+    "n": 20,
+    "g": "slam"
+   },
+   {
+    "n": 26,
+    "g": "thunderbolt"
+   },
+   {
+    "n": 33,
+    "g": "agility"
+   },
+   {
+    "n": 41,
+    "g": "thunder"
+   },
+   {
+    "n": 50,
+    "g": "lightscreen"
+   }
+  ],
+  "raichu": [
+   {
+    "n": 1,
+    "g": "quickattack"
+   },
+   {
+    "n": 1,
+    "g": "tailwhip"
+   },
+   {
+    "n": 1,
+    "g": "thunderbolt"
+   },
+   {
+    "n": 1,
+    "g": "thundershock"
+   }
+  ],
+  "poliwag": [
+   {
+    "n": 1,
+    "g": "bubble"
+   },
+   {
+    "n": 7,
+    "g": "hypnosis"
+   },
+   {
+    "n": 13,
+    "g": "watergun"
+   },
+   {
+    "n": 19,
+    "g": "doubleslap"
+   },
+   {
+    "n": 25,
+    "g": "raindance"
+   },
+   {
+    "n": 31,
+    "g": "bodyslam"
+   },
+   {
+    "n": 37,
+    "g": "bellydrum"
+   },
+   {
+    "n": 43,
+    "g": "hydropump"
+   }
+  ],
+  "poliwhirl": [
+   {
+    "n": 1,
+    "g": "bubble"
+   },
+   {
+    "n": 1,
+    "g": "hypnosis"
+   },
+   {
+    "n": 1,
+    "g": "watergun"
+   },
+   {
+    "n": 19,
+    "g": "doubleslap"
+   },
+   {
+    "n": 27,
+    "g": "raindance"
+   },
+   {
+    "n": 35,
+    "g": "bodyslam"
+   },
+   {
+    "n": 43,
+    "g": "bellydrum"
+   },
+   {
+    "n": 51,
+    "g": "hydropump"
+   }
+  ],
+  "tentacool": [
+   {
+    "n": 1,
+    "g": "poisonsting"
+   },
+   {
+    "n": 6,
+    "g": "supersonic"
+   },
+   {
+    "n": 12,
+    "g": "constrict"
+   },
+   {
+    "n": 19,
+    "g": "acid"
+   },
+   {
+    "n": 25,
+    "g": "bubblebeam"
+   },
+   {
+    "n": 30,
+    "g": "wrap"
+   },
+   {
+    "n": 36,
+    "g": "barrier"
+   },
+   {
+    "n": 43,
+    "g": "screech"
+   },
+   {
+    "n": 49,
+    "g": "hydropump"
+   }
+  ],
+  "tentacruel": [
+   {
+    "n": 1,
+    "g": "constrict"
+   },
+   {
+    "n": 1,
+    "g": "poisonsting"
+   },
+   {
+    "n": 1,
+    "g": "supersonic"
+   },
+   {
+    "n": 19,
+    "g": "acid"
+   },
+   {
+    "n": 25,
+    "g": "bubblebeam"
+   },
+   {
+    "n": 30,
+    "g": "wrap"
+   },
+   {
+    "n": 38,
+    "g": "barrier"
+   },
+   {
+    "n": 47,
+    "g": "screech"
+   },
+   {
+    "n": 55,
+    "g": "hydropump"
+   }
+  ],
+  "machop": [
+   {
+    "n": 1,
+    "g": "leer"
+   },
+   {
+    "n": 1,
+    "g": "lowkick"
+   },
+   {
+    "n": 7,
+    "g": "focusenergy"
+   },
+   {
+    "n": 13,
+    "g": "karatechop"
+   },
+   {
+    "n": 19,
+    "g": "seismictoss"
+   },
+   {
+    "n": 25,
+    "g": "foresight"
+   },
+   {
+    "n": 31,
+    "g": "vitalthrow"
+   },
+   {
+    "n": 37,
+    "g": "crosschop"
+   },
+   {
+    "n": 43,
+    "g": "scaryface"
+   },
+   {
+    "n": 49,
+    "g": "submission"
+   }
+  ],
+  "machoke": [
+   {
+    "n": 1,
+    "g": "focusenergy"
+   },
+   {
+    "n": 1,
+    "g": "leer"
+   },
+   {
+    "n": 1,
+    "g": "lowkick"
+   },
+   {
+    "n": 15,
+    "g": "karatechop"
+   },
+   {
+    "n": 19,
+    "g": "seismictoss"
+   },
+   {
+    "n": 25,
+    "g": "foresight"
+   },
+   {
+    "n": 34,
+    "g": "vitalthrow"
+   },
+   {
+    "n": 43,
+    "g": "crosschop"
+   },
+   {
+    "n": 52,
+    "g": "scaryface"
+   },
+   {
+    "n": 61,
+    "g": "submission"
+   }
+  ],
+  "doduo": [
+   {
+    "n": 1,
+    "g": "growl"
+   },
+   {
+    "n": 1,
+    "g": "peck"
+   },
+   {
+    "n": 9,
+    "g": "pursuit"
+   },
+   {
+    "n": 13,
+    "g": "furyattack"
+   },
+   {
+    "n": 21,
+    "g": "triattack"
+   },
+   {
+    "n": 25,
+    "g": "rage"
+   },
+   {
+    "n": 33,
+    "g": "drillpeck"
+   },
+   {
+    "n": 37,
+    "g": "agility"
+   }
+  ],
+  "dodrio": [
+   {
+    "n": 1,
+    "g": "furyattack"
+   },
+   {
+    "n": 1,
+    "g": "growl"
+   },
+   {
+    "n": 1,
+    "g": "peck"
+   },
+   {
+    "n": 1,
+    "g": "pursuit"
+   },
+   {
+    "n": 21,
+    "g": "triattack"
+   },
+   {
+    "n": 25,
+    "g": "rage"
+   },
+   {
+    "n": 38,
+    "g": "drillpeck"
+   },
+   {
+    "n": 47,
+    "g": "agility"
+   }
+  ],
+  "ponyta": [
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 4,
+    "g": "growl"
+   },
+   {
+    "n": 8,
+    "g": "tailwhip"
+   },
+   {
+    "n": 13,
+    "g": "ember"
+   },
+   {
+    "n": 19,
+    "g": "stomp"
+   },
+   {
+    "n": 26,
+    "g": "firespin"
+   },
+   {
+    "n": 34,
+    "g": "takedown"
+   },
+   {
+    "n": 43,
+    "g": "agility"
+   },
+   {
+    "n": 53,
+    "g": "fireblast"
+   }
+  ],
+  "rapidash": [
+   {
+    "n": 1,
+    "g": "ember"
+   },
+   {
+    "n": 1,
+    "g": "growl"
+   },
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 1,
+    "g": "tailwhip"
+   },
+   {
+    "n": 19,
+    "g": "stomp"
+   },
+   {
+    "n": 26,
+    "g": "firespin"
+   },
+   {
+    "n": 34,
+    "g": "takedown"
+   },
+   {
+    "n": 40,
+    "g": "furyattack"
+   },
+   {
+    "n": 47,
+    "g": "agility"
+   },
+   {
+    "n": 61,
+    "g": "fireblast"
+   }
+  ],
+  "slowpoke": [
+   {
+    "n": 1,
+    "g": "curse"
+   },
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 6,
+    "g": "growl"
+   },
+   {
+    "n": 15,
+    "g": "watergun"
+   },
+   {
+    "n": 20,
+    "g": "confusion"
+   },
+   {
+    "n": 29,
+    "g": "disable"
+   },
+   {
+    "n": 34,
+    "g": "headbutt"
+   },
+   {
+    "n": 43,
+    "g": "amnesia"
+   },
+   {
+    "n": 48,
+    "g": "psychic"
+   }
+  ],
+  "slowbro": [
+   {
+    "n": 1,
+    "g": "curse"
+   },
+   {
+    "n": 1,
+    "g": "growl"
+   },
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 1,
+    "g": "watergun"
+   },
+   {
+    "n": 20,
+    "g": "confusion"
+   },
+   {
+    "n": 29,
+    "g": "disable"
+   },
+   {
+    "n": 34,
+    "g": "headbutt"
+   },
+   {
+    "n": 37,
+    "g": "withdraw"
+   },
+   {
+    "n": 46,
+    "g": "amnesia"
+   },
+   {
+    "n": 54,
+    "g": "psychic"
+   }
+  ],
+  "magikarp": [
+   {
+    "n": 1,
+    "g": "splash"
+   },
+   {
+    "n": 15,
+    "g": "tackle"
+   },
+   {
+    "n": 30,
+    "g": "flail"
+   }
+  ],
+  "gyarados": [
+   {
+    "n": 1,
+    "g": "thrash"
+   },
+   {
+    "n": 20,
+    "g": "bite"
+   },
+   {
+    "n": 25,
+    "g": "dragonrage"
+   },
+   {
+    "n": 30,
+    "g": "leer"
+   },
+   {
+    "n": 35,
+    "g": "twister"
+   },
+   {
+    "n": 40,
+    "g": "hydropump"
+   },
+   {
+    "n": 45,
+    "g": "raindance"
+   },
+   {
+    "n": 50,
+    "g": "hyperbeam"
+   }
+  ],
+  "grimer": [
+   {
+    "n": 1,
+    "g": "poisongas"
+   },
+   {
+    "n": 1,
+    "g": "pound"
+   },
+   {
+    "n": 5,
+    "g": "harden"
+   },
+   {
+    "n": 10,
+    "g": "disable"
+   },
+   {
+    "n": 16,
+    "g": "sludge"
+   },
+   {
+    "n": 23,
+    "g": "minimize"
+   },
+   {
+    "n": 31,
+    "g": "screech"
+   },
+   {
+    "n": 40,
+    "g": "acidarmor"
+   },
+   {
+    "n": 50,
+    "g": "sludgebomb"
+   }
+  ],
+  "muk": [
+   {
+    "n": 1,
+    "g": "harden"
+   },
+   {
+    "n": 1,
+    "g": "poisongas"
+   },
+   {
+    "n": 1,
+    "g": "pound"
+   },
+   {
+    "n": 23,
+    "g": "minimize"
+   },
+   {
+    "n": 31,
+    "g": "screech"
+   },
+   {
+    "n": 37,
+    "g": "disable"
+   },
+   {
+    "n": 45,
+    "g": "acidarmor"
+   },
+   {
+    "n": 45,
+    "g": "sludge"
+   },
+   {
+    "n": 60,
+    "g": "sludgebomb"
+   }
+  ],
+  "tauros": [
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 4,
+    "g": "tailwhip"
+   },
+   {
+    "n": 8,
+    "g": "rage"
+   },
+   {
+    "n": 13,
+    "g": "hornattack"
+   },
+   {
+    "n": 19,
+    "g": "scaryface"
+   },
+   {
+    "n": 26,
+    "g": "pursuit"
+   },
+   {
+    "n": 34,
+    "g": "rest"
+   },
+   {
+    "n": 43,
+    "g": "thrash"
+   },
+   {
+    "n": 53,
+    "g": "takedown"
+   }
+  ],
+  "psyduck": [
+   {
+    "n": 1,
+    "g": "scratch"
+   },
+   {
+    "n": 5,
+    "g": "tailwhip"
+   },
+   {
+    "n": 10,
+    "g": "disable"
+   },
+   {
+    "n": 16,
+    "g": "confusion"
+   },
+   {
+    "n": 23,
+    "g": "screech"
+   },
+   {
+    "n": 31,
+    "g": "psychup"
+   },
+   {
+    "n": 40,
+    "g": "furyswipes"
+   },
+   {
+    "n": 50,
+    "g": "hydropump"
+   }
+  ],
+  "golduck": [
+   {
+    "n": 1,
+    "g": "confusion"
+   },
+   {
+    "n": 1,
+    "g": "disable"
+   },
+   {
+    "n": 1,
+    "g": "scratch"
+   },
+   {
+    "n": 1,
+    "g": "tailwhip"
+   },
+   {
+    "n": 23,
+    "g": "screech"
+   },
+   {
+    "n": 31,
+    "g": "psychup"
+   },
+   {
+    "n": 44,
+    "g": "furyswipes"
+   },
+   {
+    "n": 58,
+    "g": "hydropump"
+   }
+  ],
+  "krabby": [
+   {
+    "n": 1,
+    "g": "bubble"
+   },
+   {
+    "n": 5,
+    "g": "leer"
+   },
+   {
+    "n": 12,
+    "g": "visegrip"
+   },
+   {
+    "n": 16,
+    "g": "harden"
+   },
+   {
+    "n": 23,
+    "g": "stomp"
+   },
+   {
+    "n": 27,
+    "g": "guillotine"
+   },
+   {
+    "n": 34,
+    "g": "protect"
+   },
+   {
+    "n": 41,
+    "g": "crabhammer"
+   }
+  ],
+  "kingler": [
+   {
+    "n": 1,
+    "g": "bubble"
+   },
+   {
+    "n": 1,
+    "g": "leer"
+   },
+   {
+    "n": 1,
+    "g": "visegrip"
+   },
+   {
+    "n": 16,
+    "g": "harden"
+   },
+   {
+    "n": 23,
+    "g": "stomp"
+   },
+   {
+    "n": 27,
+    "g": "guillotine"
+   },
+   {
+    "n": 38,
+    "g": "protect"
+   },
+   {
+    "n": 49,
+    "g": "crabhammer"
+   }
+  ],
+  "horsea": [
+   {
+    "n": 1,
+    "g": "bubble"
+   },
+   {
+    "n": 8,
+    "g": "smokescreen"
+   },
+   {
+    "n": 15,
+    "g": "leer"
+   },
+   {
+    "n": 22,
+    "g": "watergun"
+   },
+   {
+    "n": 29,
+    "g": "twister"
+   },
+   {
+    "n": 36,
+    "g": "agility"
+   },
+   {
+    "n": 43,
+    "g": "hydropump"
+   }
+  ],
+  "seadra": [
+   {
+    "n": 1,
+    "g": "bubble"
+   },
+   {
+    "n": 1,
+    "g": "leer"
+   },
+   {
+    "n": 1,
+    "g": "smokescreen"
+   },
+   {
+    "n": 1,
+    "g": "watergun"
+   },
+   {
+    "n": 29,
+    "g": "twister"
+   },
+   {
+    "n": 40,
+    "g": "agility"
+   },
+   {
+    "n": 51,
+    "g": "hydropump"
+   }
+  ],
+  "goldeen": [
+   {
+    "n": 1,
+    "g": "peck"
+   },
+   {
+    "n": 1,
+    "g": "tailwhip"
+   },
+   {
+    "n": 10,
+    "g": "supersonic"
+   },
+   {
+    "n": 15,
+    "g": "hornattack"
+   },
+   {
+    "n": 24,
+    "g": "flail"
+   },
+   {
+    "n": 29,
+    "g": "furyattack"
+   },
+   {
+    "n": 38,
+    "g": "waterfall"
+   },
+   {
+    "n": 43,
+    "g": "horndrill"
+   },
+   {
+    "n": 52,
+    "g": "agility"
+   }
+  ],
+  "seaking": [
+   {
+    "n": 1,
+    "g": "peck"
+   },
+   {
+    "n": 1,
+    "g": "tailwhip"
+   },
+   {
+    "n": 10,
+    "g": "supersonic"
+   },
+   {
+    "n": 15,
+    "g": "hornattack"
+   },
+   {
+    "n": 24,
+    "g": "flail"
+   },
+   {
+    "n": 29,
+    "g": "furyattack"
+   },
+   {
+    "n": 41,
+    "g": "waterfall"
+   },
+   {
+    "n": 49,
+    "g": "horndrill"
+   },
+   {
+    "n": 61,
+    "g": "agility"
+   }
+  ],
+  "shellder": [
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 1,
+    "g": "withdraw"
+   },
+   {
+    "n": 9,
+    "g": "supersonic"
+   },
+   {
+    "n": 17,
+    "g": "aurorabeam"
+   },
+   {
+    "n": 25,
+    "g": "protect"
+   },
+   {
+    "n": 33,
+    "g": "leer"
+   },
+   {
+    "n": 41,
+    "g": "clamp"
+   },
+   {
+    "n": 49,
+    "g": "icebeam"
+   }
+  ],
+  "exeggcute": [
+   {
+    "n": 1,
+    "g": "barrage"
+   },
+   {
+    "n": 1,
+    "g": "hypnosis"
+   },
+   {
+    "n": 7,
+    "g": "reflect"
+   },
+   {
+    "n": 13,
+    "g": "leechseed"
+   },
+   {
+    "n": 19,
+    "g": "confusion"
+   },
+   {
+    "n": 25,
+    "g": "stunspore"
+   },
+   {
+    "n": 31,
+    "g": "poisonpowder"
+   },
+   {
+    "n": 37,
+    "g": "sleeppowder"
+   },
+   {
+    "n": 43,
+    "g": "solarbeam"
+   }
+  ],
+  "cubone": [
+   {
+    "n": 1,
+    "g": "growl"
+   },
+   {
+    "n": 5,
+    "g": "tailwhip"
+   },
+   {
+    "n": 9,
+    "g": "boneclub"
+   },
+   {
+    "n": 13,
+    "g": "headbutt"
+   },
+   {
+    "n": 17,
+    "g": "leer"
+   },
+   {
+    "n": 21,
+    "g": "focusenergy"
+   },
+   {
+    "n": 25,
+    "g": "bonemerang"
+   },
+   {
+    "n": 29,
+    "g": "rage"
+   },
+   {
+    "n": 33,
+    "g": "falseswipe"
+   },
+   {
+    "n": 37,
+    "g": "thrash"
+   },
+   {
+    "n": 41,
+    "g": "bonerush"
+   }
+  ],
+  "marowak": [
+   {
+    "n": 1,
+    "g": "boneclub"
+   },
+   {
+    "n": 1,
+    "g": "growl"
+   },
+   {
+    "n": 1,
+    "g": "headbutt"
+   },
+   {
+    "n": 1,
+    "g": "tailwhip"
+   },
+   {
+    "n": 17,
+    "g": "leer"
+   },
+   {
+    "n": 21,
+    "g": "focusenergy"
+   },
+   {
+    "n": 25,
+    "g": "bonemerang"
+   },
+   {
+    "n": 32,
+    "g": "rage"
+   },
+   {
+    "n": 39,
+    "g": "falseswipe"
+   },
+   {
+    "n": 46,
+    "g": "thrash"
+   },
+   {
+    "n": 53,
+    "g": "bonerush"
+   }
+  ],
+  "victreebel": [
+   {
+    "n": 1,
+    "g": "razorleaf"
+   },
+   {
+    "n": 1,
+    "g": "sleeppowder"
+   },
+   {
+    "n": 1,
+    "g": "sweetscent"
+   },
+   {
+    "n": 1,
+    "g": "vinewhip"
+   }
+  ],
+  "tangela": [
+   {
+    "n": 1,
+    "g": "constrict"
+   },
+   {
+    "n": 4,
+    "g": "sleeppowder"
+   },
+   {
+    "n": 10,
+    "g": "absorb"
+   },
+   {
+    "n": 13,
+    "g": "poisonpowder"
+   },
+   {
+    "n": 19,
+    "g": "vinewhip"
+   },
+   {
+    "n": 25,
+    "g": "bind"
+   },
+   {
+    "n": 31,
+    "g": "megadrain"
+   },
+   {
+    "n": 34,
+    "g": "stunspore"
+   },
+   {
+    "n": 40,
+    "g": "slam"
+   },
+   {
+    "n": 46,
+    "g": "growth"
+   }
+  ],
+  "vileplume": [
+   {
+    "n": 1,
+    "g": "absorb"
+   },
+   {
+    "n": 1,
+    "g": "petaldance"
+   },
+   {
+    "n": 1,
+    "g": "stunspore"
+   },
+   {
+    "n": 1,
+    "g": "sweetscent"
+   }
+  ],
+  "koffing": [
+   {
+    "n": 1,
+    "g": "poisongas"
+   },
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 9,
+    "g": "smog"
+   },
+   {
+    "n": 17,
+    "g": "selfdestruct"
+   },
+   {
+    "n": 21,
+    "g": "sludge"
+   },
+   {
+    "n": 25,
+    "g": "smokescreen"
+   },
+   {
+    "n": 33,
+    "g": "haze"
+   },
+   {
+    "n": 41,
+    "g": "explosion"
+   },
+   {
+    "n": 45,
+    "g": "destinybond"
+   }
+  ],
+  "weezing": [
+   {
+    "n": 1,
+    "g": "poisongas"
+   },
+   {
+    "n": 1,
+    "g": "selfdestruct"
+   },
+   {
+    "n": 1,
+    "g": "smog"
+   },
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 21,
+    "g": "sludge"
+   },
+   {
+    "n": 25,
+    "g": "smokescreen"
+   },
+   {
+    "n": 33,
+    "g": "haze"
+   },
+   {
+    "n": 44,
+    "g": "explosion"
+   },
+   {
+    "n": 51,
+    "g": "destinybond"
+   }
+  ],
+  "gastly": [
+   {
+    "n": 1,
+    "g": "hypnosis"
+   },
+   {
+    "n": 1,
+    "g": "lick"
+   },
+   {
+    "n": 8,
+    "g": "spite"
+   },
+   {
+    "n": 13,
+    "g": "meanlook"
+   },
+   {
+    "n": 16,
+    "g": "curse"
+   },
+   {
+    "n": 21,
+    "g": "nightshade"
+   },
+   {
+    "n": 28,
+    "g": "confuseray"
+   },
+   {
+    "n": 33,
+    "g": "dreameater"
+   },
+   {
+    "n": 36,
+    "g": "destinybond"
+   }
+  ],
+  "haunter": [
+   {
+    "n": 1,
+    "g": "hypnosis"
+   },
+   {
+    "n": 1,
+    "g": "lick"
+   },
+   {
+    "n": 1,
+    "g": "spite"
+   },
+   {
+    "n": 13,
+    "g": "meanlook"
+   },
+   {
+    "n": 16,
+    "g": "curse"
+   },
+   {
+    "n": 21,
+    "g": "nightshade"
+   },
+   {
+    "n": 31,
+    "g": "confuseray"
+   },
+   {
+    "n": 39,
+    "g": "dreameater"
+   },
+   {
+    "n": 48,
+    "g": "destinybond"
+   }
+  ],
+  "ditto": [
+   {
+    "n": 1,
+    "g": "transform"
+   }
+  ],
+  "lickitung": [
+   {
+    "n": 1,
+    "g": "lick"
+   },
+   {
+    "n": 7,
+    "g": "supersonic"
+   },
+   {
+    "n": 13,
+    "g": "defensecurl"
+   },
+   {
+    "n": 19,
+    "g": "stomp"
+   },
+   {
+    "n": 25,
+    "g": "wrap"
+   },
+   {
+    "n": 31,
+    "g": "disable"
+   },
+   {
+    "n": 37,
+    "g": "slam"
+   },
+   {
+    "n": 43,
+    "g": "screech"
+   }
+  ],
+  "rhyhorn": [
+   {
+    "n": 1,
+    "g": "hornattack"
+   },
+   {
+    "n": 1,
+    "g": "tailwhip"
+   },
+   {
+    "n": 13,
+    "g": "stomp"
+   },
+   {
+    "n": 19,
+    "g": "furyattack"
+   },
+   {
+    "n": 31,
+    "g": "scaryface"
+   },
+   {
+    "n": 37,
+    "g": "horndrill"
+   },
+   {
+    "n": 49,
+    "g": "takedown"
+   },
+   {
+    "n": 55,
+    "g": "earthquake"
+   }
+  ],
+  "rhydon": [
+   {
+    "n": 1,
+    "g": "furyattack"
+   },
+   {
+    "n": 1,
+    "g": "hornattack"
+   },
+   {
+    "n": 1,
+    "g": "stomp"
+   },
+   {
+    "n": 1,
+    "g": "tailwhip"
+   },
+   {
+    "n": 31,
+    "g": "scaryface"
+   },
+   {
+    "n": 37,
+    "g": "horndrill"
+   },
+   {
+    "n": 54,
+    "g": "takedown"
+   },
+   {
+    "n": 65,
+    "g": "earthquake"
+   }
+  ],
+  "seel": [
+   {
+    "n": 1,
+    "g": "headbutt"
+   },
+   {
+    "n": 5,
+    "g": "growl"
+   },
+   {
+    "n": 16,
+    "g": "aurorabeam"
+   },
+   {
+    "n": 21,
+    "g": "rest"
+   },
+   {
+    "n": 32,
+    "g": "takedown"
+   },
+   {
+    "n": 37,
+    "g": "icebeam"
+   },
+   {
+    "n": 48,
+    "g": "safeguard"
+   }
+  ],
+  "dewgong": [
+   {
+    "n": 1,
+    "g": "aurorabeam"
+   },
+   {
+    "n": 1,
+    "g": "growl"
+   },
+   {
+    "n": 1,
+    "g": "headbutt"
+   },
+   {
+    "n": 21,
+    "g": "rest"
+   },
+   {
+    "n": 32,
+    "g": "takedown"
+   },
+   {
+    "n": 43,
+    "g": "icebeam"
+   },
+   {
+    "n": 60,
+    "g": "safeguard"
+   }
+  ],
+  "farfetchd": [
+   {
+    "n": 1,
+    "g": "peck"
+   },
+   {
+    "n": 7,
+    "g": "sandattack"
+   },
+   {
+    "n": 13,
+    "g": "leer"
+   },
+   {
+    "n": 19,
+    "g": "furyattack"
+   },
+   {
+    "n": 25,
+    "g": "swordsdance"
+   },
+   {
+    "n": 31,
+    "g": "agility"
+   },
+   {
+    "n": 37,
+    "g": "slash"
+   },
+   {
+    "n": 44,
+    "g": "falseswipe"
+   }
+  ],
+  "kangaskhan": [
+   {
+    "n": 1,
+    "g": "cometpunch"
+   },
+   {
+    "n": 7,
+    "g": "leer"
+   },
+   {
+    "n": 13,
+    "g": "bite"
+   },
+   {
+    "n": 19,
+    "g": "tailwhip"
+   },
+   {
+    "n": 25,
+    "g": "megapunch"
+   },
+   {
+    "n": 31,
+    "g": "rage"
+   },
+   {
+    "n": 37,
+    "g": "endure"
+   },
+   {
+    "n": 43,
+    "g": "dizzypunch"
+   },
+   {
+    "n": 49,
+    "g": "reversal"
+   }
+  ],
+  "scyther": [
+   {
+    "n": 1,
+    "g": "leer"
+   },
+   {
+    "n": 1,
+    "g": "quickattack"
+   },
+   {
+    "n": 6,
+    "g": "focusenergy"
+   },
+   {
+    "n": 12,
+    "g": "pursuit"
+   },
+   {
+    "n": 18,
+    "g": "falseswipe"
+   },
+   {
+    "n": 24,
+    "g": "agility"
+   },
+   {
+    "n": 30,
+    "g": "wingattack"
+   },
+   {
+    "n": 36,
+    "g": "slash"
+   },
+   {
+    "n": 42,
+    "g": "swordsdance"
+   },
+   {
+    "n": 48,
+    "g": "doubleteam"
+   }
+  ],
+  "omanyte": [
+   {
+    "n": 1,
+    "g": "constrict"
+   },
+   {
+    "n": 1,
+    "g": "withdraw"
+   },
+   {
+    "n": 13,
+    "g": "bite"
+   },
+   {
+    "n": 19,
+    "g": "watergun"
+   },
+   {
+    "n": 31,
+    "g": "leer"
+   },
+   {
+    "n": 37,
+    "g": "protect"
+   },
+   {
+    "n": 49,
+    "g": "ancientpower"
+   },
+   {
+    "n": 55,
+    "g": "hydropump"
+   }
+  ],
+  "omastar": [
+   {
+    "n": 1,
+    "g": "bite"
+   },
+   {
+    "n": 1,
+    "g": "constrict"
+   },
+   {
+    "n": 1,
+    "g": "withdraw"
+   },
+   {
+    "n": 19,
+    "g": "watergun"
+   },
+   {
+    "n": 31,
+    "g": "leer"
+   },
+   {
+    "n": 37,
+    "g": "protect"
+   },
+   {
+    "n": 40,
+    "g": "spikecannon"
+   },
+   {
+    "n": 54,
+    "g": "ancientpower"
+   },
+   {
+    "n": 65,
+    "g": "hydropump"
+   }
+  ],
+  "kabuto": [
+   {
+    "n": 1,
+    "g": "harden"
+   },
+   {
+    "n": 1,
+    "g": "scratch"
+   },
+   {
+    "n": 10,
+    "g": "absorb"
+   },
+   {
+    "n": 19,
+    "g": "leer"
+   },
+   {
+    "n": 28,
+    "g": "sandattack"
+   },
+   {
+    "n": 37,
+    "g": "endure"
+   },
+   {
+    "n": 46,
+    "g": "megadrain"
+   },
+   {
+    "n": 55,
+    "g": "ancientpower"
+   }
+  ],
+  "kabutops": [
+   {
+    "n": 1,
+    "g": "absorb"
+   },
+   {
+    "n": 1,
+    "g": "harden"
+   },
+   {
+    "n": 1,
+    "g": "scratch"
+   },
+   {
+    "n": 19,
+    "g": "leer"
+   },
+   {
+    "n": 28,
+    "g": "sandattack"
+   },
+   {
+    "n": 37,
+    "g": "endure"
+   },
+   {
+    "n": 40,
+    "g": "slash"
+   },
+   {
+    "n": 51,
+    "g": "megadrain"
+   },
+   {
+    "n": 65,
+    "g": "ancientpower"
+   }
+  ],
+  "electrode": [
+   {
+    "n": 1,
+    "g": "screech"
+   },
+   {
+    "n": 1,
+    "g": "selfdestruct"
+   },
+   {
+    "n": 1,
+    "g": "sonicboom"
+   },
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 29,
+    "g": "rollout"
+   },
+   {
+    "n": 34,
+    "g": "lightscreen"
+   },
+   {
+    "n": 40,
+    "g": "swift"
+   },
+   {
+    "n": 44,
+    "g": "explosion"
+   },
+   {
+    "n": 48,
+    "g": "mirrorcoat"
+   }
+  ],
+  "magmar": [
+   {
+    "n": 1,
+    "g": "ember"
+   },
+   {
+    "n": 1,
+    "g": "firepunch"
+   },
+   {
+    "n": 1,
+    "g": "leer"
+   },
+   {
+    "n": 1,
+    "g": "smog"
+   },
+   {
+    "n": 25,
+    "g": "smokescreen"
+   },
+   {
+    "n": 33,
+    "g": "sunnyday"
+   },
+   {
+    "n": 41,
+    "g": "flamethrower"
+   },
+   {
+    "n": 49,
+    "g": "confuseray"
+   },
+   {
+    "n": 57,
+    "g": "fireblast"
+   }
+  ],
+  "lapras": [
+   {
+    "n": 1,
+    "g": "growl"
+   },
+   {
+    "n": 1,
+    "g": "sing"
+   },
+   {
+    "n": 1,
+    "g": "watergun"
+   },
+   {
+    "n": 8,
+    "g": "mist"
+   },
+   {
+    "n": 15,
+    "g": "bodyslam"
+   },
+   {
+    "n": 22,
+    "g": "confuseray"
+   },
+   {
+    "n": 29,
+    "g": "perishsong"
+   },
+   {
+    "n": 36,
+    "g": "icebeam"
+   },
+   {
+    "n": 43,
+    "g": "raindance"
+   },
+   {
+    "n": 50,
+    "g": "safeguard"
+   },
+   {
+    "n": 57,
+    "g": "hydropump"
+   }
+  ],
+  "porygon": [
+   {
+    "n": 1,
+    "g": "conversion"
+   },
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 9,
+    "g": "agility"
+   },
+   {
+    "n": 12,
+    "g": "psybeam"
+   },
+   {
+    "n": 20,
+    "g": "recover"
+   },
+   {
+    "n": 24,
+    "g": "sharpen"
+   },
+   {
+    "n": 32,
+    "g": "lockon"
+   },
+   {
+    "n": 36,
+    "g": "triattack"
+   },
+   {
+    "n": 44,
+    "g": "zapcannon"
+   }
+  ],
+  "eevee": [
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 1,
+    "g": "tailwhip"
+   },
+   {
+    "n": 8,
+    "g": "sandattack"
+   },
+   {
+    "n": 16,
+    "g": "growl"
+   },
+   {
+    "n": 23,
+    "g": "quickattack"
+   },
+   {
+    "n": 30,
+    "g": "bite"
+   },
+   {
+    "n": 36,
+    "g": "batonpass"
+   },
+   {
+    "n": 36,
+    "g": "focusenergy"
+   },
+   {
+    "n": 42,
+    "g": "takedown"
+   }
+  ],
+  "snorlax": [
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 8,
+    "g": "amnesia"
+   },
+   {
+    "n": 15,
+    "g": "defensecurl"
+   },
+   {
+    "n": 22,
+    "g": "bellydrum"
+   },
+   {
+    "n": 29,
+    "g": "headbutt"
+   },
+   {
+    "n": 36,
+    "g": "rest"
+   },
+   {
+    "n": 36,
+    "g": "snore"
+   },
+   {
+    "n": 43,
+    "g": "bodyslam"
+   },
+   {
+    "n": 50,
+    "g": "rollout"
+   },
+   {
+    "n": 57,
+    "g": "hyperbeam"
+   }
+  ],
+  "chansey": [
+   {
+    "n": 1,
+    "g": "pound"
+   },
+   {
+    "n": 5,
+    "g": "growl"
+   },
+   {
+    "n": 9,
+    "g": "tailwhip"
+   },
+   {
+    "n": 13,
+    "g": "softboiled"
+   },
+   {
+    "n": 17,
+    "g": "doubleslap"
+   },
+   {
+    "n": 23,
+    "g": "minimize"
+   },
+   {
+    "n": 29,
+    "g": "sing"
+   },
+   {
+    "n": 35,
+    "g": "eggbomb"
+   },
+   {
+    "n": 41,
+    "g": "defensecurl"
+   },
+   {
+    "n": 49,
+    "g": "lightscreen"
+   },
+   {
+    "n": 57,
+    "g": "doubleedge"
+   }
+  ],
+  "hitmonlee": [
+   {
+    "n": 1,
+    "g": "doublekick"
+   },
+   {
+    "n": 6,
+    "g": "meditate"
+   },
+   {
+    "n": 11,
+    "g": "rollingkick"
+   },
+   {
+    "n": 16,
+    "g": "jumpkick"
+   },
+   {
+    "n": 21,
+    "g": "focusenergy"
+   },
+   {
+    "n": 26,
+    "g": "highjumpkick"
+   },
+   {
+    "n": 31,
+    "g": "mindreader"
+   },
+   {
+    "n": 36,
+    "g": "foresight"
+   },
+   {
+    "n": 41,
+    "g": "endure"
+   },
+   {
+    "n": 46,
+    "g": "megakick"
+   },
+   {
+    "n": 51,
+    "g": "reversal"
+   }
+  ],
+  "hitmonchan": [
+   {
+    "n": 1,
+    "g": "cometpunch"
+   },
+   {
+    "n": 7,
+    "g": "agility"
+   },
+   {
+    "n": 13,
+    "g": "pursuit"
+   },
+   {
+    "n": 26,
+    "g": "firepunch"
+   },
+   {
+    "n": 26,
+    "g": "icepunch"
+   },
+   {
+    "n": 26,
+    "g": "thunderpunch"
+   },
+   {
+    "n": 32,
+    "g": "machpunch"
+   },
+   {
+    "n": 38,
+    "g": "megapunch"
+   },
+   {
+    "n": 44,
+    "g": "detect"
+   },
+   {
+    "n": 50,
+    "g": "counter"
+   }
+  ],
+  "pinsir": [
+   {
+    "n": 1,
+    "g": "visegrip"
+   },
+   {
+    "n": 7,
+    "g": "focusenergy"
+   },
+   {
+    "n": 13,
+    "g": "bind"
+   },
+   {
+    "n": 19,
+    "g": "seismictoss"
+   },
+   {
+    "n": 25,
+    "g": "harden"
+   },
+   {
+    "n": 31,
+    "g": "guillotine"
+   },
+   {
+    "n": 37,
+    "g": "submission"
+   },
+   {
+    "n": 43,
+    "g": "swordsdance"
+   }
+  ],
+  "electabuzz": [
+   {
+    "n": 1,
+    "g": "leer"
+   },
+   {
+    "n": 1,
+    "g": "quickattack"
+   },
+   {
+    "n": 1,
+    "g": "thunderpunch"
+   },
+   {
+    "n": 17,
+    "g": "lightscreen"
+   },
+   {
+    "n": 25,
+    "g": "swift"
+   },
+   {
+    "n": 36,
+    "g": "screech"
+   },
+   {
+    "n": 47,
+    "g": "thunderbolt"
+   },
+   {
+    "n": 58,
+    "g": "thunder"
+   }
+  ],
+  "aerodactyl": [
+   {
+    "n": 1,
+    "g": "wingattack"
+   },
+   {
+    "n": 8,
+    "g": "agility"
+   },
+   {
+    "n": 15,
+    "g": "bite"
+   },
+   {
+    "n": 22,
+    "g": "supersonic"
+   },
+   {
+    "n": 29,
+    "g": "ancientpower"
+   },
+   {
+    "n": 36,
+    "g": "scaryface"
+   },
+   {
+    "n": 43,
+    "g": "takedown"
+   },
+   {
+    "n": 50,
+    "g": "hyperbeam"
+   }
+  ],
+  "alakazam": [
+   {
+    "n": 1,
+    "g": "confusion"
+   },
+   {
+    "n": 1,
+    "g": "kinesis"
+   },
+   {
+    "n": 1,
+    "g": "teleport"
+   },
+   {
+    "n": 18,
+    "g": "disable"
+   },
+   {
+    "n": 21,
+    "g": "psybeam"
+   },
+   {
+    "n": 26,
+    "g": "recover"
+   },
+   {
+    "n": 31,
+    "g": "futuresight"
+   },
+   {
+    "n": 38,
+    "g": "psychic"
+   },
+   {
+    "n": 45,
+    "g": "reflect"
+   }
+  ],
+  "mrmime": [
+   {
+    "n": 1,
+    "g": "barrier"
+   },
+   {
+    "n": 6,
+    "g": "confusion"
+   },
+   {
+    "n": 11,
+    "g": "substitute"
+   },
+   {
+    "n": 16,
+    "g": "meditate"
+   },
+   {
+    "n": 21,
+    "g": "doubleslap"
+   },
+   {
+    "n": 26,
+    "g": "lightscreen"
+   },
+   {
+    "n": 26,
+    "g": "reflect"
+   },
+   {
+    "n": 31,
+    "g": "encore"
+   },
+   {
+    "n": 36,
+    "g": "psybeam"
+   },
+   {
+    "n": 41,
+    "g": "batonpass"
+   },
+   {
+    "n": 46,
+    "g": "safeguard"
+   }
+  ],
+  "arcanine": [
+   {
+    "n": 1,
+    "g": "flamewheel"
+   },
+   {
+    "n": 1,
+    "g": "leer"
+   },
+   {
+    "n": 1,
+    "g": "roar"
+   },
+   {
+    "n": 1,
+    "g": "takedown"
+   },
+   {
+    "n": 50,
+    "g": "extremespeed"
+   }
+  ],
+  "nidoqueen": [
+   {
+    "n": 1,
+    "g": "doublekick"
+   },
+   {
+    "n": 1,
+    "g": "scratch"
+   },
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 1,
+    "g": "tailwhip"
+   },
+   {
+    "n": 23,
+    "g": "bodyslam"
+   }
+  ],
+  "nidoking": [
+   {
+    "n": 1,
+    "g": "doublekick"
+   },
+   {
+    "n": 1,
+    "g": "hornattack"
+   },
+   {
+    "n": 1,
+    "g": "poisonsting"
+   },
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 23,
+    "g": "thrash"
+   }
+  ],
+  "graveler": [
+   {
+    "n": 1,
+    "g": "defensecurl"
+   },
+   {
+    "n": 1,
+    "g": "rockthrow"
+   },
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 16,
+    "g": "magnitude"
+   },
+   {
+    "n": 21,
+    "g": "selfdestruct"
+   },
+   {
+    "n": 27,
+    "g": "harden"
+   },
+   {
+    "n": 34,
+    "g": "rollout"
+   },
+   {
+    "n": 41,
+    "g": "earthquake"
+   },
+   {
+    "n": 48,
+    "g": "explosion"
+   }
+  ],
+  "dratini": [
+   {
+    "n": 1,
+    "g": "leer"
+   },
+   {
+    "n": 1,
+    "g": "wrap"
+   },
+   {
+    "n": 8,
+    "g": "thunderwave"
+   },
+   {
+    "n": 15,
+    "g": "twister"
+   },
+   {
+    "n": 22,
+    "g": "dragonrage"
+   },
+   {
+    "n": 29,
+    "g": "slam"
+   },
+   {
+    "n": 36,
+    "g": "agility"
+   },
+   {
+    "n": 43,
+    "g": "safeguard"
+   },
+   {
+    "n": 50,
+    "g": "outrage"
+   },
+   {
+    "n": 57,
+    "g": "hyperbeam"
+   }
+  ],
+  "dragonair": [
+   {
+    "n": 1,
+    "g": "leer"
+   },
+   {
+    "n": 1,
+    "g": "thunderwave"
+   },
+   {
+    "n": 1,
+    "g": "twister"
+   },
+   {
+    "n": 1,
+    "g": "wrap"
+   },
+   {
+    "n": 22,
+    "g": "dragonrage"
+   },
+   {
+    "n": 29,
+    "g": "slam"
+   },
+   {
+    "n": 38,
+    "g": "agility"
+   },
+   {
+    "n": 47,
+    "g": "safeguard"
+   },
+   {
+    "n": 56,
+    "g": "outrage"
+   },
+   {
+    "n": 65,
+    "g": "hyperbeam"
+   }
+  ],
+  "dragonite": [
+   {
+    "n": 1,
+    "g": "leer"
+   },
+   {
+    "n": 1,
+    "g": "thunderwave"
+   },
+   {
+    "n": 1,
+    "g": "twister"
+   },
+   {
+    "n": 1,
+    "g": "wrap"
+   },
+   {
+    "n": 22,
+    "g": "dragonrage"
+   },
+   {
+    "n": 29,
+    "g": "slam"
+   },
+   {
+    "n": 38,
+    "g": "agility"
+   },
+   {
+    "n": 47,
+    "g": "safeguard"
+   },
+   {
+    "n": 55,
+    "g": "wingattack"
+   },
+   {
+    "n": 61,
+    "g": "outrage"
+   },
+   {
+    "n": 75,
+    "g": "hyperbeam"
+   }
+  ],
+  "jynx": [
+   {
+    "n": 1,
+    "g": "lick"
+   },
+   {
+    "n": 1,
+    "g": "lovelykiss"
+   },
+   {
+    "n": 1,
+    "g": "pound"
+   },
+   {
+    "n": 1,
+    "g": "powdersnow"
+   },
+   {
+    "n": 21,
+    "g": "doubleslap"
+   },
+   {
+    "n": 25,
+    "g": "icepunch"
+   },
+   {
+    "n": 35,
+    "g": "meanlook"
+   },
+   {
+    "n": 41,
+    "g": "bodyslam"
+   },
+   {
+    "n": 51,
+    "g": "perishsong"
+   },
+   {
+    "n": 57,
+    "g": "blizzard"
+   }
+  ],
+  "exeggutor": [
+   {
+    "n": 1,
+    "g": "barrage"
+   },
+   {
+    "n": 1,
+    "g": "confusion"
+   },
+   {
+    "n": 1,
+    "g": "hypnosis"
+   },
+   {
+    "n": 19,
+    "g": "stomp"
+   },
+   {
+    "n": 31,
+    "g": "eggbomb"
+   }
+  ],
+  "clefable": [
+   {
+    "n": 1,
+    "g": "doubleslap"
+   },
+   {
+    "n": 1,
+    "g": "metronome"
+   },
+   {
+    "n": 1,
+    "g": "moonlight"
+   },
+   {
+    "n": 1,
+    "g": "sing"
+   }
+  ],
+  "wigglytuff": [
+   {
+    "n": 1,
+    "g": "defensecurl"
+   },
+   {
+    "n": 1,
+    "g": "disable"
+   },
+   {
+    "n": 1,
+    "g": "doubleslap"
+   },
+   {
+    "n": 1,
+    "g": "sing"
+   }
+  ],
+  "ninetales": [
+   {
+    "n": 1,
+    "g": "confuseray"
+   },
+   {
+    "n": 1,
+    "g": "ember"
+   },
+   {
+    "n": 1,
+    "g": "quickattack"
+   },
+   {
+    "n": 1,
+    "g": "safeguard"
+   },
+   {
+    "n": 43,
+    "g": "firespin"
+   }
+  ],
+  "poliwrath": [
+   {
+    "n": 1,
+    "g": "doubleslap"
+   },
+   {
+    "n": 1,
+    "g": "hypnosis"
+   },
+   {
+    "n": 1,
+    "g": "submission"
+   },
+   {
+    "n": 1,
+    "g": "watergun"
+   },
+   {
+    "n": 51,
+    "g": "mindreader"
+   }
+  ],
+  "cloyster": [
+   {
+    "n": 1,
+    "g": "aurorabeam"
+   },
+   {
+    "n": 1,
+    "g": "protect"
+   },
+   {
+    "n": 1,
+    "g": "supersonic"
+   },
+   {
+    "n": 1,
+    "g": "withdraw"
+   },
+   {
+    "n": 33,
+    "g": "spikes"
+   },
+   {
+    "n": 41,
+    "g": "spikecannon"
+   }
+  ],
+  "machamp": [
+   {
+    "n": 1,
+    "g": "focusenergy"
+   },
+   {
+    "n": 1,
+    "g": "leer"
+   },
+   {
+    "n": 1,
+    "g": "lowkick"
+   },
+   {
+    "n": 15,
+    "g": "karatechop"
+   },
+   {
+    "n": 19,
+    "g": "seismictoss"
+   },
+   {
+    "n": 25,
+    "g": "foresight"
+   },
+   {
+    "n": 34,
+    "g": "vitalthrow"
+   },
+   {
+    "n": 43,
+    "g": "crosschop"
+   },
+   {
+    "n": 52,
+    "g": "scaryface"
+   },
+   {
+    "n": 61,
+    "g": "submission"
+   }
+  ],
+  "golem": [
+   {
+    "n": 1,
+    "g": "defensecurl"
+   },
+   {
+    "n": 1,
+    "g": "magnitude"
+   },
+   {
+    "n": 1,
+    "g": "rockthrow"
+   },
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 21,
+    "g": "selfdestruct"
+   },
+   {
+    "n": 27,
+    "g": "harden"
+   },
+   {
+    "n": 34,
+    "g": "rollout"
+   },
+   {
+    "n": 41,
+    "g": "earthquake"
+   },
+   {
+    "n": 48,
+    "g": "explosion"
+   }
+  ],
+  "gengar": [
+   {
+    "n": 1,
+    "g": "hypnosis"
+   },
+   {
+    "n": 1,
+    "g": "lick"
+   },
+   {
+    "n": 1,
+    "g": "spite"
+   },
+   {
+    "n": 13,
+    "g": "meanlook"
+   },
+   {
+    "n": 16,
+    "g": "curse"
+   },
+   {
+    "n": 21,
+    "g": "nightshade"
+   },
+   {
+    "n": 31,
+    "g": "confuseray"
+   },
+   {
+    "n": 39,
+    "g": "dreameater"
+   },
+   {
+    "n": 48,
+    "g": "destinybond"
+   }
+  ],
+  "moltres": [
+   {
+    "n": 1,
+    "g": "ember"
+   },
+   {
+    "n": 1,
+    "g": "wingattack"
+   },
+   {
+    "n": 13,
+    "g": "firespin"
+   },
+   {
+    "n": 25,
+    "g": "agility"
+   },
+   {
+    "n": 37,
+    "g": "endure"
+   },
+   {
+    "n": 49,
+    "g": "flamethrower"
+   },
+   {
+    "n": 61,
+    "g": "safeguard"
+   },
+   {
+    "n": 73,
+    "g": "skyattack"
+   }
+  ],
+  "zapdos": [
+   {
+    "n": 1,
+    "g": "peck"
+   },
+   {
+    "n": 1,
+    "g": "thundershock"
+   },
+   {
+    "n": 13,
+    "g": "thunderwave"
+   },
+   {
+    "n": 25,
+    "g": "agility"
+   },
+   {
+    "n": 37,
+    "g": "detect"
+   },
+   {
+    "n": 49,
+    "g": "drillpeck"
+   },
+   {
+    "n": 61,
+    "g": "lightscreen"
+   },
+   {
+    "n": 73,
+    "g": "thunder"
+   }
+  ],
+  "articuno": [
+   {
+    "n": 1,
+    "g": "gust"
+   },
+   {
+    "n": 1,
+    "g": "powdersnow"
+   },
+   {
+    "n": 13,
+    "g": "mist"
+   },
+   {
+    "n": 25,
+    "g": "agility"
+   },
+   {
+    "n": 37,
+    "g": "mindreader"
+   },
+   {
+    "n": 49,
+    "g": "icebeam"
+   },
+   {
+    "n": 61,
+    "g": "reflect"
+   },
+   {
+    "n": 73,
+    "g": "blizzard"
+   }
+  ],
+  "vaporeon": [
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 1,
+    "g": "tailwhip"
+   },
+   {
+    "n": 8,
+    "g": "sandattack"
+   },
+   {
+    "n": 16,
+    "g": "watergun"
+   },
+   {
+    "n": 23,
+    "g": "quickattack"
+   },
+   {
+    "n": 30,
+    "g": "bite"
+   },
+   {
+    "n": 36,
+    "g": "aurorabeam"
+   },
+   {
+    "n": 42,
+    "g": "haze"
+   },
+   {
+    "n": 47,
+    "g": "acidarmor"
+   },
+   {
+    "n": 52,
+    "g": "hydropump"
+   }
+  ],
+  "jolteon": [
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 1,
+    "g": "tailwhip"
+   },
+   {
+    "n": 8,
+    "g": "sandattack"
+   },
+   {
+    "n": 16,
+    "g": "thundershock"
+   },
+   {
+    "n": 23,
+    "g": "quickattack"
+   },
+   {
+    "n": 30,
+    "g": "doublekick"
+   },
+   {
+    "n": 36,
+    "g": "pinmissile"
+   },
+   {
+    "n": 42,
+    "g": "thunderwave"
+   },
+   {
+    "n": 47,
+    "g": "agility"
+   },
+   {
+    "n": 52,
+    "g": "thunder"
+   }
+  ],
+  "flareon": [
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 1,
+    "g": "tailwhip"
+   },
+   {
+    "n": 8,
+    "g": "sandattack"
+   },
+   {
+    "n": 16,
+    "g": "ember"
+   },
+   {
+    "n": 23,
+    "g": "quickattack"
+   },
+   {
+    "n": 30,
+    "g": "bite"
+   },
+   {
+    "n": 36,
+    "g": "firespin"
+   },
+   {
+    "n": 42,
+    "g": "smog"
+   },
+   {
+    "n": 47,
+    "g": "leer"
+   },
+   {
+    "n": 52,
+    "g": "flamethrower"
+   }
+  ],
+  "mewtwo": [
+   {
+    "n": 1,
+    "g": "confusion"
+   },
+   {
+    "n": 1,
+    "g": "disable"
+   },
+   {
+    "n": 11,
+    "g": "barrier"
+   },
+   {
+    "n": 22,
+    "g": "swift"
+   },
+   {
+    "n": 33,
+    "g": "psychup"
+   },
+   {
+    "n": 44,
+    "g": "futuresight"
+   },
+   {
+    "n": 55,
+    "g": "mist"
+   },
+   {
+    "n": 66,
+    "g": "psychic"
+   },
+   {
+    "n": 77,
+    "g": "amnesia"
+   },
+   {
+    "n": 88,
+    "g": "recover"
+   },
+   {
+    "n": 99,
+    "g": "safeguard"
+   }
+  ],
+  "chikorita": [
+   {
+    "n": 1,
+    "g": "growl"
+   },
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 8,
+    "g": "razorleaf"
+   },
+   {
+    "n": 12,
+    "g": "reflect"
+   },
+   {
+    "n": 15,
+    "g": "poisonpowder"
+   },
+   {
+    "n": 22,
+    "g": "synthesis"
+   },
+   {
+    "n": 29,
+    "g": "bodyslam"
+   },
+   {
+    "n": 36,
+    "g": "lightscreen"
+   },
+   {
+    "n": 43,
+    "g": "safeguard"
+   },
+   {
+    "n": 50,
+    "g": "solarbeam"
+   }
+  ],
+  "bayleef": [
+   {
+    "n": 1,
+    "g": "growl"
+   },
+   {
+    "n": 1,
+    "g": "razorleaf"
+   },
+   {
+    "n": 1,
+    "g": "reflect"
+   },
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 15,
+    "g": "poisonpowder"
+   },
+   {
+    "n": 23,
+    "g": "synthesis"
+   },
+   {
+    "n": 31,
+    "g": "bodyslam"
+   },
+   {
+    "n": 39,
+    "g": "lightscreen"
+   },
+   {
+    "n": 47,
+    "g": "safeguard"
+   },
+   {
+    "n": 55,
+    "g": "solarbeam"
+   }
+  ],
+  "meganium": [
+   {
+    "n": 1,
+    "g": "growl"
+   },
+   {
+    "n": 1,
+    "g": "razorleaf"
+   },
+   {
+    "n": 1,
+    "g": "reflect"
+   },
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 15,
+    "g": "poisonpowder"
+   },
+   {
+    "n": 23,
+    "g": "synthesis"
+   },
+   {
+    "n": 31,
+    "g": "bodyslam"
+   },
+   {
+    "n": 41,
+    "g": "lightscreen"
+   },
+   {
+    "n": 51,
+    "g": "safeguard"
+   },
+   {
+    "n": 61,
+    "g": "solarbeam"
+   }
+  ],
+  "cyndaquil": [
+   {
+    "n": 1,
+    "g": "leer"
+   },
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 6,
+    "g": "smokescreen"
+   },
+   {
+    "n": 12,
+    "g": "ember"
+   },
+   {
+    "n": 19,
+    "g": "quickattack"
+   },
+   {
+    "n": 27,
+    "g": "flamewheel"
+   },
+   {
+    "n": 36,
+    "g": "swift"
+   },
+   {
+    "n": 46,
+    "g": "flamethrower"
+   }
+  ],
+  "quilava": [
+   {
+    "n": 1,
+    "g": "leer"
+   },
+   {
+    "n": 1,
+    "g": "smokescreen"
+   },
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 12,
+    "g": "ember"
+   },
+   {
+    "n": 21,
+    "g": "quickattack"
+   },
+   {
+    "n": 31,
+    "g": "flamewheel"
+   },
+   {
+    "n": 42,
+    "g": "swift"
+   },
+   {
+    "n": 54,
+    "g": "flamethrower"
+   }
+  ],
+  "typhlosion": [
+   {
+    "n": 1,
+    "g": "ember"
+   },
+   {
+    "n": 1,
+    "g": "leer"
+   },
+   {
+    "n": 1,
+    "g": "smokescreen"
+   },
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 21,
+    "g": "quickattack"
+   },
+   {
+    "n": 31,
+    "g": "flamewheel"
+   },
+   {
+    "n": 45,
+    "g": "swift"
+   },
+   {
+    "n": 60,
+    "g": "flamethrower"
+   }
+  ],
+  "totodile": [
+   {
+    "n": 1,
+    "g": "leer"
+   },
+   {
+    "n": 1,
+    "g": "scratch"
+   },
+   {
+    "n": 7,
+    "g": "rage"
+   },
+   {
+    "n": 13,
+    "g": "watergun"
+   },
+   {
+    "n": 20,
+    "g": "bite"
+   },
+   {
+    "n": 27,
+    "g": "scaryface"
+   },
+   {
+    "n": 35,
+    "g": "slash"
+   },
+   {
+    "n": 43,
+    "g": "screech"
+   },
+   {
+    "n": 52,
+    "g": "hydropump"
+   }
+  ],
+  "croconaw": [
+   {
+    "n": 1,
+    "g": "leer"
+   },
+   {
+    "n": 1,
+    "g": "rage"
+   },
+   {
+    "n": 1,
+    "g": "scratch"
+   },
+   {
+    "n": 13,
+    "g": "watergun"
+   },
+   {
+    "n": 21,
+    "g": "bite"
+   },
+   {
+    "n": 28,
+    "g": "scaryface"
+   },
+   {
+    "n": 37,
+    "g": "slash"
+   },
+   {
+    "n": 45,
+    "g": "screech"
+   },
+   {
+    "n": 55,
+    "g": "hydropump"
+   }
+  ],
+  "feraligatr": [
+   {
+    "n": 1,
+    "g": "leer"
+   },
+   {
+    "n": 1,
+    "g": "rage"
+   },
+   {
+    "n": 1,
+    "g": "scratch"
+   },
+   {
+    "n": 1,
+    "g": "watergun"
+   },
+   {
+    "n": 21,
+    "g": "bite"
+   },
+   {
+    "n": 28,
+    "g": "scaryface"
+   },
+   {
+    "n": 38,
+    "g": "slash"
+   },
+   {
+    "n": 47,
+    "g": "screech"
+   },
+   {
+    "n": 58,
+    "g": "hydropump"
+   }
+  ],
+  "sentret": [
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 5,
+    "g": "defensecurl"
+   },
+   {
+    "n": 11,
+    "g": "quickattack"
+   },
+   {
+    "n": 17,
+    "g": "furyswipes"
+   },
+   {
+    "n": 25,
+    "g": "slam"
+   },
+   {
+    "n": 33,
+    "g": "rest"
+   },
+   {
+    "n": 41,
+    "g": "amnesia"
+   }
+  ],
+  "furret": [
+   {
+    "n": 1,
+    "g": "defensecurl"
+   },
+   {
+    "n": 1,
+    "g": "quickattack"
+   },
+   {
+    "n": 1,
+    "g": "scratch"
+   },
+   {
+    "n": 18,
+    "g": "furyswipes"
+   },
+   {
+    "n": 28,
+    "g": "slam"
+   },
+   {
+    "n": 38,
+    "g": "rest"
+   },
+   {
+    "n": 48,
+    "g": "amnesia"
+   }
+  ],
+  "hoothoot": [
+   {
+    "n": 1,
+    "g": "growl"
+   },
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 6,
+    "g": "foresight"
+   },
+   {
+    "n": 11,
+    "g": "peck"
+   },
+   {
+    "n": 16,
+    "g": "hypnosis"
+   },
+   {
+    "n": 22,
+    "g": "reflect"
+   },
+   {
+    "n": 28,
+    "g": "takedown"
+   },
+   {
+    "n": 34,
+    "g": "confusion"
+   },
+   {
+    "n": 48,
+    "g": "dreameater"
+   }
+  ],
+  "noctowl": [
+   {
+    "n": 1,
+    "g": "foresight"
+   },
+   {
+    "n": 1,
+    "g": "growl"
+   },
+   {
+    "n": 1,
+    "g": "peck"
+   },
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 16,
+    "g": "hypnosis"
+   },
+   {
+    "n": 25,
+    "g": "reflect"
+   },
+   {
+    "n": 33,
+    "g": "takedown"
+   },
+   {
+    "n": 41,
+    "g": "confusion"
+   },
+   {
+    "n": 57,
+    "g": "dreameater"
+   }
+  ],
+  "ledyba": [
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 8,
+    "g": "supersonic"
+   },
+   {
+    "n": 15,
+    "g": "cometpunch"
+   },
+   {
+    "n": 22,
+    "g": "lightscreen"
+   },
+   {
+    "n": 22,
+    "g": "reflect"
+   },
+   {
+    "n": 22,
+    "g": "safeguard"
+   },
+   {
+    "n": 29,
+    "g": "batonpass"
+   },
+   {
+    "n": 36,
+    "g": "swift"
+   },
+   {
+    "n": 43,
+    "g": "agility"
+   },
+   {
+    "n": 50,
+    "g": "doubleedge"
+   }
+  ],
+  "ledian": [
+   {
+    "n": 1,
+    "g": "supersonic"
+   },
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 15,
+    "g": "cometpunch"
+   },
+   {
+    "n": 24,
+    "g": "lightscreen"
+   },
+   {
+    "n": 24,
+    "g": "reflect"
+   },
+   {
+    "n": 24,
+    "g": "safeguard"
+   },
+   {
+    "n": 33,
+    "g": "batonpass"
+   },
+   {
+    "n": 42,
+    "g": "swift"
+   },
+   {
+    "n": 51,
+    "g": "agility"
+   },
+   {
+    "n": 60,
+    "g": "doubleedge"
+   }
+  ],
+  "spinarak": [
+   {
+    "n": 1,
+    "g": "poisonsting"
+   },
+   {
+    "n": 1,
+    "g": "stringshot"
+   },
+   {
+    "n": 6,
+    "g": "scaryface"
+   },
+   {
+    "n": 11,
+    "g": "constrict"
+   },
+   {
+    "n": 17,
+    "g": "nightshade"
+   },
+   {
+    "n": 23,
+    "g": "leechlife"
+   },
+   {
+    "n": 30,
+    "g": "furyswipes"
+   },
+   {
+    "n": 37,
+    "g": "spiderweb"
+   },
+   {
+    "n": 45,
+    "g": "agility"
+   },
+   {
+    "n": 45,
+    "g": "screech"
+   },
+   {
+    "n": 53,
+    "g": "psychic"
+   }
+  ],
+  "ariados": [
+   {
+    "n": 1,
+    "g": "constrict"
+   },
+   {
+    "n": 1,
+    "g": "poisonsting"
+   },
+   {
+    "n": 1,
+    "g": "scaryface"
+   },
+   {
+    "n": 1,
+    "g": "stringshot"
+   },
+   {
+    "n": 17,
+    "g": "nightshade"
+   },
+   {
+    "n": 25,
+    "g": "leechlife"
+   },
+   {
+    "n": 34,
+    "g": "furyswipes"
+   },
+   {
+    "n": 43,
+    "g": "spiderweb"
+   },
+   {
+    "n": 53,
+    "g": "agility"
+   },
+   {
+    "n": 53,
+    "g": "screech"
+   },
+   {
+    "n": 63,
+    "g": "psychic"
+   }
+  ],
+  "crobat": [
+   {
+    "n": 1,
+    "g": "leechlife"
+   },
+   {
+    "n": 1,
+    "g": "screech"
+   },
+   {
+    "n": 1,
+    "g": "supersonic"
+   },
+   {
+    "n": 12,
+    "g": "bite"
+   },
+   {
+    "n": 19,
+    "g": "confuseray"
+   },
+   {
+    "n": 30,
+    "g": "wingattack"
+   },
+   {
+    "n": 42,
+    "g": "meanlook"
+   },
+   {
+    "n": 55,
+    "g": "haze"
+   }
+  ],
+  "chinchou": [
+   {
+    "n": 1,
+    "g": "bubble"
+   },
+   {
+    "n": 1,
+    "g": "thunderwave"
+   },
+   {
+    "n": 5,
+    "g": "supersonic"
+   },
+   {
+    "n": 13,
+    "g": "flail"
+   },
+   {
+    "n": 17,
+    "g": "watergun"
+   },
+   {
+    "n": 25,
+    "g": "spark"
+   },
+   {
+    "n": 29,
+    "g": "confuseray"
+   },
+   {
+    "n": 37,
+    "g": "takedown"
+   },
+   {
+    "n": 41,
+    "g": "hydropump"
+   }
+  ],
+  "lanturn": [
+   {
+    "n": 1,
+    "g": "bubble"
+   },
+   {
+    "n": 1,
+    "g": "supersonic"
+   },
+   {
+    "n": 1,
+    "g": "thunderwave"
+   },
+   {
+    "n": 13,
+    "g": "flail"
+   },
+   {
+    "n": 17,
+    "g": "watergun"
+   },
+   {
+    "n": 25,
+    "g": "spark"
+   },
+   {
+    "n": 33,
+    "g": "confuseray"
+   },
+   {
+    "n": 45,
+    "g": "takedown"
+   },
+   {
+    "n": 53,
+    "g": "hydropump"
+   }
+  ],
+  "pichu": [
+   {
+    "n": 1,
+    "g": "charm"
+   },
+   {
+    "n": 1,
+    "g": "thundershock"
+   },
+   {
+    "n": 6,
+    "g": "tailwhip"
+   },
+   {
+    "n": 8,
+    "g": "thunderwave"
+   },
+   {
+    "n": 11,
+    "g": "sweetkiss"
+   }
+  ],
+  "cleffa": [
+   {
+    "n": 1,
+    "g": "charm"
+   },
+   {
+    "n": 1,
+    "g": "pound"
+   },
+   {
+    "n": 4,
+    "g": "encore"
+   },
+   {
+    "n": 8,
+    "g": "sing"
+   },
+   {
+    "n": 13,
+    "g": "sweetkiss"
+   }
+  ],
+  "igglybuff": [
+   {
+    "n": 1,
+    "g": "charm"
+   },
+   {
+    "n": 1,
+    "g": "sing"
+   },
+   {
+    "n": 4,
+    "g": "defensecurl"
+   },
+   {
+    "n": 9,
+    "g": "pound"
+   },
+   {
+    "n": 14,
+    "g": "sweetkiss"
+   }
+  ],
+  "togepi": [
+   {
+    "n": 1,
+    "g": "charm"
+   },
+   {
+    "n": 1,
+    "g": "growl"
+   },
+   {
+    "n": 7,
+    "g": "metronome"
+   },
+   {
+    "n": 18,
+    "g": "sweetkiss"
+   },
+   {
+    "n": 25,
+    "g": "encore"
+   },
+   {
+    "n": 31,
+    "g": "safeguard"
+   },
+   {
+    "n": 38,
+    "g": "doubleedge"
+   }
+  ],
+  "togetic": [
+   {
+    "n": 1,
+    "g": "charm"
+   },
+   {
+    "n": 1,
+    "g": "growl"
+   },
+   {
+    "n": 7,
+    "g": "metronome"
+   },
+   {
+    "n": 18,
+    "g": "sweetkiss"
+   },
+   {
+    "n": 25,
+    "g": "encore"
+   },
+   {
+    "n": 31,
+    "g": "safeguard"
+   },
+   {
+    "n": 38,
+    "g": "doubleedge"
+   }
+  ],
+  "natu": [
+   {
+    "n": 1,
+    "g": "leer"
+   },
+   {
+    "n": 1,
+    "g": "peck"
+   },
+   {
+    "n": 10,
+    "g": "nightshade"
+   },
+   {
+    "n": 20,
+    "g": "teleport"
+   },
+   {
+    "n": 30,
+    "g": "futuresight"
+   },
+   {
+    "n": 40,
+    "g": "confuseray"
+   },
+   {
+    "n": 50,
+    "g": "psychic"
+   }
+  ],
+  "xatu": [
+   {
+    "n": 1,
+    "g": "leer"
+   },
+   {
+    "n": 1,
+    "g": "nightshade"
+   },
+   {
+    "n": 1,
+    "g": "peck"
+   },
+   {
+    "n": 20,
+    "g": "teleport"
+   },
+   {
+    "n": 35,
+    "g": "futuresight"
+   },
+   {
+    "n": 50,
+    "g": "confuseray"
+   },
+   {
+    "n": 65,
+    "g": "psychic"
+   }
+  ],
+  "mareep": [
+   {
+    "n": 1,
+    "g": "growl"
+   },
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 9,
+    "g": "thundershock"
+   },
+   {
+    "n": 16,
+    "g": "thunderwave"
+   },
+   {
+    "n": 23,
+    "g": "cottonspore"
+   },
+   {
+    "n": 30,
+    "g": "lightscreen"
+   },
+   {
+    "n": 37,
+    "g": "thunder"
+   }
+  ],
+  "flaaffy": [
+   {
+    "n": 1,
+    "g": "growl"
+   },
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 1,
+    "g": "thundershock"
+   },
+   {
+    "n": 18,
+    "g": "thunderwave"
+   },
+   {
+    "n": 27,
+    "g": "cottonspore"
+   },
+   {
+    "n": 36,
+    "g": "lightscreen"
+   },
+   {
+    "n": 45,
+    "g": "thunder"
+   }
+  ],
+  "ampharos": [
+   {
+    "n": 1,
+    "g": "growl"
+   },
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 1,
+    "g": "thundershock"
+   },
+   {
+    "n": 1,
+    "g": "thunderwave"
+   },
+   {
+    "n": 27,
+    "g": "cottonspore"
+   },
+   {
+    "n": 30,
+    "g": "thunderpunch"
+   },
+   {
+    "n": 42,
+    "g": "lightscreen"
+   },
+   {
+    "n": 57,
+    "g": "thunder"
+   }
+  ],
+  "bellossom": [
+   {
+    "n": 1,
+    "g": "absorb"
+   },
+   {
+    "n": 1,
+    "g": "petaldance"
+   },
+   {
+    "n": 1,
+    "g": "stunspore"
+   },
+   {
+    "n": 1,
+    "g": "sweetscent"
+   },
+   {
+    "n": 55,
+    "g": "solarbeam"
+   }
+  ],
+  "marill": [
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 3,
+    "g": "defensecurl"
+   },
+   {
+    "n": 6,
+    "g": "tailwhip"
+   },
+   {
+    "n": 10,
+    "g": "watergun"
+   },
+   {
+    "n": 15,
+    "g": "rollout"
+   },
+   {
+    "n": 21,
+    "g": "bubblebeam"
+   },
+   {
+    "n": 28,
+    "g": "doubleedge"
+   },
+   {
+    "n": 36,
+    "g": "raindance"
+   }
+  ],
+  "azumarill": [
+   {
+    "n": 1,
+    "g": "defensecurl"
+   },
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 1,
+    "g": "tailwhip"
+   },
+   {
+    "n": 1,
+    "g": "watergun"
+   },
+   {
+    "n": 15,
+    "g": "rollout"
+   },
+   {
+    "n": 25,
+    "g": "bubblebeam"
+   },
+   {
+    "n": 36,
+    "g": "doubleedge"
+   },
+   {
+    "n": 48,
+    "g": "raindance"
+   }
+  ],
+  "sudowoodo": [
+   {
+    "n": 1,
+    "g": "mimic"
+   },
+   {
+    "n": 1,
+    "g": "rockthrow"
+   },
+   {
+    "n": 10,
+    "g": "flail"
+   },
+   {
+    "n": 19,
+    "g": "lowkick"
+   },
+   {
+    "n": 28,
+    "g": "rockslide"
+   },
+   {
+    "n": 37,
+    "g": "feintattack"
+   },
+   {
+    "n": 46,
+    "g": "slam"
+   }
+  ],
+  "politoed": [
+   {
+    "n": 1,
+    "g": "doubleslap"
+   },
+   {
+    "n": 1,
+    "g": "hypnosis"
+   },
+   {
+    "n": 1,
+    "g": "perishsong"
+   },
+   {
+    "n": 1,
+    "g": "watergun"
+   },
+   {
+    "n": 51,
+    "g": "swagger"
+   }
+  ],
+  "hoppip": [
+   {
+    "n": 1,
+    "g": "splash"
+   },
+   {
+    "n": 1,
+    "g": "synthesis"
+   },
+   {
+    "n": 5,
+    "g": "tailwhip"
+   },
+   {
+    "n": 10,
+    "g": "tackle"
+   },
+   {
+    "n": 13,
+    "g": "poisonpowder"
+   },
+   {
+    "n": 15,
+    "g": "stunspore"
+   },
+   {
+    "n": 17,
+    "g": "sleeppowder"
+   },
+   {
+    "n": 20,
+    "g": "leechseed"
+   },
+   {
+    "n": 25,
+    "g": "cottonspore"
+   },
+   {
+    "n": 30,
+    "g": "megadrain"
+   }
+  ],
+  "skiploom": [
+   {
+    "n": 1,
+    "g": "splash"
+   },
+   {
+    "n": 1,
+    "g": "synthesis"
+   },
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 1,
+    "g": "tailwhip"
+   },
+   {
+    "n": 13,
+    "g": "poisonpowder"
+   },
+   {
+    "n": 15,
+    "g": "stunspore"
+   },
+   {
+    "n": 17,
+    "g": "sleeppowder"
+   },
+   {
+    "n": 22,
+    "g": "leechseed"
+   },
+   {
+    "n": 29,
+    "g": "cottonspore"
+   },
+   {
+    "n": 36,
+    "g": "megadrain"
+   }
+  ],
+  "jumpluff": [
+   {
+    "n": 1,
+    "g": "splash"
+   },
+   {
+    "n": 1,
+    "g": "synthesis"
+   },
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 1,
+    "g": "tailwhip"
+   },
+   {
+    "n": 13,
+    "g": "poisonpowder"
+   },
+   {
+    "n": 15,
+    "g": "stunspore"
+   },
+   {
+    "n": 17,
+    "g": "sleeppowder"
+   },
+   {
+    "n": 22,
+    "g": "leechseed"
+   },
+   {
+    "n": 33,
+    "g": "cottonspore"
+   },
+   {
+    "n": 44,
+    "g": "megadrain"
+   }
+  ],
+  "aipom": [
+   {
+    "n": 1,
+    "g": "scratch"
+   },
+   {
+    "n": 1,
+    "g": "tailwhip"
+   },
+   {
+    "n": 6,
+    "g": "sandattack"
+   },
+   {
+    "n": 12,
+    "g": "batonpass"
+   },
+   {
+    "n": 19,
+    "g": "furyswipes"
+   },
+   {
+    "n": 27,
+    "g": "swift"
+   },
+   {
+    "n": 36,
+    "g": "screech"
+   },
+   {
+    "n": 46,
+    "g": "agility"
+   }
+  ],
+  "sunkern": [
+   {
+    "n": 1,
+    "g": "absorb"
+   },
+   {
+    "n": 4,
+    "g": "growth"
+   },
+   {
+    "n": 10,
+    "g": "megadrain"
+   },
+   {
+    "n": 19,
+    "g": "sunnyday"
+   },
+   {
+    "n": 31,
+    "g": "synthesis"
+   },
+   {
+    "n": 46,
+    "g": "gigadrain"
+   }
+  ],
+  "sunflora": [
+   {
+    "n": 1,
+    "g": "absorb"
+   },
+   {
+    "n": 1,
+    "g": "pound"
+   },
+   {
+    "n": 4,
+    "g": "growth"
+   },
+   {
+    "n": 10,
+    "g": "razorleaf"
+   },
+   {
+    "n": 19,
+    "g": "sunnyday"
+   },
+   {
+    "n": 31,
+    "g": "petaldance"
+   },
+   {
+    "n": 46,
+    "g": "solarbeam"
+   }
+  ],
+  "yanma": [
+   {
+    "n": 1,
+    "g": "foresight"
+   },
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 7,
+    "g": "quickattack"
+   },
+   {
+    "n": 13,
+    "g": "doubleteam"
+   },
+   {
+    "n": 19,
+    "g": "sonicboom"
+   },
+   {
+    "n": 25,
+    "g": "detect"
+   },
+   {
+    "n": 31,
+    "g": "supersonic"
+   },
+   {
+    "n": 37,
+    "g": "swift"
+   },
+   {
+    "n": 37,
+    "g": "wingattack"
+   },
+   {
+    "n": 43,
+    "g": "screech"
+   }
+  ],
+  "wooper": [
+   {
+    "n": 1,
+    "g": "tailwhip"
+   },
+   {
+    "n": 1,
+    "g": "watergun"
+   },
+   {
+    "n": 11,
+    "g": "slam"
+   },
+   {
+    "n": 21,
+    "g": "amnesia"
+   },
+   {
+    "n": 31,
+    "g": "earthquake"
+   },
+   {
+    "n": 41,
+    "g": "raindance"
+   },
+   {
+    "n": 51,
+    "g": "haze"
+   },
+   {
+    "n": 51,
+    "g": "mist"
+   }
+  ],
+  "quagsire": [
+   {
+    "n": 1,
+    "g": "tailwhip"
+   },
+   {
+    "n": 1,
+    "g": "watergun"
+   },
+   {
+    "n": 11,
+    "g": "slam"
+   },
+   {
+    "n": 23,
+    "g": "amnesia"
+   },
+   {
+    "n": 35,
+    "g": "earthquake"
+   },
+   {
+    "n": 47,
+    "g": "raindance"
+   },
+   {
+    "n": 59,
+    "g": "haze"
+   },
+   {
+    "n": 59,
+    "g": "mist"
+   }
+  ],
+  "espeon": [
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 1,
+    "g": "tailwhip"
+   },
+   {
+    "n": 8,
+    "g": "sandattack"
+   },
+   {
+    "n": 16,
+    "g": "confusion"
+   },
+   {
+    "n": 23,
+    "g": "quickattack"
+   },
+   {
+    "n": 30,
+    "g": "swift"
+   },
+   {
+    "n": 36,
+    "g": "psybeam"
+   },
+   {
+    "n": 42,
+    "g": "psychup"
+   },
+   {
+    "n": 47,
+    "g": "psychic"
+   },
+   {
+    "n": 52,
+    "g": "morningsun"
+   }
+  ],
+  "umbreon": [
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 1,
+    "g": "tailwhip"
+   },
+   {
+    "n": 8,
+    "g": "sandattack"
+   },
+   {
+    "n": 16,
+    "g": "pursuit"
+   },
+   {
+    "n": 23,
+    "g": "quickattack"
+   },
+   {
+    "n": 30,
+    "g": "confuseray"
+   },
+   {
+    "n": 36,
+    "g": "feintattack"
+   },
+   {
+    "n": 42,
+    "g": "meanlook"
+   },
+   {
+    "n": 47,
+    "g": "screech"
+   },
+   {
+    "n": 52,
+    "g": "moonlight"
+   }
+  ],
+  "murkrow": [
+   {
+    "n": 1,
+    "g": "peck"
+   },
+   {
+    "n": 11,
+    "g": "pursuit"
+   },
+   {
+    "n": 16,
+    "g": "haze"
+   },
+   {
+    "n": 26,
+    "g": "nightshade"
+   },
+   {
+    "n": 31,
+    "g": "feintattack"
+   },
+   {
+    "n": 41,
+    "g": "meanlook"
+   }
+  ],
+  "slowking": [
+   {
+    "n": 1,
+    "g": "curse"
+   },
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 6,
+    "g": "growl"
+   },
+   {
+    "n": 15,
+    "g": "watergun"
+   },
+   {
+    "n": 20,
+    "g": "confusion"
+   },
+   {
+    "n": 29,
+    "g": "disable"
+   },
+   {
+    "n": 34,
+    "g": "headbutt"
+   },
+   {
+    "n": 43,
+    "g": "swagger"
+   },
+   {
+    "n": 48,
+    "g": "psychic"
+   }
+  ],
+  "misdreavus": [
+   {
+    "n": 1,
+    "g": "growl"
+   },
+   {
+    "n": 1,
+    "g": "psywave"
+   },
+   {
+    "n": 6,
+    "g": "spite"
+   },
+   {
+    "n": 12,
+    "g": "confuseray"
+   },
+   {
+    "n": 19,
+    "g": "meanlook"
+   },
+   {
+    "n": 27,
+    "g": "psybeam"
+   },
+   {
+    "n": 36,
+    "g": "painsplit"
+   },
+   {
+    "n": 46,
+    "g": "perishsong"
+   }
+  ],
+  "unown": [
+   {
+    "n": 1,
+    "g": "hiddenpower"
+   }
+  ],
+  "wobbuffet": [
+   {
+    "n": 1,
+    "g": "counter"
+   },
+   {
+    "n": 1,
+    "g": "destinybond"
+   },
+   {
+    "n": 1,
+    "g": "mirrorcoat"
+   },
+   {
+    "n": 1,
+    "g": "safeguard"
+   }
+  ],
+  "girafarig": [
+   {
+    "n": 1,
+    "g": "confusion"
+   },
+   {
+    "n": 1,
+    "g": "growl"
+   },
+   {
+    "n": 1,
+    "g": "stomp"
+   },
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 20,
+    "g": "agility"
+   },
+   {
+    "n": 30,
+    "g": "batonpass"
+   },
+   {
+    "n": 41,
+    "g": "psybeam"
+   },
+   {
+    "n": 54,
+    "g": "crunch"
+   }
+  ],
+  "pineco": [
+   {
+    "n": 1,
+    "g": "protect"
+   },
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 8,
+    "g": "selfdestruct"
+   },
+   {
+    "n": 15,
+    "g": "takedown"
+   },
+   {
+    "n": 22,
+    "g": "rapidspin"
+   },
+   {
+    "n": 29,
+    "g": "bide"
+   },
+   {
+    "n": 36,
+    "g": "explosion"
+   },
+   {
+    "n": 43,
+    "g": "spikes"
+   },
+   {
+    "n": 50,
+    "g": "doubleedge"
+   }
+  ],
+  "forretress": [
+   {
+    "n": 1,
+    "g": "protect"
+   },
+   {
+    "n": 1,
+    "g": "selfdestruct"
+   },
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 15,
+    "g": "takedown"
+   },
+   {
+    "n": 22,
+    "g": "rapidspin"
+   },
+   {
+    "n": 29,
+    "g": "bide"
+   },
+   {
+    "n": 39,
+    "g": "explosion"
+   },
+   {
+    "n": 49,
+    "g": "spikes"
+   },
+   {
+    "n": 59,
+    "g": "doubleedge"
+   }
+  ],
+  "dunsparce": [
+   {
+    "n": 1,
+    "g": "rage"
+   },
+   {
+    "n": 5,
+    "g": "defensecurl"
+   },
+   {
+    "n": 13,
+    "g": "glare"
+   },
+   {
+    "n": 18,
+    "g": "spite"
+   },
+   {
+    "n": 26,
+    "g": "pursuit"
+   },
+   {
+    "n": 30,
+    "g": "screech"
+   },
+   {
+    "n": 38,
+    "g": "takedown"
+   }
+  ],
+  "gligar": [
+   {
+    "n": 1,
+    "g": "poisonsting"
+   },
+   {
+    "n": 6,
+    "g": "sandattack"
+   },
+   {
+    "n": 13,
+    "g": "harden"
+   },
+   {
+    "n": 20,
+    "g": "quickattack"
+   },
+   {
+    "n": 28,
+    "g": "feintattack"
+   },
+   {
+    "n": 36,
+    "g": "slash"
+   },
+   {
+    "n": 44,
+    "g": "screech"
+   },
+   {
+    "n": 52,
+    "g": "guillotine"
+   }
+  ],
+  "steelix": [
+   {
+    "n": 1,
+    "g": "screech"
+   },
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 10,
+    "g": "bind"
+   },
+   {
+    "n": 14,
+    "g": "rockthrow"
+   },
+   {
+    "n": 23,
+    "g": "harden"
+   },
+   {
+    "n": 27,
+    "g": "rage"
+   },
+   {
+    "n": 36,
+    "g": "sandstorm"
+   },
+   {
+    "n": 40,
+    "g": "slam"
+   },
+   {
+    "n": 49,
+    "g": "crunch"
+   }
+  ],
+  "snubbull": [
+   {
+    "n": 1,
+    "g": "scaryface"
+   },
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 4,
+    "g": "tailwhip"
+   },
+   {
+    "n": 8,
+    "g": "charm"
+   },
+   {
+    "n": 13,
+    "g": "bite"
+   },
+   {
+    "n": 19,
+    "g": "lick"
+   },
+   {
+    "n": 26,
+    "g": "roar"
+   },
+   {
+    "n": 34,
+    "g": "rage"
+   },
+   {
+    "n": 43,
+    "g": "takedown"
+   }
+  ],
+  "granbull": [
+   {
+    "n": 1,
+    "g": "scaryface"
+   },
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 4,
+    "g": "tailwhip"
+   },
+   {
+    "n": 8,
+    "g": "charm"
+   },
+   {
+    "n": 13,
+    "g": "bite"
+   },
+   {
+    "n": 19,
+    "g": "lick"
+   },
+   {
+    "n": 28,
+    "g": "roar"
+   },
+   {
+    "n": 38,
+    "g": "rage"
+   },
+   {
+    "n": 51,
+    "g": "takedown"
+   }
+  ],
+  "qwilfish": [
+   {
+    "n": 1,
+    "g": "poisonsting"
+   },
+   {
+    "n": 1,
+    "g": "spikes"
+   },
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 10,
+    "g": "harden"
+   },
+   {
+    "n": 10,
+    "g": "minimize"
+   },
+   {
+    "n": 19,
+    "g": "watergun"
+   },
+   {
+    "n": 28,
+    "g": "pinmissile"
+   },
+   {
+    "n": 37,
+    "g": "takedown"
+   },
+   {
+    "n": 46,
+    "g": "hydropump"
+   }
+  ],
+  "scizor": [
+   {
+    "n": 1,
+    "g": "leer"
+   },
+   {
+    "n": 1,
+    "g": "quickattack"
+   },
+   {
+    "n": 6,
+    "g": "focusenergy"
+   },
+   {
+    "n": 12,
+    "g": "pursuit"
+   },
+   {
+    "n": 18,
+    "g": "falseswipe"
+   },
+   {
+    "n": 24,
+    "g": "agility"
+   },
+   {
+    "n": 30,
+    "g": "metalclaw"
+   },
+   {
+    "n": 36,
+    "g": "slash"
+   },
+   {
+    "n": 42,
+    "g": "swordsdance"
+   },
+   {
+    "n": 48,
+    "g": "doubleteam"
+   }
+  ],
+  "shuckle": [
+   {
+    "n": 1,
+    "g": "constrict"
+   },
+   {
+    "n": 1,
+    "g": "withdraw"
+   },
+   {
+    "n": 9,
+    "g": "wrap"
+   },
+   {
+    "n": 14,
+    "g": "encore"
+   },
+   {
+    "n": 23,
+    "g": "safeguard"
+   },
+   {
+    "n": 28,
+    "g": "bide"
+   },
+   {
+    "n": 37,
+    "g": "rest"
+   }
+  ],
+  "heracross": [
+   {
+    "n": 1,
+    "g": "leer"
+   },
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 6,
+    "g": "hornattack"
+   },
+   {
+    "n": 12,
+    "g": "endure"
+   },
+   {
+    "n": 19,
+    "g": "furyattack"
+   },
+   {
+    "n": 27,
+    "g": "counter"
+   },
+   {
+    "n": 35,
+    "g": "takedown"
+   },
+   {
+    "n": 44,
+    "g": "reversal"
+   },
+   {
+    "n": 54,
+    "g": "megahorn"
+   }
+  ],
+  "sneasel": [
+   {
+    "n": 1,
+    "g": "leer"
+   },
+   {
+    "n": 1,
+    "g": "scratch"
+   },
+   {
+    "n": 9,
+    "g": "quickattack"
+   },
+   {
+    "n": 17,
+    "g": "screech"
+   },
+   {
+    "n": 25,
+    "g": "feintattack"
+   },
+   {
+    "n": 33,
+    "g": "furyswipes"
+   },
+   {
+    "n": 41,
+    "g": "agility"
+   },
+   {
+    "n": 49,
+    "g": "slash"
+   },
+   {
+    "n": 57,
+    "g": "beatup"
+   },
+   {
+    "n": 65,
+    "g": "metalclaw"
+   }
+  ],
+  "teddiursa": [
+   {
+    "n": 1,
+    "g": "leer"
+   },
+   {
+    "n": 1,
+    "g": "scratch"
+   },
+   {
+    "n": 8,
+    "g": "lick"
+   },
+   {
+    "n": 15,
+    "g": "furyswipes"
+   },
+   {
+    "n": 22,
+    "g": "feintattack"
+   },
+   {
+    "n": 29,
+    "g": "rest"
+   },
+   {
+    "n": 36,
+    "g": "slash"
+   },
+   {
+    "n": 43,
+    "g": "snore"
+   },
+   {
+    "n": 50,
+    "g": "thrash"
+   }
+  ],
+  "ursaring": [
+   {
+    "n": 1,
+    "g": "furyswipes"
+   },
+   {
+    "n": 1,
+    "g": "leer"
+   },
+   {
+    "n": 1,
+    "g": "lick"
+   },
+   {
+    "n": 1,
+    "g": "scratch"
+   },
+   {
+    "n": 22,
+    "g": "feintattack"
+   },
+   {
+    "n": 29,
+    "g": "rest"
+   },
+   {
+    "n": 39,
+    "g": "slash"
+   },
+   {
+    "n": 49,
+    "g": "snore"
+   },
+   {
+    "n": 59,
+    "g": "thrash"
+   }
+  ],
+  "slugma": [
+   {
+    "n": 1,
+    "g": "smog"
+   },
+   {
+    "n": 8,
+    "g": "ember"
+   },
+   {
+    "n": 15,
+    "g": "rockthrow"
+   },
+   {
+    "n": 22,
+    "g": "harden"
+   },
+   {
+    "n": 29,
+    "g": "amnesia"
+   },
+   {
+    "n": 36,
+    "g": "flamethrower"
+   },
+   {
+    "n": 43,
+    "g": "rockslide"
+   },
+   {
+    "n": 50,
+    "g": "bodyslam"
+   }
+  ],
+  "magcargo": [
+   {
+    "n": 1,
+    "g": "ember"
+   },
+   {
+    "n": 1,
+    "g": "rockthrow"
+   },
+   {
+    "n": 1,
+    "g": "smog"
+   },
+   {
+    "n": 22,
+    "g": "harden"
+   },
+   {
+    "n": 29,
+    "g": "amnesia"
+   },
+   {
+    "n": 36,
+    "g": "flamethrower"
+   },
+   {
+    "n": 48,
+    "g": "rockslide"
+   },
+   {
+    "n": 60,
+    "g": "bodyslam"
+   }
+  ],
+  "swinub": [
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 10,
+    "g": "powdersnow"
+   },
+   {
+    "n": 19,
+    "g": "endure"
+   },
+   {
+    "n": 28,
+    "g": "takedown"
+   },
+   {
+    "n": 37,
+    "g": "mist"
+   },
+   {
+    "n": 46,
+    "g": "blizzard"
+   },
+   {
+    "n": 55,
+    "g": "amnesia"
+   }
+  ],
+  "piloswine": [
+   {
+    "n": 1,
+    "g": "endure"
+   },
+   {
+    "n": 1,
+    "g": "hornattack"
+   },
+   {
+    "n": 1,
+    "g": "powdersnow"
+   },
+   {
+    "n": 28,
+    "g": "takedown"
+   },
+   {
+    "n": 33,
+    "g": "furyattack"
+   },
+   {
+    "n": 42,
+    "g": "mist"
+   },
+   {
+    "n": 56,
+    "g": "blizzard"
+   },
+   {
+    "n": 70,
+    "g": "amnesia"
+   }
+  ],
+  "corsola": [
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 7,
+    "g": "harden"
+   },
+   {
+    "n": 13,
+    "g": "bubble"
+   },
+   {
+    "n": 19,
+    "g": "recover"
+   },
+   {
+    "n": 25,
+    "g": "bubblebeam"
+   },
+   {
+    "n": 31,
+    "g": "spikecannon"
+   },
+   {
+    "n": 37,
+    "g": "mirrorcoat"
+   },
+   {
+    "n": 43,
+    "g": "ancientpower"
+   }
+  ],
+  "remoraid": [
+   {
+    "n": 1,
+    "g": "watergun"
+   },
+   {
+    "n": 11,
+    "g": "lockon"
+   },
+   {
+    "n": 22,
+    "g": "aurorabeam"
+   },
+   {
+    "n": 22,
+    "g": "bubblebeam"
+   },
+   {
+    "n": 22,
+    "g": "psybeam"
+   },
+   {
+    "n": 33,
+    "g": "focusenergy"
+   },
+   {
+    "n": 44,
+    "g": "icebeam"
+   },
+   {
+    "n": 55,
+    "g": "hyperbeam"
+   }
+  ],
+  "octillery": [
+   {
+    "n": 1,
+    "g": "watergun"
+   },
+   {
+    "n": 11,
+    "g": "constrict"
+   },
+   {
+    "n": 22,
+    "g": "aurorabeam"
+   },
+   {
+    "n": 22,
+    "g": "bubblebeam"
+   },
+   {
+    "n": 22,
+    "g": "psybeam"
+   },
+   {
+    "n": 25,
+    "g": "octazooka"
+   },
+   {
+    "n": 38,
+    "g": "focusenergy"
+   },
+   {
+    "n": 54,
+    "g": "icebeam"
+   },
+   {
+    "n": 70,
+    "g": "hyperbeam"
+   }
+  ],
+  "delibird": [
+   {
+    "n": 1,
+    "g": "present"
+   }
+  ],
+  "mantine": [
+   {
+    "n": 1,
+    "g": "bubble"
+   },
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 10,
+    "g": "supersonic"
+   },
+   {
+    "n": 18,
+    "g": "bubblebeam"
+   },
+   {
+    "n": 25,
+    "g": "takedown"
+   },
+   {
+    "n": 32,
+    "g": "agility"
+   },
+   {
+    "n": 40,
+    "g": "wingattack"
+   },
+   {
+    "n": 49,
+    "g": "confuseray"
+   }
+  ],
+  "skarmory": [
+   {
+    "n": 1,
+    "g": "leer"
+   },
+   {
+    "n": 1,
+    "g": "peck"
+   },
+   {
+    "n": 13,
+    "g": "sandattack"
+   },
+   {
+    "n": 19,
+    "g": "swift"
+   },
+   {
+    "n": 25,
+    "g": "agility"
+   },
+   {
+    "n": 37,
+    "g": "furyattack"
+   },
+   {
+    "n": 49,
+    "g": "steelwing"
+   }
+  ],
+  "houndour": [
+   {
+    "n": 1,
+    "g": "ember"
+   },
+   {
+    "n": 1,
+    "g": "leer"
+   },
+   {
+    "n": 7,
+    "g": "roar"
+   },
+   {
+    "n": 13,
+    "g": "smog"
+   },
+   {
+    "n": 20,
+    "g": "bite"
+   },
+   {
+    "n": 27,
+    "g": "feintattack"
+   },
+   {
+    "n": 35,
+    "g": "flamethrower"
+   },
+   {
+    "n": 43,
+    "g": "crunch"
+   }
+  ],
+  "houndoom": [
+   {
+    "n": 1,
+    "g": "ember"
+   },
+   {
+    "n": 1,
+    "g": "leer"
+   },
+   {
+    "n": 7,
+    "g": "roar"
+   },
+   {
+    "n": 13,
+    "g": "smog"
+   },
+   {
+    "n": 20,
+    "g": "bite"
+   },
+   {
+    "n": 30,
+    "g": "feintattack"
+   },
+   {
+    "n": 41,
+    "g": "flamethrower"
+   },
+   {
+    "n": 52,
+    "g": "crunch"
+   }
+  ],
+  "kingdra": [
+   {
+    "n": 1,
+    "g": "bubble"
+   },
+   {
+    "n": 1,
+    "g": "leer"
+   },
+   {
+    "n": 1,
+    "g": "smokescreen"
+   },
+   {
+    "n": 1,
+    "g": "watergun"
+   },
+   {
+    "n": 29,
+    "g": "twister"
+   },
+   {
+    "n": 40,
+    "g": "agility"
+   },
+   {
+    "n": 51,
+    "g": "hydropump"
+   }
+  ],
+  "phanpy": [
+   {
+    "n": 1,
+    "g": "growl"
+   },
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 9,
+    "g": "defensecurl"
+   },
+   {
+    "n": 17,
+    "g": "flail"
+   },
+   {
+    "n": 25,
+    "g": "takedown"
+   },
+   {
+    "n": 33,
+    "g": "rollout"
+   },
+   {
+    "n": 41,
+    "g": "endure"
+   },
+   {
+    "n": 49,
+    "g": "doubleedge"
+   }
+  ],
+  "donphan": [
+   {
+    "n": 1,
+    "g": "growl"
+   },
+   {
+    "n": 1,
+    "g": "hornattack"
+   },
+   {
+    "n": 9,
+    "g": "defensecurl"
+   },
+   {
+    "n": 17,
+    "g": "flail"
+   },
+   {
+    "n": 25,
+    "g": "furyattack"
+   },
+   {
+    "n": 33,
+    "g": "rollout"
+   },
+   {
+    "n": 41,
+    "g": "rapidspin"
+   },
+   {
+    "n": 49,
+    "g": "earthquake"
+   }
+  ],
+  "porygon2": [
+   {
+    "n": 1,
+    "g": "conversion"
+   },
+   {
+    "n": 1,
+    "g": "conversion2"
+   },
+   {
+    "n": 9,
+    "g": "agility"
+   },
+   {
+    "n": 12,
+    "g": "psybeam"
+   },
+   {
+    "n": 20,
+    "g": "recover"
+   },
+   {
+    "n": 24,
+    "g": "defensecurl"
+   },
+   {
+    "n": 32,
+    "g": "lockon"
+   },
+   {
+    "n": 36,
+    "g": "triattack"
+   },
+   {
+    "n": 44,
+    "g": "zapcannon"
+   }
+  ],
+  "stantler": [
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 8,
+    "g": "leer"
+   },
+   {
+    "n": 15,
+    "g": "hypnosis"
+   },
+   {
+    "n": 23,
+    "g": "stomp"
+   },
+   {
+    "n": 31,
+    "g": "sandattack"
+   },
+   {
+    "n": 40,
+    "g": "takedown"
+   },
+   {
+    "n": 49,
+    "g": "confuseray"
+   }
+  ],
+  "smeargle": [
+   {
+    "n": 1,
+    "g": "sketch"
+   }
+  ],
+  "tyrogue": [
+   {
+    "n": 1,
+    "g": "tackle"
+   }
+  ],
+  "hitmontop": [
+   {
+    "n": 1,
+    "g": "rollingkick"
+   },
+   {
+    "n": 7,
+    "g": "focusenergy"
+   },
+   {
+    "n": 13,
+    "g": "pursuit"
+   },
+   {
+    "n": 19,
+    "g": "quickattack"
+   },
+   {
+    "n": 25,
+    "g": "rapidspin"
+   },
+   {
+    "n": 31,
+    "g": "counter"
+   },
+   {
+    "n": 37,
+    "g": "agility"
+   },
+   {
+    "n": 43,
+    "g": "detect"
+   },
+   {
+    "n": 49,
+    "g": "triplekick"
+   }
+  ],
+  "smoochum": [
+   {
+    "n": 1,
+    "g": "lick"
+   },
+   {
+    "n": 1,
+    "g": "pound"
+   },
+   {
+    "n": 9,
+    "g": "sweetkiss"
+   },
+   {
+    "n": 13,
+    "g": "powdersnow"
+   },
+   {
+    "n": 21,
+    "g": "confusion"
+   },
+   {
+    "n": 25,
+    "g": "sing"
+   },
+   {
+    "n": 33,
+    "g": "meanlook"
+   },
+   {
+    "n": 37,
+    "g": "psychic"
+   },
+   {
+    "n": 45,
+    "g": "perishsong"
+   },
+   {
+    "n": 49,
+    "g": "blizzard"
+   }
+  ],
+  "elekid": [
+   {
+    "n": 1,
+    "g": "leer"
+   },
+   {
+    "n": 1,
+    "g": "quickattack"
+   },
+   {
+    "n": 9,
+    "g": "thunderpunch"
+   },
+   {
+    "n": 17,
+    "g": "lightscreen"
+   },
+   {
+    "n": 25,
+    "g": "swift"
+   },
+   {
+    "n": 33,
+    "g": "screech"
+   },
+   {
+    "n": 41,
+    "g": "thunderbolt"
+   },
+   {
+    "n": 49,
+    "g": "thunder"
+   }
+  ],
+  "magby": [
+   {
+    "n": 1,
+    "g": "ember"
+   },
+   {
+    "n": 7,
+    "g": "leer"
+   },
+   {
+    "n": 13,
+    "g": "smog"
+   },
+   {
+    "n": 19,
+    "g": "firepunch"
+   },
+   {
+    "n": 25,
+    "g": "smokescreen"
+   },
+   {
+    "n": 31,
+    "g": "sunnyday"
+   },
+   {
+    "n": 37,
+    "g": "flamethrower"
+   },
+   {
+    "n": 43,
+    "g": "confuseray"
+   },
+   {
+    "n": 49,
+    "g": "fireblast"
+   }
+  ],
+  "miltank": [
+   {
+    "n": 1,
+    "g": "tackle"
+   },
+   {
+    "n": 4,
+    "g": "growl"
+   },
+   {
+    "n": 8,
+    "g": "defensecurl"
+   },
+   {
+    "n": 13,
+    "g": "stomp"
+   },
+   {
+    "n": 19,
+    "g": "milkdrink"
+   },
+   {
+    "n": 26,
+    "g": "bide"
+   },
+   {
+    "n": 34,
+    "g": "rollout"
+   },
+   {
+    "n": 43,
+    "g": "bodyslam"
+   },
+   {
+    "n": 53,
+    "g": "healbell"
+   }
+  ],
+  "blissey": [
+   {
+    "n": 1,
+    "g": "pound"
+   },
+   {
+    "n": 4,
+    "g": "growl"
+   },
+   {
+    "n": 7,
+    "g": "tailwhip"
+   },
+   {
+    "n": 10,
+    "g": "softboiled"
+   },
+   {
+    "n": 13,
+    "g": "doubleslap"
+   },
+   {
+    "n": 18,
+    "g": "minimize"
+   },
+   {
+    "n": 23,
+    "g": "sing"
+   },
+   {
+    "n": 28,
+    "g": "eggbomb"
+   },
+   {
+    "n": 33,
+    "g": "defensecurl"
+   },
+   {
+    "n": 40,
+    "g": "lightscreen"
+   },
+   {
+    "n": 47,
+    "g": "doubleedge"
+   }
+  ],
+  "raikou": [
+   {
+    "n": 1,
+    "g": "bite"
+   },
+   {
+    "n": 1,
+    "g": "leer"
+   },
+   {
+    "n": 11,
+    "g": "thundershock"
+   },
+   {
+    "n": 21,
+    "g": "roar"
+   },
+   {
+    "n": 31,
+    "g": "quickattack"
+   },
+   {
+    "n": 41,
+    "g": "spark"
+   },
+   {
+    "n": 51,
+    "g": "reflect"
+   },
+   {
+    "n": 61,
+    "g": "crunch"
+   },
+   {
+    "n": 71,
+    "g": "thunder"
+   }
+  ],
+  "entei": [
+   {
+    "n": 1,
+    "g": "bite"
+   },
+   {
+    "n": 1,
+    "g": "leer"
+   },
+   {
+    "n": 11,
+    "g": "ember"
+   },
+   {
+    "n": 21,
+    "g": "roar"
+   },
+   {
+    "n": 31,
+    "g": "firespin"
+   },
+   {
+    "n": 41,
+    "g": "stomp"
+   },
+   {
+    "n": 51,
+    "g": "flamethrower"
+   },
+   {
+    "n": 61,
+    "g": "swagger"
+   },
+   {
+    "n": 71,
+    "g": "fireblast"
+   }
+  ],
+  "suicune": [
+   {
+    "n": 1,
+    "g": "bite"
+   },
+   {
+    "n": 1,
+    "g": "leer"
+   },
+   {
+    "n": 11,
+    "g": "bubblebeam"
+   },
+   {
+    "n": 11,
+    "g": "watergun"
+   },
+   {
+    "n": 21,
+    "g": "raindance"
+   },
+   {
+    "n": 21,
+    "g": "roar"
+   },
+   {
+    "n": 31,
+    "g": "gust"
+   },
+   {
+    "n": 41,
+    "g": "aurorabeam"
+   },
+   {
+    "n": 51,
+    "g": "mist"
+   },
+   {
+    "n": 61,
+    "g": "mirrorcoat"
+   },
+   {
+    "n": 71,
+    "g": "hydropump"
+   }
+  ],
+  "larvitar": [
+   {
+    "n": 1,
+    "g": "bite"
+   },
+   {
+    "n": 1,
+    "g": "leer"
+   },
+   {
+    "n": 8,
+    "g": "sandstorm"
+   },
+   {
+    "n": 15,
+    "g": "screech"
+   },
+   {
+    "n": 22,
+    "g": "rockslide"
+   },
+   {
+    "n": 29,
+    "g": "thrash"
+   },
+   {
+    "n": 36,
+    "g": "scaryface"
+   },
+   {
+    "n": 43,
+    "g": "crunch"
+   },
+   {
+    "n": 50,
+    "g": "earthquake"
+   },
+   {
+    "n": 57,
+    "g": "hyperbeam"
+   }
+  ],
+  "pupitar": [
+   {
+    "n": 1,
+    "g": "bite"
+   },
+   {
+    "n": 1,
+    "g": "leer"
+   },
+   {
+    "n": 1,
+    "g": "sandstorm"
+   },
+   {
+    "n": 1,
+    "g": "screech"
+   },
+   {
+    "n": 22,
+    "g": "rockslide"
+   },
+   {
+    "n": 29,
+    "g": "thrash"
+   },
+   {
+    "n": 38,
+    "g": "scaryface"
+   },
+   {
+    "n": 47,
+    "g": "crunch"
+   },
+   {
+    "n": 56,
+    "g": "earthquake"
+   },
+   {
+    "n": 65,
+    "g": "hyperbeam"
+   }
+  ],
+  "tyranitar": [
+   {
+    "n": 1,
+    "g": "bite"
+   },
+   {
+    "n": 1,
+    "g": "leer"
+   },
+   {
+    "n": 1,
+    "g": "sandstorm"
+   },
+   {
+    "n": 1,
+    "g": "screech"
+   },
+   {
+    "n": 22,
+    "g": "rockslide"
+   },
+   {
+    "n": 29,
+    "g": "thrash"
+   },
+   {
+    "n": 38,
+    "g": "scaryface"
+   },
+   {
+    "n": 47,
+    "g": "crunch"
+   },
+   {
+    "n": 61,
+    "g": "earthquake"
+   },
+   {
+    "n": 75,
+    "g": "hyperbeam"
+   }
+  ],
+  "lugia": [
+   {
+    "n": 1,
+    "g": "aeroblast"
+   },
+   {
+    "n": 11,
+    "g": "safeguard"
+   },
+   {
+    "n": 22,
+    "g": "gust"
+   },
+   {
+    "n": 33,
+    "g": "recover"
+   },
+   {
+    "n": 44,
+    "g": "hydropump"
+   },
+   {
+    "n": 55,
+    "g": "raindance"
+   },
+   {
+    "n": 66,
+    "g": "swift"
+   },
+   {
+    "n": 77,
+    "g": "whirlwind"
+   },
+   {
+    "n": 88,
+    "g": "ancientpower"
+   },
+   {
+    "n": 99,
+    "g": "futuresight"
+   }
+  ],
+  "hooh": [
+   {
+    "n": 1,
+    "g": "sacredfire"
+   },
+   {
+    "n": 11,
+    "g": "safeguard"
+   },
+   {
+    "n": 22,
+    "g": "gust"
+   },
+   {
+    "n": 33,
+    "g": "recover"
+   },
+   {
+    "n": 44,
+    "g": "fireblast"
+   },
+   {
+    "n": 55,
+    "g": "sunnyday"
+   },
+   {
+    "n": 66,
+    "g": "swift"
+   },
+   {
+    "n": 77,
+    "g": "whirlwind"
+   },
+   {
+    "n": 88,
+    "g": "ancientpower"
+   },
+   {
+    "n": 99,
+    "g": "futuresight"
+   }
+  ],
+  "celebi": [
+   {
+    "n": 1,
+    "g": "confusion"
+   },
+   {
+    "n": 1,
+    "g": "healbell"
+   },
+   {
+    "n": 1,
+    "g": "leechseed"
+   },
+   {
+    "n": 1,
+    "g": "recover"
+   },
+   {
+    "n": 10,
+    "g": "safeguard"
+   },
+   {
+    "n": 20,
+    "g": "ancientpower"
+   },
+   {
+    "n": 30,
+    "g": "futuresight"
+   },
+   {
+    "n": 40,
+    "g": "batonpass"
+   },
+   {
+    "n": 50,
+    "g": "perishsong"
+   }
+  ]
+ }
+}

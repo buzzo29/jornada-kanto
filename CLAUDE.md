@@ -418,6 +418,52 @@ de golpes.
   é a maior variação de dificuldade desde o golpe moribundo. Se incomodar, o parâmetro a mexer é a
   chance da autodestruição (`CHANCE_AUTODESTRUICAO`), que é a que mais aparece.
 
+## Golpes por nível (data/golpes.json) — cadastrada, ainda NÃO usada pelo motor
+
+Base criada em 09/09/2026 pra uma feature futura: o treinador escolher quais golpes o pokémon
+leva. **Nada no motor lê este arquivo ainda** — ele foi pedido como cadastro, e é isso que ele é.
+
+- **250 espécies, 2.052 entradas (espécie × nível), 228 golpes distintos.** Cada golpe traz nome,
+  tipo, poder, PP e precisão **como eram na Gen 2**.
+- **A CATEGORIA físico/especial NÃO está no arquivo, e é de propósito.** Neste motor quem decide
+  isso é o TIPO do golpe (`isSpecialType`, regra da Gen 1), não o golpe. Gravar a categoria moderna
+  do Showdown (que é por golpe, da Gen 4 em diante) criaria uma segunda fonte de verdade
+  discordando do motor. Golpe de status se identifica por `poder: 0`.
+- **A fonte é o Pokémon Showdown, com os mods gen8→gen2 aplicados** — o MESMO método que
+  reconstruiu o `GEN2_SPECIAL` de Johto. Sem a cadeia de mods o arquivo sairia com os valores de
+  hoje: o Bite viria NORMAL (virou Sombrio na Gen 2), o Tackle com 40/100 em vez de 35/95 e o
+  Crabhammer com 100 em vez de 90. `tools/test-golpes.js` tranca justamente esses quatro.
+  O arquivo moderno do Showdown **não serve sozinho**: ele foi podado e só tem da Gen 3 pra frente.
+  O aprendizado da Gen 1/2 vive em `data/mods/gen2/learnsets.ts`, no GitHub deles.
+- **O CURSE FICA FORA DO TYPE_CHART, e está certo:** na Gen 2 ele era literalmente SEM TIPO
+  (`???`) — só virou Fantasma na Gen 5. Seis espécies o aprendem (Slowpoke, Slowbro, Slowking e a
+  linha do Gastly). Quem for montar a tela de golpes precisa decidir o que fazer com ele.
+- **O `ratata` é o único id que não bate com o da fonte** (o jogo escreve com um T só desde
+  sempre). O teste confere que ele veio: se o mapa do gerador se perder, é o primeiro a sair vazio.
+- **A BASE AUDITOU AS LISTAS FEITAS À MÃO, e achou nove divergências.** As seis listas de golpe
+  especial foram conferidas move a move no Bulbapedia em 04/09/2026; agora existe uma segunda
+  fonte pra confrontar. **Autodestruição (9/9) e Recuperar (10/10) batem 100%.** O resto:
+
+  | divergência | o que a Gen 2 diz | veredito |
+  |---|---|---|
+  | Disable: **Igglybuff** | o bebê não aprende anulação; quem aprende é a Jigglypuff, no nível 14 | provável erro da lista |
+  | Drenagem: **Exeggcute, Exeggutor** | o que eles têm é Leech Seed | provável erro — foi a MESMA razão que já tirou o Bulbasaur |
+  | Metrônomo: **Cleffa, Snubbull** | nenhum aprende por nível (a Clefairy aprende no 34) | **de propósito**: os 4 do metrônomo foram PEDIDOS, não tirados do aprendizado |
+  | Sono: **Yanma, Misdreavus** | não aprendem Hipnose na Gen 2 (o Yanma só a partir da Gen 3) | provável erro da lista |
+  | Sono: **Vileplume, Bellossom** | como Vileplume/Bellossom só têm quatro golpes, todos no nível 1 | **discutível**: eles HERDAM o Pó do Sono do Gloom, que aprende no 18 |
+
+  As nove ficam FIXADAS no teste: mudar qualquer um dos dois lados é barulhento, pra ninguém
+  consertar a lista e esquecer a base (ou o contrário). **Nada foi corrigido no jogo** — o pedido
+  era cadastrar, não mexer.
+- **O arquivo fica em `data/`, e a raiz do repo é publicada** — quando um deploy subir, ele fica em
+  `jornadakanto.com/data/golpes.json`. Isso é conveniente de propósito: são 117 KB, e o
+  `index.html` já tem 1,17 MB. Quando a feature existir, o caminho barato é o cliente BUSCAR o
+  arquivo em vez de inchar o HTML — e aí a base não precisa virar a sexta tabela duplicada.
+- **Falta o nome em PORTUGUÊS dos 228 golpes.** Hoje o arquivo traz só o nome canônico em inglês.
+  Os nomes PT que o jogo já usa (`MOVE_BY_TYPE`, `MOVE_OVERRIDES`) são por TIPO, não por golpe,
+  então não dá pra casar automático — é uma passada à parte.
+- `node tools/gerar-golpes.js` regenera o arquivo (o cabeçalho dele traz os `curl` das fontes).
+
 ## Log de batalha
 
 - O matchup carrega **`golpes`**: o diário do confronto, um registro por golpe na ordem real,
