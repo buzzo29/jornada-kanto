@@ -4159,15 +4159,48 @@ exports.activateShinyBonus = onCall(async (request) => {
   return { expiresAt };
 });
 
+/* APAGAR UMA MENSAGEM NÃO PODE CUSTAR UM ITEM. A notificação de campeão de liga É o cupom do bônus
+   shiny -- ela é a única forma de ativá-lo --, então apagá-la apagava o item da mochila junto.
+   Reportado em 10/09/2026: "deletei a notificação e o bônus shiny sumiu da mochila".
+   Agora o prêmio é RESGATADO pro armazém (`inventario.bonus_shiny`) antes de a mensagem sumir, e
+   o jogador ativa por lá -- o mesmo lugar de onde sai o bônus comprado na loja, então não houve
+   caminho novo pra manter.
+   SÓ O DA LIGA precisa disto: o prêmio da ELITE mora no SAVE (`eliteShinyGranted` sem
+   `eliteShinyUsed`) e já sobrevivia a apagar a notificação; e o DOCE RARO nunca esteve em risco --
+   ele é um contador no documento da conta, escrito pelo servidor, e notificação nenhuma o carrega.
+   UMA CONSULTA SÓ, e não um get por id: o caso que fez o apagar em lote existir foi o de 21
+   notificações iguais, e 21 leituras pra uma ação que é uma só seria trocar um custo por outro. */
+async function resgatarPremiosDasNotificacoes(uid, ids){
+  const alvo = new Set((ids || []).map(String));
+  if(!alvo.size) return 0;
+  const coll = db.collection('users').doc(uid).collection('notifications');
+  const snap = await coll.where('type','==','league_champion').get();
+  let cupons = 0;
+  snap.docs.forEach(d => {
+    if(!alvo.has(String(d.id))) return;
+    const meta = (d.data() || {}).meta || {};
+    if(!meta.activated) cupons++;
+  });
+  if(cupons > 0){
+    await db.collection('users').doc(uid).set(
+      { inventario: { bonus_shiny: admin.firestore.FieldValue.increment(cupons) } }, { merge:true });
+  }
+  return cupons;
+}
+
 // apaga UMA notificação específica -- a pessoa só pode apagar as próprias (o UID vem do token de
 // autenticação, não do que o cliente manda, então não dá pra apagar notificação de outra conta)
 exports.deleteNotification = onCall(async (request) => {
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   const uid = request.auth.uid;
-  const { notificationId } = request.data || {};
+  /* `descartar` é o botão EXCLUIR da mochila: ali o jogador está jogando o item fora de propósito,
+     e resgatá-lo pro armazém faria o botão não fazer nada. Apagar a MENSAGEM (o outro caminho)
+     resgata; jogar o ITEM fora, não. */
+  const { notificationId, descartar } = request.data || {};
   if(!notificationId){ throw new HttpsError('invalid-argument', 'Notificação não informada.'); }
+  const resgatados = descartar ? 0 : await resgatarPremiosDasNotificacoes(uid, [notificationId]);
   await db.collection('users').doc(uid).collection('notifications').doc(String(notificationId)).delete();
-  return { ok: true };
+  return { ok: true, resgatados };
 });
 
 /* Apagar em LOTE. Dava pra chamar o deleteNotification N vezes do cliente, mas o caso que fez
@@ -4181,11 +4214,12 @@ exports.deleteNotifications = onCall(async (request) => {
   const { ids } = request.data || {};
   if(!Array.isArray(ids) || ids.length===0){ throw new HttpsError('invalid-argument', 'Nenhuma notificação informada.'); }
   if(ids.length > 400){ throw new HttpsError('invalid-argument', 'Notificações demais de uma vez.'); }
+  const resgatados = await resgatarPremiosDasNotificacoes(uid, ids);
   const coll = db.collection('users').doc(uid).collection('notifications');
   const batch = db.batch();
   for(const id of ids){ batch.delete(coll.doc(String(id))); }
   await batch.commit();
-  return { ok: true, deleted: ids.length };
+  return { ok: true, deleted: ids.length, resgatados };
 });
 
 /* =====================================================================

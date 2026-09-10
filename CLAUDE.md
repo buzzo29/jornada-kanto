@@ -845,6 +845,16 @@ as três contam a mesma coisa, e enquanto eram montadas em separado já tinham d
 no tamanho da fonte. Os blocos são `golpe-cab` (o sprite num ladrilho + a frase) e
 `cartaoDeGolpe` (nome do golpe, selo do tipo, e o poder separado por um risco).
 
+- **O CARD CLICÁVEL É O MESMO CARD DO POKÉMON da tela que mostra a ordem do time** (10/09/2026,
+  a pedido): borda de 2px, cantos de 5px, sombra leve e a faixa da cor do tipo — os quatro valores
+  do `.team-grid-card`, conferidos no navegador.
+  **QUEM CARREGA A FAIXA É O BOTÃO, não o cartão de dentro**, e essa é a diferença que se vê. Ela
+  nasceu no cartão e ali ficava DENTRO da moldura de 3px do botão comum: lia-se como um risco solto
+  no meio do card em vez da borda dele. O botão comum é pesado de propósito — ele é um botão de
+  AÇÃO; aqui a lista é de CARDS que por acaso se clicam, e o peso brigava com isso.
+  O estado **selecionado** continua sendo o amarelo do `.btn.selected`, com o 1º/2º na coluna do
+  número — na tela de captura a prioridade é enxergar o que já foi escolhido, e ali a faixa some um
+  pouco contra o amarelo. É aceito.
 - **O RISQUINHO DA ESQUERDA é da cor do TIPO do golpe** (09/09/2026, a pedido), e é o mesmo desenho
   do card de pokémon da tela de ordenar o time (`.team-grid-card`): borda de 5px com a cor vindo
   **inline**, porque ela muda de card pra card. Ele repete a informação do selo de propósito — o
@@ -2851,9 +2861,23 @@ verdade, cai no game over, e o teste confere que a trava soltou dos dois lados.
   deixaram de fazer é guardar e ativar. Um prêmio guardado em três telas diferentes era o motivo de
   ninguém achar o que tinha. As funções `activateShinyBonus` e `activateEliteShiny` do cliente foram
   removidas — quem ativa é o `usarItem`, e ele fala direto com as mesmas Cloud Functions.
-  **Cuidado que continua valendo:** apagar a notificação de campeão apaga o cupom, porque é ela que
-  o servidor lê. É o mesmo comportamento de antes, e é por isso que a confirmação de apagar
-  notificação nomeia as que têm prêmio dentro.
+  **APAGAR A MENSAGEM DEIXOU DE CUSTAR O ITEM (10/09/2026).** Até aqui a notificação de campeão de
+  liga ERA o cupom, e apagá-la apagava o bônus shiny da mochila junto — reportado exatamente assim.
+  Hoje o servidor **resgata o prêmio pro armazém** (`inventario.bonus_shiny`) antes de a mensagem
+  sumir, nos dois caminhos (avulso e em lote), e o jogador ativa pela Mochila — o mesmo lugar de
+  onde sai o bônus comprado na loja, então não houve caminho novo pra manter.
+  **SÓ O DA LIGA precisava disso**, e vale registrar o que NÃO estava em risco: o **Doce Raro** é um
+  contador no documento da conta e notificação nenhuma o carrega; e o prêmio da **Elite** mora no
+  SAVE (`eliteShinyGranted` sem `eliteShinyUsed`) e já sobrevivia a apagar a notificação. Resgatar
+  o da Elite seria contar o mesmo prêmio duas vezes.
+  **O botão EXCLUIR da mochila manda `descartar:true`** e NÃO resgata: ali o jogador está jogando o
+  item fora de propósito, e devolvê-lo ao armazém faria o botão não fazer nada. Ele também estava
+  **quebrado desde sempre** — mandava `{id}` onde o servidor lê `{notificationId}`, então falhava
+  com "Notificação não informada". Os dois defeitos viviam na mesma chamada.
+  **O aviso da confirmação deixou de ser de PERDA** e passou a dizer PRA ONDE o prêmio vai. Ele
+  fica: foi ver o item sumir da mochila que gerou o relato, e um aviso que assusta sem motivo seria
+  tão ruim quanto nenhum.
+  `tools/test-notif-premio.js` tranca tudo isso no servidor, com o fake-firestore.
 - **A pilha:** cinco doces são **UM** slot com "5x", não cinco slots.
 - **A grade tem piso de 12 slots e mora dentro de uma `.box`**, como a da Pokédex — e o slot tem a
   MESMA medida da célula de lá (52px, quadrado). Solta sobre o fundo escuro da página, o slot vazio

@@ -919,13 +919,24 @@
   /* Os golpes que ele JÁ tem, na tela de troca: o mesmo cartão dentro de um botão. O .btn traz
      centralização e fonte próprias, então o cartão precisa desligar as duas -- senão o nome sai
      no meio e o número de poder herda o tamanho do botão. */
-  .btn.golpe-opcao{text-align:left;padding:6px 8px;font-size:1rem;}
-  /* Dentro do botao de opcao o cartao perde a moldura (quem molda e o proprio botao), MENOS o
-     risquinho do tipo: o `border:none` zerava ele junto, e ai a cor so aparecia no cartao do
-     cabecalho. A cor continua vindo inline; aqui so voltam a largura e o estilo. */
+  /* O CARD DE GOLPE CLICÁVEL é o mesmo card do POKÉMON na tela que mostra a ordem do time
+     (`.team-grid-card`), a pedido: borda de 2px, cantos de 5px, sombra leve e a FAIXA DA COR DO
+     TIPO na borda esquerda.
+     QUEM CARREGA A FAIXA É O BOTÃO, não o cartão de dentro -- e essa é a diferença que se vê. Ela
+     já esteve no cartão, e ali ficava DENTRO da moldura de 3px do botão comum: lia-se como um
+     risco solto no meio do card em vez da borda dele. A cor vem inline, como no card do time,
+     porque muda de golpe pra golpe.
+     O botão comum é 3px/raio 3/sombra 4px -- pesado de propósito, ele é um botão de ação. Aqui a
+     lista é de CARDS que por acaso se clica, e o peso do botão brigava com isso. */
+  .btn.golpe-opcao{
+    text-align:left;padding:6px 8px;font-size:1rem;
+    border-width:2px;border-left-width:5px;border-radius:5px;
+    box-shadow:2px 2px 0 rgba(0,0,0,.12);
+  }
+  .btn.golpe-opcao:active:not(:disabled){box-shadow:1px 1px 0 rgba(0,0,0,.12);}
+  /* O cartão de dentro fica sem moldura NENHUMA: quem molda agora é o botão, faixa inclusive. */
   .btn.golpe-opcao .golpe-cartao{
-    margin-top:0;border:none;border-left-style:solid;border-left-width:5px;
-    background:transparent !important;
+    margin-top:0;border:none;background:transparent !important;padding:4px 2px;
   }
   .btn.golpe-opcao .golpe-cartao-nome, .btn.golpe-opcao .golpe-cartao-poder b{color:var(--ink);}
   .golpes-do-time{margin-top:2px;}
@@ -4614,12 +4625,24 @@ async function openNotificationsScreen(){
 // pessoa perder o item -- e no caso do bônus shiny não existe outra porta, ele vive só aqui. Por isso
 // essas pedem confirmação; as outras continuam apagando na hora, sem atrito.
 // Devolve null se for só um aviso, ou {titulo, aviso} descrevendo o que se perde se apagar.
+/* O QUE O SERVIDOR RESGATOU ENTRA NA CÓPIA EM MEMÓRIA. Sem isto a mochila só mostraria o bônus
+   depois de recarregar a conta -- e o jogador acabou de ver a notificação sumir, então é
+   exatamente o momento em que ele vai conferir se o item está lá. */
+function contarBonusResgatado(quantos){
+  if(!(quantos > 0)) return;
+  game.inventario = game.inventario || {};
+  game.inventario.bonus_shiny = (game.inventario.bonus_shiny || 0) + quantos;
+}
 function notificationPendingReward(n){
   if(!n) return null;
   if(n.type==='league_champion' && !(n.meta && n.meta.activated)){
+    /* O AVISO DEIXOU DE SER DE PERDA em 10/09/2026: apagar a mensagem manda o bônus pra Mochila em
+       vez de destruí-lo (ver resgatarPremiosDasNotificacoes no servidor). A frase FICA porque o
+       jogador precisa saber PRA ONDE o prêmio foi -- foi justamente vê-lo sumir da mochila que
+       gerou o relato. Um aviso que assusta sem motivo seria tão ruim quanto nenhum. */
     return {
       titulo:'Bônus Shiny ainda não ativado',
-      aviso:'Essa é a <strong>única</strong> forma de ativar a sua hora de chance aumentada de shiny. Se apagar, o bônus é perdido pra sempre.'
+      aviso:'Apagar a mensagem <strong>não perde</strong> o bônus: ele vai pra sua <strong>Mochila</strong>, e você ativa por lá quando quiser.'
     };
   }
   if(n.type==='mewtwo_loan_unlocked'){
@@ -4661,7 +4684,8 @@ async function performDeleteNotification(notificationId){
   game.notificationsList = (game.notificationsList||[]).filter(n=>n.id!==notificationId);
   render();
   try{
-    await functionsClient.httpsCallable('deleteNotification')({ notificationId });
+    const r = await functionsClient.httpsCallable('deleteNotification')({ notificationId });
+    contarBonusResgatado(r && r.data && r.data.resgatados);
   } catch(e){
     console.error('Erro ao apagar notificação:', e);
     game.notificationsList = previousList;
@@ -7640,7 +7664,7 @@ function renderEscolhaDeAtaques(){
   <div class="box">
     ${disp.map(id=>{
       const i = marcados.indexOf(id);
-      return `<button class="btn golpe-opcao ${i>=0?'selected':''}" onclick="marcarAtaque('${escJs(id)}')">
+      return `<button class="btn golpe-opcao ${i>=0?'selected':''}" style="border-left-color:${corDoGolpe(id)}" onclick="marcarAtaque('${escJs(id)}')">
         <span class="mont-num">${i>=0 ? (i+1)+'º' : ''}</span>
         ${cartaoDeGolpe(id, true)}
       </button>`;
@@ -7705,7 +7729,7 @@ function renderAprenderAtaque(){
     <p class="golpe-pergunta">Escolha qual será substituído</p>
   </div>
   <div class="box">
-    ${p.ataques.filter(id => GOLPES[id]).map(id=>`<button class="btn golpe-opcao" onclick="responderAprendizado('${escJs(id)}')">
+    ${p.ataques.filter(id => GOLPES[id]).map(id=>`<button class="btn golpe-opcao" style="border-left-color:${corDoGolpe(id)}" onclick="responderAprendizado('${escJs(id)}')">
       ${cartaoDeGolpe(id, true)}
     </button>`).join('')}
   </div>
@@ -15350,6 +15374,9 @@ function cartaoDeGolpe(id, comTipo){
 /* O tipo do golpe do cabeçalho, embaixo do cartão. Já disse "Tipo: Sombrio" e hoje diz só
    "SOMBRIO": o rótulo era redundante ao lado de um selo que o jogo inteiro já usa pra tipo. */
 function seloDoTipoDoGolpe(id){ return typePill(GOLPES[id][0]); }
+/* A COR DA FAIXA de um golpe. Vive à parte porque quem a usa é o BOTÃO (por fora do cartão) e o
+   próprio cartão -- e as duas têm que ser a mesma cor. */
+function corDoGolpe(id){ return (GOLPES[id] && TYPE_COLORS[GOLPES[id][0]]) || 'var(--box-border)'; }
 /* O selo colorido com o nome do golpe dentro -- a cor já entrega o tipo. */
 function seloDeGolpe(nome, tipo){
   if(!nome) return '';
@@ -16072,7 +16099,8 @@ async function confirmarApagarSelecionadas(){
   game.notifModoSelecao = false;
   render();
   try{
-    await functionsClient.httpsCallable('deleteNotifications')({ ids: alvo.ids });
+    const r = await functionsClient.httpsCallable('deleteNotifications')({ ids: alvo.ids });
+    contarBonusResgatado(r && r.data && r.data.resgatados);
   } catch(e){
     console.error('Erro ao apagar notificações:', e);
     game.notificationsList = anterior;
@@ -18752,7 +18780,12 @@ async function excluirItem(id){
   if(!fonte) return;
   game.inventarioUsando = true; render();
   try{
-    await functionsClient.httpsCallable('deleteNotification')({ id: fonte.id });
+    /* O CAMPO É `notificationId`, e aqui ia `id`: o servidor recusava com "Notificação não
+       informada" e o botão Excluir da mochila nunca funcionou. Achado em 10/09/2026, junto do
+       resgate do cupom -- os dois vivem nesta mesma chamada.
+       `descartar` diz que este é o botão de JOGAR FORA: sem ele, o resgate devolveria o bônus pro
+       armazém e o botão viraria um laço que não descarta nada. */
+    await functionsClient.httpsCallable('deleteNotification')({ notificationId: fonte.id, descartar: true });
     game.inventarioNotificacoes = (game.inventarioNotificacoes||[]).filter(n => n.id !== fonte.id);
     const restantes = pilhasDoInventario();
     if(!restantes.some(p => p.item === id)) game.inventarioSel = restantes.length ? restantes[0].item : null;

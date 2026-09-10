@@ -139,6 +139,14 @@ console.log('\n=== A TELA DA CAPTURA ===');
      que e informacao de tabela e nao ajuda a escolher entre golpes que ele JA tem. */
   ok('e o "Nivel N" saiu de cada card', html.indexOf('Nível ') < 0);
   ok('e a frase e a pedida', html.indexOf('o resto será esquecido') >= 0);
+  /* O CARD CLICAVEL E O MESMO DO POKEMON na tela que mostra a ordem do time: a FAIXA da cor do
+     tipo fica na borda esquerda do BOTAO, nao do cartao de dentro. Ela ja esteve no cartao, e ali
+     ficava DENTRO da moldura do botao -- lia-se como um risco solto no meio do card. */
+  ok('cada opcao carrega a faixa da cor do tipo no BOTAO',
+     disp.every(id => html.indexOf('style="border-left-color:' + S.corDoGolpe(id) + '"') >= 0),
+     disp.map(id => S.nomeDoAtaque(id) + '=' + S.corDoGolpe(id)).join(' '));
+  ok('e a cor e a MESMA do selo do tipo daquele golpe',
+     disp.every(id => S.corDoGolpe(id) === S.TYPE_COLORS[S.GOLPES[id][0]]));
   ok('o confirmar nasce desabilitado', /success[^>]*disabled/.test(html));
 
   /* O TETO SAI DA CONSTANTE, nao de um numero repetido aqui: ele ja foi 2 e virou 3 em
