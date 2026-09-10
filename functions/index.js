@@ -1709,11 +1709,23 @@ function doExchange(active, enemy, rng, diario){
     const pct = 0.05 + rng()*0.10;
     survivor.hp = Math.max(1, Math.min(survivorHpBefore, Math.round(survivor.maxHp * pct)));
     /* O desempate ressuscita quem sobrou DEPOIS dos dois golpes. Sem corrigir o diário, a última
-       linha do log diria 0 de HP e a barra do mesmo cartão mostraria outro número. */
+       linha do log diria 0 de HP e a barra do mesmo cartão mostraria outro número.
+       QUANDO A CORREÇÃO ZERA O GOLPE, ele vira a linha do DESEMPATE em vez de um golpe de dano 0
+       que a tela joga fora. Era isso que estava por trás do relato de 09/09/2026 ("o Gyarados
+       atacou 2x seguidas"): o golpe que derrubou quem ressuscitou sumia, e os dois golpes do outro
+       lado ficavam colados, sem nada entre eles. Acontece quando o sobrevivente volta com a MESMA
+       vida com que entrou na troca -- 0,1% dos confrontos.
+       O SOBREVIVENTE é o ALVO desse golpe, então a frase não precisa de campo novo pra saber quem
+       ficou de pé: quem apanhou é quem sobrou.
+       O `dz` continua marcando a linha corrigida mesmo quando ela NÃO zera -- ali ela é um golpe
+       comum de dano menor, e se lê sozinha. */
     if(diario){
       const linha = (survivor === second) ? diario[diario.length-2] : diario[diario.length-1];
       const antes = (survivor === second) ? secondHpBefore : firstHpBefore;
-      if(linha){ linha.hp = survivor.hp; linha.d = antes - survivor.hp; linha.dz = 1; }
+      if(linha){
+        linha.hp = survivor.hp; linha.d = antes - survivor.hp; linha.dz = 1;
+        if(!(linha.d > 0)) linha.x = 'desempate';
+      }
     }
   }
 }

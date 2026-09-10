@@ -1451,6 +1451,77 @@ function comItem(instancia, item){
      JSON.stringify([S.avisoDoConfronto(m,0), S.avisoDoConfronto(m,1)]));
 })();
 
+console.log('\n=== O DESEMPATE TEM LINHA PROPRIA ===');
+{
+  /* Reportado em 09/09/2026 com print: num Raticate x Gyarados o Gyarados aparecia atacando DUAS
+     VEZES SEGUIDAS, sem nada entre os dois golpes.
+     A CAUSA: quando os dois caem na mesma troca, o desempate ressuscita um deles -- e o motor apara
+     a linha do golpe que o derrubou pra a soma do log fechar com a barra do cartao. Quando o
+     sobrevivente volta com a MESMA vida com que entrou na troca, essa linha vai a ZERO e some da
+     tela ("golpe de dano zero nao e golpe"), deixando os dois golpes do outro lado colados.
+     Hoje ela vira a linha do DESEMPATE, no molde da Faixa: um passo que nao move barra e uma frase
+     que conta o que aconteceu. */
+  const ids = Object.keys(S.SPECIES);
+  const rnd = n => Math.floor(Math.random() * n);
+  const semTag = h => String(h||'').replace(/<[^>]*>/g,'').replace(/\s+/g,' ').trim();
+  let conf = 0, comDesempate = 0, naTela = 0, frases = 0, colados = 0, exemplo = '';
+  for(let v = 0; v < 900; v++){
+    const mk = () => Array.from({length:6}, () => {
+      const p = S.createInstance(ids[rnd(ids.length)], 25 + rnd(30));
+      p.ataques = S.ataquesDisponiveis(p.speciesId, p.level).slice(0, S.MAX_GOLPES);
+      return p;
+    });
+    let r; try{ r = S.simulateGymBattle(mk(), mk()); }catch(e){ continue; }
+    (r.matchups || []).forEach(m => {
+      conf++;
+      const seq = S.sequenciaDoConfronto(m);
+      /* So da pra exigir a linha onde o confronto e mostrado pelo DIARIO REAL. Passando do teto de
+        golpes a reconstrucao entra e substitui a lista inteira -- ela nao conhece desempate nenhum,
+        do mesmo jeito que nao conhece tapa nem cura. */
+      const daPraMostrar = (m.golpes || []).filter(g => !g.x && g.d > 0).length <= S.TETO_GOLPES;
+      if((m.golpes || []).some(g => g.x === 'desempate') && daPraMostrar){
+        comDesempate++;
+        if(seq.some(g => g.x === 'desempate')) naTela++;
+        if(/os dois ca\S+ram na mesma troca/.test(semTag(S.passosHtml(m)))) frases++;
+      }
+      /* O INVARIANTE do relato: no caminho do DIARIO REAL, ninguem ataca duas vezes seguidas.
+         Ficam de fora o SONO (as trocas livres SAO isso, e a frase do sono explica) e a
+         RECONSTRUCAO (ela interpola HP e nao conhece a ordem real). */
+      const dano = (m.golpes || []).filter(g => !g.x && g.d > 0).length;
+      if(dano > S.TETO_GOLPES) return;
+      if((m.golpes || []).some(g => g.x === 'sono')) return;
+      /* A ADJACENCIA E NO LOG RENDERIZADO: as linhas ESPECIAIS contam como separador, porque e
+         exatamente isso que elas fazem na tela -- a do desempate entra entre os dois golpes e
+         explica por que o primeiro nao derrubou ninguem. O que nao pode e dois GOLPES do mesmo
+         lado com NADA entre eles.
+         Ficam de fora da lista so as entradas que o passosHtml nao desenha: o segundo lado da
+         explosao e da drenagem, e os tapas 2..N, que viram uma linha so. */
+      const linhas = [];
+      seq.forEach(g => {
+        if(g.x === 'boomself' || g.x === 'absorbdano') return;
+        if(!g.x && !(g.d > 0)) return;
+        const u = linhas[linhas.length - 1];
+        if(g.t > 1 && u && u.q === g.q && u.tn === g.tn){ u.d += g.d; return; }
+        linhas.push(Object.assign({}, g));
+      });
+      for(let i = 1; i < linhas.length; i++){
+        if(linhas[i].x || linhas[i-1].x) continue;          // linha especial separa
+        if(linhas[i].q !== linhas[i-1].q) continue;
+        colados++;
+        if(!exemplo) exemplo = m.player + ' ' + m.playerHpBefore + '->' + m.playerHpAfter +
+                               ' x ' + m.enemy + ' ' + m.enemyHpBefore + '->' + m.enemyHpAfter;
+        break;
+      }
+    });
+  }
+  ok('a amostra e grande o bastante', conf > 4000, conf + ' confrontos');
+  ok('o desempate aparece o bastante pra medir', comDesempate >= 5, comDesempate + ' casos');
+  ok('e ele NAO some da tela', naTela === comDesempate, naTela + ' de ' + comDesempate);
+  ok('e vira uma frase no log', frases === comDesempate, frases + ' de ' + comDesempate);
+  ok('NINGUEM ataca duas vezes seguidas no diario real', colados === 0,
+     colados + ' casos' + (exemplo ? '  ex: ' + exemplo : ''));
+}
+
 console.log('\n=== O NPC LUTA COM O MOVESET DELE ===');
 {
   /* Reportado em 09/09/2026: "os pokemons dos adversarios estao usando ataques que nao estao no

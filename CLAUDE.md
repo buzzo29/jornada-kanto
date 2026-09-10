@@ -845,6 +845,18 @@ as três contam a mesma coisa, e enquanto eram montadas em separado já tinham d
 no tamanho da fonte. Os blocos são `golpe-cab` (o sprite num ladrilho + a frase) e
 `cartaoDeGolpe` (nome do golpe, selo do tipo, e o poder separado por um risco).
 
+- **O RISQUINHO DA ESQUERDA é da cor do TIPO do golpe** (09/09/2026, a pedido), e é o mesmo desenho
+  do card de pokémon da tela de ordenar o time (`.team-grid-card`): borda de 5px com a cor vindo
+  **inline**, porque ela muda de card pra card. Ele repete a informação do selo de propósito — o
+  selo se lê, o risquinho se **reconhece** de relance, e é ele que separa dois cards antes da
+  leitura começar.
+  **Armadilha:** dentro do botão de opção existe `.btn.golpe-opcao .golpe-cartao{border:none}`, que
+  zerava o risquinho junto — a cor só aparecia no cartão do cabeçalho. A regra devolve a largura e
+  o estilo da borda esquerda; a cor continua inline.
+- **A FONTE DO NOME DO GOLPE É A MESMA DO NOME DO POKÉMON NO QUADRO DE BATALHA** (`.fighter`,
+  **.85rem**), a pedido. Era .95rem. As duas telas são a mesma leitura — um nome curto em caixa
+  alta que se lê de relance — e tamanhos diferentes pra a mesma coisa é o que faz a interface
+  parecer montada por partes.
 - **QUEM É COLORIDO É O SELO DO TIPO, e só ele.** O cartão já teve um ladrilho com emoji do tipo à
   esquerda e o fundo inteiro tingido; as duas coisas saíram no mesmo dia em que entraram — com o
   cartão tingido E o selo colorido, a mesma cor aparecia duas vezes na mesma linha e nenhuma se
@@ -1243,6 +1255,51 @@ Geodude que terminou com **14**, e a linha do Ivysaur vinha **depois** da que o 
   atacando com a barra em zero; quem termina **vivo** pode -- é o par do moribundo, os dois golpes
   são do mesmo instante. Conferido que, tirando a ressalva do `passosVisiveis`, ele acusa **194
   cadáveres em 1.277 confrontos**.
+
+### O DESEMPATE GANHOU LINHA: o golpe que sumia e deixava dois colados (09/09/2026)
+
+Reportado com print: num **Raticate × Gyarados** o Gyarados aparecia atacando **duas vezes**
+seguidas, sem nada entre os dois golpes.
+
+- **A causa é o desempate por morte súbita.** Quando os dois caem na mesma troca, um volta com
+  5%-15% da vida — e o motor **apara a linha do golpe que o derrubou** pra a soma do log fechar com
+  a barra do cartão (é o `dz`, que já existia). Quando o sobrevivente volta com a MESMA vida com
+  que entrou na troca, essa linha vai a **ZERO** e some da tela pela regra do "golpe de dano zero
+  não é golpe" — deixando os dois golpes do outro lado colados.
+- **O `dz` estava escrito e NUNCA era lido** — dado morto desde que a correção do desempate nasceu.
+  Era exatamente o gancho que faltava.
+- **Hoje a linha zerada vira `x:'desempate'`**, no molde da Faixa de Foco: um passo que não move
+  barra (a vida do sobrevivente já é a que a linha anterior deixou), uma frase no log e o mesmo
+  aviso no meio da batalha. **O sobrevivente é o ALVO do golpe aparado**, então a frase não precisa
+  de campo novo pra saber quem ficou de pé: quem apanhou é quem sobrou.
+  A frase é *"⚖️ os dois caíram na mesma troca, e Fulano ficou de pé"*.
+- **Medido: 0,1% dos confrontos.** Depois do conserto, **nenhum** confronto mostrado pelo diário
+  real tem dois golpes do mesmo lado colados — antes eram 11 em ~8.400.
+- **AS OUTRAS DUAS CAUSAS DE "dois seguidos" SÃO REGRA, não defeito**, e ficaram: o **sono** (as
+  trocas livres SÃO isso, e a frase dele explica) e a **reconstrução** (ela interpola HP e não
+  conhece a ordem real). Medido no total: 0,9% dos confrontos mostram dois seguidos — 119 do sono,
+  71 da reconstrução e 24 desta causa, que era a única sem explicação na tela.
+- **Na RECONSTRUÇÃO a linha não aparece**, e é o limite conhecido: passando do teto de 3 golpes ela
+  substitui a lista inteira e não conhece desempate nenhum — do mesmo jeito que não conhece cura.
+
+### A PROBABILIDADE DOS GOLPES MÚLTIPLOS ESTÁ CERTA — e o que se vê é o contrário do que parece
+
+Reportado como suspeita: *"está caindo muito mais 5x do que 2x, 3x ou 4x"*. **Medido em 51.159
+golpes múltiplos de batalhas de verdade:**
+
+| | oficial | medido |
+|---|---|---|
+| 2 tapas | 37,5% | **38,69%** |
+| 3 tapas | 37,5% | 37,41% |
+| 4 tapas | 12,5% | 12,24% |
+| 5 tapas | 12,5% | **11,66%** |
+
+O sorteio em si é exato (200.000 sorteios por golpe batem os pesos). O desvio que aparece em
+batalha é **para BAIXO nos 5x**, e tem causa conhecida: **`tn` é quantos tapas ACERTARAM, não
+quantos foram sorteados** — os tapas param quando o alvo cai, então um 5 sorteado vira "3x" na tela
+se o alvo caiu no terceiro. Ou seja, 5x sai **menos** que 12,5%, nunca mais.
+O que engana é a saliência: um 5x são cinco descidas de barra com a frase mudando a cada uma, e um
+2x acaba em dois piscares.
 
 ### O golpe fantasma na abertura do confronto (09/09/2026)
 

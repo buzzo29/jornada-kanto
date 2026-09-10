@@ -878,13 +878,21 @@
   /* O CARTÃO: ícone do tipo, nome do golpe, e o poder separado por um risco. O poder fica à
      direita e não embaixo do nome porque é o número que se compara entre dois golpes -- alinhado
      numa coluna, os dois cartões da tela de troca se leem de relance. */
+  /* O RISQUINHO DA ESQUERDA é da cor do TIPO do golpe, e é o mesmo desenho do card de pokémon da
+     tela de ordenar o time (`.team-grid-card`): borda de 5px com a cor vindo inline, porque ela
+     muda de card pra card. Ele repete a informação do selo de propósito -- o selo se lê, o
+     risquinho se reconhece de relance, e é ele que diferencia dois cards antes da leitura. */
   .golpe-cartao{
     display:flex;align-items:center;gap:10px;
     border-radius:10px;padding:8px 10px;margin-top:14px;
     background:rgba(26,26,46,.05);border:2px solid rgba(26,26,46,.12);
+    border-left-width:5px;
   }
+  /* A FONTE É A MESMA DO NOME DO POKÉMON NO QUADRO DE BATALHA (`.fighter`, .85rem): as duas telas
+     são a mesma leitura -- um nome curto em caixa alta que se lê de relance --, e tamanhos
+     diferentes pra a mesma coisa é o que faz a interface parecer montada por partes. */
   .golpe-cartao-nome{
-    flex:1;min-width:0;font-weight:800;font-size:.95rem;line-height:1.15;
+    flex:1;min-width:0;font-weight:800;font-size:.85rem;line-height:1.15;
     text-transform:uppercase;color:var(--ink);overflow-wrap:anywhere;
   }
   /* O selo do tipo DENTRO do cartão fica EMBAIXO do nome, em linha própria: ao lado dele, o selo
@@ -912,7 +920,13 @@
      centralização e fonte próprias, então o cartão precisa desligar as duas -- senão o nome sai
      no meio e o número de poder herda o tamanho do botão. */
   .btn.golpe-opcao{text-align:left;padding:6px 8px;font-size:1rem;}
-  .btn.golpe-opcao .golpe-cartao{margin-top:0;border:none;background:transparent !important;}
+  /* Dentro do botao de opcao o cartao perde a moldura (quem molda e o proprio botao), MENOS o
+     risquinho do tipo: o `border:none` zerava ele junto, e ai a cor so aparecia no cartao do
+     cabecalho. A cor continua vindo inline; aqui so voltam a largura e o estilo. */
+  .btn.golpe-opcao .golpe-cartao{
+    margin-top:0;border:none;border-left-style:solid;border-left-width:5px;
+    background:transparent !important;
+  }
   .btn.golpe-opcao .golpe-cartao-nome, .btn.golpe-opcao .golpe-cartao-poder b{color:var(--ink);}
   .golpes-do-time{margin-top:2px;}
   .golpes-do-time .type-pill{font-size:.5rem;padding:2px 5px;}
@@ -6588,11 +6602,23 @@ function doExchange(active, enemy, rng, diario){
     const pct = 0.05 + rng()*0.10;
     survivor.hp = Math.max(1, Math.min(survivorHpBefore, Math.round(survivor.maxHp * pct)));
     /* O desempate ressuscita quem sobrou DEPOIS dos dois golpes. Sem corrigir o diário, a última
-       linha do log diria 0 de HP e a barra do mesmo cartão mostraria outro número. */
+       linha do log diria 0 de HP e a barra do mesmo cartão mostraria outro número.
+       QUANDO A CORREÇÃO ZERA O GOLPE, ele vira a linha do DESEMPATE em vez de um golpe de dano 0
+       que a tela joga fora. Era isso que estava por trás do relato de 09/09/2026 ("o Gyarados
+       atacou 2x seguidas"): o golpe que derrubou quem ressuscitou sumia, e os dois golpes do outro
+       lado ficavam colados, sem nada entre eles. Acontece quando o sobrevivente volta com a MESMA
+       vida com que entrou na troca -- 0,1% dos confrontos.
+       O SOBREVIVENTE é o ALVO desse golpe, então a frase não precisa de campo novo pra saber quem
+       ficou de pé: quem apanhou é quem sobrou.
+       O `dz` continua marcando a linha corrigida mesmo quando ela NÃO zera -- ali ela é um golpe
+       comum de dano menor, e se lê sozinha. */
     if(diario){
       const linha = (survivor === second) ? diario[diario.length-2] : diario[diario.length-1];
       const antes = (survivor === second) ? secondHpBefore : firstHpBefore;
-      if(linha){ linha.hp = survivor.hp; linha.d = antes - survivor.hp; linha.dz = 1; }
+      if(linha){
+        linha.hp = survivor.hp; linha.d = antes - survivor.hp; linha.dz = 1;
+        if(!(linha.d > 0)) linha.x = 'desempate';
+      }
     }
   }
 }
@@ -8839,6 +8865,10 @@ function buildAnimatedHitSequence(m){
        explica. Mas ela É um passo -- sem ele, a animação pularia direto do golpe que ia matar pro
        revide, e a pausa que dá tempo de ler a mensagem não existiria. */
     if(g.x === 'faixa') return { side: g.q === 'p' ? 'player' : 'enemy', amount: 0, faixa: true, q: g.q, x: g.x };
+    /* O DESEMPATE também não move barra: a vida do sobrevivente já é a que a linha anterior deixou.
+       Ele É um passo pelo mesmo motivo da Faixa -- sem ele a animação pula do golpe que ia matar
+       direto pro seguinte, e os dois golpes do mesmo lado ficam colados. */
+    if(g.x === 'desempate') return { side: g.q === 'p' ? 'enemy' : 'player', amount: 0, faixa: true, q: g.q, x: g.x };
     /* q = quem BATE e x = o que o passo é (vazio quando é golpe comum). Os dois vêm do diário sem
        tradução porque é deles que sai a frase "Fulano usou GOLPE" -- ver fraseDoGolpeUsado. */
     /* t/tn viajam junto pelo mesmo motivo do q e do x: é deles que sai o "1x" da frase. Ausentes
@@ -15274,7 +15304,7 @@ function sequenciaDoConfronto(m){
    'quem' é sempre quem USOU o golpe; 'alvo' é quem sofreu. Repare que a frase do Disable começa
    pelo ALVO ("Gengar teve seu melhor ataque anulado por Alakazam"): quem interessa ali é o
    prejudicado, e é o nome dele que o jogador procura na tela. */
-const ICONES_ESPECIAIS = { boom:'💥', sono:'😴', disable:'🚫', recover:'💚', absorb:'🌿', faixa:'🎗️' };
+const ICONES_ESPECIAIS = { boom:'💥', sono:'😴', disable:'🚫', recover:'💚', absorb:'🌿', faixa:'🎗️', desempate:'⚖️' };
 /* O TIPO de cada golpe especial, pro selo colorido do log. Vive só no CLIENTE, como o
    MOVE_BY_TYPE: o motor manda o que aconteceu, o cliente escolhe a palavra e a cor -- é o que
    evita mais uma tabela duplicada pra sair de sincronia.
@@ -15309,7 +15339,10 @@ function cartaoDeGolpe(id, comTipo){
      justamente essa a informação que decide a escolha.
      Sai da TABELA, não de uma lista à parte: golpe novo no MULTI_GOLPE já ganha a observação. */
   const obs = MULTI_GOLPE[id] ? '<span class="golpe-cartao-obs">* Golpe repete entre 2-5x</span>' : '';
-  return `<div class="golpe-cartao">
+  /* A cor do risquinho vem INLINE porque muda de golpe pra golpe -- mesmo caminho do card de
+     pokémon da tela de ordenar o time. */
+  const risco = TYPE_COLORS[tipo] || 'var(--box-border)';
+  return `<div class="golpe-cartao" style="border-left-color:${risco}">
     <span class="golpe-cartao-nome">${escapeHtmlSafe(nomeDoAtaque(id))}${comTipo ? typePill(tipo) : ''}${obs}</span>
     <span class="golpe-cartao-poder"><span>PODER</span><b>${poder}</b></span>
   </div>`;
@@ -15378,6 +15411,14 @@ function fraseDoEspecial(g, quem, alvo, op){
        claramente o mataria, e procura bug onde é item -- o mesmo motivo do "mas não teve efeito" da
        imunidade. Quem pagou 50 moedas tem que ver as moedas trabalhando. */
     return quem + ' ia cair, mas a Faixa de Foco segurou com 1 de HP';
+  }
+  if(g.x === 'desempate'){
+    /* OS DOIS CAÍRAM na mesma troca, e o desempate pôs um de volta de pé. É a única linha do log
+       que fala de quem NÃO apanhou: o sobrevivente é justamente o ALVO do golpe, que foi aparado a
+       zero porque a vida voltou.
+       Sem ela esse golpe some da tela e o outro lado aparece atacando duas vezes seguidas -- foi
+       assim que o defeito foi reportado (Raticate x Gyarados, 09/09/2026). */
+    return 'os dois caíram na mesma troca, e ' + alvo + ' ficou de pé';
   }
   if(g.x === 'disable'){
     /* Nomeia o golpe ANULADO, não a anulação: o que interessa é o que o pokémon PERDEU. O motor
@@ -15464,12 +15505,14 @@ function avisoDoConfronto(m, passo){
      golpe -- ela não vale: a pausa dela é outra, no meio do laço. */
   if(passo != null){
     const seq = sequenciaDoConfronto(m);
-    const iFaixa = seq.findIndex(g => g.x === 'faixa');
+    /* O DESEMPATE entra pela MESMA porta da Faixa: os dois são avisos do MEIO da luta, aparecem no
+       passo seguinte ao deles e saem no próximo. */
+    const iFaixa = seq.findIndex(g => g.x === 'faixa' || g.x === 'desempate');
     if(iFaixa >= 0 && passo === iFaixa + 1){
       const f = seq[iFaixa];
       const nP = escapeHtmlSafe(m.player || ''), nE = escapeHtmlSafe(m.enemy || '');
       const doJ = f.q === 'p';
-      return (ICONES_ESPECIAIS.faixa || '') + ' ' +
+      return (ICONES_ESPECIAIS[f.x] || '') + ' ' +
              fraseDoEspecial(f, doJ ? nP : nE, doJ ? nE : nP, {}) + '!';
     }
   }
@@ -15629,7 +15672,7 @@ function passosHtml(m){
     if(g.x === 'boomself') return '';   // a linha da explosão (acima) já contou os dois lados
     if(g.x === 'absorbdano') return '';  // idem: a linha da drenagem conta a vida que saiu e a que entrou
     if(g.x === 'boom' || g.x === 'sono' || g.x === 'recover' || g.x === 'semSono' ||
-       g.x === 'pocao' || g.x === 'absorb' || g.x === 'faixa') return linhaEspecial(g);
+       g.x === 'pocao' || g.x === 'absorb' || g.x === 'faixa' || g.x === 'desempate') return linhaEspecial(g);
     return `<div class="mlog-passo ${doJogador?'p':'e'}">
       ${ladoHtml(doJogador)} atacou ${ladoHtml(!doJogador)}${seloDe(doJogador)?` com ${seloDe(doJogador, g.tn > 1 ? g.tn : 0)}`:''} e tirou <span class="mlog-tira">−${g.d}</span> de HP.
     </div>`;
