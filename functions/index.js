@@ -800,15 +800,15 @@ function withBuffs(v, p){
 }
 function effectiveBaseHp(p){
   const v = (typeof p.baseHp==='number') ? p.baseHp : ((SPECIES[p.speciesId]&&SPECIES[p.speciesId].hp)||50);
-  return withItemStat(withSpecialty(withBuffs(v, p), p), p, 'baseHp');
+  return withFuria(withItemStat(withSpecialty(withBuffs(v, p), p), p, 'baseHp'), p);
 }
 function effectiveAttack(p){
   const v = (typeof p.attack==='number') ? p.attack : ((SPECIES[p.speciesId]&&SPECIES[p.speciesId].attack)||50);
-  return withItemStat(withSpecialty(withBuffs(v, p), p), p, 'attack');
+  return withFuria(withItemStat(withSpecialty(withBuffs(v, p), p), p, 'attack'), p);
 }
 function effectiveDefense(p){
   const v = (typeof p.defense==='number') ? p.defense : ((SPECIES[p.speciesId]&&SPECIES[p.speciesId].defense)||50);
-  return withItemStat(withSpecialty(withBuffs(v, p), p), p, 'defense');
+  return withFuria(withItemStat(withSpecialty(withBuffs(v, p), p), p, 'defense'), p);
 }
 /* Sp.Atk e Sp.Def, oficiais da Gen 2. Instancia gravada ANTES do split nao tem os campos -- cai no
    valor da especie, mesma migracao ja usada pela velocidade. O 50 no fim so pega instancia de
@@ -819,19 +819,19 @@ function effectiveSpAtk(p){
   const sp = SPECIES[p.speciesId];
   const v = (typeof p.spAtk === 'number') ? p.spAtk
           : (sp && typeof sp.spAtk === 'number') ? sp.spAtk : 50;
-  return withItemStat(withSpecialty(withBuffs(v, p), p), p, 'spAtk');
+  return withFuria(withItemStat(withSpecialty(withBuffs(v, p), p), p, 'spAtk'), p);
 }
 function effectiveSpDef(p){
   const sp = SPECIES[p.speciesId];
   const v = (typeof p.spDef === 'number') ? p.spDef
           : (sp && typeof sp.spDef === 'number') ? sp.spDef : 50;
-  return withItemStat(withSpecialty(withBuffs(v, p), p), p, 'spDef');
+  return withFuria(withItemStat(withSpecialty(withBuffs(v, p), p), p, 'spDef'), p);
 }
 function effectiveSpeed(p){
   // a velocidade buffada entra também na chance de crítico (rng < speed/512, regra da Gen 1):
   // quem está no terreno do tipo dele critica mais, além de bater mais forte
   const v = (typeof p.speed === 'number') ? p.speed : ((SPECIES[p.speciesId] && SPECIES[p.speciesId].speed) || 50);
-  return withSpecialty(withBuffs(v, p), p);
+  return withFuria(withSpecialty(withBuffs(v, p), p), p);
 }
 function calcMaxHp(p){ return Math.round(30 + p.level*5 + effectiveBaseHp(p)); }
 // HP na escala Gen 1 -- usado só internamente, pra converter o dano em fração da vida
@@ -1156,6 +1156,8 @@ function calcDamage(attacker, defender, rng){
   attacker.lastMoveNulo = !!best.nulo;
   const Leff = attacker.level;   // o crítico da Gen 3 dobra o DANO no fim, não o nível aqui
   const potencia = best.poder || MOVE_POWER;   // o poder do GOLPE escolhido, ou o implícito de sempre
+  /* CONTA O USO DEPOIS de o poder deste golpe já ter sido lido: o primeiro uso sai nos 20 secos, e
+     é o SEGUINTE que vem com +6. */
   const core = Math.floor(Math.floor(2*Leff/5 + 2) * potencia * A / D / 50) + 2;
   // multiplicador de tipo COMPRIMIDO (^0.6): 2x vira ~1.5x. Aqui não se troca de pokémon no meio
   // do confronto, então tipo não pode ser sentença de morte
@@ -1219,6 +1221,27 @@ const BOOM_MINIMO_DO_ALVO = 0.5;
    OS OITO GOLPES saíram do `critRatio` do dado do Showdown com o mod da Gen 3 -- o MESMO caminho
    que gerou a base de golpes, e não uma lista escrita de cabeça: o Bulbapedia não publica o
    conjunto da geração, só exemplos. Esta lista é DUPLICADA nos dois motores. */
+/* FÚRIA: a passiva que faz o pokémon CRESCER no meio da batalha (10/09/2026).
+   Ela nasceu como um golpe que ganhava poder a cada uso, e isso foi DESFEITO: medido, o motor nunca
+   a escolhia (começa em poder 20 e perde pra qualquer alternativa -- 0,0% dos confrontos), e mesmo
+   forçada ela custava 22,7 pontos de vitória. Virou passiva, no molde do sono e da anulação.
+   COMO FUNCIONA: quem tem Fúria tem 30% por CONFRONTO de entrar em fúria, e cada vez que entra
+   ganha +10 em TODOS os seis atributos -- ataque, defesa, os dois especiais, velocidade e o HP.
+   ACUMULA: entrar em fúria em dois confrontos seguidos vale +20, e assim por diante. O acúmulo é
+   POR BATALHA e zera no começo da próxima, como a marca da autodestruição.
+   O HP CRESCE DE VERDADE: o +10 entra no teto de vida e a vida ATUAL sobe junto, então a barra
+   sobe na tela em vez de o pokémon ficar com uma fatia menor da barra sem motivo.
+   ELA VEM PRIMEIRO no sorteio, antes até do Metrônomo, e isso é decisão: é um efeito de ABERTURA
+   que não resolve o confronto, e deixá-la pra depois faria o Snubbull -- o único dos 19 que tem
+   outro especial -- nunca entrar em fúria, porque o Metrônomo corta o sorteio ali mesmo.
+   A LISTA são as 19 espécies que aprendem Fúria por NÍVEL, a mesma regra das outras seis listas. */
+const FURIA = ['beedrill','charizard','charmander','charmeleon','croconaw','cubone','dodrio','doduo','dunsparce','feraligatr','granbull','kangaskhan','marowak','onix','primeape','snubbull','steelix','tauros','totodile'];
+const CHANCE_FURIA = 0.30;
+const FURIA_BONUS = 10;   // em TODOS os seis atributos, por vez que ela entra
+/* O bônus é FLAT e entra POR ÚLTIMO, depois de shiny, terreno, especialidade e item -- todos
+   multiplicadores. Entrando antes, eles o inflariam, e "+10" deixaria de ser 10. É a mesma regra
+   do item de atributo, que já está uma linha acima na cadeia. */
+function withFuria(v, p){ return v + FURIA_BONUS * ((p && p._furia) || 0); }
 const CRIT_BASE = 1/16;   // estágio +0 -- todo golpe comum
 const CRIT_ALTO = 1/8;    // estágio +1 -- os golpes de crítico alto
 const CRIT_MULT = 2;      // Gen 2 a Gen 5: o crítico dobra o dano
@@ -1388,6 +1411,13 @@ const RECUPERACAO = ['kadabra','alakazam','staryu','starmie','porygon','porygon2
 let explosaoDoAtivo = null;
 function ehImuneAEspecial(p){ return IMUNES_A_ESPECIAL.includes(p.speciesId); }
 function sorteiaGolpeEspecial(p, rng){
+  /* A FÚRIA VEM ANTES DE TUDO, inclusive do Metrônomo: ela é abertura e não resolve o confronto,
+     e deixá-la pra depois faria o Snubbull (o único dos 19 com outro especial) nunca entrar em
+     fúria, porque o Metrônomo corta o sorteio ali mesmo. O preço é o de sempre: quem tem dois cai
+     na chance composta -- o Metrônomo do Snubbull sai 30% menos. */
+  if(FURIA.includes(p.speciesId) && rng() < CHANCE_FURIA){
+    return { efeito:'furia', golpe:'Fúria' };
+  }
   if(METRONOMO.includes(p.speciesId)){
     const r = rng();
     if(r < CHANCE_METRONOMO_EFEITO) return { efeito:'explosao', golpe:'Metrônomo (auto-destruição)' };
@@ -1491,6 +1521,27 @@ function tentarGolpeEspecial(active, enemy, rng, diario){
         diario.push({ q: marca === 'p' ? 'e' : 'p', d: danoEmSi, hp: 0, c:0, m:0, z:0, x:'boomself' });
       }
       return true;
+    }
+    if(especial.efeito === 'furia'){
+      /* ENTRAR EM FÚRIA: +10 em todos os seis atributos, e ACUMULA se acontecer de novo no
+         confronto seguinte. Como o Recuperar e a anulação, NÃO resolve o confronto: é 'continue' --
+         a luta acontece inteira, com ele maior.
+         O HP É O ÚNICO QUE PRECISA DE MÃO: os outros cinco atributos são lidos pelas effective* na
+         hora do dano, mas o teto de vida é um número gravado na instância. Ele sobe, e a vida ATUAL
+         sobe junto na mesma quantidade -- senão o pokémon ficaria com uma fatia menor da barra sem
+         ter apanhado, que é o mesmo defeito que o buff de terreno já teve. */
+      quem._furia = (quem._furia || 0) + 1;
+      const tetoAntes = quem.maxHp;
+      quem.maxHp = calcMaxHp(quem);
+      const ganho = quem.maxHp - tetoAntes;
+      quem.hp = Math.min(quem.maxHp, quem.hp + ganho);
+      if(diario){
+        /* `d` é o quanto a barra SOBE, como na cura -- a animação usa isso pra desenhar o
+           crescimento. `n` é a que vez é esta, pra a frase dizer "fúria x2". */
+        diario.push({ q: marca, d: ganho, hp: quem.hp, c:0, m:0, z:0, x:'furia',
+                      g: especial.golpe, n: quem._furia });
+      }
+      continue;
     }
     if(especial.efeito === 'cura'){
       /* RECUPERAR ACONTECE ANTES DA LUTA. O pokémon que sobreviveu ao confronto anterior entra
@@ -1757,6 +1808,10 @@ function doExchange(active, enemy, rng, diario){
 function simulateGymBattle(team, enemyTeam, rng, opts){
   team.forEach(p=>{ p.maxHp=calcMaxHp(p); p.hp=p.maxHp; });
   explosaoDoAtivo = null;   // o marcador da autodestruição é por BATALHA (ver tentarGolpeEspecial)
+  /* A FÚRIA ACUMULADA também é por BATALHA: ela cresce de confronto em confronto enquanto o pokémon
+     estiver de pé, e some quando a batalha acaba. Zerar aqui, e não no fim, é o que faz um time
+     carregado de uma batalha anterior não entrar na próxima já furioso. */
+  (team || []).concat(enemyTeam || []).forEach(p => { if(p) p._furia = 0; });   // o servidor chama o outro lado de enemyTeam
   /* A LISTA DO QUE FOI GASTO zera a cada batalha: ela é o recado pra quem chamou tirar o item da
      conta, e um recado de uma batalha anterior faria gastar item que ninguém usou. */
   itensGastos = [];
@@ -1842,6 +1897,20 @@ function simulateGymBattle(team, enemyTeam, rng, opts){
      dois times zerarem no mesmo instante (o doExchange normal sempre deixa um de pé), e sem esta
      linha o jogador perderia justamente a batalha que ele decidiu explodindo. */
   const teamStillAlive = team.some(p=>p.hp>0) || explosaoDoAtivo === true;
+  /* A FÚRIA DEVOLVE O QUE EMPRESTOU quando a batalha acaba, e isso não é detalhe: ela mexe no TETO
+     de vida, e o teto é um número GRAVADO na instância -- não é lido de uma função como os outros
+     cinco atributos. Sem devolver, um Tauros que entrou em fúria três vezes saía da luta com o teto
+     +30 pra sempre, e a barra dele na tela de time mudaria de tamanho sozinha. É o mesmo cuidado
+     que o buff de terreno já tinha (ver o CLAUDE.md), e a devolução é EXATA: sai o mesmo número que
+     entrou, do teto e da vida atual, então o pokémon volta com a vida que teria sem a fúria.
+     Quem já caiu fica em 0 -- devolver vida a um pokémon desmaiado o ressuscitaria. */
+  team.concat(enemyTeam).forEach(p => {
+    if(!p || !p._furia) return;
+    const emprestado = FURIA_BONUS * p._furia;
+    p._furia = 0;
+    p.maxHp = calcMaxHp(p);
+    p.hp = p.hp > 0 ? Math.max(1, Math.min(p.maxHp, p.hp - emprestado)) : 0;
+  });
   return { win: teamStillAlive, matchups };
 }
 function makeSeededRng(seedStr){
@@ -3361,7 +3430,7 @@ exports._raizDaLinha = raizDaLinha;
 exports._chaveDoEquipado = chaveDoEquipado;
 exports._createInstance = createInstance;
 exports._makeSeededRng = makeSeededRng;
-exports._golpesEspeciais = { AUTODESTRUICAO, SONIFEROS, METRONOMO, CHANCE_AUTODESTRUICAO, CHANCE_SONO, SONO_EM_TROCAS, MULTI_GOLPE, ataquesDisponiveis, GOLPES_CRIT_ALTO };
+exports._golpesEspeciais = { AUTODESTRUICAO, SONIFEROS, METRONOMO, CHANCE_AUTODESTRUICAO, CHANCE_SONO, SONO_EM_TROCAS, MULTI_GOLPE, ataquesDisponiveis, GOLPES_CRIT_ALTO, FURIA, CHANCE_FURIA, FURIA_BONUS };
 exports._trainersLeagueSplitGroups = trainersLeagueSplitGroups;
 exports._trainersLeagueGatherEligibleCodes = trainersLeagueGatherEligibleCodesForUid;
 exports._decodeTeamCode = decodeTeamCode;   // o teste da liga confere a ORDEM da lista pela especie de cada time
@@ -7394,7 +7463,10 @@ async function bossGetEstado(){
    lados, e o Mew tem que entrar com a vida que sobrou da ultima batalha de OUTRO jogador. O resto
    do laco e o mesmo -- inclusive o doExchange, que e quem escreve o diario do log. */
 function simulateBossFight(team, boss, opts){
-  team.forEach(p => { p.maxHp = calcMaxHp(p); p.hp = p.maxHp; });
+  /* A FÚRIA zera aqui pelo mesmo motivo que zera no simulateGymBattle: o acúmulo é por BATALHA. Na
+     raide o time é montado do save a cada ataque e não haveria o que vazar, mas a porta sem a linha
+     é onde a próxima omissão se esconde. Vem ANTES do calcMaxHp, senão o teto nasceria inflado. */
+  team.forEach(p => { p._furia = 0; p.maxHp = calcMaxHp(p); p.hp = p.maxHp; });
   /* Mesma lista do simulateGymBattle, zerada por batalha. */
   itensGastos = [];
   const matchups = [];

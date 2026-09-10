@@ -755,5 +755,108 @@ console.log('\n=== O GOLPE DA FORMA ANTERIOR NAO SE PERDE NA EVOLUCAO ===');
      kk.ataques.indexOf('poisonsting') >= 0, kk.ataques.map(S.nomeDoAtaque).join(' + '));
 }
 
+console.log('\n=== A OBSERVACAO DO CARTAO E O CARTAO DO TOPO ===');
+{
+  /* A observacao diz o que os numeros do cartao NAO contam -- a mecanica propria do golpe. Ela sai
+     de uma funcao e nao de um `if` no cartao porque ja tem duas entradas e vai ter mais. */
+  ok('o golpe multiplo avisa que repete', S.obsDoGolpe('doubleslap') === 'Golpe repete entre 2-5x',
+     S.obsDoGolpe('doubleslap'));
+  /* A FURIA NAO TEM OBSERVACAO, e isso e o desenho de hoje: ela virou PASSIVA da especie em
+     10/09/2026 e saiu do cartao do golpe. Quem escolhe golpe nao escolhe passiva -- ela e anunciada
+     na ficha da Pokedex, junto do sono e da anulacao. Uma observacao aqui prometeria uma escolha
+     que nao existe. */
+  ok('a Furia NAO avisa nada no cartao (virou passiva)', S.obsDoGolpe('rage') === '', S.obsDoGolpe('rage'));
+  ok('e golpe comum nao avisa nada', S.obsDoGolpe('tackle') === '');
+  ok('a observacao chega no cartao', S.cartaoDeGolpe('doubleslap', true).indexOf('Golpe repete entre 2-5x') >= 0);
+  ok('e o golpe comum sai sem ela', S.cartaoDeGolpe('tackle', true).indexOf('golpe-cartao-obs') < 0);
+
+  /* O CARTAO DO TOPO (o golpe OFERECIDO) usa o MESMO desenho dos de baixo desde 10/09/2026: fundo
+     branco, faixa do tipo e o SELO DENTRO. Ele era cinza, sem moldura, com o selo pendurado FORA --
+     e numa tela que existe pra COMPARAR o novo com os atuais, dois desenhos faziam a comparacao
+     comecar pela pergunta errada. */
+  {
+    g.team = []; g.aprenderAtaque = null;
+    const p = inst('growlithe', 30); p.id = 'mon1'; p.ataques = ['bite', 'ember'];
+    g.team = [p]; g.aprenderAtaque = { id:'mon1', golpe:'rage' };
+    const html = S.renderAprenderAtaque();
+    ok('o cartao do topo usa a classe de destaque', html.indexOf('golpe-cartao destaque') >= 0);
+    ok('e o selo do tipo esta DENTRO dele',
+       (function(){
+         const iCartao = html.indexOf('golpe-cartao destaque');
+         const iSelo = html.indexOf('type-pill', iCartao);
+         return iCartao >= 0 && iSelo > iCartao && (iSelo - iCartao) < 200;
+       })(),
+       'distancia entre o cartao e o selo: ' +
+       (html.indexOf('type-pill', html.indexOf('golpe-cartao destaque')) - html.indexOf('golpe-cartao destaque')));
+    ok('e nao sobrou selo pendurado do lado de fora',
+       html.indexOf('<div>' + S.seloDoTipoDoGolpe('rage') + '</div>') < 0);
+  }
+}
+
+console.log('\n=== O SKETCH DO SMEARGLE ===');
+{
+  /* No jogo oficial o Smeargle nao aprende golpe de dano NENHUM por nivel -- ele aprende Sketch,
+     que copia PERMANENTEMENTE o golpe do adversario. Aqui e a mesma coisa, e de QUALQUER adversario
+     que ele enfrentar (nao so de quem ele derrota), que e o que o jogo original faz.
+     Medido antes: com so o Tapa Duplo (poder 15, inventado pela nossa regra de cobertura) ele ganha
+     5,9% no Lv.30 e 0,2% no Lv.50 contra um painel do tamanho dele; com o Sketch, 21,9% e 26,4%. */
+  g.team = []; g.screen = ''; g.aprenderAtaque = null; g.golpesAprendidos = [];
+  const sm = inst('smeargle', 30);
+  sm.ataques = ['doubleslap']; sm.nivelDosAtaques = 30;
+  g.team = [sm];
+  ok('nasce sem nada copiado', !(sm.sketch && sm.sketch.length));
+
+  /* enfrenta tres adversarios; o golpe de cada um entra na lista */
+  const copiados = [];
+  ['pidgey', 'geodude', 'psyduck'].forEach(id => {
+    const b = inst(id, 30); b.ataques = S.ataquesDisponiveis(id, 30);
+    const r = S.simulateGymBattle([sm], [b]);
+    S.registrarSketch(r.matchups).forEach(x => copiados.push(x));
+    sm.hp = sm.maxHp;
+  });
+  ok('copiou o golpe de quem enfrentou', copiados.length >= 2, copiados.join(','));
+  ok('e todos existem na tabela GOLPES', (sm.sketch || []).every(id => !!S.GOLPES[id]));
+  ok('sem repetir', (sm.sketch || []).length === new Set(sm.sketch || []).size);
+
+  /* A FILA e a TELA passam a oferecer o que ele copiou -- e essa e a graca: o fluxo de aprender
+     golpe ja existia, so mudou de onde vem a oferta. */
+  const fila = S.aprendizadosPendentes().filter(f => f.p === sm).map(f => f.golpe);
+  ok('a fila de aprendizado oferece os copiados',
+     (sm.sketch || []).every(id => fila.indexOf(id) >= 0), fila.join(','));
+  const naTela = S.ataquesEscolhiveis(sm);
+  ok('a tela de escolha tambem', (sm.sketch || []).every(id => naTela.indexOf(id) >= 0), naTela.join(','));
+  ok('e o golpe que ele JA leva nao some da tela', naTela.indexOf('doubleslap') >= 0);
+
+  /* RECUSAR um sketch tem que valer, como vale pra qualquer golpe -- senao a pergunta volta pra
+     sempre, que foi o carrossel infinito de 09/09/2026. */
+  {
+    const alvo = (sm.sketch || [])[0];
+    sm.ataquesRecusados = [alvo];
+    const depois = S.aprendizadosPendentes().filter(f => f.p === sm).map(f => f.golpe);
+    ok('sketch RECUSADO nao volta pra fila', depois.indexOf(alvo) < 0, depois.join(','));
+    sm.ataquesRecusados = [];
+  }
+
+  /* O RESTO DO JOGO NAO PODE MUDAR: so o Smeargle tem sketch. */
+  {
+    const gy = inst('gyarados', 30); gy.ataques = ['bite'];
+    g.team = [gy];
+    S.registrarSketch([{ playerSpecies:'gyarados', enemyMoveId:'hyperbeam' }]);
+    ok('quem nao e Smeargle nao copia nada', !(gy.sketch && gy.sketch.length));
+    ok('e a tela dele continua saindo do APRENDIZADO da especie',
+       S.ataquesEscolhiveis(gy).every(id => S.ataquesDisponiveis('gyarados', 30).indexOf(id) >= 0 || id === 'bite'));
+  }
+
+  /* ADVERSARIO SEM GOLPE ESCOLHIDO (liga, online, save antigo) ataca pelo motor de tipo e nao tem
+     id -- ali nao ha o que copiar, e o registrador tem que aguentar isso sem inventar. */
+  {
+    const sm2 = inst('smeargle', 30); sm2.ataques = ['doubleslap'];
+    g.team = [sm2];
+    const novos = S.registrarSketch([{ playerSpecies:'smeargle', enemyMoveId:null },
+                                     { playerSpecies:'smeargle', enemyMoveId:'naoexiste' }]);
+    ok('adversario sem golpe nao vira sketch', novos.length === 0 && !(sm2.sketch && sm2.sketch.length));
+  }
+}
+
 console.log(falhas ? '\n' + falhas + ' FALHA(S).' : '\nTudo certo.');
 process.exit(falhas ? 1 : 0);

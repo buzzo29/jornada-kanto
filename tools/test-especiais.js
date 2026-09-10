@@ -154,8 +154,19 @@ ok('e o log diz qual golpe foi', diario.some(g => g.x === 'sono' && g.g === 'Can
             linhas nao pode dar mais dano do que o pokemon tinha. */
       const soma = { p:0, e:0 };
       seq.filter(ehDano).forEach(x => { soma[x.q] += x.d || 0; });
-      if(soma.p !== Math.max(0, m.enemyHpBefore - m.enemyHpAfter) ||
-         soma.e !== Math.max(0, m.playerHpBefore - m.playerHpAfter)) somaErrada++;
+      /* QUEM SOBE DE VIDA NO MEIO DO CONFRONTO desconta: cura, pocao, drenagem e FURIA fazem o HP
+         perdido ser menor que a soma dos golpes, e o contrato continua fechando com o ganho na
+         conta. A furia sobe o TETO e a vida atual junto; pro log e o mesmo movimento. */
+      const ganho = { p:0, e:0 };
+      seq.forEach(x => {
+        if(x.x === 'recover' || x.x === 'pocao' || x.x === 'absorb' || x.x === 'furia') ganho[x.q] += x.d || 0;
+      });
+      /* O GANHO ENTRA DENTRO DO Math.max, nao fora: com a furia o pokemon pode TERMINAR o confronto
+         com MAIS vida do que entrou -- entra com 290, cresce 10 e leva 9 de moribundo, sai com 291.
+         Com o ganho somado por fora, 'antes - depois' era aparado em zero e o contrato acusava um
+         confronto que estava certo. Sem ganho nenhum a conta e identica a de antes. */
+      if(soma.p !== Math.max(0, (m.enemyHpBefore + ganho.e) - m.enemyHpAfter) ||
+         soma.e !== Math.max(0, (m.playerHpBefore + ganho.p) - m.playerHpAfter)) somaErrada++;
 
       /* 3) NENHUM GOLPE DE DANO ZERO. Ele existe no diario -- e o revide de quem caiu contra quem
             ja tinha caido, e o dano EFETIVO ali e 0 -- e viraria um "-0 de HP" na tela, que e
@@ -169,7 +180,7 @@ ok('e o log diz qual golpe foi', diario.some(g => g.x === 'sono' && g.g === 'Can
             ANTES do golpe que derrubou quem o deu -- os dois sao do mesmo instante, e alguem sempre
             vai parecer agir depois de cair; a regra escolhe que seja o golpe que MATOU. */
       let hpP = m.playerHpBefore, hpE = m.enemyHpBefore;
-      const cura = seq.find(x => x.x === 'recover');
+      const cura = seq.find(x => x.x === 'recover' || x.x === 'furia');
       if(cura){ if(cura.q === 'p') hpP = cura.hp; else hpE = cura.hp; }
       const lista = seq.filter(ehDano);
       const caiuEm = { p:-1, e:-1 };
@@ -614,8 +625,11 @@ console.log('\nA FAIXA DE FOCO NAO PODE SER FURADA POR CAMINHO NENHUM');
         const anim = S.buildAnimatedHitSequence(m2);
         const iF = seq.findIndex(g => g.x === 'faixa');
         /* ANTES dela a tela mostra o "Trocando golpes..." de sempre -- nada entregue. */
-        ok('antes dela nao ha aviso nenhum',
-           [0, 1, iF].every(p => S.avisoDoConfronto(m2, p) === ''),
+        /* ANTES dela a tela nao pode entregar a FAIXA. Uma ABERTURA (furia, cura, sono) pode estar
+           ali -- ela e de outro efeito e tem o proprio direito a linha; o que nao pode e a frase da
+           Faixa aparecer antes do passo dela, porque isso entregaria o desfecho. */
+        ok('antes dela a Faixa nao aparece',
+           [0, 1, iF].every(p => !/Faixa de Foco/.test(S.avisoDoConfronto(m2, p) || '')),
            [0,1,iF].map(p => p + ':' + (S.avisoDoConfronto(m2,p)||'(vazio)')).join(' | '));
         /* NO PASSO DELA a frase aparece. O laco incrementa o passo depois de aplicar o golpe, entao
            quando a barra parou em 1 o contador ja esta em iF+1. */
@@ -652,7 +666,11 @@ console.log('\nA FAIXA DE FOCO NAO PODE SER FURADA POR CAMINHO NENHUM');
           const s = S.sequenciaDoConfronto(x);
           maior = Math.max(maior, s.filter(g => g.x !== 'boomself' && g.x !== 'absorbdano').length);
           const tomou = s.filter(g => (!g.x || g.x === 'boom') && g.q === 'e').reduce((a, g) => a + g.d, 0);
-          if(tomou !== x.playerHpBefore - x.playerHpAfter) somaErrada++;
+          /* Quem SOBE de vida no meio do confronto desconta: cura, pocao, drenagem e FURIA fazem o
+             HP perdido ser menor que a soma dos golpes. */
+          const subiu = s.filter(g => (g.x === 'recover' || g.x === 'pocao' || g.x === 'absorb' || g.x === 'furia') && g.q === 'p')
+                         .reduce((a, g) => a + g.d, 0);
+          if(tomou !== (x.playerHpBefore - x.playerHpAfter) + subiu) somaErrada++;
           if(s.findIndex(g => g.x === 'faixa') <= 0) foraDePosicao++;
         }
       }
@@ -689,7 +707,9 @@ console.log('\nA FAIXA DE FOCO NAO PODE SER FURADA POR CAMINHO NENHUM');
           if((bate ? p : e) <= 0 && caiuEm[g.q] !== k - 1){
             return 'o ' + (bate ? 'jogador' : 'inimigo') + ' bateu com a barra em 0';
           }
-          if(g.x === 'recover' || g.x === 'pocao' || g.x === 'absorb'){ if(bate) p += g.d; else e += g.d; continue; }
+          /* A FURIA sobe a vida como a cura -- o teto cresce e a vida atual sobe junto --, entao
+             ela entra na mesma conta de GANHO. Sem isso a soma do log nao fecha. */
+          if(g.x === 'recover' || g.x === 'pocao' || g.x === 'absorb' || g.x === 'furia'){ if(bate) p += g.d; else e += g.d; continue; }
           if(g.x === 'absorbdano'){ if(bate) e -= g.d; else p -= g.d; continue; }
           if(bate){ e = Math.max(0, e - g.d); if(e === 0 && caiuEm.e < 0) caiuEm.e = k; }
           else { p = Math.max(0, p - g.d); if(p === 0 && caiuEm.p < 0) caiuEm.p = k; }
@@ -712,7 +732,7 @@ console.log('\nA FAIXA DE FOCO NAO PODE SER FURADA POR CAMINHO NENHUM');
           /* A SOMA fecha contando a CURA junto: a drenagem devolve vida, entao "tomou" nao e so a
              variacao de HP -- e a variacao MAIS o que foi curado. */
           const s3 = S.sequenciaDoConfronto(x);
-          const curou = s3.filter(g => (g.x === 'recover' || g.x === 'pocao' || g.x === 'absorb') && g.q === 'p')
+          const curou = s3.filter(g => (g.x === 'recover' || g.x === 'pocao' || g.x === 'absorb' || g.x === 'furia') && g.q === 'p')
                           .reduce((a, g) => a + g.d, 0);
           const tomou = s3.filter(g => (!g.x || g.x === 'boom') && g.q === 'e').reduce((a, g) => a + g.d, 0);
           if(tomou !== (x.playerHpBefore - x.playerHpAfter) + curou) somaFora++;
@@ -1179,7 +1199,7 @@ const resumo = r => (r.win?'W':'L') + '|' + (r.matchups||[]).map(m =>
   m.playerSpecies+':'+m.playerHpAfter+'/'+m.enemySpecies+':'+m.enemyHpAfter+':' +
   (m.playerMoveId||'-')+'/'+(m.enemyMoveId||'-')+':' +
   (m.golpes||[]).map(g=>(g.x||'')+g.d).join(',')).join(';');
-let divergencias = 0, comEspecial = 0;
+let divergencias = 0, comEspecial = 0, comFuria = 0;
 for(let i=0;i<300;i++){
   const rngMonta = S.makeSeededRng('monta-'+i);
   const t1 = timeAleatorio(rngMonta, 6), t2 = timeAleatorio(rngMonta, 6);
@@ -1200,10 +1220,15 @@ for(let i=0;i<300;i++){
   const rS = srv._simulateGymBattle(timeS,
                                     t2.map(p=>comGolpes(srv._createInstance(p.id,p.level))), srv._makeSeededRng('m'+i));
   if((rC.matchups||[]).some(m=>(m.golpes||[]).some(g=>g.x))) comEspecial++;
+  if((rC.matchups||[]).some(m=>(m.golpes||[]).some(g=>g.x === 'furia'))) comFuria++;
   if(resumo(rC) !== resumo(rS)) divergencias++;
 }
 ok('300 batalhas com a mesma semente, golpe a golpe', divergencias === 0,
    divergencias + ' divergencias | ' + comEspecial + ' batalhas tiveram golpe especial');
+/* A FURIA tem que estar DENTRO dessas 300, senao a comparacao daria verde sem nunca toca-la: ela
+   mexe em atributo, e atributo que diverge faz a mesma batalha terminar diferente nos dois lados.
+   O time sai das 250 especies, entao ela aparece sozinha -- o que se cobra aqui e que apareceu. */
+ok('e a furia esta dentro delas', comFuria > 0, comFuria + ' batalhas com furia');
 
 console.log('\n=== OS ITENS EQUIPADOS DENTRO DA BATALHA ===');
 /* O item e DO POKEMON, nao da conta: quem carrega o Despertar e o Machop, e a protecao vale pra
@@ -1450,6 +1475,104 @@ function comItem(instancia, item){
   ok('e a frase sai antes da luta e some depois', S.avisoDoConfronto(m, 0) !== '' && S.avisoDoConfronto(m, 1) === '',
      JSON.stringify([S.avisoDoConfronto(m,0), S.avisoDoConfronto(m,1)]));
 })();
+
+console.log('\n=== A FURIA E UMA PASSIVA ===');
+{
+  /* Reescrita em 10/09/2026. Ela nasceu como golpe que ganhava poder a cada uso e isso foi
+     DESFEITO: medido, o motor nunca a escolhia (0,0% dos confrontos) e mesmo forcada custava 22,7
+     pontos. Hoje e passiva da ESPECIE, no molde do sono e da anulacao: 30% por confronto de entrar
+     em furia, +10 em TODOS os seis atributos, e ACUMULA de confronto em confronto. */
+  ok('sao as 19 especies que aprendem Furia por nivel', S.FURIA.length === 19, S.FURIA.length + '');
+  ok('a chance e 30% por confronto', S.CHANCE_FURIA === 0.30, (100*S.CHANCE_FURIA) + '%');
+  ok('e o bonus e +10', S.FURIA_BONUS === 10);
+  ok('a lista e a MESMA nos dois motores', JSON.stringify(esp.FURIA) === JSON.stringify(S.FURIA));
+  ok('e a chance tambem', esp.CHANCE_FURIA === S.CHANCE_FURIA && esp.FURIA_BONUS === S.FURIA_BONUS);
+
+  /* O BONUS ENTRA NOS SEIS ATRIBUTOS, e e FLAT: nao pode ser inflado pelo shiny nem pelo terreno,
+     que sao multiplicadores -- a mesma regra do item de atributo. */
+  {
+    const p = inst('tauros', 50);
+    const antes = { atk:S.effectiveAttack(p), def:S.effectiveDefense(p), spA:S.effectiveSpAtk(p),
+                    spD:S.effectiveSpDef(p), vel:S.effectiveSpeed(p), hp:S.calcMaxHp(p) };
+    p._furia = 1;
+    const dep = { atk:S.effectiveAttack(p), def:S.effectiveDefense(p), spA:S.effectiveSpAtk(p),
+                  spD:S.effectiveSpDef(p), vel:S.effectiveSpeed(p), hp:S.calcMaxHp(p) };
+    ok('os SEIS atributos sobem +10',
+       Object.keys(antes).every(k => dep[k] - antes[k] === S.FURIA_BONUS),
+       Object.keys(antes).map(k => k + ':' + (dep[k]-antes[k])).join(' '));
+    p._furia = 3;
+    ok('e acumula: 3 vezes valem +30', S.effectiveAttack(p) - antes.atk === 3 * S.FURIA_BONUS);
+    /* FLAT mesmo num shiny em terreno: se entrasse ANTES dos multiplicadores, +10 viraria +14. */
+    const s2 = inst('tauros', 50); s2.shiny = true; s2.terrainBuffed = true;
+    const semF = S.effectiveAttack(s2); s2._furia = 1;
+    ok('e continua FLAT num shiny em terreno', S.effectiveAttack(s2) - semF === S.FURIA_BONUS,
+       (S.effectiveAttack(s2) - semF) + '');
+  }
+
+  /* NA BATALHA: ela sai, a barra SOBE e a frase acompanha o crescimento. */
+  {
+    const semTag = h => String(h||'').replace(/<[^>]*>/g,'').replace(/\s+/g,' ').trim();
+    let achou = 0, subiu = 0, comFrase = 0, noLog = 0, acumulou = 0;
+    for(let v = 0; v < 900 && achou < 60; v++){
+      /* UM Tauros contra SEIS fracos: ele sobrevive aos seis confrontos, e e assim que o ACUMULO
+         aparece -- num 1x1 ela sai no maximo uma vez e o teste nao teria o que medir. */
+      const a = [inst('tauros', 70)]; a[0].ataques = S.ataquesDisponiveis('tauros', 70).slice(0, 3);
+      const b = [1,2,3,4,5,6].map(() => inst('ratata', 5));
+      const r = S.simulateGymBattle(a, b);
+      (r.matchups || []).forEach(m => {
+        const f = (m.golpes || []).find(g => g.x === 'furia');
+        if(!f || achou >= 60) return;
+        achou++;
+        if(f.d > 0) subiu++;
+        if(f.n > 1) acumulou++;
+        const seq = S.buildAnimatedHitSequence(m);
+        const iF = seq.findIndex(h => h.x === 'furia');
+        /* A BARRA SOBE: amount negativo e o que faz o laco desenhar crescimento. */
+        if(iF >= 0 && seq[iF].amount < 0 && /entrou em f/.test(semTag(S.statusDoConfronto(m, iF + 1, seq[iF]).html))) comFrase++;
+        if(semTag(S.passosHtml(m)).indexOf('entrou em f') >= 0) noLog++;
+      });
+    }
+    ok('a furia sai em batalha o bastante pra medir', achou >= 20, achou + ' confrontos');
+    ok('e sempre faz a vida SUBIR', subiu === achou, subiu + ' de ' + achou);
+    ok('a frase aparece NO passo em que a barra sobe', comFrase === achou, comFrase + ' de ' + achou);
+    ok('e ela vira linha no log', noLog === achou, noLog + ' de ' + achou);
+    ok('e o acumulo acontece (2a vez ou mais)', acumulou > 0, acumulou + ' confrontos');
+  }
+
+  /* ZERA POR BATALHA, E DEVOLVE O TETO DE VIDA. O teto e o unico dos seis atributos GRAVADO na
+     instancia -- os outros cinco saem das effective* na hora do dano -- entao a furia tem que
+     desfaze-lo na saida. Sem isso o Tauros sai da luta com o teto +30 pra sempre e a barra dele na
+     tela de time muda de tamanho sozinha. */
+  {
+    const p = inst('tauros', 55); p.ataques = S.ataquesDisponiveis('tauros', 55).slice(0, 3); p._furia = 9;
+    S.simulateGymBattle([p], [inst('ratata', 5)]);
+    ok('entrar com acumulo de outra batalha nao vale', (p._furia || 0) < 9, (p._furia || 0) + '');
+
+    let tetoErrado = 0, vidaErrada = 0, sobrou = 0, medidos = 0;
+    for(let v = 0; v < 400; v++){
+      const a = [inst('tauros', 70), inst('dodrio', 70)];
+      a.forEach(x => { x.ataques = S.ataquesDisponiveis(x.speciesId, 70).slice(0, 3); });
+      const teto = a.map(x => S.calcMaxHp(x));
+      S.simulateGymBattle(a, [1,2,3].map(() => inst('ratata', 5)));
+      a.forEach((x, i) => {
+        medidos++;
+        if(x._furia) sobrou++;
+        if(x.maxHp !== teto[i]) tetoErrado++;
+        if(x.hp > x.maxHp || x.hp < 0) vidaErrada++;
+      });
+    }
+    ok('o acumulo nao sobra na instancia', sobrou === 0, sobrou + ' de ' + medidos);
+    ok('e o teto de vida volta ao que era', tetoErrado === 0, tetoErrado + ' de ' + medidos);
+    ok('sem nunca deixar vida acima do teto', vidaErrada === 0, vidaErrada + ' de ' + medidos);
+  }
+
+  /* E ELA APARECE NA FICHA DA POKEDEX, junto dos outros especiais -- e nao no cartao do golpe, que
+     e onde o jogador ESCOLHE, e passiva nao se escolhe. */
+  ok('a ficha do Tauros mostra a Furia',
+     S.especiaisDaEspecie('tauros').some(e => e.nome === 'Fúria' && e.chance === S.CHANCE_FURIA),
+     JSON.stringify(S.especiaisDaEspecie('tauros')));
+  ok('e o cartao do golpe NAO fala mais dela', S.obsDoGolpe('rage') === '');
+}
 
 console.log('\n=== O CRITICO E DA GEN 3 ===');
 {
@@ -1987,7 +2110,7 @@ console.log('\n=== QUEM MORREU NAO ATACA DEPOIS DE MORRER ===');
          aparecia "morto" no primeiro golpe). Quando o campo `hp` existe ele e a fonte -- e a vida
          que sobrou depois daquele passo, gravada pelo motor; a reconstrucao nao o traz, e ai a
          conta cai na subtracao. */
-      const ehCura = g => g.x === 'recover' || g.x === 'pocao' || g.x === 'absorb';
+      const ehCura = g => g.x === 'recover' || g.x === 'pocao' || g.x === 'absorb' || g.x === 'furia';
       S.sequenciaDoConfronto(m).forEach(g => {
         if(!g.x && g.d > 0){
           const vida = g.q === 'p' ? hpP : hpE;
@@ -2037,8 +2160,8 @@ console.log('\n=== QUEM MORREU NAO ATACA DEPOIS DE MORRER ===');
           if(vida <= 0 && morto){ cadaverNoSono++; if(!exSono) exSono = m.player + ' x ' + m.enemy; }
         }
         if(g.x === 'faixa' || g.x === 'disable') return;
-        const noProprio = g.x === 'recover' || g.x === 'pocao' || g.x === 'absorb' || g.x === 'boomself';
-        const cura = g.x === 'recover' || g.x === 'pocao' || g.x === 'absorb';
+        const noProprio = g.x === 'recover' || g.x === 'pocao' || g.x === 'absorb' || g.x === 'furia' || g.x === 'boomself';
+        const cura = g.x === 'recover' || g.x === 'pocao' || g.x === 'absorb' || g.x === 'furia';
         const alvoP = noProprio ? (g.q === 'p') : (g.q !== 'p');
         if(alvoP) hpP = (g.hp != null) ? g.hp : Math.max(0, cura ? hpP + g.d : hpP - g.d);
         else      hpE = (g.hp != null) ? g.hp : Math.max(0, cura ? hpE + g.d : hpE - g.d);

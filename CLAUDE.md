@@ -927,6 +927,155 @@ no tamanho da fonte. Os blocos são `golpe-cab` (o sprite num ladrilho + a frase
 - **Saiu o `linhaDeGolpe`**, que era o formato antigo: as três telas usam o cartão, e uma função
   de apresentação sem chamador é exatamente o tipo de coisa que fica anos no arquivo.
 
+### A FÚRIA É UMA PASSIVA (10/09/2026)
+
+Pedida assim: *"todos os pokemons que possuem o ataque de furia, ao iniciar uma batalha, tem 30% de
+ativar furia, e quando isso acontece, ele ganha +10 de atributo em todos os stats ... exibir a
+mensagem que o pokemon entrou em Furia e exibir crescendo a barra de hp dele ... caso ele consiga
+usar a furia em 2 confrontos seguidos, continuar acumulando"*. Ela é o **sétimo golpe especial**, ao
+lado do sono, da autodestruição, do Metrônomo, do Disable, do Recuperar e da drenagem — e a de
+maior chance do bloco: **30% por confronto**, empatada com o Metrônomo (que rende efeito em 3 das
+10 vezes) e o dobro da autodestruição.
+
+- **A LISTA são as 19 espécies que aprendem Fúria por NÍVEL**, a mesma regra das outras seis listas:
+  a linha do Charmander, Onix e Steelix, Primeape, Tauros, Kangaskhan, a linha do Totodile,
+  Dunsparce, Doduo e Dodrio, Cubone e Marowak, Beedrill, Snubbull e Granbull.
+- **ELA VEM PRIMEIRO NO SORTEIO, antes até do Metrônomo**, e isso é decisão: é uma ABERTURA que não
+  resolve o confronto, e deixá-la pra depois faria o **Snubbull** — o único dos 19 que tem outro
+  especial — nunca entrar em fúria, porque o Metrônomo corta o sorteio ali mesmo. O preço é o de
+  sempre nas chances compostas: o Metrônomo dele passa a sair 30% menos.
+- **É `continue`, não `return true`**: como o Recuperar, a anulação e a drenagem, a luta acontece
+  inteira — com ele maior. Só a autodestruição e o sono resolvem o confronto.
+- **ACUMULA, e o acúmulo é POR BATALHA.** Entrar em fúria em dois confrontos seguidos vale +20, e
+  assim por diante — é o que faz dela um prêmio de quem fica de pé. Zera no começo da batalha
+  seguinte, no mesmo lugar em que a marca da autodestruição já zerava.
+  Quanto ela acumula de verdade está medido no fim desta seção: no caso favorável (um Tauros que
+  enfrenta seis fracos e sobrevive a todos) a segunda entrada aparece em cerca de metade dos
+  confrontos com fúria; num 6x6 de verdade, em **21,6%**.
+- **O BÔNUS É FLAT E ENTRA POR ÚLTIMO** (`withFuria`), depois de shiny, terreno, especialidade e
+  item — que são multiplicadores. Entrando antes, eles o inflariam: +10 num shiny em terreno viraria
+  +14, e "+10 de atributo" deixaria de ser 10. É a mesma regra do item de atributo, que está uma
+  linha acima na cadeia. Conferido: num shiny em terreno o ganho continua sendo exatamente 10.
+- **⚠️ O HP É O ÚNICO DOS SEIS QUE PRECISA DE MÃO, e é aí que mora a armadilha.** Os outros cinco
+  são lidos das `effective*` na hora do dano; o **teto de vida é um número GRAVADO na instância**.
+  Então a fúria escreve `maxHp` e sobe a vida atual junto — e **devolve os dois no fim da batalha**.
+  Sem devolver, um Tauros que entrou em fúria três vezes saía da luta com o teto **+30 pra sempre**,
+  e a barra dele na tela de time mudava de tamanho sozinha. Pior: o vazamento **se acumulava pela
+  jornada inteira**, e foi ele que fez a primeira medição dar +2,2 pontos — um número que era do
+  defeito, não da mecânica.
+  A devolução é EXATA: sai o mesmo número que entrou, do teto e da vida. Quem já caiu fica em 0 —
+  devolver vida a um pokémon desmaiado o ressuscitaria.
+  É o mesmo cuidado que o buff de terreno já tinha (ver "O buff de terreno mexe no TETO de HP").
+  `tools/test-especiais.js` cobra as três coisas em 800 pokémon: o acúmulo não sobra na instância, o
+  teto volta ao que era, e nunca sobra vida acima do teto.
+- **A BARRA SOBE NA TELA, e é isso que o jogador vê.** A entrada no diário vai pelo mesmo caminho da
+  cura: `amount` NEGATIVO no passo animado (os laços fazem `hp - amount`), então a barra cresce. A
+  frase acompanha esse passo — *"Tauros entrou em fúria e cresceu"*, e **a partir da segunda vez ela
+  diz qual é** (*"entrou em fúria pela 2ª vez"*): sem o número, a mesma frase duas vezes seguidas
+  pareceria a mesma coisa acontecendo à toa.
+  Ela vale **1 passo** no `passosDaAbertura` — mexe UMA barra, como a cura — e cede o lugar ao nome
+  do golpe assim que a luta começa. Fora da tabela, a frase valeria pra sempre: foi exatamente o
+  defeito que a anulação teve (ver a seção dos passos da abertura).
+  Medido: em 60 confrontos com fúria, **60 mostram a frase no passo em que a barra sobe** e 60 viram
+  linha no log.
+- **O SELO É 😤 e o tipo é Normal** (`TIPO_DO_ESPECIAL`), como o resto do bloco.
+- **ELA MORA NA FICHA DA POKÉDEX, não no cartão do golpe** — e essa é a diferença que importa: quem
+  escolhe golpe não escolhe passiva. O cartão do golpe Fúria **não diz mais nada** (o `obsDoGolpe`
+  dela saiu), e a ficha da espécie a anuncia junto do sono e da anulação, com a chance.
+- **A MECÂNICA ANTERIOR FOI DESFEITA, e vale registrar por quê.** A Fúria nasceu como um golpe que
+  ganhava **+6 de poder a cada troca**. Medido: implementada ao pé da letra (crescendo só quando SAI)
+  ela **nunca saía** — começa em poder 20 e o motor escolhe pelo dano, então perdia pra qualquer
+  alternativa: **0,0%** dos confrontos. Crescendo por troca ela chegava a 28,4%, mas aí custava
+  **−22,7 pontos** de vitória contra o golpe que substituía (o empate só vinha lá pelos +30 por
+  troca). Como passiva ela deixa de disputar uma vaga de golpe e passa a valer pra quem já tem — que
+  é o que a palavra "passiva" promete.
+- **O PREÇO NA JORNADA: +1,06 ponto de conclusão** (69,11% contra 68,05%), 12 blocos de 1.500
+  jornadas de cada lado — **18.000 de cada**, 2,5σ pelo desvio ENTRE BLOCOS. Fora do ruído, e para
+  o lado fácil. Ela **se concentra no 8º ginásio**: os game overs lá vão de **383 para 327** em
+  3.000 jornadas, contra ±20 em todos os outros. Faz sentido — é no fim que o time do jogador tem
+  mais espécies de Fúria de pé por vários confrontos seguidos, que é quando o acúmulo aparece.
+  Só +1 ponto porque **os líderes também têm**: o Onix do Brock, o Steelix da Jasmine, o Charizard
+  do rival. Ela cai dos dois lados, como o sono e a drenagem.
+- **⚠️ MAS O EFEITO POR BATALHA É GRANDE, e a jornada esconde isso.** Medido num 6x6 com o painel
+  CALIBRADO NO EMPATE (as 6 espécies de Fúria nível 60 contra 6 sem Fúria de BST pareado, nível 63,
+  onde o controle fica em 46,95%): **84,01% com a fúria contra 46,95% sem — +37 pontos**, 12.000
+  batalhas de cada lado. Nenhum item chega perto (a Faixa de Foco é +4,98).
+  **O número honesto é a conversão em NÍVEL**, porque esse painel é hipersensível — ali 1 nível vale
+  ~17 pontos. Subindo o nível do adversário até reencontrar os 46,95%, a fúria vale **≈2,3 níveis**
+  (o empate volta com o inimigo em Lv.65,3). Pra comparar: o shiny (1,20×) vale ~15 níveis e o
+  terreno (1,15×), menos. Ou seja, ela fica **abaixo dos buffs de time** e acima da especialidade.
+- **O ACÚMULO É MODESTO, e é ele que segura o preço.** Medido em 3.000 batalhas 6x6: **98,1% das
+  batalhas têm alguém em fúria**, mas quem entra fica em **1,23 vez em média** — 78,4% param em
+  1× (+10), 20,1% chegam a 2× (+20) e só 1,5% a 3× (+30). O maior visto foi 3. Um pokémon precisa
+  vencer confrontos seguidos pra acumular, e é isso que faz o teto se cuidar sozinho.
+  Se um dia parecer forte demais, os lugares de mexer são a **chance** (`CHANCE_FURIA`) e o
+  **bônus** (`FURIA_BONUS`) — e a régua está aqui.
+- **OS DOIS MOTORES sobem igual, e a comparação das 300 batalhas cobre isso**: ela sorteia times
+  entre as 250 espécies, então a fúria aparece em **93 das 300** — e o teste passou a COBRAR que
+  apareça. Sem essa linha, a comparação daria verde sem nunca tocar na mecânica, e atributo que
+  diverge faz a mesma batalha terminar diferente no cliente e no servidor.
+
+
+### O SKETCH DO SMEARGLE (10/09/2026)
+
+Reportado assim: *"como podemos fazer o Smeargle ficar mais parecido com o jogo oficial? Porque
+hoje ele tá bem ruinzinho com apenas 1 ataque"*.
+
+- **No jogo oficial ele não aprende golpe de dano NENHUM por nível.** O que ele aprende é **Sketch**,
+  dez vezes (níveis 1, 11, 21… 91), e cada Sketch **copia permanentemente** o golpe que o adversário
+  acabou de usar. É uma espécie de BST 250 e ataque 20 — o corpo mais fraco do jogo — em cima de um
+  repertório que ela constrói lutando.
+- **Aqui é a mesma coisa, e de QUALQUER adversário que ele enfrentar** (não só de quem ele derrota,
+  que é o que o jogo original faz). O golpe entra no `sketch` da INSTÂNCIA — e por isso vai junto no
+  save, que serializa o time inteiro. Dois Smeargle de saves diferentes têm repertórios diferentes,
+  que é justamente o ponto.
+- **A OFERTA REUSA O FLUXO QUE JÁ EXISTIA.** A tela *"Smeargle quer aprender um golpe novo!"* já era
+  exatamente isso; só mudou de onde vem a lista. Ele continua levando até `MAX_GOLPES`, continua
+  podendo recusar (e **sketch recusado fica recusado**, senão a pergunta voltaria pra sempre — é o
+  carrossel infinito de 09/09/2026), e a tela de escolha lista o que ele copiou **mais o que ele já
+  carrega**, pela mesma razão de sempre.
+- **Ele entra nos DOIS fins de batalha** (`finishBattle` e `finishSpecialBattle`), ao lado da
+  evolução no desmaio. Deixar num só era garantir que a Elite — que é o caminho especial — ficasse
+  sem copiar nada; é o defeito que a evolução já teve.
+- **Adversário sem golpe escolhido não vira sketch.** Liga, online e save antigo atacam pelo motor
+  de tipo e não têm id de golpe — ali não há o que copiar, e é o certo: no jogo original o Sketch
+  também não copia o que não é um golpe.
+
+**O PROBLEMA MEDIDO, e ele não era o que parecia.** A primeira medição usou um painel forte
+(Machamp, Snorlax, Rhydon nível 50) e deu **0% pra tudo**, inclusive com o golpe mais forte do jogo
+— o que sugeria que o gargalo era o atributo. Contra um painel **do tamanho dele** é o contrário:
+
+| Smeargle Lv.30, painel de BST 215–415 | vitória |
+|---|---|
+| hoje (só Tapa Duplo, poder 15) | **5,9%** |
+| com 3 golpes fortes do jogo (teto) | 76,3% |
+
+No Lv.50 o de hoje cai pra **0,2%**, porque o golpe dele não cresce. **A lição é sobre a medição:**
+um painel forte demais achata tudo em zero e faz o gargalo parecer outro.
+
+**O QUE O SKETCH ENTREGA, simulado num Smeargle atravessando 40 confrontos no nível 30:**
+
+| | copiados | leva | vitória |
+|---|---|---|---|
+| início | 0 | Tapa Duplo | 6,3% |
+| 10 confrontos | 8 | Submissão, Batida, Quebra-Telha | 9,5% |
+| 30 confrontos | 21 | Comedor de Sonhos, Submissão, Batida | 17,7% |
+| 40 confrontos | 26 | Comedor de Sonhos, Submissão, Batida | **18,3%** |
+
+Ele passa a **brigar, sem virar forte** — um Dunsparce comum de rota faz **91%** no mesmo painel.
+É o mesmo desenho do Ditto, e a mesma frase serve: *ele escolhe melhor, não fica mais forte*.
+
+- **O TAPA DUPLO CONTINUA sendo o golpe inicial dele, e isso foi MEDIDO, não herdado.** Ele é
+  invenção da nossa regra de cobertura de tipo (no jogo oficial não existe), e a tentação era tirá-lo
+  por fidelidade. Sem golpe nenhum ele cai no motor de tipo e ganha **2,4%**, contra **6,3%** com o
+  tapa: o golpe de vários tapas rende mais que o poder implícito de 60 num corpo de ataque 20.
+  Tirá-lo deixaria o Smeargle recém-capturado **pior** do que está.
+- **A jornada não foi medida, e é de propósito:** o Smeargle está em 2 pools de rota, então ele
+  aparece em pouquíssimas jornadas — o número sairia dominado por ruído e não diria nada. O que
+  vale aqui é a medição por confronto, acima.
+- **Nada disso foi pro servidor.** O `sketch` é a lista de onde a OFERTA sai; o que viaja pra
+  batalha é o `ataques`, que já viajava. `tools/test-ataques.js` tranca as onze pontas.
+
 ### O golpe da forma anterior NÃO se perde na evolução (09/09/2026)
 
 Reportado com o caso exato: a **Staryu aprende Raio de Bolhas no 28 e a Starmie não ensina esse
