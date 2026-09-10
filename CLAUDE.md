@@ -81,10 +81,43 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
   dos casos, mas a força real do time do rival sobe só **1,2%** (BST médio 488,1 → 494,1), e em
   400 jornadas simuladas de cada lado a conclusão fica em **274 contra 271** — dentro do ruído.
   Ele escolhe melhor, não escolhe mais forte.
-- **Crítico ainda é Gen 1** (`velocidade/512`, e o crítico dobra o nível na fórmula). A Gen 2 usa
-  1/16 fixo com multiplicador ×2. É o maior desvio que resta: hoje a taxa média é 13,4% e 138 das
-  150 espécies criticam mais do que criticariam na Gen 2 (Electrode 27,3%, 4,4× a taxa oficial).
-  Decisão em aberto — foi medido e apresentado, não escolhido.
+- **O CRÍTICO É DA GEN 3 desde 10/09/2026** — a "decisão em aberto" foi tomada, e com ela some o
+  último desvio de Gen 1 do motor (o jogo já usava atributos da Gen 2 e golpes da Gen 3).
+  **A Gen 3 abandonou a velocidade** e usa ESTÁGIOS de chance fixa, iguais pra todo mundo:
+  `+0 = 1/16 (6,25%)`, `+1 = 1/8`, `+2 = 1/4`, `+3 = 1/3`, `+4 = 1/2`.
+  **Só existem os DOIS primeiros aqui, e é decisão:** nada no jogo sobe estágio — não há Foco de
+  Energia, Lente de Mira, habilidade nem item de crítico. Cadastrar os estágios 2 a 4 seria código
+  que nunca roda, do tipo que fica anos no arquivo sem ninguém saber que está morto.
+- **O efeito é ×2 EXATO** (a regra da Gen 2 à Gen 5), e não mais o nível dobrado — que dava **1,78×
+  no nível 20 e 1,92× no 90**, porque o `+2` e os arredondamentos da fórmula comiam uma fatia.
+- **OS OITO GOLPES DE CRÍTICO ALTO** (`GOLPES_CRIT_ALTO`, estágio +1 = 12,5%): Ataque Celeste,
+  Aerojato, Golpe Cruzado, Martelo de Caranguejo, **Corte** (22 espécies, o de peso real),
+  Corte de Ar, Folha Navalha e Golpe de Karatê.
+  **A lista NÃO foi escrita de cabeça:** o Bulbapedia não publica o conjunto da geração, só
+  exemplos — ela saiu do `critRatio` do dado do Showdown com o mod da Gen 3, o MESMO caminho que
+  gerou a base de golpes. **Atenção: o Ás Aéreo NÃO entra** (ele nunca erra, mas não é crítico
+  alto), e essa foi a primeira coisa que a conferência contra o dado pegou.
+  Ela é **DUPLICADA nos dois motores** e o teste compara.
+- **O QUE MUDOU NA PRÁTICA:** a taxa média cai de **12,8% pra 6,25%** e **deixa de depender da
+  espécie**. O Electrode criticava 27,3% e o Shuckle 1,0%; hoje os dois criticam igual, e quem
+  carrega um dos oito golpes vai a 12,5%. Um Gyarados, que era 15,8%, virou 6,25%.
+  **Custo medido: nada.** Conclusão da jornada **69,93% → 68,77%**, −1,16 ponto, **1,6σ** (10 blocos
+  de 1.000 jornadas de cada lado). Menos crítico deixou o jogo levemente MAIS difícil, não menos —
+  dentro do ruído, mas na direção de que o jogador aproveitava o crítico um pouco mais que os NPCs.
+- **O SELO DE CRÍTICO VOLTOU** (no log e na linha do meio da batalha), e ele **já tinha saído daqui**
+  por virar ruído numa linha que se lê de relance — está registrado mais abaixo, na seção do log.
+  Voltou a pedido, e o motivo é outro agora: com ×2 exato e sem teto de dano, o crítico **decide
+  confronto** — o relato que trouxe esta mudança foi justamente um Gyarados morrendo de vida cheia
+  sem nada na tela explicando por quê.
+  **Pra não repetir o erro ele é pequeno, sem cor forte e ANEXADO ao número** (`−415 de HP.
+  CRÍTICO`): quem lê a linha vê o dano primeiro e o motivo depois, não uma etiqueta piscando na
+  frente. O campo `c` do diário existia desde sempre e nunca era lido — mesmo caso do `dz`.
+  **NA RECONSTRUÇÃO o selo é aproximado, e de propósito:** ela inventa os golpes a partir do HP e
+  não sabe QUAL foi crítico, mas o diário sabe **quantos** foram e de **que lado** — o
+  `marcarCriticos` põe o selo nessa quantidade nos golpes de maior dano daquele lado (o crítico
+  vale ×2, então é a correspondência mais provável). Sem isso o selo sumia em **56%** dos confrontos
+  com crítico, justamente os longos. O que é aproximado é a POSIÇÃO; o lado e a contagem são reais,
+  e o teste cobra os dois.
 - **Multiplicador de tipo: expoente 1.0** (`EXPOENTE_TIPO`), ou seja, a tabela oficial — 2× é 2×.
   Ele já foi `0.6` (comprimido: 2× virava 1,52×), pra tipo não virar sentença de morte num jogo
   onde não dá pra trocar de pokémon no meio do confronto. Voltou pra 1.0 em 30/08/2026, medido:
@@ -1449,7 +1482,11 @@ pedido em 09/09/2026. `PAUSA_ANTES_DO_GOLPE_MS`.
   linha anterior", que fazia a linha antiga parecer fatal).
 - A linha do log tem **uma forma só**: "X atacou Y com GOLPE e tirou −N de HP". Já passaram por
   ali selo de crítico, de moribundo e de "o tipo não pega nele" — todos saíram: viravam ruído numa
-  linha que se lê de relance. As **exceções são os três golpes especiais** (autodestruição,
+  linha que se lê de relance.
+  **O DE CRÍTICO VOLTOU em 10/09/2026**, e vale saber por que o motivo mudou: quando ele saiu, o
+  crítico valia ~1,9× e o teto de dano aparava o resultado. Hoje ele vale ×2 exato e não há teto —
+  ele DECIDE confronto, e a barra caindo o dobro sem explicação foi reportada como bug. Ele voltou
+  pequeno, sem cor forte e colado no número, que é o oposto de como estava quando incomodou. As **exceções são os três golpes especiais** (autodestruição,
   sono e Disable, seção acima): ali não há número pra contar a história, e sem a frase o jogador
   vê dois pokémon caindo juntos -- ou um deles batendo mais fraco do resto da luta -- sem
   explicação nenhuma. As frases vivem no `fraseDoEspecial`, e o aviso do meio da batalha lê a

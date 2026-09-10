@@ -1021,6 +1021,19 @@
      lado é o golpe continua sendo a COR do nome (verde você, vermelho o adversário). */
   /* linha de golpe especial: é o confronto inteiro decidido de uma vez, então ela se destaca do
      resto do log em vez de se misturar com os golpes */
+  /* O SELO DE CRÍTICO. Ele já esteve no log e SAIU, por virar ruído numa linha que se lê de
+     relance -- voltou em 10/09/2026, quando o crítico virou ×2 exato e passou a decidir confronto.
+     Pra não repetir o erro ele é pequeno, sem cor de fundo forte e ANEXADO ao número: quem lê a
+     linha inteira vê o dano primeiro e o motivo depois, não uma etiqueta piscando na frente. */
+  /* `font-size:inherit` nos dois, a pedido: o selo sai do MESMO tamanho da frase em que ele está.
+     Ele já foi menor que o texto no log (.6rem contra .62rem) e MAIOR na linha da batalha -- duas
+     medidas escritas à mão pra a mesma coisa, que é justamente o que faz um selo parecer colado de
+     fora. Herdando, ele acompanha se a frase mudar de tamanho.
+     O que distingue o selo continua sendo o peso, a cor e o fundo -- não o tamanho. */
+  .mlog-crit, .aviso-crit{
+    font-size:inherit;font-weight:800;letter-spacing:.5px;color:#b8860b;
+    background:#fff3c4;border-radius:6px;padding:1px 5px;white-space:nowrap;
+  }
   .mlog-passo.especial{ background:#fff5d6; border-left:3px solid var(--yellow); font-weight:700; }
   .mlog-passo{font-size:.62rem;font-weight:600;color:var(--ink);line-height:1.45;text-align:center;}
   .mlog-passo + .mlog-passo{border-top:1px dotted rgba(26,26,46,.09);padding-top:3px;}
@@ -6053,19 +6066,19 @@ function calcDamageNew(attacker, defender, rng){
   const defBase = special ? effectiveSpDef(defender) : effectiveDefense(defender); // Gen 2: quem defende usa o Sp.Def, nao o mesmo numero do ataque
   const A = statAtLevel(atkBase, attacker.level);
   const D = statAtLevel(defBase, defender.level);
-  const isCrit = rng() < (effectiveSpeed(attacker) / 512); // crítico oficial da Gen 1
+  const isCrit = rng() < chanceDeCritico(best.golpe);   // Gen 3: chance fixa, +1 estágio nos golpes de crítico alto
   attacker.lastCrit = isCrit;   // registro pro log, como o lastMoveType acima
   /* Imunidade: o multiplicador é 0, mas o dano tem piso de 1 -- dano 0 dos dois lados travaria
      o laço da luta pra sempre. O log precisa saber a diferença entre "tirou 1" e "não teve
      efeito", senão o jogador vê um -1 sem explicação. */
   attacker.lastMoveNulo = !!best.nulo;
-  const Leff = isCrit ? attacker.level*2 : attacker.level; // crítico dobra o nível na fórmula (regra oficial)
+  const Leff = attacker.level;   // o crítico da Gen 3 dobra o DANO no fim, não o nível aqui
   /* O PODER agora vem do GOLPE quando existe um escolhido; o MOVE_POWER de 60 virou o fallback
      de quem não tem (save antigo e as oito espécies sem golpe de dano). */
   const potencia = best.poder || MOVE_POWER;
   const core = Math.floor(Math.floor(2*Leff/5 + 2) * potencia * A / D / 50) + 2;
   const typeMult = Math.pow(best.mult, EXPOENTE_TIPO);
-  const dmgGen1 = Math.round(core * STAB * typeMult * (0.85 + rng()*0.15)); // variação 85-100%, igual ao jogo oficial
+  const dmgGen1 = Math.round(core * STAB * typeMult * (0.85 + rng()*0.15) * (isCrit ? CRIT_MULT : 1)); // variação 85-100% e o ×2 do crítico
   // converte pra FRAÇÃO da vida na escala Gen 1 (onde o balanceamento foi calibrado), aplica o teto
   // por golpe, e projeta essa fração na escala de HP real do jogo -- cada golpe tira exatamente a
   // mesma porcentagem que tiraria na Gen 1 pura, só que exibida nos números grandes de sempre
@@ -6116,6 +6129,31 @@ const CHANCE_AUTODESTRUICAO = 0.15;
    e no laço de batalha o inimigo carrega o HP de um confronto pro outro, então isso acontecia de
    verdade. Com a trava ela vira o que devia ser: o recurso de quem está diante de um alvo cheio. */
 const BOOM_MINIMO_DO_ALVO = 0.5;
+/* O CRÍTICO É DA GEN 3 desde 10/09/2026. Era da Gen 1 (`velocidade/512`, e o crítico dobrava o
+   NÍVEL na fórmula) -- o último desvio de Gen 1 que restava no motor, num jogo que já usa atributos
+   da Gen 2 e golpes da Gen 3.
+   A GEN 3 ABANDONOU A VELOCIDADE e usa ESTÁGIOS de chance fixa, iguais pra todo mundo:
+     +0 = 1/16 (6,25%)   +1 = 1/8 (12,5%)   +2 = 1/4   +3 = 1/3   +4 = 1/2
+   Aqui só existem os DOIS primeiros, e é decisão: nada no jogo sobe estágio -- não há Foco de
+   Energia, Lente de Mira, habilidade nem item de crítico. Cadastrar os estágios 2 a 4 seria código
+   que nunca roda, do tipo que fica anos no arquivo sem ninguém saber que está morto.
+   O EFEITO É ×2 EXATO (Gen 2 a Gen 5), e não mais o nível dobrado -- que dava ~1,9× por causa do
+   +2 e dos arredondamentos da fórmula.
+   O QUE MUDA NA PRÁTICA: a taxa média cai de 12,8% pra ~6,6% e deixa de depender da espécie. O
+   Electrode criticava 27,3% e o Shuckle 1,0%; agora os dois criticam 6,25%, e quem carrega um dos
+   golpes de crítico alto vai a 12,5%.
+   OS OITO GOLPES saíram do `critRatio` do dado do Showdown com o mod da Gen 3 -- o MESMO caminho
+   que gerou a base de golpes, e não uma lista escrita de cabeça: o Bulbapedia não publica o
+   conjunto da geração, só exemplos. Esta lista é DUPLICADA nos dois motores. */
+const CRIT_BASE = 1/16;   // estágio +0 -- todo golpe comum
+const CRIT_ALTO = 1/8;    // estágio +1 -- os golpes de crítico alto
+const CRIT_MULT = 2;      // Gen 2 a Gen 5: o crítico dobra o dano
+const GOLPES_CRIT_ALTO = ['aeroblast','aircutter','crabhammer','crosschop','karatechop','razorleaf','skyattack','slash'];
+/* Sem golpe escolhido (liga, online, save antigo e as espécies sem golpe de dano) o motor ataca
+   pelo TIPO e não há id pra consultar -- ali vale o estágio +0, que é o padrão da geração. */
+function chanceDeCritico(golpeId){
+  return (golpeId && GOLPES_CRIT_ALTO.indexOf(golpeId) >= 0) ? CRIT_ALTO : CRIT_BASE;
+}
 const CHANCE_SONO = 0.05;
 /* Quantas TROCAS o alvo passa sem revidar. O sono já foi abate instantâneo -- o alvo ia a 0 de HP
    sem tocar em ninguém -- e os jogadores reclamaram, com razão: não era o número que pesava (medido,
@@ -8897,7 +8935,11 @@ function buildAnimatedHitSequence(m){
        tradução porque é deles que sai a frase "Fulano usou GOLPE" -- ver fraseDoGolpeUsado. */
     /* t/tn viajam junto pelo mesmo motivo do q e do x: é deles que sai o "1x" da frase. Ausentes
        no golpe comum, e aí o passo é exatamente o que era antes. */
-    return { side: g.q === 'p' ? 'enemy' : 'player', amount: g.d, q: g.q, x: g.x || null, t: g.t || 0, tn: g.tn || 0 };
+    /* `c` (crítico) viaja junto pelo mesmo motivo do q e do t: é dele que sai o selo da frase.
+       O campo já existia no diário desde sempre e nunca era lido -- o selo de crítico chegou a
+       existir no log e saiu por virar ruído. Voltou a pedido em 10/09/2026, agora que o crítico
+       vale ×2 e decide confronto. */
+    return { side: g.q === 'p' ? 'enemy' : 'player', amount: g.d, q: g.q, x: g.x || null, t: g.t || 0, tn: g.tn || 0, c: g.c || 0 };
   });
   /* O passo SEGUINTE ao da Faixa precisa de um DESENHO pra a frase dela sair da tela. Ela é a única
      frase do meio da luta: as de abertura somem sozinhas porque a barra que elas anunciam se move e
@@ -15149,6 +15191,22 @@ function sequenciaDoConfronto(m){
      QUANTOS TAPAS saem dos que SAÍRAM DE VERDADE naquele confronto, lidos do diário na ordem -- não
      é sorteio novo. E golpe pequeno demais pra repartir (menos de 1 por tapa) fica inteiro: um
      passo de dano 0 é o que este log evita em toda regra. */
+  /* O CRÍTICO NA RECONSTRUÇÃO. Ela inventa os golpes a partir do HP de entrada e de saída, então
+     não sabe qual deles foi crítico -- mas o DIÁRIO sabe QUANTOS foram e de QUE LADO. Marcar essa
+     quantidade nos golpes de MAIOR dano daquele lado é a correspondência mais provável (o crítico
+     vale ×2) e mantém o selo honesto no que ele afirma: houve N críticos daquele lado aqui.
+     Sem isto o selo sumia em 56% dos confrontos com crítico -- justamente os longos, que são os
+     que passam do teto de 3 golpes. A POSIÇÃO é aproximada, como já é o dano de cada golpe
+     reconstruído; o que NÃO é aproximado é o lado e a contagem. */
+  const marcarCriticos = (lista) => {
+    ['p','e'].forEach(lado => {
+      const quantos = (m.golpes || []).filter(g => !g.x && g.c && g.q === lado).length;
+      if(!quantos) return;
+      lista.filter(h => !h.x && h.q === lado).sort((a, b) => b.d - a.d)
+           .slice(0, quantos).forEach(h => { h.c = 1; });
+    });
+    return lista;
+  };
   const expandirTapas = (lista) => {
     const contagens = { p: [], e: [] };
     (m.golpes || []).forEach(g => { if(g.t === 1 && g.tn > 1 && contagens[g.q]) contagens[g.q].push(g.tn); });
@@ -15254,7 +15312,7 @@ function sequenciaDoConfronto(m){
       partida[i] = Object.assign({}, g, { d: g.d - tira });
       excesso -= tira;
     }
-    return partida.filter(g => g.x || g.d > 0);
+    return marcarCriticos(partida.filter(g => g.x || g.d > 0));
   }
 
   /* AS TROCAS LIVRES DO SONO, reais. São os golpes que quem usou o sono deu ANTES do primeiro do
@@ -15319,7 +15377,7 @@ function sequenciaDoConfronto(m){
      tela é o que faz procurar bug onde é regra. */
   const resto = expandirTapas(reconstruirSequencia(base).map(h => ({ q: h.side === 'player' ? 'e' : 'p', d: h.amount }))
                                                         .filter(h => h.d > 0));
-  return aberturas.concat(livres, resto);
+  return marcarCriticos(aberturas.concat(livres, resto));
 }
 /* AS FRASES DOS GOLPES ESPECIAIS VIVEM AQUI, num lugar só.
    O log da batalha e o aviso do meio da luta leem desta função. Montadas em separado, as duas
@@ -15599,7 +15657,11 @@ function fraseDoGolpeUsado(m, hit){
                              hit.tn > 1 ? hit.t : 0);
   if(!selo) return '';
   const quem = escapeHtmlSafe((doJogador ? m.player : m.enemy) || '');
-  return '<span class="aviso-golpe-quem ' + (doJogador ? 'p' : 'e') + '">' + quem + '</span> usou ' + selo;
+  /* O SELO DE CRÍTICO fica DEPOIS do nome do golpe, e é a única coisa que entra nesta linha além
+     do golpe. Ele não repete o número (a barra já mostra), ele explica por que a barra andou tanto.
+     Num golpe de vários tapas ele vale por TAPA: cada tapa tem o próprio sorteio. */
+  const crit = hit.c ? ' <span class="aviso-crit">CRÍTICO!</span>' : '';
+  return '<span class="aviso-golpe-quem ' + (doJogador ? 'p' : 'e') + '">' + quem + '</span> usou ' + selo + crit;
 }
 /* A LINHA DE STATUS DA BATALHA, numa função só -- lida pelo render das QUATRO telas de revelação E
    pelo pintor que atualiza o DOM no meio da animação. Montadas em separado, as duas divergiriam no
@@ -15691,7 +15753,10 @@ function passosHtml(m){
   const linhas = [];
   golpes.forEach(g => {
     const ult = linhas[linhas.length - 1];
-    if(g.t > 1 && ult && ult.q === g.q && ult.tn === g.tn){ ult.d += g.d; return; }
+    /* O CRÍTICO DE QUALQUER TAPA marca a linha inteira: cada tapa tem o próprio sorteio, e a linha
+       do log é UMA pro golpe todo -- dizer que não houve crítico porque o último não foi seria
+       esconder justamente o que explica o número. */
+    if(g.t > 1 && ult && ult.q === g.q && ult.tn === g.tn){ ult.d += g.d; ult.c = ult.c || g.c; return; }
     linhas.push(Object.assign({}, g));
   });
   return `<div class="mlog-passos">${anulacoes}${linhas.map(g=>{
@@ -15701,7 +15766,7 @@ function passosHtml(m){
     if(g.x === 'boom' || g.x === 'sono' || g.x === 'recover' || g.x === 'semSono' ||
        g.x === 'pocao' || g.x === 'absorb' || g.x === 'faixa' || g.x === 'desempate') return linhaEspecial(g);
     return `<div class="mlog-passo ${doJogador?'p':'e'}">
-      ${ladoHtml(doJogador)} atacou ${ladoHtml(!doJogador)}${seloDe(doJogador)?` com ${seloDe(doJogador, g.tn > 1 ? g.tn : 0)}`:''} e tirou <span class="mlog-tira">−${g.d}</span> de HP.
+      ${ladoHtml(doJogador)} atacou ${ladoHtml(!doJogador)}${seloDe(doJogador)?` com ${seloDe(doJogador, g.tn > 1 ? g.tn : 0)}`:''} e tirou <span class="mlog-tira">−${g.d}</span> de HP.${g.c?' <span class="mlog-crit">CRÍTICO</span>':''}
     </div>`;
   }).join('')}</div>`;
 }

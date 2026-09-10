@@ -1148,19 +1148,19 @@ function calcDamage(attacker, defender, rng){
   const defBase = special ? effectiveSpDef(defender) : effectiveDefense(defender);  // Gen 2: defesa especial propria
   const A = statAtLevel(atkBase, attacker.level);
   const D = statAtLevel(defBase, defender.level);
-  const isCrit = rng() < (effectiveSpeed(attacker) / 512);  // crítico oficial da Gen 1
+  const isCrit = rng() < chanceDeCritico(best.golpe);   // Gen 3: chance fixa, +1 estágio nos golpes de crítico alto
   attacker.lastCrit = isCrit;   // registro pro log, como o lastMoveType acima
   /* Imunidade: o multiplicador é 0, mas o dano tem piso de 1 -- dano 0 dos dois lados travaria
      o laço da luta pra sempre. O log precisa saber a diferença entre "tirou 1" e "não teve
      efeito", senão o jogador vê um -1 sem explicação. */
   attacker.lastMoveNulo = !!best.nulo;
-  const Leff = isCrit ? attacker.level*2 : attacker.level;  // crítico dobra o nível na fórmula
+  const Leff = attacker.level;   // o crítico da Gen 3 dobra o DANO no fim, não o nível aqui
   const potencia = best.poder || MOVE_POWER;   // o poder do GOLPE escolhido, ou o implícito de sempre
   const core = Math.floor(Math.floor(2*Leff/5 + 2) * potencia * A / D / 50) + 2;
   // multiplicador de tipo COMPRIMIDO (^0.6): 2x vira ~1.5x. Aqui não se troca de pokémon no meio
   // do confronto, então tipo não pode ser sentença de morte
   const typeMult = Math.pow(mult, EXPOENTE_TIPO);
-  const dmgGen1 = Math.round(core * STAB * typeMult * (0.85 + rng()*0.15));
+  const dmgGen1 = Math.round(core * STAB * typeMult * (0.85 + rng()*0.15) * (isCrit ? CRIT_MULT : 1)); // variação 85-100% e o ×2 do crítico
   // converte pra fração da vida na escala Gen 1, aplica o teto por golpe, e projeta na escala de HP
   // do jogo -- sem vulnerabilidade por sequência de vitórias, que era a origem da "morte súbita"
   let pct = dmgGen1 / gen1MaxHp(defender);
@@ -1203,6 +1203,31 @@ const CHANCE_AUTODESTRUICAO = 0.15;
    e no laço de batalha o inimigo carrega o HP de um confronto pro outro, então isso acontecia de
    verdade. Com a trava ela vira o que devia ser: o recurso de quem está diante de um alvo cheio. */
 const BOOM_MINIMO_DO_ALVO = 0.5;
+/* O CRÍTICO É DA GEN 3 desde 10/09/2026. Era da Gen 1 (`velocidade/512`, e o crítico dobrava o
+   NÍVEL na fórmula) -- o último desvio de Gen 1 que restava no motor, num jogo que já usa atributos
+   da Gen 2 e golpes da Gen 3.
+   A GEN 3 ABANDONOU A VELOCIDADE e usa ESTÁGIOS de chance fixa, iguais pra todo mundo:
+     +0 = 1/16 (6,25%)   +1 = 1/8 (12,5%)   +2 = 1/4   +3 = 1/3   +4 = 1/2
+   Aqui só existem os DOIS primeiros, e é decisão: nada no jogo sobe estágio -- não há Foco de
+   Energia, Lente de Mira, habilidade nem item de crítico. Cadastrar os estágios 2 a 4 seria código
+   que nunca roda, do tipo que fica anos no arquivo sem ninguém saber que está morto.
+   O EFEITO É ×2 EXATO (Gen 2 a Gen 5), e não mais o nível dobrado -- que dava ~1,9× por causa do
+   +2 e dos arredondamentos da fórmula.
+   O QUE MUDA NA PRÁTICA: a taxa média cai de 12,8% pra ~6,6% e deixa de depender da espécie. O
+   Electrode criticava 27,3% e o Shuckle 1,0%; agora os dois criticam 6,25%, e quem carrega um dos
+   golpes de crítico alto vai a 12,5%.
+   OS OITO GOLPES saíram do `critRatio` do dado do Showdown com o mod da Gen 3 -- o MESMO caminho
+   que gerou a base de golpes, e não uma lista escrita de cabeça: o Bulbapedia não publica o
+   conjunto da geração, só exemplos. Esta lista é DUPLICADA nos dois motores. */
+const CRIT_BASE = 1/16;   // estágio +0 -- todo golpe comum
+const CRIT_ALTO = 1/8;    // estágio +1 -- os golpes de crítico alto
+const CRIT_MULT = 2;      // Gen 2 a Gen 5: o crítico dobra o dano
+const GOLPES_CRIT_ALTO = ['aeroblast','aircutter','crabhammer','crosschop','karatechop','razorleaf','skyattack','slash'];
+/* Sem golpe escolhido (liga, online, save antigo e as espécies sem golpe de dano) o motor ataca
+   pelo TIPO e não há id pra consultar -- ali vale o estágio +0, que é o padrão da geração. */
+function chanceDeCritico(golpeId){
+  return (golpeId && GOLPES_CRIT_ALTO.indexOf(golpeId) >= 0) ? CRIT_ALTO : CRIT_BASE;
+}
 const CHANCE_SONO = 0.05;
 /* Quantas TROCAS o alvo passa sem revidar. O sono já foi abate instantâneo -- o alvo ia a 0 de HP
    sem tocar em ninguém -- e os jogadores reclamaram, com razão: não era o número que pesava (medido,
@@ -3336,7 +3361,7 @@ exports._raizDaLinha = raizDaLinha;
 exports._chaveDoEquipado = chaveDoEquipado;
 exports._createInstance = createInstance;
 exports._makeSeededRng = makeSeededRng;
-exports._golpesEspeciais = { AUTODESTRUICAO, SONIFEROS, METRONOMO, CHANCE_AUTODESTRUICAO, CHANCE_SONO, SONO_EM_TROCAS, MULTI_GOLPE, ataquesDisponiveis };
+exports._golpesEspeciais = { AUTODESTRUICAO, SONIFEROS, METRONOMO, CHANCE_AUTODESTRUICAO, CHANCE_SONO, SONO_EM_TROCAS, MULTI_GOLPE, ataquesDisponiveis, GOLPES_CRIT_ALTO };
 exports._trainersLeagueSplitGroups = trainersLeagueSplitGroups;
 exports._trainersLeagueGatherEligibleCodes = trainersLeagueGatherEligibleCodesForUid;
 exports._decodeTeamCode = decodeTeamCode;   // o teste da liga confere a ORDEM da lista pela especie de cada time

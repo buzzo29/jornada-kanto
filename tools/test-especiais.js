@@ -1451,6 +1451,88 @@ function comItem(instancia, item){
      JSON.stringify([S.avisoDoConfronto(m,0), S.avisoDoConfronto(m,1)]));
 })();
 
+console.log('\n=== O CRITICO E DA GEN 3 ===');
+{
+  /* Trocado em 10/09/2026, a pedido. Era da Gen 1 (velocidade/512, e o critico dobrava o NIVEL na
+     formula) -- o ultimo desvio de Gen 1 que restava, num jogo que ja usa atributos da Gen 2 e
+     golpes da Gen 3.
+     A GEN 3 usa ESTAGIOS de chance fixa: +0 = 1/16, +1 = 1/8 (golpes de critico alto). Os estagios
+     2 a 4 nao existem aqui porque nada no jogo sobe estagio -- seria codigo que nunca roda. */
+  ok('a chance base e 1/16 (6,25%)', S.CRIT_BASE === 1/16, (100*S.CRIT_BASE).toFixed(2) + '%');
+  ok('a de critico alto e 1/8 (12,5%)', S.CRIT_ALTO === 1/8, (100*S.CRIT_ALTO).toFixed(2) + '%');
+  ok('e o multiplicador e 2 exato', S.CRIT_MULT === 2);
+  ok('sao os OITO golpes da Gen 3', S.GOLPES_CRIT_ALTO.length === 8, S.GOLPES_CRIT_ALTO.join(','));
+  /* A lista saiu do critRatio do dado do Showdown com o mod da Gen 3 -- o MESMO caminho que gerou
+     a base de golpes. Ela e DUPLICADA nos dois motores. */
+  ok('todos existem na tabela GOLPES', S.GOLPES_CRIT_ALTO.every(id => !!S.GOLPES[id]));
+  ok('e a lista e a MESMA nos dois motores',
+     JSON.stringify(esp.GOLPES_CRIT_ALTO) === JSON.stringify(S.GOLPES_CRIT_ALTO),
+     'cliente: ' + JSON.stringify(S.GOLPES_CRIT_ALTO) + '  servidor: ' + JSON.stringify(esp.GOLPES_CRIT_ALTO));
+  ok('golpe comum cai no estagio +0', S.chanceDeCritico('tackle') === S.CRIT_BASE);
+  ok('e sem golpe escolhido tambem (liga, online, save antigo)',
+     S.chanceDeCritico(null) === S.CRIT_BASE && S.chanceDeCritico(undefined) === S.CRIT_BASE);
+
+  /* A CHANCE MEDIDA, e ela nao pode mais depender da ESPECIE -- era isso que a Gen 1 fazia. */
+  const taxa = (especie, golpe) => {
+    let c = 0; const N = 30000;
+    for(let i = 0; i < N; i++){
+      const a = inst(especie, 50); a.ataques = [golpe];
+      S.calcDamage(a, inst('miltank', 50), Math.random);
+      if(a.lastCrit) c++;
+    }
+    return 100 * c / N;
+  };
+  const rapido = taxa('electrode', 'tackle');   // 27,3% na Gen 1
+  const lento  = taxa('shuckle', 'tackle');     // 1,0% na Gen 1
+  ok('o Electrode critica ~6,25% (criticava 27,3%)', Math.abs(rapido - 6.25) < 0.9, rapido.toFixed(2) + '%');
+  ok('o Shuckle tambem (criticava 1,0%)', Math.abs(lento - 6.25) < 0.9, lento.toFixed(2) + '%');
+  ok('e os dois criticam IGUAL: a velocidade saiu da conta', Math.abs(rapido - lento) < 1.2,
+     rapido.toFixed(2) + '% x ' + lento.toFixed(2) + '%');
+  const alto = taxa('persian', 'slash');
+  ok('o Corte (critico alto) critica ~12,5%', Math.abs(alto - 12.5) < 1.2, alto.toFixed(2) + '%');
+
+  /* O EFEITO: x2 EXATO, nao mais o nivel dobrado (que dava ~1,9x). */
+  {
+    let semC = 0, nSem = 0, comC = 0, nCom = 0;
+    for(let i = 0; i < 40000; i++){
+      const a = inst('gyarados', 58); a.ataques = ['hyperbeam'];
+      const d = S.calcDamage(a, inst('gyarados', 58), Math.random);
+      if(a.lastCrit){ comC += d; nCom++; } else { semC += d; nSem++; }
+    }
+    const x = (comC/nCom) / (semC/nSem);
+    ok('o critico vale 2x exato (valia ~1,9x)', Math.abs(x - 2) < 0.05, x.toFixed(3) + 'x');
+  }
+
+  /* O SELO. Ele JA ESTEVE no log e saiu por virar ruido; voltou a pedido agora que o critico vale
+     x2 e decide confronto. O que se cobra e que ele NUNCA falte: sem isso o jogador ve a barra cair
+     o dobro sem explicacao -- que foi exatamente o relato que trouxe esta mudanca. */
+  {
+    const semTag = h => String(h||'').replace(/<[^>]*>/g,'').replace(/\s+/g,' ').trim();
+    let comCrit = 0, noLog = 0, naTela = 0, contagemOk = 0;
+    for(let v = 0; v < 1500 && comCrit < 120; v++){
+      const a = [inst('gyarados', 58)]; a[0].ataques = ['hyperbeam'];
+      const b = [inst('gyarados', 58)]; b[0].ataques = ['hyperbeam'];
+      const m = (S.simulateGymBattle(a, b).matchups || [])[0];
+      if(!m) continue;
+      const noDiario = (m.golpes || []).filter(g => !g.x && g.c).length;
+      if(!noDiario) continue;
+      comCrit++;
+      const seq = S.sequenciaDoConfronto(m);
+      const marcados = seq.filter(g => !g.x && g.c).length;
+      if(marcados > 0) naTela++;
+      if(marcados === noDiario) contagemOk++;
+      if(semTag(S.passosHtml(m)).indexOf('CRÍTICO') >= 0) noLog++;
+    }
+    ok('amostra de criticos de sobra', comCrit >= 50, comCrit + ' confrontos');
+    /* A RECONSTRUCAO nao sabe QUAL golpe foi critico -- ela inventa os golpes a partir do HP. Mas o
+       diario sabe QUANTOS foram e de que LADO, e e isso que o marcarCriticos preserva. Sem ele o
+       selo sumia em 56% dos confrontos com critico, justamente os longos. */
+    ok('o selo NUNCA falta na tela', naTela === comCrit, naTela + ' de ' + comCrit);
+    ok('e a CONTAGEM de criticos e a do diario', contagemOk === comCrit, contagemOk + ' de ' + comCrit);
+    ok('e ele aparece no LOG', noLog === comCrit, noLog + ' de ' + comCrit);
+  }
+}
+
 console.log('\n=== O DESEMPATE TEM LINHA PROPRIA ===');
 {
   /* Reportado em 09/09/2026 com print: num Raticate x Gyarados o Gyarados aparecia atacando DUAS
@@ -1731,7 +1813,9 @@ console.log('\n=== GOLPES DE VARIOS TAPAS: DE 2 A 5 NUMA TROCA ===');
     const painel = ['miltank','onix','arcanine','starmie','machamp','pidgeot','gengar','rhydon'];
     for(const golpe of MULTI) for(const o of painel) for(let i = 0; i < 30; i++){
       const nomePt = S.GOLPES_PT[golpe];
-      const marcaNum = new RegExp(nomePt + ' \\d+x$');
+      /* O selo de CRITICO pode vir DEPOIS do nome (10/09/2026), entao o fim da frase deixou de
+         ser o numero de tapas. O que se cobra continua o mesmo: o golpe sai NUMERADO. */
+      const marcaNum = new RegExp(nomePt + ' \\d+x( CRÍTICO!)?$');
       const marca = new RegExp(nomePt);
       const a = inst(DONOS[golpe], 50);
       /* ataquesEscolhiveis recebe o POKEMON; o ataquesDisponiveis recebe (especie, nivel) e
