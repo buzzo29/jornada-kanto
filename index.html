@@ -5495,6 +5495,14 @@ function tiposDeAtaque(p, alvo){
    Devolver lista vazia aqui é o funil: a tela de escolha, a fila de aprendizado, o ataquesPadrao e
    o golpesDaEvolucao param todos de considerá-las, e o golpesDoTimeHtml passa a anunciar o
    Metrônomo, que é o que elas usam de verdade. Conferido: a batalha não muda em um ponto sequer. */
+/* QUANTOS GOLPES O POKÉMON DO JOGADOR LEVA. Foi 2 desde que a feature nasceu e virou 3 em
+   09/09/2026, a pedido.
+   É CONSTANTE e não um 2 espalhado porque o número aparecia em NOVE lugares -- o auto-preenchimento,
+   a marcação da tela, a validação, a fila de aprendizado, o texto do cabeçalho e o do botão. Com o
+   número solto, mudar de 2 pra 3 era achar os nove; com a constante é esta linha.
+   NÃO VALE PRO NPC: o `equiparNpc` dá o moveset INTEIRO da espécie de propósito -- o teto é a regra
+   de quem ESCOLHE, e o NPC não escolhe. */
+const MAX_GOLPES = 3;
 function usaGolpesEscolhidos(speciesId){ return !METRONOMO.includes(speciesId); }
 function ataquesDisponiveis(speciesId, nivel){
   if(!usaGolpesEscolhidos(speciesId)) return [];
@@ -5534,7 +5542,7 @@ function ataquesPadrao(p){
   if(!disp.length) return [];
   const sp = SPECIES[p.speciesId];
   const nota = id => GOLPES[id][1] * (((sp && sp.types) || []).indexOf(GOLPES[id][0]) >= 0 ? 1.5 : 1);
-  return disp.slice().sort((a, b) => nota(b) - nota(a)).slice(0, 2);
+  return disp.slice().sort((a, b) => nota(b) - nota(a)).slice(0, MAX_GOLPES);
 }
 /* O nome que o jogador lê. Vem do GOLPES_PT -- o motor manda o id, o cliente escolhe a palavra,
    a mesma regra do MOVE_BY_TYPE. */
@@ -5586,6 +5594,26 @@ function melhorAtaque(attacker, defender){
     if(teimoso){ teimoso.nulo = true; return teimoso; }
   }
   return melhor;
+}
+/* OS NPCs LUTAM COM O MOVESET DELES (09/09/2026, a pedido).
+   ANTES eles caíam no motor de TIPO: atacavam com QUALQUER tipo da espécie e poder implícito de
+   60, então um Onix batia com o nome genérico do tipo Pedra -- um golpe que ele não aprende em
+   nível nenhum. Foi assim que o jogador viu "ataques que não estão no moveset do pokémon".
+   AGORA cada NPC leva TUDO que a espécie aprende por nível até o nível dele, e o motor escolhe o
+   que tira mais dano contra quem está na frente -- que é o que o `melhorAtaque` já faz.
+   NÃO TEM TETO DE 2 GOLPES, e isso é de propósito: os dois são a regra do JOGADOR, que ESCOLHE.
+   O NPC não escolhe nada -- ele tem o que a espécie tem, e é isso que o pedido descreve.
+   NUNCA SOBRESCREVE quem já tem golpe: se esta função for chamada por engano sobre um time de
+   jogador, ela passa batido. É a mesma guarda do equiparItens.
+   ONDE NÃO VALE: batalha online, ligas e ginásio da cidade. Lá o time do outro lado é de um
+   JOGADOR (vem de um código, sem golpe), não de um NPC -- e o pedido separou os dois. */
+function equiparNpc(time){
+  (time || []).forEach(p => {
+    if(!p || (Array.isArray(p.ataques) && p.ataques.length)) return;
+    const lista = ataquesDisponiveis(p.speciesId, p.level);
+    if(lista.length) p.ataques = lista;
+  });
+  return time;
 }
 function bestAttackType(attacker, defender){
   /* Tem golpe escolhido? A escolha é entre ELES. Senão, o motor de tipo de sempre, logo abaixo. */
@@ -5917,11 +5945,6 @@ const APRENDIZADO = {
    (a causa do "estava no amarelo e foi pra zero do nada") -- anti-varredura é só dano persistente +
    golpe moribundo, gradual e previsível. */
 const MOVE_POWER = 60;
-/* >>> EXPERIMENTO 09/09/2026: O TETO DE DANO ESTÁ DESLIGADO. <<<
-   Os valores de produção são 0.65 e 0.70 -- pra voltar, é trocar os dois Infinity de volta AQUI e
-   no outro motor (index.html e functions/index.js têm cópias, e elas têm que ficar idênticas).
-   O que o teto garantia, e que agora não vale mais: one-shot não existir, e todo pokémon sempre
-   responder pelo menos uma vez. Medido ao desligar -- ver a seção do CLAUDE.md. */
 /* TETO DE DANO POR GOLPE, DESLIGADO desde 09/09/2026 -- e isso é decisão, não experimento
    esquecido: ele foi tirado pra um experimento e o resultado foi aprovado pro ar.
    Valeu 0.65 (0.70 no crítico) por quase toda a vida do jogo, e era ele que garantia que
@@ -6372,15 +6395,32 @@ function tentarGolpeEspecial(active, enemy, rng, diario){
          2) SÓ sai quando o alvo TEM um segundo golpe. Quem é de um tipo só e sem subtipo (um
             Onix, um Hitmonlee) não tem o que anular, e inventar uma punição pra ele seria
             outra regra, não esta. O sorteio simplesmente não vale contra ele. */
-      if(tiposDeAtaque(alvo, quem).length < 2) continue;
-      const tipoAnulado = bestAttackType(alvo, quem).type;
+      /* QUANTOS GOLPES DISTINTOS ELE TEM PRA PERDER. Com golpe escolhido -- o jogador, e desde
+         09/09/2026 também os NPCs -- o que conta são os TIPOS dos golpes que ele LEVA, não os
+         tipos da espécie: dois golpes do mesmo tipo caem juntos e a anulação fica sem segundo
+         golpe pra oferecer, que é exatamente o caso que esta regra existe pra evitar.
+         Sem golpe escolhido vale a lista de tipos da espécie, como sempre foi. */
+      const golpesDele = Array.isArray(alvo.ataques) ? alvo.ataques.filter(id => GOLPES[id]) : [];
+      if(golpesDele.length){
+        const tiposDele = [];
+        golpesDele.forEach(id => { if(tiposDele.indexOf(GOLPES[id][0]) < 0) tiposDele.push(GOLPES[id][0]); });
+        if(tiposDele.length < 2) continue;
+      } else if(tiposDeAtaque(alvo, quem).length < 2) continue;
+      const escolhaAnulada = bestAttackType(alvo, quem);
+      const tipoAnulado = escolhaAnulada.type;
+      /* O GOLPE anulado, quando existe um de verdade. O log dizia o nome GENÉRICO do tipo, e com
+         golpe escolhido isso nomeia um golpe que o pokémon não tem -- reportado em 09/09/2026
+         ("ele tá pegando um qualquer aleatório"). O motor manda o id; a palavra é do cliente. */
+      const golpeAnulado = escolhaAnulada.golpe || null;
       alvo._anulado = { tipo: tipoAnulado, contra: quem };
       if(diario){
         /* Grava o TIPO anulado (`a`) porque é ele que deixa o log dizer QUAL golpe se perdeu --
            "teve o ataque Nevasca anulado" em vez de "teve seu melhor ataque anulado". O nome sai
            do tipo no cliente, como em todo o resto do log: o motor manda o tipo, o cliente escolhe
            a palavra (ver nomeDoGolpe). */
-        diario.push({ q: marca, d: 0, hp: alvo.hp, c:0, m:0, z:0, x:'disable', g: especial.golpe, a: tipoAnulado });
+        const reg = { q: marca, d: 0, hp: alvo.hp, c:0, m:0, z:0, x:'disable', g: especial.golpe, a: tipoAnulado };
+        if(golpeAnulado) reg.am = golpeAnulado;   // o id do golpe perdido, quando ele existe
+        diario.push(reg);
       }
       continue;
     }
@@ -7279,15 +7319,17 @@ function escolhasDeAtaquePendentes(){
   return (game.team || []).filter(p => p && p.escolherAtaques);
 }
 /* Roda a fila da CAPTURA. Devolve true se abriu tela (e aí quem chamou tem que devolver).
-   QUEM TEM 2 OU MENOS GOLPES DISPONÍVEIS NÃO VÊ TELA NENHUMA: escolher 2 entre 2 não é escolha, e
+   QUEM TEM MAX_GOLPES OU MENOS DISPONÍVEIS NÃO VÊ TELA NENHUMA: escolher 3 entre 3 não é escolha, e
    no começo da jornada isso é a regra e não a exceção -- no nível 5, 176 das 250 espécies têm
-   menos de dois golpes de dano. Uma tela que só tem uma resposta certa é pior que tela nenhuma. */
+   menos de dois golpes de dano. Uma tela que só tem uma resposta certa é pior que tela nenhuma.
+   Com o teto em 3 isso ficou MAIS comum, não menos: a tela passou a abrir só pra quem tem 4 ou
+   mais golpes disponíveis. */
 function resolverEscolhaDeAtaques(){
   let abriu = null;
   for(const p of escolhasDeAtaquePendentes()){
     const disp = ataquesEscolhiveis(p);
-    if(disp.length <= 2){
-      p.ataques = disp.slice(0, 2);
+    if(disp.length <= MAX_GOLPES){
+      p.ataques = disp.slice(0, MAX_GOLPES);
       p.nivelDosAtaques = p.level;
       p.especieDosAtaques = p.speciesId;
       p.escolherAtaques = false;
@@ -7305,7 +7347,7 @@ function resolverEscolhaDeAtaques(){
 function marcarAtaque(golpe){
   const i = (game.ataquesMarcados || []).indexOf(golpe);
   if(i >= 0) game.ataquesMarcados.splice(i, 1);
-  else if(game.ataquesMarcados.length < 2) game.ataquesMarcados.push(golpe);
+  else if(game.ataquesMarcados.length < MAX_GOLPES) game.ataquesMarcados.push(golpe);
   render();
 }
 /* PRA ONDE IR quando a fila de escolha esvazia. No fluxo da captura é sempre a distribuição de
@@ -7324,8 +7366,8 @@ function confirmarAtaques(){
   const disp = ataquesEscolhiveis(p);
   /* A FUNÇÃO É A REGRA, a tela é a apresentação: revalida que os dois marcados são golpes que ele
      realmente pode ter -- do mesmo jeito que o escolherEvolucao revalida o destino. */
-  const escolhidos = (game.ataquesMarcados || []).filter(g => disp.indexOf(g) >= 0).slice(0, 2);
-  if(escolhidos.length !== 2) return;
+  const escolhidos = (game.ataquesMarcados || []).filter(g => disp.indexOf(g) >= 0).slice(0, MAX_GOLPES);
+  if(escolhidos.length !== MAX_GOLPES) return;
   p.ataques = escolhidos;
   p.nivelDosAtaques = p.level;
   p.especieDosAtaques = p.speciesId;
@@ -7435,7 +7477,7 @@ function aprendizadosPendentes(){
   });
   return out.sort((a, b) => a.nivel - b.nivel);
 }
-/* Devolve true se abriu tela. QUEM TEM VAGA (menos de 2 golpes) APRENDE SEM PERGUNTAR: não há o
+/* Devolve true se abriu tela. QUEM TEM VAGA (menos de MAX_GOLPES) APRENDE SEM PERGUNTAR: não há o
    que trocar, e perguntar "quer aprender?" pra quem tem uma vaga vazia é a tela de uma resposta só
    outra vez. O laço é limitado porque cada volta que não abre tela ou consome um golpe ou esvazia
    a fila -- o teto é rede de segurança, não regra. */
@@ -7444,7 +7486,7 @@ function resolverAprendizados(){
     const fila = aprendizadosPendentes();
     if(!fila.length) break;
     const primeiro = fila[0];
-    if(primeiro.p.ataques.length < 2){
+    if(primeiro.p.ataques.length < MAX_GOLPES){
       primeiro.p.ataques.push(primeiro.golpe);
       /* ANOTA PRA ANUNCIAR. Aprender com vaga livre não precisa de pergunta -- não há o que trocar
          --, mas precisa de AVISO: até aqui o jogo mudava o time do jogador sem dizer nada, e foi
@@ -7565,7 +7607,7 @@ function renderEscolhaDeAtaques(){
   <div class="box cursor">
     <div class="golpe-cab">
       <span class="golpe-cab-sprite">${spriteHtml(p.speciesId,'sprite-md',p.shiny)}</span>
-      <span class="golpe-cab-txt">Escolha <strong>2</strong> para permanecer com <strong>${escapeHtmlSafe(p.name)}</strong>, o resto será esquecido</span>
+      <span class="golpe-cab-txt">Escolha <strong>${MAX_GOLPES}</strong> para permanecer com <strong>${escapeHtmlSafe(p.name)}</strong>, o resto será esquecido</span>
     </div>
     ${faltam ? `<p class="hint-text">Mais ${faltam} pokémon ${faltam===1?'espera':'esperam'} escolha depois deste.</p>` : ''}
   </div>
@@ -7578,8 +7620,8 @@ function renderEscolhaDeAtaques(){
       </button>`;
     }).join('')}
   </div>
-  <button class="btn success" ${marcados.length===2?'':'disabled'} onclick="confirmarAtaques()">
-    ${marcados.length===2 ? 'Confirmar os 2 golpes' : `Escolha ${2-marcados.length} golpe${marcados.length===1?'':'s'}`}
+  <button class="btn success" ${marcados.length===MAX_GOLPES?'':'disabled'} onclick="confirmarAtaques()">
+    ${marcados.length===MAX_GOLPES ? `Confirmar os ${MAX_GOLPES} golpes` : `Escolha ${MAX_GOLPES-marcados.length} golpe${MAX_GOLPES-marcados.length===1?'':'s'}`}
   </button>`;
 }
 /* O ANÚNCIO. A frase é "Fulano aprendeu um novo golpe!" e o QUE ele aprendeu vem embaixo, no
@@ -8223,6 +8265,7 @@ function runSpecialBattle(){
   const cfg = game.specialBattle;
   if(!cfg) return;
   const foeTeam = cfg.opponentTeam.map(o=>createInstance(o.speciesId, o.level));
+  equiparNpc(foeTeam);   // rival, Elite 4, Rocket -- todos NPC, todos com o moveset da espécie
   // limpa primeiro SEMPRE: sem isso, o bônus do último ginásio (ou da luta anterior do rush da Elite)
   // vazaria pra cá. Rival e Rocket seguem sem terreno; a Elite 4 recebe o do membro logo abaixo
   game.team.forEach(p=>{ p.terrainBuffed = false; });
@@ -8652,6 +8695,7 @@ function runBattle(){
     if(shinyIdx.has(i)) inst.shiny = true;
     return inst;
   });
+  equiparNpc(gymTeam);   // o líder luta com o moveset dele, não com o motor de tipo
   if(game.gymTerrain){
     applyTerrainBuff(game.team, game.gymTerrain); // seguro agora -- só marca a flag, não muta os atributos de verdade
     applyTerrainBuff(gymTeam, game.gymTerrain);
@@ -15340,7 +15384,12 @@ function fraseDoEspecial(g, quem, alvo, op){
        manda o tipo (g.a) e o cliente vira em palavra, como no resto do log -- e o selo aqui é o do
        golpe perdido, então um Nevasca sai no azul do Gelo.
        Confronto gravado ANTES do campo existir cai na frase genérica: log velho não pode sumir. */
-    const nomeAnulado = g.a ? nomeDoGolpe(op.especieDoAlvo, g.a) : null;
+    /* O NOME sai do GOLPE quando o motor mandou um (`am`), e só cai no nome genérico do TIPO
+       quando não há: log velho, ou pokémon sem golpe escolhido. Nomear pelo tipo um pokémon que
+       TEM golpe escolhido inventa um golpe que ele não carrega, e foi assim que apareceu na tela
+       um ataque anulado que não estava no moveset dele. */
+    const nomeAnulado = (g.am && GOLPES[g.am]) ? nomeDoAtaque(g.am)
+                      : (g.a ? nomeDoGolpe(op.especieDoAlvo, g.a) : null);
     if(!nomeAnulado) return alvo + ' teve seu melhor ataque anulado por ' + quem;
     return alvo + ' teve o ataque ' + comoGolpe(nomeAnulado, g.a) + ' anulado por ' + quem;
   }
@@ -21452,7 +21501,7 @@ async function startMewtwoBattle(slot){
   // 1/128 -- vale tanto na primeira vitória (a que completa a Pokédex) quanto em qualquer reencontro
   // depois de um cooldown, já que os dois passam por essa mesma função
   const mewtwoIsShiny = Math.random() < SHINY_CHANCE;
-  const mewtwoTeam = [createInstance('mewtwo', 99)];
+  const mewtwoTeam = equiparNpc([createInstance('mewtwo', 99)]);
   mewtwoTeam[0].shiny = mewtwoIsShiny; // só afeta a exibição NESSA luta -- o servidor decide, a partir do mesmo sorteio, se o Mewtwo que entra no time depois vem shiny
   applySpecialtyBuff(team);
   equiparItens(team, game.equipados, game.currentSaveSlot);

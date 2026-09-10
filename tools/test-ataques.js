@@ -141,16 +141,20 @@ console.log('\n=== A TELA DA CAPTURA ===');
   ok('e a frase e a pedida', html.indexOf('o resto será esquecido') >= 0);
   ok('o confirmar nasce desabilitado', /success[^>]*disabled/.test(html));
 
-  S.marcarAtaque(disp[0]); S.marcarAtaque(disp[1]); S.marcarAtaque(disp[2]);
-  ok('nao deixa marcar um terceiro', g.ataquesMarcados.length === 2, g.ataquesMarcados.join(','));
+  /* O TETO SAI DA CONSTANTE, nao de um numero repetido aqui: ele ja foi 2 e virou 3 em
+     09/09/2026, e um teste que repete o numero so troca um lugar de falhar por outro. */
+  const TETO = S.MAX_GOLPES;
+  ok('a tela conhece o teto e ele e maior que 1', TETO >= 2, 'MAX_GOLPES = ' + TETO);
+  for(let i = 0; i <= TETO; i++) S.marcarAtaque(disp[i]);   // um a MAIS que o teto
+  ok('nao deixa marcar alem do teto', g.ataquesMarcados.length === TETO, g.ataquesMarcados.join(','));
   S.marcarAtaque(disp[0]);
-  ok('e clicar de novo desmarca', g.ataquesMarcados.length === 1 && g.ataquesMarcados[0] === disp[1]);
+  ok('e clicar de novo desmarca', g.ataquesMarcados.length === TETO - 1 && g.ataquesMarcados[0] === disp[1]);
 
-  S.marcarAtaque(disp[3]);
+  S.marcarAtaque(disp[TETO]);
   g.gymIndex = 1; g.pendingGymVictoryPool = 10;
   S.confirmarAtaques();
-  ok('confirmar grava os dois e libera a marca',
-     p.ataques.length === 2 && p.escolherAtaques === false && g.escolhaDeAtaques === null,
+  ok('confirmar grava o teto de golpes e libera a marca',
+     p.ataques.length === TETO && p.escolherAtaques === false && g.escolhaDeAtaques === null,
      p.ataques.map(S.nomeDoAtaque).join(' + '));
   ok('e o nivelDosAtaques nasce no nivel dele', p.nivelDosAtaques === 40);
   ok('e a jornada segue pra distribuicao de niveis', g.screen === 'levels');
@@ -191,7 +195,7 @@ console.log('\n=== QUEM NAO TEM O QUE ESCOLHER NAO VE TELA ===');
   g.team = [x, y];
   S.resolverEscolhaDeAtaques();
   ok('dois recem-capturados viram duas telas', S.escolhasDeAtaquePendentes().length === 2 && g.escolhaDeAtaques === x.id);
-  g.ataquesMarcados = S.ataquesDisponiveis('gyarados', 40).slice(0, 2);
+  g.ataquesMarcados = S.ataquesDisponiveis('gyarados', 40).slice(0, S.MAX_GOLPES);
   S.confirmarAtaques();
   ok('e a segunda abre sozinha depois da primeira', g.screen === 'escolhaDeAtaques' && g.escolhaDeAtaques === y.id);
 }
@@ -199,14 +203,23 @@ console.log('\n=== QUEM NAO TEM O QUE ESCOLHER NAO VE TELA ===');
 console.log('\n=== O GOLPE NOVO PELO NIVEL ===');
 {
   g.team = []; g.screen = ''; g.aprenderAtaque = null;
-  const iv = inst('ivysaur', 20);
-  iv.ataques = ['vinewhip', 'tackle']; iv.nivelDosAtaques = 20;
+  /* O BICHO TEM QUE ESTAR CHEIO: com vaga livre ele aprende sozinho e a tela de TROCA -- que e o
+     que este bloco testa -- nao abre. O Ivysaur servia quando o teto era 2 (ele tem 2 golpes ate o
+     nivel 21); com o teto em 3 ele passou a ter vaga.
+     O RATTATA e a fixture certa: cheio no 13 (Investida + Ataque Rapido + Presa Veloz) e cruza
+     EXATAMENTE UM golpe novo no 27, a Perseguicao -- dois golpes no mesmo nivel fariam a fila ter
+     dois itens e a assercao de baixo deixaria de dizer o que ela quer dizer.
+     A lista sai do APRENDIZADO, nao escrita a mao, pra acompanhar o teto se ele mudar de novo. */
+  const iv = inst('ratata', 20);
+  iv.ataques = S.ataquesDisponiveis('ratata', 20).slice(0, S.MAX_GOLPES);
+  iv.nivelDosAtaques = 20;
   g.team.push(iv);
+  ok('nasce cheio ate o teto', iv.ataques.length === S.MAX_GOLPES, iv.ataques.join(','));
   ok('parado no nivel, nao pergunta nada', S.aprendizadosPendentes().length === 0);
 
   iv.level = 30;
   const fila = S.aprendizadosPendentes();
-  ok('subiu de nivel e cruzou um golpe novo', fila.length === 1 && fila[0].golpe === 'razorleaf',
+  ok('subiu de nivel e cruzou um golpe novo', fila.length === 1 && fila[0].golpe === 'pursuit',
      fila.map(f => S.nomeDoAtaque(f.golpe) + ' Lv.' + f.nivel).join(', '));
 
   /* O DESTINO da jornada tem que sobreviver a tela: a pergunta acontece DENTRO do
@@ -216,24 +229,35 @@ console.log('\n=== O GOLPE NOVO PELO NIVEL ===');
   ok('e o destino da jornada continua guardado', g.evolucaoDepois === 'continueJourney');
 
   const html = S.renderAprenderAtaque();
-  ok('a tela nomeia o golpe novo', html.indexOf(S.nomeDoAtaque('razorleaf')) >= 0);
-  ok('e oferece os DOIS atuais pra trocar', (html.match(/responderAprendizado\('/g) || []).length === 2);
+  ok('a tela nomeia o golpe novo', html.indexOf(S.nomeDoAtaque('pursuit')) >= 0);
+  /* Oferece os golpes ATUAIS pra trocar -- tantos quantos o teto permitir carregar. */
+  ok('e oferece os golpes atuais pra trocar',
+     (html.match(/responderAprendizado\('/g) || []).length === S.MAX_GOLPES,
+     (html.match(/responderAprendizado\('/g) || []).length + ' de ' + S.MAX_GOLPES);
   ok('mais a saida de nao aprender', html.indexOf('responderAprendizado(null)') >= 0);
 
   g.evolucaoDepois = null;
   S.responderAprendizado(null);
-  ok('recusar guarda a recusa', (iv.ataquesRecusados || []).indexOf('razorleaf') >= 0);
-  ok('e os golpes ficam como estavam', iv.ataques.join(',') === 'vinewhip,tackle');
+  ok('recusar guarda a recusa', (iv.ataquesRecusados || []).indexOf('pursuit') >= 0);
+  ok('e os golpes ficam como estavam',
+     iv.ataques.join(',') === S.ataquesDisponiveis('ratata', 20).slice(0, S.MAX_GOLPES).join(','),
+     iv.ataques.join(','));
   ok('e a pergunta NAO volta', S.aprendizadosPendentes().length === 0);
 
-  const iv2 = inst('ivysaur', 20);
-  iv2.ataques = ['vinewhip', 'tackle']; iv2.nivelDosAtaques = 20; iv2.level = 30;
+  const iv2 = inst('ratata', 20);
+  iv2.ataques = S.ataquesDisponiveis('ratata', 20).slice(0, S.MAX_GOLPES);
+  iv2.nivelDosAtaques = 20; iv2.level = 30;
   g.team = [iv2]; g.evolucaoDepois = null;
   S.resolverAprendizados();
   S.responderAprendizado('tackle');
+  /* O golpe TROCADO some, o novo entra e os outros ficam onde estavam -- a lista de referencia sai
+     da propria fixture pra acompanhar o teto. */
+  const esperado = S.ataquesDisponiveis('ratata', 20).slice(0, S.MAX_GOLPES)
+                    .map(id => id === 'tackle' ? 'pursuit' : id);
   ok('trocar poe o novo no lugar do escolhido',
-     iv2.ataques.join(',') === 'vinewhip,razorleaf', iv2.ataques.map(S.nomeDoAtaque).join(' + '));
-  ok('e continua sendo DOIS golpes', iv2.ataques.length === 2);
+     iv2.ataques.slice().sort().join(',') === esperado.slice().sort().join(','),
+     iv2.ataques.map(S.nomeDoAtaque).join(' + '));
+  ok('e continua no teto de golpes', iv2.ataques.length === S.MAX_GOLPES, iv2.ataques.length + ' de ' + S.MAX_GOLPES);
   ok('e a marca alcanca o nivel', iv2.nivelDosAtaques === iv2.level);
 
   /* Quem tem VAGA aprende sozinho: nao ha o que trocar, e PERGUNTAR seria a tela de uma resposta so
@@ -244,7 +268,7 @@ console.log('\n=== O GOLPE NOVO PELO NIVEL ===');
   geo.ataques = ['tackle']; geo.nivelDosAtaques = 5; geo.level = 30;
   g.team = [geo]; g.evolucaoDepois = null; g.golpesAprendidos = [];
   const abriuGeo = S.resolverAprendizados();
-  ok('vaga vazia aprende sem perguntar', geo.ataques.length === 2 && g.aprenderAtaque === null,
+  ok('vaga vazia aprende sem perguntar', geo.ataques.length > 1 && g.aprenderAtaque === null,
      geo.ataques.map(S.nomeDoAtaque).join(' + '));
   ok('mas AVISA numa tela de anuncio', abriuGeo === true && g.screen === 'golpeAprendido', g.screen);
   S.seguirDoGolpeAprendido();
@@ -419,11 +443,17 @@ console.log('\n=== O SAVE ANTIGO E O INICIAL ===');
   while(abriu && telas < 10){
     telas++;
     const q = g.team.find(x => x.id === g.escolhaDeAtaques);
-    S.ataquesDisponiveis(q.speciesId, q.level).slice(0, 2).forEach(id => S.marcarAtaque(id));
+    S.ataquesDisponiveis(q.speciesId, q.level).slice(0, S.MAX_GOLPES).forEach(id => S.marcarAtaque(id));
     S.confirmarAtaques();
     abriu = (g.screen === 'escolhaDeAtaques');
   }
-  ok('uma tela por pokemon COM escolha (os outros dois nao tem)', telas === 2, telas + ' telas');
+  /* QUANTAS TELAS sai da propria fixture, nao de um numero escrito aqui: quem tem MAX_GOLPES ou
+     menos disponiveis e preenchido sozinho. Com o teto em 2 eram dois (Venusaur e Charizard); com
+     o teto em 3 o Venusaur passou a ter exatamente 3 e some da fila -- e e isso que a conta abaixo
+     acompanha sozinha se o teto mudar de novo. */
+  const comEscolha = g.team.filter(p => S.ataquesDisponiveis(p.speciesId, p.level).length > S.MAX_GOLPES).length;
+  ok('uma tela por pokemon COM escolha, e so por eles', telas === comEscolha,
+     telas + ' telas para ' + comEscolha + ' com escolha (teto ' + S.MAX_GOLPES + ')');
   ok('e no fim volta pra tela do save', g.screen === 'walkNext' && !g.escolhaDepois);
   ok('o Caterpie Lv.5 recebeu o unico golpe dele sem tela',
      (g.team[2].ataques || []).length === 1, (g.team[2].ataques || []).map(S.nomeDoAtaque).join(','));

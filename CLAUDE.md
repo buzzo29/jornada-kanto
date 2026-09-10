@@ -433,6 +433,17 @@ de golpes.
   Metrônomo são Normal.
   No **aviso do meio da batalha** o nome sai em texto puro, sem selo: ali a frase se lê em um
   segundo e um selo colorido no meio dela é mais uma coisa pra o olho parar.
+- **A ANULAÇÃO PASSOU A GRAVAR O GOLPE, não só o tipo (09/09/2026).** Ela gravava o TIPO (`a`) e o
+  cliente virava em palavra pelo nome GENÉRICO daquele tipo — e com golpe escolhido isso nomeia um
+  golpe que o pokémon **não carrega**. Reportado junto com o moveset dos NPCs: *"os pokémons que
+  possuem disable não estão desativando um dos ataques que o pokémon possui, ele tá pegando um
+  qualquer aleatório"*. Hoje o motor manda também o **id do golpe** (`am`) quando ele existe, e a
+  frase sai com o nome dele; sem `am` (log velho, ou pokémon sem golpe escolhido) cai no nome do
+  tipo, como sempre saiu.
+  **A GUARDA do "só vale contra quem tem um segundo golpe" mudou junto**: com golpe escolhido o que
+  conta são os TIPOS dos golpes que ele LEVA, não os tipos da espécie — dois golpes do mesmo tipo
+  caem juntos, e aí a anulação ficaria sem segundo golpe pra oferecer, que é o caso que a regra
+  existe pra evitar.
 - **O Disable nomeia o golpe ANULADO, não a anulação**: *"Jynx teve o ataque Nevasca anulado por
   Venomoth"*. O que interessa é o que o pokémon PERDEU. Pra isso o motor grava o **tipo** anulado
   no diário (campo `a`) e o cliente vira em palavra pelo `nomeDoGolpe` — o mesmo caminho de todo o
@@ -574,9 +585,9 @@ Base criada em 09/09/2026 e **trocada de geração no mesmo dia**: nasceu na Gen
   que gritar se faltar.
 - `node tools/gerar-golpes.js` regenera o arquivo (o cabeçalho dele traz os `curl` das fontes).
 
-## Os dois golpes do pokémon (escolhidos pelo jogador)
+## Os golpes do pokémon (escolhidos pelo jogador) — hoje são TRÊS
 
-Cada pokémon leva **até DOIS golpes**, escolhidos na captura e trocados quando o nível traz um
+Cada pokémon leva **até TRÊS golpes** (`MAX_GOLPES`), escolhidos na captura e trocados quando o nível traz um
 golpe novo. É a **primeira vez que uma escolha do jogador entra na conta de DANO** — até aqui todo
 golpe valia 60 (`MOVE_POWER`) e o motor só escolhia o TIPO.
 
@@ -586,7 +597,21 @@ golpe valia 60 (`MOVE_POWER`) e o motor só escolhia o TIPO.
   autodestruição, nas mesmas 9 espécies. Como golpe comum de 200 e 250 de poder, **sem o custo de
   cair junto**, seriam a escolha óbvia de todo mundo que as tem e ainda modelariam a mesma coisa
   duas vezes.
-- **"Até dois", não "dois".** Medido: no **nível 5 só 16 das 250 espécies** têm mais de dois golpes de
+- **O NÚMERO É UMA CONSTANTE, `MAX_GOLPES`, e foi 2 até 09/09/2026.** Virou **3** a pedido.
+  Ele aparecia em **nove lugares** — o auto-preenchimento, a marcação da tela, a validação do
+  confirmar, a fila de aprendizado, o texto do cabeçalho e o do botão. Com o número solto, mudar de
+  2 pra 3 era achar os nove; hoje é uma linha. **Não vale pro NPC**: o `equiparNpc` dá o moveset
+  INTEIRO da espécie de propósito — o teto é a regra de quem ESCOLHE, e o NPC não escolhe.
+  **O PREÇO MEDIDO: a jornada concluída sobe de 64,35% para 70,28%** — **+5,93 pontos, 8,4σ** (10
+  blocos de 1.000 jornadas de cada lado). É quase metade do que o moveset dos NPCs tinha tirado
+  (−12,56), e vem do mesmo lugar: **cobertura de tipo**. O 8º ginásio cai de 1.495 pra **1.185**
+  game overs e o 6º de 746 pra **541**; o Brock quase não se move (895 → 799).
+  **Efeito colateral na TELA DE ESCOLHA, e ele é grande:** com o teto em 3 ela só abre pra quem tem
+  **4 ou mais** golpes disponíveis. Um Venusaur nível 60 tem exatamente 3 e passou a ser preenchido
+  sozinho — a tela ficou bem mais rara no começo da jornada.
+  **Custo de tela medido a 320px:** a fileira do time ganha uma linha de golpe (+15px por pokémon) e
+  a tela de ordem vai de **1.114 pra 1.189px, +6,7%**, sem rolagem horizontal.
+- **"Até três", não "três".** Medido: no **nível 5 só 16 das 250 espécies** têm mais de dois golpes de
   dano — 176 têm menos de dois, e **8 não têm nenhum em nível nenhum** (Kakuna, Metapod, Abra, Ditto,
   Unown, Wobbuffet, Delibird, Smeargle; o que elas aprendem é Harden, Teleport, Transform, Sketch).
   Quem tem 2 ou menos disponíveis **não vê tela**: escolher 2 entre 2 não é escolha, e uma tela de
@@ -934,14 +959,58 @@ Achados na mesma varredura, com número, e deixados como estão porque não foi 
   como ser aprendido (a Starmie é o caso mais duro). É fiel ao jogo original, que também não volta
   atrás — mas lá existe Everstone.
 
-### A decisão que ficou em aberto
-**Dar golpes aos NPCs também** foi medido e NÃO foi aplicado — não foi o que se pediu, e muda o jogo
-mais do que a feature em si. Com os dois lados usando `ataquesPadrao`, a jornada concluída vai a
-**73,19%** (contra 65,22% do jogo sem golpes e 64,42% da versão implementada; medido antes de a
-evolução destravar, então o número da variante é um piso): **+8 pontos**, e o formato da
-dificuldade se inverte — o Brock cai de 419 pra **182** game overs e o **5º ginásio salta de 26 pra
-172**. Faz sentido: com 2 golpes o time perde cobertura, e isso machuca mais o **líder mono-tipo**
-do que o time variado do jogador. Se um dia isso for feito, é aqui que o número está.
+### OS NPCs GANHARAM MOVESET (09/09/2026) — e é a maior mudança de dificuldade já medida aqui
+
+Reportado assim: *"os pokemons dos adversários estão usando ataques que não estão no moveset do
+pokémon incluído na dex; para os pokémons dos adversários (NPC, e não batalhas online), pegue todo
+o moveset até o level que o pokémon está e veja qual que irá tirar mais dano"*. **E era verdade:**
+o NPC não tinha golpe escolhido, caía no motor de TIPO e atacava com o nome genérico do tipo, com
+poder implícito de 60 — um Onix batendo de um golpe de Pedra que ele não aprende em nível nenhum.
+
+- **`equiparNpc(time)` dá a ele TUDO que a espécie aprende por nível até o nível dele**, e o
+  `melhorAtaque` escolhe o que tira mais dano contra quem está na frente. **Sem teto de 2 golpes**,
+  e isso é de propósito: os dois são a regra do JOGADOR, que ESCOLHE. O NPC não escolhe nada — ele
+  tem o que a espécie tem, que é o que o pedido descreve.
+- **São QUATRO portas**, e uma que ficasse de fora vira uma batalha em que o adversário ataca com
+  golpe que não tem: **líder de ginásio**, **rival/Elite/Rocket** (`runSpecialBattle`), **desafio do
+  Mewtwo** e o **treinador da Torre** (esse no servidor). `tools/test-especiais.js` lê o código e
+  cobra as quatro — os casos chamam as funções direto e passariam com a chamada órfã.
+- **NÃO vale pra código de time** (liga, online, ginásio da cidade): ali o outro lado é um JOGADOR,
+  não um NPC, e dar moveset de espécie a ele seria inventar golpe pra time alheio. O pedido separou
+  os dois, e o teste tranca isso também.
+- **Quem é do Metrônomo continua sem golpe escolhido** — senão o Togepi passaria a atacar com golpe
+  comum e a mecânica dele sumia.
+- **O `APRENDIZADO` e o `GOLPES_IDS` TIVERAM QUE IR PRO SERVIDOR**, e este arquivo dizia que nunca
+  precisariam ("o servidor nunca precisa saber quem aprende o quê"). Isso valia enquanto só o
+  jogador tinha golpe; o time do treinador da Torre é montado LÁ, do zero. São 15,5 KB num arquivo
+  de 430. Viraram a **oitava e a nona tabelas duplicadas**, e o teste compara o moveset das 250
+  espécies em cinco níveis entre os dois motores.
+- **O PREÇO MEDIDO, e ele é enorme: a jornada concluída cai de 77,08% para 64,52%** — **−12,56
+  pontos, 19,9σ** (10 blocos de 1.000 jornadas de cada lado). É a maior variação de dificuldade já
+  medida neste projeto, com folga.
+  **E ela se concentra no FIM**, como a estimativa antiga previa — só que muito maior:
+
+  | ginásio | game overs antes | depois |
+  |---|---|---|
+  | 1º (Brock) | 1.160 | **928** |
+  | 5º | 90 | **417** |
+  | 6º | 231 | **705** |
+  | 8º | 712 | **1.488** |
+
+  O começo AFROUXA (no nível 12 o moveset real do líder é mais fraco que os 60 implícitos) e o fim
+  APERTA muito (no nível 60 o melhor golpe da espécie vale ~89). **Este arquivo estimava +8 pontos
+  na direção FÁCIL** (`ataquesPadrao` dos dois lados) — a estimativa era de outra coisa: lá os DOIS
+  lados ganhavam 2 golpes; aqui só o NPC ganha, e ganha o moveset INTEIRO.
+  **Se incomodar, o lugar de mexer é o `equiparNpc`, e a variante está MEDIDA**: `.slice(0, 2)` na
+  lista põe o NPC na mesma regra do jogador (os dois golpes mais fortes) e a conclusão volta pra
+  **69,92%** — devolve **5,4 dos 12,6 pontos**. O 5º ginásio não melhora (482 contra 417 game
+  overs, ele fica igual ou pior), mas o 8º cai de 1.488 pra **1.148**.
+
+  | | conclusão | 1º | 5º | 6º | 8º |
+  |---|---|---|---|---|---|
+  | NPC no motor de tipo (antes) | 77,08% | 1.160 | 90 | 231 | 712 |
+  | NPC com os 2 mais fortes | 69,92% | 897 | 482 | 477 | 1.148 |
+  | **NPC com o moveset inteiro (hoje)** | **64,52%** | 928 | 417 | 705 | 1.488 |
 
 ## Golpes de VÁRIOS TAPAS: os primeiros com mecânica PRÓPRIA (09/09/2026)
 

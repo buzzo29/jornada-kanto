@@ -1451,6 +1451,96 @@ function comItem(instancia, item){
      JSON.stringify([S.avisoDoConfronto(m,0), S.avisoDoConfronto(m,1)]));
 })();
 
+console.log('\n=== O NPC LUTA COM O MOVESET DELE ===');
+{
+  /* Reportado em 09/09/2026: "os pokemons dos adversarios estao usando ataques que nao estao no
+     moveset do pokemon incluido na dex". Era verdade -- o NPC nao tinha golpe escolhido, caia no
+     motor de TIPO e atacava com o nome generico do tipo, com poder implicito de 60.
+     Agora ele leva TUDO que a especie aprende por nivel ate o nivel dele e o motor escolhe o que
+     tira mais dano. Sem teto de 2 golpes: os dois sao a regra do JOGADOR, que escolhe. */
+
+  /* 1) O QUE O equiparNpc FAZ, e o que ele NAO faz. */
+  {
+    const npc = [S.createInstance('golem', 45), S.createInstance('onix', 14)];
+    S.equiparNpc(npc);
+    ok('o NPC recebe o moveset da especie',
+       npc.every(p => Array.isArray(p.ataques) && p.ataques.length > 0),
+       npc.map(p => p.speciesId + ':' + (p.ataques||[]).length).join(' '));
+    ok('e sao os golpes que a especie APRENDE ate aquele nivel',
+       npc.every(p => p.ataques.join(',') === S.ataquesDisponiveis(p.speciesId, p.level).join(',')));
+    ok('nenhum golpe acima do nivel dele',
+       npc.every(p => p.ataques.every(id => (S.APRENDIZADO[p.speciesId]||[]).some(par =>
+         S.GOLPES_IDS[par[1]] === id && par[0] <= p.level))));
+    /* A GUARDA: nunca sobrescreve quem ja escolheu. Se esta funcao for chamada por engano sobre um
+       time de jogador, os dois golpes dele tem que sobreviver. */
+    const doJogador = S.createInstance('golem', 45);
+    doJogador.ataques = ['rockblast', 'tackle'];
+    S.equiparNpc([doJogador]);
+    ok('NAO sobrescreve quem ja tem golpe escolhido', doJogador.ataques.join(',') === 'rockblast,tackle',
+       doJogador.ataques.join(','));
+    /* Quem usa Metronomo nao escolhe golpe, e o equiparNpc tem que respeitar isso -- senao o
+       Togepi passaria a atacar com golpe comum e a mecanica dele sumia. */
+    const togepi = S.createInstance('togepi', 40);
+    S.equiparNpc([togepi]);
+    ok('quem e do Metronomo continua sem golpe escolhido', !(togepi.ataques && togepi.ataques.length),
+       JSON.stringify(togepi.ataques || null));
+  }
+
+  /* 2) AS QUATRO PORTAS. Sao os quatro lugares onde um time de NPC nasce, e uma que ficar de fora
+        vira uma batalha em que o adversario ataca com golpe que nao tem -- que e o defeito que
+        acabou de ser consertado. Ler o CODIGO e o unico jeito de pegar a proxima omissao: os
+        casos abaixo chamam as funcoes direto e passariam com a chamada orfa. */
+  {
+    const cli = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
+    const srv = require('fs').readFileSync(path.join(raiz, 'functions', 'index.js'), 'utf8');
+    ok('o LIDER DE GINASIO recebe o moveset', cli.indexOf('equiparNpc(gymTeam)') >= 0);
+    ok('o RIVAL / ELITE / ROCKET tambem', cli.indexOf('equiparNpc(foeTeam)') >= 0);
+    ok('o desafio do MEWTWO tambem', /equiparNpc\(\[createInstance\('mewtwo'/.test(cli));
+    ok('e o treinador da TORRE, no servidor', /equiparNpc\(andar\.team/.test(srv));
+    /* E o que NAO pode receber: o codigo de time e de um JOGADOR (liga, online, ginasio da
+       cidade), e dar moveset de NPC a ele seria inventar golpe pra time alheio. */
+    ok('o decodeTeamCode NAO equipa NPC', cli.indexOf('equiparNpc(team)') < 0 && srv.indexOf('equiparNpc(team)') < 0);
+  }
+
+  /* 3) A TABELA NOVA DO SERVIDOR. O APRENDIZADO era so do cliente e veio pra ca por causa da
+        Torre; divergir faz a MESMA batalha sair diferente nos dois lados. */
+  {
+    let dif = 0, exemplo = '';
+    Object.keys(S.SPECIES).forEach(sp => {
+      [5, 20, 45, 70, 99].forEach(lvl => {
+        const a = S.ataquesDisponiveis(sp, lvl).join(','), b = esp.ataquesDisponiveis(sp, lvl).join(',');
+        if(a !== b){ dif++; if(!exemplo) exemplo = sp + ' Lv.' + lvl + ': [' + a + '] x [' + b + ']'; }
+      });
+    });
+    ok('os dois motores concordam no moveset das 250 especies', dif === 0, dif + ' divergencias  ' + exemplo);
+  }
+
+  /* 4) A ANULACAO NOMEIA UM GOLPE QUE O ALVO TEM. Ela gravava so o TIPO, e o cliente virava em
+        palavra pelo nome GENERICO daquele tipo -- que com golpe escolhido nomeia um golpe que o
+        pokemon nao carrega. Reportado junto: "ele ta pegando um qualquer aleatorio". */
+  {
+    let casos = 0, comId = 0, doMoveset = 0, exemplo = '';
+    for(let v = 0; v < 1200 && casos < 60; v++){
+      const a = inst('alakazam', 45); a.ataques = S.ataquesDisponiveis('alakazam', 45);
+      const b = inst('venusaur', 45); b.ataques = S.ataquesDisponiveis('venusaur', 45);
+      const m = (S.simulateGymBattle([a], [b]).matchups || [])[0];
+      if(!m) continue;
+      const d = (m.golpes || []).find(x => x.x === 'disable');
+      if(!d) continue;
+      casos++;
+      if(d.am){
+        comId++;
+        const alvo = d.q === 'p' ? 'venusaur' : 'alakazam';
+        if(S.ataquesDisponiveis(alvo, 45).indexOf(d.am) >= 0) doMoveset++;
+        else if(!exemplo) exemplo = 'anulou ' + d.am + ' de um ' + alvo;
+      }
+    }
+    ok('a anulacao apareceu o bastante pra medir', casos >= 10, casos + ' casos');
+    ok('ela grava o GOLPE anulado, nao so o tipo', comId === casos, comId + ' de ' + casos);
+    ok('e o golpe anulado esta no moveset do alvo', doMoveset === comId, doMoveset + ' de ' + comId + '  ' + exemplo);
+  }
+}
+
 console.log('\n=== GOLPES DE VARIOS TAPAS: DE 2 A 5 NUMA TROCA ===');
 {
   /* Pedido em 09/09/2026: primeiro o Tapa Duplo, depois os Arranhoes Furiosos, que sao a mesma

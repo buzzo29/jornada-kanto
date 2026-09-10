@@ -544,6 +544,26 @@ function melhorAtaque(attacker, defender){
   }
   return melhor;
 }
+/* OS NPCs LUTAM COM O MOVESET DELES (09/09/2026, a pedido).
+   ANTES eles caíam no motor de TIPO: atacavam com QUALQUER tipo da espécie e poder implícito de
+   60, então um Onix batia com o nome genérico do tipo Pedra -- um golpe que ele não aprende em
+   nível nenhum. Foi assim que o jogador viu "ataques que não estão no moveset do pokémon".
+   AGORA cada NPC leva TUDO que a espécie aprende por nível até o nível dele, e o motor escolhe o
+   que tira mais dano contra quem está na frente -- que é o que o `melhorAtaque` já faz.
+   NÃO TEM TETO DE 2 GOLPES, e isso é de propósito: os dois são a regra do JOGADOR, que ESCOLHE.
+   O NPC não escolhe nada -- ele tem o que a espécie tem, e é isso que o pedido descreve.
+   NUNCA SOBRESCREVE quem já tem golpe: se esta função for chamada por engano sobre um time de
+   jogador, ela passa batido. É a mesma guarda do equiparItens.
+   ONDE NÃO VALE: batalha online, ligas e ginásio da cidade. Lá o time do outro lado é de um
+   JOGADOR (vem de um código, sem golpe), não de um NPC -- e o pedido separou os dois. */
+function equiparNpc(time){
+  (time || []).forEach(p => {
+    if(!p || (Array.isArray(p.ataques) && p.ataques.length)) return;
+    const lista = ataquesDisponiveis(p.speciesId, p.level);
+    if(lista.length) p.ataques = lista;
+  });
+  return time;
+}
 function bestAttackType(attacker, defender){
   /* Tem golpe escolhido? A escolha é entre ELES. Senão, o motor de tipo de sempre, logo abaixo. */
   const doJogador = melhorAtaque(attacker, defender);
@@ -864,12 +884,231 @@ const GOLPES = {
   watergun:['Water',40],waterpulse:['Water',60],wingattack:['Flying',60],wrap:['Normal',15],
   zapcannon:['Electric',100]
 };
+/* GOLPES_IDS e APRENDIZADO CHEGARAM AO SERVIDOR em 09/09/2026, e este arquivo dizia que eles
+   nunca precisariam vir: "o servidor nunca precisa saber quem aprende o quê, porque os golpes
+   escolhidos viajam na instância". Isso valia enquanto só o JOGADOR tinha golpe.
+   Mudou quando os NPCs passaram a lutar com o moveset deles (ver equiparNpc): o time do treinador
+   da Torre é montado AQUI, do zero, e sem a tabela ele não teria como saber o que a espécie
+   aprende. São 15,5 KB num arquivo de 430 -- barato, e é o preço de a Torre não ser a única
+   batalha em que o NPC ataca com golpe que ele não tem.
+   AS DUAS SÃO GERADAS por tools/gerar-tabelas-golpes.js e agora são DUPLICADAS: mexer numa e
+   esquecer a outra faz a mesma batalha sair diferente no cliente e no servidor. O teste compara. */
+const GOLPES_IDS = ['absorb','acid','aerialace','aeroblast','aircutter','ancientpower','astonish','aurorabeam','barrage','beatup','bind','bite','blizzard','bodyslam','boneclub','bonemerang','bonerush','bounce','brickbreak','bubble','bubblebeam','bulletseed','clamp','cometpunch','confusion','constrict','covet','crabhammer','crosschop','crunch','dig','dive','dizzypunch','doubleedge','doublekick','doubleslap','dragonbreath','dreameater','drillpeck','dynamicpunch','earthquake','eggbomb','ember','extremespeed','fakeout','falseswipe','feintattack','fireblast','firepunch','firespin','flamethrower','flamewheel','furyattack','furycutter','furyswipes','futuresight','gigadrain','gust','headbutt','heatwave','highjumpkick','hornattack','hydropump','hyperbeam','hyperfang','hypervoice','iceball','icebeam','icepunch','iciclespear','icywind','irontail','jumpkick','karatechop','knockoff','leechlife','lick','machpunch','magicalleaf','megadrain','megahorn','megakick','megapunch','metalclaw','meteormash','mudshot','mudslap','octazooka','outrage','payday','peck','petaldance','pinmissile','poisonfang','poisonsting','pound','powdersnow','psybeam','psychic','pursuit','quickattack','rage','rapidspin','razorleaf','revenge','rockblast','rockslide','rockthrow','rollingkick','rollout','sacredfire','sandtomb','scratch','shadowball','shadowpunch','signalbeam','silverwind','skullbash','skyattack','skyuppercut','slam','slash','sludge','sludgebomb','smog','snore','solarbeam','spark','spikecannon','steelwing','stomp','submission','superpower','swift','tackle','takedown','thrash','thunder','thunderbolt','thunderpunch','thundershock','triattack','triplekick','twineedle','twister','uproar','vinewhip','visegrip','vitalthrow','waterfall','watergun','waterpulse','wingattack','wrap','zapcannon'];
+const GOLPES_PT = {
+  absorb:'Absorver',acid:'Ácido',aerialace:'Ás Aéreo',aeroblast:'Aerojato',aircutter:'Corte de Ar',
+  ancientpower:'Poder Ancestral',astonish:'Espanto',aurorabeam:'Raio Aurora',barrage:'Barragem',
+  beatup:'Surra',bind:'Amarrar',bite:'Mordida',blizzard:'Nevasca',bodyslam:'Golpe de Corpo',
+  boneclub:'Clava de Osso',bonemerang:'Ossomerangue',bonerush:'Investida de Ossos',bounce:'Salto',
+  brickbreak:'Quebra-Telha',bubble:'Bolha',bubblebeam:'Raio de Bolhas',bulletseed:'Semente-Bala',
+  clamp:'Mordaça',cometpunch:'Soco Cometa',confusion:'Confusão',constrict:'Constrição',
+  covet:'Cobiça',crabhammer:'Martelo de Caranguejo',crosschop:'Golpe Cruzado',crunch:'Triturar',
+  dig:'Escavar',dive:'Mergulho',dizzypunch:'Soco Tonto',doubleedge:'Investida Dupla',
+  doublekick:'Chute Duplo',doubleslap:'Tapa Duplo',dragonbreath:'Sopro do Dragão',
+  dreameater:'Comedor de Sonhos',drillpeck:'Bicada Broca',dynamicpunch:'Soco Dinâmico',
+  earthquake:'Terremoto',eggbomb:'Bomba de Ovo',ember:'Brasa',extremespeed:'Velocidade Extrema',
+  fakeout:'Finta',falseswipe:'Golpe Falso',feintattack:'Ataque Fingido',
+  fireblast:'Explosão de Fogo',firepunch:'Soco de Fogo',firespin:'Redemoinho de Fogo',
+  flamethrower:'Lança-Chamas',flamewheel:'Roda de Fogo',furyattack:'Ataque Fúria',
+  furycutter:'Cortador Furioso',furyswipes:'Arranhões Furiosos',futuresight:'Visão do Futuro',
+  gigadrain:'Giga Dreno',gust:'Rajada de Vento',headbutt:'Cabeçada',heatwave:'Onda de Calor',
+  highjumpkick:'Joelhaço Voador',hornattack:'Chifrada',hydropump:'Hidro Bomba',
+  hyperbeam:'Hiper Raio',hyperfang:'Presa Hiper',hypervoice:'Hipervoz',iceball:'Bola de Gelo',
+  icebeam:'Raio Congelante',icepunch:'Soco de Gelo',iciclespear:'Lança de Gelo',
+  icywind:'Vento Gélido',irontail:'Cauda de Ferro',jumpkick:'Chute Voador',
+  karatechop:'Golpe de Karatê',knockoff:'Nocaute',leechlife:'Sanguessuga',lick:'Lambida',
+  machpunch:'Soco Veloz',magicalleaf:'Folha Mágica',megadrain:'Mega Dreno',megahorn:'Megachifre',
+  megakick:'Mega Chute',megapunch:'Mega Soco',metalclaw:'Garra de Metal',
+  meteormash:'Golpe Meteoro',mudshot:'Tiro de Lama',mudslap:'Tapa de Lama',octazooka:'Octabazuca',
+  outrage:'Ultraje',payday:'Dia de Pagamento',peck:'Bicada',petaldance:'Dança das Pétalas',
+  pinmissile:'Míssil Agulha',poisonfang:'Presa Venenosa',poisonsting:'Ferrão Venenoso',
+  pound:'Pancada',powdersnow:'Pó de Neve',psybeam:'Psicoraio',psychic:'Psíquico',
+  pursuit:'Perseguição',quickattack:'Ataque Rápido',rage:'Fúria',rapidspin:'Giro Rápido',
+  razorleaf:'Folha Navalha',revenge:'Vingança',rockblast:'Rajada de Rochas',
+  rockslide:'Deslizamento de Rochas',rockthrow:'Lançar Pedra',rollingkick:'Chute Giratório',
+  rollout:'Rolamento',sacredfire:'Fogo Sagrado',sandtomb:'Tumba de Areia',scratch:'Arranhão',
+  shadowball:'Bola Sombria',shadowpunch:'Soco Sombrio',signalbeam:'Feixe de Sinal',
+  silverwind:'Vento Prateado',skullbash:'Quebra-Crânio',skyattack:'Ataque Celeste',
+  skyuppercut:'Cruzado Celeste',slam:'Batida',slash:'Corte',sludge:'Lodo',
+  sludgebomb:'Bomba de Lodo',smog:'Fumaça Tóxica',snore:'Ronco',solarbeam:'Raio Solar',
+  spark:'Faísca',spikecannon:'Canhão de Espinhos',steelwing:'Asa de Aço',stomp:'Pisão',
+  submission:'Submissão',superpower:'Superpoder',swift:'Rapidez',tackle:'Investida',
+  takedown:'Derrubada',thrash:'Pancadaria',thunder:'Trovão',thunderbolt:'Raio',
+  thunderpunch:'Soco Trovão',thundershock:'Choque do Trovão',triattack:'Triataque',
+  triplekick:'Chute Triplo',twineedle:'Agulha Dupla',twister:'Tornado',uproar:'Alvoroço',
+  vinewhip:'Chicote de Cipó',visegrip:'Torno',vitalthrow:'Arremesso Vital',waterfall:'Cachoeira',
+  watergun:'Jato d\'Água',waterpulse:'Pulso de Água',wingattack:'Ataque de Asa',wrap:'Enrolar',
+  zapcannon:'Canhão de Choque'
+};
+const APRENDIZADO = {
+  bulbasaur:[[1,134],[10,146],[20,103],[46,123],[46,126]],
+  charmander:[[1,112],[7,42],[13,83],[19,101],[31,50],[37,121],[49,49]],
+  squirtle:[[1,134],[7,19],[13,150],[18,11],[23,102],[40,117],[47,62]],weedle:[[1,94],[7,92]],
+  caterpie:[[1,134],[13,143]],ratata:[[1,134],[7,100],[13,64],[27,99]],pidgey:[[1,134],[9,57],[13,100],[25,152]],
+  mankey:[[1,112],[11,73],[16,54],[31,28],[46,136]],spearow:[[1,90],[13,52],[19,99],[25,2],[37,38]],
+  nidoranm:[[1,90],[12,34],[17,94],[20,61],[30,52]],oddish:[[1,0],[23,1],[39,91]],
+  geodude:[[1,134],[11,107],[26,109],[31,105],[36,40],[46,33]],
+  onix:[[1,134],[8,10],[12,107],[23,101],[30,36],[37,120],[45,71],[49,111],[56,33]],
+  ivysaur:[[1,134],[10,146],[22,103],[56,123],[56,126]],venusaur:[[1,134],[1,146],[22,103],[65,123],[65,126]],
+  charmeleon:[[1,42],[1,112],[13,83],[20,101],[34,50],[41,121],[55,49]],
+  charizard:[[1,42],[1,59],[1,83],[1,112],[20,101],[34,50],[36,152],[44,121],[64,49]],
+  wartortle:[[1,19],[1,134],[13,150],[19,11],[25,102],[45,117],[53,62]],
+  blastoise:[[1,19],[1,134],[13,150],[19,11],[25,102],[55,117],[68,62]],kakuna:[[13,143],[20,1]],
+  beedrill:[[1,52],[20,143],[25,101],[30,99],[35,92],[45,123]],metapod:[[13,143]],
+  butterfree:[[1,24],[28,57],[34,97],[47,116]],raticate:[[1,100],[1,134],[13,64],[30,99]],
+  pidgeotto:[[1,57],[1,134],[13,100],[27,152]],pidgeot:[[1,57],[1,100],[1,134],[27,152]],
+  primeape:[[1,101],[1,112],[11,73],[16,54],[35,28],[62,136]],fearow:[[1,52],[1,90],[26,99],[40,38]],
+  nidorino:[[1,90],[12,34],[18,94],[22,61],[34,52]],gloom:[[1,0],[24,1],[44,91]],
+  sandshrew:[[1,112],[17,94],[23,121],[30,133],[37,54],[45,111]],
+  sandslash:[[1,112],[17,94],[24,121],[33,133],[42,54],[52,111]],clefairy:[[1,95],[13,35],[45,84]],
+  jigglypuff:[[9,95],[19,109],[24,35],[34,13],[44,65],[49,33]],
+  zubat:[[1,75],[6,6],[16,11],[21,152],[31,4],[41,93]],golbat:[[1,6],[1,75],[16,11],[21,152],[35,4],[49,93]],
+  paras:[[1,112],[19,75],[31,121],[43,56]],parasect:[[1,112],[19,75],[35,121],[51,56]],
+  meowth:[[1,112],[10,11],[18,89],[25,46],[36,54],[40,121],[43,44]],
+  persian:[[1,11],[1,112],[18,89],[25,46],[42,54],[49,121],[55,44]],
+  bellsprout:[[1,146],[11,153],[23,1],[37,103],[45,120]],weepinbell:[[1,146],[1,153],[24,1],[42,103],[54,120]],
+  abra:[[45,98]],kadabra:[[1,24],[21,97],[30,55],[36,98]],
+  staryu:[[1,134],[6,150],[10,102],[24,133],[28,20],[46,62]],starmie:[[1,102],[1,133],[1,150],[45,98]],
+  growlithe:[[1,11],[7,42],[25,135],[31,51],[49,50]],vulpix:[[1,42],[13,100],[29,50],[41,49]],
+  ekans:[[1,153],[8,94],[13,11],[32,1]],arbok:[[1,11],[1,94],[1,153],[38,1]],
+  diglett:[[1,112],[17,30],[21,54],[25,86],[33,121],[41,40]],
+  dugtrio:[[1,112],[1,141],[17,30],[21,54],[25,86],[26,111],[38,121],[51,40]],
+  magnemite:[[1,134],[6,140],[26,127],[38,133],[50,154]],magneton:[[1,134],[1,140],[26,127],[44,141],[62,154]],
+  drowzee:[[1,95],[11,24],[17,58],[31,98],[45,55]],hypno:[[1,24],[1,95],[17,58],[35,98],[57,55]],
+  nidoranf:[[1,112],[12,34],[17,94],[20,11],[30,54],[47,29]],
+  nidorina:[[1,112],[12,34],[18,94],[22,11],[34,54],[53,29]],
+  venonat:[[1,134],[17,24],[25,75],[33,97],[41,98],[45,123]],
+  venomoth:[[1,116],[1,134],[17,24],[25,75],[31,57],[36,97],[52,98],[52,123]],
+  voltorb:[[1,134],[21,127],[32,109],[42,133]],pikachu:[[1,140],[11,100],[20,120],[26,138],[41,137]],
+  raichu:[[1,100],[1,138],[1,140]],poliwag:[[1,19],[13,150],[19,35],[31,13],[43,62]],
+  poliwhirl:[[1,19],[1,150],[19,35],[35,13],[51,62]],tentacool:[[1,94],[12,25],[19,1],[25,20],[30,153],[49,62]],
+  tentacruel:[[1,25],[1,94],[19,1],[25,20],[30,153],[55,62]],
+  machop:[[13,73],[25,104],[31,148],[37,131],[40,28],[49,39]],
+  machoke:[[13,73],[25,104],[33,148],[41,131],[46,28],[59,39]],
+  doduo:[[1,90],[9,99],[13,52],[21,141],[25,101],[33,145],[37,38]],
+  dodrio:[[1,52],[1,90],[1,99],[21,141],[25,101],[38,145],[47,38]],
+  ponyta:[[1,100],[1,134],[14,42],[19,130],[25,49],[31,135],[45,17],[53,47]],
+  rapidash:[[1,42],[1,100],[1,134],[19,130],[25,49],[31,135],[40,52],[50,17],[63,47]],
+  slowpoke:[[1,134],[13,150],[17,24],[29,58],[40,98]],slowbro:[[1,134],[13,150],[17,24],[29,58],[44,98]],
+  magikarp:[[15,134],[18,22]],gyarados:[[1,136],[20,11],[35,144],[40,62],[43,17],[55,63]],
+  grimer:[[1,95],[13,122],[43,123]],muk:[[1,95],[13,122],[47,123]],
+  tauros:[[1,134],[4,101],[8,61],[19,99],[43,136],[53,135]],psyduck:[[1,112],[16,24],[40,54],[50,62]],
+  golduck:[[1,112],[16,24],[44,54],[58,62]],krabby:[[1,19],[12,147],[23,85],[27,130],[45,27]],
+  kingler:[[1,19],[1,83],[1,147],[23,85],[27,130],[57,27]],horsea:[[1,19],[22,150],[29,144],[43,62]],
+  seadra:[[1,19],[1,150],[29,144],[51,62]],goldeen:[[1,90],[15,61],[29,52],[38,149],[57,80]],
+  seaking:[[1,90],[15,61],[29,52],[41,149],[69,80]],shellder:[[1,134],[8,69],[17,7],[41,22],[49,67]],
+  exeggcute:[[1,8],[1,145],[19,24],[43,126]],
+  cubone:[[9,14],[13,58],[25,15],[29,101],[33,45],[37,136],[41,16],[45,33]],
+  marowak:[[1,14],[1,58],[25,15],[32,101],[39,45],[46,136],[53,16],[61,33]],
+  victreebel:[[1,103],[1,146],[45,123]],tangela:[[1,25],[10,0],[22,146],[28,10],[31,79],[40,120]],
+  vileplume:[[1,0],[1,79],[44,91],[45,123]],koffing:[[1,134],[9,124],[21,122]],
+  weezing:[[1,124],[1,134],[21,122]],gastly:[[1,76],[28,37],[36,113],[45,123]],
+  haunter:[[1,76],[25,114],[31,37],[45,113],[45,123]],lickitung:[[1,76],[18,74],[23,130],[29,153],[40,120]],
+  rhyhorn:[[1,61],[10,130],[15,52],[29,105],[43,135],[52,40],[57,80]],
+  rhydon:[[1,52],[1,61],[1,130],[29,105],[46,135],[58,40],[66,80]],
+  seel:[[1,58],[17,70],[21,7],[30,31],[37,135],[41,67]],
+  dewgong:[[1,7],[1,58],[1,70],[1,115],[40,149],[42,135],[51,67]],
+  farfetchd:[[1,90],[16,52],[21,74],[26,53],[41,121],[46,45]],
+  kangaskhan:[[1,23],[7,11],[19,44],[25,82],[31,101],[43,32]],
+  scyther:[[1,100],[11,99],[16,45],[26,152],[31,121],[46,53]],
+  omanyte:[[1,25],[13,11],[19,150],[25,85],[49,5],[55,62]],
+  omastar:[[1,11],[1,25],[1,150],[25,85],[40,128],[55,5],[65,62]],
+  kabuto:[[1,112],[13,0],[25,85],[49,79],[55,5],[55,151]],
+  kabutops:[[1,0],[1,53],[1,112],[25,85],[40,121],[55,79],[65,5],[65,31]],
+  electrode:[[1,134],[21,127],[34,109],[48,133]],magmar:[[1,42],[1,48],[1,124],[41,50],[57,47]],
+  lapras:[[1,150],[13,13],[31,67],[49,62]],porygon:[[1,134],[12,97],[36,141],[48,154]],
+  eevee:[[1,134],[23,100],[30,11],[42,135]],snorlax:[[1,134],[17,58],[28,125],[33,13],[42,26],[46,109],[51,63]],
+  chansey:[[1,95],[17,35],[35,41],[57,33]],hitmonlee:[[1,34],[1,104],[11,108],[16,72],[20,18],[26,60],[46,81]],
+  hitmonchan:[[1,23],[1,104],[13,99],[20,77],[26,48],[26,68],[26,139],[32,119],[38,82]],
+  pinsir:[[1,147],[7,10],[7,53],[25,104],[31,18],[43,131]],
+  electabuzz:[[1,100],[1,139],[25,133],[47,138],[58,137]],aerodactyl:[[1,152],[15,11],[29,5],[43,135],[50,63]],
+  alakazam:[[1,24],[21,97],[30,55],[36,98]],mrmime:[[5,24],[15,35],[22,78],[29,97],[43,98]],
+  arcanine:[[1,11],[1,42],[49,43]],nidoqueen:[[1,34],[1,94],[1,112],[10,86],[22,13],[43,132]],
+  nidoking:[[1,34],[1,90],[1,94],[10,86],[22,136],[43,80]],
+  graveler:[[1,107],[1,134],[29,109],[37,105],[45,40],[62,33]],
+  dratini:[[1,153],[15,144],[29,120],[50,88],[57,63]],dragonair:[[1,144],[1,153],[29,120],[56,88],[65,63]],
+  dragonite:[[1,144],[1,153],[29,120],[55,152],[61,88],[75,63]],
+  jynx:[[1,76],[1,95],[1,96],[21,35],[25,68],[51,13],[51,98],[67,12]],
+  exeggutor:[[1,8],[1,24],[19,130],[30,56],[31,41]],clefable:[[1,35]],wigglytuff:[[1,35]],
+  ninetales:[[1,42],[1,100],[45,49]],poliwrath:[[1,35],[1,131],[1,150]],cloyster:[[1,7],[30,31],[41,128]],
+  machamp:[[13,73],[25,104],[33,148],[41,131],[46,28],[59,39]],
+  golem:[[1,107],[1,134],[29,109],[37,105],[45,40],[62,33]],gengar:[[1,76],[25,114],[31,37],[45,113],[45,123]],
+  moltres:[[1,42],[1,152],[13,49],[49,50],[73,59],[85,118]],zapdos:[[1,90],[1,140],[49,38],[85,137]],
+  articuno:[[1,57],[1,96],[49,67],[73,12]],vaporeon:[[1,134],[16,150],[23,100],[30,11],[36,7],[52,62]],
+  jolteon:[[1,134],[16,140],[23,100],[30,34],[36,92],[52,137]],
+  flareon:[[1,134],[16,42],[23,100],[30,11],[36,49],[42,124],[52,50]],mewtwo:[[1,24],[22,133],[44,55],[66,98]],
+  chikorita:[[1,134],[8,103],[29,13],[50,126]],bayleef:[[1,103],[1,134],[31,13],[55,126]],
+  meganium:[[1,103],[1,134],[31,13],[61,126]],cyndaquil:[[1,134],[12,42],[19,100],[27,51],[36,133],[46,50]],
+  quilava:[[1,134],[12,42],[21,100],[31,51],[42,133],[54,50]],
+  typhlosion:[[1,42],[1,134],[21,100],[31,51],[45,133],[60,50]],
+  totodile:[[1,112],[7,101],[13,150],[20,11],[35,121],[52,62]],
+  croconaw:[[1,101],[1,112],[13,150],[21,11],[37,121],[55,62]],
+  feraligatr:[[1,101],[1,112],[1,150],[21,11],[38,121],[58,62]],sentret:[[1,112],[7,100],[12,54],[24,120]],
+  furret:[[1,100],[1,112],[12,54],[28,120]],hoothoot:[[1,134],[11,90],[28,135],[34,24],[48,37]],
+  noctowl:[[1,90],[1,134],[33,135],[41,24],[57,37]],ledyba:[[1,134],[15,23],[36,2],[36,116],[36,133],[50,33]],
+  ledian:[[1,134],[15,23],[42,2],[42,116],[42,133],[60,33]],spinarak:[[1,94],[11,25],[23,75],[30,54],[53,98]],
+  ariados:[[1,25],[1,94],[25,75],[34,54],[63,98]],crobat:[[1,6],[1,75],[16,11],[21,152],[35,4],[49,93]],
+  chinchou:[[1,19],[17,150],[25,127],[37,135],[41,62]],lanturn:[[1,19],[17,150],[25,127],[43,135],[50,62]],
+  pichu:[[1,140]],cleffa:[[1,95],[17,78]],igglybuff:[[9,95]],togepi:[[21,5],[37,33]],
+  togetic:[[1,78],[21,5],[30,2],[37,33]],natu:[[1,90],[30,55],[50,98]],xatu:[[1,90],[35,55],[65,98]],
+  mareep:[[1,134],[9,140],[37,137]],flaaffy:[[1,134],[1,140],[45,137]],
+  ampharos:[[1,134],[1,140],[30,139],[57,137]],bellossom:[[1,0],[1,78],[44,91],[55,126]],
+  marill:[[1,134],[10,150],[15,109],[21,20],[28,33],[45,62]],
+  azumarill:[[1,134],[1,150],[15,109],[24,20],[34,33],[57,62]],
+  sudowoodo:[[1,107],[25,106],[41,46],[49,120],[57,33]],politoed:[[1,35],[1,150]],
+  hoppip:[[10,134],[30,2],[30,79]],skiploom:[[1,134],[36,2],[36,79]],jumpluff:[[1,134],[44,2],[44,79]],
+  aipom:[[1,112],[13,6],[31,54],[38,133]],sunkern:[[1,0],[13,79],[42,56]],
+  sunflora:[[1,0],[1,95],[13,103],[25,21],[37,91],[42,126]],yanma:[[1,134],[6,100],[34,145],[39,116],[39,152]],
+  wooper:[[1,150],[11,120],[16,85],[36,40]],quagsire:[[1,150],[11,120],[16,85],[42,40]],
+  espeon:[[1,134],[16,24],[23,100],[30,133],[36,97],[47,98]],umbreon:[[1,134],[16,99],[23,100],[36,46]],
+  murkrow:[[1,90],[9,6],[14,99],[35,46]],slowking:[[1,134],[13,150],[17,24],[29,58],[40,98]],
+  misdreavus:[[11,6],[30,97]],unown:[[25,24]],wobbuffet:[[25,24]],
+  girafarig:[[1,134],[7,6],[13,24],[19,130],[43,97],[49,29]],pineco:[[1,134],[15,135],[22,92],[22,102],[50,33]],
+  forretress:[[1,134],[15,135],[22,102],[31,154],[50,71],[59,33],[59,80]],
+  dunsparce:[[1,101],[21,109],[24,99],[34,135]],gligar:[[1,94],[20,100],[28,46],[30,2],[30,30],[36,121]],
+  steelix:[[1,134],[8,10],[12,107],[23,101],[30,30],[30,36],[37,120],[45,71],[49,29],[56,33]],
+  snubbull:[[1,134],[13,11],[19,76],[34,101],[43,135],[53,29]],
+  granbull:[[1,134],[13,11],[19,76],[38,101],[49,135],[61,29]],
+  qwilfish:[[1,94],[1,134],[13,150],[21,92],[25,104],[33,135],[37,62]],
+  scizor:[[1,100],[11,99],[16,45],[26,83],[31,121],[46,53]],shuckle:[[1,25],[9,92],[9,153],[37,109]],
+  heracross:[[1,134],[6,61],[17,52],[23,18],[37,135],[53,80]],
+  sneasel:[[1,112],[8,100],[22,46],[29,54],[43,70],[50,121],[57,9],[64,83]],
+  teddiursa:[[1,112],[7,76],[13,54],[25,46],[37,121],[43,125],[49,136]],
+  ursaring:[[1,54],[1,76],[1,112],[25,46],[37,121],[43,125],[49,136]],
+  slugma:[[1,124],[8,42],[15,107],[36,50],[43,106],[50,13]],
+  magcargo:[[1,42],[1,107],[1,124],[36,50],[48,106],[60,13]],swinub:[[1,134],[10,96],[28,135],[46,12],[50,40]],
+  piloswine:[[1,61],[1,96],[28,135],[30,30],[33,52],[56,12]],
+  corsola:[[1,134],[12,19],[23,20],[28,128],[34,105],[45,5]],
+  remoraid:[[1,150],[22,7],[22,20],[22,97],[44,67],[55,63]],
+  octillery:[[1,150],[11,25],[22,7],[22,20],[22,97],[25,87],[54,67],[70,63]],delibird:[[15,66],[30,2]],
+  mantine:[[1,19],[1,134],[15,20],[22,135],[36,152],[43,151]],skarmory:[[1,90],[13,133],[26,52],[29,4],[32,129]],
+  houndour:[[1,42],[13,124],[25,11],[37,46],[43,50],[49,29]],
+  houndoom:[[1,42],[13,124],[27,11],[43,46],[51,50],[59,29]],kingdra:[[1,19],[1,150],[29,144],[51,62]],
+  phanpy:[[1,134],[25,135],[33,109],[49,33],[50,40]],donphan:[[1,61],[25,52],[33,109],[41,102],[49,40]],
+  porygon2:[[1,134],[12,97],[36,141],[48,154]],stantler:[[1,134],[11,6],[21,130],[37,135]],smeargle:[[8,35]],
+  tyrogue:[[1,134],[20,77]],hitmontop:[[1,104],[1,108],[13,99],[19,100],[20,142],[25,102]],
+  smoochum:[[1,76],[1,95],[13,96],[21,24],[45,98],[57,12]],elekid:[[1,100],[9,139],[25,133],[41,138],[49,137]],
+  magby:[[1,42],[13,124],[19,48],[37,50],[49,47]],miltank:[[1,134],[13,130],[34,109],[43,13]],
+  blissey:[[1,95],[13,35],[28,41],[47,33]],raikou:[[1,11],[11,140],[31,100],[41,127],[61,29],[71,137]],
+  entei:[[1,11],[11,42],[31,49],[41,130],[51,50],[71,47]],suicune:[[1,11],[11,20],[31,57],[41,7],[71,62]],
+  larvitar:[[1,11],[22,106],[29,136],[43,29],[50,40],[57,63]],
+  pupitar:[[1,11],[22,106],[29,136],[47,29],[56,40],[65,63]],
+  tyranitar:[[1,11],[22,106],[29,136],[47,29],[61,40],[75,63]],
+  lugia:[[22,57],[44,62],[66,133],[77,3],[88,5],[99,55]],hooh:[[22,57],[44,47],[66,133],[77,110],[88,5],[99,55]],
+  celebi:[[1,24],[20,5],[30,55],[30,56]]
+};
+function usaGolpesEscolhidos(speciesId){ return !METRONOMO.includes(speciesId); }
+/* O que a espécie aprende por nível ATÉ aquele nível, do mais forte pro mais fraco. Cópia exata da
+   do cliente -- as duas alimentam o equiparNpc, e divergir aqui é divergir a batalha. */
+function ataquesDisponiveis(speciesId, nivel){
+  if(!usaGolpesEscolhidos(speciesId)) return [];
+  const lista = APRENDIZADO[speciesId];
+  if(!lista) return [];
+  const ids = [];
+  for(const par of lista){ if(par[0] <= nivel) ids.push(GOLPES_IDS[par[1]]); }
+  return ids.sort((a, b) => GOLPES[b][1] - GOLPES[a][1] || a.localeCompare(b));
+}
+
 const MOVE_POWER = 60;   // o poder de quem NÃO tem golpe escolhido (save antigo, e as 8 espécies sem golpe de dano)
-/* >>> EXPERIMENTO 09/09/2026: O TETO DE DANO ESTÁ DESLIGADO. <<<
-   Os valores de produção são 0.65 e 0.70 -- pra voltar, é trocar os dois Infinity de volta AQUI e
-   no outro motor (index.html e functions/index.js têm cópias, e elas têm que ficar idênticas).
-   O que o teto garantia, e que agora não vale mais: one-shot não existir, e todo pokémon sempre
-   responder pelo menos uma vez. Medido ao desligar -- ver a seção do CLAUDE.md. */
 /* TETO DE DANO POR GOLPE, DESLIGADO desde 09/09/2026 -- e isso é decisão, não experimento
    esquecido: ele foi tirado pra um experimento e o resultado foi aprovado pro ar.
    Valeu 0.65 (0.70 no crítico) por quase toda a vida do jogo, e era ele que garantia que
@@ -1281,15 +1520,32 @@ function tentarGolpeEspecial(active, enemy, rng, diario){
          2) SÓ sai quando o alvo TEM um segundo golpe. Quem é de um tipo só e sem subtipo (um
             Onix, um Hitmonlee) não tem o que anular, e inventar uma punição pra ele seria
             outra regra, não esta. O sorteio simplesmente não vale contra ele. */
-      if(tiposDeAtaque(alvo, quem).length < 2) continue;
-      const tipoAnulado = bestAttackType(alvo, quem).type;
+      /* QUANTOS GOLPES DISTINTOS ELE TEM PRA PERDER. Com golpe escolhido -- o jogador, e desde
+         09/09/2026 também os NPCs -- o que conta são os TIPOS dos golpes que ele LEVA, não os
+         tipos da espécie: dois golpes do mesmo tipo caem juntos e a anulação fica sem segundo
+         golpe pra oferecer, que é exatamente o caso que esta regra existe pra evitar.
+         Sem golpe escolhido vale a lista de tipos da espécie, como sempre foi. */
+      const golpesDele = Array.isArray(alvo.ataques) ? alvo.ataques.filter(id => GOLPES[id]) : [];
+      if(golpesDele.length){
+        const tiposDele = [];
+        golpesDele.forEach(id => { if(tiposDele.indexOf(GOLPES[id][0]) < 0) tiposDele.push(GOLPES[id][0]); });
+        if(tiposDele.length < 2) continue;
+      } else if(tiposDeAtaque(alvo, quem).length < 2) continue;
+      const escolhaAnulada = bestAttackType(alvo, quem);
+      const tipoAnulado = escolhaAnulada.type;
+      /* O GOLPE anulado, quando existe um de verdade. O log dizia o nome GENÉRICO do tipo, e com
+         golpe escolhido isso nomeia um golpe que o pokémon não tem -- reportado em 09/09/2026
+         ("ele tá pegando um qualquer aleatório"). O motor manda o id; a palavra é do cliente. */
+      const golpeAnulado = escolhaAnulada.golpe || null;
       alvo._anulado = { tipo: tipoAnulado, contra: quem };
       if(diario){
         /* Grava o TIPO anulado (`a`) porque é ele que deixa o log dizer QUAL golpe se perdeu --
            "teve o ataque Nevasca anulado" em vez de "teve seu melhor ataque anulado". O nome sai
            do tipo no cliente, como em todo o resto do log: o motor manda o tipo, o cliente escolhe
            a palavra (ver nomeDoGolpe). */
-        diario.push({ q: marca, d: 0, hp: alvo.hp, c:0, m:0, z:0, x:'disable', g: especial.golpe, a: tipoAnulado });
+        const reg = { q: marca, d: 0, hp: alvo.hp, c:0, m:0, z:0, x:'disable', g: especial.golpe, a: tipoAnulado };
+        if(golpeAnulado) reg.am = golpeAnulado;   // o id do golpe perdido, quando ele existe
+        diario.push(reg);
       }
       continue;
     }
@@ -3068,7 +3324,7 @@ exports._raizDaLinha = raizDaLinha;
 exports._chaveDoEquipado = chaveDoEquipado;
 exports._createInstance = createInstance;
 exports._makeSeededRng = makeSeededRng;
-exports._golpesEspeciais = { AUTODESTRUICAO, SONIFEROS, METRONOMO, CHANCE_AUTODESTRUICAO, CHANCE_SONO, SONO_EM_TROCAS, MULTI_GOLPE };
+exports._golpesEspeciais = { AUTODESTRUICAO, SONIFEROS, METRONOMO, CHANCE_AUTODESTRUICAO, CHANCE_SONO, SONO_EM_TROCAS, MULTI_GOLPE, ataquesDisponiveis };
 exports._trainersLeagueSplitGroups = trainersLeagueSplitGroups;
 exports._trainersLeagueGatherEligibleCodes = trainersLeagueGatherEligibleCodesForUid;
 exports._decodeTeamCode = decodeTeamCode;   // o teste da liga confere a ORDEM da lista pela especie de cada time
@@ -4750,7 +5006,9 @@ exports.fightTrainerTowerFloor = onCall(async (request) => {
     if(Array.isArray(p.ataques)) inst.ataques = p.ataques.slice(0, 2);
     return inst;
   });
-  const timeNpc = andar.team.map(p => createInstance(p.speciesId, p.level));
+  const timeNpc = equiparNpc(andar.team.map(p => createInstance(p.speciesId, p.level)));
+  /* O treinador da Torre é NPC como o líder de ginásio, e é por causa DELE que o APRENDIZADO
+     precisou vir pro servidor -- o time dele é montado aqui, do zero. */
 
   // especialidade de tipo do jogador vale aqui também, como em qualquer batalha
   const userSnap = await db.collection('users').doc(uid).get();
