@@ -1536,6 +1536,71 @@ function comItem(instancia, item){
      JSON.stringify([S.avisoDoConfronto(m,0), S.avisoDoConfronto(m,1)]));
 })();
 
+console.log('\n=== A RECONSTRUCAO NAO PODE MOSTRAR DOIS GOLPES IMPOSSIVEIS ===');
+{
+  /* Passando do TETO_GOLPES a luta e reconstruida em 3 linhas: o vencedor acerta uma PARTE, o
+     perdedor devolve tudo de uma vez, o vencedor termina. A primeira e a terceira sao o MESMO
+     pokemon com o MESMO golpe contra o MESMO alvo -- e a unica coisa que faz dois golpes assim
+     diferirem e o sorteio de `0,85 + rng*0,15` do calcDamageNew: no maximo 1,18x (1,00/0,85).
+     Fora o critico, que a linha anuncia com selo proprio.
+     A faixa da divisao era 30-70%, que da ate 2,33x, e isso foi RELATADO por jogadores em
+     10/09/2026: "tira uma fracao, apanha, e termina de matar com o mesmo golpe tirando muito mais
+     dano e sem critico". Medido na epoca: 78,1% dos confrontos reconstruidos ficavam fora da banda,
+     media 1,57x, pior 2,36x. Hoje a faixa e 46-54%, teto de 1,17x. */
+  const BANDA = 1.18;   // 1,00 / 0,85 -- o quanto o sorteio da formula faz um golpe variar
+  const especies = Object.keys(S.SPECIES);
+  let tres = 0, fora = 0, pior = 0, exemplo = null;
+  for(let i = 0; i < 2500; i++){
+    const rng = S.makeSeededRng('rec' + i);
+    const time = k => Array.from({ length: k }, () => {
+      const id = especies[Math.floor(rng() * especies.length)];
+      const p = S.createInstance(id, 25 + Math.floor(rng() * 40)); p.ataques = S.ataquesPadrao(p); return p;
+    });
+    const r = S.simulateGymBattle(time(3), time(3), S.makeSeededRng('b' + i));
+    (r.matchups || []).forEach(m => {
+      const reais = (m.golpes || []).filter(g => !g.x && g.d > 0).filter(g => !(g.t > 1)).length;
+      if(reais <= S.TETO_GOLPES) return;                 // so o que passa pela reconstrucao
+      const todos = S.sequenciaDoConfronto(m);
+      /* O SONO FICA DE FORA, e a excecao e estrutural: nele as trocas livres saem REAIS (uma linha
+         cada) e so o RESTO e reconstruido -- entao um golpe de verdade fica ao lado de um somado, e
+         a razao entre os dois nao tem por que caber na banda. Medido: 3 casos em 3.128 (0,1%), e
+         TODOS com sono. Sem essa linha o teste toleraria 2% e esconderia uma faixa reaberta. */
+      if(todos.some(g => g.x === 'sono')) return;
+      const seq = todos.filter(g => !g.x);
+      if(seq.length !== 3 || seq[0].q !== seq[2].q) return;   // o padrao vencedor / perdedor / vencedor
+      tres++;
+      const a = seq[0].d, b = seq[2].d;
+      const razao = Math.max(a, b) / Math.max(1, Math.min(a, b));
+      if(razao > BANDA + 0.12){                          // folga pro arredondamento em dano total pequeno
+        fora++;
+        if(razao > pior){ pior = razao; exemplo = (seq[0].q === 'p' ? m.player : m.enemy) + ': ' + a + ' e depois ' + b; }
+      }
+    });
+  }
+  ok('confrontos reconstruidos de sobra pra medir', tres > 1000, tres + ' de 3 linhas');
+  /* ZERO, e nao "quase zero": tirando o sono, a divisao e a UNICA coisa que separa os dois golpes,
+     e ela esta presa na banda por construcao. Qualquer caso aqui e a faixa tendo reaberto. */
+  ok('os dois golpes do MESMO pokemon nunca diferem mais que a formula permite',
+     fora === 0, fora + ' de ' + tres + (exemplo ? '   |  pior: ' + pior.toFixed(2) + 'x  ' + exemplo : ''));
+
+  /* E A FAIXA E A CONTA, nao um numero solto: se ela abrir de novo, o teto da razao abre junto. */
+  {
+    const txt = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
+    const m = txt.match(/const firstHitPct = ([\d.]+) \+ \(semente\/40\)\*([\d.]+);/);
+    ok('a faixa da divisao esta escrita no codigo', !!m, m ? m[0] : '(nao achei)');
+    if(m){
+      const menor = Number(m[1]), maior = Number(m[1]) + Number(m[2]);
+      ok('e ela nao permite razao acima da banda da formula', (maior / menor) <= BANDA,
+         'divide entre ' + (100*menor).toFixed(0) + '% e ' + (100*maior).toFixed(0) + '%  ->  razao maxima ' + (maior/menor).toFixed(2) + 'x');
+    }
+  }
+
+  /* E A RECONSTRUCAO NAO ENCOSTA NO MOTOR. Ela e chamada pelo sequenciaDoConfronto, que e
+     apresentacao -- mexer na faixa nao pode mudar um ponto de dano. */
+  ok('a reconstrucao vive so no cliente (o servidor nao a tem)',
+     require('fs').readFileSync(path.join(raiz, 'functions', 'index.js'), 'utf8').indexOf('firstHitPct') < 0);
+}
+
 console.log('\n=== A FURIA E UMA PASSIVA ===');
 {
   /* Reescrita em 10/09/2026. Ela nasceu como golpe que ganhava poder a cada uso e isso foi

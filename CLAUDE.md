@@ -925,6 +925,47 @@ no tamanho da fonte. Os blocos são `golpe-cab` (o sprite num ladrilho + a frase
 - **Saiu o `linhaDeGolpe`**, que era o formato antigo: as três telas usam o cartão, e uma função
   de apresentação sem chamador é exatamente o tipo de coisa que fica anos no arquivo.
 
+### A RECONSTRUÇÃO MOSTRAVA DOIS GOLPES IMPOSSÍVEIS (10/09/2026)
+
+Relatado pelo dev e por jogadores: *"às vezes um pokémon tira só uma fração de HP do inimigo,
+depois apanha, e depois termina de matar com o MESMO golpe tirando muito mais dano e sem crítico"*.
+
+- **NÃO ERA SENSAÇÃO: os números eram impossíveis mesmo.** As linhas 1 e 3 da reconstrução são o
+  MESMO pokémon, com o MESMO golpe, contra o MESMO alvo. A única coisa que faz dois golpes assim
+  diferirem é o sorteio de `0,85 + rng*0,15` do `calcDamageNew`: no máximo **1,18×** (1,00/0,85).
+  Fora o crítico, que a linha anuncia com selo próprio.
+- **A CAUSA ERA A FAIXA DA DIVISÃO**, o `firstHitPct`, que ia de **30% a 70%** do dano total — ou seja,
+  até **2,33×** entre os dois golpes. Medido em 5.009 confrontos reconstruídos:
+
+  | razão entre o 1º e o 3º golpe | |
+  |---|---|
+  | até 1,18× (o que um golpe real varia) | 21,7% |
+  | 1,18× a 1,5× | 29,5% |
+  | 1,5× a 2× | 28,6% |
+  | mais de 2× | 20,2% |
+
+  **78,1% ficavam fora do que a fórmula consegue produzir**, média 1,57×, pior 2,36× (um Golbat
+  tirando 137 e depois 58 do mesmo Onix).
+- **HOJE A FAIXA É 46% a 54%**, teto de razão **1,17×** — dentro da banda da fórmula por construção.
+  Medido depois: **0,7% → 0%** fora da banda, média 1,09×, pior 1,26×.
+  **A variação continua existindo** (nenhuma luta divide igual a outra, e a semente continua saindo
+  do próprio confronto pra o log e a animação concordarem); ela só deixou de sair da banda do que o
+  motor sabe fazer.
+- **⚠️ O QUE ISSO NÃO CONSERTA, e está medido:** a linha do PERDEDOR continua sendo a soma dos golpes
+  dele — **2,44× um golpe real**, contra **1,23×** das duas linhas do vencedor. Ela fica porque é UMA
+  linha só, e ali não há com o que comparar na tela: o que denunciava era o PAR do vencedor.
+  Se um dia incomodar, a saída medida é declarar a multiplicidade (reusar o selo `Nx` dos golpes de
+  vários tapas: *"Golbat atacou Onix com Mordida 3x e tirou −195"*), e o preço é a animação crescer
+  — o confronto reconstruído tem **4,9 golpes reais** em média contra as 3 linhas de hoje, e cada
+  golpe animado leva a pausa de 1s do nome.
+- **O SONO É A EXCEÇÃO, e ela é estrutural.** Nele as trocas livres saem REAIS (uma linha cada) e só
+  o RESTO é reconstruído, então um golpe de verdade fica ao lado de um somado e a razão não tem por
+  que caber na banda. Medido: **3 casos em 3.128 (0,1%), todos com sono**. O teste os exclui e cobra
+  **ZERO** no resto — tolerar 2% esconderia uma faixa reaberta.
+- **O MOTOR NÃO MUDA EM UM PONTO**, e isso foi conferido por impressão: o mesmo build com a faixa
+  velha e com a nova dá o MESMO hash em 6.188 confrontos. A reconstrução só é chamada pelo
+  `sequenciaDoConfronto`, que é apresentação — e o teste cobra que ela não exista no servidor.
+
 ### O METRÔNOMO SORTEIA E DEPOIS ESCOLHE (10/09/2026)
 
 Pedido assim: *"hoje a Togepi e a Cleffa só utilizam metronome, mesmo tendo outros ataques em seu

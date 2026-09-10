@@ -9163,16 +9163,28 @@ function reconstruirSequencia(m){
   }
 
   // 3 golpes: vencedor acerta uma parte (1% a 99%), perdedor acerta o dele todo de uma vez, vencedor termina
-  /* 30% a 70%, nao 1% a 99%. Com a faixa aberta antiga, 1 em cada 7 confrontos sorteava um primeiro
-     golpe abaixo de 15% do dano -- um arranhao seguido de um tranco que derrubava os outros 85%+ de
-     uma vez. Ficava com cara de bug, embora o resultado estivesse certo. Estreitar mantem a variacao
-     (nenhuma luta sai igual a outra) e tira os dois extremos. */
+  /* 46% a 54%, e o numero sai da PROPRIA FORMULA DE DANO -- nao e gosto.
+     Estas duas linhas sao o MESMO pokemon batendo com o MESMO golpe no MESMO alvo, e a unica coisa
+     que faz dois golpes assim diferirem e o sorteio de `0,85 + rng*0,15` do calcDamageNew: no
+     maximo **1,18x** entre eles (1,00/0,85). Fora do critico, que a linha anuncia com selo proprio,
+     a formula nao consegue produzir mais que isso.
+     A faixa era 30-70%, o que dava ate 2,33x. Medido em 5.009 confrontos reconstruidos: a razao
+     entre os dois golpes ficava FORA do que um golpe real varia em **78,1%** deles (media 1,57x,
+     pior 2,36x -- um Golbat tirando 137 e depois 58 do mesmo Onix, sem critico). Foi reportado por
+     jogadores exatamente assim: "tira uma fracao, apanha, e termina de matar com o mesmo golpe
+     tirando muito mais dano".
+     Com 46-54% o teto da razao vira 1,17x -- dentro da banda da formula. Medido depois: 0,7% ficam
+     fora (so arredondamento em dano total pequeno), media 1,09x, pior 1,26x.
+     A VARIACAO CONTINUA EXISTINDO (nenhuma luta divide igual a outra), so deixou de sair da banda
+     do que o motor sabe fazer. E o que ela NAO conserta esta medido e aceito: a linha do PERDEDOR
+     continua sendo a soma dos golpes dele (2,44x um golpe real), porque ela e uma linha so -- mas
+     ali nao ha com o que comparar na tela, que e o que fazia o par do vencedor denunciar. */
   /* DETERMINÍSTICO, não Math.random(). O log e a animação chamam esta função em momentos
      diferentes e precisam receber a MESMA divisão -- com sorteio, a linha do log mostrava um
      número e a barra descia outro, e cada redesenho da tela trocava os valores de novo.
      A semente sai do próprio confronto, então o mesmo confronto sempre divide igual. */
   const semente = (Math.abs(m.playerHpBefore*31 + m.enemyHpBefore*17 + playerDmg*7 + enemyDmg*3)) % 41;
-  const firstHitPct = 0.30 + (semente/40)*0.40;
+  const firstHitPct = 0.46 + (semente/40)*0.08;
   const firstHitAmount = Math.max(1, Math.min(loserTotalDmg-1, Math.round(loserTotalDmg*firstHitPct)));
   const finishingHitAmount = loserTotalDmg - firstHitAmount;
 
