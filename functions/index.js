@@ -1139,7 +1139,14 @@ function statAtLevel(base, level){ return Math.floor(2*base*level/100) + 5; }
    o corpo aqui embaixo É o motor novo. Conferido numericamente -- 6556 golpes com as mesmas
    seeds nos dois arquivos, zero divergências. Mantenha assim: um lado só mudado = a mesma
    batalha com dois vencedores. */
-function calcDamage(attacker, defender, rng){
+/* `op.semTipo` -- o dano sai SEM TIPO: nem multiplicador de tipo, nem STAB, nem o redutor de
+   subtipo. Existe pra a CONFUSAO, que no jogo oficial bate com um golpe sem tipo nenhum. O resto
+   da conta e a de sempre: nivel, poder do golpe, ataque contra defesa e a variacao de 85-100%.
+   SEM ISSO o espelho da confusao aplicava a tabela contra ELE MESMO, e Fantasma contra Fantasma e
+   2x: um Haunter tirava 299 dos proprios 300 de vida. Medido antes de mudar: 3% das confusoes
+   deixavam o alvo em 1 de HP. */
+function calcDamage(attacker, defender, rng, op){
+  op = op || {};
   rng = rng || Math.random;   // as ligas passam um rng com seed; fora delas cai no padrão
   // considera tipos próprios E subtipos, igual ao cliente (ver SUBTYPES).
   // Com USE_SUBTYPES=false volta a ser o bestMultiplier de antes, que segue ali intacto
@@ -1152,13 +1159,16 @@ function calcDamage(attacker, defender, rng){
   const mult = best.mult;
   const special = isSpecialType(best.type);
   // STAB só pro tipo próprio; subtipo perde o bônus e ainda leva o redutor
-  const STAB = best.stab ? 1.5 : SUBTYPE_PENALTY;
+  const STAB = op.semTipo ? 1 : (best.stab ? 1.5 : SUBTYPE_PENALTY);
   // ---- fórmula oficial da Gen 1, idêntica ao calcDamageNew do cliente ----
   const atkBase = special ? effectiveSpAtk(attacker) : effectiveAttack(attacker);   // COM buffs (ofensivo)
   const defBase = special ? effectiveSpDef(defender) : effectiveDefense(defender);  // Gen 2: defesa especial propria
   const A = statAtLevel(atkBase, attacker.level);
   const D = statAtLevel(defBase, defender.level);
-  const isCrit = rng() < chanceDeCritico(best.golpe);   // Gen 3: chance fixa, +1 estágio nos golpes de crítico alto
+  /* `op.semCritico` -- o golpe nao pode ser critico. Existe pra a CONFUSAO, que no jogo oficial
+     tambem nao critica. O rng E CONSUMIDO do mesmo jeito: os dois motores tem que ler a mesma
+     quantidade de numeros da mesma semente, senao a batalha diverge do 2o golpe em diante. */
+  const isCrit = (rng() < chanceDeCritico(best.golpe)) && !op.semCritico;   // Gen 3: chance fixa, +1 estágio nos golpes de crítico alto
   attacker.lastCrit = isCrit;   // registro pro log, como o lastMoveType acima
   /* Imunidade: o multiplicador é 0, mas o dano tem piso de 1 -- dano 0 dos dois lados travaria
      o laço da luta pra sempre. O log precisa saber a diferença entre "tirou 1" e "não teve
@@ -1171,7 +1181,7 @@ function calcDamage(attacker, defender, rng){
   const core = Math.floor(Math.floor(2*Leff/5 + 2) * potencia * A / D / 50) + 2;
   // multiplicador de tipo COMPRIMIDO (^0.6): 2x vira ~1.5x. Aqui não se troca de pokémon no meio
   // do confronto, então tipo não pode ser sentença de morte
-  const typeMult = Math.pow(mult, EXPOENTE_TIPO);
+  const typeMult = op.semTipo ? 1 : Math.pow(mult, EXPOENTE_TIPO);
   const dmgGen1 = Math.round(core * STAB * typeMult * (0.85 + rng()*0.15) * (isCrit ? CRIT_MULT : 1)); // variação 85-100% e o ×2 do crítico
   // converte pra fração da vida na escala Gen 1, aplica o teto por golpe, e projeta na escala de HP
   // do jogo -- sem vulnerabilidade por sequência de vitórias, que era a origem da "morte súbita"
@@ -1370,6 +1380,51 @@ const ABSORVER_MIN = 0.10, ABSORVER_MAX = 0.30;
 /* A cura só sai com a vida ABAIXO disso. Com o pokémon quase cheio não há o que recuperar, e a
    frase anunciaria um efeito que mal se vê na barra. */
 const CURA_MAXIMO_DO_HP = 0.7;
+/* CONFUSÃO: o adversário se acerta, e a luta acontece inteira depois (10/09/2026, a pedido).
+   Quem confunde tem 10% por CONFRONTO de deixar o outro confuso. O confuso leva UM golpe DELE
+   MESMO -- um ESPELHO: mesma espécie, nível, atributos e golpe -- e só então a luta começa, do
+   zero, "como se estivesse começando uma nova".
+   É `continue`, não `return true`: como o Recuperar, a anulação, a drenagem e a fúria, ela é
+   ABERTURA. Só a autodestruição e o sono resolvem o confronto. E NÃO MATA (piso de 1 de HP), a
+   mesma regra da drenagem.
+   O DANO É SEM TIPO E SEM CRÍTICO, como no jogo oficial -- ver a chamada do calcDamage lá embaixo.
+   ONZE GOLPES CONFUNDEM, e não só a Confusão. Foi reportado assim: "alguns pokémons também
+   possuem confusão que você não colocou, mas porque o nome é outro, como o Zubat, Tentacool,
+   Magnemite, que possuem Supersonic". Os onze da Gen 3 que confundem o ALVO:
+     status  -- Supersom, Raio Confuso, Beijo Doce, Bravata, Bajulação
+     de dano -- Confusão, Psicoraio, Soco Tonto, Pulso de Água, Feixe de Sinal, Soco Dinâmico
+   FICAM DE FORA o Outrage, o Petal Dance e o Thrash: eles confundem o PRÓPRIO USUÁRIO no fim da
+   sequência, que é outro efeito. E o Teeter Dance não existe no aprendizado por nível da base.
+   CADA ESPÉCIE GUARDA O NOME DO GOLPE DELA, como o SONIFEROS -- sem isso o Zubat confundiria com
+   "Confusão", e quem conhece o jogo notaria na hora. Quando ela aprende mais de um, fica com o
+   que aprende MAIS CEDO: é o que ela carrega pela maior parte da vida.
+   A LISTA saiu da base por script, não foi escrita à mão: são as 82 espécies que aprendem algum
+   dos onze por NÍVEL na Gen 3. O MEWTWO e o MEW não entram -- o tentarGolpeEspecial corta o bloco
+   inteiro quando qualquer um dos dois está no confronto, e a entrada seria letra morta. */
+const CONFUSAO = {
+  aerodactyl:'Supersom', alakazam:'Confusão', butterfree:'Confusão', celebi:'Confusão',
+  chinchou:'Supersom', cleffa:'Beijo Doce', cloyster:'Supersom', crobat:'Supersom',
+  dewgong:'Feixe de Sinal', drowzee:'Confusão', entei:'Bravata', espeon:'Confusão',
+  exeggcute:'Confusão', exeggutor:'Confusão', gastly:'Raio Confuso', gengar:'Raio Confuso',
+  girafarig:'Confusão', golbat:'Supersom', goldeen:'Supersom', golduck:'Confusão',
+  haunter:'Raio Confuso', hoothoot:'Confusão', hypno:'Confusão', igglybuff:'Beijo Doce',
+  kabuto:'Pulso de Água', kadabra:'Confusão', kangaskhan:'Soco Tonto', lanturn:'Supersom',
+  lapras:'Raio Confuso', ledian:'Supersom', ledyba:'Supersom', lickitung:'Supersom',
+  machamp:'Soco Dinâmico', machoke:'Soco Dinâmico', machop:'Soco Dinâmico', magby:'Raio Confuso',
+  magmar:'Raio Confuso', magnemite:'Supersom', magneton:'Supersom', mankey:'Bravata',
+  mantine:'Supersom', meowth:'Bravata', misdreavus:'Raio Confuso',
+  mrmime:'Confusão', natu:'Raio Confuso', nidoranf:'Bajulação', nidoranm:'Bajulação',
+  nidorina:'Bajulação', nidorino:'Bajulação', ninetales:'Raio Confuso', noctowl:'Confusão',
+  octillery:'Psicoraio', persian:'Bravata', pichu:'Beijo Doce', politoed:'Bravata',
+  porygon:'Psicoraio', porygon2:'Psicoraio', primeape:'Bravata', psyduck:'Confusão',
+  remoraid:'Psicoraio', seaking:'Supersom', shellder:'Supersom', slowbro:'Confusão',
+  slowking:'Confusão', slowpoke:'Confusão', smoochum:'Beijo Doce', stantler:'Raio Confuso',
+  starmie:'Raio Confuso', tauros:'Bravata', tentacool:'Supersom', tentacruel:'Supersom',
+  togepi:'Beijo Doce', togetic:'Beijo Doce', umbreon:'Raio Confuso', unown:'Confusão',
+  venomoth:'Supersom', venonat:'Supersom', vulpix:'Raio Confuso', wobbuffet:'Confusão',
+  xatu:'Raio Confuso', yanma:'Supersom', zubat:'Supersom'
+};
+const CHANCE_CONFUSAO = 0.10;   // por confronto, como o Disable, o Recuperar e a drenagem
 const IMUNES_A_ESPECIAL = ['mew','mewtwo'];
 /* Aprendem Autodestruição por nível na Gen 1/2. */
 const AUTODESTRUICAO = ['geodude','graveler','golem','voltorb','electrode','koffing','weezing','pineco','forretress'];
@@ -1477,6 +1532,12 @@ function sorteiaGolpeEspecial(p, rng){
   if(ABSORCAO[p.speciesId] && rng() < CHANCE_ABSORVER){
     return { efeito:'drenar', golpe: ABSORCAO[p.speciesId] };
   }
+  /* A CONFUSÃO VEM POR ÚLTIMO, e isso é de propósito: acrescentar um efeito no FIM da fila não
+     dilui nenhum dos que já estavam medidos -- quem cai na chance composta é ela. Um Alakazam
+     (Disable + Recuperar + Confusão) confunde em 0,9 × 0,9 × 10% = 8,1%. */
+  if(CONFUSAO[p.speciesId] && rng() < CHANCE_CONFUSAO){
+    return { efeito:'confusao', golpe: CONFUSAO[p.speciesId] };
+  }
   return null;
 }
 /* Devolve true quando o confronto foi RESOLVIDO aqui (e o doExchange não deve nem começar). */
@@ -1575,6 +1636,36 @@ function tentarGolpeEspecial(active, enemy, rng, diario){
            crescimento. `n` é a que vez é esta, pra a frase dizer "fúria x2". */
         diario.push({ q: marca, d: ganho, hp: quem.hp, c:0, m:0, z:0, x:'furia',
                       g: especial.golpe, n: quem._furia });
+      }
+      continue;
+    }
+    if(especial.efeito === 'confusao'){
+      /* O ALVO SE ACERTA. O dano sai de um ESPELHO dele -- uma cópia rasa, com os mesmos atributos
+         e o mesmo golpe -- batendo NELE. A cópia não é firula: o `calcDamageNew` ESCREVE
+         `lastMove`, `lastMoveType` e `lastCrit` no atacante, e sem ela o golpe que o pokémon usa na
+         luta seguinte sairia trocado no log.
+         Ele também não pode levar a anulação consigo: o `_anulado` é contra o OPONENTE, e o
+         espelho é ele mesmo.
+         NÃO MATA (piso de 1), e quem já está em 1 não gera linha nenhuma: um passo de dano 0 é o
+         que este log evita em toda regra. */
+      const espelho = Object.assign({}, alvo, { _anulado: null });
+      /* O SERVIDOR CHAMA A FUNCAO DE OUTRO NOME (`calcDamage`, sem o `New`) -- ao copiar codigo
+         entre os dois motores, conferir os NOMES e nao so a logica. E a mesma licao do `brockTeam`
+         x `enemyTeam` que a furia ja tinha custado tres suites. */
+      /* SEM TIPO, como no jogo oficial (a pedido, 10/09/2026) -- ver a nota do cliente. */
+      const dano = calcDamage(espelho, alvo, rng, { semTipo: true, semCritico: true });
+      const antes = alvo.hp;
+      alvo.hp = Math.max(1, alvo.hp - dano);
+      const saiu = antes - alvo.hp;
+      if(saiu <= 0) continue;
+      if(diario){
+        /* `q` é quem CONFUNDIU, não quem apanhou -- é a convenção do diário (o `q` do sono também
+           é quem usou o golpe), e é ela que faz a animação mover a barra do lado certo: o passo
+           comum inverte `q` pra achar quem APANHA.
+           `am` guarda o golpe que ele usou em si mesmo, pro selo da linha nomear o golpe certo. */
+        const reg = { q: marca, d: saiu, hp: alvo.hp, c:0, m:0, z:0, x:'confusao', g: especial.golpe };
+        if(espelho.lastMove) reg.am = espelho.lastMove;
+        diario.push(reg);
       }
       continue;
     }
@@ -3465,7 +3556,7 @@ exports._raizDaLinha = raizDaLinha;
 exports._chaveDoEquipado = chaveDoEquipado;
 exports._createInstance = createInstance;
 exports._makeSeededRng = makeSeededRng;
-exports._golpesEspeciais = { AUTODESTRUICAO, SONIFEROS, METRONOMO, CHANCE_AUTODESTRUICAO, CHANCE_SONO, SONO_EM_TROCAS, MULTI_GOLPE, ataquesDisponiveis, GOLPES_CRIT_ALTO, FURIA, CHANCE_FURIA, FURIA_BONUS, sorteiaGolpeDoMetronomo, POOL_METRONOMO };
+exports._golpesEspeciais = { AUTODESTRUICAO, SONIFEROS, METRONOMO, CHANCE_AUTODESTRUICAO, CHANCE_SONO, SONO_EM_TROCAS, MULTI_GOLPE, ataquesDisponiveis, GOLPES_CRIT_ALTO, FURIA, CHANCE_FURIA, FURIA_BONUS, sorteiaGolpeDoMetronomo, POOL_METRONOMO, CONFUSAO, CHANCE_CONFUSAO };
 exports._trainersLeagueSplitGroups = trainersLeagueSplitGroups;
 exports._trainersLeagueGatherEligibleCodes = trainersLeagueGatherEligibleCodesForUid;
 exports._decodeTeamCode = decodeTeamCode;   // o teste da liga confere a ORDEM da lista pela especie de cada time

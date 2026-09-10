@@ -925,6 +925,110 @@ no tamanho da fonte. Os blocos são `golpe-cab` (o sprite num ladrilho + a frase
 - **Saiu o `linhaDeGolpe`**, que era o formato antigo: as três telas usam o cartão, e uma função
   de apresentação sem chamador é exatamente o tipo de coisa que fica anos no arquivo.
 
+### A CONFUSÃO: O ADVERSÁRIO SE ACERTA (10/09/2026)
+
+Pedida assim: *"os pokemons que possuem o ataque confusão têm 10% de chance de deixar o adversário
+confuso. Esse evento ocorre logo no início da partida. Caso dê positivo, o adversário ataca ele
+mesmo (fazer o cálculo como se fosse um espelho atacando ele, mesmo pokémon, com mesmo level,
+stats, e poder do ataque) e após isso acontecer, faça a mecânica trabalhar como se estivesse
+começando uma nova luta"*. É o **oitavo golpe especial**, ao lado do sono, da autodestruição, do
+Metrônomo, do Disable, do Recuperar, da drenagem e da fúria.
+
+- **É ABERTURA, não resolve o confronto** (`continue`, como o Recuperar, a anulação, a drenagem e a
+  fúria). Só a autodestruição e o sono resolvem. A luta acontece inteira depois — que é o pedido ao
+  pé da letra.
+- **NÃO MATA: piso de 1 de HP**, a mesma regra da drenagem. Um efeito de abertura que resolvesse o
+  confronto sozinho seria um confronto sem um único golpe na tela, e o pedido diz que a luta vem
+  DEPOIS. Medido: 60 de 60 confrontos com confusão têm luta depois dela.
+- **⚠️ ONZE GOLPES CONFUNDEM, não só a Confusão — e são 82 espécies, não 23.** A primeira versão só
+  olhou o golpe `confusion` e foi reportada na hora: *"alguns pokémons também possuem confusão que
+  você não colocou, mas porque o nome é outro, como o Zubat, Tentacool, Magnemite, que possuem
+  Supersonic"*. Os onze da Gen 3 que confundem o ALVO:
+
+  | | golpes |
+  |---|---|
+  | **status** | Supersom (21 espécies), Raio Confuso (14), Bravata (7), Beijo Doce (6), Bajulação (4) |
+  | **de dano** | Confusão (20), Psicoraio (4), Soco Dinâmico (3), Feixe de Sinal, Pulso de Água, Soco Tonto (1 cada) |
+
+- **FICAM DE FORA o Outrage, o Petal Dance e o Thrash**, e isso é decisão, não esquecimento: eles
+  confundem o **PRÓPRIO USUÁRIO** no fim da sequência, que é outro efeito. O **Teeter Dance** não
+  existe no aprendizado por nível da base.
+- **CADA ESPÉCIE GUARDA O NOME DO GOLPE DELA**, como o `SONIFEROS` — sem isso o Zubat confundiria
+  com "Confusão" e quem conhece o jogo notaria na hora, que é exatamente o relato. Quando ela
+  aprende mais de um, fica com o que aprende **MAIS CEDO**: é o que ela carrega pela maior parte da
+  vida. E cada nome tem o **tipo** dele no `TIPO_DO_ESPECIAL`, então o selo do Zubat sai no cinza do
+  Normal e o do Misdreavus no roxo do Fantasma.
+  **A lista saiu da base por script, não foi escrita à mão.**
+- **O MEWTWO aprende Confusão no nível 1 e ficou de fora**: o `tentarGolpeEspecial` corta o bloco
+  inteiro quando QUALQUER um dos dois é Mew ou Mewtwo, então a entrada seria letra morta — o mesmo
+  motivo que já o tirou do Disable e do Recuperar. (São 83 na base, 82 aqui.)
+- **ELA VEM POR ÚLTIMO no sorteio**, e isso é de propósito: acrescentar um efeito no FIM da fila não
+  dilui nenhum dos que já estavam medidos — quem cai na chance composta é ela. Um Alakazam (Disable
+  + Recuperar + Confusão) confunde em 0,9 × 0,9 × 10% = **8,1%**.
+- **O DANO É SEM TIPO** (`op.semTipo` do `calcDamage`), como no jogo oficial. Nem multiplicador de
+  tipo, nem STAB, nem o redutor de subtipo — o que sobra do espelho é o que o pedido descreve:
+  mesmo nível, mesmos atributos e o poder do golpe dele.
+  **NASCEU COM TIPO e durou uma versão.** O espelho aplicava a tabela contra ELE MESMO, e Fantasma
+  contra Fantasma é **2×**: um **Haunter tirava 299 dos próprios 300 de HP**. Medido na troca:
+
+  | | com tipo | sem tipo |
+  |---|---|---|
+  | média | 35,0% da própria vida | **30,0%** |
+  | deixa com metade ou menos | 19,1% | **12,3%** |
+  | deixa em 1 de HP | 3,8% | **1,6%** |
+  | o Haunter | 96% | **69%** |
+
+- **⚠️ A CAUDA QUE SOBRA É DE ATRIBUTO, e ela é o certo:** o espelho é ELE MESMO, então quem é frágil
+  e forte se arrebenta e quem é duro mal se arranha. Medido no nível 45: **Haunter 85%** (ataque 50,
+  defesa 45), Gengar 62%, Alakazam 54% — e no outro extremo **Shuckle 3%** (defesa 230) e Chansey
+  15%. Não há o que consertar aí: é a mesma conta que decide todo golpe do jogo.
+- **E SEM CRÍTICO** (`op.semCritico`), também como no jogo oficial, e a pedido. Medido antes de
+  tirar: **43% dos golpes que deixavam o confuso em 1 de HP eram críticos** — e o crítico dobra o
+  dano **sem selo nenhum** na linha da confusão (o campo `c` do registro vai zerado), que é a mesma
+  classe de defeito dos "dois golpes impossíveis" da reconstrução.
+  **O RNG É CONSUMIDO DO MESMO JEITO**: a opção anula o resultado, não a chamada. Os dois motores
+  têm que ler a mesma quantidade de números da mesma semente, senão a batalha diverge do 2º golpe
+  em diante. O teste prova isso pelo lado do resultado: o golpe NÃO crítico dá exatamente o mesmo
+  número com e sem a opção (1.860 de 1.860).
+- **O `q` DO REGISTRO É DE QUEM CONFUNDIU, não de quem apanhou.** É a convenção do diário (o `q` do
+  sono também é de quem usou o golpe), e é ela que faz a animação mover a barra do lado certo: o
+  passo comum inverte o `q` pra achar quem APANHA. Trocar isso move a barra errada, e o defeito não
+  aparece como erro — aparece como o pokémon errado perdendo vida.
+- **A CÓPIA DO ATACANTE NÃO É FIRULA.** O `calcDamageNew` **escreve** `lastMove`, `lastMoveType` e
+  `lastCrit` no atacante, e o atacante aqui é o próprio alvo. Sem a cópia, o golpe que o pokémon usa
+  na luta seguinte sairia trocado no log. O teste cobra isso diretamente.
+  A cópia também zera o `_anulado`: a anulação é contra o OPONENTE, e o espelho é ele mesmo.
+- **⚠️ O SERVIDOR CHAMA A FUNÇÃO DE OUTRO NOME** — `calcDamage`, sem o `New`. Copiar o bloco do
+  cliente pro servidor derrubou a suíte com `ReferenceError`. É a mesma lição do `brockTeam` ×
+  `enemyTeam` que a fúria já tinha custado: ao copiar entre os dois motores, conferir os NOMES.
+- **A FRASE DO LOG NOMEIA OS DOIS GOLPES**: o que CONFUNDIU (por espécie) e o que ele usou EM SI,
+  que é o que explica o número — *"💫 Zubat deixou Machop confuso com Supersom, e ele se acertou com
+  Vingança"*. No aviso do meio da batalha ela sai curta, sem golpe nenhum, como a do sono: ali se lê
+  em um segundo. O jogador está olhando pra uma barra que desce sem ninguém ter atacado, e o que ele
+  precisa saber é de quem foi o golpe: dele mesmo.
+  Ela vale **2 passos** no `passosDaAbertura`, como a drenagem e a fúria: a frase tem que sobreviver
+  ao movimento que ela anuncia.
+- **O SELO É 💫**, e o TIPO é o do golpe de cada espécie (`TIPO_DO_ESPECIAL`): Normal no Supersom,
+  Fantasma no Raio Confuso, Sombrio na Bajulação, Lutador no Soco Dinâmico.
+- **Medido: ela sai em 5,7% dos confrontos** e em **20,6% das batalhas 3x3** — era 1,6% e 6,4%
+  quando a lista tinha só as 23 da Confusão. Com o dano sem tipo e sem crítico o golpe do espelho
+  ficou em **25,4% da própria vida** em média, e o "deixa em 1 de HP" caiu de 3,8% para **0,1%**.
+- **O PREÇO NA JORNADA: dentro do ruído.** 69,98% contra 69,32% de conclusão — **+0,66 ponto, 1,2σ**
+  (10 blocos de 1.500 jornadas de cada lado, 15.000 de cada), já com as 82 espécies e os onze golpes.
+  Faz sentido mesmo saindo em 5,7% dos confrontos: ela cai dos DOIS lados — um terço do bestiário
+  confunde, e os líderes também. É a mesma conclusão da drenagem e do sono.
+  (Com as 23 da primeira versão dava +0,10 ponto, 0,2σ.)
+- **QUATRO CONTAS DE TESTE ESTAVAM INCOMPLETAS, e a confusão só as tornou frequentes.** Toda conta
+  de "quanto ele perdeu de vida" somava os golpes do adversário — e existem duas formas de perder HP
+  que não são golpe do outro lado: o **dano da drenagem** (`absorbdano`) e agora a confusão. As duas
+  têm a MESMA forma (o `q` é de quem CAUSOU, e o HP some do lado OPOSTO), e as quatro contas passaram
+  a descontar as duas juntas. **O buraco do `absorbdano` era anterior** e passava porque a
+  combinação era rara; com 23 espécies confundindo, ele apareceu em ~1 rodada em 3.
+- **E DUAS TRAVAS DE ORDEM tiveram que aprender o que já era regra**: o par do moribundo agora
+  tolera um revide de **vários tapas** (é UM golpe que ocupa N passos — apareceu quando a Clefairy
+  entrou no Metrônomo e passou a sortear Tapa Duplo), e a trava do sono aceita o **sono DUPLO**
+  (quando os dois se dormem ninguém ganha troca livre) e o **revide na frente da linha do sono**.
+
 ### A RECONSTRUÇÃO MOSTRAVA DOIS GOLPES IMPOSSÍVEIS (10/09/2026)
 
 Relatado pelo dev e por jogadores: *"às vezes um pokémon tira só uma fração de HP do inimigo,

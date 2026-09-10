@@ -127,9 +127,24 @@ ok('e o log diz qual golpe foi', diario.some(g => g.x === 'sono' && g.g === 'Can
   const seq = S.sequenciaDoConfronto(longo);
   const sono = seq.find(g=>g.x==='sono');
   ok('o sono sobrevive ao teto de golpes', !!sono);
-  ok('e vem primeiro', seq[0].x === 'sono');
-  ok('e quem dormiu NAO ataca logo depois de dormir', seq[1] && seq[1].q === sono.q,
+  /* ELE ABRE O CONFRONTO -- com UMA excecao declarada: o revide MORIBUNDO de quem dormiu vai pra
+     frente dele desde 10/09/2026 (ver o CLAUDE.md), justamente pra nao partir ao meio a sequencia
+     de golpes que a troca livre compra. Entao o sono e o indice 0 ou o 1, e nunca mais que isso.
+     Ficou visivel quando a CONFUSAO entrou e mudou a semente desta amostra. */
+  const iSono = seq.findIndex(g => g.x === 'sono');
+  ok('e vem primeiro (ou logo depois do revide moribundo)', iSono <= 1,
      seq.map(g=>(g.x||'golpe')+':'+g.q).join(' '));
+  /* O SONO DUPLO (os dois se dormem) NAO compra troca livre pra ninguem -- os contadores correm
+     juntos, e esta cobranca nao se aplica. Esta escrito assim no CLAUDE.md desde que as trocas
+     livres passaram a sair do diario. */
+  const dobrado = seq.filter(g => g.x === 'sono').length > 1;
+  /* O PRIMEIRO GOLPE DEPOIS DO SONO, e nao o primeiro da lista: o revide MORIBUNDO de quem dormiu
+     vai pra FRENTE da linha do sono desde 10/09/2026, entao a lista pode abrir com um golpe do
+     adormecido -- e ele e legitimo (e do mesmo instante do golpe que o matou). */
+  const primeiroGolpe = seq.slice(iSono + 1).find(g => !g.x);
+  ok('e quem dormiu NAO ataca logo depois de dormir',
+     dobrado || (primeiroGolpe && primeiroGolpe.q === sono.q),
+     (dobrado ? '(sono duplo -- ninguem ganha troca livre) ' : '') + seq.map(g=>(g.x||'golpe')+':'+g.q).join(' '));
 })();
 /* O LOG MOSTRA O DIARIO INTEIRO -- e a animacao mostra o mesmo.
    Havia um teto de 3 golpes, e ele estava errado por um numero: 99,4% dos confrontos passam de 3
@@ -176,8 +191,17 @@ ok('e o log diz qual golpe foi', diario.some(g => g.x === 'sono' && g.g === 'Can
          com MAIS vida do que entrou -- entra com 290, cresce 10 e leva 9 de moribundo, sai com 291.
          Com o ganho somado por fora, 'antes - depois' era aparado em zero e o contrato acusava um
          confronto que estava certo. Sem ganho nenhum a conta e identica a de antes. */
-      if(soma.p !== Math.max(0, (m.enemyHpBefore + ganho.e) - m.enemyHpAfter) ||
-         soma.e !== Math.max(0, (m.playerHpBefore + ganho.p) - m.playerHpAfter)) somaErrada++;
+      /* HP QUE SAIU SEM SER GOLPE DO ADVERSARIO. Sao dois casos, e eles tem a MESMA forma: o `q` do
+         registro e de quem CAUSOU (quem confundiu, quem drenou) e o HP some do lado OPOSTO. Como
+         nao houve golpe do outro lado, a soma das linhas nao cobre isso -- a conta tem que
+         descontar, senao o contrato acusa um confronto que esta certo.
+         O `absorbdano` ja era assim ANTES da confusao e o teste nao o descontava: ele passava
+         porque a varredura olha o PRIMEIRO confronto de cada batalha e drenagem ali e rara. A
+         confusao, com 23 especies, so tornou o buraco frequente o bastante pra aparecer. */
+      const autoDano = { p:0, e:0 };
+      seq.forEach(x => { if(x.x === 'confusao' || x.x === 'absorbdano') autoDano[x.q === 'p' ? 'e' : 'p'] += x.d || 0; });
+      if(soma.p !== Math.max(0, (m.enemyHpBefore + ganho.e) - m.enemyHpAfter - autoDano.e) ||
+         soma.e !== Math.max(0, (m.playerHpBefore + ganho.p) - m.playerHpAfter - autoDano.p)) somaErrada++;
 
       /* 3) NENHUM GOLPE DE DANO ZERO. Ele existe no diario -- e o revide de quem caiu contra quem
             ja tinha caido, e o dano EFETIVO ali e 0 -- e viraria um "-0 de HP" na tela, que e
@@ -200,6 +224,9 @@ ok('e o log diz qual golpe foi', diario.some(g => g.x === 'sono' && g.g === 'Can
         if((g.q === 'p' ? hpP : hpE) <= 0){
           if(g.x === 'boomself') break;
           if(caiuEm[g.q] === k - 1) break;    // o par do moribundo
+          /* ... e o par vale pro GOLPE INTEIRO: um revide de varios tapas ocupa N passos e continua
+             sendo um golpe so -- ver a nota do `percorre`. */
+          if(g.t > 1 && lista[k-1] && lista[k-1].q === g.q) break;
           caiuDefeito++; if(!exCaiu) exCaiu = desc();
           break;
         }
@@ -700,7 +727,12 @@ console.log('\nA FAIXA DE FOCO NAO PODE SER FURADA POR CAMINHO NENHUM');
              HP perdido ser menor que a soma dos golpes. */
           const subiu = s.filter(g => (g.x === 'recover' || g.x === 'pocao' || g.x === 'absorb' || g.x === 'furia') && g.q === 'p')
                          .reduce((a, g) => a + g.d, 0);
-          if(tomou !== (x.playerHpBefore - x.playerHpAfter) + subiu) somaErrada++;
+          /* HP QUE O JOGADOR PERDEU SEM SER GOLPE DO ADVERSARIO: a CONFUSAO (ele se acertou) e o
+             dano da DRENAGEM. Nos dois o `q` e de quem CAUSOU, entao `q === 'e'` e o adversario
+             causando -- e o que o jogador perdeu assim nao pode ser cobrado dos golpes dele. */
+          const sozinho = s.filter(g => (g.x === 'confusao' || g.x === 'absorbdano') && g.q === 'e')
+                           .reduce((a, g) => a + g.d, 0);
+          if(tomou !== (x.playerHpBefore - x.playerHpAfter) + subiu - sozinho) somaErrada++;
           if(s.findIndex(g => g.x === 'faixa') <= 0) foraDePosicao++;
         }
       }
@@ -730,13 +762,23 @@ console.log('\nA FAIXA DE FOCO NAO PODE SER FURADA POR CAMINHO NENHUM');
         let p = mm.playerHpBefore, e = mm.enemyHpBefore;
         const caiuEm = { p:-1, e:-1 };
         const lista = S.sequenciaDoConfronto(mm);
+        /* O REVIDE MORIBUNDO PODE SER UM GOLPE DE VARIOS TAPAS, e ai ele ocupa N passos de animacao
+           -- mas e UM golpe so (o log soma os tapas numa linha). A tolerancia do par do moribundo
+           tem que cobrir o golpe INTEIRO, senao o 2o tapa e acusado de cadaver.
+           Ficou visivel em 10/09/2026, quando a Clefairy entrou no METRONOMO e passou a sortear
+           Tapa Duplo: 2 casos em 6.781 confrontos. E antigo -- multiplo + moribundo ja existia --,
+           so era raro demais pra ser sorteado. */
+        let ultimoOk = -1;
         for(let k = 0; k < lista.length; k++){
           const g = lista[k];
           if(g.x === 'faixa' || g.x === 'boomself') continue;
           const bate = g.q === 'p';
-          if((bate ? p : e) <= 0 && caiuEm[g.q] !== k - 1){
+          const caido = (bate ? p : e) <= 0;
+          const continuacao = g.t > 1 && ultimoOk === k - 1;
+          if(caido && caiuEm[g.q] !== k - 1 && !continuacao){
             return 'o ' + (bate ? 'jogador' : 'inimigo') + ' bateu com a barra em 0';
           }
+          if(caido) ultimoOk = k;
           /* A FURIA sobe a vida como a cura -- o teto cresce e a vida atual sobe junto --, entao
              ela entra na mesma conta de GANHO. Sem isso a soma do log nao fecha. */
           if(g.x === 'recover' || g.x === 'pocao' || g.x === 'absorb' || g.x === 'furia'){ if(bate) p += g.d; else e += g.d; continue; }
@@ -765,7 +807,13 @@ console.log('\nA FAIXA DE FOCO NAO PODE SER FURADA POR CAMINHO NENHUM');
           const curou = s3.filter(g => (g.x === 'recover' || g.x === 'pocao' || g.x === 'absorb' || g.x === 'furia') && g.q === 'p')
                           .reduce((a, g) => a + g.d, 0);
           const tomou = s3.filter(g => (!g.x || g.x === 'boom') && g.q === 'e').reduce((a, g) => a + g.d, 0);
-          if(tomou !== (x.playerHpBefore - x.playerHpAfter) + curou) somaFora++;
+          /* HP QUE O JOGADOR PERDEU SEM SER GOLPE DO ADVERSARIO: a CONFUSAO (ele se acertou) e o
+             dano da DRENAGEM. Nos dois o `q` e de quem CAUSOU, entao `q === 'e'` e o adversario
+             causando e o pokemon do jogador perdendo. O absorbdano ja era assim antes da confusao;
+             ele passava porque a amostra e curta e a combinacao, rara. */
+          const sozinho3 = s3.filter(g => (g.x === 'confusao' || g.x === 'absorbdano') && g.q === 'e')
+                             .reduce((a, g) => a + g.d, 0);
+          if(tomou !== (x.playerHpBefore - x.playerHpAfter) + curou - sozinho3) somaFora++;
         }
       }
       ok('ninguem ataca depois de cair, em nenhum confronto com Faixa', mortos === 0,
@@ -1536,6 +1584,180 @@ function comItem(instancia, item){
      JSON.stringify([S.avisoDoConfronto(m,0), S.avisoDoConfronto(m,1)]));
 })();
 
+console.log('\n=== A CONFUSAO: O ADVERSARIO SE ACERTA, E A LUTA ACONTECE DEPOIS ===');
+{
+  /* Pedida em 10/09/2026: quem tem Confusao tem 10% por confronto de deixar o outro confuso; o
+     confuso leva UM golpe DELE MESMO (o dano sai de um ESPELHO -- mesma especie, nivel, atributos e
+     golpe) e so entao a luta comeca, "como se fosse uma nova". */
+  /* ONZE GOLPES CONFUNDEM, nao so a Confusao -- reportado em 10/09/2026: "alguns pokemons tambem
+     possuem confusao que voce nao colocou, mas porque o nome e outro, como o Zubat, Tentacool,
+     Magnemite, que possuem Supersonic". Sao 83 especies, e cada uma guarda o NOME do golpe DELA
+     (a regra do SONIFEROS): sem isso o Zubat confundiria com "Confusao". */
+  const especiesConf = Object.keys(S.CONFUSAO);
+  /* 82: sao 83 na base, MENOS o Mewtwo -- ele aprende Confusao no nivel 1 e ficou de fora porque o
+     tentarGolpeEspecial corta o bloco inteiro quando ele ou o Mew esta no confronto. */
+  ok('sao as 82 especies que confundem por nivel', especiesConf.length === 82, especiesConf.length + '');
+  ok('a chance e 10% por confronto', S.CHANCE_CONFUSAO === 0.10, (100*S.CHANCE_CONFUSAO) + '%');
+  ok('a lista e a MESMA nos dois motores', JSON.stringify(esp.CONFUSAO) === JSON.stringify(S.CONFUSAO));
+  ok('e a chance tambem', esp.CHANCE_CONFUSAO === S.CHANCE_CONFUSAO);
+  /* OS TRES DO RELATO, nomeados: uma contagem sozinha nao diz QUAL faltou -- e a licao da auditoria
+     dos golpes especiais de 04/09/2026, quando sete especies estavam faltando. */
+  ok('o Zubat, o Tentacool e o Magnemite confundem com SUPERSOM',
+     S.CONFUSAO.zubat === 'Supersom' && S.CONFUSAO.tentacool === 'Supersom' && S.CONFUSAO.magnemite === 'Supersom',
+     [S.CONFUSAO.zubat, S.CONFUSAO.tentacool, S.CONFUSAO.magnemite].join(' / '));
+  ok('e cada golpe tem TIPO declarado, pro selo',
+     [...new Set(Object.values(S.CONFUSAO))].every(g => S.TIPO_DO_ESPECIAL[g]),
+     [...new Set(Object.values(S.CONFUSAO))].filter(g => !S.TIPO_DO_ESPECIAL[g]).join(',') || 'todos');
+  ok('sao ONZE golpes distintos', [...new Set(Object.values(S.CONFUSAO))].length === 11,
+     [...new Set(Object.values(S.CONFUSAO))].sort().join(', '));
+  /* O OUTRAGE, O PETAL DANCE E O THRASH confundem o PROPRIO USUARIO no fim da sequencia, que e
+     outro efeito -- e por isso o Dratini e o Tauros NAO entram por causa deles. */
+  ok('quem so tem Outrage/Thrash NAO entra (eles confundem o proprio usuario)',
+     !S.CONFUSAO.dratini && !S.CONFUSAO.dragonair,
+     'dratini:' + (S.CONFUSAO.dratini || '-') + '  dragonair:' + (S.CONFUSAO.dragonair || '-'));
+  /* O MEWTWO aprende Confusao no nivel 1 e ficou de fora de proposito: o tentarGolpeEspecial corta
+     o bloco INTEIRO quando qualquer um dos dois e Mew ou Mewtwo, entao a entrada seria letra morta
+     -- o mesmo motivo que ja o tirou do Disable e do Recuperar. */
+  ok('o Mewtwo e o Mew ficam de fora (seria letra morta)', !S.CONFUSAO.mewtwo && !S.CONFUSAO.mew);
+  ok('e nenhuma da lista esta fora do SPECIES',
+     especiesConf.filter(id => !S.SPECIES[id]).length === 0, especiesConf.filter(id => !S.SPECIES[id]).join(','));
+
+  /* NA BATALHA. O par e escolhido pra isolar a mecanica: o Alakazam confunde, e o Machamp nao tem
+     especial nenhum -- entao tudo que aparece no confronto e da confusao. */
+  {
+    const semTag = h => String(h||'').replace(/<[^>]*>/g,'').replace(/\s+/g,' ').trim();
+    let achou = 0, naFrente = 0, nuncaMata = 0, lutouDepois = 0, comFrase = 0, noLog = 0, nomeouGolpe = 0, semCritico = 0;
+    let somaPct = 0;
+    for(let v = 0; v < 4000 && achou < 60; v++){
+      const a = [inst('alakazam', 45)]; a[0].ataques = S.ataquesPadrao(a[0]);
+      const b = [inst('machamp', 45)];  b[0].ataques = S.ataquesPadrao(b[0]);
+      const m = (S.simulateGymBattle(a, b, S.makeSeededRng('conf' + v)).matchups || [])[0];
+      if(!m) continue;
+      const c = (m.golpes || []).find(g => g.x === 'confusao');
+      if(!c) continue;
+      achou++;
+      const seq = S.sequenciaDoConfronto(m);
+      /* 1. ELA ABRE O CONFRONTO -- e o pedido: o evento acontece no inicio. */
+      if(seq[0] && seq[0].x === 'confusao') naFrente++;
+      /* 2. NAO MATA: o alvo fica com no minimo 1. */
+      if(c.hp >= 1) nuncaMata++;
+      if(!c.c) semCritico++;
+      /* 3. E A LUTA ACONTECE DEPOIS -- "como se fosse uma nova". Sem golpe nenhum depois dela, o
+            confronto teria sido resolvido pela abertura, que e o que ela NAO faz. */
+      if(seq.filter(g => !g.x).length > 0) lutouDepois++;
+      /* 4. A FRASE acompanha a barra caindo (passosDaAbertura = 2). */
+      const anim = S.buildAnimatedHitSequence(m);
+      const iC = anim.findIndex(h => h.x === 'confusao');
+      if(iC >= 0 && /confuso/.test(semTag(S.statusDoConfronto(m, iC + 1, anim[iC]).html))) comFrase++;
+      /* 5. E vira linha no log, com o NOME do golpe que ele usou em si mesmo. */
+      const log = semTag(S.passosHtml(m));
+      if(log.indexOf('confuso') >= 0) noLog++;
+      if(c.am && GOLPES_OK(S, c.am) && log.indexOf(S.nomeDoAtaque(c.am)) >= 0) nomeouGolpe++;
+      somaPct += 100 * c.d / Math.max(1, m.enemyMaxHp);
+    }
+    ok('a confusao sai o bastante pra medir', achou >= 20, achou + ' confrontos');
+    ok('ela ABRE o confronto', naFrente === achou, naFrente + ' de ' + achou);
+    ok('e nunca mata (piso de 1 de HP)', nuncaMata === achou, nuncaMata + ' de ' + achou);
+    ok('e nunca sai critica', semCritico === achou, semCritico + ' de ' + achou);
+    ok('a luta acontece DEPOIS dela', lutouDepois === achou, lutouDepois + ' de ' + achou);
+    ok('a frase acompanha a barra caindo', comFrase === achou, comFrase + ' de ' + achou);
+    ok('e vira linha no log', noLog === achou, noLog + ' de ' + achou);
+    ok('nomeando o golpe que ele usou em si', nomeouGolpe === achou, nomeouGolpe + ' de ' + achou);
+    ok('o golpe do espelho tem tamanho de golpe de verdade', (somaPct/achou) > 5 && (somaPct/achou) < 70,
+       (somaPct/achou).toFixed(1) + '% da propria vida, em media');
+  }
+
+  /* O ESPELHO NAO PODE SUJAR O ORIGINAL. O calcDamage ESCREVE lastMove/lastMoveType/lastCrit no
+     atacante -- e o atacante aqui e uma copia. Sem ela, o golpe que o pokemon usa na luta seguinte
+     sairia trocado no log. */
+  {
+    const alvo = inst('machamp', 45); alvo.ataques = S.ataquesPadrao(alvo);
+    alvo.maxHp = S.calcMaxHp(alvo); alvo.hp = alvo.maxHp;
+    alvo.lastMove = 'tackle'; alvo.lastMoveType = 'Normal';
+    const quem = inst('alakazam', 45); quem.ataques = S.ataquesPadrao(quem);
+    quem.maxHp = S.calcMaxHp(quem); quem.hp = quem.maxHp;
+    const d = [];
+    for(let i = 0; i < 400 && !d.length; i++){ quem._especialContra = null; S.tentarGolpeEspecial(quem, alvo, Math.random, d); }
+    const saiu = d.find(g => g.x === 'confusao');
+    ok('a confusao saiu no teste do espelho', !!saiu);
+    ok('e o espelho NAO sobrescreveu o lastMove do original',
+       alvo.lastMove === 'tackle', String(alvo.lastMove));
+  }
+
+  /* O DANO E SEM TIPO, como no jogo oficial (a pedido, 10/09/2026). O espelho aplicava a tabela
+     contra ELE MESMO -- Fantasma contra Fantasma e 2x --, e um Haunter tirava 299 dos proprios 300.
+     A prova e direta: o MESMO espelho, com e sem a opcao, contra um alvo cujo golpe e
+     super-eficaz nele. */
+  {
+    const alvo = inst('haunter', 45); alvo.ataques = S.ataquesPadrao(alvo);
+    alvo.maxHp = S.calcMaxHp(alvo); alvo.hp = alvo.maxHp;
+    let comTipo = 0, semTipo = 0;
+    for(let i = 0; i < 300; i++){
+      comTipo += S.calcDamageNew(Object.assign({}, alvo, { _anulado:null }), alvo, S.makeSeededRng('t' + i));
+      semTipo += S.calcDamageNew(Object.assign({}, alvo, { _anulado:null }), alvo, S.makeSeededRng('t' + i), { semTipo: true });
+    }
+    ok('sem tipo o espelho bate MENOS num alvo super-eficaz contra si', semTipo < comTipo * 0.85,
+       'com tipo ' + (100*(comTipo/300)/alvo.maxHp).toFixed(0) + '%   sem tipo ' + (100*(semTipo/300)/alvo.maxHp).toFixed(0) + '% da vida');
+    /* E o que SOBRA e atributo, nao tipo: um Shuckle (defesa 230) mal se arranha e um Haunter
+       (defesa 45) se arrebenta. E o certo -- o espelho e ele mesmo. */
+    const shuckle = inst('shuckle', 45); shuckle.ataques = S.ataquesPadrao(shuckle);
+    shuckle.maxHp = S.calcMaxHp(shuckle); shuckle.hp = shuckle.maxHp;
+    let tanque = 0;
+    for(let i = 0; i < 300; i++) tanque += S.calcDamageNew(Object.assign({}, shuckle, { _anulado:null }), shuckle, S.makeSeededRng('s' + i), { semTipo: true });
+    ok('e quem e duro mal se arranha', (tanque/300) / shuckle.maxHp < 0.15,
+       (100*(tanque/300)/shuckle.maxHp).toFixed(0) + '% da propria vida');
+    /* E SEM CRITICO, tambem como no jogo oficial (a pedido). Medido antes de tirar: 43% dos golpes
+       que deixavam o confuso em 1 de HP eram criticos -- e o critico dobra o dano SEM selo nenhum
+       na linha da confusao, que e a mesma classe de defeito dos "dois golpes impossiveis". */
+    {
+      let comCrit = 0, semCrit = 0;
+      const p3 = inst('gengar', 45); p3.ataques = S.ataquesPadrao(p3);
+      p3.maxHp = S.calcMaxHp(p3); p3.hp = p3.maxHp;
+      for(let i = 0; i < 4000; i++){
+        const e1 = Object.assign({}, p3, { _anulado:null });
+        S.calcDamageNew(e1, p3, S.makeSeededRng('k' + i), { semTipo: true });
+        if(e1.lastCrit) comCrit++;
+        const e2 = Object.assign({}, p3, { _anulado:null });
+        S.calcDamageNew(e2, p3, S.makeSeededRng('k' + i), { semTipo: true, semCritico: true });
+        if(e2.lastCrit) semCrit++;
+      }
+      ok('sem a opcao o critico sai normalmente', comCrit > 100, comCrit + ' de 4000');
+      ok('e com ela nunca sai', semCrit === 0, semCrit + ' de 4000');
+      /* O RNG E CONSUMIDO DO MESMO JEITO: os dois motores tem que ler a mesma quantidade de numeros
+         da mesma semente, senao a batalha diverge do 2o golpe em diante. A prova e que o dano NAO
+         critico e identico com e sem a opcao. */
+      let iguais = 0, naoCrit = 0;
+      for(let i = 0; i < 2000; i++){
+        const e1 = Object.assign({}, p3, { _anulado:null });
+        const d1 = S.calcDamageNew(e1, p3, S.makeSeededRng('r' + i), { semTipo: true });
+        if(e1.lastCrit) continue;
+        naoCrit++;
+        const d2 = S.calcDamageNew(Object.assign({}, p3, { _anulado:null }), p3, S.makeSeededRng('r' + i), { semTipo: true, semCritico: true });
+        if(d1 === d2) iguais++;
+      }
+      ok('e o golpe NAO critico da o mesmo numero (o rng anda igual)', iguais === naoCrit,
+         iguais + ' de ' + naoCrit);
+    }
+
+    /* A OPCAO NAO PODE VAZAR pro resto do jogo: sem ela a conta e a de sempre. */
+    const a2 = inst('charizard', 50), b2 = inst('venusaur', 50);
+    a2.ataques = S.ataquesPadrao(a2); b2.ataques = S.ataquesPadrao(b2);
+    b2.maxHp = S.calcMaxHp(b2); b2.hp = b2.maxHp;
+    const normal = S.calcDamageNew(a2, b2, S.makeSeededRng('z'));
+    const zerado = S.calcDamageNew(a2, b2, S.makeSeededRng('z'), { semTipo: true });
+    ok('e o golpe COMUM continua com tipo (Fogo x Planta e 2x)', normal > zerado,
+       'com tipo ' + normal + '   sem tipo ' + zerado);
+  }
+
+  /* NA FICHA DA POKEDEX, com a chance -- ela e por CONFRONTO, e sem o numero o jogador acharia que
+     sai todo golpe. */
+  ok('a ficha do Alakazam anuncia a Confusao',
+     S.especiaisDaEspecie('alakazam').some(e => e.nome === 'Confusão' && e.chance === S.CHANCE_CONFUSAO),
+     JSON.stringify(S.especiaisDaEspecie('alakazam')));
+  ok('e o selo dela e Psiquico', S.TIPO_DO_ESPECIAL['Confusão'] === 'Psychic');
+}
+function GOLPES_OK(S, id){ return !!(S.GOLPES && S.GOLPES[id]); }
+
 console.log('\n=== A RECONSTRUCAO NAO PODE MOSTRAR DOIS GOLPES IMPOSSIVEIS ===');
 {
   /* Passando do TETO_GOLPES a luta e reconstruida em 3 linhas: o vencedor acerta uma PARTE, o
@@ -1808,7 +2030,12 @@ console.log('\n=== O DESEMPATE TEM LINHA PROPRIA ===');
       /* So da pra exigir a linha onde o confronto e mostrado pelo DIARIO REAL. Passando do teto de
         golpes a reconstrucao entra e substitui a lista inteira -- ela nao conhece desempate nenhum,
         do mesmo jeito que nao conhece tapa nem cura. */
-      const daPraMostrar = (m.golpes || []).filter(g => !g.x && g.d > 0).length <= S.TETO_GOLPES;
+      /* A MESMA CONTA QUE O MOTOR FAZ, e nao uma parecida: ele conta os golpes de dano INCLUINDO a
+         explosao (boom/boomself) e contando um golpe de varios tapas como UM. Uma conta so parecida
+         dizia 'da pra mostrar' num confronto que a reconstrucao ia substituir. */
+      const ehDanoT = g => !g.x || g.x === 'boom' || g.x === 'boomself';
+      const daPraMostrar = (m.golpes || []).filter(g => g.x !== 'disable' && (g.x || g.d > 0))
+                             .filter(ehDanoT).filter(g => !(g.t > 1)).length <= S.TETO_GOLPES;
       if((m.golpes || []).some(g => g.x === 'desempate') && daPraMostrar){
         comDesempate++;
         if(seq.some(g => g.x === 'desempate')) naTela++;
@@ -2217,6 +2444,14 @@ console.log('\n=== QUEM MANDA NA LINHA DE STATUS, PASSO A PASSO ===');
       const sono = (m.golpes || []).find(g => g.x === 'sono');
       const mor  = (m.golpes || []).find(g => g.m);
       if(!sono || !mor) continue;
+      /* O REORDENAMENTO SO VALE SE O MORIBUNDO TIVER FICADO MORTO. Quando os dois caem na mesma
+         troca e o desempate RESSUSCITA o dono do revide, a ordem crua do diario ja e a legivel --
+         e a regra, nao excecao (ver o CLAUDE.md, 'O cadaver que atacava'). Cobrar o revide na
+         frente ai seria cobrar o contrario do que o motor promete.
+         Ficou visivel quando a CONFUSAO entrou: o Psyduck e uma das 23 especies dela, e com um
+         golpe a mais no confronto a troca dupla passou a acontecer nesse par. */
+      const donoMorreu = mor.q === 'p' ? (m.playerHpAfter <= 0) : (m.enemyHpAfter <= 0);
+      if(!donoMorreu) continue;
       achou++;
       /* CONFRONTO CURTO x LONGO. Passando do teto de golpes, a sequencia vem da RECONSTRUCAO, e la
          o revide nao e uma linha propria -- ele e absorvido no golpe reconstruido daquele lado.
@@ -2490,7 +2725,13 @@ console.log('\n=== O NOME DO GOLPE APARECE JUNTO COM A BARRA ===');
         const p = inst(id, 40 + i); p.ataques = S.ataquesPadrao(p); return p; });
       const b = ['starmie','butterfree','geodude','staryu','electrode','onix'].map((id, i) => inst(id, 40 + i));
       const r = S.simulateGymBattle(a, b);
-      const m = r.matchups.find(x => (x.golpes || []).some(g => g.x === 'absorb'));
+      /* UM ESPECIAL SO. O aviso mostra o PRIMEIRO da lista, entao um confronto que tenha explosao
+         ou confusao junto media a frase do OUTRO especial -- e o teste falhava sem nada estar
+         errado. E a mesma guarda que o bloco do perfil da linha ja usa. */
+      const m = r.matchups.find(x => {
+        const xs = (x.golpes || []).map(g => g.x).filter(v => v && v !== 'absorbdano' && v !== 'boomself');
+        return xs.length && xs.every(v => v === 'absorb');
+      });
       if(m) return m;
     }
     return null;
@@ -2500,9 +2741,14 @@ console.log('\n=== O NOME DO GOLPE APARECE JUNTO COM A BARRA ===');
     const el = { className:'', innerHTML:'', style:{}, offsetWidth:0 };
     S.document.getElementById = id => (id === 'battle-status-txt' ? el : null);
     el.className = 'loading-text'; el.innerHTML = 'generico';
-    S.pintarStatusDoConfronto(comDreno, 1, seq[0]);
+    /* ACHA O PASSO DELA em vez de assumir que ela e o primeiro. Um confronto pode ter outra
+       abertura antes (a CONFUSAO, desde 10/09/2026) -- e ai seq[0] e a frase da outra, e o teste
+       mediria a linha errada. O que se cobra e o que a drenagem promete: a frase DELA sobrevive
+       aos DOIS passos DELA. */
+    const iAbs = seq.findIndex(h => h.x === 'absorb');
+    S.pintarStatusDoConfronto(comDreno, iAbs + 1, seq[iAbs]);
     const passo1 = el.innerHTML;
-    S.pintarStatusDoConfronto(comDreno, 2, seq[1]);
+    S.pintarStatusDoConfronto(comDreno, iAbs + 2, seq[iAbs + 1]);
     ok('a frase da drenagem sobrevive aos DOIS passos dela', el.innerHTML === passo1,
        String(el.innerHTML).replace(/<[^>]+>/g, ' ').trim().slice(0, 46));
     ok('e o pintor nunca rebaixa a linha pro texto generico',
