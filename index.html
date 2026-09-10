@@ -2147,10 +2147,6 @@
     padding:3px 0; border-bottom:1px dashed rgba(26,26,46,.15);
   }
   .dex-golpe:last-child{ border-bottom:0; }
-  /* O aviso do Metrônomo na ficha: fica ACIMA da lista porque ele muda o sentido dela inteira.
-     Embaixo, o jogador leria os seis golpes primeiro e a ressalva depois -- tarde demais. */
-  .dex-golpes-aviso{ font-size:.58rem; font-weight:700; color:var(--muted); text-align:left;
-    margin-bottom:6px; line-height:1.35; }
   .dex-golpe-nivel{ font-size:.55rem; font-weight:800; color:var(--muted); }
   .dex-golpe-nome{ font-size:.62rem; font-weight:800; color:var(--ink); overflow-wrap:anywhere; }
   .dex-golpe-poder{ font-size:.62rem; font-weight:800; color:var(--ink); }
@@ -5485,17 +5481,25 @@ function subtiposDe(p){
    fraco pode bater menos que um 1x com STAB usando o forte. Foi o que fez o Charmander
    preferir Normal a Fogo contra a Chansey (Especial altíssimo, Defesa baixa).
    Devolve o mesmo formato do bestMultiplier, mais 'stab' dizendo se o tipo é próprio. */
-/* O Metrônomo não escolhe: chama um golpe qualquer. Aqui isso é o TIPO saindo no sorteio, e
-   não da conta de qual rende mais -- é o que faz dele uma aposta, e não um upgrade. Todo o resto
-   do jogo continua escolhendo o melhor golpe disponível. */
+/* O METRÔNOMO SORTEIA E DEPOIS ESCOLHE (10/09/2026, a pedido). Ele tira um golpe qualquer da
+   tabela e o joga na MESMA disputa dos golpes escolhidos do pokémon -- vence o que tira mais dano
+   contra quem está na frente. Antes o sorteio era de TIPO e ele saía sempre, o que deixava o
+   Poder Ancestral do Togepi (nível 21) sem valer um ponto de dano.
+   REUSA O `melhorAtaque` em vez de repetir a conta: é ele que sabe do STAB, do subtipo, do golpe
+   de vários tapas, da anulação e do golpe teimoso. Duas contas em paralelo divergiriam no primeiro
+   ajuste -- foi o que já aconteceu entre a escolha e o dano quando o EXPOENTE_TIPO era outro em
+   cada lugar. A cópia rasa do atacante existe só pra não escrever no `ataques` da instância. */
 function tipoDoGolpe(attacker, defender, rng){
   if(!METRONOMO.includes(attacker.speciesId)) return bestAttackType(attacker, defender);
-  const tipos = Object.keys(TYPE_CHART);
-  const t = tipos[Math.floor((rng || Math.random)() * tipos.length)];
-  let mult = 1;
-  (defender.types || []).forEach(d => { mult *= typeVsType(t, d); });
-  // imunidade continua valendo 0, com o mesmo piso de 1 de dano e a mesma marca do log
-  return { mult, type: t, stab: (attacker.types||[]).includes(t), nulo: mult === 0 };
+  const sorteado = sorteiaGolpeDoMetronomo(rng);
+  const meus = Array.isArray(attacker.ataques) ? attacker.ataques.filter(id => GOLPES[id]) : [];
+  const lista = meus.concat(GOLPES[sorteado] ? [sorteado] : []);
+  if(lista.length){
+    const best = melhorAtaque(Object.assign({}, attacker, { ataques: lista }), defender);
+    if(best) return best;
+  }
+  /* Rede: sem golpe nenhum (tabela vazia), ele cai no motor de tipo como qualquer outra espécie. */
+  return bestAttackType(attacker, defender);
 }
 /* Os tipos que o pokémon consegue usar pra atacar: os próprios (com STAB) mais o subtipo.
    Vive numa função porque o Disable precisa da MESMA lista pra saber se sobra um segundo golpe --
@@ -5606,9 +5610,11 @@ function registrarSketch(matchups){
   });
   return novos;
 }
-function usaGolpesEscolhidos(speciesId){ return !METRONOMO.includes(speciesId); }
+/* TODA ESPÉCIE ESCOLHE GOLPE. O `usaGolpesEscolhidos` existia pra devolver lista VAZIA às espécies
+   do Metrônomo -- elas nunca chegavam no melhorAtaque, então uma tela pedindo escolha teria sido
+   uma tela mentindo. Isso acabou em 10/09/2026: o Metrônomo agora DISPUTA com os golpes próprios,
+   e o Poder Ancestral do Togepi vale de verdade a partir do nível 21. */
 function ataquesDisponiveis(speciesId, nivel){
-  if(!usaGolpesEscolhidos(speciesId)) return [];
   const lista = APRENDIZADO[speciesId];
   if(!lista) return [];
   const ids = [];
@@ -6367,9 +6373,34 @@ const SONIFEROS = {
   lapras:'Canto', cleffa:'Canto', igglybuff:'Canto',
   jynx:'Beijo Adorável'
 };
-/* Metrônomo: chama um golpe qualquer. Aqui isso quer dizer que o TIPO do ataque sai no sorteio
-   (ver tipoDoGolpe) e que os dois efeitos especiais podem sair também. */
-const METRONOMO = ['togepi','togetic','cleffa','snubbull'];
+/* METRÔNOMO: quem sorteia um golpe a cada ataque -- e agora ESCOLHE entre ele e os próprios.
+   COMO ERA ATÉ 10/09/2026: a espécie atacava com um TIPO sorteado, poder implícito de 60, e NUNCA
+   chegava no melhorAtaque. Ou seja, ela não tinha golpe escolhido nenhum -- o Togepi lutava de
+   Metrônomo até o fim da vida, mesmo depois de aprender Poder Ancestral no 21.
+   COMO É AGORA (a pedido): a cada golpe o Metrônomo sorteia um ATAQUE DE VERDADE da tabela -- com
+   tipo e poder próprios -- e ele entra na MESMA disputa dos golpes que o pokémon escolheu. Sai o
+   que tirar mais dano contra quem está na frente. Quem ainda não tem golpe nenhum (o Togepi antes
+   do 21) continua lutando só de Metrônomo, exatamente como antes.
+   É ISSO QUE FAZ DELE UMA APOSTA E NÃO UM UPGRADE: o sorteio pode entregar um Hiper Raio ou uma
+   Constrição de poder 10; o que muda é que agora ele nunca fica ABAIXO do que a espécie já tem.
+   A LISTA são as espécies que aprendem Metrônomo por nível no original, mais o Mew. O Snubbull SAIU
+   dela (ele não aprende Metrônomo por nível na Gen 3 -- ver a tabela de divergências do CLAUDE.md)
+   e passou a lutar com o moveset dele, que é grande: Mordida, Talho, Derrubada.
+   O MEW entra porque o Metrônomo é dele no original. Ele é o chefe da raide e continua IMUNE ao
+   bloco de efeitos (IMUNES_A_ESPECIAL corta antes do sorteio), então o que ele ganha aqui é só o
+   golpe sorteado -- nunca a explosão, que acabaria com a raide da semana num golpe. */
+const METRONOMO = ['snorlax','cleffa','clefairy','clefable','mew','togepi','togetic'];
+/* O BOLO DO SORTEIO é todo golpe de DANO da tabela. Vai ORDENADO de propósito: os dois motores têm
+   a tabela escrita em ordens diferentes, e sortear por índice numa lista não ordenada faria o
+   cliente e o servidor tirarem golpes DIFERENTES com a mesma semente -- a mesma batalha terminando
+   diferente dos dois lados, que é o defeito que este projeto mais evita.
+   Autodestruição e Explosão não estão na tabela (nunca estiveram), e é o certo: elas JÁ SÃO o
+   efeito de 10% logo abaixo, com o custo de cair junto. Como golpe comum de 200 elas seriam o
+   sorteio dos sonhos, sem preço nenhum. */
+const POOL_METRONOMO = Object.keys(GOLPES).filter(id => GOLPES[id][1] > 0).sort();
+function sorteiaGolpeDoMetronomo(rng){
+  return POOL_METRONOMO[Math.floor((rng || Math.random)() * POOL_METRONOMO.length)];
+}
 /* Aprendem Disable por nível na Gen 1/2. Vulpix, Ninetales, a linha do Nidoran, Seel, Kangaskhan,
    Horsea, Spinarak e Stantler aprendem só por REPRODUÇÃO e ficaram de fora -- a regra das listas
    deste bloco é aprendizado por nível, sempre.
@@ -7653,7 +7684,6 @@ function aprendizadosPendentes(){
   const out = [];
   (game.team || []).forEach(p => {
     if(!p || !Array.isArray(p.ataques)) return;
-    if(!usaGolpesEscolhidos(p.speciesId)) return;   // o Metrônomo não aprende: ver ataquesDisponiveis
     const serve = id => p.ataques.indexOf(id) < 0 && (p.ataquesRecusados || []).indexOf(id) < 0;
     const janela = new Map();   // golpe -> o nível em que ele foi CRUZADO (o menor dos dois)
     /* A VARREDURA DA FORMA ANTIGA tem uma regra a mais, e ela é o coração deste resgate: o que
@@ -7799,15 +7829,16 @@ function golpesDoTimeHtml(p){
      Quem não tem golpe escolhido nem especial (Abra, Ditto, Kakuna, save antigo, a defesa do
      ginásio da cidade -- que vem de um código de time) continua saindo vazio: ali não há o que
      dizer, e uma linha em cada fileira seria pior que nenhuma. */
-  if(!usaGolpesEscolhidos(p.speciesId)){
-    const esp = especiaisDaEspecie(p.speciesId).filter(e => e.nome === 'Metrônomo');
-    if(!esp.length) return '';
-    return `<span class="mon-sub golpes-do-time">${esp.map(e =>
-      `<span class="type-pill golpe-especial" style="background:${TYPE_COLORS[e.tipo] || '#888'}">${escapeHtmlSafe(e.nome)}</span>`).join('')}</span>`;
-  }
+  /* O SELO DO METRÔNOMO VEM JUNTO DOS ESCOLHIDOS, e não mais NO LUGAR deles (10/09/2026): desde
+     que o Metrônomo passou a DISPUTAR com os golpes próprios, os dois valem na mesma batalha e a
+     fileira tem que dizer os dois. Antes ele substituía a lista, porque o golpe escolhido daquelas
+     espécies não valia um ponto de dano. */
   const a = Array.isArray(p.ataques) ? p.ataques.filter(id => GOLPES[id]) : [];
-  if(!a.length) return '';
-  return `<span class="mon-sub golpes-do-time">${a.map(id => seloDeGolpe(nomeDoAtaque(id), GOLPES[id][0])).join('')}</span>`;
+  const metro = especiaisDaEspecie(p.speciesId).filter(e => e.nome === 'Metrônomo');
+  if(!a.length && !metro.length) return '';
+  const selos = a.map(id => seloDeGolpe(nomeDoAtaque(id), GOLPES[id][0]))
+    .concat(metro.map(e => `<span class="type-pill golpe-especial" style="background:${TYPE_COLORS[e.tipo] || '#888'}">${escapeHtmlSafe(e.nome)}</span>`));
+  return `<span class="mon-sub golpes-do-time">${selos.join('')}</span>`;
 }
 /* A TELA DA CAPTURA, no MESMO desenho das outras duas: cabeçalho com o sprite num ladrilho e a
    frase, e um cartão por golpe.
@@ -8563,7 +8594,7 @@ function advanceSpecialReveal(){
          sobe. A da FAIXA e o contrario -- ela precisa do render pra APARECER, porque o passo dela
          nao mexe barra nenhuma (a barra ja parou em 1 no golpe anterior) e sem um desenho a frase
          nunca chegaria na tela. */
-      if(hit.cura || hit.faixa || hit.posFaixa) setTimeout(render, esperaNome + hitDuration + 50);
+      if(hit.cura || hit.faixa || hit.leitura || hit.posFaixa) setTimeout(render, esperaNome + hitDuration + 50);
       setTimeout(advanceSpecialReveal, esperaNome + hitDuration + 150 + pausaDaFaixa(hit));
     }
   } else {
@@ -9004,7 +9035,7 @@ function advanceReveal(){
          sobe. A da FAIXA e o contrario -- ela precisa do render pra APARECER, porque o passo dela
          nao mexe barra nenhuma (a barra ja parou em 1 no golpe anterior) e sem um desenho a frase
          nunca chegaria na tela. */
-      if(hit.cura || hit.faixa || hit.posFaixa) setTimeout(render, esperaNome + hitDuration + 50);
+      if(hit.cura || hit.faixa || hit.leitura || hit.posFaixa) setTimeout(render, esperaNome + hitDuration + 50);
       setTimeout(advanceReveal, esperaNome + hitDuration + 150 + pausaDaFaixa(hit)); // só avança pro próximo golpe depois que esse terminou de descer
     }
   } else {
@@ -9083,7 +9114,13 @@ function buildAnimatedHitSequence(m){
      o laço já redesenha ali, e as de confronto inteiro (explosão, sono) devem mesmo ficar até o
      fim. Sem esta marca a frase da Faixa ocuparia o lugar do "Trocando golpes..." pelo resto da
      luta -- que foi exatamente o defeito que a cura teve quando ela nasceu. */
-  seq.forEach((h, i) => { if(i > 0 && seq[i-1].faixa) h.posFaixa = true; });
+  /* PASSO QUE NÃO MOVE BARRA E CARREGA FRASE precisa de tempo pra ser lido -- é o mesmo caso da
+     Faixa, e passou a existir também pro SONO em 10/09/2026: quando o moribundo de quem dormiu vai
+     pra frente, a linha do sono deixa de ser o primeiro passo, e aí ela não pega mais a pausa que
+     o `pausaDoEspecial` dá antes do confronto. Sem esta marca a frase apareceria e sumiria no
+     mesmo quadro. No índice 0 ela não é marcada: ali a pausa de abertura já cobre. */
+  seq.forEach((h, i) => { if(i > 0 && h.amount === 0 && h.x && !h.faixa) h.leitura = true; });
+  seq.forEach((h, i) => { if(i > 0 && (seq[i-1].faixa || seq[i-1].leitura)) h.posFaixa = true; });
   return seq;
 }
 function reconstruirSequencia(m){
@@ -9361,7 +9398,7 @@ function advanceTrainerReveal(){
          sobe. A da FAIXA e o contrario -- ela precisa do render pra APARECER, porque o passo dela
          nao mexe barra nenhuma (a barra ja parou em 1 no golpe anterior) e sem um desenho a frase
          nunca chegaria na tela. */
-      if(hit.cura || hit.faixa || hit.posFaixa) setTimeout(render, esperaNome + hitDuration + 50);
+      if(hit.cura || hit.faixa || hit.leitura || hit.posFaixa) setTimeout(render, esperaNome + hitDuration + 50);
       setTimeout(advanceTrainerReveal, esperaNome + hitDuration + 150 + pausaDaFaixa(hit));
     }
   } else {
@@ -15265,6 +15302,11 @@ function renderMatchupLog(matchups){
    o outro revida e o placar do cabeçalho confirma quem sobrou. */
 function passosVisiveis(golpes, m){
   const terminouVivo = q => !!m && (q === 'p' ? (m.playerHpAfter || 0) > 0 : (m.enemyHpAfter || 0) > 0);
+  const outroLado = q => q === 'p' ? 'e' : 'p';
+  /* QUEM DORMIU NESTE CONFRONTO. O `q` do registro do sono é quem USOU o golpe, então o adormecido
+     é o outro lado. Ele é o único que ganha o tratamento do bloco abaixo. */
+  const oSono = (golpes || []).find(g => g.x === 'sono');
+  const adormecido = oSono ? outroLado(oSono.q) : null;
   /* OS TAPAS DE UM GOLPE MÚLTIPLO SÃO UM LANCE SÓ, e por isso se movem juntos: o reordenamento do
      moribundo empurra o golpe inteiro pra antes do que o derrubou, não o 3º tapa sozinho. Por isso
      a lista é agrupada ANTES de reordenar e desagrupada no fim -- reordenar entrada a entrada
@@ -15285,6 +15327,22 @@ function passosVisiveis(golpes, m){
        Trocar a ordem não distorce nada: os dois golpes são do mesmo instante, e o motor só os
        aplica em sequência porque código roda em sequência. */
     const derrubou = saidaG.pop();
+    /* O MORIBUNDO DE QUEM DORMIU VAI PRO COMEÇO DO CONFRONTO, antes até da linha do sono.
+       Pôr o revide só um golpe pra trás -- que é a regra geral, logo abaixo -- resolve o cadáver
+       atacando, mas PARTE AO MEIO a sequência de golpes que a troca livre comprou: o log lia
+       "Gastly bateu / Psyduck bateu / Gastly bateu" e a coisa que o sono FAZ (dois golpes seguidos)
+       virava invisível. Reportado em 10/09/2026 com print, num Psyduck x Gastly.
+       Na frente, a leitura fica na ordem que a pessoa espera: o Psyduck atacou, aí dormiu, e aí
+       apanhou duas vezes sem revidar. É a mesma licença que a regra geral já usa -- o revide é do
+       MESMO instante do golpe que o derrubou, e a ordem aqui é apresentação, não cronologia.
+       SÓ VALE SE QUEM O MATOU TERMINAR VIVO: numa troca em que os dois caem, o revide na frente
+       deixaria o outro batendo depois de ter chegado a zero -- o defeito que esta função existe
+       pra evitar. */
+    if(g.q === adormecido && terminouVivo(outroLado(g.q))){
+      saidaG.unshift(grupo);
+      if(derrubou) saidaG.push(derrubou);
+      continue;
+    }
     saidaG.push(grupo);
     if(derrubou) saidaG.push(derrubou);
   }
@@ -15487,6 +15545,7 @@ function sequenciaDoConfronto(m){
      Achado em 09/09/2026 pelo teste do cadáver (um Golem que dormiu, tomou três golpes, morreu no
      terceiro e revidou 256 na linha seguinte). Raro e ANTIGO -- é o mesmo defeito que o
      `passosVisiveis` conserta do outro lado, só que pelo caminho do sono. */
+  let moribundoNaFrente = null;
   const golpeDoAdormecido = (sono && iOutro > 0) ? soDano[iOutro] : null;
   /* `sono.q` é quem USOU o sono; o adormecido é o OUTRO lado -- o mesmo lado que o `danoLivre`
      logo abaixo trata como quem cede vida nas trocas livres. */
@@ -15494,7 +15553,11 @@ function sequenciaDoConfronto(m){
   const moribundoDoSono = (golpeDoAdormecido && golpeDoAdormecido.m && adormecidoMorreu && livres.length)
                           ? golpeDoAdormecido : null;
   if(moribundoDoSono){
-    livres = livres.slice(0, -1).concat([Object.assign({}, moribundoDoSono, { m: 0 })], livres.slice(-1));
+    /* ELE VAI PRO COMEÇO DO CONFRONTO, antes das aberturas -- a mesma regra do `passosVisiveis`,
+       e pelo mesmo motivo: entre as trocas livres ele parte ao meio justamente a sequência de
+       golpes que o sono comprou. Já esteve ANTES DA ÚLTIMA troca livre (que resolvia o cadáver
+       atacando, mas não a leitura). */
+    moribundoNaFrente = Object.assign({}, moribundoDoSono, { m: 0 });
     /* Ele bate no OUTRO lado (quem usou o sono), então quem cede vida aqui é esse lado -- o
        espelho exato do ajuste que o `danoLivre` faz logo abaixo. */
     base = (moribundoDoSono.q === 'p')
@@ -15519,7 +15582,7 @@ function sequenciaDoConfronto(m){
      tela é o que faz procurar bug onde é regra. */
   const resto = expandirTapas(reconstruirSequencia(base).map(h => ({ q: h.side === 'player' ? 'e' : 'p', d: h.amount }))
                                                         .filter(h => h.d > 0));
-  return marcarCriticos(aberturas.concat(livres, resto));
+  return marcarCriticos((moribundoNaFrente ? [moribundoNaFrente] : []).concat(aberturas, livres, resto));
 }
 /* AS FRASES DOS GOLPES ESPECIAIS VIVEM AQUI, num lugar só.
    O log da batalha e o aviso do meio da luta leem desta função. Montadas em separado, as duas
@@ -15733,7 +15796,11 @@ function especiaisDaEspecie(id){
   if(SONIFEROS[id])               out.push({ nome: SONIFEROS[id],    chance: CHANCE_SONO });
   if(DISABLE.includes(id))        out.push({ nome:'Anulação',        chance: CHANCE_DISABLE });
   // o metrônomo sai em algum efeito em 3 das 10 vezes (explosão, sono ou anulação)
-  if(METRONOMO.includes(id))      out.push({ nome:'Metrônomo',       chance: CHANCE_METRONOMO_EFEITO*3 });
+  /* O METRÔNOMO NÃO TEM CHANCE ESCRITA, e isso mudou em 10/09/2026: ele sai em TODO golpe -- o que
+     é sorteado é QUAL golpe, não SE ele sai. Os 30% que ficavam aqui eram a chance de o sorteio
+     cair num dos três efeitos (explosão, sono, anulação), e dizer só isso fazia parecer que nos
+     outros 70% ele não acontecia. */
+  if(METRONOMO.includes(id))      out.push({ nome:'Metrônomo',       chance: null });
   if(RECUPERACAO.includes(id))    out.push({ nome:'Recuperar',       chance: CHANCE_RECUPERAR });
   if(ABSORCAO[id])                out.push({ nome: ABSORCAO[id],    chance: CHANCE_ABSORVER });
   /* A FÚRIA é passiva da espécie desde 10/09/2026, e por isso mora AQUI e não no cartão do golpe:
@@ -15753,8 +15820,8 @@ function avisoDoConfronto(m, passo){
      então quando a barra parou em 1 o contador já está em iFaixa+1) e sai no próximo.
      Chamada SEM o passo -- que é como o pausaDoEspecial faz, pra decidir a pausa ANTES do primeiro
      golpe -- ela não vale: a pausa dela é outra, no meio do laço. */
+  const seq = (passo != null) ? sequenciaDoConfronto(m) : null;
   if(passo != null){
-    const seq = sequenciaDoConfronto(m);
     /* O DESEMPATE entra pela MESMA porta da Faixa: os dois são avisos do MEIO da luta, aparecem no
        passo seguinte ao deles e saem no próximo. */
     const iFaixa = seq.findIndex(g => g.x === 'faixa' || g.x === 'desempate');
@@ -15797,7 +15864,28 @@ function avisoDoConfronto(m, passo){
      a barra sobe, que é o passo que ela existe pra explicar. É o mesmo 2 da drenagem, pelo mesmo
      motivo: a frase tem que sobreviver ao movimento que anuncia. */
   const passosDaAbertura = { recover:1, pocao:1, absorb:2, disable:1, semSono:1, sono:2, furia:2 };
-  const g = especiais.find(x => !passosDaAbertura[x.x] || !(passo >= passosDaAbertura[x.x]));
+  /* OS PASSOS SÃO CONTADOS A PARTIR DE ONDE A ABERTURA ESTÁ, não do começo do confronto -- e isso
+     passou a importar em 10/09/2026, quando o moribundo de quem dormiu foi pra frente da linha do
+     sono. Com a contagem absoluta a frase do sono aparecia enquanto o adormecido dava o revide e
+     sumia justamente no passo em que ele dorme: contava a história trocada.
+     Com a abertura no passo 0 -- que é o caso de sempre -- a conta é idêntica à de antes. */
+  const ondeEstaNaSequencia = x => {
+    if(!seq) return 0;
+    const i = seq.findIndex(h => h.x === x.x && h.q === x.q);
+    return i < 0 ? 0 : i;
+  };
+  const g = especiais.find(x => {
+    const n = passosDaAbertura[x.x];
+    if(!n) return true;          // autodestruição: não está na tabela, e a frase vale o confronto inteiro
+    if(passo == null) return true;   // chamada sem passo: é o pausaDoEspecial decidindo a pausa
+    const i = ondeEstaNaSequencia(x);
+    /* O PASSO 0 é a PAUSA de leitura, e ela só existe no começo do confronto. Uma abertura que
+       esteja no índice 0 continua ganhando essa pausa -- é a conta de sempre, intocada. Uma que
+       venha depois (o sono, quando o moribundo de quem dormiu foi pra frente) NÃO pode se apropriar
+       do passo anterior: ali corre um golpe de verdade, com nome próprio pra mostrar. */
+    const inicio = (i === 0) ? 0 : i + 1;
+    return passo >= inicio && passo < i + n;
+  });
   if(!g) return '';
   const nomeP = escapeHtmlSafe(m.player || ''), nomeE = escapeHtmlSafe(m.enemy || '');
   const doJogador = g.q === 'p';
@@ -15889,12 +15977,21 @@ function pausaDoNomeDoGolpe(m, hit){ return fraseDoGolpeUsado(m, hit) ? PAUSA_AN
    resolvido por autodestruição (que dura um golpe só) ela mal pisca. Um segundo é o mesmo tempo
    que o online já dá pro "Vai Fulano!" antes de começar a luta. */
 const PAUSA_LEITURA_ESPECIAL_MS = 1000;
-function pausaDoEspecial(m){ return avisoDoConfronto(m) ? PAUSA_LEITURA_ESPECIAL_MS : 0; }
+/* A PAUSA DE ABERTURA só vale se a frase ESTIVER MESMO na tela no passo 0. Ela pergunta pelo passo
+   0 e não sem passo desde 10/09/2026: com o moribundo de quem dormiu indo pra frente, a linha do
+   sono deixou de abrir o confronto em alguns casos, e a pausa virava um segundo parado numa tela
+   que só dizia "Trocando golpes...". Nesses casos quem dá o tempo de leitura é a marca de
+   LEITURA do passo dela, no meio do laço. Onde a abertura continua sendo o primeiro passo -- que é o caso
+   de sempre -- a conta não mudou. */
+function pausaDoEspecial(m){ return avisoDoConfronto(m, 0) ? PAUSA_LEITURA_ESPECIAL_MS : 0; }
 /* A PAUSA DA FAIXA, no meio do laço. O passo dela não mexe barra nenhuma, então a duração dele é
    ZERO -- sem esta pausa a frase apareceria e sumiria no mesmo quadro, e o jogador veria a barra
    parar em 1 sem nada explicando por quê. É o mesmo segundo que o pausaDoEspecial dá pros golpes
    de abertura, e pelo mesmo motivo. */
-function pausaDaFaixa(hit){ return (hit && hit.faixa) ? PAUSA_LEITURA_ESPECIAL_MS : 0; }
+/* `leitura` é o mesmo caso por outro caminho: uma ABERTURA que não é o primeiro passo (a linha do
+   sono, depois que o moribundo de quem dormiu passou pra frente dela). Os dois querem a mesma
+   coisa -- um segundo pra a frase ser lida num passo que não move barra nenhuma. */
+function pausaDaFaixa(hit){ return (hit && (hit.faixa || hit.leitura)) ? PAUSA_LEITURA_ESPECIAL_MS : 0; }
 function passosHtml(m){
   const golpes = sequenciaDoConfronto(m);   // a MESMA lista que a animação vai reproduzir
   if(!golpes.length) return '';
@@ -17240,7 +17337,7 @@ function advanceLeagueWatch(){
          sobe. A da FAIXA e o contrario -- ela precisa do render pra APARECER, porque o passo dela
          nao mexe barra nenhuma (a barra ja parou em 1 no golpe anterior) e sem um desenho a frase
          nunca chegaria na tela. */
-      if(hit.cura || hit.faixa || hit.posFaixa) setTimeout(render, esperaNome + hitDuration + 50);
+      if(hit.cura || hit.faixa || hit.leitura || hit.posFaixa) setTimeout(render, esperaNome + hitDuration + 50);
       setTimeout(advanceLeagueWatch, esperaNome + hitDuration + 150 + pausaDaFaixa(hit));
     }
   } else if(game.leagueWatchIndex < w.matchups.length - 1){
@@ -21542,7 +21639,10 @@ function renderPokedexFicha(){
         if(!esp.length) return '';
         return `<div class="dex-especiais">
           <div class="dex-especiais-tit">${esp.length>1?'Golpes especiais':'Golpe especial'}</div>
-          ${esp.map(e=>`<div class="dex-especial">${seloDeGolpe(e.nome, e.tipo)}<span class="dex-especial-chance">${Math.round(e.chance*100)}% por confronto</span></div>`).join('')}
+          ${esp.map(e=>`<div class="dex-especial">${seloDeGolpe(e.nome, e.tipo)}${
+            /* Sem chance declarada o especial sai SÓ com o nome: é o caso do Metrônomo, que
+               acontece em todo golpe. Um "100% por confronto" ali diria menos que nada. */
+            e.chance == null ? '' : `<span class="dex-especial-chance">${Math.round(e.chance*100)}% por confronto</span>`}</div>`).join('')}
         </div>`;
       })()}
       ${(() => {
@@ -21565,24 +21665,12 @@ function renderPokedexFicha(){
             ${typePill(GOLPES[golpe][0])}
           </div>`;
         }).join('');
-        /* O AVISO DO METRÔNOMO. As 4 espécies do METRONOMO atacam com tipo SORTEADO e nunca usam
-           golpe escolhido (ver ataquesDisponiveis), então a lista aqui é o que a espécie APRENDE
-           e não o que ela leva pra batalha. Sem esta linha a ficha promete uma coisa que a luta
-           não entrega -- foi ela que fez o jogador esperar a Folha Mágica no nível 17 da Cleffa.
-           A lista FICA, e não é decoração: quando a Cleffa vira Clefairy e o Snubbull vira
-           Granbull, esses golpes passam a valer de verdade. O que faltava era dizer QUANDO. */
-        const soDepoisDeEvoluir = !usaGolpesEscolhidos(id);
+        /* O AVISO DO METRÔNOMO SAIU em 10/09/2026. Ele dizia "na batalha ele usa o Metrônomo, não
+           estes golpes", e era verdade enquanto o Metrônomo substituía a escolha -- hoje ele
+           DISPUTA com ela, então esta lista voltou a ser o que a espécie leva pra batalha, como a
+           de qualquer outra. Manter a frase seria a promessa falsa ao contrário. */
         return `<div class="dex-golpes">
           <div class="dex-especiais-tit">Golpes por nível</div>
-          ${soDepoisDeEvoluir ? (() => {
-            /* A evolução só entra na frase se ela SAIR do Metrônomo. O Togegic também é do
-               METRONOMO, então dizer ao dono de um Togepi que os golpes valem "quando virar
-               Togetic" seria trocar uma promessa falsa por outra. */
-            const evo = EVOLUTIONS[id];
-            const sai = evo && usaGolpesEscolhidos(evo.into);
-            return `<div class="dex-golpes-aviso">Na batalha ele usa o Metrônomo, não estes golpes${
-              sai ? ` — eles passam a valer quando virar <strong>${escapeHtmlSafe(SPECIES[evo.into].name)}</strong>` : ''}.</div>`;
-          })() : ''}
           <div class="dex-golpes-lista">${linhas}</div>
         </div>`;
       })()}

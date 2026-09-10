@@ -65,20 +65,15 @@ console.log('=== A LISTA DE GOLPES DE CADA ESPECIE ===');
 
 console.log('\n=== AS DOZE QUE NAO ESCOLHEM CAEM NO MOTOR DE TIPO ===');
 {
-  /* Sao dois grupos, e a conta e 8 + 4. As OITO nao aprendem UM golpe de dano por nivel em nivel
-     nenhum -- o que tem sao Harden, Teleport, Transform, Sketch. As QUATRO do METRONOMO aprendem,
-     mas o tipoDoGolpe curto-circuita nelas: atacam de tipo sorteado e nunca chegam no melhorAtaque,
-     entao escolher golpe ali seria decorativo (ver ataquesDisponiveis). Sem a queda pro motor de
-     sempre, as doze ficariam sem atacar. */
-  /* ERAM OITO E VIROU UMA. A regra de cobertura de tipo (todo pokémon bate com o próprio tipo,
-     09/09/2026) deu golpe de dano a Kakuna, Metapod, Abra, Unown, Wobbuffet, Delibird e Smeargle
-     -- as sete que não tinham nenhum. Sobra o DITTO, e ele é a exceção de propósito: o golpe dele
-     é o tipo de quem ele copiou, e essa mecânica só roda quando o melhorAtaque devolve null. */
+  /* SOBRA UMA, e ela e o Ditto. Foram oito ate 09/09/2026 (a regra de cobertura de tipo deu golpe
+     de dano a Kakuna, Metapod, Abra, Unown, Wobbuffet, Delibird e Smeargle) e voltaram a ser
+     DOZE por um dia, quando as quatro do Metronomo passaram a devolver lista vazia de proposito.
+     Em 10/09/2026 isso acabou: o Metronomo passou a DISPUTAR com os golpes proprios em vez de
+     substitui-los, entao quem tem Metronomo escolhe golpe como todo mundo.
+     O DITTO e a excecao de sempre: o golpe dele e o tipo de quem ele copiou, e essa mecanica so
+     roda quando o melhorAtaque devolve null. */
   const semGolpe = Object.keys(S.SPECIES).filter(id => S.ataquesDisponiveis(id, 99).length === 0);
-  const semNenhum = semGolpe.filter(id => S.METRONOMO.indexOf(id) < 0);
-  ok('so o Ditto fica sem golpe de dano', semNenhum.join(',') === 'ditto', semNenhum.join(', '));
-  ok('mais as quatro do Metronomo, que tem golpe e nao escolhem',
-     semGolpe.length === 5, semGolpe.join(', '));
+  ok('so o Ditto fica sem golpe de dano', semGolpe.join(',') === 'ditto', semGolpe.join(', '));
 
   const alvo = inst('onix', 50);
   let atacaram = 0;
@@ -683,25 +678,74 @@ console.log('\n=== O CARROSSEL QUE TRAVAVA O JOGO ===');
      (nd.ataquesRecusados||[]).map(S.nomeDoAtaque).join(', '));
 }
 
-console.log('\n=== O METRONOMO NAO ESCOLHE, E ANUNCIA O QUE USA ===');
+console.log('\n=== O METRONOMO SORTEIA E DEPOIS ESCOLHE ===');
 {
-  /* O tipoDoGolpe -- o caminho do DANO, nos dois motores -- curto-circuita pras 4 especies do
-     METRONOMO: elas atacam com tipo sorteado, sempre, e nunca chegam no melhorAtaque. O golpe
-     escolhido delas nunca valeu um ponto de dano: havia uma tela pedindo uma decisao que o motor
-     ignora (Snubbull) e uma fileira MUDA no unico que nao tem golpe de dano ate o 38 (Togepi,
-     reportado em 09/09/2026: "deveria aparecer o Metronome, porem nao esta exibindo nada"). */
-  S.METRONOMO.forEach(function(sp){
-    ok('o ' + sp + ' nao tem golpe pra escolher', S.ataquesDisponiveis(sp, 99).length === 0);
-    ok('e a fileira dele anuncia o Metronomo',
-       S.golpesDoTimeHtml(S.createInstance(sp, 33)).indexOf('Metr\u00f4nomo') >= 0);
-  });
-  /* Zero impacto na batalha: era decorativo dos dois lados. */
-  const comGolpe = S.createInstance('snubbull', 40); comGolpe.ataques = ['bite','headbutt'];
-  const semGolpe = S.createInstance('snubbull', 40); semGolpe.ataques = [];
-  const alvoSn = S.createInstance('onix', 40);
-  ok('e o golpe que sai e o MESMO com e sem golpe escolhido',
-     JSON.stringify(S.tipoDoGolpe(comGolpe, alvoSn, function(){return 0.37;}))
-     === JSON.stringify(S.tipoDoGolpe(semGolpe, alvoSn, function(){return 0.37;})));
+  /* COMO ERA ATE 10/09/2026: as especies do METRONOMO atacavam com um TIPO sorteado, poder
+     implicito de 60, e NUNCA chegavam no melhorAtaque -- o golpe escolhido delas nao valia um
+     ponto de dano, entao o `ataquesDisponiveis` devolvia lista vazia pra elas e a fileira anunciava
+     o Metronomo NO LUGAR dos golpes.
+     COMO E AGORA, a pedido: a cada golpe o Metronomo sorteia um ATAQUE DE VERDADE da tabela (com
+     tipo e poder proprios) e ele entra na MESMA disputa dos golpes escolhidos. Sai o que tira mais
+     dano. Quem ainda nao tem golpe proprio (Togepi antes do nivel 21) continua so no Metronomo. */
+  ok('a lista e a pedida', S.METRONOMO.join(',') === 'snorlax,cleffa,clefairy,clefable,mew,togepi,togetic',
+     S.METRONOMO.join(','));
+
+  /* AGORA ELAS ESCOLHEM GOLPE COMO TODO MUNDO. */
+  ok('o Togepi tem Poder Ancestral a partir do 21',
+     S.ataquesDisponiveis('togepi', 21).indexOf('ancientpower') >= 0 &&
+     S.ataquesDisponiveis('togepi', 20).length === 0,
+     'Lv.20: ' + JSON.stringify(S.ataquesDisponiveis('togepi', 20)) + '   Lv.21: ' + JSON.stringify(S.ataquesDisponiveis('togepi', 21)));
+  ok('e o Snorlax leva o moveset inteiro dele', S.ataquesDisponiveis('snorlax', 60).length >= 5,
+     S.ataquesDisponiveis('snorlax', 60).join(', '));
+
+  /* O QUE SAI NA BATALHA E O QUE TIRA MAIS DANO. Contra um alvo em que o golpe proprio e OTIMO ele
+     ganha quase sempre; contra um em que e pessimo, quase nunca. E disso que a mecanica trata --
+     se o sorteado saisse sempre, o Poder Ancestral continuaria decorativo. */
+  {
+    const escolheu = (alvo) => {
+      let ap = 0;
+      for(let i = 0; i < 1500; i++){
+        const a = S.createInstance('togepi', 25); a.ataques = S.ataquesDisponiveis('togepi', 25);
+        if(S.tipoDoGolpe(a, S.createInstance(alvo, 25), S.makeSeededRng('esc' + alvo + i)).golpe === 'ancientpower') ap++;
+      }
+      return 100 * ap / 1500;
+    };
+    /* Charizard e Fogo/Voador: Pedra bate 4x nele. Geodude e Pedra/Terra: Pedra bate 0,5x. */
+    const bom = escolheu('charizard'), ruim = escolheu('geodude');
+    ok('contra quem o golpe proprio arrebenta, ele sai quase sempre', bom > 80, bom.toFixed(1) + '%');
+    ok('e contra quem ele e ruim, o sorteado assume', ruim < 40, ruim.toFixed(1) + '%');
+  }
+
+  /* QUEM AINDA NAO TEM GOLPE continua so no Metronomo -- e o Togepi antes do 21, que era o caso
+     do pedido. O sorteio cobre a tabela inteira. */
+  {
+    const vistos = new Set();
+    for(let i = 0; i < 2000; i++){
+      const a = S.createInstance('togepi', 10); a.ataques = S.ataquesDisponiveis('togepi', 10);
+      vistos.add(S.tipoDoGolpe(a, S.createInstance('onix', 25), S.makeSeededRng('so' + i)).golpe);
+    }
+    ok('sem golpe proprio ele so sorteia, e sorteia MUITO golpe', vistos.size > 100, vistos.size + ' golpes distintos');
+  }
+
+  /* A FILEIRA MOSTRA OS DOIS: os golpes escolhidos MAIS o selo do Metronomo. Antes ele aparecia NO
+     LUGAR deles, porque ali eles nao valiam nada. */
+  {
+    const p = S.createInstance('togepi', 30); p.ataques = S.ataquesDisponiveis('togepi', 30);
+    const html = S.golpesDoTimeHtml(p);
+    ok('a fileira anuncia o Metronomo', html.indexOf('Metr\u00f4nomo') >= 0);
+    ok('e mostra o golpe escolhido junto', html.indexOf(S.nomeDoAtaque('ancientpower')) >= 0, html.replace(/<[^>]*>/g, ' ').trim());
+  }
+
+  /* A FICHA DA POKEDEX nao diz mais chance nenhuma pro Metronomo: ele sai em TODO golpe -- o que e
+     sorteado e QUAL golpe, nao SE ele sai. */
+  {
+    const metro = S.especiaisDaEspecie('togepi').find(e => e.nome === 'Metr\u00f4nomo');
+    ok('a ficha traz o Metronomo sem chance', !!metro && metro.chance == null, JSON.stringify(metro));
+    /* E o resto do bloco continua com a chance -- ela so saiu de quem sai sempre. */
+    const sono = S.especiaisDaEspecie('gengar').find(e => e.chance != null);
+    ok('e os outros especiais continuam dizendo a chance', !!sono, JSON.stringify(sono));
+  }
+
   /* Quem nao tem golpe NEM especial continua saindo vazio: uma linha em cada fileira da defesa do
      ginasio da cidade (que vem de codigo de time e nunca carrega golpe) seria pior que nenhuma. */
   ok('quem nao tem golpe nem especial continua vazio',

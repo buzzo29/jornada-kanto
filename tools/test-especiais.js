@@ -38,9 +38,20 @@ ok('43 especies tem golpe de sono', Object.keys(S.SONIFEROS).length === 43, Obje
 ok('cada uma com o NOME do golpe dela',
    S.SONIFEROS.paras === 'Esporo' && S.SONIFEROS.jigglypuff === 'Canto' &&
    S.SONIFEROS.gengar === 'Hipnose' && S.SONIFEROS.oddish === 'Pó do Sono' && S.SONIFEROS.jynx === 'Beijo Adorável');
-ok('metronomo e o quarteto pedido', S.METRONOMO.join(',') === 'togepi,togetic,cleffa,snubbull');
-/* Especie que nao existe no SPECIES seria um golpe que nunca sai -- e ninguem perceberia. */
-const foraDaTabela = [...S.AUTODESTRUICAO, ...Object.keys(S.SONIFEROS), ...S.METRONOMO].filter(id => !S.SPECIES[id]);
+/* A LISTA DO METRONOMO MUDOU EM 10/09/2026, a pedido: entraram Snorlax, Clefairy, Clefable e MEW
+   (os tres primeiros aprendem Metronomo por nivel no original e tinham ficado de fora; o Mew e o
+   dono do golpe), e o SNUBBULL saiu -- ele nao aprende Metronomo por nivel na Gen 3, e hoje luta
+   com o moveset dele. */
+ok('a lista do metronomo e a pedida',
+   S.METRONOMO.join(',') === 'snorlax,cleffa,clefairy,clefable,mew,togepi,togetic', S.METRONOMO.join(','));
+ok('e o Snubbull saiu dela', !S.METRONOMO.includes('snubbull'));
+/* Especie que nao existe no SPECIES seria um golpe que nunca sai -- e ninguem perceberia.
+   O MEW E A EXCECAO, e ela e declarada: ele nao esta no SPECIES de proposito (e o chefe da raide, e
+   uma vaga #151 que ninguem captura quebraria o "capturou tudo" do desafio do Mewtwo), mas o
+   `bossInstance` do servidor carimba speciesId 'mew' -- entao a entrada dele no METRONOMO NAO e
+   letra morta: e por ela que o Mew da raide sorteia o golpe. */
+const foraDaTabela = [...S.AUTODESTRUICAO, ...Object.keys(S.SONIFEROS), ...S.METRONOMO]
+  .filter(id => !S.SPECIES[id] && id !== 'mew');
 ok('nenhuma especie das listas esta fora do SPECIES', foraDaTabela.length === 0, foraDaTabela.join(','));
 
 console.log('\nO QUE CADA GOLPE FAZ');
@@ -223,7 +234,12 @@ ok('e o log diz qual golpe foi', diario.some(g => g.x === 'sono' && g.g === 'Can
             o que apareceu na tela no dia em que o teto saiu inteiro (03/09/2026).
             COM SONO pode passar, e so por causa das trocas livres: elas sao o que o golpe E, e
             esmaga-las na reconstrucao foi a origem dos dois defeitos reportados naquele dia. */
-      const linhas = lista.length;
+      /* CONTA LINHA DE LOG, e nao passo de animacao: um golpe de VARIOS TAPAS e UMA linha (o log
+         soma os tapas), e e disso que a regra fala -- "a luta cabe em duas ou tres linhas". Contar
+         passo a passo media outra coisa, e o Metronomo tornou isso visivel: desde que ele sorteia
+         golpe de verdade, as 7 especies dele podem tirar um Missil Agulha de 5 tapas em qualquer
+         golpe. E a MESMA regra que o TETO_GOLPES ja usa pra decidir a reconstrucao. */
+      const linhas = lista.filter(g => !(g.t > 1)).length;
       if(sono){ if(linhas > maiorComSono) maiorComSono = linhas; }
       else if(linhas > TETO_ESPERADO){ passouDoTeto++; if(!exTeto) exTeto = desc(); }
       break;
@@ -578,13 +594,24 @@ console.log('\nA FAIXA DE FOCO NAO PODE SER FURADA POR CAMINHO NENHUM');
          JSON.stringify(seq[iFaixa-1]));
       /* E DEPOIS DELA e o CHARIZARD quem ataca primeiro -- a metade 2 e uma luta nova em que ele
          entra fraco, e a reconstrucao da o primeiro golpe a quem entra abaixo de 50%. */
+      /* QUANDO A METADE 2 TEM GOLPE DELE. Ela pode nao ter: se os dois cairam na mesma troca, o
+         confronto termina no revide MORIBUNDO do adversario e a metade 2 e uma linha so, do outro
+         lado -- a Faixa segurou em 1 e o golpe seguinte, do mesmo instante, terminou o servico.
+         Cobrar o golpe dele ali seria cobrar um golpe que a luta nao teve. */
+      const depois = seq.slice(iFaixa + 1).filter(g => !g.x);
       ok('e depois dela quem ataca primeiro e o Charizard',
-         seq[iFaixa+1] && seq[iFaixa+1].q === 'p', JSON.stringify(seq[iFaixa+1]));
+         !depois.some(g => g.q === 'p') || depois[0].q === 'p', JSON.stringify(depois));
       /* A SOMA CONTINUA FECHANDO: o log nao pode dizer que ele tomou mais do que tinha. A explosao
          conta junto (ela tem x='boom' mas E dano). */
       const tomou = seq.filter(g => (!g.x || g.x === 'boom') && g.q === 'e').reduce((a, g) => a + g.d, 0);
-      ok('e a soma do dano fecha com o HP dele', tomou === m.playerHpBefore - m.playerHpAfter,
-         tomou + ' de ' + (m.playerHpBefore - m.playerHpAfter));
+      /* O CHARIZARD ESTA NA LISTA DA FURIA, entao ele pode GANHAR vida no meio do confronto -- e ai
+         o que ele perdeu de HP e menor que a soma dos golpes, pela diferenca exata do ganho. E o
+         mesmo desconto que as outras varreduras deste arquivo ja fazem pra cura, pocao e drenagem.
+         Sem ele o teste falhava em ~1 rodada a cada 15, sempre por 10 (o FURIA_BONUS), e o defeito
+         era do teste: conferido que TODO confronto sem furia fecha. */
+      const ganhou = seq.filter(g => g.x === 'furia' && g.q === 'p').reduce((a, g) => a + g.d, 0);
+      ok('e a soma do dano fecha com o HP dele', tomou === (m.playerHpBefore - m.playerHpAfter) + ganhou,
+         tomou + ' de ' + ((m.playerHpBefore - m.playerHpAfter) + ganhou));
       /* AS DUAS METADES RESPEITAM O TETO. E o pedido: a luta corre normal ate ele chegar a zero, a
          Faixa o devolve a 1, e o que vem depois se le como uma luta nova -- cada uma com o mesmo
          teto de 3 golpes de sempre. */
@@ -664,7 +691,10 @@ console.log('\nA FAIXA DE FOCO NAO PODE SER FURADA POR CAMINHO NENHUM');
           if(!(x.golpes||[]).some(g => g.x === 'faixa')) continue;
           n++;
           const s = S.sequenciaDoConfronto(x);
-          maior = Math.max(maior, s.filter(g => g.x !== 'boomself' && g.x !== 'absorbdano').length);
+          /* LINHA DE LOG, nao passo de animacao: o golpe de VARIOS TAPAS e uma linha so -- ver a
+             nota da contagem no bloco do log. O Metronomo tornou isso visivel porque as 7 especies
+             dele podem sortear um Missil Agulha de 5 tapas em qualquer golpe. */
+          maior = Math.max(maior, s.filter(g => g.x !== 'boomself' && g.x !== 'absorbdano' && !(g.t > 1)).length);
           const tomou = s.filter(g => (!g.x || g.x === 'boom') && g.q === 'e').reduce((a, g) => a + g.d, 0);
           /* Quem SOBE de vida no meio do confronto desconta: cura, pocao, drenagem e FURIA fazem o
              HP perdido ser menor que a soma dos golpes. */
@@ -811,7 +841,23 @@ console.log('\nA AUDITORIA DAS LISTAS (04/09/2026)');
                    RECUPERACAO:S.RECUPERACAO };
   const imunesNaLista = [];
   for(const [nome, l] of Object.entries(listas)){
+    /* O METRONOMO E A EXCECAO DESDE 10/09/2026, e ela e de desenho: o `ehImuneAEspecial` corta
+       antes do SORTEIO DE EFEITO (explosao, sono, anulacao) -- que e o que a raide nao pode ter --,
+       mas o golpe sorteado do Metronomo nao passa por ali: ele sai do `tipoDoGolpe`, no caminho do
+       DANO. Ou seja, o Mew sorteia o golpe e continua imune a explodir. */
+    if(nome === 'METRONOMO') continue;
     for(const id of ['mew','mewtwo']) if(l.includes(id)) imunesNaLista.push(nome + ':' + id);
+  }
+  /* E o que se cobra do Mew e o outro lado da moeda: ele TEM Metronomo e NAO tem efeito nenhum.
+     Quem barra e o `tentarGolpeEspecial` (via ehImuneAEspecial), nao o sorteio -- entao e ELE que
+     o teste tem que dirigir. Com rng fixo em 0,01 todo sorteio de chance passaria. */
+  {
+    const mew = Object.assign(S.createInstance('mewtwo', 99), { speciesId:'mew', types:['Psychic'], maxHp:99999, hp:99999 });
+    const alvo = S.createInstance('snorlax', 70); alvo.maxHp = S.calcMaxHp(alvo); alvo.hp = alvo.maxHp;
+    let saiu = 0;
+    for(let i = 0; i < 2000; i++){ const d = []; S.tentarGolpeEspecial(mew, alvo, () => 0.01, d); if(d.length) saiu++; mew._especialContra = null; }
+    ok('o Mew sorteia golpe mas continua imune ao bloco de efeitos',
+       S.METRONOMO.includes('mew') && saiu === 0, saiu + ' efeitos em 2000');
   }
   for(const id of ['mew','mewtwo']){
     if(S.SONIFEROS[id]) imunesNaLista.push('SONIFEROS:' + id);
@@ -1172,6 +1218,20 @@ const esp = srv._golpesEspeciais;
      primeira || (250*99) + ' casos, ' + evoluiram + ' com evolucao');
   ok('e a forma nova leva os SEIS atributos, velocidade inclusive', atributo === 0, primeira);
 }
+/* O SORTEIO DO METRONOMO TEM QUE SER IGUAL NOS DOIS MOTORES: e ele que decide o golpe, e golpe
+   diferente e dano diferente -- a mesma batalha terminando diferente no cliente e no servidor.
+   O bolo vai ORDENADO justamente por isso: as duas tabelas de golpes estao escritas em ordens
+   diferentes nos dois arquivos, e sortear por indice numa lista nao ordenada divergiria. */
+ok('o bolo do Metronomo e o mesmo nos dois motores',
+   S.POOL_METRONOMO.join(',') === esp.POOL_METRONOMO.join(','),
+   S.POOL_METRONOMO.length + ' x ' + esp.POOL_METRONOMO.length);
+(function(){
+  let iguais = 0;
+  for(let i = 0; i < 500; i++){
+    if(S.sorteiaGolpeDoMetronomo(S.makeSeededRng('pool' + i)) === esp.sorteiaGolpeDoMetronomo(S.makeSeededRng('pool' + i))) iguais++;
+  }
+  ok('e o sorteio devolve o MESMO golpe com a mesma semente', iguais === 500, iguais + ' de 500');
+})();
 ok('as listas sao IDENTICAS nos dois motores',
    esp.AUTODESTRUICAO.join(',') === S.AUTODESTRUICAO.join(',') &&
    esp.METRONOMO.join(',') === S.METRONOMO.join(',') &&
@@ -1754,12 +1814,14 @@ console.log('\n=== O NPC LUTA COM O MOVESET DELE ===');
     S.equiparNpc([doJogador]);
     ok('NAO sobrescreve quem ja tem golpe escolhido', doJogador.ataques.join(',') === 'rockblast,tackle',
        doJogador.ataques.join(','));
-    /* Quem usa Metronomo nao escolhe golpe, e o equiparNpc tem que respeitar isso -- senao o
-       Togepi passaria a atacar com golpe comum e a mecanica dele sumia. */
+    /* QUEM USA METRONOMO TAMBEM LEVA O MOVESET DELE desde 10/09/2026: o Metronomo passou a DISPUTAR
+       com os golpes proprios em vez de substitui-los, entao o NPC do Metronomo tem os dois. Antes
+       ele saia sem golpe nenhum de proposito, porque o golpe escolhido dele nao valia um ponto de
+       dano. */
     const togepi = S.createInstance('togepi', 40);
     S.equiparNpc([togepi]);
-    ok('quem e do Metronomo continua sem golpe escolhido', !(togepi.ataques && togepi.ataques.length),
-       JSON.stringify(togepi.ataques || null));
+    ok('quem e do Metronomo TAMBEM leva o moveset dele',
+       (togepi.ataques || []).indexOf('ancientpower') >= 0, JSON.stringify(togepi.ataques || null));
   }
 
   /* 2) AS QUATRO PORTAS. Sao os quatro lugares onde um time de NPC nasce, e uma que ficar de fora
@@ -1868,7 +1930,7 @@ console.log('\n=== GOLPES DE VARIOS TAPAS: DE 2 A 5 NUMA TROCA ===');
     const alvo = inst('dunsparce', 28);
     let cruOk = 0, total = 0;
     for(const golpe of MULTI){
-      for(const dono of ['clefable','persian','jynx','furret','ursaring','chansey']){
+      for(const dono of ['jigglypuff','persian','jynx','furret','ursaring','chansey']){
         const a = inst(dono, 45);
         if((S.ataquesEscolhiveis(a) || []).indexOf(golpe) < 0) continue;
         a.ataques = [golpe];
@@ -1888,7 +1950,10 @@ console.log('\n=== GOLPES DE VARIOS TAPAS: DE 2 A 5 NUMA TROCA ===');
       for(let i = 0; i < 1200; i++){
         /* ALVO GORDO de proposito: o dano gravado e o EFETIVO, entao um alvo que morre no golpe
            trunca o numero e distorce a razao. A Chansey aguenta os dois sem cair. */
-        const a = inst('clefable', 42); a.ataques = [golpe];
+        /* JIGGLYPUFF e nao Clefable: a Clefable entrou no METRONOMO em 10/09/2026, e quem sorteia
+           golpe a cada ataque nem sempre usa o que esta em `ataques` -- a razao medida deixaria de
+           ser a do golpe que se quer medir. */
+        const a = inst('jigglypuff', 42); a.ataques = [golpe];
         const b = inst('chansey', 60);
         const m = (S.simulateGymBattle([a], [b]).matchups || [])[0];
         if(!m) continue;
@@ -1926,7 +1991,11 @@ console.log('\n=== GOLPES DE VARIOS TAPAS: DE 2 A 5 NUMA TROCA ===');
     /* Um dono por golpe da tabela. Falta de dono e assertiva logo abaixo -- golpe novo no
        MULTI_GOLPE sem dono aqui derruba o teste em vez de ficar sem cobertura. */
     const DONOS = {
-      doubleslap: 'clefairy', furyswipes: 'persian',  furyattack: 'fearow',
+      /* O DONO NAO PODE SER DO METRONOMO (10/09/2026): quem sorteia golpe a cada ataque as vezes
+         escolhe o sorteado em vez do tapa, e o teste passaria a medir outra coisa. A Clefairy era
+         o dono do Tapa Duplo e entrou na lista do Metronomo -- virou Jigglypuff, que aprende o
+         mesmo golpe e nao sorteia nada. */
+      doubleslap: 'jigglypuff', furyswipes: 'persian',  furyattack: 'fearow',
       cometpunch: 'kangaskhan', spikecannon: 'cloyster', barrage: 'exeggutor',
       pinmissile: 'beedrill',  iciclespear: 'shellder', rockblast: 'golem'
     };
@@ -2026,7 +2095,10 @@ console.log('\n=== QUEM MANDA NA LINHA DE STATUS, PASSO A PASSO ===');
            outro especial, e o teste falhava em ~1 rodada a cada 10 sem nada estar errado. */
         const especiais = (m.golpes || []).map(g => g.x).filter(x => x && x !== 'absorbdano' && x !== 'boomself');
         const tipos = especiais.filter((x, k) => especiais.indexOf(x) === k);
-        if(tipos.length === 1 && !alvo[tipos[0]]) alvo[tipos[0]] = m;
+        /* E SEM MORIBUNDO. Quando quem dormiu morre e revida, o revide vai pro COMECO do confronto
+           (10/09/2026) -- entao a abertura deixa de ser o passo 0 e o perfil e outro, de proposito.
+           Esse caso tem trava propria, logo abaixo; aqui se mede a linha do caso comum. */
+        if(tipos.length === 1 && !alvo[tipos[0]] && !(m.golpes || []).some(g => g.m)) alvo[tipos[0]] = m;
       });
     }
     return alvo;
@@ -2061,6 +2133,81 @@ console.log('\n=== QUEM MANDA NA LINHA DE STATUS, PASSO A PASSO ===');
      alvo.absorb ? perfil(alvo.absorb) : '(nao apareceu)');
   /* A trava que pega a proxima omissao: todo especial de ABERTURA tem que estar no passosDaAbertura.
      Sem entrada, a frase vale pra sempre -- que foi exatamente o defeito da anulacao. */
+  /* ------------------------------------------------------------------------------------------
+     O MORIBUNDO DE QUEM DORMIU VAI PRO COMECO DO CONFRONTO (10/09/2026).
+     Reportado com print num Psyduck x Gastly: o Gastly dormiu o Psyduck e bateu DUAS vezes
+     seguidas (a troca livre mais a troca normal, que ele abre por ser mais rapido), mas o log lia
+     "Gastly bateu / Psyduck bateu / Gastly bateu". O motor estava certo -- o golpe do Psyduck era o
+     revide MORIBUNDO, do mesmo instante do golpe que o matou --, mas a regra que o punha uma linha
+     atras PARTIA AO MEIO justamente a sequencia que o sono compra, que e a coisa que o sono FAZ.
+     Na frente ele nao parte nada: o Psyduck atacou, dormiu, e apanhou duas vezes sem revidar. */
+  {
+    const semTag = h => String(h||'').replace(/<[^>]*>/g,'').replace(/\s+/g,' ').trim();
+    let achou = 0, curtos = 0, naFrente = 0, colados = 0, cadaver = 0, somaOk = 0, comPausa = 0, frasePronta = 0;
+    for(let v = 0; v < 9000 && achou < 40; v++){
+      const a = [inst('psyduck', 21)]; a[0].ataques = S.ataquesPadrao(a[0]);
+      const b = [inst('gastly', 31)];  b[0].ataques = S.ataquesPadrao(b[0]);
+      const m = (S.simulateGymBattle(a, b, S.makeSeededRng('mor' + v)).matchups || [])[0];
+      if(!m) continue;
+      const sono = (m.golpes || []).find(g => g.x === 'sono');
+      const mor  = (m.golpes || []).find(g => g.m);
+      if(!sono || !mor) continue;
+      achou++;
+      /* CONFRONTO CURTO x LONGO. Passando do teto de golpes, a sequencia vem da RECONSTRUCAO, e la
+         o revide nao e uma linha propria -- ele e absorvido no golpe reconstruido daquele lado.
+         O que vale nos DOIS casos e o que foi reportado: os golpes de quem dormiu o outro ficam
+         colados, e ninguem ataca com a barra em zero. A linha propria do revide so existe (e so e
+         cobrada) no confronto curto. */
+      const curto = (m.golpes || []).filter(g => !g.x && g.d > 0).length <= S.TETO_GOLPES;
+      if(curto) curtos++;
+      const seq = S.sequenciaDoConfronto(m);
+      const dano = seq.filter(g => !g.x);
+      /* 1. O REVIDE ABRE O CONFRONTO, antes ate da linha do sono. */
+      if(!curto || (seq[0] && !seq[0].x && seq[0].q === mor.q)) naFrente++;
+      /* 2. E OS GOLPES DE QUEM DORMIU O OUTRO FICAM COLADOS -- e essa a informacao que se perdia. */
+      let temColados = false;
+      for(let k = 0; k + 1 < dano.length; k++) if(dano[k].q === sono.q && dano[k+1].q === sono.q) temColados = true;
+      if(temColados) colados++;
+      /* 3. NINGUEM ATACA COM A BARRA EM ZERO. E a razao de o reordenamento existir, e mover o
+            revide pra frente nao pode desfaze-la. */
+      let hpP = m.playerHpBefore, hpE = m.enemyHpBefore, morto = false;
+      seq.forEach(g => {
+        if(g.x) return;
+        if((g.q === 'p' ? hpP : hpE) <= 0) morto = true;
+        if(g.q === 'p') hpE = Math.max(0, hpE - g.d); else hpP = Math.max(0, hpP - g.d);
+      });
+      if(!morto) cadaver++;
+      /* 4. A SOMA CONTINUA FECHANDO: mudou a ordem, nao o dano. */
+      const tomouP = dano.filter(g => g.q === 'e').reduce((x, g) => x + g.d, 0);
+      const tomouE = dano.filter(g => g.q === 'p').reduce((x, g) => x + g.d, 0);
+      if(tomouP === m.playerHpBefore - m.playerHpAfter && tomouE === m.enemyHpBefore - m.enemyHpAfter) somaOk++;
+      /* 5. A LINHA DO MEIO DA BATALHA acompanha: o revide sai com o NOME DO GOLPE dele, e a frase
+            do sono aparece no passo do sono -- nao no do revide, que e o que a contagem absoluta
+            de passos fazia antes. */
+      const anim = S.buildAnimatedHitSequence(m);
+      const iSono = anim.findIndex(h => h.x === 'sono');
+      const noRevide = semTag(S.statusDoConfronto(m, 1, anim[0]).html);
+      const noSono   = iSono >= 0 ? semTag(S.statusDoConfronto(m, iSono + 1, anim[iSono]).html) : '';
+      if(!curto || (/usou/.test(noRevide) && !/dormir/.test(noRevide) && /dormir/.test(noSono))) frasePronta++;
+      /* 6. E O TEMPO DE LEITURA VAI JUNTO. A linha do sono deixou de ser o primeiro passo, entao a
+            pausa de abertura nao a cobre mais -- quem cobre e a marca de leitura do passo dela.
+            Sem isso a frase apareceria e sumiria no mesmo quadro. */
+      /* A pausa de ABERTURA so tem que zerar quando o sono e a UNICA abertura do confronto. Com uma
+         anulacao junto, por exemplo, a frase dela ocupa o passo 0 com direito -- e ai o segundo de
+         leitura dela e legitimo, e o do sono vem a parte, no passo dele. */
+      const soSono = (m.golpes || []).filter(g => g.x && g.x !== 'sono' && g.x !== 'boomself' && g.x !== 'absorbdano').length === 0;
+      if(!curto || (iSono >= 0 && S.pausaDaFaixa(anim[iSono]) > 0 && (!soSono || S.pausaDoEspecial(m) === 0))) comPausa++;
+    }
+    ok('o caso do Psyduck x Gastly aparece o bastante pra medir', achou >= 10 && curtos >= 5,
+       achou + ' confrontos, ' + curtos + ' curtos (com a linha real do revide)');
+    ok('o revide moribundo ABRE o confronto (nos curtos)', naFrente === achou, naFrente + ' de ' + achou);
+    ok('e os golpes de quem dormiu o outro ficam COLADOS', colados === achou, colados + ' de ' + achou);
+    ok('ninguem ataca com a barra em zero', cadaver === achou, cadaver + ' de ' + achou);
+    ok('e a soma de dano continua fechando', somaOk === achou, somaOk + ' de ' + achou);
+    ok('a linha mostra o GOLPE no revide e o SONO no passo do sono', frasePronta === achou, frasePronta + ' de ' + achou);
+    ok('e o tempo de leitura acompanha a linha do sono', comPausa === achou, comPausa + ' de ' + achou);
+  }
+
   ok('as aberturas estao TODAS declaradas no passosDaAbertura',
      (function(){
        const txt = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');

@@ -262,9 +262,10 @@ de golpes.
   Pineco/Forretress). Sono são **37**, cada uma com o nome do golpe dela (`SONIFEROS` guarda o par
   espécie→golpe: Pó do Sono, Esporo, Hipnose, Canto, Beijo Adorável) — sem isso o Paras dormiria o
   adversário com "Hipnose" e quem conhece o jogo notaria na hora.
-  Metrônomo são os **4 pedidos** (Togepi, Togetic, Cleffa, Snubbull). Clefairy, Clefable e Snorlax
-  também aprendem Metrônomo por nível no original e ficaram **de fora de propósito**: são espécies
-  comuns em time de jogador e de líder, e o metrônomo é o golpe mais aleatório dos três.
+  Metrônomo são **7 desde 10/09/2026** (Snorlax, Cleffa, Clefairy, Clefable, Mew, Togepi, Togetic).
+  Eram 4 (Togepi, Togetic, Cleffa, **Snubbull**), e a decisão de deixar Clefairy/Clefable/Snorlax de
+  fora — "espécies comuns em time de jogador e de líder" — foi revertida a pedido. O Snubbull saiu.
+  Ver a seção **O METRÔNOMO SORTEIA E DEPOIS ESCOLHE**, que é onde a mecânica está descrita.
 - **O sono dá UMA TROCA livre, não mata mais** (`SONO_EM_TROCAS = 1`). O alvo apanha sem revidar e
   então acorda; a luta segue normal. Como o Disable e a Recuperação, é `continue` e não
   `return true`: o confronto acontece inteiro.
@@ -832,21 +833,18 @@ perguntou qual tirar; e o Togepi deveria aparecer o Metrônomo, porém não exib
   a tela reabria pros dois **alternadamente, 40 vezes em 40**, e a jornada parava ali sem saída.
   **Tirar um golpe agora é recusar ele** (`ataquesRecusados`) — a mesma regra do "não aprender", e
   o que o jogo original faz: golpe esquecido não volta sozinho. As mesmas 40 voltas viram 3 telas.
-- **O TOGEPI NÃO EXIBIA NADA PORQUE NÃO TEM O QUE EXIBIR — e agora exibe o que ele USA.**
-  `APRENDIZADO.togepi` é `[[38,'doubleedge']]`: um golpe de dano só, no nível 38. Mas o buraco
-  real é maior e vem de antes: **`tipoDoGolpe` — o caminho do DANO, nos dois motores — curto-circuita
-  pras 4 espécies do `METRONOMO`**, que atacam com tipo **sorteado** a cada golpe e nunca chegam no
-  `melhorAtaque`. Ou seja, o golpe escolhido delas **nunca valeu um ponto de dano**: o Snubbull via
-  a tela de escolha desde o nível 20 e exibia dois selos que o motor ignorava, e o Togepi ficava
-  mudo. A mesma fileira mentia nos dois sentidos.
-  Hoje `ataquesDisponiveis` devolve **lista vazia** pras quatro (o funil: tela, fila, `ataquesPadrao`
-  e `golpesDaEvolucao` param todos de considerá-las) e a fileira **anuncia o Metrônomo**, num selo
-  **tracejado** — os selos cheios ao lado querem dizer "escolhi estes", e o especial não é escolha.
-  **Conferido: a batalha não muda em um ponto sequer** (mesmo golpe com e sem golpe escolhido).
+- **O TOGEPI NÃO EXIBIA NADA PORQUE NÃO TINHA O QUE EXIBIR — e a fileira passou a anunciar o
+  Metrônomo.** `APRENDIZADO.togepi` é `[[21,'ancientpower'],[37,'doubleedge']]`. O buraco real era
+  maior e vinha de antes: o `tipoDoGolpe` dava curto-circuito nas espécies do `METRONOMO`, que
+  atacavam com tipo **sorteado** e nunca chegavam no `melhorAtaque` — o golpe escolhido delas nunca
+  valia um ponto de dano. Na época isso se resolveu devolvendo **lista vazia** pra elas.
+  **⚠️ ESSE DESENHO ACABOU EM 10/09/2026**: o Metrônomo passou a DISPUTAR com os golpes próprios em
+  vez de substituí-los, elas voltaram a escolher golpe como todo mundo, e a fileira mostra **os
+  dois** — os selos cheios dos escolhidos mais o tracejado do Metrônomo. Ver a seção **O METRÔNOMO
+  SORTEIA E DEPOIS ESCOLHE**. A conta das "oito que não atacam", que tinha virado 8 + 4, voltou a
+  ser **uma**: o Ditto.
   Quem não tem golpe **nem** especial (Abra, Ditto, Kakuna, save antigo, a defesa do ginásio da
   cidade — que vem de código de time) continua saindo vazio: ali não há o que dizer.
-  A conta das "oito que não atacam" virou **8 + 4**: oito sem golpe de dano nenhum, mais as quatro
-  do Metrônomo, que têm e não escolhem.
 - **Três batalhas clonavam o time com `createInstance` e JOGAVAM FORA os golpes escolhidos** — o
   mesmo defeito que o `shiny` já tinha tido nos mesmos três lugares, e o comentário dele estava
   ali do lado: a batalha por **código de treinador**, o **desafio do Mewtwo** e a tela de ordem do
@@ -926,6 +924,111 @@ no tamanho da fonte. Os blocos são `golpe-cab` (o sprite num ladrilho + a frase
   precisa saber ali é o que fazer e o que ele perde, não como o motor escolhe.
 - **Saiu o `linhaDeGolpe`**, que era o formato antigo: as três telas usam o cartão, e uma função
   de apresentação sem chamador é exatamente o tipo de coisa que fica anos no arquivo.
+
+### O METRÔNOMO SORTEIA E DEPOIS ESCOLHE (10/09/2026)
+
+Pedido assim: *"hoje a Togepi e a Cleffa só utilizam metronome, mesmo tendo outros ataques em seu
+moveset ... após o level 21 ele aprende o Poder Ancestral ... sempre vai sortear um ataque para o
+metronome, assim como é hoje, e então vai fazer o cálculo do que tira mais dano, esse poder sorteado
+pelo metronome ou o Poder Ancestral? E vai usar na batalha o que tirar mais dano"*.
+
+- **A PREMISSA ESTAVA CERTA, e o defeito era grande:** o `tipoDoGolpe` — o caminho do DANO — dava
+  curto-circuito nas espécies do Metrônomo. Elas atacavam com um **TIPO sorteado, poder implícito de
+  60**, e nunca chegavam no `melhorAtaque`. Ou seja, o Poder Ancestral do Togepi (nível 21) e a
+  Folha Mágica da Cleffa (17) **não valiam um ponto de dano em lugar nenhum**. Era tão verdade que
+  o `ataquesDisponiveis` devolvia lista VAZIA pra elas de propósito, e a ficha da Pokédex trazia um
+  aviso dizendo "na batalha ele usa o Metrônomo, não estes golpes".
+- **AGORA O SORTEIO É DE GOLPE, não de tipo**, e ele entra na MESMA disputa dos golpes escolhidos:
+  sai o que tirar mais dano contra quem está na frente. Quem ainda não tem golpe próprio (o Togepi
+  antes do 21) continua só no Metrônomo, exatamente como era.
+  **É isso que mantém a aposta de pé:** o sorteio pode entregar um Hiper Raio (150) ou uma Constrição
+  (10); o que mudou é que ele nunca fica ABAIXO do que a espécie já tem.
+- **REUSA O `melhorAtaque` em vez de repetir a conta.** É ele que sabe do STAB, do subtipo, do golpe
+  de vários tapas, da anulação e do golpe teimoso. Duas contas em paralelo divergiriam no primeiro
+  ajuste — foi o que já aconteceu entre a escolha e o dano quando o `EXPOENTE_TIPO` era um valor em
+  cada lugar. A chamada monta uma cópia rasa do atacante com `ataques = próprios + sorteado`.
+- **⚠️ O BOLO DO SORTEIO VAI ORDENADO** (`POOL_METRONOMO`), e isso não é estética: as tabelas de
+  golpes dos dois arquivos estão escritas em ordens diferentes, e sortear por índice numa lista não
+  ordenada faria o cliente e o servidor tirarem golpes DIFERENTES com a mesma semente — a mesma
+  batalha terminando diferente dos dois lados. `tools/test-especiais.js` compara o bolo e cobra 500
+  sorteios idênticos com a mesma semente.
+  São os **155 golpes de dano** da tabela. Autodestruição e Explosão não estão nela (nunca
+  estiveram) e é o certo: elas JÁ SÃO o efeito de 10% do Metrônomo, com o custo de cair junto.
+- **A LISTA MUDOU: 7 espécies** — Snorlax, Cleffa, Clefairy, Clefable, Mew, Togepi e Togetic. As três
+  primeiras aprendem Metrônomo por nível no original e tinham ficado de fora de propósito
+  ("espécies comuns em time de jogador e de líder"); essa decisão foi revertida a pedido.
+  **⚠️ O SNUBBULL SAIU**, e ele era um dos 4 originais. É consistente com o dado (ele não aprende
+  Metrônomo por nível na Gen 3 — está na tabela de divergências desta seção), mas **custa a ele**:
+  medido 1x1 contra um painel de 8, ele vai de **13,1% pra 3,3%** de vitória. Ele passou a lutar com
+  o moveset dele (Mordida, Lambida, Investida, Fúria), que é pior que um sorteio com 30% de efeito.
+  Se a intenção era MANTER o Snubbull, é uma linha no `METRONOMO` — e a régua está aqui.
+- **O MEW ENTROU, e ele é o único da lista fora do `SPECIES`.** Ele é o chefe da raide, e o
+  `bossInstance` do servidor carimba `speciesId: 'mew'` — então a entrada NÃO é letra morta: é por
+  ela que o Mew da raide sorteia o golpe.
+  **Ele continua imune ao bloco de EFEITOS** (explosão, sono, anulação): o `ehImuneAEspecial` corta
+  no `tentarGolpeEspecial`, e o golpe sorteado sai por outro caminho (o `tipoDoGolpe`, no dano). Um
+  Mew que explodisse acabaria com a raide da semana num golpe. Conferido: **0 efeitos em 2.000
+  tentativas** com o rng travado em 0,01.
+  **E A RAIDE NÃO SE MOVE, medido: 651 → 646 ataques** pra derrubar (time nível 70). O Mew perde
+  58% do dano relativo (ele troca o Psíquico com STAB por um golpe qualquer), mas isso não muda
+  nada: com o teto de dano desligado ele derruba **cada pokémon do time em UMA troca** dos dois
+  jeitos, então cada ataque continua entregando os mesmos 6 golpes.
+- **O QUE SAI NA PRÁTICA, medido num Togepi Lv.25 (Poder Ancestral, Pedra):**
+
+  | contra | Poder Ancestral sai em |
+  |---|---|
+  | Charizard (Fogo/Voador — Pedra é 4×) | **92,2%** |
+  | Geodude (Pedra/Terra — Pedra é 0,5×) | 21,9% |
+  | Machamp (Lutador — Pedra é 1×) | 17,1% |
+
+  É exatamente o que a mecânica promete: contra quem o golpe próprio arrebenta ele sai quase sempre,
+  e contra quem ele é ruim o sorteado assume.
+- **O PREÇO POR ESPÉCIE É GRANDE, e é o número que importa** (1x1 contra um painel de 8, mesmo nível):
+
+  | | antes | agora | |
+  |---|---|---|---|
+  | Clefable Lv.50 | 4,2% | **53,9%** | +49,7 |
+  | Togetic Lv.40 | 17,9% | **55,4%** | +37,5 |
+  | Clefairy Lv.40 | 1,3% | **29,2%** | +27,9 |
+  | Snorlax Lv.60 | 62,5% | 74,2% | +11,7 |
+  | Cleffa Lv.20 | 23,4% | 34,3% | +10,9 |
+  | Togepi Lv.30 | 18,4% | 20,4% | +2,0 |
+  | **Snubbull Lv.40** | 13,1% | **3,3%** | **−9,8** |
+
+  A Clefairy e a Clefable eram os casos mais absurdos: o único golpe de dano delas por nível é o
+  **Tapa Duplo, poder 15**, e elas lutavam a vida inteira com ele. O Togepi quase não se move porque
+  o Poder Ancestral (60, sem STAB) raramente ganha do sorteio.
+- **O CUSTO DE ANIMAÇÃO É PEQUENO E VAI NOS DOIS SENTIDOS.** O sorteio pode cair num golpe de vários
+  tapas, e aí o confronto ganha passos; mas ele também acaba mais rápido quando o golpe é forte.
+  Medido: Togepi **2,59 → 2,94** passos por confronto, Snorlax **2,52 → 2,33**, Clefable
+  **5,03 → 4,22** (ela era a pior de todas, presa num Tapa Duplo de 2 a 5 golpes).
+  **As LINHAS DE LOG não se movem** (2,59 → 2,57 no Togepi): o log soma os tapas numa linha só.
+- **DUAS TRAVAS CONTAVAM PASSO DE ANIMAÇÃO ONDE A REGRA FALA DE LINHA DE LOG**, e o Metrônomo tornou
+  isso visível: com 7 espécies sorteando golpe a cada ataque, um Míssil Agulha de 5 tapas passou a
+  cair em qualquer confronto. As duas passaram a contar linha (`!(g.t > 1)`), que é a MESMA regra
+  que o `TETO_GOLPES` já usa. O que a casa promete — "a luta cabe em duas ou três linhas" — continua
+  valendo e continua sendo cobrado.
+- **E TRÊS FIXTURES DE TESTE TIVERAM QUE TROCAR DE DONO**: a Clefairy era o dono declarado do Tapa
+  Duplo e a Clefable era quem media o poder cru. As duas entraram no Metrônomo, e quem sorteia golpe
+  a cada ataque nem sempre usa o que está em `ataques` — o teste passaria a medir outra coisa.
+  Viraram **Jigglypuff**, que aprende os mesmos golpes e não sorteia nada.
+- **SAIU O AVISO DA FICHA** ("na batalha ele usa o Metrônomo, não estes golpes") e **saiu a chance de
+  30% do selo do Metrônomo**, os dois a pedido. O 30% era a chance de o sorteio cair num dos três
+  efeitos; dizer só isso fazia parecer que nos outros 70% ele não acontecia. Hoje o especial pode vir
+  **sem chance declarada** (`chance: null`), e a ficha desenha só o nome — os outros continuam
+  dizendo a chance deles.
+- **A FILEIRA DO TIME MOSTRA OS DOIS**: os golpes escolhidos MAIS o selo tracejado do Metrônomo.
+  Antes ele aparecia NO LUGAR deles, porque ali eles não valiam nada.
+- **O PREÇO NA JORNADA: +1,61 ponto de conclusão** (69,71% contra 68,10%), 10 blocos de 1.500
+  jornadas de cada lado — **15.000 de cada**, 2,6σ pelo desvio ENTRE BLOCOS. Fora do ruído, e para
+  o lado fácil, que é o esperado: seis das sete espécies ficaram mais fortes e elas aparecem nos
+  dois lados da luta, mas o jogador escolhe quem leva e os líderes não.
+  Só +1,6 apesar dos +50 pontos da Clefable porque são **7 espécies em 250** — o jogador raramente
+  tem uma no time. Se incomodar, os lugares de mexer são a LISTA (tirar Snorlax, que é a mais comum
+  em time de jogador) ou fazer o sorteado disputar com um redutor.
+- **O `usaGolpesEscolhidos` MORREU.** Ele existia só pra devolver lista vazia às espécies do
+  Metrônomo; com elas escolhendo golpe como todo mundo, ele não tinha o que responder. As "doze que
+  não escolhem" voltaram a ser **uma**: o Ditto.
 
 ### A FÚRIA É UMA PASSIVA (10/09/2026)
 
@@ -1447,6 +1550,66 @@ Geodude que terminou com **14**, e a linha do Ivysaur vinha **depois** da que o 
   atacando com a barra em zero; quem termina **vivo** pode -- é o par do moribundo, os dois golpes
   são do mesmo instante. Conferido que, tirando a ressalva do `passosVisiveis`, ele acusa **194
   cadáveres em 1.277 confrontos**.
+
+### O MORIBUNDO DE QUEM DORMIU VAI PRO COMEÇO DO CONFRONTO (10/09/2026)
+
+Reportado com print: num **Psyduck × Gastly** o Gastly dormiu o Psyduck e deveria bater **duas vezes**
+seguidas — a troca livre que o sono compra mais a troca normal, que ele abre por ser mais rápido —,
+mas o log lia *"Gastly bateu / Psyduck bateu / Gastly bateu"*.
+
+- **O MOTOR ESTAVA CERTO, e dá pra provar pelo próprio print.** O golpe do Psyduck era o revide
+  **MORIBUNDO**, do mesmo instante do golpe que o matou. Duas evidências: a ordem da troca é
+  decidida por velocidade pura (Gastly **80**, Psyduck **55**), então não existe troca em que o
+  Psyduck bata primeiro contra ele; e 107 + 78 = **185**, o HP cheio do Psyduck, ou seja o −78 é o
+  golpe que o matou e o −135 que aparecia ACIMA dele veio depois.
+- **O DEFEITO ERA DA ORDENAÇÃO, e era de leitura.** A regra de sempre põe o moribundo **uma linha**
+  atrás, antes do golpe que derrubou quem o deu — o que resolve o cadáver atacando, mas aqui PARTIA
+  AO MEIO justamente a sequência de golpes que o sono compra. Ou seja, a única coisa que o sono FAZ
+  virava invisível.
+- **Hoje ele vai pro COMEÇO do confronto, antes até da linha do sono**: *"Psyduck atacou / Gastly fez
+  Psyduck dormir / Gastly atacou / Gastly atacou"*. É a mesma licença que a regra geral já usa — os
+  dois golpes são do mesmo instante e a ordem aqui é apresentação, não cronologia.
+  **SÓ VALE PRO ADORMECIDO** (o `q` do registro do sono é quem USOU o golpe, então o adormecido é o
+  outro lado) **e só se quem o matou terminar VIVO**: numa troca em que os dois caem, o revide na
+  frente deixaria o outro batendo depois de ter chegado a zero — o defeito que o reordenamento
+  existe pra evitar.
+- **São DOIS caminhos, e os dois mudaram.** O `passosVisiveis` cobre o confronto curto (o do print);
+  o `moribundoDoSono`, dentro do `sequenciaDoConfronto`, cobre o que passa do teto e cai na
+  reconstrução — lá ele já ia pra ANTES DA ÚLTIMA troca livre, o que também partia a sequência.
+  Passando do teto o revide não é linha própria (a reconstrução o absorve no golpe daquele lado), e
+  isso é o esperado: o que a trava cobra nos dois casos é que os golpes fiquem **colados**.
+- **⚠️ A LINHA DO MEIO DA BATALHA TEVE QUE MUDAR JUNTO, e é a parte que quase passou.** O
+  `passosDaAbertura` contava os passos **a partir do zero**, não de onde a abertura está. Com a
+  linha do sono deixando de ser o primeiro passo, a frase dele aparecia **enquanto o Psyduck dava o
+  revide** e sumia **justamente no passo em que ele dorme**: contava a história trocada. Hoje a
+  janela é `[i, i+n)` quando a abertura está no índice 0 — a conta de sempre, intocada — e
+  `[i+1, i+n)` quando ela vem depois, porque ali o passo anterior é um golpe de verdade, com nome
+  próprio pra mostrar.
+- **E O TEMPO DE LEITURA VAI JUNTO.** A linha do sono não move barra (dano 0), então fora do passo 0
+  ela apareceria e sumiria no mesmo quadro — o defeito que a Faixa de Foco já teve. O passo ganha a
+  marca `leitura`, que vale o mesmo segundo do `pausaDaFaixa` e força o redesenho do passo seguinte
+  (senão a frase ocuparia o lugar do "Trocando golpes..." pelo resto da luta). Em troca, o
+  `pausaDoEspecial` passou a perguntar pelo **passo 0** em vez de perguntar sem passo: sem isso ele
+  gastava um segundo parado numa tela que só dizia "Trocando golpes...".
+  A pausa de abertura **continua valendo quando outra abertura ocupa o passo 0** — um confronto com
+  anulação junto tem as duas frases, cada uma com o próprio segundo.
+- **Medido: 4,3% dos confrontos com sono** (21 em 484). É exatamente a fatia que estava quebrada
+  antes — ou seja, o conserto alcança todos os casos relatados.
+  Os confrontos com sono que **continuam** sem dois golpes colados não são defeito: em 144 de 235 o
+  dono do sono só chegou a dar UM golpe (a troca livre matou, ou ele mesmo caiu), e nos outros o
+  adormecido é o mais RÁPIDO, então ele acorda e bate primeiro.
+- `tools/test-especiais.js` tranca as sete pontas no par do print: que o revide abre o confronto
+  (nos curtos), que os golpes de quem dormiu ficam colados, que **ninguém ataca com a barra em
+  zero**, que a soma de dano continua fechando, que a linha mostra o NOME DO GOLPE no revide e a
+  frase do sono no passo do sono, e que o segundo de leitura acompanhou. A trava do PERFIL da linha
+  (`EEggg`) passou a escolher confronto **sem moribundo** de propósito: com ele o perfil é outro, e
+  legítimo.
+- **Dois flakes da FÚRIA saíram junto, e eram do teste, não do jogo.** O bloco da Faixa de Foco usa
+  um **Charizard**, que está na lista da Fúria: a soma dele não fechava por exatamente 10 (o
+  `FURIA_BONUS`) quando ela saía, e a trava do "depois dela quem ataca primeiro é o Charizard"
+  quebrava quando os dois caíam na mesma troca e a metade 2 virava uma linha só, do outro lado.
+  Conferido: **todo confronto sem fúria fecha**. Falhavam ~1 rodada em 15, que é o pior tipo de
+  teste — o que passa quase sempre.
 
 ### O DESEMPATE GANHOU LINHA: o golpe que sumia e deixava dois colados (09/09/2026)
 

@@ -439,17 +439,25 @@ function subtiposDe(p){
   if(!USE_SUBTYPES) return [];
   return SUBTYPES[p.speciesId] || [];
 }
-/* O Metrônomo não escolhe: chama um golpe qualquer. Aqui isso é o TIPO saindo no sorteio, e
-   não da conta de qual rende mais -- é o que faz dele uma aposta, e não um upgrade. Todo o resto
-   do jogo continua escolhendo o melhor golpe disponível. */
+/* O METRÔNOMO SORTEIA E DEPOIS ESCOLHE (10/09/2026, a pedido). Ele tira um golpe qualquer da
+   tabela e o joga na MESMA disputa dos golpes escolhidos do pokémon -- vence o que tira mais dano
+   contra quem está na frente. Antes o sorteio era de TIPO e ele saía sempre, o que deixava o
+   Poder Ancestral do Togepi (nível 21) sem valer um ponto de dano.
+   REUSA O `melhorAtaque` em vez de repetir a conta: é ele que sabe do STAB, do subtipo, do golpe
+   de vários tapas, da anulação e do golpe teimoso. Duas contas em paralelo divergiriam no primeiro
+   ajuste -- foi o que já aconteceu entre a escolha e o dano quando o EXPOENTE_TIPO era outro em
+   cada lugar. A cópia rasa do atacante existe só pra não escrever no `ataques` da instância. */
 function tipoDoGolpe(attacker, defender, rng){
   if(!METRONOMO.includes(attacker.speciesId)) return bestAttackType(attacker, defender);
-  const tipos = Object.keys(TYPE_CHART);
-  const t = tipos[Math.floor((rng || Math.random)() * tipos.length)];
-  let mult = 1;
-  (defender.types || []).forEach(d => { mult *= typeVsType(t, d); });
-  // imunidade continua valendo 0, com o mesmo piso de 1 de dano e a mesma marca do log
-  return { mult, type: t, stab: (attacker.types||[]).includes(t), nulo: mult === 0 };
+  const sorteado = sorteiaGolpeDoMetronomo(rng);
+  const meus = Array.isArray(attacker.ataques) ? attacker.ataques.filter(id => GOLPES[id]) : [];
+  const lista = meus.concat(GOLPES[sorteado] ? [sorteado] : []);
+  if(lista.length){
+    const best = melhorAtaque(Object.assign({}, attacker, { ataques: lista }), defender);
+    if(best) return best;
+  }
+  /* Rede: sem golpe nenhum (tabela vazia), ele cai no motor de tipo como qualquer outra espécie. */
+  return bestAttackType(attacker, defender);
 }
 /* Os tipos que o pokémon consegue usar pra atacar: os próprios (com STAB) mais o subtipo.
    Vive numa função porque o Disable precisa da MESMA lista pra saber se sobra um segundo golpe --
@@ -1096,11 +1104,13 @@ const APRENDIZADO = {
   lugia:[[22,57],[44,62],[66,133],[77,3],[88,5],[99,55]],hooh:[[22,57],[44,47],[66,133],[77,110],[88,5],[99,55]],
   celebi:[[1,24],[20,5],[30,55],[30,56]]
 };
-function usaGolpesEscolhidos(speciesId){ return !METRONOMO.includes(speciesId); }
+/* TODA ESPÉCIE ESCOLHE GOLPE. O `usaGolpesEscolhidos` existia pra devolver lista VAZIA às espécies
+   do Metrônomo -- elas nunca chegavam no melhorAtaque, então uma tela pedindo escolha teria sido
+   uma tela mentindo. Isso acabou em 10/09/2026: o Metrônomo agora DISPUTA com os golpes próprios,
+   e o Poder Ancestral do Togepi vale de verdade a partir do nível 21. */
 /* O que a espécie aprende por nível ATÉ aquele nível, do mais forte pro mais fraco. Cópia exata da
    do cliente -- as duas alimentam o equiparNpc, e divergir aqui é divergir a batalha. */
 function ataquesDisponiveis(speciesId, nivel){
-  if(!usaGolpesEscolhidos(speciesId)) return [];
   const lista = APRENDIZADO[speciesId];
   if(!lista) return [];
   const ids = [];
@@ -1382,9 +1392,34 @@ const SONIFEROS = {
   lapras:'Canto', cleffa:'Canto', igglybuff:'Canto',
   jynx:'Beijo Adorável'
 };
-/* Metrônomo: chama um golpe qualquer. Aqui isso quer dizer que o TIPO do ataque sai no sorteio
-   (ver tipoDoGolpe) e que os dois efeitos especiais podem sair também. */
-const METRONOMO = ['togepi','togetic','cleffa','snubbull'];
+/* METRÔNOMO: quem sorteia um golpe a cada ataque -- e agora ESCOLHE entre ele e os próprios.
+   COMO ERA ATÉ 10/09/2026: a espécie atacava com um TIPO sorteado, poder implícito de 60, e NUNCA
+   chegava no melhorAtaque. Ou seja, ela não tinha golpe escolhido nenhum -- o Togepi lutava de
+   Metrônomo até o fim da vida, mesmo depois de aprender Poder Ancestral no 21.
+   COMO É AGORA (a pedido): a cada golpe o Metrônomo sorteia um ATAQUE DE VERDADE da tabela -- com
+   tipo e poder próprios -- e ele entra na MESMA disputa dos golpes que o pokémon escolheu. Sai o
+   que tirar mais dano contra quem está na frente. Quem ainda não tem golpe nenhum (o Togepi antes
+   do 21) continua lutando só de Metrônomo, exatamente como antes.
+   É ISSO QUE FAZ DELE UMA APOSTA E NÃO UM UPGRADE: o sorteio pode entregar um Hiper Raio ou uma
+   Constrição de poder 10; o que muda é que agora ele nunca fica ABAIXO do que a espécie já tem.
+   A LISTA são as espécies que aprendem Metrônomo por nível no original, mais o Mew. O Snubbull SAIU
+   dela (ele não aprende Metrônomo por nível na Gen 3 -- ver a tabela de divergências do CLAUDE.md)
+   e passou a lutar com o moveset dele, que é grande: Mordida, Talho, Derrubada.
+   O MEW entra porque o Metrônomo é dele no original. Ele é o chefe da raide e continua IMUNE ao
+   bloco de efeitos (IMUNES_A_ESPECIAL corta antes do sorteio), então o que ele ganha aqui é só o
+   golpe sorteado -- nunca a explosão, que acabaria com a raide da semana num golpe. */
+const METRONOMO = ['snorlax','cleffa','clefairy','clefable','mew','togepi','togetic'];
+/* O BOLO DO SORTEIO é todo golpe de DANO da tabela. Vai ORDENADO de propósito: os dois motores têm
+   a tabela escrita em ordens diferentes, e sortear por índice numa lista não ordenada faria o
+   cliente e o servidor tirarem golpes DIFERENTES com a mesma semente -- a mesma batalha terminando
+   diferente dos dois lados, que é o defeito que este projeto mais evita.
+   Autodestruição e Explosão não estão na tabela (nunca estiveram), e é o certo: elas JÁ SÃO o
+   efeito de 10% logo abaixo, com o custo de cair junto. Como golpe comum de 200 elas seriam o
+   sorteio dos sonhos, sem preço nenhum. */
+const POOL_METRONOMO = Object.keys(GOLPES).filter(id => GOLPES[id][1] > 0).sort();
+function sorteiaGolpeDoMetronomo(rng){
+  return POOL_METRONOMO[Math.floor((rng || Math.random)() * POOL_METRONOMO.length)];
+}
 /* Aprendem Disable por nível na Gen 1/2. Vulpix, Ninetales, a linha do Nidoran, Seel, Kangaskhan,
    Horsea, Spinarak e Stantler aprendem só por REPRODUÇÃO e ficaram de fora -- a regra das listas
    deste bloco é aprendizado por nível, sempre.
@@ -3430,7 +3465,7 @@ exports._raizDaLinha = raizDaLinha;
 exports._chaveDoEquipado = chaveDoEquipado;
 exports._createInstance = createInstance;
 exports._makeSeededRng = makeSeededRng;
-exports._golpesEspeciais = { AUTODESTRUICAO, SONIFEROS, METRONOMO, CHANCE_AUTODESTRUICAO, CHANCE_SONO, SONO_EM_TROCAS, MULTI_GOLPE, ataquesDisponiveis, GOLPES_CRIT_ALTO, FURIA, CHANCE_FURIA, FURIA_BONUS };
+exports._golpesEspeciais = { AUTODESTRUICAO, SONIFEROS, METRONOMO, CHANCE_AUTODESTRUICAO, CHANCE_SONO, SONO_EM_TROCAS, MULTI_GOLPE, ataquesDisponiveis, GOLPES_CRIT_ALTO, FURIA, CHANCE_FURIA, FURIA_BONUS, sorteiaGolpeDoMetronomo, POOL_METRONOMO };
 exports._trainersLeagueSplitGroups = trainersLeagueSplitGroups;
 exports._trainersLeagueGatherEligibleCodes = trainersLeagueGatherEligibleCodesForUid;
 exports._decodeTeamCode = decodeTeamCode;   // o teste da liga confere a ORDEM da lista pela especie de cada time
