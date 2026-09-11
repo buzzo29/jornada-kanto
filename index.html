@@ -2133,8 +2133,36 @@
      separação -- é informação de outra natureza (o que ele FAZ, não o quanto ele tem). */
   .dex-especiais{ border-top:2px solid var(--box-border); margin-top:10px; padding-top:10px; }
   .dex-especiais-tit{ font-size:.55rem; font-weight:800; color:var(--muted); letter-spacing:.04em; margin-bottom:6px; }
-  .dex-especial{ display:flex; align-items:center; justify-content:center; gap:8px; margin-bottom:4px; flex-wrap:wrap; }
+  /* A LINHA DO ESPECIAL É UM BOTÃO desde 11/09/2026: tocar nela abre a caixa que explica o que
+     aquilo faz na partida. Ela NÃO usa o `.btn` da casa de propósito -- aquele é um botão de AÇÃO,
+     com moldura de 3px, e aqui a lista é de informação que por acaso se toca. É o mesmo raciocínio
+     que já tinha tirado o `.btn` dos cartões de golpe.
+     O `width:100%` existe pra o alvo do toque ser a LINHA inteira e não o texto dentro dela. */
+  .dex-especial{ display:flex; align-items:center; justify-content:center; gap:8px; margin-bottom:4px;
+    flex-wrap:wrap; width:100%; background:none; border:0; padding:3px 2px; border-radius:5px;
+    font:inherit; color:inherit; cursor:pointer; text-align:center; }
+  .dex-especial:hover{ background:rgba(0,0,0,.06); }
+  .dex-especial:active{ background:rgba(0,0,0,.12); }
   .dex-especial-chance{ font-size:.6rem; color:var(--muted); }
+  /* O ⓘ é o que diz que a linha se toca. Sem ele o selo se lê como o mesmo selo estático que o
+     jogo usa em toda tela, e ninguém descobre que há o que ler atrás. Fica no FIM e apagado: ele
+     é a affordance, não a informação. */
+  .dex-especial-info{ font-size:.7rem; color:var(--muted); opacity:.75; }
+  /* A CAIXA QUE EXPLICA O ESPECIAL. Estreita como a ficha (340px): ela é aberta de dentro dela e
+     duas larguras diferentes empilhadas se leem como duas telas, não como uma abrindo a outra. */
+  .especial-info{ max-width:340px; }
+  .especial-info-selo{ margin-bottom:6px; }
+  /* O MOMENTO é a informação que o jogador mais erra sobre este bloco -- "abre o confronto" e
+     "resolve o confronto" jogam muito diferente --, então ele vem em cima, antes do texto. */
+  .especial-info-quando{ font-size:.55rem; font-weight:800; color:var(--muted); letter-spacing:.04em;
+    text-transform:uppercase; margin-bottom:8px; }
+  .especial-info-texto{ font-size:.75rem; line-height:1.45; margin:0 0 8px; text-align:left; }
+  /* Os detalhes ficam numa lista e não no corpo do texto: são as exceções da regra (a trava dos
+     70%, o "nunca mata", a Faixa segurando a explosão), e no meio do parágrafo elas afogam a
+     frase que responde "o que isso faz?". */
+  .especial-info-lista{ font-size:.68rem; line-height:1.4; color:var(--muted); text-align:left;
+    margin:0 0 12px; padding-left:16px; }
+  .especial-info-lista li{ margin-bottom:5px; }
   /* A LISTA DE GOLPES da ficha. Ela ROLA POR DENTRO (max-height) em vez de esticar a ficha: um
      Nidoking aprende 11 golpes de dano, e sem o teto o botão Fechar ia parar fora da tela num
      celular -- o mesmo cuidado do modal de ranking da Torre.
@@ -5591,12 +5619,30 @@ function usaSketch(speciesId){ return speciesId === ESPECIE_SKETCH; }
 /* O que ele já copiou. Mora na INSTÂNCIA (e por isso vai junto no save, que serializa o time
    inteiro): dois Smeargle de saves diferentes têm repertórios diferentes, que é o ponto. */
 function sketchDe(p){ return (p && Array.isArray(p.sketch)) ? p.sketch : []; }
+/* SÓ NA JORNADA (11/09/2026, a pedido: "se usarem o Smeargle em uma liga online, no ginásio ou na
+   torre dos treinadores, ele NÃO deve aprender novas habilidades").
+   A GUARDA MORA AQUI DENTRO, e não nos chamadores, de propósito: o `registrarSketch` é a ÚNICA
+   porta por onde a lista cresce, e fechá-la por dentro é o que impede um chamador futuro de
+   reabri-la sem ninguém ver. Fechar no chamador seria confiar em três lugares em vez de um.
+   O `battleResultContext` é quem responde: ele é null na jornada e vale 'neighborhoodGym' no
+   desafio do Ginásio da Cidade -- e é ESSE o caso que vazava de verdade. Os outros modos nem
+   chegam aqui (a Torre roda na tela 'trainerBattling' com fluxo próprio, e as ligas e o online
+   resolvem tudo no servidor), mas a guarda vale pra eles também no dia em que algum deles passar
+   a reusar este caminho.
+   O VAZAMENTO ERA REAL E TINHA CAMINHO: o Ginásio da Cidade usa a MESMA tela 'battling' da
+   jornada, e o `aceitarConvite` chama `finishBattle()` quando a tela é essa -- aceitar um convite
+   online no meio da revelação de um desafio de ginásio caía aqui com os matchups DELE. Pior que
+   copiar de onde não devia: o Smeargle que ele achava era o do `game.team` (a jornada aberta),
+   que pode nem ter lutado aquela batalha -- no Ginásio da Cidade e na Torre o time é montado a
+   partir de VÁRIOS saves e não é o `game.team`. */
+function ehJornada(){ return !game.battleResultContext; }
 /* REGISTRA o que ele enfrentou. Chamado no fim da batalha, nos DOIS caminhos -- deixar num só era
    garantir que o outro ficasse sem, que é o defeito que a evolução no desmaio já teve.
    O golpe vem do `enemyMoveId` do confronto; adversário sem golpe escolhido (liga, online, save
    antigo) ataca pelo motor de tipo e não tem id -- ali não há o que copiar, e é o certo: no jogo
    original o Sketch também falha contra o que não é um golpe. */
 function registrarSketch(matchups){
+  if(!ehJornada()) return [];
   const smeargle = (game.team || []).find(p => p && usaSketch(p.speciesId));
   if(!smeargle) return [];
   const novos = [];
@@ -6406,6 +6452,36 @@ const CONFUSAO = {
   xatu:'Raio Confuso', yanma:'Supersom', zubat:'Supersom'
 };
 const CHANCE_CONFUSAO = 0.10;   // por confronto, como o Disable, o Recuperar e a drenagem
+/* FÚRIA DO DRAGÃO: 40 de HP no adversário, na abertura do confronto (11/09/2026, a pedido).
+   É o NONO golpe especial, ao lado do sono, da autodestruição, do Metrônomo, do Disable, do
+   Recuperar, da drenagem, da fúria e da confusão -- e o mais simples de todos: não sorteia dano,
+   não olha tipo, não olha atributo. São 40, sempre, como no jogo oficial.
+   É ABERTURA e NÃO resolve o confronto ('continue', como o Recuperar, a anulação, a drenagem, a
+   fúria e a confusão): o adversário começa a luta 40 de HP mais pobre e ela acontece INTEIRA
+   depois -- que é o pedido ao pé da letra ("o motor deve calcular a batalha como se fosse uma
+   nova batalha começando").
+   NÃO MATA: piso de 1 de HP, a mesma regra da drenagem e da confusão. Um efeito de abertura que
+   resolvesse o confronto sozinho seria um confronto sem um único golpe na tela.
+   O DANO É FIXO E É ISSO QUE ELE É. No motor daqui todo golpe é uma fração da vida do alvo, então
+   um número cru pesa MUITO diferente conforme o nível: 40 num Dratini Lv.22 (181 de teto) é 22%
+   da barra, e num Dragonite Lv.70 (466) é 8,6%. É o mesmo desenho do jogo original, onde a Fúria
+   do Dragão é forte cedo e vira lembrança depois -- e é por isso que ela não precisa de teto: o
+   crescimento do jogo já a aposenta sozinha.
+   A LISTA são as 7 espécies que aprendem Dragon Rage por NÍVEL na Gen 3, a mesma regra das outras
+   sete listas, e ela saiu da base (data/golpes.json) por script -- não foi escrita à mão.
+   A linha do Charmander aparece porque ela aprende MESMO (nível 43/48/54 no FireRed); a intuição
+   de que seria só a dos dragões erra.
+   ELA NÃO DISPUTA VAGA DE GOLPE, e isso é dado e não decisão: `dragonrage` tem poder VARIÁVEL, e
+   os 22 golpes de poder variável ficaram fora da tabela GOLPES quando a base da Gen 3 entrou. Ou
+   seja, ela nunca foi escolhível -- e sem esta passiva ela não existia no jogo.
+   ELA VEM POR ÚLTIMO NO SORTEIO, depois até da confusão, e é a mesma decisão de sempre:
+   acrescentar um efeito no FIM da fila não dilui nenhum dos que já estavam medidos. Quem cai na
+   chance composta é ela -- a linha do Charmander, que já tem Fúria (30%), sai em 0,7 x 10% = 7%.
+   O MEWTWO e o MEW não entram (nenhum dos dois aprende, e o tentarGolpeEspecial corta o bloco
+   inteiro quando um deles está no confronto: a entrada seria letra morta). */
+const FURIA_DRAGAO = ['charmander','charmeleon','charizard','gyarados','dratini','dragonair','dragonite'];
+const CHANCE_FURIA_DRAGAO = 0.10;   // por confronto, como o Disable, o Recuperar, a drenagem e a confusão
+const FURIA_DRAGAO_DANO = 40;       // fixo, como no jogo oficial -- não escala com nível nem com atributo
 const IMUNES_A_ESPECIAL = ['mew','mewtwo'];
 /* Aprendem Autodestruição por nível na Gen 1/2. */
 const AUTODESTRUICAO = ['geodude','graveler','golem','voltorb','electrode','koffing','weezing','pineco','forretress'];
@@ -6441,10 +6517,15 @@ const SONIFEROS = {
    A LISTA são as espécies que aprendem Metrônomo por nível no original, mais o Mew. O Snubbull SAIU
    dela (ele não aprende Metrônomo por nível na Gen 3 -- ver a tabela de divergências do CLAUDE.md)
    e passou a lutar com o moveset dele, que é grande: Mordida, Talho, Derrubada.
+   O SNORLAX SAIU EM 11/09/2026, a pedido, e ele era o lugar que este arquivo já apontava como a
+   alavanca da lista ("tirar Snorlax, que é a mais comum em time de jogador"). Ele também não
+   aprende Metrônomo por nível na Gen 3 -- estava aqui por pedido, como o Snubbull esteve --, e o
+   moveset dele é o oposto do da Clefairy: Golpe de Corpo (85), Hiper Raio (150) e Cabeçada (70).
+   Ou seja, ao contrário dela ele não dependia do sorteio pra ter o que bater.
    O MEW entra porque o Metrônomo é dele no original. Ele é o chefe da raide e continua IMUNE ao
    bloco de efeitos (IMUNES_A_ESPECIAL corta antes do sorteio), então o que ele ganha aqui é só o
    golpe sorteado -- nunca a explosão, que acabaria com a raide da semana num golpe. */
-const METRONOMO = ['snorlax','cleffa','clefairy','clefable','mew','togepi','togetic'];
+const METRONOMO = ['cleffa','clefairy','clefable','mew','togepi','togetic'];
 /* O BOLO DO SORTEIO é todo golpe de DANO da tabela. Vai ORDENADO de propósito: os dois motores têm
    a tabela escrita em ordens diferentes, e sortear por índice numa lista não ordenada faria o
    cliente e o servidor tirarem golpes DIFERENTES com a mesma semente -- a mesma batalha terminando
@@ -6518,6 +6599,13 @@ function sorteiaGolpeEspecial(p, rng){
      (Disable + Recuperar + Confusão) confunde em 0,9 × 0,9 × 10% = 8,1%. */
   if(CONFUSAO[p.speciesId] && rng() < CHANCE_CONFUSAO){
     return { efeito:'confusao', golpe: CONFUSAO[p.speciesId] };
+  }
+  /* A FÚRIA DO DRAGÃO É A ÚLTIMA DA FILA, pelo mesmo motivo que a confusão foi um dia: o efeito que
+     entra no FIM não dilui nenhum dos que já estavam medidos -- quem paga a chance composta é ele.
+     A linha do Charmander, que já tem Fúria (30%), dispara esta em 0,7 x 10% = 7%; o Gyarados e a
+     linha do Dratini, que não têm outro especial, ficam nos 10% cheios. */
+  if(FURIA_DRAGAO.includes(p.speciesId) && rng() < CHANCE_FURIA_DRAGAO){
+    return { efeito:'furiadragao', golpe:'Fúria do Dragão' };
   }
   return null;
 }
@@ -6647,6 +6735,28 @@ function tentarGolpeEspecial(active, enemy, rng, diario){
         const reg = { q: marca, d: saiu, hp: alvo.hp, c:0, m:0, z:0, x:'confusao', g: especial.golpe };
         if(espelho.lastMove) reg.am = espelho.lastMove;
         diario.push(reg);
+      }
+      continue;
+    }
+    if(especial.efeito === 'furiadragao'){
+      /* 40 DE HP NO ADVERSÁRIO, e a luta acontece INTEIRA depois -- é 'continue', não
+         'return true'. O pedido é literal: "o oponente começa a batalha perdendo 40 de hp e depois
+         disso o motor deve calcular a batalha como se fosse uma nova batalha começando".
+         NÃO MATA: piso de 1, a mesma regra da drenagem e da confusão. E quem já está em 1 não gera
+         linha nenhuma -- um passo de dano 0 é o que este log evita em toda regra.
+         O DANO GRAVADO É O EFETIVO, não os 40 crus: num alvo com 25 de HP a linha diz 24, que é o
+         que a barra vai andar. É a regra do diário desde sempre -- com o valor cru a soma das
+         linhas passava do HP que o pokémon tinha. */
+      const antes = alvo.hp;
+      alvo.hp = Math.max(1, alvo.hp - FURIA_DRAGAO_DANO);
+      const saiu = antes - alvo.hp;
+      if(saiu <= 0) continue;
+      if(diario){
+        /* `q` é quem USOU o golpe, não quem apanhou -- a convenção do diário, a mesma do sono, da
+           confusão e do dano da drenagem. É ela que faz a animação mover a barra do lado certo: o
+           passo comum inverte o `q` pra achar quem APANHA. Trocar isso não aparece como erro,
+           aparece como o pokémon errado perdendo vida. */
+        diario.push({ q: marca, d: saiu, hp: alvo.hp, c:0, m:0, z:0, x:'furiadragao', g: especial.golpe });
       }
       continue;
     }
@@ -15478,7 +15588,7 @@ function sequenciaDoConfronto(m){
   /* TODAS AS ABERTURAS: acontecem antes da luta e não são dano. A poção entrou aqui quando passou a
      funcionar como o Recuperar -- ela era um FECHAMENTO enquanto disparava na vitória do confronto. */
   const aberturas = reais.filter(g => g.x === 'recover' || g.x === 'furia' || g.x === 'confusao' || g.x === 'sono' || g.x === 'semSono' ||
-                                      g.x === 'pocao' || g.x === 'absorb' || g.x === 'absorbdano');
+                                      g.x === 'pocao' || g.x === 'absorb' || g.x === 'absorbdano' || g.x === 'furiadragao');
   const ehDano = g => !g.x || g.x === 'boom' || g.x === 'boomself';
   /* OS TAPAS SOBREVIVEM À RECONSTRUÇÃO. Ela devolve golpes inteiros (interpola o HP de entrada e o
      de saída), e um golpe de vários tapas precisa virar N passos pra a barra descer N vezes -- que
@@ -15560,7 +15670,7 @@ function sequenciaDoConfronto(m){
       /* A FURIA tambem sobe HP -- o teto cresce e a vida atual sobe junto --, entao ela desloca o
          ponto de partida como a cura. Sem isso a reconstrucao recontaria o ganho como dano. */
       base = Object.assign({}, base, g.q === 'p' ? { playerHpBefore: g.hp } : { enemyHpBefore: g.hp });
-    } else if(g.x === 'absorbdano' || g.x === 'confusao'){
+    } else if(g.x === 'absorbdano' || g.x === 'confusao' || g.x === 'furiadragao'){
       /* A CONFUSÃO desce o HP de quem NÃO usou o golpe (o `q` é de quem confundiu), então ela
          desloca o ponto de partida do lado oposto -- exatamente como o dano da drenagem. Sem isso
          a reconstrução recontaria como dano o que a abertura já mostrou. */
@@ -15697,7 +15807,7 @@ function sequenciaDoConfronto(m){
    'quem' é sempre quem USOU o golpe; 'alvo' é quem sofreu. Repare que a frase do Disable começa
    pelo ALVO ("Gengar teve seu melhor ataque anulado por Alakazam"): quem interessa ali é o
    prejudicado, e é o nome dele que o jogador procura na tela. */
-const ICONES_ESPECIAIS = { boom:'💥', sono:'😴', disable:'🚫', recover:'💚', absorb:'🌿', faixa:'🎗️', desempate:'⚖️', furia:'😤', confusao:'💫' };
+const ICONES_ESPECIAIS = { boom:'💥', sono:'😴', disable:'🚫', recover:'💚', absorb:'🌿', faixa:'🎗️', desempate:'⚖️', furia:'😤', confusao:'💫', furiadragao:'🐉' };
 /* O TIPO de cada golpe especial, pro selo colorido do log. Vive só no CLIENTE, como o
    MOVE_BY_TYPE: o motor manda o que aconteceu, o cliente escolhe a palavra e a cor -- é o que
    evita mais uma tabela duplicada pra sair de sincronia.
@@ -15708,6 +15818,12 @@ const TIPO_DO_ESPECIAL = {
   'Pó do Sono':'Grass', 'Esporo':'Grass', 'Hipnose':'Psychic',
   'Canto':'Normal', 'Beijo Adorável':'Normal',
   'Anulação':'Normal', 'Metrônomo':'Normal', 'Recuperar':'Normal', 'Fúria':'Normal',
+  /* A FÚRIA DO DRAGÃO é o único especial de tipo DRAGÃO -- o selo dela sai no roxo do Dragon, e é
+     ele que a separa de relance da Fúria comum, que é Normal e tem nome parecido. */
+  'Fúria do Dragão':'Dragon',
+  /* O Sketch é Normal na fonte. Declarado e não deixado no fallback de propósito: o fallback existe
+     pra golpe que o motor inventa, e este é um golpe de verdade, com ficha na base. */
+  'Sketch':'Normal',
   /* OS ONZE QUE CONFUNDEM, cada um com o tipo dele: o selo do Zubat sai no cinza do Normal
      (Supersom) e o do Misdreavus no roxo do Fantasma (Raio Confuso). */
   'Raio Confuso':'Ghost',
@@ -15777,7 +15893,7 @@ function seloDeGolpe(nome, tipo){
   if(!nome) return '';
   return `<span class="type-pill" style="background:${TYPE_COLORS[tipo]||'#888'}">${escapeHtmlSafe(nome)}</span>`;
 }
-function ehGolpeEspecial(g){ return g && (g.x === 'boom' || g.x === 'sono' || g.x === 'disable' || g.x === 'recover' || g.x === 'furia' || g.x === 'confusao' || g.x === 'semSono' || g.x === 'pocao' || g.x === 'absorb'); }
+function ehGolpeEspecial(g){ return g && (g.x === 'boom' || g.x === 'sono' || g.x === 'disable' || g.x === 'recover' || g.x === 'furia' || g.x === 'confusao' || g.x === 'furiadragao' || g.x === 'semSono' || g.x === 'pocao' || g.x === 'absorb'); }
 /* Os itens da mochila: o que cada um se chama na tela e quanto cura. O motor manda o id (g.g), o
    cliente escolhe a palavra -- mesmo caminho do MOVE_BY_TYPE. */
 const ITENS_DE_BATALHA = {
@@ -15817,6 +15933,18 @@ function fraseDoEspecial(g, quem, alvo, op){
     const base = quem + ' deixou ' + alvo + ' confuso' + causa + ', e ele se acertou';
     if(!(g.am && GOLPES[g.am])) return base;
     return base + ' com ' + comoGolpe(nomeDoAtaque(g.am), GOLPES[g.am][0]);
+  }
+  if(g.x === 'furiadragao'){
+    /* A FÚRIA DO DRAGÃO. Ela é a única do bloco em que o NÚMERO é a informação: são sempre 40, não
+       importa o nível nem o atributo de ninguém, e é justamente isso que surpreende quem vê um
+       Dratini Lv.22 e um Dragonite Lv.70 tirando a mesma coisa. Por isso o número entra na frase
+       DO LOG -- e o `d` é o EFETIVO, então num alvo quase caído ela diz o que a barra andou, não
+       os 40 crus.
+       No aviso do meio da batalha ela sai CURTA, como a do sono e a da confusão: ali se lê em um
+       segundo, e a barra descendo já mostra o número. */
+    const selo = comoGolpe(golpe || 'Fúria do Dragão', 'Dragon');
+    if(!op.comGolpe) return quem + ' usou ' + selo;
+    return quem + ' usou ' + selo + ' e tirou ' + (g.d || 0) + ' de HP de ' + alvo;
   }
   if(g.x === 'furia'){
     /* ENTROU EM FÚRIA. A frase diz a VEZ quando é a segunda ou mais, porque o acúmulo é o que
@@ -15924,24 +16052,225 @@ function listaEmPortugues(xs){
   if(xs.length <= 1) return xs[0] || '';
   return xs.slice(0, -1).join(', ') + ' e ' + xs[xs.length - 1];
 }
+/* OS ESPECIAIS DE UMA ESPÉCIE, pra ficha da Pokédex. É LISTA porque dá pra ter mais de um: a
+   Jigglypuff canta E anula, o Charizard tem Fúria E Fúria do Dragão.
+   CADA ENTRADA CARREGA O `efeito`, e ele NÃO é o nome: o nome é por espécie (o Zubat confunde com
+   Supersom e o Alakazam com Confusão; o Paras dorme com Esporo e a Jigglypuff com Canto) e o
+   EFEITO é a mecânica, que é uma só. É o `efeito` que a caixa de explicação lê -- sem ele, a
+   explicação teria que ser escrita 5 vezes pro sono e 11 pra confusão, e a sexta divergiria no
+   primeiro ajuste de texto. Mesma lição da `fraseDoEspecial`. */
 function especiaisDaEspecie(id){
   const out = [];
-  if(AUTODESTRUICAO.includes(id)) out.push({ nome:'auto-destruição', chance: CHANCE_AUTODESTRUICAO });
-  if(SONIFEROS[id])               out.push({ nome: SONIFEROS[id],    chance: CHANCE_SONO });
-  if(DISABLE.includes(id))        out.push({ nome:'Anulação',        chance: CHANCE_DISABLE });
+  if(AUTODESTRUICAO.includes(id)) out.push({ nome:'auto-destruição', chance: CHANCE_AUTODESTRUICAO, efeito:'explosao' });
+  if(SONIFEROS[id])               out.push({ nome: SONIFEROS[id],    chance: CHANCE_SONO, efeito:'sono' });
+  if(DISABLE.includes(id))        out.push({ nome:'Anulação',        chance: CHANCE_DISABLE, efeito:'anula' });
   // o metrônomo sai em algum efeito em 3 das 10 vezes (explosão, sono ou anulação)
   /* O METRÔNOMO NÃO TEM CHANCE ESCRITA, e isso mudou em 10/09/2026: ele sai em TODO golpe -- o que
      é sorteado é QUAL golpe, não SE ele sai. Os 30% que ficavam aqui eram a chance de o sorteio
      cair num dos três efeitos (explosão, sono, anulação), e dizer só isso fazia parecer que nos
      outros 70% ele não acontecia. */
-  if(METRONOMO.includes(id))      out.push({ nome:'Metrônomo',       chance: null });
-  if(RECUPERACAO.includes(id))    out.push({ nome:'Recuperar',       chance: CHANCE_RECUPERAR });
-  if(ABSORCAO[id])                out.push({ nome: ABSORCAO[id],    chance: CHANCE_ABSORVER });
+  if(METRONOMO.includes(id))      out.push({ nome:'Metrônomo',       chance: null, efeito:'metronomo' });
+  if(RECUPERACAO.includes(id))    out.push({ nome:'Recuperar',       chance: CHANCE_RECUPERAR, efeito:'cura' });
+  if(ABSORCAO[id])                out.push({ nome: ABSORCAO[id],    chance: CHANCE_ABSORVER, efeito:'drenar' });
   /* A FÚRIA é passiva da espécie desde 10/09/2026, e por isso mora AQUI e não no cartão do golpe:
      ela não é escolha do jogador. É a de maior chance da lista -- 30% por confronto. */
-  if(FURIA.includes(id))          out.push({ nome:'Fúria',          chance: CHANCE_FURIA });
-  if(CONFUSAO[id])                out.push({ nome: CONFUSAO[id],   chance: CHANCE_CONFUSAO });
+  if(FURIA.includes(id))          out.push({ nome:'Fúria',          chance: CHANCE_FURIA, efeito:'furia' });
+  if(CONFUSAO[id])                out.push({ nome: CONFUSAO[id],   chance: CHANCE_CONFUSAO, efeito:'confusao' });
+  /* A FÚRIA DO DRAGÃO mora AQUI e não no cartão do golpe, pelo mesmo motivo da Fúria: ela é passiva
+     da ESPÉCIE, e quem escolhe golpe não escolhe passiva. E aqui ela é a única coisa que conta ao
+     jogador que aquele bicho existe -- o `dragonrage` tem poder variável e nunca entrou na tabela
+     GOLPES, então ele não aparece em tela nenhuma além desta. */
+  if(FURIA_DRAGAO.includes(id))   out.push({ nome:'Fúria do Dragão', chance: CHANCE_FURIA_DRAGAO, efeito:'furiadragao' });
+  /* O SKETCH entrou aqui em 11/09/2026, a pedido, e só pra APARECER -- a mecânica dele não foi
+     tocada. Ele é o único desta lista que NÃO mora no tentarGolpeEspecial: não é sorteio de
+     confronto, é o que acontece DEPOIS da batalha (o registrarSketch copia o que ele enfrentou).
+     Mesmo assim o lugar dele é aqui, porque a pergunta que esta seção responde é a mesma -- 'o que
+     este bicho faz que os seis números não contam?' -- e no Smeargle a resposta é o Sketch e mais
+     nada: sem ele a ficha do único pokémon do jogo que constrói o próprio moveset saía muda.
+     SEM CHANCE DECLARADA, como o Metrônomo: ele não é sorteado, acontece sempre. Um '100% por
+     confronto' ali diria menos que nada. */
+  if(usaSketch(id))               out.push({ nome:'Sketch',          chance: null, efeito:'sketch' });
   return out.map(e => Object.assign({}, e, { tipo: TIPO_DO_ESPECIAL[e.nome] || 'Normal' }));
+}
+/* O QUE CADA ESPECIAL FAZ NA PARTIDA, em português, pra caixa que abre ao tocar nele na ficha da
+   Pokédex (11/09/2026, a pedido).
+   VIVE SÓ NO CLIENTE, como o MOVE_BY_TYPE e o TIPO_DO_ESPECIAL: o motor faz, o cliente conta. E é
+   indexada pelo EFEITO e não pelo NOME -- o sono tem 5 nomes, a confusão 11 e a drenagem 3, mas
+   cada um desses grupos é UMA mecânica. Indexar por nome seria escrever o mesmo texto 19 vezes, e
+   a vigésima divergiria no primeiro ajuste.
+   O `quando` é a coisa que o jogador mais erra sobre este bloco, e por isso é campo separado e não
+   uma frase no meio do texto: existem TRÊS momentos e eles jogam muito diferente -- o especial que
+   ABRE o confronto (a luta acontece inteira depois, com alguém já em vantagem), o que o RESOLVE
+   (não há luta depois: a autodestruição e o sono são os únicos) e o que vale A CADA GOLPE (só o
+   Metrônomo).
+   TUDO AQUI TEM QUE SER VERDADE SOBRE O MOTOR. Os números vêm das constantes de cima sempre que
+   existem (`SONO_EM_TROCAS`, `CURA_MAXIMO_DO_HP`, `FURIA_BONUS`, `FURIA_DRAGAO_DANO`, os dois
+   limites da drenagem), justamente pra a caixa não virar um texto que envelhece sozinho quando o
+   balanceamento mudar -- que é o defeito que a especialidade teve quando valia 1% e este arquivo
+   dizia "~13 pontos". */
+const EXPLICACAO_DO_ESPECIAL = {
+  explosao: {
+    quando: 'Resolve o confronto',
+    texto: 'Ele se explode e leva o adversário junto: os dois caem no mesmo golpe, e não há luta ' +
+           'depois disso. É o único especial que decide um confronto sozinho.',
+    detalhes: [
+      'Só sai contra adversário com MAIS da metade da vida — explodir em quem já está machucado ' +
+      'seria trocar o seu pokémon inteiro por um abate que a troca de golpes ia entregar de graça.',
+      'A Faixa de Foco segura a explosão: o alvo fica com 1 de HP, e aí quem explodiu cai sozinho.'
+    ]
+  },
+  sono: {
+    /* ABRE o confronto, não o resolve -- e o teste PEGOU isto escrito errado na primeira versão
+       desta caixa. O sono matava o pokémon até 02/09/2026 e comprava DUAS trocas livres até 09/09;
+       hoje é UMA e a luta acontece inteira depois, como o Recuperar e a anulação. Quem manda aqui
+       é o `continue` do motor, e é o motor que o teste lê. */
+    quando: 'Abre o confronto',
+    texto: 'Faz o adversário dormir. Ele apanha sem revidar e acorda logo em seguida — a luta ' +
+           'segue inteira a partir daí, normal.',
+    detalhes: [
+      'É UMA troca livre, não uma vitória: o adormecido volta pra luta e pode ganhar o confronto.',
+      'O Despertar equipado anula isso uma vez. A tentativa aparece no log mesmo quando falha.'
+    ]
+  },
+  anula: {
+    quando: 'Abre o confronto',
+    texto: 'Tira de cena o melhor golpe do adversário — o que tiraria mais dano contra você. Ele ' +
+           'luta o confronto INTEIRO com o segundo melhor.',
+    detalhes: [
+      'Só vale contra quem TEM um segundo golpe: pokémon de um tipo só e sem alternativa não tem ' +
+      'o que perder, e o sorteio simplesmente não pega nele.',
+      'A anulação vale só contra QUEM anulou. No confronto seguinte o golpe volta.'
+    ]
+  },
+  metronomo: {
+    quando: 'A cada golpe',
+    texto: 'A cada ataque ele sorteia um golpe qualquer do jogo e usa o que tirar mais dano: o ' +
+           'sorteado ou um dos que ele já carrega. Nunca fica abaixo do que ele tem.',
+    detalhes: [
+      'É uma aposta, não um upgrade: o sorteio tanto pode entregar um Hiper Raio quanto uma ' +
+      'Constrição de poder 10.',
+      'Em 3 de cada 10 vezes o que sai não é golpe, e sim um efeito: explosão, sono ou anulação.'
+    ]
+  },
+  cura: {
+    quando: 'Abre o confronto',
+    texto: 'Se ele entrar no confronto machucado, se cura por COMPLETO antes de o novo adversário ' +
+           'atacar — e só então a luta começa.',
+    detalhes: [
+      'Só dispara abaixo de {CURA}% da vida: quase cheio não há o que recuperar.',
+      'É o prêmio de quem sobreviveu ao confronto anterior — no primeiro de cada batalha o time ' +
+      'já entra cheio, então ela não tem o que fazer.'
+    ]
+  },
+  drenar: {
+    quando: 'Abre o confronto',
+    texto: 'Se ele entrar no confronto machucado, tira uma fatia da vida do adversário e põe em ' +
+           'si — e só então a luta começa, inteira.',
+    detalhes: [
+      'Entre {DRENO_MIN}% e {DRENO_MAX}%, sorteado a cada uso. É a mesma PORCENTAGEM dos dois ' +
+      'lados, mas cada um do próprio total de vida.',
+      'Só dispara abaixo de {CURA}% da vida, e NUNCA mata: o adversário fica com pelo menos 1 de HP.'
+    ]
+  },
+  furia: {
+    quando: 'Abre o confronto',
+    texto: 'Ele entra em fúria e CRESCE: +{FURIA} em todos os seis atributos, e a vida máxima sobe ' +
+           'junto (a barra cresce na tela). A luta acontece inteira, com ele maior.',
+    detalhes: [
+      'ACUMULA: entrar em fúria em confrontos seguidos vale +{FURIA2}, +{FURIA3}, e assim por diante.',
+      'O acúmulo é por BATALHA — ele zera quando a próxima começa.'
+    ]
+  },
+  confusao: {
+    quando: 'Abre o confronto',
+    texto: 'Deixa o adversário confuso, e ele se acerta: leva um golpe DELE MESMO, como se um ' +
+           'espelho o atacasse. Depois disso a luta acontece inteira, do zero.',
+    detalhes: [
+      'O golpe do espelho não tem tipo nem crítico — o que conta são o nível, os atributos e o ' +
+      'poder do golpe dele.',
+      'Quem é frágil e forte se arrebenta; quem é duro mal se arranha. E nunca mata: sobra ao ' +
+      'menos 1 de HP.'
+    ]
+  },
+  sketch: {
+    /* O QUARTO MOMENTO desta tabela, e o único fora de um confronto: os outros oito abrem ou
+       resolvem uma luta, o Metrônomo vale a cada golpe, e este acontece DEPOIS que a batalha
+       acabou (o `registrarSketch` roda nos dois fins de batalha). Dizer "abre o confronto" aqui
+       seria a mesma classe de erro que o sono teve. */
+    quando: 'Depois da batalha',
+    texto: 'Ele COPIA o golpe de todo adversário que enfrenta, pra sempre. O golpe copiado entra ' +
+           'na lista dele, e é dessa lista — não do que a espécie aprende — que saem os até ' +
+           '{GOLPES} golpes que ele leva pra batalha.',
+    detalhes: [
+      'De QUALQUER adversário que ele enfrentar, não só de quem ele derrota. Vale nos dois fins ' +
+      'de batalha, a Elite 4 inclusive.',
+      'A cópia fica no pokémon e vai junto no save: dois Smeargle de treinadores diferentes têm ' +
+      'repertórios diferentes. É o único do jogo que constrói o próprio moveset lutando.',
+      'Adversário que luta sem golpe escolhido (liga, batalha online, save antigo) não deixa nada ' +
+      'pra copiar — no jogo original o Sketch também falha contra o que não é um golpe.',
+      'Ele não fica mais FORTE, fica melhor SERVIDO: o corpo continua sendo o mais fraco do jogo.'
+    ]
+  },
+  furiadragao: {
+    quando: 'Abre o confronto',
+    texto: 'Tira {DRAGAO} de HP do adversário antes do primeiro golpe. Depois disso a luta ' +
+           'acontece inteira, normal — como se ela estivesse começando ali.',
+    detalhes: [
+      'São sempre {DRAGAO}, não importa o nível nem o atributo de ninguém. Por isso ela pesa muito ' +
+      'no começo do jogo e vira lembrança no fim.',
+      'Nunca mata: o adversário fica com pelo menos 1 de HP.'
+    ]
+  }
+};
+/* Os números saem das CONSTANTES do motor, não escritos à mão no texto: é o que impede a caixa de
+   mentir no dia em que o balanceamento mudar. */
+function textoDoEspecial(s){
+  return String(s)
+    .replace(/\{CURA\}/g,      Math.round(CURA_MAXIMO_DO_HP * 100))
+    .replace(/\{DRENO_MIN\}/g, Math.round(ABSORVER_MIN * 100))
+    .replace(/\{DRENO_MAX\}/g, Math.round(ABSORVER_MAX * 100))
+    .replace(/\{FURIA2\}/g,    FURIA_BONUS * 2)
+    .replace(/\{FURIA3\}/g,    FURIA_BONUS * 3)
+    .replace(/\{FURIA\}/g,     FURIA_BONUS)
+    .replace(/\{DRAGAO\}/g,    FURIA_DRAGAO_DANO)
+    /* O teto de golpes já foi 2 e virou 3 a pedido; escrito à mão no texto do Sketch ele
+       envelheceria na próxima mudança, que é o que esta função existe pra impedir. */
+    .replace(/\{GOLPES\}/g,    MAX_GOLPES);
+}
+/* A CAIXA QUE EXPLICA O ESPECIAL. Ela é aberta de DENTRO da ficha da Pokédex, então é anexada
+   DEPOIS dela no render -- os modais empilham na ordem em que entram, e vindo antes ela abriria
+   atrás da ficha (a mesma armadilha que a ficha já teve em relação ao modal da Pokédex).
+   Guarda o NOME junto do efeito porque o título mostra o nome DAQUELA espécie: quem abriu num
+   Zubat tem que ler "Supersom", não "Confusão". */
+function abrirEspecialInfo(efeito, nome, tipo, chance){
+  if(!EXPLICACAO_DO_ESPECIAL[efeito]) return;
+  game.especialInfo = { efeito, nome, tipo, chance: (chance === '' || chance == null) ? null : Number(chance) };
+  render();
+}
+function fecharEspecialInfo(){
+  game.especialInfo = null;
+  render();
+}
+function renderEspecialInfoModal(){
+  const e = game.especialInfo;
+  const x = EXPLICACAO_DO_ESPECIAL[e.efeito];
+  if(!x) return '';
+  return `
+  <div class="modal-overlay" onclick="fecharEspecialInfo()">
+    <div class="modal-box especial-info" onclick="event.stopPropagation();">
+      <div class="especial-info-selo">${seloDeGolpe(e.nome, e.tipo)}</div>
+      <div class="especial-info-quando">${escapeHtmlSafe(x.quando)}${
+        /* A CHANCE NO TÍTULO, e ela é por CONFRONTO -- não por golpe. É o número que o jogador mais
+           erra sobre este bloco, e sem ele a caixa faria parecer que o efeito sai sempre.
+           O Metrônomo não tem chance (ele sai em TODO golpe, o que é sorteado é QUAL), e aí a
+           linha sai só com o momento. */
+        e.chance == null ? '' : ` · ${Math.round(e.chance * 100)}% por confronto`}</div>
+      <p class="especial-info-texto">${escapeHtmlSafe(textoDoEspecial(x.texto))}</p>
+      <ul class="especial-info-lista">${
+        (x.detalhes || []).map(d => `<li>${escapeHtmlSafe(textoDoEspecial(d))}</li>`).join('')}</ul>
+      <button class="btn secondary" onclick="fecharEspecialInfo()">Fechar</button>
+    </div>
+  </div>`;
 }
 /* O aviso que aparece NO MEIO DA BATALHA, na mesma linha onde se lê "Trocando golpes...".
    Devolve '' quando o confronto não teve nada especial -- é isso que as telas usam pra decidir
@@ -16002,7 +16331,7 @@ function avisoDoConfronto(m, passo){
      sem ninguém ter batido nele, e com 1 ela sumiria justamente no passo em que a barra desce.
      É o mesmo 2 da drenagem e da fúria, pelo mesmo motivo: a frase tem que sobreviver ao
      movimento que ela anuncia. */
-  const passosDaAbertura = { recover:1, pocao:1, absorb:2, disable:1, semSono:1, sono:2, furia:2, confusao:2 };
+  const passosDaAbertura = { recover:1, pocao:1, absorb:2, disable:1, semSono:1, sono:2, furia:2, confusao:2, furiadragao:2 };
   /* OS PASSOS SÃO CONTADOS A PARTIR DE ONDE A ABERTURA ESTÁ, não do começo do confronto -- e isso
      passou a importar em 10/09/2026, quando o moribundo de quem dormiu foi pra frente da linha do
      sono. Com a contagem absoluta a frase do sono aparecia enquanto o adormecido dava o revide e
@@ -16168,7 +16497,7 @@ function passosHtml(m){
     const doJogador = g.q === 'p';
     if(g.x === 'boomself') return '';   // a linha da explosão (acima) já contou os dois lados
     if(g.x === 'absorbdano') return '';  // idem: a linha da drenagem conta a vida que saiu e a que entrou
-    if(g.x === 'boom' || g.x === 'sono' || g.x === 'recover' || g.x === 'furia' || g.x === 'confusao' || g.x === 'semSono' ||
+    if(g.x === 'boom' || g.x === 'sono' || g.x === 'recover' || g.x === 'furia' || g.x === 'confusao' || g.x === 'furiadragao' || g.x === 'semSono' ||
        g.x === 'pocao' || g.x === 'absorb' || g.x === 'faixa' || g.x === 'desempate') return linhaEspecial(g);
     return `<div class="mlog-passo ${doJogador?'p':'e'}">
       ${ladoHtml(doJogador)} atacou ${ladoHtml(!doJogador)}${seloDe(doJogador)?` com ${seloDe(doJogador, g.tn > 1 ? g.tn : 0)}`:''} e tirou <span class="mlog-tira">−${g.d}</span> de HP.${g.c?' <span class="mlog-crit">CRÍTICO</span>':''}
@@ -21776,12 +22105,22 @@ function renderPokedexFicha(){
            deixaria o jogador achar que sai todo golpe. */
         const esp = especiaisDaEspecie(id);
         if(!esp.length) return '';
+        /* A LINHA INTEIRA É O BOTÃO, não só o selo (11/09/2026, a pedido: "quando o usuário clicar
+           em cima dessa habilidade passiva, abre um modal explicando o que ocorre"). É a mesma
+           regra da lista de notificações: mirar num selo de 60px num celular é pedir erro, e a
+           linha já é o alvo natural do dedo.
+           ELE É IRMÃO DE NADA E FILHO DE NADA -- a ficha é um `modal-box`, não um botão. `<button>`
+           dentro de `<button>` é HTML inválido e o clique de dentro se perde, que é a armadilha da
+           lupa do encontro selvagem; aqui ela não existe, e este comentário é pra continuar não
+           existindo se algum dia a ficha virar clicável.
+           O `ⓘ` fica no FIM da linha, e ele é o que diz que há o que ler: sem ele o selo parece o
+           mesmo selo estático que o jogo usa em toda tela, e ninguém descobre que dá pra tocar. */
         return `<div class="dex-especiais">
           <div class="dex-especiais-tit">${esp.length>1?'Golpes especiais':'Golpe especial'}</div>
-          ${esp.map(e=>`<div class="dex-especial">${seloDeGolpe(e.nome, e.tipo)}${
+          ${esp.map(e=>`<button type="button" class="dex-especial" onclick="abrirEspecialInfo('${escJs(e.efeito)}','${escJs(e.nome)}','${escJs(e.tipo)}','${e.chance == null ? '' : e.chance}')">${seloDeGolpe(e.nome, e.tipo)}${
             /* Sem chance declarada o especial sai SÓ com o nome: é o caso do Metrônomo, que
                acontece em todo golpe. Um "100% por confronto" ali diria menos que nada. */
-            e.chance == null ? '' : `<span class="dex-especial-chance">${Math.round(e.chance*100)}% por confronto</span>`}</div>`).join('')}
+            e.chance == null ? '' : `<span class="dex-especial-chance">${Math.round(e.chance*100)}% por confronto</span>`}<span class="dex-especial-info">ⓘ</span></button>`).join('')}
         </div>`;
       })()}
       ${(() => {
@@ -22237,6 +22576,10 @@ function render(){
   // ficha é aberta a partir de dentro dele -- se viesse antes, abriria atrás
   if(game.timeModal){ html += renderTimeModal(); }
   if(game.pokedexFicha){ html += renderPokedexFicha(); }
+  /* DEPOIS da ficha de propósito: a caixa de explicação é aberta de DENTRO dela, e os modais
+     empilham na ordem em que são anexados -- vindo antes, ela abriria atrás. É a mesma nota que a
+     própria ficha carrega em relação ao modal da Pokédex. */
+  if(game.especialInfo){ html += renderEspecialInfoModal(); }
   if(game.onlinePendente){ html += renderConviteModal(); }   // aparece por cima de qualquer tela
   if(game.desafioAviso){ html += renderAvisoDesafioModal(); }   // desafio de amigo, idem
   html += renderAvisoDeSaveHtml();   // "não estou conseguindo salvar" -- por cima de tudo

@@ -114,7 +114,11 @@ console.log('\n=== CRUZAMENTO COM AS LISTAS QUE O JOGO JÁ TINHA ===');
     confere('recuperar', S.RECUPERACAO, ['recover']),
     confere('disable', S.DISABLE, ['disable']),
     confere('drenagem', Object.keys(S.ABSORCAO), ['absorb', 'megadrain', 'leechlife', 'gigadrain']),
-    confere('metrônomo', S.METRONOMO, ['metronome'])
+    confere('metrônomo', S.METRONOMO, ['metronome']),
+    /* A FÚRIA DO DRAGÃO entrou aqui em 11/09/2026, no dia em que nasceu: a lista dela saiu da base
+       por script, e é este cruzamento que garante que ela CONTINUE saindo de lá. Sem ele, a
+       próxima mão que mexer nas 7 espécies não teria nada cobrando o dado. */
+    confere('furia do dragao', S.FURIA_DRAGAO, ['dragonrage'])
   ];
   r.forEach(x => {
     if(!x.faltam.length) ok('a lista de ' + x.nome + ' bate 100%', true, x.total + '/' + x.total);
@@ -138,11 +142,19 @@ console.log('\n=== CRUZAMENTO COM AS LISTAS QUE O JOGO JÁ TINHA ===');
          Grama/Psíquico e não tinha golpe de dano de Grama; a regra de cobertura de tipo lhe deu
          Giga Dreno no 30, que por acaso é um golpe de drenagem. O Exeggcute continua divergindo,
          porque ele é Grama/Psíquico também mas já tinha Grama coberto. */
+  /* AS DO METRÔNOMO MUDARAM EM 10/09/2026, quando a lista foi reescrita a pedido: entraram
+     Snorlax, Clefairy, Clefable e o Mew, e o SNUBBULL saiu. Clefairy e Clefable aprendem Metrônomo
+     por nível e por isso somem daqui; Snorlax e Mew não aprendem (o Mew nem está no SPECIES -- ele
+     é o chefe da raide) e entram. O 'metronomo:snubbull' saiu junto: ele não está mais na lista.
+     E o 'metronomo:snorlax' saiu em 11/09/2026, pelo mesmo caminho: o Snorlax foi TIRADO da lista
+     a pedido, então ele deixou de ser uma espécie do metrônomo que a base não confirma.
+     Este bloco ficou VERMELHO por um commit inteiro exatamente por isso -- a lista do jogo mudou e
+     a das divergências não. É o que ele existe pra denunciar, e denunciou. */
   const divergencias = [
     'disable:igglybuff',        // o Jigglypuff aprende Disable no 14; o bebê não aprende nenhum
     'drenagem:exeggcute',       // o que ele tem é Leech Seed -- a mesma razão que já tirou o Bulbasaur
-    'metronomo:cleffa',         // os 4 do metrônomo foram PEDIDOS, não tirados do aprendizado
-    'metronomo:snubbull',
+    'metronomo:cleffa',         // as espécies do metrônomo foram PEDIDAS, não tiradas do aprendizado
+    'metronomo:mew',            // o chefe da raide: o Metrônomo é dele no original, mas não por nível aqui
     'sono:misdreavus',
     'sono:vileplume',           // herdam o Pó do Sono do Gloom; como Vileplume não aprendem nada
     'sono:bellossom'

@@ -687,7 +687,7 @@ console.log('\n=== O METRONOMO SORTEIA E DEPOIS ESCOLHE ===');
      COMO E AGORA, a pedido: a cada golpe o Metronomo sorteia um ATAQUE DE VERDADE da tabela (com
      tipo e poder proprios) e ele entra na MESMA disputa dos golpes escolhidos. Sai o que tira mais
      dano. Quem ainda nao tem golpe proprio (Togepi antes do nivel 21) continua so no Metronomo. */
-  ok('a lista e a pedida', S.METRONOMO.join(',') === 'snorlax,cleffa,clefairy,clefable,mew,togepi,togetic',
+  ok('a lista e a pedida', S.METRONOMO.join(',') === 'cleffa,clefairy,clefable,mew,togepi,togetic',
      S.METRONOMO.join(','));
 
   /* AGORA ELAS ESCOLHEM GOLPE COMO TODO MUNDO. */
@@ -899,6 +899,55 @@ console.log('\n=== O SKETCH DO SMEARGLE ===');
     const novos = S.registrarSketch([{ playerSpecies:'smeargle', enemyMoveId:null },
                                      { playerSpecies:'smeargle', enemyMoveId:'naoexiste' }]);
     ok('adversario sem golpe nao vira sketch', novos.length === 0 && !(sm2.sketch && sm2.sketch.length));
+  }
+
+  /* ⚠️ SO NA JORNADA (11/09/2026, a pedido). O VAZAMENTO ERA REAL E TINHA CAMINHO: o Ginasio da
+     Cidade usa a MESMA tela 'battling' da jornada, e o `aceitarConvite` chama `finishBattle()`
+     quando a tela e essa -- aceitar um convite online no meio da revelacao de um desafio de
+     ginasio caia no registrarSketch com os matchups DELE. E o Smeargle que ele achava era o do
+     `game.team` (a jornada aberta), que pode nem ter lutado aquela batalha: no Ginasio da Cidade e
+     na Torre o time e montado a partir de VARIOS saves e nao e o `game.team`.
+     Conferido antes da guarda: com o contexto 'neighborhoodGym' ele copiava 'earthquake'. */
+  {
+    const m = [{ playerSpecies:'smeargle', enemySpecies:'machamp', enemyMoveId:'earthquake' }];
+    const limpo = () => { const p = inst('smeargle', 30); p.ataques = ['doubleslap']; p.sketch = []; g.team = [p]; return p; };
+    g.battleResultContext = null;
+    const naJornada = limpo();
+    ok('na JORNADA ele copia', S.registrarSketch(m).length === 1 && naJornada.sketch.length === 1,
+       JSON.stringify(naJornada.sketch));
+    g.battleResultContext = 'neighborhoodGym';
+    const noGinasio = limpo();
+    ok('no GINASIO DA CIDADE ele NAO copia',
+       S.registrarSketch(m).length === 0 && noGinasio.sketch.length === 0, JSON.stringify(noGinasio.sketch));
+    ok('e o ehJornada responde pelos dois', S.ehJornada() === false, String(S.ehJornada()));
+    g.battleResultContext = null;
+    ok('e volta a valer quando a jornada volta', S.ehJornada() === true);
+  }
+
+  /* A GUARDA MORA DENTRO DO registrarSketch, nao nos chamadores -- e e isso que este teste LE DO
+     CODIGO. Ele existe porque os casos acima chamam a funcao direto: uma guarda movida pro
+     chamador passaria por eles e deixaria a proxima porta aberta.
+     E cobra tambem QUEM chama: hoje sao dois (finishBattle e finishSpecialBattle, os dois da
+     jornada). Um terceiro chamador e barulhento aqui em vez de virar relato. */
+  {
+    const txt = require('fs').readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+    const corpo = txt.slice(txt.indexOf('function registrarSketch'),
+                            txt.indexOf('function ataquesDisponiveis'));
+    ok('achei o corpo do registrarSketch pra ler', corpo.length > 200, corpo.length + ' chars');
+    ok('a guarda da jornada esta DENTRO do registrarSketch', /if\(!ehJornada\(\)\)\s*return \[\];/.test(corpo));
+    /* As CHAMADAS: so as duas da jornada. O `function registrarSketch` e a definicao e nao conta. */
+    const chamadas = (txt.match(/(?<!function )registrarSketch\(/g) || []).length;
+    ok('e so DOIS lugares chamam o registrarSketch', chamadas === 2, chamadas + ' chamadas');
+    /* E os dois sao os fins de batalha da JORNADA -- nem a Torre nem o Ginasio da Cidade. */
+    for(const fn of ['finishBattle', 'finishSpecialBattle']){
+      const i = txt.indexOf('function ' + fn + '(');
+      const fim = txt.indexOf('\nfunction ', i + 1);
+      ok('o ' + fn + ' chama o registrarSketch', txt.slice(i, fim).indexOf('registrarSketch(') > 0);
+    }
+    ok('e o fim do Ginasio da Cidade NAO chama', (function(){
+      const i = txt.indexOf('function finishNeighborhoodGymBattle(');
+      return txt.slice(i, txt.indexOf('\nfunction ', i + 1)).indexOf('registrarSketch') < 0;
+    })());
   }
 }
 

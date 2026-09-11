@@ -262,9 +262,11 @@ de golpes.
   Pineco/Forretress). Sono são **37**, cada uma com o nome do golpe dela (`SONIFEROS` guarda o par
   espécie→golpe: Pó do Sono, Esporo, Hipnose, Canto, Beijo Adorável) — sem isso o Paras dormiria o
   adversário com "Hipnose" e quem conhece o jogo notaria na hora.
-  Metrônomo são **7 desde 10/09/2026** (Snorlax, Cleffa, Clefairy, Clefable, Mew, Togepi, Togetic).
-  Eram 4 (Togepi, Togetic, Cleffa, **Snubbull**), e a decisão de deixar Clefairy/Clefable/Snorlax de
-  fora — "espécies comuns em time de jogador e de líder" — foi revertida a pedido. O Snubbull saiu.
+  Metrônomo são **6 desde 11/09/2026** (Cleffa, Clefairy, Clefable, Mew, Togepi, Togetic).
+  Eram 4 (Togepi, Togetic, Cleffa, **Snubbull**), viraram 7 em 10/09 quando a decisão de deixar
+  Clefairy/Clefable/Snorlax de fora — "espécies comuns em time de jogador e de líder" — foi
+  revertida a pedido, e o Snubbull saiu. **O SNORLAX SAIU EM 11/09**, também a pedido: a lista era
+  a alavanca que esta seção já apontava, e ela foi usada.
   Ver a seção **O METRÔNOMO SORTEIA E DEPOIS ESCOLHE**, que é onde a mecânica está descrita.
 - **O sono dá UMA TROCA livre, não mata mais** (`SONO_EM_TROCAS = 1`). O alvo apanha sem revidar e
   então acorda; a luta segue normal. Como o Disable e a Recuperação, é `continue` e não
@@ -490,9 +492,16 @@ de golpes.
   Geodude e um Graveler de atributo parecido jogam diferente porque um deles explode, e sem isso o
   jogador só descobre perdendo. A chance vai junto porque é **por confronto**: só o nome deixaria
   ele achar que sai todo golpe. É lista porque dá pra ter dois (a Jigglypuff canta E anula).
-  `tools/test-especiais.js` confere que **as 59 espécies das quatro listas** aparecem e que todo
-  golpe que o motor sabe gerar tem tipo declarado — sem isso o selo sairia num cinza genérico, e só
-  no confronto que teve aquele golpe.
+  **E DESDE 11/09/2026 CADA LINHA SE TOCA e abre uma caixa explicando o que aquilo faz na partida**
+  — ver a seção **A CAIXA QUE EXPLICA O ESPECIAL**, mais abaixo. É lá que mora a decisão de a
+  explicação ser por EFEITO e não por nome.
+  `tools/test-especiais.js` confere que todo golpe que o motor sabe gerar tem tipo declarado — sem
+  isso o selo sairia num cinza genérico, e só no confronto que teve aquele golpe.
+  (**O número "59 espécies das quatro listas" que estava aqui era de outra época** e envelheceu
+  calado: são DEZ listas hoje, e **149 das 250** espécies têm pelo menos um especial — 9
+  autodestruição, 43 sono, 17 anulação, 6 Metrônomo, 10 Recuperar, 23 drenagem, 19 Fúria, 82
+  confusão, 7 Fúria do Dragão e 1 Sketch, com sobreposição. O teste varre as listas em vez de
+  contar, que é o que impede o próximo número de envelhecer do mesmo jeito.)
 - **A linha do log tem forma própria aqui.** A regra do log é "uma forma só" (ver a seção acima), e
   estes três são as **exceções**: não são dano, são o confronto inteiro decidido de uma vez, e o
   jogador precisa ler por quê. Um `−0` solto faria procurar bug onde é regra — o mesmo motivo do
@@ -1099,14 +1108,57 @@ pelo metronome ou o Poder Ancestral? E vai usar na batalha o que tirar mais dano
   sorteios idênticos com a mesma semente.
   São os **155 golpes de dano** da tabela. Autodestruição e Explosão não estão nela (nunca
   estiveram) e é o certo: elas JÁ SÃO o efeito de 10% do Metrônomo, com o custo de cair junto.
-- **A LISTA MUDOU: 7 espécies** — Snorlax, Cleffa, Clefairy, Clefable, Mew, Togepi e Togetic. As três
-  primeiras aprendem Metrônomo por nível no original e tinham ficado de fora de propósito
-  ("espécies comuns em time de jogador e de líder"); essa decisão foi revertida a pedido.
+- **A LISTA HOJE SÃO 6** — Cleffa, Clefairy, Clefable, Mew, Togepi e Togetic. Ela foi a 7 em
+  10/09/2026 (entraram Snorlax, Clefairy e Clefable, que aprendem Metrônomo por nível no original e
+  tinham ficado de fora por serem "espécies comuns em time de jogador e de líder") e voltou a 6 em
+  **11/09/2026, quando o SNORLAX saiu a pedido** — ver o item próprio dele, mais abaixo.
   **⚠️ O SNUBBULL SAIU**, e ele era um dos 4 originais. É consistente com o dado (ele não aprende
   Metrônomo por nível na Gen 3 — está na tabela de divergências desta seção), mas **custa a ele**:
   medido 1x1 contra um painel de 8, ele vai de **13,1% pra 3,3%** de vitória. Ele passou a lutar com
   o moveset dele (Mordida, Lambida, Investida, Fúria), que é pior que um sorteio com 30% de efeito.
   Se a intenção era MANTER o Snubbull, é uma linha no `METRONOMO` — e a régua está aqui.
+- **⚠️ O SNORLAX SAIU DA LISTA EM 11/09/2026, a pedido — e esta seção já apontava esse lugar como a
+  alavanca** ("se incomodar, os lugares de mexer são a LISTA (tirar Snorlax, que é a mais comum em
+  time de jogador)"). Ele também **não aprende Metrônomo por nível na Gen 3** — estava aqui por
+  pedido, exatamente como o Snubbull esteve —, então sair é o que o dado diz.
+  **ELE É O CASO OPOSTO AO DA CLEFABLE, e é isso que faz a remoção ser barata:** o único golpe de
+  dano por nível da Clefable é o Tapa Duplo (poder 15), e sem o sorteio ela luta a vida inteira com
+  ele; o Snorlax leva **Hiper Raio (150), Golpe de Corpo (85) e Cabeçada (70)**. Ele nunca dependeu
+  do Metrônomo pra ter o que bater — o que ele perde é o **efeito**, não o dano.
+  **CUSTA A ELE, e o número é por nível** (1x1 contra um painel de 8, mesmo nível dos dois lados,
+  4.800 batalhas em cada célula):
+
+  | | com Metrônomo | sem | |
+  |---|---|---|---|
+  | Snorlax Lv.30 | 82,2% | 75,3% | **−6,9** (9,6σ) |
+  | Snorlax Lv.45 | 74,6% | 62,6% | **−12,1** (16,7σ) |
+  | Snorlax Lv.60 | 75,0% | 72,0% | −3,0 (4,2σ) |
+  | Snorlax Lv.80 | 75,9% | 72,9% | −3,1 (4,2σ) |
+
+  **O buraco é no Lv.45, e ele tem causa:** ali o Snorlax já tem o Golpe de Corpo (33) mas ainda
+  **não tem o Hiper Raio (51)** — é a janela em que o próprio arsenal dele é mais fraco, e é
+  justamente onde o sorteio mais valia. Depois do 51 ele tem o golpe mais forte da tabela e o
+  Metrônomo raramente ganha dele, que é por que o custo cai pela metade no Lv.60.
+  **E O QUE ELE PERDE MESMO É O EFEITO**: medido em 2.000 confrontos de um Snorlax Lv.60, ele saía
+  com **231 explosões, 193 sonos e 142 anulações** (28% dos confrontos com algum efeito) e agora sai
+  com **zero**. Ele deixou de ter especial nenhum — a ficha da Pokédex dele fica sem a seção.
+- **O CUSTO NA JORNADA: nada. 69,38% contra 69,70%**, **−0,32 ponto, 0,5σ** (10 blocos de 1.500
+  jornadas de cada lado, **15.000 de cada**, desvio tirado de ENTRE os blocos). Não dá pra
+  distinguir de zero.
+  **E A FORMA TAMBÉM NÃO SE MOVE** — 2 blocos de 2.000 de cada lado: 1º ginásio 347→322, 5º 200→179,
+  6º 248→257, 8º 417→426. Nenhum passa de 1,1σ, e nenhum tem direção consistente entre os blocos.
+  (Uma primeira amostra ÚNICA de 2.500 tinha dado 180→226 no 1º ginásio, o que pareceria efeito
+  real: é impossível por mecanismo — o Snorlax só mora em rota de trecho 7 e 8 —, e em blocos a
+  diferença inverteu de sinal. **Amostra única não é medição neste simulador**, que é o que este
+  arquivo já registra sobre o σ binomial.)
+- **⚠️ MAS ESTA MUDANÇA É DE UM LADO SÓ, e isso a separa de todas as outras desta série.** Conferido
+  nos 16 ginásios das duas regiões: **nenhum líder tem Snorlax no time**, e ele não está no
+  `WILD_POOL_LEG8`. Ou seja, ao contrário da drenagem, do sono e da Fúria do Dragão — que caem dos
+  dois lados e por isso somem na conta —, esta só tira poder do JOGADOR. A jornada não se move
+  mesmo assim porque o Snorlax só aparece em **2 rotas, nos trechos 7 e 8** (Mansão Pokémon e
+  Victory Road): quando ele entra no time, a jornada está quase acabando.
+  **Onde ele continua valendo é na Torre**, que sorteia evoluções finais pro time dos NPCs — lá o
+  Snorlax do adversário também perdeu o Metrônomo.
 - **O MEW ENTROU, e ele é o único da lista fora do `SPECIES`.** Ele é o chefe da raide, e o
   `bossInstance` do servidor carimba `speciesId: 'mew'` — então a entrada NÃO é letra morta: é por
   ela que o Mew da raide sorteia o golpe.
@@ -1135,7 +1187,7 @@ pelo metronome ou o Poder Ancestral? E vai usar na batalha o que tirar mais dano
   | Clefable Lv.50 | 4,2% | **53,9%** | +49,7 |
   | Togetic Lv.40 | 17,9% | **55,4%** | +37,5 |
   | Clefairy Lv.40 | 1,3% | **29,2%** | +27,9 |
-  | Snorlax Lv.60 | 62,5% | 74,2% | +11,7 |
+  | ~~Snorlax Lv.60~~ | 62,5% | 74,2% | +11,7 |
   | Cleffa Lv.20 | 23,4% | 34,3% | +10,9 |
   | Togepi Lv.30 | 18,4% | 20,4% | +2,0 |
   | **Snubbull Lv.40** | 13,1% | **3,3%** | **−9,8** |
@@ -1143,10 +1195,14 @@ pelo metronome ou o Poder Ancestral? E vai usar na batalha o que tirar mais dano
   A Clefairy e a Clefable eram os casos mais absurdos: o único golpe de dano delas por nível é o
   **Tapa Duplo, poder 15**, e elas lutavam a vida inteira com ele. O Togepi quase não se move porque
   o Poder Ancestral (60, sem STAB) raramente ganha do sorteio.
+  **A LINHA DO SNORLAX ESTÁ RISCADA porque ele SAIU DA LISTA em 11/09/2026** (a pedido) — ela fica
+  como história do que a mecânica lhe deu, não do que ele tem hoje. A medição de quanto a saída lhe
+  custou é outra, e está no item dele acima.
 - **O CUSTO DE ANIMAÇÃO É PEQUENO E VAI NOS DOIS SENTIDOS.** O sorteio pode cair num golpe de vários
   tapas, e aí o confronto ganha passos; mas ele também acaba mais rápido quando o golpe é forte.
   Medido: Togepi **2,59 → 2,94** passos por confronto, Snorlax **2,52 → 2,33**, Clefable
   **5,03 → 4,22** (ela era a pior de todas, presa num Tapa Duplo de 2 a 5 golpes).
+  (A linha do Snorlax é HISTÓRIA: ele saiu da lista em 11/09/2026 e hoje não sorteia nada.)
   **As LINHAS DE LOG não se movem** (2,59 → 2,57 no Togepi): o log soma os tapas numa linha só.
 - **DUAS TRAVAS CONTAVAM PASSO DE ANIMAÇÃO ONDE A REGRA FALA DE LINHA DE LOG**, e o Metrônomo tornou
   isso visível: com 7 espécies sorteando golpe a cada ataque, um Míssil Agulha de 5 tapas passou a
@@ -1169,8 +1225,10 @@ pelo metronome ou o Poder Ancestral? E vai usar na batalha o que tirar mais dano
   o lado fácil, que é o esperado: seis das sete espécies ficaram mais fortes e elas aparecem nos
   dois lados da luta, mas o jogador escolhe quem leva e os líderes não.
   Só +1,6 apesar dos +50 pontos da Clefable porque são **7 espécies em 250** — o jogador raramente
-  tem uma no time. Se incomodar, os lugares de mexer são a LISTA (tirar Snorlax, que é a mais comum
-  em time de jogador) ou fazer o sorteado disputar com um redutor.
+  tem uma no time.
+  **ESSA ALAVANCA FOI PUXADA em 11/09/2026**: o Snorlax saiu da lista, a pedido, e a conclusão da
+  jornada voltou 0,32 ponto (0,5σ, ruído — ver o item dele acima). A outra que sobra, se um dia
+  precisar, é fazer o sorteado disputar com um REDUTOR em vez de entrar no poder cheio.
 - **O `usaGolpesEscolhidos` MORREU.** Ele existia só pra devolver lista vazia às espécies do
   Metrônomo; com elas escolhendo golpe como todo mundo, ele não tinha o que responder. As "doze que
   não escolhem" voltaram a ser **uma**: o Ditto.
@@ -1264,6 +1322,136 @@ maior chance do bloco: **30% por confronto**, empatada com o Metrônomo (que ren
   diverge faz a mesma batalha terminar diferente no cliente e no servidor.
 
 
+### A FÚRIA DO DRAGÃO: 40 FIXOS NA ABERTURA (11/09/2026)
+
+Pedida assim: *"adicione a habilidade passiva furia do dragão para os pokemons que possuem esse
+move, quando começar a batalha, o pokemon que tem esse move tem 10% de chance de já infligir -40hp
+no inicio da batalha no adversario. Então quando entrar a furia do dragão, o oponente começa a
+batalha perdendo 40 de hp e depois disso o motor deve calcular a batalha como se fosse uma nova
+batalha começando"*. É o **nono golpe especial**, ao lado do sono, da autodestruição, do Metrônomo,
+do Disable, do Recuperar, da drenagem, da fúria e da confusão.
+
+- **É o mais simples do bloco inteiro, e isso é a feature:** não sorteia dano, não olha tipo, não
+  olha atributo, não tem crítico. São **40**, sempre — como no jogo oficial.
+- **É ABERTURA e NÃO resolve o confronto** (`continue`, como o Recuperar, a anulação, a drenagem, a
+  fúria e a confusão; só a autodestruição e o sono resolvem). A luta acontece INTEIRA depois, que é
+  o pedido ao pé da letra. Medido: **1.053 de 1.055** confrontos com ela têm luta depois; os 2 que
+  não têm são o outro lado EXPLODINDO na mesma abertura, e isso já valia pra todas as outras
+  aberturas. O teste cobra que não exista um terceiro caso.
+- **NÃO MATA: piso de 1 de HP**, a mesma regra da drenagem e da confusão. Um efeito de abertura que
+  resolvesse o confronto sozinho seria um confronto sem um único golpe na tela — e o pedido diz que
+  a luta vem DEPOIS. Medido: **0 mortes em 1.055** disparos.
+- **O DANO GRAVADO É O EFETIVO, não os 40 crus.** Num alvo com 12 de HP a linha diz **11**, que é o
+  que a barra vai andar. É a regra do diário desde sempre: com o valor cru a soma das linhas passa
+  do HP que o pokémon tinha. E quem já está em **1** não gera linha nenhuma — um passo de dano 0 é
+  o que este log evita em toda regra.
+- **SÃO 7 ESPÉCIES**: a linha do Charmander (Charmander, Charmeleon, Charizard), o **Gyarados** e a
+  linha do Dratini (Dratini, Dragonair, Dragonite).
+  **A lista saiu da base (`data/golpes.json`) por script, não foi escrita à mão** — são as que
+  aprendem `dragonrage` por NÍVEL na Gen 3, a mesma regra das outras sete listas.
+  **A intuição erra: não são "os dragões".** A linha do Charmander aprende MESMO (nível 43/48/54 no
+  FireRed), e o Dragonite aprende no 22 igual ao Dratini.
+  `tools/test-golpes.js` passou a cruzar esta lista com a base junto das outras cinco: ela bate
+  **7/7**, e é esse cruzamento que garante que ela CONTINUE saindo do dado.
+- **ELA NÃO DISPUTA VAGA DE GOLPE, e isso é DADO e não decisão:** o `dragonrage` tem **poder
+  variável**, e os 22 golpes de poder variável ficaram fora da tabela `GOLPES` quando a base da
+  Gen 3 entrou (ver a seção da base). Ou seja, ela nunca foi escolhível — **sem esta passiva o
+  golpe não existia no jogo**, e a ficha da Pokédex é hoje o único lugar em que ele aparece. Se um
+  dia o `dragonrage` entrar na tabela, esta passiva passa a modelar a mesma coisa duas vezes: há um
+  teste que grita nesse dia.
+- **ELA VEM POR ÚLTIMO NO SORTEIO, depois até da confusão**, e é a decisão de sempre: acrescentar um
+  efeito no FIM da fila não dilui nenhum dos que já estavam medidos — quem paga a chance composta é
+  ela. Medido: a linha do Charmander, que já tem **Fúria (30%)**, dispara esta em **7,04%**
+  (0,7 × 10%); o Gyarados e a linha do Dratini, que não têm outro especial, ficam nos **9,99%**.
+- **O `q` DO REGISTRO É DE QUEM USOU, não de quem apanhou** — a convenção do diário, a mesma do
+  sono, da confusão e do dano da drenagem. É ela que faz a animação mover a barra do lado certo (o
+  passo comum inverte o `q` pra achar quem APANHA). Trocar isso não aparece como erro: aparece como
+  o pokémon errado perdendo vida.
+- **⚠️ ELA É A TERCEIRA DA FAMÍLIA "HP QUE SUMIU SEM SER GOLPE DO ADVERSÁRIO"**, ao lado do
+  `absorbdano` e da `confusao` — e a lista dos três estava **copiada à mão em QUATRO contas** do
+  `tools/test-especiais.js`. Isso já tinha custado um flake antes: o `absorbdano` era o único da
+  família e o teste não o descontava, e só virou visível quando a confusão tornou a combinação
+  frequente. Agora a lista vive numa função só (`danoSemGolpe`), e o próximo efeito desta família
+  entra numa linha. Quatro cópias garantiriam que a quarta ficasse pra trás — falhando raro e
+  intermitente, que é o pior tipo de teste.
+- **O SELO É 🐉 e o tipo é DRAGÃO** (`TIPO_DO_ESPECIAL`), e ele é o **único especial de tipo
+  Dragão**. Isso não é enfeite: a **Fúria** comum é Normal, tem nome parecido e mora na MESMA linha
+  do Charmander — o Charizard aparece na ficha com as duas, uma no cinza e outra no roxo, e é a cor
+  que as separa de relance.
+- **A FICHA ANUNCIA A CHANCE NOMINAL (10%), não a composta (7% no Charizard)** — e isso não é
+  descuido novo: é a convenção que já vale pro Kadabra (Disable 10% + Recuperar, que na prática sai
+  em 9%). O número na tela é o da REGRA daquele especial; a composição vem de quantos especiais a
+  espécie tem, e escrever "7%" ali faria a mesma passiva anunciar números diferentes de espécie pra
+  espécie sem nada explicando por quê. Fica registrado porque o Charizard é o caso mais visível
+  disso no jogo — ele é o único que mostra dois especiais de nome parecido lado a lado.
+- **VALE 2 PASSOS no `passosDaAbertura`**, como a drenagem, a fúria e a confusão: a frase tem que
+  sobreviver ao movimento de barra que ela anuncia. Com 1 ela sumiria justamente no passo que
+  existe pra explicar; fora da tabela ela valeria pra SEMPRE (o defeito que a anulação teve).
+- **A FRASE DO LOG TRAZ O NÚMERO**, e ela é a única do bloco que traz: *"🐉 Gyarados usou Fúria do
+  Dragão e tirou 40 de HP de Machoke"*. São sempre 40, e é justamente isso que surpreende quem vê um
+  Dratini Lv.22 e um Dragonite Lv.70 tirando a mesma coisa. No aviso do meio da batalha ela sai
+  CURTA, sem o número, como a do sono e a da confusão: ali se lê em um segundo e a barra descendo
+  já mostra quanto foi.
+- **O Mew e o Mewtwo são imunes**, como ao bloco inteiro: o `tentarGolpeEspecial` corta quando um
+  dos dois está no confronto. Nenhum dos dois aprende o golpe, então a lista nem os mencionaria —
+  o teste cobra a imunidade mesmo assim, porque um Gyarados tirando 40 por confronto do Mew da
+  raide seria de graça.
+
+**O QUE 40 SIGNIFICA, MEDIDO — e é isso que explica todo o resto.** Neste motor todo golpe é uma
+fração da vida do alvo, então um número CRU pesa muito diferente conforme o nível:
+
+| | Lv.22 | Lv.30 | Lv.45 | Lv.60 | Lv.75 | Lv.90 |
+|---|---|---|---|---|---|---|
+| Dratini | **22,1%** da barra | 18,1% | 13,5% | 10,8% | 9,0% | **7,7%** |
+| Gyarados | 17,0% | 14,5% | 11,4% | 9,4% | 8,0% | 7,0% |
+| Dragonite | 17,3% | 14,8% | 11,6% | 9,5% | 8,1% | 7,0% |
+
+É o mesmo desenho do jogo original — **forte cedo, lembrança depois** —, e é por isso que ela não
+precisa de teto: o crescimento do jogo a aposenta sozinha.
+
+**O PREÇO POR BATALHA, num 6x6 calibrado no empate** (os 6 da Fúria do Dragão nível 60 contra 6 sem
+ela de BST pareado — Snorlax, Tyranitar, Typhlosion, Marowak, Ivysaur, Geodude —, 6.000 batalhas de
+cada lado): **43,92% sem contra 51,20% com, +7,28 pontos**.
+(Medida com o Snorlax do painel ainda no Metrônomo, horas antes de ele sair. Os DOIS lados do A/B
+tinham o mesmo painel, então a diferença continua valendo; o que mudou depois foi só o ponto de
+calibragem, que sobe um pouco com o painel enfraquecido.)
+**Mas o número honesto é a conversão em NÍVEL**, porque esse painel é hipersensível: medido, **1
+nível dele vale 13,2 pontos** (o controle vai de 57,15% no Lv.53 a 43,92% no Lv.54). Ou seja, a
+Fúria do Dragão vale **≈0,55 nível** — bem abaixo da **Fúria comum (≈2,3 níveis)**, do terreno e do
+shiny (~15 níveis). Ela está mais perto da especialidade do que dos buffs de time.
+
+**O PREÇO NA JORNADA: NADA — é o primeiro especial desta série que não move a conta nem um pouco.**
+**70,05% contra 70,18%** de conclusão, **−0,13 ponto, 0,2σ** (10 blocos de 1.500 jornadas de cada
+lado, **15.000 de cada**, com o desvio tirado de ENTRE os blocos, nunca do binomial). Não dá pra
+distinguir de zero, e a direção é até negativa — ou seja, ruído puro.
+Faz sentido por dois motivos somados, e é a conclusão de sempre aqui: são **7 espécies em 250**, e
+elas caem dos DOIS lados — o Charizard do rival (de quem escolheu o Bulbasaur) e o time quase
+inteiro da Clair. Some a isso o que a tabela acima mostra: os 40 pesam justamente no COMEÇO da
+jornada, e é lá que as sete são raras no time do jogador — só quem escolheu o Charmander já começa
+com uma.
+**MAS A FORMA SE MOVE UM POUCO, e num lugar só: o 8º ginásio.** Medido em duas amostras
+independentes (3.000 e 2.500 jornadas de cada lado), os game overs lá sobem ~**12%** (607 → 683
+somando as duas), enquanto o 1º, o 5º e o 6º ficam parados dentro do ruído.
+**A causa tem nome: a Clair.** O time dela é `Dragonair ×3, Gyarados, Kingdra, Dragonite` —
+**cinco dos seis carregam a passiva**, e ela é a ÚNICA equipe de líder do jogo em que isso
+acontece (conferido nos 16 ginásios das duas regiões). Ou seja, o efeito líquido da mecânica é
+tornar o último ginásio de Johto um pouco mais duro, e é aí que ela aparece.
+Se um dia isso incomodar, o lugar de mexer NÃO é a chance: é o time da Clair — ele é o único ponto
+do jogo onde a passiva se concentra.
+
+- **Se um dia incomodar, os lugares de mexer são a CHANCE (`CHANCE_FURIA_DRAGAO`) e o DANO
+  (`FURIA_DRAGAO_DANO`)**, e a régua está aqui. Mexer no dano é o mais forte dos dois, porque ele é
+  a coisa toda: os 40 não escalam, então dobrá-los dobra o efeito no começo do jogo e quase não se
+  vê no fim.
+- `tools/test-especiais.js` tranca as pontas: a lista e a chance iguais nos dois motores, os 40
+  exatos, o piso de 1, o dano EFETIVO na linha, o alvo já em 1 sem linha nenhuma, a imunidade dos
+  chefes, a luta acontecendo depois em 100% dos casos (ou a explosão), o `q` de quem usou, a barra
+  do adversário sendo a que anda, a frase aparecendo no passo 0 e sobrevivendo ao passo da barra, e
+  as duas chances compostas (7% no Charizard, 10% no Gyarados). E a comparação das 300 batalhas
+  entre os dois motores passou a **COBRAR que ela apareça** — sem essa linha ela daria verde sem
+  nunca ser tocada, e uma divergência aqui faz a mesma batalha terminar diferente no cliente e no
+  servidor.
+
 ### O SKETCH DO SMEARGLE (10/09/2026)
 
 Reportado assim: *"como podemos fazer o Smeargle ficar mais parecido com o jogo oficial? Porque
@@ -1285,10 +1473,66 @@ hoje ele tá bem ruinzinho com apenas 1 ataque"*.
 - **Ele entra nos DOIS fins de batalha** (`finishBattle` e `finishSpecialBattle`), ao lado da
   evolução no desmaio. Deixar num só era garantir que a Elite — que é o caminho especial — ficasse
   sem copiar nada; é o defeito que a evolução já teve.
+  **E só nesses dois: desde 11/09/2026 ele só copia na JORNADA** — ver o item logo abaixo.
+- **⚠️ O SKETCH SÓ COPIA NA JORNADA desde 11/09/2026, e o vazamento era REAL — não era só
+  precaução.** Pedido assim: *"se usarem o Smeargle em uma liga online, no ginásio ou na torre dos
+  treinadores, ele NÃO deve aprender novas habilidades, as habilidades dele só vai ser aprendida
+  durante a jornada"*.
+  **O CAMINHO QUE VAZAVA, reproduzido antes do conserto:** o **Ginásio da Cidade usa a MESMA tela
+  `battling`** da jornada, e o `aceitarConvite` faz `if(game.screen === 'battling') finishBattle()`
+  — aceitar um convite online **no meio da revelação de um desafio de ginásio** caía no
+  `registrarSketch` com os matchups DELE. Conferido: com o contexto `neighborhoodGym` ele copiava
+  o `earthquake` do adversário.
+  **E o estrago seria pior que copiar de onde não devia:** o Smeargle que ele acha vem do
+  `game.team`, que é a **jornada aberta** — e no Ginásio da Cidade e na Torre o time é montado a
+  partir de VÁRIOS saves e não é o `game.team`. Ou seja, o golpe entraria num Smeargle que **nem
+  lutou aquela batalha**.
+- **A GUARDA MORA DENTRO DO `registrarSketch`, não nos chamadores** (`if(!ehJornada()) return []`),
+  e isso é a decisão. Ele é a **única porta** por onde a lista cresce; fechá-la por dentro é o que
+  impede um chamador futuro de reabri-la sem ninguém ver. Fechar no chamador seria confiar em três
+  lugares em vez de um — e foi um chamador que criou o problema.
+  Quem responde é o **`battleResultContext`**: null na jornada, `'neighborhoodGym'` no desafio do
+  Ginásio da Cidade.
+- **OS OUTROS MODOS JÁ NÃO CHEGAVAM LÁ, e a guarda vale pra eles assim mesmo.** A **Torre** roda na
+  tela `trainerBattling`, com fluxo próprio; as **ligas** e o **online** resolvem tudo no servidor.
+  Nenhum dos três chama o `registrarSketch` hoje — mas a guarda passa a valer no dia em que algum
+  deles reusar este caminho, que é exatamente o que o Ginásio da Cidade fez.
+  Some a isso o que já valia: adversário de liga/online luta pelo **motor de tipo** e não tem
+  `enemyMoveId`, então ali nunca houve o que copiar.
+- **O TESTE LÊ O CÓDIGO**, e precisa: os casos chamam o `registrarSketch` direto, então uma guarda
+  movida pro chamador passaria por eles e deixaria a próxima porta aberta. Ele cobra que a guarda
+  está DENTRO da função, que só **dois** lugares a chamam (`finishBattle` e `finishSpecialBattle`,
+  os dois da jornada) e que o `finishNeighborhoodGymBattle` **não** chama. Conferido que ele falha
+  em 2 casos com a guarda removida.
+- **⚠️ FICA UM DEFEITO CONHECIDO NO MESMO CAMINHO, e ele NÃO foi mexido porque não foi pedido:**
+  aceitar um convite online no meio da revelação de um desafio do Ginásio da Cidade chama o
+  `finishBattle` da JORNADA, que além do sketch também faz `game.badgesEarned.push(gymAtual().badge)`
+  e conta derrota — ou seja, **dá ou tira insígnia da jornada por causa de uma batalha de ginásio
+  de cidade**. O conserto natural é o `aceitarConvite` olhar o `battleResultContext` e chamar o
+  `finishNeighborhoodGymBattle` nesse caso; a guarda do sketch não cobre isso, porque ela protege
+  só a porta dela.
 - **Adversário sem golpe escolhido não vira sketch.** Liga, online e save antigo atacam pelo motor
   de tipo e não têm id de golpe — ali não há o que copiar, e é o certo: no jogo original o Sketch
   também não copia o que não é um golpe.
 
+- **⚠️ O SKETCH ENTROU NA FICHA DA POKÉDEX EM 11/09/2026, e a mecânica NÃO foi tocada.** Pedido
+  assim: *"colocar no Smeargle a habilidade passiva Sketch, só indicar na pokedex como as outras
+  hoje, não precisa mexer em nada na mecânica dela, e também adicionar a explicação do que ela
+  faz"*. É uma linha no `especiaisDaEspecie` e uma entrada no `EXPLICACAO_DO_ESPECIAL` — ver a
+  seção **A CAIXA QUE EXPLICA O ESPECIAL**.
+  **Antes disso a ficha do Smeargle saía MUDA**, e ele é justamente o único pokémon do jogo que
+  constrói o próprio moveset: quem abrisse a ficha dele via BST 250 e um Tapa Duplo de poder 15, e
+  nada explicando por que valeria a pena levá-lo.
+  **ELE É O ÚNICO DA LISTA QUE NÃO MORA NO `tentarGolpeEspecial`**, e por isso ganhou um quarto
+  valor de momento na caixa — **"Depois da batalha"**. Os outros nove abrem ou resolvem um
+  confronto (ou, no Metrônomo, valem a cada golpe); este acontece quando a luta acabou, no
+  `registrarSketch`. Escrever "abre o confronto" nele seria a mesma classe de erro que o sono teve.
+  **SEM CHANCE DECLARADA** (`chance: null`), como o Metrônomo: ele não é sorteado, acontece sempre.
+  Um "100% por confronto" ali diria menos que nada.
+  **CONFERIDO QUE É SÓ APRESENTAÇÃO, por impressão do motor:** 1.500 batalhas com um Smeargle de
+  repertório copiado mais o próprio `registrarSketch` dão o **MESMO hash** com e sem a entrada na
+  ficha. É o mesmo método que provou que passar o diário de golpes pro matchup não mudava um ponto
+  de dano.
 **O PROBLEMA MEDIDO, e ele não era o que parecia.** A primeira medição usou um painel forte
 (Machamp, Snorlax, Rhydon nível 50) e deu **0% pra tudo**, inclusive com o golpe mais forte do jogo
 — o que sugeria que o gargalo era o atributo. Contra um painel **do tamanho dele** é o contrário:
@@ -1343,6 +1587,85 @@ a valer o moveset da forma nova.
 - Isso vale pra qualquer degrau, não só o da Staryu: são **13 golpes** que a forma antiga ensina
   acima do nível da evolução e a nova nunca ensina (ver "O que foi medido e NÃO foi mexido").
   Continuam inalcançáveis pra quem nunca os teve — o que muda é que quem OS TEM não os perde mais.
+
+### A CAIXA QUE EXPLICA O ESPECIAL (11/09/2026)
+
+Pedida assim: *"para todos os ataques especiais/passivas, coloque que quando o usuário clicar em
+cima dessa habilidade passiva, abre um modal explicando o que ocorre quando acontece aquela
+habilidade na partida"*. São os **dez**: autodestruição, sono, anulação, Metrônomo, Recuperar,
+drenagem, Fúria, confusão, Fúria do Dragão e **Sketch** — este último acrescentado à ficha no mesmo
+dia, também a pedido, e SÓ pra aparecer: a mecânica dele não foi tocada.
+
+- **ELA É INDEXADA PELO EFEITO, NÃO PELO NOME** (`EXPLICACAO_DO_ESPECIAL`), e essa é a decisão que
+  sustenta o resto. O nome é **por espécie** — o Zubat confunde com Supersom e o Alakazam com
+  Confusão, o Paras dorme com Esporo e a Jigglypuff com Canto —, mas a MECÂNICA é uma só. Indexar
+  por nome seria escrever o mesmo texto **5 vezes pro sono, 11 pra confusão e 3 pra drenagem**, e a
+  vigésima divergiria no primeiro ajuste. É a mesma lição da `fraseDoEspecial`, que já vive numa
+  função só pelo mesmo motivo.
+  Por isso o `especiaisDaEspecie` passou a devolver **`efeito`** ao lado de `nome`/`chance`/`tipo`:
+  é ele que escolhe o texto. O **título** continua sendo o nome daquela espécie, com o selo na cor
+  do tipo dela — quem abriu num Zubat lê "Supersom" em cinza, quem abriu num Misdreavus lê "Raio
+  Confuso" em roxo, e os dois leem o mesmo corpo.
+- **A TABELA VIVE SÓ NO CLIENTE**, como o `MOVE_BY_TYPE` e o `TIPO_DO_ESPECIAL`: o motor faz, o
+  cliente conta. O servidor não tem tela e não precisa saber a palavra.
+- **OS NÚMEROS SAEM DAS CONSTANTES, não escritos à mão no texto** (`textoDoEspecial` troca
+  `{CURA}`, `{DRENO_MIN}`, `{DRENO_MAX}`, `{FURIA}`, `{FURIA2}`, `{FURIA3}` e `{DRAGAO}` pelos
+  valores do motor). É o que impede a caixa de mentir no dia em que o balanceamento mudar — o
+  defeito que a especialidade teve, quando valia 1% e este arquivo dizia "~13 pontos percentuais"
+  por ter sobrevivido à mudança do valor. `tools/test-especiais.js` cobra que **nenhum marcador
+  fique por substituir** e que cada um bata com a constante.
+- **O "QUANDO" É CAMPO PRÓPRIO, e não uma frase no meio do texto** — é a informação que o jogador
+  mais erra sobre este bloco. São QUATRO momentos e eles jogam muito diferente:
+  **ABRE o confronto** (a luta acontece inteira depois, com alguém já em vantagem), **RESOLVE o
+  confronto** (não há luta depois, e só a autodestruição faz isso), **A CADA GOLPE** (só o
+  Metrônomo) e **DEPOIS DA BATALHA** (só o Sketch).
+  O conjunto é FECHADO e o teste cobra isso: um quinto momento escrito com outra palavra ("no fim
+  da luta") passaria despercebido, e as duas travas que procuram por /Resolve/ e /cada golpe/
+  deixariam de valer sobre ele.
+- **⚠️ SÓ A AUTODESTRUIÇÃO RESOLVE O CONFRONTO — e a primeira versão desta caixa dizia que o SONO
+  também resolvia.** Era verdade até **02/09/2026**, quando ele matava o alvo; hoje ele compra UMA
+  troca livre e é `continue` como todos os outros. **O teste pegou isso no dia em que a caixa
+  nasceu**, e ele pega porque **LÊ O MOTOR**: ele fatia o `tentarGolpeEspecial` e vê quem tem
+  `return true`, em vez de comparar com uma lista escrita à mão que envelheceria junto com o texto.
+  Sem essa trava, a tela passaria a explicar uma mecânica que o jogo não tem mais — e ninguém
+  reclamaria, porque o texto continuaria plausível.
+  **Armadilha do próprio teste, e ela quase o fez passar em branco:** a primeira fatia ia de
+  `tentarGolpeEspecial` até `equiparItens`, e o `equiparItens` fica **ANTES** no arquivo — a fatia
+  saía VAZIA e o teste passava sem ler nada. Hoje ela vai até o `faixaDeFoco`, e há um `ok` só pra
+  cobrar que a fatia tem tamanho.
+- **A LINHA INTEIRA DA FICHA É O BOTÃO**, não só o selo: é a mesma regra da lista de notificações
+  ("a linha toda já é o alvo do toque, e mirar num quadradinho num celular é pedir erro"). Ela
+  **não usa o `.btn` da casa** — aquele é botão de AÇÃO, com moldura de 3px; aqui a lista é de
+  informação que por acaso se toca, o mesmo raciocínio que já tinha tirado o `.btn` dos cartões de
+  golpe. O fundo só acende no hover e no toque.
+- **O `ⓘ` no fim da linha é o que diz que há o que ler.** Sem ele o selo se lê como os selos
+  estáticos que o jogo usa em toda tela, e ninguém descobre que dá pra tocar. Ele fica apagado e
+  pequeno de propósito: é a affordance, não a informação.
+- **`<button>` DENTRO DE `<button>` — a armadilha da casa — NÃO existe aqui**, e o teste tranca
+  isso: a ficha é um `modal-box`, não um botão. Ela já custou dois defeitos neste projeto (a lupa
+  do encontro selvagem e a do montador), e a trava fica pra o dia em que alguém tornar a ficha
+  clicável.
+- **A CAIXA É ANEXADA DEPOIS DA FICHA no `render`**, porque os modais empilham na ordem em que
+  entram e ela é aberta de DENTRO da ficha — vindo antes, abriria atrás. É a mesma nota que a
+  própria ficha já carrega em relação ao modal da Pokédex, e o teste **lê o código** pra cobrar a
+  ordem: os casos chamam as funções direto e passariam com a ordem trocada.
+- **Efeito desconhecido NÃO abre caixa vazia** (`abrirEspecialInfo` recusa em silêncio). É a rede
+  pro dia em que um especial novo chegar à ficha antes de ter texto — e o teste cobra que os dois
+  lados batam: **todo efeito que a ficha sabe mostrar tem explicação, e nenhuma explicação sobra
+  sem dono**. Sem isso, um especial novo nasce com a linha abrindo uma caixa vazia, e só no bicho
+  que tem AQUELE especial: o tipo de defeito que fica meses sem ninguém ver.
+- **O METRÔNOMO É O ÚNICO SEM CHANCE NO TÍTULO**, e isso vem de 10/09/2026: ele sai em TODO golpe,
+  o que é sorteado é QUAL. Um "100% por confronto" ali diria menos que nada, e a caixa dele sai só
+  com o momento.
+- **MEDIDO A 320px:** a maior caixa (autodestruição e confusão) fica em **~304px** de altura, contra
+  os 568 da menor tela que a casa mira — **cabe sem rolagem**, e por isso a lista de detalhes não
+  precisou de `max-height` como a dos golpes por nível. A linha mais larga da ficha ("Fúria do
+  Dragão" + chance + ⓘ) mede **~198px** numa coluna de 260: cabe numa linha só.
+- **A FILEIRA DO TIME ficou de fora, e é decisão.** O selo do Metrônomo aparece lá, mas aquela
+  lista é de GOLPES — tornar clicável só o único especial que passa por ela seria uma exceção no
+  meio de uma lista uniforme, e a linha já carrega o `+` de item e as setas de ordem. Quem pergunta
+  "o que este bicho faz?" pergunta na ficha, e a lupa que abre a ficha está no encontro selvagem,
+  nas duas telas de evolução e no montador de time.
 
 ### A lista de golpes na ficha da Pokédex (09/09/2026)
 

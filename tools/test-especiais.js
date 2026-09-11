@@ -28,6 +28,16 @@ const inst = (id, lv) => S.createInstance(id, lv || 50);
 /* rng que sempre devolve o mesmo numero: com 0.01 todo sorteio de chance passa, com 0.99 nenhum.
    Mais legivel que uma sequencia -- a ordem em que o motor consome os numeros nao importa aqui. */
 const rngFixo = (v) => () => v;
+/* HP QUE SUMIU SEM SER GOLPE DO OUTRO LADO. Sao os efeitos em que o `q` do registro e de quem
+   CAUSOU e o HP some do lado OPOSTO -- o dano da drenagem, a confusao (ele se acertou) e a furia
+   do dragao (40 fixos no adversario). Toda conta de "quanto ele perdeu de vida" soma os golpes do
+   ADVERSARIO, e esses tres nao sao golpe do adversario: sem descontar, o contrato acusa um
+   confronto que esta certo.
+   ELA E UMA FUNCAO E NAO TRES LISTAS ESCRITAS A MAO, e isso e a licao de 11/09/2026: quando a
+   furia do dragao entrou, a lista estava copiada em QUATRO contas deste arquivo, e a quarta que
+   ficasse pra tras falharia raro e intermitente -- o pior tipo de teste. O proximo efeito desta
+   familia entra numa linha so. */
+const danoSemGolpe = (g) => !!g && (g.x === 'absorbdano' || g.x === 'confusao' || g.x === 'furiadragao');
 
 console.log('\nAS LISTAS SAO DO APRENDIZADO POR NIVEL DA GEN 1/2');
 ok('9 especies aprendem autodestruicao', S.AUTODESTRUICAO.length === 9, S.AUTODESTRUICAO.join(', '));
@@ -41,10 +51,13 @@ ok('cada uma com o NOME do golpe dela',
 /* A LISTA DO METRONOMO MUDOU EM 10/09/2026, a pedido: entraram Snorlax, Clefairy, Clefable e MEW
    (os tres primeiros aprendem Metronomo por nivel no original e tinham ficado de fora; o Mew e o
    dono do golpe), e o SNUBBULL saiu -- ele nao aprende Metronomo por nivel na Gen 3, e hoje luta
-   com o moveset dele. */
+   com o moveset dele.
+   O SNORLAX SAIU EM 11/09/2026, a pedido -- mesmo caso do Snubbull: ele tambem nao aprende
+   Metronomo por nivel na Gen 3 e estava aqui por pedido. */
 ok('a lista do metronomo e a pedida',
-   S.METRONOMO.join(',') === 'snorlax,cleffa,clefairy,clefable,mew,togepi,togetic', S.METRONOMO.join(','));
-ok('e o Snubbull saiu dela', !S.METRONOMO.includes('snubbull'));
+   S.METRONOMO.join(',') === 'cleffa,clefairy,clefable,mew,togepi,togetic', S.METRONOMO.join(','));
+ok('e o Snubbull e o Snorlax sairam dela',
+   !S.METRONOMO.includes('snubbull') && !S.METRONOMO.includes('snorlax'), S.METRONOMO.join(','));
 /* Especie que nao existe no SPECIES seria um golpe que nunca sai -- e ninguem perceberia.
    O MEW E A EXCECAO, e ela e declarada: ele nao esta no SPECIES de proposito (e o chefe da raide, e
    uma vaga #151 que ninguem captura quebraria o "capturou tudo" do desafio do Mewtwo), mas o
@@ -197,9 +210,12 @@ ok('e o log diz qual golpe foi', diario.some(g => g.x === 'sono' && g.g === 'Can
          descontar, senao o contrato acusa um confronto que esta certo.
          O `absorbdano` ja era assim ANTES da confusao e o teste nao o descontava: ele passava
          porque a varredura olha o PRIMEIRO confronto de cada batalha e drenagem ali e rara. A
-         confusao, com 23 especies, so tornou o buraco frequente o bastante pra aparecer. */
+         confusao, com 23 especies, so tornou o buraco frequente o bastante pra aparecer.
+         A FURIA DO DRAGAO (11/09/2026) e a TERCEIRA da familia e entrou nas quatro contas junto:
+         ela tira 40 do adversario e o `q` e de quem USOU. Sao tres agora, e a lista vive em UMA
+         funcao -- escrita a mao em cada conta, a quarta divergiria. */
       const autoDano = { p:0, e:0 };
-      seq.forEach(x => { if(x.x === 'confusao' || x.x === 'absorbdano') autoDano[x.q === 'p' ? 'e' : 'p'] += x.d || 0; });
+      seq.forEach(x => { if(danoSemGolpe(x)) autoDano[x.q === 'p' ? 'e' : 'p'] += x.d || 0; });
       if(soma.p !== Math.max(0, (m.enemyHpBefore + ganho.e) - m.enemyHpAfter - autoDano.e) ||
          soma.e !== Math.max(0, (m.playerHpBefore + ganho.p) - m.playerHpAfter - autoDano.p)) somaErrada++;
 
@@ -730,7 +746,7 @@ console.log('\nA FAIXA DE FOCO NAO PODE SER FURADA POR CAMINHO NENHUM');
           /* HP QUE O JOGADOR PERDEU SEM SER GOLPE DO ADVERSARIO: a CONFUSAO (ele se acertou) e o
              dano da DRENAGEM. Nos dois o `q` e de quem CAUSOU, entao `q === 'e'` e o adversario
              causando -- e o que o jogador perdeu assim nao pode ser cobrado dos golpes dele. */
-          const sozinho = s.filter(g => (g.x === 'confusao' || g.x === 'absorbdano') && g.q === 'e')
+          const sozinho = s.filter(g => danoSemGolpe(g) && g.q === 'e')
                            .reduce((a, g) => a + g.d, 0);
           if(tomou !== (x.playerHpBefore - x.playerHpAfter) + subiu - sozinho) somaErrada++;
           if(s.findIndex(g => g.x === 'faixa') <= 0) foraDePosicao++;
@@ -782,6 +798,10 @@ console.log('\nA FAIXA DE FOCO NAO PODE SER FURADA POR CAMINHO NENHUM');
           /* A FURIA sobe a vida como a cura -- o teto cresce e a vida atual sobe junto --, entao
              ela entra na mesma conta de GANHO. Sem isso a soma do log nao fecha. */
           if(g.x === 'recover' || g.x === 'pocao' || g.x === 'absorb' || g.x === 'furia'){ if(bate) p += g.d; else e += g.d; continue; }
+          /* DANO QUE NAO E GOLPE DO OUTRO LADO: o `q` e de quem CAUSOU e o HP some do lado
+             OPOSTO -- absorbdano, confusao e furia do dragao. A confusao e a furia do dragao ja
+             caem no ramo comum abaixo (o `bate` inverte certo), mas o absorbdano precisa do
+             desvio porque ele nao pode marcar quem caiu. */
           if(g.x === 'absorbdano'){ if(bate) e -= g.d; else p -= g.d; continue; }
           if(bate){ e = Math.max(0, e - g.d); if(e === 0 && caiuEm.e < 0) caiuEm.e = k; }
           else { p = Math.max(0, p - g.d); if(p === 0 && caiuEm.p < 0) caiuEm.p = k; }
@@ -811,7 +831,7 @@ console.log('\nA FAIXA DE FOCO NAO PODE SER FURADA POR CAMINHO NENHUM');
              dano da DRENAGEM. Nos dois o `q` e de quem CAUSOU, entao `q === 'e'` e o adversario
              causando e o pokemon do jogador perdendo. O absorbdano ja era assim antes da confusao;
              ele passava porque a amostra e curta e a combinacao, rara. */
-          const sozinho3 = s3.filter(g => (g.x === 'confusao' || g.x === 'absorbdano') && g.q === 'e')
+          const sozinho3 = s3.filter(g => danoSemGolpe(g) && g.q === 'e')
                              .reduce((a, g) => a + g.d, 0);
           if(tomou !== (x.playerHpBefore - x.playerHpAfter) + curou - sozinho3) somaFora++;
         }
@@ -1307,7 +1327,7 @@ const resumo = r => (r.win?'W':'L') + '|' + (r.matchups||[]).map(m =>
   m.playerSpecies+':'+m.playerHpAfter+'/'+m.enemySpecies+':'+m.enemyHpAfter+':' +
   (m.playerMoveId||'-')+'/'+(m.enemyMoveId||'-')+':' +
   (m.golpes||[]).map(g=>(g.x||'')+g.d).join(',')).join(';');
-let divergencias = 0, comEspecial = 0, comFuria = 0;
+let divergencias = 0, comEspecial = 0, comFuria = 0, comDragao = 0;
 for(let i=0;i<300;i++){
   const rngMonta = S.makeSeededRng('monta-'+i);
   const t1 = timeAleatorio(rngMonta, 6), t2 = timeAleatorio(rngMonta, 6);
@@ -1329,6 +1349,7 @@ for(let i=0;i<300;i++){
                                     t2.map(p=>comGolpes(srv._createInstance(p.id,p.level))), srv._makeSeededRng('m'+i));
   if((rC.matchups||[]).some(m=>(m.golpes||[]).some(g=>g.x))) comEspecial++;
   if((rC.matchups||[]).some(m=>(m.golpes||[]).some(g=>g.x === 'furia'))) comFuria++;
+  if((rC.matchups||[]).some(m=>(m.golpes||[]).some(g=>g.x === 'furiadragao'))) comDragao++;
   if(resumo(rC) !== resumo(rS)) divergencias++;
 }
 ok('300 batalhas com a mesma semente, golpe a golpe', divergencias === 0,
@@ -1337,6 +1358,9 @@ ok('300 batalhas com a mesma semente, golpe a golpe', divergencias === 0,
    mexe em atributo, e atributo que diverge faz a mesma batalha terminar diferente nos dois lados.
    O time sai das 250 especies, entao ela aparece sozinha -- o que se cobra aqui e que apareceu. */
 ok('e a furia esta dentro delas', comFuria > 0, comFuria + ' batalhas com furia');
+/* A FURIA DO DRAGAO pelo mesmo motivo: sem esta linha a comparacao daria verde sem nunca toca-la.
+   Sao 7 especies em 250, entao ela aparece pouco -- o que se cobra e que apareceu ALGUMA vez. */
+ok('e a furia do dragao tambem', comDragao > 0, comDragao + ' batalhas com furia do dragao');
 
 console.log('\n=== OS ITENS EQUIPADOS DENTRO DA BATALHA ===');
 /* O item e DO POKEMON, nao da conta: quem carrega o Despertar e o Machop, e a protecao vale pra
@@ -1757,6 +1781,221 @@ console.log('\n=== A CONFUSAO: O ADVERSARIO SE ACERTA, E A LUTA ACONTECE DEPOIS 
   ok('e o selo dela e Psiquico', S.TIPO_DO_ESPECIAL['Confusão'] === 'Psychic');
 }
 function GOLPES_OK(S, id){ return !!(S.GOLPES && S.GOLPES[id]); }
+
+console.log('\n=== A FURIA DO DRAGAO: 40 FIXOS NA ABERTURA, E A LUTA ACONTECE DEPOIS ===');
+{
+  /* Pedida em 11/09/2026: "quando comecar a batalha, o pokemon que tem esse move tem 10% de chance
+     de ja infligir -40hp no inicio da batalha no adversario ... e depois disso o motor deve
+     calcular a batalha como se fosse uma nova batalha comecando".
+     E o NONO especial, e o mais simples de todos: nao sorteia dano, nao olha tipo, nao olha
+     atributo. Sao 40, sempre. */
+  ok('sao as 7 especies que aprendem Dragon Rage por nivel na Gen 3',
+     S.FURIA_DRAGAO.length === 7, S.FURIA_DRAGAO.join(', '));
+  /* NOMEADAS, nao contadas: e a licao da auditoria de 04/09/2026 -- uma contagem sozinha nao diz
+     QUAL faltou. A linha do Charmander esta aqui porque ela aprende MESMO (43/48/54 no FireRed);
+     a intuicao de que seriam so os dragoes erra. */
+  ok('e sao as certas (a linha do Charmander, o Gyarados e a linha do Dratini)',
+     ['charmander','charmeleon','charizard','gyarados','dratini','dragonair','dragonite']
+       .every(id => S.FURIA_DRAGAO.includes(id)));
+  ok('e nenhuma esta fora do SPECIES',
+     S.FURIA_DRAGAO.filter(id => !S.SPECIES[id]).length === 0,
+     S.FURIA_DRAGAO.filter(id => !S.SPECIES[id]).join(','));
+  ok('o Mewtwo e o Mew ficam de fora (seria letra morta)',
+     !S.FURIA_DRAGAO.includes('mewtwo') && !S.FURIA_DRAGAO.includes('mew'));
+  ok('a chance e 10% por confronto', S.CHANCE_FURIA_DRAGAO === 0.10, (100*S.CHANCE_FURIA_DRAGAO) + '%');
+  ok('e o dano e 40, fixo', S.FURIA_DRAGAO_DANO === 40, S.FURIA_DRAGAO_DANO + '');
+  /* OS DOIS MOTORES. Uma lista ou uma chance diferente faz a MESMA batalha terminar diferente no
+     cliente e no servidor -- e isso nao aparece como erro, aparece como o log discordando da
+     batalha que foi jogada. */
+  ok('a lista e a MESMA nos dois motores', esp.FURIA_DRAGAO.join(',') === S.FURIA_DRAGAO.join(','),
+     'servidor: ' + esp.FURIA_DRAGAO.join(','));
+  ok('e a chance e o dano tambem',
+     esp.CHANCE_FURIA_DRAGAO === S.CHANCE_FURIA_DRAGAO && esp.FURIA_DRAGAO_DANO === S.FURIA_DRAGAO_DANO,
+     esp.CHANCE_FURIA_DRAGAO + ' / ' + esp.FURIA_DRAGAO_DANO);
+
+  /* ELA NAO DISPUTA VAGA DE GOLPE, e isso e dado e nao decisao: o `dragonrage` tem poder VARIAVEL
+     e ficou fora da tabela GOLPES junto com os outros 21 quando a base da Gen 3 entrou. Se um dia
+     ele entrar la, esta passiva passa a modelar a mesma coisa duas vezes -- e e este ok que grita. */
+  ok('o dragonrage NAO esta na tabela GOLPES (poder variavel)', !GOLPES_OK(S, 'dragonrage'));
+
+  /* O EFEITO, com o rng travado: 0.01 faz TODO sorteio de chance passar. */
+  {
+    const a = inst('gyarados', 50), b = inst('machoke', 50);
+    a.maxHp = S.calcMaxHp(a); a.hp = a.maxHp;
+    b.maxHp = S.calcMaxHp(b); b.hp = b.maxHp;
+    const antes = b.hp, diario = [];
+    S.tentarGolpeEspecial(a, b, rngFixo(0.01), diario);
+    const g = diario.find(x => x.x === 'furiadragao');
+    ok('o adversario perde exatamente 40', !!g && (antes - b.hp) === 40, (antes - b.hp) + '');
+    /* O `q` E DE QUEM USOU, nao de quem apanhou -- a convencao do diario, a mesma do sono e da
+       confusao. Trocar isso nao aparece como erro: aparece como o pokemon errado perdendo vida. */
+    ok('e o `q` do registro e de quem USOU o golpe', !!g && g.q === 'p', g && g.q);
+    ok('o registro guarda o HP que sobrou', !!g && g.hp === b.hp, g && g.hp);
+    ok('e o nome do golpe vai junto', !!g && g.g === 'Fúria do Dragão', g && g.g);
+  }
+  /* NAO MATA: piso de 1, a mesma regra da drenagem e da confusao. Um efeito de abertura que
+     resolvesse o confronto sozinho seria um confronto sem um unico golpe na tela. */
+  {
+    const a = inst('dragonite', 60), b = inst('caterpie', 5);
+    b.maxHp = S.calcMaxHp(b); b.hp = 12;
+    const diario = [];
+    S.tentarGolpeEspecial(a, b, rngFixo(0.01), diario);
+    const g = diario.find(x => x.x === 'furiadragao');
+    ok('nao mata: o alvo fica com 1 de HP', b.hp === 1, b.hp + '');
+    /* O DANO GRAVADO E O EFETIVO, nao os 40 crus: com o valor cru a soma das linhas passaria do HP
+       que o pokemon tinha. E a regra do diario desde sempre. */
+    ok('e a linha grava o dano EFETIVO (11), nao os 40 crus', !!g && g.d === 11, g && g.d);
+  }
+  /* QUEM JA ESTA EM 1 nao gera linha nenhuma -- um passo de dano 0 e o que este log evita em toda
+     regra (o mesmo "-0 de HP" que faz procurar bug onde e regra). */
+  {
+    const a = inst('dratini', 40), b = inst('pidgey', 20);
+    b.maxHp = S.calcMaxHp(b); b.hp = 1;
+    const diario = [];
+    S.tentarGolpeEspecial(a, b, rngFixo(0.01), diario);
+    ok('alvo ja em 1 nao vira linha no log', !diario.some(x => x.x === 'furiadragao'),
+       JSON.stringify(diario));
+  }
+  /* OS CHEFES SAO IMUNES: o tentarGolpeEspecial corta o bloco INTEIRO quando o Mew ou o Mewtwo
+     esta no confronto. Um Gyarados tirando 40 por confronto do Mew da raide seria de graca. */
+  {
+    const a = inst('gyarados', 50), b = inst('mewtwo', 70);
+    b.maxHp = S.calcMaxHp(b); b.hp = b.maxHp;
+    const antes = b.hp, diario = [];
+    S.tentarGolpeEspecial(a, b, rngFixo(0.01), diario);
+    ok('o Mewtwo nao toma Furia do Dragao', b.hp === antes && !diario.length, (antes - b.hp) + '');
+  }
+
+  /* ELA E ABERTURA: a luta acontece INTEIRA depois. A UNICA excecao e o outro lado EXPLODIR na
+     mesma abertura -- a autodestruicao e o unico efeito que resolve o confronto, e isso ja valia
+     pra todas as outras aberturas. */
+  {
+    const IDS = Object.keys(S.SPECIES);
+    let comDragao = 0, lutaDepois = 0, matou = 0, foraDos40 = 0, semLutaSemBoom = 0, explodiu = 0;
+    let confrontos = 0, batalhas = 0, batalhasCom = 0;
+    for(let i = 0; i < 2500; i++){
+      const meu = [S.createInstance('gyarados', 45), S.createInstance('dratini', 30), S.createInstance('dragonair', 40)];
+      S.equiparItens(meu, null);
+      const inim = [S.createInstance(IDS[(i*7) % IDS.length], 45), S.createInstance(IDS[(i*13) % IDS.length], 45),
+                    S.createInstance(IDS[(i*29) % IDS.length], 45)];
+      S.equiparItens(inim, null);
+      const r = S.simulateGymBattle(meu, inim, Math.random);
+      batalhas++;
+      let teve = false;
+      for(const m of (r.matchups || [])){
+        confrontos++;
+        const i0 = (m.golpes || []).findIndex(x => x.x === 'furiadragao');
+        if(i0 < 0) continue;
+        comDragao++; teve = true;
+        const g = m.golpes[i0];
+        if(g.d > 40 || g.d <= 0) foraDos40++;
+        if(g.hp <= 0) matou++;
+        const depois = m.golpes.slice(i0 + 1);
+        if(depois.some(x => !x.x)) lutaDepois++;
+        else if(depois.some(x => x.x === 'boom')) explodiu++;   // a excecao legitima
+        else semLutaSemBoom++;
+      }
+      if(teve) batalhasCom++;
+    }
+    ok('ela sai o bastante pra medir', comDragao >= 200,
+       comDragao + ' confrontos (' + (100*comDragao/confrontos).toFixed(1) + '%) em ' +
+       (100*batalhasCom/batalhas).toFixed(0) + '% das batalhas');
+    ok('nunca tira mais que 40 nem menos que 1', foraDos40 === 0, foraDos40 + ' de ' + comDragao);
+    ok('e nunca mata ninguem', matou === 0, matou + ' de ' + comDragao);
+    /* A LUTA ACONTECE DEPOIS -- e o pedido ao pe da letra. Quando nao acontece, foi porque o outro
+       lado explodiu na mesma abertura, e a explosao E o unico efeito que resolve o confronto. */
+    /* TODO caso cai num dos dois baldes: ou a luta veio depois, ou o outro lado EXPLODIU na
+       mesma abertura (a autodestruicao e o unico efeito que resolve o confronto, e isso ja valia
+       pra todas as outras aberturas). Um terceiro balde e defeito. */
+    ok('a luta acontece INTEIRA depois dela (ou o outro lado explodiu)',
+       semLutaSemBoom === 0 && lutaDepois + explodiu === comDragao,
+       lutaDepois + ' de ' + comDragao + ' | explosao: ' + explodiu +
+       ' | sem luta e sem explosao: ' + semLutaSemBoom);
+  }
+
+  /* NA TELA: a frase, o selo e o passo. Ela mexe a barra do ADVERSARIO, entao vale DOIS passos no
+     passosDaAbertura -- a frase tem que sobreviver ao movimento que ela anuncia. E o mesmo 2 da
+     drenagem, da furia e da confusao, e ficar de fora da tabela faria a frase valer pra SEMPRE
+     (o defeito que a anulacao teve). */
+  {
+    const NOME = 'Fúria do Dragão';
+    const m = {
+      player:'Gyarados', enemy:'Machoke', playerSpecies:'gyarados', enemySpecies:'machoke',
+      playerHpBefore: 300, playerHpAfter: 220, enemyHpBefore: 280, enemyHpAfter: 0,
+      playerMove:'Water', enemyMove:'Fighting',
+      golpes:[{ q:'p', d:40, hp:240, c:0, m:0, z:0, x:'furiadragao', g: NOME },
+              { q:'p', d:120, hp:120 }, { q:'e', d:80, hp:220 }, { q:'p', d:120, hp:0 }]
+    };
+    const seq = S.sequenciaDoConfronto(m);
+    ok('ela ABRE a sequencia', seq[0] && seq[0].x === 'furiadragao', JSON.stringify(seq[0]));
+    /* A BARRA QUE ANDA E A DO ADVERSARIO: o `q` e de quem USOU, e o passo comum inverte pra achar
+       quem APANHA. E dano de verdade, entao o `amount` e POSITIVO (ao contrario da cura). */
+    const anim = S.buildAnimatedHitSequence(m);
+    ok('e a barra que anda e a do ADVERSARIO', anim[0].side === 'enemy' && anim[0].amount === 40,
+       JSON.stringify(anim[0]));
+    /* A FRASE NO LOG nomeia o golpe E o numero: sao sempre 40, e e justamente isso que surpreende
+       quem ve um Dratini Lv.22 e um Dragonite Lv.70 tirando a mesma coisa. */
+    const log = S.passosHtml(m);
+    const linha = (log.match(/<div class="mlog-passo especial[^>]*>([\s\S]*?)<\/div>/) || [])[1] || '';
+    ok('o log traz a linha dela, com o numero',
+       log.indexOf(NOME) >= 0 && /40 de HP de/.test(log), linha.replace(/<[^>]+>/g, ' ').trim());
+    /* UMA LINHA SO: a linha comum ("X atacou Y com GOLPE") nao pode sair pro mesmo evento. */
+    ok('e e UMA linha so', log.split(NOME).length - 1 === 1);
+    /* O AVISO DO MEIO DA BATALHA sai CURTO, como o do sono e o da confusao -- ali se le em um
+       segundo, e a barra descendo ja mostra o numero. */
+    const aviso = p => (S.avisoDoConfronto(m, p) || '').replace(/<[^>]+>/g, '');
+    ok('o aviso do meio da batalha aparece no passo 0', aviso(0).indexOf(NOME) >= 0, aviso(0) || '(vazio)');
+    /* E SOBREVIVE AO PASSO EM QUE A BARRA ANDA -- e pra isso que ela vale 2. Com 1 ela sumiria
+       justamente no passo que existe pra explicar. */
+    ok('e sobrevive ao passo em que a barra desce', aviso(1).indexOf(NOME) >= 0, aviso(1) || '(vazio)');
+    /* E CEDE O LUGAR ao nome do golpe assim que a luta comeca: ela e abertura, nao o confronto. */
+    ok('e cede o lugar quando a luta comeca', aviso(2).indexOf(NOME) < 0, aviso(2) || '(vazio)');
+    ok('ela esta declarada no passosDaAbertura', (function(){
+      const txt = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
+      const mm = txt.match(/const passosDaAbertura = \{([^}]*)\}/);
+      return !!mm && /furiadragao:\s*2/.test(mm[1]);
+    })());
+    /* O SELO E DE DRAGAO, e e ele que a separa de relance da FURIA comum -- os nomes se parecem e
+       as duas sao passivas da mesma linha do Charmander. */
+    ok('o selo dela e de DRAGAO', S.TIPO_DO_ESPECIAL[NOME] === 'Dragon', S.TIPO_DO_ESPECIAL[NOME]);
+    ok('e a Furia comum continua sendo Normal', S.TIPO_DO_ESPECIAL['Fúria'] === 'Normal');
+    /* NA FICHA DA POKEDEX, com a chance. Ela e o UNICO lugar do jogo em que o `dragonrage` aparece:
+       ele tem poder variavel e nunca entrou na tabela GOLPES, entao nao ha cartao de golpe pra ele. */
+    ok('a ficha do Gyarados anuncia a Furia do Dragao',
+       S.especiaisDaEspecie('gyarados').some(e => e.nome === NOME && e.chance === S.CHANCE_FURIA_DRAGAO),
+       JSON.stringify(S.especiaisDaEspecie('gyarados')));
+    /* O CHARIZARD TEM AS DUAS, e a ficha mostra as duas: ele e o caso da chance composta. */
+    ok('e a do Charizard anuncia as DUAS (Furia e Furia do Dragao)',
+       [NOME, 'Fúria'].every(n => S.especiaisDaEspecie('charizard').some(e => e.nome === n)),
+       S.especiaisDaEspecie('charizard').map(e => e.nome).join(', '));
+  }
+  /* A CHANCE COMPOSTA da linha do Charmander: a Furia comum e sorteada PRIMEIRO e corta o sorteio,
+     entao a Furia do Dragao dela sai em 0,7 x 10% = 7%. E o preco de ter dois especiais, o mesmo
+     que o Kadabra (Disable + Recuperar) ja paga. */
+  {
+    let comum = 0, dragao = 0;
+    const rng = S.makeSeededRng('charizard-composta');
+    for(let i = 0; i < 40000; i++){
+      const e = S.sorteiaGolpeEspecial(inst('charizard', 50), rng);
+      if(e && e.efeito === 'furia') comum++;
+      if(e && e.efeito === 'furiadragao') dragao++;
+    }
+    const pct = 100 * dragao / 40000;
+    ok('a Furia do Dragao do Charizard sai em ~7% (a chance composta)', pct > 6.3 && pct < 7.7,
+       pct.toFixed(2) + '%  |  a Furia comum em ' + (100*comum/40000).toFixed(2) + '%');
+  }
+  /* E O GYARADOS, que nao tem outro especial, fica nos 10% cheios. */
+  {
+    let n = 0;
+    const rng = S.makeSeededRng('gyarados-pura');
+    for(let i = 0; i < 40000; i++){
+      const e = S.sorteiaGolpeEspecial(inst('gyarados', 50), rng);
+      if(e && e.efeito === 'furiadragao') n++;
+    }
+    const pct = 100 * n / 40000;
+    ok('e a do Gyarados fica nos 10% cheios', pct > 9.3 && pct < 10.7, pct.toFixed(2) + '%');
+  }
+}
 
 console.log('\n=== A RECONSTRUCAO NAO PODE MOSTRAR DOIS GOLPES IMPOSSIVEIS ===');
 {
@@ -2758,5 +2997,195 @@ console.log('\n=== O NOME DO GOLPE APARECE JUNTO COM A BARRA ===');
   }
 }
 
+console.log('\n=== A CAIXA QUE EXPLICA O ESPECIAL (11/09/2026) ===');
+{
+  /* Pedida assim: "para todos os ataques especiais/passivas, coloque que quando o usuario clicar
+     em cima dessa habilidade passiva, abre um modal explicando o que ocorre quando acontece
+     aquela habilidade na partida". */
+  const limpo = h => String(h).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+
+  /* 1) TODO EFEITO QUE A FICHA SABE MOSTRAR TEM EXPLICACAO -- e o contrario tambem.
+        Sem esta trava, um especial novo nasce com a linha clicavel abrindo uma caixa VAZIA, e so
+        no bicho que tem AQUELE especial: o tipo de defeito que fica meses sem ninguem ver.
+        E o mesmo tipo de trava que o TIPO_DO_ESPECIAL ja tem pro selo. */
+  const efeitos = new Set();
+  Object.keys(S.SPECIES).concat(['mew']).forEach(id =>
+    S.especiaisDaEspecie(id).forEach(e => efeitos.add(e.efeito)));
+  const semTexto = [...efeitos].filter(x => !S.EXPLICACAO_DO_ESPECIAL[x]);
+  const semDono  = Object.keys(S.EXPLICACAO_DO_ESPECIAL).filter(x => !efeitos.has(x));
+  ok('todo especial da ficha tem explicacao', semTexto.length === 0, semTexto.join(',') || [...efeitos].sort().join(', '));
+  ok('e nenhuma explicacao sobra sem dono', semDono.length === 0, semDono.join(','));
+  /* SAO DEZ desde 11/09/2026: os NOVE do tentarGolpeEspecial mais o SKETCH, que entrou so pra
+     APARECER na ficha -- a mecanica dele nao foi tocada. Ele e o unico da lista que nao e sorteio
+     de confronto: acontece DEPOIS da batalha. */
+  ok('sao os DEZ especiais do jogo', efeitos.size === 10, efeitos.size + ': ' + [...efeitos].sort().join(', '));
+  ok('e o Sketch e do Smeargle, e so dele',
+     Object.keys(S.SPECIES).filter(id => S.especiaisDaEspecie(id).some(e => e.efeito === 'sketch')).join(',') === 'smeargle',
+     Object.keys(S.SPECIES).filter(id => S.especiaisDaEspecie(id).some(e => e.efeito === 'sketch')).join(','));
+  /* A FICHA DELE NAO PODE SAIR MUDA: o Smeargle nao tem outro especial, e o Sketch e a unica coisa
+     que ele faz que os seis numeros nao contam. Era isso que faltava antes desta entrada. */
+  {
+    const e = S.especiaisDaEspecie('smeargle');
+    ok('o Smeargle tem exatamente um especial na ficha, o Sketch',
+       e.length === 1 && e[0].nome === 'Sketch' && e[0].tipo === 'Normal', JSON.stringify(e));
+    /* SEM CHANCE, como o Metronomo: ele nao e sorteado, acontece sempre. */
+    ok('e ele nao declara chance (nao e sorteio)', e[0].chance == null, String(e[0].chance));
+  }
+  /* O `quando` E UM CONJUNTO FECHADO. Sao QUATRO momentos e eles jogam muito diferente; um quinto
+     escrito com outra palavra ("no fim da luta") passaria despercebido e as duas travas abaixo --
+     que procuram por /Resolve/ e /cada golpe/ -- deixariam de valer sobre ele. */
+  {
+    const validos = ['Abre o confronto','Resolve o confronto','A cada golpe','Depois da batalha'];
+    const fora = Object.entries(S.EXPLICACAO_DO_ESPECIAL)
+      .filter(([, x]) => validos.indexOf(x.quando) < 0).map(([k, x]) => k + ':' + x.quando);
+    ok('todo `quando` e um dos quatro momentos conhecidos', fora.length === 0, fora.join(', '));
+  }
+
+  /* 2) TODA ENTRADA CARREGA O EFEITO. E por ele que a caixa e escolhida -- sem ele a linha nao
+        tem o que abrir, e o `abrirEspecialInfo` recusa em silencio. */
+  const semEfeito = [];
+  Object.keys(S.SPECIES).forEach(id =>
+    S.especiaisDaEspecie(id).forEach(e => { if(!e.efeito) semEfeito.push(id + ':' + e.nome); }));
+  ok('toda entrada do especiaisDaEspecie tem `efeito`', semEfeito.length === 0, semEfeito.slice(0,5).join(', '));
+
+  /* 3) A CAIXA E POR MECANICA, NAO POR NOME -- e e isso que a estrutura promete. O sono tem 5
+        nomes e a confusao 11; todos abrem o MESMO texto, com o nome DAQUELA especie no titulo.
+        Sem isso o texto teria que ser escrito 19 vezes, e a vigesima divergiria. */
+  const nomesDoSono = [...new Set(Object.values(S.SONIFEROS))];
+  const nomesDaConf = [...new Set(Object.values(S.CONFUSAO))];
+  ok('o sono tem 5 nomes e uma explicacao so', nomesDoSono.length === 5, nomesDoSono.join(', '));
+  ok('e a confusao tem 11', nomesDaConf.length === 11, nomesDaConf.length + '');
+  {
+    /* O Zubat confunde com Supersom e o Alakazam com Confusao: MESMO texto, titulos diferentes. */
+    const a = S.especiaisDaEspecie('zubat').find(e => e.efeito === 'confusao');
+    const b = S.especiaisDaEspecie('alakazam').find(e => e.efeito === 'confusao');
+    S.abrirEspecialInfo(a.efeito, a.nome, a.tipo, a.chance);
+    const hA = S.renderEspecialInfoModal();
+    S.abrirEspecialInfo(b.efeito, b.nome, b.tipo, b.chance);
+    const hB = S.renderEspecialInfoModal();
+    ok('o Zubat e o Alakazam leem o MESMO texto', limpo(hA).replace('Supersom','') === limpo(hB).replace('Confusão',''),
+       a.nome + ' / ' + b.nome);
+    ok('mas cada um com o NOME da especie dele no titulo',
+       hA.indexOf('Supersom') >= 0 && hB.indexOf('Confusão') >= 0 && hA.indexOf('Confusão') < 0);
+    /* E o SELO sai na cor do tipo daquele nome -- o Supersom e Normal, a Confusao e Psiquico. */
+    ok('e o selo sai na cor do tipo daquele nome',
+       hA.indexOf(S.TYPE_COLORS.Normal) >= 0 && hB.indexOf(S.TYPE_COLORS.Psychic) >= 0);
+  }
+
+  /* 4) OS NUMEROS SAEM DAS CONSTANTES, nao escritos a mao no texto. E o que impede a caixa de
+        mentir no dia em que o balanceamento mudar -- o defeito que a especialidade teve quando
+        valia 1% e o CLAUDE.md dizia "~13 pontos". */
+  ok('o texto nao tem marcador por substituir',
+     !/\{[A-Z_0-9]+\}/.test(Object.values(S.EXPLICACAO_DO_ESPECIAL)
+       .map(x => S.textoDoEspecial(x.texto) + ' ' + (x.detalhes||[]).map(S.textoDoEspecial).join(' ')).join(' ')));
+  ok('a trava dos 70% vem da constante',
+     S.textoDoEspecial('{CURA}') === String(Math.round(S.CURA_MAXIMO_DO_HP * 100)), S.textoDoEspecial('{CURA}'));
+  ok('o bonus da furia tambem', S.textoDoEspecial('{FURIA}/{FURIA2}/{FURIA3}') ===
+     [S.FURIA_BONUS, S.FURIA_BONUS*2, S.FURIA_BONUS*3].join('/'), S.textoDoEspecial('{FURIA}/{FURIA2}/{FURIA3}'));
+  ok('e o dano da furia do dragao', S.textoDoEspecial('{DRAGAO}') === String(S.FURIA_DRAGAO_DANO),
+     S.textoDoEspecial('{DRAGAO}'));
+  ok('e os dois limites da drenagem', S.textoDoEspecial('{DRENO_MIN}-{DRENO_MAX}') ===
+     Math.round(S.ABSORVER_MIN*100) + '-' + Math.round(S.ABSORVER_MAX*100), S.textoDoEspecial('{DRENO_MIN}-{DRENO_MAX}'));
+
+  /* 5) O MOMENTO e a informacao que o jogador mais erra sobre este bloco, e ele TEM que bater com
+        o motor: so a AUTODESTRUICAO resolve o confronto (return true); todo o resto e abertura
+        (continue) e a luta acontece inteira depois. O Metronomo e o unico que vale a cada golpe.
+        Um texto dizendo o contrario seria pior que texto nenhum.
+        ⚠️ ESTA TRAVA JA TRABALHOU, no dia em que nasceu: a primeira versao da caixa dizia que o
+        SONO tambem resolvia o confronto. Era verdade ate 02/09/2026 (quando ele matava o alvo) e
+        deixou de ser -- hoje ele compra UMA troca livre e a luta acontece inteira. Texto de tela
+        que envelhece calado e exatamente o que ela existe pra impedir. */
+  const resolvem = Object.entries(S.EXPLICACAO_DO_ESPECIAL)
+    .filter(([, x]) => /Resolve/.test(x.quando)).map(([k]) => k).sort();
+  ok('so a explosao diz que RESOLVE o confronto', resolvem.join(',') === 'explosao', resolvem.join(','));
+  const aCadaGolpe = Object.entries(S.EXPLICACAO_DO_ESPECIAL)
+    .filter(([, x]) => /cada golpe/.test(x.quando)).map(([k]) => k);
+  ok('e so o Metronomo vale A CADA GOLPE', aCadaGolpe.join(',') === 'metronomo', aCadaGolpe.join(','));
+  /* E O MOTOR TEM QUE CONCORDAR: quem diz "abre o confronto" nao pode resolve-lo. Isto e lido do
+     CODIGO, nao de uma lista -- o `return true` do tentarGolpeEspecial e a fonte da verdade. */
+  {
+    const txt = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
+    /* A FATIA VAI ATE O `faixaDeFoco`, que e a funcao seguinte. Usar o `equiparItens` de fim (a
+       primeira tentativa) dava fatia VAZIA, porque ele fica ANTES do tentarGolpeEspecial no
+       arquivo -- e aí o teste passava sem ler nada, que e o pior jeito de um teste passar. */
+    const i0 = txt.indexOf('function tentarGolpeEspecial');
+    const bloco = txt.slice(i0, txt.indexOf('function faixaDeFoco', i0));
+    ok('achei o corpo do tentarGolpeEspecial pra ler', bloco.length > 2000, bloco.length + ' chars');
+    /* Cada efeito vale do `if` dele ate o proximo. O SONO nao tem `if` proprio (ele e o que sobra
+       depois dos outros, no fim do laco), entao ele entra na conta a parte -- e e justamente ele
+       que esta trava pegou escrito errado. */
+    const partes = bloco.split(/if\(especial\.efeito === '/).slice(1);
+    const resolveNoMotor = partes.filter(p => /\breturn true;/.test(p))
+                                 .map(p => p.slice(0, p.indexOf("'")));
+    const cauda = bloco.slice(bloco.lastIndexOf('_dormindoPor = SONO_EM_TROCAS'));
+    if(/\breturn true;/.test(cauda)) resolveNoMotor.push('sono');
+    resolveNoMotor.sort();
+    ok('o motor so RESOLVE o confronto no que a caixa diz', resolveNoMotor.join(',') === resolvem.join(','),
+       'motor: ' + (resolveNoMotor.join(',') || '(nenhum)') + '  |  caixa: ' + resolvem.join(','));
+  }
+
+  /* 6) A LINHA DA FICHA E UM BOTAO, e o alvo do toque e a linha inteira. */
+  {
+    const g = S.__getGame();
+    g.pokedexFicha = { id:'charizard', shiny:false };
+    const ficha = S.renderPokedexFicha();
+    const linhas = (ficha.match(/<button type="button" class="dex-especial"/g) || []).length;
+    ok('cada especial da ficha e um botao', linhas === 2, linhas + ' botoes (o Charizard tem 2)');
+    ok('e cada um chama o abrirEspecialInfo com o efeito dele',
+       ficha.indexOf("abrirEspecialInfo('furia'") >= 0 && ficha.indexOf("abrirEspecialInfo('furiadragao'") >= 0);
+    /* O ⓘ e o que diz que ha o que ler: sem ele o selo se le como os selos estaticos do jogo. */
+    ok('e a linha traz o ⓘ', (ficha.match(/dex-especial-info/g) || []).length === 2);
+    /* A ARMADILHA DA CASA: <button> dentro de <button> e HTML invalido -- o navegador fecha o de
+       fora sozinho e o clique de dentro se perde, com a tela continuando a PARECER certa. Ja
+       aconteceu duas vezes neste projeto (a lupa do encontro selvagem e a do montador). */
+    ok('e NENHUM botao esta dentro de outro',
+       !/<button[^>]*>(?:(?!<\/button>)[\s\S])*<button/.test(ficha));
+    /* Especie sem especial nenhum nao ganha a secao -- uma lista vazia diria menos que nada.
+       ⚠️ PROCURAR POR `dex-especiais` DA FALSO POSITIVO: a classe `dex-especiais-tit` e reusada
+       pelo titulo da lista de GOLPES POR NIVEL, que toda especie tem. O que so a secao dos
+       especiais tem e o BOTAO, e e ele que se procura. */
+    const semEspecial = Object.keys(S.SPECIES).find(id => S.especiaisDaEspecie(id).length === 0);
+    g.pokedexFicha = { id: semEspecial, shiny:false };
+    ok('especie sem especial nao ganha a secao (' + semEspecial + ')',
+       S.renderPokedexFicha().indexOf('class="dex-especial"') < 0);
+    g.pokedexFicha = null;
+  }
+
+  /* 7) ABRIR E FECHAR, e a recusa do efeito que nao existe (senao a caixa abre VAZIA). */
+  {
+    S.abrirEspecialInfo('furia', 'Fúria', 'Normal', 0.3);
+    ok('abrir guarda o especial', !!S.__getGame().especialInfo);
+    const html = S.renderEspecialInfoModal();
+    ok('e a caixa traz o momento, a chance e o texto',
+       /ABERTURA|Abre o confronto/i.test(limpo(html)) && /30% por confronto/.test(limpo(html)) &&
+       limpo(html).indexOf('entra em fúria') >= 0, limpo(html).slice(0, 70));
+    S.fecharEspecialInfo();
+    ok('e fechar limpa', S.__getGame().especialInfo === null);
+    S.abrirEspecialInfo('inventado', 'X', 'Normal', 0.1);
+    ok('efeito desconhecido NAO abre caixa vazia', S.__getGame().especialInfo === null);
+  }
+
+  /* 8) O METRONOMO E O UNICO SEM CHANCE (ele sai em TODO golpe -- o que se sorteia e QUAL), e a
+        caixa dele nao pode inventar um numero. */
+  {
+    const m = S.especiaisDaEspecie('togepi').find(e => e.efeito === 'metronomo');
+    ok('o Metronomo nao declara chance', m && m.chance == null, JSON.stringify(m));
+    S.abrirEspecialInfo(m.efeito, m.nome, m.tipo, '');
+    ok('e a caixa dele nao mostra "% por confronto"',
+       limpo(S.renderEspecialInfoModal()).indexOf('por confronto') < 0);
+    S.fecharEspecialInfo();
+  }
+
+  /* 9) A CAIXA E ANEXADA DEPOIS DA FICHA no render -- os modais empilham na ordem em que entram, e
+        vindo antes ela abriria ATRAS da ficha, que e de onde ela e aberta. Isso e lido do CODIGO:
+        os casos aqui chamam as funcoes direto e passariam com a ordem trocada. */
+  {
+    const txt = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
+    const iFicha = txt.indexOf('if(game.pokedexFicha){ html += renderPokedexFicha(); }');
+    const iCaixa = txt.indexOf('if(game.especialInfo){ html += renderEspecialInfoModal(); }');
+    ok('a caixa e anexada DEPOIS da ficha', iFicha > 0 && iCaixa > iFicha,
+       'ficha em ' + iFicha + ', caixa em ' + iCaixa);
+  }
+}
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
 process.exit(falhas ? 1 : 0);

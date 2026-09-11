@@ -1425,6 +1425,36 @@ const CONFUSAO = {
   xatu:'Raio Confuso', yanma:'Supersom', zubat:'Supersom'
 };
 const CHANCE_CONFUSAO = 0.10;   // por confronto, como o Disable, o Recuperar e a drenagem
+/* FÚRIA DO DRAGÃO: 40 de HP no adversário, na abertura do confronto (11/09/2026, a pedido).
+   É o NONO golpe especial, ao lado do sono, da autodestruição, do Metrônomo, do Disable, do
+   Recuperar, da drenagem, da fúria e da confusão -- e o mais simples de todos: não sorteia dano,
+   não olha tipo, não olha atributo. São 40, sempre, como no jogo oficial.
+   É ABERTURA e NÃO resolve o confronto ('continue', como o Recuperar, a anulação, a drenagem, a
+   fúria e a confusão): o adversário começa a luta 40 de HP mais pobre e ela acontece INTEIRA
+   depois -- que é o pedido ao pé da letra ("o motor deve calcular a batalha como se fosse uma
+   nova batalha começando").
+   NÃO MATA: piso de 1 de HP, a mesma regra da drenagem e da confusão. Um efeito de abertura que
+   resolvesse o confronto sozinho seria um confronto sem um único golpe na tela.
+   O DANO É FIXO E É ISSO QUE ELE É. No motor daqui todo golpe é uma fração da vida do alvo, então
+   um número cru pesa MUITO diferente conforme o nível: 40 num Dratini Lv.22 (181 de teto) é 22%
+   da barra, e num Dragonite Lv.70 (466) é 8,6%. É o mesmo desenho do jogo original, onde a Fúria
+   do Dragão é forte cedo e vira lembrança depois -- e é por isso que ela não precisa de teto: o
+   crescimento do jogo já a aposenta sozinha.
+   A LISTA são as 7 espécies que aprendem Dragon Rage por NÍVEL na Gen 3, a mesma regra das outras
+   sete listas, e ela saiu da base (data/golpes.json) por script -- não foi escrita à mão.
+   A linha do Charmander aparece porque ela aprende MESMO (nível 43/48/54 no FireRed); a intuição
+   de que seria só a dos dragões erra.
+   ELA NÃO DISPUTA VAGA DE GOLPE, e isso é dado e não decisão: `dragonrage` tem poder VARIÁVEL, e
+   os 22 golpes de poder variável ficaram fora da tabela GOLPES quando a base da Gen 3 entrou. Ou
+   seja, ela nunca foi escolhível -- e sem esta passiva ela não existia no jogo.
+   ELA VEM POR ÚLTIMO NO SORTEIO, depois até da confusão, e é a mesma decisão de sempre:
+   acrescentar um efeito no FIM da fila não dilui nenhum dos que já estavam medidos. Quem cai na
+   chance composta é ela -- a linha do Charmander, que já tem Fúria (30%), sai em 0,7 x 10% = 7%.
+   O MEWTWO e o MEW não entram (nenhum dos dois aprende, e o tentarGolpeEspecial corta o bloco
+   inteiro quando um deles está no confronto: a entrada seria letra morta). */
+const FURIA_DRAGAO = ['charmander','charmeleon','charizard','gyarados','dratini','dragonair','dragonite'];
+const CHANCE_FURIA_DRAGAO = 0.10;   // por confronto, como o Disable, o Recuperar, a drenagem e a confusão
+const FURIA_DRAGAO_DANO = 40;       // fixo, como no jogo oficial -- não escala com nível nem com atributo
 const IMUNES_A_ESPECIAL = ['mew','mewtwo'];
 /* Aprendem Autodestruição por nível na Gen 1/2. */
 const AUTODESTRUICAO = ['geodude','graveler','golem','voltorb','electrode','koffing','weezing','pineco','forretress'];
@@ -1460,10 +1490,15 @@ const SONIFEROS = {
    A LISTA são as espécies que aprendem Metrônomo por nível no original, mais o Mew. O Snubbull SAIU
    dela (ele não aprende Metrônomo por nível na Gen 3 -- ver a tabela de divergências do CLAUDE.md)
    e passou a lutar com o moveset dele, que é grande: Mordida, Talho, Derrubada.
+   O SNORLAX SAIU EM 11/09/2026, a pedido, e ele era o lugar que este arquivo já apontava como a
+   alavanca da lista ("tirar Snorlax, que é a mais comum em time de jogador"). Ele também não
+   aprende Metrônomo por nível na Gen 3 -- estava aqui por pedido, como o Snubbull esteve --, e o
+   moveset dele é o oposto do da Clefairy: Golpe de Corpo (85), Hiper Raio (150) e Cabeçada (70).
+   Ou seja, ao contrário dela ele não dependia do sorteio pra ter o que bater.
    O MEW entra porque o Metrônomo é dele no original. Ele é o chefe da raide e continua IMUNE ao
    bloco de efeitos (IMUNES_A_ESPECIAL corta antes do sorteio), então o que ele ganha aqui é só o
    golpe sorteado -- nunca a explosão, que acabaria com a raide da semana num golpe. */
-const METRONOMO = ['snorlax','cleffa','clefairy','clefable','mew','togepi','togetic'];
+const METRONOMO = ['cleffa','clefairy','clefable','mew','togepi','togetic'];
 /* O BOLO DO SORTEIO é todo golpe de DANO da tabela. Vai ORDENADO de propósito: os dois motores têm
    a tabela escrita em ordens diferentes, e sortear por índice numa lista não ordenada faria o
    cliente e o servidor tirarem golpes DIFERENTES com a mesma semente -- a mesma batalha terminando
@@ -1537,6 +1572,13 @@ function sorteiaGolpeEspecial(p, rng){
      (Disable + Recuperar + Confusão) confunde em 0,9 × 0,9 × 10% = 8,1%. */
   if(CONFUSAO[p.speciesId] && rng() < CHANCE_CONFUSAO){
     return { efeito:'confusao', golpe: CONFUSAO[p.speciesId] };
+  }
+  /* A FÚRIA DO DRAGÃO É A ÚLTIMA DA FILA, pelo mesmo motivo que a confusão foi um dia: o efeito que
+     entra no FIM não dilui nenhum dos que já estavam medidos -- quem paga a chance composta é ele.
+     A linha do Charmander, que já tem Fúria (30%), dispara esta em 0,7 x 10% = 7%; o Gyarados e a
+     linha do Dratini, que não têm outro especial, ficam nos 10% cheios. */
+  if(FURIA_DRAGAO.includes(p.speciesId) && rng() < CHANCE_FURIA_DRAGAO){
+    return { efeito:'furiadragao', golpe:'Fúria do Dragão' };
   }
   return null;
 }
@@ -1666,6 +1708,28 @@ function tentarGolpeEspecial(active, enemy, rng, diario){
         const reg = { q: marca, d: saiu, hp: alvo.hp, c:0, m:0, z:0, x:'confusao', g: especial.golpe };
         if(espelho.lastMove) reg.am = espelho.lastMove;
         diario.push(reg);
+      }
+      continue;
+    }
+    if(especial.efeito === 'furiadragao'){
+      /* 40 DE HP NO ADVERSÁRIO, e a luta acontece INTEIRA depois -- é 'continue', não
+         'return true'. O pedido é literal: "o oponente começa a batalha perdendo 40 de hp e depois
+         disso o motor deve calcular a batalha como se fosse uma nova batalha começando".
+         NÃO MATA: piso de 1, a mesma regra da drenagem e da confusão. E quem já está em 1 não gera
+         linha nenhuma -- um passo de dano 0 é o que este log evita em toda regra.
+         O DANO GRAVADO É O EFETIVO, não os 40 crus: num alvo com 25 de HP a linha diz 24, que é o
+         que a barra vai andar. É a regra do diário desde sempre -- com o valor cru a soma das
+         linhas passava do HP que o pokémon tinha. */
+      const antes = alvo.hp;
+      alvo.hp = Math.max(1, alvo.hp - FURIA_DRAGAO_DANO);
+      const saiu = antes - alvo.hp;
+      if(saiu <= 0) continue;
+      if(diario){
+        /* `q` é quem USOU o golpe, não quem apanhou -- a convenção do diário, a mesma do sono, da
+           confusão e do dano da drenagem. É ela que faz a animação mover a barra do lado certo: o
+           passo comum inverte o `q` pra achar quem APANHA. Trocar isso não aparece como erro,
+           aparece como o pokémon errado perdendo vida. */
+        diario.push({ q: marca, d: saiu, hp: alvo.hp, c:0, m:0, z:0, x:'furiadragao', g: especial.golpe });
       }
       continue;
     }
@@ -3556,7 +3620,7 @@ exports._raizDaLinha = raizDaLinha;
 exports._chaveDoEquipado = chaveDoEquipado;
 exports._createInstance = createInstance;
 exports._makeSeededRng = makeSeededRng;
-exports._golpesEspeciais = { AUTODESTRUICAO, SONIFEROS, METRONOMO, CHANCE_AUTODESTRUICAO, CHANCE_SONO, SONO_EM_TROCAS, MULTI_GOLPE, ataquesDisponiveis, GOLPES_CRIT_ALTO, FURIA, CHANCE_FURIA, FURIA_BONUS, sorteiaGolpeDoMetronomo, POOL_METRONOMO, CONFUSAO, CHANCE_CONFUSAO };
+exports._golpesEspeciais = { AUTODESTRUICAO, SONIFEROS, METRONOMO, CHANCE_AUTODESTRUICAO, CHANCE_SONO, SONO_EM_TROCAS, MULTI_GOLPE, ataquesDisponiveis, GOLPES_CRIT_ALTO, FURIA, CHANCE_FURIA, FURIA_BONUS, sorteiaGolpeDoMetronomo, POOL_METRONOMO, CONFUSAO, CHANCE_CONFUSAO, FURIA_DRAGAO, CHANCE_FURIA_DRAGAO, FURIA_DRAGAO_DANO };
 exports._trainersLeagueSplitGroups = trainersLeagueSplitGroups;
 exports._trainersLeagueGatherEligibleCodes = trainersLeagueGatherEligibleCodesForUid;
 exports._decodeTeamCode = decodeTeamCode;   // o teste da liga confere a ORDEM da lista pela especie de cada time
