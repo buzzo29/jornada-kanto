@@ -110,50 +110,58 @@ console.log('\n=== SAVE ANTIGO NÃO LEVA RETROATIVO ===');
 
 console.log('\n=== O RE-SORTEIO COBRA ===');
 {
-  await conta('c', jaVisto(), 7);
-  const r = await chamar('rerollWildOffer', 'c', {});
-  ok('re-sortear custa 3', r.custo === 3 && r.moedas === 4, JSON.stringify(r));
-  await chamar('rerollWildOffer', 'c', {});
+  /* O PRECO SUBIU DE 3 PRA 5 em 11/09/2026, a pedido -- e o pedido veio junto com a VENDA de
+     itens, que tinha criado uma torneira de moeda (ver a secao VENDER no CLAUDE.md). */
+  await conta('c', jaVisto(), 11);
+  /* O SLOT E OBRIGATORIO desde 11/09/2026, quando o TETO por save entrou: sem ele nao ha como
+     contar, e deixar passar transformaria "nao mandar o slot" no jeito de furar o teto. */
+  const r = await chamar('rerollWildOffer', 'c', { slot:'0' });
+  ok('re-sortear custa 5', r.custo === 5 && r.moedas === 6, JSON.stringify(r));
+  await chamar('rerollWildOffer', 'c', { slot:'0' });
   ok('e de novo', await moedasDe('c') === 1, String(await moedasDe('c')));
-  /* COM MENOS DE 3 ele RECUSA -- e a recusa diz quanto falta, senão o botão parece quebrado. */
-  const erro = await recusa('rerollWildOffer', 'c', {});
+  /* COM MENOS DE 5 ele RECUSA -- e a recusa diz quanto falta, senão o botão parece quebrado. */
+  const erro = await recusa('rerollWildOffer', 'c', { slot:'0' });
   ok('com 1 moeda ele recusa', erro === 'failed-precondition', String(erro));
   ok('e não cobra nada na recusa', await moedasDe('c') === 1, String(await moedasDe('c')));
 
   await conta('d', jaVisto(), 0);
   ok('quem não tem moeda nenhuma também é recusado',
-     await recusa('rerollWildOffer', 'd', {}) === 'failed-precondition');
+     await recusa('rerollWildOffer', 'd', { slot:'0' }) === 'failed-precondition');
   ok('e continua com zero, não fica negativo', await moedasDe('d') === 0, String(await moedasDe('d')));
 
-  /* COM O BONUS SHINY LIGADO o preco sobe a cada re-sorteio NA MESMA ROTA: 3, 6, 9... O contador
+  /* COM O BONUS SHINY LIGADO o preco sobe a cada re-sorteio NA MESMA ROTA: 5, 10, 15... O contador
      vem do SAVE, e isso e seguro por construcao -- ele entra na SEMENTE da oferta, entao mentir que
      e zero devolve a MESMA oferta de antes. Quem falsifica pra pagar menos nao ganha nada. */
   await conta('r', jaVisto(), 500);
   await userRef('r').set({ shinyBonusExpiresAt: Date.now() + 60*60*1000 }, { merge:true });
   await saveRef('r', 0).set({ wildRerolls: 0 }, { merge:true });
   const p1 = await chamar('rerollWildOffer', 'r', { slot:'0' });
-  ok('com o bonus, o primeiro custa 3', p1.custo === 3, String(p1.custo));
+  ok('com o bonus, o primeiro custa 5', p1.custo === 5, String(p1.custo));
   await saveRef('r', 0).set({ wildRerolls: 1 }, { merge:true });
   const p2 = await chamar('rerollWildOffer', 'r', { slot:'0' });
-  ok('o segundo custa 6', p2.custo === 6, String(p2.custo));
+  ok('o segundo custa 10', p2.custo === 10, String(p2.custo));
   await saveRef('r', 0).set({ wildRerolls: 2 }, { merge:true });
   const p3 = await chamar('rerollWildOffer', 'r', { slot:'0' });
-  ok('e o terceiro custa 9', p3.custo === 9, String(p3.custo));
-  ok('e o saldo desceu 3+6+9', p3.moedas === 500 - 18, String(p3.moedas));
+  ok('e o terceiro custa 15', p3.custo === 15, String(p3.custo));
+  ok('e o saldo desceu 5+10+15', p3.moedas === 500 - 30, String(p3.moedas));
 
   /* SEM o bonus o preco nao sobe, por mais que ele tenha re-sorteado. */
   await conta('s', jaVisto(), 500);
   await saveRef('s', 0).set({ wildRerolls: 7 }, { merge:true });
   const semBonus = await chamar('rerollWildOffer', 's', { slot:'0' });
-  ok('sem o bonus, sete re-sorteios depois, ainda custa 3', semBonus.custo === 3, String(semBonus.custo));
+  ok('sem o bonus, sete re-sorteios depois, ainda custa 5', semBonus.custo === 5, String(semBonus.custo));
 
   /* BONUS VENCIDO tambem nao encarece. */
   await userRef('s').set({ shinyBonusExpiresAt: Date.now() - 1000 }, { merge:true });
-  ok('bonus vencido nao encarece', (await chamar('rerollWildOffer', 's', { slot:'0' })).custo === 3);
+  ok('bonus vencido nao encarece', (await chamar('rerollWildOffer', 's', { slot:'0' })).custo === 5);
 
-  /* CLIENTE ANTIGO EM CACHE nao manda o slot: cai no preco de sempre, em vez de quebrar. */
+  /* ⚠️ SEM O SLOT ELE PASSOU A RECUSAR em 11/09/2026, com o teto por save. Antes ele caia no
+     preco de sempre ("cliente antigo em cache"), e isso virou um buraco: sem slot nao ha como
+     contar, entao nao mandar o slot seria o jeito de furar o teto. O index.html vai com no-cache e
+     revalida, entao cliente velho de verdade dura um F5. */
   await userRef('s').set({ shinyBonusExpiresAt: Date.now() + 60*60*1000 }, { merge:true });
-  ok('sem o slot, o preco e o de sempre', (await chamar('rerollWildOffer', 's', {})).custo === 3);
+  ok('sem o slot ele recusa, em vez de cair no preco de sempre',
+     await recusa('rerollWildOffer', 's', {}) === 'failed-precondition');
 
   /* A RECUSA diz o preco CERTO, nao os 3 fixos -- senao o botao promete um preco e a cobranca
      pratica outro. */
@@ -162,21 +170,22 @@ console.log('\n=== O RE-SORTEIO COBRA ===');
   await saveRef('u', 0).set({ wildRerolls: 2 }, { merge:true });
   let msg = '';
   try { await chamar('rerollWildOffer', 'u', { slot:'0' }); } catch(e){ msg = e.message || ''; }
-  ok('a recusa nomeia o preco escalonado', /custa 9/.test(msg), msg);
+  ok('a recusa nomeia o preco escalonado', /custa 15/.test(msg), msg);
 }
 
 console.log('\n=== DUAS ABAS NÃO GASTAM A MESMA MOEDA ===');
 {
-  /* Sem transação, as duas leem o mesmo saldo e as duas passam -- 6 moedas de re-sorteio saindo por
-     3. É o mesmo cuidado do desconto da raide do Mew. */
-  await conta('e', jaVisto(), 5);
+  /* Sem transação, as duas leem o mesmo saldo e as duas passam -- 10 moedas de re-sorteio saindo
+     por 5. É o mesmo cuidado do desconto da raide do Mew.
+     O saldo é 8 de propósito: dá pra UM re-sorteio de 5 e não pra dois. */
+  await conta('e', jaVisto(), 8);
   const rs = await Promise.allSettled([
-    chamar('rerollWildOffer', 'e', {}),
-    chamar('rerollWildOffer', 'e', {})
+    chamar('rerollWildOffer', 'e', { slot:'0' }),
+    chamar('rerollWildOffer', 'e', { slot:'0' })
   ]);
   const passaram = rs.filter(x => x.status === 'fulfilled').length;
   ok('só uma das duas passa', passaram === 1, passaram + ' passaram');
-  ok('e sobra o saldo certo', await moedasDe('e') === 2, String(await moedasDe('e')));
+  ok('e sobra o saldo certo', await moedasDe('e') === 3, String(await moedasDe('e')));
 
   /* O mesmo vale pro pagamento: duas telas de vitória reivindicando a mesma insígnia. */
   await conta('f', jaVisto({ badgesEarned:['1'], badgeCount:1 }), 0);
@@ -384,6 +393,175 @@ console.log('\n=== O MODO DIFICIL E PAGO ===');
   ok('e continua com zero', await moedasDe('dif2') === 0);
 }
 
+console.log('\n=== O TETO DE RE-SORTEIOS POR SAVE ===');
+{
+  /* Pedido em 11/09/2026: "so pode usar no maximo 8 re-sorteio por save". Ele e a trava que o PRECO
+     nao consegue ser -- preco depende do saldo, e toda fonte de moeda nova reabre a torneira. */
+  await conta('t', jaVisto(), 10000);
+  await saveRef('t', 0).set({ saveGen: 0 }, { merge:true });
+  let ok8 = 0;
+  for(let i = 0; i < 8; i++){
+    const r = await chamar('rerollWildOffer', 't', { slot:'0' });
+    if(r.ressorteiosUsados === i + 1 && r.ressorteiosRestantes === 8 - (i + 1)) ok8++;
+  }
+  ok('os oito primeiros passam, contando certo', ok8 === 8, ok8 + ' de 8');
+  const cod = await recusa('rerollWildOffer', 't', { slot:'0' });
+  ok('e o NONO e recusado', cod === 'failed-precondition', String(cod));
+  /* E A RECUSA NAO COBRA -- senao o teto viraria uma forma de perder moeda. */
+  const saldo = await moedasDe('t');
+  await recusa('rerollWildOffer', 't', { slot:'0' });
+  ok('e a recusa nao cobra nada', await moedasDe('t') === saldo, String(await moedasDe('t')));
+  /* A RECUSA DIZ POR QUE -- "sem moeda" e "acabaram os re-sorteios" sao problemas diferentes, e um
+     botao apagado sem motivo faz procurar bug. */
+  let msg = '';
+  try { await chamar('rerollWildOffer', 't', { slot:'0' }); } catch(e){ msg = e.message || ''; }
+  ok('e a recusa nomeia o teto, nao a moeda', /8 re-sorteios/.test(msg) && !/moeda/.test(msg), msg);
+
+  /* ⚠️ O TETO E POR SAVE, e o OUTRO SLOT nao e afetado. */
+  await saveRef('t', 1).set({ saveGen: 0 }, { merge:true });
+  const outro = await chamar('rerollWildOffer', 't', { slot:'1' });
+  ok('outro slot tem o teto proprio', outro.ressorteiosUsados === 1, String(outro.ressorteiosUsados));
+
+  /* ⚠️ E ELE ZERA QUANDO UM SAVE NOVO NASCE NO MESMO SLOT. A chave e slot:geracao, e a geracao
+     avanca quando o save novo e criado (o mesmo mecanismo que fecha o save-scumming dos iniciais).
+     Sem isso, apagar e recriar o save herdaria o teto gasto -- ou, pior, resolver com uma limpeza a
+     mao esqueceria algum caminho. */
+  await saveRef('t', 0).set({ saveGen: 1 }, { merge:true });
+  const novo = await chamar('rerollWildOffer', 't', { slot:'0' });
+  ok('save novo no mesmo slot comeca com o teto cheio', novo.ressorteiosUsados === 1,
+     String(novo.ressorteiosUsados));
+  ok('e o teto do save ANTIGO continua gravado',
+     (((await userRef('t').get()).data() || {}).rerollsPorSave || {})['0:0'] === 8,
+     JSON.stringify(((await userRef('t').get()).data() || {}).rerollsPorSave));
+
+  /* ⚠️ O CONTADOR NAO MORA NO SAVE, e este caso e o que prova. O save e LIVRE pro dono, entao zerar
+     o wildRerolls dele nao pode devolver re-sorteio nenhum -- o que ele controla e o PRECO
+     escalonado, nao o teto. */
+  await conta('t2', jaVisto(), 10000);
+  await saveRef('t2', 0).set({ saveGen: 0 }, { merge:true });
+  for(let i = 0; i < 8; i++) await chamar('rerollWildOffer', 't2', { slot:'0' });
+  await saveRef('t2', 0).set({ wildRerolls: 0 }, { merge:true });   // o jogador "limpa" o save
+  ok('zerar o contador do SAVE nao devolve re-sorteio',
+     await recusa('rerollWildOffer', 't2', { slot:'0' }) === 'failed-precondition');
+
+  /* SEM SLOT ele RECUSA em vez de passar livre: deixar passar transformaria "nao mandar o slot" no
+     jeito de furar o teto, e um cliente adulterado faria exatamente isso. */
+  await conta('t3', jaVisto(), 1000);
+  ok('sem o slot ele recusa', await recusa('rerollWildOffer', 't3', {}) === 'failed-precondition');
+  ok('e nao cobra nada', await moedasDe('t3') === 1000, String(await moedasDe('t3')));
+
+  /* DUAS ABAS NAO FURAM O TETO: o contador sobe na MESMA transacao da cobranca. */
+  await conta('t4', jaVisto(), 10000);
+  await saveRef('t4', 0).set({ saveGen: 0 }, { merge:true });
+  for(let i = 0; i < 7; i++) await chamar('rerollWildOffer', 't4', { slot:'0' });
+  const duas = await Promise.allSettled([
+    chamar('rerollWildOffer', 't4', { slot:'0' }),
+    chamar('rerollWildOffer', 't4', { slot:'0' })
+  ]);
+  ok('com 1 sobrando, so UMA das duas abas passa',
+     duas.filter(x => x.status === 'fulfilled').length === 1,
+     duas.filter(x => x.status === 'fulfilled').length + ' passaram');
+  ok('e o total fica exatamente em 8',
+     (((await userRef('t4').get()).data() || {}).rerollsPorSave || {})['0:0'] === 8,
+     JSON.stringify(((await userRef('t4').get()).data() || {}).rerollsPorSave));
+
+  /* OS DOIS LADOS TEM QUE CONCORDAR NO TETO: o cliente desabilita o botao com esse numero e o
+     servidor recusa com ele. Se divergirem, a tela oferece o que a cobranca nega. */
+  {
+    const S = require('./game-sandbox').createSandbox();
+    const srv = require('fs').readFileSync(path.join(__dirname, '..', 'functions', 'index.js'), 'utf8');
+    const m = srv.match(/const MAX_RESSORTEIOS_POR_SAVE = (\d+)/);
+    ok('o teto e o mesmo nos dois lados',
+       !!m && Number(m[1]) === S.MAX_RESSORTEIOS_POR_SAVE,
+       'cliente ' + S.MAX_RESSORTEIOS_POR_SAVE + '  servidor ' + (m && m[1]));
+    ok('e ele e 8', S.MAX_RESSORTEIOS_POR_SAVE === 8, String(S.MAX_RESSORTEIOS_POR_SAVE));
+  }
+
+  /* ⚠️ E O CAMPO PRECISA ESTAR NA TRAVA DAS REGRAS -- senao o teto inteiro e decorativo: uma linha
+     no console zeraria o contador. Lido do firestore.rules, que e a fonte da verdade desde
+     30/08/2026. */
+  {
+    const regras = require('fs').readFileSync(path.join(__dirname, '..', 'firestore.rules'), 'utf8');
+    const naTrava = (regras.match(/hasAny\(\[[^\]]*'rerollsPorSave'[^\]]*\]\)/g) || []).length;
+    ok('o rerollsPorSave esta na trava do firestore.rules (escrita E criacao)', naTrava === 2,
+       naTrava + ' ocorrencias');
+  }
+}
+console.log('\n=== A LOJA: VENDER POR METADE ===');
+{
+  /* Pedido em 11/09/2026: "caso o usuario ja tenha um dos itens listado, ele pode ter a opcao
+     vender por 50% do valor de compra". */
+  await conta('v', jaVisto(), 0);
+  await userRef('v').set({ inventario: { potion: 4, awakening: 1 }, rareCandies: 2 }, { merge:true });
+
+  const r = await chamar('sellItem', 'v', { item:'potion' });
+  ok('vender uma Pocao (30) rende 15', r.moedas === 15 && r.recebeu === 15, JSON.stringify(r));
+  ok('e tira do armazem', r.inventario.potion === 3, JSON.stringify(r.inventario));
+
+  /* A METADE E SOBRE O PRECO DE COMPRA, item a item -- e o numero sai do MESMO preco, nunca de uma
+     segunda tabela. Aqui se cobra o resultado dos quatro precos que o jogo tem hoje. */
+  const v2 = await chamar('sellItem', 'v', { item:'awakening' });   // 50 -> 25
+  ok('o Despertar (50) rende 25', v2.recebeu === 25, String(v2.recebeu));
+
+  /* VENDER VARIOS DE UMA VEZ, e a mesma regra da compra: pedir mais do que se tem vende o que tem.
+     Recusar tudo porque o estoque mudou entre a tela e a transacao seria pior que fazer o que da. */
+  const v3 = await chamar('sellItem', 'v', { item:'potion', quantidade: 99 });
+  ok('pedir 99 tendo 3 vende 3', v3.vendeu === 3, v3.vendeu + ' vendidas');
+  ok('e paga as 3', v3.recebeu === 45, String(v3.recebeu));
+  ok('e o armazem zera, nao fica negativo', v3.inventario.potion === 0, JSON.stringify(v3.inventario));
+
+  /* SEM ESTOQUE ELE RECUSA -- e nao paga nada. E a guarda que impede moeda do nada. */
+  const antes = await moedasDe('v');
+  ok('vender o que nao se tem e recusado',
+     await recusa('sellItem', 'v', { item:'faixa_foco' }) === 'failed-precondition');
+  ok('e nao paga nada na recusa', await moedasDe('v') === antes, String(await moedasDe('v')));
+  ok('item que nao existe e recusado', await recusa('sellItem', 'v', { item:'masterball' }) === 'invalid-argument');
+  ok('quantidade zero e recusada', await recusa('sellItem', 'v', { item:'awakening', quantidade: 0 }) === 'invalid-argument');
+
+  /* O DOCE RARO SAI DO CONTADOR, nao do inventario -- o mesmo caminho da compra, ao contrario. */
+  const dc = await chamar('sellItem', 'v', { item:'doce_raro', quantidade: 2 });
+  ok('o Doce Raro sai do contador da conta', dc.rareCandies === 0, String(dc.rareCandies));
+  ok('e rende 150 cada', dc.recebeu === 300, String(dc.recebeu));
+  ok('e o contador gravado bate', ((await userRef('v').get()).data() || {}).rareCandies === 0);
+  ok('e sem doce ele recusa', await recusa('sellItem', 'v', { item:'doce_raro' }) === 'failed-precondition');
+
+  /* ⚠️ NAO EXISTE LOOP DE ARBITRAGEM, e isso e por construcao: comprar e vender de volta PERDE
+     metade. Qualquer fracao acima de 100% viraria maquina de moeda, e este caso e o que grita se
+     alguem mexer nela. */
+  await conta('w', jaVisto(), 300);
+  await chamar('buyItem', 'w', { item:'potion', quantidade: 10 });   // -300
+  const volta = await chamar('sellItem', 'w', { item:'potion', quantidade: 10 });   // +150
+  ok('comprar e vender de volta PERDE metade', volta.moedas === 150, volta.moedas + ' de 300');
+
+  /* ⚠️ O BONUS SHINY DE CUPOM NAO SE VENDE. O quantoTenho da mochila soma os cupons (save campeao
+     e notificacao de liga) com o estoque comprado, porque pra USAR os dois valem igual; pra VENDER
+     nao ha de onde descontar -- cupom e uma marca dentro de um save, nao uma linha de estoque.
+     O servidor so olha o inventario, e e isso que este caso tranca. */
+  await conta('x', jaVisto(), 0);
+  ok('sem estoque comprado, o Bonus Shiny nao se vende',
+     await recusa('sellItem', 'x', { item:'bonus_shiny' }) === 'failed-precondition');
+  await userRef('x').set({ inventario: { bonus_shiny: 1 } }, { merge:true });
+  const bs = await chamar('sellItem', 'x', { item:'bonus_shiny' });
+  ok('mas o COMPRADO se vende, por 400', bs.recebeu === 400 && bs.moedas === 400, JSON.stringify(bs));
+
+  /* OS DOIS LADOS TEM QUE CONCORDAR NO PRECO. O cliente desenha "Vender por N" e o servidor paga N;
+     se divergirem, a tela promete o que a cobranca nao pratica -- o mesmo cuidado que o preco de
+     COMPRA ja carrega. Isto compara os DOIS catalogos, item a item. */
+  {
+    const S = require('./game-sandbox').createSandbox();
+    const compravel = Object.keys(S.ITENS).filter(id => S.ITENS[id].comprável);
+    const fora = compravel.filter(id => S.precoDeVenda(id) !== Math.floor(S.ITENS[id].preco / 2));
+    ok('o cliente calcula a metade de todos', fora.length === 0, fora.join(','));
+    /* E a metade do CLIENTE tem que ser a mesma do SERVIDOR, que e quem paga. Lido do codigo do
+       servidor, porque o preco de la vive na tabela LOJA e nao e exportado. */
+    const srv = require('fs').readFileSync(path.join(__dirname, '..', 'functions', 'index.js'), 'utf8');
+    const divergem = compravel.filter(id => {
+      const m = srv.match(new RegExp('\\b' + id + ':\\s*\\{[^}]*preco:\\s*(\\d+)'));
+      return !m || Math.floor(Number(m[1]) / 2) !== S.precoDeVenda(id);
+    });
+    ok('e o servidor paga exatamente essa metade', divergem.length === 0, divergem.join(','));
+  }
+}
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
 process.exit(falhas ? 1 : 0);
 

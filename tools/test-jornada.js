@@ -816,7 +816,10 @@ console.log('\n=== A OFERTA SELVAGEM ===');
   const posCards = tela.indexOf('wild-linha');
   ok('o botao fica entre o contador e os cards', posContador < posBotao && posBotao < posCards,
      'contador ' + posContador + ', botao ' + posBotao + ', cards ' + posCards);
-  ok('com o texto pedido', tela.includes('🪙 3 - Sortear novamente'),
+  /* O NUMERO SAI DA CONSTANTE, nao escrito a mao: o preco ja subiu uma vez (3 -> 5 em
+     11/09/2026) e o teste quebrou junto. Amarrado a constante, o proximo reajuste so muda o
+     valor -- o que se cobra aqui e a FORMA do botao. */
+  ok('com o texto pedido', tela.includes('🪙 ' + S.MOEDAS_RESSORTEIO + ' - Sortear novamente'),
      (tela.match(/Sortear[^<]*/g)||[]).join(' | '));
   ok('e o saldo do lado direito, dentro do mesmo botao',
      /wild-reroll[^>]*>[\s\S]*?Possui: 🪙 1000[\s\S]*?<\/button>/.test(tela),
@@ -849,18 +852,22 @@ console.log('\n=== COM O BONUS SHINY, O RE-SORTEIO ENCARECE NA MESMA ROTA ===');
   ok('e continua fixo depois de cinco re-sorteios', S.precoDoRessorteio() === S.MOEDAS_RESSORTEIO,
      String(S.precoDoRessorteio()));
 
-  /* COM o bonus: 3, 6, 9... exatamente o que foi pedido. */
+  /* COM o bonus ele sobe de MOEDAS_RESSORTEIO em MOEDAS_RESSORTEIO: 5, 10, 15... (era 3, 6, 9
+     ate 11/09/2026). O esperado sai da constante pelo mesmo motivo do botao acima. */
   const g3 = S.__getGame(); g3.shinyBonusExpiresAt = Date.now() + 60000; S.__setGame(g3);
   const precos = [0,1,2,3].map(n => { const x = S.__getGame(); x.wildRerolls = n; S.__setGame(x); return S.precoDoRessorteio(); });
-  ok('com o bonus ele sobe de 3 em 3', precos.join(',') === '3,6,9,12', precos.join(','));
+  const esperado = [1,2,3,4].map(k => S.MOEDAS_RESSORTEIO * k).join(',');
+  ok('com o bonus ele sobe de ' + S.MOEDAS_RESSORTEIO + ' em ' + S.MOEDAS_RESSORTEIO,
+     precos.join(',') === esperado, precos.join(',') + '  esperado ' + esperado);
 
-  /* A ROTA SEGUINTE volta a 3, porque o wildRerolls zera a cada encontro novo -- o que se quer
+  /* A ROTA SEGUINTE volta ao preco base, porque o wildRerolls zera a cada encontro novo -- o que se quer
      encarecer e insistir NA MESMA rota, nao jogar. */
   const g4 = S.__getGame(); g4.wildRerolls = 4; g4.wildEncounterSeq = 1; S.__setGame(g4);
-  ok('antes do encontro novo o preco esta alto', S.precoDoRessorteio() === 15, String(S.precoDoRessorteio()));
+  ok('antes do encontro novo o preco esta alto', S.precoDoRessorteio() === S.MOEDAS_RESSORTEIO * 5,
+     String(S.precoDoRessorteio()));
   S.goToWildEncounter();
   ok('encontro novo zera o contador', (S.__getGame().wildRerolls || 0) === 0, String(S.__getGame().wildRerolls));
-  ok('e o preco volta pros 3', S.precoDoRessorteio() === S.MOEDAS_RESSORTEIO, String(S.precoDoRessorteio()));
+  ok('e o preco volta pro base', S.precoDoRessorteio() === S.MOEDAS_RESSORTEIO, String(S.precoDoRessorteio()));
 
   /* BONUS VENCIDO nao encarece: e o mesmo teste do currentShinyChance. */
   const g5 = S.__getGame(); g5.shinyBonusExpiresAt = Date.now() - 1000; g5.wildRerolls = 3; S.__setGame(g5);

@@ -2997,6 +2997,316 @@ console.log('\n=== O NOME DO GOLPE APARECE JUNTO COM A BARRA ===');
   }
 }
 
+console.log('\n=== A DANCA DA CHUVA: O PRIMEIRO CLIMA DO JOGO (11/09/2026) ===');
+{
+  /* Pedida assim: "10% de chance de acontecer na batalha, ativada antes da batalha comecar, dura
+     3 confrontos, e durante esses 3 os ataques de agua tem +50%, os de fogo e o solar beam perdem
+     50%, e os eletricos tem +25%". */
+  ok('sao as 13 especies que aprendem Rain Dance por nivel na Gen 3',
+     S.CHUVA.length === 13, S.CHUVA.join(', '));
+  /* NOMEADAS, nao contadas -- a licao da auditoria de 04/09/2026. */
+  ok('e sao as certas (a linha do Squirtle, do Poliwag, Gyarados, Lapras, a linha do Marill, do Wooper, Suicune e Lugia)',
+     ['squirtle','wartortle','blastoise','poliwag','poliwhirl','gyarados','lapras','marill',
+      'azumarill','wooper','quagsire','suicune','lugia'].every(id => S.CHUVA.includes(id)));
+  /* A CHANCE E POR ENTRADA DO PORTADOR NUM CONFRONTO; o que e POR BATALHA e a DURACAO. */
+  ok('a chance e 10%', S.CHANCE_CHUVA === 0.10, (100*S.CHANCE_CHUVA) + '%');
+  ok('e ela dura 3 confrontos', S.CHUVA_EM_CONFRONTOS === 3, S.CHUVA_EM_CONFRONTOS + '');
+  /* OS DOIS MOTORES: uma tabela diferente faz a MESMA batalha terminar diferente no cliente e no
+     servidor -- e clima mexe em DANO, que e o que mais diverge. */
+  ok('a lista e a MESMA nos dois motores', esp.CHUVA.join(',') === S.CHUVA.join(','), esp.CHUVA.join(','));
+  ok('e a chance, a duracao e os multiplicadores tambem',
+     esp.CHANCE_CHUVA === S.CHANCE_CHUVA && esp.CHUVA_EM_CONFRONTOS === S.CHUVA_EM_CONFRONTOS &&
+     JSON.stringify(esp.CHUVA_MULT) === JSON.stringify(S.CHUVA_MULT) &&
+     JSON.stringify(esp.CHUVA_GOLPE_MULT) === JSON.stringify(S.CHUVA_GOLPE_MULT),
+     JSON.stringify(esp.CHUVA_MULT) + ' / ' + JSON.stringify(esp.CHUVA_GOLPE_MULT));
+
+  /* OS MULTIPLICADORES PEDIDOS, um a um. */
+  /* O sorteio vive na ABERTURA DO CONFRONTO desde o esclarecimento de 11/09/2026: o `tentarChuva`
+     recebe os DOIS pokemon do confronto e so sorteia por quem tem a passiva. */
+  const gyPadrao = () => S.createInstance('gyarados', 50);
+  const neutro = () => S.createInstance('snorlax', 50);
+  const seco = () => { S.limparClima(); S.tentarChuva(neutro(), neutro(), () => 0.99); };
+  const chovendo = () => { S.limparClima(); S.tentarChuva(gyPadrao(), neutro(), () => 0.01); };
+  seco();
+  ok('sem chuva nao chove', !S.estaChovendo());
+  ok('e todo multiplicador e 1',
+     ['Water','Fire','Electric','Normal','Grass'].every(t => S.multDaChuva(t, null) === 1) &&
+     S.multDaChuva('Grass','solarbeam') === 1);
+  chovendo();
+  ok('com chuva, chove', S.estaChovendo());
+  ok('Agua +50%',      S.multDaChuva('Water', null) === 1.5,  S.multDaChuva('Water', null) + '');
+  ok('Fogo -50%',      S.multDaChuva('Fire', null) === 0.5,   S.multDaChuva('Fire', null) + '');
+  ok('Eletrico +25%',  S.multDaChuva('Electric', null) === 1.25, S.multDaChuva('Electric', null) + '');
+  ok('Raio Solar -50%', S.multDaChuva('Grass', 'solarbeam') === 0.5, S.multDaChuva('Grass','solarbeam') + '');
+  /* O RESTO NAO MUDA -- clima que mexesse em tudo nao seria clima, seria um buff. */
+  ok('e o resto dos tipos nao muda',
+     ['Normal','Grass','Rock','Ghost','Dragon','Ice'].every(t => S.multDaChuva(t, null) === 1));
+  /* ⚠️ A LAMINA SOLAR NAO EXISTE NA GEN 3 (ela e da Gen 7), entao nao ha o que reduzir. Ela e
+     NOMEADA aqui pra ninguem achar que foi esquecimento -- o pedido citava os dois. */
+  ok('a Lamina Solar nao existe na base da Gen 3 (por isso so o Raio Solar entra)',
+     !S.GOLPES['solarblade'] && S.CHUVA_GOLPE_MULT['solarblade'] == null);
+  ok('e o Raio Solar existe e e de Planta', !!S.GOLPES['solarbeam'] && S.GOLPES['solarbeam'][0] === 'Grass',
+     JSON.stringify(S.GOLPES['solarbeam']));
+  seco();
+
+  /* O DANO MUDA DE VERDADE -- mesmo golpe, mesma semente, so a chuva mudando. E o que prova que o
+     multiplicador chega no calcDamage e nao so na tabela. */
+  {
+    const dano = (atk, def, golpe) => {
+      const a = S.createInstance(atk, 50); a.ataques = [golpe];
+      const b = S.createInstance(def, 50); b.maxHp = S.calcMaxHp(b); b.hp = b.maxHp;
+      return S.calcDamageNew(a, b, S.makeSeededRng('chuva'));
+    };
+    const razao = (atk, def, golpe) => {
+      seco(); const s = dano(atk, def, golpe);
+      chovendo(); const c = dano(atk, def, golpe);
+      seco(); return c / s;
+    };
+    const perto = (x, alvo) => Math.abs(x - alvo) < 0.03;
+    const rAgua = razao('blastoise','geodude','hydropump');
+    const rFogo = razao('charizard','venusaur','flamethrower');
+    const rEle  = razao('pikachu','pidgeot','thunderbolt');
+    const rSol  = razao('venusaur','geodude','solarbeam');
+    const rNorm = razao('snorlax','geodude','bodyslam');
+    ok('o dano de Agua sobe 50%',      perto(rAgua, 1.5), 'x' + rAgua.toFixed(2));
+    ok('o de Fogo cai pela metade',    perto(rFogo, 0.5), 'x' + rFogo.toFixed(2));
+    ok('o Eletrico sobe 25%',          perto(rEle, 1.25), 'x' + rEle.toFixed(2));
+    ok('o Raio Solar cai pela metade', perto(rSol, 0.5),  'x' + rSol.toFixed(2));
+    ok('e o Normal nao se move',       rNorm === 1,       'x' + rNorm.toFixed(2));
+  }
+
+  /* ⚠️ A CHUVA ENTRA NA ESCOLHA DO GOLPE, e nao so no dano. Se entrasse so no dano, o motor
+     escolheria por uma regra e aplicaria outra -- e sob chuva o Raio Solar continuaria sendo
+     escolhido como se valesse 120. E a licao do EXPOENTE_TIPO, que ficou comprimido no dano e cru
+     na escolha e fez os dois motores discordarem do melhor golpe em 4% dos confrontos. */
+  {
+    /* DOIS PARES REAIS, achados varrendo as 250 x 250 e nao escolhidos no gosto -- a primeira
+       tentativa (Venusaur x Geodude) era desequilibrada demais: Planta e 4x num Geodude, entao
+       mesmo pela METADE o Raio Solar continuava ganhando, e o teste falhava sem nada estar errado.
+       1) O BULBASAUR LARGA O RAIO SOLAR: no seco ele escolhe solarbeam, na chuva ele vale metade e
+          a Bomba de Lodo passa na frente.
+       2) O SQUIRTLE PASSA A USAR AGUA: no seco o Quebra-Cranio (Normal, 100) rende mais que a
+          Hidro Bomba contra um Bulbasaur (Agua e 0,5x em Planta); na chuva os +50% viram o jogo. */
+    const comGolpes = (id) => { const p = S.createInstance(id, 50); p.ataques = S.ataquesPadrao(p); return p; };
+    const escolhe = (atk, def, chove) => {
+      chove ? chovendo() : seco();
+      const g = S.melhorAtaque(comGolpes(atk), S.createInstance(def, 50));
+      seco();
+      return g && g.golpe;
+    };
+    ok('no seco o Bulbasaur escolhe o Raio Solar', escolhe('bulbasaur','ratata',false) === 'solarbeam',
+       escolhe('bulbasaur','ratata',false));
+    ok('e na CHUVA ele LARGA o Raio Solar', escolhe('bulbasaur','ratata',true) !== 'solarbeam',
+       escolhe('bulbasaur','ratata',true));
+    ok('no seco o Squirtle nao usa Agua contra um Bulbasaur',
+       S.GOLPES[escolhe('squirtle','bulbasaur',false)][0] !== 'Water', escolhe('squirtle','bulbasaur',false));
+    ok('e na CHUVA ele passa a usar', S.GOLPES[escolhe('squirtle','bulbasaur',true)][0] === 'Water',
+       escolhe('squirtle','bulbasaur',true));
+    /* E o PODER que vai pro dano continua sendo o CRU -- a chuva entra na NOTA, nunca no `poder`.
+       Trocar isso foi o defeito mais caro desta serie (o poder efetivo dos tapas virando dano). */
+    chovendo();
+    const soSolar = (function(){ const p = S.createInstance('venusaur', 50); p.ataques = ['solarbeam']; return p; })();
+    const so = S.melhorAtaque(soSolar, S.createInstance('geodude', 50));
+    ok('e o `poder` que vai pro dano continua sendo o CRU', so.poder === S.GOLPES['solarbeam'][1],
+       so.poder + ' vs ' + S.GOLPES['solarbeam'][1]);
+    seco();
+  }
+
+  /* O ESPELHO DA CONFUSAO NAO SENTE CLIMA (`op.semTipo`): no jogo oficial ele bate sem tipo, e sem
+     esta guarda a chuva mudaria o dano dele e as medicoes da confusao deixariam de valer. */
+  {
+    const a = S.createInstance('blastoise', 50); a.ataques = ['hydropump'];
+    const b = S.createInstance('geodude', 50); b.maxHp = S.calcMaxHp(b); b.hp = b.maxHp;
+    seco();     const s = S.calcDamageNew(a, b, S.makeSeededRng('esp'), { semTipo:true, semCritico:true });
+    chovendo(); const c = S.calcDamageNew(a, b, S.makeSeededRng('esp'), { semTipo:true, semCritico:true });
+    seco();
+    ok('o espelho da confusao nao sente a chuva', s === c, s + ' vs ' + c);
+  }
+
+  /* O SORTEIO E NA ABERTURA DO CONFRONTO, quando o PORTADOR entra -- nao antes da batalha.
+     ⚠️ A PRIMEIRA VERSAO SORTEAVA ANTES DA BATALHA e este bloco cobrava "um bloco no COMECO":
+     estava errado nos dois lados. Hoje o portador pode entrar no 6o confronto e comecar a chuva
+     ALI, e como o dado rola a cada entrada dele, ela pode sair MAIS DE UMA VEZ na mesma batalha. */
+  {
+    const IDS = Object.keys(S.SPECIES);
+    const ehPortador = id => S.CHUVA.includes(id);
+    let batalhas = 0, com = 0, confrontos = 0, marcados = 0, semExplicacao = 0, comecouTarde = 0;
+    for(let i = 0; i < 4000; i++){
+      /* O PORTADOR E O TERCEIRO DO TIME de proposito: com o sorteio antigo a chuva podia comecar
+         no confronto 1 com ele no banco, e hoje nao pode. */
+      const meu = [S.createInstance('snorlax', 60), S.createInstance('machamp', 60), S.createInstance('blastoise', 60)];
+      meu.forEach(p => { p.ataques = S.ataquesPadrao(p); });
+      S.equiparItens(meu, null);
+      const ini = Array.from({ length: 6 }, (_, k) => {
+        const p = S.createInstance(IDS[(i*(7+k*3)) % IDS.length], 55); p.ataques = S.ataquesPadrao(p); return p; });
+      S.equiparItens(ini, null);
+      const ms = (S.simulateGymBattle(meu, ini, Math.random).matchups) || [];
+      batalhas++; confrontos += ms.length;
+      const n = ms.filter(m => m.chuva).length;
+      if(!n) continue;
+      com++; marcados += n;
+      if(ms.findIndex(m => m.chuva) > 0) comecouTarde++;
+      /* CADA TRECHO cabe em CHUVA_EM_CONFRONTOS. Um trecho MAIOR so pode existir se houve
+         RE-SORTEIO -- ou seja, se o confronto em que a segunda chuva comecaria tinha um portador
+         em campo. Sem portador ali, e defeito de contagem. */
+      const bloco = ms.map(m => m.chuva ? 1 : 0).join('');
+      let k = 0;
+      while(k < bloco.length){
+        if(bloco[k] !== '1'){ k++; continue; }
+        let fim = k; while(bloco[fim] === '1') fim++;
+        if(fim - k > S.CHUVA_EM_CONFRONTOS){
+          const c = ms[k + S.CHUVA_EM_CONFRONTOS];
+          if(!c || !(ehPortador(c.playerSpecies) || ehPortador(c.enemySpecies))) semExplicacao++;
+        }
+        k = fim;
+      }
+    }
+    const pct = 100 * com / batalhas;
+    ok('ela sai numa fatia razoavel das batalhas', pct > 5 && pct < 25,
+       pct.toFixed(1) + '% (' + com + ' de ' + batalhas + ')');
+    /* ELA COMECA TARDE na maioria das vezes, e e isso que prova que o sorteio e na ENTRADA do
+       portador: com o dado rolado antes da batalha ela comecaria SEMPRE no confronto 1. */
+    ok('e ela comeca DEPOIS do primeiro confronto na maioria das vezes', comecouTarde > com * 0.5,
+       comecouTarde + ' de ' + com + ' comecaram depois do 1o');
+    /* NENHUM trecho longo sem um portador pra explica-lo: e o invariante que sobrou depois de a
+       mecanica passar a poder re-sortear. */
+    ok('e nenhum trecho passa de 3 sem um portador pra explicar', semExplicacao === 0, semExplicacao + '');
+    ok('marcou confrontos pra a tela mostrar', marcados > 150,
+       marcados + ' confrontos (' + (100*marcados/confrontos).toFixed(1) + '% do total)');
+  }
+  /* O SORTEIO EM SI, no unitario -- e onde a duracao e a nao-renovacao se cobram sem ruido. */
+  {
+    seco();
+    const gy = S.createInstance('gyarados', 50), sn = S.createInstance('snorlax', 50);
+    ok('sem portador em campo nao ha sorteio', !S.tentarChuva(sn, sn, () => 0.01) && !S.estaChovendo());
+    ok('com portador e o dado baixo, comeca', S.tentarChuva(gy, sn, () => 0.01) && S.estaChovendo());
+    ok('e comeca com a duracao cheia', S.CHUVA_EM_CONFRONTOS === 3);
+    /* ENQUANTO CHOVE NINGUEM SORTEIA DE NOVO: ela nao se renova. */
+    ok('enquanto chove ninguem sorteia de novo', !S.tentarChuva(gy, sn, () => 0.01));
+    seco();
+    ok('e o dado alto nao faz chover', !S.tentarChuva(gy, sn, () => 0.99) && !S.estaChovendo());
+    /* OS DOIS LADOS sorteiam, um dado cada -- e por isso num confronto com dois portadores a
+       chance daquele confronto e 19%, nao 10%. */
+    let n = 0;
+    const rng = S.makeSeededRng('dois-portadores');
+    for(let i = 0; i < 40000; i++){ S.limparClima(); if(S.tentarChuva(gy, S.createInstance('lapras', 50), rng)) n++; }
+    seco();
+    const pct = 100 * n / 40000;
+    ok('com portador dos DOIS lados a chance do confronto e ~19%', pct > 17.5 && pct < 20.5, pct.toFixed(2) + '%');
+    let m = 0;
+    const rng2 = S.makeSeededRng('um-portador');
+    for(let i = 0; i < 40000; i++){ S.limparClima(); if(S.tentarChuva(gy, sn, rng2)) m++; }
+    seco();
+    const pct2 = 100 * m / 40000;
+    ok('e com um portador so ela fica nos 10% cheios', pct2 > 9.3 && pct2 < 10.7, pct2.toFixed(2) + '%');
+  }
+
+  /* ⚠️ O ESTADO NAO PODE VAZAR ENTRE BATALHAS. O `chuvaRestante` e modulo-level (como o
+     `explosaoDoAtivo` e o `itensGastos`), e uma batalha pode acabar com confrontos de chuva
+     SOBRANDO -- a chuva dura 3 e a luta pode terminar no primeiro. Sem o zero no comeco da
+     proxima, ela comecaria debaixo da chuva de outra pessoa. */
+  {
+    S.limparClima();
+    S.tentarChuva(S.createInstance('gyarados', 50), S.createInstance('snorlax', 50), () => 0.01);
+    ok('sobrou chuva de uma batalha curta', S.estaChovendo());
+    S.simulateGymBattle([S.createInstance('pidgey', 20)], [S.createInstance('ratata', 20)], () => 0.99);
+    ok('e a batalha seguinte comeca SECA', !S.estaChovendo());
+    /* ⚠️ NO SERVIDOR O RISCO E MAIOR, e por isso ele tem DUAS portas fechadas a mao: a INSTANCIA e
+       reaproveitada entre invocacoes, entao um chuvaRestante que sobre de um simulateGymBattle
+       (Torre, ginasio da cidade) vazaria pro proximo ataque da RAIDE ou pro proximo confronto
+       ONLINE -- os dois resolvem dano sem passar pelo sortearChuva. Isto e lido do CODIGO: os
+       casos acima rodam no cliente e nao alcancam nenhum dos dois. */
+    const srvTxt = require('fs').readFileSync(path.join(raiz, 'functions', 'index.js'), 'utf8');
+    for(const fn of ['simulateBossFight','battleResolveMatchup']){
+      const i = srvTxt.indexOf('function ' + fn + '(');
+      const fim = srvTxt.indexOf('\nfunction ', i + 1);
+      /* O ( E ) PRECISAM DO ESCAPE: sem eles o `()` vira grupo de captura e a regex casa com
+         "limparClima;", que nao existe em lugar nenhum -- o teste falhava com o codigo CERTO. */
+      ok('o ' + fn + ' do servidor zera a chuva', srvTxt.slice(i, fim).indexOf('limparClima();') > 0);
+    }
+    /* E o unico que SORTEIA e o simulateGymBattle -- se outro passar a sortear, o clima nasce em
+       modo que ninguem mediu. */
+    const sorteios = (srvTxt.match(/tentarChuva\(/g) || []).length;
+    ok('e so o simulateGymBattle sorteia chuva', sorteios === 2,   // a definicao + a unica chamada
+       sorteios + ' ocorrencias');
+  }
+
+  /* NA TELA, e sao TRES coisas diferentes (11/09/2026, a pedido, olhando um print):
+     1) a FRASE no meio da batalha, com a pausa de 1s antes de a luta comecar;
+     2) a LINHA no log, SO no confronto que ativou, com o selo CLICAVEL;
+     3) o 🌧️ em cima do ×, em TODO confronto que teve chuva. */
+  {
+    const m = {
+      player:'Squirtle', enemy:'Cubone', playerSpecies:'squirtle', enemySpecies:'cubone',
+      playerHpBefore: 299, playerHpAfter: 150, enemyHpBefore: 290, enemyHpAfter: 0,
+      playerMove:'Water', enemyMove:'Ground', chuva: true,
+      golpes:[{ q:'p', d:0, hp:299, c:0, m:0, z:0, x:'chuva', g:'Dança da Chuva' },
+              { q:'p', d:160, hp:130 }, { q:'e', d:149, hp:150 }, { q:'p', d:130, hp:0 }]
+    };
+    const limpo = h => String(h).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    /* 1) A FRASE, palavra por palavra como foi pedida. */
+    const aviso = p => limpo(S.avisoDoConfronto(m, p) || '');
+    ok('a frase da chuva e a pedida', /Squirtle usou Dança da Chuva e começa a chover/.test(aviso(0)), aviso(0));
+    ok('e ela sobrevive ao passo dela', /começa a chover/.test(aviso(1)), aviso(1) || '(vazio)');
+    /* E CEDE quando a luta comeca -- "e entao comeca a batalha novamente". */
+    ok('e cede o lugar quando a luta comeca', !/chover/.test(aviso(2)), aviso(2) || '(vazio)');
+    /* A PAUSA DE 1s: ela e um passo de dano ZERO, entao sem a pausa a frase apareceria e sumiria
+       no mesmo quadro -- o defeito que a Faixa de Foco ja teve. */
+    ok('e a pausa de 1s esta la', S.pausaDoEspecial(m) === S.PAUSA_LEITURA_ESPECIAL_MS,
+       S.pausaDoEspecial(m) + 'ms');
+    ok('ela esta declarada no passosDaAbertura', (function(){
+      const txt = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
+      const mm = txt.match(/const passosDaAbertura = \{([^}]*)\}/);
+      return !!mm && /chuva:\s*2/.test(mm[1]);
+    })());
+    /* 2) A LINHA NO LOG, com o SELO CLICAVEL -- o unico selo clicavel do jogo. */
+    const log = S.renderMatchupLog([m]);
+    ok('o log traz a linha da ativacao', /Squirtle<\/span> usou/.test(log) && /começa a chover/.test(log));
+    ok('e o selo dela e CLICAVEL', /class="type-pill selo-clicavel"[^>]*abrirEspecialInfo/.test(log),
+       (log.match(/<button[^>]*selo-clicavel[^>]*>/) || ['(sem botao)'])[0].slice(0, 90));
+    /* Ele abre a MESMA caixa dos especiais -- nao uma segunda. */
+    ok('e ele abre a caixa da chuva', /abrirEspecialInfo\(&quot;chuva&quot;/.test(log));
+    /* 3) O 🌧️ EM CIMA DO ×, em todo confronto com chuva. */
+    ok('o 🌧️ fica em cima do ×', /<span class="mlog-x"><span class="mlog-chuva">🌧️<\/span>×<\/span>/.test(log));
+    const semChuva = Object.assign({}, m, { chuva: false, golpes: m.golpes.slice(1) });
+    const logSeco = S.renderMatchupLog([semChuva]);
+    ok('e confronto sem chuva nao ganha o emoji', !/mlog-chuva/.test(logSeco));
+    ok('nem a linha da ativacao', !/começa a chover/.test(logSeco));
+    /* CONFRONTO QUE SO HERDOU a chuva: tem o emoji, mas NAO a linha -- foi o pedido ao pe da letra
+       ("no log, voce vai escrever somente na batalha que foi ativada"). */
+    const herdou = Object.assign({}, m, { golpes: m.golpes.slice(1) });   // chuva:true, sem o registro
+    const logHerdou = S.renderMatchupLog([herdou]);
+    ok('confronto que so HERDOU a chuva tem o emoji', /mlog-chuva/.test(logHerdou));
+    ok('mas NAO repete a linha da ativacao', !/começa a chover/.test(logHerdou));
+    /* O SELO DO QUADRO DE BATALHA (o que diz "este confronto esta sob chuva") continua nas QUATRO
+       telas. Isto e lido do CODIGO: uma tela de fora seria a unica muda. */
+    const txt = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
+    for(const fn of ['renderSpecialBattling','renderTrainerBattling','renderBattling','renderLeagueWatch']){
+      const i = txt.indexOf('function ' + fn + '(');
+      const fim = txt.indexOf('\nfunction ', i + 1);
+      ok('o ' + fn + ' mostra o selo da chuva', txt.slice(i, fim).indexOf('chuvaBadgeHtml(m)') > 0);
+    }
+  }
+
+  /* A FICHA DA POKEDEX. Ela e a unica passiva POR BATALHA, e a ficha tem que dizer isso: um
+     "10% por confronto" ali seria mentir por um fator de seis num time cheio. */
+  {
+    const e = S.especiaisDaEspecie('blastoise').find(x => x.efeito === 'chuva');
+    ok('o Blastoise anuncia a Danca da Chuva', !!e && e.nome === 'Dança da Chuva' && e.tipo === 'Water',
+       JSON.stringify(e));
+    ok('e ela e marcada como POR BATALHA', !!e && e.porBatalha === true);
+    const g = S.__getGame();
+    g.pokedexFicha = { id:'blastoise', shiny:false };
+    const ficha = S.renderPokedexFicha();
+    ok('a ficha escreve "por batalha", nao "por confronto"',
+       /10% por batalha/.test(ficha) && !/Dança da Chuva[\s\S]{0,120}por confronto/.test(ficha));
+    g.pokedexFicha = null;
+    /* O GYARADOS tem TRES: Furia, Furia do Dragao e Danca da Chuva -- e cada uma abre a sua caixa. */
+    const tres = S.especiaisDaEspecie('gyarados').map(x => x.efeito).sort();
+    ok('o Gyarados tem furia do dragao E chuva', tres.indexOf('chuva') >= 0 && tres.indexOf('furiadragao') >= 0,
+       tres.join(','));
+  }
+}
 console.log('\n=== A CAIXA QUE EXPLICA O ESPECIAL (11/09/2026) ===');
 {
   /* Pedida assim: "para todos os ataques especiais/passivas, coloque que quando o usuario clicar
@@ -3018,7 +3328,7 @@ console.log('\n=== A CAIXA QUE EXPLICA O ESPECIAL (11/09/2026) ===');
   /* SAO DEZ desde 11/09/2026: os NOVE do tentarGolpeEspecial mais o SKETCH, que entrou so pra
      APARECER na ficha -- a mecanica dele nao foi tocada. Ele e o unico da lista que nao e sorteio
      de confronto: acontece DEPOIS da batalha. */
-  ok('sao os DEZ especiais do jogo', efeitos.size === 10, efeitos.size + ': ' + [...efeitos].sort().join(', '));
+  ok('sao os ONZE especiais do jogo', efeitos.size === 11, efeitos.size + ': ' + [...efeitos].sort().join(', '));
   ok('e o Sketch e do Smeargle, e so dele',
      Object.keys(S.SPECIES).filter(id => S.especiaisDaEspecie(id).some(e => e.efeito === 'sketch')).join(',') === 'smeargle',
      Object.keys(S.SPECIES).filter(id => S.especiaisDaEspecie(id).some(e => e.efeito === 'sketch')).join(','));
@@ -3035,10 +3345,14 @@ console.log('\n=== A CAIXA QUE EXPLICA O ESPECIAL (11/09/2026) ===');
      escrito com outra palavra ("no fim da luta") passaria despercebido e as duas travas abaixo --
      que procuram por /Resolve/ e /cada golpe/ -- deixariam de valer sobre ele. */
   {
-    const validos = ['Abre o confronto','Resolve o confronto','A cada golpe','Depois da batalha'];
+    /* SAO CINCO desde 11/09/2026: a DANCA DA CHUVA trouxe o quinto, e ele e o unico que vale por
+       VARIOS confrontos -- os outros abrem ou resolvem UM, o Metronomo vale a cada golpe e o
+       Sketch e depois da batalha. */
+    const validos = ['Abre o confronto','Resolve o confronto','A cada golpe','Depois da batalha',
+                     'Dura {CHUVACONF} confrontos'];
     const fora = Object.entries(S.EXPLICACAO_DO_ESPECIAL)
       .filter(([, x]) => validos.indexOf(x.quando) < 0).map(([k, x]) => k + ':' + x.quando);
-    ok('todo `quando` e um dos quatro momentos conhecidos', fora.length === 0, fora.join(', '));
+    ok('todo `quando` e um dos cinco momentos conhecidos', fora.length === 0, fora.join(', '));
   }
 
   /* 2) TODA ENTRADA CARREGA O EFEITO. E por ele que a caixa e escolhida -- sem ele a linha nao

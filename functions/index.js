@@ -537,7 +537,10 @@ function melhorAtaque(attacker, defender){
        bestAttackType com o poder acrescentado -- e é ela que faz "o que tira mais dano" ser
        escolhido de verdade, e não "o melhor tipo". */
     return { golpe:id, type:tipo, poder:poder, mult:mult, stab:proprio,
-             nota: poderEfetivo(id) * Math.pow(mult, EXPOENTE_TIPO) * (proprio ? 1.5 : SUBTYPE_PENALTY)
+             /* A CHUVA ENTRA NA NOTA, e não só no dano: se ela mudasse só o dano, o motor
+                escolheria o golpe por uma regra e aplicaria outra -- e sob chuva o Raio Solar
+                continuaria sendo escolhido como se valesse 120. É a lição do EXPOENTE_TIPO. */
+             nota: poderEfetivo(id) * multDaChuva(tipo, id) * Math.pow(mult, EXPOENTE_TIPO) * (proprio ? 1.5 : SUBTYPE_PENALTY)
                    * (atk / Math.max(1, def)) };
   };
   let melhor = null;
@@ -595,7 +598,10 @@ function bestAttackType(attacker, defender){
     // ^0.6 igual ao dano: se a escolha usasse o multiplicador cru e o dano o comprimido, o motor
     // escolheria um tipo e aplicaria outro -- foi essa diferença que fez cliente e servidor
     // discordarem do melhor golpe em 4% dos confrontos
-    const nota = Math.pow(mult, EXPOENTE_TIPO) * (proprio ? 1.5 : SUBTYPE_PENALTY) * (atk / Math.max(1, def));
+    /* A CHUVA entra aqui pelo MESMO motivo da nota do melhorAtaque. Sem golpe escolhido não há
+       id, então só o tipo conta -- e é o que basta: os dois golpes que ela apaga por nome são de
+       Planta, que este caminho nunca escolhe por nome. */
+    const nota = multDaChuva(t, null) * Math.pow(mult, EXPOENTE_TIPO) * (proprio ? 1.5 : SUBTYPE_PENALTY) * (atk / Math.max(1, def));
     if(!melhor || nota > melhor.nota) melhor = { mult, type: t, stab: proprio, nota };
   }
   /* GOLPE TEIMOSO -- quando NADA que o atacante tem machuca o alvo.
@@ -1182,7 +1188,17 @@ function calcDamage(attacker, defender, rng, op){
   // multiplicador de tipo COMPRIMIDO (^0.6): 2x vira ~1.5x. Aqui não se troca de pokémon no meio
   // do confronto, então tipo não pode ser sentença de morte
   const typeMult = op.semTipo ? 1 : Math.pow(mult, EXPOENTE_TIPO);
-  const dmgGen1 = Math.round(core * STAB * typeMult * (0.85 + rng()*0.15) * (isCrit ? CRIT_MULT : 1)); // variação 85-100% e o ×2 do crítico
+  /* A CHUVA: +50% em Água, -50% em Fogo e no Raio Solar, +25% em Elétrico. É o MESMO multDaChuva
+     que as duas escolhas de golpe leem -- um número só pros três, senão o motor escolhe por uma
+     regra e aplica outra (a lição do EXPOENTE_TIPO).
+     NÃO VALE COM `op.semTipo`: esse é o espelho da CONFUSÃO, que no jogo oficial bate sem tipo e
+     por isso também não sente clima. Sem esta guarda a chuva mudaria o dano do espelho e as
+     medições da confusão deixariam de valer.
+     ⚠️ AQUI OS NOMES SÃO OUTROS: o servidor usa `mult` e `best.type`/`best.golpe` continuam
+     valendo, mas a função se chama `calcDamage`, sem o `New`. É a lição do `brockTeam` x
+     `enemyTeam` -- ao copiar entre os dois motores, conferir os NOMES. */
+  const chuvaMult = op.semTipo ? 1 : multDaChuva(best.type, best.golpe);
+  const dmgGen1 = Math.round(core * STAB * typeMult * chuvaMult * (0.85 + rng()*0.15) * (isCrit ? CRIT_MULT : 1)); // variação 85-100%, o clima e o ×2 do crítico
   // converte pra fração da vida na escala Gen 1, aplica o teto por golpe, e projeta na escala de HP
   // do jogo -- sem vulnerabilidade por sequência de vitórias, que era a origem da "morte súbita"
   let pct = dmgGen1 / gen1MaxHp(defender);
@@ -1533,6 +1549,104 @@ const RECUPERACAO = ['kadabra','alakazam','staryu','starmie','porygon','porygon2
    É o que deixa os laços decidirem "os dois últimos caíram, quem ganha?" sem mudar assinatura.
    Módulo-level dá certo porque uma batalha é síncrona do começo ao fim: não existem duas rodando
    ao mesmo tempo nem no navegador nem numa invocação da função. */
+/* DANÇA DA CHUVA: o primeiro CLIMA do jogo (11/09/2026, a pedido).
+   Ela é diferente de tudo que veio antes neste motor, e em duas coisas:
+   1) É POR BATALHA, não por confronto. Todos os nove especiais anteriores são sorteados dentro do
+      `tentarGolpeEspecial`, uma vez por confronto; esta é sorteada ANTES da batalha começar, no
+      `simulateGymBattle`, e vale pelos CHUVA_EM_CONFRONTOS primeiros confrontos dela.
+   2) VALE PROS DOIS LADOS. Clima é do CAMPO, não de quem o invocou -- é assim no jogo oficial, e o
+      pedido não põe lado nenhum ("durante esses 3 confrontos, os ataques de tipo água vão ter um
+      acréscimo"). Ou seja, quem chama a chuva também fortalece o Vaporeon do adversário. É a
+      decisão que mais muda o número: medida, ela é o que segura o custo na jornada.
+   O SORTEIO É UM SÓ POR BATALHA, e isso é o pedido ao pé da letra ("ela tem 10% de chance de
+   acontecer na batalha"): basta UM pokémon com Dança da Chuva em qualquer um dos dois times pra
+   haver sorteio, e ele sai 10%. NÃO é 10% por portador -- com seis deles isso viraria 47%, e o
+   pedido diz 10%. Se um dia a intenção for a outra, é trocar o `algum` por um laço.
+   A LISTA são as 13 espécies que aprendem Rain Dance por NÍVEL na Gen 3, a mesma regra das outras
+   listas, e ela saiu da base por script. O Lugia está nela por ser o que o dado diz, como já
+   acontece no RECUPERACAO -- ele é INTOCÁVEL e ninguém o tem, então a entrada não roda hoje, mas
+   é verdade e já estará certa no dia em que algum modo o puser em campo. */
+const CHUVA = ['squirtle','wartortle','blastoise','poliwag','poliwhirl','gyarados','lapras',
+               'marill','azumarill','wooper','quagsire','suicune','lugia'];
+const CHANCE_CHUVA = 0.10;        // por BATALHA, sorteada antes do primeiro confronto
+const CHUVA_EM_CONFRONTOS = 3;    // quantos confrontos ela dura
+/* O QUE A CHUVA FAZ COM CADA TIPO DE GOLPE. É pelo tipo do GOLPE, não pelo tipo de quem bate: um
+   Charizard usando um golpe Normal não perde nada, e um Pikachu usando Raio ganha os 25%. */
+const CHUVA_MULT = { Water: 1.5, Fire: 0.5, Electric: 1.25 };
+/* GOLPES QUE A CHUVA APAGA por NOME, além do tipo -- eles são de Planta e não entrariam pela
+   tabela acima. O pedido cita dois: Raio Solar e Lâmina Solar.
+   ⚠️ SÓ O RAIO SOLAR EXISTE AQUI: a `solarblade` é da Gen 7 e NÃO está na base da Gen 3, então
+   cadastrá-la seria letra morta -- o mesmo motivo que manteve os estágios 2 a 4 do crítico fora do
+   jogo. Se um dia a base mudar de geração, é uma linha. `tools/test-especiais.js` NOMEIA a
+   ausência, pra ninguém achar que foi esquecimento. */
+const CHUVA_GOLPE_MULT = { solarbeam: 0.5 };
+/* QUANTOS CONFRONTOS DE CHUVA SOBRAM nesta batalha. Módulo-level pelo mesmo motivo do
+   `explosaoDoAtivo` e do `itensGastos`: as funções do motor são compartilhadas por vários laços de
+   batalha, e enfiar mais um parâmetro em todas seria pior que um estado zerado no começo de cada
+   batalha. Uma batalha é síncrona do começo ao fim, então não existem duas rodando ao mesmo tempo. */
+let chuvaRestante = 0;
+function estaChovendo(){ return chuvaRestante > 0; }
+/* APAGA O CLIMA. Tem nome porque TRES caminhos precisam dele e pelo mesmo motivo: o
+   `chuvaRestante` e modulo-level e uma batalha acaba com chuva SOBRANDO sempre que a luta termina
+   antes dos CHUVA_EM_CONFRONTOS confrontos. No servidor a instancia e reaproveitada entre
+   invocacoes, entao sobra vira chuva na batalha de outra pessoa.
+   Escrito a mao nos tres, o quarto caminho nasceria sem -- e o vazamento nao aparece como erro,
+   aparece como um golpe de Fogo tirando metade sem nada na tela dizendo por que. */
+function limparClima(){ chuvaRestante = 0; }
+/* O MULTIPLICADOR DA CHUVA, num lugar só -- e ESSE é o ponto.
+   Ele é lido pelo DANO (`calcDamage`) E pelas DUAS escolhas de golpe (a `nota` do `melhorAtaque` e
+   a do `bestAttackType`). Os três TÊM que usar o mesmo valor: quando a escolha usa um número e o
+   dano usa outro, o motor escolhe um golpe e aplica outro -- foi exatamente o que aconteceu com o
+   EXPOENTE_TIPO, que ficou comprimido no dano e cru na escolha, e fez cliente e servidor
+   discordarem do melhor golpe em 4% dos confrontos.
+   SEM CHUVA ele devolve 1, então tudo que existia antes continua idêntico ao que era. */
+function multDaChuva(tipo, golpeId){
+  if(!estaChovendo()) return 1;
+  if(golpeId && CHUVA_GOLPE_MULT[golpeId] != null) return CHUVA_GOLPE_MULT[golpeId];
+  return CHUVA_MULT[tipo] != null ? CHUVA_MULT[tipo] : 1;
+}
+/* SORTEIA A CHUVA NA ABERTURA DO CONFRONTO -- quando o portador ENTRA nele.
+   ⚠️ ELA NASCEU SORTEADA ANTES DA BATALHA e durou uma versão: "10% de chance de acontecer na
+   batalha" foi lido como um dado só, rolado no `simulateGymBattle`. O pedido era outro, e foi
+   esclarecido: *"ele é por batalha mas a chance é sorteada quando o pokémon que possui essa
+   habilidade passiva entra no confronto que deve ser ativada ou não"*.
+   O "POR BATALHA" É O EFEITO, NÃO O SORTEIO, e essa é a diferença que importa: o dado rola a cada
+   confronto em que um dos 13 entra, como todo o resto deste bloco; o que é POR BATALHA é a DURAÇÃO
+   -- começou, ela atravessa CHUVA_EM_CONFRONTOS confrontos, e é o único efeito do motor que passa
+   do confronto em que nasceu.
+   OS DOIS LADOS SORTEIAM, um dado cada, como o `tentarGolpeEspecial` já faz com os outros: num
+   confronto em que os dois têm Dança da Chuva a chance daquele confronto é 19%, não 10%.
+   ENQUANTO CHOVE NINGUÉM SORTEIA DE NOVO. Ela não se renova: no jogo oficial usar o golpe de novo
+   reinicia o contador, mas isso não foi pedido e faria o clima virar permanente num time de Água.
+   Se um dia for pedido, é trocar o `if(estaChovendo()) return false` por um `chuvaRestante =
+   CHUVA_EM_CONFRONTOS`.
+   ELA É INDEPENDENTE do `sorteiaGolpeEspecial`, e isso é decisão: aquele devolve UM efeito por
+   pokémon por confronto, então pôr a chuva lá faria o Gyarados (que já tem Fúria do Dragão) cair
+   na chance composta e sair em 9%. O pedido diz 10%, e clima não é um golpe usado CONTRA o
+   adversário -- é uma condição do campo. Por isso ela tem dado próprio. */
+function tentarChuva(a, b, rng, diario){
+  if(estaChovendo()) return false;
+  const r = rng || Math.random;
+  /* O `q` do registro é de QUEM USOU o golpe -- a convenção do diário, a mesma do sono e da
+     confusão. O `a` é sempre o lado 'p' do confronto e o `b` o 'e'. */
+  const lados = [[a, 'p'], [b, 'e']];
+  for(const [p, marca] of lados){
+    if(!p || !CHUVA.includes(p.speciesId)) continue;
+    if(r() < CHANCE_CHUVA){
+      chuvaRestante = CHUVA_EM_CONFRONTOS;
+      /* A LINHA SÓ SAI NO CONFRONTO EM QUE ELA COMEÇA, e é isso que foi pedido: "no log, você vai
+         escrever somente na batalha que foi ativada a dança da chuva". Os confrontos seguintes,
+         que só herdam a chuva, são marcados pelo 🌧️ em cima do × -- não por outra linha.
+         Dano ZERO e `x` preenchido: ela É um passo da animação (barra parada), como o sono, e é
+         por isso que ela ganha a pausa de 1s antes de a luta começar. */
+      if(diario){
+        diario.push({ q: marca, d: 0, hp: p.hp, c:0, m:0, z:0, x:'chuva', g:'Dança da Chuva' });
+      }
+      return true;
+    }
+  }
+  return false;
+}
 let explosaoDoAtivo = null;
 function ehImuneAEspecial(p){ return IMUNES_A_ESPECIAL.includes(p.speciesId); }
 function sorteiaGolpeEspecial(p, rng){
@@ -1624,6 +1738,16 @@ const POCAO_GATILHO_HP = 0.25;
 function tentarGolpeEspecial(active, enemy, rng, diario){
   explosaoDoAtivo = null;
   if(ehImuneAEspecial(active) || ehImuneAEspecial(enemy)) return false;
+  /* A CHUVA E SORTEADA AQUI, na abertura do confronto -- e o lugar certo porque este bloco roda
+     UMA VEZ por confronto (o marcador _especialContra, no doExchange), que e exatamente o
+     "quando o pokemon entra no confronto" do pedido.
+     VEM ANTES DO SORTEIO DE EFEITO e com dado PROPRIO: ela nao disputa a vaga unica do
+     sorteiaGolpeEspecial, senao o Gyarados (que ja tem Furia do Dragao) cairia na chance composta
+     e a chuva sairia em 9%. O pedido diz 10%.
+     E RESPEITA A IMUNIDADE DOS CHEFES, que esta uma linha acima: o Mew e o Mewtwo sao imunes ao
+     bloco INTEIRO, e abrir uma excecao pro clima faria a batalha deles se comportar diferente sem
+     ninguem ter pedido. */
+  tentarChuva(active, enemy, rng || Math.random, diario);
   // o mais rápido tenta primeiro -- mesma regra que decide quem conecta antes numa troca normal
   const spdA = effectiveSpeed(active), spdE = effectiveSpeed(enemy);
   const ativoPrimeiro = spdA > spdE || (spdA === spdE && rng() < 0.5);
@@ -2005,6 +2129,13 @@ function simulateGymBattle(team, enemyTeam, rng, opts){
   /* A LISTA DO QUE FOI GASTO zera a cada batalha: ela é o recado pra quem chamou tirar o item da
      conta, e um recado de uma batalha anterior faria gastar item que ninguém usou. */
   itensGastos = [];
+  /* A CHUVA É POR BATALHA, e é sorteada AQUI -- antes do primeiro confronto, que é o pedido ao pé
+     da letra ("é ativada antes da batalha começar"). Ela é o único efeito deste motor que não sai
+     do `tentarGolpeEspecial`: os nove de lá são por confronto, este vale pelos três primeiros
+     confrontos da batalha inteira e VALE PROS DOIS LADOS.
+     Zerar aqui, e não no fim, é o que faz uma batalha não herdar a chuva da anterior -- a mesma
+     razão do `_furia` e do `explosaoDoAtivo` logo acima. */
+  limparClima();   // quem SORTEIA agora e a abertura de cada confronto (ver tentarChuva)
   enemyTeam.forEach(p=>{ p.maxHp=calcMaxHp(p); p.hp=p.maxHp; });
 
   const matchups = [];
@@ -2048,6 +2179,11 @@ function simulateGymBattle(team, enemyTeam, rng, opts){
         }
       }
       while(active.hp>0 && enemy.hp>0){ doExchange(active, enemy, rng, diario); }
+      /* A CHUVA DESTE CONFRONTO é lida DEPOIS da luta, e isso mudou junto com o sorteio: ela pode
+         COMEÇAR neste confronto (o dado rola na abertura, dentro do doExchange), então lida antes
+         o matchup sairia sem o selo justamente no confronto em que a chuva nasceu.
+         Vem antes do decremento, que é o que faz o último confronto de chuva ainda sair marcado. */
+      const comChuva = estaChovendo();
       const enemyFainted = enemy.hp<=0;
       const activeFainted = active.hp<=0;
       // doExchange garante um único sobrevivente por troca -- empate/morte súbita não existem mais
@@ -2057,6 +2193,11 @@ function simulateGymBattle(team, enemyTeam, rng, opts){
       const playerAliveAfter = activeFainted ? playerAliveBefore - 1 : playerAliveBefore;
       const enemyAliveAfter = enemyFainted ? enemyAliveBefore - 1 : enemyAliveBefore;
       matchups.push({
+        /* O SÍMBOLO DA CHUVA sai daqui: o confronto carrega SE choveu nele. É um campo do matchup e
+           não um estado global porque o log é relido depois, às vezes dias depois -- e ali o
+           `chuvaRestante` já não existe mais. Confronto gravado antes do campo existir sai sem
+           chuva, que é o que ele era. */
+        chuva: comChuva || undefined,
         player:active.name, playerSpecies:active.speciesId, playerLevel:active.level, playerShiny: !!active.shiny, playerBuffed: !!active.terrainBuffed, playerSpecialty: !!active.specialtyBuffed,
         enemy:enemy.name, enemySpecies:enemy.speciesId, enemyLevel:enemy.level, enemyShiny: !!enemy.shiny, enemyBuffed: !!enemy.terrainBuffed, enemySpecialty: !!enemy.specialtyBuffed,
         playerTrainerStreak: playerStreak, enemyTrainerStreak: enemyStreak,
@@ -2077,6 +2218,10 @@ function simulateGymBattle(team, enemyTeam, rng, opts){
         playerAliveBefore, playerAliveAfter, playerTeamSize: team.length,
         enemyAliveBefore, enemyAliveAfter, enemyTeamSize: enemyTeam.length
       });
+      /* UM CONFRONTO DE CHUVA A MENOS. Cai AQUI, no fim do confronto, e não no começo do seguinte:
+         assim o último confronto de chuva é o terceiro e não o quarto. Conta CONFRONTO e não troca
+         de golpes -- é o que o pedido diz ("vai durar por 3 confrontos"). */
+      if(chuvaRestante > 0) chuvaRestante--;
       if(isTrade){ enemyDefeated = true; playerStreak = 0; enemyStreak = 0; } // ninguém venceu: zera os dois
       else if(enemyFainted){ enemyDefeated = true; playerStreak++; enemyStreak = 0; }
       else if(activeFainted){ enemyStreak++; playerStreak = 0; }
@@ -3620,7 +3765,7 @@ exports._raizDaLinha = raizDaLinha;
 exports._chaveDoEquipado = chaveDoEquipado;
 exports._createInstance = createInstance;
 exports._makeSeededRng = makeSeededRng;
-exports._golpesEspeciais = { AUTODESTRUICAO, SONIFEROS, METRONOMO, CHANCE_AUTODESTRUICAO, CHANCE_SONO, SONO_EM_TROCAS, MULTI_GOLPE, ataquesDisponiveis, GOLPES_CRIT_ALTO, FURIA, CHANCE_FURIA, FURIA_BONUS, sorteiaGolpeDoMetronomo, POOL_METRONOMO, CONFUSAO, CHANCE_CONFUSAO, FURIA_DRAGAO, CHANCE_FURIA_DRAGAO, FURIA_DRAGAO_DANO };
+exports._golpesEspeciais = { AUTODESTRUICAO, SONIFEROS, METRONOMO, CHANCE_AUTODESTRUICAO, CHANCE_SONO, SONO_EM_TROCAS, MULTI_GOLPE, ataquesDisponiveis, GOLPES_CRIT_ALTO, FURIA, CHANCE_FURIA, FURIA_BONUS, sorteiaGolpeDoMetronomo, POOL_METRONOMO, CONFUSAO, CHANCE_CONFUSAO, FURIA_DRAGAO, CHANCE_FURIA_DRAGAO, FURIA_DRAGAO_DANO, CHUVA, CHANCE_CHUVA, CHUVA_EM_CONFRONTOS, CHUVA_MULT, CHUVA_GOLPE_MULT, multDaChuva, estaChovendo, tentarChuva, limparClima };
 exports._trainersLeagueSplitGroups = trainersLeagueSplitGroups;
 exports._trainersLeagueGatherEligibleCodes = trainersLeagueGatherEligibleCodesForUid;
 exports._decodeTeamCode = decodeTeamCode;   // o teste da liga confere a ORDEM da lista pela especie de cada time
@@ -5789,6 +5934,67 @@ exports.buyItem = onCall(async (request) => {
   });
 });
 
+/* VENDER: 50% do preço de compra (11/09/2026, a pedido). O espelho do buyItem, e a metade é
+   calculada AQUI a partir do mesmo `LOJA[item].preco` -- um segundo número escrito à mão divergiria
+   no primeiro reajuste, que é o defeito que o preço no cliente já quase teve.
+   `Math.floor` porque os onze preços são pares (800, 300, 50, 30) e todos dividem redondo hoje; o
+   piso está aqui pra o dia em que um preço ímpar entrar, e ele erra a favor do JOGO, não do
+   jogador -- moeda fracionada não existe.
+   ⚠️ NÃO HÁ LOOP DE ARBITRAGEM, e isso é por construção: comprar por 300 e vender por 150 perde
+   150. A metade é o que garante isso -- qualquer coisa acima de 100% viraria máquina de moeda.
+   ⚠️ O QUE ELA CRIA É UMA TORNEIRA NOVA, e essa é a consequência real: o Doce Raro da Torre e o
+   Bônus Shiny da Elite passam a virar moeda. Está medido no CLAUDE.md. */
+function precoDeVenda(item){
+  const daLoja = LOJA[item];
+  return daLoja ? Math.floor(daLoja.preco / 2) : 0;
+}
+exports.sellItem = onCall(async (request) => {
+  if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
+  const uid = request.auth.uid;
+  const item = String(request.data?.item ?? '');
+  const daLoja = LOJA[item];
+  if(!daLoja) throw new HttpsError('invalid-argument', 'Item desconhecido.');
+  const pedido = Math.floor(Number(request.data?.quantidade ?? 1));
+  if(!Number.isFinite(pedido) || pedido < 1){
+    throw new HttpsError('invalid-argument', 'Quantidade inválida.');
+  }
+  const userRef = db.collection('users').doc(uid);
+  /* Transação pelo mesmo motivo da compra: duas abas leem o mesmo estoque e as duas passam --
+     aqui isso seria pior que na compra, porque cria moeda do nada. */
+  return db.runTransaction(async (tx) => {
+    const [snap] = await tx.getAll(userRef);
+    const d = snap.exists ? (snap.data() || {}) : {};
+    /* ⚠️ O QUE DÁ PRA VENDER NÃO É O QUE A MOCHILA MOSTRA, e o Bônus Shiny é o caso:
+       o `quantoTenho` do cliente soma os CUPONS (o save campeão e a notificação de liga) com o
+       estoque comprado, porque pra USAR os dois valem igual. Pra VENDER não: cupom é uma marca de
+       "você ganhou isso" dentro de um save ou de uma notificação, não uma linha de estoque -- não
+       há de onde descontar. Só o ARMAZÉM (inventario) e o CONTADOR do Doce Raro se vendem.
+       O cliente calcula a mesma coisa no `quantoPossoVender`; se os dois divergirem, a tela oferece
+       um botão que a cobrança recusa. */
+    const estoque = daLoja.contador ? (d[daLoja.contador] || 0)
+                                    : ((d.inventario && d.inventario[item]) || 0);
+    if(estoque < 1){
+      throw new HttpsError('failed-precondition', 'Você não tem esse item pra vender.');
+    }
+    /* VENDE O QUE TEM, não menos: pedir 10 tendo 4 vende 4. Mesma regra da compra -- recusar tudo
+       porque o estoque mudou entre a tela e a transação seria pior que fazer o que dá. */
+    const qtd = Math.min(pedido, estoque);
+    const ganho = qtd * precoDeVenda(item);
+    const patch = { moedas: admin.firestore.FieldValue.increment(ganho) };
+    if(daLoja.contador){ patch[daLoja.contador] = admin.firestore.FieldValue.increment(-qtd); }
+    else { patch.inventario = { [item]: admin.firestore.FieldValue.increment(-qtd) }; }
+    tx.set(userRef, patch, { merge: true });
+    const inv = Object.assign({}, d.inventario || {});
+    if(!daLoja.contador) inv[item] = estoque - qtd;
+    return {
+      moedas: (d.moedas || 0) + ganho,
+      inventario: inv,
+      rareCandies: (d.rareCandies || 0) - (daLoja.contador === 'rareCandies' ? qtd : 0),
+      vendeu: qtd,
+      recebeu: ganho
+    };
+  });
+});
 /* ATIVA UM BÔNUS SHINY COMPRADO. Os outros dois caminhos (activateEliteShinyBonus e
    activateShinyBonus) leem um CUPOM -- o save campeão e a notificação de liga --, que é uma marca
    de "você ganhou isso" e não um estoque. O comprado é estoque de verdade, no inventário, e por
@@ -5927,7 +6133,21 @@ exports.consumeEquipped = onCall(async (request) => {
 const MOEDAS_POR_GINASIO = 5;
 const MOEDAS_JORNADA_COMPLETA = 10;   // as 8 insígnias
 const MOEDAS_ELITE = 20;
-const MOEDAS_RESSORTEIO = 3;
+const MOEDAS_RESSORTEIO = 5;
+/* TETO DE RE-SORTEIOS POR SAVE (11/09/2026, a pedido). Ele é a trava que o PREÇO não consegue ser:
+   preço depende de quanto o jogador tem, e toda fonte de moeda nova (o pagamento da jornada, a
+   venda de itens, o que vier depois) reabre a torneira. O teto não se importa com o saldo.
+   ⚠️ ELE NÃO PODE MORAR NO SAVE, e essa é a diferença que importa. O documento do save é LIVRE pro
+   dono (`allow read, write: if uid == userId`), e o `wildRerolls` se dá ao luxo disso porque mentir
+   nele não paga: ele alimenta a SEMENTE da oferta, então um re-sorteio barato devolve a MESMA
+   oferta. Mentir no TOTAL paga -- compra re-sorteio a mais. Por isso o contador vive no documento
+   da CONTA, sob a mesma trava das moedas, e quem escreve é esta função.
+   A CHAVE É `slot:saveGen`, e isso resolve o reuso de slot de graça: quando um save é apagado e
+   outro nasce ali, a geração do slot avança (ver `saveGen`) e a chave muda -- o teto do save novo
+   nasce zerado sem ninguém precisar limpar nada. É o mesmo mecanismo que já fecha o save-scumming
+   dos iniciais. */
+const MAX_RESSORTEIOS_POR_SAVE = 8;
+function chaveDoTetoDeRessorteio(slot, saveGen){ return String(slot) + ':' + (saveGen || 0); }
 
 /* O QUE UM SAVE JÁ RENDEU. Conta do zero toda vez, a partir do estado do save -- não é um contador
    que incrementa. Assim uma chamada perdida (rede caindo na hora da vitória) não custa moeda
@@ -5946,7 +6166,7 @@ function moedasDevidasDoSave(save){
 
    SAVE ANTIGO NÃO RECEBE RETROATIVO. Na primeira vez que um save passa por aqui sem `coinsPaid`,
    o campo nasce valendo o que ele já teria rendido -- e nada é pago. É a escolha reversível: quem
-   estava com 8 insígnias e a Elite vencida receberia 70 moedas de uma vez, ou seja, 23 re-sorteios
+   estava com 8 insígnias e a Elite vencida receberia 70 moedas de uma vez, ou seja, 14 re-sorteios
    de encontro selvagem caídos do céu. Se um dia se decidir pagar retroativo, é trocar este ramo
    por um `jaPago = 0`; o contrário -- tirar moeda que já foi paga -- não tem volta. */
 exports.claimJourneyCoins = onCall(async (request) => {
@@ -5986,7 +6206,7 @@ exports.claimJourneyCoins = onCall(async (request) => {
    dele (ver goToWildEncounter): o servidor não conhece rota nem pool, e mandar a oferta daqui
    duplicaria as tabelas de encontro, que é justamente o que o projeto evita.
    O que o servidor garante é o que importa: que a moeda existia e saiu. */
-/* O PREÇO DO RE-SORTEIO SOBE A CADA UM NA MESMA ROTA, MAS SÓ COM O BÔNUS SHINY LIGADO: 3, 6, 9...
+/* O PREÇO DO RE-SORTEIO SOBE A CADA UM NA MESMA ROTA, MAS SÓ COM O BÔNUS SHINY LIGADO: 5, 10, 15...
    Sem o bônus são os 3 de sempre. A mesma conta vive no cliente (precoDoRessorteio), que precisa
    dela pra desenhar o botão -- mas quem cobra é aqui.
    O motivo é a matemática do bônus: a chance dele ESCALA +10 pontos por encontro sem shiny, então
@@ -6040,14 +6260,40 @@ exports.rerollWildOffer = onCall(async (request) => {
     const userSnap = lidos[0], saveSnap = lidos[1];
     const d = (userSnap.exists && userSnap.data()) || {};
     const moedas = d.moedas || 0;
-    const jaFeitos = (saveSnap && saveSnap.exists && saveSnap.data().wildRerolls) || 0;
+    const save = (saveSnap && saveSnap.exists && saveSnap.data()) || {};
+    const jaFeitos = save.wildRerolls || 0;
+    /* O TETO POR SAVE. A chave sai do slot MAIS a geração gravada no save: slot reaproveitado por
+       um save novo tem geração nova, então o teto do save novo nasce zerado sozinho.
+       SEM SLOT (cliente antigo em cache) NÃO HÁ COMO CONTAR, e aí ele é RECUSADO em vez de passar
+       livre: deixar passar transformaria "não mandar o slot" no jeito de furar o teto, e um cliente
+       adulterado faria exatamente isso. O index.html vai com no-cache e revalida a cada visita,
+       então cliente velho de verdade dura um F5. */
+    if(!saveRef){
+      throw new HttpsError('failed-precondition',
+        'Recarregue a página pra sortear de novo (versão antiga do jogo).');
+    }
+    const chave = chaveDoTetoDeRessorteio(slot, save.saveGen);
+    const usados = ((d.rerollsPorSave || {})[chave]) || 0;
+    if(usados >= MAX_RESSORTEIOS_POR_SAVE){
+      throw new HttpsError('failed-precondition',
+        `Esta jornada já usou os ${MAX_RESSORTEIOS_POR_SAVE} re-sorteios dela.`);
+    }
     const custo = precoDoRessorteio(jaFeitos, d.shinyBonusExpiresAt);
     if(moedas < custo){
       throw new HttpsError('failed-precondition',
         `Você tem ${moedas} moeda${moedas===1?'':'s'} — o re-sorteio custa ${custo}.`);
     }
-    tx.set(userRef, { moedas: admin.firestore.FieldValue.increment(-custo) }, { merge: true });
-    return { moedas: moedas - custo, custo };
+    /* O CONTADOR SOBE NA MESMA TRANSAÇÃO DA COBRANÇA: separados, duas abas passariam pelo teto
+       juntas -- o mesmo motivo pelo qual a moeda já está aqui dentro. */
+    tx.set(userRef, {
+      moedas: admin.firestore.FieldValue.increment(-custo),
+      rerollsPorSave: { [chave]: admin.firestore.FieldValue.increment(1) }
+    }, { merge: true });
+    return { moedas: moedas - custo, custo,
+             /* QUANTOS SOBRAM vai na resposta pra a tela não precisar de uma segunda leitura --
+                o mesmo desenho do inventário nas respostas da loja. */
+             ressorteiosUsados: usados + 1,
+             ressorteiosRestantes: MAX_RESSORTEIOS_POR_SAVE - (usados + 1) };
   });
 });
 
@@ -6283,6 +6529,16 @@ function battlePrimeiroVivo(time, atual){
    É o miolo do simulateGymBattle, extraído -- lá ele roda em laço até o time acabar; aqui
    precisa parar depois de um confronto pra abrir a janela de escolha. */
 function battleResolveMatchup(estado, rng){
+  /* ⚠️ A BATALHA ONLINE NÃO TEM CLIMA, e zerar aqui é OBRIGATÓRIO -- não é precaução.
+     O `chuvaRestante` é módulo-level, e no servidor a INSTÂNCIA é reaproveitada entre invocações:
+     um `simulateGymBattle` (Torre, ginásio da cidade) que termine com confrontos de chuva SOBRANDO
+     -- e sobra sempre que a luta acaba antes dos 3 -- deixaria o contador positivo, e o próximo
+     confronto online resolvido naquela instância sairia debaixo da chuva de outra pessoa, sem nada
+     na tela dizendo isso.
+     É o mesmo cuidado que o `simulateBossFight` já leva, e pelo mesmo motivo. Aqui NÃO se sorteia
+     chuva: o online resolve confronto a confronto e um clima de 3 confrontos não tem onde caber --
+     fica em aberto, como os itens equipados. */
+  limparClima();
   const a = battleHydrate(estado.aTeam[estado.aCurrent]);
   const b = battleHydrate(estado.bTeam[estado.bCurrent]);
   applySpecialtyBuff([a], estado.aSpecialties);
@@ -7659,6 +7915,13 @@ function simulateBossFight(team, boss, opts){
   team.forEach(p => { p._furia = 0; p.maxHp = calcMaxHp(p); p.hp = p.maxHp; });
   /* Mesma lista do simulateGymBattle, zerada por batalha. */
   itensGastos = [];
+  /* A RAIDE NÃO TEM CLIMA, e zerar aqui não é firula: o `chuvaRestante` é módulo-level e a
+     batalha anterior pode ter acabado com confrontos de chuva SOBRANDO (a chuva dura 3 e a luta
+     pode terminar no primeiro). Sem este zero, o ataque seguinte à raide sairia debaixo da chuva
+     da batalha de outra pessoa -- e a raide é calibrada em ~399 ataques, com o Mew imune ao bloco
+     inteiro de especiais justamente pra ninguém a derrubar de graça.
+     Ou seja: aqui não se SORTEIA chuva, e a que sobrou de fora é apagada. */
+  limparClima();
   const matchups = [];
   let playerStreak = 0, enemyStreak = 0;
   const hpInicialDoBoss = boss.hp;

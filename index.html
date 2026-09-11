@@ -1005,6 +1005,11 @@
   .mlog-lv{font-size:.56rem;font-weight:800;color:var(--muted);}
   .mlog-hp{font-size:.56rem;font-weight:800;color:var(--muted);}
   .mlog-x{align-self:center;font-size:.8rem;color:var(--muted);font-weight:800;padding-top:14px;}
+  /* O 🌧️ fica EM CIMA do ×, e por isso a coluna vira bloco: o × sozinho e uma linha so, e o emoji
+     precisa de uma propria. O padding-top de cima sai quando ha chuva, senao os dois juntos
+     empurrariam o × pra fora do meio do cabecalho. */
+  .mlog-x:has(.mlog-chuva){ padding-top:0; }
+  .mlog-chuva{ display:block; font-size:.85rem; line-height:1; margin-bottom:2px; }
   .mlog-res{text-align:center;font-size:.66rem;margin-top:3px;}
   /* barra curta com o número ao lado -- mesma marcação e mesmas classes de cor de sempre
      (renderHpBar); o rótulo dela sai de cena porque o número já está aqui do lado */
@@ -1515,6 +1520,14 @@
   .league-wins-total-label{font-size:.7rem;color:var(--muted);font-weight:700;margin-top:4px;}
   .league-watch-wrap{position:relative;}
   .terrain-badge-row{text-align:center; margin-bottom:10px;}
+  /* O SELO DA CHUVA usa a MESMA forma do selo de terreno (ele e o vizinho na tela e ensina a ler
+     aquela faixa como "condicao desta partida"), so que no azul do tipo Agua, que e o tipo do
+     golpe que a invoca. */
+  .terrain-inline-badge.chuva-badge{ background:#6890F0; }
+  /* O SELO CLICAVEL do log: e um <button>, entao precisa zerar o que o botao traz de fabrica pra
+     ficar do MESMO tamanho dos selos normais -- foi o que se pediu. So o cursor denuncia que ele
+     se clica, e e o bastante: quem le o log ja aprendeu que selo colorido e nome de golpe. */
+  .type-pill.selo-clicavel{ border:0; font:inherit; font-size:inherit; cursor:pointer; }
   .terrain-inline-badge{
     display:inline-block;
     padding:3px 9px;
@@ -1637,6 +1650,8 @@
     font-size:.78rem;
   }
   .wild-reroll-saldo{ flex-shrink:0; font-size:.68rem; opacity:.85; white-space:nowrap; }
+  /* A linha dos restantes fica logo embaixo do botao, colada nele: ela explica o botao, nao a tela. */
+  .wild-reroll-restam{ margin:4px 0 0; text-align:center; }
   .wild-dex{
     position:absolute; right:9px; top:50%; margin-top:-16px;   /* margem negativa e não translate: o :active já usa o transform */
     width:32px; height:32px; font-size:.95rem; line-height:1;
@@ -2105,6 +2120,10 @@
      o Excluir ficava longe do item que ele apaga. */
   .item-acoes{ display:flex; gap:8px; margin-top:10px; }
   .item-acoes .btn{ flex:1; margin:0; }
+  /* NA LOJA os dois botoes EMPILHAM: o Vender fica EMBAIXO do Comprar, que foi o pedido. A
+     .item-acoes sozinha e uma LINHA -- ela nasceu na mochila, onde Usar e Excluir ficam lado a
+     lado --, entao a loja pede a propria direcao em vez de mudar a de la. */
+  .loja-acoes{ flex-direction:column; }
   .pokedex-cell.mystery{
     background:linear-gradient(135deg,#2b2f5c,#4a2f6b);
     border-color:#9b6bd6;
@@ -5241,6 +5260,10 @@ async function loadPermanentUserData(){
     game.moedas = d.moedas || 0;
     game.inventario = d.inventario || {};        // o armazém de verdade (ver ITENS/comprável)
     game.equipados = d.equipados || {};  // espécie -> item que ela carrega; só o servidor escreve
+    /* QUANTOS RE-SORTEIOS CADA SAVE JA GASTOU -- mapa slot:geracao -> usados, escrito SO pelo
+       servidor (ver o teto no rerollWildOffer). Guardado inteiro porque o save carregado pode
+       mudar sem passar por aqui; quem escolhe a chave e o carregamento do save. */
+    game.rerollsPorSave = d.rerollsPorSave || {};
     /* O time em memória tem que refletir isso NA HORA: o HP Up mexe no teto de vida, e o calcMaxHp
        roda fora da batalha (distribuição de níveis, Doce Raro). Sem sincronizar aqui, a barra
        mudaria de tamanho sozinha ao entrar na luta. */
@@ -5744,7 +5767,10 @@ function melhorAtaque(attacker, defender){
        bestAttackType com o poder acrescentado -- e é ela que faz "o que tira mais dano" ser
        escolhido de verdade, e não "o melhor tipo". */
     return { golpe:id, type:tipo, poder:poder, mult:mult, stab:proprio,
-             nota: poderEfetivo(id) * Math.pow(mult, EXPOENTE_TIPO) * (proprio ? 1.5 : SUBTYPE_PENALTY)
+             /* A CHUVA ENTRA NA NOTA, e não só no dano: se ela mudasse só o dano, o motor
+                escolheria o golpe por uma regra e aplicaria outra -- e sob chuva o Raio Solar
+                continuaria sendo escolhido como se valesse 120. É a lição do EXPOENTE_TIPO. */
+             nota: poderEfetivo(id) * multDaChuva(tipo, id) * Math.pow(mult, EXPOENTE_TIPO) * (proprio ? 1.5 : SUBTYPE_PENALTY)
                    * (atk / Math.max(1, def)) };
   };
   let melhor = null;
@@ -5800,7 +5826,10 @@ function bestAttackType(attacker, defender){
     const atk = especial ? effectiveSpAtk(attacker) : effectiveAttack(attacker);
     const def = especial ? effectiveSpDef(defender) : effectiveDefense(defender);
     // mesma compressão de tipo do motor (^0.6), pra a escolha refletir o dano que sai de verdade
-    const nota = Math.pow(mult, EXPOENTE_TIPO) * (proprio ? 1.5 : SUBTYPE_PENALTY) * (atk / Math.max(1, def));
+    /* A CHUVA entra aqui pelo MESMO motivo da nota do melhorAtaque. Sem golpe escolhido não há
+       id, então só o tipo conta -- e é o que basta: os dois golpes que ela apaga por nome são de
+       Planta, que este caminho nunca escolhe por nome. */
+    const nota = multDaChuva(t, null) * Math.pow(mult, EXPOENTE_TIPO) * (proprio ? 1.5 : SUBTYPE_PENALTY) * (atk / Math.max(1, def));
     if(!melhor || nota > melhor.nota) melhor = { mult, type: t, stab: proprio, nota };
   }
   /* GOLPE TEIMOSO -- quando NADA que o atacante tem machuca o alvo.
@@ -6201,7 +6230,14 @@ function calcDamageNew(attacker, defender, rng, op){
   const potencia = best.poder || MOVE_POWER;
   const core = Math.floor(Math.floor(2*Leff/5 + 2) * potencia * A / D / 50) + 2;
   const typeMult = op.semTipo ? 1 : Math.pow(best.mult, EXPOENTE_TIPO);
-  const dmgGen1 = Math.round(core * STAB * typeMult * (0.85 + rng()*0.15) * (isCrit ? CRIT_MULT : 1)); // variação 85-100% e o ×2 do crítico
+  /* A CHUVA: +50% em Água, -50% em Fogo e no Raio Solar, +25% em Elétrico. É o MESMO multDaChuva
+     que as duas escolhas de golpe leem -- um número só pros três, senão o motor escolhe por uma
+     regra e aplica outra (a lição do EXPOENTE_TIPO).
+     NÃO VALE COM `op.semTipo`: esse é o espelho da CONFUSÃO, que no jogo oficial bate sem tipo e
+     por isso também não sente clima. Sem esta guarda a chuva mudaria o dano do espelho e as
+     medições da confusão deixariam de valer. */
+  const chuvaMult = op.semTipo ? 1 : multDaChuva(best.type, best.golpe);
+  const dmgGen1 = Math.round(core * STAB * typeMult * chuvaMult * (0.85 + rng()*0.15) * (isCrit ? CRIT_MULT : 1)); // variação 85-100%, o clima e o ×2 do crítico
   // converte pra FRAÇÃO da vida na escala Gen 1 (onde o balanceamento foi calibrado), aplica o teto
   // por golpe, e projeta essa fração na escala de HP real do jogo -- cada golpe tira exatamente a
   // mesma porcentagem que tiraria na Gen 1 pura, só que exibida nos números grandes de sempre
@@ -6560,6 +6596,104 @@ const RECUPERACAO = ['kadabra','alakazam','staryu','starmie','porygon','porygon2
    É o que deixa os laços decidirem "os dois últimos caíram, quem ganha?" sem mudar assinatura.
    Módulo-level dá certo porque uma batalha é síncrona do começo ao fim: não existem duas rodando
    ao mesmo tempo nem no navegador nem numa invocação da função. */
+/* DANÇA DA CHUVA: o primeiro CLIMA do jogo (11/09/2026, a pedido).
+   Ela é diferente de tudo que veio antes neste motor, e em duas coisas:
+   1) É POR BATALHA, não por confronto. Todos os nove especiais anteriores são sorteados dentro do
+      `tentarGolpeEspecial`, uma vez por confronto; esta é sorteada ANTES da batalha começar, no
+      `simulateGymBattle`, e vale pelos CHUVA_EM_CONFRONTOS primeiros confrontos dela.
+   2) VALE PROS DOIS LADOS. Clima é do CAMPO, não de quem o invocou -- é assim no jogo oficial, e o
+      pedido não põe lado nenhum ("durante esses 3 confrontos, os ataques de tipo água vão ter um
+      acréscimo"). Ou seja, quem chama a chuva também fortalece o Vaporeon do adversário. É a
+      decisão que mais muda o número: medida, ela é o que segura o custo na jornada.
+   O SORTEIO É UM SÓ POR BATALHA, e isso é o pedido ao pé da letra ("ela tem 10% de chance de
+   acontecer na batalha"): basta UM pokémon com Dança da Chuva em qualquer um dos dois times pra
+   haver sorteio, e ele sai 10%. NÃO é 10% por portador -- com seis deles isso viraria 47%, e o
+   pedido diz 10%. Se um dia a intenção for a outra, é trocar o `algum` por um laço.
+   A LISTA são as 13 espécies que aprendem Rain Dance por NÍVEL na Gen 3, a mesma regra das outras
+   listas, e ela saiu da base por script. O Lugia está nela por ser o que o dado diz, como já
+   acontece no RECUPERACAO -- ele é INTOCÁVEL e ninguém o tem, então a entrada não roda hoje, mas
+   é verdade e já estará certa no dia em que algum modo o puser em campo. */
+const CHUVA = ['squirtle','wartortle','blastoise','poliwag','poliwhirl','gyarados','lapras',
+               'marill','azumarill','wooper','quagsire','suicune','lugia'];
+const CHANCE_CHUVA = 0.10;        // por BATALHA, sorteada antes do primeiro confronto
+const CHUVA_EM_CONFRONTOS = 3;    // quantos confrontos ela dura
+/* O QUE A CHUVA FAZ COM CADA TIPO DE GOLPE. É pelo tipo do GOLPE, não pelo tipo de quem bate: um
+   Charizard usando um golpe Normal não perde nada, e um Pikachu usando Raio ganha os 25%. */
+const CHUVA_MULT = { Water: 1.5, Fire: 0.5, Electric: 1.25 };
+/* GOLPES QUE A CHUVA APAGA por NOME, além do tipo -- eles são de Planta e não entrariam pela
+   tabela acima. O pedido cita dois: Raio Solar e Lâmina Solar.
+   ⚠️ SÓ O RAIO SOLAR EXISTE AQUI: a `solarblade` é da Gen 7 e NÃO está na base da Gen 3, então
+   cadastrá-la seria letra morta -- o mesmo motivo que manteve os estágios 2 a 4 do crítico fora do
+   jogo. Se um dia a base mudar de geração, é uma linha. `tools/test-especiais.js` NOMEIA a
+   ausência, pra ninguém achar que foi esquecimento. */
+const CHUVA_GOLPE_MULT = { solarbeam: 0.5 };
+/* QUANTOS CONFRONTOS DE CHUVA SOBRAM nesta batalha. Módulo-level pelo mesmo motivo do
+   `explosaoDoAtivo` e do `itensGastos`: as funções do motor são compartilhadas por vários laços de
+   batalha, e enfiar mais um parâmetro em todas seria pior que um estado zerado no começo de cada
+   batalha. Uma batalha é síncrona do começo ao fim, então não existem duas rodando ao mesmo tempo. */
+let chuvaRestante = 0;
+function estaChovendo(){ return chuvaRestante > 0; }
+/* APAGA O CLIMA. Tem nome porque TRES caminhos precisam dele e pelo mesmo motivo: o
+   `chuvaRestante` e modulo-level e uma batalha acaba com chuva SOBRANDO sempre que a luta termina
+   antes dos CHUVA_EM_CONFRONTOS confrontos. No servidor a instancia e reaproveitada entre
+   invocacoes, entao sobra vira chuva na batalha de outra pessoa.
+   Escrito a mao nos tres, o quarto caminho nasceria sem -- e o vazamento nao aparece como erro,
+   aparece como um golpe de Fogo tirando metade sem nada na tela dizendo por que. */
+function limparClima(){ chuvaRestante = 0; }
+/* O MULTIPLICADOR DA CHUVA, num lugar só -- e ESSE é o ponto.
+   Ele é lido pelo DANO (`calcDamage`) E pelas DUAS escolhas de golpe (a `nota` do `melhorAtaque` e
+   a do `bestAttackType`). Os três TÊM que usar o mesmo valor: quando a escolha usa um número e o
+   dano usa outro, o motor escolhe um golpe e aplica outro -- foi exatamente o que aconteceu com o
+   EXPOENTE_TIPO, que ficou comprimido no dano e cru na escolha, e fez cliente e servidor
+   discordarem do melhor golpe em 4% dos confrontos.
+   SEM CHUVA ele devolve 1, então tudo que existia antes continua idêntico ao que era. */
+function multDaChuva(tipo, golpeId){
+  if(!estaChovendo()) return 1;
+  if(golpeId && CHUVA_GOLPE_MULT[golpeId] != null) return CHUVA_GOLPE_MULT[golpeId];
+  return CHUVA_MULT[tipo] != null ? CHUVA_MULT[tipo] : 1;
+}
+/* SORTEIA A CHUVA NA ABERTURA DO CONFRONTO -- quando o portador ENTRA nele.
+   ⚠️ ELA NASCEU SORTEADA ANTES DA BATALHA e durou uma versão: "10% de chance de acontecer na
+   batalha" foi lido como um dado só, rolado no `simulateGymBattle`. O pedido era outro, e foi
+   esclarecido: *"ele é por batalha mas a chance é sorteada quando o pokémon que possui essa
+   habilidade passiva entra no confronto que deve ser ativada ou não"*.
+   O "POR BATALHA" É O EFEITO, NÃO O SORTEIO, e essa é a diferença que importa: o dado rola a cada
+   confronto em que um dos 13 entra, como todo o resto deste bloco; o que é POR BATALHA é a DURAÇÃO
+   -- começou, ela atravessa CHUVA_EM_CONFRONTOS confrontos, e é o único efeito do motor que passa
+   do confronto em que nasceu.
+   OS DOIS LADOS SORTEIAM, um dado cada, como o `tentarGolpeEspecial` já faz com os outros: num
+   confronto em que os dois têm Dança da Chuva a chance daquele confronto é 19%, não 10%.
+   ENQUANTO CHOVE NINGUÉM SORTEIA DE NOVO. Ela não se renova: no jogo oficial usar o golpe de novo
+   reinicia o contador, mas isso não foi pedido e faria o clima virar permanente num time de Água.
+   Se um dia for pedido, é trocar o `if(estaChovendo()) return false` por um `chuvaRestante =
+   CHUVA_EM_CONFRONTOS`.
+   ELA É INDEPENDENTE do `sorteiaGolpeEspecial`, e isso é decisão: aquele devolve UM efeito por
+   pokémon por confronto, então pôr a chuva lá faria o Gyarados (que já tem Fúria do Dragão) cair
+   na chance composta e sair em 9%. O pedido diz 10%, e clima não é um golpe usado CONTRA o
+   adversário -- é uma condição do campo. Por isso ela tem dado próprio. */
+function tentarChuva(a, b, rng, diario){
+  if(estaChovendo()) return false;
+  const r = rng || Math.random;
+  /* O `q` do registro é de QUEM USOU o golpe -- a convenção do diário, a mesma do sono e da
+     confusão. O `a` é sempre o lado 'p' do confronto e o `b` o 'e'. */
+  const lados = [[a, 'p'], [b, 'e']];
+  for(const [p, marca] of lados){
+    if(!p || !CHUVA.includes(p.speciesId)) continue;
+    if(r() < CHANCE_CHUVA){
+      chuvaRestante = CHUVA_EM_CONFRONTOS;
+      /* A LINHA SÓ SAI NO CONFRONTO EM QUE ELA COMEÇA, e é isso que foi pedido: "no log, você vai
+         escrever somente na batalha que foi ativada a dança da chuva". Os confrontos seguintes,
+         que só herdam a chuva, são marcados pelo 🌧️ em cima do × -- não por outra linha.
+         Dano ZERO e `x` preenchido: ela É um passo da animação (barra parada), como o sono, e é
+         por isso que ela ganha a pausa de 1s antes de a luta começar. */
+      if(diario){
+        diario.push({ q: marca, d: 0, hp: p.hp, c:0, m:0, z:0, x:'chuva', g:'Dança da Chuva' });
+      }
+      return true;
+    }
+  }
+  return false;
+}
 let explosaoDoAtivo = null;
 function ehImuneAEspecial(p){ return IMUNES_A_ESPECIAL.includes(p.speciesId); }
 function sorteiaGolpeEspecial(p, rng){
@@ -6651,6 +6785,16 @@ const POCAO_GATILHO_HP = 0.25;
 function tentarGolpeEspecial(active, enemy, rng, diario){
   explosaoDoAtivo = null;
   if(ehImuneAEspecial(active) || ehImuneAEspecial(enemy)) return false;
+  /* A CHUVA E SORTEADA AQUI, na abertura do confronto -- e o lugar certo porque este bloco roda
+     UMA VEZ por confronto (o marcador _especialContra, no doExchange), que e exatamente o
+     "quando o pokemon entra no confronto" do pedido.
+     VEM ANTES DO SORTEIO DE EFEITO e com dado PROPRIO: ela nao disputa a vaga unica do
+     sorteiaGolpeEspecial, senao o Gyarados (que ja tem Furia do Dragao) cairia na chance composta
+     e a chuva sairia em 9%. O pedido diz 10%.
+     E RESPEITA A IMUNIDADE DOS CHEFES, que esta uma linha acima: o Mew e o Mewtwo sao imunes ao
+     bloco INTEIRO, e abrir uma excecao pro clima faria a batalha deles se comportar diferente sem
+     ninguem ter pedido. */
+  tentarChuva(active, enemy, rng || Math.random, diario);
   // o mais rápido tenta primeiro -- mesma regra que decide quem conecta antes numa troca normal
   const spdA = effectiveSpeed(active), spdE = effectiveSpeed(enemy);
   const ativoPrimeiro = spdA > spdE || (spdA === spdE && rng() < 0.5);
@@ -7047,6 +7191,13 @@ function simulateGymBattle(team, brockTeam, rng, opts){
   /* A LISTA DO QUE FOI GASTO zera a cada batalha: ela é o recado pra quem chamou tirar o item da
      conta, e um recado de uma batalha anterior faria gastar item que ninguém usou. */
   itensGastos = [];
+  /* A CHUVA É POR BATALHA, e é sorteada AQUI -- antes do primeiro confronto, que é o pedido ao pé
+     da letra ("é ativada antes da batalha começar"). Ela é o único efeito deste motor que não sai
+     do `tentarGolpeEspecial`: os nove de lá são por confronto, este vale pelos três primeiros
+     confrontos da batalha inteira e VALE PROS DOIS LADOS.
+     Zerar aqui, e não no fim, é o que faz uma batalha não herdar a chuva da anterior -- a mesma
+     razão do `_furia` e do `explosaoDoAtivo` logo acima. */
+  limparClima();   // quem SORTEIA agora e a abertura de cada confronto (ver tentarChuva)
   if(opts.preservePlayerHp){
     /* Elite 4: o HP do time do jogador CARREGA de uma batalha pra outra. O que carrega é a
        FRAÇÃO de vida, não o número cru -- porque o TETO muda entre uma luta e outra: cada membro
@@ -7119,6 +7270,11 @@ function simulateGymBattle(team, brockTeam, rng, opts){
         }
       }
       while(active.hp>0 && enemy.hp>0){ doExchange(active, enemy, rng, diario); }
+      /* A CHUVA DESTE CONFRONTO é lida DEPOIS da luta, e isso mudou junto com o sorteio: ela pode
+         COMEÇAR neste confronto (o dado rola na abertura, dentro do doExchange), então lida antes
+         o matchup sairia sem o selo justamente no confronto em que a chuva nasceu.
+         Vem antes do decremento, que é o que faz o último confronto de chuva ainda sair marcado. */
+      const comChuva = estaChovendo();
       const enemyFainted = enemy.hp<=0 || Number.isNaN(enemy.hp); // NaN nunca é <=0 -- sem esse OR, um hp corrompido travaria a batalha pra sempre (ninguém nunca "desmaia")
       const activeFainted = active.hp<=0 || Number.isNaN(active.hp);
       // doExchange garante um único sobrevivente por troca -- empate/morte súbita não existem mais
@@ -7128,6 +7284,11 @@ function simulateGymBattle(team, brockTeam, rng, opts){
       const playerAliveAfter = activeFainted ? playerAliveBefore - 1 : playerAliveBefore;
       const enemyAliveAfter = enemyFainted ? enemyAliveBefore - 1 : enemyAliveBefore;
       matchups.push({
+        /* O SÍMBOLO DA CHUVA sai daqui: o confronto carrega SE choveu nele. É um campo do matchup e
+           não um estado global porque o log é relido depois, às vezes dias depois -- e ali o
+           `chuvaRestante` já não existe mais. Confronto gravado antes do campo existir sai sem
+           chuva, que é o que ele era. */
+        chuva: comChuva || undefined,
         player:active.name, playerSpecies:active.speciesId, playerLevel:active.level, playerShiny: !!active.shiny, playerBuffed: !!active.terrainBuffed, playerSpecialty: !!active.specialtyBuffed,
         enemy:enemy.name, enemySpecies:enemy.speciesId, enemyLevel:enemy.level, enemyShiny: !!enemy.shiny, enemyBuffed: !!enemy.terrainBuffed, enemySpecialty: !!enemy.specialtyBuffed,
         playerTrainerStreak: playerStreak, enemyTrainerStreak: enemyStreak,
@@ -7148,6 +7309,10 @@ function simulateGymBattle(team, brockTeam, rng, opts){
         playerAliveBefore, playerAliveAfter, playerTeamSize: team.length,
         enemyAliveBefore, enemyAliveAfter, enemyTeamSize: brockTeam.length
       });
+      /* UM CONFRONTO DE CHUVA A MENOS. Cai AQUI, no fim do confronto, e não no começo do seguinte:
+         assim o último confronto de chuva é o terceiro e não o quarto. Conta CONFRONTO e não troca
+         de golpes -- é o que o pedido diz ("vai durar por 3 confrontos"). */
+      if(chuvaRestante > 0) chuvaRestante--;
       if(isTrade){
         // os dois caíram na mesma troca (agora possível em qualquer confronto, via golpe moribundo):
         // ninguém venceu, então as duas sequências zeram
@@ -7466,6 +7631,8 @@ async function resortearEncontro(){
     await saveCurrentGame();
     const r = await functionsClient.httpsCallable('rerollWildOffer')({ slot: String(game.currentSaveSlot) });
     game.moedas = r.data.moedas;
+    /* QUANTOS JA FORAM, direto da resposta: e o servidor que conta, e a tela so espelha. */
+    if(typeof r.data.ressorteiosUsados === 'number') game.ressorteiosUsados = r.data.ressorteiosUsados;
     game.wildRerolls = (game.wildRerolls || 0) + 1;
     const sorteioOriginal = Math.random;
     Math.random = makeSeededRng(sementeDoEncontro());
@@ -13345,6 +13512,12 @@ function applySavedState(data){
   game.starterId = data.starterId || null;
   game.wildEncounterSeq = data.wildEncounterSeq || 0;
   game.wildRerolls = data.wildRerolls || 0;
+  /* QUANTOS RE-SORTEIOS ESTE SAVE JA GASTOU. Vem do mapa da CONTA (rerollsPorSave), nao do save --
+     o save e livre pro dono e um teto que ele zera nao e teto. A chave e slot:geracao, e e por ela
+     que um save NOVO no mesmo slot nasce com o teto cheio: a geracao avanca quando ele nasce.
+     O saveGen daqui e o do SAVE (a geracao congelada nele), nao o do slot na conta -- sao
+     diferentes justamente depois de recriar, e quem manda e o do save que esta aberto. */
+  game.ressorteiosUsados = (game.rerollsPorSave || {})[String(game.currentSaveSlot) + ':' + (data.saveGen || 0)] || 0;
   game.wildOffer = data.wildOffer || [];
   game.wildSelected = data.wildSelected || [];
   game.team = hydrateTeam(data.team);
@@ -14607,6 +14780,7 @@ function renderSpecialBattling(){
   return `
   <div class="eyebrow">${cfg.meta.icon||'⚔️'} ${((cfg.meta.title||'Batalha') + (cfg.meta.sub ? ' — ' + cfg.meta.sub : '')).toUpperCase()}</div>
   ${eliteTerrainBadgeHtml()}
+  ${chuvaBadgeHtml(m)}
   <div class="box cursor" style="${terrainBattleBgStyle(cfg.context==='elite' ? game.eliteTerrain : null)}">
     <div class="team-alive-row">
       <span class="team-alive-chip">🎒 ${escapeHtmlSafe(game.trainerName||'Você')}: ${(loading||animating)?m.playerAliveBefore:m.playerAliveAfter}/${m.playerTeamSize}</span>
@@ -14706,11 +14880,22 @@ function renderWild(){
     <p>No meio do caminho, alguns Pokémons selvagens aparecem. Escolha até <strong>2</strong> para se juntarem ao seu time — se não quiser nenhum, pode seguir em frente também.</p>
   </div>
   <div class="pool-badge">SELECIONADOS: ${game.wildSelected.length}/2</div>
-  <button class="btn secondary wild-reroll" ${(game.moedas||0) < precoDoRessorteio() || game.rerolando ? 'disabled' : ''}
+  <button class="btn secondary wild-reroll" ${(game.moedas||0) < precoDoRessorteio() || ressorteiosRestantes() < 1 || game.rerolando ? 'disabled' : ''}
     onclick="resortearEncontro()">
+    <!-- O SALDO CEDE O LUGAR PROS RESTANTES quando eles acabam. Os dois nao cabem juntos: a 320px
+         sobram ~170px pra a acao depois do texto da direita, e "Possui: 🪙 1000" ja ocupa isso.
+         Quando ainda ha re-sorteio, o que decide e o dinheiro; quando acabou, o dinheiro deixou de
+         importar e o que a pessoa precisa saber e POR QUE o botao apagou. -->
     <span>${game.rerolando ? 'Re-sorteando...' : `🪙 ${precoDoRessorteio()} - Sortear novamente`}</span>
-    <span class="wild-reroll-saldo">Possui: 🪙 ${game.moedas||0}</span>
+    <span class="wild-reroll-saldo">${ressorteiosRestantes() < 1
+      ? 'Acabaram os desta jornada'
+      : `Possui: 🪙 ${game.moedas||0}`}</span>
   </button>
+  <!-- QUANTOS SOBRAM, e so quando ja se usou algum: numa jornada em que ninguem re-sorteou, dizer
+       "8 de 8" seria anunciar um limite que ninguem estava perto de encostar. -->
+  ${(game.ressorteiosUsados||0) > 0 && ressorteiosRestantes() > 0
+    ? `<p class="hint-text wild-reroll-restam">Restam ${ressorteiosRestantes()} re-sorteio${ressorteiosRestantes()===1?'':'s'} nesta jornada.</p>`
+    : ''}
   ${bonusShinyAtivo() && (game.wildRerolls||0) > 0
     ? `<div class="box"><p class="hint-text">✨ Com o Bônus Shiny ligado, cada re-sorteio nesta rota custa 🪙 ${MOEDAS_RESSORTEIO} a mais. Na próxima rota volta a ${MOEDAS_RESSORTEIO}.</p></div>`
     : ''}
@@ -15035,6 +15220,7 @@ function renderTrainerBattling(){
   return `
   <div class="eyebrow">${game.bossBattlePending ? '✨ BOSS DE DOMINGO'
                        : game.towerBattlePending ? '🗼 TORRE DOS TREINADORES' : '🤝 BATALHA ENTRE TREINADORES'}</div>
+  ${chuvaBadgeHtml(m)}
   <div class="box cursor">
     <div class="team-alive-row">
       <!-- o lado esquerdo NEM SEMPRE é quem está logado: na reprise de um desafio do Ginásio da
@@ -15448,6 +15634,24 @@ function golpeSeloHtml(speciesId, tipo, golpeId, vezes){
   if(nome && vezes) nome = nome + ' ' + vezes + 'x';
   return seloDeGolpe(nome, (golpeId && GOLPES[golpeId]) ? GOLPES[golpeId][0] : tipo);
 }
+/* O SÍMBOLO DA CHUVA NA TELA (11/09/2026, a pedido: "coloque algum símbolo na tela para
+   identificar que aquele confronto está acontecendo sob o efeito do Rain Dance").
+   É UMA FUNÇÃO SÓ, lida pelas QUATRO telas de batalha que mostram um confronto -- jornada/ginásio
+   da cidade, batalha especial (Elite, Rocket, Mewtwo), Torre e liga assistida. Quatro cópias
+   divergiriam no primeiro ajuste de texto, que é o que já aconteceu entre o log e a animação.
+   ELE VEM DO MATCHUP (`m.chuva`) e não de um estado global: o log é relido depois, às vezes dias
+   depois, e ali o `chuvaRestante` já não existe. Confronto gravado antes do campo sai sem chuva,
+   que é o que ele era.
+   A FORMA É A DO SELO DE TERRENO, que é o vizinho dele na tela e já ensina o jogador a ler
+   "condição desta partida" naquela faixa. Ele é CLICÁVEL e abre a mesma caixa de explicação dos
+   especiais: a pergunta que ele levanta ("por que meu Fogo tirou metade?") é a mesma que a caixa
+   responde, e criar uma segunda caixa pra isso seria dois textos pra a mesma mecânica. */
+function chuvaBadgeHtml(m){
+  if(!m || !m.chuva) return '';
+  return `<div class="terrain-badge-row"><button class="terrain-inline-badge chuva-badge" ` +
+         `onclick="event.stopPropagation();abrirEspecialInfo('chuva','Dança da Chuva','Water',${CHANCE_CHUVA},1)">` +
+         `🌧️ Dança da Chuva</button></div>`;
+}
 function renderMatchupLog(matchups){
   const lado = (m, id) => {
     // maxHp faltando (log antigo, gravado antes de o campo existir): cai no HP de entrada
@@ -15477,7 +15681,12 @@ function renderMatchupLog(matchups){
         ${lado({ nome:m.player, sp:m.playerSpecies, lvl:m.playerLevel, shiny:m.playerShiny,
                  hp:m.playerHpAfter, hpBefore:m.playerHpBefore, maxHp:m.playerMaxHp,
                  tipo:m.playerMove, golpeId:m.playerMoveId, dano:danoDoPlayer, semPassos }, i+'a')}
-        <span class="mlog-x">×</span>
+        <!-- 🌧️ EM CIMA DO ×: e assim que o log diz "este confronto aconteceu debaixo de chuva".
+             Vale pros TRES confrontos, nao so pro que a ativou -- a linha com a frase sai so no
+             primeiro (ver o registro x:chuva), e este emoji e o que conta os outros dois.
+             Ele fica no × de proposito: e o unico ponto do cabecalho que pertence aos DOIS lados,
+             e clima nao e de ninguem, e do campo. -->
+        <span class="mlog-x">${m.chuva ? '<span class="mlog-chuva">🌧️</span>' : ''}×</span>
         ${lado({ nome:m.enemy, sp:m.enemySpecies, lvl:m.enemyLevel, shiny:m.enemyShiny,
                  hp:m.enemyHpAfter, hpBefore:m.enemyHpBefore, maxHp:m.enemyMaxHp,
                  tipo:m.enemyMove, golpeId:m.enemyMoveId, dano:danoDoEnemy, semPassos }, i+'b')}
@@ -15588,7 +15797,8 @@ function sequenciaDoConfronto(m){
   /* TODAS AS ABERTURAS: acontecem antes da luta e não são dano. A poção entrou aqui quando passou a
      funcionar como o Recuperar -- ela era um FECHAMENTO enquanto disparava na vitória do confronto. */
   const aberturas = reais.filter(g => g.x === 'recover' || g.x === 'furia' || g.x === 'confusao' || g.x === 'sono' || g.x === 'semSono' ||
-                                      g.x === 'pocao' || g.x === 'absorb' || g.x === 'absorbdano' || g.x === 'furiadragao');
+                                      g.x === 'pocao' || g.x === 'absorb' || g.x === 'absorbdano' || g.x === 'furiadragao' ||
+                                      g.x === 'chuva');
   const ehDano = g => !g.x || g.x === 'boom' || g.x === 'boomself';
   /* OS TAPAS SOBREVIVEM À RECONSTRUÇÃO. Ela devolve golpes inteiros (interpola o HP de entrada e o
      de saída), e um golpe de vários tapas precisa virar N passos pra a barra descer N vezes -- que
@@ -15807,7 +16017,7 @@ function sequenciaDoConfronto(m){
    'quem' é sempre quem USOU o golpe; 'alvo' é quem sofreu. Repare que a frase do Disable começa
    pelo ALVO ("Gengar teve seu melhor ataque anulado por Alakazam"): quem interessa ali é o
    prejudicado, e é o nome dele que o jogador procura na tela. */
-const ICONES_ESPECIAIS = { boom:'💥', sono:'😴', disable:'🚫', recover:'💚', absorb:'🌿', faixa:'🎗️', desempate:'⚖️', furia:'😤', confusao:'💫', furiadragao:'🐉' };
+const ICONES_ESPECIAIS = { boom:'💥', sono:'😴', disable:'🚫', recover:'💚', absorb:'🌿', faixa:'🎗️', desempate:'⚖️', furia:'😤', confusao:'💫', furiadragao:'🐉', chuva:'🌧️' };
 /* O TIPO de cada golpe especial, pro selo colorido do log. Vive só no CLIENTE, como o
    MOVE_BY_TYPE: o motor manda o que aconteceu, o cliente escolhe a palavra e a cor -- é o que
    evita mais uma tabela duplicada pra sair de sincronia.
@@ -15824,6 +16034,9 @@ const TIPO_DO_ESPECIAL = {
   /* O Sketch é Normal na fonte. Declarado e não deixado no fallback de propósito: o fallback existe
      pra golpe que o motor inventa, e este é um golpe de verdade, com ficha na base. */
   'Sketch':'Normal',
+  /* A Danca da Chuva e o golpe que a invoca -- tipo Agua, e e por isso que o selo dela sai no azul
+     tanto na ficha quanto no quadro de batalha. */
+  'Dança da Chuva':'Water',
   /* OS ONZE QUE CONFUNDEM, cada um com o tipo dele: o selo do Zubat sai no cinza do Normal
      (Supersom) e o do Misdreavus no roxo do Fantasma (Raio Confuso). */
   'Raio Confuso':'Ghost',
@@ -15893,7 +16106,23 @@ function seloDeGolpe(nome, tipo){
   if(!nome) return '';
   return `<span class="type-pill" style="background:${TYPE_COLORS[tipo]||'#888'}">${escapeHtmlSafe(nome)}</span>`;
 }
-function ehGolpeEspecial(g){ return g && (g.x === 'boom' || g.x === 'sono' || g.x === 'disable' || g.x === 'recover' || g.x === 'furia' || g.x === 'confusao' || g.x === 'furiadragao' || g.x === 'semSono' || g.x === 'pocao' || g.x === 'absorb'); }
+/* O SELO DA CHUVA NO LOG, e ele é o ÚNICO selo clicável do jogo (11/09/2026, a pedido: "esse selo
+   é clicável para ler o que a dança da chuva ocasiona").
+   Ele tem o MESMO tamanho e a mesma forma do `seloDeGolpe`, e a mesma cor -- o azul do tipo Água --
+   porque foi pedido "do mesmo tamanho que aparece os outros selos hoje". O que muda é ser um
+   `<button>`, e por isso ele precisa zerar a borda e o padding que o botão traz de fábrica (ver
+   `.selo-clicavel` no CSS).
+   ELE ABRE A MESMA CAIXA DOS ESPECIAIS: a pergunta que ele levanta ("por que meu Fogo tirou
+   metade?") é a que a caixa já responde, e uma segunda caixa seria dois textos pra a mesma coisa.
+   O `<button>` é VÁLIDO aqui: a linha do log é uma `<div>`, não um botão -- a armadilha do
+   `<button>` dentro de `<button>`, que já custou dois defeitos neste projeto, não existe neste
+   caminho. Se um dia a linha do log virar clicável, este é o lugar que quebra. */
+function seloDeChuvaClicavel(nome){
+  return '<button type="button" class="type-pill selo-clicavel" style="background:' + TYPE_COLORS.Water + '"' +
+         ' onclick="event.stopPropagation();abrirEspecialInfo(&quot;chuva&quot;,&quot;Dança da Chuva&quot;,&quot;Water&quot;,' +
+         CHANCE_CHUVA + ',1)">' + escapeHtmlSafe(nome) + '</button>';
+}
+function ehGolpeEspecial(g){ return g && (g.x === 'boom' || g.x === 'sono' || g.x === 'disable' || g.x === 'recover' || g.x === 'furia' || g.x === 'confusao' || g.x === 'furiadragao' || g.x === 'chuva' || g.x === 'semSono' || g.x === 'pocao' || g.x === 'absorb'); }
 /* Os itens da mochila: o que cada um se chama na tela e quanto cura. O motor manda o id (g.g), o
    cliente escolhe a palavra -- mesmo caminho do MOVE_BY_TYPE. */
 const ITENS_DE_BATALHA = {
@@ -15933,6 +16162,17 @@ function fraseDoEspecial(g, quem, alvo, op){
     const base = quem + ' deixou ' + alvo + ' confuso' + causa + ', e ele se acertou';
     if(!(g.am && GOLPES[g.am])) return base;
     return base + ' com ' + comoGolpe(nomeDoAtaque(g.am), GOLPES[g.am][0]);
+  }
+  if(g.x === 'chuva'){
+    /* COMEÇOU A CHOVER. A frase é a pedida, palavra por palavra: "Squirtle usou Dança da Chuva e
+       começa a chover". Ela sai IGUAL no log e no aviso do meio da batalha -- ao contrário do sono,
+       aqui não há detalhe que só o log comporte: o efeito é o mesmo nos dois.
+       O SELO DELA É CLICÁVEL, e só o dela: foi pedido que dê pra ler o que a chuva ocasiona sem
+       sair do log. No aviso do meio da batalha ele sai em texto puro (op.selo é falso ali), que é
+       a regra de sempre -- um botão no meio de uma frase que dura um segundo não se clica. */
+    const nome = golpe || 'Dança da Chuva';
+    const selo = op.selo ? seloDeChuvaClicavel(nome) : escapeHtmlSafe(nome);
+    return quem + ' usou ' + selo + ' e começa a chover';
   }
   if(g.x === 'furiadragao'){
     /* A FÚRIA DO DRAGÃO. Ela é a única do bloco em que o NÚMERO é a informação: são sempre 40, não
@@ -16090,6 +16330,9 @@ function especiaisDaEspecie(id){
      SEM CHANCE DECLARADA, como o Metrônomo: ele não é sorteado, acontece sempre. Um '100% por
      confronto' ali diria menos que nada. */
   if(usaSketch(id))               out.push({ nome:'Sketch',          chance: null, efeito:'sketch' });
+  /* A DANCA DA CHUVA e a unica da ficha que e por BATALHA e nao por confronto -- por isso a chance
+     dela nao leva o "por confronto" das outras, e quem diz isso e o proprio texto da caixa. */
+  if(CHUVA.includes(id))          out.push({ nome:'Dança da Chuva', chance: CHANCE_CHUVA, porBatalha: true, efeito:'chuva' });
   return out.map(e => Object.assign({}, e, { tipo: TIPO_DO_ESPECIAL[e.nome] || 'Normal' }));
 }
 /* O QUE CADA ESPECIAL FAZ NA PARTIDA, em português, pra caixa que abre ao tocar nele na ficha da
@@ -16192,6 +16435,23 @@ const EXPLICACAO_DO_ESPECIAL = {
       'menos 1 de HP.'
     ]
   },
+  chuva: {
+    /* O CLIMA É O QUINTO MOMENTO desta tabela, e o único que vale por VÁRIOS confrontos: os outros
+       abrem ou resolvem UM confronto, o Metrônomo vale a cada golpe, o Sketch é depois da batalha.
+       Este é sorteado ANTES da batalha e dura CHUVA_EM_CONFRONTOS confrontos. */
+    quando: 'Dura {CHUVACONF} confrontos',
+    texto: 'Começa a chover no campo, e a chuva vale pelos {CHUVACONF} primeiros confrontos da ' +
+           'batalha: golpes de Água tiram +50%, golpes de Fogo e o Raio Solar tiram metade, e ' +
+           'golpes Elétricos tiram +25%.',
+    detalhes: [
+      'VALE PROS DOIS LADOS. Clima é do campo, não de quem o invocou — quem chama a chuva também ' +
+      'fortalece o golpe de Água do adversário.',
+      'É sorteada UMA vez, antes do primeiro confronto, e basta um dos {CHUVAESP} pokémon que a ' +
+      'conhecem estar em QUALQUER um dos dois times.',
+      'O que muda é o tipo do GOLPE, não o tipo de quem bate: um Charizard batendo de Normal não ' +
+      'perde nada, e um Pikachu batendo de Raio ganha os 25%.'
+    ]
+  },
   sketch: {
     /* O QUARTO MOMENTO desta tabela, e o único fora de um confronto: os outros oito abrem ou
        resolvem uma luta, o Metrônomo vale a cada golpe, e este acontece DEPOIS que a batalha
@@ -16235,16 +16495,21 @@ function textoDoEspecial(s){
     .replace(/\{DRAGAO\}/g,    FURIA_DRAGAO_DANO)
     /* O teto de golpes já foi 2 e virou 3 a pedido; escrito à mão no texto do Sketch ele
        envelheceria na próxima mudança, que é o que esta função existe pra impedir. */
-    .replace(/\{GOLPES\}/g,    MAX_GOLPES);
+    .replace(/\{GOLPES\}/g,    MAX_GOLPES)
+    /* A duração da chuva e quantas espécies a conhecem: os dois vieram das constantes pelo mesmo
+       motivo. "3 confrontos" escrito à mão envelheceria no dia em que a duração mudar. */
+    .replace(/\{CHUVACONF\}/g, CHUVA_EM_CONFRONTOS)
+    .replace(/\{CHUVAESP\}/g,  CHUVA.length);
 }
 /* A CAIXA QUE EXPLICA O ESPECIAL. Ela é aberta de DENTRO da ficha da Pokédex, então é anexada
    DEPOIS dela no render -- os modais empilham na ordem em que entram, e vindo antes ela abriria
    atrás da ficha (a mesma armadilha que a ficha já teve em relação ao modal da Pokédex).
    Guarda o NOME junto do efeito porque o título mostra o nome DAQUELA espécie: quem abriu num
    Zubat tem que ler "Supersom", não "Confusão". */
-function abrirEspecialInfo(efeito, nome, tipo, chance){
+function abrirEspecialInfo(efeito, nome, tipo, chance, porBatalha){
   if(!EXPLICACAO_DO_ESPECIAL[efeito]) return;
-  game.especialInfo = { efeito, nome, tipo, chance: (chance === '' || chance == null) ? null : Number(chance) };
+  game.especialInfo = { efeito, nome, tipo, porBatalha: !!porBatalha,
+                        chance: (chance === '' || chance == null) ? null : Number(chance) };
   render();
 }
 function fecharEspecialInfo(){
@@ -16259,12 +16524,12 @@ function renderEspecialInfoModal(){
   <div class="modal-overlay" onclick="fecharEspecialInfo()">
     <div class="modal-box especial-info" onclick="event.stopPropagation();">
       <div class="especial-info-selo">${seloDeGolpe(e.nome, e.tipo)}</div>
-      <div class="especial-info-quando">${escapeHtmlSafe(x.quando)}${
+      <div class="especial-info-quando">${escapeHtmlSafe(textoDoEspecial(x.quando))}${
         /* A CHANCE NO TÍTULO, e ela é por CONFRONTO -- não por golpe. É o número que o jogador mais
            erra sobre este bloco, e sem ele a caixa faria parecer que o efeito sai sempre.
            O Metrônomo não tem chance (ele sai em TODO golpe, o que é sorteado é QUAL), e aí a
            linha sai só com o momento. */
-        e.chance == null ? '' : ` · ${Math.round(e.chance * 100)}% por confronto`}</div>
+        e.chance == null ? '' : ` · ${Math.round(e.chance * 100)}% por ${e.porBatalha ? 'batalha' : 'confronto'}`}</div>
       <p class="especial-info-texto">${escapeHtmlSafe(textoDoEspecial(x.texto))}</p>
       <ul class="especial-info-lista">${
         (x.detalhes || []).map(d => `<li>${escapeHtmlSafe(textoDoEspecial(d))}</li>`).join('')}</ul>
@@ -16331,7 +16596,10 @@ function avisoDoConfronto(m, passo){
      sem ninguém ter batido nele, e com 1 ela sumiria justamente no passo em que a barra desce.
      É o mesmo 2 da drenagem e da fúria, pelo mesmo motivo: a frase tem que sobreviver ao
      movimento que ela anuncia. */
-  const passosDaAbertura = { recover:1, pocao:1, absorb:2, disable:1, semSono:1, sono:2, furia:2, confusao:2, furiadragao:2 };
+  /* A CHUVA VALE 2, como o sono, e pelo MESMO motivo: ela É um passo da animação com dano ZERO
+     (barra parada), então a frase precisa cobrir o passo 0 -- a pausa de leitura de 1s -- MAIS o
+     passo dela. Com 1 ela sumiria antes de a pausa acabar. */
+  const passosDaAbertura = { recover:1, pocao:1, absorb:2, disable:1, semSono:1, sono:2, furia:2, confusao:2, furiadragao:2, chuva:2 };
   /* OS PASSOS SÃO CONTADOS A PARTIR DE ONDE A ABERTURA ESTÁ, não do começo do confronto -- e isso
      passou a importar em 10/09/2026, quando o moribundo de quem dormiu foi pra frente da linha do
      sono. Com a contagem absoluta a frase do sono aparecia enquanto o adormecido dava o revide e
@@ -16497,7 +16765,7 @@ function passosHtml(m){
     const doJogador = g.q === 'p';
     if(g.x === 'boomself') return '';   // a linha da explosão (acima) já contou os dois lados
     if(g.x === 'absorbdano') return '';  // idem: a linha da drenagem conta a vida que saiu e a que entrou
-    if(g.x === 'boom' || g.x === 'sono' || g.x === 'recover' || g.x === 'furia' || g.x === 'confusao' || g.x === 'furiadragao' || g.x === 'semSono' ||
+    if(g.x === 'boom' || g.x === 'sono' || g.x === 'recover' || g.x === 'furia' || g.x === 'confusao' || g.x === 'furiadragao' || g.x === 'chuva' || g.x === 'semSono' ||
        g.x === 'pocao' || g.x === 'absorb' || g.x === 'faixa' || g.x === 'desempate') return linhaEspecial(g);
     return `<div class="mlog-passo ${doJogador?'p':'e'}">
       ${ladoHtml(doJogador)} atacou ${ladoHtml(!doJogador)}${seloDe(doJogador)?` com ${seloDe(doJogador, g.tn > 1 ? g.tn : 0)}`:''} e tirou <span class="mlog-tira">−${g.d}</span> de HP.${g.c?' <span class="mlog-crit">CRÍTICO</span>':''}
@@ -16534,6 +16802,7 @@ function renderBattling(){
   <div class="league-watch-wrap">
   <div class="eyebrow">${eyebrowText}</div>
   ${terrain ? `<div class="terrain-badge-row"><button class="terrain-inline-badge" style="background:${terrainColor(terrain)}" onclick="openTerrainInfoModal('${terrain.id}')">${terrain.icon} ${terrain.name}</button></div>` : ''}
+  ${chuvaBadgeHtml(m)}
   <div class="box cursor" style="${terrainBattleBgStyle(terrain)}">
     <div class="team-alive-row">
       <span class="team-alive-chip">🎒 ${escapeHtmlSafe(game.trainerName||'Você')}: ${(loading||animating)?m.playerAliveBefore:m.playerAliveAfter}/${m.playerTeamSize}</span>
@@ -17894,6 +18163,7 @@ function renderLeagueWatch(){
   <div class="league-watch-wrap">
   <div class="eyebrow">🏆 ${w.playerAName.toUpperCase()} 🆚 ${w.playerBName.toUpperCase()}</div>
   ${w.terrain ? `<div class="terrain-badge-row"><button class="terrain-inline-badge" style="background:${terrainColor(w.terrain)}" onclick="openTerrainInfoModal('${w.terrain.id}')">${w.terrain.icon} ${w.terrain.name}</button></div>` : ''}
+  ${chuvaBadgeHtml(m)}
   <div class="box cursor" style="${terrainBattleBgStyle(w.terrain)}">
     <div class="team-alive-row">
       <span class="team-alive-chip">🎽 ${w.playerAName}: ${(loading||animating)?m.playerAliveBefore:m.playerAliveAfter}/${m.playerTeamSize}</span>
@@ -19679,49 +19949,121 @@ function maximoQueCabe(id){
   if(preco <= 0) return 0;
   return Math.floor((game.moedas || 0) / preco);
 }
-function abrirCompra(id){
-  const max = maximoQueCabe(id);
-  if(max < 1) return;
+/* VENDER: 50% do preço de compra (11/09/2026, a pedido). O número sai do MESMO `preco` do catálogo,
+   nunca escrito à mão: um segundo valor divergiria no primeiro reajuste, e a tela passaria a
+   prometer um preço que a cobrança não pratica -- que é exatamente o cuidado que o preço de COMPRA
+   já carrega em relação ao `LOJA` do servidor.
+   A conta vive nos DOIS lados (aqui e no `precoDeVenda` do servidor) pelo mesmo motivo de sempre: o
+   cliente precisa dela pra desenhar o botão, o servidor é quem paga. */
+const VENDA_FRACAO = 0.5;
+function precoDeVenda(id){
+  const it = ITENS[id];
+  return it && it.comprável ? Math.floor(it.preco * VENDA_FRACAO) : 0;
+}
+/* ⚠️ QUANTO DÁ PRA VENDER NÃO É O QUE A MOCHILA MOSTRA, e o Bônus Shiny é o caso que obriga esta
+   função a existir. O `quantoTenho` soma os CUPONS (o save campeão e a notificação de liga) com o
+   estoque comprado, porque pra USAR os dois valem igual. Pra VENDER não: cupom é uma marca de
+   "você ganhou isso" dentro de um save ou de uma notificação, não uma linha de estoque -- não há de
+   onde descontar.
+   Se esta conta divergir do servidor, a tela oferece um botão que a cobrança recusa. */
+function quantoPossoVender(id){
+  if(!ITENS[id] || !ITENS[id].comprável) return 0;
+  if(id === 'doce_raro') return game.rareCandies || 0;
+  return (game.inventario || {})[id] || 0;
+}
+function abrirVenda(id){
+  if(quantoPossoVender(id) < 1) return;
+  /* O MESMO POPUP da compra, em modo de venda: são a mesma pergunta ("quantos?") com o mesmo
+     stepper e o mesmo Máx, e duas telas pra isso divergiriam no primeiro ajuste. O que muda é o
+     teto (o estoque, não o dinheiro), o total e o botão. */
   game.compraItem = id;
+  game.compraModo = 'vender';
   game.compraQtd = 1;
   game.lojaErro = null;
   render();
 }
-function fecharCompra(){ game.compraItem = null; render(); }
+async function venderItem(id){
+  if(game.comprando) return;
+  const qtd = Math.min(quantoPossoVender(id), Math.max(1, game.compraQtd || 1));
+  if(qtd < 1) return;
+  game.lojaErro = null; game.comprando = true; render();
+  try{
+    const r = await functionsClient.httpsCallable('sellItem')({ item: id, quantidade: qtd });
+    game.moedas = r.data.moedas;
+    game.inventario = r.data.inventario || {};
+    /* O Doce Raro não mora no inventário: o servidor devolve o contador junto, como na compra. */
+    if(typeof r.data.rareCandies === 'number' && id === 'doce_raro') game.rareCandies = r.data.rareCandies;
+    game.compraItem = null;
+    game.compraModo = null;
+  } catch(e){
+    console.error('Erro ao vender:', e);
+    game.lojaErro = (e && e.message) || 'Não deu pra vender agora.';
+  }
+  game.comprando = false;
+  render();
+}
+function abrirCompra(id){
+  const max = maximoQueCabe(id);
+  if(max < 1) return;
+  game.compraItem = id;
+  /* ZERA O MODO: sem isto um "vender" de antes grudaria no popup da compra seguinte, e o botao
+     diria Vender numa tela aberta pelo Comprar. */
+  game.compraModo = null;
+  game.compraQtd = 1;
+  game.lojaErro = null;
+  render();
+}
+function fecharCompra(){ game.compraItem = null; game.compraModo = null; render(); }
 /* O passo do +/-. Segurar o botão não existe aqui (é toque, não teclado), então o caminho pra
    comprar 20 poções é o "Máx" -- por isso ele está ao lado e não escondido. */
+/* O TETO MUDA COM O MODO: comprando, e o que o dinheiro paga; vendendo, e o que voce TEM. */
+function tetoDoPopup(){
+  return game.compraModo === 'vender' ? quantoPossoVender(game.compraItem) : maximoQueCabe(game.compraItem);
+}
 function mudarQtdCompra(delta){
-  const max = maximoQueCabe(game.compraItem);
+  const max = tetoDoPopup();
   game.compraQtd = Math.min(max, Math.max(1, (game.compraQtd || 1) + delta));
   render();
 }
-function qtdCompraMax(){ game.compraQtd = Math.max(1, maximoQueCabe(game.compraItem)); render(); }
+function qtdCompraMax(){ game.compraQtd = Math.max(1, tetoDoPopup()); render(); }
 function renderCompraModal(){
   const id = game.compraItem;
   if(!id) return '';
   const it = ITENS[id];
   if(!it) return '';
-  const max = maximoQueCabe(id);
+  /* O MESMO POPUP serve compra e venda: é a mesma pergunta ("quantos?"), com o mesmo stepper e o
+     mesmo Máx. Duas telas pra isso divergiriam no primeiro ajuste -- a mesma lição das três telas
+     de golpe, que viraram uma cópia só depois de já terem divergido no texto. */
+  const vendendo = game.compraModo === 'vender';
+  const max = tetoDoPopup();
   const qtd = Math.min(max, Math.max(1, game.compraQtd || 1));
-  const total = qtd * it.preco;
+  const unidade = vendendo ? precoDeVenda(id) : it.preco;
+  const total = qtd * unidade;
+  const ocupado = game.comprando;
   return `
   <div class="modal-overlay" onclick="fecharCompra()">
     <div class="modal-box" onclick="event.stopPropagation()">
       <div class="modal-icon">${it.icone}</div>
       <h2>${escapeHtmlSafe(it.nome)}</h2>
-      <p class="hint-text">🪙 ${it.preco} cada. Você tem 🪙 ${game.moedas||0} — dá pra levar até <strong>${max}</strong>.</p>
+      <p class="hint-text">${vendendo
+        ? `🪙 ${unidade} cada (metade do preço). Você tem <strong>${max}</strong> pra vender.`
+        : `🪙 ${unidade} cada. Você tem 🪙 ${game.moedas||0} — dá pra levar até <strong>${max}</strong>.`}</p>
       <div class="compra-stepper">
-        <button class="circle-btn" ${qtd<=1||game.comprando?'disabled':''} onclick="mudarQtdCompra(-1)">−</button>
+        <button class="circle-btn" ${qtd<=1||ocupado?'disabled':''} onclick="mudarQtdCompra(-1)">−</button>
         <span class="compra-qtd">${qtd}</span>
-        <button class="circle-btn" ${qtd>=max||game.comprando?'disabled':''} onclick="mudarQtdCompra(1)">+</button>
-        <button class="btn secondary compra-max" ${qtd>=max||game.comprando?'disabled':''} onclick="qtdCompraMax()">Máx</button>
+        <button class="circle-btn" ${qtd>=max||ocupado?'disabled':''} onclick="mudarQtdCompra(1)">+</button>
+        <button class="btn secondary compra-max" ${qtd>=max||ocupado?'disabled':''} onclick="qtdCompraMax()">Máx</button>
       </div>
-      <p class="compra-total">Total: <strong>🪙 ${total}</strong></p>
+      <p class="compra-total">${vendendo ? 'Você recebe' : 'Total'}: <strong>🪙 ${total}</strong></p>
       ${game.lojaErro ? `<p class="error-text">${escapeHtmlSafe(game.lojaErro)}</p>` : ''}
-      <button class="btn success" ${game.comprando?'disabled':''} onclick="comprarItem('${escJs(id)}')">
-        ${game.comprando ? 'Comprando...' : 'Comprar ' + qtd + (qtd>1?' unidades':' unidade')}
-      </button>
-      <button class="btn secondary" ${game.comprando?'disabled':''} onclick="fecharCompra()">Cancelar</button>
+      ${vendendo
+        ? `<button class="btn danger" ${ocupado?'disabled':''} onclick="venderItem('${escJs(id)}')">
+            ${ocupado ? 'Vendendo...' : 'Vender ' + qtd + (qtd>1?' unidades':' unidade')}
+          </button>`
+        : `<button class="btn success" ${ocupado?'disabled':''} onclick="comprarItem('${escJs(id)}')">
+            ${ocupado ? 'Comprando...' : 'Comprar ' + qtd + (qtd>1?' unidades':' unidade')}
+          </button>`}
+      <button class="btn secondary" ${ocupado?'disabled':''} onclick="fecharCompra()">Cancelar</button>
     </div>
   </div>`;
 }
@@ -19752,6 +20094,9 @@ function renderLoja(){
   const sel = aVenda.find(p => p.item === game.lojaSel) || null;
   const it = sel ? ITENS[sel.item] : null;
   const moedas = game.moedas || 0;
+  /* Quanto dá pra VENDER do item selecionado — zero esconde o botão. É o `quantoPossoVender` e não
+     o `quantoTenho`: cupom de Bônus Shiny conta pra USAR e não pra vender. */
+  const vendaveis = sel ? quantoPossoVender(sel.item) : 0;
   return `
   <div class="eyebrow">🛒 LOJA</div>
   <!-- O QUADRO DE CIMA É FIXO (position:sticky): só a lista rola. Com 11 itens a lista passa da
@@ -19768,9 +20113,21 @@ function renderLoja(){
       </div>
       <p class="item-detalhe-texto">${escapeHtmlSafe(it.descricao)}</p>
       ${game.lojaErro ? `<p class="error-text">${escapeHtmlSafe(game.lojaErro)}</p>` : ''}
-      <div class="item-acoes">
+      <div class="item-acoes loja-acoes">
         <button class="btn success" ${(game.moedas||0) < it.preco || game.comprando ? 'disabled' : ''}
           onclick="abrirCompra('${escJs(sel.item)}')">${game.comprando ? 'Comprando...' : '🪙 Comprar'}</button>
+        <!-- ATENCAO: este comentario vive DENTRO de um template literal, entao ele nao pode ter
+             crase nenhuma -- elas fecham a string e o arquivo inteiro para de compilar.
+             O VENDER SO APARECE QUANDO HA O QUE VENDER (11/09/2026, a pedido: "caso o usuario ja
+             tenha um dos itens listado"). Um botao sempre visivel e quase sempre desabilitado seria
+             mais uma coisa apagada na tela -- e aqui a AUSENCIA dele ja diz "voce nao tem nenhum".
+             Fica EMBAIXO do Comprar, que foi o pedido: a classe loja-acoes empilha em coluna,
+             porque a item-acoes sozinha e uma LINHA (ela nasceu na mochila, com Usar e Excluir lado
+             a lado). No vermelho do danger pelo mesmo motivo do Excluir: sai coisa da conta.
+             O QUE ELE CONTA E O quantoPossoVender, NAO o quantoTenho -- o Bonus Shiny de CUPOM
+             aparece na mochila e nao se vende. Ver a nota da funcao. -->
+        ${vendaveis > 0 ? `<button class="btn danger" ${game.comprando ? 'disabled' : ''}
+          onclick="abrirVenda('${escJs(sel.item)}')">🪙 Vender por ${precoDeVenda(sel.item)}</button>` : ''}
       </div>
       ${(game.moedas||0) < it.preco ? `<p class="hint-text">Faltam 🪙 ${it.preco - (game.moedas||0)} pra comprar um.</p>` : ''}
       <p class="loja-saldo">Você tem <strong>🪙 ${moedas}</strong>.</p>`
@@ -19811,8 +20168,20 @@ const MONT_ORDENS = [
 ];
 /* DEZ POR PÁGINA. Com dez saves de seis, a lista chega a 60 linhas -- e uma lista de 60 numa tela
    de 320px é rolagem demais pra uma decisão que se toma olhando poucos de cada vez. */
-const MOEDAS_RESSORTEIO = 3;   // tem que bater com o do servidor (ver rerollWildOffer)
-/* O PREÇO SOBE A CADA RE-SORTEIO NA MESMA ROTA, MAS SÓ COM O BÔNUS SHINY LIGADO: 3, 6, 9...
+const MOEDAS_RESSORTEIO = 5;   // tem que bater com o do servidor (ver rerollWildOffer)
+/* O TETO DE RE-SORTEIOS POR SAVE (11/09/2026, a pedido). O número vive aqui E no servidor
+   (MAX_RESSORTEIOS_POR_SAVE nos dois): o cliente precisa dele pra desabilitar o botão e dizer
+   quantos sobram, o servidor é quem RECUSA. Se os dois divergirem, a tela oferece um re-sorteio que
+   a cobrança nega.
+   ⚠️ QUEM MANDA É O SERVIDOR, e o contador dele NÃO está no save: o save é livre pro dono e um teto
+   que o jogador zera no console não é teto. O `game.ressorteiosUsados` aqui é só a cópia que a tela
+   lê, vinda da resposta da última cobrança e da leitura da conta -- ela pode estar velha, e o pior
+   que acontece é o botão aparecer habilitado e a recusa explicar. */
+const MAX_RESSORTEIOS_POR_SAVE = 8;   // tem que bater com o do servidor (ver rerollWildOffer)
+function ressorteiosRestantes(){
+  return Math.max(0, MAX_RESSORTEIOS_POR_SAVE - (game.ressorteiosUsados || 0));
+}
+/* O PREÇO SOBE A CADA RE-SORTEIO NA MESMA ROTA, MAS SÓ COM O BÔNUS SHINY LIGADO: 5, 10, 15...
    Sem o bônus ele fica nos 3 de sempre.
    O motivo é a matemática do bônus: a chance dele ESCALA +10 pontos por encontro sem shiny, então
    sob o bônus re-sortear é quase comprar um shiny -- 78% de já ter um no 5º encontro. Um preço fixo
@@ -22117,10 +22486,12 @@ function renderPokedexFicha(){
            mesmo selo estático que o jogo usa em toda tela, e ninguém descobre que dá pra tocar. */
         return `<div class="dex-especiais">
           <div class="dex-especiais-tit">${esp.length>1?'Golpes especiais':'Golpe especial'}</div>
-          ${esp.map(e=>`<button type="button" class="dex-especial" onclick="abrirEspecialInfo('${escJs(e.efeito)}','${escJs(e.nome)}','${escJs(e.tipo)}','${e.chance == null ? '' : e.chance}')">${seloDeGolpe(e.nome, e.tipo)}${
+          ${esp.map(e=>`<button type="button" class="dex-especial" onclick="abrirEspecialInfo('${escJs(e.efeito)}','${escJs(e.nome)}','${escJs(e.tipo)}','${e.chance == null ? '' : e.chance}',${e.porBatalha ? 1 : 0})">${seloDeGolpe(e.nome, e.tipo)}${
             /* Sem chance declarada o especial sai SÓ com o nome: é o caso do Metrônomo, que
                acontece em todo golpe. Um "100% por confronto" ali diria menos que nada. */
-            e.chance == null ? '' : `<span class="dex-especial-chance">${Math.round(e.chance*100)}% por confronto</span>`}<span class="dex-especial-info">ⓘ</span></button>`).join('')}
+            /* A DANCA DA CHUVA e a unica por BATALHA: dizer 'por confronto' nela seria mentir
+               por um fator de seis num time cheio. O campo `porBatalha` e quem separa os dois. */
+            e.chance == null ? '' : `<span class="dex-especial-chance">${Math.round(e.chance*100)}% por ${e.porBatalha ? 'batalha' : 'confronto'}</span>`}<span class="dex-especial-info">ⓘ</span></button>`).join('')}
         </div>`;
       })()}
       ${(() => {

@@ -498,10 +498,10 @@ de golpes.
   `tools/test-especiais.js` confere que todo golpe que o motor sabe gerar tem tipo declarado — sem
   isso o selo sairia num cinza genérico, e só no confronto que teve aquele golpe.
   (**O número "59 espécies das quatro listas" que estava aqui era de outra época** e envelheceu
-  calado: são DEZ listas hoje, e **149 das 250** espécies têm pelo menos um especial — 9
+  calado: são ONZE listas hoje, e **157 das 250** espécies têm pelo menos um especial — 9
   autodestruição, 43 sono, 17 anulação, 6 Metrônomo, 10 Recuperar, 23 drenagem, 19 Fúria, 82
-  confusão, 7 Fúria do Dragão e 1 Sketch, com sobreposição. O teste varre as listas em vez de
-  contar, que é o que impede o próximo número de envelhecer do mesmo jeito.)
+  confusão, 7 Fúria do Dragão, 1 Sketch e 13 Dança da Chuva, com sobreposição. O teste varre as
+  listas em vez de contar, que é o que impede o próximo número de envelhecer do mesmo jeito.)
 - **A linha do log tem forma própria aqui.** A regra do log é "uma forma só" (ver a seção acima), e
   estes três são as **exceções**: não são dano, são o confronto inteiro decidido de uma vez, e o
   jogador precisa ler por quê. Um `−0` solto faria procurar bug onde é regra — o mesmo motivo do
@@ -1588,13 +1588,170 @@ a valer o moveset da forma nova.
   acima do nível da evolução e a nova nunca ensina (ver "O que foi medido e NÃO foi mexido").
   Continuam inalcançáveis pra quem nunca os teve — o que muda é que quem OS TEM não os perde mais.
 
+### A DANÇA DA CHUVA: O PRIMEIRO CLIMA DO JOGO (11/09/2026)
+
+Pedida assim: *"10% de chance de acontecer na batalha ... vai durar por 3 confrontos, e durante
+esses 3 confrontos, os ataques de tipo água vão ter um acréscimo de dano de 50%, e os ataques de
+fogo, solar beam e solar blade, perdem 50% ... os ataques elétricos têm um acréscimo de 25%.
+Durante a batalha, coloque algum símbolo na tela"*.
+
+**⚠️ ELA NASCEU SORTEADA ANTES DA BATALHA E DUROU UMA VERSÃO.** "10% de chance de acontecer na
+batalha" foi lido como um dado só, rolado no `simulateGymBattle`. O pedido era outro, e foi
+esclarecido no mesmo dia: *"ele é por batalha mas a chance é sorteada quando o pokémon que possui
+essa habilidade passiva entra no confronto que deve ser ativada ou não"*.
+**O "POR BATALHA" É O EFEITO, NÃO O SORTEIO** — e essa é a frase que resume a seção inteira. O dado
+rola na ABERTURA de cada confronto em que um dos 13 entra, como todo o resto deste bloco; o que é
+POR BATALHA é a **DURAÇÃO**: começou, ela atravessa `CHUVA_EM_CONFRONTOS` (3) confrontos, e é **o
+único efeito do motor que passa do confronto em que nasceu**.
+
+- **O SORTEIO MORA NO `tentarGolpeEspecial`**, que é onde "o pokémon entra no confronto" já
+  acontece: esse bloco roda UMA VEZ por confronto (o marcador `_especialContra`, no `doExchange`).
+- **MAS COM DADO PRÓPRIO, fora do `sorteiaGolpeEspecial`**, e isso é decisão: aquele devolve UM
+  efeito por pokémon por confronto, então pôr a chuva lá faria o **Gyarados** — que já tem Fúria do
+  Dragão — cair na chance composta e a chuva sair em **9%**. O pedido diz 10%. E clima não é um
+  golpe usado CONTRA o adversário: é uma condição do campo.
+- **OS DOIS LADOS SORTEIAM, um dado cada.** Num confronto em que os dois têm Dança da Chuva a
+  chance daquele confronto é **19%**, não 10% — medido, 19,29%. Com um portador só, 9,86%.
+- **ENQUANTO CHOVE NINGUÉM SORTEIA DE NOVO: ela não se renova.** No jogo oficial usar o golpe outra
+  vez reinicia o contador; isso não foi pedido, e faria o clima virar quase permanente num time de
+  Água. Se um dia for pedido, é trocar o `if(estaChovendo()) return false`.
+- **⚠️ MAS ELA PODE SAIR MAIS DE UMA VEZ NA MESMA BATALHA**, e isso é consequência direta do
+  sorteio ser por entrada: acabados os 3 confrontos, o portador que entrar no seguinte sorteia de
+  novo. Medido: **0,9% das batalhas com chuva** têm dois trechos — e dois trechos colados se leem
+  na tela como um só de 4+ confrontos. **Não é defeito**, e o teste sabe disso: ele exige que todo
+  trecho maior que 3 tenha um portador em campo no confronto em que a segunda chuva começaria.
+  Foi um `00001111` que ensinou isso — o Azumarill do adversário chamou no 5º e o Blastoise do
+  jogador chamou de novo no 8º.
+- **ELA RESPEITA A IMUNIDADE DO MEW E DO MEWTWO**, que está uma linha acima dela no
+  `tentarGolpeEspecial`: eles são imunes ao bloco INTEIRO, e abrir exceção pro clima faria a
+  batalha deles se comportar diferente sem ninguém ter pedido.
+
+- **VALE PROS DOIS LADOS.** Clima é do CAMPO, não de quem o invocou — é assim no jogo oficial, e o
+  pedido não põe lado nenhum. **Quem chama a chuva também fortalece o golpe de Água do
+  adversário.** É a decisão que mais segura o número.
+- **ELA MEXE NO NÚCLEO DO DANO**, e é a primeira coisa desde o `EXPOENTE_TIPO` que faz isso. Por
+  causa disso ela entra em **TRÊS lugares com o mesmo valor**: o `calcDamage`, a `nota` do
+  `melhorAtaque` e a `nota` do `bestAttackType` — todos lendo o mesmo **`multDaChuva`**.
+  **Se entrasse só no dano, o motor escolheria por uma regra e aplicaria outra** — sob chuva o Raio
+  Solar continuaria sendo escolhido como se valesse 120. É literalmente a lição do `EXPOENTE_TIPO`.
+- **A LISTA são 13 espécies** — a linha do Squirtle, Poliwag e Poliwhirl (o Poliwrath não aprende),
+  Gyarados, Lapras, a linha do Marill, a do Wooper, Suicune e Lugia. Saiu da base por script. O
+  **Lugia** está nela por ser o que o dado diz, como no `RECUPERACAO`: ele é INTOCÁVEL e a entrada
+  não roda hoje.
+- **⚠️ A LÂMINA SOLAR NÃO EXISTE NA BASE DA GEN 3** — ela é da Gen 7. O pedido citava as duas, e só
+  o **Raio Solar** pôde entrar; cadastrar a outra seria letra morta, o mesmo motivo que manteve os
+  estágios 2 a 4 do crítico fora do jogo. O teste **NOMEIA a ausência**.
+- **O ESPELHO DA CONFUSÃO NÃO SENTE CLIMA** (`op.semTipo`): no jogo oficial ele bate sem tipo, e sem
+  essa guarda a chuva mudaria o dano dele e **todas as medições da confusão deixariam de valer**.
+**NA TELA SÃO TRÊS COISAS DIFERENTES, e a divisão foi pedida olhando um print (11/09/2026).** A
+primeira versão tinha só uma faixa 🌧️ repetida em todo confronto com chuva — informação demais e
+explicação de menos. Hoje:
+
+- **1) A FRASE NO MEIO DA BATALHA, no confronto em que ela ATIVA:** *"Squirtle usou Dança da Chuva e
+  começa a chover"*, com a **pausa de 1s** e só então a luta começa. Pra isso a chuva virou uma
+  **entrada de ABERTURA no diário** (`x:'chuva'`, dano 0), como o sono — e é isso que lhe dá a
+  pausa: um passo de dano zero sem pausa apareceria e sumiria no mesmo quadro, que é o defeito que
+  a Faixa de Foco já teve. Ela vale **2 passos** no `passosDaAbertura` pelo mesmo motivo do sono
+  (ela É um passo da animação, então precisa cobrir o passo 0 mais o dela) e **cede o lugar ao nome
+  do golpe** quando a luta começa.
+- **2) A LINHA NO LOG, SÓ no confronto que ativou** — "somente na batalha que foi ativada a dança da
+  chuva". Os confrontos seguintes herdam a chuva e **não repetem a linha**: repetir três vezes a
+  mesma frase é a parede que o teto de 3 golpes existe pra evitar.
+  **O SELO DELA É CLICÁVEL, e é o ÚNICO selo clicável do jogo** (`seloDeChuvaClicavel`). Tem o mesmo
+  tamanho e a mesma cor dos outros — foi o que se pediu —, e o que muda é ser um `<button>`, que
+  precisa zerar a borda e o padding de fábrica. Ele abre a MESMA caixa de explicação dos especiais:
+  a pergunta que ele levanta ("por que meu Fogo tirou metade?") é a que a caixa já responde.
+  O `<button>` é válido ali porque a linha do log é uma `<div>` — a armadilha do `<button>` dentro
+  de `<button>`, que já custou dois defeitos neste projeto, não existe neste caminho; se um dia a
+  linha do log virar clicável, é este o lugar que quebra.
+- **3) O 🌧️ EM CIMA DO ×, em TODO confronto que teve chuva.** Ele fica no × de propósito: é o único
+  ponto do cabeçalho que pertence aos DOIS lados, e clima não é de ninguém — é do campo. É ele que
+  conta os confrontos 2 e 3, que não ganham linha.
+- **E O SELO DE FAIXA CONTINUA nas QUATRO telas de batalha** (`chuvaBadgeHtml`), na forma do selo de
+  terreno: ele é o vizinho na tela e já ensina a ler aquela faixa como "condição desta partida". É
+  ele que responde "este confronto está sob chuva?" nos confrontos 2 e 3, onde a frase já cedeu.
+  Ele **saiu do log**, onde virou a linha + o emoji.
+- Tudo isso sai do **MATCHUP** (`m.chuva` e o registro do diário), não de um estado global: o log é
+  relido dias depois, e ali o `chuvaRestante` já não existe. E o `m.chuva` é lido **DEPOIS** da
+  troca de golpes, não antes — a chuva pode COMEÇAR naquele confronto, e lido antes o selo sumia
+  justamente onde ela nasceu.
+
+**⚠️ O VAZAMENTO DE ESTADO, E ELE ERA REAL NO SERVIDOR.** O `chuvaRestante` é módulo-level (como o
+`explosaoDoAtivo` e o `itensGastos`), e **uma batalha acaba com chuva sobrando sempre que a luta
+termina antes dos 3 confrontos**. No servidor a INSTÂNCIA é reaproveitada entre invocações — então
+um `simulateGymBattle` (Torre, ginásio da cidade) deixaria o contador positivo e **o próximo ataque
+da RAIDE ou o próximo confronto ONLINE sairia debaixo da chuva de outra pessoa**, sem nada na tela
+dizendo isso. Os dois resolvem dano sem passar pelo sorteio.
+Por isso o reset tem NOME — **`limparClima()`** — e não é uma atribuição solta em três lugares:
+escrito à mão nos três, o quarto caminho nasceria sem, e o vazamento não aparece como erro, aparece
+como um golpe de Fogo tirando metade sem explicação. Ele é chamado pelo `simulateGymBattle`, pelo
+`simulateBossFight` e pelo `battleResolveMatchup`, e o teste **lê o código** pra cobrar os dois
+últimos. No cliente o risco não existe: o `doExchange` só é chamado dentro do `simulateGymBattle`.
+**A RAIDE E O ONLINE FICAM SEM CLIMA de propósito:** a raide é calibrada em ~399 ataques com o Mew
+imune ao bloco inteiro, e o online resolve confronto a confronto — um clima de 3 confrontos não tem
+onde caber ali. Fica em aberto, como os itens equipados.
+
+**O QUE ELA FAZ, MEDIDO — e o número muda MUITO conforme o que se pergunta.**
+
+**Por GOLPE, com o golpe fixo, ela é exatamente o que foi pedido** (mesmo golpe, mesma semente):
+
+| | fora da chuva | na chuva | |
+|---|---|---|---|
+| Hidro Bomba (Água) | 2.269 | 3.402 | **×1,50** |
+| Lança-Chamas (Fogo) | 314 | 157 | **×0,50** |
+| Raio (Elétrico) | 211 | 261 | **×1,25** |
+| Raio Solar | 2.650 | 1.325 | **×0,50** |
+| Golpe de Corpo (Normal) | 86 | 86 | ×1,00 |
+
+**Mas por BATALHA ela quase não move a taxa de vitória — e a causa é que o motor CONTORNA a
+penalidade.** Como a chuva entra na escolha do golpe, um Charizard sob chuva **para de usar Fogo** e
+passa a bater de Ataque de Asa. Medido em 8.640 pares atacante × alvo:
+
+- a chuva **troca o golpe escolhido em 6,7%** deles;
+- **206 pares largam um golpe de Fogo** e **136 largam o Raio Solar**;
+- **223 passam a usar Água** e 18 a usar Elétrico;
+- a fatia de Água entre os golpes escolhidos vai de **11,7% para 14,3%**, e a de Fogo cai de
+  **7,0% para 4,6%**.
+
+Ou seja: **ela muda QUAL golpe sai muito mais do que muda quem ganha.** É o mesmo desenho do Ditto e
+do Smeargle — *escolhe melhor, não fica mais forte*. Num 1x1 contra painel calibrado no empate e com
+a chuva forçada em 100%, todos os efeitos por espécie ficaram **dentro de 2σ**.
+
+**NA BATALHA, medido com o sorteio por entrada** (time com um portador na 3ª vaga contra seis
+adversários sorteados, 6.000 batalhas): ela sai em **13,1% das batalhas** e cobre **3,1% dos
+confrontos**. Ela **começa tarde** — em 96% das vezes depois do 1º confronto —, e isso é justamente
+a assinatura do sorteio por entrada: com o dado rolado antes da batalha ela começaria sempre no
+confronto 1.
+
+**O PREÇO NA JORNADA: nada. 69,15% contra 69,43%, −0,27 ponto, 0,5σ** (10 blocos de 1.500
+jornadas de cada lado, **15.000 de cada**, desvio tirado de ENTRE os blocos). Faz sentido, e por
+três razões que se somam: ela sai em **13% das batalhas**, cobre **3 confrontos** de uma batalha que
+costuma ter mais, e **cai dos dois lados**.
+
+- **Se um dia incomodar, os lugares de mexer são a CHANCE (`CHANCE_CHUVA`), a DURAÇÃO
+  (`CHUVA_EM_CONFRONTOS`) e os MULTIPLICADORES (`CHUVA_MULT`)**. O mais forte dos três é a duração:
+  é ela que decide quantos confrontos da batalha o clima alcança.
+- `tools/test-especiais.js` tranca as pontas: as listas e os multiplicadores iguais nos dois
+  motores, os quatro multiplicadores pedidos, que o resto dos tipos não muda, o dano medido por
+  razão, que a chuva **troca o golpe escolhido** (dois pares reais, achados varrendo as 250×250 — a
+  primeira tentativa foi um Venusaur × Geodude onde Planta é 4× e mesmo pela metade o Raio Solar
+  ganhava, e o teste falhava sem nada estar errado), que o `poder` que vai pro dano continua CRU,
+  que o espelho da confusão não sente clima, as duas chances (10% e 19%), que ela não se renova, que
+  **começa depois do 1º confronto na maioria das vezes**, que nenhum trecho passa de 3 sem um
+  portador pra explicar, que o estado não vaza, e que a ficha escreve "por batalha".
+  **E as TRÊS coisas da tela**, cada uma separada: a frase palavra por palavra com a pausa de 1s e
+  cedendo quando a luta começa, a linha do log saindo **só** no confronto que ativou (um confronto
+  que só herdou a chuva tem o emoji e NÃO a linha), o selo sendo clicável e abrindo a caixa da
+  chuva, o 🌧️ em cima do ×, e as quatro telas de batalha com a faixa.
+
 ### A CAIXA QUE EXPLICA O ESPECIAL (11/09/2026)
 
 Pedida assim: *"para todos os ataques especiais/passivas, coloque que quando o usuário clicar em
 cima dessa habilidade passiva, abre um modal explicando o que ocorre quando acontece aquela
-habilidade na partida"*. São os **dez**: autodestruição, sono, anulação, Metrônomo, Recuperar,
-drenagem, Fúria, confusão, Fúria do Dragão e **Sketch** — este último acrescentado à ficha no mesmo
-dia, também a pedido, e SÓ pra aparecer: a mecânica dele não foi tocada.
+habilidade na partida"*. São os **onze**: autodestruição, sono, anulação, Metrônomo, Recuperar,
+drenagem, Fúria, confusão, Fúria do Dragão, **Sketch** — este acrescentado à ficha no mesmo dia,
+também a pedido, e SÓ pra aparecer: a mecânica dele não foi tocada — e a **Dança da Chuva**, que
+chegou logo depois e é a única POR BATALHA.
 
 - **ELA É INDEXADA PELO EFEITO, NÃO PELO NOME** (`EXPLICACAO_DO_ESPECIAL`), e essa é a decisão que
   sustenta o resto. O nome é **por espécie** — o Zubat confunde com Supersom e o Alakazam com
@@ -1618,8 +1775,9 @@ dia, também a pedido, e SÓ pra aparecer: a mecânica dele não foi tocada.
   mais erra sobre este bloco. São QUATRO momentos e eles jogam muito diferente:
   **ABRE o confronto** (a luta acontece inteira depois, com alguém já em vantagem), **RESOLVE o
   confronto** (não há luta depois, e só a autodestruição faz isso), **A CADA GOLPE** (só o
-  Metrônomo) e **DEPOIS DA BATALHA** (só o Sketch).
-  O conjunto é FECHADO e o teste cobra isso: um quinto momento escrito com outra palavra ("no fim
+  Metrônomo), **DEPOIS DA BATALHA** (só o Sketch) e **DURA N CONFRONTOS** (só a Dança da Chuva,
+  que é a única que atravessa vários).
+  O conjunto é FECHADO e o teste cobra isso: um sexto momento escrito com outra palavra ("no fim
   da luta") passaria despercebido, e as duas travas que procuram por /Resolve/ e /cada golpe/
   deixariam de valer sobre ele.
 - **⚠️ SÓ A AUTODESTRUIÇÃO RESOLVE O CONFRONTO — e a primeira versão desta caixa dizia que o SONO
@@ -2260,6 +2418,12 @@ pedido em 09/09/2026. `PAUSA_ANTES_DO_GOLPE_MS`.
   porque código roda em sequência. Qualquer outra ordem faz o log dizer que alguém atacou depois
   de cair, e isso já foi reportado como bug três vezes (inclusive na forma "somar o revide numa
   linha anterior", que fazia a linha antiga parecer fatal).
+- **O SELO DA DANÇA DA CHUVA É O ÚNICO SELO CLICÁVEL DO LOG** (11/09/2026, a pedido): tocar nele
+  abre a caixa que explica o clima. Ele tem o mesmo tamanho e a mesma cor dos outros de propósito —
+  o que muda é ser um `<button>`, e por isso ele zera a borda e o padding de fábrica
+  (`.selo-clicavel`). É a única exceção à regra de que selo de log é só leitura, e ela existe porque
+  o clima é a única coisa do log que muda o dano de TODO MUNDO por três confrontos: a pergunta "por
+  que meu Fogo tirou metade?" nasce ali e merece resposta ali.
 - A linha do log tem **uma forma só**: "X atacou Y com GOLPE e tirou −N de HP". Já passaram por
   ali selo de crítico, de moribundo e de "o tipo não pega nele" — todos saíram: viravam ruído numa
   linha que se lê de relance.
@@ -2814,6 +2978,8 @@ pedido em 09/09/2026. `PAUSA_ANTES_DO_GOLPE_MS`.
   A Super Poção era 30 e a Poção 15; subiram em 04/09/2026. Pela medição anterior isso põe a Poção
   em **0,070 ponto por moeda** (era 0,141) e a Super em **0,063** (era 0,105) — elas deixam de ser
   as compras mais eficientes e passam a valer o mesmo que os de atributo.
+- **A LOJA VENDE DE VOLTA por metade do preço desde 11/09/2026** -- ver a seção **VENDER**, mais
+  abaixo, que é onde está a torneira de moeda que isso cria.
 - **A LOJA É UMA LISTA, com o quadro de cima FIXO** (04/09/2026). Era a mesma grade de quadradinhos
   da mochila, e com 11 itens ela parou de funcionar: o quadradinho mostra só o ÍCONE, e metade dos
   ícones são emojis parecidos (❤️ ⚔️ 🛡️ 🔮 ✴️) — não dava pra escolher sem clicar em cada um.
@@ -2844,7 +3010,80 @@ pedido em 09/09/2026. `PAUSA_ANTES_DO_GOLPE_MS`.
   efeito prático — mas ele existe porque um item sem preço no catálogo deixava o quadro de cima
   VAZIO, e foi pego pelo teste no dia em que a loja passou a vender.
 
+### VENDER: metade do preço de compra (11/09/2026)
+
+Pedido assim: *"na loja, caso o usuário já tenha um dos itens listado, ele pode ter a opção vender
+por 50% do valor de compra. Então vai abrir um botão Vender embaixo do botão Comprar"*.
+
+- **O BOTÃO SÓ APARECE QUANDO HÁ O QUE VENDER**, e é o que o pedido diz. Um botão sempre visível e
+  quase sempre desabilitado seria mais uma coisa apagada na tela — e aqui a **ausência dele já
+  informa**: "você não tem nenhum". Fica **embaixo** do Comprar (a `.loja-acoes` empilha em coluna;
+  a `.item-acoes` sozinha é uma LINHA, porque ela nasceu na mochila com Usar e Excluir lado a lado)
+  e no **vermelho do `danger`**, pelo mesmo motivo do Excluir: sai coisa da conta.
+- **A METADE SAI DO MESMO `preco` do catálogo**, nos dois lados (`precoDeVenda`, aqui e no
+  servidor). Um segundo número escrito à mão divergiria no primeiro reajuste — é o mesmo cuidado
+  que o preço de COMPRA já carrega, e o teste **compara os dois catálogos item a item**, lendo o
+  preço do servidor direto do código.
+  `Math.floor` porque os quatro preços do jogo são pares e dividem redondo hoje; o piso está ali
+  pro dia em que um preço ímpar entrar, e ele erra a favor do JOGO.
+- **⚠️ O QUE DÁ PRA VENDER NÃO É O QUE A MOCHILA MOSTRA, e o Bônus Shiny é o caso.** O `quantoTenho`
+  soma os **CUPONS** (o save campeão e a notificação de liga) com o estoque comprado, porque pra
+  USAR os dois valem igual. Pra VENDER não: cupom é uma marca de "você ganhou isso" dentro de um
+  save ou de uma notificação, **não uma linha de estoque** — não há de onde descontar. Por isso
+  existe o `quantoPossoVender`, que olha só o **armazém** (e o contador, no Doce Raro). Se as duas
+  contas divergirem, a tela oferece um botão que a cobrança recusa.
+  Um Bônus Shiny **resgatado** pro armazém (o que acontece quando a notificação é apagada) já é
+  estoque e se vende.
+- **QUEM PAGA É O SERVIDOR, em transação** — a mesma regra de tudo que mexe em moeda. Aqui ela pesa
+  mais que na compra: sem a transação, duas abas leem o mesmo estoque e as duas passam, e isso
+  **cria moeda do nada**.
+- **VENDE O QUE TEM, não menos:** pedir 10 tendo 4 vende 4, e a resposta diz quantos foram. É a
+  mesma regra da compra, e pelo mesmo motivo — recusar tudo porque o estoque mudou entre a tela e a
+  transação seria pior que fazer o que dá.
+- **O POPUP É O MESMO da compra, em modo de venda** (`game.compraModo`): é a mesma pergunta
+  ("quantos?"), com o mesmo stepper e o mesmo Máx. Duas telas pra isso divergiriam no primeiro
+  ajuste — a lição das três telas de golpe, que viraram uma cópia só **depois** de já terem
+  divergido no texto. O que muda é o **teto** (o estoque, não o dinheiro), o total ("Você recebe")
+  e o botão.
+  O `abrirCompra` **zera o modo**: sem isso um "vender" anterior grudaria e o popup aberto pelo
+  Comprar diria Vender.
+
+**⚠️ NÃO EXISTE LOOP DE ARBITRAGEM, e isso é por construção:** comprar por 300 e vender de volta
+devolve 150 — **perde metade**. Qualquer fração acima de 100% viraria máquina de moeda, e há um
+caso de teste que compra 10 poções por 300 e vende de volta por 150 justamente pra gritar no dia em
+que alguém mexer na constante.
+
+**⚠️ MAS ELA CRIA UMA TORNEIRA NOVA, e esse é o custo real da feature.** O que vem de JOGAR passa a
+virar moeda:
+
+| | vende por | = quantas jornadas (70/jornada) |
+|---|---|---|
+| **Bônus Shiny** (Elite, liga) | **400** | **5,7 jornadas** |
+| **Doce Raro** (pódio da Torre) | **150** | **2,1 jornadas** |
+| Despertar / Super Poção / Faixa | 25 | 0,36 |
+| Poção e os cinco de atributo | 15 | 0,21 |
+
+**O caso que merece atenção é o Bônus Shiny.** Ele é o item mais forte da loja (a chance escala +10
+pontos por encontro sem shiny — 78% de já ter um no 5º encontro), e vendê-lo rende **400 moedas**.
+**⚠️ ESSA ALAVANCA FOI PUXADA NO MESMO DIA, e depois uma segunda:** o re-sorteio subiu de 3 pra 5
+(as 400 moedas caíram de 133 pra 80 re-sorteios, e as 150 de um Doce Raro de 50 pra 30), e logo
+depois entrou um **TETO de 8 re-sorteios por save**. O teto é o que realmente fecha a conversão:
+as 400 moedas não viram mais 80 re-sorteios numa jornada, viram **10 jornadas com o teto cheio** —
+espalhados no tempo em vez de concentrados num save. Ver as duas na seção do re-sorteio.
+Não é um loop (não dá pra comprar outro Bônus de volta: ele custa 800).
+Se ainda incomodar, o que sobra, em ordem de força: **tirar os dois prêmios da venda** (uma linha:
+pular `doce_raro` e `bonus_shiny` no `quantoPossoVender` e no servidor) ou **baixar a fração**
+(`VENDA_FRACAO`). A régua está aqui.
+
+- `tools/test-moedas.js` tranca: a metade de cada preço, que o Doce Raro sai do CONTADOR e não do
+  inventário, que pedir mais do que se tem vende o que tem, que sem estoque ele recusa **e não paga
+  nada**, que o cupom de Bônus Shiny **não** se vende mas o comprado sim, que comprar e vender de
+  volta perde metade, e que o preço que o cliente desenha é exatamente o que o servidor paga.
+
 ### O popup de quantidade
+- **ELE SERVE COMPRAR E VENDER desde 11/09/2026** (`game.compraModo`): é a mesma pergunta, com o
+  mesmo stepper e o mesmo Máx. O que muda é o teto — comprando é o que o dinheiro paga, vendendo é
+  o que você TEM (`tetoDoPopup`) —, o total ("Você recebe") e o botão. Ver a seção **VENDER**, acima.
 - **Comprar abre um popup** com −/+, um botão **Máx** e o total. O teto é **o que o dinheiro
   compra** (`maximoQueCabe` = `moedas / preço`, arredondado pra baixo).
 - **O teto da tela é conveniência; quem valida é o SERVIDOR**, contra o saldo lido DENTRO da
@@ -3586,7 +3825,7 @@ verdade, cai no game over, e o teste confere que a trava soltou dos dois lados.
   podia nem estar lá, e a vitória só seria paga na chamada seguinte.
 - **Save antigo NÃO leva retroativo, e essa é a decisão irreversível daqui.** Na primeira vez que um
   save passa pela função sem `coinsPaid`, o campo nasce valendo o que ele já teria rendido e **nada
-  é pago**. Um campeão de antes do sistema receberia 70 moedas de uma vez — 23 re-sorteios de
+  é pago**. Um campeão de antes do sistema receberia 70 moedas de uma vez — 14 re-sorteios de
   encontro caídos do céu. Se um dia se decidir pagar retroativo, é trocar esse ramo por um
   `jaPago = 0`; o contrário — tirar moeda que já foi paga — não tem volta.
 - **`moedas` está na trava do `firestore.rules`, junto do `rareCandies`.** Não é opcional: moeda é
@@ -3599,8 +3838,10 @@ verdade, cai no game over, e o teste confere que a trava soltou dos dois lados.
 
 ## Re-sorteio pago do encontro selvagem
 
-- **3 moedas trocam a oferta INTEIRA — espécies e níveis** da rota atual (`MOEDAS_RESSORTEIO`, no
+- **5 moedas trocam a oferta INTEIRA — espécies e níveis** da rota atual (`MOEDAS_RESSORTEIO`, no
   cliente e no servidor; se os dois divergirem, a tela promete um preço que a cobrança não pratica).
+  **ERA 3 ATÉ 11/09/2026**, e subiu a pedido — no mesmo dia em que a loja passou a COMPRAR itens de
+  volta, que é o que tinha criado moeda nova. Ver o custo medido no fim desta seção.
 - **O contador de re-sorteios entra na MESMA semente do encontro** (`sementeDoEncontro`, um lugar só
   pro primeiro sorteio e pro re-sorteio). É isso que mantém a trava anti save-scumming de pé: sem
   pagar, a oferta é sempre a mesma (sair do save e voltar não muda nada); pagando, ela muda; e voltar
@@ -3613,43 +3854,123 @@ verdade, cai no game over, e o teste confere que a trava soltou dos dois lados.
 - **O botão fica ENTRE o contador de selecionados e a caixa dos selvagens**, não no rodapé: é ali
   que a decisão é tomada. Embaixo dos cards e do "Confirmar equipe" ele chegava tarde -- quem
   rolou até o fim da lista já escolheu.
-  Ele carrega os dois textos: **"🪙 3 - Sortear novamente"** à esquerda e **"Possui: 🪙 N"** à
+  Ele carrega os dois textos: **"🪙 5 - Sortear novamente"** à esquerda e **"Possui: 🪙 N"** à
   direita, dentro do mesmo botão. Por isso a fonte dele é menor que a dos outros botões, e isso foi
   medido: a 320px sobram ~170px pra ação depois do saldo, e a frase no corpo normal (14,4px) mede
   200 -- quebrava em duas linhas. Quem tem que caber com folga é o SALDO, que cresce com 4 dígitos;
   a ação é texto fixo.
   A frase que explicava tudo isso em texto ("Você tem X. O re-sorteio troca as espécies E os
   níveis") saiu a pedido em 02/09/2026: o botão já diz o preço e o saldo.
-- **COM O BÔNUS SHINY LIGADO O PREÇO SOBE A CADA RE-SORTEIO NA MESMA ROTA: 3, 6, 9...**
-  (`precoDoRessorteio`, no cliente e no servidor). Sem o bônus fica nos 3 de sempre.
-  O motivo é a matemática do bônus: a chance dele **escala +10 pontos por encontro sem shiny**
-  (78% de já ter um no 5º encontro), então re-sortear sob o bônus é quase comprar um shiny — a preço
-  fixo de 3, as 70 moedas de uma jornada virariam shiny garantido.
-  **Volta pros 3 na rota seguinte**, porque o `wildRerolls` zera a cada encontro novo: o que se
+- **COM O BÔNUS SHINY LIGADO O PREÇO SOBE A CADA RE-SORTEIO NA MESMA ROTA: 5, 10, 15...**
+  (`precoDoRessorteio`, no cliente e no servidor). Sem o bônus fica nos 5 de sempre.
+  **A ESCALADA SAI DA PRÓPRIA CONSTANTE** (`MOEDAS_RESSORTEIO * (1 + wildRerolls)`), e é por isso
+  que subir o preço de 3 pra 5 mudou a série de 3/6/9 pra 5/10/15 sem tocar na fórmula — era uma
+  linha em cada motor. Insistir até o 5º na mesma rota custava 45 e passou a custar **75**.
+  O motivo da escalada é a matemática do bônus: a chance dele **escala +10 pontos por encontro sem
+  shiny** (78% de já ter um no 5º encontro), então re-sortear sob o bônus é quase comprar um shiny.
+  **Volta pros 5 na rota seguinte**, porque o `wildRerolls` zera a cada encontro novo: o que se
   quer encarecer é insistir NA MESMA rota, não jogar.
-- **O contador vem do SAVE, e isso é seguro por construção.** O servidor lê `wildRerolls` do save
-  gravado — que o cliente escreve. Mentir que é zero não compensa: ele entra na **semente da
-  oferta**, então o re-sorteio barato devolve a MESMA oferta de antes. Quem falsifica o contador
-  não recebe pokémon novo nenhum.
+- **⚠️ TETO DE 8 RE-SORTEIOS POR SAVE (11/09/2026, `MAX_RESSORTEIOS_POR_SAVE`).** É a trava que o
+  PREÇO não consegue ser: preço depende de quanto o jogador tem, e **toda fonte de moeda nova**
+  (o pagamento da jornada, a venda de itens, o que vier depois) reabre a torneira. O teto não se
+  importa com o saldo.
+  Oito é **um por encontro** — a jornada tem 8 —, mas eles NÃO são por rota: dá pra queimar os oito
+  no primeiro encontro e ficar sem nenhum no resto. É decisão, e é o que faz o teto virar escolha.
+- **⚠️ O CONTADOR NÃO PODE MORAR NO SAVE, e essa é a parte que quase passou.** O documento do save é
+  LIVRE pro dono (`allow read, write: if uid == userId`), e o `wildRerolls` se dá ao luxo disso
+  porque **mentir nele não paga**: ele alimenta a SEMENTE, então um re-sorteio barato devolve a
+  MESMA oferta. **Mentir no TOTAL paga** — compra re-sorteio a mais. Por isso ele vive no documento
+  da CONTA (`rerollsPorSave`), **na mesma trava das moedas** no `firestore.rules`, e quem escreve é
+  o `rerollWildOffer`. Há um caso de teste que gasta os 8, zera o `wildRerolls` do save "no console"
+  e confirma que **não volta nenhum**.
+- **A CHAVE É `slot:saveGen`**, e isso resolve o reuso de slot de graça: quando um save é apagado e
+  outro nasce ali, a **geração do slot avança** e a chave muda — o teto do save novo nasce zerado
+  sem ninguém limpar nada. É o mesmo mecanismo que já fecha o save-scumming dos iniciais, reusado.
+  Uma limpeza à mão teria esquecido algum caminho; esta não tem o que esquecer.
+- **⚠️ SEM SLOT ELE PASSOU A RECUSAR**, e isso mudou o comportamento antigo. Antes, cliente sem slot
+  "caía no preço de sempre, em vez de quebrar"; com o teto isso virou buraco — **não mandar o slot
+  seria o jeito de furá-lo**, e um cliente adulterado faria exatamente isso. O `index.html` vai com
+  `no-cache` e revalida a cada visita, então cliente velho de verdade dura um F5.
+- **O contador sobe na MESMA transação da cobrança.** Separados, duas abas passariam pelo teto
+  juntas — e há um caso que deixa 1 sobrando, dispara duas abas e cobra que só uma passe e o total
+  pare **exatamente em 8**.
+- **NA TELA:** o botão apaga ao acabar, e o **saldo cede o lugar** pra "Acabaram os desta jornada" —
+  os dois não cabem juntos a 320px (sobram ~170px pra a ação depois do texto da direita, e
+  "Possui: 🪙 1000" já ocupa isso). Enquanto há re-sorteio, quem decide é o dinheiro; quando acaba,
+  o dinheiro deixou de importar e o que a pessoa precisa saber é POR QUE o botão apagou.
+  A linha "Restam N" só aparece **depois do primeiro re-sorteio**: numa jornada em que ninguém
+  re-sorteou, dizer "8 de 8" seria anunciar um limite que ninguém estava perto de encostar.
+  E a recusa do servidor **nomeia o teto, não a moeda** — são problemas diferentes, e um botão
+  apagado sem motivo faz procurar bug.
+
+**O PREÇO MEDIDO DO TETO:**
+
+| | re-sorteios | jornadas com shiny |
+|---|---|---|
+| sem gastar nada | 0 | 22,2% |
+| o que 70 moedas pagavam a 3 | 23 | **62,2%** |
+| o que 70 moedas pagam a 5 | 14 | 49,9% |
+| **com o teto de 8** | **8** | **39,5%** |
+
+Ou seja, os dois freios do mesmo dia levaram o caçador de shiny de **62,2% pra 39,5%** — e o teto
+sozinho vale **−10,4 pontos** em cima do preço.
+
+**DUAS CONSEQUÊNCIAS QUE VALE SABER, e nenhuma delas é ruim:**
+1. **A ESCALADA DO BÔNUS SHINY VIROU QUASE DECORATIVA.** Ela existe pra impedir farmar UMA rota;
+   com o teto, gastar os 8 numa rota só custa `5+10+15+20+25+30+35+40 = 180` moedas — **2,6
+   jornadas de renda**, que ninguém tem em mãos. O teto já faz o trabalho dela. Ela FICA porque
+   ainda molda ONDE os 8 vão (espalhar é muito mais barato que amontoar), mas virou o segundo freio
+   de uma roda que o teto já parou.
+2. **O RE-SORTEIO DEIXOU DE SER O SUMIDOURO DE MOEDA QUE ERA.** Oito a 5 custam **40** de uma
+   jornada que paga **70** — sobram 30 por jornada sem destino urgente, e eles vão pra loja. É
+   provavelmente bom, mas é uma mudança de papel: antes o re-sorteio absorvia tudo que entrava.
+   E a venda de um Bônus Shiny (400 moedas) deixou de virar 80 re-sorteios numa jornada: viram
+   **10 jornadas com o teto cheio**, espalhados no tempo em vez de concentrados.
+- **O contador do PREÇO vem do SAVE, e isso é seguro por construção — mas só pro PREÇO.** O
+  servidor lê `wildRerolls` do save gravado, que o cliente escreve. Mentir que é zero não compensa:
+  ele entra na **semente da oferta**, então o re-sorteio barato devolve a MESMA oferta de antes.
+  Quem falsifica o contador não recebe pokémon novo nenhum.
+  **⚠️ ESSE ARGUMENTO NÃO VALE PRO TETO**, e é por isso que o teto mora em outro lugar: lá mentir
+  compra re-sorteio a mais. Ver o item do teto, logo acima.
   Por isso o cliente faz `await saveCurrentGame()` **antes** de chamar a cobrança: sem ela, dois
   re-sorteios seguidos leriam o mesmo contador velho e o segundo sairia pelo preço do primeiro.
-- **A recusa diz quanto falta E o preço CERTO** ("Você tem 5 moedas — o re-sorteio custa 9"), senão
+- **A recusa diz quanto falta E o preço CERTO** ("Você tem 5 moedas — o re-sorteio custa 15"), senão
   o botão promete um preço e a cobrança pratica outro. Ele também já nasce desabilitado abaixo do
   preço da vez.
-- **O PREÇO MEDIDO, e é a maior mexida de dificuldade desta série.** Com as 70 moedas de uma jornada
-  completa gastas na jornada seguinte são ~23 re-sorteios, ou 2 a 3 por encontro. Medido em 4.000
-  jornadas de cada caso, a chance de ver um shiny numa jornada:
+- **O PREÇO MEDIDO.** Com as 70 moedas de uma jornada completa gastas na jornada seguinte, a chance
+  de ver um shiny numa jornada (4.000 jornadas de cada caso):
 
   | re-sorteios por encontro | ofertas na jornada | jornadas com shiny |
   |---|---|---|
-  | 0 (hoje) | 8 | **22,6%** |
+  | 0 (sem gastar nada) | 8 | **22,6%** |
   | 1 | 16 | 39,0% |
   | 2 | 24 | 52,2% |
   | 3 | 32 | **62,5%** |
 
-  Ou seja: gastar tudo em re-sorteio quase **triplica** a chance de shiny por jornada. Não foi
-  compensado em nada — se incomodar, os lugares de mexer são o **preço** (`MOEDAS_RESSORTEIO`) e o
-  **pagamento** (`MOEDAS_POR_GINASIO` e companhia), e o mais direto é o preço.
+  **⚠️ O QUE AS 70 MOEDAS COMPRAM MUDOU EM 11/09/2026, quando o preço foi de 3 pra 5:**
+
+  | preço | re-sorteios que 70 moedas pagam | por encontro | jornadas com shiny |
+  |---|---|---|---|
+  | 3 (antes) | 23 | 2,9 | **62,2%** |
+  | **5 (hoje)** | **14** | **1,8** | **49,9%** |
+
+  Ou seja: gastar tudo em re-sorteio ainda **dobra** a chance de shiny por jornada (de 22,6% pra
+  ~50%), mas deixou de quase **triplicar**. São **−12,3 pontos** de chance de shiny por jornada pra
+  quem gasta tudo nisso.
+  **E O TETO DE 8 CORTOU MAIS 10,4 PONTOS em cima disso** (49,9% → **39,5%**), porque as 70 moedas
+  passaram a pagar mais re-sorteios do que o save permite usar. Hoje quem manda é o teto, não o
+  preço — ver o item dele acima.
+  **O número é calculado, não simulado** — `1 − (1 − 1/128)^(ofertas × 4 cards)` —, e o cálculo foi
+  validado contra a tabela medida acima: ele devolve 22,2% / 39,5% / 52,9% / 63,4% contra os 22,6% /
+  39,0% / 52,2% / 62,5% que a simulação de 4.000 jornadas deu. Bate dentro do ruído nas quatro
+  linhas, então a projeção pros 14 re-sorteios é confiável.
+  **POR QUE SUBIU:** a loja passou a COMPRAR itens de volta no mesmo dia (ver a seção **VENDER**), e
+  isso transformou o Bônus Shiny da Elite e o Doce Raro da Torre em moeda. A 3 por re-sorteio, os
+  400 moedas de um Bônus Shiny vendido viravam **133 re-sorteios**; a 5, viram **80**. O Doce Raro
+  cai de 50 pra **30**.
+  Se um dia precisar mexer de novo, os lugares são o **preço** (`MOEDAS_RESSORTEIO`), o **pagamento**
+  (`MOEDAS_POR_GINASIO` e companhia) e a **fração da venda** (`VENDA_FRACAO`) — e o mais direto
+  continua sendo o preço.
 - O servidor **não sorteia a oferta** — ele só cobra. Quem sorteia é o cliente, com a semente dele:
   o servidor não conhece rota nem pool, e mandar a oferta de lá duplicaria as tabelas de encontro,
   que é justamente o que o projeto evita.
