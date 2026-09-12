@@ -1754,6 +1754,16 @@ function tentarGolpeEspecial(active, enemy, rng, diario){
   const ordem = ativoPrimeiro ? [[active, enemy, true], [enemy, active, false]]
                               : [[enemy, active, false], [active, enemy, true]];
   for(const [quem, alvo, ehAtivo] of ordem){
+    /* ⚠️ QUEM ESTÁ DORMINDO NÃO USA GOLPE ESPECIAL. Os dois lados sorteiam nesta mesma volta, em
+       ordem de velocidade -- então o mais rápido podia adormecer o outro e o adormecido usava o
+       especial DELE logo em seguida, na mesma abertura.
+       Reportado com print em 11/09/2026: num Smoochum x Magnemite lia-se "Smoochum fez Magnemite
+       dormir com Canto" e, na linha de baixo, "Magnemite deixou Smoochum confuso com Supersom".
+       É a mesma regra que o golpe comum já tinha ("quem está dormindo não ataca nesta troca"), que
+       vale no doExchange e não alcançava este bloco -- ele roda ANTES da primeira troca.
+       O `_dormindoPor` é solto no fim da batalha (ver encerrarBatalha), então um valor de um
+       confronto antigo não trava o especial de ninguém. */
+    if(quem._dormindoPor > 0) continue;
     const especial = sorteiaGolpeEspecial(quem, rng);
     if(!especial) continue;
     const marca = ehAtivo ? 'p' : 'e';
@@ -1997,6 +2007,13 @@ function golpesDaTroca(atacante, alvo, rng){
   for(let i = 1; i < tapas; i++) lista.push(calcDamage(atacante, alvo, rng));
   return lista;
 }
+/* ⚠️ QUANTOS GOLPES O POKÉMON DO JOGADOR LEVA. É o mesmo `MAX_GOLPES` do cliente, e ele precisou
+   vir pra cá porque o servidor **truncava em 2** enquanto o cliente já escolhia 3 desde 09/09/2026:
+   quem escolheu três golpes lutava a Torre e o Ginásio da Cidade com os DOIS PRIMEIROS, em
+   silêncio. O número solto nos dois lugares era exatamente o que a constante existe pra evitar --
+   ela nasceu no cliente porque o 2 estava espalhado por nove pontos, e aqui repetiu o mesmo erro.
+   Se mudar de novo, tem que mudar nos DOIS arquivos. */
+const MAX_GOLPES = 3;
 function doExchange(active, enemy, rng, diario){
   /* Golpe especial: só na PRIMEIRA troca de cada confronto. O marcador é o próprio
      adversário -- oponente novo, confronto novo, e as chances valem de novo. */
@@ -2057,6 +2074,8 @@ function doExchange(active, enemy, rng, diario){
   const saiuNoPrimeiro = aplicarGolpes(first, counter);
   const faixaDoPrimeiro = first.hp <= 0 && faixaDeFoco(first, (first === active) ? 'p' : 'e');
   if(faixaDoPrimeiro){ first.hp = 1; aparaAFaixa(saiuNoPrimeiro); }
+  /* Os registros de cada lado, guardados pra o desempate achar a linha certa lá embaixo. */
+  let regsDoSegundo = null, regsDoPrimeiro = null;
   if(diario){
     /* O dano registrado é o que SAIU DE VERDADE da vida do alvo, não o número que a fórmula
        sorteou: um golpe de 101 num pokémon com 54 de HP tira 54. Gravar o valor cru fazia o log
@@ -2067,19 +2086,25 @@ function doExchange(active, enemy, rng, diario){
        viram uma linha só, somadas -- a mesma regra da drenagem, que tem duas entradas e uma linha.
        Os campos t (qual tapa) e tn (quantos ao todo) só existem quando há mais de um: assim o
        confronto comum grava exatamente o que gravava antes, e log velho continua se lendo igual. */
+    /* Ele DEVOLVE os registros que empurrou, e isso não é conveniência: o desempate precisa achar
+       depois a linha do sobrevivente, e achá-la por posição (`diario.length-2`) só funciona quando
+       cada lado gravou exatamente uma entrada. Com um golpe de VÁRIOS TAPAS, ou com a marca da
+       Faixa no meio, a contagem erra a linha -- ver o bloco do desempate, mais abaixo. */
     const gravar = (q, saiu, quemBate, marcaM) => {
+      const regs = [];
       saiu.forEach((h, i) => {
         const reg = { q: q, d: h.d, hp: h.hp, c: quemBate.lastCrit?1:0, m: marcaM, z: quemBate.lastMoveNulo?1:0 };
         if(saiu.length > 1){ reg.t = i + 1; reg.tn = saiu.length; }
-        diario.push(reg);
+        diario.push(reg); regs.push(reg);
       });
+      return regs;
     };
     if(!primeiroDormiu){
-      gravar(activeFirst?'p':'e', saiuNoSegundo, first, 0);
+      regsDoSegundo = gravar(activeFirst?'p':'e', saiuNoSegundo, first, 0);
       if(faixaDoSegundo) diario.push(marcaDaFaixa((second === active) ? 'p' : 'e', firstHpBefore));
     }
     if(!segundoDormiu){
-      gravar(activeFirst?'e':'p', saiuNoPrimeiro, second, segundoCaiu?1:0);
+      regsDoPrimeiro = gravar(activeFirst?'e':'p', saiuNoPrimeiro, second, segundoCaiu?1:0);
       if(faixaDoPrimeiro) diario.push(marcaDaFaixa((first === active) ? 'p' : 'e', second.hp));
     }
   }
@@ -2098,26 +2123,63 @@ function doExchange(active, enemy, rng, diario){
     const survivorHpBefore = (survivor === first) ? firstHpBefore : secondHpBefore;
     const pct = 0.05 + rng()*0.10;
     survivor.hp = Math.max(1, Math.min(survivorHpBefore, Math.round(survivor.maxHp * pct)));
-    /* O desempate ressuscita quem sobrou DEPOIS dos dois golpes. Sem corrigir o diário, a última
-       linha do log diria 0 de HP e a barra do mesmo cartão mostraria outro número.
-       QUANDO A CORREÇÃO ZERA O GOLPE, ele vira a linha do DESEMPATE em vez de um golpe de dano 0
-       que a tela joga fora. Era isso que estava por trás do relato de 09/09/2026 ("o Gyarados
-       atacou 2x seguidas"): o golpe que derrubou quem ressuscitou sumia, e os dois golpes do outro
-       lado ficavam colados, sem nada entre eles. Acontece quando o sobrevivente volta com a MESMA
-       vida com que entrou na troca -- 0,1% dos confrontos.
-       O SOBREVIVENTE é o ALVO desse golpe, então a frase não precisa de campo novo pra saber quem
-       ficou de pé: quem apanhou é quem sobrou.
-       O `dz` continua marcando a linha corrigida mesmo quando ela NÃO zera -- ali ela é um golpe
-       comum de dano menor, e se lê sozinha. */
+    /* ⚠️ O LOG MOSTRA A VERDADE: os golpes ficam com o dano que REALMENTE saiu, e a vida que a
+       morte súbita devolveu vira uma LINHA PRÓPRIA, com a barra SUBINDO -- do mesmo jeito que a
+       cura, a poção e a fúria já fazem.
+       ATÉ 11/09/2026 ERA O CONTRÁRIO: o motor APARAVA o golpe que derrubou o sobrevivente pra a
+       soma do log fechar com a barra do cartão, e isso escrevia na tela um número que NUNCA
+       ACONTECEU. Os três defeitos reportados nesta família saíam daí, e são o mesmo defeito:
+         - "o mesmo golpe tirou 154 e depois 2" (Porygon x Gastly) -- o 2 era o aparo;
+         - "o Magnemite tirou 175 e o Togepi ainda apareceu com 24" -- o aparo caindo na linha
+           errada num golpe de vários tapas;
+         - "a Bellsprout tomou 26 e morreu, mas apareceu que os dois caíram" (Bellsprout x Onix).
+           Nesse o Onix CAIU MESMO e voltou com 22 -- mas o aparo tinha baixado o golpe dela de 170
+           pra 148, e aí o log deixava de mostrar a queda. A frase virou a única coisa dizendo a
+           verdade, contra números que diziam outra coisa -- e o jogador acreditou nos números, com
+           razão.
+       Sem o aparo a conta fecha pelo outro lado, que é o lado honesto: o dano é o dano, o
+       sobrevivente ganha a vida de volta numa linha que se lê, e a soma bate com o cartão.
+       O `q` é o de QUEM DEU o golpe, que é a convenção da linha desde que ela nasceu -- o
+       sobrevivente é o ALVO dele, e é por isso que a frase não precisa de campo novo pra saber quem
+       ficou de pé. Log velho (onde a linha tem d=0) continua se lendo igual: a barra não sobe e a
+       frase é a mesma. */
     if(diario){
-      const linha = (survivor === second) ? diario[diario.length-2] : diario[diario.length-1];
-      const antes = (survivor === second) ? secondHpBefore : firstHpBefore;
-      if(linha){
-        linha.hp = survivor.hp; linha.d = antes - survivor.hp; linha.dz = 1;
-        if(!(linha.d > 0)) linha.x = 'desempate';
-      }
+      const ladoDoSobrevivente = (survivor === active) ? 'p' : 'e';
+      diario.push({ q: ladoDoSobrevivente === 'p' ? 'e' : 'p', d: survivor.hp, hp: survivor.hp,
+                    c:0, m:0, z:0, x:'desempate' });
     }
   }
+}
+/* O FIM DA BATALHA, e ele vale nos DOIS caminhos de saída -- a vitória E A DERROTA. Existir como
+   função é o ponto: enquanto era um bloco solto antes do `return` da vitória, o `return` da
+   derrota passava por cima dele e nada acusava.
+   1) A FÚRIA DEVOLVE O QUE EMPRESTOU. Ela mexe no TETO de vida, e o teto é um número GRAVADO na
+      instância -- não é lido de uma função como os outros cinco atributos. Sem devolver, um Tauros
+      que entrou em fúria três vezes saía da luta com o teto +30, e a barra dele na tela de time
+      mudava de tamanho sozinha. Pior: o `_furia` é zerado no COMEÇO da batalha seguinte, então o
+      teto inflado deixava de ter de onde ser recalculado e ficava errado pra valer.
+      Medido em 11/09/2026, quando a derrota ainda escapava: 983 pokémon de 3.000 saíam de uma
+      derrota com o teto errado, contra ZERO nas vitórias.
+      A devolução é EXATA: sai o mesmo número que entrou, do teto e da vida atual. Quem já caiu fica
+      em 0 -- devolver vida a um pokémon desmaiado o ressuscitaria.
+   2) OS MARCADORES DE CONFRONTO SÃO SOLTOS. `_especialContra` e `_anulado.contra` guardam uma
+      REFERÊNCIA ao pokémon adversário: enquanto não eram soltos, cada membro do time segurava um
+      time inimigo inteiro vivo na memória depois da luta -- e, quando o adversário apontava de
+      volta, o par fechava um CICLO que estourava a pilha do salvamento (ver limparParaFirestore).
+      Medido: os campos sobravam em 100% das batalhas e o ciclo se fechava em 3% delas. */
+function encerrarBatalha(team, inimigos){
+  (team || []).concat(inimigos || []).forEach(p => {
+    if(!p) return;
+    if(p._furia){
+      const emprestado = FURIA_BONUS * p._furia;
+      p._furia = 0;
+      p.maxHp = calcMaxHp(p);
+      p.hp = p.hp > 0 ? Math.max(1, Math.min(p.maxHp, p.hp - emprestado)) : 0;
+    }
+    p._especialContra = null;
+    p._anulado = null;
+    p._dormindoPor = 0;
+  });
 }
 function simulateGymBattle(team, enemyTeam, rng, opts){
   team.forEach(p=>{ p.maxHp=calcMaxHp(p); p.hp=p.maxHp; });
@@ -2146,7 +2208,7 @@ function simulateGymBattle(team, enemyTeam, rng, opts){
     let enemyDefeated = false;
     while(!enemyDefeated){
       const alive = team.filter(p=>p.hp>0);
-      if(alive.length===0){ return { win:false, matchups }; }
+      if(alive.length===0){ encerrarBatalha(team, enemyTeam); return { win:false, matchups }; }
       const active = alive[0];
       anotarItemDeAtributo(active, 'p');   // entrou em confronto: o item de atributo será gasto
       anotarItemDeAtributo(enemy, 'e');
@@ -2232,20 +2294,7 @@ function simulateGymBattle(team, enemyTeam, rng, opts){
      dois times zerarem no mesmo instante (o doExchange normal sempre deixa um de pé), e sem esta
      linha o jogador perderia justamente a batalha que ele decidiu explodindo. */
   const teamStillAlive = team.some(p=>p.hp>0) || explosaoDoAtivo === true;
-  /* A FÚRIA DEVOLVE O QUE EMPRESTOU quando a batalha acaba, e isso não é detalhe: ela mexe no TETO
-     de vida, e o teto é um número GRAVADO na instância -- não é lido de uma função como os outros
-     cinco atributos. Sem devolver, um Tauros que entrou em fúria três vezes saía da luta com o teto
-     +30 pra sempre, e a barra dele na tela de time mudaria de tamanho sozinha. É o mesmo cuidado
-     que o buff de terreno já tinha (ver o CLAUDE.md), e a devolução é EXATA: sai o mesmo número que
-     entrou, do teto e da vida atual, então o pokémon volta com a vida que teria sem a fúria.
-     Quem já caiu fica em 0 -- devolver vida a um pokémon desmaiado o ressuscitaria. */
-  team.concat(enemyTeam).forEach(p => {
-    if(!p || !p._furia) return;
-    const emprestado = FURIA_BONUS * p._furia;
-    p._furia = 0;
-    p.maxHp = calcMaxHp(p);
-    p.hp = p.hp > 0 ? Math.max(1, Math.min(p.maxHp, p.hp - emprestado)) : 0;
-  });
+  encerrarBatalha(team, enemyTeam);
   return { win: teamStillAlive, matchups };
 }
 function makeSeededRng(seedStr){
@@ -5429,7 +5478,7 @@ async function resolverTimeDosSaves(uid, escolhidos, tamanho, ondeErro, minimo){
                    save. Sem esta linha, a Torre e o Ginásio da Cidade lutariam com o motor de
                    tipo enquanto a jornada luta com os golpes escolhidos -- o mesmo pokémon com
                    dois comportamentos. */
-                ataques: Array.isArray(real.ataques) ? real.ataques.slice(0, 2) : null,
+                ataques: Array.isArray(real.ataques) ? real.ataques.slice(0, MAX_GOLPES) : null,
                 chave: chaveDoPokemonNaConta(achado.slot, real) });
   }
   return time;
@@ -5478,7 +5527,7 @@ exports.fightTrainerTowerFloor = onCall(async (request) => {
     inst.slotDaConta = (p.slotDaConta != null) ? String(p.slotDaConta) : null;
     /* Nem os golpes: o createInstance monta do zero. Subida gravada antes desta feature fica sem,
        e aí o motor cai no de tipo -- que é como ela sempre lutou. */
-    if(Array.isArray(p.ataques)) inst.ataques = p.ataques.slice(0, 2);
+    if(Array.isArray(p.ataques)) inst.ataques = p.ataques.slice(0, MAX_GOLPES);
     return inst;
   });
   const timeNpc = equiparNpc(andar.team.map(p => createInstance(p.speciesId, p.level)));
@@ -6548,9 +6597,18 @@ function battleResolveMatchup(estado, rng){
   const bVivosAntes = estado.bTeam.filter(p=>p.hp>0).length;
   const diario = [];
   while(a.hp>0 && b.hp>0){ doExchange(a, b, rng, diario); }
-  // grava o HP de volta no estado
-  estado.aTeam[estado.aCurrent].hp = Math.max(0, a.hp);
-  estado.bTeam[estado.bCurrent].hp = Math.max(0, b.hp);
+  /* Grava o HP de volta no estado, APARADO NO TETO GUARDADO.
+     ⚠️ A FÚRIA sobe o `maxHp` da instância e a vida junto, mas quem volta pro estado é só o `hp`
+     -- o `maxHp` guardado continua sendo o limpo, e o `battleHydrate` do confronto seguinte o
+     usa de novo. Sem o aparo o pokémon reentrava com `hp` ACIMA do próprio teto: barra passando
+     de 100% e até +10 de vida de graça por confronto em que ele entrou em fúria e sobreviveu.
+     É a mesma família do defeito que o `encerrarBatalha` fechou na jornada, por outro caminho --
+     aqui não dá pra chamar ele: o diário deste confronto já contou a subida da barra, e devolver
+     o empréstimo antes de responder faria a soma do log não fechar com o `playerHpAfter`. */
+  const tetoA = estado.aTeam[estado.aCurrent].maxHp || a.maxHp;
+  const tetoB = estado.bTeam[estado.bCurrent].maxHp || b.maxHp;
+  estado.aTeam[estado.aCurrent].hp = Math.max(0, Math.min(tetoA, a.hp));
+  estado.bTeam[estado.bCurrent].hp = Math.max(0, Math.min(tetoB, b.hp));
   const aCaiu = a.hp<=0, bCaiu = b.hp<=0;
   return {
     player:a.name, playerSpecies:a.speciesId, playerLevel:a.level, playerShiny:!!a.shiny, playerBuffed:false,

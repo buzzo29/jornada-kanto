@@ -1069,7 +1069,7 @@ depois apanha, e depois termina de matar com o MESMO golpe tirando muito mais da
   linha só, e ali não há com o que comparar na tela: o que denunciava era o PAR do vencedor.
   Se um dia incomodar, a saída medida é declarar a multiplicidade (reusar o selo `Nx` dos golpes de
   vários tapas: *"Golbat atacou Onix com Mordida 3x e tirou −195"*), e o preço é a animação crescer
-  — o confronto reconstruído tem **4,9 golpes reais** em média contra as 3 linhas de hoje, e cada
+  — o confronto reconstruído tem **4,9 golpes reais** em média contra as 4 linhas de hoje, e cada
   golpe animado leva a pausa de 1s do nome.
 - **O SONO É A EXCEÇÃO, e ela é estrutural.** Nele as trocas livres saem REAIS (uma linha cada) e só
   o RESTO é reconstruído, então um golpe de verdade fica ao lado de um somado e a razão não tem por
@@ -1274,6 +1274,21 @@ maior chance do bloco: **30% por confronto**, empatada com o Metrônomo (que ren
   É o mesmo cuidado que o buff de terreno já tinha (ver "O buff de terreno mexe no TETO de HP").
   `tools/test-especiais.js` cobra as três coisas em 800 pokémon: o acúmulo não sobra na instância, o
   teto volta ao que era, e nunca sobra vida acima do teto.
+- **⚠️ E A DEVOLUÇÃO ESCAPAVA PELA DERROTA, até 11/09/2026.** O bloco que devolve o teto vivia solto
+  antes do `return` da vitória, e o `return` da DERROTA passava por cima dele — então tudo que este
+  item promete valia só quando o jogador ganhava. **Medido: 983 pokémon de 3.000 saíam de uma
+  derrota com o teto errado (até +30), contra ZERO nas vitórias**, e como o `_furia` é zerado no
+  começo da batalha seguinte o teto inflado deixava de ter de onde ser recalculado — ficava errado
+  pra valer, no save e na barra da tela de time.
+  Hoje as duas portas chamam a MESMA função (`encerrarBatalha`), e é ela também que solta os
+  marcadores de confronto. Ver a seção **O CICLO QUE PERDIA O SAVE**.
+- **⚠️ NO ONLINE ELA VAZAVA POR OUTRO CAMINHO, e o conserto lá é outro.** O `battleResolveMatchup`
+  grava só o `hp` de volta no estado; o `maxHp` guardado continua o limpo, e o `battleHydrate` do
+  confronto seguinte usa esse. Sem aparo, o pokémon reentrava com `hp` ACIMA do teto — barra passando
+  de 100% e até +10 de vida de graça por confronto em que ele entrou em fúria e sobreviveu.
+  Lá o `encerrarBatalha` **não serve**: o diário daquele confronto já contou a subida da barra, e
+  devolver o empréstimo antes de responder faria a soma do log não fechar com o `playerHpAfter`. O
+  conserto é aparar o `hp` no teto guardado na hora de gravar.
 - **A BARRA SOBE NA TELA, e é isso que o jogador vê.** A entrada no diário vai pelo mesmo caminho da
   cura: `amount` NEGATIVO no passo animado (os laços fazem `hp - amount`), então a barra cresce. A
   frase acompanha esse passo — *"Tauros entrou em fúria e cresceu"*, e **a partir da segunda vez ela
@@ -1656,7 +1671,7 @@ explicação de menos. Hoje:
   do golpe** quando a luta começa.
 - **2) A LINHA NO LOG, SÓ no confronto que ativou** — "somente na batalha que foi ativada a dança da
   chuva". Os confrontos seguintes herdam a chuva e **não repetem a linha**: repetir três vezes a
-  mesma frase é a parede que o teto de 3 golpes existe pra evitar.
+  mesma frase é a parede que o `TETO_GOLPES` existe pra evitar.
   **O SELO DELA É CLICÁVEL, e é o ÚNICO selo clicável do jogo** (`seloDeChuvaClicavel`). Tem o mesmo
   tamanho e a mesma cor dos outros — foi o que se pediu —, e o que muda é ser um `<button>`, que
   precisa zerar a borda e o padding de fábrica. Ele abre a MESMA caixa de explicação dos especiais:
@@ -1743,6 +1758,40 @@ costuma ter mais, e **cai dos dois lados**.
   cedendo quando a luta começa, a linha do log saindo **só** no confronto que ativou (um confronto
   que só herdou a chuva tem o emoji e NÃO a linha), o selo sendo clicável e abrindo a caixa da
   chuva, o 🌧️ em cima do ×, e as quatro telas de batalha com a faixa.
+
+### DUAS PASSIVAS NO MESMO CONFRONTO (11/09/2026)
+
+Três defeitos reportados juntos, com print, e os três só aparecem quando o confronto tem **mais de
+uma abertura** — que é o caso que nasceu comum quando o bloco de especiais passou de três pra onze.
+
+- **⚠️ QUEM ESTÁ DORMINDO USAVA GOLPE ESPECIAL.** Relatado assim: *"o Smoochum utilizou a passiva
+  dele Canto e fez o Magnemite dormir, porém depois apareceu que o Magnemite usou o Supersom pra
+  deixar o Smoochum confuso, mas como ele conseguiu usar o Supersom sendo que ele deveria estar
+  dormindo?"*
+  Os DOIS lados sorteiam na MESMA volta do `tentarGolpeEspecial`, em ordem de velocidade — então o
+  mais rápido adormecia o outro e o adormecido usava o especial DELE logo em seguida, na mesma
+  abertura. A regra *"quem está dormindo não ataca nesta troca"* já existia, mas no `doExchange`,
+  que roda DEPOIS deste bloco.
+  Hoje o laço pula quem tem `_dormindoPor > 0`. Medido: **0 casos em 309 confrontos com sono**.
+- **CADA ABERTURA GANHA O SEGUNDO DE LEITURA DELA.** *"Aparece a primeira mensagem e espera 1s e
+  depois aparece a próxima tudo muito rápido e não dá para ler."* A pausa vinha de duas portas: o
+  `pausaDoEspecial`, que só vale no desenho que antecede a animação, e a marca `leitura`, que só era
+  posta em passo de **dano zero**. Uma segunda abertura que MOVE barra (confusão, drenagem, Fúria do
+  Dragão) não pegava nenhuma das duas: a frase durava o tempo da barra e sumia.
+  Hoje toda abertura fora do passo 0 é marcada, mexa barra ou não.
+- **⚠️ A MARCA DA FAIXA E A DO DESEMPATE ERAM ACHADAS COM UM `findIndex` DO PRIMEIRO.** Um confronto
+  pode ter as duas (a Faixa segura um golpe e, mais tarde, os dois caem na mesma troca), e a segunda
+  ficava com "Trocando golpes..." no passo dela — com 1s de pausa e nada escrito. Hoje a marca é
+  achada **pelo passo**.
+
+**⚠️ E A ARMADILHA DESTE TRECHO, que custou uma volta inteira de conserto errado: o `passo` que
+chega no `avisoDoConfronto` é o ÍNDICE DA SEQUÊNCIA MAIS UM.** Os quatro laços de revelação fazem
+`HitStep++` **antes** de pintar a linha, então `passo === k + 1` quer dizer "animando `seq[k]`", e
+`passo === 0` é o desenho que antecede a animação — o da pausa de leitura. É por isso que a janela
+de uma abertura fora do índice 0 começa em `i + 1`: **esse É o passo dela.** Lido como se `passo`
+fosse o índice, o `i + 1` parece um erro de um a mais e "consertá-lo" atrasa TODAS as frases em um
+passo. O teste é quem tem a convenção escrita (o `perfil` monta `[0, 1..seq.length]`), e foi ele que
+mostrou o engano.
 
 ### A CAIXA QUE EXPLICA O ESPECIAL (11/09/2026)
 
@@ -2044,7 +2093,7 @@ serviu de prova de que o gerador de golpes está lendo a geração certa.
 - **OS TAPAS PARAM QUANDO O ALVO CAI.** O 4º tapa não sai num pokémon que caiu no 3º — é assim no
   jogo original e é o que preserva o "todo pokémon responde pelo menos uma vez".
 - **UM GOLPE DE VÁRIOS TAPAS É UM GOLPE SÓ PRO TETO** (`TETO_GOLPES`): só o primeiro tapa ocupa
-  vaga. Sem isso um Tapa Duplo de 5 sozinho estouraria o teto de 3 e jogaria o confronto inteiro na
+  vaga. Sem isso um Tapa Duplo de 5 sozinho estouraria o teto e jogaria o confronto inteiro na
   reconstrução. E eles **se movem juntos** no reordenamento do moribundo — reordenar entrada a
   entrada partiria o golpe ao meio, com metade antes e metade depois do golpe que o derrubou.
 - **ELES SOBREVIVEM À RECONSTRUÇÃO, e isso é o que faz a feature existir.** A reconstrução devolve
@@ -2249,18 +2298,55 @@ seguidas, sem nada entre os dois golpes.
   não é golpe" — deixando os dois golpes do outro lado colados.
 - **O `dz` estava escrito e NUNCA era lido** — dado morto desde que a correção do desempate nasceu.
   Era exatamente o gancho que faltava.
-- **Hoje a linha zerada vira `x:'desempate'`**, no molde da Faixa de Foco: um passo que não move
-  barra (a vida do sobrevivente já é a que a linha anterior deixou), uma frase no log e o mesmo
-  aviso no meio da batalha. **O sobrevivente é o ALVO do golpe aparado**, então a frase não precisa
-  de campo novo pra saber quem ficou de pé: quem apanhou é quem sobrou.
-  A frase é *"⚖️ os dois caíram na mesma troca, e Fulano ficou de pé"*.
-- **Medido: 0,1% dos confrontos.** Depois do conserto, **nenhum** confronto mostrado pelo diário
-  real tem dois golpes do mesmo lado colados — antes eram 11 em ~8.400.
+- **A PRIMEIRA CORREÇÃO (09/09/2026) FOI PEQUENA DEMAIS, e vale registrar por quê.** Ela fez a linha
+  **zerada** virar `x:'desempate'` — no molde da Faixa de Foco: um passo que não move barra, uma
+  frase no log e o mesmo aviso no meio da batalha. Resolveu o print do Raticate × Gyarados e cobria
+  **0,1% dos confrontos**: exatamente o caso em que o aparo zera o golpe e ele some da tela.
+  O que ela não viu é que o aparo acontece em **14,3%** — e nos outros 14,2% ele não fazia o golpe
+  sumir, fazia ele **mentir**. Os três prints abaixo são esses 14,2%.
+- **⚠️ O APARO ACABOU EM 11/09/2026, e com ele a família inteira de defeitos.** Até aqui, quando os
+  dois caíam na mesma troca, o motor **aparava o golpe que derrubou o sobrevivente** pra a soma do
+  log fechar com a barra do cartão — ou seja, escrevia na tela **um número que nunca aconteceu**.
+  Foram TRÊS relatos, e são o mesmo defeito visto de três ângulos:
+
+  | print | o que se via | o que era |
+  |---|---|---|
+  | **Porygon × Gastly** | "o mesmo golpe tirou 154 e depois 2" | o 2 era o aparo |
+  | **Togepi × Magnemite** | "tirou −175, já era pra matar, e ele ficou com 24" | o aparo caindo na linha errada num golpe de vários tapas |
+  | **Bellsprout × Onix** | "ela tomou 26 e morreu, mas apareceu que os dois caíram" | o Onix **caiu mesmo** e voltou com 22 — o aparo baixou o golpe dela de 170 pra 148 e o log deixou de mostrar a queda |
+
+  O terceiro é o que fechou o assunto: ali a frase era a única coisa dizendo a verdade, contra
+  números que diziam outra — e o jogador acreditou nos números, **com razão**.
+- **HOJE O DANO É O DANO, E A VIDA QUE VOLTA É UMA LINHA.** O golpe fica com o que realmente saiu, e
+  a morte súbita vira uma entrada própria com a **barra SUBINDO** — a mesma mecânica da cura, da
+  poção e da fúria (`amount` negativo). A conta fecha pelo lado honesto: `dano − devolução = a barra`.
+  Medido: a soma do log fecha em **1.402 de 1.402** confrontos com desempate.
+  A frase passou a dizer **com quanto** ele ficou de pé, e esse número é o que a barra acabou de
+  mostrar subindo: *"⚖️ os dois caíram na mesma troca, e Onix ficou de pé com 22 de HP"*.
+- **⚠️ E O APARO ESCONDIA UM QUARTO DEFEITO, no reordenamento do moribundo.** Sem ele, a barra do
+  sobrevivente passou a chegar a ZERO na tela — e aí ficou visível que um **revide LETAL** não pode
+  ser movido: subindo, ele fica ANTES dos golpes do pokémon que ele matou, e é esse pokémon que
+  passa a atacar de barra zerada (3 casos em 10.556, todos com sono); andando um lugar pra trás, ele
+  cola dois golpes do mesmo lado (281 em 13.162).
+  **A ordem CRUA do diário é a certa nesses casos**, e não precisa de licença nenhuma: ali o revide
+  vem logo depois do golpe que derrubou quem o deu, que é o PAR DO MORIBUNDO, e antes dele está o
+  golpe do outro lado. Quem responde "foi letal?" é o próprio diário — o `hp` do registro é a vida
+  do ALVO depois do golpe.
+  Medido depois: **0 cadáveres** em 12.954 confrontos e **0 colagem criada** pela tela (que mostra
+  0,30% contra 0,53% do diário).
+- **⚠️ UMA TRAVA TEVE QUE ABRIR EXCEÇÃO, e vale saber por quê.** A regra "quem termina MORTO nunca
+  aparece atacando com a barra em zero" valia porque o reordenamento SEMPRE conseguia pôr o revide
+  antes do golpe que o derrubou. Com revide letal isso é impossível — as três ordens possíveis têm
+  defeito, e a crua é a menos ruim. **Na tela isso fica explicado**: a linha do desempate vem logo
+  abaixo e diz que os dois caíram. Sem ela seria um cadáver sem motivo; com ela, é a mecânica sendo
+  contada.
+- **Conferido que nada disso é motor:** o bloco novo só faz `diario.push`, e o mesmo build com e sem
+  a linha dá o **MESMO hash** de resultado em 900 batalhas semeadas.
 - **AS OUTRAS DUAS CAUSAS DE "dois seguidos" SÃO REGRA, não defeito**, e ficaram: o **sono** (as
   trocas livres SÃO isso, e a frase dele explica) e a **reconstrução** (ela interpola HP e não
   conhece a ordem real). Medido no total: 0,9% dos confrontos mostram dois seguidos — 119 do sono,
   71 da reconstrução e 24 desta causa, que era a única sem explicação na tela.
-- **Na RECONSTRUÇÃO a linha não aparece**, e é o limite conhecido: passando do teto de 3 golpes ela
+- **Na RECONSTRUÇÃO a linha não aparece**, e é o limite conhecido: passando do `TETO_GOLPES` ela
   substitui a lista inteira e não conhece desempate nenhum — do mesmo jeito que não conhece cura.
 
 ### A PROBABILIDADE DOS GOLPES MÚLTIPLOS ESTÁ CERTA — e o que se vê é o contrário do que parece
@@ -2339,17 +2425,70 @@ pedido em 09/09/2026. `PAUSA_ANTES_DO_GOLPE_MS`.
   Com o valor cru o log não fechava: somando as linhas dava mais dano do que o pokémon tinha.
 - **Log e animação leem a MESMA lista** (`sequenciaDoConfronto`). Enquanto eram montadas em separado,
   o jogador via 3 golpes na tela e lia 4, 7 linhas no log — reportado três vezes.
-- **O TETO DE 3 GOLPES VALE, e vale por leitura: uma luta comum tem que caber em duas ou três
-  linhas.** Medido, 99,4% dos confrontos passam de 3 golpes REAIS (mediana 4, 90% até 6, maior 28 em
-  3.944), então o teto não é um detalhe — é ele que decide o que a tela mostra quase sempre.
+- **O TETO É DE 4 GOLPES desde 11/09/2026** (`TETO_GOLPES`, era 3 — a pedido), e ele vale por
+  leitura: uma luta comum tem que caber em poucas linhas. Medido, 99,4% dos confrontos passam de 3
+  golpes REAIS (mediana 4, 90% até 6, maior 28 em 3.944) — ou seja, o teto não é um detalhe, é ele
+  que decide o que a tela mostra quase sempre.
+  **O QUE A SUBIDA COMPRA É A VERDADE, e o número é grande:** os confrontos que o jogador lê como
+  uma divisão INVENTADA pela reconstrução caem de **36,9% pra 11,9%** (11 mil confrontos de cada
+  lado, o mesmo código com a constante trocada). A causa é direta — 4 golpes reais é o caso mais
+  comum de todos, e no teto 3 ele caía inteiro na reconstrução.
+  **O QUE ELA CUSTA É TEMPO DE TELA:** a animação de uma batalha 6x6 vai de **46,9s pra 49,8s**
+  (+2,9s, +6,2%) e os passos por confronto de 2,63 pra 2,93. No log, as lutas de 4 linhas passam de
+  4,9% pra **24,6%**.
+  **NA DIFICULDADE, NADA — por construção.** `TETO_GOLPES` é apresentação: ele não existe no
+  servidor e não entra em conta nenhuma de dano. Conferido por impressão: o mesmo build com 3 e com
+  4 dá o MESMO hash de resultado em 900 batalhas semeadas.
   **Ele chegou a sair inteiro por um dia** (03/09/2026), pra o log mostrar o diário: uma troca banal
   de Gloom contra Miltank virou **seis linhas** e foi reportado com print. Voltou no mesmo dia.
+- **⚠️ A SUBIDA PARA 4 DESENTERROU DOIS DEFEITOS ANTIGOS, e os dois estavam escondidos pela
+  reconstrução.** É a lição a guardar daqui: **o teto não era só um corte de leitura, era uma
+  cortina** — tudo que o diário tinha de errado num confronto de 4 golpes nunca chegava à tela,
+  porque a tela mostrava outra coisa. Mexer nele é abrir a cortina.
+  1. **O REORDENAMENTO DO MORIBUNDO COLAVA DOIS GOLPES DO MESMO LADO.** Num confronto de 4 golpes
+     (`p, e, p-mata, e-revide`), pôr o revide um lugar atrás — que é a regra geral — produz
+     `p, e, e, p`: o adversário batendo duas vezes sem nada entre os dois, que é a forma já
+     **reportada como defeito três vezes** neste log. Medido: **12,6% de TODOS os confrontos**,
+     98,8% deles com moribundo.
+     O conserto é a mesma licença que o **sono** já usava desde 10/09/2026 — o revide sobe no
+     confronto em vez de andar um lugar. Só que ele sobe **para depois das aberturas**, e não para o
+     índice 0 como o do sono: cura, poção, drenagem e fúria MOVEM BARRA e são o primeiro passo da
+     animação por desenho (a frase de cada uma anuncia a barra que vai andar). Empurrado na frente
+     delas, o golpe fazia a barra subir depois do golpe que deveria explicá-la — e foi o teste da
+     cura que pegou isso, não a varredura.
+     Medido depois: **12,6% → 0%**, e a tela passou a mostrar **menos** colagem que o diário.
+  2. **O DESEMPATE INFLAVA O DANO DO LOG QUANDO APARAVA UM GOLPE DE VÁRIOS TAPAS.** Quando os dois
+     caem na mesma troca, o motor ressuscita um — e naquele momento ele **aparava a linha do golpe
+     que o derrubou** pra a soma do log fechar com a barra do cartão (o `dz`). Só que ele aparava a
+     **última entrada** usando o HP de entrada da **troca inteira**, e um golpe de vários tapas
+     grava uma entrada por tapa: o dano da troca toda ia parar no último tapa enquanto os anteriores
+     ficavam com o deles. Medido num Wigglytuff × Diglett: o log somava **402 numa barra que andou
+     294**. E a busca era por **POSIÇÃO** (`diario.length-2`), o que só acerta quando cada lado
+     gravou uma entrada só.
+     **⚠️ ESTE ITEM É HISTÓRIA: o aparo INTEIRO saiu horas depois**, quando o print do Bellsprout ×
+     Onix mostrou que o problema não era a conta do aparo e sim o aparo existir — ver a seção do
+     desempate. Ele fica aqui porque é a prova do que o teto escondia: um número errado no diário,
+     em 14% dos confrontos, que a reconstrução nunca deixava chegar à tela.
+
+- **DOIS GOLPES SEGUIDOS DO MESMO LADO EXISTEM, E SÃO A VERDADE — o motor empata velocidade.**
+  O desempate de quem bate primeiro é **sorteado a cada troca**, então duas espécies de mesma
+  velocidade (Skarmory e Butterfree têm 70, Golduck e Seadra têm 85, Zubat e Machamp têm 55) trocam
+  de ordem entre uma troca e outra e o mesmo lado bate duas vezes de fato. Medido: **0,5% dos
+  confrontos** têm isso no DIÁRIO, e a tela mostra **0,2%** — menos, porque o reordenamento do
+  moribundo desfaz parte.
+  **É por isso que a trava mudou de forma.** Ela era "ninguém ataca duas vezes seguidas no diário
+  real", e isso era verdade **por acidente**: com o teto em 3, todo confronto de 4 golpes caía na
+  reconstrução e o diário nunca chegava à tela. Hoje ela é **comparativa** — a apresentação não pode
+  CRIAR colagem que o diário não tinha. Exigir zero puniria o motor por dizer a verdade; exigir "não
+  criou" pega de volta exatamente o defeito que o teto escondia.
+  **E ela não pode ser estatística:** a primeira versão cobrava "a tela mostra MENOS que o diário"
+  (23 contra 42 na média, 2,4σ) e falhava sozinha **~1 vez em 100** — o pior tipo de teste que
+  existe, o que passa quase sempre. Hoje cobra "não mais", que é verdade por construção.
 - **A EXCEÇÃO É O SONO, e só ele.** As trocas livres que ele compra são o que o golpe É, e esmagá-las
   na reconstrução foi a origem dos dois defeitos reportados naquele dia ("um golpe dele, dois dela").
   Elas entram **reais, uma linha cada**, e só o RESTO da luta é reconstruído.
-  Medido: **sem sono, 98,6% dos confrontos ficam em 3 linhas e 1,4% em 2** — a leitura de sempre.
-  **Com sono: 4 linhas em 19,5%, 5 em 41,5%, 6 em 5,9%** (as seis são quando quem usou o sono é o
-  mais rápido e ganha 3 golpes livres) e 2 linhas em 33,2% (o confronto acabou dentro do teto).
+  Medido com o teto em 4: **2 linhas em 55,0%, 3 em 16,5%, 4 em 24,6%**, 5 em 3,5% e 6 em 0,3%.
+  (Com o teto em 3 eram 58,9% / 35,4% / 4,9%.)
 - **E SAI DA ORDEM DO DIÁRIO, não da lista já reordenada pelo `passosVisiveis`.** Ele move o golpe
   MORIBUNDO pra antes do golpe que derrubou quem o deu — e na lista reordenada esse moribundo
   aparecia ANTES do primeiro golpe do adormecido, entrando na conta como se fosse troca livre.
@@ -2436,7 +2575,7 @@ pedido em 09/09/2026. `PAUSA_ANTES_DO_GOLPE_MS`.
   explicação nenhuma. As frases vivem no `fraseDoEspecial`, e o aviso do meio da batalha lê a
   mesma função.
 - **A animação mostra o mesmo diário.** `buildAnimatedHitSequence` devolve os golpes reais (pelo
-  `passosVisiveis`, pra dobrar o moribundo igual ao log); a reconstrução antiga — até 3 golpes
+  `passosVisiveis`, pra dobrar o moribundo igual ao log); a reconstrução antiga — até 4 golpes
   inventados a partir do HP antes/depois — virou fallback pra confronto gravado antes do diário.
   Enquanto as duas coexistiram, a contagem batia em só 31% dos confrontos, e o jogador via 3
   golpes na tela e lia 7 linhas no log.
@@ -2775,6 +2914,34 @@ pedido em 09/09/2026. `PAUSA_ANTES_DO_GOLPE_MS`.
 - **O Monte Lua ficou só com os bebês** (Cleffa, Igglybuff, Smoochum): a Clefairy e a Jigglypuff
   adultas saíam ao lado dos próprios bebês. As duas evoluem no nível 20, acima da faixa da etapa 2,
   então quem as quer sobe o bebê. A Estrada Ciclável perdeu o raro Muk no mesmo pedido.
+- **⚠️ O DUGTRIO SAIU DAS DUAS ROTAS EM QUE APARECIA (11/09/2026, a pedido), e a causa é o PISO.**
+  Reportado como *"tire o dugtrio level 28 que aparece nas rotas iniciais"*. Medido, ele saía em
+  duas, e as duas estavam erradas pelo mesmo motivo:
+
+  | rota | faixa da rota | o Dugtrio saía em |
+  |---|---|---|
+  | **Caverna Escura** (Johto, trecho 1) — no pool | 3–6 | **Lv.26–29** |
+  | **Caverna Diglett** (Kanto, trecho 3) — era o RARO | 13–17 | **Lv.26–30** |
+
+  O `EVOLVED_MIN_LEVEL` não deixa uma forma evoluída sair abaixo do nível em que ela existiria, e o
+  Diglett só evolui no **26** — então o piso empurrava a faixa inteira pra cima, como já tinha feito
+  com o Pikachu antes do `SEM_PISO_DE_NIVEL`. **Não dava pra consertar o nível**: abaixo do 26 o
+  Dugtrio não existe. E pôr ele no `SEM_PISO_DE_NIVEL` seria errado — aquela lista é curta de
+  propósito, só entra quem é a forma COMUM da linha e ganhou um bebê depois.
+- **⚠️ CONSEQUÊNCIA: o Dugtrio deixou de existir como SELVAGEM, e só se consegue evoluindo Diglett.**
+  Ele continua no `WILD_POOL_LEG6`, mas isso **não é uma porta**: conferido, **todas as 32 rotas têm
+  pool próprio**, então os `WILD_POOL_LEG*` nunca são usados no encontro — eles são fallback de uma
+  rota sem pool, e não existe nenhuma. A entrada dele lá é letra morta.
+  Isso é consistente com o resto do jogo (50 espécies estão em 1 rota só, e as formas evoluídas
+  como Machamp, Gengar e Kingdra já são alcançadas evoluindo), e o teste de "todo pokémon tem como
+  ser capturado" continua verde porque ele calcula o fecho das evoluções.
+  Se um dia se quiser ele selvagem de novo, o lugar certo é uma rota de trecho **6 ou mais** (28-33
+  pra cima), onde o Lv.26 do piso cabe.
+- **A CAVERNA DIGLETT FICOU SEM RARO**, e isso é estado suportado: já havia três rotas assim
+  (Estrada Ciclável, Ilhas Redemoinho e Dojo Lutador), e o `montaOfertaSelvagem` guarda
+  `route.rare && route.rare.length`. O rumor dela continua verdadeiro sem ele — **o counter do
+  Surge é o Diglett**, que está no pool. As duas rotas seguem entregando **9 formas distintas** cada
+  (eram 10).
 - **`SEM_PISO_DE_NIVEL`: quem pode aparecer abaixo do piso da própria evolução.** O piso
   (`EVOLVED_MIN_LEVEL`) é montado a partir do `EVOLUTIONS`, e a Gen 2 acrescentou BEBÊS a linhas
   que já existiam — o Pikachu virou "evolução do Pichu" dez anos depois de ser um pokémon de nível
@@ -3354,7 +3521,7 @@ pular `doce_raro` e `bonus_shiny` no `quantoPossoVender` e no servidor) ou **bai
 - **A Faixa segura ANTES de o diário ser escrito**, então o dano gravado é o EFETIVO (o que saiu de
   verdade, parando em 1) e a barra da tela desce até 1.
 - **ELA PARTE O CONFRONTO EM DUAS LUTAS, e cada uma é reconstruída como qualquer outra — com o
-  mesmo teto de 3 golpes.** A luta corre normal até o pokémon chegar a zero, a Faixa o devolve a 1,
+  mesmo `TETO_GOLPES`.** A luta corre normal até o pokémon chegar a zero, a Faixa o devolve a 1,
   e o que vem depois se lê como uma luta nova em que ELE ataca primeiro. No log continua sendo um
   confronto só.
   **Três tentativas até acertar, e as duas primeiras estão registradas porque cada uma errou de um
@@ -3419,9 +3586,14 @@ pular `doce_raro` e `bonus_shiny` no `quantoPossoVender` e no servidor) ou **bai
   Sem o segundo ela ficaria no lugar do "Trocando golpes..." pelo resto da luta — que foi exatamente
   o defeito que a cura teve quando nasceu.
   Os quatro laços de revelação (jornada, ginásio, Torre/raide e liga assistida) receberam os dois.
-- **O preço em linhas, medido:** a luta comum continua em **3 linhas (100%)** — a regra da casa não
-  se move. A com Faixa fica em **6 linhas em 66%** dos casos, 5 em 18%, 4 em 15%, e o **maior é 7**
-  (era 14 na versão sem teto). Cabe na mesma leitura do sono, que vai até 6.
+- **O preço em linhas, medido de novo com o TETO_GOLPES em 4** (11/09/2026; o mesmo bot contra os
+  dois valores, ~6.400 confrontos de cada tipo em cada lado): a luta comum fica em **2 linhas em 77%,
+  3 em 7% e 4 em 16%** e nunca passa do teto — a regra da casa não se move. A com Faixa fica em
+  **5 linhas em 52%**, 6 em 26%, 3 em 15%, e o **maior é 9** (era 14 na versão sem teto).
+  **Ela ENCURTOU com o teto maior, o que é contra a intuição e tem causa:** cada metade é
+  reconstruída em separado, e a reconstrução sempre devolvia **três** linhas; com o teto em 4 mais
+  metades saem do diário REAL, e uma metade real costuma ter uma ou duas. No teto 3 eram 5 linhas em
+  33% e 6 em 33%, com o maior em 8.
 - **É O ITEM MAIS FORTE DO JOGO, e por larga margem** (12.000 batalhas 6x6 nível 60, 1σ = 0,65):
 
   | item | preço | ganho | trabalhou em |
@@ -3979,6 +4151,82 @@ sozinho vale **−10,4 pontos** em cima do preço.
   "tx.getAll is not a function" — erro do harness, não do código testado. Passa pela mesma trava de
   leitura-depois-de-escrita.
 
+## HMs — a primeira Máquina Oculta (11/09/2026)
+
+Começou pelo **HM01 (Corte)**, e por enquanto ele **só existe**: entra na mochila e não faz nada.
+É de propósito — primeiro a porta, depois o que tem atrás dela. O plano é ele destravar uma terceira
+rota por trecho, com cadeado visível; nada disso está implementado.
+
+- **⚠️ O HM É DA CONTA, NÃO DO SAVE — mudou em 11/09/2026, a pedido.** Ele nasceu por save, e a
+  razão registrada aqui era boa: a condição do HM01 é uma conquista DAQUELA jornada, e guardada na
+  conta uma jornada de sorte apagaria o cadeado de todos os saves pra sempre. O pedido foi o
+  contrário — *"depois que qualquer save conseguiu ele, ele fica permanentemente na conta do
+  usuário"* — e a consequência é exatamente essa: **a condição virou um aro de UMA VEZ SÓ por
+  conta**. Ganhou uma vez, todo save novo já nasce com ele.
+  Ele mora em `users/{uid}.hms` e é gravado pelo **cliente**: não está na trava de campos do
+  `firestore.rules`, que guarda os que dão poder de compra (`moedas`, `rareCandies`, `inventario`,
+  `equipados`, `rerollsPorSave`). É o mesmo nível de confiança do `badgesEarned` — conquista, e
+  livre pro dono.
+  **⚠️ E ELE PRECISOU ENTRAR NO `CAMPOS_DA_CONTA`:** o `resetGame` tira um instantâneo desses campos
+  e restaura depois, então um campo de conta que fique de fora dele **some ao abrir outro save** —
+  em silêncio, e só pra quem tem mais de um. O teste lê o código pra cobrar isso.
+  Com ele na conta, a tela de TMs e HMs deixou de ter o estado "abra um save pra ver os dele": a
+  mochila aberta da home mostra os mesmos.
+- **A LISTA É SÓ O NOME E UMA LEGENDA PEQUENA** (11/09/2026, a pedido). Ela tinha um parágrafo azul
+  por baixo de cada Máquina dizendo que ela ainda não faz nada — com um item só na lista, a
+  explicação ocupava mais espaço que a coisa explicada. O campo `descricao` saiu da tabela junto,
+  em vez de virar dado morto, e o `resumo` ("Abre caminho onde a mata fecha.") caiu de .7rem
+  (o `.mon-sub` da casa) pra **.55rem**: o nome é a informação, ele é a legenda.
+- **A CONDIÇÃO DO HM01**: escolher a rota do **S.S. Anne** e vencer o **Lt. Surge em no máximo uma
+  tentativa** (nenhuma derrota naquele ginásio).
+  **As duas peças já existiam no jogo**, e é por isso que ela encaixou sem inventar nada: o
+  `ss_anne` é uma das duas rotas do trecho 3, e o trecho 3 é justamente o do Surge. O teste cobra as
+  duas — se qualquer uma mudar de lugar, o HM01 fica **inalcançável em silêncio**.
+- **⚠️ A ORDEM DENTRO DO `finishBattle` É O QUE SUSTENTA A CONDIÇÃO.** O `game.losses` (derrotas
+  naquele ginásio) só zera **depois**, na distribuição de níveis. Lida de lá, a condição acharia zero
+  sempre e daria o HM a quem perdeu quatro vezes. O teste **lê o código** pra cobrar que o
+  `conquistouHM01()` está no `finishBattle` e que o `game.losses = 0` **não** está — os casos chamam
+  a função direto e passariam com a ordem trocada.
+- **O `routeHistory` GANHOU O PRIMEIRO LEITOR DE REGRA.** Ele guarda a rota escolhida por trecho e
+  este arquivo dizia "só o mapa lê" — agora a condição do HM01 depende dele. Se ele deixar de ser
+  gravado, o HM01 some sem erro nenhum.
+- **O ANÚNCIO sai do `ganhouHmAgora`**, marcado no `finishBattle` — não de "tem HM na mochila". A
+  tela de vitória é relida a cada render, e sem a marca ela anunciaria o mesmo HM em toda vitória
+  dali pra frente. Ele fica **ao lado do prêmio de moedas**: é a mesma leitura ("o que esta vitória
+  me deu"), e um lugar novo faria o jogador procurar.
+- **A TELA DE TMs E HMs É SEPARADA DA GRADE**, e isso é decisão: TM e HM **não empilham, não se
+  gastam, não se vendem e não se usam dali** — todas as regras da grade são falsas pra eles.
+  Misturá-los poria coisas de regras diferentes no mesmo quadradinho, que é o incômodo que o Doce
+  Raro já cria sozinho. E ela **escala**: são 301 golpes na base, então a lista de TMs vai crescer —
+  a grade de ícones já não dava conta de 11 itens na loja.
+  Ela tem **dois estados e nenhum é mudo**: lista o que a CONTA tem, e sem nenhum **diz onde achar**.
+  (Havia um terceiro — "abra um save pra ver os dele" — e ele sumiu quando o HM deixou de ser do
+  save: a mochila aberta da home mostra os mesmos.)
+- **⚠️ O GOLPE `cut` NÃO EXISTE NA TABELA DE GOLPES**, e isso não é esquecimento nem bug: a base é
+  aprendizado por **NÍVEL** da Gen 3, e HM ninguém aprende por nível — o gerador nunca o viu. É o
+  mesmo motivo do `surf`, que o teste do Sketch já tinha encontrado.
+  **Isso é o que confirma o desenho "HM = ITEM, não golpe"**: não há golpe pra apontar. E se um dia
+  se quiser o Corte como golpe de batalha, ele terá que ser cadastrado à mão — o gerador não o
+  produz.
+- **⚠️ O NOME "CORTE" JÁ ESTÁ OCUPADO.** O `slash` (Normal, 70) se chama **Corte** no jogo, é um dos
+  oito de crítico alto e 22 espécies o aprendem. Por isso o item é **"HM01 — Corte"** e não "Corte":
+  no dia em que os dois aparecerem na mesma tela, o prefixo é o que os separa.
+
+**MEDIDO — e o número muda a leitura da condição.** Ela tem três filtros em série:
+
+| | |
+|---|---|
+| o trecho 3 ser **Kanto** (o outro lado é a Whitney) | o jogador escolhe |
+| o **S.S. Anne** entre as duas rotas | o jogador escolhe |
+| vencer o Surge **sem perder** | **1 game over em 1.500 jornadas** |
+
+**O 3º ginásio é o menos letal da jornada inteira** — 1 game over contra 115 no 1º, 173 no 8º. Ou
+seja, "vencer de primeira" é uma barra baixa: **a condição real é saber escolher a rota.** Ela é um
+portão de CONHECIMENTO, não de dificuldade. Por acaso ela sai em ~25% das jornadas (50% × 50%); quem
+sabe o caminho pega perto de 100%.
+Se a intenção for que o HM01 seja uma prova, o Surge é o lugar errado — os candidatos seriam o 1º, o
+6º ou o 8º ginásio. Ficou como pedido.
+
 ## Mochila (inventário) e Loja
 
 - **O ESTOQUE NÃO É UMA LISTA GRAVADA.** É uma leitura do que a conta já tem:
@@ -4263,6 +4511,19 @@ que é justamente a parte que o jogador percebe.
   manda `monId`/`slot`/`idx`/`shiny` e o servidor vai do mais específico pro mais genérico;
   os dois últimos níveis existem só pra não quebrar cliente antigo em cache.
   `node tools/test-torre.js` cobre os dois lados (escolher o shiny e escolher o normal).
+
+### O TETO DE GOLPES DA TORRE ESTAVA EM 2 NO SERVIDOR (12/09/2026)
+
+Achado investigando um print da Torre. O `MAX_GOLPES` do cliente é **3** desde 09/09/2026, mas o
+servidor truncava em **2** em dois pontos do caminho da Torre e do Ginásio da Cidade
+(`resolverTimeDosSaves` e a remontagem do time no `fightTrainerTowerFloor`). Ou seja: **quem
+escolheu três golpes lutava a Torre com os dois primeiros**, em silêncio — o terceiro sumia.
+
+- **O número solto nos dois lugares era exatamente o que a constante existe pra evitar.** Ela nasceu
+  no cliente porque o 2 estava espalhado por nove pontos; aqui o mesmo erro se repetiu do outro lado
+  da linha. Hoje o `MAX_GOLPES` existe nos DOIS arquivos e é a **décima tabela duplicada**.
+- **Não é o defeito do print** (os números de dano), e é por isso que ele fica registrado à parte:
+  foi encontrado lendo o caminho, não medindo o sintoma.
 
 ## Batalha Online
 
@@ -4576,8 +4837,11 @@ que é justamente a parte que o jogador percebe.
   inteira virava espaguete: o trajeto real de Kanto se cruza várias vezes (Celadon → Fuchsia →
   Saffron → Cinnabar → Viridian) e num celular isso lia como rabisco. A visão linear do que falta
   é a **trilha de insígnias** (`kantoTrailHtml`), que é outra coisa e fica em outro lugar da tela.
-- `game.routeHistory` guarda a rota escolhida por trecho. É estado de **exibição** — nenhuma regra
-  lê. `currentRoute` sozinho não servia: ele é sobrescrito no trecho seguinte, e o mapa perdia a
+- `game.routeHistory` guarda a rota escolhida por trecho. **Nasceu como estado de exibição** e
+  desde 11/09/2026 tem UM leitor de regra: a condição do **HM01** (ver a seção dos HMs). Se ele
+  deixar de ser gravado, o HM01 fica inalcançável sem erro nenhum — e é por isso que o teste de lá
+  cobra o par (rota gravada + HM ganho).
+  `currentRoute` sozinho não servia: ele é sobrescrito no trecho seguinte, e o mapa perdia a
   memória de por onde a pessoa passou. Save antigo sem o campo desenha normal, só sem o passado.
 - Cada lugar tem um `lp` (posição do rótulo). Com todos em cima, "Saffron City" caía sobre o ícone
   da rota e "Vermilion City" sobre a linha do trecho. Os nomes usam halo (`paint-order:stroke`),
@@ -4619,6 +4883,39 @@ que é justamente a parte que o jogador percebe.
 - **Sair da conta devolve o formulário ao estado inicial** (modo, erro, recado e e-mail). Sem isso
   quem saiu com a tela em "criar conta" reencontrava aquele formulário no lugar do login, e o
   e-mail da conta anterior ficava preenchido num aparelho que pode não ser só dele.
+
+## O CICLO QUE PERDIA O SAVE (11/09/2026)
+
+Relatado assim: *"constantemente fica aparecendo aquela mensagem vermelha no save e realmente não
+salva o progresso, por que que ta acontecendo isso? Outros usuários relataram o mesmo problema."*
+A tarja dizia **`Maximum call stack size exceeded`**, que é um `RangeError` — não um erro de rede.
+
+- **A CAUSA: o motor pendura REFERÊNCIAS ao pokémon adversário na instância do time, e o
+  salvamento é recursivo.** São dois marcadores de confronto: o `_especialContra` (com quem foi o
+  último confronto, comparado por IDENTIDADE — é ele que faz o golpe especial sair uma vez só) e o
+  `_anulado`, que guarda `{ tipo, contra }` — e o `contra` também é um pokémon.
+  Quando o adversário aponta de volta, os dois fecham um **CICLO**:
+  `team[3]._especialContra → _anulado.contra → team[3]`. O `limparParaFirestore` desce campo a
+  campo sem guarda nenhuma, então ele descia pra sempre e morria na pilha.
+- **MEDIDO: os campos sobram em 100% das batalhas e o ciclo se fecha em 3% delas.** Ou seja, mais ou
+  menos **uma batalha em trinta perdia o save inteiro** — o que bate com o "constantemente" do
+  relato, e com ser vários jogadores.
+- **E o custo silencioso era maior que o erro:** sem o ciclo, o save ainda gravava um **pokémon
+  adversário INTEIRO por membro do time** dentro do documento. Ninguém veria isso como defeito.
+- **O CORTE É NA CAMADA DO SAVE: campo que começa com `_` não vai pro Firestore.** Podia ser só a
+  limpeza de fim de batalha, e ela também foi feita — mas o corte aqui é o que faz o PRÓXIMO
+  marcador de motor nascer protegido. O `_` já era a convenção de rascunho do projeto inteiro
+  (`_furia`, `_anulado`, `_especialContra`, `_itemGastoAnotado`, `_dormindoPor`), e nenhum deles
+  tem por que ser gravado.
+- **O `encerrarBatalha` É A OUTRA METADE, e ele nasceu porque a saída da batalha tinha DUAS portas.**
+  A devolução do teto de HP da Fúria vivia num bloco solto antes do `return` da vitória, e o
+  `return` da DERROTA passava por cima dele. **Medido: 983 pokémon de 3.000 saíam de uma derrota com
+  o teto de vida errado (até +30), contra ZERO nas vitórias** — e como o `_furia` é zerado no começo
+  da batalha seguinte, o teto inflado deixava de ter de onde ser recalculado e ficava errado pra
+  valer, inclusive no save e na barra da tela de time. Isto é exatamente o defeito que o próprio
+  CLAUDE.md descrevia ("saía da luta com o teto +30 pra sempre"); ele só tinha sido fechado de um
+  lado.
+  Hoje as duas portas chamam a MESMA função, e ela também solta os marcadores de confronto.
 
 ## Salvamento
 

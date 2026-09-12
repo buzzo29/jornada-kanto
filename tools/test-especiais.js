@@ -38,6 +38,14 @@ const rngFixo = (v) => () => v;
    ficasse pra tras falharia raro e intermitente -- o pior tipo de teste. O proximo efeito desta
    familia entra numa linha so. */
 const danoSemGolpe = (g) => !!g && (g.x === 'absorbdano' || g.x === 'confusao' || g.x === 'furiadragao');
+/* VIDA DEVOLVIDA SEM SER CURA: desde 11/09/2026 o desempate poe o sobrevivente de volta de pe numa
+   linha PROPRIA, com a barra subindo, em vez de o motor APARAR o golpe que o derrubou -- o aparo
+   escrevia na tela um numero que nunca aconteceu (ver o CLAUDE.md).
+   O `q` da linha e de quem DEU o golpe, como no resto do log, entao a vida volta pro lado OPOSTO:
+   e a mesma forma do `danoSemGolpe`, com o sinal trocado. Toda conta de HP deste arquivo precisa
+   das DUAS, e por isso as duas vivem aqui em cima -- copiadas a mao em cada conta, a proxima
+   ficaria pra tras (ja aconteceu com o `absorbdano`, que falhava raro e intermitente). */
+const devolveVida = (g) => !!g && g.x === 'desempate' && g.d > 0;
 
 console.log('\nAS LISTAS SAO DO APRENDIZADO POR NIVEL DA GEN 1/2');
 ok('9 especies aprendem autodestruicao', S.AUTODESTRUICAO.length === 9, S.AUTODESTRUICAO.join(', '));
@@ -171,7 +179,10 @@ ok('e o log diz qual golpe foi', diario.some(g => g.x === 'sono' && g.g === 'Can
   const POOL = Object.keys(S.SPECIES).filter(id => S.SPECIES[id].dex <= 251);
   const rng = S.makeSeededRng('log-diario');
   const ehDano = x => !x.x || x.x === 'boom' || x.x === 'boomself';
-  const TETO_ESPERADO = 3;
+  /* O TETO SAI DA CONSTANTE DO JOGO. Escrito a mao aqui, ele virava uma segunda fonte de verdade:
+     quando o TETO_GOLPES foi de 3 pra 4 (11/09/2026) este teste acusou 1.465 confrontos "fora do
+     teto" que estavam exatamente dentro dele. */
+  const TETO_ESPERADO = S.TETO_GOLPES;
   let confrontos = 0, animDif = 0, somaErrada = 0, comZero = 0, caiuDefeito = 0;
   let comSono = 0, sonoOk = 0, exZero = null, exAnim = null, exCaiu = null;
   let passouDoTeto = 0, maiorComSono = 0, exTeto = null;
@@ -199,6 +210,8 @@ ok('e o log diz qual golpe foi', diario.some(g => g.x === 'sono' && g.g === 'Can
       const ganho = { p:0, e:0 };
       seq.forEach(x => {
         if(x.x === 'recover' || x.x === 'pocao' || x.x === 'absorb' || x.x === 'furia') ganho[x.q] += x.d || 0;
+        /* O DESEMPATE devolve vida pro lado OPOSTO ao q -- ver devolveVida, no topo. */
+        if(devolveVida(x)) ganho[x.q === 'p' ? 'e' : 'p'] += x.d || 0;
       });
       /* O GANHO ENTRA DENTRO DO Math.max, nao fora: com a furia o pokemon pode TERMINAR o confronto
          com MAIS vida do que entrou -- entra com 290, cresce 10 e leva 9 de moribundo, sai com 291.
@@ -295,7 +308,7 @@ ok('e o log diz qual golpe foi', diario.some(g => g.x === 'sono' && g.g === 'Can
   ok('ninguem ataca depois de cair (fora explosao e moribundo)', caiuDefeito === 0,
      caiuDefeito + ' de ' + confrontos + (exCaiu ? '  |  ' + exCaiu : ''));
   ok('o sono mostra as trocas livres que ele compra', sonoOk === comSono, sonoOk + ' de ' + comSono);
-  ok('luta SEM golpe especial nao passa de 3 linhas', passouDoTeto === 0,
+  ok('luta SEM golpe especial nao passa do teto de linhas', passouDoTeto === 0,
      passouDoTeto + ' de ' + (confrontos - comSono) + (exTeto ? '  |  ' + exTeto : ''));
   ok('e a com sono passa, que e o motivo da excecao', maiorComSono > TETO_ESPERADO,
      'maior confronto com sono: ' + maiorComSono + ' linhas');
@@ -788,6 +801,11 @@ console.log('\nA FAIXA DE FOCO NAO PODE SER FURADA POR CAMINHO NENHUM');
         for(let k = 0; k < lista.length; k++){
           const g = lista[k];
           if(g.x === 'faixa' || g.x === 'boomself') continue;
+          /* A DEVOLUCAO DO DESEMPATE nao e golpe, e o `q` dela e de quem DEU o golpe -- que pode
+             ser justamente quem ficou morto. Ela entra aqui em cima, antes da checagem de
+             cadaver, senao a propria linha que explica a ressurreicao seria acusada. */
+          if(devolveVida(g)){ if(g.q === 'p') e += g.d; else p += g.d; continue; }
+          if(g.x === 'desempate') continue;
           const bate = g.q === 'p';
           const caido = (bate ? p : e) <= 0;
           const continuacao = g.t > 1 && ultimoOk === k - 1;
@@ -2011,7 +2029,10 @@ console.log('\n=== A RECONSTRUCAO NAO PODE MOSTRAR DOIS GOLPES IMPOSSIVEIS ===')
   const BANDA = 1.18;   // 1,00 / 0,85 -- o quanto o sorteio da formula faz um golpe variar
   const especies = Object.keys(S.SPECIES);
   let tres = 0, fora = 0, pior = 0, exemplo = null;
-  for(let i = 0; i < 2500; i++){
+  /* 6.000 e nao 2.500: com o TETO_GOLPES em 4 os confrontos que passam pela reconstrucao caem de
+     43% pra 16% do total -- que e justamente o ganho da mudanca -- e a amostra deste bloco encolheu
+     junto. O numero de voltas existe pra manter o "de sobra pra medir" abaixo. */
+  for(let i = 0; i < 6000; i++){
     const rng = S.makeSeededRng('rec' + i);
     const time = k => Array.from({ length: k }, () => {
       const id = especies[Math.floor(rng() * especies.length)];
@@ -2256,6 +2277,7 @@ console.log('\n=== O DESEMPATE TEM LINHA PROPRIA ===');
   const rnd = n => Math.floor(Math.random() * n);
   const semTag = h => String(h||'').replace(/<[^>]*>/g,'').replace(/\s+/g,' ').trim();
   let conf = 0, comDesempate = 0, naTela = 0, frases = 0, colados = 0, exemplo = '';
+  let comColagem = 0, jaNoDiario = 0;
   for(let v = 0; v < 900; v++){
     const mk = () => Array.from({length:6}, () => {
       const p = S.createInstance(ids[rnd(ids.length)], 25 + rnd(30));
@@ -2280,7 +2302,22 @@ console.log('\n=== O DESEMPATE TEM LINHA PROPRIA ===');
         if(seq.some(g => g.x === 'desempate')) naTela++;
         if(/os dois ca\S+ram na mesma troca/.test(semTag(S.passosHtml(m)))) frases++;
       }
-      /* O INVARIANTE do relato: no caminho do DIARIO REAL, ninguem ataca duas vezes seguidas.
+      /* O INVARIANTE do relato: A APRESENTACAO NAO CRIA COLAGEM. Ele era "ninguem ataca duas vezes
+         seguidas", e isso era verdade por acidente: com o TETO_GOLPES em 3, todo confronto de 4
+         golpes caia na reconstrucao e o diario real nunca chegava a tela. Com o teto em 4
+         (11/09/2026) apareceram 12,6% de confrontos com dois golpes colados, e a varredura mostrou
+         DUAS causas de naturezas diferentes:
+           - o REORDENAMENTO DO MORIBUNDO, que e apresentacao e era defeito nosso: num confronto de
+             4 golpes (p, e, p-mata, e-revide) por o revide um lugar atras produz "p, e, e, p".
+             Consertado mandando ele pro comeco, a mesma licenca que o sono ja usava. 98,8% dos
+             casos eram este;
+           - o EMPATE DE VELOCIDADE, que e o motor e e a verdade: o desempate e sorteado a cada
+             troca, entao um Skarmory e uma Butterfree (os dois com 70 de velocidade) trocam de
+             ordem entre uma troca e outra e o mesmo lado bate duas vezes de fato. O log esta
+             contando o que aconteceu, e esconder isso seria mentir.
+         Por isso a conta e COMPARATIVA: quantas colagens a tela mostra contra quantas o DIARIO ja
+         tinha. Exigir zero puniria o motor por dizer a verdade; exigir "nao criou" pega de volta
+         exatamente o defeito que o teto escondia.
          Ficam de fora o SONO (as trocas livres SAO isso, e a frase do sono explica) e a
          RECONSTRUCAO (ela interpola HP e nao conhece a ordem real). */
       const dano = (m.golpes || []).filter(g => !g.x && g.d > 0).length;
@@ -2292,21 +2329,29 @@ console.log('\n=== O DESEMPATE TEM LINHA PROPRIA ===');
          lado com NADA entre eles.
          Ficam de fora da lista so as entradas que o passosHtml nao desenha: o segundo lado da
          explosao e da drenagem, e os tapas 2..N, que viram uma linha so. */
-      const linhas = [];
-      seq.forEach(g => {
-        if(g.x === 'boomself' || g.x === 'absorbdano') return;
-        if(!g.x && !(g.d > 0)) return;
-        const u = linhas[linhas.length - 1];
-        if(g.t > 1 && u && u.q === g.q && u.tn === g.tn){ u.d += g.d; return; }
-        linhas.push(Object.assign({}, g));
-      });
-      for(let i = 1; i < linhas.length; i++){
-        if(linhas[i].x || linhas[i-1].x) continue;          // linha especial separa
-        if(linhas[i].q !== linhas[i-1].q) continue;
+      const quantasColagens = (lista) => {
+        const linhas = [];
+        lista.forEach(g => {
+          if(g.x === 'boomself' || g.x === 'absorbdano') return;
+          if(!g.x && !(g.d > 0)) return;
+          const u = linhas[linhas.length - 1];
+          if(g.t > 1 && u && u.q === g.q && u.tn === g.tn){ u.d += g.d; return; }
+          linhas.push(Object.assign({}, g));
+        });
+        let n = 0;
+        for(let i = 1; i < linhas.length; i++){
+          if(linhas[i].x || linhas[i-1].x) continue;        // linha especial separa
+          if(linhas[i].q === linhas[i-1].q) n++;
+        }
+        return n;
+      };
+      const colaTela = quantasColagens(seq), colaDiario = quantasColagens(m.golpes || []);
+      if(colaTela > 0) comColagem++;
+      if(colaDiario > 0) jaNoDiario++;
+      if(colaTela > colaDiario){
         colados++;
         if(!exemplo) exemplo = m.player + ' ' + m.playerHpBefore + '->' + m.playerHpAfter +
                                ' x ' + m.enemy + ' ' + m.enemyHpBefore + '->' + m.enemyHpAfter;
-        break;
       }
     });
   }
@@ -2314,8 +2359,121 @@ console.log('\n=== O DESEMPATE TEM LINHA PROPRIA ===');
   ok('o desempate aparece o bastante pra medir', comDesempate >= 5, comDesempate + ' casos');
   ok('e ele NAO some da tela', naTela === comDesempate, naTela + ' de ' + comDesempate);
   ok('e vira uma frase no log', frases === comDesempate, frases + ' de ' + comDesempate);
-  ok('NINGUEM ataca duas vezes seguidas no diario real', colados === 0,
+  /* ZERO, e nao "quase zero": o reordenamento do moribundo e a unica coisa entre o diario e a tela
+     que consegue colar dois golpes, e ele esta fechado por construcao. Qualquer caso aqui e ele
+     tendo reaberto. */
+  ok('a APRESENTACAO nunca cria colagem que o diario nao tinha', colados === 0,
      colados + ' casos' + (exemplo ? '  ex: ' + exemplo : ''));
+  /* E A AMOSTRA TEM COLAGEM DE VERDADE PRA MEDIR -- senao a linha de cima passaria por nao haver
+     nada acontecendo. Quem a produz e o EMPATE DE VELOCIDADE do motor, e por isso ela nunca chega
+     a zero: o desempate e sorteado a cada troca.
+     ⚠️ A COMPARACAO E "NAO MAIS", e nao "menos". Escrita como "menos" ela era uma trava
+     ESTATISTICA -- media 23 na tela contra 42 no diario, uma diferenca de 2,4 sigma -- e falhava
+     sozinha mais ou menos uma vez em cem, que e o pior tipo de teste que existe: o que passa quase
+     sempre. O "nao mais" e verdade por construcao (se a tela nunca cria colagem, todo confronto com
+     colagem na tela ja a tinha no diario) e continua pegando o defeito, que e a linha de cima. */
+  ok('o diario tem colagem propria na amostra, e a tela nunca mostra mais',
+     jaNoDiario > 0 && comColagem <= jaNoDiario,
+     comColagem + ' na tela contra ' + jaNoDiario + ' no diario');
+}
+
+
+console.log('\n=== O CICLO QUE PERDIA O SAVE (11/09/2026) ===');
+{
+  /* Relatado assim: "constantemente fica aparecendo aquela mensagem vermelha no save e realmente
+     nao salva o progresso". A tarja dizia `Maximum call stack size exceeded` -- um RangeError, nao
+     um erro de rede.
+     A CAUSA: o motor pendura REFERENCIAS ao pokemon adversario na instancia do time
+     (`_especialContra` e o `contra` do `_anulado`), e quando o adversario aponta de volta os dois
+     fecham um CICLO. O `limparParaFirestore` e recursivo: ele descia pra sempre.
+     Sao DOIS consertos, e os dois sao cobrados aqui -- o de motor (soltar no fim da batalha) e o de
+     save (campo com `_` nao vai pro Firestore). O segundo e o que faz o PROXIMO marcador nascer
+     protegido, e por isso ele tem caso proprio. */
+  const ids = Object.keys(S.SPECIES);
+  const rng = S.makeSeededRng('ciclo-do-save');
+  const time = () => Array.from({ length: 6 }, () => {
+    const p = S.createInstance(ids[Math.floor(rng()*ids.length)], 25 + Math.floor(rng()*30));
+    p.ataques = S.ataquesDisponiveis(p.speciesId, p.level).slice(0, S.MAX_GOLPES);
+    return p;
+  });
+  /* Anda pelo objeto sem guarda nenhuma, que e o que o limparParaFirestore faz. */
+  const achaCiclo = (raiz) => {
+    const pilha = [], visto = new Set();
+    const anda = (v, nome) => {
+      if(!v || typeof v !== 'object') return null;
+      if(visto.has(v)) return pilha.concat(nome).join(' -> ');
+      visto.add(v); pilha.push(nome);
+      for(const k of Object.keys(v)){ const r = anda(v[k], k); if(r) return r; }
+      pilha.pop(); visto.delete(v); return null;
+    };
+    return anda(raiz, 'team');
+  };
+  let ciclos = 0, sobrando = 0, tetoErrado = 0, batalhas = 0, derrotas = 0;
+  const limpoDaFuria = p => { const c = Object.assign(Object.create(Object.getPrototypeOf(p)), p); c._furia = 0; return S.calcMaxHp(c); };
+  for(let v = 0; v < 300; v++){
+    const meu = time(), dele = time();
+    S.equiparItens(meu, null); S.equiparItens(dele, null);
+    meu.forEach(p => p.maxHp = S.calcMaxHp(p));
+    let r; try{ r = S.simulateGymBattle(meu, dele); }catch(e){ continue; }
+    batalhas++; if(!r.win) derrotas++;
+    if(achaCiclo(meu)) ciclos++;
+    if(meu.some(p => p._especialContra || p._anulado || p._dormindoPor)) sobrando++;
+    /* ⚠️ O TETO DE HP DA FURIA tem que voltar nos DOIS caminhos de saida. Ele vivia num bloco solto
+       antes do `return` da vitoria, e o `return` da DERROTA passava por cima: 983 pokemon de 3.000
+       saiam de uma derrota com o teto errado, contra ZERO nas vitorias. */
+    meu.forEach(p => { if(p.maxHp !== limpoDaFuria(p)) tetoErrado++; });
+  }
+  ok('a amostra tem derrota, que e o caminho que escapava', derrotas > 20, derrotas + ' de ' + batalhas);
+  ok('nenhum time sai da batalha com CICLO no objeto', ciclos === 0, ciclos + ' de ' + batalhas);
+  ok('nem com marcador de confronto sobrando', sobrando === 0, sobrando + ' de ' + batalhas);
+  ok('e ninguem sai com o TETO de HP da furia por devolver', tetoErrado === 0,
+     tetoErrado + ' pokemon (a devolucao vale na vitoria E na derrota)');
+
+  /* O CORTE NA CAMADA DO SAVE. Ele vale mesmo com o motor sujo -- e e isso que protege o proximo
+     marcador de rascunho que alguem pendurar numa instancia. */
+  {
+    const a = S.createInstance('pikachu', 30), b = S.createInstance('onix', 30);
+    a._especialContra = b; b._anulado = { tipo: 'Elétrico', contra: a };   // o ciclo, na mao
+    const g = S.__getGame();
+    g.team = [a];
+    let estourou = null, limpo = null;
+    try{ limpo = S.limparParaFirestore(S.serializeGame(), '', []); }
+    catch(e){ estourou = String(e && e.message || e); }
+    ok('o salvamento NAO estoura a pilha num time com ciclo', estourou === null, estourou || 'ok');
+    ok('e o campo de rascunho nao vai pro Firestore',
+       !!limpo && limpo.team && limpo.team[0] && limpo.team[0]._especialContra === undefined);
+    /* E ele nao pode levar junto o que o save PRECISA. */
+    ok('o que o save precisa continua indo', !!limpo && limpo.team[0].speciesId === 'pikachu' &&
+       limpo.team[0].level === 30 && Array.isArray(limpo.badgesEarned));
+    /* A regra e sobre o `_`, e nao sobre estes dois nomes: e isso que faz ela valer pro proximo. */
+    const c = S.createInstance('gastly', 30);
+    c._qualquerCoisaNova = { volta: c };
+    g.team = [c];
+    let estourou2 = null;
+    try{ S.limparParaFirestore(S.serializeGame(), '', []); }catch(e){ estourou2 = String(e && e.message || e); }
+    ok('e vale pra QUALQUER campo com _, nao so pros dois de hoje', estourou2 === null, estourou2 || 'ok');
+    g.team = [];
+  }
+
+  /* ⚠️ AS DUAS PORTAS DE SAIDA CHAMAM A MESMA FUNCAO -- lido do CODIGO, porque os casos acima
+     passam pelo simulateGymBattle inteiro e nao veem QUANTOS `return` ele tem. Foi exatamente por
+     haver dois `return` que a devolucao da furia ficou valendo so num deles. */
+  {
+    const txt = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
+    const i = txt.indexOf('function simulateGymBattle(');
+    const fim = txt.indexOf('\nfunction ', i + 1);
+    const corpo = txt.slice(i, fim);
+    ok('o simulateGymBattle do cliente encerra nas DUAS saidas',
+       (corpo.match(/encerrarBatalha\(/g) || []).length === 2,
+       (corpo.match(/encerrarBatalha\(/g) || []).length + ' chamadas');
+    const srv = require('fs').readFileSync(path.join(raiz, 'functions', 'index.js'), 'utf8');
+    const j = srv.indexOf('function simulateGymBattle(');
+    const fimS = srv.indexOf('\nfunction ', j + 1);
+    const corpoS = srv.slice(j, fimS);
+    ok('e o do servidor tambem', (corpoS.match(/encerrarBatalha\(/g) || []).length === 2,
+       (corpoS.match(/encerrarBatalha\(/g) || []).length + ' chamadas');
+    ok('o corte do _ existe no salvamento', txt.indexOf("if(k.charAt(0) === '_') continue;") > 0);
+  }
 }
 
 console.log('\n=== O NPC LUTA COM O MOVESET DELE ===');
@@ -2691,6 +2849,13 @@ console.log('\n=== QUEM MANDA NA LINHA DE STATUS, PASSO A PASSO ===');
          golpe a mais no confronto a troca dupla passou a acontecer nesse par. */
       const donoMorreu = mor.q === 'p' ? (m.playerHpAfter <= 0) : (m.enemyHpAfter <= 0);
       if(!donoMorreu) continue;
+      /* ⚠️ CONFRONTO COM DESEMPATE FICA DE FORA, e nao e tolerancia: ali o revide MATOU o outro
+         lado, e revide letal NAO sobe (subindo, quem ele matou passa a atacar de barra zerada --
+         ver passosVisiveis). Ou seja, o que este bloco mede nao se aplica a esses confrontos.
+         Medido: 3 em 40. Antes do 11/09/2026 eles nem apareciam aqui, porque o APARO do desempate
+         segurava a barra acima de zero e o revide nunca era letal aos olhos do log. */
+      const ultimoMor = (m.golpes || []).filter(g => g.m).slice(-1)[0];
+      if(ultimoMor && (ultimoMor.hp || 0) <= 0) continue;
       achou++;
       /* CONFRONTO CURTO x LONGO. Passando do teto de golpes, a sequencia vem da RECONSTRUCAO, e la
          o revide nao e uma linha propria -- ele e absorvido no golpe reconstruido daquele lado.
@@ -2709,17 +2874,30 @@ console.log('\n=== QUEM MANDA NA LINHA DE STATUS, PASSO A PASSO ===');
       if(temColados) colados++;
       /* 3. NINGUEM ATACA COM A BARRA EM ZERO. E a razao de o reordenamento existir, e mover o
             revide pra frente nao pode desfaze-la. */
+      /* ⚠️ O PAR DO MORIBUNDO E TOLERADO, como no resto do arquivo: quem caiu no passo IMEDIATAMENTE
+         anterior pode bater, porque os dois golpes sao do mesmo instante. Esta conta nao tinha a
+         tolerancia e passava assim mesmo -- porque o APARO do desempate segurava a barra do
+         sobrevivente acima de zero e a queda nunca chegava na tela. Com o aparo fora (11/09/2026) a
+         queda aparece, e a conta precisou aprender o que ja era regra. */
       let hpP = m.playerHpBefore, hpE = m.enemyHpBefore, morto = false;
-      seq.forEach(g => {
+      const caiuNo = { p:-1, e:-1 };
+      seq.forEach((g, k) => {
+        if(devolveVida(g)){ if(g.q === 'p') hpE += g.d; else hpP += g.d; return; }
         if(g.x) return;
-        if((g.q === 'p' ? hpP : hpE) <= 0) morto = true;
-        if(g.q === 'p') hpE = Math.max(0, hpE - g.d); else hpP = Math.max(0, hpP - g.d);
+        if((g.q === 'p' ? hpP : hpE) <= 0 && caiuNo[g.q] !== k - 1) morto = true;
+        if(g.q === 'p'){ hpE = Math.max(0, hpE - g.d); if(hpE === 0 && caiuNo.e < 0) caiuNo.e = k; }
+        else { hpP = Math.max(0, hpP - g.d); if(hpP === 0 && caiuNo.p < 0) caiuNo.p = k; }
       });
       if(!morto) cadaver++;
       /* 4. A SOMA CONTINUA FECHANDO: mudou a ordem, nao o dano. */
+      /* A SOMA CONTINUA FECHANDO: mudou a ordem, nao o dano. O desempate devolve vida, e por
+         isso entra na conta como ganho do lado OPOSTO ao q (ver devolveVida). */
+      const voltouP = seq.filter(g => devolveVida(g) && g.q === 'e').reduce((x, g) => x + g.d, 0);
+      const voltouE = seq.filter(g => devolveVida(g) && g.q === 'p').reduce((x, g) => x + g.d, 0);
       const tomouP = dano.filter(g => g.q === 'e').reduce((x, g) => x + g.d, 0);
       const tomouE = dano.filter(g => g.q === 'p').reduce((x, g) => x + g.d, 0);
-      if(tomouP === m.playerHpBefore - m.playerHpAfter && tomouE === m.enemyHpBefore - m.enemyHpAfter) somaOk++;
+      if(tomouP === m.playerHpBefore + voltouP - m.playerHpAfter &&
+         tomouE === m.enemyHpBefore + voltouE - m.enemyHpAfter) somaOk++;
       /* 5. A LINHA DO MEIO DA BATALHA acompanha: o revide sai com o NOME DO GOLPE dele, e a frase
             do sono aparece no passo do sono -- nao no do revide, que e o que a contagem absoluta
             de passos fazia antes. */
@@ -2797,12 +2975,33 @@ console.log('\n=== QUEM MORREU NAO ATACA DEPOIS DE MORRER ===');
          que sobrou depois daquele passo, gravada pelo motor; a reconstrucao nao o traz, e ai a
          conta cai na subtracao. */
       const ehCura = g => g.x === 'recover' || g.x === 'pocao' || g.x === 'absorb' || g.x === 'furia';
+      /* ⚠️ COM DESEMPATE, O PAR DO MORIBUNDO VALE TAMBEM PRA QUEM TERMINA MORTO -- e e a unica
+         excecao desta trava.
+         A regra dela ("quem termina morto nunca aparece atacando com a barra em zero") valia porque
+         o reordenamento SEMPRE conseguia por o revide antes do golpe que o derrubou. Quando o
+         revide e LETAL isso deixa de ser possivel: subindo ele, quem passa a atacar de barra zerada
+         e o pokemon que ELE matou (e em varios passos, nao so no par); andando um lugar pra tras,
+         ele cola dois golpes do mesmo lado. A ordem CRUA do diario e a menos ruim das tres, e o que
+         sobra e o par -- os dois golpes sao do mesmo instante.
+         E na tela isso fica EXPLICADO, que e o que muda: a linha do desempate vem logo abaixo e diz
+         que os dois cairam na mesma troca. Sem ela seria um cadaver sem motivo; com ela, e a
+         mecanica sendo contada. */
+      const comDesempate = (m.golpes || []).some(g => g.x === 'desempate');
+      /* O REVIDE PODE SER UM GOLPE DE VARIOS TAPAS, e ai ele ocupa N passos -- mas e UM golpe so.
+         A tolerancia tem que cobrir o golpe INTEIRO, senao o 2o tapa e acusado de cadaver. E a
+         mesma ressalva que o `percorre` la de cima ja carrega, e ela aparece aqui porque a
+         Clefairy (Tapa Duplo, e do METRONOMO) cai muito nesta amostra. */
+      let caiuNoPasso = { p:-1, e:-1 }, passo = -1, ultimoTolerado = -1;
       S.sequenciaDoConfronto(m).forEach(g => {
+        passo++;
         if(!g.x && g.d > 0){
           const vida = g.q === 'p' ? hpP : hpE;
           if(vida <= 0){
             const terminouMorto = g.q === 'p' ? m.playerHpAfter <= 0 : m.enemyHpAfter <= 0;
-            if(terminouMorto){
+            const parDoMoribundo = comDesempate &&
+              (caiuNoPasso[g.q] === passo - 1 || (g.t > 1 && ultimoTolerado === passo - 1));
+            if(parDoMoribundo) ultimoTolerado = passo;
+            if(terminouMorto && !parDoMoribundo){
               cadaver++;
               if(exemplos.length < 3) exemplos.push(m.player + ' ' + m.playerHpBefore + '->' + m.playerHpAfter +
                 ' x ' + m.enemy + ' ' + m.enemyHpBefore + '->' + m.enemyHpAfter);
@@ -2813,8 +3012,10 @@ console.log('\n=== QUEM MORREU NAO ATACA DEPOIS DE MORRER ===');
         /* a cura e a explosao em si mexem a vida de QUEM AGE; todo o resto mexe a do outro lado */
         const noProprio = ehCura(g) || g.x === 'boomself';
         const alvoP = noProprio ? (g.q === 'p') : (g.q !== 'p');
-        if(alvoP) hpP = (g.hp != null) ? g.hp : Math.max(0, ehCura(g) ? hpP + g.d : hpP - g.d);
-        else      hpE = (g.hp != null) ? g.hp : Math.max(0, ehCura(g) ? hpE + g.d : hpE - g.d);
+        if(alvoP){ hpP = (g.hp != null) ? g.hp : Math.max(0, ehCura(g) ? hpP + g.d : hpP - g.d);
+                   if(hpP <= 0 && caiuNoPasso.p < 0) caiuNoPasso.p = passo; }
+        else      { hpE = (g.hp != null) ? g.hp : Math.max(0, ehCura(g) ? hpE + g.d : hpE - g.d);
+                   if(hpE <= 0 && caiuNoPasso.e < 0) caiuNoPasso.e = passo; }
       });
     });
   }

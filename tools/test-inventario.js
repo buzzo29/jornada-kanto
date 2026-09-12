@@ -18,6 +18,8 @@
  *
  *   node tools/test-inventario.js
  */
+const path = require('path');
+const raiz = path.join(__dirname, '..');
 const { createSandbox } = require('./game-sandbox');
 const S = createSandbox();
 
@@ -488,6 +490,134 @@ console.log('\n=== A MOCHILA VOLTA PRA ONDE VEIO ===');
   S.openInventario();
   S.sairDaMochila();
   ok('vindo da home, volta pra home', S.__getGame().screen === 'saveSelect', S.__getGame().screen);
+}
+console.log('\n=== O HM01: A PRIMEIRA MAQUINA OCULTA (11/09/2026) ===');
+{
+  /* Pedido assim: "o usuario so consegue o HM01 caso nas rotas dele ele tenha escolhido a rota do
+     SS Ane e ter vencido o Surge em no maximo 1 tentativa. Ai aparece a mensagem depois da luta
+     dizendo que ele obteve o HM01 e o HM01 vai para a mochila".
+     POR ENQUANTO ELE SO EXISTE -- nao equipa, nao destrava rota, nao faz nada. E de proposito:
+     primeiro a porta, depois o que tem atras dela. */
+  const g = S.__getGame();
+  const limpo = h => String(h).replace(/<!--[\s\S]*?-->/g, ' ').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+
+  /* AS DUAS PECAS DA CONDICAO JA EXISTIAM no jogo, e e isso que faz ela encaixar: o ss_anne e uma
+     das duas rotas do trecho 3, e o trecho 3 e justamente o do Surge. Se qualquer um dos dois
+     mudar de lugar, o HM01 fica inalcancavel EM SILENCIO -- por isso os dois sao cobrados aqui. */
+  ok('a rota do S.S. Anne existe, e no trecho do Surge',
+     !!S.ROUTE_MAP[2].find(r => r.id === S.HM01_ROTA), S.HM01_ROTA);
+  ok('e o ginasio daquele trecho e o Lt. Surge',
+     S.KANTO_GYMS[2].id === S.HM01_GINASIO, S.KANTO_GYMS[2].leaderName);
+
+  /* A CONDICAO, caso a caso. */
+  g.currentSaveSlot = 0; g.gymPath = ['kanto','kanto','kanto']; g.gymIndex = 2;
+  const cond = (rota, derrotas, trecho) => {
+    g.gymIndex = (trecho == null) ? 2 : trecho;
+    g.routeHistory = []; g.routeHistory[g.gymIndex] = rota;
+    g.losses = derrotas;
+    return S.conquistouHM01();
+  };
+  ok('S.S. Anne + zero derrotas: ganha', cond(S.HM01_ROTA, 0) === true);
+  /* "EM NO MAXIMO 1 TENTATIVA" = venceu de primeira, ou seja, nenhuma derrota naquele ginasio. */
+  ok('uma derrota ja tira o HM', cond(S.HM01_ROTA, 1) === false);
+  ok('e quatro derrotas tambem', cond(S.HM01_ROTA, 4) === false);
+  ok('a outra rota do trecho nao da o HM', cond('diglett_cave', 0) === false);
+  ok('e outro ginasio nao da, nem pela rota certa', cond(S.HM01_ROTA, 0, 1) === false);
+
+  /* DAR O HM e IDEMPOTENTE: quem ja tem nao ganha de novo, e e isso que impede a tela de vitoria
+     de anunciar o mesmo HM em toda vitoria dali pra frente. */
+  g.gymIndex = 2; g.hms = [];
+  ok('a primeira vez entra e avisa', S.darHM('hm01') === true && S.temHM('hm01'));
+  ok('e a segunda nao avisa de novo', S.darHM('hm01') === false);
+  ok('e a lista nao duplica', S.hmsDaConta().length === 1, JSON.stringify(S.hmsDaConta()));
+  ok('HM que nao existe nao entra', S.darHM('hm99') === false && S.hmsDaConta().length === 1);
+
+  /* ⚠️ A ORDEM DENTRO DO finishBattle E O QUE SUSTENTA TUDO: o `game.losses` so zera DEPOIS, na
+     distribuicao de niveis. Se a condicao fosse lida de la, ela acharia zero sempre e daria o HM a
+     quem perdeu quatro vezes. Isto e lido do CODIGO porque os casos acima chamam a funcao direto e
+     passariam com a ordem trocada. */
+  {
+    const txt = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
+    const i = txt.indexOf('function finishBattle()');
+    const fim = txt.indexOf('\nfunction ', i + 1);
+    const corpo = txt.slice(i, fim);
+    ok('o finishBattle decide o HM', corpo.indexOf('conquistouHM01()') > 0);
+    ok('e NAO zera o losses antes disso', corpo.indexOf('game.losses = 0') < 0,
+       'o zero do losses mora na distribuicao de niveis, e e por isso que a condicao cabe aqui');
+    /* O zero existe, so nao e aqui -- se ele sumir do jogo, a condicao vira sempre-verdadeira.
+       COM O PONTO E VIRGULA: sem ele a regex casa tambem com a MENCAO dentro do comentario que
+       explica esta mesma regra, e o teste acusa 2 onde ha 1. Foi o que aconteceu ao escreve-lo. */
+    ok('e o zero do losses continua existindo em outro lugar',
+       (txt.match(/game\.losses = 0;/g) || []).length === 1,
+       (txt.match(/game\.losses = 0;/g) || []).length + ' atribuicoes');
+  }
+
+  /* O ANUNCIO sai do `ganhouHmAgora`, nao de "tem HM na mochila": a tela e relida a cada render. */
+  g.ganhouHmAgora = 'hm01';
+  ok('a vitoria anuncia o HM', /HM01/.test(S.hmGanhoHtml()) && /mochila/.test(S.hmGanhoHtml()),
+     limpo(S.hmGanhoHtml()));
+  g.ganhouHmAgora = null;
+  ok('e sem HM ganho a vitoria nao diz nada', S.hmGanhoHtml() === '');
+
+  /* A TELA DE TMs E HMs. Dois estados, e nenhum deles pode ser uma tela muda. */
+  g.currentSaveSlot = 0; g.hms = ['hm01'];
+  ok('a tela lista o HM da conta', /HM01/.test(S.renderTmHm()), limpo(S.renderTmHm()).slice(0, 60));
+  /* SO O NOME E UMA LINHA CURTA (11/09/2026, a pedido): o paragrafo azul que dizia "ainda nao da
+     pra usar em nada" saiu, e o resumo virou uma legenda pequena. Com um item so na lista, a
+     explicacao ocupava mais espaco que a coisa explicada. */
+  ok('e nao traz mais o paragrafo azul por baixo', !/tmhm-obs/.test(S.renderTmHm()));
+  ok('o resumo fica na classe pequena', /tmhm-resumo/.test(S.renderTmHm()));
+  ok('e a tabela nao tem mais descricao', S.HMS.hm01.descricao === undefined);
+  g.hms = [];
+  ok('sem nenhum, ela diz ONDE achar', /S\.S\. Anne/.test(S.renderTmHm()) && /Surge/.test(S.renderTmHm()),
+     limpo(S.renderTmHm()).slice(0, 90));
+  /* A mochila e aberta da HOME tambem, sem save nenhum -- e agora ali TEM o que mostrar, porque os
+     HMs sao da CONTA e nao daquela jornada. */
+  g.currentSaveSlot = null; g.hms = ['hm01'];
+  ok('e sem save aberto ela mostra os mesmos, porque sao da conta',
+     /HM01/.test(S.renderTmHm()) && !/Abra um save/.test(S.renderTmHm()), limpo(S.renderTmHm()));
+  g.currentSaveSlot = 0;
+
+  /* O BOTAO na mochila, e a contagem nele. */
+  {
+    g.inventario = {}; g.rareCandies = 0; g.hms = [];
+    ok('a mochila tem o botao de TMs e HMs', /abrirTmHm\(\)/.test(S.renderInventario()));
+    ok('e sem nenhum ele nao mostra contagem', !/TMs e HMs \(/.test(S.renderInventario()));
+    g.hms = ['hm01'];
+    ok('com um, ele mostra (1)', /TMs e HMs \(1\)/.test(S.renderInventario()));
+  }
+
+  /* ⚠️ O HM E DA CONTA, NAO DO SAVE (11/09/2026, a pedido: "depois que qualquer save conseguiu ele,
+     ele fica permanentemente na conta do usuario"). Ele nasceu por save, e o pedido inverteu isso --
+     a consequencia aceita e que a condicao do HM01 virou um aro de UMA VEZ SO por conta.
+     Ele mora em users/{uid}.hms, escrito pelo CLIENTE: nao esta na trava de campos do
+     firestore.rules, que guarda os que dao poder de compra. E o mesmo nivel de confianca do
+     badgesEarned, que tambem e conquista e tambem e livre pro dono. */
+  {
+    const txt = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
+    /* A FORMA DO serializeGame, e nao so "hms: game.hms": a gravacao na CONTA usa as mesmas
+       palavras, e uma regex frouxa aqui falha em cima do proprio conserto. */
+    ok('o hms NAO e mais serializado no save', !/hms: game\.hms \|\| \[\]/.test(txt));
+    ok('nem lido do save', !/game\.hms = Array\.isArray\(data\.hms\)/.test(txt));
+    ok('ele e lido do documento da CONTA', /game\.hms = Array\.isArray\(d\.hms\)/.test(txt));
+    ok('e gravado no documento da CONTA', /set\(\{ hms: game\.hms \}/.test(txt));
+    /* ⚠️ E ELE PRECISA ESTAR NO CAMPOS_DA_CONTA: o resetGame tira um instantaneo desses campos e
+       restaura depois, entao um campo de conta que fique fora dele SOME ao abrir outro save --
+       silenciosamente, e so pra quem tem mais de um. */
+    ok('e esta no CAMPOS_DA_CONTA, senao sumiria ao trocar de save',
+       /'hms'\s+\/\/ as Máquinas Ocultas/.test(txt));
+    /* JORNADA NOVA NAO ZERA MAIS: era isso que o tornava por save. */
+    ok('e jornada nova NAO zera mais os HMs', !/game\.hms = \[\];\s+\/\/ HM é conquista/.test(txt));
+  }
+
+  /* ⚠️ O GOLPE `cut` NAO EXISTE NA TABELA, e nao e esquecimento: a base e aprendizado por NIVEL da
+     Gen 3, e HM ninguem aprende por nivel -- o gerador nunca o viu (mesmo caso do `surf`). E por
+     isso que o HM aqui e ITEM e nao golpe.
+     E ATENCAO AO NOME: o jogo JA tem um golpe chamado "Corte", o `slash`. Por isso o item se chama
+     "HM01 — Corte" e nao so "Corte". */
+  ok('o golpe cut NAO esta na tabela de golpes (a base e por nivel)', !S.GOLPES['cut']);
+  ok('e o "Corte" que o jogo ja tem e o slash', S.nomeDoAtaque('slash') === 'Corte');
+  ok('por isso o item carrega o prefixo HM01', /^HM01/.test(S.HMS.hm01.nome), S.HMS.hm01.nome);
 }
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
 process.exit(falhas ? 1 : 0);

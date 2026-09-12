@@ -2048,6 +2048,20 @@
      prêmio no jogo (o card do nome na home, o 1º lugar dos rankings). */
   .moeda-premio{ background:#fff8e0; border-color:var(--yellow-dark); text-align:center; }
   .moeda-premio p{ margin:0; font-size:.92rem; }
+  /* O PREMIO DE HM usa a mesma caixa do de moeda -- e a mesma leitura ("o que esta vitoria me
+     deu") -- num azul proprio so pra os dois nao se confundirem quando sairem juntos. */
+  .hm-premio{ background:#e7f0ff; border-color:#4c6ef5; text-align:center; }
+  .hm-premio p{ margin:0; font-size:.92rem; }
+  .hm-premio .hint-text{ margin-top:4px; }
+  .hm-premio-icone{ font-size:1.2rem; }
+  /* A LINHA DE TM/HM: icone a esquerda, nome e resumo empilhados -- a mesma forma da linha do
+     montador de time, que e onde o jogador ja aprendeu a ler "icone + duas linhas". */
+  .tmhm-linha{ display:flex; align-items:center; gap:10px; text-align:left; }
+  .tmhm-icone{ font-size:1.6rem; flex-shrink:0; }
+  .tmhm-texto{ display:flex; flex-direction:column; min-width:0; }
+  /* O resumo é deliberadamente pequeno: o nome é a informação, ele é a legenda. Era .7rem
+     (o .mon-sub da casa) e competia com o próprio nome numa lista de um item só. */
+  .tmhm-resumo{ font-size:.55rem; color:var(--muted); font-weight:600; margin-top:2px; }
   /* O + DA TELA DE ORDEM, embaixo do número da posição. Ele é o botão de item DAQUELA linha, e
      mora na coluna do número por medida, não por gosto: como bloco próprio na faixa do meio ele
      custa a largura dele MAIS o gap (50px), e a 320px o nome do pokémon precisa de 180px numa
@@ -3323,7 +3337,16 @@ const ROUTE_MAP = [
   [ // antes de Lt. Surge (Elétrico)
     { id:'diglett_cave', name:'Caverna Diglett', icon:'🕳️', types:['Ground'],
       rumor:'O chão inteiro se mexe. O counter do Surge mora aqui embaixo.',
-      pool:['diglett','sandshrew','ekans','cubone','spearow','mankey','phanpy','dunsparce','gligar'], rare:['dugtrio'] },
+      /* ⚠️ SEM RARO, e de propósito: o raro daqui era o DUGTRIO, e ele não cabe nesta rota.
+         O `EVOLVED_MIN_LEVEL` não deixa uma forma evoluída sair abaixo do nível em que ela
+         existiria, e o Diglett só evolui no 26 -- então o raro de uma rota de 13 a 17 saía
+         **Lv.26-30**, dez a dezessete níveis acima de tudo em volta. Reportado em 11/09/2026
+         ("tire o dugtrio level 28 que aparece nas rotas iniciais").
+         Não dá pra consertar o nível: abaixo do 26 o Dugtrio não existe. O que dava era pôr ele no
+         SEM_PISO_DE_NIVEL, e aquela lista é curta de propósito -- só entra quem é a forma COMUM da
+         linha e ganhou um bebê depois (Pikachu, Quagsire). O Dugtrio é o oposto disso.
+         O rumor continua verdadeiro sem ele: o counter do Surge é o DIGLETT, que está no pool. */
+      pool:['diglett','sandshrew','ekans','cubone','spearow','mankey','phanpy','dunsparce','gligar'], rare:[] },
     { id:'ss_anne', name:'S.S. Anne', icon:'🚢', types:['Normal','Water'],
       rumor:'Um navio de luxo ancorado no porto — dizem que tem gente rica embarcando com pokémons raros.',
       pool:['krabby','shellder','staryu','tentacool','goldeen','meowth','chinchou','mantine','igglybuff','porygon','smeargle'], rare:['lapras'] }
@@ -3387,7 +3410,10 @@ const JOHTO_ROUTE_MAP = [
       pool:['sentret','hoothoot','pidgey','ledyba','spinarak','caterpie','weedle','pichu','lickitung','snubbull'], rare:['mareep'] },
     { id:'dark_cave', name:'Caverna Escura', icon:'🕯️', types:['Rock','Ground'],
       rumor:'Sem lanterna não se enxerga nada — e tem coisa se arrastando no escuro.',
-      pool:['geodude','zubat','dunsparce','teddiursa','wooper','machop','onix','wobbuffet','dugtrio'], rare:['phanpy'] }
+      /* O DUGTRIO SAIU DAQUI em 11/09/2026, e este era o caso mais absurdo dos dois: numa rota de
+         nível 3 a 6 ele saía **Lv.26-29**, mais de vinte níveis acima de tudo em volta. Ver a nota
+         na Caverna Diglett. */
+      pool:['geodude','zubat','dunsparce','teddiursa','wooper','machop','onix','wobbuffet'], rare:['phanpy'] }
   ],
   [ // antes do Bugsy (Inseto) -- Rota 32 e a Caverna União
     { id:'route_32', name:'Rota 32', icon:'🎣', types:['Electric','Water'],
@@ -3967,7 +3993,8 @@ function freshGameDefaults(){
 
     // --- rotas / rival / equipe rocket / shiny (portados da versão do amigo) ---
     currentRoute:null,
-    routeHistory:[],       // rota escolhida por trecho -- só o mapa lê (ver registrarRotaEscolhida)
+    routeHistory:[],       // rota escolhida por trecho -- o mapa lê, e desde 11/09/2026 a condição do HM01 também
+    hms:[],                // as Máquinas Ocultas -- são da CONTA (ver darHM), e o resetGame as devolve
     routeCards:null,
     rivalName:'',
     rivalNameError:null,
@@ -5249,6 +5276,7 @@ async function loadPermanentUserData(){
     game.permanentShinyDex = [...permanentShiny];
     game.trainerName = d.trainerName || '';
     game.rivalNameDefault = d.rivalNameDefault || '';   // preenche a tela de nome do rival (ver nomeDoRivalPadrao)
+    game.hms = Array.isArray(d.hms) ? d.hms : [];       // as Máquinas Ocultas são da CONTA (ver darHM)
     game.accountEliteChampion = !!d.eliteChampion;
     game.leagueWinsTotal = d.leagueWinsTotal || 0;
     game.trainerBestStreak = d.trainerBestStreak || 0;
@@ -6801,6 +6829,16 @@ function tentarGolpeEspecial(active, enemy, rng, diario){
   const ordem = ativoPrimeiro ? [[active, enemy, true], [enemy, active, false]]
                               : [[enemy, active, false], [active, enemy, true]];
   for(const [quem, alvo, ehAtivo] of ordem){
+    /* ⚠️ QUEM ESTÁ DORMINDO NÃO USA GOLPE ESPECIAL. Os dois lados sorteiam nesta mesma volta, em
+       ordem de velocidade -- então o mais rápido podia adormecer o outro e o adormecido usava o
+       especial DELE logo em seguida, na mesma abertura.
+       Reportado com print em 11/09/2026: num Smoochum x Magnemite lia-se "Smoochum fez Magnemite
+       dormir com Canto" e, na linha de baixo, "Magnemite deixou Smoochum confuso com Supersom".
+       É a mesma regra que o golpe comum já tinha ("quem está dormindo não ataca nesta troca"), que
+       vale no doExchange e não alcançava este bloco -- ele roda ANTES da primeira troca.
+       O `_dormindoPor` é solto no fim da batalha (ver encerrarBatalha), então um valor de um
+       confronto antigo não trava o especial de ninguém. */
+    if(quem._dormindoPor > 0) continue;
     const especial = sorteiaGolpeEspecial(quem, rng);
     if(!especial) continue;
     const marca = ehAtivo ? 'p' : 'e';
@@ -7108,6 +7146,8 @@ function doExchange(active, enemy, rng, diario){
   const saiuNoPrimeiro = aplicarGolpes(first, counter);
   const faixaDoPrimeiro = first.hp <= 0 && faixaDeFoco(first, (first === active) ? 'p' : 'e');
   if(faixaDoPrimeiro){ first.hp = 1; aparaAFaixa(saiuNoPrimeiro); }
+  /* Os registros de cada lado, guardados pra o desempate achar a linha certa lá embaixo. */
+  let regsDoSegundo = null, regsDoPrimeiro = null;
   if(diario){
     /* O dano registrado é o que SAIU DE VERDADE da vida do alvo, não o número que a fórmula
        sorteou: um golpe de 101 num pokémon com 54 de HP tira 54. Gravar o valor cru fazia o log
@@ -7118,19 +7158,25 @@ function doExchange(active, enemy, rng, diario){
        viram uma linha só, somadas -- a mesma regra da drenagem, que tem duas entradas e uma linha.
        Os campos t (qual tapa) e tn (quantos ao todo) só existem quando há mais de um: assim o
        confronto comum grava exatamente o que gravava antes, e log velho continua se lendo igual. */
+    /* Ele DEVOLVE os registros que empurrou, e isso não é conveniência: o desempate precisa achar
+       depois a linha do sobrevivente, e achá-la por posição (`diario.length-2`) só funciona quando
+       cada lado gravou exatamente uma entrada. Com um golpe de VÁRIOS TAPAS, ou com a marca da
+       Faixa no meio, a contagem erra a linha -- ver o bloco do desempate, mais abaixo. */
     const gravar = (q, saiu, quemBate, marcaM) => {
+      const regs = [];
       saiu.forEach((h, i) => {
         const reg = { q: q, d: h.d, hp: h.hp, c: quemBate.lastCrit?1:0, m: marcaM, z: quemBate.lastMoveNulo?1:0 };
         if(saiu.length > 1){ reg.t = i + 1; reg.tn = saiu.length; }
-        diario.push(reg);
+        diario.push(reg); regs.push(reg);
       });
+      return regs;
     };
     if(!primeiroDormiu){
-      gravar(activeFirst?'p':'e', saiuNoSegundo, first, 0);
+      regsDoSegundo = gravar(activeFirst?'p':'e', saiuNoSegundo, first, 0);
       if(faixaDoSegundo) diario.push(marcaDaFaixa((second === active) ? 'p' : 'e', firstHpBefore));
     }
     if(!segundoDormiu){
-      gravar(activeFirst?'e':'p', saiuNoPrimeiro, second, segundoCaiu?1:0);
+      regsDoPrimeiro = gravar(activeFirst?'e':'p', saiuNoPrimeiro, second, segundoCaiu?1:0);
       if(faixaDoPrimeiro) diario.push(marcaDaFaixa((first === active) ? 'p' : 'e', second.hp));
     }
   }
@@ -7149,28 +7195,65 @@ function doExchange(active, enemy, rng, diario){
     const survivorHpBefore = (survivor === first) ? firstHpBefore : secondHpBefore;
     const pct = 0.05 + rng()*0.10;
     survivor.hp = Math.max(1, Math.min(survivorHpBefore, Math.round(survivor.maxHp * pct)));
-    /* O desempate ressuscita quem sobrou DEPOIS dos dois golpes. Sem corrigir o diário, a última
-       linha do log diria 0 de HP e a barra do mesmo cartão mostraria outro número.
-       QUANDO A CORREÇÃO ZERA O GOLPE, ele vira a linha do DESEMPATE em vez de um golpe de dano 0
-       que a tela joga fora. Era isso que estava por trás do relato de 09/09/2026 ("o Gyarados
-       atacou 2x seguidas"): o golpe que derrubou quem ressuscitou sumia, e os dois golpes do outro
-       lado ficavam colados, sem nada entre eles. Acontece quando o sobrevivente volta com a MESMA
-       vida com que entrou na troca -- 0,1% dos confrontos.
-       O SOBREVIVENTE é o ALVO desse golpe, então a frase não precisa de campo novo pra saber quem
-       ficou de pé: quem apanhou é quem sobrou.
-       O `dz` continua marcando a linha corrigida mesmo quando ela NÃO zera -- ali ela é um golpe
-       comum de dano menor, e se lê sozinha. */
+    /* ⚠️ O LOG MOSTRA A VERDADE: os golpes ficam com o dano que REALMENTE saiu, e a vida que a
+       morte súbita devolveu vira uma LINHA PRÓPRIA, com a barra SUBINDO -- do mesmo jeito que a
+       cura, a poção e a fúria já fazem.
+       ATÉ 11/09/2026 ERA O CONTRÁRIO: o motor APARAVA o golpe que derrubou o sobrevivente pra a
+       soma do log fechar com a barra do cartão, e isso escrevia na tela um número que NUNCA
+       ACONTECEU. Os três defeitos reportados nesta família saíam daí, e são o mesmo defeito:
+         - "o mesmo golpe tirou 154 e depois 2" (Porygon x Gastly) -- o 2 era o aparo;
+         - "o Magnemite tirou 175 e o Togepi ainda apareceu com 24" -- o aparo caindo na linha
+           errada num golpe de vários tapas;
+         - "a Bellsprout tomou 26 e morreu, mas apareceu que os dois caíram" (Bellsprout x Onix).
+           Nesse o Onix CAIU MESMO e voltou com 22 -- mas o aparo tinha baixado o golpe dela de 170
+           pra 148, e aí o log deixava de mostrar a queda. A frase virou a única coisa dizendo a
+           verdade, contra números que diziam outra coisa -- e o jogador acreditou nos números, com
+           razão.
+       Sem o aparo a conta fecha pelo outro lado, que é o lado honesto: o dano é o dano, o
+       sobrevivente ganha a vida de volta numa linha que se lê, e a soma bate com o cartão.
+       O `q` é o de QUEM DEU o golpe, que é a convenção da linha desde que ela nasceu -- o
+       sobrevivente é o ALVO dele, e é por isso que a frase não precisa de campo novo pra saber quem
+       ficou de pé. Log velho (onde a linha tem d=0) continua se lendo igual: a barra não sobe e a
+       frase é a mesma. */
     if(diario){
-      const linha = (survivor === second) ? diario[diario.length-2] : diario[diario.length-1];
-      const antes = (survivor === second) ? secondHpBefore : firstHpBefore;
-      if(linha){
-        linha.hp = survivor.hp; linha.d = antes - survivor.hp; linha.dz = 1;
-        if(!(linha.d > 0)) linha.x = 'desempate';
-      }
+      const ladoDoSobrevivente = (survivor === active) ? 'p' : 'e';
+      diario.push({ q: ladoDoSobrevivente === 'p' ? 'e' : 'p', d: survivor.hp, hp: survivor.hp,
+                    c:0, m:0, z:0, x:'desempate' });
     }
   }
 }
 
+/* O FIM DA BATALHA, e ele vale nos DOIS caminhos de saída -- a vitória E A DERROTA. Existir como
+   função é o ponto: enquanto era um bloco solto antes do `return` da vitória, o `return` da
+   derrota passava por cima dele e nada acusava.
+   1) A FÚRIA DEVOLVE O QUE EMPRESTOU. Ela mexe no TETO de vida, e o teto é um número GRAVADO na
+      instância -- não é lido de uma função como os outros cinco atributos. Sem devolver, um Tauros
+      que entrou em fúria três vezes saía da luta com o teto +30, e a barra dele na tela de time
+      mudava de tamanho sozinha. Pior: o `_furia` é zerado no COMEÇO da batalha seguinte, então o
+      teto inflado deixava de ter de onde ser recalculado e ficava errado pra valer.
+      Medido em 11/09/2026, quando a derrota ainda escapava: 983 pokémon de 3.000 saíam de uma
+      derrota com o teto errado, contra ZERO nas vitórias.
+      A devolução é EXATA: sai o mesmo número que entrou, do teto e da vida atual. Quem já caiu fica
+      em 0 -- devolver vida a um pokémon desmaiado o ressuscitaria.
+   2) OS MARCADORES DE CONFRONTO SÃO SOLTOS. `_especialContra` e `_anulado.contra` guardam uma
+      REFERÊNCIA ao pokémon adversário: enquanto não eram soltos, cada membro do time segurava um
+      time inimigo inteiro vivo na memória depois da luta -- e, quando o adversário apontava de
+      volta, o par fechava um CICLO que estourava a pilha do salvamento (ver limparParaFirestore).
+      Medido: os campos sobravam em 100% das batalhas e o ciclo se fechava em 3% delas. */
+function encerrarBatalha(team, inimigos){
+  (team || []).concat(inimigos || []).forEach(p => {
+    if(!p) return;
+    if(p._furia){
+      const emprestado = FURIA_BONUS * p._furia;
+      p._furia = 0;
+      p.maxHp = calcMaxHp(p);
+      p.hp = p.hp > 0 ? Math.max(1, Math.min(p.maxHp, p.hp - emprestado)) : 0;
+    }
+    p._especialContra = null;
+    p._anulado = null;
+    p._dormindoPor = 0;
+  });
+}
 function buildResult(team, brockTeam, win, matchups){
   return {
     win,
@@ -7232,6 +7315,7 @@ function simulateGymBattle(team, brockTeam, rng, opts){
     while(!enemyDefeated){
       const alive = team.filter(p=>p.hp>0);
       if(alive.length===0){
+        encerrarBatalha(team, brockTeam);
         const defeatResult = buildResult(team, brockTeam, false, matchups);
         defeatResult.playerBestStreak = maxPlayerStreak;
         return defeatResult;
@@ -7334,20 +7418,7 @@ function simulateGymBattle(team, brockTeam, rng, opts){
      dois times zerarem no mesmo instante (o doExchange normal sempre deixa um de pé), e sem esta
      linha o jogador perderia justamente a batalha que ele decidiu explodindo. */
   const teamStillAlive = team.some(p=>p.hp>0) || explosaoDoAtivo === true;
-  /* A FÚRIA DEVOLVE O QUE EMPRESTOU quando a batalha acaba, e isso não é detalhe: ela mexe no TETO
-     de vida, e o teto é um número GRAVADO na instância -- não é lido de uma função como os outros
-     cinco atributos. Sem devolver, um Tauros que entrou em fúria três vezes saía da luta com o teto
-     +30 pra sempre, e a barra dele na tela de time mudaria de tamanho sozinha. É o mesmo cuidado
-     que o buff de terreno já tinha (ver o CLAUDE.md), e a devolução é EXATA: sai o mesmo número que
-     entrou, do teto e da vida atual, então o pokémon volta com a vida que teria sem a fúria.
-     Quem já caiu fica em 0 -- devolver vida a um pokémon desmaiado o ressuscitaria. */
-  team.concat(brockTeam).forEach(p => {
-    if(!p || !p._furia) return;
-    const emprestado = FURIA_BONUS * p._furia;
-    p._furia = 0;
-    p.maxHp = calcMaxHp(p);
-    p.hp = p.hp > 0 ? Math.max(1, Math.min(p.maxHp, p.hp - emprestado)) : 0;
-  });
+  encerrarBatalha(team, brockTeam);
   const result = buildResult(team, brockTeam, teamStillAlive, matchups);
   result.playerBestStreak = maxPlayerStreak;
   return result;
@@ -9450,6 +9521,22 @@ function animatePartialHpBars(){
 /* A animação lê a MESMA sequência do log (sequenciaDoConfronto) e só traduz o vocabulário:
    lá 'q' é quem BATE, aqui 'side' é quem APANHA. Enquanto as duas listas eram montadas em
    separado, o jogador via 3 golpes na tela e lia 4 linhas no log. */
+/* QUANTOS PASSOS DA ANIMAÇÃO A FRASE DE CADA ABERTURA OCUPA. Ela é lida em DOIS lugares -- a
+   janela da frase (avisoDoConfronto) e a pausa de leitura (aqui embaixo) --, e por isso mora no
+   escopo do arquivo: duas cópias divergiriam no primeiro especial novo, que foi exatamente como a
+   anulação nasceu sem entrada e ficou com a frase valendo pra SEMPRE.
+   A cura e a poção mexem UMA barra e valem 1. A drenagem mexe as DUAS e vale 2. A fúria, a
+   confusão e a Fúria do Dragão valem 2 porque a frase tem que sobreviver ao movimento que ela
+   anuncia -- com 1 ela sumia justamente no passo que existe pra explicar. O sono e a chuva valem 2
+   porque o registro deles entra na sequência com dano ZERO (barra parada): a frase precisa cobrir o
+   passo delas MAIS o seguinte, senão apareceria e sumiria no mesmo quadro.
+   A ANULAÇÃO E O DESPERTAR não mexem barra nenhuma e mesmo assim são ABERTURA: valem 1, ou seja a
+   frase é lida na pausa que antecede o confronto e cede assim que o primeiro golpe sai. Foi a falta
+   da entrada do `disable` que fez a frase dele ocupar a linha a luta INTEIRA (reportado num
+   Venusaur x Muk).
+   A AUTODESTRUIÇÃO fica FORA da tabela de propósito: ali o confronto INTEIRO é aquilo (os dois caem
+   no mesmo golpe e não há luta depois), e a frase acompanha até o fim. */
+const passosDaAbertura = { recover:1, pocao:1, absorb:2, disable:1, semSono:1, sono:2, furia:2, confusao:2, furiadragao:2, chuva:2 };
 function buildAnimatedHitSequence(m){
   const seq = sequenciaDoConfronto(m).map(g => {
     /* Na lista 'q' é quem BATE e 'side' é quem APANHA -- por isso a inversão. A CURA é o contrário
@@ -9463,10 +9550,15 @@ function buildAnimatedHitSequence(m){
        explica. Mas ela É um passo -- sem ele, a animação pularia direto do golpe que ia matar pro
        revide, e a pausa que dá tempo de ler a mensagem não existiria. */
     if(g.x === 'faixa') return { side: g.q === 'p' ? 'player' : 'enemy', amount: 0, faixa: true, q: g.q, x: g.x };
-    /* O DESEMPATE também não move barra: a vida do sobrevivente já é a que a linha anterior deixou.
-       Ele É um passo pelo mesmo motivo da Faixa -- sem ele a animação pula do golpe que ia matar
-       direto pro seguinte, e os dois golpes do mesmo lado ficam colados. */
-    if(g.x === 'desempate') return { side: g.q === 'p' ? 'enemy' : 'player', amount: 0, faixa: true, q: g.q, x: g.x };
+    /* O DESEMPATE FAZ A BARRA DO SOBREVIVENTE SUBIR, e é a única linha do log que devolve vida sem
+       ser uma cura. O `amount` NEGATIVO é o que faz isso (os laços fazem `hp - amount`), a mesma
+       mecânica da cura e da fúria; o `side` continua sendo o do ALVO do golpe, que É o sobrevivente
+       -- por isso a inversão do `q` fica como estava.
+       Ele ainda é marcado como `faixa`: é dela que vem o segundo de leitura, e a frase precisa
+       sobreviver ao movimento que anuncia.
+       Log VELHO, gravado quando o motor aparava o golpe em vez de gravar a devolução, tem `d` zero
+       aqui -- e aí a barra não sobe e o passo é exatamente o que era antes. */
+    if(g.x === 'desempate') return { side: g.q === 'p' ? 'enemy' : 'player', amount: -(g.d || 0), faixa: true, q: g.q, x: g.x };
     /* q = quem BATE e x = o que o passo é (vazio quando é golpe comum). Os dois vêm do diário sem
        tradução porque é deles que sai a frase "Fulano usou GOLPE" -- ver fraseDoGolpeUsado. */
     /* t/tn viajam junto pelo mesmo motivo do q e do x: é deles que sai o "1x" da frase. Ausentes
@@ -9487,7 +9579,13 @@ function buildAnimatedHitSequence(m){
      pra frente, a linha do sono deixa de ser o primeiro passo, e aí ela não pega mais a pausa que
      o `pausaDoEspecial` dá antes do confronto. Sem esta marca a frase apareceria e sumiria no
      mesmo quadro. No índice 0 ela não é marcada: ali a pausa de abertura já cobre. */
-  seq.forEach((h, i) => { if(i > 0 && h.amount === 0 && h.x && !h.faixa) h.leitura = true; });
+  /* ⚠️ TODA ABERTURA FORA DO PASSO 0 GANHA O SEGUNDO DE LEITURA, mexa ela barra ou não.
+     A regra olhava só `amount === 0`, então uma segunda abertura que MOVE barra (confusão,
+     drenagem, Fúria do Dragão) não ganhava pausa nenhuma: a primeira frase parava 1s e a segunda
+     passava junto com a barra, rápido demais pra ler. Reportado em 11/09/2026.
+     No índice 0 não se marca: ali o `pausaDoEspecial` já cobre, e marcar seria pausa em cima de
+     pausa. */
+  seq.forEach((h, i) => { if(i > 0 && h.x && !h.faixa && (passosDaAbertura[h.x] || h.amount === 0)) h.leitura = true; });
   seq.forEach((h, i) => { if(i > 0 && (seq[i-1].faixa || seq[i-1].leitura)) h.posFaixa = true; });
   return seq;
 }
@@ -9616,6 +9714,11 @@ function finishBattle(){
   evoluirQuemSubiuNoDesmaio(subiram);
   if(result.win){
     game.badgesEarned.push(gymAtual().badge);
+    /* O HM01 É DECIDIDO AQUI, e o lugar não é escolha de estilo: o `game.losses` só zera depois,
+       na distribuição de níveis. Lido de lá ele seria zero sempre, e o HM sairia pra quem perdeu
+       quatro vezes. O `ganhouHmAgora` é o que a tela de vitória lê pra anunciar -- e ele guarda o
+       ID, não um booleano, porque o próximo HM vai passar por esta mesma linha. */
+    game.ganhouHmAgora = (conquistouHM01() && darHM('hm01')) ? 'hm01' : null;
     // 1ª insígnia = a jornada saiu do papel; aquele slot ganha direito a um sorteio novo de
     // iniciais E a encontros novos na PRÓXIMA vez que for recriado (ver encerrarTentativaDoSlot)
     if(game.badgesEarned.length === 1) encerrarTentativaDoSlot(game.currentSaveSlot);
@@ -12785,7 +12888,8 @@ const CAMPOS_DA_CONTA = [
   'shinyBonusExpiresAt','shinyPityCount','specialties','specialtyCounts','rareCandies','moedas',
   'inventario','equipados',
   'mewtwoLoanActive','mewtwoLoanCooldownUntil','mewtwoLoanUnlocked','mewtwoLoanReadyToClaim',
-  'userTest','neighborhoodGymLocation','startersSorteados','geracaoDosSlots','bossTop10','bossKiller'
+  'userTest','neighborhoodGymLocation','startersSorteados','geracaoDosSlots','bossTop10','bossKiller',
+  'hms'   // as Máquinas Ocultas são da CONTA, não do save -- ver darHM
 ];
 function snapshotDaConta(){
   const o = {};
@@ -13407,6 +13511,22 @@ function limparParaFirestore(valor, caminho, achados){
   if(valor && typeof valor === 'object'){
     const saida = {};
     for(const k of Object.keys(valor)){
+      /* ⚠️ CAMPO COM _ NA FRENTE É RASCUNHO DE BATALHA E NÃO VAI PRO SAVE, e esta linha existe
+         porque a falta dela custou progresso de jogador de verdade (11/09/2026).
+         O motor pendura marcadores na instância do pokémon: `_especialContra` (com quem foi o
+         último confronto), `_anulado` (qual tipo a anulação tirou, e CONTRA QUEM), `_furia` e
+         `_itemGastoAnotado`. Os dois primeiros guardam uma REFERÊNCIA ao pokémon adversário --
+         e o adversário guarda uma de volta. Isso fecha um CICLO
+         (`team[3]._especialContra -> _anulado.contra -> team[3]`), e esta função é recursiva:
+         ela descia pra sempre e morria com `Maximum call stack size exceeded`.
+         Medido: os campos sobram em 100% das batalhas e o ciclo se fecha em 3% delas -- ou seja,
+         mais ou menos uma batalha em trinta perdia o save inteiro, com a tarja vermelha na tela.
+         Foi relatado por vários jogadores.
+         O corte é AQUI, na camada que decide o que vai pro Firestore, e não só na limpeza de fim de
+         batalha (que também foi feita): o próximo marcador de motor nasce protegido, em vez de
+         reabrir isto sem ninguém ver. E ele leva junto o custo que nem dava erro -- sem o corte,
+         CADA membro do time carregava um pokémon adversário INTEIRO pro documento do save. */
+      if(k.charAt(0) === '_') continue;
       const sub = caminho ? caminho+'.'+k : k;
       const limpo = limparParaFirestore(valor[k], sub, achados);
       if(limpo === undefined){ achados.push(sub); continue; }
@@ -13557,6 +13677,7 @@ function applySavedState(data){
   game.currentRoute = data.currentRoute || null;
   // save antigo não tem histórico: começa vazio e o mapa desenha só os trechos daqui pra frente
   game.routeHistory = Array.isArray(data.routeHistory) ? data.routeHistory : [];
+  /* Save anterior ao HM01 não tem o campo: começa vazio, que é o que ele era. */
   game.rivalName = data.rivalName || RIVAL_NAME_DEFAULT;
   game.rivalPool = data.rivalPool || [];
   game.rivalStarterId = data.rivalStarterId || null;
@@ -15729,6 +15850,19 @@ function passosVisiveis(golpes, m){
      é o outro lado. Ele é o único que ganha o tratamento do bloco abaixo. */
   const oSono = (golpes || []).find(g => g.x === 'sono');
   const adormecido = oSono ? outroLado(oSono.q) : null;
+  /* ⚠️ REVIDE LETAL NÃO SOBE, e essa é a condição que o `terminouVivo` deixou de cobrir.
+     As duas licenças abaixo (o moribundo indo pro começo no caminho do sono, e indo pra depois das
+     aberturas na regra geral) existem porque o revide é do MESMO instante do golpe que o derrubou --
+     a ordem ali é apresentação. Elas já pediam que QUEM MATOU terminasse VIVO, justamente pra ele
+     não aparecer batendo depois de ter chegado a zero.
+     Só que o DESEMPATE quebra essa conta: com ele, quem morreu na troca termina VIVO -- caiu e
+     voltou. Um revide LETAL empurrado pra frente fica então ANTES dos golpes do pokémon que ele
+     matou, e é esse pokémon que passa a atacar de barra zerada.
+     Quem responde "foi letal?" é o próprio diário: o `hp` do registro é a vida do ALVO depois do
+     golpe. Medido: 3 casos em 10.556 confrontos, todos com sono.
+     Isto não é novo -- o APARO do desempate escondia, porque ele segurava a barra do sobrevivente
+     acima de zero. Apareceu em 11/09/2026, quando o aparo saiu e o log passou a mostrar a queda. */
+  const revideLetal = (grupo) => { const u = grupo[grupo.length - 1]; return !!u && (u.hp || 0) <= 0; };
   /* OS TAPAS DE UM GOLPE MÚLTIPLO SÃO UM LANCE SÓ, e por isso se movem juntos: o reordenamento do
      moribundo empurra o golpe inteiro pra antes do que o derrubou, não o 3º tapa sozinho. Por isso
      a lista é agrupada ANTES de reordenar e desagrupada no fim -- reordenar entrada a entrada
@@ -15743,6 +15877,23 @@ function passosVisiveis(golpes, m){
   for(const grupo of grupos){
     const g = grupo[0];
     if(!g.m || terminouVivo(g.q)){ saidaG.push(grupo); continue; }
+    /* ⚠️ REVIDE LETAL FICA ONDE ESTÁ -- não sobe, e também não anda um lugar pra trás.
+       As duas licenças abaixo existem porque o revide é do MESMO instante do golpe que o derrubou:
+       a ordem ali é apresentação, e elas escolhem a leitura "quem morreu bateu primeiro".
+       Quando o revide MATA o outro lado, nenhuma das duas serve:
+         - subindo, ele fica ANTES dos golpes do pokémon que ele matou, e é esse pokémon que passa
+           a atacar de barra zerada (3 casos em 10.556, todos com sono);
+         - andando um lugar pra trás, ele cola dois golpes do mesmo lado, que é a forma reportada
+           como defeito três vezes neste log (281 casos em 13.162).
+       E não precisa de nenhuma: a ordem CRUA do diário já é a legível. Ali o revide vem logo depois
+       do golpe que derrubou quem o deu, o que é exatamente o PAR DO MORIBUNDO -- quem caiu no passo
+       imediatamente anterior pode bater, porque os dois golpes são do mesmo instante. Antes do
+       revide está o golpe do outro lado, então também não há colagem.
+       Quem responde "foi letal?" é o próprio diário: o `hp` do registro é a vida do ALVO depois do
+       golpe. Isto não é novo -- o APARO do desempate escondia, porque segurava a barra do
+       sobrevivente acima de zero. Apareceu em 11/09/2026, quando o aparo saiu e o log passou a
+       mostrar a queda de verdade. */
+    if(revideLetal(grupo)){ saidaG.push(grupo); continue; }
     /* GOLPE MORIBUNDO -- quem cai ainda revida, na mesma troca. Ele entra ANTES do golpe que o
        derrubou: assim ninguém aparece atacando depois de já ter caído, e a leitura fica na ordem
        que faz sentido -- quem morreu bateu primeiro, o outro respondeu e matou.
@@ -15760,10 +15911,38 @@ function passosVisiveis(golpes, m){
        SÓ VALE SE QUEM O MATOU TERMINAR VIVO: numa troca em que os dois caem, o revide na frente
        deixaria o outro batendo depois de ter chegado a zero -- o defeito que esta função existe
        pra evitar. */
+    /* E ELE SOBE TAMBÉM QUANDO A REGRA GERAL COLARIA DOIS GOLPES DO MESMO LADO.
+       Num confronto de 4 golpes (p, e, p-mata, e-revide) pôr o revide um lugar atrás produz
+       "p, e, e, p": o adversário aparece batendo duas vezes seguidas sem nada entre os dois, que é
+       a forma que já foi reportada como defeito três vezes neste log. Mais acima ele não cola em
+       ninguém e o par (revide, golpe que matou) continua junto e na ordem certa.
+       Isto só ficou visível quando o TETO_GOLPES foi a 4 (11/09/2026): com 3, todo confronto desse
+       formato caía na reconstrução, que não conhece moribundo nenhum. Medido: 12,6% de TODOS os
+       confrontos, e o conserto os leva a zero.
+       LINHA DE ABERTURA NÃO COLA EM NADA: ela separa os dois golpes na tela, então os dois lados
+       desta conta só olham GOLPE. Contando a abertura como golpe, um confronto que abre com a
+       confusão do mesmo lado do moribundo caía fora da regra à toa -- eram 0,77% dos confrontos. */
+    const anterior = saidaG[saidaG.length - 1];
+    const colaria = !!anterior && !anterior[0].x && anterior[0].q === g.q;
     if(g.q === adormecido && terminouVivo(outroLado(g.q))){
       saidaG.unshift(grupo);
       if(derrubou) saidaG.push(derrubou);
       continue;
+    }
+    if(colaria && terminouVivo(outroLado(g.q))){
+      /* ⚠️ DEPOIS DAS ABERTURAS, e nunca no índice 0 como o sono: a cura, a poção, a drenagem e a
+         fúria MOVEM BARRA e são o primeiro passo da animação por desenho -- a frase de cada uma
+         anuncia a barra que vai andar logo em seguida. Um golpe empurrado na frente delas faz a
+         barra subir depois do golpe que deveria explicá-la, e foi o que este teste pegou.
+         (O sono é a exceção porque a linha dele não move barra nenhuma, e porque a sequência de
+         golpes que ele compra tem que ficar inteira -- ver o bloco acima.) */
+      let pos = 0; while(pos < saidaG.length && saidaG[pos][0].x) pos++;
+      const seguinte = saidaG[pos];
+      if(!seguinte || seguinte[0].q !== g.q){
+        saidaG.splice(pos, 0, grupo);
+        if(derrubou) saidaG.push(derrubou);
+        continue;
+      }
     }
     saidaG.push(grupo);
     if(derrubou) saidaG.push(derrubou);
@@ -15783,7 +15962,7 @@ function passosVisiveis(golpes, m){
    na reconstrução foi a origem dos dois defeitos reportados naquele mesmo dia ("um golpe dele, dois
    dela"). Então elas entram REAIS, uma linha cada, e só o RESTO da luta é reconstruído -- ou seja,
    o confronto com sono fica em quatro ou cinco linhas de golpe, não em três nem em oito. */
-const TETO_GOLPES = 3;
+const TETO_GOLPES = 4;
 function sequenciaDoConfronto(m){
   /* O Disable não é um golpe na tela: não tira HP e a luta continua depois dele -- viraria um passo
      de dano 0 na animação. A frase dele é montada à parte, no passosHtml.
@@ -16226,11 +16405,16 @@ function fraseDoEspecial(g, quem, alvo, op){
   }
   if(g.x === 'desempate'){
     /* OS DOIS CAÍRAM na mesma troca, e o desempate pôs um de volta de pé. É a única linha do log
-       que fala de quem NÃO apanhou: o sobrevivente é justamente o ALVO do golpe, que foi aparado a
-       zero porque a vida voltou.
-       Sem ela esse golpe some da tela e o outro lado aparece atacando duas vezes seguidas -- foi
-       assim que o defeito foi reportado (Raticate x Gyarados, 09/09/2026). */
-    return 'os dois caíram na mesma troca, e ' + alvo + ' ficou de pé';
+       que fala de quem NÃO apanhou: o sobrevivente é justamente o ALVO do golpe.
+       Sem ela o log ficava sem nada explicando por que um pokémon que chegou a zero continua na
+       luta -- foi assim que o defeito foi reportado (Raticate x Gyarados, 09/09/2026).
+       ⚠️ ELA DIZ COM QUANTO ELE FICOU DE PÉ, e esse número é o que a barra acabou de mostrar
+       subindo. Sem ele a frase afirmava uma coisa (os dois caíram) que os números da tela
+       contradiziam, porque o motor aparava o golpe em vez de gravar a devolução -- reportado num
+       Bellsprout x Onix em 11/09/2026, e é ele que fechou este assunto.
+       Log VELHO não tem o número (a linha era gravada com d=0) e cai na frase curta de antes. */
+    return 'os dois caíram na mesma troca, e ' + alvo + ' ficou de pé' +
+           (g.d > 0 ? ' com ' + g.d + ' de HP' : '');
   }
   if(g.x === 'disable'){
     /* Nomeia o golpe ANULADO, não a anulação: o que interessa é o que o pokémon PERDEU. O motor
@@ -16553,8 +16737,15 @@ function avisoDoConfronto(m, passo){
   if(passo != null){
     /* O DESEMPATE entra pela MESMA porta da Faixa: os dois são avisos do MEIO da luta, aparecem no
        passo seguinte ao deles e saem no próximo. */
-    const iFaixa = seq.findIndex(g => g.x === 'faixa' || g.x === 'desempate');
-    if(iFaixa >= 0 && passo === iFaixa + 1){
+    /* ⚠️ A MARCA É ACHADA PELO PASSO, e não com um `findIndex` do primeiro que aparecer.
+       Um confronto pode ter as DUAS (a Faixa segura um golpe, e mais tarde os dois caem na mesma
+       troca), e o `findIndex` devolvia sempre a primeira -- a segunda ficava com "Trocando
+       golpes..." no passo dela, com 1s de pausa e nada escrito. Ficou frequente em 11/09/2026,
+       quando a linha do desempate passou a sair em todo aparo e não só quando ele zera o golpe.
+       `passo - 1` é o índice porque os laços fazem `HitStep++` antes de pintar. */
+    const iFaixa = (passo == null) ? -1 : passo - 1;
+    const marca = iFaixa >= 0 && seq[iFaixa] && (seq[iFaixa].x === 'faixa' || seq[iFaixa].x === 'desempate');
+    if(marca){
       const f = seq[iFaixa];
       const nP = escapeHtmlSafe(m.player || ''), nE = escapeHtmlSafe(m.enemy || '');
       const doJ = f.q === 'p';
@@ -16599,7 +16790,10 @@ function avisoDoConfronto(m, passo){
   /* A CHUVA VALE 2, como o sono, e pelo MESMO motivo: ela É um passo da animação com dano ZERO
      (barra parada), então a frase precisa cobrir o passo 0 -- a pausa de leitura de 1s -- MAIS o
      passo dela. Com 1 ela sumiria antes de a pausa acabar. */
-  const passosDaAbertura = { recover:1, pocao:1, absorb:2, disable:1, semSono:1, sono:2, furia:2, confusao:2, furiadragao:2, chuva:2 };
+  /* A tabela mora no escopo do arquivo (logo acima de buildAnimatedHitSequence): ela decide a
+     JANELA da frase aqui e a PAUSA de leitura lá, e duas cópias divergiriam no primeiro especial
+     novo -- que é exatamente como a anulação nasceu sem entrada e ficou com a frase valendo pra
+     sempre. */
   /* OS PASSOS SÃO CONTADOS A PARTIR DE ONDE A ABERTURA ESTÁ, não do começo do confronto -- e isso
      passou a importar em 10/09/2026, quando o moribundo de quem dormiu foi pra frente da linha do
      sono. Com a contagem absoluta a frase do sono aparecia enquanto o adormecido dava o revide e
@@ -16610,18 +16804,30 @@ function avisoDoConfronto(m, passo){
     const i = seq.findIndex(h => h.x === x.x && h.q === x.q);
     return i < 0 ? 0 : i;
   };
-  const g = especiais.find(x => {
-    const n = passosDaAbertura[x.x];
-    if(!n) return true;          // autodestruição: não está na tabela, e a frase vale o confronto inteiro
-    if(passo == null) return true;   // chamada sem passo: é o pausaDoEspecial decidindo a pausa
+  /* ⚠️ O `passo` QUE CHEGA AQUI É O ÍNDICE DA SEQUÊNCIA MAIS UM: os laços de revelação fazem
+     `HitStep++` ANTES de pintar a linha, então `passo === k + 1` significa "animando seq[k]", e
+     `passo === 0` é o desenho que antecede a animação -- o da pausa de leitura.
+     É por isso que a janela de uma abertura fora do índice 0 começa em `i + 1`: esse É o passo
+     dela. Ler `i` como o passo próprio parece certo e não é, e o erro fica invisível porque quase
+     toda abertura está no índice 0.
+     ⚠️ E QUEM MANDA É A ÚLTIMA ABERTURA QUE COMEÇOU, não a primeira do diário. Hoje as janelas de
+     duas aberturas nunca se sobrepõem (nenhuma passa de 2 passos), então isto não muda um pixel --
+     está aqui pra que o dia em que uma abertura valer 3 passos não faça a segunda frase sumir em
+     silêncio, que é o defeito que o `.find` produziria. */
+  let g = null, melhor = -1;
+  for(const x of especiais){
+    if(passo == null){ if(!g) g = x; continue; }   // pausaDoEspecial: basta existir alguma
     const i = ondeEstaNaSequencia(x);
-    /* O PASSO 0 é a PAUSA de leitura, e ela só existe no começo do confronto. Uma abertura que
-       esteja no índice 0 continua ganhando essa pausa -- é a conta de sempre, intocada. Uma que
-       venha depois (o sono, quando o moribundo de quem dormiu foi pra frente) NÃO pode se apropriar
-       do passo anterior: ali corre um golpe de verdade, com nome próprio pra mostrar. */
+    const n = passosDaAbertura[x.x];
+    /* Sem entrada na tabela é a AUTODESTRUIÇÃO: ali o confronto INTEIRO é aquilo, e a frase vai
+       até o fim -- por isso ela não tem passo de saída. */
+    if(!n){ if(i >= melhor){ melhor = i; g = x; } continue; }
+    /* O PASSO 0 é a pausa de leitura, e ela só existe no começo do confronto: uma abertura no
+       índice 0 a ganha, uma que venha depois não pode se apropriar do passo anterior -- ali corre
+       um golpe de verdade, com nome próprio pra mostrar. */
     const inicio = (i === 0) ? 0 : i + 1;
-    return passo >= inicio && passo < i + n;
-  });
+    if(passo >= inicio && passo < i + n && i >= melhor){ melhor = i; g = x; }
+  }
   if(!g) return '';
   const nomeP = escapeHtmlSafe(m.player || ''), nomeE = escapeHtmlSafe(m.enemy || '');
   const doJogador = g.q === 'p';
@@ -16835,6 +17041,88 @@ function renderBattling(){
 /* A linha de moeda da tela de vitória. Só aparece quando ALGO foi pago: a chamada é assíncrona, e
    até ela voltar o número é 0 -- anunciar "+0 moedas" enquanto a rede responde seria pior que
    esperar meio segundo pela linha certa. */
+/* OS HMs (11/09/2026). Começam pelo HM01, e por enquanto eles só EXISTEM: entram na mochila e não
+   fazem nada. A mecânica que eles vão destravar (rotas com cadeado) vem depois, de propósito --
+   primeiro a porta, depois o que tem atrás dela.
+   ⚠️ ELES SÃO POR SAVE, e isso é decisão, não descuido. Todo o resto da mochila é da CONTA
+   (`inventario`, escrito pelo servidor), mas um HM é conquista DAQUELA jornada: a condição do HM01
+   é ter escolhido uma rota específica e ter vencido um líder específico sem perder. Guardado na
+   conta, bastaria uma jornada de sorte pra o cadeado nunca mais existir em save nenhum -- e aí a
+   feature inteira vira um aro de uma vez só.
+   O PRECEDENTE É O `badgesEarned`: insígnia também é conquista da jornada, também mora no save,
+   também é livre pro dono, e ninguém protege. HM é da mesma família. Se um dia o cadeado precisar
+   de trava de verdade (quando ele valer alguma coisa), o caminho está pronto: é o mesmo
+   `rerollsPorSave`, no documento da conta com chave slot:geração.
+   ⚠️ O GOLPE `cut` NÃO EXISTE NA TABELA DE GOLPES, e não é esquecimento: a base é aprendizado por
+   NÍVEL da Gen 3, e HM ninguém aprende por nível -- o gerador nunca o viu (é o mesmo motivo do
+   `surf`, que o teste do Sketch já tinha encontrado). Por isso o HM aqui é um ITEM, não um golpe, e
+   o campo `golpe` fica de fora: ele não tem o que apontar.
+   E ATENÇÃO AO NOME: o jogo JÁ tem um golpe chamado "Corte" -- o `slash` (Normal, 70), um dos oito
+   de crítico alto, que 22 espécies aprendem. Por isso o item se chama "HM01 — Corte" e não só
+   "Corte": no dia em que os dois aparecerem na mesma tela, o prefixo é o que os separa. */
+const HMS = {
+  hm01: {
+    nome: 'HM01 — Corte',
+    icone: '📀',
+    resumo: 'Abre caminho onde a mata fecha.',
+    comoGanhar: 'Embarcando no S.S. Anne e vencendo o Lt. Surge de primeira, sem perder nenhuma vez.'
+  }
+};
+/* ⚠️ OS HMs SÃO DA CONTA, NÃO DO SAVE (11/09/2026, a pedido: "depois que qualquer save conseguiu
+   ele, ele fica permanentemente na conta do usuário"). Eles nasceram por save, e a razão escrita
+   aqui era que a condição é uma conquista DAQUELA jornada -- o pedido decidiu o contrário, e a
+   consequência é a que se espera: a condição do HM01 é um aro de UMA VEZ SÓ por conta, não por
+   jornada. Ganhou uma vez, todo save novo já nasce com ele.
+   Ele mora em `users/{uid}.hms`, ao lado do `rivalNameDefault`, e é gravado pelo CLIENTE: não
+   está na trava de campos do firestore.rules, que é onde moram os que dão poder de compra (moedas,
+   rareCandies, inventario, equipados, rerollsPorSave). É o mesmo nível de confiança do
+   `badgesEarned`, que também é conquista e também é livre pro dono.
+   `game.hms` entrou no CAMPOS_DA_CONTA: sem isso o `resetGame` o perderia ao abrir outro save. */
+function hmsDaConta(){ return Array.isArray(game.hms) ? game.hms.filter(id => HMS[id]) : []; }
+function temHM(id){ return hmsDaConta().indexOf(id) >= 0; }
+/* DÁ UM HM À CONTA. Devolve true só quando ele é NOVO -- é isso que decide se a tela de vitória
+   anuncia. Repetir o anúncio de um HM que a pessoa já tem seria pior que não anunciar.
+   A gravação é best-effort, como a do rival padrão: se ela falhar, a jornada não para e o HM volta
+   a ser ganho na próxima vez que a condição bater. */
+function darHM(id){
+  if(!HMS[id] || temHM(id)) return false;
+  game.hms = hmsDaConta().concat([id]);
+  if(game.authUser){
+    userDocRef(game.authUser.uid).set({ hms: game.hms }, { merge: true })
+      .catch(e => console.error('Erro ao gravar o HM na conta:', e));
+  }
+  return true;
+}
+/* A CONDIÇÃO DO HM01 (11/09/2026, a pedido): escolher a rota do S.S. Anne e vencer o Lt. Surge em
+   no máximo UMA tentativa -- ou seja, sem nenhuma derrota naquele ginásio.
+   ELA É LIDA NA VITÓRIA, dentro do `finishBattle`, e a ordem importa: o `game.losses` só zera
+   depois, na distribuição de níveis (ver o `game.losses = 0`). Lida de lá, ela acharia zero sempre
+   e daria o HM a quem perdeu quatro vezes.
+   O `routeHistory` guarda a rota escolhida por trecho e até hoje SÓ O MAPA lia -- esta é a primeira
+   REGRA que depende dele. Se ele deixar de ser gravado, o HM01 fica inalcançável em silêncio, e é
+   por isso que o teste cobra o par (rota gravada + HM ganho). */
+const HM01_ROTA = 'ss_anne';
+const HM01_GINASIO = 'surge';
+function conquistouHM01(){
+  const gym = gymAtual();
+  if(!gym || gym.id !== HM01_GINASIO) return false;
+  if((game.losses || 0) > 0) return false;                       // "no máximo 1 tentativa"
+  return (game.routeHistory || [])[game.gymIndex] === HM01_ROTA;
+}
+/* O ANÚNCIO DO HM na tela de vitória. Ele sai do `ganhouHmAgora`, marcado no `finishBattle`, e não
+   de "tem HM na mochila": a tela é relida a cada render, e sem a marca ela anunciaria o mesmo HM em
+   toda vitória dali pra frente.
+   Fica ao lado do prêmio de moedas de propósito -- é a mesma leitura ("o que esta vitória me deu"),
+   e um lugar novo faria o jogador procurar. Ele diz PRA QUE serve a caixa dos TMs/HMs, porque hoje
+   o item não faz nada e a pergunta "e agora?" nasce na hora. */
+function hmGanhoHtml(){
+  const hm = HMS[game.ganhouHmAgora];
+  if(!hm) return '';
+  return `<div class="box hm-premio">
+    <p><span class="hm-premio-icone">${hm.icone}</span> Você encontrou a <strong>${escapeHtmlSafe(hm.nome)}</strong>!</p>
+    <p class="hint-text">Guardada na mochila, em <strong>TMs e HMs</strong>.</p>
+  </div>`;
+}
 function moedasGanhasHtml(){
   const n = game.moedasGanhasAgora || 0;
   if(n <= 0) return '';
@@ -16851,7 +17139,8 @@ function renderBattleResult(win){
     ${badgeMarkup(gym.badge,'lg')}
     <div class="badge-text">Você ganhou a<br><strong>${gym.badge}</strong>!</div>
   </div>
-  ${moedasGanhasHtml()}` : ''}
+  ${moedasGanhasHtml()}
+  ${hmGanhoHtml()}` : ''}
   <div class="box">
     <h2>Log da batalha</h2>
     <div class="status-list">${renderMatchupLog(r.matchups)}</div>
@@ -19912,8 +20201,50 @@ function renderInventario(){
   <div class="eyebrow">🎒 INVENTÁRIO</div>
   <div class="box item-detalhe">${detalhe}</div>
   ${gradeDeItensHtml(slotsDaGrade(pilhas), game.inventarioSel, 'escolherItem')}
-  <button class="btn secondary u-mt8" onclick="sairDaMochila()">⬅ Voltar</button>
+  <!-- TM/HM em tela PROPRIA: eles nao empilham, nao se gastam, nao se vendem e nao se usam daqui --
+       todas as regras da grade acima sao falsas pra eles. Ver renderTmHm. -->
+  <button class="btn secondary u-mt8" onclick="abrirTmHm()">📀 TMs e HMs${
+    hmsDaConta().length ? ' (' + hmsDaConta().length + ')' : ''}</button>
+  <button class="btn secondary" onclick="sairDaMochila()">⬅ Voltar</button>
   ${renderExcluirItemModal()}`;
+}
+/* A TELA DE TMs E HMs (11/09/2026, a pedido). Ela é SEPARADA da grade da mochila, e isso é decisão:
+   TM e HM não empilham, não se gastam, não se vendem e não se usam dali -- todas as regras da grade
+   são falsas pra eles. Misturá-los ali poria coisas de regras diferentes no mesmo quadradinho, que
+   é o incômodo que o Doce Raro já cria sozinho (ele é o único que não dá pra excluir, e precisa de
+   uma frase explicando).
+   E ela ESCALA: são 301 golpes na base da Gen 3, então a lista de TMs vai crescer. A grade de
+   quadradinhos, que mostra só o ícone, já não dava conta de 11 itens na loja -- não daria conta
+   disso.
+   ⚠️ OS HMs SÃO DO SAVE, não da conta: a mochila é aberta de três lugares e um deles é a HOME, sem
+   save nenhum carregado. Ali não há o que mostrar, e a tela diz isso em vez de mentir que está
+   vazia -- é a mesma regra do "nenhuma tela pode ficar Carregando pra sempre". */
+function abrirTmHm(){ game.screen = 'tmhm'; render(); }
+function sairDoTmHm(){ game.screen = 'inventario'; render(); }
+/* A LISTA É SÓ O NOME E UMA LINHA CURTA embaixo (11/09/2026, a pedido). Ela já teve um parágrafo
+   azul por baixo de cada Máquina explicando que ela ainda não faz nada -- com um item só na lista,
+   a explicação ocupava mais espaço que a coisa explicada.
+   NÃO DEPENDE MAIS DE SAVE ABERTO: os HMs são da CONTA, então a mochila aberta da home mostra os
+   mesmos. */
+function renderTmHm(){
+  const meus = hmsDaConta();
+  const corpo = meus.length
+      ? meus.map(id => { const hm = HMS[id]; return `
+        <div class="tmhm-linha">
+          <span class="tmhm-icone">${hm.icone}</span>
+          <div class="tmhm-texto">
+            <strong>${escapeHtmlSafe(hm.nome)}</strong>
+            <span class="tmhm-resumo">${escapeHtmlSafe(hm.resumo)}</span>
+          </div>
+        </div>`; }).join('')
+      /* A LISTA VAZIA DIZ ONDE ACHAR. Uma tela que só diz "vazio" faz a pessoa procurar no jogo
+         inteiro; esta nomeia o caminho do único que existe hoje. */
+      : `<p class="item-detalhe-vazio">Nenhuma Máquina ainda.</p>
+         <p class="hint-text">A <strong>${escapeHtmlSafe(HMS.hm01.nome)}</strong> está por aí: ${escapeHtmlSafe(HMS.hm01.comoGanhar)}</p>`;
+  return `
+  <div class="eyebrow">📀 TMs E HMs</div>
+  <div class="box">${corpo}</div>
+  <button class="btn secondary u-mt8" onclick="sairDoTmHm()">⬅ Voltar</button>`;
 }
 function renderExcluirItemModal(){
   if(!game.inventarioExcluir) return '';
@@ -22869,6 +23200,7 @@ function render(){
     case 'neighborhoodGymLeaderboard': html = renderNeighborhoodGymLeaderboard(); break;
     case 'notifications': html = renderNotificationsScreen(); break;
     case 'inventario': html = renderInventario(); break;
+    case 'tmhm': html = renderTmHm(); break;
     case 'loja': html = renderLoja(); break;
     case 'neighborhoodGymChallengeHistory': html = renderNeighborhoodGymChallengeHistory(); break;
     case 'neighborhoodGymChallengeTeamPicker': html = renderNeighborhoodGymChallengeTeamPicker(); break;
