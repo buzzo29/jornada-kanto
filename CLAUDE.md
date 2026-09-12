@@ -1793,14 +1793,249 @@ fosse o índice, o `i + 1` parece um erro de um a mais e "consertá-lo" atrasa T
 passo. O teste é quem tem a convenção escrita (o `perfil` monta `[0, 1..seq.length]`), e foi ele que
 mostrou o engano.
 
+
+### O REMOINHO: O SOPRO QUE TROCA O POKÉMON DO ADVERSÁRIO (12/09/2026)
+
+Pedido assim: *"aplique a habilidade Whirlwind, onde acontece logo quando o pokemon que tem ela
+entrar na partida, ela deve ter 20% de chance de sucesso, e quando acontecer, troca o pokemon ativo
+do treinador adversario por um outro aleatorio do time dele. Importante que se o pokemon do
+adversario ja tava em uma batalha e sofreu dano, quando ele voltar para a batalha, volte com o mesmo
+tanto de hp"*. É o **décimo segundo** especial, e o primeiro que não é sobre dano nem sobre status.
+
+- **⚠️ ELE NÃO CABE NO `tentarGolpeEspecial`, e é a primeira vez que isso acontece.** Os onze de lá
+  recebem DOIS pokémon e mexem no que acontece entre eles; este muda **QUEM está no confronto**, e
+  isso só o laço da batalha sabe fazer. Por isso ele mora no `simulateGymBattle`, num
+  `tentarRemoinho` próprio, e por isso **não vale no ONLINE** (lá quem escolhe o próximo pokémon é o
+  jogador, entre confrontos — um sopro forçado brigaria com a escolha) **nem na raide** (um alvo só).
+- **⚠️ O LAÇO DA BATALHA FOI REESCRITO PRA ISSO, e essa é a mudança estrutural.** O inimigo era
+  `brockTeam[brockIndex]` com o índice **só andando pra frente**: não havia como um pokémon sair do
+  confronto sem ter caído e voltar depois. Hoje cada lado tem um **índice do ativo**, que é só "quem
+  está em campo agora", e os dois laços aninhados ("enquanto este inimigo não cai") viraram **um
+  só** — o de fora deixou de fazer sentido quando o inimigo passou a poder trocar sem cair.
+  **E ISSO NÃO MUDA NADA sem o Whirlwind, por construção**: o índice só avançava quando o inimigo
+  CAÍA, então ele já era exatamente "o primeiro vivo", que é o que a conta nova faz. O mesmo vale
+  pro jogador, que era `alive[0]`. **Conferido por impressão: com a lista VAZIA o build dá o MESMO
+  hash de antes da feature, em 900 batalhas semeadas.**
+- **⚠️ E FOI ESSA IMPRESSÃO QUE PEGOU O ÚNICO DEFEITO DE VERDADE DA FEATURE.** A primeira versão
+  sorteava o **desempate de velocidade** antes de saber se alguém tinha a passiva — ou seja, lia um
+  número do RNG em TODO confronto, e isso **deslocava a semente inteira**: batalhas sem nenhum
+  Pidgey no campo terminavam diferente. Hoje há uma saída antecipada (`!temAtivo && !temInimigo`), e
+  o desempate só é sorteado quando **os dois** têm — que é o único caso em que a ordem importa.
+  É a mesma lição do `op.semCritico` da confusão, ao contrário: lá a opção anula o RESULTADO e não a
+  CHAMADA; aqui a chamada não pode existir.
+- **A LISTA são as 6 espécies que aprendem `whirlwind` por NÍVEL na Gen 3**, a mesma regra das outras
+  onze: a linha do **Pidgey** (19/20/20), o **Butterfree** (23) e **Lugia/Ho-Oh** no nível 1. Os dois
+  lendários ficam por ser o que o dado diz — eles são INTOCÁVEIS e a entrada não roda hoje,
+  exatamente como no `RECUPERACAO`. O teste cruza a lista com a base, como já faz com as outras.
+- **O HP VOLTA SOZINHO, e não foi preciso escrever nada pra isso** — que é justamente por que ele
+  precisa de trava. O laço trabalha sobre as MESMAS instâncias o tempo todo, então quem sai machucado
+  volta com o que tinha; um "conserto" futuro que recriasse a instância quebraria a promessa sem nada
+  acusar. Medido: **1.712 de 1.712 voltas com o HP idêntico**.
+- **SÓ SAI SE HOUVER PRA ONDE TROCAR**, e quem decide isso é a SITUAÇÃO do time do outro, não o
+  sorteio — com um pokémon de pé só não há quem entre no lugar. É a mesma regra do
+  `BOOM_MINIMO_DO_ALVO`, que também não consome a chance. E só entra quem está **de pé**: soprar pra
+  dentro um pokémon desmaiado seria pior que não soprar.
+- **A CORRENTE NÃO EXPLODE.** O marcador `_remoinhoContra` faz o sorteio valer **uma vez por par**
+  (adversário novo, confronto novo, como o `_especialContra`), e o sopro roda **uma vez por volta do
+  laço** — sem re-rolar depois da troca. Medido em 3.000 batalhas: a maior corrente de sopros
+  seguidos foi **3**, e nenhuma batalha travou.
+- **A FRASE NOMEIA QUEM SAIU, não quem entrou**: *"🌪️ Pidgeot usou Remoinho e soprou Feraligatr pra
+  fora"*. Quem entrou já está no cabeçalho do confronto, com sprite e barra; quem saiu não aparece em
+  lugar nenhum, e sem o nome dele o jogador não tem como saber que o pokémon que ele estava
+  desgastando foi embora (e que volta com o HP que tinha). O nome viaja no diário (`sai`), pelo mesmo
+  motivo do tipo anulado no Disable: nenhum dos dois lados do matchup é ele.
+  Log gravado antes do campo cai na frase sem nome — log velho não pode sumir.
+- **O NOME PT É "Remoinho"**, e ele estava livre: o único parecido que o jogo já usa é o "Redemoinho
+  de Fogo" do `firespin`. O selo é **Normal**, como o golpe de verdade, e o ícone é 🌪️.
+  Ele vale **2 passos** no `passosDaAbertura`, como a chuva e o sono: ele É um passo da animação com
+  dano ZERO, então a frase precisa cobrir a pausa de leitura MAIS o passo dele.
+- **⚠️ UMA TRAVA DA FAIXA DE FOCO TEVE QUE APRENDER O QUE JÁ ERA REGRA.** Ela cobrava "nenhum
+  confronto com Faixa passa de 8 linhas", contando as ABERTURAS junto — e assim o teto subia com o
+  número de passivas do jogo. Ele estourou aqui (9 linhas) **sem nada da Faixa ter mudado**. Hoje ela
+  cobra o que a Faixa promete — **7 linhas de luta** (3 + a linha dela + 3) — e as aberturas não
+  contam.
+- **⚠️ ELE NÃO EXISTE NO ONLINE NEM NAS LIGAS, e não é esquecimento — é o único lugar onde ele NÃO
+  PODERIA existir.** Ali quem escolhe o pokémon ativo é o JOGADOR, numa janela de 5 a 10 segundos;
+  um sopro que troca o ativo do outro lado desfaria a escolha que a pessoa acabou de fazer, e a
+  janela seguinte abriria com ela olhando um pokémon que não pôs em campo.
+  **A separação é por construção, não por uma guarda:** o `tentarRemoinho` é chamado de dentro do
+  `simulateGymBattle`, e o online resolve confronto a confronto pelo `battleResolveMatchup`, que vai
+  direto no `doExchange`. Ou seja, ele vale na jornada, na Torre, no Ginásio da Cidade e na Elite —
+  os mesmos lugares onde o time é uma FILA e não uma escolha.
+  Se um dia o Remoinho precisar valer no online, não é mover a chamada: é decidir o que acontece com
+  a escolha do adversário, e isso é mecânica nova.
+
+### AS DUAS DANÇAS DE ATAQUE (12/09/2026)
+
+Pedidas assim: *"adicione o Feather Dance e a Sword Dance, onde uma diminui em 50% o attack do
+oponente e a outra aumenta em 50% o attack do usuario. Tem 20% de ocorrer no inicio de cada
+confronto"*. São o **décimo terceiro e o décimo quarto** especiais.
+
+| | quem tem | o quê |
+|---|---|---|
+| **Dança das Espadas** | Farfetch'd, Pinsir, Scizor, Scyther | quem usa fica com **×1,5** de Ataque |
+| **Dança da Pluma** | a linha do Pidgey | o ADVERSÁRIO fica com **×0,5** de Ataque |
+
+- **As listas saem do aprendizado por NÍVEL da Gen 3**, a regra das outras treze. São 4 e 3
+  espécies — as duas menores listas do bloco inteiro.
+- **⚠️ É O ATAQUE FÍSICO E SÓ ELE** (`effectiveAttack`), como no jogo oficial. Neste motor quem
+  decide se um golpe usa o Ataque ou o Ataque Especial é o **TIPO** dele (`isSpecialType`, regra da
+  Gen 1), e as duas danças mexem no Ataque.
+  **A consequência está medida, e ela é grande pra a Pluma:** das 250 espécies, **110 atacam sempre
+  pelo físico** (ela morde inteiro), **39 sempre pelo especial** (ela não tira um ponto de dano) e
+  101 variam conforme o alvo. É o mesmo efeito que os itens de atributo já têm — e foi por isso que
+  a caixa da ficha diz isso com todas as letras.
+- **O MULTIPLICADOR ENTRA POR ÚLTIMO** (`withDanca`), depois dos flats (item e fúria): "50% do
+  ataque" é 50% do que o pokémon TEM na hora do golpe. Entrando antes, ele multiplicaria só a parte
+  base e o +15 do item ficaria de fora da conta. Conferido: num Pinsir com Atk Up, 140 → 210.
+  É o espelho da regra do flat, que entra por último **porque** é flat.
+- **OS DOIS PODEM COEXISTIR**: um Pinsir que dançou as espadas contra um Pidgeot que dançou a pluma
+  fica em 1,5 × 0,5 = **0,75**.
+- **⚠️ NÃO ACUMULA E NÃO ATRAVESSA CONFRONTO**, e isso é o "no início de cada confronto" do pedido ao
+  pé da letra: os dois marcadores são LIMPOS no começo de cada confronto e sorteados de novo. Sem a
+  limpeza, um Pinsir que dançasse em três confrontos seguidos sairia com 1,5³ = **3,4×** de ataque —
+  o mesmo tipo de vazamento que o teto de HP da fúria já teve. O teste cobra o teto de 1,5 em 600
+  batalhas.
+- **DADO PRÓPRIO, fora do `sorteiaGolpeEspecial`**, como a chuva. Disputando a vaga única do sorteio
+  de efeito, o **Pidgey** — que já tem Remoinho — veria a Pluma sair menos que os 20% pedidos.
+  O `tentarDancas` roda na abertura do confronto, ao lado do `tentarChuva`, e o teste **lê o código**
+  pra cobrar que os dois motores o chamem: os casos chamam a função direto e passariam com a chamada
+  órfã.
+- **SÃO ABERTURA** (`continue`): a luta acontece inteira depois, com um dos dois mudado. Valem 2
+  passos no `passosDaAbertura`, como o sono — elas SÃO um passo da animação (dano 0, barra parada),
+  então a frase cobre o passo 0 mais o passo delas e cede o lugar ao nome do golpe.
+- **AS FRASES dizem o que MUDOU, não o nome do atributo**: *"⚔️ Pinsir usou Dança das Espadas e ficou
+  mais forte"* e *"🪶 Pidgeot usou Dança da Pluma e enfraqueceu o ataque de Machoke"*. A da Pluma
+  **nomeia o ALVO**, como a anulação: quem interessa ali é o prejudicado. O número fica na caixa da
+  ficha, que é onde se explica.
+  Os selos são **⚔️ (Normal)** e **🪶 (Voador)**, os tipos dos dois golpes no jogo oficial.
+- **O QUE CADA UMA VALE, com a chance FORÇADA em 100%** pra isolar o efeito (1x1 contra um painel de
+  8, mesmo nível, 2.000 batalhas por célula):
+
+  | | sem | com | |
+  |---|---|---|---|
+  | Pinsir Lv.50 | 34,6% | **58,0%** | +23,4 |
+  | Scyther Lv.50 | 34,4% | 47,8% | +13,4 |
+  | Scizor Lv.50 | 66,5% | 76,8% | +10,3 |
+  | Pidgeot Lv.50 (pluma) | 24,4% | 31,4% | +7,0 |
+  | Farfetch'd Lv.50 | 7,8% | 13,0% | +5,2 |
+  | Pidgey Lv.30 (pluma) | 13,3% | 15,1% | +1,8 |
+
+  **A Pluma rende menos que as Espadas, e a causa é a de cima:** metade do painel ataca pelo
+  especial, e contra esses ela não faz nada. As Espadas sempre valem, porque quem as tem é
+  justamente um atacante físico.
+  **Na chance real de 20% o efeito por batalha é ~1/5 disso.**
+- **Medido: elas saem em 0,65% (Espadas) e 0,48% (Pluma) dos confrontos**, e em **4,0% das batalhas
+  3x3**. São 7 espécies em 250 — as duas listas mais curtas do jogo.
+- **O PREÇO NA JORNADA: dentro do ruído.** 67,37% contra 66,94% de conclusão — **+0,43 ponto,
+  0,8σ** (10 blocos de 1.500 jornadas de cada lado, 15.000 de cada). Faz sentido: são 7 espécies em
+  250, elas saem em ~1% dos confrontos, e caem dos DOIS lados — o Pidgeot é rota comum e o Scyther
+  e o Pinsir aparecem na Zona de Safári.
+  **A impressão do motor MUDA, e tem que mudar** (com a chance em 0 ela volta ao que era): ao
+  contrário do Remoinho na tela, estas mexem no DANO.
+- **Se um dia incomodarem**, os lugares de mexer são a **chance** (`CHANCE_DANCA`) e os
+  **multiplicadores** (`DANCA_ESPADAS_MULT`, `DANCA_PLUMA_MULT`) — e a régua está aqui.
+
+### O REMOINHO MOSTRA A TROCA: SAI, FICA VAZIO, ENTRA (12/09/2026)
+
+Pedido assim: *"primeiro aparece a mensagem falando que entrou o golpe, depois tem que mostrar
+saindo o pokemon, ficando sem nada, e depois entrando o novo, e exibindo a mensagem 'Psyduck foi
+trocado por Geodude!' e depois de 1s começa a batalha novamente"*. Antes o sopro era **uma linha**:
+a tela já mostrava o pokémon novo desde o primeiro quadro, e a frase explicava por quê.
+
+- **A CENA HOJE, medida quadro a quadro** (Pidgeot soprando um Geodude pra fora, entra um Machop):
+
+  | passo | cabeçalho do adversário | pausa | linha de status |
+  |---|---|---|---|
+  | 0 | **Geodude** | 1s | 🌪️ Pidgeot usou Remoinho e soprou Geodude pra fora |
+  | 1 | Geodude | — | idem |
+  | 2 | **(vazio)** | 1s | idem |
+  | 3 | **Machop** | 1s | **Geodude foi trocado por Machop!** |
+  | 4+ | Machop | — | a luta |
+
+- **O MOTOR GRAVA UM REGISTRO; QUEM REPARTE EM TRÊS É A APRESENTAÇÃO** (`sequenciaDoConfronto`),
+  e isso é decisão: assim os três quadros valem pra **log velho** também — um confronto gravado
+  antes disso tem o registro único e ganha a cena inteira na releitura.
+  Os dois quadros novos (`remoinhoVazio`, `remoinhoEntra`) existem só na sequência, e o **log
+  continua com UMA linha** — a mesma forma da drenagem (duas entradas, uma linha) e dos golpes de
+  vários tapas.
+- **⚠️ QUEM SAI VIAJA INTEIRO NO DIÁRIO, e não só o nome.** Pra desenhar o quadro do que está saindo
+  a tela precisa do sprite, do nome, do nível e da BARRA dele — e **nenhum dos dois lados do matchup
+  é ele**. São `ss`/`sai`/`sl`/`sh`/`shp`/`smx`, mais o `entra` (o nome de quem chega, pra a frase
+  valer sozinha quando o log é relido dias depois). Sem eles o quadro mostrava o nome do que sai com
+  a barra do que entra.
+- **⚠️ O QUADRO SAI DO PASSO CONTRA A SEQUÊNCIA, e não do `hit`** — e essa foi a primeira versão,
+  errada. O `hit` é o passo que a animação acabou de APLICAR, e no **passo 0 ele é null**; só que o
+  passo 0 é justamente onde a frase "soprou Geodude pra fora" já está na tela com o segundo de
+  leitura do `pausaDoEspecial`. Lido do `hit`, o cabeçalho mostrava o pokémon **NOVO** enquanto a
+  frase falava do antigo: **a cena começava pelo fim.**
+- **O `fighterHtml` NASCEU DESTA MUDANÇA.** O quadro de um lutador estava **triplicado** inline no
+  `renderBattling`, no `renderSpecialBattling` e no `renderTrainerBattling`; virou função porque
+  agora ele deixa de ser o pokémon do matchup durante três passos. Três cópias divergiriam no
+  primeiro ajuste, e é a parte que o jogador olha.
+  O `comTerreno` existe porque **só a tela da jornada** mostra o 🔺 do terreno — nas outras duas não
+  há terreno, e o selo prometeria um bônus que aquela batalha não dá.
+  A **liga assistida ficou de fora** de propósito: o sopro não existe em liga (ver a seção do
+  Remoinho), então ali o quadro continua inline.
+- **OS TRÊS QUADROS PEDEM REDESENHO** (`troca`), e por um motivo que nenhuma outra abertura tem:
+  eles trocam o **SPRITE** do cabeçalho, e sprite só muda num `render()` — o
+  `pintarStatusDoConfronto` mexe na linha de status e em nada mais. A marca é própria e não o
+  `leitura` porque o primeiro quadro está no índice 0: ali o `pausaDoEspecial` já dá o segundo de
+  leitura, e marcar `leitura` seria pausa em cima de pausa — mas o desenho ele precisa do mesmo
+  jeito.
+- **A VAGA VAZIA NÃO TEM FRASE PRÓPRIA, e não pode ter entrada no `passosDaAbertura`.** A janela do
+  sopro (**3 passos**) já cobre o passo dela, com o mesmo texto. Pior: entrando na lista de avisos
+  **sem** entrada na tabela, ela cai no ramo da autodestruição (`!n` = a frase vale o confronto
+  INTEIRO) e a linha ficava presa em "soprou X pra fora" até o fim da luta, por cima do nome dos
+  golpes. O `remoinhoEntra` vale **2**, e é por isso que a luta só começa um segundo depois dele.
+- **O quadro do novo é ACRESCENTADO À MÃO na lista de avisos.** Ela sai do DIÁRIO (via
+  `ehGolpeEspecial`), e o `remoinhoEntra` não existe lá. Trocar a fonte pela sequência perderia a
+  **ANULAÇÃO**, que tem frase e é filtrada FORA da sequência (ela não é um passo).
+- **⚠️ E ISSO DESENTERROU UM DEFEITO ANTIGO: a frase da AUTODESTRUIÇÃO começava no passo 0.** Ela não
+  tem passo de saída de propósito ("ali o confronto INTEIRO é aquilo"), mas também não tinha passo
+  de **ENTRADA** — então num confronto em que o sopro traz um Geodude que explode, lia-se *"Geodude
+  usou auto-destruição"* durante a animação da troca inteira: a frase do fim contando o começo.
+  Era antigo — com o sopro em um passo só ela já comia aquele passo —, e só ficou visível quando a
+  cena passou a durar três. Hoje ela vale de `i+1` em diante, como as outras; com a explosão no
+  índice 0, que é o caso comum, nada muda.
+- **CONFERIDO QUE NÃO É MOTOR, por impressão:** o mesmo build antes e depois do quadro novo dá o
+  **MESMO hash** em 3.669 confrontos. Os campos novos do diário são só escrita — o motor nunca os
+  lê de volta —, e a expansão vive no `sequenciaDoConfronto`, que é apresentação. O teste cobra que
+  o `remoinhoVazio` **não exista no servidor**.
+- `tools/test-especiais.js` tranca a cena inteira em 40 confrontos: os campos do diário, os três
+  quadros na ordem, a animação com os mesmos passos do log, a **uma linha** no log, o cabeçalho
+  fazendo *sai / sai / vazio / entra*, a frase do sopro cobrindo os três primeiros e o "trocado por"
+  fechando, o segundo de leitura em cada quadro, o redesenho, a tabela dos passos (3 e 2, e a vaga
+  vazia FORA dela) e o acréscimo à mão na lista de avisos.
+
+#### E TRÊS ARTEFATOS DA TRAVA DO SELO DE CRÍTICO saíram junto
+
+A trava "nenhum selo num número < 1/3 do maior daquele atacante" falhava **~1 rodada em 3**, e as
+três causas eram do TESTE, não do jogo — ela lê a TELA (é o que ela existe pra medir) e agrupa as
+linhas por NOME:
+
+1. **O golpe de VÁRIOS TAPAS não era isentado** — o comentário dizia que era, desde 10/09/2026, e o
+   código nunca fez. A linha dele é a **soma** de N tapas de poder baixo (o Tapa Duplo é poder 15),
+   então ela pode somar menos que um terço do maior golpe único sem o selo mentir.
+2. **E o BASELINE também precisava excluí-los**: o "maior golpe daquele atacante" não pode ser uma
+   linha de tapas. Um Shuckle de 28 num crítico contra os 182 de um Ataque Fúria de 3 tapas é golpe
+   único contra soma. Isentar só a linha medida deixava metade do artefato de pé.
+3. **O confronto ESPELHO conflava os dois lados**: com a mesma espécie nos dois lados, o maior golpe
+   de um entrava na conta do outro — um Blastoise × Blastoise acusou um crítico de 21 contra o 142
+   do adversário.
+
+Hoje ela roda **14 vezes seguidas em zero**. A lição é a de sempre aqui: trava que amostra confronto
+aleatório precisa de invariante, e o invariante tem que comparar coisas do mesmo tipo.
+
 ### A CAIXA QUE EXPLICA O ESPECIAL (11/09/2026)
 
 Pedida assim: *"para todos os ataques especiais/passivas, coloque que quando o usuário clicar em
 cima dessa habilidade passiva, abre um modal explicando o que ocorre quando acontece aquela
-habilidade na partida"*. São os **onze**: autodestruição, sono, anulação, Metrônomo, Recuperar,
+habilidade na partida"*. São **doze** hoje: autodestruição, sono, anulação, Metrônomo, Recuperar,
 drenagem, Fúria, confusão, Fúria do Dragão, **Sketch** — este acrescentado à ficha no mesmo dia,
-também a pedido, e SÓ pra aparecer: a mecânica dele não foi tocada — e a **Dança da Chuva**, que
-chegou logo depois e é a única POR BATALHA.
+também a pedido, e SÓ pra aparecer: a mecânica dele não foi tocada —, a **Dança da Chuva**, que
+chegou logo depois e é a única POR BATALHA, e o **Remoinho** (12/09/2026), que é o único que muda
+QUEM está no confronto.
 
 - **ELA É INDEXADA PELO EFEITO, NÃO PELO NOME** (`EXPLICACAO_DO_ESPECIAL`), e essa é a decisão que
   sustenta o resto. O nome é **por espécie** — o Zubat confunde com Supersom e o Alakazam com
@@ -2217,6 +2452,11 @@ Geodude que terminou com **14**, e a linha do Ivysaur vinha **depois** da que o 
 - **A regra nova:** o reordenamento **só vale se o moribundo tiver ficado morto**. Quando ele volta
   vivo pelo desempate, a ordem natural do diário já é a legível -- quem estava vivo bate, o outro
   revida, e o placar do cabeçalho confirma quem sobrou.
+  **⚠️ ESSE SEGUNDO RAMO MORREU EM 12/09/2026** (ver "A MORTE SÚBITA ACABOU"): sem empate, o
+  moribundo **nunca** volta vivo, então hoje a condição é sempre verdadeira e o reordenamento sempre
+  vale. A condição FICA no código porque ela lê o diário, e **diário antigo tem empate gravado** --
+  um log de setembro relido hoje precisa dela pra continuar legível. O que não existe mais é o motor
+  produzir um caso novo.
 - **ELE EXISTE EM PRODUÇÃO, e isso é o que mais importa aqui:** com o teto ligado são **4 casos em
   4.280 confrontos (0,09%)**; sem o teto, **660 em 4.235 (15,6%)**. O experimento não criou o
   defeito, só o tornou 165× mais frequente -- sem teto um golpe derruba de vida cheia e a troca
@@ -2286,7 +2526,89 @@ mas o log lia *"Gastly bateu / Psyduck bateu / Gastly bateu"*.
   Conferido: **todo confronto sem fúria fecha**. Falhavam ~1 rodada em 15, que é o pior tipo de
   teste — o que passa quase sempre.
 
-### O DESEMPATE GANHOU LINHA: o golpe que sumia e deixava dois colados (09/09/2026)
+### A MORTE SÚBITA ACABOU (12/09/2026) — e com ela três relatos de uma vez
+
+Pedida assim: *"não quero mais que exista isso, não existe de os 2 cairem juntos, somente na auto
+destruição; fora isso, jamais os 2 devem morrer juntos e um ficar de pé"*.
+
+- **O QUE MUDOU NO MOTOR É UMA LINHA: o revide moribundo não mata.** Ele deixa o outro entre **1% e
+  10% da barra** (sorteado a cada vez). Era ele a ÚNICA coisa do motor que fazia os dois caírem na
+  mesma troca; sem isso, não há o que desempatar.
+  **A AUTODESTRUIÇÃO CONTINUA MATANDO OS DOIS**, que é o que o pedido preserva: ela zera o HP dentro
+  do `tentarGolpeEspecial` e devolve antes de chegar no bloco de troca. Medido: **148 de 148**
+  confrontos em que os dois caem são autodestruição.
+- **⚠️ O PISO NÃO APARECE NA TELA, e isso foi pedido com estas palavras:** *"não deve ser exibido na
+  tela para o usuário ver, deve ficar mascarado na lógica/mecânica da batalha"*. Não há linha, frase
+  nem selo — o log mostra o dano que REALMENTE saiu (o diário sempre grava o efetivo) e a barra para
+  onde parou. De fora, é um golpe que não matou.
+  Conferido com rng fixo: `rng=0.5` deixa o alvo em **5,47%** e `rng=0.999` em **9,89%**, batendo
+  com a fórmula, e o diário sai **sem nenhuma linha especial**.
+- **NUNCA SOBE A VIDA DE NINGUÉM**: o piso é aparado no que o alvo tinha ENTRANDO na troca, então um
+  pokémon que já estava abaixo de 10% continua onde estava — o revide só não o derruba. Sem esse
+  teto, um alvo raspando terminaria a troca com MAIS vida do que começou.
+- **O APARO DA LINHA ANDA PRA TRÁS** (`apararRevide`), e não só na última entrada como o da Faixa: o
+  alvo sorteado pode ser MAIOR do que o último tapa tirou, e aí o de antes também tem que ceder. É a
+  mesma conta que o aparo do desempate usava antes de ele deixar de existir. Os tapas que sobram em
+  zero saem da lista, senão o selo prometeria "3x" numa linha que mostra dois.
+- **⚠️ O SORTEIO SÓ ACONTECE QUANDO O PISO VALE.** Ler o rng fora disso deslocaria a semente inteira
+  e mudaria batalhas que não têm revide nenhum — é a mesma armadilha que o Whirlwind quase trouxe no
+  mesmo dia, e a que o `op.semCritico` da confusão registra pelo outro lado.
+- **⚠️ O QUE SAIU JUNTO É O TAMANHO DA DECISÃO.** Foram embora a ressurreição com 5%-15%, o aparo da
+  linha que ela obrigava, a linha ⚖️ do log, o `x:'desempate'` gerado, os registros que o `gravar`
+  devolvia só pra ela achar a linha certa, e a colocação dessa linha no meio da sequência.
+  **E, principalmente, foram embora TRÊS relatos seguidos que eram todos consequência dela:**
+
+  | print | o que se via | era |
+  |---|---|---|
+  | Raticate × Gyarados (09/09) | "atacou 2x seguidas" | o golpe aparado sumindo da tela |
+  | Porygon × Gastly (11/09) | "o mesmo golpe tirou 154 e depois 2" | o aparo escrevendo um número que nunca aconteceu |
+  | Gyarados × Arbok (12/09) | "ele mesmo sem hp tirou −37 e ficou de pé" | o revide do que caiu, e a volta contada depois |
+
+  Cada um custou uma volta de conserto na ORDENAÇÃO — e a causa era sempre a mesma. Tirando a causa,
+  os três deixam de existir **por construção**, e não por ordenação esperta.
+- **AS EXCEÇÕES QUE ELA TINHA OBRIGADO MORRERAM NO MESMO DIA:** o `revideLetal` (que impedia o
+  revide que mata de subir) e a tolerância da trava de colagem pro "revide letal" duraram horas. Com
+  o empate fora, **a apresentação voltou a nunca criar colagem** — medido, 15 na tela contra 40 no
+  diário — e **ninguém ataca com a barra em zero**, agora por construção: quem cai fica caído, e
+  quem revida estava vivo quando revidou.
+  O que ficou de pé dos dois é só o que serve a **log velho**: a linha `x:'desempate'` continua
+  sendo desenhada (`passosHtml`, `fraseDoEspecial`) e o `revideLetal` continua guardando a ordenação
+  de um diário antigo, que pode ter revide letal gravado. O que não existe mais é **gerar** um novo.
+- **⚠️ O PISO PEGA EM 20% DOS CONFRONTOS, e é esse número que explica o resto desta seção.** Medido
+  em 12.817 confrontos: o revide moribundo acontece em **59,4%** deles, e em **20,0%** ele era
+  LETAL — ou seja, um em cada cinco confrontos do jogo terminava com os dois caindo e a morte súbita
+  decidindo. Não era um caso raro que se conserta por ordenação: era um quinto das lutas.
+  Onde o alvo termina: **0,25% a 10,00% da barra, média 4,75%**.
+  **O 0,25% é o teto funcionando, não um furo:** quem já entrou na troca abaixo de 1% fica onde
+  estava, porque o piso nunca SOBE vida.
+- **O PREÇO NA JORNADA: −2,65 pontos de conclusão, e é a maior mexida de dificuldade desde o
+  moveset dos NPCs.** 69,88% contra **67,22%**, **7,2σ** — 8 blocos de 1.500 jornadas de cada lado,
+  desvio tirado de ENTRE os blocos. **Os 8 de 8 blocos apontam pro mesmo lado**, que é o teste que
+  importa: não é amostra sortuda. E a direção é pro lado DIFÍCIL.
+  **⚠️ E ELE SE CONCENTRA NO 8º GINÁSIO** (3 blocos de 2.000 jornadas de cada lado):
+
+  | ginásio | game overs antes | depois |
+  |---|---|---|
+  | 1º | 518 | 548 |
+  | 5º | 294 | **269** |
+  | 6º | 403 | **337** |
+  | **8º** | 598 | **833** |
+
+  O 8º sobe **39%** e o 6º até CAI. Faz sentido: é no fim que os confrontos se decidem em poucas
+  trocas, e era lá que o jogador trocava o pokémon moribundo por um abate. Esse negócio acabou —
+  hoje o adversário fica de pé com 1%-10% e continua lutando.
+  Se um dia incomodar, a régua é a FAIXA do piso: subi-la (15%-25%) devolve parte, porque o que
+  aperta não é o alvo sobreviver, é ele sobreviver com quase nada e ainda assim ter que ser morto
+  de novo pelo pokémon seguinte.
+- **⚠️ QUEM SOBREVIVE À TROCA DUPLA MUDOU DE LADO, e é essa a mexida de verdade.** Antes ela era
+  ganha por **fração de vida** (o desempate escolhia quem entrou mais inteiro) e o vencedor voltava
+  com 5%-15%; hoje ela é ganha por **quem conectou primeiro** — ou seja, por VELOCIDADE —, e quem
+  fica de pé é o outro lado, com 1%-10%.
+  É uma troca de critério, não um ajuste de número: a velocidade já decidia a ordem dos golpes e a
+  taxa de crítico, e agora decide também quem leva a troca mortal. Não foi compensado em nada.
+  **O preço na jornada está medido logo abaixo.**
+
+### HISTÓRIA: O DESEMPATE GANHOU LINHA (09/09/2026) — a mecânica acabou em 12/09, ver acima
 
 Reportado com print: num **Raticate × Gyarados** o Gyarados aparecia atacando **duas vezes**
 seguidas, sem nada entre os dois golpes.
@@ -2323,12 +2645,50 @@ seguidas, sem nada entre os dois golpes.
   Medido: a soma do log fecha em **1.402 de 1.402** confrontos com desempate.
   A frase passou a dizer **com quanto** ele ficou de pé, e esse número é o que a barra acabou de
   mostrar subindo: *"⚖️ os dois caíram na mesma troca, e Onix ficou de pé com 22 de HP"*.
+- **⚠️ A LINHA DA VOLTA ENTRA LOGO DEPOIS DO GOLPE QUE DERRUBOU QUEM VOLTOU (12/09/2026), e é ela
+  que faz "ninguém ataca com a barra em zero" virar verdade ABSOLUTA.** Reportado com print num
+  **Gyarados × Arbok**: *"a arbok já era para ter morrido no terceiro ataque, mas ele mesmo sem hp
+  tirou −37 do gyarados e depois ficou em pé; isso não pode acontecer jamais"*. E estava certo — a
+  Arbok chegava a 0, revidava, e só então a linha lá embaixo contava que ela tinha voltado.
+  O motor grava a linha no FIM do diário (é lá que o desempate acontece). A tela passou a colocá-la
+  onde a cena fecha: **ele cai, a barra SOBE na linha do desempate, e aí ele ataca.** Os dois golpes
+  continuam sendo do mesmo instante — a ordem aqui é apresentação, a mesma licença que o
+  reordenamento do moribundo já usa.
+  **Medido: quem ataca com a barra em zero vai de 11,47% dos confrontos para ZERO.**
+- **⚠️ E AQUI HÁ UM CONFLITO REAL, resolvido por decisão e não por engenharia.** Quando o revide
+  moribundo é **LETAL**, não existe ordem que evite as duas coisas ao mesmo tempo — foi verificado
+  caso a caso:
+
+  | ordem | o que sai errado |
+  |---|---|
+  | a crua do diário | quem deu o revide **ataca com a barra em zero** |
+  | revide um lugar atrás + a linha da volta no meio | ele fica **colado** no golpe anterior do mesmo lado |
+
+  O pedido decidiu qual das duas: *"isso não pode acontecer jamais"*. **A colagem é o preço**, e ele
+  está medido: ela vai de **0,44%** (a que o diário já tinha, dos empates de velocidade) para
+  **2,26%** dos confrontos. É o menos ruim dos dois — dois golpes seguidos do mesmo lado o motor
+  produz de verdade (o desempate de velocidade é sorteado a cada troca), enquanto atacar a zero não
+  acontece nunca.
+  `tools/test-especiais.js` cobra exatamente isso: a apresentação **só** pode criar colagem onde o
+  revide foi letal; em qualquer outro confronto, criar colagem continua sendo defeito.
+- **⚠️ E O REVIDE LETAL NÃO SOBE — ele anda um lugar atrás, e só.** Subindo (a regra de 11/09 que o
+  joga pra depois das aberturas), ele fica ANTES dos golpes do pokémon que ele MATOU, e os campos
+  `hp` do diário — que são **cronológicos** — deixam de bater com a ordem mostrada: a conta passa a
+  ver o sobrevivente caído antes da hora e a linha da volta vai parar no lugar errado. Foi assim que
+  a trava acusou 66 confrontos que estavam certos.
+- **A LINHA DO REMOINHO NÃO GRAVA `hp`, e isso é da mesma família.** O campo quer dizer "a vida do
+  ALVO depois do golpe", e num sopro não há alvo nem golpe. Gravando a vida de quem soprou, toda
+  conta que lê o diário passava a achar que o OUTRO lado tinha aquela vida. (A `chuva` ainda grava a
+  do usuário — inofensivo hoje porque o golpe seguinte corrige, mas é o mesmo tipo de armadilha.)
 - **⚠️ E O APARO ESCONDIA UM QUARTO DEFEITO, no reordenamento do moribundo.** Sem ele, a barra do
   sobrevivente passou a chegar a ZERO na tela — e aí ficou visível que um **revide LETAL** não pode
   ser movido: subindo, ele fica ANTES dos golpes do pokémon que ele matou, e é esse pokémon que
   passa a atacar de barra zerada (3 casos em 10.556, todos com sono); andando um lugar pra trás, ele
   cola dois golpes do mesmo lado (281 em 13.162).
-  **A ordem CRUA do diário é a certa nesses casos**, e não precisa de licença nenhuma: ali o revide
+  **⚠️ ESTA CONCLUSÃO DUROU UM DIA.** Ela dizia que a ordem CRUA do diário era a certa nesses
+  casos -- e é, se o único critério for a colagem. Em 12/09/2026 o pedido pôs um critério acima
+  dela ("ninguém ataca com a barra em zero, jamais"), e aí a ordem crua deixou de servir: ver o
+  item da linha da volta, logo acima. O que continua valendo daqui é o diagnóstico: ali o revide
   vem logo depois do golpe que derrubou quem o deu, que é o PAR DO MORIBUNDO, e antes dele está o
   golpe do outro lado. Quem responde "foi letal?" é o próprio diário — o `hp` do registro é a vida
   do ALVO depois do golpe.
@@ -2546,10 +2906,13 @@ pedido em 09/09/2026. `PAUSA_ANTES_DO_GOLPE_MS`.
   jogador procurava bug no multiplicador. Medido na mudança: **11,2% das batalhas trocam de
   vencedor** (a maior mexida desta série), taxa de vitória geral parada (51,3% → 51,0%), e os
   confrontos decididos no **desempate sobem de 6,5% pra 14,6%** — mais gente cai junto.
-  Quem sobra no desempate volta com **5%-15%** da vida (já foi 1%-3% e 1%-10%). Subir a faixa
-  mexe pouco: 0,5% das batalhas mudam de vencedor, e o sobrevivente passa a vencer o confronto
-  seguinte em 0,6% das vezes, contra 0,2% — continua sendo um empate que ele ganhou no critério,
-  não uma vitória.
+  **⚠️ E DESDE 12/09/2026 ELE NÃO MATA: ele deixa o alvo entre 1% e 10% da barra** (ver "A MORTE
+  SÚBITA ACABOU"). Os 14,6% de confrontos decididos no desempate viraram ZERO, e quem sobrevive à
+  troca dupla é sempre quem **CONECTOU PRIMEIRO**, não quem tinha mais fração de vida.
+  **A FAIXA VOLTOU A SER A MESMA DE UMA ÉPOCA ANTERIOR, e a coincidência engana:** a ressurreição do
+  desempate já devolveu 1%-3%, depois 1%-10%, e terminou em 5%-15%. O 1%-10% de hoje **não é aquele
+  número de volta** — é outro mecanismo (ninguém ressuscita; o golpe só não mata), e quem fica com a
+  vida é o LADO OPOSTO do que ficava.
   Armadilha: a marca de moribundo tem que sair da SITUAÇÃO (o segundo caiu e revidou), não de o
   dano ter sido reduzido. Enquanto era deduzida do dano, subir o fator pra 1.0 apagava a marca —
   e sem ela o log volta a mostrar pokémon atacando depois de cair.
@@ -2574,6 +2937,40 @@ pedido em 09/09/2026. `PAUSA_ANTES_DO_GOLPE_MS`.
   vê dois pokémon caindo juntos -- ou um deles batendo mais fraco do resto da luta -- sem
   explicação nenhuma. As frases vivem no `fraseDoEspecial`, e o aviso do meio da batalha lê a
   mesma função.
+- **⚠️ O SELO DE CRÍTICO NÃO SAI EM GOLPE QUE O CORTE ENCOLHEU (12/09/2026).** Reportado com print
+  num **Bulbasaur × Onix**: *"no primeiro chicote de cipó ele tirou −152, e depois num ataque foi
+  CRÍTICO, ele tirou apenas 9hp, isso fica feio, o onix já deveria ter morrido"*.
+  **O MOTOR ESTAVA CERTO E O RELATO TAMBÉM.** O Onix tinha 9 de HP e o crítico o MATOU; o 9 é só o
+  que sobrava. Reproduzido: `p -166 | e -57 | p -4 CRIT`, com o Onix em 160/170.
+  O defeito é do SELO. Ele existe pra explicar uma barra que caiu o DOBRO — foi por isso que ele
+  voltou em 10/09/2026 — e num golpe encolhido a barra não caiu o dobro: caiu o que sobrava. Ali
+  ele diz o contrário do que se vê, e o jogador lê *"o crítico tirou menos que o golpe comum"*.
+- **⚠️ A REGRA É "O CORTE COMEU A DOBRA", não "o golpe foi cortado" — e a primeira versão errou**
+  **justamente aí.** Ela tirava o selo de todo golpe cujo efetivo ficasse abaixo do sorteado, o que
+  é quase todo golpe que MATA. Um crítico que tira **300 de 350** mostra um número grande e ali o
+  selo é informativo; o que contradiz é quando sobra menos da METADE, porque aí o número na tela
+  fica abaixo do que um golpe comum daria. Hoje o campo `cap` é `efetivo * 2 < sorteado`.
+  **Quem pegou o erro foi o teste**, com o fixture Gyarados × Gyarados de Hiper Raio: luta de 2 a 3
+  golpes, em que quase todo crítico é o golpe final — a amostra de confrontos com selo caiu de 120
+  pra 40 e a trava do "o selo NUNCA falta" acusou.
+  **A Faixa de Foco NÃO marca `cap`**: ela tira 1 de HP, o que nunca come a dobra.
+- **MEDIDO, contado na TELA** (25.890 linhas de golpe em 10,6 mil confrontos): o selo sai em
+  **5,0%** das linhas, e as que mostram selo num número menor que **um terço** do maior daquele
+  atacante caíram de **31 para 1** — e essa uma é um golpe de vários tapas, caso legítimo.
+  **Só 0,32% dos confrontos com crítico ficam sem selo nenhum**: são aqueles em que o ÚNICO crítico
+  foi um golpe final encolhido, e ali não havia o que explicar.
+- **CONFERIDO QUE NÃO É MOTOR, por impressão:** o mesmo build com e sem a guarda dá o **MESMO hash**
+  de resultado em 900 batalhas semeadas. O campo `c` do diário nunca é lido de volta pelo motor —
+  só pelo log e pela animação —, e o `cap` nasceu só pra ele.
+  **⚠️ Ao medir isso, o rng é o TERCEIRO argumento do `simulateGymBattle`**, não o quinto: passado
+  na posição errada ele é ignorado, o motor cai no `Math.random` e o hash muda a cada rodada — o
+  que se lê como "a mudança mexeu no motor" quando o que mexeu foi a medição. Dois hashes seguidos
+  do MESMO build é o que separa os dois casos.
+- **NA RECONSTRUÇÃO a guarda é a mesma, e é aproximação em cima de aproximação.** O
+  `marcarCriticos` não sabe QUAL golpe foi crítico (só quantos e de que lado), então ele passou a
+  **não descer o selo pra uma linha menor que um terço da maior daquele lado**. Preferir o silêncio
+  à contradição é a mesma escolha que o diário real faz com o `cap`. No caminho REAL essa guarda
+  não é necessária — lá o `cap` resolve, e está medido em **zero**.
 - **A animação mostra o mesmo diário.** `buildAnimatedHitSequence` devolve os golpes reais (pelo
   `passosVisiveis`, pra dobrar o moribundo igual ao log); a reconstrução antiga — até 4 golpes
   inventados a partir do HP antes/depois — virou fallback pra confronto gravado antes do diário.
