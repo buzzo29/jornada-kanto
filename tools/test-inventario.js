@@ -150,6 +150,176 @@ console.log('\n=== A TELA DO DOCE LE A CONTA, NAO A TORRE ===');
   ok('sem doce ela nao abre', !S.__getGame().candyPicker);
 }
 
+console.log('\n=== A PORTA DOS MODOS DE CAMPEAO (as 8 insignias) ===');
+{
+  /* Pedida em 12/09/2026: *"caso a conta nao tenha nenhum time vencedor das 8 insignias, coloque
+     uma mensagem de erro quando o treinador clicar para entrar no ginasio da cidade, ligas
+     classicas e batalhas onlines ... e nao deixe entrar"*. */
+  const TIME = [{ speciesId:'venusaur', level:70 }];
+  const monta = (slots, carregado) => {
+    const g = S.__getGame();
+    g.saveSlots = new Array(S.MAX_SAVE_SLOTS).fill(null);
+    slots.forEach((sv, i) => { g.saveSlots[i] = sv; });
+    g.saveSlotsCarregados = carregado !== false;
+    g.modoBloqueado = null;
+    g.screen = 'saveSelect';
+    S.__setGame(g);
+  };
+  /* Cada modo e testado pela SUA porta: abrir e ver se a tela mudou. */
+  const tenta = (abrir) => {
+    S.__getGame().screen = 'saveSelect';
+    S.__getGame().modoBloqueado = null;
+    abrir();
+    return { tela: S.__getGame().screen, msg: S.__getGame().modoBloqueado };
+  };
+  const MODOS = [
+    ['Ligas', () => S.openLeagueTypesList(), 'leagueTypesList'],
+    ['Ginásio da Cidade', () => S.openNeighborhoodGymScreen(), 'neighborhoodGym'],
+    ['Batalha Online', () => S.openOnlineBattle(), 'onlineBattle']
+  ];
+
+  /* 1) CONTA SEM NENHUM CAMPEAO: os tres recusam, com a frase pedida. */
+  monta([]);
+  MODOS.forEach(([nome, abrir, tela]) => {
+    const r = tenta(abrir);
+    ok(nome + ': sem campeao NAO entra', r.tela !== tela, 'ficou em ' + r.tela);
+    ok(nome + ': e diz por que', r.msg === S.AVISO_SEM_CAMPEAO, String(r.msg));
+  });
+  ok('e a frase e a pedida',
+     S.AVISO_SEM_CAMPEAO === 'É necessário vencer as 8 insígnias para entrar nesse modo de jogo.',
+     S.AVISO_SEM_CAMPEAO);
+
+  /* 2) SAVE SEM AS 8 tambem nao abre porta. */
+  monta([{ team:TIME, badgeCount:3 }]);
+  MODOS.forEach(([nome, abrir, tela]) => {
+    ok(nome + ': com 3 insignias tambem nao entra', tenta(abrir).tela !== tela);
+  });
+
+  /* ⚠️ 3) SAVE COM AS 8 E SEM TIME tambem nao. Era a copia divergente: a tela do ginasio nao pedia
+     o `team` e deixava passar, as outras nao. */
+  monta([{ badgeCount:8 }]);
+  ok('save com as 8 e SEM time nao conta', S.savesCampeoes().length === 0, S.savesCampeoes().join(','));
+  MODOS.forEach(([nome, abrir, tela]) => {
+    ok(nome + ': save sem time nao entra', tenta(abrir).tela !== tela);
+  });
+
+  /* 4) COM UM CAMPEAO, os tres abrem normalmente -- e a mensagem nao aparece. */
+  monta([{ team:TIME, badgeCount:8 }]);
+  MODOS.forEach(([nome, abrir, tela]) => {
+    const r = tenta(abrir);
+    ok(nome + ': com o time campeao ENTRA', r.tela === tela, r.tela);
+    ok(nome + ': e sem mensagem nenhuma', !r.msg, String(r.msg));
+  });
+
+  /* ⚠️ 5) SAVES AINDA NAO CARREGADOS: a porta DEIXA PASSAR. O game.saveSlots nasce com 20 nulos e
+     e preenchido por uma chamada assincrona -- bloquear ali trancaria a porta na cara de quem TEM
+     o time. Errar pro lado de deixar entrar e o certo: os tres continuam recusando la dentro. */
+  monta([], false);
+  MODOS.forEach(([nome, abrir, tela]) => {
+    ok(nome + ': saves nao carregados NAO bloqueiam', tenta(abrir).tela === tela);
+  });
+
+  /* 6) NA HOME a mensagem aparece, colada nos botoes, e some ao voltar. */
+  monta([]);
+  S.openLeagueTypesList();
+  {
+    const g = S.__getGame(); g.screen = 'saveSelect'; S.__setGame(g);
+    const home = S.renderSaveSelect();
+    ok('a home mostra a recusa', home.indexOf(S.AVISO_SEM_CAMPEAO) >= 0,
+       (home.match(/error-text[^>]*>[^<]*/) || ['(nada)'])[0]);
+    ok('e ela vem ANTES dos botoes de modo', home.indexOf('error-text') < home.indexOf('home-modes-row'));
+    ok('e os quatro botoes continuam la', (home.match(/leagues-big-btn/g) || []).length === 4,
+       (home.match(/leagues-big-btn/g) || []).length + ' botoes');
+  }
+  S.openSaveSelect();
+  ok('e voltando pra home ela some', !S.__getGame().modoBloqueado, String(S.__getGame().modoBloqueado));
+
+  /* ⚠️ 7) A TORRE NAO FOI GATEADA -- so os tres que o pedido nomeia. Fica FIXADO aqui pra o dia em
+     que alguem quiser a mesma porta la ser uma DECISAO, e nao um descuido. */
+  {
+    const txt = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
+    const porta = /if\(!exigeTimeCampeao\(\)\) return;/g;
+    ok('a porta esta em exatamente tres lugares', (txt.match(porta) || []).length === 3,
+       (txt.match(porta) || []).length + ' chamadas');
+    const torre = txt.slice(txt.indexOf('function openTrainerTower('), txt.indexOf('function openTrainerTower(') + 400);
+    ok('e a Torre continua FORA dela (so os tres pedidos)', torre.indexOf('exigeTimeCampeao') < 0);
+  }
+}
+
+console.log('\n=== AS TRES PRATELEIRAS DA LOJA ===');
+{
+  /* Pedidas em 12/09/2026: *"na parte que exibe a lista dos itens, diminua ela pela metade na
+     horizontal e adicione do lado esquerdo 3 botoes: o primeiro e 'Para as batalhas', e adicione
+     nessa secao todos os itens que sao usados equipando um pokemon; no segundo botao coloque
+     'Especiais', e adicione o Rare Candy; e o terceiro botao coloque TMs, ainda sem nada"*. */
+  conta({ doces: 0 });
+  S.openLoja();
+  ok('sao tres, na ordem pedida',
+     S.LOJA_PRATELEIRAS.map(p => p.nome).join(' | ') === 'Para as batalhas | Especiais | TMs',
+     S.LOJA_PRATELEIRAS.map(p => p.nome).join(' | '));
+  ok('e a loja abre na primeira', S.__getGame().lojaAba === 'batalha', String(S.__getGame().lojaAba));
+
+  /* ⚠️ TODO ITEM A VENDA CAI EM EXATAMENTE UMA PRATELEIRA. E o que impede um item novo de sumir da
+     loja sem ninguem ver -- a prateleira sai do proprio item (`equipável`), nao de uma lista
+     escrita na tela, justamente pra nenhuma lista envelhecer calada. */
+  {
+    const aVenda = Object.keys(S.ITENS).filter(id => S.ITENS[id].comprável);
+    const somadas = S.LOJA_PRATELEIRAS.reduce((a, p) => a.concat(S.itensDaPrateleira(p.id)), []);
+    ok('todo item a venda esta em exatamente uma prateleira',
+       somadas.length === aVenda.length && aVenda.every(id => somadas.filter(x => x === id).length === 1),
+       somadas.length + ' de ' + aVenda.length);
+  }
+  /* "Para as batalhas" E exatamente o `equipável` -- a marca que ja dizia que o item vai num
+     pokemon pelo + da tela de ordem. Casar as duas coisas e o que mantem a prateleira honesta. */
+  ok('"Para as batalhas" e exatamente quem se EQUIPA num pokemon',
+     S.itensDaPrateleira('batalha').join(',') === Object.keys(S.ITENS).filter(id => S.ITENS[id].comprável && S.ITENS[id].equipável).join(','),
+     S.itensDaPrateleira('batalha').join(', '));
+  ok('e sao os nove', S.itensDaPrateleira('batalha').length === 9, S.itensDaPrateleira('batalha').length + ' itens');
+  ok('"Especiais" tem o Doce Raro', S.itensDaPrateleira('especiais').indexOf('doce_raro') >= 0,
+     S.itensDaPrateleira('especiais').join(', '));
+  ok('e as TMs estao vazias, como pedido', S.itensDaPrateleira('tms').length === 0,
+     S.itensDaPrateleira('tms').join(', ') || '(vazia)');
+
+  /* NA TELA: os tres botoes aparecem, e a lista mostra so a prateleira aberta. */
+  {
+    const t = S.renderLoja();
+    ok('os tres botoes estao na tela', (t.match(/class="loja-aba /g)||[]).length === 3,
+       (t.match(/class="loja-aba /g)||[]).length + ' botoes');
+    ok('com os nomes por extenso', S.LOJA_PRATELEIRAS.every(p => t.indexOf(p.nome) >= 0));
+    ok('a lista fica ao lado deles', t.indexOf('loja-corpo') >= 0 && t.indexOf('loja-abas') < t.indexOf('loja-lista'));
+    /* O Doce Raro NAO pode aparecer na prateleira das batalhas. */
+    ok('e a lista mostra so a prateleira aberta', t.indexOf('>Doce Raro') < 0,
+       (t.match(/loja-nome[^>]*>[^<]*/g)||[]).length + ' linhas');
+  }
+
+  /* ⚠️ TROCAR DE PRATELEIRA MOVE A SELECAO. Sem isso o quadro de cima continuava mostrando um item
+     que a lista ao lado nem lista mais -- e na prateleira VAZIA ele mostraria o da anterior, com
+     botao de comprar e tudo. */
+  S.escolherPrateleira('especiais');
+  ok('trocar de prateleira move a selecao junto', S.__getGame().lojaSel === 'doce_raro',
+     String(S.__getGame().lojaSel));
+  {
+    const t = S.renderLoja();
+    ok('e a lista passa a ser a dela', (t.match(/class="loja-linha/g)||[]).length === 1 && t.indexOf('>Doce Raro') >= 0);
+  }
+  S.escolherPrateleira('tms');
+  ok('e na prateleira vazia nao sobra item selecionado', S.__getGame().lojaSel === null,
+     String(S.__getGame().lojaSel));
+  {
+    const t = S.renderLoja();
+    ok('ela nao mostra linha nenhuma', (t.match(/class="loja-linha/g)||[]).length === 0);
+    /* UM RECADO SO. O quadro de cima e o DETALHE do item selecionado, e ali nao ha item -- com ele
+       a tela dizia a mesma coisa duas vezes (em cima e na lista). */
+    ok('e o quadro de detalhe SOME', t.indexOf('loja-fixa') < 0);
+    ok('deixando um recado so, que nomeia a prateleira', /Ainda não há TMs à venda/.test(t),
+       (t.match(/loja-vazia[^>]*>[^<]*/g)||[]).join(' | '));
+    ok('e o saldo continua na tela', /Você tem <strong>🪙/.test(t));
+    /* E O BOTAO DE COMPRAR NAO PODE ESTAR LA: nao ha o que comprar. */
+    ok('e nao ha botao de comprar', t.indexOf('abrirCompra') < 0);
+  }
+  S.escolherPrateleira('batalha');
+}
+
 console.log('\n=== A LOJA ===');
 {
   conta({ doces: 0 });
@@ -167,11 +337,13 @@ console.log('\n=== A LOJA ===');
      t.includes('loja-lista') && !t.includes('item-grade'));
   /* O NUMERO SAI DO CATALOGO, e nao escrito a mao: ele ja envelheceu uma vez (estava 11 quando o
      Bonus Shiny saiu da loja, em 12/09/2026) e o teste acusou a tela por uma mudanca que era do
-     catalogo. O que a regra quer e "uma linha por item a venda", nao "onze linhas". */
+     catalogo. O que a regra quer e "uma linha por item a venda", nao "onze linhas".
+     ⚠️ E DESDE 12/09/2026 A LISTA E DA PRATELEIRA ABERTA, nao do catalogo inteiro -- a loja ganhou
+     tres (Para as batalhas / Especiais / TMs). */
   {
-    const aVenda = Object.keys(S.ITENS).filter(id => S.ITENS[id].comprável).length;
-    ok('com uma linha por item a venda', (t.match(/class="loja-linha/g)||[]).length === aVenda,
-       (t.match(/class="loja-linha/g)||[]).length + ' linhas pra ' + aVenda + ' itens a venda');
+    const daAba = S.itensDaPrateleira(S.__getGame().lojaAba).length;
+    ok('com uma linha por item da prateleira aberta', (t.match(/class="loja-linha/g)||[]).length === daAba,
+       (t.match(/class="loja-linha/g)||[]).length + ' linhas pra ' + daAba + ' itens em ' + S.__getGame().lojaAba);
   }
   /* Cada linha traz o que a grade nao trazia: NOME e PRECO, sem precisar clicar. */
   ok('e cada linha tem icone, nome e preco',
@@ -593,13 +765,28 @@ console.log('\n=== O HM01: A PRIMEIRA MAQUINA OCULTA (11/09/2026) ===');
      /HM01/.test(S.renderTmHm()) && !/Abra um save/.test(S.renderTmHm()), limpo(S.renderTmHm()));
   g.currentSaveSlot = 0;
 
-  /* O BOTAO na mochila, e a contagem nele. */
+  /* ⚠️ O BOTAO DA MOCHILA ESTA ESCONDIDO PRA TODO MUNDO (12/09/2026, a pedido). O que se cobra
+     agora e o par: ele nao aparece pra NINGUEM -- nem pra quem ja tem o HM01, que era justamente
+     quem via a contagem --, e o RESTO da feature continua de pe.
+     A trava le a constante em vez de so procurar o botao: assim o dia em que ela voltar a ser true
+     o teste acompanha sozinho, e ninguem precisa lembrar de mexer aqui. */
   {
     g.inventario = {}; g.rareCandies = 0; g.hms = [];
-    ok('a mochila tem o botao de TMs e HMs', /abrirTmHm\(\)/.test(S.renderInventario()));
-    ok('e sem nenhum ele nao mostra contagem', !/TMs e HMs \(/.test(S.renderInventario()));
+    ok('a porta da tela de TMs e HMs esta fechada', S.MOSTRAR_TM_HM === false, String(S.MOSTRAR_TM_HM));
+    const semHm = S.renderInventario();
     g.hms = ['hm01'];
-    ok('com um, ele mostra (1)', /TMs e HMs \(1\)/.test(S.renderInventario()));
+    const comHm = S.renderInventario();
+    ok('a mochila NAO mostra o botao de TMs e HMs',
+       (/abrirTmHm\(\)/.test(semHm) === S.MOSTRAR_TM_HM) && (/abrirTmHm\(\)/.test(comHm) === S.MOSTRAR_TM_HM),
+       'sem HM: ' + /abrirTmHm\(\)/.test(semHm) + '   com HM01: ' + /abrirTmHm\(\)/.test(comHm));
+    ok('nem pra quem ja tem o HM01 (a contagem some junto)',
+       /TMs e HMs/.test(comHm) === S.MOSTRAR_TM_HM, /TMs e HMs \(1\)/.test(comHm) ? 'mostra (1)' : 'nao mostra');
+    ok('e o Voltar continua la', /sairDaMochila\(\)/.test(comHm));
+    /* O RESTO DA FEATURE CONTINUA DE PE -- o que sumiu e so a porta. */
+    ok('a tela continua desenhavel', /HM01/.test(S.renderTmHm()), '(desenha)');
+    ok('e o HM01 continua na conta', S.temHM('hm01') === true);
+    ok('e o render ainda sabe desenhar a tela tmhm',
+       require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8').indexOf("case 'tmhm':") >= 0);
   }
 
   /* ⚠️ O HM E DA CONTA, NAO DO SAVE (11/09/2026, a pedido: "depois que qualquer save conseguiu ele,

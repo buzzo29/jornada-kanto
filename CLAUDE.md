@@ -1759,6 +1759,211 @@ costuma ter mais, e **cai dos dois lados**.
   que só herdou a chuva tem o emoji e NÃO a linha), o selo sendo clicável e abrindo a caixa da
   chuva, o 🌧️ em cima do ×, e as quatro telas de batalha com a faixa.
 
+### A FRASE DA PASSIVA NASCE NO PASSO DO EVENTO (12/09/2026)
+
+Reportada assim: *"quando aparece as frases de habilidades passivas nos ataques, como sono,
+autodestruição, dança da chuva, etc, a frase fica piscando na tela antes de ocorrer o evento,
+ajuste para que nao fique assim"*.
+
+- **E ficava mesmo — em 92,3% das frases de abertura**, medido em 11.338 confrontos. A janela
+  começava no **passo 0**, que é o desenho que ANTECEDE a animação: a frase entrava, ficava 1,55s
+  (os 550ms de sempre mais o segundo do `pausaDoEspecial`) contando algo que ainda não tinha
+  acontecido, e só então o evento passava por baixo dela. Nas que não movem barra — sono, chuva,
+  as duas danças — era pior ainda: a frase anunciava e a tela não mudava nada.
+- **HOJE A JANELA COMEÇA EM `i + 1`, que é o passo do próprio evento.** A frase da confusão nasce
+  no passo em que a barra do confuso desce; a da fúria, no passo em que o pokémon cresce; a do
+  sono, no passo em que ele dorme.
+- **O SEGUNDO DE LEITURA MUDOU DE LADO, e é isso que mantém o tempo igual.** Ele vinha do
+  `pausaDoEspecial`, ANTES do primeiro passo; hoje vem da marca **`leitura`**, DEPOIS do passo —
+  que já era como toda abertura fora do índice 0 funcionava desde 11/09/2026. O `i > 0` que
+  excluía o índice 0 caiu junto. **Medido: a cena de um confronto continua em ~3,6s** (3.603ms →
+  3.593ms) e os passos por confronto não se movem (3,06).
+- **⚠️ A ANULAÇÃO É A ÚNICA EXCEÇÃO, e ela se identifica sozinha.** Ela não move barra e é
+  **filtrada FORA da sequência** (não é um passo), então não existe passo de evento pra ela
+  esperar — o passo dela É o 0, que é quando a anulação de fato acontece: antes do primeiro golpe.
+  Quem separa os dois casos é o `ondeEstaNaSequencia`, que passou a devolver **-1** quando a
+  abertura não está na sequência. Ele devolvia **0** nos dois casos ("está no primeiro passo" e
+  "não está em passo nenhum"), o que era inofensivo enquanto toda frase começava no passo 0 e
+  deixou de ser agora: sem o -1, a anulação esperaria por um passo que nunca chega e **nunca
+  apareceria**.
+  Ou seja: o `pausaDoEspecial` continua existindo, e hoje ele serve a **um** especial só.
+- **A TABELA `passosDaAbertura` MUDOU DE SIGNIFICADO, e por isso os números caíram.** Ela contava
+  "a pausa MAIS os passos"; hoje conta **só os passos do evento**. Quase todas viraram **1**
+  (sono, fúria, confusão, Fúria do Dragão, chuva, as duas danças, cura, poção); a **drenagem fica
+  em 2** porque ela mexe as DUAS barras, e o **Remoinho em 2** (quem sai + a vaga vazia) com o
+  `remoinhoEntra` em 1.
+  Quem for acrescentar um especial: o número é **quantos passos da animação a frase precisa
+  cobrir**, e some com o passo 0 da conta.
+- **E ISSO DESENTERROU A AUTODESTRUIÇÃO DE NOVO.** Ela não tem passo de SAÍDA de propósito (o
+  confronto INTEIRO é aquilo), e o passo de ENTRADA dela tinha sido consertado em 12/09 pela
+  metade — `(i === 0) ? 0 : i + 1` ainda a deixava começar no passo 0 no caso comum. Hoje ela
+  também nasce no passo em que a explosão acontece.
+- **MEDIDO DEPOIS: as frases anunciadas antes da hora vão de 2.147 para ZERO.** As 252 que a
+  varredura ainda conta são os dois quadros de **CONTINUAÇÃO** — o `boomself` (a segunda entrada
+  da explosão) e a **vaga vazia** do sopro —, onde a frase já estava na tela desde o passo
+  anterior do MESMO evento. Não são anúncio adiantado: são a mesma frase seguindo.
+- **CONFERIDO QUE NÃO É MOTOR, por impressão:** o mesmo build antes e depois dá o **MESMO hash**
+  em 900 batalhas semeadas. `passosDaAbertura`, `avisoDoConfronto` e `buildAnimatedHitSequence`
+  **não existem no servidor** — é apresentação inteira.
+- `tools/test-especiais.js` tranca o invariante que o pedido criou: **nenhuma das cinco aberturas
+  medidas (sono, explosão, cura, drenagem, anulação) pode ter frase na tela antes do passo do
+  evento dela**, e cada uma continua cedendo o lugar ao nome do golpe (menos a explosão, que fica
+  até o fim). O helper `passoDoEvento` é quem sabe que a anulação vale 0 e o resto vale `índice+1`.
+
+#### E O PISCAR QUE SOBROU ERA A ANIMAÇÃO DE ENTRADA RODANDO DUAS VEZES
+
+Reportado logo depois: *"ainda está piscando um pouco a mensagem das habilidades passivas"*.
+
+- **A janela já estava certa; o que repetia era o FADE-IN.** O pintor põe a frase no passo do
+  evento e reinicia a animação de propósito (é o que separa dois golpes seguidos do mesmo lado);
+  50ms depois o laço pede um `render()` por causa da marca `leitura`, e **o render recria o
+  elemento** — então o `aviso-especial-entra` rodava de novo em cima do que tinha acabado de rodar.
+  O jogador via a frase surgir duas vezes.
+- **FRASE QUE JÁ ESTÁ NA TELA NÃO REENTRA.** Quem responde isso é o próprio DOM: o HTML do
+  `statusDoConfrontoHtml` é montado ANTES de o `render()` trocar o conteúdo, então o elemento
+  antigo ainda está lá com o que o jogador está vendo — comparar com ele é exato e não guarda
+  estado nenhum. Igual ⇒ sai com `aviso-sem-entrada` (`animation:none`). O **pintor** ganhou a
+  mesma guarda e devolve sem encostar no elemento.
+  **Frase NOVA continua entrando normalmente** — é o que separa um golpe do seguinte.
+- **A PAUSA FOI A 1,5s** (`PAUSA_LEITURA_ESPECIAL_MS`, era 1s), a pedido. Ela vale pras três portas
+  de leitura: a marca `leitura` do passo do evento, a pausa da Faixa no meio da luta e a pausa de
+  abertura da anulação. **Custo medido: +466ms nos confrontos que têm passiva** (17,2% deles) e
+  +81ms na média de todos (4.914 → 4.995ms por confronto).
+- **O SANDBOX DOS TESTES PRECISOU APRENDER QUE O MESMO id É O MESMO ELEMENTO.** O
+  `getElementById` devolvia um stub NOVO a cada chamada, e com isso qualquer código que PERGUNTE o
+  que já está na tela ficava invisível pro teste — a guarda acima é exatamente disso. Agora ele
+  guarda um elemento por id, como o DOM de verdade.
+- `tools/test-especiais.js` simula o laço (pinta no passo do evento, depois desenha) e cobra: nada
+  no passo 0, a frase no passo do evento, o desenho seguinte **sem** reentrada, o pintor não
+  encostando no que já está lá, e a frase nova entrando. Conferido que ele falha com a guarda
+  removida (2 casos).
+
+### O GOLPE APARADO NÃO APARECE COM O NÚMERO APARADO (12/09/2026)
+
+Reportado com print de um **Bulbasaur × Onix**: *"o primeiro chicote de cipó tirou −45hp, e o
+segundo −126, por que está tendo essa diferença tão grande sendo que nem era crítico?"*. E depois,
+com o diagnóstico na mão: *"esse golpe moribundo não é de conhecimento do usuário, e a ideia é ele
+nunca saber; se ele ver que o mesmo golpe, contra o mesmo pokémon, tá tirando danos muito
+distintos, ele vai achar que o jogo tá bugado e vai começar a desanimar de jogar ... por que você
+não somou o 126 + 45, dando 171, e então dividiu esse 171 ... assim vai passar a sensação de que
+aquele era o dano médio mesmo que tiraria do oponente"*.
+
+- **O MOTOR ESTAVA CERTO, e a causa é o diário gravar o dano EFETIVO** — a regra que faz a soma das
+  linhas fechar com a barra. Um golpe que esbarra no fim de uma barra é escrito **menor do que
+  foi**. Medido em 18.160 confrontos, em todo par de golpes do mesmo lado com razão acima de 2×
+  (19,9% dos confrontos), o golpe PEQUENO era:
+
+  | | |
+  |---|---|
+  | o golpe que **MATOU** (só tirou o que sobrava) | **76,8%** |
+  | o alvo ficou no **piso do revide moribundo** (1%-10%) | **12,8%** |
+  | um dos dois foi **crítico** | 6,3% |
+  | confronto **reconstruído** (passou do teto) | 3,7% |
+  | não explicado | 0,3% |
+
+  **O print era o segundo caso, e dava pra provar pelo próprio print:** o Onix terminou em **9 de
+  180 = 5,0% da barra**, no meio da faixa do piso. A ordem real foi `Onix −95 · Bulbasaur −126 ·
+  Onix −19 (mata) · Bulbasaur −45 MORIBUNDO` — ou seja, a linha de CIMA era a ÚLTIMA coisa que
+  aconteceu, empurrada pra frente pelo reordenamento (pra ninguém aparecer atacando com a barra em
+  zero) e pequena porque o piso de 12/09 a aparou.
+  **E ela não tinha como se explicar na tela**, porque o piso foi pedido MASCARADO.
+
+- **A SAÍDA É REPARTIR, e ela cabe porque a luta JÁ ACABOU quando a tela desenha.** O motor resolve
+  o confronto inteiro; o log e a animação são apresentação em cima do resultado. Então as linhas de
+  um lado passam a mostrar o TOTAL dele repartido em fatias parecidas, em vez do dano efetivo golpe
+  a golpe.
+- **O TOTAL NÃO MUDA, e é isso que mantém tudo de pé**: a soma das linhas continua fechando com a
+  barra (medido, **10.898 de 10.898** em todos os caminhos), o alvo termina exatamente onde
+  terminava, e ninguém morre um golpe antes ou depois — as somas parciais só encolhem, então
+  nenhuma barra chega a zero antes do golpe que a zerava.
+- **A BANDA É A DA FÓRMULA, e agora ela mora num lugar só** (`JITTER_DO_GOLPE`, `fatiaDoGolpe`).
+  Dois golpes do mesmo pokémon, com o mesmo golpe, contra o mesmo alvo, só diferem pelo sorteio de
+  `0,85 + rng*0,15`: no máximo **1,176×**. Cada fatia fica entre **92% e 108%** da divisão igual —
+  num par isso é exatamente os **46%-54%** que a reconstrução já usava desde 10/09/2026, e as duas
+  passaram a ler a MESMA conta. Duas cópias divergiriam no primeiro ajuste, e aí um dos dois
+  caminhos voltaria a mostrar par impossível.
+  **O pedido falava em 40%-60%**; isso daria razão de **1,5×**, acima do que a fórmula produz — é a
+  mesma faixa larga que foi estreitada em 10/09 justamente por isso. Se um dia se quiser a divisão
+  mais solta, é uma constante.
+- **⚠️ O CRÍTICO ENTRA PESANDO 2, e não fica de fora.** O selo dele promete que aquela barra caiu o
+  DOBRO, então a linha tem que sair o dobro das outras do mesmo atacante. A primeira versão o
+  excluía do bolo, e aí um crítico aparado ficava **menor** que os irmãos já acertados — o selo
+  passava a dizer o contrário do que se vê, que é exatamente o defeito que o `cap` conserta.
+  Foi a trava do selo que pegou, falhando **~1 rodada em 16**.
+  O campo `c` do diário já nasce **zero** quando o corte comeu a dobra, então "pesa 2" é exatamente
+  "esta linha vai mostrar o selo". Medido: a linha do crítico **nunca** sai menor que a do golpe
+  comum do mesmo atacante (239 de 239).
+- **O QUE FICA DE FORA:** o golpe de **vários tapas** (a linha dele é a SOMA de N e já traz o `Nx`)
+  e o confronto com **FAIXA DE FOCO** (ela fixa a barra em 1 no passo dela; mexer nos números
+  anteriores faria a barra chegar noutro valor e a frase prometeria um 1 que não se vê).
+- **⚠️ ELE RODA ANTES DO `passosVisiveis`, no DIÁRIO — e essa ordem custou uma volta de conserto.**
+  O campo `hp` é a vida do ALVO depois do golpe e é **CRONOLÓGICO**; a tela mostra outra ordem (o
+  revide moribundo vai pra frente). Corrigindo `hp` na ordem da TELA o acumulado sai trocado e o
+  diário passa a descrever uma luta que não aconteceu: medido, **259 cadáveres** na trava do
+  "ninguém ataca com a barra em zero", com `hp` até **negativo**. Rodando antes, a ordem já é a do
+  motor e a correção é exata (`hp_novo = hp_velho + acumulado_velho − acumulado_novo`).
+- **O CAMINHO DO SONO TAMBÉM PASSA, e ele era o último resto.** Lá as trocas livres saem REAIS (uma
+  linha cada, que é a coisa que o sono FAZ) e só o resto é reconstruído — então um golpe de verdade
+  fica ao lado de uma linha que é a SOMA de vários. Medido antes: **61 lados, o pior em 56×**;
+  depois, 7, o pior em 1,22×. Ali o `hp` é **apagado** nas linhas tocadas, de propósito: a lista
+  mistura entrada real (que tem `hp`) com reconstruída (que nunca teve), e quem lê o diário pela
+  tela passa a subtrair os próprios números mostrados — que é a conta certa.
+- **ELE CLONA, nunca muta.** `sequenciaDoConfronto` é chamada a cada desenho da tela, e `m.golpes` é
+  o diário de verdade: mutando, a segunda chamada suavizaria o suavizado e o log iria mudando de
+  número sozinho. O teste cobra que o diário fica intacto e que três chamadas devolvem a mesma
+  divisão (ela é **determinística**, semeada pelo próprio confronto — com sorteio, o log mostraria
+  um número e a barra desceria outro).
+
+**O QUE MUDOU, MEDIDO** (18.160 confrontos, o mesmo bot contra os dois builds):
+
+| | antes | depois |
+|---|---|---|
+| pares FORA da banda da fórmula | **43,1%** | **0,9%** |
+| pior razão vista | **294×** | **1,22×** |
+| razão média | 3,64× | **1,08×** |
+| linhas de golpe na tela | 50.509 | 50.509 |
+| linhas de dano zero | 0 | 0 |
+
+Os 0,9% que sobram são **arredondamento** (as fatias são inteiras, e num total pequeno — 27 e 32 —
+o inteiro mais próximo passa de 1,176 por alguns centésimos): 89 no caminho normal com o pior em
+1,20×, 7 no sono e 4 na reconstrução. Nenhum deles se distingue a olho do 1,176 que a fórmula já
+produz.
+
+**O CASO DO PRINT, antes e depois:**
+
+```
+antes                                       depois
+😤 Onix entrou em fúria e cresceu            😤 Onix entrou em fúria e cresceu
+Bulbasaur ... Chicote de Cipó   −30          Bulbasaur ... Chicote de Cipó   −82
+Onix ... Lançar Pedra           −95          Onix ... Lançar Pedra           −76
+Bulbasaur ... Chicote de Cipó  −131          Bulbasaur ... Chicote de Cipó   −79
+Onix ... Lançar Pedra           −55          Onix ... Lançar Pedra           −74
+(razão 4,37×)                                (razão 1,04×, mesma soma, Onix em 9)
+```
+
+- **CONFERIDO QUE NÃO É MOTOR, por impressão:** o mesmo build antes e depois dá o **MESMO hash** em
+  900 batalhas semeadas. O diário continua com os números reais — o que muda é só o que a tela
+  desenha a partir dele.
+- `tools/test-especiais.js` tranca: nenhum par fora da banda em 3.453 lados, a soma fechando com a
+  barra em todos os caminhos, nenhuma linha de dano zero ou negativo, o crítico nunca menor que o
+  golpe comum, o diário intacto, a divisão igual em três chamadas seguidas, e o log e a animação
+  mostrando os mesmos números. Conferido que a trava **falha** com a suavização desligada (1.357
+  de 3.453 pares, pior 261×).
+- **Se um dia incomodar**, os lugares são o `JITTER_DO_GOLPE` (o quanto as fatias variam entre si)
+  e a `RAZAO_DE_UM_GOLPE` (a partir de quando ela decide repartir).
+
+#### E duas correções de teste saíram junto
+
+1. **A trava da cura cobrava o ÍNDICE 0** (`seq[0].x === (a cura)`), e outra ABERTURA pode
+   legitimamente vir antes dela — as aberturas guardam a ordem do diário, e um Remoinho ou uma
+   Dança das Espadas acontece antes. Medido: **7 de 376** confrontos, e como o caso roda com
+   `Math.random` isso virava ~2 rodadas em 14. Conferido que a frequência é a MESMA antes e depois
+   da suavização, ou seja é artefato antigo. Hoje ela cobra o que a regra promete: a cura vem
+   **antes de qualquer golpe**.
+2. **A conta da soma das linhas contava a AUTODESTRUIÇÃO pelo lado errado.** As duas entradas
+   (`boom` e `boomself`) seguem a MESMA convenção do `q` que todo o resto do diário — quem causou
+   está no `q`, o alvo é o outro lado. Contar o `boomself` invertido dava **136 falsos positivos em
+   10.898**, todos com explosão.
 ### DUAS PASSIVAS NO MESMO CONFRONTO (11/09/2026)
 
 Três defeitos reportados juntos, com print, e os três só aparecem quando o confronto tem **mais de
@@ -3574,6 +3779,53 @@ pedido em 09/09/2026. `PAUSA_ANTES_DO_GOLPE_MS`.
   efeito prático — mas ele existe porque um item sem preço no catálogo deixava o quadro de cima
   VAZIO, e foi pego pelo teste no dia em que a loja passou a vender.
 
+### AS TRÊS PRATELEIRAS DA LOJA (12/09/2026)
+
+Pedidas assim: *"na loja, na parte que exibe a lista dos itens, diminua ela pela metade na
+horizontal e adicione do lado esquerdo 3 botões: o primeiro é 'Para as batalhas', e adicione nessa
+seção todos os itens que são usados equipando um pokémon; no segundo botão coloque 'Especiais', e
+adicione o Rare Candy; e o terceiro botão coloque TMs, ainda sem nada para vender"*.
+
+| prateleira | o que tem |
+|---|---|
+| **Para as batalhas** | os **9** que se equipam num pokémon |
+| **Especiais** | o Doce Raro |
+| **TMs** | vazia, de propósito |
+
+- **⚠️ A PRATELEIRA SAI DO PRÓPRIO ITEM, nunca de uma lista escrita na tela.** "Para as batalhas"
+  **é** exatamente o `equipável` — a marca que já existia e que diz que o item vai num pokémon pelo
+  `+` da tela de ordem —, e o resto cai em "Especiais". Assim um item novo nasce numa prateleira
+  sozinho e nenhuma lista envelhece calada: o teste cobra que **todo `comprável` apareça em
+  exatamente uma**, e que a prateleira das batalhas case item a item com o `equipável`.
+  É a mesma lição do "59 espécies das quatro listas" que envelheceu calado na ficha da Pokédex.
+- **As TMs ficam vazias antes de ter o que vender**, que é o mesmo desenho do HM01: primeiro a
+  porta, depois o que tem atrás dela.
+- **TROCAR DE PRATELEIRA MOVE A SELEÇÃO JUNTO** (`escolherPrateleira`). Sem isso o quadro de cima
+  continuava mostrando um item que a lista ao lado nem lista mais — e na prateleira VAZIA ele
+  mostraria o da anterior, com botão de comprar e tudo.
+- **NA PRATELEIRA VAZIA O QUADRO DE CIMA SOME.** Ele é o DETALHE do item selecionado, e ali não há
+  item: com ele, a tela dizia a mesma coisa duas vezes (em cima e na lista). Quem carrega o recado
+  — e o saldo — passa a ser a própria lista, que é onde a ausência está.
+- **MEDIDO A 320px, no navegador** (as duas colunas são `1fr 1fr`):
+
+  | | antes | depois |
+  |---|---|---|
+  | largura da lista | 281px | **137px** (a outra metade são as prateleiras) |
+  | altura da página, prateleira cheia | 931px | **1.008px** |
+  | altura de uma linha | 46px | 51px a 68px |
+  | rolagem horizontal | nenhuma | **nenhuma** |
+
+  A página cresce 8% na prateleira mais cheia porque a coluna pela metade faz o nome quebrar; a de
+  Especiais fica em **597px**. Os três nomes de prateleira cabem, e "Para as batalhas" usa duas
+  linhas.
+- **⚠️ O PAPEL DO JOGO É `--box`, não `--cream`** — essa variável não existe na paleta, e com o
+  fallback vazio a aba ficava TRANSPARENTE sobre o fundo escuro da página, com o texto em `--ink`
+  por cima: ilegível. Só a selecionada (amarela) se lia. Pego no navegador, a 320px, não pelo teste
+  — layout quebrado passa em qualquer asserção de HTML.
+- **A prateleira NÃO usa o `.btn` da casa**: aquele é botão de AÇÃO, com moldura de 3px. Aqui a
+  lista é de lugares onde se entra — o mesmo raciocínio que já tinha tirado o `.btn` dos cartões de
+  golpe e das linhas da ficha.
+
 ### VENDER: metade do preço de compra (11/09/2026)
 
 Pedido assim: *"na loja, caso o usuário já tenha um dos itens listado, ele pode ter a opção vender
@@ -4261,6 +4513,43 @@ verdade, cai no game over, e o teste confere que a trava soltou dos dois lados.
   mesmos iniciais; agora, além de não adiantar, sai 10 moedas por tentativa. Com o difícil em 1/16
   a tela dos sete iniciais mostra shiny em 36,3% das vezes, então essa trava passou a valer mais.
 
+## A porta dos modos de campeão (as 8 insígnias)
+
+Pedida em 12/09/2026: *"caso a conta não tenha nenhum time vencedor das 8 insígnias, coloque uma
+mensagem de erro quando o treinador clicar para entrar no ginásio da cidade, ligas clássicas e
+batalhas onlines ... e não deixe entrar"*.
+
+- **Os três JÁ recusavam — mas lá dentro.** Cada um tinha a própria frase ("Você precisa de um time
+  com as 8 insígnias pra desafiar", "...pra se inscrever"), e ela só aparecia depois de abrir a
+  tela, esperar a **geolocalização** no caso do Ginásio, e montar o picker vazio. Agora a recusa é
+  na porta, com uma frase só (`AVISO_SEM_CAMPEAO`).
+- **⚠️ A PERGUNTA VIVIA COPIADA EM CINCO TELAS** (`s && s.team && (s.badgeCount||0) >= 8`) — e uma
+  delas **não pedia o `team`**: um save com as 8 insígnias e sem time passava no Ginásio da Cidade
+  e era recusado nas outras. Hoje é o `savesCampeoes()`, num lugar só, e o `team` faz parte da
+  pergunta: o que estes modos precisam é de um TIME pronto, não de um troféu.
+- **⚠️ A PORTA SÓ BLOQUEIA DEPOIS QUE OS SAVES CARREGAM, e isso não é detalhe.** O `game.saveSlots`
+  nasce com 20 nulos e só é preenchido pelo `loadSaveSlots`, que é assíncrono e começa DEPOIS do
+  primeiro desenho da home — sem a guarda, quem clicasse nessa janela levava a mensagem **sendo
+  campeão**. Errar pro lado de DEIXAR ENTRAR é o certo aqui: a janela dura alguns centésimos, os
+  três modos continuam recusando lá dentro, e o contrário é trancar a porta na cara de quem tem o
+  time. Quem responde é o `saveSlotsCarregados`, e ele **entrou no `CAMPOS_DA_CONTA`** — sem isso o
+  `resetGame` o apagaria ao abrir um save e a porta pararia de bloquear em silêncio.
+- **A mensagem fica na HOME, colada nos botões que a provocaram** — num rodapé ou no topo o jogador
+  não liga uma coisa na outra. Ela é do CLIQUE e não do estado da conta: `openSaveSelect` a limpa,
+  senão ela continuaria na tela depois de o jogador ir conquistar a 8ª insígnia.
+- **Os botões continuam clicáveis**, e foi o pedido: *"coloque uma mensagem de erro quando o
+  treinador clicar"*. Um botão apagado não diz por quê — e o que falta aqui é justamente saber o
+  que fazer pra abrir aquilo.
+- **⚠️ A TORRE DOS TREINADORES FICOU DE FORA**, porque o pedido nomeia três modos. Ela monta time a
+  partir dos saves campeões do mesmo jeito, então hoje uma conta sem campeão entra lá e encontra o
+  montador vazio. **Fica FIXADO no teste** (a porta está em exatamente três lugares, e a Torre não
+  é um deles) pra o dia em que isso mudar ser uma decisão e não um descuido.
+- **Medido a 320px, no navegador:** a caixa da mensagem mede **84px**, o texto cai em 2 linhas, ela
+  fica logo acima da fileira de modos e não há rolagem horizontal.
+- `tools/test-inventario.js` tranca os cinco cenários nos TRÊS modos: conta vazia, save com 3
+  insígnias, save com as 8 **sem time**, save campeão (entra e sem mensagem) e saves ainda não
+  carregados (não bloqueia) — mais a mensagem na home, a posição dela e a limpeza ao voltar.
+
 ## Ginásio da Cidade
 
 - **O time dos DOIS lados é MONTADO, não é mais um save** (01/09/2026). Líder e desafiante escolhem
@@ -4595,6 +4884,15 @@ rota por trecho, com cadeado visível; nada disso está implementado.
   em silêncio, e só pra quem tem mais de um. O teste lê o código pra cobrar isso.
   Com ele na conta, a tela de TMs e HMs deixou de ter o estado "abra um save pra ver os dele": a
   mochila aberta da home mostra os mesmos.
+- **⚠️ O BOTÃO DA MOCHILA ESTÁ ESCONDIDO PRA TODO MUNDO desde 12/09/2026** (a pedido: *"esconda o
+  botão na mochila de tm/hm para todos"*). Quem manda é o **`MOSTRAR_TM_HM`**, e ele é uma
+  constante e não uma remoção porque o pedido foi "esconda", não "tire".
+  **O QUE CONTINUA DE PÉ:** o HM01 é conquistado na jornada do mesmo jeito (a rota do S.S. Anne
+  mais o Surge sem derrota), é anunciado na tela de vitória, e continua guardado em
+  `users/{uid}.hms` — nada disso passa pelo botão. O `case 'tmhm'` do render fica também: sem ele,
+  o dia em que o botão voltar começa com uma tela em branco.
+  **Voltar a mostrar é ESSA LINHA.** O teste LÊ a constante em vez de só procurar o botão, então no
+  dia em que ela virar `true` ele acompanha sozinho — ninguém precisa lembrar de mexer lá.
 - **A LISTA É SÓ O NOME E UMA LEGENDA PEQUENA** (11/09/2026, a pedido). Ela tinha um parágrafo azul
   por baixo de cada Máquina dizendo que ela ainda não faz nada — com um item só na lista, a
   explicação ocupava mais espaço que a coisa explicada. O campo `descricao` saiu da tabela junto,

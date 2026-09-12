@@ -482,8 +482,15 @@ ok('mas a linha dele aparece no log, e vem primeiro',
 
 /* Sem golpe especial, a linha e a de sempre -- e o aviso nao aparece. */
 ok('confronto comum nao ganha aviso', S.avisoDoConfronto({ player:'A', enemy:'B', golpes:[{q:'p',d:10,hp:5}] }) === '');
-ok('e a pausa de leitura so existe quando ha o que ler',
-   S.pausaDoEspecial(mBoom) === 1000 && S.pausaDoEspecial({ golpes:[{q:'p',d:10}] }) === 0);
+/* ⚠️ A PAUSA DE ABERTURA HOJE E SO DA ANULACAO. Desde 12/09/2026 a frase nasce no passo do
+   EVENTO, nao no passo 0 -- entao quem E um passo da animacao (explosao, sono, chuva...) nao tem
+   nada escrito no passo 0 e nao precisa da pausa de la: o segundo de leitura dele vem DEPOIS do
+   passo, pela marca `leitura`. A anulacao nao e um passo (nao move barra, e filtrada fora da
+   sequencia), entao o passo dela E o 0 -- e e so ela que ainda usa esta pausa. */
+ok('a pausa de abertura e so de quem NAO tem passo proprio (a anulacao)',
+   S.pausaDoEspecial(mDis) === S.PAUSA_LEITURA_ESPECIAL_MS && S.pausaDoEspecial(mBoom) === 0 &&
+   S.pausaDoEspecial({ golpes:[{q:'p',d:10}] }) === 0,
+   'anulacao ' + S.pausaDoEspecial(mDis) + 'ms  |  explosao ' + S.pausaDoEspecial(mBoom) + 'ms');
 
 console.log('\nDITTO: O GOLPE ACOMPANHA A TRANSFORMACAO');
 /* A tela ja mostrava o sprite do adversario desde sempre; o golpe passou a acompanhar. Ele SOMA os
@@ -726,7 +733,14 @@ console.log('\nA FAIXA DE FOCO NAO PODE SER FURADA POR CAMINHO NENHUM');
         ok('e por isso ele pede a pausa de 1s',
            anim[iF].faixa === true && S.pausaDaFaixa(anim[iF]) === S.PAUSA_LEITURA_ESPECIAL_MS,
            S.pausaDaFaixa(anim[iF]) + 'ms');
-        ok('e golpe comum nao pausa nada', S.pausaDaFaixa(anim[0]) === 0);
+        /* ⚠️ O GOLPE COMUM SAI PROCURADO, nao e o `anim[0]`. O Charizard deste caso tem FÚRIA e
+           FÚRIA DO DRAGÃO, entao o passo 0 pode ser uma ABERTURA -- e desde 12/09/2026 toda
+           abertura carrega o segundo de leitura, inclusive no indice 0 (a frase passou a nascer no
+           passo do evento, e o segundo dela vem depois). O caso roda com Math.random, entao ler o
+           indice 0 falhava so quando a furia saia: o pior tipo de teste, o que passa quase sempre. */
+        const comum = anim.filter(h => !h.x && !h.faixa)[0];
+        ok('e golpe comum nao pausa nada', !!comum && S.pausaDaFaixa(comum) === 0,
+           comum ? S.pausaDaFaixa(comum) + 'ms' : '(nao achei golpe comum)');
         /* O PASSO SEGUINTE pede um desenho, que e o que TIRA a frase da tela. */
         ok('e o passo seguinte pede o desenho que limpa a frase', anim[iF+1] && anim[iF+1].posFaixa === true,
            JSON.stringify(anim[iF+1]));
@@ -1055,10 +1069,12 @@ console.log('\nDRENAGEM: TIRA DO OUTRO E POE EM SI, ANTES DA LUTA');
      (log.match(/mlog-passo especial/g) || []).length === 1,
      (log.match(/mlog-passo especial/g) || []).length + ' linhas especiais');
   ok('com o selo do tipo do golpe', log.includes(S.TYPE_COLORS['Grass']));
-  /* A FRASE tem que durar os DOIS passos: sumindo no primeiro, a segunda barra anda sem explicacao. */
-  ok('a frase aparece no comeco', /drenou a vida de/.test(S.avisoDoConfronto(m, 0)), S.avisoDoConfronto(m, 0));
-  ok('e sobrevive ao segundo passo', /drenou a vida de/.test(S.avisoDoConfronto(m, 1)), S.avisoDoConfronto(m, 1));
-  ok('e some quando a luta comeca', S.avisoDoConfronto(m, 2) === '', S.avisoDoConfronto(m, 2));
+  /* A FRASE NASCE NO PASSO DELA (nao antes -- 12/09/2026) e tem que durar os DOIS: sumindo no
+     primeiro, a segunda barra anda sem explicacao. */
+  ok('nada e anunciado antes de a drenagem acontecer', S.avisoDoConfronto(m, 0) === '', S.avisoDoConfronto(m, 0));
+  ok('a frase aparece NO passo dela', /drenou a vida de/.test(S.avisoDoConfronto(m, 1)), S.avisoDoConfronto(m, 1));
+  ok('e sobrevive ao segundo passo', /drenou a vida de/.test(S.avisoDoConfronto(m, 2)), S.avisoDoConfronto(m, 2));
+  ok('e some quando a luta comeca', S.avisoDoConfronto(m, 3) === '', S.avisoDoConfronto(m, 3));
 })();
 
 console.log('\nRECUPERAR: ANTES DA LUTA, E SO COM MENOS DE 70% DE VIDA');
@@ -1128,8 +1144,9 @@ ok('a frase e a pedida', S.avisoDoConfronto(mRec) === '💚 Alakazam usou Recupe
    S.avisoDoConfronto(mRec));
 /* Ela anuncia a barra que VAI subir -- e some quando a barra ja subiu, senao ficaria uma frase
    velha ocupando o lugar do "Trocando golpes..." pelo resto da luta. */
-ok('e ela aparece ANTES da cura acontecer (passo 0)', S.avisoDoConfronto(mRec, 0) !== '');
-ok('e some depois que a barra subiu', S.avisoDoConfronto(mRec, 1) === '', S.avisoDoConfronto(mRec, 1));
+ok('nada e anunciado antes de a cura acontecer', S.avisoDoConfronto(mRec, 0) === '', S.avisoDoConfronto(mRec, 0));
+ok('ela aparece NO passo em que a barra sobe', S.avisoDoConfronto(mRec, 1) !== '', S.avisoDoConfronto(mRec, 1));
+ok('e some depois que a barra subiu', S.avisoDoConfronto(mRec, 2) === '', S.avisoDoConfronto(mRec, 2));
 /* Autodestruicao e sono sao o contrario: o confronto INTEIRO e aquilo, e a frase acompanha ate o fim. */
 ok('a explosao continua avisando ate o fim', S.avisoDoConfronto(mBoom, 3) !== '');
 
@@ -1172,7 +1189,18 @@ ok('tres golpes + cura continuam sendo os golpes REAIS', seq3.length === 4 && se
   if(!m) return;
   const seq = S.sequenciaDoConfronto(m);
   ok('a cura sobrevive ao teto de golpes', seq.some(g=>g.x==='recover'), seq.map(g=>g.x||'golpe').join(','));
-  ok('e continua sendo o PRIMEIRO passo', seq[0].x === 'recover');
+  /* ⚠️ ANTES DE QUALQUER GOLPE -- e nao "no indice 0". O que a regra promete e que o pokemon entra
+     machucado, se cura, e SO ENTAO a luta comeca; outra ABERTURA pode legitimamente vir antes dela
+     (as aberturas guardam a ordem do diario, e um Remoinho ou uma Danca das Espadas acontece antes).
+     Lido como indice 0 o caso falhava em 7 de 376 confrontos -- e como ele roda com Math.random,
+     isso virava ~2 rodadas em 14: o pior tipo de teste, o que passa quase sempre. Conferido que a
+     frequencia e a MESMA antes e depois da suavizacao, ou seja e artefato antigo do caso. */
+  {
+    const iCura = seq.findIndex(g => g.x === 'recover');
+    const iGolpe = seq.findIndex(g => !g.x);
+    ok('e ela vem ANTES de qualquer golpe', iCura >= 0 && (iGolpe < 0 || iCura < iGolpe),
+       seq.map(g => g.x || 'golpe').join(','));
+  }
   /* A luta comeca da vida CHEIA -- e o que a reconstrucao tem que enxergar. */
   const cura = m.golpes.find(g=>g.x==='recover');
   const eu = cura.q === 'p';
@@ -1629,9 +1657,201 @@ function comItem(instancia, item){
   const anim = S.buildAnimatedHitSequence(m);
   ok('e a barra SOBE nela', anim[0].amount === -336 && anim[0].cura === true, JSON.stringify(anim[0]));
   ok('o log fala dela', /recuperou HP/.test(S.passosHtml(m)));
-  ok('e a frase sai antes da luta e some depois', S.avisoDoConfronto(m, 0) !== '' && S.avisoDoConfronto(m, 1) === '',
-     JSON.stringify([S.avisoDoConfronto(m,0), S.avisoDoConfronto(m,1)]));
+  ok('e a frase sai NO passo da pocao e some depois',
+     S.avisoDoConfronto(m, 0) === '' && S.avisoDoConfronto(m, 1) !== '' && S.avisoDoConfronto(m, 2) === '',
+     JSON.stringify([S.avisoDoConfronto(m,0), S.avisoDoConfronto(m,1), S.avisoDoConfronto(m,2)]));
 })();
+
+console.log('\n=== A FRASE DA PASSIVA NAO REENTRA (o piscar) ===');
+{
+  /* Reportado em 12/09/2026, depois de a frase ja ter passado a nascer no passo do evento:
+     *"ainda esta piscando um pouco a mensagem das habilidades passivas"*.
+     A CAUSA nao era a janela, era a ANIMACAO DE ENTRADA rodando duas vezes: o pintor poe a frase
+     no passo do evento (com o reflow que reinicia a animacao) e o laco pede um `render()` 50ms
+     depois -- e o render RECRIA o elemento, entao o fade-in roda de novo em cima do que acabou de
+     rodar. O jogador ve a frase surgir duas vezes seguidas.
+     O TESTE SIMULA O LACO: pinta no passo do evento e depois desenha, como o laco faz. */
+  let m = null;
+  for(let i = 0; i < 9000 && !m; i++){
+    const a = [inst('butterfree', 40)]; a[0].ataques = S.ataquesPadrao(a[0]);
+    const b = [inst('arbok', 40)]; b[0].ataques = S.ataquesPadrao(b[0]);
+    const x = (S.simulateGymBattle(a, b, S.makeSeededRng('pisca' + i)).matchups || [])[0];
+    if(!x) continue;
+    const xs = (x.golpes || []).map(g => g.x).filter(Boolean);
+    if(xs.length === 1 && xs[0] === 'sono') m = x;
+  }
+  ok('achei um confronto com sono', !!m);
+  if(m){
+    const seq = S.buildAnimatedHitSequence(m);
+    const k = seq.findIndex(h => h.x === 'sono');
+    const el = () => S.document.getElementById('battle-status-txt');
+    /* o desenho que ANTECEDE a animacao: a linha e a generica, e a frase ainda nao esta la */
+    el().innerHTML = ''; el().className = '';
+    const passo0 = S.statusDoConfrontoHtml(m, 0, null);
+    ok('no passo 0 nao ha frase de passiva', passo0.indexOf('dormir') < 0, passo0.slice(0, 80));
+    /* o laco pinta no passo do evento -- e a frase ENTRA (ela e nova) */
+    S.pintarStatusDoConfronto(m, k + 1, seq[k]);
+    ok('o pintor poe a frase no passo do evento', el().innerHTML.indexOf('dormir') >= 0,
+       el().innerHTML.replace(/<[^>]+>/g, '').slice(0, 60));
+    /* e 50ms depois o laco desenha (marca `leitura`): o HTML tem que sair SEM reentrada */
+    ok('o passo do evento pede o desenho', seq[k].leitura === true);
+    const depois = S.statusDoConfrontoHtml(m, k + 1, seq[k]);
+    ok('e o desenho seguinte NAO reanima a frase', /aviso-sem-entrada/.test(depois),
+       depois.slice(0, 110));
+    /* e o PINTOR tambem nao: chamado de novo com a mesma frase, ele nao encosta no elemento */
+    const antes = el().innerHTML;
+    el().style.animation = 'MARCA';
+    S.pintarStatusDoConfronto(m, k + 1, seq[k]);
+    ok('e o pintor nao reanima o que ja esta la',
+       el().innerHTML === antes && el().style.animation === 'MARCA', el().style.animation);
+    /* MAS UMA FRASE NOVA ENTRA -- e o que separa um golpe do seguinte. */
+    const kg = seq.findIndex((h, i) => i > k && !h.x);
+    if(kg > 0){
+      const novo = S.statusDoConfrontoHtml(m, kg + 1, seq[kg]);
+      ok('mas frase NOVA entra normalmente', !/aviso-sem-entrada/.test(novo), novo.slice(0, 110));
+    }
+  }
+  /* E A PAUSA E DE 1,5s, a pedido. */
+  ok('a pausa de leitura da passiva e 1,5s', S.PAUSA_LEITURA_ESPECIAL_MS === 1500,
+     S.PAUSA_LEITURA_ESPECIAL_MS + 'ms');
+}
+
+console.log('\n=== O GOLPE APARADO NAO APARECE COM O NUMERO APARADO ===');
+{
+  /* Pedido em 12/09/2026, com print de um Bulbasaur x Onix: *"esse golpe moribundo nao e de
+     conhecimento do usuario ... se ele ver que o mesmo golpe, contra o mesmo pokemon ta tirando
+     danos muito distintos, ele vai achar que o jogo ta bugado ... por que voce nao somou o 126 +
+     45, dando 171, e entao dividiu esse 171 ... assim vai passar a sensacao de que aquele era o
+     dano medio mesmo"*.
+     O INVARIANTE: dois golpes do MESMO pokemon, com o MESMO golpe, contra o MESMO alvo, so podem
+     diferir pelo sorteio de 0,85 a 1,00 do calcDamageNew -- no maximo 1,176x. Fora isso so o
+     CRITICO, que tem selo proprio, e o golpe de VARIOS TAPAS, que tem o Nx. */
+  const BANDA_APARO = 1 / 0.85;
+  const todos = Object.keys(S.SPECIES);
+  let conf = 0, lados = 0, fora = 0, pior = 1, exemplo = '';
+  let somaOk = 0, somaTot = 0, zero = 0, negativo = 0;
+  for(let i = 0; i < 1200; i++){
+    const t = k => { const p = inst(todos[(i*11 + k*37) % todos.length], 40 + (k%3)*5); p.ataques = S.ataquesPadrao(p); return p; };
+    const ms = S.simulateGymBattle([t(0),t(1),t(2)], [t(3),t(4),t(5)], S.makeSeededRng('aparo' + i)).matchups || [];
+    ms.forEach(mm => {
+      conf++;
+      const seq = S.sequenciaDoConfronto(mm);
+      seq.forEach(g => { if(!g.x && g.d <= 0) zero++; if(!g.x && g.d < 0) negativo++; });
+      ['p','e'].forEach(lado => {
+        /* A SOMA DAS LINHAS TEM QUE CONTINUAR FECHANDO COM A BARRA -- e o que mantem tudo de pe:
+           a suavizacao reparte, nunca cria nem some com dano. */
+        const alvoAntes = lado === 'p' ? mm.enemyHpBefore : mm.playerHpBefore;
+        const alvoDepois = lado === 'p' ? mm.enemyHpAfter : mm.playerHpAfter;
+        /* A AUTODESTRUICAO segue a MESMA convencao do `q` que todo o resto do diario -- quem causou
+           esta no `q` e o alvo e o outro lado --, nas DUAS entradas (`boom` e `boomself`). Contar o
+           `boomself` pelo lado errado dava 136 falsos positivos em 10.898, todos com explosao. */
+        const dela = seq.filter(g => (!g.x || g.x === 'boom' || g.x === 'boomself') && g.q === lado).reduce((a,g) => a + g.d, 0);
+        const ganho = seq.filter(g => (g.x === 'recover' || g.x === 'pocao' || g.x === 'absorb' || g.x === 'furia') && g.q !== lado).reduce((a,g) => a + g.d, 0);
+        const perda = seq.filter(g => danoSemGolpe(g) && g.q === lado).reduce((a,g) => a + g.d, 0);
+        somaTot++;
+        if(alvoAntes - dela - perda + ganho === alvoDepois) somaOk++;
+        const g2 = seq.filter(g => !g.x && g.q === lado && g.d > 0 && !g.c && !(g.tn > 1));
+        if(g2.length < 2) return;
+        lados++;
+        const r = Math.max.apply(null, g2.map(g => g.d)) / Math.max(1, Math.min.apply(null, g2.map(g => g.d)));
+        /* A tolerancia de 1,25 e o ARREDONDAMENTO: as fatias sao inteiras, e num total pequeno
+           (27 e 32) o inteiro mais proximo passa de 1,176 por alguns centesimos. O que a trava
+           existe pra pegar e a faixa REABRINDO -- ali a razao volta pras dezenas. */
+        if(r > 1.25){ fora++; if(r > pior){ pior = r; exemplo = mm.player + ' x ' + mm.enemy + ': ' + g2.map(g => g.d).join(' e '); } }
+      });
+    });
+  }
+  ok('a amostra e grande o bastante', conf > 3000 && lados > 1500, conf + ' confrontos, ' + lados + ' lados com par');
+  ok('NENHUM par mostra numero que a formula nao consegue produzir', fora === 0,
+     fora + ' de ' + lados + (exemplo ? '   pior ' + pior.toFixed(1) + 'x  ' + exemplo : ''));
+  ok('e a soma das linhas continua fechando com a barra', somaOk === somaTot, somaOk + ' de ' + somaTot);
+  ok('nenhuma linha de dano zero ou negativo', zero === 0 && negativo === 0, zero + ' zeradas, ' + negativo + ' negativas');
+
+  /* E O CRITICO SAI O DOBRO, que e o que o selo dele promete. Medido no COMPORTAMENTO, nao no
+     codigo: um atacante com um critico e pelo menos um comum na mesma tela. */
+  {
+    let pares = 0, dobro = 0, pior = 0;
+    for(let i = 0; i < 1200; i++){
+      const t = k => { const p = inst(todos[(i*11 + k*37) % todos.length], 40 + (k%3)*5); p.ataques = S.ataquesPadrao(p); return p; };
+      const ms = S.simulateGymBattle([t(0),t(1),t(2)], [t(3),t(4),t(5)], S.makeSeededRng('crit' + i)).matchups || [];
+      ms.forEach(mm => {
+        /* SO NO CAMINHO DO DIARIO REAL. Na RECONSTRUCAO o `marcarCriticos` poe o selo nas linhas
+           de MAIOR dano sem saber qual golpe foi critico -- a posicao e aproximada por desenho --,
+           e as linhas dela ja saem quase iguais. Cobrar o dobro ali seria cobrar do lugar errado. */
+        const reais = (mm.golpes || []).filter(g => !g.x && g.d > 0).length;
+        if(reais > S.TETO_GOLPES) return;
+        if((mm.golpes || []).some(g => g.x === 'faixa' || g.x === 'sono')) return;
+        const seq = S.sequenciaDoConfronto(mm);
+        ['p','e'].forEach(lado => {
+          const g2 = seq.filter(g => !g.x && g.q === lado && g.d > 0 && !(g.tn > 1));
+          const c = g2.filter(g => g.c), comuns = g2.filter(g => !g.c);
+          if(!c.length || !comuns.length) return;
+          const mediaComum = comuns.reduce((a,g) => a + g.d, 0) / comuns.length;
+          c.forEach(g => {
+            pares++;
+            const r = g.d / Math.max(1, mediaComum);
+            /* O INVARIANTE E 'nunca MENOR', nao 'exatamente 2x'. O selo existe pra explicar uma
+               barra que caiu o dobro, e o defeito e ele aparecer num numero menor que o do golpe
+               comum do lado. O 2x exato nao da pra cobrar: o sorteio de 0,85 a 1,00 corre nos dois
+               golpes (a razao real vai de 1,7x a 2,35x) e um aparo pequeno pode encolher a linha
+               sem tirar a banda do lugar. */
+            if(r >= 1) dobro++; else if(r < pior || !pior) pior = r;
+          });
+        });
+      });
+    }
+    ok('a linha do CRITICO nunca sai MENOR que a do golpe comum do mesmo atacante', pares > 30 && dobro === pares,
+       dobro + ' de ' + pares + (pior ? '   pior ' + pior.toFixed(2) + 'x' : ''));
+  }
+
+  /* ⚠️ O CRITICO ENTRA PESANDO 2, e o TAPA fica de fora. O selo do critico promete que aquela
+     barra caiu o DOBRO, entao a linha tem que sair o dobro das outras do mesmo atacante -- tirando
+     ele do bolo, um critico aparado ficava MENOR que os irmaos ja acertados e o selo dizia o
+     contrario do que se ve (pego pela trava do selo, ~1 rodada em 16). A linha do tapa e a SOMA de
+     N tapas e ja traz o Nx explicando.
+     O teste le o CODIGO porque o caso acima EXCLUI os dois da medicao -- ele passaria com a regra
+     removida. */
+  {
+    const txt = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
+    const bloco = (txt.match(/const suavizarAparados = \(lista, semHp\) => \{[\s\S]*?\n  \};/) || [''])[0];
+    ok('a suavizacao existe e e uma so', bloco.length > 200, bloco.length + ' chars');
+    ok('ela pula o golpe de varios tapas', /!\(g\.tn > 1\)/.test(bloco));
+    ok('e pesa o CRITICO por 2', /saida\[i\]\.c \? 2 : 1/.test(bloco));
+    ok('e o confronto com FAIXA DE FOCO inteiro', /g\.x === 'faixa'/.test(bloco));
+    /* E ELA E APRESENTACAO: nao pode existir no servidor, e o diario continua com os numeros reais. */
+    ok('e ela vive so no cliente (o servidor nao a tem)',
+       require('fs').readFileSync(path.join(raiz, 'functions', 'index.js'), 'utf8').indexOf('suavizarAparados') < 0);
+  }
+
+  /* ⚠️ ELA NAO PODE MUTAR O DIARIO. Esta funcao e chamada a cada desenho da tela: mutando, a
+     segunda chamada suavizaria o suavizado e o log iria mudando de numero sozinho. */
+  {
+    let achei = null;
+    for(let i = 0; i < 2000 && !achei; i++){
+      const a = [inst('bulbasaur', 15)]; a[0].ataques = S.ataquesPadrao(a[0]);
+      const b = [inst('onix', 20)]; S.equiparNpc(b);
+      const mm = (S.simulateGymBattle(a, b, S.makeSeededRng('mut' + i)).matchups || [])[0];
+      if(!mm) continue;
+      const g2 = (mm.golpes || []).filter(g => !g.x && g.d > 0 && g.q === 'p');
+      if(g2.length >= 2 && Math.max.apply(null, g2.map(g=>g.d)) > 2 * Math.min.apply(null, g2.map(g=>g.d))) achei = mm;
+    }
+    ok('achei um confronto com golpe aparado', !!achei);
+    if(achei){
+      const antesDoDiario = (achei.golpes || []).map(g => g.d).join(',');
+      const um = S.sequenciaDoConfronto(achei).map(g => g.d).join(',');
+      const dois = S.sequenciaDoConfronto(achei).map(g => g.d).join(',');
+      const tres = S.sequenciaDoConfronto(achei).map(g => g.d).join(',');
+      ok('o DIARIO continua com os numeros reais', (achei.golpes || []).map(g => g.d).join(',') === antesDoDiario,
+         antesDoDiario);
+      ok('e a tela devolve SEMPRE a mesma divisao', um === dois && dois === tres, um);
+      ok('e a divisao NAO e a do diario', um !== antesDoDiario, 'diario ' + antesDoDiario + '  ->  tela ' + um);
+      /* E o LOG e a ANIMACAO tem que ver a MESMA coisa -- eles chamam a funcao em momentos diferentes. */
+      const somaSeq = S.sequenciaDoConfronto(achei).filter(g => !g.x).reduce((a,g) => a + g.d, 0);
+      const somaAnim = S.buildAnimatedHitSequence(achei).filter(h => !h.x).reduce((a,h) => a + Math.abs(h.amount), 0);
+      ok('o log e a animacao mostram os mesmos numeros', somaSeq === somaAnim, somaSeq + ' e ' + somaAnim);
+    }
+  }
+}
 
 console.log('\n=== AS DUAS DANCAS DE ATAQUE ===');
 {
@@ -1796,11 +2016,13 @@ console.log('\n=== O REMOINHO MOSTRA A TROCA: SAI, FICA VAZIO, ENTRA ===');
     /* 6. AS FRASES: o sopro cobre os dois primeiros quadros, e o "X foi trocado por Y" cai NO
           quadro em que o novo entra. */
     const frase = (passo) => semTag(S.statusDoConfronto(m, passo, passo > 0 ? anim[passo-1] : null).html);
-    if(/soprou/.test(frase(i)) && /soprou/.test(frase(i+1)) && /soprou/.test(frase(i+2)) &&
+    if(/soprou/.test(frase(i+1)) && /soprou/.test(frase(i+2)) &&
        frase(i+3).indexOf(reg.sai + ' foi trocado por ' + reg.entra) >= 0) cedeDepois++;
     /* 7. O SEGUNDO DE LEITURA em cada quadro, e o REDESENHO -- o sprite muda, e sprite so muda num
           render(): o pintarStatusDoConfronto mexe so na linha de status. */
-    if(S.pausaDoEspecial(m) > 0 && S.pausaDaFaixa(anim[i+1]) > 0 && S.pausaDaFaixa(anim[i+2]) > 0) pausaOk++;
+    /* O SEGUNDO DE LEITURA vem DEPOIS de cada quadro (a marca `leitura`), inclusive no primeiro:
+       ate 12/09/2026 o do primeiro vinha do `pausaDoEspecial`, ANTES do quadro. */
+    if(S.pausaDaFaixa(anim[i]) > 0 && S.pausaDaFaixa(anim[i+1]) > 0 && S.pausaDaFaixa(anim[i+2]) > 0) pausaOk++;
     if(anim[i].troca && anim[i+1].troca && anim[i+2].troca) redesenha++;
   }
   ok('o sopro sai o bastante pra medir', achou >= 15, achou + ' confrontos');
@@ -1821,8 +2043,10 @@ console.log('\n=== O REMOINHO MOSTRA A TROCA: SAI, FICA VAZIO, ENTRA ===');
     const tab = txt.match(/const passosDaAbertura = \{([^}]*)\}/);
     ok('a tabela dos passos existe', !!tab);
     if(tab){
-      ok('o sopro vale 3 passos e o quadro do novo vale 2',
-         /remoinho:\s*3/.test(tab[1]) && /remoinhoEntra:\s*2/.test(tab[1]), tab[1].trim().slice(-60));
+      /* O sopro cobre os DOIS quadros dele (quem sai + a vaga vazia) e o quadro do novo cobre o
+         proprio -- os numeros contam PASSOS DO EVENTO desde 12/09/2026, nao mais a pausa + o passo. */
+      ok('o sopro vale 2 passos e o quadro do novo vale 1',
+         /remoinho:\s*2/.test(tab[1]) && /remoinhoEntra:\s*1/.test(tab[1]), tab[1].trim().slice(-60));
       ok('e a vaga vazia NAO esta na tabela', !/remoinhoVazio/.test(tab[1]));
     }
     /* E o quadro do novo PRECISA ser acrescentado a mao na lista de avisos: ele nao existe no
@@ -2172,16 +2396,16 @@ console.log('\n=== A FURIA DO DRAGAO: 40 FIXOS NA ABERTURA, E A LUTA ACONTECE DE
     /* O AVISO DO MEIO DA BATALHA sai CURTO, como o do sono e o da confusao -- ali se le em um
        segundo, e a barra descendo ja mostra o numero. */
     const aviso = p => (S.avisoDoConfronto(m, p) || '').replace(/<[^>]+>/g, '');
-    ok('o aviso do meio da batalha aparece no passo 0', aviso(0).indexOf(NOME) >= 0, aviso(0) || '(vazio)');
-    /* E SOBREVIVE AO PASSO EM QUE A BARRA ANDA -- e pra isso que ela vale 2. Com 1 ela sumiria
-       justamente no passo que existe pra explicar. */
-    ok('e sobrevive ao passo em que a barra desce', aviso(1).indexOf(NOME) >= 0, aviso(1) || '(vazio)');
+    /* ELA NASCE NO PASSO EM QUE A BARRA DESCE, nao antes (12/09/2026): a frase existe pra explicar
+       aquela barra, e anunciada um passo antes ela contava o que ainda nao tinha acontecido. */
+    ok('nada e anunciado antes de ela acontecer', aviso(0).indexOf(NOME) < 0, aviso(0) || '(vazio)');
+    ok('o aviso aparece NO passo em que a barra desce', aviso(1).indexOf(NOME) >= 0, aviso(1) || '(vazio)');
     /* E CEDE O LUGAR ao nome do golpe assim que a luta comeca: ela e abertura, nao o confronto. */
     ok('e cede o lugar quando a luta comeca', aviso(2).indexOf(NOME) < 0, aviso(2) || '(vazio)');
     ok('ela esta declarada no passosDaAbertura', (function(){
       const txt = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
       const mm = txt.match(/const passosDaAbertura = \{([^}]*)\}/);
-      return !!mm && /furiadragao:\s*2/.test(mm[1]);
+      return !!mm && /furiadragao:\s*1/.test(mm[1]);
     })());
     /* O SELO E DE DRAGAO, e e ele que a separa de relance da FURIA comum -- os nomes se parecem e
        as duas sao passivas da mesma linha do Charmander. */
@@ -2275,15 +2499,26 @@ console.log('\n=== A RECONSTRUCAO NAO PODE MOSTRAR DOIS GOLPES IMPOSSIVEIS ===')
   ok('os dois golpes do MESMO pokemon nunca diferem mais que a formula permite',
      fora === 0, fora + ' de ' + tres + (exemplo ? '   |  pior: ' + pior.toFixed(2) + 'x  ' + exemplo : ''));
 
-  /* E A FAIXA E A CONTA, nao um numero solto: se ela abrir de novo, o teto da razao abre junto. */
+  /* ⚠️ E A FAIXA MORA NUM LUGAR SO, desde 12/09/2026: a reconstrucao e a SUAVIZACAO do golpe
+     aparado repartem dano, e as duas tem que caber na mesma banda. Duas copias divergiriam no
+     primeiro ajuste, e um dos dois caminhos voltaria a mostrar par impossivel. */
   {
     const txt = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
-    const m = txt.match(/const firstHitPct = ([\d.]+) \+ \(semente\/40\)\*([\d.]+);/);
-    ok('a faixa da divisao esta escrita no codigo', !!m, m ? m[0] : '(nao achei)');
-    if(m){
-      const menor = Number(m[1]), maior = Number(m[1]) + Number(m[2]);
+    const j = txt.match(/const JITTER_DO_GOLPE = ([\d.]+);/);
+    ok('a banda esta escrita no codigo, numa constante', !!j, j ? j[0] : '(nao achei)');
+    ok('e a reconstrucao USA a constante, em vez de um numero solto',
+       /const firstHitPct = 0\.5 \* fatiaDoGolpe\(semente\);/.test(txt));
+    ok('e a suavizacao tambem', /fatiaDoGolpe\(semente \+ k \* 13\)/.test(txt));
+    if(j){
+      const jit = Number(j[1]);
+      const menor = 1 - jit, maior = 1 + jit;
       ok('e ela nao permite razao acima da banda da formula', (maior / menor) <= BANDA,
-         'divide entre ' + (100*menor).toFixed(0) + '% e ' + (100*maior).toFixed(0) + '%  ->  razao maxima ' + (maior/menor).toFixed(2) + 'x');
+         'cada fatia entre ' + (100*menor).toFixed(0) + '% e ' + (100*maior).toFixed(0) + '% da divisao igual' +
+         '  ->  razao maxima ' + (maior/menor).toFixed(2) + 'x');
+      /* Num PAR isso tem que dar exatamente os 46%-54% que a reconstrucao ja usava. */
+      ok('e num par ela da os mesmos 46%-54% de sempre',
+         Math.abs(0.5*menor - 0.46) < 1e-9 && Math.abs(0.5*maior - 0.54) < 1e-9,
+         (100*0.5*menor).toFixed(0) + '% a ' + (100*0.5*maior).toFixed(0) + '%');
     }
   }
 
@@ -3265,23 +3500,52 @@ console.log('\n=== QUEM MANDA NA LINHA DE STATUS, PASSO A PASSO ===');
       return c === 'aviso-especial' ? 'E' : c === 'aviso-golpe' ? 'g' : '-';
     }).join('');
   };
-  const donoAteOFim = k => { const m = alvo[k]; return m ? perfil(m).split('').every(c => c === 'E') : null; };
-  const cede = k => { const m = alvo[k]; if(!m) return null; const p = perfil(m); return p[0] === 'E' && p.indexOf('g') > 0; };
+  /* ⚠️ O PASSO DO EVENTO: o registro dele na animacao, MAIS UM (a convencao do laco, que faz
+     HitStep++ antes de pintar). A ANULACAO nao e um passo -- ela nao move barra e e filtrada fora
+     da sequencia --, e o passo dela E o 0: ela acontece antes do primeiro golpe e nao tem barra
+     nenhuma pra esperar. */
+  const passoDoEvento = (m, k) => {
+    const i = S.buildAnimatedHitSequence(m).findIndex(h => h.x === k);
+    return i < 0 ? 0 : i + 1;
+  };
+  /* ⚠️ NADA PODE SER ANUNCIADO ANTES DE ACONTECER (12/09/2026, a pedido): *"a frase fica piscando
+     na tela antes de ocorrer o evento"*. A janela comecava no passo 0, entao a frase entrava 1,55s
+     antes do evento e contava o que ainda ia acontecer. Hoje ela NASCE no passo do evento. */
+  const nasceNoEvento = k => {
+    const m = alvo[k]; if(!m) return null;
+    const p = perfil(m), e = passoDoEvento(m, k);
+    return p.slice(0, e).indexOf('E') < 0 && p[e] === 'E';
+  };
+  const donoAteOFim = k => {
+    const m = alvo[k]; if(!m) return null;
+    const p = perfil(m), e = passoDoEvento(m, k);
+    return p.slice(0, e).indexOf('E') < 0 && p.slice(e).split('').every(c => c === 'E');
+  };
+  const cede = k => {
+    const m = alvo[k]; if(!m) return null;
+    const p = perfil(m), e = passoDoEvento(m, k);
+    return p[e] === 'E' && p.indexOf('g', e) > e;
+  };
 
   /* O SONO PASSOU A CEDER A LINHA em 09/09/2026, junto com a troca livre virar uma so. Reportado
      num Haunter x Dunsparce: a luta inteira so se lia "Haunter fez Dunsparce dormir" enquanto a
      barra descia, e o nome do golpe que estava batendo nunca aparecia.
      Ele cede no PASSO 2 e nao no 1 como a anulacao, porque o registro do sono E um passo da
      animacao (dano 0, barra parada) -- a frase cobre a pausa de leitura e o passo dele. */
-  ok('o SONO abre e CEDE o lugar ao nome do golpe livre', cede('sono') !== false,
+  /* NENHUMA DAS CINCO pode ser anunciada antes de acontecer -- a trava do pedido de 12/09/2026. */
+  ['sono','boom','recover','absorb','disable'].forEach(k => {
+    ok('o ' + k + ' nasce NO passo do evento, nunca antes', nasceNoEvento(k) !== false,
+       alvo[k] ? perfil(alvo[k]) + '  (evento no passo ' + passoDoEvento(alvo[k], k) + ')' : '(nao apareceu)');
+  });
+  ok('o SONO CEDE o lugar ao nome do golpe livre', cede('sono') !== false,
      alvo.sono ? perfil(alvo.sono) : '(nao apareceu)');
-  ok('e ele cobre o proprio passo antes de ceder (nao cede no passo 1)',
-     !alvo.sono || perfil(alvo.sono).slice(0, 2) === 'EE', alvo.sono ? perfil(alvo.sono) : '(nao apareceu)');
-  ok('a EXPLOSAO tambem', donoAteOFim('boom') !== false, alvo.boom ? perfil(alvo.boom) : '(nao apareceu)');
-  ok('a ANULACAO abre e CEDE o lugar ao nome do golpe', cede('disable') !== false,
+  /* A EXPLOSAO e a unica que fica ate o FIM: ali o confronto INTEIRO e aquilo, e nao ha luta depois. */
+  ok('a EXPLOSAO fica ate o fim', donoAteOFim('boom') !== false, alvo.boom ? perfil(alvo.boom) : '(nao apareceu)');
+  ok('a ANULACAO CEDE o lugar ao nome do golpe', cede('disable') !== false,
      alvo.disable ? perfil(alvo.disable) : '(nao apareceu)');
-  ok('a CURA abre e cede', cede('recover') !== false, alvo.recover ? perfil(alvo.recover) : '(nao apareceu)');
-  ok('a DRENAGEM abre, vale os DOIS passos dela e cede', cede('absorb') !== false,
+  ok('a CURA cede', cede('recover') !== false, alvo.recover ? perfil(alvo.recover) : '(nao apareceu)');
+  ok('a DRENAGEM vale os DOIS passos dela e cede',
+     cede('absorb') !== false && (!alvo.absorb || perfil(alvo.absorb).slice(1, 3) === 'EE'),
      alvo.absorb ? perfil(alvo.absorb) : '(nao apareceu)');
   /* A trava que pega a proxima omissao: todo especial de ABERTURA tem que estar no passosDaAbertura.
      Sem entrada, a frase vale pra sempre -- que foi exatamente o defeito da anulacao. */
@@ -3906,18 +4170,21 @@ console.log('\n=== A DANCA DA CHUVA: O PRIMEIRO CLIMA DO JOGO (11/09/2026) ===')
     const limpo = h => String(h).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
     /* 1) A FRASE, palavra por palavra como foi pedida. */
     const aviso = p => limpo(S.avisoDoConfronto(m, p) || '');
-    ok('a frase da chuva e a pedida', /Squirtle usou Dança da Chuva e começa a chover/.test(aviso(0)), aviso(0));
-    ok('e ela sobrevive ao passo dela', /começa a chover/.test(aviso(1)), aviso(1) || '(vazio)');
+    ok('nada e anunciado antes de comecar a chover', aviso(0) === '', aviso(0) || '(vazio)');
+    ok('a frase da chuva e a pedida, e sai NO passo dela',
+       /Squirtle usou Dança da Chuva e começa a chover/.test(aviso(1)), aviso(1));
     /* E CEDE quando a luta comeca -- "e entao comeca a batalha novamente". */
     ok('e cede o lugar quando a luta comeca', !/chover/.test(aviso(2)), aviso(2) || '(vazio)');
     /* A PAUSA DE 1s: ela e um passo de dano ZERO, entao sem a pausa a frase apareceria e sumiria
-       no mesmo quadro -- o defeito que a Faixa de Foco ja teve. */
-    ok('e a pausa de 1s esta la', S.pausaDoEspecial(m) === S.PAUSA_LEITURA_ESPECIAL_MS,
-       S.pausaDoEspecial(m) + 'ms');
+       no mesmo quadro -- o defeito que a Faixa de Foco ja teve. Ela vem DEPOIS do passo desde
+       12/09/2026 (a marca `leitura`), e nao mais antes dele. */
+    ok('e a pausa de 1s esta la, DEPOIS do passo dela',
+       S.pausaDaFaixa(S.buildAnimatedHitSequence(m)[0]) === S.PAUSA_LEITURA_ESPECIAL_MS,
+       S.pausaDaFaixa(S.buildAnimatedHitSequence(m)[0]) + 'ms');
     ok('ela esta declarada no passosDaAbertura', (function(){
       const txt = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
       const mm = txt.match(/const passosDaAbertura = \{([^}]*)\}/);
-      return !!mm && /chuva:\s*2/.test(mm[1]);
+      return !!mm && /chuva:\s*1/.test(mm[1]);
     })());
     /* 2) A LINHA NO LOG, com o SELO CLICAVEL -- o unico selo clicavel do jogo. */
     const log = S.renderMatchupLog([m]);

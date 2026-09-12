@@ -794,6 +794,11 @@
   .aviso-golpe-quem.p{ color:var(--blue); }
   .aviso-golpe-quem.e{ color:var(--red); }
   .loading-text.aviso-golpe .type-pill{ margin-right:0; }
+  /* ⚠️ FRASE QUE JÁ ESTÁ NA TELA NÃO REENTRA. O `render()` recria o HTML inteiro, então a
+     animação de entrada rodava DE NOVO a cada desenho -- e o passo de uma abertura pede um desenho
+     50ms depois de o pintor já ter posto a frase. O jogador via a frase surgir duas vezes seguidas,
+     que é o "ainda está piscando um pouco" de 12/09/2026. */
+  .loading-text.aviso-sem-entrada{ animation:none !important; }
   @keyframes aviso-especial-entra{ from{ opacity:0; transform:translateY(-4px); } to{ opacity:1; transform:none; } }
   .battle-vs{
     display:flex;
@@ -2108,13 +2113,37 @@
      largura, e ele só "cola" quando o topo da página passa por ele. */
   .loja-fixa{ position:sticky; top:0; z-index:5; box-shadow:0 6px 12px rgba(12,16,36,.45); }
   .loja-saldo{ margin:10px 0 0; font-size:.8rem; color:var(--muted); }
-  .loja-lista{ padding:6px 10px; }
+  /* A LISTA PELA METADE, com as prateleiras do lado esquerdo. As duas colunas dividem igual
+     (1fr 1fr) -- foi o pedido ("diminua ela pela metade na horizontal") --, e o `min-width:0` nas
+     duas e o que deixa o nome do item truncar em vez de empurrar a coluna. */
+  .loja-corpo{ display:grid; grid-template-columns:1fr 1fr; gap:8px; align-items:start; }
+  .loja-abas{ display:flex; flex-direction:column; gap:6px; min-width:0; }
+  /* A prateleira NAO usa o .btn da casa: aquele e botao de ACAO, com moldura de 3px. Aqui a lista
+     e de lugares onde se entra -- o mesmo raciocinio que ja tinha tirado o .btn dos cartoes de
+     golpe e das linhas da ficha. */
+  /* ⚠️ O PAPEL DO JOGO E `--box`, nao `--cream` -- essa variavel nao existe na paleta, e com o
+     fallback vazio a aba ficava TRANSPARENTE sobre o fundo escuro da pagina, com o texto em
+     `--ink` por cima: ilegivel. So a selecionada (amarela) se lia. Pego no navegador, a 320px. */
+  .loja-aba{
+    display:flex; align-items:center; gap:6px;
+    width:100%; min-width:0; padding:7px 8px; margin:0; text-align:left; cursor:pointer;
+    background:var(--box); color:var(--ink);
+    border:2px solid var(--box-border); border-radius:5px;
+    font-family:var(--font-ui);
+  }
+  .loja-aba.sel{ background:var(--yellow); border-color:var(--yellow-dark); }
+  .loja-aba-icone{ font-size:1.05rem; line-height:1; flex-shrink:0; }
+  .loja-aba-txt{ display:flex; flex-direction:column; gap:1px; min-width:0; }
+  .loja-aba-nome{ font-weight:800; font-size:.7rem; line-height:1.15; overflow-wrap:anywhere; }
+  .loja-aba-qtd{ font-size:.58rem; font-weight:700; color:var(--muted); }
+  .loja-vazia{ margin:0; padding:6px 0; font-size:.75rem; color:var(--muted); }
+  .loja-lista{ padding:6px 10px; min-width:0; }
   /* Uma linha por item: ícone, nome (com o que você já tem) e preço à direita. A grade de
      quadradinhos mostrava só o ícone -- com 11 itens, metade deles são emojis parecidos e não dava
      pra escolher sem clicar em cada um. */
   .loja-linha{
-    display:flex; align-items:center; gap:10px; width:100%;
-    padding:10px 4px; margin:0; background:none; border:none;
+    display:flex; align-items:center; gap:6px; width:100%;
+    padding:8px 3px; margin:0; background:none; border:none;
     border-bottom:2px dashed #ddd7c2; cursor:pointer; text-align:left;
     font-family:var(--font-ui); color:var(--ink);
   }
@@ -2124,9 +2153,14 @@
      leva a pessoa a juntar as moedas. Desabilitar esconderia a descrição de quem ainda não pode. */
   .loja-linha.caro .loja-preco{ color:var(--red); }
   .loja-icone{ font-size:1.5rem; line-height:1; flex-shrink:0; width:28px; text-align:center; }
-  .loja-nome{ flex:1; min-width:0; font-weight:800; font-size:.85rem; display:flex; flex-direction:column; gap:2px; }
-  .loja-tem{ font-size:.65rem; font-weight:700; color:var(--muted); }
-  .loja-preco{ flex-shrink:0; font-weight:800; font-size:.85rem; }
+  /* NA COLUNA PELA METADE o icone encolhe e o preco desce pra baixo do NOME, dentro da mesma
+     coluna de texto -- nao pra uma linha propria. Medido a 320px: a coluna da lista fica com 137px
+     e sobram ~95px de texto; com o preco ao lado, "Atk Special Up" quebrava em tres linhas e a
+     lista dos 9 itens levava a pagina a 1.260px. */
+  .loja-icone{ font-size:1.1rem; width:18px; }
+  .loja-nome{ flex:1; min-width:0; font-weight:800; font-size:.72rem; display:flex; flex-direction:column; gap:1px; overflow-wrap:anywhere; }
+  .loja-tem{ font-size:.6rem; font-weight:700; color:var(--muted); }
+  .loja-preco{ font-weight:800; font-size:.68rem; color:var(--muted); }
   .item-detalhe-topo{ display:flex; align-items:center; gap:10px; }
   .item-detalhe-icone{ font-size:2.2rem; line-height:1; flex-shrink:0; }
   .item-detalhe-nome{ display:flex; flex-direction:column; gap:2px; min-width:0; }
@@ -4859,6 +4893,7 @@ function openNeighborhoodGymRemote(city, countryCode){
   loadNeighborhoodGymDetail();
 }
 async function openNeighborhoodGymScreen(){
+  if(!exigeTimeCampeao()) return;
   game.screen = 'neighborhoodGym';
   game.neighborhoodGymScreenState = 'locating';
   game.neighborhoodGymError = null;
@@ -9741,15 +9776,40 @@ function animatePartialHpBars(){
    Venusaur x Muk).
    A AUTODESTRUIÇÃO fica FORA da tabela de propósito: ali o confronto INTEIRO é aquilo (os dois caem
    no mesmo golpe e não há luta depois), e a frase acompanha até o fim. */
-/* O REMOINHO VALE 3 e o `remoinhoEntra` vale 2: o sopro cobre a pausa de leitura, o quadro do que
-   SAI e o quadro VAZIO; o "X foi trocado por Y" cobre o quadro em que o novo entra, e é por isso
-   que a luta só começa um segundo depois dele. O `remoinhoVazio` NÃO entra na tabela de propósito
-   -- ele não tem frase própria, é o sopro que ainda está na tela. */
-const passosDaAbertura = { recover:1, pocao:1, absorb:2, disable:1, semSono:1, sono:2, furia:2, confusao:2, furiadragao:2, chuva:2, remoinho:3, remoinhoEntra:2,
-  /* AS DUAS DANÇAS valem 2, como o sono: elas SÃO um passo da animação (dano 0, barra parada),
-     então a frase precisa cobrir o passo 0 (a pausa de leitura) MAIS o passo delas -- e cede o
-     lugar ao nome do golpe quando a luta começa. */
-  espadas:2, pluma:2 };
+/* O REMOINHO VALE 2 e o `remoinhoEntra` vale 1: o sopro cobre o quadro do que SAI e o quadro
+   VAZIO; o "X foi trocado por Y" cobre o quadro em que o novo entra, e é por isso que a luta só
+   começa um segundo depois dele. O `remoinhoVazio` NÃO entra na tabela de propósito -- ele não tem
+   frase própria, é o sopro que ainda está na tela. */
+/* ⚠️ O NÚMERO É QUANTOS PASSOS DA ANIMAÇÃO A FRASE COBRE, contados A PARTIR DO PASSO DO PRÓPRIO
+   EVENTO -- e isso mudou em 12/09/2026, a pedido: *"quando aparece as frases de habilidades
+   passivas nos ataques, como sono, autodestruição, dança da chuva, etc, a frase fica piscando na
+   tela antes de ocorrer o evento"*. E ficava mesmo: a janela começava no passo 0 (o desenho que
+   antecede a animação), então a frase entrava 1,55s ANTES de o evento acontecer, contava o que
+   ainda ia acontecer e depois o evento passava por baixo dela.
+   Hoje a frase NASCE no passo do evento. Quem paga o segundo de leitura é a marca `leitura`, que
+   vale DEPOIS do passo -- ou seja, o mesmo segundo, do lado certo do acontecimento.
+   Quase toda abertura vale 1 (o passo dela). As exceções são as que ocupam mais de um passo:
+   a DRENAGEM mexe as DUAS barras (2) e o REMOINHO mostra quem sai e a vaga vazia antes de o novo
+   entrar (2, e o `remoinhoEntra` vale o 1 dele).
+   ⚠️ A ANULAÇÃO É A ÚNICA QUE NÃO É UM PASSO: ela não move barra e é filtrada fora da sequência,
+   então não existe passo de evento pra ela esperar -- ela continua no passo 0, que é onde a
+   anulação de fato acontece (antes do primeiro golpe). Quem separa os dois casos é o índice -1 do
+   `ondeEstaNaSequencia`, logo abaixo. */
+/* ⚠️ A BANDA DE UM GOLPE SÓ -- e ela vale nos DOIS lugares da apresentação que repartem dano.
+   Dois golpes do MESMO pokémon, com o MESMO golpe, contra o MESMO alvo, só diferem pelo sorteio de
+   `0,85 + rng*0,15` do `calcDamageNew`: no máximo **1,176×** (1,00/0,85). Fora isso só o crítico,
+   que tem selo próprio pra explicar.
+   Então toda divisão que a tela inventa tem que caber aí: cada fatia fica entre 92% e 108% da
+   divisão igual, o que dá razão máxima de 1,174×. Num PAR isso é exatamente os 46%-54% que a
+   reconstrução usa desde 10/09/2026 -- ela já nasceu com 30%-70% e foi estreitada porque 78,1% dos
+   pares saíam FORA do que a fórmula consegue produzir.
+   Duas cópias divergiriam no primeiro ajuste, e aí um dos dois caminhos voltaria a mostrar par
+   impossível -- por isso a conta mora aqui, e os dois a chamam. */
+const JITTER_DO_GOLPE = 0.08;
+const RAZAO_DE_UM_GOLPE = 1 / 0.85;
+function fatiaDoGolpe(semente){ return (1 - JITTER_DO_GOLPE) + ((Math.abs(semente) % 41) / 40) * (2 * JITTER_DO_GOLPE); }
+const passosDaAbertura = { recover:1, pocao:1, absorb:2, disable:1, semSono:1, sono:1, furia:1, confusao:1, furiadragao:1, chuva:1, remoinho:2, remoinhoEntra:1,
+  espadas:1, pluma:1 };
 function buildAnimatedHitSequence(m){
   const seq = sequenciaDoConfronto(m).map(g => {
     /* Na lista 'q' é quem BATE e 'side' é quem APANHA -- por isso a inversão. A CURA é o contrário
@@ -9787,24 +9847,25 @@ function buildAnimatedHitSequence(m){
      o laço já redesenha ali, e as de confronto inteiro (explosão, sono) devem mesmo ficar até o
      fim. Sem esta marca a frase da Faixa ocuparia o lugar do "Trocando golpes..." pelo resto da
      luta -- que foi exatamente o defeito que a cura teve quando ela nasceu. */
-  /* PASSO QUE NÃO MOVE BARRA E CARREGA FRASE precisa de tempo pra ser lido -- é o mesmo caso da
-     Faixa, e passou a existir também pro SONO em 10/09/2026: quando o moribundo de quem dormiu vai
-     pra frente, a linha do sono deixa de ser o primeiro passo, e aí ela não pega mais a pausa que
-     o `pausaDoEspecial` dá antes do confronto. Sem esta marca a frase apareceria e sumiria no
-     mesmo quadro. No índice 0 ela não é marcada: ali a pausa de abertura já cobre. */
-  /* ⚠️ TODA ABERTURA FORA DO PASSO 0 GANHA O SEGUNDO DE LEITURA, mexa ela barra ou não.
+  /* TODA ABERTURA GANHA O SEGUNDO DE LEITURA, mexa ela barra ou não -- e ele vem DEPOIS do passo
+     dela, que é onde a frase está.
      A regra olhava só `amount === 0`, então uma segunda abertura que MOVE barra (confusão,
      drenagem, Fúria do Dragão) não ganhava pausa nenhuma: a primeira frase parava 1s e a segunda
      passava junto com a barra, rápido demais pra ler. Reportado em 11/09/2026.
-     No índice 0 não se marca: ali o `pausaDoEspecial` já cobre, e marcar seria pausa em cima de
-     pausa. */
-  seq.forEach((h, i) => { if(i > 0 && h.x && !h.faixa && (passosDaAbertura[h.x] || h.amount === 0)) h.leitura = true; });
+     ⚠️ E O ÍNDICE 0 ENTROU EM 12/09/2026. Ele ficava de fora porque a abertura do primeiro passo
+     pegava a pausa do `pausaDoEspecial`, que roda ANTES do passo -- e era justamente essa pausa
+     que punha a frase na tela antes de o evento acontecer, o que foi reportado. Com a janela
+     começando no passo do evento, o segundo de leitura tem que vir DEPOIS dele, e quem dá isso é
+     esta marca. O tempo total da cena não muda: o mesmo segundo, do outro lado do acontecimento.
+     Quem ainda usa o `pausaDoEspecial` é só a ANULAÇÃO, que não é um passo. */
+  seq.forEach(h => { if(h.x && !h.faixa && (passosDaAbertura[h.x] || h.amount === 0)) h.leitura = true; });
   /* ⚠️ OS TRES QUADROS DO REMOINHO PEDEM REDESENHO, e por um motivo que nenhuma outra abertura tem:
      eles trocam o SPRITE do cabecalho (o que sai, a vaga vazia, o que entra), e sprite so muda num
      render() -- o pintarStatusDoConfronto mexe na linha de status e nada mais.
-     A marca e propria (`troca`) e nao o `leitura` porque o PRIMEIRO quadro esta no indice 0: ali o
-     pausaDoEspecial ja da o segundo de leitura, e marcar `leitura` seria pausa em cima de pausa --
-     mas o desenho ele precisa do mesmo jeito. */
+     A marca e PROPRIA (`troca`) e nao o `leitura` porque as duas coisas sao diferentes: `leitura`
+     compra TEMPO e `troca` pede DESENHO. Os tres quadros precisam das duas, e hoje tem as duas --
+     ate 12/09/2026 o primeiro quadro so tinha o desenho, porque o segundo dele vinha do
+     pausaDoEspecial, antes do quadro. */
   seq.forEach(h => { if(h.x === 'remoinho' || h.x === 'remoinhoVazio' || h.x === 'remoinhoEntra') h.troca = true; });
   seq.forEach((h, i) => { if(i > 0 && (seq[i-1].faixa || seq[i-1].leitura)) h.posFaixa = true; });
   return seq;
@@ -9870,7 +9931,8 @@ function reconstruirSequencia(m){
      número e a barra descia outro, e cada redesenho da tela trocava os valores de novo.
      A semente sai do próprio confronto, então o mesmo confronto sempre divide igual. */
   const semente = (Math.abs(m.playerHpBefore*31 + m.enemyHpBefore*17 + playerDmg*7 + enemyDmg*3)) % 41;
-  const firstHitPct = 0.46 + (semente/40)*0.08;
+  /* A MESMA banda da suavização (`fatiaDoGolpe`): num par, 46% a 54%. */
+  const firstHitPct = 0.5 * fatiaDoGolpe(semente);
   const firstHitAmount = Math.max(1, Math.min(loserTotalDmg-1, Math.round(loserTotalDmg*firstHitPct)));
   const finishingHitAmount = loserTotalDmg - firstHitAmount;
 
@@ -10805,10 +10867,7 @@ async function registerForTrainersLeague(){
   // não pede pra escolher UM time -- reúne todos os times prontos (8 insígnias) que a conta tem agora.
   // Cada partida usa o time trocado especificamente pra ela (até 5min antes); sem troca, sorteia entre
   // esses times elegíveis na hora de resolver (mesma ideia do terreno sorteado quando ninguém escolhe)
-  const eligibleCodes = Array.from({length:MAX_SAVE_SLOTS}, (_, i) => i)
-    .map(slot => game.saveSlots[slot])
-    .filter(s => s && s.team && (s.badgeCount||0) >= 8)
-    .map(s => encodeTeamCode(s.team));
+  const eligibleCodes = savesCampeoes().map(slot => encodeTeamCode(game.saveSlots[slot].team));
   if(eligibleCodes.length === 0){
     game.trainersLeagueError = 'Você precisa de pelo menos um time com as 8 insígnias pra se inscrever.';
     render();
@@ -11951,6 +12010,7 @@ function openLeague(typeId, typeConfig){
   startLeagueListener();
 }
 function openLeagueTypesList(){
+  if(!exigeTimeCampeao()) return;
   game.screen = 'leagueTypesList';
   game.customLeagueTypes = null;
   render();
@@ -12504,10 +12564,7 @@ function openTrainersLeagueTeamSwap(dateId, roundIndex){
 }
 function renderTrainersLeagueTeamSwapPicker(){
   const target = game.trainersLeagueSwapTarget;
-  const eligible = Array.from({length:MAX_SAVE_SLOTS}, (_, i) => i).filter(slot=>{
-    const s = game.saveSlots[slot];
-    return s && s.team && (s.badgeCount||0) >= 8;
-  });
+  const eligible = savesCampeoes();
   return `
   <div class="box cursor">
     <h2>Trocar time dessa rodada</h2>
@@ -12781,10 +12838,7 @@ function renderLeagueTeamPicker(){
   if(typeConfig && typeConfig.allowedTypes && typeConfig.allowedTypes.length>0){
     return renderCustomLeagueTeamPicker(typeConfig);
   }
-  const eligible = Array.from({length:MAX_SAVE_SLOTS}, (_, i) => i).filter(slot=>{
-    const s = game.saveSlots[slot];
-    return s && s.team && (s.badgeCount||0) >= 8;
-  });
+  const eligible = savesCampeoes();
   return `
   <div class="box cursor">
     <h2>Qual time vai representar você?</h2>
@@ -13102,6 +13156,35 @@ function showJourneyEnd(){
                         a jornada nova INTEIRA sem o +1%, já que applySpecialtyBuff cai em
                         game.specialties e o syncSpecialties só dispara quando alguém do time chega
                         ao nível da especialidade. */
+/* ⚠️ QUEM JA VENCEU AS 8 INSIGNIAS -- e esta pergunta vive NUM LUGAR SO desde 12/09/2026. Ela
+   estava copiada em CINCO telas (`s && s.team && (s.badgeCount||0) >= 8`), e uma delas nem pedia o
+   `team`: um save com as 8 insignias e sem time passava por la e nao passava nas outras.
+   O `team` faz parte da pergunta -- o que estes modos precisam e de um TIME pronto, nao de um
+   troféu. */
+function savesCampeoes(){
+  return Array.from({length:MAX_SAVE_SLOTS}, (_, i) => i).filter(slot => {
+    const sv = game.saveSlots[slot];
+    return !!(sv && sv.team && (sv.badgeCount || 0) >= 8);
+  });
+}
+const AVISO_SEM_CAMPEAO = 'É necessário vencer as 8 insígnias para entrar nesse modo de jogo.';
+/* A PORTA DOS TRES MODOS DE CAMPEAO (Ginásio da Cidade, Ligas e Batalha Online), pedida em
+   12/09/2026: *"caso a conta nao tenha nenhum time vencedor das 8 insignias, coloque uma mensagem
+   de erro quando o treinador clicar para entrar ... e nao deixe entrar"*.
+   Os tres ja recusavam LA DENTRO, cada um com a sua frase ("você precisa de um time com as 8
+   insígnias pra desafiar"), mas depois de abrir a tela, esperar a geolocalização e montar o
+   picker. Agora a recusa é na porta.
+   ⚠️ ELA SO BLOQUEIA QUANDO OS SAVES JA CARREGARAM. O `game.saveSlots` nasce com 20 nulos e só é
+   preenchido pelo `loadSaveSlots`, que é assíncrono -- sem esta guarda, quem clicasse no meio do
+   carregamento levava a mensagem sendo campeão. Errar pro lado de DEIXAR ENTRAR é o certo aqui:
+   a janela é de alguns centésimos, os três modos continuam recusando lá dentro, e o contrário
+   seria trancar a porta na cara de quem tem o time. */
+function exigeTimeCampeao(){
+  if(!game.saveSlotsCarregados || savesCampeoes().length > 0){ game.modoBloqueado = null; return true; }
+  game.modoBloqueado = AVISO_SEM_CAMPEAO;
+  render();
+  return false;
+}
 const CAMPOS_DA_CONTA = [
   'authUser','saveSlots','trainerName','rivalNameDefault','permanentPokedex','permanentShinyDex',
   'accountEliteChampion','leagueWinsTotal','leagueLeaderboard','trainerBestStreak','trainerLastStreak',
@@ -13109,6 +13192,9 @@ const CAMPOS_DA_CONTA = [
   'inventario','equipados',
   'mewtwoLoanActive','mewtwoLoanCooldownUntil','mewtwoLoanUnlocked','mewtwoLoanReadyToClaim',
   'userTest','neighborhoodGymLocation','startersSorteados','geracaoDosSlots','bossTop10','bossKiller',
+  /* anda junto com o `saveSlots`: sem ele aqui, abrir um save e voltar apagaria a marca e a porta
+     dos modos de campeão pararia de bloquear em silêncio */
+  'saveSlotsCarregados',
   'hms'   // as Máquinas Ocultas são da CONTA, não do save -- ver darHM
 ];
 function snapshotDaConta(){
@@ -13343,6 +13429,9 @@ function saveDocRef(uid, slot){
 }
 function openSaveSelect(){
   game.screen = 'saveSelect';
+  /* A recusa e do CLIQUE, nao do estado da conta: voltando pra home ela some. Deixada de pe, ela
+     ficaria na tela depois de o jogador ir conquistar a 8a insignia. */
+  game.modoBloqueado = null;
   render();
   Promise.all([
     loadSaveSlots().then(loadPermanentUserData).then(syncSpecialties).then(reconcileLeagueWinsFromHistory).then(()=>{
@@ -13408,6 +13497,8 @@ async function loadSaveSlots(){
     });
   } catch(e){ console.error('Erro ao carregar saves:', e); }
   game.saveSlots = slots;
+  /* A PORTA DOS MODOS DE CAMPEAO so vale depois daqui -- ver exigeTimeCampeao. */
+  game.saveSlotsCarregados = true;
   await repararEvolucoesAtrasadas();
   if(game.screen==='saveSelect'){ render(); }
 }
@@ -16230,7 +16321,86 @@ function sequenciaDoConfronto(m){
     });
     return out;
   };
-  const reais = expandirRemoinho(passosVisiveis((m.golpes || []).filter(g => g.x !== 'disable' && (g.x || g.d > 0)), m));
+  /* ⚠️ O GOLPE APARADO NÃO PODE APARECER COM O NÚMERO APARADO (12/09/2026, a pedido).
+     O diário grava o dano EFETIVO -- é a regra que faz a soma das linhas fechar com a barra --,
+     então um golpe que esbarra no fim de uma barra é escrito MENOR do que foi. Na tela isso vira o
+     mesmo pokémon, com o mesmo golpe, contra o mesmo alvo, tirando 45 e depois 126.
+     Reportado com print num Bulbasaur × Onix, e o pedido foi direto: *"ele vai achar que o jogo ta
+     bugado e vai começar a desanimar de jogar ... por que voce nao somou o 126 + 45, dando 171, e
+     então dividiu esse 171 ... assim vai passar a sensação de que aquele era o dano médio mesmo"*.
+     DÁ PRA FAZER PORQUE A LUTA JÁ ACABOU quando a tela desenha: o motor resolveu o confronto
+     inteiro, e o log e a animação são apresentação em cima do resultado.
+     O TOTAL NÃO MUDA, e é isso que mantém tudo de pé: a soma das linhas continua fechando com a
+     barra, o alvo termina exatamente onde terminou, e ninguém morre um golpe antes ou depois --
+     as somas parciais só encolhem, então nenhuma barra chega a zero antes do golpe que a zerava.
+     SÃO DUAS FAMÍLIAS de golpe aparado, as duas medidas em 18.160 confrontos:
+       - o golpe que MATOU (76,8% dos pares fora da banda): só tirou o que sobrava;
+       - o REVIDE MORIBUNDO (12,8%): desde 12/09 ele não mata, para no piso de 1%-10% da barra --
+         e esse é o pior dos dois, porque o piso é MASCARADO por decisão e o reordenamento ainda
+         põe a linha aparada na FRENTE, onde ela se lê como "o mesmo golpe escalou".
+     O CRÍTICO ENTRA, mas PESANDO 2 -- ele não é exceção, é uma fatia dobrada. O selo dele promete
+     que aquela barra caiu o DOBRO, então a linha tem que sair o dobro das outras do mesmo atacante;
+     tirando-o do bolo, um crítico aparado ficava MENOR que os irmãos já acertados e o selo passava a
+     dizer o contrário do que se vê. E o campo `c` do diário já nasce ZERO quando o corte comeu a
+     dobra (o `cap`), então "pesa 2" é exatamente "a linha vai mostrar o selo".
+     O QUE FICA DE FORA, e cada um por um motivo:
+       - o golpe de VÁRIOS TAPAS, cuja linha é a SOMA de N tapas e já traz o `Nx` explicando;
+       - o confronto com FAIXA DE FOCO, que fixa a barra em 1 no passo dela: mexer nos números
+         anteriores faria a barra chegar noutro valor e a frase prometeria um 1 que não se vê.
+     ⚠️ ELE RODA ANTES DO `passosVisiveis`, no DIÁRIO -- e essa ordem custou uma volta de conserto.
+     O campo `hp` é a vida do ALVO depois do golpe e é CRONOLÓGICO; a tela mostra outra ordem (o
+     revide moribundo vai pra frente). Corrigindo `hp` na ordem da TELA o acumulado sai trocado e o
+     diário passa a descrever uma luta que não aconteceu -- medido, 259 cadáveres na trava do
+     "ninguém ataca com a barra em zero", com `hp` até negativo. Aqui a ordem JÁ é a do motor.
+     E ele CLONA em vez de mutar: esta função é chamada a cada desenho da tela, e o `m.golpes` é o
+     diário de verdade -- mutar ali corromperia o log e a próxima chamada suavizaria o suavizado. */
+  const suavizarAparados = (lista, semHp) => {
+    if(lista.some(g => g.x === 'faixa' || g.x === 'desempate')) return lista;
+    let saida = lista;
+    ['p','e'].forEach(lado => {
+      const idx = [];
+      saida.forEach((g, i) => { if(!g.x && g.q === lado && g.d > 0 && !(g.tn > 1)) idx.push(i); });
+      if(idx.length < 2) return;
+      const ds = idx.map(i => saida[i].d);
+      /* O PESO é 2 no crítico e 1 no resto -- é o que faz a linha dele sair o dobro, como o selo diz. */
+      const pesos = idx.map(i => saida[i].c ? 2 : 1);
+      const somaPesos = pesos.reduce((a, b) => a + b, 0);
+      /* A razão medida é entre golpes COMPARÁVEIS: um crítico ao lado de um comum tem que dar 2×,
+         então o que se compara é o dano POR PESO. */
+      const porPeso = ds.map((d, k) => d / pesos[k]);
+      const mx = Math.max.apply(null, porPeso), mn = Math.min.apply(null, porPeso);
+      if(mx <= mn * RAZAO_DE_UM_GOLPE) return;   // já cabe no que a fórmula produz
+      const total = ds.reduce((a, b) => a + b, 0);
+      const n = idx.length;
+      if(total < somaPesos) return;              // não dá pra repartir sem gerar linha de 0
+      /* DETERMINÍSTICO, como a reconstrução: o log e a animação chamam esta função em momentos
+         diferentes e têm que receber a MESMA divisão. Com sorteio, cada redesenho da tela trocaria
+         os números e a barra desceria um valor diferente do que a linha diz. */
+      const semente = Math.abs((m.playerHpBefore || 0) * 31 + (m.enemyHpBefore || 0) * 17 + total * 7 + (lado === 'p' ? 3 : 5));
+      const novos = [];
+      let sobra = total;
+      for(let k = 0; k < n; k++){
+        if(k === n - 1){ novos.push(Math.max(1, sobra)); break; }
+        const restoPesos = pesos.slice(k + 1).reduce((a, b) => a + b, 0);
+        const v = Math.max(1, Math.min(sobra - restoPesos,
+                  Math.round(total * pesos[k] * fatiaDoGolpe(semente + k * 13) / somaPesos)));
+        novos.push(v); sobra -= v;
+      }
+      /* A ÚNICA coisa que muda entre as duas linhas do tempo é o ACUMULADO deste lado, então a
+         correção do `hp` é exata sem precisar saber de mais nada -- e o ÚLTIMO golpe do lado fecha
+         a conta, ou seja o alvo termina exatamente onde terminava. */
+      saida = saida.slice();
+      let antes = 0, depois = 0;
+      idx.forEach((i, k) => {
+        const g = saida[i];
+        antes += ds[k]; depois += novos[k];
+        saida[i] = Object.assign({}, g, { d: novos[k] },
+                                 semHp ? { hp: null } : ((g.hp != null) ? { hp: g.hp + (antes - depois) } : {}));
+      });
+    });
+    return saida;
+  };
+  const reais = expandirRemoinho(passosVisiveis(suavizarAparados((m.golpes || []).filter(g => g.x !== 'disable' && (g.x || g.d > 0))), m));
   /* TODAS AS ABERTURAS: acontecem antes da luta e não são dano. A poção entrou aqui quando passou a
      funcionar como o Recuperar -- ela era um FECHAMENTO enquanto disparava na vitória do confronto. */
   const aberturas = reais.filter(g => g.x === 'recover' || g.x === 'furia' || g.x === 'confusao' || g.x === 'sono' || g.x === 'semSono' ||
@@ -16455,7 +16625,17 @@ function sequenciaDoConfronto(m){
      tela é o que faz procurar bug onde é regra. */
   const resto = expandirTapas(reconstruirSequencia(base).map(h => ({ q: h.side === 'player' ? 'e' : 'p', d: h.amount }))
                                                         .filter(h => h.d > 0));
-  return marcarCriticos((moribundoNaFrente ? [moribundoNaFrente] : []).concat(aberturas, livres, resto));
+  /* ⚠️ O CAMINHO DO SONO TAMBÉM PASSA PELA SUAVIZAÇÃO, e ele era o único resto de par impossível
+     depois dela: medido, 61 lados em 11.529, com o pior em **56×**. A causa é estrutural e está
+     registrada há tempos -- aqui as trocas livres saem REAIS (uma linha cada, que é a coisa que o
+     sono FAZ e o jogador precisa ver) e só o RESTO é reconstruído, então um golpe de verdade fica
+     ao lado de uma linha que é a SOMA de vários. Os dois são do mesmo pokémon, com o mesmo golpe,
+     contra o mesmo alvo: na tela isso é o mesmo "o jogo bugou" do golpe aparado.
+     O `hp` SAI das linhas que ela toca (`hp: null`), e isso é de propósito: aqui a lista MISTURA
+     entrada real (que tem `hp`, cronológico) com entrada reconstruída (que nunca teve), então
+     corrigir o campo seria descrever uma linha do tempo que não existe. Sem ele, quem lê o diário
+     pela tela subtrai os próprios números mostrados -- que é exatamente a conta certa. */
+  return marcarCriticos(suavizarAparados((moribundoNaFrente ? [moribundoNaFrente] : []).concat(aberturas, livres, resto), true));
 }
 /* AS FRASES DOS GOLPES ESPECIAIS VIVEM AQUI, num lugar só.
    O log da batalha e o aviso do meio da luta leem desta função. Montadas em separado, as duas
@@ -17131,23 +17311,17 @@ function avisoDoConfronto(m, passo){
      Reportado num Haunter x Dunsparce: a luta inteira só se lia "Haunter fez Dunsparce dormir"
      enquanto a barra do Dunsparce descia duas vezes, e o nome do golpe que estava batendo nele --
      Devorador de Sonhos -- nunca aparecia. O log estava certo, trazia os dois golpes com nome.
-     Ele vale 2 e não 1 porque, ao contrário da anulação, **o sono É um passo da animação**: o
-     registro dele entra na sequência com dano 0 (barra parada), então a frase precisa cobrir o
-     passo 0 (a pausa de leitura) MAIS o passo dele. Cede no golpe livre, que é o primeiro que
-     mexe barra -- e é justamente o golpe cujo nome foi pedido.
+     O sono É um passo da animação (dano 0, barra parada), ao contrário da anulação -- então a
+     frase dele nasce NO passo dele e cede no golpe livre, que é o primeiro que mexe barra e é
+     justamente o golpe cujo nome foi pedido.
      AUTODESTRUIÇÃO continua fora da lista de propósito: ali o confronto INTEIRO é aquilo (os dois
      caem no mesmo golpe e não há luta depois), e a frase tem que acompanhar até o fim. */
-  /* A FÚRIA VALE 2 PASSOS, e não 1 como a cura -- foi pedido que a frase apareça ENQUANTO a barra
-     cresce, e não só na pausa que antecede o confronto. Com 1 ela sumia justamente no passo em que
-     a barra sobe, que é o passo que ela existe pra explicar. É o mesmo 2 da drenagem, pelo mesmo
-     motivo: a frase tem que sobreviver ao movimento que anuncia. */
-  /* A CONFUSÃO VALE 2, e não 1 como a cura: a frase existe pra explicar a barra do CONFUSO caindo
-     sem ninguém ter batido nele, e com 1 ela sumiria justamente no passo em que a barra desce.
-     É o mesmo 2 da drenagem e da fúria, pelo mesmo motivo: a frase tem que sobreviver ao
-     movimento que ela anuncia. */
-  /* A CHUVA VALE 2, como o sono, e pelo MESMO motivo: ela É um passo da animação com dano ZERO
-     (barra parada), então a frase precisa cobrir o passo 0 -- a pausa de leitura de 1s -- MAIS o
-     passo dela. Com 1 ela sumiria antes de a pausa acabar. */
+  /* FÚRIA, CONFUSÃO, FÚRIA DO DRAGÃO, CHUVA E AS DUAS DANÇAS VALEM 1, como quase todas: a frase
+     nasce no passo DELAS e cede assim que a luta começa. Cada uma dessas frases existe pra
+     explicar a barra daquele passo -- a do confuso caindo sem ninguém ter batido nele, a do
+     pokémon crescendo --, e é justamente por isso que ela não pode vir antes dele.
+     A DRENAGEM é a única de 2, porque ela mexe as DUAS barras: a frase tem que sobreviver até a
+     segunda ter andado, senão o jogador vê uma barra se mover sem nada explicando. */
   /* A tabela mora no escopo do arquivo (logo acima de buildAnimatedHitSequence): ela decide a
      JANELA da frase aqui e a PAUSA de leitura lá, e duas cópias divergiriam no primeiro especial
      novo -- que é exatamente como a anulação nasceu sem entrada e ficou com a frase valendo pra
@@ -17157,10 +17331,14 @@ function avisoDoConfronto(m, passo){
      sono. Com a contagem absoluta a frase do sono aparecia enquanto o adormecido dava o revide e
      sumia justamente no passo em que ele dorme: contava a história trocada.
      Com a abertura no passo 0 -- que é o caso de sempre -- a conta é idêntica à de antes. */
+  /* ⚠️ DEVOLVE -1 QUANDO A ABERTURA NÃO É UM PASSO DA ANIMAÇÃO, e essa distinção é o que sustenta
+     a regra nova. Ela devolvia 0 nos dois casos -- "está no primeiro passo" e "não está em passo
+     nenhum" --, o que era inofensivo enquanto toda frase começava no passo 0 e deixou de ser
+     quando ela passou a nascer no passo do evento: sem o -1, a ANULAÇÃO (que não é passo) esperaria
+     por um passo que nunca chega e nunca apareceria. */
   const ondeEstaNaSequencia = x => {
-    if(!seq) return 0;
-    const i = seq.findIndex(h => h.x === x.x && h.q === x.q);
-    return i < 0 ? 0 : i;
+    if(!seq) return -1;
+    return seq.findIndex(h => h.x === x.x && h.q === x.q);
   };
   /* ⚠️ O `passo` QUE CHEGA AQUI É O ÍNDICE DA SEQUÊNCIA MAIS UM: os laços de revelação fazem
      `HitStep++` ANTES de pintar a linha, então `passo === k + 1` significa "animando seq[k]", e
@@ -17184,13 +17362,17 @@ function avisoDoConfronto(m, passo){
        ocupar três passos (12/09/2026): num confronto em que o sopro traz um Geodude que explode,
        lia-se "Geodude usou auto-destruição" durante a animação da troca inteira -- a frase do fim
        contando o começo. Era antigo: com o sopro em um passo só ela já comia aquele passo. */
-    const iniBoom = (i === 0) ? 0 : i + 1;
-    if(!n){ if(passo >= iniBoom && i >= melhor){ melhor = i; g = x; } continue; }
-    /* O PASSO 0 é a pausa de leitura, e ela só existe no começo do confronto: uma abertura no
-       índice 0 a ganha, uma que venha depois não pode se apropriar do passo anterior -- ali corre
-       um golpe de verdade, com nome próprio pra mostrar. */
-    const inicio = (i === 0) ? 0 : i + 1;
-    if(passo >= inicio && passo < i + n && i >= melhor){ melhor = i; g = x; }
+    if(!n){ if(passo >= i + 1 && i >= melhor){ melhor = i; g = x; } continue; }
+    /* ⚠️ A JANELA COMEÇA NO PASSO DO EVENTO (`i + 1`), NUNCA ANTES. Ela começava no passo 0 quando
+       a abertura estava no índice 0 -- ou seja, a frase entrava no desenho que ANTECEDE a animação
+       e contava um evento que ainda não tinha acontecido. Era o que o jogador via como a frase
+       piscando antes da coisa (reportado em 12/09/2026), e era pior nas que não movem barra: o
+       sono ficava 1,55s na tela e só então o pokémon dormia.
+       A ANULAÇÃO é a exceção, e ela se identifica sozinha pelo `i === -1`: não sendo um passo, o
+       passo dela É o 0 -- a anulação acontece antes do primeiro golpe e não tem barra pra esperar.
+       O `i + 1` sai da convenção do laço: `passo === k + 1` quer dizer "animando seq[k]". */
+    const inicio = i + 1;
+    if(passo >= inicio && passo < inicio + n && i >= melhor){ melhor = i; g = x; }
   }
   if(!g) return '';
   const nomeP = escapeHtmlSafe(m.player || ''), nomeE = escapeHtmlSafe(m.enemy || '');
@@ -17240,7 +17422,18 @@ function statusDoConfronto(m, passo, hit){
 }
 function statusDoConfrontoHtml(m, passo, hit){
   const st = statusDoConfronto(m, passo, hit);
-  return '<p class="loading-text' + (st.classe ? ' ' + st.classe : '') +
+  /* ⚠️ SE A FRASE JÁ ESTÁ NA TELA, ela não reentra. Quem responde isso é o próprio DOM: este
+     HTML é montado ANTES de o `render()` trocar o conteúdo, então o elemento antigo ainda está lá
+     com o que o jogador está vendo. Comparar com ele é exato e não guarda estado nenhum.
+     Sem isso a animação de entrada rodava a cada desenho: o pintor punha a frase no passo do
+     evento e o desenho de 50ms depois a fazia surgir de novo -- o piscar reportado em 12/09/2026.
+     A frase MUDOU? entra normalmente, que é o que separa um golpe do seguinte. */
+  let igual = false;
+  try {
+    const el = (typeof document !== 'undefined') && document.getElementById('battle-status-txt');
+    igual = !!el && el.innerHTML === st.html && el.className.indexOf(st.classe || 'x-nenhuma') >= 0;
+  } catch(e){ igual = false; }
+  return '<p class="loading-text' + (st.classe ? ' ' + st.classe : '') + (igual ? ' aviso-sem-entrada' : '') +
          '" id="battle-status-txt">' + st.html + '</p>';
 }
 /* PINTA A LINHA DIRETO NO DOM, sem render(). É obrigatório: um render() no meio da animação recria
@@ -17260,6 +17453,10 @@ function pintarStatusDoConfronto(m, passo, hit){
      as DUAS barras, a frase tem que sobreviver às duas, e o passo que desce a barra do alvo
      (absorbdano) não é golpe comum nem abertura -- caía no genérico e comia a explicação. */
   if(!st.classe) return;
+  /* ⚠️ E NADA A FAZER SE A LINHA JÁ DIZ ISSO. O reflow abaixo existe pra a animação rodar DE NOVO
+     quando o texto troca sem trocar de classe (dois golpes seguidos do mesmo lado) -- mas rodando
+     no texto IGUAL ele faz a frase surgir duas vezes, que é o piscar de 12/09/2026. */
+  if(el.innerHTML === st.html && el.className.indexOf(st.classe) >= 0) return;
   el.className = 'loading-text' + (st.classe ? ' ' + st.classe : '');
   el.innerHTML = st.html;
   el.style.animation = 'none';
@@ -17282,13 +17479,17 @@ function pausaDoNomeDoGolpe(m, hit){ return fraseDoGolpeUsado(m, hit) ? PAUSA_AN
 /* PAUSA PRA LER. Sem ela a frase aparece e some junto com o primeiro golpe, e num confronto
    resolvido por autodestruição (que dura um golpe só) ela mal pisca. Um segundo é o mesmo tempo
    que o online já dá pro "Vai Fulano!" antes de começar a luta. */
-const PAUSA_LEITURA_ESPECIAL_MS = 1000;
-/* A PAUSA DE ABERTURA só vale se a frase ESTIVER MESMO na tela no passo 0. Ela pergunta pelo passo
-   0 e não sem passo desde 10/09/2026: com o moribundo de quem dormiu indo pra frente, a linha do
-   sono deixou de abrir o confronto em alguns casos, e a pausa virava um segundo parado numa tela
-   que só dizia "Trocando golpes...". Nesses casos quem dá o tempo de leitura é a marca de
-   LEITURA do passo dela, no meio do laço. Onde a abertura continua sendo o primeiro passo -- que é o caso
-   de sempre -- a conta não mudou. */
+/* 1,5s desde 12/09/2026, a pedido: *"aumenta para 1,5s a espera para sumir essa mensagem e
+   continuar o processo"*. Era 1s. Ele vale pra TODA frase de passiva -- a marca `leitura` do passo
+   do evento, a pausa da Faixa no meio da luta e a pausa de abertura da anulação. */
+const PAUSA_LEITURA_ESPECIAL_MS = 1500;
+/* A PAUSA DE ABERTURA só vale se a frase ESTIVER MESMO na tela no passo 0 -- e desde 12/09/2026
+   isso é só a ANULAÇÃO. Ela é a única abertura que não é um passo da animação (não move barra e
+   é filtrada fora da sequência), então o passo dela É o 0: ela acontece antes do primeiro golpe e
+   não tem barra nenhuma pra esperar.
+   Todas as outras nascem no passo do PRÓPRIO evento e pegam o segundo de leitura DEPOIS dele, pela
+   marca `leitura` -- foi essa troca que tirou a frase da tela antes de a coisa acontecer. Aqui a
+   função devolve 0 pra elas, e é por isso que ela continua existindo em vez de virar constante. */
 function pausaDoEspecial(m){ return avisoDoConfronto(m, 0) ? PAUSA_LEITURA_ESPECIAL_MS : 0; }
 /* A PAUSA DA FAIXA, no meio do laço. O passo dela não mexe barra nenhuma, então a duração dele é
    ZERO -- sem esta pausa a frase apareceria e sumiria no mesmo quadro, e o jogador veria a barra
@@ -18217,8 +18418,9 @@ function renderNeighborhoodGym(){
             <span class="gym-action-icon">🚪</span><span>Sair da liderança</span>
           </button>`);
       } else {
-        const eligibleSlots = Array.from({length:MAX_SAVE_SLOTS}, (_, i) => i)
-          .filter(i => game.saveSlots[i] && (game.saveSlots[i].badgeCount||0) >= 8);
+        /* ⚠️ ESTA ERA A COPIA QUE NAO PEDIA O `team`: um save com as 8 insignias e sem time passava
+           por aqui e era recusado nas outras telas. O savesCampeoes pergunta as duas coisas. */
+        const eligibleSlots = savesCampeoes();
         out += eligibleSlots.length===0
           ? `<div class="box"><p class="hint-text">Você precisa de um time com as 8 insígnias pra desafiar.</p></div>`
           : `<button class="btn danger" onclick="startNeighborhoodGymChallenge()">⚔️ Desafiar Ginásio</button>`;
@@ -20636,10 +20838,12 @@ function renderInventario(){
   <div class="box item-detalhe">${detalhe}</div>
   ${gradeDeItensHtml(slotsDaGrade(pilhas), game.inventarioSel, 'escolherItem')}
   <!-- TM/HM em tela PROPRIA: eles nao empilham, nao se gastam, nao se vendem e nao se usam daqui --
-       todas as regras da grade acima sao falsas pra eles. Ver renderTmHm. -->
-  <button class="btn secondary u-mt8" onclick="abrirTmHm()">📀 TMs e HMs${
-    hmsDaConta().length ? ' (' + hmsDaConta().length + ')' : ''}</button>
-  <button class="btn secondary" onclick="sairDaMochila()">⬅ Voltar</button>
+       todas as regras da grade acima sao falsas pra eles. Ver renderTmHm.
+       ⚠️ O BOTAO ESTA ESCONDIDO PRA TODO MUNDO desde 12/09/2026, a pedido. A tela e o HM01 continuam
+       inteiros -- ver MOSTRAR_TM_HM. -->
+  ${MOSTRAR_TM_HM ? `<button class="btn secondary u-mt8" onclick="abrirTmHm()">📀 TMs e HMs${
+    hmsDaConta().length ? ' (' + hmsDaConta().length + ')' : ''}</button>` : ''}
+  <button class="btn secondary u-mt8" onclick="sairDaMochila()">⬅ Voltar</button>
   ${renderExcluirItemModal()}`;
 }
 /* A TELA DE TMs E HMs (11/09/2026, a pedido). Ela é SEPARADA da grade da mochila, e isso é decisão:
@@ -20653,6 +20857,18 @@ function renderInventario(){
    ⚠️ OS HMs SÃO DO SAVE, não da conta: a mochila é aberta de três lugares e um deles é a HOME, sem
    save nenhum carregado. Ali não há o que mostrar, e a tela diz isso em vez de mentir que está
    vazia -- é a mesma regra do "nenhuma tela pode ficar Carregando pra sempre". */
+/* ⚠️ A PORTA DA TELA DE TMs E HMs, FECHADA PRA TODO MUNDO desde 12/09/2026 (a pedido: *"esconda o
+   botao na mochila de tm/hm para todos"*).
+   O QUE FICA DE PE: o HM01 continua sendo CONQUISTADO na jornada (a rota do S.S. Anne mais o Surge
+   sem derrota), continua sendo ANUNCIADO na tela de vitoria, e continua guardado em `users/{uid}.hms`
+   -- nada disso passa por aqui. O que sumiu e o unico caminho pra ABRIR a tela.
+   ELA E UMA CONSTANTE E NAO UMA REMOCAO porque o pedido foi "esconda", nao "tire": a tela, a lista
+   e a trava do HM01 continuam prontas, e voltar a mostrar o botao e ESTA LINHA. Deixar o codigo sem
+   chamador e sem nada explicando seria o tipo de coisa que fica anos no arquivo sem ninguem saber
+   se e defeito ou decisao -- que e justamente o que este arquivo evita.
+   O `case 'tmhm'` do render fica: a tela continua desenhavel, e sem ele o dia em que o botao voltar
+   comeca com uma tela em branco. */
+const MOSTRAR_TM_HM = false;
 function abrirTmHm(){ game.screen = 'tmhm'; render(); }
 function sairDoTmHm(){ game.screen = 'inventario'; render(); }
 /* A LISTA É SÓ O NOME E UMA LINHA CURTA embaixo (11/09/2026, a pedido). Ela já teve um parágrafo
@@ -20698,11 +20914,39 @@ function renderExcluirItemModal(){
    ("um monte de quadradinhos, clico num e leio o que é"), e o que muda é o botão do quadro.
    AINDA NÃO VENDE NADA. Os itens aparecem com o preço e o botão DESABILITADO em vez de a tela
    ficar vazia: assim dá pra ver o que a loja vai ser, e um botão apagado não promete nada. */
+/* AS TRES PRATELEIRAS DA LOJA (12/09/2026, a pedido). A lista encolheu pela metade e do lado
+   esquerdo entraram tres botoes: *"o primeiro e 'Para as batalhas', e adicione nessa secao todos
+   os itens que sao usados equipando um pokemon; no segundo botao coloque 'Especiais', e adicione o
+   Rare Candy; e o terceiro botao coloque TMs, ainda sem nada para vender"*.
+   ⚠️ A PRATELEIRA SAI DO PROPRIO ITEM, nunca de uma lista escrita aqui. "Para as batalhas" E
+   exatamente `equipável` -- a marca que ja existia e que diz que o item vai num pokemon pelo + da
+   tela de ordem --, e o resto cai em "Especiais". Assim um item novo nasce numa prateleira sozinho,
+   e nenhuma lista envelhece calada: o teste cobra que TODO comprável apareca em exatamente uma.
+   As TMs ficam VAZIAS de proposito -- a prateleira existe antes do que vai nela, que e o mesmo
+   desenho do HM01 (primeiro a porta, depois o que tem atras). */
+const LOJA_PRATELEIRAS = [
+  { id:'batalha',   nome:'Para as batalhas', icone:'⚔️' },
+  { id:'especiais', nome:'Especiais',        icone:'✨' },
+  { id:'tms',       nome:'TMs',              icone:'💿' }
+];
+function prateleiraDoItem(id){ return (ITENS[id] || {}).equipável ? 'batalha' : 'especiais'; }
+function itensDaPrateleira(p){ return Object.keys(ITENS).filter(id => ITENS[id].comprável && prateleiraDoItem(id) === p); }
 function openLoja(){
   game.screen = 'loja';
+  game.lojaAba = LOJA_PRATELEIRAS[0].id;
   /* O PRIMEIRO QUE ELA VENDE, e nao o primeiro do catalogo: o Doce Raro e o Bonus Shiny estao no
      ITENS mas nao estao a venda, e abrir escolhendo um deles deixava o quadro de cima VAZIO. */
-  game.lojaSel = Object.keys(ITENS).find(id => ITENS[id].comprável) || null;
+  game.lojaSel = itensDaPrateleira(game.lojaAba)[0] || null;
+  render();
+}
+/* TROCAR DE PRATELEIRA MOVE A SELECAO JUNTO. Sem isso o quadro de cima continuava mostrando um
+   item que a lista ao lado nem lista mais -- e na prateleira vazia ele mostraria o item da
+   anterior, com botao de comprar e tudo. */
+function escolherPrateleira(p){
+  game.lojaAba = p;
+  game.lojaErro = null;
+  const dela = itensDaPrateleira(p);
+  if(dela.indexOf(game.lojaSel) < 0) game.lojaSel = dela[0] || null;
   render();
 }
 function escolherItemDaLoja(id){ game.lojaSel = id; game.lojaErro = null; render(); }
@@ -20854,7 +21098,8 @@ async function comprarItem(id){
 function renderLoja(){
   /* A grade mostra quanto você JÁ TEM de cada um -- e isso vem do quantoTenho, não do inventario:
      o Doce Raro mora no contador da conta e o Bônus Shiny soma cupom com estoque comprado. */
-  const aVenda = Object.keys(ITENS).filter(id => ITENS[id].comprável)
+  const aba = game.lojaAba || LOJA_PRATELEIRAS[0].id;
+  const aVenda = itensDaPrateleira(aba)
     .map(id => ({ item:id, quantidade:quantoTenho(id), fontes:[] }));
   const sel = aVenda.find(p => p.item === game.lojaSel) || null;
   const it = sel ? ITENS[sel.item] : null;
@@ -20867,6 +21112,10 @@ function renderLoja(){
   <!-- O QUADRO DE CIMA É FIXO (position:sticky): só a lista rola. Com 11 itens a lista passa da
        tela a 320px, e sem isto o jogador rolava até o item, clicava, e tinha que voltar pra cima
        pra ler o que ele faz e comprar -- duas viagens pra uma decisão. -->
+  <!-- O QUADRO DE CIMA SOME NA PRATELEIRA VAZIA. Ele e o DETALHE do item selecionado, e ali nao ha
+       item nenhum -- com ele a tela dizia a mesma coisa duas vezes, em cima e na lista. Quem
+       carrega o recado (e o saldo) passa a ser a propria lista, que e onde a ausencia esta. -->
+  ${!aVenda.length ? '' : `
   <div class="box item-detalhe loja-fixa">
     ${it ? `
       <div class="item-detalhe-topo">
@@ -20897,15 +21146,33 @@ function renderLoja(){
       ${(game.moedas||0) < it.preco ? `<p class="hint-text">Faltam 🪙 ${it.preco - (game.moedas||0)} pra comprar um.</p>` : ''}
       <p class="loja-saldo">Você tem <strong>🪙 ${moedas}</strong>.</p>`
     : `<p class="item-detalhe-vazio">A loja ainda não abriu.</p>`}
-  </div>
-  <div class="box loja-lista">
-    ${aVenda.map(p => { const i = ITENS[p.item]; const cabe = moedas >= i.preco; return `
-      <button class="loja-linha ${p.item === game.lojaSel ? 'sel' : ''} ${cabe ? '' : 'caro'}"
-        onclick="escolherItemDaLoja('${escJs(p.item)}')">
-        <span class="loja-icone">${i.icone}</span>
-        <span class="loja-nome">${escapeHtmlSafe(i.nome)}${p.quantidade > 0 ? `<span class="loja-tem">você tem ${p.quantidade}</span>` : ''}</span>
-        <span class="loja-preco">🪙 ${i.preco}</span>
-      </button>`; }).join('')}
+  </div>`}
+  <!-- AS PRATELEIRAS A ESQUERDA e a lista pela metade (12/09/2026, a pedido). A .loja-corpo e uma
+       linha de duas colunas: sem ela a lista ocupava a largura inteira, e com tres prateleiras a
+       pessoa teria que rolar pra saber que elas existem. -->
+  <div class="loja-corpo">
+    <div class="loja-abas">
+      ${LOJA_PRATELEIRAS.map(pr => { const n = itensDaPrateleira(pr.id).length; return `
+        <button class="loja-aba ${pr.id === aba ? 'sel' : ''}" onclick="escolherPrateleira('${escJs(pr.id)}')">
+          <span class="loja-aba-icone">${pr.icone}</span>
+          <span class="loja-aba-txt">
+            <span class="loja-aba-nome">${escapeHtmlSafe(pr.nome)}</span>
+            <span class="loja-aba-qtd">${n ? n + (n === 1 ? ' item' : ' itens') : 'em breve'}</span>
+          </span>
+        </button>`; }).join('')}
+    </div>
+    <div class="box loja-lista">
+      ${aVenda.length ? aVenda.map(p => { const i = ITENS[p.item]; const cabe = moedas >= i.preco; return `
+        <button class="loja-linha ${p.item === game.lojaSel ? 'sel' : ''} ${cabe ? '' : 'caro'}"
+          onclick="escolherItemDaLoja('${escJs(p.item)}')">
+          <span class="loja-icone">${i.icone}</span>
+          <span class="loja-nome">${escapeHtmlSafe(i.nome)}
+            <span class="loja-preco">🪙 ${i.preco}</span>
+            ${p.quantidade > 0 ? `<span class="loja-tem">você tem ${p.quantidade}</span>` : ''}</span>
+        </button>`; }).join('')
+      : `<p class="loja-vazia">Ainda não há ${escapeHtmlSafe((LOJA_PRATELEIRAS.find(x => x.id === aba) || {}).nome || 'itens')} à venda.</p>
+         <p class="loja-saldo">Você tem <strong>🪙 ${moedas}</strong>.</p>`}
+    </div>
   </div>
   <button class="btn secondary u-mt8" onclick="openSaveSelect()">⬅ Voltar</button>`;
 }
@@ -21243,6 +21510,7 @@ async function carregarHistoricoOnline(tentativa){
   if(game.screen === 'onlineBattle') render();
 }
 function openOnlineBattle(){
+  if(!exigeTimeCampeao()) return;
   stopOnlinePoll();            // só a consulta da batalha AO VIVO; a da fila é outra
   game.screen = 'onlineBattle';
   game.onlineBattleId = null;
@@ -21779,12 +22047,7 @@ function sairDaBatalhaOnline(){
 }
 
 // ---------- telas ----------
-function timeElegiveisOnline(){
-  return Array.from({length:MAX_SAVE_SLOTS}, (_,i)=>i).filter(slot=>{
-    const s = game.saveSlots[slot];
-    return s && s.team && (s.badgeCount||0) >= 8;
-  });
-}
+function timeElegiveisOnline(){ return savesCampeoes(); }
 /* Reprise: reaproveita a MESMA tela de revelação das outras batalhas (ver finishTrainerBattle),
    como a Torre já faz. A batalha já aconteceu -- aqui é só tocar o log de novo. */
 async function reverPartidaOnline(battleId){
@@ -23078,6 +23341,9 @@ function renderSaveSelect(){
       <span class="home-menu-title">Loja</span>
     </button>
   </div>
+  <!-- A RECUSA FICA COLADA NOS BOTOES que a provocaram: ela e sobre ESTES modos, e num rodape
+       (ou no topo, longe deles) o jogador nao liga uma coisa na outra. -->
+  ${game.modoBloqueado ? `<div class="box"><p class="error-text">⚠️ ${escapeHtmlSafe(game.modoBloqueado)}</p></div>` : ''}
   <div class="home-modes-row">
     <button class="home-nav-btn leagues-big-btn" onclick="openLeagueTypesList()">
       <span class="home-mode-icon">${icone('ligas','modo')}</span><span>Ligas Pokémon</span></button>
