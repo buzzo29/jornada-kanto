@@ -165,8 +165,14 @@ console.log('\n=== A LOJA ===');
      metade deles sao emojis parecidos -- nao dava pra escolher sem clicar em cada um. */
   ok('a loja e uma LISTA, nao a grade de quadradinhos',
      t.includes('loja-lista') && !t.includes('item-grade'));
-  ok('com uma linha por item a venda', (t.match(/class="loja-linha/g)||[]).length === 11,
-     (t.match(/class="loja-linha/g)||[]).length + ' linhas');
+  /* O NUMERO SAI DO CATALOGO, e nao escrito a mao: ele ja envelheceu uma vez (estava 11 quando o
+     Bonus Shiny saiu da loja, em 12/09/2026) e o teste acusou a tela por uma mudanca que era do
+     catalogo. O que a regra quer e "uma linha por item a venda", nao "onze linhas". */
+  {
+    const aVenda = Object.keys(S.ITENS).filter(id => S.ITENS[id].comprável).length;
+    ok('com uma linha por item a venda', (t.match(/class="loja-linha/g)||[]).length === aVenda,
+       (t.match(/class="loja-linha/g)||[]).length + ' linhas pra ' + aVenda + ' itens a venda');
+  }
   /* Cada linha traz o que a grade nao trazia: NOME e PRECO, sem precisar clicar. */
   ok('e cada linha tem icone, nome e preco',
      t.includes('loja-icone') && t.includes('loja-nome') && t.includes('loja-preco') &&
@@ -180,9 +186,17 @@ console.log('\n=== A LOJA ===');
   ok('e os cinco de atributo custam 30',
      ['hp_up','atk_up','def_up','spatk_up','spdef_up'].every(id => S.ITENS[id].preco === 30),
      ['hp_up','atk_up','def_up','spatk_up','spdef_up'].map(id => id + ':' + S.ITENS[id].preco).join(' '));
-  ok('e todo item do catalogo esta a venda',
-     Object.keys(S.ITENS).every(id => S.ITENS[id].comprável),
-     Object.keys(S.ITENS).filter(id => !S.ITENS[id].comprável).join(', ') || 'todos');
+  /* ⚠️ O CATALOGO NAO E MAIS SO A LOJA. O Bonus Shiny continua no ITENS -- e de la que a MOCHILA
+     tira o nome, o icone e a descricao dele --, mas nao esta a venda desde 12/09/2026: ele so vem
+     de vencer a Elite 4 (ou uma liga online).
+     A lista de fora da loja e FIXADA aqui de proposito: o proximo item que perder o `comprável`
+     tem que ser uma decisao, nao um descuido. */
+  ok('o unico item do catalogo fora da loja e o Bonus Shiny',
+     Object.keys(S.ITENS).filter(id => !S.ITENS[id].comprável).join(',') === 'bonus_shiny',
+     Object.keys(S.ITENS).filter(id => !S.ITENS[id].comprável).join(', ') || '(nenhum)');
+  ok('e ele nao tem preco nenhum, dos dois lados',
+     S.ITENS.bonus_shiny.preco === undefined && S.precoDeVenda('bonus_shiny') === 0 &&
+     S.quantoPossoVender('bonus_shiny') === 0);
   ok('o quadro de cima traz preco e descricao', /🪙 \d+/.test(t) && t.includes('item-detalhe-texto'));
   /* SEM MOEDA o botao ja NASCE desabilitado -- um botao que so recusa depois do toque e pior. */
   ok('sem moeda o Comprar nasce desabilitado',
@@ -199,8 +213,9 @@ console.log('\n=== A LOJA ===');
   /* Precos revisados em 04/09/2026: Super Pocao 30 -> 50 e Pocao 15 -> 30. */
   ok('os precos sao os pedidos', S.ITENS.awakening.preco === 50 && S.ITENS.hyperpotion.preco === 50 && S.ITENS.potion.preco === 30,
      [S.ITENS.awakening.preco, S.ITENS.hyperpotion.preco, S.ITENS.potion.preco].join('/'));
-  ok('e os dois de jogar tambem tem preco', S.ITENS.doce_raro.preco === 300 && S.ITENS.bonus_shiny.preco === 800,
-     S.ITENS.doce_raro.preco + '/' + S.ITENS.bonus_shiny.preco);
+  /* O DOCE RARO continua a venda (300); o Bonus Shiny saiu em 12/09/2026 -- ver o caso acima. */
+  ok('e o Doce Raro, que vem de jogar, tambem tem preco', S.ITENS.doce_raro.preco === 300,
+     String(S.ITENS.doce_raro.preco));
 }
 
 console.log('\n=== O POPUP DE QUANTIDADE ===');

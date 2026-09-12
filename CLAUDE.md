@@ -3138,7 +3138,7 @@ pedido em 09/09/2026. `PAUSA_ANTES_DO_GOLPE_MS`.
   carregava devolve o antigo — perder um item por ter clicado no botão errado seria pior que a troca
   não acontecer. Tudo em transação: sem ela duas abas leem o mesmo estoque e as duas passam, e um
   Despertar protege dois pokémon.
-- **Preços: Bônus Shiny 800, Doce Raro 300, Despertar 50, Super Poção 50, Faixa de Foco 50,
+- **Preços: Doce Raro 300, Despertar 50, Super Poção 50, Faixa de Foco 50,
   Poção 30, os cinco de atributo 30.** O número vive no cliente (`ITENS`) E no servidor (`LOJA`):
   o cliente precisa dele pra desabilitar o botão, o servidor é quem cobra. Se os dois divergirem, a
   tela promete um preço que a cobrança não pratica.
@@ -3158,9 +3158,9 @@ pedido em 09/09/2026. `PAUSA_ANTES_DO_GOLPE_MS`.
   fica em `top:0` e só a lista anda.
   A **mochila continua com a grade**: ela mostra o que você TEM (raramente mais que três ou quatro
   pilhas), e ali o quadradinho ainda funciona.
-- **A loja vende os CINCO desde 03/09/2026.** O Doce Raro e o Bônus Shiny voltaram a ter preço; eles
-  continuam vindo de jogar também, e é por isso que **cada um lê de uma fonte própria**
-  (`quantoTenho`) em vez de sair de um campo só:
+- **A loja vende os CINCO desde 03/09/2026.** O Doce Raro voltou a ter preço (o Bônus Shiny também
+  teve, e **saiu em 12/09/2026** — ver a seção VENDER); eles continuam vindo de jogar, e é por isso
+  que **cada um lê de uma fonte própria** (`quantoTenho`) em vez de sair de um campo só:
   o Doce Raro do contador `rareCandies`, o Bônus Shiny dos CUPONS (save campeão + notificação de liga)
   **mais** o estoque comprado, e os três de batalha do armazém. Derivar tudo do `inventario` faria a
   mochila mostrar **duas pilhas** do mesmo item.
@@ -3193,14 +3193,16 @@ por 50% do valor de compra. Então vai abrir um botão Vender embaixo do botão 
   preço do servidor direto do código.
   `Math.floor` porque os quatro preços do jogo são pares e dividem redondo hoje; o piso está ali
   pro dia em que um preço ímpar entrar, e ele erra a favor do JOGO.
-- **⚠️ O QUE DÁ PRA VENDER NÃO É O QUE A MOCHILA MOSTRA, e o Bônus Shiny é o caso.** O `quantoTenho`
-  soma os **CUPONS** (o save campeão e a notificação de liga) com o estoque comprado, porque pra
-  USAR os dois valem igual. Pra VENDER não: cupom é uma marca de "você ganhou isso" dentro de um
-  save ou de uma notificação, **não uma linha de estoque** — não há de onde descontar. Por isso
-  existe o `quantoPossoVender`, que olha só o **armazém** (e o contador, no Doce Raro). Se as duas
-  contas divergirem, a tela oferece um botão que a cobrança recusa.
-  Um Bônus Shiny **resgatado** pro armazém (o que acontece quando a notificação é apagada) já é
-  estoque e se vende.
+- **⚠️ O QUE DÁ PRA VENDER NÃO É O QUE A MOCHILA MOSTRA, e o Bônus Shiny foi o caso que obrigou esta
+  função a existir.** O `quantoTenho` soma os **CUPONS** (o save campeão e a notificação de liga) com
+  o estoque comprado, porque pra USAR os dois valem igual. Pra VENDER não: cupom é uma marca de
+  "você ganhou isso" dentro de um save ou de uma notificação, **não uma linha de estoque** — não há
+  de onde descontar. Por isso existe o `quantoPossoVender`, que olha só o **armazém** (e o contador,
+  no Doce Raro). Se as duas contas divergirem, a tela oferece um botão que a cobrança recusa.
+  **⚠️ HOJE O BÔNUS SHINY NÃO SE VENDE DE JEITO NENHUM** (12/09/2026): ele saiu do catálogo, e o
+  `quantoPossoVender` devolve 0 pra quem não é `comprável` antes mesmo de olhar o armazém. A função
+  continua valendo pelo mesmo motivo — ela é o que impede a tela de oferecer o que a cobrança
+  recusa — e o Doce Raro, que também vem de jogar, continua vendendo.
 - **QUEM PAGA É O SERVIDOR, em transação** — a mesma regra de tudo que mexe em moeda. Aqui ela pesa
   mais que na compra: sem a transação, duas abas leem o mesmo estoque e as duas passam, e isso
   **cria moeda do nada**.
@@ -3220,32 +3222,52 @@ devolve 150 — **perde metade**. Qualquer fração acima de 100% viraria máqui
 caso de teste que compra 10 poções por 300 e vende de volta por 150 justamente pra gritar no dia em
 que alguém mexer na constante.
 
-**⚠️ MAS ELA CRIA UMA TORNEIRA NOVA, e esse é o custo real da feature.** O que vem de JOGAR passa a
+**⚠️ MAS ELA CRIOU UMA TORNEIRA, e esse era o custo real da feature.** O que vem de JOGAR passa a
 virar moeda:
 
 | | vende por | = quantas jornadas (70/jornada) |
 |---|---|---|
-| **Bônus Shiny** (Elite, liga) | **400** | **5,7 jornadas** |
+| ~~**Bônus Shiny**~~ | ~~400~~ | **não se vende mais** — ver abaixo |
 | **Doce Raro** (pódio da Torre) | **150** | **2,1 jornadas** |
 | Despertar / Super Poção / Faixa | 25 | 0,36 |
 | Poção e os cinco de atributo | 15 | 0,21 |
 
-**O caso que merece atenção é o Bônus Shiny.** Ele é o item mais forte da loja (a chance escala +10
-pontos por encontro sem shiny — 78% de já ter um no 5º encontro), e vendê-lo rende **400 moedas**.
-**⚠️ ESSA ALAVANCA FOI PUXADA NO MESMO DIA, e depois uma segunda:** o re-sorteio subiu de 3 pra 5
-(as 400 moedas caíram de 133 pra 80 re-sorteios, e as 150 de um Doce Raro de 50 pra 30), e logo
-depois entrou um **TETO de 8 re-sorteios por save**. O teto é o que realmente fecha a conversão:
-as 400 moedas não viram mais 80 re-sorteios numa jornada, viram **10 jornadas com o teto cheio** —
-espalhados no tempo em vez de concentrados num save. Ver as duas na seção do re-sorteio.
-Não é um loop (não dá pra comprar outro Bônus de volta: ele custa 800).
-Se ainda incomodar, o que sobra, em ordem de força: **tirar os dois prêmios da venda** (uma linha:
-pular `doce_raro` e `bonus_shiny` no `quantoPossoVender` e no servidor) ou **baixar a fração**
-(`VENDA_FRACAO`). A régua está aqui.
+**⚠️ O BÔNUS SHINY SAIU DA LOJA EM 12/09/2026, a pedido: não se compra nem se vende.** Ele era ao
+mesmo tempo o item mais forte que ela tinha (a chance escala +10 pontos por encontro sem shiny —
+78% de já ter um no 5º encontro) e a maior torneira de moeda dela: **400 por unidade**, quase seis
+jornadas de renda por um prêmio que vem de jogar. Este arquivo já apontava esse lugar como a
+alavanca ("tirar os dois prêmios da venda"), e ela foi puxada — só que inteira, tirando também a
+compra.
+**O QUE FECHA OS DOIS É A AUSÊNCIA NO CATÁLOGO DO SERVIDOR** (`LOJA`): o `buyItem` e o `sellItem`
+consultam ele antes de qualquer outra coisa, então nem um cliente velho em cache consegue comprar
+ou vender. No cliente basta tirar o `comprável` e o `preco` — o `renderLoja` lista por `comprável`,
+e o `quantoPossoVender` e o `precoDeVenda` já devolvem 0 pra quem não é.
+**QUEM JÁ COMPROU CONTINUA COM O DELE**: a mochila lê o `quantoTenho` (que não passa pelo
+`comprável`) e o `activateBoughtShinyBonus` lê o inventário direto. Apagar o estoque de quem pagou
+seria tirar o que já foi comprado.
+**⚠️ E ELE NÃO VEM SÓ DA ELITE 4 — são TRÊS fontes**, e vale saber quais, porque o pedido dizia "só
+pode ser obtido quando ganha da elite 4":
+  1. **a Elite 4** (`eliteShinyGranted` no save), que vira cupom na mochila;
+  2. **o campeão de liga** (a notificação `league_champion`), que vira cupom do mesmo jeito;
+  3. **o Top 10 da raide do Mew**, que não é item — ele escreve o `shinyBonusExpiresAt` direto, ou
+     seja liga a hora na hora.
+  As duas últimas **continuam valendo**: o pedido era sobre a loja, e tirar prêmio de modo inteiro é
+  outra decisão. Se for pra ficar só a Elite, os lugares são o `cuponsDeBonusShiny` (a notificação)
+  e o prêmio do `fightSundayBoss`.
+**AS DUAS ALAVANCAS DO RE-SORTEIO CONTINUAM DE PÉ** (preço 5 e teto de 8 por save) — elas foram
+puxadas justamente por causa desta torneira, e o que sobra agora é só o Doce Raro (150).
+Se um dia incomodar, o que resta é **baixar a fração** (`VENDA_FRACAO`) ou tirar o Doce Raro da
+venda, do mesmo jeito.
 
 - `tools/test-moedas.js` tranca: a metade de cada preço, que o Doce Raro sai do CONTADOR e não do
   inventário, que pedir mais do que se tem vende o que tem, que sem estoque ele recusa **e não paga
-  nada**, que o cupom de Bônus Shiny **não** se vende mas o comprado sim, que comprar e vender de
-  volta perde metade, e que o preço que o cliente desenha é exatamente o que o servidor paga.
+  nada**, que o Bônus Shiny **não se compra nem se vende — nem tendo estoque**, que o estoque de
+  quem já tinha fica intacto e continua ativável, que comprar e vender de volta perde metade, e que
+  o preço que o cliente desenha é exatamente o que o servidor paga.
+  `tools/test-inventario.js` tranca o outro lado: que a loja desenha **uma linha por item à venda**
+  (contado do catálogo, e não um número escrito à mão — ele já envelheceu quando o Bônus Shiny
+  saiu) e que **o único item do catálogo fora da loja é o Bônus Shiny**, pra o próximo que perder o
+  `comprável` ser decisão e não descuido.
 
 ### O popup de quantidade
 - **ELE SERVE COMPRAR E VENDER desde 11/09/2026** (`game.compraModo`): é a mesma pergunta, com o
@@ -3270,17 +3292,20 @@ pular `doce_raro` e `bonus_shiny` no `quantoPossoVender` e no servidor) ou **bai
 ### O preço das duas vendas novas, medido
 - A moeda vem de jogar: **70 por jornada completa**. Então o preço de cada item é, na prática,
   **quantas jornadas ele custa**: Poção 0,21 · Super Poção 0,43 · Despertar 0,71 ·
-  **Doce Raro 4,3** · **Bônus Shiny 11,4**.
+  **Doce Raro 4,3**. (O Bônus Shiny custava 11,4 e saiu da loja em 12/09/2026.)
 - **O Doce Raro é +1 nível, e um nível sozinho quase não se vê**: medido em 8.000 batalhas 6x6
   nível 60 (1σ = 0,79 ponto), +1 nível no líder do time vale **+0,54 ponto** — dentro do ruído.
   O que ele compra é ACÚMULO: +5 níveis valem **+4,25** (5,4σ) e +10 valem **+8,19** (10,4σ).
   A 4,3 jornadas por doce, subir um pokémon 10 níveis custa **43 jornadas completas**. É lento de
   propósito, e o teto de nível 99 continua valendo.
-- **O Bônus Shiny é o item mais forte da loja, e de longe.** A chance dele não é fixa: começa em 5%
-  e sobe **+10 pontos por encontro sem shiny** enquanto durar (`SHINY_PITY_STEP`). Calculado:
-  39% de já ter um shiny no 3º encontro, **78% no 5º, 99% no 8º** — ou seja, uma jornada inteira sob
-  o bônus é praticamente um shiny garantido, contra **6,1%** sem ele no modo normal.
-  As 11,4 jornadas de preço são o que segura isso; se um dia incomodar, o lugar de mexer é o preço.
+- **⚠️ O BÔNUS SHINY É O EFEITO MAIS FORTE DO JOGO, e foi por isso que ele saiu da loja.** A chance
+  dele não é fixa: começa em 5% e sobe **+10 pontos por encontro sem shiny** enquanto durar
+  (`SHINY_PITY_STEP`). Calculado: 39% de já ter um shiny no 3º encontro, **78% no 5º, 99% no 8º** —
+  ou seja, uma jornada inteira sob o bônus é praticamente um shiny garantido, contra **6,1%** sem
+  ele no modo normal.
+  As 11,4 jornadas de preço eram o que segurava isso. **Desde 12/09/2026 ele não tem preço nenhum**:
+  não se compra nem se vende, e só vem de jogar (ver a seção VENDER, que é onde estão as três
+  fontes que sobraram).
 
 ### O + DA TELA DE ORDEM (onde o item entra no pokémon)
 - **Está nas QUATRO telas de ordem** onde o jogador entra em batalha: jornada, desafio do ginásio da
@@ -4096,6 +4121,7 @@ sozinho vale **−10,4 pontos** em cima do preço.
 2. **O RE-SORTEIO DEIXOU DE SER O SUMIDOURO DE MOEDA QUE ERA.** Oito a 5 custam **40** de uma
    jornada que paga **70** — sobram 30 por jornada sem destino urgente, e eles vão pra loja. É
    provavelmente bom, mas é uma mudança de papel: antes o re-sorteio absorvia tudo que entrava.
+   ⚠️ Esta conta virou HISTÓRIA em 12/09/2026: o Bônus Shiny saiu da loja e não se vende mais.
    E a venda de um Bônus Shiny (400 moedas) deixou de virar 80 re-sorteios numa jornada: viram
    **10 jornadas com o teto cheio**, espalhados no tempo em vez de concentrados.
 - **O contador do PREÇO vem do SAVE, e isso é seguro por construção — mas só pro PREÇO.** O

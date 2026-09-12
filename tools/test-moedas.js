@@ -245,11 +245,18 @@ console.log('\n=== A LOJA: COMPRAR E USAR ===');
   ok('cobrando 300 cada', dc.moedas === 100, String(dc.moedas));
   ok('e o contador gravado bate', ((await userRef('q').get()).data() || {}).rareCandies === 5);
 
-  /* O BONUS SHINY COMPRADO e estoque de verdade, e tem funcao propria pra ativar: os outros dois
-     caminhos leem um CUPOM (save campeao / notificacao), que e marca de premio e nao estoque. */
+  /* ⚠️ O BONUS SHINY NAO SE COMPRA MAIS (12/09/2026, a pedido): ele saiu do catalogo da LOJA, e e
+     isso que fecha a compra -- o buyItem consulta o catalogo antes de qualquer outra coisa, entao
+     nem um cliente velho em cache consegue comprar. */
   await conta('q', jaVisto(), 1600);
-  const bs = await chamar('buyItem', 'q', { item:'bonus_shiny', quantidade: 2 });
-  ok('o Bonus Shiny comprado vira estoque', bs.inventario.bonus_shiny === 2, JSON.stringify(bs.inventario));
+  ok('o Bonus Shiny NAO se compra',
+     await recusa('buyItem', 'q', { item:'bonus_shiny', quantidade: 2 }) === 'invalid-argument');
+  ok('e o dinheiro nao foi tocado', ((await userRef('q').get()).data() || {}).moedas === 1600);
+
+  /* MAS QUEM JA TEM ESTOQUE CONTINUA USANDO -- apagar o que ja foi comprado (ou resgatado de uma
+     notificacao de liga, que escreve no MESMO campo) seria tirar o que a pessoa ja tinha.
+     O activateBoughtShinyBonus le o inventario direto e NAO passa pelo catalogo. */
+  await userRef('q').set({ inventario: { bonus_shiny: 2 } }, { merge:true });
   const a1 = await chamar('activateBoughtShinyBonus', 'q', {});
   ok('ativar gasta um do armazem', a1.inventario.bonus_shiny === 1, JSON.stringify(a1.inventario));
   ok('e liga a janela de 1 hora', a1.expiresAt > Date.now() + 59*60*1000 && a1.expiresAt <= Date.now() + 60*60*1000 + 500,
@@ -533,16 +540,21 @@ console.log('\n=== A LOJA: VENDER POR METADE ===');
   const volta = await chamar('sellItem', 'w', { item:'potion', quantidade: 10 });   // +150
   ok('comprar e vender de volta PERDE metade', volta.moedas === 150, volta.moedas + ' de 300');
 
-  /* ⚠️ O BONUS SHINY DE CUPOM NAO SE VENDE. O quantoTenho da mochila soma os cupons (save campeao
-     e notificacao de liga) com o estoque comprado, porque pra USAR os dois valem igual; pra VENDER
-     nao ha de onde descontar -- cupom e uma marca dentro de um save, nao uma linha de estoque.
-     O servidor so olha o inventario, e e isso que este caso tranca. */
+  /* ⚠️ O BONUS SHINY NAO SE VENDE, tendo estoque ou nao (12/09/2026, a pedido). Ele era a maior
+     torneira de moeda da loja: 400 por unidade, ou seja quase 6 jornadas de renda por um premio
+     que vem de jogar. Hoje ele nao esta no catalogo, e o sellItem recusa pela mesma porta do
+     buyItem -- o que tambem cobre o cliente velho em cache que ainda desenhe o botao.
+     O CASO COM ESTOQUE e o que importa: sem ele, "nao vende" passaria so por nao haver o que
+     descontar, e a regra ficaria sem trava. */
   await conta('x', jaVisto(), 0);
-  ok('sem estoque comprado, o Bonus Shiny nao se vende',
-     await recusa('sellItem', 'x', { item:'bonus_shiny' }) === 'failed-precondition');
+  ok('sem estoque, o Bonus Shiny nao se vende',
+     await recusa('sellItem', 'x', { item:'bonus_shiny' }) === 'invalid-argument');
   await userRef('x').set({ inventario: { bonus_shiny: 1 } }, { merge:true });
-  const bs = await chamar('sellItem', 'x', { item:'bonus_shiny' });
-  ok('mas o COMPRADO se vende, por 400', bs.recebeu === 400 && bs.moedas === 400, JSON.stringify(bs));
+  ok('e COM estoque tambem nao',
+     await recusa('sellItem', 'x', { item:'bonus_shiny' }) === 'invalid-argument');
+  ok('e o estoque continua la, intacto',
+     ((await userRef('x').get()).data() || {}).inventario.bonus_shiny === 1);
+  ok('sem ter recebido moeda nenhuma', (((await userRef('x').get()).data() || {}).moedas || 0) === 0);
 
   /* OS DOIS LADOS TEM QUE CONCORDAR NO PRECO. O cliente desenha "Vender por N" e o servidor paga N;
      se divergirem, a tela promete o que a cobranca nao pratica -- o mesmo cuidado que o preco de

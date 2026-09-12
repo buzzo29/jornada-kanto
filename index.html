@@ -19756,12 +19756,20 @@ const ITENS = {
     descricao: 'Sobe 1 nível de um pokémon seu, na hora. Vale acima do teto de distribuição da jornada — é a única coisa, junto do desmaio e do Bônus de Kanto, que passa do nível 55.',
     comoGanhar: 'Chegando mais longe que todo mundo na Torre dos Treinadores no dia, ou na loja.'
   },
+  /* ⚠️ O BÔNUS SHINY SAIU DA LOJA em 12/09/2026, a pedido: não se compra nem se vende. Ele é o
+     item mais forte que ela tinha (a chance escala +10 pontos por encontro sem shiny -- 78% de já
+     ter um no 5º encontro), e com a venda valendo 400 moedas ele também era a maior torneira de
+     moeda dela. Hoje ele volta a ser SÓ prêmio de jogar.
+     SEM `comprável` E SEM `preco`, e é por isso que basta isto: o `renderLoja` lista por
+     `comprável`, e o `quantoPossoVender` e o `precoDeVenda` já devolvem 0 pra quem não é.
+     QUEM JÁ TEM ESTOQUE COMPRADO CONTINUA USANDO: a mochila lê o `quantoTenho`, que não passa por
+     aqui, e o `activateBoughtShinyBonus` lê o inventário direto. Apagar o estoque de quem pagou
+     seria tirar o que já foi comprado. */
   bonus_shiny: {
     nome: 'Bônus Shiny',
     icone: '✨',
-    comprável: true, preco: 800,
     descricao: '1 hora de chance bem maior de encontrar shiny nos encontros selvagens. O contador aparece na home enquanto estiver valendo. Ativando um com outro já valendo, o tempo SOMA.',
-    comoGanhar: 'Vencendo a Elite dos 4 ou uma liga online, ou na loja.'
+    comoGanhar: 'Vencendo a Elite dos 4 ou uma liga online.'
   },
   /* OS COMPRÁVEIS. Estes têm ARMAZÉM de verdade (o campo inventario da conta, escrito só pelo
      servidor) -- diferente dos dois de cima, que são uma leitura do que a conta já tinha. O preço

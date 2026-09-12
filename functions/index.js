@@ -5829,12 +5829,16 @@ const LOJA = {
   spdef_up:    { preco: 30 },
   /* A Faixa age NO MEIO da luta (segura um golpe fatal), e não na abertura como os outros. */
   faixa_foco:  { preco: 50 },
-  /* OS DOIS QUE NÃO MORAM NO INVENTÁRIO. O Doce Raro é um CONTADOR da conta (rareCandies), escrito
-     pela Torre e descontado pelo useRareCandy -- comprar é somar nele, e a mochila continua lendo
-     de um lugar só. O Bônus Shiny comprado vira estoque em inventario.bonus_shiny e é ativado pelo
-     activateBoughtShinyBonus; o ganho de jogar continua vindo do cupom do save/da notificação. */
-  doce_raro:   { preco: 300, contador: 'rareCandies' },
-  bonus_shiny: { preco: 800 }
+  /* O DOCE RARO NÃO MORA NO INVENTÁRIO: ele é um CONTADOR da conta (rareCandies), escrito pela
+     Torre e descontado pelo useRareCandy -- comprar é somar nele, e a mochila continua lendo de um
+     lugar só. */
+  doce_raro:   { preco: 300, contador: 'rareCandies' }
+  /* ⚠️ O BÔNUS SHINY NÃO ESTÁ AQUI, e a ausência É a regra (12/09/2026, a pedido): ele não se
+     compra nem se vende, e só vem de VENCER A ELITE 4 (ou uma liga online). O `buyItem` e o
+     `sellItem` consultam este catálogo antes de qualquer outra coisa, então tirá-lo daqui fecha os
+     dois -- inclusive pra um cliente velho em cache que ainda desenhe o botão.
+     O `activateBoughtShinyBonus` continua existindo e NÃO olha pra cá: quem já comprou antes segue
+     usando o estoque que tem. */
 };
 /* Quais itens se equipam num pokémon. Os outros dois do catálogo (Doce Raro, Bônus Shiny) não são
    de batalha -- vêm de jogar e se usam na mochila. */
