@@ -19272,6 +19272,13 @@ function advanceLeagueWatch(){
       setTimeout(advanceLeagueWatch, 1300);
     }
   } else if(game.leagueWatchPhase === 'animating'){
+    /* ⚠️ O CONFRONTO VEM ANTES DE TUDO NESTE RAMO, como nos outros três laços de revelação. Ele
+       estava declarado LÁ EMBAIXO e o pintor do nome do golpe já o usava aqui em cima: `const` é
+       zona morta temporal, então a primeira chamada estourava "Cannot access 'm' before
+       initialization" e a animação MORRIA no primeiro golpe -- a tela ficava parada pra sempre.
+       Isso derrubou as QUATRO telas que usam esta revelação (o desafio do Mewtwo, a liga assistida,
+       a partida da Trainers League e o desempate dela) de 09/09 a 13/09/2026. */
+    const m = w.matchups[game.leagueWatchIndex];
     const hit = game.leagueWatchHitSequence[game.leagueWatchHitStep];
     if(hit.side==='player'){ game.leagueWatchCurrentPlayerHp = Math.max(0, game.leagueWatchCurrentPlayerHp - hit.amount); }
     else { game.leagueWatchCurrentEnemyHp = Math.max(0, game.leagueWatchCurrentEnemyHp - hit.amount); }
@@ -19279,7 +19286,6 @@ function advanceLeagueWatch(){
     game.leagueWatchHitStep++;
     pintarStatusDoConfronto(m, game.leagueWatchHitStep, hit);   // o nome do golpe, no mesmo instante da barra
     const isLastHit = game.leagueWatchHitStep >= game.leagueWatchHitSequence.length;
-    const m = w.matchups[game.leagueWatchIndex];
     const hitMaxHp = hit.side==='player' ? m.playerMaxHp : m.enemyMaxHp;
     const hitDuration = hpBarTransitionMs((hit.amount / hitMaxHp) * 100);
     /* O nome do golpe já está na tela (pintarStatusDoConfronto, acima). A barra e tudo que vem

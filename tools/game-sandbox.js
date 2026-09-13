@@ -176,6 +176,11 @@ function createSandbox(htmlPath){
     'runSpecialBattle','advanceSpecialReveal','continueAfterSpecial','continueAfterWildDisguiseReveal',
     // emboscada da Jigglypuff da Rocket: a cena acontece na tela de BATALHA e so depois vira
     // resultado (ver test-jornada.js)
+    /* OS LACOS DE REVELACAO. Eles precisam ser DIRIGIDOS por um teste ate o fim: um erro de
+       tempo-de-execucao no meio (uma variavel usada antes de existir, por exemplo) mata a animacao
+       e a tela fica parada pra sempre -- e nada no carregamento acusa. Foi o que aconteceu com o
+       advanceLeagueWatch entre 09 e 13/09/2026 (ver test-especiais.js). */
+    'advanceLeagueWatch','renderLeagueWatch','advanceTrainerReveal','startMewtwoBattle',
     // aviso de versao nova na home (ver test-inventario.js)
     'conferirVersaoNoAr','atualizarParaVersaoNova','CHECAGEM_DE_VERSAO_MS',
     'renderSpecialBattling','renderSpecialResult','triggerRocketSleepAmbush','fraseDoCantoDaRocket',

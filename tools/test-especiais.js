@@ -4535,5 +4535,107 @@ console.log('\n=== A CAIXA QUE EXPLICA O ESPECIAL (11/09/2026) ===');
        'ficha em ' + iFicha + ', caixa em ' + iCaixa);
   }
 }
+/* O ultimo bloco dirige o desafio do Mewtwo, que e uma funcao async -- por isso o fim do teste mora
+   dentro dele (o arquivo e CommonJS e nao tem await de topo). */
+(async function(){
+console.log('\n=== OS LACOS DE REVELACAO CHEGAM AO FIM ===');
+{
+  /* ⚠️ O DEFEITO DE 13/09/2026, reportado como *"a luta contra o Mewtwo lvl 99 que aparece na
+     pokedex, a luta nao esta acontecendo"*: o `advanceLeagueWatch` usava o confronto (`m`) ANTES de
+     declara-lo -- `const` e zona morta temporal, entao a primeira volta estourava
+     "Cannot access 'm' before initialization", a animacao morria no primeiro golpe e a tela ficava
+     parada pra sempre. E nao era so o Mewtwo: sao QUATRO telas nessa revelacao (o desafio do
+     Mewtwo, a liga assistida, a partida da Trainers League e o desempate dela), todas travadas de
+     09 a 13/09/2026.
+
+     A LICAO E A COBERTURA, nao a linha: dos cinco lacos de animacao do jogo, so DOIS eram dirigidos
+     por teste. Um erro assim nao aparece em `node --check` nem no carregamento da pagina -- so
+     rodando o laco ate o fim. Este bloco dirige os dois que faltavam.
+     (O quinto, o do online, pinta direto no DOM e depende de uma partida em curso; ele continua de
+     fora, e isso fica dito aqui pra ser decisao e nao descuido.) */
+  const time = (ids, lv) => ids.map((id,i)=> S.createInstance(id, lv + i));
+  const meu = time(['venusaur','charizard','blastoise','snorlax','gyarados','dragonite'], 70);
+  const dele = time(['machamp','alakazam','gengar','lapras','arcanine','tyranitar'], 70);
+  const r = S.simulateGymBattle(meu, dele, S.makeSeededRng('lacos'));
+  ok('a batalha de teste tem confrontos de sobra', r.matchups.length >= 3, r.matchups.length + ' confrontos');
+
+  /* Dirige um laco ate ele parar de andar, cobrando que nenhuma volta estoure -- nem a que avanca,
+     nem a que desenha. O 'andar' e medido pelo par (indice, fase): parou de mudar, acabou. */
+  /* ⚠️ A CHAVE DO 'ANDOU' INCLUI O PASSO DO GOLPE, e nao so (indice, fase): dentro de um confronto
+     o laco avanca golpe a golpe SEM mudar nenhum dos dois, entao um confronto de quatro golpes
+     pareceria travado na terceira volta -- o teste acusaria um defeito que nao existe. */
+  const dirigir = (nome, avanca, chave, leIndice, leFase, desenha) => {
+    let erro = null, voltas = 0, parado = 0, ultimo = '';
+    while(voltas < 400 && parado < 3){
+      try{ avanca(); }
+      catch(e){ erro = e && e.message; break; }
+      try{ desenha(); }
+      catch(e){ erro = 'ao desenhar: ' + (e && e.message); break; }
+      const agora = chave();
+      parado = (agora === ultimo) ? parado + 1 : 0;
+      ultimo = agora; voltas++;
+    }
+    ok(nome + ': o laco roda ate o fim sem estourar', !erro, erro || (voltas + ' voltas'));
+    return { erro, indice: leIndice(), fase: leFase() };
+  };
+
+  /* 1) A TELA DA LIGA ASSISTIDA -- a do relato. */
+  {
+    const g = S.__getGame();
+    g.trainerName = 'Buzzo';
+    g.leagueWatch = { playerAName:'Buzzo', playerBName:'Mewtwo', matchups: r.matchups,
+                      winnerName: r.win ? 'Buzzo' : 'Mewtwo' };
+    g.leagueWatchIndex = 0; g.leagueWatchPhase = 'loading'; g.leagueWatchLastHit = null;
+    g.leagueWatchReturnScreen = 'pokedex'; g.screen = 'leagueWatch';
+    S.__setGame(g);
+    const chaveLiga = ()=>{ const j = S.__getGame(); return j.leagueWatchIndex + ':' + j.leagueWatchPhase + ':' + j.leagueWatchHitStep; };
+    const fim = dirigir('liga assistida', S.advanceLeagueWatch, chaveLiga,
+      ()=>S.__getGame().leagueWatchIndex, ()=>S.__getGame().leagueWatchPhase, S.renderLeagueWatch);
+    ok('e chega no ULTIMO confronto', fim.indice === r.matchups.length - 1,
+       'parou em ' + fim.indice + '/' + (r.matchups.length - 1) + ', fase ' + fim.fase);
+    ok('e termina mostrando o resultado', fim.fase === 'result', 'fase: ' + fim.fase);
+  }
+
+  /* 2) A TELA DA TORRE / RAIDE. */
+  {
+    const g = S.__getGame();
+    g.trainerBattleResult = { matchups: r.matchups, win: r.win };
+    g.trainerRevealIndex = 0; g.trainerRevealPhase = 'loading'; g.trainerLastHit = null;
+    g.trainerBattleMeta = { opponentName:'Treinador', title:'Torre' };
+    g.screen = 'trainerBattling';
+    S.__setGame(g);
+    const chaveTorre = ()=>{ const j = S.__getGame(); return j.trainerRevealIndex + ':' + j.trainerRevealPhase + ':' + j.trainerHitStep; };
+    const fim = dirigir('torre / raide', S.advanceTrainerReveal, chaveTorre,
+      ()=>S.__getGame().trainerRevealIndex, ()=>S.__getGame().trainerRevealPhase, S.renderTrainerBattling);
+    ok('e chega no ULTIMO confronto', fim.indice === r.matchups.length - 1,
+       'parou em ' + fim.indice + '/' + (r.matchups.length - 1) + ', fase ' + fim.fase);
+  }
+
+  /* 3) E O CAMINHO DO RELATO DE PONTA A PONTA: a celula do Mewtwo na Pokedex monta a luta, e ela
+     ANDA. Sem este caso, os dois de cima continuariam verdes se o desafio parasse de chegar na
+     tela de revelacao. */
+  {
+    const g = S.freshGameDefaults();
+    g.trainerName = 'Buzzo'; g.authUser = { uid:'u1' };
+    g.saveSlots = new Array(S.MAX_SAVE_SLOTS).fill(null);
+    g.saveSlots[0] = { slot:0, trainerName:'Buzzo', badgeCount:8, customName:'Time 1',
+      team: ['venusaur','charizard','blastoise','snorlax','gyarados','dragonite']
+        .map((id,i)=>({ speciesId:id, level:70+i, shiny:i===0 })) };
+    S.__setGame(g);
+    let erro = null;
+    try{ await S.startMewtwoBattle(0); }catch(e){ erro = e && e.message; }
+    const d = S.__getGame();
+    ok('o desafio do Mewtwo monta a luta', !erro && d.screen === 'leagueWatch',
+       erro || ('tela: ' + d.screen));
+    const total = (d.leagueWatch && d.leagueWatch.matchups || []).length;
+    const chave = ()=>{ const j = S.__getGame(); return j.leagueWatchIndex + ':' + j.leagueWatchPhase + ':' + j.leagueWatchHitStep; };
+    const fim = dirigir('desafio do Mewtwo', S.advanceLeagueWatch, chave,
+      ()=>S.__getGame().leagueWatchIndex, ()=>S.__getGame().leagueWatchPhase, S.renderLeagueWatch);
+    ok('e a luta anda ate o ultimo confronto', total > 0 && fim.indice === total - 1,
+       'parou em ' + fim.indice + '/' + (total - 1));
+  }
+}
+
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
 process.exit(falhas ? 1 : 0);
+})();

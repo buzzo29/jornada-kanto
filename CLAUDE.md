@@ -3048,6 +3048,37 @@ pedido em 09/09/2026. `PAUSA_ANTES_DO_GOLPE_MS`.
   passaram a ser 58,6%**; nos 41% que não cabem, tudo encolhe pelo fator (média 0,93, menor 0,55),
   e a pausa de 1s vira **545ms no pior caso**. O que se perde é tempo de leitura, nunca a escolha.
 
+### QUATRO TELAS DE BATALHA FICARAM PARADAS POR QUATRO DIAS (13/09/2026)
+
+Reportado como *"a luta contra o Mewtwo lvl 99 que aparece na pokedex, a luta não está
+acontecendo"*. E não era o Mewtwo: era o **laço de revelação** que ele usa.
+
+- **A CAUSA É UMA LINHA NA ORDEM ERRADA.** No ramo `animating` do `advanceLeagueWatch`, o pintor do
+  nome do golpe recebia o confronto (`m`) e o `const m` estava declarado **três linhas abaixo**.
+  `const` é zona morta temporal: a primeira volta estourava `Cannot access 'm' before
+  initialization`, a animação morria no primeiro golpe e **a tela ficava parada pra sempre**.
+  Os outros três laços declaram `m` primeiro e depois `hit`; este era o único fora de forma.
+- **⚠️ E NÃO ERA SÓ O MEWTWO: são QUATRO telas nessa mesma revelação** — o desafio do Mewtwo, a
+  **liga assistida**, a **partida da Trainers League** e o **desempate** dela. Todas travadas de
+  **09/09 a 13/09/2026**, desde o commit que pôs o nome do golpe na tela.
+- **⚠️ A LIÇÃO É A COBERTURA, NÃO A LINHA.** O jogo tem **cinco laços de animação** e só **dois**
+  eram dirigidos por teste (o da jornada e o da batalha especial). Um erro assim **não aparece no
+  `node --check`** (é de execução, não de sintaxe) nem no carregamento da página: só rodando o laço
+  até o fim. Os três descobertos eram justamente onde ele estava.
+  `tools/test-especiais.js` passou a **dirigir os laços** da liga assistida e da Torre/raide até
+  parar de andar, cobrando que nem a volta que avança nem a que DESENHA estourem, e que a animação
+  chegue ao ÚLTIMO confronto. Mais o caminho do relato de ponta a ponta: o desafio do Mewtwo monta a
+  luta e ela anda até o fim — sem esse, os dois primeiros continuariam verdes se o desafio parasse
+  de chegar na tela de revelação.
+  **O quinto laço — o do online — continua de fora**: ele pinta direto no DOM e depende de uma
+  partida em curso. Fica dito pra ser decisão e não descuido.
+- **⚠️ A CHAVE DO "ANDOU" INCLUI O PASSO DO GOLPE**, e não só (índice, fase): dentro de um confronto
+  o laço avança golpe a golpe sem mexer em nenhum dos dois, então um confronto de quatro golpes
+  pareceria travado na terceira volta — e o teste acusaria um defeito que não existe. Foi o primeiro
+  jeito que escrevi, e ele deu quatro falhas falsas.
+- Conferido que o teste acusa com a declaração de volta pra baixo: **`parou em 0/10`**, que é
+  exatamente o que o jogador via.
+
 ## Log de batalha
 
 - O matchup carrega **`golpes`**: o diário do confronto, um registro por golpe na ordem real,
