@@ -2503,6 +2503,10 @@
   .home-nav-row .home-nav-btn{margin:0;}
   .home-nav-btn.install{background:var(--yellow);}
   .leagues-big-btn{
+    /* ⚠️ ANCORA DO SELO: o `.notif-badge` é `position:absolute`, e sem um ancestral posicionado ele
+       se pendura no CANTO DA PÁGINA em vez do canto do botão. É o mesmo motivo pelo qual o sino e
+       o card de Amigos já são relativos. */
+    position:relative;
     display:block;
     width:100%;
     margin:4px 0 14px;
@@ -13502,6 +13506,13 @@ function openSaveSelect(){
     }),
     loadLeagueLeaderboard().then(lb=>{ game.leagueLeaderboard = lb; }),
     loadNotificationsUnreadCount(),
+    /* ⚠️ O AVISO DA LIGA PASSOU A SER CALCULADO NA HOME. Ele só rodava dentro do `runBattle`, pra o
+       botão de busca online das telas de batalha -- então na home o `game.avisoLiga` era o que tinha
+       sobrado da última jornada, ou nada. Com o selo do botão dependendo dele, isso virava um `!`
+       que só aparecia depois de o jogador ter batalhado.
+       Custa no MÁXIMO 2 leituras a cada 5 minutos (a folga mora no `atualizarAvisoDaLiga`), e ele
+       engole o próprio erro: é um aviso, falhar aqui não pode atrapalhar a home. */
+    atualizarAvisoDaLiga(),
     // idempotente e barato (já sai rápido se já tiver desbloqueado antes) -- pega quem já tinha vencido
     // o Mewtwo antes dessa feature existir e nunca foi avisado
     functionsClient.httpsCallable('checkMewtwoLoanUnlock')().catch(e=>console.error('Erro ao checar desbloqueio do empréstimo de Mewtwo:', e))
@@ -23535,8 +23546,11 @@ function renderSaveSelect(){
        (ou no topo, longe deles) o jogador nao liga uma coisa na outra. -->
   ${game.modoBloqueado ? `<div class="box"><p class="error-text">⚠️ ${escapeHtmlSafe(game.modoBloqueado)}</p></div>` : ''}
   <div class="home-modes-row">
+    <!-- O ! APARECE QUANDO HÁ LIGA ABERTA E ELE ESTÁ DE FORA (13/09/2026, a pedido). É o MESMO
+         selo do sino e do card de Amigos: um sinal que o jogador já sabe ler como "tem coisa aqui". -->
     <button class="home-nav-btn leagues-big-btn" onclick="openLeagueTypesList()">
-      <span class="home-mode-icon">${icone('ligas','modo')}</span><span>Ligas Pokémon</span></button>
+      <span class="home-mode-icon">${icone('ligas','modo')}</span><span>Ligas Pokémon</span>${
+        game.avisoLiga ? '<span class="notif-badge">!</span>' : ''}</button>
     <button class="home-nav-btn leagues-big-btn" style="background:var(--green);" onclick="openNeighborhoodGymScreen()">
       <span class="home-mode-icon">${icone('ginasio','modo')}</span><span>Ginásio da Cidade</span></button>
     <button class="home-nav-btn leagues-big-btn" style="background:#8a5a00;" onclick="openTrainerTower()">

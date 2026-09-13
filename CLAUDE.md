@@ -5216,6 +5216,35 @@ Se a intenção for que o HM01 seja uma prova, o Surge é o lugar errado — os 
 
 ## Home
 
+### O ! DO BOTÃO DAS LIGAS (13/09/2026)
+
+Pedido assim: *"coloque um sinal de ! (igual quando tem notificação) no botão de ligas onlines,
+quando o treinador ainda não está inscrito em nenhuma liga"*. É o MESMO `.notif-badge` do sino e do
+card de Amigos — um sinal que o jogador já sabe ler como "tem coisa aqui".
+
+- **⚠️ ELE SÓ APARECE QUANDO HÁ LIGA COM INSCRIÇÃO ABERTA**, e isso é decisão: quem responde é o
+  `game.avisoLiga`, que já existia pro aviso das telas de batalha e significa *"há um ciclo aberto E
+  você está de fora"*. Um `!` aceso o tempo todo pra quem não quer liga viraria ruído — e aceso com
+  a inscrição FECHADA seria convidar pra uma porta fechada, que é a regra que o próprio aviso já
+  segue.
+  Se um dia a intenção for o `!` no sentido literal ("não está inscrito, ponto"), é trocar a
+  condição — e a régua está aqui.
+- **"Já está dentro" é mais que estar inscrito NESTE ciclo**: quem está disputando um ciclo já
+  sorteado não consegue se inscrever no próximo. Quem cobre os dois casos é o
+  `isAccountActiveInLeague`, e é ele que o `avisoLiga` usa.
+- **⚠️ A HOME PASSOU A CALCULAR O AVISO.** Ele só rodava dentro do `runBattle` (pro botão de busca
+  online das telas de batalha), então na home o valor era o que tinha sobrado da última jornada — o
+  `!` só apareceria depois de o jogador ter batalhado. Custa no MÁXIMO **2 leituras a cada 5
+  minutos** (a folga mora no `atualizarAvisoDaLiga`) e ele engole o próprio erro.
+- **⚠️ O BOTÃO PRECISOU VIRAR `position:relative`.** O selo é `position:absolute`, e sem um ancestral
+  posicionado ele se pendura no canto da PÁGINA em vez do canto do botão — o sino e o card de Amigos
+  já eram relativos. Isso não aparece em asserção de HTML nenhuma, então o teste lê o CSS.
+- **Medido a 320px, no navegador:** o selo fica em `top −4px, right −4px` do botão, sem rolagem
+  horizontal, ao lado dos outros três selos da home.
+- `tools/test-inventario.js` conta o selo DENTRO do botão das ligas, e não na home inteira: o sino e
+  o card de Amigos também usam o `.notif-badge`, e um teste que contasse todos daria verde por acaso.
+
+
 - **Cinco cards numa linha só**: Pokédex, Conquistas, Amigos, Mochila e Loja. A linha virou
   `grid-template-columns:repeat(5,minmax(0,1fr))` — com `1fr` (que é `minmax(auto,1fr)`) a coluna não
   encolhe abaixo do conteúdo, e "Conquistas" empurrava a linha inteira pra fora dos 320px.

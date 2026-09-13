@@ -821,5 +821,49 @@ console.log('\n=== O HM01: A PRIMEIRA MAQUINA OCULTA (11/09/2026) ===');
   ok('e o "Corte" que o jogo ja tem e o slash', S.nomeDoAtaque('slash') === 'Corte');
   ok('por isso o item carrega o prefixo HM01', /^HM01/.test(S.HMS.hm01.nome), S.HMS.hm01.nome);
 }
+console.log('\n=== O ! DO BOTAO DAS LIGAS ===');
+{
+  /* Pedido em 13/09/2026: *"coloque um sinal de ! (igual quando tem notificacao) no botao de ligas
+     onlines, quando o treinador ainda nao esta inscrito em nenhuma liga"*. */
+  const g = S.__getGame();
+  g.trainerName = 'Buzzo';
+  g.saveSlots = new Array(S.MAX_SAVE_SLOTS).fill(null);
+  g.notificationsUnreadCount = 0; g.friendRequestCount = 0;
+  const selosNoBotao = () => {
+    const h = S.renderSaveSelect();
+    /* conta o selo DENTRO do botao das ligas, e nao na home inteira -- o sino e o card de Amigos
+       tambem usam o `.notif-badge`, e um teste que contasse todos daria verde por acaso. */
+    const i = h.indexOf('openLeagueTypesList()');
+    const fim = h.indexOf('</button>', i);
+    return (h.slice(i, fim).match(/notif-badge/g) || []).length;
+  };
+  g.avisoLiga = null; S.__setGame(g);
+  ok('sem liga aberta (ou ja inscrito), nao ha selo', selosNoBotao() === 0, selosNoBotao() + ' selo(s)');
+  g.avisoLiga = { hora: Date.now() + 3600000 }; S.__setGame(g);
+  ok('com liga aberta e ele de fora, o selo aparece', selosNoBotao() === 1, selosNoBotao() + ' selo(s)');
+  {
+    const h = S.renderSaveSelect();
+    const i = h.indexOf('openLeagueTypesList()');
+    ok('e ele e um ! (o mesmo selo do sino)', /notif-badge">!</.test(h.slice(i, h.indexOf('</button>', i))));
+  }
+  /* ⚠️ O SELO E `position:absolute`: sem um ancestral posicionado ele se pendura no canto da PAGINA
+     em vez do canto do botao. Isso nao aparece em asserção de HTML nenhuma -- por isso o teste le o
+     CSS. */
+  {
+    const txt = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
+    const bloco = (txt.match(/\.leagues-big-btn\{[\s\S]*?\}/) || [''])[0];
+    ok('o botao e a ancora do selo (position:relative)', /position:relative/.test(bloco));
+  }
+  /* ⚠️ E A HOME PRECISA CALCULAR O AVISO. Ele so rodava dentro do runBattle (pro botao de busca
+     online das telas de batalha), entao na home o valor era o que tinha sobrado da ultima jornada --
+     o `!` so apareceria depois de o jogador ter batalhado. O teste le o codigo porque os casos acima
+     escrevem o `avisoLiga` na mao e passariam com a chamada ausente. */
+  {
+    const txt = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
+    const bloco = (txt.match(/function openSaveSelect\(\)[\s\S]*?\n\}/) || [''])[0];
+    ok('a home chama o atualizarAvisoDaLiga', /atualizarAvisoDaLiga\(\)/.test(bloco), bloco.length + ' chars');
+  }
+  g.avisoLiga = null; S.__setGame(g);
+}
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
 process.exit(falhas ? 1 : 0);
