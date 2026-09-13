@@ -16,6 +16,28 @@ let filaDeTransacoes = Promise.resolve();   // ver runTransaction
 function pathOf(parts){ return parts.join('/'); }
 function clone(o){ return o === undefined ? undefined : JSON.parse(JSON.stringify(o)); }
 
+/* ⚠️ O FIRESTORE DE VERDADE RECUSA `undefined`, e o fake precisava recusar junto.
+   Por padrão o Admin SDK joga
+     `Cannot use "undefined" as a Firestore value (found in field X)`
+   e derruba a GRAVAÇÃO INTEIRA. Aqui o `clone` é JSON.parse(JSON.stringify()), que **descarta**
+   undefined em silêncio -- então o fake aceitava alegremente um documento que a produção recusa.
+
+   ISSO CUSTOU AS DUAS LIGAS INTEIRAS, de 11 a 13/09/2026. A Dança da Chuva gravava
+   `chuva: comChuva || undefined` em cada confronto do log; no cliente isso é inofensivo (o
+   JSON.stringify some com o campo), no servidor derrubava o `storeMatchLogAndStrip` E a gravação
+   do ciclo -- e como a notificação era mandada ANTES da gravação, o agendador refazia tudo a cada
+   minuto e mandava a notificação de novo. Deu 285 mensagens iguais numa conta e 91 na outra, e a
+   bateria inteira estava verde.
+   A varredura é recursiva porque o campo estava a três níveis de profundidade
+   (`matchups[0].chuva`), que é exatamente onde ninguém olha. */
+function recusaUndefined(v, caminho){
+  if(v === undefined) throw new Error('Cannot use "undefined" as a Firestore value (found in field ' + caminho + ')');
+  if(v === null || typeof v !== 'object') return;
+  if(v.__op !== undefined || v instanceof Date) return;   // increment/delete/timestamp são marcas nossas
+  if(Array.isArray(v)){ v.forEach((x, i) => recusaUndefined(x, caminho + '.`' + i + '`')); return; }
+  Object.keys(v).forEach(k => recusaUndefined(v[k], caminho ? caminho + '.' + k : k));
+}
+
 function ehMapaSimples(v){
   return v && typeof v === 'object' && !Array.isArray(v) && !(v instanceof Date) && v.__op === undefined;
 }
@@ -66,8 +88,12 @@ function docRef(parts){
       const d = store.get(caminho);
       return { exists: d !== undefined, id: parts[parts.length-1], ref: docRef(parts), data(){ return clone(d); } };
     },
-    async set(patch, opts){ store.set(caminho, aplicar(store.get(caminho), patch, !!(opts && opts.merge))); },
+    async set(patch, opts){
+      recusaUndefined(patch, '');
+      store.set(caminho, aplicar(store.get(caminho), patch, !!(opts && opts.merge)));
+    },
     async update(patch){
+      recusaUndefined(patch, '');
       if(!store.has(caminho)) throw new Error('NOT_FOUND: ' + caminho);
       store.set(caminho, aplicar(store.get(caminho), expandirPontos(patch), true));
     },

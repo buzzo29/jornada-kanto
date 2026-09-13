@@ -2495,8 +2495,13 @@ function simulateGymBattle(team, enemyTeam, rng, opts){
         /* O SÍMBOLO DA CHUVA sai daqui: o confronto carrega SE choveu nele. É um campo do matchup e
            não um estado global porque o log é relido depois, às vezes dias depois -- e ali o
            `chuvaRestante` já não existe mais. Confronto gravado antes do campo existir sai sem
-           chuva, que é o que ele era. */
-        chuva: comChuva || undefined,
+           chuva, que é o que ele era.
+           ⚠️ É `!!comChuva` E NUNCA `comChuva || undefined`, que foi como ele nasceu. No cliente o
+           undefined é inofensivo (o JSON.stringify some com o campo); no SERVIDOR o log da liga vai
+           pro Firestore, e o Admin SDK RECUSA undefined -- derruba a gravação inteira, não o campo.
+           Isso matou as duas ligas de 11 a 13/09/2026 (ver a seção do log de batalha no CLAUDE.md).
+           Os dois motores escrevem igual porque a comparação das 300 batalhas compara VALOR. */
+        chuva: !!comChuva,
         player:active.name, playerSpecies:active.speciesId, playerLevel:active.level, playerShiny: !!active.shiny, playerBuffed: !!active.terrainBuffed, playerSpecialty: !!active.specialtyBuffed,
         enemy:enemy.name, enemySpecies:enemy.speciesId, enemyLevel:enemy.level, enemyShiny: !!enemy.shiny, enemyBuffed: !!enemy.terrainBuffed, enemySpecialty: !!enemy.specialtyBuffed,
         playerTrainerStreak: playerStreak, enemyTrainerStreak: enemyStreak,
@@ -3128,7 +3133,11 @@ async function advanceCyclePhases(typeId, cycleEntry, leagueTypeConfig, leagueTy
   } catch(e){ logger.error('Erro na checagem prévia do ciclo da Liga:', e); }
   const claimed = await claimCycleForProcessing(typeId, cycleEntry.id, 'drawn', 'advancing');
   if(!claimed) return false;
-  let pendingChampions = [], pendingPlacements = [], pendingStreakUpdates = [], changed = false;
+  /* Os "pending" existem porque NADA pode sair da função antes de a gravação do ciclo dar certo:
+     se ela falhar, o catch devolve o ciclo pra 'drawn' e o agendador refaz a passada inteira.
+     `pendingMatchNotices` entrou nessa lista em 13/09/2026, junto com o irmão dela na Trainers
+     League -- ver o comentário de lá pro estrago que a ordem antiga causou. */
+  let pendingChampions = [], pendingPlacements = [], pendingStreakUpdates = [], pendingMatchNotices = [], changed = false;
   try{
     const ref = cycleDocRef(typeId, cycleEntry.id);
     const snap = await ref.get();
@@ -3189,25 +3198,22 @@ async function advanceCyclePhases(typeId, cycleEntry, leagueTypeConfig, leagueTy
             if(!match.a.isBot){
               const aWon = match.winner.uid === match.a.uid;
               pendingStreakUpdates.push({ uid: match.a.uid, won: aWon });
-              // não usa await de propósito -- notificação não pode atrasar o avanço da liga (que já
-              // processa vários confrontos numa passada só). createNotification já trata os próprios
-              // erros internamente, sem lançar
-              createNotification(match.a.uid, 'match_played',
-                aWon ? '🏆 Você venceu na Liga Pokémon!' : '💥 Você perdeu na Liga Pokémon',
-                aWon
+              pendingMatchNotices.push({ uid: match.a.uid,
+                titulo: aWon ? '🏆 Você venceu na Liga Pokémon!' : '💥 Você perdeu na Liga Pokémon',
+                corpo: aWon
                   ? `Seu confronto contra ${match.b.name} terminou: vitória!${nextPhaseInfo ? ` Sua ${nextPhaseInfo.label} é${nextPhaseInfo.time?` às ${nextPhaseInfo.time}`:''}, contra ${nextPhaseInfo.opponentName||'a definir'}.` : ''}`
                   : `Seu confronto contra ${match.b.name} terminou: derrota. Você foi eliminado na ${eliminatedPhaseLabel}.`,
-                { leagueTypeId: typeId, opponentName: match.b.name, won: aWon, eliminatedPhase: aWon?null:eliminatedPhaseLabel });
+                meta: { leagueTypeId: typeId, opponentName: match.b.name, won: aWon, eliminatedPhase: aWon?null:eliminatedPhaseLabel } });
             }
             if(!match.b.isBot){
               const bWon = match.winner.uid === match.b.uid;
               pendingStreakUpdates.push({ uid: match.b.uid, won: bWon });
-              createNotification(match.b.uid, 'match_played',
-                bWon ? '🏆 Você venceu na Liga Pokémon!' : '💥 Você perdeu na Liga Pokémon',
-                bWon
+              pendingMatchNotices.push({ uid: match.b.uid,
+                titulo: bWon ? '🏆 Você venceu na Liga Pokémon!' : '💥 Você perdeu na Liga Pokémon',
+                corpo: bWon
                   ? `Seu confronto contra ${match.a.name} terminou: vitória!${nextPhaseInfo ? ` Sua ${nextPhaseInfo.label} é${nextPhaseInfo.time?` às ${nextPhaseInfo.time}`:''}, contra ${nextPhaseInfo.opponentName||'a definir'}.` : ''}`
                   : `Seu confronto contra ${match.a.name} terminou: derrota. Você foi eliminado na ${eliminatedPhaseLabel}.`,
-                { leagueTypeId: typeId, opponentName: match.a.name, won: bWon, eliminatedPhase: bWon?null:eliminatedPhaseLabel });
+                meta: { leagueTypeId: typeId, opponentName: match.a.name, won: bWon, eliminatedPhase: bWon?null:eliminatedPhaseLabel } });
             }
           }
         }
@@ -3221,6 +3227,10 @@ async function advanceCyclePhases(typeId, cycleEntry, leagueTypeConfig, leagueTy
       await ref.set(detail);
     }
     await claimCycleForProcessing(typeId, cycleEntry.id, 'advancing', allDone ? 'complete' : 'drawn');
+    // o ciclo já está gravado -- daqui pra baixo nada será refeito, então dá pra anunciar
+    for(const aviso of pendingMatchNotices){
+      await createNotification(aviso.uid, 'match_played', aviso.titulo, aviso.corpo, aviso.meta);
+    }
     for(const champ of pendingChampions){
       await recordLeagueChampionWin(champ.name, champ.uid, typeId, !!champ.elite);
       if(champ.uid){
@@ -3870,6 +3880,13 @@ async function trainersLeagueAdvanceRounds(dateId){
     const data = snap.data();
     const now = Date.now();
     let anyResolved = false;
+    /* ⚠️ AS NOTIFICAÇÕES DE PARTIDA ESPERAM A GRAVAÇÃO. Elas eram criadas DENTRO do laço, antes do
+       `ref.set` -- e quando a gravação falha, o catch devolve o ciclo pra 'locked' e o agendador
+       (que roda de minuto em minuto) refaz tudo: resolve de novo, notifica de novo, falha de novo.
+       Em 13/09/2026 isso mandou 285 mensagens iguais pra uma conta e 91 pra outra, uma por minuto,
+       sem parar. A causa da falha era um `undefined` no log (ver a Dança da Chuva), mas a causa do
+       DILÚVIO é esta ordem: nada pode ser anunciado antes de o estado que o justifica estar salvo. */
+    const avisosDePartida = [];
 
     // 1) finaliza o terreno de toda partida cujo prazo do mandante (10min antes) já passou e ainda não
     // tem terreno definido -- usa a escolha dele se ele fez uma a tempo, senão sorteia (como sempre foi)
@@ -3956,18 +3973,24 @@ async function trainersLeagueAdvanceRounds(dateId){
             if(code){ match[side].code = code; }
           }
           resolveTrainersLeagueMatch(match, `trainers-match-${dateId}-R${ri}-${match.a.uid}-${match.b.uid}`);
+          /* ⚠️ "HOUVE LUTA?" SE PERGUNTA ANTES DO STRIP. O storeMatchLogAndStrip ZERA o
+             `match.matchups` quando consegue gravar o log (é pra isso que ele existe) -- então a
+             condição lida depois dele dava FALSO justamente no caminho que dá certo, e a
+             notificação de partida da Trainers League não saía NUNCA. As únicas que chegaram até
+             hoje foram as de 13/09/2026, e chegaram porque a gravação estava falhando. */
+          const houveLuta = !!(match.matchups && match.matchups.length > 0); // W.O./bye não é partida
           await storeMatchLogAndStrip(trainersLeagueCycleRef(dateId).collection('matchLogs'), `R${ri}_M${round.matches.indexOf(match)}`, match);
           anyResolved = true;
-          if(match.matchups && match.matchups.length > 0){ // pula W.O./bye -- não é uma partida de verdade
+          if(houveLuta){
             const aWon = match.winner.uid === match.a.uid;
-            createNotification(match.a.uid, 'match_played',
-              aWon ? '🏆 Você venceu na Trainers League!' : '💥 Você perdeu na Trainers League',
-              `Seu confronto contra ${match.b.name} terminou: ${aWon?'vitória':'derrota'}.`,
-              { leagueTypeId: TRAINERS_LEAGUE_TYPE, opponentName: match.b.name, won: aWon });
-            createNotification(match.b.uid, 'match_played',
-              !aWon ? '🏆 Você venceu na Trainers League!' : '💥 Você perdeu na Trainers League',
-              `Seu confronto contra ${match.a.name} terminou: ${!aWon?'vitória':'derrota'}.`,
-              { leagueTypeId: TRAINERS_LEAGUE_TYPE, opponentName: match.a.name, won: !aWon });
+            avisosDePartida.push({ uid: match.a.uid,
+              titulo: aWon ? '🏆 Você venceu na Trainers League!' : '💥 Você perdeu na Trainers League',
+              corpo: `Seu confronto contra ${match.b.name} terminou: ${aWon?'vitória':'derrota'}.`,
+              meta: { leagueTypeId: TRAINERS_LEAGUE_TYPE, opponentName: match.b.name, won: aWon } });
+            avisosDePartida.push({ uid: match.b.uid,
+              titulo: !aWon ? '🏆 Você venceu na Trainers League!' : '💥 Você perdeu na Trainers League',
+              corpo: `Seu confronto contra ${match.a.name} terminou: ${!aWon?'vitória':'derrota'}.`,
+              meta: { leagueTypeId: TRAINERS_LEAGUE_TYPE, opponentName: match.a.name, won: !aWon } });
           }
         }
       }
@@ -3989,6 +4012,13 @@ async function trainersLeagueAdvanceRounds(dateId){
       finalStandings = standings;
     }
     await ref.set(data, { merge:false });
+    /* DAQUI PRA BAIXO o estado já está salvo: a partida não vai ser resolvida de novo, então
+       anunciá-la é seguro. E COM `await`: sem ele a Cloud Function podia ser encerrada no meio,
+       e foi isso que fez um lado receber 285 mensagens e o outro 91 no mesmo laço -- a segunda
+       chamada morria com a instância com mais frequência que a primeira. */
+    for(const aviso of avisosDePartida){
+      await createNotification(aviso.uid, 'match_played', aviso.titulo, aviso.corpo, aviso.meta);
+    }
     if(allDone && finalStandings){
       // registra quem terminou em 1º no ranking global de vencedores (já com o desempate aplicado,
       // então só sobra 1 campeão aqui, a não ser no caso raríssimo do próprio desempate empatar de novo)

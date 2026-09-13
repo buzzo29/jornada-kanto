@@ -7660,8 +7660,13 @@ function simulateGymBattle(team, brockTeam, rng, opts){
         /* O SÍMBOLO DA CHUVA sai daqui: o confronto carrega SE choveu nele. É um campo do matchup e
            não um estado global porque o log é relido depois, às vezes dias depois -- e ali o
            `chuvaRestante` já não existe mais. Confronto gravado antes do campo existir sai sem
-           chuva, que é o que ele era. */
-        chuva: comChuva || undefined,
+           chuva, que é o que ele era.
+           ⚠️ É `!!comChuva` E NUNCA `comChuva || undefined`, que foi como ele nasceu. No cliente o
+           undefined é inofensivo (o JSON.stringify some com o campo); no SERVIDOR o log da liga vai
+           pro Firestore, e o Admin SDK RECUSA undefined -- derruba a gravação inteira, não o campo.
+           Isso matou as duas ligas de 11 a 13/09/2026 (ver a seção do log de batalha no CLAUDE.md).
+           Os dois motores escrevem igual porque a comparação das 300 batalhas compara VALOR. */
+        chuva: !!comChuva,
         player:active.name, playerSpecies:active.speciesId, playerLevel:active.level, playerShiny: !!active.shiny, playerBuffed: !!active.terrainBuffed, playerSpecialty: !!active.specialtyBuffed,
         enemy:enemy.name, enemySpecies:enemy.speciesId, enemyLevel:enemy.level, enemyShiny: !!enemy.shiny, enemyBuffed: !!enemy.terrainBuffed, enemySpecialty: !!enemy.specialtyBuffed,
         playerTrainerStreak: playerStreak, enemyTrainerStreak: enemyStreak,

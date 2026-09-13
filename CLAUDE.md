@@ -1718,6 +1718,11 @@ POR BATALHA é a **DURAÇÃO**: começou, ela atravessa `CHUVA_EM_CONFRONTOS` (3
 - **⚠️ A LÂMINA SOLAR NÃO EXISTE NA BASE DA GEN 3** — ela é da Gen 7. O pedido citava as duas, e só
   o **Raio Solar** pôde entrar; cadastrar a outra seria letra morta, o mesmo motivo que manteve os
   estágios 2 a 4 do crítico fora do jogo. O teste **NOMEIA a ausência**.
+- **⚠️ O CAMPO `chuva` DO CONFRONTO É `!!comChuva`, NUNCA `comChuva || undefined`.** Ele nasceu
+  assim e derrubou as duas ligas por dois dias: o log da liga vai pro Firestore, que **recusa**
+  `undefined` e junto com ele a gravação inteira. No cliente o mesmo código é inofensivo (o
+  `JSON.stringify` some com a chave) — é a armadilha de uma linha que vive nos DOIS motores e só
+  num deles vira documento. Ver **UM `undefined` MATOU AS DUAS LIGAS**, na seção da Trainers League.
 - **O ESPELHO DA CONFUSÃO NÃO SENTE CLIMA** (`op.semTipo`): no jogo oficial ele bate sem tipo, e sem
   essa guarda a chuva mudaria o dano dele e **todas as medições da confusão deixariam de valer**.
 **NA TELA SÃO TRÊS COISAS DIFERENTES, e a divisão foi pedida olhando um print (11/09/2026).** A
@@ -5729,6 +5734,58 @@ escolheu três golpes lutava a Torre com os dois primeiros**, em silêncio — o
   mostrando uma inscrição que não existe mais.
 
 ## Trainers League
+
+### UM `undefined` MATOU AS DUAS LIGAS — E MANDOU 376 NOTIFICAÇÕES (13/09/2026)
+
+Reportado com print: *"está mandando notificação seguidas para o vencedor da trainers league"*.
+Eram **285 mensagens idênticas** numa conta e **91** na outra, **uma por minuto**, começando às
+15:06 e sem parar. E o estrago real era maior que o incômodo: **a liga de 13/09 nunca terminou**.
+
+São **TRÊS defeitos em fila**, e o que assusta é que a bateria inteira estava VERDE.
+
+- **⚠️ 1) A CAUSA: `chuva: comChuva || undefined` no registro do confronto.** O Firestore **RECUSA**
+  `undefined` — e recusa a GRAVAÇÃO INTEIRA, não o campo:
+  `Cannot use "undefined" as a Firestore value (found in field matchups.\`0\`.chuva)`.
+  **No CLIENTE isso é inofensivo** (o `JSON.stringify` some com a chave), e foi por isso que passou:
+  a linha é a MESMA nos dois motores, mas só um dos dois grava aquilo num banco. O log da liga vai
+  pro Firestore (`matchLogs`), e desde a Dança da Chuva (11/09) **toda gravação de log de liga
+  falhava**. Hoje é `!!comChuva` nos dois — um booleano não tem como virar undefined.
+  **Alcance medido em produção:** as duas ligas, desde 11/09. Os dias 11 e 12 não tinham inscrito
+  nenhum (`scheduleRounds: []`), então **13/09 foi a primeira partida de verdade depois da chuva** —
+  e ela morreu. O ciclo ficou com `status: locked`, `resolved: false` e a subcoleção `matchLogs`
+  **vazia**, que foi a prova.
+- **⚠️ 2) O DILÚVIO: a notificação era criada ANTES da gravação.** Falhando o `ref.set`, o `catch`
+  devolve o ciclo pra `locked`/`drawn` — e o agendador, que roda **de minuto em minuto**, refaz a
+  passada inteira: resolve de novo, notifica de novo, falha de novo. 86 voltas em 85 minutos.
+  **A regra que ficou: nada é anunciado antes de o estado que o justifica estar salvo.** As duas
+  ligas juntam os avisos numa lista (`avisosDePartida` / `pendingMatchNotices`) e só mandam depois
+  do `set` — que é o padrão que a Liga Clássica já usava pro campeão, pra colocação e pra sequência.
+  Note que o defeito 1 só transformou isto em desastre; **a ordem errada estava lá desde sempre**, e
+  qualquer falha futura de gravação faria o mesmo.
+- **⚠️ 3) E O AVISO DE PARTIDA DA TRAINERS LEAGUE NUNCA SAÍA QUANDO DAVA CERTO.** A condição
+  `if(match.matchups && ...)` — que existe pra pular W.O./bye — era lida **DEPOIS** do
+  `storeMatchLogAndStrip`, e é ele quem **zera** o `matchups` ao conseguir gravar o log (é pra isso
+  que ele existe). Ou seja: log gravado ⇒ campo nulo ⇒ ninguém avisado. **As únicas notificações de
+  partida que essa liga já entregou foram as 376 do incidente**, e elas chegaram porque a gravação
+  estava falhando. Hoje a pergunta é feita antes (`houveLuta`).
+- **⚠️ E O `await` QUE FALTAVA EXPLICA OS NÚMEROS DESIGUAIS.** `createNotification` era chamado sem
+  `await`, "de propósito, pra não atrasar o avanço da liga". Numa Cloud Function isso é uma promessa
+  solta: quando a instância é encerrada, o que ainda não foi enviado morre. Por isso o **lado A**
+  (chamado primeiro) ficou com **285** e o **lado B** com **91** — o mesmo laço, a mesma quantidade
+  de voltas. Hoje os avisos saem fora do laço de resolução e **com `await`**.
+
+**O QUE TRANCA A PRÓXIMA, e é a parte que importa:** `tools/fake-firestore.js` passou a **RECUSAR
+`undefined`**, recursivamente, como o Admin SDK de verdade. Ele clonava com
+`JSON.parse(JSON.stringify())` — que **descarta** undefined em silêncio —, então o fake aceitava
+alegremente um documento que a produção recusa. Era esse o buraco: nenhum teste escrevia um log de
+batalha REAL no banco, e o campo estava a três níveis de profundidade (`matchups[0].chuva`), que é
+exatamente onde ninguém olha.
+`tools/test-liga-treinadores.js` cobra as quatro coisas, e foi conferido que cada defeito religado
+derruba o teste: o log de uma batalha de verdade cabendo no Firestore (com a mensagem de erro
+idêntica à de produção quando não cabe), o ciclo fechando o dia, **UM** aviso de cada lado no
+caminho que dá certo, e **ZERO** aviso depois de três passadas do agendador com a gravação
+recusada. Varrido também o motor inteiro: 600 batalhas, 5.313 confrontos, as 250 espécies — nenhum
+valor que o Firestore recusaria.
 
 - **O "mínimo pra formar" vale só pro RESTO, e resto só existe quando outra liga já se formou.**
   A regra divide os inscritos em grupos de 16 e manda o último grupo pra amanhã se ele tiver

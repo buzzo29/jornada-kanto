@@ -144,6 +144,109 @@ await (async function(){
   ok('conta sem save devolve lista vazia', Array.isArray(vazio) && vazio.length === 0);
 })();
 
+console.log('\n=== A RODADA GRAVA O LOG, E SO ENTAO NOTIFICA ===');
+/* O INCIDENTE DE 13/09/2026: um treinador recebeu 285 notificacoes iguais de "Voce perdeu na
+   Trainers League", uma por minuto, e o outro 91. A liga de 11, 12 e 13/09 nunca terminou.
+
+   Eram TRES defeitos em fila, e nenhum teste via nenhum deles:
+   1. a Danca da Chuva gravava `chuva: comChuva || undefined` em cada confronto do log. O Firestore
+      RECUSA undefined -- e recusa a gravacao INTEIRA, nao o campo. O fake-firestore clonava com
+      JSON.parse(JSON.stringify()), que descarta undefined em silencio, entao a bateria ficava verde;
+   2. a notificacao era criada ANTES do `ref.set`. Falhando a gravacao, o catch devolve o ciclo pra
+      'locked' e o agendador (de minuto em minuto) refaz tudo -- inclusive as notificacoes;
+   3. e a condicao `if(match.matchups && ...)` era lida DEPOIS do storeMatchLogAndStrip, que zera o
+      campo quando consegue gravar: no caminho que da certo, a notificacao nao saia nunca.
+   Os tres sao cobrados aqui, e o 1 tambem la dentro do fake (que agora recusa undefined). */
+await (async function(){
+  const TIME = (esp) => [{ id:'m0', speciesId:esp, level:70, shiny:false },
+                         { id:'m1', speciesId:'gyarados', level:68, shiny:false }];
+  for(const [uid, esp] of [['aa','venusaur'], ['bb','charizard']]){
+    await db.collection('users').doc(uid).collection('saves').doc('0')
+      .set({ badgeCount:8, team: TIME(esp) });
+  }
+  const codesA = await fns._trainersLeagueGatherEligibleCodes('aa');
+  const codesB = await fns._trainersLeagueGatherEligibleCodes('bb');
+
+  const HOJE = fns._trainersLeagueTodayDateStr();
+  const ref = () => db.collection('trainersLeagueCycles').doc(HOJE);
+  const montar = async () => {
+    await ref().set({
+      dateId: HOJE, status:'locked', currentRound: 0,
+      players: [{ uid:'aa', name:'A', elite:false, eligibleCodes:codesA, specialties:[], mewtwoTeamCode:null },
+                { uid:'bb', name:'B', elite:false, eligibleCodes:codesB, specialties:[], mewtwoTeamCode:null }],
+      scheduleRounds: [{ matches: [{ a:{ uid:'aa', name:'A', code:codesA[0], specialties:[] },
+                                      b:{ uid:'bb', name:'B', code:codesB[0], specialties:[] },
+                                      winner:null, matchups:null, resolved:false, terrain:null }] }],
+      roundTimes: [Date.now() - 60000], siblingCycleIds: [],
+      lockedAt: Date.now(), updatedAt: Date.now()
+    }, { merge:false });
+  };
+  const avisos = async (uid) => (await db.collection('users').doc(uid).collection('notifications').get())
+    .docs.map(d=>d.data()).filter(n=>n.type === 'match_played');
+  const limparAvisos = async (uid) => {
+    const snap = await db.collection('users').doc(uid).collection('notifications').get();
+    for(const d of snap.docs) await db.collection('users').doc(uid).collection('notifications').doc(d.id).delete();
+  };
+
+  /* ---- 1) o caminho que DA CERTO: log gravado e UMA notificacao de cada lado ---- */
+  await montar();
+  await limparAvisos('aa'); await limparAvisos('bb');
+  await fns.advanceTrainersLeague({});
+  const dep = (await ref().get()).data();
+  ok('a partida fica resolvida', dep.scheduleRounds[0].matches[0].resolved === true);
+  ok('e o ciclo fecha o dia', dep.status === 'complete', 'status: ' + dep.status);
+  const logs = await ref().collection('matchLogs').get();
+  ok('o log da batalha foi gravado', logs.docs.length === 1, logs.docs.length + ' log(s)');
+  if(logs.docs.length){
+    const m = (logs.docs[0].data().matchups) || [];
+    ok('e ele tem os confrontos dentro', m.length > 0, m.length + ' confrontos');
+  }
+  /* ⚠️ ESTE E O DEFEITO 3: com a condicao lida depois do strip, isto dava ZERO dos dois lados. */
+  ok('o vencedor e avisado UMA vez', (await avisos('aa')).length === 1, (await avisos('aa')).length + ' aviso(s)');
+  ok('o perdedor tambem', (await avisos('bb')).length === 1, (await avisos('bb')).length + ' aviso(s)');
+
+  /* ---- 2) o caminho que FALHA: ninguem pode ser avisado de um resultado que nao foi salvo ---- */
+  let recusarEscrita = false;
+  const collOriginal = db.collection.bind(db);
+  db.collection = (nome) => {
+    const c = collOriginal(nome);
+    if(nome !== 'trainersLeagueCycles') return c;
+    const docOriginal = c.doc.bind(c);
+    c.doc = (id) => {
+      const d = docOriginal(id);
+      const setOriginal = d.set.bind(d);
+      d.set = async (patch, opts) => {
+        if(recusarEscrita) throw new Error('gravacao recusada de proposito (simula o undefined)');
+        return setOriginal(patch, opts);
+      };
+      return d;
+    };
+    return c;
+  };
+  await montar();
+  await limparAvisos('aa'); await limparAvisos('bb');
+  recusarEscrita = true;
+  await fns.advanceTrainersLeague({});
+  await fns.advanceTrainersLeague({});
+  await fns.advanceTrainersLeague({});   // tres passadas do agendador, como os tres minutos do incidente
+  recusarEscrita = false;
+  const spamA = (await avisos('aa')).length, spamB = (await avisos('bb')).length;
+  ok('gravacao que falha NAO notifica ninguem', spamA === 0 && spamB === 0, spamA + ' e ' + spamB + ' aviso(s)');
+  db.collection = collOriginal;
+
+  /* ---- 3) e a trava que teria pegado a causa: um log de batalha DE VERDADE no banco ---- */
+  const res = fns._simulateGymBattle(fns._decodeTeamCode(codesA[0]), fns._decodeTeamCode(codesB[0]),
+                                     fns._makeSeededRng('undef'));
+  let recusou = null;
+  try{ await db.collection('provaDeLog').doc('1').set({ matchups: res.matchups, updatedAt: 1 }); }
+  catch(e){ recusou = e.message; }
+  ok('o log de uma batalha real cabe no Firestore (sem undefined)', recusou === null, recusou || '');
+  /* e o fake precisa MESMO recusar, senao a linha acima nao prova nada */
+  let pegou = false;
+  try{ await db.collection('provaDeLog').doc('2').set({ a:[{ b: undefined }] }); } catch(e){ pegou = true; }
+  ok('e o fake recusa undefined, como o Firestore de verdade', pegou);
+})();
+
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
   process.exit(falhas ? 1 : 0);
 })();
