@@ -934,6 +934,68 @@ no tamanho da fonte. Os blocos são `golpe-cab` (o sprite num ladrilho + a frase
 - **Saiu o `linhaDeGolpe`**, que era o formato antigo: as três telas usam o cartão, e uma função
   de apresentação sem chamador é exatamente o tipo de coisa que fica anos no arquivo.
 
+### CADA TAPA SORTEAVA UM GOLPE NOVO (13/09/2026) — e o log nomeava tudo errado
+
+Reportado com print: *"a Clefairy usou metronome porém atacou com Raio Solar 3x, depois com Canhão
+de Choque 4x, esses ataques não são assim de repetir"*. E tinha razão duas vezes.
+
+- **⚠️ ERA DEFEITO DE MOTOR, não só de log.** O `golpesDaTroca` lê o número de tapas do PRIMEIRO
+  golpe e depois chama o `calcDamage` de novo pra cada tapa — e pra quem **sorteia golpe a cada
+  ataque** (o Metrônomo) cada tapa sorteava um golpe NOVO. Um Tapa Duplo de 3 virava **Tapa Duplo +
+  Rapidez + Mega Dreno**, cada tapa com o poder do que tinha caído, e o diário gravava o ÚLTIMO
+  deles como o golpe da linha. Na tela isso saía como "Rapidez 3x", "Raio Solar 3x", "Canhão de
+  Choque 4x" — golpes que não são de vários tapas.
+  Hoje os tapas seguintes repetem o golpe do primeiro (`op.golpeFixo`), e o ajudante
+  `golpeComoEscolhido` reusa o `melhorAtaque` com uma lista de UM item: refazer a conta à mão ali
+  seria uma segunda fonte de verdade pro dano.
+- **⚠️ E O WRAPPER `calcDamage` DO CLIENTE ENGOLIA O 4º ARGUMENTO.** A primeira versão do conserto
+  passava o golpe fixo e **ele nunca chegava no motor** — o sintoma ficou idêntico ao defeito. O
+  wrapper existe porque o motor legado está comentado ali do lado; ele tinha três parâmetros e o
+  `op` nasceu depois. O teste **lê o código** pra cobrar o repasse.
+- **O GOLPE PASSOU A VIAJAR POR LINHA** (`mv` no diário). O log nomeava TODA linha de um lado com o
+  golpe do MATCHUP — o último usado —, o que é falso pra quem troca de golpe no confronto. Log
+  gravado antes do campo cai no golpe do matchup, como sempre saiu.
+- **E O TAPA E O NOME VÊM DO MESMO GOLPE REAL na reconstrução.** O `expandirTapas` lia só as
+  CONTAGENS de tapa e as aplicava em ordem nos golpes inventados, enquanto o nome vinha de outro
+  lugar: era ele quem casava o tapa de um golpe com o nome de outro. Hoje cada golpe real entra na
+  fila inteiro — quantos tapas, QUAL golpe e se foi Metrônomo — e o inventado recebe os três juntos.
+
+**O PREÇO MEDIDO, e ele é grande pras duas que tinham Tapa Duplo:**
+
+| 1x1 contra um painel de 8 | antes | depois | |
+|---|---|---|---|
+| **Clefable Lv.50** | 55,0% | **38,7%** | **−16,3** |
+| **Clefairy Lv.40** | 22,3% | **15,1%** | **−7,2** |
+| Togetic Lv.40 | 37,8% | 37,8% | 0,0 |
+| Togepi Lv.30 | 17,8% | 17,3% | −0,4 |
+| Cleffa Lv.20 | 31,3% | 30,9% | −0,4 |
+
+Faz sentido e é a assinatura do defeito: **só a Clefairy e a Clefable têm golpe de vários tapas**
+(o Tapa Duplo), e eram elas que ganhavam até **cinco sorteios do Metrônomo num ataque só** — cada
+tapa podendo cair num Hiper Raio. As outras três não têm multi-tapa e não se movem.
+⚠️ **Isso reinterpreta um número deste arquivo:** os "+49,7 pontos" que a seção do Metrônomo
+registra pra Clefable foram medidos COM o defeito. O ganho real da mecânica é menor.
+
+- **CONFERIDO QUE NÃO ENCOSTOU EM MAIS NADA, por impressão:** um time SEM espécie de Metrônomo dá o
+  **MESMO hash** antes e depois, em 600 batalhas semeadas; com Metrônomo no time o hash muda, como
+  tem que mudar. O sorteio deixou de rodar uma vez por tapa, então a semente anda diferente — e só
+  ali.
+- **A FRASE PEDIDA** (*"Togepi usou METRONOME(selo) e atacou com RAIO SOLAR(selo)"*) sai na linha de
+  status da batalha exatamente assim, com os dois selos. **No LOG ela muda a linha inteira**: a
+  forma da casa é "X atacou Y com GOLPE", e enfiar o Metrônomo ali dava "atacou Y com Metrônomo e
+  atacou com Raio Solar" — dois "atacou" na mesma frase. Lá ela vira *"Togepi usou Metrônomo e
+  atacou Machop com Raio Solar e tirou −98 de HP"*.
+- **⚠️ ELA SÓ SAI QUANDO O SORTEADO GANHOU A DISPUTA** (`mt`). Desde 10/09/2026 o Metrônomo DISPUTA
+  com os golpes próprios; quando o próprio vence, não houve Metrônomo naquele ataque e anunciá-lo
+  seria mentira. E o crédito não vale quando o sorteado É um dos próprios: ali ele teria sido usado
+  de qualquer jeito. Medido: **10.216 de 10.216** golpes próprios saem sem a frase.
+- **E NA JORNADA NÃO MOVE NADA: 56,00% contra 55,98%, −0,02 ponto, 0,0σ** (6 blocos de 1.500 de
+  cada lado, 9.000 no total), com 3 de 6 blocos pra cada lado. Faz sentido: são 5 espécies em 250,
+  e elas aparecem nos dois lados da luta. O que muda de verdade é a força DELAS, na tabela acima.
+- `tools/test-especiais.js` tranca o par: nenhum golpe troca de golpe no meio dos tapas, nenhum selo
+  `Nx` em golpe que não é de vários tapas (na TELA, que é onde o defeito aparecia), o wrapper
+  repassando o `op`, os dois motores fixando o golpe, e as duas frases.
+
 ### A CONFUSÃO: O ADVERSÁRIO SE ACERTA (10/09/2026)
 
 Pedida assim: *"os pokemons que possuem o ataque confusão têm 10% de chance de deixar o adversário

@@ -1662,6 +1662,106 @@ function comItem(instancia, item){
      JSON.stringify([S.avisoDoConfronto(m,0), S.avisoDoConfronto(m,1), S.avisoDoConfronto(m,2)]));
 })();
 
+console.log('\n=== OS TAPAS SAO SEMPRE O MESMO GOLPE (e a frase do Metronomo) ===');
+{
+  /* Reportado com print em 13/09/2026: *"a Clefairy usou metronome porem atacou com Raio Solar 3x,
+     depois com Canhao de Choque 4x, esses ataques nao sao assim de repetir"*. E era defeito de
+     MOTOR, nao so de log: o `golpesDaTroca` lia o numero de tapas do PRIMEIRO golpe e depois
+     chamava o calcDamage de novo pra cada tapa -- e pra quem sorteia golpe a cada ataque
+     (o Metronomo) cada tapa sorteava um golpe NOVO. Um Tapa Duplo de 3 virava Tapa Duplo +
+     Rapidez + Mega Dreno, cada um com o poder do que tinha caido, e o diario gravava o ULTIMO
+     deles como o golpe da linha.
+     ⚠️ E O WRAPPER `calcDamage` DO CLIENTE ENGOLIA O 4o ARGUMENTO: a primeira versao do conserto
+     passava o golpe fixo e ele nunca chegava no motor. O sintoma ficou igualzinho ao defeito. */
+  const todos = Object.keys(S.SPECIES);
+  let conf = 0, trocou = 0, seloErrado = 0, comMetro = 0, ex1 = '', ex2 = '';
+  for(let i = 0; i < 1500; i++){
+    const a = [inst(['clefairy','clefable','togepi','togetic','cleffa'][i % 5], 30 + (i % 20))];
+    a[0].ataques = S.ataquesPadrao(a[0]);
+    const b = [inst(todos[(i * 37) % todos.length], 32 + (i % 15))];
+    S.equiparNpc(b);
+    (S.simulateGymBattle(a, b, S.makeSeededRng('tp' + i)).matchups || []).forEach(m => {
+      conf++;
+      /* 1) TODOS OS TAPAS DE UM GOLPE SAO O MESMO GOLPE. */
+      let grupo = null;
+      (m.golpes || []).forEach(g => {
+        if(g.x || !(g.d > 0)){ grupo = null; return; }
+        if(g.tn > 1 && g.t === 1){ grupo = { q:g.q, mv:g.mv }; return; }
+        if(g.tn > 1 && grupo && g.q === grupo.q && g.mv !== grupo.mv){
+          trocou++; if(!ex1) ex1 = grupo.mv + ' virou ' + g.mv + ' no tapa ' + g.t + '/' + g.tn;
+        }
+      });
+      /* 2) O SELO `Nx` SO SAI EM GOLPE QUE E MESMO DE VARIOS TAPAS -- e isso vale na TELA, que e
+         onde o defeito aparecia (a reconstrucao casava o tapa de um golpe com o nome de outro). */
+      S.sequenciaDoConfronto(m).forEach(g => {
+        if(g.x || !(g.tn > 1) || !g.mv) return;
+        if(!S.MULTI_GOLPE[g.mv]){ seloErrado++; if(!ex2) ex2 = g.mv + ' com ' + g.tn + 'x'; }
+      });
+      if((m.golpes || []).some(g => g.mt)) comMetro++;
+    });
+  }
+  ok('a amostra tem Metronomo de sobra', comMetro > 300, comMetro + ' de ' + conf + ' confrontos');
+  ok('nenhum golpe TROCA de golpe no meio dos tapas', trocou === 0, trocou + (ex1 ? '   ex: ' + ex1 : ''));
+  ok('e nenhum selo Nx sai em golpe que nao e de varios tapas', seloErrado === 0,
+     seloErrado + (ex2 ? '   ex: ' + ex2 : ''));
+
+  /* ⚠️ 3) O WRAPPER PASSA O `op` ADIANTE. O teste le o CODIGO porque o caso acima passaria de novo
+     se alguem reescrevesse o wrapper sem o 4o argumento -- foi exatamente o que aconteceu. */
+  {
+    const txt = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
+    ok('o wrapper calcDamage repassa o op',
+       /function calcDamage\(attacker, defender, rng, op\)\{[\s\S]{0,80}calcDamageNew\(attacker, defender, rng, op\)/.test(txt));
+    ok('e os dois motores fixam o golpe dos tapas seguintes',
+       /golpeFixo: golpe/.test(txt) &&
+       /golpeFixo: golpe/.test(require('fs').readFileSync(path.join(raiz, 'functions', 'index.js'), 'utf8')));
+  }
+
+  /* 4) A FRASE PEDIDA: *"Togepi usou METRONOME(selo) e atacou com RAIO SOLAR(selo)"*. */
+  {
+    const semTag = h => String(h||'').replace(/<[^>]*>/g,'|').replace(/\|+/g,' ').replace(/\s+/g,' ').trim();
+    let achou = null, anim = null, k = -1;
+    for(let i = 0; i < 9000 && !achou; i++){
+      const a = [inst('togepi', 30)]; a[0].ataques = S.ataquesPadrao(a[0]);
+      const b = [inst('machop', 30)]; S.equiparNpc(b);
+      const m = (S.simulateGymBattle(a, b, S.makeSeededRng('fm' + i)).matchups || [])[0];
+      if(!m) continue;
+      const an = S.buildAnimatedHitSequence(m);
+      const j = an.findIndex(h => h.mt && !h.x);
+      if(j >= 0){ achou = m; anim = an; k = j; }
+    }
+    ok('achei um golpe vindo do Metronomo', !!achou);
+    if(achou){
+      const naTela = semTag(S.statusDoConfronto(achou, k + 1, anim[k]).html);
+      ok('a tela da batalha diz "usou Metronomo e atacou com X"',
+         /usou Metr\u00f4nomo e atacou com \S/.test(naTela), naTela);
+      ok('e com os DOIS selos', (S.statusDoConfronto(achou, k + 1, anim[k]).html.match(/type-pill/g) || []).length >= 2,
+         (S.statusDoConfronto(achou, k + 1, anim[k]).html.match(/type-pill/g) || []).length + ' selos');
+      const log = semTag(S.passosHtml(achou));
+      ok('e o log traz a mesma coisa, com o alvo no lugar de sempre',
+         /usou Metr\u00f4nomo e atacou \S+ com \S/.test(log), (log.match(/[^.]*Metr\u00f4nomo[^.]*\./) || ['(nao achei)'])[0]);
+    }
+  }
+
+  /* ⚠️ 5) E QUANDO O GOLPE PROPRIO GANHA A DISPUTA, o Metronomo NAO e anunciado -- senao a frase
+     apareceria em todo ataque de quem tem a passiva, e ela deixaria de dizer alguma coisa. */
+  {
+    let proprios = 0, semFrase = 0;
+    for(let i = 0; i < 3000; i++){
+      const a = [inst('clefable', 45)]; a[0].ataques = S.ataquesPadrao(a[0]);
+      const b = [inst('onix', 45)]; S.equiparNpc(b);
+      const m = (S.simulateGymBattle(a, b, S.makeSeededRng('pr' + i)).matchups || [])[0];
+      if(!m) continue;
+      (m.golpes || []).forEach(g => {
+        if(g.x || !(g.d > 0) || g.q !== 'p' || !g.mv) return;
+        if((a[0].ataques || []).indexOf(g.mv) < 0) return;   // saiu um golpe PROPRIO dela
+        proprios++; if(!g.mt) semFrase++;
+      });
+    }
+    ok('golpe PROPRIO nao e creditado ao Metronomo', proprios > 50 && semFrase === proprios,
+       semFrase + ' de ' + proprios);
+  }
+}
+
 console.log('\n=== A FRASE DA PASSIVA NAO REENTRA (o piscar) ===');
 {
   /* Reportado em 12/09/2026, depois de a frase ja ter passado a nascer no passo do evento:

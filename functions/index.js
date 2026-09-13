@@ -454,7 +454,10 @@ function tipoDoGolpe(attacker, defender, rng){
   const lista = meus.concat(GOLPES[sorteado] ? [sorteado] : []);
   if(lista.length){
     const best = melhorAtaque(Object.assign({}, attacker, { ataques: lista }), defender);
-    if(best) return best;
+    /* ⚠️ MARCA SE QUEM GANHOU FOI O SORTEADO -- e daqui sai o `mt` do diario, que faz a tela dizer
+       "usou Metronomo e atacou com X". So conta quando o sorteado NAO e um dos proprios: caindo no
+       mesmo golpe, ele teria sido usado de qualquer jeito. */
+    if(best){ best.metronomo = (best.golpe === sorteado && meus.indexOf(sorteado) < 0); return best; }
   }
   /* Rede: sem golpe nenhum (tabela vazia), ele cai no motor de tipo como qualquer outra espécie. */
   return bestAttackType(attacker, defender);
@@ -1151,17 +1154,36 @@ function statAtLevel(base, level){ return Math.floor(2*base*level/100) + 5; }
    SEM ISSO o espelho da confusao aplicava a tabela contra ELE MESMO, e Fantasma contra Fantasma e
    2x: um Haunter tirava 299 dos proprios 300 de vida. Medido antes de mudar: 3% das confusoes
    deixavam o alvo em 1 de HP. */
+/* O MESMO GOLPE DE NOVO, sem sortear: os tapas seguintes de um golpe de vários tapas. Ele reusa o
+   `melhorAtaque` com uma lista de UM item, que é o que garante que o STAB, o subtipo, a anulação e
+   a chuva entrem exatamente como entraram no primeiro tapa -- refazer essa conta à mão aqui seria
+   uma segunda fonte de verdade pro dano. */
+function golpeComoEscolhido(attacker, defender, golpeId, foiMetronomo){
+  const best = melhorAtaque(Object.assign({}, attacker, { ataques: [golpeId], _anulado: null }), defender);
+  if(best){ best.metronomo = !!foiMetronomo; return best; }
+  return bestAttackType(attacker, defender);
+}
 function calcDamage(attacker, defender, rng, op){
   op = op || {};
   rng = rng || Math.random;   // as ligas passam um rng com seed; fora delas cai no padrão
   // considera tipos próprios E subtipos, igual ao cliente (ver SUBTYPES).
   // Com USE_SUBTYPES=false volta a ser o bestMultiplier de antes, que segue ali intacto
-  const best = tipoDoGolpe(attacker, defender, rng);
+  /* ⚠️ `op.golpeFixo` -- os TAPAS SEGUINTES repetem o MESMO golpe do primeiro.
+     Sem isso, quem sorteia golpe a cada ataque (o Metrônomo) trocava de golpe A CADA TAPA: um Tapa
+     Duplo de 3 virava Tapa Duplo + Rapidez + Mega Dreno, cada tapa com o poder do que tinha sido
+     sorteado, e o diário gravava o ÚLTIMO deles como o golpe da linha -- "Rapidez 3x", "Raio Solar
+     3x", "Canhão de Choque 4x". Reportado com print em 13/09/2026 (Clefairy e Clefable).
+     Não é só o log: o DANO também saía de um golpe que o pokémon não estava usando. O número de
+     tapas é lido do PRIMEIRO golpe, e os outros tinham que ser o mesmo golpe. */
+  const best = (op.golpeFixo && GOLPES[op.golpeFixo])
+    ? golpeComoEscolhido(attacker, defender, op.golpeFixo, op.metronomoFixo)
+    : tipoDoGolpe(attacker, defender, rng);
   /* Registro pro LOG: qual tipo este golpe usou. É só leitura -- nada daqui volta pra conta.
      O tipo escolhido não depende de HP (só de atributos e tipos, que não mudam durante o
      confronto), então na prática ele é o mesmo do começo ao fim da luta entre esses dois. */
   attacker.lastMoveType = best.type;
   attacker.lastMove = best.golpe || null;   // qual GOLPE saiu -- vai pro log
+  attacker.lastMetronomo = !!best.metronomo;  // veio do sorteio do Metronomo? (ver tipoDoGolpe)
   const mult = best.mult;
   const special = isSpecialType(best.type);
   // STAB só pro tipo próprio; subtipo perde o bônus e ainda leva o redutor
@@ -2153,7 +2175,11 @@ function marcaDaFaixa(marca, hpDoOutro){ return { q: marca, d: 0, hp: 1, ho: hpD
 function golpesDaTroca(atacante, alvo, rng){
   const lista = [calcDamage(atacante, alvo, rng)];
   const tapas = tapasDoGolpe(atacante.lastMove, rng);
-  for(let i = 1; i < tapas; i++) lista.push(calcDamage(atacante, alvo, rng));
+  /* ⚠️ OS TAPAS SEGUINTES REPETEM O GOLPE DO PRIMEIRO (ver op.golpeFixo). O numero de tapas foi
+     lido do golpe que saiu no primeiro calcDamage; deixar os outros sortearem de novo trocava de
+     golpe no meio do mesmo ataque. */
+  const golpe = atacante.lastMove, foiMetro = !!atacante.lastMetronomo;
+  for(let i = 1; i < tapas; i++) lista.push(calcDamage(atacante, alvo, rng, { golpeFixo: golpe, metronomoFixo: foiMetro }));
   return lista;
 }
 /* ⚠️ QUANTOS GOLPES O POKÉMON DO JOGADOR LEVA. É o mesmo `MAX_GOLPES` do cliente, e ele precisou
@@ -2299,7 +2325,12 @@ function doExchange(active, enemy, rng, diario){
            tendo 9 de HP. O critico MATOU o Onix; o 9 e so o que ele tinha.
            NUM GOLPE DE VARIOS TAPAS so o tapa limitado perde o selo -- os outros seguem, e como
            o log soma os tapas numa linha so, a linha continua selada quando o total foi grande. */
+        /* ⚠️ O GOLPE VIAJA POR LINHA (`mv`). O log nomeava TODA linha de um lado com o golpe do
+           MATCHUP -- o ultimo usado --, e isso e falso pra quem sorteia golpe a cada ataque
+           (reportado em 13/09/2026: Clefairy com "Raio Solar 3x"). Ver o comentario do cliente. */
         const reg = { q: q, d: h.d, hp: h.hp, c: (quemBate.lastCrit && !h.cap)?1:0, m: marcaM, z: quemBate.lastMoveNulo?1:0 };
+        if(quemBate.lastMove) reg.mv = quemBate.lastMove;
+        if(quemBate.lastMetronomo) reg.mt = 1;
         if(saiu.length > 1){ reg.t = i + 1; reg.tn = saiu.length; }
         diario.push(reg);
       });

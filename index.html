@@ -5618,7 +5618,12 @@ function tipoDoGolpe(attacker, defender, rng){
   const lista = meus.concat(GOLPES[sorteado] ? [sorteado] : []);
   if(lista.length){
     const best = melhorAtaque(Object.assign({}, attacker, { ataques: lista }), defender);
-    if(best) return best;
+    /* ⚠️ MARCA SE QUEM GANHOU FOI O SORTEADO. É o que deixa a tela dizer "usou Metrônomo e atacou
+       com X" em vez de anunciar o Metrônomo em todo golpe -- quando o golpe PRÓPRIO dele ganha da
+       disputa, não houve Metrônomo nenhum naquele ataque.
+       E só conta quando o sorteado NÃO é um dos próprios: caindo no mesmo golpe, ele teria sido
+       usado de qualquer jeito, e creditar o Metrônomo ali seria cara ou coroa. */
+    if(best){ best.metronomo = (best.golpe === sorteado && meus.indexOf(sorteado) < 0); return best; }
   }
   /* Rede: sem golpe nenhum (tabela vazia), ele cai no motor de tipo como qualquer outra espécie. */
   return bestAttackType(attacker, defender);
@@ -6222,8 +6227,11 @@ const MOVE_POWER = 60;
 const DMG_CAP_PCT = Infinity;
 const DMG_CAP_PCT_CRIT = Infinity;
 function statAtLevel(base, level){ return Math.floor(2*base*level/100) + 5; }
-function calcDamage(attacker, defender, rng){
-  return calcDamageNew(attacker, defender, rng);
+/* ⚠️ O WRAPPER TEM QUE PASSAR O `op` ADIANTE. Ele engolia o 4o argumento, e com isso o
+   `golpeFixo` dos tapas (ver golpesDaTroca) nunca chegava no motor -- o sintoma era o golpe
+   trocando no meio do mesmo ataque, que e o defeito que ele existe pra fechar. */
+function calcDamage(attacker, defender, rng, op){
+  return calcDamageNew(attacker, defender, rng, op);
 }
 /* ===== MOTOR LEGADO -- APOSENTADO no cliente (mantido aqui como referência) =====
    Esta era a fórmula que o jogo usou até a migração pro motor Gen 1. Está comentada, não deletada,
@@ -6267,17 +6275,36 @@ function calcDamageLegacy(attacker, defender, rng){
    SEM ISSO o espelho da confusao aplicava a tabela contra ELE MESMO, e Fantasma contra Fantasma e
    2x: um Haunter tirava 299 dos proprios 300 de vida. Medido antes de mudar: 3% das confusoes
    deixavam o alvo em 1 de HP. */
+/* O MESMO GOLPE DE NOVO, sem sortear: os tapas seguintes de um golpe de vários tapas. Ele reusa o
+   `melhorAtaque` com uma lista de UM item, que é o que garante que o STAB, o subtipo, a anulação e
+   a chuva entrem exatamente como entraram no primeiro tapa -- refazer essa conta à mão aqui seria
+   uma segunda fonte de verdade pro dano. */
+function golpeComoEscolhido(attacker, defender, golpeId, foiMetronomo){
+  const best = melhorAtaque(Object.assign({}, attacker, { ataques: [golpeId], _anulado: null }), defender);
+  if(best){ best.metronomo = !!foiMetronomo; return best; }
+  return bestAttackType(attacker, defender);
+}
 function calcDamageNew(attacker, defender, rng, op){
   op = op || {};
   rng = rng || Math.random;
   // considera tipos próprios E subtipos (ver SUBTYPES). Com USE_SUBTYPES=false isso vira
   // exatamente o bestMultiplier de antes, que continua ali intacto
-  const best = tipoDoGolpe(attacker, defender, rng);
+  /* ⚠️ `op.golpeFixo` -- os TAPAS SEGUINTES repetem o MESMO golpe do primeiro.
+     Sem isso, quem sorteia golpe a cada ataque (o Metrônomo) trocava de golpe A CADA TAPA: um Tapa
+     Duplo de 3 virava Tapa Duplo + Rapidez + Mega Dreno, cada tapa com o poder do que tinha sido
+     sorteado, e o diário gravava o ÚLTIMO deles como o golpe da linha -- "Rapidez 3x", "Raio Solar
+     3x", "Canhão de Choque 4x". Reportado com print em 13/09/2026 (Clefairy e Clefable).
+     Não é só o log: o DANO também saía de um golpe que o pokémon não estava usando. O número de
+     tapas é lido do PRIMEIRO golpe, e os outros tinham que ser o mesmo golpe. */
+  const best = (op.golpeFixo && GOLPES[op.golpeFixo])
+    ? golpeComoEscolhido(attacker, defender, op.golpeFixo, op.metronomoFixo)
+    : tipoDoGolpe(attacker, defender, rng);
   /* Registro pro LOG: qual tipo este golpe usou. É só leitura -- nada daqui volta pra conta.
      O tipo escolhido não depende de HP (só de atributos e tipos, que não mudam durante o
      confronto), então na prática ele é o mesmo do começo ao fim da luta entre esses dois. */
   attacker.lastMoveType = best.type;
   attacker.lastMove = best.golpe || null;   // qual GOLPE saiu -- é o que o log nomeia
+  attacker.lastMetronomo = !!best.metronomo;  // veio do sorteio do Metrônomo? (ver tipoDoGolpe)
   const special = isSpecialType(best.type); // o tipo do golpe decide se é físico ou especial (tabela oficial Gen 1)
   // STAB só quando o tipo escolhido é PRÓPRIO do atacante. Subtipo não só perde o bônus como
   // ainda leva o redutor -- é isso que impede o subtipo de virar poder de graça
@@ -7273,7 +7300,11 @@ function marcaDaFaixa(marca, hpDoOutro){ return { q: marca, d: 0, hp: 1, ho: hpD
 function golpesDaTroca(atacante, alvo, rng){
   const lista = [calcDamage(atacante, alvo, rng)];
   const tapas = tapasDoGolpe(atacante.lastMove, rng);
-  for(let i = 1; i < tapas; i++) lista.push(calcDamage(atacante, alvo, rng));
+  /* ⚠️ OS TAPAS SEGUINTES REPETEM O GOLPE DO PRIMEIRO (ver op.golpeFixo). O numero de tapas foi
+     lido do golpe que saiu no primeiro calcDamage; deixar os outros sortearem de novo trocava de
+     golpe no meio do mesmo ataque. */
+  const golpe = atacante.lastMove, foiMetro = !!atacante.lastMetronomo;
+  for(let i = 1; i < tapas; i++) lista.push(calcDamage(atacante, alvo, rng, { golpeFixo: golpe, metronomoFixo: foiMetro }));
   return lista;
 }
 function doExchange(active, enemy, rng, diario){
@@ -7414,7 +7445,16 @@ function doExchange(active, enemy, rng, diario){
            tendo 9 de HP. O critico MATOU o Onix; o 9 e so o que ele tinha.
            NUM GOLPE DE VARIOS TAPAS so o tapa limitado perde o selo -- os outros seguem, e como
            o log soma os tapas numa linha so, a linha continua selada quando o total foi grande. */
+        /* ⚠️ O GOLPE VIAJA POR LINHA (`mv`), e não mais só no matchup. O log nomeava TODA linha de
+           um lado com o `m.playerMove` -- o ÚLTIMO golpe usado --, e isso é falso pra quem sorteia
+           golpe a cada ataque: reportado em 13/09/2026 com print de uma Clefairy atacando com
+           "Raio Solar 3x" e uma Clefable com "Canhão de Choque 4x", golpes que não são de vários
+           tapas. O motor estava certo: os tapas eram do Tapa Duplo dela, e o NOME veio de outro
+           golpe. Reproduzido em 4 de 20.000 confrontos varridos, todos do Metrônomo.
+           Log gravado ANTES do campo cai no golpe do matchup, como sempre saiu. */
         const reg = { q: q, d: h.d, hp: h.hp, c: (quemBate.lastCrit && !h.cap)?1:0, m: marcaM, z: quemBate.lastMoveNulo?1:0 };
+        if(quemBate.lastMove) reg.mv = quemBate.lastMove;
+        if(quemBate.lastMetronomo) reg.mt = 1;
         if(saiu.length > 1){ reg.t = i + 1; reg.tn = saiu.length; }
         diario.push(reg);
       });
@@ -9861,7 +9901,9 @@ function buildAnimatedHitSequence(m){
        O campo já existia no diário desde sempre e nunca era lido -- o selo de crítico chegou a
        existir no log e saiu por virar ruído. Voltou a pedido em 10/09/2026, agora que o crítico
        vale ×2 e decide confronto. */
-    return { side: g.q === 'p' ? 'enemy' : 'player', amount: g.d, q: g.q, x: g.x || null, t: g.t || 0, tn: g.tn || 0, c: g.c || 0 };
+    /* O GOLPE DA LINHA (mv) e a marca do Metronomo (mt) viajam junto: a linha de status nomeia o
+       golpe DAQUELE passo, e quem sorteia golpe a cada ataque usava um e a tela mostrava outro. */
+    return { side: g.q === 'p' ? 'enemy' : 'player', amount: g.d, q: g.q, x: g.x || null, t: g.t || 0, tn: g.tn || 0, c: g.c || 0, mv: g.mv || null, mt: g.mt || 0 };
   });
   /* O passo SEGUINTE ao da Faixa precisa de um DESENHO pra a frase dela sair da tela. Ela é a única
      frase do meio da luta: as de abertura somem sozinhas porque a barra que elas anunciam se move e
@@ -16539,20 +16581,37 @@ function sequenciaDoConfronto(m){
     });
     return lista;
   };
+  /* ⚠️ O TAPA E O NOME DO GOLPE VÊM DO MESMO GOLPE REAL, e essa é a coisa toda desta função hoje.
+     Ela lia só as CONTAGENS de tapa do diário e as aplicava em ordem nos golpes inventados pela
+     reconstrução -- o NOME vinha de outro lugar (o golpe do matchup, que é o ÚLTIMO usado). Pra
+     quem sorteia golpe a cada ataque isso casava o tapa de um golpe com o nome de outro, e a tela
+     mostrava "Raio Solar 3x" e "Canhão de Choque 4x": golpes que não são de vários tapas.
+     Reportado com print em 13/09/2026 (Clefairy e Clefable).
+     Hoje cada golpe REAL entra na fila inteiro -- quantos tapas, QUAL golpe e se foi Metrônomo --,
+     e o inventado recebe os três juntos. Continua sendo aproximação (a reconstrução não sabe em que
+     ORDEM eles saíram), mas é a mesma aproximação do selo de crítico: o que ela afirma é verdade. */
   const expandirTapas = (lista) => {
-    const contagens = { p: [], e: [] };
-    (m.golpes || []).forEach(g => { if(g.t === 1 && g.tn > 1 && contagens[g.q]) contagens[g.q].push(g.tn); });
-    if(!contagens.p.length && !contagens.e.length) return lista;
+    const fila = { p: [], e: [] };
+    (m.golpes || []).forEach(g => {
+      if(g.x || !(g.d > 0) || !fila[g.q]) return;
+      if(g.t > 1) return;                       // só o PRIMEIRO tapa representa o golpe
+      fila[g.q].push({ tn: g.tn || 1, mv: g.mv || null, mt: g.mt || 0 });
+    });
+    if(!fila.p.length && !fila.e.length) return lista;
     const usados = { p: 0, e: 0 };
     const saida = [];
     lista.forEach(h => {
-      const fila = contagens[h.q];
-      if(h.x || !fila || !fila.length){ saida.push(h); return; }
-      const n = fila[Math.min(usados[h.q]++, fila.length - 1)];
-      if(!(n > 1) || h.d < n){ saida.push(h); return; }
+      const f = fila[h.q];
+      if(h.x || !f || !f.length){ saida.push(h); return; }
+      const real = f[Math.min(usados[h.q]++, f.length - 1)];
+      /* O NOME e a marca do Metrônomo valem mesmo quando o golpe não é de vários tapas: é
+         justamente o caso do print. */
+      const base = Object.assign({}, h, real.mv ? { mv: real.mv } : {}, real.mt ? { mt: 1 } : {});
+      const n = real.tn;
+      if(!(n > 1) || h.d < n){ saida.push(base); return; }
       const cada = Math.floor(h.d / n);
       for(let i = 1; i <= n; i++){
-        saida.push(Object.assign({}, h, { d: (i === n) ? h.d - cada * (n - 1) : cada, t: i, tn: n }));
+        saida.push(Object.assign({}, base, { d: (i === n) ? h.d - cada * (n - 1) : cada, t: i, tn: n }));
       }
     });
     return saida;
@@ -17490,17 +17549,23 @@ function fraseDoGolpeUsado(m, hit){
   /* NO MEIO DA BATALHA a contagem é PROGRESSIVA: "usou Tapa Duplo 1x", desce a barra, "2x", desce
      de novo. É o pedido, e é o que casa com o que a tela está fazendo -- cada tapa é um passo com
      a sua descida de barra. No LOG é o contrário: lá sai o TOTAL, numa linha só. */
+  /* O GOLPE SAI DO PASSO (`mv`), não do matchup -- quem sorteia golpe a cada ataque (o Metrônomo)
+     usava um e a tela nomeava outro. O do matchup continua sendo o fallback pra log velho. */
   const selo = golpeSeloHtml(doJogador ? m.playerSpecies : m.enemySpecies,
                              doJogador ? m.playerMove : m.enemyMove,
-                             doJogador ? m.playerMoveId : m.enemyMoveId,
+                             hit.mv || (doJogador ? m.playerMoveId : m.enemyMoveId),
                              hit.tn > 1 ? hit.t : 0);
   if(!selo) return '';
+  /* A FRASE DO METRÔNOMO nomeia os DOIS, como foi pedido: *"Togepi usou METRONOME e atacou com
+     RAIO SOLAR"*. Só quando o sorteado ganhou a disputa (`mt`) -- quando o golpe próprio dele vence,
+     não houve Metrônomo naquele ataque. */
+  const usou = hit.mt ? (seloDeGolpe('Metrônomo', 'Normal') + ' e atacou com ' + selo) : selo;
   const quem = escapeHtmlSafe((doJogador ? m.player : m.enemy) || '');
   /* O SELO DE CRÍTICO fica DEPOIS do nome do golpe, e é a única coisa que entra nesta linha além
      do golpe. Ele não repete o número (a barra já mostra), ele explica por que a barra andou tanto.
      Num golpe de vários tapas ele vale por TAPA: cada tapa tem o próprio sorteio. */
   const crit = hit.c ? ' <span class="aviso-crit">CRÍTICO!</span>' : '';
-  return '<span class="aviso-golpe-quem ' + (doJogador ? 'p' : 'e') + '">' + quem + '</span> usou ' + selo + crit;
+  return '<span class="aviso-golpe-quem ' + (doJogador ? 'p' : 'e') + '">' + quem + '</span> usou ' + usou + crit;
 }
 /* A LINHA DE STATUS DA BATALHA, numa função só -- lida pelo render das QUATRO telas de revelação E
    pelo pintor que atualiza o DOM no meio da animação. Montadas em separado, as duas divergiriam no
@@ -17598,7 +17663,26 @@ function passosHtml(m){
   if(!golpes.length) return '';
   const nomeP = escapeHtmlSafe(m.player||''), nomeE = escapeHtmlSafe(m.enemy||'');
   const ladoHtml = (doJogador) => `<span class="mlog-quem ${doJogador?'p':'e'}">${doJogador?nomeP:nomeE}</span>`;
-  const seloDe = (doJogador, vezes) => golpeSeloHtml(doJogador?m.playerSpecies:m.enemySpecies, doJogador?m.playerMove:m.enemyMove, doJogador?m.playerMoveId:m.enemyMoveId, vezes);
+  /* O GOLPE SAI DA LINHA quando ela traz um (`mv`); o do matchup é o fallback, pra log velho e pra
+     quem não tem golpe escolhido. O TIPO continua mandando na COR -- ele vem do matchup, e o id só
+     troca a PALAVRA, que é a regra desde que os golpes escolhidos entraram. */
+  const seloDe = (doJogador, vezes, g) => golpeSeloHtml(
+    doJogador ? m.playerSpecies : m.enemySpecies,
+    doJogador ? m.playerMove : m.enemyMove,
+    (g && g.mv) || (doJogador ? m.playerMoveId : m.enemyMoveId), vezes);
+  /* A FRASE DO METRÔNOMO NOMEIA OS DOIS (13/09/2026, a pedido: *"Togepi usou METRONOME e atacou com
+     RAIO SOLAR"*). Sem ela a linha dizia só o golpe sorteado, e quem lê não tinha como saber por que
+     a Clefairy atacou de Raio Solar num confronto e de Soco Veloz no seguinte.
+     Ela sai SÓ quando o sorteado ganhou a disputa (`mt`): quando o golpe PRÓPRIO dele vence, não
+     houve Metrônomo naquele ataque e anunciá-lo seria mentira.
+     ⚠️ ELA MUDA A LINHA INTEIRA, e não só o selo. A forma da casa é "X atacou Y com GOLPE"; enfiar o
+     Metrônomo ali dava "atacou Y com Metrônomo e atacou com Raio Solar" -- dois "atacou" na mesma
+     frase. Aqui a linha vira "X usou Metrônomo e atacou Y com Raio Solar", que é a frase pedida com
+     o alvo no lugar que a linha do log sempre teve. */
+  const linhaDoGolpe = (doJogador, g, vezes) => (g && g.mt)
+    ? ladoHtml(doJogador) + ' usou ' + seloDeGolpe('Metrônomo', 'Normal') + ' e atacou ' +
+      ladoHtml(!doJogador) + ' com ' + seloDe(doJogador, vezes, g)
+    : ladoHtml(doJogador) + ' atacou ' + ladoHtml(!doJogador) + ' com ' + seloDe(doJogador, vezes, g);
   /* Uma frase só, sempre na mesma forma: "X atacou Y com GOLPE e tirou -N de HP."
      Já passaram por aqui marcação de crítico, de golpe moribundo e de "o tipo não pega nele" --
      cada uma virava ruído numa linha que se lê de relance. O número conta a história.
@@ -17637,7 +17721,7 @@ function passosHtml(m){
     if(g.x === 'boom' || g.x === 'sono' || g.x === 'recover' || g.x === 'furia' || g.x === 'confusao' || g.x === 'furiadragao' || g.x === 'chuva' || g.x === 'remoinho' || g.x === 'espadas' || g.x === 'pluma' || g.x === 'semSono' ||
        g.x === 'pocao' || g.x === 'absorb' || g.x === 'faixa' || g.x === 'desempate') return linhaEspecial(g);
     return `<div class="mlog-passo ${doJogador?'p':'e'}">
-      ${ladoHtml(doJogador)} atacou ${ladoHtml(!doJogador)}${seloDe(doJogador)?` com ${seloDe(doJogador, g.tn > 1 ? g.tn : 0)}`:''} e tirou <span class="mlog-tira">−${g.d}</span> de HP.${g.c?' <span class="mlog-crit">CRÍTICO</span>':''}
+      ${seloDe(doJogador, 0, g) ? linhaDoGolpe(doJogador, g, g.tn > 1 ? g.tn : 0) : `${ladoHtml(doJogador)} atacou ${ladoHtml(!doJogador)}`} e tirou <span class="mlog-tira">−${g.d}</span> de HP.${g.c?' <span class="mlog-crit">CRÍTICO</span>':''}
     </div>`;
   }).join('')}</div>`;
 }
