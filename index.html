@@ -20083,7 +20083,17 @@ function saveStatusLabel(s){
    segunda pelo console, não quebra nada -- a raide é a mesma, só não estaria anunciada. Fechar
    isso no servidor obrigaria a escolher um fuso pro mundo inteiro, e o jogador que vê "domingo"
    no celular dele não entenderia por que o botão sumiu. */
-function ehDomingo(){ return new Date().getDay() === 0; }
+/* ⚠️ O BOSS DE DOMINGO ESTÁ DESATIVADO desde 13/09/2026, a pedido: *"tire o evento do boss de
+   domingo, vamos deixar ele desativado porque estou pensando numa nova mecânica para ele"*.
+   É uma constante e não uma remoção porque o pedido é uma PAUSA, não um fim: a raide inteira
+   continua aqui -- a tela, a escuta em tempo real, o ranking, o prêmio do top 10 --, e religar é
+   esta linha mais a do servidor.
+   ⚠️ O QUE FECHA DE VERDADE É O SERVIDOR (`BOSS_ATIVO` no functions/index.js). Aqui é só a porta
+   da tela: o `index.html` vai com `no-cache` e revalida a cada visita, mas uma aba ABERTA continua
+   com o jogo velho, e o estado da raide é GLOBAL -- um ataque que passasse mexeria na barra que o
+   jogo inteiro vê, justamente enquanto a mecânica está sendo repensada. */
+const BOSS_DE_DOMINGO_ATIVO = false;
+function ehDomingo(){ return BOSS_DE_DOMINGO_ATIVO && new Date().getDay() === 0; }
 const BOSS_POLL_MS = 5000;
 let bossPollTimer = null;
 let bossEscutas = [];
@@ -20167,6 +20177,8 @@ function atualizarBarraDoBossNoDom(){
   label.textContent = `${Math.max(0,b.hp)}/${b.maxHp} HP`;
 }
 async function openSundayBoss(){
+  /* A tela não abre nem pelo console enquanto o evento estiver desativado. */
+  if(!BOSS_DE_DOMINGO_ATIVO) return;
   game.screen = 'sundayBoss';
   game.bossError = null;
   game.bossEscolhendoTime = false;   // sempre volta pro estado de leitura, não pra escolha

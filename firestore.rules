@@ -40,13 +40,17 @@ service cloud.firestore {
       // oferta. Mentir no TOTAL paga: compra re-sorteio a mais. Por isso ele está aqui, com as
       // moedas, e quem escreve é o rerollWildOffer.
       // O resto do documento (nome, pokédex, conquistas) continua livre pro dono como sempre foi.
+      // 'admin' entrou em 12/09/2026 com o painel de treinadores. Ele NAO podia ser um campo livre:
+      // quem o tem consegue ler o save de TODO MUNDO pela adminListTrainers, entao um campo que o
+      // proprio jogador escreve seria uma linha no console pra ver a conta alheia. Ele so existe
+      // aqui e no console do Firebase -- nem as Cloud Functions o escrevem.
       allow write: if request.auth != null && request.auth.uid == userId
         && !request.resource.data.diff(resource.data).affectedKeys()
-             .hasAny(['specialties', 'specialtyCounts', 'specialtyCounted', 'rareCandies', 'moedas', 'inventario', 'equipados', 'rerollsPorSave']);
+             .hasAny(['specialties', 'specialtyCounts', 'specialtyCounted', 'rareCandies', 'moedas', 'inventario', 'equipados', 'rerollsPorSave', 'admin']);
       // criação do documento: não há resource.data pra comparar, então checa direto que os campos
       // protegidos não vêm no payload inicial
       allow create: if request.auth != null && request.auth.uid == userId
-        && !request.resource.data.keys().hasAny(['specialties', 'specialtyCounts', 'specialtyCounted', 'rareCandies', 'moedas', 'inventario', 'equipados', 'rerollsPorSave']);
+        && !request.resource.data.keys().hasAny(['specialties', 'specialtyCounts', 'specialtyCounted', 'rareCandies', 'moedas', 'inventario', 'equipados', 'rerollsPorSave', 'admin']);
       match /saves/{saveId} {
         allow read, write: if request.auth != null && request.auth.uid == userId;
       }

@@ -63,6 +63,21 @@ function fim(){
 (async () => {
   await preparar();
 
+  /* ⚠️ O EVENTO ESTA DESATIVADO (13/09/2026, a pedido: "estou pensando numa nova mecanica para
+     ele"). O que se cobra aqui e o PAR: desligado ele recusa NO SERVIDOR -- que e o unico lugar
+     que fecha de verdade, porque o estado da raide e global e uma aba aberta continua com o jogo
+     velho --, e ligado a mecanica continua inteira. Sem a primeira metade, religar o evento um dia
+     seria uma surpresa; sem a segunda, a raide apodrecia sem ninguem ver. */
+  console.log('\nO EVENTO ESTA DESLIGADO');
+  ok('o flag nasce desligado', fns._boss.ativo() === false);
+  let off1 = null, off2 = null;
+  try{ await chamar('getSundayBoss','comum'); }catch(e){ off1 = e.code; }
+  try{ await chamar('fightSundayBoss','comum',{ slot:0 }); }catch(e){ off2 = e.code; }
+  ok('e as duas portas recusam', off1 === 'failed-precondition' && off2 === 'failed-precondition',
+     off1 + ' / ' + off2);
+  /* DAQUI PRA BAIXO a raide roda LIGADA: e a mecanica que continua de pe pra quando ela voltar. */
+  fns._boss.ativo(true);
+
   console.log('\nQUEM PODE ENTRAR (a raide abriu pra todos; so login continua obrigatorio)');
   let semLogin = null;
   try{ await fns.getSundayBoss({ data:{} }); }catch(e){ semLogin = e.code; }

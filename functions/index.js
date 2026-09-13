@@ -4021,6 +4021,8 @@ exports._raizDaLinha = raizDaLinha;
 exports._chaveDoEquipado = chaveDoEquipado;
 exports._createInstance = createInstance;
 exports._makeSeededRng = makeSeededRng;
+/* Gancho de teste do Boss de Domingo -- ver BOSS_ATIVO. */
+exports._boss = { ativo(v){ if(v !== undefined) BOSS_ATIVO = !!v; return BOSS_ATIVO; } };
 exports._golpesEspeciais = { AUTODESTRUICAO, SONIFEROS, METRONOMO, CHANCE_AUTODESTRUICAO, CHANCE_SONO, SONO_EM_TROCAS, MULTI_GOLPE, ataquesDisponiveis, GOLPES_CRIT_ALTO, FURIA, CHANCE_FURIA, FURIA_BONUS, sorteiaGolpeDoMetronomo, POOL_METRONOMO, CONFUSAO, CHANCE_CONFUSAO, DANCA_ESPADAS, DANCA_PLUMA, CHANCE_DANCA, DANCA_ESPADAS_MULT, DANCA_PLUMA_MULT, FURIA_DRAGAO, CHANCE_FURIA_DRAGAO, FURIA_DRAGAO_DANO, CHUVA, CHANCE_CHUVA, CHUVA_EM_CONFRONTOS, CHUVA_MULT, CHUVA_GOLPE_MULT, multDaChuva, estaChovendo, tentarChuva, limparClima };
 exports._trainersLeagueSplitGroups = trainersLeagueSplitGroups;
 exports._trainersLeagueGatherEligibleCodes = trainersLeagueGatherEligibleCodesForUid;
@@ -7767,6 +7769,201 @@ exports.removeFriend = onCall(async (request) => {
    desafio em aberto -- se cada bloco fosse uma chamada, a tela abriria em três
    tempos e o contador do desafio começaria atrasado.
    -------------------------------------------------------------------------- */
+/* ============================================================================
+   PAINEL DE TREINADORES (12/09/2026, a pedido: *"uma pagina onde eu consiga ver todos os
+   treinadores online, e tambem os offline, os saves e como ta o time de cada save"*).
+
+   ⚠️ POR QUE ISTO E UMA CLOUD FUNCTION E NAO UMA PAGINA LENDO O FIRESTORE: a regra do
+   `/users/{userId}` deixa ler SO o proprio documento (`request.auth.uid == userId`), e os saves
+   herdam isso. Nao existe consulta de cliente que veja a conta de outro -- e afrouxar a regra pra
+   isso seria abrir o save de todo mundo pra qualquer jogador logado, que e o oposto do que ela
+   protege. O Admin SDK ignora as regras; entao quem le e o servidor, com a porta na mao.
+
+   ⚠️ A PORTA E UM CAMPO QUE O CLIENTE NAO ESCREVE (`users/{uid}.admin === true`), e ela NAO podia
+   ser um segredo no codigo: o `firebase.json` publica a RAIZ do repositorio, entao este arquivo
+   esta baixavel em jornadakanto.com/functions/index.js. Qualquer lista de uid ou e-mail aqui seria
+   publica -- e um `userTest` da vida nao serve porque ele E livre pro dono (a trava de campos das
+   regras nao o cobre). O `admin` entrou nessa trava junto com esta funcao: so o console do Firebase
+   escreve nele.
+
+   ⚠️ CUSTO: e 1 leitura por treinador MAIS 1 por save dele. Com 20 por pagina e ~3 saves cada, sao
+   ~80 leituras por pagina -- por isso ele e PAGINADO e nao devolve a conta inteira de uma vez. O
+   cursor e o id do documento, que e o uid: a ordenacao por documentId e a unica que nao precisa de
+   indice nem de campo que todo mundo tenha.
+   ============================================================================ */
+const ADMIN_PAGINA = 20;              // treinadores por pagina
+const ADMIN_PAGINA_MAX = 60;
+/* ONLINE = visto nos ultimos 10 minutos. O numero NAO e escolhido aqui: e o mesmo do
+   `vistoPorUltimo` do jogo, que e o que o jogador ja le na lista de amigos ("agora ha pouco").
+   O carimbo tem folga de 5 min (LAST_SEEN_THROTTLE_MS), entao qualquer janela menor que isso
+   mostraria gente offline que esta jogando. */
+const ADMIN_ONLINE_MS = 10 * 60 * 1000;
+/* O TIME SAI RESUMIDO, e de proposito: a tela quer NOME, nivel e tipo -- o save guarda a instancia
+   inteira (seis atributos, golpes, item, HP), e mandar isso de 20 treinadores x N saves x 6 pokemon
+   seria um payload enorme pra desenhar seis etiquetas. O nome e os tipos saem do SPECIES daqui, que
+   e o mesmo do jogo: assim a pagina nao precisa carregar tabela nenhuma. */
+/* Os GOLPES saem com o nome em portugues -- o GOLPES_PT ja vive aqui desde que o moveset dos NPCs
+   entrou (o time do treinador da Torre e montado no servidor). Golpe sem nome na tabela sai com o
+   id, que e o mesmo comportamento do log do jogo. */
+function adminGolpes(ataques){
+  if(!Array.isArray(ataques)) return [];
+  return ataques.map(id => {
+    const g = GOLPES[id];
+    return { id, nome: GOLPES_PT[id] || id, tipo: g ? g[0] : null, poder: g ? g[1] : null };
+  });
+}
+function adminResumoDoTime(team){
+  if(!Array.isArray(team)) return [];
+  return team.map(p => {
+    const esp = SPECIES[p && p.speciesId] || null;
+    return {
+      especie: (p && p.speciesId) || '?',
+      nome: esp ? esp.name : ((p && p.speciesId) || '?'),
+      tipos: esp ? esp.types : [],
+      nivel: (p && p.level) || 0,
+      shiny: !!(p && p.shiny),
+      hp: (p && p.hp != null) ? p.hp : null,
+      maxHp: (p && p.maxHp != null) ? p.maxHp : null,
+      item: (p && p.item) || null,
+      golpes: adminGolpes(p && p.ataques)
+    };
+  });
+}
+/* O SAVE TAMBEM SAI RESUMIDO -- o documento tem dezenas de campos de estado de tela (wildOffer,
+   routeCards, battleResult) que nao dizem nada sobre "como esta o time". */
+/* ⚠️ ONDE A JORNADA ESTA e a parte que responde "o que esta acontecendo" -- e nao cabia so no
+   numero de insignias. O `screen` diz em que tela o jogador parou, o `gymIndex` em que trecho ele
+   esta, o `losses` quantas derrotas ele ja tem NAQUELE ginasio (o limite e 5 e zera a cada
+   vitoria), e o `eliteStage` onde ele parou na Elite. */
+function adminResumoDoSave(slot, s){
+  return {
+    slot,
+    nome: (s && s.trainerName) || '',
+    rival: (s && s.rivalName) || '',
+    insignias: (s && s.badgeCount) || 0,
+    insigniasNomes: (s && Array.isArray(s.badgesEarned)) ? s.badgesEarned : [],
+    modo: (s && s.gameMode) || 'normal',
+    campeao: !!(s && s.eliteStatus === 'champion'),
+    tela: (s && s.screen) || '',
+    trecho: (s && s.gymIndex != null) ? s.gymIndex : null,
+    rota: (s && s.currentRoute) || null,
+    caminho: (s && Array.isArray(s.gymPath)) ? s.gymPath : [],
+    derrotas: (s && s.losses) || 0,
+    eliteEtapa: (s && s.eliteStage != null) ? s.eliteStage : null,
+    eliteTentativas: (s && s.eliteAttemptsUsed) || 0,
+    rocket: (s && s.hideoutStage) || 0,
+    capturados: (s && Array.isArray(s.caughtSpecies)) ? s.caughtSpecies.length : 0,
+    atualizado: (s && s.updatedAt) || 0,
+    time: adminResumoDoTime(s && s.team)
+  };
+}
+exports.adminListTrainers = onCall(async (request) => {
+  if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
+  const uid = request.auth.uid;
+  const eu = await db.collection('users').doc(uid).get();
+  /* A RECUSA NAO DIZ O QUE FALTA. Quem nao e admin nao precisa saber que existe um campo `admin`
+     -- e quem e, ja sabe. */
+  if(!eu.exists || eu.data().admin !== true){
+    throw new HttpsError('permission-denied', 'Esta página é só para administradores.');
+  }
+  const pedido = (request.data && request.data.limite) || ADMIN_PAGINA;
+  const limite = Math.max(1, Math.min(ADMIN_PAGINA_MAX, pedido));
+  const cursor = (request.data && request.data.cursor) || null;
+  /* ⚠️ LÊ UM A MAIS SÓ PRA SABER SE HÁ PRÓXIMA. Sem isso, a última página cheia oferecia um
+     cursor que levava a uma página VAZIA -- e a tela mostrava um "carregar mais" que não carrega
+     nada. O documento extra é descartado; ele custa 1 leitura por página e é a única forma de a
+     resposta ser honesta sobre o que vem depois. */
+  let q = db.collection('users').orderBy(admin.firestore.FieldPath.documentId()).limit(limite + 1);
+  if(cursor){ q = q.startAfter(cursor); }
+  const bruto = await q.get();
+  const temMais = bruto.docs.length > limite;
+  const snap = { docs: bruto.docs.slice(0, limite) };
+  const agora = Date.now();
+  /* OS SAVES DE CADA UM EM PARALELO: sao N coleções independentes, e em série a página de 20
+     esperaria 20 idas ao banco uma atrás da outra. */
+  const treinadores = await Promise.all(snap.docs.map(async doc => {
+    const d = doc.data() || {};
+    const saves = await db.collection('users').doc(doc.id).collection('saves').get();
+    const lista = saves.docs
+      .map(sd => ({ slot: parseInt(sd.id, 10), dados: sd.data() }))
+      .filter(x => Number.isInteger(x.slot))
+      /* ORDEM NUMERICA DO SLOT. O Firestore devolve por id em ordem de TEXTO, então o "10" vem
+         entre o "1" e o "2" -- a mesma armadilha que ja mordeu a Trainers League. */
+      .sort((a, b) => a.slot - b.slot)
+      .map(x => adminResumoDoSave(x.slot, x.dados));
+    const visto = d.lastSeenAt || 0;
+    /* ⚠️ A CONTA INTEIRA, e nao so o nome: *"quero saber tudo o que esta acontecendo na conta dos
+       outros treinadores"* (13/09/2026). O que nao entra aqui e o que nao diz nada sobre o jogador
+       -- o `startersSorteados` e o `geracaoDosSlots` sao tranca anti save-scumming, e a
+       `leagueLeaderboard` e uma copia do ranking que a propria tela do jogo ja mostra. */
+    const inv = d.inventario || {};
+    return {
+      uid: doc.id,
+      nome: d.trainerName || '',
+      visto,
+      online: visto > 0 && (agora - visto) < ADMIN_ONLINE_MS,
+      moedas: d.moedas || 0,
+      doces: d.rareCandies || 0,
+      /* O inventario vem como lista de pares pra a tela nao precisar iterar objeto -- e com o
+         ZERO fora: o `increment` deixa a chave com 0 quando o item acaba, e um "0x Poção" na tela
+         seria ruido. */
+      itens: Object.keys(inv).filter(k => (inv[k] || 0) > 0).map(k => ({ item: k, qtd: inv[k] })),
+      equipados: Object.keys(d.equipados || {}).map(k => ({ chave: k, item: d.equipados[k] })),
+      hms: Array.isArray(d.hms) ? d.hms : [],
+      pokedex: Array.isArray(d.permanentPokedex) ? d.permanentPokedex.length : 0,
+      shinyDex: Array.isArray(d.permanentShinyDex) ? d.permanentShinyDex.length : 0,
+      especialidades: Array.isArray(d.specialties) ? d.specialties : [],
+      ligas: d.leagueWinsTotal || 0,
+      sequencia: d.trainerBestStreak || 0,
+      campeao: !!d.accountEliteChampion,
+      bonusShinyAte: d.shinyBonusExpiresAt || 0,
+      mewtwo: { emprestado: !!d.mewtwoLoanActive, liberado: !!d.mewtwoLoanUnlocked,
+                esperaAte: d.mewtwoLoanCooldownUntil || 0, aResgatar: !!d.mewtwoLoanReadyToClaim },
+      cidade: (d.neighborhoodGymLocation && d.neighborhoodGymLocation.city) || '',
+      admin: d.admin === true,
+      ginasios: [],   // preenchido abaixo, numa consulta so pra pagina inteira
+      saves: lista
+    };
+  }));
+  /* ONLINE PRIMEIRO, e depois pelo visto por ultimo -- que e a ordem em que a pergunta é feita
+     ("quem está jogando agora?"). O cursor continua sendo o do BANCO (por uid): ordenar aqui é só
+     apresentação, e ordenar no banco exigiria índice e um campo que todo documento tenha. */
+  /* ⚠️ OS GINASIOS DA CIDADE EM UMA CONSULTA SO pra a pagina inteira, e nao uma por treinador: com
+     20 por pagina seriam 20 idas ao banco pra uma informacao de uma linha. O `in` do Firestore
+     aceita ate 30 valores, e a pagina tem no maximo ADMIN_PAGINA_MAX... por isso ele e fatiado em
+     blocos de 30. Liderar e do jogo ("quem manda em que cidade") e nao daria pra deduzir do save:
+     a defesa e um codigo CONGELADO, nao o time atual. */
+  const porUid = Object.fromEntries(treinadores.map(t => [t.uid, t]));
+  const uids = treinadores.map(t => t.uid);
+  for(let i = 0; i < uids.length; i += 30){
+    const bloco = uids.slice(i, i + 30);
+    if(!bloco.length) continue;
+    try{
+      const gsnap = await db.collection('neighborhoodGyms').where('leaderUid', 'in', bloco).get();
+      gsnap.forEach(g => {
+        const dg = g.data() || {};
+        const dono = porUid[dg.leaderUid];
+        if(dono) dono.ginasios.push({ id: g.id, cidade: dg.city || g.id, terreno: dg.terrain || null });
+      });
+    }catch(e){
+      /* ⚠️ O PAINEL NAO PODE CAIR POR CAUSA DISTO. A consulta precisa de indice em `leaderUid`, e
+         se ele nao existir a lista inteira de treinadores viria vazia por causa de uma linha de
+         enfeite -- a mesma regra do "nenhuma tela pode ficar Carregando pra sempre". */
+      logger.warn('adminListTrainers: nao deu pra ler os ginasios', e);
+    }
+  }
+  treinadores.sort((a, b) => (b.visto || 0) - (a.visto || 0));
+  const ultimo = snap.docs.length ? snap.docs[snap.docs.length - 1].id : null;
+  return {
+    agora,
+    online: treinadores.filter(t => t.online).length,
+    total: treinadores.length,
+    janelaOnlineMs: ADMIN_ONLINE_MS,
+    proximo: temMais ? ultimo : null,
+    treinadores
+  };
+});
+
 exports.getMyFriends = onCall(async (request) => {
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   const uid = request.auth.uid;
@@ -8094,7 +8291,21 @@ function bossEstadoInicial(){
 }
 /* Devolve os dados da conta -- o nome vem junto porque o ranking precisa dele, e ler o documento
    duas vezes na mesma chamada seria desperdicio. */
+/* ⚠️ O EVENTO ESTA DESATIVADO desde 13/09/2026, a pedido ("estou pensando numa nova mecanica para
+   ele"). E AQUI que ele fecha de verdade: o estado da raide e GLOBAL -- um unico ataque que passe
+   mexe na barra que o jogo inteiro ve --, e o cliente sozinho nao fecha nada, porque uma aba
+   ABERTA continua com o jogo velho e o console esta sempre ali.
+   E uma PAUSA, nao um fim: a raide inteira continua de pe (o Mew, o ranking, o premio do top 10).
+   Religar e esta linha mais o BOSS_DE_DOMINGO_ATIVO do cliente. */
+/* `let` e nao `const` por causa do TESTE: a raide continua inteira aqui, e a suite dela precisa
+   exercitar os dois lados -- que ela RECUSA desligada, e que a mecanica continua certa ligada.
+   Quem liga e so o `_boss` la embaixo; nada do jogo escreve neste flag. */
+let BOSS_ATIVO = false;
+function bossExigeAtivo(){
+  if(!BOSS_ATIVO){ throw new HttpsError('failed-precondition', 'O Boss de Domingo está desativado no momento.'); }
+}
 async function bossRequireTester(uid){
+  bossExigeAtivo();
   const snap = await db.collection('users').doc(uid).get();
   return snap.exists ? snap.data() : {};
 }

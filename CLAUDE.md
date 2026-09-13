@@ -4513,6 +4513,82 @@ verdade, cai no game over, e o teste confere que a trava soltou dos dois lados.
   mesmos iniciais; agora, além de não adiantar, sai 10 moedas por tentativa. Com o difícil em 1/16
   a tela dos sete iniciais mostra shiny em 36,3% das vezes, então essa trava passou a valer mais.
 
+## Painel de treinadores (`admin-treinadores.html`, 12/09/2026)
+
+Pedido assim: *"uma página onde eu consiga ver todos os treinadores online, e também os offline, os
+saves e como tá o time de cada save"*. Ela mostra quem está online, os saves de cada conta e o time
+de cada save, com nível, shiny, tipos e barra de vida.
+
+- **⚠️ POR QUE É UMA CLOUD FUNCTION E NÃO UMA PÁGINA LENDO O FIRESTORE.** A regra do
+  `/users/{userId}` deixa ler **só o próprio documento** (`request.auth.uid == userId`), e os saves
+  herdam isso — não existe consulta de cliente que veja a conta de outro. Afrouxar a regra pra isso
+  abriria o save de todo mundo pra qualquer jogador logado, que é o oposto do que ela protege. O
+  Admin SDK ignora as regras, então quem lê é o servidor (`adminListTrainers`).
+- **⚠️ A PORTA É UM CAMPO QUE O CLIENTE NÃO ESCREVE** (`users/{uid}.admin === true`), e ela **não
+  podia ser um segredo no código**: o `firebase.json` publica a RAIZ do repositório, então
+  `jornadakanto.com/functions/index.js` é baixável — conferido, responde 200, junto com o
+  `CLAUDE.md` e o `tools/`. Qualquer lista de uid ou e-mail ali seria pública.
+  E o `userTest` **não serviria**: ele é livre pro dono (a trava de campos das regras não o cobre),
+  ou seja uma linha no console do navegador e qualquer jogador lia a conta alheia. O `admin` entrou
+  nessa trava junto com a função — só o console do Firebase escreve nele.
+- **PRA LIGAR:** no console do Firebase, em `users/{seu uid}`, acrescentar o campo `admin`
+  (booleano) = `true`. **A página mostra o uid na própria recusa** — sem isso a mensagem mandaria
+  fazer algo que não dá pra fazer, porque o uid não aparece em lugar nenhum do jogo.
+- **A PÁGINA É PÚBLICA e não tem como não ser** (é a raiz publicada). O que protege os dados não é
+  ela estar escondida: é a função recusar. Sem o campo, ela abre e não mostra nada.
+- **⚠️ CUSTO: 1 leitura por treinador MAIS 1 por save dele**, e é por isso que ela é PAGINADA (20
+  por página, teto de 60) em vez de devolver a conta inteira. O cursor é o **id do documento** (o
+  uid): é a única ordenação que não precisa de índice nem de um campo que todo documento tenha.
+  **Ela lê um documento A MAIS** só pra saber se existe próxima página — sem isso, a última página
+  cheia oferecia um "carregar mais" que carregava nada.
+- **A ORDEM DA TELA É OUTRA: online primeiro, depois por visto por último** — é a ordem em que a
+  pergunta é feita. Ela é feita na apresentação de propósito; ordenar no banco exigiria índice.
+- **ONLINE = visto nos últimos 10 minutos**, e o número não é escolhido aqui: é o mesmo do
+  `vistoPorUltimo` do jogo ("agora há pouco"), que é o que o jogador já lê na lista de amigos. O
+  carimbo tem folga de 5 min (`LAST_SEEN_THROTTLE_MS`), então qualquer janela menor mostraria
+  offline quem está jogando.
+- **O TIME E O SAVE VOLTAM RESUMIDOS.** O documento do save tem dezenas de campos de estado de tela
+  (`wildOffer`, `routeCards`, `battleResult`) que não dizem nada sobre "como está o time", e mandar
+  isso de 20 treinadores × N saves seria um payload enorme pra desenhar seis etiquetas. O **nome e
+  os tipos saem do `SPECIES` do servidor**, então a página não carrega tabela nenhuma.
+- **⚠️ A ORDEM DOS SLOTS É NUMÉRICA, na mão** — o Firestore devolve por id em ordem de TEXTO, então
+  o `"10"` vem entre o `"1"` e o `"2"`. É a mesma armadilha que já mordeu a Trainers League.
+- **O `tools/fake-firestore.js` aprendeu `startAfter` e `FieldPath.documentId()`** por causa disto.
+  Sem eles o `startAfter` era ignorado e **a segunda página devolvia a primeira** — o teste passava
+  e a paginação quebraria só em produção. É a mesma lição do `increment` dentro de mapa e do ponto
+  no `update()`.
+- **A busca da página filtra o que JÁ foi carregado**, não vai ao servidor: com a lista paginada,
+  buscar no banco exigiria um índice por nome e mudaria o custo da página.
+- **O login erra igual pros dois casos** ("E-mail ou senha incorretos"), como o do jogo: repassar o
+  `user-not-found` do Firebase transformaria o formulário num oráculo de quem tem conta.
+- **⚠️ ELA MOSTRA A CONTA INTEIRA, e isso foi pedido depois** (13/09/2026): *"quero saber tudo o que
+  está acontecendo na conta dos outros treinadores sendo o admin do jogo"*. Por treinador vêm
+  moedas, doces, **mochila** (sem os itens zerados — o `increment` deixa a chave em 0 quando acaba),
+  **o que está equipado e em quem**, HMs, Pokédex normal e shiny, especialidades, ligas, sequência,
+  bônus shiny valendo, empréstimo do Mewtwo, cidade e **os ginásios que ele lidera**.
+  Por save vem **onde a jornada está** — trecho, região, rota, tela, derrotas naquele ginásio,
+  etapa da Elite, fase do esconderijo — e o time com **golpes e item**.
+  **O que fica de fora é o que não diz nada sobre o jogador:** o `startersSorteados` e o
+  `geracaoDosSlots` são trava anti save-scumming, e a `leagueLeaderboard` é uma cópia do ranking que
+  a própria tela do jogo já mostra.
+- **OS GINÁSIOS LIDERADOS SAEM DE UMA CONSULTA SÓ pra a página inteira** (`where(leaderUid, in, ...)`,
+  em blocos de 30, que é o teto do `in`), e não uma por treinador — com 20 por página seriam 20 idas
+  ao banco por uma linha de informação. Eles **não dariam pra deduzir do save**: a defesa do ginásio
+  é um código CONGELADO, não o time atual.
+  **A consulta está num `try` que só loga**: ela precisa de índice em `leaderUid`, e sem ele a lista
+  inteira de treinadores viria vazia por causa de uma linha de enfeite.
+- **O NOME DOS GOLPES VEM DO SERVIDOR** (`GOLPES_PT`), que já mora lá desde o moveset dos NPCs —
+  então a página não carrega tabela nenhuma. **O nome dos ITENS é a exceção**: a `LOJA` do servidor
+  só guarda preço, e o catálogo com nome e descrição é do cliente do jogo; mandar tudo isso pro
+  painel seria duplicar uma tabela de apresentação, então são onze nomes na página e item novo sem
+  nome sai com o id.
+- **O `tools/fake-firestore.js` aprendeu o `in`** por causa disto. Sem ele a consulta dos ginásios
+  caía no `catch` do próprio código testado e **o teste dava verde sem cobrir nada** — a mesma
+  classe de armadilha do `startAfter`.
+- `tools/test-admin.js` tranca a porta (sem login, sem o campo, `admin:'sim'`, `admin:false`, conta
+  inexistente), **lê a REGRA como texto** pra garantir que o campo continua fora do alcance do
+  cliente, e cobre a paginação, a ordem dos slots e o save não voltando cru.
+
 ## A porta dos modos de campeão (as 8 insígnias)
 
 Pedida em 12/09/2026: *"caso a conta não tenha nenhum time vencedor das 8 insígnias, coloque uma
@@ -5309,7 +5385,22 @@ escolheu três golpes lutava a Torre com os dois primeiros**, em silêncio — o
 - No lobby cada treinador aparece com a **faixa** de nível dos times dele (`Lv.62–70`), não com uma
   média só: qual time vai entrar nem ele decidiu ainda.
 
-## Boss de Domingo (raide global)
+## Boss de Domingo (raide global) — **DESATIVADO desde 13/09/2026**
+
+- **⚠️ O EVENTO ESTÁ DESLIGADO**, a pedido: *"tire o evento do boss de domingo, vamos deixar ele
+  desativado porque estou pensando numa nova mecânica para ele"*. Tudo abaixo continua valendo como
+  descrição do que ele É — nada foi removido.
+- **QUEM FECHA DE VERDADE É O SERVIDOR** (`BOSS_ATIVO` no `functions/index.js`): o
+  `bossRequireTester` passou a recusar com `failed-precondition`, e ele é o caminho das duas
+  callables. O cliente sozinho não fecharia nada — o estado da raide é **global** (um único ataque
+  mexe na barra que o jogo inteiro vê), o `index.html` vai com `no-cache` mas uma aba **aberta**
+  continua com o jogo velho, e o console está sempre ali.
+- No cliente é o `BOSS_DE_DOMINGO_ATIVO`: o `ehDomingo()` passa a ser sempre falso (o botão da home
+  some) e o `openSundayBoss` recusa. **São duas constantes e religar é as duas.**
+- `tools/test-boss.js` cobra **os dois lados**: desligado as duas portas recusam, e daí pra baixo a
+  suíte liga o evento (`fns._boss.ativo(true)`) e testa a mecânica inteira. Sem a primeira metade,
+  religar um dia seria uma surpresa; sem a segunda, a raide apodrecia sem ninguém ver.
+
 
 - **Aberto pra todos** desde 30/08/2026 (nasceu restrito a `userTest`; o `bossRequireTester` ficou
   como gancho, sem efeito). O que limita é o CALENDÁRIO: o botão da home só existe **aos domingos**,

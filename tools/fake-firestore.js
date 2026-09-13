@@ -75,16 +75,24 @@ function docRef(parts){
   };
 }
 
-function collRef(parts, filtros, limite, ordem){
+/* ⚠️ ORDENAR PELO ID DO DOCUMENTO e o que o Firestore chama de FieldPath.documentId() -- ele nao e
+   um campo dos dados, e a paginacao por cursor de uma colecao inteira depende dele (e a unica ordem
+   que nao precisa de indice nem de um campo que TODO documento tenha). Aqui ele e uma marca. */
+const DOC_ID = { __documentId: true };
+function collRef(parts, filtros, limite, ordem, depoisDe){
   filtros = filtros || [];
   const prefixo = pathOf(parts) + '/';
   return {
     doc(id){ return docRef(parts.concat([id])); },
-    where(campo, op, valor){ return collRef(parts, filtros.concat([[campo, op, valor]]), limite, ordem); },
+    where(campo, op, valor){ return collRef(parts, filtros.concat([[campo, op, valor]]), limite, ordem, depoisDe); },
     /* ORDENA DE VERDADE. Era um no-op que so devolvia a colecao: um teste de ranking passava sem
        nunca conferir a ordem, e o limit(10) cortava dez QUALQUER em vez dos dez primeiros. */
-    orderBy(campo, dir){ return collRef(parts, filtros, limite, [campo, dir === 'desc' ? -1 : 1]); },
-    limit(n){ return collRef(parts, filtros, n, ordem); },
+    orderBy(campo, dir){ return collRef(parts, filtros, limite, [campo, dir === 'desc' ? -1 : 1], depoisDe); },
+    limit(n){ return collRef(parts, filtros, n, ordem, depoisDe); },
+    /* PAGINACAO POR CURSOR. Sem ela, uma funcao paginada passava no teste lendo sempre a PRIMEIRA
+       pagina -- o `startAfter` era ignorado e o teste da segunda pagina via a mesma coisa da
+       primeira, o que se le como "funciona". */
+    startAfter(v){ return collRef(parts, filtros, limite, ordem, v); },
     async get(){
       let docs = [];
       for(const [caminho, dados] of store){
@@ -98,19 +106,30 @@ function collRef(parts, filtros, limite, ordem){
           if(op === '>=') return v !== undefined && v >= valor;
           if(op === '<=') return v !== undefined && v <= valor;
           if(op === '>')  return v !== undefined && v > valor;
+          /* O 'in' do Firestore (ate 30 valores). Sem ele, uma consulta que o usa caia no catch do
+             codigo testado e o teste dava verde sem cobrir nada -- foi o caso dos ginasios liderados
+             no painel de treinadores. */
+          if(op === 'in') return Array.isArray(valor) && valor.indexOf(v) >= 0;
           return true;
         });
         if(ok) docs.push({ id, bruto: dados, ref: docRef(parts.concat([id])), data(){ return clone(dados); }, exists:true });
       }
       if(ordem){
         const [campo, dir] = ordem;
+        const valor = d => (campo && campo.__documentId) ? d.id : d.bruto[campo];
         docs.sort((a,b)=>{
-          const x = a.bruto[campo], y = b.bruto[campo];
+          const x = valor(a), y = valor(b);
           if(x === y) return a.id < b.id ? -1 : 1;      // desempate estável, como o Firestore (pelo id)
           if(x === undefined) return 1;
           if(y === undefined) return -1;
           return (x < y ? -1 : 1) * dir;
         });
+        /* O CURSOR CORTA DEPOIS DA ORDENACAO e ANTES do limite -- essa ordem e a coisa toda: cortando
+           depois do limite, a segunda pagina viria vazia sempre que a primeira estivesse cheia. */
+        if(depoisDe !== undefined && depoisDe !== null){
+          const i = docs.findIndex(d => valor(d) === depoisDe);
+          if(i >= 0) docs = docs.slice(i + 1);
+        }
       }
       if(limite) docs = docs.slice(0, limite);
       // forEach existe no QuerySnapshot de verdade e o código de produção usa (startTrainerTowerRun)
@@ -180,13 +199,15 @@ function makeDb(){
   };
 }
 
+/* O FieldPath do Admin SDK -- so o documentId() e usado hoje (a paginacao do painel). */
+const FieldPath = { documentId(){ return DOC_ID; } };
 const FieldValue = {
   increment: (n)=>({ __op: INCREMENT, n }),
   delete: ()=>({ __op: DELETE })
 };
 
 module.exports = {
-  makeDb, FieldValue, store,
+  makeDb, FieldValue, FieldPath, store,
   reset(){ store.clear(); },
   dump(){ return Object.fromEntries([...store.entries()].map(([k,v])=>[k, clone(v)])); }
 };

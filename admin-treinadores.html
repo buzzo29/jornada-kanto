@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jornada Kanto — Treinadores</title>
+<meta name="robots" content="noindex, nofollow">
+
+<!-- ⚠️ ESTA PÁGINA É PÚBLICA e não tem como não ser: o firebase.json publica a RAIZ do repositório
+     ("public": "."), então tudo que está aqui é baixável em jornadakanto.com. O que protege os
+     dados NÃO é a página estar escondida -- é a Cloud Function: ela exige login E o campo
+     `users/{uid}.admin === true`, que só o console do Firebase escreve (a regra do Firestore
+     bloqueia esse campo pro cliente). Sem isso, a página abre e não mostra nada. -->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-functions-compat.js"></script>
+<script>
+  /* A MESMA config do jogo. Chave de API do Firebase não é segredo -- ela identifica o projeto; quem
+     autoriza é a regra do Firestore e a porta da função. */
+  firebase.initializeApp({
+    apiKey: "AIzaSyC3xcRdMQWMfyj6ng_4l9dxtx2Oh5y72WY",
+    authDomain: "jornada-kanto.firebaseapp.com",
+    projectId: "jornada-kanto",
+    storageBucket: "jornada-kanto.firebasestorage.app",
+    messagingSenderId: "492255022607",
+    appId: "1:492255022607:web:d68f06f2e075ce9eb71d7a"
+  });
+  const auth = firebase.auth();
+  const fns = firebase.functions();
+</script>
+
+<style>
+  :root{
+    --bg:#0c1024; --box:#fefbf0; --box-border:#1a1a2e; --ink:#1a1a2e; --muted:#6b6b80;
+    --blue:#2a5fd6; --red:#d1291b; --yellow:#ffcb05; --yellow-dark:#e0a800; --green:#2f9e44;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; padding:14px; background:var(--bg); color:var(--ink);
+    font-family:'Inter',-apple-system,system-ui,sans-serif; min-height:100vh;
+  }
+  .wrap{max-width:900px; margin:0 auto;}
+  h1{ color:var(--yellow); text-align:center; font-size:1.15rem; margin:4px 0 2px; letter-spacing:.5px; }
+  .sub{ text-align:center; color:#9aa0c8; font-size:.76rem; margin:0 0 16px; }
+  .box{
+    background:var(--box); border:3px solid var(--box-border); border-radius:5px;
+    box-shadow:4px 4px 0 rgba(0,0,0,.45); padding:14px; margin-bottom:12px;
+  }
+  .btn{
+    display:inline-block; padding:10px 14px; margin:0; border:3px solid var(--box-border);
+    border-radius:4px; background:var(--yellow); color:var(--ink); font-family:inherit;
+    font-weight:800; font-size:.85rem; cursor:pointer; box-shadow:3px 3px 0 rgba(0,0,0,.4);
+  }
+  .btn:active{ transform:translate(2px,2px); box-shadow:none; }
+  .btn.secondary{ background:#e7e3d4; }
+  .btn:disabled{ opacity:.5; cursor:default; }
+  .erro{ color:var(--red); font-weight:700; font-size:.82rem; margin:8px 0 0; white-space:pre-line; word-break:break-all; }
+  .muted{ color:var(--muted); font-size:.78rem; }
+
+  /* O RESUMO no topo: as três perguntas da página em três números. */
+  .resumo{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  .num{ display:flex; flex-direction:column; align-items:center; min-width:74px;
+        padding:6px 10px; border:2px solid #ddd7c2; border-radius:5px; }
+  .num b{ font-size:1.25rem; line-height:1.1; }
+  .num span{ font-size:.62rem; font-weight:800; color:var(--muted); text-transform:uppercase; }
+  .num.on b{ color:var(--green); }
+
+  /* A LINHA DO TREINADOR é o botão que abre os saves -- a linha inteira, e não um quadradinho:
+     mirar num alvo pequeno num celular é pedir erro (a mesma regra da lista de notificações). */
+  .tre{ border:2px solid #ddd7c2; border-radius:5px; margin-bottom:8px; overflow:hidden; }
+  .tre-cab{
+    display:flex; align-items:center; gap:9px; width:100%; padding:9px 10px; margin:0;
+    background:var(--box); border:none; border-bottom:2px dashed transparent;
+    font-family:inherit; color:var(--ink); text-align:left; cursor:pointer;
+  }
+  .tre.aberto .tre-cab{ border-bottom-color:#ddd7c2; background:#fff8e0; }
+  .bolinha{ width:9px; height:9px; border-radius:50%; background:#c9c6ba; flex-shrink:0; }
+  .bolinha.on{ background:var(--green); box-shadow:0 0 0 3px rgba(47,158,68,.22); }
+  .tre-nome{ flex:1; min-width:0; font-weight:800; font-size:.88rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .tre-visto{ font-size:.68rem; font-weight:700; color:var(--muted); flex-shrink:0; }
+  .tre-saves{ font-size:.68rem; font-weight:800; color:var(--muted); flex-shrink:0; }
+  .tre-corpo{ padding:8px 10px 10px; }
+  .tre-meta{ font-size:.68rem; color:var(--muted); margin:0 0 8px; word-break:break-all; }
+
+  .save{ border:2px solid #ddd7c2; border-radius:5px; padding:8px; margin-bottom:7px; }
+  .save-cab{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-bottom:6px; }
+  .save-slot{ font-weight:800; font-size:.76rem; }
+  .tag{ font-size:.6rem; font-weight:800; padding:2px 6px; border-radius:20px; background:#e7e3d4; color:var(--ink); }
+  .tag.hard{ background:#3a1d1d; color:#ffd6d6; }
+  .tag.camp{ background:var(--yellow); border:1px solid var(--yellow-dark); }
+  .save-quando{ margin-left:auto; font-size:.62rem; color:var(--muted); }
+
+  /* O TIME: uma etiqueta por pokémon, com a barra de vida embaixo. É o que a pergunta pede
+     ("como tá o time de cada save") -- nome, nível e se está de pé. */
+  .time{ display:flex; flex-wrap:wrap; gap:6px; }
+  /* Os cards CRESCEM pra preencher a linha (flex:1 1 104px) em vez de ficarem na largura minima:
+     a 320px eles empilhavam um por linha e um time de seis virava seis fileiras. A base e 92px
+     e nao 104: a coluna util a 320px mede 214px, e com 104 dois cards + o gap davam exatamente 214 --
+     um pixel de folga a menos e a linha quebrava. */
+  /* O max-width existe pro save de UM pokemon: sem ele o card crescia a largura inteira da
+     caixa e um Pikachu sozinho ocupava a linha toda, com a barra de vida de ponta a ponta. */
+  .mon{ flex:1 1 92px; max-width:190px; border:2px solid #ddd7c2; border-radius:5px; padding:5px 7px; }
+  .mon-nome{ font-weight:800; font-size:.74rem; }
+  .mon-sub{ font-size:.62rem; color:var(--muted); }
+  .tipos{ display:flex; gap:3px; margin:3px 0 4px; }
+  .tipo{ font-size:.52rem; font-weight:800; color:#fff; padding:1px 5px; border-radius:20px; }
+  .barra{ height:5px; background:#ddd7c2; border-radius:3px; overflow:hidden; }
+  .barra i{ display:block; height:100%; background:var(--green); }
+  .barra i.meio{ background:var(--yellow-dark); }
+  .barra i.baixo{ background:var(--red); }
+  .vazio{ font-size:.72rem; color:var(--muted); margin:0; }
+  /* A CONTA em fichinhas: cada uma é um fato ("3 poções", "170/250 na Pokédex"). Em parágrafo
+     corrido isso vira uma frase longa que ninguém varre com o olho. */
+  .fichas{ display:flex; flex-wrap:wrap; gap:5px; margin:0 0 9px; }
+  .ficha{ font-size:.63rem; font-weight:700; padding:3px 7px; border-radius:4px;
+          background:#f2eee0; border:1px solid #ddd7c2; }
+  .ficha b{ font-weight:800; }
+  .ficha.destaque{ background:var(--yellow); border-color:var(--yellow-dark); }
+  .ficha.alerta{ background:#ffe3e0; border-color:#f0b6b0; }
+  .secao{ font-size:.6rem; font-weight:800; color:var(--muted); text-transform:uppercase;
+          margin:10px 0 4px; letter-spacing:.4px; }
+  .onde{ font-size:.66rem; color:var(--muted); margin:0 0 6px; }
+  .golpes{ display:flex; flex-wrap:wrap; gap:2px; margin-top:3px; }
+  .golpe{ font-size:.52rem; font-weight:700; padding:1px 4px; border-radius:3px;
+          background:#f2eee0; border:1px solid #e2dccb; }
+  .mon-item{ font-size:.55rem; font-weight:800; color:#8a5a00; }
+  .filtros{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px; }
+  .filtros input{ flex:1; min-width:130px; padding:8px 10px; border:2px solid var(--box-border);
+                  border-radius:4px; font-family:inherit; font-size:.82rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>★ TREINADORES ★</h1>
+  <p class="sub">quem está online, os saves de cada um e como está o time</p>
+  <div id="tela"></div>
+</div>
+
+<script>
+/* As cores de tipo são as MESMAS do jogo -- o painel é lido junto com ele, e duas paletas pro mesmo
+   tipo fariam o olho reaprender a cada tela. */
+const TYPE_COLORS = {
+  Normal:'#A8A878', Fire:'#F08030', Water:'#6890F0', Electric:'#F8D030', Grass:'#78C850',
+  Ice:'#98D8D8', Fighting:'#C03028', Poison:'#A040A0', Ground:'#E0C068', Flying:'#A890F0',
+  Psychic:'#F85888', Bug:'#A8B820', Rock:'#B8A038', Ghost:'#705898', Dragon:'#7038F8',
+  Dark:'#705848', Steel:'#B8B8D0'
+};
+/* O NOME DOS ITENS. São onze e eles NÃO viajam do servidor: a `LOJA` de lá só guarda preço, e o
+   catálogo com nome/descrição é do cliente do jogo -- mandar tudo isso pro painel seria duplicar
+   uma tabela de apresentação. Item novo sem nome aqui sai com o id, que é legível o bastante. */
+const ITEM_PT = {
+  doce_raro:'Doce Raro', bonus_shiny:'Bônus Shiny', awakening:'Despertar', hyperpotion:'Super Poção',
+  potion:'Poção', hp_up:'HP Up', atk_up:'Atk Up', def_up:'Def Up', spatk_up:'Atk Special Up',
+  spdef_up:'Def Special Up', faixa_foco:'Faixa de Foco'
+};
+const TYPE_PT = {
+  Normal:'Normal', Fire:'Fogo', Water:'Água', Electric:'Elétrico', Grass:'Planta', Ice:'Gelo',
+  Fighting:'Lutador', Poison:'Veneno', Ground:'Terra', Flying:'Voador', Psychic:'Psíquico',
+  Bug:'Inseto', Rock:'Pedra', Ghost:'Fantasma', Dragon:'Dragão', Dark:'Sombrio', Steel:'Aço'
+};
+
+const estado = {
+  authChecked: false, user: null,
+  carregando: false, erro: null,
+  treinadores: [], online: 0, proximo: null, agora: 0,
+  abertos: {}, busca: ''
+};
+
+const esc = (s) => String(s == null ? '' : s)
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+
+/* "visto por último" com a MESMA granularidade grossa do jogo: o carimbo do servidor tem folga de
+   5 minutos, então "há 3 min" seria precisão inventada. */
+function visto(ms, agora){
+  if(!ms) return 'nunca visto';
+  const d = (agora || Date.now()) - ms;
+  if(d < 10*60000) return 'agora há pouco';
+  if(d < 60*60000) return 'há ' + Math.round(d/60000) + ' min';
+  if(d < 24*3600000) return 'há ' + Math.round(d/3600000) + 'h';
+  const dias = Math.round(d/86400000);
+  if(dias < 30) return 'há ' + dias + (dias === 1 ? ' dia' : ' dias');
+  return new Date(ms).toLocaleDateString('pt-BR');
+}
+
+function monHtml(m){
+  const pct = (m.maxHp > 0) ? Math.max(0, Math.min(100, Math.round(100 * (m.hp == null ? m.maxHp : m.hp) / m.maxHp))) : 100;
+  const classe = pct <= 0 ? 'baixo' : (pct <= 25 ? 'baixo' : (pct <= 50 ? 'meio' : ''));
+  const tipos = (m.tipos || []).map(t =>
+    `<span class="tipo" style="background:${TYPE_COLORS[t] || '#888'}">${esc(TYPE_PT[t] || t)}</span>`).join('');
+  /* Os GOLPES e o ITEM equipado: é o que o jogador escolheu, e é a parte do time que não dá pra
+     deduzir de mais nada. O nome vem em português do servidor (GOLPES_PT), então esta página não
+     carrega tabela nenhuma. */
+  const golpes = (m.golpes || []).map(g =>
+    `<span class="golpe" title="${esc(g.tipo || '')} ${g.poder || ''}">${esc(g.nome)}</span>`).join('');
+  return `<div class="mon">
+    <div class="mon-nome">${m.shiny ? '🌟 ' : ''}${esc(m.nome)}</div>
+    <div class="mon-sub">Lv.${m.nivel}${m.maxHp ? ' — ' + (m.hp == null ? m.maxHp : m.hp) + '/' + m.maxHp : ''}</div>
+    <div class="tipos">${tipos}</div>
+    <div class="barra"><i class="${classe}" style="width:${pct}%"></i></div>
+    ${m.item ? `<div class="mon-item">+ ${esc(ITEM_PT[m.item] || m.item)}</div>` : ''}
+    ${golpes ? `<div class="golpes">${golpes}</div>` : ''}
+  </div>`;
+}
+
+/* ONDE A JORNADA ESTÁ. É o que responde "o que está acontecendo" -- o número de insígnias sozinho
+   não diz se ele parou no meio da Elite ou se está tomando derrota no mesmo ginásio há três vezes. */
+function ondeHtml(s){
+  const p = [];
+  if(s.trecho != null) p.push('trecho ' + (s.trecho + 1) + '/8');
+  if(s.caminho && s.caminho[s.trecho]) p.push(s.caminho[s.trecho] === 'johto' ? 'Johto' : 'Kanto');
+  if(s.rota) p.push('rota ' + s.rota);
+  if(s.tela) p.push('tela: ' + s.tela);
+  if(s.derrotas) p.push(s.derrotas + '/5 derrotas neste ginásio');
+  if(s.eliteEtapa != null) p.push('Elite: etapa ' + (s.eliteEtapa + 1) + (s.eliteTentativas ? ' (' + s.eliteTentativas + ' tentativa(s))' : ''));
+  if(s.rocket) p.push('Rocket: fase ' + s.rocket);
+  if(s.capturados) p.push(s.capturados + ' capturados neste save');
+  return p.length ? `<p class="onde">${esc(p.join(' · '))}</p>` : '';
+}
+function saveHtml(s){
+  return `<div class="save">
+    <div class="save-cab">
+      <span class="save-slot">Slot ${s.slot + 1}</span>
+      <span class="tag">${s.insignias}/8 insígnias</span>
+      ${s.modo === 'hard' ? '<span class="tag hard">difícil</span>' : ''}
+      ${s.campeao ? '<span class="tag camp">🏆 campeão</span>' : ''}
+      ${s.rival ? `<span class="tag">rival: ${esc(s.rival)}</span>` : ''}
+      <span class="save-quando">${s.atualizado ? 'salvo ' + visto(s.atualizado, estado.agora) : ''}</span>
+    </div>
+    ${ondeHtml(s)}
+    ${s.insigniasNomes && s.insigniasNomes.length ? `<p class="onde">insígnias: ${esc(s.insigniasNomes.join(', '))}</p>` : ''}
+    ${s.time.length ? `<div class="time">${s.time.map(monHtml).join('')}</div>`
+                    : '<p class="vazio">sem time ainda</p>'}
+  </div>`;
+}
+
+/* A CONTA EM FICHINHAS. Cada uma é um fato; em parágrafo corrido isso vira uma frase longa que
+   ninguém varre com o olho. Só aparece o que EXISTE -- uma ficha "0 ligas" seria ruído. */
+function contaHtml(t){
+  const f = [];
+  const põe = (txt, classe) => f.push(`<span class="ficha ${classe || ''}">${txt}</span>`);
+  põe(`🪙 <b>${t.moedas}</b>`);
+  põe(`🍬 <b>${t.doces}</b>`);
+  põe(`Pokédex <b>${t.pokedex}</b>${t.shinyDex ? ' · 🌟 ' + t.shinyDex : ''}`);
+  if(t.campeao) põe('🏆 campeão da Elite', 'destaque');
+  if(t.ligas) põe(`${t.ligas} liga(s)`);
+  if(t.sequencia) põe(`sequência ${t.sequencia}`);
+  if(t.especialidades.length) põe('especialista: ' + t.especialidades.map(x => esc(TYPE_PT[x] || x)).join(', '));
+  (t.itens || []).forEach(i => põe(`${i.qtd}× ${esc(ITEM_PT[i.item] || i.item)}`));
+  (t.equipados || []).forEach(e => põe(`${esc(ITEM_PT[e.item] || e.item)} em ${esc(e.chave)}`));
+  (t.hms || []).forEach(h => põe(esc(h.toUpperCase())));
+  (t.ginasios || []).forEach(g => põe(`🏟️ lidera ${esc(g.cidade)}`, 'destaque'));
+  if(t.bonusShinyAte > (estado.agora || Date.now())) põe('✨ bônus shiny valendo', 'destaque');
+  if(t.mewtwo && t.mewtwo.emprestado) põe('Mewtwo emprestado', 'alerta');
+  else if(t.mewtwo && t.mewtwo.aResgatar) põe('Mewtwo a resgatar', 'alerta');
+  else if(t.mewtwo && t.mewtwo.liberado) põe('Mewtwo liberado');
+  return f.join('');
+}
+function treinadorHtml(t){
+  const aberto = !!estado.abertos[t.uid];
+  return `<div class="tre ${aberto ? 'aberto' : ''}">
+    <button class="tre-cab" onclick="alternar('${esc(t.uid)}')">
+      <span class="bolinha ${t.online ? 'on' : ''}"></span>
+      <span class="tre-nome">${esc(t.nome || '(sem nome)')}</span>
+      <span class="tre-saves">${t.saves.length} save${t.saves.length === 1 ? '' : 's'}</span>
+      <span class="tre-visto">${esc(visto(t.visto, estado.agora))}</span>
+    </button>
+    ${aberto ? `<div class="tre-corpo">
+      <p class="tre-meta">uid ${esc(t.uid)}${t.cidade ? ' · ' + esc(t.cidade) : ''}${t.admin ? ' · ADMIN' : ''}</p>
+      <div class="fichas">${contaHtml(t)}</div>
+      ${t.saves.length ? `<div class="secao">${t.saves.length} save${t.saves.length === 1 ? '' : 's'}</div>` : ''}
+      ${t.saves.length ? t.saves.map(saveHtml).join('') : '<p class="vazio">nenhum save nesta conta.</p>'}
+    </div>` : ''}
+  </div>`;
+}
+
+function render(){
+  const el = document.getElementById('tela');
+  if(!estado.authChecked){ el.innerHTML = '<div class="box"><p class="muted">Verificando login...</p></div>'; return; }
+  if(!estado.user){
+    el.innerHTML = `<div class="box">
+      <p class="muted">Entre com a conta de administrador pra ver os treinadores.</p>
+      <button class="btn" onclick="entrar()">Entrar com e-mail e senha</button>
+      ${estado.erro ? `<p class="erro">${esc(estado.erro)}</p>` : ''}
+    </div>`;
+    return;
+  }
+  /* A BUSCA filtra o que JÁ foi carregado -- ela não vai ao servidor. Com a lista paginada, buscar
+     no banco exigiria um índice por nome e mudaria o custo da página; aqui ela serve pra achar
+     alguém na página aberta, que é o que se faz olhando uma lista. */
+  const termo = estado.busca.trim().toLowerCase();
+  const lista = termo
+    ? estado.treinadores.filter(t => (t.nome || '').toLowerCase().includes(termo) || t.uid.toLowerCase().includes(termo))
+    : estado.treinadores;
+  el.innerHTML = `
+    <div class="box">
+      <div class="resumo">
+        <div class="num on"><b>${estado.online}</b><span>online</span></div>
+        <div class="num"><b>${estado.treinadores.length - estado.online}</b><span>offline</span></div>
+        <div class="num"><b>${estado.treinadores.length}</b><span>carregados</span></div>
+        <div style="flex:1"></div>
+        <button class="btn secondary" onclick="recarregar()" ${estado.carregando ? 'disabled' : ''}>${
+          estado.carregando ? 'Carregando...' : '🔄 Atualizar'}</button>
+        <button class="btn secondary" onclick="sair()">Sair</button>
+      </div>
+      ${estado.erro ? `<p class="erro">${esc(estado.erro)}</p>` : ''}
+      <p class="muted" style="margin:8px 0 0">Logado como ${esc(estado.user.email || estado.user.uid)} · online = visto nos últimos 10 min</p>
+    </div>
+    <div class="box">
+      <div class="filtros">
+        <input id="busca" placeholder="Filtrar por nome ou uid..." value="${esc(estado.busca)}"
+               oninput="filtrar(this.value)">
+      </div>
+      ${lista.length ? lista.map(treinadorHtml).join('')
+                     : `<p class="vazio">${estado.carregando ? 'Carregando...' : 'Nenhum treinador aqui.'}</p>`}
+      ${estado.proximo ? `<button class="btn secondary" onclick="maisUma()" ${estado.carregando ? 'disabled' : ''}
+         style="width:100%; margin-top:8px;">Carregar mais</button>` : ''}
+    </div>`;
+  const b = document.getElementById('busca');
+  /* O cursor volta pro fim do texto: o render recria o input a cada tecla, e sem isto o cursor
+     pulava pro começo e a busca saía com as letras invertidas. */
+  if(b && document.activeElement !== b && termo){ b.focus(); b.selectionStart = b.selectionEnd = b.value.length; }
+}
+
+function alternar(uid){ estado.abertos[uid] = !estado.abertos[uid]; render(); }
+function filtrar(v){ estado.busca = v; render(); }
+
+async function carregar(cursor){
+  estado.carregando = true; estado.erro = null; render();
+  try{
+    const r = await fns.httpsCallable('adminListTrainers')({ limite: 20, cursor: cursor || null });
+    const d = r.data;
+    estado.agora = d.agora;
+    estado.treinadores = cursor ? estado.treinadores.concat(d.treinadores) : d.treinadores;
+    /* O CONTADOR DE ONLINE É RECONTADO NA LISTA INTEIRA, e não somado página a página: o servidor
+       conta só a página que devolveu, e somar daria o número certo por acaso enquanto ninguém
+       recarregasse a primeira. */
+    estado.online = estado.treinadores.filter(t => t.online).length;
+    estado.proximo = d.proximo;
+  }catch(e){
+    /* ⚠️ A RECUSA MOSTRA O UID, e isso é a diferença entre a página funcionar e não. A porta é um
+       campo que SÓ o console do Firebase escreve -- então a primeira coisa que se precisa saber é
+       QUAL documento marcar, e o uid não aparece em lugar nenhum do jogo. Sem ele, a mensagem
+       manda fazer algo que não dá pra fazer. */
+    estado.erro = (e && e.code === 'functions/permission-denied')
+      ? ('Esta conta não é administradora.' + String.fromCharCode(10) + 'No console do Firebase, abra users/' +
+         ((estado.user && estado.user.uid) || '?') + ' e acrescente o campo admin (booleano) = true.')
+      : ('Não deu pra carregar: ' + (e && e.message ? e.message : e));
+  }
+  estado.carregando = false; render();
+}
+function recarregar(){ estado.treinadores = []; estado.proximo = null; carregar(null); }
+function maisUma(){ carregar(estado.proximo); }
+
+function entrar(){
+  const email = prompt('E-mail:');
+  if(!email) return;
+  const senha = prompt('Senha:');
+  if(!senha) return;
+  auth.signInWithEmailAndPassword(email, senha).catch(e => {
+    /* A MESMA resposta pros dois casos. Repassar o "user-not-found" do Firebase transformaria o
+       formulário num oráculo: dá pra descobrir quem tem conta testando e-mails. É a regra que o
+       login do jogo já segue. */
+    estado.erro = 'E-mail ou senha incorretos.';
+    render();
+  });
+}
+function sair(){ auth.signOut(); }
+
+auth.onAuthStateChanged(u => {
+  estado.user = u; estado.authChecked = true;
+  estado.treinadores = []; estado.proximo = null; estado.erro = null;
+  render();
+  if(u) carregar(null);
+});
+render();
+</script>
+</body>
+</html>
