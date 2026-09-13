@@ -43,6 +43,7 @@ function createSandbox(htmlPath){
      principalmente quais NAO foram (o da bifurcacao, que ele nao pode resolver sozinho). */
   const escritas = [];
   const timers = [];   // ver o setTimeout abaixo: ele ANOTA o prazo, nao roda nada
+  const recargas = [];  // location.reload() anotado, ver o aviso de versao nova
   const firestoreStub = (caminho) => ({
     collection(nome){ return firestoreStub(nome); },
     doc(id){ return firestoreStub(id); },
@@ -89,7 +90,9 @@ function createSandbox(htmlPath){
     // (__captureInitialVersion). Fora do navegador isso não tem sentido, mas sem estes quatro
     // stubs ele lança e o console.error do catch suja a saída de toda simulação. Com eles a
     // checagem roda até o fim, em silêncio, sobre uma página vazia.
-    location:{ pathname:'/' },
+    /* O reload e ANOTADO, nao executado: e ele que o botao de "versao nova" chama, e um teste
+       precisa cobrar que o botao recarrega sem que o processo do teste se recarregue. */
+    location:{ pathname:'/', href:'http://localhost/', reload(){ recargas.push(Date.now()); } },
     fetch:()=>Promise.resolve({ text:()=>Promise.resolve('') }),
     TextEncoder, crypto,
     firebase:{ initializeApp(){}, auth(){ return {}; }, firestore(){ return firestoreStub(); } },
@@ -173,6 +176,8 @@ function createSandbox(htmlPath){
     'runSpecialBattle','advanceSpecialReveal','continueAfterSpecial','continueAfterWildDisguiseReveal',
     // emboscada da Jigglypuff da Rocket: a cena acontece na tela de BATALHA e so depois vira
     // resultado (ver test-jornada.js)
+    // aviso de versao nova na home (ver test-inventario.js)
+    'conferirVersaoNoAr','atualizarParaVersaoNova','CHECAGEM_DE_VERSAO_MS',
     'renderSpecialBattling','renderSpecialResult','triggerRocketSleepAmbush','fraseDoCantoDaRocket',
     'ROCKET_SLEEP_CHANCE','ROCKET_SLEEP_AVISO_MS','ROCKET_POOL','avgTeamLevel'
   ];
@@ -184,6 +189,7 @@ function createSandbox(htmlPath){
   sandbox.render = function(){};
   sandbox.__escritas = escritas;
   sandbox.__timers = timers;
+  sandbox.__recargas = recargas;
   return sandbox;
 }
 

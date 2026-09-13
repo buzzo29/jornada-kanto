@@ -13310,7 +13310,9 @@ const CAMPOS_DA_CONTA = [
   'userTest','neighborhoodGymLocation','startersSorteados','geracaoDosSlots','bossTop10','bossKiller',
   /* anda junto com o `saveSlots`: sem ele aqui, abrir um save e voltar apagaria a marca e a porta
      dos modos de campeão pararia de bloquear em silêncio */
-  'saveSlotsCarregados','contaCarregada',
+  /* o aviso de versão nova é da ABA, não do save: sem ele aqui, abrir um save e voltar pra home
+     apagaria a marca e o botão sumiria até a próxima pergunta (que é folgada em 1 minuto) */
+  'saveSlotsCarregados','contaCarregada','versaoNova',
   'hms'   // as Máquinas Ocultas são da CONTA, não do save -- ver darHM
 ];
 function snapshotDaConta(){
@@ -13527,6 +13529,61 @@ if('serviceWorker' in navigator){
     navigator.serviceWorker.register('/sw.js').catch(e=>console.error('Service worker não registrou:', e));
   });
 }
+
+/* ------------------------------------------------------------------
+   VERSÃO NOVA NO AR (13/09/2026, a pedido)
+
+   O `index.html` vai com `Cache-Control: no-cache`, então quem ABRE a página depois de um deploy já
+   pega a versão nova -- isso já estava resolvido. O que não estava é a **aba que ficou aberta**: o
+   jogo é um arquivo só, a pessoa deixa o jogo aberto o dia inteiro, e continua jogando o código
+   velho até dar F5. Isso já custou um relatório de bug (o jogador mandou print de um defeito que
+   estava consertado) e é o que o botão da home resolve.
+
+   ⚠️ A IMPRESSÃO É O ETag DO PRÓPRIO `index.html`, e é por isso que não existe número de versão pra
+   ninguém lembrar de subir. O Firebase Hosting devolve um ETag que é o SHA-256 do conteúdo:
+   conferido em produção, ele é estável entre requisições e só muda quando o arquivo muda. Um
+   `VERSAO = '1.2.3'` escrito à mão seria uma linha a mais pra esquecer em todo deploy, e esquecer
+   significaria o aviso nunca aparecer -- em silêncio.
+
+   O HEAD não baixa o arquivo (1,2 MB), só os cabeçalhos.
+
+   ⚠️ A MINHA VERSÃO É A PRIMEIRA QUE EU VI, e nunca é atualizada depois: é isso que faz a
+   comparação significar "saiu coisa nova DESDE que eu carreguei". Sobra uma janela minúscula -- se
+   um deploy cair entre o carregamento da página e a primeira pergunta, esta aba adota a versão nova
+   como a dela e não avisa. O erro é pro lado de NÃO avisar, que é o certo: um aviso falso mandaria
+   o jogador recarregar à toa.
+------------------------------------------------------------------ */
+let minhaVersaoDoJogo = null;        // a impressão do index.html que ESTA aba carregou
+let ultimaChecagemDeVersao = 0;
+const CHECAGEM_DE_VERSAO_MS = 60 * 1000;   // folga: ir e voltar na home não vira uma pergunta por clique
+async function impressaoDoIndexNoAr(){
+  try{
+    const r = await fetch('index.html', { method:'HEAD', cache:'no-store' });
+    if(!r || !r.ok) return null;
+    /* O Last-Modified é a rede de segurança: se um dia a hospedagem parar de mandar ETag, o aviso
+       continua funcionando (com a granularidade de 1s, que aqui é de sobra). */
+    return r.headers.get('ETag') || r.headers.get('Last-Modified') || null;
+  }catch(e){ return null; }   // sem rede não se afirma nada -- é um aviso, não pode atrapalhar
+}
+async function conferirVersaoNoAr(){
+  if(game.versaoNova) return;   // já sabe; perguntar de novo não muda nada
+  const agora = Date.now();
+  if(agora - ultimaChecagemDeVersao < CHECAGEM_DE_VERSAO_MS) return;
+  ultimaChecagemDeVersao = agora;
+  const noAr = await impressaoDoIndexNoAr();
+  if(!noAr) return;
+  if(!minhaVersaoDoJogo){ minhaVersaoDoJogo = noAr; return; }   // a primeira resposta É a minha versão
+  if(noAr !== minhaVersaoDoJogo){ game.versaoNova = true; render(); }
+}
+/* ⚠️ O BOTÃO SÓ EXISTE NA HOME, e isso não é onde ele COUBE -- é onde ele é seguro. Recarregar no
+   meio de uma jornada jogaria fora a tela em que a pessoa está (uma escolha de golpe, uma
+   distribuição de níveis); na home não há nada em curso e o save já está gravado.
+   `location.reload()` basta: com `no-cache` o navegador revalida pelo ETag, e o service worker do
+   jogo é passa-direto (não tem cache -- ver sw.js). Um `?v=` na URL resolveria o mesmo e deixaria
+   lixo na barra de endereço de quem instalou o atalho. */
+function atualizarParaVersaoNova(){
+  try{ location.reload(); }catch(e){}
+}
 async function logout(){
   stopLeaguePolling();
   await auth.signOut();
@@ -13562,6 +13619,9 @@ function openSaveSelect(){
        Custa no MÁXIMO 2 leituras a cada 5 minutos (a folga mora no `atualizarAvisoDaLiga`), e ele
        engole o próprio erro: é um aviso, falhar aqui não pode atrapalhar a home. */
     atualizarAvisoDaLiga(),
+    /* Pergunta se saiu versão nova enquanto esta aba estava aberta. É aqui porque é aqui que o
+       botão aparece -- e porque a home é a única tela em que recarregar não custa nada. */
+    conferirVersaoNoAr(),
     // idempotente e barato (já sai rápido se já tiver desbloqueado antes) -- pega quem já tinha vencido
     // o Mewtwo antes dessa feature existir e nunca foi avisado
     functionsClient.httpsCallable('checkMewtwoLoanUnlock')().catch(e=>console.error('Erro ao checar desbloqueio do empréstimo de Mewtwo:', e))
@@ -23560,7 +23620,17 @@ function renderSaveSelect(){
     ${game.evolucoesReparadas.map(e => `<p>${spriteHtml(e.paraId, 'sprite-sm', e.shiny)} <strong>${escapeHtmlSafe(e.de)}</strong> virou <strong>${escapeHtmlSafe(e.para)}</strong> (Lv.${e.nivel}, time ${e.slot+1}).</p>`).join('')}
     <button class="btn primary" onclick="fecharAvisoDeReparo()">Entendi</button>
   </div>` : '';
+  /* ⚠️ ELE VEM ANTES DE TUDO, inclusive do aviso de evolução em atraso: o que está velho aqui é o
+     JOGO INTEIRO, e qualquer coisa que a pessoa faça na versão antiga pode ser um defeito já
+     consertado. */
+  const versao = game.versaoNova ? `
+  <div class="box cursor">
+    <h2>🔄 Versão nova no ar</h2>
+    <p>Saiu uma atualização enquanto esta aba estava aberta — você está jogando a versão anterior.</p>
+    <button class="btn primary" onclick="atualizarParaVersaoNova()">Atualizar para versão mais recente</button>
+  </div>` : '';
   return `
+  ${versao}
   ${reparo}
   <div class="home-header">
     <div class="home-title">★ JORNADA KANTO ★</div>

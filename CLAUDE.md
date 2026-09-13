@@ -5306,6 +5306,58 @@ Se a intenção for que o HM01 seja uma prova, o Surge é o lugar errado — os 
 
 ## Home
 
+### O BOTÃO DE ATUALIZAR, QUANDO SAI VERSÃO NOVA (13/09/2026)
+
+Pedido assim: *"caso algum usuário esteja jogando em uma versão que não é a mais atual, aparecer um
+botão de 'Atualizar para versão mais recente'"*.
+
+- **O QUE ISSO RESOLVE NÃO É O CACHE — esse já estava resolvido.** O `index.html` vai com
+  `no-cache`, então quem ABRE a página depois de um deploy já pega a versão nova. O buraco é a **aba
+  que ficou aberta**: o jogo é um arquivo só, a pessoa deixa o jogo aberto o dia inteiro e continua
+  jogando o código velho até dar F5. Isso já custou um relatório de bug — o jogador mandou print de
+  um defeito que estava consertado (ver a seção de Deploy).
+- **⚠️ A IMPRESSÃO É O ETag DO PRÓPRIO `index.html`, e é por isso que NÃO existe número de versão.**
+  O Firebase Hosting devolve um ETag que é o SHA-256 do conteúdo — conferido em produção antes de
+  construir em cima: ele é estável entre requisições e só muda quando o arquivo muda. Um
+  `VERSAO = '1.2.3'` escrito à mão seria mais uma linha pra lembrar em todo deploy, e **esquecer
+  significaria o aviso nunca aparecer, em silêncio** — que é a pior forma de um aviso falhar.
+  A pergunta é um `HEAD`: não baixa os 1,2 MB, só os cabeçalhos. O `Last-Modified` é a rede de
+  segurança se um dia a hospedagem parar de mandar ETag.
+- **⚠️ A MINHA VERSÃO É A PRIMEIRA QUE EU VI, e nunca é atualizada depois.** É isso que faz a
+  comparação significar *"saiu coisa nova DESDE que eu carreguei"*. Atualizando-a, o aviso sumiria
+  sozinho na pergunta seguinte. Sobra uma janela minúscula: se um deploy cair entre o carregamento
+  da página e a primeira pergunta, esta aba adota a versão nova como a dela e não avisa. **O erro é
+  pro lado de NÃO avisar**, que é o certo — um aviso falso mandaria o jogador recarregar à toa.
+- **SEM REDE NÃO SE AFIRMA NADA**: falha de fetch ou resposta ruim não acendem o botão. É um aviso;
+  ele não pode atrapalhar a home.
+- **⚠️ O BOTÃO SÓ EXISTE NA HOME, e isso não é onde ele coube — é onde ele é SEGURO.** Recarregar no
+  meio de uma jornada jogaria fora a tela em que a pessoa está (uma escolha de golpe, uma
+  distribuição de níveis); na home não há nada em curso e o save já está gravado.
+- **`location.reload()` basta.** Com `no-cache` o navegador revalida pelo ETag, e o service worker do
+  jogo é passa-direto (ver `sw.js`, que é sem cache de propósito). Um `?v=` na URL resolveria o mesmo
+  e deixaria lixo na barra de endereço de quem instalou o atalho.
+- **O aviso vem ANTES DE TUDO na home**, inclusive do aviso de evolução em atraso: o que está velho
+  aqui é o JOGO INTEIRO, e qualquer coisa que a pessoa faça na versão antiga pode ser um defeito já
+  consertado.
+- **`versaoNova` está no `CAMPOS_DA_CONTA`**: ele é da ABA, não do save. Sem isso, abrir um save e
+  voltar pra home apagaria a marca e o botão sumiria até a próxima pergunta (que tem folga de 1
+  minuto, pra ir e voltar na home não virar uma pergunta por clique).
+- **Medido a 320px:** o aviso ocupa 226px e o botão quebra em duas linhas (34 caracteres), sem
+  rolagem lateral.
+- `tools/test-inventario.js` tranca a mecânica com a rede trocada por um dublê: a primeira resposta
+  só guarda a versão desta aba, impressão igual não avisa, impressão diferente acende o botão com o
+  texto pedido palavra por palavra, o aviso vem antes do cabeçalho, a minha versão não se atualiza
+  sozinha, o botão recarrega, sem rede não aparece nada, e a folga vale (3 chamadas, 1 ida à rede).
+  Mais duas que **leem o código**: que o campo está no `CAMPOS_DA_CONTA` e que a home realmente
+  pergunta — os casos chamam a função na mão e passariam com a chamada órfã.
+  **⚠️ Ele usa um sandbox PRÓPRIO**: é o único bloco que depende de estado de MÓDULO (a impressão
+  desta aba, a folga), e o resto do arquivo deixa promessas de `openSaveSelect` pendentes — quando o
+  primeiro `await` cede, elas rodam e uma delas também pergunta a versão, roubando a primeira
+  resposta. Conferido que o teste acusa com o botão fora da home, com a home sem perguntar, e com a
+  minha versão se atualizando sozinha.
+- **O sandbox aprendeu `location.reload()`** (anotado em `__recargas`, não executado) — sem isso o
+  teste do botão recarregaria o próprio processo do teste.
+
 ### O ! DO BOTÃO DAS LIGAS (13/09/2026)
 
 Pedido assim: *"coloque um sinal de ! (igual quando tem notificação) no botão de ligas onlines,

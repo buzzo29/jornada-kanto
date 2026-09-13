@@ -865,5 +865,117 @@ console.log('\n=== O ! DO BOTAO DAS LIGAS ===');
   }
   g.avisoLiga = null; S.__setGame(g);
 }
+/* Este bloco pergunta a "rede" (trocada por um dublê) e por isso e o unico com await -- o arquivo e
+   CommonJS, entao o fim do teste mora dentro dele. */
+(async function(){
+console.log('\n=== O AVISO DE VERSAO NOVA NA HOME ===');
+{
+  /* ⚠️ SANDBOX PROPRIO, e nao o do resto do arquivo. Este bloco e o unico que depende de estado de
+     MODULO -- a impressao que ESTA aba carregou e a folga da pergunta --, e o resto do teste deixa
+     promessas de openSaveSelect pendentes: quando o primeiro await cede, elas rodam, e uma delas
+     tambem pergunta a versao e rouba a primeira resposta (a que define "a minha versao"). Com
+     sandbox proprio nao ha o que atrapalhar, e a interferencia nao volta no dia em que alguem
+     acrescentar um caso acima. */
+  const S = createSandbox();
+  /* Pedido em 13/09/2026: *"caso algum usuario esteja jogando em uma versao que nao e a mais atual,
+     aparecer um botao de 'Atualizar para versao mais recente'"*.
+     O `index.html` vai com no-cache, entao quem ABRE a pagina depois do deploy ja pega a versao
+     nova. O buraco e a ABA QUE FICOU ABERTA -- o jogo e um arquivo so, e quem deixa o jogo aberto
+     continua no codigo velho ate dar F5. Isso ja custou um relatorio de bug de um defeito que ja
+     estava consertado. */
+  const g = S.__getGame();
+  g.trainerName = 'Buzzo';
+  g.saveSlots = new Array(S.MAX_SAVE_SLOTS).fill(null);
+  g.saveSlotsCarregados = true; g.versaoNova = false;
+  S.__setGame(g);
+
+  /* A impressao e o ETag do proprio index.html -- e por isso que nao existe numero de versao pra
+     ninguem lembrar de subir. Aqui a rede e trocada por uma que devolve a impressao que o teste
+     quiser. */
+  let impressao = 'v-antiga';
+  S.fetch = () => Promise.resolve({ ok:true, headers:{ get:(h)=> h === 'ETag' ? impressao : null } });
+  /* Relogio que anda 10 min a cada olhada, pra cada pergunta cair fora da folga de 1 min. Ele e
+     posto no Date DESTE sandbox (um objeto proprio), e nao no global: o `Date` que o sandbox recebe
+     e o do processo, entao mexer no `now` dele mexeria no relogio do teste inteiro. */
+  let t = 5000000;
+  S.Date = Object.assign(Object.create(Date), { now: () => (t += 10*60*1000) });
+
+  const temBotao = () => S.renderSaveSelect().indexOf('atualizarParaVersaoNova()') >= 0;
+  ok('sem nada novo no ar, nao ha botao nenhum', !temBotao());
+
+  /* A PRIMEIRA resposta E a versao desta aba -- ela nao avisa nada. */
+  await S.conferirVersaoNoAr();
+  ok('a primeira pergunta so guarda a versao desta aba, sem avisar',
+     !S.__getGame().versaoNova && !temBotao());
+
+  await S.conferirVersaoNoAr();
+  ok('e enquanto a impressao for a mesma, nada aparece', !temBotao());
+
+  /* ⚠️ O DEPLOY: a impressao muda. */
+  impressao = 'v-nova';
+  await S.conferirVersaoNoAr();
+  ok('saiu versao nova -> o botao aparece', temBotao());
+  ok('e com o texto pedido, palavra por palavra',
+     S.renderSaveSelect().indexOf('Atualizar para versão mais recente') >= 0);
+
+  /* ⚠️ ELE VEM ANTES DE TUDO: o que esta velho e o JOGO INTEIRO. */
+  {
+    const h = S.renderSaveSelect();
+    ok('e ele vem antes do cabecalho da home',
+       h.indexOf('atualizarParaVersaoNova()') < h.indexOf('home-header'),
+       'aviso em ' + h.indexOf('atualizarParaVersaoNova()') + ', cabecalho em ' + h.indexOf('home-header'));
+  }
+
+  /* ⚠️ A MINHA VERSAO NUNCA E ATUALIZADA: senao a comparacao deixaria de significar "saiu coisa
+     nova DESDE que eu carreguei", e o aviso sumiria sozinho na pergunta seguinte. */
+  { const j = S.__getGame(); j.versaoNova = false; S.__setGame(j); }
+  await S.conferirVersaoNoAr();
+  ok('a versao desta aba nao se atualiza sozinha (o aviso volta)', temBotao());
+
+  /* O BOTAO RECARREGA. O sandbox anota o reload em vez de executar. */
+  const antes = (S.__recargas || []).length;
+  S.atualizarParaVersaoNova();
+  ok('o botao recarrega a pagina', (S.__recargas || []).length === antes + 1,
+     (S.__recargas || []).length + ' recarga(s)');
+
+  /* SEM REDE nao se afirma nada: um aviso falso mandaria o jogador recarregar a toa. */
+  { const j = S.__getGame(); j.versaoNova = false; S.__setGame(j); }
+  S.fetch = () => Promise.reject(new Error('sem rede'));
+  await S.conferirVersaoNoAr();
+  ok('sem rede, o aviso nao aparece', !temBotao());
+  S.fetch = () => Promise.resolve({ ok:false, headers:{ get:()=>null } });
+  await S.conferirVersaoNoAr();
+  ok('e resposta ruim tambem nao', !temBotao());
+
+  /* A FOLGA: ir e voltar na home nao vira uma pergunta por clique. */
+  {
+    let idas = 0;
+    /* Relogio PARADO e bem a frente da ultima pergunta: a primeira chamada cai FORA da folga (e
+       vai a rede) e as duas seguintes caem dentro (e nao vao). Parado num instante ANTERIOR, as tres
+       ficariam dentro da folga e o caso passaria sem provar nada. */
+    S.Date = Object.assign(Object.create(Date), { now: () => 99000000 });
+    S.fetch = () => { idas++; return Promise.resolve({ ok:true, headers:{ get:()=>'v-nova' } }); };
+    await S.conferirVersaoNoAr(); await S.conferirVersaoNoAr(); await S.conferirVersaoNoAr();
+    ok('a pergunta tem folga de 1 minuto: 3 chamadas, 1 ida a rede', idas === 1 && S.CHECAGEM_DE_VERSAO_MS === 60000,
+       idas + ' ida(s) a rede, folga de ' + S.CHECAGEM_DE_VERSAO_MS + 'ms');
+  }
+
+  /* ⚠️ E O AVISO SOBREVIVE A ABRIR UM SAVE: ele e da ABA, nao do save. Sem estar no CAMPOS_DA_CONTA
+     o resetGame o apagaria e o botao sumiria ate a proxima pergunta. */
+  {
+    const txt = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
+    const bloco = (txt.match(/const CAMPOS_DA_CONTA = \[[\s\S]*?\];/) || [''])[0];
+    ok('o aviso esta na lista de campos da conta', /'versaoNova'/.test(bloco));
+  }
+  /* ⚠️ E A HOME E QUEM PERGUNTA -- os casos acima chamam a funcao na mao e passariam com a chamada
+     orfa. O botao so existe na home porque so ali recarregar nao custa nada. */
+  {
+    const txt = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
+    const bloco = (txt.match(/function openSaveSelect\(\)[\s\S]*?\n\}/) || [''])[0];
+    ok('e a home pergunta de verdade', /conferirVersaoNoAr\(\)/.test(bloco), bloco.length + ' chars');
+  }
+}
+
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
 process.exit(falhas ? 1 : 0);
+})();
