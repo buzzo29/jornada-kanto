@@ -7859,6 +7859,14 @@ const ADMIN_PAGINA_MAX = 60;
    O carimbo tem folga de 5 min (LAST_SEEN_THROTTLE_MS), entao qualquer janela menor que isso
    mostraria gente offline que esta jogando. */
 const ADMIN_ONLINE_MS = 10 * 60 * 1000;
+/* Teto do bloco de quem está online. Ele não é uma página: é o bloco INTEIRO que vem na frente, e
+   cada treinador nele custa uma leitura mais uma por save dele. 50 é folgado pro tamanho do jogo
+   (56 contas hoje) e evita uma primeira página gigante num dia de pico. Estourando, a resposta
+   avisa (`onlineTruncado`) em vez de mentir uma contagem. */
+const ADMIN_ONLINE_MAX = 50;
+/* Quantas vezes a busca da página pode repetir pra encher a página depois de tirar os repetidos.
+   Sem teto, uma coleção só de gente online rodaria o laço até o fim da coleção numa chamada só. */
+const ADMIN_VOLTAS_MAX = 6;
 /* O TIME SAI RESUMIDO, e de proposito: a tela quer NOME, nivel e tipo -- o save guarda a instancia
    inteira (seis atributos, golpes, item, HP), e mandar isso de 20 treinadores x N saves x 6 pokemon
    seria um payload enorme pra desenhar seis etiquetas. O nome e os tipos saem do SPECIES daqui, que
@@ -7934,12 +7942,64 @@ exports.adminListTrainers = onCall(async (request) => {
      cursor que levava a uma página VAZIA -- e a tela mostrava um "carregar mais" que não carrega
      nada. O documento extra é descartado; ele custa 1 leitura por página e é a única forma de a
      resposta ser honesta sobre o que vem depois. */
-  let q = db.collection('users').orderBy(admin.firestore.FieldPath.documentId()).limit(limite + 1);
-  if(cursor){ q = q.startAfter(cursor); }
-  const bruto = await q.get();
-  const temMais = bruto.docs.length > limite;
-  const snap = { docs: bruto.docs.slice(0, limite) };
   const agora = Date.now();
+  /* ⚠️ QUEM ESTÁ ONLINE VEM SEMPRE NA FRENTE, e não só "ordenado primeiro" -- essa era a diferença
+     que fazia a página mentir. A paginação é por UID, e quem está jogando agora está espalhado por
+     essa ordem: com 20 por vez, um treinador online com uid no fim do alfabeto só aparecia depois
+     de o admin clicar "carregar mais" algumas vezes, e a tela dizia "1 online" com 4 jogando.
+     Reportado em 13/09/2026: *"hoje tem gente online mas só carrega 20 ... dessas que carregou
+     mais, tinha gente online porém eu só conseguia ver se eu clicasse no carregar mais"*.
+     Agora quem está online sai de uma consulta PRÓPRIA, e ela é a primeira coisa da lista.
+     O `where` + `orderBy` são no MESMO campo, então o índice de campo único que o Firestore cria
+     sozinho já serve -- não há índice composto pra criar. Quem não tem `lastSeenAt` não casa com a
+     desigualdade, que é o certo: nunca visto é offline.
+     NAS PÁGINAS SEGUINTES ela roda em `select()` (só os ids): ali ela não serve pra mostrar
+     ninguém, serve pra o mesmo treinador não aparecer duas vezes.
+     Ela vai num try/catch pelo mesmo motivo dos ginásios liderados: uma consulta de enfeite não
+     pode derrubar a lista inteira. Falhando, a página volta a ser o que era. */
+  let onlineDocs = [], onlineTruncado = false, listouOnline = false;
+  let uidsOnline = new Set();
+  try{
+    let qo = db.collection('users')
+      .where('lastSeenAt', '>=', agora - ADMIN_ONLINE_MS)
+      .orderBy('lastSeenAt', 'desc')
+      .limit(ADMIN_ONLINE_MAX + 1);
+    if(cursor){ qo = qo.select(); }
+    const on = await qo.get();
+    onlineTruncado = on.docs.length > ADMIN_ONLINE_MAX;
+    onlineDocs = on.docs.slice(0, ADMIN_ONLINE_MAX);
+    uidsOnline = new Set(onlineDocs.map(d => d.id));
+    listouOnline = true;
+  } catch(e){ logger.warn('adminListTrainers: nao deu pra listar quem esta online', e); }
+
+  /* ⚠️ A PÁGINA SE ENCHE MESMO DEPOIS DE TIRAR OS REPETIDOS. Quem já veio no bloco de online não
+     aparece de novo aqui -- e tirá-los da fatia deixava a página curta E, no pior caso, VAZIA: a
+     última fatia podia ser só de gente online, e aí a tela oferecia um "Carregar mais" que não
+     carregava nada. É o mesmo defeito que o `limite + 1` existe pra evitar, por outra porta.
+     Então ela busca de novo enquanto sobrar espaço e houver banco. O teto de voltas está aí pra
+     uma coleção só de gente online não virar uma varredura inteira numa chamada só.
+     O CURSOR É O ÚLTIMO DOCUMENTO **MOSTRADO**: a próxima página relê os online que ficaram no meio
+     e os filtra de novo (algumas leituras a mais), o que é o lado certo pra errar -- com o cursor
+     adiantado, uma conta offline no meio sumiria da lista sem ninguém ver. */
+  const daPagina = [];
+  let ultimo = cursor, temMais = false;
+  for(let volta = 0; volta < ADMIN_VOLTAS_MAX; volta++){
+    let q = db.collection('users').orderBy(admin.firestore.FieldPath.documentId()).limit(limite + 1);
+    if(ultimo){ q = q.startAfter(ultimo); }
+    const bruto = await q.get();
+    const fatia = bruto.docs.slice(0, limite);
+    temMais = bruto.docs.length > limite;
+    if(!fatia.length){ temMais = false; break; }
+    ultimo = fatia[fatia.length - 1].id;
+    fatia.forEach(d => { if(!uidsOnline.has(d.id)) daPagina.push(d); });
+    if(daPagina.length >= limite || !temMais) break;
+  }
+  if(daPagina.length > limite){
+    ultimo = daPagina[limite - 1].id;   // o corte vira o cursor
+    daPagina.length = limite;
+    temMais = true;
+  }
+  const snap = { docs: (cursor ? [] : onlineDocs).concat(daPagina) };
   /* OS SAVES DE CADA UM EM PARALELO: sao N coleções independentes, e em série a página de 20
      esperaria 20 idas ao banco uma atrás da outra. */
   const treinadores = await Promise.all(snap.docs.map(async doc => {
@@ -8013,11 +8073,18 @@ exports.adminListTrainers = onCall(async (request) => {
       logger.warn('adminListTrainers: nao deu pra ler os ginasios', e);
     }
   }
-  treinadores.sort((a, b) => (b.visto || 0) - (a.visto || 0));
-  const ultimo = snap.docs.length ? snap.docs[snap.docs.length - 1].id : null;
+  /* ONLINE PRIMEIRO E DEPOIS PELO VISTO POR ÚLTIMO. O `online` é explícito na comparação (e não
+     deduzido do `visto`) porque a janela é o que define os dois grupos: sem ele, um treinador visto
+     há 10min01s empataria visualmente com um visto há 9min59s, e são coisas diferentes na tela. */
+  treinadores.sort((a, b) => (b.online ? 1 : 0) - (a.online ? 1 : 0) || (b.visto || 0) - (a.visto || 0));
   return {
     agora,
-    online: treinadores.filter(t => t.online).length,
+    /* A CONTAGEM É A DE VERDADE, não a da página: ela sai da consulta dos online, que varre a
+       coleção inteira. Antes ela contava só o que tinha sido carregado -- e era isso que fazia a
+       tela dizer "1 online" numa hora em que havia mais. Se a consulta falhou, cai no que dá pra
+       afirmar (a página). */
+    online: listouOnline ? uidsOnline.size : treinadores.filter(t => t.online).length,
+    onlineTruncado,
     total: treinadores.length,
     janelaOnlineMs: ADMIN_ONLINE_MS,
     proximo: temMais ? ultimo : null,

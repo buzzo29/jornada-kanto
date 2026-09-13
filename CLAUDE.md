@@ -4675,8 +4675,39 @@ de cada save, com nível, shiny, tipos e barra de vida.
   uid): é a única ordenação que não precisa de índice nem de um campo que todo documento tenha.
   **Ela lê um documento A MAIS** só pra saber se existe próxima página — sem isso, a última página
   cheia oferecia um "carregar mais" que carregava nada.
-- **A ORDEM DA TELA É OUTRA: online primeiro, depois por visto por último** — é a ordem em que a
-  pergunta é feita. Ela é feita na apresentação de propósito; ordenar no banco exigiria índice.
+- **⚠️ QUEM ESTÁ ONLINE VEM SEMPRE NA FRENTE, e não só "ordenado primeiro" (13/09/2026).** Essa era
+  a diferença que fazia a página mentir: a paginação caminha por **UID**, e quem está jogando agora
+  está espalhado por essa ordem — com 20 por vez, um treinador online com uid no fim do alfabeto só
+  aparecia depois de alguns cliques em "Carregar mais", e o contador dizia **"1 online" com 4
+  jogando**. Reportado assim: *"hoje tem gente online mas só carrega 20 ... dessas que carregou
+  mais, tinha gente online porém eu só conseguia ver se eu clicasse no carregar mais"*.
+  Hoje quem está online sai de uma **consulta própria** (`where(lastSeenAt, >=) + orderBy` no MESMO
+  campo, teto de `ADMIN_ONLINE_MAX` = 50) e é o começo da lista. **Não precisa de índice composto**:
+  a desigualdade e a ordenação são do mesmo campo, então o índice de campo único que o Firestore cria
+  sozinho já serve — conferido contra a produção antes de subir, `where + orderBy DESC` devolvendo
+  29 contas em ordem. Quem não tem `lastSeenAt` não casa com a desigualdade, que é o certo: nunca
+  visto é offline.
+- **O BLOCO DE ONLINE NÃO CONTA PRO LIMITE** — ele vem por cima dos 20. Uma primeira página num dia
+  de pico pode ter 50 + 20 linhas, e cada uma custa 1 leitura mais 1 por save: é o preço de a
+  pergunta "quem está jogando agora?" ser respondida sem clique nenhum. Estourando os 50, a resposta
+  diz (`onlineTruncado`) e a tela avisa, em vez de mentir a contagem.
+- **⚠️ E A PÁGINA SE ENCHE DEPOIS DE TIRAR OS REPETIDOS.** Quem já veio no bloco de online não
+  aparece de novo — e tirá-los da fatia deixava a página curta e, no pior caso, **vazia**: a última
+  fatia podia ser só de gente online, e a tela oferecia um "Carregar mais" que não carregava nada. É
+  o mesmo defeito que o `limite + 1` existe pra evitar, entrando por outra porta. Hoje ela busca de
+  novo enquanto sobrar espaço e houver banco, com teto de `ADMIN_VOLTAS_MAX` (6) voltas pra uma
+  coleção só de gente online não virar uma varredura inteira numa chamada só.
+  **O cursor é o último documento MOSTRADO**, então a página seguinte relê os online que ficaram no
+  meio e os filtra de novo — algumas leituras a mais, que é o lado certo pra errar: com o cursor
+  adiantado, uma conta offline no meio sumiria da lista sem ninguém ver.
+- **A CONTAGEM DE ONLINE É A DA COLEÇÃO, não a da página.** Ela sai da consulta acima; antes contava
+  só o que tinha sido carregado, e era isso que fazia o número na tela estar errado. Se a consulta
+  falhar (ela vive num `try` como a dos ginásios liderados), a página volta a ser o que era e o
+  contador cai no que dá pra afirmar.
+- **A ORDEM DA TELA — online primeiro, depois por visto por último — é a ordem em que a pergunta é
+  feita**, e ela é refeita na lista INTEIRA a cada carga. O servidor ordena só o que ELE devolveu;
+  concatenando páginas, um treinador offline da primeira ficava acima de um mais recente da segunda.
+  Medido a 320px: o cabeçalho fica em 260px (308 com o aviso de truncado) e não há rolagem lateral.
 - **ONLINE = visto nos últimos 10 minutos**, e o número não é escolhido aqui: é o mesmo do
   `vistoPorUltimo` do jogo ("agora há pouco"), que é o que o jogador já lê na lista de amigos. O
   carimbo tem folga de 5 min (`LAST_SEEN_THROTTLE_MS`), então qualquer janela menor mostraria
@@ -4687,6 +4718,9 @@ de cada save, com nível, shiny, tipos e barra de vida.
   os tipos saem do `SPECIES` do servidor**, então a página não carrega tabela nenhuma.
 - **⚠️ A ORDEM DOS SLOTS É NUMÉRICA, na mão** — o Firestore devolve por id em ordem de TEXTO, então
   o `"10"` vem entre o `"1"` e o `"2"`. É a mesma armadilha que já mordeu a Trainers League.
+- **O `tools/fake-firestore.js` aprendeu `select()`** junto com o bloco de online: o Firestore devolve
+  os documentos sem dado nenhum, e é assim que as páginas seguintes descobrem quem já foi mostrado
+  sem pagar o payload de novo (a leitura continua sendo cobrada; o que se economiza é banda).
 - **O `tools/fake-firestore.js` aprendeu `startAfter` e `FieldPath.documentId()`** por causa disto.
   Sem eles o `startAfter` era ignorado e **a segunda página devolvia a primeira** — o teste passava
   e a paginação quebraria só em produção. É a mesma lição do `increment` dentro de mapa e do ponto
@@ -4722,6 +4756,10 @@ de cada save, com nível, shiny, tipos e barra de vida.
 - `tools/test-admin.js` tranca a porta (sem login, sem o campo, `admin:'sim'`, `admin:false`, conta
   inexistente), **lê a REGRA como texto** pra garantir que o campo continua fora do alcance do
   cliente, e cobre a paginação, a ordem dos slots e o save não voltando cru.
+  E tranca o ONLINE PRIMEIRO no caso que foi reportado: um treinador online com o uid no FIM da
+  ordem do banco tem que sair na PRIMEIRA página mesmo com limite 2, os online vêm na frente, a
+  contagem é a da coleção, o resto da página vem cheio, e -- caminhando todas as páginas -- ninguém
+  repete nem some. Conferido que ele acusa 4 falhas com o bloco de online removido.
 
 ## A porta dos modos de campeão (as 8 insígnias)
 

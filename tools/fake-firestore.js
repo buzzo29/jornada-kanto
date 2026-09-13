@@ -105,20 +105,24 @@ function docRef(parts){
    um campo dos dados, e a paginacao por cursor de uma colecao inteira depende dele (e a unica ordem
    que nao precisa de indice nem de um campo que TODO documento tenha). Aqui ele e uma marca. */
 const DOC_ID = { __documentId: true };
-function collRef(parts, filtros, limite, ordem, depoisDe){
+function collRef(parts, filtros, limite, ordem, depoisDe, soIds){
   filtros = filtros || [];
   const prefixo = pathOf(parts) + '/';
   return {
     doc(id){ return docRef(parts.concat([id])); },
-    where(campo, op, valor){ return collRef(parts, filtros.concat([[campo, op, valor]]), limite, ordem, depoisDe); },
+    where(campo, op, valor){ return collRef(parts, filtros.concat([[campo, op, valor]]), limite, ordem, depoisDe, soIds); },
+    /* O `select()` SEM CAMPO do Firestore devolve os documentos sem dado nenhum -- serve pra quando
+       só os ids interessam (o painel de treinadores usa isso pra não repetir ninguém entre páginas).
+       Continua custando uma leitura por documento; o que ele economiza é payload. */
+    select(){ return collRef(parts, filtros, limite, ordem, depoisDe, true); },
     /* ORDENA DE VERDADE. Era um no-op que so devolvia a colecao: um teste de ranking passava sem
        nunca conferir a ordem, e o limit(10) cortava dez QUALQUER em vez dos dez primeiros. */
-    orderBy(campo, dir){ return collRef(parts, filtros, limite, [campo, dir === 'desc' ? -1 : 1], depoisDe); },
-    limit(n){ return collRef(parts, filtros, n, ordem, depoisDe); },
+    orderBy(campo, dir){ return collRef(parts, filtros, limite, [campo, dir === 'desc' ? -1 : 1], depoisDe, soIds); },
+    limit(n){ return collRef(parts, filtros, n, ordem, depoisDe, soIds); },
     /* PAGINACAO POR CURSOR. Sem ela, uma funcao paginada passava no teste lendo sempre a PRIMEIRA
        pagina -- o `startAfter` era ignorado e o teste da segunda pagina via a mesma coisa da
        primeira, o que se le como "funciona". */
-    startAfter(v){ return collRef(parts, filtros, limite, ordem, v); },
+    startAfter(v){ return collRef(parts, filtros, limite, ordem, v, soIds); },
     async get(){
       let docs = [];
       for(const [caminho, dados] of store){
@@ -138,7 +142,8 @@ function collRef(parts, filtros, limite, ordem, depoisDe){
           if(op === 'in') return Array.isArray(valor) && valor.indexOf(v) >= 0;
           return true;
         });
-        if(ok) docs.push({ id, bruto: dados, ref: docRef(parts.concat([id])), data(){ return clone(dados); }, exists:true });
+        if(ok) docs.push({ id, bruto: dados, ref: docRef(parts.concat([id])),
+                           data(){ return soIds ? {} : clone(dados); }, exists:true });
       }
       if(ordem){
         const [campo, dir] = ordem;

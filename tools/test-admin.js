@@ -209,22 +209,53 @@ const erroDe = async (p) => { try { await p; return null; } catch(e){ return e.c
      porUid.c_ontem.saves.map(s=>s.slot).join(','));
 
   /* ======================================================================================
-     3) A PAGINACAO. Ela existe porque o custo e 1 leitura por treinador MAIS 1 por save.
+     3) A PAGINACAO E QUEM ESTA ONLINE. Ela existe porque o custo e 1 leitura por treinador MAIS
+     1 por save -- e o que o bloco abaixo tranca e que a paginacao nao ESCONDA quem esta jogando.
      ====================================================================================== */
-  console.log('\n=== A PAGINACAO ===');
+  console.log('\n=== A PAGINACAO E QUEM ESTA ONLINE ===');
+  /* ⚠️ O CASO REPORTADO EM 13/09/2026: *"hoje tem gente online mas so carrega 20, entao se eu clico
+     pra carregar mais, ai carrega mais conta e dessas que carregou mais, tinha gente online porem eu
+     so conseguia ver se eu clicasse no carregar mais"*.
+     O `z_online` e exatamente esse treinador: esta ONLINE e tem o uid no FIM da ordem do banco, que
+     e a ordem em que a pagina caminha. Com o bloco de online, ele tem que sair na PRIMEIRA pagina
+     mesmo com limite 2 -- antes ele so aparecia depois de dois cliques em "carregar mais". */
+  await db.collection('users').doc('z_online').set({ trainerName:'Gary', lastSeenAt: agora - 60000 });
+
   const p1 = await chamar('a_admin', { limite: 2 });
-  ok('a primeira pagina respeita o limite', p1.treinadores.length === 2, p1.treinadores.length + '');
-  ok('e diz que ha mais', !!p1.proximo, String(p1.proximo));
-  const p2 = await chamar('a_admin', { limite: 2, cursor: p1.proximo });
-  ok('a segunda pagina traz OUTROS treinadores',
-     p2.treinadores.every(t => !p1.treinadores.some(x => x.uid === t.uid)),
-     p1.treinadores.map(t=>t.uid).join(',') + '  ->  ' + p2.treinadores.map(t=>t.uid).join(','));
-  ok('e as duas juntas dao a conta toda',
-     p1.treinadores.length + p2.treinadores.length === 4);
-  ok('a ultima pagina nao oferece proxima', p2.proximo === null, String(p2.proximo));
-  /* O cursor e o UID (a ordem do banco), nao a ordem da tela -- que e por visto por ultimo. */
+  const uidsP1 = p1.treinadores.map(t => t.uid);
+  ok('quem esta online no FIM da ordem do banco vem na PRIMEIRA pagina',
+     uidsP1.indexOf('z_online') >= 0, uidsP1.join(','));
+  ok('e os online vem na frente de todo mundo',
+     p1.treinadores.length > 3 && p1.treinadores.slice(0, 3).every(t => t.online) && !p1.treinadores[3].online,
+     p1.treinadores.map(t => t.uid + (t.online ? '(on)' : '')).join(','));
+  /* A CONTAGEM E A DE VERDADE, e nao a do que foi carregado: era ela que dizia "1 online" numa hora
+     em que havia mais. */
+  ok('a contagem de online e a da COLECAO, nao a da pagina', p1.online === 3, p1.online + ' online');
+  /* ⚠️ E A PAGINA CONTINUA CHEIA. Tirar os repetidos da fatia deixava a pagina curta e, no pior
+     caso, VAZIA -- a fatia podia ser so de gente online, e a tela oferecia um "Carregar mais" que
+     nao carregava nada. O bloco de online NAO conta pro limite: ele vem por cima. */
+  ok('e o limite vale pro resto, que vem cheio',
+     p1.treinadores.filter(t => !t.online).length === 2,
+     p1.treinadores.filter(t => !t.online).map(t=>t.uid).join(','));
+  ok('e ela diz que ha mais', !!p1.proximo, String(p1.proximo));
+
+  /* NINGUEM REPETE E NINGUEM SOME: o teste caminha todas as paginas e confere a conta. */
+  const vistos = [];
+  let cursor = null, voltas = 0;
+  do {
+    const pg = await chamar('a_admin', { limite: 2, cursor });
+    pg.treinadores.forEach(t => vistos.push(t.uid));
+    cursor = pg.proximo;
+  } while(cursor && ++voltas < 10);
+  const unicos = [...new Set(vistos)].sort();
+  ok('ninguem aparece duas vezes nas paginas', vistos.length === unicos.length,
+     vistos.join(',') );
+  ok('e ninguem some no caminho',
+     unicos.join(',') === 'a_admin,b_online,c_ontem,d_nunca,z_online', unicos.join(','));
+
   const tudo = await chamar('a_admin', { limite: 99 });
-  ok('o limite tem teto', tudo.treinadores.length === 4 && tudo.proximo === null);
+  ok('o limite tem teto', tudo.treinadores.length === 5 && tudo.proximo === null,
+     tudo.treinadores.length + ' treinadores');
 
   console.log('');
   console.log(falhas === 0 ? 'Tudo certo.' : falhas + ' FALHA(S)');

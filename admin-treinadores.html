@@ -162,7 +162,7 @@ const TYPE_PT = {
 const estado = {
   authChecked: false, user: null,
   carregando: false, erro: null,
-  treinadores: [], online: 0, proximo: null, agora: 0,
+  treinadores: [], online: 0, onlineTruncado: false, proximo: null, agora: 0,
   abertos: {}, busca: ''
 };
 
@@ -295,7 +295,7 @@ function render(){
     <div class="box">
       <div class="resumo">
         <div class="num on"><b>${estado.online}</b><span>online</span></div>
-        <div class="num"><b>${estado.treinadores.length - estado.online}</b><span>offline</span></div>
+        <div class="num"><b>${Math.max(0, estado.treinadores.length - estado.online)}</b><span>offline</span></div>
         <div class="num"><b>${estado.treinadores.length}</b><span>carregados</span></div>
         <div style="flex:1"></div>
         <button class="btn secondary" onclick="recarregar()" ${estado.carregando ? 'disabled' : ''}>${
@@ -303,7 +303,8 @@ function render(){
         <button class="btn secondary" onclick="sair()">Sair</button>
       </div>
       ${estado.erro ? `<p class="erro">${esc(estado.erro)}</p>` : ''}
-      <p class="muted" style="margin:8px 0 0">Logado como ${esc(estado.user.email || estado.user.uid)} · online = visto nos últimos 10 min</p>
+      <p class="muted" style="margin:8px 0 0">Logado como ${esc(estado.user.email || estado.user.uid)} · online = visto nos últimos 10 min · quem está online vem sempre primeiro</p>
+      ${estado.onlineTruncado ? '<p class="muted" style="margin:4px 0 0">⚠️ Tem mais gente online do que cabe no bloco da frente — o resto aparece pelo "Carregar mais".</p>' : ''}
     </div>
     <div class="box">
       <div class="filtros">
@@ -331,10 +332,17 @@ async function carregar(cursor){
     const d = r.data;
     estado.agora = d.agora;
     estado.treinadores = cursor ? estado.treinadores.concat(d.treinadores) : d.treinadores;
-    /* O CONTADOR DE ONLINE É RECONTADO NA LISTA INTEIRA, e não somado página a página: o servidor
-       conta só a página que devolveu, e somar daria o número certo por acaso enquanto ninguém
-       recarregasse a primeira. */
-    estado.online = estado.treinadores.filter(t => t.online).length;
+    /* ⚠️ A ORDEM É REFEITA NA LISTA INTEIRA, e não herdada de cada página. O servidor ordena o que
+       ELE devolveu; concatenando, um treinador offline da página 1 ficava acima de um mais recente
+       da página 2. Quem está online vem todo na primeira página (o servidor garante), então aqui
+       isso só arruma o resto -- mas é o que mantém a promessa de "online primeiro" se um dia o
+       bloco de online for truncado. */
+    estado.treinadores.sort((a, b) => (b.online ? 1 : 0) - (a.online ? 1 : 0) || (b.visto || 0) - (a.visto || 0));
+    /* O CONTADOR É O DO SERVIDOR, que varre a coleção inteira -- e não a conta do que foi carregado.
+       Era isso que fazia a tela dizer "1 online" numa hora em que havia mais: os outros estavam em
+       páginas que o admin ainda não tinha pedido. */
+    estado.online = d.online;
+    estado.onlineTruncado = !!d.onlineTruncado;
     estado.proximo = d.proximo;
   }catch(e){
     /* ⚠️ A RECUSA MOSTRA O UID, e isso é a diferença entre a página funcionar e não. A porta é um
