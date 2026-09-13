@@ -138,6 +138,57 @@ g.authMode = 'reset'; g.authNotice = null; g.authError = null; S.__setGame(g);
 await S.sendPasswordReset();
 ok('campo vazio pede o e-mail em vez de chamar o servidor', !!S.__getGame().authError);
 
+console.log('\n=== NENHUMA JORNADA COMECA SEM NOME DE TREINADOR ===');
+{
+  /* Reportado em 13/09/2026: *"tem alguns usuarios que estao sem nome de treinador mesmo depois de
+     se cadastrar, ai nao sei se deu algum bug pra eles ou eles que nao quiseram colocar mesmo"*.
+     ERA BUG. A tela de nome era um remendo DEPOIS do carregamento da home
+     (`if(screen==='saveSelect' && !trainerName)`), disparado no fim de um Promise.all que carrega
+     saves, pokedex, especialidades, ranking, notificacoes e uma callable -- e a home JA ESTAVA na
+     tela e clicavel esse tempo todo. Quem clicasse num slot nessa janela criava a jornada sem nunca
+     ver a pergunta.
+     MEDIDO EM PRODUCAO: 5 contas de 48 (10,4%) sem nome, e DUAS com rivalNameDefault,
+     startersSorteados e pokedexCaught gravados -- ou seja, jogaram. */
+  const g = S.__getGame();
+
+  /* 1) CONTA SEM NOME, JA CARREGADA: os tres caminhos de jogar mandam pra tela de nome. */
+  const tenta = (fn) => { const gg = S.__getGame(); gg.screen = 'saveSelect'; S.__setGame(gg); fn(); return S.__getGame().screen; };
+  g.trainerName = ''; g.contaCarregada = true; g.authUser = { uid:'u1' };
+  g.saveSlots = new Array(S.MAX_SAVE_SLOTS).fill(null);
+  S.__setGame(g);
+  ok('comecar um save novo pede o nome antes', tenta(() => S.startNewSave(0)) === 'accountSetup',
+     tenta(() => S.startNewSave(0)));
+  ok('continuar um save tambem', tenta(() => S.continueSave(0)) === 'accountSetup');
+  ok('e o save campeao tambem', tenta(() => S.continueCompleteSave(0)) === 'accountSetup');
+
+  /* 2) COM NOME, a porta nao atrapalha. */
+  { const gg = S.__getGame(); gg.trainerName = 'Buzzo'; S.__setGame(gg); }
+  ok('com nome, comecar um save segue o fluxo normal',
+     tenta(() => S.startNewSave(0)) === 'newSaveMode', tenta(() => S.startNewSave(0)));
+
+  /* ⚠️ 3) ENQUANTO A CONTA NAO FOI LIDA, a guarda NAO manda pra tela de nome -- ela nao tem como
+     afirmar que a conta esta sem nome, e mandar quem JA TEM seria trocar um defeito por outro. */
+  { const gg = S.__getGame(); gg.trainerName = ''; gg.contaCarregada = false; S.__setGame(gg); }
+  ok('conta ainda carregando NAO e mandada pra tela de nome',
+     tenta(() => S.startNewSave(0)) === 'saveSelect', tenta(() => S.startNewSave(0)));
+
+  /* ⚠️ 4) E A GUARDA MORA NA PORTA DA JORNADA, nao na home. O teste le o CODIGO porque os casos
+     acima chamam as funcoes direto e passariam com a guarda movida pra um render. */
+  {
+    const txt = require('fs').readFileSync(require('path').join(__dirname, '..', 'index.html'), 'utf8');
+    const chamadas = (txt.match(/if\(!exigeNomeDeTreinador\(\)\) return;/g) || []).length;
+    ok('os tres caminhos chamam a guarda', chamadas === 3, chamadas + ' chamadas');
+    /* E A ESCRITA DO NOME E CONFIRMADA antes de navegar: `set()` resolvendo nao quer dizer que
+       salvou -- sem rede ele vai pra uma fila em memoria que morre com a aba, e o nome e escrito
+       UMA vez na vida da conta. */
+    const bloco = (txt.match(/async function confirmAccountSetup\(\)[\s\S]*?\n\}/) || [''])[0];
+    ok('a escrita do nome espera a confirmacao do servidor',
+       /waitForPendingWrites/.test(bloco) && bloco.indexOf('waitForPendingWrites') < bloco.indexOf("screen = 'saveSelect'"),
+       bloco.length + ' chars');
+    ok('e sem confirmacao ela NAO navega, e diz o que houve',
+       /accountNameError = 'N\u00e3o deu pra salvar/.test(bloco));
+  }
+}
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
 process.exit(falhas ? 1 : 0);
 

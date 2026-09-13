@@ -4330,6 +4330,45 @@ venda, do mesmo jeito.
 - **A regra viveria no `toggleRelease`, não só na tela.** O card apagado é a apresentação; a função é
   quem tem que recusar, pra valer se alguém a chamar por fora.
 
+## +2 NÍVEIS EM TODO POKÉMON DE LÍDER (13/09/2026) — a maior mexida de dificuldade já medida aqui
+
+Pedido direto: *"aumente 2 level de cada pokemon de cada lider de ginasio"*. São **74 pokémon** —
+37 em Kanto e 37 em Johto, os 16 líderes. As tabelas (`KANTO_GYMS`/`JOHTO_GYMS`) vivem **só no
+cliente**, então é um lugar só.
+
+**O PREÇO MEDIDO, e ele é enorme: a jornada concluída cai de 67,77% para 52,46%.**
+**−15,31 pontos, 25,2σ**, 8 blocos de 1.500 jornadas de cada lado (**12.000 de cada**), com o
+desvio tirado de ENTRE os blocos. **Os 8 de 8 blocos apontam pro mesmo lado** — não é amostra
+sortuda. Pra comparar: o moveset dos NPCs, que este arquivo chamava de "a maior variação de
+dificuldade já medida neste projeto, com folga", foi **−12,56**.
+
+**E ELA BATE MAIS FORTE NO PRIMEIRO GINÁSIO**, não no fim (game overs em 12.000 jornadas):
+
+| ginásio | antes | depois | |
+|---|---|---|---|
+| **1º** | 999 | **1.665** | **+67%** |
+| 5º | 526 | 684 | +30% |
+| 6º | 608 | 918 | +51% |
+| **8º** | 1.710 | **2.373** | **+39%** |
+| 2º, 3º, 4º, 7º | ~25 no total | ~65 | irrelevantes |
+
+Faz sentido: **no 1º ginásio o time é o inicial mais um ou dois encontros**, e +2 níveis num time de
+três pokémon de nível 17-20 é proporcionalmente muito mais do que +2 num time de seis no nível 60.
+O Brock e o Falkner são a peneira da jornada (está registrado na seção da bifurcação), e a mudança
+aperta justamente ali.
+
+- **⚠️ A MEDIÇÃO POR PAINEL FIXO NÃO SERVE AQUI, e quase enganou:** um time padrão de nível fixo
+  contra cada líder satura em 100% em quase todos, e só a Sabrina (que fica perto do ponto de
+  equilíbrio) mostrava queda — 55,5% → 11,0%. O número honesto é o da JORNADA, que joga o time que
+  o jogador realmente tem em cada altura. É a mesma lição do painel forte demais que já está
+  registrada na seção do Smeargle.
+- **A paridade Kanto/Johto continua de pé**: o +2 vale pros dois lados, então os dois caminhos
+  seguem com o mesmo número de pokémon e a mesma média de nível por etapa — o que
+  `tools/test-jornada.js` já cobra.
+- **Se um dia incomodar, os lugares são a própria tabela.** As variantes que valem considerar, em
+  ordem: **+1 em vez de +2** (a mexida é quase linear), ou **+2 só a partir do 3º ginásio** — isso
+  poupa a peneira, que é onde estão 666 dos 1.883 game overs a mais.
+
 ## Progressão da jornada
 
 - Distribuição de níveis trava em **55**; acima disso só desmaio, Bônus de Kanto e Doce Raro.
@@ -5667,6 +5706,48 @@ escolheu três golpes lutava a Torre com os dois primeiros**, em silêncio — o
   revela cidade antes da hora — os dois erros que somem em silêncio.
 
 ## Conta e login
+
+### NENHUMA JORNADA COMEÇA SEM NOME DE TREINADOR (13/09/2026)
+
+Reportado assim: *"tem alguns usuários que estão sem nome de treinador mesmo depois de se
+cadastrar, aí não sei se deu algum bug pra eles ou eles que não quiseram colocar mesmo"*.
+
+**ERA BUG, e dá pra provar pelos dados.** Medido em produção, lendo a coleção `users` pelo MCP do
+Firebase: **5 contas de 48 (10,4%) sem `trainerName`**. Três têm só o carimbo de presença
+(`lastSeenAt`) — entraram e não passaram da tela. Mas **duas têm `rivalNameDefault`,
+`startersSorteados`, `geracaoDosSlots` e `pokedexCaught` gravados**: elas nomearam o rival,
+sortearam inicial e capturaram pokémon. **Se a pergunta fosse mesmo obrigatória, esse estado não
+existiria.**
+
+- **⚠️ A CAUSA ERA A TELA DE NOME SER UM REMENDO DEPOIS DO CARREGAMENTO.** Ela era decidida no
+  `.then()` de um `Promise.all` que carrega saves, pokédex, especialidades, ranking, notificações e
+  uma callable — e a home **já estava na tela e clicável** esse tempo todo. Quem clicasse num slot
+  nessa janela criava a jornada inteira sem nunca ver a pergunta. Numa rede lenta, ou com uma
+  Cloud Function em cold start, a janela são segundos.
+- **A GUARDA FOI PRO COMEÇO DA JORNADA** (`exigeNomeDeTreinador`, nos três caminhos:
+  `startNewSave`, `continueSave`, `continueCompleteSave`), e não na home. É ela que vale por mais
+  rápido que seja o clique, e é ela que continua valendo se alguém acrescentar outro caminho pra
+  começar a jogar. O remendo do `Promise.all` **fica**, como rede — perguntar assim que dá pra
+  saber é melhor que deixar a home parecendo pronta.
+- **⚠️ ENQUANTO A CONTA NÃO FOI LIDA, A GUARDA NÃO BLOQUEIA** (`contaCarregada`, escrita no fim do
+  `loadPermanentUserData`). Ela não tem como AFIRMAR que a conta está sem nome antes da leitura, e
+  mandar pra tela de nome quem JÁ TEM seria trocar um defeito por outro. É o mesmo cuidado do
+  `saveSlotsCarregados` na porta dos modos de campeão — e o campo entrou no `CAMPOS_DA_CONTA` pelo
+  mesmo motivo que ele: sem isso o `resetGame` o apagaria ao abrir um save.
+- **⚠️ E A ESCRITA DO NOME NÃO ERA CONFIRMADA.** O `confirmAccountSetup` navegava pra home NA HORA e
+  mandava a gravação atrás, com um `console.error` como único tratamento. **`set()` resolvendo não
+  quer dizer que salvou** — sem rede ele vai pra uma fila em memória que morre com a aba, e é a
+  lição que o salvamento do jogo já carrega (ver `CONFIRMA_SAVE_MS`). Aqui ela vale mais: o nome é
+  escrito **UMA vez na vida da conta**, então uma falha silenciosa ali fica pra sempre.
+  Hoje ele grava, espera o `waitForPendingWrites` e **só então** navega; sem confirmação, ele fica
+  na tela e diz o que houve.
+- **O QUE NÃO FOI MEXIDO:** as três contas que só têm `lastSeenAt` continuam sem nome — não dá pra
+  saber se elas viram a tela e desistiram ou se bateram na janela. Elas serão perguntadas na
+  próxima vez que abrirem o jogo, agora sem escapatória.
+- `tools/test-conta.js` tranca os três caminhos, o caso da conta ainda carregando (que NÃO pode ser
+  mandada pra tela de nome), e **lê o código** pra cobrar que a guarda está nas três portas e que a
+  escrita espera a confirmação antes de navegar.
+
 
 - **O rival padrão mora na CONTA** (`users/{uid}.rivalNameDefault`), não no save: a tela de nome do
   rival já vem preenchida com ele, e trocar ali troca o padrão das próximas jornadas. Não existe
