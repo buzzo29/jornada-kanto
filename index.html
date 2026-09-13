@@ -3586,6 +3586,17 @@ const ROCKET_POOL = ['ratata','zubat','ekans','koffing','grimer','golbat','arbok
 // dormir -- quando acontece, não tem luta: a Rocket já vence na hora e rouba um pokémon (priorizando
 // um shiny, se a pessoa tiver algum)
 const ROCKET_SLEEP_CHANCE = 0.10;
+/* ⚠️ E ELA SE ANUNCIA NA TELA DE BATALHA ANTES DE TROCAR DE TELA (13/09/2026, a pedido). A
+   emboscada cortava a revelação e pulava direto pro resultado -- *"hoje a tela troca diretamente
+   para o log falando que a jigglypuff cantou e um pokemon foi roubado ... ta confuso"*. O jogador
+   via a luta e, sem transição, uma tela dizendo que tinha perdido um pokémon.
+   Agora o confronto contra ela ENTRA em cena como qualquer outro (sprites, barras cheias, o placar
+   de quantos estão de pé) e a frase ocupa a linha onde os golpes são narrados. Só depois a tela do
+   resultado. É o mesmo desenho das passivas: o que acontece é contado ONDE acontece.
+   5 segundos porque aqui não há barra andando pra dar o tempo -- a frase é o evento inteiro, e ela
+   tem duas informações (todo mundo dormiu E estão roubando alguém). É bem mais que o 1,5s de uma
+   passiva comum, e é de propósito. */
+const ROCKET_SLEEP_AVISO_MS = 5000;
 const ROCKET_NAMES = ['Recruta Rocket', 'Agente Rocket', 'Capanga Rocket', 'Executiva Rocket'];
 
 /* -------------------------------------------------------------------
@@ -9225,8 +9236,18 @@ function startSpecialBattle(context, opponentTeam, meta){
   game.screen = 'specialIntro';
   render();
 }
-// canção de ninar da Jigglypuff/Wigglytuff -- chamada NO MEIO da revelação da batalha, exatamente
-// quando ela é a inimiga ativa (os confrontos anteriores, contra os outros pokémon da Rocket, já
+/* A FRASE DO CANTO, num lugar só: ela é lida pela tela de BATALHA (durante os 5s) e pela tela do
+   RESULTADO. Montadas em separado elas divergiriam no primeiro ajuste de texto, que é o que já
+   aconteceu entre o log e a animação mais de uma vez neste projeto.
+   ⚠️ O NOME SAI DO CONFRONTO, e não é "Jigglypuff" escrito à mão: quem canta pode ser uma
+   Wigglytuff (as duas estão no `ROCKET_POOL` e as duas disparam a emboscada), e a tela dizia
+   Jigglypuff nos dois casos. */
+function fraseDoCantoDaRocket(m){
+  const quem = escapeHtmlSafe((m && m.enemy) || 'Jigglypuff');
+  return `🎤 ${quem} cantou e todos dormiram! Menos a Equipe Rocket, que está roubando seu pokémon`;
+}
+// canção de ninar da Jigglypuff/Wigglytuff -- chamada depois dos 5s do aviso na tela de batalha,
+// no confronto em que ela é a inimiga ativa (os confrontos anteriores, contra os outros pokémon da Rocket, já
 // aconteceram normalmente). Corta a luta bem ali: ninguém desmaia de dano, o time inteiro cai no sono
 // e a Rocket vence na hora. Rouba o shiny do time, se a pessoa tiver algum; senão, sorteia igual a
 // derrota normal já fazia. De propósito deixa game.specialBattle intacto (context:'rocket') -- é dele
@@ -9234,6 +9255,9 @@ function startSpecialBattle(context, opponentTeam, meta){
 function triggerRocketSleepAmbush(){
   const r = game.specialBattleResult;
   const cutIndex = game.specialRevealIndex; // exclui o próprio confronto contra ela -- não teve luta de verdade
+  /* ⚠️ QUEM CANTOU SE GUARDA ANTES DO CORTE: o confronto contra ela sai do `r.matchups` na linha
+     seguinte, e é dele que sai o nome da frase. */
+  const cantou = r.matchups[cutIndex];
   r.matchups = r.matchups.slice(0, cutIndex);
   r.win = false;
   // ninguém desmaiou de dano -- só dormiu. Recalcula o status a partir da luta JÁ REALMENTE
@@ -9256,7 +9280,8 @@ function triggerRocketSleepAmbush(){
     saveCurrentGame();
     stolenMsg = `Enquanto isso, a Equipe Rocket <strong>sequestrou ${game.stolenMon.shiny?'seu Pokémon ✨shiny✨ ':''}${escapeHtmlSafe(game.stolenMon.name)}</strong>! Você tem <strong>3 tentativas</strong> de resgatá-lo(a) no esconderijo deles antes do próximo ginásio — depois disso, ele(a) se perde pra sempre.`;
   }
-  game.specialResultMsg = `🎤 <strong>Jigglypuff cantou uma canção de ninar e todo mundo caiu no sono!</strong> ${stolenMsg}`;
+  // a MESMA frase que ficou 5 segundos na linha da batalha -- ver fraseDoCantoDaRocket
+  game.specialResultMsg = `<strong>${fraseDoCantoDaRocket(cantou)}</strong> ${stolenMsg}`;
   game.screen = 'specialResult';
   render();
 }
@@ -9300,7 +9325,26 @@ function advanceSpecialReveal(){
     // cantar todo mundo pra dormir -- checado bem aqui, ANTES de animar esse confronto específico,
     // porque se acontecer não tem luta nenhuma contra ela: a Rocket já vence na hora
     if(game.specialBattle.context==='rocket' && (m.enemySpecies==='jigglypuff' || m.enemySpecies==='wigglytuff') && Math.random() < ROCKET_SLEEP_CHANCE){
-      triggerRocketSleepAmbush();
+      /* A CENA ACONTECE NA TELA DE BATALHA, e só depois vem o resultado. As barras ficam no valor
+         de ENTRADA (ninguém apanhou -- todo mundo dormiu), e o confronto contra ela continua no
+         `specialRevealIndex`: é ele que o triggerRocketSleepAmbush usa pra cortar a luta, então
+         nada aqui pode mexer no índice.
+         ⚠️ O PASSO E O ÚLTIMO GOLPE SÃO ZERADOS JUNTOS: o `specialLastHit` guarda o passo animado
+         do confronto ANTERIOR, e sem zerar os dois o quadro do lutador sairia anunciando um golpe
+         que ninguém deu -- o golpe fantasma de 09/09/2026, por esta porta. */
+      game.specialHitSequence = [];
+      game.specialHitStep = 0;
+      game.specialLastHit = null;
+      game.specialCurrentPlayerHp = m.playerHpBefore;
+      game.specialCurrentEnemyHp = m.enemyHpBefore;
+      game.specialRevealPhase = 'rocketSleep';
+      render();
+      setTimeout(() => {
+        // se o jogador saiu da tela no meio dos 5s (um convite online aceito, por exemplo), a
+        // emboscada não pode acontecer por cima do que ele foi fazer
+        if(game.screen !== 'specialBattling' || game.specialRevealPhase !== 'rocketSleep') return;
+        triggerRocketSleepAmbush();
+      }, ROCKET_SLEEP_AVISO_MS);
       return;
     }
     game.specialHitSequence = buildAnimatedHitSequence(m);
@@ -15336,6 +15380,11 @@ function renderSpecialBattling(){
   const m = matchups[game.specialRevealIndex];
   const loading = game.specialRevealPhase === 'loading';
   const animating = game.specialRevealPhase === 'animating';
+  /* A EMBOSCADA DA ROCKET é uma fase própria: a luta contra ela não acontece, então não há passo
+     pra animar nem resultado pra anunciar -- o que há é a frase. Ela entra junto do `animating` em
+     tudo que diz "a luta está em curso" (o placar de quem está de pé, as espadas girando), porque
+     é isso que ela é na tela. */
+  const emboscada = game.specialRevealPhase === 'rocketSleep';
   const playerSp = SPECIES[m.playerSpecies];
   const enemySp = SPECIES[m.enemySpecies];
   const cfg = game.specialBattle;
@@ -15347,19 +15396,21 @@ function renderSpecialBattling(){
   ${chuvaBadgeHtml(m)}
   <div class="box cursor" style="${terrainBattleBgStyle(cfg.context==='elite' ? game.eliteTerrain : null)}">
     <div class="team-alive-row">
-      <span class="team-alive-chip">🎒 ${escapeHtmlSafe(game.trainerName||'Você')}: ${(loading||animating)?m.playerAliveBefore:m.playerAliveAfter}/${m.playerTeamSize}</span>
-      <span class="team-alive-chip">🥊 ${escapeHtmlSafe(cfg.meta.opponentName||'Adversário')}: ${(loading||animating)?m.enemyAliveBefore:m.enemyAliveAfter}/${m.enemyTeamSize}</span>
+      <span class="team-alive-chip">🎒 ${escapeHtmlSafe(game.trainerName||'Você')}: ${(loading||animating||emboscada)?m.playerAliveBefore:m.playerAliveAfter}/${m.playerTeamSize}</span>
+      <span class="team-alive-chip">🥊 ${escapeHtmlSafe(cfg.meta.opponentName||'Adversário')}: ${(loading||animating||emboscada)?m.enemyAliveBefore:m.enemyAliveAfter}/${m.enemyTeamSize}</span>
     </div>
     <div class="battle-vs">
       ${fighterHtml(m, 'p', { hp: displayPlayerHp, passo: game.specialHitStep, hit: game.specialLastHit, comTerreno: false })}
-      <span class="vs-swords ${(loading||animating)?'spin':''}">⚔️</span>
+      <span class="vs-swords ${(loading||animating||emboscada)?'spin':''}">⚔️</span>
       ${fighterHtml(m, 'e', { hp: displayEnemyHp, passo: game.specialHitStep, hit: game.specialLastHit, comTerreno: false })}
     </div>
     <div class="battle-status-area">${loading
       ? `<div class="loading-dots"><span></span><span></span><span></span></div><p class="loading-text">Aguardando o resultado da batalha...</p>`
-      : (animating
-        ? statusDoConfrontoHtml(m, game.specialHitStep, game.specialLastHit)
-        : `<p class="battle-result-line">${matchupResultLine(m)}!${suddenDeathNote(m)}</p>`)
+      : (emboscada
+        ? `<p class="loading-text aviso-especial">${fraseDoCantoDaRocket(m)}</p>`
+        : (animating
+          ? statusDoConfrontoHtml(m, game.specialHitStep, game.specialLastHit)
+          : `<p class="battle-result-line">${matchupResultLine(m)}!${suddenDeathNote(m)}</p>`))
     }</div>
   </div>`;
 }

@@ -1009,5 +1009,113 @@ console.log('\n=== O +2 DOS LIDERES VALE DO 3o GINASIO EM DIANTE ===');
        Math.abs(mk - mj) <= 1.5);
   }
 }
+console.log('\nO CANTO DA JIGGLYPUFF ACONTECE NA TELA DE BATALHA');
+/* Pedido em 13/09/2026: *"hoje a tela troca diretamente para o log falando que a jigglypuff cantou
+   e um pokemon foi roubado, vamos melhorar porque ta confuso, deve aparecer a luta normal, e ai
+   aparece a mensagem durante a luta ... e fica essa frase na tela de batalha durante 5s, e so depois
+   troca para como e hoje"*. */
+{
+  const semTag = h => String(h||'').replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim();
+  /* Monta uma emboscada da Rocket em que a cantora e a SEGUNDA inimiga: assim o primeiro confronto
+     acontece de verdade e da pra cobrar que a cena nao come a luta que veio antes. */
+  const montar = (especie) => {
+    const g = S.freshGameDefaults();
+    g.gymIndex = 2; g.starterId = 'charmander'; g.trainerName = 'Buzzo';
+    g.team = ['venusaur','gyarados','raichu'].map((id,i)=>{
+      const p = S.createInstance(id, 40 + i); p.id = 'p'+i; return p;
+    });
+    g.team[2].shiny = true;   // o roubo prioriza o shiny -- da pra cobrar QUEM foi levado
+    g.specialBattle = { context:'rocket',
+      opponentTeam: [{ speciesId:'ratata', level:38 }, { speciesId:especie, level:40 }],
+      meta: { icon:'🚀', title:'Equipe Rocket', opponentName:'Recruta Rocket' } };
+    S.__setGame(g);
+    return g;
+  };
+  /* Roda a revelacao ate a cantora ser a inimiga ATIVA, com o sorteio da emboscada FORCADO: a
+     chance real e 10%, e esperar por ela deixaria o teste dependendo de sorte de semente. */
+  const ateOCanto = (especie) => {
+    montar(especie);
+    const randomOriginal = Math.random;
+    try{
+      S.runSpecialBattle();
+      for(let i = 0; i < 40; i++){
+        const g = S.__getGame();
+        if(g.screen !== 'specialBattling' || g.specialRevealPhase === 'rocketSleep') break;
+        const m = g.specialBattleResult.matchups[g.specialRevealIndex];
+        const ehACantora = m && (m.enemySpecies === 'jigglypuff' || m.enemySpecies === 'wigglytuff');
+        // so o sorteio da emboscada e forcado; o resto da batalha corre normal
+        Math.random = (g.specialRevealPhase === 'loading' && ehACantora) ? (()=>0) : randomOriginal;
+        S.advanceSpecialReveal();
+      }
+    } finally { Math.random = randomOriginal; }
+    return S.__getGame();
+  };
+
+  const g = ateOCanto('jigglypuff');
+  ok('a emboscada NAO troca de tela na hora', g.screen === 'specialBattling', 'tela: ' + g.screen);
+  ok('e ela e uma fase propria da revelacao', g.specialRevealPhase === 'rocketSleep',
+     'fase: ' + g.specialRevealPhase);
+
+  /* A tela so e desenhada quando a fase e a certa: sem isso, com o defeito de volta (que troca de
+     tela na hora) o teste MORRE com uma excecao em vez de dizer o que esta errado. */
+  const telaDaCena = (jogo) => (jogo.screen === 'specialBattling' && jogo.specialRevealPhase === 'rocketSleep')
+    ? S.renderSpecialBattling() : '';
+  const tela = telaDaCena(g);
+  const frase = 'Jigglypuff cantou e todos dormiram! Menos a Equipe Rocket, que está roubando seu pokémon';
+  ok('a frase pedida sai na linha da batalha', semTag(tela).indexOf(frase) >= 0,
+     (semTag(tela).match(/🎤[^|]{0,90}/) || ['(nao achei)'])[0]);
+  /* A LUTA CONTINUA NA TELA: e o "deve aparecer a luta normal" do pedido. Os dois sprites, as duas
+     barras e o placar de quantos estao de pe -- nada disso existia na tela do resultado. */
+  ok('e a luta continua desenhada: os dois lutadores e as duas barras',
+     (tela.match(/hp-bar-fill/g) || []).length === 2 && tela.indexOf('battle-vs') >= 0,
+     (tela.match(/hp-bar-fill/g) || []).length + ' barra(s)');
+  ok('com o placar de quem esta de pe ANTES do canto (ninguem desmaiou)',
+     tela.indexOf('🎒 Buzzo: 3/3') >= 0, (semTag(tela).match(/🎒[^🥊]*/) || [''])[0].trim());
+  ok('e a cantora e quem esta em campo', tela.indexOf('Jigglypuff') >= 0);
+  /* ⚠️ E SEM NOME DE GOLPE: o `specialLastHit` guarda o passo do confronto ANTERIOR, e sem zera-lo
+     junto com o passo o quadro anunciaria um golpe que ninguem deu (o golpe fantasma de
+     09/09/2026, entrando por esta porta). */
+  ok('o passo e o ultimo golpe foram zerados juntos',
+     g.specialHitStep === 0 && g.specialLastHit === null,
+     'passo ' + g.specialHitStep + ', ultimo golpe ' + JSON.stringify(g.specialLastHit));
+
+  /* OS 5 SEGUNDOS. O sandbox nao roda timer nenhum -- ele ANOTA o prazo, e e isso que da pra cobrar
+     sem relogio. */
+  const prazos = (S.__timers || []).map(t => t.ms);
+  ok('a cena fica 5s na tela antes de trocar', prazos.indexOf(S.ROCKET_SLEEP_AVISO_MS) >= 0 &&
+     S.ROCKET_SLEEP_AVISO_MS === 5000, S.ROCKET_SLEEP_AVISO_MS + 'ms   (prazos vistos: ' +
+     prazos.slice(-4).join(', ') + ')');
+
+  /* SO DEPOIS a tela de sempre. */
+  const timeAntes = g.team.length;
+  S.triggerRocketSleepAmbush();
+  const d = S.__getGame();
+  ok('e ai sim vem a tela do resultado', d.screen === 'specialResult', 'tela: ' + d.screen);
+  ok('com a MESMA frase que ficou na batalha', semTag(d.specialResultMsg).indexOf(frase) >= 0,
+     semTag(d.specialResultMsg).slice(0, 110));
+  ok('o shiny foi o roubado', !!d.stolenMon && d.stolenMon.shiny === true && d.team.length === timeAntes - 1,
+     d.stolenMon ? d.stolenMon.name : '(ninguem)');
+  ok('e a tela do resultado mostra quem foi', S.renderSpecialResult().indexOf('Pokémon roubado') >= 0);
+  /* Ninguem desmaiou de dano -- so dormiu. */
+  ok('ninguem aparece nocauteado', d.specialBattleResult.playerStatus.every(p => !p.fainted));
+  /* O confronto contra ela sai do log: nao houve luta ali. O que veio ANTES fica. */
+  ok('a luta que aconteceu antes continua no log',
+     d.specialBattleResult.matchups.length >= 1 &&
+     d.specialBattleResult.matchups.every(m => m.enemySpecies !== 'jigglypuff'),
+     d.specialBattleResult.matchups.map(m=>m.enemySpecies).join(','));
+
+  /* ⚠️ E QUEM CANTA PODE SER UMA WIGGLYTUFF -- as duas estao no ROCKET_POOL e as duas disparam a
+     emboscada. A tela dizia "Jigglypuff" nos dois casos. */
+  const w = ateOCanto('wigglytuff');
+  const telaW = telaDaCena(w);
+  ok('a Wigglytuff canta com o nome DELA', semTag(telaW).indexOf('Wigglytuff cantou') >= 0,
+     (semTag(telaW).match(/🎤[^|]{0,50}/) || ['(nao achei)'])[0]);
+  S.triggerRocketSleepAmbush();
+  ok('e na tela do resultado tambem', semTag(S.__getGame().specialResultMsg).indexOf('Wigglytuff cantou') >= 0,
+     semTag(S.__getGame().specialResultMsg).slice(0, 60));
+  ok('as duas estao no time da Rocket', S.ROCKET_POOL.indexOf('jigglypuff') >= 0 &&
+     S.ROCKET_POOL.indexOf('wigglytuff') >= 0);
+}
+
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
 process.exit(falhas ? 1 : 0);

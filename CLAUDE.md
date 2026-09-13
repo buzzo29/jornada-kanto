@@ -3725,6 +3725,53 @@ pedido em 09/09/2026. `PAUSA_ANTES_DO_GOLPE_MS`.
 
 ## Equipe Rocket
 
+### O CANTO DA JIGGLYPUFF ACONTECE NA TELA DE BATALHA (13/09/2026)
+
+Pedido assim: *"hoje a tela troca diretamente para o log falando que a jigglypuff cantou e um
+pokemon foi roubado, vamos melhorar porque ta confuso, deve aparecer a luta normal, e ai aparece a
+mensagem durante a luta ... e fica essa frase na tela de batalha durante 5s, e só depois troca para
+como é hoje"*.
+
+- **A EMBOSCADA VIROU UMA FASE DA REVELAÇÃO** (`specialRevealPhase === 'rocketSleep'`), e não mais
+  uma troca de tela. O confronto contra a cantora **entra em cena como qualquer outro** — os dois
+  sprites, as duas barras e o placar de quantos estão de pé —, e a frase ocupa a linha onde os
+  golpes são narrados. É o mesmo desenho das passivas: **o que acontece é contado ONDE acontece**.
+  Antes o jogador via a luta e, sem transição nenhuma, uma tela dizendo que tinha perdido um
+  pokémon.
+- **SÃO 5 SEGUNDOS** (`ROCKET_SLEEP_AVISO_MS`), contra o 1,5s de uma passiva comum, e é de
+  propósito: aqui **não há barra andando** pra dar o tempo de leitura — a frase É o evento inteiro,
+  e ela carrega duas informações (todo mundo dormiu E estão roubando alguém).
+- **AS BARRAS FICAM NO VALOR DE ENTRADA e ninguém aparece nocauteado**: ninguém apanhou, todo mundo
+  dormiu. O placar (`3/3`) usa o número de ANTES pelo mesmo motivo. O que veio antes continua na
+  tela e no log — o confronto que o jogador acabou de ver contra o outro pokémon da Rocket é real, e
+  é ele que explica o Venusaur entrando machucado.
+- **⚠️ O PASSO E O ÚLTIMO GOLPE SÃO ZERADOS JUNTOS.** O `specialLastHit` guarda o passo animado do
+  confronto ANTERIOR, e a fase nova desenha o quadro do lutador — sem zerar os dois, ele sairia
+  anunciando um golpe que ninguém deu. É o **golpe fantasma de 09/09/2026 entrando por uma porta
+  nova**, e foi o teste que cobrou (ele conta `HitStep = 0` contra `LastHit = null`).
+- **A FRASE VIVE NUMA FUNÇÃO SÓ** (`fraseDoCantoDaRocket`), lida pela tela de BATALHA e pela do
+  RESULTADO. Montadas em separado divergiriam no primeiro ajuste de texto — é o que já aconteceu
+  entre o log e a animação mais de uma vez neste projeto.
+- **⚠️ E O NOME SAI DO CONFRONTO, não é "Jigglypuff" escrito à mão.** Quem canta pode ser uma
+  **Wigglytuff** — as duas estão no `ROCKET_POOL` e as duas disparam a emboscada —, e a tela dizia
+  Jigglypuff nos dois casos. Foi consertado junto porque é a MESMA frase que o pedido mudou.
+- **O `cutIndex` continua sendo o `specialRevealIndex`**, e nada na fase nova encosta nele: é ele
+  que o `triggerRocketSleepAmbush` usa pra cortar a luta. **Quem cantou se guarda ANTES do corte** —
+  o confronto contra ela sai do `r.matchups` na linha seguinte, e é dele que sai o nome.
+- **Se o jogador sair da tela nos 5 segundos** (um convite online aceito, por exemplo), a emboscada
+  não acontece por cima do que ele foi fazer: o timer confere a tela e a fase antes de disparar.
+- **Medido a 320px, no navegador:** a cena inteira fica em 399px, a frase em 4 linhas (58px), sem
+  rolagem lateral.
+- **O sandbox dos testes passou a ANOTAR o prazo de cada `setTimeout`** (`__timers`) — ele continua
+  não rodando nenhum (as suítes dirigem os laços na mão), e é assim que dá pra cobrar "essa cena
+  dura 5s" sem relógio.
+- `tools/test-jornada.js` tranca a cena inteira com o sorteio da emboscada FORÇADO (a chance real é
+  10%, e esperar por ela deixaria o teste dependendo de sorte de semente): que não troca de tela na
+  hora, a frase palavra por palavra, os dois lutadores e as duas barras ainda desenhados, o placar
+  de antes, o passo e o último golpe zerados, os 5s, a mesma frase na tela do resultado, o shiny
+  sendo o roubado, e a Wigglytuff cantando com o nome dela. Conferido que ele acusa **11 falhas**
+  com a troca de tela imediata de volta.
+
 - **O resgate com o time cheio virava um LAÇO SEM FIM.** Se a Rocket rouba um pokémon, o treinador
   enche o time até 6 e só então vence o esconderijo, o resgatado não cabia — e voltava pro
   `stolenMon` "esperando uma vaga". Só que `stolenMon` pendente é justamente o que reabre o

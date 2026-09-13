@@ -42,6 +42,7 @@ function createSandbox(htmlPath){
      saves que o jogador nem abriu -- o teste precisa poder cobrar QUAIS saves foram regravados, e
      principalmente quais NAO foram (o da bifurcacao, que ele nao pode resolver sozinho). */
   const escritas = [];
+  const timers = [];   // ver o setTimeout abaixo: ele ANOTA o prazo, nao roda nada
   const firestoreStub = (caminho) => ({
     collection(nome){ return firestoreStub(nome); },
     doc(id){ return firestoreStub(id); },
@@ -57,7 +58,11 @@ function createSandbox(htmlPath){
     console,
     Math, JSON, Date, Number, String, Object, Array, Boolean, Error, Set, Map, Promise, RegExp,
     isNaN, parseInt, parseFloat, encodeURIComponent, decodeURIComponent,
-    setTimeout:(fn)=>{ /* nada: as animações não existem fora do navegador */ return 0; },
+    /* ANOTA, MAS NAO RODA. As animacoes nao existem fora do navegador e as suites dirigem os
+       lacos chamando advanceX() na mao -- rodar os timers aqui quebraria isso. O que ele passou a
+       guardar e o PRAZO de cada um (`__timers`), pra um teste poder cobrar "essa cena dura 5s"
+       sem precisar de relogio. */
+    setTimeout:(fn, ms)=>{ timers.push({ ms: ms || 0, fn: fn }); return timers.length; },
     clearTimeout: noop, setInterval:()=>0, clearInterval: noop,
     btoa:(str)=>Buffer.from(str,'binary').toString('base64'),
     atob:(str)=>Buffer.from(str,'base64').toString('binary'),
@@ -165,7 +170,11 @@ function createSandbox(htmlPath){
     'entrarNoModoSelecao','sairDoModoSelecao','alternarSelecaoNotificacao','marcarTodasNotificacoes','pedirApagarSelecionadas','cancelarApagarSelecionadas','confirmarApagarSelecionadas','renderDeleteNotificationsBulkModal','notificationPendingReward',
     // conta: rival padrao e recuperacao de senha (ver test-conta.js)
     'nomeDoRivalPadrao','gravarRivalPadrao','RIVAL_NAME_DEFAULT','renderNewSaveName','renderAuth','switchAuthMode','sendPasswordReset','confirmNewSaveName',
-    'runSpecialBattle','advanceSpecialReveal','continueAfterSpecial','continueAfterWildDisguiseReveal'
+    'runSpecialBattle','advanceSpecialReveal','continueAfterSpecial','continueAfterWildDisguiseReveal',
+    // emboscada da Jigglypuff da Rocket: a cena acontece na tela de BATALHA e so depois vira
+    // resultado (ver test-jornada.js)
+    'renderSpecialBattling','renderSpecialResult','triggerRocketSleepAmbush','fraseDoCantoDaRocket',
+    'ROCKET_SLEEP_CHANCE','ROCKET_SLEEP_AVISO_MS','ROCKET_POOL','avgTeamLevel'
   ];
   const epilogue = '\n;globalThis.render = function(){};\n' +
     EXPORTS.map(n=>`try{ globalThis[${JSON.stringify(n)}] = ${n}; }catch(e){}`).join('\n') +
@@ -174,6 +183,7 @@ function createSandbox(htmlPath){
   vm.runInContext(code + epilogue, sandbox, { filename:'jornada-kanto.js' });
   sandbox.render = function(){};
   sandbox.__escritas = escritas;
+  sandbox.__timers = timers;
   return sandbox;
 }
 
