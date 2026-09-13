@@ -918,5 +918,96 @@ console.log('\n=== O PROF. CARVALHO ACEITA QUALQUER UM, NOS DOIS MODOS ===');
   ok('e da pra escolher quem mandar', (S.__getGame().releaseSelected || []).length === 1);
 })();
 
+console.log('\n=== A PRIMEIRA ROTA EXIGE UMA CAPTURA ===');
+{
+  /* Pedido em 13/09/2026: *"o jogador sempre e obrigado a escolher pelo menos 1 pokemon selvagem na
+     primeira rota que ele entrar, nao pode enfrentar o primeiro ginasio apenas com o inicial ...
+     abrir um modal falando 'Para enfrentar o primeiro ginasio, voce deve ter no minimo 2
+     pokemons'"*. */
+  const põe = (gymIndex, time, escolhidos) => {
+    const g = S.__getGame();
+    g.gymIndex = gymIndex;
+    g.team = time.map(id => ({ speciesId:id, level:5 }));
+    g.wildSelected = escolhidos.slice();
+    /* ⚠️  com UM T -- e o unico id do jogo que nao bate com o da fonte (esta no CLAUDE.md).
+       Com dois, o SPECIES devolve undefined e o renderWild quebra no . */
+    g.wildOffer = [{ speciesId:'pidgey', level:4 }, { speciesId:'ratata', level:4 }];
+    g.wildAvisoMinimo = false;
+    g.screen = 'wild';
+    S.__setGame(g);
+  };
+
+  /* 1) O CASO DO PEDIDO: primeiro trecho, so o inicial, nada escolhido. */
+  põe(0, ['bulbasaur'], []);
+  S.confirmWild();
+  ok('nao sai da tela sem escolher', S.__getGame().screen === 'wild', S.__getGame().screen);
+  ok('e levanta o aviso', S.__getGame().wildAvisoMinimo === true);
+  {
+    const limpo = S.renderWild().replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+    ok('o modal traz a frase pedida, palavra por palavra',
+       limpo.indexOf('Para enfrentar o primeiro ginásio, você deve ter no mínimo 2 pokémons.') >= 0,
+       (limpo.match(/Para enfrentar[^.]*\./) || ['(nao achei)'])[0]);
+    ok('e ele e um modal, nao uma linha de erro no rodape', /modal-overlay/.test(S.renderWild()));
+  }
+  /* ⚠️ E A PROPRIA TELA PRECISA CONTAR A REGRA. A frase dela prometia 'se nao quiser nenhum, pode
+     seguir em frente tambem' -- tela que promete o que o jogo recusa e pior que tela sem explicacao:
+     o jogador clica em Confirmar e leva um modal do nada. */
+  {
+    const frase = () => S.renderWild().replace(/<[^>]+>/g,'').replace(/\s+/g,' ');
+    ok('a tela avisa ANTES, no primeiro trecho',
+       /precisa levar pelo menos/.test(frase()) && !/pode seguir em frente/.test(frase()),
+       (frase().match(/Escolha at[^.]*\./)||['?'])[0]);
+  }
+  S.fecharAvisoDeCaptura();
+  ok('e da pra fechar', S.__getGame().wildAvisoMinimo === false);
+
+  /* 2) COM UM ESCOLHIDO, passa. */
+  põe(0, ['bulbasaur'], ['pidgey']);
+  S.confirmWild();
+  ok('com um escolhido a jornada segue', S.__getGame().screen !== 'wild', S.__getGame().screen);
+
+  /* ⚠️ 3) FORA DO PRIMEIRO TRECHO, PULAR CONTINUA VALENDO. Guardar a vaga pra uma rota melhor e
+     jogo -- a regra existe so pra ninguem chegar no Brock/Falkner com um pokemon. */
+  põe(3, ['bulbasaur'], []);
+  S.confirmWild();
+  ok('no 4o trecho pular continua valendo', S.__getGame().wildAvisoMinimo === false &&
+     S.__getGame().screen !== 'wild', S.__getGame().screen);
+
+  /* ⚠️ 4) A CONTA E DO TIME, nao da oferta: quem chega ao primeiro trecho ja com dois (um resgatado
+     da Rocket, por exemplo) nao e obrigado a capturar de novo. */
+  põe(0, ['bulbasaur','pidgey'], []);
+  S.confirmWild();
+  ok('quem ja tem 2 no time nao e obrigado', S.__getGame().wildAvisoMinimo === false &&
+     S.__getGame().screen !== 'wild', S.__getGame().screen);
+}
+
+console.log('\n=== O +2 DOS LIDERES VALE DO 3o GINASIO EM DIANTE ===');
+{
+  /* Pedido em 13/09/2026, depois de medido: o +2 em TODOS custava -15,31 pontos de conclusao e
+     batia mais forte no PRIMEIRO ginasio (+67% de game overs), que e a peneira da jornada. */
+  const ORIG = {
+    kanto: [[17,18,20], [25,26,27,30]],
+    johto: [[17,19,19], [25,26,27,30]]
+  };
+  ok('o 1o e o 2o de Kanto continuam no nivel original',
+     JSON.stringify(S.KANTO_GYMS.slice(0,2).map(g=>g.team.map(p=>p.level))) === JSON.stringify(ORIG.kanto),
+     JSON.stringify(S.KANTO_GYMS.slice(0,2).map(g=>g.team.map(p=>p.level))));
+  ok('e os de Johto tambem',
+     JSON.stringify(S.JOHTO_GYMS.slice(0,2).map(g=>g.team.map(p=>p.level))) === JSON.stringify(ORIG.johto),
+     JSON.stringify(S.JOHTO_GYMS.slice(0,2).map(g=>g.team.map(p=>p.level))));
+  /* Do 3o em diante o +2 vale -- conferido pelo par que o pedido criou: o nivel do 3o tem que ser
+     MAIOR que o original. O numero exato fica nas tabelas; o que se cobra aqui e a REGRA. */
+  ok('do 3o em diante os niveis subiram',
+     S.KANTO_GYMS[2].team[0].level === 31 && S.JOHTO_GYMS[2].team[0].level === 31,
+     'Lt. Surge ' + S.KANTO_GYMS[2].team[0].level + ' / Whitney ' + S.JOHTO_GYMS[2].team[0].level);
+  /* ⚠️ E A PARIDADE KANTO/JOHTO CONTINUA: os dois caminhos tem que ter a mesma media de nivel por
+     etapa -- a escolha e de TIPO, nao de dificuldade. Mexer num lado so quebraria isso em silencio. */
+  for(let i = 0; i < 8; i++){
+    const mk = S.KANTO_GYMS[i].team.reduce((a,p)=>a+p.level,0) / S.KANTO_GYMS[i].team.length;
+    const mj = S.JOHTO_GYMS[i].team.reduce((a,p)=>a+p.level,0) / S.JOHTO_GYMS[i].team.length;
+    ok('etapa ' + (i+1) + ': as duas regioes na mesma media (' + mk.toFixed(1) + ' x ' + mj.toFixed(1) + ')',
+       Math.abs(mk - mj) <= 1.5);
+  }
+}
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
 process.exit(falhas ? 1 : 0);

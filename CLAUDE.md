@@ -4330,44 +4330,72 @@ venda, do mesmo jeito.
 - **A regra viveria no `toggleRelease`, não só na tela.** O card apagado é a apresentação; a função é
   quem tem que recusar, pra valer se alguém a chamar por fora.
 
-## +2 NÍVEIS EM TODO POKÉMON DE LÍDER (13/09/2026) — a maior mexida de dificuldade já medida aqui
+## +2 NÍVEIS NOS LÍDERES, DO 3º GINÁSIO EM DIANTE (13/09/2026)
 
-Pedido direto: *"aumente 2 level de cada pokemon de cada lider de ginasio"*. São **74 pokémon** —
-37 em Kanto e 37 em Johto, os 16 líderes. As tabelas (`KANTO_GYMS`/`JOHTO_GYMS`) vivem **só no
-cliente**, então é um lugar só.
+Pedido em duas etapas. Primeiro *"aumente 2 level de cada pokemon de cada lider de ginasio"*; com a
+medição na mão, *"deixa +2 só a partir do 3º ginásio então"*. São **60 pokémon** (30 em Kanto, 30 em
+Johto); o 1º e o 2º de cada região voltaram ao nível original. As tabelas
+(`KANTO_GYMS`/`JOHTO_GYMS`) vivem **só no cliente**, então é um lugar só.
 
-**O PREÇO MEDIDO, e ele é enorme: a jornada concluída cai de 67,77% para 52,46%.**
-**−15,31 pontos, 25,2σ**, 8 blocos de 1.500 jornadas de cada lado (**12.000 de cada**), com o
-desvio tirado de ENTRE os blocos. **Os 8 de 8 blocos apontam pro mesmo lado** — não é amostra
-sortuda. Pra comparar: o moveset dos NPCs, que este arquivo chamava de "a maior variação de
-dificuldade já medida neste projeto, com folga", foi **−12,56**.
+**O PREÇO MEDIDO: a jornada concluída cai de 66,88% para 55,47% — −11,42 pontos, 18,0σ**, 8 blocos
+de 1.500 jornadas de cada lado (**12.000 de cada**), desvio tirado de ENTRE os blocos, **8 de 8
+blocos apontando pro mesmo lado**.
 
-**E ELA BATE MAIS FORTE NO PRIMEIRO GINÁSIO**, não no fim (game overs em 12.000 jornadas):
+**⚠️ E A FORMA É O PONTO DA DECISÃO: o 1º ginásio NÃO SE MOVE.**
 
-| ginásio | antes | depois | |
-|---|---|---|---|
-| **1º** | 999 | **1.665** | **+67%** |
-| 5º | 526 | 684 | +30% |
-| 6º | 608 | 918 | +51% |
-| **8º** | 1.710 | **2.373** | **+39%** |
-| 2º, 3º, 4º, 7º | ~25 no total | ~65 | irrelevantes |
+| ginásio | +2 em TODOS | +2 do 3º em diante |
+|---|---|---|
+| conclusão da jornada | 52,46% (**−15,31**) | **55,47% (−11,42)** |
+| **1º** (a peneira) | 999 → 1.665 (**+67%**) | 1.098 → 1.090 (**parado**) |
+| 5º | +30% | 550 → 825 (+50%) |
+| 6º | +51% | 666 → 939 (+41%) |
+| 8º | +39% | 1.641 → 2.438 (+49%) |
 
-Faz sentido: **no 1º ginásio o time é o inicial mais um ou dois encontros**, e +2 níveis num time de
-três pokémon de nível 17-20 é proporcionalmente muito mais do que +2 num time de seis no nível 60.
-O Brock e o Falkner são a peneira da jornada (está registrado na seção da bifurcação), e a mudança
-aperta justamente ali.
+Poupar os dois primeiros devolve **3,9 pontos** de conclusão e, principalmente, **tira o aperto de
+onde a jornada já morre mais**: no 1º ginásio o time é o inicial mais um ou dois encontros, e +2
+níveis num time de três no nível 17-20 pesam muito mais que +2 num time de seis no nível 60.
 
 - **⚠️ A MEDIÇÃO POR PAINEL FIXO NÃO SERVE AQUI, e quase enganou:** um time padrão de nível fixo
-  contra cada líder satura em 100% em quase todos, e só a Sabrina (que fica perto do ponto de
-  equilíbrio) mostrava queda — 55,5% → 11,0%. O número honesto é o da JORNADA, que joga o time que
-  o jogador realmente tem em cada altura. É a mesma lição do painel forte demais que já está
-  registrada na seção do Smeargle.
-- **A paridade Kanto/Johto continua de pé**: o +2 vale pros dois lados, então os dois caminhos
-  seguem com o mesmo número de pokémon e a mesma média de nível por etapa — o que
-  `tools/test-jornada.js` já cobra.
-- **Se um dia incomodar, os lugares são a própria tabela.** As variantes que valem considerar, em
-  ordem: **+1 em vez de +2** (a mexida é quase linear), ou **+2 só a partir do 3º ginásio** — isso
-  poupa a peneira, que é onde estão 666 dos 1.883 game overs a mais.
+  contra cada líder satura em 100% em quase todos, e só a Sabrina mostrava queda (55,5% → 11,0%).
+  O número honesto é o da JORNADA, que joga o time que o jogador realmente tem em cada altura. É a
+  mesma lição do painel forte demais registrada na seção do Smeargle.
+- **A paridade Kanto/Johto continua de pé** — o corte vale pros dois lados, e as oito etapas seguem
+  com a mesma média de nível nas duas regiões (a escolha é de TIPO, não de dificuldade).
+  `tools/test-jornada.js` cobra as oito, e cobra também que o 1º e o 2º continuam nos números
+  originais: mexer num lado só quebraria isso em silêncio.
+- **Se um dia incomodar**, a alavanca é a própria tabela, e a régua está aqui: o +2 é quase linear,
+  então +1 custa aproximadamente metade.
+
+## A PRIMEIRA ROTA EXIGE UMA CAPTURA (13/09/2026)
+
+Pedido junto: *"o jogador sempre é obrigado a escolher pelo menos 1 pokémon selvagem na primeira
+rota que ele entrar, não pode enfrentar o primeiro ginásio apenas com o inicial ... abrir um modal
+falando 'Para enfrentar o primeiro ginásio, você deve ter no mínimo 2 pokémons'"*.
+
+- **VALE SÓ NO PRIMEIRO TRECHO** (`gymIndex === 0`). Dali pra frente pular continua valendo, e é
+  escolha legítima — guardar a vaga pra uma rota melhor é jogo. O que não pode é chegar no Brock ou
+  no Falkner com um pokémon só.
+- **A CONTA É DO TIME, não da oferta** (`precisaCapturarNaPrimeiraRota`): quem chega ao primeiro
+  trecho já com dois — um resgatado da Rocket, por exemplo — cumpre a regra e não é obrigado a
+  capturar de novo.
+- **A recusa é um MODAL, não uma linha de erro.** O botão fica no fim de uma lista de quatro cards,
+  e uma frase embaixo dele passaria despercebida justamente por quem clicou sem escolher.
+- **⚠️ O EFEITO DELA NÃO É MENSURÁVEL PELO SIMULADOR, e isso é honesto dizer: o bot SEMPRE captura**
+  (`for(let i=0;i<Math.min(3, offers.length);i++) g.toggleWild(...)`), então a regra é no-op nas
+  12.000 jornadas medidas. Os −11,42 pontos acima são inteiramente do +2. O valor dela é sobre o
+  jogador humano que pulava.
+- **O QUE ELA EVITA, medido no confronto** (Brock, 2.000 batalhas por célula, inicial sozinho contra
+  inicial + um segundo dois níveis abaixo): **+3,8 a +4,9 pontos** de vitória na faixa em que a luta
+  se decide (Lv.18 a 22), caindo pra +1,5 quando o inicial já está muito acima. Ou seja: ela ajuda
+  exatamente quem estava prestes a perder.
+  ⚠️ **Num painel de nível 14 os dois lados dão 0%** — outra vez o painel degenerado; o número só
+  significa alguma coisa na faixa em que a batalha existe.
+- **E A PRÓPRIA TELA CONTA A REGRA ANTES DO CLIQUE.** A frase dela prometia *"se não quiser
+  nenhum, pode seguir em frente também"* — tela que promete o que o jogo recusa é pior que tela sem
+  explicação: o jogador clica em Confirmar e leva um modal do nada. No primeiro trecho ela passou a
+  dizer *"aqui você precisa levar pelo menos 1"*.
+- `tools/test-jornada.js` tranca os quatro casos (não sai da tela sem escolher, a frase palavra por
+  palavra, pular continua valendo fora do primeiro trecho, e quem já tem dois não é obrigado).
 
 ## Progressão da jornada
 

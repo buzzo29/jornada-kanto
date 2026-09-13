@@ -3663,7 +3663,7 @@ const KANTO_GYMS = [
   {
     id:'brock', leaderName:'Brock', gymTypeName:'Pedra', badge:'Insígnia Pedra',
     city:'Pewter City', adviceTypes:'Planta, Água e Lutador',
-    team:[{species:'sandshrew', level: 19}, {species:'geodude', level: 20}, {species:'onix', level: 22}]
+    team:[{species:'sandshrew', level: 17}, {species:'geodude', level: 18}, {species:'onix', level: 20}]
   },
   {
     id:'misty', leaderName:'Misty', gymTypeName:'Água', badge:'Insígnia Cascata',
@@ -3672,7 +3672,7 @@ const KANTO_GYMS = [
     // acumula dano entre confrontos, um adversário a mais pesa muito mais que 1/4 -- ele chega quando o
     // time do jogador já está gasto. O Horsea (30 de HP, 40 de ataque) engrossa o time da Misty sem
     // empurrar o nível mínimo do ginásio pra cima, coisa que um Seaking (80 de HP, 92 de ataque) fazia
-    team:[{species:'goldeen', level: 27}, {species:'horsea', level: 28}, {species:'staryu', level: 29}, {species:'starmie', level: 32}]
+    team:[{species:'goldeen', level: 25}, {species:'horsea', level: 26}, {species:'staryu', level: 27}, {species:'starmie', level: 30}]
   },
   {
     id:'surge', leaderName:'Lt. Surge', gymTypeName:'Elétrico', badge:'Insígnia Trovão',
@@ -3723,12 +3723,12 @@ const JOHTO_GYMS = [
        O Noctowl também não bastou: 100 de HP não compensam 50 de Defesa.
        Ela é Aço/Voador, então o espelho com o Brock é bonito: lá o Bulbasaur passa fácil e o
        Charmander sofre; aqui é o contrário. */
-    team:[{species:'pidgey', level: 19}, {species:'pidgeotto', level: 21}, {species:'skarmory', level: 21}]
+    team:[{species:'pidgey', level: 17}, {species:'pidgeotto', level: 19}, {species:'skarmory', level: 19}]
   },
   {
     id:'bugsy', leaderName:'Bugsy', gymTypeName:'Inseto', badge:'Insígnia Colmeia',
     city:'Azalea Town', adviceTypes:'Fogo, Voador e Pedra',
-    team:[{species:'metapod', level: 27}, {species:'kakuna', level: 28}, {species:'ledian', level: 29}, {species:'scyther', level: 32}]
+    team:[{species:'metapod', level: 25}, {species:'kakuna', level: 26}, {species:'ledian', level: 27}, {species:'scyther', level: 30}]
   },
   {
     id:'whitney', leaderName:'Whitney', gymTypeName:'Normal', badge:'Insígnia Planície',
@@ -7953,6 +7953,7 @@ async function resortearEncontro(){
     Math.random = makeSeededRng(sementeDoEncontro());
     try{ montaOfertaSelvagem(); } finally { Math.random = sorteioOriginal; }
     game.wildSelected = [];        // a oferta é outra: o que estava marcado não existe mais
+  game.wildAvisoMinimo = false;  // e o aviso da primeira rota não sobrevive ao re-sorteio
     game.wildDisguiseAcknowledged = false;
     saveCurrentGame();             // o contador de re-sorteios precisa chegar ao servidor
   } catch(e){
@@ -8113,8 +8114,24 @@ function continueAfterWildDisguiseReveal(){
   game.wildDisguiseAcknowledged = true;
   confirmWild();
 }
+/* ⚠️ A PRIMEIRA ROTA EXIGE PELO MENOS UMA CAPTURA (13/09/2026, a pedido): *"o jogador sempre é
+   obrigado a escolher pelo menos 1 pokémon selvagem na primeira rota que ele entrar, não pode
+   enfrentar o primeiro ginásio apenas com o inicial"*.
+   VALE SÓ NO PRIMEIRO TRECHO (`gymIndex === 0`): dali pra frente pular continua valendo, e é
+   escolha legítima -- guardar a vaga pra uma rota melhor é jogo. O que não pode é chegar no Brock
+   ou no Falkner com um pokémon só, que é onde a jornada já morre mais (ver a peneira do 1º).
+   A CONTA É DO TIME, não da oferta: quem chega aqui com dois pokémon (um resgatado da Rocket, por
+   exemplo) já cumpre a regra e não é obrigado a capturar de novo. */
+const MIN_TIME_PRIMEIRO_GINASIO = 2;
+function precisaCapturarNaPrimeiraRota(){
+  return game.gymIndex === 0 && ((game.team || []).length + game.wildSelected.length) < MIN_TIME_PRIMEIRO_GINASIO;
+}
+function fecharAvisoDeCaptura(){ game.wildAvisoMinimo = false; render(); }
 function confirmWild(){
   if(game.wildSelected.length>2) return;
+  /* A recusa é um MODAL e não uma linha de erro: o botão fica no fim de uma lista de quatro cards,
+     e uma frase embaixo dele passaria despercebida justamente por quem clicou sem escolher. */
+  if(precisaCapturarNaPrimeiraRota()){ game.wildAvisoMinimo = true; render(); return; }
   // se escolheu um dos disfarçados e ainda não viu a revelação, mostra ela primeiro -- confirmWild()
   // roda de novo depois que o jogador clicar em "continuar" na tela de revelação, dessa vez seguindo
   // o fluxo normal (a flag evita o loop)
@@ -15358,7 +15375,12 @@ function renderWild(){
   return `
   <div class="box">
     <h2>🌿 Pokémons selvagens!</h2>
-    <p>No meio do caminho, alguns Pokémons selvagens aparecem. Escolha até <strong>2</strong> para se juntarem ao seu time — se não quiser nenhum, pode seguir em frente também.</p>
+    <!-- ⚠️ NA PRIMEIRA ROTA A FRASE MUDA. Ela prometia "se não quiser nenhum, pode seguir em frente
+         também" -- e desde 13/09/2026 isso é falso no primeiro trecho. Tela que promete o que o jogo
+         recusa é pior que tela sem explicação: o jogador clica em Confirmar e leva um modal do nada. -->
+    <p>No meio do caminho, alguns Pokémons selvagens aparecem. Escolha até <strong>2</strong> para se juntarem ao seu time — ${
+      precisaCapturarNaPrimeiraRota() ? `aqui você precisa levar pelo menos <strong>1</strong>: não dá pra enfrentar o primeiro ginásio só com o inicial.`
+                                     : `se não quiser nenhum, pode seguir em frente também.`}</p>
   </div>
   <div class="pool-badge">SELECIONADOS: ${game.wildSelected.length}/2</div>
   <button class="btn secondary wild-reroll" ${(game.moedas||0) < precoDoRessorteio() || ressorteiosRestantes() < 1 || game.rerolando ? 'disabled' : ''}
@@ -15413,7 +15435,22 @@ function renderWild(){
   </div>
   <button class="btn success" onclick="confirmWild()">Confirmar equipe ✔</button>
   ${botaoSeuTimeHtml()}
-  <button class="btn secondary" onclick="abrirPokedexModal()">${pokedexIcon('grande')} Consultar Pokédex</button>`;
+  <button class="btn secondary" onclick="abrirPokedexModal()">${pokedexIcon('grande')} Consultar Pokédex</button>
+  ${renderAvisoMinimoModal()}`;
+}
+/* O AVISO DA PRIMEIRA ROTA. Ele é anexado DEPOIS do resto da tela porque os modais empilham na
+   ordem em que entram -- vindo antes, abriria atrás dos cards. É a mesma nota que a caixa que
+   explica o especial já carrega. */
+function renderAvisoMinimoModal(){
+  if(!game.wildAvisoMinimo) return '';
+  return `
+  <div class="modal-overlay" onclick="fecharAvisoDeCaptura()">
+    <div class="modal-box" onclick="event.stopPropagation()">
+      <h2>Escolha pelo menos um</h2>
+      <p class="hint-text">Para enfrentar o primeiro ginásio, você deve ter no mínimo 2 pokémons.</p>
+      <button class="btn success" onclick="fecharAvisoDeCaptura()">Entendi</button>
+    </div>
+  </div>`;
 }
 /* O time atual, sem sair da tela. A decisão de capturar depende de quem já está no time (tipo que
    falta, nível de quem está atrás), e antes disso exigia sair e voltar -- o que, desde a semente
