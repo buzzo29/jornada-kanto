@@ -296,7 +296,11 @@ ok('e o log diz qual golpe foi', diario.some(g => g.x === 'sono' && g.g === 'Can
          golpe de verdade, as 7 especies dele podem tirar um Missil Agulha de 5 tapas em qualquer
          golpe. E a MESMA regra que o TETO_GOLPES ja usa pra decidir a reconstrucao. */
       const linhas = lista.filter(g => !(g.t > 1)).length;
-      if(sono){ if(linhas > maiorComSono) maiorComSono = linhas; }
+      /* ⚠️ O ROLAMENTO E A SEGUNDA EXCECAO AO TETO, ao lado do sono (14/09/2026): a reconstrucao
+         nao conhece a escala do golpe e achatava a mecanica em 68% dos confrontos, entao ali as
+         linhas saem REAIS. Ver o temRolamento do sequenciaDoConfronto. */
+      const rolou = lista.some(g => g.rl > 1);
+      if(sono || rolou){ if(linhas > maiorComSono) maiorComSono = linhas; }
       else if(linhas > TETO_ESPERADO){ passouDoTeto++; if(!exTeto) exTeto = desc(); }
       break;
     }
@@ -769,7 +773,13 @@ console.log('\nA FAIXA DE FOCO NAO PODE SER FURADA POR CAMINHO NENHUM');
              o numero de passivas do jogo: ele estourou em 12/09/2026, quando o REMOINHO virou mais
              uma linha de abertura possivel, sem nada da Faixa ter mudado. */
           const ABERTURAS_LOG = ['recover','pocao','absorb','absorbdano','sono','semSono','furia',
-                                 'confusao','furiadragao','chuva','remoinho'];
+                                 'confusao','furiadragao','chuva','chuvafim','acordou','remoinho'];
+          /* ⚠️ E O CONFRONTO COM ROLAMENTO NAO CONTA (14/09/2026): ele sai do TETO de propósito --
+             a reconstrucao nao conhece a escala do golpe e achatava a mecanica em 68% dos casos
+             (ver sequenciaDoConfronto). Entao ali as linhas sao REAIS e podem passar de 7 sem nada
+             da Faixa ter mudado, que e exatamente o mesmo motivo pelo qual as aberturas ja nao
+             contavam. A trava continua cobrando o que a Faixa promete: 3 + a linha dela + 3. */
+          if(s.some(g => g.rl > 1)) continue;
           maior = Math.max(maior, s.filter(g => g.x !== 'boomself' && ABERTURAS_LOG.indexOf(g.x) < 0 && !(g.t > 1)).length);
           const tomou = s.filter(g => (!g.x || g.x === 'boom') && g.q === 'e').reduce((a, g) => a + g.d, 0);
           /* Quem SOBE de vida no meio do confronto desconta: cura, pocao, drenagem e FURIA fazem o
@@ -1777,7 +1787,10 @@ console.log('\n=== A FRASE DA PASSIVA NAO REENTRA (o piscar) ===');
     const b = [inst('arbok', 40)]; b[0].ataques = S.ataquesPadrao(b[0]);
     const x = (S.simulateGymBattle(a, b, S.makeSeededRng('pisca' + i)).matchups || [])[0];
     if(!x) continue;
-    const xs = (x.golpes || []).map(g => g.x).filter(Boolean);
+    /* ⚠️ O  NAO conta como outra passiva: ele e CONSEQUENCIA do sono (14/09/2026), e todo
+       confronto com sono passou a ter as duas marcas. Sem esta linha o fixture nao acha um unico
+       caso em 9.000 voltas -- e o teste falha sem nada estar errado no jogo. */
+    const xs = (x.golpes || []).map(g => g.x).filter(v => v && v !== 'acordou');
     if(xs.length === 1 && xs[0] === 'sono') m = x;
   }
   ok('achei um confronto com sono', !!m);
@@ -1853,11 +1866,19 @@ console.log('\n=== O GOLPE APARADO NAO APARECE COM O NUMERO APARADO ===');
         const g2 = seq.filter(g => !g.x && g.q === lado && g.d > 0 && !g.c && !(g.tn > 1));
         if(g2.length < 2) return;
         lados++;
-        const r = Math.max.apply(null, g2.map(g => g.d)) / Math.max(1, Math.min.apply(null, g2.map(g => g.d)));
+        /* ⚠️ A COMPARACAO E POR PESO, nao pelo numero cru -- e o ROLAMENTO obrigou isso (14/09/2026).
+           A trava nasceu da regra "dois golpes do mesmo atacante contra o mesmo alvo so diferem pelo
+           sorteio de 0,85 a 1,00", e o Rolamento e a PRIMEIRA excecao real a ela: o poder dele dobra
+           a cada uso seguido, entao 6 / 13 / 24 / 53 na mesma linha e a mecanica funcionando, nao um
+           numero impossivel. Foi exatamente esse par que a trava acusou (Lickitung x Shuckle, 8,8x).
+           A suavizacao ja divide pelo mesmo peso (`saida[i].rl`), entao o teste passa a medir o que
+           ela mede: dano POR ESCALA. */
+        const porEscala = g2.map(g => g.d / (g.rl || 1));
+        const r = Math.max.apply(null, porEscala) / Math.max(1, Math.min.apply(null, porEscala));
         /* A tolerancia de 1,25 e o ARREDONDAMENTO: as fatias sao inteiras, e num total pequeno
            (27 e 32) o inteiro mais proximo passa de 1,176 por alguns centesimos. O que a trava
            existe pra pegar e a faixa REABRINDO -- ali a razao volta pras dezenas. */
-        if(r > 1.25){ fora++; if(r > pior){ pior = r; exemplo = mm.player + ' x ' + mm.enemy + ': ' + g2.map(g => g.d).join(' e '); } }
+        if(r > 1.25){ fora++; if(r > pior){ pior = r; exemplo = mm.player + ' x ' + mm.enemy + ': ' + g2.map(g => g.d + (g.rl > 1 ? '(x' + g.rl + ')' : '')).join(' e '); } }
       });
     });
   }
@@ -1886,10 +1907,14 @@ console.log('\n=== O GOLPE APARADO NAO APARECE COM O NUMERO APARADO ===');
           const g2 = seq.filter(g => !g.x && g.q === lado && g.d > 0 && !(g.tn > 1));
           const c = g2.filter(g => g.c), comuns = g2.filter(g => !g.c);
           if(!c.length || !comuns.length) return;
-          const mediaComum = comuns.reduce((a,g) => a + g.d, 0) / comuns.length;
+          /* ⚠️ A MEDIA E POR ESCALA, pelo mesmo motivo da trava acima: um critico no PRIMEIRO
+             Rolamento (poder 30) sai menor que um Rolamento comum no terceiro uso (120), e isso e
+             a mecanica, nao o selo mentindo. Comparar dano cru dava 1 falha em 236. */
+          const escala = g => g.d / (g.rl || 1);
+          const mediaComum = comuns.reduce((a,g) => a + escala(g), 0) / comuns.length;
           c.forEach(g => {
             pares++;
-            const r = g.d / Math.max(1, mediaComum);
+            const r = escala(g) / Math.max(1, mediaComum);
             /* O INVARIANTE E 'nunca MENOR', nao 'exatamente 2x'. O selo existe pra explicar uma
                barra que caiu o dobro, e o defeito e ele aparecer num numero menor que o do golpe
                comum do lado. O 2x exato nao da pra cobrar: o sorteio de 0,85 a 1,00 corre nos dois
@@ -2076,7 +2101,11 @@ console.log('\n=== O REMOINHO MOSTRA A TROCA: SAI, FICA VAZIO, ENTRA ===');
      O motor grava UM registro; quem reparte em TRES quadros e a apresentacao (sequenciaDoConfronto),
      e o log continua com UMA linha -- a mesma forma da drenagem e dos golpes de varios tapas. */
   const semTag = h => String(h||'').replace(/<[^>]*>/g,'').replace(/\s+/g,' ').trim();
-  const cara = h => { const t = semTag(h); const mm = t.match(/([A-Za-zÀ-ÿ'.\-]+) Lv\.(\d+)/);
+  /* ⚠️ OS SELOS ENTRAM ENTRE O NOME E O "Lv." (🌟 shiny, 🔺 terreno, 🎖️ especialidade e, desde
+     14/09/2026, ⚔️ e 🪶 das duas danças). A regex exigia o nome COLADO no Lv. e passou a devolver
+     "?" -- 30 de 40 quadros, sem nada do Remoinho ter mudado. O fixture usa um PIDGEOT, que e
+     justamente o dono da Dança da Pluma. */
+  const cara = h => { const t = semTag(h); const mm = t.match(/([A-Za-zÀ-ÿ'.\-]+)[^A-Za-zÀ-ÿ]*Lv\.(\d+)/);
                       return (t.indexOf('—') >= 0 && !mm) ? '(vazio)' : (mm ? mm[1] : '?'); };
   let achou = 0, tresQuadros = 0, ordemOk = 0, umaLinha = 0, frasesOk = 0, pausaOk = 0, redesenha = 0;
   let campos = 0, cedeDepois = 0;
@@ -3514,7 +3543,13 @@ console.log('\n=== GOLPES DE VARIOS TAPAS: DE 2 A 5 NUMA TROCA ===');
          Beedrill, que tambem aprende a Agulha Dupla -- com o mesmo dono pros dois, o teste mediria
          o golpe que o motor escolhesse, nao o que ele quer cobrir. Cada golpe precisa de um dono
          que so tenha ELE da tabela. */
-      doublekick: 'nidoking', bonemerang: 'marowak', twineedle: 'beedrill'
+      doublekick: 'nidoking', bonemerang: 'marowak', twineedle: 'beedrill',
+      /* OS DOIS DE PRENDER (14/09/2026). No jogo oficial eles prendem o alvo por 2 a 5 TURNOS;
+         aqui viram 2 a 5 tapas na mesma troca -- o numero de vezes e o mesmo.
+         ⚠️ OS DONOS SAO LIMPOS de proposito: a Rapidash tambem tem Ataque Furia e o Shuckle tambem
+         tem Missil Agulha -- com eles, o teste mediria o golpe que o motor escolhesse, nao o que
+         ele quer cobrir. A NINETALES usa o Redemoinho em 96,6% dos ataques, medido. */
+      firespin: 'ninetales', wrap: 'arbok'
     };
     const semDono = MULTI.filter(g => !DONOS[g]);
     ok('todo golpe da tabela tem dono no teste', semDono.length === 0, semDono.join(', ') || '-');
@@ -4278,12 +4313,26 @@ console.log('\n=== A DANCA DA CHUVA: O PRIMEIRO CLIMA DO JOGO (11/09/2026) ===')
        ONLINE -- os dois resolvem dano sem passar pelo sortearChuva. Isto e lido do CODIGO: os
        casos acima rodam no cliente e nao alcancam nenhum dos dois. */
     const srvTxt = require('fs').readFileSync(path.join(raiz, 'functions', 'index.js'), 'utf8');
-    for(const fn of ['simulateBossFight','battleResolveMatchup']){
-      const i = srvTxt.indexOf('function ' + fn + '(');
+    /* ⚠️ A RAIDE ZERA; O ONLINE PASSOU A DEFINIR (14/09/2026). Os dois fecham a mesma porta -- o
+       clima que sobrou na INSTANCIA nao pode vazar --, mas por caminhos diferentes:
+         - o simulateBossFight zera e pronto: a raide e um ataque so, sem onde um clima caber;
+         - o battleResolveMatchup passou a CARREGAR o clima do estado da partida, porque a chuva
+           dele durava UM confronto em vez de tres. Definir com o valor do documento fecha o
+           vazamento igual (ele nao le o que sobrou na memoria) E devolve a duracao certa. */
+    {
+      const i = srvTxt.indexOf('function simulateBossFight(');
       const fim = srvTxt.indexOf('\nfunction ', i + 1);
       /* O ( E ) PRECISAM DO ESCAPE: sem eles o `()` vira grupo de captura e a regex casa com
          "limparClima;", que nao existe em lugar nenhum -- o teste falhava com o codigo CERTO. */
-      ok('o ' + fn + ' do servidor zera a chuva', srvTxt.slice(i, fim).indexOf('limparClima();') > 0);
+      ok('o simulateBossFight do servidor zera a chuva', srvTxt.slice(i, fim).indexOf('limparClima();') > 0);
+    }
+    {
+      const i = srvTxt.indexOf('function battleResolveMatchup(');
+      const fim = srvTxt.indexOf('\nfunction ', i + 1);
+      const corpo = srvTxt.slice(i, fim);
+      ok('e o battleResolveMatchup DEFINE o clima a partir do estado (nunca le o que sobrou)',
+         /definirClima\(estado\.chuva \|\| 0\)/.test(corpo) && corpo.indexOf('limparClima();') < 0,
+         corpo.indexOf('limparClima();') >= 0 ? 'ainda limpa' : 'define');
     }
     /* E o unico que SORTEIA e o simulateGymBattle -- se outro passar a sortear, o clima nasce em
        modo que ninguem mediu. */
@@ -4640,10 +4689,21 @@ console.log('\n=== QUEM JA ESTAVA RASPANDO NAO LEVA REVIDE ===');
     forte[0].hp = Math.max(1, Math.round(forte[0].maxHp * (0.01 + (i % 3) * 0.01)));
     const fraco = [mk(FRACOS[i % FRACOS.length], 50)];
     fraco[0].ataques = S.ataquesPadrao(fraco[0]);
+    /* ⚠️ O FRACO ENTRA MACHUCADO (60%), e isso mudou em 14/09/2026: a trava do "quem esta raspando
+       nao derruba um pokemon CHEIO num golpe" acabou com este cenario inteiro. O forte raspando
+       parava em 70% da barra do fraco, ninguem morria, e a varredura foi de 300+ casos para ZERO --
+       o teste falhava sem nada do PISO ter mudado.
+       Com o fraco em 60% a trava nao vale (ela so morde contra alvo CHEIO) e o cenario volta: o
+       forte mata, o fraco revida, e o piso e quem decide. */
+    fraco[0].hp = Math.round(fraco[0].maxHp * 0.6);
     const antesDoRevide = forte[0].hp;
-    const r = S.simulateGymBattle(forte, fraco, S.makeSeededRng('piso' + i), { preservePlayerHp: true });
-    const mt = (r.matchups || [])[0];
-    if(!mt) continue;
+    /* ⚠️ E O doExchange NO LUGAR DO simulateGymBattle: aquele CURA o time B, entao o fraco entrava
+       cheio de novo e a trava voltava a morder. E a mesma armadilha do preservePlayerHp, pelo
+       terceiro caminho. Aqui eu resolvo UMA troca com os HPs que mandei. */
+    const diario = [];
+    S.doExchange(forte[0], fraco[0], S.makeSeededRng('piso' + i), diario);
+    const mt = { golpes: diario, player: forte[0].name, enemy: fraco[0].name,
+                 playerHpAfter: forte[0].hp, playerMaxHp: forte[0].maxHp };
     /* ⚠️ SEM ABERTURA no confronto. O Alakazam do painel aprende RECUPERAR: entrando com 3% ele se
        cura ANTES da luta e vai pra barra cheia -- e ai o HP que este teste guardou nao e o HP no
        momento do revide (acusou 18 "furos" com o alvo sobrando 207 de quem "tinha 10"). A drenagem,
@@ -4810,6 +4870,593 @@ console.log('\n=== OS LACOS DE REVELACAO CHEGAM AO FIM ===');
       ()=>S.__getGame().leagueWatchIndex, ()=>S.__getGame().leagueWatchPhase, S.renderLeagueWatch);
     ok('e a luta anda ate o ultimo confronto', total > 0 && fim.indice === total - 1,
        'parou em ' + fim.indice + '/' + (total - 1));
+  }
+}
+
+console.log('\n=== O ROLAMENTO DOBRA A CADA USO SEGUIDO (14/09/2026) ===');
+{
+  /* Pedido: *"dobrar o poder a cada uso, depois de 5x usados consecutivamente, reseta o poder para
+     30 novamente, caso use outro ataque sem ser o Rollout, reseta tambem"*. E o PRIMEIRO golpe do
+     jogo cujo poder depende do que aconteceu nas trocas anteriores. */
+  const mk = (id, lv, ats) => { const p = S.createInstance(id, lv); p.maxHp = S.calcMaxHp(p); p.hp = p.maxHp; p.ataques = ats || S.ataquesPadrao(p); return p; };
+  const alvo = mk('machop', 50, ['karatechop']);
+
+  /* A ESCALA, com o contador forcado: 30, 60, 120, 240, 480 e de volta pra 30 */
+  {
+    const g = mk('golem', 50, ['rollout']);
+    const poderes = [];
+    for(let n = 0; n < 6; n++){ g._rolamento = n % S.ROLAMENTO_USOS; poderes.push(S.melhorAtaque(g, alvo).poder); }
+    ok('o poder dobra a cada uso', poderes.slice(0, 5).join(',') === '30,60,120,240,480', poderes.join(','));
+    ok('e o 6o uso volta pro comeco', poderes[5] === 30, String(poderes[5]));
+    ok('sao ' + S.ROLAMENTO_USOS + ' usos ate zerar', S.ROLAMENTO_USOS === 5);
+  }
+
+  /* O CONTADOR ANDA SOZINHO, e so pra quem usou o Rolamento */
+  {
+    const g = mk('golem', 50, ['rollout']);
+    S.calcDamage(g, alvo, S.makeSeededRng('r1')); S.atualizarRolamento(g);
+    ok('usar o Rolamento sobe o contador', g._rolamento === 1, String(g._rolamento));
+    S.calcDamage(g, alvo, S.makeSeededRng('r2')); S.atualizarRolamento(g);
+    ok('e sobe de novo', g._rolamento === 2, String(g._rolamento));
+    /* ⚠️ OUTRO GOLPE ZERA -- e o "caso use outro ataque, reseta tambem" do pedido */
+    g.ataques = ['earthquake'];
+    S.calcDamage(g, alvo, S.makeSeededRng('r3')); S.atualizarRolamento(g);
+    ok('usar OUTRO golpe zera o contador', g._rolamento === 0, String(g._rolamento));
+  }
+
+  /* E A ESCALA CHEGA NA TELA. Sem isso o jogador le o mesmo nome tirando 71, 123 e 246 e procura
+     bug onde e regra -- a mesma licao do selo de critico, que voltou por isso. */
+  {
+    let m = null;
+    for(let i = 0; i < 300 && !m; i++){
+      const a = [mk('golem', 50, ['rollout'])], b = [mk('shuckle', 55, ['rockthrow'])];
+      const x = (S.simulateGymBattle(a, b, S.makeSeededRng('rl' + i)).matchups || [])[0];
+      if(x && (x.golpes || []).filter(g => g.rl > 1).length >= 2) m = x;
+    }
+    ok('achei um confronto com o Rolamento escalando', !!m);
+    if(m){
+      const meus = (m.golpes || []).filter(g => !g.x && g.q === 'p');
+      ok('o diario carrega a escala de cada linha', meus.some(g => g.rl === 2) && meus.some(g => g.rl === 4),
+         meus.map(g => g.d + (g.rl > 1 ? 'x' + g.rl : '')).join(' '));
+      /* ⚠️ O CONFRONTO SAI DO TETO: a reconstrucao nao conhece escala e achatava a mecanica em 68%
+         dos casos (medido). E a MESMA excecao do sono. */
+      const seq = S.sequenciaDoConfronto(m);
+      ok('e a sequencia mostra os golpes REAIS, sem reconstruir', seq.filter(g => g.rl > 1).length >= 2,
+         seq.filter(g => !g.x).map(g => g.d + (g.rl > 1 ? 'x' + g.rl : '')).join(' '));
+      const html = S.passosHtml(m);
+      ok('e o selo do log mostra o x2 e o x4', /Rolamento \u00d72/.test(html) && /Rolamento \u00d74/.test(html),
+         html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').match(/Rolamento[^.]{0,20}/g).join(' | '));
+      /* e o numero na tela CRESCE, que e a mecanica */
+      const ds = seq.filter(g => !g.x && g.q === 'p' && g.rl > 1).map(g => g.d);
+      ok('e o dano cresce junto', ds.length >= 2 && ds[1] > ds[0], ds.join(' -> '));
+    }
+  }
+
+  /* NAO VAZA ENTRE BATALHAS -- o mesmo cuidado do teto de HP da Furia */
+  {
+    const t = [mk('golem', 50, ['rollout'])], e = [mk('shuckle', 50, ['rockthrow'])];
+    S.simulateGymBattle(t, e, S.makeSeededRng('vaza'));
+    ok('o contador nao sobra na instancia depois da batalha', !t[0]._rolamento, String(t[0]._rolamento));
+  }
+
+  /* OS DOIS MOTORES: a mesma tabela e a mesma regra */
+  {
+    const cli = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
+    const srv = require('fs').readFileSync(path.join(raiz, 'functions', 'index.js'), 'utf8');
+    ok('o GOLPE_ROLAMENTO existe nos dois', /const GOLPE_ROLAMENTO = "rollout"/.test(cli) && /const GOLPE_ROLAMENTO = "rollout"/.test(srv));
+    ok('e o ROLAMENTO_USOS tambem', /const ROLAMENTO_USOS = 5/.test(cli) && /const ROLAMENTO_USOS = 5/.test(srv));
+    /* ⚠️ O CONTADOR ANDA NO golpesDaTroca, que roda UMA VEZ POR ATAQUE -- no calcDamage ele
+       contaria uma vez por TAPA, e um golpe de varios tapas daria cinco usos num ataque so. */
+    ok('e o contador anda no golpesDaTroca nos dois', /atualizarRolamento\(atacante\)/.test(cli) && /atualizarRolamento\(atacante\)/.test(srv));
+  }
+}
+
+console.log('\n=== O SINO CURATIVO (Heal Bell) ===');
+{
+  /* Pedido: *"adicionar a habilidade passiva Heal Bell da Miltank e Celebi, tendo a mesma mecanica
+     que o RECOVER do Alakazam"*. Ele cai no MESMO ramo `cura`: abre o confronto, so vale abaixo do
+     CURA_MAXIMO_DO_HP, e e `continue` -- a luta acontece inteira depois. */
+  ok('sao a Miltank e o Celebi', S.SINO_CURATIVO.join(',') === 'miltank,celebi', S.SINO_CURATIVO.join(','));
+  ok('com a mesma chance do Recuperar', S.CHANCE_SINO === S.CHANCE_RECUPERAR, S.CHANCE_SINO + ' x ' + S.CHANCE_RECUPERAR);
+  const mk = (id, lv) => { const p = S.createInstance(id, lv); p.maxHp = S.calcMaxHp(p); p.hp = p.maxHp; return p; };
+  const sorteio = S.sorteiaGolpeEspecial(mk('miltank', 50), () => 0.001);
+  ok('a Miltank cura com o Sino', sorteio && sorteio.efeito === 'cura' && sorteio.golpe === 'Sino Curativo',
+     JSON.stringify(sorteio));
+  /* ⚠️ O CELEBI JA ESTA NO RECUPERACAO, e o Recuperar vem ANTES na fila: ele cura com "Recuperar" e
+     o Sino sai na chance composta. Fica registrado porque a ficha dele mostra os dois. */
+  ok('e o Celebi, que tem os dois, cura com o Recuperar (o primeiro da fila)',
+     S.sorteiaGolpeEspecial(mk('celebi', 50), () => 0.001).golpe === 'Recuperar');
+  /* a mecanica e a MESMA: so abaixo do teto, e nao resolve o confronto */
+  {
+    const p = mk('miltank', 50); p.hp = p.maxHp;   // cheia: nao cura
+    const d = [];
+    S.tentarGolpeEspecial(p, mk('machop', 48), () => 0.001, d);
+    ok('com a vida cheia ela NAO cura (a trava dos ' + Math.round(S.CURA_MAXIMO_DO_HP * 100) + '%)',
+       !d.some(g => g.x === 'recover'), d.map(g => g.x).join(','));
+  }
+  {
+    const p = mk('miltank', 50); p.hp = Math.round(p.maxHp * 0.3);
+    const d = [];
+    const resolveu = S.tentarGolpeEspecial(p, mk('machop', 48), () => 0.001, d);
+    ok('machucada ela cura', d.some(g => g.x === 'recover' && g.g === 'Sino Curativo'), d.map(g => g.x + ':' + (g.g||'')).join(','));
+    ok('e NAO resolve o confronto -- a luta acontece inteira depois', !resolveu);
+  }
+  ok('a ficha da Pokedex anuncia', (S.especiaisDaEspecie('miltank') || []).some(e => e.nome === 'Sino Curativo'),
+     JSON.stringify(S.especiaisDaEspecie('miltank')));
+  ok('e o tipo dele e Normal, como no jogo oficial', S.TIPO_DO_ESPECIAL['Sino Curativo'] === 'Normal');
+}
+
+console.log('\n=== AS DUAS FRASES NOVAS: acordou e chuva terminou ===');
+{
+  const mk = (id, lv) => { const p = S.createInstance(id, lv); p.maxHp = S.calcMaxHp(p); p.hp = p.maxHp; p.ataques = S.ataquesPadrao(p); return p; };
+  /* ⚠️ A ORDEM E O PEDIDO: *"quando um pokemon dormir, ele vai tomar um dano, E DEPOIS DISSO, exiba
+     a mensagem"*. A primeira versao gravava no comeco do doExchange e a linha saia ANTES do golpe. */
+  {
+    let m = null;
+    for(let i = 0; i < 600 && !m; i++){
+      const a = ['butterfree','blastoise','krabby'].map(id => mk(id, 45));
+      const b = ['gyarados','vileplume','raichu'].map(id => mk(id, 45));
+      S.equiparNpc(b);
+      (S.simulateGymBattle(a, b, S.makeSeededRng('ac' + i)).matchups || []).forEach(x => {
+        if(!m && (x.golpes || []).some(g => g.x === 'acordou')) m = x;
+      });
+    }
+    ok('achei um confronto em que alguem acorda', !!m);
+    if(m){
+      const xs = (m.golpes || []);
+      const iSono = xs.findIndex(g => g.x === 'sono');
+      const iAcordou = xs.findIndex(g => g.x === 'acordou');
+      const iGolpe = xs.findIndex((g, k) => k > iSono && !g.x && g.d > 0);
+      ok('a ordem e: dorme, APANHA, e so entao acorda', iSono < iGolpe && iGolpe < iAcordou,
+         'sono@' + iSono + ' golpe@' + iGolpe + ' acordou@' + iAcordou);
+      const html = S.passosHtml(m);
+      ok('a frase e a pedida, palavra por palavra', /acordou e voltou \u00e0 luta!/.test(html),
+         (html.replace(/<[^>]+>/g, ' ').match(/[A-Z]\w* acordou[^.]*/) || ['(nao achei)'])[0]);
+      /* ⚠️ O `q` E DE QUEM ACORDOU, como o da furia -- a linha e sobre UM pokemon. Se ele fosse do
+         outro lado (a convencao do sono), a frase nomearia o pokemon errado. */
+      const reg = xs.find(g => g.x === 'acordou');
+      ok('e ela nomeia quem REALMENTE acordou', html.indexOf(reg.g) >= 0, reg.q + ' / ' + reg.g);
+      /* ela vale 1 passo, como toda frase que nao mexe barra -- fora da tabela valeria PRA SEMPRE */
+      ok('e ela vale 1 passo na animacao', S.passosDaAbertura && S.passosDaAbertura.acordou === 1);
+    }
+    /* ⚠️ E A ORDEM TEM QUE VALER NA TELA, nao so no diario (14/09/2026, reportado num Venusaur x
+       Vileplume: *"a Vileplume fez o venusaur dormir mas ele ja acordou sem a vileplume ter batido
+       nele"*). O MOTOR estava certo; o que embaralhava era a sequenciaDoConfronto, que tratava o
+        como ABERTURA -- e abertura e puxada pro TOPO quando o confronto passa do
+       TETO_GOLPES e cai na reconstrucao.
+       A trava e sobre a TELA de proposito: e la que o defeito aparecia, e o diario ja tinha trava. */
+    {
+      const mk2 = (id, lv) => { const p = S.createInstance(id, lv); p.maxHp = S.calcMaxHp(p); p.hp = p.maxHp; p.ataques = S.ataquesPadrao(p); return p; };
+      let n = 0, fora = 0, exemplo = null;
+      for(let i = 0; i < 700 && n < 200; i++){
+        const t = ['butterfree','venusaur','krabby','gengar','blastoise','onix'].map(id => mk2(id, 45 + (i % 9)));
+        const e = ['vileplume','gyarados','raichu','rhydon','alakazam','arcanine'].map(id => mk2(id, 45 + (i % 7)));
+        S.equiparNpc(e);
+        (S.simulateGymBattle(t, e, S.makeSeededRng('ord' + i)).matchups || []).forEach(x => {
+          if(!(x.golpes || []).some(g => g.x === 'acordou')) return;
+          n++;
+          const seq = S.sequenciaDoConfronto(x);
+          const jS = seq.findIndex(g => g.x === 'sono');
+          const jA = seq.findIndex(g => g.x === 'acordou');
+          const jG = seq.findIndex((g, k) => k > jS && !g.x && g.d > 0);
+          if(!(jS >= 0 && jG >= 0 && jG < jA)){ fora++; if(!exemplo) exemplo = seq.map(g => g.x || (g.q + g.d)).join(','); }
+        });
+      }
+      ok('amostra de sobra pra medir a ordem na tela', n > 100, n + ' confrontos com despertar');
+      ok('NA TELA ele tambem acorda depois de apanhar, inclusive nos que passam do teto',
+         fora === 0, fora + ' de ' + n + (exemplo ? '   |  ' + exemplo : ''));
+    }
+  }
+  /* A CHUVA SE DESPEDE, no confronto que foi o ULTIMO debaixo dela */
+  {
+    let m = null;
+    for(let i = 0; i < 900 && !m; i++){
+      const a = ['blastoise','gyarados','lapras'].map(id => mk(id, 50));
+      const b = ['machamp','rhydon','arcanine'].map(id => mk(id, 50));
+      S.equiparNpc(b);
+      (S.simulateGymBattle(a, b, S.makeSeededRng('cf' + i)).matchups || []).forEach(x => {
+        if(!m && (x.golpes || []).some(g => g.x === 'chuvafim')) m = x;
+      });
+    }
+    ok('achei um confronto em que a chuva acaba', !!m);
+    if(m){
+      const html = S.passosHtml(m);
+      ok('a frase e a pedida, palavra por palavra', /A dan\u00e7a da chuva terminou!/.test(html));
+      /* ela nao nomeia ninguem: o clima e do CAMPO, nao de quem o invocou */
+      ok('e ela nao nomeia treinador nenhum', html.indexOf('chuva terminou') >= 0 && !/\w+ A dan/.test(html));
+      ok('e vale 1 passo', S.passosDaAbertura.chuvafim === 1);
+      /* ⚠️ ELA SAI NO ULTIMO CONFRONTO DEBAIXO DA CHUVA, nao no seguinte: ali o jogador ja teria
+         visto o golpe de Fogo voltar ao normal sem explicacao, e o confronto seguinte pode nem
+         existir (a batalha acaba junto). */
+      const i = (m.golpes || []).findIndex(g => g.x === 'chuvafim');
+      ok('e ela e a ULTIMA linha do confronto', i === (m.golpes || []).length - 1, i + ' de ' + (m.golpes||[]).length);
+    }
+  }
+  ok('e o ponto de exclamacao nao dobra', S.pontuada('Ja tem!') === 'Ja tem!' && S.pontuada('Nao tem') === 'Nao tem!');
+}
+
+console.log('\n=== O ONLINE SEGUE A MESMA MECANICA DA JORNADA (14/09/2026) ===');
+{
+  /* Pedido: *"verifique em geral o funcionamento das batalhas onlines se esta seguindo a mesma
+     mecanica das batalhas da jornada"*. O online resolve CONFRONTO A CONFRONTO (battleResolveMatchup)
+     e a jornada roda a batalha inteira (simulateGymBattle) -- os dois chamam o MESMO doExchange,
+     entao as 11 passivas de confronto valem igual. O que divergia era a DURACAO da chuva. */
+  const cli = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
+  const srv = require('fs').readFileSync(path.join(raiz, 'functions', 'index.js'), 'utf8');
+  /* ⚠️ A CHUVA DURAVA UM CONFRONTO NO ONLINE. O comentario dizia que ela "nao existia" ali -- era
+     falso desde que a Danca da Chuva entrou (o sorteio mora no tentarGolpeEspecial, que o
+     doExchange chama). Medido: ela saia em 10,3% dos confrontos e morria no primeiro, porque o
+     battleResolveMatchup chamava limparClima() antes de cada um. */
+  ok('o online CARREGA a chuva do estado da partida', /definirClima\(estado\.chuva \|\| 0\)/.test(srv));
+  ok('e devolve o que sobrou pro documento', /estado\.chuva = Math\.max\(0, climaRestante\(\) - 1\)/.test(srv));
+  ok('o definirClima existe nos DOIS motores', /function definirClima\(n\)/.test(cli) && /function definirClima\(n\)/.test(srv));
+  /* e a duracao e a MESMA da jornada */
+  {
+    const mk = (id, lv) => { const p = S.createInstance(id, lv); p.maxHp = S.calcMaxHp(p); p.hp = p.maxHp; return p; };
+    let estado = { chuva: 0 }, achou = false;
+    for(let i = 0; i < 400 && !achou; i++){
+      estado = { chuva: 0 };
+      const sobras = [];
+      for(let k = 0; k < 4; k++){
+        S.definirClima(estado.chuva || 0);
+        const a = mk('blastoise', 60), b = mk('machop', 60);
+        const d = [];
+        let v = 0; while(a.hp > 0 && b.hp > 0 && v++ < 60) S.doExchange(a, b, S.makeSeededRng('oc' + i + k), d);
+        if(k === 0 && !d.some(g => g.x === 'chuva')) break;
+        estado.chuva = Math.max(0, S.climaRestante() - 1);
+        sobras.push(estado.chuva);
+      }
+      if(sobras.length === 4){
+        achou = true;
+        ok('a chuva do online dura ' + S.CHUVA_EM_CONFRONTOS + ' confrontos, como na jornada',
+           sobras.join(',') === '2,1,0,0', sobras.join(','));
+      }
+    }
+    ok('achei uma chuva pra medir', achou);
+  }
+  /* ⚠️ O QUE CONTINUA DIFERENTE, e e decisao antiga: o time do online vem de um CODIGO
+     (especie:nivel:shiny), entao ele nao tem golpe escolhido e luta no motor de tipo. */
+  ok('o battleHydrate NAO da golpe escolhido (o time vem de um codigo)',
+     !/inst\.ataques/.test(srv.slice(srv.indexOf('function battleHydrate'), srv.indexOf('function battleHydrate') + 400)));
+  /* AS JANELAS GANHARAM +5s, e o cliente desenha os MESMOS numeros */
+  ok('as quatro janelas ganharam +5s', /const BATTLE_PICK_MS = 10000/.test(srv) && /const BATTLE_FIRST_PICK_MS = 15000/.test(srv) &&
+     /const BATTLE_ACCEPT_MS = 20000/.test(srv) && /const BATTLE_TEAM_PICK_MS = 20000/.test(srv));
+  ok('e o cronometro da tela usa os mesmos tetos', /st\.primeiraEscolha \? 15 : 10/.test(cli));
+  /* ⚠️ DA PRA TROCAR ATE O TEMPO ACABAR: o servidor sempre aceitou (ele sobrescreve a escolha
+     enquanto a fase e `choosing`), quem travava era a tela. */
+  ok('a tela deixa trocar enquanto a janela esta aberta', /const janelaAberta = st\.phase===.choosing.;/.test(cli));
+  ok('e o servidor aceita a segunda escolha', /if\(souA\) estado\.aChoice = idx; else estado\.bChoice = idx;/.test(srv));
+  /* ⚠️ A FRASE DA PASSIVA CEDE O LUGAR AO NOME DO GOLPE, como nas outras quatro telas. Ela ficava
+     ESTATICA: o aviso era calculado UMA VEZ, sem passo, e o pintor saia cedo enquanto ele existisse. */
+  ok('o aviso do online e perguntado POR PASSO', /avisoDoConfronto\(a\.mVirado, a\.passo\)/.test(cli));
+  ok('e o pintor nao sai mais cedo por causa dele', !/if\(!a \|\| a\.avisoEspecial\) return;/.test(cli));
+}
+
+console.log('\n=== OS SELOS DAS DUAS DANCAS (14/09/2026) ===');
+{
+  /* Pedido: *"para a Sword Dance e Feather Dance que acontecer no momento do confronto, coloque um
+     sinal para identificar os pokemons afetados"*.
+     ⚠️ QUEM E AFETADO NAO E O MESMO NOS DOIS, e e esse o cuidado inteiro:
+       - Espadas: quem USA fica com x1,5 de Ataque -> o selo vai no lado do `q`;
+       - Pluma:   o ADVERSARIO fica com x0,5      -> o selo vai no lado OPOSTO ao `q`.
+     O `q` do diario e sempre de QUEM USOU o golpe (a convencao de todo o motor), entao ler os dois
+     igual poria a pluma no pokemon errado -- e o defeito nao apareceria como erro, apareceria como
+     o selo no lado que ficou mais FORTE. */
+  const mk = (id, lv) => { const p = S.createInstance(id, lv); p.maxHp = S.calcMaxHp(p); p.hp = p.maxHp; p.ataques = S.ataquesPadrao(p); return p; };
+  const ESPADA = '\u2694', PLUMA = '\ud83e\udeb6';
+
+  /* ⚠️ O CASO DURO E O MESMO POKEMON COM OS DOIS SELOS: o Pinsir danca as espadas E leva a pluma do
+     Pidgeot, entao ele sai com ⚔️🪶 e o Pidgeot sai SEM NADA -- ele usou a pluma, mas quem foi
+     afetado por ela foi o outro. Foi este caso que a primeira versao erraria. */
+  {
+    const a = mk('pinsir', 50), b = mk('pidgeot', 50);
+    const d = [];
+    S.tentarDancas(a, b, () => 0.001, d);      // chance forcada: as duas saem
+    const m = { player: a.name, enemy: b.name, golpes: d };
+    ok('as duas dancas saem com a chance forcada', d.length === 2, d.map(g => g.x + '@' + g.q).join(','));
+    ok('o Pinsir fica com os DOIS selos (dancou E levou a pluma)',
+       S.selosDoConfronto(m, 'p').indexOf(ESPADA) >= 0 && S.selosDoConfronto(m, 'p').indexOf(PLUMA) >= 0,
+       JSON.stringify(S.selosDoConfronto(m, 'p')));
+    ok('e o Pidgeot fica SEM NENHUM: ele usou a pluma, quem sofreu foi o outro',
+       S.selosDoConfronto(m, 'e').trim() === '', JSON.stringify(S.selosDoConfronto(m, 'e')));
+    /* e o selo tem que casar com o que o MOTOR marcou na instancia */
+    ok('o selo casa com o _espadas/_pluma do motor',
+       (S.selosDoConfronto(m, 'p').indexOf(ESPADA) >= 0) === !!a._espadas &&
+       (S.selosDoConfronto(m, 'p').indexOf(PLUMA) >= 0) === !!a._pluma &&
+       (S.selosDoConfronto(m, 'e').indexOf(ESPADA) >= 0) === !!b._espadas &&
+       (S.selosDoConfronto(m, 'e').indexOf(PLUMA) >= 0) === !!b._pluma);
+  }
+
+  /* OS LADOS INVERTIDOS: o mesmo par, trocando quem e p e quem e e */
+  {
+    const a = mk('pidgeot', 50), b = mk('pinsir', 50);
+    const d = [];
+    S.tentarDancas(a, b, () => 0.001, d);
+    const m = { player: a.name, enemy: b.name, golpes: d };
+    ok('com os lados trocados o selo acompanha',
+       S.selosDoConfronto(m, 'e').indexOf(ESPADA) >= 0 && S.selosDoConfronto(m, 'e').indexOf(PLUMA) >= 0 &&
+       S.selosDoConfronto(m, 'p').trim() === '',
+       'p=' + JSON.stringify(S.selosDoConfronto(m, 'p')) + '  e=' + JSON.stringify(S.selosDoConfronto(m, 'e')));
+  }
+
+  /* SO ESPADAS: o selo vai em quem USOU */
+  {
+    const a = mk('scyther', 50), b = mk('machop', 50);
+    const d = []; S.tentarDancas(a, b, () => 0.001, d);
+    const m = { player: a.name, enemy: b.name, golpes: d };
+    ok('so espadas: o selo vai em quem usou', S.selosDoConfronto(m, 'p') === ' ' + ESPADA + '\ufe0f' &&
+       S.selosDoConfronto(m, 'e') === '', JSON.stringify(S.selosDoConfronto(m, 'p')));
+  }
+  /* SO PLUMA: o selo vai no OUTRO */
+  {
+    const a = mk('machop', 50), b = mk('pidgey', 50);
+    const d = []; S.tentarDancas(a, b, () => 0.001, d);
+    const m = { player: a.name, enemy: b.name, golpes: d };
+    ok('so pluma: o selo vai em quem SOFREU, nao em quem usou',
+       S.selosDoConfronto(m, 'p') === ' ' + PLUMA && S.selosDoConfronto(m, 'e') === '',
+       'p=' + JSON.stringify(S.selosDoConfronto(m, 'p')) + '  e=' + JSON.stringify(S.selosDoConfronto(m, 'e')));
+  }
+  /* SEM DANCA NENHUMA: nada de selo */
+  {
+    const m = { player: 'A', enemy: 'B', golpes: [{ q:'p', d:10, x:null }] };
+    ok('confronto sem danca nao ganha selo', S.selosDoConfronto(m, 'p') === '' && S.selosDoConfronto(m, 'e') === '');
+    /* e log VELHO, gravado antes das dancas existirem, sai sem selo -- que e o que ele era */
+    ok('e log velho (sem o campo golpes) tambem', S.selosDoConfronto({ player:'A', enemy:'B' }, 'p') === '');
+  }
+
+  /* NA TELA: o quadro do lutador mostra */
+  {
+    let alvo = null;
+    for(let i = 0; i < 4000 && !alvo; i++){
+      const t = [mk('pinsir', 50)], e = [mk('pidgeot', 50)];
+      S.equiparNpc(e);
+      const m = (S.simulateGymBattle(t, e, S.makeSeededRng('sel' + i)).matchups || [])[0];
+      if(m && (m.golpes || []).filter(g => g.x === 'espadas' || g.x === 'pluma').length === 2) alvo = m;
+    }
+    ok('achei uma batalha de verdade com as duas dancas', !!alvo);
+    if(alvo){
+      const html = S.fighterHtml(alvo, 'p', { hp: alvo.playerHpAfter, passo: 99, comTerreno: true });
+      ok('o quadro do lutador mostra os dois selos', html.indexOf(ESPADA) >= 0 && html.indexOf(PLUMA) >= 0,
+         html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 50));
+      /* ⚠️ QUEM ESTA SAINDO DE CAMPO (o quadro do Remoinho) NAO leva selo: o efeito e de quem esta
+         lutando agora. */
+      const cli = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
+      ok('e quem esta saindo de campo nao leva', /\$\{saindo\?''\:selosDoConfronto\(m, lado\)\}/.test(cli));
+    }
+  }
+
+  /* AS QUATRO TELAS DE BATALHA leem a MESMA funcao -- copias divergiriam no primeiro ajuste */
+  {
+    const cli = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
+    const usos = (cli.match(/selosDoConfronto\(/g) || []).length;
+    /* 1 definicao + 1 no fighterHtml (as 3 primeiras telas) + 2 na liga assistida + 2 no online.
+       ⚠️ A FUNCAO MUDOU DE NOME em 14/09/2026 (selosDaDanca -> selosDoConfronto) quando a FURIA
+       entrou nela: ela deixou de ser so das duas dancas. */
+    ok('as quatro telas de batalha usam a mesma funcao', usos >= 6, usos + ' usos');
+    ok('a liga assistida mostra', /selosDoConfronto\(m, 'p'\)/.test(cli) && /selosDoConfronto\(m, 'e'\)/.test(cli));
+    ok('e o online tambem, com a perspectiva ja virada',
+       /selosDoConfronto\(anim\.mVirado, 'p'\)/.test(cli) && /selosDoConfronto\(anim\.mVirado, 'e'\)/.test(cli));
+  }
+}
+
+console.log('\n=== QUEM MORRE DORMINDO NAO ACORDA (14/09/2026) ===');
+{
+  /* Reportado com print num Venusaur x Mr. Mime: o Mr. Mime levou o golpe dormindo, morreu (0/331),
+     e a linha do despertar saiu logo abaixo. Pedido: *"quando um pokemon morre durante o sono, nao
+     precisa exibir que ele acordou e voltou para a luta, nem no log e nem na batalha"*.
+     ⚠️ O CONTADOR DO SONO ANDA NO COMECO DA TROCA e o pokemon leva o golpe no MEIO dela -- entao so
+     depois dos golpes da pra saber se ele chegou vivo ao fim. */
+  const mk2 = (id, lv) => { const p = S.createInstance(id, lv); p.maxHp = S.calcMaxHp(p); p.hp = p.maxHp; p.ataques = S.ataquesPadrao(p); return p; };
+  const puro = h => String(h).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  /* ⚠️ O MR. MIME E O TIME A: o `preservePlayerHp` preserva o A e CURA o B -- montado ao contrario,
+     ele entrava cheio e o cenario nao acontecia nenhuma vez em 12.000 voltas. E a mesma armadilha
+     que a medicao do revide ja tinha custado. */
+  let morreu = 0, comLinha = 0, sobreviveu = 0, semLinha = 0, ex = null;
+  for(let i = 0; i < 9000; i++){
+    const a = mk2('mrmime', 51); a.hp = 20 + (i % 40);
+    const b = mk2('venusaur', 57);
+    const m = (S.simulateGymBattle([a], [b], S.makeSeededRng('dorme' + i), { preservePlayerHp:true }).matchups || [])[0];
+    if(!m) continue;
+    const g = m.golpes || [];
+    const iS = g.findIndex(x => x.x === 'sono');
+    if(iS < 0) continue;
+    const ladoDormiu = g[iS].q === 'p' ? 'e' : 'p';
+    if(ladoDormiu !== 'p') continue;
+    const iG = g.findIndex((x, k) => k > iS && !x.x && x.d > 0 && x.q !== ladoDormiu);
+    if(iG < 0) continue;
+    const temLinha = g.some(x => x.x === 'acordou');
+    if(g[iG].hp === 0){ morreu++; if(temLinha){ comLinha++; if(!ex) ex = m; } }
+    else { sobreviveu++; if(temLinha) semLinha++; }
+  }
+  /* ⚠️ QUEM SOBREVIVE PRECISA DE UM LACO PROPRIO: com 20-60 de vida o Mr. Mime morre SEMPRE no
+     golpe que leva dormindo, e o contra-caso ficava em 0 de 0 -- um teste que nao testa nada. */
+  for(let i = 0; i < 4000 && sobreviveu < 120; i++){
+    const a = mk2('mrmime', 51);              // cheio: sobrevive ao golpe
+    const b = mk2('venusaur', 57);
+    const m = (S.simulateGymBattle([a], [b], S.makeSeededRng('vive' + i), { preservePlayerHp:true }).matchups || [])[0];
+    if(!m) continue;
+    const g = m.golpes || [];
+    const iS = g.findIndex(x => x.x === 'sono');
+    if(iS < 0) continue;
+    const ladoDormiu = g[iS].q === 'p' ? 'e' : 'p';
+    if(ladoDormiu !== 'p') continue;
+    const iG = g.findIndex((x, k) => k > iS && !x.x && x.d > 0 && x.q !== ladoDormiu);
+    if(iG < 0 || g[iG].hp === 0) continue;
+    sobreviveu++;
+    if(g.some(x => x.x === 'acordou')) semLinha++;
+  }
+  ok('amostra de sobra: ele morreu dormindo em ' + morreu + ' confrontos', morreu > 100, String(morreu));
+  ok('e NENHUM deles anuncia o despertar', comLinha === 0,
+     comLinha + ' de ' + morreu + (ex ? '   |  ' + puro(S.passosHtml(ex)).slice(0, 90) : ''));
+  /* e o contrario continua valendo: quem SOBREVIVE ao golpe acorda e anuncia */
+  ok('mas quem SOBREVIVE continua anunciando', sobreviveu > 50 && semLinha === sobreviveu,
+     semLinha + ' de ' + sobreviveu);
+  /* ⚠️ E O PONTO FINAL NAO DOBRA COM O "!": a frase ja vem pontuada do pedido, e a linha saia "!." */
+  {
+    let comAcordou = null;
+    for(let i = 0; i < 4000 && !comAcordou; i++){
+      const m = (S.simulateGymBattle([mk2('venusaur', 57)], [mk2('machop', 45)], S.makeSeededRng('pt' + i)).matchups || [])[0];
+      if(m && (m.golpes || []).some(x => x.x === 'acordou')) comAcordou = m;
+    }
+    ok('achei um despertar pra medir o ponto', !!comAcordou);
+    if(comAcordou) ok('a linha do log nao sai com "!."', !/!\./.test(puro(S.passosHtml(comAcordou))),
+      (puro(S.passosHtml(comAcordou)).match(/\w+ acordou[^!]*!\.?/) || [''])[0]);
+    ok('o pontoFinal so acrescenta quando falta',
+       S.pontoFinal('Ja tem!') === 'Ja tem!' && S.pontoFinal('Nao tem') === 'Nao tem.');
+  }
+}
+
+console.log('\n=== O SELO DA FURIA (14/09/2026) ===');
+{
+  /* Pedido: *"coloque um sinal tambem no pokemon que esta com Furia ativa"*.
+     ⚠️ ELA E DIFERENTE DAS DUAS DANCAS num ponto que importa: **ela ACUMULA por batalha**, entao um
+     pokemon pode atravessar tres confrontos furioso com a marca do diario so no PRIMEIRO. Por isso
+     o selo sai do CAMPO do matchup (`playerFuria`/`enemyFuria`, o acumulado) e nao da marca --
+     lido do diario, ele sumiria justamente nos confrontos em que o bonus e maior. */
+  const mk2 = (id, lv) => { const p = S.createInstance(id, lv); p.maxHp = S.calcMaxHp(p); p.hp = p.maxHp; p.ataques = S.ataquesPadrao(p); return p; };
+  let umaVez = null, acumulada = null, herdada = null, semFuria = null;
+  for(let i = 0; i < 9000 && !(umaVez && acumulada && herdada && semFuria); i++){
+    const t = [mk2('tauros', 55)];
+    const e = ['ratata','pidgey','caterpie','weedle'].map(id => mk2(id, 26));
+    S.equiparNpc(e);
+    (S.simulateGymBattle(t, e, S.makeSeededRng('fu' + i)).matchups || []).forEach(m => {
+      if(!umaVez && m.playerFuria === 1) umaVez = m;
+      if(!acumulada && m.playerFuria >= 2) acumulada = m;
+      if(!herdada && m.playerFuria > 0 && !(m.golpes || []).some(x => x.x === 'furia')) herdada = m;
+      if(!semFuria && !m.playerFuria) semFuria = m;
+    });
+  }
+  ok('achei os quatro casos', !!(umaVez && acumulada && herdada && semFuria));
+  ok('com a furia ativa o selo sai', umaVez && S.selosDoConfronto(umaVez, 'p').indexOf('\ud83d\ude24') >= 0,
+     umaVez ? JSON.stringify(S.selosDoConfronto(umaVez, 'p')) : '');
+  ok('e so no lado dele', umaVez && S.selosDoConfronto(umaVez, 'e').indexOf('\ud83d\ude24') < 0);
+  /* O NUMERO SAI A PARTIR DA SEGUNDA, como a frase do log ja faz: sem ele, um Tauros com +30 de
+     tudo mostra o mesmo selo de um com +10. */
+  ok('a partir da 2a vez o selo traz o numero',
+     acumulada && S.selosDoConfronto(acumulada, 'p').indexOf(String(acumulada.playerFuria)) >= 0,
+     acumulada ? JSON.stringify(S.selosDoConfronto(acumulada, 'p')) + ' (furia ' + acumulada.playerFuria + ')' : '');
+  ok('e na primeira ele sai LIMPO', umaVez && S.selosDoConfronto(umaVez, 'p').indexOf('1') < 0);
+  /* ⚠️ O CASO QUE A MARCA DO DIARIO NAO PEGA -- e o motivo do campo existir */
+  ok('a furia HERDADA de um confronto anterior tambem mostra',
+     herdada && S.selosDoConfronto(herdada, 'p').indexOf('\ud83d\ude24') >= 0,
+     herdada ? 'furia ' + herdada.playerFuria + ' sem marca no diario' : '');
+  ok('e sem furia nao sai selo nenhum', semFuria && S.selosDoConfronto(semFuria, 'p').indexOf('\ud83d\ude24') < 0);
+  /* log VELHO, gravado antes do campo existir, sai sem selo -- nao pode sumir */
+  ok('log velho (sem o campo) sai sem selo',
+     S.selosDoConfronto({ player:'A', enemy:'B', golpes:[] }, 'p').indexOf('\ud83d\ude24') < 0);
+  /* e o quadro do lutador mostra */
+  if(umaVez){
+    const html = S.fighterHtml(umaVez, 'p', { hp: umaVez.playerHpAfter, passo: 99, comTerreno: true });
+    ok('o quadro do lutador mostra o selo da furia', html.indexOf('\ud83d\ude24') >= 0,
+       String(html).replace(/<[^>]+>/g, ' ').replace(/s+/g, ' ').trim().slice(0, 40));
+  }
+  /* OS DOIS MOTORES gravam o campo -- o online le o mesmo selo */
+  {
+    const cli = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
+    const srv = require('fs').readFileSync(path.join(raiz, 'functions', 'index.js'), 'utf8');
+    ok('a furia viaja no matchup nos DOIS motores',
+       /playerFuria: active\._furia \|\| 0/.test(cli) && /playerFuria: a\._furia \|\| 0/.test(srv));
+  }
+}
+
+console.log('\n=== QUEM ESTA RASPANDO NAO DERRUBA UM POKEMON CHEIO NUM GOLPE (14/09/2026) ===');
+{
+  /* Reportado com print: uma PONYTA com 10 de 362 (2,8%) atravessou um Heracross e um Victreebel
+     CHEIOS, matando cada um com um golpe e sem tomar nada de volta. Pedido: *"quando for assim de um
+     pokemon com menos de 10% de hp for levar o outro com vida cheia em um golpe so, coloque que o
+     dano dele vai ser de 70%"*.
+     ⚠️ ELA E A OUTRA METADE DO PISO DO REVIDE: desde 12/09 o revide moribundo nao mata, e desde
+     13/09 ele nem gera linha quando o alvo JA estava na faixa -- o que criou exatamente este caso.
+     A trava fecha o ciclo pelo lado do ATAQUE. */
+  const mk2 = (id, lv) => { const p = S.createInstance(id, lv); p.maxHp = S.calcMaxHp(p); p.hp = p.maxHp; p.ataques = S.ataquesPadrao(p); return p; };
+  ok('as constantes sao as pedidas', S.MORIBUNDO_ABAIXO_DE === 0.10 && S.MORIBUNDO_TETO_NO_CHEIO === 0.70,
+     (100 * S.MORIBUNDO_ABAIXO_DE) + '% / ' + (100 * S.MORIBUNDO_TETO_NO_CHEIO) + '%');
+
+  /* O CASO PEDIDO: raspando, alvo CHEIO, e o golpe mataria -> o alvo fica com 30% */
+  {
+    const a = mk2('ponyta', 70); a.hp = Math.round(a.maxHp * 0.02); a.ataques = ['fireblast'];
+    const b = mk2('caterpie', 40); b.ataques = ['tackle'];
+    const m = (S.simulateGymBattle([a], [b], S.makeSeededRng('rasp'), { preservePlayerHp:true }).matchups || [])[0];
+    const pct = 100 * m.enemyHpAfter / m.enemyMaxHp;
+    ok('o alvo cheio sobra com ~30% da barra', Math.abs(pct - 30) < 2, pct.toFixed(1) + '%');
+    ok('e ele revida de pe', m.enemyHpAfter > 0 && m.playerHpAfter <= 0, 'venceu: ' + m.winner);
+  }
+
+  /* ⚠️ AS TRES CONDICOES. Fora delas nada muda -- e cada uma tem um caso proprio, porque uma trava
+     que morde onde nao devia e pior que trava nenhuma. */
+  {
+    /* (a) o atacante NAO esta raspando: mata normalmente */
+    const a = mk2('ponyta', 70); a.hp = Math.round(a.maxHp * 0.5); a.ataques = ['fireblast'];
+    const b = mk2('caterpie', 40); b.ataques = ['tackle'];
+    const m = (S.simulateGymBattle([a], [b], S.makeSeededRng('ok1'), { preservePlayerHp:true }).matchups || [])[0];
+    ok('com metade da vida ele mata de vida cheia como sempre', m.enemyHpAfter <= 0,
+       m.enemyHpAfter + '/' + m.enemyMaxHp);
+  }
+  {
+    /* (b) o alvo NAO esta cheio: mata normalmente -- a trava e sobre derrubar um pokemon INTEIRO.
+       ⚠️ AQUI O simulateGymBattle NAO SERVE: ele CURA o time B, entao o alvo entrava cheio e a trava
+       pegava -- o teste acusava um defeito que nao existe. E a mesma armadilha do preservePlayerHp
+       que ja custou duas medicoes. O doExchange resolve UMA troca com os HPs que eu mando. */
+    const a = mk2('ponyta', 70); a.hp = Math.round(a.maxHp * 0.02); a.ataques = ['fireblast'];
+    const b = mk2('caterpie', 40); b.ataques = ['tackle']; b.hp = Math.round(b.maxHp * 0.9);
+    const d = [];
+    S.doExchange(a, b, S.makeSeededRng('ok2'), d);
+    ok('contra um alvo JA machucado ele mata normalmente', b.hp <= 0,
+       b.hp + '/' + b.maxHp + ' (entrou com 90%)');
+  }
+  {
+    /* (c) o golpe NAO mataria: sai inteiro, sem teto nenhum */
+    const a = mk2('ponyta', 55); a.hp = 10; a.ataques = ['ember'];
+    const b = mk2('snorlax', 70); b.ataques = ['tackle'];
+    const antes = b.hp;
+    const m = (S.simulateGymBattle([a], [b], S.makeSeededRng('ok3'), { preservePlayerHp:true }).matchups || [])[0];
+    const tirou = antes - m.enemyHpAfter;
+    ok('um golpe que NAO mataria sai inteiro', tirou > 0 && m.enemyHpAfter > m.enemyMaxHp * 0.30,
+       'tirou ' + tirou + ' de ' + m.enemyMaxHp);
+  }
+
+  /* ⚠️ O TETO VALE POR TROCA, nao por golpe: um multi-tapa tambem "leva o outro num ataque so", e
+     limitar so o primeiro tapa deixaria os outros quatro matarem do mesmo jeito. */
+  {
+    /* ⚠️ A REGRA E SOBRE MATAR DE VIDA CHEIA, nao sobre o confronto inteiro: depois da primeira
+       troca o alvo JA esta em 30% e a trava deixa de valer -- ele morre na troca seguinte, e nesse
+       meio-tempo revidou. E isso que o pedido quer ("nao deveria aguentar tanto"). Por isso o teste
+       mede UMA TROCA, com o doExchange. */
+    let comTapa = 0, matouNaPrimeira = 0, sobrou30 = 0;
+    for(let i = 0; i < 400; i++){
+      const a = mk2('ninetales', 70); a.hp = Math.round(a.maxHp * 0.03); a.ataques = ['firespin'];
+      const b = mk2('caterpie', 45); b.ataques = ['tackle'];
+      const d = [];
+      S.doExchange(a, b, S.makeSeededRng('tp' + i), d);
+      const tapas = d.filter(g => !g.x && g.q === 'p' && g.tn > 1);
+      if(!tapas.length) continue;
+      comTapa++;
+      if(b.hp <= 0) matouNaPrimeira++;
+      if(Math.abs(100 * b.hp / b.maxHp - 30) < 2) sobrou30++;
+    }
+    ok('amostra de multi-tapa pra medir', comTapa > 50, comTapa + ' trocas');
+    ok('e o multi-tapa de quem raspa tambem NAO mata o alvo cheio', matouNaPrimeira === 0,
+       matouNaPrimeira + ' de ' + comTapa);
+    ok('o alvo sobra com ~30% mesmo levando varios tapas', sobrou30 === comTapa,
+       sobrou30 + ' de ' + comTapa);
+  }
+
+  /* ⚠️ O REVIDE MORIBUNDO FICA DE FORA: ali o atacante JA caiu (hp 0, sempre "abaixo de 10%") e o
+     revide ja tem a propria trava -- o piso de 1%-10%. Somar as duas o apararia duas vezes. */
+  {
+    const cli = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
+    ok('o revide moribundo nao passa pelo teto',
+       /aplicarGolpes\(first, segundoCaiu \? counter : tetoDeQuemRaspa\(second, first, counter\)\)/.test(cli));
+  }
+
+  /* OS DOIS MOTORES: a mesma regra e os mesmos numeros */
+  {
+    const cli = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
+    const srv = require('fs').readFileSync(path.join(raiz, 'functions', 'index.js'), 'utf8');
+    ok('as constantes existem nos dois',
+       /const MORIBUNDO_ABAIXO_DE = 0\.10;/.test(cli) && /const MORIBUNDO_ABAIXO_DE = 0\.10;/.test(srv) &&
+       /const MORIBUNDO_TETO_NO_CHEIO = 0\.70;/.test(cli) && /const MORIBUNDO_TETO_NO_CHEIO = 0\.70;/.test(srv));
+    ok('e a funcao tambem', /function tetoDeQuemRaspa|const tetoDeQuemRaspa/.test(cli) && /const tetoDeQuemRaspa/.test(srv));
   }
 }
 

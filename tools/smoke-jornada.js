@@ -26,6 +26,13 @@ const HTML = (()=>{ const i=args.indexOf('--html'); return i>=0 ? args[i+1] : nu
 /* --dificil roda as jornadas no modo DIFICIL. Sem ele o bot so joga no normal, e uma mudanca que
    so existe no dificil (a chance de shiny, o bolo de niveis) ficaria invisivel na medicao. */
 const DIFICIL = args.includes('--dificil');
+/* --corte finge um treinador que JA TEM o HM01 e o ensinou: ele passa a poder entrar na Mata
+   Fechada, e o bot sempre entra quando ela aparece. Sem ele a mata e invisivel na medicao -- o bot
+   nunca ensina nada, entao o card fica trancado e a rota nunca e escolhida. E o unico jeito de
+   medir a Vigilia contra o encontro selvagem que ela substitui. */
+const CORTE = args.includes('--corte');
+/* quanto a Vigilia foi jogada e como ela terminou -- o numero que interessa nao e so a conclusao */
+const vigilia = { entrou:0, venceu:0, niveis:[], porTrecho:{} , ultimoTrecho:null };
 
 const TERMINAL = new Set(['journeyEnd','gameover']);
 const MAX_STEPS = 4000;
@@ -46,7 +53,39 @@ function act(g, log){
     // 'routeChoice' separada, que não existem mais)
     case 'walk':
     case 'walkNext':
-    case 'routeChoice':  g.chooseRoute(game.routeCards[Math.floor(Math.random()*game.routeCards.length)]); return true;
+    case 'routeChoice': {
+      /* A MATA FECHADA e uma carta como as outras, mas so da pra entrar com alguem que corte -- e
+         o bot nunca ensina o HM01, entao ele filtra o que a tela desabilitaria. Sem o filtro ele
+         chamaria chooseRoute num card trancado, a acao recusaria em silencio e a jornada travaria
+         na mesma tela ate o MAX_STEPS. */
+      if(CORTE){
+        /* ensina o Corte a quem puder: e o que um treinador com o HM01 na mochila faria */
+        const quem = (game.team||[]).find(p => g.podeAprenderCorte(p.speciesId));
+        if(quem && !g.sabeCortar(quem)){
+          quem.ataques = [g.GOLPE_DO_CORTE].concat((quem.ataques||[]).slice(0, g.MAX_GOLPES - 1));
+        }
+      }
+      const abertas = game.routeCards.filter(id => {
+        const r = g.routeById(id);
+        return r && (!r.corte || g.timeQueCorta(game.team));
+      });
+      /* com --corte a mata e SEMPRE preferida: o que se quer medir e o desvio, nao a chance de o
+         bot aleatorio cair nele */
+      const mata = CORTE && abertas.find(id => { const r = g.routeById(id); return r && r.corte; });
+      g.chooseRoute(mata || abertas[Math.floor(Math.random()*abertas.length)]);
+      return true;
+    }
+    /* A VIGILIA: a clareira e a escolha do premio. O bot pega sempre o primeiro -- o que ele mede
+       e a taxa de CONCLUSAO da jornada, nao a qualidade da escolha. */
+    case 'mataFechada':
+      vigilia.entrou++;
+      vigilia.niveis.push(Math.round((game.team||[]).reduce((a,p)=>a+p.level,0) / (game.team||[1]).length));
+      vigilia.ultimoTrecho = game.gymIndex;
+      const t = vigilia.porTrecho[game.gymIndex] = vigilia.porTrecho[game.gymIndex] || {n:0,v:0,lv:0};
+      t.n++; t.lv += Math.round((game.team||[]).reduce((a,p)=>a+p.level,0) / (game.team||[1]).length);
+      g.comecarAVigilia();
+      return true;
+    case 'vigiliaPremio': vigilia.venceu++; if(vigilia.porTrecho[vigilia.ultimoTrecho]) vigilia.porTrecho[vigilia.ultimoTrecho].v++; g.escolherOPremioDaVigilia(0); return true;
     case 'routeEvent':   Math.random()<0.5 ? g.crossTunnelBlind() : g.crossTunnelSlow(); return true;
     case 'fossil':       Math.random()<0.8 ? g.chooseFossil(Math.random()<0.5?'omanyte':'kabuto') : g.skipFossil(); return true;
     case 'dojo':         g.chooseDojoPrize(Math.random()<0.5?'hitmonlee':'hitmonchan'); return true;
@@ -124,8 +163,13 @@ function act(g, log){
     case 'aprenderAtaque': {
       const pend = g.__getGame().aprenderAtaque;
       const p = g.__getGame().team.find(x => x.id === pend.id);
-      const pior = p.ataques.slice().sort((a,b)=> g.GOLPES[a][1] - g.GOLPES[b][1])[0];
-      g.responderAprendizado(g.GOLPES[pend.golpe][1] > g.GOLPES[pior][1] ? pior : null);
+      /* ⚠️ ELE ESCOLHE ENTRE OS TROCAVEIS, nao entre todos os `ataques`: golpe de Maquina (o HM01)
+         nao se desaprende, a acao recusa em silencio, e o bot ficava oferecendo o Corte pra sempre
+         -- a jornada travava nesta tela ate o MAX_STEPS. 72 falhas em 100 jornadas.
+         `ataquesTrocaveis` e a MESMA lista que a tela desenha, que e o que um jogador ve. */
+      const podem = g.ataquesTrocaveis(p);
+      const pior = podem.slice().sort((a,b)=> g.GOLPES[a][1] - g.GOLPES[b][1])[0];
+      g.responderAprendizado(pior && g.GOLPES[pend.golpe][1] > g.GOLPES[pior][1] ? pior : null);
       return true;
     }
     case 'levels': {
@@ -188,6 +232,11 @@ for(let run=0; run<RUNS; run++){
   st.screen = 'start';
   st.trainerName = 'Teste'+run;
   st.rivalName = 'Gary';
+  /* o SLOT e a GERACAO entram na semente da Mata Fechada (ver temRotaDoCorte). Sem eles todas as
+     jornadas do smoke teriam o MESMO perfil de trechos com mata -- que e exatamente o que
+     aconteceu na primeira medicao: zero entradas em 300 jornadas. */
+  st.currentSaveSlot = run % 20;
+  st.saveGen = Math.floor(run / 20);
   st.gameMode = DIFICIL ? 'hard' : 'normal';
   st.nuzlocke = NUZ ? (run % 5 === 0) : false;      // 1 em 5 jornadas testa o modo Nuzlocke
   st.dailyChallenge = (run % 7 === 0);
@@ -226,6 +275,12 @@ for(let run=0; run<RUNS; run++){
 console.log(`\n=== SMOKE TEST DA JORNADA — ${RUNS} jornadas completas ===\n`);
 console.log(`  Jornadas concluídas (8 insígnias ou fim normal): ${completed}`);
 console.log(`  Game overs (5 derrotas): ${gameovers}${gameoverGyms.length?' — no ginásio '+gameoverGyms.sort((a,b)=>a-b).join(', '):''}`);
+if(vigilia.entrou){
+  const m = vigilia.niveis.reduce((a,n)=>a+n,0) / vigilia.niveis.length;
+  console.log(`  Vigilia: entrou ${vigilia.entrou}x, venceu ${vigilia.venceu} (${(100*vigilia.venceu/vigilia.entrou).toFixed(1)}%), nivel medio do time ${m.toFixed(1)}`);
+  Object.keys(vigilia.porTrecho).sort().forEach(k=>{ const t=vigilia.porTrecho[k];
+    console.log(`    trecho ${Number(k)+1}: ${t.n}x, venceu ${(100*t.v/t.n).toFixed(1)}%, time ~${(t.lv/t.n).toFixed(0)}`); });
+}
 console.log(`  Falhas: ${failures}`);
 console.log(`\n  Telas visitadas (${screensSeen.size}): ${[...screensSeen].sort().join(', ')}`);
 console.log(`  Eventos disparados (${eventsSeen.size}): ${[...eventsSeen].sort().join(', ')}\n`);

@@ -29,8 +29,9 @@ function ok(titulo, cond, extra){
   else { falhas++; console.log('  FALHOU ' + titulo + (extra ? '   ' + extra : '')); }
 }
 const contaEm = (t, re) => (t.match(re)||[]).length;
-/* Os slots de verdade -- `class="item-slot` também casa com item-slot-icone e item-slot-qtd. */
-const slots = (t) => contaEm(t, /class="item-slot[ "]/g);
+/* ⚠️ A MOCHILA VIROU UMA LISTA como a loja (14/09/2026): a grade de quadradinhos (.item-slot)
+   morreu, e o que se conta agora e a LINHA. */
+const linhas = (t) => contaEm(t, /class="loja-linha/g);
 
 function conta({ doces = 0, saves = [], notificacoes = [] } = {}){
   const g = S.__getGame();
@@ -58,20 +59,23 @@ console.log('\n=== AS PILHAS: O QUE A CONTA TEM ===');
      JSON.stringify(p.map(x=>x.item+':'+x.quantidade)));
   S.escolherItem('doce_raro');
   const t = S.renderInventario();
-  ok('e a grade mostra o 5x', /item-slot-qtd">5x/.test(t), (t.match(/item-slot-qtd">\d+x/g)||[]).join(' '));
-  ok('num slot so', contaEm(t, /item-slot-icone/g) === 1, contaEm(t, /item-slot-icone/g) + ' icones');
+  ok('e a lista mostra o 5x', /loja-preco">5x/.test(t), (t.match(/loja-preco">\d+x/g)||[]).join(' '));
+  ok('numa linha so', linhas(t) === 1, linhas(t) + ' linhas');
 
   conta();
   ok('conta sem nada nao tem pilha nenhuma', S.pilhasDoInventario().length === 0);
   const vazio = S.renderInventario();
-  ok('e a tela explica de onde vem cada coisa', /Torre dos Treinadores/.test(vazio) && /Elite dos 4/.test(vazio));
-  /* A grade continua desenhada mesmo vazia: uma mochila que encolhe ate caber no que voce tem nao
-     parece uma mochila, parece uma lista. */
-  ok('a grade continua la, com os slots vazios', slots(vazio) === S.INVENTARIO_SLOTS_MINIMOS,
-     slots(vazio) + ' slots');
-  /* Slot vazio e <div>, nao <button> desabilitado: nao ha nada pra fazer nele, e um botao vazio
-     ainda recebe foco pelo teclado. */
-  ok('e slot vazio nao e botao', !/<button class="item-slot vazio"/.test(vazio));
+  /* ⚠️ A PRATELEIRA VAZIA CONTINUA DIZENDO DE ONDE VEM O QUE FALTA -- era o que a mochila vazia
+     dizia antes das prateleiras, e uma tela que so diz 'vazio' faz a pessoa procurar no jogo
+     inteiro. A das MAQUINAS e a unica que ficou muda, e foi o que se pediu. */
+  S.escolherPrateleiraDaMochila('especiais');
+  const vazio2 = S.renderInventario();
+  ok('e a prateleira vazia explica de onde vem cada coisa',
+     /Torre dos Treinadores/.test(vazio2) && /Elite dos 4/.test(vazio2));
+  ok('sem nada, a lista nao desenha linha nenhuma', linhas(vazio2) === 0, linhas(vazio2) + ' linhas');
+  ok('e o quadro de cima fica EM BRANCO (mas continua la)',
+     /class="box item-detalhe loja-fixa"><\/div>/.test(vazio2),
+     (vazio2.match(/loja-fixa">[\s\S]{0,20}/) || [''])[0].replace(/\s+/g, ' '));
 }
 
 console.log('\n=== O CUPOM DE BONUS SHINY VEM DAS DUAS ORIGENS ===');
@@ -107,8 +111,8 @@ console.log('\n=== O QUADRO DE CIMA: USAR E EXCLUIR ===');
   conta({ doces: 2, saves: [SAVE_CAMPEAO] });
   S.escolherItem('doce_raro');
   const t = S.renderInventario();
-  ok('o quadro descreve o item escolhido', t.includes('Doce Raro') && t.includes('2 no inventário'),
-     (t.match(/\d+ no inventário/g)||[]).join(' '));
+  ok('o quadro descreve o item escolhido', t.includes('Doce Raro') && t.includes('2 na mochila'),
+     (t.match(/\d+ na mochila/g)||[]).join(' '));
   ok('com o botao de usar', /class="btn success" [^>]*onclick="usarItem\('doce_raro'\)"/.test(t) ||
      /onclick="usarItem\('doce_raro'\)"/.test(t));
   /* O DOCE NAO PODE SER EXCLUIDO: ele e um contador que so o servidor mexe, e nao existe funcao
@@ -255,7 +259,7 @@ console.log('\n=== AS TRES PRATELEIRAS DA LOJA ===');
   conta({ doces: 0 });
   S.openLoja();
   ok('sao tres, na ordem pedida',
-     S.LOJA_PRATELEIRAS.map(p => p.nome).join(' | ') === 'Para as batalhas | Especiais | TMs',
+     S.LOJA_PRATELEIRAS.map(p => p.nome).join(' | ') === 'Para as batalhas | Especiais | TMs/HMs',
      S.LOJA_PRATELEIRAS.map(p => p.nome).join(' | '));
   ok('e a loja abre na primeira', S.__getGame().lojaAba === 'batalha', String(S.__getGame().lojaAba));
 
@@ -381,14 +385,18 @@ console.log('\n=== AS TRES PRATELEIRAS DA LOJA ===');
 
     /* ⚠️ OS BOTOES FICAM NO RODAPE, e o rodape e irmao do miolo -- nao filho dele. Dentro do miolo
        eles rolariam com a descricao, que e exatamente o que se pediu pra parar. */
-    const quadroHtml = (css.match(/<div class="box item-detalhe loja-fixa">[\s\S]*?\n  <\/div>/) || [''])[0];
+    /* ⚠️ O QUADRO DA LOJA, e nao o primeiro do arquivo: desde 14/09/2026 a MOCHILA usa a mesma
+       marcacao (.loja-fixa) e ela vem ANTES no index.html -- sem recortar a partir do renderLoja,
+       esta trava passou a medir o quadro da outra tela. */
+    const soALoja = css.slice(css.indexOf('function renderLoja(){'));
+    const quadroHtml = (soALoja.match(/<div class="box item-detalhe loja-fixa">[\s\S]*?\n  <\/div>/) || [''])[0];
     const iMiolo = quadroHtml.indexOf('loja-miolo');
     const iRodape = quadroHtml.indexOf('loja-rodape');
     const iAcoes = quadroHtml.indexOf('item-acoes');
     ok('os botoes estao no rodape, depois do miolo',
        iMiolo > 0 && iRodape > iMiolo && iAcoes > iRodape,
        'miolo em ' + iMiolo + ', rodape em ' + iRodape + ', botoes em ' + iAcoes);
-    ok('deixando um recado so, que nomeia a prateleira', /Ainda não há TMs à venda/.test(t),
+    ok('deixando um recado so, que nomeia a prateleira', /Ainda não há TMs\/HMs à venda/.test(t),
        (t.match(/loja-vazia[^>]*>[^<]*/g)||[]).join(' | '));
     ok('e o saldo continua na tela', /Você tem <strong>🪙/.test(t));
     /* E O BOTAO DE COMPRAR NAO PODE ESTAR LA: nao ha o que comprar. */
@@ -823,47 +831,63 @@ console.log('\n=== O HM01: A PRIMEIRA MAQUINA OCULTA (11/09/2026) ===');
   g.ganhouHmAgora = null;
   ok('e sem HM ganho a vitoria nao diz nada', S.hmGanhoHtml() === '');
 
-  /* A TELA DE TMs E HMs. Dois estados, e nenhum deles pode ser uma tela muda. */
-  g.currentSaveSlot = 0; g.hms = ['hm01'];
-  ok('a tela lista o HM da conta', /HM01/.test(S.renderTmHm()), limpo(S.renderTmHm()).slice(0, 60));
-  /* SO O NOME E UMA LINHA CURTA (11/09/2026, a pedido): o paragrafo azul que dizia "ainda nao da
-     pra usar em nada" saiu, e o resumo virou uma legenda pequena. Com um item so na lista, a
-     explicacao ocupava mais espaco que a coisa explicada. */
-  ok('e nao traz mais o paragrafo azul por baixo', !/tmhm-obs/.test(S.renderTmHm()));
-  ok('o resumo fica na classe pequena', /tmhm-resumo/.test(S.renderTmHm()));
-  ok('e a tabela nao tem mais descricao', S.HMS.hm01.descricao === undefined);
-  g.hms = [];
-  ok('sem nenhum, ela diz ONDE achar', /S\.S\. Anne/.test(S.renderTmHm()) && /Surge/.test(S.renderTmHm()),
-     limpo(S.renderTmHm()).slice(0, 90));
-  /* A mochila e aberta da HOME tambem, sem save nenhum -- e agora ali TEM o que mostrar, porque os
-     HMs sao da CONTA e nao daquela jornada. */
-  g.currentSaveSlot = null; g.hms = ['hm01'];
+  /* ⚠️ A TELA SEPARADA DE TMs E HMs MORREU EM 14/09/2026: ela virou a terceira PRATELEIRA da
+     mochila, quando a mochila passou a ser uma lista como a loja (a pedido). O que era tela agora
+     e uma aba, e e isso que estas travas cobram. */
+  g.currentSaveSlot = 0; g.hms = ['hm01']; g.inventario = {}; g.rareCandies = 0;
+  S.escolherPrateleiraDaMochila('tms');
+  {
+    const t = S.renderInventario();
+    ok('a prateleira lista o HM da conta', /HM01/.test(t) && linhas(t) === 1, limpo(t).slice(0, 70));
+    /* A MAQUINA NAO SE USA NEM SE EXCLUI: ela ENSINA, e ensina quantas vezes quiser. */
+    ok('e o quadro traz o botao de Ensinar', /onclick="abrirEnsinarHm\('hm01'\)"/.test(t));
+    ok('sem Usar e sem Excluir', !/usarItem\(/.test(t) && !/pedirExclusaoDeItem\(/.test(t));
+    ok('e a tabela nao tem mais descricao', S.HMS.hm01.descricao === undefined);
+  }
+  /* ⚠️ SEM NENHUM: o quadro fica EM BRANCO e a lista diz "Nenhum TM/HM" -- os dois ao pe da letra
+     do pedido de 14/09/2026 (*"caso nao possua nenhum TM/HM, deixar em branco"*). A frase que
+     ensinava o caminho do HM01 (S.S. Anne, Lt. Surge de primeira) SAIU no mesmo pedido. */
+  g.hms = []; S.escolherPrateleiraDaMochila('tms');
+  {
+    const t = S.renderInventario();
+    ok('sem nenhum, a lista diz exatamente "Nenhum TM/HM"', /Nenhum TM\/HM/.test(t),
+       (t.match(/loja-vazia[^>]*>[^<]*/g)||[]).join(' | '));
+    ok('e NAO conta mais como ganhar o HM01', !/S\.S\. Anne/.test(t) && !/Surge/.test(t));
+    ok('nem diz "Nenhuma Maquina ainda"', !/Nenhuma M.quina/.test(t));
+    ok('e o quadro de cima fica em branco', /class="box item-detalhe loja-fixa"><\/div>/.test(t));
+    ok('mas a prateleira continua na tela, marcada como vazia',
+       /escolherPrateleiraDaMochila\('tms'\)/.test(t) && /TMs\/HMs/.test(t));
+  }
+  /* A mochila e aberta da HOME tambem, sem save nenhum -- e ali TEM o que mostrar, porque os HMs
+     sao da CONTA e nao daquela jornada. */
+  g.currentSaveSlot = null; g.hms = ['hm01']; S.escolherPrateleiraDaMochila('tms');
   ok('e sem save aberto ela mostra os mesmos, porque sao da conta',
-     /HM01/.test(S.renderTmHm()) && !/Abra um save/.test(S.renderTmHm()), limpo(S.renderTmHm()));
+     /HM01/.test(S.renderInventario()) && !/Abra um save/.test(S.renderInventario()));
   g.currentSaveSlot = 0;
 
-  /* ⚠️ O BOTAO DA MOCHILA ESTA ESCONDIDO PRA TODO MUNDO (12/09/2026, a pedido). O que se cobra
-     agora e o par: ele nao aparece pra NINGUEM -- nem pra quem ja tem o HM01, que era justamente
-     quem via a contagem --, e o RESTO da feature continua de pe.
-     A trava le a constante em vez de so procurar o botao: assim o dia em que ela voltar a ser true
-     o teste acompanha sozinho, e ninguem precisa lembrar de mexer aqui. */
+  /* ⚠️ A PORTA VOLTOU A ABRIR em 13/09/2026, quando o HM01 passou a ENSINAR o Corte -- e em
+     14/09/2026 ela deixou de ser um BOTAO e virou uma PRATELEIRA, sempre visivel.
+     O `abrirTmHm` FICA, apontando pra ela: ele e o que o resto do jogo chama, e um atalho que leva
+     ao lugar certo e melhor que um chamador quebrado. */
   {
-    g.inventario = {}; g.rareCandies = 0; g.hms = [];
-    ok('a porta da tela de TMs e HMs esta fechada', S.MOSTRAR_TM_HM === false, String(S.MOSTRAR_TM_HM));
-    const semHm = S.renderInventario();
-    g.hms = ['hm01'];
+    g.inventario = {}; g.rareCandies = 0; g.hms = ['hm01'];
+    ok('a porta das Maquinas esta aberta', S.MOSTRAR_TM_HM === true, String(S.MOSTRAR_TM_HM));
+    S.escolherPrateleiraDaMochila('batalha');
+    S.abrirTmHm();
+    ok('o abrirTmHm leva pra prateleira das Maquinas', S.__getGame().inventarioAba === 'tms',
+       String(S.__getGame().inventarioAba));
     const comHm = S.renderInventario();
-    ok('a mochila NAO mostra o botao de TMs e HMs',
-       (/abrirTmHm\(\)/.test(semHm) === S.MOSTRAR_TM_HM) && (/abrirTmHm\(\)/.test(comHm) === S.MOSTRAR_TM_HM),
-       'sem HM: ' + /abrirTmHm\(\)/.test(semHm) + '   com HM01: ' + /abrirTmHm\(\)/.test(comHm));
-    ok('nem pra quem ja tem o HM01 (a contagem some junto)',
-       /TMs e HMs/.test(comHm) === S.MOSTRAR_TM_HM, /TMs e HMs \(1\)/.test(comHm) ? 'mostra (1)' : 'nao mostra');
+    ok('e quem tem o HM01 ve a contagem na prateleira', /1 item/.test(comHm));
     ok('e o Voltar continua la', /sairDaMochila\(\)/.test(comHm));
-    /* O RESTO DA FEATURE CONTINUA DE PE -- o que sumiu e so a porta. */
-    ok('a tela continua desenhavel', /HM01/.test(S.renderTmHm()), '(desenha)');
     ok('e o HM01 continua na conta', S.temHM('hm01') === true);
+    /* O `game.screen` nao e salvo, mas nada impede um caminho em memoria de ter posto 'tmhm' ali. */
     ok('e o render ainda sabe desenhar a tela tmhm',
        require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8').indexOf("case 'tmhm':") >= 0);
+    /* A GRADE DE QUADRADINHOS MORREU JUNTO -- e com ela o gradeDeItensHtml e o item-slot. */
+    const cli = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
+    ok('e a grade de quadradinhos nao existe mais',
+       !/function gradeDeItensHtml/.test(cli) && !/class="item-slot/.test(cli));
+    ok('nem a tela separada de TMs e HMs', !/function renderTmHm/.test(cli));
   }
 
   /* ⚠️ O HM E DA CONTA, NAO DO SAVE (11/09/2026, a pedido: "depois que qualquer save conseguiu ele,
@@ -889,14 +913,236 @@ console.log('\n=== O HM01: A PRIMEIRA MAQUINA OCULTA (11/09/2026) ===');
     ok('e jornada nova NAO zera mais os HMs', !/game\.hms = \[\];\s+\/\/ HM é conquista/.test(txt));
   }
 
-  /* ⚠️ O GOLPE `cut` NAO EXISTE NA TABELA, e nao e esquecimento: a base e aprendizado por NIVEL da
-     Gen 3, e HM ninguem aprende por nivel -- o gerador nunca o viu (mesmo caso do `surf`). E por
-     isso que o HM aqui e ITEM e nao golpe.
-     E ATENCAO AO NOME: o jogo JA tem um golpe chamado "Corte", o `slash`. Por isso o item se chama
-     "HM01 — Corte" e nao so "Corte". */
-  ok('o golpe cut NAO esta na tabela de golpes (a base e por nivel)', !S.GOLPES['cut']);
-  ok('e o "Corte" que o jogo ja tem e o slash', S.nomeDoAtaque('slash') === 'Corte');
-  ok('por isso o item carrega o prefixo HM01', /^HM01/.test(S.HMS.hm01.nome), S.HMS.hm01.nome);
+  /* ⚠️ O GOLPE `cut` FOI CADASTRADO A MAO (13/09/2026) -- ele e o UNICO da tabela que nao veio do
+     gerador, porque a base e aprendizado por NIVEL e HM ninguem aprende por nivel (mesmo caso do
+     `surf`). Sem ele o HM01 nao teria o que ensinar.
+     E O NOME BRIGAVA: o jogo ja chamava o `slash` de "Corte". O `slash` virou "Talho" -- que e o
+     nome oficial dele em portugues -- e o "Corte" ficou com quem e o Corte. Dois golpes de nomes
+     iguais no log, um de poder 70 com critico alto e outro de 50, seria indistinguivel de defeito. */
+  ok('o golpe cut EXISTE na tabela de golpes', !!S.GOLPES['cut'], JSON.stringify(S.GOLPES['cut']));
+  ok('ele e Normal, poder 50 (os valores da Gen 1/2/3)',
+     S.GOLPES['cut'][0] === 'Normal' && S.GOLPES['cut'][1] === 50);
+  ok('e ele se chama Corte', S.nomeDoAtaque('cut') === 'Corte');
+  /* ⚠️ ELE NAO PODE ENTRAR NO GOLPES_IDS: aquele array e INDEXADO pelo APRENDIZADO (as entradas
+     sao [nivel, indice]), entao um id a mais no meio trocaria o moveset das 250 especies em
+     silencio. E ninguem o aprende por nivel, entao ele nao tem o que fazer la. */
+  ok('e NAO esta no GOLPES_IDS, que e indexado pelo APRENDIZADO', S.GOLPES_IDS.indexOf('cut') < 0);
+  ok('o slash virou Talho', S.nomeDoAtaque('slash') === 'Talho');
+  ok('e ele continua sendo o de critico alto, nao o Corte',
+     S.GOLPES_CRIT_ALTO.indexOf('slash') >= 0 && S.GOLPES_CRIT_ALTO.indexOf('cut') < 0);
+  ok('o item carrega o prefixo HM01', /^HM01/.test(S.HMS.hm01.nome), S.HMS.hm01.nome);
+  ok('e ele aponta pro golpe que ensina', S.HMS.hm01.golpe === 'cut');
+
+  /* ===== A MAQUINA ENSINA (13/09/2026) ===== */
+  {
+    /* A LISTA DOS 72 saiu do learnsets.ts do Showdown pela tag de maquina da Gen 3 (`3M`), nao foi
+       escrita de cabeca. O que se tranca aqui e o FORMATO dela e as tres surpresas que a intuicao
+       erra -- uma lista que envelhecer calada e o defeito que este projeto mais evita. */
+    ok('sao 72 especies que aprendem o Corte', S.CORTADORES.length === 72, String(S.CORTADORES.length));
+    ok('todas existem no SPECIES', S.CORTADORES.every(id => !!S.SPECIES[id]),
+       S.CORTADORES.filter(id => !S.SPECIES[id]).join(','));
+    ok('nenhuma repetida', new Set(S.CORTADORES).size === S.CORTADORES.length);
+    ok('cinco dos sete iniciais cortam',
+       ['bulbasaur','charmander','chikorita','cyndaquil','totodile'].every(S.podeAprenderCorte));
+    ok('e a linha do Squirtle e o Pichu NAO',
+       !S.podeAprenderCorte('squirtle') && !S.podeAprenderCorte('blastoise') && !S.podeAprenderCorte('pichu'));
+    /* Os quatro lendarios FICAM, porque e o que o dado diz -- a mesma decisao do Lugia no
+       RECUPERACAO e no REMOINHO. O Celebi e INTOCAVEL, entao a entrada dele nao roda hoje. */
+    ok('os lendarios que o dado traz ficam na lista',
+       ['raikou','entei','suicune','celebi'].every(S.podeAprenderCorte));
+
+    /* SABER CORTAR E DA INSTANCIA, nao da especie: dois Scyther do mesmo treinador podem estar um
+       com e outro sem. */
+    const semCorte = { speciesId:'scyther', ataques:['slash','wingattack'] };
+    const comCorte = { speciesId:'scyther', ataques:['cut','wingattack'] };
+    ok('sabeCortar le a instancia, nao a especie', !S.sabeCortar(semCorte) && S.sabeCortar(comCorte));
+    ok('timeQueCorta acha um so no time', S.timeQueCorta([semCorte, comCorte]) && !S.timeQueCorta([semCorte]));
+
+    /* A TELA: todos os pokemons de TODOS os saves, porque a Maquina e da CONTA. */
+    const mk = (id, lv, ats) => ({ id:'m'+id, speciesId:id, name:S.SPECIES[id].name, level:lv, ataques:ats });
+    g.currentSaveSlot = null; g.team = [];
+    g.saveSlots = new Array(S.MAX_SAVE_SLOTS).fill(null);
+    g.saveSlots[0] = { customName:'Kanto', team:[
+      mk('venusaur', 60, ['solarbeam','sludgebomb','bodyslam']),
+      mk('blastoise', 60, ['hydropump']),
+      mk('scyther', 48, ['slash','wingattack','furycutter']) ] };
+    g.saveSlots[3] = { team:[ mk('meganium', 55, ['bodyslam']), mk('alakazam', 55, ['psychic']) ] };
+    g.hms = ['hm01'];
+    S.abrirEnsinarHm('hm01');
+    ok('a Maquina abre a tela de escolher o alvo', g.screen === 'hmAlvo', g.screen);
+    const cands = S.candidatosDaMaquina('hm01');
+    ok('ela atravessa os saves', cands.map(c => c.nome).join(',') === 'Venusaur,Scyther,Meganium',
+       cands.map(c => c.nome + '@' + c.slot).join(' '));
+    ok('e o Blastoise e o Alakazam ficam de fora, porque nao aprendem',
+       !cands.some(c => c.nome === 'Blastoise' || c.nome === 'Alakazam'));
+
+    /* ⚠️ A TELA E POR TIME, EM DOIS NIVEIS (13/09/2026, a pedido): *"nao exiba pokemon por pokemon,
+       exiba time por time, assim como fica na tela home, porem so exiba no card do time os pokemons
+       que podem aprender o HM01, e quando clicar no time, ai sim abre a lista"*.
+       Com 20 slots, a lista corrida vira uma parede de dezenas de linhas onde a unica pista de onde
+       cada um mora e uma legenda pequena. */
+    const times = S.timesDaMaquina('hm01');
+    ok('so os times que tem alguem pra ensinar viram card',
+       times.map(t => t.slot).join(',') === '0,3', times.map(t => t.slot).join(','));
+    const n1 = S.renderHmAlvo();
+    ok('o card e o MESMO da home', (n1.match(/save-slot-card/g) || []).length === 2 &&
+       /team-avg-star/.test(n1), (n1.match(/save-slot-card/g) || []).length + ' cards');
+    ok('e ele NAO lista pokemon direto', !/hm-alvo/.test(n1));
+    ok('a fileira do card traz SO quem pode aprender (2 de 3 no time Kanto)',
+       (n1.match(/save-slot-mon-sprite/g) || []).length === 3,
+       (n1.match(/save-slot-mon-sprite/g) || []).length + ' sprites (2 do Kanto + 1 do Time 4)');
+    ok('e ela nomeia os times', /Kanto/.test(n1) && /Time 4/.test(n1));
+    /* NIVEL 2: clicar no time abre a lista dele */
+    S.abrirTimeDaMaquina(0);
+    const n2 = S.renderHmAlvo();
+    ok('o nivel 2 lista os pokemons daquele time', (n2.match(/hm-alvo"/g) || []).length === 2,
+       (n2.match(/hm-alvo"/g) || []).length + ' linhas');
+    ok('e so os DAQUELE time', /Venusaur/.test(n2) && /Scyther/.test(n2) && !/Meganium/.test(n2));
+    ok('com volta pros times', /voltarAosTimesDaMaquina/.test(n2));
+    S.voltarAosTimesDaMaquina();
+    ok('e a volta desenha os times de novo', /Ensinar em qual time/.test(S.renderHmAlvo()));
+    /* ⚠️ QUANDO O ULTIMO CANDIDATO DO TIME APRENDE, a tela volta sozinha pros times: uma lista
+       vazia ali nao diria nada que o anuncio na tela de cima nao diga melhor. */
+    S.abrirTimeDaMaquina(3);
+    const soUm = S.candidatosDaMaquina('hm01', 3);
+    S.escolherAlvoDaMaquina(3, soUm[0].idx);
+    ok('o ultimo candidato do time faz a tela voltar pros times',
+       /Ensinar em qual time/.test(S.renderHmAlvo()) && /aprendeu Corte/.test(S.renderHmAlvo()));
+    /* e o Meganium desse teste ja aprendeu -- o bloco de baixo refaz o cenario */
+    g.saveSlots[3].team[0].ataques = ['bodyslam'];
+
+    /* QUEM TEM VAGA APRENDE SEM PERGUNTAR -- a mesma regra da fila de aprendizado por nivel. */
+    const vaga = cands.find(c => c.nome === 'Meganium');
+    S.abrirTimeDaMaquina(vaga.slot);
+    S.escolherAlvoDaMaquina(vaga.slot, vaga.idx);
+    ok('quem tem vaga aprende sem tela de troca', g.screen === 'hmAlvo', g.screen);
+    ok('e o Corte entrou', g.saveSlots[3].team[0].ataques.join(',') === 'bodyslam,cut',
+       g.saveSlots[3].team[0].ataques.join(','));
+    ok('e a tela ANUNCIA quem aprendeu', /Meganium/.test(S.renderHmAlvo()) && /aprendeu Corte/.test(S.renderHmAlvo()));
+
+    /* QUEM ESTA CHEIO ESCOLHE o que sai -- e o retirado e RECUSADO, senao ele voltava pela fila de
+       aprendizado no proximo nivel e voltaria pra sempre (o carrossel infinito de 09/09/2026). */
+    const cheio = S.candidatosDaMaquina('hm01').find(c => c.nome === 'Scyther');
+    S.abrirTimeDaMaquina(cheio.slot);
+    S.escolherAlvoDaMaquina(cheio.slot, cheio.idx);
+    ok('quem tem 3 golpes cai na tela de troca', g.screen === 'hmTroca', g.screen);
+    ok('ela mostra o Corte e os tres dele',
+       /quer aprender Corte/.test(S.renderHmTroca()) && (S.renderHmTroca().match(/ensinarOGolpeDaMaquina/g) || []).length === 3);
+    S.ensinarOGolpeDaMaquina('slash');
+    const sc = g.saveSlots[0].team[2];
+    ok('o Corte entrou no lugar do escolhido', sc.ataques.join(',') === 'cut,wingattack,furycutter', sc.ataques.join(','));
+    ok('e o retirado ficou RECUSADO, senao ele volta pra sempre',
+       (sc.ataquesRecusados || []).indexOf('slash') >= 0, (sc.ataquesRecusados || []).join(','));
+    ok('quem ja sabe sai da lista', !S.candidatosDaMaquina('hm01').some(c => c.nome === 'Scyther'));
+
+    /* A MAQUINA NAO SE GASTA: ela e da conta e ensina quantas vezes quiser, como no jogo original. */
+    ok('a Maquina continua na conta depois de ensinar duas vezes', S.temHM('hm01') === true);
+
+    /* ⚠️ O SLOT ABERTO LE O game.team, NAO a copia do saveSlots -- sem isso um pokemon capturado
+       nesta sessao nao apareceria, e pior: os INDICES das duas listas deixariam de bater e o Corte
+       iria parar no pokemon errado. */
+    g.currentSaveSlot = 0;
+    g.team = [ mk('charizard', 70, ['flamethrower']), mk('pidgeot', 66, ['fly']) ];
+    ok('com o save aberto, a fonte e o game.team', S.timeDoSlot(0)[0].speciesId === 'charizard');
+    const c2 = S.candidatosDaMaquina('hm01').filter(c => c.slot === 0);
+    ok('e a lista mostra o time VIVO', c2.map(c => c.nome).join(',') === 'Charizard', c2.map(c => c.nome).join(','));
+  }
+
+  /* ===== O CORTE E UM GOLPE DE VERDADE, e e por isso que o desenho "ensinar" ganha do "equipar" ===== */
+  {
+    /* ELE SOBREVIVE A EVOLUCAO: o tryEvolve nao encosta no campo `ataques`, e o `ataquesEscolhiveis`
+       inclui "o que ele ja carrega" -- a mesma correcao de 09/09/2026 que salvou o Raio de Bolhas da
+       Staryu. Se um dia isso mudar, o Corte some do pokemon sem nada avisando. */
+    const p = S.createInstance('charmeleon', 35);
+    p.maxHp = S.calcMaxHp(p); p.hp = p.maxHp;
+    p.ataques = ['cut','flamethrower','slash'];
+    p.nivelDosAtaques = 35; p.especieDosAtaques = 'charmeleon';
+    g.team = [p];
+    p.level = 36; S.tryEvolve(p);
+    ok('o Corte sobrevive a evolucao', p.speciesId === 'charizard' && p.ataques.indexOf('cut') >= 0,
+       p.name + ': ' + p.ataques.join(','));
+    ok('e ele continua escolhivel na forma nova', S.ataquesEscolhiveis(p).indexOf('cut') >= 0);
+
+    /* O NPC NUNCA TEM CORTE: o equiparNpc da o moveset da ESPECIE, que sai do APRENDIZADO -- e o
+       `cut` nao esta la (ninguem o aprende por nivel). Ou seja, so o jogador corta. */
+    const npc = [S.createInstance('scyther', 50)];
+    S.equiparNpc(npc);
+    ok('o NPC nunca tem o Corte', (npc[0].ataques || []).indexOf('cut') < 0, (npc[0].ataques||[]).join(','));
+
+    /* ⚠️ O GERADOR DE TABELAS PRECISA SABER DO `cut`: sem o A_MAO, regenerar as tabelas o APAGA em
+       silencio e o HM01 fica sem nada pra ensinar. A trava LE O CODIGO do gerador, porque os casos
+       acima leem a tabela ja gerada e passariam com o gerador quebrado. */
+    const ger = require('fs').readFileSync(path.join(raiz, 'tools', 'gerar-tabelas-golpes.js'), 'utf8');
+    ok('o gerador emite o cut a mao', /const A_MAO = \{ cut: \{ tipo:'Normal', poder:50 \} \}/.test(ger));
+    ok('e o nome PT dele esta no golpes-pt.json', require(path.join(raiz, 'tools', 'golpes-pt.json')).cut === 'Corte');
+    ok('e o slash cedeu o nome', require(path.join(raiz, 'tools', 'golpes-pt.json')).slash === 'Talho');
+  }
+
+  /* ===== ⚠️ A GRAVACAO NAO PODE ENCOSTAR NA TELA (13/09/2026) =====
+     Reportado: *"eu tava na tela que apareceu a nova rota ... fui no Mochila e ensinei para ele,
+     quando voltei para o save ... ja tinha avancado o estagio do save ... pulou a etapa de eu
+     escolher uma rota, capturar pokemons da rota, foi direto para enfrentar o ginasio"*.
+     A causa: a mochila e aberta da HOME, e ir pra home NAO descarrega o save -- so o game.screen
+     muda. O saveCurrentGame() gravava o serializeGame() INTEIRO, entao screen:"hmAlvo" ia por cima
+     da tela em que a jornada estava. */
+  {
+    let escrito = null;
+    const refVelha = S.saveDocRef;
+    S.saveDocRef = () => ({ set: async (d) => { escrito = d; } });
+    const mk2 = (id, lv, ats) => { const p = S.createInstance(id, lv); p.maxHp = S.calcMaxHp(p); p.hp = p.maxHp; p.ataques = ats; return p; };
+    g.authUser = { uid:'u1' };
+    g.currentSaveSlot = 2; g.gymIndex = 4; g.saveGen = 0;
+    g.team = [ mk2('persian', 40, ['feintattack','payday','slash']) ];
+    g.saveSlots = new Array(S.MAX_SAVE_SLOTS).fill(null);
+    g.saveSlots[2] = { team: g.team, customName:'Jornada 3' };
+    g.hms = ['hm01'];
+    /* o jogador foi pra home e abriu a mochila -- o save continua carregado em memoria */
+    g.screen = 'inventario';
+    S.abrirEnsinarHm('hm01');
+    S.abrirTimeDaMaquina(2);
+    const alvo = S.candidatosDaMaquina('hm01', 2)[0];
+    S.escolherAlvoDaMaquina(2, alvo.idx);
+    S.ensinarOGolpeDaMaquina('slash');
+    /* o ensinarOGolpeDaMaquina e async, mas o corpo roda sincrono ate a gravacao -- entao o
+       stub ja recebeu o documento aqui, sem precisar ceder a volta do laco */
+    ok('a gravacao escreve SO o team', escrito && Object.keys(escrito).join(',') === 'team',
+       Object.keys(escrito || {}).join(','));
+    ok('e NAO grava a tela, que era o que pulava a rota', !(escrito && 'screen' in escrito));
+    ok('o golpe foi gravado', escrito.team[0].ataques.indexOf('cut') >= 0, escrito.team[0].ataques.join(','));
+    ok('e o game.team em memoria tem o mesmo', g.team[0].ataques.indexOf('cut') >= 0);
+    S.saveDocRef = refVelha;
+  }
+
+  /* ===== ⚠️ O GOLPE DE MAQUINA NAO SE DESAPRENDE (13/09/2026) =====
+     Reportado: *"o HM01 nao pode ser desaprendido, acabei de ensinar para um Persian, e depois ele
+     aprendeu Talho e eu consegui tirar o corte"*. E assim no jogo original, e aqui ele e mais que
+     um golpe: e a CHAVE da Mata Fechada. */
+  {
+    const p = g.team[0];
+    ok('a lista sai dos HMs, nao e o cut escrito a mao',
+       S.ehGolpeDeMaquina('cut') && !S.ehGolpeDeMaquina('slash') && !S.ehGolpeDeMaquina('tackle'));
+    g.aprenderAtaque = { id: p.id, golpe: 'hyperbeam' };
+    const tela = S.renderAprenderAtaque();
+    const ofertas = (tela.match(/responderAprendizado\('([a-z]+)'\)/g) || []).map(x => x.match(/'([a-z]+)'/)[1]);
+    ok('a tela de troca por nivel NAO oferece o Corte', ofertas.indexOf('cut') < 0, ofertas.join(','));
+    ok('e continua oferecendo os comuns', ofertas.length === 2, ofertas.join(','));
+    ok('e ela explica por que ele nao esta la', /de M.quina e n.o pode ser esquecido/.test(tela));
+    /* quem VALIDA e a ACAO: um clique forjado nao pode tirar o HM */
+    S.responderAprendizado('cut');
+    ok('forcar a acao com o Corte nao faz nada', p.ataques.indexOf('cut') >= 0, p.ataques.join(','));
+    ok('e a fila nao anda (continua perguntando)', !!g.aprenderAtaque);
+    /* ⚠️ E ELE NAO PODE TRAVAR A FILA. O bot do smoke le o ESTADO e nao a tela: ele escolhia o
+       golpe mais fraco de p.ataques, caia no Corte (poder 50), a acao recusava em silencio e a
+       jornada travava nesta tela ate o MAX_STEPS -- 72 falhas em 100 jornadas. A regra passou a
+       viver numa funcao so (ataquesTrocaveis), lida pela TELA, pela ACAO e pelo BOT. */
+    ok('ataquesTrocaveis e a mesma lista que a tela desenha',
+       S.ataquesTrocaveis(p).join(',') === ofertas.join(','), S.ataquesTrocaveis(p).join(','));
+    ok('e ela NUNCA fica vazia com um HM so e ' + S.MAX_GOLPES + ' slots',
+       S.ataquesTrocaveis(p).length > 0);
+    S.responderAprendizado('payday');
+    ok('mas trocar um golpe COMUM continua funcionando',
+       p.ataques.indexOf('hyperbeam') >= 0 && p.ataques.indexOf('cut') >= 0, p.ataques.join(','));
+  }
 }
 console.log('\n=== O ! DO BOTAO DAS LIGAS ===');
 {
@@ -1096,6 +1342,86 @@ console.log('\n=== O AVISO DE VERSAO NOVA NA HOME ===');
     ok('o aviso acende a faixa do topo tambem', faixa.style.display === 'flex',
        'display: ' + faixa.style.display);
     ok('e marca o quadro da home junto', S.__getGame().versaoNova === true);
+  }
+}
+
+console.log('\n=== O ITEM EQUIPADO NAO VAZA MAIS ENTRE SAVES (14/09/2026) ===');
+{
+  /* Reportado: *"se eu equipo um pikachu no slot 3 com uma pocao, esta exibindo que o pikachu do
+     slot 7 tambem ta com pocao"*.
+     ⚠️ A CAUSA ERA UM CARIMBO QUE GRUDAVA: o equiparItens escrevia `p.slotDaConta` so quando o
+     campo era null, e a INSTANCIA vai pro save. Um Pikachu equipado no slot 3 gravava
+     `slotDaConta:"3"` dentro do save dele, e dali em diante toda leitura daquele pokemon procurava
+     o item do SLOT 3 -- inclusive a do Pikachu de outro save, porque a chave e "slot:linha". */
+  const g = S.__getGame();
+  const mk = (id, lv) => { const p = S.createInstance(id, lv); p.maxHp = S.calcMaxHp(p); p.hp = p.maxHp; return p; };
+
+  g.equipados = { '3:pichu': 'potion' };
+  /* O CASO DO RELATO, com o carimbo velho ja gravado no save do slot 7 */
+  const visto = {};
+  for(const slot of [3, 7]){
+    g.currentSaveSlot = slot;
+    const p = mk('pikachu', 30); p.slotDaConta = '3';   // o carimbo velho, gravado numa sessao antiga
+    g.team = [p];
+    S.equiparItens(g.team, g.equipados, g.currentSaveSlot);
+    visto[slot] = /com-item/.test(S.botaoDeItemHtml(g.team[0]));
+  }
+  ok('o slot que equipou mostra o item', visto[3] === true);
+  ok('e o MESMO pokemon em outro save nao mostra nada', visto[7] === false,
+     'carimbo velho de slot 3 dentro do save do slot 7');
+
+  /* ⚠️ E NENHUM DOS DOIS CAMPOS VAI PRO SAVE: os dois sao DERIVADOS do que a conta tem equipado,
+     e quem os escreve e sempre o equiparItens. Gravados, eles so conseguiam ficar velhos. */
+  {
+    g.currentSaveSlot = 3;
+    g.team = [mk('pikachu', 30)];
+    S.equiparItens(g.team, g.equipados, 3);
+    const bruto = S.serializeGame();
+    ok('o equiparItens carimba os dois na instancia',
+       bruto.team[0].slotDaConta === '3' && bruto.team[0].item === 'potion');
+    const limpo = S.limparParaFirestore(bruto, '', []);
+    ok('mas o slotDaConta NAO vai pro banco', !('slotDaConta' in limpo.team[0]));
+    ok('e o item tambem nao', !('item' in limpo.team[0]));
+  }
+
+  /* ⚠️ O HP UP E LIDO PELO calcMaxHp, QUE RODA FORA DA BATALHA (distribuicao de niveis, Doce Raro).
+     E por isso que o save RECARIMBA ao abrir: sem essa linha o campo nasceria vazio e a barra
+     mudaria de tamanho sozinha ao entrar na primeira luta. */
+  {
+    const cru = mk('pikachu', 30);
+    g.equipados = { '3:pichu': 'hp_up' };
+    g.currentSaveSlot = 3;
+    g.team = [mk('pikachu', 30)];
+    S.equiparItens(g.team, g.equipados, 3);
+    ok('o HP Up conta antes da primeira batalha', S.calcMaxHp(g.team[0]) === cru.maxHp + 15,
+       cru.maxHp + ' -> ' + S.calcMaxHp(g.team[0]));
+  }
+
+  /* ⚠️ E O TIME MISTURADO CONTINUA VALENDO: Torre e Ginasio da Cidade carimbam o slot POR POKEMON e
+     chamam o equiparItens SEM slotPadrao -- ali nao ha o que informar, e o carimbo e a verdade.
+     Sem este degrau, a correcao teria apagado o item de quem mistura saves. */
+  {
+    g.equipados = { '3:pichu': 'potion', '9:pichu': 'awakening' };
+    const a = mk('pikachu', 30); a.slotDaConta = '3';
+    const b = mk('pikachu', 30); b.slotDaConta = '9';
+    S.equiparItens([a, b], g.equipados);   // sem slotPadrao, como a Torre chama
+    ok('time que mistura saves mantem o item de cada slot',
+       a.item === 'potion' && b.item === 'awakening', a.item + ' / ' + b.item);
+  }
+
+  /* AS TRAVAS QUE LEEM O CODIGO: os casos acima chamam as funcoes na mao e passariam com a
+     chamada orfa ou com o carimbo grudento de volta. */
+  {
+    const cli = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
+    const srv = require('fs').readFileSync(path.join(raiz, 'functions', 'index.js'), 'utf8');
+    const grudento = 'if(p.slotDaConta == null)';
+    ok('o carimbo nao gruda mais, nos dois motores',
+       cli.indexOf(grudento) < 0 && srv.indexOf(grudento) < 0);
+    const novo = /p\.slotDaConta = \(p\.slot != null\) \? String\(p\.slot\)/;
+    ok('e os dois recarimbam pela mesma regra', novo.test(cli) && novo.test(srv));
+    const j = cli.indexOf('game.team = hydrateTeam(data.team);');
+    ok('e o save RECARIMBA ao abrir, logo depois de montar o time',
+       j > 0 && /equiparItens\(game\.team, game\.equipados, game\.currentSaveSlot\)/.test(cli.slice(j, j + 900)));
   }
 }
 

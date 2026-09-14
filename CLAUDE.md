@@ -91,8 +91,9 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
 - **O efeito é ×2 EXATO** (a regra da Gen 2 à Gen 5), e não mais o nível dobrado — que dava **1,78×
   no nível 20 e 1,92× no 90**, porque o `+2` e os arredondamentos da fórmula comiam uma fatia.
 - **OS OITO GOLPES DE CRÍTICO ALTO** (`GOLPES_CRIT_ALTO`, estágio +1 = 12,5%): Ataque Celeste,
-  Aerojato, Golpe Cruzado, Martelo de Caranguejo, **Corte** (22 espécies, o de peso real),
-  Corte de Ar, Folha Navalha e Golpe de Karatê.
+  Aerojato, Golpe Cruzado, Martelo de Caranguejo, **Talho** (o `slash`, 22 espécies, o de peso
+  real — ele se chamava "Corte" até 13/09/2026, quando o HM01 passou a ensinar o `cut` e o nome
+  foi pro dono certo), Corte de Ar, Folha Navalha e Golpe de Karatê.
   **A lista NÃO foi escrita de cabeça:** o Bulbapedia não publica o conjunto da geração, só
   exemplos — ela saiu do `critRatio` do dado do Showdown com o mod da Gen 3, o MESMO caminho que
   gerou a base de golpes. **Atenção: o Ás Aéreo NÃO entra** (ele nunca erra, mas não é crítico
@@ -500,7 +501,7 @@ de golpes.
   (**O número "59 espécies das quatro listas" que estava aqui era de outra época** e envelheceu
   calado: são ONZE listas hoje, e **157 das 250** espécies têm pelo menos um especial — 9
   autodestruição, 43 sono, 17 anulação, 6 Metrônomo, 10 Recuperar, 23 drenagem, 19 Fúria, 82
-  confusão, 7 Fúria do Dragão, 1 Sketch e 13 Dança da Chuva, com sobreposição. O teste varre as
+  confusão, 7 Fúria do Dragão, 1 Sketch, 13 Dança da Chuva e 2 Sino Curativo, com sobreposição. O teste varre as
   listas em vez de contar, que é o que impede o próximo número de envelhecer do mesmo jeito.)
 - **A linha do log tem forma própria aqui.** A regra do log é "uma forma só" (ver a seção acima), e
   estes três são as **exceções**: não são dano, são o confronto inteiro decidido de uma vez, e o
@@ -620,12 +621,16 @@ Base criada em 09/09/2026 e **trocada de geração no mesmo dia**: nasceu na Gen
   `jornadakanto.com/data/golpes.json`. Isso é conveniente de propósito: são 149 KB, e o
   `index.html` já tem 1,17 MB. Quando a feature existir, o caminho barato é o cliente BUSCAR o
   arquivo em vez de inchar o HTML — e aí a base não precisa virar a sexta tabela duplicada.
-- **O nome em PORTUGUÊS vive em `tools/golpes-pt.json`, e são 158.** O arquivo da base traz só o
+- **O nome em PORTUGUÊS vive em `tools/golpes-pt.json`, e são 160** (159 da base mais o `cut`). O arquivo da base traz só o
   nome canônico em inglês — os nomes PT que o jogo já usava (`MOVE_BY_TYPE`, `MOVE_OVERRIDES`)
   são por TIPO e não por golpe, então a passada foi à mão, uma vez. A Gen 3 acrescentou **37**
   (Ás Aéreo, Vento Prateado, Pulso de Água, Quebra-Telha, Cauda de Ferro...). Golpe de dano sem
   nome ali sai no log e nas telas com o **id em inglês**, então o gerador de tabelas é quem tem
   que gritar se faltar.
+- **⚠️ O `cut` É ESCRITO À MÃO NO GERADOR DE TABELAS** (`A_MAO`, em `tools/gerar-tabelas-golpes.js`),
+  e ele é o ÚNICO golpe da tabela `GOLPES` que não sai da base — HM ninguém aprende por nível, então
+  o gerador nunca o viu. **Sem essa linha, regenerar as tabelas APAGA o `cut` em silêncio** e o HM01
+  fica sem nada pra ensinar. Ele sai fora do `GOLPES_IDS`, que é indexado pelo `APRENDIZADO`.
 - `node tools/gerar-golpes.js` regenera o arquivo (o cabeçalho dele traz os `curl` das fontes).
 
 ## Os golpes do pokémon (escolhidos pelo jogador) — hoje são TRÊS
@@ -1168,7 +1173,9 @@ pelo metronome ou o Poder Ancestral? E vai usar na batalha o que tirar mais dano
   ordenada faria o cliente e o servidor tirarem golpes DIFERENTES com a mesma semente — a mesma
   batalha terminando diferente dos dois lados. `tools/test-especiais.js` compara o bolo e cobra 500
   sorteios idênticos com a mesma semente.
-  São os **155 golpes de dano** da tabela. Autodestruição e Explosão não estão nela (nunca
+  São os **156 golpes de dano** da tabela — eram 155 até 13/09/2026, quando o `cut` entrou pra o
+  HM01 ter o que ensinar (ver a seção dos HMs): o bolo é derivado do `GOLPES`, então acrescentar um
+  golpe ao jogo desloca a semente do sorteio. Autodestruição e Explosão não estão nela (nunca
   estiveram) e é o certo: elas JÁ SÃO o efeito de 10% do Metrônomo, com o custo de cair junto.
 - **A LISTA HOJE SÃO 6** — Cleffa, Clefairy, Clefable, Mew, Togepi e Togetic. Ela foi a 7 em
   10/09/2026 (entraram Snorlax, Clefairy e Clefable, que aprendem Metrônomo por nível no original e
@@ -1362,6 +1369,17 @@ maior chance do bloco: **30% por confronto**, empatada com o Metrônomo (que ren
   Medido: em 60 confrontos com fúria, **60 mostram a frase no passo em que a barra sobe** e 60 viram
   linha no log.
 - **O SELO É 😤 e o tipo é Normal** (`TIPO_DO_ESPECIAL`), como o resto do bloco.
+- **⚠️ E ELE APARECE NO QUADRO DO LUTADOR desde 14/09/2026** (a pedido: *"coloque um sinal também no
+  pokémon que está com Fúria ativa"*), ao lado do 🌟, 🔺, 🎖️ e dos ⚔️🪶 das duas danças — todos saem
+  da mesma função (`selosDoConfronto`, que era `selosDaDanca` até a fúria entrar nela).
+  **⚠️ MAS ELA É DIFERENTE DAS DANÇAS NUM PONTO QUE IMPORTA: ela ACUMULA por batalha.** Um pokémon
+  pode atravessar três confrontos furioso com a marca do diário **só no primeiro** — então o selo
+  sai de um CAMPO do matchup (`playerFuria`/`enemyFuria`, o acumulado), e não da marca. Lido do
+  diário, ele sumiria justamente nos confrontos em que o bônus é maior. Há caso de teste para
+  exatamente isso (a "fúria herdada").
+  **O NÚMERO SAI A PARTIR DA SEGUNDA VEZ** (😤2), como a frase do log já faz: sem ele, um Tauros com
+  +30 de tudo mostra o mesmo selo de um com +10. Na primeira ele sai limpo.
+  Confronto gravado antes do campo existir sai sem selo — log velho não pode sumir.
 - **ELA MORA NA FICHA DA POKÉDEX, não no cartão do golpe** — e essa é a diferença que importa: quem
   escolhe golpe não escolhe passiva. O cartão do golpe Fúria **não diz mais nada** (o `obsDoGolpe`
   dela saiu), e a ficha da espécie a anuncia junto do sono e da anulação, com a chance.
@@ -2205,6 +2223,33 @@ confronto"*. São o **décimo terceiro e o décimo quarto** especiais.
   e o Pinsir aparecem na Zona de Safári.
   **A impressão do motor MUDA, e tem que mudar** (com a chance em 0 ela volta ao que era): ao
   contrário do Remoinho na tela, estas mexem no DANO.
+- **⚠️ OS DOIS SELOS NO QUADRO DO LUTADOR (14/09/2026, a pedido:** *"para a Sword Dance e Feather
+  Dance que acontecer no momento do confronto, coloque um sinal para identificar os pokémons
+  afetados"*). Eles ficam ao lado do 🌟 (shiny), 🔺 (terreno) e 🎖️ (especialidade), e são os mesmos
+  ⚔️ e 🪶 que o log já usa.
+  **⚠️ QUEM É AFETADO NÃO É O MESMO NOS DOIS, e esse é o cuidado inteiro:** nas **Espadas** quem usa
+  é quem fica forte, então o selo vai no lado do `q`; na **Pluma** quem sofre é o ADVERSÁRIO, então
+  ele vai no lado OPOSTO ao `q`. O `q` do diário é sempre de QUEM USOU o golpe — a convenção de todo
+  o motor —, e ler os dois igual poria a pluma no pokémon errado. **O defeito não apareceria como
+  erro**: apareceria como o selo no lado que ficou mais FORTE.
+  **O CASO DURO É O MESMO POKÉMON COM OS DOIS**: um Pinsir que dançou as espadas contra um Pidgeot
+  que dançou a pluma sai com **⚔️🪶** (ele é 1,5 × 0,5 = 0,75), e o **Pidgeot sai sem selo nenhum** —
+  ele usou a pluma, mas quem sofreu foi o outro. É esse caso que uma leitura ingênua erraria, e é
+  ele que o teste cobra primeiro.
+  **ELES VALEM O CONFRONTO INTEIRO**, como o 🔺 e o 🎖️: as duas são ABERTURA (acontecem antes do
+  primeiro golpe, então não há o que adiantar) e o efeito dura a luta toda. É o contrário da Faixa
+  de Foco, que fica escondida até o passo dela porque mostrá-la antes entregaria o desfecho.
+  **SAI DO DIÁRIO**, não de um campo do matchup: o log é relido dias depois, e confronto anterior a
+  12/09/2026 não tem as marcas e sai sem selo — que é o que ele era.
+  **As QUATRO telas de batalha leem a MESMA função** (`selosDaDanca`): as três do `fighterHtml`, a
+  liga assistida (que tem quadro próprio) e o online — este com a perspectiva já virada, porque os
+  matchups vêm do lado A. Quem está SAINDO de campo (o quadro do Remoinho) não leva selo: o efeito é
+  de quem está lutando agora.
+- **⚠️ E O SELO NOVO QUEBROU UM EXTRATOR DE TESTE, que é a lição a guardar daqui.** A trava do
+  Remoinho lê o nome do quadro com uma regex que exigia o nome COLADO no "Lv.", e o fixture dela usa
+  um **PIDGEOT** — justamente o dono da Dança da Pluma. Ela passou a devolver "?" em **30 de 40**
+  quadros, sem nada do Remoinho ter mudado. Já havia três selos naquela posição (🌟, 🔺, 🎖️) e a
+  regex só não tinha esbarrado neles: hoje ela tolera qualquer coisa entre o nome e o nível.
 - **Se um dia incomodarem**, os lugares de mexer são a **chance** (`CHANCE_DANCA`) e os
   **multiplicadores** (`DANCA_ESPADAS_MULT`, `DANCA_PLUMA_MULT`) — e a régua está aqui.
 
@@ -2518,6 +2563,8 @@ levas, e todos com a MESMA distribuição — conferida na fonte golpe a golpe:
 | Míssil Agulha | 14 | 42 | 6 |
 | Lança de Gelo | 10 | 30 | 1 (Shellder) |
 | Rajada de Rochas | 25 | 75 | 6 |
+| **Redemoinho de Fogo** | 15 | 45 | 10 |
+| **Enrolar** | 15 | 45 | 11 |
 
 **68 das 250 espécies (27%) têm pelo menos um deles**, contando as sobreposições (Rhyhorn e Rhydon
 têm Ataque Fúria e Rajada de Rochas; Corsola tem Canhão de Espinhos e Rajada).
@@ -2697,6 +2744,46 @@ nada: são dois golpes, sempre.
   painel -- o tipo de teste que passa quase sempre. Hoje o corte é pelo próprio HTML
   (`<div class="mlog-passo">`), que é onde a linha de verdade começa. Quatro rodadas seguidas em
   zero. **O log sempre esteve certo.**
+
+### OS DOIS DE PRENDER VIRARAM DE VÁRIOS TAPAS (14/09/2026)
+
+Pedido assim: *"coloque que os moves fire spin e wrap, também ataquem de 2x a 5x igual outros
+ataques desse estilo que já existem"*.
+
+- **⚠️ NO JOGO OFICIAL ELES NÃO SÃO DE VÁRIOS TAPAS — são de PRENDER.** Lá o Fire Spin e o Wrap
+  seguram o alvo por **2 a 5 TURNOS**, tirando uma fatia a cada um. Aqui eles viram 2 a 5 tapas na
+  MESMA troca: **o número de vezes é o mesmo, e a distribuição também** — o que muda é caberem num
+  confronto só, que é como este motor resolve tudo. Fica registrado porque a diferença some da tela
+  e quem for conferir contra o jogo original vai encontrá-la.
+- **FOI UMA LINHA DE TABELA CADA**, que era a previsão do `MULTI_GOLPE`: o motor, o log, a animação,
+  o selo `Nx`, o `poderEfetivo` e a frase do cartão saíram de graça.
+- Os dois têm **poder 15**, igual ao Tapa Duplo e ao Ataque Fúria — o efetivo vai a **45**.
+  São **10 espécies** no Redemoinho (a linha do Charmander, Vulpix/Ninetales, Ponyta/Rapidash,
+  Moltres, Flareon, Entei) e **11** no Enrolar (Bellsprout/Weepinbell, Ekans/Arbok,
+  Tentacool/Tentacruel, Lickitung, a linha do Dratini, Shuckle).
+
+**⚠️ O PREÇO MEDIDO, e ele é de UMA ESPÉCIE:** dos 21 que aprendem, só **5 levam** no moveset padrão
+do nível 50, e só **2 usam** de verdade. O motor escolhe pelo dano, e o `poderEfetivo` de 45 ainda
+perde pra quase tudo:
+
+| | usa antes | usa depois | vitória |
+|---|---|---|---|
+| **Ninetales** | 0,0% | **96,6%** | 12,8% → **19,8%** (+7,0) |
+| Shuckle | 0,0% | 10,3% | — |
+| Dragonite, Dragonair, Lickitung | 0,0% | **0,0%** | não se move |
+
+**NA JORNADA NÃO MOVE NADA: 58,54% contra 58,75%** — **+0,21 ponto, 0,2σ** (6 blocos de 800 de cada
+lado, 4.800 jornadas de cada, desvio tirado de ENTRE os blocos; 2 de 6 blocos pro lado fácil, ou
+seja ruído puro). Faz sentido: é uma espécie em 250, e ela cai dos dois lados da luta.
+
+A Ninetales é o caso extremo pelo mesmo motivo do Shuckle no Rolamento: **o arsenal dela é fraco**,
+então um golpe de 15 × 3 vezes ganha do que ela tinha. Quem tem Terremoto ou Hiper Raio não olha
+para ele.
+
+- **⚠️ OS DONOS DO TESTE PRECISARAM SER LIMPOS:** a **Rapidash** também tem Ataque Fúria e o
+  **Shuckle** também tem Míssil Agulha — com eles, o teste mediria o golpe que o motor escolhesse e
+  não o que ele quer cobrir. É a mesma lição que o Míssil Agulha já tinha custado quando trocou do
+  Beedrill pro Qwilfish. Ficaram a **Ninetales** e o **Arbok**.
 
 ## O nome do golpe DURANTE a batalha (09/09/2026)
 
@@ -2961,6 +3048,72 @@ E a quinta: o painel de "meia barra" não garante meia barra **na última troca*
 longo o alvo chega raspando lutando, e ali o dano zero é o conserto funcionando. A asserção passou
 a olhar o HP no momento do revide, lido do diário.
 
+### QUEM ESTÁ RASPANDO NÃO DERRUBA UM POKÉMON CHEIO NUM GOLPE (14/09/2026)
+
+Reportado com print: uma **Ponyta com 10 de 362 (2,8% da barra)** atravessou um **Heracross** e um
+**Victreebel cheios**, matando cada um com um golpe e **sem tomar nada de volta**. O pedido foi
+direto: *"quando for assim de um pokémon com menos de 10% de hp for levar o outro com vida cheia em
+um golpe só, coloque que o dano dele vai ser de 70%, pois se formos pensar na lógica, um pokémon
+muito ferido não deveria aguentar tanto numa luta"*.
+
+- **⚠️ ELA É A OUTRA METADE DO PISO DO REVIDE, e por isso as constantes moram lado a lado.** O caso
+  do print é a soma de duas regras recentes: desde **12/09** o revide moribundo não mata (para em
+  1%–10%), e desde **13/09** ele nem gera linha quando o alvo **já estava** nessa faixa. Juntas, elas
+  deixavam quem está raspando matar de vida cheia, **não levar revide nenhum**, e seguir pro próximo.
+  Esta trava fecha o ciclo pelo lado do **ATAQUE**.
+- **O TETO É 70% DA BARRA DO ALVO** (`MORIBUNDO_TETO_NO_CHEIO`), então ele fica com **30%** e revida
+  de pé. **Não é "70% do dano"**: um golpe de 800 numa barra de 400 ainda mataria, e o que se quer é
+  que ele **não mate**.
+- **AS TRÊS CONDIÇÕES**, e cada uma tem caso de teste próprio — uma trava que morde onde não devia é
+  pior que trava nenhuma:
+  1. o atacante abaixo de **10%** da barra dele (`MORIBUNDO_ABAIXO_DE`);
+  2. o alvo com a vida **CHEIA** — contra quem já está machucado ele mata normalmente;
+  3. o ataque **matando** — um golpe que não mataria sai inteiro.
+- **⚠️ O TETO VALE POR TROCA, NÃO POR GOLPE.** Um Tapa Duplo de 5 tapas também "leva o outro num
+  ataque só", e limitar só o primeiro tapa deixaria os outros quatro matarem do mesmo jeito. Ele
+  reparte o teto entre os tapas na mesma proporção, pra a linha do log continuar coerente com o selo
+  `Nx`. Medido: **363 de 363** trocas de multi-tapa deixam o alvo em ~30%.
+- **⚠️ O REVIDE MORIBUNDO FICA DE FORA**, e isso é decisão: ali o atacante **já caiu** (hp 0, ou seja
+  sempre "abaixo de 10%") e o revide dele já tem a própria trava — o piso de 1%–10%. Somar as duas o
+  apararia duas vezes.
+- **A REGRA É SOBRE MATAR DE VIDA CHEIA, não sobre o confronto inteiro:** depois da primeira troca o
+  alvo já está em 30% e a trava deixa de valer — ele morre na troca seguinte, **e nesse meio-tempo
+  revidou**. É exatamente isso que o pedido quer.
+
+**MEDIDO NO CASO DO PRINT:** uma Ponyta em 3% contra um painel de 4 cheios derrubava **2 ou mais**
+em **25 de 600** batalhas; hoje, **0 de 600**.
+
+**⚠️ O PREÇO NA JORNADA É GRANDE, E ELE VAI PRO LADO FÁCIL: +3,75 pontos de conclusão.**
+**58,34% contra 62,09%**, **3,6σ** — 8 blocos de 800 jornadas de cada lado (**6.400 de cada**, desvio
+tirado de ENTRE os blocos), com **7 de 8 blocos** apontando pro mesmo lado. É a terceira maior mexida
+de dificuldade desta série, atrás do moveset dos NPCs (−12,56) e do +2 dos líderes (−11,42).
+
+**⚠️ E ISSO CONTRARIA A INTUIÇÃO, porque a trava cai dos DOIS lados — a explicação é QUEM ficava
+raspando.** Numa batalha o time entra cheio e quem sobrevive a um confronto carrega o HP pro
+seguinte: ou seja, o pokémon raspando é sempre **o que está VENCENDO**, e o cheio é o que acabou de
+entrar. Quem vencia confrontos seguidos era o líder — e era ele que varria o time do jogador de vida
+cheia. Tirar isso devolve ao jogador as trocas que ele perdia de graça.
+**A FORMA confirma, e ela se concentra no fim** (1.500 jornadas de cada lado):
+
+| ginásio | game overs sem | com |
+|---|---|---|
+| 1º | 102 | 95 |
+| 5º | 56 | 50 |
+| 6º | 126 | **104** |
+| **8º** | 318 | **289** |
+
+- **Se um dia incomodar**, as réguas são o **gatilho** (`MORIBUNDO_ABAIXO_DE`, hoje 10% — baixá-lo
+  pra 5% faz a trava morder metade das vezes) e o **teto** (`MORIBUNDO_TETO_NO_CHEIO`, hoje 70% —
+  subi-lo pra 90% deixa o alvo com 10% em vez de 30%, ou seja de pé mas quase morto). O gatilho é o
+  mais forte dos dois, porque ele decide QUANTAS trocas passam por aqui.
+
+**⚠️ E ELA APAGOU UM CENÁRIO INTEIRO DO TESTE, que é a lição a guardar daqui.** A varredura do piso
+do revide montava "o forte raspando mata o fraco CHEIO, e o fraco revida" — com a trava, o forte
+para em 70%, ninguém morre, e a varredura foi de **300+ casos para ZERO**: o teste falhava sem nada
+do piso ter mudado. O fixture passou a entrar com o fraco em **60%** (onde a trava não vale) e a
+usar o `doExchange` direto — porque o `simulateGymBattle` **cura o time B** e o alvo voltava a entrar
+cheio. É a mesma armadilha do `preservePlayerHp` pelo **terceiro** caminho.
+
 ### HISTÓRIA: O DESEMPATE GANHOU LINHA (09/09/2026) — a mecânica acabou em 12/09, ver acima
 
 Reportado com print: num **Raticate × Gyarados** o Gyarados aparecia atacando **duas vezes**
@@ -3217,9 +3370,31 @@ acontecendo"*. E não era o Mewtwo: era o **laço de revelação** que ele usa.
 - **DOIS GOLPES SEGUIDOS DO MESMO LADO EXISTEM, E SÃO A VERDADE — o motor empata velocidade.**
   O desempate de quem bate primeiro é **sorteado a cada troca**, então duas espécies de mesma
   velocidade (Skarmory e Butterfree têm 70, Golduck e Seadra têm 85, Zubat e Machamp têm 55) trocam
-  de ordem entre uma troca e outra e o mesmo lado bate duas vezes de fato. Medido: **0,5% dos
-  confrontos** têm isso no DIÁRIO, e a tela mostra **0,2%** — menos, porque o reordenamento do
-  moribundo desfaz parte.
+  de ordem entre uma troca e outra e o mesmo lado bate duas vezes de fato.
+  **MEDIDO DE NOVO EM 14/09/2026, em 13.535 confrontos — e os números velhos (0,5% no diário, 0,2%
+  na tela) estavam desatualizados:** hoje são **3,19% no diário** e **0,96% na tela**. A tela
+  continua mostrando MENOS, que é o que a trava cobra. Subiu porque muita coisa entrou no meio:
+  o revide que não mata (12/09), o teto de 4 linhas (11/09) e o Rolamento saindo do teto (14/09).
+  **AS QUATRO CAUSAS, medidas** (dos 0,96% que chegam à tela):
+
+  | causa | fatia |
+  |---|---|
+  | **empate de velocidade** — a verdade do motor | **0,41%** |
+  | **sono** — as trocas livres SÃO isso | 0,38% |
+  | reconstrução (o confronto passou do teto) | 0,12% |
+  | **revide moribundo com dano ZERO** | **0,05%** |
+
+  **⚠️ A ÚLTIMA É EFEITO COLATERAL DO CONSERTO DE 13/09** ("quem já estava raspando não leva
+  revide"): quando o alvo do revide já entrou na troca dentro da faixa de 1%–10%, o revide sai com
+  dano ZERO — e "golpe de dano zero não é golpe" tira a linha da tela. O par que fecharia a cena
+  some, e o outro lado parece ter batido duas vezes.
+  Reportado em 14/09 com print de um **Victreebel × Magneton** (os dois com velocidade **70**, ou
+  seja empate): o Magneton bateu primeiro nas DUAS trocas e o revide do Victreebel saiu zerado
+  porque ele estava com 15 de 305 (4,9%). Reproduzido no motor, número por número.
+  **NÃO FOI MEXIDO**, e a razão é a proporção: consertar essa causa resolveria **7 de 130** casos
+  (5%), e a causa dominante — o empate de velocidade — continuaria mostrando a mesma coisa. Mostrar
+  o revide zerado como linha seria um "−0 de HP" na tela, que é justamente o que este log evita em
+  toda regra.
   **É por isso que a trava mudou de forma.** Ela era "ninguém ataca duas vezes seguidas no diário
   real", e isso era verdade **por acidente**: com o teto em 3, todo confronto de 4 golpes caía na
   reconstrução e o diário nunca chegava à tela. Hoje ela é **comparativa** — a apresentação não pode
@@ -4005,6 +4180,69 @@ como é hoje"*.
   efeito prático — mas ele existe porque um item sem preço no catálogo deixava o quadro de cima
   VAZIO, e foi pego pelo teste no dia em que a loja passou a vender.
 
+### A MOCHILA VIROU A LOJA (14/09/2026)
+
+Pedida assim: *"A mochila, deixe igual a loja, o quadro em cima, e a lista com os itens que o
+usuário possui e os 3 botões de navegação (Para as batalhas, Especiais e TMs/HMs)"*.
+
+- **ELA ERA UMA GRADE DE QUADRADINHOS, e a loja já tinha deixado de ser uma pelo mesmo motivo**: o
+  quadradinho mostra só o **ÍCONE**, e metade dos ícones do jogo são emojis parecidos (❤️ ⚔️ 🛡️ 🔮 ✴️)
+  — não dava pra escolher sem clicar em cada um. Hoje as duas telas dividem a MESMA marcação:
+  `.loja-fixa` em cima, `.loja-abas` com as três prateleiras e `.loja-lista` ao lado.
+- **⚠️ AS PRATELEIRAS SÃO A MESMA LISTA (`LOJA_PRATELEIRAS`), e a regra de qual item cai em qual
+  também (`prateleiraDoItem`).** Duas listas separadas divergiriam no primeiro item novo — é a lição
+  das três telas de golpe, que viraram uma cópia só **depois** de já terem divergido no texto. O que
+  muda é o que cada prateleira CONTA: na loja é o que está **à venda**, na mochila é o que o jogador
+  **TEM**.
+  A terceira mudou de nome junto: **"TMs" virou "TMs/HMs"**, porque na mochila ela tem um HM de
+  verdade dentro — um rótulo que diz só "TMs" na tela que mostra um HM seria a tela discordando de
+  si mesma.
+- **⚠️ A TELA SEPARADA DE TMs E HMs MORREU, e virou a terceira prateleira.** Ela existia porque TM e
+  HM *"não empilham, não se gastam, não se vendem e não se usam daqui"* — todas as regras da GRADE
+  eram falsas pra eles. Com a grade fora, a razão de eles ficarem noutra tela foi junto: **a lista
+  mostra NOME, e nome era o que faltava.**
+  O `abrirTmHm` **fica**, apontando pra prateleira: ele é o que o resto do jogo chama (a frase da
+  vitória do HM01 manda pra lá), e um atalho que leva ao lugar certo é melhor que um chamador
+  quebrado.
+- **O `MOSTRAR_TM_HM` CONTINUA, e agora esconde a PRATELEIRA em vez do botão.** Ele já foi puxado
+  uma vez (de 12/09 a 13/09/2026) e voltou em uma linha — é o que essa chave compra. **Ele não
+  encosta na LOJA**: lá a prateleira das TMs é a vitrine de algo que ainda não existe, e fechá-la
+  junto esconderia a porta antes de ela ter o que mostrar.
+- **A MÁQUINA NÃO SE USA NEM SE EXCLUI: ela ENSINA.** No lugar do par Usar/Excluir, o quadro traz um
+  **📀 Ensinar** — o mesmo caminho que a linha da tela antiga abria. Ela não se gasta: é da conta e
+  ensina quantas vezes quiser, como no jogo original.
+- **⚠️ O QUADRO DE CIMA FICA EM BRANCO NA PRATELEIRA VAZIA, e do MESMO tamanho.** Foi o pedido ao pé
+  da letra (*"caso não possua nenhum TM/HM, deixar em branco"*), e é a mesma decisão que a loja já
+  tinha tomado em 13/09: um quadro que vai e vem — e cresce e encolhe — faz a tela inteira dançar a
+  cada clique. Quem conta que não há nada é a **lista**, que é onde a ausência está.
+- **SAIU A FRASE QUE ENSINAVA O CAMINHO DO HM01** (*"está por aí: Embarcando no S.S. Anne e vencendo
+  o Lt. Surge de primeira"*) e **"Nenhuma Máquina ainda" virou "Nenhum TM/HM"**, os dois a pedido. O
+  caminho continua escrito no `comoGanhar` do `HMS`, que é de onde ele saía; o que mudou é a tela
+  não entregar de graça um achado que a jornada devia entregar.
+  **⚠️ AS OUTRAS DUAS PRATELEIRAS CONTINUAM DIZENDO DE ONDE VEM O QUE FALTA** ("Doces Raros vêm da
+  Torre dos Treinadores…", "Estes se compram na Loja"): era o que a mochila vazia dizia antes das
+  prateleiras, e uma tela que só diz "vazio" faz a pessoa procurar no jogo inteiro. Só a das
+  Máquinas ficou muda, porque foi o que se pediu.
+- **ELA ABRE NA PRIMEIRA PRATELEIRA QUE TEM ALGUMA COISA**, não sempre na primeira da lista: quem só
+  tem Doce Raro abriria numa prateleira vazia, com o quadro em branco, e teria que descobrir sozinho
+  que o que ele tem está na de baixo.
+- **⚠️ ESCOLHER UM ITEM LEVA A PRATELEIRA JUNTO.** Pela TELA isso nunca é preciso — a linha clicada
+  está sempre na prateleira aberta —, mas quem escolhe por AÇÃO escolhe às cegas: o `usarItem` e o
+  `excluirItem` repõem a seleção quando o item acaba, e o que sobra pode estar na prateleira de
+  baixo. Sem isso a seleção apontava pra um item que a lista nem lista, e o quadro saía vazio.
+- **MEDIDO A 320px, no navegador:** a página fica em **757px** nas três prateleiras (era uma grade
+  de 12 quadradinhos), o quadro em **375px** sempre — o mesmo da loja —, a linha em **34–36px** e
+  **nenhum nome quebra**. Sem rolagem lateral. A quantidade ("2x", "3x") foi pra coluna da direita,
+  a mesma em que a loja põe o preço.
+- **MORREU JUNTO:** `gradeDeItensHtml`, `slotsDaGrade`, `INVENTARIO_SLOTS_MINIMOS`, `renderTmHm`,
+  `sairDoTmHm` e o CSS `.item-grade`/`.item-slot`. O piso de 12 slots era uma decisão com razão
+  escrita ("um inventário que encolhe até caber no que você tem não parece um inventário") e ela não
+  vale mais: a lista tem prateleira, e prateleira vazia diz que está vazia.
+- `tools/test-inventario.js` tranca as três prateleiras na mochila, a contagem de cada uma, o quadro
+  em branco com a lista dizendo **"Nenhum TM/HM"** ao pé da letra, que o S.S. Anne e o Lt. Surge
+  **não** aparecem mais ali, o botão de Ensinar sem Usar nem Excluir, o `abrirTmHm` caindo na
+  prateleira certa, e que a grade e a tela antiga não existem mais no arquivo.
+
 ### AS TRÊS PRATELEIRAS DA LOJA (12/09/2026)
 
 Pedidas assim: *"na loja, na parte que exibe a lista dos itens, diminua ela pela metade na
@@ -4106,6 +4344,54 @@ item"*.
   botões no RODAPÉ (irmão do miolo, não filho dele), o Vender presente e desabilitado sem estoque, o
   preço como IRMÃO do nome e o "você tem" fora da lista — e **lê o CSS** pra altura fixa, pra quem
   rola ser o miolo e pro teto da lista. Nada disso aparece em asserção de HTML.
+
+### O ITEM EQUIPADO VAZAVA ENTRE SAVES (14/09/2026)
+
+Reportado assim: *"o item que a gente equipar no pokémon, ele fica equipado no pokémon do slot,
+porque hoje se eu equipo um pikachu no slot 3 com uma poção, está exibindo que o pikachu do slot 7
+também tá com poção"*.
+
+- **⚠️ A CHAVE ESTAVA CERTA; QUEM ESTAVA ERRADO ERA O CARIMBO.** A chave é `"SLOT:LINHA"` desde
+  04/09/2026 e o servidor grava certo. O que vazava era o `slotDaConta` — o campo que diz **de que
+  save este pokémon é** — porque o `equiparItens` o escrevia **UMA VEZ SÓ** (só quando estava
+  vazio) e **a instância vai pro SAVE**. Um Pikachu equipado no slot 3 gravava `slotDaConta:"3"`
+  DENTRO do save dele; dali em diante toda leitura daquele pokémon procurava o item do **slot 3**,
+  e o Pikachu do slot 7 aparecia com a poção que não é dele.
+- **HOJE O CARIMBO É REFEITO A CADA CHAMADA**, com esta precedência: o slot do **próprio pokémon**
+  (`p.slot`, que só time misturado carrega) > o slot que **quem chamou** informou > o carimbo que já
+  estava lá.
+  **⚠️ O TERCEIRO DEGRAU NÃO É ENFEITE:** a Torre e o Ginásio da Cidade carimbam o slot **por
+  pokémon** (o time mistura saves) e chamam o `equiparItens` **sem `slotPadrao`** — conferido, são
+  as 4 chamadas de liga/online/torre do servidor. Sem ele, a correção teria apagado o item de quem
+  mistura saves, que é justamente o caso pra que a chave com slot foi criada.
+  Na jornada é o contrário: quem sabe de qual save o time é, é sempre quem chamou.
+- **⚠️ E NEM `slotDaConta` NEM `item` VÃO MAIS PRO SAVE.** Os dois são **DERIVADOS** do que a conta
+  tem equipado (`game.equipados`), e quem os escreve é sempre o `equiparItens` — gravados, eles só
+  conseguiam ficar velhos. O corte é no `limparParaFirestore`, ao lado da regra do `_`, e não no
+  `serializeGame`: é a camada que decide o que vai pro banco, e é por ela que passam **os dois**
+  caminhos de gravação (o save inteiro e o `{ team }` do HM01).
+  **Eles não ganharam `_` porque o SERVIDOR persiste o `slotDaConta` de propósito**: a subida da
+  Torre é um documento que mistura saves e precisa lembrar de qual veio cada pokémon.
+- **⚠️ E POR ISSO O SAVE RECARIMBA AO ABRIR** (`equiparItens` logo depois do `hydrateTeam`). O
+  `p.item` é lido pelo **`calcMaxHp`**, que roda **FORA da batalha** (distribuição de níveis, Doce
+  Raro): sem recarimbar na abertura, um HP Up equipado só contaria a partir da primeira luta e **a
+  barra mudaria de tamanho sozinha ao entrar nela** — exatamente o que a sincronização do
+  carregamento da conta existe pra evitar. É o primeiro instante em que dá pra saber as duas
+  coisas: QUAL save abriu e o que a conta tem equipado.
+- **⚠️ O `p.item` TINHA O MESMO VAZAMENTO, por outro caminho, e ele não foi relatado porque não tem
+  selo na tela:** o `botaoDeItemHtml` lê o `game.equipados` (certo), mas o `calcMaxHp` lê o
+  `p.item`. Um HP Up desequipado meses atrás continuaria inflando a barra daquele pokémon até a
+  próxima batalha recarimbar.
+- **⚠️ E O PRÓPRIO COMENTÁRIO DERRUBOU A TRAVA.** Ela procura o código velho (`if(p.slotDaConta ==
+  null)`) nos dois arquivos — e a primeira versão do comentário CITAVA esse código, no `index.html`,
+  que é publicado inteiro. O comentário se acusava. É a mesma armadilha já registrada na
+  bifurcação ("citar nome de líder no comentário faz um teste que procura nome de líder na tela
+  acusar o próprio comentário"), agora numa trava que lê o CÓDIGO em vez da tela.
+- `tools/test-inventario.js` tranca o caso do relato com o carimbo velho já gravado (o slot que
+  equipou mostra, o outro não), que nenhum dos dois campos chega ao banco, que o HP Up conta antes
+  da primeira batalha, que o time misturado mantém o item de cada slot, e — **lendo o código** — que
+  o carimbo não gruda nos dois motores e que o save recarimba ao abrir. Conferido que ele acusa **4
+  falhas** com o defeito religado.
 
 ### VENDER: metade do preço de compra (11/09/2026)
 
@@ -5421,15 +5707,14 @@ rota por trecho, com cadeado visível; nada disso está implementado.
   em silêncio, e só pra quem tem mais de um. O teste lê o código pra cobrar isso.
   Com ele na conta, a tela de TMs e HMs deixou de ter o estado "abra um save pra ver os dele": a
   mochila aberta da home mostra os mesmos.
-- **⚠️ O BOTÃO DA MOCHILA ESTÁ ESCONDIDO PRA TODO MUNDO desde 12/09/2026** (a pedido: *"esconda o
-  botão na mochila de tm/hm para todos"*). Quem manda é o **`MOSTRAR_TM_HM`**, e ele é uma
-  constante e não uma remoção porque o pedido foi "esconda", não "tire".
-  **O QUE CONTINUA DE PÉ:** o HM01 é conquistado na jornada do mesmo jeito (a rota do S.S. Anne
-  mais o Surge sem derrota), é anunciado na tela de vitória, e continua guardado em
-  `users/{uid}.hms` — nada disso passa pelo botão. O `case 'tmhm'` do render fica também: sem ele,
-  o dia em que o botão voltar começa com uma tela em branco.
-  **Voltar a mostrar é ESSA LINHA.** O teste LÊ a constante em vez de só procurar o botão, então no
-  dia em que ela virar `true` ele acompanha sozinho — ninguém precisa lembrar de mexer lá.
+- **⚠️ O BOTÃO DA MOCHILA FICOU ESCONDIDO DE 12/09 A 13/09/2026** (a pedido: *"esconda o botão na
+  mochila de tm/hm para todos"*), e **voltou a aparecer quando o HM01 passou a ENSINAR o Corte**:
+  enquanto a tela era só uma vitrine — uma lista de uma linha que não fazia nada — ela não tinha
+  por que existir; hoje ela é o **único caminho pra usar a Máquina**.
+  Quem manda é o **`MOSTRAR_TM_HM`**, e ele é uma constante e não uma remoção porque o pedido foi
+  "esconda", não "tire" — foi justamente isso que fez a volta custar **uma linha**. O teste LÊ a
+  constante em vez de só procurar o botão, então no dia em que ela mudar de novo ele acompanha
+  sozinho.
 - **A LISTA É SÓ O NOME E UMA LEGENDA PEQUENA** (11/09/2026, a pedido). Ela tinha um parágrafo azul
   por baixo de cada Máquina dizendo que ela ainda não faz nada — com um item só na lista, a
   explicação ocupava mais espaço que a coisa explicada. O campo `descricao` saiu da tabela junto,
@@ -5452,23 +5737,26 @@ rota por trecho, com cadeado visível; nada disso está implementado.
   tela de vitória é relida a cada render, e sem a marca ela anunciaria o mesmo HM em toda vitória
   dali pra frente. Ele fica **ao lado do prêmio de moedas**: é a mesma leitura ("o que esta vitória
   me deu"), e um lugar novo faria o jogador procurar.
-- **A TELA DE TMs E HMs É SEPARADA DA GRADE**, e isso é decisão: TM e HM **não empilham, não se
-  gastam, não se vendem e não se usam dali** — todas as regras da grade são falsas pra eles.
-  Misturá-los poria coisas de regras diferentes no mesmo quadradinho, que é o incômodo que o Doce
-  Raro já cria sozinho. E ela **escala**: são 301 golpes na base, então a lista de TMs vai crescer —
-  a grade de ícones já não dava conta de 11 itens na loja.
-  Ela tem **dois estados e nenhum é mudo**: lista o que a CONTA tem, e sem nenhum **diz onde achar**.
-  (Havia um terceiro — "abra um save pra ver os dele" — e ele sumiu quando o HM deixou de ser do
-  save: a mochila aberta da home mostra os mesmos.)
-- **⚠️ O GOLPE `cut` NÃO EXISTE NA TABELA DE GOLPES**, e isso não é esquecimento nem bug: a base é
-  aprendizado por **NÍVEL** da Gen 3, e HM ninguém aprende por nível — o gerador nunca o viu. É o
-  mesmo motivo do `surf`, que o teste do Sketch já tinha encontrado.
-  **Isso é o que confirma o desenho "HM = ITEM, não golpe"**: não há golpe pra apontar. E se um dia
-  se quiser o Corte como golpe de batalha, ele terá que ser cadastrado à mão — o gerador não o
-  produz.
-- **⚠️ O NOME "CORTE" JÁ ESTÁ OCUPADO.** O `slash` (Normal, 70) se chama **Corte** no jogo, é um dos
-  oito de crítico alto e 22 espécies o aprendem. Por isso o item é **"HM01 — Corte"** e não "Corte":
-  no dia em que os dois aparecerem na mesma tela, o prefixo é o que os separa.
+- **⚠️ A TELA DE TMs E HMs VIROU UMA PRATELEIRA DA MOCHILA EM 14/09/2026** — ver **A MOCHILA VIROU
+  A LOJA**. Ela era separada porque TM e HM não cabiam na GRADE (não empilham, não se gastam, não
+  se vendem, não se usam dali); com a grade fora e a lista mostrando NOME, a razão foi junto.
+  O estado "diz onde achar" também saiu: hoje a prateleira vazia diz só **"Nenhum TM/HM"**.
+- **⚠️ O GOLPE `cut` FOI CADASTRADO À MÃO EM 13/09/2026, e ele é o ÚNICO da tabela `GOLPES` que não
+  veio do gerador.** A base é aprendizado por **NÍVEL** da Gen 3, e HM ninguém aprende por nível —
+  o gerador nunca o viu (é o mesmo motivo do `surf`). Ele é **Normal, poder 50**, os valores da
+  Gen 1/2/3. Sem ele o HM01 não teria o que ensinar.
+  **⚠️ ELE NÃO ENTRA NO `GOLPES_IDS`, e isso é decisão:** aquele array é **indexado** pelo
+  `APRENDIZADO` (as entradas são `[nível, índice]`), então inserir um id no meio deslocaria todos os
+  índices seguintes e trocaria o moveset das 250 espécies **em silêncio**. Ele não precisa dele:
+  ninguém o aprende por nível, e o campo `ataques` guarda o id em TEXTO.
+  **⚠️ MAS ELE ENTRA NO BOLO DO METRÔNOMO** (`POOL_METRONOMO` é derivado do `GOLPES`), que foi de
+  **155 pra 156** golpes. Isso desloca a semente do sorteio — esperado, e é o preço de o Metrônomo
+  sortear "qualquer poder existente no jogo", que é o que ele promete.
+- **⚠️ O `slash` VIROU "TALHO", porque o nome "Corte" era dele e passou pro dono certo.** Ele é
+  Normal 70, um dos oito de crítico alto, e 22 espécies o aprendem — dois golpes escritos igual no
+  log, um de poder 70 com crítico alto e outro de 50, seria indistinguível de defeito. "Talho" é o
+  nome oficial dele em português. O nome é resolvido **na hora de desenhar**, então log velho só
+  troca a palavra — e troca pra a palavra certa.
 
 **MEDIDO — e o número muda a leitura da condição.** Ela tem três filtros em série:
 
@@ -5484,6 +5772,475 @@ portão de CONHECIMENTO, não de dificuldade. Por acaso ela sai em ~25% das jorn
 sabe o caminho pega perto de 100%.
 Se a intenção for que o HM01 seja uma prova, o Surge é o lugar errado — os candidatos seriam o 1º, o
 6º ou o 8º ginásio. Ficou como pedido.
+
+### A MÁQUINA ENSINA, E O CORTE É UM GOLPE DE VERDADE (13/09/2026)
+
+Pedido em três passos, e o desenho mudou no meio do caminho. A primeira ideia foi **equipar** o HM
+num pokémon, como a Poção; ela foi recusada: *"eu acho que o equipar como se fosse um item não é
+legal, gosto de ser um item para ensinar um ataque como no jogo mesmo, e aí o cortar pode virar uma
+habilidade passiva"*. O pedido final: *"quando o usuário entrar na mochila e clicar no item do HM01,
+vai aparecer todos os pokémons que podem aprender o HM01 dentro dos saves dele. No pokémon que ele
+clicar, vai abrir a tela para ensinar o cut e qual habilidade o pokémon vai perder"*.
+
+- **⚠️ A DIFERENÇA ENTRE AS DUAS IDEIAS É GRANDE, e é ela que explica o resto.** Equipado, o HM
+  seria mais um item com chave `slot:raiz` no armazém da conta, e "saber cortar" seria uma consulta
+  ao `equipados`. **Ensinado, quem sabe cortar é o POKÉMON** — no campo `ataques` dele. Isso ganha
+  três coisas de graça: o Corte **viaja no save** (o `ataques` já era serializado), ele **vale em
+  TODA batalha** como golpe de verdade (Normal, 50), e a **Máquina não se gasta** — é da conta e
+  ensina quantas vezes quiser, como no jogo original.
+- **⚠️ E ELE ATRAVESSA SAVES.** A lista é de TODOS os saves da conta, porque a Máquina é da conta —
+  ensinar só no save aberto faria a mochila da HOME (que é de onde ela é aberta na maior parte das
+  vezes) não ter o que mostrar.
+- **⚠️ A GRAVAÇÃO ESCREVE SÓ O `team`, NUNCA O ESTADO INTEIRO — e isso custou o defeito mais grave
+  desta feature.** Reportado: *"eu tava na tela que apareceu a nova rota ... fui no Mochila e
+  ensinei para ele, quando voltei para o save ... já tinha avançado o estágio do save ... pulou a
+  etapa de eu escolher uma rota, capturar pokémons da rota, foi direto para enfrentar o ginásio"*.
+  A primeira versão chamava `saveCurrentGame()` quando o alvo estava no save ABERTO — o que parecia
+  o certo, porque ele grava o estado consistente e espera a confirmação do servidor. **Só que a
+  mochila é aberta da HOME, e ir pra home NÃO descarrega o save:** o `game` continua com o time, o
+  trecho, as cartas de rota e tudo o mais — só o `game.screen` muda. Então o `serializeGame()`
+  gravava **`screen:'hmAlvo'` por cima da tela em que a jornada estava**, e o save voltava noutro
+  ponto. Reproduzido no sandbox: save parado em `walkNext` (a escolha de rota) gravado como
+  `hmAlvo`.
+  Hoje os dois caminhos gravam a MESMA coisa — `{ team }` com `merge` — e nenhum toca em estado de
+  tela. No save aberto isso é exato: o objeto mutado **é** o `game.team`, então o autosave seguinte
+  já leva o golpe novo junto com o resto.
+  **A REGRA QUE FICA: nada chamado de FORA da jornada pode gravar o estado da jornada.** Ela vale
+  pra qualquer coisa que a home venha a fazer com um save — é o mesmo tipo de vazamento que o
+  `game.escolhaDepois` já tinha tido, por outra porta.
+- **⚠️ A TELA É POR TIME, EM DOIS NÍVEIS** (a pedido: *"não exiba pokémon por pokémon, exiba time
+  por time, assim como fica na tela home, porém só exiba no card do time os pokémons que podem
+  aprender o HM01, e quando clicar no time, aí sim abre a lista"*). A primeira versão era uma lista
+  corrida de todos os saves — com 20 slots ela vira uma parede de dezenas de linhas em que a única
+  pista de onde cada um mora é uma legenda pequena.
+  **O card é o MESMO da home** (a estrela com a média e a fileira de sprites): é por ele que o
+  jogador reconhece um time, e repetir a forma é o que evita reaprender a ler.
+  **⚠️ MAS A FILEIRA TRAZ SÓ QUEM PODE APRENDER, não o time inteiro** — foi o pedido, e ele está
+  certo: um card com seis sprites em que dois servem faria o jogador clicar pra descobrir quais. A
+  **média da estrela também é a dos candidatos**, pelo mesmo motivo: ela descreve o que está
+  desenhado ali, não o time.
+  **Save sem nenhum candidato não vira card** — um time inteiro apagado na lista diria menos que
+  não estar lá. E **quando o último candidato de um time aprende, a tela volta sozinha pros
+  times**, com o anúncio: uma lista vazia ali não diz nada que o anúncio na tela de cima não diga
+  melhor.
+- **⚠️ O TIME DE UM SLOT SAI DE DUAS FONTES, e escolher a errada mostra um time velho.** O
+  `game.saveSlots` é uma cópia carregada na HOME; o `game.team` é o time VIVO do save aberto. Pro
+  slot aberto a fonte é o `game.team` (`timeDoSlot`) — sem isso um pokémon capturado nesta sessão
+  não apareceria, e pior: os **ÍNDICES** das duas listas deixariam de bater e o Corte iria parar no
+  pokémon ERRADO.
+- **QUEM TEM VAGA APRENDE SEM PERGUNTAR** (menos de `MAX_GOLPES`): não há o que trocar, e a tela
+  seria uma pergunta de uma resposta só. É a MESMA regra da fila de aprendizado por nível.
+- **⚠️ O GOLPE RETIRADO É RECUSADO** (`ataquesRecusados`), exatamente como na tela de troca por
+  nível. Sem isso ele voltaria pela fila de aprendizado no próximo nível — e voltaria pra sempre,
+  que é o **carrossel infinito de 09/09/2026**. Golpe esquecido não volta sozinho.
+- **⚠️ MAS O GOLPE DE MÁQUINA NÃO SE DESAPRENDE** (`ehGolpeDeMaquina`). Reportado: *"o HM01 não pode
+  ser desaprendido, acabei de ensinar para um Persian, e depois ele aprendeu Talho e eu consegui
+  tirar o corte"*. É assim no jogo original — HM é permanente —, e **aqui ele é mais que um golpe:
+  é a CHAVE da Mata Fechada**. Perdê-lo sem querer numa tela de troca fecharia a rota de novo, e o
+  jogador não teria como ligar uma coisa à outra.
+  **Era pela tela de aprendizado por NÍVEL que ele se perdia** — o Persian aprende Talho no 50 e a
+  tela oferecia trocar justamente o HM. Hoje ele não entra na lista, e a tela **diz por quê** (sem
+  a frase, um golpe some da lista sem explicação e isso se lê como bug).
+  **Quem valida é a AÇÃO**, não a tela: `responderAprendizado` recusa o golpe de Máquina mesmo que
+  o clique venha forjado — a mesma regra do `confirmarAtaques` e do `chooseRoute`.
+  **A lista sai dos próprios HMs**, não é o `cut` escrito à mão: o HM02 nasce protegido sozinho.
+- **⚠️ E A REGRA PRECISOU DE UM LUGAR SÓ (`ataquesTrocaveis`), porque ela tem TRÊS leitores e um
+  deles não é a tela.** Escrita dentro do render, ela travou o jogo: o **bot do smoke lê o ESTADO**
+  — ele escolhia o golpe mais fraco de `p.ataques`, caía no Corte (poder 50, o mais fraco de um time
+  maduro), a ação recusava em silêncio e a jornada **parava naquela tela até o `MAX_STEPS`**.
+  **72 falhas em 100 jornadas**, e nenhuma delas existia antes da guarda.
+  Hoje a TELA, a AÇÃO e o BOT leem a mesma função. **Regra que só a tela aplica é regra que o resto
+  do jogo não enxerga** — e o preço disso aqui foi o carrossel infinito de 09/09/2026 voltando por
+  uma porta nova.
+- **A TELA DA TROCA reusa os MESMOS blocos das três telas de golpe** (o `golpe-cab` e o
+  `cartaoDeGolpe`): ela conta a mesma coisa que a tela de aprendizado por nível, e um formato
+  próprio obrigaria a reaprender a ler no meio da decisão.
+- **A linha da Máquina na mochila virou botão**, e ela **não usa o `.btn` da casa** — aquele é botão
+  de AÇÃO, com moldura de 3px; aqui a lista é de Máquinas que por acaso se tocam, o mesmo raciocínio
+  que já tinha tirado o `.btn` dos cartões de golpe e das linhas da ficha da Pokédex. O **`ⓘ`** do
+  fim é o que diz que há o que fazer: sem ele a linha se lê como as listas estáticas do jogo.
+
+**⚠️ OS 72 CORTADORES, e a lista NÃO foi escrita de cabeça.** Ela saiu do `learnsets.ts` do Pokémon
+Showdown pela tag de MÁQUINA da Gen 3 (**`3M`**) — a mesma geração da base de golpes do jogo, e o
+mesmo caminho que gerou o `GOLPES_CRIT_ALTO` e as listas de golpe especial.
+**⚠️ ATENÇÃO À FONTE:** as tags `1M` e `2M` dão **ZERO** nas 250 do jogo, porque o arquivo do
+Showdown é podado e só traz da Gen 3 pra frente — exatamente a armadilha que a seção da base de
+golpes já registra. Quem for refazer a lista tem que usar a `3M`.
+
+A intuição erra três vezes:
+
+| | |
+|---|---|
+| **cinco dos sete iniciais cortam** | Bulbasaur, Charmander, Chikorita, Cyndaquil, Totodile |
+| **a linha do Squirtle e o Pichu NÃO** | e são justamente os dois que "pareceriam" cortar |
+| **os quatro lendários da lista ficam** | Raikou, Entei, Suicune e Celebi — é o que o dado diz, a mesma decisão do Lugia no `RECUPERACAO` e no `REMOINHO`. O Celebi é INTOCÁVEL, então a entrada dele não roda hoje |
+
+### A MATA FECHADA: A TERCEIRA ROTA (13/09/2026)
+
+Pedida assim: *"na jornada, coloque aleatoriamente a partir do trecho 4, que pode exibir alguma nova
+rota ao invés das 2 que já tem por padrão, pode aparecer 3, essa nova rota o treinador só pode
+acessar caso tenha um pokémon equipado com o Cut"*.
+
+- **A partir do TRECHO 4** (`ROTA_DO_CORTE_A_PARTIR_DE = 3`) e em **1 de cada 4** trechos
+  (`CHANCE_ROTA_DO_CORTE = 0,25`). Em cinco trechos elegíveis isso dá **~75% de chance de ver a mata
+  pelo menos uma vez** numa jornada — medido, 74,8%. Rara o bastante pra ser um achado, comum o
+  bastante pra existir.
+- **⚠️ O SORTEIO É SEMEADO PELO SAVE**, como o do encontro selvagem, e pelo mesmo motivo: com
+  `Math.random` bastaria sair do save e voltar até a mata aparecer. A semente carrega o slot, a
+  **GERAÇÃO** do slot (senão recriar no mesmo slot repetiria a jornada) e o trecho.
+- **⚠️ E O CADEADO É CALCULADO NO DESENHO, nunca gravado no estado — e isso é o pedido ao pé da
+  letra:** *"caso o treinador esteja nessa tela e não possui um pokémon que tem o cut, e então ele
+  sai da tela, vai pro home, pra mochila e ensina para o pokémon do time dele e volta para o save,
+  deve habilitar a rota"*. Com a trava gravada, voltar da mochila encontraria o cadeado do jeito que
+  ele estava. Lida no render, ela responde à pergunta certa: **este time, AGORA, sabe cortar?**
+  O sorteio **não olha o time**: a mata aparece independente de o treinador saber cortar — quem
+  decide se dá pra ENTRAR é o desenho, e é isso que faz a mecânica funcionar.
+- **A tela NOMEIA quem abre o caminho** (*"🪓 Venusaur abre caminho"*): um cadeado aberto que não diz
+  quem o abriu faz o jogador conferir o time golpe a golpe pra ter certeza. Trancado, ela diz o que
+  falta.
+- **Quem VALIDA é a ação, não a tela** (`chooseRoute` recusa a rota trancada): o card apagado é
+  apresentação — a mesma regra do `confirmarAtaques` e do `toggleRelease`.
+- **⚠️ AS CARTAS DE ROTA SÃO MONTADAS EM TRÊS PONTOS** (a saída do laboratório, a escolha de ginásio
+  e a auto-recuperação de save antigo), e por isso a soma vive numa função só (`cartasDeRota`): três
+  cópias fariam a mata aparecer em dois deles e sumir no terceiro.
+- **⚠️ ELA NÃO TEM POOL, e por isso não é uma rota como as outras**: escolhê-la NÃO leva ao encontro
+  selvagem. O pokémon do trecho, ali, se ganha lutando.
+
+### O ROLAMENTO DOBRA A CADA USO SEGUIDO (14/09/2026)
+
+Pedido assim: *"ajustar o movimento Rollout, dobrar o poder a cada uso, depois de 5x usados
+consecutivamente, reseta o poder para 30 novamente, caso use outro ataque sem ser o Rollout, reseta
+também"*. É o **primeiro golpe do jogo cujo poder depende do que aconteceu nas trocas anteriores** —
+até aqui o poder era um número fixo da tabela, e o único que variava era o de vários tapas (que
+varia por SORTEIO, não por histórico).
+
+- **30 → 60 → 120 → 240 → 480, e o 6º uso volta pra 30** (`ROLAMENTO_USOS = 5`). O contador vive na
+  INSTÂNCIA e começa com `_`, então não vai pro Firestore — e é solto no fim da batalha junto com os
+  outros marcadores: sem isso um Golem sairia da luta com 480 guardado e a batalha seguinte começaria
+  com ele. É o mesmo cuidado que o teto de HP da Fúria já tinha custado.
+- **A ESCALA ENTRA NOS DOIS LADOS** — o `poder` (que vira o dano) e a `nota` (que decide a escolha).
+  Só no dano, o motor escolheria um Rolamento de 30 e aplicaria um de 480: é a lição do
+  `EXPOENTE_TIPO` e a da chuva.
+- **O CONTADOR ANDA NO `golpesDaTroca`, não no `calcDamage`** — este é o único ponto que roda uma vez
+  por ATAQUE. No `calcDamage` ele contaria uma vez por TAPA, e um golpe de vários tapas daria cinco
+  usos num ataque só.
+
+**⚠️ E ELE ACHATAVA NO LOG, porque a suavização de 12/09 existe pra impedir exatamente o que ele
+faz.** Aquela regra reparte dois golpes do mesmo atacante quando a razão passa de 1,176×, porque *"o
+mesmo golpe contra o mesmo alvo só difere pelo sorteio de 0,85 a 1,00"* — e o Rolamento é a **primeira
+exceção real** a isso. Medido: a barra caía 30 e 60 e o log dizia **82 e 72**.
+A escala passou a viajar por linha (campo `rl`) e entra como **PESO na suavização**, exatamente como
+o crítico pesa 2. Duas travas do teste tiveram que aprender a mesma coisa (elas comparavam dano cru).
+
+**⚠️ E O CONFRONTO COM ROLAMENTO SAI DO `TETO_GOLPES`, que é a MESMA exceção do sono.** A
+reconstrução não conhece escala nenhuma — ela interpola HP e devolve golpes inventados, todos do
+mesmo tamanho. Medido: a escala só chegava na tela em **31,6%** dos confrontos com Rolamento; nos
+outros 68% o jogador via o mesmo nome com números lisos e a mecânica ficava invisível.
+O preço é pequeno porque o caso é raro: 7,9% dos confrontos, e neles a tela vai de 2,7 pra 5,5
+linhas — **+0,22 linha na média de todos**.
+
+- **O SELO DIZ `×2`, `×4`, e não `2x`**: o `Nx` já quer dizer "bateu N vezes" nos golpes de vários
+  tapas, e um Rolamento "2x" se leria como dois tapas. Aqui o que dobrou foi o PODER. O `×1` não sai:
+  no primeiro uso não há o que explicar.
+
+**⚠️ O NÚMERO QUE IMPORTA, E ELE É DESCONFORTÁVEL: na prática QUASE NINGUÉM O USA.** O motor escolhe
+pelo DANO, e 30 de poder perde pra qualquer alternativa no PRIMEIRO uso — que é o único que conta pra
+decisão. Dos 14 que aprendem, 4 o levam no moveset padrão, e medido no nível 50 contra um painel de 8:
+
+| espécie | leva | usa | o que ele vale |
+|---|---|---|---|
+| Graveler, Golem, Donphan, Dunsparce | sim | **0,0%** | nada — eles têm Terremoto (100) e Derrubada (90) |
+| **Shuckle** | sim | **8,8%** (sequências de até 5) | **+12,1 pontos** de vitória (7,8% → 20,0%) |
+
+É **a mesma armadilha da Fúria**, que "implementada ao pé da letra nunca saía: 0,0% dos confrontos".
+A diferença é que aqui ela não é total — quem não tem nada melhor o usa, e pra esse ele é enorme.
+
+**⚠️ E A SAÍDA ÓBVIA FOI MEDIDA E É PIOR.** O precedente da casa é o `poderEfetivo` dos multi-tapas,
+criado justamente porque *"o seletor compara PODER, e o tapa vale 15 — perde pra qualquer coisa"*.
+Aplicando a mesma ideia (a nota olhar a MÉDIA da sequência, 186), o Rolamento passa a ser escolhido em
+60% a 97% dos ataques — **e custa vitória em todos**:
+
+| | usa hoje | vitória hoje | usa investindo | vitória investindo |
+|---|---|---|---|---|
+| Golem | 0,0% | 56,4% | 59,2% | **48,5%** (−7,9) |
+| Donphan | 0,0% | 62,5% | 66,2% | **44,5%** (−18,0) |
+| Dunsparce | 0,0% | 18,8% | 79,9% | **10,2%** (−8,6) |
+| Shuckle | 8,8% | 19,7% | 97,5% | **11,8%** (−7,9) |
+
+A causa é direta: o motor largaria um Terremoto de 100 por um golpe que começa em 30, e **a sequência
+raramente chega ao 4º uso** — o confronto acaba antes. **O motor está certo em recusar.**
+Se um dia se quiser vê-lo mais, a alavanca honesta é o **poder base** (30 é muito baixo pra um golpe
+que precisa sobreviver a um primeiro uso) ou a **velocidade da escala**, não a nota.
+
+### O SINO CURATIVO (Heal Bell) — 14/09/2026
+
+Pedido assim: *"adicionar a habilidade passiva Heal Bell da Miltank e Celebi, tendo a mesma mecânica
+que o RECOVER do Alakazam"*. Ele cai no **mesmo ramo `cura`** do Recuperar: abre o confronto, só vale
+abaixo de `CURA_MAXIMO_DO_HP`, e é `continue` — a luta acontece inteira depois.
+
+- **REUSA A MECÂNICA INTEIRA** em vez de nascer como efeito novo: a caixa da ficha é indexada pelo
+  EFEITO e não pelo nome (ver **A CAIXA QUE EXPLICA O ESPECIAL**), então o texto veio de graça. O que
+  muda é o nome que a ficha e o log mostram.
+- **⚠️ O CELEBI JÁ ESTÁ NO `RECUPERACAO`, e o Recuperar vem ANTES na fila**: ele cura com "Recuperar"
+  em 10% e o Sino sai na chance composta (9%). Na prática isso não roda — ele é INTOCÁVEL e ninguém o
+  captura —, e a entrada fica porque é o que foi pedido e o que o jogo original diz. **Quem aparece
+  de verdade é a MILTANK**, que não tem outro especial e cura nos 10% cheios.
+- Tipo **Normal**, como no jogo oficial.
+
+**O PREÇO DOS DOIS JUNTOS, NA JORNADA: dentro do ruído.** 57,88% sem contra **58,99%** com —
+**+1,12 ponto, 1,8σ** (16 blocos de 800 jornadas de cada lado, **12.800 de cada**, desvio tirado de
+ENTRE os blocos, 10 de 16 blocos pro lado fácil). Faz sentido: o Rolamento é usado por uma espécie e o
+Sino por outra, e as duas caem dos dois lados da luta.
+
+### AS DUAS FRASES QUE FALTAVAM (14/09/2026)
+
+- **"Krabby acordou e voltou à luta!"** — pedida com estas palavras, e **só DEPOIS de ele apanhar**:
+  *"quando um pokémon dormir, ele vai tomar um dano, E DEPOIS DISSO, exiba a mensagem"*.
+  **⚠️ A PRIMEIRA VERSÃO GRAVAVA NO COMEÇO DO `doExchange`** e a linha saía ANTES do golpe que ele
+  levou dormindo — o log dizia *"fez dormir / acordou / atacou"*, contando a história de trás pra
+  frente. Hoje o começo só guarda QUEM acordou; o registro entra depois dos golpes daquela troca.
+  **O `q` é de QUEM ACORDOU**, como o da fúria: a linha é sobre UM pokémon, não sobre um causador e um
+  alvo — ao contrário do sono, cujo `q` é de quem USOU o golpe. O nome viaja junto (`g`) porque o log
+  é relido dias depois, quando o matchup já não diz qual dos dois estava dormindo.
+  **⚠️ E A ORDEM PRECISOU VALER NA TELA TAMBÉM, não só no diário.** Reportado logo depois, num
+  Venusaur × Vileplume: *"a Vileplume fez o venusaur dormir mas ele já acordou sem a vileplume ter
+  batido nele"*. **O motor estava certo** — o diário saía `sono → golpe → acordou` em 100% dos
+  casos. Quem embaralhava era a `sequenciaDoConfronto`: eu tinha posto o `acordou` (e o `chuvafim`)
+  na lista de **ABERTURAS**, e aquela lista tem **significado posicional** — o que está nela é
+  puxado pro TOPO quando o confronto passa do `TETO_GOLPES` e cai na reconstrução. Por isso só
+  aparecia em luta longa, que é justamente o caso do print.
+  Hoje os dois têm lugar próprio na cena: o despertar vem **depois da troca livre em que ele
+  apanhou** e a chuva **fecha o confronto**.
+  **⚠️ E O DESPERTAR ENTRA ENTRE AS TROCAS LIVRES, não depois de todas.** Ele acontece no fim da
+  troca em que o contador zera — a PRIMEIRA delas. Quem usou o sono pode ter mais de uma troca livre
+  (se for o mais rápido, ele ainda bate primeiro na troca em que o outro acorda), e contadas todas
+  antes do despertar a tela dizia que ele levou **dois** golpes dormindo. A posição sai do próprio
+  diário: quantos golpes livres vieram antes da marca.
+  **⚠️ E QUEM MORRE DORMINDO NÃO ACORDA (14/09/2026, a pedido:** *"quando um pokémon morre durante o
+  sono, não precisa exibir que ele acordou e voltou para a luta, nem no log e nem na batalha"*).
+  Reportado com print num **Venusaur × Mr. Mime**: o Mr. Mime levou o golpe dormindo, morreu (0/331),
+  e a linha do despertar saiu logo abaixo.
+  **O contador do sono anda no COMEÇO da troca e o pokémon leva o golpe no MEIO dela** — então só
+  depois dos golpes dá pra saber se ele chegou vivo ao fim. É por isso que o começo do `doExchange`
+  guarda o pokémon (e não só o lado e o nome): a decisão é lá embaixo.
+  Medido: **450 confrontos** em que ele morre no golpe que leva dormindo, **0 com a linha** — e
+  **120 de 120** em que ele sobrevive continuam anunciando.
+  **⚠️ ARMADILHA DA MEDIÇÃO, e ela custou uma volta:** o `preservePlayerHp` preserva o time **A** e
+  CURA o **B**. Com o Mr. Mime montado como B ele entrava sempre cheio e o cenário não acontecia
+  **nenhuma vez em 12.000 voltas** — o teste passaria sem testar nada. É a mesma armadilha que a
+  medição do revide moribundo já tinha custado.
+  **⚠️ E O PONTO FINAL DEIXOU DE DOBRAR COM O "!".** A linha do log saía *"acordou e voltou à
+  luta!."* — as duas frases novas já vêm pontuadas do pedido, e o `linhaEspecial` concatenava um "."
+  cego. Hoje o `pontoFinal()` só acrescenta quando falta, exatamente como o `pontuada()` já fazia no
+  aviso do meio da batalha.
+  Medido depois: **0 de 521** confrontos com a ordem errada na tela (250 deles no caso exato do
+  print), e há trava sobre a TELA — o diário já tinha a sua.
+- **"A dança da chuva terminou!"** — e ela sai no confronto que foi o **ÚLTIMO debaixo dela**, não no
+  seguinte. Pô-la no seguinte seria pior de duas formas: ele pode **não existir** (a batalha acaba
+  junto) e, existindo, ele já é um confronto sem chuva — a frase chegaria depois de o jogador ver um
+  golpe de Fogo voltar ao normal sem explicação.
+  Ela **não nomeia ninguém**: o clima é do CAMPO, a mesma razão pela qual o 🌧️ do cabeçalho fica em
+  cima do ×.
+- As duas valem **1 passo** no `passosDaAbertura` e ganham o segundo e meio de leitura pela marca
+  `leitura`, como toda frase que não mexe barra. Fora da tabela, valeriam pra SEMPRE — o defeito que a
+  anulação teve.
+- **⚠️ E O `!` DEIXOU DE DOBRAR.** As duas já vêm pontuadas do pedido, e a concatenação cega do
+  `avisoDoConfronto` dava **"!!"** na tela. Hoje o `pontuada()` só acrescenta quando falta.
+
+### O MAPA SAIU DA ABERTURA DA JORNADA (14/09/2026)
+
+Pedido assim: *"o mapa que aparece logo quando inicia o save, pode tirar, deixar apenas naquele botão
+do Mapa que já existe hoje quando se tem que escolher qual o próximo ginásio a enfrentar"*.
+
+- Ele existia como um beat de tela pra dar a Kanto o tamanho que o texto sozinho não dava. O botão
+  **"🗺️ Ver o mapa" continua em toda tela de escolha**, então o mapa não sumiu: o que sumiu é a parada
+  obrigatória nele.
+- **⚠️ A TELA `kantoIntro` FICA DESENHÁVEL, e isso é de propósito:** ela era ponto seguro de gravação,
+  então save antigo parado nela precisa de uma tela pra abrir — sem ela, quem fechou a aba ali volta
+  numa tela em branco. É a mesma decisão do `case 'tmhm'` quando o botão dele foi escondido.
+
+### AS QUATRO CORREÇÕES DA BATALHA ONLINE (14/09/2026)
+
+**1) +5s EM CADA JANELA.** São QUATRO: aceitar a partida (15→**20s**), escolher o TIME (15→**20s**), o
+pokémon INICIAL (10→**15s**) e as trocas do meio da batalha (5→**10s**).
+**⚠️ O `BATTLE_ANIM_MS` NÃO É UMA DELAS**, de propósito: ele não é tempo de DECISÃO, é a reserva que o
+servidor dá pra a animação rodar antes de a janela começar a contar. O cliente desenha o cronômetro
+com os MESMOS números — se divergirem, o relógio da tela começa num número que a partida não tem.
+
+**2) DÁ PRA TROCAR ATÉ O TEMPO ACABAR.** Reportado: *"quando você seleciona um pokémon, não tá sendo
+possível trocar para outro na mesma etapa"*.
+**⚠️ O SERVIDOR SEMPRE ACEITOU** — o `pickOnlineBattlePokemon` sobrescreve a escolha enquanto a fase é
+`choosing`, e o prazo nunca foi encurtado quando os dois escolhem cedo. **Quem travava era só a tela**:
+ela desabilitava os cards assim que a primeira escolha era enviada. `escolhendo` (a janela está aberta)
+e `escolhi` (já mandei uma) eram a mesma variável e são coisas diferentes — hoje o cabeçalho muda de
+texto e os cards continuam clicáveis.
+
+**3) A FRASE DA PASSIVA FICAVA ESTÁTICA.** Reportado: *"quando acontece alguma habilidade passiva na
+batalha online, a mensagem fica estática e não sai mais, ou seja, não aparece os ataques dos pokémons,
+somente essa frase"*.
+A causa: o online calculava `avisoDoConfronto(m)` **UMA VEZ, sem passo**, e o `pintarGolpeOnline` saía
+cedo enquanto ele existisse — então um confronto com sono, chuva ou qualquer abertura ficava com a
+mesma frase do começo ao fim, e **nenhum golpe era nomeado**.
+**As outras quatro telas já faziam certo desde 09/09/2026** (a tabela `passosDaAbertura`): a frase vale
+os passos dela e CEDE o lugar ao nome do golpe. O online ficou pra trás porque é o quinto laço e o
+único com perspectiva — **exatamente a exceção em lista onde a próxima omissão se esconde**, que é o
+que já tinha acontecido com o buff de especialidade na raide do Mew.
+
+**4) A VERIFICAÇÃO GERAL — e ela achou um quinto defeito.** Pedido: *"verifique em geral o
+funcionamento das batalhas onlines se está seguindo a mesma mecânica das batalhas da jornada"*.
+O online resolve **confronto a confronto** (`battleResolveMatchup`) e a jornada roda a batalha inteira
+(`simulateGymBattle`) — mas os dois chamam o **MESMO `doExchange`**, então as **11 passivas de confronto
+valem igual**: conferido uma a uma, todas saem (sono, fúria, confusão, Fúria do Dragão, as duas danças,
+Recuperar, chuva, autodestruição, anulação, drenagem).
+
+**⚠️ O QUE DIVERGIA ERA A CHUVA: ela durava UM confronto em vez de três.** E o comentário do código
+dizia que *"a batalha online não tem clima"* e que ela não era sorteada ali — **isso era falso** desde
+que a Dança da Chuva entrou: o sorteio mora no `tentarGolpeEspecial`, que o `doExchange` chama. Medido:
+ela saía em **10,3% dos confrontos** e morria no primeiro, porque o `limparClima()` zerava o contador
+antes de cada um.
+Hoje o clima **vem do ESTADO da partida** (`definirClima(estado.chuva)`) e o que sobra volta pro
+documento. **E zerar continua sendo obrigatório**, por outro motivo: o `chuvaRestante` é módulo-level e
+no servidor a INSTÂNCIA é reaproveitada entre invocações — um `simulateGymBattle` (Torre, ginásio da
+cidade) que acabe com chuva sobrando vazaria pro próximo confronto online. Ler do documento fecha as
+duas portas de uma vez.
+
+**O QUE CONTINUA DIFERENTE, e é decisão antiga:** o time do online vem de um CÓDIGO
+(`especie:nivel:shiny`), então ele **não tem golpe escolhido** e luta no motor de tipo — o Rolamento,
+que depende de golpe escolhido, não existe lá. E os **itens equipados** continuam fora (daria vantagem
+a um lado num PvP).
+
+### A MATA FECHADA: O CADEADO DIZ O QUE FAZER, E A CLAREIRA MOSTRA AS DUAS FILAS (14/09/2026)
+
+- **O cadeado nomeia o HM01 e a MOCHILA**: *"🔒 Use o HM01 (na Mochila) em um pokémon do time pra
+  liberar este caminho"*. Ele dizia *"precisa de um pokémon que saiba Corte"* — isso descreve o ESTADO,
+  não diz que o HM01 mora na mochila nem que ele se USA num pokémon, e sem isso o jogador que tem a
+  Máquina no bolso fica olhando o cadeado sem saber que a chave já é dele.
+- **A clareira mostra a ORDEM dos dez e deixa arrumar a sua.** É a **única batalha do jogo em que o
+  jogador vê a fila do adversário antes de lutar** — e isso é a coisa toda: 10 contra 6 sem cura entre
+  confrontos se decide na ORDEM, e sem ver a fila a escolha seria no escuro. O 1º dele encara o 1º seu.
+  As setas são as mesmas da tela de ordem do time, e reordenam o `game.team` — que é o que entra na
+  batalha, sem cópia no meio. Elas **gravam**: a clareira está no `SAFE_SAVE_SCREENS`, então fechar a
+  aba depois de arrumar a fila não pode desfazer o que foi arrumado.
+- **⚠️ E A FILA É A `order-row` DA TELA DE ORDEM DE BATALHA, não um formato próprio** (14/09/2026, a
+  pedido: *"as setinhas para ordenar têm que seguir o mesmo padrão que já existe em outras telas de
+  ordenação, são 2 setinhas azuis, uma embaixo da outra, e também deixe os sprites dessa tela da
+  vigília do mesmo tamanho... e também exiba o tipo dos pokémons do treinador (hoje não está
+  exibindo)"*).
+  Ela teve CSS próprio por um dia, e ele custava **três diferenças pra a mesma pergunta**: sprite
+  menor, setas de outra forma, e a fila do JOGADOR saía **sem selo de tipo** (a dos dez tinha).
+  Reusar a linha de sempre resolve os três de uma vez e não deixa o quarto nascer — a pergunta aqui
+  é a mesma da tela de ordem ("em que ordem eles entram?"), e um formato diferente obrigaria a
+  reaprender a ler no meio da decisão.
+  **⚠️ O `botaoDeItemHtml` VEIO JUNTO EM 14/09/2026, a pedido** — e ele é o lugar certo: a clareira
+  é a última tela antes de **10 contra 6 sem cura nenhuma entre confrontos**, ou seja é exatamente
+  aqui que se decide quem leva a poção. Mandar o jogador sair pra equipar e voltar seria o oposto
+  do motivo de o `+` existir ("decidir quem entra primeiro e quem leva o quê é a mesma conversa").
+  **Medido a 320px: ele custa ZERO** — a página fica nos mesmos **2.442px**, a coluna do número nos
+  mesmos 28px e a linha nos mesmos 103px, porque o `+` mora DENTRO da coluna do número (que já era
+  mais alta que o texto dela). É a mesma conta que pôs o botão ali em primeiro lugar.
+  **O QUE CONTINUA FORA é o `golpesDoTimeHtml`**: golpe não se troca aqui, e a clareira já é a tela
+  mais alta da jornada.
+  **Medido a 320px:** sprite de **48px** nas duas telas (idêntico), 12 setas `.circle-btn`, 24 selos
+  de tipo, o "10º" cabendo na coluna do número (o `.order-num` ganhou `min-width`, que a tela de
+  ordem nunca precisou — lá o máximo é 6º) e **sem rolagem lateral**. A tela vai a **2.464px** com as
+  16 linhas.
+  A quebra do nome comprido é **a mesma das duas telas** (4 de 6 na de ordem, 5 de 16 aqui) — e a
+  clareira ainda sobra mais espaço pro nome, 205px contra 167px, porque não tem o botão de item.
+
+### A VIGÍLIA DO ARCO-ÍRIS: 10 CONTRA 6 (13/09/2026)
+
+Pedida assim: *"nessa rota você vai exibir uma tela dizendo que ele encontrou uma reunião de pokémons
+selvagens celebrando algo (procure alguma mitologia do pokémon), e que ele atrapalhou e agora esses
+pokémons estão furiosos, e então você vai elaborar um time com 10 pokémons (média de level -5 level
+da média do time do treinador), sendo que 2 devem ser shiny, e caso o treinador vença esses 10
+pokémons, ele pode escolher 1 dos 10 para ir na jornada com ele"*.
+
+- **O MITO É O DO ARCO-ÍRIS DE HO-OH**, e ele foi escolhido por caber nas duas regiões: no folclore
+  de Johto, Ho-Oh cruza o céu deixando um arco-íris atrás de si, e quem o vê carrega a felicidade pra
+  sempre — é a lenda que explica a Torre Sino e as três bestas. Os selvagens fazem vigília esperando
+  a passagem dele; o galho cortado cai no meio da roda e desfaz o arco-íris.
+  **A alternativa era o santuário do Celebi na Floresta Ilex** — que é justamente onde o Corte é
+  obrigatório no jogo original, e seria a piscadela mais bonita. Ela foi descartada por ser de UM
+  lugar só: a mata aqui aparece em qualquer trecho de 4 a 8, nas duas regiões.
+- **⚠️ OS DEZ SÃO SORTEADOS COM SEMENTE DO SAVE**, como tudo nesta jornada: com `Math.random`
+  bastaria fechar a aba antes da gravação pra re-sortear até vir um painel fácil — ou até vir o
+  shiny que se quer de prêmio.
+- **AS TRÊS EXCLUSÕES PEDIDAS**: nada de lendário, nada que o treinador já tenha, e nada repetido
+  entre os dez — as duas últimas por **LINHA EVOLUTIVA** e não por espécie, que é a regra que o
+  encontro selvagem já usa (dois Magikarp viram dois Gyarados).
+- **⚠️ E A ESPÉCIE TEM QUE BATER COM O NÍVEL** (`especieNoNivel`): um Caterpie nível 45 não existe. A
+  conversão vem ANTES da checagem de linha, senão dois ids diferentes (caterpie e metapod) viriam os
+  dois como Butterfree.
+- **A MÉDIA BATE EXATO.** Os desvios são montados pra **somar zero**, então a média dos dez é
+  exatamente `media − 5` e não "mais ou menos isso". E **os dois shiny são marcados depois, em
+  posições distintas**: sorteando "shiny?" um a um, uma vigília sairia com zero e outra com cinco —
+  o pedido diz DOIS.
+- **⚠️ O `createInstance` NÃO COPIA A FLAG SHINY** — armadilha conhecida da casa, e a Vigília é a
+  **primeira batalha especial em que o ADVERSÁRIO tem shiny**. O `runSpecialBattle` passou a copiar,
+  e ele só **LIGA, nunca desliga**: os outros contextos não mandam o campo e continuam idênticos.
+- **A VIGÍLIA VAI PRO SAVE**, e não só no `specialBattle` (que **não é serializado**): a clareira e a
+  tela do prêmio são pontos de leitura e de decisão, e fechar a aba numa delas não pode perder os
+  dez — muito menos o prêmio de quem já venceu. As duas entraram no `SAFE_SAVE_SCREENS`.
+- **O PRÊMIO ENTRA COMO UM SELVAGEM CAPTURADO**: mesmo nível, mesmo shiny, e passando pela MESMA
+  tela de escolha de golpes. **Com o time cheio ele entra assim mesmo e o time fica com 7** — quem
+  resolve é a tela do Prof. Carvalho, exatamente como num encontro selvagem. Sem isso, o prêmio de
+  quem tem 6 sumia.
+- **PERDER NÃO CUSTA TENTATIVA DE GINÁSIO e não tira ninguém do time.** O preço é outro, e é grande:
+  a mata **substituiu o encontro selvagem do trecho**, então quem perde atravessa aquele trecho SEM
+  CAPTURAR. É o que faz dela uma aposta.
+
+**⚠️ O PREÇO MEDIDO, E ELE É MUITO DESIGUAL AO LONGO DA JORNADA — este é o número que importa aqui.**
+800 jornadas com o bot entrando na mata sempre que ela aparece (839 vigílias):
+
+| trecho | vigílias | o jogador venceu | nível médio do time |
+|---|---|---|---|
+| 4º | 168 | **97,6%** | ~27 |
+| 5º | 162 | **88,3%** | ~35 |
+| 6º | 180 | **54,4%** | ~45 |
+| 7º | 161 | **34,2%** | ~53 |
+| 8º | 168 | **22,0%** | ~56 |
+| **no total** | **839** | **59,2%** | ~43 |
+
+**A CAUSA É ARITMÉTICA, não balanceamento:** "média −5" é uma diferença **absoluta**, e em termos
+relativos ela encolhe — −5 em cima de 27 é −19%, em cima de 56 é −9%. No fim da jornada os dez estão
+praticamente no mesmo nível do time, e **10 contra 6 sem cura entre confrontos** é esmagador.
+Medido em painel fixo, a mesma coisa por outro ângulo: time ~25 vence **88,4%**, ~45 vence **37,7%**,
+~65 vence **14,4%**.
+
+**Se um dia incomodar, as três alavancas estão medidas** (time ~45, com os dois shiny):
+
+| régua | |
+|---|---|
+| **`VIGILIA_TAMANHO`** (10) | contra 6 são **94,3%**, contra 8 **75,3%**, contra 10 **36,6%** — é a alavanca mais forte, de longe |
+| **`VIGILIA_ABAIXO`** (5) | trocar o número fixo por uma FRAÇÃO da média resolveria a desigualdade por trecho de vez |
+| **`VIGILIA_SHINIES`** (2) | os dois shiny custam **−13,9 pontos** no nível 45 e **−8,1** no 65 (1,20× em todos os atributos vale ~15 níveis) |
+
+**NA JORNADA, MEDIDO: dentro do ruído.** Conclusão **58,60% sem a mata contra 57,40% com**,
+**−1,20 ponto, 1,1σ** — 12 blocos de 500 jornadas de cada lado (**6.000 de cada**), desvio tirado de
+ENTRE os blocos. A direção é pro lado difícil (8 de 12 blocos), o que faz sentido: o jogador troca um
+encontro selvagem garantido — que rende **duas** capturas — por uma aposta de ~59% que rende **uma**.
+**⚠️ E ISSO É UMA LIÇÃO DE MÉTODO:** os **6 primeiros blocos** deram −2,90 pontos e **2,1σ**, o que
+pareceria efeito real. Com o dobro da amostra caiu pra 1,1σ. Amostra única não é medição neste
+simulador, e meia amostra também não.
+**E pra quem NÃO tem o HM01 o preço é zero por construção**: sem ninguém que corte, o card fica
+trancado e a rota nunca é escolhida.
+
+- **⚠️ O SMOKE PRECISOU DE DUAS MUDANÇAS PRA ENXERGAR A MATA, e as duas são armadilha de medição:**
+  o bot ganhou `--corte` (ele finge um treinador que já ensinou o HM01 e sempre entra na mata), e o
+  `currentSaveSlot`/`saveGen` passaram a variar por jornada. **Sem a segunda, as 300 jornadas tinham
+  o MESMO perfil de trechos com mata** — a semente é do save — e a primeira medição deu **zero**
+  entradas em 300 jornadas sem nada estar errado.
+- **Medido a 320px, no navegador:** a lista de TIMES da Máquina fica em **723px** com três cards de
+  **114px**, e a de pokémon de um time em **962px**; o card da mata mede **138px** (uma linha a mais que os outros,
+  por causa do cadeado), a clareira fica em **988px** com a roda de dez sprites em **duas fileiras de
+  cinco**, e a tela do prêmio em **1.879px** (dez cards com a lupa da Pokédex). Nenhuma rola pro lado.
+
+`tools/test-jornada.js` tranca a rota inteira (o sorteio nunca antes do trecho 4, a taxa, a
+estabilidade da semente, o cadeado no desenho **e** na ação, o destrave ao voltar da mochila, as três
+exclusões dos dez, a média exata, os dois shiny, a espécie batendo com o nível, o prêmio, o time
+cheio caindo no Prof. Carvalho e a derrota sem prêmio) e `tools/test-inventario.js` tranca a Máquina
+(os 72, as três surpresas da lista, a tela atravessando saves, quem tem vaga, o retirado recusado, e
+o slot aberto lendo o `game.team`).
 
 ## Mochila (inventário) e Loja
 
@@ -5523,11 +6280,9 @@ Se a intenção for que o HM01 seja uma prova, o Surge é o lugar errado — os 
   tão ruim quanto nenhum.
   `tools/test-notif-premio.js` tranca tudo isso no servidor, com o fake-firestore.
 - **A pilha:** cinco doces são **UM** slot com "5x", não cinco slots.
-- **A grade tem piso de 12 slots e mora dentro de uma `.box`**, como a da Pokédex — e o slot tem a
-  MESMA medida da célula de lá (52px, quadrado). Solta sobre o fundo escuro da página, o slot vazio
-  (creme com `opacity:.6`) virava um bloco **cinza**: parecia item bloqueado, não espaço livre.
-  Slot vazio é `<div>` e não `<button>` desabilitado: não há o que fazer nele, e um botão vazio
-  ainda recebe foco pelo teclado.
+- **⚠️ A GRADE DE QUADRADINHOS SAIU EM 14/09/2026**: a mochila virou uma LISTA com três
+  prateleiras, igual à loja — ver **A MOCHILA VIROU A LOJA**. O que este item descrevia (o piso de
+  12 slots, o slot com a medida da célula da Pokédex, o vazio como `<div>`) não existe mais.
 - **"Excluir" só vale pro que dá pra jogar fora de verdade.** O cupom de liga é uma notificação, e
   apagá-la é apagar o cupom. O **Doce Raro não pode ser descartado** — é um contador que só o
   servidor mexe, e não existe função pra devolver um; o botão fica desabilitado **dizendo por quê**.

@@ -528,7 +528,10 @@ function melhorAtaque(attacker, defender){
        com 45 em vez de 15 E ainda batia de 2 a 5 vezes -- ~9× o dano pretendido. Apareceu num log
        de Clefable Lv.42 que matou um Dunsparce de 270 de HP com 3 tapas e um Eevee de 235 com 2,
        enquanto a Folha Mágica dela (poder 60) tirava 88. Reportado em 09/09/2026. */
-    const tipo = GOLPES[id][0], poder = GOLPES[id][1];
+    /* ⚠️ O ROLAMENTO entra pelos DOIS lados: o `poder` (que vira o dano) e a `nota` (que decide a
+       escolha). Só no dano, o motor escolheria um Rolamento de 30 e aplicaria um de 480. */
+    const escala = escalaDoRolamento(attacker, id);
+    const tipo = GOLPES[id][0], poder = GOLPES[id][1] * escala;
     let mult = 1;
     (defender.types || []).forEach(d => { mult *= typeVsType(tipo, d); });
     if(multForcado != null) mult = multForcado;
@@ -543,7 +546,7 @@ function melhorAtaque(attacker, defender){
              /* A CHUVA ENTRA NA NOTA, e não só no dano: se ela mudasse só o dano, o motor
                 escolheria o golpe por uma regra e aplicaria outra -- e sob chuva o Raio Solar
                 continuaria sendo escolhido como se valesse 120. É a lição do EXPOENTE_TIPO. */
-             nota: poderEfetivo(id) * multDaChuva(tipo, id) * Math.pow(mult, EXPOENTE_TIPO) * (proprio ? 1.5 : SUBTYPE_PENALTY)
+             nota: poderEfetivo(id) * escala * multDaChuva(tipo, id) * Math.pow(mult, EXPOENTE_TIPO) * (proprio ? 1.5 : SUBTYPE_PENALTY)
                    * (atk / Math.max(1, def)) };
   };
   let melhor = null;
@@ -858,7 +861,18 @@ function gen1MaxHp(p){ return Math.floor(2 * effectiveBaseHp(p) * p.level / 100)
    diferente no cliente e no servidor. tools/test-golpes.js compara as duas.
    O nome em português e o aprendizado por nível NÃO vêm pra cá: nome é apresentação, e o servidor
    nunca precisa saber quem aprende o quê -- os golpes escolhidos viajam na instância. */
+/* ⚠️ O `cut` (o HM01) NASCE AQUI, escrito à mão, e é o único da tabela que não veio do gerador: a
+   base é aprendizado por NÍVEL e HM ninguém aprende por nível (isso já estava previsto por escrito
+   na seção da base de golpes). Poder 50, Normal -- os valores reais da Gen 1/2/3.
+   ⚠️ ELE NÃO ENTRA NO `GOLPES_IDS`, e isso é de propósito: aquele array é indexado pelo
+   `APRENDIZADO` (as entradas são `[nivel, indice]`), então inserir um id no meio deslocaria TODOS
+   os índices seguintes e trocaria o moveset das 250 espécies em silêncio. O `cut` não precisa dele:
+   ninguém o aprende por nível, e o campo `ataques` de um pokémon guarda o id em TEXTO.
+   ⚠️ MAS ELE ENTRA NO BOLO DO METRÔNOMO (`POOL_METRONOMO` é derivado do `GOLPES`), que vai de 155
+   pra 156 golpes. Isso desloca a semente do sorteio -- esperado, e é o preço de o Metrônomo
+   sortear "qualquer poder existente no jogo", que é o que ele promete. */
 const GOLPES = {
+  cut: ['Normal', 50],
   absorb:['Grass',20],acid:['Poison',40],aerialace:['Flying',60],aeroblast:['Flying',100],
   aircutter:['Flying',55],ancientpower:['Rock',60],astonish:['Ghost',30],aurorabeam:['Ice',65],
   barrage:['Normal',15],beatup:['Dark',10],bind:['Normal',15],bite:['Dark',60],
@@ -945,7 +959,7 @@ const GOLPES_PT = {
   rollout:'Rolamento',sacredfire:'Fogo Sagrado',sandtomb:'Tumba de Areia',scratch:'Arranhão',
   shadowball:'Bola Sombria',shadowpunch:'Soco Sombrio',signalbeam:'Feixe de Sinal',
   silverwind:'Vento Prateado',skullbash:'Quebra-Crânio',skyattack:'Ataque Celeste',
-  skyuppercut:'Cruzado Celeste',slam:'Batida',slash:'Corte',sludge:'Lodo',
+  skyuppercut:'Cruzado Celeste',slam:'Batida',slash:'Talho',cut:'Corte',sludge:'Lodo',
   sludgebomb:'Bomba de Lodo',smog:'Fumaça Tóxica',snore:'Ronco',solarbeam:'Raio Solar',
   spark:'Faísca',spikecannon:'Canhão de Espinhos',steelwing:'Asa de Aço',stomp:'Pisão',
   submission:'Submissão',superpower:'Superpoder',swift:'Rapidez',tackle:'Investida',
@@ -1202,6 +1216,10 @@ function calcDamage(attacker, defender, rng, op){
      o laço da luta pra sempre. O log precisa saber a diferença entre "tirou 1" e "não teve
      efeito", senão o jogador vê um -1 sem explicação. */
   attacker.lastMoveNulo = !!best.nulo;
+  /* ⚠️ A ESCALA DO ROLAMENTO fica registrada aqui, junto do lastCrit -- e ela precisa ser a que
+     ESTE golpe usou, não a do próximo. O contador anda no golpesDaTroca, que roda ANTES de o
+     diário ser escrito; lido de lá, o log mostraria sempre a escala seguinte. */
+  attacker.lastRolamento = escalaDoRolamento(attacker, best.golpe);
   const Leff = attacker.level;   // o crítico da Gen 3 dobra o DANO no fim, não o nível aqui
   const potencia = best.poder || MOVE_POWER;   // o poder do GOLPE escolhido, ou o implícito de sempre
   /* CONTA O USO DEPOIS de o poder deste golpe já ter sido lido: o primeiro uso sai nos 20 secos, e
@@ -1239,6 +1257,20 @@ const DYING_BLOW_FACTOR = 1.0;
    doExchange; virou constante quando o caso de "quem já está dentro da faixa" passou a precisar
    ler o TETO dela (ver o piso no doExchange). Dois lugares com o mesmo 10% divergiriam no primeiro
    ajuste, e este é um número de balanceamento -- ele custou 2,65 pontos de conclusão quando entrou. */
+/* =====================================================================
+   ⚠️ QUEM ESTÁ RASPANDO NÃO DERRUBA UM POKÉMON INTEIRO NUM GOLPE (14/09/2026, a pedido).
+   Reportado com print: uma **Ponyta com 10 de 362 (2,8%)** atravessou um Heracross e um Victreebel
+   **cheios**, matando cada um com um golpe e sem tomar nada de volta. O pedido foi direto: *"se
+   formos pensar na lógica, um pokémon muito ferido não deveria aguentar tanto numa luta"*.
+   ⚠️ ELA É A OUTRA METADE DO PISO DO REVIDE, e por isso mora aqui do lado. Desde 12/09 o revide
+   moribundo não mata (para em 1%-10%), e desde 13/09 ele nem gera linha quando o alvo JÁ estava
+   nessa faixa -- o que criou exatamente o caso do print: quem está raspando mata de vida cheia,
+   não leva revide nenhum, e segue pro próximo. A trava fecha esse ciclo pelo lado do ATAQUE.
+   O TETO É 70% DA BARRA DO ALVO: ele fica com 30% e revida de pé. Não é "70% do dano" -- um golpe
+   de 800 numa barra de 400 ainda mataria; o que se quer é que ele NÃO mate.
+   ===================================================================== */
+const MORIBUNDO_ABAIXO_DE = 0.10;   // "com menos de 10% de HP"
+const MORIBUNDO_TETO_NO_CHEIO = 0.70;
 const REVIDE_PISO_MIN = 0.01;
 const REVIDE_PISO_MAX = 0.10;
 /* O 4º parâmetro é o DIÁRIO da luta: um registro por golpe, na ordem em que aconteceram, pro log
@@ -1369,6 +1401,14 @@ const MULTI_GOLPE = {
   pinmissile:  TAPAS_2A5,   // Míssil Agulha       poder 14  -- 6
   iciclespear: TAPAS_2A5,   // Lança de Gelo       poder 10  -- 1 (Shellder)
   rockblast:   TAPAS_2A5,   // Rajada de Rochas    poder 25  -- 6
+  /* ⚠️ ESTES DOIS SÃO DE "PRENDER", NÃO DE VÁRIOS TAPAS no jogo oficial (14/09/2026, a pedido:
+     *"coloque que os moves fire spin e wrap, também ataquem de 2x a 5x igual outros ataques desse
+     estilo que já existem"*). Lá eles prendem o alvo por 2 a 5 TURNOS, tirando uma fatia a cada um;
+     aqui viram 2 a 5 tapas na mesma troca. O NÚMERO DE VEZES é o mesmo, e a distribuição também --
+     o que muda é caberem num confronto só, que é como este motor resolve tudo.
+     Os dois têm poder 15, igual ao Tapa Duplo e ao Ataque Fúria: o efetivo vai a 45. */
+  firespin:    TAPAS_2A5,   // Redemoinho de Fogo  poder 15  -- 10 (a linha do Charmander, Vulpix/Ninetales, Ponyta/Rapidash, Moltres, Flareon, Entei)
+  wrap:        TAPAS_2A5,   // Enrolar             poder 15  -- 11 (Bellsprout/Weepinbell, Ekans/Arbok, Tentacool/Tentacruel, Lickitung, a linha do Dratini, Shuckle)
   doublekick:  TAPAS_SEMPRE_2,   // Chute Duplo      poder 30  -- 8 espécies (a linha do Nidoran, Hitmonlee, Jolteon)
   bonemerang:  TAPAS_SEMPRE_2,   // Ossomerangue     poder 50  -- 2 (Cubone, Marowak)
   twineedle:   TAPAS_SEMPRE_2    // Agulha Dupla     poder 25  -- 4 (a linha do Caterpie e o Beedrill)
@@ -1390,6 +1430,34 @@ function tapasDoGolpe(golpeId, rng){
    ATENÇÃO: quem NÃO passa por aqui é a TELA DE ESCOLHA -- ela continua anunciando o poder cru (15)
    pro jogador. É a mesma ressalva que o CLAUDE.md já registra sobre STAB e subtipo ("Poder não é
    comparável entre dois golpes"), agora com um caso a mais. Não foi mexido porque não foi pedido. */
+/* =====================================================================
+   O ROLAMENTO DOBRA A CADA USO SEGUIDO (14/09/2026, a pedido: *"dobrar o poder a cada uso, depois
+   de 5x usados consecutivamente, reseta o poder para 30 novamente, caso use outro ataque sem ser o
+   Rollout, reseta também"*).
+   É o PRIMEIRO golpe do jogo cujo poder depende do que aconteceu nas trocas anteriores -- até aqui
+   o poder era um número fixo da tabela, e o único que variava era o de vários tapas (que varia por
+   sorteio, não por histórico).
+   30 → 60 → 120 → 240 → 480, e o 6º uso volta pra 30. O contador vive na INSTÂNCIA e começa com
+   `_`, então ele não vai pro Firestore (ver limparParaFirestore) e é solto no fim da batalha
+   junto com os outros marcadores -- sem isso um Golem sairia da luta com o Rolamento carregado e a
+   próxima batalha começaria com 480 de poder. */
+const GOLPE_ROLAMENTO = "rollout";
+const ROLAMENTO_USOS = 5;
+/* A escala do golpe DESTE pokémon AGORA: 1, 2, 4, 8, 16. Ela multiplica o poder E a nota -- se
+   entrasse só no dano, o motor escolheria por uma regra e aplicaria outra, que é a lição do
+   EXPOENTE_TIPO e a da chuva. */
+function escalaDoRolamento(p, golpeId){
+  if(golpeId !== GOLPE_ROLAMENTO) return 1;
+  return Math.pow(2, (p && p._rolamento) || 0);
+}
+/* Chamado UMA VEZ por ataque, depois de o golpe sair (ver golpesDaTroca). Golpe diferente zera --
+   é o "caso use outro ataque, reseta também" do pedido, e ele vale para os dois lados: quem toma
+   um Rolamento não carrega nada, quem dá só acumula enquanto insistir. */
+function atualizarRolamento(p){
+  if(!p) return;
+  if(p.lastMove !== GOLPE_ROLAMENTO){ p._rolamento = 0; return; }
+  p._rolamento = ((p._rolamento || 0) + 1) % ROLAMENTO_USOS;
+}
 function poderEfetivo(golpeId){
   const base = (GOLPES[golpeId] || [])[1] || 0;
   const tabela = MULTI_GOLPE[golpeId];
@@ -1401,6 +1469,16 @@ function poderEfetivo(golpeId){
 const CHANCE_METRONOMO_EFEITO = 0.10;   // por efeito: 10% cada um dos três, 70% golpe comum
 const CHANCE_DISABLE = 0.10;
 const CHANCE_RECUPERAR = 0.10;
+/* O SINO CURATIVO (Heal Bell) -- a MESMA mecânica do Recuperar, com outro nome e outro dono
+   (14/09/2026, a pedido: *"adicionar a habilidade passiva Heal Bell da Miltank e Celebi, tendo a
+   mesma mecânica que o RECOVER do Alakazam"*). Ele cai no mesmo ramo `'cura'`: abre o confronto,
+   só vale abaixo de `CURA_MAXIMO_DO_HP`, e é `continue` -- a luta acontece inteira depois.
+   ⚠️ O CELEBI JÁ ESTÁ NO `RECUPERACAO`, e o Recuperar vem ANTES na fila: ele cura com "Recuperar"
+   em 10% e o Sino sai na chance composta (0,9 × 10% = 9%). Na prática isso não roda -- ele é
+   INTOCÁVEL e ninguém o captura --, e a entrada fica porque é o que foi pedido e o que o jogo
+   original diz. Quem aparece de verdade é a MILTANK, que não tem outro especial e cura nos 10%. */
+const SINO_CURATIVO = ["miltank", "celebi"];
+const CHANCE_SINO = 0.10;
 /* DRENAGEM (Absorb e companhia): tira vida do adversário e devolve pra si. 23 espécies.
    A LISTA SAI DO APRENDIZADO POR NÍVEL DA GEN 1/2, como as outras -- conferida no Bulbapedia, move
    a move, e não deduzida do tipo: Kabuto e Kabutops aprendem Absorb e Mega Drain por nível apesar
@@ -1630,6 +1708,11 @@ function estaChovendo(){ return chuvaRestante > 0; }
    Escrito a mao nos tres, o quarto caminho nasceria sem -- e o vazamento nao aparece como erro,
    aparece como um golpe de Fogo tirando metade sem nada na tela dizendo por que. */
 function limparClima(){ chuvaRestante = 0; }
+/* PÕE o clima de volta. Existe pro ONLINE, que resolve UM confronto por invocação: sem um jeito de
+   restaurar o contador, a chuva morria no fim de cada confronto e durava 1 em vez de 3.
+   Ver `battleResolveMatchup`. */
+function definirClima(n){ chuvaRestante = Math.max(0, n | 0); }
+function climaRestante(){ return chuvaRestante; }
 /* O MULTIPLICADOR DA CHUVA, num lugar só -- e ESSE é o ponto.
    Ele é lido pelo DANO (`calcDamage`) E pelas DUAS escolhas de golpe (a `nota` do `melhorAtaque` e
    a do `bestAttackType`). Os três TÊM que usar o mesmo valor: quando a escolha usa um número e o
@@ -1768,6 +1851,11 @@ function sorteiaGolpeEspecial(p, rng){
   if(RECUPERACAO.includes(p.speciesId) && rng() < CHANCE_RECUPERAR){
     return { efeito:'cura', golpe:'Recuperar' };
   }
+  /* O SINO CURATIVO vem logo depois, e cai no MESMO ramo de efeito -- o que muda é o nome que a
+     frase e o selo mostram. Ver SINO_CURATIVO. */
+  if(SINO_CURATIVO.includes(p.speciesId) && rng() < CHANCE_SINO){
+    return { efeito:'cura', golpe:'Sino Curativo' };
+  }
   /* A drenagem vem por último. Quem tem dois especiais cai na chance composta, como o Kadabra
      (Disable + Recuperar): um Vileplume, que também é sonífero, absorve em 0,95 x 10% = 9,5%. */
   if(ABSORCAO[p.speciesId] && rng() < CHANCE_ABSORVER){
@@ -1820,7 +1908,20 @@ function equiparItens(team, equipados, slotPadrao){
      só depois some), e uma marca sobrando de uma batalha anterior faria o gasto não ser anotado. */
   team.forEach(p => {
     if(!p) return;
-    if(p.slotDaConta == null) p.slotDaConta = (p.slot != null) ? String(p.slot) : (slotPadrao != null ? String(slotPadrao) : null);
+    /* ⚠️ O CARIMBO É REFEITO A CADA CHAMADA, e isso mudou em 14/09/2026 (reportado). Ele era
+       um carimbo de UMA VEZ SÓ (escrito só quando o campo estava vazio) -- ou seja, GRUDAVA na
+       instância, e instância vai pro SAVE. Um
+       Pikachu equipado no slot 3 gravava `slotDaConta:"3"` dentro do save dele; qualquer leitura
+       posterior daquele pokémon procurava o item do SLOT 3, e o jogador via o Pikachu de outro
+       save marcado com a poção que não é dele. Relatado exatamente assim.
+       A PRECEDÊNCIA é: o slot do PRÓPRIO pokémon (`p.slot`, que só time misturado carrega) > o
+       slot que QUEM CHAMOU informou > o carimbo que já estava lá. O terceiro degrau existe pros
+       times misturados do servidor (Torre, Ginásio da Cidade), que carimbam o slot por pokémon e
+       chamam esta função SEM slotPadrao -- ali não há o que informar e o carimbo é a verdade.
+       Na jornada é o contrário: quem sabe de qual save o time é, é sempre quem chamou. */
+    p.slotDaConta = (p.slot != null) ? String(p.slot)
+                  : (slotPadrao != null ? String(slotPadrao)
+                  : (p.slotDaConta != null ? String(p.slotDaConta) : null));
     p.item = itemEquipado(equipados, p.slotDaConta, p.speciesId);
     p._itemGastoAnotado = false;
   });
@@ -2189,6 +2290,10 @@ function marcaDaFaixa(marca, hpDoOutro){ return { q: marca, d: 0, hp: 1, ho: hpD
    grava o lastMove; antes dele não há id pra consultar na tabela. */
 function golpesDaTroca(atacante, alvo, rng){
   const lista = [calcDamage(atacante, alvo, rng)];
+  /* O contador do Rolamento anda AQUI, e não no calcDamage: este é o único ponto que roda uma vez
+     por ATAQUE. O calcDamage é chamado uma vez por TAPA, e um golpe de vários tapas contaria cinco
+     usos num ataque só. */
+  atualizarRolamento(atacante);
   const tapas = tapasDoGolpe(atacante.lastMove, rng);
   /* ⚠️ OS TAPAS SEGUINTES REPETEM O GOLPE DO PRIMEIRO (ver op.golpeFixo). O numero de tapas foi
      lido do golpe que saiu no primeiro calcDamage; deixar os outros sortearem de novo trocava de
@@ -2217,8 +2322,17 @@ function doExchange(active, enemy, rng, diario){
   /* Quem está dormindo não ataca nesta troca, e o contador anda. O golpe dele não sai NEM no
      diário: uma linha de "-0 de HP" faria o log dizer que ele atacou e não machucou, quando o que
      aconteceu foi ele não ter atacado. O log tem que contar a mesma coisa que a tela mostra. */
+  /* ⚠️ QUEM ACORDA ANUNCIA, e só DEPOIS de apanhar (14/09/2026, a pedido: *"quando um pokémon
+     dormir, ele vai tomar um dano, e depois disso, exiba a mensagem Krabby acordou e voltou à
+     luta"*). Aqui só se guarda QUEM acordou; o registro entra depois dos golpes desta troca --
+     gravado no começo, o log dizia "fez dormir / acordou / atacou", de trás pra frente.
+     O `q` é de QUEM ACORDOU, como o da fúria: a linha é sobre UM pokémon, não sobre um causador e
+     um alvo (ao contrário do sono, cujo `q` é de quem USOU o golpe). */
   const acorda = (p) => { if(!(p._dormindoPor > 0)) return false; p._dormindoPor--; return true; };
   const activeDorme = acorda(active), enemyDorme = acorda(enemy);
+  const acordaram = [];
+  if(activeDorme && active._dormindoPor <= 0) acordaram.push({ q:'p', nome: active.name, p: active });
+  if(enemyDorme && enemy._dormindoPor <= 0) acordaram.push({ q:'e', nome: enemy.name, p: enemy });
   const dmgToEnemy = activeDorme ? [] : golpesDaTroca(active, enemy, rng);
   const dmgToActive = enemyDorme ? [] : golpesDaTroca(enemy, active, rng);
   const spdActive = effectiveSpeed(active);
@@ -2233,6 +2347,29 @@ function doExchange(active, enemy, rng, diario){
   /* APLICA OS GOLPES DE UMA TROCA, um a um, e PARA quando o alvo cai: o 4º tapa não sai num
      pokémon que caiu no 3º. Devolve o que saiu DE VERDADE de cada golpe mais a vida que sobrou --
      é desse par que saem a linha do diário e o passo da animação, uma barra por tapa. */
+  /* ⚠️ O TETO DE QUEM ESTÁ RASPANDO (ver MORIBUNDO_TETO_NO_CHEIO). Ele vale por TROCA e não por
+     golpe: um Tapa Duplo de 5 tapas também "leva o outro num ataque só", e limitar só o primeiro
+     tapa deixaria os outros quatro matarem do mesmo jeito.
+     AS TRÊS CONDIÇÕES: o atacante abaixo de 10% da barra DELE, o alvo com a vida CHEIA, e o ataque
+     matando. Fora disso nada muda -- um raspando que tira 90% de um alvo cheio continua tirando 90%,
+     e um raspando contra um alvo já machucado mata normalmente. */
+  const tetoDeQuemRaspa = (quemBate, alvo, golpes) => {
+    if(!quemBate || !alvo) return golpes;
+    if(quemBate.hp > quemBate.maxHp * MORIBUNDO_ABAIXO_DE) return golpes;
+    if(alvo.hp < alvo.maxHp) return golpes;               // só vale contra quem está CHEIO
+    const total = golpes.reduce((a, d) => a + d, 0);
+    if(total < alvo.hp) return golpes;                    // não ia matar: nada a fazer
+    const teto = Math.max(1, Math.round(alvo.maxHp * MORIBUNDO_TETO_NO_CHEIO));
+    /* reparte o teto entre os tapas na MESMA proporção, pra a linha do log continuar coerente
+       com o selo `Nx` -- e o último leva a sobra do arredondamento */
+    const fora = golpes.map(d => Math.max(1, Math.round(d * teto / total)));
+    let soma = fora.reduce((a, d) => a + d, 0);
+    for(let k = fora.length - 1; k >= 0 && soma > teto; k--){
+      const tira = Math.min(soma - teto, fora[k] - 1);
+      fora[k] -= tira; soma -= tira;
+    }
+    return fora;
+  };
   const aplicarGolpes = (alvo, golpes) => {
     const saiu = [];
     for(const d of golpes){
@@ -2272,7 +2409,7 @@ function doExchange(active, enemy, rng, diario){
     }
     while(saiu.length > 1 && !(saiu[saiu.length - 1].d > 0)) saiu.pop();
   };
-  const saiuNoSegundo = aplicarGolpes(second, dmgByFirst);
+  const saiuNoSegundo = aplicarGolpes(second, tetoDeQuemRaspa(first, second, dmgByFirst));
   /* A Faixa segura ANTES de o diário ser escrito: assim o dano gravado é o EFETIVO (o que saiu de
      verdade, parando em 1) e a barra da tela desce até 1, que é o que aconteceu. A LINHA dela é
      empurrada mais abaixo, depois da linha do golpe -- ver marcaDaFaixa. */
@@ -2287,7 +2424,10 @@ function doExchange(active, enemy, rng, diario){
      Hoje ele é 1.0 e isso não muda um ponto -- mas no dia em que voltar a valer metade, valer
      metade em cada tapa é o que mantém a regra sendo sobre o GOLPE e não sobre o número de tapas. */
   const counter = dmgBySecond.map(d => (segundoCaiu && d > 0) ? Math.max(1, Math.round(d * DYING_BLOW_FACTOR)) : d);
-  const saiuNoPrimeiro = aplicarGolpes(first, counter);
+  /* ⚠️ O TETO NÃO VALE NO REVIDE MORIBUNDO, e isso é decisão: ali o atacante JÁ caiu (hp 0, ou seja
+     sempre "abaixo de 10%"), e o revide dele já tem a própria trava -- o piso de 1%-10%, que desde
+     12/09 impede que ele mate. Somar os dois faria o revide ser aparado duas vezes. */
+  const saiuNoPrimeiro = aplicarGolpes(first, segundoCaiu ? counter : tetoDeQuemRaspa(second, first, counter));
   /* ⚠️ O REVIDE MORIBUNDO NÃO MATA: ele deixa o outro entre 1% e 10% da barra (12/09/2026, a
      pedido -- antes era 1 de HP fixo, e antes disso ele matava e a morte súbita ressuscitava um).
      É a única coisa no motor que fazia os DOIS caírem na mesma troca, e o piso é o que impede isso:
@@ -2364,6 +2504,13 @@ function doExchange(active, enemy, rng, diario){
            (reportado em 13/09/2026: Clefairy com "Raio Solar 3x"). Ver o comentario do cliente. */
         const reg = { q: q, d: h.d, hp: h.hp, c: (quemBate.lastCrit && !h.cap)?1:0, m: marcaM, z: quemBate.lastMoveNulo?1:0 };
         if(quemBate.lastMove) reg.mv = quemBate.lastMove;
+        /* ⚠️ A ESCALA DO ROLAMENTO viaja por linha, e ela existe pro LOG NÃO ACHATAR o golpe.
+           A suavização de 12/09/2026 reparte dois golpes do mesmo atacante quando a razão passa de
+           1,176×, porque "o mesmo golpe contra o mesmo alvo só difere pelo sorteio da fórmula" --
+           e o Rolamento é a PRIMEIRA exceção real a isso: ele dobra de verdade. Sem este campo o
+           log mostrava 82 e depois 72 onde a barra tinha caído 30 e 60.
+           Ele entra como PESO na suavização, exatamente como o crítico pesa 2 -- ver fatiaDoGolpe. */
+        if(quemBate.lastRolamento > 1) reg.rl = quemBate.lastRolamento;
         if(quemBate.lastMetronomo) reg.mt = 1;
         if(saiu.length > 1){ reg.t = i + 1; reg.tn = saiu.length; }
         diario.push(reg);
@@ -2377,6 +2524,14 @@ function doExchange(active, enemy, rng, diario){
       gravar(activeFirst?'e':'p', saiuNoPrimeiro, second, segundoCaiu?1:0);
       if(faixaDoPrimeiro) diario.push(marcaDaFaixa((first === active) ? 'p' : 'e', second.hp));
     }
+    // AGORA sim: ele apanhou nesta troca, e so entao acorda (ver o comentario do `acordaram`)
+    /* ⚠️ QUEM MORREU DORMINDO NÃO ACORDA (14/09/2026, a pedido: *"quando um pokémon morre durante
+       o sono, não precisa exibir que ele acordou e voltou para a luta, nem no log e nem na
+       batalha"*). Reportado num Venusaur × Mr. Mime: o Mr. Mime levou o golpe dormindo, morreu, e a
+       linha do despertar saiu logo abaixo do 0/331.
+       O contador do sono anda no começo da troca e o pokémon leva o golpe no meio dela -- então só
+       AQUI, depois dos golpes, dá pra saber se ele chegou vivo ao fim. */
+    acordaram.forEach(a => { if(a.p && a.p.hp > 0) diario.push({ q:a.q, d:0, hp:null, c:0, m:0, z:0, x:'acordou', g:a.nome }); });
   }
   /* ⚠️ A MORTE SÚBITA ACABOU EM 12/09/2026, a pedido, e o bloco inteiro saiu daqui.
      Ela existia porque o revide moribundo podia derrubar o primeiro: os dois ficavam em 0, e ela
@@ -2424,6 +2579,10 @@ function encerrarBatalha(team, inimigos){
        ele guarda uma REFERENCIA ao adversario, igual ao _especialContra, e sem soltar ele
        a feature nova reabria exatamente o defeito que custou save de jogador. */
     p._remoinhoContra = null;
+    /* ⚠️ O DO ROLAMENTO. Ele não guarda referência a ninguém (é só um contador), mas vaza do mesmo
+       jeito: sem esta linha um Golem que rolou quatro vezes sai da luta com 480 de poder guardado e
+       a batalha SEGUINTE começa com ele -- o mesmo tipo de vazamento que o teto de HP da Fúria teve. */
+    p._rolamento = 0;
   });
 }
 function simulateGymBattle(team, enemyTeam, rng, opts){
@@ -2432,7 +2591,10 @@ function simulateGymBattle(team, enemyTeam, rng, opts){
   /* A FÚRIA ACUMULADA também é por BATALHA: ela cresce de confronto em confronto enquanto o pokémon
      estiver de pé, e some quando a batalha acaba. Zerar aqui, e não no fim, é o que faz um time
      carregado de uma batalha anterior não entrar na próxima já furioso. */
-  (team || []).concat(enemyTeam || []).forEach(p => { if(p) p._furia = 0; });   // o servidor chama o outro lado de enemyTeam
+  /* O ROLAMENTO zera junto: ele é por BATALHA, como a Fúria. Zerar no começo E no fim não é
+     redundância -- um time montado por fora (a Torre, o Ginásio da Cidade) pode chegar aqui sem ter
+     passado por um encerrarBatalha. */
+  (team || []).concat(enemyTeam || []).forEach(p => { if(p){ p._furia = 0; p._rolamento = 0; } });   // o servidor chama o outro lado de enemyTeam
   /* A LISTA DO QUE FOI GASTO zera a cada batalha: ela é o recado pra quem chamou tirar o item da
      conta, e um recado de uma batalha anterior faria gastar item que ninguém usou. */
   itensGastos = [];
@@ -2536,6 +2698,14 @@ function simulateGymBattle(team, enemyTeam, rng, opts){
            Isso matou as duas ligas de 11 a 13/09/2026 (ver a seção do log de batalha no CLAUDE.md).
            Os dois motores escrevem igual porque a comparação das 300 batalhas compara VALOR. */
         chuva: !!comChuva,
+        /* ⚠️ A FÚRIA VIAJA NO MATCHUP, e não só como marca no diário (14/09/2026, a pedido: *"coloque
+           um sinal também no pokémon que está com Fúria ativa"*). A marca do diário diz só o confronto
+           em que ela ENTROU -- e ela ACUMULA por batalha, então um pokémon pode atravessar três
+           confrontos furioso com a marca só no primeiro. Sem o campo, o selo sumiria justamente nos
+           confrontos em que o bônus é maior.
+           É o ACUMULADO (1, 2, 3...), não um booleano: ele vale +10 por vez, e o número é o que
+           explica um Tauros com +30 de tudo. */
+        playerFuria: active._furia || 0, enemyFuria: enemy._furia || 0,
         player:active.name, playerSpecies:active.speciesId, playerLevel:active.level, playerShiny: !!active.shiny, playerBuffed: !!active.terrainBuffed, playerSpecialty: !!active.specialtyBuffed,
         enemy:enemy.name, enemySpecies:enemy.speciesId, enemyLevel:enemy.level, enemyShiny: !!enemy.shiny, enemyBuffed: !!enemy.terrainBuffed, enemySpecialty: !!enemy.specialtyBuffed,
         playerTrainerStreak: playerStreak, enemyTrainerStreak: enemyStreak,
@@ -2559,7 +2729,14 @@ function simulateGymBattle(team, enemyTeam, rng, opts){
       /* UM CONFRONTO DE CHUVA A MENOS. Cai AQUI, no fim do confronto, e não no começo do seguinte:
          assim o último confronto de chuva é o terceiro e não o quarto. Conta CONFRONTO e não troca
          de golpes -- é o que o pedido diz ("vai durar por 3 confrontos"). */
-      if(chuvaRestante > 0) chuvaRestante--;
+      if(chuvaRestante > 0){
+        chuvaRestante--;
+        /* A CHUVA ANUNCIA O PROPRIO FIM (14/09/2026, a pedido). A linha entra no diario do confronto
+           que ACABOU de terminar -- ele foi o ultimo debaixo dela, e e nele que o jogador esta
+           olhando quando ela para. No confronto seguinte a frase chegaria depois de o golpe de Fogo
+           ja ter voltado ao normal sem explicacao -- e ele pode nem existir. */
+        if(chuvaRestante === 0 && diario) diario.push({ q:'p', d:0, hp:null, c:0, m:0, z:0, x:'chuvafim' });
+      }
     /* QUEM CAIU SAI DE CAMPO SOZINHO: a volta seguinte do laço vê o hp em 0 e pula pro primeiro
        vivo. Não há mais `enemyDefeated` -- ele existia pra fechar o laço interno, e com um laço só
        o que decide é a vida. */
@@ -6798,11 +6975,18 @@ exports.getTrainerTowerRanking = onCall(async (request) => {
    documento ao escolher, e sem isso duas escolhas simultâneas se perderiam.
    ============================================================================ */
 const BATTLE_QUEUE_TTL_MS = 90 * 1000;   // entrada na fila expira: aba fechada não deixa fantasma
-const BATTLE_PICK_MS = 5000;             // janela pra trocar de pokémon no meio da batalha
+/* ⚠️ TODAS AS JANELAS GANHARAM +5s EM 14/09/2026, a pedido ("aumenta 5s de espera para cada
+   estágio que hoje já tem um timer"). São QUATRO: a de aceitar a partida, a de escolher o TIME, a
+   do pokémon INICIAL e a das trocas do meio da batalha.
+   ⚠️ E O BATTLE_ANIM_MS NÃO É UM DELES, de propósito: ele não é tempo de DECISÃO, é a reserva que
+   o servidor dá pra a animação rodar antes de a janela começar a contar. Somar 5s ali só faria a
+   partida ficar parada -- e o orçamento da animação (ORCAMENTO_ANIM_ONLINE_MS, no cliente) é que
+   manda nele. */
+const BATTLE_PICK_MS = 10000;            // janela pra trocar de pokémon no meio da batalha (era 5s)
 /* A escolha do INICIAL tem janela maior: é a única decisão feita com os dois times inteiros de
    pé, olhando 6 contra 6. As trocas do meio da batalha são mais simples -- sobram poucos vivos e
-   a urgência faz parte -- então continuam com 5s. */
-const BATTLE_FIRST_PICK_MS = 10000;
+   a urgência faz parte. */
+const BATTLE_FIRST_PICK_MS = 15000;      // era 10s
 const GRACA_REDE_MS = 600;   // folga pra escolhas em trânsito (ver battleAdvance)
 /* Tempo reservado pra ANIMAÇÃO do confronto antes da janela de escolha começar a valer.
    Sem isso o prazo começava a correr no instante em que o servidor resolvia a luta -- e como o
@@ -6820,7 +7004,7 @@ const BATTLE_IDLE_MS = 3 * 60 * 1000;    // batalha parada sem ninguém consulta
    pra voltar; quem não voltar sai da busca e o outro volta pra fila automaticamente.
    É o que permite buscar oponente sem ficar preso na tela: ninguém é jogado numa batalha sem
    confirmar, e ninguém fica esperando indefinidamente por alguém que sumiu. */
-const BATTLE_ACCEPT_MS = 15000;
+const BATTLE_ACCEPT_MS = 20000;   // era 15s (ver o +5s de 14/09/2026)
 
 /* Janela pra ESCOLHER O TIME -- com os dois treinadores JÁ conectados.
    Antes o time era escolhido antes de entrar na fila, e a pessoa ficava presa àquele time por
@@ -6829,7 +7013,7 @@ const BATTLE_ACCEPT_MS = 15000;
    Mandar a lista inteira lá atrás é o que permite ter um padrão: se o jogador não escolher (ou
    fechar a aba), o servidor entra com o primeiro da lista sozinho -- ele não tem os times salvos,
    só o que o cliente enviou. */
-const BATTLE_TEAM_PICK_MS = 15000;
+const BATTLE_TEAM_PICK_MS = 20000;   // era 15s (ver o +5s de 14/09/2026)
 /* MESMO TETO DE SAVES DO CLIENTE (MAX_SAVE_SLOTS). Tem que acompanhar: o cliente manda todos os
    times elegíveis e depois escolhe por ÍNDICE nessa lista -- se o servidor cortar em 10, quem tem
    time no slot 12 nunca consegue escolhê-lo, e a lista que a tela desenha (que vem daqui) some com
@@ -6925,16 +7109,19 @@ function battlePrimeiroVivo(time, atual){
    É o miolo do simulateGymBattle, extraído -- lá ele roda em laço até o time acabar; aqui
    precisa parar depois de um confronto pra abrir a janela de escolha. */
 function battleResolveMatchup(estado, rng){
-  /* ⚠️ A BATALHA ONLINE NÃO TEM CLIMA, e zerar aqui é OBRIGATÓRIO -- não é precaução.
-     O `chuvaRestante` é módulo-level, e no servidor a INSTÂNCIA é reaproveitada entre invocações:
-     um `simulateGymBattle` (Torre, ginásio da cidade) que termine com confrontos de chuva SOBRANDO
-     -- e sobra sempre que a luta acaba antes dos 3 -- deixaria o contador positivo, e o próximo
-     confronto online resolvido naquela instância sairia debaixo da chuva de outra pessoa, sem nada
-     na tela dizendo isso.
-     É o mesmo cuidado que o `simulateBossFight` já leva, e pelo mesmo motivo. Aqui NÃO se sorteia
-     chuva: o online resolve confronto a confronto e um clima de 3 confrontos não tem onde caber --
-     fica em aberto, como os itens equipados. */
-  limparClima();
+  /* ⚠️ A CHUVA DURA 3 CONFRONTOS NO ONLINE TAMBÉM, desde 14/09/2026 -- e até então ela durava UM.
+     O comentário aqui dizia que "a batalha online não tem clima" e que ela não era sorteada. Isso
+     era FALSO desde que a Dança da Chuva entrou: o sorteio mora no `tentarGolpeEspecial`, que é
+     chamado pelo `doExchange`, que o online usa igual à jornada. Medido: ela saía em 10,3% dos
+     confrontos. O que não existia era a DURAÇÃO -- o `limparClima()` daqui zerava o contador antes
+     de cada confronto, então o efeito de 3 confrontos morria no primeiro.
+     ⚠️ E ZERAR CONTINUA SENDO OBRIGATÓRIO, por outro motivo: o `chuvaRestante` é módulo-level e no
+     servidor a INSTÂNCIA é reaproveitada entre invocações. Um `simulateGymBattle` (Torre, ginásio
+     da cidade) que acabe com chuva sobrando deixaria o contador positivo, e o próximo confronto
+     online sairia debaixo da chuva de OUTRA PESSOA. Por isso o clima vem do ESTADO da partida e
+     não do que sobrou na memória: `definirClima` põe o desta batalha, e o que sobrar volta pro
+     documento no fim. */
+  definirClima(estado.chuva || 0);
   const a = battleHydrate(estado.aTeam[estado.aCurrent]);
   const b = battleHydrate(estado.bTeam[estado.bCurrent]);
   applySpecialtyBuff([a], estado.aSpecialties);
@@ -6952,12 +7139,19 @@ function battleResolveMatchup(estado, rng){
      É a mesma família do defeito que o `encerrarBatalha` fechou na jornada, por outro caminho --
      aqui não dá pra chamar ele: o diário deste confronto já contou a subida da barra, e devolver
      o empréstimo antes de responder faria a soma do log não fechar com o `playerHpAfter`. */
+  /* O QUE SOBROU DA CHUVA VOLTA PRO DOCUMENTO. O `doExchange` não decrementa -- quem conta
+     confronto é o laço da batalha (no `simulateGymBattle` isso fica no fim de cada confronto), e
+     aqui o laço é o próprio servidor, uma invocação por confronto. */
+  estado.chuva = Math.max(0, climaRestante() - 1);
   const tetoA = estado.aTeam[estado.aCurrent].maxHp || a.maxHp;
   const tetoB = estado.bTeam[estado.bCurrent].maxHp || b.maxHp;
   estado.aTeam[estado.aCurrent].hp = Math.max(0, Math.min(tetoA, a.hp));
   estado.bTeam[estado.bCurrent].hp = Math.max(0, Math.min(tetoB, b.hp));
   const aCaiu = a.hp<=0, bCaiu = b.hp<=0;
   return {
+    /* a FÚRIA viaja aqui pelo mesmo motivo da jornada: o selo da tela precisa saber quem está
+       furioso, e a marca do diário diz só o confronto em que ela entrou */
+    playerFuria: a._furia || 0, enemyFuria: b._furia || 0,
     player:a.name, playerSpecies:a.speciesId, playerLevel:a.level, playerShiny:!!a.shiny, playerBuffed:false,
     enemy:b.name, enemySpecies:b.speciesId, enemyLevel:b.level, enemyShiny:!!b.shiny, enemyBuffed:false,
     winner: (aCaiu && bCaiu) ? null : (bCaiu ? a.name : b.name),

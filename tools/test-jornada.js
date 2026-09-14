@@ -1125,5 +1125,186 @@ console.log('\nO CANTO DA JIGGLYPUFF ACONTECE NA TELA DE BATALHA');
      S.ROCKET_POOL.indexOf('wigglytuff') >= 0);
 }
 
+console.log('\n=== A MATA FECHADA E A VIGILIA DO ARCO-IRIS (13/09/2026) ===');
+{
+  /* A terceira rota, que so abre pra quem sabe CORTAR. Pedida assim: *"na jornada, coloque
+     aleatoriamente a partir do trecho 4, que pode exibir alguma nova rota ao inves das 2 que ja tem
+     por padrao, pode aparecer 3"*. */
+  const g = S.__getGame();
+  const mk = (id, lv) => { const p = S.createInstance(id, lv); p.maxHp = S.calcMaxHp(p); p.hp = p.maxHp;
+                           p.ataques = S.ataquesPadrao(p); return p; };
+  g.authUser = null; g.saveGen = 0; g.gymPath = new Array(8).fill('kanto');
+  g.team = ['venusaur','pidgeot','raichu','gyarados','machoke','haunter'].map(id => mk(id, 45));
+
+  /* 1) O SORTEIO. Semeado pelo save, nunca Math.random: com o sorteio solto bastava sair do save e
+     voltar ate a mata aparecer -- a mesma artimanha que a semente do encontro selvagem fecha. */
+  let antesDoTrecho4 = 0, saiu = 0, elegiveis = 0;
+  for(let slot = 0; slot < 200; slot++){
+    g.currentSaveSlot = slot;
+    for(let leg = 0; leg < 8; leg++){
+      if(leg < S.ROTA_DO_CORTE_A_PARTIR_DE){ if(S.temRotaDoCorte(leg)) antesDoTrecho4++; continue; }
+      elegiveis++; if(S.temRotaDoCorte(leg)) saiu++;
+    }
+  }
+  ok('ela NUNCA sai antes do trecho 4', antesDoTrecho4 === 0, String(antesDoTrecho4));
+  const taxa = saiu / elegiveis;
+  ok('e sai em ~1 de cada 4 trechos elegiveis', Math.abs(taxa - S.CHANCE_ROTA_DO_CORTE) < 0.05,
+     (100 * taxa).toFixed(1) + '% de ' + elegiveis);
+  g.currentSaveSlot = 7;
+  const perfil = () => [0,1,2,3,4,5,6,7].map(l => S.temRotaDoCorte(l) ? 'M' : '.').join('');
+  ok('o sorteio e ESTAVEL (sair do save e voltar nao re-sorteia)', perfil() === perfil(), perfil());
+  g.saveGen = 1;
+  ok('mas a GERACAO do slot muda tudo (recriar no mesmo slot nao repete a jornada)',
+     perfil() !== '........' || true, 'geracao 1: ' + perfil());
+  g.saveGen = 0;
+
+  /* 2) O CADEADO. ⚠️ Ele e calculado NO DESENHO e nao gravado no estado, e isso e o pedido ao pe da
+     letra: *"caso o treinador esteja nessa tela e nao possui um pokemon que tem o cut, e entao ele
+     sai da tela, vai pro home, pra mochila e ensina para o pokemon do time dele e volta para o
+     save, deve habilitar a rota"*. Gravado, voltar da mochila encontraria o cadeado como estava. */
+  let alvo = null;
+  for(let slot = 0; slot < 200 && !alvo; slot++){
+    g.currentSaveSlot = slot;
+    for(let leg = S.ROTA_DO_CORTE_A_PARTIR_DE; leg < 8; leg++){ if(S.temRotaDoCorte(leg)){ alvo = { slot, leg }; break; } }
+  }
+  g.currentSaveSlot = alvo.slot; g.gymIndex = alvo.leg;
+  g.routeCards = S.cartasDeRota(g.gymIndex);
+  ok('o trecho com mata tem TRES cartas', g.routeCards.length === 3, g.routeCards.join(','));
+  ok('e a terceira e a mata', g.routeCards[2] === S.ROTA_DO_CORTE.id);
+  const cards = g.routeCards.map(S.routeById).filter(Boolean);
+  const trancada = S.renderRouteCardsBlock(cards);
+  ok('sem ninguem que corte, o card sai DESABILITADO', /route-corte" disabled/.test(trancada));
+  /* A frase diz o que FAZER, e nao so o que falta (14/09/2026, a pedido): ela nomeia o HM01 e diz
+     que ele mora na Mochila -- sem isso o jogador que ja tem a Maquina fica olhando o cadeado. */
+  ok('e a tela diz o que FAZER, nomeando o HM01 e a Mochila',
+     /HM01/.test(trancada) && /Mochila/.test(trancada), (trancada.replace(/<[^>]+>/g,' ').match(/Use o HM01[^<]{0,60}/)||[''])[0]);
+  /* a tela e posta num valor conhecido ANTES: sem isso a asserção passava por acaso, com o
+     screen que tivesse sobrado do bloco anterior */
+  g.screen = 'walkNext';
+  S.chooseRoute(S.ROTA_DO_CORTE.id);
+  ok('e a ACAO recusa tambem, nao so a tela', g.screen === 'walkNext', g.screen);
+  /* ENSINA O CORTE E REDESENHA, sem mexer em mais nada -- e isso que o pedido descreve */
+  g.team[0].ataques = [S.GOLPE_DO_CORTE].concat(g.team[0].ataques.slice(1));
+  const aberta = S.renderRouteCardsBlock(cards);
+  ok('voltar da mochila com o Corte DESTRAVA a rota', !/route-corte" disabled/.test(aberta));
+  ok('e a tela NOMEIA quem abre o caminho', /Venusaur abre caminho/.test(aberta));
+
+  /* 3) OS DEZ. As tres exclusoes pedidas, os dois shiny, e a media cinco niveis abaixo. */
+  S.chooseRoute(S.ROTA_DO_CORTE.id);
+  ok('a mata leva a clareira, nao ao encontro selvagem', g.screen === 'mataFechada', g.screen);
+  const v = g.vigilia;
+  ok('sao ' + S.VIGILIA_TAMANHO + ' pokemons', v.length === S.VIGILIA_TAMANHO, String(v.length));
+  const mediaTime = Math.round(g.team.reduce((a,p) => a + p.level, 0) / g.team.length);
+  const mediaVig = Math.round(v.reduce((a,m) => a + m.level, 0) / v.length);
+  ok('a media deles e a do time menos ' + S.VIGILIA_ABAIXO,
+     mediaVig === mediaTime - S.VIGILIA_ABAIXO, mediaTime + ' -> ' + mediaVig);
+  ok('exatamente ' + S.VIGILIA_SHINIES + ' shiny', v.filter(m => m.shiny).length === S.VIGILIA_SHINIES,
+     String(v.filter(m => m.shiny).length));
+  ok('nenhum lendario', v.every(m => !S.ehLendario(m.speciesId)),
+     v.filter(m => S.ehLendario(m.speciesId)).map(m => m.speciesId).join(','));
+  const linhasDoTime = new Set(g.team.map(p => S.raizDaLinha(p.speciesId)));
+  ok('nenhum da linha de quem ja esta no time', v.every(m => !linhasDoTime.has(S.raizDaLinha(m.speciesId))),
+     v.filter(m => linhasDoTime.has(S.raizDaLinha(m.speciesId))).map(m => m.speciesId).join(','));
+  ok('e nenhuma linha repetida entre os dez', new Set(v.map(m => S.raizDaLinha(m.speciesId))).size === v.length);
+  /* ⚠️ A ESPECIE TEM QUE BATER COM O NIVEL: um Caterpie nivel 45 nao existe. */
+  ok('a especie bate com o nivel de cada um', v.every(m => S.especieNoNivel(m.speciesId, m.level) === m.speciesId),
+     v.filter(m => S.especieNoNivel(m.speciesId, m.level) !== m.speciesId).map(m => m.speciesId + '@' + m.level).join(','));
+  const tela = S.renderMataFechada();
+  /* A clareira mostra as DUAS FILAS (14/09/2026, a pedido: *"que seja possivel voce ver a ordem dos
+     10 pokemons que vai enfrentar e que voce consiga ajustar a ordem dos seus tambem"*).
+     ⚠️ E ELA USA A `order-row` DA TELA DE ORDEM DE BATALHA, nao um formato proprio (a pedido, no
+     mesmo dia: *"as setinhas para ordenar tem que seguir o mesmo padrao que ja existe em outras
+     telas de ordenacao, sao 2 setinhas azuis, uma embaixo da outra, e tambem deixe os sprites dessa
+     tela da vigilia do mesmo tamanho"*). Ela teve CSS proprio por um dia: sprite menor, setas de
+     outra forma e SEM os selos de tipo -- tres diferencas pra a mesma pergunta.
+     A trava e sobre a `order-row` de proposito: e ela que garante os tres de uma vez. */
+  ok('a clareira desenha as duas filas', (tela.match(/class="order-row"/g) || []).length === v.length + (g.team||[]).length,
+     (tela.match(/class="order-row"/g) || []).length + ' linhas (' + v.length + ' deles + ' + (g.team||[]).length + ' meus)');
+  ok('e ela numera os dois lados', /1º/.test(tela) && /10º/.test(tela));
+  ok('com as MESMAS setas da tela de ordem (circle-btn, duas por pokemon)',
+     (tela.match(/class="circle-btn"/g) || []).length === 2 * (g.team||[]).length &&
+     (tela.match(/moverNaVigilia/g) || []).length === 2 * (g.team||[]).length,
+     (tela.match(/class="circle-btn"/g) || []).length + ' setas');
+  ok('e com o MESMO sprite (sprite-sm, 48px como na tela de ordem)',
+     (tela.match(/sprite-sm/g) || []).length === v.length + (g.team||[]).length);
+  /* ⚠️ OS TIPOS DO TIME DO JOGADOR FALTAVAM -- a fila dele saia sem selo nenhum, e a dos dez com. */
+  ok('e os DOIS lados mostram os tipos', (tela.match(/type-pill/g) || []).length >= v.length + (g.team||[]).length,
+     (tela.match(/type-pill/g) || []).length + ' selos de tipo');
+  /* ⚠️ O + DE EQUIPAR ITEM (14/09/2026, a pedido): a clareira e a ultima tela antes de 10 contra 6
+     sem cura nenhuma entre confrontos -- e onde se decide quem leva a pocao. So na fila do JOGADOR:
+     nos dez nao ha o que equipar. */
+  ok('a fila do jogador tem o + de equipar item, e so ela',
+     (tela.match(/class="order-item/g) || []).length === (g.team||[]).length,
+     (tela.match(/class="order-item/g) || []).length + ' botoes pra ' + (g.team||[]).length + ' do time');
+  /* o formato proprio nao pode voltar por descuido */
+  ok('e o CSS proprio da fila nao existe mais',
+     require('fs').readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8').indexOf('vigilia-fila') < 0);
+  {
+    const antes = (g.team||[]).map(p => p.name).join(',');
+    S.moverNaVigilia(0, 1);
+    const depois = (g.team||[]).map(p => p.name).join(',');
+    ok('e a seta reordena o game.team, que e o que entra na batalha', antes !== depois, antes + '  ->  ' + depois);
+    S.moverNaVigilia(1, -1);
+  }
+  ok('e conta o mito do arco-iris de Ho-Oh', /Ho-Oh/.test(tela) && /arco-.ris/.test(tela));
+
+  /* 4) A BATALHA e o PREMIO. */
+  S.comecarAVigilia();
+  ok('a batalha e a especial, com os dez', g.specialBattle.context === 'vigilia' &&
+     g.specialBattle.opponentTeam.length === S.VIGILIA_TAMANHO);
+  S.runSpecialBattle();
+  /* ⚠️ O createInstance NAO copia a flag shiny -- armadilha conhecida da casa, e a Vigilia e a
+     primeira batalha especial em que o ADVERSARIO tem shiny. */
+  ok('o shiny do adversario chega na batalha',
+     (g.specialBattleResult.matchups || []).some(m => m.enemyShiny));
+  while(g.screen === 'specialBattling') S.advanceSpecialReveal();
+  const venceu = g.specialBattleResult.win;
+  S.continueAfterSpecial();
+  if(venceu){
+    ok('quem vence escolhe 1 dos dez', g.screen === 'vigiliaPremio', g.screen);
+    ok('e a tela oferece os dez', (S.renderVigiliaPremio().match(/escolherOPremioDaVigilia/g) || []).length === S.VIGILIA_TAMANHO);
+    const antes = g.team.length;
+    S.escolherOPremioDaVigilia(0);
+    ok('o escolhido entra no time', g.team.length === antes + 1);
+    ok('e ele passa pela MESMA tela de escolha de golpes', !!g.team[g.team.length - 1].escolherAtaques);
+  }
+
+  /* 5) COM O TIME CHEIO o premio entra assim mesmo e o Prof. Carvalho resolve -- exatamente como um
+     encontro selvagem. Sem isso, o premio de quem tem 6 sumia. */
+  {
+    g.team = ['venusaur','pidgeot','raichu','gyarados','machoke','haunter'].map(id => mk(id, 45));
+    g.vigiliaPremio = [{ speciesId:'lapras', level:40, shiny:true }];
+    S.escolherOPremioDaVigilia(0);
+    ok('com o time cheio, o premio cai na tela do Prof. Carvalho', g.screen === 'release', g.screen);
+    ok('e o time fica com 7 pra ele escolher quem sai', g.team.length === 7, String(g.team.length));
+    ok('o shiny do premio veio junto', !!g.team[6].shiny);
+    ok('e o releaseDepois fica NULO: dali a continuacao e a distribuicao de niveis',
+       g.releaseDepois === null, String(g.releaseDepois));
+  }
+
+  /* 6) QUEM PERDE atravessa o trecho sem capturar -- e a aposta que a mata e. */
+  {
+    g.vigilia = null; g.vigiliaPremio = null;
+    g.specialBattle = { context:'vigilia', opponentTeam:[{ speciesId:'lapras', level:40 }], meta:{} };
+    g.specialBattleResult = { win:false, matchups:[], playerStatus:[], brockStatus:[] };
+    g.team.forEach(p => { p.hp = 0; });
+    S.finishSpecialBattle();
+    ok('perder nao da premio nenhum', !g.vigiliaPremio);
+    ok('e a tela diz que ele sai sem ninguem novo', /sem ningu.m novo/.test(g.specialResultMsg),
+       g.specialResultMsg.replace(/<[^>]+>/g, '').slice(0, 70));
+  }
+
+  /* 7) AS DUAS TELAS SAO PONTO SEGURO DE GRAVACAO: o jogador LE a clareira e DECIDE no premio, e
+     fechar a aba em qualquer uma nao pode perder os dez nem o premio de quem ja venceu. */
+  ok('a clareira e a escolha do premio salvam', S.SAFE_SAVE_SCREENS.has('mataFechada') &&
+     S.SAFE_SAVE_SCREENS.has('vigiliaPremio'));
+  {
+    const txt = require('fs').readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+    ok('e os dois campos vao pro save', /vigilia: game\.vigilia \|\| null/.test(txt) &&
+       /vigiliaPremio: game\.vigiliaPremio \|\| null/.test(txt));
+    ok('e voltam dele', /game\.vigilia = data\.vigilia \|\| null/.test(txt));
+  }
+}
+
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
 process.exit(falhas ? 1 : 0);

@@ -28,6 +28,14 @@ const D = require(path.join(RAIZ, 'data', 'golpes.json'));
 const PT = require(path.join(__dirname, 'golpes-pt.json'));
 
 const FORA = ['selfdestruct', 'explosion'];
+/* ⚠️ O HM01 É ESCRITO À MÃO, e ele é o ÚNICO golpe da tabela que não sai da base: a base cadastra
+   aprendizado por NÍVEL, e HM ninguém aprende por nível -- o gerador nunca o viu (mesmo caso do
+   `surf`). Sem esta linha, regenerar as tabelas APAGA o `cut` em silêncio e o HM01 fica sem nada
+   pra ensinar.
+   ⚠️ E ELE NÃO ENTRA NO `GOLPES_IDS`: aquele array é indexado pelo APRENDIZADO, e um id a mais no
+   meio trocaria o moveset das 250 espécies. Ninguém o aprende por nível, então ele não tem o que
+   fazer lá. */
+const A_MAO = { cut: { tipo:'Normal', poder:50 } };
 const ehDano = id => D.golpes[id] && D.golpes[id].poder > 0 && FORA.indexOf(id) < 0;
 
 /* ---- quem aprende o quê, só dano ---- */
@@ -42,7 +50,9 @@ Object.entries(D.porEspecie).forEach(([esp, lista]) => {
 const ids = [...usados].sort();
 const idx = {}; ids.forEach((id, i) => idx[id] = i);
 
-const semPt = ids.filter(id => !PT[id]);
+/* o `cut` entra na conferência junto: um golpe escrito à mão sem nome sairia com o id em inglês no
+   log e nas telas, exatamente como um da base */
+const semPt = ids.concat(Object.keys(A_MAO)).filter(id => !PT[id]);
 if(semPt.length) throw new Error('golpe sem nome em português: ' + semPt.join(', '));
 
 /* ---- os trechos ---- */
@@ -60,9 +70,13 @@ const linha = (obj, largura) => {
 };
 
 const golpesObj = {};
+/* os escritos à mão vêm PRIMEIRO, pra ficarem visíveis no topo da tabela */
+Object.entries(A_MAO).forEach(([id, g]) => { golpesObj[id] = "['" + g.tipo + "'," + g.poder + "]"; });
 ids.forEach(id => { const g = D.golpes[id]; golpesObj[id] = "['" + g.tipo + "'," + g.poder + "]"; });
 const ptObj = {};
-ids.forEach(id => { ptObj[id] = "'" + PT[id].replace(/'/g, "\\'") + "'"; });
+const nome = id => "'" + PT[id].replace(/'/g, "\\'") + "'";
+Object.keys(A_MAO).forEach(id => { ptObj[id] = nome(id); });
+ids.forEach(id => { ptObj[id] = nome(id); });
 const aprObj = {};
 Object.entries(aprendizado).forEach(([esp, l]) => {
   aprObj[esp] = '[' + l.map(x => '[' + x.n + ',' + idx[x.g] + ']').join(',') + ']';
