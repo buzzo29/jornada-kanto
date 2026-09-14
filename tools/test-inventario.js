@@ -298,6 +298,17 @@ console.log('\n=== AS TRES PRATELEIRAS DA LOJA ===');
   S.escolherPrateleira('especiais');
   ok('trocar de prateleira move a selecao junto', S.__getGame().lojaSel === 'doce_raro',
      String(S.__getGame().lojaSel));
+  /* ⚠️ E O QUADRO E O MESMO EM TODAS AS PRATELEIRAS -- foi assim que o pedido veio ("ser o mesmo
+     quadro para todos os botoes"). Sem este caso, so a prateleira vazia estaria coberta. */
+  {
+    const semQuadro = S.LOJA_PRATELEIRAS.filter(pr => {
+      S.escolherPrateleira(pr.id);
+      return S.renderLoja().indexOf('loja-fixa') < 0;
+    });
+    ok('o quadro de cima existe nas TRES prateleiras', semQuadro.length === 0,
+       semQuadro.map(pr => pr.id).join(',') || 'todas ok');
+    S.escolherPrateleira('especiais');
+  }
   {
     const t = S.renderLoja();
     ok('e a lista passa a ser a dela', (t.match(/class="loja-linha/g)||[]).length === 1 && t.indexOf('>Doce Raro') >= 0);
@@ -308,9 +319,24 @@ console.log('\n=== AS TRES PRATELEIRAS DA LOJA ===');
   {
     const t = S.renderLoja();
     ok('ela nao mostra linha nenhuma', (t.match(/class="loja-linha/g)||[]).length === 0);
-    /* UM RECADO SO. O quadro de cima e o DETALHE do item selecionado, e ali nao ha item -- com ele
-       a tela dizia a mesma coisa duas vezes (em cima e na lista). */
-    ok('e o quadro de detalhe SOME', t.indexOf('loja-fixa') < 0);
+    /* ⚠️ O QUADRO DE CIMA FICA, E VAZIO (13/09/2026, a pedido). Ele chegou a SUMIR na prateleira
+       vazia, por um dia, pra a tela nao dizer a mesma coisa duas vezes -- so que com ele indo e
+       vindo (e crescendo e encolhendo conforme o item) a tela inteira dancava a cada clique:
+       *"hoje ele ta dinamico e ta ficando feio quando fica trocando de item"*.
+       Hoje ele existe sempre, com altura FIXA no CSS, e aqui ele fica sem nada dentro. */
+    ok('o quadro de detalhe CONTINUA na prateleira vazia', t.indexOf('loja-fixa') >= 0);
+    ok('e ele fica sem nada dentro', t.indexOf('item-detalhe-topo') < 0 && t.indexOf('abrirCompra') < 0);
+    /* A ALTURA E FIXA NO CSS -- o teste le a folha, porque isso nao aparece em asserção de HTML
+       nenhuma. 375px e o maior quadro medido a 320px (o Despertar, o unico com o botao de Vender E
+       a linha de "Faltam"); o `overflow-y` e o que faz a altura ser promessa e nao torcida. */
+    const css = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
+    const bloco = (css.match(/\.loja-fixa\{[\s\S]*?\}/) || [''])[0];
+    ok('a altura do quadro e fixa no CSS', /height:\s*\d+px/.test(bloco) && /overflow-y:\s*auto/.test(bloco),
+       bloco.replace(/\s+/g, ' ').slice(0, 120));
+    /* E A LISTA MOSTRA 6 E ROLA (a pedido). A linha mede 63px a 320px, medida no navegador. */
+    const blocoLista = (css.match(/\.loja-lista\{[^}]*max-height[^}]*\}/) || [''])[0];
+    ok('a lista tem teto de 6 itens e rola', /max-height:\s*390px/.test(blocoLista) && /overflow-y:\s*auto/.test(blocoLista),
+       blocoLista.replace(/\s+/g, ' '));
     ok('deixando um recado so, que nomeia a prateleira', /Ainda não há TMs à venda/.test(t),
        (t.match(/loja-vazia[^>]*>[^<]*/g)||[]).join(' | '));
     ok('e o saldo continua na tela', /Você tem <strong>🪙/.test(t));

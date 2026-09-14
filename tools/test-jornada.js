@@ -385,6 +385,14 @@ ok('mesmo numero de pokemon e mesma media em cada posto', eliteDif.length === 0,
    eliteDif.map(([k,j])=>k.name+' x '+j.name).join(', '));
 S.ELITE_FOUR.forEach((k,i)=>console.log('         posto '+(i+1)+': '+k.name.padEnd(9)+' x '+
   S.JOHTO_ELITE[i].name.padEnd(9)+'  '+k.team.length+' pokemon, media '+medE(k).toFixed(1)));
+/* ⚠️ A FILA SO SOBE. Os quatro postos levaram +1 nivel em 13/09/2026 (a pedido, nas duas regioes),
+   e o que precisa continuar valendo depois de qualquer mexida de nivel e a ESCADA: o posto 2 nao
+   pode ficar mais facil que o 1. Um numero fixo aqui envelheceria no proximo ajuste; a escada, nao.
+   A paridade Kanto/Johto esta logo acima -- ela e quem pega uma mexida de um lado so. */
+const foraDaEscada = [S.ELITE_FOUR, S.JOHTO_ELITE].flatMap(lista =>
+  lista.slice(1).map((m,i)=>[lista[i], m]).filter(([a,b]) => medE(b) < medE(a)));
+ok('a fila da Elite so fica mais dificil, posto a posto', foraDaEscada.length === 0,
+   foraDaEscada.map(([a,b])=>a.name+' '+medE(a).toFixed(1)+' -> '+b.name+' '+medE(b).toFixed(1)).join(', '));
 const semSpE = S.ELITE_FOUR.concat(S.JOHTO_ELITE).flatMap(m=>m.team.map(t=>t.speciesId)).filter(id=>!S.SPECIES[id]);
 ok('todo pokemon da Elite existe', semSpE.length === 0, [...new Set(semSpE)].join(','));
 ok('nenhum id de membro repetido',

@@ -1347,6 +1347,12 @@ const SONO_EM_TROCAS = 1;
    erro que ninguém vê. Se um dia entrar um golpe com distribuição própria (o Chute Triplo bate 3
    vezes com acerto crescente, por exemplo), ele ganha o array dele aqui e mais nada muda. */
 const TAPAS_2A5 = [[2,3],[3,3],[4,1],[5,1]];
+/* ⚠️ E TRÊS BATEM SEMPRE DUAS VEZES, nem mais nem menos (13/09/2026, a pedido). No jogo oficial o
+   Chute Duplo, o Ossomerangue e a Agulha Dupla não sorteiam nada: são dois golpes, sempre. É
+   exatamente o caso que o comentário acima previa ("se um dia entrar um golpe com distribuição
+   própria, ele ganha o array dele aqui e mais nada muda") -- o motor, o log, a animação e o selo
+   `2x` saem de graça, e o `poderEfetivo` já faz a média ponderada de qualquer tabela. */
+const TAPAS_SEMPRE_2 = [[2,1]];
 const MULTI_GOLPE = {
   doubleslap:  TAPAS_2A5,   // Tapa Duplo          poder 15  -- 13 espécies
   furyswipes:  TAPAS_2A5,   // Arranhões Furiosos  poder 18  -- 20
@@ -1356,7 +1362,10 @@ const MULTI_GOLPE = {
   barrage:     TAPAS_2A5,   // Barragem            poder 15  -- 2
   pinmissile:  TAPAS_2A5,   // Míssil Agulha       poder 14  -- 6
   iciclespear: TAPAS_2A5,   // Lança de Gelo       poder 10  -- 1 (Shellder)
-  rockblast:   TAPAS_2A5    // Rajada de Rochas    poder 25  -- 6
+  rockblast:   TAPAS_2A5,   // Rajada de Rochas    poder 25  -- 6
+  doublekick:  TAPAS_SEMPRE_2,   // Chute Duplo      poder 30  -- 8 espécies (a linha do Nidoran, Hitmonlee, Jolteon)
+  bonemerang:  TAPAS_SEMPRE_2,   // Ossomerangue     poder 50  -- 2 (Cubone, Marowak)
+  twineedle:   TAPAS_SEMPRE_2    // Agulha Dupla     poder 25  -- 4 (a linha do Caterpie e o Beedrill)
 };
 function tapasDoGolpe(golpeId, rng){
   const tabela = MULTI_GOLPE[golpeId];

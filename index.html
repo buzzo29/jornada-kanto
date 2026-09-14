@@ -2111,7 +2111,20 @@
   /* O QUADRO DA LOJA FICA FIXO no topo enquanto a lista rola. É sticky e não fixed: fixed sairia do
      fluxo e a lista subiria por baixo dele; sticky o mantém dentro da coluna do app, com a mesma
      largura, e ele só "cola" quando o topo da página passa por ele. */
-  .loja-fixa{ position:sticky; top:0; z-index:5; box-shadow:0 6px 12px rgba(12,16,36,.45); }
+  /* ⚠️ ALTURA FIXA, e não mínima (13/09/2026, a pedido: "hoje ele tá dinâmico e tá ficando feio
+     quando fica trocando de item"). Medido a 320px, o quadro ia de 253px (Def Up) a 375px
+     (Despertar, o único com o botão de Vender E a linha de "Faltam 🪙 X") -- 122px de pulo a cada
+     item clicado, com a lista inteira dançando junto.
+     O `overflow-y:auto` é o que faz a altura ser uma PROMESSA: um item de descrição mais longa
+     rola por dentro em vez de voltar a esticar o quadro. Com `min-height` o pulo voltaria no
+     primeiro item que passasse de 375.
+     Ela vale inclusive na prateleira VAZIA (as TMs), que foi o resto do pedido: o quadro fica lá,
+     do mesmo tamanho, sem nada dentro. */
+  .loja-fixa{ position:sticky; top:0; z-index:5; box-shadow:0 6px 12px rgba(12,16,36,.45);
+    height:375px; overflow-y:auto; }
+  /* SEIS ITENS E O RESTO ROLA (a pedido). A linha mede 63px a 320px, medida no navegador; 6 delas
+     mais o padding de 6px de cima e de baixo dão os 390. */
+  .loja-lista{ max-height:390px; overflow-y:auto; }
   .loja-saldo{ margin:10px 0 0; font-size:.8rem; color:var(--muted); }
   /* A LISTA PELA METADE, com as prateleiras do lado esquerdo. As duas colunas dividem igual
      (1fr 1fr) -- foi o pedido ("diminua ela pela metade na horizontal") --, e o `min-width:0` nas
@@ -6485,6 +6498,12 @@ const SONO_EM_TROCAS = 1;
    erro que ninguém vê. Se um dia entrar um golpe com distribuição própria (o Chute Triplo bate 3
    vezes com acerto crescente, por exemplo), ele ganha o array dele aqui e mais nada muda. */
 const TAPAS_2A5 = [[2,3],[3,3],[4,1],[5,1]];
+/* ⚠️ E TRÊS BATEM SEMPRE DUAS VEZES, nem mais nem menos (13/09/2026, a pedido). No jogo oficial o
+   Chute Duplo, o Ossomerangue e a Agulha Dupla não sorteiam nada: são dois golpes, sempre. É
+   exatamente o caso que o comentário acima previa ("se um dia entrar um golpe com distribuição
+   própria, ele ganha o array dele aqui e mais nada muda") -- o motor, o log, a animação e o selo
+   `2x` saem de graça, e o `poderEfetivo` já faz a média ponderada de qualquer tabela. */
+const TAPAS_SEMPRE_2 = [[2,1]];
 const MULTI_GOLPE = {
   doubleslap:  TAPAS_2A5,   // Tapa Duplo          poder 15  -- 13 espécies
   furyswipes:  TAPAS_2A5,   // Arranhões Furiosos  poder 18  -- 20
@@ -6494,7 +6513,10 @@ const MULTI_GOLPE = {
   barrage:     TAPAS_2A5,   // Barragem            poder 15  -- 2
   pinmissile:  TAPAS_2A5,   // Míssil Agulha       poder 14  -- 6
   iciclespear: TAPAS_2A5,   // Lança de Gelo       poder 10  -- 1 (Shellder)
-  rockblast:   TAPAS_2A5    // Rajada de Rochas    poder 25  -- 6
+  rockblast:   TAPAS_2A5,   // Rajada de Rochas    poder 25  -- 6
+  doublekick:  TAPAS_SEMPRE_2,   // Chute Duplo      poder 30  -- 8 espécies (a linha do Nidoran, Hitmonlee, Jolteon)
+  bonemerang:  TAPAS_SEMPRE_2,   // Ossomerangue     poder 50  -- 2 (Cubone, Marowak)
+  twineedle:   TAPAS_SEMPRE_2    // Agulha Dupla     poder 25  -- 4 (a linha do Caterpie e o Beedrill)
 };
 function tapasDoGolpe(golpeId, rng){
   const tabela = MULTI_GOLPE[golpeId];
@@ -9057,19 +9079,25 @@ const ELITE_MAX_ATTEMPTS = 5; // tentativas TOTAIS -- cada uma é o rush complet
 // seguida, com o time do jogador já desgastado -- por isso a média fica um pouco acima do Lance (60)
 const ELITE_RIVAL_AVG_LEVEL = 61;
 
+/* ⚠️ OS QUATRO MEMBROS LEVARAM +1 NIVEL EM 13/09/2026, a pedido, nas DUAS regiões -- a paridade
+   Kanto/Johto é a regra desta tabela (mesmo número de pokémon e mesma média de nível em cada
+   posição), e mexer num lado só a quebraria em silêncio. `tools/test-jornada.js` cobra a paridade
+   posto a posto.
+   O 5º adversário -- o RIVAL -- ficou de fora: o time dele é montado na hora pelo
+   `buildEliteRivalTeam` a partir do time do jogador, e ele não é da Elite 4. */
 const ELITE_FOUR = [
   { id:'lorelei', name:'Lorelei', icon:'🧊', title:'Mestra do Gelo', type:'Ice',
     intro:'«Ninguém passa do meu gelo sem congelar por dentro.» Seus pokémons de gelo não conhecem piedade.',
-    team:[{speciesId:'dewgong',level:56},{speciesId:'cloyster',level:56},{speciesId:'slowbro',level:57},{speciesId:'jynx',level:57},{speciesId:'lapras',level:59}] },
+    team:[{speciesId:'dewgong',level:57},{speciesId:'cloyster',level:57},{speciesId:'slowbro',level:58},{speciesId:'jynx',level:58},{speciesId:'lapras',level:60}] },
   { id:'bruno', name:'Bruno', icon:'🥊', title:'Punho de Aço', type:'Fighting',
     intro:'«Força bruta também é uma arte. Vou te mostrar na prática.» Músculos e pedra, nada mais.',
-    team:[{speciesId:'onix',level:57},{speciesId:'hitmonchan',level:58},{speciesId:'hitmonlee',level:58},{speciesId:'rhydon',level:59},{speciesId:'machamp',level:61}] },
+    team:[{speciesId:'onix',level:58},{speciesId:'hitmonchan',level:59},{speciesId:'hitmonlee',level:59},{speciesId:'rhydon',level:60},{speciesId:'machamp',level:62}] },
   { id:'agatha', name:'Agatha', icon:'👻', title:'Dama Fantasma', type:'Ghost',
     intro:'«Há coisas nesse mundo que você não consegue nem tocar... mas elas tocam você.» Fantasmas e veneno.',
-    team:[{speciesId:'gengar',level:58},{speciesId:'golbat',level:58},{speciesId:'haunter',level:59},{speciesId:'arbok',level:59},{speciesId:'gengar',level:61}] },
+    team:[{speciesId:'gengar',level:59},{speciesId:'golbat',level:59},{speciesId:'haunter',level:60},{speciesId:'arbok',level:60},{speciesId:'gengar',level:62}] },
   { id:'lance', name:'Lance', icon:'🐉', title:'Mestre dos Dragões', type:'Dragon',
     intro:'«Dragões são criaturas míticas — e eu sou o último mestre deles. Mostre que você merece chegar à final.»',
-    team:[{speciesId:'dragonair',level:59},{speciesId:'dragonair',level:59},{speciesId:'gyarados',level:60},{speciesId:'aerodactyl',level:60},{speciesId:'dragonite',level:62}] }
+    team:[{speciesId:'dragonair',level:60},{speciesId:'dragonair',level:60},{speciesId:'gyarados',level:61},{speciesId:'aerodactyl',level:61},{speciesId:'dragonite',level:63}] }
 ];
 /* A Elite de Johto. Cada um pareado com o de Kanto da MESMA POSIÇÃO: mesmo número de pokémon e
    mesma média de nível, exatamente como foi feito com os 16 ginásios. A escolha é de tipo, não de
@@ -9080,16 +9108,16 @@ const ELITE_FOUR = [
 const JOHTO_ELITE = [
   { id:'will', name:'Will', icon:'🔮', title:'Mente Alada', type:'Psychic',
     intro:'«Treinei a vida toda pra dominar os pokémons psíquicos... e agora estou pronto pra você.» Tudo aqui voa e lê a sua próxima jogada.',
-    team:[{speciesId:'xatu',level:56},{speciesId:'jynx',level:56},{speciesId:'exeggutor',level:57},{speciesId:'slowbro',level:57},{speciesId:'xatu',level:59}] },
+    team:[{speciesId:'xatu',level:57},{speciesId:'jynx',level:57},{speciesId:'exeggutor',level:58},{speciesId:'slowbro',level:58},{speciesId:'xatu',level:60}] },
   { id:'koga_elite', name:'Koga', icon:'☠️', title:'Mestre do Veneno', type:'Poison',
     intro:'«Nos encontramos de novo — mas não como líder de ginásio. Aqui eu não me seguro.» O veneno dele corrói mais devagar do que parece.',
-    team:[{speciesId:'ariados',level:57},{speciesId:'venomoth',level:58},{speciesId:'forretress',level:58},{speciesId:'muk',level:59},{speciesId:'crobat',level:61}] },
+    team:[{speciesId:'ariados',level:58},{speciesId:'venomoth',level:59},{speciesId:'forretress',level:59},{speciesId:'muk',level:60},{speciesId:'crobat',level:62}] },
   { id:'bruno_johto', name:'Bruno', icon:'🥊', title:'Punho de Aço', type:'Fighting',
     intro:'«Você de novo? Ótimo. Meus punhos não esqueceram.» Músculos e pedra, nada mais.',
-    team:[{speciesId:'hitmontop',level:58},{speciesId:'hitmonlee',level:58},{speciesId:'hitmonchan',level:59},{speciesId:'onix',level:59},{speciesId:'machamp',level:61}] },
+    team:[{speciesId:'hitmontop',level:59},{speciesId:'hitmonlee',level:59},{speciesId:'hitmonchan',level:60},{speciesId:'onix',level:60},{speciesId:'machamp',level:62}] },
   { id:'karen', name:'Karen', icon:'🌑', title:'Dama Sombria', type:'Dark',
     intro:'«Pokémon fortes. Pokémon fracos. Isso é só a opinião egoísta das pessoas.» O que ela traz não se intimida com nada.',
-    team:[{speciesId:'umbreon',level:59},{speciesId:'murkrow',level:59},{speciesId:'vileplume',level:60},{speciesId:'gengar',level:60},{speciesId:'houndoom',level:62}] }
+    team:[{speciesId:'umbreon',level:60},{speciesId:'murkrow',level:60},{speciesId:'vileplume',level:61},{speciesId:'gengar',level:61},{speciesId:'houndoom',level:63}] }
 ];
 /* Qual dos dois em cada posição -- sorteado UMA VEZ, na primeira tentativa, e guardado no save.
    As tentativas seguintes enfrentam a mesma fila: perder e voltar não pode virar um jeito de
@@ -21435,10 +21463,13 @@ function renderLoja(){
   <!-- O QUADRO DE CIMA É FIXO (position:sticky): só a lista rola. Com 11 itens a lista passa da
        tela a 320px, e sem isto o jogador rolava até o item, clicava, e tinha que voltar pra cima
        pra ler o que ele faz e comprar -- duas viagens pra uma decisão. -->
-  <!-- O QUADRO DE CIMA SOME NA PRATELEIRA VAZIA. Ele e o DETALHE do item selecionado, e ali nao ha
-       item nenhum -- com ele a tela dizia a mesma coisa duas vezes, em cima e na lista. Quem
-       carrega o recado (e o saldo) passa a ser a propria lista, que e onde a ausencia esta. -->
-  ${!aVenda.length ? '' : `
+  <!-- O QUADRO DE CIMA EXISTE SEMPRE, E SEMPRE DO MESMO TAMANHO (13/09/2026, a pedido). Ele ja
+       sumiu na prateleira vazia, por um dia: a ideia era nao dizer a mesma coisa duas vezes. So que
+       com ele indo e vindo -- e crescendo e encolhendo conforme o item -- a tela inteira dancava a
+       cada clique, que foi o que se pediu pra consertar. Hoje a altura e fixa no CSS (ver
+       .loja-fixa) e na prateleira das TMs ele fica la, vazio.
+       O VAZIO E VAZIO MESMO: "ficar o quadro la sem nada mesmo, mas do mesmo tamanho". Quem conta
+       que nao ha nada a venda continua sendo a lista, que e onde a ausencia esta. -->
   <div class="box item-detalhe loja-fixa">
     ${it ? `
       <div class="item-detalhe-topo">
@@ -21468,8 +21499,8 @@ function renderLoja(){
       </div>
       ${(game.moedas||0) < it.preco ? `<p class="hint-text">Faltam 🪙 ${it.preco - (game.moedas||0)} pra comprar um.</p>` : ''}
       <p class="loja-saldo">Você tem <strong>🪙 ${moedas}</strong>.</p>`
-    : `<p class="item-detalhe-vazio">A loja ainda não abriu.</p>`}
-  </div>`}
+    : ''}
+  </div>
   <!-- AS PRATELEIRAS A ESQUERDA e a lista pela metade (12/09/2026, a pedido). A .loja-corpo e uma
        linha de duas colunas: sem ela a lista ocupava a largura inteira, e com tres prateleiras a
        pessoa teria que rolar pra saber que elas existem. -->

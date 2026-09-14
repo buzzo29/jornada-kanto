@@ -3376,22 +3376,42 @@ console.log('\n=== GOLPES DE VARIOS TAPAS: DE 2 A 5 NUMA TROCA ===');
      ESTE BLOCO VARRE A TABELA e nao um golpe nomeado: golpe novo que entre no MULTI_GOLPE ja nasce
      coberto, e um que saia derruba o teste em vez de sumir em silencio. */
   const MULTI = Object.keys(S.MULTI_GOLPE);
-  ok('a tabela tem os nove golpes pedidos', MULTI.indexOf('doubleslap') >= 0 && MULTI.indexOf('furyswipes') >= 0,
+  ok('a tabela tem os golpes pedidos', MULTI.indexOf('doubleslap') >= 0 && MULTI.indexOf('furyswipes') >= 0,
      MULTI.join(', '));
+  /* ⚠️ TRES BATEM SEMPRE DUAS VEZES (13/09/2026, a pedido): Chute Duplo, Ossomerangue e Agulha
+     Dupla. No jogo oficial eles nao sorteiam nada. */
+  ['doublekick','bonemerang','twineedle'].forEach(g =>
+    ok('o ' + g + ' esta na tabela', MULTI.indexOf(g) >= 0, MULTI.join(', ')));
 
-  /* 1) OS PESOS, um golpe de cada vez. Sem isto um ajuste na tabela passa despercebido. */
+  /* 1) OS PESOS, um golpe de cada vez, LIDOS DA TABELA DELE.
+     ⚠️ Este bloco cobrava os quatro pesos do 2-a-5 em TODO golpe da tabela -- o que era verdade
+     enquanto todos dividiam a mesma distribuicao, e virou mentira no dia em que entrou um golpe com
+     distribuicao propria (o comentario da constante ja previa esse dia). Agora ele cobra que o
+     SORTEIO bate com a tabela DAQUELE golpe, que e a regra de verdade: um ajuste na tabela continua
+     sendo pego, e golpe novo com distribuicao nova nasce coberto. */
   for(const golpe of MULTI){
+    const tabela = S.MULTI_GOLPE[golpe];
+    const peso = tabela.reduce((a, p) => a + p[1], 0);
     const conta = {}; let n = 0;
     const rng = S.makeSeededRng('tapas-' + golpe);
     for(let i = 0; i < 80000; i++){ const t = S.tapasDoGolpe(golpe, rng); conta[t] = (conta[t]||0)+1; n++; }
     const pct = k => 100 * (conta[k]||0) / n;
-    const perto = (a, b) => Math.abs(a - b) < 1.0;
-    ok(golpe + ': 2 tapas em ~37,5%', perto(pct(2), 37.5), pct(2).toFixed(2) + '%');
-    ok(golpe + ': 3 tapas em ~37,5%', perto(pct(3), 37.5), pct(3).toFixed(2) + '%');
-    ok(golpe + ': 4 tapas em ~12,5%', perto(pct(4), 12.5), pct(4).toFixed(2) + '%');
-    ok(golpe + ': 5 tapas em ~12,5%', perto(pct(5), 12.5), pct(5).toFixed(2) + '%');
-    ok(golpe + ': nunca sai 1 nem 6', !conta[1] && !conta[6] && !conta[0]);
+    const fora = tabela.filter(p => Math.abs(pct(p[0]) - 100 * p[1] / peso) >= 1.0);
+    ok(golpe + ': o sorteio bate com a tabela dele',
+       fora.length === 0,
+       tabela.map(p => p[0] + 'x ' + pct(p[0]).toFixed(1) + '% (esperado ' + (100*p[1]/peso).toFixed(1) + '%)').join(', '));
+    const possiveis = new Set(tabela.map(p => String(p[0])));
+    ok(golpe + ': nao sai numero de tapas fora da tabela',
+       Object.keys(conta).every(k => possiveis.has(k)) && !conta[1] && !conta[0],
+       'saiu: ' + Object.keys(conta).sort().join(','));
   }
+  /* E os tres novos batem SEMPRE 2 -- a forma direta do pedido, alem da varredura acima. */
+  ['doublekick','bonemerang','twineedle'].forEach(g => {
+    const rng = S.makeSeededRng('dois-' + g);
+    let todos2 = true;
+    for(let i = 0; i < 5000; i++){ if(S.tapasDoGolpe(g, rng) !== 2) todos2 = false; }
+    ok(g + ': bate sempre 2 vezes', todos2, JSON.stringify(S.MULTI_GOLPE[g]));
+  });
   ok('golpe comum continua batendo UMA vez', S.tapasDoGolpe('pound', S.makeSeededRng('x')) === 1);
 
   /* 2) O MOTOR TEM QUE ESCOLHER O GOLPE. O seletor compara PODER, e estes valem 15 e 18 -- pelo
@@ -3402,6 +3422,11 @@ console.log('\n=== GOLPES DE VARIOS TAPAS: DE 2 A 5 NUMA TROCA ===');
   ok('o dos Arranhoes Furiosos e 54, nao 18', S.poderEfetivo('furyswipes') === 54,
      'efetivo: ' + S.poderEfetivo('furyswipes') + '  cru: ' + S.GOLPES.furyswipes[1]);
   ok('e TODO golpe da tabela vale mais que o cru', MULTI.every(g => S.poderEfetivo(g) > S.GOLPES[g][1]));
+  /* Nos de 2 fixos o efetivo e o DOBRO do cru, e e isso que os poe na disputa: um Ossomerangue de
+     50 vale 100 na comparacao, que e o que ele tira de verdade. */
+  ['doublekick','bonemerang','twineedle'].forEach(g =>
+    ok('o efetivo do ' + g + ' e o dobro do cru', S.poderEfetivo(g) === S.GOLPES[g][1] * 2,
+       'efetivo ' + S.poderEfetivo(g) + ', cru ' + S.GOLPES[g][1]));
   ok('golpe comum nao muda de poder', S.poderEfetivo('pound') === S.GOLPES.pound[1]);
 
   /* 2b) E O DANO TEM QUE USAR O PODER CRU. O poder EFETIVO existe pra COMPARAR golpes; o dano de
@@ -3484,7 +3509,12 @@ console.log('\n=== GOLPES DE VARIOS TAPAS: DE 2 A 5 NUMA TROCA ===');
          mesmo golpe e nao sorteia nada. */
       doubleslap: 'jigglypuff', furyswipes: 'persian',  furyattack: 'fearow',
       cometpunch: 'kangaskhan', spikecannon: 'cloyster', barrage: 'exeggutor',
-      pinmissile: 'beedrill',  iciclespear: 'shellder', rockblast: 'golem'
+      pinmissile: 'qwilfish',  iciclespear: 'shellder', rockblast: 'golem',
+      /* OS TRES DE 2 FIXOS (13/09/2026). ⚠️ O Missil Agulha trocou de dono junto: ele era do
+         Beedrill, que tambem aprende a Agulha Dupla -- com o mesmo dono pros dois, o teste mediria
+         o golpe que o motor escolhesse, nao o que ele quer cobrir. Cada golpe precisa de um dono
+         que so tenha ELE da tabela. */
+      doublekick: 'nidoking', bonemerang: 'marowak', twineedle: 'beedrill'
     };
     const semDono = MULTI.filter(g => !DONOS[g]);
     ok('todo golpe da tabela tem dono no teste', semDono.length === 0, semDono.join(', ') || '-');
@@ -3532,8 +3562,15 @@ console.log('\n=== GOLPES DE VARIOS TAPAS: DE 2 A 5 NUMA TROCA ===');
       if(numerados.every(r => marcaNum.test(r))) numerado++;
       /* o LOG traz UMA linha por GOLPE, nao por tapa: a conta e a mesma do passosHtml -- so o
          primeiro tapa de cada grupo abre linha, e o golpe nao repartido abre a sua. */
-      const linhas = semTag(S.passosHtml(m)).split(' de HP.').filter(x => x.trim());
-      const doTapa = linhas.filter(x => marca.test(x));
+      /* ⚠️ AS LINHAS SAO SEPARADAS PELO PROPRIO HTML, e nao por ' de HP.'. Cada linha do log e um
+         `<div class="mlog-passo">`; cortando pelo texto, a frase de um especial (que nao termina em
+         "de HP.") ficava COLADA na linha de ataque seguinte -- e como a frase da CONFUSAO nomeia o
+         golpe que o pokemon usou EM SI MESMO ("se acertou com Agulha Dupla"), o pedaco colado
+         casava com o nome do golpe e contava como mais uma linha dele.
+         Dava 2 a 5 falsos positivos em ~590 confrontos, e so aparecia em quem tem confusao no
+         painel: o tipo de teste que passa quase sempre. O log sempre esteve certo. */
+      const linhas = S.passosHtml(m).split('<div class="mlog-passo').slice(1).map(semTag);
+      const doTapa = linhas.filter(x => marca.test(x) && x.indexOf(' atacou ') >= 0);
       const gruposNaTela = seq.filter(g => !g.x && g.q === 'p' && !(g.t > 1)).length;
       if(doTapa.length === gruposNaTela) umaLinha++;
       /* e o total da linha bate com a soma dos tapas daquele grupo */

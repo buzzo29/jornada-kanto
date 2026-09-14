@@ -2665,6 +2665,39 @@ serviu de prova de que o gerador de golpes está lendo a geração certa.
   **O dono leva o golpe múltiplo mais o MAIS FORTE que ele tem** — o caso duro. Emparelhar com um
   golpe fraco de propósito inflaria a amostra e provaria menos.
 
+### TRÊS GOLPES BATEM SEMPRE DUAS VEZES (13/09/2026)
+
+Pedido assim: *"quando um pokemon usar o ataque double kick, Bonemerang e o Twineedle, coloque pra
+bater 2x, igual como os outros ataques já batem mais vezes"*. No jogo oficial eles não sorteiam
+nada: são dois golpes, sempre.
+
+- **FOI UMA LINHA DE TABELA, e isso era a previsão.** O comentário do `TAPAS_2A5` dizia: *"se um dia
+  entrar um golpe com distribuição própria (o Chute Triplo bate 3 vezes com acerto crescente, por
+  exemplo), ele ganha o array dele aqui e mais nada muda"*. Foi exatamente isso: nasceu o
+  `TAPAS_SEMPRE_2 = [[2,1]]` e o motor, o log, a animação, o selo `2x` e o `poderEfetivo` saíram de
+  graça.
+- **14 ESPÉCIES**: Chute Duplo (8 — a linha do Nidoran, Hitmonlee, Jolteon), Ossomerangue (2 — Cubone
+  e Marowak) e Agulha Dupla (4 — a linha do Caterpie e o Beedrill).
+- **O PODER EFETIVO DOBRA**, que é o que os põe na disputa do `melhorAtaque`: o Ossomerangue vale
+  **100** na comparação (50 × 2), que é o que ele tira de verdade. Sem isso um golpe de 50 perderia
+  pra qualquer alternativa e a mecânica seria código morto -- a mesma razão pela qual o
+  `poderEfetivo` existe.
+- **⚠️ E O TESTE COBRAVA OS QUATRO PESOS DO 2-A-5 EM TODO GOLPE DA TABELA.** Isso era verdade
+  enquanto todos dividiam a mesma distribuição e virou mentira no dia em que entrou um golpe com a
+  sua. Hoje ele cobra que o SORTEIO bate com a tabela **daquele** golpe, que é a regra de verdade:
+  um ajuste continua sendo pego e golpe novo com distribuição nova nasce coberto.
+- **⚠️ O MÍSSIL AGULHA TROCOU DE DONO NO TESTE** (Beedrill → Qwilfish): o Beedrill também aprende a
+  Agulha Dupla, e com o mesmo dono pros dois o teste mediria o golpe que o motor escolhesse, não o
+  que ele quer cobrir. Cada golpe da tabela precisa de um dono que só tenha ELE.
+- **⚠️ E ELES DESENTERRARAM UM FLAKE ANTIGO DO TESTE, que não é do jogo.** A conta de "uma linha por
+  golpe" cortava o log por `' de HP.'` -- só que a frase de um especial não termina assim, e ficava
+  **colada** na linha de ataque seguinte. Como a frase da CONFUSÃO nomeia o golpe que o pokémon usou
+  EM SI MESMO (*"se acertou com Agulha Dupla"*), o pedaço colado casava com o nome e contava como
+  mais uma linha. Dava 2 a 5 falsos positivos em ~590 confrontos e só aparecia com confusão no
+  painel -- o tipo de teste que passa quase sempre. Hoje o corte é pelo próprio HTML
+  (`<div class="mlog-passo">`), que é onde a linha de verdade começa. Quatro rodadas seguidas em
+  zero. **O log sempre esteve certo.**
+
 ## O nome do golpe DURANTE a batalha (09/09/2026)
 
 Pedido assim: *"se está descendo a barra de HP do pokémon X, é porque o pokémon Y usou um ataque —
@@ -3971,6 +4004,32 @@ adicione o Rare Candy; e o terceiro botão coloque TMs, ainda sem nada para vend
   lista é de lugares onde se entra — o mesmo raciocínio que já tinha tirado o `.btn` dos cartões de
   golpe e das linhas da ficha.
 
+### O QUADRO DE CIMA É SEMPRE O MESMO, E DO MESMO TAMANHO (13/09/2026)
+
+Pedido assim: *"teria como sempre deixar aquele quadro de cima fixo e ser o mesmo quadro para todos
+os botões? E mesmo quando clicar no botão de TM e não ter TM à venda, ficar o quadro lá sem nada
+mesmo, mas do mesmo tamanho, porque hoje ele tá dinâmico e tá ficando feio quando fica trocando de
+item"*.
+
+- **A ALTURA É FIXA, e não mínima.** Medido a 320px, o quadro ia de **253px** (Def Up) a **375px**
+  (Despertar, o único que tem o botão de Vender E a linha de "Faltam 🪙 X") — **122px de pulo** a
+  cada item clicado, com a lista inteira dançando junto. Hoje ele é `height:375px`, o maior medido.
+  O `overflow-y:auto` é o que faz a altura ser uma PROMESSA: um item de descrição mais longa rola
+  por dentro em vez de voltar a esticar o quadro. Com `min-height` o pulo voltaria no primeiro item
+  que passasse de 375.
+- **⚠️ ELE SOME NA PRATELEIRA VAZIA? NÃO MAIS — e isso reverte uma decisão de 12/09.** Ela era "não
+  dizer a mesma coisa duas vezes, em cima e na lista", e durou um dia: com o quadro indo e vindo (e
+  crescendo e encolhendo) a tela inteira dançava, que é justamente o que se pediu pra consertar.
+  Na prateleira das TMs ele fica lá, do mesmo tamanho, **sem nada dentro** — foi o pedido ao pé da
+  letra. Quem conta que não há nada à venda continua sendo a lista, que é onde a ausência está.
+- **A LISTA MOSTRA 6 ITENS E ROLA** (`max-height:390px`). A linha mede **63px** a 320px, medida no
+  navegador; 6 delas mais o padding dão os 390.
+- **Conferido no navegador, nos 11 casos** (os 10 itens mais a prateleira vazia): quadro em 375px em
+  todos, nenhum precisando rolar por dentro, lista com exatamente 6 linhas visíveis, sem rolagem
+  horizontal.
+- `tools/test-inventario.js` cobra o quadro existindo nas TRÊS prateleiras, vazio na das TMs, e **lê
+  o CSS** pra altura fixa e pro teto da lista — nada disso aparece em asserção de HTML.
+
 ### VENDER: metade do preço de compra (11/09/2026)
 
 Pedido assim: *"na loja, caso o usuário já tenha um dos itens listado, ele pode ter a opção vender
@@ -4510,6 +4569,42 @@ níveis num time de três no nível 17-20 pesam muito mais que +2 num time de se
   originais: mexer num lado só quebraria isso em silêncio.
 - **Se um dia incomodar**, a alavanca é a própria tabela, e a régua está aqui: o +2 é quase linear,
   então +1 custa aproximadamente metade.
+
+## +1 NÍVEL NA ELITE 4 (13/09/2026)
+
+Pedido junto do +2 dos líderes: *"aumente 1 level também de cada pokemon da elite 4"*. São os
+**quatro membros de cada região** (5 pokémon cada, 40 no total). O **5º adversário — o rival —
+ficou de fora**: o time dele é montado na hora pelo `buildEliteRivalTeam` a partir do time do
+jogador, e ele não é da Elite 4.
+
+- **O +1 VALE NOS DOIS LADOS.** A paridade Kanto/Johto é a regra desta tabela (mesmo número de
+  pokémon e mesma média em cada posto), e mexer num lado só a quebraria em silêncio.
+  `tools/test-jornada.js` já cobrava a paridade posto a posto; ganhou junto a **escada** — o posto 2
+  não pode ficar mais fácil que o 1. Um número fixo ali envelheceria no próximo ajuste; a escada,
+  não. Hoje: **58,0 → 59,6 → 60,0 → 61,0**.
+- **⚠️ O PREÇO MEDIDO É GRANDE, e ele não é uma luta: é a FILA.** A Elite é um rush com o HP
+  carregando entre as lutas (`preservePlayerHp`) e só **2 curas por vitória** — um nível a mais em
+  cada um dos 20 adversários compõe ao longo dos quatro. Medido com times pareados e as mesmas
+  sementes dos dois lados (1.200 filas por célula, o bot curando os dois mais machucados a cada
+  vitória):
+
+  | time | Kanto | Johto |
+  |---|---|---|
+  | ~62 | 20,0% → **15,8%** (−4,2) | 39,5% → **23,0%** (−16,5) |
+  | ~66 | 58,3% → **46,0%** (−12,3) | 76,2% → **57,8%** (−18,3) |
+  | ~70 | 91,2% → **87,4%** (−3,8) | 92,5% → **79,5%** (−13,0) |
+
+  Repetido com outras sementes no nível 66: **−11,9 e −16,2** — estável.
+- **⚠️ E A MEDIÇÃO ENCONTROU UMA ASSIMETRIA QUE JÁ EXISTIA: a Elite de Johto é mais FÁCIL que a de
+  Kanto** (76,2% contra 58,3% no mesmo time), apesar de os níveis baterem posto a posto. A paridade
+  da tabela é de NÍVEL, não de força efetiva — os times são de tipos diferentes. Não foi mexido
+  porque não foi pedido, e fica registrado: quem for equilibrar isso um dia mexe nas ESPÉCIES, não
+  nos níveis.
+- **⚠️ ARMADILHA DA MEDIÇÃO, e ela me custou duas rodadas em zero:** com `preservePlayerHp` o motor
+  **não enche a barra** -- quem enche é o `startEliteChallenge`, antes do rush. O `createInstance`
+  devolve `hp:0/maxHp:0`, então um harness que não chame o `calcMaxHp` manda o time MORTO pra fila e
+  mede 0% em qualquer nível. E sem as 2 curas por vitória o rush também é 0% pra todo mundo: é o
+  painel degenerado da lição do Smeargle, por dois caminhos diferentes.
 
 ## A PRIMEIRA ROTA EXIGE UMA CAPTURA (13/09/2026)
 
