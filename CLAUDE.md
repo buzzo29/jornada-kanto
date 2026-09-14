@@ -6868,6 +6868,14 @@ escolheu três golpes lutava a Torre com os dois primeiros**, em silêncio — o
   amarela, com a segunda oração um degrau abaixo em peso pra o olho pegar primeiro o que expira.
   **A fonte de pixel saiu de propósito:** a frase tem duas orações e um número que muda a cada
   minuto, e ela come largura demais pra isso.
+  **⚠️ E O NEGRITO DELE É BRANCO, não herdado** (reportado no mesmo dia: *"troque a cor azul de Liga
+  Clássica e 20 minutos pela cor branca, pois não está dando para ler"*). A regra global do reset,
+  `strong{color:var(--blue-dark)}`, **ganha da cor do container** — cor não se herda quando o próprio
+  elemento declara a dele —, então as duas partes em negrito, que são justamente o nome da liga e a
+  contagem, saíam em azul escuro sobre o fundo escuro da página. Branco e não amarelo de propósito:
+  o amarelo já é a cor do resto da frase, e com os dois iguais o negrito deixaria de marcar o que
+  importa. É o mesmo remendo que a `.kt-legenda` já fazia, e o teste **lê o CSS** — cor de texto não
+  aparece em asserção de HTML nenhuma.
   **Medido a 320px:** a caixa vai de **273×59px** para **281×74px** (+15px de altura), sem rolagem
   lateral. O pulso continua o mesmo do Bônus Shiny da home — é a mesma ideia, uma janela que expira.
   **Inscrever-se apaga o aviso na hora e zera a folga** (`game.ultimaChecagemDaLiga`): sem isso quem

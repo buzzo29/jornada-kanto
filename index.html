@@ -1534,6 +1534,15 @@
   }
   /* A segunda oração é a CHAMADA -- ela fica um degrau abaixo em peso pra o olho pegar primeiro
      o "começa em N minutos", que é a informação que expira. */
+  /* ⚠️ O <strong> DAQUI E BRANCO, e nao herdado (14/09/2026, reportado: *"troque a cor azul de Liga
+     Classica e 20 minutos pela cor branca, pois nao esta dando para ler"*).
+     A regra global `strong{color:var(--blue-dark)}` (la em cima, no reset) GANHA da cor do
+     container: a cor nao e herdada quando o proprio elemento declara a dele. O aviso e amarelo
+     sobre o fundo escuro da pagina, entao as duas partes em negrito -- justamente o nome da liga e a
+     contagem, que e a informacao que expira -- saiam em azul escuro, ilegiveis.
+     Branco e nao amarelo de proposito: o amarelo ja e a cor do resto da frase, e com os dois iguais
+     o negrito deixaria de marcar o que importa. Mesmo remendo que a .kt-legenda ja faz. */
+  .aviso-liga-jornada strong{ color:#fff; }
   .aviso-liga-jornada .aviso-liga-cta{ display:block; margin-top:2px; font-size:.72rem; font-weight:800; }
   .league-wins-total-box{display:flex;align-items:center;gap:14px;}
   .league-wins-total-icon{font-size:2.2rem;flex-shrink:0;}

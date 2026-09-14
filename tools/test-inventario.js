@@ -1477,6 +1477,18 @@ console.log('\n=== O AVISO DA LIGA VIROU UMA CONTAGEM (14/09/2026) ===');
        css.replace(/\s+/g, ' '));
     ok('e saiu da fonte de pixel', /font-family:var\(--font-ui\)/.test(css));
     ok('mas o pulso continua', /shiny-bonus-pulse/.test(css));
+    /* ⚠️ O <strong> DAQUI E BRANCO (14/09/2026, reportado: *"troque a cor azul de Liga Classica e 20
+       minutos pela cor branca, pois nao esta dando para ler"*). A regra global do reset
+       (strong{color:var(--blue-dark)}) GANHA da cor do container -- a cor nao e herdada quando o
+       proprio elemento declara a dele --, entao as duas partes em NEGRITO (o nome da liga e a
+       contagem, que e a informacao que expira) saiam em azul escuro sobre o fundo escuro da pagina.
+       A trava le o CSS: cor de texto nao aparece em asserção de HTML nenhuma. */
+    ok('e o negrito dele e BRANCO, nao o azul do reset',
+       /.aviso-liga-jornada strong{ color:#fff; }/.test(cli),
+       (cli.match(/.aviso-liga-jornada strong{[^}]*}/) || ['(sem regra)'])[0]);
+    /* e a frase continua tendo os dois pedacos em negrito -- sem eles a regra acima nao teria alvo */
+    ok('e a frase marca os dois em negrito', (daqui(20*60000).match(/<strong/g) || []).length === 2,
+       (daqui(20*60000).match(/<strong[^>]*>[^<]*/g) || []).join(' | '));
   }
 }
 
