@@ -298,6 +298,36 @@ console.log('\n=== AS TRES PRATELEIRAS DA LOJA ===');
   S.escolherPrateleira('especiais');
   ok('trocar de prateleira move a selecao junto', S.__getGame().lojaSel === 'doce_raro',
      String(S.__getGame().lojaSel));
+
+  /* ⚠️ O VENDER ESTA SEMPRE NA TELA, e DESABILITADO quando nao ha o que vender (13/09/2026, a
+     pedido). Ele ja apareceu e sumiu conforme o estoque, por dois dias -- e um botao que vai e vem
+     MUDA A ALTURA do rodape, entao o Comprar dancava de lugar conforme o item. Presente e cinza, a
+     mao encontra os dois sempre no mesmo lugar. */
+  {
+    const g2 = S.__getGame();
+    g2.inventario = { potion: 2 };   // tem Pocao pra vender, e mais nada
+    S.escolherPrateleira('batalha');
+    S.escolherItemDaLoja('potion'); S.__setGame(g2);
+    const comEstoque = S.renderLoja();
+    ok('com estoque, o Vender esta la e ativo',
+       comEstoque.indexOf('abrirVenda') >= 0 && !/abrirVenda[^>]*>\s*Você não tem/.test(comEstoque));
+    S.escolherItemDaLoja('faixa_foco');
+    const semEstoque = S.renderLoja();
+    ok('SEM estoque o Vender continua na tela', semEstoque.indexOf('abrirVenda') >= 0);
+    /* desabilitado: o `.btn.danger:disabled` da casa e o cinza, o mesmo do Excluir sem o que apagar */
+    const botao = (semEstoque.match(/<button class="btn danger"[^>]*>[^<]*<\/button>/) || [''])[0];
+    ok('e vem desabilitado', /disabled/.test(botao), botao.replace(/\s+/g, ' '));
+    ok('dizendo por que', /não tem/.test(botao), botao.replace(/\s+/g, ' ').slice(0, 120));
+  }
+
+  /* A LINHA DA LISTA: preco a DIREITA do nome (irmao dele, nao filho) e sem o "voce tem N". */
+  {
+    const t = S.renderLoja();
+    ok('o preco e irmao do nome, na mesma linha',
+       /<span class="loja-nome">[^<]*<\/span>\s*<span class="loja-preco">/.test(t),
+       (t.match(/<span class="loja-nome">[\s\S]{0,80}/) || [''])[0].replace(/\s+/g, ' '));
+    ok('e o "voce tem N" saiu da lista', t.indexOf('loja-tem') < 0 && t.indexOf('você tem') < 0);
+  }
   /* ⚠️ E O QUADRO E O MESMO EM TODAS AS PRATELEIRAS -- foi assim que o pedido veio ("ser o mesmo
      quadro para todos os botoes"). Sem este caso, so a prateleira vazia estaria coberta. */
   {
@@ -331,12 +361,33 @@ console.log('\n=== AS TRES PRATELEIRAS DA LOJA ===');
        a linha de "Faltam"); o `overflow-y` e o que faz a altura ser promessa e nao torcida. */
     const css = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
     const bloco = (css.match(/\.loja-fixa\{[\s\S]*?\}/) || [''])[0];
-    ok('a altura do quadro e fixa no CSS', /height:\s*\d+px/.test(bloco) && /overflow-y:\s*auto/.test(bloco),
+    ok('a altura do quadro e fixa no CSS', /height:\s*\d+px/.test(bloco),
        bloco.replace(/\s+/g, ' ').slice(0, 120));
-    /* E A LISTA MOSTRA 6 E ROLA (a pedido). A linha mede 63px a 320px, medida no navegador. */
+    /* ⚠️ O QUADRO E UMA COLUNA DE TRES ANDARES (13/09/2026, a pedido: "dependendo do tamanho do
+       texto eles sobem ou descem"). A altura fixa ja tinha parado o QUADRO de pular entre um item e
+       outro; o que ainda dancava eram os BOTOES dentro dele, porque a descricao muda de tamanho.
+       Quem cede e o MIOLO -- e por isso o `overflow` saiu do quadro e foi pra ele: no quadro
+       inteiro, o rodape rolava junto e os botoes voltavam a sair do lugar. */
+    ok('e ele e uma coluna, com o rodape colado embaixo',
+       /display:flex/.test(bloco) && /flex-direction:column/.test(bloco), bloco.replace(/\s+/g, ' ').slice(0, 160));
+    const miolo = (css.match(/\.loja-miolo\{[^}]*\}/) || [''])[0];
+    ok('quem rola e o miolo, nao o quadro', /flex:\s*1/.test(miolo) && /overflow-y:\s*auto/.test(miolo), miolo);
+    /* E A LISTA MOSTRA 6 E ROLA (a pedido). A linha mede 36px a 320px desde que o preco foi pro
+       lado do nome -- era 63 com ele embaixo, e o teto velho de 390 deixava os 9 itens caberem: o
+       limite de 6 tinha virado letra morta. Numero de tela envelhece junto com a tela. */
     const blocoLista = (css.match(/\.loja-lista\{[^}]*max-height[^}]*\}/) || [''])[0];
-    ok('a lista tem teto de 6 itens e rola', /max-height:\s*390px/.test(blocoLista) && /overflow-y:\s*auto/.test(blocoLista),
+    ok('a lista tem teto de 6 itens e rola', /max-height:\s*228px/.test(blocoLista) && /overflow-y:\s*auto/.test(blocoLista),
        blocoLista.replace(/\s+/g, ' '));
+
+    /* ⚠️ OS BOTOES FICAM NO RODAPE, e o rodape e irmao do miolo -- nao filho dele. Dentro do miolo
+       eles rolariam com a descricao, que e exatamente o que se pediu pra parar. */
+    const quadroHtml = (css.match(/<div class="box item-detalhe loja-fixa">[\s\S]*?\n  <\/div>/) || [''])[0];
+    const iMiolo = quadroHtml.indexOf('loja-miolo');
+    const iRodape = quadroHtml.indexOf('loja-rodape');
+    const iAcoes = quadroHtml.indexOf('item-acoes');
+    ok('os botoes estao no rodape, depois do miolo',
+       iMiolo > 0 && iRodape > iMiolo && iAcoes > iRodape,
+       'miolo em ' + iMiolo + ', rodape em ' + iRodape + ', botoes em ' + iAcoes);
     ok('deixando um recado so, que nomeia a prateleira', /Ainda não há TMs à venda/.test(t),
        (t.match(/loja-vazia[^>]*>[^<]*/g)||[]).join(' | '));
     ok('e o saldo continua na tela', /Você tem <strong>🪙/.test(t));

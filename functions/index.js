@@ -2896,6 +2896,35 @@ function assignMatchTerrain(match, seedStr, allowedTerrainIds){
 // SEGURANÇA: só esvazia o campo embutido DEPOIS da gravação do log confirmar -- se a gravação falhar,
 // o log fica embutido como sempre foi (formato antigo), e nada se perde. O cliente entende os dois
 // formatos: embutido (partidas antigas) e logStored (novas, busca sob demanda no "Assistir batalha")
+/* ⚠️ APAGAR UM DOCUMENTO NO FIRESTORE NÃO APAGA AS SUBCOLEÇÕES DELE. Elas continuam existindo,
+   invisíveis no console (o documento pai vira "missing"), e continuam ocupando espaço pra sempre.
+   Medido em produção em 13/09/2026, um mês depois de a poda entrar: **687 ciclos órfãos** com
+   ~3.200 documentos de inscritos parados dentro, do dia 13/08 em diante.
+   O custo de LEITURA disso é zero -- nada varre o `leagueCycles`, todo acesso é por id --, e o de
+   armazenamento eram alguns MB. Mas cresce pra sempre: no ritmo de hoje são ~8.000 órfãos por ano.
+   É o tipo de coisa que só vira problema quando já é grande demais pra limpar sem susto.
+   Ele apaga em LOTES de 300 porque um `batch` do Firestore aceita 500 operações, e devolve quantos
+   apagou pra quem chama poder contar no log. */
+async function apagarSubcolecoes(docRef, nomes){
+  let apagados = 0;
+  for(const nome of nomes){
+    try{
+      let snap = await docRef.collection(nome).limit(300).get();
+      while(!snap.empty){
+        const lote = db.batch();
+        snap.docs.forEach(d => lote.delete(d.ref));
+        await lote.commit();
+        apagados += snap.docs.length;
+        snap = await docRef.collection(nome).limit(300).get();
+      }
+    } catch(e){ logger.warn('Nao deu pra limpar a subcolecao ' + nome + ' de ' + docRef.path, e); }
+  }
+  return apagados;
+}
+/* As subcoleções que um ciclo de liga pendura. Ficam numa constante porque quem apaga o ciclo
+   precisa saber a lista INTEIRA -- e o dia em que nascer uma terceira, ela entra aqui e os dois
+   caminhos de poda (a Clássica e a Trainers) já limpam junto. */
+const SUBCOLECOES_DO_CICLO = ['registrants', 'matchLogs', 'terrainPicks', 'teamPicks'];
 async function storeMatchLogAndStrip(logCollRef, logId, match){
   if(!match.matchups || match.matchups.length===0) return; // walkover/bye não tem log pra extrair
   try{
@@ -3307,7 +3336,15 @@ async function advanceLeagueOnceForType(typeId, typeConfig){
     const completed = freshData.cycles.filter(c=>c.status==='complete').sort((a,b)=>a.scheduledTime-b.scheduledTime);
     if(completed.length>LEAGUE_HISTORY_RETENTION){
       const toRemoveIds = new Set(completed.slice(0, completed.length-LEAGUE_HISTORY_RETENTION).map(c=>c.id));
-      for(const id of toRemoveIds){ await cycleDocRef(typeId, id).delete(); }
+      /* ⚠️ AS SUBCOLEÇÕES PRIMEIRO, o documento depois -- apagar o documento não leva as
+         subcoleções junto (ver apagarSubcolecoes). Foi assim que 687 ciclos órfãos se acumularam
+         entre 13/08 e 13/09/2026. */
+      let dentro = 0;
+      for(const id of toRemoveIds){
+        dentro += await apagarSubcolecoes(cycleDocRef(typeId, id), SUBCOLECOES_DO_CICLO);
+        await cycleDocRef(typeId, id).delete();
+      }
+      logger.info(`Liga (${typeId}): ${toRemoveIds.size} ciclo(s) antigo(s) apagado(s), com ${dentro} documento(s) dentro.`);
       await db.runTransaction(async (tx)=>{
         const snap = await tx.get(scheduleDocRef(typeId));
         const d = snap.data();
@@ -4094,6 +4131,8 @@ exports._makeSeededRng = makeSeededRng;
 /* Gancho de teste do Boss de Domingo -- ver BOSS_ATIVO. */
 exports._boss = { ativo(v){ if(v !== undefined) BOSS_ATIVO = !!v; return BOSS_ATIVO; } };
 exports._golpesEspeciais = { AUTODESTRUICAO, SONIFEROS, METRONOMO, CHANCE_AUTODESTRUICAO, CHANCE_SONO, SONO_EM_TROCAS, MULTI_GOLPE, ataquesDisponiveis, GOLPES_CRIT_ALTO, FURIA, CHANCE_FURIA, FURIA_BONUS, sorteiaGolpeDoMetronomo, POOL_METRONOMO, CONFUSAO, CHANCE_CONFUSAO, DANCA_ESPADAS, DANCA_PLUMA, CHANCE_DANCA, DANCA_ESPADAS_MULT, DANCA_PLUMA_MULT, FURIA_DRAGAO, CHANCE_FURIA_DRAGAO, FURIA_DRAGAO_DANO, CHUVA, CHANCE_CHUVA, CHUVA_EM_CONFRONTOS, CHUVA_MULT, CHUVA_GOLPE_MULT, multDaChuva, estaChovendo, tentarChuva, limparClima };
+exports._apagarSubcolecoes = apagarSubcolecoes;   // testado direto: no ar ele roda dentro da poda
+exports._SUBCOLECOES_DO_CICLO = SUBCOLECOES_DO_CICLO;
 exports._trainersLeagueSplitGroups = trainersLeagueSplitGroups;
 exports._trainersLeagueGatherEligibleCodes = trainersLeagueGatherEligibleCodesForUid;
 exports._decodeTeamCode = decodeTeamCode;   // o teste da liga confere a ORDEM da lista pela especie de cada time

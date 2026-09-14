@@ -4027,8 +4027,37 @@ item"*.
 - **Conferido no navegador, nos 11 casos** (os 10 itens mais a prateleira vazia): quadro em 375px em
   todos, nenhum precisando rolar por dentro, lista com exatamente 6 linhas visíveis, sem rolagem
   horizontal.
-- `tools/test-inventario.js` cobra o quadro existindo nas TRÊS prateleiras, vazio na das TMs, e **lê
-  o CSS** pra altura fixa e pro teto da lista — nada disso aparece em asserção de HTML.
+- **⚠️ E OS BOTÕES TAMBÉM PARARAM DE DANÇAR (13/09/2026, a pedido):** *"dependendo do tamanho do
+  texto eles sobem ou descem"*. A altura fixa tinha parado o QUADRO de pular entre um item e outro;
+  o que ainda se mexia eram os botões DENTRO dele, porque a descrição muda de tamanho. Hoje o quadro
+  é uma **coluna de três andares** — topo, miolo que rola, rodapé colado embaixo —, e quem cede é o
+  miolo. Medido: o fim dos botões fica a **21px do fim do quadro nos 10 itens**, sem exceção.
+  O `overflow` saiu do quadro e foi pro miolo: no quadro inteiro, o rodapé rolava junto.
+- **⚠️ O VENDER ESTÁ SEMPRE NA TELA**, desabilitado e cinza quando não há o que vender. Ele aparecia
+  e sumia conforme o estoque, por dois dias — a ideia era que a ausência dele já dizia "você não tem
+  nenhum". Só que **um botão que vai e vem muda a altura do rodapé**, e aí o Comprar mudava de lugar
+  conforme o item: exatamente o que se pediu pra parar. Ele diz por que está apagado ("Você não tem
+  pra vender") em vez de só ficar cinza.
+- **O PREÇO FOI PRO LADO DO NOME** na lista, e o "você tem N" saiu. Com os preços alinhados numa
+  borda eles viram uma COLUNA que se compara de relance, que é pra isso que a lista existe.
+- **⚠️ ISSO CUSTOU LARGURA, e a conta foi feita.** O CSS tinha um comentário explicando por que o
+  preço estava embaixo: *"na coluna pela metade... sobram ~95px de texto; com o preço ao lado, Atk
+  Special Up quebrava em três linhas"*. Era verdade — então a coluna da lista teve que crescer:
+  `1fr 1fr` virou **`0.45fr 1fr`** (lista de 137px para 188px) e a fonte do nome caiu de .72 para
+  **.68rem** — seis pixels são o que separa uma linha de duas em "Atk Special Up".
+  Medido depois: **nenhum nome quebra** e todas as linhas ficam em 34-36px.
+- **AS PRATELEIRAS PAGARAM A CONTA, e o ícone subiu pro topo delas.** Em linha, o ícone e o padding
+  comiam 49 dos 85px e sobravam **36** pro rótulo: "Especiais" não cabia inteiro e "Para as
+  batalhas" ia a três linhas, quebrando no meio da palavra. Empilhado, o texto fica com a largura
+  toda do botão.
+- **⚠️ E O TETO DA LISTA TEVE QUE CAIR DE 390 PARA 228px.** A linha encolheu de 63 para 36px quando
+  o preço subiu pra mesma linha, e com o teto velho os **9 itens cabiam**: o limite de 6 tinha
+  virado letra morta sem ninguém ver. **Número de tela envelhece junto com a tela** — é o mesmo
+  tropeço do "59 espécies" da ficha da Pokédex, agora em CSS.
+- `tools/test-inventario.js` cobra o quadro existindo nas TRÊS prateleiras, vazio na das TMs, os
+  botões no RODAPÉ (irmão do miolo, não filho dele), o Vender presente e desabilitado sem estoque, o
+  preço como IRMÃO do nome e o "você tem" fora da lista — e **lê o CSS** pra altura fixa, pra quem
+  rola ser o miolo e pro teto da lista. Nada disso aparece em asserção de HTML.
 
 ### VENDER: metade do preço de compra (11/09/2026)
 
@@ -5115,6 +5144,45 @@ batalhas onlines ... e não deixe entrar"*.
   e não no dia em que a troca foi feita. `tools/test-liga-treinadores.js` grava os saves fora de
   ordem de propósito e confere a ordem pela espécie de cada time; conferido que ele FALHA sem o
   `sort`.
+
+## O HISTÓRICO DAS LIGAS NO FIRESTORE (13/09/2026)
+
+Perguntado assim: *"o `leagueCycles` está guardando vários registros de liga clássica ao longo do
+tempo. Seria interessante limpar os registros que estão a mais de uma semana pra melhorar
+performance/custo, ou não influencia em nada?"*. **Não influencia** — e a resposta importa mais que
+a pergunta, porque ela vale pra toda coleção deste projeto.
+
+- **O CUSTO DO FIRESTORE É POR DOCUMENTO LIDO, NÃO POR DOCUMENTO GUARDADO.** Uma coleção com 10 mil
+  documentos custa igual a uma com 10, desde que ninguém a varra — e a busca por id é O(log n).
+  Conferido: **nenhum acesso ao `leagueCycles` varre a coleção**, é tudo `cycleDocRef(typeId, id)`.
+- **E A PODA JÁ EXISTIA, mais agressiva que uma semana:** `LEAGUE_HISTORY_RETENTION = 48` mantém os
+  48 ciclos concluídos mais recentes. Como a Clássica roda de hora em hora, são **2 dias**. O número
+  está amarrado à lista "Suas últimas Ligas" do cliente — baixá-lo quebra o botão "Rever".
+- **Medido em produção:** 48 ciclos vivos (~7 KB cada), `leagues/schedule_classic` com 49 entradas e
+  **9,5 KB** — e é ele, não o `leagueCycles`, o documento que é lido a toda consulta de liga. Tudo
+  somado dá menos de 1 MB, contra 1 GiB gratuitos.
+
+### ⚠️ MAS APAGAR UM DOCUMENTO NÃO APAGA AS SUBCOLEÇÕES DELE
+
+A poda fazia `cycleDocRef(...).delete()` e pronto. No Firestore isso apaga **só o documento**: as
+subcoleções continuam existindo, invisíveis no console (o pai vira *missing*), pra sempre.
+
+- **Medido um mês depois de a poda entrar: 687 ciclos órfãos**, de 13/08 em diante, com **~3.400
+  documentos de inscritos** parados dentro.
+- **Hoje isso custava centavos** — alguns MB, dentro do gratuito. Mas cresce pra sempre: no ritmo de
+  hoje são ~8.000 órfãos por ano. É o tipo de coisa que só vira problema quando já é grande demais
+  pra limpar sem susto.
+- **A LISTA DAS SUBCOLEÇÕES VIVE NUMA CONSTANTE** (`SUBCOLECOES_DO_CICLO`): o dia em que nascer uma
+  terceira, ela entra lá e os dois caminhos de poda já limpam junto. Escrita em cada lugar, a
+  próxima ficaria pra trás.
+- **A limpeza apaga em LOTES de 300** (o `batch` do Firestore aceita 500) e devolve quantos apagou,
+  pra o log contar.
+- **⚠️ E ELA TEM QUE VIR ANTES DO `delete()`**: depois, o pai já não existe pra alcançar as
+  subcoleções por referência. `tools/test-liga-treinadores.js` cobra as duas coisas — a limpeza
+  funcionando em 700 documentos (pra o laço de lotes dar mais de uma volta) e, **lendo o código**,
+  que a poda a chame antes de apagar: os casos chamam a função na mão e passariam com a chamada
+  órfã.
+- **O que já tinha vazado foi limpo à mão**, com o script em seco antes.
 
 ## Moedas
 

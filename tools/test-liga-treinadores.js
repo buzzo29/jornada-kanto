@@ -144,6 +144,50 @@ await (async function(){
   ok('conta sem save devolve lista vazia', Array.isArray(vazio) && vazio.length === 0);
 })();
 
+console.log('\n=== A PODA LEVA AS SUBCOLECOES JUNTO ===');
+/* ⚠️ APAGAR UM DOCUMENTO NO FIRESTORE NAO APAGA AS SUBCOLECOES DELE -- elas ficam, invisiveis no
+   console (o pai vira "missing"), ocupando espaco pra sempre. A poda da Liga Classica apagava so o
+   documento do ciclo, e em 13/09/2026 a producao tinha 687 ciclos orfaos com ~3.200 documentos de
+   inscritos parados dentro, acumulados desde 13/08.
+   O custo de LEITURA disso e zero (nada varre o leagueCycles: todo acesso e por id) e o de
+   armazenamento eram alguns MB -- mas cresce pra sempre, e e o tipo de coisa que so vira problema
+   quando ja e grande demais pra limpar sem susto. */
+await (async function(){
+  const ciclo = db.collection('leagueCycles').doc('classic__teste');
+  await ciclo.set({ status:'complete' });
+  /* 700 inscritos pra o laco de lotes ter que dar mais de uma volta (o batch vai de 300) */
+  for(let i = 0; i < 700; i++) await ciclo.collection('registrants').doc('r' + i).set({ uid:'u' + i });
+  await ciclo.collection('matchLogs').doc('L0_R0_M0').set({ matchups: [] });
+  await ciclo.collection('terrainPicks').doc('u1').set({ picks: {} });
+
+  const antes = (await ciclo.collection('registrants').get()).docs.length;
+  ok('o cenario tem inscritos de sobra', antes === 700, antes + ' inscritos');
+
+  const apagados = await fns._apagarSubcolecoes(ciclo, fns._SUBCOLECOES_DO_CICLO);
+  ok('a limpeza apaga TODAS as subcolecoes, em lotes', apagados === 702, apagados + ' documentos');
+  ok('e nao sobra nada dentro',
+     (await ciclo.collection('registrants').get()).docs.length === 0 &&
+     (await ciclo.collection('matchLogs').get()).docs.length === 0 &&
+     (await ciclo.collection('terrainPicks').get()).docs.length === 0);
+  /* ela nao encosta no documento do ciclo -- quem apaga e quem chamou */
+  ok('o documento do ciclo continua de pe', (await ciclo.get()).exists);
+
+  /* ⚠️ E A PODA TEM QUE CHAMAR A LIMPEZA ANTES DO DELETE. O caso acima chama a funcao na mao e
+     passaria com a chamada orfa -- e uma chamada DEPOIS do delete nao limparia nada (o pai ja
+     nao existe pra alcancar as subcolecoes por referencia). Por isso o teste le o codigo. */
+  const src = require('fs').readFileSync(path.join(__dirname, '..', 'functions', 'index.js'), 'utf8');
+  const bloco = (src.match(/const toRemoveIds = new Set[\s\S]{0,700}/) || [''])[0];
+  const iLimpa = bloco.indexOf('apagarSubcolecoes');
+  const iDelete = bloco.indexOf('.delete()');
+  ok('a poda limpa as subcolecoes ANTES de apagar o ciclo',
+     iLimpa > 0 && iDelete > iLimpa, 'limpeza em ' + iLimpa + ', delete em ' + iDelete);
+  /* a lista das subcolecoes vive numa constante: o dia em que nascer uma terceira, ela entra la e
+     os dois caminhos de poda ja limpam junto */
+  ok('e a lista de subcolecoes e uma so', Array.isArray(fns._SUBCOLECOES_DO_CICLO) &&
+     fns._SUBCOLECOES_DO_CICLO.indexOf('registrants') >= 0 && fns._SUBCOLECOES_DO_CICLO.indexOf('matchLogs') >= 0,
+     (fns._SUBCOLECOES_DO_CICLO || []).join(', '));
+})();
+
 console.log('\n=== A RODADA GRAVA O LOG, E SO ENTAO NOTIFICA ===');
 /* O INCIDENTE DE 13/09/2026: um treinador recebeu 285 notificacoes iguais de "Voce perdeu na
    Trainers League", uma por minuto, e o outro 91. A liga de 11, 12 e 13/09 nunca terminou.

@@ -2120,16 +2120,34 @@
      primeiro item que passasse de 375.
      Ela vale inclusive na prateleira VAZIA (as TMs), que foi o resto do pedido: o quadro fica lá,
      do mesmo tamanho, sem nada dentro. */
+  /* ⚠️ COLUNA DE TRES ANDARES: topo, miolo que rola, e o RODAPE COLADO EMBAIXO (13/09/2026, a
+     pedido: "dependendo do tamanho do texto eles sobem ou descem"). A altura fixa ja tinha parado o
+     quadro de pular entre um item e outro; o que ainda dancava eram os BOTOES dentro dele, porque a
+     descricao muda de tamanho. Agora quem cede e o miolo (ele rola), e a mao do jogador encontra o
+     Comprar sempre no mesmo lugar.
+     O `overflow` saiu daqui e foi pro miolo: com ele no quadro inteiro, o rodape rolava junto. */
   .loja-fixa{ position:sticky; top:0; z-index:5; box-shadow:0 6px 12px rgba(12,16,36,.45);
-    height:375px; overflow-y:auto; }
-  /* SEIS ITENS E O RESTO ROLA (a pedido). A linha mede 63px a 320px, medida no navegador; 6 delas
-     mais o padding de 6px de cima e de baixo dão os 390. */
-  .loja-lista{ max-height:390px; overflow-y:auto; }
+    height:375px; display:flex; flex-direction:column; }
+  .loja-miolo{ flex:1; min-height:0; overflow-y:auto; }
+  .loja-rodape{ flex-shrink:0; padding-top:6px; }
+  /* SEIS ITENS E O RESTO ROLA (a pedido). A linha mede 36px a 320px, medida no navegador; 6 delas
+     mais o padding de 6px de cima e de baixo dão os 228.
+     ⚠️ ERA 390 -- o numero de quando o preco ficava EMBAIXO do nome e a linha tinha 63px. Com o
+     preco ao lado a linha encolheu quase pela metade, e o teto velho deixava os 9 itens caberem: o
+     limite de 6 tinha virado letra morta sem ninguem ver. Numero de tela envelhece junto com a tela. */
+  .loja-lista{ max-height:228px; overflow-y:auto; }
   .loja-saldo{ margin:10px 0 0; font-size:.8rem; color:var(--muted); }
   /* A LISTA PELA METADE, com as prateleiras do lado esquerdo. As duas colunas dividem igual
      (1fr 1fr) -- foi o pedido ("diminua ela pela metade na horizontal") --, e o `min-width:0` nas
      duas e o que deixa o nome do item truncar em vez de empurrar a coluna. */
-  .loja-corpo{ display:grid; grid-template-columns:1fr 1fr; gap:8px; align-items:start; }
+  /* ⚠️ A LISTA GANHOU LARGURA quando o preço foi pro lado do nome (13/09/2026). Em 1fr 1fr a coluna
+     da lista ficava com 137px e sobravam ~60px de texto ao lado do preço -- "Atk Special Up" e
+     "Faixa de Foco" quebravam em TRÊS linhas, e cada linha da lista tinha uma altura diferente (52,
+     86, 101px). Era por isso que o preço estava embaixo.
+     As prateleiras cedem porque elas cabem: são três rótulos curtos que já quebravam em duas linhas
+     de qualquer jeito. O pedido de "metade" era pra a lista não ocupar a largura inteira -- e ela
+     continua não ocupando. */
+  .loja-corpo{ display:grid; grid-template-columns:0.45fr 1fr; gap:8px; align-items:start; }
   .loja-abas{ display:flex; flex-direction:column; gap:6px; min-width:0; }
   /* A prateleira NAO usa o .btn da casa: aquele e botao de ACAO, com moldura de 3px. Aqui a lista
      e de lugares onde se entra -- o mesmo raciocinio que ja tinha tirado o .btn dos cartoes de
@@ -2137,17 +2155,26 @@
   /* ⚠️ O PAPEL DO JOGO E `--box`, nao `--cream` -- essa variavel nao existe na paleta, e com o
      fallback vazio a aba ficava TRANSPARENTE sobre o fundo escuro da pagina, com o texto em
      `--ink` por cima: ilegivel. So a selecionada (amarela) se lia. Pego no navegador, a 320px. */
+  /* ⚠️ O ÍCONE EM CIMA, e não ao lado (13/09/2026). Em linha ele e o padding comiam 49 dos 85px da
+     coluna e sobravam **36** pro rótulo -- "Especiais" não cabia inteiro, e "Para as batalhas" ia a
+     três linhas. Empilhado, o texto fica com a largura toda do botão.
+     A coluna ficou estreita quando a lista ganhou espaço pro preço ir pro lado do nome; foi a troca
+     que o pedido de 13/09 impôs, e é aqui que ela se paga. */
   .loja-aba{
-    display:flex; align-items:center; gap:6px;
-    width:100%; min-width:0; padding:7px 8px; margin:0; text-align:left; cursor:pointer;
+    display:flex; flex-direction:column; align-items:center; gap:3px;
+    width:100%; min-width:0; padding:7px 5px; margin:0; text-align:center; cursor:pointer;
     background:var(--box); color:var(--ink);
     border:2px solid var(--box-border); border-radius:5px;
     font-family:var(--font-ui);
   }
   .loja-aba.sel{ background:var(--yellow); border-color:var(--yellow-dark); }
   .loja-aba-icone{ font-size:1.05rem; line-height:1; flex-shrink:0; }
-  .loja-aba-txt{ display:flex; flex-direction:column; gap:1px; min-width:0; }
-  .loja-aba-nome{ font-weight:800; font-size:.7rem; line-height:1.15; overflow-wrap:anywhere; }
+  .loja-aba-txt{ display:flex; flex-direction:column; gap:1px; min-width:0; width:100%; }
+  /* ⚠️ QUEBRA ENTRE PALAVRAS, e nao no meio delas. Com o overflow-wrap:anywhere e a coluna em 85px
+     (ela cedeu largura pra lista quando o preco foi pro lado do nome), "Para as batalhas" virava
+     "Para as batal / has" -- uma palavra partida ao meio se le pior que uma linha a mais.
+     A fonte caiu junto pra "batalhas" caber inteira numa linha. */
+  .loja-aba-nome{ font-weight:800; font-size:.62rem; line-height:1.15; }
   .loja-aba-qtd{ font-size:.58rem; font-weight:700; color:var(--muted); }
   .loja-vazia{ margin:0; padding:6px 0; font-size:.75rem; color:var(--muted); }
   .loja-lista{ padding:6px 10px; min-width:0; }
@@ -2171,9 +2198,17 @@
      e sobram ~95px de texto; com o preco ao lado, "Atk Special Up" quebrava em tres linhas e a
      lista dos 9 itens levava a pagina a 1.260px. */
   .loja-icone{ font-size:1.1rem; width:18px; }
-  .loja-nome{ flex:1; min-width:0; font-weight:800; font-size:.72rem; display:flex; flex-direction:column; gap:1px; overflow-wrap:anywhere; }
-  .loja-tem{ font-size:.6rem; font-weight:700; color:var(--muted); }
-  .loja-preco{ font-weight:800; font-size:.68rem; color:var(--muted); }
+  /* ⚠️ O PRECO FICA NA MESMA LINHA DO NOME, encostado a direita (13/09/2026, a pedido). Ele ficava
+     EMBAIXO porque a `.loja-nome` era uma coluna -- e isso fazia cada linha ter duas alturas. Com o
+     preco alinhado numa borda, os precos da lista viram uma COLUNA que se compara de relance, que e
+     pra isso que a lista existe.
+     O `você tem N` saiu junto: quem quer saber isso esta olhando a mochila, e ali ele era a terceira
+     informacao numa linha de 137px. */
+  /* .68rem e nao .72: medido a 320px, "Atk Special Up" (o nome mais longo da loja) precisa de 98px
+     e a coluna do nome tem 93. Seis pixels de fonte e o que separa uma linha de duas, e duas linhas
+     aqui e a lista com alturas diferentes de novo. */
+  .loja-nome{ flex:1; min-width:0; font-weight:800; font-size:.68rem; overflow-wrap:anywhere; }
+  .loja-preco{ flex-shrink:0; font-weight:800; font-size:.68rem; color:var(--muted); white-space:nowrap; }
   .item-detalhe-topo{ display:flex; align-items:center; gap:10px; }
   .item-detalhe-icone{ font-size:2.2rem; line-height:1; flex-shrink:0; }
   .item-detalhe-nome{ display:flex; flex-direction:column; gap:2px; min-width:0; }
@@ -21506,26 +21541,33 @@ function renderLoja(){
           <span class="item-detalhe-qtd">🪙 ${it.preco}</span>
         </div>
       </div>
-      <p class="item-detalhe-texto">${escapeHtmlSafe(it.descricao)}</p>
-      ${game.lojaErro ? `<p class="error-text">${escapeHtmlSafe(game.lojaErro)}</p>` : ''}
+      <div class="loja-miolo">
+        <p class="item-detalhe-texto">${escapeHtmlSafe(it.descricao)}</p>
+        ${game.lojaErro ? `<p class="error-text">${escapeHtmlSafe(game.lojaErro)}</p>` : ''}
+      </div>
+      <div class="loja-rodape">
+      ${(game.moedas||0) < it.preco ? `<p class="hint-text">Faltam 🪙 ${it.preco - (game.moedas||0)} pra comprar um.</p>` : ''}
+      <p class="loja-saldo">Você tem <strong>🪙 ${moedas}</strong>.</p>
       <div class="item-acoes loja-acoes">
         <button class="btn success" ${(game.moedas||0) < it.preco || game.comprando ? 'disabled' : ''}
           onclick="abrirCompra('${escJs(sel.item)}')">${game.comprando ? 'Comprando...' : '🪙 Comprar'}</button>
         <!-- ATENCAO: este comentario vive DENTRO de um template literal, entao ele nao pode ter
              crase nenhuma -- elas fecham a string e o arquivo inteiro para de compilar.
-             O VENDER SO APARECE QUANDO HA O QUE VENDER (11/09/2026, a pedido: "caso o usuario ja
-             tenha um dos itens listado"). Um botao sempre visivel e quase sempre desabilitado seria
-             mais uma coisa apagada na tela -- e aqui a AUSENCIA dele ja diz "voce nao tem nenhum".
-             Fica EMBAIXO do Comprar, que foi o pedido: a classe loja-acoes empilha em coluna,
-             porque a item-acoes sozinha e uma LINHA (ela nasceu na mochila, com Usar e Excluir lado
-             a lado). No vermelho do danger pelo mesmo motivo do Excluir: sai coisa da conta.
+             O VENDER ESTA SEMPRE NA TELA, e DESABILITADO quando nao ha o que vender (13/09/2026, a
+             pedido). Ele ja apareceu e sumiu conforme o estoque, por dois dias: a ideia era que a
+             ausencia dele ja dizia -voce nao tem nenhum-. So que um botao que vai e vem MUDA A
+             ALTURA do rodape, e ai o Comprar dancava de lugar conforme o item -- que e justamente o
+             que se pediu pra parar. Presente e cinza, a mao encontra os dois sempre no mesmo lugar.
+             Fica EMBAIXO do Comprar: a classe loja-acoes empilha em coluna, porque a item-acoes
+             sozinha e uma LINHA (ela nasceu na mochila, com Usar e Excluir lado a lado). No vermelho
+             do danger pelo mesmo motivo do Excluir: sai coisa da conta.
              O QUE ELE CONTA E O quantoPossoVender, NAO o quantoTenho -- o Bonus Shiny de CUPOM
              aparece na mochila e nao se vende. Ver a nota da funcao. -->
-        ${vendaveis > 0 ? `<button class="btn danger" ${game.comprando ? 'disabled' : ''}
-          onclick="abrirVenda('${escJs(sel.item)}')">🪙 Vender por ${precoDeVenda(sel.item)}</button>` : ''}
+        <button class="btn danger" ${(vendaveis > 0 && !game.comprando) ? '' : 'disabled'}
+          onclick="abrirVenda('${escJs(sel.item)}')">${vendaveis > 0
+            ? `🪙 Vender por ${precoDeVenda(sel.item)}` : 'Você não tem pra vender'}</button>
       </div>
-      ${(game.moedas||0) < it.preco ? `<p class="hint-text">Faltam 🪙 ${it.preco - (game.moedas||0)} pra comprar um.</p>` : ''}
-      <p class="loja-saldo">Você tem <strong>🪙 ${moedas}</strong>.</p>`
+      </div>`
     : ''}
   </div>
   <!-- AS PRATELEIRAS A ESQUERDA e a lista pela metade (12/09/2026, a pedido). A .loja-corpo e uma
@@ -21547,9 +21589,8 @@ function renderLoja(){
         <button class="loja-linha ${p.item === game.lojaSel ? 'sel' : ''} ${cabe ? '' : 'caro'}"
           onclick="escolherItemDaLoja('${escJs(p.item)}')">
           <span class="loja-icone">${i.icone}</span>
-          <span class="loja-nome">${escapeHtmlSafe(i.nome)}
-            <span class="loja-preco">🪙 ${i.preco}</span>
-            ${p.quantidade > 0 ? `<span class="loja-tem">você tem ${p.quantidade}</span>` : ''}</span>
+          <span class="loja-nome">${escapeHtmlSafe(i.nome)}</span>
+          <span class="loja-preco">🪙 ${i.preco}</span>
         </button>`; }).join('')
       : `<p class="loja-vazia">Ainda não há ${escapeHtmlSafe((LOJA_PRATELEIRAS.find(x => x.id === aba) || {}).nome || 'itens')} à venda.</p>
          <p class="loja-saldo">Você tem <strong>🪙 ${moedas}</strong>.</p>`}
