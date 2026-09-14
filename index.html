@@ -2074,7 +2074,20 @@
   .route-corte{ border-left:5px solid var(--green, #3a9d4a); }
   .route-cadeado{ display:block; font-size:.5rem; font-weight:800; margin-top:4px; color:var(--muted); }
   /* a roda da vigília: dez sprites pequenos, que a 320px cabem em duas fileiras de cinco */
-  .encounter-banner.vigilia{ background:linear-gradient(90deg,#e05a5a,#e0a13a,#7bbf4a,#4a8fd6,#8a5ad6); }
+  /* ⚠️ O ARCO-ÍRIS ESCURECEU E O TEXTO FICOU BRANCO (14/09/2026, reportado: *"o quadro da Vigília do
+     Arco-Íris não dá para ler direito por conta das cores"*).
+     A faixa era o arco-íris CLARO e o texto caía na cor padrão do banner -- o tom escuro da casa.
+     Medido: o contraste passeava de 7,63:1 no verde a **3,67:1 no roxo**, ou seja ele MUDAVA debaixo
+     da mesma frase conforme ela cruzava o gradiente, e no pior pedaço ficava abaixo do 4,5:1 que o
+     AA pede pra texto normal. A fonte de PIXEL é fina e piora isso além do que o número mostra.
+     Os matizes são os MESMOS -- a identidade é o arco-íris, e ela fica. O que mudou é a luz: com as
+     cinco faixas escuras e o texto branco, o PIOR pedaço vai a **7,31:1**, que é o alvo que a fonte
+     de pixel pede. É o mesmo remendo que a faixa da Rocket levou (ver o comentário dela), e pelo
+     mesmo motivo. */
+  .encounter-banner.vigilia{
+    background:linear-gradient(90deg,#7a1e1e,#7e4a0a,#285c18,#143e78,#3e1c78);
+    color:#fff; border-color:#f2c744;
+  }
   .vigilia-roda{ display:flex; flex-wrap:wrap; justify-content:center; gap:4px; }
   .vigilia-mon{ line-height:0; }
   .vigilia-mon.shiny{ filter:drop-shadow(0 0 3px #ffd34d); }
@@ -2374,6 +2387,13 @@
   }
   .result-banner.win{background:#d3f9d8;color:var(--green-dark);}
   .result-banner.lose{background:#ffe3e3;color:var(--red-dark);}
+  /* ⚠️ O BASE TEM FUNDO E TEXTO CLARO, e isso é rede e não estética (14/09/2026). Ele era
+     TRANSPARENTE, e a cor do texto vinha da página -- o tom escuro da casa sobre o fundo escuro da
+     página dava **1,10:1**. Enquanto todo contexto tinha variante isso não aparecia; no dia em que
+     três não tiveram (`vigilia`, `hideout1`, `hideout2`), as três telas nasceram ilegíveis e
+     ninguém viu, porque quem testa olha as telas que já existiam.
+     Com fundo aqui, o pior que acontece com um contexto novo é ele ficar SEM identidade -- nunca
+     invisível. Medido depois: 13,4:1. */
   .encounter-banner{
     font-family:var(--font-pixel);
     text-align:center;
@@ -2384,6 +2404,8 @@
     line-height:1.8;
     margin-bottom:14px;
     box-shadow:5px 5px 0 rgba(0,0,0,.35);
+    background:linear-gradient(160deg,#2b2f4a,#1a1d33);
+    color:#f2f4ff;
   }
   .encounter-banner .encounter-icon{ font-size:2.2rem; display:block; margin-bottom:8px; }
   /* o salmao #ff8a75 sobre esse fundo escuro ficava perto demais do proprio fundo na tela do
@@ -16156,7 +16178,20 @@ function eliteTerrainBadgeHtml(){
 function renderSpecialIntro(){
   const cfg = game.specialBattle;
   if(!cfg) return '';
-  const bannerClass = cfg.context==='rocket' ? 'rocket' : (cfg.context==='rival' ? 'rival' : (cfg.context==='elite' ? 'elite' : ''));
+  /* ⚠️ O CONTEXTO VIRA CLASSE POR TABELA (14/09/2026, reportado: *"o quadro da Vigília do Arco-Íris
+     não dá para ler direito por conta das cores... se não me engano tem um quadro assim também em
+     algum confronto com a equipe Rocket"*). E tinha: eram TRÊS contextos caindo no vazio.
+     A escada de ternários cobria `rocket`, `rival` e `elite` -- e o `startSpecialBattle` é chamado
+     com SEIS contextos. Os outros três (`vigilia`, `hideout1` e `hideout2`) caíam na string vazia,
+     ou seja no banner BASE, que não tem fundo próprio: texto na cor escura da casa sobre o fundo
+     escuro da página. Medido: **1,10:1** -- praticamente invisível.
+     ⚠️ E O DEFEITO ERA DE OMISSÃO, não de cor: cada contexto novo nascia invisível e ninguém
+     percebia, porque as três telas que alguém tinha olhado estavam certas. Por isso a tabela, e por
+     isso o `.encounter-banner` base ganhou fundo (ver o CSS): o próximo contexto nasce legível
+     mesmo sem ninguém lembrar de mapeá-lo aqui. */
+  const CLASSE_DO_BANNER = { rocket:'rocket', hideout1:'rocket', hideout2:'rocket',
+                             rival:'rival', elite:'elite', vigilia:'vigilia' };
+  const bannerClass = CLASSE_DO_BANNER[cfg.context] || '';
   const showIcon = cfg.context !== 'rival';
   return `
   <div class="encounter-banner ${bannerClass}">

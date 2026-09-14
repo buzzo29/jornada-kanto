@@ -1392,5 +1392,53 @@ console.log('\n=== A MATA FECHADA E A VIGILIA DO ARCO-IRIS (13/09/2026) ===');
   }
 }
 
+console.log('\nNENHUM CONTEXTO CAI NO BANNER INVISIVEL (14/09/2026)');
+{
+  /* Reportado: *"o quadro da Vigilia do Arco-Iris nao da para ler direito por conta das cores... se
+     nao me engano tem um quadro assim tambem em algum confronto com a equipe Rocket"*. E tinha.
+     O `renderSpecialIntro` mapeava o contexto pra classe numa escada de ternarios que cobria TRES
+     (rocket, rival, elite) -- e o `startSpecialBattle` e chamado com SEIS. Os outros tres (vigilia,
+     hideout1, hideout2) caiam na string vazia, ou seja no banner BASE, que nao tinha fundo proprio:
+     texto escuro da casa sobre o fundo escuro da pagina, medido em 1,10:1.
+     ⚠️ O DEFEITO ERA DE OMISSAO: cada contexto novo nascia invisivel, e ninguem via porque as telas
+     que alguem ja tinha olhado estavam certas. Por isso a trava e sobre a LISTA e nao sobre as
+     cores -- ela varre os contextos que o codigo REALMENTE usa. */
+  const cli = require('fs').readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  /* os contextos de verdade, lidos das chamadas -- nao de uma lista escrita aqui, que envelheceria */
+  const usados = [...new Set((cli.match(/startSpecialBattle\((['"])([a-z0-9]+)\1/g) || [])
+    .map(x => x.replace(/^.*startSpecialBattle\(['"]/, '').replace(/['"]$/, '')))];
+  ok('achei os contextos nas chamadas', usados.length >= 5, usados.join(', '));
+
+  const g2 = S.__getGame();
+  const semClasse = [];
+  usados.forEach(ctx => {
+    g2.specialBattle = { context: ctx, meta: { title:'X', icon:'⚔️', intro:'y' } };
+    g2.screen = 'specialIntro';
+    S.__setGame(g2);
+    const html = S.renderSpecialIntro();
+    const m = html.match(/class="encounter-banner ([a-z]*)"/);
+    if(!m || !m[1]) semClasse.push(ctx);
+  });
+  ok('TODO contexto usado tem variante de banner', semClasse.length === 0,
+     semClasse.join(', ') || usados.length + ' contextos, todos com classe');
+
+  /* ⚠️ E O BASE DEIXOU DE SER TRANSPARENTE -- e essa e a rede: o proximo contexto acrescentado sem
+     passar pela tabela fica sem IDENTIDADE, nunca invisivel. A trava le o CSS porque cor de texto e
+     fundo nao aparecem em assercao de HTML nenhuma. */
+  const base = (cli.match(/\.encounter-banner\{[^}]*\}/) || [''])[0];
+  ok('o banner base tem fundo proprio', /background:linear-gradient/.test(base), base.replace(/\s+/g,' ').slice(0,90));
+  ok('e cor de texto clara', /color:#f2f4ff/.test(base));
+
+  /* A VIGILIA mantem o arco-iris (e a identidade dela), mas escuro e com texto branco. */
+  const vig = (cli.match(/\.encounter-banner\.vigilia\{[^}]*\}/) || [''])[0];
+  ok('a vigilia continua sendo um arco-iris de CINCO faixas',
+     (vig.match(/#[0-9a-f]{6}/g) || []).length >= 6, vig.replace(/\s+/g,' ').slice(0,110));
+  ok('com texto branco', /color:#fff/.test(vig));
+
+  /* e os dois do esconderijo sao da ROCKET, que e o que eles sao */
+  ok('hideout1 e hideout2 levam a faixa da Rocket',
+     /hideout1:'rocket'/.test(cli) && /hideout2:'rocket'/.test(cli));
+}
+
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
 process.exit(falhas ? 1 : 0);

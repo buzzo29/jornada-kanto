@@ -6233,6 +6233,43 @@ a um lado num PvP).
   A quebra do nome comprido é **a mesma das duas telas** (4 de 6 na de ordem, 5 de 16 aqui) — e a
   clareira ainda sobra mais espaço pro nome, 205px contra 167px, porque não tem o botão de item.
 
+### ⚠️ TRÊS TELAS NASCERAM ILEGÍVEIS, E O DEFEITO ERA DE OMISSÃO (14/09/2026)
+
+Reportado assim: *"o quadro da Vigília do Arco-Íris não dá para ler direito por conta das cores. Se
+não me engano tem um quadro assim também em algum confronto com a equipe Rocket"* — e tinha.
+
+- **O `renderSpecialIntro` mapeava o contexto pra classe numa escada de ternários** que cobria
+  **três** (`rocket`, `rival`, `elite`), e o `startSpecialBattle` é chamado com **seis**. Os outros
+  — **`vigilia`, `hideout1` e `hideout2`** — caíam na string vazia, ou seja no banner **BASE**, que
+  não tinha fundo próprio: texto na cor escura da casa sobre o fundo escuro da página.
+  **Medido: 1,10:1.** Praticamente invisível.
+- **⚠️ NINGUÉM VIU PORQUE AS TELAS QUE JÁ EXISTIAM ESTAVAM CERTAS.** Cada contexto novo nascia
+  invisível, e quem testa olha o que já estava lá. Por isso o conserto tem duas metades, e a segunda
+  é a que importa:
+  1. o contexto vira classe por **TABELA** (`CLASSE_DO_BANNER`), com os dois do esconderijo caindo na
+     faixa da Rocket — que é o que eles são;
+  2. **o banner BASE ganhou fundo e texto claro.** O pior que acontece com um contexto novo agora é
+     ele ficar **sem identidade** — nunca invisível.
+- **A VIGÍLIA MANTÉM O ARCO-ÍRIS, só que escuro.** A identidade dela é o arco-íris e ela fica; o que
+  mudou é a luz. Com as cinco faixas claras e o texto escuro o contraste **passeava de 7,63:1 no
+  verde a 3,67:1 no roxo** — ou seja ele MUDAVA debaixo da mesma frase conforme ela cruzava o
+  gradiente, e no pior pedaço ficava abaixo do 4,5:1 que o AA pede pra texto normal. Com as faixas
+  escuras e o texto branco o pior pedaço vai a **7,31:1** — o alvo que a fonte de PIXEL pede, porque
+  ela é fina e piora o número na prática. É o mesmo remendo que a faixa da Rocket já tinha levado.
+
+  | variante | pior contraste |
+  |---|---|
+  | **(base)** | 1,10:1 → **11,9:1** |
+  | **vigilia** | 3,67:1 → **7,31:1** |
+  | rocket | 12,51:1 (já estava) |
+  | elite | 10,52:1 (já estava) |
+  | rival | 5,94:1 (já estava) |
+
+- `tools/test-jornada.js` varre os contextos **lidos das chamadas** — não de uma lista escrita no
+  teste, que envelheceria do mesmo jeito — e cobra que todos tenham variante, que o base tenha fundo
+  e que a vigília continue com as cinco faixas. Conferido que ele acusa `hideout1, hideout2, vigilia`
+  com a escada de ternários de volta.
+
 ### A VIGÍLIA DO ARCO-ÍRIS: 10 CONTRA 6 (13/09/2026)
 
 Pedida assim: *"nessa rota você vai exibir uma tela dizendo que ele encontrou uma reunião de pokémons
