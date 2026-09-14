@@ -2803,7 +2803,14 @@ const EVOLUTIONS = {
   ekans:{level:22, into:'arbok'},
   diglett:{level:26, into:'dugtrio'},
   magnemite:{level:30, into:'magneton'},
-  voltorb:{level:40, into:'electrode'},   // faltava aqui e existe no cliente -- divergência antiga, corrigida
+  /* ⚠️ ESTES DOIS ESTAVAM NO 40, e era erro de varredura (corrigido em 14/09/2026). O nível 40 é a
+     regra da casa pro que NÃO evolui por nível no original (troca, amizade, pedra), e estes dois
+     evoluem por NÍVEL mesmo -- o Voltorb no 30 e o Koffing no 35. Eles foram varridos pro balaio do
+     40 junto com os de troca e ficaram anos lá.
+     Achado contando quem sairia do 40 no dia em que as pedras entrarem: dos 30 degraus de lá, 14
+     são pedra, 8 são troca, 3 são amizade -- e 5 são por nível, sendo que TRÊS já estavam certos
+     (Ponyta, Kabuto e Omanyte são 40 no original) e estes dois não. */
+  voltorb:{level:30, into:'electrode'},   // faltava aqui e existe no cliente -- divergência antiga, corrigida
   drowzee:{level:26, into:'hypno'},
   nidoranf:{level:16, into:'nidorina'},
   venonat:{level:31, into:'venomoth'},
@@ -2846,7 +2853,7 @@ const EVOLUTIONS = {
   machoke:{level:40, into:'machamp'},
   graveler:{level:40, into:'golem'},
   haunter:{level:40, into:'gengar'},
-  koffing:{level:40, into:'weezing'},
+  koffing:{level:35, into:'weezing'},   // ver a nota do Voltorb, acima
   nidorina:{level:40, into:'nidoqueen'},
   nidorino:{level:40, into:'nidoking'},
   pikachu:{level:40, into:'raichu'},

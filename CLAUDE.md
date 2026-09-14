@@ -2037,6 +2037,50 @@ Onix ... Lançar Pedra           −55          Onix ... Lançar Pedra          
 - **Se um dia incomodar**, os lugares são o `JITTER_DO_GOLPE` (o quanto as fatias variam entre si)
   e a `RAZAO_DE_UM_GOLPE` (a partir de quando ela decide repartir).
 
+#### ⚠️ O GOLPE QUE MATA SAIU DA SUAVIZAÇÃO (14/09/2026)
+
+Relatado como uma pergunta: *"por que a minha Kingdra shiny tirou menos dano que a Kingdra normal?"*
+— e o motor estava certo. Conferido: o shiny vale **1,20× nos cinco atributos e no HP** (405 → 420),
+ele **não se perde em nenhum `createInstance`** do cliente e **sobrevive ao código de time**. No
+espelho, a shiny bate **194 contra 132**.
+
+**A causa era o golpe DELA ter sido o que MATOU** — o diário grava o dano EFETIVO, então o golpe de
+180 dela virou a linha de 54 que sobrava. Só que a **suavização de 12/09** ainda repartia o par, e
+isso fazia o CONTRÁRIO do que ela existe pra fazer: achatava um golpe forte de verdade **(262 e 159)**
+num par morno, e o jogador comparava a linha dele com a do adversário achando o próprio pokémon fraco.
+
+- **A REGRA NOVA, pedida palavra por palavra:** *"passa a ser o golpe REAL, porém o segundo golpe que
+  mata vai tirar só o que resta de HP do adversário"*. Os golpes de antes mostram o tamanho **real** e
+  o último mostra o **resto** — e **a soma continua fechando com a barra**, porque o resto É o que
+  faltava. Medido: `[262, 159]` virou **`[325, 96]`**.
+- **⚠️ SÃO DUAS FAMÍLIAS, e a função SEMPRE soube disso — ela é que tratava as duas igual.** O
+  comentário dela já dizia: *"o golpe que MATOU (76,8%)"* e *"o REVIDE MORIBUNDO (12,8%)"*. Elas são o
+  oposto uma da outra:
+  - o **revide moribundo** é aparado por uma trava **MASCARADA por decisão** — o jogador não tem como
+    saber por que o número encolheu, e sem a suavização ele lê *"o mesmo golpe escalou"*. **Esse
+    continua sendo repartido**, que é pra isso que ela existe;
+  - o **golpe que matou** se explica sozinho: a barra do cabeçalho mostra o alvo zerado.
+- **⚠️ O SELO DE CRÍTICO FICA, inclusive num golpe final pequeno.** Cheguei a tirá-lo e desfiz: a
+  regra nova é **uma só**, e esconder o selo ali criaria uma segunda regra pra explicar a primeira —
+  o jogador perderia a informação de que aquele golpe foi crítico só porque o alvo estava acabando.
+  O caso que REALMENTE contradiz a tela continua coberto pelo `cap` do motor (quando o corte come a
+  dobra inteira, o campo `c` já nasce zero).
+- **AS TRÊS TRAVAS QUE MEDEM RAZÃO ENTRE LINHAS GANHARAM A MESMA ISENÇÃO**, pelo mesmo motivo: a
+  banda da fórmula, o selo do crítico e a escala do Rolamento. Um Rolamento que derruba no 2º uso
+  encolhe sem que a escala tenha deixado de crescer — o fixture dele passou a exigir **dois usos
+  escalados que não matam** (e um alvo mais duro, senão o Golem derrubava no segundo).
+- **MEDIDO, e é o número que importa:** os pares fora da banda vão de **199 para 960** — e **ZERO
+  ficam sem explicação, antes e depois**. Os 960 são 825 do golpe final (a regra nova) e 135 de
+  crítico/Rolamento/multi-tapa (que já eram isentos). A soma fecha em **1.537 de 1.537**.
+- **⚠️ E O QUE ISSO NÃO CONSERTA:** quando o confronto tem **UMA linha só** — o pokémon entra, bate
+  uma vez e derruba um alvo que já chegou machucado — **não há primeiro golpe pra ficar grande**. Foi
+  esse o caso do print. Medido: **79% dos lados com a linha pequena são uma linha só**, e a
+  suavização nunca pôde agir neles. O que a tela não conta ali é que **o adversário entrou quase
+  morto**: o cabeçalho mostra o HP do FIM (`0/421`), não o da entrada (`94/421`). Se um dia isso
+  incomodar, é ali que se mexe.
+- **CONFERIDO QUE NÃO É MOTOR, por impressão:** o mesmo build antes e depois dá o **MESMO hash** em
+  900 batalhas semeadas. A suavização vive no `sequenciaDoConfronto`, que é apresentação.
+
 #### E duas correções de teste saíram junto
 
 1. **A trava da cura cobrava o ÍNDICE 0** (`seq[0].x === (a cura)`), e outra ABERTURA pode
@@ -3704,6 +3748,40 @@ acontecendo"*. E não era o Mewtwo: era o **laço de revelação** que ele usa.
 - Evoluções que vinham de troca no jogo original seguem a regra que Kanto já usava: **viram nível
   40**. Vale pro Seadra→Kingdra, Onix→Steelix, Scyther→Scizor, Golbat→Crobat, Chansey→Blissey e
   Porygon→Porygon2, exatamente como Machoke→Machamp e Haunter→Gengar já faziam.
+- **⚠️ O NÍVEL 40 É UM BALAIO DE TRÊS COISAS, e vale saber quais** — a regra acima é "o que NÃO
+  evolui por nível vira 40", e com o tempo isso juntou métodos diferentes no mesmo número. Dos **30
+  degraus** que moram lá: **14 são PEDRA** (as seis da Gen 1/2 — Lua 4, Folha 3, Água 3, Fogo 2,
+  Trovão 1, Sol 1), **8 são TROCA**, **3 são AMIZADE** (Chansey, Golbat, Togepi) e **5 evoluem por
+  NÍVEL mesmo** (Ponyta, Kabuto e Omanyte, que são 40 no original, mais o Voltorb e o Koffing).
+  É esta a lista que sairia da tabela no dia em que as pedras entrarem — e o que mais pesa nesse dia
+  **não é o encontro selvagem, é o `finalEvolutionOf`**: ele sobe pela tabela e monta o time do
+  RIVAL e o pool da Torre. Medido, tirando os 14 degraus **22 espécies mudam de "evolução final"** e
+  o pool vai de 138 pra 152 — o rival passaria a levar Vulpix em vez de Ninetales e Gloom em vez de
+  Vileplume. Quem for implementar pedra precisa de uma lista de "final por pedra" à parte.
+- **⚠️ O VOLTORB E O KOFFING ESTAVAM NO 40, e era erro de varredura** (corrigido em 14/09/2026): os
+  dois evoluem por NÍVEL no original — **Voltorb no 30 e Koffing no 35** — e tinham sido varridos
+  pro balaio junto com os de troca. Ficaram anos assim, e o achado saiu de contar quem SAIRIA do 40
+  no dia das pedras, não de um relato.
+  **O QUE MUDA NA PRÁTICA É UM LUGAR SÓ, e ele está medido.** As duas linhas moram em 4 rotas, e em
+  3 delas a faixa de nível do trecho já resolvia igual:
+
+  | rota (trecho) | antes | depois |
+  |---|---|---|
+  | Estrada Ciclável (5, Lv.23-28) | Koffing e Voltorb | **igual** — a faixa não alcança 30 nem 35 |
+  | **Farol de Olivine (6, Lv.28-33)** | Voltorb sempre | **Electrode em 67% das vezes** (Lv.30-33) |
+  | **Farol de Olivine** — o Weezing | saía em **Lv.42,5** de média | **Lv.37,5** (o piso caiu de 40 pra 35) |
+  | Usina e Caminho de Gelo (8, Lv.50-55) | Electrode e Weezing | **igual** — já convertiam |
+
+  O piso é o `EVOLVED_MIN_LEVEL`, que sai do próprio `EVOLUTIONS`: baixar o nível da evolução baixa
+  junto o nível em que a forma evoluída pode aparecer selvagem.
+  **⚠️ E ELE MEXE EM SAVE QUE JÁ EXISTE:** o `repararEvolucoesAtrasadas` roda no carregamento da
+  HOME e conserta quem ficou pra trás quando a tabela muda — que é exatamente este caso. Quem tem um
+  **Koffing Lv.35+** ou um **Voltorb Lv.30+** guardado vai encontrá-lo já evoluído, com a caixa de
+  aviso da home explicando. É o mecanismo funcionando como foi desenhado (ele nasceu porque "toda
+  vez que a tabela crescer, quem já passou daquele nível fica pra trás"), mas é bom saber antes.
+  **Custo medido na jornada: 61,88% → 62,77%, **+0,90 ponto, 1,3σ** (8 blocos de 1.000 jornadas de cada lado, desvio tirado de ENTRE os blocos, 6 de 8 pro lado fácil) — dentro do ruído, e pro lado esperado: um Electrode no lugar de um Voltorb no 6º trecho é um upgrade, e o Weezing 5 níveis abaixo puxa de volta.**
+  `tools/test-johto.js` **FIXA os cinco níveis** (30, 35, 40, 40, 40) e cobra que nenhum degrau por
+  nível sobre no balaio do 40 — o próximo acrescentado "no 40 por padrão" passa a ser barulhento.
 - **O `game.startersShiny` vazava entre saves** — e furava a trava anti save-scumming inteira. Ele
   é escrito só na criação do save, **não está no `serializeGame` nem no `freshGameDefaults`**, e o
   `applySavedState` não o toca. Então ele atravessava de um save pro outro, nos dois sentidos:
@@ -6041,6 +6119,14 @@ Sino por outra, e as duas caem dos dois lados da luta.
   golpe de Fogo voltar ao normal sem explicação.
   Ela **não nomeia ninguém**: o clima é do CAMPO, a mesma razão pela qual o 🌧️ do cabeçalho fica em
   cima do ×.
+- **⚠️ E A PAUSA VALE NO ÚLTIMO PASSO TAMBÉM (14/09/2026, reportado:** *"a mensagem de fim da
+  dança da chuva não está esperando 1,5s para ela seguir com o processo depois"*). O ramo do passo do
+  MEIO já somava o `pausaDaFaixa`; o do **último** não — e só uma abertura cai ali SEMPRE, o
+  `chuvafim`, que fecha o confronto por desenho ("ele foi o último debaixo da chuva"). Era por isso
+  que só ela tinha sido relatada.
+  **São os QUATRO laços de revelação**, e não só o da jornada: deixar em um só era garantir que a
+  mesma frase durasse tempos diferentes na Elite, na Torre e na liga assistida — exceção em lista é
+  onde a próxima omissão se esconde. O teste **lê o código** pra cobrar os quatro.
 - As duas valem **1 passo** no `passosDaAbertura` e ganham o segundo e meio de leitura pela marca
   `leitura`, como toda frase que não mexe barra. Fora da tabela, valeriam pra SEMPRE — o defeito que a
   anulação teve.
@@ -6168,9 +6254,32 @@ pokémons, ele pode escolher 1 dos 10 para ir na jornada com ele"*.
 - **AS TRÊS EXCLUSÕES PEDIDAS**: nada de lendário, nada que o treinador já tenha, e nada repetido
   entre os dez — as duas últimas por **LINHA EVOLUTIVA** e não por espécie, que é a regra que o
   encontro selvagem já usa (dois Magikarp viram dois Gyarados).
-- **⚠️ E A ESPÉCIE TEM QUE BATER COM O NÍVEL** (`especieNoNivel`): um Caterpie nível 45 não existe. A
+- **⚠️ E A ESPÉCIE TEM QUE BATER COM O NÍVEL** (`formaNoNivel`): um Caterpie nível 45 não existe. A
   conversão vem ANTES da checagem de linha, senão dois ids diferentes (caterpie e metapod) viriam os
   dois como Butterfree.
+  **⚠️ ERA O `especieNoNivel`, E ELE SÓ ANDA PRA FRENTE — foi o defeito de 14/09/2026**, relatado
+  com print: *"está aparecendo Charizard no level 24, Poliwrath no level 25, Steelix no level 27"*.
+  Aquele nasceu pro **encontro selvagem**, onde a rota lista a forma BASE e o que pode acontecer é
+  ela já ter evoluído naquele nível; quem barra o contrário por lá é o **piso**
+  (`EVOLVED_MIN_LEVEL`), que empurra o NÍVEL pra cima quando a rota lista uma forma evoluída.
+  **A vigília não tem piso nenhum pra barrar:** ela sorteia da DEX INTEIRA, então tira forma FINAL
+  direto e o nível dela é baixo por construção (a média do time menos cinco).
+  **Medido: 28,5% dos dez** eram uma forma que não existe naquele nível — mais de um em quatro.
+  O `formaNoNivel` **DESCE** a linha até a forma que existe ali e só então deixa o `especieNoNivel`
+  subir. Charizard Lv.24 → **Charmeleon**, Poliwrath Lv.25 → **Poliwhirl**, Steelix Lv.27 → **Onix**,
+  Blissey Lv.25 → **Chansey**, Magneton Lv.27 → **Magnemite**. Depois: **0 de 4.000**.
+  O nível de CHEGADA de cada forma sai do próprio `EVOLUTIONS`, e os destinos da bifurcação entram
+  pelo `EVOLUTION_CHOICES` — sem eles, Vileplume e Bellossom não teriam de onde descer.
+  **⚠️ E VIGÍLIA JÁ GRAVADA É ARRUMADA NA LEITURA** (no `applySavedState`, os dois campos): quem
+  está no meio da clareira — ou, pior, na tela do **PRÊMIO** — escolheria um pokémon impossível e o
+  levaria pro time. É o mesmo espírito do `repararEvolucoesAtrasadas`: fechar a torneira não
+  conserta o que já vazou.
+  **O QUE ISSO CUSTOU À DIFICULDADE, medido** (600 batalhas por célula, mesmos times e sementes):
+  a vigília ficou **9,8% mais fraca em BST**, e a vitória do jogador sobe
+  **62,2% → 87,3%** num time ~27 (trecho 4), **71,0% → 72,3%** num ~45 e **41,0% → 42,7%** num ~56.
+  Ela se concentra no começo porque é lá que a forma final era mais absurda: um Charizard Lv.24 é
+  muito mais acima do trecho do que um Charizard Lv.56. **Não foi compensado** — era defeito, não
+  balanceamento.
 - **A MÉDIA BATE EXATO.** Os desvios são montados pra **somar zero**, então a média dos dez é
   exatamente `media − 5` e não "mais ou menos isso". E **os dois shiny são marcados depois, em
   posições distintas**: sorteando "shiny?" um a um, uma vigília sairia com zero e outra com cinco —
@@ -6241,6 +6350,54 @@ exclusões dos dez, a média exata, os dois shiny, a espécie batendo com o nív
 cheio caindo no Prof. Carvalho e a derrota sem prêmio) e `tools/test-inventario.js` tranca a Máquina
 (os 72, as três surpresas da lista, a tela atravessando saves, quem tem vaga, o retirado recusado, e
 o slot aberto lendo o `game.team`).
+
+## TMs/HMs DENTRO DO "SEU TIME" (14/09/2026)
+
+Pedido assim: *"quando o usuário clicar no Seu Time, adicione o botão TMs/HMs, e quando clicar,
+mostre a lista TMs e HMs que o usuário possui na mochila, e quando ele clicar em algum para usar,
+já mostra diretamente os pokemons desse time, sem ele precisar indicar qual time"*.
+
+- **O modal do "Seu time" ganhou DUAS ABAS** (`game.timeModalAba`): o time e as Máquinas. É estado
+  de TELA e não entra no save — ninguém volta amanhã querendo o modal aberto na lista de Máquinas —,
+  então o `abrirTimeModal` a zera em toda entrada.
+- **⚠️ O ATALHO É O PONTO: daqui o jogador já está olhando UM time**, então escolher a Máquina cai
+  **direto nos pokémon dele**. A tela de escolher o time existe quando a Máquina é aberta pela
+  MOCHILA, onde não há time nenhum em foco; aqui ela seria uma pergunta cuja resposta já está na
+  tela.
+  Ele **não inventa caminho novo**: o `hmTimeAberto` já é o segundo nível daquela tela, e pôr o slot
+  nele faz o `renderHmAlvo` desenhar a lista de pokémon direto.
+- **⚠️ "⬅ OUTRO TIME" SOME quando se entra por aqui.** Oferecer a lista de times ali seria devolver o
+  jogador exatamente à tela que o atalho existe pra pular. No lugar dele vai um "⬅ Voltar" que leva
+  **pra a tela da jornada em que ele estava** — e não pra mochila, que é o destino de quem entrou
+  pela mochila. Quem guarda isso é o `hmVoltarPara`, mesmo desenho do `inventarioVoltarPara` e do
+  `evolucaoDepois`.
+  **⚠️ E ELE ZERA NA ENTRADA do `abrirEnsinarHm`:** um destino sobrando de uma passada anterior
+  levaria quem abriu a Máquina pela MOCHILA de volta pra uma tela de jornada — no pior caso, a de um
+  save que nem está aberto. Campo de caminho de volta tem que nascer limpo.
+- **⚠️ MÁQUINA QUE NINGUÉM DESTE TIME APRENDE FICA APAGADA, COM O MOTIVO** ("ninguém deste time
+  aprende") — e não escondida. Escondendo, ela sumia sem explicação pra quem a tem na mochila;
+  deixando clicável, o `telaDoTimeDaMaquina` cai no fallback dele, que é **a lista de times**, e o
+  atalho vira justamente a tela que ele pula. É a mesma regra do montador: desabilitar dizendo por
+  quê é melhor que sumir. **Quem recusa é a AÇÃO**, não só a tela.
+  A contagem da linha ("2 podem aprender") é do **time aberto**, não da conta.
+
+### ⚠️ E UMA CRASE NUM COMENTÁRIO HTML MATOU A TELA
+
+No mesmo dia, escrevendo esse modal, escrevi o nome de uma classe **entre crases** dentro de um
+comentário `<!-- -->` que vive DENTRO de um template literal. **A crase FECHA a string**, e o que
+vem depois vira um template **TAGUEADO**: o `node --check` passa (continua JS válido) e a tela morre
+só no navegador, com `(…).btn is not a function`.
+O CLAUDE.md já registrava isso num comentário da loja (*"este comentario vive DENTRO de um template
+literal, entao ele nao pode ter crase nenhuma"*) — agora a regra é **cobrada**:
+`tools/test-inventario.js` varre todo comentário HTML do `index.html` e falha se algum tiver crase.
+É o tipo de defeito que o `node --check` não pega e o teste de HTML também não, porque a função
+inteira estoura antes de devolver marcação.
+
+- `tools/test-inventario.js` tranca o resto: a frase do aviso **palavra por palavra**, os três
+  arredondamentos, o sumiço perto do zero, o CSS maior e a fonte de texto, o botão de TMs/HMs com a
+  contagem, a aba listando a Máquina, o atalho caindo no `hmAlvo` com o time fixado, o Voltar
+  devolvendo pra jornada, o destino zerando na entrada, e a linha apagada com o motivo. Conferido
+  que ele acusa **5 falhas** com os defeitos religados.
 
 ## Mochila (inventário) e Loja
 
@@ -6686,10 +6843,33 @@ escolheu três golpes lutava a Torre com os dois primeiros**, em silêncio — o
 - **O convite NÃO espera a batalha terminar**: ele tem 15 segundos de prazo, e do outro lado há
   alguém esperando. Segurar até o fim da revelação (que dura mais que isso) faria a partida expirar
   pros dois.
-- **O aviso "inscrições abertas pra Liga Clássica das XXh"** aparece embaixo desse botão, e só pra
-  quem AINDA NÃO ESTÁ NA LIGA — o que é mais que "não inscrito neste ciclo": quem está disputando um
-  ciclo já sorteado não consegue se inscrever no próximo (a própria tela bloqueia), e avisar seria
-  convidar pra uma porta fechada. Quem responde isso é o `isAccountActiveInLeague`.
+- **O aviso da Liga Clássica** aparece embaixo desse botão, e só pra quem AINDA NÃO ESTÁ NA LIGA —
+  o que é mais que "não inscrito neste ciclo": quem está disputando um ciclo já sorteado não
+  consegue se inscrever no próximo (a própria tela bloqueia), e avisar seria convidar pra uma porta
+  fechada. Quem responde isso é o `isAccountActiveInLeague`.
+- **⚠️ ELE É UMA CONTAGEM, NÃO UMA HORA, desde 14/09/2026** (a pedido, palavra por palavra):
+  *"🏆 Liga Clássica começa em 38 minutos! Inscreva seu time e concorra ao prêmio!"*. Ele dizia
+  *"das 14:00"* — e hora é um número que o jogador precisa subtrair de cabeça pra saber se dá
+  tempo; o que ele quer saber é **quanto falta**.
+  **A CONTA É FEITA NO DESENHO** (`minutosParaALiga`), não guardada: o `atualizarAvisoDaLiga` tem
+  folga de 5 minutos porque custa duas leituras, então um número congelado lá erraria por até 5
+  minutos. O que fica guardado continua sendo a **hora** do ciclo.
+  **⚠️ E O RELÓGIO É O DO SERVIDOR** (`agoraServidor`): o `scheduledTime` é carimbo dele, e
+  comparar com o `Date.now()` do celular desloca a contagem inteira — relógio de celular quase
+  nunca bate. O teste **lê o código** pra cobrar isso, porque um caso de comportamento passaria com
+  os dois.
+  **ARREDONDA, não sobe:** faltando 38min05s o certo é dizer 38, e o `Math.ceil` dizia **39** — ele
+  sobe com qualquer sobra de segundos. Com `round`, os últimos ~30 segundos caem em zero e **o
+  aviso some**, que é o certo: a cópia em memória pode estar velha, e anunciar uma inscrição que já
+  fechou é pior que não anunciar. Nunca sai "em 0 minutos" nem "em −3 minutos".
+- **⚠️ ELE CRESCEU E GANHOU MOLDURA** ("aumente e deixe mais visível"). Era uma linha solta em
+  **.55rem da fonte de PIXEL** — que é de título curto e, nesse tamanho, se lê de longe como
+  enfeite. Hoje é a fonte de TEXTO (**.8rem**, o corpo do jogo) dentro de uma caixa com borda
+  amarela, com a segunda oração um degrau abaixo em peso pra o olho pegar primeiro o que expira.
+  **A fonte de pixel saiu de propósito:** a frase tem duas orações e um número que muda a cada
+  minuto, e ela come largura demais pra isso.
+  **Medido a 320px:** a caixa vai de **273×59px** para **281×74px** (+15px de altura), sem rolagem
+  lateral. O pulso continua o mesmo do Bônus Shiny da home — é a mesma ideia, uma janela que expira.
   **Inscrever-se apaga o aviso na hora e zera a folga** (`game.ultimaChecagemDaLiga`): sem isso quem
   acabava de se inscrever continuava vendo o convite nas batalhas seguintes, porque a cópia em
   memória só era relida 5 minutos depois — reportado em 01/09/2026. Pisca no mesmo ritmo do Bônus Shiny da home (`shiny-bonus-pulse`):

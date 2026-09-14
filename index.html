@@ -1518,11 +1518,23 @@
   /* "Classic League" e nome proprio: quebrando no meio dele a frase fica com "Classic" numa
      linha e "League" na outra, que se le como duas coisas. A quebra cai ANTES do par. */
   .aviso-liga-jornada .nao-quebra{ white-space:nowrap; }
+  /* ⚠️ ELE CRESCEU E GANHOU MOLDURA em 14/09/2026, a pedido ("aumente e deixe mais visível").
+     Era uma linha de texto solta em .55rem da fonte de PIXEL -- que é de título curto e, num
+     tamanho desses, se lê de longe como enfeite. Hoje a chamada está na fonte de TEXTO (.8rem,
+     que é o corpo do jogo) dentro de uma caixa com borda amarela, e o pulso continua: ele é o
+     mesmo do Bônus Shiny da home, porque é a mesma ideia -- uma janela de tempo que expira.
+     ⚠️ A FONTE DE PIXEL SAIU DE PROPÓSITO: a frase tem duas orações e um número que muda a cada
+     minuto, e a de pixel come largura demais pra isso a 320px (medido: a mesma frase ia a quatro
+     linhas). Ela continua nos títulos, que é onde ela funciona. */
   .aviso-liga-jornada{
-    font-family:var(--font-pixel); font-size:.55rem; line-height:1.5;
-    color:var(--yellow); text-align:center; margin:2px 4px 10px; letter-spacing:.3px;
+    font-family:var(--font-ui); font-size:.8rem; font-weight:700; line-height:1.4;
+    color:var(--yellow); text-align:center; margin:8px 0 10px; padding:8px 10px;
+    background:rgba(255,203,5,.10); border:2px solid var(--yellow); border-radius:6px;
     animation:shiny-bonus-pulse 2.4s ease-in-out infinite;
   }
+  /* A segunda oração é a CHAMADA -- ela fica um degrau abaixo em peso pra o olho pegar primeiro
+     o "começa em N minutos", que é a informação que expira. */
+  .aviso-liga-jornada .aviso-liga-cta{ display:block; margin-top:2px; font-size:.72rem; font-weight:800; }
   .league-wins-total-box{display:flex;align-items:center;gap:14px;}
   .league-wins-total-icon{font-size:2.2rem;flex-shrink:0;}
   .league-wins-total-num{font-family:var(--font-pixel);font-size:1.5rem;color:var(--blue-dark);line-height:1;}
@@ -3197,7 +3209,14 @@ const EVOLUTIONS = {
   drowzee:{level:26, into:'hypno'},
   nidoranf:{level:16, into:'nidorina'},
   venonat:{level:31, into:'venomoth'},
-  voltorb:{level:40, into:'electrode'},
+  /* ⚠️ ESTES DOIS ESTAVAM NO 40, e era erro de varredura (corrigido em 14/09/2026). O nível 40 é a
+     regra da casa pro que NÃO evolui por nível no original (troca, amizade, pedra), e estes dois
+     evoluem por NÍVEL mesmo -- o Voltorb no 30 e o Koffing no 35. Eles foram varridos pro balaio do
+     40 junto com os de troca e ficaram anos lá.
+     Achado contando quem sairia do 40 no dia em que as pedras entrarem: dos 30 degraus de lá, 14
+     são pedra, 8 são troca, 3 são amizade -- e 5 são por nível, sendo que TRÊS já estavam certos
+     (Ponyta, Kabuto e Omanyte são 40 no original) e estes dois não. */
+  voltorb:{level:30, into:'electrode'},
 
   poliwag:{level:25, into:'poliwhirl'},
   tentacool:{level:30, into:'tentacruel'},
@@ -3237,7 +3256,7 @@ const EVOLUTIONS = {
   machoke:{level:40, into:'machamp'},
   graveler:{level:40, into:'golem'},
   haunter:{level:40, into:'gengar'},
-  koffing:{level:40, into:'weezing'},
+  koffing:{level:35, into:'weezing'},   // ver a nota do Voltorb, acima
   nidorina:{level:40, into:'nidoqueen'},
   nidorino:{level:40, into:'nidoking'},
   pikachu:{level:40, into:'raichu'},
@@ -3351,6 +3370,37 @@ function especieNoNivel(id, nivel){
     cur = EVOLUTIONS[cur].into;
   }
   return cur;
+}
+/* ⚠️ O `especieNoNivel` SÓ ANDA PRA FRENTE, e isso não é descuido: ele nasceu pro encontro
+   selvagem, onde a rota lista a forma BASE e o que pode acontecer é ela já ter evoluído naquele
+   nível. Quem entrega a forma evoluída cedo demais por lá é barrado antes, pelo piso
+   (`EVOLVED_MIN_LEVEL`), que empurra o NÍVEL pra cima.
+   ⚠️ SÓ QUE QUEM SORTEIA DA DEX INTEIRA não tem piso nenhum pra barrar -- e foi isso que a VIGÍLIA
+   trouxe (relatado em 14/09/2026 com print: *"está aparecendo Charizard no level 24, Poliwrath no
+   25, Steelix no 27"*). Medido antes do conserto: **28,5% dos dez** eram uma forma que não existe
+   naquele nível.
+   O `formaNoNivel` DESCE a linha até a forma que existe ali, e só então deixa o `especieNoNivel`
+   subir. Charizard Lv.24 vira Charmeleon, Steelix Lv.27 vira Onix, Poliwrath Lv.25 vira Poliwhirl.
+   O nível de CHEGADA de cada forma sai do próprio `EVOLUTIONS` -- e os destinos da bifurcação
+   entram pelo `EVOLUTION_CHOICES`, senão Vileplume e Bellossom não teriam de onde descer. */
+let _nivelDeChegada = null;
+function nivelDeChegada(id){
+  if(!_nivelDeChegada){
+    _nivelDeChegada = {};
+    for(const de in EVOLUTIONS){ _nivelDeChegada[EVOLUTIONS[de].into] = { de, level: EVOLUTIONS[de].level }; }
+    for(const de in EVOLUTION_CHOICES){
+      EVOLUTION_CHOICES[de].forEach(d => {
+        if(EVOLUTIONS[de]) _nivelDeChegada[d] = { de, level: EVOLUTIONS[de].level };
+      });
+    }
+  }
+  return _nivelDeChegada[id] || null;
+}
+function formaNoNivel(id, nivel){
+  let cur = id, guarda = 0;
+  let pai = nivelDeChegada(cur);
+  while(pai && nivel < pai.level && guarda++ < 10){ cur = pai.de; pai = nivelDeChegada(cur); }
+  return especieNoNivel(cur, nivel);
 }
 
 /* SEIS iniciais desde 30/08/2026: os três de Kanto e os três de Johto. A jornada agora se bifurca
@@ -9621,7 +9671,10 @@ function montarAVigilia(){
     /* sem teto superior: o alvo é a média do time MENOS cinco, então ele nunca encosta no 99 */
     const nivel = Math.max(2, alvo + desvios[mons.length]);
     const cru = ids[Math.floor(rng() * ids.length)];
-    const id = especieNoNivel(cru, nivel);
+    /* ⚠️ `formaNoNivel` E NÃO `especieNoNivel`: aqui o sorteio vem da DEX INTEIRA, então ele pode
+       tirar uma forma FINAL e o nível da vigília é baixo -- e o `especieNoNivel` só sabe subir.
+       Ver a nota dele. */
+    const id = formaNoNivel(cru, nivel);
     const raiz = raizDaLinha(id);
     if(proibidas.has(raiz)) continue;
     proibidas.add(raiz);
@@ -9936,7 +9989,16 @@ function advanceSpecialReveal(){
       game.specialRevealPhase = 'result';
       setTimeout(animateSpecialHpBars, esperaNome);
       setTimeout(render, esperaNome + hitDuration + 50);
-      setTimeout(advanceSpecialReveal, esperaNome + hitDuration + 800);
+      /* ⚠️ A PAUSA DE LEITURA VALE NO ÚLTIMO PASSO TAMBÉM (14/09/2026, reportado: *"a mensagem de fim
+         da dança da chuva não está esperando 1,5s para ela seguir com o processo depois"*).
+         O ramo de baixo (o passo do meio) já somava o `pausaDaFaixa`; este aqui não, e por isso a
+         frase de qualquer abertura que caia no ÚLTIMO passo passava batido. Só uma delas cai ali
+         SEMPRE -- o `chuvafim`, que fecha o confronto por desenho ("ele foi o último debaixo da
+         chuva") --, e era por isso que só ela tinha sido relatada.
+         São os QUATRO laços de revelação, e não só o da jornada: deixar em um só era garantir que a
+         mesma frase durasse tempos diferentes na Elite, na Torre e na liga assistida -- exceção em
+         lista é onde a próxima omissão se esconde. */
+      setTimeout(advanceSpecialReveal, esperaNome + hitDuration + 800 + pausaDaFaixa(hit));
     } else {
       setTimeout(animatePartialSpecialHpBars, esperaNome);
       /* A frase da cura ja cumpriu o papel: troca ela pelo "Trocando golpes..." assim que a barra
@@ -10402,7 +10464,8 @@ function advanceReveal(){
       game.revealPhase = 'result';
       setTimeout(animateHpBars, esperaNome);
       setTimeout(render, esperaNome + hitDuration + 50); // espera a transição da barra terminar de verdade, pra não dar salto visual
-      setTimeout(advanceReveal, esperaNome + hitDuration + 800);
+      // a pausa de leitura do último passo -- ver a nota no advanceSpecialReveal
+      setTimeout(advanceReveal, esperaNome + hitDuration + 800 + pausaDaFaixa(hit));
     } else {
       setTimeout(animatePartialHpBars, esperaNome);
       /* A frase da cura ja cumpriu o papel: troca ela pelo "Trocando golpes..." assim que a barra
@@ -10857,7 +10920,8 @@ function advanceTrainerReveal(){
       game.trainerRevealPhase = 'result';
       setTimeout(animateTrainerHpBars, esperaNome);
       setTimeout(render, esperaNome + hitDuration + 50);
-      setTimeout(advanceTrainerReveal, esperaNome + hitDuration + 800);
+      // a pausa de leitura do último passo -- ver a nota no advanceSpecialReveal
+      setTimeout(advanceTrainerReveal, esperaNome + hitDuration + 800 + pausaDaFaixa(hit));
     } else {
       setTimeout(animatePartialTrainerHpBars, esperaNome);
       /* A frase da cura ja cumpriu o papel: troca ela pelo "Trocando golpes..." assim que a barra
@@ -14820,8 +14884,16 @@ function applySavedState(data){
   equiparItens(game.team, game.equipados, game.currentSaveSlot);
   game.releaseSelected = data.releaseSelected || [];
   game.releaseDepois = data.releaseDepois || null;
-  game.vigilia = data.vigilia || null;
-  game.vigiliaPremio = data.vigiliaPremio || null;
+  /* ⚠️ VIGÍLIA GRAVADA ANTES DO CONSERTO DE 14/09/2026 vem com forma impossível dentro (Charizard
+     Lv.24). Ela é arrumada na LEITURA e não só na criação: quem está no meio da clareira -- ou,
+     pior, na tela do PRÊMIO -- escolheria um pokémon que não pode existir e o levaria pro time.
+     É o mesmo espírito do `repararEvolucoesAtrasadas`: fechar a torneira não conserta o que já
+     vazou. Vigília nova passa por aqui sem mudar nada, porque ela já nasce certa. */
+  const arrumarVigilia = lista => Array.isArray(lista)
+    ? lista.map(m => (m && m.speciesId) ? { ...m, speciesId: formaNoNivel(m.speciesId, m.level) } : m)
+    : null;
+  game.vigilia = arrumarVigilia(data.vigilia);
+  game.vigiliaPremio = arrumarVigilia(data.vigiliaPremio);
   game.evolucaoDepois = data.evolucaoDepois || null;
   game.escolhaDeAtaques = data.escolhaDeAtaques || null;
   game.escolhaDepois = data.escolhaDepois || null;
@@ -16287,16 +16359,23 @@ function renderAvisoMinimoModal(){
 function botaoSeuTimeHtml(){
   return `<button class="btn secondary" onclick="abrirTimeModal()">👥 Seu time (${(game.team||[]).length})</button>`;
 }
-function abrirTimeModal(){ game.timeModal = true; render(); }
-function fecharTimeModal(){ game.timeModal = false; render(); }
+/* ⚠️ O MODAL TEM DUAS ABAS desde 14/09/2026 (a pedido: *"quando o usuário clicar no Seu Time,
+   adicione o botão TMs/HMs, e quando clicar, mostre a lista de TMs e HMs que o usuário possui na
+   mochila, e quando ele clicar em algum para usar, já mostra diretamente os pokémons desse time,
+   sem ele precisar indicar qual time"*).
+   A aba é estado de TELA e não entra no save: ninguém volta amanhã querendo o modal aberto na
+   lista de Máquinas. Por isso o `abrirTimeModal` a zera em toda entrada. */
+function abrirTimeModal(){ game.timeModal = true; game.timeModalAba = 'time'; render(); }
+function fecharTimeModal(){ game.timeModal = false; game.timeModalAba = 'time'; render(); }
+function trocarAbaDoTimeModal(aba){ game.timeModalAba = aba; render(); }
 function renderTimeModal(){
   if(!game.timeModal) return '';
   const time = game.team || [];
   return `
   <div class="modal-overlay" onclick="fecharTimeModal()">
     <div class="modal-box" onclick="event.stopPropagation()">
-      <h2>👥 Seu time</h2>
-      ${time.length ? `<div class="time-modal-lista">${time.map((p,i)=>{
+      <h2>${game.timeModalAba === 'tmhm' ? '📀 TMs e HMs' : '👥 Seu time'}</h2>
+      ${game.timeModalAba === 'tmhm' ? timeModalMaquinasHtml() : (time.length ? `<div class="time-modal-lista">${time.map((p,i)=>{
         const sp = SPECIES[p.speciesId];
         if(!sp) return '';
         /* Duas linhas na coluna da direita, e não tudo numa fileira só: em 320px os selos de dois
@@ -16309,10 +16388,59 @@ function renderTimeModal(){
             <span class="time-modal-sub"><span class="time-modal-lv">Lv.${p.level}</span>${typesHtml(sp.types)}</span>
           </span>
         </div>`;
-      }).join('')}</div>` : `<p class="hint-text">Seu time está vazio.</p>`}
+      }).join('')}</div>` : `<p class="hint-text">Seu time está vazio.</p>`)}
+      <!-- ATENCAO: este comentario vive DENTRO de um template literal, entao ele nao pode ter
+           crase nenhuma -- elas fecham a string e o que vem depois vira template TAGUEADO. Foi o que
+           aconteceu aqui: escrevi o nome da classe entre crases, o node --check passou (continua JS
+           valido) e a tela morreu so no navegador, com -btn is not a function-.
+           O BOTAO DA OUTRA ABA e secundario de proposito: o Fechar e a acao de saida e continua
+           sendo o botao pesado; este e so uma troca de vista. -->
+      ${game.timeModalAba === 'tmhm'
+        ? `<button class="btn secondary" onclick="trocarAbaDoTimeModal('time')">⬅ Seu time</button>`
+        : `<button class="btn secondary" onclick="trocarAbaDoTimeModal('tmhm')">📀 TMs/HMs${
+            hmsDaConta().length ? ' (' + hmsDaConta().length + ')' : ''}</button>`}
       <button class="btn" onclick="fecharTimeModal()">Fechar</button>
     </div>
   </div>`;
+}
+/* ⚠️ A LISTA DE MÁQUINAS DENTRO DO MODAL, e o atalho que ela existe pra ser: daqui o jogador já
+   está olhando UM time, então escolher a Máquina cai DIRETO nos pokémon dele -- a tela de escolher
+   o time (que existe quando a Máquina é aberta pela mochila, onde não há time nenhum em foco)
+   seria uma pergunta cuja resposta já está na tela.
+   ⚠️ A LINHA DE QUEM NINGUÉM DESTE TIME APRENDE FICA APAGADA, COM O MOTIVO -- e não escondida.
+   Escondendo, a Máquina sumia sem explicação pra quem a tem na mochila; e deixando clicável, o
+   `telaDoTimeDaMaquina` cai de volta na lista de times (é o fallback dele) e o atalho vira
+   justamente a tela que ele existe pra pular. É a mesma regra do montador: desabilitar dizendo
+   por quê é melhor que sumir. */
+function timeModalMaquinasHtml(){
+  const meus = hmsDaConta();
+  if(!meus.length) return `<p class="loja-vazia">Nenhum TM/HM</p>`;
+  return `<div class="time-modal-lista">${meus.map(id => {
+    const hm = HMS[id];
+    const quantos = candidatosDaMaquina(id, game.currentSaveSlot).length;
+    return `<button class="loja-linha${quantos ? '' : ' caro'}" ${quantos ? '' : 'disabled'}
+      onclick="ensinarMaquinaNesteTime('${escJs(id)}')">
+      <span class="loja-icone">${hm.icone}</span>
+      <span class="loja-nome">${escapeHtmlSafe(hm.nome)}
+        <span class="time-modal-sub">${quantos ? quantos + (quantos === 1 ? ' pode aprender' : ' podem aprender') : 'ninguém deste time aprende'}</span>
+      </span>
+    </button>`;
+  }).join('')}</div>`;
+}
+/* ⚠️ ENTRA NO FLUXO DA MÁQUINA COM O TIME JÁ ESCOLHIDO. O `hmTimeAberto` é o segundo nível daquela
+   tela -- pondo o slot nele, o `renderHmAlvo` desenha a lista de pokémon direto, sem inventar um
+   caminho novo. O `hmVoltarPara` é pra onde o Voltar leva: aberta pela mochila a Máquina volta pra
+   lá, mas quem entrou daqui está no meio da jornada e tem que voltar pra a tela em que estava.
+   É o mesmo desenho do `inventarioVoltarPara` e do `evolucaoDepois`. */
+function ensinarMaquinaNesteTime(hmId){
+  if(!HMS[hmId] || !temHM(hmId)) return;
+  if(!candidatosDaMaquina(hmId, game.currentSaveSlot).length) return;
+  const volta = game.screen;
+  fecharTimeModal();
+  abrirEnsinarHm(hmId);
+  game.hmTimeAberto = game.currentSaveSlot;
+  game.hmVoltarPara = volta;
+  render();
 }
 
 /* DIA OU NOITE, pelo relógio DO CELULAR do jogador -- é assim que Espeon e Umbreon se separam no
@@ -17287,14 +17415,40 @@ function sequenciaDoConfronto(m){
     ['p','e'].forEach(lado => {
       const idx = [];
       saida.forEach((g, i) => { if(!g.x && g.q === lado && g.d > 0 && !(g.tn > 1)) idx.push(i); });
-      if(idx.length < 2) return;
-      const ds = idx.map(i => saida[i].d);
+      /* ⚠️ O GOLPE QUE MATOU SAI DO BOLO (14/09/2026, a pedido: *"passa a ser o golpe REAL, porém o
+         segundo golpe que mata vai tirar só o que resta de HP do adversário"*).
+         ESTA FUNÇÃO SEMPRE SOUBE QUE SÃO DUAS FAMÍLIAS -- está escrito aqui em cima --, e ela
+         tratava as duas igual. Só que elas são o oposto uma da outra:
+           - o REVIDE MORIBUNDO é aparado por uma trava MASCARADA por decisão: o jogador não tem
+             como saber por que o número encolheu, e sem a suavização ele lê 'o mesmo golpe
+             escalou'. Esse continua sendo repartido -- é pra isso que ela existe;
+           - o golpe que MATOU se explica sozinho: ele só tirou o que sobrava, e a barra do
+             cabeçalho mostra o alvo zerado. Repartir esse fazia o CONTRÁRIO do que se quer --
+             achatava um golpe forte de verdade (180) num par morno (110 e 110) e o jogador
+             comparava a linha dele com a do adversário achando o seu pokémon fraco. Foi
+             exatamente o relato: uma Kingdra SHINY parecendo bater menos que uma normal.
+         Hoje os golpes de antes mostram o tamanho REAL e o último mostra o resto -- e a soma
+         continua fechando com a barra, porque o resto É o que faltava. */
+      const ultimo = idx.length ? idx[idx.length - 1] : -1;
+      const matou = ultimo >= 0 && saida[ultimo].hp != null && saida[ultimo].hp <= 0;
+      const bolo = matou ? idx.slice(0, -1) : idx;
+      /* ⚠️ E O SELO DE CRÍTICO FICA, inclusive num golpe final que saiu pequeno. Cheguei a tirá-lo
+         aqui e desfiz: a regra nova é UMA só -- *o golpe que mata mostra o que sobrava* --, e ela
+         vale pro crítico pelo mesmo motivo que vale pro resto. Esconder o selo ali criaria uma
+         segunda regra pra explicar a primeira, e o jogador perderia a informação de que aquele
+         golpe foi crítico só porque o alvo estava acabando.
+         O caso que REALMENTE contradiz a tela continua coberto pelo `cap` do motor: quando o corte
+         come a dobra INTEIRA (`efetivo * 2 < sorteado`), o campo `c` já nasce zero e o selo não sai.
+         As três travas que mediam razão entre linhas (a banda, o selo do crítico e a escala do
+         Rolamento) passaram a isentar o golpe final -- a mesma isenção, pelo mesmo motivo. */
+      if(bolo.length < 2) return;
+      const ds = bolo.map(i => saida[i].d);
       /* O PESO é 2 no crítico e 1 no resto -- é o que faz a linha dele sair o dobro, como o selo diz.
          E ele MULTIPLICA a escala do ROLAMENTO (1, 2, 4, 8, 16): aquele golpe dobra de verdade a cada
          uso, então dois Rolamentos seguidos SÃO 1×2 e a razão por peso volta a caber na banda da
          fórmula. Sem isso a suavização achatava justamente a mecânica -- medido num Golem, a barra
          caía 30 e 60 e o log dizia 82 e 72. */
-      const pesos = idx.map(i => (saida[i].c ? 2 : 1) * (saida[i].rl || 1));
+      const pesos = bolo.map(i => (saida[i].c ? 2 : 1) * (saida[i].rl || 1));
       const somaPesos = pesos.reduce((a, b) => a + b, 0);
       /* A razão medida é entre golpes COMPARÁVEIS: um crítico ao lado de um comum tem que dar 2×,
          então o que se compara é o dano POR PESO. */
@@ -17302,7 +17456,7 @@ function sequenciaDoConfronto(m){
       const mx = Math.max.apply(null, porPeso), mn = Math.min.apply(null, porPeso);
       if(mx <= mn * RAZAO_DE_UM_GOLPE) return;   // já cabe no que a fórmula produz
       const total = ds.reduce((a, b) => a + b, 0);
-      const n = idx.length;
+      const n = bolo.length;
       if(total < somaPesos) return;              // não dá pra repartir sem gerar linha de 0
       /* DETERMINÍSTICO, como a reconstrução: o log e a animação chamam esta função em momentos
          diferentes e têm que receber a MESMA divisão. Com sorteio, cada redesenho da tela trocaria
@@ -17322,7 +17476,7 @@ function sequenciaDoConfronto(m){
          a conta, ou seja o alvo termina exatamente onde terminava. */
       saida = saida.slice();
       let antes = 0, depois = 0;
-      idx.forEach((i, k) => {
+      bolo.forEach((i, k) => {
         const g = saida[i];
         antes += ds[k]; depois += novos[k];
         saida[i] = Object.assign({}, g, { d: novos[k] },
@@ -20122,7 +20276,8 @@ function advanceLeagueWatch(){
       game.leagueWatchPhase = 'result';
       setTimeout(animateLeagueWatchHpBars, esperaNome);
       setTimeout(render, esperaNome + hitDuration + 50);
-      setTimeout(advanceLeagueWatch, esperaNome + hitDuration + 800);
+      // a pausa de leitura do último passo -- ver a nota no advanceSpecialReveal
+      setTimeout(advanceLeagueWatch, esperaNome + hitDuration + 800 + pausaDaFaixa(hit));
     } else {
       setTimeout(animatePartialLeagueWatchHpBars, esperaNome);
       /* A frase da cura ja cumpriu o papel: troca ela pelo "Trocando golpes..." assim que a barra
@@ -22158,6 +22313,11 @@ function abrirEnsinarHm(hmId){
   game.hmEnsino = { hm: hmId, slot: null, idx: null };
   game.hmAviso = null;
   game.hmTimeAberto = null;
+  /* ⚠️ O DESTINO DA VOLTA ZERA AQUI, e quem entra pelo atalho do "Seu time" o escreve DEPOIS (ver
+     ensinarMaquinaNesteTime). Sem esta linha, um destino sobrando de uma passada anterior levaria
+     quem abriu a Máquina PELA MOCHILA de volta pra uma tela de jornada -- e no pior caso pra uma
+     tela de um save que nem está aberto. Campo de caminho de volta tem que nascer limpo. */
+  game.hmVoltarPara = null;
   game.screen = "hmAlvo";
   render();
 }
@@ -22168,9 +22328,13 @@ function abrirTimeDaMaquina(slot){
   render();
 }
 function voltarAosTimesDaMaquina(){ game.hmTimeAberto = null; render(); }
+/* ⚠️ A VOLTA DEPENDE DE POR ONDE SE ENTROU. Pela mochila, ela é a mochila; pelo "Seu time" do meio
+   da jornada, é a tela em que o jogador estava -- mandá-lo pra mochila ali seria tirá-lo da
+   jornada por ter ido ensinar um golpe. O campo é o mesmo desenho do `inventarioVoltarPara`. */
 function sairDoEnsinarHm(){
-  game.hmEnsino = null; game.hmAviso = null; game.hmTimeAberto = null;
-  game.screen = "tmhm"; render();
+  const volta = game.hmVoltarPara;
+  game.hmEnsino = null; game.hmAviso = null; game.hmTimeAberto = null; game.hmVoltarPara = null;
+  game.screen = volta || "tmhm"; render();
 }
 function voltarDaTrocaDaMaquina(){
   if(game.hmEnsino){ game.hmEnsino.slot = null; game.hmEnsino.idx = null; }
@@ -22313,7 +22477,12 @@ function telaDoTimeDaMaquina(hm, slot){
         <span class="hm-alvo-save">${c.ataques.length >= MAX_GOLPES ? "precisa esquecer um golpe" : "tem vaga"}</span>
       </button>`).join("")}
   </div>
-  <button class="btn secondary u-mt8" onclick="voltarAosTimesDaMaquina()">⬅ Outro time</button>`;
+  ${/* ⚠️ "OUTRO TIME" SÓ EXISTE QUANDO HÁ OUTRO TIME PRA ESCOLHER. Quem entrou pelo "Seu time" veio
+       com o time já fixado (foi o pedido: *"sem ele precisar indicar qual time"*), e oferecer a
+       lista de times ali seria devolvê-lo justamente à tela que o atalho pula. */''}
+  ${game.hmVoltarPara
+    ? `<button class="btn secondary u-mt8" onclick="sairDoEnsinarHm()">⬅ Voltar</button>`
+    : `<button class="btn secondary u-mt8" onclick="voltarAosTimesDaMaquina()">⬅ Outro time</button>`}`;
 }
 /* A TELA DA TROCA reusa os MESMOS blocos das três telas de golpe (o `golpe-cab` e o `cartaoDeGolpe`)
    -- ela conta a mesma coisa que a tela de aprendizado por nível, e um formato próprio obrigaria a
@@ -23109,10 +23278,32 @@ function botaoBuscaOnlineHtml(){
    coisas são janelas de tempo que expiram, e repetir o pulso faz reconhecer a ideia sem ler.
    Só aparece pra quem AINDA NÃO se inscreveu -- pra quem já está dentro seria só ruído no meio de
    uma batalha. */
-function avisoLigaHtml(){
+/* ⚠️ A FRASE É UMA CONTAGEM, e ela é calculada NO DESENHO (14/09/2026, a pedido: *"Liga Clássica
+   começa em 38 minutos! Inscreva seu time e concorra ao prêmio!"*). Ela dizia a HORA do ciclo
+   ("das 14:00"), e hora é um número que o jogador tem que subtrair de cabeça pra saber se dá
+   tempo -- o que ele quer saber é quanto FALTA.
+   Calculada no desenho e não no `atualizarAvisoDaLiga`: aquele tem folga de 5 minutos (ele custa
+   duas leituras), então um número congelado ali erraria por até 5 minutos. Aqui ele se refaz a
+   cada render natural da tela.
+   ⚠️ E O RELÓGIO É O DO SERVIDOR (`agoraServidor`): o `scheduledTime` é carimbo dele, e comparar
+   com o `Date.now()` do celular desloca a contagem inteira -- relógio de celular quase nunca bate.
+   ⚠️ ZERO OU MENOS NÃO VIRA "em -3 minutos": o aviso some. A cópia em memória pode estar velha
+   (a folga de 5 min), e anunciar uma inscrição que já fechou é pior que não anunciar. */
+function minutosParaALiga(){
   const aviso = game.avisoLiga;
-  if(!aviso) return '';
-  return `<div class="aviso-liga-jornada">🏆 Inscreva-se para a <span class="nao-quebra">Classic League</span> das <strong>${formatClock(aviso.hora)}</strong></div>`;
+  if(!aviso || aviso.hora == null) return null;
+  /* ⚠️ ARREDONDA, nao sobe: faltando 38min05s o certo e dizer 38, e o Math.ceil dizia 39 --
+     ele arredonda pra cima qualquer sobra de segundos. Com round, os ultimos ~30 segundos caem em
+     zero e o aviso some; e o certo, porque ali a inscricao esta fechando e "em 0 minutos" nao ajuda. */
+  const m = Math.round((aviso.hora - agoraServidor()) / 60000);
+  return m > 0 ? m : null;
+}
+function avisoLigaHtml(){
+  const min = minutosParaALiga();
+  if(min == null) return '';
+  return `<div class="aviso-liga-jornada">🏆 <strong>Liga Clássica</strong> começa em
+    <strong class="nao-quebra">${min} ${min === 1 ? 'minuto' : 'minutos'}</strong>!
+    <span class="aviso-liga-cta">Inscreva seu time e concorra ao prêmio!</span></div>`;
 }
 /* Lê o ciclo aberto e a sua inscrição: duas leituras, no MÁXIMO uma a cada 5 minutos. O ciclo vira
    de hora em hora, então essa folga não atrasa nada que importe.

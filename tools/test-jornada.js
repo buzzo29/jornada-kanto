@@ -624,13 +624,25 @@ gB.authUser = { uid:'u1' }; S.__setGame(gB);
 
 console.log('\nO AVISO DA LIGA CLASSICA');
 ok('sem inscricao aberta, nao aparece nada', !S.botaoBuscaOnlineHtml().includes('aviso-liga-jornada'));
-gB.avisoLiga = { hora: new Date(2026, 7, 31, 14, 0, 0).getTime() };
+/* ⚠️ O AVISO VIROU CONTAGEM em 14/09/2026 (a pedido) -- ele dizia a HORA do ciclo ("das 14:00") e
+   hoje diz quanto FALTA. Esta trava usava uma data FIXA de 2026-08-31, que ja era passado: com a
+   regra nova (passado nao vira "em -N minutos", o aviso some) ela passou a acusar um defeito que
+   nao existe. O tempo agora e RELATIVO ao relogio do servidor, que e o que a tela usa.
+   A frase palavra por palavra e os arredondamentos ficam em tools/test-inventario.js; aqui o que se
+   cobra e o que este arquivo cobre: que o botao de busca da jornada CARREGA o aviso. */
+gB.avisoLiga = { hora: S.agoraServidor() + 38*60000 };
 S.__setGame(gB);
 const comAviso = S.botaoBuscaOnlineHtml();
-ok('com inscricao aberta, avisa a hora', comAviso.includes('aviso-liga-jornada') && comAviso.includes('14:00'),
-   comAviso.includes('14:00') ? '' : 'a hora nao saiu no texto');
+ok('com inscricao aberta, avisa quanto falta',
+   comAviso.includes('aviso-liga-jornada') && /38 minutos/.test(comAviso),
+   /38 minutos/.test(comAviso) ? '' : 'a contagem nao saiu no texto');
 /* Pisca no mesmo ritmo do Bonus Shiny da home: mesma ideia, uma janela que expira. */
 ok('e usa a classe que pisca', comAviso.includes('class="aviso-liga-jornada"'));
+/* E O CICLO QUE JA COMECOU NAO APARECE: a copia em memoria tem folga de 5 minutos e pode estar
+   velha, e convidar pra uma inscricao fechada e pior que nao convidar. */
+gB.avisoLiga = { hora: S.agoraServidor() - 60000 };
+S.__setGame(gB);
+ok('e um ciclo que ja comecou nao aparece', !S.botaoBuscaOnlineHtml().includes('aviso-liga-jornada'));
 
 console.log('\nONDE O BOTAO APARECE (e onde NAO)');
 gB.avisoLiga = null;
@@ -1248,6 +1260,74 @@ console.log('\n=== A MATA FECHADA E A VIGILIA DO ARCO-IRIS (13/09/2026) ===');
   }
   ok('e conta o mito do arco-iris de Ho-Oh', /Ho-Oh/.test(tela) && /arco-.ris/.test(tela));
 
+  /* ⚠️ A ESPECIE TEM QUE EXISTIR NAQUELE NIVEL -- e ela nao existia (relatado em 14/09/2026 com
+     print: *"esta aparecendo charizard no level 24, poliwrath no level 25, Steelix no level 27"*).
+     A vigilia sorteia da DEX INTEIRA, entao ela tira forma FINAL direto; o `especieNoNivel` so sabe
+     andar PRA FRENTE (ele nasceu pro encontro selvagem, onde a rota lista a forma base e quem
+     barra o resto e o piso do EVOLVED_MIN_LEVEL). Medido antes do conserto: 28,5% dos dez.
+     O `formaNoNivel` DESCE ate a forma que existe ali antes de deixar o outro subir. */
+  {
+    /* ⚠️ ESTE BLOCO MEXE NO ESTADO COMPARTILHADO (ele varre 120 vigilias e chama o
+       applySavedState, que TROCA o jogo inteiro). As travas de baixo deste arquivo continuam
+       usando o `g` -- entao ele guarda o que elas precisam e devolve no fim. Sem isso elas
+       acusam defeito que nao existe, e foi o que aconteceu ao escrever isto. */
+    const guardaBloco = { slot:g.currentSaveSlot, gen:g.saveGen, leg:g.gymIndex,
+                          team:g.team, vigilia:g.vigilia, premio:g.vigiliaPremio };
+    const chega = {};
+    for(const de in S.EVOLUTIONS) chega[S.EVOLUTIONS[de].into] = S.EVOLUTIONS[de].level;
+    for(const de in (S.EVOLUTION_CHOICES||{}))
+      (S.EVOLUTION_CHOICES[de]||[]).forEach(d => { if(chega[d] == null && S.EVOLUTIONS[de]) chega[d] = S.EVOLUTIONS[de].level; });
+
+    /* OS TRES DO PRINT, nome por nome */
+    ok('Charizard Lv.24 vira Charmeleon', S.formaNoNivel('charizard', 24) === 'charmeleon', S.formaNoNivel('charizard', 24));
+    ok('Poliwrath Lv.25 vira Poliwhirl', S.formaNoNivel('poliwrath', 25) === 'poliwhirl', S.formaNoNivel('poliwrath', 25));
+    ok('Steelix Lv.27 vira Onix', S.formaNoNivel('steelix', 27) === 'onix', S.formaNoNivel('steelix', 27));
+    /* ⚠️ E ELE CONTINUA SUBINDO: o formaNoNivel DESCE e depois chama o especieNoNivel. Sem a
+       segunda metade, um Caterpie Lv.45 ficaria Caterpie. */
+    ok('e o Caterpie Lv.45 continua virando Butterfree', S.formaNoNivel('caterpie', 45) === 'butterfree');
+    ok('e quem ja cabe no nivel nao se mexe', S.formaNoNivel('gyarados', 60) === 'gyarados');
+
+    /* A VARREDURA: nenhum dos dez, em nenhuma semente, pode ser forma impossivel. */
+    let impossiveis = 0, total = 0;
+    const mk2 = (id, lv) => { const p = S.createInstance(id, lv); p.maxHp = S.calcMaxHp(p); p.hp = p.maxHp; return p; };
+    for(let i = 0; i < 120; i++){
+      g.currentSaveSlot = i % 20; g.saveGen = Math.floor(i / 20); g.gymIndex = 3 + (i % 5);
+      g.team = [mk2('pidgeotto', 30), mk2('kadabra', 29), mk2('machoke', 31)];
+      S.montarAVigilia().forEach(m => {
+        total++;
+        if(chega[m.speciesId] != null && m.level < chega[m.speciesId]) impossiveis++;
+      });
+    }
+    ok('nenhum dos dez e uma forma que nao existe naquele nivel', impossiveis === 0,
+       impossiveis + ' de ' + total);
+
+    /* ⚠️ E VIGILIA JA GRAVADA e arrumada na LEITURA: quem esta no meio da clareira -- ou, pior, na
+       tela do PREMIO -- escolheria um pokemon impossivel e o levaria pro time. Mesmo espirito do
+       repararEvolucoesAtrasadas: fechar a torneira nao conserta o que ja vazou. */
+    {
+      /* ⚠️ O applySavedState TROCA O ESTADO INTEIRO -- ele e o caminho de ABRIR um save. Sem
+         guardar e devolver o que estava aqui, as travas seguintes deste arquivo rodam em cima de
+         um jogo zerado e acusam defeito que nao existe (foi o que aconteceu ao escrever isto). */
+      const guardado = JSON.parse(JSON.stringify(S.serializeGame()));
+      const salvo = {
+        vigilia: [{ speciesId:'charizard', level:24, shiny:false }],
+        vigiliaPremio: [{ speciesId:'steelix', level:27, shiny:true }]
+      };
+      S.applySavedState(salvo);
+      const gg = S.__getGame();
+      ok('vigilia gravada e arrumada ao abrir o save', gg.vigilia[0].speciesId === 'charmeleon',
+         gg.vigilia[0].speciesId);
+      ok('e a lista do PREMIO tambem', gg.vigiliaPremio[0].speciesId === 'onix', gg.vigiliaPremio[0].speciesId);
+      ok('sem perder o nivel nem o shiny', gg.vigiliaPremio[0].level === 27 && gg.vigiliaPremio[0].shiny === true);
+      S.applySavedState(guardado);
+    }
+    /* devolve o `g` pras travas de baixo, no estado exato em que ele chegou aqui */
+    const gg2 = S.__getGame();
+    gg2.currentSaveSlot = guardaBloco.slot; gg2.saveGen = guardaBloco.gen; gg2.gymIndex = guardaBloco.leg;
+    gg2.team = guardaBloco.team; gg2.vigilia = guardaBloco.vigilia; gg2.vigiliaPremio = guardaBloco.premio;
+    S.__setGame(gg2);
+  }
+
   /* 4) A BATALHA e o PREMIO. */
   S.comecarAVigilia();
   ok('a batalha e a especial, com os dez', g.specialBattle.context === 'vigilia' &&
@@ -1302,7 +1382,13 @@ console.log('\n=== A MATA FECHADA E A VIGILIA DO ARCO-IRIS (13/09/2026) ===');
     const txt = require('fs').readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
     ok('e os dois campos vao pro save', /vigilia: game\.vigilia \|\| null/.test(txt) &&
        /vigiliaPremio: game\.vigiliaPremio \|\| null/.test(txt));
-    ok('e voltam dele', /game\.vigilia = data\.vigilia \|\| null/.test(txt));
+    /* ⚠️ ELES VOLTAM ARRUMADOS desde 14/09/2026: a leitura passa os dois pelo `formaNoNivel`, senao
+       uma vigilia gravada antes do conserto devolve Charizard Lv.24 -- e na tela do PREMIO isso
+       vira um pokemon impossivel dentro do time. */
+    ok('e voltam dele, pelo conserto de forma',
+       /game\.vigilia = arrumarVigilia\(data\.vigilia\)/.test(txt) &&
+       /game\.vigiliaPremio = arrumarVigilia\(data\.vigiliaPremio\)/.test(txt) &&
+       /formaNoNivel\(m\.speciesId, m\.level\)/.test(txt));
   }
 }
 

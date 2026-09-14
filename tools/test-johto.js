@@ -89,6 +89,29 @@ ok('Slowpoke continua virando Slowbro', E.valor.slowpoke.into === 'slowbro', E.v
 ok('Bellossom, Politoed e Slowking ficaram de fora (sem tela de escolha ainda)',
    !Object.values(E.valor).some(e=>['bellossom','politoed','slowking'].includes(e.into)));
 ok('o Eevee continua fora do EVOLUTIONS (tem tela propria)', !E.valor.eevee);
+
+/* ⚠️ QUEM EVOLUI POR NIVEL DE VERDADE TEM O NIVEL DO ORIGINAL, E ELE FICA FIXADO AQUI (14/09/2026).
+   O nivel 40 desta tabela e a regra da casa pro que NAO evolui por nivel no jogo original -- troca,
+   amizade e pedra viram 40. Sao 30 degraus la, e a varredura de 14/09 (feita contando quem sairia
+   do 40 no dia em que as pedras entrarem) mostrou que DOIS deles evoluem por NIVEL mesmo e tinham
+   sido varridos pro balaio junto com os de troca: o Voltorb (30 no original) e o Koffing (35).
+   Os outros tres por nivel ja estavam certos e entram aqui pelo mesmo motivo: um deles cair no 40
+   de novo seria a mesma classe de erro, e ela passou anos sem ninguem ver.
+   A trava e sobre o NUMERO e nao sobre "nao ser 40": Ponyta, Kabuto e Omanyte SAO 40 no original. */
+{
+  const PORNIVEL = { voltorb:30, koffing:35, ponyta:40, kabuto:40, omanyte:40 };
+  Object.keys(PORNIVEL).forEach(id => {
+    const e = E.valor[id];
+    ok('o ' + id + ' evolui no nivel do jogo original', !!e && e.level === PORNIVEL[id],
+       (e ? e.level : '(sem entrada)') + ', esperado ' + PORNIVEL[id]);
+  });
+  /* ⚠️ E O BALAIO DO 40 CONTINUA SENDO SO DO QUE NAO E POR NIVEL. Sem esta conta, o proximo degrau
+     acrescentado 'no 40 por padrao' entra sem ninguem perguntar de que metodo ele e. */
+  const no40 = Object.keys(E.valor).filter(k => E.valor[k].level === 40);
+  const porNivelNo40 = no40.filter(k => PORNIVEL[k] === undefined ? false : PORNIVEL[k] !== 40);
+  ok('nenhum degrau POR NIVEL sobrou no balaio do 40', porNivelNo40.length === 0,
+     porNivelNo40.join(', ') || no40.length + ' degraus no 40, nenhum deles por nivel');
+}
 const destinoRuim = Object.keys(E.valor).filter(id=>!S[E.valor[id].into]);
 ok('toda evolucao aponta pra especie existente', destinoRuim.length === 0, destinoRuim.join(','));
 const origemRuim = Object.keys(E.valor).filter(id=>!S[id]);

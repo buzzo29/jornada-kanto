@@ -1425,6 +1425,163 @@ console.log('\n=== O ITEM EQUIPADO NAO VAZA MAIS ENTRE SAVES (14/09/2026) ===');
   }
 }
 
+/* O mesmo limpador de HTML do bloco do HM01 -- ele e local la, e estes blocos tambem comparam
+   TEXTO e nao marcacao. */
+const limpo = h => String(h).replace(/<!--[\s\S]*?-->/g, ' ').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+console.log('\n=== O AVISO DA LIGA VIROU UMA CONTAGEM (14/09/2026) ===');
+{
+  /* Pedido: *"aumente e deixe mais visivel aquele texto para quem ainda nao ta inscrito na Liga
+     Classica, coloque assim: Liga Classica comeca em 38 minutos! Inscreva seu time e concorra ao
+     premio!"*. Ele dizia a HORA do ciclo ("das 14:00"), e hora e um numero que o jogador tem que
+     subtrair de cabeca. */
+  const g = S.__getGame();
+  const daqui = min => { g.avisoLiga = { hora: S.agoraServidor() + min }; return S.avisoLigaHtml(); };
+
+  /* ⚠️ O limpador troca cada TAG por um espaco, entao ele deixa " !" onde o <strong> fecha antes
+     do ponto de exclamacao -- no navegador (innerText) o texto sai colado, conferido. A trava
+     normaliza isso em vez de afrouxar a frase: o que se cobra continua sendo palavra por palavra. */
+  const frase = h => limpo(h).replace(/\s+([!?.,])/g, '$1');
+  const t = frase(daqui(38*60000 + 5000));
+  ok('a frase e a pedida, palavra por palavra',
+     t === '🏆 Liga Clássica começa em 38 minutos! Inscreva seu time e concorra ao prêmio!', t);
+
+  /* ⚠️ ARREDONDA, nao sobe: 38min05s e 38, nao 39. O Math.ceil dizia 39 -- ele sobe com qualquer
+     sobra de segundos, e o numero na tela ficava sempre um a mais do que o relogio. */
+  ok('38min05s le 38 minutos, nao 39', /38 minutos/.test(t) && !/39 minutos/.test(t));
+  ok('e o singular existe', /em 1 minuto!/.test(frase(daqui(61000))), frase(daqui(61000)));
+  ok('1min30s arredonda pra 2', /em 2 minutos!/.test(frase(daqui(90000))));
+
+  /* ⚠️ ZERO OU MENOS NAO VIRA "em -3 minutos": a copia em memoria tem folga de 5 min (ela custa
+     duas leituras), entao ela PODE estar velha -- e anunciar inscricao que ja fechou e pior que
+     nao anunciar. */
+  ok('faltando 25 segundos ele some', S.avisoLigaHtml() !== undefined && daqui(25000) === '');
+  ok('e ja passado tambem', daqui(-60000) === '');
+  g.avisoLiga = null;
+  ok('sem ciclo aberto, nada', S.avisoLigaHtml() === '');
+
+  /* ⚠️ O RELOGIO E O DO SERVIDOR: o scheduledTime e carimbo dele, e relogio de celular quase nunca
+     bate. A trava le o CODIGO porque o caso acima passaria com Date.now(). */
+  {
+    const cli = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
+    const fn = cli.slice(cli.indexOf('function minutosParaALiga()'), cli.indexOf('function avisoLigaHtml()'));
+    ok('a conta usa o relogio do servidor', /agoraServidor\(\)/.test(fn) && !/Date\.now\(\)/.test(fn));
+    /* ⚠️ E ELA E FEITA NO DESENHO, nao guardada: o atualizarAvisoDaLiga so roda a cada 5 minutos, e
+       um numero congelado la erraria por ate 5 minutos. */
+    const upd = cli.slice(cli.indexOf('async function atualizarAvisoDaLiga()'));
+    ok('e o aviso guarda a HORA, nao os minutos',
+       /avisoLiga = jaEstaNaLiga \? null : \{ hora: ciclo\.scheduledTime \}/.test(upd.slice(0, 1200)));
+    /* MAIS VISIVEL: fonte de TEXTO (a de pixel come largura demais numa frase de duas oracoes) e
+       moldura. O teste le o CSS -- nada disso aparece em asserção de HTML. */
+    const css = (cli.match(/\.aviso-liga-jornada\{[^}]*\}/) || [''])[0];
+    ok('ele cresceu e ganhou moldura', /font-size:\.8rem/.test(css) && /border:2px solid var\(--yellow\)/.test(css),
+       css.replace(/\s+/g, ' '));
+    ok('e saiu da fonte de pixel', /font-family:var\(--font-ui\)/.test(css));
+    ok('mas o pulso continua', /shiny-bonus-pulse/.test(css));
+  }
+}
+
+console.log('\n=== TMs/HMs DENTRO DO "SEU TIME" (14/09/2026) ===');
+{
+  /* Pedido: *"quando o usuario clicar no Seu Time, adicione o botao TMs/HMs, e quando clicar, mostre
+     a lista TMs e HMs que o usuario possui na mochila, e quando ele clicar em algum para usar, ja
+     mostra diretamente os pokemons desse time, sem ele precisar indicar qual time"*. */
+  const g = S.__getGame();
+  const mk = (id, lv, atks) => { const p = S.createInstance(id, lv); p.maxHp = S.calcMaxHp(p); p.hp = p.maxHp; if(atks) p.ataques = atks; return p; };
+  const monta = () => {
+    g.currentSaveSlot = 0;
+    g.hms = ['hm01'];
+    g.team = [ mk('persian', 50, ['slash','bite','scratch']), mk('bulbasaur', 30, ['tackle']), mk('gastly', 30) ];
+    g.saveSlots = [{ customName:'Kanto', team: g.team },
+                   { customName:'Johto', team: [ mk('meganium', 60, ['tackle']) ] }];
+    g.screen = 'wild'; g.hmEnsino = null; g.hmTimeAberto = null; g.hmVoltarPara = null;
+  };
+  monta();
+
+  S.abrirTimeModal();
+  ok('o modal abre na aba do time', g.timeModalAba === 'time', String(g.timeModalAba));
+  ok('e traz o botao de TMs/HMs com a contagem', /TMs\/HMs \(1\)/.test(S.renderTimeModal()));
+
+  S.trocarAbaDoTimeModal('tmhm');
+  {
+    const t = S.renderTimeModal();
+    ok('a aba lista a Maquina da conta', /HM01/.test(t), limpo(t).slice(0, 80));
+    /* A contagem e do TIME ABERTO, nao da conta: o Persian e o Bulbasaur cortam, o Gastly nao. */
+    ok('e diz quantos DESTE time aprendem', /2 podem aprender/.test(t), limpo(t));
+    ok('e da pra voltar pra lista do time', /trocarAbaDoTimeModal\('time'\)/.test(t));
+  }
+
+  /* ⚠️ O ATALHO: clicar na Maquina cai DIRETO nos pokemon DESTE time. */
+  S.ensinarMaquinaNesteTime('hm01');
+  ok('o modal fecha', !g.timeModal);
+  ok('e vai pra tela da Maquina com o time JA fixado', g.screen === 'hmAlvo' && g.hmTimeAberto === 0,
+     g.screen + ' / time ' + g.hmTimeAberto);
+  ok('e ela guarda pra onde voltar (a tela da jornada)', g.hmVoltarPara === 'wild', String(g.hmVoltarPara));
+  {
+    const t = S.renderHmAlvo();
+    ok('a tela mostra os pokemon, nao a escolha de time',
+       /Persian/.test(t) && /Bulbasaur/.test(t) && !/Johto/.test(t), limpo(t).slice(0, 110));
+    /* ⚠️ "OUTRO TIME" SOME: oferecer a lista de times aqui seria devolver o jogador exatamente a
+       tela que o atalho existe pra pular. */
+    ok('e o botao de baixo e Voltar, nao Outro time', /sairDoEnsinarHm\(\)/.test(t) && !/voltarAosTimesDaMaquina/.test(t));
+  }
+
+  /* A ida e a volta pela tela de troca mantem o time fixado. */
+  S.escolherAlvoDaMaquina(0, 0);
+  ok('quem tem os 3 golpes cai na tela de troca', g.screen === 'hmTroca', g.screen);
+  S.voltarDaTrocaDaMaquina();
+  ok('e voltar da troca devolve pra lista do MESMO time', g.screen === 'hmAlvo' && g.hmTimeAberto === 0);
+  S.sairDoEnsinarHm();
+  ok('e o Voltar final devolve pra JORNADA, nao pra mochila', g.screen === 'wild', g.screen);
+  ok('e o destino de volta e limpo', !g.hmVoltarPara);
+
+  /* ⚠️ ABERTA PELA MOCHILA ela continua como era: escolhe o time, e o Voltar leva pra mochila.
+     O destino ZERA na entrada -- sem isso, um sobrando de uma passada anterior levaria quem abriu
+     pela mochila pra uma tela de jornada, no pior caso de um save que nem esta aberto. */
+  g.hmVoltarPara = 'wild';
+  S.abrirEnsinarHm('hm01');
+  ok('abrir pela mochila zera o destino de volta', !g.hmVoltarPara, String(g.hmVoltarPara));
+  ok('e ela volta a pedir o time', g.hmTimeAberto == null && /Johto/.test(S.renderHmAlvo()));
+  S.sairDoEnsinarHm();
+  ok('e o Voltar dela leva pra mochila', g.screen === 'tmhm', g.screen);
+
+  /* ⚠️ MAQUINA QUE NINGUEM DESTE TIME APRENDE FICA APAGADA, COM O MOTIVO -- e nao escondida.
+     Clicavel, ela cairia no fallback do telaDoTimeDaMaquina, que e a lista de TIMES: o atalho
+     viraria justamente a tela que ele pula. */
+  monta();
+  g.team = [ mk('gastly', 30), mk('haunter', 40) ];   // nenhum dos dois corta
+  g.saveSlots[0].team = g.team;
+  S.abrirTimeModal();
+  S.trocarAbaDoTimeModal('tmhm');
+  {
+    const t = S.renderTimeModal();
+    ok('a Maquina continua na lista', /HM01/.test(t));
+    ok('mas desabilitada, dizendo por que', /disabled/.test(t) && /ningu.m deste time aprende/.test(t),
+       limpo(t).slice(0, 100));
+  }
+  const antes = g.screen;
+  S.ensinarMaquinaNesteTime('hm01');
+  ok('e a acao RECUSA (nao e so a tela)', g.screen === antes, g.screen);
+
+  /* Sem Maquina nenhuma: a mesma frase da mochila. */
+  g.hms = [];
+  ok('sem nenhuma, a aba diz Nenhum TM/HM', /Nenhum TM\/HM/.test(S.timeModalMaquinasHtml()));
+  S.fecharTimeModal();
+}
+
+console.log('\n=== CRASE DENTRO DE COMENTARIO HTML (a armadilha da casa) ===');
+{
+  /* ⚠️ ESTA TRAVA NASCEU DE UM DEFEITO MEU, no mesmo dia (14/09/2026): escrevi o nome de uma classe
+     entre crases num comentario <!-- --> que vive DENTRO de um template literal. A crase FECHA a
+     string, e o que vem depois vira template TAGUEADO -- o `node --check` passa (continua JS valido)
+     e a tela morre so no navegador, com "(...).btn is not a function".
+     O CLAUDE.md ja avisava disso num comentario da loja; agora a regra e cobrada. */
+  const cli = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
+  const crase = String.fromCharCode(96);
+  const comEles = (cli.match(/<!--[\s\S]*?-->/g) || []).filter(c => c.indexOf(crase) >= 0);
+  ok('nenhum comentario HTML tem crase', comEles.length === 0,
+     comEles.map(c => c.replace(/\s+/g, ' ').slice(0, 70)).join(' | ') || 'nenhum');
+}
+
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
 process.exit(falhas ? 1 : 0);
 })();

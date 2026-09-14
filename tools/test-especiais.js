@@ -1863,7 +1863,21 @@ console.log('\n=== O GOLPE APARADO NAO APARECE COM O NUMERO APARADO ===');
         const perda = seq.filter(g => danoSemGolpe(g) && g.q === lado).reduce((a,g) => a + g.d, 0);
         somaTot++;
         if(alvoAntes - dela - perda + ganho === alvoDepois) somaOk++;
-        const g2 = seq.filter(g => !g.x && g.q === lado && g.d > 0 && !g.c && !(g.tn > 1));
+        const g2cru = seq.filter(g => !g.x && g.q === lado && g.d > 0 && !g.c && !(g.tn > 1));
+        /* ⚠️ O GOLPE QUE MATOU SAI DA CONTA (14/09/2026, a pedido: *"o segundo golpe que mata vai
+           tirar só o que resta de HP do adversário"*). A suavizacao parou de reparti-lo -- e essa
+           e a diferenca entre as DUAS familias que ela sempre soube distinguir:
+             - o REVIDE MORIBUNDO e aparado por uma trava MASCARADA, entao o jogador nao tem como
+               saber por que o numero encolheu: esse continua sendo repartido, e e ele que esta
+               trava pega;
+             - o golpe que MATOU se explica sozinho (a barra do cabecalho mostra o alvo zerado), e
+               reparti-lo achatava um golpe forte de verdade num par morno -- foi o relato da
+               Kingdra shiny que parecia bater menos que uma normal.
+           A trava continua valendo pro resto: o que ela existe pra pegar e a FAIXA REABRINDO, e ali
+           a razao volta pras dezenas. Medido na troca: os pares fora da banda vao de 199 pra 960, e
+           825 deles sao o golpe que matou -- ZERO ficam sem explicacao, antes e depois. */
+        const ultimo = g2cru.length ? g2cru[g2cru.length - 1] : null;
+        const g2 = (ultimo && ultimo.hp != null && ultimo.hp <= 0) ? g2cru.slice(0, -1) : g2cru;
         if(g2.length < 2) return;
         lados++;
         /* ⚠️ A COMPARACAO E POR PESO, nao pelo numero cru -- e o ROLAMENTO obrigou isso (14/09/2026).
@@ -1904,7 +1918,13 @@ console.log('\n=== O GOLPE APARADO NAO APARECE COM O NUMERO APARADO ===');
         if((mm.golpes || []).some(g => g.x === 'faixa' || g.x === 'sono')) return;
         const seq = S.sequenciaDoConfronto(mm);
         ['p','e'].forEach(lado => {
-          const g2 = seq.filter(g => !g.x && g.q === lado && g.d > 0 && !(g.tn > 1));
+          const g2bruto = seq.filter(g => !g.x && g.q === lado && g.d > 0 && !(g.tn > 1));
+          /* ⚠️ O GOLPE QUE MATOU FICA DE FORA (14/09/2026): desde que ele deixou de ser suavizado,
+             ele mostra so o que SOBRAVA -- entao um critico que DERRUBA sai menor que o irmao sem
+             que o selo esteja mentindo: o alvo simplesmente nao tinha mais vida. E a mesma isencao
+             da banda e da escala do Rolamento, pelo mesmo motivo. */
+          const fim = g2bruto.length ? g2bruto[g2bruto.length - 1] : null;
+          const g2 = (fim && fim.hp != null && fim.hp <= 0) ? g2bruto.slice(0, -1) : g2bruto;
           const c = g2.filter(g => g.c), comuns = g2.filter(g => !g.c);
           if(!c.length || !comuns.length) return;
           /* ⚠️ A MEDIA E POR ESCALA, pelo mesmo motivo da trava acima: um critico no PRIMEIRO
@@ -1925,7 +1945,7 @@ console.log('\n=== O GOLPE APARADO NAO APARECE COM O NUMERO APARADO ===');
         });
       });
     }
-    ok('a linha do CRITICO nunca sai MENOR que a do golpe comum do mesmo atacante', pares > 30 && dobro === pares,
+  ok('a linha do CRITICO nunca sai MENOR que a do golpe comum do mesmo atacante', pares > 30 && dobro === pares,
        dobro + ' de ' + pares + (pior ? '   pior ' + pior.toFixed(2) + 'x' : ''));
   }
 
@@ -4908,10 +4928,19 @@ console.log('\n=== O ROLAMENTO DOBRA A CADA USO SEGUIDO (14/09/2026) ===');
      bug onde e regra -- a mesma licao do selo de critico, que voltou por isso. */
   {
     let m = null;
-    for(let i = 0; i < 300 && !m; i++){
-      const a = [mk('golem', 50, ['rollout'])], b = [mk('shuckle', 55, ['rockthrow'])];
+    /* ⚠️ MAIS TENTATIVAS, e um alvo mais DURO: precisa de dois usos escalados que NAO matam, e o
+       golpe que mata deixou de servir de prova desde 14/09/2026. Com o Shuckle nivel 55 o Golem
+       derrubava no segundo uso quase sempre. */
+    for(let i = 0; i < 1200 && !m; i++){
+      const a = [mk('golem', 50, ['rollout'])], b = [mk('shuckle', 75, ['rockthrow'])];
       const x = (S.simulateGymBattle(a, b, S.makeSeededRng('rl' + i)).matchups || [])[0];
-      if(x && (x.golpes || []).filter(g => g.rl > 1).length >= 2) m = x;
+      /* ⚠️ PRECISA DE DOIS USOS ESCALADOS QUE NAO MATAM: desde 14/09/2026 o golpe que mata mostra
+         so o que sobrava, entao um Rolamento que derruba no 2o uso nao serve pra provar que a
+         escala cresce -- ele encolhe por outro motivo, e legitimo. */
+      const escalados = x ? (x.golpes || []).filter(g => !g.x && g.q === 'p' && g.rl > 1) : [];
+      const ult = escalados.length ? escalados[escalados.length - 1] : null;
+      const uteis = (ult && ult.hp != null && ult.hp <= 0) ? escalados.length - 1 : escalados.length;
+      if(uteis >= 2) m = x;
     }
     ok('achei um confronto com o Rolamento escalando', !!m);
     if(m){
@@ -4926,8 +4955,13 @@ console.log('\n=== O ROLAMENTO DOBRA A CADA USO SEGUIDO (14/09/2026) ===');
       const html = S.passosHtml(m);
       ok('e o selo do log mostra o x2 e o x4', /Rolamento \u00d72/.test(html) && /Rolamento \u00d74/.test(html),
          html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').match(/Rolamento[^.]{0,20}/g).join(' | '));
-      /* e o numero na tela CRESCE, que e a mecanica */
-      const ds = seq.filter(g => !g.x && g.q === 'p' && g.rl > 1).map(g => g.d);
+      /* e o numero na tela CRESCE, que e a mecanica.
+         ⚠️ O GOLPE QUE MATOU FICA DE FORA (14/09/2026): desde que ele deixou de ser suavizado, ele
+         mostra so o que sobrava -- e um Rolamento que mata no 3o uso sai MENOR que o 2o sem que a
+         escala tenha deixado de crescer. O que a trava cobra e a mecanica, nao o resto da barra. */
+      const rs = seq.filter(g => !g.x && g.q === 'p' && g.rl > 1);
+      const ultimoR = rs.length ? rs[rs.length - 1] : null;
+      const ds = ((ultimoR && ultimoR.hp != null && ultimoR.hp <= 0) ? rs.slice(0, -1) : rs).map(g => g.d);
       ok('e o dano cresce junto', ds.length >= 2 && ds[1] > ds[0], ds.join(' -> '));
     }
   }
@@ -5457,6 +5491,111 @@ console.log('\n=== QUEM ESTA RASPANDO NAO DERRUBA UM POKEMON CHEIO NUM GOLPE (14
        /const MORIBUNDO_ABAIXO_DE = 0\.10;/.test(cli) && /const MORIBUNDO_ABAIXO_DE = 0\.10;/.test(srv) &&
        /const MORIBUNDO_TETO_NO_CHEIO = 0\.70;/.test(cli) && /const MORIBUNDO_TETO_NO_CHEIO = 0\.70;/.test(srv));
     ok('e a funcao tambem', /function tetoDeQuemRaspa|const tetoDeQuemRaspa/.test(cli) && /const tetoDeQuemRaspa/.test(srv));
+  }
+}
+
+console.log('\n=== O GOLPE QUE MATA MOSTRA O QUE SOBROU, E OS DE ANTES O TAMANHO REAL (14/09/2026) ===');
+{
+  /* Pedido depois de um print: uma Kingdra SHINY parecendo bater menos que uma normal. A causa era
+     o golpe dela ter sido o que MATOU -- o diario grava o dano EFETIVO --, e a suavizacao de 12/09
+     ainda repartia o par, achatando um golpe forte de verdade (180) num par morno (110 e 110).
+     *"Passa a ser o golpe REAL, porem o segundo golpe que mata vai tirar so o que resta de HP do
+     adversario"* -- e com isso a soma CONTINUA fechando com a barra, porque o resto E o que faltava.
+     ⚠️ SAO DUAS FAMILIAS, e so uma muda: o REVIDE MORIBUNDO continua sendo suavizado (a trava dele e
+     MASCARADA por decisao, entao sem a suavizacao o jogador le "o mesmo golpe escalou"). */
+  const mk3 = (id, lv, sh) => { const p = S.createInstance(id, lv); p.shiny = !!sh; p.maxHp = S.calcMaxHp(p); p.hp = p.maxHp; p.ataques = S.ataquesPadrao(p); return p; };
+  let achei = null, conf = 0, fechou = 0, semExplicacao = 0, comMorte = 0;
+  for(let b = 0; b < 400; b++){
+    const meu = [mk3('kingdra', 60, true), mk3('gyarados', 60, false), mk3('alakazam', 60, false)];
+    const dela = S.equiparNpc([mk3('kingdra', 60, false), mk3('dragonite', 60, false), mk3('starmie', 60, false)]);
+    const r = S.simulateGymBattle(meu, dela, S.makeSeededRng('KM' + b));
+    (r.matchups || []).forEach(m => {
+      const seq = S.sequenciaDoConfronto(m);
+      ['p','e'].forEach(lado => {
+        const gs = seq.filter(g => !g.x && g.q === lado && g.d > 0);
+        if(gs.length < 2) return;
+        conf++;
+        const ultimo = gs[gs.length - 1];
+        const matou = ultimo.hp != null && ultimo.hp <= 0;
+        /* A SOMA DO LADO tem que continuar batendo com o que o alvo perdeu.
+           ⚠️ A CONTA E A MESMA DA VARREDURA GRANDE deste arquivo, e ela nao e obvia: alem dos golpes
+           entram a AUTODESTRUICAO (que segue a convencao do `q` nas duas entradas), o que o alvo
+           GANHOU no meio (cura, pocao, drenagem, furia) e o que ele perdeu SEM ser golpe do outro
+           lado (o `danoSemGolpe`: drenagem, confusao e Furia do Dragao). Escrita pela metade, ela
+           acusa ~9% de falso positivo -- foi o que a primeira versao desta trava fez. */
+        const alvoAntes = lado === 'p' ? m.enemyHpBefore : m.playerHpBefore;
+        const alvoDepois = lado === 'p' ? m.enemyHpAfter : m.playerHpAfter;
+        const dela = seq.filter(g => (!g.x || g.x === 'boom' || g.x === 'boomself') && g.q === lado).reduce((a, g) => a + g.d, 0);
+        const ganho = seq.filter(g => (g.x === 'recover' || g.x === 'pocao' || g.x === 'absorb' || g.x === 'furia') && g.q !== lado).reduce((a, g) => a + g.d, 0);
+        const perda = seq.filter(g => danoSemGolpe(g) && g.q === lado).reduce((a, g) => a + g.d, 0);
+        if(alvoAntes - dela - perda + ganho === alvoDepois) fechou++;
+        if(matou) comMorte++;
+        /* NENHUM par pode ficar sem explicacao: ou cabe na banda, ou e o golpe final, ou tem
+           critico / Rolamento / multi-tapa pra explicar. */
+        const d = gs.map(g => g.d), mx = Math.max.apply(null, d), mn = Math.min.apply(null, d);
+        if(mx > mn * 1.30){
+          const explicado = (matou && ultimo.d === mn) || gs.some(g => g.c || g.rl > 1 || g.tn > 1);
+          if(!explicado) semExplicacao++;
+        }
+        if(!achei && matou && gs.length === 2 && gs[0].d > gs[1].d * 2) achei = gs.map(g => g.d);
+      });
+    });
+  }
+  ok('a amostra tem lados com 2+ linhas', conf > 500, conf + ' lados, ' + comMorte + ' terminando em morte');
+  ok('o primeiro golpe sai GRANDE e o ultimo so termina de matar', !!achei, achei ? achei.join(' e ') : '(nao achei)');
+  ok('e a soma continua fechando com a barra', fechou === conf, fechou + ' de ' + conf);
+  ok('e NENHUM par fica sem explicacao na tela', semExplicacao === 0, semExplicacao + ' de ' + conf);
+
+  /* ⚠️ E O REVIDE MORIBUNDO CONTINUA SUAVIZADO -- ele e a outra familia, e a trava dele e mascarada.
+     A varredura da banda (bem acima neste arquivo) e quem cobra isso, e ela isenta so o golpe final. */
+  {
+    const cli = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
+    const fn = cli.slice(cli.indexOf('const suavizarAparados ='), cli.indexOf('const reais = expandirRemoinho'));
+    /* ⚠️ COMPARACAO LITERAL, sem regex: as chaves e os parenteses destas linhas viram classe de
+       caractere e grupo numa expressao regular, e a trava passa a casar com quase tudo. */
+    ok('a suavizacao tira o golpe final do bolo',
+       fn.indexOf('const matou = ultimo >= 0 && saida[ultimo].hp != null && saida[ultimo].hp <= 0;') >= 0 &&
+       fn.indexOf('const bolo = matou ? idx.slice(0, -1) : idx;') >= 0);
+    ok('mas continua repartindo o RESTO (o revide moribundo)',
+       fn.indexOf('if(bolo.length < 2) return;') >= 0 && fn.indexOf('const total = ds.reduce') >= 0);
+  }
+}
+
+console.log('\n=== A PAUSA DE LEITURA VALE NO ULTIMO PASSO TAMBEM (14/09/2026) ===');
+{
+  /* Reportado: *"a mensagem de fim da danca da chuva nao esta esperando 1,5s para ela seguir com o
+     processo depois"*. O ramo do passo do MEIO ja somava o `pausaDaFaixa`; o do ULTIMO passo nao.
+     So uma abertura cai ali SEMPRE -- o `chuvafim`, que fecha o confronto por desenho --, e era por
+     isso que so ela tinha sido relatada. */
+  const mk4 = (id, lv) => { const p = S.createInstance(id, lv); p.maxHp = S.calcMaxHp(p); p.hp = p.maxHp; p.ataques = S.ataquesPadrao(p); return p; };
+  let achei = null;
+  for(let i = 0; i < 900 && !achei; i++){
+    const a = [mk4('blastoise', 60), mk4('gyarados', 60)];
+    const b = S.equiparNpc([mk4('charizard', 60), mk4('arcanine', 60)]);
+    const r = S.simulateGymBattle(a, b, S.makeSeededRng('cf' + i));
+    (r.matchups || []).forEach(m => {
+      if(achei) return;
+      const seq = S.buildAnimatedHitSequence(m);
+      if(seq.length && seq[seq.length - 1].x === 'chuvafim') achei = seq;
+    });
+  }
+  ok('achei um confronto que TERMINA com a frase da chuva', !!achei);
+  if(achei){
+    const ult = achei[achei.length - 1];
+    ok('o ultimo passo leva a marca de leitura', !!ult.leitura);
+    ok('e a pausa dele e a de 1,5s', S.pausaDaFaixa(ult) === S.PAUSA_LEITURA_ESPECIAL_MS,
+       S.pausaDaFaixa(ult) + 'ms');
+  }
+  /* ⚠️ E OS QUATRO LACOS SOMAM ELA no ramo do ultimo passo. Os casos acima medem a marca, nao o
+     laco -- sem esta leitura do codigo, um laco que esquecesse a soma passaria. Deixar em um so era
+     garantir que a mesma frase durasse tempos diferentes na Elite, na Torre e na liga assistida. */
+  {
+    const cli = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
+    const lacos = ['advanceSpecialReveal', 'advanceReveal', 'advanceTrainerReveal', 'advanceLeagueWatch'];
+    const faltam = lacos.filter(n =>
+      cli.indexOf('setTimeout(' + n + ', esperaNome + hitDuration + 800 + pausaDaFaixa(hit));') < 0);
+    ok('os quatro lacos somam a pausa no ultimo passo', faltam.length === 0, faltam.join(', ') || 'os quatro');
+    ok('e nenhum ficou com o 800 solto', cli.indexOf('esperaNome + hitDuration + 800);') < 0);
   }
 }
 
