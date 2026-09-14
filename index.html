@@ -1544,6 +1544,19 @@
      o negrito deixaria de marcar o que importa. Mesmo remendo que a .kt-legenda ja faz. */
   .aviso-liga-jornada strong{ color:#fff; }
   .aviso-liga-jornada .aviso-liga-cta{ display:block; margin-top:2px; font-size:.72rem; font-weight:800; }
+  /* ⚠️ O BOTÃO DE INSCRIÇÃO NÃO USA O `.btn` DA CASA: aquele é de largura cheia com moldura de 3px,
+     e dentro da caixa do aviso ele faria o aviso parecer dois blocos empilhados. Aqui ele é a
+     chamada da própria frase -- amarelo sólido sobre o fundo translúcido dela, que é a inversão do
+     resto do bloco e o que faz o olho achá-lo sem precisar de tamanho.
+     Ele não pulsa junto: o `animation` é do container e o botão é filho, então ele herda o
+     piscar -- e um alvo de toque que pisca é mais difícil de acertar. O `animation:none` corta. */
+  .aviso-liga-jornada .aviso-liga-botao{
+    display:inline-block; margin-top:8px; padding:7px 14px;
+    font-family:var(--font-ui); font-size:.72rem; font-weight:800; cursor:pointer;
+    color:#1a1a2e; background:var(--yellow); border:2px solid #fff; border-radius:5px;
+    animation:none;
+  }
+  .aviso-liga-jornada .aviso-liga-botao:active{ transform:translateY(1px); }
   .league-wins-total-box{display:flex;align-items:center;gap:14px;}
   .league-wins-total-icon{font-size:2.2rem;flex-shrink:0;}
   .league-wins-total-num{font-family:var(--font-pixel);font-size:1.5rem;color:var(--blue-dark);line-height:1;}
@@ -4331,6 +4344,7 @@ function freshGameDefaults(){
     specialRevealPhase:'loading',
     specialResultMsg:'',
     avisoLiga:null,        // {hora} da Liga Clássica com inscrição aberta -- ver atualizarAvisoDaLiga
+    inscricaoLiga:null,    // o modal de inscrição rápida do aviso -- ver abrirInscricaoRapida
     ultimaChecagemDaLiga:0 // folga de 5min da checagem acima
   };
 }
@@ -12093,7 +12107,10 @@ async function countRegistrants(typeId, cycleId){
     return snap.size;
   } catch(e){ console.error('Erro ao contar inscritos:', e); return 0; }
 }
-async function registerForLeague(typeId, slot){
+/* ⚠️ O TERCEIRO ARGUMENTO É "NÃO SAIA DA TELA" (14/09/2026). Ele nasceu pra inscrição rápida do
+   aviso da jornada: ali o jogador está no meio de uma batalha, e mandá-lo pra tela da Liga por ter
+   se inscrito seria o oposto do que se pediu. Sem ele, a função continua fazendo o que sempre fez. */
+async function registerForLeague(typeId, slot, ficarNaTela){
   if(!game.authUser){ game.leagueError = 'Você precisa estar logado.'; render(); return; }
   const name = (game.trainerName || '').trim();
   if(!name){ game.leagueError = 'Sua conta não tem um nome de treinador definido.'; render(); return; }
@@ -12126,7 +12143,11 @@ async function registerForLeague(typeId, slot){
     if(typeId === CLASSIC_LEAGUE_TYPE){ game.avisoLiga = null; }
     game.ultimaChecagemDaLiga = 0;   // a próxima checagem relê de verdade, sem esperar a folga
     game.leagueSubmitting = false;
-    game.screen = 'league';
+    /* ⚠️ VINDO DO AVISO, a confirmação é o próprio modal: ele troca pro estado "Inscrito!" e o
+       jogador fecha quando quiser. Sem isso o modal sumia e a única pista de que deu certo era o
+       aviso ter desaparecido -- que é o mesmo que acontece quando ele EXPIRA. */
+    if(ficarNaTela){ game.inscricaoLiga = { feito: true, slot }; }
+    else { game.screen = 'league'; }
     render();
     /* A lista do time inscrito sai do game.registeredTeam, e ele só era lido ao ABRIR a tela.
        Resultado: cancelar a inscrição e entrar com OUTRO time deixava o time antigo na tela até
@@ -12138,6 +12159,8 @@ async function registerForLeague(typeId, slot){
     game.leagueSubmitting = false;
     if(e.message==='DUPLICATE' || e.message==='ACTIVE_ELSEWHERE') game.leagueError = 'Sua conta já está inscrita nessa Liga em outra rodada.';
     else { console.error(e); game.leagueError = 'Erro ao se inscrever. Confira sua conexão e tente de novo.'; }
+    /* O `leagueError` é lido pelas DUAS telas: a da Liga e o modal do aviso. Com o modal aberto,
+       deixar o erro só na tela da Liga seria falhar em silêncio na cara de quem clicou. */
     render();
   }
 }
@@ -16205,7 +16228,17 @@ function renderSpecialIntro(){
   <div class="box cursor">
     <p>${cfg.meta.intro||''}</p>
   </div>
-  <button class="btn primary" onclick="runSpecialBattle()">Encarar ➜</button>`;
+  <button class="btn primary" onclick="runSpecialBattle()">Encarar ➜</button>
+  ${/* ⚠️ O AVISO DA LIGA FALTAVA NAS TELAS DA BATALHA ESPECIAL (14/09/2026, reportado: *"não
+       apareceu a mensagem para se inscrever na liga clássica naquela tela, porém ela exibe em
+       outras"*). Ele estava em três renders -- `renderPreBattle`, `renderBattling` e
+       `renderBattleResult` --, e a batalha do RIVAL, da ROCKET, da ELITE e da VIGÍLIA tem renders
+       PRÓPRIOS. São os mesmos três momentos da jornada, em outra função: a escada de telas nasceu
+       com o botão de busca online e ninguém lembrou das especiais quando elas ganharam tela própria.
+       É o mesmo tipo de omissão que acabara de ser consertada nos banners de intro, no mesmo dia --
+       um conjunto espalhado por vários renders é onde a próxima omissão se esconde. O teste agora
+       cobra o CONJUNTO. */''}
+  ${botaoBuscaOnlineHtml()}`;
 }
 function renderSpecialBattling(){
   const matchups = game.specialBattleResult.matchups;
@@ -16244,7 +16277,8 @@ function renderSpecialBattling(){
           ? statusDoConfrontoHtml(m, game.specialHitStep, game.specialLastHit)
           : `<p class="battle-result-line">${matchupResultLine(m)}!${suddenDeathNote(m)}</p>`))
     }</div>
-  </div>`;
+  </div>
+  ${botaoBuscaOnlineHtml()}`;
 }
 function renderSpecialResult(){
   const r = game.specialBattleResult;
@@ -16281,7 +16315,8 @@ function renderSpecialResult(){
     <h2>Time adversário</h2>
     <div class="status-list">${renderEnemyStatus(r.brockStatus)}</div>
   </div>` : ''}
-  <button class="btn primary" onclick="seguirDoResultado('special')">Continuar ➜</button>`;
+  <button class="btn primary" onclick="seguirDoResultado('special')">Continuar ➜</button>
+  ${botaoBuscaOnlineHtml()}`;
 }
 function renderRocketHideout(){
   const stage = game.hideoutStage||0;
@@ -20022,7 +20057,11 @@ function renderJourneyEnd(){
         </div>
       </div>`;
     }).join('')}
-  </div>`;
+  </div>
+  ${/* ⚠️ E O FIM DA JORNADA ENTROU JUNTO, e ele é o lugar mais óbvio de todos: quem chega aqui
+       ACABOU de fechar as 8 insígnias, ou seja é exatamente quem a Liga Clássica aceita. O convite
+       estava em toda tela de batalha e faltava justamente na que produz o inscrito. */''}
+  ${botaoBuscaOnlineHtml()}`;
 }
 
 // nome do treinador com o 🏆 permanente de quem venceu a Elite 4 -- o troféu NUNCA entra no nome
@@ -23342,12 +23381,89 @@ function minutosParaALiga(){
   const m = Math.round((aviso.hora - agoraServidor()) / 60000);
   return m > 0 ? m : null;
 }
+/* ⚠️ O BOTÃO DE INSCRIÇÃO MORA DENTRO DO AVISO (14/09/2026, a pedido: *"teria como adicionar um
+   botão na mensagem de aviso para se inscrever na liga clássica... e automaticamente já abre um
+   modal da mesma tela de Escolher time, e então ele escolhe e já inscreve automaticamente, sem
+   precisar entrar na tela de liga"*).
+   Ele só aparece pra quem TEM time campeão: o aviso já nasce só pra quem pode se inscrever, mas
+   `timeElegiveisOnline` (que decide se o bloco inteiro sai) e `savesCampeoes` não são a mesma
+   pergunta -- um botão que abre um modal vazio é pior que botão nenhum.
+   ⚠️ E ELE NÃO É UM `.btn` DA CASA: aqueles são de largura cheia e moldura de 3px, e um deles
+   dentro da caixa do aviso faria o aviso parecer dois blocos empilhados. Aqui ele é a chamada da
+   própria frase, e por isso herda a cor dela. */
 function avisoLigaHtml(){
   const min = minutosParaALiga();
   if(min == null) return '';
+  const temTime = savesCampeoes().length > 0;
   return `<div class="aviso-liga-jornada">🏆 <strong>Liga Clássica</strong> começa em
     <strong class="nao-quebra">${min} ${min === 1 ? 'minuto' : 'minutos'}</strong>!
-    <span class="aviso-liga-cta">Inscreva seu time e concorra ao prêmio!</span></div>`;
+    <span class="aviso-liga-cta">Inscreva seu time e concorra ao prêmio!</span>
+    ${temTime ? `<button class="aviso-liga-botao" onclick="abrirInscricaoRapida()">Clique aqui para se inscrever</button>` : ''}</div>`;
+}
+/* ⚠️ A INSCRIÇÃO RÁPIDA. Ela usa o MESMO `registerForLeague` da tela da Liga -- e isso é a decisão:
+   ali moram a checagem das 8 insígnias, o `ensureRegisteringCycle`, a trava de "já inscrito em
+   outra rodada" e a transação que impede inscrição dupla. Uma segunda inscrição escrita aqui
+   divergiria dela no primeiro ajuste, e o que ela protege é o chaveamento.
+   O que muda é só PRA ONDE SE VOLTA: a tela da Liga manda pra `league`, e daqui o jogador está no
+   meio de uma batalha -- tirá-lo dali por ter se inscrito seria o oposto do "sem precisar entrar
+   na tela de liga". */
+function abrirInscricaoRapida(){
+  game.inscricaoLiga = { feito: false, slot: null };
+  game.leagueError = null;   // ela pode ter sobrado de uma visita anterior à tela da Liga
+  render();
+}
+function fecharInscricaoRapida(){ game.inscricaoLiga = null; render(); }
+function renderInscricaoLigaModal(){
+  const st = game.inscricaoLiga;
+  if(!st) return '';
+  if(st.feito){
+    const s2 = (game.saveSlots || [])[st.slot] || {};
+    const nome = s2.customName || ('Time ' + ((st.slot || 0) + 1));
+    return `
+    <div class="modal-overlay" onclick="fecharInscricaoRapida()">
+      <div class="modal-box" onclick="event.stopPropagation()">
+        <div class="modal-icon">🏆</div>
+        <h2>Inscrito!</h2>
+        <p class="hint-text"><strong>${escapeHtmlSafe(nome)}</strong> está na Liga Clássica. O chaveamento sai na hora marcada — dá pra acompanhar pela tela da Liga.</p>
+        <button class="btn" onclick="fecharInscricaoRapida()">Fechar</button>
+      </div>
+    </div>`;
+  }
+  const elegiveis = savesCampeoes();
+  return `
+  <div class="modal-overlay" onclick="fecharInscricaoRapida()">
+    <div class="modal-box" onclick="event.stopPropagation()">
+      <h2>Qual time vai representar você?</h2>
+      <p class="hint-text">Só times que já venceram as 8 insígnias podem se inscrever. Sua conta só pode ter <strong>1 time</strong> inscrito por vez.</p>
+      ${game.leagueError ? `<p class="error-text">${escapeHtmlSafe(game.leagueError)}</p>` : ''}
+      ${elegiveis.map(slot => {
+        const sv = game.saveSlots[slot];
+        const time = sv.team || [];
+        const nome = sv.customName || ('Time ' + (slot + 1));
+        /* ⚠️ O CARD É O MESMO DA TELA DA LIGA (e o mesmo da home): a estrela com a média e a
+           fileira de sprites. É por ele que o jogador reconhece um time, e um formato próprio aqui
+           obrigaria a reaprender a ler no meio da decisão. */
+        const media = time.length ? Math.round(time.reduce((a, p) => a + (p.level || 0), 0) / time.length) : 0;
+        return `<button class="save-slot-card ${time.length ? 'has-avg-star' : ''} clickable" ${game.leagueSubmitting ? 'disabled' : ''}
+            onclick="registerForLeague(CLASSIC_LEAGUE_TYPE, ${slot}, true)">
+          <div class="save-slot-top">
+            <span class="team-avg-star" title="Média de nível do time">${STAR_SVG}<span class="team-avg-star-num">${media}</span></span>
+            <span class="save-slot-name"><span class="team-avg-star-name">${escapeHtmlSafe(nome)}</span></span>
+          </div>
+          <div class="save-slot-team-row spread">
+            ${time.map(p => {
+              const sp = SPECIES[p.speciesId];
+              return `<div class="save-slot-mon">
+                <div class="save-slot-mon-sprite">${sp ? spriteHtml(p.speciesId, 'sprite-sm', p.shiny) : '❔'}</div>
+                <div class="save-slot-mon-level">Lv.${p.level}</div>
+              </div>`;
+            }).join('')}
+          </div>
+        </button>`;
+      }).join('')}
+      <button class="btn secondary" onclick="fecharInscricaoRapida()">${game.leagueSubmitting ? 'Inscrevendo...' : 'Cancelar'}</button>
+    </div>
+  </div>`;
 }
 /* Lê o ciclo aberto e a sua inscrição: duas leituras, no MÁXIMO uma a cada 5 minutos. O ciclo vira
    de hora em hora, então essa folga não atrasa nada que importe.
@@ -25757,6 +25873,8 @@ function render(){
   if(game.renameSlotTarget!=null){ html += renderRenameSlotModal(); }
   if(game.editTrainerName){ html += renderEditTrainerNameModal(); }
   if(game.terrainInfoTarget){ html += renderTerrainInfoModal(); }
+  /* A inscrição rápida da Liga: ela é aberta do AVISO, que vive nas telas de batalha da jornada. */
+  if(game.inscricaoLiga){ html += renderInscricaoLigaModal(); }
   /* A tela inteira é redesenhada a cada toque (innerHTML novo). Quando o redesenho é da MESMA tela
      -- tocar várias vezes no "+" da distribuição de níveis, por exemplo --, a rolagem tem que ficar
      onde estava: no atalho-app ela escorregava pra baixo a cada toque e acabava mostrando a faixa

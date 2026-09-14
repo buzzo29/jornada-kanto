@@ -6852,12 +6852,24 @@ escolheu três golpes lutava a Torre com os dois primeiros**, em silêncio — o
 
 ## Batalha Online
 
-- **Dá pra ligar a busca de dentro da jornada** (`botaoBuscaOnlineHtml`, nas telas `preBattle`,
-  `battling`, `victory` e `defeat`). A busca em si SEMPRE foi global — ela roda em qualquer tela e o
-  convite aparece por cima do que estiver aberto (ver `agendarBuscaGlobal`); o que faltava era poder
-  LIGAR sem ir até a Batalha Online, e aí a jornada ficava pra trás. `startOnlineSearchAqui` é a
-  mesma `entrarNaFilaOnline`, só que sem trocar de tela.
+- **Dá pra ligar a busca de dentro da jornada** (`botaoBuscaOnlineHtml`). A busca em si SEMPRE foi
+  global — ela roda em qualquer tela e o convite aparece por cima do que estiver aberto (ver
+  `agendarBuscaGlobal`); o que faltava era poder LIGAR sem ir até a Batalha Online, e aí a jornada
+  ficava pra trás. `startOnlineSearchAqui` é a mesma `entrarNaFilaOnline`, só que sem trocar de tela.
   Fica fora da Torre e das ligas de propósito: ali o jogador já está numa disputa organizada.
+- **⚠️ SÃO SETE TELAS desde 14/09/2026, e não três.** O bloco (que leva junto o **aviso da Liga**)
+  estava só no `preBattle`, no `battling` e no `battleResult` — e a batalha do **rival**, da
+  **Rocket**, da **Elite** e da **Vigília** tem renders PRÓPRIOS: são os mesmos três momentos, em
+  outra função. Reportado com print: *"não apareceu a mensagem para se inscrever na liga clássica
+  naquela tela, porém ela exibe em outras"*.
+  **Entrou junto o FIM DA JORNADA**, que é o lugar mais óbvio de todos: quem chega ali acabou de
+  fechar as 8 insígnias, ou seja é exatamente quem a Liga aceita — era a única tela que **produz**
+  inscrito sem convidar ninguém.
+  **⚠️ O DEFEITO ERA DE OMISSÃO**, o mesmo dos banners de intro do mesmo dia: um conjunto espalhado
+  por vários renders é onde a próxima se esconde. Por isso o teste cobra o **CONJUNTO** — as sete que
+  TÊM e as quatro que **não podem ter** (Torre, ligas, online), senão "acrescentar em todo lugar"
+  passaria. E ele confere que os nomes das duas listas existem no arquivo: renomear um render faria a
+  trava passar lendo string vazia.
 - **O histórico carrega SEMPRE, inclusive com uma busca rodando.** Ele ficava depois do `return` da
   busca no `openOnlineBattle`, e o resultado era uma tela morta: quem tinha busca em segundo plano
   abria a Batalha Online, via "Procurando oponente", cancelava — e a tela dizia *"Carregando seu
@@ -6899,6 +6911,28 @@ escolheu três golpes lutava a Torre com os dois primeiros**, em silêncio — o
   sobe com qualquer sobra de segundos. Com `round`, os últimos ~30 segundos caem em zero e **o
   aviso some**, que é o certo: a cópia em memória pode estar velha, e anunciar uma inscrição que já
   fechou é pior que não anunciar. Nunca sai "em 0 minutos" nem "em −3 minutos".
+- **⚠️ E A INSCRIÇÃO ACONTECE NO PRÓPRIO AVISO desde 14/09/2026** (a pedido: *"um botão na mensagem
+  de aviso para se inscrever... e automaticamente já abre um modal da mesma tela de Escolher time,
+  e então ele escolhe e já inscreve automaticamente, sem precisar entrar na tela de liga"*). O
+  convite virava uma viagem: sair da batalha, achar as Ligas, achar a Clássica, escolher o time.
+  **⚠️ ELA REUSA O `registerForLeague` da tela da Liga, e isso é a decisão**: ali moram a checagem
+  das 8 insígnias, o `ensureRegisteringCycle`, a trava de "já inscrito em outra rodada" e a
+  transação que impede inscrição dupla. Uma segunda inscrição escrita no modal divergiria dela no
+  primeiro ajuste — e o que ela protege é o **chaveamento**.
+  O que muda é só **pra onde se volta**: o terceiro argumento (`ficarNaTela`) segura a troca de
+  tela, porque daqui o jogador está no meio de uma batalha e tirá-lo dali seria o oposto do pedido.
+  **O MODAL É O MESMO CARD da tela da Liga e da home** (a estrela com a média e a fileira de
+  sprites): é por ele que o jogador reconhece um time, e um formato próprio obrigaria a reaprender
+  a ler no meio da decisão.
+  **A CONFIRMAÇÃO É O PRÓPRIO MODAL** ("Inscrito!", nomeando o time). Sem ela, a única pista de que
+  deu certo era o aviso sumir — que é exatamente o que acontece quando ele **expira**.
+  **O botão só aparece pra quem TEM time campeão:** o aviso nasce pra quem pode se inscrever, mas o
+  `timeElegiveisOnline` (que decide se o bloco inteiro sai) e o `savesCampeoes` não são a mesma
+  pergunta, e um botão que abre um modal vazio é pior que botão nenhum.
+  **E ele não pisca junto com o aviso** (`animation:none`): o pulso é do container e o botão é
+  filho, então ele herdava — e um alvo de toque que pisca é mais difícil de acertar.
+  **Medido a 320px:** o botão fica em **197×32px**, o aviso vai de 74 para **114px**, o modal em
+  **280px** com dois times, e não há rolagem lateral.
 - **⚠️ ELE CRESCEU E GANHOU MOLDURA** ("aumente e deixe mais visível"). Era uma linha solta em
   **.55rem da fonte de PIXEL** — que é de título curto e, nesse tamanho, se lê de longe como
   enfeite. Hoje é a fonte de TEXTO (**.8rem**, o corpo do jogo) dentro de uma caixa com borda

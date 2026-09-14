@@ -1594,6 +1594,128 @@ console.log('\n=== CRASE DENTRO DE COMENTARIO HTML (a armadilha da casa) ===');
      comEles.map(c => c.replace(/\s+/g, ' ').slice(0, 70)).join(' | ') || 'nenhum');
 }
 
+console.log('\n=== A INSCRICAO RAPIDA PELO AVISO DA LIGA (14/09/2026) ===');
+{
+  /* Pedido: *"teria como adicionar um botao na mensagem de aviso para se inscrever na liga classica...
+     e automaticamente ja abre um modal da mesma tela quando clica no Escolher time dentro da liga
+     classica, mostrando os times que estao aptos, e entao ele escolhe e ja inscreve automaticamente,
+     sem precisar entrar na tela de liga"*. */
+  const g = S.__getGame();
+  const mk5 = (id, lv) => { const p = S.createInstance(id, lv); p.maxHp = S.calcMaxHp(p); p.hp = p.maxHp; return p; };
+  const timeA = ['venusaur','gyarados','alakazam'].map(id => mk5(id, 62));
+  const timeB = ['typhlosion','ampharos'].map(id => mk5(id, 58));
+  const monta = () => {
+    g.authUser = { uid:'u1' }; g.trainerName = 'Buzzo'; g.currentSaveSlot = 0;
+    g.saveSlots = [{ customName:'Kanto', badgeCount:8, team: timeA },
+                   { customName:'Johto', badgeCount:8, team: timeB },
+                   { customName:'Novo',  badgeCount:3, team: [mk5('pidgey', 12)] }];
+    g.team = timeA; g.screen = 'preBattle';
+    g.avisoLiga = { hora: S.agoraServidor() + 20*60000 };
+    g.inscricaoLiga = null; g.leagueError = null; g.leagueSubmitting = false;
+  };
+  monta();
+
+  ok('o aviso traz o botao, com o texto pedido', /Clique aqui para se inscrever/.test(S.avisoLigaHtml()),
+     limpo(S.avisoLigaHtml()));
+  /* ⚠️ SEM TIME CAMPEAO ELE NAO APARECE: um botao que abre um modal vazio e pior que botao nenhum.
+     O aviso nasce pra quem PODE se inscrever, mas o `timeElegiveisOnline` (que decide se o bloco
+     inteiro sai) e o `savesCampeoes` nao sao a mesma pergunta. */
+  g.saveSlots = [{ customName:'Novo', badgeCount:3, team: [mk5('pidgey', 12)] }];
+  ok('sem time campeao, o botao some', !/Clique aqui/.test(S.avisoLigaHtml()));
+  ok('mas o aviso continua', /Liga Cl.ssica/.test(S.avisoLigaHtml()));
+  monta();
+
+  /* O MODAL: os mesmos cards da tela da Liga, e SO os times de 8 insignias. */
+  S.abrirInscricaoRapida();
+  {
+    const t = S.renderInscricaoLigaModal();
+    ok('o modal abre com a mesma pergunta da tela da Liga', /Qual time vai representar voc.\?/.test(t));
+    ok('e com um card por time CAMPEAO, nao por save',
+       (t.match(/save-slot-card/g) || []).length === 2, (t.match(/save-slot-card/g) || []).length + ' cards');
+    ok('o time de 3 insignias fica de fora', !/Novo/.test(t), limpo(t).slice(0, 90));
+    /* ⚠️ E O CARD E O MESMO DA HOME (a estrela com a media), pelo mesmo motivo de sempre: e por ele
+       que o jogador reconhece um time. */
+    ok('com a estrela da media', /team-avg-star/.test(t));
+    /* ⚠️ O TERCEIRO ARGUMENTO E O QUE FAZ ELE NAO SAIR DA TELA. */
+    ok('e o clique inscreve SEM trocar de tela', /registerForLeague\(CLASSIC_LEAGUE_TYPE, \d+, true\)/.test(t),
+       (t.match(/registerForLeague\([^)]*\)/) || ['(nao achei)'])[0]);
+  }
+
+  /* A TELA DE TRAS NAO MUDA -- e o "sem precisar entrar na tela de liga" ao pe da letra. */
+  ok('abrir o modal nao troca a tela', g.screen === 'preBattle', g.screen);
+
+  /* A CONFIRMACAO: sem ela, a unica pista de que deu certo era o aviso sumir -- que e o mesmo que
+     acontece quando ele EXPIRA. */
+  g.inscricaoLiga = { feito: true, slot: 1 };
+  {
+    const t = S.renderInscricaoLigaModal();
+    ok('inscrito, o modal confirma e NOMEIA o time', /Inscrito!/.test(t) && /Johto/.test(t), limpo(t).slice(0, 80));
+    ok('e a tela de tras continua a mesma', g.screen === 'preBattle');
+  }
+
+  /* O ERRO APARECE NO MODAL: com ele aberto, deixar o erro so na tela da Liga e falhar em silencio
+     na cara de quem clicou. */
+  g.inscricaoLiga = { feito: false, slot: null };
+  g.leagueError = 'Sua conta já está inscrita nessa Liga em outra rodada.';
+  ok('o erro sai dentro do modal', /j. est. inscrita/.test(S.renderInscricaoLigaModal()));
+
+  S.fecharInscricaoRapida();
+  ok('fechar tira o modal e nao mexe na tela', !g.inscricaoLiga && g.screen === 'preBattle');
+
+  /* ⚠️ AS TRAVAS QUE LEEM O CODIGO: os casos acima chamam as funcoes na mao. */
+  {
+    const cli = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
+    /* A INSCRICAO E A MESMA da tela da Liga -- ali moram a checagem das 8 insignias, o
+       ensureRegisteringCycle, a trava de "ja inscrito em outra rodada" e a transacao que impede
+       inscricao dupla. Uma segunda escrita aqui divergiria dela no primeiro ajuste. */
+    ok('a inscricao rapida REUSA o registerForLeague',
+       (cli.match(/registerForLeague\(/g) || []).length >= 3 &&
+       cli.indexOf('async function registerForLeague(typeId, slot, ficarNaTela)') >= 0);
+    ok('e o ficarNaTela e o que segura a troca de tela',
+       cli.indexOf('if(ficarNaTela){ game.inscricaoLiga = { feito: true, slot }; }') >= 0);
+    /* o modal precisa ser ANEXADO pelo render, senao ele nunca chega na tela */
+    ok('o render anexa o modal', /if\(game\.inscricaoLiga\)\{ html \+= renderInscricaoLigaModal\(\); \}/.test(cli));
+    /* ⚠️ O BOTAO NAO PISCA JUNTO com o aviso: o `animation` e do container e o botao e filho, entao
+       ele herda o piscar -- e um alvo de toque que pisca e mais dificil de acertar. */
+    const css = (cli.match(/\.aviso-liga-jornada \.aviso-liga-botao\{[^}]*\}/) || [''])[0];
+    ok('e ele nao herda o pulso do aviso', /animation:none/.test(css), css.replace(/\s+/g, ' ').slice(0, 80));
+
+    /* ⚠️ O CONJUNTO DE TELAS, e nao cada uma solta (14/09/2026, reportado: *"nao apareceu a mensagem
+       para se inscrever na liga classica naquela tela, porem ela exibe em outras"*).
+       O aviso estava em TRES renders -- preBattle, battling e battleResult --, e a batalha do RIVAL,
+       da ROCKET, da ELITE e da VIGILIA tem renders PROPRIOS: os mesmos tres momentos, em outra
+       funcao. E faltava tambem no FIM DA JORNADA, que e onde nasce o campeao -- exatamente quem a
+       Liga aceita.
+       ⚠️ A TRAVA E SOBRE O CONJUNTO porque o defeito e de OMISSAO: uma lista espalhada por varios
+       renders e onde a proxima se esconde. E a mesma licao dos banners de intro, do mesmo dia. */
+    const corpoDe = nome => {
+      const l = cli.split('\n');
+      const i = l.findIndex(x => new RegExp('^function ' + nome + '\\s*\\(').test(x));
+      if(i < 0) return '';
+      let j = i + 1;
+      while(j < l.length && !/^function /.test(l[j])) j++;
+      return l.slice(i, j).join('\n');
+    };
+    const COM_AVISO = ['renderPreBattle','renderBattling','renderBattleResult',
+                       'renderSpecialIntro','renderSpecialBattling','renderSpecialResult','renderJourneyEnd'];
+    /* ⚠️ E ONDE ELE NAO PODE ESTAR: na Torre e nas ligas o jogador JA esta numa disputa organizada,
+       e chamar pra outra no meio dela nao faz sentido. Sem esta metade, "acrescentar em todo lugar"
+       passaria no teste. */
+    const SEM_AVISO = ['renderTrainerBattling','renderTrainerTower','renderLeague','renderOnlineBattle'];
+    const faltando = COM_AVISO.filter(n => !/botaoBuscaOnlineHtml/.test(corpoDe(n)));
+    const sobrando = SEM_AVISO.filter(n => /botaoBuscaOnlineHtml/.test(corpoDe(n)));
+    ok('o aviso esta nas SETE telas da jornada', faltando.length === 0,
+       faltando.join(', ') || COM_AVISO.length + ' telas');
+    ok('e NAO esta na Torre nem nas ligas', sobrando.length === 0,
+       sobrando.join(', ') || 'nenhuma');
+    /* a lista do teste tem que bater com o arquivo: se alguem renomear um render, a trava acima
+       passaria lendo string vazia */
+    ok('e as duas listas apontam pra funcoes que existem',
+       COM_AVISO.concat(SEM_AVISO).every(n => corpoDe(n).length > 0),
+       COM_AVISO.concat(SEM_AVISO).filter(n => !corpoDe(n).length).join(', ') || 'todas existem');
+  }
+}
+
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
 process.exit(falhas ? 1 : 0);
 })();
