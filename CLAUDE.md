@@ -2913,6 +2913,54 @@ destruição; fora isso, jamais os 2 devem morrer juntos e um ficar de pé"*.
   taxa de crítico, e agora decide também quem leva a troca mortal. Não foi compensado em nada.
   **O preço na jornada está medido logo abaixo.**
 
+### QUEM JÁ ESTAVA RASPANDO NÃO LEVA REVIDE (13/09/2026)
+
+Reportado com print: *"Golem × Mr. Mime, por que o Golem tirou apenas 4 de HP, sendo que o ataque
+Terremoto é bem forte e eles eram do mesmo nível?"*.
+
+- **O MOTOR ESTAVA CERTO, e dá pra provar pelo próprio print.** O Terremoto do Golem no Mr. Mime
+  tira **348 em média — 107% da barra dele**. O que aconteceu é que o Golem tinha acabado de MORRER
+  pra uma Folha Mágica (Planta é **4×** contra Pedra/Terra: 351 num Golem de 365), aquilo era o
+  **revide moribundo**, e o Mr. Mime já estava com **23 de 331**. O piso do revide sorteou 19, e a
+  conta deu 4.
+- **⚠️ MAS O PISO FORÇAVA O VALOR SORTEADO MESMO EM QUEM JÁ ESTAVA NA FAIXA.** Ele promete que o
+  alvo **termina** entre 1% e 10% da barra; se o alvo JÁ entrou na troca dentro dessa faixa, a
+  promessa já está cumprida — descê-lo até o sorteio não acrescentava regra nenhuma, só um número
+  sem sentido na tela. Hoje ele fica exatamente onde estava, e o revide não gera linha (dano zero
+  não é golpe, pela regra de sempre).
+- **Medido:** o alvo já estava dentro da faixa em **7,9% dos confrontos**; em **1,3%** deles isso
+  virava uma LINHA com um número que não explica o golpe (nos outros o dano já dava zero e a linha
+  nem aparecia). Depois: **359 → 5**, e os 5 são artefato da conta do medidor, não do jogo.
+- **⚠️ O PREÇO NA JORNADA: −0,86 ponto de conclusão** (54,90% → 54,04%), 6 blocos de 1.200 jornadas
+  de cada lado (**7.200 de cada**), com **5 de 6 blocos** apontando pro mesmo lado — **2,0σ**, no
+  limite do ruído e para o lado difícil. Pra comparar: o +2 dos líderes foi −11,42 pontos (18σ), ou
+  seja 13× maior. O efeito existe porque o alvo do revide guarda os poucos pontos que tinha, e isso
+  vale pros dois lados — mas quem carrega HP entre confrontos com mais frequência é o time que está
+  vencendo.
+- **O REVIDE CONTINUA DOENDO quando ele NÃO ia matar** — o piso só roda quando o revide mataria
+  (`revideIaMatar`). Um Tyrogue tirando 37 de um Magneton com 45 é o dano REAL dele, e continua
+  saindo: o revide existe pra um pokémon raspando não varrer uma fila de graça.
+- **A FAIXA VIROU CONSTANTE** (`REVIDE_PISO_MIN`/`REVIDE_PISO_MAX`): ela era `0.01 + rng*0.09`
+  escrita à mão, e o caso novo precisa LER o teto dela. Dois lugares com o mesmo 10% divergiriam no
+  primeiro ajuste — e este é um número de balanceamento, ele custou 2,65 pontos quando entrou.
+- **⚠️ O SORTEIO CONTINUA SENDO LIDO** mesmo no ramo que não o usa: ler o rng um número diferente de
+  vezes desloca a semente inteira e muda batalhas que não têm revide nenhum. É a mesma armadilha que
+  o Remoinho quase trouxe, e o teste **lê o código** pra cobrar que o `pct` é calculado ANTES do ramo.
+
+**⚠️ E ESTE TESTE CUSTOU QUATRO TENTATIVAS, TODAS PELO MESMO MOTIVO: montar o cenário errado e medir
+outra coisa.** Fica registrado porque cada uma é uma armadilha de quem for escrever o próximo:
+
+| o que eu montei | por que media outra coisa |
+|---|---|
+| o alvo do revide como time **B** | o `preservePlayerHp` preserva o **A** e CURA o B -- o alvo entrava cheio |
+| um Tyranitar (vel. 61) contra um Ratata (72) | **quem bate primeiro é quem leva o revide**: os papéis invertiam |
+| o alvo com 9% da barra | o revide de um Caterpie não o mataria, o piso nem rodava, e o dano saía inteiro (legítimo) |
+| um Alakazam no painel | ele aprende **Recuperar**: entrava com 3%, se curava na abertura e lutava de barra cheia |
+
+E a quinta: o painel de "meia barra" não garante meia barra **na última troca** — num confronto
+longo o alvo chega raspando lutando, e ali o dano zero é o conserto funcionando. A asserção passou
+a olhar o HP no momento do revide, lido do diário.
+
 ### HISTÓRIA: O DESEMPATE GANHOU LINHA (09/09/2026) — a mecânica acabou em 12/09, ver acima
 
 Reportado com print: num **Raticate × Gyarados** o Gyarados aparecia atacando **duas vezes**

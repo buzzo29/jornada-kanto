@@ -4572,6 +4572,146 @@ console.log('\n=== A CAIXA QUE EXPLICA O ESPECIAL (11/09/2026) ===');
        'ficha em ' + iFicha + ', caixa em ' + iCaixa);
   }
 }
+console.log('\n=== QUEM JA ESTAVA RASPANDO NAO LEVA REVIDE ===');
+{
+  /* ⚠️ REPORTADO COM PRINT EM 13/09/2026: um Golem Lv.51 "atacando com Terremoto e tirando -4" de um
+     Mr. Mime do mesmo nivel. O Terremoto tira 348 ali em media -- 107% da barra do Mr. Mime.
+     O que aconteceu: o Golem tinha acabado de MORRER pra uma Folha Magica (Planta e 4x contra
+     Pedra/Terra), aquilo era o REVIDE MORIBUNDO, e o Mr. Mime ja estava com 23 de 331. O piso do
+     revide sorteou 19, e a conta deu 4.
+     O piso promete que o alvo TERMINA entre 1% e 10% da barra. Se ele JA entrou na troca dentro
+     dessa faixa, a promessa ja esta cumprida -- forcar o valor sorteado nao acrescentava regra
+     nenhuma, so um numero sem sentido na tela. */
+  const mk = (id, lv, ataques) => {
+    const p = S.createInstance(id, lv); p.maxHp = S.calcMaxHp(p); p.hp = p.maxHp;
+    if(ataques) p.ataques = ataques;
+    return p;
+  };
+
+  /* 1) O CASO DO PRINT, ao pe da letra. */
+  let casos = 0, semDano = 0, comLinha = 0, exemplo = '';
+  for(let i = 0; i < 4000; i++){
+    /* ⚠️ O MR. MIME E O LADO DO JOGADOR, e nao o inimigo: o `preservePlayerHp` preserva o HP do time
+       A e CURA o B. Com ele do lado do inimigo, ele entrava CHEIO e o caso do print nao acontecia --
+       o teste media outra coisa e passava. */
+    const m = [mk('mrmime', 51, ['magicalleaf'])];
+    m[0].hp = 23;   // como no print: ele vinha machucado do confronto anterior
+    const g = [mk('golem', 51, ['earthquake'])];
+    const r = S.simulateGymBattle(m, g, S.makeSeededRng('golem' + i), { preservePlayerHp: true });
+    const mt = (r.matchups || [])[0];
+    if(!mt || mt.enemyHpAfter > 0 || mt.playerHpAfter <= 0) continue;   // so quando o Golem cai e o Mime sobra
+    casos++;
+    if(mt.playerHpAfter === 23) semDano++;
+    const texto = String(S.passosHtml(mt)).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ');
+    if(texto.indexOf('Golem atacou') >= 0){ comLinha++; if(!exemplo) exemplo = texto.trim().slice(0, 150); }
+  }
+  ok('o caso do print acontece na amostra', casos > 100, casos + ' confrontos');
+  ok('o Mr. Mime termina com os 23 que tinha -- o revide nao tira nada',
+     casos > 0 && semDano === casos, semDano + ' de ' + casos);
+  ok('e o Golem nao vira linha no log', comLinha === 0, comLinha + (exemplo ? '   ex: ' + exemplo : ''));
+
+  /* 2) A VARREDURA -- e ⚠️ ELA PRECISA DE UM PAINEL EM QUE O REVIDE MATARIA, que e a unica situacao
+        em que o piso roda (`revideIaMatar = segundoCaiu && first.hp <= 0`). A primeira versao deste
+        bloco varria batalhas quaisquer e cobrava "nenhum revide tira dano de quem esta raspando" --
+        e acusava 23 casos que estavam CERTOS: um Tyrogue tirando 37 de um Magneton com 45 e o dano
+        REAL dele, nao um numero aparado. O piso nem tinha rodado ali.
+        Aqui o atacante e sempre muito mais forte que o alvo, e o alvo entra raspando: o revide
+        mataria, o piso roda, e o conserto tem que zerar o dano. */
+/* ⚠️ TODO FORTE E MAIS RAPIDO QUE TODO FRACO, e isso e a coisa toda: quem bate PRIMEIRO e quem
+     leva o revide. Com um Tyranitar (61) contra um Ratata (72), o rato batia primeiro, matava o
+     Tyranitar, e quem revidava era o Tyranitar -- os papeis invertiam e o teste media outra coisa
+     (acusou 455 "furos" que eram so isso). Aqui o mais lento dos fortes (80) passa do mais rapido
+     dos fracos (50). */
+  const FORTES = ['aerodactyl','jolteon','alakazam','arcanine','dragonite','gyarados'];
+    const FRACOS = ['caterpie','metapod','kakuna','weedle','slowpoke','shuckle'];
+  let casosDoPiso = 0, comDano = 0, exemploFuro = '';
+  for(let i = 0; i < 1200; i++){
+    /* ⚠️ O ALVO DO REVIDE E O LADO A. O `preservePlayerHp` preserva o time A e CURA o B -- com o
+       alvo do lado B ele entrava CHEIO, o revide nao o mataria, o piso nem rodava, e o teste media
+       outra coisa (acusou 802 "furos" que eram so isso). E o mesmo tropeco do bloco de cima, pelo
+       outro lado.
+       Entao: o FORTE e o jogador e entra raspando; o FRACO, cheio, e o que morre e revida. */
+    const forte = [mk(FORTES[i % FORTES.length], 50)];
+    forte[0].ataques = S.ataquesPadrao(forte[0]);
+    /* ⚠️ O ALVO ENTRA COM 1% A 3%, e nao com 2% a 9%: o piso so roda quando o revide MATARIA
+       (`revideIaMatar = segundoCaiu && first.hp <= 0`). Com 9% da barra, o revide de um Caterpie
+       nao mata um Aerodactyl e sai inteiro -- legitimo, e o teste acusava isso como furo (212
+       deles). Com 1-3%, qualquer revide mataria, e o que se ve e o piso trabalhando. */
+    forte[0].hp = Math.max(1, Math.round(forte[0].maxHp * (0.01 + (i % 3) * 0.01)));
+    const fraco = [mk(FRACOS[i % FRACOS.length], 50)];
+    fraco[0].ataques = S.ataquesPadrao(fraco[0]);
+    const antesDoRevide = forte[0].hp;
+    const r = S.simulateGymBattle(forte, fraco, S.makeSeededRng('piso' + i), { preservePlayerHp: true });
+    const mt = (r.matchups || [])[0];
+    if(!mt) continue;
+    /* ⚠️ SEM ABERTURA no confronto. O Alakazam do painel aprende RECUPERAR: entrando com 3% ele se
+       cura ANTES da luta e vai pra barra cheia -- e ai o HP que este teste guardou nao e o HP no
+       momento do revide (acusou 18 "furos" com o alvo sobrando 207 de quem "tinha 10"). A drenagem,
+       a pocao e a furia fazem o mesmo. */
+    if((mt.golpes || []).some(x => x.x)) continue;
+    const grupo = (mt.golpes || []).filter(x => !x.x && x.m);
+    if(!grupo.length) continue;
+    casosDoPiso++;
+    const dano = grupo.reduce((a, x) => a + x.d, 0);
+    if(mt.playerHpAfter !== antesDoRevide || dano !== 0){
+      comDano++;
+      if(!exemploFuro) exemploFuro = mt.enemy + ' revidou em ' + mt.player + ': tirou ' + dano +
+        ' de quem tinha ' + antesDoRevide + '/' + mt.playerMaxHp + ' (sobrou ' + mt.playerHpAfter + ')';
+    }
+  }
+  ok('a varredura tem casos do piso de sobra', casosDoPiso > 300, casosDoPiso + ' revides contra alvo raspando');
+  ok('e NENHUM deles tira dano', comDano === 0, comDano + (exemploFuro ? '   ex: ' + exemploFuro : ''));
+  /* ⚠️ E O REVIDE LEGITIMO CONTINUA DOENDO: quem nao ia matar tira o dano dele, mesmo contra alvo
+     raspando. Sem esta metade, "zerar tudo" passaria no teste -- e o revide existe justamente pra
+     um pokemon raspando nao varrer uma fila de graca. */
+  {
+    let legitimos = 0, comDanoReal = 0;
+    for(let i = 0; i < 900; i++){
+      const fraco = [mk(FRACOS[i % FRACOS.length], 50)];
+      fraco[0].ataques = S.ataquesPadrao(fraco[0]);
+      const forte = [mk(FORTES[i % FORTES.length], 50)];
+      forte[0].ataques = S.ataquesPadrao(forte[0]);
+      /* agora o alvo do revide entra com MEIA barra: o revide do fraco nao mata, e deve doer.
+         Mesma regra de lados do bloco acima -- o alvo e o A, senao ele entra cheio. */
+      forte[0].hp = Math.round(forte[0].maxHp * 0.5);
+      const r = S.simulateGymBattle(forte, fraco, S.makeSeededRng('leg' + i), { preservePlayerHp: true });
+      const mt = (r.matchups || [])[0];
+      if(!mt) continue;
+      /* ⚠️ SEM GOLPE ESPECIAL no confronto: a autodestruicao, a confusao e a drenagem mudam quem
+         cai e com quanto, e ai o revide deixa de ser o que este caso quer medir. Sao 14 em 895 --
+         pequeno, mas e a diferenca entre cobrar 100% e cobrar "quase sempre". */
+      if((mt.golpes || []).some(x => x.x)) continue;
+      const grupo = (mt.golpes || []).filter(x => !x.x && x.m);
+      if(!grupo.length) continue;
+      /* ⚠️ E O ALVO TEM QUE ESTAR ACIMA DA FAIXA NO MOMENTO DO REVIDE, nao no comeco: num confronto
+         de varias trocas ele chega raspando lutando, e ai o dano ZERO e o conserto funcionando --
+         nao um furo. Foram 4 em 771 assim, todos Dragonite com 16/371 na ultima troca. */
+      const dano = grupo.reduce((a, x) => a + x.d, 0);
+      const antes = grupo[grupo.length - 1].hp + dano;
+      if(antes <= mt.playerMaxHp * 0.10) continue;
+      legitimos++;
+      if(dano > 0) comDanoReal++;
+    }
+    ok('o revide que NAO mataria continua tirando o dano dele',
+       legitimos > 100 && comDanoReal === legitimos, comDanoReal + ' de ' + legitimos);
+  }
+
+  /* 3) ⚠️ O SORTEIO CONTINUA SENDO LIDO -- ler o rng um numero diferente de vezes desloca a semente
+        e muda batalhas que nao tem revide nenhum. O teste le o CODIGO porque isso nao aparece em
+        nenhum resultado: o `pct` tem que ser calculado ANTES do ramo, nao dentro dele. */
+  {
+    const txt = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
+    const bloco = (txt.match(/const revideIaMatar[\s\S]{0,2200}?apararRevide\(saiuNoPrimeiro/) || [''])[0];
+    const iSorteio = bloco.indexOf('const pct =');
+    const iRamo = bloco.indexOf('const jaRaspando');
+    ok('o sorteio do piso acontece antes do ramo (a semente nao desloca)',
+       iSorteio > 0 && iRamo > iSorteio, 'sorteio em ' + iSorteio + ', ramo em ' + iRamo);
+    /* e a faixa vive numa constante, lida pelos dois lugares que precisam dela */
+    ok('a faixa do piso e uma constante nos dois motores',
+       /const REVIDE_PISO_MAX = 0\.10;/.test(txt) &&
+       /const REVIDE_PISO_MAX = 0\.10;/.test(require('fs').readFileSync(path.join(raiz, 'functions', 'index.js'), 'utf8')));
+  }
+}
 /* O ultimo bloco dirige o desafio do Mewtwo, que e uma funcao async -- por isso o fim do teste mora
    dentro dele (o arquivo e CommonJS e nao tem await de topo). */
 (async function(){
