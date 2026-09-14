@@ -5484,6 +5484,43 @@ botão de 'Atualizar para versão mais recente'"*.
 - **O sandbox aprendeu `location.reload()`** (anotado em `__recargas`, não executado) — sem isso o
   teste do botão recarregaria o próprio processo do teste.
 
+#### ⚠️ E ELE NASCEU DUPLICADO — a unificação (13/09/2026)
+
+**O jogo JÁ TINHA um aviso de versão nova**, escrito antes de 28/08, e eu não procurei antes de
+construir o de cima. Eram dois mecanismos fazendo a mesma pergunta. O velho:
+
+- **baixava o `index.html` INTEIRO** e tirava o SHA-256, no carregamento e **a cada 5 minutos**.
+  São **1,45 MB por consulta, por aba aberta** — ~17 MB por hora em cada aba parada;
+- mostrava uma **faixa fixa no topo** (`#version-banner`), que aparece em qualquer tela.
+
+**O que ficou de cada um:** a PERGUNTA é a barata (o ETag num `HEAD`), e as DUAS telas ficaram — a
+faixa do topo e o quadro da home. São **duas portas pro mesmo aviso, não dois avisos**: a faixa
+existe porque a ronda de fundo roda com o jogador em qualquer lugar, e o quadro porque é na home
+que dá pra recarregar sem perder nada. Os dois botões chamam o mesmo `atualizarParaVersaoNova`.
+
+- **A RONDA DE FUNDO ficou nos mesmos 5 minutos** do mecanismo antigo — o que mudou foi o preço.
+  E o gancho de `visibilitychange` ficou também: ele cobre o caso mais comum de todos (a aba que
+  passou o dia em segundo plano e voltou).
+- **⚠️ O `render()` SÓ ACONTECE NA HOME.** Este aviso chega por um TIMER, e um `render()` no meio de
+  uma animação de batalha recria o HTML e mata a transição da barra de vida — a regra da casa, que
+  já custou três defeitos. A faixa é pintada direto no DOM, como tudo que chega de fora da tela.
+  O mecanismo antigo já fazia assim; a primeira versão do novo chamava `render()` de dentro do
+  timer, e isso só não quebrou nada porque ela ainda não tinha ronda nenhuma.
+- **⚠️ E EU REPETI, NO MESMO DIA, O DEFEITO QUE TINHA ACABADO DE CONSERTAR.** A chamada de
+  carregamento (`conferirVersaoNoAr()`) ficou **acima** das declarações `let`/`const` que ela lê —
+  zona morta temporal, o mesmo erro que travou as quatro telas de revelação em 09/09. E aqui era
+  **pior**: a função é `async`, então o erro não aparece na cara — vira uma promessa rejeitada em
+  silêncio, e a versão desta aba nunca seria capturada. Nenhum teste de comportamento pega isso (os
+  casos chamam a função na mão, com tudo já declarado); o que pega é a ORDEM no arquivo, e é isso
+  que o teste passou a cobrar.
+- **⚠️ E O RELÓGIO FALSO DO TESTE TEVE QUE SUBIR.** Com a pergunta acontecendo no carregamento, o
+  script carimba `ultimaChecagemDeVersao` com o `Date.now()` REAL — um relógio de teste começando em
+  5.000.000 fica bilhões de milissegundos atrás dele, e aí toda pergunta cai dentro da folga e
+  nenhuma vai à rede. Ele passou a começar em `Date.now() + 1h`.
+- `tools/test-inventario.js` tranca a unificação: o mecanismo que baixava o arquivo não existe mais,
+  a faixa continua e usa a mesma ação do quadro, a ronda usa a pergunta barata, o `render()` só na
+  home, a ordem da chamada de carregamento, e a faixa acendendo junto com o quadro.
+
 ### O ! DO BOTÃO DAS LIGAS (13/09/2026)
 
 Pedido assim: *"coloque um sinal de ! (igual quando tem notificação) no botão de ligas onlines,

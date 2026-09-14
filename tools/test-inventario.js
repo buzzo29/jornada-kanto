@@ -923,7 +923,10 @@ console.log('\n=== O AVISO DE VERSAO NOVA NA HOME ===');
   /* Relogio que anda 10 min a cada olhada, pra cada pergunta cair fora da folga de 1 min. Ele e
      posto no Date DESTE sandbox (um objeto proprio), e nao no global: o `Date` que o sandbox recebe
      e o do processo, entao mexer no `now` dele mexeria no relogio do teste inteiro. */
-  let t = 5000000;
+  /* ⚠️ O RELOGIO FALSO COMECA ACIMA DO RELOGIO DE VERDADE. O script marca a primeira pergunta no
+     CARREGAMENTO, com o Date.now() real -- um relogio de teste comecando em 5.000.000 fica bilhoes
+     de milissegundos ATRAS dele, e ai toda pergunta cai dentro da folga e nenhuma vai a rede. */
+  let t = Date.now() + 3600000;
   S.Date = Object.assign(Object.create(Date), { now: () => (t += 10*60*1000) });
 
   const temBotao = () => S.renderSaveSelect().indexOf('atualizarParaVersaoNova()') >= 0;
@@ -979,7 +982,8 @@ console.log('\n=== O AVISO DE VERSAO NOVA NA HOME ===');
     /* Relogio PARADO e bem a frente da ultima pergunta: a primeira chamada cai FORA da folga (e
        vai a rede) e as duas seguintes caem dentro (e nao vao). Parado num instante ANTERIOR, as tres
        ficariam dentro da folga e o caso passaria sem provar nada. */
-    S.Date = Object.assign(Object.create(Date), { now: () => 99000000 });
+    const parado = Date.now() + 10 * 3600000;
+    S.Date = Object.assign(Object.create(Date), { now: () => parado });
     S.fetch = () => { idas++; return Promise.resolve({ ok:true, headers:{ get:()=>'v-nova' } }); };
     await S.conferirVersaoNoAr(); await S.conferirVersaoNoAr(); await S.conferirVersaoNoAr();
     ok('a pergunta tem folga de 1 minuto: 3 chamadas, 1 ida a rede', idas === 1 && S.CHECAGEM_DE_VERSAO_MS === 60000,
@@ -999,6 +1003,48 @@ console.log('\n=== O AVISO DE VERSAO NOVA NA HOME ===');
     const txt = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
     const bloco = (txt.match(/function openSaveSelect\(\)[\s\S]*?\n\}/) || [''])[0];
     ok('e a home pergunta de verdade', /conferirVersaoNoAr\(\)/.test(bloco), bloco.length + ' chars');
+
+    /* ⚠️ A PERGUNTA DO CARREGAMENTO VEM DEPOIS DAS DECLARACOES. `let`/`const` sao zona morta
+       temporal, e a funcao le o CHECAGEM_DE_VERSAO_MS: chamada antes, ela estoura "Cannot access
+       ... before initialization" -- e como ela e `async`, isso nao aparece na cara: vira uma
+       promessa rejeitada em silencio, e a versao desta aba nunca e capturada.
+       E O MESMO DEFEITO QUE TRAVOU AS QUATRO TELAS DE REVELACAO em 09/09/2026, e eu o repeti aqui
+       no mesmo dia em que o consertei. Nenhum teste de comportamento pega isso (os casos acima
+       chamam a funcao na mao, ja com tudo declarado) -- so a ordem no arquivo. */
+    const decl = txt.indexOf('const CHECAGEM_DE_VERSAO_MS');
+    const carga = txt.indexOf('\nconferirVersaoNoAr();');
+    ok('a pergunta do carregamento vem DEPOIS das declaracoes', decl > 0 && carga > decl,
+       'declaracao em ' + decl + ', chamada em ' + carga);
+
+    /* ⚠️ E A VERIFICACAO DE VERSAO VIVE NUM LUGAR SO (13/09/2026). Existia um segundo mecanismo,
+       anterior a este, que BAIXAVA O ARQUIVO INTEIRO e tirava o SHA-256 a cada 5 minutos -- 1,45 MB
+       por consulta, por aba aberta. Os dois faziam a mesma pergunta; o velho saiu e a FAIXA dele
+       ficou, lendo a mesma marca. */
+    ok('o mecanismo que baixava o arquivo inteiro nao existe mais',
+       txt.indexOf('__initialPageHash') < 0 && txt.indexOf('__checkForNewVersion') < 0);
+    ok('e a faixa do topo continua, com a MESMA acao do quadro da home',
+       /id="version-banner"/.test(txt) && /atualizarParaVersaoNova\(\)"?>Atualizar agora/.test(txt));
+    /* A ronda de fundo e quem acende a faixa pra quem nao passa pela home. */
+    ok('a ronda de fundo existe e usa a pergunta barata',
+       /setInterval\(conferirVersaoNoAr, RONDA_DE_VERSAO_MS\)/.test(txt));
+    /* ⚠️ E O RENDER SO ACONTECE NA HOME: o aviso chega por um TIMER, e um render() no meio de uma
+       animacao de batalha mata a transicao da barra de vida. */
+    const mostrar = (txt.match(/function mostrarAvisoDeVersao\(\)[\s\S]*?\n\}/) || [''])[0];
+    ok('o aviso so redesenha a tela na home', /screen === 'saveSelect'\) render\(\)/.test(mostrar),
+       mostrar.replace(/\s+/g, ' ').slice(0, 140));
+  }
+
+  /* A FAIXA ACENDE JUNTO COM O QUADRO -- sao duas portas pro mesmo aviso, nao dois avisos. */
+  {
+    const j = S.__getGame(); j.versaoNova = false; j.screen = 'saveSelect'; S.__setGame(j);
+    S.fetch = () => Promise.resolve({ ok:true, headers:{ get:()=>'v-outra-ainda' } });
+    S.Date = Object.assign(Object.create(Date), { now: () => Date.now() + 20 * 3600000 });
+    const faixa = S.document.getElementById('version-banner');
+    faixa.style.display = 'none';
+    await S.conferirVersaoNoAr();
+    ok('o aviso acende a faixa do topo tambem', faixa.style.display === 'flex',
+       'display: ' + faixa.style.display);
+    ok('e marca o quadro da home junto', S.__getGame().versaoNova === true);
   }
 }
 
