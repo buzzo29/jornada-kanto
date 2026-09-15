@@ -113,7 +113,6 @@ console.log('\n=== CRUZAMENTO COM AS LISTAS QUE O JOGO JÁ TINHA ===');
     confere('autodestruição', S.AUTODESTRUICAO, ['selfdestruct', 'explosion']),
     confere('recuperar', S.RECUPERACAO, ['recover']),
     confere('disable', S.DISABLE, ['disable']),
-    confere('drenagem', Object.keys(S.ABSORCAO), ['absorb', 'megadrain', 'leechlife', 'gigadrain']),
     confere('metrônomo', S.METRONOMO, ['metronome']),
     /* A FÚRIA DO DRAGÃO entrou aqui em 11/09/2026, no dia em que nasceu: a lista dela saiu da base
        por script, e é este cruzamento que garante que ela CONTINUE saindo de lá. Sem ele, a
@@ -152,7 +151,6 @@ console.log('\n=== CRUZAMENTO COM AS LISTAS QUE O JOGO JÁ TINHA ===');
      a das divergências não. É o que ele existe pra denunciar, e denunciou. */
   const divergencias = [
     'disable:igglybuff',        // o Jigglypuff aprende Disable no 14; o bebê não aprende nenhum
-    'drenagem:exeggcute',       // o que ele tem é Leech Seed -- a mesma razão que já tirou o Bulbasaur
     'metronomo:cleffa',         // as espécies do metrônomo foram PEDIDAS, não tiradas do aprendizado
     'metronomo:mew',            // o chefe da raide: o Metrônomo é dele no original, mas não por nível aqui
     'sono:misdreavus',
@@ -163,8 +161,36 @@ console.log('\n=== CRUZAMENTO COM AS LISTAS QUE O JOGO JÁ TINHA ===');
     .concat(r.flatMap(x => x.faltam.map(id => x.nome.replace('ô','o').replace('ç','c').replace('ã','a') + ':' + id)))
     .concat(sonoRuim.map(x => 'sono:' + x[0]))
     .sort();
-  ok('as divergências são EXATAMENTE as sete conhecidas', achadas.join(' ') === divergencias.join(' '),
+  ok('as divergências são EXATAMENTE as seis conhecidas', achadas.join(' ') === divergencias.join(' '),
      achadas.length === divergencias.length ? achadas.length + ' divergências' : ('achei: ' + achadas.join(' ')));
+}
+
+console.log('\n=== A DRENAGEM SAI DO GOLPE, NAO DA ESPECIE (15/09/2026) ===');
+{
+  /* ⚠️ ESTE CRUZAMENTO MUDOU DE NATUREZA no dia em que a passiva de drenagem saiu. Ele conferia uma
+     lista de ESPECIES escrita a mao (a ABSORCAO) contra o aprendizado por nivel; hoje quem drena e
+     o GOLPE, entao o que da pra cobrar -- e o que importa -- e que os cinco ids existam na base,
+     sejam golpes de DANO e tenham o poder que a tabela do jogo promete.
+     E mais forte que o cruzamento antigo: quem leva o golpe passou a ser o jogador, e nao uma lista
+     nossa, entao um id errado aqui nao "diverge" -- ele simplesmente nao cura ninguem, em silencio. */
+  const esperado = { absorb: 20, megadrain: 40, gigadrain: 60, leechlife: 20, dreameater: 100 };
+  const ids = Object.keys(S.GOLPES_DRENO).sort();
+  ok('sao os cinco drenantes', ids.join(' ') === Object.keys(esperado).sort().join(' '), ids.join(' '));
+  ids.forEach(id => {
+    const b = D.golpes[id];
+    ok('  ' + id + ' existe na base, e dano, e o poder bate',
+       !!b && b.poder === esperado[id], b ? (b.nome + ' poder ' + b.poder) : 'FALTA NA BASE');
+  });
+  /* A FRACAO E A MESMA pros cinco (metade do dano), e e de proposito: no jogo oficial o Comedor de
+     Sonhos cura o dano INTEIRO e os outros metade. Aqui ele ja paga o preco de so valer contra alvo
+     dormindo, e uma segunda vantagem em cima disso o faria dominar o moveset de quem o tem. */
+  ok('e todos curam a mesma fracao', ids.every(id => S.GOLPES_DRENO[id] === 0.5), '0,5');
+  /* ⚠️ E O COMEDOR DE SONHOS E O UNICO COM TRAVA DE ALVO. Se um segundo golpe entrar no
+     GOLPES_SO_DORMINDO sem entrar no GOLPES_DRENO (ou vice-versa), e decisao -- mas tem que ser
+     decisao, e nao descuido: e por isso que esta linha existe. */
+  ok('e o Comedor de Sonhos e o unico que so vale contra quem dorme',
+     Object.keys(S.GOLPES_SO_DORMINDO).join(' ') === 'dreameater' && !!S.GOLPES_DRENO.dreameater,
+     Object.keys(S.GOLPES_SO_DORMINDO).join(' '));
 }
 
 console.log('');

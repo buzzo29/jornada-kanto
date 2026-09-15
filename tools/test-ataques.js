@@ -803,14 +803,16 @@ console.log('\n=== A OBSERVACAO DO CARTAO E O CARTAO DO TOPO ===');
 {
   /* A observacao diz o que os numeros do cartao NAO contam -- a mecanica propria do golpe. Ela sai
      de uma funcao e nao de um `if` no cartao porque ja tem duas entradas e vai ter mais. */
-  ok('o golpe multiplo avisa que repete', S.obsDoGolpe('doubleslap') === 'Golpe repete entre 2-5x',
+  /* ⚠️ `obsDoGolpe` DEVOLVE LISTA desde 15/09/2026: o Comedor de Sonhos tem DUAS observacoes
+     (a cura e o 'so contra quem dorme'), e com `return` de string a segunda apagava a primeira. */
+  ok('o golpe multiplo avisa que repete', S.obsDoGolpe('doubleslap').join('|') === 'Golpe repete entre 2-5x',
      S.obsDoGolpe('doubleslap'));
   /* A FURIA NAO TEM OBSERVACAO, e isso e o desenho de hoje: ela virou PASSIVA da especie em
      10/09/2026 e saiu do cartao do golpe. Quem escolhe golpe nao escolhe passiva -- ela e anunciada
      na ficha da Pokedex, junto do sono e da anulacao. Uma observacao aqui prometeria uma escolha
      que nao existe. */
-  ok('a Furia NAO avisa nada no cartao (virou passiva)', S.obsDoGolpe('rage') === '', S.obsDoGolpe('rage'));
-  ok('e golpe comum nao avisa nada', S.obsDoGolpe('tackle') === '');
+  ok('a Furia NAO avisa nada no cartao (virou passiva)', S.obsDoGolpe('rage').length === 0, S.obsDoGolpe('rage').join('|'));
+  ok('e golpe comum nao avisa nada', S.obsDoGolpe('tackle').length === 0);
   ok('a observacao chega no cartao', S.cartaoDeGolpe('doubleslap', true).indexOf('Golpe repete entre 2-5x') >= 0);
   ok('e o golpe comum sai sem ela', S.cartaoDeGolpe('tackle', true).indexOf('golpe-cartao-obs') < 0);
 

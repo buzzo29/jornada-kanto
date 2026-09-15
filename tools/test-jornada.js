@@ -1089,8 +1089,15 @@ console.log('\nO CANTO DA JIGGLYPUFF ACONTECE NA TELA DE BATALHA');
   ok('e a luta continua desenhada: os dois lutadores e as duas barras',
      (tela.match(/hp-bar-fill/g) || []).length === 2 && tela.indexOf('battle-vs') >= 0,
      (tela.match(/hp-bar-fill/g) || []).length + ' barra(s)');
+  /* ⚠️ O PLACAR VIROU POKEBOLAS em 15/09/2026: era "🎒 Buzzo: 3/3" e hoje e o nome com uma pokebola
+     por pokemon do time, as caidas em preto. O que esta trava cobra continua sendo o mesmo -- o
+     placar do JOGADOR mostra os TRES de pe, porque o canto nao desmaia ninguem.
+     So o chip do Buzzo entra na conta: o do adversario tem outro time e outro numero. */
+  const chipDoBuzzo = (tela.split('team-alive-chip').find(p => p.indexOf('Buzzo') >= 0) || '');
+  const vivas = (chipDoBuzzo.match(/class="pokeball"/g) || []).length;
+  const pretas = (chipDoBuzzo.match(/class="pokeball ko"/g) || []).length;
   ok('com o placar de quem esta de pe ANTES do canto (ninguem desmaiou)',
-     tela.indexOf('🎒 Buzzo: 3/3') >= 0, (semTag(tela).match(/🎒[^🥊]*/) || [''])[0].trim());
+     vivas === 3 && pretas === 0, vivas + ' vivas, ' + pretas + ' pretas');
   ok('e a cantora e quem esta em campo', tela.indexOf('Jigglypuff') >= 0);
   /* ⚠️ E SEM NOME DE GOLPE: o `specialLastHit` guarda o passo do confronto ANTERIOR, e sem zera-lo
      junto com o passo o quadro anunciaria um golpe que ninguem deu (o golpe fantasma de

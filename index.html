@@ -290,6 +290,16 @@
   .tower-rank-tit{ font-family:var(--font-pixel); font-size:.62rem; margin:14px 0 4px; text-align:left; }
   .tower-rank-tit:first-of-type{ margin-top:4px; }
   .tower-rank-box{ max-height:80vh; overflow-y:auto; }
+  /* AS DUAS ABAS do ranking da Torre. Elas NAO usam o `.btn` da casa: aquele e botao de ACAO com
+     moldura de 3px, e aqui sao dois lugares onde se ENTRA -- o mesmo raciocinio que ja tinha
+     tirado o `.btn` das prateleiras da loja e das linhas da ficha da Pokedex. */
+  .tower-rank-abas{ display:flex; gap:6px; margin:2px 0 8px; }
+  .tower-rank-aba{
+    flex:1; border:2px solid var(--box-border); border-radius:3px; background:var(--box);
+    color:var(--ink); font-family:inherit; font-size:.72rem; font-weight:800; padding:6px 4px;
+    cursor:pointer;
+  }
+  .tower-rank-aba.on{ background:var(--yellow); border-color:var(--ink); }
   .tower-rank-list{text-align:left;margin-bottom:12px;}
   .tower-rank-row{display:flex;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid rgba(26,26,46,.12);}
   .tower-rank-row:last-child{border-bottom:none;}
@@ -760,6 +770,14 @@
     transform-origin:left;
     transition:transform .5s linear, background-color .5s ease-out;
   }
+  /* A BARRA QUE ENCHE quando o Remoinho traz o pokémon novo. O `to` é implícito -- ele é o
+     `transform` inline do elemento, ou seja o HP de verdade --, e é isso que faz a animação valer
+     pra qualquer valor sem o CSS precisar saber qual é.
+     Ela é um pouco mais lenta que a transição normal da barra (.5s) de propósito: aqui não há um
+     golpe explicando o movimento, então ele precisa ser lido como "chegando", não como "levando
+     dano". O `ease-out` faz a mesma coisa pelo outro lado -- ela desacelera ao chegar. */
+  .hp-bar-fill.hp-bar-entra{animation:hpEntra .7s ease-out;}
+  @keyframes hpEntra{ from{transform:scaleX(0);} }
   .hp-bar-fill.hp-high{background:var(--green-dark);}
   .hp-bar-fill.hp-mid{background:#f5a623;}
   .hp-bar-fill.hp-low{background:var(--red);}
@@ -779,9 +797,50 @@
     padding:5px 9px;
     font-size:.8rem;
     font-weight:700;
-    flex:1;
+    flex:1 1 0;
+    /* ⚠️ O `min-width:0` MORA AQUI, e nao so no nome (conferido no navegador a 320px): um flex
+       item se recusa a encolher abaixo do conteudo por padrao, entao sem ele o chip do nome
+       comprido CRESCIA e roubava a largura do outro -- os dois quadros ficavam de tamanhos
+       diferentes na mesma linha. */
+    min-width:0;
     text-align:center;
   }
+  /* ⚠️ O NOME NUNCA EMPURRA AS POKEBOLAS PRA FORA (15/09/2026). O chip mede ~140px a 320px e o nome
+     de treinador vai a 20 caracteres, entao ele TRUNCA -- o `min-width:0` e obrigatorio pra isso
+     funcionar dentro de um flex, senao o item se recusa a encolher abaixo do conteudo e o chip
+     estoura a linha. Quem cede espaco e o nome; as pokebolas sao a informacao. */
+  .team-alive-nome{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;}
+  .team-alive-bolas{display:flex;justify-content:center;gap:3px;margin-top:4px;flex-wrap:wrap;}
+  /* A POKEBOLA E DESENHADA EM CSS, nao e imagem: a regra da casa e "nenhuma imagem de fora" (ja
+     houve dois episodios de hotlink que funcionava local e morria publicado), e um gradiente
+     sobrevive a reducao melhor que pixel art de 13px -- que e o tamanho que cabe seis vezes num
+     chip de 140px (6*13 + 5*3 de gap = 93px). */
+  .pokeball{
+    width:13px;height:13px;border-radius:50%;
+    border:1.5px solid #2b2b2b;
+    background:linear-gradient(to bottom,#e5352b 0 45%,#2b2b2b 45% 57%,#f7f7f7 57% 100%);
+    position:relative;flex:0 0 auto;
+  }
+  .pokeball::after{
+    content:'';position:absolute;left:50%;top:50%;width:3.5px;height:3.5px;
+    transform:translate(-50%,-50%);border-radius:50%;
+    background:#f7f7f7;border:1.5px solid #2b2b2b;
+  }
+  /* ⚠️ A POKEBOLA DE QUEM CAIU FICA PRETA, e nao so apagada: o pedido foi *"conforme os pokemons
+     forem morrendo, as pokebolas vao ficando pretinhas"*. So baixar a opacidade deixaria a
+     vermelha visivel por baixo e as duas se pareceriam de relance -- e ler esse quadro de relance
+     e a unica coisa que ele faz. O botao do meio fica cinza pra a silhueta continuar sendo uma
+     pokebola, e nao um ponto preto. */
+  /* ⚠️ SEM OPACIDADE: ela clareava o #2b2b2b contra o fundo claro do chip e a bolinha saia CINZA,
+     nao preta -- conferido no navegador. O pedido foi "vao ficando pretinhas", e o cinza se
+     confunde com "desabilitado", que e outra coisa. */
+  /* ⚠️ MENOS PRETA (15/09/2026, a pedido). Ela nasceu em #1c1c1c -- quase carvao -- e num chip
+     claro seis daquelas viravam uma fileira de furos. Hoje e um cinza ESCURO: continua se separando
+     da vermelha de relance (que e o unico trabalho dela) sem pesar na tela.
+     Continua SEM opacidade: ela clareia o preto contra o fundo claro e a bolinha saia cinza-claro
+     demais, indistinguivel de "desabilitado". Quem clareia aqui e a COR, que da pra escolher. */
+  .pokeball.ko{background:#5f5f5f;border-color:#3d3d3d;}
+  .pokeball.ko::after{background:#9a9a9a;border-color:#3d3d3d;}
 
   /* O aviso do golpe especial é a MESMA linha do "Trocando golpes...", só que acesa: ela já é
      onde o jogador olha durante a luta, então não precisa de caixa nova nem de outro lugar. */
@@ -814,10 +873,19 @@
   .shiny-badge{ display:inline-block; font-size:.62rem; font-weight:800; color:#8a6d00; background:#fff3c4; padding:1px 6px; border-radius:8px; margin-left:4px; }
   .fighter-types{margin:3px 0 6px; display:flex; justify-content:center; flex-wrap:wrap; gap:2px;}
   .fighter-types .type-pill{margin-right:0;}
-  /* A VAGA VAZIA do remoinho. Ela reserva a MESMA altura do sprite: sem isso o cabecalho encolhe no
-     meio da animacao e a tela inteira pula de tamanho por um quadro. */
-  .fighter-vazio{ display:flex; align-items:center; justify-content:center; min-height:72px; }
-  .fighter-sumiu{ font-weight:800; color:var(--muted); letter-spacing:.1em; }
+  /* A VAGA VAZIA do remoinho. Ela reserva a MESMA altura do quadro de um lutador -- sem isso o
+     cabecalho encolhe no meio da animacao e a tela inteira pula de tamanho por um quadro.
+     ⚠️ A CONTA MUDOU EM 15/09/2026, quando ela perdeu a barra de HP: antes o `min-height` cobria so
+     o sprite e o resto da altura vinha da barra e dos selos de tipo. Hoje ela e a altura INTEIRA do
+     quadro, e o `justify-content:center` poe o ❔ no meio dela. */
+  .fighter-vaga{ display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:118px; }
+  .fighter-vazio{ display:flex; align-items:center; justify-content:center; }
+  .fighter-vaga .fighter-emoji{ font-size:2.4rem; margin-bottom:4px; }
+  /* O POKEMON QUE ENTRA aparece junto com a barra enchendo -- um fade curto, no mesmo tempo da
+     barra. Sem ele o sprite PISCA na tela (ele sai de "nada" pra "opaco" num quadro) enquanto a
+     barra ao lado sobe devagar, e as duas coisas do mesmo evento andam em ritmos diferentes. */
+  .fighter-entra{ animation:fighterEntra .7s ease-out; }
+  @keyframes fighterEntra{ from{opacity:0; transform:translateY(6px);} }
   .fighter-level{display:block;font-size:.7rem;color:var(--muted);font-weight:700;margin-top:1px;}
   .vs-swords{font-size:1.4rem;display:inline-block;}
   .vs-swords.spin{animation:swordSpin .9s linear infinite;}
@@ -1068,6 +1136,11 @@
   .mlog-quem.p{color:var(--green-dark);}
   .mlog-quem.e{color:var(--red-dark);}
   .mlog-tira{font-weight:800;color:var(--red-dark);}
+  /* A cura da drenagem, na MESMA linha do golpe que a gerou -- ela é o par do .mlog-tira, e o
+     verde/vermelho lado a lado é o que faz a linha se ler de relance ("tirou tanto, devolveu
+     tanto"). Verde CLARO e não o --green-dark do .mlog-quem.p: aquele é a cor do NOME do lado do
+     jogador, e dois verdes iguais na mesma linha fariam o número parecer parte do nome. */
+  .mlog-cura{font-weight:800;color:var(--green);}
   .mlog-passos .type-pill{font-size:.55rem;padding:1px 5px;margin:0;
     text-transform:none;letter-spacing:0;}
 
@@ -5407,6 +5480,7 @@ async function confirmNeighborhoodGymChallenge(){
     game.neighborhoodGymLastWin = result.data.win;
     game.revealIndex = 0;
     game.revealPhase = 'loading';
+    abrirConfronto('reveal');
     preloadBattleSprites(result.data.matchups);
     game.screen = 'battling';
     render();
@@ -6032,6 +6106,15 @@ function melhorAtaque(attacker, defender){
     const sobra = candidatos.filter(id => GOLPES[id][0] !== attacker._anulado.tipo);
     if(sobra.length) candidatos = sobra;
   }
+  /* ⚠️ O COMEDOR DE SONHOS SÓ ENTRA NA LISTA SE O ALVO ESTIVER DORMINDO (ver GOLPES_SO_DORMINDO).
+     Quem responde isso é o `_dormeAgora`, marcado pelo doExchange na troca em que o alvo perde o
+     turno -- e NÃO o `_dormindoPor`, que é decrementado no COMEÇO da troca: na troca livre ele já
+     está em 0 enquanto o pokémon ainda nem atacou, e ler dali faria o golpe nunca sair.
+     O FILTRO É INCONDICIONAL, ao contrário do da anulação logo acima: medido, o Comedor de Sonhos
+     nunca é o único golpe de dano de ninguém. Se um dia sobrar vazio, `melhor` fica null e o
+     pokémon cai no motor de tipo -- a regra de sempre pra quem não tem golpe. */
+  if(!defender._dormeAgora) candidatos = candidatos.filter(id => !GOLPES_SO_DORMINDO[id]);
+  if(!candidatos.length) return null;
   const avalia = (id, multForcado) => {
     /* O `poder` DAQUI VIRA O DANO -- o calcDamageNew lê `best.poder`. Então ele tem que ser o poder
        REAL do golpe, sempre. Quem usa o poder EFETIVO (poder × média de tapas) é só a NOTA, que é a
@@ -6434,8 +6517,9 @@ const APRENDIZADO = {
    (velocidade/512, nível dobrado). Buffs de shiny/terreno são SÓ OFENSIVOS (nunca defesa/HP) -- fim
    do penhasco "shiny+terreno fica imortal". Teto de dano por golpe (65% do HP máximo; 70% no crítico):
    one-shot não existe, todo pokémon sempre responde pelo menos 1x. Sem vulnerabilidade por vitórias
-   (a causa do "estava no amarelo e foi pra zero do nada") -- anti-varredura é só dano persistente +
-   golpe moribundo, gradual e previsível. */
+   (a causa do "estava no amarelo e foi pra zero do nada"). ⚠️ O "anti-varredura" descrito aqui
+   (dano persistente + golpe moribundo) perdeu a segunda metade em 15/09/2026, quando o moribundo
+   acabou: hoje sobra o dano persistente e o teto de quem raspa. */
 const MOVE_POWER = 60;
 /* TETO DE DANO POR GOLPE, DESLIGADO desde 09/09/2026 -- e isso é decisão, não experimento
    esquecido: ele foi tirado pra um experimento e o resultado foi aprovado pro ar.
@@ -6578,33 +6662,20 @@ function effText(mult){
   return '';
 }
 
-/* Golpe moribundo: quem cai ainda conecta o contra-golpe -- e desde 30/08/2026 ele vale CHEIO.
-   Valeu metade por um tempo, e o efeito colateral era ilegível: o jogador via seu pokémon com
-   vantagem de tipo tirando 112 em vez de 223 e procurava bug no multiplicador.
-   Medido na mudança: 11,2% das batalhas trocam de vencedor, a taxa de vitória geral não se move
-   (51,3% → 51,0%), e os confrontos que terminam no desempate sobem de 6,5% pra 14,6% -- mais
-   gente cai junto, e o desempate (sobrevivente com 1-10% da vida) passa a decidir mais confronto. */
-const DYING_BLOW_FACTOR = 1.0;
-/* A FAIXA EM QUE O REVIDE MORIBUNDO DEIXA O ALVO. Ela era 0.01 + rng*0.09 escrita à mão dentro do
-   doExchange; virou constante quando o caso de "quem já está dentro da faixa" passou a precisar
-   ler o TETO dela (ver o piso no doExchange). Dois lugares com o mesmo 10% divergiriam no primeiro
-   ajuste, e este é um número de balanceamento -- ele custou 2,65 pontos de conclusão quando entrou. */
 /* =====================================================================
    ⚠️ QUEM ESTÁ RASPANDO NÃO DERRUBA UM POKÉMON INTEIRO NUM GOLPE (14/09/2026, a pedido).
    Reportado com print: uma **Ponyta com 10 de 362 (2,8%)** atravessou um Heracross e um Victreebel
    **cheios**, matando cada um com um golpe e sem tomar nada de volta. O pedido foi direto: *"se
    formos pensar na lógica, um pokémon muito ferido não deveria aguentar tanto numa luta"*.
-   ⚠️ ELA É A OUTRA METADE DO PISO DO REVIDE, e por isso mora aqui do lado. Desde 12/09 o revide
-   moribundo não mata (para em 1%-10%), e desde 13/09 ele nem gera linha quando o alvo JÁ estava
-   nessa faixa -- o que criou exatamente o caso do print: quem está raspando mata de vida cheia,
-   não leva revide nenhum, e segue pro próximo. A trava fecha esse ciclo pelo lado do ATAQUE.
+   ⚠️ ELA NASCEU COMO "A OUTRA METADE DO PISO DO REVIDE" -- e desde 15/09/2026 ela é a ÚNICA metade:
+   o golpe moribundo acabou, e com ele o piso de 1%-10% e o ramo que zerava o revide contra alvo já
+   raspando. O caso do print continua sendo exatamente o que ela existe pra impedir (quem está
+   raspando matando de vida cheia), e agora ela o impede sozinha, pelo lado do ATAQUE.
    O TETO É 70% DA BARRA DO ALVO: ele fica com 30% e revida de pé. Não é "70% do dano" -- um golpe
    de 800 numa barra de 400 ainda mataria; o que se quer é que ele NÃO mate.
    ===================================================================== */
 const MORIBUNDO_ABAIXO_DE = 0.10;   // "com menos de 10% de HP"
 const MORIBUNDO_TETO_NO_CHEIO = 0.70;
-const REVIDE_PISO_MIN = 0.01;
-const REVIDE_PISO_MAX = 0.10;
 /* O 4º parâmetro é o DIÁRIO da luta: um registro por golpe, na ordem em que aconteceram, pro log
    conseguir contar o passo a passo. É só escrita -- nada aqui é lido de volta pelo motor, e passar
    ou não passar o array não muda um ponto de dano.
@@ -6679,7 +6750,7 @@ const GOLPES_CRIT_ALTO = ['aeroblast','aircutter','crabhammer','crosschop','kara
 function chanceDeCritico(golpeId){
   return (golpeId && GOLPES_CRIT_ALTO.indexOf(golpeId) >= 0) ? CRIT_ALTO : CRIT_BASE;
 }
-const CHANCE_SONO = 0.05;
+const CHANCE_SONO = 0.15;
 /* Quantas TROCAS o alvo passa sem revidar. O sono já foi abate instantâneo -- o alvo ia a 0 de HP
    sem tocar em ninguém -- e os jogadores reclamaram, com razão: não era o número que pesava (medido,
    valia +1,4 ponto de vitória, contra +0,8 do Recuperar), era a FORMA. Perder um pokémon inteiro
@@ -6697,7 +6768,29 @@ const CHANCE_SONO = 0.05;
    então enfraquecer o golpe cai dos dois lados igual.
    O NÚMERO É DUPLICADO no index.html e no functions/index.js -- divergência aqui faz a mesma
    batalha terminar diferente no cliente e no servidor. `tools/test-especiais.js` tranca os dois. */
-const SONO_EM_TROCAS = 1;
+/* ⚠️ QUANTAS TROCAS O SONO COMPRA: 1, 2 ou 3, com 1/3 DE CHANCE CADA (15/09/2026, a pedido:
+   *"coloque 1/3 de chance para ele tomar 1 ataque, 1/3 de chance para ele tomar 2 ataques e 1/3 de
+   chance para ele tomar 3 ataques, assim como no jogo real"*).
+   Era um número FIXO -- valeu 2 até 09/09/2026 e 1 daí em diante --, e a mudança de 2 pra 1 tinha
+   sido feita justamente porque perder um pokémon inteiro num sorteio de 5% era ruim mesmo valendo
+   pouco. Isto devolve parte do que aquela mudança tirou, mas de um jeito diferente: o pior caso
+   volta a ser 3 trocas, só que ele sai em 1 vez em 3 em vez de sempre.
+   ⚠️ O SORTEIO É POR USO, e ele é LIDO DO PRÓPRIO rng DA BATALHA -- não de Math.random. Cliente e
+   servidor resolvem a MESMA batalha a partir da mesma semente (a Liga, o online, a comparação dos
+   300 confrontos), então um dado a mais num dos dois lados desloca a semente inteira e a batalha
+   passa a terminar diferente nos dois. É a mesma armadilha que o Remoinho quase trouxe.
+   ⚠️ E ELE SÓ É LIDO QUANDO O SONO REALMENTE SAI, pelo mesmo motivo: lê-lo antes da checagem
+   mudaria confronto que não tem sonífero nenhum.
+   A TABELA é uma lista de durações com peso, no molde do MULTI_GOLPE: se um dia as chances
+   deixarem de ser iguais, é ela que muda e mais nada. Ela é DUPLICADA nos dois motores, e
+   `tools/test-especiais.js` compara as duas E cobra a distribuição. */
+const SONO_EM_TROCAS = [[1, 1], [2, 1], [3, 1]];
+function sorteiaTrocasDeSono(rng){
+  const total = SONO_EM_TROCAS.reduce((a, x) => a + x[1], 0);
+  let r = rng() * total;
+  for(const [trocas, peso] of SONO_EM_TROCAS){ r -= peso; if(r < 0) return trocas; }
+  return SONO_EM_TROCAS[SONO_EM_TROCAS.length - 1][0];
+}
 /* GOLPES DE VÁRIOS TAPAS. Batem de 2 a 5 vezes numa troca, cada tapa com o próprio sorteio de dano
    e de crítico -- é assim no jogo original, e é o que faz um golpe de poder baixo valer a pena: a
    média de 3,0 tapas exatos põe o Tapa Duplo (15) em 45 de poder efetivo e os Arranhões Furiosos
@@ -6763,6 +6856,38 @@ function tapasDoGolpe(golpeId, rng){
    pro jogador. É a mesma ressalva que o CLAUDE.md já registra sobre STAB e subtipo ("Poder não é
    comparável entre dois golpes"), agora com um caso a mais. Não foi mexido porque não foi pedido. */
 /* =====================================================================
+   DRENAGEM NO GOLPE: tira do adversário e devolve pra si, NO MESMO INSTANTE (15/09/2026, a pedido).
+   É o PRIMEIRO efeito do jogo colado num GOLPE COMUM. Os onze do `tentarGolpeEspecial` são
+   sorteados na abertura e valem por CONFRONTO; este vale por GOLPE, toda vez que o golpe sai, sem
+   sorteio nenhum -- quem decide se ele acontece é o motor ter escolhido aquele golpe.
+   A FRAÇÃO É 50%, a do jogo oficial: os cinco drenantes devolvem metade do dano.
+   ⚠️ ELA NÃO ENTRA NA NOTA do `melhorAtaque`, e isso é decisão: quem escolhe continua sendo o DANO.
+   Inflar a nota faria o Absorver (poder 20) ganhar de golpes de 70 por causa da cura, e isso é
+   balanceamento que não foi pedido. Medido ANTES de implementar, e era o risco real da feature: os
+   drenantes já saem em 16,4% dos golpes de um time de donos e em 2,57% de um time sorteado, ou
+   seja a mecânica não nasce código morto -- que foi o que aconteceu com a Fúria (0,0% dos
+   confrontos quando implementada ao pé da letra, e por isso ela virou passiva).
+   A TABELA É DUPLICADA no servidor, como todas as do motor: o dano roda dos dois lados. */
+const GOLPES_DRENO = {
+  absorb:     0.5,   // Absorver          poder 20
+  megadrain:  0.5,   // Mega Dreno        poder 40
+  gigadrain:  0.5,   // Giga Dreno        poder 60
+  leechlife:  0.5,   // Sanguessuga       poder 20
+  dreameater: 0.5    // Comedor de Sonhos poder 100 -- SÓ contra alvo dormindo, ver abaixo
+};
+/* ⚠️ O COMEDOR DE SONHOS SÓ VALE CONTRA ALVO DORMINDO (15/09/2026, a pedido), como no jogo oficial.
+   Sem a trava ele é o mais forte da lista (poder 100) E cura metade, sem custo nenhum: medido antes
+   de implementar, um Gengar recuperaria ~29% da barra dele por confronto, com ~1 uso por confronto
+   -- de longe o maior número desta feature, e o único que preocupava.
+   A TRAVA MORA NA ESCOLHA (`melhorAtaque` tira o golpe dos candidatos), não no dano. Barrado só no
+   dano, o motor escolheria um golpe de 100 e aplicaria zero -- a mesma classe de erro do
+   EXPOENTE_TIPO valendo num lugar e não no outro.
+   MEDIDO que ele NUNCA é o único golpe de dano de ninguém (as 5 espécies que o levam -- a linha do
+   Gastly, Hoothoot e Noctowl -- sempre têm outro): por isso o filtro é incondicional, e não "só se
+   sobrar alternativa" como o da anulação. Se um dia sobrar vazio, o `melhorAtaque` devolve null e o
+   pokémon cai no motor de tipo, que é a regra de sempre pra quem não tem golpe. */
+const GOLPES_SO_DORMINDO = { dreameater: true };
+/* =====================================================================
    O ROLAMENTO DOBRA A CADA USO SEGUIDO (14/09/2026, a pedido: *"dobrar o poder a cada uso, depois
    de 5x usados consecutivamente, reseta o poder para 30 novamente, caso use outro ataque sem ser o
    Rollout, reseta também"*).
@@ -6811,35 +6936,18 @@ const CHANCE_RECUPERAR = 0.10;
    original diz. Quem aparece de verdade é a MILTANK, que não tem outro especial e cura nos 10%. */
 const SINO_CURATIVO = ["miltank", "celebi"];
 const CHANCE_SINO = 0.10;
-/* DRENAGEM (Absorb e companhia): tira vida do adversário e devolve pra si. 23 espécies.
-   A LISTA SAI DO APRENDIZADO POR NÍVEL DA GEN 1/2, como as outras -- conferida no Bulbapedia, move
-   a move, e não deduzida do tipo: Kabuto e Kabutops aprendem Absorb e Mega Drain por nível apesar
-   de serem Pedra/Água, e o Bulbasaur, que "devia" estar aqui, NÃO aprende nenhum dos três (o que
-   ele tem é Leech Seed, que é outra coisa).
-   Giga Drain ficou de fora porque na Gen 2 ele é TM19 -- ninguém o aprende por nível.
-   Cada espécie guarda o NOME do golpe dela, como no SONIFEROS: sem isso um Zubat drenaria com
-   "Absorver", e quem conhece o jogo notaria na hora. Os que aprendem Absorb E Mega Drain ficam com
-   o Mega Dreno, que é o que eles ganham depois. */
-const ABSORCAO = {
-  // Absorb por nível (Gen 1 e 2)
-  oddish:'Absorver', gloom:'Absorver', exeggcute:'Absorver', exeggutor:'Absorver',
-  hoppip:'Absorver', skiploom:'Absorver', jumpluff:'Absorver',
-  sunkern:'Absorver', sunflora:'Absorver',
-  // esses cinco também pegam Mega Drain por nível na Gen 2
-  vileplume:'Mega Dreno', bellossom:'Mega Dreno', tangela:'Mega Dreno',
-  kabuto:'Mega Dreno', kabutops:'Mega Dreno',
-  // Leech Life por nível (Gen 1 e 2) -- é drenagem também, e é o golpe deles
-  zubat:'Sanguessuga', golbat:'Sanguessuga', crobat:'Sanguessuga',
-  venonat:'Sanguessuga', venomoth:'Sanguessuga',
-  spinarak:'Sanguessuga', ariados:'Sanguessuga',
-  paras:'Sanguessuga', parasect:'Sanguessuga'
-};
-const CHANCE_ABSORVER = 0.10;
-/* Quanto ele drena, em fração do HP MÁXIMO -- de cada um o seu: o atacante recupera essa fração do
-   teto DELE e o alvo perde a mesma fração do teto DELE. Sorteado a cada uso.
-   O teto de 30% casa com a trava dos 70% (a mesma do Recuperar): abaixo de 70% de vida, +30% nunca
-   passa de 100%, então a cura nunca é desperdiçada. */
-const ABSORVER_MIN = 0.10, ABSORVER_MAX = 0.30;
+/* ⚠️ A PASSIVA DE DRENAGEM ACABOU (15/09/2026, a pedido: *"retire a habilidade passiva Absorver
+   que vários pokémons têm também, assim como o Zubat que tem o sanguessuga"*).
+   Ela era a drenagem de ABERTURA: 10% por confronto, 23 espécies, tirava 10%-30% do teto do alvo e
+   punha em si ANTES da luta. Existia porque o golpe drenante não fazia nada -- era a única forma de
+   o Zubat "usar Sanguessuga".
+   ⚠️ COM A DRENAGEM NO GOLPE (ver a seção dela) ela virou a MESMA coisa duas vezes, e pior: a
+   passiva era sorteada e a do golpe acontece sempre, então o mesmo Oddish tinha duas drenagens com
+   regras diferentes e o jogador não tinha como saber qual estava vendo.
+   A APRESENTAÇÃO DELA FICA (as entradas 'absorb' e 'absorbdano' no log, na animação e na
+   reconstrução): diário gravado antes de hoje tem as duas, e sem elas aquele log perde uma linha e
+   a soma para de fechar. É a mesma decisão do 'desempate' e da marca 'm' do moribundo. O que não
+   existe mais é GERAR um caso novo. */
 /* A cura só sai com a vida ABAIXO disso. Com o pokémon quase cheio não há o que recuperar, e a
    frase anunciaria um efeito que mal se vê na barra. */
 const CURA_MAXIMO_DO_HP = 0.7;
@@ -7190,9 +7298,6 @@ function sorteiaGolpeEspecial(p, rng){
   }
   /* A drenagem vem por último. Quem tem dois especiais cai na chance composta, como o Kadabra
      (Disable + Recuperar): um Vileplume, que também é sonífero, absorve em 0,95 x 10% = 9,5%. */
-  if(ABSORCAO[p.speciesId] && rng() < CHANCE_ABSORVER){
-    return { efeito:'drenar', golpe: ABSORCAO[p.speciesId] };
-  }
   /* A CONFUSÃO VEM POR ÚLTIMO, e isso é de propósito: acrescentar um efeito no FIM da fila não
      dilui nenhum dos que já estavam medidos -- quem cai na chance composta é ela. Um Alakazam
      (Disable + Recuperar + Confusão) confunde em 0,9 × 0,9 × 10% = 8,1%. */
@@ -7501,35 +7606,6 @@ function tentarGolpeEspecial(active, enemy, rng, diario){
       }
       continue;
     }
-    if(especial.efeito === 'drenar'){
-      /* DRENAGEM: mesma hora do Recuperar -- ANTES da luta. O pokémon que sobreviveu ao confronto
-         anterior entra machucado; se está abaixo de 70% da vida, ele tira uma fatia do adversário
-         e põe em si, e SÓ ENTÃO o confronto acontece, inteiro. É 'continue', não 'return true'.
-         A MESMA FRAÇÃO dos dois lados, mas cada um do próprio teto: 25% num Vileplume de 47% o
-         leva a 72%, e tira 25% do teto do Fearow, que entra com 75%.
-         A trava dos 70% é a do Recuperar, e aqui ela tem um segundo efeito: com o teto de 30%, um
-         pokémon abaixo de 70% nunca passa de 100% -- a cura jamais é desperdiçada. Sem a trava, um
-         pokémon cheio drenaria só pra machucar o outro, e a barra dele não se moveria: um passo de
-         cura ZERO na animação, que é o que o log deste jogo evita em toda regra.
-         NÃO MATA: o alvo fica com no mínimo 1 de HP. Todas as aberturas deste motor (Recuperar,
-         Disable, poção) deixam a luta acontecer, e um efeito de abertura que resolve o confronto
-         sozinho seria um confronto sem um único golpe na tela. */
-      if(quem.hp >= quem.maxHp * CURA_MAXIMO_DO_HP) continue;
-      const fatia = ABSORVER_MIN + rng() * (ABSORVER_MAX - ABSORVER_MIN);
-      const curado = Math.min(quem.maxHp - quem.hp, Math.round(quem.maxHp * fatia));
-      const drenado = Math.min(alvo.hp - 1, Math.round(alvo.maxHp * fatia));
-      if(curado <= 0 && drenado <= 0) continue;
-      quem.hp += curado;
-      alvo.hp -= drenado;
-      if(diario){
-        /* DUAS entradas, uma por barra -- como a explosão. A primeira sobe a vida de quem drenou
-           (o laço da animação trata 'absorb' como cura) e a segunda desce a do alvo. No LOG elas
-           viram UMA linha só: a segunda existe pro cálculo e pra barra, não pra leitura. */
-        diario.push({ q: marca, d: curado, hp: quem.hp, c:0, m:0, z:0, x:'absorb', g: especial.golpe });
-        diario.push({ q: marca, d: drenado, hp: alvo.hp, c:0, m:0, z:0, x:'absorbdano' });
-      }
-      continue;
-    }
     if(especial.efeito === 'anula'){
       /* DISABLE: o melhor golpe do alvo contra QUEM anulou sai de cena e ele passa a atacar pelo
          segundo melhor -- que é o pedido ("desconsidera o que tira mais dano, usa o outro").
@@ -7590,7 +7666,7 @@ function tentarGolpeEspecial(active, enemy, rng, diario){
     /* SONO: o alvo passa SONO_EM_TROCAS trocas sem revidar e depois acorda -- a luta segue normal.
        Como o Disable e a Recuperação, é 'continue' e não 'return true': o confronto acontece
        inteiro, só que com o adversário de mãos atadas no começo. */
-    alvo._dormindoPor = SONO_EM_TROCAS;
+    alvo._dormindoPor = sorteiaTrocasDeSono(rng);
     if(diario){
       diario.push({ q: marca, d: 0, hp: alvo.hp, c:0, m:0, z:0, x:'sono', g: especial.golpe });
     }
@@ -7645,9 +7721,9 @@ function doExchange(active, enemy, rng, diario){
   }
   rng = rng || Math.random;
   // Os DOIS sempre atacam em toda troca -- a velocidade (Gen 1 real) só decide QUEM conecta primeiro.
-  // Se o primeiro golpe nocauteia, o caído ainda responde com o "golpe moribundo" (reduzido, nunca
-  // cancelado). Isso impede que um pokémon raspando de HP varra uma fila inteira só por ser mais
-  // rápido: cada abate cobra o seu preço, e o dano acumulado alcança o sweeper em 1-2 abates.
+  // ⚠️ QUEM CAI NÃO RESPONDE, desde 15/09/2026: o golpe moribundo acabou (ver o bloco do
+  // saiuNoPrimeiro, mais abaixo). Até então o caído ainda conectava o contra-golpe, e era isso que
+  // impedia um pokémon rápido e forte de varrer a fila de graça -- hoje o abate é limpo.
   /* Quem está dormindo não ataca nesta troca, e o contador anda. O golpe dele não sai NEM no
      diário: uma linha de "-0 de HP" faria o log dizer que ele atacou e não machucou, quando o que
      aconteceu foi ele não ter atacado. O log tem que contar a mesma coisa que a tela mostra. */
@@ -7669,8 +7745,18 @@ function doExchange(active, enemy, rng, diario){
   const acordaram = [];
   if(activeDorme && active._dormindoPor <= 0) acordaram.push({ q:'p', nome: active.name, p: active });
   if(enemyDorme && enemy._dormindoPor <= 0) acordaram.push({ q:'e', nome: enemy.name, p: enemy });
+  /* ⚠️ QUEM ESTÁ DORMINDO NESTA TROCA, pro Comedor de Sonhos saber contra quem ele vale (ver
+     GOLPES_SO_DORMINDO). Tem que ser marcado AQUI, depois do `acorda` e antes dos golpes: o
+     `_dormindoPor` já foi decrementado, então na troca livre ele está em 0 enquanto o pokémon
+     ainda não atacou -- lido dali, o golpe nunca sairia.
+     O campo começa com `_`, então não vai pro Firestore (ver limparParaFirestore), e é LIMPO logo
+     depois dos dois `golpesDaTroca`: ele vale pra ESTA troca e mais nada. */
+  active._dormeAgora = activeDorme;
+  enemy._dormeAgora = enemyDorme;
   const dmgToEnemy = activeDorme ? [] : golpesDaTroca(active, enemy, rng);
   const dmgToActive = enemyDorme ? [] : golpesDaTroca(enemy, active, rng);
+  active._dormeAgora = false;
+  enemy._dormeAgora = false;
   const spdActive = effectiveSpeed(active);
   const spdEnemy = effectiveSpeed(enemy);
   // empate de velocidade: sorteio -- usa o mesmo rng da batalha, então nas Ligas (seed fixa) é determinístico
@@ -7679,7 +7765,42 @@ function doExchange(active, enemy, rng, diario){
   const second = activeFirst ? enemy : active;
   const dmgByFirst  = activeFirst ? dmgToEnemy : dmgToActive;
   const dmgBySecond = activeFirst ? dmgToActive : dmgToEnemy;
-  const firstHpBefore = first.hp, secondHpBefore = second.hp;
+  /* ⚠️ `firstHpBefore` É `let` POR CAUSA DA DRENAGEM: ele significa "a vida do first no instante em
+     que o second vai bater nele", e a cura do first acontece ENTRE as duas coisas. Os três lugares
+     que o leem (o `jaRaspando`, o clamp do piso do revide e o `ho` da marca da Faixa) querem esse
+     valor, não o do começo da troca -- enquanto nada curava no meio, os dois eram o mesmo número. */
+  let firstHpBefore = first.hp;
+  const secondHpBefore = second.hp;
+  const primeiroDormiu = (first === active) ? activeDorme : enemyDorme;
+  const segundoDormiu  = (second === active) ? activeDorme : enemyDorme;
+  /* ⚠️ A DRENAGEM DEVOLVE METADE DO DANO EFETIVO, e ela roda em DOIS momentos diferentes -- um por
+     lado --, porque ela é CRONOLÓGICA: quem bate primeiro cura primeiro, antes de o outro revidar.
+     Numa versão anterior as duas curas rodavam juntas no fim, e isso dava vantagem indevida: um
+     Oddish CHEIO que matasse o Geodude com Absorver tomava o revide moribundo e só então curava --
+     terminando cheio de novo, quando no jogo ele deveria curar zero (já estava cheio) e terminar
+     machucado. O teste pegou isso na primeira batalha.
+     A CURA SAI DO DANO EFETIVO (`saiu[].d`), que é o que a barra andou de verdade: o número bruto
+     de `aplicarGolpes` ainda é aparado pelo teto de quem raspa, pela Faixa, pelo piso do revide e
+     Calculada antes deles, ela sairia de um dano que não aconteceu.
+     ELA RODA FORA DO `if(diario)`: o diário é apresentação e é opcional, e uma mecânica que só
+     valesse com ele faria a mesma batalha terminar diferente conforme quem a chamou.
+     QUEM CAIU NÃO SE CURA -- o revide moribundo é de quem já está em 0, e devolver vida ali o
+     ressuscitaria; a morte súbita acabou em 12/09/2026 justamente pra que ninguém volte.
+     NUNCA PASSA DO TETO, senão a soma das linhas do log não fecharia com a barra.
+     O COMEDOR DE SONHOS confere o sono AQUI TAMBÉM, e é rede e não repetição: o `melhorAtaque` já o
+     tira dos candidatos, mas o METRÔNOMO sorteia entre todos os golpes de dano da tabela e podia
+     trazê-lo por outro caminho. */
+  const drenar = (saiu, quemBate, alvoDormia) => {
+    const fr = GOLPES_DRENO[quemBate.lastMove];
+    if(!fr) return 0;
+    if(GOLPES_SO_DORMINDO[quemBate.lastMove] && !alvoDormia) return 0;
+    if(quemBate.hp <= 0) return 0;
+    const total = saiu.reduce((a, h) => a + h.d, 0);
+    const cura = Math.min(Math.floor(total * fr), quemBate.maxHp - quemBate.hp);
+    if(cura <= 0) return 0;
+    quemBate.hp += cura;
+    return cura;
+  };
   /* APLICA OS GOLPES DE UMA TROCA, um a um, e PARA quando o alvo cai: o 4º tapa não sai num
      pokémon que caiu no 3º. Devolve o que saiu DE VERDADE de cada golpe mais a vida que sobrou --
      é desse par que saem a linha do diário e o passo da animação, uma barra por tapa. */
@@ -7726,96 +7847,60 @@ function doExchange(active, enemy, rng, diario){
   /* A FAIXA APARA O ÚLTIMO GOLPE que saiu, seja ele o único ou o último tapa. Sem aparar, a soma
      das linhas do log passaria do que o pokémon perdeu de verdade -- ele foi a zero e voltou a 1. */
   const aparaAFaixa = (saiu) => { const u = saiu[saiu.length - 1]; if(u){ u.d = Math.max(0, u.d - 1); u.hp = 1; } };
-  /* APARA O REVIDE PRA O ALVO PARAR EXATAMENTE EM `alvoHp`, andando DE TRÁS PRA FRENTE.
-     O `aparaAFaixa` logo acima faz o mesmo com um alvo fixo (1) e mexendo só na última entrada;
-     aqui o alvo é sorteado e pode ser MAIOR do que o último tapa tirou, e aí o de antes também tem
-     que ceder. É a mesma conta que o aparo do desempate usava antes de ele deixar de existir.
-     OS TAPAS QUE SOBRAM EM ZERO SAEM DA LISTA: sem isso o `gravar` ainda os contaria no `tn`, e o
-     selo prometeria "3x" numa linha que mostra dois -- golpe de dano zero não é golpe. */
-  const apararRevide = (saiu, alvoHp) => {
-    let alvo = alvoHp;
-    for(let k = saiu.length - 1; k >= 0; k--){
-      const antes = saiu[k].hp + saiu[k].d;
-      const dAntes = saiu[k].d;
-      saiu[k].hp = alvo;
-      saiu[k].d = Math.max(0, antes - alvo);
-      /* Mesma regra do `cap` la em cima: o selo so cai quando o aparo comeu a dobra. */
-      if(saiu[k].d * 2 < dAntes) saiu[k].cap = true;
-      if(saiu[k].d > 0) break;
-    }
-    while(saiu.length > 1 && !(saiu[saiu.length - 1].d > 0)) saiu.pop();
-  };
   const saiuNoSegundo = aplicarGolpes(second, tetoDeQuemRaspa(first, second, dmgByFirst));
   /* A Faixa segura ANTES de o diário ser escrito: assim o dano gravado é o EFETIVO (o que saiu de
      verdade, parando em 1) e a barra da tela desce até 1, que é o que aconteceu. A LINHA dela é
      empurrada mais abaixo, depois da linha do golpe -- ver marcaDaFaixa. */
   const faixaDoSegundo = second.hp <= 0 && faixaDeFoco(second, (second === active) ? 'p' : 'e');
   if(faixaDoSegundo){ second.hp = 1; aparaAFaixa(saiuNoSegundo); }
-  /* A marca sai da SITUAÇÃO (o segundo caiu e mesmo assim revidou), não de o dano ter sido
-     reduzido. Enquanto ela era deduzida do dano, subir o DYING_BLOW_FACTOR pra 1.0 fazia a marca
-     sumir junto -- e sem ela o log volta a mostrar pokémon atacando depois de cair, porque é ela
-     que manda o revide vir ANTES do golpe que derrubou. */
+  /* A CURA DE QUEM BATEU PRIMEIRO, no instante do golpe dele -- ANTES de o second revidar. Daqui
+     pra baixo, `firstHpBefore` é a vida dele já curada: é dela que o piso do revide parte e é ela
+     que a marca da Faixa registra. */
+  const drenouOFirst = primeiroDormiu ? 0 : drenar(saiuNoSegundo, first, segundoDormiu);
+  if(drenouOFirst) firstHpBefore = first.hp;
+  /* ⚠️ O HP DA LINHA É CAPTURADO AQUI, NA HORA DA CURA -- e não lá embaixo, na hora de gravar.
+     O campo `hp` do diário quer dizer "a vida depois deste passo", e a linha do first é escrita
+     DEPOIS de o second já ter revidado: lida na gravação, ela registrava a vida pós-revide.
+     Medido: um Oddish que curou 77 gravava `hp:0` porque o revide o derrubou em seguida -- e esse
+     campo é lido pela reconstrução (o laço do `base`) e pelas contas que leem o diário. */
+  const hpDoFirstAposDreno = first.hp;
   const segundoCaiu = second.hp <= 0;
-  /* O golpe moribundo vale por GOLPE, então num golpe de vários tapas cada tapa passa pelo fator.
-     Hoje ele é 1.0 e isso não muda um ponto -- mas no dia em que voltar a valer metade, valer
-     metade em cada tapa é o que mantém a regra sendo sobre o GOLPE e não sobre o número de tapas. */
-  const counter = dmgBySecond.map(d => (segundoCaiu && d > 0) ? Math.max(1, Math.round(d * DYING_BLOW_FACTOR)) : d);
-  /* ⚠️ O TETO NÃO VALE NO REVIDE MORIBUNDO, e isso é decisão: ali o atacante JÁ caiu (hp 0, ou seja
-     sempre "abaixo de 10%"), e o revide dele já tem a própria trava -- o piso de 1%-10%, que desde
-     12/09 impede que ele mate. Somar os dois faria o revide ser aparado duas vezes. */
-  const saiuNoPrimeiro = aplicarGolpes(first, segundoCaiu ? counter : tetoDeQuemRaspa(second, first, counter));
-  /* ⚠️ O REVIDE MORIBUNDO NÃO MATA: ele deixa o outro entre 1% e 10% da barra (12/09/2026, a
-     pedido -- antes era 1 de HP fixo, e antes disso ele matava e a morte súbita ressuscitava um).
-     É a única coisa no motor que fazia os DOIS caírem na mesma troca, e o piso é o que impede isso:
-     *"jamais os 2 devem morrer juntos e um ficar de pé"*.
-     A AUTODESTRUIÇÃO CONTINUA MATANDO OS DOIS: ela zera o HP dentro do `tentarGolpeEspecial` e
-     devolve antes de chegar aqui, que é o que o pedido preserva.
-     O REVIDE CONTINUA DOENDO, que é o motivo de ele existir: um pokémon raspando de HP não varre
-     uma fila inteira de graça só por ser mais rápido -- cada abate cobra o seu preço. O que ele
-     perdeu foi o poder de levar o outro junto.
-     ⚠️ E ISSO NÃO APARECE NA TELA, que foi pedido com estas palavras: *"deve ficar mascarado na
-     lógica/mecânica da batalha"*. Não há linha, frase nem selo -- o log mostra o dano que REALMENTE
-     saiu (o diário grava o efetivo, sempre), e a barra para onde parou. Do lado de fora é um golpe
-     que não matou, e é só isso que se vê.
-     NUNCA SOBE A VIDA DE NINGUÉM: o piso é aparado no que o alvo tinha ENTRANDO na troca, então um
-     pokémon que já estava abaixo de 10% continua onde estava e o revide simplesmente não o derruba.
-     O SORTEIO SÓ ACONTECE QUANDO O PISO VALE -- ler o rng fora disso deslocaria a semente inteira,
-     que foi o defeito que o Whirlwind quase trouxe no mesmo dia. */
-  const revideIaMatar = segundoCaiu && first.hp <= 0;
-  if(revideIaMatar){
-    /* O SORTEIO ACONTECE SEMPRE QUE O PISO VALE, mesmo quando o ramo de baixo não vai usá-lo: ler o
-       rng num número diferente de vezes desloca a semente inteira e muda batalhas que não têm
-       revide nenhum. É a mesma armadilha que o Remoinho quase trouxe. */
-    const pct = REVIDE_PISO_MIN + (rng ? rng() : Math.random()) * (REVIDE_PISO_MAX - REVIDE_PISO_MIN);
-    /* ⚠️ QUEM JÁ ESTAVA RASPANDO FICA EXATAMENTE ONDE ESTAVA, e o revide não tira nada (13/09/2026).
-       O piso promete que o alvo termina entre 1% e 10% da barra -- se ele JÁ entrou na troca dentro
-       dessa faixa, a promessa já está cumprida e forçá-lo pro valor sorteado não acrescenta regra
-       nenhuma. O que acrescentava era um NÚMERO SEM SENTIDO na tela.
-       Reportado com print: um Golem Lv.51 "atacando com Terremoto e tirando −4" de um Mr. Mime do
-       mesmo nível. O Terremoto tira 348 em média ali (107% da barra do Mr. Mime) -- só que o Golem
-       tinha acabado de morrer pra uma Folha Mágica (Planta é 4× contra Pedra/Terra), aquilo era o
-       revide moribundo, e o Mr. Mime já estava com 23 de 331. O piso sorteou 19, e a conta deu 4.
-       Medido: o alvo já estava dentro da faixa em 7,9% dos confrontos; em 1,3% deles isso virava
-       uma LINHA com um número que não explica o golpe (nos outros o dano já dava zero e a linha
-       nem aparecia, pela regra de "golpe de dano zero não é golpe").
-       Custa quase nada de jogo: o alvo sobrevive com os poucos pontos que já tinha em vez dos
-       poucos que o sorteio daria -- ele ia sobreviver de um jeito ou de outro. */
-    const jaRaspando = firstHpBefore > 0 && firstHpBefore <= first.maxHp * REVIDE_PISO_MAX;
-    first.hp = jaRaspando
-      ? firstHpBefore
-      : Math.max(1, Math.min(firstHpBefore, Math.round(first.maxHp * pct)));
-    apararRevide(saiuNoPrimeiro, first.hp);
-  }
-  /* A FAIXA não é gasta quando o revide já não podia matar -- ela existe pra segurar golpe fatal, e
-     depois do piso acima este não é mais um. */
+  /* =====================================================================================
+     ⚠️ QUEM CAI NÃO REVIDA (15/09/2026, a pedido: *"esse negócio de golpe moribundo eu queria
+     acabar com ele"*). O GOLPE MORIBUNDO ACABOU.
+     Ele era a regra mais antiga deste laço: quem era derrubado ainda conectava o contra-golpe, e
+     existia pra que um pokémon raspando de HP não varresse uma fila inteira só por ser mais rápido
+     -- cada abate cobrava o seu preço. Hoje o abate é limpo: caiu, acabou.
+     O QUE SAIU JUNTO, e é o tamanho da decisão: o `DYING_BLOW_FACTOR`, o PISO de 1%-10% (que desde
+     12/09 impedia o revide de matar), o `apararRevide` que o piso obrigava, o `REVIDE_PISO_MIN/MAX`
+     e o ramo de "quem já estava raspando não leva revide" (13/09). Os cinco eram remendos em cima
+     do revide; sem ele, nenhum tem o que fazer.
+     ⚠️ O QUE FICA É O TETO DE QUEM RASPA (`MORIBUNDO_TETO_NO_CHEIO`, 14/09), e ele NÃO é a mesma
+     coisa: aquele é sobre o ATAQUE de quem está com pouca vida -- ele não derruba um pokémon cheio
+     num golpe só --, e continua valendo por conta própria. O que morreu é o REVIDE de quem caiu.
+     ⚠️ E A MARCA `m` DO DIÁRIO NUNCA MAIS É GERADA. O reordenamento que ela comanda no
+     `passosVisiveis` FICA, como o `x:'desempate'` ficou: diário gravado antes de hoje tem a marca,
+     e sem o reordenamento aquele log volta a mostrar pokémon atacando com a barra em zero.
+     O que não existe mais é PRODUZIR um caso novo. */
+  const saiuNoPrimeiro = segundoCaiu ? [] : aplicarGolpes(first, tetoDeQuemRaspa(second, first, dmgBySecond));
+  /* O PISO DO REVIDE (1%-10%) SAIU JUNTO COM O REVIDE, em 15/09/2026 -- ver o bloco acima. Ele
+     existia pra o revide de quem caiu não matar o outro ("jamais os 2 devem morrer juntos e um
+     ficar de pé"), e sem revide não há o que limitar: os dois nunca mais caem na mesma troca,
+     agora por construção e não por aparo.
+     A AUTODESTRUIÇÃO continua sendo o único jeito de os dois caírem juntos -- ela zera o HP dentro
+     do `tentarGolpeEspecial` e devolve antes de chegar aqui. */
+  /* A FAIXA DO PRIMEIRO só tem o que segurar quando o second sobreviveu pra bater nele: com o
+     second caído, `saiuNoPrimeiro` é vazio e o HP do first não se moveu nesta linha. */
   const faixaDoPrimeiro = first.hp <= 0 && faixaDeFoco(first, (first === active) ? 'p' : 'e');
   if(faixaDoPrimeiro){ first.hp = 1; aparaAFaixa(saiuNoPrimeiro); }
+  /* A CURA DE QUEM BATEU POR ÚLTIMO. Com o second caído ela não acontece: `saiuNoPrimeiro` é
+     vazio, o total dá zero e o `drenar` devolve 0 sem escrever linha nenhuma. */
+  const drenouOSecond = segundoDormiu ? 0 : drenar(saiuNoPrimeiro, second, primeiroDormiu);
+  const hpDoSecondAposDreno = second.hp;
   if(diario){
     /* O dano registrado é o que SAIU DE VERDADE da vida do alvo, não o número que a fórmula
        sorteou: um golpe de 101 num pokémon com 54 de HP tira 54. Gravar o valor cru fazia o log
        não fechar -- somando as linhas dava mais dano do que o pokémon tinha de vida. */
-    const primeiroDormiu = (first === active) ? activeDorme : enemyDorme;
-    const segundoDormiu  = (second === active) ? activeDorme : enemyDorme;
     /* UMA ENTRADA POR TAPA: a barra desce uma vez por tapa, e a animação lê o diário. No LOG elas
        viram uma linha só, somadas -- a mesma regra da drenagem, que tem duas entradas e uma linha.
        Os campos t (qual tapa) e tn (quantos ao todo) só existem quando há mais de um: assim o
@@ -7856,12 +7941,24 @@ function doExchange(active, enemy, rng, diario){
         diario.push(reg);
       });
     };
+    /* A LINHA DA DRENAGEM VEM COLADA NA DO GOLPE, e antes da marca da Faixa: ela é parte do MESMO
+       lance (o golpe tira e devolve), e é essa adjacência que os dois lados da apresentação usam --
+       o `passosVisiveis` agrupa os dois pra o reordenamento do moribundo mover o par junto, e o
+       `passosHtml` anexa a cura à linha do golpe em vez de abrir linha própria.
+       O `q` É DE QUEM CUROU, que aqui é o mesmo de quem bateu -- ao contrário do `absorbdano` da
+       drenagem de abertura, cujo `q` é de quem causou e o HP some do outro lado.
+       O `hp` é a vida de QUEM CUROU depois da cura, a mesma convenção da entrada `absorb`.
+       O `mv` viaja junto porque o log nomeia o golpe por LINHA desde 13/09/2026. */
+    const marcaDoDreno = (q, cura, hpApos, quem) =>
+      ({ q: q, d: cura, hp: hpApos, c:0, m:0, z:0, x:'dreno', mv: quem.lastMove });
     if(!primeiroDormiu){
       gravar(activeFirst?'p':'e', saiuNoSegundo, first, 0);
+      if(drenouOFirst) diario.push(marcaDoDreno(activeFirst?'p':'e', drenouOFirst, hpDoFirstAposDreno, first));
       if(faixaDoSegundo) diario.push(marcaDaFaixa((second === active) ? 'p' : 'e', firstHpBefore));
     }
     if(!segundoDormiu){
       gravar(activeFirst?'e':'p', saiuNoPrimeiro, second, segundoCaiu?1:0);
+      if(drenouOSecond) diario.push(marcaDoDreno(activeFirst?'e':'p', drenouOSecond, hpDoSecondAposDreno, second));
       if(faixaDoPrimeiro) diario.push(marcaDaFaixa((first === active) ? 'p' : 'e', second.hp));
     }
     // AGORA sim: ele apanhou nesta troca, e só então acorda (ver o comentario do `acordaram`)
@@ -8122,8 +8219,8 @@ function simulateGymBattle(team, brockTeam, rng, opts){
        vivo. Não há mais `enemyDefeated` -- ele existia pra fechar o laço interno, e com um laço só
        o que decide é a vida. */
     if(isTrade){
-      // os dois caíram na mesma troca (agora possível em qualquer confronto, via golpe moribundo):
-      // ninguém venceu, então as duas sequências zeram
+      // os dois caíram na mesma troca -- desde 15/09/2026 só a AUTODESTRUIÇÃO faz isso (o golpe
+      // moribundo acabou, e era ele o outro caminho): ninguém venceu, então as duas sequências zeram
       playerStreak = 0; enemyStreak = 0;
     } else if(enemyFainted){
       playerStreak++; enemyStreak = 0;
@@ -9967,6 +10064,7 @@ function runSpecialBattle(){
   game.specialBattleResult = result;
   game.specialRevealIndex = 0;
   game.specialRevealPhase = 'loading';
+  abrirConfronto('special');
   game.screen = 'specialBattling';
   render();
   setTimeout(advanceSpecialReveal, 1200);
@@ -10058,6 +10156,7 @@ function advanceSpecialReveal(){
     if(game.specialRevealIndex < matchups.length - 1){
       game.specialRevealIndex++;
       game.specialRevealPhase = 'loading';
+      abrirConfronto('special');
       render();
       setTimeout(advanceSpecialReveal, 1200);
     } else {
@@ -10448,9 +10547,30 @@ function runBattle(){
   game.battleResult = result;
   game.revealIndex = 0;
   game.revealPhase = 'loading';
+  abrirConfronto('reveal');
   game.screen = 'battling';
   render();
   setTimeout(advanceReveal, 1200);
+}
+/* ⚠️ ABRIR UM CONFRONTO ZERA O PASSO E O ÚLTIMO GOLPE — E ANTES DO DESENHO (15/09/2026).
+   Reportado na animação do Remoinho: *"antes de trocar o pokemon, ta aparecendo qual vai ser o novo
+   pokemon rapidamente e rapidamente troca para o pokemon que vai ser trocado"*.
+   A CAUSA: os laços faziam `Phase = 'loading'; render(); setTimeout(advance, 1200)`, e quem zerava o
+   passo era o ramo `loading` do `advance` — ou seja, **1,2 segundo depois do desenho**. Nesse
+   intervalo o cabeçalho era desenhado com o passo do confronto ANTERIOR, que é alto; o
+   `trocaDoRemoinho` via um passo além do fim da cena, devolvia `null` ("é o pokémon do matchup") e a
+   tela mostrava **quem ENTROU** — e só então voltava pro que estava saindo. A cena começava pelo fim.
+   É A TERCEIRA PORTA DO MESMO DEFEITO. O "golpe fantasma" de 09/09/2026 era o `LastHit` sobrando de
+   um confronto pro outro; o conserto de lá zerou os dois JUNTOS, mas só nos pontos que já zeravam o
+   passo — e os que entram em `loading` não zeravam nenhum dos dois.
+   ⚠️ E ELA TEM QUE SER CHAMADA ANTES DO `render()`, não depois: o problema nunca foi o valor ficar
+   velho, foi ele ser DESENHADO velho.
+   UMA FUNÇÃO SÓ, com o prefixo do laço: são CINCO laços de animação e doze pontos de abertura, e
+   escrever duas linhas em cada um garantiria que o próximo nascesse sem. O teste lê o código e cobra
+   que todo `Phase = 'loading'` tenha a chamada junto. */
+function abrirConfronto(qual){
+  game[qual + 'HitStep'] = 0;
+  game[qual + 'LastHit'] = null;
 }
 function advanceReveal(){
   if(game.screen !== 'battling') return;
@@ -10525,6 +10645,7 @@ function advanceReveal(){
     if(game.revealIndex < matchups.length - 1){
       game.revealIndex++;
       game.revealPhase = 'loading';
+      abrirConfronto('reveal');
       render();
       setTimeout(advanceReveal, 1200);
     } else if(game.battleResultContext === 'neighborhoodGym'){
@@ -10625,7 +10746,12 @@ function buildAnimatedHitSequence(m){
     /* A FÚRIA entra aqui junto da cura: o `amount` NEGATIVO é o que faz a barra SUBIR (os laços
        fazem hp - amount), e é assim que o jogador vê o pokémon crescer. Ela não cura -- o que sobe
        é o TETO de vida --, mas pra a animação é o mesmo movimento. */
-    if(g.x === 'recover' || g.x === 'pocao' || g.x === 'absorb' || g.x === 'furia') return { side: g.q === 'p' ? 'player' : 'enemy', amount: -g.d, cura: true, q: g.q, x: g.x };
+    /* A DRENAGEM NO GOLPE entra aqui junto: a barra de quem drenou SOBE, e `amount` negativo é o
+       que faz isso. Ela é marcada como `cura` de propósito -- é essa marca que faz o
+       `fraseDoGolpeUsado` devolver vazio no passo dela, e aí o pintor (que só sobe a linha, nunca
+       a rebaixa) DEIXA NA TELA o "Fulano usou ABSORVER" do passo anterior enquanto a barra sobe.
+       É o que se quer: o mesmo golpe tirou e devolveu, e a frase é uma só. */
+    if(g.x === 'recover' || g.x === 'pocao' || g.x === 'absorb' || g.x === 'furia' || g.x === 'dreno') return { side: g.q === 'p' ? 'player' : 'enemy', amount: -g.d, cura: true, q: g.q, x: g.x };
     /* A FAIXA não move barra nenhuma: o golpe anterior já parou em 1, e é justamente esse 1 que ela
        explica. Mas ela É um passo -- sem ele, a animação pularia direto do golpe que ia matar pro
        revide, e a pausa que dá tempo de ler a mensagem não existiria. */
@@ -10924,6 +11050,7 @@ function runTrainerBattle(opponentTeam){
   game.trainerBattleResult = result;
   game.trainerRevealIndex = 0;
   game.trainerRevealPhase = 'loading';
+  abrirConfronto('trainer');
   game.screen = 'trainerBattling';
   render();
   setTimeout(advanceTrainerReveal, 1200);
@@ -10981,6 +11108,7 @@ function advanceTrainerReveal(){
     if(game.trainerRevealIndex < matchups.length - 1){
       game.trainerRevealIndex++;
       game.trainerRevealPhase = 'loading';
+      abrirConfronto('trainer');
       render();
       setTimeout(advanceTrainerReveal, 1200);
     } else {
@@ -13119,6 +13247,7 @@ async function watchTrainersLeagueMatch(dateId, roundIndex, matchIndex, matchKey
   preloadBattleSprites(matchups);
   game.leagueWatchIndex = 0;
   game.leagueWatchPhase = 'loading';
+  abrirConfronto('leagueWatch');
   game.leagueWatchReturnScreen = game.screen; // volta pra tela certa (liga ou navegador de rodadas)
   game.screen = 'leagueWatch';
   render();
@@ -13165,6 +13294,7 @@ function watchTrainersLeagueTiebreakMatch(roundIndex, matchIndex){
   preloadBattleSprites(match.matchups);
   game.leagueWatchIndex = 0;
   game.leagueWatchPhase = 'loading';
+  abrirConfronto('leagueWatch');
   game.leagueWatchReturnScreen = game.screen;
   game.screen = 'leagueWatch';
   render();
@@ -16261,8 +16391,8 @@ function renderSpecialBattling(){
   ${chuvaBadgeHtml(m)}
   <div class="box cursor" style="${terrainBattleBgStyle(cfg.context==='elite' ? game.eliteTerrain : null)}">
     <div class="team-alive-row">
-      <span class="team-alive-chip">🎒 ${escapeHtmlSafe(game.trainerName||'Você')}: ${(loading||animating||emboscada)?m.playerAliveBefore:m.playerAliveAfter}/${m.playerTeamSize}</span>
-      <span class="team-alive-chip">🥊 ${escapeHtmlSafe(cfg.meta.opponentName||'Adversário')}: ${(loading||animating||emboscada)?m.enemyAliveBefore:m.enemyAliveAfter}/${m.enemyTeamSize}</span>
+      ${placarDoTreinador(game.trainerName||'Você', (loading||animating||emboscada)?m.playerAliveBefore:m.playerAliveAfter, m.playerTeamSize)}
+      ${placarDoTreinador(cfg.meta.opponentName||'Adversário', (loading||animating||emboscada)?m.enemyAliveBefore:m.enemyAliveAfter, m.enemyTeamSize)}
     </div>
     <div class="battle-vs">
       ${fighterHtml(m, 'p', { hp: displayPlayerHp, passo: game.specialHitStep, hit: game.specialLastHit, comTerreno: false })}
@@ -16778,8 +16908,8 @@ function renderTrainerBattling(){
            grava os confrontos na perspectiva de quem atacou o ginásio). Por isso o nome vem de
            trainerBattlePlayerName quando existe, e só cai pro seu quando não existe -- jornada,
            Torre e reprise da Online são sempre batalhas suas e deixam esse campo nulo -->
-      <span class="team-alive-chip">🎒 ${escapeHtmlSafe(game.trainerBattlePlayerName||game.trainerName||'Você')}: ${(loading||animating)?m.playerAliveBefore:m.playerAliveAfter}/${m.playerTeamSize}</span>
-      <span class="team-alive-chip">🥊 ${escapeHtmlSafe(game.trainerBattleOpponentName||'Adversário')}: ${(loading||animating)?m.enemyAliveBefore:m.enemyAliveAfter}/${m.enemyTeamSize}</span>
+      ${placarDoTreinador(game.trainerBattlePlayerName||game.trainerName||'Você', (loading||animating)?m.playerAliveBefore:m.playerAliveAfter, m.playerTeamSize)}
+      ${placarDoTreinador(game.trainerBattleOpponentName||'Adversário', (loading||animating)?m.enemyAliveBefore:m.enemyAliveAfter, m.enemyTeamSize)}
     </div>
     <div class="battle-vs">
       ${fighterHtml(m, 'p', { hp: displayPlayerHp, passo: game.trainerHitStep, hit: game.trainerLastHit, comTerreno: false })}
@@ -17252,8 +17382,11 @@ function renderMatchupLog(matchups){
    golpes a partir do HP antes/depois). Então o número de golpes aqui pode não bater com o que a
    animação mostrou. Confronto antigo, gravado antes disso, não tem a lista e o bloco some. */
 /* O GOLPE MORIBUNDO NÃO VIRA LINHA.
-   Regra do motor: na troca os dois atacam, e quem cai ainda conecta o contra-golpe pela metade
-   (DYING_BLOW_FACTOR). Isso é real e o dano conta -- mas a ANIMAÇÃO nunca mostra um pokémon
+   ⚠️ ISTO É HISTÓRIA desde 15/09/2026: o golpe moribundo ACABOU -- quem cai não revida mais, e o
+   motor não produz mais um caso destes. O bloco FICA porque ele lê o DIÁRIO, e diário gravado
+   antes disso tem a marca `m`: um log de setembro relido hoje precisa dele pra continuar legível.
+   Regra do motor na época: na troca os dois atacavam, e quem caía ainda conectava o contra-golpe
+   (DYING_BLOW_FACTOR). Isso era real e o dano contava -- mas a ANIMAÇÃO nunca mostra um pokémon
    desmaiado batendo, e no log, escrito como linha própria, parecia defunto atacando.
    Aqui o dano dele é somado ao golpe ANTERIOR do mesmo pokémon: o log passa a ter as mesmas
    linhas que a animação mostrou e continua fechando com o HP do cartão (a soma das linhas
@@ -17296,10 +17429,15 @@ function passosVisiveis(golpes, m){
      moribundo empurra o golpe inteiro pra antes do que o derrubou, não o 3º tapa sozinho. Por isso
      a lista é agrupada ANTES de reordenar e desagrupada no fim -- reordenar entrada a entrada
      partiria o Tapa Duplo ao meio, com metade antes e metade depois. */
+  /* ⚠️ A CURA DA DRENAGEM ANDA COLADA NO GOLPE que a gerou, pelo mesmo motivo dos tapas: os dois
+     são o MESMO lance. Solta, ela ficaria pra trás quando o reordenamento empurra o golpe
+     moribundo pra frente -- e a tela mostraria o pokémon se curando de um golpe que, ali, ele
+     ainda não deu. */
   const grupos = [];
   for(const g of golpes){
     const ultimo = grupos[grupos.length - 1];
     if(g.t > 1 && ultimo && ultimo[0].q === g.q && ultimo[0].tn === g.tn) ultimo.push(g);
+    else if(g.x === 'dreno' && ultimo && !ultimo[0].x && ultimo[0].q === g.q) ultimo.push(g);
     else grupos.push([g]);
   }
   const saidaG = [];
@@ -17414,15 +17552,9 @@ function passosVisiveis(golpes, m){
 /* A MESMA sequência serve o LOG e a ANIMAÇÃO -- é isso que garante que as duas contem a mesma
    história, com o mesmo número de golpes. Enquanto eram montadas em separado, o jogador via 3
    golpes na tela e lia 7 linhas no log, e isso foi reportado três vezes.
-   O TETO DE 3 GOLPES VALE, e vale por um motivo de leitura: uma luta comum tem que caber em duas ou
-   três linhas. Medido, 99,4% dos confrontos passam de 3 golpes reais (mediana 4, maior 28) -- sem
-   teto, uma troca banal de Gloom contra Miltank virava seis linhas, que foi o que apareceu na tela
-   quando ele saiu por um dia (03/09/2026).
-   A EXCEÇÃO É O SONO, e só ele: as trocas livres que ele compra são o que o golpe É, e esmagá-las
-   na reconstrução foi a origem dos dois defeitos reportados naquele mesmo dia ("um golpe dele, dois
-   dela"). Então elas entram REAIS, uma linha cada, e só o RESTO da luta é reconstruído -- ou seja,
-   o confronto com sono fica em quatro ou cinco linhas de golpe, não em três nem em oito. */
-const TETO_GOLPES = 4;
+   ⚠️ O TETO DE LINHAS ACABOU EM 15/09/2026 -- ver o comentário no sequenciaDoConfronto. O log
+   mostra a luta INTEIRA, sempre, e a reconstrução ficou sendo só o que ela sempre foi por escrito:
+   o fallback de confronto gravado ANTES de o diário existir, e o partidor da Faixa de Foco. */
 function sequenciaDoConfronto(m){
   /* O Disable não é um golpe na tela: não tira HP e a luta continua depois dele -- viraria um passo
      de dano 0 na animação. A frase dele é montada à parte, no passosHtml.
@@ -17493,7 +17625,14 @@ function sequenciaDoConfronto(m){
     let saida = lista;
     ['p','e'].forEach(lado => {
       const idx = [];
-      saida.forEach((g, i) => { if(!g.x && g.q === lado && g.d > 0 && !(g.tn > 1)) idx.push(i); });
+      /* ⚠️ O GOLPE QUE DRENOU FICA FORA DO BOLO, e é o mesmo motivo do golpe de vários tapas e do
+         confronto com Faixa: a linha dele carrega um segundo número (a cura) que o jogador consegue
+         conferir -- ela é metade do dano, e ele vê os dois lado a lado. Repartido, o dano na tela
+         deixaria de bater com a cura ao lado, e a conta que a linha promete quebraria.
+         Alternativa descartada: recalcular a cura a partir do número suavizado. Isso faria a linha
+         fechar consigo mesma e MENTIR sobre a barra, que subiu o valor real. */
+      const drenouNeste = (i) => { const p = saida[i + 1]; return !!p && p.x === 'dreno' && p.q === saida[i].q; };
+      saida.forEach((g, i) => { if(!g.x && g.q === lado && g.d > 0 && !(g.tn > 1) && !drenouNeste(i)) idx.push(i); });
       /* ⚠️ O GOLPE QUE MATOU SAI DO BOLO (14/09/2026, a pedido: *"passa a ser o golpe REAL, porém o
          segundo golpe que mata vai tirar só o que resta de HP do adversário"*).
          ESTA FUNÇÃO SEMPRE SOUBE QUE SÃO DUAS FAMÍLIAS -- está escrito aqui em cima --, e ela
@@ -17659,22 +17798,35 @@ function sequenciaDoConfronto(m){
     });
     return saida;
   };
-  /* O teto conta GOLPES, e um golpe de vários tapas é UM golpe: só o primeiro tapa ocupa vaga.
-     Sem isso um Tapa Duplo de 5 sozinho estouraria o teto de 3 e jogaria o confronto inteiro na
-     reconstrução -- que não conhece tapa nenhum e devolveria três golpes inventados no lugar. */
-  const golpesDeDano = reais.filter(ehDano).filter(g => !(g.t > 1)).length;
-  /* As aberturas (cura e sono) não são dano -- deixá-las contar jogaria uma troca real de 2 golpes
-     na reconstrução, perdendo os golpes de verdade. */
-  /* ⚠️ O CONFRONTO COM ROLAMENTO SAI DO TETO, e é a MESMA exceção do sono: o que aquele golpe FAZ
-     é crescer de uso em uso, e a reconstrução não conhece escala nenhuma -- ela interpola o HP e
-     devolve golpes inventados, todos do mesmo tamanho. Medido: a escala só chegava na tela em
-     **31,6%** dos confrontos com Rolamento; nos outros 68% o jogador via o mesmo nome com números
-     lisos e a mecânica ficava invisível.
-     O PREÇO É PEQUENO porque o caso é raro: são 7,9% dos confrontos, e neles a tela vai de 2,7 pra
-     5,5 linhas -- +0,22 linha na média de TODOS. A regra da casa ("uma luta comum cabe em poucas
-     linhas") continua valendo pro resto. */
-  const temRolamento = reais.some(g => g.rl > 1);
-  if(reais.length && (temRolamento || golpesDeDano <= TETO_GOLPES)) return reais;
+  /* =====================================================================================
+     ⚠️ O TETO DE LINHAS ACABOU (15/09/2026, a pedido: *"vamos então deixar sem teto, as lutas agora
+     vão seguir 100% real ao jogo"*). O LOG MOSTRA A LUTA INTEIRA, SEMPRE.
+     Até hoje ele valia 4 golpes, e acima disso a tela trocava a luta por uma RECONSTRUÇÃO -- três
+     golpes inventados a partir do HP de entrada e de saída. Ela não conhece mecânica nenhuma (nem
+     cura, nem escala do Rolamento, nem trocas livres do sono), e por isso o sono, o Rolamento e a
+     drenagem já tinham saído do teto um a um, cada um depois de um relato.
+     ⚠️ O QUE MATOU O TETO FOI A INCONSISTÊNCIA QUE ISSO CRIOU, e quem a viu foi o jogador: no mesmo
+     log, um Ariados × Goldeen saía com 10 linhas (drenagem: isento) e um Ivysaur × Horsea com 2 --
+     e a pergunta foi "um deles segue o motor real e o outro é resumido?". Seguiam o MESMO motor; o
+     que mudava era a tela. Medido com o build antigo de volta, 7.810 confrontos: **7,8% dos
+     confrontos SEM drenagem eram resumidos e 0% dos COM** -- dois pesos, sem o jogador ter como
+     saber em qual dos dois estava olhando.
+     O PREÇO, medido nos MESMOS 7.810 confrontos (o mesmo bot contra os dois builds): o log vai de
+     2,27 pra 2,62 linhas por confronto (**+16%**), 94% continuam em até 6 linhas, e a animação de
+     uma batalha 6x6 vai de 38,8s pra 43,9s (**+5,1s**). É menos do que parece porque **59% das
+     lutas se resolvem em UMA ou DUAS linhas**. A cauda é o que cresce: o pior caso visto foi de 23
+     pra 31 linhas (um Furret × Shuckle -- o Shuckle tem 230 de Defesa).
+     ⚠️ A RECONSTRUÇÃO NÃO FOI REMOVIDA, e não pode ser: ela é o fallback de confronto gravado ANTES
+     de o diário existir (`m.golpes` vazio), e é ela também que a FAIXA DE FOCO usa pra partir a luta
+     em duas metades. O que não existe mais é um confronto COM diário cair nela.
+     CONFERIDO QUE NÃO É MOTOR, por impressão: o mesmo build com e sem o teto dá o MESMO hash em 900
+     batalhas semeadas. `TETO_GOLPES` não existia no servidor e não entrava em conta de dano nenhuma.
+     HISTÓRICO: o teto já saiu inteiro uma vez, em 03/09/2026, e voltou no mesmo dia -- "uma troca
+     banal de Gloom contra Miltank virou seis linhas", reportado com print. O que mudou de lá pra cá
+     é que o teto tinha subido de 3 pra 4 e a cauda encolheu; e principalmente que hoje três
+     mecânicas já eram isentas, o que tornou o corte mais estranho do que o log comprido. */
+  if(reais.length) return reais;
+
 
   /* A FAIXA PARTE O CONFRONTO EM DUAS LUTAS, e cada uma é reconstruída como qualquer outra -- com o
      mesmo teto de 3 golpes. É o pedido, e é a leitura certa: a luta corre normal até o pokémon
@@ -17794,8 +17946,10 @@ function sequenciaDoConfronto(m){
   const livresAntesDoDespertar = (iDespertar < 0 || !sono) ? livres.length
     : (m.golpes || []).slice(0, iDespertar).filter(g => ehDano(g) && g.d > 0 && g.q === sono.q).length;
 
-  /* O MORIBUNDO DE QUEM DORMIU. Quando a última troca livre MATA o adormecido, ele ainda revida --
-     e esse revide é do MESMO instante do golpe que o derrubou (é o que o DYING_BLOW_FACTOR faz).
+  /* O MORIBUNDO DE QUEM DORMIU. ⚠️ HISTÓRIA desde 15/09/2026 (o golpe moribundo acabou): o motor
+     não gera mais este caso, e o bloco fica pelo mesmo motivo dos outros -- diário antigo tem a
+     marca gravada. Quando a última troca livre MATAVA o adormecido, ele ainda revidava --
+     e esse revide é do MESMO instante do golpe que o derrubou (é o que o DYING_BLOW_FACTOR fazia).
      Na ordem crua ele vem DEPOIS, e o log mostra um cadáver atacando.
      Este caminho não passa pelo `passosVisiveis` -- as trocas livres saem do diário cru de
      propósito (ver o comentário logo acima) e o revide cai na RECONSTRUÇÃO, que é montada depois
@@ -17921,18 +18075,46 @@ const TIPO_DO_ESPECIAL = {
    É função e não um `if` no cartão porque ela já tem duas entradas e vai ter mais: cada golpe que
    ganhar regra nova precisa dizer isso na hora em que o jogador escolhe, e não na batalha, quando
    já é tarde. Vale nas TRÊS telas de golpe, porque as três dividem o cartão. */
+/* ⚠️ ELA DEVOLVE UMA LISTA, não uma frase (15/09/2026). Era uma string com `return` em cada regra,
+   e a primeira regra que casasse ganhava -- o que funcionava enquanto nenhum golpe tinha DUAS
+   coisas a dizer. O Comedor de Sonhos tem: ele cura E só vale contra alvo dormindo, e as duas são
+   informação de escolha (a segunda é o que explica por que um golpe de poder 100 não é a escolha
+   óbvia). Com `return` de string, cadastrar a segunda apagaria a primeira em silêncio.
+   A ORDEM É A DA TABELA, e ela importa: o que o golpe FAZ vem antes da condição em que ele vale. */
 function obsDoGolpe(id){
-  if(MULTI_GOLPE[id]) return 'Golpe repete entre 2-5x';
+  const obs = [];
+  if(MULTI_GOLPE[id]) obs.push('Golpe repete entre 2-5x');
+  /* ⚠️ A DRENAGEM (15/09/2026, a pedido: *"coloque um * nessas habilidades naquele quadro que
+     aparece quando aprende habilidade"*). Ela é o caso mais forte desta função inteira: o cartão
+     mostra "Absorver — PODER 20", o número mais baixo da tela, e sem a frase o jogador larga o
+     golpe sem saber que ele devolve metade do dano. Um Absorver de 20 que cura vale mais que um
+     Talho de 70 num pokémon que precisa sobreviver -- e essa conta ele só consegue fazer se a
+     tela disser.
+     Ela entrou junto com a saída da PASSIVA de drenagem: enquanto a passiva existia, a ficha da
+     Pokédex contava a história por ela; agora quem drena é o GOLPE, e é no cartão do golpe -- na
+     hora em que ele escolhe -- que isso tem que estar escrito.
+     Sai da TABELA, como a dos multi-tapas: golpe novo no GOLPES_DRENO já nasce com a observação. */
+  if(GOLPES_DRENO[id]) obs.push('Cura o Pokémon que utilizou ao atacar o oponente');
+  /* ⚠️ A TRAVA DE ALVO (15/09/2026, a pedido, palavra por palavra: *"Só utilizado quando o
+     adversário dorme"*). Ela é a observação mais importante do Comedor de Sonhos, e mais que a
+     cura: sem ela o cartão anuncia **PODER 100** -- o número mais alto que a maioria das espécies
+     vê na vida -- e o jogador gasta uma das três vagas num golpe que, contra adversário acordado,
+     o motor NUNCA escolhe. Ele é a escolha certa pra quem tem sonífero e a pior de todas pra quem
+     não tem, e é essa a conta que a linha entrega.
+     Ela sai do GOLPES_SO_DORMINDO, que é a MESMA tabela que o `melhorAtaque` consulta -- se um dia
+     um segundo golpe entrar lá, o cartão dele já nasce avisando. Conferido no motor: 188 de 188
+     usos com o alvo dormindo e ZERO com ele acordado. */
+  if(GOLPES_SO_DORMINDO[id]) obs.push('Só utilizado quando o adversário dorme');
   /* O ROLAMENTO FICA AQUI, e não na ficha da espécie, porque ele É uma escolha do jogador: ele
      compete por uma das três vagas de golpe, e sem a frase o cartão anuncia "Poder 30" -- o mais
      fraco da tela -- sem dizer que o 5º uso vale 480. Foi por isso que a FÚria saiu daqui e ele
      fica: ela virou passiva, ele continua sendo golpe. */
-  if(id === GOLPE_ROLAMENTO) return "Dobra a cada uso seguido, até " + ROLAMENTO_USOS + "x";
+  if(id === GOLPE_ROLAMENTO) obs.push("Dobra a cada uso seguido, até " + ROLAMENTO_USOS + "x");
   /* A FÚRIA SAIU DAQUI em 10/09/2026: ela deixou de ser uma regra do GOLPE (que ganhava poder a
      cada uso) e virou passiva da ESPÉCIE, no molde do sono e da anulação. Passiva não é escolha do
      jogador, então ela não pertence ao cartão de escolher golpe -- ela aparece na ficha da Pokédex,
      junto dos outros especiais, que é onde o jogador vai perguntar "o que este bicho faz?". */
-  return '';
+  return obs;
 }
 function cartaoDeGolpe(id, comTipo, destaque){
   const tipo = GOLPES[id][0], poder = GOLPES[id][1];
@@ -17944,8 +18126,9 @@ function cartaoDeGolpe(id, comTipo, destaque){
      um Míssil Agulha de 14 com um Talho de 70 sem saber que um deles sai de 2 a 5 vezes -- e é
      justamente essa a informação que decide a escolha.
      Sai da TABELA, não de uma lista à parte: golpe novo no MULTI_GOLPE já ganha a observação. */
-  const texto = obsDoGolpe(id);
-  const obs = texto ? '<span class="golpe-cartao-obs">* ' + escapeHtmlSafe(texto) + '</span>' : '';
+  /* UMA LINHA POR OBSERVAÇÃO -- o Comedor de Sonhos tem duas (cura e "só contra quem dorme"), e
+     juntá-las numa frase só daria um parágrafo numa coluna de 167px a 320px. */
+  const obs = obsDoGolpe(id).map(t => '<span class="golpe-cartao-obs">* ' + escapeHtmlSafe(t) + '</span>').join('');
   /* A cor do risquinho vem INLINE porque muda de golpe pra golpe -- mesmo caminho do card de
      pokémon da tela de ordenar o time. */
   const risco = TYPE_COLORS[tipo] || 'var(--box-border)';
@@ -18228,7 +18411,6 @@ function especiaisDaEspecie(id){
      nome -- ver EXPLICACAO_DO_ESPECIAL), então ele reusa o texto inteiro. O que muda é o nome que
      a ficha mostra: quem abrir numa Miltank lê "Sino Curativo". */
   if(SINO_CURATIVO.includes(id))  out.push({ nome:'Sino Curativo',   chance: CHANCE_SINO, efeito:'cura' });
-  if(ABSORCAO[id])                out.push({ nome: ABSORCAO[id],    chance: CHANCE_ABSORVER, efeito:'drenar' });
   /* A FÚRIA é passiva da espécie desde 10/09/2026, e por isso mora AQUI e não no cartão do golpe:
      ela não é escolha do jogador. É a de maior chance da lista -- 30% por confronto. */
   if(FURIA.includes(id))          out.push({ nome:'Fúria',          chance: CHANCE_FURIA, efeito:'furia' });
@@ -18323,16 +18505,6 @@ const EXPLICACAO_DO_ESPECIAL = {
       'Só dispara abaixo de {CURA}% da vida: quase cheio não há o que recuperar.',
       'É o prêmio de quem sobreviveu ao confronto anterior — no primeiro de cada batalha o time ' +
       'já entra cheio, então ela não tem o que fazer.'
-    ]
-  },
-  drenar: {
-    quando: 'Abre o confronto',
-    texto: 'Se ele entrar no confronto machucado, tira uma fatia da vida do adversário e põe em ' +
-           'si — e só então a luta começa, inteira.',
-    detalhes: [
-      'Entre {DRENO_MIN}% e {DRENO_MAX}%, sorteado a cada uso. É a mesma PORCENTAGEM dos dois ' +
-      'lados, mas cada um do próprio total de vida.',
-      'Só dispara abaixo de {CURA}% da vida, e NUNCA mata: o adversário fica com pelo menos 1 de HP.'
     ]
   },
   furia: {
@@ -18442,8 +18614,6 @@ const EXPLICACAO_DO_ESPECIAL = {
 function textoDoEspecial(s){
   return String(s)
     .replace(/\{CURA\}/g,      Math.round(CURA_MAXIMO_DO_HP * 100))
-    .replace(/\{DRENO_MIN\}/g, Math.round(ABSORVER_MIN * 100))
-    .replace(/\{DRENO_MAX\}/g, Math.round(ABSORVER_MAX * 100))
     .replace(/\{FURIA2\}/g,    FURIA_BONUS * 2)
     .replace(/\{FURIA3\}/g,    FURIA_BONUS * 3)
     .replace(/\{FURIA\}/g,     FURIA_BONUS)
@@ -18806,6 +18976,12 @@ function passosHtml(m){
        do log é UMA pro golpe todo -- dizer que não houve crítico porque o último não foi seria
        esconder justamente o que explica o número. */
     if(g.t > 1 && ult && ult.q === g.q && ult.tn === g.tn){ ult.d += g.d; ult.c = ult.c || g.c; return; }
+    /* A CURA DA DRENAGEM NÃO ABRE LINHA: ela entra na linha do golpe que a gerou, porque é o MESMO
+       lance -- o golpe tirou e devolveu. É a regra da casa ("duas entradas no diário, uma linha"),
+       a mesma da drenagem de abertura e dos golpes de vários tapas.
+       Uma linha própria diria "Oddish recuperou +22" logo abaixo de "Oddish atacou e tirou −45", e
+       o jogador teria que ligar as duas sozinho -- sendo que juntas elas se leem de relance. */
+    if(g.x === 'dreno' && ult && !ult.x && ult.q === g.q){ ult.cura = (ult.cura || 0) + g.d; return; }
     linhas.push(Object.assign({}, g));
   });
   return `<div class="mlog-passos">${anulacoes}${linhas.map(g=>{
@@ -18814,22 +18990,31 @@ function passosHtml(m){
     /* UMA LINHA SÓ pro remoinho: os quadros `remoinhoVazio` e `remoinhoEntra` existem pra a
        ANIMAÇÃO mostrar a troca, e no log a frase do sopro já conta a história inteira (ela nomeia
        quem saiu). É a mesma regra do segundo lado da explosão e da drenagem. */
-    if(g.x === 'absorbdano' ||
+    /* `dreno` só chega aqui se não achou o golpe dele pra anexar (log velho, ou um caminho novo que
+       grave a cura solta): melhor sumir que virar uma linha de golpe dizendo que ele "atacou". */
+    if(g.x === 'absorbdano' || g.x === 'dreno' ||
        g.x === 'remoinhoVazio' || g.x === 'remoinhoEntra') return '';
     if(g.x === 'boom' || g.x === 'sono' || g.x === 'recover' || g.x === 'furia' || g.x === 'confusao' || g.x === 'furiadragao' || g.x === 'chuva' || g.x === 'chuvafim' || g.x === 'acordou' || g.x === 'remoinho' || g.x === 'espadas' || g.x === 'pluma' || g.x === 'semSono' ||
        g.x === 'pocao' || g.x === 'absorb' || g.x === 'faixa' || g.x === 'desempate') return linhaEspecial(g);
     return `<div class="mlog-passo ${doJogador?'p':'e'}">
-      ${seloDe(doJogador, 0, g) ? linhaDoGolpe(doJogador, g, g.tn > 1 ? g.tn : 0) : `${ladoHtml(doJogador)} atacou ${ladoHtml(!doJogador)}`} e tirou <span class="mlog-tira">−${g.d}</span> de HP.${g.c?' <span class="mlog-crit">CRÍTICO</span>':''}
+      ${seloDe(doJogador, 0, g) ? linhaDoGolpe(doJogador, g, g.tn > 1 ? g.tn : 0) : `${ladoHtml(doJogador)} atacou ${ladoHtml(!doJogador)}`} e tirou <span class="mlog-tira">−${g.d}</span> de HP${g.cura ? ' e recuperou <span class="mlog-cura">+' + g.cura + '</span>' : ''}.${g.c?' <span class="mlog-crit">CRÍTICO</span>':''}
     </div>`;
   }).join('')}</div>`;
 }
 
-function renderHpBar(hp, maxHp, fillId, labelId){
+/* ⚠️ `entrando` FAZ A BARRA NASCER VAZIA E ENCHER (15/09/2026, a pedido, no quadro em que o
+   Remoinho traz o pokémon novo). Ela não muda o valor: o `scaleX` inline continua sendo o HP de
+   verdade, e o que a classe acrescenta é uma ANIMAÇÃO que parte do zero e chega nele.
+   Por que animação e não transição: a transição do `.hp-bar-fill` precisa de DOIS desenhos (um com
+   o valor velho, outro com o novo) pra existir, e aqui há UM só -- o pokémon aparece do nada. O
+   `@keyframes` sem `to` usa o valor computado do elemento como destino, então ela chega exatamente
+   no HP que ele tem, seja ele qual for. */
+function renderHpBar(hp, maxHp, fillId, labelId, entrando){
   const pct = Math.max(0, Math.min(100, (hp/maxHp)*100));
   return `
   <div class="hp-bar-wrap">
     <div class="hp-bar-track">
-      <div class="hp-bar-fill ${hpBarClass(pct)}" id="${fillId}" style="transform:scaleX(${pct/100})"></div>
+      <div class="hp-bar-fill ${hpBarClass(pct)}${entrando ? ' hp-bar-entra' : ''}" id="${fillId}" style="transform:scaleX(${pct/100})"></div>
     </div>
     <div class="hp-bar-label" id="${labelId}">${Math.max(0,hp)}/${maxHp} HP</div>
   </div>`;
@@ -18865,7 +19050,14 @@ function trocaDoRemoinho(m, lado, passo){
   const p = (passo == null) ? 0 : passo;
   if(p <= i + 1) return { quadro:'sai', g: g };
   if(p === i + 2) return { quadro:'vazio', g: g };
-  return null;   // do i+3 em diante é o pokémon do matchup, que é justamente o que entrou
+  /* ⚠️ O QUADRO DE ENTRADA PASSOU A SER NOMEADO (15/09/2026, a pedido: *"do [on]de aparece a barra
+     de hp do pokemon que ta entrando, vazia e começa a encher"*). Antes ele devolvia `null` daqui
+     em diante, e `null` quer dizer "é o pokémon do matchup, desenhe normal" -- o que está certo
+     pro resto da luta e estava errado pro PRIMEIRO quadro dele: o pokémon novo aparecia com a
+     barra já no valor final, sem nada dizendo que ele tinha acabado de entrar.
+     Ele é UM passo só: do `i+4` em diante a luta começou e o quadro volta a ser o normal. */
+  if(p === i + 3) return { quadro:'entra', g: g };
+  return null;   // do i+4 em diante é o pokémon do matchup, e a luta já começou
 }
 /* =====================================================================
    OS SELOS DAS DUAS DANÇAS no quadro do lutador (14/09/2026, a pedido: *"para a Sword Dance e
@@ -18901,17 +19093,57 @@ function selosDoConfronto(m, lado){
   if(furia > 0) out += ' \ud83d\ude24' + (furia > 1 ? furia : '');
   return out;
 }
+/* O PLACAR DE QUEM ESTÁ DE PÉ: nome centralizado e uma POKÉBOLA por pokémon do time (15/09/2026,
+   a pedido: *"voce vai criar sprites de pokebolas, caso o usuário tenha 5 pokemons vai aparecer 5
+   pokebolas, conforme os pokemons forem morrendo as pokebolas vao ficando pretinhas ... e pode
+   tirar aqueles emojis que tem antes dos nomes"*).
+   Era `🎒 Ash: 5/6`. A fração dizia a mesma coisa, mas cobrava uma leitura: o jogador tinha que
+   comparar dois números pra saber quem estava na frente. Seis bolinhas com duas pretas se leem de
+   relance, que é o que este quadro existe pra fazer -- ele fica ACIMA dos lutadores, no canto do
+   olho de quem está olhando a barra de HP.
+   ⚠️ ELA VIVE NUMA FUNÇÃO SÓ, e isso não é economia: o placar aparece em SEIS telas (jornada,
+   batalha especial, Torre/raide, liga assistida e as DUAS do online). Seis cópias divergiriam no
+   primeiro ajuste -- foi exatamente o que aconteceu com os emojis, que eram 🎒/🥊 em quatro telas e
+   🎽/🥊 na liga assistida, sem motivo nenhum.
+   ⚠️ E ELA TOLERA `total` MAIOR QUE O QUE CABE: seis é o teto do jogo, mas a Vigília do Arco-Íris
+   monta DEZ adversários. O `flex-wrap` da fileira deixa as bolinhas quebrarem em duas linhas em
+   vez de estourarem o chip -- medido a 320px, dez bolas cabem em duas fileiras de cinco. */
+function placarDoTreinador(nome, vivos, total){
+  const n = Math.max(0, total|0);
+  const v = Math.max(0, Math.min(n, vivos|0));
+  /* ⚠️ AS ESCURAS VÊM PRIMEIRO, à ESQUERDA (15/09/2026, a pedido: *"o primeiro pokemon que morrer,
+     a primeira bolinha da esquerda que fica escura, hoje ta ficando a primeira bolinha da
+     direita"*). A primeira versão punha as vivas à esquerda, e ela tinha uma razão que não
+     sobreviveu ao teste do olho: "o placar conta quantos SOBRARAM".
+     O jogador lê a fileira como uma BARRA que se gasta, e barra se gasta da esquerda pra direita —
+     com as vivas na frente, a fileira parecia encolher pelo lado errado. Nenhuma bolinha muda de
+     lugar de um confronto pro outro nas duas ordens (a contagem é a mesma); o que muda é de que
+     lado o escuro avança. */
+  let bolas = '';
+  const caidos = n - v;
+  for(let i = 0; i < n; i++) bolas += '<span class="pokeball' + (i < caidos ? ' ko' : '') + '"></span>';
+  return `<span class="team-alive-chip">
+      <span class="team-alive-nome">${escapeHtmlSafe(nome || '')}</span>
+      <span class="team-alive-bolas">${bolas}</span>
+    </span>`;
+}
 function fighterHtml(m, lado, op){
   op = op || {};
   const doJogador = lado === 'p';
   const troca = trocaDoRemoinho(m, lado, op.passo);
-  /* A VAGA VAZIA. O quadro fica com a MESMA altura (o `fighter-vazio` reserva o espaço do sprite),
-     senão o cabeçalho pula de tamanho no meio da animação e a tela inteira se mexe. */
+  /* ⚠️ A VAGA VAZIA VIROU O QUADRO DO ONLINE (15/09/2026, a pedido: *"nas batalhas onlines quando
+     um pokemon morre, fica um espaço no lugar do pokemon esperando o treinador escolher qual o
+     proximo, faça mais ou menos assim"*). Ela era um travessão solto (`—`) mais uma barra vazia de
+     `0/1 HP` -- e o `0/1` era o pior detalhe: é um número que não existe em lugar nenhum do jogo, e
+     quem o lesse de relance acharia que o pokémon tinha ficado com 1 de vida.
+     Hoje ela reusa o desenho que o online já tem pra "ninguém em campo" (o `fighter-oculto`: um ❔
+     apagado com a palavra embaixo), e **sem barra nenhuma** -- é a ausência que ela precisa mostrar.
+     O quadro continua reservando a MESMA altura: sem isso o cabeçalho encolhe no meio da animação e
+     a tela inteira pula de tamanho por um quadro. */
   if(troca && troca.quadro === 'vazio'){
-    return `<div class="fighter">
-        <div class="fighter-emoji fighter-vazio"></div><span class="fighter-sumiu">—</span>
-        <div class="fighter-types"></div>
-        ${renderHpBar(0, 1, doJogador ? 'hp-fill-player' : 'hp-fill-enemy', doJogador ? 'hp-label-player' : 'hp-label-enemy')}
+    return `<div class="fighter fighter-oculto fighter-vaga">
+        <div class="fighter-emoji fighter-vazio">❔</div>
+        <span class="fighter-oculto-l">entrando...</span>
       </div>`;
   }
   /* QUEM ESTÁ SAINDO: sprite, nome, nível e barra vêm do DIÁRIO (`ss`/`sai`/`sl`/`shp`/`smx`) --
@@ -18919,6 +19151,9 @@ function fighterHtml(m, lado, op){
      matchup, que é como era antes de a animação existir. */
   const g = troca && troca.quadro === 'sai' ? troca.g : null;
   const saindo = !!(g && g.ss && SPECIES[g.ss]);
+  /* O QUADRO DE ENTRADA é o pokémon do matchup (ele JÁ é quem entrou) -- o que muda é só a barra,
+     que nasce vazia e enche. Por isso ele não mexe em nenhum dos campos abaixo. */
+  const entrando = !!(troca && troca.quadro === 'entra');
   const especie = saindo ? g.ss : (doJogador ? m.playerSpecies : m.enemySpecies);
   const contra  = doJogador ? m.enemySpecies : m.playerSpecies;
   const sp = SPECIES[especie];
@@ -18929,12 +19164,12 @@ function fighterHtml(m, lado, op){
   const especialidade = saindo ? false : (doJogador ? m.playerSpecialty : m.enemySpecialty);
   const hp = saindo ? (g.shp != null ? g.shp : 0) : op.hp;
   const maxHp = saindo ? (g.smx || 1) : (doJogador ? m.playerMaxHp : m.enemyMaxHp);
-  return `<div class="fighter">
+  return `<div class="fighter${entrando ? ' fighter-entra' : ''}">
         ${/* os selos das duas danças vêm DEPOIS dos outros três e não saem em quem está SAINDO de
              campo (o quadro do Remoinho): o efeito é de quem está lutando agora */''}
         <div class="fighter-emoji">${sp ? battleSpriteHtml(especie, contra, 'sprite-lg', shiny, doJogador) : ''}</div>${nome}${shiny?' 🌟':''}${(op.comTerreno && buffed)?' 🔺':''}${especialidade?' 🎖️':''}${saindo?'':selosDoConfronto(m, lado)} <span class="fighter-level">Lv.${nivel}</span>
         <div class="fighter-types">${sp ? typesHtml(sp.types) : ''}</div>
-        ${renderHpBar(hp, maxHp, doJogador ? 'hp-fill-player' : 'hp-fill-enemy', doJogador ? 'hp-label-player' : 'hp-label-enemy')}
+        ${renderHpBar(hp, maxHp, doJogador ? 'hp-fill-player' : 'hp-fill-enemy', doJogador ? 'hp-label-player' : 'hp-label-enemy', entrando)}
       </div>`;
 }
 function renderBattling(){
@@ -18958,8 +19193,8 @@ function renderBattling(){
   ${chuvaBadgeHtml(m)}
   <div class="box cursor" style="${terrainBattleBgStyle(terrain)}">
     <div class="team-alive-row">
-      <span class="team-alive-chip">🎒 ${escapeHtmlSafe(game.trainerName||'Você')}: ${(loading||animating)?m.playerAliveBefore:m.playerAliveAfter}/${m.playerTeamSize}</span>
-      <span class="team-alive-chip">🥊 ${escapeHtmlSafe(enemyLabel)}: ${(loading||animating)?m.enemyAliveBefore:m.enemyAliveAfter}/${m.enemyTeamSize}</span>
+      ${placarDoTreinador(game.trainerName||'Você', (loading||animating)?m.playerAliveBefore:m.playerAliveAfter, m.playerTeamSize)}
+      ${placarDoTreinador(enemyLabel, (loading||animating)?m.enemyAliveBefore:m.enemyAliveAfter, m.enemyTeamSize)}
     </div>
     <div class="battle-vs">
       ${fighterHtml(m, 'p', { hp: displayPlayerHp, passo: game.revealHitStep, hit: game.revealLastHit, comTerreno: true })}
@@ -19568,6 +19803,7 @@ function reverDesafioGinasio(idx){
   game.onlineReplayPending = false;
   game.trainerRevealIndex = 0;
   game.trainerRevealPhase = 'loading';
+  abrirConfronto('trainer');
   game.trainerHitSequence = [];
   game.trainerHitStep = 0;
   game.trainerLastHit = null;
@@ -20235,7 +20471,14 @@ function renderTerrainInfoModal(){
         <span class="terrain-modal-icon">${t.icon}</span>
         <span class="terrain-modal-name">${t.name}</span>
       </div>
-      <p class="hint-text">Pokémons dos tipos abaixo ganham <strong>+15%</strong> em todos os atributos (HP, Ataque e Defesa) nessa partida:</p>
+      ${/* ⚠️ A LISTA ENTRE PARÊNTESES ESTAVA INCOMPLETA (15/09/2026, reportado: *"verifique se a
+           vantagem de terreno também aumenta em 15% os stats de ataque especial e def especial,
+           porque isso não ta escrito no texto"*). Ela dizia "(HP, Ataque e Defesa)" ao lado de
+           "todos os atributos" -- e o parêntese ganha da frase, porque é ele que PARECE a lista.
+           CONFERIDO NO MOTOR: o withBuffs é chamado pelas SEIS effective*, então o terreno vale
+           1,15x em HP, Ataque, Defesa, Sp.Atk, Sp.Def E Velocidade -- nos dois motores. O texto é
+           que tinha ficado de quando a Gen 1 tinha UM campo de atributo especial. */''}
+      <p class="hint-text">Pokémons dos tipos abaixo ganham <strong>+15%</strong> em <strong>todos os seis atributos</strong> (HP, Ataque, Defesa, Ataque Especial, Defesa Especial e Velocidade) nessa partida:</p>
       <div class="terrain-modal-types">${t.types.map(ty=>typePill(ty)).join('')}</div>
       <button class="btn secondary" onclick="closeTerrainInfoModal()">Fechar</button>
     </div>
@@ -20311,6 +20554,7 @@ async function watchLeagueMatch(ct, li, rk, mi, matchKey){
   preloadBattleSprites(matchups);
   game.leagueWatchIndex = 0;
   game.leagueWatchPhase = 'loading';
+  abrirConfronto('leagueWatch');
   game.screen = 'leagueWatch';
   render();
   setTimeout(advanceLeagueWatch, 1200);
@@ -20373,6 +20617,7 @@ function advanceLeagueWatch(){
   } else if(game.leagueWatchIndex < w.matchups.length - 1){
     game.leagueWatchIndex++;
     game.leagueWatchPhase = 'loading';
+    abrirConfronto('leagueWatch');
     render();
     setTimeout(advanceLeagueWatch, 1200);
   }
@@ -20459,8 +20704,8 @@ function renderLeagueWatch(){
   ${chuvaBadgeHtml(m)}
   <div class="box cursor" style="${terrainBattleBgStyle(w.terrain)}">
     <div class="team-alive-row">
-      <span class="team-alive-chip">🎽 ${w.playerAName}: ${(loading||animating)?m.playerAliveBefore:m.playerAliveAfter}/${m.playerTeamSize}</span>
-      <span class="team-alive-chip">🥊 ${w.playerBName}: ${(loading||animating)?m.enemyAliveBefore:m.enemyAliveAfter}/${m.enemyTeamSize}</span>
+      ${placarDoTreinador(w.playerAName, (loading||animating)?m.playerAliveBefore:m.playerAliveAfter, m.playerTeamSize)}
+      ${placarDoTreinador(w.playerBName, (loading||animating)?m.enemyAliveBefore:m.enemyAliveAfter, m.enemyTeamSize)}
     </div>
     <div class="battle-vs">
       <div class="fighter">
@@ -21070,44 +21315,80 @@ function renderTrainerTower(){
 function renderTowerRankingModal(){
   const r = game.towerRanking;
   if(!r) return '';
-  /* DUAS listas, e a de HOJE vem primeiro: é a disputa que ainda dá pra mudar. O geral, embaixo,
-     é histórico -- ele não muda com o que o jogador fizer nos próximos minutos. */
+  /* DUAS listas na aba de HOJE, e ela vem primeiro: é a disputa que ainda dá pra mudar. O geral,
+     embaixo, é histórico -- ele não muda com o que o jogador fizer nos próximos minutos. */
   /* O PÓDIO É DE ANDAR, NÃO DE POSIÇÃO NA LISTA. Cinco treinadores empatados no andar 20 estão
      todos no primeiro degrau, e o segundo degrau é o próximo andar que teve gente -- por isso a
      marca sai dos TRÊS ANDARES distintos mais altos, e não de "os três primeiros da lista".
-     Mostrar isso importa: prêmio que o jogador não vê é o erro da especialidade de novo. */
-  const degraus = Array.from(new Set((r.hoje||[]).map(x=>x.bestFloor||0)))
+     Mostrar isso importa: prêmio que o jogador não vê é o erro da especialidade de novo.
+     ⚠️ ELE É CALCULADO POR LISTA desde 15/09/2026, e não uma vez a partir do `r.hoje`: com o
+     histórico, cada dia tem o PRÓPRIO pódio. Lido do de hoje, um dia antigo mostraria a medalha no
+     andar errado -- ou em ninguém. */
+  const degrausDe = (linhas) => Array.from(new Set((linhas||[]).map(x=>x.bestFloor||0)))
     .filter(f=>f>0).sort((a,b)=>b-a).slice(0, 3);
-  const medalhaDoAndar = (andar) => ['🥇','🥈','🥉'][degraus.indexOf(andar)] || '';
-  const lista = (linhas, valorDe, sufixo, comPodio) => `<div class="tower-rank-list">${linhas.map((x,i)=>{
-    const med = comPodio ? medalhaDoAndar(x.bestFloor||0) : '';
-    return `
+  /* `comPodio` diz também SE o dia já virou: no histórico o doce já foi pago, então o título do
+     🍬 fala no passado. A mesma marca com o texto de hoje anunciaria um prêmio que já saiu. */
+  const lista = (linhas, valorDe, sufixo, comPodio) => {
+    const degraus = comPodio ? degrausDe(linhas) : [];
+    const medalha = (andar) => ['🥇','🥈','🥉'][degraus.indexOf(andar)] || '';
+    const titulo = comPodio === 'passado' ? 'Ganhou um Doce Raro na virada do dia'
+                                          : 'Ganha um Doce Raro na virada do dia';
+    return `<div class="tower-rank-list">${(linhas||[]).map((x,i)=>{
+      const med = comPodio ? medalha(x.bestFloor||0) : '';
+      return `
       <div class="tower-rank-row ${i===0?'ouro':''}">
         <span class="tower-rank-pos">${med || (i+1)+'º'}</span>
-        <span class="tower-rank-name">${trainerProfileLink(escapeHtmlSafe(x.name), x.uid, x.name)}${med?' <span class="tower-rank-doce" title="Ganha um Doce Raro na virada do dia">🍬</span>':''}</span>
+        <span class="tower-rank-name">${trainerProfileLink(escapeHtmlSafe(x.name), x.uid, x.name)}${med?' <span class="tower-rank-doce" title="'+titulo+'">🍬</span>':''}</span>
         <span class="tower-rank-count">${valorDe(x)}<span class="tower-rank-x">${sufixo}</span></span>
       </div>`;
-  }).join('')}</div>`;
+    }).join('')}</div>`;
+  };
   let corpo;
   if(r.loading){ corpo = `<p class="loading-text">Carregando...</p>`; }
+  else if(r.aba === 'historico'){
+    /* ⚠️ A DATA É FORMATADA DO TEXTO, não por `new Date(dateId)` -- essa construção lê a string
+       como UTC e, num fuso a oeste, devolve o dia ANTERIOR. O `dateId` já vem no formato do jogo
+       (AAAA-MM-DD, pelo relógio de São Paulo), então o que se quer é só reordenar os pedaços. */
+    const dia = (id) => { const p = String(id||'').split('-'); return p.length === 3 ? p[2] + '/' + p[1] : id; };
+    if(r.histLoading){ corpo = `<p class="loading-text">Carregando os últimos dias...</p>`; }
+    else if(r.histErro){ corpo = `<p class="error-text">Não deu pra carregar o histórico. Tente de novo.</p>`; }
+    else {
+      const dias = r.historico || [];
+      corpo = dias.map(d => `
+        <h3 class="tower-rank-tit">📅 ${escapeHtmlSafe(dia(d.dateId))}</h3>
+        ${(d.linhas||[]).length
+          ? lista(d.linhas, x=>x.bestFloor, '🏢', 'passado')
+          : `<p class="hint-text">Ninguém subiu nenhum andar neste dia.</p>`}`).join('');
+      if(!dias.length) corpo = `<p class="hint-text">Ainda não há dias anteriores pra mostrar.</p>`;
+    }
+  }
   else {
     const hoje = r.hoje || [];
     const geral = r.top || [];
     corpo = `
       <h3 class="tower-rank-tit">🔥 Hoje</h3>
       <p class="hint-text">O andar mais alto alcançado pelos treinadores no dia de hoje. Na virada, os <strong>3 andares mais altos</strong> levam 🍬 Doce Raro — e quem estiver no mais alto de todos leva também o ponto do ranking geral.</p>
-      ${hoje.length ? lista(hoje, x=>x.bestFloor, '🏢', true)
+      ${hoje.length ? lista(hoje, x=>x.bestFloor, '🏢', 'hoje')
                     : `<p class="hint-text">Ninguém subiu nenhum andar hoje ainda. O primeiro nome da lista pode ser o seu.</p>`}
       <h3 class="tower-rank-tit">🏅 Geral</h3>
       <p class="hint-text">Quantas vezes cada treinador terminou o dia no <strong>andar mais alto</strong>. Só ele pontua aqui: o pódio dá doce, o topo dá ponto.</p>
       ${geral.length ? lista(geral, x=>x.topDays||0, '🗼', false)
                      : `<p class="hint-text">Ninguém pontuou ainda — o primeiro ponto sai na virada do dia.</p>`}`;
   }
+  /* ⚠️ AS ABAS FICAM COLADAS NO TÍTULO, e o pedido era literalmente esse (*"do lado do titulo
+     Hoje um botão chamado Histórico"*). Elas NÃO usam o `.btn` da casa -- aquele é botão de AÇÃO,
+     com moldura de 3px; aqui são dois lugares onde se ENTRA, o mesmo raciocínio que já tinha
+     tirado o `.btn` das prateleiras da loja e das linhas da ficha da Pokédex. */
+  const abas = r.loading ? '' : `<div class="tower-rank-abas">
+      <button class="tower-rank-aba ${r.aba==='historico'?'':'on'}" onclick="abrirHojeDaTorre()">Hoje</button>
+      <button class="tower-rank-aba ${r.aba==='historico'?'on':''}" onclick="abrirHistoricoDaTorre()">Histórico</button>
+    </div>`;
   return `
   <div class="modal-overlay" onclick="closeTowerRanking()">
     <div class="modal-box tower-rank-box" onclick="event.stopPropagation()">
       <div class="modal-icon">🏅</div>
       <h2>Ranking da Torre</h2>
+      ${abas}
       ${corpo}
       <button class="btn secondary" onclick="closeTowerRanking()">Fechar</button>
     </div>
@@ -21607,6 +21888,7 @@ async function lutarSundayBoss(slot){
     game.bossBattlePending = true;
     game.trainerRevealIndex = 0;
     game.trainerRevealPhase = 'loading';
+    abrirConfronto('trainer');
     game.trainerHitSequence = [];
     game.trainerHitStep = 0;
     game.trainerLastHit = null;
@@ -23143,6 +23425,7 @@ async function fightTowerFloor(){
     game.towerBattlePending = true;
     game.trainerRevealIndex = 0;
     game.trainerRevealPhase = 'loading';
+    abrirConfronto('trainer');
     game.trainerHitSequence = [];
     game.trainerHitStep = 0;
     game.trainerLastHit = null;
@@ -23159,16 +23442,41 @@ async function fightTowerFloor(){
   game.towerLoading = false; render();
 }
 async function openTowerRanking(){
-  game.towerRanking = { loading:true, top:null };
+  /* `aba` é estado de TELA e nasce sempre em 'hoje': ninguém volta amanhã querendo o modal aberto
+     no histórico -- e abrir nele cobraria a chamada de 50 leituras de quem só quer ver o de hoje. */
+  game.towerRanking = { loading:true, top:null, aba:'hoje' };
   render();
   try{
     const r = await functionsClient.httpsCallable('getTrainerTowerRanking')();
-    game.towerRanking = { loading:false, top: r.data.top || [], hoje: r.data.hoje || [] };
+    game.towerRanking = { loading:false, top: r.data.top || [], hoje: r.data.hoje || [], aba:'hoje' };
   } catch(e){
-    game.towerRanking = { loading:false, top: [], hoje: [], erro:true };
+    game.towerRanking = { loading:false, top: [], hoje: [], aba:'hoje', erro:true };
   }
   render();
 }
+/* ⚠️ O HISTÓRICO É CARREGADO UMA VEZ SÓ POR ABERTURA DO MODAL, e é isso que faz o botão ser barato:
+   ele custa ~50 leituras (5 dias × até 10 linhas), e sem o cache ir e voltar entre as duas abas
+   cobraria isso a cada clique. `histCarregado` responde "já paguei por este modal" -- ele não é
+   `historico != null` porque um dia sem ninguém volta lista vazia, que é resposta legítima. */
+async function abrirHistoricoDaTorre(){
+  const r = game.towerRanking;
+  if(!r) return;
+  r.aba = 'historico';
+  if(r.histCarregado){ render(); return; }
+  r.histLoading = true;
+  render();
+  try{
+    const resp = await functionsClient.httpsCallable('getTrainerTowerHistory')();
+    r.historico = resp.data.dias || [];
+    r.histCarregado = true;
+  } catch(e){
+    r.historico = [];
+    r.histErro = true;
+  }
+  r.histLoading = false;
+  render();
+}
+function abrirHojeDaTorre(){ if(game.towerRanking){ game.towerRanking.aba = 'hoje'; render(); } }
 function closeTowerRanking(){ game.towerRanking = null; render(); }
 /* ============================================================================
    BATALHA ONLINE -- cliente
@@ -23901,6 +24209,7 @@ async function reverPartidaOnline(battleId){
     game.onlineBattlePending = false;
     game.trainerRevealIndex = 0;
     game.trainerRevealPhase = 'loading';
+    abrirConfronto('trainer');
     game.trainerHitSequence = [];
     game.trainerHitStep = 0;
     game.trainerLastHit = null;
@@ -24325,8 +24634,8 @@ function renderOnlineCountdown(st){
   <div class="eyebrow">⚔️ BATALHA ONLINE</div>
   <div class="box cursor">
     <div class="team-alive-row">
-      <span class="team-alive-chip">🎒 ${escapeHtmlSafe(st.eu.nome)}: ${st.eu.time.filter(p=>p.hp>0).length}/${st.eu.time.length}</span>
-      <span class="team-alive-chip">🥊 ${escapeHtmlSafe(st.oponente.nome)}: ${st.oponente.time.filter(p=>p.hp>0).length}/${st.oponente.time.length}</span>
+      ${placarDoTreinador(st.eu.nome, st.eu.time.filter(p=>p.hp>0).length, st.eu.time.length)}
+      ${placarDoTreinador(st.oponente.nome, st.oponente.time.filter(p=>p.hp>0).length, st.oponente.time.length)}
     </div>
     <div class="battle-vs">
       ${fighterOnlineHtml(meu,'eu')}
@@ -24438,8 +24747,8 @@ function renderOnlineFight(){
   <div class="eyebrow">⚔️ BATALHA ONLINE</div>
   <div class="box cursor">
     <div class="team-alive-row">
-      <span class="team-alive-chip">🎒 ${escapeHtmlSafe(st.eu.nome)}: ${st.eu.time.filter(p=>p.hp>0).length}/${st.eu.time.length}</span>
-      <span class="team-alive-chip">🥊 ${escapeHtmlSafe(st.oponente.nome)}: ${st.oponente.time.filter(p=>p.hp>0).length}/${st.oponente.time.length}</span>
+      ${placarDoTreinador(st.eu.nome, st.eu.time.filter(p=>p.hp>0).length, st.eu.time.length)}
+      ${placarDoTreinador(st.oponente.nome, st.oponente.time.filter(p=>p.hp>0).length, st.oponente.time.length)}
     </div>
     <div class="battle-vs">
       ${ocultarLutadores
@@ -25682,6 +25991,7 @@ async function startMewtwoBattle(slot){
   preloadBattleSprites(result.matchups);
   game.leagueWatchIndex = 0;
   game.leagueWatchPhase = 'loading';
+  abrirConfronto('leagueWatch');
   game.leagueWatchReturnScreen = 'pokedex';
   game.screen = 'leagueWatch';
   render();

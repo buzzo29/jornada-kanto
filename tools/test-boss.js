@@ -90,7 +90,15 @@ function fim(){
   ok('e nivel 4999', inicial.boss.level === 4999);
   ok('o HP sai da formula do jogo', inicial.boss.maxHp === Math.round(30 + 4999*5 + 100),
      String(inicial.boss.maxHp));
-  const r1 = await chamar('fightSundayBoss','tester',{ slot:'0' });
+  /* ⚠️ ATACA ATE TIRAR VIDA (15/09/2026, o FIM DO GOLPE MORIBUNDO). Um ataque podia sempre tirar
+     alguma coisa, porque o Mew mata cada pokemon do time e o derrubado ainda conectava o
+     contra-golpe. Sem o revide ele nao conecta nada, e um ataque INTEIRO pode sair com dano ZERO.
+     ⚠️ ISSO E SINTOMA, E A RAIDE PRECISA SER RECALIBRADA antes de o evento voltar (ele esta
+     DESLIGADO desde 13/09): o dano por ataque caiu de 40,5 pra 12,5 e ela foi de ~621 pra ~2.016
+     ataques. O laco aqui so tira o flake; ele nao conserta a raide.
+     O que este caso mede continua o mesmo: quando o ataque TIRA vida, a conta fecha. */
+  let r1 = null;
+  for(let t = 0; t < 40 && !(r1 && r1.dano > 0); t++) r1 = await chamar('fightSundayBoss','tester',{ slot:'0' });
   ok('a investida tira vida', r1.dano > 0 && r1.hpDepois === r1.hpAntes - r1.dano,
      r1.hpAntes+' -> '+r1.hpDepois+' (-'+r1.dano+')');
   ok('o time inteiro cai (e um Lv.999)', r1.win === false);
@@ -126,7 +134,19 @@ function fim(){
 
   console.log('\nDERRUBANDO O MEW');
   let voltas = 0, ultimo = null;
-  while(voltas < 900){          // Lv.4999 = 25.125 de vida, ~400 ataques de um time Lv.70
+  /* ⚠️ O TETO SUBIU DE 900 PRA 2500 EM 15/09/2026, e o motivo e o FIM DO GOLPE MORIBUNDO.
+     A raide e o caso extremo da mudanca: o Mew e Lv.4999, mais rapido que qualquer pokemon do
+     time, e mata cada um numa troca. O revide de quem cai era o que garantia que o pokemon
+     derrubado ainda conectasse UM golpe -- e era dali que vinha quase todo o dano do time.
+     MEDIDO: o dano por ataque cai de 40,5 pra 12,5 (o revide era 69% dele), e a raide vai de
+     ~621 pra ~2.016 ataques -- 3,2x mais lenta.
+     ⚠️ O EVENTO ESTA DESLIGADO desde 13/09/2026 (BOSS_ATIVO), entao isso nao afeta ninguem hoje.
+     MAS ELE PRECISA SER RECALIBRADO ANTES DE VOLTAR: a regua e o nivel do Mew (que entra no
+     divisor do dano) ou o BOSS_MAX_HP, e mexer neles exige apagar globalBoss/mew, globalBoss/mewRank
+     e a subcolecao players -- o maxHp fica gravado no documento e o dano acumulado esta na escala
+     antiga (ver o CLAUDE.md).
+     O teste continua cobrando o que importa: que a raide TERMINA. */
+  while(voltas < 2500){         // Lv.4999 = 25.125 de vida, ~2.000 ataques de um time Lv.70
     const est = await chamar('getSundayBoss','tester');
     if(est.boss.hp <= 0) break;
     ultimo = await chamar('fightSundayBoss','tester',{ slot:'0' });
@@ -283,14 +303,25 @@ async function resumo(){
 
   /* O caso do print: duas contas abertas, so uma ataca. A outra tem que enxergar. */
   const antes = (await chamar('getSundayBoss','s2',{resumo:true}));
-  const r = await chamar('fightSundayBoss','s1',{ slot:'0' });
+  /* ⚠️ ATACA ATE CAUSAR DANO, e isso mudou em 15/09/2026 com o FIM DO GOLPE MORIBUNDO.
+     O que este bloco mede e a PROPAGACAO do ranking -- "duas contas abertas, so uma ataca, a outra
+     tem que enxergar" --, e ele pressupunha que um ataque sempre tira alguma vida do Mew. Deixou de
+     ser verdade: sem o revide de quem cai, o Mew (Lv.4999, mais rapido que todo mundo) mata cada
+     pokemon do time sem levar golpe, e um ataque inteiro pode sair com dano ZERO. Ai ninguem entra
+     no ranking e o teste falhava -- 3 rodadas em 5, sem nada da propagacao ter mudado.
+     ⚠️ ISSO E SINTOMA, NAO CAUSA: a raide precisa ser RECALIBRADA antes de o evento voltar (ver o
+     CLAUDE.md -- o dano por ataque caiu de 40,5 pra 12,5 e ela foi de ~621 pra ~2.016 ataques).
+     O laco aqui so tira o flake do teste; ele nao conserta a raide. */
+  let r = null;
+  for(let t = 0; t < 40 && !(r && r.dano > 0); t++) r = await chamar('fightSundayBoss','s1',{ slot:'0' });
+  ok('o ataque causou dano (senao nao ha ranking pra propagar)', r && r.dano > 0, r ? String(r.dano) : 'null');
   const depois = (await chamar('getSundayBoss','s2',{resumo:true}));
-  ok('a outra conta ve a vida nova', depois.boss.hp === antes.boss.hp - r.dano,
+  ok('a outra conta ve a vida nova', depois.boss.hp < antes.boss.hp,
      antes.boss.hp+' -> '+depois.boss.hp);
   ok('a outra conta ve o ranking novo',
-     depois.ranking.length === 1 && depois.ranking[0].uid === 's1' && depois.ranking[0].dano === r.dano,
+     depois.ranking.length === 1 && depois.ranking[0].uid === 's1' && depois.ranking[0].dano === antes.boss.hp - depois.boss.hp,
      JSON.stringify(depois.ranking.map(e=>e.uid+':'+e.dano)));
   ok('quem atacou ve a propria contribuicao atualizada',
-     (await chamar('getSundayBoss','s1',{resumo:true})).meu.dano === r.dano);
+     (await chamar('getSundayBoss','s1',{resumo:true})).meu.dano === antes.boss.hp - depois.boss.hp);
   fim();
 }

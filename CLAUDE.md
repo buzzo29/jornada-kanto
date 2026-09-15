@@ -177,8 +177,21 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
   Um caminho que esquecia o buff já aconteceu: desafio do lobby criava batalha com `specialties: []`
   porque `joinBattleLobby` não gravava o campo. Medido em 02/09/2026, com o buff em 1,05: um time todo do tipo vale **+7,1 pontos** de
   vitória (40,95% → 48,02%) e um time misto, **+0,9**. "+1% em tudo" engana — em batalha parelha decide.
-- Buffs: **shiny 1,20× e terreno 1,15×, em TODOS os atributos** — ataque, especial, defesa,
-  velocidade e HP. Multiplicam entre si: um shiny no terreno do tipo dele fica 1,38× em tudo.
+- Buffs: **shiny 1,20× e terreno 1,15×, nos SEIS atributos** — HP, Ataque, Defesa, **Ataque
+  Especial, Defesa Especial** e Velocidade. Multiplicam entre si: um shiny no terreno do tipo dele
+  fica 1,38× em tudo.
+  **⚠️ ESTE ITEM DIZIA "ataque, especial, defesa, velocidade e HP"**, que é texto de quando a Gen 1
+  tinha **UM** campo `special`. Ele sobreviveu à separação em Sp.Atk/Sp.Def (30/08/2026) e passou a
+  deixar dois atributos de fora da lista — **e a mesma frase incompleta estava na TELA**, na caixa
+  que explica o terreno ("+15% em todos os atributos (HP, Ataque e Defesa)"). Reportado em
+  15/09/2026: *"verifique se a vantagem de terreno também aumenta em 15% os stats de ataque especial
+  e def especial, porque isso não ta escrito no texto"*.
+  **CONFERIDO NO MOTOR, e a mecânica sempre esteve certa:** o `withBuffs` é chamado pelas **SEIS**
+  `effective*`, nos dois motores. Medido num Alakazam Lv.50 com a flag de terreno — **SpAtk 135 →
+  155 e SpDef 85 → 98**, junto com HP 55→63, Atk 50→57, Def 45→52 e Vel 120→138. As razões ficam
+  entre 1,140 e 1,156 só pelo **arredondamento** (`Math.round` por atributo), não por regra.
+  **O QUE FOI CORRIGIDO FOI O TEXTO**, aqui e na tela. Custo medido a 320px: a caixa do terreno vai
+  de **283 para 321px** (+38px) e a frase de 3 para 5 linhas — sem rolagem lateral.
   Houve uma fase em que foram só ofensivos (1,15 e 1,10); acabou, por decisão de design.
   O custo é conhecido e aceito: 1 contra 1 da mesma espécie, um shiny no terreno dele em nível 60
   ganha de um normal de nível 70 em 90% das vezes. O buff vale ~15 níveis.
@@ -269,8 +282,11 @@ de golpes.
   revertida a pedido, e o Snubbull saiu. **O SNORLAX SAIU EM 11/09**, também a pedido: a lista era
   a alavanca que esta seção já apontava, e ela foi usada.
   Ver a seção **O METRÔNOMO SORTEIA E DEPOIS ESCOLHE**, que é onde a mecânica está descrita.
-- **O sono dá UMA TROCA livre, não mata mais** (`SONO_EM_TROCAS = 1`). O alvo apanha sem revidar e
-  então acorda; a luta segue normal. Como o Disable e a Recuperação, é `continue` e não
+- **⚠️ O sono dá de 1 A 3 TROCAS livres desde 15/09/2026, 1/3 cada** (`SONO_EM_TROCAS`, hoje uma
+  TABELA com peso — ver a seção **O SONO DURA DE 1 A 3 TROCAS**). O alvo apanha sem revidar e
+  então acorda; a luta segue normal. **Tudo que este item diz abaixo sobre "uma troca" é a régua de
+  09/09 a 15/09/2026**, e continua valendo como história: o efeito isolado hoje é +29,0 pontos, não
+  +17,8. Como o Disable e a Recuperação, é `continue` e não
   `return true`: o confronto acontece inteiro.
   **Eram DUAS até 09/09/2026** (a mudança de 02/09 que tirou a morte instantânea). Virou uma a
   pedido — *"ao invés de dar 2 golpes em sequência, dê apenas 1 e depois volte a batalha como se
@@ -310,7 +326,8 @@ de golpes.
   batalha), e a reconstrução virou o fallback que ela sempre foi por escrito. Sem ela no caminho não
   há o que contradizer — e os remendos saíram.
 
-- **Chance por CONFRONTO, não por golpe**: 15% autodestruição, 5% sono.
+- **Chance por CONFRONTO, não por golpe**: 15% autodestruição, **15% sono** (era 5% até
+  15/09/2026 -- ver **E A CHANCE FOI A 15%**).
   **Só sai contra alvo com MAIS da metade da vida** (`BOOM_MINIMO_DO_ALVO = 0,5`, 02/09/2026).
   Explodir num adversário já machucado é trocar o pokémon inteiro por um abate que a troca de golpes
   ia entregar de graça — e isso acontecia de verdade, porque no laço de batalha o inimigo carrega o
@@ -425,7 +442,10 @@ de golpes.
   (A cura não gastava vaga do `TETO_GOLPES`, e quando o confronto passava do teto a reconstrução
   tinha de partir da vida CHEIA — senão a barra caía de um valor que a luta nunca teve. Isso caducou
   em 03/09/2026 junto com o teto: o log mostra o diário, e a cura está nele.)
-- **DRENAGEM (`ABSORCAO`, 10%): 23 espécies, e acontece ANTES da luta**, no mesmo lugar do Recuperar.
+- **⚠️ DRENAGEM DE ABERTURA (`ABSORCAO`) — ISTO É HISTÓRIA: ela foi REMOVIDA em 15/09/2026**, quando
+  a drenagem passou a valer no GOLPE (ver a seção própria). O que este item descreve não acontece
+  mais; o que ficou dele é só a apresentação, pra log velho. Era assim:
+  **10%: 23 espécies, e acontecia ANTES da luta**, no mesmo lugar do Recuperar.
   O pokémon que sobreviveu ao confronto anterior entra machucado; se está **abaixo de 70%**
   (`CURA_MAXIMO_DO_HP`, a trava do Recuperar), ele tira uma fatia do adversário e põe em si — e só
   então o confronto acontece, inteiro. É `continue`, não `return true`.
@@ -1382,7 +1402,8 @@ maior chance do bloco: **30% por confronto**, empatada com o Metrônomo (que ren
   Confronto gravado antes do campo existir sai sem selo — log velho não pode sumir.
 - **ELA MORA NA FICHA DA POKÉDEX, não no cartão do golpe** — e essa é a diferença que importa: quem
   escolhe golpe não escolhe passiva. O cartão do golpe Fúria **não diz mais nada** (o `obsDoGolpe`
-  dela saiu), e a ficha da espécie a anuncia junto do sono e da anulação, com a chance.
+  dela saiu — e desde 15/09/2026 essa função devolve uma LISTA de observações, não uma frase),
+  e a ficha da espécie a anuncia junto do sono e da anulação, com a chance.
 - **A MECÂNICA ANTERIOR FOI DESFEITA, e vale registrar por quê.** A Fúria nasceu como um golpe que
   ganhava **+6 de poder a cada troca**. Medido: implementada ao pé da letra (crescendo só quando SAI)
   ela **nunca saía** — começa em poder 20 e o motor escolhe pelo dano, então perdia pra qualquer
@@ -1756,7 +1777,8 @@ explicação de menos. Hoje:
   do golpe** quando a luta começa.
 - **2) A LINHA NO LOG, SÓ no confronto que ativou** — "somente na batalha que foi ativada a dança da
   chuva". Os confrontos seguintes herdam a chuva e **não repetem a linha**: repetir três vezes a
-  mesma frase é a parede que o `TETO_GOLPES` existe pra evitar.
+  mesma frase é a parede que o `TETO_GOLPES` existia pra evitar (ele acabou em 15/09/2026; a razão
+  de não repetir a linha continua).
   **O SELO DELA É CLICÁVEL, e é o ÚNICO selo clicável do jogo** (`seloDeChuvaClicavel`). Tem o mesmo
   tamanho e a mesma cor dos outros — foi o que se pediu —, e o que muda é ser um `<button>`, que
   precisa zerar a borda e o padding de fábrica. Ele abre a MESMA caixa de explicação dos especiais:
@@ -2690,9 +2712,9 @@ serviu de prova de que o gerador de golpes está lendo a geração certa.
   luta ela é PROGRESSIVA (qual tapa está saindo) e no log é o TOTAL.
 - **OS TAPAS PARAM QUANDO O ALVO CAI.** O 4º tapa não sai num pokémon que caiu no 3º — é assim no
   jogo original e é o que preserva o "todo pokémon responde pelo menos uma vez".
-- **UM GOLPE DE VÁRIOS TAPAS É UM GOLPE SÓ PRO TETO** (`TETO_GOLPES`): só o primeiro tapa ocupa
-  vaga. Sem isso um Tapa Duplo de 5 sozinho estouraria o teto e jogaria o confronto inteiro na
-  reconstrução. E eles **se movem juntos** no reordenamento do moribundo — reordenar entrada a
+- **UM GOLPE DE VÁRIOS TAPAS ERA UM GOLPE SÓ PRO TETO** (`TETO_GOLPES`, história desde
+  15/09/2026): só o primeiro tapa ocupava vaga. Sem isso um Tapa Duplo de 5 sozinho estourava o
+  teto e jogava o confronto inteiro na reconstrução. E eles **se movem juntos** no reordenamento do moribundo — reordenar entrada a
   entrada partiria o golpe ao meio, com metade antes e metade depois do golpe que o derrubou.
 - **ELES SOBREVIVEM À RECONSTRUÇÃO, e isso é o que faz a feature existir.** A reconstrução devolve
   golpes inteiros e não conhece tapa nenhum: medido, sem tratar isso os tapas só apareciam em
@@ -2875,6 +2897,11 @@ exiba na tela o nome desse ataque no mesmo momento que a barra se movimenta"*.
 
 ### O cadáver que atacava: o moribundo que VOLTA VIVO (09/09/2026)
 
+> **⚠️ ISTO É HISTÓRIA desde 15/09/2026: o GOLPE MORIBUNDO ACABOU** (ver a seção própria). O motor
+> não gera mais a marca `m`, então nenhum caso novo nasce por este caminho. O reordenamento que
+> esta seção descreve **fica no código**, e é por causa dela: diário gravado antes daquela data tem
+> a marca, e sem ele aquele log volta a mostrar pokémon atacando com a barra em zero.
+
 Reportado com print, durante o experimento do teto de dano desligado: **Ivysaur 0/180** contra um
 Geodude que terminou com **14**, e a linha do Ivysaur vinha **depois** da que o matou.
 
@@ -2903,6 +2930,9 @@ Geodude que terminou com **14**, e a linha do Ivysaur vinha **depois** da que o 
   cadáveres em 1.277 confrontos**.
 
 ### O MORIBUNDO DE QUEM DORMIU VAI PRO COMEÇO DO CONFRONTO (10/09/2026)
+
+> **⚠️ ISTO É HISTÓRIA desde 15/09/2026**: sem golpe moribundo, quem morre dormindo não revida mais
+> e não há o que reordenar. O código fica pra log velho, como o da seção acima.
 
 Reportado com print: num **Psyduck × Gastly** o Gastly dormiu o Psyduck e deveria bater **duas vezes**
 seguidas — a troca livre que o sono compra mais a troca normal, que ele abre por ser mais rápido —,
@@ -2963,6 +2993,11 @@ mas o log lia *"Gastly bateu / Psyduck bateu / Gastly bateu"*.
   teste — o que passa quase sempre.
 
 ### A MORTE SÚBITA ACABOU (12/09/2026) — e com ela três relatos de uma vez
+
+> **⚠️ O PISO DE 1%–10% QUE ESTA SEÇÃO CRIOU SAIU EM 15/09/2026**, junto com o golpe moribundo: sem
+> revide não há o que limitar. O que ela garantia continua valendo, e agora **por construção** — os
+> dois só caem na mesma troca pela autodestruição. Os números medidos aqui (o revide acontecia em
+> 59,4% dos confrontos e era letal em 20,0%) descrevem o motor **daquela** época.
 
 Pedida assim: *"não quero mais que exista isso, não existe de os 2 cairem juntos, somente na auto
 destruição; fora isso, jamais os 2 devem morrer juntos e um ficar de pé"*.
@@ -3046,6 +3081,10 @@ destruição; fora isso, jamais os 2 devem morrer juntos e um ficar de pé"*.
 
 ### QUEM JÁ ESTAVA RASPANDO NÃO LEVA REVIDE (13/09/2026)
 
+> **⚠️ ISTO É HISTÓRIA desde 15/09/2026: não existe mais revide de quem cai**, então o ramo que esta
+> seção criou saiu junto. O relato que a originou (o Golem tirando −4 com Terremoto) não pode mais
+> acontecer — ali não há golpe nenhum.
+
 Reportado com print: *"Golem × Mr. Mime, por que o Golem tirou apenas 4 de HP, sendo que o ataque
 Terremoto é bem forte e eles eram do mesmo nível?"*.
 
@@ -3093,6 +3132,10 @@ longo o alvo chega raspando lutando, e ali o dano zero é o conserto funcionando
 a olhar o HP no momento do revide, lido do diário.
 
 ### QUEM ESTÁ RASPANDO NÃO DERRUBA UM POKÉMON CHEIO NUM GOLPE (14/09/2026)
+
+> **⚠️ ESTA CONTINUA VALENDO** — ela é sobre o **ATAQUE** de quem tem pouca vida, não sobre o revide
+> de quem caiu. O que mudou em 15/09/2026 é que ela deixou de ser "a outra metade do piso do revide"
+> e passou a ser a **única** metade: o piso saiu com o golpe moribundo.
 
 Reportado com print: uma **Ponyta com 10 de 362 (2,8% da barra)** atravessou um **Heracross** e um
 **Victreebel cheios**, matando cada um com um golpe e **sem tomar nada de volta**. O pedido foi
@@ -3256,8 +3299,9 @@ seguidas, sem nada entre os dois golpes.
   trocas livres SÃO isso, e a frase dele explica) e a **reconstrução** (ela interpola HP e não
   conhece a ordem real). Medido no total: 0,9% dos confrontos mostram dois seguidos — 119 do sono,
   71 da reconstrução e 24 desta causa, que era a única sem explicação na tela.
-- **Na RECONSTRUÇÃO a linha não aparece**, e é o limite conhecido: passando do `TETO_GOLPES` ela
-  substitui a lista inteira e não conhece desempate nenhum — do mesmo jeito que não conhece cura.
+- **Na RECONSTRUÇÃO a linha não aparece**, e é o limite conhecido: ela substitui a lista inteira e
+  não conhece desempate nenhum — do mesmo jeito que não conhece cura. **Com o fim do teto
+  (15/09/2026) isso só alcança log gravado antes de o diário existir.**
 
 ### A PROBABILIDADE DOS GOLPES MÚLTIPLOS ESTÁ CERTA — e o que se vê é o contrário do que parece
 
@@ -3293,6 +3337,10 @@ tela, trazia os três golpes certos (Machoke, Krabby, Machoke).
 - **O log nunca mostrou o fantasma** porque ele não lê esse campo: lê a sequência. É por isso que o
   print tinha três linhas certas e a animação, quatro passos -- exatamente a divergência entre log
   e animação que esta seção já registrou duas vezes, agora por um caminho novo.
+- **⚠️ O CONSERTO DE 09/09 FICOU PELA METADE, e a outra metade só apareceu em 15/09/2026** (ver
+  **E A CENA COMEÇAVA PELO FIM**, na seção do Remoinho): ele zerou os dois juntos **nos pontos que
+  já zeravam o passo**, e os pontos que entram em `loading` não zeravam nenhum dos dois -- eles
+  desenhavam o confronto novo com o passo do anterior. Hoje há uma porta só, o `abrirConfronto`.
 - **O conserto é o LastHit zerar junto com o passo**, em TODO lugar que volta o passo pra 0 -- são
   **8 pontos** (os quatro laços mais os setups da Torre, da raide e do desafio de treinador). O
   teste conta os dois lados e falha se algum `HitStep = 0` ficar sem o `LastHit = null` do lado.
@@ -3366,22 +3414,30 @@ acontecendo"*. E não era o Mewtwo: era o **laço de revelação** que ele usa.
   Com o valor cru o log não fechava: somando as linhas dava mais dano do que o pokémon tinha.
 - **Log e animação leem a MESMA lista** (`sequenciaDoConfronto`). Enquanto eram montadas em separado,
   o jogador via 3 golpes na tela e lia 4, 7 linhas no log — reportado três vezes.
-- **O TETO É DE 4 GOLPES desde 11/09/2026** (`TETO_GOLPES`, era 3 — a pedido), e ele vale por
-  leitura: uma luta comum tem que caber em poucas linhas. Medido, 99,4% dos confrontos passam de 3
-  golpes REAIS (mediana 4, 90% até 6, maior 28 em 3.944) — ou seja, o teto não é um detalhe, é ele
-  que decide o que a tela mostra quase sempre.
-  **O QUE A SUBIDA COMPRA É A VERDADE, e o número é grande:** os confrontos que o jogador lê como
-  uma divisão INVENTADA pela reconstrução caem de **36,9% pra 11,9%** (11 mil confrontos de cada
-  lado, o mesmo código com a constante trocada). A causa é direta — 4 golpes reais é o caso mais
-  comum de todos, e no teto 3 ele caía inteiro na reconstrução.
-  **O QUE ELA CUSTA É TEMPO DE TELA:** a animação de uma batalha 6x6 vai de **46,9s pra 49,8s**
-  (+2,9s, +6,2%) e os passos por confronto de 2,63 pra 2,93. No log, as lutas de 4 linhas passam de
-  4,9% pra **24,6%**.
-  **NA DIFICULDADE, NADA — por construção.** `TETO_GOLPES` é apresentação: ele não existe no
-  servidor e não entra em conta nenhuma de dano. Conferido por impressão: o mesmo build com 3 e com
-  4 dá o MESMO hash de resultado em 900 batalhas semeadas.
-  **Ele chegou a sair inteiro por um dia** (03/09/2026), pra o log mostrar o diário: uma troca banal
-  de Gloom contra Miltank virou **seis linhas** e foi reportado com print. Voltou no mesmo dia.
+- **⚠️ O TETO DE LINHAS ACABOU EM 15/09/2026 — o log mostra a luta INTEIRA, sempre.** Ver a seção
+  **O TETO ACABOU**, logo abaixo. Tudo que vem a seguir sobre o `TETO_GOLPES` é **história**: a
+  constante não existe mais, e nenhum confronto com diário cai na reconstrução.
+
+> **⚠️ ISTO É HISTÓRIA desde 15/09/2026.** O teto acabou; o parágrafo fica porque ele explica as
+> duas correções que a subida de 3 pra 4 desenterrou, e as duas continuam valendo.
+>
+> - **O TETO ERA DE 4 GOLPES desde 11/09/2026** (`TETO_GOLPES`, era 3 — a pedido), e ele valia por
+>   leitura: uma luta comum tinha que caber em poucas linhas. Medido, 99,4% dos confrontos passam de
+>   3 golpes REAIS (mediana 4, 90% até 6, maior 28 em 3.944) — ou seja, o teto não era um detalhe,
+>   era ele que decidia o que a tela mostrava quase sempre.
+>   **O QUE A SUBIDA COMPROU FOI A VERDADE, e o número é grande:** os confrontos que o jogador lia
+>   como uma divisão INVENTADA pela reconstrução caíram de **36,9% pra 11,9%** (11 mil confrontos de
+>   cada lado, o mesmo código com a constante trocada). A causa é direta — 4 golpes reais é o caso
+>   mais comum de todos, e no teto 3 ele caía inteiro na reconstrução.
+>   **O QUE ELA CUSTOU FOI TEMPO DE TELA:** a animação de uma batalha 6x6 foi de **46,9s pra 49,8s**
+>   (+2,9s, +6,2%) e os passos por confronto de 2,63 pra 2,93. No log, as lutas de 4 linhas passaram
+>   de 4,9% pra **24,6%**.
+>   **NA DIFICULDADE, NADA — por construção.** `TETO_GOLPES` era apresentação: não existia no
+>   servidor e não entrava em conta nenhuma de dano. Conferido por impressão: o mesmo build com 3 e
+>   com 4 dava o MESMO hash de resultado em 900 batalhas semeadas.
+>   **Ele chegou a sair inteiro por um dia** (03/09/2026), pra o log mostrar o diário: uma troca
+>   banal de Gloom contra Miltank virou **seis linhas** e foi reportado com print. Voltou no mesmo
+>   dia — e voltou a sair, pra valer, em 15/09.
 - **⚠️ A SUBIDA PARA 4 DESENTERROU DOIS DEFEITOS ANTIGOS, e os dois estavam escondidos pela
   reconstrução.** É a lição a guardar daqui: **o teto não era só um corte de leitura, era uma
   cortina** — tudo que o diário tinha de errado num confronto de 4 golpes nunca chegava à tela,
@@ -3586,6 +3642,343 @@ acontecendo"*. E não era o Mewtwo: era o **laço de revelação** que ele usa.
 - Nomes de golpe (`MOVE_BY_TYPE` + `MOVE_OVERRIDES`, 150 espécies / 294 combinações) vivem **só no
   cliente**. O servidor manda o TIPO; o cliente escolhe a palavra. É o que evita mais uma tabela
   duplicada pra sair de sincronia.
+
+
+### O SONO DURA DE 1 A 3 TROCAS, 1/3 CADA (15/09/2026)
+
+Pedido assim: *"quando um pokemon dormir, coloque 1/3 de chance para ele tomar 1 ataque, 1/3 de
+chance para ele tomar 2 ataques e 1/3 de chance para ele tomar 3 ataques, assim como no jogo real"*.
+
+- **`SONO_EM_TROCAS` DEIXOU DE SER UM NÚMERO e virou uma TABELA com peso** (`[[1,1],[2,1],[3,1]]`),
+  no molde do `MULTI_GOLPE`. Ele valeu **2** até 09/09/2026 e **1** daí em diante; agora o pior caso
+  volta a ser 3, só que **sai em 1 vez em 3 em vez de sempre**.
+  A tabela existe pra o dia em que as chances deixarem de ser iguais ser uma linha — e ela é
+  **duplicada nos dois motores**, como todo o resto do bloco de especiais.
+- **⚠️ O SORTEIO LÊ O `rng` DA BATALHA, nunca `Math.random`.** Cliente e servidor resolvem a MESMA
+  batalha a partir da mesma semente (a Liga, o online, a comparação dos 300 confrontos), então um
+  dado a mais num dos dois lados desloca a semente inteira e a batalha passa a terminar diferente
+  nos dois. É a mesma armadilha que o Remoinho quase trouxe.
+  **E ele só é lido quando o sono REALMENTE sai** — lê-lo antes da checagem mudaria confronto que
+  não tem sonífero nenhum. O teste cobra 500 sorteios idênticos entre os dois motores.
+
+**O EFEITO ISOLADO DOBROU, e é esse o número que importa.** Medido com a chance **FORÇADA em 100%**
+— o único jeito de isolar, porque a 5% por confronto ele se dilui e some no ruído (é a mesma
+metodologia da medição de 09/09) — 16 soníferos × 8 adversários × 40 voltas, nível 50 dos dois lados:
+
+| | vitória | ganho |
+|---|---|---|
+| sem sono (controle) | 31,17% | — |
+| **1 troca** (o de ontem) | 43,81% | +12,6 |
+| **1 a 3 trocas** (hoje) | **60,16%** | **+29,0** |
+
+Ele voltou ao patamar que tinha quando comprava **2 trocas fixas** — o que faz sentido: a média de
+`(1+2+3)/3` é exatamente 2. O que mudou em relação àquela época é a **forma**: o jogador não perde
+mais sempre o mesmo, ele às vezes escapa com um golpe e às vezes toma três.
+
+**O QUE SAI NA TELA, medido no mesmo painel:**
+
+| trocas livres | 1 troca (antes) | 1 a 3 (hoje) |
+|---|---|---|
+| 1× | 71,9% | **25,3%** |
+| 2× | 27,3% | **41,1%** |
+| 3× | ~0% | **27,5%** |
+| 4× | 0,1% | 5,4% |
+
+A 4ª aparece pelo motivo de sempre: quem usou o sono, se for o mais rápido, ainda bate primeiro na
+troca em que o outro acorda.
+
+**O PREÇO NA JORNADA: nada. 52,22% contra 52,92%** de conclusão — **+0,70 ponto, 1,0σ**, 8 blocos de
+800 jornadas de cada lado (**6.400 de cada**, desvio tirado de ENTRE os blocos), com **4 de 8 blocos**
+pro lado de cada — ou seja, ruído puro. É a mesma conclusão que o sono já tinha em 09/09: **os
+líderes também têm sonífero** (Oddish, Paras, Venonat), então o corte cai dos dois lados igual.
+
+- **Se um dia incomodar**, o lugar de mexer é o PESO da tabela (deixar o 3 mais raro que o 1, por
+  exemplo) — e a régua está aqui.
+- **⚠️ E ELE DESENTERROU UMA TRAVA QUE MEDIA A DURAÇÃO, NÃO A REGRA.** A do despertar era *"quem
+  sobrevive ao golpe que levou dormindo acorda naquela mesma troca"* — verdade enquanto o sono
+  comprava UMA troca, e mentira agora: com 2 ou 3 ele sobrevive ao primeiro golpe e **continua
+  dormindo**. Ela caiu pra 61 de 120 sem nada estar errado. O invariante novo não depende da
+  duração: **quem volta a ATACAR necessariamente acordou**, então a linha tem que existir.
+
+
+#### E A CHANCE FOI A 15% (15/09/2026)
+
+Pedido logo em seguida: *"Aumente a % das habilidades passivas que fazem dormir para 15%"*.
+`CHANCE_SONO` foi de **0,05 para 0,15** — nos dois motores.
+
+**ELE VIROU O ESPECIAL MAIS COMUM DO JOGO, e é essa a mudança:** a chance TRIPLICOU e o ganho por
+uso não mudou (é o mesmo da tabela de 1 a 3 trocas, acima). O que o jogador sente é frequência:
+
+| | 5% | 15% |
+|---|---|---|
+| sai em | 1,65% dos confrontos | **5,30%** |
+| numa batalha 6x6 | 13,1% | **33,3%** |
+
+Ou seja: **uma batalha em três** passa a ter sono em algum momento, contra uma em oito.
+
+**O PREÇO NA JORNADA: +1,36 ponto de conclusão** (54,33% → 55,69%), **1,5σ**, 8 blocos de 800
+jornadas de cada lado (**6.400 de cada**, desvio tirado de ENTRE os blocos), com **6 de 8 blocos**
+pro lado fácil. Está dentro do ruído, e a direção é a esperada: o sono cai dos DOIS lados (os
+líderes têm Oddish, Paras e Venonat), mas **o jogador escolhe quem leva no time** e os líderes não.
+
+- **⚠️ ELE MUDA A CHANCE COMPOSTA DE QUEM TEM DOIS ESPECIAIS**, e isso não é decisão nova — é a
+  consequência de o sono ser sorteado cedo na fila. A **Jigglypuff** (Canto + Disable) via o Disable
+  dela cair de `0,95 × 10% = 9,5%` para **`0,85 × 10% = 8,5%`**. O teste passou a calcular esse
+  número **das constantes** em vez de tê-lo escrito à mão — com o 0,095 fixo, ele teria que ser
+  editado junto, que é a classe de manutenção que faz um teste envelhecer calado.
+- **A FICHA DA POKÉDEX SE ATUALIZA SOZINHA:** a chance que ela mostra sai do `CHANCE_SONO`, não de
+  um texto. É a mesma regra que a caixa de explicação já segue (`{CURA}`, `{FURIA}`…).
+- **Se um dia incomodar**, a régua é a própria constante — e o efeito é quase linear na frequência,
+  porque o ganho por uso não depende dela.
+
+
+### O COMEDOR DE SONHOS AVISA NO CARTÃO (15/09/2026)
+
+Pedido: *"Coloque mais um * no ataque comedor dos sonhos: 'Só utilizado quando o adversário dorme',
+e verifique na batalha se isso esta ocorrendo mesmo"*.
+
+- **A VERIFICAÇÃO DEU CERTO, e está medida:** 3.000 confrontos de um Gengar (que tem Hipnose e
+  Comedor de Sonhos) contra um Machoke — **188 de 188** confrontos com sono usam o golpe com o alvo
+  DORMINDO, **ZERO** com ele acordado, e em 36 deles dá pra ver a troca na tela (ele bate de Comedor
+  de Sonhos e, na linha seguinte ao despertar, de Bomba de Lodo).
+- **⚠️ `obsDoGolpe` DEIXOU DE DEVOLVER UMA STRING e passou a devolver uma LISTA.** Ela era uma
+  sequência de `return`, e a primeira regra que casasse ganhava — o que funcionava enquanto nenhum
+  golpe tinha DUAS coisas a dizer. O Comedor de Sonhos tem: ele **cura** e **só vale contra alvo
+  dormindo**. Com `return` de string, cadastrar a segunda **apagaria a primeira em silêncio**.
+  A ordem é a da tabela: o que o golpe FAZ vem antes da condição em que ele vale.
+- **ELA É A OBSERVAÇÃO MAIS IMPORTANTE DELE, e mais que a cura:** o cartão anuncia **PODER 100** — o
+  número mais alto que a maioria das espécies vê na vida — e sem a linha o jogador gasta uma das três
+  vagas num golpe que, contra adversário acordado, o motor **nunca escolhe**. Ele é a escolha certa
+  pra quem tem sonífero e a pior de todas pra quem não tem, e é essa a conta que a linha entrega.
+- **Sai do `GOLPES_SO_DORMINDO`**, que é a MESMA tabela que o `melhorAtaque` consulta — um segundo
+  golpe que entre lá já nasce com o cartão avisando.
+- **Custo de tela, medido a 320px:** o cartão dele vai a **120px**, contra 78 do Absorver (uma
+  observação) e 53 de um golpe comum. São **+67px** sobre o cartão comum, numa tela que mostra de 3 a
+  5 cartões. Se um dia incomodar, o lugar é o `obsDoGolpe` e a saída é encurtar a frase.
+
+### O TETO ACABOU: O LOG É A LUTA (15/09/2026)
+
+Pedido assim: *"vamos então deixar sem teto, as lutas agora vão seguir 100% real ao jogo"*. Ele veio
+de uma **pergunta**, não de um relato de bug — e a pergunta é a coisa mais importante desta seção.
+
+- **A PERGUNTA FOI: "essas duas lutas seguem motores diferentes?"** O jogador mandou print de um log
+  em que um **Ariados × Goldeen** tinha **10 linhas** e um **Ivysaur × Horsea** tinha **2**, e
+  perguntou se a batalha com golpe de absorção segue o motor real e a sem absorção segue "o nosso
+  motor um pouco resumido".
+  **Seguiam o MESMO motor. O que mudava era a TELA** — e não havia nada no jogo dizendo isso.
+- **⚠️ O TETO NÃO ERA UM CORTE DE LEITURA, ERA UMA CORTINA.** Acima de `TETO_GOLPES` (4) a tela
+  trocava a luta por uma **RECONSTRUÇÃO**: três golpes INVENTADOS a partir do HP de entrada e de
+  saída. Ela não conhece mecânica nenhuma — nem cura, nem escala do Rolamento, nem trocas livres do
+  sono —, e é por isso que **três mecânicas já tinham saído do teto, uma a uma, cada uma depois de
+  um relato**: o sono (04/09), o Rolamento (14/09) e a drenagem (15/09, horas antes).
+  Ou seja: **o jogo já tinha dois pesos, e eles cresciam.** Medido com o build antigo de volta, em
+  7.810 confrontos: **7,8% dos confrontos SEM drenagem eram resumidos e 0% dos COM**.
+- **O PREÇO É DE TELA, e ele é pequeno na mediana e grande na cauda** (o MESMO bot contra os dois
+  builds, 7.810 confrontos, 900 batalhas):
+
+  | | com teto | sem teto |
+  |---|---|---|
+  | linhas por confronto | 2,27 | **2,62** (+16%) |
+  | confrontos resumidos | 7,6% | **0%** |
+  | cabem em até 3 linhas | 84% | 76% |
+  | cabem em até 6 linhas | 98% | **94%** |
+  | pior caso visto | 23 linhas | **31 linhas** (Furret × Shuckle) |
+  | animação de uma batalha 6x6 | 38,8s | **43,9s** (+5,1s) |
+
+  **É menos do que parece porque 59% das lutas se resolvem em UMA ou DUAS linhas** — o teto só
+  alcançava a minoria comprida. O pior caso é um Shuckle (230 de Defesa) apanhando de um Furret.
+- **NA DIFICULDADE, NADA — por construção, e conferido por impressão.** O mesmo build com e sem o
+  teto dá o **MESMO hash** em 900 batalhas semeadas. `TETO_GOLPES` nunca existiu no servidor e não
+  entrava em conta de dano nenhuma; ele vivia no `sequenciaDoConfronto`, que é apresentação.
+- **⚠️ A RECONSTRUÇÃO NÃO FOI REMOVIDA, e não pode ser.** Ela continua sendo **o fallback de
+  confronto gravado ANTES de o diário existir** (`m.golpes` vazio) e **o partidor da Faixa de Foco**,
+  que quebra a luta em duas metades. O que não existe mais é um confronto **com** diário cair nela.
+  Consequência pro teste: só se chega naquele código **tirando o `golpes` do matchup à mão**, e é
+  exatamente o que `tools/test-especiais.js` passou a fazer — sem isso o bloco inteiro da banda da
+  fórmula viraria letra morta em silêncio.
+- **HISTÓRICO: o teto já saiu inteiro uma vez, em 03/09/2026, e voltou no MESMO dia** — *"uma troca
+  banal de Gloom contra Miltank virou seis linhas"*, reportado com print. O que mudou de lá pra cá
+  é que ele tinha subido de 3 pra 4 (a cauda encolheu) e que três mecânicas já eram isentas — ou
+  seja, **o corte tinha ficado mais estranho que o log comprido**.
+- **Se um dia o log comprido incomodar**, o lugar NÃO é um teto novo: é o tempo por passo
+  (`PAUSA_ANTES_DO_GOLPE_MS`, 1s) ou isentar o 2º tapa em diante da pausa. Um teto volta a criar
+  dois pesos, e foi disso que o jogador reclamou.
+
+**⚠️ E ELE DESENTERROU QUATRO TRAVAS QUE MEDIAM OUTRA COISA — a lição é a mesma da subida de 3 pra
+4, agora inteira:** o que o teto escondia não era só defeito do jogo, era **cobertura de teste**.
+Com ele, confronto comprido nunca chegava à tela, e quatro travas passavam sem nunca olhar o que
+elas existem pra olhar:
+
+| trava | o que ela media de verdade |
+|---|---|
+| a **banda da fórmula** ("dois golpes do mesmo pokémon não diferem mais que 1,176×") | ela nunca olhava o **`mv`**. Com o Metrônomo sorteando golpe a cada ataque, uma Clefairy que tira 124 com Meteor Mash e 286 com Fire Blast **não** é número impossível — são dois golpes diferentes. 20 dos 1.129 pares fora da banda eram isso |
+| a **colagem** ("a tela não pode criar dois golpes seguidos do mesmo lado") | pulava justamente a luta comprida, que é onde o reordenamento tem mais chance de colar |
+| o **selo de crítico** | a passada da reconstrução ficou em zero: agora ela roda **duas vezes**, a tela de verdade e a mesma tela sem diário |
+| a **Faixa de Foco** ("nenhum confronto passa de 7 linhas") | a promessa era do caminho RECONSTRUÍDO. Hoje a Faixa é uma linha no meio dos golpes reais, e o que se cobra dela é posição e soma — não tamanho |
+
+### O PLACAR VIROU POKÉBOLAS (15/09/2026)
+
+Pedido assim: *"naqueles quadros que aparece escrito o nome do usuário: 5/6 e Misty: 4/4, vamos
+reformular: Voce vai colocar o nome do usuário centralizado e embaixo voce vai criar sprites de
+pokebolas, caso o usuário tenha 5 pokemons vai aparecer 5 pokebolas, conforme os pokemons forem
+morrendo, as pokebolas vao ficando pretinhas ... e pode tirar aqueles emojis que tem antes dos
+nomes"*.
+
+- **A FRAÇÃO DIZIA A MESMA COISA, MAS COBRAVA UMA LEITURA:** pra saber quem estava na frente o
+  jogador tinha que comparar dois números. Seis bolinhas com duas pretas se leem **de relance**, que
+  é o que este quadro existe pra fazer — ele fica acima dos lutadores, no canto do olho de quem está
+  olhando a barra de HP.
+- **⚠️ ELE APARECIA EM SEIS TELAS, COPIADO** (jornada, batalha especial, Torre/raide, liga assistida
+  e as DUAS do online), e elas **já tinham divergido**: quatro usavam 🎒/🥊 e a liga assistida usava
+  🎽/🥊, sem motivo nenhum. Hoje é o `placarDoTreinador`, num lugar só — e o teste **lê o código** pra
+  cobrar que nenhum render volte a montar o chip à mão.
+- **A POKÉBOLA É DESENHADA EM CSS, não é imagem.** É a regra da casa ("nenhuma imagem de fora" — já
+  houve dois episódios de hotlink que funcionava local e morria publicado), e um gradiente sobrevive
+  à redução melhor que pixel art de 13px, que é o tamanho que cabe **seis vezes** num chip de 137px
+  (6×13 + 5×3 de gap = 93px).
+- **⚠️ A PRETA NÃO USA OPACIDADE, e a primeira versão usava.** O `opacity:.55` clareava o `#2b2b2b`
+  contra o fundo claro do chip e a bolinha saía **cinza**, não preta — conferido no navegador. O
+  pedido foi "vão ficando pretinhas", e cinza se lê como "desabilitado", que é outra coisa.
+- **⚠️ O `min-width:0` MORA NO CHIP, não só no nome.** Um flex item se recusa a encolher abaixo do
+  conteúdo por padrão, então sem ele o chip do nome comprido **crescia e roubava a largura do
+  outro** — os dois quadros ficavam de tamanhos diferentes na mesma linha. Também conferido no
+  navegador: com ele, "TreinadorNomeComprido" trunca com reticências e os dois chips ficam em 137px.
+- **ELA TOLERA MAIS DE SEIS:** o teto do jogo é 6, mas a **Vigília do Arco-Íris** monta DEZ
+  adversários. O `flex-wrap` deixa as bolinhas quebrarem em duas fileiras de cinco em vez de
+  estourarem o chip — medido, o chip vai de 46 pra 62px de altura nesse caso.
+- **Medido a 320px, no navegador:** chip de **137×46px**, seis bolas numa fileira só, nome truncando,
+  **sem rolagem lateral**.
+
+### AS POKÉBOLAS FICARAM MENOS PRETAS, E O ESCURO AVANÇA DA ESQUERDA (15/09/2026)
+
+Dois ajustes pedidos no dia seguinte ao placar nascer: *"Coloque para que as bolinhas fiquem menos
+pretas, e que o primeiro pokemon que morrer, a primeira bolinha da esquerda que fica escura, hoje ta
+ficando a primeira bolinha da direita"*.
+
+- **⚠️ A ORDEM ERA O DEFEITO, e a contagem não pegava.** As vivas vinham primeiro, e a razão escrita
+  era *"o placar conta quantos SOBRARAM, não quem caiu em que ordem"* — ela não sobreviveu ao teste
+  do olho: **o jogador lê a fileira como uma BARRA que se gasta**, e barra se gasta da esquerda pra
+  direita. Com as vivas na frente, ela parecia encolher pelo lado errado.
+  Nenhuma bolinha muda de lugar de um confronto pro outro nas duas ordens (a contagem é a mesma); o
+  que muda é **de que lado o escuro avança**. Por isso a trava passou a ler a **SEQUÊNCIA**
+  (`Xooooo`), e não o número de cada tipo — a contagem dá igual nas duas.
+- **A ESCURA É UM CINZA, não um quase-preto.** Ela nasceu em `#1c1c1c` e num chip claro **seis
+  daquelas viravam uma fileira de furos**. Hoje é `#5f5f5f`: continua se separando da vermelha de
+  relance — que é o único trabalho dela — sem pesar na tela.
+  **E continua SEM opacidade**, que é o remendo errado aqui: ela clareia o preto contra o fundo claro
+  e a bolinha sai indistinguível de "desabilitado". Quem clareia é a **cor**, que dá pra escolher.
+  O teste cobra as duas coisas — nada de `opacity` e o valor fora da faixa do quase-preto.
+
+### A CENA DO REMOINHO: SAI, FICA VAZIO, ENTRA COM A BARRA ENCHENDO (15/09/2026)
+
+Pedido assim: *"Quando o Pidgeot usa Remoinho, a animação não esta muito legal, melhore ... aparece
+a barra de hp do pokemon que ta entrando, vazia e começa a encher ... nas batalhas onlines quando um
+pokemon morre, fica um espaço no lugar do pokemon esperando o treinador escolher qual o proximo,
+faça mais ou menos assim"*.
+
+A cena em três quadros já existia desde 12/09/2026; o que mudou foi **o que cada quadro mostra**.
+
+| passo | cabeçalho do adversário | linha de status |
+|---|---|---|
+| 0 | **Psyduck** | ⚔️ Trocando golpes... |
+| 1 | Psyduck | 🌪️ Pidgeot usou Remoinho e soprou Psyduck pra fora! |
+| 2 | **❔ entrando...** (sem barra) | idem |
+| 3 | **Machop**, com a barra **enchendo** | **Psyduck foi trocado por Machop!** |
+| 4+ | Machop | a luta |
+
+- **⚠️ A VAGA VAZIA REUSA O QUADRO DO ONLINE**, que foi o pedido ao pé da letra. Ela era um travessão
+  solto (`—`) mais uma barra de **`0/1 HP`** — e esse `0/1` era o pior detalhe: é um número que não
+  existe em lugar nenhum do jogo, e quem o lesse de relance acharia que o pokémon tinha ficado com 1
+  de vida. Hoje é o mesmo `fighter-oculto` que o online já usa pra "ninguém em campo" (um ❔ apagado
+  com a palavra embaixo), e **sem barra nenhuma** — é a ausência que ela precisa mostrar.
+- **⚠️ E O QUADRO DE ENTRADA PASSOU A EXISTIR.** O `trocaDoRemoinho` devolvia `null` do `i+3` em
+  diante, e `null` quer dizer "é o pokémon do matchup, desenhe normal" — o que está certo pro resto
+  da luta e estava errado pro PRIMEIRO quadro dele: o pokémon novo aparecia com a barra **já no valor
+  final**, sem nada dizendo que ele tinha acabado de entrar.
+- **A BARRA NASCE VAZIA E ENCHE, e o valor continua sendo o HP de verdade:** a classe acrescenta uma
+  **animação**, não troca o número. **Por que animação e não transição:** a transição do `.hp-bar-fill`
+  precisa de DOIS desenhos (um com o valor velho, outro com o novo) pra existir, e aqui há UM só — o
+  pokémon aparece do nada. O `@keyframes` sem `to` usa o valor computado do elemento como destino,
+  então ela chega exatamente no HP que ele tem, **seja ele qual for**, sem o CSS precisar saber.
+- **O sprite entra junto, com um fade curto no mesmo tempo da barra.** Sem ele o sprite PISCA (sai de
+  "nada" pra "opaco" num quadro) enquanto a barra ao lado sobe devagar, e as duas coisas do mesmo
+  evento andam em ritmos diferentes.
+- **⚠️ A ALTURA NÃO PULA, e isso foi medido:** os QUATRO quadros da cena ficam em **219px** no
+  navegador a 320px. O `min-height` da vaga teve que mudar junto (ele cobria só o sprite, porque o
+  resto da altura vinha da barra e dos selos de tipo; hoje ela é a altura inteira do quadro).
+- **O log continua com UMA linha** — os três quadros são da animação, a mesma forma da drenagem
+  (duas entradas no diário, uma linha) e dos golpes de vários tapas.
+
+
+#### ⚠️ E A CENA COMEÇAVA PELO FIM: O PASSO VELHO SOBREVIVIA À VIRADA DE CONFRONTO
+
+Reportado logo depois: *"antes de trocar o pokemon, ta aparecendo qual vai ser o novo pokemon
+rapidamente e rapidamente troca para o pokemon que vai ser trocado"*.
+
+- **A CAUSA NÃO ESTAVA NA CENA, e sim na VIRADA.** Os laços faziam
+  `Phase = 'loading'; render(); setTimeout(advance, 1200)` — e quem zerava o passo era o ramo
+  `loading` do `advance`, ou seja **1,2 segundo DEPOIS do desenho**. Nesse intervalo o cabeçalho era
+  desenhado com o passo do confronto ANTERIOR, que é alto: o `trocaDoRemoinho` via um passo além do
+  fim da cena, devolvia `null` ("é o pokémon do matchup") e a tela mostrava **quem ENTROU** — e só
+  então voltava pro que estava saindo.
+  Medido: **38 de 40** confrontos com sopro (que não fossem o primeiro da batalha) abriam assim.
+- **⚠️ É A TERCEIRA PORTA DO MESMO DEFEITO.** O "golpe fantasma" de 09/09/2026 era o `LastHit`
+  sobrando de um confronto pro outro, e o conserto de lá zerou os dois JUNTOS — mas **só nos pontos
+  que já zeravam o passo**. Os pontos que entram em `loading` não zeravam nenhum dos dois, e ficaram
+  de fora. Ele só ficou visível agora porque o Remoinho é a primeira coisa que faz o CABEÇALHO
+  depender do passo; até então o passo velho só afetava a linha de status.
+- **HOJE HÁ UMA PORTA SÓ (`abrirConfronto(qual)`)**, chamada nos **16 pontos** que entram em
+  `loading`, nos cinco laços. Uma função com o prefixo do laço em vez de duas linhas em cada ponto:
+  com duas linhas à mão, o próximo ponto nasceria sem elas — que é exatamente o que aconteceu no
+  conserto de 09/09.
+- **⚠️ E ELA TEM QUE VIR ANTES DO `render()`, não depois.** O problema nunca foi o valor ficar velho
+  — foi ele ser **DESENHADO** velho. O teste cobra a posição, não só a presença.
+- **CONFERIDO QUE NÃO É MOTOR:** o `abrirConfronto` só escreve dois campos de tela
+  (`<qual>HitStep` e `<qual>LastHit`), e nenhum dos dois é lido por conta de dano nenhuma.
+
+**A PROVA É DE PONTA A PONTA, e ela foi a terceira tentativa de escrever a trava.** As duas
+primeiras montavam a fase `loading` **à mão** e davam verde nos dois builds — quem chama o
+`abrirConfronto` é a VIRADA, então a virada precisa acontecer de verdade. Hoje o teste começa no
+confronto ANTERIOR (fase `result`), chama `advanceReveal()` e anota o cabeçalho a cada desenho:
+
+```
+sem o conserto:  Machop > Geodude > Geodude > (vazio) > Machop > ...
+com o conserto:  Geodude > Geodude > Geodude > (vazio) > Machop > ...
+```
+
+A primeira linha é literalmente o relato. Conferido que a trava **acusa** com a chamada removida.
+
+### O HISTÓRICO DO RANKING DA TORRE (15/09/2026)
+
+Pedido assim: *"No ranking da torre de treinadores, adicione do lado do titulo 'Hoje' um botão
+chamado 'Histórico', quando clicado, exibir como foi o ranking do dia nos 5 últimos dias"*.
+
+- **⚠️ É UMA CHAMADA SEPARADA, e o CUSTO é a razão.** Cada dia é uma consulta de até 10 documentos,
+  então o histórico inteiro são **~50 leituras**. Junto do `getTrainerTowerRanking`, TODO jogador que
+  abrisse a Torre pagaria isso — e a maioria só quer ver o de hoje. Sob demanda, quem paga é quem
+  clica. E o cliente **cacheia por abertura do modal**: ir e voltar entre as abas não cobra de novo.
+- **SÃO OS 5 DIAS ANTERIORES A HOJE**, e não "os 5 últimos incluindo hoje": o de hoje já está na aba
+  ao lado, e repeti-lo gastaria uma das cinco linhas dizendo o que a tela já diz.
+- **⚠️ A DATA SAI DO MESMO `trainersLeagueDateStrPlusDays` do fechamento do dia.** Uma segunda regra
+  de data (a minha, em UTC) discordaria da do jogo em algum fuso, e aí o histórico mostraria um dia a
+  mais ou a menos que o ranking.
+- **⚠️ E NA TELA ELA É FORMATADA DO TEXTO, não por `new Date(dateId)`** — essa construção lê a string
+  como UTC e, num fuso a oeste, devolve o **dia anterior**: o histórico mostraria 13/09 no lugar de
+  14/09. O `dateId` já vem no formato do jogo, então o que se quer é só reordenar os pedaços.
+- **DIA SEM NINGUÉM FICA NA LISTA**, com a lista vazia e a frase dizendo isso. Sumir com ele faria o
+  histórico mostrar cinco datas que **não são as cinco últimas**, e o jogador leria isso como se
+  tivesse havido torre em dias que não houve.
+- **⚠️ O PÓDIO PASSOU A SER CALCULADO POR LISTA**, e não uma vez a partir do `r.hoje`: cada dia do
+  histórico tem o PRÓPRIO pódio (os três ANDARES distintos mais altos daquele dia). Lido do de hoje,
+  um dia antigo mostraria a medalha no andar errado — ou em ninguém.
+- **E o 🍬 do histórico fala no PASSADO** ("Ganhou um Doce Raro na virada do dia"): ali o dia já
+  virou e o doce já foi pago. A mesma marca com o texto de hoje anunciaria um prêmio que já saiu.
+- **As abas NÃO usam o `.btn` da casa**: aquele é botão de AÇÃO, com moldura de 3px; aqui são dois
+  lugares onde se ENTRA — o mesmo raciocínio que já tinha tirado o `.btn` das prateleiras da loja e
+  das linhas da ficha da Pokédex.
+- **Medido a 320px, no navegador:** cada aba **101×33px** sem quebra de texto, o modal em **265px** de
+  largura rolando por dentro (o `max-height:80vh` já existia), e o histórico de 5 dias em **938px** de
+  conteúdo.
 
 ## Bifurcação Kanto / Johto
 
@@ -4641,7 +5034,8 @@ venda, do mesmo jeito.
   primeira versão dele, que cobrava proteção eterna, falhou 1 vez em 6.000 confrontos exatamente por
   esse motivo.
 - Medido no modelo de hoje: **+0,1 ponto** de vitória por batalha 6x6 (50,48% → 50,59%, 0,2σ — ruído),
-  e ele trabalha em **1,5%** das batalhas. Parece pouco e é: o sono é 5% por confronto e agora
+  e ele trabalha em **1,5%** das batalhas. Parece pouco e é: o sono era 5% por confronto (hoje é
+  15%, o que triplica o trabalho dele -- o número acima é de antes) e
   protege um pokémon só. O que ele compra não é taxa de vitória, é **não perder aquele pokémon pra
   um sorteio** — que foi exatamente a reclamação que fez o sono ser reescrito.
 
@@ -4840,9 +5234,11 @@ venda, do mesmo jeito.
 - **A Faixa segura ANTES de o diário ser escrito**, então o dano gravado é o EFETIVO (o que saiu de
   verdade, parando em 1) e a barra da tela desce até 1.
 - **ELA PARTE O CONFRONTO EM DUAS LUTAS, e cada uma é reconstruída como qualquer outra — com o
-  mesmo `TETO_GOLPES`.** A luta corre normal até o pokémon chegar a zero, a Faixa o devolve a 1,
-  e o que vem depois se lê como uma luta nova em que ELE ataca primeiro. No log continua sendo um
-  confronto só.
+  mesmo `TETO_GOLPES`.** ⚠️ **Isto virou história em 15/09/2026**: sem teto, um confronto COM
+  diário mostra os golpes reais e a Faixa é uma linha no meio deles; o partidor em duas metades só
+  alcança log gravado antes de o diário existir.
+  A luta corre normal até o pokémon chegar a zero, a Faixa o devolve a 1, e o que vem depois se lê
+  como uma luta nova em que ELE ataca primeiro. No log continua sendo um confronto só.
   **Três tentativas até acertar, e as duas primeiras estão registradas porque cada uma errou de um
   jeito diferente:**
   1. **A linha como rodapé, depois de UMA reconstrução do confronto inteiro.** O log dizia que o
@@ -6010,7 +6406,8 @@ exceção real** a isso. Medido: a barra caía 30 e 60 e o log dizia **82 e 72**
 A escala passou a viajar por linha (campo `rl`) e entra como **PESO na suavização**, exatamente como
 o crítico pesa 2. Duas travas do teste tiveram que aprender a mesma coisa (elas comparavam dano cru).
 
-**⚠️ E O CONFRONTO COM ROLAMENTO SAI DO `TETO_GOLPES`, que é a MESMA exceção do sono.** A
+**⚠️ E O CONFRONTO COM ROLAMENTO SAÍA DO `TETO_GOLPES`, que era a MESMA exceção do sono** (história
+desde 15/09/2026 — hoje NENHUM confronto com diário é cortado; ver **O TETO ACABOU**). A
 reconstrução não conhece escala nenhuma — ela interpola HP e devolve golpes inventados, todos do
 mesmo tamanho. Medido: a escala só chegava na tela em **31,6%** dos confrontos com Rolamento; nos
 outros 68% o jogador via o mesmo nome com números lisos e a mecânica ficava invisível.
@@ -6069,6 +6466,321 @@ abaixo de `CURA_MAXIMO_DO_HP`, e é `continue` — a luta acontece inteira depoi
 **+1,12 ponto, 1,8σ** (16 blocos de 800 jornadas de cada lado, **12.800 de cada**, desvio tirado de
 ENTRE os blocos, 10 de 16 blocos pro lado fácil). Faz sentido: o Rolamento é usado por uma espécie e o
 Sino por outra, e as duas caem dos dois lados da luta.
+
+### O GOLPE MORIBUNDO ACABOU (15/09/2026)
+
+Pedido assim: *"esse negócio de golpe moribundo eu queria acabar com ele, vamos acabar com ele e eu
+vou começar a testar e a gente vê as diferenças"*.
+
+Era a regra mais antiga do `doExchange`: **quem era derrubado ainda conectava o contra-golpe**. Ela
+existia pra que um pokémon raspando de HP não varresse uma fila inteira só por ser mais rápido —
+cada abate cobrava o seu preço. **Hoje o abate é limpo: caiu, acabou.**
+
+- **A MUDANÇA NO MOTOR É UMA LINHA** (`saiuNoPrimeiro = segundoCaiu ? [] : …`), e é o tamanho do que
+  ela arrasta que importa. **SAÍRAM JUNTO CINCO COISAS**, todas remendos em cima do revide:
+  o `DYING_BLOW_FACTOR`, o **PISO de 1%–10%** (12/09, que impedia o revide de matar), o
+  `apararRevide` que o piso obrigava, o `REVIDE_PISO_MIN/MAX` e o ramo de **"quem já estava raspando
+  não leva revide"** (13/09). Sem o revide, nenhum deles tem o que fazer.
+- **⚠️ O QUE FICA É O TETO DE QUEM RASPA** (`MORIBUNDO_TETO_NO_CHEIO`, 14/09), e ele **não é a mesma
+  coisa**: aquele é sobre o **ATAQUE** de quem tem pouca vida — ele não derruba um pokémon cheio num
+  golpe só — e continua valendo por conta própria. O comentário dele dizia que ele era "a outra
+  metade do piso do revide"; hoje ele é a **única** metade.
+- **OS DOIS NUNCA MAIS CAEM NA MESMA TROCA, e agora por construção.** O revide era o único caminho
+  para isso fora da autodestruição — que continua sendo a exceção, porque ela zera o HP dentro do
+  `tentarGolpeEspecial` e devolve antes de chegar na troca. Medido: **0 em 2.666** abates, e todo
+  confronto em que os dois caem tem explosão.
+- **⚠️ A MARCA `m` DO DIÁRIO NUNCA MAIS É GERADA, MAS O REORDENAMENTO FICA.** É a mesma decisão do
+  `x:'desempate'`: diário gravado antes de hoje **tem** a marca, e sem o reordenamento aquele log
+  volta a mostrar pokémon atacando com a barra em zero. Há caso de teste com um diário velho (o
+  revide gravado por último, com `m:1`) provando que ele continua legível. O que não existe mais é
+  **produzir** um caso novo.
+
+**O PREÇO NA JORNADA: −8,05 PONTOS DE CONCLUSÃO — a segunda maior mexida de dificuldade já medida
+aqui**, atrás só do moveset dos NPCs (−12,56). 62,05% → **54,00%**, **9,8σ**, 8 blocos de 800
+jornadas de cada lado (6.400 de cada, desvio tirado de ENTRE os blocos) e **8 de 8 blocos apontando
+pro mesmo lado** — não é amostra sortuda.
+
+**⚠️ E ELE SE CONCENTRA NO FIM, como as outras mexidas desta série** (1.200 jornadas de cada lado):
+
+| ginásio | com o revide | sem o revide |
+|---|---|---|
+| 1º | 65 | 71 |
+| 5º | 45 | 38 |
+| **6º** | 105 | **138** |
+| **8º** | 231 | **284** |
+
+Faz sentido: é no fim que os confrontos se decidem em poucas trocas, e é lá que o revide mais
+cobrava o preço de cada abate. **A causa mecânica é direta** — um pokémon rápido e forte agora varre
+a fila sem tomar nada de volta, e quem tem times assim são os líderes.
+**Se um dia isso for demais, a régua não é o revide de volta:** é o nível dos líderes (que já custou
+−11,42 quando subiu 2) ou o bolo de derrota.
+
+**⚠️ E A RAIDE DO MEW É O CASO EXTREMO — ela ficou 3,2× mais lenta.** O Mew é Lv.4999, mais rápido
+que qualquer pokémon do time, e mata cada um numa troca: **o revide era o que garantia que o
+derrubado ainda conectasse UM golpe**, e era dali que vinha quase todo o dano.
+
+| | dano por ataque | ataques pra derrubar |
+|---|---|---|
+| com o revide | 40,5 | ~621 |
+| **sem o revide** | **12,5** | **~2.016** |
+
+**⚠️ E UM ATAQUE INTEIRO PODE SAIR COM DANO ZERO** — o time todo cai sem conectar um golpe. Isso não
+é raro o bastante pra ignorar: dois casos do `tools/test-boss.js` que pressupunham "um ataque sempre
+tira vida" passaram a falhar em ~3 rodadas de 5, e o jogador que visse isso leria como jogo quebrado
+(pior: quem tira zero **não entra no ranking**).
+O evento está **DESLIGADO** desde 13/09 (`BOSS_ATIVO`), então isso não afeta ninguém hoje — mas
+**ele precisa ser recalibrado antes de voltar**, e essa é a pendência que esta mudança deixou. A
+régua é o **nível do Mew** (que entra no divisor do dano) ou o `BOSS_MAX_HP`, e mexer neles exige
+apagar `globalBoss/mew`, `globalBoss/mewRank` e a subcoleção `players`: o `maxHp` fica gravado no
+documento e o dano acumulado está na escala antiga.
+Os dois fixtures do teste passaram a **atacar até causar dano** — o laço tira o flake e não conserta
+a raide, e o comentário deles diz isso com todas as letras.
+
+**O QUE ISSO CUSTOU NOS TESTES, e vale como lição:** sete travas mediam o revide ou remendos dele, e
+foram de 300+ casos para **zero** — falhando sem nada estar errado. Elas viraram um bloco só, que
+cobra o invariante novo (quem cai não revida, a marca não é gerada, os dois nunca caem juntos) e —
+**lendo o código** — que os cinco remendos não voltem. Duas amostras também tiveram que crescer: sem
+o revide cada confronto rende menos linhas, e os limiares passaram a falhar por falta de dado.
+
+### A PASSIVA DE DRENAGEM ACABOU, E O GOLPE GANHOU ASTERISCO (15/09/2026)
+
+Pedido assim: *"retire a habilidade passiva Absorver que vários pokémons têm também, assim como o
+Zubat que tem o sanguessuga e tals, e coloque um * nessas habilidades naquele quadro que aparece
+quando aprende habilidade: 'Cura o Pokémon que utilizou ao atacar o oponente'"*.
+
+**A passiva (`ABSORCAO`) era a drenagem de ABERTURA**: 10% por confronto, 23 espécies, tirava
+10%–30% do teto do alvo e punha em si antes da luta. Ela existia por um motivo que deixou de valer:
+**o golpe drenante não fazia nada**, e ela era a única forma de o Zubat "usar Sanguessuga".
+
+- **⚠️ COM A DRENAGEM NO GOLPE ELA VIROU A MESMA COISA DUAS VEZES — e pior, com regras diferentes.**
+  A passiva era **sorteada** (10%) e tirava uma fração do TETO; a do golpe acontece **sempre** e
+  devolve metade do DANO. O mesmo Oddish tinha as duas, e o jogador não tinha como saber qual estava
+  vendo na tela.
+- **⚠️ ELA JÁ ESTAVA QUASE MORTA, e isso explica o número:** ela só dispara **abaixo de 70% da
+  vida** (`CURA_MAXIMO_DO_HP`), e a cura no golpe mantém o dono acima disso. Medido, a passiva
+  aparecia em **3,1%** dos confrontos de um Zubat numa fila de quatro.
+- **O PREÇO NA JORNADA: nada.** 51,58% → **52,33%**, **+0,75 ponto, 1,0σ**, 8 blocos de 800 (6.400
+  de cada lado), com **3 de 8 blocos** pro outro lado — ruído puro.
+- **⚠️ A APRESENTAÇÃO DELA FICA.** O motor não gera mais `absorb`/`absorbdano`, mas o log, a
+  animação e a reconstrução continuam sabendo desenhá-los: diário gravado antes de hoje tem as duas
+  entradas, e sem elas aquele log perde uma linha e **a soma para de fechar com a barra**. É a mesma
+  decisão do `x:'desempate'` e da marca `m` do moribundo. Há caso de teste com um diário velho
+  provando que ele ainda desenha e que a frase continua saindo.
+- **SAIU JUNTO DA FICHA DA POKÉDEX**, e é coerente: a ficha conta o que a espécie faz **sozinha**, e
+  drenar deixou de ser isso — virou escolha de golpe. O Oddish fica só com o Pó do Sono e o Zubat só
+  com o Supersom. A explicação do efeito `drenar` saiu da caixa pelo mesmo motivo (e porque o teste
+  cobra que nenhuma explicação sobre sem dono). **Os especiais foram de CATORZE para TREZE.**
+
+**O ASTERISCO NO CARTÃO DO GOLPE** é a outra metade do pedido, e ele **substitui** o que a ficha
+contava: *"* Cura o Pokémon que utilizou ao atacar o oponente"*. Ele mora no `obsDoGolpe`, ao lado
+do `* Golpe repete entre 2-5x` — a mesma função, o mesmo lugar, e vale nas **três telas de golpe**
+porque as três dividem o `cartaoDeGolpe`.
+- **É o caso mais forte dessa função inteira:** o cartão do Absorver mostra **PODER 20**, o número
+  mais baixo da tela, e sem a frase o jogador larga o golpe sem saber que ele devolve **metade do
+  dano**. Um Absorver de 20 que cura vale mais que um Talho de 70 num pokémon que precisa
+  sobreviver — e essa conta ele só faz se a tela disser.
+- **Sai da TABELA** (`GOLPES_DRENO`), como a dos multi-tapas: golpe novo na tabela já nasce com a
+  observação, e um que saia dela perde junto. O teste cobra isso varrendo a tabela, não uma lista.
+- **⚠️ CUSTO DE TELA: a frase tem 48 caracteres contra 23 da dos multi-tapas — 2,1× mais longa.**
+  Medido no navegador a 320px (15/09/2026): o cartão do Absorver vai a **78px**, contra 53 de um
+  golpe comum — **+25px**. O do Comedor de Sonhos, que tem DUAS observações, vai a **120px**. Se incomodar, o
+  lugar é o `obsDoGolpe` e as alternativas medidas são *"Cura quem usou, ao atacar"* (25) ou
+  *"Devolve metade do dano em vida"* (30).
+
+### A DRENAGEM NO GOLPE: TIRA E DEVOLVE NO MESMO INSTANTE (15/09/2026)
+
+Pedida assim: *"os ataques que tiram dano do oponente e recuperam seu hp, como absorb e giga drain,
+quando usar um desses ataques, recuperar a vida do pokemon que usou no mesmo instante que tira hp
+do adversario"*.
+
+**⚠️ É O PRIMEIRO EFEITO DO JOGO COLADO NUM GOLPE COMUM, e essa é a diferença que organiza tudo.**
+Os onze do `tentarGolpeEspecial` são **sorteados na abertura** e valem por CONFRONTO; este vale por
+**GOLPE**, toda vez que o golpe sai, **sem sorteio nenhum** — quem decide se ele acontece é o motor
+ter escolhido aquele golpe. ⚠️ Ela CONVIVEU por algumas horas com a **drenagem de ABERTURA**
+(`ABSORCAO`, 10%, 23 espécies) — e foi essa convivência que matou a passiva no mesmo dia: duas
+drenagens com regras diferentes, e o jogador sem saber qual estava vendo. Ver a seção acima.
+
+- **SÃO OS CINCO da tabela `GOLPES`**, e todos devolvem **50%** (`GOLPES_DRENO`), a fração do jogo
+  oficial: Absorver (20), Sanguessuga (20), Mega Dreno (40), Giga Dreno (60) e Comedor de Sonhos
+  (100). Nada precisou ser cadastrado — eles já estavam na base da Gen 3.
+- **⚠️ A CURA SAI DO DANO EFETIVO, e ela é calculada DEPOIS DE TODOS OS APAROS.** O número que sai
+  do `aplicarGolpes` ainda vai ser aparado por QUATRO coisas: o teto de quem raspa, a Faixa de Foco,
+  o piso do revide moribundo e o `apararRevide`. Calculada antes deles, a cura sairia de um dano que
+  **não aconteceu** — a mesma família do aparo do desempate, que escrevia na tela um número que
+  nunca existiu.
+- **⚠️ E ELA É CRONOLÓGICA: são DOIS momentos, um por lado.** Quem bate primeiro cura primeiro,
+  **antes de o outro revidar**. A primeira versão rodava as duas curas juntas no fim, e o teste
+  pegou na primeira batalha: um **Oddish CHEIO** que matava o Geodude com Absorver tomava o revide
+  moribundo e **só então** curava, terminando cheio de novo — quando no jogo ele cura zero (já
+  estava cheio) e termina machucado.
+  Por isso o **`firstHpBefore` virou `let`**: ele significa "a vida do first no instante em que o
+  second vai bater nele", e a cura acontece ENTRE as duas coisas. Os três lugares que o leem (o
+  `jaRaspando`, o clamp do piso do revide e o `ho` da marca da Faixa) querem esse valor — enquanto
+  nada curava no meio, os dois eram o mesmo número.
+- **⚠️ O `hp` DA LINHA É CAPTURADO NA HORA DA CURA, não na hora de gravar.** A linha do first é
+  escrita depois de o second já ter revidado: lida na gravação, ela registrava a vida pós-revide.
+  Medido: um Oddish que curou 77 gravava **`hp:0`** — e esse campo é lido pela reconstrução (o laço
+  do `base`) e por toda conta que lê o diário.
+- **QUEM CAIU NÃO SE CURA** (o revide moribundo é de quem já está em 0, e devolver vida ali o
+  ressuscitaria) e **a cura NUNCA passa do teto**, senão a soma das linhas não fecharia com a barra.
+- **ELA RODA FORA DO `if(diario)`**: o diário é apresentação e é opcional, e uma mecânica que só
+  valesse com ele faria a mesma batalha terminar diferente conforme quem a chamou.
+- **⚠️ ELA NÃO ENTRA NA NOTA do `melhorAtaque`, e isso é decisão:** quem escolhe continua sendo o
+  DANO. Inflar a nota faria o Absorver (poder 20) ganhar de golpes de 70 por causa da cura, e isso é
+  balanceamento que não foi pedido. **Medido ANTES de implementar**, porque era o risco real da
+  feature (a Fúria nasceu saindo em **0,0%** dos confrontos e teve que virar passiva): os drenantes
+  já saem em **16,4%** dos golpes de um time de donos e em **2,57%** de um time sorteado.
+
+**NA TELA a cura é UMA LINHA SÓ com o golpe** — *"Oddish atacou Geodude com Absorver e tirou −220 de
+HP e recuperou +110."* É a regra da casa ("duas entradas no diário, uma linha"), a mesma da drenagem
+de abertura e dos golpes de vários tapas. Na ANIMAÇÃO ela é um passo próprio, com a barra **subindo**
+(`amount` negativo).
+- **⚠️ E A LINHA DA CURA QUEBROU UM EXTRATOR DE TESTE, pelo mesmo caminho de sempre.** A trava do
+  selo de crítico lia a tela com um regex que termina em `de HP\.` — e a linha da drenagem **não
+  termina assim**: ela é *"… e tirou −92 de HP e recuperou +46."*. Como o extrator colapsa o log
+  numa linha só, o `(.*?)` do regex **atravessava** a linha inteira e casava com o `de HP.` da
+  SEGUINTE. Medido no par Vileplume × Gloom: o primeiro match saía com `quem="Vileplume"` e
+  `dano=80` — **um golpe que era do Gloom**. A trava comparava o selo com dano do lado errado, e
+  falhava ~1 rodada em 3.
+  É a MESMA armadilha que a conta de "uma linha por golpe" já tinha custado em 13/09/2026, e o
+  conserto é o mesmo: **cortar pelo HTML** (`mlog-passo`), que é onde a linha de verdade começa —
+  e não por um pedaço de texto que só por acaso aparece no fim de cada uma.
+  ⚠️ **O marcador traz a classe do lado junto** (`<div class="mlog-passo p">`), então o corte tem que
+  ser por `mlog-passo` seguido de espaço OU aspas — cortar por `mlog-passo">` dá zero linhas, o que
+  é pior que o defeito: a trava passa a medir nada e continua verde.
+- **A FRASE DO GOLPE FICA NA TELA enquanto a barra sobe, e isso saiu de graça:** o passo é marcado
+  como `cura`, o `fraseDoGolpeUsado` devolve vazio pra passo de cura, e o pintor **só sobe a linha,
+  nunca a rebaixa** — então o *"Oddish usou ABSORVER"* do passo anterior continua lá. O mesmo golpe
+  tirou e devolveu: a frase é uma só.
+- **A CURA ANDA COLADA NO GOLPE** no `passosVisiveis`, pelo mesmo motivo dos tapas: os dois são o
+  MESMO lance. Solta, ela ficaria pra trás quando o reordenamento empurra o golpe moribundo pra
+  frente, e a tela mostraria o pokémon se curando de um golpe que ali ele ainda não deu.
+- **⚠️ A SUAVIZAÇÃO NÃO REPARTE O GOLPE QUE DRENOU**, e é a mesma isenção do multi-tapa e do golpe
+  que matou: a linha dele carrega um **segundo número que o jogador confere** (a cura é metade do
+  dano, lado a lado). Repartido, a conta que a linha promete quebraria.
+
+**⚠️ O CONFRONTO COM DRENAGEM SAI DO TETO POR COMPLETO — e isso corrigiu um teto de 6 que durou
+algumas horas no mesmo dia.** Ele nasceu com teto próprio de 6 (`TETO_GOLPES_COM_CURA`, a pedido:
+*"para esses casos que tem os poderes de cura pode aumentar o teto para 6"*), e **6 não bastava**.
+
+**REPORTADO COM PRINT: um Oddish Lv.12 × Sandshrew Lv.17 em que o Absorver não curava nada.** O
+motor estava certo — o diário tinha **QUATRO** curas; o confronto passava do teto, caía na
+**reconstrução** (que não conhece cura nenhuma) e a tela mostrava três golpes inventados sem um
+"+N" sequer. O jogador via "Absorver −77 / −88" e nenhuma cura.
+
+**⚠️ E A MEDIÇÃO QUE ESCOLHEU O 6 ESTAVA ENVIESADA — esta é a lição a guardar.** Ela usou donos no
+**Lv.50 com moveset forte** e achou que 87,1% dos confrontos cabiam em 4. No **começo da jornada** é
+o contrário: o Absorver tem poder **20**, o alvo tem 165 de HP, e a luta leva **8 golpes**. Medido
+naquele par: **74% passavam do teto de 6, e em 74% a cura sumia da tela.** É o mesmo erro do "painel
+forte demais" que este arquivo já registra na medição do Smeargle — e ele é pior aqui, porque o caso
+que a amostra não cobriu é justamente o mais comum pra quem está jogando.
+
+A isenção total é o que o **SONO** e o **ROLAMENTO** já usam, e pelo motivo idêntico: a reconstrução
+não conhece a mecânica, então ela fica invisível nas lutas longas — que aqui são as do começo do
+jogo, onde o golpe drenante costuma ser o **único** que o pokémon tem.
+
+**O CUSTO EM LINHAS, medido** (4.000 batalhas, níveis 15 a 70): os confrontos com drenagem são
+**2,1%** do total e ficam em **3,58 linhas** em média, contra 2,18 de um confronto comum.
+**90,8% cabem em 6 linhas** e 95,4% em 8; a cauda vai a 19 numa fração de 0,3% deles — ou seja
+**~0,1% dos confrontos do jogo**. É o mesmo perfil que o sono e o Rolamento já têm.
+
+**⚠️ E A ISENÇÃO DUROU POUCAS HORAS: o TETO INTEIRO acabou no mesmo dia** (ver **O TETO ACABOU**).
+Foi justamente ela que o matou — com sono, Rolamento e drenagem isentos, o log passou a ter **dois
+pesos** no mesmo print, e foi disso que o jogador perguntou. Medido: **7,8% dos confrontos SEM
+drenagem eram resumidos e 0% dos COM**.
+- **A TRAVA QUE FALTAVA E QUE AGORA EXISTE: "a cura NUNCA some da tela".** Ela compara as curas do
+  DIÁRIO com as da SEQUÊNCIA, e o fixture dela é o par do relato — duro de propósito, porque a luta
+  dele passa de 8 golpes. Era ela que teria pego isto, e nenhuma das outras pegava: o motor estava
+  certo o tempo todo, e o que falhava era só a apresentação.
+  **Com o fim do teto ela ficou MAIS forte, não menos:** deixou de cobrar "o confronto é comprido,
+  logo ele cai na reconstrução" e passou a cobrar que a cura chegue à tela em confronto de QUALQUER
+  tamanho. Se um dia algum corte voltar — um teto novo, uma isenção, um resumo —, é ali que grita.
+
+#### ⚠️ O COMEDOR DE SONHOS SÓ VALE CONTRA ALVO DORMINDO — e o preço dele é o maior desta feature
+
+Pedido junto (*"o comedor dos sonhos pode colocar que o gengar só usa quando o adversário está
+dormindo"*), e é o que o jogo oficial faz. **A trava mora na ESCOLHA** (`melhorAtaque` tira o golpe
+dos candidatos), não no dano: barrado só no dano, o motor escolheria um golpe de 100 e aplicaria
+zero — a mesma classe de erro do `EXPOENTE_TIPO` valendo num lugar e não no outro.
+- Quem responde "o alvo está dormindo?" é o **`_dormeAgora`**, marcado pelo `doExchange` na troca em
+  que o alvo perde o turno — e **não o `_dormindoPor`**, que é decrementado no COMEÇO da troca: na
+  troca livre ele já está em 0 enquanto o pokémon ainda nem atacou, e lido dali o golpe **nunca
+  sairia**.
+- O filtro é **incondicional** (ao contrário do da anulação, que só morde quem tem alternativa):
+  medido, o Comedor de Sonhos **nunca é o único golpe de dano de ninguém** nas 250 × 99 níveis.
+- A guarda vale **também no motor da cura**, e é rede e não repetição: o **METRÔNOMO** sorteia entre
+  todos os golpes de dano da tabela e podia trazê-lo por outro caminho.
+
+**⚠️ O CUSTO É ENORME, E A CAUSA NÃO É A CURA — É QUE ELE É O ÚNICO GOLPE ESPECIAL DA LINHA DO
+GASTLY.** Medido num painel fixo de 8, nível 50:
+
+| | sem a trava | com a trava | |
+|---|---|---|---|
+| **Haunter** | 52,1% | **16,3%** | **−35,8** |
+| **Gengar** | 81,9% | **67,5%** | −14,4 |
+| **Gastly** | 15,0% | **1,3%** | −13,7 |
+
+O Haunter Lv.50 tem **Ataque 50 e Sp.Atk 115**, e neste motor quem decide físico/especial é o TIPO
+(regra da Gen 1): **Comedor de Sonhos é Psíquico = ESPECIAL**, enquanto Bomba de Lodo (Veneno) e
+Bola Sombria (Fantasma) são **físicos**. Ou seja, tirar o Comedor os obriga a bater com **50 em vez
+de 115** — menos da metade da força. Não é "trocar 100 por 90".
+**A alternativa está medida e é uma linha:** ele **usa sempre, mas só CURA contra alvo dormindo** (a
+guarda já existe no `drenar`; basta não filtrar no `melhorAtaque`). Ela devolve os três à taxa
+original e mantém barrado o que preocupava — a cura de graça.
+
+**O PREÇO NA JORNADA, medido em 8 blocos de 800 (6.400 de cada lado, desvio ENTRE blocos) — e as
+duas metades desta feature se ANULAM:**
+
+| A/B | conclusão | |
+|---|---|---|
+| só a **CURA** (com a trava do Comedor já valendo dos dois lados) | 60,30% → **62,20%** | **+1,91 ponto, 4,2σ**, 7 de 8 blocos |
+| a **FEATURE INTEIRA** (cura + trava) contra o jogo de antes | 61,52% → **61,70%** | **+0,19 ponto, 0,2σ**, 4 de 8 blocos |
+
+Ou seja: a cura é um ganho real e fora do ruído, e **a trava do Comedor de Sonhos come esse ganho
+inteiro**. Na conta final a jornada não se move — mas ela não se move porque duas mexidas grandes se
+cancelam, e não porque as duas sejam pequenas. Adotar a variante B (usar sempre, curar só dormindo)
+devolveria a jornada aos **+1,9 pontos** da primeira linha.
+
+- **20 das 250 espécies levam um drenante** no moveset padrão do Lv.50. Num time aleatório ele sai
+  em **2,57% dos golpes**, **5,6% dos confrontos** e **34,4% das batalhas**.
+- **ONDE ELA VALE, e não é decisão nova — é consequência do golpe escolhido.** Ela vive no
+  `doExchange`, então vale na **jornada**, na **Elite**, na **Torre** e no **Ginásio da Cidade**:
+  esses quatro montam o time a partir dos SAVES, e o campo `ataques` viaja junto.
+  **NÃO vale nas ligas nem no online**, pelo mesmo motivo dos golpes de vários tapas: lá o time é um
+  **CÓDIGO** (`especie:nivel:shiny`), ninguém tem golpe escolhido, o `lastMove` é null e o motor cai
+  no de tipo — não há id de golpe pra consultar na tabela. A única porta que sobra ali é o
+  **METRÔNOMO**, que sorteia entre todos os golpes de dano e pode trazer um drenante; é coerente
+  ("qualquer poder existente no jogo") e é justamente por isso que a guarda do Comedor de Sonhos
+  vive TAMBÉM no motor da cura.
+  **Os NPCs drenam**: o `equiparNpc` dá o moveset inteiro da espécie ao líder, ao rival e ao
+  treinador da Torre — então o Vileplume da Erika e o Gengar da Agatha usam a mecânica contra o
+  jogador, que é o que faz o efeito na jornada ser pequeno.
+- **Se um dia incomodar**, a régua é a **fração** (`GOLPES_DRENO`, hoje 0.5 em todos — ela é por
+  GOLPE, então dá pra deixar o Giga Dreno em 0.5 e o Absorver em 0.25). **O teto de linhas não é
+  régua aqui**: ele saiu, e voltar a limitá-lo traz de volta a cura sumindo da tela.
+- **⚠️ ACHADO NO CAMINHO E NÃO MEXIDO (não foi pedido, e é ANTERIOR a esta feature): no online, quem
+  é o lado B vê a luta RECONSTRUÍDA, não o diário.** O `meuM` que o `advanceOnlineReveal` monta pra
+  virar a perspectiva carrega só os HPs — ele **não leva o `golpes`** —, e o
+  `buildAnimatedHitSequence` lê o diário de lá. Então o lado A vê os golpes reais e o B vê os
+  inventados. O resultado final é o mesmo (a reconstrução interpola entre os HPs), o que muda é a
+  divisão em golpes. Hoje isso quase não custa, porque no online ninguém tem golpe escolhido; no dia
+  em que a drenagem valer lá, o lado B não veria a barra subir. O conserto é uma linha (levar o
+  `golpes` no objeto virado), mas ele muda o que metade dos jogadores vê numa batalha PvP e merece
+  medição própria.
+- `tools/test-especiais.js` tranca: as duas tabelas iguais nos dois motores, a cura sendo metade do
+  dano efetivo (casada com o golpe que a gerou), o teto de vida, quem caiu não curando, a soma
+  fechando, **quem entra CHEIO não curando** (a trava cronológica), o Comedor de Sonhos fora da
+  escolha contra alvo acordado e dentro contra dormindo, ele nunca sendo o único golpe de alguém, a
+  rede do Metrônomo, o `_dormeAgora` marcado antes dos golpes e limpo depois, a cura não abrindo
+  linha no log, o passo com a barra subindo do lado certo, a frase do golpe não sendo apagada, a
+  cura colada no golpe, e o teto de 6. E a comparação das 300 batalhas entre os dois motores
+  **COBRA que ela apareça** — sem essa linha ela daria verde sem nunca ser tocada, e aqui isso pesa
+  mais que nos outros: ela **muda o HP no meio da troca**, então um motor curando e o outro não faz
+  a mesma batalha terminar diferente a partir do golpe seguinte.
+
+**⚠️ E A LISTA DE "VIDA QUE SOBE" DO TESTE ESTAVA COPIADA À MÃO EM NOVE CONTAS** — exatamente a
+armadilha que o `danoSemGolpe` já tinha registrado ("a quarta que ficasse pra trás falharia raro e
+intermitente"). Ela virou `subiuAVida()`, numa função só, e o `dreno` entrou numa linha.
 
 ### AS DUAS FRASES QUE FALTAVAM (14/09/2026)
 
