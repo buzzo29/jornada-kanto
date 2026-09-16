@@ -908,7 +908,7 @@ console.log('\n=== O HM01: A PRIMEIRA MAQUINA OCULTA (11/09/2026) ===');
        restaura depois, entao um campo de conta que fique fora dele SOME ao abrir outro save --
        silenciosamente, e so pra quem tem mais de um. */
     ok('e esta no CAMPOS_DA_CONTA, senao sumiria ao trocar de save',
-       /'hms'\s+\/\/ as Máquinas Ocultas/.test(txt));
+       /'hms'/.test((txt.match(/const CAMPOS_DA_CONTA = \[[\s\S]*?\];/) || [''])[0]));
     /* JORNADA NOVA NAO ZERA MAIS: era isso que o tornava por save. */
     ok('e jornada nova NAO zera mais os HMs', !/game\.hms = \[\];\s+\/\/ HM é conquista/.test(txt));
   }
@@ -943,13 +943,13 @@ console.log('\n=== O HM01: A PRIMEIRA MAQUINA OCULTA (11/09/2026) ===');
        S.CORTADORES.filter(id => !S.SPECIES[id]).join(','));
     ok('nenhuma repetida', new Set(S.CORTADORES).size === S.CORTADORES.length);
     ok('cinco dos sete iniciais cortam',
-       ['bulbasaur','charmander','chikorita','cyndaquil','totodile'].every(S.podeAprenderCorte));
+       ['bulbasaur','charmander','chikorita','cyndaquil','totodile'].every(id => S.podeAprenderHM('hm01', id)));
     ok('e a linha do Squirtle e o Pichu NAO',
-       !S.podeAprenderCorte('squirtle') && !S.podeAprenderCorte('blastoise') && !S.podeAprenderCorte('pichu'));
+       !S.podeAprenderHM('hm01','squirtle') && !S.podeAprenderHM('hm01','blastoise') && !S.podeAprenderHM('hm01','pichu'));
     /* Os quatro lendarios FICAM, porque e o que o dado diz -- a mesma decisao do Lugia no
        RECUPERACAO e no REMOINHO. O Celebi e INTOCAVEL, entao a entrada dele nao roda hoje. */
     ok('os lendarios que o dado traz ficam na lista',
-       ['raikou','entei','suicune','celebi'].every(S.podeAprenderCorte));
+       ['raikou','entei','suicune','celebi'].every(id => S.podeAprenderHM('hm01', id)));
 
     /* SABER CORTAR E DA INSTANCIA, nao da especie: dois Scyther do mesmo treinador podem estar um
        com e outro sem. */
@@ -1073,7 +1073,14 @@ console.log('\n=== O HM01: A PRIMEIRA MAQUINA OCULTA (11/09/2026) ===');
        silencio e o HM01 fica sem nada pra ensinar. A trava LE O CODIGO do gerador, porque os casos
        acima leem a tabela ja gerada e passariam com o gerador quebrado. */
     const ger = require('fs').readFileSync(path.join(raiz, 'tools', 'gerar-tabelas-golpes.js'), 'utf8');
-    ok('o gerador emite o cut a mao', /const A_MAO = \{ cut: \{ tipo:'Normal', poder:50 \} \}/.test(ger));
+    /* ⚠️ SAO DOIS A MAO desde 15/09/2026 (o `surf` do HM03 entrou junto). A trava VARRE o HMS em
+       vez de nomear os dois: HM novo sem linha no A_MAO passa a ser barulhento sozinho -- e sem
+       ela o gerador APAGA o golpe do HM em silencio na proxima regeneracao. */
+    Object.keys(S.HMS).forEach(id => {
+      const g = S.HMS[id].golpe;
+      ok('  o gerador emite o ' + g + ' a mao', new RegExp('\\b' + g + ': \\{ tipo:').test(ger),
+         (ger.match(/const A_MAO = .*/) || [''])[0]);
+    });
     ok('e o nome PT dele esta no golpes-pt.json', require(path.join(raiz, 'tools', 'golpes-pt.json')).cut === 'Corte');
     ok('e o slash cedeu o nome', require(path.join(raiz, 'tools', 'golpes-pt.json')).slash === 'Talho');
   }
@@ -1143,6 +1150,200 @@ console.log('\n=== O HM01: A PRIMEIRA MAQUINA OCULTA (11/09/2026) ===');
     ok('mas trocar um golpe COMUM continua funcionando',
        p.ataques.indexOf('hyperbeam') >= 0 && p.ataques.indexOf('cut') >= 0, p.ataques.join(','));
   }
+}
+console.log('\n=== O HM03: O SURF, E O PRIMEIRO HM QUE NAO VEM DE BATALHA (15/09/2026) ===');
+{
+  /* Pedido assim: *"quando um usuario conseguir capturar TODOS os pokemons da rota da Zona Safari,
+     ele vai ganhar o HM03, o Surf. Mesmo coisa que o HM01, ele fica na conta, e nao no save, e ao
+     ensinar para algum pokemon, esse movimento nao pode mais ser retirado"*. */
+  const g = S.__getGame();
+
+  /* ===== O GOLPE ===== */
+  ok('o surf esta na tabela de golpes', !!S.GOLPES.surf, JSON.stringify(S.GOLPES.surf));
+  /* ⚠️ 95 E O PODER DA GEN 3, que e a geracao da base deste jogo -- o moderno e 90, e e o mod gen5
+     do Showdown que devolve o 95. Fixado aqui pelo mesmo motivo que o Tackle 35/95 e fixado no
+     test-golpes: se um dia alguem regerar a tabela com a cadeia de mods errada, isto grita. */
+  ok('e ele e Agua, poder 95 (Gen 3)', S.GOLPES.surf[0] === 'Water' && S.GOLPES.surf[1] === 95,
+     S.GOLPES.surf.join('/'));
+  ok('e ele tem nome em portugues', S.nomeDoAtaque('surf') === 'Surf', S.nomeDoAtaque('surf'));
+  /* ⚠️ O `surf` NAO PODE ENTRAR NO GOLPES_IDS: aquele array e INDEXADO pelo APRENDIZADO, entao um
+     id no meio dele deslocaria o moveset das 250 especies EM SILENCIO. E o mesmo motivo do `cut`. */
+  ok('e ele fica FORA do GOLPES_IDS (que e indexado pelo APRENDIZADO)',
+     (S.GOLPES_IDS || []).indexOf('surf') < 0);
+
+  /* ===== QUEM APRENDE ===== */
+  /* A lista saiu do learnsets.ts do Showdown pela tag de MAQUINA da Gen 3 (`3M`), o MESMO caminho
+     dos 72 cortadores -- e o metodo foi conferido reproduzindo os 72 sem uma divergencia. */
+  ok('sao 65 especies que aprendem o Surf', S.SURFISTAS.length === 65, String(S.SURFISTAS.length));
+  ok('todas existem no SPECIES', S.SURFISTAS.every(id => !!S.SPECIES[id]),
+     S.SURFISTAS.filter(id => !S.SPECIES[id]).join(','));
+  ok('nenhuma repetida', new Set(S.SURFISTAS).size === S.SURFISTAS.length);
+  /* ⚠️ A INTUICAO ERRA, e erra ao contrario do HM01: o Squirtle e justamente o inicial que NAO
+     corta, e e ele que surfa. O Totodile faz as duas. */
+  ok('a linha do Squirtle surfa (e ela e a que NAO corta)',
+     ['squirtle','wartortle','blastoise'].every(id => S.podeAprenderHM('hm03', id)) &&
+     !S.podeAprenderHM('hm01','squirtle'));
+  ok('o Totodile faz as duas',
+     S.podeAprenderHM('hm03','totodile') && S.podeAprenderHM('hm01','totodile'));
+  ok('e o Bulbasaur e o Charmander NAO surfam',
+     !S.podeAprenderHM('hm03','bulbasaur') && !S.podeAprenderHM('hm03','charmander'));
+  /* Surpreendem: nenhum dos tres e de Agua. */
+  ok('o Snorlax, o Tauros e o Lickitung surfam',
+     ['snorlax','tauros','lickitung'].every(id => S.podeAprenderHM('hm03', id)));
+  /* Os lendarios FICAM, porque e o que o dado diz -- a mesma decisao do Lugia no RECUPERACAO e no
+     REMOINHO, e dos quatro do CORTADORES. O Lugia e INTOCAVEL, entao a entrada dele nao roda hoje. */
+  ok('o Lugia e o Suicune ficam na lista (e o que o dado diz)',
+     S.podeAprenderHM('hm03','lugia') && S.podeAprenderHM('hm03','suicune'));
+
+  /* ⚠️ QUEM APRENDE SAI DO PROPRIO HM, e nao de um `if` com o id escrito a mao. As tres portas da
+     tela de ensinar chamavam o `podeAprenderCorte` direto -- ou seja, o HM03 teria oferecido o SURF
+     aos 72 cortadores. Sem esta trava o proximo HM nasce com o mesmo defeito. */
+  ok('a lista vive DENTRO do item', S.HMS.hm03.aprendem === S.SURFISTAS &&
+     S.HMS.hm01.aprendem === S.CORTADORES);
+  ok('e o podeAprenderHM le o item, nao uma lista fixa',
+     S.podeAprenderHM('hm03','squirtle') && !S.podeAprenderHM('hm01','squirtle') &&
+     S.podeAprenderHM('hm01','scyther') && !S.podeAprenderHM('hm03','scyther'));
+  ok('HM que nao existe nao ensina a ninguem', !S.podeAprenderHM('hm99','squirtle'));
+
+  /* ===== A CONDICAO: TODOS OS DA ZONA DE SAFARI ===== */
+  /* ⚠️ A CONDICAO USA AS FORMAS PROPRIAS DA ROTA, sem o evento de pre-evolucao de inicial -- e a
+     diferenca entre 17 e 24. As sete pre-evolucoes caem em QUALQUER rota do trecho 5 e o sorteio
+     nunca da a do PROPRIO inicial: exigi-las faria a condicao depender de ter jogado com outro
+     inicial, que ninguem adivinharia lendo "todos os pokemon da rota". */
+  const formas = S.formasDoHM03();
+  ok('a condicao sao 17 formas', formas.length === 17, formas.length + ': ' + formas.join(','));
+  const naTela = S.formasDaRota(S.HM03_ROTA, S.HM03_LEG).map(x => x.id);
+  ok('e a TELA continua mostrando as 24', naTela.length === 24, String(naTela.length));
+  {
+    const fora = naTela.filter(id => formas.indexOf(id) < 0);
+    ok('as 7 que a condicao dispensa sao as pre-evolucoes de inicial',
+       fora.length === 7 && fora.every(id => Object.values(S.STARTER_EVOLUTIONS).indexOf(id) >= 0),
+       fora.join(','));
+  }
+  ok('e toda forma da condicao esta na tela', formas.every(id => naTela.indexOf(id) >= 0));
+  /* ⚠️ A ROTA E O TRECHO TEM QUE EXISTIR: se qualquer um dos dois mudar de lugar, a condicao para
+     de fechar EM SILENCIO e o HM03 fica inalcancavel -- o mesmo par que o HM01 ja cobra. */
+  ok('a Zona de Safari existe no trecho declarado',
+     !!(S.ROUTE_MAP[S.HM03_LEG] || []).find(r => r.id === S.HM03_ROTA),
+     S.HM03_ROTA + ' no trecho ' + (S.HM03_LEG + 1));
+
+  /* ===== O HM E DA CONTA, NAO DO SAVE ===== */
+  {
+    g.hms = []; g.hmGanhoModal = null; g.authUser = null;
+    g.permanentPokedex = []; g.caughtSpecies = [];
+    ok('sem nenhum capturado, nao ganha', S.conquistouHM03() === false);
+    /* faltando UMA, nao ganha -- e a trava que separa "todos" de "quase todos" */
+    g.permanentPokedex = formas.slice(0, formas.length - 1);
+    ok('faltando uma, nao ganha', S.conquistouHM03() === false, 'falta ' + formas[formas.length-1]);
+    ok('e o conferir nao da o HM', S.conferirHM03() === false && !S.temHM('hm03'));
+    g.permanentPokedex = formas.slice();
+    ok('com as 17, ganha', S.conquistouHM03() === true);
+    ok('e o conferir da o HM UMA vez', S.conferirHM03() === true && S.temHM('hm03'));
+    ok('e nao da de novo', S.conferirHM03() === false);
+  }
+  /* ⚠️ ELA LE A POKEDEX DA CONTA, nao o save: da pra juntar as 17 em VARIAS jornadas, que e o que o
+     texto do `comoGanhar` promete. O `caughtSpecies` (o save aberto) tambem conta, porque ele e o
+     que ainda nao sincronizou. */
+  {
+    g.hms = []; g.hmGanhoModal = null;
+    g.permanentPokedex = formas.slice(0, 10);
+    g.caughtSpecies = formas.slice(10);
+    ok('dez da conta mais sete do save aberto fecham a conta', S.conquistouHM03() === true);
+    g.caughtSpecies = [];
+    ok('e so as dez da conta nao fecham', S.conquistouHM03() === false);
+  }
+
+  /* ===== O AVISO: UM HM QUE NAO VEM DE BATALHA PRECISA DE TELA PROPRIA ===== */
+  /* O do HM01 e o `ganhouHmAgora`, lido pela tela de VITORIA -- e ele funciona porque o HM01 sai de
+     uma vitoria. Este sai de uma CAPTURA (e ate do carregamento da conta), entao nao tem uma tela
+     pra pegar carona: o modal e anexado ao RENDER PRINCIPAL. */
+  {
+    g.hms = []; g.hmGanhoModal = null;
+    g.permanentPokedex = formas.slice(); g.caughtSpecies = [];
+    S.conferirHM03();
+    ok('ganhar abre o modal', g.hmGanhoModal === 'hm03', String(g.hmGanhoModal));
+    const m = S.renderHmGanhoModal();
+    ok('e ele NOMEIA o HM', /HM03/.test(m) && /Surf/.test(m), m.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80));
+    ok('e diz onde ele foi parar', /TMs\/HMs/.test(m) && /[Mm]ochila/.test(m));
+    S.fecharHmGanho();
+    ok('fechar tira o modal', !g.hmGanhoModal);
+    ok('e o HM continua na conta', S.temHM('hm03') === true);
+    ok('modal sem HM nao desenha nada', S.renderHmGanhoModal() === '');
+  }
+  /* ⚠️ O MODAL E ANEXADO AO RENDER PRINCIPAL, e nao a uma tela: o teste LE O CODIGO porque os casos
+     acima chamam a funcao na mao e passariam com a chamada orfa. E ele vem ANTES do convite online,
+     que tem 15 segundos de prazo e precisa ficar por cima. */
+  {
+    const txt = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
+    const i = txt.indexOf('renderHmGanhoModal();');
+    const j = txt.indexOf('renderConviteModal();');
+    ok('o render principal anexa o modal', i > 0 && /if\(game\.hmGanhoModal\)/.test(txt.slice(i - 60, i)));
+    ok('e o convite online fica POR CIMA dele', i > 0 && j > i);
+    /* ⚠️ E ELE PRECISA SOBREVIVER AO resetGame: o HM03 pode ser dado no CARREGAMENTO DA CONTA, com o
+       jogador na home -- sem o campo no CAMPOS_DA_CONTA, abrir um save apagaria a marca e o aviso
+       nao voltaria NUNCA, porque o conferirHM03 ve o temHM e vai embora. */
+    const campos = (txt.match(/const CAMPOS_DA_CONTA = \[[\s\S]*?\];/) || [''])[0];
+    ok('hmGanhoModal esta no CAMPOS_DA_CONTA', /'hmGanhoModal'/.test(campos));
+    /* mas ele NAO vai pro banco: o serializeGame e uma lista de permissao */
+    const ser = (txt.match(/function serializeGame\(\)[\s\S]*?\n\}/) || [''])[0];
+    ok('e NAO entra no serializeGame (e estado de tela)', !/hmGanhoModal/.test(ser), ser.length + ' chars');
+  }
+  /* ⚠️ OS DOIS PONTOS DE CONFERENCIA, e os dois sao necessarios: depois de uma CAPTURA (que e quando
+     a condicao pode virar verdadeira) e no CARREGAMENTO da conta (pra quem ja tinha as 17 antes
+     desta feature). O teste le o codigo -- os casos chamam a funcao direto. */
+  {
+    const txt = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
+    const cw = (txt.match(/function confirmWild\(\)[\s\S]*?\n\}/) || [''])[0];
+    ok('a captura confere o HM03', /conferirHM03\(\)/.test(cw), cw.length + ' chars');
+    /* ⚠️ E DEPOIS DO LACO, nao dentro: quem fecha a Zona de Safari pode fechar com os DOIS pokemon
+       da mesma oferta, e conferir por captura anunciaria no meio da leva. */
+    ok('e DEPOIS do laco de capturas', cw.indexOf('conferirHM03()') > cw.indexOf('markCaught('));
+    const lp = (txt.match(/async function loadPermanentUserData\([\s\S]*?\n\}/) || [''])[0];
+    ok('o carregamento da conta tambem confere', /conferirHM03\(\)/.test(lp), lp.length + ' chars');
+    /* ⚠️ E DEPOIS de a Pokedex e os HMs serem escritos, senao ele leria uma Pokedex vazia e o temHM
+       nao saberia que o HM ja foi dado. */
+    ok('e DEPOIS de a Pokedex e os HMs entrarem',
+       lp.indexOf('conferirHM03()') > lp.indexOf('permanentPokedex') &&
+       lp.indexOf('conferirHM03()') > lp.indexOf('game.hms'));
+  }
+
+  /* ===== ENSINAR, E NAO PODER TIRAR ===== */
+  {
+    g.hms = ['hm03']; g.currentSaveSlot = 0;
+    g.saveSlots = new Array(S.MAX_SAVE_SLOTS).fill(null);
+    /* um que surfa e um que nao: a lista da tela tem que separar os dois */
+    g.team = [S.createInstance('blastoise', 60), S.createInstance('venusaur', 60)];
+    g.team.forEach(p => { p.ataques = ['tackle','watergun','bite'].slice(0, S.MAX_GOLPES); });
+    g.saveSlots[0] = { team: g.team, badgeCount: 8, name: 'Kanto' };
+    S.abrirEnsinarHm('hm03');
+    const cands = S.candidatosDaMaquina('hm03');
+    ok('a Maquina oferece so quem surfa', cands.length === 1 && cands[0].nome === 'Blastoise',
+       cands.map(c => c.nome).join(','));
+    S.escolherAlvoDaMaquina(0, 0);
+    /* com os tres slots cheios ele cai na tela de TROCA -- e a troca precisa dizer quem sai */
+    S.ensinarOGolpeDaMaquina('tackle');
+    ok('o Blastoise aprendeu o Surf', g.team[0].ataques.indexOf('surf') >= 0, g.team[0].ataques.join(','));
+    /* A MAQUINA NAO SE GASTA: ela e da conta e ensina quantas vezes quiser, como no original. */
+    ok('e a Maquina continua na conta', S.temHM('hm03') === true);
+    /* ⚠️ E O SURF NAO SE DESAPRENDE, pela MESMA regra do Corte -- e ela varre os HMs em vez de
+       nomear o `cut`, entao o HM novo nasceu protegido sozinho. */
+    ok('o Surf e golpe de Maquina', S.ehGolpeDeMaquina('surf') === true);
+    g.aprenderAtaque = { id: g.team[0].id, golpe: 'hyperbeam' };
+    const tela = S.renderAprenderAtaque();
+    const ofertas = (tela.match(/responderAprendizado\('([a-z]+)'\)/g) || []).map(x => x.match(/'([a-z]+)'/)[1]);
+    ok('a tela de troca por nivel NAO oferece o Surf', ofertas.indexOf('surf') < 0, ofertas.join(','));
+    /* quem VALIDA e a ACAO: um clique forjado nao pode tirar o HM */
+    S.responderAprendizado('surf');
+    ok('forcar a acao com o Surf nao faz nada', g.team[0].ataques.indexOf('surf') >= 0,
+       g.team[0].ataques.join(','));
+    /* ⚠️ E O NPC NUNCA GANHA GOLPE DE HM: o equiparNpc da o moveset por NIVEL, e HM ninguem aprende
+       por nivel. Um Blastoise de lider batendo de Surf seria golpe que ele nao tem. */
+    const npc = [S.createInstance('blastoise', 60)];
+    S.equiparNpc(npc);
+    ok('o NPC nunca tem o Surf', (npc[0].ataques || []).indexOf('surf') < 0, (npc[0].ataques||[]).join(','));
+    g.aprenderAtaque = null; S.sairDoEnsinarHm();
+  }
+  g.hms = []; g.hmGanhoModal = null; g.permanentPokedex = []; g.caughtSpecies = [];
 }
 console.log('\n=== O ! DO BOTAO DAS LIGAS ===');
 {

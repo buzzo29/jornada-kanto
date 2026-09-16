@@ -1447,5 +1447,369 @@ console.log('\nNENHUM CONTEXTO CAI NO BANNER INVISIVEL (14/09/2026)');
      /hideout1:'rocket'/.test(cli) && /hideout2:'rocket'/.test(cli));
 }
 
+
+console.log('\n=== "POKEMONS DESTA ROTA" (15/09/2026) ===');
+{
+  /* Pedido com print: *"crie um botao com o texto 'Pokemons desta rota' e quando clicado, abre um
+     modal exibindo todos os pokemons disponiveis de capturar nessa rota. E para os pokemons que o
+     treinador ja capturou, coloque aquele simbolo de pokedex que ja existe hoje"*. */
+  const g = S.__getGame();
+  const semTagR = h => String(h||'').replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim();
+  const rotas = [];
+  [S.ROUTE_MAP, S.JOHTO_ROUTE_MAP].forEach(m => m.forEach((par, leg) => par.forEach(r => rotas.push({ r, leg }))));
+
+  /* 1) ⚠️ A LISTA TEM QUE BATER COM O QUE O ENCONTRO ENTREGA, e e a trava que importa: a faixa de
+     nivel sai do `faixaDeNivelSelvagem`, a MESMA que o sorteio usa, mas a conversao pra FORMA e
+     refeita aqui -- se as duas divergirem, a tela promete um pokemon que a rota nao da.
+     A varredura roda 250 ofertas de VERDADE em cada rota e cobra que nada saia fora da lista. */
+  let fora = [], listadoTot = 0, rotasOk = 0;
+  const antes = { gymIndex: g.gymIndex, currentRoute: g.currentRoute, starterId: g.starterId,
+                  team: g.team, wildOffer: g.wildOffer, wildSelected: g.wildSelected,
+                  permanentPokedex: g.permanentPokedex, caughtSpecies: g.caughtSpecies };
+  rotas.forEach(({ r, leg }) => {
+    g.gymIndex = leg; g.currentRoute = r.id; g.starterId = 'bulbasaur';
+    g.team = []; g.wildSelected = []; g.shinyBonusExpiresAt = 0;
+    const listado = new Set(S.formasDaRota().map(x => x.id));
+    listadoTot += listado.size;
+    let ok = true;
+    for(let i = 0; i < 250; i++){
+      g.wildOffer = []; g.wildSelected = [];
+      S.montaOfertaSelvagem();
+      (g.wildOffer || []).forEach(o => {
+        /* ⚠️ O DISFARCADO NAO CONTA: o Ditto fingindo de "Mew" e pegadinha, e listá-lo seria a
+           unica tela do jogo que a dedura -- ver o comentario do formasDaRota. */
+        if(o.disguise) return;
+        if(!listado.has(o.speciesId)){ ok = false; if(fora.length < 6) fora.push(r.name + ': ' + o.speciesId); }
+      });
+    }
+    if(ok) rotasOk++;
+  });
+  ok('as 32 rotas listam alguma coisa', rotas.length === 32 && listadoTot > 300,
+     rotas.length + ' rotas, ' + listadoTot + ' formas (media ' + (listadoTot/rotas.length).toFixed(1) + ')');
+  ok('e NADA que o encontro entrega fica fora da lista', rotasOk === rotas.length,
+     rotasOk + ' de ' + rotas.length + (fora.length ? '  |  ' + fora.join(', ') : ''));
+
+  /* 2) ⚠️ A LISTA E DE FORMAS, NAO DO POOL. O Covil do Dragao e o caso do CLAUDE.md: 13 entradas +
+     2 raros que entregam 10 formas (dratini e dragonair viram os dois Dragonair, magikarp e
+     gyarados viram os dois Gyarados, horsea e seadra viram os dois Kingdra). */
+  {
+    const covil = rotas.find(x => /Covil/i.test(x.r.name));
+    g.gymIndex = covil.leg; g.currentRoute = covil.r.id; g.team = []; g.starterId = 'bulbasaur';
+    const formas = S.formasDaRota();
+    const entradas = covil.r.pool.length + (covil.r.rare || []).length;
+    ok('o Covil do Dragao entrega menos FORMAS que entradas do pool', formas.length < entradas,
+       entradas + ' entradas -> ' + formas.length + ' formas');
+    ok('e nenhuma forma se repete', new Set(formas.map(x=>x.id)).size === formas.length);
+    ok('os raros da rota saem marcados', formas.filter(x=>x.raro).length >= 2,
+       formas.filter(x=>x.raro).map(x=>S.SPECIES[x.id].name).join(', '));
+  }
+
+  /* 3) ⚠️ A PRE-EVOLUCAO DE OUTRO INICIAL (15% no trecho 5) NAO esta em pool nenhum -- foi ela que
+     a varredura pegou faltando. E ela RESPEITA o inicial do jogador. */
+  {
+    const t5 = rotas.find(x => x.leg === 4);
+    g.gymIndex = 4; g.currentRoute = t5.r.id; g.team = [];
+    g.starterId = 'charmander';
+    const comCharm = S.formasDaRota().map(x => x.id);
+    g.starterId = 'bulbasaur';
+    const comBulba = S.formasDaRota().map(x => x.id);
+    ok('o trecho 5 lista a pre-evolucao dos OUTROS iniciais',
+       comBulba.includes('charmeleon') && comCharm.includes('ivysaur'),
+       'bulba ve charmeleon? ' + comBulba.includes('charmeleon') + ' | charm ve ivysaur? ' + comCharm.includes('ivysaur'));
+    ok('e NUNCA a do proprio', !comCharm.includes('charmeleon') && !comBulba.includes('ivysaur'),
+       'charm ve charmeleon? ' + comCharm.includes('charmeleon') + ' | bulba ve ivysaur? ' + comBulba.includes('ivysaur'));
+    /* e fora do trecho 5 ela nao entra */
+    const t1 = rotas.find(x => x.leg === 0);
+    g.gymIndex = 0; g.currentRoute = t1.r.id;
+    const noT1 = S.formasDaRota().map(x => x.id);
+    ok('e fora do trecho 5 ela nao aparece', !noT1.includes('charmeleon') && !noT1.includes('quilava'));
+  }
+
+  /* 4) OS INTOCAVEIS ficam de fora -- a tela nao pode prometer uma captura que a rede de seguranca
+     do encontro troca. */
+  {
+    let vazou = [];
+    rotas.forEach(({ r, leg }) => {
+      g.gymIndex = leg; g.currentRoute = r.id; g.team = []; g.starterId = 'bulbasaur';
+      S.formasDaRota().forEach(x => { if(S.SEM_CAPTURA_SELVAGEM.includes(x.id)) vazou.push(r.name + ':' + x.id); });
+    });
+    ok('nenhum intocavel entra na lista', vazou.length === 0, vazou.join(', ') || 'nenhum');
+  }
+
+  /* 5) O SELO DE POKEDEX -- a outra metade do pedido. */
+  {
+    const r0 = rotas.find(x => /Covil/i.test(x.r.name));
+    g.gymIndex = r0.leg; g.currentRoute = r0.r.id; g.team = []; g.starterId = 'bulbasaur';
+    const formas = S.formasDaRota();
+    g.permanentPokedex = formas.slice(0, 3).map(x => x.id);
+    g.caughtSpecies = [];
+    g.rotaModal = true;
+    const h = S.renderPokemonsDaRotaModal();
+    g.rotaModal = false;
+    /* conta o marcador que TODA linha tem -- a classe do card varia com o 'tem' */
+    const linhas = (h.match(/rota-mon-nome/g) || []).length;
+    ok('o modal desenha uma linha por forma', linhas === formas.length, linhas + ' de ' + formas.length);
+    ok('e SO os capturados levam o selo da Pokedex',
+       (h.match(/pokedex-owned-badge/g) || []).length === 3, (h.match(/pokedex-owned-badge/g) || []).length + ' selos pra 3 capturados');
+    ok('o selo e o MESMO icone que o resto do jogo usa', h.indexOf(S.pokedexIcon()) >= 0);
+    /* ⚠️ AS DUAS LINHAS AZUIS SAIRAM em 16/09/2026, a pedido: o nome da rota (que e a informacao
+       mais redundante possivel aqui -- o modal so abre de dentro da tela daquela rota) e o CONTADOR
+       de quantos faltam. O contador era, por escrito, "a razao de esta tela existir"; quem responde
+       isso agora e a propria lista, pelo selo da Pokedex em cada linha.
+       Estas travas existem pra a volta deles ser DECISAO e nao descuido. */
+    const txt = semTagR(h);
+    ok('nao ha mais o contador de quantos faltam', !/aparecem aqui/.test(txt),
+       (txt.match(/aparecem aqui[^.]*/) || [''])[0]);
+    ok('nem o nome da rota', txt.indexOf(r0.r.name) < 0, r0.r.name);
+    /* ⚠️ E O NIVEL SAIU DOS CARDS, tambem a pedido: dentro de uma rota quase toda forma cai na MESMA
+       faixa, entao eram doze linhas escrevendo "Lv.3-6". Ele era o que obrigava o nome a dividir a
+       linha de cima com ele. */
+    ok('e nenhum card mostra o nivel', !/Lv\./.test(txt), (txt.match(/Lv\.[^ ]*/) || [''])[0]);
+  }
+
+  /* 5b) ⚠️ AS DUAS COISAS QUE SO O CSS DIZ, e que passaram por uma medicao de HTML sem acusar nada.
+     A marcacao estava CERTA nas duas vezes -- o que estava errado era a folha de estilo. */
+  {
+    const cli = require('fs').readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+    /* ⚠️ 1) O SELETOR DO SPRITE PRECISA DE TRES CLASSES. `.rota-mon .sprite-img` tem a MESMA
+       especificidade que o `.sprite-sm .sprite-img` da casa, e aquele e declarado DEPOIS -- entao
+       ele ganhava o empate e o sprite continuava 48px. O card nao encolhia, e nenhuma assertiva de
+       HTML tinha como perceber. */
+    ok('o sprite da lista vence o .sprite-sm por especificidade',
+       /\.rota-mon \.sprite-sm \.sprite-img\{[^}]*34px/.test(cli),
+       (cli.match(/\.rota-mon \.sprite-sm \.sprite-img\{[^}]*\}/) || ['(nao achou a regra)'])[0]);
+    /* ⚠️ 2) O NOME NAO PODE TER BASE 0 NUMA COLUNA. O `flex:1 1 0` e do EIXO do container: com o
+       `.rota-mon-info` em coluna, base 0 zera a ALTURA do nome e ele SOME da tela (os selos de tipo
+       continuam aparecendo, entao a lista parece certa de relance).
+       E isto escapou de uma medicao real: eu media `scrollWidth > clientWidth` pra achar nome
+       truncado, e a LARGURA estava certa -- 130px. O que estava zerado era a altura. */
+    const regra = (cli.match(/\.rota-mon-nome\{[^}]*\}/) || [''])[0];
+    ok('e o nome do card nao tem flex-basis 0 (ele sumiria numa coluna)',
+       /flex:0 0 auto/.test(regra) && !/flex:1 1 0/.test(regra), regra);
+    ok('mas mantem o min-width:0, que e quem faz o ellipsis funcionar', /min-width:0/.test(regra));
+  }
+
+  /* 6) O BOTAO fica DENTRO da caixa dos cards, antes do primeiro -- e onde o print pediu. E o modal
+     e anexado DEPOIS do resto da tela, senao abriria ATRAS dos cards. */
+  {
+    const cli = require('fs').readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+    ok('o botao existe com o texto pedido', /Pokémons desta rota<\/button>/.test(cli));
+    /* ⚠️ PROCURA O onclick, nao a CLASSE: a classe aparece antes no CSS e a trava passava
+       medindo a folha de estilo em vez do render. */
+    const iBtn = cli.indexOf('onclick="abrirPokemonsDaRota()"'), iCards = cli.indexOf('game.wildOffer.map(entry=>{');
+    ok('e ele vem ANTES dos cards da oferta, dentro da mesma caixa',
+       iBtn > 0 && iBtn < iCards && (iCards - iBtn) < 700,
+       'botao em ' + iBtn + ', cards ' + (iCards - iBtn) + ' caracteres depois');
+    const iAviso = cli.indexOf('${renderAvisoMinimoModal()}'), iModal = cli.indexOf('${renderPokemonsDaRotaModal()}');
+    ok('o modal e anexado no fim da tela (senao abre ATRAS dos cards)', iModal > iAviso, 'modal em ' + iModal);
+    /* estado de TELA: nao pode ir pro save */
+    ok('o rotaModal NAO entra no save', !/rotaModal/.test(cli.slice(cli.indexOf('function serializeGame()'), cli.indexOf('function serializeGame()') + 3000)));
+    ok('e ele nasce fechado a cada encontro', (cli.match(/game\.rotaModal = false;/g) || []).length >= 3,
+       (cli.match(/game\.rotaModal = false;/g) || []).length + ' pontos');
+  }
+
+  /* 7) ⚠️ A FAIXA DE NIVEL MORA NUM LUGAR SO -- quem sorteia e quem lista tem que concordar. */
+  {
+    const cli = require('fs').readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+    ok('o rollWildLevel usa a faixaDeNivelSelvagem', /function rollWildLevel[\s\S]{0,260}faixaDeNivelSelvagem/.test(cli));
+    ok('e o nivelSelvagem tambem', /function nivelSelvagem[\s\S]{0,260}faixaDeNivelSelvagem/.test(cli));
+    /* e ela respeita os tres degraus */
+    const leg = { minLevel: 3, maxLevel: 9 };
+    ok('  a faixa PROPRIA da rota ganha de tudo',
+       JSON.stringify(S.faixaDeNivelSelvagem('eevee', { niveis: { eevee: [30, 35] } }, leg)) === '[30,35]');
+    ok('  o PISO da evolucao empurra a faixa pra cima',
+       S.faixaDeNivelSelvagem('metapod', null, leg)[0] === S.EVOLVED_MIN_LEVEL['metapod'],
+       JSON.stringify(S.faixaDeNivelSelvagem('metapod', null, leg)));
+    ok('  e ele tem TETO: o Metapod nao sai no nivel em que ja seria Butterfree',
+       S.faixaDeNivelSelvagem('metapod', null, leg)[1] < S.EVOLUTIONS['metapod'].level,
+       JSON.stringify(S.faixaDeNivelSelvagem('metapod', null, leg)) + ' (evolui no ' + S.EVOLUTIONS['metapod'].level + ')');
+    ok('  e o SEM_PISO_DE_NIVEL pula o piso (o Pikachu numa rota de 3 a 6)',
+       JSON.stringify(S.faixaDeNivelSelvagem('pikachu', null, leg)) === '[3,9]');
+  }
+
+  Object.assign(g, antes);
+}
+
+console.log('\n=== AS 28 FORMAS DO UNOWN (16/09/2026) ===');
+{
+  /* Pedido assim: *"implemente as sprites de todas as letras do alfabeto do unown"*. Ele e a unica
+     especie do jogo com mais de um sprite, e ate aqui todos apareciam com o desenho da letra A. */
+  const g = S.__getGame();
+  const antes = JSON.parse(JSON.stringify({ team: g.team || [], gymIndex: g.gymIndex,
+    currentSaveSlot: g.currentSaveSlot, currentRoute: g.currentRoute, wildOffer: g.wildOffer || [],
+    wildSelected: g.wildSelected || [], wildEncounterSeq: g.wildEncounterSeq || 0, starterId: g.starterId }));
+  const url = h => (h.match(/src="([^"]*)"/) || [])[1];
+  const fb  = h => (h.match(/data-fallback-src="([^"]*)"/) || [])[1];
+
+  /* ===== A TABELA ===== */
+  ok('sao 28 formas', S.FORMAS_DO_UNOWN.length === 28, String(S.FORMAS_DO_UNOWN.length));
+  ok('as 26 letras mais ? e !',
+     S.FORMAS_DO_UNOWN.join('') === 'ABCDEFGHIJKLMNOPQRSTUVWXYZ?!', S.FORMAS_DO_UNOWN.join(''));
+  ok('nenhuma repetida', new Set(S.FORMAS_DO_UNOWN).size === 28);
+
+  /* ===== O SUFIXO DO ARQUIVO =====
+     ⚠️ A LETRA A NAO TEM ARQUIVO PROPRIO: ela e a forma PADRAO da especie, ou seja o `201.png` de
+     sempre -- o `201-a.png` responde 404 no CDN (conferido). Esta trava e a que impede alguem de
+     "arrumar" o sufixo dela por simetria e quebrar a forma mais comum do jogo. */
+  ok('a letra A e o 201.png de sempre (sufixo vazio)', S.sufixoDoUnown('A') === '', JSON.stringify(S.sufixoDoUnown('A')));
+  ok('e SEM letra tambem (save antigo, codigo de time, NPC)', S.sufixoDoUnown(undefined) === '');
+  ok('B a Z viram -b .. -z', S.sufixoDoUnown('B') === '-b' && S.sufixoDoUnown('H') === '-h' && S.sufixoDoUnown('Z') === '-z');
+  ok('o ? e o ! tem nome por extenso',
+     S.sufixoDoUnown('?') === '-question' && S.sufixoDoUnown('!') === '-exclamation');
+  ok('minuscula tambem vale', S.sufixoDoUnown('h') === '-h');
+  ok('lixo cai na forma padrao', S.sufixoDoUnown('QQ') === '' && S.sufixoDoUnown('1') === '');
+
+  /* ===== A URL, QUE E O QUE O NAVEGADOR PEDE =====
+     ⚠️ ELA SAI DO MESMO CDN E TEM O MESMO DOMINIO DE FALLBACK das 250 especies -- e isso e a decisao
+     desta feature, nao um detalhe: as formas herdam de graca a repeticao do handleSpriteLoadError, a
+     troca de dominio e o emoji de ultimo caso. Um host novo teria que ganhar tudo isso de novo. */
+  {
+    const h = S.spriteHtml({ speciesId:'unown', unown:'H' }, 'sprite-sm');
+    ok('a letra entra no NOME DO ARQUIVO', /\/201-h\.png$/.test(url(h)), url(h));
+    ok('e no mesmo CDN de todo mundo', url(h).indexOf('cdn.jsdelivr.net/gh/PokeAPI/sprites') > 0);
+    ok('com o mesmo dominio de fallback', /raw\.githubusercontent\.com.*201-h\.png$/.test(fb(h)), fb(h));
+    const s = S.spriteHtml({ speciesId:'unown', unown:'H', shiny:true }, 'sprite-sm');
+    ok('e o shiny entra na pasta certa, com a letra junto', /\/shiny\/201-h\.png$/.test(url(s)), url(s));
+    ok('o ! vira 201-exclamation.png',
+       /\/201-exclamation\.png$/.test(url(S.spriteHtml({ speciesId:'unown', unown:'!' }, 'sprite-sm'))));
+  }
+  /* ⚠️ SEM LETRA, A URL TEM QUE SER BYTE A BYTE A DE ANTES desta feature -- e isso nao e detalhe de
+     compatibilidade: e o que faz save antigo, codigo de time (que nao carrega letra por construcao)
+     e NPC continuarem mostrando EXATAMENTE o que mostram hoje. */
+  ok('sem letra, a URL e a de sempre',
+     url(S.spriteHtml('unown', 'sprite-sm')).endsWith('/pokemon/201.png'), url(S.spriteHtml('unown','sprite-sm')));
+  ok('e passar a instancia SEM letra da o mesmo que passar o id',
+     S.spriteHtml({ speciesId:'unown' }, 'sprite-sm') === S.spriteHtml('unown', 'sprite-sm'));
+  /* ⚠️ A LETRA SO VALE NO DEX 201. Um campo `unown` sobrando em outra especie (save estranho, clone
+     mal feito) nao pode trocar o sprite dela. */
+  ok('a letra nao vaza pra outra especie',
+     url(S.spriteHtml({ speciesId:'pikachu', unown:'H' }, 'sprite-sm')).endsWith('/25.png'));
+
+  /* ===== O spriteHtml ACEITANDO A INSTANCIA =====
+     Ele tem 72 chamadores; em 45 os dois primeiros argumentos ja saiam do MESMO objeto. Passar o
+     objeto nao acrescentou parametro nenhum -- e era isso ou um QUINTO posicional em 45 lugares. */
+  {
+    const mon = { speciesId:'pikachu', shiny:true };
+    ok('a instancia traz o shiny junto', /\/shiny\/25\.png$/.test(url(S.spriteHtml(mon, 'sprite-sm'))));
+    /* ⚠️ O SHINY EXPLICITO GANHA DO DA INSTANCIA, e isso e obrigatorio: a previa da evolucao desenha
+       de proposito uma especie DIFERENTE com o brilho deste pokemon, e o disfarce desenha o Mew. */
+    ok('mas o explicito ganha (a previa da evolucao)',
+       /\/25\.png$/.test(url(S.spriteHtml(mon, 'sprite-sm', false))));
+    ok('e o id solto continua funcionando igual',
+       /\/shiny\/25\.png$/.test(url(S.spriteHtml('pikachu', 'sprite-sm', true))));
+  }
+  /* ⚠️ E NENHUM CHAMADOR PODE VOLTAR A PASSAR `X.speciesId` COM `X.shiny`: ali a letra se perde em
+     silencio -- o sprite sai certo pras 249 outras especies e errado so pro Unown, que e o tipo de
+     defeito que fica meses sem ninguem ver. O teste LE O CODIGO porque os casos acima chamam a
+     funcao na mao e passariam com qualquer chamador. */
+  {
+    const txt = require('fs').readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+    const ruins = [...txt.matchAll(/spriteHtml\(\s*([A-Za-z_$][A-Za-z0-9_.$]*)\.speciesId\s*,[^)]*?([A-Za-z_$][A-Za-z0-9_.$]*)\.shiny[^)]*\)/g)]
+      .filter(m => m[1] === m[2]).map(m => m[0]);
+    ok('nenhum chamador passa <P>.speciesId junto com <P>.shiny', ruins.length === 0, ruins.slice(0,3).join(' | '));
+  }
+
+  /* ===== O SORTEIO E SEMEADO ===== */
+  /* ⚠️ ELE RECEBE O RNG, nunca chama Math.random por dentro: e o que permite semear a letra junto
+     com o resto da oferta selvagem. Sem isso, sair do save e voltar re-sortearia a letra ate vir a
+     que o jogador quer -- exatamente a artimanha que a semente do encontro existe pra fechar. */
+  {
+    const r1 = S.makeSeededRng('unown-teste'), r2 = S.makeSeededRng('unown-teste');
+    const a = [], b = [];
+    for(let i = 0; i < 40; i++){ a.push(S.sorteiaFormaDoUnown(r1)); b.push(S.sorteiaFormaDoUnown(r2)); }
+    ok('a mesma semente da a mesma letra', a.join('') === b.join(''), a.slice(0,8).join(''));
+    ok('e ele so devolve forma que existe na tabela', a.every(L => S.FORMAS_DO_UNOWN.indexOf(L) >= 0));
+  }
+
+  /* ===== A OFERTA SELVAGEM ===== */
+  {
+    g.currentSaveSlot = 3; g.saveGen = 0; g.gymIndex = 5; g.team = [];
+    g.wildRerolls = 0; g.currentRoute = 'silph_co'; g.starterId = 'bulbasaur'; g.screen = 'wild';
+    const acha = () => { for(let k = 0; k < 400; k++){ g.wildEncounterSeq = k;
+      S.goToWildEncounter(); const u = (g.wildOffer||[]).find(o => o.speciesId === 'unown'); if(u) return k; } return -1; };
+    const k = acha();
+    ok('o Unown aparece na oferta da Silph Co.', k >= 0, 'semente ' + k);
+    const letra = g.wildOffer.find(o => o.speciesId === 'unown').unown;
+    ok('e a oferta ja traz a letra', !!letra && S.FORMAS_DO_UNOWN.indexOf(letra) >= 0, String(letra));
+    /* ⚠️ A TRAVA ANTI SAVE-SCUMMING: remontar a MESMA semente devolve a MESMA letra. */
+    const vistas = new Set();
+    for(let i = 0; i < 6; i++){ g.wildEncounterSeq = k; S.goToWildEncounter();
+      vistas.add(g.wildOffer.find(o => o.speciesId === 'unown').unown); }
+    ok('sair do save e voltar NAO re-sorteia a letra', vistas.size === 1 && vistas.has(letra),
+       [...vistas].join(','));
+    /* e sementes diferentes cobrem a tabela inteira -- se ela travasse numa letra so, ninguem veria */
+    const todas = new Set();
+    for(let s2 = 0; s2 < 400; s2++){ g.wildEncounterSeq = s2; S.goToWildEncounter();
+      const u = g.wildOffer.find(o => o.speciesId === 'unown'); if(u) todas.add(u.unown); }
+    ok('e 400 sementes cobrem as 28 formas', todas.size === 28, todas.size + ' de 28');
+    /* ⚠️ SO O UNOWN GANHA O CAMPO: um `unown` em toda entrada seria lixo em 249 especies. */
+    g.wildEncounterSeq = k; S.goToWildEncounter();
+    ok('e nenhuma outra especie da oferta ganha o campo',
+       g.wildOffer.filter(o => o.speciesId !== 'unown').every(o => o.unown === undefined));
+
+    /* ===== A CAPTURA E O SAVE ===== */
+    const naOferta = g.wildOffer.find(o => o.speciesId === 'unown').unown;
+    g.wildSelected = ['unown']; g.wildDisguiseAcknowledged = true;
+    S.confirmWild();
+    const mon = (g.team || []).find(p => p.speciesId === 'unown');
+    ok('a captura leva a letra da oferta pro time', mon && mon.unown === naOferta,
+       mon ? String(mon.unown) + ' vs ' + naOferta : '(nao capturou)');
+    /* ⚠️ E ELA SOBREVIVE AO SAVE. O `team` e serializado inteiro, entao o campo vai junto sozinho --
+       esta trava existe pra o dia em que o serializeGame passar a filtrar campo de instancia. */
+    const doc = JSON.parse(JSON.stringify(S.serializeGame()));
+    const salvo = doc.team.find(p => p.speciesId === 'unown');
+    ok('e sobrevive ao save', salvo && salvo.unown === naOferta, salvo ? String(salvo.unown) : '(sumiu)');
+    S.hydrateTeamMember(salvo);
+    ok('e a reidratacao nao a apaga', salvo.unown === naOferta, String(salvo.unown));
+    ok('e o sprite do time sai com a letra',
+       url(S.spriteHtml(mon, 'sprite-sm')).endsWith('/201-' + naOferta.toLowerCase() + '.png') ||
+       (naOferta === 'A' && url(S.spriteHtml(mon, 'sprite-sm')).endsWith('/201.png')),
+       url(S.spriteHtml(mon, 'sprite-sm')));
+  }
+
+  /* ===== A VIGILIA ===== */
+  /* ⚠️ ELA SORTEIA COM O RNG DELA, e nao com Math.random: a vigilia e GRAVADA no save (a clareira e
+     a tela do premio sao pontos de gravacao), e o premio pode virar pokemon do jogador -- com
+     Math.random a letra mudaria entre montar a clareira e escolher o premio. */
+  {
+    g.currentSaveSlot = 3; g.saveGen = 0; g.gymIndex = 5;
+    g.team = [S.createInstance('pidgeot', 40)];
+    const a = S.montarAVigilia(), b = S.montarAVigilia();
+    const ua = a.filter(m => m.speciesId === 'unown'), ub = b.filter(m => m.speciesId === 'unown');
+    ok('duas montagens da mesma vigilia dao a mesma letra',
+       ua.map(m => m.unown).join(',') === ub.map(m => m.unown).join(','), ua.map(m => m.unown).join(','));
+    ok('e so o Unown ganha o campo', a.every(m => m.speciesId === 'unown' || m.unown === undefined));
+    /* E O PREMIO LEVA A LETRA JUNTO: o jogador escolheu OLHANDO o sprite dele -- entregar outra
+       letra seria entregar outro bicho.
+       ⚠️ O UNOWN E FORCADO NA CLAREIRA em vez de esperar o sorteio dar um: ele e 1 em ~140 especies,
+       entao depender da sorte da semente e nao cobrir o caminho. */
+    {
+      g.vigiliaPremio = [{ speciesId: 'unown', level: 30, shiny: false, unown: 'Q' }];
+      g.team = []; g.vigilia = null;
+      S.escolherOPremioDaVigilia(0);
+      const p2 = (g.team || []).find(x => x.speciesId === 'unown');
+      ok('e o premio entra no time com a MESMA letra', p2 && p2.unown === 'Q',
+         p2 ? String(p2.unown) : '(nao entrou)');
+      ok('  e o sprite dele sai com ela',
+         url(S.spriteHtml(p2, 'sprite-sm')).endsWith('/201-q.png'), url(S.spriteHtml(p2, 'sprite-sm')));
+    }
+  }
+
+  /* ===== OS CLONES =====
+     ⚠️ O `createInstance` NAO COPIA CAMPO NENHUM -- armadilha que o shiny ja custou tres vezes neste
+     projeto, nos MESMOS tres lugares. Todo lugar que recola o shiny tem que recolar a letra. */
+  {
+    const txt = require('fs').readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+    const blocos = [...txt.matchAll(/const inst = createInstance\([^)]*\);[\s\S]{0,420}?return inst;/g)].map(m => m[0]);
+    const comShiny = blocos.filter(b => /\.shiny/.test(b));
+    const semLetra = comShiny.filter(b => !/\.unown/.test(b) && !/bits\[2\]/.test(b) && !/shinyIdx/.test(b));
+    ok('todo clone que recola o shiny recola a letra', semLetra.length === 0,
+       semLetra.length + ' sem: ' + semLetra.map(b => b.slice(0, 60)).join(' /// '));
+    ok('e sao os quatro conhecidos', comShiny.length >= 4, comShiny.length + ' clones');
+  }
+
+  Object.assign(g, antes);
+}
+
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
 process.exit(falhas ? 1 : 0);

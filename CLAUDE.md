@@ -641,16 +641,20 @@ Base criada em 09/09/2026 e **trocada de geração no mesmo dia**: nasceu na Gen
   `jornadakanto.com/data/golpes.json`. Isso é conveniente de propósito: são 149 KB, e o
   `index.html` já tem 1,17 MB. Quando a feature existir, o caminho barato é o cliente BUSCAR o
   arquivo em vez de inchar o HTML — e aí a base não precisa virar a sexta tabela duplicada.
-- **O nome em PORTUGUÊS vive em `tools/golpes-pt.json`, e são 160** (159 da base mais o `cut`). O arquivo da base traz só o
+- **O nome em PORTUGUÊS vive em `tools/golpes-pt.json`, e são 161** (159 da base mais o `cut` e o `surf`). O arquivo da base traz só o
   nome canônico em inglês — os nomes PT que o jogo já usava (`MOVE_BY_TYPE`, `MOVE_OVERRIDES`)
   são por TIPO e não por golpe, então a passada foi à mão, uma vez. A Gen 3 acrescentou **37**
   (Ás Aéreo, Vento Prateado, Pulso de Água, Quebra-Telha, Cauda de Ferro...). Golpe de dano sem
   nome ali sai no log e nas telas com o **id em inglês**, então o gerador de tabelas é quem tem
   que gritar se faltar.
-- **⚠️ O `cut` É ESCRITO À MÃO NO GERADOR DE TABELAS** (`A_MAO`, em `tools/gerar-tabelas-golpes.js`),
-  e ele é o ÚNICO golpe da tabela `GOLPES` que não sai da base — HM ninguém aprende por nível, então
-  o gerador nunca o viu. **Sem essa linha, regenerar as tabelas APAGA o `cut` em silêncio** e o HM01
-  fica sem nada pra ensinar. Ele sai fora do `GOLPES_IDS`, que é indexado pelo `APRENDIZADO`.
+- **⚠️ OS GOLPES DE HM SÃO ESCRITOS À MÃO NO GERADOR DE TABELAS** (`A_MAO`, em
+  `tools/gerar-tabelas-golpes.js`) — são **dois desde 15/09/2026**: o `cut` (HM01) e o `surf` (HM03).
+  Eles são os ÚNICOS golpes da tabela `GOLPES` que não saem da base, e o motivo é um só: **HM ninguém
+  aprende por NÍVEL**, e a base só cadastra aprendizado por nível — o gerador nunca os viu.
+  **Sem essas linhas, regenerar as tabelas APAGA os dois em silêncio** e os HMs ficam sem nada pra
+  ensinar. Eles saem fora do `GOLPES_IDS`, que é indexado pelo `APRENDIZADO`.
+  `tools/test-inventario.js` **varre o `HMS`** em vez de nomear os dois: o próximo HM que nascer sem
+  linha no `A_MAO` passa a ser barulhento sozinho.
 - `node tools/gerar-golpes.js` regenera o arquivo (o cabeçalho dele traz os `curl` das fontes).
 
 ## Os golpes do pokémon (escolhidos pelo jogador) — hoje são TRÊS
@@ -767,10 +771,11 @@ golpe valia 60 (`MOVE_POWER`) e o motor só escolhia o TIPO.
 - **Valem**: jornada, Torre e Ginásio da Cidade — os três montam o time a partir dos SAVES, e o campo
   viaja junto (`resolverTimeDosSaves` devolve `ataques`; o `createInstance` da Torre recola, pelo
   mesmo motivo que já recolava o shiny).
-- **NÃO valem nas ligas nem no online**, e é de propósito: lá o time é um **código**
-  (`especie:nivel:shiny`), o `decodeTeamCode` recusa um quarto campo e o `sanitizeTeamCode` existe
-  justamente pra apagar o que não está no código. Ali a batalha continua exatamente como é hoje, no
-  motor de tipo. Mexer nisso é mexer na trava anti-falsificação do código de time.
+- **⚠️ E VALEM NAS LIGAS E NO ONLINE DESDE 16/09/2026** — ver a seção **OS GOLPES ESCOLHIDOS CHEGAM
+  NA LIGA E NO ONLINE**. Até lá não valiam, e a razão escrita aqui era: *"o time é um código
+  (`especie:nivel:shiny`), o `decodeTeamCode` recusa um quarto campo, e mexer nisso é mexer na trava
+  anti-falsificação"*. **A trava continua intocada** — o que mudou é que os golpes passaram a viajar
+  **AO LADO** do código, dentro do match, como os `slots` já faziam, e o servidor valida o que chega.
 - **Os NPCs não têm golpe escolhido** — líder de ginásio, rival, treinador da Torre. Todos vêm do
   `createInstance`, que não preenche o campo, então eles lutam no motor de tipo, com o poder
   implícito de 60. **Isso é a maior consequência da feature, e o número está abaixo.**
@@ -2543,12 +2548,14 @@ Achados na mesma varredura, com número, e deixados como estão porque não foi 
   motor implícito escolhia entre TODOS os tipos da espécie sempre com poder 60 e STAB 1,5. Como os
   NPCs continuam no motor implícito, o mesmo Venusaur é ~23% mais forte do lado do líder. É a mesma
   assimetria já registrada em "A decisão que ficou em aberto", agora com o número por espécie.
-- **O Ginásio da Cidade descarta os golpes na ida pro servidor**: `resolverTimeDosSaves` devolve
-  `ataques`, mas o time vira um **código** (`especie:nivel:shiny`) uma linha depois, e a batalha
-  decodifica dele. Ou seja, a linha deste arquivo que diz que os golpes valem lá **não é verdade
-  hoje**. O conserto tem precedente pronto: os `slots` já viajam **dentro do match** e são
-  carimbados depois do `decodeTeamCode` (`carimbaSlots`) — os golpes cabem no mesmo lugar, sem
-  tocar na trava anti-falsificação do código.
+- **⚠️ O GINÁSIO DA CIDADE DESCARTAVA OS GOLPES na ida pro servidor, e isso foi CONSERTADO em
+  16/09/2026** (ver **OS GOLPES ESCOLHIDOS CHEGAM NA LIGA E NO ONLINE**). O diagnóstico que estava
+  aqui era exato -- *"o `resolverTimeDosSaves` devolve `ataques`, mas o time vira um código uma linha
+  depois"* -- e a saída apontada era a que foi tomada: **os `slots` já viajavam dentro do match, e os
+  golpes couberam no mesmo lugar**, sem tocar na trava anti-falsificação do código de time.
+  A DEFESA congela os golpes junto com o código (`leaderTeamAtaques`), pelo mesmo motivo que ela
+  congela o time: o líder montou aquele time e é com ele que defende. Ginásio tomado antes desta
+  data não tem o campo e defende no motor de tipo, como defendia.
 - **O Doce Raro e a evolução no SERVIDOR sobem nível sem nunca oferecer o golpe novo.**
   `evoluirNoSave` não conhece `nivelDosAtaques`/`especieDosAtaques`, o que deixa a pendência
   CORRETA gravada — mas quem a resolve é só o `continueFromEvolution`, e abrir o save não passa por
@@ -2724,9 +2731,10 @@ serviu de prova de que o gerador de golpes está lendo a geração certa.
   sorteio novo) e a visibilidade vai a **100%**. O total não muda, então a soma das linhas continua
   fechando. Golpe pequeno demais pra repartir (menos de 1 de dano por tapa) fica inteiro — passo de
   dano 0 é o que este log evita em toda regra.
-- **NO ONLINE E NAS LIGAS ELE NÃO ACONTECE**, e não é exceção nova: lá o time vem de um CÓDIGO
-  (`especie:nivel:shiny`) e não carrega golpe escolhido, então `lastMove` é null e o motor cai no
-  de tipo. É a mesma regra que já valia pros golpes escolhidos.
+- **⚠️ ELE PASSOU A ACONTECER NO ONLINE E NAS LIGAS EM 16/09/2026**, junto com os golpes escolhidos
+  chegando lá (ver a seção própria). Este item dizia que "não acontece", e a razão era a mesma de
+  sempre: sem golpe escolhido o `lastMove` é null e o motor cai no de tipo. Medido na virada: o
+  multi-tapa vai de **0 para 292** em 220 partidas de liga.
 - **O PREÇO MEDIDO — na dificuldade, nada, nas três levas:** com os DOIS primeiros e o dano já
   consertado, **76,41% → 76,37%** (−0,04, **0,1σ**); com os **NOVE**, **76,50% → 77,01%** (+0,51,
   **0,8σ**) — 10 blocos de 1.000 jornadas de cada lado em cada medição. Nem com 27% das espécies
@@ -4303,7 +4311,8 @@ chamado 'Histórico', quando clicado, exibir como foi o ranking do dia nos 5 úl
   Entraram **Lapras, Kabutops, Omastar e Qwilfish** -- os quatro cabem no teto de 4 da linha deles,
   são de Água (o tipo da rota) e combinam com uma caverna alagada e antiga. Agora são **10 formas**
   em 13 entradas. Custo medido: conclusão 64,8% → 65,1% (8.000 jornadas de cada lado, 0,5σ).
-  **Quem contar rota por rota, conte FORMAS.** Ainda ficam abaixo de 10: Dojo Lutador (7), Usina de
+  **Quem contar rota por rota, conte FORMAS** -- e desde 15/09/2026 o JOGO conta: a tela
+  "Pokémons desta rota" lista as formas, não o pool (ver a seção dela). Ainda ficam abaixo de 10: Dojo Lutador (7), Usina de
   Força (8), Estrada Ciclável (9) e Caminho de Gelo (9) -- as três primeiras pelo mesmo motivo, e o
   Dojo porque a lista de Lutadores do jogo acabou.
 - **A OFERTA NÃO REPETE MAIS UMA LINHA QUE O TIME JÁ TEM — nem pela reserva.** Eram dois furos:
@@ -4480,6 +4489,107 @@ chamado 'Histórico', quando clicado, exibir como foi o ranking do dia nos 5 úl
   insígnia de Johto (foi um defeito real, pego na revisão anterior).
   A ponte entre as duas — Rotas 26/27 e as Quedas Tohjo no original — fica sempre visível,
   pontilhada, pra explicar por que a jornada consegue pular de um continente pro outro.
+
+### "POKÉMONS DESTA ROTA" (15/09/2026)
+
+Pedido com print, apontando o espaço em branco no topo da caixa dos selvagens: *"crie um botão com
+o texto 'Pokémons desta rota' e quando clicado, abre um modal exibindo todos os pokemons
+disponiveis de capturar nessa rota. E para os pokemons que o treinador ja capturou, coloque aquele
+símbolo de pokedex que ja existe hoje"*.
+
+- **⚠️ A LISTA É DE FORMAS, NÃO DO POOL — e é essa a parte que a intuição erra.** Este arquivo já
+  registrava a armadilha (*"POOL NÃO É O QUE APARECE NA TELA... conte FORMAS"*): a regra de
+  espécie-por-nível converte a entrada do pool na forma que existe naquele nível, então **uma
+  entrada entrega formas diferentes** conforme o sorteio e **duas entradas entregam a mesma forma**.
+  O Covil do Dragão é o caso extremo: **15 entradas → 10 formas** (dratini e dragonair viram os dois
+  Dragonair, magikarp e gyarados viram os dois Gyarados, horsea e seadra viram os dois Kingdra).
+  Listar o pool cru mostraria nomes que o jogador **nunca** vai ver ali.
+- **⚠️ A FAIXA DE NÍVEL PASSOU A MORAR NUM LUGAR SÓ** (`faixaDeNivelSelvagem`), e foi essa a única
+  mudança em código de motor: quem SORTEIA (`rollWildLevel`/`nivelSelvagem`) e quem LISTA leem a
+  mesma função. Duas cópias divergiriam no primeiro ajuste, e o sintoma seria o pior possível — a
+  tela prometendo uma forma que o sorteio nunca entrega, ou escondendo uma que ele entrega.
+  São três degraus: a faixa **própria da rota** (`route.niveis`, o Eevee 30-35 na Silph Co.), o
+  **piso da evolução** (com o teto que impede o Metapod de sair no nível em que já seria Butterfree)
+  e a faixa do **trecho**. **Conferido por impressão: o sorteio não mudou** — mesmo hash em 6.000
+  sorteios semeados.
+- **⚠️ E A VARREDURA ACHOU UMA FALTA DE VERDADE: a PRÉ-EVOLUÇÃO DE OUTRO INICIAL** (15% no trecho 5)
+  **não está em pool nenhum** — ela é um sorteio à parte dentro do `montaOfertaSelvagem`. A Estrada
+  Ciclável entregava Charmeleon, Ivysaur, Wartortle, Quilava, Bayleef, Croconaw e Pikachu que a
+  primeira versão da lista não mostrava. Ela **respeita o inicial do jogador**: o sorteio nunca dá a
+  evolução do próprio, e a lista também não.
+- **⚠️ O DITTO DISFARÇADO FICA DE FORA, e é decisão.** Medido nas 32 rotas: onde ele é capturável de
+  verdade — o **raro** da Silph Co., da Mansão e da Rota 34 — ele já entra e aparece. Nas **outras
+  sete** (Seafoam, Usina, Victory Road, Monte Mortar, Lago da Fúria, Caminho de Gelo e Covil do
+  Dragão) ele só existe como o disfarce de "Mew"/"Mewtwo", e ali listá-lo seria **a única tela do
+  jogo que dedura a pegadinha** — a lupa do encontro já é escondida no disfarçado pelo mesmo motivo.
+  E o erro seria duplo: a tela prometeria um "Ditto" que o jogador procuraria na oferta e nunca
+  acharia, porque ali ele se chama Mew.
+- **Os INTOCÁVEIS ficam de fora** pelo mesmo raciocínio: eles não estão em pool nenhum, mas o
+  encontro tem uma rede de segurança que os troca — anunciá-los prometeria uma captura que não
+  acontece.
+- **A LINHA INTEIRA É O BOTÃO** e abre a **mesma ficha da Pokédex** que a lupa do encontro abre: a
+  pergunta que se faz aqui é a mesma (*"esse cobre o tipo que falta no meu time?"*). É a regra da
+  ficha do especial e da lista de notificações — mirar num quadradinho num celular é pedir erro.
+- **⚠️ O CONTADOR E O NOME DA ROTA SAÍRAM EM 16/09/2026** (a pedido: *"tire os textos em azul"*).
+  Eram as duas linhas azuis acima da lista, e juntas ocupavam 4 linhas de texto.
+  O contador (*"12 pokémons aparecem aqui — 3 ainda faltam na sua Pokédex"*) estava registrado aqui
+  como **"a razão de a tela existir"** — ele respondia *"vale a pena parar aqui?"* antes de o
+  jogador ler a lista inteira. **Quem responde isso agora é a própria lista**, pelo selo da Pokédex
+  e pela faixa verde de cada linha: a informação continua ali, só deixou de vir somada.
+  O **nome da rota** era a informação mais redundante possível: este modal só abre **de dentro da
+  tela daquela rota**.
+  Há trava pros dois, pra a volta deles ser decisão e não descuido.
+
+**A TRAVA QUE IMPORTA compara a lista com o que o encontro REALMENTE entrega:** ela roda **250
+ofertas de verdade em cada uma das 32 rotas** e exige que nada saia fora da lista. Foi ela que pegou
+a pré-evolução de inicial — nenhuma leitura do código teria pego, porque o sorteio dela mora longe
+do pool.
+
+### ⚠️ ELA VIROU LISTA, E O NÍVEL SAIU (16/09/2026)
+
+Pedido junto com as linhas azuis: *"tire o Lvl 3-6 que aparece dentro dos cards, e diminua a altura
+de cada card, para ficar parecendo mais uma lista"*.
+
+- **O NÍVEL SAIU, e a razão estava na própria tela:** dentro de uma rota quase toda forma cai na
+  **MESMA faixa**, então eram doze linhas escrevendo *"Lv.3–6"*. Ele era o que obrigava o nome a
+  dividir a linha de cima — e é o que o layout de três tentativas (registrado abaixo como história)
+  existia pra acomodar.
+- **QUEM MANDA NA ALTURA É O SPRITE, não o texto** — e isso é o contra-intuitivo daqui. Baixar só o
+  padding não faria nada: o sprite de 48px segurava a linha sozinho. Ele foi pra **34px**, que é a
+  MESMA medida que o montador de time e a lista da Torre já usam (não é um número novo), e o padding
+  vertical de 5 pra 2. **O card foi de 62px para 42px** e o conteúdo de uma rota de 14 formas, de
+  1.038 para 842px.
+- **⚠️ E O NOME CONTINUA EMPILHADO SOBRE OS TIPOS, o que NÃO custa altura:** as duas linhas de texto
+  (14 + 2 + 12 = 28px) cabem **dentro** da altura que o sprite já impõe. Numa linha só o nome ficava
+  com o que sobrasse dos selos — a 320px sobram **47px** quando a espécie tem dois tipos, e aí **8
+  dos 14 nomes truncavam**, "Pidgey" e "Oddish" inclusive. Empilhado ele fica com os 116px inteiros
+  e **nenhum trunca**.
+
+**⚠️ E DOIS DEFEITOS PASSARAM POR UMA MEDIÇÃO SEM ACUSAR NADA. A marcação estava certa nas duas
+vezes — o errado era a folha de estilo, e é por isso que as travas novas LEEM O CSS.**
+
+1. **O sprite não encolheu**, porque `.rota-mon .sprite-img` tem a **MESMA especificidade** que o
+   `.sprite-sm .sprite-img` da casa — e aquele é declarado **depois**, então ganhava o empate.
+   O seletor foi a **três classes** (`.rota-mon .sprite-sm .sprite-img`), que vence independente da
+   ordem. Nenhuma assertiva de HTML teria percebido: o card simplesmente não mudava de altura.
+2. **⚠️ O NOME SUMIU DA TELA**, e este é o que vale guardar. O `flex:1 1 0` é do **EIXO do
+   container**: com o `.rota-mon-info` virando COLUNA, base 0 passou a zerar a **ALTURA** do nome.
+   Os selos de tipo continuavam aparecendo, então a lista parecia certa de relance.
+   **E ele escapou de uma medição de verdade:** eu media `scrollWidth > clientWidth` pra achar nome
+   truncado, e a LARGURA estava certa — 130px. O que estava zerado era a altura.
+   **Medir a dimensão errada dá verde num defeito que se vê no primeiro print.**
+
+**Medido a 320px depois de tudo, na Floresta de Viridian (14 formas):** card de **42px** uniforme,
+**zero** nomes truncados, **zero** listas de tipo em duas linhas, sem rolagem lateral, e o modal
+rolando por dentro (`max-height:85vh`) como a lista de golpes da ficha e o ranking da Torre.
+
+**HISTÓRIA — o layout de quando o nível existia**, que custou três tentativas e fica registrado
+porque a conta de largura continua valendo (o card mede só 208px a 320px):
+  1. **nome e nível no mesmo span**: o `ellipsis` comia o NÍVEL — *"Gyarados Lv.50…"*, em 4 das 10
+     linhas do Covil;
+  2. **nível na linha dos tipos**: ele empurrava o segundo selo pra uma segunda linha, em **9 das
+     10**;
+  3. **nível numa coluna própria à direita**: a coluna roubava 50px e os tipos quebravam de novo.
 
 ## Equipe Rocket
 
@@ -6349,6 +6459,130 @@ A intuição erra três vezes:
 | **a linha do Squirtle e o Pichu NÃO** | e são justamente os dois que "pareceriam" cortar |
 | **os quatro lendários da lista ficam** | Raikou, Entei, Suicune e Celebi — é o que o dado diz, a mesma decisão do Lugia no `RECUPERACAO` e no `REMOINHO`. O Celebi é INTOCÁVEL, então a entrada dele não roda hoje |
 
+### O HM03 (SURF): O PRIMEIRO HM QUE NÃO VEM DE UMA BATALHA (15/09/2026)
+
+Pedido assim: *"quando um usuário conseguir capturar TODOS os pokemons da rota da Zona Safári, ele
+vai ganhar o HM03, o Surf. Mesmo coisa que o HM01, ele fica na conta, e nao no save, e ao ensinar
+para algum pokemon, esse movimento nao pode mais ser retirado."*
+
+- **QUASE TUDO SAIU DE GRAÇA, e isso é o que a estrutura do HM01 comprou.** "Ficar na conta" já é o
+  `game.hms` (com o `CAMPOS_DA_CONTA`), "não pode ser retirado" já é o `ehGolpeDeMaquina` — que
+  **varre o `HMS`** em vez de nomear o `cut`, então o HM03 nasceu protegido sem uma linha. A tela de
+  ensinar, a prateleira da mochila e o `abrirEnsinarHm` também já eram genéricos pelo `hmId`.
+- **⚠️ MAS TRÊS COISAS ESTAVAM AMARRADAS AO CORTE, e as três teriam oferecido o SURF aos 72
+  CORTADORES.** O `podeAprenderCorte` era chamado direto pelas **três portas** da tela (a lista de
+  candidatos, a escolha do alvo e o próprio ensinar) e lia o `CORTADORES` escrito à mão.
+  Hoje a lista vive **DENTRO do item** (`hm.aprendem`) e quem responde é o `podeAprenderHM(hmId,
+  speciesId)`. O próximo HM já nasce perguntando a lista certa.
+  A **frase** da tela também citava "72 espécies que aprendem o Corte" com o nome na mão — ela sai do
+  `hm.aprendem` e do `hm.golpe` agora, e os exemplos são um campo do item.
+- **O GOLPE: Água, poder 95** — o número da **Gen 3**, que é a geração da base deste jogo. O moderno
+  é 90, e é o mod `gen5` do Showdown que devolve o 95; fixado no teste pelo mesmo motivo que o Tackle
+  35/95 é fixado. Ele entra no `GOLPES` e no `GOLPES_PT` **dos dois motores** e no `A_MAO` do gerador
+  (ver a seção da base de golpes), e fica **fora do `GOLPES_IDS`**.
+  **⚠️ E ELE DESLOCA A SEMENTE DO METRÔNOMO:** o `POOL_METRONOMO` é derivado do `GOLPES` e foi de
+  **156 pra 157**. É o mesmo preço que o `cut` já tinha cobrado, e é o que o Metrônomo promete
+  ("qualquer poder existente no jogo").
+
+**OS 65 SURFISTAS saíram da tag de MÁQUINA da Gen 3 (`3M`) do `learnsets.ts` do Showdown**, o MESMO
+caminho dos 72 cortadores — e **o método foi conferido reproduzindo os 72 sem uma divergência**, que
+é o que dá confiança na lista nova. A intuição erra três vezes:
+
+| | |
+|---|---|
+| **o Squirtle surfa** | e ele é justamente o inicial que **NÃO corta** |
+| **o Totodile faz as duas** | e é o único inicial nas duas listas |
+| **Snorlax, Tauros e Lickitung surfam** | nenhum dos três é de Água |
+
+O **Lugia** e o **Suicune** ficam, porque é o que o dado diz — a mesma decisão do Lugia no
+`RECUPERACAO` e no `REMOINHO`, e dos quatro lendários do `CORTADORES`. O Lugia é INTOCÁVEL, então a
+entrada dele não roda hoje.
+
+**A CONDIÇÃO: as 17 formas PRÓPRIAS da Zona de Safári, na Pokédex DA CONTA.**
+
+- **Ela lê a Pokédex permanente, não o save** — o HM é da conta, então a captura conta por conta: dá
+  pra juntar as 17 em **várias jornadas**, que é o que o texto do `comoGanhar` promete. O
+  `caughtSpecies` do save aberto conta junto, porque é o que ainda não sincronizou.
+- **⚠️ SÃO 17 E NÃO 24, e a diferença são as pré-evoluções de inicial.** A tela "Pokémons desta rota"
+  mostra **24**; sete delas (Ivysaur, Charmeleon, Wartortle, Bayleef, Quilava, Croconaw e o Pikachu)
+  são o **evento do trecho 5**, caem em QUALQUER rota daquele trecho e **o sorteio nunca dá a do
+  PRÓPRIO inicial** — exigi-las faria a condição depender de o jogador ter jogado com outro inicial,
+  que é uma regra que ninguém adivinharia lendo *"todos os pokémon da rota"*.
+  A TELA continua mostrando as 24, porque ali a pergunta é outra: **o que dá pra capturar aqui**.
+- **⚠️ A ROTA E O TRECHO TÊM QUE EXISTIR**, e o teste cobra os dois: se qualquer um mudar de lugar, a
+  condição para de fechar **em silêncio** e o HM03 fica inalcançável. É o mesmo par que o HM01 já
+  cobra (o S.S. Anne e o Lt. Surge).
+- **NADA NO JOGO ANUNCIA A CONDIÇÃO ANTES, e é decisão** — a mesma do HM01, cuja prateleira vazia
+  deixou de contar o caminho ("a tela não entrega de graça um achado que a jornada devia entregar").
+  Quem quiser acompanhar tem a tela **"Pokémons desta rota"** da Zona de Safári, que já marca com o
+  ícone da Pokédex quem você tem.
+
+**⚠️ E ELE PRECISOU DE UM AVISO PRÓPRIO, porque é o primeiro que não sai de uma batalha.** O do HM01
+é o `ganhouHmAgora`, lido pela tela de **VITÓRIA** — e ele funciona porque o HM01 sai de uma vitória.
+Este sai de uma **CAPTURA**, e pode sair até do **carregamento da conta**: não há uma tela pra pegar
+carona. O modal é **anexado ao render principal** (como a caixa que explica o especial), então ele
+aparece venha de onde vier, e o **convite online fica por cima dele** — aquele tem 15 segundos de
+prazo.
+
+- **SÃO DOIS PONTOS DE CONFERÊNCIA, e os dois são necessários:**
+  - depois de uma **captura** (`confirmWild`), que é quando a condição pode virar verdadeira — e
+    **DEPOIS do laço**, não dentro: quem fecha a Zona de Safári pode fechá-la com os DOIS pokémon da
+    mesma oferta, e conferir por captura anunciaria no meio da leva;
+  - no **carregamento da conta** (`loadPermanentUserData`), pra quem já tinha as 17 antes desta
+    feature — sem ele teria que capturar tudo de novo, e não dá: a Pokédex não esquece. É a mesma
+    ideia do `repararEvolucoesAtrasadas`. Ele vem **depois** de a Pokédex e o `game.hms` entrarem,
+    senão leria uma Pokédex vazia.
+- **⚠️ O `hmGanhoModal` ESTÁ NO `CAMPOS_DA_CONTA`, e isso não é enfeite:** o HM03 pode ser dado no
+  carregamento, com o jogador na home — sem o campo lá, abrir um save apagaria a marca e **o aviso
+  não voltaria NUNCA**, porque o `conferirHM03` vê o `temHM` e vai embora. Ele fica **fora do
+  `serializeGame`** (que é uma lista de permissão): é estado de tela, não vai pro banco.
+
+**O QUE O SURF VALE, MEDIDO** (1x1 contra um painel de 8, nível 50 dos dois lados, o HM trocando o
+golpe mais fraco do moveset — que é o que o jogador faria):
+
+| | sem | com | |
+|---|---|---|---|
+| **Dragonite** | 45,5% | **71,0%** | **+25,6** |
+| **Lickitung** | 3,9% | 25,6% | +21,7 |
+| **Snorlax** | 31,1% | 52,3% | +21,2 |
+| Feraligatr | 48,0% | 64,1% | +16,1 |
+| Blastoise | 48,8% | 64,7% | +16,0 |
+| Tauros | 37,3% | 50,0% | +12,7 |
+| Starmie | 66,3% | 72,6% | +6,3 |
+| Kangaskhan | 41,3% | 45,2% | +3,9 |
+| Lapras | 71,4% | 71,4% | 0,0 |
+| **Gyarados** | 90,2% | **78,4%** | **−11,9** |
+
+**⚠️ ELE PODE CUSTAR, E O GYARADOS É O CASO — a razão é o SLOT, não o poder.** São três golpes só
+(`MAX_GOLPES`), e o Gyarados larga o **Salto (Voador 85)** pra levar um SEGUNDO golpe de Água ao lado
+da Hidro Bomba (120): ele perde **cobertura de tipo** e ganha nada. A Lapras larga o Golpe de Corpo e
+fica igual, pelo mesmo motivo. Quem mais ganha é justamente quem tinha **arsenal fraco** — o
+Lickitung e o Dragonite estavam com o **Enrolar, poder 15**.
+É o mesmo desenho do Ditto e do Smeargle, com uma diferença que vale dizer: aqui **a troca é do
+jogador**, e a tela de ensinar mostra o poder de cada candidato justamente pra ele fazer essa conta.
+
+**O PREÇO NA JORNADA: nada. 56,58% contra 57,17% de conclusão** — **+0,58 ponto, 0,8σ** (6 blocos de
+800 jornadas de cada lado, **4.800 de cada**, o MESMO bot contra os dois builds pelo `--html`, com o
+desvio tirado de ENTRE os blocos e **4 de 6** blocos pro lado do HM03). Ruído puro, e por construção:
+**o bot nunca ensina HM**, então a única diferença que a jornada enxerga é o deslocamento da semente
+do Metrônomo. O que a feature vale de verdade está na tabela acima.
+
+- **Ele NÃO destrava rota nenhuma por enquanto**, e é o mesmo desenho do HM01 no primeiro dia:
+  primeiro a porta, depois o que tem atrás dela. O golpe existe, se ensina e vale em batalha.
+- **O NPC nunca ganha o Surf**: o `equiparNpc` dá o moveset por NÍVEL, e HM ninguém aprende por
+  nível. Um Blastoise de líder batendo de Surf seria golpe que ele não tem — e há trava pra isso.
+- **Medido a 320px, no navegador:** o modal do achado fica em **265×334px** (cabe sem rolagem numa
+  tela de 568), a lista de times em **568px**, a lista de pokémon do time em **700px**, a tela de
+  troca em **665px** e a prateleira TMs/HMs com os dois em **780px** — nenhuma rola pro lado.
+- `tools/test-inventario.js` tranca o conjunto: o golpe (Água/95, o nome PT, fora do `GOLPES_IDS`),
+  a lista (65, todas no `SPECIES`, as três surpresas, os lendários), a lista vindo **do item** e não
+  de um `if` com o id na mão, a condição (17 formas, as 24 da tela, as 7 dispensadas, a rota e o
+  trecho), o HM ser **da conta** (faltando uma não ganha; dez da conta mais sete do save fecham), o
+  modal (abre, nomeia, fecha, e o convite por cima), os **dois** pontos de conferência com a ORDEM de
+  cada um, e ensinar + não poder tirar. Conferido que ele acusa com cada defeito religado — 8 falhas
+  com o `podeAprenderHM` ignorando o HM, 2 sem o `conferirHM03` na captura, 2 sem o modal no render e
+  1 sem o `hmGanhoModal` no `CAMPOS_DA_CONTA`.
+
 ### A MATA FECHADA: A TERCEIRA ROTA (13/09/2026)
 
 Pedida assim: *"na jornada, coloque aleatoriamente a partir do trecho 4, que pode exibir alguma nova
@@ -6746,12 +6980,14 @@ devolveria a jornada aos **+1,9 pontos** da primeira linha.
 - **ONDE ELA VALE, e não é decisão nova — é consequência do golpe escolhido.** Ela vive no
   `doExchange`, então vale na **jornada**, na **Elite**, na **Torre** e no **Ginásio da Cidade**:
   esses quatro montam o time a partir dos SAVES, e o campo `ataques` viaja junto.
-  **NÃO vale nas ligas nem no online**, pelo mesmo motivo dos golpes de vários tapas: lá o time é um
-  **CÓDIGO** (`especie:nivel:shiny`), ninguém tem golpe escolhido, o `lastMove` é null e o motor cai
-  no de tipo — não há id de golpe pra consultar na tabela. A única porta que sobra ali é o
-  **METRÔNOMO**, que sorteia entre todos os golpes de dano e pode trazer um drenante; é coerente
-  ("qualquer poder existente no jogo") e é justamente por isso que a guarda do Comedor de Sonhos
-  vive TAMBÉM no motor da cura.
+  **⚠️ E VALE NAS LIGAS E NO ONLINE DESDE 16/09/2026** — foi justamente ela que trouxe o relato
+  (*"o sanguessuga não está curando nas batalhas das ligas onlines"*) e o conserto está na seção
+  **OS GOLPES ESCOLHIDOS CHEGAM NA LIGA E NO ONLINE**. Até lá não valia, porque o time vinha de um
+  CÓDIGO que não carrega golpe: o `lastMove` era null e o motor caía no de tipo.
+  **A única porta que existia ali era o METRÔNOMO**, que sorteia entre todos os golpes de dano e
+  podia trazer um drenante — é coerente ("qualquer poder existente no jogo"), é por isso que a
+  guarda do Comedor de Sonhos vive TAMBÉM no motor da cura, e é por isso que a medição do "antes"
+  dá 1 e não 0.
   **Os NPCs drenam**: o `equiparNpc` dá o moveset inteiro da espécie ao líder, ao rival e ao
   treinador da Torre — então o Vileplume da Erika e o Gengar da Agatha usam a mecânica contra o
   jogador, que é o que faz o efeito na jornada ser pequeno.
@@ -7844,6 +8080,133 @@ escolheu três golpes lutava a Torre com os dois primeiros**, em silêncio — o
   — conquista que nunca acende é o defeito mais silencioso do jogo, porque ninguém consegue reclamar
   do que não viu.
 
+## OS GOLPES ESCOLHIDOS CHEGAM NA LIGA E NO ONLINE (16/09/2026)
+
+Reportado assim: *"o sanguessuga e outros ataques de absorver não estão curando nas batalhas das
+ligas onlines. Verifique se tudo que tem nas batalhas da jornada está na mecânica da liga online"*.
+
+**Era verdade, e a causa era UMA só:** o time da liga vem de um **CÓDIGO** (`especie:nivel:shiny`),
+que não carrega golpe. Sem golpe escolhido o `melhorAtaque` devolve null, o motor cai no de tipo, e
+**três mecânicas simplesmente não existiam lá**.
+
+**A AUDITORIA, medida** (300 batalhas 3x3, mesmo elenco e mesmas sementes dos dois lados):
+
+| | jornada | liga (antes) |
+|---|---|---|
+| confrontos **com golpe escolhido** | 1.081 | **0** |
+| **CURA por drenagem** | 225 | **1** |
+| **golpe de vários tapas** | 218 | **22** |
+| **Rolamento escalado** | 40 | **0** |
+| sono, confusão, anulação, fúria, explosão, danças, Remoinho | ✓ | ✓ (iguais) |
+
+**⚠️ O "1" E O "22" SÃO O METRÔNOMO, e é por isso que a trava compara proporção e não "zero contra
+alguma coisa":** ele sorteia entre TODOS os golpes de dano do jogo, então era a **única porta** por
+onde um drenante ou um multi-tapa entrava numa liga sem golpe escolhido.
+
+**O resto do bloco de especiais já valia**, e isso é por construção: os três caminhos chamam o MESMO
+`doExchange`. O que muda entre eles é só **como o time chega**.
+
+### O CONSERTO: OS GOLPES VIAJAM AO LADO DO CÓDIGO, NUNCA DENTRO DELE
+
+Este arquivo já apontava o lugar, na seção do que foi medido e não mexido: *"o conserto tem
+precedente pronto: os `slots` já viajam dentro do match e são carimbados depois do `decodeTeamCode`
+— os golpes cabem no mesmo lugar, sem tocar na trava anti-falsificação do código de time"*.
+
+- **O código continua `especie:nivel:shiny`** e o `decodeTeamCode` continua recusando um quarto
+  campo. Ele é a trava anti-falsificação; o que viaja ao lado dele é o que ele recusaria.
+- **⚠️ A CHAVE É `espécie:nível`, NÃO a posição** (`chaveDosGolpes`, nos dois motores). Por posição
+  isto quebraria na **Trainers League**, que é o modo que mexe na lista: ela deixa o jogador
+  **REORDENAR** o time da rodada (o override) e **ACRESCENTA** o código do Mewtwo emprestado ao
+  sorteio. Nos dois casos o índice desanda e cada pokémon luta com o moveset de outro — um defeito
+  que não aparece como erro, aparece como **um Snorlax batendo de Raio Solar**.
+  Ela é única dentro de um time pelo mesmo motivo que a chave do item equipado é: um save não tem
+  duas da mesma espécie. E o **nível entra na chave** porque o Doce Raro sobe nível, e nível novo
+  pode ter destravado golpe novo — sem ele, um time repropagado casaria com os golpes de antes.
+- **⚠️ E O SLOT CONTINUA SENDO POR POSIÇÃO**, de propósito: ele diz de que SAVE veio aquele pokémon,
+  e dois saves podem ter a mesma espécie no mesmo nível — por espécie:nível eles colidiriam.
+- **UM CARIMBO SÓ** (`carimbaDoMatch`). O `carimbaSlots` estava **copiado palavra por palavra** no
+  `resolveLeagueMatch` e no `resolveTrainersLeagueMatch`, e os golpes seriam a terceira e a quarta
+  cópia. Duas já divergiriam no primeiro ajuste; quatro é garantia. O cliente tem a função também,
+  porque ele **TAMBÉM resolve partida de liga** — sem ela a mesma partida daria resultado diferente
+  conforme quem a resolvesse primeiro.
+
+### ⚠️ O SERVIDOR NÃO CONFIA NO QUE CHEGA
+
+Código de time é dado de cliente, e agora os golpes viajam ao lado dele: **sem validação, uma linha
+no console poria Hiper Raio em tudo.** O `golpesValidos` reconstrói o que aquela espécie **naquele
+nível** pode ter e fica só com a interseção. Medido, com uma lista forjada de sete golpes fortes:
+
+| | aceita |
+|---|---|
+| Caterpie Lv.5 | **nada** |
+| Machamp Lv.70 | **nada** |
+| Blastoise Lv.70 | só o `surf` (ele é surfista) |
+| Snorlax Lv.70 | `hyperbeam` (ele aprende) e `surf` |
+
+O que sobra de um time forjado é **o motor de tipo** — ou seja, exatamente o que a liga fazia antes
+desta mudança. Errar pro lado de TIRAR o golpe é o certo aqui.
+
+- **⚠️ AS LISTAS DE HM FORAM DUPLICADAS PRO SERVIDOR** (`CORTADORES`, `SURFISTAS`), e elas vieram
+  por um motivo só: **HM ninguém aprende por nível**, então o `APRENDIZADO` não os conhece e sem as
+  listas o Surf de um Blastoise sumiria na liga. O teste compara as duas cópias com as do cliente.
+- **⚠️ A TRAINERS LEAGUE NÃO PRECISA CONFIAR NO CLIENTE, e não confia:** ela é a única em que o
+  **servidor já lê os saves** (`trainersLeagueGatherEligibleCodesForUid`, no refresh automático de
+  5 min antes de cada rodada). Os golpes dela saem **do save**, server-derived — não há o que forjar
+  e não há o que validar. É também a que tem ranking.
+- **⚠️ O QUE FICA EM ABERTO, e é decisão registrada:** na Clássica, nas customizadas e no online o
+  servidor valida a **espécie**, mas não tem como saber se a conta **possui o HM**. Ou seja, um
+  cliente forjado consegue dar Surf a um surfista sem ter feito a Zona de Safári. O ganho é
+  limitado (95 de poder, num bicho que quase sempre já aprende coisa mais forte por nível) e a
+  barreira da espécie continua de pé. Se um dia importar, o caminho é ler `users/{uid}.hms` — uma
+  leitura a mais por time, longe de quem jogou.
+
+### O QUE MUDOU, MEDIDO
+
+**No caminho REAL da liga** (`resolveLeagueMatch`, 300 partidas 3x3, mesmas sementes):
+
+| | antes | depois |
+|---|---|---|
+| confrontos com golpe escolhido | 0 de 249 | **239 de 239** |
+| CURA por drenagem | 0 | **50** |
+| golpe de vários tapas | 0 | **292** |
+
+**⚠️ E O PREÇO É GRANDE NO RESULTADO E NULO NO EQUILÍBRIO** (3.000 partidas 6x6 Lv.70, mesmos times
+e mesmas sementes): **31,8% das partidas trocam de vencedor**, e a taxa de vitória geral quase não
+se move — **49,70% → 48,93%**. Faz sentido, e é a assinatura de uma mudança **simétrica**: os dois
+lados ganham os golpes ao mesmo tempo.
+
+**Por espécie o efeito é de ±6 pontos**, e ele diz quem estava sendo mal representado pelo motor de
+tipo: **Scizor −6,4**, **Espeon +6,0**, **Lapras +6,0**, **Venusaur +5,7**, **Dragonite −4,2**.
+
+**⚠️ ISSO NÃO É UM AJUSTE DE BALANCEAMENTO — é a liga passar a jogar o MESMO jogo que a jornada.**
+Um jogador que passou a jornada inteira escolhendo três golpes por pokémon não via **nada disso** na
+competição: era esse o defeito.
+
+- **O BOT DA LIGA GANHOU MOVESET** (`equiparNpc`-style, o que a espécie aprende por nível). Até aqui
+  "todo mundo sem golpe" era igual pra todos; a partir desta mudança um bot sem golpe seria o único
+  time em desvantagem. Ele não ESCOLHE — leva o que a espécie tem, a regra de todo NPC do jogo.
+- **INSCRIÇÃO VELHA CONTINUA VALENDO**: sem o campo, o time luta no motor de tipo, exatamente como
+  lutava. O mesmo vale pra ginásio de cidade tomado antes desta data e pra cliente antigo em cache.
+
+### O QUE CONTINUA DIFERENTE, E É DECISÃO
+
+- **O REMOINHO não existe no ONLINE** — e ele **existe nas ligas** (medido: 37 na jornada, 35 na
+  liga). A diferença é estrutural: as ligas passam pelo `simulateGymBattle`, que tem o laço da
+  batalha; o online resolve **confronto a confronto** pelo `battleResolveMatchup`, que chama o
+  `doExchange` direto. E é o único lugar onde ele **não poderia** existir: ali quem escolhe o
+  pokémon ativo é o JOGADOR, e um sopro desfaria a escolha que a pessoa acabou de fazer.
+- **OS ITENS EQUIPADOS continuam fora** da liga e do online, pelos motivos já registrados na seção
+  deles (a liga é resolvida horas depois; no online seria vantagem de um lado num PvP).
+- **O TERRENO não existe no online** — lá não há terreno escolhido.
+
+`tools/test-liga-treinadores.js` tranca 30 pontas: a chave por espécie:nível (inclusive com o mapa
+fora de ordem, que é o caso da Trainers League), o nível na chave, a validação contra time forjado,
+os HMs passando por espécie, as duas listas iguais nos dois motores, **a mesma função de chave nos
+dois**, o caminho real da liga antes e depois, o online (`battleInstances` validando na entrada e
+`battleHydrate` devolvendo), o slot continuando por posição, o carimbo único nos quatro resolvedores
+e o moveset do bot. Conferido que desligar o carimbo acusa 3, a validação 4, a chave divergente 5 e
+a reidratação do online 1.
+
 ## Liga Clássica (e as customizadas)
 
 - **Na escolha de time, o CARD é o botão.** Havia um botão vermelho "Inscrever esse time" embaixo de
@@ -7997,6 +8360,109 @@ valor que o Firestore recusaria.
   e como nome de treinador não filtra caractere nenhum (só corta em 20), um `Ash" onmouseover=…`
   fechava o atributo e executava. Quem chamar `escJs` **não deve** passar `escapeHtmlSafe` por
   cima: escaparia o `&` das entidades de novo.
+
+## AS 28 FORMAS DO UNOWN (16/09/2026)
+
+Pedido assim: *"implemente as sprites de todas as letras do alfabeto do unown"*, com o
+`pokemondb.net` como fonte sugerida e um *"verifique se dá certo usar desse site"*.
+
+**O Unown é a única espécie do jogo com mais de um sprite** — no original ele tem 28 formas (as 26
+letras mais `?` e `!`), e até aqui todos os Unown do jogo apareciam com o MESMO desenho: o da
+**letra A**, que é a forma padrão da espécie.
+
+### ⚠️ A FONTE NÃO É O pokemondb, E O MOTIVO NÃO É ELE SER RUIM
+
+O site foi testado como pedido, e **ele funciona**: `img.pokemondb.net` responde **200** com o
+`Referer` do jogo, `Content-Type: image/png`, sem proteção de hotlink, atrás da Cloudflare e com
+`Cache-Control: public, max-age=2592000`.
+
+**Ele não foi usado porque o repo que o jogo JÁ USA tem as 28 formas.** O `PokeAPI/sprites` as traz
+como **`201-<letra>.png`**, no MESMO CDN (`cdn.jsdelivr.net`) e com o MESMO domínio de fallback
+(`raw.githubusercontent.com`) das 250 espécies. Com isso elas herdam **de graça**:
+
+- a repetição do `handleSpriteLoadError` (2 tentativas, 500ms e 1200ms),
+- a troca automática pro domínio alternativo,
+- e o emoji de último caso quando os dois falham.
+
+Um host novo teria que ganhar tudo isso de novo — e a regra da casa sobre imagem de fora nasceu de
+**dois episódios de hotlink que funcionavam local e morriam publicados** (ver `GYM_BADGE_VISUALS`).
+De quebra o sprite do PokeAPI é **96×96**, o mesmo das outras 250; o do pokemondb é 80×80, ou seja
+o Unown apareceria menor que o resto do bestiário.
+
+**Conferido, e não por amostragem:** as **84 URLs** que o próprio jogo gera (28 formas × normal +
+shiny + fallback) foram batidas uma a uma — **84 de 84 respondem 200** com imagem de verdade. E no
+navegador, a 320px, as **28 desenham e carregam** (`naturalWidth > 0`), todas 96×96.
+
+- **⚠️ A LETRA A NÃO TEM ARQUIVO PRÓPRIO:** ela é a forma PADRÃO da espécie, ou seja o `201.png` de
+  sempre — **o `201-a.png` responde 404**. É por isso que o sufixo dela é vazio, e é isso que faz
+  save antigo, código de time e NPC continuarem mostrando EXATAMENTE o que mostram hoje. Há trava
+  só pra isso: é o tipo de simetria que alguém "arruma" e quebra a forma mais comum do jogo.
+- **A tabela vive SÓ NO CLIENTE**, como o `MOVE_BY_TYPE` e o `TIPO_DO_ESPECIAL`: é apresentação
+  pura. A letra **não muda um ponto** de atributo, de tipo ou de dano — o motor não sabe nem
+  precisa saber qual é.
+
+### ⚠️ O `spriteHtml` PASSOU A ACEITAR A INSTÂNCIA, E ISSO FOI A DECISÃO ESTRUTURAL
+
+Ele tem **72 chamadores**, e em **45** deles os dois primeiros argumentos já saíam do **MESMO
+objeto** (`spriteHtml(p.speciesId, 'sprite-sm', p.shiny)`). Então passar o objeto **não acrescenta
+parâmetro nenhum**: troca `p.speciesId` por `p`, e a letra (e o shiny) vêm junto.
+
+Era isso ou um **QUINTO parâmetro posicional em 45 lugares** — que é exatamente a forma de defeito
+que este projeto mais paga: o próximo chamador nasce sem ele e ninguém vê, porque o sprite continua
+saindo certo pras outras 249 espécies.
+
+- **Os 27 chamadores de id solto ficaram intactos, e isso é necessário — não é compatibilidade:** a
+  prévia da evolução (`spriteHtml(destino, ..., p.shiny)`) desenha de propósito uma espécie
+  **DIFERENTE** da do pokémon, e o disfarce do Ditto desenha o Mew.
+- Por isso o **shiny explícito ganha do da instância**: sem essa precedência, a prévia da evolução
+  perderia o brilho do pokémon que está evoluindo.
+- `tools/test-jornada.js` **lê o código** e falha se algum chamador voltar a passar `X.speciesId`
+  junto com `X.shiny` — ali a letra se perde em silêncio.
+
+### ONDE A LETRA NASCE, E POR QUE ELA É SEMEADA
+
+Ela é um campo da INSTÂNCIA (`p.unown`), como o `shiny`, e vai pro save de graça — o `team` é
+serializado inteiro.
+
+- **NA OFERTA SELVAGEM, uma linha depois do sorteio do shiny.** Duas razões se somam: **(1)** aquele
+  bloco é **SEMEADO** (o `goToWildEncounter` troca o `Math.random` por um rng preso ao contador de
+  encontros do save), então **sair do save e voltar devolve A MESMA letra** — sem isso o jogador
+  re-sortearia até vir a que ele quer; **(2)** é uma linha **depois de tudo**, como a do shiny, então
+  o pool, o raro da rota, a pré-evolução de inicial e a rede dos intocáveis já passaram e nenhum
+  caminho novo escapa por esquecimento.
+  **E é isso que faz o jogador VER qual forma está pegando antes de escolher** — que é o que faz a
+  letra valer alguma coisa. Medido: 400 sementes cobrem **as 28 formas**.
+- **NA VIGÍLIA**, com o rng **dela**, não com `Math.random`: a vigília é gravada no save (a clareira
+  e a tela do prêmio são pontos de gravação), e o prêmio pode virar pokémon do jogador — com
+  `Math.random` a letra mudaria entre montar a clareira e escolher o prêmio.
+- **SÓ O UNOWN GANHA O CAMPO.** Um `o.unown` em toda entrada seria lixo em 249 espécies.
+
+### ⚠️ E ELA TEM QUE SOBREVIVER AOS CLONES
+
+O `createInstance` **não copia campo nenhum** — a armadilha que o `shiny` já custou **três vezes**
+neste projeto, nos mesmos três lugares. Todo lugar que recola o shiny passou a recolar a letra: o
+desafio do **Ginásio da Cidade**, a **Vigília**, a batalha por **código de treinador** e o desafio do
+**Mewtwo**. O teste varre o código atrás de clones que recolem `.shiny` e **não** recolem `.unown`.
+
+### O QUE FICA EM A, E É DECISÃO
+
+- **Save antigo, código de time (liga e online) e NPC da Torre.** O código de time é
+  `especie:nivel:shiny` e não carrega letra **por construção** — mexer nisso é mexer na trava
+  anti-falsificação. O NPC da Torre é montado no servidor, que não conhece letra nenhuma.
+  Nos três a letra fica indefinida, e indefinida quer dizer **a forma padrão**: o Unown A de sempre,
+  byte a byte a mesma URL de antes desta feature.
+  ⚠️ O Unown **está** no pool da Torre (ele não evolui, então conta como evolução final), então
+  Unown de NPC sai sempre A. Se um dia isso incomodar, o caminho é o servidor mandar um índice
+  0–27 junto do time — e não uma segunda regra de sorteio no cliente, que divergiria da primeira.
+- **A Pokédex e a tela "Pokémons desta rota" mostram A**, e é o certo: ali a pergunta é sobre a
+  ESPÉCIE, não sobre um bicho.
+- **O nome continua "Unown"**, sem a letra. No original é assim, e o glifo já é a identidade.
+
+`tools/test-jornada.js` tranca 37 pontas: a tabela, os sufixos (com a letra A explicitamente vazia),
+as URLs nos dois domínios, a letra não vazando pra outra espécie, o `spriteHtml` com instância e com
+id, a precedência do shiny explícito, a semente (mesma semente = mesma letra, 400 sementes = 28
+formas), a captura levando a letra, o save e a reidratação, a Vigília e o prêmio dela, e os clones.
+**Conferido que cada um dos sete defeitos religado derruba o teste** — inclusive o `201-a.png`.
 
 ## Mapa de Kanto
 

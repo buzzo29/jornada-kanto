@@ -2354,6 +2354,61 @@
     box-shadow:0 0 8px rgba(155,107,214,.6);
   }
   .pokedex-mystery{font-size:1.2rem;color:#e8d9ff;}
+  /* "POKÉMONS DESTA ROTA" -- o botao no topo da caixa dos cards e o modal que ele abre. */
+  .rota-mons-btn{ margin:0 0 10px; font-size:.78rem; }
+  /* A LISTA ROLA POR DENTRO em vez de esticar a caixa: sem o teto, o botao Fechar ia parar fora da
+     tela numa rota cheia (a maior tem 13 formas). E o mesmo cuidado da lista de golpes da ficha da
+     Pokedex e do ranking da Torre. */
+  .rota-mons-box{ max-height:85vh; overflow-y:auto; }
+  .rota-mons-lista{ display:flex; flex-direction:column; gap:3px; margin:10px 0; text-align:left; }
+  /* A LINHA NAO USA O `.btn` DA CASA: aquele e botao de ACAO, com moldura de 3px. Aqui a lista e de
+     informacao que por acaso se toca -- o mesmo raciocinio que ja tinha tirado o `.btn` dos cartoes
+     de golpe, das linhas da ficha da Pokedex e das prateleiras da loja. */
+  .rota-mon{
+    /* ⚠️ GAP E PADDING APERTADOS (6px): a 320px o card mede 208px e o nome divide a linha com o
+       sprite, os selos de tipo e o selo da Pokedex. Cada pixel aqui e um pixel de nome. */
+    display:flex; align-items:center; gap:6px; width:100%;
+    border:2px solid var(--box-border); border-radius:3px; background:var(--box);
+    padding:2px 6px; font-family:inherit; color:var(--ink); cursor:pointer; text-align:left;
+  }
+  /* ⚠️ QUEM MANDA NA ALTURA E O SPRITE, nao o texto -- por isso ele encolheu junto com o padding
+     (16/09/2026, a pedido de "diminua a altura pra ficar parecendo mais uma lista"). Baixar so o
+     padding nao faria nada: o sprite de 48px segurava a linha sozinho. 34px e a MESMA medida que o
+     montador de time e a lista da Torre ja usam -- nao e um numero novo. */
+  /* ⚠️ TRES CLASSES, e nao duas: `.rota-mon .sprite-img` tem a MESMA especificidade que o
+     `.sprite-sm .sprite-img` da casa, e aquele e declarado DEPOIS -- entao ele ganhava no empate e
+     o sprite continuava 48px. Isso nao aparece em asserção de HTML nenhuma: a marcacao estava
+     certa e a altura nao mudava. Por isso a trava le o CSS e cobra o seletor. */
+  .rota-mon .sprite-sm .sprite-img{ width:34px; height:34px; }
+  .rota-mon:hover{ background:#eef0f7; }
+  /* QUEM JA ESTA NA POKEDEX fica com uma faixa verde a esquerda -- ela repete o que o selo diz, de
+     proposito: o selo se LE e a faixa se RECONHECE de relance, e e ela que separa "tenho" de
+     "falta" antes da leitura comecar. E a mesma ideia do risquinho de tipo do cartao de golpe. */
+  .rota-mon.tem{ border-left:5px solid var(--green-dark); }
+  .rota-mon-sprite{ flex:0 0 auto; display:flex; align-items:center; }
+  /* `min-width:0` pra o nome comprido truncar em vez de empurrar o selo pra fora do card. */
+  /* ⚠️ NOME EM CIMA, TIPOS EMBAIXO -- e isso NAO custa altura, que e o contra-intuitivo aqui:
+     quem manda na altura do card e o SPRITE (34px), nao o texto (14 + 2 + 12 = 28px). Ou seja as
+     duas linhas cabem DENTRO da altura que o sprite ja impoe, e o card mede o mesmo 42px que
+     mediria com tudo numa linha so.
+     Numa linha so o nome ficava com o que sobrasse dos selos de tipo: a 320px sobram 47px pra ele
+     quando a especie tem DOIS tipos, e ai 8 dos 14 nomes truncavam -- "Pidgey" e "Oddish"
+     inclusive. Empilhado, o nome fica com os 116px inteiros e nenhum trunca. */
+  .rota-mon-info{ flex:1 1 0; min-width:0; display:flex; flex-direction:column; justify-content:center; gap:2px; }
+  /* ⚠️ `flex:0 0 auto`, e NAO `1 1 0` -- o flex e do EIXO do container, e aqui ele e COLUNA: com
+     base 0 o nome ficava com ALTURA ZERO e sumia da tela (os selos de tipo continuavam aparecendo,
+     entao a lista parecia certa de relance).
+     E isso passou por uma medicao: eu media `scrollWidth > clientWidth` pra achar nome truncado, e
+     largura estava certa -- 130px. O que estava zerado era a ALTURA. Medir a dimensao errada da
+     verde num defeito que se ve no primeiro print.
+     O `min-width:0` FICA: e ele que deixa o ellipsis funcionar quando o nome passa da largura. */
+  .rota-mon-nome{ flex:0 0 auto; min-width:0; font-size:.68rem; font-weight:800; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .rota-mon-raro{ font-size:.7rem; }
+  .rota-mon-tipos{ display:flex; flex-wrap:wrap; gap:3px; align-items:center; }
+  .rota-mon-tipos .type-pill{ margin-right:0; font-size:.5rem; padding:1px 5px; }
+  /* A VAGA DO SELO fica reservada mesmo em quem falta: sem ela as linhas com e sem selo teriam
+     larguras diferentes e a coluna dos tipos dancaria de linha pra linha. */
+  .rota-mon-falta{ flex:0 0 auto; width:16px; }
   .pokedex-owned-badge{font-size:.85rem;}
   .pokedex-cell.caught{background:#fff;}
   .pokedex-cell.clickable{
@@ -3462,17 +3517,33 @@ function shinyChainSpeciesIds(speciesId){
    acima de tudo em volta -- um Pikachu Lv.20 numa rota de 3 a 6.
    A lista é curta de propósito: só entra quem é a forma COMUM da linha e ganhou um bebê depois. */
 const SEM_PISO_DE_NIVEL = ['pikachu','quagsire'];
+/* ⚠️ A FAIXA DE NÍVEL DE UM SELVAGEM MORA NUM LUGAR SÓ (15/09/2026), e é por isso que ela foi
+   extraída daqui: quem sorteia (`rollWildLevel`) e quem LISTA o que a rota entrega (a tela
+   "Pokémons desta rota") têm que concordar. Duas cópias divergiriam no primeiro ajuste, e o
+   sintoma seria o pior possível -- a tela prometendo uma forma que o sorteio nunca entrega, ou
+   escondendo uma que ele entrega.
+   SÃO TRÊS DEGRAUS, nesta ordem:
+     1. a faixa PRÓPRIA da rota (`route.niveis[id]`) -- é o Eevee 30-35 na Silph Co. e 45 na Mansão;
+     2. o PISO da evolução (`EVOLVED_MIN_LEVEL`): uma forma evoluída não pode sair abaixo do nível
+        em que ela existiria. Ele empurra a faixa inteira pra cima -- e tem um TETO, senão o piso
+        jogava o bicho pra fora da própria janela (um Metapod, que existe do 7 ao 9, saía com nível
+        até 10 num trecho de 3-6 e virava Butterfree na hora, apagando o Metapod do jogo);
+     3. a faixa do TRECHO.
+   O `SEM_PISO_DE_NIVEL` pula o degrau 2: são as formas COMUNS que ganharam um bebê depois (Pikachu,
+   Quagsire) -- sem isso o piso punha um Pikachu Lv.20 numa rota de 3 a 6. */
+function faixaDeNivelSelvagem(id, route, leg){
+  const propria = route && route.niveis && route.niveis[id];
+  if(propria) return [propria[0], propria[1]];
+  const min = leg.minLevel, max = leg.maxLevel;
+  if(SEM_PISO_DE_NIVEL.includes(id)) return [min, max];
+  const piso = EVOLVED_MIN_LEVEL[id];
+  if(!piso || piso <= min) return [min, max];
+  const teto = EVOLUTIONS[id] ? EVOLUTIONS[id].level - 1 : Infinity;
+  return [piso, Math.max(piso, Math.min(piso + (max - min), teto))];
+}
 function rollWildLevel(speciesId, minLevel, maxLevel){
-  if(SEM_PISO_DE_NIVEL.includes(speciesId)) return randomInt(minLevel, maxLevel);
-  const floor = EVOLVED_MIN_LEVEL[speciesId];
-  if(!floor || floor <= minLevel) return randomInt(minLevel, maxLevel);
-  const spread = maxLevel - minLevel;
-  /* O deslocamento pra cima não pode passar do nível em que ela PRÓPRIA evolui, senão o piso
-     empurrava o bicho pra fora da própria janela: um Metapod (que existe do 7 ao 9) num trecho de
-     3-6 saía com nível até 10 -- e aí, pela regra de coerência abaixo, viraria Butterfree na hora,
-     apagando o Metapod do jogo. */
-  const teto = EVOLUTIONS[speciesId] ? EVOLUTIONS[speciesId].level - 1 : Infinity;
-  return randomInt(floor, Math.max(floor, Math.min(floor + spread, teto)));
+  const [de, ate] = faixaDeNivelSelvagem(speciesId, null, { minLevel, maxLevel });
+  return randomInt(de, ate);
 }
 /* A ESPÉCIE TEM QUE BATER COM O NÍVEL. Um Caterpie nível 17 não existe: aos 7 ele virou Metapod e
    aos 10, Butterfree. O encontro sorteia a espécie do pool e o nível do TRECHO, e os dois podiam
@@ -4503,16 +4574,62 @@ function handleSpriteLoadError(img){
   const delays = [500, 1200];
   setTimeout(() => { img.src = baseSrc + '?retry=' + (attempt + 1); }, delays[attempt]);
 }
-function spriteHtml(speciesId, sizeClass, isShiny, flip){
+/* ⚠️ AS 28 FORMAS DO UNOWN (16/09/2026, a pedido). Ele é a única espécie do jogo que tem mais de um
+   sprite, e até aqui todos os Unown do jogo apareciam com o MESMO desenho -- o da letra A, que é a
+   forma padrão da espécie.
+   ELAS VIVEM SÓ NO CLIENTE, como o `MOVE_BY_TYPE` e o `TIPO_DO_ESPECIAL`: é apresentação pura. O
+   motor não sabe (nem precisa saber) que letra o bicho é -- a letra não muda um ponto de atributo,
+   de tipo ou de dano. */
+const FORMAS_DO_UNOWN = ["A","B","C","D","E","F","G","H","I","J","K","L","M",
+                         "N","O","P","Q","R","S","T","U","V","W","X","Y","Z","?","!"];
+/* ⚠️ O SPRITE VEM DO MESMO LUGAR DE TODOS OS OUTROS, e isso foi a decisão desta feature: o repo
+   `PokeAPI/sprites` já traz as 28 formas como `201-<letra>.png`, no MESMO CDN (jsdelivr) e com o
+   MESMO domínio de fallback (raw.githubusercontent) que as 250 espécies já usam. Ou seja, elas
+   herdam de graça a repetição do `handleSpriteLoadError`, a troca de domínio e o emoji de último
+   caso. Um host novo teria que ganhar tudo isso de novo -- e a regra da casa sobre imagem de fora
+   nasceu de dois hotlinks que funcionavam local e morriam publicados.
+   ⚠️ A LETRA A NÃO TEM ARQUIVO PRÓPRIO: ela é a forma PADRÃO da espécie, ou seja o `201.png` de
+   sempre. O `201-a.png` responde 404 -- conferido. É por isso que o sufixo dela é vazio, e é isso
+   que faz save antigo, código de time e NPC continuarem mostrando EXATAMENTE o que mostram hoje. */
+const SUFIXO_DO_UNOWN = { "?": "-question", "!": "-exclamation", "A": "" };
+function sufixoDoUnown(letra){
+  if(!letra) return "";                                   // sem letra = a forma padrão, o 201.png de sempre
+  const L = String(letra).toUpperCase();
+  if(SUFIXO_DO_UNOWN[L] !== undefined) return SUFIXO_DO_UNOWN[L];
+  return /^[B-Z]$/.test(L) ? "-" + L.toLowerCase() : "";
+}
+/* O SORTEIO RECEBE O RNG, nunca chama Math.random por dentro -- é o que permite semear a letra
+   junto com o resto da oferta selvagem (a trava anti save-scumming) e junto da Vigília. Sem isso,
+   sair do save e voltar re-sortearia a letra até vir a que o jogador quer. */
+function sorteiaFormaDoUnown(rng){
+  return FORMAS_DO_UNOWN[Math.floor((rng || Math.random)() * FORMAS_DO_UNOWN.length)];
+}
+/* ⚠️ O spriteHtml PASSOU A ACEITAR A INSTÂNCIA, e não só o id (16/09/2026). Ele tem 72 chamadores e
+   em 45 deles os dois primeiros argumentos já saíam do MESMO objeto (`p.speciesId` e `p.shiny`) --
+   então passar o objeto não acrescenta parâmetro nenhum: ele troca `p.speciesId` por `p`, e a letra
+   (e o shiny) vêm junto.
+   Era isso ou um QUINTO parâmetro posicional em 45 lugares, que é exatamente a forma de defeito que
+   este projeto mais paga: o próximo chamador nasce sem ele e ninguém vê.
+   Quem passa um ID solto continua funcionando igual -- e isso é necessário, não é compatibilidade:
+   a prévia da evolução (`spriteHtml(destino, ..., p.shiny)`) desenha de propósito uma espécie
+   DIFERENTE da do pokémon, e o disfarce do Ditto desenha o Mew. */
+function spriteHtml(quem, sizeClass, isShiny, flip){
+  const mon = (quem && typeof quem === 'object') ? quem : null;
+  const speciesId = mon ? mon.speciesId : quem;
   const sp = especieParaTela(speciesId);   // inclui quem luta sem estar na Pokédex (ver SPECIES_FORA_DA_DEX)
   if(!sp) return '';
-  return spriteMarkupByDex(sp.dex, sp.name, sp.emoji, sizeClass, isShiny, flip);
+  /* o shiny explícito GANHA do da instância: é o que faz a prévia da evolução desenhar outra
+     espécie com o brilho deste pokémon, e o que mantém os 27 chamadores de id solto intactos */
+  const brilho = (isShiny === undefined && mon) ? !!mon.shiny : isShiny;
+  return spriteMarkupByDex(sp.dex, sp.name, sp.emoji, sizeClass, brilho, flip, mon && mon.unown);
 }
-function spriteMarkupByDex(dex, name, fallbackEmoji, sizeClass, isShiny, flip){
+function spriteMarkupByDex(dex, name, fallbackEmoji, sizeClass, isShiny, flip, unown){
   const cls = (sizeClass || 'sprite-md') + (flip ? ' sprite-flip' : '');
   const shinyPath = isShiny ? 'shiny/' : '';
-  const url = `https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/${shinyPath}${dex}.png`;
-  const fallbackUrl = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${shinyPath}${dex}.png`;
+  /* a forma do Unown entra no NOME DO ARQUIVO, não num host novo -- ver FORMAS_DO_UNOWN */
+  const forma = (dex === 201) ? sufixoDoUnown(unown) : '';
+  const url = `https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/${shinyPath}${dex}${forma}.png`;
+  const fallbackUrl = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${shinyPath}${dex}${forma}.png`;
   return `<span class="sprite-wrap ${cls}"><img src="${url}" data-fallback-src="${fallbackUrl}" class="sprite-img" alt="${name}" onerror="handleSpriteLoadError(this)"><span class="sprite-fallback">${fallbackEmoji||'❔'}</span></span>`;
 }
 // dados só de EXIBIÇÃO pro disfarce do Ditto (pegadinha do Mew/Mewtwo) -- de propósito NÃO entram em
@@ -5439,6 +5556,7 @@ function pickNeighborhoodGymChallengeTeam(){
     // os golpes vêm junto pela mesma razão do shiny: esta tela mostra a fileira com os selos de
     // golpe, e sem o campo ela sairia muda num modo em que os golpes VALEM na batalha
     if(Array.isArray(p.ataques)) inst.ataques = p.ataques.slice();
+    if(p.unown) inst.unown = p.unown;   // a letra, pela mesma razão -- ver FORMAS_DO_UNOWN
     inst._escolha = p;
     return inst;
   });
@@ -5635,6 +5753,13 @@ async function loadPermanentUserData(){
     game.userTest = !!d.userTest; // conta de teste: sem efeito no momento (a Torre foi liberada pra todos), mantido pro próximo recurso em avaliação
     game.mewtwoLoanReadyToClaim = !!d.mewtwoLoanReadyToClaim;
     game.neighborhoodGymLocation = d.neighborhoodGymLocation || null; // cache de localização (lat/lon/cidade), pra não bater no serviço de geocodificação toda hora
+    /* ⚠️ O HM03 É CONFERIDO AQUI, e não só na captura: quem já tinha as 17 da Zona de Safári antes
+       desta feature existir precisa ganhá-lo sem capturar tudo de novo -- e não daria, porque a
+       Pokédex não esquece. É a mesma ideia do repararEvolucoesAtrasadas: fechar a torneira não
+       conserta o que já passou.
+       Ele vem DEPOIS de o `game.permanentPokedex` e o `game.hms` serem escritos, senão a condição
+       leria uma Pokédex vazia e o `temHM` não saberia que ele já foi dado. */
+    conferirHM03();
   } catch(e){ console.error('Erro ao carregar dados permanentes da conta:', e); }
 }
 async function recordLeagueChampionWin(name, uid, typeId){
@@ -6257,11 +6382,17 @@ function bestMultiplier(atkTypes, defTypes){
    `APRENDIZADO` (as entradas são `[nivel, indice]`), então inserir um id no meio deslocaria TODOS
    os índices seguintes e trocaria o moveset das 250 espécies em silêncio. O `cut` não precisa dele:
    ninguém o aprende por nível, e o campo `ataques` de um pokémon guarda o id em TEXTO.
-   ⚠️ MAS ELE ENTRA NO BOLO DO METRÔNOMO (`POOL_METRONOMO` é derivado do `GOLPES`), que vai de 155
-   pra 156 golpes. Isso desloca a semente do sorteio -- esperado, e é o preço de o Metrônomo
-   sortear "qualquer poder existente no jogo", que é o que ele promete. */
+   ⚠️ MAS ELES ENTRAM NO BOLO DO METRÔNOMO (`POOL_METRONOMO` é derivado do `GOLPES`), que foi de
+   155 pra 156 com o `cut` e pra 157 com o `surf`. Isso desloca a semente do sorteio -- esperado,
+   e é o preço de o Metrônomo sortear "qualquer poder existente no jogo", que é o que ele promete.
+   ⚠️ SÃO DOIS À MÃO DESDE 15/09/2026, e o segundo é o `surf` (HM03). Os valores saem do MESMO
+   caminho do resto da base -- o `moves.json` do Showdown com a cadeia de mods 8→3 -- e ela importa:
+   o Surf moderno é poder 90, e o mod da **gen5** devolve os **95** que valiam na Gen 3. Lido do
+   arquivo moderno ele entraria 5 pontos fraco.
+   (Conferido pelo mesmo método: o `cut` sai Normal 50, exatamente o que já estava aqui.) */
 const GOLPES = {
   cut: ['Normal', 50],
+  surf: ['Water', 95],
   absorb:['Grass',20],acid:['Poison',40],aerialace:['Flying',60],aeroblast:['Flying',100],
   aircutter:['Flying',55],ancientpower:['Rock',60],astonish:['Ghost',30],aurorabeam:['Ice',65],
   barrage:['Normal',15],beatup:['Dark',10],bind:['Normal',15],bite:['Dark',60],
@@ -6339,7 +6470,7 @@ const GOLPES_PT = {
   rollout:'Rolamento',sacredfire:'Fogo Sagrado',sandtomb:'Tumba de Areia',scratch:'Arranhão',
   shadowball:'Bola Sombria',shadowpunch:'Soco Sombrio',signalbeam:'Feixe de Sinal',
   silverwind:'Vento Prateado',skullbash:'Quebra-Crânio',skyattack:'Ataque Celeste',
-  skyuppercut:'Cruzado Celeste',slam:'Batida',slash:'Talho',cut:'Corte',sludge:'Lodo',
+  skyuppercut:'Cruzado Celeste',slam:'Batida',slash:'Talho',cut:'Corte',surf:'Surf',sludge:'Lodo',
   sludgebomb:'Bomba de Lodo',smog:'Fumaça Tóxica',snore:'Ronco',solarbeam:'Raio Solar',
   spark:'Faísca',spikecannon:'Canhão de Espinhos',steelwing:'Asa de Aço',stomp:'Pisão',
   submission:'Submissão',superpower:'Superpoder',swift:'Rapidez',tackle:'Investida',
@@ -8493,6 +8624,9 @@ function goToWildEncounter(){
     Math.random = sorteioOriginal;
   }
   game.wildSelected = [];
+  /* A lista da rota nasce FECHADA: o modal e estado de tela, e um true sobrando de um encontro
+     anterior abriria ele por cima da oferta nova. */
+  game.rotaModal = false;
   game.wildDisguiseAcknowledged = false;
   game.rerollErro = null;
   game.screen = 'wild';
@@ -8531,7 +8665,10 @@ async function resortearEncontro(){
     Math.random = makeSeededRng(sementeDoEncontro());
     try{ montaOfertaSelvagem(); } finally { Math.random = sorteioOriginal; }
     game.wildSelected = [];        // a oferta é outra: o que estava marcado não existe mais
-  game.wildAvisoMinimo = false;  // e o aviso da primeira rota não sobrevive ao re-sorteio
+    game.wildAvisoMinimo = false;  // e o aviso da primeira rota não sobrevive ao re-sorteio
+    /* A lista da rota fecha junto: ela e estado de TELA (nao entra no serializeGame), e deixada
+       aberta reapareceria por cima da oferta nova. */
+    game.rotaModal = false;
     game.wildDisguiseAcknowledged = false;
     saveCurrentGame();             // o contador de re-sorteios precisa chegar ao servidor
   } catch(e){
@@ -8580,9 +8717,9 @@ function semLinhaRepetida(offer, pool, leg, route){
    Agora quem manda é o LUGAR -- 30 a 35 na Silph Co., 45 na Mansão, e a faixa da etapa em
    qualquer outra rota, como todo mundo. */
 function nivelSelvagem(id, route, leg){
-  const propria = route && route.niveis && route.niveis[id];
-  if(propria) return randomInt(propria[0], propria[1]);
-  return rollWildLevel(id, leg.minLevel, leg.maxLevel);
+  /* A FAIXA e a MESMA que a tela "Pokemons desta rota" lista -- ver faixaDeNivelSelvagem. */
+  const [de, ate] = faixaDeNivelSelvagem(id, route, leg);
+  return randomInt(de, ate);
 }
 function montaOfertaSelvagem(){
   const leg = LEGS[game.gymIndex];
@@ -8647,6 +8784,17 @@ function montaOfertaSelvagem(){
     : o);
   offer = semLinhaRepetida(offer, pool, leg, route);
   offer.forEach(o=>{ o.shiny = Math.random() < currentShinyChance(); }); // shiny (1 em 128, ou a chance crescente do bônus, se estiver ativo)
+  /* ⚠️ A LETRA DO UNOWN SAI AQUI, no MESMO lugar do shiny, e por duas razões que se somam:
+     1) ESTE BLOCO É SEMEADO. O `goToWildEncounter` troca o `Math.random` por um rng preso ao
+        contador de encontros do save enquanto a oferta é montada -- então sair do save e voltar
+        devolve A MESMA letra. Sorteada na hora da CAPTURA ela também não teria volta (captura não
+        se desfaz), mas sorteada aqui ela é a mesma coisa E o jogador VÊ qual letra está pegando
+        antes de escolher, que é o que faz a forma valer alguma coisa.
+     2) É UMA LINHA DEPOIS DE TUDO, como a do shiny: o pool, o raro da rota, a pré-evolução de
+        inicial e a rede dos intocáveis já passaram, então nenhum caminho novo escapa por
+        esquecimento. Foi exatamente por isso que a linha do shiny foi parar aqui.
+     Só o Unown ganha o campo -- um `o.unown` em toda entrada seria lixo em 249 espécies. */
+  offer.forEach(o=>{ if(o.speciesId === 'unown') o.unown = sorteiaFormaDoUnown(Math.random); });
   // registra que esse encontro rodou, PRA VALER na próxima chamada -- é isso que faz a chance subir
   // encontro após encontro enquanto a pessoa não captura nenhum shiny (currentShinyChance lê esse
   // contador). Só conta enquanto o bônus estiver de fato ativo -- fora do bônus, não tem pra que subir
@@ -8735,6 +8883,10 @@ function confirmWild(){
                 : (id==='eevee' ? 45 : LEGS[game.gymIndex].minLevel);
     const mon = createInstance(id, level);
     mon.shiny = !!(offerEntry && offerEntry.shiny);
+    /* a letra vem da OFERTA, que é quem a sorteou -- é o mesmo caminho do shiny, uma linha acima.
+       Sem oferta gravada (save anterior a esta feature) ela fica indefinida, e indefinida quer
+       dizer a forma padrão: o Unown A de sempre. */
+    if(offerEntry && offerEntry.unown) mon.unown = offerEntry.unown;
     /* CAPTUROU: ele escolhe os golpes. A marca fica na instância e a fila é derivada dela (ver
        resolverEscolhaDeAtaques), então dois capturados na mesma leva viram duas telas em sequência
        sem ninguém guardar ordem. */
@@ -8746,6 +8898,9 @@ function confirmWild(){
     game.team.push(mon);
     markCaught(id, mon.shiny);
   });
+  /* ⚠️ DEPOIS DE TODAS AS CAPTURAS, não dentro do laço: quem fecha a Zona de Safári pode fechá-la
+     com os DOIS pokémon da mesma oferta, e conferir por captura anunciaria no meio da leva. */
+  conferirHM03();
   if(game.team.length > 6){
     game.releaseSelected = [];
     game.screen = 'release';
@@ -9137,7 +9292,7 @@ function renderEscolhaDeAtaques(){
   <div class="eyebrow">GOLPES</div>
   <div class="box cursor">
     <div class="golpe-cab">
-      <span class="golpe-cab-sprite">${spriteHtml(p.speciesId,'sprite-md',p.shiny)}</span>
+      <span class="golpe-cab-sprite">${spriteHtml(p,'sprite-md')}</span>
       <span class="golpe-cab-txt">Escolha <strong>${MAX_GOLPES}</strong> para permanecer com <strong>${escapeHtmlSafe(p.name)}</strong>, o resto será esquecido</span>
     </div>
     ${faltam ? `<p class="hint-text">Mais ${faltam} pokémon ${faltam===1?'espera':'esperam'} escolha depois deste.</p>` : ''}
@@ -9175,7 +9330,7 @@ function renderGolpeAprendido(){
   });
   const blocos = porMon.map(g => `
     <div class="golpe-cab">
-      <span class="golpe-cab-sprite">${spriteHtml(g.p.speciesId,'sprite-md',g.p.shiny)}</span>
+      <span class="golpe-cab-sprite">${spriteHtml(g.p,'sprite-md')}</span>
       <span class="golpe-cab-txt"><strong>${escapeHtmlSafe(g.p.name)}</strong> aprendeu ${g.golpes.length > 1 ? 'novos golpes!' : 'um novo golpe!'}</span>
     </div>
     ${g.golpes.map(id => cartaoDeGolpe(id, true, true)).join('')}`).join('<hr class="golpe-sep">');
@@ -9202,7 +9357,7 @@ function renderAprenderAtaque(){
   <div class="eyebrow">NOVO GOLPE</div>
   <div class="box cursor">
     <div class="golpe-cab">
-      <span class="golpe-cab-sprite">${spriteHtml(p.speciesId,'sprite-md',p.shiny)}</span>
+      <span class="golpe-cab-sprite">${spriteHtml(p,'sprite-md')}</span>
       <span class="golpe-cab-txt"><strong>${escapeHtmlSafe(p.name)}</strong> quer aprender um golpe novo!</span>
     </div>
     ${cartaoDeGolpe(pend.golpe, true, true)}
@@ -9410,7 +9565,7 @@ function renderRegisteredTeamOrderModal(){
         <div class="order-row">
           <div class="order-num">${idx+1}º</div>
           <div class="order-info">
-            <span class="mon-name">${spriteHtml(p.speciesId,'sprite-sm',p.shiny)} ${p.name}${p.shiny?' 🌟':''} — Lv.${p.level}</span>
+            <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${p.name}${p.shiny?' 🌟':''} — Lv.${p.level}</span>
           </div>
           <div class="order-controls">
             <button class="circle-btn" onclick="moveRegisteredTeamOrder('${p.id}', -1)" ${idx===0?'disabled':''}>▲</button>
@@ -9820,7 +9975,11 @@ function montarAVigilia(){
     const raiz = raizDaLinha(id);
     if(proibidas.has(raiz)) continue;
     proibidas.add(raiz);
-    mons.push({ speciesId: id, level: nivel, shiny: false });
+    /* a letra do Unown sai do rng DA VIGÍLIA, não do Math.random: ela é gravada no save (a clareira
+       e a tela do prêmio são pontos de gravação), e o prêmio pode virar pokémon do jogador -- com
+       Math.random a letra mudaria entre montar e escolher. */
+    mons.push({ speciesId: id, level: nivel, shiny: false,
+                unown: id === "unown" ? sorteiaFormaDoUnown(rng) : undefined });
   }
   /* OS DOIS SHINY são marcados depois e em posições distintas: sorteando "shiny?" um a um, uma
      vigília poderia sair com zero e outra com cinco -- o pedido diz DOIS. */
@@ -9871,7 +10030,7 @@ function renderMataFechada(){
       return `<div class="order-row">
         <div class="order-num">${i + 1}º</div>
         <div class="order-info">
-          <span class="mon-name">${spriteHtml(m.speciesId,"sprite-sm",m.shiny)} ${escapeHtmlSafe(sp.name)}${m.shiny ? " 🌟" : ""} — Lv.${m.level}</span>
+          <span class="mon-name">${spriteHtml(m,"sprite-sm")} ${escapeHtmlSafe(sp.name)}${m.shiny ? " 🌟" : ""} — Lv.${m.level}</span>
           <span class="mon-sub">${typesHtml(sp.types)}</span>
         </div>
       </div>`;
@@ -9893,7 +10052,7 @@ function renderMataFechada(){
     ${meu.map((p, i) => `<div class="order-row">
       <div class="order-num">${i + 1}º${botaoDeItemHtml(p)}</div>
       <div class="order-info">
-        <span class="mon-name">${spriteHtml(p.speciesId,"sprite-sm",p.shiny)} ${escapeHtmlSafe(p.name)}${p.shiny ? " 🌟" : ""} — Lv.${p.level}</span>
+        <span class="mon-name">${spriteHtml(p,"sprite-sm")} ${escapeHtmlSafe(p.name)}${p.shiny ? " 🌟" : ""} — Lv.${p.level}</span>
         <span class="mon-sub">${typesHtml(p.types || (SPECIES[p.speciesId] || {}).types || [])}</span>
       </div>
       <div class="order-controls">
@@ -9932,6 +10091,9 @@ function escolherOPremioDaVigilia(i){
   if(!esc) return;
   const mon = createInstance(esc.speciesId, esc.level);
   mon.shiny = !!esc.shiny;
+  /* a letra vem junto: o prêmio é o MESMO pokémon que estava na clareira, e ele foi escolhido
+     olhando pro sprite dele -- entregar outra letra seria entregar outro bicho */
+  if(esc.unown) mon.unown = esc.unown;
   mon.escolherAtaques = true;
   if(mon.shiny){ game.shinyPityCount = 0; game.shinyFoundThisSave = true; }
   game.team.push(mon);
@@ -9963,7 +10125,7 @@ function renderVigiliaPremio(){
       const sp = SPECIES[m.speciesId];
       return `<div class="evo-linha">
         <button class="btn" onclick="escolherOPremioDaVigilia(${i})">
-          <span class="mon-name">${spriteHtml(m.speciesId,"sprite-sm",m.shiny)} ${escapeHtmlSafe(sp.name)}${m.shiny ? " 🌟" : ""} <span class="wild-lv">— Lv.${m.level}</span></span>
+          <span class="mon-name">${spriteHtml(m,"sprite-sm")} ${escapeHtmlSafe(sp.name)}${m.shiny ? " 🌟" : ""} <span class="wild-lv">— Lv.${m.level}</span></span>
           <span class="mon-sub">${typesHtml(sp.types)}</span>
         </button>
         <button class="wild-dex" onclick="abrirPokedexFicha(\'${escJs(m.speciesId)}\', ${m.shiny ? "true" : "false"})"
@@ -10038,6 +10200,7 @@ function runSpecialBattle(){
        é a primeira batalha especial em que o ADVERSÁRIO tem shiny (dois dos dez). Só LIGA, nunca
        desliga: os outros contextos não mandam o campo e continuam idênticos. */
     if(o.shiny) inst.shiny = true;
+    if(o.unown) inst.unown = o.unown;   // a letra do Unown, pelo MESMO motivo e pela mesma porta
     return inst;
   });
   equiparNpc(foeTeam);   // rival, Elite 4, Rocket, Vigília -- todos NPC, todos com o moveset da espécie
@@ -10963,6 +11126,47 @@ function encodeTeamCode(team){
   try{ return btoa(payload).replace(/=+$/,''); }
   catch(e){ return ''; }
 }
+/* ⚠️ OS GOLPES ESCOLHIDOS VIAJAM AO LADO DO CÓDIGO (16/09/2026), nunca DENTRO dele.
+   O código é `especie:nivel:shiny` e o `decodeTeamCode` RECUSA um quarto campo -- ele é a trava
+   anti-falsificação do time, e mexer nele é mexer nela. Os `slots` já viajavam assim desde que o
+   item equipado entrou; os golpes cabem no mesmo lugar, que é o que o CLAUDE.md já apontava como o
+   conserto com precedente pronto.
+   Quem recebe VALIDA (ver `golpesValidos` no servidor): o que chega é dado de cliente.
+   Time sem golpe escolhido devolve posição vazia -- e vazio quer dizer o motor de tipo, que é
+   exatamente o que a liga inteira fazia até hoje. */
+function golpesDoTime(team){
+  const m = {};
+  for(const p of team || []){
+    if(!p || !Array.isArray(p.ataques) || !p.ataques.length) continue;
+    m[chaveDosGolpes(p)] = p.ataques.slice(0, MAX_GOLPES);
+  }
+  return m;
+}
+/* ⚠️ A CHAVE É ESPÉCIE:NÍVEL, e NÃO a posição no time. Por posição isto quebraria na Trainers
+   League, que é o modo que mexe na lista: ela deixa o jogador REORDENAR o time da rodada (o
+   override) e ACRESCENTA o código do Mewtwo emprestado ao sorteio. Nos dois casos o índice desanda
+   e cada pokémon luta com o moveset de outro -- um defeito que não aparece como erro, aparece como
+   um Snorlax batendo de Raio Solar.
+   Ela é única dentro de um time pelo mesmo motivo que a chave do item equipado é: um save não tem
+   duas da mesma espécie (o encontro selvagem nunca oferece uma linha que o time já tem, e o
+   montador recusa repetida). E o NÍVEL entra porque o Doce Raro sobe nível, e nível novo pode ter
+   destravado golpe novo -- sem ele, um time repropagado casaria com os golpes de antes. */
+function chaveDosGolpes(p){ return p.speciesId + ':' + p.level; }
+/* O MESMO CARIMBO DO SERVIDOR, e ele precisa existir aqui porque o cliente TAMBÉM resolve partida
+   de liga (a Trainers League é resolvida dos dois lados). Sem ele, a mesma partida daria resultado
+   diferente conforme quem a resolvesse primeiro -- que é o defeito que os dois motores existem pra
+   não ter.
+   Ele NÃO valida: aqui o dado já passou pelo servidor, e revalidar exigiria duplicar as listas de
+   HM no cliente só pra conferir o que ele mesmo mandou. */
+function carimbaDoMatch(time, lado){
+  if(!Array.isArray(time) || !lado) return;
+  time.forEach((p, i) => {
+    if(!p) return;
+    if(Array.isArray(lado.slots) && lado.slots[i] != null) p.slotDaConta = String(lado.slots[i]);
+    const golpes = lado.ataques && lado.ataques[chaveDosGolpes(p)];
+    if(Array.isArray(golpes) && golpes.length) p.ataques = golpes.slice(0, MAX_GOLPES);
+  });
+}
 // monta o código de time especial com o Mewtwo emprestado do prêmio -- substitui o pokémon que foi banido
 /* O PRÊMIO DE "1 USO" NA LIGA NÃO EXISTE MAIS (31/08/2026 -> 01/09/2026).
    Ele era anterior ao empréstimo do Mewtwo e vinha da ideia oposta: um código de time DERIVADO,
@@ -11039,6 +11243,7 @@ function runTrainerBattle(opponentTeam){
     const inst = createInstance(p.speciesId, p.level);
     inst.shiny = !!p.shiny;
     if(Array.isArray(p.ataques)) inst.ataques = p.ataques.slice();
+    if(p.unown) inst.unown = p.unown;   // idem
     return inst;
   });
   applySpecialtyBuff(myTeamClone);
@@ -11447,6 +11652,8 @@ function resolveTrainersLeagueMatch(match, seedStr){
   const rng = makeSeededRng(seedStr);
   const teamA = decodeTeamCode(match.a.code);
   const teamB = decodeTeamCode(match.b.code);
+  /* os golpes escolhidos viajam AO LADO do codigo, como os slots -- ver carimbaDoMatch */
+  carimbaDoMatch(teamA, match.a); carimbaDoMatch(teamB, match.b);
   if(!teamA || !teamB){
     match.winner = teamA ? match.a : match.b;
     match.resolved = true;
@@ -11610,7 +11817,7 @@ async function trainersLeagueDoLock(dateId){
     const selected = ordered.slice(0, TRAINERS_LEAGUE_MAX_PLAYERS);
     const overflow = ordered.slice(TRAINERS_LEAGUE_MAX_PLAYERS);
 
-    const players = selected.map(r=>({ uid:r.uid, name:r.name, eligibleCodes:r.eligibleCodes||[], specialties:r.specialties||[], mewtwoTeamCode:r.mewtwoTeamCode||null }));
+    const players = selected.map(r=>({ uid:r.uid, name:r.name, eligibleCodes:r.eligibleCodes||[], eligibleAtaques:r.eligibleAtaques||null, specialties:r.specialties||[], mewtwoTeamCode:r.mewtwoTeamCode||null }));
     const shuffled = shuffleWithSeed(players, `trainers-${dateId}`);
     const scheduleRounds = buildRoundRobinSchedule(shuffled);
     const numRounds = scheduleRounds.length;
@@ -11737,6 +11944,12 @@ async function trainersLeagueAdvanceRounds(dateId){
               }
             }
             if(code){ match[side].code = code; }
+            /* os golpes vao junto, e NAO dependem de qual codigo saiu: a chave e especie:nivel (ver
+               chaveDosGolpes), entao o mapa da conta serve pro override reordenado e pro Mewtwo */
+            {
+              const pi = (data.players||[]).find(p=>p.uid===match[side].uid);
+              if(pi && pi.eligibleAtaques) match[side].ataques = pi.eligibleAtaques;
+            }
           }
           resolveTrainersLeagueMatch(match, `trainers-match-${dateId}-R${ri}-${match.a.uid}-${match.b.uid}`);
         }
@@ -11806,6 +12019,13 @@ async function registerForTrainersLeague(){
   // Cada partida usa o time trocado especificamente pra ela (até 5min antes); sem troca, sorteia entre
   // esses times elegíveis na hora de resolver (mesma ideia do terreno sorteado quando ninguém escolhe)
   const eligibleCodes = savesCampeoes().map(slot => encodeTeamCode(game.saveSlots[slot].team));
+  /* ⚠️ UM MAPA SO PRA CONTA INTEIRA, e nao um por time -- o MESMO formato que o servidor grava no
+     refresh automatico (ver trainersLeagueGatherEligibleCodesForUid). A chave e especie:nivel,
+     entao dois times que dividem o mesmo pokemon apontam pra mesma entrada, e o sorteio de time da
+     rodada, o override de ordem e o codigo do Mewtwo passam todos por ela sem indice pra desandar.
+     Se as duas formas divergirem, o servidor procura golpe numa chave que nao existe e o time cai
+     no motor de tipo, em silencio. */
+  const eligibleAtaques = Object.assign({}, ...savesCampeoes().map(slot => golpesDoTime(game.saveSlots[slot].team)));
   if(eligibleCodes.length === 0){
     game.trainersLeagueError = 'Você precisa de pelo menos um time com as 8 insígnias pra se inscrever.';
     render();
@@ -11825,7 +12045,7 @@ async function registerForTrainersLeague(){
     await trainersLeagueEnsureCycleDoc(dateId);
     // especialidades entram CONGELADAS na inscrição: a liga do dia inteiro roda com o mesmo número,
     // então subir de especialista no meio do campeonato não muda partidas já agendadas
-    await trainersLeagueRegistrantRef(dateId, uid).set({ uid, name, eligibleCodes, specialties: game.specialties||[], elite: !!game.accountEliteChampion, registeredAt: Date.now() }, { merge:true });
+    await trainersLeagueRegistrantRef(dateId, uid).set({ uid, name, eligibleCodes, eligibleAtaques, specialties: game.specialties||[], elite: !!game.accountEliteChampion, registeredAt: Date.now() }, { merge:true });
     game.trainersLeagueSubmitting = false;
     await refreshTrainersLeagueView();
   } catch(e){
@@ -12138,6 +12358,8 @@ function resolveLeagueMatch(match, seedStr, allowedTerrainIds){
   const rng = makeSeededRng(seedStr);
   const teamA = decodeTeamCode(match.a.code);
   const teamB = decodeTeamCode(match.b.code);
+  /* os golpes escolhidos viajam AO LADO do codigo, como os slots -- ver carimbaDoMatch */
+  carimbaDoMatch(teamA, match.a); carimbaDoMatch(teamB, match.b);
   if(!teamA || !teamB){
     match.winner = teamA ? match.a : match.b;
     match.resolved = true;
@@ -12262,7 +12484,7 @@ async function registerForLeague(typeId, slot, ficarNaTela){
     await db.runTransaction(async (tx)=>{
       const snap = await tx.get(regRef);
       if(snap.exists){ throw new Error('DUPLICATE'); }
-      tx.set(regRef, { name, code, uid, slot, specialties: game.specialties||[], elite: !!game.accountEliteChampion, registeredAt: Date.now() });
+      tx.set(regRef, { name, code, uid, slot, ataques: golpesDoTime(saveData.team), specialties: game.specialties||[], elite: !!game.accountEliteChampion, registeredAt: Date.now() });
     });
     game.accountLeagueSlots = { ...(game.accountLeagueSlots||{}), [typeId]: slot };
     /* O aviso "inscrições abertas" vive numa cópia em memória com folga de 5 minutos (ver
@@ -12326,7 +12548,8 @@ async function updateRegisteredTeamCode(typeId){
     if(registering){
       const regRef = registrantDocRef(typeId, registering.id, uid);
       const regSnap = await regRef.get();
-      if(regSnap.exists){ await regRef.set({ ...regSnap.data(), code: newCode }); }
+      /* os golpes vao junto: o Doce Raro sobe o nivel, e nivel novo pode ter destravado golpe novo */
+      if(regSnap.exists){ await regRef.set({ ...regSnap.data(), code: newCode, ataques: golpesDoTime(game.registeredTeam) }); }
     }
     for(const entry of cycles){
       if(entry.status!=='drawn') continue;
@@ -13046,7 +13269,7 @@ function trainersLeagueMyTeamBoxHtml(data, roundIndex){
       ${team.map(p=>{
         const sp = SPECIES[p.speciesId];
         return `<div class="save-slot-mon">
-          <div class="save-slot-mon-sprite">${sp?spriteHtml(p.speciesId,'sprite-sm',p.shiny):'❔'}</div>
+          <div class="save-slot-mon-sprite">${sp?spriteHtml(p,'sprite-sm'):'❔'}</div>
           <div class="save-slot-mon-level">Lv.${p.level}</div>
         </div>`;
       }).join('')}
@@ -13117,7 +13340,7 @@ function renderTrainersLeagueOrderModal(){
         <div class="order-row">
           <div class="order-num">${idx+1}º</div>
           <div class="order-info">
-            <span class="mon-name">${spriteHtml(p.speciesId,'sprite-sm',p.shiny)} ${p.name}${p.shiny?' 🌟':''} — Lv.${p.level}</span>
+            <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${p.name}${p.shiny?' 🌟':''} — Lv.${p.level}</span>
           </div>
           <div class="order-controls">
             <button class="circle-btn" onclick="moveTrainersLeagueOrder(${idx}, -1)" ${idx===0?'disabled':''}>▲</button>
@@ -13537,7 +13760,7 @@ function renderTrainersLeagueTeamSwapPicker(){
         ${team.map(p=>{
           const sp = SPECIES[p.speciesId];
           return `<div class="save-slot-mon">
-            <div class="save-slot-mon-sprite">${sp?spriteHtml(p.speciesId,'sprite-sm',p.shiny):'❔'}</div>
+            <div class="save-slot-mon-sprite">${sp?spriteHtml(p,'sprite-sm'):'❔'}</div>
             <div class="save-slot-mon-level">Lv.${p.level}</div>
           </div>`;
         }).join('')}
@@ -13816,7 +14039,7 @@ function renderLeagueTeamPicker(){
         ${team.map(p=>{
           const sp = SPECIES[p.speciesId];
           return `<div class="save-slot-mon">
-            <div class="save-slot-mon-sprite">${sp?spriteHtml(p.speciesId,'sprite-sm',p.shiny):'❔'}</div>
+            <div class="save-slot-mon-sprite">${sp?spriteHtml(p,'sprite-sm'):'❔'}</div>
             <div class="save-slot-mon-level">Lv.${p.level}</div>
           </div>`;
         }).join('')}
@@ -13843,7 +14066,7 @@ function renderCustomLeagueTeamPicker(typeConfig){
     const isSel = selected.includes(p.speciesId);
     const disabled = (!isSel && selected.length>=6) ? 'disabled' : '';
     return `<button class="btn ${isSel?'selected':''}" ${disabled} onclick="toggleCustomPickerMon('${p.speciesId}')">
-      <span class="mon-name">${spriteHtml(p.speciesId,'sprite-sm',p.shiny)} ${sp.name}${p.shiny?' 🌟':''} — Lv.${p.level} ${isSel?'✓':''}</span>
+      <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${sp.name}${p.shiny?' 🌟':''} — Lv.${p.level} ${isSel?'✓':''}</span>
       <span class="mon-sub">${typesHtml(sp.types)} <span class="pool-origin-tag">${escapeHtmlSafe(slotDisplayName(p.sourceSlot))}</span></span>
     </button>`;
   }).join('')}
@@ -13875,7 +14098,7 @@ async function registerCustomTeamForLeague(){
       if(snap.exists){ throw new Error('DUPLICATE'); }
       // slot fica 'custom' -- esse time não vem de um único save, é montado de vários, então não faz
       // sentido apontar pra um número de slot específico
-      tx.set(regRef, { name, code, uid, slot: 'custom', specialties: game.specialties||[], elite: !!game.accountEliteChampion, registeredAt: Date.now() });
+      tx.set(regRef, { name, code, uid, slot: 'custom', ataques: golpesDoTime(saveData.team), specialties: game.specialties||[], elite: !!game.accountEliteChampion, registeredAt: Date.now() });
     });
     game.accountLeagueSlots = { ...(game.accountLeagueSlots||{}), [typeId]: 'custom' };
     game.leagueSubmitting = false;
@@ -14146,7 +14369,12 @@ const CAMPOS_DA_CONTA = [
   /* o aviso de versão nova é da ABA, não do save: sem ele aqui, abrir um save e voltar pra home
      apagaria a marca e o botão sumiria até a próxima pergunta (que é folgada em 1 minuto) */
   'saveSlotsCarregados','contaCarregada','versaoNova',
-  'hms'   // as Máquinas Ocultas são da CONTA, não do save -- ver darHM
+  'hms',   // as Máquinas Ocultas são da CONTA, não do save -- ver darHM
+  /* ⚠️ O AVISO DO HM TAMBÉM: o HM03 pode ser dado no CARREGAMENTO DA CONTA (pra quem já tinha as
+     17 antes da feature), e aí o jogador está na home. Sem ele aqui, abrir um save apagaria a marca
+     -- e o aviso não voltaria NUNCA, porque o `conferirHM03` vê o `temHM` e vai embora. Ele fica
+     FORA do `serializeGame` (que é uma lista de permissão): é estado de tela, não vai pro banco. */
+  'hmGanhoModal'
 ];
 function snapshotDaConta(){
   const o = {};
@@ -16420,7 +16648,7 @@ function renderSpecialResult(){
   </div>
   ${game.rocketSleepStolenMon ? `<div class="box u-center">
     <h2>😴 Pokémon roubado</h2>
-    ${spriteHtml(game.rocketSleepStolenMon.speciesId,'sprite-md',game.rocketSleepStolenMon.shiny)}
+    ${spriteHtml(game.rocketSleepStolenMon,'sprite-md')}
     <p><strong>${escapeHtmlSafe(game.rocketSleepStolenMon.name)}</strong> Lv.${game.rocketSleepStolenMon.level}</p>
   </div>` : ''}
   ${/* Cada quadro sai da tela quando não tem o que mostrar, em vez de aparecer como uma caixa vazia
@@ -16476,6 +16704,129 @@ function escapeHtmlSafe(s){
 
 
 
+/* =====================================================================
+   "POKÉMONS DESTA ROTA" (15/09/2026, a pedido: *"crie um botão com o texto 'Pokemons desta rota' e
+   quando clicado, abre um modal exibindo todos os pokemons disponiveis de capturar nessa rota. E
+   para os pokemons que o treinador ja capturou, coloque aquele simbolo de pokedex que ja existe"*).
+
+   ⚠️ A LISTA É DE FORMAS, NÃO DO POOL -- e essa é a parte que a intuição erra. A regra de
+   espécie-por-nível converte a entrada do pool na forma que existe naquele nível, então uma MESMA
+   entrada pode entregar formas diferentes conforme o sorteio, e duas entradas podem entregar a
+   MESMA forma. O Covil do Dragão é o caso extremo: 13 entradas que entregam 10 formas (dratini e
+   dragonair viram os dois Dragonair; magikarp e gyarados viram os dois Gyarados).
+   Listar o pool cru mostraria nomes que o jogador NUNCA vai ver naquela rota.
+
+   A FAIXA DE NÍVEL sai do `faixaDeNivelSelvagem`, a MESMA função que o sorteio usa -- se as duas
+   divergirem, a tela promete uma forma que o encontro não entrega.
+
+   O QUE FICA DE FORA: os `SEM_CAPTURA_SELVAGEM` (os três intocáveis mais o Mewtwo). Eles não estão
+   em pool nenhum, mas o encontro tem uma rede de segurança que os troca -- e uma tela que os
+   anunciasse prometeria uma captura que não acontece. */
+/* ⚠️ ELA ACEITA ROTA E TRECHO (15/09/2026): a TELA chama sem argumento e lê onde o jogador está;
+   a condição do HM03 chama com a Zona de Safári, que pode não ser a rota de agora. */
+function formasDaRota(routeId, legIdx){
+  const leg = LEGS[legIdx == null ? game.gymIndex : legIdx];
+  const route = routeById(routeId == null ? game.currentRoute : routeId);
+  if(!leg) return [];
+  const pool = (route && route.pool && route.pool.length) ? route.pool : leg.pool;
+  const achadas = new Map();   // forma -> { faixa, raro }
+  const anota = (forma, de, ate, raro) => {
+    if(SEM_CAPTURA_SELVAGEM.includes(forma)) return;
+    if(!SPECIES[forma]) return;
+    const ja = achadas.get(forma);
+    if(!ja){ achadas.set(forma, { id: forma, min: de, max: ate, raro: !!raro }); return; }
+    /* A MESMA forma pode vir de duas entradas com faixas diferentes -- a faixa mostrada é a UNIÃO.
+       E `raro` é OU: basta uma entrada rara pra a forma valer como rara. */
+    ja.min = Math.min(ja.min, de); ja.max = Math.max(ja.max, ate);
+    ja.raro = ja.raro || !!raro;
+  };
+  const varre = (id, raro) => {
+    /* LENDÁRIO tem nível próprio e nenhum deles evolui -- entra como está. */
+    if(ehLendario(id)){ const n = nivelDeLendario(leg); anota(id, n, n, true); return; }
+    const [de, ate] = faixaDeNivelSelvagem(id, route, leg);
+    /* O nível de cada forma é a fatia da faixa em que ELA sai, não a faixa inteira: um Caterpie
+       num trecho 3-9 sai de 3 a 6 e o Metapod de 7 a 9. Sem isso as duas linhas diriam "3-9" e o
+       jogador leria que dá pra achar um Metapod nível 3. */
+    const faixaDa = {};
+    for(let n = de; n <= ate; n++){
+      const f = especieNoNivel(id, n);
+      if(!faixaDa[f]) faixaDa[f] = [n, n]; else faixaDa[f][1] = n;
+    }
+    Object.keys(faixaDa).forEach(f => anota(f, faixaDa[f][0], faixaDa[f][1], raro));
+  };
+  pool.forEach(id => varre(id, false));
+  (route && route.rare ? route.rare : []).forEach(x => varre(typeof x === 'object' ? x.species : x, true));
+  /* ⚠️ A PRÉ-EVOLUÇÃO DE OUTRO INICIAL (15% no trecho 5, o de antes do Koga) NÃO está em pool
+     nenhum -- ela é um sorteio à parte dentro do `montaOfertaSelvagem`. Achada varrendo as 32
+     rotas contra 700 ofertas de verdade em cada: a Estrada Ciclável entregava Charmeleon, Ivysaur,
+     Wartortle, Quilava, Bayleef, Croconaw e Pikachu que a lista não mostrava.
+     ELA RESPEITA O INICIAL DO JOGADOR -- o sorteio nunca dá a evolução do PRÓPRIO inicial, então a
+     lista também não pode dar: seria a tela prometendo um Charmeleon a quem escolheu o Charmander.
+     Entra como RARA: 15% num trecho é pouco, e o ✨ é o que separa "vai aparecer" de "pode
+     aparecer" no resto desta lista. */
+  if((legIdx == null ? game.gymIndex : legIdx) === 4){
+    const meu = STARTER_EVOLUTIONS[game.starterId];
+    Object.values(STARTER_EVOLUTIONS).filter(id => id !== meu).forEach(id => varre(id, true));
+  /* ⚠️ O DITTO DISFARÇADO (a pegadinha do "Mew"/"Mewtwo") FICA DE FORA, e isso é decisão.
+     Medido nas 32 rotas: onde ele é capturável de verdade -- o RARO da Silph Co., da Mansão e da
+     Rota 34 -- ele já entra por aqui e aparece na lista. Nas OUTRAS SETE (Seafoam, Usina, Victory
+     Road, Monte Mortar, Lago da Fúria, Caminho de Gelo e Covil do Dragão) ele só existe como
+     disfarce, e ali listá-lo seria a única tela do jogo que dedura a pegadinha -- a lupa do
+     encontro já é escondida no disfarçado pelo mesmo motivo.
+     E o erro seria duplo: a tela prometeria um "Ditto" que o jogador procuraria na oferta e nunca
+     acharia, porque ali ele se chama Mew. */
+  }
+  /* ORDEM DA POKÉDEX: é a ordem que o jogador já conhece, e ela põe as linhas evolutivas juntas.
+     Ordenar por raridade separaria o Dratini do Dragonair sem motivo. */
+  return Array.from(achadas.values()).sort((a, b) => (SPECIES[a.id].dex || 0) - (SPECIES[b.id].dex || 0));
+}
+function abrirPokemonsDaRota(){ game.rotaModal = true; render(); }
+function fecharPokemonsDaRota(){ game.rotaModal = false; render(); }
+/* ⚠️ ANEXADO DEPOIS DO RESTO DA TELA, como o aviso da primeira rota e a caixa do especial: os
+   modais empilham na ordem em que entram, e vindo antes ele abriria ATRÁS dos cards. */
+function renderPokemonsDaRotaModal(){
+  if(!game.rotaModal) return '';
+  const lista = formasDaRota();
+  const caught = getAllCaughtSpecies();
+  return `
+  <div class="modal-overlay" onclick="fecharPokemonsDaRota()">
+    <div class="modal-box rota-mons-box" onclick="event.stopPropagation()">
+      <div class="modal-icon">🌿</div>
+      <h2>Pokémons desta rota</h2>
+      ${/* ⚠️ AS DUAS LINHAS AZUIS SAÍRAM (16/09/2026, a pedido) -- o nome da rota e o contador de
+           quantos faltam. Elas ocupavam 4 linhas de texto acima de uma lista que já cabia numa
+           tela, e o nome da rota é a informação mais redundante possível aqui: este modal só abre
+           DE DENTRO da tela daquela rota.
+           ⚠️ O CONTADOR era, por escrito, "a razão de esta tela existir" -- ele respondia "vale a
+           pena parar aqui?" antes de o jogador ler a lista inteira. Quem responde isso agora é a
+           própria lista, pelo selo da Pokédex em cada linha: a informação continua ali, só deixou
+           de vir somada. Se um dia fizer falta, o lugar dela é o título, não uma linha nova. */''}
+      <div class="rota-mons-lista">${lista.map(x => {
+        const sp = SPECIES[x.id];
+        const tem = caught.has(x.id);
+        /* A LINHA INTEIRA É O BOTÃO (a mesma regra da ficha do especial e da lista de notificações:
+           mirar num quadradinho num celular é pedir erro), e ela abre a MESMA ficha da Pokédex que
+           a lupa do encontro abre -- é a pergunta que se faz aqui: "esse cobre o tipo que falta?". */
+        return `<button class="rota-mon ${tem?'tem':''}" onclick="abrirPokedexFicha('${escJs(x.id)}', false)">
+          <span class="rota-mon-sprite">${spriteHtml(x.id,'sprite-sm',false)}</span>
+          ${/* ⚠️ O NÍVEL SAIU (16/09/2026, a pedido) -- e a razão está na tela: dentro de uma rota
+               quase toda forma cai na MESMA faixa, então eram doze linhas escrevendo "Lv.3–6".
+               Ele era o que obrigava o nome a dividir a linha de cima (três tentativas de layout,
+               medidas a 320px). Sem ele o NOME e os TIPOS cabem na MESMA linha, e é isso que faz o
+               card virar linha de lista em vez de cartão. */''}
+          <span class="rota-mon-info">
+            <span class="rota-mon-nome">${escapeHtmlSafe(sp.name)}${
+              x.raro ? ' <span class="rota-mon-raro" title="Aparece com menos frequência">✨</span>' : ''}</span>
+            <span class="rota-mon-tipos">${typesHtml(sp.types)}</span>
+          </span>
+          ${tem ? `<span class="pokedex-owned-badge" title="Já está na sua Pokédex">${pokedexIcon()}</span>`
+                : `<span class="rota-mon-falta" title="Ainda não está na sua Pokédex"></span>`}
+        </button>`;
+      }).join('')}</div>
+      <button class="btn secondary" onclick="fecharPokemonsDaRota()">Fechar</button>
+    </div>
+  </div>`;
+}
 function renderWild(){
   const caught = getAllCaughtSpecies();
   return `
@@ -16510,13 +16861,19 @@ function renderWild(){
     : ''}
   ${game.rerollErro ? `<div class="box"><p class="error-text">${escapeHtmlSafe(game.rerollErro)}</p></div>` : ''}
   <div class="box">
+    ${/* O BOTAO FICA NO TOPO DA CAIXA DOS CARDS, que e onde ele foi pedido -- e e o lugar certo:
+         a pergunta que ele responde ("o que mais tem aqui?") nasce olhando a oferta, e a resposta
+         ficaria a duas telas de distancia em qualquer outro canto. */''}
+    <button class="btn secondary rota-mons-btn" onclick="abrirPokemonsDaRota()">🌿 Pokémons desta rota</button>
     ${game.wildOffer.map(entry=>{
       const id = entry.speciesId;
       const disguiseInfo = entry.disguise ? DISGUISE_DISPLAY[entry.disguise] : null;
       const sp = disguiseInfo || SPECIES[id];
       const spriteMarkup = disguiseInfo
         ? spriteMarkupByDex(disguiseInfo.dex, disguiseInfo.name, disguiseInfo.emoji, 'sprite-sm', entry.shiny)
-        : spriteHtml(id,'sprite-sm',entry.shiny);
+        /* A ENTRADA INTEIRA, e nao o id: e ela que carrega a letra do Unown (ver FORMAS_DO_UNOWN).
+           O jogador VE qual forma esta pegando antes de escolher, que e o que faz a letra valer. */
+        : spriteHtml(entry,'sprite-sm',entry.shiny);
       const isLegendary = ehLendario(id) || !!entry.disguise;
       const isSel = game.wildSelected.includes(id);
       /* O marcador respeita a pokédex CERTA: um shiny inédito não pode herdar o "já tenho" da
@@ -16542,7 +16899,8 @@ function renderWild(){
   <button class="btn success" onclick="confirmWild()">Confirmar equipe ✔</button>
   ${botaoSeuTimeHtml()}
   <button class="btn secondary" onclick="abrirPokedexModal()">${pokedexIcon('grande')} Consultar Pokédex</button>
-  ${renderAvisoMinimoModal()}`;
+  ${renderAvisoMinimoModal()}
+  ${renderPokemonsDaRotaModal()}`;
 }
 /* O AVISO DA PRIMEIRA ROTA. Ele é anexado DEPOIS do resto da tela porque os modais empilham na
    ordem em que entram -- vindo antes, abriria atrás dos cards. É a mesma nota que a caixa que
@@ -16591,7 +16949,7 @@ function renderTimeModal(){
            tipos (Água + Voador) não cabiam ao lado do nome e passavam por cima dele. */
         return `<div class="time-modal-linha">
           <span class="time-modal-pos">${i+1}º</span>
-          <span class="time-modal-sprite">${spriteHtml(p.speciesId,'sprite-sm',p.shiny)}</span>
+          <span class="time-modal-sprite">${spriteHtml(p,'sprite-sm')}</span>
           <span class="time-modal-info">
             <span class="time-modal-nome">${escapeHtmlSafe(sp.name)}${p.shiny?' 🌟':''}</span>
             <span class="time-modal-sub"><span class="time-modal-lv">Lv.${p.level}</span>${typesHtml(sp.types)}</span>
@@ -16722,7 +17080,7 @@ function renderRelease(){
       const isSel = game.releaseSelected.includes(p.id);
       const disabled = (!isSel && game.releaseSelected.length>=excess) ? 'disabled' : '';
       return `<button class="btn ${isSel?'selected':''}" ${disabled} onclick="toggleRelease('${p.id}')">
-        <span class="mon-name">${spriteHtml(p.speciesId,'sprite-sm',p.shiny)} ${p.name}${p.shiny?' 🌟':''} — Lv.${p.level} ${isSel?'📦':''}</span>
+        <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${p.name}${p.shiny?' 🌟':''} — Lv.${p.level} ${isSel?'📦':''}</span>
         <span class="mon-sub">${typesHtml(p.types)}</span>
       </button>`;
     }).join('')}
@@ -16767,7 +17125,7 @@ function renderLevels(){
       const capLabel = atLevelCap ? ' (nível 55 — só sobe desmaiando em batalha)' : (atLevel40Cap ? ' (máx. +3 além do nível 40)' : (atPoolMax ? ' (máx.)' : ''));
       return `<div class="level-row">
         <div class="level-info">
-          <span class="mon-name">${spriteHtml(p.speciesId,'sprite-sm',p.shiny)} ${p.name}${p.shiny?' 🌟':''} — Lv.${current}${capLabel}</span>
+          <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${p.name}${p.shiny?' 🌟':''} — Lv.${current}${capLabel}</span>
           <span class="mon-sub">${typesHtml(p.types)}</span>
         </div>
         <div class="level-controls">
@@ -16806,7 +17164,7 @@ function renderTeamOrder(){
       return `<div class="order-row">
         <div class="order-num">${idx+1}º${botaoDeItemHtml(p)}</div>
         <div class="order-info">
-          <span class="mon-name">${spriteHtml(p.speciesId,'sprite-sm',p.shiny)} ${p.name}${p.shiny?" 🌟":""} — Lv.${p.level}</span>
+          <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${p.name}${p.shiny?" 🌟":""} — Lv.${p.level}</span>
           <span class="mon-sub">${typesHtml(p.types)}</span>
           ${golpesDoTimeHtml(p)}
         </div>
@@ -16847,7 +17205,7 @@ function renderPreBattle(){
         const accent = sp ? TYPE_COLORS[sp.types[0]] : 'var(--box-border)';
         return `<div class="team-grid-card" style="border-left-color:${accent}">
           <span class="team-grid-num">${idx+1}</span>
-          <span class="team-grid-sprite">${spriteHtml(p.speciesId,'sprite-sm',p.shiny)}</span>
+          <span class="team-grid-sprite">${spriteHtml(p,'sprite-sm')}</span>
           <div class="team-grid-info">
             <span class="team-grid-name">${p.name}${p.shiny?' 🌟':''}</span>
             <span class="team-grid-level">Lv.${p.level}</span>
@@ -16991,7 +17349,7 @@ function teamStatusRowHtml(list){
   return `<div class="save-slot-team-row spread">${(list||[]).map(p=>{
     const sp = SPECIES[p.speciesId];
     return `<div class="save-slot-mon ${p.fainted?'caiu':''}">
-      <div class="save-slot-mon-sprite large">${sp?spriteHtml(p.speciesId,'sprite-md',p.shiny):'❔'}</div>
+      <div class="save-slot-mon-sprite large">${sp?spriteHtml(p,'sprite-md'):'❔'}</div>
       <div class="save-slot-mon-level">${p.shiny?'🌟 ':''}Lv.${p.level}</div>
     </div>`;
   }).join('')}</div>`;
@@ -19259,8 +19617,29 @@ const CORTADORES = [
   "sunflora","espeon","umbreon","gligar","steelix","scizor","heracross","sneasel",
   "teddiursa","ursaring","skarmory","raikou","entei","suicune","tyranitar","celebi"
 ];
+/* ⚠️ QUEM APRENDE O HM03 (o SURF), pelo MESMO caminho dos 72 cortadores: a tag de MÁQUINA da Gen 3
+   (`3M`) do `learnsets.ts` do Pokémon Showdown. São **65 das 250**.
+   O MÉTODO FOI CONFERIDO CONTRA O QUE JÁ EXISTIA: rodado pro `cut`, ele devolve exatamente os 72
+   cortadores que já estavam aqui, sem uma divergência -- é isso que dá confiança nesta lista.
+   A intuição erra: o **Squirtle** surfa (e ele é justamente o inicial que NÃO corta), o Totodile
+   surfa e corta, e o **Snorlax**, o **Tauros** e o **Lickitung** também surfam. O Charmander e o
+   Bulbasaur não.
+   ⚠️ O LUGIA E O SUICUNE FICAM, porque é o que o dado diz -- a mesma decisão do Lugia no
+   `RECUPERACAO` e no `REMOINHO`, e dos quatro lendários do `CORTADORES`. O Lugia é INTOCÁVEL
+   (ninguém o captura), então a entrada dele não roda hoje.
+   Ela vive SÓ NO CLIENTE, como o `CORTADORES` e o `APRENDIZADO`: o servidor nunca precisa saber
+   quem pode aprender o quê, porque o golpe escolhido viaja dentro da instância. */
+const SURFISTAS = [
+  "squirtle","wartortle","blastoise","staryu","starmie","poliwag","poliwhirl","tentacool",
+  "tentacruel","slowpoke","slowbro","gyarados","tauros","psyduck","golduck","krabby",
+  "kingler","horsea","seadra","goldeen","seaking","shellder","lickitung","rhydon",
+  "seel","dewgong","kangaskhan","omanyte","omastar","kabuto","kabutops","lapras",
+  "snorlax","nidoqueen","nidoking","dratini","dragonair","dragonite","poliwrath","cloyster",
+  "vaporeon","totodile","croconaw","feraligatr","sentret","furret","chinchou","lanturn",
+  "marill","azumarill","politoed","wooper","quagsire","slowking","qwilfish","sneasel",
+  "corsola","remoraid","octillery","mantine","kingdra","miltank","suicune","tyranitar","lugia"
+];
 const GOLPE_DO_CORTE = "cut";
-function podeAprenderCorte(speciesId){ return CORTADORES.indexOf(speciesId) >= 0; }
 /* SABER O CORTE É UMA PROPRIEDADE DA INSTÂNCIA, não da espécie -- dois Scyther do mesmo treinador
    podem estar um com e outro sem. É o mesmo desenho do `sketch` do Smeargle, e é por isso que ele
    viaja no save de graça: o `ataques` já é serializado. */
@@ -19292,7 +19671,25 @@ const HMS = {
     icone: '📀',
     resumo: 'Ensina o Corte. Abre caminho onde a mata fecha.',
     golpe: 'cut',
+    aprendem: CORTADORES,
+    exemplos: 'o Bulbasaur, o Charmander, o Totodile e a linha do Nidoran',
     comoGanhar: 'Embarcando no S.S. Anne e vencendo o Lt. Surge de primeira, sem perder nenhuma vez.'
+  },
+  /* ⚠️ O HM03 É O PRIMEIRO QUE NÃO VEM DE UMA BATALHA (15/09/2026, a pedido: *"quando um usuário
+     conseguir capturar TODOS os pokemons da rota da Zona Safári, ele vai ganhar o HM03, o Surf"*).
+     O HM01 sai de uma VITÓRIA e é conferido no `finishBattle`; este sai de uma CAPTURA, e por isso
+     é conferido em outro lugar -- ver `conquistouHM03`.
+     E ele NÃO destrava rota nenhuma por enquanto: o golpe existe, se ensina e vale em batalha (Água,
+     poder 95), e mais nada. É o mesmo desenho do HM01 no primeiro dia -- primeiro a porta, depois o
+     que tem atrás dela. */
+  hm03: {
+    nome: 'HM03 — Surf',
+    icone: '📀',
+    resumo: 'Ensina o Surf. Um golpe de Água forte, pra quem nada.',
+    golpe: 'surf',
+    aprendem: SURFISTAS,
+    exemplos: 'o Squirtle, o Totodile, o Snorlax, o Lapras e a linha do Dratini',
+    comoGanhar: 'Capturando TODOS os pokémon da Zona de Safári — eles ficam na Pokédex da conta, então dá pra juntar em várias jornadas.'
   }
 };
 /* ⚠️ OS HMs SÃO DA CONTA, NÃO DO SAVE (11/09/2026, a pedido: "depois que qualquer save conseguiu
@@ -19305,6 +19702,14 @@ const HMS = {
    rareCandies, inventario, equipados, rerollsPorSave). É o mesmo nível de confiança do
    `badgesEarned`, que também é conquista e também é livre pro dono.
    `game.hms` entrou no CAMPOS_DA_CONTA: sem isso o `resetGame` o perderia ao abrir outro save. */
+/* ⚠️ QUEM APRENDE SAI DO PRÓPRIO HM (`hm.aprendem`), e não de um `if` com o id escrito à mão
+   (15/09/2026, quando o HM03 entrou). As três portas da tela de ensinar chamavam
+   `podeAprenderCorte` direto -- ou seja, o HM03 teria oferecido o SURF aos 72 cortadores.
+   Com a lista ligada ao item, o próximo HM já nasce perguntando a lista certa. */
+function podeAprenderHM(hmId, speciesId){
+  const hm = HMS[hmId];
+  return !!(hm && Array.isArray(hm.aprendem) && hm.aprendem.indexOf(speciesId) >= 0);
+}
 function hmsDaConta(){ return Array.isArray(game.hms) ? game.hms.filter(id => HMS[id]) : []; }
 function temHM(id){ return hmsDaConta().indexOf(id) >= 0; }
 /* DÁ UM HM À CONTA. Devolve true só quando ele é NOVO -- é isso que decide se a tela de vitória
@@ -19335,6 +19740,68 @@ function conquistouHM01(){
   if(!gym || gym.id !== HM01_GINASIO) return false;
   if((game.losses || 0) > 0) return false;                       // "no máximo 1 tentativa"
   return (game.routeHistory || [])[game.gymIndex] === HM01_ROTA;
+}
+/* ⚠️ A CONDIÇÃO DO HM03: TODOS os pokémon DA ZONA DE SAFÁRI na Pokédex da conta.
+   ELA LÊ A POKÉDEX PERMANENTE, e não o save -- o HM é da conta, então a captura também conta por
+   conta: dá pra juntar as 17 em várias jornadas. É o que o texto do `comoGanhar` promete.
+   ⚠️ E ELA USA AS FORMAS PRÓPRIAS DA ROTA, sem o evento de trecho -- é a diferença entre 17 e 24.
+   As SETE pré-evoluções de inicial (Ivysaur, Charmeleon, Wartortle, Bayleef, Quilava, Croconaw e o
+   Pikachu) caem em QUALQUER rota do trecho 5, não são da Zona de Safári, e o sorteio nunca dá a do
+   PRÓPRIO inicial -- exigi-las faria a condição depender de o jogador ter jogado com outro inicial,
+   que é uma regra que ninguém adivinharia lendo "todos os pokémon da rota".
+   A TELA continua mostrando as 24, porque ali a pergunta é outra: o que dá pra capturar aqui. */
+const HM03_ROTA = 'safari_zone';
+const HM03_LEG = 4;                       // o trecho da Zona de Safari (o 5o)
+function formasDoHM03(){
+  const r = routeById(HM03_ROTA), leg = LEGS[HM03_LEG];
+  if(!r || !leg) return [];
+  const iniciais = new Set(Object.values(STARTER_EVOLUTIONS));
+  return formasDaRota(HM03_ROTA, HM03_LEG).filter(x => !iniciais.has(x.id)).map(x => x.id);
+}
+/* ⚠️ UM HM QUE NÃO VEM DE BATALHA PRECISA DE UM AVISO PRÓPRIO. O do HM01 é o `ganhouHmAgora`, lido
+   pela tela de VITÓRIA -- e ele funciona porque o HM01 sai de uma vitória. O HM03 sai de uma
+   CAPTURA (e pode sair até no carregamento da conta, pra quem já tinha todos antes desta feature),
+   então ele não tem uma tela pra pegar carona.
+   O MODAL É ANEXADO AO RENDER PRINCIPAL, como a caixa que explica o especial: assim ele aparece
+   venha de onde vier, sem cada caminho novo precisar lembrar de anunciar.
+   `hmGanhoModal` é estado de TELA -- não entra no serializeGame. Se o jogador fechar a aba antes de
+   ler, o HM continua na conta: quem guarda é o `game.hms`, e o aviso é só o aviso. */
+function darHMComAviso(id){
+  if(!darHM(id)) return false;
+  game.hmGanhoModal = id;
+  return true;
+}
+function fecharHmGanho(){ game.hmGanhoModal = null; render(); }
+function renderHmGanhoModal(){
+  const hm = HMS[game.hmGanhoModal];
+  if(!hm) return '';
+  return `
+  <div class="modal-overlay" onclick="fecharHmGanho()">
+    <div class="modal-box" onclick="event.stopPropagation()">
+      <div class="modal-icon">${hm.icone}</div>
+      <h2>Você encontrou a ${escapeHtmlSafe(hm.nome)}!</h2>
+      <p class="hint-text">${escapeHtmlSafe(hm.resumo)}</p>
+      <p class="hint-text">Ela ficou guardada na mochila, na prateleira <strong>TMs/HMs</strong> — é de lá que você ensina o golpe a um pokémon.</p>
+      <button class="btn success" onclick="fecharHmGanho()">Entendi</button>
+    </div>
+  </div>`;
+}
+/* ⚠️ CONFERE O HM03 EM DOIS PONTOS, e os dois são necessários:
+     - depois de uma CAPTURA (`confirmWild`), que é quando a condição pode virar verdadeira;
+     - no CARREGAMENTO da conta, pra quem já tinha as 17 antes desta feature existir. Sem ele,
+       quem já completou a Zona de Safári teria que capturar tudo de novo -- e não dá, a Pokédex
+       não esquece.
+   Ela é barata: são 17 `Set.has` sobre uma lista que já está em memória. */
+function conferirHM03(){
+  if(temHM('hm03')) return false;
+  if(!conquistouHM03()) return false;
+  return darHMComAviso('hm03');
+}
+function conquistouHM03(){
+  const formas = formasDoHM03();
+  if(!formas.length) return false;
+  const tem = getAllCaughtSpecies();
+  return formas.every(id => tem.has(id));
 }
 /* O ANÚNCIO DO HM na tela de vitória. Ele sai do `ganhouHmAgora`, marcado no `finishBattle`, e não
    de "tem HM na mochila": a tela é relida a cada render, e sem a marca ela anunciaria o mesmo HM em
@@ -19573,7 +20040,7 @@ function renderEliteHeal(){
       return `<div class="order-row elite-row">
         <div class="order-num">${idx+1}º</div>
         <div class="order-info">
-          <span class="mon-name">${spriteHtml(p.speciesId,'sprite-sm',p.shiny)} ${p.name}${p.shiny?' 🌟':''} — Lv.${p.level}</span>
+          <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${p.name}${p.shiny?' 🌟':''} — Lv.${p.level}</span>
           ${renderHpBar(hp, p.maxHp, `elite-hp-fill-${p.id}`, `elite-hp-label-${p.id}`)}
         </div>
         <div class="order-controls-compact">
@@ -19862,7 +20329,7 @@ function timeComTerrenoHtml(lista, terrain){
     const sp = SPECIES[p.speciesId];
     const buff = ganhaBuffDeTerreno(p.speciesId, terrain);
     return `<div class="save-slot-mon">
-      <div class="save-slot-mon-sprite large">${sp?spriteHtml(p.speciesId,'sprite-md',p.shiny):'❔'}${
+      <div class="save-slot-mon-sprite large">${sp?spriteHtml(p,'sprite-md'):'❔'}${
         buff ? `<span class="mon-terreno-selo" title="Ganha bônus no terreno ${escapeHtmlSafe(terrain.name)}">🔺</span>` : ''}</div>
       <div class="save-slot-mon-level">${p.shiny?'🌟 ':''}Lv.${p.level}</div>
     </div>`;
@@ -20068,7 +20535,7 @@ function renderNeighborhoodGymDefenseOrder(){
       return `<div class="order-row">
         <div class="order-num">${idx+1}º${botaoDeItemHtml(p)}</div>
         <div class="order-info">
-          <span class="mon-name">${spriteHtml(p.speciesId,'sprite-sm',p.shiny)} ${escapeHtmlSafe(sp?sp.name:'?')}${p.shiny?' 🌟':''} — Lv.${p.level}${buff?' 🔺':''}</span>
+          <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${escapeHtmlSafe(sp?sp.name:'?')}${p.shiny?' 🌟':''} — Lv.${p.level}${buff?' 🔺':''}</span>
           <span class="mon-sub">${sp?typesHtml(sp.types):''}</span>
           ${golpesDoTimeHtml(p)}
         </div>
@@ -20131,7 +20598,7 @@ function renderNeighborhoodGymChallengeOrderPicker(){
     ${team.map((p,idx)=>`<div class="order-row">
       <div class="order-num">${idx+1}º${botaoDeItemHtml(p)}</div>
       <div class="order-info">
-        <span class="mon-name">${spriteHtml(p.speciesId,'sprite-sm',p.shiny)} ${p.name}${p.shiny?" 🌟":""} — Lv.${p.level}</span>
+        <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${p.name}${p.shiny?" 🌟":""} — Lv.${p.level}</span>
         <span class="mon-sub">${typesHtml(p.types)}</span>
         ${golpesDoTimeHtml(p)}
       </div>
@@ -20288,7 +20755,7 @@ function renderJourneyEnd(){
       return `<div class="order-row">
         <div class="order-num">${idx+1}º</div>
         <div class="order-info">
-          <span class="mon-name">${spriteHtml(p.speciesId,'sprite-sm',p.shiny)} ${p.name}${p.shiny?" 🌟":""} — Lv.${p.level}</span>
+          <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${p.name}${p.shiny?" 🌟":""} — Lv.${p.level}</span>
           <span class="mon-sub">${typesHtml(p.types)}</span>
         </div>
       </div>`;
@@ -20511,7 +20978,7 @@ function renderPlayerTeamModal(){
         ${sorted.length>0 ? sorted.map(p=>{
           const sp = SPECIES[p.speciesId];
           const buffed = terrainTypes && sp && sp.types.some(t=>terrainTypes.includes(t));
-          return `<div class="status-row"><span class="icon">${spriteHtml(p.speciesId,'sprite-sm',p.shiny)}</span><span>${p.name} — Lv.${p.level}${p.shiny?' 🌟':''}${buffed?' 🔺':''}</span></div>`;
+          return `<div class="status-row"><span class="icon">${spriteHtml(p,'sprite-sm')}</span><span>${p.name} — Lv.${p.level}${p.shiny?' 🌟':''}${buffed?' 🔺':''}</span></div>`;
         }).join('') : '<p>Não foi possível carregar esse time.</p>'}
       </div>
       ${(anyBuffed || sorted.some(p=>p.shiny)) ? `<p class="hint-text">${anyBuffed?'🔺 Buffado pelo terreno da partida. ':''}${sorted.some(p=>p.shiny)?'🌟 Shiny (+20% em todos os atributos).':''}</p>` : ''}
@@ -20925,7 +21392,7 @@ function renderLeague(){
         <div class="order-row">
           <div class="order-num">${idx+1}º</div>
           <div class="order-info">
-            <span class="mon-name">${spriteHtml(p.speciesId,'sprite-sm',p.shiny)} ${p.name}${p.shiny?' 🌟':''} — Lv.${p.level}</span>
+            <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${p.name}${p.shiny?' 🌟':''} — Lv.${p.level}</span>
           </div>
           <div class="order-controls">
             <button class="circle-btn" onclick="moveRegisteredTeamOrder('${p.id}', -1)" ${idx===0?'disabled':''}>▲</button>
@@ -21017,7 +21484,7 @@ function towerTeamRowHtml(team){
   return `<div class="save-slot-team-row spread">${(team||[]).map(p=>{
     const sp = SPECIES[p.speciesId];
     return `<div class="save-slot-mon">
-      <div class="save-slot-mon-sprite large">${sp?spriteHtml(p.speciesId,'sprite-md',p.shiny):'❔'}</div>
+      <div class="save-slot-mon-sprite large">${sp?spriteHtml(p,'sprite-md'):'❔'}</div>
       <div class="save-slot-mon-level">${p.shiny?'🌟 ':''}Lv.${p.level}</div>
     </div>`;
   }).join('')}</div>`;
@@ -21113,7 +21580,7 @@ function renderCandyPickerModal(){
           return `<button class="tower-pick ${noMax?'off':''}" ${noMax?'disabled':''}
             onclick="useRareCandyOn(${slot},'${escJs(p.id||'')}')"
             title="${escapeHtmlSafe(sp?sp.name:'?')} Lv.${p.level}${noMax?' -- já está no nível máximo':''}">
-            ${sp?spriteHtml(p.speciesId,'sprite-sm',p.shiny):'❔'}
+            ${sp?spriteHtml(p,'sprite-sm'):'❔'}
             <span class="tower-pick-lv">${p.shiny?'<span>🌟</span>':''}<span>Lv.${p.level}</span></span>
           </button>`;
         }).join('')}</div>
@@ -21149,7 +21616,7 @@ function renderTowerOrderModal(){
           return `<div class="order-row">
             <div class="order-num">${idx+1}º${botaoDeItemHtml(p)}</div>
             <div class="order-info">
-              <span class="mon-name">${sp?spriteHtml(p.speciesId,'sprite-sm',p.shiny):'❔'} ${escapeHtmlSafe(sp?sp.name:'?')}${p.shiny?' 🌟':''} — Lv.${p.level}</span>
+              <span class="mon-name">${sp?spriteHtml(p,'sprite-sm'):'❔'} ${escapeHtmlSafe(sp?sp.name:'?')}${p.shiny?' 🌟':''} — Lv.${p.level}</span>
               ${golpesDoTimeHtml(p)}
             </div>
             <div class="order-controls">
@@ -21484,7 +21951,7 @@ function renderTrainerProfileModal(){
     </div>` : '';
 
     const aceHtml = (ace && especie) ? `<div class="tp-ace">
-      ${spriteHtml(ace.speciesId, 'sprite-md', !!ace.shiny)}
+      ${spriteHtml(ace,'sprite-md')}
       <div>
         <div class="tp-ace-label">POKÉMON MAIS FORTE</div>
         <div class="tp-ace-name">${ace.shiny?'✨ ':''}${escapeHtmlSafe(especie.name)} — Lv.${ace.level}</div>
@@ -21963,7 +22430,7 @@ function renderSundayBoss(){
            320px, sem nenhum indício de que existia -->
       <div class="save-slot-team-row spread">${t.team.map(p=>`
         <div class="save-slot-mon">
-          <div class="save-slot-mon-sprite large">${spriteHtml(p.speciesId,'sprite-md',p.shiny)}</div>
+          <div class="save-slot-mon-sprite large">${spriteHtml(p,'sprite-md')}</div>
           <div class="save-slot-mon-level">Lv.${p.level}</div>
         </div>`).join('')}</div>
     </button>`;}).join('')
@@ -22646,7 +23113,7 @@ function candidatosDaMaquina(hmId, slot){
     if(de != null && i !== de) continue;
     timeDoSlot(i).forEach((p, idx) => {
       if(!p || !SPECIES[p.speciesId]) return;
-      if(!podeAprenderCorte(p.speciesId)) return;
+      if(!podeAprenderHM(hmId, p.speciesId)) return;
       if((p.ataques || []).indexOf(hm.golpe) >= 0) return;
       lista.push({ slot:i, idx, speciesId:p.speciesId, nome:p.name || SPECIES[p.speciesId].name,
                    level:p.level, shiny:!!p.shiny, ataques:(p.ataques || []).slice() });
@@ -22712,7 +23179,7 @@ function escolherAlvoDaMaquina(slot, idx){
   const e = game.hmEnsino;
   if(!e) return;
   const p = timeDoSlot(slot)[idx];
-  if(!p || !podeAprenderCorte(p.speciesId)) return;
+  if(!p || !podeAprenderHM(e.hm, p.speciesId)) return;
   e.slot = slot; e.idx = idx;
   if((p.ataques || []).length < MAX_GOLPES){ ensinarOGolpeDaMaquina(null); return; }
   game.screen = "hmTroca";
@@ -22743,7 +23210,7 @@ async function ensinarOGolpeDaMaquina(golpeQueSai){
      embaixo ainda precisa saber em qual save escrever */
   const slot = e.slot;
   const p = timeDoSlot(slot)[e.idx];
-  if(!p || !podeAprenderCorte(p.speciesId)) return;
+  if(!p || !podeAprenderHM(e.hm, p.speciesId)) return;
   const ataques = (p.ataques || []).slice();
   if(golpeQueSai){
     const i = ataques.indexOf(golpeQueSai);
@@ -22780,7 +23247,7 @@ function avisoDaMaquinaHtml(){
   if(!a) return "";
   return `<div class="box cursor">
     <div class="golpe-cab">
-      <span class="golpe-cab-sprite">${spriteHtml(a.speciesId,"sprite-md",a.shiny)}</span>
+      <span class="golpe-cab-sprite">${spriteHtml(a,"sprite-md")}</span>
       <span class="golpe-cab-txt"><strong>${escapeHtmlSafe(a.nome)}</strong> aprendeu ${escapeHtmlSafe(nomeDoAtaque(a.golpe))}!</span>
     </div>
     ${a.saiu ? `<p class="hint-text">Esqueceu ${escapeHtmlSafe(nomeDoAtaque(a.saiu))} pra abrir espaço.</p>` : ""}
@@ -22795,7 +23262,12 @@ function telaDosTimesDaMaquina(hm){
   const times = timesDaMaquina(game.hmEnsino.hm);
   const corpo = times.length === 0
     ? `<div class="box"><p class="item-detalhe-vazio">Nenhum pokémon dos seus times aprende essa Máquina.</p>
-        <p class="hint-text">São ${CORTADORES.length} espécies que aprendem o Corte — entre elas o Bulbasaur, o Charmander, o Totodile e a linha do Nidoran.</p></div>`
+        ${/* ⚠️ A FRASE SAI DO PRÓPRIO HM (15/09/2026): ela citava os CORTADORES e o Corte com o nome
+             escrito à mão, então a tela do HM03 diria "72 espécies aprendem o Corte" com o Surf na
+             mão. Hoje o número vem do `hm.aprendem` e o nome do `hm.golpe`, e o próximo HM já nasce
+             com a frase certa -- os exemplos ficam no item, que é quem sabe quem são. */''}
+        <p class="hint-text">São ${(HMS[game.hmEnsino.hm].aprendem || []).length} espécies que aprendem o ${escapeHtmlSafe(nomeDoAtaque(HMS[game.hmEnsino.hm].golpe))}${
+          HMS[game.hmEnsino.hm].exemplos ? ' — entre elas ' + escapeHtmlSafe(HMS[game.hmEnsino.hm].exemplos) : ''}.</p></div>`
     : times.map(t => {
         const media = Math.round(t.mons.reduce((a, m) => a + (m.level || 0), 0) / t.mons.length);
         return `<button class="save-slot-card has-avg-star clickable" onclick="abrirTimeDaMaquina(${t.slot})">
@@ -22805,7 +23277,7 @@ function telaDosTimesDaMaquina(hm){
           </div>
           <div class="save-slot-team-row spread">
             ${t.mons.map(m => `<div class="save-slot-mon">
-              <div class="save-slot-mon-sprite">${spriteHtml(m.speciesId,"sprite-sm",m.shiny)}</div>
+              <div class="save-slot-mon-sprite">${spriteHtml(m,"sprite-sm")}</div>
               <div class="save-slot-mon-level">Lv.${m.level}</div>
             </div>`).join("")}
           </div>
@@ -22837,7 +23309,7 @@ function telaDoTimeDaMaquina(hm, slot){
   <div class="box">
     ${mons.map(c => `
       <button class="btn hm-alvo" style="border-left-color:${TYPE_COLORS[SPECIES[c.speciesId].types[0]] || "var(--box-border)"}" onclick="escolherAlvoDaMaquina(${c.slot},${c.idx})">
-        <span class="mon-name">${spriteHtml(c.speciesId,"sprite-sm",c.shiny)} ${escapeHtmlSafe(c.nome)}${c.shiny ? " 🌟" : ""} <span class="wild-lv">— Lv.${c.level}</span></span>
+        <span class="mon-name">${spriteHtml(c,"sprite-sm")} ${escapeHtmlSafe(c.nome)}${c.shiny ? " 🌟" : ""} <span class="wild-lv">— Lv.${c.level}</span></span>
         <span class="mon-sub">${typesHtml(SPECIES[c.speciesId].types)}</span>
         <span class="hm-alvo-save">${c.ataques.length >= MAX_GOLPES ? "precisa esquecer um golpe" : "tem vaga"}</span>
       </button>`).join("")}
@@ -22862,7 +23334,7 @@ function renderHmTroca(){
   <div class="eyebrow">${hm.icone} ${escapeHtmlSafe(hm.nome)}</div>
   <div class="box cursor">
     <div class="golpe-cab">
-      <span class="golpe-cab-sprite">${spriteHtml(p.speciesId,"sprite-md",p.shiny)}</span>
+      <span class="golpe-cab-sprite">${spriteHtml(p,"sprite-md")}</span>
       <span class="golpe-cab-txt"><strong>${escapeHtmlSafe(p.name || SPECIES[p.speciesId].name)}</strong> quer aprender ${escapeHtmlSafe(nomeDoAtaque(hm.golpe))}!</span>
     </div>
     ${cartaoDeGolpe(hm.golpe, true, true)}
@@ -23327,7 +23799,7 @@ function montadorDeTimeHtml(escolhidos, nomeDoToggle, max, esperas){
         ${bloqueado?'disabled':''}
         title="${escapeHtmlSafe(sp?sp.name:'?')} Lv.${p.level}${bloqueado?porque:''}">
         <span class="mont-num">${sel ? (posicao+1)+'º' : ''}</span>
-        ${sp?spriteHtml(p.speciesId,'sprite-sm',p.shiny):'❔'}
+        ${sp?spriteHtml(p,'sprite-sm'):'❔'}
         <span class="mont-info">
           <span class="mont-nome">${escapeHtmlSafe(sp?sp.name:'?')}${p.shiny?' 🌟':''} <span class="mont-lv">— ${falta>0 ? '⏳'+Math.ceil(falta/60000)+'min' : 'Lv.'+p.level}</span></span>
           <span class="mont-sub">${sp?typesHtml(sp.types):''}<span class="mont-time">${escapeHtmlSafe(p.teamName)}</span></span>
@@ -23621,6 +24093,14 @@ function pararBuscaGlobal(){ if(buscaTimer){ clearTimeout(buscaTimer); buscaTime
 function codigosElegiveisOnline(){
   return timeElegiveisOnline().map(slot => encodeTeamCode(game.saveSlots[slot].team));
 }
+/* ⚠️ OS GOLPES DE CADA TIME ELEGÍVEL, NA MESMA ORDEM DOS CÓDIGOS (16/09/2026) -- e a ordem é a
+   coisa toda: a escolha do time no online é um ÍNDICE nessa lista. Fora de ordem, cada time
+   lutaria com o moveset de outro, e isso não aparece como erro -- aparece como um Snorlax batendo
+   de Raio Solar.
+   Ela lê o MESMO `timeElegiveisOnline()` que os códigos, na mesma passada, pelo mesmo motivo. */
+function golpesElegiveisOnline(){
+  return timeElegiveisOnline().map(slot => golpesDoTime(game.saveSlots[slot].team));
+}
 function startOnlineSearch(){ return entrarNaFilaOnline(true); }
 /* A MESMA busca, mas sem sair da tela -- é a do botão que aparece nas batalhas da jornada. Quem
    liga a procura no meio de uma jornada quer continuar jogando, não ser levado pra outra tela. */
@@ -23637,7 +24117,7 @@ async function entrarNaFilaOnline(irParaTelaOnline){
   if(irParaTelaOnline) game.screen = 'onlineBattle';
   render();
   try{
-    const r = await functionsClient.httpsCallable('joinBattleQueue')({ codes });
+    const r = await functionsClient.httpsCallable('joinBattleQueue')({ codes, ataques: golpesElegiveisOnline() });
     if(r.data.pending){ mostrarConvite(r.data); return; }
     agendarBuscaGlobal();
   } catch(e){
@@ -23762,7 +24242,7 @@ function renderInscricaoLigaModal(){
             ${time.map(p => {
               const sp = SPECIES[p.speciesId];
               return `<div class="save-slot-mon">
-                <div class="save-slot-mon-sprite">${sp ? spriteHtml(p.speciesId, 'sprite-sm', p.shiny) : '❔'}</div>
+                <div class="save-slot-mon-sprite">${sp ? spriteHtml(p,'sprite-sm') : '❔'}</div>
                 <div class="save-slot-mon-level">Lv.${p.level}</div>
               </div>`;
             }).join('')}
@@ -23805,7 +24285,7 @@ function agendarBuscaGlobal(){
       // caiu da fila sem batalha (expirou): reentra, senão a busca fica parada pra sempre
       if(!r.data.inQueue){
         const codes = codigosElegiveisOnline();
-        if(codes.length) await functionsClient.httpsCallable('joinBattleQueue')({ codes });
+        if(codes.length) await functionsClient.httpsCallable('joinBattleQueue')({ codes, ataques: golpesElegiveisOnline() });
       }
     } catch(e){ console.error('Erro na fila:', e); }
     agendarBuscaGlobal();
@@ -24270,7 +24750,7 @@ async function entrarNoLobby(){
 async function pulsarLobby(codes){
   try{
     const r = await functionsClient.httpsCallable('joinBattleLobby')(
-      codes ? { codes, since: game.onlineSince } : { since: game.onlineSince });
+      codes ? { codes, ataques: golpesElegiveisOnline(), since: game.onlineSince } : { since: game.onlineSince });
     game.lobbyJogadores = r.data.jogadores || [];
     if(r.data.battleId){ pararLobby(); game.onlinePendente = null; entrarNaBatalha(r.data.battleId); return true; }
     if(r.data.convite && !game.onlinePendente){ mostrarConvite(r.data.convite); }
@@ -24535,7 +25015,7 @@ function fighterOnlineHtml(mon, lado, hpMostrado, especialidades, selos){
   // durante a animação a barra parte do HP ANTERIOR; fora dela, mostra o valor atual
   const hp = (typeof hpMostrado === 'number') ? hpMostrado : mon.hp;
   return `<div class="fighter online-fighter-${lado}">
-    <div class="fighter-emoji">${sp?spriteHtml(mon.speciesId,'sprite-lg',mon.shiny):'❔'}</div>
+    <div class="fighter-emoji">${sp?spriteHtml(mon,'sprite-lg'):'❔'}</div>
     ${escapeHtmlSafe(mon.name)}${mon.shiny?' 🌟':''}${comEspecialidade?' 🎖️':''}${selos || ''} <span class="fighter-level">Lv.${mon.level}</span>
     <div class="fighter-types">${sp?typesHtml(sp.types):''}</div>
     ${renderHpBar(hp, mon.maxHp, 'online-hp-'+lado, 'online-hplabel-'+lado)}
@@ -24811,7 +25291,7 @@ function painelTimesHtml(st, anim, precisaEscolher, restam, padraoOnline){
       ${(p.hp<=0 || !precisaEscolher || !!anim)?'disabled':''} onclick="escolherPokemonOnline(${i})"
       title="${escapeHtmlSafe(sp?sp.name:'?')} — ${p.hp}/${p.maxHp} HP">
       ${escolhido?'<span class="online-pick-check">✓</span>':''}
-      ${sp?spriteHtml(p.speciesId,'sprite-md',p.shiny):'❔'}
+      ${sp?spriteHtml(p,'sprite-md'):'❔'}
       <span class="online-pick-nome">${escapeHtmlSafe(sp?sp.name:'?')}${p.shiny?' 🌟':''}</span>
       <span class="online-pick-lvl">Lv.${p.level}</span>
       <span class="online-pick-hp"><span class="hp-bar-fill ${hpBarClass(pct)}" id="online-pickhp-${i}" style="transform:scaleX(${pct/100})"></span></span>
@@ -24824,7 +25304,7 @@ function painelTimesHtml(st, anim, precisaEscolher, restam, padraoOnline){
     const morto = p.hp<=0;
     const sp = SPECIES[p.speciesId];
     return `<div class="tower-pick online-pick sem-clique ${morto?'off':''}" title="${escapeHtmlSafe(sp?sp.name:'?')} — Lv.${p.level}">
-      ${sp?spriteHtml(p.speciesId,'sprite-md',p.shiny):'❔'}
+      ${sp?spriteHtml(p,'sprite-md'):'❔'}
       <span class="online-pick-nome">${escapeHtmlSafe(sp?sp.name:'?')}${p.shiny?' 🌟':''}</span>
       <span class="online-pick-lvl">Lv.${p.level}</span>
       <span class="tower-pick-lv">${morto?'✖ caiu':'&nbsp;'}</span>
@@ -25068,7 +25548,7 @@ async function desafiarAmigo(uid, nome){
   game.onlineSince = Date.now() - 1000;
   render();
   try{
-    const r = await functionsClient.httpsCallable('challengeFriend')({ targetUid: uid, codes });
+    const r = await functionsClient.httpsCallable('challengeFriend')({ targetUid: uid, codes, ataques: golpesElegiveisOnline() });
     game.friendChallenge = r.data.challenge;
   } catch(e){
     console.error('Erro ao desafiar amigo:', e);
@@ -25092,7 +25572,7 @@ async function responderDesafioAmigo(challengeId, aceitar){
   render();
   try{
     const payload = { challengeId, accept: !!aceitar };
-    if(aceitar) payload.codes = codigosElegiveisOnline();
+    if(aceitar){ payload.codes = codigosElegiveisOnline(); payload.ataques = golpesElegiveisOnline(); }
     const r = await functionsClient.httpsCallable('respondFriendChallenge')(payload);
     game.friendsBusy = null;
     game.friendChallenge = null;
@@ -25584,7 +26064,7 @@ function renderSaveSelect(){
         ${team.map(p=>{
           const sp = SPECIES[p.speciesId];
           return `<div class="save-slot-mon">
-            <div class="save-slot-mon-sprite large">${sp?spriteHtml(p.speciesId,'sprite-md',p.shiny):'❔'}</div>
+            <div class="save-slot-mon-sprite large">${sp?spriteHtml(p,'sprite-md'):'❔'}</div>
             <div class="save-slot-mon-level">Lv.${p.level}</div>
           </div>`;
         }).join('')}
@@ -25823,7 +26303,7 @@ function renderMewtwoPicker(){
         ${team.map(p=>{
           const sp = SPECIES[p.speciesId];
           return `<div class="save-slot-mon">
-            <div class="save-slot-mon-sprite large">${sp?spriteHtml(p.speciesId,'sprite-md',p.shiny):'❔'}</div>
+            <div class="save-slot-mon-sprite large">${sp?spriteHtml(p,'sprite-md'):'❔'}</div>
             <div class="save-slot-mon-level">Lv.${p.level}</div>
           </div>`;
         }).join('')}
@@ -25861,7 +26341,7 @@ function renderMewtwoLoanTeamPicker(){
         ${team.map(p=>{
           const sp = SPECIES[p.speciesId];
           return `<div class="save-slot-mon">
-            <div class="save-slot-mon-sprite large">${sp?spriteHtml(p.speciesId,'sprite-md',p.shiny):'❔'}</div>
+            <div class="save-slot-mon-sprite large">${sp?spriteHtml(p,'sprite-md'):'❔'}</div>
             <div class="save-slot-mon-level">Lv.${p.level}</div>
           </div>`;
         }).join('')}
@@ -25888,7 +26368,7 @@ function renderMewtwoLoanBenchPicker(){
     ${saveData.team.map((p,i)=>{
       const sp = SPECIES[p.speciesId];
       return `<div class="save-slot-card u-center">
-        <div class="save-slot-mon-sprite">${sp?spriteHtml(p.speciesId,'sprite-sm',p.shiny):'❔'}</div>
+        <div class="save-slot-mon-sprite">${sp?spriteHtml(p,'sprite-sm'):'❔'}</div>
         <div class="save-slot-mon-level">${sp?sp.name:p.speciesId} Lv.${p.level}</div>
         <button class="btn danger" ${game.mewtwoLoanSubmitting?'disabled':''} onclick="confirmMewtwoLoanActivation(${slot},${i})">Mandar pro Prof. Carvalho</button>
       </div>`;
@@ -25912,7 +26392,7 @@ function renderMewtwoBenchPicker(){
     ${saveData.team.map((p,i)=>{
       const sp = SPECIES[p.speciesId];
       return `<div class="save-slot-card u-center">
-        <div class="save-slot-mon-sprite">${sp?spriteHtml(p.speciesId,'sprite-sm',p.shiny):'❔'}</div>
+        <div class="save-slot-mon-sprite">${sp?spriteHtml(p,'sprite-sm'):'❔'}</div>
         <div class="save-slot-mon-level">${sp?sp.name:p.speciesId} Lv.${p.level}</div>
         <button class="btn danger" onclick="chooseMewtwoBench(${slot},${i})">Mandar pro Prof. Carvalho</button>
       </div>`;
@@ -25951,6 +26431,7 @@ async function startMewtwoBattle(slot){
     const inst = createInstance(p.speciesId, p.level);
     inst.shiny = !!p.shiny;
     if(Array.isArray(p.ataques)) inst.ataques = p.ataques.slice();   // mesmo motivo do shiny, ver acima
+    if(p.unown) inst.unown = p.unown;                                // idem
     return inst;
   });
   // 1/128 -- vale tanto na primeira vitória (a que completa a Pokédex) quanto em qualquer reencontro
@@ -26167,6 +26648,10 @@ function render(){
      empilham na ordem em que são anexados -- vindo antes, ela abriria atrás. É a mesma nota que a
      própria ficha carrega em relação ao modal da Pokédex. */
   if(game.especialInfo){ html += renderEspecialInfoModal(); }
+  /* ⚠️ O HM GANHO vem DEPOIS da ficha e da caixa do especial e ANTES do convite online: ele pode
+     nascer em QUALQUER tela (a captura, ou o carregamento da conta), entao ele nao pode ficar
+     preso a uma; e o convite, que tem 15 segundos de prazo, tem que ficar por cima dele. */
+  if(game.hmGanhoModal){ html += renderHmGanhoModal(); }
   if(game.onlinePendente){ html += renderConviteModal(); }   // aparece por cima de qualquer tela
   if(game.desafioAviso){ html += renderAvisoDesafioModal(); }   // desafio de amigo, idem
   html += renderAvisoDeSaveHtml();   // "não estou conseguindo salvar" -- por cima de tudo

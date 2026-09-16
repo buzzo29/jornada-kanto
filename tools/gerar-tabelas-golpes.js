@@ -35,7 +35,11 @@ const FORA = ['selfdestruct', 'explosion'];
    ⚠️ E ELE NÃO ENTRA NO `GOLPES_IDS`: aquele array é indexado pelo APRENDIZADO, e um id a mais no
    meio trocaria o moveset das 250 espécies. Ninguém o aprende por nível, então ele não tem o que
    fazer lá. */
-const A_MAO = { cut: { tipo:'Normal', poder:50 } };
+/* ⚠️ OS DOIS HMs SÃO ESCRITOS À MÃO: HM ninguém aprende por NÍVEL, então o gerador nunca os vê.
+   Sem estas linhas, regenerar as tabelas APAGA os dois em silêncio e o HM01/HM03 fica sem nada pra
+   ensinar. Os valores saem do mesmo caminho do resto (mods 8→3): o Surf é 95 na Gen 3, não os 90
+   do arquivo moderno. */
+const A_MAO = { cut: { tipo:'Normal', poder:50 }, surf: { tipo:'Water', poder:95 } };
 const ehDano = id => D.golpes[id] && D.golpes[id].poder > 0 && FORA.indexOf(id) < 0;
 
 /* ---- quem aprende o quê, só dano ---- */

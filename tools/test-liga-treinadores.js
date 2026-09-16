@@ -291,6 +291,196 @@ await (async function(){
   ok('e o fake recusa undefined, como o Firestore de verdade', pegou);
 })();
 
+console.log('\n=== OS GOLPES ESCOLHIDOS CHEGAM NA LIGA E NO ONLINE (16/09/2026) ===');
+{
+  /* Reportado assim: *"o sanguessuga e outros ataques de absorver nao estao curando nas batalhas
+     das ligas onlines"*. Era verdade, e a causa era UMA: o time da liga vem de um CODIGO
+     (`especie:nivel:shiny`), que nao carrega golpe -- entao `melhorAtaque` devolvia null, o motor
+     caia no de tipo, e TRES mecanicas simplesmente nao existiam la: a drenagem no golpe, o golpe de
+     varios tapas e a escala do Rolamento. */
+  const G = fns._golpesEspeciais;
+  const NIVEL = 50;
+  const code = ids => Buffer.from(ids.map(id => id + ':' + NIVEL).join(','), 'utf8').toString('base64');
+  const mapa = ids => { const m = {}; for(const id of ids){
+    const l = G.ataquesDisponiveis(id, NIVEL).slice(0, 3); if(l.length) m[id + ':' + NIVEL] = l; } return m; };
+
+  /* ===== A CHAVE E ESPECIE:NIVEL, NAO A POSICAO ===== */
+  /* ⚠️ Por posicao isto quebraria na Trainers League, que REORDENA o time (o override de rodada) e
+     ACRESCENTA o codigo do Mewtwo ao sorteio. Nos dois casos o indice desanda e cada pokemon luta
+     com o moveset de outro -- e isso nao aparece como erro, aparece como um Snorlax batendo de
+     Raio Solar. */
+  {
+    const time = fns._decodeTeamCode(code(['blastoise','machamp','gengar']));
+    /* o mapa vem na ordem TROCADA de proposito: por posicao, cada um pegaria o golpe do vizinho */
+    fns._carimbaDoMatch(time, { ataques: mapa(['gengar','machamp','blastoise']) });
+    const doBlastoise = (time.find(p => p.speciesId === 'blastoise').ataques || []);
+    ok('o golpe vai pro pokemon certo mesmo fora de ordem',
+       doBlastoise.every(id => G.ataquesDisponiveis('blastoise', NIVEL).indexOf(id) >= 0),
+       doBlastoise.join(','));
+    ok('e nenhum leva golpe que a especie nao aprende',
+       time.every(p => (p.ataques||[]).every(id => G.ataquesDisponiveis(p.speciesId, NIVEL).indexOf(id) >= 0)));
+  }
+  /* ⚠️ O NIVEL ENTRA NA CHAVE porque o Doce Raro sobe nivel, e nivel novo pode ter destravado golpe
+     novo. Sem ele, um time repropagado casaria com os golpes de antes. */
+  {
+    const time = fns._decodeTeamCode(code(['blastoise']));
+    fns._carimbaDoMatch(time, { ataques: { 'blastoise:60': ['hydropump'] } });   // nivel que nao e o dele
+    ok('chave de outro nivel nao cola', !time[0].ataques, (time[0].ataques||[]).join(','));
+  }
+
+  /* ===== O SERVIDOR NAO CONFIA NO CLIENTE ===== */
+  /* O codigo de time e dado de cliente, e os golpes viajam ao lado dele -- sem validacao, uma linha
+     no console poria Hiper Raio em tudo. O que sobra de um time forjado e o motor de tipo, ou seja
+     exatamente o que a liga fazia antes desta mudanca: errar pro lado de TIRAR e o certo aqui. */
+  {
+    const forjado = ['hyperbeam','solarbeam','earthquake','naoexiste','thunder'];
+    ok('um Caterpie Lv.5 nao recebe nada disso',
+       fns._golpesValidos('caterpie', 5, forjado).length === 0,
+       fns._golpesValidos('caterpie', 5, forjado).join(','));
+    ok('golpe que nao existe na tabela e descartado',
+       fns._golpesValidos('snorlax', 70, ['naoexiste','xyz']).length === 0);
+    ok('e o que a especie REALMENTE aprende passa',
+       fns._golpesValidos('snorlax', 70, ['hyperbeam']).join(',') === 'hyperbeam');
+    /* o teto tambem e conferido aqui: mandar seis golpes nao da seis */
+    const seis = G.ataquesDisponiveis('snorlax', 70).slice(0, 6);
+    ok('mandar seis golpes nao da mais que ' + 3,
+       fns._golpesValidos('snorlax', 70, seis).length <= 3,
+       String(fns._golpesValidos('snorlax', 70, seis).length));
+    /* ⚠️ O GOLPE DE HM passa pela LISTA DA ESPECIE, e nao pelo aprendizado por nivel -- HM ninguem
+       aprende por nivel, entao sem isso o Surf de um Blastoise sumiria na liga. */
+    ok('o Surf passa em quem surfa', fns._golpesValidos('blastoise', 70, ['surf']).join(',') === 'surf');
+    ok('e NAO passa em quem nao surfa', fns._golpesValidos('machamp', 70, ['surf']).length === 0);
+    ok('o Corte passa em quem corta e nao em quem nao corta',
+       fns._golpesValidos('scyther', 70, ['cut']).join(',') === 'cut' &&
+       fns._golpesValidos('blastoise', 70, ['cut']).length === 0);
+    /* lixo nao derruba nada */
+    ok('lista vazia, nula ou lixo nao quebra',
+       fns._golpesValidos('snorlax', 70, null).length === 0 &&
+       fns._golpesValidos('snorlax', 70, [null, 5, {}]).length === 0);
+  }
+  /* ⚠️ AS DUAS LISTAS DE HM SAO DUPLICADAS DO CLIENTE, e elas tem que bater: divergindo, o Surf de
+     um Blastoise passa num motor e some no outro -- a mesma partida daria resultado diferente
+     conforme quem a resolvesse. */
+  {
+    const cli = require('./game-sandbox').createSandbox(path.join(__dirname, '..', 'index.html'));
+    ok('CORTADORES igual nos dois motores',
+       fns._CORTADORES.slice().sort().join(',') === cli.CORTADORES.slice().sort().join(','),
+       fns._CORTADORES.length + ' vs ' + cli.CORTADORES.length);
+    ok('SURFISTAS igual nos dois motores',
+       fns._SURFISTAS.slice().sort().join(',') === cli.SURFISTAS.slice().sort().join(','),
+       fns._SURFISTAS.length + ' vs ' + cli.SURFISTAS.length);
+    /* e a CHAVE tem que ser a mesma nos dois: divergindo, o golpe e procurado numa chave que nao
+       existe e o time inteiro cai no motor de tipo, EM SILENCIO */
+    const txtCli = require('fs').readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+    const txtSrv = require('fs').readFileSync(path.join(__dirname, '..', 'functions', 'index.js'), 'utf8');
+    const forma = t => (t.match(/function chaveDosGolpes\(p\)\{[^}]*\}/) || [''])[0];
+    ok('e a chave dos golpes e a MESMA funcao nos dois', forma(txtCli) === forma(txtSrv) && !!forma(txtCli),
+       forma(txtSrv));
+  }
+
+  /* ===== O CAMINHO REAL DA LIGA ===== */
+  /* A prova que importa: a MESMA partida, com e sem o mapa de golpes ao lado do codigo. */
+  {
+    /* o elenco tem dono de DRENAGEM (a linha do Oddish, o Zubat) e de MULTI-TAPA (Jigglypuff,
+       Doduo, Rhyhorn) de proposito: sem eles a trava mediria o que nao esta la. */
+    const ELENCO = ['oddish','gloom','vileplume','zubat','golbat','crobat','paras','parasect',
+                    'bellsprout','weepinbell','victreebel','gastly','haunter','gengar','venonat',
+                    'jigglypuff','wigglytuff','doduo','dodrio','rhyhorn','rhydon','cloyster'];
+    const sorteia = (i,n) => { const o=[]; const b=(i*7)%ELENCO.length;
+      for(let k=0;k<n;k++) o.push(ELENCO[(b+k*5)%ELENCO.length]); return o; };
+    const terreno = fns._TERRAINS[0];
+    const conta = comGolpes => {
+      const c = { conf:0, comMove:0, dreno:0, tapas:0 };
+      for(let i=0;i<220;i++){
+        const A = sorteia(i,3), B = sorteia(i+3,3);
+        const match = { a:{ code:code(A), ataques: comGolpes?mapa(A):null },
+                        b:{ code:code(B), ataques: comGolpes?mapa(B):null },
+                        terrain:{ id:terreno.id, name:terreno.name, types:terreno.types },
+                        winner:null, matchups:null, resolved:false };
+        fns._resolveLeagueMatch(match, 'trava|'+i, null);
+        for(const m of match.matchups||[]){ c.conf++;
+          if(m.playerMoveId || m.enemyMoveId) c.comMove++;
+          for(const g of m.golpes||[]){ if(g.x==='dreno') c.dreno++; if(!g.x && g.t>1) c.tapas++; } }
+      }
+      return c;
+    };
+    const antes = conta(false), depois = conta(true);
+    /* ⚠️ "ANTES" NAO E ZERO, e isso e o METRONOMO: ele sorteia entre TODOS os golpes de dano do
+       jogo, entao ele e a unica porta por onde um drenante ou um multi-tapa entrava numa liga sem
+       golpe escolhido. E por isso que a trava compara PROPORCAO e nao "zero contra alguma coisa". */
+    ok('sem o mapa, quase nenhum confronto tem golpe escolhido',
+       antes.comMove < antes.conf * 0.15, antes.comMove + ' de ' + antes.conf);
+    ok('com o mapa, quase todos tem', depois.comMove > depois.conf * 0.9,
+       depois.comMove + ' de ' + depois.conf);
+    /* ⚠️ A ASSERCAO E ABSOLUTA, e nao uma razao: 'antes' costuma ser ZERO (so o Metronomo abre
+       essa porta), e razao contra zero nao mede nada -- foi assim que esta trava nasceu falhando. */
+    ok('a CURA por drenagem passa a acontecer', antes.dreno < 10 && depois.dreno >= 40,
+       antes.dreno + ' -> ' + depois.dreno);
+    ok('e o golpe de varios tapas tambem', antes.tapas < 10 && depois.tapas >= 40,
+       antes.tapas + ' -> ' + depois.tapas);
+  }
+
+  /* ===== O ONLINE ===== */
+  /* Ele nao passa pelo resolveLeagueMatch: resolve confronto a confronto, e o pokemon RENASCE a
+     cada um (battleHydrate). Sem a linha de la, ele lutaria no motor de tipo pra sempre. */
+  {
+    const guardados = fns._battleInstances(code(['blastoise','gengar']), mapa(['blastoise','gengar']));
+    ok('o battleInstances guarda os golpes JA validados',
+       Array.isArray(guardados[0].ataques) && guardados[0].ataques.length > 0,
+       (guardados[0].ataques||[]).join(','));
+    ok('e valida na entrada: golpe forjado nao entra no estado',
+       (fns._battleInstances(code(['caterpie']), { 'caterpie:50': ['hyperbeam'] })[0].ataques) === null);
+    const vivo = fns._battleHydrate(guardados[0]);
+    ok('e o battleHydrate devolve os golpes na instancia',
+       (vivo.ataques||[]).join(',') === guardados[0].ataques.join(','), (vivo.ataques||[]).join(','));
+    const semGolpe = fns._battleInstances(code(['blastoise']), null);
+    ok('sem golpe mandado, o online continua no motor de tipo (como era)',
+       semGolpe[0].ataques === null && !fns._battleHydrate(semGolpe[0]).ataques);
+  }
+
+  /* ===== O QUE NAO PODE TER MUDADO ===== */
+  /* ⚠️ Time SEM golpe tem que sair IDENTICO ao que saia antes -- e isso nao e compatibilidade, e o
+     que garante que inscricao velha (que nao tem o campo) e codigo de time continuem lutando
+     exatamente como lutavam. */
+  {
+    const time = fns._decodeTeamCode(code(['blastoise','machamp']));
+    fns._carimbaDoMatch(time, { ataques: null });
+    ok('sem o campo, ninguem ganha golpe', time.every(p => !p.ataques));
+    fns._carimbaDoMatch(time, {});
+    ok('e um lado sem nada tambem nao', time.every(p => !p.ataques));
+  }
+  /* ⚠️ E OS SLOTS CONTINUAM SENDO POR POSICAO: eles dizem de que SAVE veio o pokemon, e dois saves
+     podem ter a mesma especie no mesmo nivel -- por especie:nivel eles colidiriam. */
+  {
+    const time = fns._decodeTeamCode(code(['blastoise','machamp','gengar']));
+    fns._carimbaDoMatch(time, { slots: ['3', '7', null] });
+    ok('o slot continua sendo por POSICAO',
+       time[0].slotDaConta === '3' && time[1].slotDaConta === '7' && !time[2].slotDaConta,
+       time.map(p => p.slotDaConta).join(','));
+  }
+  /* ⚠️ E O CARIMBO E UM SO: ele estava COPIADO no resolveLeagueMatch e no resolveTrainersLeagueMatch,
+     palavra por palavra, e os golpes seriam a terceira e a quarta copia. */
+  {
+    const txt = require('fs').readFileSync(path.join(__dirname, '..', 'functions', 'index.js'), 'utf8');
+    ok('o carimbaSlots copiado nao existe mais', txt.indexOf('const carimbaSlots') < 0);
+    ok('e os dois resolvedores chamam a MESMA funcao',
+       (txt.match(/carimbaDoMatch\(teamA, match\.a\); carimbaDoMatch\(teamB, match\.b\);/g) || []).length === 2,
+       String((txt.match(/carimbaDoMatch\(teamA/g) || []).length));
+    const cli = require('fs').readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+    ok('e as DUAS copias do cliente tambem carimbam',
+       (cli.match(/carimbaDoMatch\(teamA, match\.a\); carimbaDoMatch\(teamB, match\.b\);/g) || []).length === 2);
+  }
+  /* ⚠️ O BOT DA LIGA GANHOU MOVESET: ate hoje "todo mundo sem golpe" era igual pra todos; a partir
+     desta mudanca, um bot sem golpe seria o unico time em desvantagem. Ele nao ESCOLHE -- leva o
+     que a especie aprende por nivel, a regra de todo NPC do jogo. */
+  {
+    const txt = require('fs').readFileSync(path.join(__dirname, '..', 'functions', 'index.js'), 'utf8');
+    const bloco = (txt.match(/function createBotRegistrant\([\s\S]*?\n\}/) || [''])[0];
+    ok('o bot da liga entra com o moveset da especie',
+       /ataquesDisponiveis\(/.test(bloco) && /ataques,/.test(bloco), bloco.length + ' chars');
+  }
+}
+
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
   process.exit(falhas ? 1 : 0);
 })();

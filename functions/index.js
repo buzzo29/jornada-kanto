@@ -876,11 +876,17 @@ function gen1MaxHp(p){ return Math.floor(2 * effectiveBaseHp(p) * p.level / 100)
    `APRENDIZADO` (as entradas são `[nivel, indice]`), então inserir um id no meio deslocaria TODOS
    os índices seguintes e trocaria o moveset das 250 espécies em silêncio. O `cut` não precisa dele:
    ninguém o aprende por nível, e o campo `ataques` de um pokémon guarda o id em TEXTO.
-   ⚠️ MAS ELE ENTRA NO BOLO DO METRÔNOMO (`POOL_METRONOMO` é derivado do `GOLPES`), que vai de 155
-   pra 156 golpes. Isso desloca a semente do sorteio -- esperado, e é o preço de o Metrônomo
-   sortear "qualquer poder existente no jogo", que é o que ele promete. */
+   ⚠️ MAS ELES ENTRAM NO BOLO DO METRÔNOMO (`POOL_METRONOMO` é derivado do `GOLPES`), que foi de
+   155 pra 156 com o `cut` e pra 157 com o `surf`. Isso desloca a semente do sorteio -- esperado,
+   e é o preço de o Metrônomo sortear "qualquer poder existente no jogo", que é o que ele promete.
+   ⚠️ SÃO DOIS À MÃO DESDE 15/09/2026, e o segundo é o `surf` (HM03). Os valores saem do MESMO
+   caminho do resto da base -- o `moves.json` do Showdown com a cadeia de mods 8→3 -- e ela importa:
+   o Surf moderno é poder 90, e o mod da **gen5** devolve os **95** que valiam na Gen 3. Lido do
+   arquivo moderno ele entraria 5 pontos fraco.
+   (Conferido pelo mesmo método: o `cut` sai Normal 50, exatamente o que já estava aqui.) */
 const GOLPES = {
   cut: ['Normal', 50],
+  surf: ['Water', 95],
   absorb:['Grass',20],acid:['Poison',40],aerialace:['Flying',60],aeroblast:['Flying',100],
   aircutter:['Flying',55],ancientpower:['Rock',60],astonish:['Ghost',30],aurorabeam:['Ice',65],
   barrage:['Normal',15],beatup:['Dark',10],bind:['Normal',15],bite:['Dark',60],
@@ -967,7 +973,7 @@ const GOLPES_PT = {
   rollout:'Rolamento',sacredfire:'Fogo Sagrado',sandtomb:'Tumba de Areia',scratch:'Arranhão',
   shadowball:'Bola Sombria',shadowpunch:'Soco Sombrio',signalbeam:'Feixe de Sinal',
   silverwind:'Vento Prateado',skullbash:'Quebra-Crânio',skyattack:'Ataque Celeste',
-  skyuppercut:'Cruzado Celeste',slam:'Batida',slash:'Talho',cut:'Corte',sludge:'Lodo',
+  skyuppercut:'Cruzado Celeste',slam:'Batida',slash:'Talho',cut:'Corte',surf:'Surf',sludge:'Lodo',
   sludgebomb:'Bomba de Lodo',smog:'Fumaça Tóxica',snore:'Ronco',solarbeam:'Raio Solar',
   spark:'Faísca',spikecannon:'Canhão de Espinhos',steelwing:'Asa de Aço',stomp:'Pisão',
   submission:'Submissão',superpower:'Superpoder',swift:'Rapidez',tackle:'Investida',
@@ -1149,6 +1155,79 @@ function ataquesDisponiveis(speciesId, nivel){
   return ids.sort((a, b) => GOLPES[b][1] - GOLPES[a][1] || a.localeCompare(b));
 }
 
+/* ⚠️ QUEM APRENDE CADA HM -- DUPLICADAS DO CLIENTE (16/09/2026), e elas vieram pra cá por um motivo
+   só: **o servidor precisa VALIDAR o golpe que o cliente manda**. Os golpes escolhidos passaram a
+   viajar ao lado do código de time (ver `carimbaDoMatch`), e código de time é dado de cliente --
+   sem validação, uma linha no console poria Hiper Raio em tudo.
+   O aprendizado por NÍVEL o servidor já sabia conferir (`ataquesDisponiveis`); o que faltava era o
+   HM, que ninguém aprende por nível e por isso não está no `APRENDIZADO`.
+   `tools/test-liga-treinadores.js` compara as duas cópias com as do cliente, por VALOR. */
+const CORTADORES = [
+  "bulbasaur","charmander","ratata","nidoranm","oddish","ivysaur","venusaur","charmeleon",
+  "charizard","beedrill","raticate","nidorino","gloom","sandshrew","sandslash","paras",
+  "parasect","meowth","persian","bellsprout","weepinbell","diglett","dugtrio","nidoranf",
+  "nidorina","tentacool","tentacruel","krabby","kingler","victreebel","tangela","vileplume",
+  "lickitung","rhydon","farfetchd","kangaskhan","scyther","kabutops","pinsir","nidoqueen",
+  "nidoking","dragonite","chikorita","bayleef","meganium","cyndaquil","quilava","typhlosion",
+  "totodile","croconaw","feraligatr","sentret","furret","bellossom","aipom","sunkern",
+  "sunflora","espeon","umbreon","gligar","steelix","scizor","heracross","sneasel",
+  "teddiursa","ursaring","skarmory","raikou","entei","suicune","tyranitar","celebi"
+];
+const SURFISTAS = [
+  "squirtle","wartortle","blastoise","staryu","starmie","poliwag","poliwhirl","tentacool",
+  "tentacruel","slowpoke","slowbro","gyarados","tauros","psyduck","golduck","krabby",
+  "kingler","horsea","seadra","goldeen","seaking","shellder","lickitung","rhydon",
+  "seel","dewgong","kangaskhan","omanyte","omastar","kabuto","kabutops","lapras",
+  "snorlax","nidoqueen","nidoking","dratini","dragonair","dragonite","poliwrath","cloyster",
+  "vaporeon","totodile","croconaw","feraligatr","sentret","furret","chinchou","lanturn",
+  "marill","azumarill","politoed","wooper","quagsire","slowking","qwilfish","sneasel",
+  "corsola","remoraid","octillery","mantine","kingdra","miltank","suicune","tyranitar","lugia"
+];
+/* golpe de HM -> quem pode aprender. Uma tabela, e não um `if` por golpe: o próximo HM entra numa
+   linha, e o validador não precisa saber que HM existe. */
+const APRENDEM_HM = { cut: CORTADORES, surf: SURFISTAS };
+/* ⚠️ O QUE O SERVIDOR ACEITA DE GOLPE ESCOLHIDO. Ele não confia na lista que chegou: reconstrói o
+   que aquela espécie NAQUELE nível pode ter e fica só com a interseção.
+   O que sobra de um time forjado é o motor de tipo -- ou seja, exatamente o que a liga já fazia
+   antes desta mudança. Errar pro lado de TIRAR o golpe é o certo aqui.
+   O teto é o `MAX_GOLPES`, e ele é conferido aqui também: mandar seis golpes não dá seis. */
+function golpesValidos(speciesId, nivel, lista){
+  if(!Array.isArray(lista) || !lista.length) return [];
+  const porNivel = new Set(ataquesDisponiveis(speciesId, nivel));
+  const out = [];
+  for(const id of lista){
+    if(typeof id !== "string" || out.indexOf(id) >= 0) continue;
+    if(!GOLPES[id]) continue;                                  // golpe que não existe
+    const hm = APRENDEM_HM[id];
+    if(hm ? hm.indexOf(speciesId) < 0 : !porNivel.has(id)) continue;
+    out.push(id);
+    if(out.length >= MAX_GOLPES) break;
+  }
+  return out;
+}
+/* ⚠️ UM CARIMBO SÓ PROS DOIS (16/09/2026). O `carimbaSlots` estava COPIADO no `resolveLeagueMatch`
+   e no `resolveTrainersLeagueMatch`, palavra por palavra -- e os golpes seriam a terceira e a
+   quarta cópia. Duas cópias já divergiriam no primeiro ajuste; quatro é garantia.
+   O CÓDIGO DE TIME (`especie:nivel:shiny`) continua intocado: ele é a trava anti-falsificação, e
+   o que viaja ao lado dele é o que o `decodeTeamCode` recusaria -- os slots desde sempre, e agora
+   os golpes. Quem não mandar nada luta no motor de tipo, como a liga inteira fazia até hoje. */
+/* a MESMA chave do cliente -- se as duas divergirem, o golpe é procurado numa chave que não existe
+   e o time inteiro cai no motor de tipo, em silêncio */
+function chaveDosGolpes(p){ return p.speciesId + ':' + p.level; }
+function carimbaDoMatch(time, lado){
+  if(!Array.isArray(time) || !lado) return;
+  time.forEach((p, i) => {
+    if(!p) return;
+    if(Array.isArray(lado.slots) && lado.slots[i] != null) p.slotDaConta = String(lado.slots[i]);
+    /* ⚠️ A CHAVE É ESPÉCIE:NÍVEL, não a posição -- ver chaveDosGolpes. E o `i` continua valendo
+       pros SLOTS, que são por posição mesmo: eles dizem de que save veio aquele pokémon. */
+    const crus = lado.ataques && lado.ataques[chaveDosGolpes(p)];
+    if(crus){
+      const bons = golpesValidos(p.speciesId, p.level, crus);
+      if(bons.length) p.ataques = bons;
+    }
+  });
+}
 const MOVE_POWER = 60;   // o poder de quem NÃO tem golpe escolhido (save antigo, e as 8 espécies sem golpe de dano)
 /* TETO DE DANO POR GOLPE, DESLIGADO desde 09/09/2026 -- e isso é decisão, não experimento
    esquecido: ele foi tirado pra um experimento e o resultado foi aprovado pro ar.
@@ -2941,9 +3020,17 @@ function createBotRegistrant(index, allowedTypes, seedBase){
   const shuffled = shuffleWithSeed(pool, `bot-${seedBase}-${index}`);
   const chosen = shuffled.slice(0, 6);
   const team = chosen.map(sid=>({ speciesId: sid, level: BOT_LEVEL }));
+  /* ⚠️ O BOT GANHA O MOVESET DA ESPECIE (16/09/2026), pela MESMA regra de todo NPC do jogo (ver
+     equiparNpc): ele nao ESCOLHE golpe, entao leva o que a especie aprende por nivel.
+     Sem isto ele seria o unico time da liga sem golpe -- e a partir de hoje isso deixou de ser
+     "todo mundo igual" e virou desvantagem so dele. */
+  const ataques = {};
+  for(const t of team){ const lista = ataquesDisponiveis(t.speciesId, t.level);
+    if(lista.length) ataques[chaveDosGolpes(t)] = lista.slice(0, MAX_GOLPES); }
   return {
     name: `Bot ${index}`,
     code: encodeTeamCode(team),
+    ataques,
     uid: `bot-${seedBase}-${index}`,
     slot: 'bot',
     registeredAt: 0,
@@ -3119,14 +3206,9 @@ function resolveLeagueMatch(match, seedStr, allowedTerrainIds){
   const rng = makeSeededRng(seedStr);
   const teamA = decodeTeamCode(match.a.code);
   const teamB = decodeTeamCode(match.b.code);
-  /* O CÓDIGO DO TIME não carrega o slot de cada pokémon -- ele é compacto. Quem manda os slots é
-     quem montou o match (hoje só o Ginásio da Cidade; as ligas não usam item). Sem este carimbo o
-     item equipado seria procurado sem slot e cairia na chave velha, valendo pra qualquer save. */
-  const carimbaSlots = (time, lado) => {
-    if(!lado || !Array.isArray(lado.slots)) return;
-    time.forEach((p, i) => { if(p && lado.slots[i] != null) p.slotDaConta = String(lado.slots[i]); });
-  };
-  carimbaSlots(teamA, match.a); carimbaSlots(teamB, match.b);
+  /* O CÓDIGO DO TIME é compacto: ele não carrega o slot nem os GOLPES ESCOLHIDOS. Os dois viajam
+     ao lado, dentro do match, e o carimbo valida antes de aplicar -- ver carimbaDoMatch. */
+  carimbaDoMatch(teamA, match.a); carimbaDoMatch(teamB, match.b);
   if(!teamA || !teamB){
     match.winner = teamA ? match.a : match.b;
     match.resolved = true;
@@ -3633,14 +3715,30 @@ async function trainersLeagueGatherEligibleCodesForUid(uid){
     .filter(x => Number.isInteger(x.slot) && x.slot >= 0 && x.slot < TRAINERS_LEAGUE_MAX_SAVE_SLOTS)
     .sort((a, b) => a.slot - b.slot);
   const codes = [];
+  /* ⚠️ OS GOLPES ESCOLHIDOS SAEM DAQUI, DO SAVE, e não do cliente (16/09/2026) -- e esta liga é a
+     única que pode fazer isso, porque é a única em que o SERVIDOR já lê os saves.
+     Isso a deixa de fora do problema de confiança que as outras têm: não há o que forjar, e por
+     isso não há o que validar. O `golpesValidos` continua correndo em cima (ele é o caminho
+     comum), e ali ele não tem o que descartar.
+     UM MAPA SÓ pra conta inteira, e não um por time: a chave é espécie:nível, então dois times que
+     compartilham o mesmo pokémon apontam pra mesma entrada -- e o sorteio de time da rodada, o
+     override de ordem e o código do Mewtwo passam todos por ela sem índice nenhum pra desandar. */
+  const golpes = {};
   for(const { dados: s } of porSlot){
     if(s && s.team && (s.badgeCount||0) >= 8){
       // sanitiza na origem: reconstrói do zero (espécie+nível+shiny), nível limitado ao teto -- um save
       // adulterado com stats/níveis impossíveis entra na liga como um time normalizado, não como monstro
       const clean = sanitizeTeamCode(encodeTeamCode(s.team));
-      if(clean){ codes.push(clean); }
+      if(clean){
+        codes.push(clean);
+        for(const mon of s.team){
+          if(!mon || !mon.speciesId || !Array.isArray(mon.ataques) || !mon.ataques.length) continue;
+          golpes[chaveDosGolpes(mon)] = mon.ataques.slice(0, MAX_GOLPES);
+        }
+      }
     }
   }
+  codes.ataques = golpes;   // pendurado na lista: quem só quer os códigos não muda uma linha
   return codes;
 }
 // atualiza os times elegíveis de TODO MUNDO inscrito, automaticamente, sem precisar de nenhum clique --
@@ -3670,7 +3768,8 @@ async function trainersLeagueRefreshEligibleCodes(dateId){
       try{
         const eligibleCodes = await trainersLeagueGatherEligibleCodesForUid(reg.uid);
         if(eligibleCodes.length > 0){
-          await trainersLeagueRegistrantRef(dateId, reg.uid).set({ eligibleCodes }, { merge:true });
+          await trainersLeagueRegistrantRef(dateId, reg.uid).set(
+            { eligibleCodes, eligibleAtaques: eligibleCodes.ataques || {} }, { merge:true });
         }
         const userSnap = await db.collection('users').doc(reg.uid).get();
         const isElite = !!(userSnap.exists && userSnap.data().eliteChampion);
@@ -3798,14 +3897,9 @@ function resolveTrainersLeagueMatch(match, seedStr){
   const rng = makeSeededRng(seedStr);
   const teamA = decodeTeamCode(match.a.code);
   const teamB = decodeTeamCode(match.b.code);
-  /* O CÓDIGO DO TIME não carrega o slot de cada pokémon -- ele é compacto. Quem manda os slots é
-     quem montou o match (hoje só o Ginásio da Cidade; as ligas não usam item). Sem este carimbo o
-     item equipado seria procurado sem slot e cairia na chave velha, valendo pra qualquer save. */
-  const carimbaSlots = (time, lado) => {
-    if(!lado || !Array.isArray(lado.slots)) return;
-    time.forEach((p, i) => { if(p && lado.slots[i] != null) p.slotDaConta = String(lado.slots[i]); });
-  };
-  carimbaSlots(teamA, match.a); carimbaSlots(teamB, match.b);
+  /* O CÓDIGO DO TIME é compacto: ele não carrega o slot nem os GOLPES ESCOLHIDOS. Os dois viajam
+     ao lado, dentro do match, e o carimbo valida antes de aplicar -- ver carimbaDoMatch. */
+  carimbaDoMatch(teamA, match.a); carimbaDoMatch(teamB, match.b);
   if(!teamA || !teamB){
     match.winner = teamA ? match.a : match.b;
     match.resolved = true;
@@ -3884,7 +3978,9 @@ function buildTrainersLeagueTiebreak(dateId, players, standings){
     const eligible = (p && p.eligibleCodes) ? p.eligibleCodes : [];
     const rng = makeSeededRng(`trainers-tiebreak-team-${dateId}-${t.uid}`);
     const code = eligible.length>0 ? eligible[Math.floor(rng()*eligible.length)] : null;
-    return { uid:t.uid, name:t.name, code };
+    /* o desempate luta com os mesmos golpes da temporada -- o mapa e da conta, entao ele serve
+       pro time que o sorteio tirar */
+    return { uid:t.uid, name:t.name, code, ataques: (p && p.eligibleAtaques) || null };
   });
   const miniRounds = buildRoundRobinSchedule(tiedPlayers);
   miniRounds.forEach((round, ri)=>{
@@ -3958,7 +4054,7 @@ async function trainersLeagueClaim(dateId, fromStatus, toStatus){
 // no mesmo dia. startTime sempre usa o dateId REAL (não o cycleId, que pode ter sufixo) -- é dele que
 // vem o horário oficial de início do dia
 async function trainersLeagueLockGroupInto(cycleId, group, dateId){
-  const players = group.map(r=>({ uid:r.uid, name:r.name, elite: !!r.elite, eligibleCodes:r.eligibleCodes||[], specialties:r.specialties||[], mewtwoTeamCode:r.mewtwoTeamCode||null }));
+  const players = group.map(r=>({ uid:r.uid, name:r.name, elite: !!r.elite, eligibleCodes:r.eligibleCodes||[], eligibleAtaques:r.eligibleAtaques||null, specialties:r.specialties||[], mewtwoTeamCode:r.mewtwoTeamCode||null }));
   const shuffled = shuffleWithSeed(players, `trainers-${cycleId}`);
   const scheduleRounds = buildRoundRobinSchedule(shuffled);
   const numRounds = scheduleRounds.length;
@@ -4173,6 +4269,13 @@ async function trainersLeagueAdvanceRounds(dateId){
               if(playerInfo && playerInfo.mewtwoTeamCode && !mewtwoCode){ mewtwoCode = sanitizeTeamCode(playerInfo.mewtwoTeamCode); }
             }
             if(mewtwoCode){ eligible.push(mewtwoCode); }
+            /* ⚠️ OS GOLPES VÃO NO LADO DO MATCH, e eles NÃO dependem de qual código foi sorteado:
+               a chave é espécie:nível, então o mapa da conta serve pro time que sair -- inclusive
+               pro override reordenado e pro código do Mewtwo. */
+            try{
+              const regSnap2 = await trainersLeagueRegistrantRef(dateId, uid).get();
+              if(regSnap2.exists){ match[side].ataques = regSnap2.data().eligibleAtaques || null; }
+            } catch(e){ logger.error('Erro ao ler os golpes do inscrito:', e); }
 
             let code = null;
             try{
@@ -4317,7 +4420,12 @@ exports._apagarSubcolecoes = apagarSubcolecoes;   // testado direto: no ar ele r
 exports._SUBCOLECOES_DO_CICLO = SUBCOLECOES_DO_CICLO;
 exports._trainersLeagueSplitGroups = trainersLeagueSplitGroups;
 exports._trainersLeagueGatherEligibleCodes = trainersLeagueGatherEligibleCodesForUid;
-exports._decodeTeamCode = decodeTeamCode;   // o teste da liga confere a ORDEM da lista pela especie de cada time
+exports._decodeTeamCode = decodeTeamCode;
+exports._carimbaDoMatch = carimbaDoMatch;         // o teste confere que o golpe chega na liga
+exports._golpesValidos = golpesValidos;           // e que golpe forjado nao passa
+exports._resolveLeagueMatch = resolveLeagueMatch; // a auditoria roda o caminho real da liga
+exports._CORTADORES = CORTADORES; exports._SURFISTAS = SURFISTAS;   // comparadas com as do cliente
+exports._battleInstances = battleInstances; exports._battleHydrate = battleHydrate;   // o teste da liga confere a ORDEM da lista pela especie de cada time
 exports.advanceTrainersLeague = onSchedule('every 1 minutes', async (event) => {
   try{
     const todayStr = trainersLeagueTodayDateStr();
@@ -4466,9 +4574,12 @@ exports.setNeighborhoodGymDefense = onCall(async (request) => {
      O que fica guardado no ginásio continua sendo um CÓDIGO congelado: depois de montada, a defesa
      não depende mais dos saves, então mexer no save (ou apagá-lo) não muda quem defende. */
   let newTeamCode = null;
+  let newTeamAtaques = null;   // anda junto com o codigo: a defesa congela time E golpes
   if(Array.isArray(team)){
     const resolvido = await resolverTimeDosSaves(uid, team, NEIGHBORHOOD_GYM_TEAM_SIZE, 'time de defesa', 1);
     newTeamCode = sanitizeTeamCode(encodeTeamCode(resolvido));
+    /* os golpes congelam junto com o código: a defesa é um retrato do time que assumiu o ginásio */
+    newTeamAtaques = resolvido.map(p => p.ataques || null);
     if(!newTeamCode){ throw new HttpsError('failed-precondition', 'Time inválido.'); }
   }
   const leaderName = (userSnap.exists && userSnap.data().trainerName) || 'Treinador';
@@ -4511,6 +4622,7 @@ exports.setNeighborhoodGymDefense = onCall(async (request) => {
       // e o Firestore de verdade REJEITA escrever undefined (só aceita null), quebrando a transação
       // inteira com "Cannot use undefined as a Firestore value" se isso vazar pro payload
       leaderTeamCode: newTeamCode!==null ? newTeamCode : ((gymData && gymData.leaderTeamCode!=null) ? gymData.leaderTeamCode : null),
+      leaderTeamAtaques: newTeamAtaques!==null ? newTeamAtaques : ((gymData && gymData.leaderTeamAtaques!=null) ? gymData.leaderTeamAtaques : null),
       // null quando a defesa foi MONTADA (não vem de um save); documento antigo mantém o que tinha
       leaderTeamSlot: newTeamCode!==null ? null : ((gymData && gymData.leaderTeamSlot!=null) ? gymData.leaderTeamSlot : null),
       leaderTerrain: terrainId ? terrainId : ((gymData && gymData.leaderTerrain!=null) ? gymData.leaderTerrain : null),
@@ -4679,9 +4791,18 @@ exports.challengeNeighborhoodGym = onCall(async (request) => {
          agora e ele. O LIDER esta dormindo do outro lado do mundo e nao entra com item. */
       /* Os SLOTS viajam junto: o código do time não os carrega (ele é compacto de propósito), e o
          item equipado é por save -- sem eles o Venusaur do slot 11 usaria o item do slot 5. */
+      /* ⚠️ OS GOLPES VIAJAM AO LADO DO CÓDIGO, como os slots (16/09/2026). O `resolverTimeDosSaves` já
+         devolvia o campo `ataques` -- ele só era jogado fora uma linha depois, quando o time virava
+         CÓDIGO. Era isso que fazia o desafio do Ginásio da Cidade lutar no motor de tipo enquanto a
+         jornada lutava com os golpes escolhidos. */
       a: { uid, name: challengerName, code: challengerCode, specialties: challengerSpecialties,
-           equipados: challengerEquipados, slots: timeDoDesafiante.map(p => p.slotDaConta || null) },
-      b: { uid: gymData.leaderUid, name: gymData.leaderName, code: gymData.leaderTeamCode, specialties: gymData.leaderSpecialties || [] },
+           equipados: challengerEquipados, slots: timeDoDesafiante.map(p => p.slotDaConta || null),
+           ataques: timeDoDesafiante.map(p => p.ataques || null) },
+      /* a DEFESA é um código CONGELADO, e os golpes dela congelam junto: o líder montou aquele time
+         e é com ele que ele defende, mesmo que o save mude depois. Ginásio anterior a esta data não
+         tem o campo -- ali a defesa luta no motor de tipo, como lutava. */
+      b: { uid: gymData.leaderUid, name: gymData.leaderName, code: gymData.leaderTeamCode,
+           specialties: gymData.leaderSpecialties || [], ataques: gymData.leaderTeamAtaques || null },
       winner:null, matchups:null, resolved:false, terrain // terreno do líder = vantagem de mandante
     };
     resolveLeagueMatch(match, `cidade-${city}-${uid}-${Date.now()}`, null);
@@ -4735,6 +4856,8 @@ exports.challengeNeighborhoodGym = onCall(async (request) => {
         leaderUid: uid, leaderName: challengerName,
         leaderSpecialties: challengerSpecialties, // congelado ao assumir: quem defende o ginásio defende com o que tinha
         leaderTeamCode: challengerCode,
+        // e com os golpes que ele usou pra vencer -- o time é o mesmo, os golpes também
+        leaderTeamAtaques: timeDoDesafiante.map(p => p.ataques || null),
         leaderTeamSlot: null,   // defesa montada à mão não vem de save nenhum
         leaderTerrain: null,
         becameLeaderAt: Date.now(), defenseCount: 0
@@ -7068,16 +7191,21 @@ function battleStatsFrom(userData){
 async function battleRequireTester(uid){ return; }
 
 // instância "crua" pra guardar no documento: só o que muda de confronto pra confronto
-function battleInstances(code){
+function battleInstances(code, ataques){
   const time = decodeTeamCode(code);
   if(!time) return null;
-  return time.map(p=>{
+  return time.map((p, i)=>{
     const inst = createInstance(p.speciesId, p.level);
     inst.shiny = !!p.shiny;
     inst.maxHp = calcMaxHp(inst);
     inst.hp = inst.maxHp;
+    /* ⚠️ VALIDADO AQUI, UMA VEZ, e guardado já limpo no estado -- não a cada confronto. O estado da
+       batalha é reescrito a cada resolução; validar na entrada é o que impede um golpe forjado de
+       ser re-aceito de graça na volta seguinte. */
+    const bons = golpesValidos(inst.speciesId, inst.level, ataques && ataques[chaveDosGolpes(inst)]);
     return { speciesId: inst.speciesId, name: inst.name, level: inst.level,
-             shiny: !!inst.shiny, hp: inst.hp, maxHp: inst.maxHp };
+             shiny: !!inst.shiny, hp: inst.hp, maxHp: inst.maxHp,
+             ataques: bons.length ? bons : null };
   });
 }
 /* Times elegíveis que o cliente mandou, todos de uma vez e na MESMA ORDEM da tela dele --
@@ -7095,6 +7223,27 @@ function battleCodes(data){
   }
   return codes;
 }
+/* ⚠️ OS GOLPES DE CADA TIME ELEGÍVEL, EM LOCKSTEP COM O `battleCodes` (16/09/2026) -- e o lockstep
+   é a coisa toda: a escolha do time é um ÍNDICE na lista de códigos, e o `battleCodes` DESCARTA
+   código inválido. Filtrada por conta própria, a lista de golpes sairia deslocada e cada time
+   lutaria com o moveset de outro -- um defeito que não aparece como erro, aparece como um Snorlax
+   batendo de Raio Solar.
+   Por isso ela roda o MESMO laço, com o MESMO critério de descarte, e o que ela guarda é a posição
+   no array ORIGINAL. Os golpes em si só são validados depois, no `battleInstances`, onde a espécie
+   e o nível de cada um já são conhecidos. */
+function battleAtaques(data){
+  const bruto = Array.isArray(data?.codes) ? data.codes : (data?.code ? [data.code] : []);
+  const ataques = Array.isArray(data?.ataques) ? data.ataques : [];
+  const out = [];
+  for(let i = 0; i < bruto.slice(0, MAX_BATTLE_CODES).length; i++){
+    const s = String(bruto[i] || '');
+    if(!s) continue;
+    const time = decodeTeamCode(s);
+    if(!time || !time.length) continue;
+    out.push((ataques[i] && typeof ataques[i] === 'object') ? ataques[i] : null);
+  }
+  return out;
+}
 /* Faixa de nível dos times de um jogador, pro lobby. Com vários times não existe mais "a média
    dele" -- mostrar a faixa diz o que dá pra esperar sem entregar qual time ele vai escolher. */
 function battleMediaRange(codes){
@@ -7110,6 +7259,12 @@ function battleHydrate(guardado){
   inst.shiny = !!guardado.shiny;
   inst.maxHp = guardado.maxHp;
   inst.hp = guardado.hp;
+  /* ⚠️ OS GOLPES VOLTAM AQUI (16/09/2026). O `createInstance` não copia campo nenhum, e este é o
+     ponto por onde o pokémon do online renasce a CADA confronto -- sem esta linha ele lutaria no
+     motor de tipo, que é o que a batalha online fazia até hoje.
+     Eles já vêm validados do `battleInstances`: o que está guardado no estado é o que o servidor
+     aceitou, não o que o cliente mandou. */
+  if(Array.isArray(guardado.ataques) && guardado.ataques.length) inst.ataques = guardado.ataques.slice();
   return inst;
 }
 function battlePrimeiroVivo(time, atual){
@@ -7194,13 +7349,16 @@ function battleAdvance(estado){
     const doisEscolheram = Number.isInteger(estado.aTeamChoice) && Number.isInteger(estado.bTeamChoice);
     if(!doisEscolheram && Date.now() < (estado.teamUntil || 0) + GRACA_REDE_MS) return estado;
     // quem não escolheu a tempo entra com o primeiro time da lista dele
-    const montar = (codes, idx) => {
+    /* ⚠️ A LISTA DE GOLPES É PARALELA À DE CÓDIGOS, e indexada pelo MESMO índice: a escolha do time
+       é um índice na lista de códigos, então os golpes precisam estar na mesma posição. Cliente que
+       não mande a lista (versão antiga em cache) cai no motor de tipo, como antes. */
+    const montar = (codes, idx, ataques) => {
       const lista = codes || [];
       const i = (Number.isInteger(idx) && idx >= 0 && idx < lista.length) ? idx : 0;
-      return battleInstances(lista[i]) || [];
+      return battleInstances(lista[i], (ataques || [])[i]) || [];
     };
-    estado.aTeam = montar(estado.aCodes, estado.aTeamChoice);
-    estado.bTeam = montar(estado.bCodes, estado.bTeamChoice);
+    estado.aTeam = montar(estado.aCodes, estado.aTeamChoice, estado.aAtaques);
+    estado.bTeam = montar(estado.bCodes, estado.bTeamChoice, estado.bAtaques);
     // sem time válido de algum lado não existe batalha: encerra sem vencedor em vez de travar
     if(!estado.aTeam.length || !estado.bTeam.length){
       estado.phase = 'done'; estado.winnerUid = null; estado.updatedAt = Date.now();
@@ -7333,11 +7491,13 @@ exports.joinBattleQueue = onCall(async (request) => {
   // quando o oponente aparecer (fase 'teamPick' da batalha)
   const codes = battleCodes(request.data);
   if(!codes.length){ throw new HttpsError('invalid-argument', 'Time inválido.'); }
+  const ataquesDosTimes = battleAtaques(request.data);
 
   const userSnap = await db.collection('users').doc(uid).get();
   const userData = userSnap.exists ? userSnap.data() : {};
   await touchLastSeen(uid, userData);
   const eu = { uid, name: userData.trainerName || 'Treinador', codes,
+               ataques: ataquesDosTimes,
                specialties: userData.specialties || [],
                stats: battleStatsFrom(userData),
                joinedAt: Date.now() };
@@ -7390,6 +7550,8 @@ function montarBatalhaOnline(aSide, bSide){
        opções que cada um mandou ao entrar na fila (ou no lobby); aTeam/bTeam são montados
        quando a janela fecha, em battleAdvance. */
     aCodes: aSide.codes || [], bCodes: bSide.codes || [],
+    /* os golpes escolhidos de cada time elegível, na MESMA ordem dos códigos -- ver montar() */
+    aAtaques: aSide.ataques || [], bAtaques: bSide.ataques || [],
     aTeam: [], bTeam: [], aTeamChoice: null, bTeamChoice: null,
     aSpecialties: aSide.specialties || [], bSpecialties: bSide.specialties || [],
     aStats: aSide.stats || { wins:0, losses:0, favorito:null },
@@ -7833,8 +7995,11 @@ exports.challengeLobbyPlayer = onCall(async (request) => {
     const eu = meuSnap.data();
     const pend = {
       id: matchId, players: [uid, alvo],
-      a: { uid, name: eu.name, codes: eu.codes||[], specialties: eu.specialties||[], stats: eu.stats||null },
-      b: { uid: alvo, name: alvoDados.name, codes: alvoDados.codes||[], specialties: alvoDados.specialties||[], stats: alvoDados.stats||null },
+      /* os `ataques` vem junto dos `codes` porque os dois lados saem do MESMO documento da fila --
+         e sem eles aqui o desafio do lobby seria a unica porta do online sem golpe escolhido, que e
+         exatamente o tipo de exceao onde a proxima omissao se esconde (ja aconteceu com specialties) */
+      a: { uid, name: eu.name, codes: eu.codes||[], ataques: eu.ataques||[], specialties: eu.specialties||[], stats: eu.stats||null },
+      b: { uid: alvo, name: alvoDados.name, codes: alvoDados.codes||[], ataques: alvoDados.ataques||[], specialties: alvoDados.specialties||[], stats: alvoDados.stats||null },
       accepted: { [uid]: true },      // quem desafia já está dentro
       desafio: true,
       deadline: agora + BATTLE_ACCEPT_MS, createdAt: agora
@@ -8527,7 +8692,8 @@ exports.challengeFriend = onCall(async (request) => {
   const meuNome = meuDados.trainerName || 'Treinador';
   const desafio = {
     id, players: [uid, alvo],
-    from: { uid, name: meuNome, codes, specialties: meuDados.specialties || [], stats: battleStatsFrom(meuDados) },
+    from: { uid, name: meuNome, codes, ataques: battleAtaques(request.data),
+            specialties: meuDados.specialties || [], stats: battleStatsFrom(meuDados) },
     to:   { uid: alvo, name: alvoDados.trainerName || 'Treinador' },
     createdAt: agora, expiresAt: agora + FRIEND_CHALLENGE_MS, aliveAt: agora
   };
@@ -8630,7 +8796,8 @@ exports.respondFriendChallenge = onCall(async (request) => {
 
   const estado = montarBatalhaOnline(d.from, {
     uid, name: meuDados.trainerName || d.to.name,
-    codes, specialties: meuDados.specialties || [], stats: battleStatsFrom(meuDados)
+    codes, ataques: battleAtaques(request.data),
+    specialties: meuDados.specialties || [], stats: battleStatsFrom(meuDados)
   });
   const agora = Date.now();
   const lote = db.batch();
