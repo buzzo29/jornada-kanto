@@ -4792,6 +4792,16 @@ usuário possui e os 3 botões de navegação (Para as batalhas, Especiais e TMs
 - **A MÁQUINA NÃO SE USA NEM SE EXCLUI: ela ENSINA.** No lugar do par Usar/Excluir, o quadro traz um
   **📀 Ensinar** — o mesmo caminho que a linha da tela antiga abria. Ela não se gasta: é da conta e
   ensina quantas vezes quiser, como no jogo original.
+- **⚠️ E O QUADRO MOSTRA O CARTÃO DO GOLPE (16/09/2026, a pedido)** — nome, **tipo** e **poder**, no
+  vazio que sobrava entre o resumo e o botão.
+  **É o MESMO `cartaoDeGolpe` das três telas de golpe e da tela de ensinar, e ser o mesmo é o
+  ponto:** o jogador compara o Surf daqui com os golpes que o pokémon já tem LÁ, e um formato
+  próprio obrigaria a reaprender a ler no meio da decisão. O teste compara o HTML dos dois.
+  **E é a informação que decide**: o resumo diz o que a Máquina FAZ, o cartão diz se ela vale a
+  vaga — Água/95 ao lado de um Hiper Raio de 150 é uma conta que só dá pra fazer vendo os dois
+  números. Item comum não ganha cartão: ele não ensina golpe nenhum.
+  **Medido a 320px:** cartão de 243×56px, o quadro fica nos mesmos **375px** fixos (não dança ao
+  trocar de Máquina), o miolo **não precisa rolar** e sobram 113px abaixo do cartão.
 - **⚠️ O QUADRO DE CIMA FICA EM BRANCO NA PRATELEIRA VAZIA, e do MESMO tamanho.** Foi o pedido ao pé
   da letra (*"caso não possua nenhum TM/HM, deixar em branco"*), e é a mesma decisão que a loja já
   tinha tomado em 13/09: um quadro que vai e vem — e cresce e encolhe — faz a tela inteira dançar a
@@ -6399,14 +6409,38 @@ clicar, vai abrir a tela para ensinar o cut e qual habilidade o pokémon vai per
   pista de onde cada um mora é uma legenda pequena.
   **O card é o MESMO da home** (a estrela com a média e a fileira de sprites): é por ele que o
   jogador reconhece um time, e repetir a forma é o que evita reaprender a ler.
-  **⚠️ MAS A FILEIRA TRAZ SÓ QUEM PODE APRENDER, não o time inteiro** — foi o pedido, e ele está
-  certo: um card com seis sprites em que dois servem faria o jogador clicar pra descobrir quais. A
-  **média da estrela também é a dos candidatos**, pelo mesmo motivo: ela descreve o que está
-  desenhado ali, não o time.
-  **Save sem nenhum candidato não vira card** — um time inteiro apagado na lista diria menos que
-  não estar lá. E **quando o último candidato de um time aprende, a tela volta sozinha pros
+  **⚠️ A FILEIRA TRAZ O TIME INTEIRO desde 16/09/2026, com quem NÃO aprende APAGADO** (a pedido:
+  *"mostre o card completo dos pokémons do time, porém só deixe com aspecto de ativo os pokémons que
+  podem aprender o move"*).
+  Ela trazia **só os candidatos** até aqui, e a razão registrada era boa — *"um card com seis
+  sprites em que dois servem faria o jogador clicar pra descobrir quais"*. **O que mudou é que agora
+  a tela DIZ quais:** o apagado resolve o mesmo problema sem esconder metade do time, e some com a
+  pergunta *"cadê o resto?"* que a fileira curta criava.
+  **⚠️ O APAGADO É O `.caiu` QUE JÁ EXISTE** — o mesmo do pokémon desmaiado na fileira do time e no
+  log de batalha (`opacity:.35` + `grayscale(.5)`), que foi exatamente o que se pediu. Reusar a
+  classe é melhor que criar uma segunda com as mesmas duas regras: o jogo já ensinou o olho a ler
+  esse cinza como *"esse não entra"*, e duas classes iguais divergiriam no primeiro ajuste. O NOME
+  fala de desmaio e aqui o motivo é outro — quem explica é o `title` de cada sprite.
+  **⚠️ E ELE TEM DOIS MOTIVOS, que o título separa:** a espécie **não aprende**, ou o pokémon **já
+  sabe** o golpe. Sem a distinção, quem acabou de ensinar veria o pokémon apagado sem entender por
+  quê.
+  **A média da estrela virou a do TIME**, pelo mesmo motivo de sempre: ela descreve o que está
+  desenhado ali. Enquanto a fileira só trazia os candidatos, ela era a média DELES.
+  **Save sem nenhum candidato continua NÃO virando card** — um time inteiro apagado na lista diria
+  menos que não estar lá, e isso não mudou com o time inteiro na fileira. E **quando o último candidato de um time aprende, a tela volta sozinha pros
   times**, com o anúncio: uma lista vazia ali não diz nada que o anúncio na tela de cima não diga
   melhor.
+
+- **⚠️ A FRASE DA TELA ENCURTOU (16/09/2026)**, pedida palavra por palavra: **"Ensine quantas vezes
+  quiser. O ataque fica para sempre no Pokémon."** Ela era *"A Máquina não se gasta — dá pra ensinar
+  o Corte a quantos pokémons quiser. Cada card mostra só quem pode aprender."*, e as duas metades
+  tinham problema: a primeira explicava a **MECÂNICA** da Máquina ("não se gasta"), que é vocabulário
+  de motor -- a nova diz o mesmo pelo que o jogador FAZ e acrescenta o que ele precisa saber pra
+  decidir, que o golpe **não sai depois** (isso não estava escrito em lugar nenhum da tela, e é a
+  parte irreversível da decisão); a segunda **descrevia a tela** ("cada card mostra só quem pode
+  aprender") e deixou de ser verdade no MESMO pedido, porque o card passou a mostrar o time inteiro.
+  **Frase que descreve o layout envelhece junto com ele.**
+  Medido a 320px: ela cai em 3 linhas e o card do time fica em **114px** com os seis sprites.
 - **⚠️ O TIME DE UM SLOT SAI DE DUAS FONTES, e escolher a errada mostra um time velho.** O
   `game.saveSlots` é uma cópia carregada na HOME; o `game.team` é o time VIVO do save aberto. Pro
   slot aberto a fonte é o `game.team` (`timeDoSlot`) — sem isso um pokémon capturado nesta sessão

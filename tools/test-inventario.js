@@ -843,6 +843,32 @@ console.log('\n=== O HM01: A PRIMEIRA MAQUINA OCULTA (11/09/2026) ===');
     ok('e o quadro traz o botao de Ensinar', /onclick="abrirEnsinarHm\('hm01'\)"/.test(t));
     ok('sem Usar e sem Excluir', !/usarItem\(/.test(t) && !/pedirExclusaoDeItem\(/.test(t));
     ok('e a tabela nao tem mais descricao', S.HMS.hm01.descricao === undefined);
+    /* ⚠️ O CARTAO DO GOLPE QUE A MAQUINA ENSINA (16/09/2026, a pedido) -- o resumo diz o que ela
+       FAZ, o cartao diz se ela vale a vaga. Ele preenche o vazio que sobrava no quadro. */
+    ok('o quadro traz o cartao do golpe', /golpe-cartao/.test(t), limpo(t).slice(0, 110));
+    ok('  com o nome, o TIPO e o PODER', /CORTE/i.test(limpo(t)) && /NORMAL/i.test(limpo(t)) && /50/.test(limpo(t)),
+       (limpo(t).match(/CORTE[^]{0,40}/i) || [''])[0]);
+    /* ⚠️ E E O MESMO cartaoDeGolpe das tres telas de golpe e da tela de ensinar -- e ser o MESMO e
+       o ponto: o jogador compara o golpe daqui com os que o pokemon ja tem LA, e um formato
+       proprio obrigaria a reaprender a ler no meio da decisao. O teste compara o HTML dos dois. */
+    ok('  e e o MESMO cartao da tela de ensinar', t.indexOf(S.cartaoDeGolpe('cut', true, true)) >= 0);
+    /* cada HM mostra O GOLPE DELE, e nao um escrito a mao.
+       ⚠️ A CONTA PRECISA TER AS DUAS: este bloco roda com `hms=['hm01']`, e um HM que a conta nao
+       tem nao entra na prateleira -- o quadro sai VAZIO e a trava media a ausencia, nao o golpe. */
+    S.__getGame().hms = ['hm01','hm03'];
+    S.escolherItem('hm03');
+    /* ⚠️ OLHA SO O CARTAO, e nao a tela: a LISTA la embaixo mostra o nome das duas Maquinas, entao
+       procurar 'Corte' na tela inteira acusa sempre -- foi assim que esta trava nasceu falhando. */
+    const cartao3 = (S.renderInventario().match(new RegExp(String.raw`<div class="golpe-cartao[^]*?PODER[^]*?</b>`)) || [''])[0];
+    ok('  e cada Maquina mostra o golpe DELA',
+       /SURF/i.test(limpo(cartao3)) && /95/.test(limpo(cartao3)) && !/CORTE/i.test(limpo(cartao3)),
+       limpo(cartao3));
+    /* ⚠️ ITEM COMUM NAO GANHA CARTAO: ele nao ensina golpe nenhum, e um cartao vazio ali seria
+       um quadro prometendo o que nao existe. */
+    S.escolherPrateleiraDaMochila('especiais'); S.escolherItem('rare_candy');
+    ok('  e item comum NAO ganha cartao', !/golpe-cartao/.test(S.renderInventario()));
+    S.escolherPrateleiraDaMochila('tms'); S.escolherItem('hm01');
+    S.__getGame().hms = ['hm01'];   // devolve o estado que o resto do bloco espera
   }
   /* ⚠️ SEM NENHUM: o quadro fica EM BRANCO e a lista diz "Nenhum TM/HM" -- os dois ao pe da letra
      do pedido de 14/09/2026 (*"caso nao possua nenhum TM/HM, deixar em branco"*). A frase que
@@ -987,11 +1013,46 @@ console.log('\n=== O HM01: A PRIMEIRA MAQUINA OCULTA (11/09/2026) ===');
     const n1 = S.renderHmAlvo();
     ok('o card e o MESMO da home', (n1.match(/save-slot-card/g) || []).length === 2 &&
        /team-avg-star/.test(n1), (n1.match(/save-slot-card/g) || []).length + ' cards');
-    ok('e ele NAO lista pokemon direto', !/hm-alvo/.test(n1));
-    ok('a fileira do card traz SO quem pode aprender (2 de 3 no time Kanto)',
-       (n1.match(/save-slot-mon-sprite/g) || []).length === 3,
-       (n1.match(/save-slot-mon-sprite/g) || []).length + ' sprites (2 do Kanto + 1 do Time 4)');
+    /* ⚠️ A FILEIRA TRAZ O TIME INTEIRO desde 16/09/2026 (a pedido), e quem nao aprende sai APAGADO.
+       Ate aqui ela trazia so os candidatos, e a razao registrada era boa -- "um card com seis
+       sprites em que dois servem faria o jogador clicar pra descobrir quais". O que mudou e que
+       agora a tela DIZ quais: o apagado resolve o mesmo problema sem esconder metade do time.
+       Kanto tem 3 (Venusaur, Blastoise, Scyther) e o Time 4 tem 2 (Meganium, Alakazam) = 5. */
+    ok('a fileira do card traz o TIME INTEIRO',
+       (n1.match(/save-slot-mon-sprite/g) || []).length === 5,
+       (n1.match(/save-slot-mon-sprite/g) || []).length + ' sprites (3 do Kanto + 2 do Time 4)');
+    /* ⚠️ E O APAGADO E O .caiu QUE JA EXISTE -- o mesmo do pokemon desmaiado na fileira do time e no
+       log de batalha, que foi o que se pediu. Uma segunda classe com as mesmas duas regras
+       divergiria no primeiro ajuste. */
+    ok('  e quem NAO aprende sai apagado, com o .caiu do desmaiado',
+       (n1.match(/save-slot-mon caiu/g) || []).length === 2,
+       (n1.match(/save-slot-mon caiu/g) || []).length + ' apagados (Blastoise e Alakazam)');
+    ok('  e o titulo diz por que', /Blastoise não aprende essa Máquina/.test(n1),
+       (n1.match(/title="[^"]*não aprende[^"]*"/) || [''])[0]);
+    /* ⚠️ QUEM JA SABE O GOLPE tambem sai apagado -- ele nao pode aprender de novo --, mas por outro
+       MOTIVO, e o titulo separa os dois: sem isso, quem acabou de ensinar veria o pokemon apagado
+       sem entender por que. */
+    {
+      const antesAtq = (g.saveSlots[0].team[0].ataques || []).slice();
+      g.saveSlots[0].team[0].ataques = ['cut'];
+      const comCut = S.renderHmAlvo();
+      ok('  quem JA SABE o golpe tambem sai apagado',
+         (comCut.match(/save-slot-mon caiu/g) || []).length === 3,
+         (comCut.match(/save-slot-mon caiu/g) || []).length + ' apagados');
+      ok('  e o titulo dele diz OUTRA coisa', /Já sabe o Corte/.test(comCut),
+         (comCut.match(/title="Já sabe[^"]*"/) || [''])[0]);
+      g.saveSlots[0].team[0].ataques = antesAtq;
+    }
+    /* SAVE SEM NENHUM CANDIDATO continua NAO virando card: um time inteiro apagado na lista diria
+       menos que nao estar la. */
+    ok('  e save sem nenhum candidato continua fora da lista',
+       S.timesDaMaquina('hm01').map(t => t.slot).join(',') === '0,3');
     ok('e ela nomeia os times', /Kanto/.test(n1) && /Time 4/.test(n1));
+    /* ⚠️ A FRASE ENCURTOU no mesmo pedido, palavra por palavra: a antiga descrevia a tela ("cada
+       card mostra so quem pode aprender"), e essa metade deixou de ser verdade. */
+    ok('a frase da tela e a pedida, palavra por palavra',
+       n1.indexOf('Ensine quantas vezes quiser. O ataque fica para sempre no Pokémon.') >= 0);
+    ok('  e a antiga saiu', !/não se gasta/.test(n1) && !/só quem pode aprender/.test(n1));
     /* NIVEL 2: clicar no time abre a lista dele */
     S.abrirTimeDaMaquina(0);
     const n2 = S.renderHmAlvo();

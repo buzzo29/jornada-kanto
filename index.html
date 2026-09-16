@@ -23006,6 +23006,14 @@ function renderInventario(){
     </div>
     <div class="loja-miolo">
       <p class="item-detalhe-texto">${escapeHtmlSafe(ehHm ? it.resumo : it.descricao)}</p>
+      ${/* ⚠️ O CARTÃO DO GOLPE QUE A MÁQUINA ENSINA (16/09/2026, a pedido). É o MESMO `cartaoDeGolpe`
+           das três telas de golpe e da tela de ensinar -- e ser o mesmo é o ponto: o jogador
+           compara o Surf daqui com os golpes que o pokémon já tem LÁ, e um formato próprio
+           obrigaria a reaprender a ler no meio da decisão.
+           E é a informação que decide: o resumo diz o que a Máquina FAZ, o cartão diz se vale a
+           vaga -- Água/95 ao lado de um Hiper Raio de 150 é uma conta que só dá pra fazer vendo
+           os dois números. Ele preenche justamente o vazio que sobrava no quadro. */
+        ehHm && GOLPES[it.golpe] ? cartaoDeGolpe(it.golpe, true, true) : ""}
       ${game.inventarioErro ? `<p class="error-text">${escapeHtmlSafe(game.inventarioErro)}</p>` : ''}
       ${(!ehHm && it.equipável) ? '<p class="hint-text">Este item não se usa daqui: ele vai num pokémon. Abra a ordem de batalha do seu time e toque no + da linha dele.</p>' : ''}
       ${(!ehHm && !podeExcluir(sel.item)) ? `<p class="hint-text">${escapeHtmlSafe(motivoDeNaoExcluir(sel.item))}</p>` : ''}
@@ -23122,11 +23130,36 @@ function candidatosDaMaquina(hmId, slot){
   return lista;
 }
 /* OS TIMES QUE TÊM ALGUÉM PRA ENSINAR, na ordem dos slots. Save sem nenhum candidato não vira card:
-   um time inteiro apagado na lista diria menos que não estar lá. */
+   um time inteiro apagado na lista diria menos que não estar lá.
+   ⚠️ E ELE DEVOLVE O TIME INTEIRO desde 16/09/2026 (a pedido), não só os candidatos: cada pokémon
+   vem com a marca `pode`, e o card apaga quem não aprende.
+   Até aqui a fileira trazia SÓ quem aprende, e a razão registrada era boa -- *"um card com seis
+   sprites em que dois servem faria o jogador clicar pra descobrir quais"*. O que mudou é que agora
+   a tela DIZ quais: o apagado resolve o mesmo problema sem esconder metade do time, e some com a
+   pergunta "cadê o resto?" que a fileira curta criava.
+   `pode` é falso em DOIS casos diferentes -- a espécie não aprende, ou o pokémon JÁ SABE o golpe --
+   e o `porque` separa os dois pro título do sprite: sem isso, quem acabou de ensinar veria o
+   pokémon apagado sem entender por quê. */
 function timesDaMaquina(hmId){
-  const por = {};
-  candidatosDaMaquina(hmId).forEach(c => { (por[c.slot] = por[c.slot] || []).push(c); });
-  return Object.keys(por).map(Number).sort((a,b) => a-b).map(slot => ({ slot, mons: por[slot] }));
+  const hm = HMS[hmId];
+  if(!hm || !hm.golpe) return [];
+  const candidatos = candidatosDaMaquina(hmId);
+  const temCandidato = new Set(candidatos.map(c => c.slot));
+  const times = [];
+  for(let i = 0; i < MAX_SAVE_SLOTS; i++){
+    if(!temCandidato.has(i)) continue;
+    const mons = timeDoSlot(i).map((p, idx) => {
+      if(!p || !SPECIES[p.speciesId]) return null;
+      const jaSabe = (p.ataques || []).indexOf(hm.golpe) >= 0;
+      const aprende = podeAprenderHM(hmId, p.speciesId);
+      return { slot:i, idx, speciesId:p.speciesId, nome:p.name || SPECIES[p.speciesId].name,
+               level:p.level, shiny:!!p.shiny, ataques:(p.ataques || []).slice(),
+               pode: aprende && !jaSabe,
+               porque: jaSabe ? 'ja' : (aprende ? null : 'nao') };
+    }).filter(Boolean);
+    times.push({ slot: i, mons });
+  }
+  return times;
 }
 function nomeDoSave(slot){
   const sv = (game.saveSlots || [])[slot];
@@ -23269,14 +23302,26 @@ function telaDosTimesDaMaquina(hm){
         <p class="hint-text">São ${(HMS[game.hmEnsino.hm].aprendem || []).length} espécies que aprendem o ${escapeHtmlSafe(nomeDoAtaque(HMS[game.hmEnsino.hm].golpe))}${
           HMS[game.hmEnsino.hm].exemplos ? ' — entre elas ' + escapeHtmlSafe(HMS[game.hmEnsino.hm].exemplos) : ''}.</p></div>`
     : times.map(t => {
+        /* A MÉDIA É A DO TIME INTEIRO, porque é o time inteiro que está desenhado -- ela descreve
+           o que se vê, que é a mesma regra do card da home. Enquanto a fileira só trazia os
+           candidatos, ela era a média DELES pelo mesmo motivo. */
         const media = Math.round(t.mons.reduce((a, m) => a + (m.level || 0), 0) / t.mons.length);
         return `<button class="save-slot-card has-avg-star clickable" onclick="abrirTimeDaMaquina(${t.slot})">
           <div class="save-slot-top">
-            <span class="team-avg-star" title="Média de nível de quem pode aprender">${STAR_SVG}<span class="team-avg-star-num">${media}</span></span>
+            <span class="team-avg-star" title="Média de nível do time">${STAR_SVG}<span class="team-avg-star-num">${media}</span></span>
             <span class="save-slot-name"><span class="team-avg-star-name">${escapeHtmlSafe(nomeDoSave(t.slot))}</span></span>
           </div>
           <div class="save-slot-team-row spread">
-            ${t.mons.map(m => `<div class="save-slot-mon">
+            ${/* ⚠️ O APAGADO E O `.caiu` QUE JA EXISTE -- o mesmo do pokemon desmaiado na fileira do
+                 time e no log de batalha, que foi o que se pediu (*"usando o mesmo sprite que fica
+                 no log de batalha, nos pokemons que ficaram vivos e mortos"*).
+                 Reusar a classe e melhor que criar uma segunda com as mesmas duas regras: o jogo
+                 ja ensinou o olho a ler esse cinza como "esse nao entra", e duas classes iguais
+                 divergiriam no primeiro ajuste. O NOME fala de desmaio e aqui o motivo e outro --
+                 o que o `title` de cada sprite explica. */''}
+            ${t.mons.map(m => `<div class="save-slot-mon${m.pode ? '' : ' caiu'}" title="${
+              m.pode ? '' : (m.porque === 'ja' ? 'Já sabe o ' + escapeHtmlSafe(nomeDoAtaque(hm.golpe))
+                                               : escapeHtmlSafe(m.nome) + ' não aprende essa Máquina')}">
               <div class="save-slot-mon-sprite">${spriteHtml(m,"sprite-sm")}</div>
               <div class="save-slot-mon-level">Lv.${m.level}</div>
             </div>`).join("")}
@@ -23288,7 +23333,12 @@ function telaDosTimesDaMaquina(hm){
   ${avisoDaMaquinaHtml()}
   <div class="box cursor">
     <h2>Ensinar em qual time?</h2>
-    <p>A Máquina não se gasta — dá pra ensinar o <strong>${escapeHtmlSafe(nomeDoAtaque(hm.golpe))}</strong> a quantos pokémons quiser. Cada card mostra <strong>só quem pode aprender</strong>.</p>
+    ${/* ⚠️ A FRASE ENCURTOU (16/09/2026, a pedido, palavra por palavra). A antiga explicava a
+         MECÂNICA da Máquina ("não se gasta") e ainda descrevia a tela ("cada card mostra só quem
+         pode aprender") -- essa segunda metade deixou de ser verdade no mesmo pedido, porque o card
+         passou a mostrar o time inteiro. O que ficou é o que o jogador precisa saber pra decidir:
+         que pode ensinar de novo, e que o golpe não sai depois. */''}
+    <p>Ensine quantas vezes quiser. O ataque fica para sempre no Pokémon.</p>
   </div>
   ${corpo}
   <button class="btn secondary u-mt8" onclick="sairDoEnsinarHm()">⬅ Voltar</button>`;
