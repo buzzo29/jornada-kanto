@@ -2543,6 +2543,21 @@
   .achievement-row.locked{opacity:.45;}
   .achievement-text{font-size:.8rem;}
   .achievement-desc{font-size:.7rem;font-weight:600;color:var(--muted);}
+  /* ⚠️ O PREMIO E UMA COLUNA PROPRIA, a direita, e ela NAO encolhe (flex-shrink:0): o texto da
+     conquista e uma frase de tamanho variavel, e sem isso o "🪙 150" quebrava no meio em algumas
+     linhas e nao em outras -- e a coluna so se compara de relance quando esta alinhada. */
+  .conquista-premio{
+    flex:0 0 auto;
+    margin-left:auto;
+    align-self:center;
+    font-size:.62rem;
+    font-weight:800;
+    color:var(--muted);
+    white-space:nowrap;
+  }
+  /* ganha e nao resgatada: e a unica que o jogador pode fazer alguma coisa a respeito */
+  .conquista-premio.pronta{color:var(--blue-dark);}
+  .conquista-premio.paga{color:var(--green);}
 
   .status-row .tag{
     margin-left:auto;
@@ -5757,6 +5772,10 @@ async function loadPermanentUserData(){
     game.contaCarregada = true;
     game.rivalNameDefault = d.rivalNameDefault || '';   // preenche a tela de nome do rival (ver nomeDoRivalPadrao)
     game.hms = Array.isArray(d.hms) ? d.hms : [];       // as Máquinas Ocultas são da CONTA (ver darHM)
+    /* ⚠️ O QUE JA FOI RESGATADO DE CONQUISTA. Ele mora na CONTA e sob a mesma trava das moedas no
+       firestore.rules -- e a trava nao e enfeite pelo lado que parece: mentir pra MAIS nao paga
+       nada, mas zerar a lista pelo console faria o bolo inteiro ficar resgatavel de novo, toda vez. */
+    game.achievementsPaid = Array.isArray(d.achievementsPaid) ? d.achievementsPaid : [];
     game.accountEliteChampion = !!d.eliteChampion;
     game.leagueWinsTotal = d.leagueWinsTotal || 0;
     game.trainerBestStreak = d.trainerBestStreak || 0;
@@ -10273,6 +10292,18 @@ const VIGILIA_SHINIES = 2;
    contra seis, e o HP NÃO se recupera entre confrontos -- ver o preço medido no CLAUDE.md. */
 const VIGILIA_ABAIXO = 5;
 const VIGILIA_ESPALHA = 2;
+/* ⚠️ O HO-OH APARECE EM 5% DAS VIGILIAS (16/09/2026, a pedido) -- e isso o torna o UNICO dos tres
+   INTOCAVEIS que se deixa pegar, porque o premio da vigilia e escolher 1 dos 10.
+   E o pagamento do mito: a vigilia EXISTE por causa dele (os selvagens esperam a passagem do
+   arco-iris), entao ele aparecer na roda e o unico jeito de a lenda se cumprir. Um Ho-Oh apagado,
+   impossivel de escolher no meio dos dez, precisaria de uma explicacao que a tela nao tem -- e se
+   leria como defeito.
+   ⚠️ O QUE ISSO NAO MUDA, e e o que mantem tudo de pe: as metas de "capturar tudo" continuam
+   EXCLUINDO os tres (ver johtoTotal e totalCapturavel). Contando o Ho-Oh, toda conta que ja tinha
+   a Pokedex de Johto ou o Mestre Pokemon PERDERIA a conquista ate tirar 5% numa mata fechada --
+   e conquista que se perde sozinha e pior que conquista nenhuma. Ele e trofeu, nao requisito.
+   O Lugia e o Celebi continuam sem porta nenhuma. */
+const CHANCE_HOOH_VIGILIA = 0.05;
 /* ⚠️ OS DEZ SÃO SORTEADOS COM SEMENTE DO SAVE, como tudo que é sorteado nesta jornada: com
    `Math.random` bastaria fechar a aba antes da gravação pra re-sortear até vir um painel fácil (ou
    até vir o shiny que se quer de prêmio). A semente carrega slot, geração e trecho, então cada
@@ -10298,10 +10329,22 @@ function montarAVigilia(){
   }
   const sobra = desvios.reduce((a, d) => a + d, 0);
   desvios[desvios.length - 1] -= sobra;
+  /* ⚠️ OS DOIS NUMEROS DO HO-OH SAO LIDOS SEMPRE, mesmo quando ele nao vem -- assim a sequencia do
+     rng e a MESMA com e sem ele, e a vigilia de quem nao tirou os 5% continua sendo exatamente a
+     que ela seria. Lidos so quando passam, eles deslocariam o resto do sorteio. */
+  const temHooh = rng() < CHANCE_HOOH_VIGILIA;
+  const vagaDoHooh = Math.floor(rng() * VIGILIA_TAMANHO);
   let voltas = 0;
   while(mons.length < VIGILIA_TAMANHO && voltas++ < 4000){
     /* sem teto superior: o alvo é a média do time MENOS cinco, então ele nunca encosta no 99 */
     const nivel = Math.max(2, alvo + desvios[mons.length]);
+    /* o Ho-Oh entra na vaga sorteada, com o NIVEL daquela vaga: ele nao vem acima da roda, vem no
+       lugar de alguem. O que o torna duro e o corpo (BST 680), nao o nivel -- ver o preco medido. */
+    if(temHooh && mons.length === vagaDoHooh){
+      proibidas.add(raizDaLinha("hooh"));
+      mons.push({ speciesId: "hooh", level: nivel, shiny: false });
+      continue;
+    }
     const cru = ids[Math.floor(rng() * ids.length)];
     /* ⚠️ `formaNoNivel` E NÃO `especieNoNivel`: aqui o sorteio vem da DEX INTEIRA, então ele pode
        tirar uma forma FINAL e o nível da vigília é baixo -- e o `especieNoNivel` só sabe subir.
@@ -14715,6 +14758,8 @@ const CAMPOS_DA_CONTA = [
   /* o aviso de versão nova é da ABA, não do save: sem ele aqui, abrir um save e voltar pra home
      apagaria a marca e o botão sumiria até a próxima pergunta (que é folgada em 1 minuto) */
   'saveSlotsCarregados','contaCarregada','versaoNova',
+  /* o que a conta JA resgatou de conquista -- ver as moedas das conquistas */
+  'achievementsPaid',
   'hms',   // as Máquinas Ocultas são da CONTA, não do save -- ver darHM
   /* ⚠️ O AVISO DO HM TAMBÉM: o HM03 pode ser dado no CARREGAMENTO DA CONTA (pra quem já tinha as
      17 antes da feature), e aí o jogador está na home. Sem ele aqui, abrir um save apagaria a marca
@@ -16262,113 +16307,184 @@ async function computeLeagueAchievementExtra(trainerNames, uid){
 
   return result;
 }
+/* ===================== AS MOEDAS DAS CONQUISTAS (16/09/2026) =====================
+   Pedido assim: *"a cada conquista o treinador ganha moeda ... faça niveis de conquistas, as
+   conquistas faceis dao menos dinheiro e as mais dificeis dao mais"*.
+
+   ⚠️ QUEM PAGA E O SERVIDOR, e aqui isso custa uma DUPLICACAO GRANDE -- a maior do projeto depois
+   do motor. As regras do Firestore nao deixam o cliente escrever `moedas` (moeda e poder de
+   compra), entao o servidor precisa saber sozinho quais conquistas estao ganhas: a tabela das 69 E
+   o agregado que as alimenta foram portados pro functions/index.js.
+   Confiar no cliente aqui seria uma linha no console valendo o BOLO INTEIRO -- ver o total medido
+   no CLAUDE.md. O teste compara os dois lados por COMPORTAMENTO (agregados sorteados, os dois
+   destravam o mesmo conjunto), e nao por texto: e o unico jeito de pegar divergencia de logica.
+
+   O NIVEL VIVE NOS DOIS LADOS, como o preco da loja (`ITENS` x `LOJA`): o cliente precisa dele pra
+   DESENHAR o valor, o servidor e quem PAGA. Se os dois divergirem, a tela promete um numero que a
+   cobranca nao pratica -- e o teste cobra que sejam iguais conquista a conquista. */
+const NIVEL_DA_CONQUISTA = {
+  facil:    { moedas: 10,  nome: 'Fácil',    selo: '🥉' },
+  media:    { moedas: 25,  nome: 'Média',    selo: '🥈' },
+  dificil:  { moedas: 60,  nome: 'Difícil',  selo: '🥇' },
+  lendaria: { moedas: 150, nome: 'Lendária', selo: '💎' }
+};
+function moedasDaConquista(ach){
+  const n = NIVEL_DA_CONQUISTA[ach && ach.nivel];
+  return n ? n.moedas : 0;
+}
+/* ⚠️ O `extra` DA LIGA CHEGA DEPOIS (ele custa leitura e roda em segundo plano na home). Enquanto
+   nao chegou, as cinco conquistas de liga contam como TRANCADAS -- ou seja, o aviso erra pro lado
+   de NAO prometer, e se conserta sozinho no desenho seguinte. Quem paga de verdade e o servidor,
+   que calcula tudo por conta propria: este numero e so pra tela. */
+function conquistasGanhas(){
+  const agg = getAchievementAggregate();
+  const extra = game.achievementsExtra ||
+    { anyRegistered:false, anySemifinal:false, anyRunnerUp:false, anyChampion:false, anyTrainersChampion:false };
+  return ACHIEVEMENTS.filter(a => a.check(agg, extra));
+}
+function conquistasAResgatar(){
+  const pagas = new Set(game.achievementsPaid || []);
+  return conquistasGanhas().filter(a => !pagas.has(a.id));
+}
+function moedasAResgatar(){
+  return conquistasAResgatar().reduce((soma, a) => soma + moedasDaConquista(a), 0);
+}
+/* ⚠️ O AVISO SO VALE DEPOIS QUE A CONTA CARREGOU, pelo mesmo motivo da porta dos modos de campeao:
+   o `achievementsPaid` nasce vazio e os saves nascem em 20 nulos -- antes da leitura, TUDO pareceria
+   por resgatar, e o circulo vermelho apareceria numa conta que ja pegou tudo. */
+function temConquistaAResgatar(){
+  return !!game.contaCarregada && moedasAResgatar() > 0;
+}
 const ACHIEVEMENTS = [
-  { id:'first_step', icon:'🌱', name:'Primeiro Passo', desc:'Comece uma jornada escolhendo seu Pokémon inicial.', check:a=>a.slotsUsed>=1 },
-  { id:'first_badge', icon:'🥇', name:'Treinador em Ascensão', desc:'Vença seu primeiro ginásio.', check:a=>a.maxBadges>=1 },
-  { id:'halfway', icon:'🏅', name:'Metade do Caminho', desc:'Vença 4 ginásios em um único save.', check:a=>a.maxBadges>=4 },
-  { id:'all_badges', icon:'👑', name:'Mestre de Insígnias', desc:'Vença todos os 8 ginásios em um único save.', check:a=>a.maxBadges>=8 },
-  { id:'catch_10', icon:'🎒', name:'Colecionador Iniciante', desc:'Capture 10 espécies diferentes (somando todos os saves).', check:a=>a.caughtCount>=10 },
-  { id:'catch_30', icon:'📦', name:'Colecionador Dedicado', desc:'Capture 30 espécies diferentes.', check:a=>a.caughtCount>=30 },
-  { id:'catch_60', icon:'🗂️', name:'Colecionador Avançado', desc:'Capture 60 espécies diferentes.', check:a=>a.caughtCount>=60 },
-  { id:'catch_100', icon:'🗃️', name:'Quase Completo', desc:'Capture 100 espécies diferentes.', check:a=>a.caughtCount>=100 },
-  { id:'catch_all', icon:'🌟', name:'Mestre Pokémon', desc:'Capture tudo que dá pra capturar (Lugia, Ho-Oh e Celebi não se deixam pegar).',
+  { id:'first_step', nivel:'facil', icon:'🌱', name:'Primeiro Passo', desc:'Comece uma jornada escolhendo seu Pokémon inicial.', check:a=>a.slotsUsed>=1 },
+  { id:'first_badge', nivel:'facil', icon:'🥇', name:'Treinador em Ascensão', desc:'Vença seu primeiro ginásio.', check:a=>a.maxBadges>=1 },
+  { id:'halfway', nivel:'facil', icon:'🏅', name:'Metade do Caminho', desc:'Vença 4 ginásios em um único save.', check:a=>a.maxBadges>=4 },
+  { id:'all_badges', nivel:'media', icon:'👑', name:'Mestre de Insígnias', desc:'Vença todos os 8 ginásios em um único save.', check:a=>a.maxBadges>=8 },
+  { id:'catch_10', nivel:'facil', icon:'🎒', name:'Colecionador Iniciante', desc:'Capture 10 espécies diferentes (somando todos os saves).', check:a=>a.caughtCount>=10 },
+  { id:'catch_30', nivel:'facil', icon:'📦', name:'Colecionador Dedicado', desc:'Capture 30 espécies diferentes.', check:a=>a.caughtCount>=30 },
+  { id:'catch_60', nivel:'media', icon:'🗂️', name:'Colecionador Avançado', desc:'Capture 60 espécies diferentes.', check:a=>a.caughtCount>=60 },
+  { id:'catch_100', nivel:'dificil', icon:'🗃️', name:'Quase Completo', desc:'Capture 100 espécies diferentes.', check:a=>a.caughtCount>=100 },
+  { id:'catch_all', nivel:'lendaria', icon:'🌟', name:'Mestre Pokémon', desc:'Capture tudo que dá pra capturar (Lugia e Celebi não se deixam pegar; o Ho-Oh só na Vigília).',
     check:a=>a.caughtCount>=a.totalCapturavel },
-  { id:'evolve_1', icon:'✨', name:'Evolucionista', desc:'Evolua um Pokémon pela primeira vez.', check:a=>a.anyEvolution },
-  { id:'eevee_choice', icon:'💧', name:'Escolha Dourada', desc:'Evolua um Eevee para uma de suas formas.', check:a=>a.anyEeveeEvo },
-  { id:'legendary', icon:'🦅', name:'Caçador de Lendas', desc:'Capture uma das aves lendárias (Moltres, Zapdos ou Articuno).', check:a=>a.anyLegendary },
-  { id:'full_team', icon:'🎽', name:'Time Completo', desc:'Tenha um time com 6 Pokémons ao mesmo tempo.', check:a=>a.anyFullTeam },
-  { id:'comeback', icon:'🔄', name:'Superação', desc:'Vença um ginásio depois de já ter perdido nele antes.', check:a=>a.anyComeback },
-  { id:'three_saves', icon:'📁', name:'Três Jornadas', desc:'Tenha 3 saves em uso ao mesmo tempo.', check:a=>a.slotsUsed>=3 },
-  { id:'league_registered', icon:'🏟️', name:'Inscrito na História', desc:'Inscreva-se na Liga Pokémon pela primeira vez.', check:(a,x)=>x.anyRegistered },
-  { id:'league_semifinal', icon:'🥊', name:'Semifinalista', desc:'Chegue pelo menos à semifinal de uma Liga.', check:(a,x)=>x.anySemifinal },
-  { id:'league_runnerup', icon:'🥈', name:'Vice-Campeão', desc:'Termine uma Liga em segundo lugar.', check:(a,x)=>x.anyRunnerUp },
-  { id:'league_champion', icon:'🏆', name:'Campeão da Liga', desc:'Vença uma Liga Pokémon inteira.', check:(a,x)=>x.anyChampion },
-  { id:'legend_of_kanto', icon:'🐉', name:'Lenda de Kanto', desc:'Vença os 8 ginásios em um save E seja campeão de uma Liga.', check:(a,x)=>a.anyJourneyEnd && x.anyChampion },
+  { id:'evolve_1', nivel:'facil', icon:'✨', name:'Evolucionista', desc:'Evolua um Pokémon pela primeira vez.', check:a=>a.anyEvolution },
+  { id:'eevee_choice', nivel:'facil', icon:'💧', name:'Escolha Dourada', desc:'Evolua um Eevee para uma de suas formas.', check:a=>a.anyEeveeEvo },
+  { id:'legendary', nivel:'media', icon:'🦅', name:'Caçador de Lendas', desc:'Capture uma das aves lendárias (Moltres, Zapdos ou Articuno).', check:a=>a.anyLegendary },
+  { id:'full_team', nivel:'facil', icon:'🎽', name:'Time Completo', desc:'Tenha um time com 6 Pokémons ao mesmo tempo.', check:a=>a.anyFullTeam },
+  { id:'comeback', nivel:'facil', icon:'🔄', name:'Superação', desc:'Vença um ginásio depois de já ter perdido nele antes.', check:a=>a.anyComeback },
+  { id:'three_saves', nivel:'facil', icon:'📁', name:'Três Jornadas', desc:'Tenha 3 saves em uso ao mesmo tempo.', check:a=>a.slotsUsed>=3 },
+  { id:'league_registered', nivel:'facil', icon:'🏟️', name:'Inscrito na História', desc:'Inscreva-se na Liga Pokémon pela primeira vez.', check:(a,x)=>x.anyRegistered },
+  { id:'league_semifinal', nivel:'media', icon:'🥊', name:'Semifinalista', desc:'Chegue pelo menos à semifinal de uma Liga.', check:(a,x)=>x.anySemifinal },
+  { id:'league_runnerup', nivel:'dificil', icon:'🥈', name:'Vice-Campeão', desc:'Termine uma Liga em segundo lugar.', check:(a,x)=>x.anyRunnerUp },
+  { id:'league_champion', nivel:'dificil', icon:'🏆', name:'Campeão da Liga', desc:'Vença uma Liga Pokémon inteira.', check:(a,x)=>x.anyChampion },
+  { id:'legend_of_kanto', nivel:'dificil', icon:'🐉', name:'Lenda de Kanto', desc:'Vença os 8 ginásios em um save E seja campeão de uma Liga.', check:(a,x)=>a.anyJourneyEnd && x.anyChampion },
   /* Boss de Domingo. As duas marcas são gravadas pelo SERVIDOR no instante em que o Mew cai (ver
      bossPremiarTop10) -- não dá pra derivar do save, porque a raide é da conta e coletiva. */
-  { id:'boss_top10', icon:'✨', name:'Caçada Coletiva', desc:'Termine no Top 10 de dano numa raide em que o Mew foi derrotado.', check:a=>a.bossTop10 },
-  { id:'boss_killer', icon:'💥', name:'Golpe Final', desc:'Dê o golpe que derruba o Mew do Boss de Domingo.', check:a=>a.bossKiller },
-  { id:'elite_ditto', icon:'🎭', name:'Mestre do Disfarce', desc:'Vença a Elite 4 com um Ditto no time.', check:a=>a.anyEliteDittoWin },
+  { id:'boss_top10', nivel:'dificil', icon:'✨', name:'Caçada Coletiva', desc:'Termine no Top 10 de dano numa raide em que o Mew foi derrotado.', check:a=>a.bossTop10 },
+  { id:'boss_killer', nivel:'lendaria', icon:'💥', name:'Golpe Final', desc:'Dê o golpe que derruba o Mew do Boss de Domingo.', check:a=>a.bossKiller },
+  { id:'elite_ditto', nivel:'dificil', icon:'🎭', name:'Mestre do Disfarce', desc:'Vença a Elite 4 com um Ditto no time.', check:a=>a.anyEliteDittoWin },
   // ---- conquistas novas (20), baseadas em recursos que já existem no jogo hoje ----
   /* Era "149 espécies -- todas menos o Mewtwo", de quando a Pokédex tinha 150. Com Johto ela foi a
      250, e "149" deixou de significar coisa alguma. Virou o marco de fechar KANTO. */
-  { id:'catch_149', icon:'📖', name:'Pokédex de Kanto', desc:'Capture todas as espécies de Kanto (#001 a #150).', check:a=>a.kantoCaught>=a.kantoTotal },
-  { id:'mewtwo_caught', icon:'🧬', name:'O Desafio Final', desc:'Capture o Mewtwo.', check:a=>a.hasMewtwo },
-  { id:'mewtwo_reward', icon:'🔮', name:'Arma Secreta', desc:'Chame o Mewtwo emprestado pro seu time.', check:a=>a.anyMewtwoUsed },
-  { id:'all_birds', icon:'🌪️', name:'Trindade Alada', desc:'Capture as 3 aves lendárias: Moltres, Zapdos e Articuno.', check:a=>a.allBirds },
-  { id:'shiny_team', icon:'💫', name:'Brilho Raro', desc:'Tenha um Pokémon shiny no seu time.', check:a=>a.anyShinyTeam },
-  { id:'ditto_caught', icon:'🎭', name:'Era um Ditto!', desc:'Capture um Ditto. Talvez ele não fosse o que parecia ser...', check:a=>a.hasDitto },
-  { id:'dragon_master', icon:'🐲', name:'Domador de Dragões', desc:'Capture um Dragonite.', check:a=>a.hasDragonite },
-  { id:'eevee_all', icon:'🌈', name:'Coleção Eevee', desc:'Capture as 3 evoluções do Eevee: Vaporeon, Jolteon e Flareon.', check:a=>a.allEeveeEvos },
-  { id:'starters_final', icon:'🎓', name:'Tripla Coroa Inicial', desc:'Capture Venusaur, Charizard e Blastoise.', check:a=>a.allStartersFinal },
-  { id:'level_60', icon:'📈', name:'Elite', desc:'Tenha um Pokémon de nível 60 ou mais no time.', check:a=>a.maxTeamLevel>=60 },
-  { id:'level_70', icon:'🚀', name:'Potência Máxima', desc:'Tenha um Pokémon de nível 70 ou mais no time.', check:a=>a.maxTeamLevel>=70 },
-  { id:'team_all_50', icon:'💪', name:'Esquadrão de Elite', desc:'Tenha um time completo (6) com todos no nível 50+.', check:a=>a.anyTeamAll50 },
-  { id:'double_journey', icon:'🎖️', name:'Dupla Jornada', desc:'Vença as 8 insígnias em 2 saves diferentes.', check:a=>a.savesWith8Badges>=2 },
-  { id:'badges_20', icon:'🧭', name:'Andarilho de Kanto', desc:'Some 20 insígnias entre todos os seus saves.', check:a=>a.totalBadges>=20 },
+  { id:'catch_149', nivel:'dificil', icon:'📖', name:'Pokédex de Kanto', desc:'Capture todas as espécies de Kanto (#001 a #150).', check:a=>a.kantoCaught>=a.kantoTotal },
+  { id:'mewtwo_caught', nivel:'lendaria', icon:'🧬', name:'O Desafio Final', desc:'Capture o Mewtwo.', check:a=>a.hasMewtwo },
+  { id:'mewtwo_reward', nivel:'dificil', icon:'🔮', name:'Arma Secreta', desc:'Chame o Mewtwo emprestado pro seu time.', check:a=>a.anyMewtwoUsed },
+  { id:'all_birds', nivel:'dificil', icon:'🌪️', name:'Trindade Alada', desc:'Capture as 3 aves lendárias: Moltres, Zapdos e Articuno.', check:a=>a.allBirds },
+  { id:'shiny_team', nivel:'media', icon:'💫', name:'Brilho Raro', desc:'Tenha um Pokémon shiny no seu time.', check:a=>a.anyShinyTeam },
+  { id:'ditto_caught', nivel:'facil', icon:'🎭', name:'Era um Ditto!', desc:'Capture um Ditto. Talvez ele não fosse o que parecia ser...', check:a=>a.hasDitto },
+  { id:'dragon_master', nivel:'media', icon:'🐲', name:'Domador de Dragões', desc:'Capture um Dragonite.', check:a=>a.hasDragonite },
+  { id:'eevee_all', nivel:'dificil', icon:'🌈', name:'Coleção Eevee', desc:'Capture as 3 evoluções do Eevee: Vaporeon, Jolteon e Flareon.', check:a=>a.allEeveeEvos },
+  { id:'starters_final', nivel:'dificil', icon:'🎓', name:'Tripla Coroa Inicial', desc:'Capture Venusaur, Charizard e Blastoise.', check:a=>a.allStartersFinal },
+  { id:'level_60', nivel:'facil', icon:'📈', name:'Elite', desc:'Tenha um Pokémon de nível 60 ou mais no time.', check:a=>a.maxTeamLevel>=60 },
+  { id:'level_70', nivel:'media', icon:'🚀', name:'Potência Máxima', desc:'Tenha um Pokémon de nível 70 ou mais no time.', check:a=>a.maxTeamLevel>=70 },
+  { id:'team_all_50', nivel:'media', icon:'💪', name:'Esquadrão de Elite', desc:'Tenha um time completo (6) com todos no nível 50+.', check:a=>a.anyTeamAll50 },
+  { id:'double_journey', nivel:'dificil', icon:'🎖️', name:'Dupla Jornada', desc:'Vença as 8 insígnias em 2 saves diferentes.', check:a=>a.savesWith8Badges>=2 },
+  { id:'badges_20', nivel:'media', icon:'🧭', name:'Andarilho de Kanto', desc:'Some 20 insígnias entre todos os seus saves.', check:a=>a.totalBadges>=20 },
   /* Era "50 espécies num único save" -- IMPOSSÍVEL. Cada trecho da jornada tem UM encontro selvagem,
      e são 8 trechos: no máximo 8 capturas mais o inicial, 9 espécies. Contando todas as evoluções
      possíveis dessas 9 linhas, o teto absoluto fica em torno de 27. Nenhum jogador chegaria a 50.
      Baixado pra 18, que exige capturar em todos os trechos e evoluir bem o time. */
-  { id:'catch_18_one_save', icon:'🧳', name:'Mochila Cheia', desc:'Registre 18 espécies num único save (capturas + evoluções).', check:a=>a.maxCaughtOneSave>=18 },
-  { id:'streak_5', icon:'🔥', name:'Imbatível', desc:'Vença 5 batalhas seguidas sem nenhum Pokémon do time desmaiar.', check:a=>a.bestStreak>=5 },
-  { id:'streak_10', icon:'☄️', name:'Invencível', desc:'Vença 10 batalhas seguidas sem nenhum Pokémon do time desmaiar.', check:a=>a.bestStreak>=10 },
-  { id:'classic_bi', icon:'🏵️', name:'Bicampeão', desc:'Vença a Liga Clássica 2 vezes.', check:a=>a.leagueWinsTotal>=2 },
-  { id:'classic_tri', icon:'💎', name:'Dinastia', desc:'Vença a Liga Clássica 3 vezes.', check:a=>a.leagueWinsTotal>=3 },
-  { id:'trainers_champion', icon:'🏁', name:'Rei dos Pontos Corridos', desc:'Termine um dia da Trainers League em 1º lugar.', check:(a,x)=>x.anyTrainersChampion },
+  { id:'catch_18_one_save', nivel:'media', icon:'🧳', name:'Mochila Cheia', desc:'Registre 18 espécies num único save (capturas + evoluções).', check:a=>a.maxCaughtOneSave>=18 },
+  { id:'streak_5', nivel:'media', icon:'🔥', name:'Imbatível', desc:'Vença 5 batalhas seguidas sem nenhum Pokémon do time desmaiar.', check:a=>a.bestStreak>=5 },
+  { id:'streak_10', nivel:'dificil', icon:'☄️', name:'Invencível', desc:'Vença 10 batalhas seguidas sem nenhum Pokémon do time desmaiar.', check:a=>a.bestStreak>=10 },
+  { id:'classic_bi', nivel:'dificil', icon:'🏵️', name:'Bicampeão', desc:'Vença a Liga Clássica 2 vezes.', check:a=>a.leagueWinsTotal>=2 },
+  { id:'classic_tri', nivel:'lendaria', icon:'💎', name:'Dinastia', desc:'Vença a Liga Clássica 3 vezes.', check:a=>a.leagueWinsTotal>=3 },
+  { id:'trainers_champion', nivel:'dificil', icon:'🏁', name:'Rei dos Pontos Corridos', desc:'Termine um dia da Trainers League em 1º lugar.', check:(a,x)=>x.anyTrainersChampion },
   // ---- Elite 4: a vitória em si e com cada inicial ----
-  { id:'elite_champion', icon:'👑', name:'Campeão da Elite', desc:'Vença a Elite dos 4 pela primeira vez.', check:a=>a.anyEliteChampion },
-  { id:'elite_venusaur', icon:'🌿', name:'A Semente Venceu', desc:'Vença a Elite dos 4 com um Venusaur no time.', check:a=>a.eliteTeams.some(t=>t.includes('venusaur')) },
-  { id:'elite_charizard', icon:'🔥', name:'A Chama Venceu', desc:'Vença a Elite dos 4 com um Charizard no time.', check:a=>a.eliteTeams.some(t=>t.includes('charizard')) },
-  { id:'elite_blastoise', icon:'💧', name:'A Onda Venceu', desc:'Vença a Elite dos 4 com um Blastoise no time.', check:a=>a.eliteTeams.some(t=>t.includes('blastoise')) },
-  { id:'elite_all_starters', icon:'🎖️', name:'Os Três Caminhos', desc:'Vença a Elite dos 4 com cada um dos 3 iniciais finais, em saves diferentes.',
+  { id:'elite_champion', nivel:'media', icon:'👑', name:'Campeão da Elite', desc:'Vença a Elite dos 4 pela primeira vez.', check:a=>a.anyEliteChampion },
+  { id:'elite_venusaur', nivel:'dificil', icon:'🌿', name:'A Semente Venceu', desc:'Vença a Elite dos 4 com um Venusaur no time.', check:a=>a.eliteTeams.some(t=>t.includes('venusaur')) },
+  { id:'elite_charizard', nivel:'dificil', icon:'🔥', name:'A Chama Venceu', desc:'Vença a Elite dos 4 com um Charizard no time.', check:a=>a.eliteTeams.some(t=>t.includes('charizard')) },
+  { id:'elite_blastoise', nivel:'dificil', icon:'💧', name:'A Onda Venceu', desc:'Vença a Elite dos 4 com um Blastoise no time.', check:a=>a.eliteTeams.some(t=>t.includes('blastoise')) },
+  { id:'elite_all_starters', nivel:'lendaria', icon:'🎖️', name:'Os Três Caminhos', desc:'Vença a Elite dos 4 com cada um dos 3 iniciais finais, em saves diferentes.',
     check:a=>['venusaur','charizard','blastoise'].every(sp=>a.eliteTeams.some(t=>t.includes(sp))) },
-  { id:'elite_twice', icon:'🏛️', name:'Duas Coroas', desc:'Vença a Elite dos 4 em 2 saves diferentes.', check:a=>a.savesEliteChampion>=2 },
-  { id:'elite_legendary', icon:'⚡', name:'Poder Lendário', desc:'Vença a Elite dos 4 com uma ave lendária no time.',
+  { id:'elite_twice', nivel:'dificil', icon:'🏛️', name:'Duas Coroas', desc:'Vença a Elite dos 4 em 2 saves diferentes.', check:a=>a.savesEliteChampion>=2 },
+  { id:'elite_legendary', nivel:'dificil', icon:'⚡', name:'Poder Lendário', desc:'Vença a Elite dos 4 com uma ave lendária no time.',
     check:a=>a.eliteTeams.some(t=>['moltres','zapdos','articuno'].some(b=>t.includes(b))) },
-  { id:'elite_no_legendary', icon:'🤝', name:'Sem Atalhos', desc:'Vença a Elite dos 4 sem nenhum lendário no time.',
+  { id:'elite_no_legendary', nivel:'media', icon:'🤝', name:'Sem Atalhos', desc:'Vença a Elite dos 4 sem nenhum lendário no time.',
     check:a=>a.eliteTeams.some(t=>!['moltres','zapdos','articuno','mewtwo'].some(b=>t.includes(b))) },
   /* ---- Elite 4: o CAMINHO da jornada e a COMPOSIÇÃO do time ----
      O caminho sai do gymPath (uma região por etapa, imutável depois da jornada). A composição sai
      do time congelado na vitória -- ver eliteWinTeam. */
-  { id:'elite_path_kanto', icon:'🗾', name:'Puro Kanto', desc:'Vença a Elite dos 4 tendo enfrentado só ginásios de Kanto.',
+  { id:'elite_path_kanto', nivel:'dificil', icon:'🗾', name:'Puro Kanto', desc:'Vença a Elite dos 4 tendo enfrentado só ginásios de Kanto.',
     check:a=>a.eliteGymPaths.some(p=>p.length>0 && p.every(r=>r!=='johto')) },
-  { id:'elite_path_johto', icon:'🌾', name:'Puro Johto', desc:'Vença a Elite dos 4 tendo enfrentado só ginásios de Johto.',
+  { id:'elite_path_johto', nivel:'dificil', icon:'🌾', name:'Puro Johto', desc:'Vença a Elite dos 4 tendo enfrentado só ginásios de Johto.',
     check:a=>a.eliteGymPaths.some(p=>p.length>0 && p.every(r=>r==='johto')) },
-  { id:'elite_path_split', icon:'🌉', name:'Entre Dois Mundos', desc:'Vença a Elite dos 4 com 4 insígnias de Kanto e 4 de Johto.',
+  { id:'elite_path_split', nivel:'media', icon:'🌉', name:'Entre Dois Mundos', desc:'Vença a Elite dos 4 com 4 insígnias de Kanto e 4 de Johto.',
     check:a=>a.eliteGymPaths.some(p=>p.filter(r=>r==='johto').length===4 && p.filter(r=>r!=='johto').length===4) },
-  { id:'elite_team_kanto', icon:'🧢', name:'Turma dos Clássicos', desc:'Vença a Elite dos 4 com o time inteiro de Pokémons de Kanto.',
+  { id:'elite_team_kanto', nivel:'dificil', icon:'🧢', name:'Turma dos Clássicos', desc:'Vença a Elite dos 4 com o time inteiro de Pokémons de Kanto.',
     check:a=>a.eliteTeams.some(t=>t.length>0 && t.every(id=>SPECIES[id] && SPECIES[id].dex<=151)) },
-  { id:'elite_team_johto', icon:'🌟', name:'A Nova Geração', desc:'Vença a Elite dos 4 com o time inteiro de Pokémons de Johto.',
+  { id:'elite_team_johto', nivel:'dificil', icon:'🌟', name:'A Nova Geração', desc:'Vença a Elite dos 4 com o time inteiro de Pokémons de Johto.',
     check:a=>a.eliteTeams.some(t=>t.length>0 && t.every(id=>SPECIES[id] && SPECIES[id].dex>=152)) },
   /* Monotipo: todo mundo do time compartilhando UM tipo -- num time de tipagem dupla, basta existir
      um tipo que todos tenham. É a conquista mais difícil da lista: os oito ginásios são de tipos
      diferentes, então não dá pra só levar o que é bom contra o próximo. */
-  { id:'elite_monotype', icon:'🎯', name:'Especialista Absoluto', desc:'Vença a Elite dos 4 com um time inteiro do mesmo tipo.',
+  { id:'elite_monotype', nivel:'lendaria', icon:'🎯', name:'Especialista Absoluto', desc:'Vença a Elite dos 4 com um time inteiro do mesmo tipo.',
     check:a=>a.eliteTeams.some(t=>{
       if(!t.length) return false;
       const tipos = t.map(id=> (SPECIES[id] && SPECIES[id].types) || []);
       return tipos[0].some(tipo => tipos.every(ts => ts.includes(tipo)));
     }) },
-  { id:'elite_first_try', icon:'🎩', name:'De Primeira', desc:'Vença a Elite dos 4 sem gastar nenhuma tentativa (de primeira).',
+  { id:'elite_first_try', nivel:'dificil', icon:'🎩', name:'De Primeira', desc:'Vença a Elite dos 4 sem gastar nenhuma tentativa (de primeira).',
     check:a=>a.eliteFirstTry },
   /* ---- os buracos que Johto deixou: a Pokédex e os lendários de lá ---- */
-  { id:'catch_johto', icon:'📗', name:'Pokédex de Johto', desc:'Capture as espécies de Johto que dá pra capturar (#152 a #251).',
+  { id:'catch_johto', nivel:'lendaria', icon:'📗', name:'Pokédex de Johto', desc:'Capture as espécies de Johto que dá pra capturar (#152 a #251).',
     check:a=>a.johtoCaught>=a.johtoTotal },
-  { id:'all_beasts', icon:'🐾', name:'As Três Bestas', desc:'Capture Raikou, Entei e Suicune.', check:a=>a.allBeasts },
+  { id:'all_beasts', nivel:'dificil', icon:'🐾', name:'As Três Bestas', desc:'Capture Raikou, Entei e Suicune.', check:a=>a.allBeasts },
   // ---- força do time ----
-  { id:'team_avg_60', icon:'📊', name:'Time Sólido', desc:'Tenha um time com média de nível 60.', check:a=>a.bestTeamAvg>=60 },
-  { id:'team_avg_70', icon:'📐', name:'Time de Elite', desc:'Tenha um time com média de nível 70.', check:a=>a.bestTeamAvg>=70 },
-  { id:'team_avg_80', icon:'🛡️', name:'Time Lendário', desc:'Tenha um time com média de nível 80.', check:a=>a.bestTeamAvg>=80 },
-  { id:'level_90', icon:'🌠', name:'Rumo ao Topo', desc:'Tenha um Pokémon de nível 90 ou mais.', check:a=>a.maxTeamLevel>=90 },
+  { id:'team_avg_60', nivel:'media', icon:'📊', name:'Time Sólido', desc:'Tenha um time com média de nível 60.', check:a=>a.bestTeamAvg>=60 },
+  { id:'team_avg_70', nivel:'dificil', icon:'📐', name:'Time de Elite', desc:'Tenha um time com média de nível 70.', check:a=>a.bestTeamAvg>=70 },
+  { id:'team_avg_80', nivel:'lendaria', icon:'🛡️', name:'Time Lendário', desc:'Tenha um time com média de nível 80.', check:a=>a.bestTeamAvg>=80 },
+  { id:'level_90', nivel:'dificil', icon:'🌠', name:'Rumo ao Topo', desc:'Tenha um Pokémon de nível 90 ou mais.', check:a=>a.maxTeamLevel>=90 },
   // ---- shinies ----
-  { id:'shiny_5', icon:'✨', name:'Caçador de Brilhos', desc:'Registre 5 shinies diferentes na Pokédex.', check:a=>a.shinyCount>=5 },
-  { id:'shiny_25', icon:'🌟', name:'Colecionador Brilhante', desc:'Registre 25 shinies diferentes na Pokédex.', check:a=>a.shinyCount>=25 },
-  { id:'shiny_50', icon:'💠', name:'Mestre dos Shinies', desc:'Registre 50 shinies diferentes na Pokédex.', check:a=>a.shinyCount>=50 },
+  { id:'shiny_5', nivel:'dificil', icon:'✨', name:'Caçador de Brilhos', desc:'Registre 5 shinies diferentes na Pokédex.', check:a=>a.shinyCount>=5 },
+  { id:'shiny_25', nivel:'lendaria', icon:'🌟', name:'Colecionador Brilhante', desc:'Registre 25 shinies diferentes na Pokédex.', check:a=>a.shinyCount>=25 },
+  { id:'shiny_50', nivel:'lendaria', icon:'💠', name:'Mestre dos Shinies', desc:'Registre 50 shinies diferentes na Pokédex.', check:a=>a.shinyCount>=50 },
   // ---- desempenho na jornada (usa o contador do Bônus de Kanto) ----
-  { id:'flawless_journey', icon:'🎯', name:'Jornada Impecável', desc:'Vença as 8 insígnias sem perder nenhuma vez num ginásio.', check:a=>a.bestJourneyLosses===0 },
-  { id:'clean_journey', icon:'🧊', name:'Jornada Limpa', desc:'Vença as 8 insígnias com no máximo 5 derrotas.', check:a=>a.bestJourneyLosses<=5 }
+  { id:'flawless_journey', nivel:'lendaria', icon:'🎯', name:'Jornada Impecável', desc:'Vença as 8 insígnias sem perder nenhuma vez num ginásio.', check:a=>a.bestJourneyLosses===0 },
+  { id:'clean_journey', nivel:'dificil', icon:'🧊', name:'Jornada Limpa', desc:'Vença as 8 insígnias com no máximo 5 derrotas.', check:a=>a.bestJourneyLosses<=5 }
 ];
+/* RESGATA TUDO DE UMA VEZ, numa chamada só. Por conquista seriam N idas ao servidor pra uma ação
+   que é uma só -- a mesma conta que fez o apagar-em-lote das notificações existir.
+   ⚠️ O SERVIDOR RECALCULA TUDO: o que vai daqui é o PEDIDO, não a lista. Ele lê os saves e a conta,
+   descobre o que está ganho, desconta o que já foi pago e paga a diferença -- o mesmo desenho do
+   claimJourneyCoins. É isso que faz o número desenhado aqui ser só uma previsão, e é isso que
+   impede uma linha no console de valer o bolo inteiro. */
+async function resgatarConquistas(){
+  if(!game.authUser || game.resgatandoConquistas) return;
+  game.resgatandoConquistas = true;
+  game.conquistaResgateErro = null;
+  render();
+  try{
+    const r = await functionsClient.httpsCallable('claimAchievementCoins')();
+    game.moedas = r.data.moedas;
+    game.achievementsPaid = r.data.pagas || [];
+    game.conquistaResgateGanhou = r.data.ganhou || 0;
+  }catch(e){
+    console.error('Erro ao resgatar conquistas:', e);
+    game.conquistaResgateErro = 'Não deu pra resgatar agora. Tente de novo.';
+  }
+  game.resgatandoConquistas = false;
+  render();
+}
 async function openAchievements(){
   game.screen = 'achievements';
   game.achievementsExtra = null;
@@ -16380,6 +16496,10 @@ async function openAchievements(){
   if(game.screen==='achievements'){ render(); }
 }
 function closeAchievements(){
+  /* o "+N resgatadas" é o aviso de UM resgate, não um placar: sem limpar, ele reapareceria toda
+     vez que a tela fosse aberta de novo. Mesma regra do `ganhouHmAgora`. */
+  game.conquistaResgateGanhou = 0;
+  game.conquistaResgateErro = null;
   game.screen = 'saveSelect';
   render();
 }
@@ -26679,8 +26799,12 @@ function renderSaveSelect(){
       <span class="home-menu-title">Pokédex</span>
       <span class="home-menu-stat">${caughtCount}/${totalSpecies}</span>
     </button>
+    <!-- ⚠️ O ! DO RESGATE (16/09/2026, a pedido). É o MESMO selo do sino, do card de Amigos e do
+         botão das Ligas: um sinal que o jogador já sabe ler como "tem coisa aqui". Ele NÃO conta
+         quantas faltam, e é de propósito -- o que importa é que há dinheiro esperando, e o número
+         de conquistas pendentes não é o número de moedas. -->
     <button class="home-menu-card achievements" onclick="openAchievements()">
-      <span class="home-menu-icon">${icone('conquistas','menu')}</span>
+      <span class="home-menu-icon">${icone('conquistas','menu')}${temConquistaAResgatar() ? '<span class="notif-badge">!</span>' : ''}</span>
       <span class="home-menu-title">Conquistas</span>
       ${achievementsTeaser ? `<span class="home-menu-stat">${achievementsTeaser}</span>` : ''}
     </button>
@@ -27186,18 +27310,45 @@ function renderAchievements(){
   const extra = game.achievementsExtra || { anyRegistered:false, anySemifinal:false, anyRunnerUp:false, anyChampion:false, anyTrainersChampion:false };
   const loadingExtra = game.achievementsExtra === null;
   const unlockedCount = ACHIEVEMENTS.filter(ach=>ach.check(agg, extra)).length;
+  const pagas = new Set(game.achievementsPaid || []);
+  const aResgatar = moedasAResgatar();
+  const ganhouAgora = game.conquistaResgateGanhou || 0;
   return `
   <div class="box">
     <h2>🏆 Conquistas</h2>
     <p>${unlockedCount} de ${ACHIEVEMENTS.length} desbloqueadas, somando todos os seus saves.${loadingExtra?' (calculando conquistas da Liga...)':''}</p>
   </div>
+  <!-- ⚠️ O RESGATE É UM BOTÃO SÓ, e ele só existe quando há o que pegar: um botão desabilitado
+       permanente ali seria mais uma coisa apagada na tela, e a ausência dele já diz "está tudo
+       pego". Ele fica ACIMA da lista porque é a resposta do círculo vermelho que trouxe o
+       jogador até aqui -- embaixo de 69 linhas ele chegaria depois da rolagem. -->
+  <div class="box">
+    ${aResgatar > 0 ? `
+      <p class="hint-text">Você tem <strong>🪙 ${aResgatar}</strong> esperando em conquistas já desbloqueadas.</p>
+      <button class="btn success" ${game.resgatandoConquistas?'disabled':''} onclick="resgatarConquistas()">
+        ${game.resgatandoConquistas ? 'Resgatando...' : `🪙 Resgatar ${aResgatar} moedas`}
+      </button>`
+      : `<p class="hint-text">Tudo resgatado. As próximas conquistas já caem com a moeda esperando aqui.</p>`}
+    ${ganhouAgora > 0 ? `<p class="success-text">✅ +🪙 ${ganhouAgora} resgatadas!</p>` : ''}
+    ${game.conquistaResgateErro ? `<p class="error-text">${escapeHtmlSafe(game.conquistaResgateErro)}</p>` : ''}
+  </div>
   <div class="box">
     <div class="status-list">
       ${ACHIEVEMENTS.map(ach=>{
         const unlocked = ach.check(agg, extra);
+        const nivel = NIVEL_DA_CONQUISTA[ach.nivel] || NIVEL_DA_CONQUISTA.facil;
+        const paga = pagas.has(ach.id);
+        /* ⚠️ O PRÊMIO APARECE MESMO NA TRANCADA, e é de propósito: é ele que diz por que vale a
+           pena ir atrás daquela, e é a única informação da linha que o nome e a descrição não dão.
+           Escondê-lo até destravar faria o nível (que é a feature) só existir depois que ele já
+           não decide mais nada. */
+        const premio = paga
+          ? `<span class="conquista-premio paga" title="Já resgatada">✓ 🪙 ${nivel.moedas}</span>`
+          : `<span class="conquista-premio ${unlocked?'pronta':''}" title="${nivel.nome}">${nivel.selo} 🪙 ${nivel.moedas}</span>`;
         return `<div class="status-row achievement-row ${unlocked?'':'locked'}">
           <span class="icon">${unlocked ? ach.icon : '🔒'}</span>
           <span class="achievement-text"><strong>${ach.name}</strong><br><span class="achievement-desc">${ach.desc}</span></span>
+          ${premio}
         </div>`;
       }).join('')}
     </div>

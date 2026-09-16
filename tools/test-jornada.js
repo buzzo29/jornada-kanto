@@ -1811,5 +1811,98 @@ console.log('\n=== AS 28 FORMAS DO UNOWN (16/09/2026) ===');
   Object.assign(g, antes);
 }
 
+
+console.log('\nO HO-OH NA VIGILIA (5%)');
+{
+  const g = S.__getGame();
+  const mk = (id, lv) => { const q = S.createInstance(id, lv); q.maxHp = S.calcMaxHp(q); q.hp = q.maxHp; return q; };
+  g.team = ['pidgeotto','raticate','gyarados','machoke','kadabra','golem'].map(id => mk(id, 45));
+  S.__setGame(g);
+  let com = 0, total = 0, niveisDele = [], duplicado = 0, tamanhoErrado = 0;
+  const vistas = [];
+  for(let slot = 0; slot < 1200; slot++){
+    for(let trecho = 3; trecho < 8; trecho++){
+      g.currentSaveSlot = String(slot); g.saveGen = slot % 7; g.gymIndex = trecho;
+      S.__setGame(g);
+      const v = S.montarAVigilia();
+      total++;
+      if(v.length !== S.VIGILIA_TAMANHO) tamanhoErrado++;
+      const hoohs = v.filter(m => m.speciesId === 'hooh');
+      if(hoohs.length > 1) duplicado++;
+      if(hoohs.length === 1){ com++; niveisDele.push(hoohs[0].level); if(vistas.length < 3) vistas.push(v); }
+    }
+  }
+  const pct = 100 * com / total;
+  const sigma = 100 * Math.sqrt(0.05 * 0.95 / total);
+  ok('a chance e 5%', S.CHANCE_HOOH_VIGILIA === 0.05, String(S.CHANCE_HOOH_VIGILIA));
+  ok('e ele aparece nessa taxa nas vigilias de verdade', Math.abs(pct - 5) < 3 * sigma,
+     pct.toFixed(2) + '% em ' + total + ' vigilias (' + ((pct-5)/sigma).toFixed(1) + 'sigma)');
+  /* ⚠️ ELE OCUPA UMA VAGA, nao entra POR CIMA das dez: a vigilia e calibrada em 10 contra 6 sem
+     cura entre confrontos, e um 11o mudaria o preco medido da mata inteira. */
+  ok('a vigilia continua com dez', tamanhoErrado === 0, tamanhoErrado + ' fora do tamanho');
+  ok('e ele nunca aparece duas vezes', duplicado === 0);
+  /* o nivel dele e o da VAGA: ele nao vem acima da roda, vem no lugar de alguem */
+  const media = S.avgTeamLevel();
+  ok('e o nivel dele e o da vaga que ele ocupou',
+     niveisDele.every(n => Math.abs(n - (media - S.VIGILIA_ABAIXO)) <= S.VIGILIA_ESPALHA),
+     'entre ' + Math.min.apply(null, niveisDele) + ' e ' + Math.max.apply(null, niveisDele) +
+     ' (alvo ' + (media - S.VIGILIA_ABAIXO) + ')');
+  /* ⚠️ E ELE PODE SER O PREMIO -- e disso que vem a unica porta de captura dele no jogo. A tela do
+     premio oferece os DEZ, entao basta ele estar na lista; o que se tranca aqui e que ele nao foi
+     marcado de um jeito que a escolha do premio fosse pular. */
+  ok('ele entra na roda como os outros (mesma forma de registro)',
+     vistas.every(v => {
+       const h = v.find(m => m.speciesId === 'hooh');
+       return h && typeof h.level === 'number' && 'shiny' in h;
+     }), vistas.length + ' vigilias conferidas');
+}
+
+console.log('\nE O QUE O HO-OH CAPTURAVEL NAO PODE MEXER');
+{
+  /* ⚠️ ELE CONTINUA FORA DAS ROTAS: a vigilia e a UNICA porta. O SEM_CAPTURA_SELVAGEM e o que
+     segura isso, e ele nao foi tocado. */
+  ok('ele continua sem aparecer como selvagem de rota',
+     S.SEM_CAPTURA_SELVAGEM.indexOf('hooh') >= 0);
+  ok('e continua na lista dos intocaveis', S.ESPECIES_INTOCAVEIS.indexOf('hooh') >= 0);
+  /* ⚠️ E ESTA E A TRAVA QUE IMPORTA: as metas de "capturar tudo" continuam EXCLUINDO os tres.
+     Contando o Ho-Oh, toda conta que ja tinha a Pokedex de Johto ou o Mestre Pokemon PERDERIA a
+     conquista ate tirar 5% numa mata fechada -- e conquista que se perde sozinha e pior que
+     conquista nenhuma. Ele e trofeu, nao requisito. */
+  const g2 = S.__getGame();
+  g2.saveSlots = []; g2.permanentPokedex = []; g2.permanentShinyDex = [];
+  S.__setGame(g2);
+  const agg = S.getAchievementAggregate();
+  const johto = Object.keys(S.SPECIES).filter(id => S.SPECIES[id].dex >= 152);
+  ok('o Ho-Oh NAO conta na meta da Pokedex de Johto',
+     agg.johtoTotal === johto.length - 3,
+     agg.johtoTotal + ' de ' + johto.length + ' especies de Johto');
+  ok('nem na meta de capturar tudo',
+     agg.totalCapturavel === Object.keys(S.SPECIES).length - 3,
+     String(agg.totalCapturavel));
+}
+console.log('\nO BOT COM --corte ATRAVESSA A MATA FECHADA');
+/* ⚠️ ESTA TRAVA NASCEU DE UM DEFEITO REAL (16/09/2026), e ela e de COMPORTAMENTO de proposito.
+   Quando o HM03 entrou, o `podeAprenderCorte` morreu -- a lista passou a viver dentro do item
+   (`podeAprenderHM('hm01', ...)`) -- e o tools/smoke-jornada.js continuou chamando a funcao que
+   nao existia mais. O efeito NAO foi um erro barulhento: toda jornada com --corte morria no passo
+   3, e um A/B com a flag devolvia ZERO jornadas concluidas dos dois lados -- "sem diferenca" sem
+   ter medido nada.
+   ⚠️ A PRIMEIRA VERSAO DESTA TRAVA ERA ESTATICA (varrer os `g.x` do smoke e cobrar que existam) e
+   foi DESCARTADA: ela acusa 20 nomes de ramos MORTOS (cassino, safari, fossil -- eventos que
+   sairam do jogo e que o bot nunca alcanca). Trava que acusa o que nao roda vira ruido, e ruido
+   e desligado. Rodar 8 jornadas custa 0,4s e cobra a coisa certa: o caminho funciona.
+   A mata so aparece do trecho 4 em diante e em 1 de cada 4, entao o que se exige e que o bot NAO
+   FALHE -- exigir que ele veja a mata em 8 jornadas seria um teste que falha sozinho. */
+{
+  const { execFileSync } = require('child_process');
+  let saida = "";
+  try{
+    saida = execFileSync(process.execPath, [require('path').join(__dirname, 'smoke-jornada.js'), '--runs', '8', '--corte'],
+                         { encoding: 'utf8', timeout: 120000 });
+  }catch(e){ saida = 'NAO RODOU: ' + e.message; }
+  const m = saida.match(/Falhas: (\d+)/);
+  ok('8 jornadas com --corte, nenhuma falha', !!m && m[1] === '0',
+     m ? m[1] + ' falha(s)' : saida.slice(0, 120));
+}
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
 process.exit(falhas ? 1 : 0);

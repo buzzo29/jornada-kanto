@@ -40,17 +40,21 @@ service cloud.firestore {
       // oferta. Mentir no TOTAL paga: compra re-sorteio a mais. Por isso ele está aqui, com as
       // moedas, e quem escreve é o rerollWildOffer.
       // O resto do documento (nome, pokédex, conquistas) continua livre pro dono como sempre foi.
+      // 'achievementsPaid' entrou em 16/09/2026 com as moedas das conquistas, e a trava importa
+      // pelo lado que NAO e obvio: escrever pra MAIS ali nao paga nada (o servidor so paga o que
+      // esta ganho de verdade), mas ZERAR a lista pelo console faria o bolo inteiro das 69 ficar
+      // resgatavel de novo, quantas vezes quisessem. Quem escreve e o claimAchievementCoins.
       // 'admin' entrou em 12/09/2026 com o painel de treinadores. Ele NAO podia ser um campo livre:
       // quem o tem consegue ler o save de TODO MUNDO pela adminListTrainers, entao um campo que o
       // proprio jogador escreve seria uma linha no console pra ver a conta alheia. Ele so existe
       // aqui e no console do Firebase -- nem as Cloud Functions o escrevem.
       allow write: if request.auth != null && request.auth.uid == userId
         && !request.resource.data.diff(resource.data).affectedKeys()
-             .hasAny(['specialties', 'specialtyCounts', 'specialtyCounted', 'rareCandies', 'moedas', 'inventario', 'equipados', 'rerollsPorSave', 'admin']);
+             .hasAny(['specialties', 'specialtyCounts', 'specialtyCounted', 'rareCandies', 'moedas', 'inventario', 'equipados', 'rerollsPorSave', 'admin', 'achievementsPaid']);
       // criação do documento: não há resource.data pra comparar, então checa direto que os campos
       // protegidos não vêm no payload inicial
       allow create: if request.auth != null && request.auth.uid == userId
-        && !request.resource.data.keys().hasAny(['specialties', 'specialtyCounts', 'specialtyCounted', 'rareCandies', 'moedas', 'inventario', 'equipados', 'rerollsPorSave', 'admin']);
+        && !request.resource.data.keys().hasAny(['specialties', 'specialtyCounts', 'specialtyCounted', 'rareCandies', 'moedas', 'inventario', 'equipados', 'rerollsPorSave', 'admin', 'achievementsPaid']);
       match /saves/{saveId} {
         allow read, write: if request.auth != null && request.auth.uid == userId;
       }

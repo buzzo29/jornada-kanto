@@ -59,8 +59,13 @@ function act(g, log){
          chamaria chooseRoute num card trancado, a acao recusaria em silencio e a jornada travaria
          na mesma tela ate o MAX_STEPS. */
       if(CORTE){
-        /* ensina o Corte a quem puder: e o que um treinador com o HM01 na mochila faria */
-        const quem = (game.team||[]).find(p => g.podeAprenderCorte(p.speciesId));
+        /* ensina o Corte a quem puder: e o que um treinador com o HM01 na mochila faria.
+           ⚠️ E `podeAprenderHM('hm01', ...)`, NAO o `podeAprenderCorte` -- aquele morreu quando o
+           HM03 entrou e a lista passou a viver DENTRO do item. O smoke ficou chamando uma funcao
+           que nao existia mais, e o efeito nao foi um erro barulhento: TODA jornada com --corte
+           falhava no passo 3, entao qualquer A/B medido com essa flag media ZERO jornadas de cada
+           lado e dava "sem diferenca". Ferramenta de medicao quebrada mente calada. */
+        const quem = (game.team||[]).find(p => g.podeAprenderHM('hm01', p.speciesId));
         if(quem && !g.sabeCortar(quem)){
           quem.ataques = [g.GOLPE_DO_CORTE].concat((quem.ataques||[]).slice(0, g.MAX_GOLPES - 1));
         }

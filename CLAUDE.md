@@ -8138,6 +8138,53 @@ a um lado num PvP).
   A quebra do nome comprido é **a mesma das duas telas** (4 de 6 na de ordem, 5 de 16 aqui) — e a
   clareira ainda sobra mais espaço pro nome, 205px contra 167px, porque não tem o botão de item.
 
+
+### ⚠️ O HO-OH APARECE EM 5% DAS VIGÍLIAS (16/09/2026)
+
+Pedido assim: *"adicione 5% de chance de o HoHo ser um dos pokemons que aparece na vigilia do arco
+iris"*. **E isso o torna o único dos três INTOCÁVEIS que se deixa capturar**, porque o prêmio da
+vigília é escolher 1 dos 10.
+
+- **É O PAGAMENTO DO MITO.** A vigília EXISTE por causa dele — os selvagens esperam a passagem do
+  arco-íris —, então ele aparecer na roda é o único jeito de a lenda se cumprir. Um Ho-Oh apagado,
+  impossível de escolher no meio dos dez, precisaria de uma explicação que a tela não tem e se
+  leria como defeito.
+- **⚠️ O QUE ISSO NÃO MUDA, e é o que mantém tudo de pé: as metas de "capturar tudo" continuam
+  EXCLUINDO os três.** Contando o Ho-Oh, **toda conta que já tinha a Pokédex de Johto ou o Mestre
+  Pokémon PERDERIA a conquista** até tirar 5% numa mata fechada — e conquista que se perde sozinha
+  é pior que conquista nenhuma. Ele é **troféu, não requisito**. Há trava pras duas metas.
+  O Lugia e o Celebi continuam sem porta nenhuma, e ele continua fora das rotas selvagens
+  (`SEM_CAPTURA_SELVAGEM` não foi tocado) — a vigília é a única porta.
+- **A descrição do "Mestre Pokémon" mudou junto**: ela dizia que os três não se deixam pegar, e
+  isso deixou de ser verdade inteira. Hoje ela nomeia a exceção.
+- **⚠️ OS DOIS NÚMEROS DO SORTEIO SÃO LIDOS SEMPRE**, mesmo quando ele não vem: assim a sequência
+  do rng é a MESMA com e sem ele, e a vigília de quem não tirou os 5% continua sendo exatamente a
+  que ela seria. Lidos só quando passam, eles deslocariam o resto do sorteio.
+- **ELE OCUPA UMA VAGA, não entra por cima das dez**, e com o NÍVEL daquela vaga: a vigília é
+  calibrada em 10 contra 6 sem cura entre confrontos, e um 11º mudaria o preço medido da mata
+  inteira. O que o torna duro é o CORPO (BST 680), não o nível.
+
+**O QUE ELE CUSTA E O QUE ELE VALE, medido:**
+
+| | |
+|---|---|
+| taxa de aparição | **4,91%** em 20.000 vigílias (0,6σ de 5%) |
+| a vigília quando ele aparece | 56,2% → **49,3%** de vitória (**−6,8**) |
+| diluído pelos 5% | −0,34 ponto na vigília em geral |
+
+**Como PRÊMIO ele é forte e não é absurdo** (1x1 contra um painel de 8, Lv.45): **Ho-Oh 79,2%**,
+contra 40,5% de um Vileplume (prêmio comum) e 11,4% de um Raticate. E o **Gyarados de rota faz
+89,8%** no mesmo painel — ou seja, ele não é o melhor pokémon do jogo, é um troféu bom.
+
+**O PREÇO NA JORNADA: nada. 56,20% contra 56,32% de conclusão** — **+0,13 ponto, 0,2σ** (8 blocos
+de 700 jornadas de cada lado, **5.600 de cada**, com o bot `--corte` entrando na mata sempre, e o
+desvio tirado de ENTRE os blocos; **4 de 8 blocos** pra cada lado). Ruído absolutamente puro, e faz
+sentido pelos três motivos somados: ele sai em **5%** das vigílias, a mata aparece em 1 de cada 4
+trechos a partir do 4º, e quando ele sai ele DIFICULTA a vigília (−6,8) ao mesmo tempo em que a
+PAGA melhor — os dois se cancelam na conta da jornada.
+
+- **Se um dia incomodar**, a régua é o `CHANCE_HOOH_VIGILIA`.
+
 ### ⚠️ TRÊS TELAS NASCERAM ILEGÍVEIS, E O DEFEITO ERA DE OMISSÃO (14/09/2026)
 
 Reportado assim: *"o quadro da Vigília do Arco-Íris não dá para ler direito por conta das cores. Se
@@ -8281,6 +8328,16 @@ trancado e a rota nunca é escolhida.
   `currentSaveSlot`/`saveGen` passaram a variar por jornada. **Sem a segunda, as 300 jornadas tinham
   o MESMO perfil de trechos com mata** — a semente é do save — e a primeira medição deu **zero**
   entradas em 300 jornadas sem nada estar errado.
+- **⚠️ E O `--corte` FICOU QUEBRADO POR UM COMMIT INTEIRO, EM SILÊNCIO (achado em 16/09/2026).**
+  Quando o HM03 entrou, o `podeAprenderCorte` morreu — a lista passou a viver DENTRO do item
+  (`podeAprenderHM('hm01', ...)`) —, e o `tools/smoke-jornada.js` continuou chamando a função que
+  não existia mais. **O efeito não foi um erro barulhento: toda jornada com `--corte` morria no
+  passo 3**, então o smoke devolvia `Falhas: N` e **zero jornadas concluídas dos DOIS lados** —
+  qualquer A/B medido com essa flag daria "sem diferença" sem ter medido nada.
+  Foi descoberto porque um A/B novo deu `sem=0 com=0` em quatro blocos seguidos, o que é
+  impossível — e não porque alguém rodou o smoke: **ele só quebra com a flag**, e a bateria não a
+  usa. **A lição é a de sempre aqui, do outro lado: ferramenta de medição quebrada mente calada,
+  e um zero perfeito é mais suspeito que um número feio.**
 - **Medido a 320px, no navegador:** a lista de TIMES da Máquina fica em **723px** com três cards de
   **114px**, e a de pokémon de um time em **962px**; o card da mata mede **138px** (uma linha a mais que os outros,
   por causa do cadeado), a clareira fica em **988px** com a roda de dez sprites em **duas fileiras de
@@ -9014,6 +9071,136 @@ escolheu três golpes lutava a Torre com os dois primeiros**, em silêncio — o
 - Em aberto, não implementado: **limite de ataques por jogador** (hoje é livre — sem isso, uma
   conta sozinha derruba a raide em ~399 ataques) e o que acontece depois que ele cai (hoje fica
   derrubado e a tela diz isso; não renasce no domingo seguinte).
+
+## AS MOEDAS DAS CONQUISTAS (16/09/2026)
+
+Pedido assim: *"a cada conquista o treinador ganha moeda, entao quando ele conseguir uma conquista e
+nao pegar a moeda, fica aquele circulo vermelho com uma exclamação no meio como se fosse
+notificação, indicando para ele ir pegar a recompensa. Faça niveis de conquistas, as conquistas
+faceis dao menos dinheiro e as mais dificeis dao mais"*.
+
+- **SÃO QUATRO NÍVEIS**, e a escala é o pedido ao pé da letra:
+
+  | | paga | quantas | o que é |
+  |---|---|---|---|
+  | 🥉 **Fácil** | 10 | 13 | acontece só de jogar (primeira insígnia, primeira evolução, 3 saves) |
+  | 🥈 **Média** | 25 | 15 | uma jornada inteira, ou um marco de coleção de verdade |
+  | 🥇 **Difícil** | 60 | 30 | várias jornadas, ou um feito duro numa só |
+  | 💎 **Lendária** | 150 | 11 | o topo do jogo (a Pokédex fechada, o monotipo, a jornada impecável) |
+
+  **O bolo das 69 é 🪙 3.955 — 56,5 jornadas completas** (a jornada paga 70).
+- **⚠️ O TESTE NÃO TRANCA OS VALORES, ele tranca a ESCALA.** Fixar 10/25/60/150 ali faria o teste
+  virar uma cópia da tabela: todo reajuste passaria a exigir editar dois lugares e o teste não diria
+  nada sobre a regra. O que ele cobra é `facil < media < dificil < lendaria`, que É o pedido — um
+  "difícil" pagando menos que um "fácil" é o único jeito de isto estar errado.
+
+### ⚠️ QUEM PAGA É O SERVIDOR, E ISSO CUSTOU A MAIOR DUPLICAÇÃO DEPOIS DO MOTOR
+
+As regras do Firestore não deixam o cliente escrever `moedas` — é a mesma trava que existe pra o
+console não virar shiny à vontade. Só que **o servidor não sabia o que é uma conquista**: a tabela
+das 69 e o agregado que as alimenta viviam só no `index.html`.
+
+Então os dois foram portados pro `functions/index.js`. Confiar no que o cliente mandasse seria **uma
+linha no console valendo o bolo inteiro**.
+
+- **AS 69 CHECKS FORAM COPIADAS, não redigitadas** — redigitar 69 funções é garantir que uma
+  divergisse. O que não veio é o que o servidor não tem: ícone, nome e descrição.
+- **⚠️ E O `dex` TEVE QUE ENTRAR NO `SPECIES` DO SERVIDOR**, porque quatro conquistas contam Kanto
+  contra Johto e ele não tinha o número. Foi acrescentado um CAMPO à tabela que já era duplicada, e
+  não criada uma segunda tabela só pro número da Pokédex.
+  **A ordem das duas cópias do `SPECIES` é idêntica (conferido, 0 divergências), mas `dex` NÃO é a
+  posição** — a tabela é por linha evolutiva, então o Charmander é o 2º e o dex dele é 4. Derivar
+  da posição daria errado em 247 das 250.
+- **⚠️ O TESTE COMPARA POR COMPORTAMENTO, e não por texto.** Comparar o texto das duas tabelas não
+  provaria nada: elas foram geradas uma da outra, então passariam iguais **mesmo com os AGREGADOS
+  divergindo** — que é onde o risco de verdade está, porque o cliente monta o dele do `game` e o
+  servidor dos documentos. A trava sorteia **400 contas** (saves, Pokédex, flags) e cobra que os
+  dois destravem o MESMO conjunto e que nenhum campo do agregado difira. Conferido que ela acusa:
+  zerar o `shinyCount` do servidor derruba 396 dos 400.
+
+### ⚠️ AS CINCO CONQUISTAS DE LIGA DEPENDEM DE UMA MIGRAÇÃO, E ISSO SE RESOLVE SOZINHO
+
+Elas saem das flags `anyChampion`/`anySemifinal`/... gravadas na conta. Conta que **ainda não foi
+migrada** (`achievementFlagsMigrated`) tem as cinco como falsas no servidor — e o cliente, que faz o
+escaneamento completo, as mostraria como ganhas.
+
+Isso não vira defeito porque **quem migra é a própria tela de Conquistas**, que é de onde o resgate
+é pedido: abrir a tela migra, e o clique seguinte já paga. O erro é sempre pro lado de **não pagar
+agora**, nunca pro de pagar duas vezes.
+
+### O CÍRCULO VERMELHO
+
+- É o **MESMO `.notif-badge`** do sino, do card de Amigos e do botão das Ligas — um sinal que o
+  jogador já sabe ler como "tem coisa aqui". O `.home-menu-icon` já era `position:relative`, então
+  ele nasceu ancorado no card certo.
+- **Ele NÃO conta quantas faltam**, e é decisão: o número de conquistas pendentes **não é** o número
+  de moedas, e um "12" ali seria lido como 12 moedas. Quem diz o valor é a tela de destino.
+- **⚠️ E ELE SÓ ACENDE DEPOIS QUE A CONTA CARREGA** (`contaCarregada`), pela mesma razão da porta dos
+  modos de campeão: o `achievementsPaid` nasce vazio e os saves nascem em 20 nulos — antes da
+  leitura **tudo pareceria por resgatar**, e o círculo apareceria numa conta que já pegou tudo.
+  Há trava pra exatamente isso, e ela acusa com a guarda removida.
+
+### O RESGATE
+
+- **É UM BOTÃO SÓ, não um por conquista.** Por conquista seriam N idas ao servidor pra uma ação que
+  é uma só — a mesma conta que fez o apagar-em-lote das notificações existir.
+- **O SERVIDOR RECALCULA TUDO**: o que vai do cliente é o PEDIDO, não a lista. Ele lê os saves e a
+  conta, descobre o que está ganho, desconta o que já foi pago e paga a diferença — o mesmo desenho
+  do `claimJourneyCoins`. É isso que faz o número desenhado na tela ser só uma **previsão**.
+- **⚠️ OS SAVES SÃO LIDOS FORA DA TRANSAÇÃO, de propósito.** Ler uma coleção dentro dela pra depois
+  escrever só no documento da conta não compra nada, e **conquista só CRESCE**: um save que mudou
+  entre a leitura e a gravação no máximo adia uma conquista pro próximo resgate. O que a transação
+  protege é o par (já pago, saldo), que é onde duas abas se atropelariam.
+- **`achievementsPaid` ENTROU NA TRAVA DO `firestore.rules`**, e ela importa pelo lado que NÃO é
+  óbvio: escrever pra MAIS ali não paga nada (o servidor só paga o que está ganho de verdade), mas
+  **ZERAR a lista pelo console faria o bolo inteiro ficar resgatável de novo**, quantas vezes
+  quisessem.
+- **O prêmio aparece na linha da conquista TRANCADA também**, e isso é o que faz o nível ser a
+  feature: é ele que diz por que vale a pena ir atrás daquela. Escondido até destravar, o número só
+  existiria depois de já não decidir mais nada.
+
+### ⚠️ O RETROATIVO É A DECISÃO DESTA FEATURE, E ELE ESTÁ MEDIDO
+
+Conquista já desbloqueada **entra como resgatável** — é a leitura literal do pedido ("quando ele
+conseguir uma conquista e não pegar a moeda"), e uma conta que tem 43 delas ganhou as 43.
+Isso **contraria o precedente do `claimJourneyCoins`**, que decidiu não pagar retroativo; lá o
+motivo era 70 moedas caindo do céu sem o jogador fazer nada, e aqui a feature INTEIRA é "vá pegar o
+que você já ganhou".
+
+**O que cada perfil pega no primeiro clique** (perfis construídos — não há dado de produção nesta
+sessão —, cada um um ponto real da progressão):
+
+| perfil | conquistas | resgate | em jornadas |
+|---|---|---|---|
+| começando (1 save, 2 insígnias) | 4/69 | 🪙 **40** | 0,6 |
+| uma jornada inteira (8 insígnias + Elite) | 20/69 | 🪙 **505** | 7,2 |
+| veterano (3 saves, 2 campeões, liga vencida) | 43/69 | 🪙 **1.560** | **22,3** |
+| tudo (as 69) | 69/69 | 🪙 3.955 | 56,5 |
+
+**Os 1.560 do veterano num clique são o número a olhar.** Ele compra 5 Doces Raros, ou enche o teto
+de re-sorteio de quatro saves. Se incomodar, a régua é o `NIVEL_DA_CONQUISTA` — **dividir os quatro
+valores por 2 divide o retroativo por 2**, e o teste continua verde porque ele cobra a escala, não
+os números. Se a intenção for que o passado NÃO pague, é fazer o primeiro resgate de uma conta
+carimbar `achievementsPaid` sem creditar — o mesmo ramo que o `claimJourneyCoins` usa.
+
+- **Medido a 320px, no navegador:** a coluna do prêmio mede **43px**, nada quebra em duas linhas,
+  nenhum nome trunca, e não há rolagem lateral. O botão de resgatar fica em 52px.
+- **⚠️ E O `tools/fake-firestore.js` GANHOU `arrayUnion` por causa disto** — é assim que a lista de
+  já-pagas é gravada, e sem ele a callable morria com *"arrayUnion is not a function"*. É a mesma
+  família do `increment` dentro de mapa, do `FieldPath.documentId()` e do `getAll` da transação:
+  **o fake tem que aprender o que o SDK de verdade faz, senão o teste dá verde e a produção**
+  **quebra** (ou, como aqui, o contrário — a produção funcionaria e só o teste não rodava).
+  Ele foi escrito pra **só CRESCER**, que é o que o `arrayUnion` é: é a única escrita de lista que
+  não pode encolher, e foi por não ser assim que a Pokédex de um jogador perdeu 49 espécies.
+- **A trava de PONTA A PONTA roda a callable de verdade** contra o fake: o primeiro resgate paga, o
+  **segundo seguido não paga nada** (um duplo-clique viraria moeda de graça), uma conquista nova
+  depois paga só a diferença, a lista de pagas só cresce e não repete id, sem login recusa, e conta
+  vazia não quebra. Sem ela, o que estava testado eram as PEÇAS — e o risco mora na escrita.
+- `tools/test-conquistas.js` tranca 33 pontas: os quatro níveis com dono, a escala crescente, as
+  duas tabelas iguais em id/nível/valor, os **dois agregados idênticos em 400 contas sorteadas**, o
+  resgate pagando a diferença, id de conquista removida valendo zero, o aviso acendendo e apagando,
+  a guarda do `contaCarregada`, e a tela (botão com valor, prêmio nas 69, prêmio na trancada,
+  o ✓ depois de pago).
 
 ## Conquistas
 

@@ -13,7 +13,29 @@
  *
  *   node tools/test-conquistas.js
  */
+const path = require('path');
+const Module = require('module');
+const fake = require('./fake-firestore');
 const { createSandbox } = require('./game-sandbox');
+
+/* ⚠️ O SERVIDOR ENTRA AQUI porque as moedas das conquistas moram nos DOIS lados: a tabela das 69
+   foi portada pro functions/index.js (o cliente nao pode escrever `moedas`), e o que este arquivo
+   tranca de mais importante e que os dois destravem SEMPRE o mesmo conjunto. */
+const db = fake.makeDb();
+const stubs = {
+  'firebase-functions/v2/scheduler': { onSchedule: (a, b)=> (typeof a === 'function' ? a : b) },
+  'firebase-functions/v2/https': {
+    onCall: (fn)=>fn,
+    HttpsError: class HttpsError extends Error { constructor(code, msg){ super(msg); this.code = code; } }
+  },
+  'firebase-functions/logger': { error(){}, info(){}, warn(){}, log(){} },
+  'firebase-admin': { initializeApp(){}, firestore: Object.assign(()=>db, { FieldValue: fake.FieldValue }) }
+};
+const loadOriginal = Module._load;
+Module._load = function(req){ if(stubs[req]) return stubs[req]; return loadOriginal.apply(this, arguments); };
+const fns = require(path.join(__dirname, '..', 'functions', 'index.js'));
+Module._load = loadOriginal;
+const SRV = fns._conquistas;
 
 const S = createSandbox();
 const g = S.__getGame();
@@ -116,5 +138,231 @@ ok('o Ditto da Elite continua vindo da flag da vitoria',
    acendeu('elite_ditto', [campeao({ eliteDittoWin:true, team:[] })]));
 ok('campeao da Elite', acendeu('elite_champion', [campeao({})]));
 
-console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
-process.exit(falhas ? 1 : 0);
+
+/* =====================================================================
+   AS MOEDAS DAS CONQUISTAS (16/09/2026)
+   ===================================================================== */
+console.log('\nCADA CONQUISTA TEM NIVEL, E O NIVEL VALE MOEDA');
+const NIVEIS = ['facil','media','dificil','lendaria'];
+ok('todas as 69 tem nivel declarado',
+   S.ACHIEVEMENTS.every(c => NIVEIS.indexOf(c.nivel) >= 0),
+   S.ACHIEVEMENTS.filter(c => NIVEIS.indexOf(c.nivel) < 0).map(c=>c.id).join(', ') || 'todas');
+ok('os quatro niveis existem de verdade (nenhum sem dono)',
+   NIVEIS.every(n => S.ACHIEVEMENTS.some(c => c.nivel === n)),
+   NIVEIS.map(n => n + ':' + S.ACHIEVEMENTS.filter(c=>c.nivel===n).length).join(' '));
+/* ⚠️ O PEDIDO E "facil da MENOS, dificil da MAIS" -- entao a escala tem que ser CRESCENTE, e isso
+   e o que se cobra. Trancar os valores 10/25/60/150 aqui faria o teste virar uma copia da tabela:
+   qualquer reajuste passaria a exigir editar os dois lugares, e o teste nao diria nada sobre a
+   regra. O que nao pode e um nivel "dificil" pagando menos que um "facil". */
+ok('a escala e crescente: facil < media < dificil < lendaria',
+   S.NIVEL_DA_CONQUISTA.facil.moedas < S.NIVEL_DA_CONQUISTA.media.moedas &&
+   S.NIVEL_DA_CONQUISTA.media.moedas < S.NIVEL_DA_CONQUISTA.dificil.moedas &&
+   S.NIVEL_DA_CONQUISTA.dificil.moedas < S.NIVEL_DA_CONQUISTA.lendaria.moedas,
+   NIVEIS.map(n => S.NIVEL_DA_CONQUISTA[n].moedas).join(' < '));
+
+console.log('\nO CLIENTE E O SERVIDOR CONCORDAM (a tabela e duplicada)');
+ok('as duas tabelas tem as mesmas 69, na mesma ordem',
+   S.ACHIEVEMENTS.map(a=>a.id).join(',') === SRV.CONQUISTAS.map(a=>a.id).join(','),
+   S.ACHIEVEMENTS.length + ' x ' + SRV.CONQUISTAS.length);
+ok('e o NIVEL de cada uma bate nos dois lados',
+   S.ACHIEVEMENTS.every((a,i) => a.nivel === SRV.CONQUISTAS[i].nivel),
+   S.ACHIEVEMENTS.filter((a,i)=> a.nivel !== SRV.CONQUISTAS[i].nivel).map(a=>a.id).join(', ') || 'todas');
+/* ⚠️ O VALOR TAMBEM: o cliente DESENHA o numero e o servidor PAGA. Divergindo, a tela promete um
+   preco que a cobranca nao pratica -- a mesma armadilha do catalogo da loja (ITENS x LOJA). */
+ok('e quanto cada nivel paga bate nos dois lados',
+   NIVEIS.every(n => S.NIVEL_DA_CONQUISTA[n].moedas === SRV.NIVEL_DA_CONQUISTA[n].moedas),
+   NIVEIS.map(n => n + ' ' + S.NIVEL_DA_CONQUISTA[n].moedas + '/' + SRV.NIVEL_DA_CONQUISTA[n].moedas).join(' '));
+
+/* ⚠️ E A TRAVA QUE IMPORTA E ESTA: os dois lados destravam o MESMO conjunto pra a MESMA conta.
+   Comparar o TEXTO das tabelas nao serviria -- elas foram geradas uma da outra, entao passariam
+   iguais mesmo com os AGREGADOS divergindo, que e onde o risco de verdade esta (o cliente monta o
+   dele do `game`, o servidor dos documentos). Por isso a comparacao e por COMPORTAMENTO, sobre
+   contas sorteadas. */
+console.log('\nOS DOIS AGREGADOS SAO O MESMO AGREGADO');
+{
+  let semente = 12345;
+  const rnd = () => (semente = (semente * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+  const esp = Object.keys(S.SPECIES);
+  const pega = n => { const r = []; for(let i=0;i<n;i++) r.push(esp[Math.floor(rnd()*esp.length)]); return r; };
+  const timeDe = n => { const t=[]; for(let i=0;i<n;i++) t.push({ speciesId: esp[Math.floor(rnd()*esp.length)], level: 1+Math.floor(rnd()*99), shiny: rnd()<0.15 }); return t; };
+  let difCampos = 0, difConjunto = 0, camposRuins = {};
+  const VOLTAS = 400;
+  for(let k = 0; k < VOLTAS; k++){
+    const saves = [];
+    const quantos = Math.floor(rnd()*5);
+    for(let i = 0; i < quantos; i++){
+      saves.push({
+        badgeCount: Math.floor(rnd()*9), team: timeDe(Math.floor(rnd()*7)),
+        caughtSpecies: pega(Math.floor(rnd()*25)), evolutions: rnd()<0.5 ? ['x'] : [],
+        everComeback: rnd()<0.3, losses: Math.floor(rnd()*6),
+        eliteStatus: rnd()<0.3 ? 'champion' : null,
+        eliteWinTeam: rnd()<0.5 ? pega(6) : null,
+        gymPath: rnd()<0.5 ? new Array(8).fill(rnd()<0.5?'kanto':'johto') : null,
+        eliteAttemptsUsed: Math.floor(rnd()*3), eliteDittoWin: rnd()<0.2,
+        mewtwoReward: rnd()<0.3 ? { earned:true, used: rnd()<0.5 } : null,
+        lossesTotal: Math.floor(rnd()*12)
+      });
+    }
+    const conta = {
+      pokedexCaught: pega(Math.floor(rnd()*120)), pokedexShinyCaught: pega(Math.floor(rnd()*60)),
+      bossTop10: rnd()<0.2, bossKiller: rnd()<0.1,
+      mewtwoLoanActive: rnd()<0.2, mewtwoLoanCooldownUntil: rnd()<0.2 ? Date.now() : 0,
+      trainerBestStreak: Math.floor(rnd()*14), leagueWinsTotal: Math.floor(rnd()*4),
+      anyRegistered: rnd()<0.5, anySemifinal: rnd()<0.4, anyRunnerUp: rnd()<0.3,
+      anyChampion: rnd()<0.2, anyTrainersChampion: rnd()<0.2
+    };
+    /* o cliente le do `game`: e assim que o carregamento da conta o deixa */
+    g.saveSlots = saves;
+    g.permanentPokedex = conta.pokedexCaught.slice();
+    saves.forEach(sv => (sv.caughtSpecies||[]).forEach(id => { if(g.permanentPokedex.indexOf(id) < 0) g.permanentPokedex.push(id); }));
+    g.caughtSpecies = [];
+    g.permanentShinyDex = conta.pokedexShinyCaught;
+    g.bossTop10 = conta.bossTop10; g.bossKiller = conta.bossKiller;
+    g.mewtwoLoanActive = conta.mewtwoLoanActive; g.mewtwoLoanCooldownUntil = conta.mewtwoLoanCooldownUntil;
+    g.trainerBestStreak = conta.trainerBestStreak; g.leagueWinsTotal = conta.leagueWinsTotal;
+    S.__setGame(g);
+    const aCli = S.getAchievementAggregate();
+    const aSrv = SRV.agregadoDasConquistas(saves, conta);
+    Object.keys(aCli).forEach(campo => {
+      if(campo === 'trainerNames') return;     // so o cliente usa, pro escaneamento da Liga
+      if(JSON.stringify(aCli[campo]) !== JSON.stringify(aSrv[campo])){
+        difCampos++; camposRuins[campo] = (camposRuins[campo]||0) + 1;
+      }
+    });
+    const extra = { anyRegistered:conta.anyRegistered, anySemifinal:conta.anySemifinal,
+                    anyRunnerUp:conta.anyRunnerUp, anyChampion:conta.anyChampion,
+                    anyTrainersChampion:conta.anyTrainersChampion };
+    const doCliente = S.ACHIEVEMENTS.filter(a=>a.check(aCli, extra)).map(a=>a.id).join(',');
+    const doServidor = SRV.conquistasGanhasDaConta(saves, conta).join(',');
+    if(doCliente !== doServidor) difConjunto++;
+  }
+  ok('nenhum campo do agregado diverge em ' + VOLTAS + ' contas sorteadas', difCampos === 0,
+     Object.keys(camposRuins).length ? JSON.stringify(camposRuins) : 'zero');
+  ok('e o conjunto destravado e identico nas ' + VOLTAS, difConjunto === 0, difConjunto + ' divergencias');
+}
+
+console.log('\nO RESGATE PAGA UMA VEZ SO');
+{
+  const conta = { pokedexCaught: [], trainerBestStreak: 0 };
+  const saves = [{ badgeCount: 8, team: [], caughtSpecies: [], evolutions: ['x'] }];
+  const ganhas = SRV.conquistasGanhasDaConta(saves, conta);
+  ok('uma conta com 8 insignias ja tem o que resgatar', ganhas.length > 0, ganhas.length + ' conquistas');
+  const total = SRV.moedasDasConquistas(ganhas);
+  ok('e elas valem moeda', total > 0, '🪙 ' + total);
+  /* ⚠️ O QUE JA FOI PAGO NAO PAGA DE NOVO -- e o mesmo desenho do coinsPaid da jornada: conta do
+     zero o que esta ganho e paga a DIFERENCA pro que ja saiu. */
+  const metade = ganhas.slice(0, Math.floor(ganhas.length/2));
+  const falta = ganhas.filter(id => metade.indexOf(id) < 0);
+  ok('pagando a metade, sobra exatamente a outra metade',
+     SRV.moedasDasConquistas(falta) === total - SRV.moedasDasConquistas(metade),
+     '🪙 ' + SRV.moedasDasConquistas(falta) + ' de ' + total);
+  ok('e com tudo pago nao sobra nada', SRV.moedasDasConquistas([]) === 0);
+  /* id desconhecido (conquista removida do jogo, mas ainda na lista de pagas da conta) nao pode
+     valer moeda nem quebrar a conta */
+  ok('id que nao existe mais vale zero', SRV.moedasDasConquistas(['conquista_que_sumiu']) === 0);
+}
+
+console.log('\nO AVISO SO APARECE QUANDO HA O QUE PEGAR');
+{
+  g.saveSlots = [{ badgeCount: 8, team: [], caughtSpecies: [], evolutions: ['x'] }];
+  g.permanentPokedex = []; g.permanentShinyDex = [];
+  g.bossTop10 = false; g.bossKiller = false; g.trainerBestStreak = 0; g.leagueWinsTotal = 0;
+  g.achievementsExtra = { anyRegistered:false, anySemifinal:false, anyRunnerUp:false, anyChampion:false, anyTrainersChampion:false };
+  g.achievementsPaid = [];
+  g.contaCarregada = true;
+  S.__setGame(g);
+  const pendente = S.moedasAResgatar();
+  ok('com conquista nova, ha moeda esperando', pendente > 0, '🪙 ' + pendente);
+  ok('e o aviso acende', S.temConquistaAResgatar() === true);
+  /* ⚠️ E ELE NAO PODE ACENDER ANTES DA CONTA CARREGAR: o achievementsPaid nasce vazio, entao
+     TUDO pareceria por resgatar -- o circulo vermelho apareceria numa conta que ja pegou tudo. */
+  g.contaCarregada = false; S.__setGame(g);
+  ok('mas NAO acende enquanto a conta nao carregou', S.temConquistaAResgatar() === false);
+  g.contaCarregada = true;
+  g.achievementsPaid = S.conquistasGanhas().map(a=>a.id);
+  S.__setGame(g);
+  ok('com tudo resgatado, o aviso apaga', S.temConquistaAResgatar() === false, '🪙 ' + S.moedasAResgatar());
+}
+
+console.log('\nA TELA MOSTRA O PREMIO E O BOTAO');
+{
+  g.achievementsPaid = [];
+  g.contaCarregada = true;
+  g.conquistaResgateGanhou = 0;
+  g.conquistaResgateErro = null;
+  S.__setGame(g);
+  const html = S.renderAchievements();
+  ok('o botao de resgatar aparece com o valor', /🪙 Resgatar \d+ moedas/.test(html),
+     (html.match(/🪙 Resgatar \d+ moedas/) || ['(sem botao)'])[0]);
+  ok('e cada linha mostra o premio dela', (html.match(/conquista-premio/g)||[]).length === S.ACHIEVEMENTS.length,
+     (html.match(/conquista-premio/g)||[]).length + ' de ' + S.ACHIEVEMENTS.length);
+  /* ⚠️ O PREMIO APARECE NA TRANCADA TAMBEM: e ele que diz por que vale a pena ir atras daquela. */
+  const trancadas = (html.match(/achievement-row locked/g)||[]).length;
+  ok('inclusive nas trancadas', trancadas > 0 && (html.match(/conquista-premio/g)||[]).length > trancadas,
+     trancadas + ' trancadas');
+  g.achievementsPaid = S.conquistasGanhas().map(a=>a.id);
+  S.__setGame(g);
+  const pago = S.renderAchievements();
+  ok('resgatado, o botao some e a linha vira ✓', !/🪙 Resgatar/.test(pago) && /conquista-premio paga/.test(pago));
+  ok('e a tela diz que esta tudo pego', /Tudo resgatado/.test(pago));
+}
+
+
+console.log('\nO claimAchievementCoins DE PONTA A PONTA');
+/* ⚠️ ATE AQUI o que se testava eram as PECAS (o que esta ganho, quanto vale). Esta parte roda a
+   CALLABLE de verdade contra o fake-firestore: a transacao, o increment das moedas e o arrayUnion
+   da lista de pagas. E onde mora o risco que nenhuma das outras pega -- uma escrita errada aqui
+   paga duas vezes ou nao paga nunca, e so apareceria em producao. */
+async function rodaOResgate(){
+  const uid = "treinador1";
+  const userRef = db.collection("users").doc(uid);
+  await userRef.set({ moedas: 100, pokedexCaught: [], trainerBestStreak: 0 });
+  await userRef.collection("saves").doc("0").set({
+    badgeCount: 8, team: [], caughtSpecies: [], evolutions: ["x"], lossesTotal: 3
+  });
+
+  const req = { auth: { uid } };
+  const r1 = await fns.claimAchievementCoins(req);
+  ok('o primeiro resgate paga', r1.ganhou > 0, '🪙 ' + r1.ganhou);
+  ok('e o saldo sobe exatamente isso', r1.moedas === 100 + r1.ganhou, '100 -> ' + r1.moedas);
+  ok('e a lista de pagas volta preenchida', (r1.pagas||[]).length > 0, (r1.pagas||[]).length + ' conquistas');
+
+  /* ⚠️ O SEGUNDO RESGATE NAO PAGA NADA -- e a trava mais importante deste bloco: sem ela, um
+     duplo-clique (ou um F5 na tela) viraria moeda de graca. */
+  const r2 = await fns.claimAchievementCoins(req);
+  ok('o segundo resgate seguido nao paga nada', r2.ganhou === 0, '🪙 ' + r2.ganhou);
+  ok('e o saldo nao se move', r2.moedas === r1.moedas, String(r2.moedas));
+
+  /* conquista NOVA depois do resgate paga so a diferenca */
+  const doc = await userRef.get();
+  const antes = (doc.data().moedas)|0;
+  await userRef.collection("saves").doc("1").set({
+    badgeCount: 8, team: [], caughtSpecies: [], evolutions: ["x"]
+  });
+  const r3 = await fns.claimAchievementCoins(req);
+  ok('uma conquista nova depois paga so a diferenca', r3.ganhou > 0 && r3.ganhou < r1.ganhou,
+     '🪙 ' + r3.ganhou + ' (o primeiro tinha sido ' + r1.ganhou + ')');
+  ok('e o saldo acompanha', r3.moedas === antes + r3.ganhou);
+
+  /* ⚠️ A LISTA DE PAGAS SO CRESCE (arrayUnion): sem isso, o resgate seguinte reescreveria a lista
+     com o que ELE viu, e uma conquista paga que sumisse da lista seria paga de novo. */
+  const fim = (await userRef.get()).data();
+  ok('a lista de pagas so cresce', (fim.achievementsPaid||[]).length >= (r1.pagas||[]).length,
+     (fim.achievementsPaid||[]).length + ' >= ' + (r1.pagas||[]).length);
+  ok('e nao repete id', new Set(fim.achievementsPaid||[]).size === (fim.achievementsPaid||[]).length);
+
+  /* sem login nao resgata */
+  let recusou = false;
+  try{ await fns.claimAchievementCoins({}); }catch(e){ recusou = true; }
+  ok('sem login ele recusa', recusou);
+
+  /* conta sem save nenhum: nao quebra e nao paga */
+  const r4 = await fns.claimAchievementCoins({ auth: { uid: "vazio" } });
+  ok('conta vazia nao paga nem quebra', r4.ganhou === 0, '🪙 ' + r4.ganhou);
+}
+
+rodaOResgate().then(()=>{
+  console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
+  process.exit(falhas ? 1 : 0);
+}).catch(e => { console.error(e); process.exit(1); });
+

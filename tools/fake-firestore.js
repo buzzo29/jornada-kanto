@@ -1,6 +1,6 @@
 /**
  * Firestore em memória, só com o que as Cloud Functions da lista de amigos usam:
- * collection/doc encadeados, get/set/delete, where+limit, batch e FieldValue.increment.
+ * collection/doc encadeados, get/set/delete, where+limit, batch, FieldValue.increment e arrayUnion.
  *
  * NÃO é um emulador. Não valida regras, não tem índice composto, não simula concorrência.
  * Serve pra uma coisa só: rodar a MÁQUINA DE ESTADOS da amizade (pedir → aceitar → desafiar →
@@ -9,6 +9,7 @@
  * fica pendurado depois de recusado -- e nenhum deles aparece num teste de tela.
  */
 const INCREMENT = Symbol('increment');
+const ARRAY_UNION = Symbol('arrayUnion');
 const DELETE = Symbol('delete');
 const store = new Map();   // 'caminho/do/doc' -> objeto
 let filaDeTransacoes = Promise.resolve();   // ver runTransaction
@@ -48,6 +49,14 @@ function aplicar(alvo, patch, merge){
       delete base[k];
     } else if(v && typeof v === 'object' && v.__op === INCREMENT){
       base[k] = (typeof base[k] === 'number' ? base[k] : 0) + v.n;
+    } else if(v && typeof v === 'object' && v.__op === ARRAY_UNION){
+      /* ARRAY_UNION: acrescenta o que falta, SEM repetir, e sem reescrever o que ja estava --
+         quem soma e o servidor. E a unica escrita de lista que nao pode ENCOLHER, e foi por nao
+         ser assim que a Pokedex de um jogador perdeu 49 especies (ver o CLAUDE.md). Entrou aqui
+         em 16/09/2026 com as moedas das conquistas, que gravam a lista de ja-pagas assim. */
+      const atual = Array.isArray(base[k]) ? base[k].slice() : [];
+      v.itens.forEach(item => { if(atual.indexOf(item) < 0) atual.push(item); });
+      base[k] = atual;
     } else if(merge && ehMapaSimples(v)){
       /* MAPA DENTRO DE MAPA. O Firestore de verdade MESCLA mapa aninhado num set({merge:true}) e
          resolve increment la dentro -- e assim que o inventario da mochila e escrito
@@ -234,6 +243,7 @@ function makeDb(){
 const FieldPath = { documentId(){ return DOC_ID; } };
 const FieldValue = {
   increment: (n)=>({ __op: INCREMENT, n }),
+  arrayUnion: (...itens)=>({ __op: ARRAY_UNION, itens }),
   delete: ()=>({ __op: DELETE })
 };
 
