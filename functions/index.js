@@ -832,7 +832,7 @@ function effectiveBaseHp(p){
 }
 function effectiveAttack(p){
   const v = (typeof p.attack==='number') ? p.attack : ((SPECIES[p.speciesId]&&SPECIES[p.speciesId].attack)||50);
-  return withDanca(withFuria(withItemStat(withSpecialty(withBuffs(v, p), p), p, 'attack'), p), p);
+  return withQueimadura(withDanca(withFuria(withItemStat(withSpecialty(withBuffs(v, p), p), p, 'attack'), p), p), p);
 }
 function effectiveDefense(p){
   const v = (typeof p.defense==='number') ? p.defense : ((SPECIES[p.speciesId]&&SPECIES[p.speciesId].defense)||50);
@@ -1868,6 +1868,19 @@ function withDanca(v, p){
   if(p._pluma) r = r * DANCA_PLUMA_MULT;
   return Math.round(r);
 }
+/* ⚠️ A QUEIMADURA CORTA O ATAQUE FISICO PELA METADE, e ela entra pela MESMA porta da Danca da
+   Pluma -- que ja e exatamente este efeito (x0,5 no Ataque) com outro gatilho. Sendo um degrau do
+   effectiveAttack, ela vale de graca nos SEIS pontos do motor que leem ataque fisico, e nenhum
+   caminho novo nasce sem ela.
+   O ATAQUE ESPECIAL NAO E TOCADO, que e a regra: neste motor quem decide fisico x especial e o
+   TIPO do golpe (isSpecialType, regra da Gen 1). Medido nas 250: 115 especies atacam SEMPRE pelo
+   fisico (a queimadura morde inteiro), 91 sempre pelo especial (ela nao tira um ponto de dano) e
+   44 variam conforme o alvo.
+   ⚠️ ELA ENTRA DEPOIS DOS MULTIPLICADORES E DO FLAT, como a danca: "metade do ataque" e metade do
+   que o pokemon TEM na hora do golpe, e nao metade so da parte base. */
+function withQueimadura(v, p){
+  return (p && p._queimado) ? Math.round(v * QUEIMADURA_FISICO) : v;
+}
 /* O SORTEIO TEM DADO PRÓPRIO e roda ANTES do sorteio de efeito, como a chuva: assim as duas danças
    não disputam a vaga única do `sorteiaGolpeEspecial` -- se disputassem, o Pidgey (que já tem
    Remoinho) veria a Pluma sair menos que os 20% pedidos.
@@ -2370,6 +2383,119 @@ function golpesDaTroca(atacante, alvo, rng){
    ela nasceu no cliente porque o 2 estava espalhado por nove pontos, e aqui repetiu o mesmo erro.
    Se mudar de novo, tem que mudar nos DOIS arquivos. */
 const MAX_GOLPES = 3;
+/* os tipos de uma instância, com o campo da espécie como rede -- o `p.types` é o que o
+   `tryEvolve` atualiza, e é ele que manda. Espelha o do cliente. */
+function tiposDoPokemon(p){
+  if(!p) return [];
+  if(Array.isArray(p.types) && p.types.length) return p.types;
+  const sp = SPECIES[p.speciesId];
+  return (sp && sp.types) || [];
+}
+/* ⚠️ O CONGELAMENTO É O PRIMEIRO STATUS POR ATAQUE DO JOGO (16/09/2026, a pedido), e é isso que o
+   separa das ONZE passivas do `tentarGolpeEspecial`: aquelas são sorteadas UMA VEZ na abertura do
+   confronto (o marcador `_especialContra`) e valem pra ele inteiro. Esta rola **a cada ataque** --
+   o pedido diz com todas as letras: *"a chance de congelar é por ataque dentro do confronto, e não
+   somente no início ou no fim da batalha como as habilidades passivas"*.
+   Por isso ela não mora lá: ela roda no `doExchange`, depois dos golpes daquela troca.
+   OS QUATRO GOLPES saíram do dado do FireRed (Gen 3): são os ÚNICOS que congelam, e todos a 10%.
+   Não existe golpe de STATUS que congele -- congelar é sempre efeito secundário, e é por isso que
+   ele é o status mais raro do jogo original. */
+const GOLPES_QUE_CONGELAM = { icepunch: 0.10, icebeam: 0.10, blizzard: 0.10, powdersnow: 0.10 };
+/* 25% por turno, e a duração é GEOMÉTRICA: sem teto, média de 4 turnos, e 1 em 5 congelamentos
+   passa de 5. É o número do ciclo que o pedido descreveu passo a passo. */
+const CHANCE_DESCONGELAR = 0.25;
+/* ⚠️ A QUEIMADURA (16/09/2026), a segunda mecanica POR ATAQUE do jogo. As regras sao as da GEN 3,
+   que e a geracao da base de golpes daqui (Bulbapedia, Burn):
+     - 1/16 do HP MAXIMO por turno, e ela PODE matar, como no original;
+     - METADE do dano dos golpes FISICOS (neste motor quem decide fisico e o TIPO do golpe,
+       regra da Gen 1 -- ver isSpecialType);
+     - o tipo FOGO e imune;
+     - e ela NAO PASSA SOZINHA. E essa a diferenca que a separa do congelamento: o gelo sorteia
+       degelo a cada turno, e a queimadura dura o resto da BATALHA. Ela e um efeito que se ACUMULA
+       no tempo em vez de um que se espera passar.
+   OS SETE GOLPES sairam do dado (Showdown, mod da Gen 3), o mesmo caminho dos quatro do gelo. O
+   Will-O-Wisp fica de fora por ser golpe de STATUS (poder 0, e a base so cadastra dano) e o Blaze
+   Kick porque ninguem o aprende por nivel nas 250 -- cadastra-lo seria letra morta.
+   O SACRED FIRE e 50%, que e o valor oficial dele; os outros seis sao 10%. Ele so existe no Ho-Oh,
+   que e INTOCAVEL, entao a entrada nao roda hoje -- fica por ser o que o dado diz, a mesma decisao
+   do Lugia no RECUPERACAO e no REMOINHO. */
+const GOLPES_QUE_QUEIMAM = { firepunch: 0.10, ember: 0.10, flamethrower: 0.10, fireblast: 0.10,
+                             flamewheel: 0.10, heatwave: 0.10, sacredfire: 0.50 };
+const QUEIMADURA_DANO = 1/16;        // do HP MAXIMO, por turno
+const QUEIMADURA_FISICO = 0.5;       // o que sobra do ataque fisico de quem esta queimado
+/* ⚠️ O ENVENENAMENTO (16/09/2026), a terceira mecanica POR ATAQUE. Regras da GEN 3 (Bulbapedia,
+   Poison), e ele e o mais simples dos tres -- so dano, sem cortar atributo nenhum:
+     - 1/8 do HP MAXIMO por turno (o DOBRO da queimadura), e ele PODE matar;
+     - dura ate o fim da BATALHA, como a queimadura -- nao passa sozinho;
+     - ACO e VENENO sao imunes.
+   ⚠️ O VENENO NA LISTA DE IMUNES FOI ACRESCENTADO POR MIM: o pedido dizia so *"pokemon de aço tem
+   imunidade"*, mas a Bulbapedia (a fonte citada no proprio pedido) poe os dois, e e a mesma
+   simetria dos outros dois status -- o Gelo nao congela e o Fogo nao queima. Sem ela, as 37
+   especies de Veneno se envenenariam com os PROPRIOS golpes: quase todos os donos da lista abaixo
+   sao de Veneno. Se um dia for pra valer so o Aço, e tirar um termo do `podeEnvenenar`.
+   OS SEIS GOLPES sairam do dado (Showdown, mod da Gen 3), com as chances OFICIAIS de cada um --
+   ao contrario do gelo (todos 10%), aqui elas variam de 10% a 50%.
+   ⚠️ FICARAM DE FORA: Po Venenoso, Toxico e Gas Venenoso (golpes de STATUS, poder 0, e a base so
+   cadastra dano) e a Cauda Venenosa (ninguem a aprende por nivel nas 250).
+   ⚠️ E A PRESA VENENOSA E "GRAVE" NO ORIGINAL (o veneno que escala 1/16, 2/16, 3/16...). Aqui ela
+   entra como veneno NORMAL: o pedido fixou 1/8, e o veneno grave e outra mecanica. Ter o golpe
+   funcionando com 1/8 e mais proximo do jogo do que nao ter o efeito nenhum. */
+const GOLPES_QUE_ENVENENAM = { poisonsting: 0.30, twineedle: 0.20, smog: 0.40,
+                               sludge: 0.30, sludgebomb: 0.30, poisonfang: 0.50 };
+const VENENO_DANO = 1/8;             // do HP MAXIMO, por turno -- o DOBRO da queimadura
+/* ⚠️ POKÉMON DE GELO NÃO CONGELA, como no jogo original -- e aqui isso pesa mais que lá: quase
+   todo dono de golpe de gelo É de Gelo (Articuno, Lapras, Dewgong, Jynx, Cloyster), então sem a
+   imunidade o efeito mais comum seria dois pokémon de Gelo se congelando um ao outro. */
+function podeCongelar(p){
+  return !!p && p.hp > 0 && !p._congelado && (tiposDoPokemon(p).indexOf("Ice") < 0);
+}
+/* Sorteia o congelamento DEPOIS de o golpe conectar. Devolve o id do golpe que congelou (pra frase
+   nomeá-lo) ou null. Só vale se o golpe REALMENTE saiu: um ataque que não conectou não congela. */
+/* O TIPO FOGO E IMUNE, como no original. Quem ja caiu nao queima, e quem JA esta queimado tambem
+   nao -- a marca seria reescrita e o log passaria a nomear o golpe errado. */
+/* ACO e VENENO sao imunes (ver a nota da constante). Quem ja caiu nao envenena, e quem JA esta
+   envenenado tambem nao -- a marca seria reescrita e o log passaria a nomear o golpe errado. */
+function podeEnvenenar(p){
+  if(!p || p.hp <= 0 || p._envenenado) return false;
+  const t = tiposDoPokemon(p);
+  return t.indexOf("Steel") < 0 && t.indexOf("Poison") < 0;
+}
+/* O sorteio roda DEPOIS de o golpe conectar e le o rng da BATALHA, saindo antes dele quando o
+   golpe nao envenena ou o alvo e imune -- a mesma forma dos outros dois status. */
+function tentarEnvenenar(quemBate, alvo, rng){
+  if(!quemBate || quemBate.hp <= 0) return null;
+  const golpe = quemBate.lastMove;
+  const chance = GOLPES_QUE_ENVENENAM[golpe];
+  if(!chance || !podeEnvenenar(alvo)) return null;
+  if(rng() >= chance) return null;
+  alvo._envenenado = golpe;
+  return golpe;
+}
+function podeQueimar(p){
+  return !!p && p.hp > 0 && !p._queimado && (tiposDoPokemon(p).indexOf("Fire") < 0);
+}
+/* ⚠️ O SORTEIO RODA DEPOIS DE O GOLPE CONECTAR, e le o rng da BATALHA -- nunca Math.random: um
+   dado a mais num dos motores desloca a semente inteira e a mesma batalha termina diferente nos
+   dois lados. E ele SAI ANTES do rng() quando o golpe nao queima ou o alvo e imune, senao ele
+   mudaria toda batalha que nao tem golpe de fogo nenhum. */
+function tentarQueimar(quemBate, alvo, rng){
+  if(!quemBate || quemBate.hp <= 0) return null;
+  const golpe = quemBate.lastMove;
+  const chance = GOLPES_QUE_QUEIMAM[golpe];
+  if(!chance || !podeQueimar(alvo)) return null;
+  if(rng() >= chance) return null;
+  alvo._queimado = golpe;
+  return golpe;
+}
+function tentarCongelar(quemBate, alvo, rng){
+  if(!quemBate || quemBate.hp <= 0) return null;
+  const golpe = quemBate.lastMove;
+  const chance = GOLPES_QUE_CONGELAM[golpe];
+  if(!chance || !podeCongelar(alvo)) return null;
+  if(rng() >= chance) return null;
+  alvo._congelado = golpe;
+  return golpe;
+}
 function doExchange(active, enemy, rng, diario){
   /* Golpe especial: só na PRIMEIRA troca de cada confronto. O marcador é o próprio
      adversário -- oponente novo, confronto novo, e as chances valem de novo. */
@@ -2392,6 +2518,21 @@ function doExchange(active, enemy, rng, diario){
      um alvo (ao contrário do sono, cujo `q` é de quem USOU o golpe). */
   const acorda = (p) => { if(!(p._dormindoPor > 0)) return false; p._dormindoPor--; return true; };
   const activeDorme = acorda(active), enemyDorme = acorda(enemy);
+  /* ⚠️ O CONGELADO TENTA DEGELAR NA VEZ DELE, e o pedido descreve o ciclo exato: ele NÃO ataca
+     enquanto estiver preso, e no turno em que degela ele **ataca normalmente** -- *"ele consegue se
+     descongelar e aparece a frase ... e então ele realiza o ataque normalmente"*.
+     ⚠️ ISSO DIFERE DO JOGO ORIGINAL, onde degelar consome o turno. Foi pedido assim, e é o que
+     mantém o ciclo legível: a frase do degelo e o golpe dele saem na mesma troca.
+     O sorteio é lido na ENTRADA da troca, como o acorda do sono: quem está congelado já entra
+     sabendo se joga ou não. */
+  const degela = (p) => {
+    if(!p._congelado) return null;
+    if(rng() < CHANCE_DESCONGELAR){ p._congelado = null; return "degelou"; }
+    return "preso";
+  };
+  const activeGelo = degela(active), enemyGelo = degela(enemy);
+  const activeCongelado = activeGelo === "preso", enemyCongelado = enemyGelo === "preso";
+
   const acordaram = [];
   if(activeDorme && active._dormindoPor <= 0) acordaram.push({ q:'p', nome: active.name, p: active });
   if(enemyDorme && enemy._dormindoPor <= 0) acordaram.push({ q:'e', nome: enemy.name, p: enemy });
@@ -2403,8 +2544,8 @@ function doExchange(active, enemy, rng, diario){
      `golpesDaTroca`: ele vale pra ESTA troca e mais nada. */
   active._dormeAgora = activeDorme;
   enemy._dormeAgora = enemyDorme;
-  const dmgToEnemy = activeDorme ? [] : golpesDaTroca(active, enemy, rng);
-  const dmgToActive = enemyDorme ? [] : golpesDaTroca(enemy, active, rng);
+  const dmgToEnemy = (activeDorme || activeCongelado) ? [] : golpesDaTroca(active, enemy, rng);
+  const dmgToActive = (enemyDorme || enemyCongelado) ? [] : golpesDaTroca(enemy, active, rng);
   active._dormeAgora = false;
   enemy._dormeAgora = false;
   const spdActive = effectiveSpeed(active);
@@ -2514,7 +2655,21 @@ function doExchange(active, enemy, rng, diario){
      de quem tem pouca vida, não sobre o revide de quem caiu.
      A marca `m` do diário nunca mais é gerada; o reordenamento que ela comanda no cliente fica,
      porque diário antigo tem a marca. Ver o comentário completo no index.html. */
-  const saiuNoPrimeiro = segundoCaiu ? [] : aplicarGolpes(first, tetoDeQuemRaspa(second, first, dmgBySecond));
+  /* ⚠️ O CONGELAMENTO DO GOLPE DESTA TROCA PEGA O SEGUNDO NA MESMA TROCA, e é o pedido ao pé da
+     letra: no exemplo, o Articuno congela o Dragonite e *"agora o dragonite não conseguiu atacar
+     porque tá congelado"* -- no mesmo turno, sem esperar o próximo.
+     Ele só alcança quem ataca DEPOIS: se o congelado for o mais rápido, ele já bateu antes de o
+     gelo chegar, e o efeito vale a partir da troca seguinte. É a mesma assimetria que o segundoCaiu
+     já tem, e ela é a do jogo -- quem conecta primeiro leva vantagem.
+     ⚠️ E ELE RODA DEPOIS DE O GOLPE CONECTAR (não antes): um ataque que não saiu não congela, e um
+     alvo que CAIU também não -- o podeCongelar cobra hp > 0. */
+  /* A QUEIMADURA sai pela mesma porta do gelo e na mesma hora: depois de o golpe conectar. Um
+     golpe so pode fazer UM dos dois (nenhum golpe esta nas duas tabelas), entao nao ha ordem a
+     decidir entre elas -- o que existe e a ordem entre os dois LADOS, e essa e a de velocidade. */
+  const congelouOSegundo = segundoCaiu ? null : tentarCongelar(first, second, rng);
+  const queimouOSegundo = segundoCaiu ? null : tentarQueimar(first, second, rng);
+  const envenenouOSegundo = segundoCaiu ? null : tentarEnvenenar(first, second, rng);
+  const saiuNoPrimeiro = (segundoCaiu || congelouOSegundo) ? [] : aplicarGolpes(first, tetoDeQuemRaspa(second, first, dmgBySecond));
   /* O PISO DO REVIDE saiu junto com o revide -- sem revide não há o que limitar, e os dois nunca
      mais caem na mesma troca (por construção, não por aparo). A AUTODESTRUIÇÃO continua sendo o
      único jeito disso acontecer. */
@@ -2524,6 +2679,11 @@ function doExchange(active, enemy, rng, diario){
   /* A CURA DE QUEM BATEU POR ÚLTIMO. Com o second caído ela não acontece: `saiuNoPrimeiro` é
      vazio e o `drenar` devolve 0 sem escrever linha nenhuma. */
   const drenouOSecond = segundoDormiu ? 0 : drenar(saiuNoPrimeiro, second, primeiroDormiu);
+  /* o golpe do SEGUNDO também pode congelar -- mas o primeiro já atacou nesta troca, então o efeito
+     dele só aparece na próxima. Não há o que bloquear aqui: só a marca. */
+  const congelouOPrimeiro = (segundoCaiu || congelouOSegundo) ? null : tentarCongelar(second, first, rng);
+  const queimouOPrimeiro = (segundoCaiu || congelouOSegundo) ? null : tentarQueimar(second, first, rng);
+  const envenenouOPrimeiro = (segundoCaiu || congelouOSegundo) ? null : tentarEnvenenar(second, first, rng);
   const hpDoSecondAposDreno = second.hp;
   if(diario){
     /* O dano registrado é o que SAIU DE VERDADE da vida do alvo, não o número que a fórmula
@@ -2572,16 +2732,83 @@ function doExchange(active, enemy, rng, diario){
        quem causou e o HP some do outro lado. */
     const marcaDoDreno = (q, cura, hpApos, quem) =>
       ({ q: q, d: cura, hp: hpApos, c:0, m:0, z:0, x:'dreno', mv: quem.lastMove });
+    /* ⚠️ AS LINHAS DO CONGELAMENTO VAO PRO SLOT DE QUEM ELAS DESCREVEM, em ordem de VELOCIDADE --
+       e nao todas empilhadas no fim. Elas sao sobre a VEZ de um pokemon, entao tem que sair onde a
+       vez dele acontece:
+         - DEGELOU vem ANTES do golpe dele, porque o pedido diz que ele degela e ENTAO ataca
+           (*"aparece a frase ... e entao ele realiza o ataque normalmente"*);
+         - GELADO vem no lugar do golpe dele, que e o que a frase explica;
+         - CONGELOU vem DEPOIS do golpe que congelou, porque e consequencia dele.
+       Empilhadas no fim, o log dizia "Blissey ataca / Blissey degelou" -- a ordem invertida da cena,
+       o mesmo defeito que a linha do acordou teve em 14/09/2026.
+       O q e de QUEM ESTA CONGELADO (como o do acordou e o da furia): estas linhas sao sobre UM
+       pokemon, nao sobre um causador e um alvo. */
+    const qDoFirst = activeFirst ? "p" : "e", qDoSecond = activeFirst ? "e" : "p";
+    const geloDe = (p, q) => {
+      const g = (p === active) ? activeGelo : enemyGelo;
+      if(g === "degelou") diario.push({ q:q, d:0, hp:null, c:0, m:0, z:0, x:"degelou", g:p.name });
+      if(g === "preso")   diario.push({ q:q, d:0, hp:null, c:0, m:0, z:0, x:"gelado",  g:p.name });
+    };
+    /* ⚠️ "CONTINUA A DORMIR" (16/09/2026, pedida com estas palavras: *"Caso o pokemon nao acorde no
+       turno dele, deve exibir a mensagem: Onix continua a dormir e nao pode atacar, espera 1,5s e
+       continua"*). Ela e o analogo EXATO do `gelado` do congelamento, e faltava: o sono tinha a
+       linha de ADORMECER e a de ACORDAR, e nada nos turnos do meio -- o jogador via a barra dele
+       parada sem nada explicando, que e a mesma razao do "mas nao teve efeito" da imunidade.
+       ⚠️ ELA NAO SAI NA TROCA EM QUE ELE ACORDA: ali quem conta a historia e a linha do `acordou`,
+       e as duas juntas se contradiriam ("continua a dormir" / "acordou" no mesmo turno). Quem
+       separa os dois casos e o `_dormindoPor`, que o `acorda` ja decrementou na entrada da troca:
+       maior que zero quer dizer que ainda ha sono depois desta.
+       ⚠️ ELA SAI TAMBEM NA PRIMEIRA TROCA LIVRE, e isso e o pedido ao pe da letra (*"caso o pokemon
+       nao acorde no turno dele"*). Uma versao anterior a pulava, pra nao repetir a informacao da
+       frase "X fez Y dormir" -- e com isso ela so aparecia no sono de TRES trocas, ou seja em um
+       terco dos sonos e uma vez so. As duas nao competem: o `sono` ocupa o passo DELE e esta e
+       sobre a vez que o adormecido perdeu, num passo proprio.
+       O q e de QUEM ESTA DORMINDO, como o do `gelado`, o do `acordou` e o da furia: estas linhas
+       sao sobre UM pokemon, nao sobre um causador e um alvo. */
+    const dormeDe = (p, q) => {
+      const dormiu = (p === first) ? primeiroDormiu : segundoDormiu;
+      if(!dormiu || p._dormindoPor <= 0) return;
+      diario.push({ q:q, d:0, hp:null, c:0, m:0, z:0, x:"dormindo", g:p.name });
+    };
+    const congelou = (p, q, mv) => { if(mv) diario.push({ q:q, d:0, hp:null, c:0, m:0, z:0, x:"congelou", g:p.name, mv:mv }); };
+    /* A linha da queimadura tem a MESMA forma da do congelamento: dano 0, o q de QUEM FOI QUEIMADO
+       e o golpe no mv -- e o golpe que a frase nomeia. */
+    const queimou = (p, q, mv) => { if(mv) diario.push({ q:q, d:0, hp:null, c:0, m:0, z:0, x:"queimou", g:p.name, mv:mv }); };
+    const envenenou = (p, q, mv) => { if(mv) diario.push({ q:q, d:0, hp:null, c:0, m:0, z:0, x:"envenenou", g:p.name, mv:mv }); };
+    /* ⚠️ AS DUAS LINHAS DE ENTRADA (degelou / gelado) SAEM NO COMECO DA TROCA, antes de QUALQUER
+       golpe -- dos dois lados. O sorteio do degelo acontece na entrada do doExchange, entao e ali
+       que elas sao verdade; e e assim que o pedido descreve o ciclo: *"aparece a frase: Dragonite
+       nao consegue atacar por estar congelado, E O ARTICUNO ATACA NOVAMENTE"*.
+       ⚠️ POSTAS NO SLOT DE CADA UM elas saiam ao contrario no caso do RECONGELAMENTO: quem degelou
+       e foi congelado de novo na mesma troca lia 'congelou / degelou', a ordem invertida da cena. */
+    geloDe(first, qDoFirst);
+    dormeDe(first, qDoFirst);
+    geloDe(second, qDoSecond);
     if(!primeiroDormiu){
-      gravar(activeFirst?'p':'e', saiuNoSegundo, first, 0);
-      if(drenouOFirst) diario.push(marcaDoDreno(activeFirst?'p':'e', drenouOFirst, hpDoFirstAposDreno, first));
+      gravar(qDoFirst, saiuNoSegundo, first, 0);
+      if(drenouOFirst) diario.push(marcaDoDreno(qDoFirst, drenouOFirst, hpDoFirstAposDreno, first));
       if(faixaDoSegundo) diario.push(marcaDaFaixa((second === active) ? 'p' : 'e', firstHpBefore));
     }
+    /* o congelamento causado pelo golpe do FIRST vem colado nele, e ANTES da vez do second -- e ele
+       que explica por que o second nao ataca nesta troca */
+    congelou(second, qDoSecond, congelouOSegundo);
+    queimou(second, qDoSecond, queimouOSegundo);
+    envenenou(second, qDoSecond, envenenouOSegundo);
+    /* ⚠️ O "CONTINUA A DORMIR" DO SECOND VEM DEPOIS DO GOLPE DO FIRST, e nao junto do geloDe la
+       em cima: a frase e sobre O TURNO DELE (*"caso o pokemon nao acorde no turno dele"*), e o
+       turno dele e depois do golpe de quem e mais rapido. Junto do gelo, o log dizia "Onix
+       continua a dormir / Gengar atacou" -- a ordem invertida da cena.
+       As duas do GELO ficam juntas la em cima de proposito, e por um caso que o sono nao tem: o
+       recongelamento na mesma troca (ver o comentario delas). */
+    dormeDe(second, qDoSecond);
     if(!segundoDormiu){
-      gravar(activeFirst?'e':'p', saiuNoPrimeiro, second, segundoCaiu?1:0);
-      if(drenouOSecond) diario.push(marcaDoDreno(activeFirst?'e':'p', drenouOSecond, hpDoSecondAposDreno, second));
+      gravar(qDoSecond, saiuNoPrimeiro, second, segundoCaiu?1:0);
+      if(drenouOSecond) diario.push(marcaDoDreno(qDoSecond, drenouOSecond, hpDoSecondAposDreno, second));
       if(faixaDoPrimeiro) diario.push(marcaDaFaixa((first === active) ? 'p' : 'e', second.hp));
     }
+    congelou(first, qDoFirst, congelouOPrimeiro);
+    queimou(first, qDoFirst, queimouOPrimeiro);
+    envenenou(first, qDoFirst, envenenouOPrimeiro);
     // AGORA sim: ele apanhou nesta troca, e so entao acorda (ver o comentario do `acordaram`)
     /* ⚠️ QUEM MORREU DORMINDO NÃO ACORDA (14/09/2026, a pedido: *"quando um pokémon morre durante
        o sono, não precisa exibir que ele acordou e voltou para a luta, nem no log e nem na
@@ -2590,7 +2817,70 @@ function doExchange(active, enemy, rng, diario){
        O contador do sono anda no começo da troca e o pokémon leva o golpe no meio dela -- então só
        AQUI, depois dos golpes, dá pra saber se ele chegou vivo ao fim. */
     acordaram.forEach(a => { if(a.p && a.p.hp > 0) diario.push({ q:a.q, d:0, hp:null, c:0, m:0, z:0, x:'acordou', g:a.nome }); });
+
   }
+  /* ⚠️ O DANO DA QUEIMADURA FECHA A TROCA: 1/16 do HP MAXIMO, nos DOIS lados, depois de todos os
+     golpes. E o unico dano do motor que nao vem de um ataque, e por isso ele e o TERCEIRO membro da
+     familia "HP que sumiu sem ser golpe do adversario" -- ao lado do absorbdano e da confusao. Toda
+     conta de teste que soma "quanto ele perdeu de vida" precisa descontar os tres (ver danoSemGolpe
+     no tools/test-especiais.js).
+     ELA PODE MATAR, como no jogo original. Quem ja caiu na troca nao queima de novo -- o dano
+     aconteceria depois da morte.
+     ⚠️ E O q DA LINHA E DE QUEM ESTA QUEIMADO, nao de quem causou: a queimadura nao tem causador
+     nesta troca (ela foi aplicada turnos atras). E a convencao do acordou, do gelado e da furia --
+     linhas sobre UM pokemon. Por isso ela nao pode usar o passo comum da animacao, que INVERTE o q
+     pra achar quem apanha: ela tem passo proprio (ver buildAnimatedHitSequence).
+     O MINIMO E 1 de dano: com o arredondamento, um pokemon de menos de 16 de teto levaria ZERO e a
+     queimadura viraria enfeite -- e uma linha de "-0 de HP" e o que este log evita em toda regra. */
+  /* ⚠️ E ELA NUNCA DERRUBA OS DOIS NA MESMA TROCA. A regra e de 12/09/2026, pedida com estas
+     palavras: *"nao existe de os 2 cairem juntos, somente na auto destruicao; fora isso, jamais os
+     2 devem morrer juntos e um ficar de pe"*. Foi por ela que o revide moribundo deixou de matar, e
+     a queimadura reabriria a porta pelo outro lado: o adversario cai no golpe, e no fim da mesma
+     troca a queimadura leva quem o derrubou.
+     Medido antes da trava: **95 dos 99 casos de morte dupla** passaram a ser dela -- ou seja, ela
+     virou a causa dominante de algo que o jogo tinha acabado de eliminar.
+     Quem chega ultimo cede: se o outro lado ja esta em 0, a queimadura para em 1 de HP. Ela mata
+     normalmente em todo o resto, que e o que o jogo original faz.
+     O `outro` e passado como FUNCAO porque o first pode cair na queima DELE -- lido antes, o
+     second veria o estado velho e a trava nao valeria no caso que ela existe pra pegar. */
+  /* ⚠️ OS DOIS STATUS DE DANO POR TURNO DIVIDEM ESTE BLOCO, e isso e o ponto: a trava do "os dois
+     nunca caem juntos" tem que valer sobre os DOIS somados. Em blocos separados, a queimadura
+     pararia em 1 olhando o adversario vivo e o veneno o mataria logo depois -- e a trava daria
+     verde em cada metade enquanto o par quebrava a regra.
+     A ORDEM e queimadura e depois veneno, e ela quase nao importa hoje: nenhum pokemon costuma ter
+     os dois (o Fogo e imune a queimadura e quem envenena e quase todo de Veneno). Fica fixa pra o
+     dia em que os dois se encontrarem. */
+  const danoDeStatus = (p, q, outro, marca, fracao, x) => {
+    if(!p || !p[marca] || p.hp <= 0) return;
+    let d = Math.min(p.hp, Math.max(1, Math.round((p.maxHp || 0) * fracao)));
+    const o = outro();
+    if(d >= p.hp && o && o.hp <= 0) d = p.hp - 1;   // o outro ja caiu: este nao pode matar
+    /* ⚠️ A FAIXA DE FOCO SEGURA O DANO DE STATUS TAMBEM (16/09/2026). No jogo original o Focus
+       Sash so protege de dano DIRETO -- aqui ela protege dos dois, e a razao esta na promessa que
+       a casa fez pro item: "quem carrega a Faixa nunca termina um confronto em 0 sem ela ter
+       disparado antes". Foi essa a trava que pegou isto, e ela existe porque a AUTODESTRUICAO ja
+       tinha furado a Faixa uma vez e o jogador reportou (*"equipei o charizard com Faixa de foco e
+       ele morreu direto quando chegou com 0 de hp"*). Um item que promete segurar a morte e falha
+       justamente na morte silenciosa e pior que nao ter o item.
+       Ela e UMA: gasta aqui, e o proximo turno de queimadura leva o pokemon. */
+    if(d >= p.hp && faixaDeFoco(p, q)){
+      d = p.hp - 1;
+      if(diario) diario.push(marcaDaFaixa(q, o ? o.hp : 0));
+    }
+    if(d <= 0) return;                               // ele ja esta em 1 e nao ha o que tirar
+    p.hp -= d;
+    /* ⚠️ ELA NAO GRAVA `hp`, e e a mesma razao do REMOINHO: o campo quer dizer "a vida do ALVO
+       depois do golpe", e o alvo de uma linha comum e o lado OPOSTO ao `q`. Aqui o `q` e de quem
+       PERDE, entao gravar a vida dele ali faz toda conta que le o diario atribui-la ao outro lado.
+       Foi exatamente isso: a trava do "ninguem ataca depois de cair" acusou 1 em 3.645 por causa
+       deste campo, e a queimadura era a unica no confronto. */
+    if(diario) diario.push({ q:q, d:d, hp:null, c:0, m:0, z:0, x:x, g:p.name });
+  };
+  const qDoPrimeiro = activeFirst ? "p" : "e", qDoSegundo = activeFirst ? "e" : "p";
+  danoDeStatus(first,  qDoPrimeiro, () => second, "_queimado",   QUEIMADURA_DANO, "queima");
+  danoDeStatus(second, qDoSegundo,  () => first,  "_queimado",   QUEIMADURA_DANO, "queima");
+  danoDeStatus(first,  qDoPrimeiro, () => second, "_envenenado", VENENO_DANO,     "veneno");
+  danoDeStatus(second, qDoSegundo,  () => first,  "_envenenado", VENENO_DANO,     "veneno");
   /* ⚠️ A MORTE SÚBITA ACABOU EM 12/09/2026, a pedido, e o bloco inteiro saiu daqui.
      Ela existia porque o revide moribundo podia derrubar o primeiro: os dois ficavam em 0, e ela
      ressuscitava um com 5%-15% da vida (já foi 1%-3% e 1%-10%). Hoje o revide **não mata** (ver o
@@ -2764,6 +3054,12 @@ function simulateGymBattle(team, enemyTeam, rng, opts){
            É o ACUMULADO (1, 2, 3...), não um booleano: ele vale +10 por vez, e o número é o que
            explica um Tauros com +30 de tudo. */
         playerFuria: active._furia || 0, enemyFuria: enemy._furia || 0,
+        /* ⚠️ A QUEIMADURA SAI DE UM CAMPO, nao da marca do diario, e e o MESMO caso da furia: ela
+           persiste entre confrontos, entao um pokemon pode atravessar tres deles queimado com a
+           marca so no primeiro. Lida do diario, o selo sumiria justamente nos confrontos em que o
+           jogador mais precisa saber que o ataque dele esta pela metade. */
+        playerQueimado: !!active._queimado, enemyQueimado: !!enemy._queimado,
+        playerEnvenenado: !!active._envenenado, enemyEnvenenado: !!enemy._envenenado,
         player:active.name, playerSpecies:active.speciesId, playerLevel:active.level, playerShiny: !!active.shiny, playerBuffed: !!active.terrainBuffed, playerSpecialty: !!active.specialtyBuffed,
         enemy:enemy.name, enemySpecies:enemy.speciesId, enemyLevel:enemy.level, enemyShiny: !!enemy.shiny, enemyBuffed: !!enemy.terrainBuffed, enemySpecialty: !!enemy.specialtyBuffed,
         playerTrainerStreak: playerStreak, enemyTrainerStreak: enemyStreak,
@@ -2964,10 +3260,6 @@ const EVOLUTIONS = {
   elekid:{level:20, into:'electabuzz'},
   magby:{level:20, into:'magmar'}
 };
-
-
-
-
 
 function encodeTeamCode(team){
   const payload = team.map(p=>`${p.speciesId}:${p.level}${p.shiny?':1':''}`).join(',');
@@ -3815,7 +4107,6 @@ function extractRoundKeyedMap(docData, mapField){
   }
   return out;
 }
-
 
 function trainersLeagueTimeOnDate(dateStr, hour, minute){
   const hh = String(hour).padStart(2,'0');
@@ -7099,7 +7390,6 @@ exports.getTrainerTowerHistory = onCall(async (request) => {
   return { dias };
 });
 
-
 /* ============================================================================
    BATALHA ONLINE -- confronto a confronto, em tempo real
    ----------------------------------------------------------------------------
@@ -7326,6 +7616,8 @@ function battleResolveMatchup(estado, rng){
     /* a FÚRIA viaja aqui pelo mesmo motivo da jornada: o selo da tela precisa saber quem está
        furioso, e a marca do diário diz só o confronto em que ela entrou */
     playerFuria: a._furia || 0, enemyFuria: b._furia || 0,
+    playerQueimado: !!a._queimado, enemyQueimado: !!b._queimado,
+    playerEnvenenado: !!a._envenenado, enemyEnvenenado: !!b._envenenado,
     player:a.name, playerSpecies:a.speciesId, playerLevel:a.level, playerShiny:!!a.shiny, playerBuffed:false,
     enemy:b.name, enemySpecies:b.speciesId, enemyLevel:b.level, enemyShiny:!!b.shiny, enemyBuffed:false,
     winner: (aCaiu && bCaiu) ? null : (bCaiu ? a.name : b.name),
@@ -9151,7 +9443,6 @@ exports.fightSundayBoss = onCall(async (request) => {
 });
 
 exports._TERRAINS = TERRAINS;   // so pro teste do ginasio escolher um terreno valido
-
 
 exports._towerFecharDia = towerFecharDia;   // o fechamento do dia e testado direto: no ar ele roda dentro do cron
 /* As duas contas de data saem daqui pro teste porque ele precisa falar do MESMO "hoje" que o cron:

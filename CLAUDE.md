@@ -1444,6 +1444,556 @@ maior chance do bloco: **30% por confronto**, empatada com o Metrônomo (que ren
   diverge faz a mesma batalha terminar diferente no cliente e no servidor.
 
 
+### O CONGELAMENTO: O PRIMEIRO STATUS POR ATAQUE (16/09/2026)
+
+Pedido assim: *"a qualquer momento da partida que for usado algum ataque que tenha a possibilidade
+de congelador, por exemplo: Blizzard, ele vai ter 10% de chance de congelar o adversario, e quando
+isso acontecer, o adversario nao consegue atacar, e a cada turno ele tem 20% de descongelar"* — com
+o ciclo inteiro escrito passo a passo, e a razão: *"eu decidi te falar o ciclo completo porque a
+chance de congelar é por ataque dentro do confronto, e nao somente no inicio ou no fim da batalha
+como as habilidades passivas"*.
+
+- **⚠️ E É ISSO QUE O SEPARA DE TUDO QUE VEIO ANTES.** Os onze efeitos do `tentarGolpeEspecial` são
+  sorteados **na ABERTURA** e valem **por CONFRONTO** (o marcador `_especialContra`); este é
+  sorteado **a cada golpe que sai**, quantas vezes for. É a primeira mecânica do motor em que o
+  mesmo pokémon pode ser atingido pelo mesmo efeito **duas vezes no mesmo confronto** — e foi
+  justamente isso que desenterrou o defeito do `findIndex` (ver o item próprio, abaixo).
+- **SÃO QUATRO GOLPES, 10% cada** (`GOLPES_QUE_CONGELAM`): Soco de Gelo, Raio Congelante, **Nevasca**
+  e Pó de Neve. São exatamente os do FireRed.
+  **⚠️ E OS OUTROS QUATRO GOLPES DE GELO DA TABELA NÃO CONGELAM, e isso é fiel:** Aurora Beam baixa
+  Ataque, Icy Wind baixa Velocidade, Icicle Spear é multi-tapa puro e o Iceball escala. O teste
+  varre a tabela por TIPO e cobra que só os quatro estejam na lista — assim um golpe de Gelo novo
+  não entra por engano nem fica de fora em silêncio.
+- **A CHANCE DE DEGELO É 25%, não os 20% do pedido** — e foi o próprio pedido que decidiu: o ciclo
+  de exemplo que veio junto descrevia 25%, e quando perguntei qual valia, a resposta foi *"o do
+  exemplo"*. Dá **4,0 turnos de gelo em média** (medido, 3,97 em 20.000 sorteios); 23,5% dos
+  congelamentos passam de 5 turnos e o pior visto foi 32.
+  **Na prática ele dura muito menos: 1,77 turnos**, porque o confronto acaba antes.
+- **⚠️ DEGELAR NÃO CONSOME O TURNO, e isso DIFERE DO JOGO ORIGINAL.** Lá o pokémon degela e perde a
+  vez; aqui ele degela **e ataca na mesma troca** — é o pedido ao pé da letra (*"ele consegue se
+  descongelar e aparece a frase ... e então ele realiza o ataque normalmente"*), e é o que mantém o
+  ciclo legível: a frase do degelo e o golpe dele saem juntos, em vez de mais um turno em branco.
+- **O TIPO GELO É IMUNE**, como no original (`podeCongelar`). Quem já caiu e quem já está congelado
+  também não congelam — o segundo porque a marca seria sobrescrita e o log passaria a nomear o
+  golpe errado.
+- **O SORTEIO RODA DEPOIS DE O GOLPE CONECTAR**, nunca antes: um ataque que não saiu não congela, e
+  um alvo que CAIU também não.
+- **⚠️ O CONGELAMENTO DESTA TROCA PEGA O SEGUNDO NA MESMA TROCA.** É o pedido ao pé da letra — no
+  exemplo, o Articuno congela o Dragonite e *"agora o dragonite não conseguiu atacar porque tá
+  congelado"*, no mesmo turno. Ele só alcança quem ataca **DEPOIS**: se o congelado for o mais
+  rápido, ele já bateu antes de o gelo chegar, e o efeito vale a partir da troca seguinte. É a mesma
+  assimetria que o `segundoCaiu` já tem, e ela é a do jogo — quem conecta primeiro leva vantagem.
+- **⚠️ O `rng` É O DA BATALHA, e só é lido quando o golpe PODE congelar.** O `tentarCongelar` sai
+  antes do `rng()` quando o golpe não está na tabela ou o alvo é imune — lido sempre, ele deslocaria
+  a semente de **toda** batalha que não tem golpe de gelo nenhum. É a mesma armadilha que o Remoinho
+  quase trouxe, e há trava pras duas saídas antecipadas.
+- **A MARCA É SOLTA NO `encerrarBatalha`** (`p._congelado = null`), junto com o `_rolamento` e o
+  `_furia`. Ela é um campo da instância e o time vai pro SAVE: sem soltar, um pokémon sairia da
+  batalha congelado **pra sempre** — e como o campo começa com `_` (não vai pro Firestore), o save
+  nem guardaria o motivo: ele voltaria descongelado no F5 e congelado até lá. É o mesmo vazamento
+  que o teto de HP da Fúria teve, e lá ele escapou pela porta da DERROTA por semanas.
+
+**AS TRÊS FRASES, e a ORDEM entre elas é o ciclo:**
+
+| linha | quando sai | frase |
+|---|---|---|
+| `congelou` | **DEPOIS** do golpe que congelou | *Blissey ficou congelado com NEVASCA!* |
+| `gelado` | no lugar do golpe dele | *Blissey não consegue atacar por estar congelado* |
+| `degelou` | **ANTES** do golpe dele | *Blissey não está mais congelado!* |
+
+- **A frase do congelamento nomeia o GOLPE, não quem congelou** — foi o pedido, e faz sentido: o que
+  o jogador precisa ligar é o EFEITO ao GOLPE, pra saber que aquele ataque pode fazer isso de novo.
+  O nome sai do campo `mv`; log gravado antes dele cai numa versão sem golpe, que continua contando
+  o que aconteceu.
+- **⚠️ "COM" E NÃO "PELO", e é a única palavra que mudei do pedido.** Os quatro nomes PT têm gêneros
+  diferentes — Soco de Gelo, Raio Congelante e Pó de Neve são masculinos, mas **NEVASCA é feminina**,
+  e *"congelado pelo Nevasca"* sai errado. A preposição neutra serve aos quatro sem precisar de uma
+  tabela de gênero pra uma frase só. O teste cobra os quatro.
+- **A do `gelado` existe pra explicar uma barra parada:** sem ela o jogador vê o pokémon não atacar e
+  procura bug onde é regra. É a mesma razão do *"mas não teve efeito"* da imunidade.
+- **O `q` da linha é de QUEM ESTÁ CONGELADO**, não de quem congelou — a convenção do `acordou` e da
+  Fúria: estas linhas são sobre UM pokémon, não sobre um causador e um alvo.
+
+**O SEGUNDO E MEIO DE LEITURA** foi pedido com estas palavras (*"a cada frase, esperar aquele 1,5s
+para o usuario conseguir ler o que aconteceu"*), e quem o entrega é a tabela `passosDaAbertura`: as
+três valem **1 passo** cada, o que as faz virar passo próprio da animação e ganhar a marca `leitura`.
+Sem entrada na tabela a frase valeria pra **SEMPRE** — o defeito que a anulação teve.
+
+**⚠️ A ORDEM DAS LINHAS CUSTOU DUAS VERSÕES, e a segunda parecia certa.** As linhas nasceram
+empilhadas no FIM do `doExchange`, junto do `acordou` — e o log saía *"Blissey ataca / Blissey
+degelou"*, a ordem invertida da cena. A segunda versão as pôs por slot mas ainda no fim, e o
+re-congelamento saía *"congelou / degelou"*. Hoje cada linha mora no **slot de quem ela descreve**,
+em ordem de VELOCIDADE: as de entrada (`degelou`, `gelado`) antes do golpe daquele lado, e a
+`congelou` logo depois do golpe que a causou.
+**O invariante que o teste cobra é o que isso existe pra sustentar:** percorrendo o log linha a
+linha, **quem está congelado nunca aparece atacando**. Conferido em 766 confrontos, e ele acusa 965
+casos com o bloqueio removido.
+
+#### ⚠️ E ELE DESENTERROU O DEFEITO DO `findIndex`, por uma porta nova
+
+O `ondeEstaNaSequencia` do `avisoDoConfronto` procurava **o primeiro** `{x, q}` igual na sequência.
+Isso dava o certo por acidente: até aqui **nenhuma abertura repetia a mesma linha, do mesmo lado, no
+mesmo confronto**. O congelamento repete — o mesmo pokémon perde a vez três turnos seguidos (três
+linhas `gelado` do mesmo `q`) e pode congelar de novo depois.
+
+Com o `findIndex`, todas apontavam pro primeiro índice e **só a primeira ganhava frase**: as outras
+ficavam com "Trocando golpes..." no passo delas, com a pausa de leitura e nada escrito. É o mesmo
+defeito que a Faixa de Foco e o desempate já tiveram (11/09/2026), agora por outra porta.
+
+Hoje o emparelhamento é **posicional**: o k-ésimo `{x,q}` do DIÁRIO é o k-ésimo `{x,q}` da
+SEQUÊNCIA. As duas listas guardam a ordem do motor, então isso é exato.
+**Conferido que não é motor, por impressão:** o mesmo build antes e depois dá o **MESMO hash** em
+900 batalhas semeadas.
+
+**O QUE ISSO VALE, MEDIDO — e a conclusão é que a mecânica é RARA e PESADA.**
+
+**⚠️ SÓ 12 DAS 250 APRENDEM UM DOS QUATRO por nível, e 10 os levam** no moveset padrão do Lv.70:
+Shellder, Seel, Dewgong, Lapras, Jynx, Articuno, Swinub, Piloswine, Remoraid e Smoochum. Das que
+levam, o motor **escolhe** o golpe de gelo em 65% dos ataques contra um painel de 8.
+
+| 1x1 contra um painel de 8, mesmo nível, 2.000 batalhas por célula | sem | com | |
+|---|---|---|---|
+| **Articuno Lv.50** | 61,0% | **69,0%** | **+8,0** |
+| **Jynx Lv.50** | 52,5% | **57,0%** | **+4,6** |
+| Smoochum Lv.30 | 9,5% | 11,3% | +1,8 |
+| Swinub Lv.30 | 0,0% | 1,8% | +1,8 |
+| Lapras Lv.50 | 61,7% | 63,3% | +1,5 |
+| Piloswine, Dewgong, Shellder, Seel, Remoraid | — | — | **0,0** |
+
+**⚠️ OS CINCO ZEROS TÊM CAUSA, e ela não é a mecânica: eles NÃO LEVAM um golpe de gelo no nível
+testado.** O Dewgong Lv.50 leva Aurora Beam (que é Gelo e **não congela**), o Piloswine leva
+Derrubada e Escavar. Só Jynx e Articuno usam o golpe contra os 8 do painel; Lapras usa contra 3.
+É a mesma conclusão do Rolamento: **o motor está certo em recusar**.
+
+**NA BATALHA: sai em 0,7% das batalhas 3x3** e em 0,18% dos confrontos, com **1,77 turnos perdidos
+por congelamento**. As linhas de gelo são **0,2% do log**.
+
+**O PREÇO NA JORNADA: nada. 58,31% contra 57,14% de conclusão** — **+1,17 ponto, 1,2σ** (8 blocos de
+800 jornadas de cada lado, **6.400 de cada**, desvio tirado de ENTRE os blocos, **5 de 8 blocos** pro
+lado do gelo). Ruído puro, e por dois motivos somados: são **10 espécies em 250**, e elas caem dos
+DOIS lados — o Articuno é raro de rota e a Jynx aparece em time de líder.
+
+- **Se um dia incomodar**, as réguas são a **chance por golpe** (`GOLPES_QUE_CONGELAM`, que é por
+  GOLPE — dá pra deixar a Nevasca em 10% e o Pó de Neve em 5%) e a **chance de degelo**
+  (`CHANCE_DESCONGELAR`, hoje 25%: baixá-la alonga o gelo, e é a alavanca mais forte das duas).
+- **⚠️ E VALE SABER O QUE ELE NÃO ALCANÇA:** a mecânica vive no `doExchange`, então ela vale na
+  jornada, na Elite, na Torre e no Ginásio da Cidade — os quatro que montam time a partir dos SAVES.
+  **Nas ligas e no online ela quase não existe**, e não é exceção nova: lá o time vem de um CÓDIGO
+  (`especie:nivel:shiny`), ninguém tem golpe escolhido e o motor cai no de tipo, então não há id de
+  golpe pra consultar na tabela. A única porta que sobra ali é o **METRÔNOMO**, que sorteia entre
+  todos os golpes de dano e pode trazer um dos quatro.
+- `tools/test-especiais.js` tranca: os quatro golpes e a chance, que eles EXISTEM na tabela e são de
+  tipo Gelo (a lição da Lâmina Solar), que os outros golpes de Gelo **não** congelam, que 10 espécies
+  os LEVAM de verdade (a lição da Fúria, que ao pé da letra saía em 0,0%), as duas chances medidas
+  com **um rng contínuo**, a imunidade do tipo Gelo em 3.000 trocas, o alvo caído e o já congelado, o
+  invariante da ordem, as três frases palavra por palavra nos quatro golpes, a pausa de 1,5s, a marca
+  solta em 400 batalhas, as duas saídas antecipadas do rng, e **120 batalhas com gelo garantido
+  batendo golpe a golpe nos dois motores**.
+  **⚠️ A comparação das 300 batalhas NÃO serve pra isso**: são 10 espécies em 250 e o gelo sairia em
+  ~2 delas, o que faz a trava falhar sozinha **uma vez em sete** — o pior tipo de teste que existe,
+  o que passa quase sempre. Por isso ela tem painel próprio.
+
+#### ⚠️ E AS TRÊS LINHAS NÃO SAÍAM NO LOG — o defeito que só o NAVEGADOR pegou
+
+A lista de `x` que viram frase no `passosHtml` era **escrita à mão**, uma fileira de 17 nomes. O
+congelamento nasceu fora dela, e as três linhas caíam no **ramo do golpe comum**:
+
+```
+Blissey atacou Articuno com Nevasca e tirou −0 de HP.
+Blissey atacou Articuno com Pancada e tirou −0 de HP.
+```
+
+Duas coisas erradas na mesma linha: um **`−0 de HP`** (o que este log evita em toda regra, pelo
+mesmo motivo do *"mas não teve efeito"* da imunidade) e o nome de **um golpe que a Blissey nem
+tem** — o campo `mv` da linha do congelamento virava o golpe dela.
+
+- **⚠️ NENHUMA DAS 31 TRAVAS PEGOU, e a razão é a lição:** elas liam o **DIÁRIO** e a **SEQUÊNCIA**,
+  e as duas estavam certas. O defeito era do **HTML**. Quem pegou foi desenhar a tela no navegador.
+- **O conserto não foi acrescentar três nomes à lista: foi a lista deixar de existir.** Quem decide
+  hoje é o **`ehGolpeEspecial`**, que já existia e já conhecia os três. Acrescentar nomes deixaria a
+  armadilha armada pro próximo especial.
+  **Duas exceções, e as duas têm razão:** o `disable` ESTÁ no `ehGolpeEspecial` e fica de fora
+  (as anulações já foram desenhadas antes de tudo, porque acontecem na abertura do confronto), e
+  `faixa`/`desempate` NÃO estão nele (são avisos do MEIO da luta) e precisam entrar.
+- **Conferido que o conserto não tocou em mais nada:** varrendo 494 confrontos com especial e 19
+  marcas diferentes, as **decisões que mudaram foram exatamente as 16 linhas de gelo**.
+- **O SELO ❄️ veio junto**, e pelo mesmo tipo de conferência: as três saíam **mudas** na linha de
+  status enquanto todo o resto do bloco tem o seu (😴 💫 🌪️ 😤 🐉). As três dividem o mesmo ícone de
+  propósito — elas são o mesmo evento em três momentos (pegou / perdeu a vez / passou), e ícones
+  diferentes fariam procurar três mecânicas onde há uma.
+
+**MEDIDO NO NAVEGADOR, a 320px:** as quatro frases cabem sem rolagem lateral, as duas mais longas em
+**2 linhas (41px)** e a do degelo em 1 (21px) — o mesmo perfil que a confusão, o Remoinho e a Fúria
+já têm. O log do confronto do exemplo fica em **500px, 22 linhas, zero `−0 de HP`**; varrendo 182
+confrontos com gelo, **zero** também.
+
+`tools/test-especiais.js` passou a **ler o HTML do log** por causa disto: nenhuma linha de gelo vira
+`−0 de HP`, as 888 linhas de gelo saem com a frase delas, a decisão vem do `ehGolpeEspecial` (e não
+de uma lista à mão), o `disable` fica de fora, e as três têm o ❄️.
+
+**⚠️ E ELE CUSTOU QUATRO ERROS DE MEDIÇÃO SEGUIDOS, todos da mesma família — a lição fica:**
+
+| o que eu fiz | o que a medição disse |
+|---|---|
+| `ataquesPadrao(id, nivel)` em vez de `ataquesPadrao(instancia)` | **zero** espécies levam golpe de gelo |
+| `best.id` em vez de `best.golpe` | o motor **nunca** escolhe o golpe de gelo (0 de 80) |
+| `r.playerWon` em vez de `r.win` | **0,0%** de vitória pra todas as dez |
+| `inst()` do teste, que não preenche `hp` | congela em **0,00%** (66,7σ) |
+
+Nenhum deles é defeito do jogo, e os quatro pareciam ser. **Conferir a FORMA do retorno antes de
+medir** é mais barato que interpretar um zero.
+
+### A QUEIMADURA: O PRIMEIRO STATUS QUE NÃO PASSA (16/09/2026)
+
+Pedida assim: *"faça o mesmo com os ataques que causam queimar, segue como funciona na bulbapedia,
+lembrando que estamos seguindo as regras da geração III, ou seja, quando um pokemon sofrer
+queimadura, ele perde 1/16hp a cada turno e reduz pela metade o dano que um Pokémon queimado causa
+com golpes físicos, Pokémon do tipo Fogo não podem mais ser queimados. Adicionar algum símbolo no
+pokemon que está queimado"*.
+
+- **⚠️ ELA É O CONTRÁRIO DO CONGELAMENTO NO QUE MAIS IMPORTA: ela NÃO PASSA.** O gelo sorteia degelo
+  a cada turno e dura 1,77 turno na prática; a queimadura pega e fica **até o fim da BATALHA**. É a
+  diferença entre um efeito que se espera passar e um que se acumula — e é ela que faz o selo na
+  tela ser obrigatório, porque o jogador precisa saber por que o pokémon dele está batendo metade
+  três confrontos depois.
+- **SÃO SETE GOLPES** (`GOLPES_QUE_QUEIMAM`): Soco de Fogo, Brasa, Lança-Chamas, Explosão de Fogo,
+  Roda de Fogo e Onda de Calor a **10%**, mais o **Fogo Sagrado a 50%** — os valores oficiais.
+  A lista saiu do dado (Showdown, mod da Gen 3), o mesmo caminho dos quatro do gelo.
+  **⚠️ DOIS FICARAM DE FORA, e os dois por razão de dado:** o **Will-O-Wisp** é golpe de STATUS
+  (poder 0, e a base só cadastra dano) e o **Blaze Kick** ninguém aprende por nível nas 250 —
+  cadastrá-los seria letra morta, a lição da Lâmina Solar.
+  **⚠️ O FOGO SAGRADO SÓ EXISTE NO HO-OH**, que é INTOCÁVEL: a entrada não roda hoje e fica por ser
+  o que o dado diz, a mesma decisão do Lugia no `RECUPERACAO` e no `REMOINHO`.
+- **⚠️ E O REDEMOINHO DE FOGO É O ÚNICO GOLPE DE FOGO DA TABELA QUE NÃO QUEIMA** — fiel: ele é o de
+  PRENDER (que virou multi-tapa aqui) e não tem efeito de status. Há trava varrendo a tabela por
+  TIPO, pra um golpe de fogo novo não entrar por engano nem ficar de fora em silêncio.
+- **O TIPO FOGO É IMUNE**, como no original. Um detalhe bonito que caiu de graça: **as 22 espécies
+  que levam um golpe que queima são exatamente as 22 do tipo Fogo** — então elas nunca se queimam
+  entre si, e o espelho é seguro sem precisar de regra nenhuma.
+- **O DANO É 1/16 DO TETO, por turno, e ELA PODE MATAR** — como no jogo original. O **mínimo é 1**:
+  com o arredondamento, um pokémon de teto menor que 16 levaria ZERO e a queimadura viraria enfeite
+  — e uma linha de `−0 de HP` é o que este log evita em toda regra.
+- **⚠️ MAS ELA NUNCA DERRUBA OS DOIS NA MESMA TROCA**, e essa foi a única decisão de mecânica que
+  este pedido obrigou. A regra é de 12/09/2026, pedida com estas palavras: *"não existe de os 2
+  cairem juntos, somente na auto destruição"*. Foi por ela que o revide moribundo deixou de matar, e
+  a queimadura reabria a porta pelo outro lado: o adversário cai no golpe, e no fim da mesma troca a
+  queimadura leva quem o derrubou.
+  **Medido antes da trava: 95 dos 99 casos de morte dupla passaram a ser dela** — ou seja, ela virou
+  a causa dominante de algo que o jogo tinha acabado de eliminar. Hoje quem chega por último cede:
+  se o outro lado já está em 0, a queimadura para em 1 de HP. Medido depois: **174 de 174** mortes
+  duplas são autodestruição.
+
+**A METADE DO ATAQUE FÍSICO entra pela MESMA porta da Dança da Pluma** (`withQueimadura`, um degrau
+do `effectiveAttack`) — que já é exatamente este efeito, ×0,5 no Ataque, com outro gatilho. Sendo um
+degrau do atributo, ela vale de graça nos **seis** pontos do motor que leem ataque físico, e nenhum
+caminho novo nasce sem ela. O Ataque Especial não é tocado, que é a regra.
+
+**⚠️ ELA ENTRA DEPOIS DOS MULTIPLICADORES E DO FLAT**, como a dança: "metade do ataque" é metade do
+que o pokémon TEM na hora do golpe. Conferido num shiny: 156 → 78, exato.
+
+**⚠️ E AQUI ESTÁ O NÚMERO QUE IMPORTA — o valor dela é DEFENSIVO, e a medição de quem queima
+esconde isso.** Pra quem usa o golpe, o ganho é de +1 a +3 pontos. Pro alvo, o custo é enorme
+(1x1 contra um painel de 8, queimadura forçada, 1.200 batalhas por célula):
+
+| queimado | vitória cai | |
+|---|---|---|
+| **Gyarados** | 76,9% → **40,1%** | **−36,8** |
+| **Snorlax** | 65,6% → 40,0% | −25,6 |
+| **Dragonite** | 55,1% → 35,7% | −19,4 |
+| **Rhydon** | 18,3% → **0,1%** | −18,3 |
+| Machamp | 39,4% → 24,9% | −14,5 |
+| Starmie | 53,3% → 42,0% | −11,3 |
+| Venusaur | 27,1% → 20,9% | −6,2 |
+| **Alakazam** | 60,8% → 58,2% | **−2,7** |
+
+**A distância entre o Gyarados (−36,8) e o Alakazam (−2,7) É a mecânica**: neste motor quem decide
+físico × especial é o **TIPO do golpe** (`isSpecialType`, regra da Gen 1). Medido nas 250: **115
+espécies atacam sempre pelo físico** (a queimadura morde inteiro), **91 sempre pelo especial** (ela
+não tira um ponto de dano) e 44 variam conforme o alvo. É o mesmo desenho que a Dança da Pluma já
+tinha, com o gatilho invertido.
+
+**⚠️ E A ESCOLHA DO GOLPE NÃO SABE DA QUEIMADURA, e isso é herdado — não é decisão nova.** A `nota`
+do `melhorAtaque` compara poder × tipo × STAB e **não olha o atributo**, então um pokémon queimado
+continua escolhendo pelo poder cru e pode insistir num físico que agora vale metade. A Dança da
+Pluma vive com isso desde 12/09/2026, pelo mesmo motivo. Se um dia incomodar, o lugar é a `nota` —
+e o cuidado é o de sempre: ela tem que mudar nos DOIS motores e nos dois lugares (a escolha e o
+dano), senão o motor escolhe por uma regra e aplica outra.
+
+**NA TELA são três coisas, e a terceira é a que foi pedida:**
+
+| | |
+|---|---|
+| `queimou` | *🔥 Snorlax ficou queimado com LANÇA-CHAMAS!* — no passo do golpe que causou |
+| `queima` | *🔥 Snorlax perdeu 35 de HP pela queimadura* — a cada turno |
+| **o selo 🔥** | no quadro do lutador, ao lado do 🌟, 🔺, 🎖️, ⚔️ e 🪶 |
+
+- **⚠️ A LINHA DO DANO TRAZ O NÚMERO, e ela é a única do bloco de status que traz:** a linha de um
+  especial não ganha o "e tirou −N de HP" automático, e sem o número a soma das linhas não fecharia
+  com a barra — o jogador veria a barra descer mais do que o log conta. É a mesma razão pela qual a
+  Fúria do Dragão escreve os 40 dela.
+- **⚠️ O SELO SAI DE UM CAMPO DO MATCHUP** (`playerQueimado`/`enemyQueimado`), **não da marca do
+  diário** — e é o MESMO caso da Fúria: a queimadura ATRAVESSA confrontos, então um pokémon pode
+  lutar três deles queimado com a marca só no primeiro. Lido do diário, o selo sumiria justamente
+  nos confrontos em que o jogador mais precisa dele. Há caso de teste para exatamente isso (a
+  "queimadura herdada": o pokémon entra já queimado, sem marca nenhuma, e o selo sai).
+  Confronto gravado antes do campo sai sem selo — log velho não pode sumir.
+- **⚠️ O PASSO DA ANIMAÇÃO NÃO INVERTE O LADO**, e essa é a armadilha da mecânica. O passo comum lê
+  o `q` como QUEM BATE e desce a barra do OUTRO; aqui o `q` é de **quem está queimado** — não há
+  causador nesta troca, ela foi aplicada turnos atrás. Invertido, a barra que desce é a do pokémon
+  errado, e o defeito não aparece como erro: aparece como o adversário perdendo vida do nada. É o
+  mesmo cuidado que a cura, a fúria e o dreno já têm, pelo lado oposto.
+- **⚠️ E A LINHA NÃO GRAVA `hp`, pela mesma razão do REMOINHO:** o campo quer dizer "a vida do ALVO
+  depois do golpe", e o alvo de uma linha comum é o lado OPOSTO ao `q`. Gravando ali a vida de quem
+  PERDE, toda conta que lê o diário a atribui ao outro lado.
+- **A pausa de 1,5s** vem da entrada no `passosDaAbertura` (1 passo cada), como as três do gelo.
+
+**⚠️ ELA É A QUARTA DA FAMÍLIA "HP QUE SUMIU SEM SER GOLPE DO ADVERSÁRIO"** — ao lado do
+`absorbdano`, da `confusao` e da `furiadragao` — **e a PRIMEIRA em que o `q` é de QUEM PERDE**; nas
+outras três ele é de quem CAUSOU, e por isso todas as contas do teste invertem o `q` pra achar o
+lado. Somada ao `danoSemGolpe` sem mais nada, ela seria contada no lado errado nas **oito** contas.
+Hoje quem responde "quanto o lado X perdeu sem ser golpe do outro" é uma função só
+(`perdeuSemGolpe`), e não cada conta invertendo à mão — a mesma lição que fez o `danoSemGolpe` virar
+função quando a Fúria do Dragão entrou.
+
+**MEDIDO NA BATALHA: ela sai em 2,4% das batalhas 3x3** e em 0,80% dos confrontos, com 180 turnos de
+dano e **12 mortes pela queimadura** em 15.793 confrontos. As linhas dela são 0,6% do log.
+
+**O PREÇO NA JORNADA: NADA — 57,57% contra 57,63%, −0,05 ponto, 0,0σ** (7 blocos de 800 jornadas de
+cada lado, **5.600 de cada**, desvio tirado de ENTRE os blocos, **3 de 7 blocos** pro lado da
+queimadura). Ruído absolutamente puro, e por dois motivos somados: são 22 espécies em 250, e elas
+caem dos DOIS lados — o Charizard do rival, o Arcanine do Blaine, o Houndoom de rota.
+
+- **Se um dia incomodar**, as réguas são a **chance por golpe** (`GOLPES_QUE_QUEIMAM`, que é por
+  GOLPE), o **dano por turno** (`QUEIMADURA_DANO`) e o **corte do ataque** (`QUEIMADURA_FISICO`). O
+  corte é a alavanca mais forte de longe — é ele que vale os −36,8 do Gyarados.
+- **⚠️ E ELA NÃO ALCANÇA as ligas nem o online**, pela mesma razão do gelo: lá o time vem de um
+  CÓDIGO e ninguém tem golpe escolhido, então o motor cai no de tipo e não há id pra consultar na
+  tabela. A única porta que sobra é o **METRÔNOMO**.
+- **⚠️ E O TRI ATTACK FICOU DE FORA, de propósito.** Ele existe na tabela (Normal, 80) e na Gen 3
+  tem 6,67% de causar **um dos três** status — só que o dado do Showdown não o marca como `brn` (ele
+  modela o sorteio com `onHit`), e dois dos três status ainda não existem no jogo. Cadastrá-lo hoje
+  seria inventar. Fica registrado pro dia em que a paralisia entrar.
+- `tools/test-especiais.js` tranca 40 pontas: os sete golpes e as duas chances, que eles EXISTEM na
+  tabela e são de tipo Fogo, que o Redemoinho de Fogo é o único de Fogo que não queima, que 22
+  espécies os LEVAM de verdade (a lição da Fúria), a chance medida com **um rng contínuo**, a
+  imunidade do Fogo em 3.000 trocas, o alvo caído e o já queimado, o 1/16 com piso de 1 (num teto
+  de 10), o corte do físico e o Sp.Atk intocado, o corte exato num shiny, **os dois nunca caindo
+  juntos fora da autodestruição**, as duas frases palavra por palavra, o selo 🔥 no lado certo, a
+  **queimadura herdada**, o lado da barra na animação, a linha sem `hp`, o HTML do log sem `−0 de
+  HP`, a marca solta em 400 batalhas, as duas saídas antecipadas do rng, e **120 batalhas com
+  queimadura garantida batendo golpe a golpe nos dois motores**.
+
+#### ⚠️ E O SELO 🔥 ENTREGAVA A QUEIMADURA ANTES DE ELA ACONTECER (16/09/2026)
+
+Reportado assim: *"o emoji de quando o pokemon ta queimando, ta aparecendo logo quando o pokemon
+entra na luta, mesmo se o golpe que for dar o queimar for tipo o sexto golpe"*.
+
+- **A CAUSA: ele saía do CAMPO do matchup, que é o estado no FIM do confronto.** O campo existe pela
+  razão certa (a queimadura ATRAVESSA confrontos, então a marca do diário não serve — ver acima), e
+  o defeito era o outro lado da mesma moeda: lido sem o passo, ele anuncia no primeiro quadro uma
+  queimadura que só vai acontecer seis golpes depois.
+- **⚠️ ELE É O CONTRÁRIO DOS OUTROS CINCO SELOS DAQUELE QUADRO, e é por isso que precisou de regra
+  própria.** O 🌟, o 🔺, o 🎖️, o ⚔️ e o 🪶 valem o confronto inteiro porque são **ABERTURA** — já são
+  verdade antes do primeiro golpe. A queimadura acontece **NO MEIO**, como a Faixa de Foco — e a
+  Faixa fica escondida até o passo dela exatamente pelo mesmo motivo (*"mostrá-la antes entregaria
+  o desfecho"*).
+- **O `selosDoConfronto` passou a receber o PASSO**, e quem decide é o `queimouAteAqui`:
+  - há marca `queimou` deste lado no diário → o selo sai a partir do **passo dela** (`i + 1`, a
+    convenção de sempre: `passo === k + 1` quer dizer "animando `seq[k]`");
+  - **não há marca → a queimadura é HERDADA**, e aí o selo vale desde o primeiro quadro: ele entra
+    no confronto já queimado, e ali o selo é verdade desde o começo. *Procurar a marca e não achar
+    significa "veio de antes", não "não houve"* — é o caso que uma leitura ingênua erraria.
+  - **sem `passo` o selo vale**, e isso é o log relido dias depois: ali o confronto já acabou e ele
+    é o resumo, não um anúncio.
+- **AS CINCO CHAMADAS PASSAM O PASSO** — o `fighterHtml` (as três primeiras telas), as duas da liga
+  assistida (`game.leagueWatchHitStep`) e as duas do online (`anim.passo`). Uma tela que esqueça o
+  passo volta a ter o defeito, **e só nela**: por isso o teste conta as chamadas com três argumentos
+  contra o total, em vez de nomear as telas.
+- **CONFERIDO QUE NÃO É MOTOR, por impressão:** o mesmo build antes e depois dá o **MESMO hash** em
+  900 batalhas semeadas. O selo é apresentação inteira.
+- **Medido no navegador**, num confronto em que a queimadura sai no 5º de 7 passos: o 🔥 está ausente
+  nos passos 0 a 4 e presente do 5 em diante, exatamente.
+
+### O ASTERISCO DOS TRÊS STATUS NO CARTÃO DO GOLPE (16/09/2026)
+
+Pedido assim: *"Nos ataque de fogo, veneno e congelamento que causam esses status, coloque um * no
+quadro deles, avisando '10% de chance de causar queimadura (emoji da queimadura)'"*.
+
+São **17 golpes** (7 de queimadura, 4 de congelamento, 6 de veneno), e a linha entra no
+`obsDoGolpe`, que já é a função das observações e já devolve uma LISTA desde 15/09/2026.
+
+- **É a informação que MAIS muda a escolha e que os seis números MENOS contam.** Um Ferrão Venenoso
+  de **poder 15** com 30% de envenenar vale mais, num confronto longo, que um golpe de 40 que só
+  bate — e o cartão mostrava só o 15. É o mesmo raciocínio que pôs a drenagem e a trava do Comedor
+  de Sonhos aqui.
+- **⚠️ A CHANCE SAI DA TABELA, nunca escrita à mão, e aqui isso não é detalhe: ela VARIA de golpe
+  pra golpe.** O Fogo Sagrado queima em **50%**, a Presa Venenosa envenena em **50%**, a Fumaça em
+  **40%**, o Agulha Dupla em **20%**. Uma frase fixa de "10%" — que é o que o pedido escreveu como
+  exemplo — **mentiria em cinco dos dezessete golpes**. E golpe novo numa das três tabelas já nasce
+  com o aviso.
+  O teste prova que ela é DERIVADA mexendo na tabela e cobrando que a frase acompanhe: um texto fixo
+  passaria em todos os casos nomeados e falharia só nesse.
+- **O EMOJI É O MESMO DO LOG E DO QUADRO DO LUTADOR** (`ICONES_ESPECIAIS`): o jogador lê 🔥 aqui e
+  reconhece o 🔥 no quadro do pokémon queimado, sem precisar ligar as duas coisas.
+- **O AGULHA DUPLA É O CASO DE DUAS OBSERVAÇÕES** — ele é multi-tapa E envenena. Foi por um caso
+  assim que o `obsDoGolpe` virou lista; com `return` de string, a segunda apagaria a primeira em
+  silêncio.
+
+**Custo de tela, medido a 320px no navegador:**
+
+| | altura do cartão |
+|---|---|
+| golpe comum | 52px |
+| com queimadura | 66px |
+| com congelamento ou veneno | 78px (a frase cai em 2 linhas) |
+| **com DUAS observações** (Agulha Dupla) | 93px |
+
+Na TELA de escolha: **484px** com cinco golpes comuns e **537px** no pior caso possível (cinco
+golpes de status, que nenhum pokémon tem) — **+11%**, sem rolagem lateral. No caso real (um golpe
+de status entre quatro) o custo é **zero**: a tela fica nos mesmos 484px.
+
+#### ⚠️ E ELE DESENTERROU UMA FRASE QUE MENTIA HÁ TRÊS DIAS
+
+A observação dos multi-tapa era **"Golpe repete entre 2-5x" escrita à mão** — e isso virou mentira
+em **13/09/2026**, quando o Chute Duplo, o Ossomerangue e a Agulha Dupla entraram com distribuição
+PRÓPRIA (`TAPAS_SEMPRE_2`): eles batem **SEMPRE 2 vezes**, e o cartão prometia de 2 a 5.
+**Três golpes em catorze.**
+
+- **Só ficou visível agora** porque a Agulha Dupla ganhou uma segunda linha e as duas foram lidas
+  juntas — *"Golpe repete entre 2-5x"* logo acima de *"20% de chance de causar envenenamento"*.
+- **Hoje a faixa sai da TABELA**, como as chances: `min === max` vira *"Golpe repete 2x"* e o resto
+  continua *"Golpe repete entre 2-5x"*. Golpe novo com distribuição própria já nasce com a frase
+  certa.
+- **É a mesma lição da lista à mão do `passosHtml`**, que deixou as três linhas do congelamento
+  caírem no ramo do golpe comum: **texto fixo que descreve uma tabela envelhece quando a tabela
+  cresce**. Os dois defeitos nasceram no mesmo lugar do pensamento.
+
+`tools/test-especiais.js` tranca: os 17 golpes avisando e **nenhum de fora**, as cinco chances que
+não são 10%, que ela é derivada (mexendo na tabela, a frase acompanha), o emoji sendo o mesmo do
+log, o Agulha Dupla com as duas observações, e a faixa de tapas batendo com a tabela nos catorze
+golpes. Conferido que ele acusa 5 falhas com a chance fixa em 10%, 2 com a faixa de tapas fixa e 6
+com o veneno sem aviso.
+
+### O ENVENENAMENTO (16/09/2026)
+
+Pedido assim: *"faça a mesma mecanica para pokemons que causam Poison ... tirando 1/8 de hp maximo e
+pokemon de aço tem imunidade, e o pokemon continua com esse status até ele morrer, mesma coisa com a
+queimadura"*, com a Bulbapedia como fonte.
+
+É a **terceira** mecânica POR ATAQUE, e a **mais simples das três**: só dano, sem tocar em atributo
+nenhum. O que ela tem de próprio é o **dobro** do dano da queimadura.
+
+- **SÃO SEIS GOLPES** (`GOLPES_QUE_ENVENENAM`), e aqui as chances **VARIAM** — ao contrário do gelo
+  (todos 10%): Ferrão Venenoso 30%, **Agulha Dupla 20%**, Fumaça 40%, Lama 30%, Bomba de Lodo 30% e
+  **Presa Venenosa 50%**. São os valores oficiais, tirados do dado (Showdown, mod da Gen 3).
+- **⚠️ FICARAM DE FORA: Pó Venenoso, Tóxico e Gás Venenoso** (golpes de STATUS, poder 0, e a base só
+  cadastra dano) e a **Cauda Venenosa** (ninguém a aprende por nível nas 250). A mesma regra que
+  tirou o Will-O-Wisp da queimadura.
+- **⚠️ A PRESA VENENOSA É "GRAVE" NO ORIGINAL** — o veneno que escala 1/16, 2/16, 3/16… Aqui ela
+  entra como veneno **NORMAL**: o pedido fixou 1/8, e o veneno grave é outra mecânica. Ter o golpe
+  funcionando com 1/8 é mais próximo do jogo do que não ter o efeito nenhum.
+- **⚠️ O AGULHA DUPLA É O ÚNICO DA LISTA QUE NÃO É DE VENENO** (ele é Inseto) — e é também o único
+  que **já é um golpe de VÁRIOS TAPAS**. A chance vale por **ATAQUE**, não por tapa: o
+  `tentarEnvenenar` roda uma vez por golpe no `doExchange`, como os outros dois status. No original
+  só o segundo tapa pode envenenar; a diferença some da tela e fica registrada aqui.
+- **⚠️ O ÁCIDO É O ÚNICO GOLPE DE VENENO DA TABELA QUE NÃO ENVENENA**, e é fiel: na Gen 3 ele baixa
+  a Defesa Especial. É o mesmo par que o Redemoinho de Fogo faz na queimadura, e há trava varrendo a
+  tabela por tipo.
+
+**⚠️ O VENENO ENTROU NA LISTA DE IMUNES POR DECISÃO MINHA, e vale saber por quê.** O pedido dizia só
+*"pokemon de aço tem imunidade"*, mas a **Bulbapedia — a fonte citada no próprio pedido** — põe os
+dois, e é a mesma simetria dos outros dois status (o Gelo não congela, o Fogo não queima).
+Medido, é isso que sustenta a mecânica: **24 das 26 espécies que levam um golpe da lista são de
+Veneno**. Sem ela, elas se envenenariam com os próprios golpes, e o espelho de um time de Veneno
+viraria uma troca de veneno mútua. Se um dia for pra valer só o Aço, é tirar um termo do
+`podeEnvenenar` — e a régua está aqui: **41 espécies são imunes** hoje (4 de Aço + 37 de Veneno).
+
+**O DANO É 1/8 DO TETO, o DOBRO da queimadura, e ELE PODE MATAR** — como no original. Mínimo de 1,
+pelo mesmo motivo de lá: com o arredondamento, um teto pequeno levaria ZERO e o veneno viraria
+enfeite.
+
+**⚠️ OS DOIS STATUS DE DANO POR TURNO DIVIDEM UMA FUNÇÃO SÓ (`danoDeStatus`), e isso não é economia
+— é o que faz a trava dos "dois nunca caem juntos" valer.** Em blocos separados, a queimadura
+pararia em 1 olhando o adversário vivo e o veneno o mataria logo depois: **a trava daria verde em
+cada metade enquanto o par quebrava a regra**. Medido depois: **158 de 158** mortes duplas são
+autodestruição.
+
+#### ⚠️ E A FAIXA DE FOCO PASSOU A SEGURAR O DANO DE STATUS
+
+A trava do item pegou um furo de verdade: **a queimadura e o veneno matavam por baixo da Faixa**.
+
+- **No jogo original o Focus Sash só protege de dano DIRETO**, então tecnicamente estava certo.
+  **Aqui ela protege dos dois**, e a razão é a promessa que a casa fez pro item — *"quem carrega a
+  Faixa nunca termina um confronto em 0 sem ela ter disparado antes"*. Essa trava existe porque a
+  **autodestruição já tinha furado a Faixa uma vez e o jogador reportou** (*"equipei o charizard com
+  Faixa de foco e ele morreu direto quando chegou com 0 de hp"*).
+- Um item que promete segurar a morte e falha justamente na morte silenciosa — a que não tem golpe
+  na tela pra explicar — é pior que não ter o item.
+- Ela continua sendo **UMA**: gasta ali, e o turno seguinte de veneno leva o pokémon.
+
+**NA TELA são três coisas, as mesmas da queimadura:**
+
+| | |
+|---|---|
+| `envenenou` | *🟣 Snorlax foi envenenado com BOMBA DE LODO!* — no passo do golpe que causou |
+| `veneno` | *🟣 Snorlax perdeu 77 de HP pelo veneno* — a cada turno, **com o número** |
+| **o selo 🟣** | no quadro do lutador, **só a partir do passo em que o veneno pega** |
+
+- **O 🟣 É A COR DO TIPO, e não uma caveira:** ☠️ se lê como MORTE, e o envenenado continua lutando.
+- **O selo segue a regra que o 🔥 acabou de ganhar** — ele só aparece no passo do evento, porque o
+  veneno também acontece NO MEIO do confronto. Envenenamento **herdado** (sem marca no diário) vale
+  desde o primeiro quadro. A função `statusAteAqui` serve aos dois.
+- **O `q` da linha é de QUEM PERDE**, e por isso o passo da animação **não inverte o lado** — a
+  mesma armadilha da queimadura, e a linha do motor é literalmente a mesma.
+
+**O QUE ELE VALE, MEDIDO — e ele é UNIFORME, ao contrário da queimadura.** 1x1 contra um painel de
+8, veneno forçado, 1.200 batalhas por célula:
+
+| envenenado | vitória cai | |
+|---|---|---|
+| **Rhydon** | 30,8% → **9,9%** | **−20,9** |
+| Starmie | 51,9% → 38,1% | −13,8 |
+| Gyarados | 70,3% → 56,9% | −13,4 |
+| Dragonite | 43,7% → 31,0% | −12,7 |
+| Alakazam | 52,3% → 43,8% | −8,5 |
+| Snorlax | 63,0% → 56,8% | −6,3 |
+| Machamp | 42,9% → 42,2% | −0,8 |
+
+**A diferença pra queimadura é o FORMATO, não o tamanho.** Lá o custo ia de −2,7 (Alakazam) a −36,8
+(Gyarados) porque ela corta o **ataque físico** — quem bate pelo especial quase não sentia. Aqui é
+só dano, então ele cai parecido em todo mundo: o **Alakazam sente −8,5** contra os −2,7 da
+queimadura.
+
+**MEDIDO NA BATALHA: sai em 4,5% das batalhas 3x3** e em 1,51% dos confrontos, com 347 turnos de
+dano e **27 mortes pelo veneno** em 15.912 confrontos. As linhas dele são 1,09% do log.
+
+**O PREÇO NA JORNADA: NADA. 57,66% contra 58,08% de conclusão** -- **−0,42 ponto, 0,6σ** (8 blocos
+de 800 jornadas de cada lado, **6.400 de cada**, desvio tirado de ENTRE os blocos, e apenas **3 de 8
+blocos** pro lado do veneno). Ruído puro, e a direção é até negativa. Faz sentido pelos dois motivos
+de sempre: são 26 espécies em 250 e elas caem dos DOIS lados -- o Venusaur do rival, o Muk da rota,
+o Vileplume da Erika.
+
+**⚠️ E ESTA MEDIÇÃO PRECISOU SER REFEITA, pela lição de método que vale guardar:** a primeira rodou
+contra o `index.html` do repo enquanto eu **mexia nele** pra conferir que as travas acusavam com os
+defeitos religados. Dois blocos saíram vazios e os outros não eram confiáveis. Hoje o A/B roda sobre
+**duas cópias congeladas** (`--html` dos dois lados), e mexer no repo durante a medição deixou de
+contaminá-la.
+
+- **Se um dia incomodar**, as réguas são as **chances por golpe** (`GOLPES_QUE_ENVENENAM`, que são
+  por GOLPE) e o **dano** (`VENENO_DANO`). O dano é a alavanca mais forte, e ele é o dobro da
+  queimadura por pedido.
+- **⚠️ E ELE NÃO ALCANÇA as ligas nem o online**, pela mesma razão dos outros dois: lá o time vem de
+  um CÓDIGO e ninguém tem golpe escolhido, então o motor cai no de tipo e não há id pra consultar na
+  tabela. A única porta que sobra é o **METRÔNOMO**.
+- `tools/test-especiais.js` tranca 44 pontas: os seis golpes e as quatro chances medidas com **um
+  rng contínuo**, que eles existem na tabela, o Ácido fora, o Agulha Dupla sendo o único de fora do
+  tipo e continuando multi-tapa, 26 espécies LEVANDO de verdade, as duas imunidades (com a do Veneno
+  nomeada como acréscimo), o alvo caído e o já envenenado, o 1/8 sendo o dobro da queimadura, que
+  ele **não corta atributo nenhum**, os dois nunca caindo juntos, **a Faixa segurando e sendo
+  gasta**, as duas frases, o selo 🟣 só a partir do passo, o lado da barra, o HTML do log sem `−0 de
+  HP`, a marca solta em 400 batalhas, as duas saídas antecipadas do rng e 120 batalhas batendo golpe
+  a golpe nos dois motores.
+
 ### A FÚRIA DO DRAGÃO: 40 FIXOS NA ABERTURA (11/09/2026)
 
 Pedida assim: *"adicione a habilidade passiva furia do dragão para os pokemons que possuem esse
@@ -1792,6 +2342,9 @@ explicação de menos. Hoje:
   O `<button>` é válido ali porque a linha do log é uma `<div>` — a armadilha do `<button>` dentro
   de `<button>`, que já custou dois defeitos neste projeto, não existe neste caminho; se um dia a
   linha do log virar clicável, é este o lugar que quebra.
+  **⚠️ ESSE DIA CHEGOU em 16/09/2026**, quando o log passou a começar comprimido — e a previsão
+  estava certa. O que salva é a ESTRUTURA: o botão envolve só o CABEÇALHO, e o passo a passo (que
+  contém este selo) é IRMÃO dele. Há trava posicional pra isso — ver a seção do log comprimido.
 - **3) O 🌧️ EM CIMA DO ×, em TODO confronto que teve chuva.** Ele fica no × de propósito: é o único
   ponto do cabeçalho que pertence aos DOIS lados, e clima não é de ninguém — é do campo. É ele que
   conta os confrontos 2 e 3, que não ganham linha.
@@ -3512,6 +4065,29 @@ acontecendo"*. E não era o Mewtwo: era o **laço de revelação** que ele usa.
   **E ela não pode ser estatística:** a primeira versão cobrava "a tela mostra MENOS que o diário"
   (23 contra 42 na média, 2,4σ) e falhava sozinha **~1 vez em 100** — o pior tipo de teste que
   existe, o que passa quase sempre. Hoje cobra "não mais", que é verdade por construção.
+- **⚠️ NO ESPELHO O EMPATE É A REGRA, E O NÚMERO É 70%.** Perguntado em 16/09/2026 (*"por que que o
+  meu Pidgeotto na luta entre Pidgeotto x Pidgeotto, atacou 2x consecutivas?"*), e o motor estava
+  certo: **mesma espécie no mesmo nível = mesma velocidade**, então o desempate é sorteado em TODA
+  troca e a ordem inverte metade das vezes.
+  A conta é fechada: com T trocas há T−1 fronteiras entre elas, e cada uma tem 1/2 de repetir o
+  lado — `P(nenhuma repetição) = (1/2)^(T−1)`. Medido num Pidgeotto × Pidgeotto Lv.30, 3.000
+  confrontos: **70,3% deles mostram dois golpes seguidos, e 100% por empate de velocidade** (zero
+  por sono, zero pelo revide zerado).
+  **No jogo inteiro isso é raro** — só **4,5% dos pares de espécies** têm a mesma velocidade base.
+- **⚠️ SE UM DIA INCOMODAR, A ALTERNATIVA ESTÁ MEDIDA:** sortear a ordem do empate **uma vez por
+  confronto** em vez de a cada troca (guardando a escolha na instância, como o `_especialContra`
+  já faz).
+
+  | | espelho Pidgeotto | jogo geral | taxa de vitória |
+  |---|---|---|---|
+  | **hoje** (sorteia a cada troca) | **70,3%** | 9,57% | 50,9% |
+  | fixa por confronto | **0,0%** | 8,78% | 50,8% |
+
+  Ela **resolve o espelho por completo e quase não move o jogo geral** — porque no geral as outras
+  causas (sono, revide zerado) dominam —, e **não custa balanceamento**. O preço é outro: ela muda
+  o MOTOR (a semente anda diferente), então exige as duas cópias, medição de jornada e cuidado com
+  log já gravado. Não foi feita porque não foi pedida.
+
 - **A EXCEÇÃO É O SONO, e só ele.** As trocas livres que ele compra são o que o golpe É, e esmagá-las
   na reconstrução foi a origem dos dois defeitos reportados naquele dia ("um golpe dele, dois dela").
   Elas entram **reais, uma linha cada**, e só o RESTO da luta é reconstruído.
@@ -3594,6 +4170,12 @@ acontecendo"*. E não era o Mewtwo: era o **laço de revelação** que ele usa.
   (`.selo-clicavel`). É a única exceção à regra de que selo de log é só leitura, e ela existe porque
   o clima é a única coisa do log que muda o dano de TODO MUNDO por três confrontos: a pergunta "por
   que meu Fogo tirou metade?" nasce ali e merece resposta ali.
+- **⚠️ QUEM DECIDE SE A LINHA É FRASE OU GOLPE É O `ehGolpeEspecial`, e não uma lista escrita à
+  mão no `passosHtml`** (16/09/2026). Ela era uma fileira de 17 nomes, e era o lugar exato onde a
+  próxima omissão se escondia: o congelamento nasceu fora dela e as três linhas dele caíram no ramo
+  do golpe comum — o log saía com um **`−0 de HP`** e o nome de um golpe que o pokémon não tem.
+  Ver a seção do congelamento. **As exceções são o `disable`** (as anulações já saem antes de tudo,
+  e sem a guarda ele sairia duas vezes) **e o par `faixa`/`desempate`**, que não são aberturas.
 - A linha do log tem **uma forma só**: "X atacou Y com GOLPE e tirou −N de HP". Já passaram por
   ali selo de crítico, de moribundo e de "o tipo não pega nele" — todos saíram: viravam ruído numa
   linha que se lê de relance.
@@ -3653,6 +4235,161 @@ acontecendo"*. E não era o Mewtwo: era o **laço de revelação** que ele usa.
   duplicada pra sair de sincronia.
 
 
+### O LOG COMEÇA COMPRIMIDO, UM CONFRONTO POR LINHA (16/09/2026)
+
+Pedido assim: *"na tela que mostra o log da batalha, comprima o log de cada confronto em uma linha
+com uma + no meio, e quando clicar expandir o log daquele confronto, entao tudo começa comprimido, e
+se o usuario quiser ver o log de algum dos confrontos, ele clica no + e abre"*.
+
+- **O CABEÇALHO DO CONFRONTO JÁ ERA A LINHA** — os dois lutadores com sprite, nível e barra de vida,
+  com o `×` no meio. O que mudou é que o **passo a passo** deixou de ser desenhado junto e passou a
+  esperar um toque.
+- **⚠️ ELE FICOU GRANDE QUANDO O TETO DE LINHAS SAIU** (15/09/2026): sem corte, uma batalha 6x6
+  passava de 1.800px de log. Medido a 320px, num 6x6 de 9 confrontos:
+
+  | | altura |
+  |---|---|
+  | **comprimido** (como nasce) | **768px** |
+  | um confronto aberto | 996px |
+  | todos abertos (como era antes) | **1.890px** |
+
+  **−59%**, sem rolagem lateral em nenhum dos três. Cada linha fica em **65px**.
+- **NÃO HÁ CONTROLE NENHUM: o card inteiro clica.** O `+` passou por dois lugares antes de sumir
+  — ver o item próprio logo abaixo, que é onde está a razão.
+- **⚠️ O ALVO DO TOQUE É O CARD INTEIRO** — a regra da casa ("a linha toda já é o alvo do toque, e
+  mirar num quadradinho num celular é pedir erro"), a mesma da ficha da Pokédex e da lista de
+  notificações. Quem diz que há o que abrir é o **título**: ele anuncia o vencedor, e um card com
+  título se lê como um card, não como as linhas estáticas do jogo.
+- **O botão NÃO usa o `.btn` da casa**: aquele é botão de AÇÃO, com moldura de 3px. Aqui a linha é
+  informação que por acaso se toca, o mesmo raciocínio que já tinha tirado o `.btn` dos cartões de
+  golpe, das prateleiras da loja e das linhas da ficha.
+- **⚠️ CONFRONTO SEM PASSO A PASSO NÃO GANHA O `+` nem vira botão**: é o log antigo, gravado antes de
+  o diário existir, e ali não há o que expandir — o cabeçalho dele já mostra o golpe e o dano.
+- **VALE NAS SETE TELAS** que mostram este log (jornada, batalha especial, Torre, Ginásio da Cidade,
+  game over, liga assistida e online), porque as sete chamam o mesmo `renderMatchupLog`.
+- **`render()` é seguro aqui**, e isso merece nota porque a regra da casa é o contrário: as sete são
+  telas de **RESULTADO** — a batalha já acabou e nada está animando. A proibição de redesenhar vale
+  pros laços de revelação, que são outras telas.
+
+#### ⚠️ O CONTROLE MUDOU TRÊS VEZES NO MESMO DIA, E ACABOU SUMINDO
+
+O pedido final: *"suma com esse botão que acabamos de criar e coloque no titulo de cada confronto
+centralizado quem foi o vencedor: 'Vitória do Charizard', e torne cada confronto um card para
+clicar, e quando clicar, abre o log embaixo"*.
+
+As três tentativas, na ordem, porque o caminho explica o destino:
+
+| | o que era | por que saiu |
+|---|---|---|
+| 1ª | um `+` no bloco do `×` | caractere solto, do tamanho do texto em volta — **lia-se como parte do placar**, não como controle |
+| 2ª | um botão quadrado azul na linha de baixo | virou um controle visível, mas **competia com o conteúdo**: um botão no meio do card pra abrir o próprio card |
+| **3ª** | **o card inteiro clica, e o título diz quem venceu** | o alvo passa a ser a coisa toda, e o espaço que o controle ocupava vira **informação** |
+
+- **⚠️ É "Vitória Charizard", SEM O "do"** (pedido logo depois: *"em vez do 'Vitoria do Charizard',
+  coloque apenas 'Vitoria Charizard'"*). O artigo saiu por leitura, e de quebra ele levava junto um
+  problema de gênero: o jogo **não guarda gênero de espécie** em lugar nenhum, então "Vitória do"
+  sai errado em Jynx, Nidoqueen, Chansey e companhia — e uma tabela de gênero pra uma frase só é
+  exatamente o que a preposição neutra do congelamento já tinha evitado ("congelado **com** NEVASCA").
+  Sem o artigo, a linha serve aos 250 sem exceção.
+- **O TÍTULO É A TROCA QUE FAZ O DESENHO FECHAR.** Sem ele, um confronto fechado obriga a **ler as
+  duas barras de vida** pra saber quem ficou de pé — e essa é a única coisa que o jogador quer saber
+  de um confronto que ele não vai abrir. O controle saiu e no lugar entrou a resposta.
+- **O NOME SAI NA COR DO LADO** (azul pro jogador, vermelho pro adversário), as mesmas do log — é o
+  que faz o título se ler de relance, antes mesmo do nome.
+- **⚠️ TRÊS CASOS, e o terceiro só existe por causa da autodestruição.** Medido em 11.879 confrontos:
+  **49,0%** o jogador vence, **49,8%** o adversário vence e **1,2% os DOIS caem** — e os dois caindo
+  é *sempre* explosão, que é a regra desde 12/09/2026. Ali o título diz **"Os dois caíram"**, porque
+  "Vitória de" seria mentira. **"Os dois de pé" deu ZERO**: o confronto só termina quando alguém cai.
+  O caso fica tratado assim mesmo (sem título) — o Remoinho tira um de campo vivo, e no dia em que
+  isso virar um matchup o título não vai inventar um vencedor.
+
+**⚠️ E O CARD É UMA `<div role="button">`, NUNCA UM `<button>` — essa é a decisão que faz o desenho
+funcionar.** O passo a passo fica DENTRO do card, e ele contém o **selo clicável da chuva**, que é um
+`<button>`. `<button>` dentro de `<button>` é HTML inválido: o navegador fecha o de fora e o clique
+de dentro se perde, com a tela continuando a PARECER certa.
+
+Numa `div` o aninhamento é válido, e o selo **já nasceu com `event.stopPropagation()`** — tocar nele
+abre a caixa da chuva sem fechar o card. A nota daquele selo previu este dia com todas as letras, e
+previu certo. O preço da `div` é o teclado, que entra na mão (`tabindex="0"` + Enter/Espaço).
+
+- **⚠️ ELE TEM BORDA, E ELA É A DO CARD DE POKÉMON** (pedido junto: *"coloque bordas no card para
+  destacar mais que ele é clicável"*): 2px, cantos de 5px, fundo branco e a sombrinha de 2px — os
+  quatro valores do `.team-grid-card`, que é o card que o jogador já sabe tocar. Ele nasceu **sem**
+  borda, contando só com o título pra parecer clicável, e não bastava: entre um card e outro havia só
+  o tracejado que a lista já tinha, então a fileira continuava lendo como **lista**.
+- **⚠️ ABERTO A BORDA FICA AZUL, e é ela que diz QUAL card está aberto.** Com o log embaixo, a única
+  pista era o conteúdo — e num confronto de duas linhas isso é fácil de perder de vista ao rolar. A
+  sombra acompanha a cor pelo mesmo motivo.
+- **⚠️ O TRACEJADO DE BAIXO JÁ TINHA SAÍDO ANTES — não é desta mudança.** Quem o desliga é o
+  `.matchup-row.mlog{border-bottom:none}`, que é do desenho de quando o log virou cartão de dois
+  lados. Fica dito porque a borda nova esconde a pergunta: com ela em volta, ninguém nota que a
+  lista já não separava por linha nenhuma.
+- **A regra do `:last-child` do card é REDUNDANTE hoje, e ela fica sabendo disso.** Medido no
+  navegador (desligando a regra na mão): o último card **continua com a borda**, porque
+  `.matchup-row.mlog-card` e `.matchup-row:last-child` têm a MESMA especificidade e o card é
+  declarado depois. Ela existe só pra o dia em que alguém mover o bloco pra cima — sem ela, o
+  último confronto perderia a borda de baixo e ninguém ligaria uma coisa à outra.
+- **Medido a 320px, no navegador:** o card mede **243px** e a página não passou a rolar pro lado.
+- **O card não usa o `.btn` da casa** — aquele é botão de AÇÃO, com moldura de 3px. Aqui é informação
+  que por acaso se toca, o mesmo raciocínio dos cartões de golpe, das prateleiras da loja e das
+  linhas da ficha. Ele ganha só cursor, um realce no toque e o foco visível.
+- **Medido no navegador, a 320px:** o título ocupa **22px** por card, o log de 4 confrontos fica em
+  **518px** comprimido e **746px** com um aberto, sem rolagem lateral.
+
+**⚠️ E DUAS TRAVAS MINHAS COMETERAM O MESMO ERRO DE REGEX, com horas de diferença — a lição fica:**
+`/\.mlog-mais\{[\s\S]*?border-radius:50%/` e `/matchup-row[^"]*btn/` são a mesma armadilha. **Um
+quantificador sem limite atravessa o arquivo inteiro** e encontra a string em outra regra, centenas
+de linhas abaixo — as duas travas acusavam algo que estava certo. Dentro de uma regra CSS o limite é
+`[^}]*`; pra classes de um elemento, o certo é ler o **HTML gerado** e partir por espaço, não varrer
+a folha de estilo.
+
+
+#### ⚠️ O QUE O CLAUDE.md JÁ TINHA PREVISTO
+
+A nota do selo clicável da chuva dizia, com todas as letras: *"o `<button>` é válido ali porque a
+linha do log é uma `<div>` … **se um dia a linha do log virar clicável, é este o lugar que
+quebra**"*. É hoje.
+
+`<button>` dentro de `<button>` é HTML inválido — o navegador fecha o de fora e o clique de dentro
+se perde, com a tela continuando a PARECER certa. O que salva é a estrutura: **o botão envolve só o
+cabeçalho, e o passo a passo (que contém o selo) é IRMÃO dele**. Há trava posicional pra isso — no
+HTML, o `</button>` aparece **antes** do `mlog-passo`, e num confronto com chuva o `selo-clicavel`
+aparece **depois** do fecha-botão.
+
+#### ⚠️ E O ESTADO NÃO PODE SER A REFERÊNCIA DO ARRAY
+
+Quais confrontos estão abertos é estado de **TELA** (não vai pro save), e a pergunta difícil é
+**quando ele zera** — senão o confronto 2 de uma batalha nova nasce aberto porque o 2 da anterior
+estava.
+
+- A primeira versão comparava a **referência** do array de matchups. Isso é exato nas seis telas que
+  guardam o resultado — e **quebra no online**, que monta o `logDaMinhaVista` a **cada render**: ali
+  o array é sempre novo, o estado zeraria em todo desenho e o clique nunca abriria nada.
+- Hoje a chave é **`tela + número de confrontos`**. Duas batalhas seguidas nunca caem na mesma chave
+  porque o jogador passa por outra tela entre elas (a distribuição de níveis, a tela da Torre, o
+  lobby). Há trava com um array NOVO de mesmo conteúdo, que é exatamente o caso do online.
+
+**⚠️ DUAS LIÇÕES DE TESTE saíram daqui:**
+
+1. **O ajudante do teste tem que GARANTIR ABERTO, não alternar.** A chave é tela+tamanho, então dois
+   blocos do arquivo com o mesmo número de confrontos **compartilham o estado** — e alternar ali
+   fechava o que o bloco anterior tinha aberto. O sintoma era um HTML vazio dando falha numa trava
+   que não tinha nada a ver.
+2. **⚠️ No NAVEGADOR o `render()` redireciona pra `auth`** quando não há sessão — e aí a chave muda e
+   o estado zera. Isso é artefato do sandbox (no jogo real há save aberto e a tela não muda), mas
+   custou uma rodada de investigação: o clique "não abria" e parecia defeito.
+
+**CONFERIDO QUE NÃO É MOTOR, por impressão:** o mesmo build antes e depois dá o **MESMO hash** em 900
+batalhas semeadas.
+
+`tools/test-especiais.js` tranca: que nasce tudo comprimido e cada um traz um `+`, que abrir mostra
+só aquele e o `+` vira `−`, que clicar de novo fecha, que mudar o número de confrontos zera, que a
+tela entra na chave, que um array NOVO de mesmo conteúdo **mantém** o aberto (o caso do online), que
+log antigo não ganha `+` nem vira botão, que o `</button>` fecha antes do passo a passo, que o selo
+da chuva fica FORA dele, e que o CSS zera o estilo de fábrica. E o ajudante `logAberto` do próprio
+arquivo passou a abrir **pela API de verdade** — o que faz toda trava que lê o log exercitar o
+caminho do clique.
+
 ### O SONO DURA DE 1 A 3 TROCAS, 1/3 CADA (15/09/2026)
 
 Pedido assim: *"quando um pokemon dormir, coloque 1/3 de chance para ele tomar 1 ataque, 1/3 de
@@ -3709,6 +4446,68 @@ líderes também têm sonífero** (Oddish, Paras, Venonat), então o corte cai d
   dormindo**. Ela caiu pra 61 de 120 sem nada estar errado. O invariante novo não depende da
   duração: **quem volta a ATACAR necessariamente acordou**, então a linha tem que existir.
 
+
+#### "CONTINUA A DORMIR": A LINHA DO TURNO DO MEIO (16/09/2026)
+
+Pedida com estas palavras: *"Caso o pokemon nao acorde no turno dele, deve exibir a mensagem: 'Onix
+continua a dormir e não pode atacar', espera 1,5s e continua"*.
+
+- **⚠️ ELA FALTAVA, e a falta tinha uma forma conhecida:** o sono tinha a linha de ADORMECER
+  (*"Butterfree fez Snorlax dormir"*) e a de ACORDAR (*"Snorlax acordou e voltou à luta!"*), **e
+  nada nos turnos do meio** — o jogador via a barra dele parada, o adversário batendo de novo, e
+  nada na tela explicando. É a mesma razão do *"mas não teve efeito"* da imunidade, e o
+  congelamento já tinha resolvido o análogo exato com o `gelado` (16/09/2026). O sono ficou pra
+  trás porque ele é muito mais antigo que o bloco de status.
+- **O CICLO INTEIRO, agora:**
+
+  ```
+  😴 Butterfree fez Snorlax dormir com Pó do Sono.
+  Butterfree atacou Snorlax com Rajada de Vento e tirou −19 de HP.
+  😴 Snorlax continua a dormir e não pode atacar.        [1,5s]
+  Butterfree atacou Snorlax com Rajada de Vento e tirou −19 de HP.
+  ⏰ Snorlax acordou e voltou à luta!
+  Butterfree atacou Snorlax com Rajada de Vento e tirou −20 de HP.
+  Snorlax atacou Butterfree com Golpe de Corpo e tirou −315 de HP.
+  ```
+
+- **⚠️ ELA NÃO SAI NA TROCA EM QUE ELE ACORDA**, e essa é a única regra da linha: ali quem conta a
+  história é o `acordou`, e as duas juntas se contradiriam (*"continua a dormir"* e *"acordou"* no
+  mesmo turno). Quem separa os dois casos é o `_dormindoPor`, que o `acorda` já decrementou na
+  entrada da troca — maior que zero quer dizer que ainda há sono depois desta.
+- **⚠️ MAS ELA SAI NA PRIMEIRA TROCA LIVRE, e isso reverte a primeira versão.** Ela pulava a
+  primeira, pra não repetir a informação da frase *"X fez Y dormir"* — e com isso só aparecia no
+  sono de TRÊS trocas, ou seja em **um terço dos sonos e uma vez só**. O pedido é literal (*"caso o
+  pokemon não acorde no turno dele"*), e as duas frases não competem: o `sono` ocupa o passo DELE, e
+  esta é sobre a vez que o adormecido perdeu, num passo próprio.
+- **⚠️ E ELA VEM DEPOIS DO GOLPE DE QUEM É MAIS RÁPIDO.** A frase é sobre **o turno dele**, e o
+  turno dele é depois do golpe do outro. Ela nasceu junto do `geloDe` (que grava as duas linhas de
+  entrada do gelo no começo da troca, dos dois lados) e ali o log dizia *"Onix continua a dormir /
+  Gengar atacou"* — a ordem invertida da cena. As do gelo ficam juntas lá em cima por um caso que o
+  sono não tem: o **recongelamento** na mesma troca.
+- **O SELO É O MESMO 😴 DO SONO**, e é de propósito: é o mesmo efeito visto num turno do meio, e um
+  ícone próprio faria procurar duas mecânicas onde há uma. É a mesma decisão do ❄️ repetido nas três
+  linhas do gelo.
+- **O `q` é de QUEM ESTÁ DORMINDO**, como o do `gelado`, o do `acordou` e o da Fúria — estas linhas
+  são sobre UM pokémon, não sobre um causador e um alvo.
+- **O 1,5s vem da entrada no `passosDaAbertura`** (1 passo), como todas as que não mexem barra. Sem
+  entrada na tabela a frase valeria pra **SEMPRE** — o defeito que a anulação teve.
+
+**MEDIDO: ela sai em 2,98% dos confrontos** — **64% dos que têm sono**, que é exatamente a fatia de
+sonos de 2 ou 3 trocas (o `SONO_EM_TROCAS` é 1, 2 ou 3 com 1/3 cada, e a troca do despertar não
+ganha linha). São **1,32% das linhas do log**, e as linhas por confronto não se movem (2,98).
+
+**NA DIFICULDADE, NADA — por construção.** É uma linha de dano 0 no diário: **o mesmo build antes e
+depois dá o MESMO hash** em 900 batalhas semeadas.
+
+**Medido a 320px, no navegador:** a frase cai em **2 linhas (41px)** — o mesmo perfil da confusão, do
+Remoinho e das do gelo —, o log do ciclo completo fica em 484px e não há rolagem lateral.
+
+`tools/test-especiais.js` tranca: a frase palavra por palavra, o selo sendo o mesmo do sono, a pausa
+de 1,5s, **a contagem batendo com a duração** (um sono de N trocas rende N−1 linhas), que ela nunca
+é vizinha do `acordou`, que **quem continua dormindo não ataca naquele turno**, que ela vem depois
+do golpe de quem é mais rápido, o HTML do log sem `−0 de HP`, e 120 batalhas batendo golpe a golpe
+nos dois motores. Conferido que ele acusa 3 falhas com a guarda do despertar removida, 3 com a
+ordem invertida e 1 com o servidor sem a linha.
 
 #### E A CHANCE FOI A 15% (15/09/2026)
 

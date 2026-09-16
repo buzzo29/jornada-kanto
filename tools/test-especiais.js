@@ -37,7 +37,43 @@ const rngFixo = (v) => () => v;
    furia do dragao entrou, a lista estava copiada em QUATRO contas deste arquivo, e a quarta que
    ficasse pra tras falharia raro e intermitente -- o pior tipo de teste. O proximo efeito desta
    familia entra numa linha so. */
+/* ⚠️ O LOG DE CADA CONFRONTO COMECA COMPRIMIDO (16/09/2026): o passo a passo so e desenhado quando
+   o jogador toca no cabecalho. Toda trava que LE o passo a passo tem que abrir antes -- e este
+   ajudante e o que impede que a proxima seja escrita lendo um log vazio e dando verde a toa. */
+/* o + / − de cada confronto, lido do CONTEUDO do botao -- e nao do HTML literal, que muda a cada
+   ajuste de marcacao (ja mudou uma vez, quando ele deixou de ser um <span> no bloco do × e virou
+   um <button> na linha de baixo). */
+const sinaisDoLog = (html) => (html.match(/class="mlog-mais"[\s\S]*?>([+−])</g) || [])
+  .map(x => x.slice(-2, -1));
+const logAberto = (lista) => {
+  /* ⚠️ ABRE PELA API DE VERDADE (a mesma que o clique chama), e nao escrevendo no estado: o `game`
+     e REATRIBUIDO pelo resetGame, entao uma referencia guardada aponta pro objeto velho -- e o
+     ajudante escrevia num lugar que o render nao le. De quebra, isto faz toda trava que le o log
+     exercitar o caminho do clique. */
+  S.renderMatchupLog(lista);                       // cria o estado com a chave da tela
+  /* ⚠️ GARANTE ABERTO, nao alterna: a chave e tela+tamanho, entao dois blocos deste arquivo com
+     o mesmo numero de confrontos compartilham o estado -- e alternar ali FECHAVA o que o bloco
+     anterior tinha aberto. */
+  const jaAbertos = S.abertosDoLog(lista);
+  lista.forEach((m, i) => { if(!jaAbertos[i]) S.alternarLogDoConfronto(i); });
+  return S.renderMatchupLog(lista);
+};
 const danoSemGolpe = (g) => !!g && (g.x === 'absorbdano' || g.x === 'confusao' || g.x === 'furiadragao');
+/* ⚠️ A QUEIMADURA (16/09/2026) E A QUARTA DA FAMILIA, e ela e a PRIMEIRA em que o `q` e de QUEM
+   PERDE -- nas outras tres ele e de quem CAUSOU, e por isso todas as contas deste arquivo invertem
+   o `q` pra achar o lado. A queimadura nao tem causador na troca em que ela doi (ela foi aplicada
+   turnos atras), entao o `q` dela ja e o lado certo.
+   Somada ao `danoSemGolpe` sem mais nada, ela seria contada no lado ERRADO em todas as oito contas
+   -- e o sintoma seria a soma nao fechar, que e justamente o que essas contas medem. */
+/* ⚠️ O VENENO (16/09/2026) entrou aqui junto da queimadura: sao os DOIS status de dano por turno,
+   e nos dois o `q` e de quem PERDE. Uma linha so -- a licao de sempre deste arquivo. */
+const danoNoProprio = (g) => !!g && (g.x === 'queima' || g.x === 'veneno');
+/* ⚠️ E QUEM RESPONDE "QUANTO O LADO X PERDEU SEM SER GOLPE DO OUTRO" E ESTA FUNCAO, nao cada conta
+   invertendo o `q` na mao. Com duas convencoes de `q` convivendo, a inversao escrita a mao em oito
+   lugares era garantia de que um deles ficaria pra tras -- a mesma licao que fez o `danoSemGolpe`
+   virar funcao quando a Furia do Dragao entrou. */
+const perdeuSemGolpe = (g, lado) =>
+  ((danoSemGolpe(g) && g.q !== lado) || (danoNoProprio(g) && g.q === lado)) ? (g.d || 0) : 0;
 /* VIDA DEVOLVIDA SEM SER CURA: desde 11/09/2026 o desempate poe o sobrevivente de volta de pe numa
    linha PROPRIA, com a barra subindo, em vez de o motor APARAR o golpe que o derrubou -- o aparo
    escrevia na tela um numero que nunca aconteceu (ver o CLAUDE.md).
@@ -249,7 +285,7 @@ ok('e o log diz qual golpe foi', diario.some(g => g.x === 'sono' && g.g === 'Can
          ela tira 40 do adversario e o `q` e de quem USOU. Sao tres agora, e a lista vive em UMA
          funcao -- escrita a mao em cada conta, a quarta divergiria. */
       const autoDano = { p:0, e:0 };
-      seq.forEach(x => { if(danoSemGolpe(x)) autoDano[x.q === 'p' ? 'e' : 'p'] += x.d || 0; });
+      seq.forEach(x => { autoDano.p += perdeuSemGolpe(x, 'p'); autoDano.e += perdeuSemGolpe(x, 'e'); });
       if(soma.p !== Math.max(0, (m.enemyHpBefore + ganho.e) - m.enemyHpAfter - autoDano.e) ||
          soma.e !== Math.max(0, (m.playerHpBefore + ganho.p) - m.playerHpAfter - autoDano.p)) somaErrada++;
 
@@ -901,8 +937,7 @@ console.log('\nA FAIXA DE FOCO NAO PODE SER FURADA POR CAMINHO NENHUM');
           /* HP QUE O JOGADOR PERDEU SEM SER GOLPE DO ADVERSARIO: a CONFUSAO (ele se acertou) e o
              dano da DRENAGEM. Nos dois o `q` e de quem CAUSOU, entao `q === 'e'` e o adversario
              causando -- e o que o jogador perdeu assim nao pode ser cobrado dos golpes dele. */
-          const sozinho = s.filter(g => danoSemGolpe(g) && g.q === 'e')
-                           .reduce((a, g) => a + g.d, 0);
+          const sozinho = s.reduce((a, g) => a + perdeuSemGolpe(g, 'p'), 0);
           if(tomou !== (x.playerHpBefore - x.playerHpAfter) + subiu - sozinho) somaErrada++;
           if(s.findIndex(g => g.x === 'faixa') <= 0) foraDePosicao++;
         }
@@ -956,6 +991,17 @@ console.log('\nA FAIXA DE FOCO NAO PODE SER FURADA POR CAMINHO NENHUM');
              cadaver, senao a propria linha que explica a ressurreicao seria acusada. */
           if(devolveVida(g)){ if(g.q === 'p') e += g.d; else p += g.d; continue; }
           if(g.x === 'desempate') continue;
+          /* ⚠️ A QUEIMADURA TIRA DO PROPRIO `q`, e ela nao e um ataque -- entao ela entra ANTES do
+             teste de cadaver, senao a propria linha que MATA o pokemon seria acusada de ser um
+             golpe dele com a barra em zero. E, ao contrario do absorbdano, ela PODE matar: por
+             isso ela marca o `caiuEm`.
+             Sem este desvio ela caia no ramo comum e o teste descontava do lado ERRADO -- 1 em
+             ~3.600 confrontos, e o defeito era do teste, nao do jogo. */
+          if(danoNoProprio(g)){
+            if(g.q === 'p'){ p = Math.max(0, p - g.d); if(p === 0 && caiuEm.p < 0) caiuEm.p = k; }
+            else { e = Math.max(0, e - g.d); if(e === 0 && caiuEm.e < 0) caiuEm.e = k; }
+            continue;
+          }
           const bate = g.q === 'p';
           const caido = (bate ? p : e) <= 0;
           const continuacao = g.t > 1 && ultimoOk === k - 1;
@@ -999,8 +1045,7 @@ console.log('\nA FAIXA DE FOCO NAO PODE SER FURADA POR CAMINHO NENHUM');
              dano da DRENAGEM. Nos dois o `q` e de quem CAUSOU, entao `q === 'e'` e o adversario
              causando e o pokemon do jogador perdendo. O absorbdano ja era assim antes da confusao;
              ele passava porque a amostra e curta e a combinacao, rara. */
-          const sozinho3 = s3.filter(g => danoSemGolpe(g) && g.q === 'e')
-                             .reduce((a, g) => a + g.d, 0);
+          const sozinho3 = s3.reduce((a, g) => a + perdeuSemGolpe(g, 'p'), 0);
           if(tomou !== (x.playerHpBefore - x.playerHpAfter) + curou - sozinho3) somaFora++;
         }
       }
@@ -1907,7 +1952,7 @@ console.log('\n=== O GOLPE APARADO NAO APARECE COM O NUMERO APARADO ===');
            `boomself` pelo lado errado dava 136 falsos positivos em 10.898, todos com explosao. */
         const dela = seq.filter(g => (!g.x || g.x === 'boom' || g.x === 'boomself') && g.q === lado).reduce((a,g) => a + g.d, 0);
         const ganho = seq.filter(g => subiuAVida(g) && g.q !== lado).reduce((a,g) => a + g.d, 0);
-        const perda = seq.filter(g => danoSemGolpe(g) && g.q === lado).reduce((a,g) => a + g.d, 0);
+        const perda = seq.reduce((a, g) => a + perdeuSemGolpe(g, lado === 'p' ? 'e' : 'p'), 0);
         somaTot++;
         if(alvoAntes - dela - perda + ganho === alvoDepois) somaOk++;
         /* ⚠️ O GOLPE QUE DRENOU SAI DA CONTA (15/09/2026), pelo MESMO motivo do golpe que matou e do
@@ -3129,9 +3174,10 @@ console.log('\n=== OS DOIS NUNCA CAEM JUNTOS, FORA A AUTODESTRUICAO (12/09/2026)
           if(vida <= 0 && !exCad){ cadaver++; exCad = m.player + ' x ' + m.enemy; }
           else if(vida <= 0) cadaver++;
         }
-        const mexe = !g.x || ehCura(g) || g.x === 'boom' || g.x === 'boomself' || danoSemGolpe(g);
+        const mexe = !g.x || ehCura(g) || g.x === 'boom' || g.x === 'boomself' || danoSemGolpe(g) || danoNoProprio(g);
         if(!mexe) return;
-        const noProprio = ehCura(g) || g.x === 'boomself';
+        /* a QUEIMADURA tira do PROPRIO `q`, como o boomself e as curas -- ela nao tem causador */
+        const noProprio = ehCura(g) || g.x === 'boomself' || danoNoProprio(g);
         const alvoP = noProprio ? (g.q === 'p') : (g.q !== 'p');
         if(alvoP) hpP = (g.hp != null) ? g.hp : Math.max(0, ehCura(g) ? hpP + g.d : hpP - g.d);
         else      hpE = (g.hp != null) ? g.hp : Math.max(0, ehCura(g) ? hpE + g.d : hpE - g.d);
@@ -4046,7 +4092,7 @@ console.log('\n=== QUEM MORREU NAO ATACA DEPOIS DE MORRER ===');
            chuva, sono, anulacao, Despertar, Faixa) nao mexem vida nenhuma, e o campo `hp` delas
            e do pokemon que AGIU -- lido como se fosse do alvo, ele zerava o lado errado e a trava
            acusava confronto certo. */
-        const mexeVida = !g.x || ehCura(g) || g.x === 'boom' || g.x === 'boomself' || danoSemGolpe(g);
+        const mexeVida = !g.x || ehCura(g) || g.x === 'boom' || g.x === 'boomself' || danoSemGolpe(g) || danoNoProprio(g);
         if(!mexeVida) return;
         /* a cura e a explosao em si mexem a vida de QUEM AGE; todo o resto mexe a do outro lado */
         const noProprio = ehCura(g) || g.x === 'boomself';
@@ -4486,22 +4532,25 @@ console.log('\n=== A DANCA DA CHUVA: O PRIMEIRO CLIMA DO JOGO (11/09/2026) ===')
       return !!mm && /chuva:\s*1/.test(mm[1]);
     })());
     /* 2) A LINHA NO LOG, com o SELO CLICAVEL -- o unico selo clicavel do jogo. */
-    const log = S.renderMatchupLog([m]);
+    const log = logAberto([m]);
     ok('o log traz a linha da ativacao', /Squirtle<\/span> usou/.test(log) && /começa a chover/.test(log));
     ok('e o selo dela e CLICAVEL', /class="type-pill selo-clicavel"[^>]*abrirEspecialInfo/.test(log),
        (log.match(/<button[^>]*selo-clicavel[^>]*>/) || ['(sem botao)'])[0].slice(0, 90));
     /* Ele abre a MESMA caixa dos especiais -- nao uma segunda. */
     ok('e ele abre a caixa da chuva', /abrirEspecialInfo\(&quot;chuva&quot;/.test(log));
     /* 3) O 🌧️ EM CIMA DO ×, em todo confronto com chuva. */
-    ok('o 🌧️ fica em cima do ×', /<span class="mlog-x"><span class="mlog-chuva">🌧️<\/span>×<\/span>/.test(log));
+    /* o + do log comprimido entra logo depois do ×, no mesmo bloco central -- o invariante que
+       importa e o 🌧️ vir ANTES dele, que e o que diz "este confronto teve chuva". */
+    ok('o 🌧️ fica em cima do ×',
+       /<span class="mlog-x"><span class="mlog-chuva">🌧️<\/span>×/.test(log));
     const semChuva = Object.assign({}, m, { chuva: false, golpes: m.golpes.slice(1) });
-    const logSeco = S.renderMatchupLog([semChuva]);
+    const logSeco = logAberto([semChuva]);
     ok('e confronto sem chuva nao ganha o emoji', !/mlog-chuva/.test(logSeco));
     ok('nem a linha da ativacao', !/começa a chover/.test(logSeco));
     /* CONFRONTO QUE SO HERDOU a chuva: tem o emoji, mas NAO a linha -- foi o pedido ao pe da letra
        ("no log, voce vai escrever somente na batalha que foi ativada"). */
     const herdou = Object.assign({}, m, { golpes: m.golpes.slice(1) });   // chuva:true, sem o registro
-    const logHerdou = S.renderMatchupLog([herdou]);
+    const logHerdou = logAberto([herdou]);
     ok('confronto que so HERDOU a chuva tem o emoji', /mlog-chuva/.test(logHerdou));
     ok('mas NAO repete a linha da ativacao', !/começa a chover/.test(logHerdou));
     /* O SELO DO QUADRO DE BATALHA (o que diz "este confronto esta sob chuva") continua nas QUATRO
@@ -5316,7 +5365,7 @@ console.log('\n=== OS SELOS DAS DUAS DANCAS (14/09/2026) ===');
       /* ⚠️ QUEM ESTA SAINDO DE CAMPO (o quadro do Remoinho) NAO leva selo: o efeito e de quem esta
          lutando agora. */
       const cli = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
-      ok('e quem esta saindo de campo nao leva', /\$\{saindo\?''\:selosDoConfronto\(m, lado\)\}/.test(cli));
+      ok('e quem esta saindo de campo nao leva', /\$\{saindo\?''\:selosDoConfronto\(m, lado, op\.passo\)\}/.test(cli));
     }
   }
 
@@ -5328,9 +5377,21 @@ console.log('\n=== OS SELOS DAS DUAS DANCAS (14/09/2026) ===');
        ⚠️ A FUNCAO MUDOU DE NOME em 14/09/2026 (selosDaDanca -> selosDoConfronto) quando a FURIA
        entrou nela: ela deixou de ser so das duas dancas. */
     ok('as quatro telas de batalha usam a mesma funcao', usos >= 6, usos + ' usos');
-    ok('a liga assistida mostra', /selosDoConfronto\(m, 'p'\)/.test(cli) && /selosDoConfronto\(m, 'e'\)/.test(cli));
+    /* ⚠️ E AS CINCO CHAMADAS PASSAM O PASSO. Sem ele o 🔥 entrega, no primeiro quadro, uma
+       queimadura que so vai acontecer seis golpes depois -- reportado em 16/09/2026. Uma tela que
+       esqueca o passo volta a ter o defeito, e so nela. */
+    {
+      /* a DEFINICAO da funcao tambem tem tres parametros -- ela nao e chamada, e sai das duas contas */
+      const chamadas = usos - 1;
+      const comPasso = (cli.match(/selosDoConfronto\([^)]*,[^)]*,[^)]*\)/g) || []).length - 1;
+      ok('e TODAS passam o passo (senao o 🔥 entrega a queimadura cedo)', comPasso === chamadas,
+         comPasso + ' de ' + chamadas + ' chamadas');
+    }
+    ok('a liga assistida mostra', /selosDoConfronto\(m, 'p', game\.leagueWatchHitStep\)/.test(cli) &&
+       /selosDoConfronto\(m, 'e', game\.leagueWatchHitStep\)/.test(cli));
     ok('e o online tambem, com a perspectiva ja virada',
-       /selosDoConfronto\(anim\.mVirado, 'p'\)/.test(cli) && /selosDoConfronto\(anim\.mVirado, 'e'\)/.test(cli));
+       /selosDoConfronto\(anim\.mVirado, 'p', anim\.passo\)/.test(cli) &&
+       /selosDoConfronto\(anim\.mVirado, 'e', anim\.passo\)/.test(cli));
   }
 }
 
@@ -5592,7 +5653,7 @@ console.log('\n=== O GOLPE QUE MATA MOSTRA O QUE SOBROU, E OS DE ANTES O TAMANHO
         const alvoDepois = lado === 'p' ? m.enemyHpAfter : m.playerHpAfter;
         const dela = seq.filter(g => (!g.x || g.x === 'boom' || g.x === 'boomself') && g.q === lado).reduce((a, g) => a + g.d, 0);
         const ganho = seq.filter(g => subiuAVida(g) && g.q !== lado).reduce((a, g) => a + g.d, 0);
-        const perda = seq.filter(g => danoSemGolpe(g) && g.q === lado).reduce((a, g) => a + g.d, 0);
+        const perda = seq.reduce((a, g) => a + perdeuSemGolpe(g, lado === 'p' ? 'e' : 'p'), 0);
         if(alvoAntes - dela - perda + ganho === alvoDepois) fechou++;
         if(matou) comMorte++;
         /* NENHUM par pode ficar sem explicacao: ou cabe na banda, ou e o golpe final, ou tem
@@ -5740,7 +5801,7 @@ console.log('\n=== A DRENAGEM NO GOLPE (15/09/2026) ===');
          escrever a lista a mao aqui era exatamente o que ia dar errado. */
       const tomou = (m.golpes || []).filter(g => !g.x && g.q === 'e').reduce((a, g) => a + g.d, 0);
       const curou = (m.golpes || []).filter(g => subiuAVida(g) && g.q === 'p').reduce((a, g) => a + g.d, 0);
-      const sozinho = (m.golpes || []).filter(g => danoSemGolpe(g) && g.q === 'e').reduce((a, g) => a + g.d, 0);
+      const sozinho = (m.golpes || []).reduce((a, g) => a + perdeuSemGolpe(g, 'p'), 0);
       if(m.playerHpBefore - tomou - sozinho + curou === m.playerHpAfter) somaOk++;
     }
   }
@@ -5800,8 +5861,8 @@ console.log('\n=== A DRENAGEM NO GOLPE (15/09/2026) ===');
      decrementado pelo `acorda`, entao na troca livre ele esta em 0 enquanto o pokemon ainda nao
      atacou -- lido dali, o golpe nunca sairia. */
   ok('o _dormeAgora e marcado antes dos golpes, nos dois motores',
-     cli.indexOf('active._dormeAgora = activeDorme;') < cli.indexOf('const dmgToEnemy = activeDorme') &&
-     srvTxt.indexOf('active._dormeAgora = activeDorme;') < srvTxt.indexOf('const dmgToEnemy = activeDorme'));
+     cli.indexOf('active._dormeAgora = activeDorme;') < cli.indexOf('const dmgToEnemy =') &&
+     srvTxt.indexOf('active._dormeAgora = activeDorme;') < srvTxt.indexOf('const dmgToEnemy ='));
   ok('e limpo logo depois', /active\._dormeAgora = false;/.test(cli) && /active\._dormeAgora = false;/.test(srvTxt));
   /* O campo comeca com `_`, entao nao vai pro Firestore (a regra de 11/09/2026 que matou o ciclo
      do save). Se um dia ele perder o underline, o save volta a carregar estado de motor. */
@@ -6315,6 +6376,1329 @@ console.log('\n=== ABRIR UM CONFRONTO ZERA O PASSO, ANTES DO DESENHO (15/09/2026
     g.battleResult = null; g.revealPhase = null; g.screen = null; g.battleResultContext = null;
     g.revealCurrentPlayerHp = null; g.revealCurrentEnemyHp = null;
   }
+}
+
+/* ============================ O CONGELAMENTO (16/09/2026) ==============================
+   O PRIMEIRO status POR ATAQUE do jogo -- os onze do tentarGolpeEspecial sao sorteados na
+   ABERTURA e valem por CONFRONTO; este e sorteado a cada golpe que sai. */
+{
+  console.log('\n--- o congelamento ---');
+  const GELO = Object.keys(S.GOLPES_QUE_CONGELAM);
+  const cliG = require("fs").readFileSync(require("path").join(raiz, "index.html"), "utf8");
+  const srvG = require("fs").readFileSync(require("path").join(raiz, "functions", "index.js"), "utf8");
+  /* ⚠️ O inst() do topo deste arquivo NAO preenche hp, e o podeCongelar cobra hp > 0 -- sem isto
+     a medicao da chance da ZERO e parece defeito da mecanica, quando e do fixture. */
+  const vivo = (id, lv) => { const q = inst(id, lv); q.maxHp = S.calcMaxHp(q); q.hp = q.maxHp; return q; };
+  const perfilGelo = (g) => g.map(x => (x.q || '?') + ':' + (x.x || ('-' + x.d))).join(' | ');
+
+  /* 1) A TABELA, e que ela nao e letra morta. A licao da Lamina Solar: cadastrar um golpe que a
+        base da Gen 3 nao tem e escrever codigo que nunca roda. */
+  ok('sao os 4 golpes de gelo que congelam no FireRed', GELO.length === 4 &&
+     ['icepunch', 'icebeam', 'blizzard', 'powdersnow'].every(g => S.GOLPES_QUE_CONGELAM[g] === 0.10),
+     GELO.join(', '));
+  ok('os quatro EXISTEM na tabela GOLPES e sao de tipo Gelo',
+     GELO.every(g => S.GOLPES[g] && S.GOLPES[g][0] === 'Ice'),
+     GELO.map(g => g + (S.GOLPES[g] ? '=' + S.GOLPES[g][0] : '=SUMIU')).join(' '));
+  /* ⚠️ E OS OUTROS GOLPES DE GELO DA TABELA NAO CONGELAM, e isso e fiel ao FireRed: Aurora Beam
+     baixa Ataque, Icy Wind baixa Velocidade, Icicle Spear e multi-tapa puro e o Iceball escala.
+     Nenhum dos quatro tem efeito de congelar. */
+  {
+    const ice = Object.keys(S.GOLPES).filter(g => S.GOLPES[g][0] === 'Ice');
+    const naoCongelam = ice.filter(g => !S.GOLPES_QUE_CONGELAM[g]).sort();
+    ok('e os outros golpes de Gelo da tabela NAO congelam (fiel ao FireRed)',
+       naoCongelam.length === ice.length - 4 && naoCongelam.indexOf('aurorabeam') >= 0 &&
+       naoCongelam.indexOf('icywind') >= 0, naoCongelam.join(', '));
+  }
+  /* alguem tem que APRENDER, senao a mecanica nunca roda */
+  {
+    const quem = Object.keys(S.SPECIES).filter(id =>
+      (S.ataquesDisponiveis(id, 70) || []).some(g => GELO.indexOf(g) >= 0));
+    ok('e ha especies que os aprendem por nivel', quem.length >= 10, quem.length + ' de 250');
+    /* ⚠️ E QUE ELAS OS LEVAM: aprender nao basta -- sao tres vagas e quem escolhe e o poder. Sem
+       isto a mecanica seria a Furia de novo, implementada ao pe da letra e nunca saindo. */
+    const levam = quem.filter(id => {
+      const p = S.createInstance(id, 70);
+      return (S.ataquesPadrao(p) || []).some(g => GELO.indexOf(g) >= 0);
+    });
+    ok('e o moveset padrao do Lv.70 realmente os leva', levam.length >= 8, levam.length + ' levam');
+  }
+
+  /* 2) AS DUAS CHANCES, medidas com UM rng continuo -- semente nova a cada volta correlaciona o
+        primeiro valor com a semente, e a medicao sai enviesada (deu 7,8% na primeira tentativa). */
+  {
+    const rng = S.makeSeededRng('gelo-chance'), N = 40000;
+    let c = 0;
+    for(let i = 0; i < N; i++){
+      const a = vivo('articuno', 50); a.lastMove = 'blizzard';
+      if(S.tentarCongelar(a, vivo('blissey', 70), rng)) c++;
+    }
+    const sd = Math.sqrt(0.1 * 0.9 / N), sig = Math.abs(c / N - 0.10) / sd;
+    ok('congela em 10% por ataque', sig < 3, (100 * c / N).toFixed(2) + '%  (' + sig.toFixed(1) + ' sigma)');
+  }
+  ok('e descongela em 25% por turno', S.CHANCE_DESCONGELAR === 0.25, String(S.CHANCE_DESCONGELAR));
+  {
+    const rng = S.makeSeededRng('gelo-dur'); const dur = [];
+    for(let i = 0; i < 20000; i++){ let t = 1; while(rng() >= S.CHANCE_DESCONGELAR && t < 500) t++; dur.push(t); }
+    const m = dur.reduce((a, b) => a + b, 0) / dur.length;
+    ok('o que da 4,0 turnos de gelo em media', Math.abs(m - 4) < 0.2, m.toFixed(2) + ' turnos');
+  }
+
+  /* 3) O TIPO GELO E IMUNE, como no jogo original. */
+  ok('quem e do tipo Gelo nao congela',
+     !S.podeCongelar(vivo('lapras', 50)) && !S.podeCongelar(vivo('articuno', 50)) &&
+     !S.podeCongelar(vivo('jynx', 50)) && S.podeCongelar(vivo('machamp', 50)));
+  {
+    let c = 0;
+    for(let i = 0; i < 3000; i++){
+      const a = vivo('articuno', 50); a.ataques = ['blizzard'];
+      const b = vivo('lapras', 50); b.ataques = ['pound'];
+      S.doExchange(a, b, S.makeSeededRng('im' + i), []);
+      if(b._congelado) c++;
+    }
+    ok('e nenhuma Lapras congela em 3.000 trocas', c === 0, c + ' congeladas');
+  }
+  { const m = vivo('machamp', 50); m.hp = 0; ok('nem quem ja caiu', !S.podeCongelar(m)); }
+  { const m = vivo('machamp', 50); m._congelado = 'blizzard'; ok('nem quem ja esta congelado', !S.podeCongelar(m)); }
+
+  /* 4) O CICLO NA TELA -- e o invariante que a ordem das linhas existe pra sustentar: percorrendo
+        o log linha a linha, QUEM ESTA CONGELADO NUNCA APARECE ATACANDO. Foi este o defeito das
+        duas primeiras versoes: as linhas empilhadas no fim do doExchange davam "Blissey ataca /
+        Blissey degelou", a ordem invertida da cena. */
+  {
+    let confs = 0, atacouGelado = 0, linhaSemGelo = 0, congelouSemGolpe = 0, ex = null;
+    for(let i = 0; i < 1200; i++){
+      const a = vivo('articuno', 55); a.ataques = ['blizzard'];
+      const b = vivo('blissey', 75); b.ataques = ['pound'];
+      const r = S.simulateGymBattle([a], [b], S.makeSeededRng('ciclo' + i));
+      for(const m of (r.matchups || [])){
+        const g = m.golpes || [];
+        if(!g.some(x => x.x === 'congelou')) continue;
+        confs++;
+        const preso = { p: false, e: false };
+        for(let k = 0; k < g.length; k++){
+          const l = g[k];
+          if(l.x === 'congelou'){
+            preso[l.q] = true;
+            /* a linha e CONSEQUENCIA de um golpe: vem logo depois de um golpe do lado OPOSTO */
+            const ant = g[k - 1];
+            if(!(ant && !ant.x && ant.q !== l.q)){ congelouSemGolpe++; if(!ex) ex = perfilGelo(g); }
+          } else if(l.x === 'degelou'){
+            if(!preso[l.q]){ linhaSemGelo++; if(!ex) ex = perfilGelo(g); }
+            preso[l.q] = false;
+          } else if(l.x === 'gelado'){
+            if(!preso[l.q]){ linhaSemGelo++; if(!ex) ex = perfilGelo(g); }
+          } else if(!l.x && l.d > 0){
+            if(preso[l.q]){ atacouGelado++; if(!ex) ex = perfilGelo(g); }
+          }
+        }
+      }
+    }
+    ok('achei confrontos com congelamento pra ler', confs >= 100, confs + ' confrontos');
+    ok('QUEM ESTA CONGELADO NUNCA APARECE ATACANDO', atacouGelado === 0,
+       atacouGelado + (ex ? '  |  ' + ex : ''));
+    ok('e nenhuma linha de gelo sai sem o pokemon estar congelado', linhaSemGelo === 0, String(linhaSemGelo));
+    ok('e o "ficou congelado" vem logo DEPOIS do golpe que congelou', congelouSemGolpe === 0,
+       congelouSemGolpe + (ex ? '  |  ' + ex : ''));
+  }
+
+  /* 5) AS TRES FRASES, palavra por palavra. */
+  ok('a frase do congelamento nomeia o GOLPE, nao quem congelou',
+     S.fraseDoEspecial({ x: 'congelou', g: 'Dragonite', mv: 'blizzard' }, {}, {}) ===
+     'Dragonite ficou congelado com NEVASCA!');
+  ok('a de quem perdeu a vez diz por que a barra dele nao anda',
+     S.fraseDoEspecial({ x: 'gelado', g: 'Dragonite' }, {}, {}) ===
+     'Dragonite não consegue atacar por estar congelado');
+  ok('e a do degelo',
+     S.fraseDoEspecial({ x: 'degelou', g: 'Dragonite' }, {}, {}) ===
+     'Dragonite não está mais congelado!');
+  /* ⚠️ "COM" E NAO "PELO": NEVASCA e feminina e "congelado pelo Nevasca" sai errado. Os outros
+     tres nomes sao masculinos, entao a preposicao neutra e a unica que serve aos quatro sem uma
+     tabela de genero pra uma frase so. */
+  ok('e ela serve aos QUATRO golpes sem erro de genero',
+     GELO.every(mv => {
+       const f = S.fraseDoEspecial({ x: 'congelou', g: 'X', mv: mv }, {}, {});
+       return f.indexOf('X ficou congelado com ') === 0 && !/pelo |pela /.test(f);
+     }),
+     GELO.map(mv => S.fraseDoEspecial({ x: 'congelou', g: 'X', mv: mv }, {}, {})).join(' / '));
+  ok('log gravado antes do campo mv cai numa frase sem golpe',
+     S.fraseDoEspecial({ x: 'congelou', g: 'Dragonite' }, {}, {}) === 'Dragonite ficou congelado!');
+
+  /* 6) O SEGUNDO E MEIO DE LEITURA -- pedido com estas palavras: "a cada frase, esperar aquele
+        1,5s para o usuario conseguir ler o que aconteceu". Quem o entrega e a tabela: uma entrada
+        la faz a frase virar PASSO da animacao e ganhar a marca de leitura. Sem entrada, a frase
+        valeria pra SEMPRE -- o defeito que a anulacao teve. */
+  ok('as tres frases valem 1 passo cada na animacao',
+     S.passosDaAbertura.congelou === 1 && S.passosDaAbertura.gelado === 1 && S.passosDaAbertura.degelou === 1);
+  ok('e as tres sao reconhecidas como golpe especial (senao nao virariam passo)',
+     S.ehGolpeEspecial({ x: 'congelou' }) && S.ehGolpeEspecial({ x: 'gelado' }) && S.ehGolpeEspecial({ x: 'degelou' }));
+
+  /* 7) A MARCA E SOLTA NO FIM DA BATALHA. Ela e um campo da instancia, e o time vai pro SAVE --
+        sem soltar, um pokemon sairia da batalha congelado pra sempre. E o mesmo vazamento que o
+        teto de HP da Furia teve, e la ele escapou pela porta da DERROTA por semanas. */
+  ok('o campo comeca com _ (entao nao vai pro Firestore)', /_congelado/.test(cliG));
+  ok('e o encerrarBatalha o solta', /p\._congelado = null;/.test(cliG));
+  {
+    let sobrou = 0;
+    for(let i = 0; i < 400; i++){
+      const a = vivo('articuno', 55); a.ataques = ['blizzard'];
+      const time = [a, vivo('machamp', 50)], adv = [vivo('blissey', 60), vivo('snorlax', 60)];
+      time.concat(adv).forEach(p => { p.maxHp = S.calcMaxHp(p); p.hp = p.maxHp; });
+      S.simulateGymBattle(time, adv, S.makeSeededRng('solta' + i));
+      if(time.concat(adv).some(p => p._congelado)) sobrou++;
+    }
+    ok('e ninguem sai de 400 batalhas ainda congelado', sobrou === 0, sobrou + ' sobraram');
+  }
+
+  /* 8) OS DOIS MOTORES. A tabela e a constante sao duplicadas, e um lado congelando mais que o
+        outro faz a MESMA batalha terminar diferente no cliente e no servidor. */
+  ok('a tabela e a chance sao iguais nos dois motores',
+     /icepunch:\s*0\.10/.test(srvG) && /icebeam:\s*0\.10/.test(srvG) &&
+     /blizzard:\s*0\.10/.test(srvG) && /powdersnow:\s*0\.10/.test(srvG) &&
+     /CHANCE_DESCONGELAR = 0\.25/.test(cliG) && /CHANCE_DESCONGELAR = 0\.25/.test(srvG));
+  /* ⚠️ E O SORTEIO LE O rng DA BATALHA, nunca Math.random: um dado a mais num dos lados desloca a
+     semente inteira. E a mesma armadilha que o Remoinho quase trouxe. */
+  ok('o sorteio le o rng da batalha nos dois motores',
+     /function tentarCongelar\(quemBate, alvo, rng\)/.test(cliG) &&
+     /function tentarCongelar\(quemBate, alvo, rng\)/.test(srvG));
+  /* ⚠️ E ELE SO E LIDO QUANDO O GOLPE PODE CONGELAR: o tentarCongelar sai ANTES do rng() quando o
+     golpe nao esta na tabela ou o alvo nao pode congelar. Lido sempre, ele mudaria toda batalha
+     que nao tem golpe de gelo nenhum. */
+  {
+    let leu = 0; const conta = () => { leu++; return 0.001; };
+    const a = vivo('machamp', 50); a.lastMove = 'karatechop';
+    S.tentarCongelar(a, vivo('blissey', 60), conta);
+    ok('e o rng NAO e lido quando o golpe nao congela', leu === 0, leu + ' leituras');
+    const b = vivo('articuno', 50); b.lastMove = 'blizzard';
+    S.tentarCongelar(b, vivo('lapras', 60), conta);
+    ok('nem quando o alvo e imune', leu === 0, leu + ' leituras');
+  }
+
+  /* 9) OS DOIS MOTORES, GOLPE A GOLPE, NUM PAINEL QUE GARANTE GELO.
+     ⚠️ A comparacao das 300 batalhas NAO serve aqui: sao 10 especies em 250 e o gelo sairia em
+     ~2 delas, o que faz a trava falhar sozinha uma vez em sete. Isto e o pior tipo de teste que
+     existe -- o que passa quase sempre. O painel forca o golpe, e a cobranca fica exata. */
+  {
+    const ALVOS = ['machamp', 'snorlax', 'rhydon', 'blissey', 'venusaur', 'dragonite'];
+    let div = 0, comGelo = 0, presos = 0, ex = null;
+    for(let i = 0; i < 120; i++){
+      const alvo = ALVOS[i % ALVOS.length];
+      const monta = (novo) => {
+        const a = novo('articuno', 60); a.ataques = ['blizzard'];
+        const b = novo('jynx', 60); b.ataques = ['icepunch'];
+        return [a, b];
+      };
+      const advs = (novo) => [novo(alvo, 62), novo(ALVOS[(i + 3) % ALVOS.length], 62)];
+      const rC = S.simulateGymBattle(monta((id, lv) => S.createInstance(id, lv)),
+                                     advs((id, lv) => S.createInstance(id, lv)), S.makeSeededRng('g2m' + i));
+      const rS = srv._simulateGymBattle(monta((id, lv) => srv._createInstance(id, lv)),
+                                        advs((id, lv) => srv._createInstance(id, lv)), srv._makeSeededRng('g2m' + i));
+      const gelo = (r) => (r.matchups || []).reduce((n, m) =>
+        n + (m.golpes || []).filter(g => g.x === 'congelou' || g.x === 'gelado' || g.x === 'degelou').length, 0);
+      if(gelo(rC) > 0) comGelo++;
+      presos += (rC.matchups || []).reduce((n, m) => n + (m.golpes || []).filter(g => g.x === 'gelado').length, 0);
+      if(resumo(rC) !== resumo(rS)){ div++; if(!ex) ex = 'volta ' + i + ' contra ' + alvo; }
+    }
+    ok('120 batalhas com gelo garantido batem golpe a golpe nos dois motores', div === 0,
+       div + ' divergencias' + (ex ? '  |  ' + ex : ''));
+    /* ⚠️ E O GELO TEM QUE ESTAR DENTRO DELAS -- sem esta linha a comparacao daria verde sem nunca
+       tocar na mecanica, que e a mesma armadilha que a Furia e a Furia do Dragao ja registram. */
+    ok('e o gelo esta dentro delas', comGelo >= 25 && presos > 0,
+       comGelo + ' batalhas com gelo, ' + presos + ' turnos perdidos');
+  }
+
+  /* 10) ⚠️ E O LOG. ESTA TRAVA EXISTE PORQUE O NAVEGADOR PEGOU O QUE ELAS NAO PEGAVAM.
+     As de cima leem o DIARIO e a SEQUENCIA, e o defeito era do HTML: a lista de `x` que viram
+     frase no passosHtml era escrita A MAO (17 nomes), o congelamento nasceu fora dela, e as tres
+     linhas cairam no ramo do GOLPE COMUM. O log saia com "Blissey atacou Articuno com Nevasca e
+     tirou −0 de HP" -- um −0 (o que este log evita em toda regra) com o nome de um golpe que a
+     Blissey nem tem, porque o campo `mv` da linha do congelamento virou o golpe dela.
+     Hoje quem decide e o ehGolpeEspecial, e esta trava cobra as duas pontas. */
+  {
+    let comGelo = 0, zeros = 0, semFrase = 0, linhasGelo = 0, ex = null;
+    for(let i = 0; i < 300; i++){
+      const a = vivo('articuno', 55); a.ataques = ['blizzard'];
+      const b = vivo('blissey', 75); b.ataques = ['pound'];
+      const r = S.simulateGymBattle([a], [b], S.makeSeededRng('log' + i));
+      for(const m of (r.matchups || [])){
+        const g = m.golpes || [];
+        const nGelo = g.filter(x => x.x === 'congelou' || x.x === 'gelado' || x.x === 'degelou').length;
+        if(!nGelo) continue;
+        comGelo++;
+        const html = S.passosHtml(m);
+        /* nenhum "-0 de HP" -- a marca de que a linha caiu no ramo do golpe comum */
+        const z = (html.match(/−0<\/span> de HP/g) || []).length;
+        if(z){ zeros += z; if(!ex) ex = html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').slice(0, 160); }
+        /* e cada linha de gelo tem que estar LA, com a frase dela */
+        const naTela = (html.match(/congelado|não está mais congelado/g) || []).length;
+        linhasGelo += nGelo;
+        if(naTela < nGelo){ semFrase += nGelo - naTela; if(!ex) ex = html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').slice(0, 160); }
+      }
+    }
+    ok('achei confrontos com gelo pra ler o HTML do log', comGelo >= 100, comGelo + ' confrontos');
+    ok('nenhuma linha de gelo vira um "−0 de HP" no log', zeros === 0, zeros + (ex ? '  |  ' + ex : ''));
+    ok('e as ' + linhasGelo + ' linhas de gelo saem com a frase delas', semFrase === 0,
+       semFrase + ' sem frase' + (ex ? '  |  ' + ex : ''));
+  }
+  /* ⚠️ E A DECISAO DEIXOU DE SER UMA LISTA A MAO. Sem esta linha, o proximo especial nasce com o
+     mesmo defeito e ninguem ve -- que e exatamente o que aconteceu aqui. */
+  ok('quem decide a frase no log e o ehGolpeEspecial, nao uma lista escrita a mao',
+     /if\(ehGolpeEspecial\(g\) \|\| g\.x === 'faixa' \|\| g\.x === 'desempate'\) return linhaEspecial\(g\);/.test(cliG));
+  /* ⚠️ MENOS O `disable`: ele ESTA no ehGolpeEspecial e as anulacoes ja foram desenhadas antes de
+     tudo (elas acontecem na abertura do confronto). Sem a guarda, ele sairia DUAS vezes. */
+  ok('e o disable fica de fora, porque as anulacoes ja saem la em cima',
+     /if\(g\.x === 'disable'\) return '';/.test(cliG));
+  /* AS TRES DIVIDEM O MESMO SELO ❄️ -- elas sao o mesmo evento em tres momentos. Sem selo, seriam
+     as unicas frases mudas da linha de status: todo o resto do bloco tem o dele. */
+  ok('e as tres tem o selo ❄️',
+     S.ICONES_ESPECIAIS && S.ICONES_ESPECIAIS.congelou === '❄️' &&
+     S.ICONES_ESPECIAIS.gelado === '❄️' && S.ICONES_ESPECIAIS.degelou === '❄️');
+}
+
+/* ============================= A QUEIMADURA (16/09/2026) ==============================
+   A SEGUNDA mecanica POR ATAQUE do jogo, e a primeira que DURA a batalha inteira: o gelo sorteia
+   degelo a cada turno, a queimadura nao passa. As regras sao as da GEN 3 (Bulbapedia, Burn). */
+{
+  console.log('\n--- a queimadura ---');
+  const QUEIMAM = Object.keys(S.GOLPES_QUE_QUEIMAM);
+  const cliQ = require('fs').readFileSync(require('path').join(raiz, 'index.html'), 'utf8');
+  const srvQ = require('fs').readFileSync(require('path').join(raiz, 'functions', 'index.js'), 'utf8');
+  /* o inst() do topo nao preenche hp, e o podeQueimar cobra hp > 0 -- a licao do gelo */
+  const vq = (id, lv) => { const q = inst(id, lv); q.maxHp = S.calcMaxHp(q); q.hp = q.maxHp; return q; };
+
+  /* 1) A TABELA, e que ela nao e letra morta. */
+  ok('sao os 7 golpes de fogo que queimam no FireRed', QUEIMAM.length === 7 &&
+     ['firepunch', 'ember', 'flamethrower', 'fireblast', 'flamewheel', 'heatwave']
+       .every(g => S.GOLPES_QUE_QUEIMAM[g] === 0.10) && S.GOLPES_QUE_QUEIMAM.sacredfire === 0.50,
+     QUEIMAM.join(', '));
+  ok('os sete EXISTEM na tabela GOLPES e sao de tipo Fogo',
+     QUEIMAM.every(g => S.GOLPES[g] && S.GOLPES[g][0] === 'Fire'),
+     QUEIMAM.map(g => g + (S.GOLPES[g] ? '=' + S.GOLPES[g][0] : '=SUMIU')).join(' '));
+  /* ⚠️ O FIRE SPIN E O UNICO GOLPE DE FOGO DA TABELA QUE NAO QUEIMA, e e fiel: ele e o de PRENDER
+     (que virou multi-tapa aqui), nao tem efeito de status nenhum. */
+  {
+    const fogo = Object.keys(S.GOLPES).filter(g => S.GOLPES[g][0] === 'Fire');
+    const fora = fogo.filter(g => !S.GOLPES_QUE_QUEIMAM[g]);
+    ok('e o Fire Spin e o unico de Fogo que NAO queima', fora.length === 1 && fora[0] === 'firespin',
+       fora.join(', '));
+  }
+  /* alguem tem que APRENDER e LEVAR, senao a mecanica seria a Furia de novo */
+  {
+    const quem = Object.keys(S.SPECIES).filter(id =>
+      (S.ataquesDisponiveis(id, 70) || []).some(g => QUEIMAM.indexOf(g) >= 0));
+    const levam = quem.filter(id => {
+      const p = S.createInstance(id, 70);
+      return (S.ataquesPadrao(p) || []).some(g => QUEIMAM.indexOf(g) >= 0);
+    });
+    ok('23 especies os aprendem por nivel', quem.length >= 20, quem.length + ' de 250');
+    ok('e 22 os LEVAM no moveset padrao do Lv.70', levam.length >= 20, levam.length + ' levam');
+  }
+
+  /* 2) A CHANCE, com UM rng continuo -- semente nova a cada volta enviesa (a licao do gelo). */
+  {
+    const rng = S.makeSeededRng('queima-chance'), N = 40000;
+    let c = 0;
+    for(let i = 0; i < N; i++){
+      const a = vq('charizard', 50); a.lastMove = 'flamethrower';
+      if(S.tentarQueimar(a, vq('snorlax', 70), rng)) c++;
+    }
+    const sd = Math.sqrt(0.1 * 0.9 / N), sig = Math.abs(c / N - 0.10) / sd;
+    ok('queima em 10% por ataque', sig < 3, (100 * c / N).toFixed(2) + '%  (' + sig.toFixed(1) + ' sigma)');
+  }
+  /* o Sacred Fire e 50%, e e o valor oficial dele */
+  {
+    const rng = S.makeSeededRng('sf'), N = 20000;
+    let c = 0;
+    for(let i = 0; i < N; i++){
+      const a = vq('hooh', 70); a.lastMove = 'sacredfire';
+      if(S.tentarQueimar(a, vq('snorlax', 70), rng)) c++;
+    }
+    ok('e o Sacred Fire em 50%', Math.abs(c / N - 0.5) < 0.02, (100 * c / N).toFixed(1) + '%');
+  }
+
+  /* 3) O TIPO FOGO E IMUNE. */
+  ok('quem e do tipo Fogo nao queima',
+     !S.podeQueimar(vq('charizard', 50)) && !S.podeQueimar(vq('arcanine', 50)) &&
+     !S.podeQueimar(vq('magcargo', 50)) && S.podeQueimar(vq('machamp', 50)));
+  {
+    let c = 0;
+    for(let i = 0; i < 3000; i++){
+      const a = vq('charizard', 50); a.ataques = ['flamethrower'];
+      const b = vq('arcanine', 50); b.ataques = ['bite'];
+      S.doExchange(a, b, S.makeSeededRng('iq' + i), []);
+      if(b._queimado) c++;
+    }
+    ok('e nenhum Arcanine queima em 3.000 trocas', c === 0, c + ' queimados');
+  }
+  { const m = vq('machamp', 50); m.hp = 0; ok('nem quem ja caiu', !S.podeQueimar(m)); }
+  { const m = vq('machamp', 50); m._queimado = 'ember'; ok('nem quem ja esta queimado', !S.podeQueimar(m)); }
+
+  /* 4) OS DOIS EFEITOS: 1/16 por turno e METADE do ataque fisico. */
+  ok('1/16 do HP maximo por turno', S.QUEIMADURA_DANO === 1/16, String(S.QUEIMADURA_DANO));
+  ok('e metade do ataque fisico', S.QUEIMADURA_FISICO === 0.5, String(S.QUEIMADURA_FISICO));
+  {
+    const a = vq('machamp', 50), b = vq('machamp', 50);
+    b._queimado = 'ember';
+    ok('o ataque FISICO cai pela metade', S.effectiveAttack(b) === Math.round(S.effectiveAttack(a) * 0.5),
+       S.effectiveAttack(a) + ' -> ' + S.effectiveAttack(b));
+    ok('e o ataque ESPECIAL nao e tocado', S.effectiveSpAtk(b) === S.effectiveSpAtk(a),
+       S.effectiveSpAtk(a) + ' -> ' + S.effectiveSpAtk(b));
+    /* ⚠️ ELA ENTRA DEPOIS DOS MULTIPLICADORES E DO FLAT, como a danca: "metade do ataque" e metade
+       do que o pokemon TEM na hora do golpe. Num shiny em terreno com item o corte continua exato. */
+    const c = vq('machamp', 50), d = vq('machamp', 50);
+    c.shiny = true; d.shiny = true; d._queimado = 'ember';
+    ok('e o corte continua exato num shiny', S.effectiveAttack(d) === Math.round(S.effectiveAttack(c) * 0.5),
+       S.effectiveAttack(c) + ' -> ' + S.effectiveAttack(d));
+  }
+  {
+    /* o dano por turno, medido no motor */
+    let ok1 = 0, n = 0, piso = 0;
+    for(let i = 0; i < 400; i++){
+      const a = vq('charizard', 60); a.ataques = ['flamethrower'];
+      const b = vq('snorlax', 70); b.ataques = ['bodyslam']; b._queimado = 'ember';
+      const di = [];
+      S.doExchange(a, b, S.makeSeededRng('dt' + i), di);
+      const q = di.filter(g => g.x === 'queima' && g.q === 'e');
+      if(!q.length) continue;
+      n++;
+      const esperado = Math.max(1, Math.round(b.maxHp / 16));
+      if(q[0].d === esperado || q[0].d === piso) ok1++;
+    }
+    ok('e o dano por turno e 1/16 do teto', n > 0 && ok1 === n, ok1 + ' de ' + n);
+  }
+  /* ⚠️ O MINIMO E 1: com o arredondamento, um pokemon de teto pequeno levaria ZERO e a queimadura
+     viraria enfeite -- e uma linha de "-0 de HP" e o que este log evita em toda regra. */
+  {
+    /* ⚠️ O ALVO PRECISA SOBREVIVER A TROCA, senao a linha nem existe e o caso da verde sem medir
+       nada -- foi o que a primeira versao fez ("morreu antes"). Um Caterpie com teto 10 morre de
+       qualquer golpe, entao quem apanha aqui e um Shuckle (230 de Defesa) com o teto forcado. */
+    const p = vq('shuckle', 50); p._queimado = 'ember'; p.maxHp = 10; p.hp = 10;
+    const o = vq('caterpie', 5); o.ataques = ['tackle'];
+    const di = [];
+    S.doExchange(o, p, S.makeSeededRng('min'), di);
+    const q = di.find(g => g.x === 'queima');
+    ok('e ela nunca tira ZERO, mesmo num teto de 10', !!q && q.d >= 1, q ? (q.d + ' de dano') : 'NAO GEROU LINHA');
+  }
+
+  /* 5) ⚠️ ELA NUNCA DERRUBA OS DOIS NA MESMA TROCA. A regra e de 12/09/2026, pedida com estas
+        palavras: "nao existe de os 2 cairem juntos, somente na auto destruicao". Foi por ela que o
+        revide moribundo deixou de matar, e a queimadura reabria a porta pelo outro lado. */
+  {
+    const IDSQ = Object.keys(S.SPECIES);
+    const rngQ = S.makeSeededRng('dupla');
+    const mkq = (id, lv) => { const p = S.createInstance(id, lv); p.ataques = S.ataquesPadrao(p);
+                              p.maxHp = S.calcMaxHp(p); p.hp = p.maxHp; return p; };
+    let dup = 0, comBoom = 0, comQueima = 0, conf = 0, ex = null;
+    for(let b = 0; b < 2500; b++){
+      const t = n => Array.from({length:n}, () => mkq(IDSQ[Math.floor(rngQ()*IDSQ.length)], 30 + Math.floor(rngQ()*50)));
+      const A = t(3), B = t(3); S.equiparNpc(B);
+      const r = S.simulateGymBattle(A, B, S.makeSeededRng('dp' + b));
+      for(const m of (r.matchups || [])){
+        conf++;
+        if((m.golpes || []).some(g => g.x === 'queima')) comQueima++;
+        if(m.playerHpAfter <= 0 && m.enemyHpAfter <= 0){
+          dup++;
+          if((m.golpes || []).some(g => g.x === 'boom')) comBoom++;
+          else if(!ex) ex = m.playerSpecies + ' ' + m.playerHpBefore + '->0 x ' + m.enemySpecies + ' ' + m.enemyHpBefore + '->0';
+        }
+      }
+    }
+    ok('a queimadura aparece na varredura', comQueima > 0, comQueima + ' confrontos de ' + conf);
+    ok('e os DOIS nunca caem juntos fora da autodestruicao', dup === comBoom,
+       comBoom + ' de ' + dup + (ex ? '  |  ' + ex : ''));
+  }
+
+  /* 6) AS DUAS FRASES, palavra por palavra. */
+  ok('a frase da queimadura nomeia o GOLPE',
+     S.fraseDoEspecial({ x: 'queimou', g: 'Machamp', mv: 'flamethrower' }, {}, {}) ===
+     'Machamp ficou queimado com LANÇA-CHAMAS!');
+  /* ⚠️ E ELA TRAZ O NUMERO, e e a unica do bloco de status que traz: a linha de um especial nao
+     ganha o "e tirou -N de HP" automatico, e sem o numero a soma das linhas nao fecharia com a
+     barra -- o jogador veria a barra descer mais do que o log conta. */
+  ok('e a do dano por turno traz o NUMERO',
+     S.fraseDoEspecial({ x: 'queima', g: 'Machamp', d: 29 }, {}, {}) ===
+     'Machamp perdeu 29 de HP pela queimadura');
+  ok('log gravado antes do campo mv cai numa frase sem golpe',
+     S.fraseDoEspecial({ x: 'queimou', g: 'Machamp' }, {}, {}) === 'Machamp ficou queimado!');
+  ok('e as duas tem o selo 🔥',
+     S.ICONES_ESPECIAIS.queimou === '🔥' && S.ICONES_ESPECIAIS.queima === '🔥');
+  ok('as duas valem 1 passo cada na animacao (a pausa de leitura)',
+     S.passosDaAbertura.queimou === 1 && S.passosDaAbertura.queima === 1);
+  ok('e sao reconhecidas como golpe especial',
+     S.ehGolpeEspecial({ x: 'queimou' }) && S.ehGolpeEspecial({ x: 'queima' }));
+
+  /* 7) ⚠️ O PASSO DA ANIMACAO NAO INVERTE O LADO. O passo comum le o `q` como QUEM BATE e desce a
+        barra do OUTRO; aqui o `q` e de QUEM ESTA QUEIMADO -- nao ha causador nesta troca. Invertido,
+        a barra que desce e a do pokemon errado, e o defeito nao aparece como erro: aparece como o
+        adversario perdendo vida do nada. */
+  {
+    let confs = 0, ladoErrado = 0, ex = null;
+    for(let i = 0; i < 400; i++){
+      const a = vq('charizard', 60); a.ataques = ['flamethrower'];
+      const b = vq('snorlax', 70); b.ataques = ['bodyslam'];
+      const r = S.simulateGymBattle([a], [b], S.makeSeededRng('anim' + i));
+      for(const m of (r.matchups || [])){
+        const seq = S.buildAnimatedHitSequence(m);
+        for(let k = 0; k < seq.length; k++){
+          if(seq[k].x !== 'queima') continue;
+          confs++;
+          const esperado = seq[k].q === 'p' ? 'player' : 'enemy';
+          if(seq[k].side !== esperado || !(seq[k].amount > 0)){
+            ladoErrado++; if(!ex) ex = 'q=' + seq[k].q + ' side=' + seq[k].side + ' amount=' + seq[k].amount;
+          }
+        }
+      }
+    }
+    ok('achei passos de queimadura na animacao', confs >= 50, confs + ' passos');
+    ok('e a barra que desce e a de QUEM ESTA QUEIMADO', ladoErrado === 0,
+       ladoErrado + (ex ? '  |  ' + ex : ''));
+  }
+  /* ⚠️ E A LINHA NAO GRAVA `hp`, pela mesma razao do REMOINHO: o campo quer dizer "a vida do ALVO",
+     e o alvo de uma linha comum e o lado OPOSTO ao `q`. Gravando a vida de quem PERDE ali, toda
+     conta que le o diario a atribui ao outro lado. */
+  /* A trava le o `danoDeStatus`, que e onde a queimadura E o veneno gravam -- os dois dividem a
+     funcao desde 16/09/2026, e por isso a linha e `x:x` e nao o nome de um deles. */
+  ok('e a linha nao grava hp (o campo seria lido do lado errado)',
+     /const danoDeStatus[\s\S]{0,2400}?hp:null, c:0, m:0, z:0, x:x, g:p\.name/.test(cliQ) &&
+     /const danoDeStatus[\s\S]{0,2400}?hp:null, c:0, m:0, z:0, x:x, g:p\.name/.test(srvQ));
+
+  /* 8) O LOG. A licao do gelo: a trava tem que ler o HTML, porque as que leem o diario e a
+        sequencia dao verde com a linha caindo no ramo do golpe comum. */
+  {
+    let comQ = 0, zeros = 0, semFrase = 0, linhas = 0, ex = null;
+    for(let i = 0; i < 300; i++){
+      const a = vq('charizard', 60); a.ataques = ['flamethrower'];
+      const b = vq('snorlax', 75); b.ataques = ['bodyslam'];
+      const r = S.simulateGymBattle([a], [b], S.makeSeededRng('logq' + i));
+      for(const m of (r.matchups || [])){
+        const g = m.golpes || [];
+        const n = g.filter(x => x.x === 'queimou' || x.x === 'queima').length;
+        if(!n) continue;
+        comQ++; linhas += n;
+        const html = S.passosHtml(m);
+        const z = (html.match(/−0<\/span> de HP/g) || []).length;
+        if(z){ zeros += z; if(!ex) ex = html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').slice(0, 150); }
+        const naTela = (html.match(/queimad|queimadura/g) || []).length;
+        if(naTela < n){ semFrase += n - naTela; if(!ex) ex = html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').slice(0, 150); }
+      }
+    }
+    ok('achei confrontos com queimadura pra ler o HTML', comQ >= 40, comQ + ' confrontos');
+    ok('nenhuma linha de queimadura vira "−0 de HP"', zeros === 0, zeros + (ex ? '  |  ' + ex : ''));
+    ok('e as ' + linhas + ' linhas saem com a frase delas', semFrase === 0, semFrase + (ex ? '  |  ' + ex : ''));
+  }
+
+  /* 9) ⚠️ O SELO NO QUADRO SAI DE UM CAMPO DO MATCHUP, nao da marca do diario -- e o MESMO caso da
+        furia: a queimadura ATRAVESSA confrontos, entao um pokemon pode lutar tres deles queimado
+        com a marca so no primeiro. Lida do diario, o selo sumiria justamente nos confrontos em que
+        o jogador mais precisa saber que o ataque dele esta pela metade. */
+  ok('o selo 🔥 sai do campo do matchup, e so no lado queimado',
+     S.selosDoConfronto({ playerQueimado: true, enemyQueimado: false }, 'p').indexOf('🔥') >= 0 &&
+     S.selosDoConfronto({ playerQueimado: true, enemyQueimado: false }, 'e').indexOf('🔥') < 0 &&
+     S.selosDoConfronto({ playerQueimado: false, enemyQueimado: true }, 'e').indexOf('🔥') >= 0);
+  ok('e confronto gravado antes do campo sai sem selo (log velho nao pode sumir)',
+     S.selosDoConfronto({}, 'p').indexOf('🔥') < 0);
+  /* ⚠️ E A QUEIMADURA HERDADA -- o caso que uma leitura ingenua erraria: o pokemon entra no
+     confronto JA queimado, sem nenhuma marca no diario dele, e o selo tem que sair assim mesmo. */
+  {
+    const a = vq('snorlax', 70); a.ataques = ['bodyslam']; a._queimado = 'ember';
+    const b = vq('machamp', 60); b.ataques = ['karatechop'];
+    const r = S.simulateGymBattle([a], [b], S.makeSeededRng('herd'));
+    const m = (r.matchups || [])[0];
+    ok('a queimadura HERDADA aparece no selo mesmo sem marca no diario',
+       m && m.playerQueimado === true && !(m.golpes || []).some(g => g.x === 'queimou'),
+       m ? ('campo=' + m.playerQueimado + ' marcas=' + (m.golpes || []).filter(g => g.x === 'queimou').length) : '(sem confronto)');
+  }
+
+  /* 10) A MARCA E SOLTA NO FIM DA BATALHA. Sem isso um pokemon sairia da luta queimado pra sempre --
+         e com o ataque fisico pela metade em TODAS as batalhas seguintes, o que nao apareceria como
+         erro nenhum na tela. */
+  ok('o encerrarBatalha solta a marca', /p\._queimado = null;/.test(cliQ));
+  {
+    let sobrou = 0;
+    for(let i = 0; i < 400; i++){
+      const a = vq('charizard', 60); a.ataques = ['flamethrower'];
+      const time = [a, vq('machamp', 55)], adv = [vq('snorlax', 60), vq('rhydon', 60)];
+      time.concat(adv).forEach(p => { p.maxHp = S.calcMaxHp(p); p.hp = p.maxHp; });
+      S.simulateGymBattle(time, adv, S.makeSeededRng('soltaq' + i));
+      if(time.concat(adv).some(p => p._queimado)) sobrou++;
+    }
+    ok('e ninguem sai de 400 batalhas ainda queimado', sobrou === 0, sobrou + ' sobraram');
+  }
+
+  /* 11) OS DOIS MOTORES, num painel que GARANTE queimadura. A comparacao das 300 nao serve: sao 22
+         especies em 250 e a trava falharia sozinha de vez em quando -- a licao do gelo. */
+  {
+    const ALVOS = ['machamp', 'snorlax', 'rhydon', 'gyarados', 'venusaur', 'starmie'];
+    let div = 0, comQ = 0, dano = 0, ex = null;
+    for(let i = 0; i < 120; i++){
+      const alvo = ALVOS[i % ALVOS.length];
+      const monta = (novo) => { const a = novo('charizard', 60); a.ataques = ['flamethrower'];
+                                const b = novo('magmar', 60); b.ataques = ['firepunch']; return [a, b]; };
+      const advs = (novo) => [novo(alvo, 62), novo(ALVOS[(i + 3) % ALVOS.length], 62)];
+      const rC = S.simulateGymBattle(monta((id, lv) => S.createInstance(id, lv)),
+                                     advs((id, lv) => S.createInstance(id, lv)), S.makeSeededRng('q2m' + i));
+      const rS = srv._simulateGymBattle(monta((id, lv) => srv._createInstance(id, lv)),
+                                        advs((id, lv) => srv._createInstance(id, lv)), srv._makeSeededRng('q2m' + i));
+      const n = (r) => (r.matchups || []).reduce((a, m) =>
+        a + (m.golpes || []).filter(g => g.x === 'queimou' || g.x === 'queima').length, 0);
+      if(n(rC) > 0) comQ++;
+      dano += (rC.matchups || []).reduce((a, m) =>
+        a + (m.golpes || []).filter(g => g.x === 'queima').reduce((x, g) => x + g.d, 0), 0);
+      if(resumo(rC) !== resumo(rS)){ div++; if(!ex) ex = 'volta ' + i + ' contra ' + alvo; }
+    }
+    ok('120 batalhas com queimadura garantida batem golpe a golpe nos dois motores', div === 0,
+       div + ' divergencias' + (ex ? '  |  ' + ex : ''));
+    ok('e a queimadura esta dentro delas', comQ >= 25 && dano > 0,
+       comQ + ' batalhas queimaram, ' + dano + ' de dano por turno');
+  }
+  /* ⚠️ E O SORTEIO SO LE O rng QUANDO O GOLPE PODE QUEIMAR: lido sempre, ele deslocaria a semente
+     de toda batalha sem golpe de fogo nenhum. A mesma armadilha que o Remoinho quase trouxe. */
+  {
+    let leu = 0; const conta = () => { leu++; return 0.001; };
+    const a = vq('machamp', 50); a.lastMove = 'karatechop';
+    S.tentarQueimar(a, vq('snorlax', 60), conta);
+    ok('o rng NAO e lido quando o golpe nao queima', leu === 0, leu + ' leituras');
+    const b = vq('charizard', 50); b.lastMove = 'flamethrower';
+    S.tentarQueimar(b, vq('arcanine', 60), conta);
+    ok('nem quando o alvo e imune', leu === 0, leu + ' leituras');
+  }
+
+  /* 12) ⚠️ O SELO 🔥 NAO PODE APARECER ANTES DA QUEIMADURA (16/09/2026, reportado: *"o emoji ta
+         aparecendo logo quando o pokemon entra na luta, mesmo se o golpe que for dar o queimar for
+         tipo o sexto golpe"*). Ele saia do CAMPO do matchup, que e o estado no FIM do confronto --
+         entao ele entregava, no primeiro quadro, uma queimadura que so ia acontecer depois.
+         ⚠️ ELE E O CONTRARIO DOS OUTROS CINCO SELOS DAQUELE QUADRO: o 🌟, o 🔺, o 🎖️, o ⚔️ e o 🪶
+         valem o confronto inteiro porque sao ABERTURA. A queimadura acontece NO MEIO, como a Faixa
+         de Foco -- e a Faixa fica escondida ate o passo dela pelo mesmo motivo. */
+  {
+    let confs = 0, cedo = 0, tarde = 0, ex = null;
+    for(let i = 0; i < 800; i++){
+      const a = vq('charizard', 60); a.ataques = ['flamethrower'];
+      const b = vq('snorlax', 80); b.ataques = ['bodyslam'];
+      const r = S.simulateGymBattle([a], [b], S.makeSeededRng('selo' + i));
+      for(const m of (r.matchups || [])){
+        const seq = S.sequenciaDoConfronto(m);
+        const i0 = seq.findIndex(x => x.x === 'queimou' && x.q === 'e');
+        if(i0 < 0) continue;
+        confs++;
+        /* ANTES do passo dela: sem selo. A PARTIR dele: com. */
+        for(let k = 0; k <= seq.length; k++){
+          const tem = S.selosDoConfronto(m, 'e', k).indexOf('🔥') >= 0;
+          if(k < i0 + 1 && tem){ cedo++; if(!ex) ex = 'passo ' + k + ' de ' + (i0 + 1); break; }
+          if(k >= i0 + 1 && !tem){ tarde++; if(!ex) ex = 'passo ' + k + ' de ' + (i0 + 1); break; }
+        }
+      }
+    }
+    ok('achei confrontos com queimadura pra medir o selo', confs >= 50, confs + ' confrontos');
+    ok('o 🔥 nunca aparece ANTES do passo da queimadura', cedo === 0, cedo + (ex ? '  |  ' + ex : ''));
+    ok('e nunca falta DEPOIS dele', tarde === 0, tarde + (ex ? '  |  ' + ex : ''));
+  }
+  /* ⚠️ MAS A QUEIMADURA HERDADA VALE DESDE O PRIMEIRO QUADRO: quem entra no confronto JA queimado
+     nao tem marca no diario, e ali o selo e verdade desde o comeco. E o caso que uma leitura
+     ingenua erraria -- procurar a marca e nao achar significa "veio de antes", nao "nao houve". */
+  {
+    const a = vq('snorlax', 70); a.ataques = ['bodyslam']; a._queimado = 'ember';
+    const b = vq('machamp', 60); b.ataques = ['karatechop'];
+    const r = S.simulateGymBattle([a], [b], S.makeSeededRng('herd2'));
+    const m = (r.matchups || [])[0];
+    ok('a queimadura HERDADA mostra o selo desde o passo 0',
+       m && !(m.golpes || []).some(g => g.x === 'queimou' && g.q === 'p') &&
+       S.selosDoConfronto(m, 'p', 0).indexOf('🔥') >= 0 &&
+       S.selosDoConfronto(m, 'p', 1).indexOf('🔥') >= 0);
+  }
+  /* SEM PASSO o selo vale, e isso e o log relido dias depois: ali o confronto ja acabou e ele e o
+     resumo, nao um anuncio. */
+  {
+    const a = vq('snorlax', 70); a._queimado = 'ember';
+    const m = { playerQueimado: true, golpes: [{ x: 'queimou', q: 'p', d: 0 }] };
+    ok('e sem passo ele vale (o log relido nao anima nada)',
+       S.selosDoConfronto(m, 'p').indexOf('🔥') >= 0);
+  }
+}
+
+/* ==================== "CONTINUA A DORMIR" (16/09/2026) ====================
+   O analogo do `gelado` do congelamento, e ele faltava: o sono tinha a linha de ADORMECER e a de
+   ACORDAR, e nada nos turnos do meio. */
+{
+  console.log('\n--- o "continua a dormir" ---');
+  const cliD = require('fs').readFileSync(require('path').join(raiz, 'index.html'), 'utf8');
+  const srvD = require('fs').readFileSync(require('path').join(raiz, 'functions', 'index.js'), 'utf8');
+  const vd = (id, lv) => { const q = inst(id, lv); q.maxHp = S.calcMaxHp(q); q.hp = q.maxHp; return q; };
+
+  /* 1) A FRASE, palavra por palavra -- ela foi pedida assim. */
+  ok('a frase e a pedida', S.fraseDoEspecial({ x: 'dormindo', g: 'Onix' }, {}, {}) ===
+     'Onix continua a dormir e não pode atacar');
+  ok('e o selo e o MESMO 😴 do sono (e o mesmo efeito, num turno do meio)',
+     S.ICONES_ESPECIAIS.dormindo === S.ICONES_ESPECIAIS.sono && S.ICONES_ESPECIAIS.dormindo === '😴');
+  /* o 1,5s de leitura vem da entrada na tabela -- sem ela a frase valeria pra SEMPRE */
+  ok('e ela vale 1 passo na animacao (a pausa de 1,5s)', S.passosDaAbertura.dormindo === 1);
+  ok('e e reconhecida como golpe especial', S.ehGolpeEspecial({ x: 'dormindo' }));
+
+  /* 2) ⚠️ O INVARIANTE QUE LIGA A LINHA A MECANICA: um sono de N trocas rende N-1 linhas. A linha
+        NAO sai na troca em que ele acorda -- ali quem conta e o `acordou`, e as duas juntas se
+        contradiriam ("continua a dormir" e "acordou" no mesmo turno). */
+  {
+    const dist = {};
+    let confs = 0, contradiz = 0, atacouDormindo = 0, ex = null;
+    for(let i = 0; i < 2500; i++){
+      const a = vd('butterfree', 45); a.ataques = ['gust'];
+      const b = vd('snorlax', 80); b.ataques = ['bodyslam'];
+      const r = S.simulateGymBattle([a], [b], S.makeSeededRng('sono' + i));
+      for(const m of (r.matchups || [])){
+        const g = m.golpes || [];
+        if(!g.some(x => x.x === 'sono')) continue;
+        confs++;
+        const n = g.filter(x => x.x === 'dormindo').length;
+        dist[n] = (dist[n] || 0) + 1;
+        /* ⚠️ A CONTRADICAO: a linha e o `acordou` do mesmo lado nao podem ser VIZINHAS na ordem --
+           seria "continua a dormir / acordou" no mesmo turno. */
+        for(let k = 0; k + 1 < g.length; k++){
+          if(g[k].x === 'dormindo' && g[k+1].x === 'acordou' && g[k].q === g[k+1].q){
+            contradiz++; if(!ex) ex = g.map(x => (x.q||'?') + ':' + (x.x || ('-'+x.d))).join(' | ');
+          }
+        }
+        /* ⚠️ E QUEM TEM A LINHA NAO ATACA NAQUELE TURNO: percorrendo o log, entre a linha dele e a
+           linha seguinte do MESMO lado nao pode haver um golpe dele. */
+        for(let k = 0; k < g.length; k++){
+          if(g[k].x !== 'dormindo') continue;
+          for(let j = k + 1; j < g.length; j++){
+            if(g[j].x === 'acordou' && g[j].q === g[k].q) break;
+            if(g[j].x === 'dormindo' && g[j].q === g[k].q) break;
+            if(!g[j].x && g[j].d > 0 && g[j].q === g[k].q){
+              atacouDormindo++; if(!ex) ex = g.map(x => (x.q||'?') + ':' + (x.x || ('-'+x.d))).join(' | ');
+              break;
+            }
+          }
+        }
+      }
+    }
+    ok('achei confrontos com sono pra ler', confs >= 200, confs + ' confrontos');
+    /* SONO_EM_TROCAS e 1, 2 ou 3 com 1/3 cada -> 0, 1 ou 2 linhas, em partes parecidas */
+    ok('e a contagem bate com a duracao do sono (0, 1 ou 2 linhas)',
+       !Object.keys(dist).some(k => Number(k) > 2) && (dist[1] || 0) > 0 && (dist[2] || 0) > 0,
+       JSON.stringify(dist));
+    ok('a linha NUNCA sai na troca em que ele acorda', contradiz === 0,
+       contradiz + (ex ? '  |  ' + ex : ''));
+    ok('e QUEM CONTINUA DORMINDO NAO ATACA naquele turno', atacouDormindo === 0,
+       atacouDormindo + (ex ? '  |  ' + ex : ''));
+  }
+
+  /* 3) ⚠️ A ORDEM: a frase e sobre O TURNO DELE, entao ela vem DEPOIS do golpe de quem e mais
+        rapido. Junto do geloDe (que foi onde ela nasceu), o log dizia "Onix continua a dormir /
+        Gengar atacou" -- a ordem invertida da cena. */
+  {
+    let confs = 0, foraDeOrdem = 0, ex = null;
+    for(let i = 0; i < 2000; i++){
+      /* o Gengar (110 de velocidade) e SEMPRE o mais rapido que o Onix (70) */
+      const a = vd('gengar', 60); a.ataques = ['dreameater'];
+      const b = vd('onix', 80); b.ataques = ['rockslide'];
+      const r = S.simulateGymBattle([a], [b], S.makeSeededRng('ord' + i));
+      for(const m of (r.matchups || [])){
+        const g = m.golpes || [];
+        const k = g.findIndex(x => x.x === 'dormindo' && x.q === 'e');
+        if(k < 0) continue;
+        confs++;
+        /* antes dela, no mesmo turno, tem que haver um golpe do lado RAPIDO (o jogador) */
+        let temGolpeAntes = false;
+        for(let j = k - 1; j >= 0; j--){
+          if(g[j].x === 'sono' || g[j].x === 'dormindo' || g[j].x === 'acordou') break;
+          if(!g[j].x && g[j].d > 0 && g[j].q === 'p'){ temGolpeAntes = true; break; }
+        }
+        if(!temGolpeAntes){ foraDeOrdem++; if(!ex) ex = g.map(x => (x.q||'?') + ':' + (x.x || ('-'+x.d))).join(' | '); }
+      }
+    }
+    ok('achei confrontos pra medir a ordem', confs >= 100, confs + ' confrontos');
+    ok('e a linha vem DEPOIS do golpe de quem e mais rapido', foraDeOrdem === 0,
+       foraDeOrdem + (ex ? '  |  ' + ex : ''));
+  }
+
+  /* 4) O LOG. A licao do gelo: a trava tem que ler o HTML -- as que leem o diario dao verde com a
+        linha caindo no ramo do golpe comum, e ali ela vira um "−0 de HP" com o nome de um golpe
+        que o pokemon nem tem. */
+  {
+    let comD = 0, zeros = 0, semFrase = 0, linhas = 0, ex = null;
+    for(let i = 0; i < 400; i++){
+      const a = vd('gengar', 60); a.ataques = ['dreameater'];
+      const b = vd('onix', 85); b.ataques = ['rockslide'];
+      const r = S.simulateGymBattle([a], [b], S.makeSeededRng('logd' + i));
+      for(const m of (r.matchups || [])){
+        const n = (m.golpes || []).filter(x => x.x === 'dormindo').length;
+        if(!n) continue;
+        comD++; linhas += n;
+        const html = S.passosHtml(m);
+        const z = (html.match(/−0<\/span> de HP/g) || []).length;
+        if(z){ zeros += z; if(!ex) ex = html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').slice(0, 150); }
+        const naTela = (html.match(/continua a dormir/g) || []).length;
+        if(naTela < n){ semFrase += n - naTela; if(!ex) ex = html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').slice(0, 150); }
+      }
+    }
+    ok('achei confrontos pra ler o HTML do log', comD >= 30, comD + ' confrontos');
+    ok('nenhuma linha vira "−0 de HP"', zeros === 0, zeros + (ex ? '  |  ' + ex : ''));
+    ok('e as ' + linhas + ' linhas saem com a frase delas', semFrase === 0, semFrase + (ex ? '  |  ' + ex : ''));
+  }
+
+  /* 5) OS DOIS MOTORES. A linha e apresentacao (dano 0), mas ela e GRAVADA pelo doExchange dos dois
+        lados -- um deles gravando e o outro nao faria o log da liga divergir do da jornada. */
+  ok('o ajudante existe nos dois motores',
+     /const dormeDe = \(p, q\) =>/.test(cliD) && /const dormeDe = \(p, q\) =>/.test(srvD));
+  ok('e a linha do second sai DEPOIS do golpe do first nos dois',
+     cliD.indexOf('queimou(second, qDoSecond, queimouOSegundo);') < cliD.indexOf('dormeDe(second, qDoSecond);') &&
+     srvD.indexOf('queimou(second, qDoSecond, queimouOSegundo);') < srvD.indexOf('dormeDe(second, qDoSecond);'));
+  {
+    const ALVOS = ['snorlax', 'machamp', 'rhydon', 'gyarados'];
+    let div = 0, comD = 0, ex = null;
+    for(let i = 0; i < 120; i++){
+      const alvo = ALVOS[i % ALVOS.length];
+      const monta = (novo) => { const a = novo('butterfree', 50); a.ataques = ['gust']; return [a]; };
+      const advs = (novo) => [novo(alvo, 70), novo(ALVOS[(i + 2) % ALVOS.length], 70)];
+      const rC = S.simulateGymBattle(monta((id, lv) => S.createInstance(id, lv)),
+                                     advs((id, lv) => S.createInstance(id, lv)), S.makeSeededRng('d2m' + i));
+      const rS = srv._simulateGymBattle(monta((id, lv) => srv._createInstance(id, lv)),
+                                        advs((id, lv) => srv._createInstance(id, lv)), srv._makeSeededRng('d2m' + i));
+      const n = (r) => (r.matchups || []).reduce((a, m) =>
+        a + (m.golpes || []).filter(g => g.x === 'dormindo').length, 0);
+      if(n(rC) > 0) comD++;
+      if(n(rC) !== n(rS)){ div++; if(!ex) ex = 'volta ' + i + ': ' + n(rC) + ' x ' + n(rS); }
+      if(resumo(rC) !== resumo(rS)){ div++; if(!ex) ex = 'resumo diferente na volta ' + i; }
+    }
+    ok('120 batalhas com sono batem golpe a golpe nos dois motores', div === 0,
+       div + ' divergencias' + (ex ? '  |  ' + ex : ''));
+    ok('e a linha esta dentro delas', comD >= 5, comD + ' batalhas com a linha');
+  }
+}
+
+/* ========================= O ENVENENAMENTO (16/09/2026) =========================
+   A terceira mecanica POR ATAQUE, e a mais simples das tres: so dano, sem cortar atributo. */
+{
+  console.log('\n--- o envenenamento ---');
+  const VEN = Object.keys(S.GOLPES_QUE_ENVENENAM);
+  const cliV = require('fs').readFileSync(require('path').join(raiz, 'index.html'), 'utf8');
+  const srvV = require('fs').readFileSync(require('path').join(raiz, 'functions', 'index.js'), 'utf8');
+  const vv = (id, lv) => { const q = inst(id, lv); q.maxHp = S.calcMaxHp(q); q.hp = q.maxHp; return q; };
+
+  /* 1) A TABELA, com as chances OFICIAIS de cada golpe -- aqui elas VARIAM (10% a 50%), ao
+        contrario do gelo (todos 10%). */
+  ok('sao os 6 golpes de dano que envenenam no FireRed', VEN.length === 6 &&
+     S.GOLPES_QUE_ENVENENAM.poisonsting === 0.30 && S.GOLPES_QUE_ENVENENAM.twineedle === 0.20 &&
+     S.GOLPES_QUE_ENVENENAM.smog === 0.40 && S.GOLPES_QUE_ENVENENAM.sludge === 0.30 &&
+     S.GOLPES_QUE_ENVENENAM.sludgebomb === 0.30 && S.GOLPES_QUE_ENVENENAM.poisonfang === 0.50,
+     VEN.join(', '));
+  ok('os seis EXISTEM na tabela GOLPES', VEN.every(g => !!S.GOLPES[g]),
+     VEN.map(g => g + (S.GOLPES[g] ? '' : '=SUMIU')).join(' '));
+  /* ⚠️ O ACIDO E O UNICO GOLPE DE VENENO DA TABELA QUE NAO ENVENENA, e e fiel: na Gen 3 ele baixa
+     a Defesa Especial. E o AGULHA DUPLA e o unico da lista que NAO e de tipo Veneno (ele e Inseto)
+     -- e tambem o unico que ja e um golpe de VARIOS TAPAS. */
+  {
+    const veneno = Object.keys(S.GOLPES).filter(g => S.GOLPES[g][0] === 'Poison');
+    const fora = veneno.filter(g => !S.GOLPES_QUE_ENVENENAM[g]);
+    ok('e o Acido e o unico de Veneno que NAO envenena', fora.length === 1 && fora[0] === 'acid',
+       fora.join(', '));
+    ok('e o Agulha Dupla e o unico da lista fora do tipo Veneno',
+       VEN.filter(g => S.GOLPES[g][0] !== 'Poison').join(',') === 'twineedle');
+    /* ⚠️ E ELE JA E MULTI-TAPA: a chance vale por ATAQUE, nao por tapa -- o tentarEnvenenar roda
+       uma vez por golpe no doExchange, como os outros dois status. */
+    ok('e o Agulha Dupla continua sendo de varios tapas', !!S.MULTI_GOLPE.twineedle);
+  }
+  {
+    const quem = Object.keys(S.SPECIES).filter(id =>
+      (S.ataquesDisponiveis(id, 70) || []).some(g => VEN.indexOf(g) >= 0));
+    const levam = quem.filter(id => {
+      const p = S.createInstance(id, 70);
+      return (S.ataquesPadrao(p) || []).some(g => VEN.indexOf(g) >= 0);
+    });
+    ok('45 especies os aprendem por nivel', quem.length >= 40, quem.length + ' de 250');
+    ok('e 26 os LEVAM no moveset padrao (a licao da Furia)', levam.length >= 20, levam.length + ' levam');
+  }
+
+  /* 2) AS CHANCES, com UM rng continuo -- semente nova a cada volta enviesa. */
+  for(const [golpe, esperado] of [['sludgebomb', 0.30], ['smog', 0.40], ['poisonfang', 0.50], ['twineedle', 0.20]]){
+    const rng = S.makeSeededRng('ven-' + golpe), N = 30000;
+    let c = 0;
+    for(let i = 0; i < N; i++){
+      const a = vv('venusaur', 60); a.lastMove = golpe;
+      if(S.tentarEnvenenar(a, vv('snorlax', 70), rng)) c++;
+    }
+    const sd = Math.sqrt(esperado * (1 - esperado) / N), sig = Math.abs(c / N - esperado) / sd;
+    ok('o ' + golpe + ' envenena em ' + (esperado * 100) + '%', sig < 3,
+       (100 * c / N).toFixed(2) + '%  (' + sig.toFixed(1) + ' sigma)');
+  }
+
+  /* 3) AS IMUNIDADES. ⚠️ O VENENO NA LISTA FOI ACRESCENTADO POR MIM: o pedido dizia so "pokemon de
+        aço tem imunidade", mas a Bulbapedia (a fonte citada no proprio pedido) poe os dois, e e a
+        mesma simetria dos outros dois status. Sem ela, as 37 especies de Veneno se envenenariam com
+        os PROPRIOS golpes -- 24 dos 26 que levam um golpe da lista sao de Veneno. */
+  ok('ACO e imune', !S.podeEnvenenar(vv('steelix', 50)) && !S.podeEnvenenar(vv('forretress', 50)) &&
+     !S.podeEnvenenar(vv('scizor', 50)) && !S.podeEnvenenar(vv('skarmory', 50)));
+  ok('e VENENO tambem (acrescentado: o pedido citava so o Aço)',
+     !S.podeEnvenenar(vv('muk', 50)) && !S.podeEnvenenar(vv('arbok', 50)) &&
+     !S.podeEnvenenar(vv('venusaur', 50)) && S.podeEnvenenar(vv('machamp', 50)));
+  {
+    let c = 0;
+    for(let i = 0; i < 3000; i++){
+      const a = vv('venusaur', 60); a.ataques = ['sludgebomb'];
+      const b = vv('steelix', 60); b.ataques = ['rockslide'];
+      S.doExchange(a, b, S.makeSeededRng('iv' + i), []);
+      if(b._envenenado) c++;
+    }
+    ok('e nenhum Steelix envenena em 3.000 trocas', c === 0, c + ' envenenados');
+  }
+  { const m = vv('machamp', 50); m.hp = 0; ok('nem quem ja caiu', !S.podeEnvenenar(m)); }
+  { const m = vv('machamp', 50); m._envenenado = 'sludge'; ok('nem quem ja esta envenenado', !S.podeEnvenenar(m)); }
+
+  /* 4) O DANO: 1/8 do teto, o DOBRO da queimadura. */
+  ok('1/8 do HP maximo por turno', S.VENENO_DANO === 1/8, String(S.VENENO_DANO));
+  ok('e e o DOBRO da queimadura', S.VENENO_DANO === S.QUEIMADURA_DANO * 2);
+  {
+    let ok1 = 0, n = 0;
+    for(let i = 0; i < 400; i++){
+      const a = vv('venusaur', 60); a.ataques = ['sludgebomb'];
+      const b = vv('snorlax', 70); b.ataques = ['bodyslam']; b._envenenado = 'sludge';
+      const di = [];
+      S.doExchange(a, b, S.makeSeededRng('dv' + i), di);
+      const q = di.filter(g => g.x === 'veneno' && g.q === 'e');
+      if(!q.length) continue;
+      n++;
+      if(q[0].d === Math.max(1, Math.round(b.maxHp / 8))) ok1++;
+    }
+    ok('e o dano por turno e 1/8 do teto', n > 0 && ok1 === n, ok1 + ' de ' + n);
+  }
+  /* ⚠️ E ELE NAO CORTA ATRIBUTO NENHUM -- essa e a diferenca dele pra queimadura. */
+  {
+    const a = vv('machamp', 50), b = vv('machamp', 50);
+    b._envenenado = 'sludge';
+    ok('e ele NAO corta atributo nenhum (a diferenca pra queimadura)',
+       S.effectiveAttack(a) === S.effectiveAttack(b) && S.effectiveSpAtk(a) === S.effectiveSpAtk(b) &&
+       S.effectiveDefense(a) === S.effectiveDefense(b) && S.effectiveSpeed(a) === S.effectiveSpeed(b));
+  }
+
+  /* 5) ⚠️ OS DOIS NUNCA CAEM JUNTOS FORA DA AUTODESTRUICAO -- a regra de 12/09/2026. Os DOIS status
+        de dano por turno dividem o `danoDeStatus` justamente por isto: em blocos separados, a
+        queimadura pararia em 1 olhando o adversario vivo e o veneno o mataria logo depois. */
+  {
+    const IDSV = Object.keys(S.SPECIES);
+    const rngV = S.makeSeededRng('dupv');
+    const mkv = (id, lv) => { const p = S.createInstance(id, lv); p.ataques = S.ataquesPadrao(p);
+                              p.maxHp = S.calcMaxHp(p); p.hp = p.maxHp; return p; };
+    let dup = 0, comBoom = 0, comVen = 0, ex = null;
+    for(let b = 0; b < 2500; b++){
+      const t = n => Array.from({length:n}, () => mkv(IDSV[Math.floor(rngV()*IDSV.length)], 30 + Math.floor(rngV()*50)));
+      const A = t(3), B = t(3); S.equiparNpc(B);
+      const r = S.simulateGymBattle(A, B, S.makeSeededRng('dv' + b));
+      for(const m of (r.matchups || [])){
+        if((m.golpes || []).some(g => g.x === 'veneno')) comVen++;
+        if(m.playerHpAfter <= 0 && m.enemyHpAfter <= 0){
+          dup++;
+          if((m.golpes || []).some(g => g.x === 'boom')) comBoom++;
+          else if(!ex) ex = m.playerSpecies + ' x ' + m.enemySpecies;
+        }
+      }
+    }
+    ok('o veneno aparece na varredura', comVen > 0, comVen + ' confrontos');
+    ok('e os DOIS nunca caem juntos fora da autodestruicao', dup === comBoom,
+       comBoom + ' de ' + dup + (ex ? '  |  ' + ex : ''));
+  }
+
+  /* 6) ⚠️ A FAIXA DE FOCO SEGURA O DANO DE STATUS (16/09/2026). No jogo original o Focus Sash so
+        protege de dano DIRETO; aqui ela protege dos dois, e a razao e a promessa que a casa fez
+        pro item -- "quem carrega a Faixa nunca termina um confronto em 0 sem ela ter disparado".
+        Foi a trava dessa promessa que pegou o furo, e ela existe porque a AUTODESTRUICAO ja tinha
+        furado a Faixa uma vez e o jogador reportou. */
+  {
+    const p = vv('machamp', 50); p.item = 'faixa_foco'; p._envenenado = 'sludge';
+    p.maxHp = 100; p.hp = 5;                       // o veneno (12) mataria
+    const o = vv('caterpie', 5); o.ataques = ['tackle'];
+    const di = [];
+    S.doExchange(o, p, S.makeSeededRng('fx'), di);
+    ok('a Faixa segura o dano de veneno e deixa em 1', p.hp === 1, p.hp + ' de HP');
+    ok('e a linha dela entra no diario', di.some(g => g.x === 'faixa'));
+    ok('e o item foi gasto', p.item !== 'faixa_foco');
+  }
+
+  /* 7) AS DUAS FRASES e o selo. */
+  ok('a frase do envenenamento nomeia o GOLPE',
+     S.fraseDoEspecial({ x: 'envenenou', g: 'Machamp', mv: 'sludgebomb' }, {}, {}) ===
+     'Machamp foi envenenado com BOMBA DE LODO!');
+  ok('e a do dano por turno traz o NUMERO',
+     S.fraseDoEspecial({ x: 'veneno', g: 'Machamp', d: 59 }, {}, {}) ===
+     'Machamp perdeu 59 de HP pelo veneno');
+  ok('log velho, sem o campo mv, cai numa frase sem golpe',
+     S.fraseDoEspecial({ x: 'envenenou', g: 'Machamp' }, {}, {}) === 'Machamp foi envenenado!');
+  /* o 🟣 e a cor do tipo, e nao uma cavera: ☠️ se le como MORTE e o envenenado continua lutando */
+  ok('e as duas tem o selo 🟣',
+     S.ICONES_ESPECIAIS.envenenou === '🟣' && S.ICONES_ESPECIAIS.veneno === '🟣');
+  ok('as duas valem 1 passo cada (a pausa de 1,5s)',
+     S.passosDaAbertura.envenenou === 1 && S.passosDaAbertura.veneno === 1);
+  ok('e sao reconhecidas como golpe especial',
+     S.ehGolpeEspecial({ x: 'envenenou' }) && S.ehGolpeEspecial({ x: 'veneno' }));
+
+  /* 8) O PASSO DA ANIMACAO nao inverte o lado (o `q` e de quem PERDE), e o SELO so aparece no passo
+        em que o veneno pega -- as duas regras da queimadura, pelos mesmos motivos. */
+  {
+    let passos = 0, ladoErrado = 0, cedo = 0, confs = 0, ex = null;
+    for(let i = 0; i < 600; i++){
+      const a = vv('venusaur', 60); a.ataques = ['sludgebomb'];
+      const b = vv('snorlax', 80); b.ataques = ['bodyslam'];
+      const r = S.simulateGymBattle([a], [b], S.makeSeededRng('av' + i));
+      for(const m of (r.matchups || [])){
+        const seq = S.buildAnimatedHitSequence(m);
+        for(const h of seq){
+          if(h.x !== 'veneno') continue;
+          passos++;
+          if(h.side !== (h.q === 'p' ? 'player' : 'enemy') || !(h.amount > 0)){
+            ladoErrado++; if(!ex) ex = 'q=' + h.q + ' side=' + h.side;
+          }
+        }
+        const i0 = seq.findIndex(x => x.x === 'envenenou' && x.q === 'e');
+        if(i0 < 0) continue;
+        confs++;
+        for(let k = 0; k < i0 + 1; k++) if(S.selosDoConfronto(m, 'e', k).indexOf('🟣') >= 0){ cedo++; break; }
+      }
+    }
+    ok('achei passos de veneno na animacao', passos >= 50, passos + ' passos');
+    ok('e a barra que desce e a de QUEM ESTA ENVENENADO', ladoErrado === 0,
+       ladoErrado + (ex ? '  |  ' + ex : ''));
+    ok('e o 🟣 nunca aparece ANTES do passo do envenenamento', cedo === 0,
+       cedo + ' de ' + confs + ' confrontos');
+  }
+
+  /* 9) O LOG. A licao do gelo: ler o HTML. */
+  {
+    let comV = 0, zeros = 0, semFrase = 0, linhas = 0, ex = null;
+    for(let i = 0; i < 300; i++){
+      const a = vv('venusaur', 60); a.ataques = ['sludgebomb'];
+      const b = vv('snorlax', 85); b.ataques = ['bodyslam'];
+      const r = S.simulateGymBattle([a], [b], S.makeSeededRng('lv' + i));
+      for(const m of (r.matchups || [])){
+        const n = (m.golpes || []).filter(x => x.x === 'envenenou' || x.x === 'veneno').length;
+        if(!n) continue;
+        comV++; linhas += n;
+        const html = S.passosHtml(m);
+        const z = (html.match(/−0<\/span> de HP/g) || []).length;
+        if(z){ zeros += z; if(!ex) ex = html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').slice(0, 150); }
+        const naTela = (html.match(/envenenado|pelo veneno/g) || []).length;
+        if(naTela < n){ semFrase += n - naTela; if(!ex) ex = html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').slice(0, 150); }
+      }
+    }
+    ok('achei confrontos pra ler o HTML do log', comV >= 30, comV + ' confrontos');
+    ok('nenhuma linha de veneno vira "−0 de HP"', zeros === 0, zeros + (ex ? '  |  ' + ex : ''));
+    ok('e as ' + linhas + ' linhas saem com a frase delas', semFrase === 0, semFrase + (ex ? '  |  ' + ex : ''));
+  }
+
+  /* 10) A MARCA E SOLTA NO FIM DA BATALHA. */
+  ok('o encerrarBatalha solta a marca', /p\._envenenado = null;/.test(cliV));
+  {
+    let sobrou = 0;
+    for(let i = 0; i < 400; i++){
+      const a = vv('venusaur', 60); a.ataques = ['sludgebomb'];
+      const time = [a, vv('machamp', 55)], adv = [vv('snorlax', 60), vv('tauros', 60)];
+      time.concat(adv).forEach(p => { p.maxHp = S.calcMaxHp(p); p.hp = p.maxHp; });
+      S.simulateGymBattle(time, adv, S.makeSeededRng('sv' + i));
+      if(time.concat(adv).some(p => p._envenenado)) sobrou++;
+    }
+    ok('e ninguem sai de 400 batalhas ainda envenenado', sobrou === 0, sobrou + ' sobraram');
+  }
+
+  /* 11) OS DOIS MOTORES, num painel que GARANTE veneno. */
+  ok('a tabela e igual nos dois motores',
+     /poisonsting: 0\.30/.test(srvV) && /sludgebomb: 0\.30/.test(srvV) &&
+     /poisonfang: 0\.50/.test(srvV) && /VENENO_DANO = 1\/8/.test(cliV) && /VENENO_DANO = 1\/8/.test(srvV));
+  {
+    const ALVOS = ['machamp', 'snorlax', 'rhydon', 'tauros', 'dragonite', 'starmie'];
+    let div = 0, comV = 0, dano = 0, ex = null;
+    for(let i = 0; i < 120; i++){
+      const alvo = ALVOS[i % ALVOS.length];
+      const monta = (novo) => { const a = novo('venusaur', 60); a.ataques = ['sludgebomb'];
+                                const b = novo('muk', 60); b.ataques = ['sludge']; return [a, b]; };
+      const advs = (novo) => [novo(alvo, 62), novo(ALVOS[(i + 3) % ALVOS.length], 62)];
+      const rC = S.simulateGymBattle(monta((id, lv) => S.createInstance(id, lv)),
+                                     advs((id, lv) => S.createInstance(id, lv)), S.makeSeededRng('v2m' + i));
+      const rS = srv._simulateGymBattle(monta((id, lv) => srv._createInstance(id, lv)),
+                                        advs((id, lv) => srv._createInstance(id, lv)), srv._makeSeededRng('v2m' + i));
+      const n = (r) => (r.matchups || []).reduce((a, m) =>
+        a + (m.golpes || []).filter(g => g.x === 'envenenou' || g.x === 'veneno').length, 0);
+      if(n(rC) > 0) comV++;
+      dano += (rC.matchups || []).reduce((a, m) =>
+        a + (m.golpes || []).filter(g => g.x === 'veneno').reduce((x, g) => x + g.d, 0), 0);
+      if(resumo(rC) !== resumo(rS)){ div++; if(!ex) ex = 'volta ' + i + ' contra ' + alvo; }
+    }
+    ok('120 batalhas com veneno garantido batem golpe a golpe nos dois motores', div === 0,
+       div + ' divergencias' + (ex ? '  |  ' + ex : ''));
+    ok('e o veneno esta dentro delas', comV >= 25 && dano > 0,
+       comV + ' batalhas com veneno, ' + dano + ' de dano por turno');
+  }
+  {
+    let leu = 0; const conta = () => { leu++; return 0.001; };
+    const a = vv('machamp', 50); a.lastMove = 'karatechop';
+    S.tentarEnvenenar(a, vv('snorlax', 60), conta);
+    ok('o rng NAO e lido quando o golpe nao envenena', leu === 0, leu + ' leituras');
+    const b = vv('venusaur', 50); b.lastMove = 'sludgebomb';
+    S.tentarEnvenenar(b, vv('steelix', 60), conta);
+    ok('nem quando o alvo e imune', leu === 0, leu + ' leituras');
+  }
+}
+
+/* =============== O ASTERISCO DOS TRES STATUS no cartao do golpe (16/09/2026) ===============
+   Pedido: *"Nos ataque de fogo, veneno e congelamento que causam esses status, coloque um * no
+   quadro deles, avisando 10% de chance de causar queimadura (emoji da queimadura)"*. */
+{
+  console.log('\n--- o aviso de status no cartao do golpe ---');
+  const TRES = [['GOLPES_QUE_QUEIMAM', 'queimadura', 'queimou'],
+                ['GOLPES_QUE_CONGELAM', 'congelamento', 'congelou'],
+                ['GOLPES_QUE_ENVENENAM', 'envenenamento', 'envenenou']];
+
+  /* 1) TODOS os golpes das tres tabelas avisam, e nenhum outro. Varre a tabela em vez de nomear:
+        golpe novo numa delas ja nasce com o aviso, e um que saia perde junto. */
+  {
+    let semAviso = [], ex = null;
+    const comStatus = new Set();
+    for(const [tab, palavra] of TRES){
+      for(const id of Object.keys(S[tab])){
+        comStatus.add(id);
+        const o = S.obsDoGolpe(id);
+        if(!o.some(x => x.indexOf(palavra) >= 0)){ semAviso.push(id); if(!ex) ex = id + ': ' + o.join(' | '); }
+      }
+    }
+    ok('os 17 golpes de status avisam no cartao', semAviso.length === 0,
+       semAviso.length + ' sem aviso' + (ex ? '  |  ' + ex : ''));
+    /* e NENHUM outro golpe da tabela avisa -- senao a frase sairia onde nao ha efeito */
+    let intruso = null;
+    for(const id of Object.keys(S.GOLPES)){
+      if(comStatus.has(id)) continue;
+      const o = S.obsDoGolpe(id);
+      if(o.some(x => /queimadura|congelamento|envenenamento/.test(x))) { intruso = id + ': ' + o.join(' | '); break; }
+    }
+    ok('e nenhum golpe fora delas avisa', !intruso, intruso || 'nenhum');
+  }
+
+  /* 2) ⚠️ A CHANCE SAI DA TABELA, nunca de um texto fixo -- e aqui isso nao e detalhe: ela VARIA de
+        golpe pra golpe. Uma frase fixa de "10%" mentiria em CINCO dos dezessete. */
+  ok('o Fogo Sagrado avisa 50% (e nao 10%)',
+     S.obsDoGolpe('sacredfire').some(x => x.indexOf('50% de chance de causar queimadura') >= 0),
+     S.obsDoGolpe('sacredfire').join(' | '));
+  ok('a Presa Venenosa avisa 50%',
+     S.obsDoGolpe('poisonfang').some(x => x.indexOf('50% de chance de causar envenenamento') >= 0));
+  ok('a Fumaca avisa 40%',
+     S.obsDoGolpe('smog').some(x => x.indexOf('40% de chance de causar envenenamento') >= 0));
+  ok('o Agulha Dupla avisa 20%',
+     S.obsDoGolpe('twineedle').some(x => x.indexOf('20% de chance de causar envenenamento') >= 0));
+  ok('e a Nevasca avisa 10%',
+     S.obsDoGolpe('blizzard').some(x => x.indexOf('10% de chance de causar congelamento') >= 0));
+  /* ⚠️ E A PROVA DE QUE ELA E DERIVADA: mexendo na TABELA, a frase acompanha. Um texto fixo daria
+     verde em todos os casos acima e falharia aqui. */
+  {
+    const guarda = S.GOLPES_QUE_CONGELAM.blizzard;
+    S.GOLPES_QUE_CONGELAM.blizzard = 0.35;
+    const mudou = S.obsDoGolpe('blizzard').some(x => x.indexOf('35% de chance') >= 0);
+    S.GOLPES_QUE_CONGELAM.blizzard = guarda;
+    ok('e ela e DERIVADA da tabela (mexendo nela, a frase acompanha)', mudou);
+  }
+
+  /* 3) O EMOJI E O MESMO DO LOG E DO QUADRO DO LUTADOR -- o jogador le o aviso aqui e reconhece o
+        selo la, sem precisar ligar as duas coisas. */
+  for(const [tab, palavra, marca] of TRES){
+    const id = Object.keys(S[tab])[0];
+    ok('o aviso de ' + palavra + ' usa o mesmo emoji do log (' + S.ICONES_ESPECIAIS[marca] + ')',
+       S.obsDoGolpe(id).some(x => x.indexOf(S.ICONES_ESPECIAIS[marca]) >= 0),
+       S.obsDoGolpe(id).join(' | '));
+  }
+
+  /* 4) O CASO DE DUAS OBSERVACOES: o Agulha Dupla e multi-tapa E envenena. Foi por ele que o
+        obsDoGolpe virou LISTA em 15/09/2026 -- com `return` de string, a segunda apagaria a
+        primeira em silencio. */
+  {
+    const o = S.obsDoGolpe('twineedle');
+    ok('o Agulha Dupla tem as DUAS observacoes', o.length === 2 &&
+       o[0].indexOf('repete') >= 0 && o[1].indexOf('envenenamento') >= 0, o.join(' | '));
+  }
+  /* golpe comum nao ganha observacao nenhuma */
+  ok('e um golpe comum nao tem observacao', S.obsDoGolpe('slash').length === 0,
+     S.obsDoGolpe('slash').join(' | '));
+
+  /* 5) ⚠️ E A FAIXA DOS MULTI-TAPA TAMBEM SAI DA TABELA (16/09/2026). Ela era "entre 2-5x" escrito
+        a mao, e virou MENTIRA em 13/09/2026, quando o Chute Duplo, o Ossomerangue e a Agulha Dupla
+        entraram com distribuicao PROPRIA (TAPAS_SEMPRE_2): eles batem SEMPRE 2 vezes, e o cartao
+        prometia de 2 a 5. Tres golpes em catorze, por tres dias.
+        So ficou visivel quando o aviso de status entrou -- a Agulha Dupla ganhou uma segunda linha
+        e as duas foram lidas juntas. E a mesma licao da lista a mao do passosHtml: texto fixo que
+        descreve uma tabela envelhece quando a tabela cresce. */
+  {
+    let erradas = [], ex = null;
+    for(const [id, dist] of Object.entries(S.MULTI_GOLPE)){
+      const vezes = dist.map(d => d[0]);
+      const min = Math.min.apply(null, vezes), max = Math.max.apply(null, vezes);
+      const esperado = (min === max) ? ('Golpe repete ' + min + 'x')
+                                     : ('Golpe repete entre ' + min + '-' + max + 'x');
+      const o = S.obsDoGolpe(id);
+      if(o[0] !== esperado){ erradas.push(id); if(!ex) ex = id + ': "' + o[0] + '" (esperado "' + esperado + '")'; }
+    }
+    ok('a faixa de tapas bate com a tabela nos 14 golpes', erradas.length === 0,
+       erradas.length + (ex ? '  |  ' + ex : ''));
+    ok('e os tres de SEMPRE 2x dizem "repete 2x", nao "entre 2-5x"',
+       ['doublekick', 'bonemerang', 'twineedle'].every(id => S.obsDoGolpe(id)[0] === 'Golpe repete 2x'),
+       ['doublekick', 'bonemerang', 'twineedle'].map(id => S.obsDoGolpe(id)[0]).join(' | '));
+  }
+}
+
+/* ============== O LOG COMECA COMPRIMIDO (16/09/2026) ==============
+   Pedido: *"na tela que mostra o log da batalha, comprima o log de cada confronto em uma linha com
+   uma + no meio, e quando clicar expandir o log daquele confronto"*. */
+{
+  console.log('\n--- o log comprimido ---');
+  const cliL = require('fs').readFileSync(require('path').join(raiz, 'index.html'), 'utf8');
+  const conf = (n) => Array.from({length:n}, (_, k) => ({
+    player: 'Gloom' + k, enemy: 'Goldeen' + k, playerSpecies: 'gloom', enemySpecies: 'goldeen',
+    playerLevel: 30, enemyLevel: 30, playerHpBefore: 100, playerHpAfter: 60,
+    enemyHpBefore: 100, enemyHpAfter: 0,
+    golpes: [{ q:'p', d:40, hp:60, c:0, m:0, z:0 }, { q:'e', d:40, hp:60, c:0, m:0, z:0 }]
+  }));
+
+  /* 1) COMECA TUDO COMPRIMIDO, e cada cabecalho traz um +. */
+  {
+    const lista = conf(3);
+    const html = S.renderMatchupLog(lista);
+    ok('os tres confrontos aparecem', (html.match(/matchup-row/g) || []).length === 3);
+    ok('e NENHUM passo a passo esta na tela', !/mlog-passo/.test(html),
+       (html.match(/mlog-passo/g) || []).length + ' passos visiveis');
+    /* o estado saiu do + e foi pra a CLASSE do card -- e o que sobrou das duas tentativas de hoje */
+    ok('e nenhum card esta aberto', (html.match(/mlog-card aberto/g) || []).length === 0,
+       (html.match(/mlog-card[^"]*/g) || []).join(' | '));
+  }
+
+  /* 2) O CLIQUE ABRE SO AQUELE, e o + vira −. */
+  {
+    const lista = conf(3);
+    S.renderMatchupLog(lista);
+    S.alternarLogDoConfronto(1);
+    const html = S.renderMatchupLog(lista);
+    ok('abrir o do meio mostra o passo a passo dele', /mlog-passo/.test(html));
+    ok('e SO dele', (html.match(/mlog-passos/g) || []).length === 1,
+       (html.match(/mlog-passos/g) || []).length + ' blocos abertos');
+    ok('e so o do meio ganhou a classe aberto', (html.match(/mlog-card aberto/g) || []).length === 1,
+       (html.match(/mlog-card[^"]*/g) || []).join(' | '));
+    /* e fechar volta */
+    S.alternarLogDoConfronto(1);
+    ok('e clicar de novo fecha', !/mlog-passo/.test(S.renderMatchupLog(lista)));
+  }
+
+  /* 3) ⚠️ O ESTADO ZERA QUANDO A TELA OU O TAMANHO MUDA -- senao o confronto 2 de uma batalha nova
+        nasceria aberto porque o 2 da anterior estava. */
+  {
+    const lista = conf(3);
+    S.renderMatchupLog(lista); S.alternarLogDoConfronto(0);
+    ok('o confronto 0 esta aberto', /mlog-passo/.test(S.renderMatchupLog(lista)));
+    ok('e mudar o NUMERO de confrontos zera', !/mlog-passo/.test(S.renderMatchupLog(conf(5))));
+    /* ⚠️ A TELA ENTRA NA CHAVE, e isso se prova LENDO O CODIGO: o `game.screen` e mexido por outros
+       blocos deste arquivo, entao uma trava de comportamento aqui mediria o estado de outro teste.
+       Sem a tela na chave, duas batalhas seguidas com o mesmo numero de confrontos herdariam os
+       abertos uma da outra. */
+    ok('e a TELA entra na chave (senao duas batalhas seguidas herdariam os abertos)',
+       cliL.indexOf('const chave = String(game.screen) + ":" + ((matchups && matchups.length) || 0)') > 0);
+  }
+  /* ⚠️ E ELE NAO PODE DEPENDER DA REFERENCIA DO ARRAY: o online monta o `logDaMinhaVista` a CADA
+     render, entao ali o array e sempre novo -- comparando referencia, o estado zeraria em todo
+     desenho e o clique nunca abriria nada. Esta trava e a prova. */
+  {
+    const a = conf(2);
+    S.renderMatchupLog(a); S.alternarLogDoConfronto(0);
+    const b = conf(2);                                  // MESMO conteudo, array NOVO (o caso do online)
+    ok('um array NOVO com o mesmo conteudo mantem o aberto', /mlog-passo/.test(S.renderMatchupLog(b)));
+  }
+
+  /* 4) ⚠️ CONFRONTO SEM PASSO A PASSO NAO GANHA O + nem vira botao: e o log antigo, gravado antes de
+        o diario existir, e ali nao ha o que expandir. */
+  {
+    const velho = conf(1); delete velho[0].golpes;
+    const html = S.renderMatchupLog(velho);
+    ok('log antigo (sem diario) nao ganha o +', !/mlog-mais/.test(html));
+    ok('e nem vira botao', !/mlog-abre/.test(html));
+  }
+
+  /* 5) ⚠️ O CARD E UMA <div role="button">, E NAO UM <button> -- e essa e a diferenca que faz o
+        desenho funcionar. O passo a passo fica DENTRO do card, e ele contem o selo clicavel da
+        chuva, que E um <button>: <button> dentro de <button> e HTML invalido, o navegador fecha o
+        de fora e o clique de dentro se perde -- com a tela continuando a PARECER certa.
+        A nota do selo da chuva previu este dia com todas as letras: *"se um dia a linha do log
+        virar clicavel, e este o lugar que quebra"*. Numa div o aninhamento e valido, e o selo ja
+        nasceu com `event.stopPropagation()` -- tocar nele abre a caixa da chuva sem fechar o card. */
+  {
+    const lista = conf(1);
+    const html = logAberto(lista);
+    ok('o card NAO e um <button> (senao o selo da chuva dentro dele seria invalido)',
+       /<div class="matchup-row mlog mlog-card[^"]*"[^>]*role="button"/.test(html) &&
+       !/<button[^>]*matchup-row/.test(html),
+       (html.match(/<div class="matchup-row[^>]*>/) || ['(nao achei o card)'])[0].slice(0, 80));
+    ok('e o passo a passo fica DENTRO dele', html.indexOf('mlog-passo') > html.indexOf('mlog-card'));
+    ok('e ele tem teclado (a div nao traz de fabrica)',
+       /tabindex="0"/.test(html) && /onkeydown="if\(event\.key==='Enter'/.test(html));
+  }
+  /* o caso concreto que a nota descrevia: o selo da chuva DENTRO do card */
+  {
+    const lista = conf(1);
+    lista[0].chuva = true;
+    lista[0].golpes = [{ q:'p', d:0, hp:null, c:0, m:0, z:0, x:'chuva', g:'Gloom0' }].concat(lista[0].golpes);
+    const html = logAberto(lista);
+    ok('o selo clicavel da chuva aparece dentro do card', /selo-clicavel/.test(html));
+    ok('e ele nao fecha o card ao ser tocado (stopPropagation)',
+       /selo-clicavel[^>]*onclick="event\.stopPropagation\(\)/.test(html),
+       (html.match(/<button[^>]*selo-clicavel[^>]*>/) || ['(sem selo)'])[0].slice(0, 90));
+    /* ⚠️ E O CARD CONTINUA SENDO O UNICO <div role=button>: se alguem o trocar por <button>, o selo
+       vira aninhado e o clique dele some. Esta e a trava que guarda isso. */
+    ok('e o card segue sendo div, com o selo como <button> dentro',
+       /role="button"/.test(html) && (html.match(/<button/g) || []).length >= 1 &&
+       !/<button[^>]*role="button"/.test(html));
+  }
+
+  /* 6) ⚠️ O TITULO DIZ QUEM VENCEU (16/09/2026, a pedido) -- e a unica coisa que o confronto FECHADO
+        precisa dizer: sem ele, saber quem ficou de pe exige LER as duas barras de vida. */
+  {
+    const um = conf(1);                                  // o player vence (enemyHpAfter 0)
+    ok('o titulo anuncia o vencedor',
+       /<div class="mlog-titulo">Vitória <span class="mlog-quem p">Gloom0<\/span><\/div>/.test(S.renderMatchupLog(um)),
+       (S.renderMatchupLog(um).match(/<div class="mlog-titulo">[\s\S]*?<\/div>/) || ['(sem titulo)'])[0]);
+    const doInimigo = conf(1);
+    doInimigo[0].playerHpAfter = 0; doInimigo[0].enemyHpAfter = 50;
+    ok('e quando quem vence e o adversario, o nome sai na cor DELE',
+       /Vitória <span class="mlog-quem e">Goldeen0<\/span>/.test(S.renderMatchupLog(doInimigo)));
+    /* ⚠️ OS DOIS CAINDO e 1,2% dos confrontos e e SEMPRE autodestruicao (a regra de 12/09/2026).
+       "Vitoria de" ali seria mentira, entao o titulo conta o que aconteceu. */
+    const ambos = conf(1);
+    ambos[0].playerHpAfter = 0; ambos[0].enemyHpAfter = 0;
+    ok('e se os dois cairem, o titulo diz isso',
+       /<div class="mlog-titulo">Os dois caíram<\/div>/.test(S.renderMatchupLog(ambos)));
+    /* os dois de pe nao acontece hoje (medido: 0 em 11.879) -- sem titulo e melhor que mentir */
+    const vivos = conf(1);
+    vivos[0].playerHpAfter = 50; vivos[0].enemyHpAfter = 50;
+    ok('e os dois de pe nao ganham titulo nenhum', !/mlog-titulo/.test(S.renderMatchupLog(vivos)));
+    ok('o titulo e centralizado', /\.mlog-titulo\{[^}]*text-align:center/.test(cliL));
+  }
+  /* ⚠️ E O BOTAO AZUL SUMIU -- ele durou horas, entre o + solto no bloco do × e o card. As tres
+     tentativas do mesmo dia estao registradas no CLAUDE.md; esta trava impede que os restos de
+     qualquer uma delas voltem sem querer. */
+  ok('nao sobrou nada do + nem do botao azul',
+     !/mlog-mais/.test(cliL) && !/mlog-barra/.test(cliL) && !/mlog-abre/.test(cliL),
+     ['mlog-mais', 'mlog-barra', 'mlog-abre'].filter(c => cliL.indexOf(c) >= 0).join(', ') || 'nenhum resto');
+
+  /* 7) o card nao usa o `.btn` da casa -- aquele e botao de ACAO, com moldura de 3px */
+  /* ⚠️ LE O HTML GERADO, e nao o CSS: o regex anterior (`matchup-row[^"]*btn`) atravessava o
+     arquivo inteiro ate achar um "btn" em outra regra, centenas de linhas abaixo. E o MESMO erro
+     do [\s\S]*? que a trava do formato do botao azul cometeu horas antes. */
+  {
+    const cls = (S.renderMatchupLog(conf(1)).match(/class="(matchup-row[^"]*)"/) || ['', ''])[1];
+    ok('o card nao usa o .btn da casa', cls.split(/\s+/).indexOf('btn') < 0, cls);
+  }
+  /* ⚠️ A BORDA E O QUE DIZ QUE ELE E CLICAVEL, e ela segue o `.team-grid-card` (o card de pokemon
+     da tela de ordem): 2px, cantos de 5px, fundo branco e sombra. Reusar o molde e o que faz o
+     jogador reconhecer "isto se toca" sem aprender nada novo. */
+  ok('o card tem borda de 2px e cantos de 5px, como o card de pokemon',
+     /\.matchup-row\.mlog-card\{[^}]*border:2px solid var\(--box-border\)/.test(cliL) &&
+     /\.matchup-row\.mlog-card\{[^}]*border-radius:5px/.test(cliL),
+     (cliL.match(/\.matchup-row\.mlog-card\{[^}]*}/) || ['(sem regra)'])[0].replace(/\s+/g, ' ').slice(0, 110));
+  ok('e aberto ele fica com a borda AZUL (e o que diz QUAL card esta aberto)',
+     /\.mlog-card\.aberto\{border-color:var\(--blue\)/.test(cliL));
+  /* ⚠️ A regra do :last-child do card e REDUNDANTE hoje (ordem de declaracao ja resolve, medido no
+     navegador) -- ela guarda o dia em que o bloco for movido pra cima. */
+  ok('e o card tem cursor e foco visivel',
+     /\.matchup-row\.mlog-card\{[^}]*cursor:pointer/.test(cliL) &&
+     /\.mlog-card:focus-visible\{outline:2px solid var\(--blue\)/.test(cliL));
 }
 
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
