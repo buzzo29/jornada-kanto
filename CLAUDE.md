@@ -641,14 +641,15 @@ Base criada em 09/09/2026 e **trocada de geração no mesmo dia**: nasceu na Gen
   `jornadakanto.com/data/golpes.json`. Isso é conveniente de propósito: são 149 KB, e o
   `index.html` já tem 1,17 MB. Quando a feature existir, o caminho barato é o cliente BUSCAR o
   arquivo em vez de inchar o HTML — e aí a base não precisa virar a sexta tabela duplicada.
-- **O nome em PORTUGUÊS vive em `tools/golpes-pt.json`, e são 161** (159 da base mais o `cut` e o `surf`). O arquivo da base traz só o
+- **O nome em PORTUGUÊS vive em `tools/golpes-pt.json`, e são 162** (159 da base mais os TRÊS de HM: o `cut`, o `surf` e o `fly`). O arquivo da base traz só o
   nome canônico em inglês — os nomes PT que o jogo já usava (`MOVE_BY_TYPE`, `MOVE_OVERRIDES`)
   são por TIPO e não por golpe, então a passada foi à mão, uma vez. A Gen 3 acrescentou **37**
   (Ás Aéreo, Vento Prateado, Pulso de Água, Quebra-Telha, Cauda de Ferro...). Golpe de dano sem
   nome ali sai no log e nas telas com o **id em inglês**, então o gerador de tabelas é quem tem
   que gritar se faltar.
 - **⚠️ OS GOLPES DE HM SÃO ESCRITOS À MÃO NO GERADOR DE TABELAS** (`A_MAO`, em
-  `tools/gerar-tabelas-golpes.js`) — são **dois desde 15/09/2026**: o `cut` (HM01) e o `surf` (HM03).
+  `tools/gerar-tabelas-golpes.js`) — são **TRÊS desde 16/09/2026**: o `cut` (HM01), o `surf` (HM03)
+  e o `fly` (HM02).
   Eles são os ÚNICOS golpes da tabela `GOLPES` que não saem da base, e o motivo é um só: **HM ninguém
   aprende por NÍVEL**, e a base só cadastra aprendizado por nível — o gerador nunca os viu.
   **Sem essas linhas, regenerar as tabelas APAGA os dois em silêncio** e os HMs ficam sem nada pra
@@ -6492,6 +6493,129 @@ A intuição erra três vezes:
 | **cinco dos sete iniciais cortam** | Bulbasaur, Charmander, Chikorita, Cyndaquil, Totodile |
 | **a linha do Squirtle e o Pichu NÃO** | e são justamente os dois que "pareceriam" cortar |
 | **os quatro lendários da lista ficam** | Raikou, Entei, Suicune e Celebi — é o que o dado diz, a mesma decisão do Lugia no `RECUPERACAO` e no `REMOINHO`. O Celebi é INTOCÁVEL, então a entrada dele não roda hoje |
+
+### O HM02 (VOAR): O PRIMEIRO QUE COBRA COMO O TIME FOI MONTADO (16/09/2026)
+
+Pedido assim: *"implemente o HM02, Fly, para um treinador obter ele, ele tem que vencer a oitava
+insígnia usando os 6 pokemons sendo voadores, pode ter mais tipo além do voador, como por exemplo o
+Charizard que é Fogo e Voador, porém todos os 6 devem ter o selo de voador"*.
+
+**Os três HMs cobram coisas de naturezas diferentes**, e é isso que faz eles não se parecerem: o
+**HM01** cobra uma ROTA e uma vitória limpa, o **HM03** cobra uma COLEÇÃO (as 17 da Zona de Safári),
+e este cobra **COMO você montou o time**. É também o único que dá pra perder sem perceber — trocando
+um pokémon antes do último ginásio.
+
+- **O GOLPE: Voador, poder 70** — o número da **Gen 3**, conferido pela cadeia de mods 8→3, o mesmo
+  caminho do `cut` (50) e do `surf` (95). Entra no `GOLPES` e no `GOLPES_PT` **dos dois motores**,
+  no `A_MAO` do gerador e no `golpes-pt.json`, e fica **fora do `GOLPES_IDS`**.
+  **O `POOL_METRONOMO` foi de 157 pra 158**, como nos outros dois.
+- **⚠️ A CONDIÇÃO É SOBRE O TIME, não sobre quem lutou.** O pedido é *"usando os 6 pokémons"*, e num
+  ginásio o time inteiro está em jogo mesmo que a luta acabe no terceiro confronto.
+- **⚠️ E ELA NÃO OLHA A LISTA DE QUEM APRENDE** (confirmado a pedido: *"independente se essas 6 podem
+  aprender o Fly ou não"*). São duas perguntas diferentes e elas não se encostam: a **condição**
+  pergunta o TIPO do time, a **lista** pergunta o que a ESPÉCIE aprende.
+  **Seis voadores em que NENHUM aprende o Voar ganham o HM do mesmo jeito** — e aí ele fica na
+  mochila esperando um pokémon que saiba usá-lo. O caso extremo existe de verdade e está trancado no
+  teste: Gyarados, Scyther, Butterfree, Gligar, Mantine e Golbat voam e nenhum aprende.
+- **⚠️ SEIS, e não "todos os que tiver".** Levar três voadores não é a mesma proeza — é o que a
+  palavra *"os 6"* diz, e é o que faz dela um desafio.
+- **⚠️ E O TIPO SAI DA INSTÂNCIA (`p.types`), não da espécie:** é ele que o `tryEvolve` atualiza e é
+  ele que a tela DESENHA no selo. Lido da espécie, um save cujo campo ficou pra trás discordaria da
+  tela — e a regra é literalmente *"todos com o selo de Voador"*. Sem o campo, cai na espécie.
+  O segundo tipo é livre, que é o pedido ao pé da letra: o Charizard (Fogo/Voador) entra.
+
+**⚠️ ELE É ALCANÇÁVEL, E ISSO FOI MEDIDO ANTES DE ESCREVER A CONDIÇÃO** — HM impossível é o pior
+defeito que existe, e este projeto já teve um (o desafio do Mewtwo, impossível por semanas por causa
+do Celebi).
+
+| | |
+|---|---|
+| jornadas que chegam aos **seis voadores** | **76,3%** |
+| idem **sem contar o inicial** (quem não escolheu Charmander) | 53,0% |
+| trechos que oferecem voador | **8 de 8** |
+| linhas evolutivas voadoras em rota | 19 |
+
+(600 jornadas simuladas, com o jogador escolhendo sempre a rota que mais oferece voador e pegando
+2 por trecho — que é o que alguém caçando o HM faria.)
+
+**E um time desses GANHA o 8º ginásio** (600 batalhas por lado, time de seis voadores Lv.58):
+**72,8%** contra o Giovanni e **67,2%** contra a Clair. Faz sentido que o de Kanto seja mais fácil —
+Voador é **imune** a Terra, e o time do Giovanni é quase todo de Terra.
+
+**OS 24 QUE APRENDEM saíram da tag de MÁQUINA da Gen 3 (`3M`)**, o MESMO caminho dos 72 cortadores e
+dos 65 surfistas — e o método foi conferido de novo rodando o extrator pro `cut` e pro `surf`:
+devolve **exatamente 72 e 65**, sem uma divergência.
+
+**⚠️ TODO MUNDO QUE APRENDE VOAR É VOADOR, MAS O CONTRÁRIO NÃO VALE — e a diferença é grande: 14
+voadores não aprendem.** Gyarados, Scyther, Butterfree, Gligar, Mantine, Natu, Yanma, a linha do
+Hoppip, Ledyba/Ledian, e — o detalhe que só o dado sabe — **Zubat e Golbat não, mas o Crobat sim**.
+Ou seja, **dá pra ganhar o HM02 com um time em que metade não consegue usá-lo**, e está certo: a
+CONDIÇÃO é sobre o time, a lista é sobre a espécie.
+O Lugia e o Ho-Oh ficam por ser o que o dado diz, como no `RECUPERACAO` e no `REMOINHO`: os dois são
+INTOCÁVEIS e a entrada não roda hoje.
+
+- **⚠️ OS HMs DE VITÓRIA VIRARAM UMA TABELA** (`HM_DA_VITORIA`) — o comentário do `finishBattle` já
+  previa isto por escrito: *"o `ganhouHmAgora` guarda o ID, não um booleano, porque o próximo HM vai
+  passar por esta mesma linha"*. Hoje o próximo é uma linha na lista.
+  **SÓ UM É ANUNCIADO POR VITÓRIA, e isso é seguro por construção:** o HM01 se decide no 3º ginásio
+  e o HM02 no 8º, então eles não podem cair na mesma luta. Há trava cobrando que as duas condições
+  **nunca valham no mesmo ginásio** — se um dia valerem, é ali que se decide o que fazer.
+- **⚠️ E A LISTA TEVE QUE IR PRO SERVIDOR TAMBÉM**, e isso quase passou: o `APRENDEM_HM` do
+  `golpesValidos` é quem deixa um golpe de HM sobreviver na liga e no online (HM ninguém aprende por
+  nível, então o `APRENDIZADO` não o conhece). Sem a entrada, **quem ensinasse Voar perderia o golpe
+  em toda partida de liga, em silêncio**. Conferido no ato: `golpesValidos('charizard', 70, ['fly'])`
+  devolvia lista vazia.
+  Hoje há trava varrendo o `HMS` e cobrando que **todo HM do jogo tenha entrada na tabela do
+  servidor** — o próximo nasce coberto.
+- A trava do `A_MAO` pegou o `fly` sozinha, que é exatamente o que ela foi escrita pra fazer: ela
+  **varre o `HMS`** em vez de nomear os golpes.
+
+`tools/test-inventario.js` tranca 29 pontas: o golpe (Voador/70, o nome PT, fora do `GOLPES_IDS`,
+não se desaprende), a lista (24, todas voadoras, o Crobat sim e o Golbat não, os 14 que voam sem
+aprender), a condição (os seis, o segundo tipo livre, um não-voador derrubando, cinco não bastando,
+só no 8º ginásio, o tipo vindo da instância), o gancho da vitória com o HM01 ainda saindo por ele, o
+não-cruzamento das condições, e — a mais importante — que **existe voador pra capturar nos 8
+trechos**, que é o que sustenta os 76,3%.
+
+#### ⚠️ E ELE DESENTERROU UM FLAKE DA RAIDE, que não era dele
+
+`tools/test-boss.js` falhava **2 em 12 rodadas**, com quatro travas caindo juntas. **Não era o
+`fly`** — medido, falhava igual sem ele.
+
+A causa é a pendência que a seção do golpe moribundo já registra: **desde 15/09/2026 uma investida
+tira ~12,5 de dano relativo em vez de ~40,5**, porque o Mew é mais rápido que o time inteiro e mata
+cada um numa troca — quase todo o dano vinha do **revide de quem caía**.
+
+O teste desbastava a vida do Mew até `hp > 250` e então mandava N investidas simultâneas, supondo
+que **uma** tirava mais que 250. Não tira mais: o Mew sobrevivia, e as quatro travas do "fio de
+vida" caíam juntas.
+
+**⚠️ O ALVO CERTO É `N × a MENOR investida`, e isso custou TRÊS tentativas — as duas grandezas em
+jogo são OPOSTAS:**
+
+| tentativa | o que quebrou |
+|---|---|
+| parar quando a vida cabe na **MAIOR** investida | a leva não derruba quando todas as N saem fracas — 2/12 virou **1/37**, ainda flake |
+| parar na **MENOR** | o próprio laço **MATA** o Mew, e a leva estoura com *"O Mew já foi derrotado"* |
+| **escrever o HP** direto (determinístico!) | quebra a trava do fim, que cobra que a soma das **contribuições** bate com o `maxHp` — ou seja, que tudo que saiu do Mew foi creditado a alguém. Pular 25 mil de vida escrevendo o campo quebra exatamente essa conta |
+
+`N × menorDano` satisfaz as duas: ele é **maior que a maior investida já vista** (10 × 13 = 130
+contra 68), então o laço nunca mata; e é o **piso** do que N investidas somam, então a leva derruba.
+
+E o laço **não pode esperar que toda volta machuque**: uma investida pode sair com dano ZERO, então
+ele guarda o menor dano **não nulo** e tem teto de voltas — sem o teto, uma raide mal calibrada
+travaria o teste em vez de acusar.
+
+**⚠️ E O MESMO DANO ZERO DERRUBAVA OUTRA TRAVA, num bloco que nem é sobre isso:** o `tester2` atacava
+uma vez, tirava zero, e a trava do *"cada jogador tem o dano dele"* caía lá embaixo — ~1 rodada em
+25. Ele passou a **atacar até machucar**, com teto.
+
+Medido depois de tudo: **0 falhas em 25 rodadas**, contra 2 em 12 no começo.
+
+**O que isto NÃO conserta é a raide**, que continua descalibrada e por isso **DESLIGADA**
+(`BOSS_ATIVO`). Recalibrar é mexer no nível do Mew ou no `BOSS_MAX_HP`, e exige apagar
+`globalBoss/mew`, `globalBoss/mewRank` e a subcoleção `players` — o `maxHp` fica gravado no
+documento e o dano acumulado está na escala antiga.
 
 ### O HM03 (SURF): O PRIMEIRO HM QUE NÃO VEM DE UMA BATALHA (15/09/2026)
 

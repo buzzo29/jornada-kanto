@@ -6393,6 +6393,7 @@ function bestMultiplier(atkTypes, defTypes){
 const GOLPES = {
   cut: ['Normal', 50],
   surf: ['Water', 95],
+  fly: ['Flying', 70],
   absorb:['Grass',20],acid:['Poison',40],aerialace:['Flying',60],aeroblast:['Flying',100],
   aircutter:['Flying',55],ancientpower:['Rock',60],astonish:['Ghost',30],aurorabeam:['Ice',65],
   barrage:['Normal',15],beatup:['Dark',10],bind:['Normal',15],bite:['Dark',60],
@@ -6470,7 +6471,7 @@ const GOLPES_PT = {
   rollout:'Rolamento',sacredfire:'Fogo Sagrado',sandtomb:'Tumba de Areia',scratch:'Arranhão',
   shadowball:'Bola Sombria',shadowpunch:'Soco Sombrio',signalbeam:'Feixe de Sinal',
   silverwind:'Vento Prateado',skullbash:'Quebra-Crânio',skyattack:'Ataque Celeste',
-  skyuppercut:'Cruzado Celeste',slam:'Batida',slash:'Talho',cut:'Corte',surf:'Surf',sludge:'Lodo',
+  skyuppercut:'Cruzado Celeste',slam:'Batida',slash:'Talho',cut:'Corte',surf:'Surf',fly:'Voar',sludge:'Lodo',
   sludgebomb:'Bomba de Lodo',smog:'Fumaça Tóxica',snore:'Ronco',solarbeam:'Raio Solar',
   spark:'Faísca',spikecannon:'Canhão de Espinhos',steelwing:'Asa de Aço',stomp:'Pisão',
   submission:'Submissão',superpower:'Superpoder',swift:'Rapidez',tackle:'Investida',
@@ -11094,11 +11095,15 @@ function finishBattle(){
   evoluirQuemSubiuNoDesmaio(subiram);
   if(result.win){
     game.badgesEarned.push(gymAtual().badge);
-    /* O HM01 É DECIDIDO AQUI, e o lugar não é escolha de estilo: o `game.losses` só zera depois,
-       na distribuição de níveis. Lido de lá ele seria zero sempre, e o HM sairia pra quem perdeu
-       quatro vezes. O `ganhouHmAgora` é o que a tela de vitória lê pra anunciar -- e ele guarda o
-       ID, não um booleano, porque o próximo HM vai passar por esta mesma linha. */
-    game.ganhouHmAgora = (conquistouHM01() && darHM('hm01')) ? 'hm01' : null;
+    /* OS HMs DE VITÓRIA SÃO DECIDIDOS AQUI, e o lugar não é escolha de estilo: o `game.losses` só
+       zera depois, na distribuição de níveis. Lido de lá ele seria zero sempre, e o HM01 sairia pra
+       quem perdeu quatro vezes. O `ganhouHmAgora` guarda o ID, não um booleano.
+       ⚠️ ELES VIRARAM UMA TABELA em 16/09/2026, quando o HM02 entrou -- o comentário aqui já previa
+       que "o próximo HM vai passar por esta mesma linha". Hoje o próximo é uma linha na lista.
+       ⚠️ SÓ UM É ANUNCIADO POR VITÓRIA, e isso é seguro por construção: o HM01 se decide no 3º
+       ginásio e o HM02 no 8º, então eles não podem cair na mesma luta. Se um dia dois coincidirem,
+       é aqui que se decide o que fazer -- e há teste cobrando que as condições não se cruzem. */
+    game.ganhouHmAgora = hmDaVitoria();
     // 1ª insígnia = a jornada saiu do papel; aquele slot ganha direito a um sorteio novo de
     // iniciais E a encontros novos na PRÓXIMA vez que for recriado (ver encerrarTentativaDoSlot)
     if(game.badgesEarned.length === 1) encerrarTentativaDoSlot(game.currentSaveSlot);
@@ -19639,6 +19644,22 @@ const SURFISTAS = [
   "marill","azumarill","politoed","wooper","quagsire","slowking","qwilfish","sneasel",
   "corsola","remoraid","octillery","mantine","kingdra","miltank","suicune","tyranitar","lugia"
 ];
+/* ⚠️ QUEM APRENDE O HM02 (o VOAR), pelo MESMO caminho dos 72 cortadores e dos 65 surfistas: a tag
+   de MÁQUINA da Gen 3 (`3M`) do `learnsets.ts` do Pokémon Showdown. São **24 das 250**.
+   O MÉTODO FOI CONFERIDO de novo, rodando o mesmo extrator pro `cut` e pro `surf`: ele devolve
+   exatamente 72 e 65, sem uma divergência.
+   ⚠️ TODO MUNDO QUE APRENDE VOAR É VOADOR -- mas o contrário NÃO vale, e essa é a parte que
+   surpreende: **14 voadores não aprendem** (Zubat e Golbat não, o Crobat sim; Gyarados, Scyther,
+   Butterfree, Gligar, Mantine, a linha do Hoppip, Natu, Ledyba, Yanma).
+   Ou seja, dá pra ganhar o HM02 com um time de seis voadores em que metade não consegue usá-lo --
+   e está certo: a CONDIÇÃO é sobre o time, a lista é sobre a espécie.
+   O Lugia e o Ho-Oh ficam por ser o que o dado diz, como no `RECUPERACAO` e no `REMOINHO`: os dois
+   são INTOCÁVEIS e a entrada não roda hoje. */
+const VOADORES = [
+  "charizard","pidgey","pidgeotto","pidgeot","spearow","fearow","crobat","farfetchd",
+  "doduo","dodrio","aerodactyl","articuno","zapdos","moltres","dragonite","hoothoot",
+  "noctowl","togetic","xatu","murkrow","delibird","skarmory","lugia","hooh"
+];
 const GOLPE_DO_CORTE = "cut";
 /* SABER O CORTE É UMA PROPRIEDADE DA INSTÂNCIA, não da espécie -- dois Scyther do mesmo treinador
    podem estar um com e outro sem. É o mesmo desenho do `sketch` do Smeargle, e é por isso que ele
@@ -19682,6 +19703,20 @@ const HMS = {
      E ele NÃO destrava rota nenhuma por enquanto: o golpe existe, se ensina e vale em batalha (Água,
      poder 95), e mais nada. É o mesmo desenho do HM01 no primeiro dia -- primeiro a porta, depois o
      que tem atrás dela. */
+  /* ⚠️ O HM02 É O PRIMEIRO QUE COBRA UMA COMPOSIÇÃO DE TIME (16/09/2026, a pedido: *"para um
+     treinador obter ele, ele tem que vencer a oitava insígnia usando os 6 pokemons sendo
+     voadores"*). O HM01 cobra uma ROTA e uma vitória limpa; o HM03, uma coleção. Este cobra COMO
+     você montou o time -- e por isso ele é o único que dá pra perder sem saber, trocando um pokémon
+     antes do último ginásio. */
+  hm02: {
+    nome: 'HM02 — Voar',
+    icone: '📀',
+    resumo: 'Ensina o Voar. Um golpe de Voador forte, pra quem tem asas.',
+    golpe: 'fly',
+    aprendem: VOADORES,
+    exemplos: 'o Charizard, o Pidgeot, o Fearow, o Dodrio e o Crobat',
+    comoGanhar: 'Vencendo a OITAVA insígnia com os seis do time sendo do tipo Voador — o segundo tipo pode ser qualquer um.'
+  },
   hm03: {
     nome: 'HM03 — Surf',
     icone: '📀',
@@ -19740,6 +19775,39 @@ function conquistouHM01(){
   if(!gym || gym.id !== HM01_GINASIO) return false;
   if((game.losses || 0) > 0) return false;                       // "no máximo 1 tentativa"
   return (game.routeHistory || [])[game.gymIndex] === HM01_ROTA;
+}
+/* ⚠️ A CONDIÇÃO DO HM02: a OITAVA insígnia com os SEIS do time sendo VOADORES.
+   ELA É SOBRE O TIME, não sobre quem lutou: o pedido é "usando os 6 pokémons sendo voadores", e num
+   ginásio o time inteiro está em jogo mesmo que a luta acabe no terceiro.
+   ⚠️ SEIS, e não "todos os que tiver": levar três voadores não é a mesma proeza. É o que a palavra
+   "os 6" diz, e é o que faz dela um desafio -- com quatro ela seria quase de graça.
+   ⚠️ E O TIPO SAI DA INSTÂNCIA (`p.types`), não da espécie: é ele que o `tryEvolve` atualiza e é
+   ele que o jogo DESENHA no selo. Lido da espécie, um save antigo com o campo velho discordaria da
+   tela -- e a regra é justamente "todos com o selo de Voador".
+   O segundo tipo é livre, que é o pedido ao pé da letra: o Charizard (Fogo/Voador) entra.
+   MEDIDO: quem caça voador chega aos seis em **76,3%** das jornadas (600 simuladas, escolhendo a
+   rota que mais oferece e pegando 2 por trecho), e um time desses vence o 8º ginásio em 72,8%
+   contra o Giovanni e 67,2% contra a Clair. É um desafio de verdade e alcançável. */
+/* Os HMs que se decidem numa VITÓRIA de ginásio, na ordem em que são conferidos. HM novo que saia
+   de uma vitória entra aqui e mais nada muda. */
+const HM_DA_VITORIA = [['hm01', () => conquistouHM01()], ['hm02', () => conquistouHM02()]];
+function hmDaVitoria(){
+  for(const [id, cond] of HM_DA_VITORIA){ if(cond() && darHM(id)) return id; }
+  return null;
+}
+const HM02_GINASIO_IDX = 7;             // o 8o ginasio (o indice e base zero)
+const HM02_TIME = 6;
+function tiposDoPokemon(p){
+  if(!p) return [];
+  if(Array.isArray(p.types) && p.types.length) return p.types;
+  const sp = SPECIES[p.speciesId];
+  return (sp && sp.types) || [];
+}
+function conquistouHM02(){
+  if(game.gymIndex !== HM02_GINASIO_IDX) return false;
+  const time = game.team || [];
+  if(time.length !== HM02_TIME) return false;
+  return time.every(p => tiposDoPokemon(p).indexOf('Flying') >= 0);
 }
 /* ⚠️ A CONDIÇÃO DO HM03: TODOS os pokémon DA ZONA DE SAFÁRI na Pokédex da conta.
    ELA LÊ A POKÉDEX PERMANENTE, e não o save -- o HM é da conta, então a captura também conta por

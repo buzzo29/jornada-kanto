@@ -887,6 +887,7 @@ function gen1MaxHp(p){ return Math.floor(2 * effectiveBaseHp(p) * p.level / 100)
 const GOLPES = {
   cut: ['Normal', 50],
   surf: ['Water', 95],
+  fly: ['Flying', 70],
   absorb:['Grass',20],acid:['Poison',40],aerialace:['Flying',60],aeroblast:['Flying',100],
   aircutter:['Flying',55],ancientpower:['Rock',60],astonish:['Ghost',30],aurorabeam:['Ice',65],
   barrage:['Normal',15],beatup:['Dark',10],bind:['Normal',15],bite:['Dark',60],
@@ -973,7 +974,7 @@ const GOLPES_PT = {
   rollout:'Rolamento',sacredfire:'Fogo Sagrado',sandtomb:'Tumba de Areia',scratch:'Arranhão',
   shadowball:'Bola Sombria',shadowpunch:'Soco Sombrio',signalbeam:'Feixe de Sinal',
   silverwind:'Vento Prateado',skullbash:'Quebra-Crânio',skyattack:'Ataque Celeste',
-  skyuppercut:'Cruzado Celeste',slam:'Batida',slash:'Talho',cut:'Corte',surf:'Surf',sludge:'Lodo',
+  skyuppercut:'Cruzado Celeste',slam:'Batida',slash:'Talho',cut:'Corte',surf:'Surf',fly:'Voar',sludge:'Lodo',
   sludgebomb:'Bomba de Lodo',smog:'Fumaça Tóxica',snore:'Ronco',solarbeam:'Raio Solar',
   spark:'Faísca',spikecannon:'Canhão de Espinhos',steelwing:'Asa de Aço',stomp:'Pisão',
   submission:'Submissão',superpower:'Superpoder',swift:'Rapidez',tackle:'Investida',
@@ -1173,6 +1174,11 @@ const CORTADORES = [
   "sunflora","espeon","umbreon","gligar","steelix","scizor","heracross","sneasel",
   "teddiursa","ursaring","skarmory","raikou","entei","suicune","tyranitar","celebi"
 ];
+const VOADORES = [
+  "charizard","pidgey","pidgeotto","pidgeot","spearow","fearow","crobat","farfetchd",
+  "doduo","dodrio","aerodactyl","articuno","zapdos","moltres","dragonite","hoothoot",
+  "noctowl","togetic","xatu","murkrow","delibird","skarmory","lugia","hooh"
+];
 const SURFISTAS = [
   "squirtle","wartortle","blastoise","staryu","starmie","poliwag","poliwhirl","tentacool",
   "tentacruel","slowpoke","slowbro","gyarados","tauros","psyduck","golduck","krabby",
@@ -1185,7 +1191,7 @@ const SURFISTAS = [
 ];
 /* golpe de HM -> quem pode aprender. Uma tabela, e não um `if` por golpe: o próximo HM entra numa
    linha, e o validador não precisa saber que HM existe. */
-const APRENDEM_HM = { cut: CORTADORES, surf: SURFISTAS };
+const APRENDEM_HM = { cut: CORTADORES, surf: SURFISTAS, fly: VOADORES };
 /* ⚠️ O QUE O SERVIDOR ACEITA DE GOLPE ESCOLHIDO. Ele não confia na lista que chegou: reconstrói o
    que aquela espécie NAQUELE nível pode ter e fica só com a interseção.
    O que sobra de um time forjado é o motor de tipo -- ou seja, exatamente o que a liga já fazia
@@ -4424,7 +4430,7 @@ exports._decodeTeamCode = decodeTeamCode;
 exports._carimbaDoMatch = carimbaDoMatch;         // o teste confere que o golpe chega na liga
 exports._golpesValidos = golpesValidos;           // e que golpe forjado nao passa
 exports._resolveLeagueMatch = resolveLeagueMatch; // a auditoria roda o caminho real da liga
-exports._CORTADORES = CORTADORES; exports._SURFISTAS = SURFISTAS;   // comparadas com as do cliente
+exports._CORTADORES = CORTADORES; exports._SURFISTAS = SURFISTAS; exports._VOADORES = VOADORES;   // comparadas com as do cliente
 exports._battleInstances = battleInstances; exports._battleHydrate = battleHydrate;   // o teste da liga confere a ORDEM da lista pela especie de cada time
 exports.advanceTrainersLeague = onSchedule('every 1 minutes', async (event) => {
   try{

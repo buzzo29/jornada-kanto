@@ -110,8 +110,18 @@ function fim(){
 
   const outro = await chamar('getSundayBoss','tester2');
   ok('OUTRO jogador ve a mesma vida', outro.boss.hp === r1.hpDepois, outro.boss.hp+' = '+r1.hpDepois);
-  const r2 = await chamar('fightSundayBoss','tester2',{ slot:'0' });
-  ok('a segunda investida continua de onde a primeira parou', r2.hpAntes === r1.hpDepois);
+  /* ⚠️ ATACA ATE MACHUCAR: desde que o GOLPE MORIBUNDO acabou (15/09/2026) uma investida pode sair
+     com dano ZERO -- o Mew e mais rapido que o time inteiro e mata cada um numa troca, entao o time
+     pode cair sem conectar um golpe. Com dano zero, o `tester2` ficava sem contribuicao nenhuma e a
+     trava do 'cada jogador tem o dano dele' caia la embaixo, em ~1 rodada de 25.
+     O laco nao conserta a raide (ela segue descalibrada e DESLIGADA, ver BOSS_ATIVO) -- ele tira o
+     flake de um cenario que nao e sobre isso. */
+  let r2 = await chamar('fightSundayBoss','tester2',{ slot:'0' });
+  const hpDepoisDaPrimeira = r1.hpDepois;
+  let tentativas = 0;
+  while(r2.dano === 0 && tentativas++ < 200){ r2 = await chamar('fightSundayBoss','tester2',{ slot:'0' }); }
+  ok('a segunda investida continua de onde a primeira parou', r2.hpAntes <= hpDepoisDaPrimeira);
+  ok('  e ela machucou o Mew', r2.dano > 0, r2.dano + ' de dano em ' + (tentativas + 1) + ' investida(s)');
   ok('a vida nao regenerou entre as duas', r2.hpAntes <= r1.hpDepois);
 
   console.log('\nO SERVIDOR NAO ACEITA TIME DO CLIENTE');
@@ -213,8 +223,35 @@ async function multidao(){
   ok('ninguem derruba um Mew cheio', r.every(x=>!x.derrubou));
 
   console.log('\n' + N + ' AO MESMO TEMPO -- MEW A UM FIO DE VIDA');
-  // deixa menos vida do que UMA investida tira: e aqui que a conta estourava
-  while((await doc()).hp > 250){ await chamar('fightSundayBoss','m0',{slot:'0'}); }
+  /* ⚠️ O FIO DE VIDA E MEDIDO, e o alvo e `N x a MENOR investida` -- nao um numero escrito a mao e
+     nao a maior. Isso custou tres tentativas, e as duas grandezas sao OPOSTAS:
+       - o laco nao pode MATAR o Mew (a leva depois estoura com "O Mew ja foi derrotado"), entao ele
+         so ataca enquanto a vida for MAIOR que o pior caso de uma investida;
+       - a leva precisa DAR CONTA do que sobrou, entao a vida tem que caber na soma de N investidas.
+     `N x menorDano` satisfaz as duas: ele e maior que a MAIOR investida ja vista (10 x 13 = 130
+     contra 68), entao o laco nunca mata; e e o piso do que N investidas somam, entao a leva derruba.
+     ⚠️ E ESCREVER O HP DIRETO NAO SERVE, apesar de ser deterministico: a trava do fim cobra que a
+     soma das CONTRIBUICOES bate com o `maxHp` -- ou seja, que tudo que saiu do Mew foi creditado a
+     alguem. Pular 25 mil de vida escrevendo o campo quebra exatamente essa conta.
+     O numero velho (250) valia enquanto UMA investida tirava ~40 de dano relativo; desde que o
+     GOLPE MORIBUNDO acabou (15/09/2026) ela tira ~12,5, o Mew nao caia, e quatro travas falhavam
+     juntas em 2 de 12 rodadas.
+     ⚠️ E UMA INVESTIDA PODE SAIR COM DANO ZERO (o time todo cai sem conectar um golpe), entao o laco
+     guarda o menor dano NAO NULO e tem teto de voltas -- sem o teto, uma raide mal calibrada trava
+     o teste em vez de acusar. */
+  let menorDano = Infinity, voltas = 0;
+  while(voltas++ < 8000){
+    const hpAgora = (await doc()).hp;
+    if(menorDano < Infinity && hpAgora <= N * menorDano) break;
+    const inv = await chamar('fightSundayBoss', 'm0', { slot:'0' });
+    if(inv.dano > 0 && inv.dano < menorDano) menorDano = inv.dano;
+  }
+  {
+    const hpFio = (await doc()).hp;
+    ok('o Mew chegou a um fio de vida, sem o laco derruba-lo',
+       hpFio > 0 && menorDano < Infinity && hpFio <= N * menorDano,
+       'vida ' + hpFio + ', menor investida ' + menorDano + ', teto ' + (N * menorDano));
+  }
   antes = (await doc()).hp;
   r = await todos();
   const max = (await doc()).maxHp;

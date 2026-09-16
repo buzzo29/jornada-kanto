@@ -369,6 +369,19 @@ console.log('\n=== OS GOLPES ESCOLHIDOS CHEGAM NA LIGA E NO ONLINE (16/09/2026) 
     ok('SURFISTAS igual nos dois motores',
        fns._SURFISTAS.slice().sort().join(',') === cli.SURFISTAS.slice().sort().join(','),
        fns._SURFISTAS.length + ' vs ' + cli.SURFISTAS.length);
+    ok('VOADORES igual nos dois motores',
+       fns._VOADORES.slice().sort().join(',') === cli.VOADORES.slice().sort().join(','),
+       fns._VOADORES.length + ' vs ' + cli.VOADORES.length);
+    /* ⚠️ E A TABELA TEM QUE COBRIR TODO HM DO JOGO: sem a entrada, o golpe do HM some na liga EM
+       SILENCIO -- foi exatamente o que aconteceu com o `fly` quando ele nasceu, e so apareceu
+       porque eu fui conferir. O proximo HM nasce coberto por esta trava. */
+    {
+      const srv = require('fs').readFileSync(path.join(__dirname, '..', 'functions', 'index.js'), 'utf8');
+      const tab = (srv.match(/const APRENDEM_HM = \{[^}]*\}/) || [''])[0];
+      const semEntrada = Object.values(cli.HMS).map(h => h.golpe).filter(gp => tab.indexOf(gp + ':') < 0);
+      ok('  e todo HM do jogo tem entrada no APRENDEM_HM do servidor',
+         semEntrada.length === 0, semEntrada.length ? 'sem entrada: ' + semEntrada.join(',') : tab);
+    }
     /* e a CHAVE tem que ser a mesma nos dois: divergindo, o golpe e procurado numa chave que nao
        existe e o time inteiro cai no motor de tipo, EM SILENCIO */
     const txtCli = require('fs').readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');

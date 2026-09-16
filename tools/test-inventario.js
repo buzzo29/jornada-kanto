@@ -813,7 +813,16 @@ console.log('\n=== O HM01: A PRIMEIRA MAQUINA OCULTA (11/09/2026) ===');
     const i = txt.indexOf('function finishBattle()');
     const fim = txt.indexOf('\nfunction ', i + 1);
     const corpo = txt.slice(i, fim);
-    ok('o finishBattle decide o HM', corpo.indexOf('conquistouHM01()') > 0);
+    /* ⚠️ E ELE DECIDE OS HMs POR UMA TABELA desde 16/09/2026, quando o HM02 entrou -- o comentario
+       do codigo ja previa que "o proximo HM vai passar por esta mesma linha". A trava cobra o
+       GANCHO, e nao o nome de uma condicao: assim o HM04 entra numa linha sem mexer nela. */
+    ok('o finishBattle decide os HMs da vitoria', corpo.indexOf('hmDaVitoria()') > 0);
+    /* ⚠️ O REGEX VAI ATE O `];`, e nao `[^\]]*`: as entradas da tabela sao arrays, entao aquele
+       para na PRIMEIRA delas e a trava acusa a tabela certa como incompleta. */
+    const tabelaHm = (txt.match(/const HM_DA_VITORIA = \[[\s\S]*?\];/) || [''])[0];
+    ok('  e a tabela tem as duas condicoes',
+       /conquistouHM01/.test(tabelaHm) && /conquistouHM02/.test(tabelaHm),
+       tabelaHm.replace(/\s+/g, ' '));
     ok('e NAO zera o losses antes disso', corpo.indexOf('game.losses = 0') < 0,
        'o zero do losses mora na distribuicao de niveis, e e por isso que a condicao cabe aqui');
     /* O zero existe, so nao e aqui -- se ele sumir do jogo, a condicao vira sempre-verdadeira.
@@ -1212,6 +1221,143 @@ console.log('\n=== O HM01: A PRIMEIRA MAQUINA OCULTA (11/09/2026) ===');
        p.ataques.indexOf('hyperbeam') >= 0 && p.ataques.indexOf('cut') >= 0, p.ataques.join(','));
   }
 }
+console.log('\n=== O HM02: O VOAR, E O PRIMEIRO QUE COBRA COMO O TIME FOI MONTADO (16/09/2026) ===');
+{
+  /* Pedido assim: *"implemente o HM02, Fly, para um treinador obter ele, ele tem que vencer a
+     oitava insignia usando os 6 pokemons sendo voadores, pode ter mais tipo alem do voador, como
+     por exemplo o Charizard que e Fogo e Voador, porem todos os 6 devem ter o selo de voador"*. */
+  const g = S.__getGame();
+  const mk = id => S.createInstance(id, 60);
+  const SEIS = ['charizard','pidgeot','fearow','dodrio','crobat','aerodactyl'];
+
+  /* ===== O GOLPE ===== */
+  ok('o fly esta na tabela de golpes', !!S.GOLPES.fly, JSON.stringify(S.GOLPES.fly));
+  /* ⚠️ 70 E O PODER DA GEN 3 -- conferido pela cadeia de mods 8->3, o mesmo caminho do cut (50) e
+     do surf (95). */
+  ok('e ele e Voador, poder 70 (Gen 3)', S.GOLPES.fly[0] === 'Flying' && S.GOLPES.fly[1] === 70,
+     S.GOLPES.fly.join('/'));
+  ok('e tem nome em portugues', S.nomeDoAtaque('fly') === 'Voar', S.nomeDoAtaque('fly'));
+  /* fora do GOLPES_IDS pelo mesmo motivo dos outros dois: aquele array e INDEXADO pelo APRENDIZADO */
+  ok('e fica FORA do GOLPES_IDS', (S.GOLPES_IDS || []).indexOf('fly') < 0);
+  ok('e nao se desaprende', S.ehGolpeDeMaquina('fly') === true);
+
+  /* ===== QUEM APRENDE ===== */
+  ok('sao 24 especies que aprendem o Voar', S.VOADORES.length === 24, String(S.VOADORES.length));
+  ok('todas existem no SPECIES', S.VOADORES.every(id => !!S.SPECIES[id]),
+     S.VOADORES.filter(id => !S.SPECIES[id]).join(','));
+  ok('nenhuma repetida', new Set(S.VOADORES).size === S.VOADORES.length);
+  /* ⚠️ TODO MUNDO QUE APRENDE VOAR E VOADOR -- mas o contrario NAO vale, e e a parte que surpreende:
+     14 voadores nao aprendem. Isso quer dizer que da pra GANHAR o HM02 com um time em que metade
+     nao consegue usa-lo, e esta certo: a CONDICAO e sobre o time, a lista e sobre a especie. */
+  ok('todo mundo que aprende o Voar e do tipo Voador',
+     S.VOADORES.every(id => S.SPECIES[id].types.indexOf('Flying') >= 0),
+     S.VOADORES.filter(id => S.SPECIES[id].types.indexOf('Flying') < 0).join(','));
+  {
+    const voa = id => S.SPECIES[id].types.indexOf('Flying') >= 0;
+    const semFly = Object.keys(S.SPECIES).filter(id => voa(id) && S.VOADORES.indexOf(id) < 0);
+    ok('  mas nem todo Voador aprende (o Gyarados e o Zubat nao)',
+       semFly.indexOf('gyarados') >= 0 && semFly.indexOf('zubat') >= 0 && semFly.length === 14,
+       semFly.length + ' voadores sem o Voar');
+    /* o Crobat aprende e o Golbat nao -- o tipo de detalhe que so o dado sabe */
+    ok('  e o Crobat aprende enquanto o Golbat nao',
+       S.podeAprenderHM('hm02','crobat') && !S.podeAprenderHM('hm02','golbat'));
+  }
+  ok('a lista vive DENTRO do item', S.HMS.hm02.aprendem === S.VOADORES);
+
+  /* ===== A CONDICAO ===== */
+  const antes = { gymIndex:g.gymIndex, team:g.team, hms:g.hms };
+  g.hms = []; g.authUser = null;
+  g.gymIndex = S.HM02_GINASIO_IDX;
+  g.team = SEIS.map(mk);
+  ok('os SEIS voadores no 8o ginasio ganham', S.conquistouHM02() === true);
+  /* ⚠️ O SEGUNDO TIPO E LIVRE -- o Charizard e Fogo/Voador e entra, que e o pedido ao pe da letra */
+  ok('  e o segundo tipo e livre (o Charizard e Fogo/Voador)',
+     S.SPECIES.charizard.types.join('/') === 'Fire/Flying' && S.conquistouHM02() === true);
+  g.team = ['charizard','pidgeot','machamp','dodrio','crobat','aerodactyl'].map(mk);
+  ok('um nao-voador no meio derruba a condicao', S.conquistouHM02() === false);
+  /* ⚠️ SEIS, e nao "todos os que tiver": levar tres voadores nao e a mesma proeza */
+  g.team = SEIS.slice(0, 5).map(mk);
+  ok('cinco voadores nao bastam', S.conquistouHM02() === false);
+  g.team = SEIS.slice(0, 3).map(mk);
+  ok('e tres muito menos', S.conquistouHM02() === false);
+  /* e SO no 8o */
+  g.team = SEIS.map(mk);
+  for(const i of [0, 2, 5, 6]){
+    g.gymIndex = i;
+    ok('  e so vale no 8o ginasio (testado o ' + (i+1) + 'o)', S.conquistouHM02() === false);
+  }
+  g.gymIndex = S.HM02_GINASIO_IDX;
+  /* ⚠️ O TIPO SAI DA INSTANCIA, que e o que o `tryEvolve` atualiza e o que a tela DESENHA no selo.
+     Lido da especie, um save antigo com o campo velho discordaria da tela -- e a regra e "todos com
+     o selo de Voador". */
+  {
+    const t = SEIS.map(mk);
+    t[0].types = ['Fire'];              // um save cujo campo ficou pra tras
+    g.team = t;
+    ok('o tipo vem da INSTANCIA, nao da especie', S.conquistouHM02() === false);
+    delete t[0].types;                  // sem o campo, cai na especie
+    ok('  e sem o campo ele cai na especie', S.conquistouHM02() === true);
+  }
+
+  /* ⚠️ A CONDICAO NAO OLHA A LISTA DE QUEM APRENDE, e isso foi confirmado a pedido (16/09/2026):
+     *"a condicao para ganhar o Fly e que os 6 pokemons que vencem a oitava insignia sejam voadores,
+     independente se essas 6 podem aprender o Fly ou nao"*.
+     Sao duas perguntas DIFERENTES e elas nao se encostam: a CONDICAO pergunta o TIPO do time, a
+     lista pergunta o que a ESPECIE aprende. Seis voadores em que NENHUM aprende o Voar ganham o HM
+     do mesmo jeito -- e aí ele fica na mochila esperando um pokemon que saiba usa-lo.
+     Este caso e o extremo, e existe de verdade: os seis abaixo voam e nenhum aprende. */
+  {
+    const SEM_FLY = ['gyarados','scyther','butterfree','gligar','mantine','golbat'];
+    ok('  os seis do caso extremo voam', SEM_FLY.every(id => S.SPECIES[id].types.indexOf('Flying') >= 0));
+    ok('  e NENHUM deles aprende o Voar', SEM_FLY.every(id => !S.podeAprenderHM('hm02', id)));
+    g.hms = []; g.gymIndex = S.HM02_GINASIO_IDX; g.team = SEM_FLY.map(mk);
+    ok('e mesmo assim eles GANHAM o HM02', S.conquistouHM02() === true);
+    ok('  e a vitoria entrega', S.hmDaVitoria() === 'hm02' && S.temHM('hm02'));
+  }
+
+  /* ===== O GANCHO DA VITORIA ===== */
+  g.hms = []; g.team = SEIS.map(mk); g.gymIndex = S.HM02_GINASIO_IDX;
+  ok('a vitoria entrega o HM02', S.hmDaVitoria() === 'hm02');
+  ok('  e nao entrega de novo', S.hmDaVitoria() === null && S.temHM('hm02'));
+  /* o HM01 continua saindo pelo MESMO gancho */
+  g.hms = []; g.gymIndex = 2; g.losses = 0; g.routeHistory = []; g.routeHistory[2] = S.HM01_ROTA;
+  g.gymPath = ['kanto','kanto','kanto'];
+  ok('e o HM01 continua saindo pelo mesmo gancho', S.hmDaVitoria() === 'hm01');
+  /* ⚠️ SO UM E ANUNCIADO POR VITORIA, e isso e seguro porque as duas condicoes NUNCA valem juntas:
+     o HM01 se decide no 3o ginasio e o HM02 no 8o. Se um dia dois coincidirem, e aqui que grita. */
+  {
+    g.hms = [];
+    let cruza = 0;
+    for(let i = 0; i < 8; i++){
+      g.gymIndex = i; g.losses = 0; g.routeHistory = []; g.routeHistory[i] = S.HM01_ROTA;
+      g.team = SEIS.map(mk);
+      if(S.conquistouHM01() && S.conquistouHM02()) cruza++;
+    }
+    ok('as duas condicoes nunca valem no MESMO ginasio', cruza === 0, cruza + ' ginasio(s)');
+  }
+
+  /* ===== E ELE E ALCANCAVEL -- HM impossivel e o pior defeito que existe ===== */
+  /* Medido a parte (600 jornadas): quem caca voador chega aos seis em 76,3% das vezes, e um time
+     desses vence o 8o em 72,8% contra o Giovanni e 67,2% contra a Clair. A trava aqui cobra o que
+     torna isso possivel: que exista voador pra capturar em QUANTIDADE, espalhado pelos trechos. */
+  {
+    const voa = id => (S.SPECIES[id].types || []).indexOf('Flying') >= 0;
+    const linhas = new Set();
+    let trechosComVoador = 0;
+    for(let leg = 0; leg < 8; leg++){
+      let achou = false;
+      for(const r of (S.ROUTE_MAP[leg] || [])){
+        S.formasDaRota(r.id, leg).forEach(x => { if(voa(x.id)){ achou = true; linhas.add(S.raizDaLinha(x.id)); } });
+      }
+      if(achou) trechosComVoador++;
+    }
+    ok('ha voador pra capturar em TODOS os 8 trechos', trechosComVoador === 8, trechosComVoador + ' de 8');
+    ok('  e em linhas evolutivas distintas o bastante pra seis', linhas.size >= 6, linhas.size + ' linhas');
+  }
+
+  g.gymIndex = antes.gymIndex; g.team = antes.team; g.hms = antes.hms;
+}
+
 console.log('\n=== O HM03: O SURF, E O PRIMEIRO HM QUE NAO VEM DE BATALHA (15/09/2026) ===');
 {
   /* Pedido assim: *"quando um usuario conseguir capturar TODOS os pokemons da rota da Zona Safari,
