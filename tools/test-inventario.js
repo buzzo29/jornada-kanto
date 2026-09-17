@@ -303,7 +303,13 @@ console.log('\n=== AS TRES PRATELEIRAS DA LOJA ===');
     const t = S.renderLoja();
     ok('os tres botoes estao na tela', (t.match(/class="loja-aba /g)||[]).length === 3,
        (t.match(/class="loja-aba /g)||[]).length + ' botoes');
-    ok('com os nomes por extenso', S.LOJA_PRATELEIRAS.every(p => t.indexOf(p.nome) >= 0));
+    /* ⚠️ O ROTULO E O DA TELA: a LOJA usa o 'nomeLoja' quando ele existe (a prateleira das
+       Maquinas se chama 'TMs' la, porque HM ninguem compra) e a MOCHILA usa o 'nome'. Esta trava
+       cobrava o 'nome' nas duas e comecou a falhar no dia em que elas passaram a divergir --
+       ela media a tabela, e o que importa e o que a TELA mostra. */
+    ok('com os nomes por extenso',
+       S.LOJA_PRATELEIRAS.every(p => t.indexOf(p.nomeLoja || p.nome) >= 0),
+       S.LOJA_PRATELEIRAS.map(p => p.nomeLoja || p.nome).join(' | '));
     ok('a lista fica ao lado deles', t.indexOf('loja-corpo') >= 0 && t.indexOf('loja-abas') < t.indexOf('loja-lista'));
     /* O Doce Raro NAO pode aparecer na prateleira das batalhas. */
     ok('e a lista mostra so a prateleira aberta', t.indexOf('>Doce Raro') < 0,
@@ -903,7 +909,10 @@ console.log('\n=== O HM01: A PRIMEIRA MAQUINA OCULTA (11/09/2026) ===');
   S.escolherPrateleiraDaMochila('tms');
   {
     const t = S.renderInventario();
-    ok('a prateleira lista o HM da conta', /HM01/.test(t) && linhas(t) === 1, limpo(t).slice(0, 70));
+    /* ⚠️ SAO TRES LINHAS desde 17/09/2026: os HMs aparecem todos, tendo ou nao (ver o bloco
+       "OS TRES HMs NA MOCHILA"). Antes so os conquistados entravam. */
+    ok('a prateleira lista os TRES HMs', /HM01/.test(t) && linhas(t) === Object.keys(S.HMS).length,
+       linhas(t) + ' linhas');
     /* A MAQUINA NAO SE USA NEM SE EXCLUI: ela ENSINA, e ensina quantas vezes quiser. */
     ok('e o quadro traz o botao de Ensinar', /onclick="abrirEnsinarHm\('hm01'\)"/.test(t));
     ok('sem Usar e sem Excluir', !/usarItem\(/.test(t) && !/pedirExclusaoDeItem\(/.test(t));
@@ -935,19 +944,26 @@ console.log('\n=== O HM01: A PRIMEIRA MAQUINA OCULTA (11/09/2026) ===');
     S.escolherPrateleiraDaMochila('tms'); S.escolherItem('hm01');
     S.__getGame().hms = ['hm01'];   // devolve o estado que o resto do bloco espera
   }
-  /* ⚠️ SEM NENHUM: o quadro fica EM BRANCO e a lista diz "Nenhum TM/HM" -- os dois ao pe da letra
-     do pedido de 14/09/2026 (*"caso nao possua nenhum TM/HM, deixar em branco"*). A frase que
-     ensinava o caminho do HM01 (S.S. Anne, Lt. Surge de primeira) SAIU no mesmo pedido. */
+  /* ⚠️ A PRATELEIRA NUNCA MAIS FICA VAZIA (17/09/2026): os tres HMs aparecem sempre, e os que
+     faltam vem apagados com o caminho pra consegui-los. Com isso caem TRES travas de 14/09 --
+     o "Nenhum TM/HM", o quadro em branco e o "nao conta como ganhar o HM01" --, e a ultima e uma
+     REVERSAO de pedido, nao um descuido:
+       14/09: *"nao precisa dizer como ganhar o HM01"* (a tela nao entrega o achado de graca)
+       17/09: *"escreva o que e necessario fazer para obter o HM"*
+     O de hoje e mais recente e explicito, e ele vale. O que o de 14/09 protegia -- nao entregar o
+     caminho de graca -- deixou de fazer sentido quando a linha passou a existir mesmo pra quem nao
+     tem o HM: sem o caminho ela seria uma promessa muda.
+     ⚠️ O "Nenhum TM/HM" CONTINUA NO CODIGO e continua sendo o certo pra uma prateleira sem nada --
+     ele so nao e mais alcancavel nesta, porque ela sempre tem os tres. */
   g.hms = []; S.escolherPrateleiraDaMochila('tms');
   {
     const t = S.renderInventario();
-    ok('sem nenhum, a lista diz exatamente "Nenhum TM/HM"', /Nenhum TM\/HM/.test(t),
-       (t.match(/loja-vazia[^>]*>[^<]*/g)||[]).join(' | '));
-    ok('e NAO conta mais como ganhar o HM01', !/S\.S\. Anne/.test(t) && !/Surge/.test(t));
+    ok('sem NENHUM conquistado, os tres continuam na lista',
+       /HM01/.test(t) && /HM02/.test(t) && /HM03/.test(t));
+    ok('e o quadro conta o caminho do que falta', /Como conseguir/.test(t));
+    ok('e o caminho do HM01 e o dele', /S\.S\. Anne/.test(t) || /Surge/.test(t));
     ok('nem diz "Nenhuma Maquina ainda"', !/Nenhuma M.quina/.test(t));
-    ok('e o quadro de cima fica em branco', /class="box item-detalhe loja-fixa"><\/div>/.test(t));
-    ok('mas a prateleira continua na tela, marcada como vazia',
-       /escolherPrateleiraDaMochila\('tms'\)/.test(t) && /TMs\/HMs/.test(t));
+    ok('mas a prateleira continua na tela', /escolherPrateleiraDaMochila\('tms'\)/.test(t) && /TMs\/HMs/.test(t));
   }
   /* A mochila e aberta da HOME tambem, sem save nenhum -- e ali TEM o que mostrar, porque os HMs
      sao da CONTA e nao daquela jornada. */
@@ -968,7 +984,9 @@ console.log('\n=== O HM01: A PRIMEIRA MAQUINA OCULTA (11/09/2026) ===');
     ok('o abrirTmHm leva pra prateleira das Maquinas', S.__getGame().inventarioAba === 'tms',
        String(S.__getGame().inventarioAba));
     const comHm = S.renderInventario();
-    ok('e quem tem o HM01 ve a contagem na prateleira', /1 item/.test(comHm));
+    /* a contagem e a da LISTA, e a lista tem os tres HMs agora (tendo ou nao) */
+    ok('e a prateleira mostra a contagem', new RegExp(Object.keys(S.HMS).length + ' it').test(comHm),
+       (comHm.match(/\d+ it\w+/) || ['(sem contagem)'])[0]);
     ok('e o Voltar continua la', /sairDaMochila\(\)/.test(comHm));
     ok('e o HM01 continua na conta', S.temHM('hm01') === true);
     /* O `game.screen` nao e salvo, mas nada impede um caminho em memoria de ter posto 'tmhm' ali. */
@@ -1092,7 +1110,9 @@ console.log('\n=== O HM01: A PRIMEIRA MAQUINA OCULTA (11/09/2026) ===');
     ok('  e quem NAO aprende sai apagado, com o .caiu do desmaiado',
        (n1.match(/save-slot-mon caiu/g) || []).length === 2,
        (n1.match(/save-slot-mon caiu/g) || []).length + ' apagados (Blastoise e Alakazam)');
-    ok('  e o titulo diz por que', /Blastoise não aprende essa Máquina/.test(n1),
+    /* ⚠️ "essa Maquina" virou "esse golpe" em 17/09/2026 (a pedido: *"nao use a palavra maquina
+       para descrever TM ou HM, ninguem entende isso"*). */
+    ok('  e o titulo diz por que', /Blastoise não aprende esse golpe/.test(n1),
        (n1.match(/title="[^"]*não aprende[^"]*"/) || [''])[0]);
     /* ⚠️ QUEM JA SABE O GOLPE tambem sai apagado -- ele nao pode aprender de novo --, mas por outro
        MOTIVO, e o titulo separa os dois: sem isso, quem acabou de ensinar veria o pokemon apagado
@@ -2629,6 +2649,147 @@ console.log('\n=== AS MAQUINAS DE TECNICA (TMs) ===');
        Object.keys(GEN3).filter(id => srv.indexOf(id) < 0).join(',') || 'todos');
   }
 }
+
+
+console.log('\n=== O TM COMPRADO CHEGA NA MOCHILA (17/09/2026) ===');
+{
+  /* Reportado assim: *"ao comprar um TM, ele nao foi para a Mochila, ele simplesmente sumiu"*.
+     ⚠️ A CAUSA: o 'pilhasDaPrateleira' devolvia SO OS HMs na prateleira 'tms' -- ela foi escrita
+     quando era so deles, e o 'return' dos HMs saia antes de o filtro do inventario ser alcancado.
+     O TM estava no armazem o tempo todo (o quantoTenho o via, o servidor tinha gravado); o que
+     faltava era a mochila LISTA-LO.
+     ⚠️ E A TRAVA QUE EXISTIA NAO PEGOU porque ela media a LOJA ("a prateleira tem os 23 TMs"), e a
+     loja estava certa. O caminho que ninguem cobria era o de DEPOIS da compra. Esta e de ponta a
+     ponta: comprar -> aparecer na mochila -> abrir a tela de ensinar. */
+  const g5 = S.__getGame();
+  g5.moedas = 5000;
+  g5.inventario = {};
+  g5.hms = ['hm01'];
+  g5.saveSlots = new Array(S.MAX_SAVE_SLOTS).fill(null);
+  g5.saveSlots[0] = { team:[{ speciesId:'snorlax', level:70, name:'Snorlax' }], badgeCount:8, name:'Buzzo' };
+  g5.currentSaveSlot = 0;
+  g5.team = [];
+  S.__setGame(g5);
+
+  /* 1) SEM TER COMPRADO: so o HM esta la. */
+  /* os tres HMs aparecem sempre: sem TM, a prateleira tem exatamente eles */
+  ok('sem TM, a prateleira tem so os HMs',
+     S.pilhasDaPrateleira('tms').map(x => x.item).join(',') === Object.keys(S.HMS).join(','),
+     S.pilhasDaPrateleira('tms').map(x => x.item).join(',') || '(vazia)');
+
+  /* 2) DEPOIS DA COMPRA (o servidor grava no inventario -- aqui simulamos a resposta dele). */
+  S.__getGame().inventario = { tm26: 1 };
+  const pilhas = S.pilhasDaPrateleira('tms');
+  ok('comprou um TM e ele APARECE na mochila',
+     pilhas.some(x => x.item === 'tm26'), pilhas.map(x => x.item).join(',') || '(vazia)');
+  /* e o HM continua la -- as duas fontes convivem */
+  ok('e o HM continua junto', pilhas.some(x => x.item === 'hm01'),
+     pilhas.map(x => x.item).join(','));
+  /* ⚠️ E OS HMs VEM PRIMEIRO: eles sao permanentes, e o TM some quando ensina -- uma lista que muda
+     de ordem conforme o estoque e pior que uma que nao muda. */
+  ok('e os HMs vem primeiro', pilhas[0].item === 'hm01', pilhas.map(x => x.item).join(','));
+  /* a quantidade e a do inventario, nao 1 */
+  S.__getGame().inventario = { tm26: 3 };
+  ok('e a quantidade e a do armazem',
+     S.pilhasDaPrateleira('tms').find(x => x.item === 'tm26').quantidade === 3,
+     JSON.stringify(S.pilhasDaPrateleira('tms')));
+
+  /* 3) E ELE CHEGA NA TELA, com o botao de ensinar. */
+  S.openInventario();
+  S.escolherPrateleiraDaMochila('tms');
+  S.escolherItem('tm26');
+  {
+    const t = S.renderInventario();
+    ok('a mochila desenha a linha do TM', t.indexOf('TM26') >= 0);
+    ok('e o quadro traz o botao de Ensinar', /abrirEnsinarHm\('tm26'\)/.test(t));
+    ok('e ele avisa que some depois', /some depois/.test(t), '(o TM e de uso unico)');
+    /* e a tela de ensinar abre de verdade */
+    S.abrirEnsinarHm('tm26');
+    ok('e a tela de ensinar ABRE', S.__getGame().screen === 'hmAlvo', S.__getGame().screen);
+  }
+
+  /* ⚠️ 4) O ROTULO DA PRATELEIRA DEPENDE DA TELA (a pedido): a LOJA vende TM e so TM (HM ninguem
+     compra), e a MOCHILA tem HM de verdade dentro. Um rotulo unico mentiria numa das duas. */
+  {
+    const g6 = S.__getGame();
+    g6.screen = 'loja'; S.__setGame(g6);
+    S.openLoja();
+    const naLoja = (S.renderLoja().match(/loja-aba-nome">([^<]*)/g) || []).map(x => x.split('>')[1]);
+    ok('na LOJA a prateleira se chama "TMs"', naLoja.indexOf('TMs') >= 0, naLoja.join(' | '));
+    ok('e nao diz HMs (nenhum HM esta a venda)', naLoja.indexOf('TMs/HMs') < 0, naLoja.join(' | '));
+    S.openInventario();
+    const naMochila = (S.renderInventario().match(/loja-aba-nome">([^<]*)/g) || []).map(x => x.split('>')[1]);
+    ok('e na MOCHILA continua "TMs/HMs"', naMochila.indexOf('TMs/HMs') >= 0, naMochila.join(' | '));
+    /* ⚠️ E A LISTA CONTINUA SENDO UMA -- o que varia e a palavra. Duas listas divergiriam no
+       proximo item, que e a licao das tres telas de golpe. */
+    ok('e a lista de prateleiras e UMA so',
+       S.LOJA_PRATELEIRAS.length === 3 && S.LOJA_PRATELEIRAS[2].id === 'tms',
+       S.LOJA_PRATELEIRAS.map(x => x.id).join(','));
+  }
+}
+
+console.log('\n=== OS TRES HMs NA MOCHILA, E A PALAVRA QUE SAIU (17/09/2026) ===');
+{
+  /* Pedido assim: *"na mochila, no botão de TMs/HMs, adcione os 3 HMs existentes no jogo, porém se
+     o jogador não tiver, deixar desativado o botão de usar, e escreva o que é necessário fazer para
+     obter o HM. Não use a palavra máquina para descrever TM ou HM, ninguem entende isso"*. */
+  const g = S.__getGame();
+  g.authUser = { uid:'t' };
+  g.inventario = {}; g.rareCandies = 0;
+  g.hms = ['hm01'];                 // tem UM dos tres
+  g.inventarioAba = 'tms';
+  g.inventarioSel = null;
+  g.inventarioErro = null;
+  S.__setGame(g);
+
+  const pilhas = S.pilhasDaPrateleira('tms');
+  const ids = pilhas.filter(p => p.hm).map(p => p.item);
+  ok('os TRES HMs aparecem, tendo ou nao', ids.length === Object.keys(S.HMS).length,
+     ids.join(', '));
+  ok('e o que ele TEM nao e marcado como faltando',
+     pilhas.find(p => p.item === 'hm01').falta === false);
+  ok('e os que faltam sao marcados',
+     pilhas.filter(p => p.hm && p.falta).map(p => p.item).join(',') === 'hm02,hm03',
+     pilhas.filter(p => p.hm && p.falta).map(p => p.item).join(','));
+
+  /* ---------- o quadro de quem FALTA ---------- */
+  g.inventarioSel = 'hm02'; S.__setGame(g);
+  const falta = S.renderInventario();
+  ok('o HM que falta diz COMO conseguir', /Como conseguir/.test(falta));
+  ok('e o texto e o `comoGanhar` daquele HM',
+     falta.indexOf(S.HMS.hm02.comoGanhar.slice(0, 40)) >= 0,
+     S.HMS.hm02.comoGanhar.slice(0, 50) + '...');
+  /* ⚠️ DESABILITADO, e nao ESCONDIDO: sumir com o botao faria a linha nao explicar o que ela e. */
+  ok('e o botao de ensinar fica DESABILITADO',
+     /<button class="btn success"\s+disabled/.test(falta));
+
+  /* ---------- o quadro de quem TEM ---------- */
+  g.inventarioSel = 'hm01'; S.__setGame(g);
+  const tem = S.renderInventario();
+  ok('o HM que ele TEM nao mostra o caminho', !/Como conseguir/.test(tem));
+  ok('e o botao dele funciona',
+     /<button class="btn success"\s+onclick="abrirEnsinarHm\('hm01'\)"/.test(tem));
+
+  /* ---------- ⚠️ A PALAVRA, varrida em TODAS as telas que falam de TM/HM ---------- */
+  /* Ela vive numa varredura e nao num `indexOf` solto porque comentario HTML VAI PRO DOM -- foi
+     exatamente assim que a primeira versao desta trava acusou o proprio comentario que eu tinha
+     acabado de escrever. A regra e sobre o que o JOGADOR le. */
+  const PROIBIDA = /[Mm]áquina|[Mm]aquina/;
+  const telas = [];
+  ['hm01','hm02','hm03'].forEach(id => {
+    g.inventarioSel = id; S.__setGame(g);
+    telas.push(['mochila/' + id, S.renderInventario()]);
+  });
+  g.hms = ['hm01','hm02','hm03']; g.inventarioSel = 'hm01'; S.__setGame(g);
+  telas.push(['mochila/com-os-tres', S.renderInventario()]);
+  /* a tela de ensinar, os dois niveis */
+  S.abrirEnsinarHm('hm01');
+  telas.push(['ensinar/times', S.renderHmAlvo()]);
+  const sujas = telas.filter(([, html]) => PROIBIDA.test(html)).map(([nome]) => nome);
+  ok('a palavra nao aparece em tela nenhuma', sujas.length === 0,
+     sujas.length ? sujas.join(', ') : telas.length + ' telas varridas');
+}
+
 
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
 process.exit(falhas ? 1 : 0);

@@ -292,8 +292,20 @@ console.log('\nA TELA MOSTRA O PREMIO E O BOTAO');
   g.conquistaResgateErro = null;
   S.__setGame(g);
   const html = S.renderAchievements();
-  ok('o botao de resgatar aparece com o valor', /🪙 Resgatar \d+ moedas/.test(html),
-     (html.match(/🪙 Resgatar \d+ moedas/) || ['(sem botao)'])[0]);
+  /* ⚠️ O RESGATE E POR LINHA desde 17/09/2026: o botao unico de "resgatar tudo" saiu, e cada
+     conquista GANHA tem o seu, com o valor dela. A trava passou a contar os BOTOES e a cobrar que
+     eles sejam exatamente as ganhas-e-nao-pagas -- nem as trancadas nem as ja pagas podem ter um.
+     Ela media o botao unico ate aqui; medir "tem um botao" so seria fraco demais pro que mudou. */
+  const botoes = (html.match(/<button class="conquista-premio pronta"/g) || []).length;
+  const ganhasNaoPagas = S.conquistasAResgatar().length;
+  ok('cada conquista ganha tem o BOTAO dela, com o valor', botoes > 0 && botoes === ganhasNaoPagas,
+     botoes + ' botoes para ' + ganhasNaoPagas + ' a resgatar');
+  ok('e o botao carrega o id da conquista', /onclick="resgatarConquista\('[a-z0-9_]+'\)"/.test(html),
+     (html.match(/resgatarConquista\('[a-z0-9_]+'\)/) || ['(sem onclick)'])[0]);
+  /* ⚠️ E O BOTAO DE "RESGATAR TUDO" NAO PODE VOLTAR: ele foi TIRADO a pedido, e uma volta por
+     descuido passaria despercebida -- a tela continuaria funcionando com os dois. */
+  ok('e o botao de resgatar TUDO nao existe mais',
+     !/🪙 Resgatar \d+ moedas/.test(html) && !/resgatarConquistas\(\)/.test(html));
   ok('e cada linha mostra o premio dela', (html.match(/conquista-premio/g)||[]).length === S.ACHIEVEMENTS.length,
      (html.match(/conquista-premio/g)||[]).length + ' de ' + S.ACHIEVEMENTS.length);
   /* ⚠️ O PREMIO APARECE NA TRANCADA TAMBEM: e ele que diz por que vale a pena ir atras daquela. */
@@ -303,7 +315,8 @@ console.log('\nA TELA MOSTRA O PREMIO E O BOTAO');
   g.achievementsPaid = S.conquistasGanhas().map(a=>a.id);
   S.__setGame(g);
   const pago = S.renderAchievements();
-  ok('resgatado, o botao some e a linha vira ✓', !/🪙 Resgatar/.test(pago) && /conquista-premio paga/.test(pago));
+  ok('resgatado, o botao some e a linha vira ✓',
+     !/<button class="conquista-premio pronta"/.test(pago) && /conquista-premio paga/.test(pago));
   ok('e a tela diz que esta tudo pego', /Tudo resgatado/.test(pago));
 }
 
@@ -322,9 +335,40 @@ async function rodaOResgate(){
   });
 
   const req = { auth: { uid } };
+
+  /* ⚠️ O RESGATE POR ID (17/09/2026) -- a parte nova, e a que tem risco proprio: o `id` vem do
+     CLIENTE, entao o servidor tem que recalcular o que esta ganho e ignorar qualquer coisa fora
+     disso. Sem essa checagem, um id inventado pagaria uma conquista trancada. */
+  {
+    const ganhasAgora = fns._conquistas.conquistasGanhasDaConta(
+      [{ badgeCount:8, team:[], caughtSpecies:[], evolutions:["x"], lossesTotal:3 }],
+      { moedas:100, pokedexCaught:[], trainerBestStreak:0 });
+    const uma = ganhasAgora[0];
+    const antesDeUma = (await userRef.get()).data().moedas | 0;
+    const rUma = await fns.claimAchievementCoins({ auth:{ uid }, data:{ id: uma } });
+    ok('resgatar UMA paga so ela', rUma.ganhou === fns._conquistas.moedasDasConquistas([uma]),
+       '🪙 ' + rUma.ganhou + ' pela ' + uma);
+    ok('e a lista de pagas tem exatamente ela', (rUma.pagas||[]).length === 1 && rUma.pagas[0] === uma,
+       (rUma.pagas||[]).join(','));
+    ok('e o saldo sobe so isso', rUma.moedas === antesDeUma + rUma.ganhou, antesDeUma + ' -> ' + rUma.moedas);
+    /* ⚠️ E A MESMA DE NOVO NAO PAGA: e o duplo-clique numa linha so. */
+    const rDeNovo = await fns.claimAchievementCoins({ auth:{ uid }, data:{ id: uma } });
+    ok('a mesma conquista de novo nao paga', rDeNovo.ganhou === 0, '🪙 ' + rDeNovo.ganhou);
+    /* ⚠️ E UM ID INVENTADO NAO PAGA NADA -- o pedido vem do cliente, a resposta vem do servidor. */
+    const rFalso = await fns.claimAchievementCoins({ auth:{ uid }, data:{ id: 'conquista_que_nao_existe' } });
+    ok('um id inventado nao paga nada', rFalso.ganhou === 0, '🪙 ' + rFalso.ganhou);
+    /* ⚠️ E UMA CONQUISTA TRANCADA tambem nao: ela EXISTE na tabela, mas esta conta nao a tem. */
+    const trancada = fns._conquistas.CONQUISTAS.map(c => c.id).find(id => ganhasAgora.indexOf(id) < 0);
+    const rTrancada = await fns.claimAchievementCoins({ auth:{ uid }, data:{ id: trancada } });
+    ok('e uma conquista TRANCADA nao paga', rTrancada.ganhou === 0, trancada + ': 🪙 ' + rTrancada.ganhou);
+  }
+
+  /* ⚠️ SEM `id` ELE PAGA TUDO, e isso NAO e sobra: e o que um cliente antigo em cache manda. */
+  /* o saldo de partida e LIDO, e nao 100 fixo: o bloco do resgate por id acima ja pagou uma. */
+  const antesDoResto = (await userRef.get()).data().moedas | 0;
   const r1 = await fns.claimAchievementCoins(req);
-  ok('o primeiro resgate paga', r1.ganhou > 0, '🪙 ' + r1.ganhou);
-  ok('e o saldo sobe exatamente isso', r1.moedas === 100 + r1.ganhou, '100 -> ' + r1.moedas);
+  ok('sem id, o resgate paga o resto todo de uma vez', r1.ganhou > 0, '🪙 ' + r1.ganhou);
+  ok('e o saldo sobe exatamente isso', r1.moedas === antesDoResto + r1.ganhou, antesDoResto + ' -> ' + r1.moedas);
   ok('e a lista de pagas volta preenchida', (r1.pagas||[]).length > 0, (r1.pagas||[]).length + ' conquistas');
 
   /* ⚠️ O SEGUNDO RESGATE NAO PAGA NADA -- e a trava mais importante deste bloco: sem ela, um

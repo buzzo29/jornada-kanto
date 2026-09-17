@@ -2268,6 +2268,34 @@
     background:linear-gradient(90deg,#7a1e1e,#7e4a0a,#285c18,#143e78,#3e1c78);
     color:#fff; border-color:#f2c744;
   }
+  /* ⚠️ A MONTANHA HERDA A REGRA DE CONTRASTE DA VIGÍLIA: fundo escuro e texto branco, porque a
+     fonte de PIXEL é fina e um fundo claro com texto escuro passeia pelo limite do AA. O gradiente
+     é a pedra subindo pra nuvem — dois tons, não cinco: aqui não há arco-íris pra evocar.
+     ⚠️ O TOM CLARO É O QUE MANDA NO CONTRASTE, e ele foi MEDIDO: com o  que eu tinha posto
+     a pior parte do gradiente dava **5,85:1** -- passa no AA de 4,5, mas fica abaixo do 7,31:1 que
+     a Vigília ficou depois de ser reportada como ilegível. Em  o pior pedaço vai a
+     **7,70:1**, e é esse o alvo da casa pra fonte de pixel. */
+  .encounter-banner.montanha{
+    background:linear-gradient(180deg,#2f3a4a,#4a5460);
+    color:#fff; border-color:#cfd8e3;
+  }
+  /* OS TRÊS NINHOS lado a lado. `1fr` em três colunas e não flex: os três têm que ficar do MESMO
+     tamanho -- um cheio (sprite de 34px) ao lado de dois vazios (um emoji) faria a fileira dançar
+     conforme as missões fossem acendendo. */
+  .ninhos{ display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
+  .ninho{
+    border:2px solid var(--ink); border-radius:5px; background:#fff;
+    box-shadow:0 2px 0 rgba(0,0,0,.18); padding:6px 2px; text-align:center; cursor:pointer;
+  }
+  .ninho:focus-visible{ outline:2px solid var(--blue); outline-offset:2px; }
+  /* o ninho CHEIO acende na borda, que é o que se lê de relance numa fileira de três */
+  .ninho.cheio{ border-color:#f2c744; box-shadow:0 2px 0 rgba(242,199,68,.45); }
+  .ninho.vazio{ opacity:.75; }
+  /* altura fixa: o emoji do ninho vazio e o sprite de 34px não medem o mesmo, e sem isso os três
+     cards ficariam de alturas diferentes */
+  .ninho-cima{ height:38px; display:flex; align-items:center; justify-content:center; font-size:26px; line-height:1; }
+  .ninho-nome{ font-size:.6rem; margin-top:2px; overflow-wrap:anywhere; }
+  .ninhos-conta{ text-align:center; margin-top:6px; }
   .vigilia-roda{ display:flex; flex-wrap:wrap; justify-content:center; gap:4px; }
   .vigilia-mon{ line-height:0; }
   .vigilia-mon.shiny{ filter:drop-shadow(0 0 3px #ffd34d); }
@@ -2626,9 +2654,25 @@
     color:var(--muted);
     white-space:nowrap;
   }
-  /* ganha e nao resgatada: e a unica que o jogador pode fazer alguma coisa a respeito */
-  .conquista-premio.pronta{color:var(--blue-dark);}
+  /* ⚠️ A PRONTA E UM <button> desde 17/09/2026 (o resgate virou por linha), e por isso ela zera o
+     estilo de fabrica: borda, fundo e fonte do sistema. Ela NAO usa o `.btn` da casa -- aquele e
+     botao de ACAO, com moldura de 3px, e aqui ele brigaria com as outras 68 linhas da lista. E o
+     mesmo raciocinio que ja tinha tirado o `.btn` dos cartoes de golpe e das linhas da ficha. */
+  .conquista-premio.pronta{
+    color:var(--blue-dark);
+    font-family:inherit; font-size:.62rem; font-weight:800;
+    background:#fffbe6; border:2px solid var(--blue-dark); border-radius:5px;
+    padding:3px 7px; cursor:pointer; line-height:1.1;
+  }
+  .conquista-premio.pronta:hover{ background:#fff3bf; }
+  .conquista-premio.pronta:disabled{ opacity:.6; cursor:default; }
   .conquista-premio.paga{color:var(--green);}
+  /* ⚠️ O HM QUE O JOGADOR AINDA NAO TEM (17/09/2026). E o MESMO apagado do pokemon desmaiado e do
+     que esta descansando no montador -- o jogo ja ensinou o olho a ler esse cinza como "esse nao",
+     e uma terceira forma pra a mesma ideia e o que faz a interface parecer montada por partes.
+     Ela continua CLICAVEL: o quadro dela e onde esta o caminho pra consegui-la. */
+  .loja-linha.nao-tem{ opacity:.55; }
+  .loja-linha.nao-tem .loja-nome{ font-weight:600; }
 
   .status-row .tag{
     margin-left:auto;
@@ -3985,6 +4029,7 @@ function routesForLeg(legIndex){
 }
 function routeById(routeId){
   if(routeId === ROTA_DO_CORTE.id) return ROTA_DO_CORTE;
+  if(routeId === MONTANHA.id) return MONTANHA;
   for(const pair of ROUTE_MAP){ const found = pair.find(r=>r.id===routeId); if(found) return found; }
   for(const pair of JOHTO_ROUTE_MAP){ const found = pair.find(r=>r.id===routeId); if(found) return found; }
   return null;
@@ -3999,6 +4044,170 @@ function routeById(routeId){
    selvagem -- leva à Vigília (ver `entrarNaMataFechada`). O pokémon do trecho, ali, se ganha
    lutando. É uma aposta: quem perde a Vigília fica sem captura naquele trecho.
    ===================================================================== */
+/* ============================================================================
+   A MONTANHA SAGRADA -- 17/09/2026
+   ----------------------------------------------------------------------------
+   Pedida assim: *"uma rota especial que poderá aparecer como terceira opção durante a jornada,
+   acessível apenas se o treinador tiver um Pokémon no time que saiba Fly, deve aparecer
+   aleatoriamente a partir do sexto ginásio"*.
+
+   ⚠️ ELA É A SEGUNDA ROTA DE CHAVE DO JOGO, e reusa o desenho da MATA FECHADA inteiro: o sorteio
+   semeado pelo save, o cadeado calculado NO DESENHO (nunca gravado) e a ação validando de novo.
+   O que muda é a chave (o `fly` em vez do `cut`), o trecho (o 6º em vez do 4º) e o que há do outro
+   lado.
+
+   ⚠️ UMA POR TRECHO: se a mata já saiu naquele trecho, a montanha não sai. As cartas de rota são
+   DUAS por padrão e a promessa da terceira é "uma terceira" -- com as duas no mesmo trecho seriam
+   quatro, e a tela deixaria de ser a tela que o jogador conhece.
+
+   ⚠️ E ELA PODE SAIR MAIS DE UMA VEZ NA JORNADA, ao contrário da mata (que é 1× desde hoje). É o
+   pedido ao pé da letra: *"após receber o lendário, as três missões serão reiniciadas e os ninhos
+   voltarão a ficar vazios, exigindo novas realizações para liberar outra batalha e conquistar
+   outra recompensa"*. Quem limita a recompensa são as MISSÕES, não a rota -- e elas são caras.
+   ============================================================================ */
+const MONTANHA = {
+  id: "montanha_sagrada", name: "Montanha Sagrada", icon: "🗻", types: ["Flying"],
+  rumor: "O caminho sobe até onde a trilha some na nuvem. Só se chega voando.",
+  voo: true
+};
+/* a partir do 6º ginásio (índice 5), em 1 de cada 4 trechos -- a mesma régua da mata */
+const MONTANHA_A_PARTIR_DE = 5;
+const CHANCE_MONTANHA = 0.25;
+/* ⚠️ SEMEADO PELO SAVE, como todo sorteio desta jornada: com `Math.random` bastaria sair do save e
+   voltar até a montanha aparecer. A semente carrega o slot, a GERAÇÃO do slot e o trecho. */
+function montanhaSaiNoTrecho(leg){
+  if(leg < MONTANHA_A_PARTIR_DE) return false;
+  /* ⚠️ A MATA TEM PREFERÊNCIA: se ela sai neste trecho, a montanha não sai -- senão seriam QUATRO
+     cartas, e a promessa é de uma TERCEIRA. A mata vem primeiro porque ela é do trecho 4 em diante
+     e a montanha do 6º: onde as duas competem, a que já estava é a que fica. */
+  if(temRotaDoCorte(leg)) return false;
+  const rng = makeSeededRng("montanha|" + game.currentSaveSlot + "|" + (game.saveGen||0) + "|" + leg);
+  return rng() < CHANCE_MONTANHA;
+}
+/* QUEM ABRE O CAMINHO: alguém do time que saiba Voar. É o espelho exato do `cortadorDoTime`, e a
+   pergunta é feita NO DESENHO -- este time, AGORA, sabe voar? */
+function voadorDoTime(){
+  return (game.team || []).find(p => p && (p.ataques || []).indexOf(GOLPE_DO_VOO) >= 0) || null;
+}
+function podeVoar(){ return !!voadorDoTime(); }
+
+/* ============================================================================
+   OS TRÊS NINHOS
+   ----------------------------------------------------------------------------
+   ⚠️ AS MISSÕES SÃO DA CONTA? NÃO -- ELAS SÃO DO SAVE, e isso é decisão. As três falam de coisas
+   que acontecem DENTRO de uma jornada ("vencer o Blaine", "três ginásios seguidos", "numa única
+   batalha de ginásio"), então guardá-las na conta faria uma jornada terminar a missão que outra
+   começou -- e a de Zapdos, que é uma sequência, deixaria de significar qualquer coisa.
+
+   ⚠️ E ELAS SÃO CUMULATIVAS ENTRE VISITAS: o ninho fica aceso até o jogador RECEBER o lendário, e
+   só então as três reiniciam. É o pedido ao pé da letra -- quem acende dois ninhos e sai da
+   montanha volta com os dois acesos.
+   ============================================================================ */
+/* ⚠️ CADA NINHO TEM DOIS NOMES, e eles dizem coisas diferentes (17/09/2026, a pedido):
+   o `ninho` é o nome do LUGAR ("Ninho Queimado") e o `nome` é quem mora nele ("Moltres").
+   A tela dos três mostra o do LUGAR -- ele é o mesmo esteja o ninho cheio ou vazio, então a
+   fileira não muda de rótulo quando uma missão acende; quem identifica a ave é o sprite. O nome
+   do pokémon fica no modal, que é onde se lê sobre ele. */
+const NINHOS = [
+  { id:"moltres", especie:"moltres", nome:"Moltres", ninho:"Ninho Queimado", icone:"🔥",
+    missao:"Vença o <strong>Blaine</strong> com pelo menos <strong>3 pokémon de Planta</strong> no time.",
+    dica:"Os três precisam estar no time na hora da luta — não precisam lutar." },
+  { id:"zapdos", especie:"zapdos", nome:"Zapdos", ninho:"Ninho Elétrico", icone:"⚡",
+    missao:"Vença <strong>3 ginásios seguidos</strong> sem perder nenhum para um líder.",
+    dica:"Pokémon que desmaia não quebra a sequência, e derrota em outro evento também não — só perder para um LÍDER zera." },
+  { id:"articuno", especie:"articuno", nome:"Articuno", ninho:"Ninho Congelado", icone:"❄️",
+    missao:"Um <strong>mesmo pokémon de Gelo</strong> precisa derrubar <strong>3 adversários seguidos</strong> numa única batalha de ginásio.",
+    dica:"A conta é por batalha: vitórias de batalhas diferentes não somam. Ele pode desmaiar depois da terceira." }
+];
+/* ⚠️ OS QUATRO DA BATALHA FINAL, todos no MESMO nível (65), formando UMA equipe -- foi o pedido.
+   O LUGIA entra aqui, e ele é INTOCÁVEL (`ESPECIES_INTOCAVEIS`): esta é a segunda porta pela qual
+   um intocável se deixa capturar, depois do Ho-Oh da Vigília -- e a decisão é a MESMA de lá. Ele é
+   TROFÉU, não requisito: as metas de "capturar tudo" (a Pokédex de Johto e o Mestre Pokémon)
+   continuam EXCLUINDO os três, senão toda conta que já as tem PERDERIA a conquista até vir aqui. */
+const MONTANHA_LENDARIOS = ["zapdos", "articuno", "moltres", "lugia"];
+const MONTANHA_NIVEL_LENDARIO = 65;
+const MONTANHA_GUARDIOES = 6;
+/* ⚠️ O TETO DE NÍVEL DO JOGO É 99, e ele não tinha nome: o único outro lugar que precisava dele o
+   escrevia à mão. Aqui ele é lido de verdade -- a média do time com o desvio +3 pode encostar nele
+   num save de Doce Raro. */
+const NIVEL_MAXIMO = 99;
+
+function missoesDaMontanha(){
+  if(!game.montanha) game.montanha = { ninhos:{}, sequenciaDeGinasios:0 };
+  if(!game.montanha.ninhos) game.montanha.ninhos = {};
+  return game.montanha;
+}
+function ninhoAceso(id){ return !!missoesDaMontanha().ninhos[id]; }
+function ninhosAcesos(){ return NINHOS.filter(n => ninhoAceso(n.id)).length; }
+function acenderNinho(id){
+  const m = missoesDaMontanha();
+  if(m.ninhos[id]) return false;
+  m.ninhos[id] = true;
+  return true;
+}
+/* ⚠️ AS TRÊS REINICIAM QUANDO O LENDÁRIO É RECEBIDO, e não quando a batalha é vencida: quem vence e
+   fecha a aba antes de escolher não pode perder as três missões. */
+function reiniciarMissoesDaMontanha(){
+  const m = missoesDaMontanha();
+  m.ninhos = {};
+  m.sequenciaDeGinasios = 0;
+}
+
+/* ---- os três ganchos, lidos no fim de uma batalha de GINÁSIO ---- */
+/* ⚠️ ELES LEEM O RESULTADO, e não mexem no motor: a impressão dele é a coisa mais cara de manter
+   neste projeto, e nenhuma das três missões precisa de um número que o `matchups` não traga. */
+function ehDoTipo(speciesId, tipo){
+  const sp = SPECIES[speciesId];
+  return !!(sp && (sp.types || []).indexOf(tipo) >= 0);
+}
+/* MOLTRES: o Blaine, com 3 de Planta no time. ⚠️ TIPO DUPLO CONTA (foi o pedido), e é o que o
+   `ehDoTipo` já faz -- ele pergunta se o tipo ESTÁ na lista, não se ele é o único. */
+function cumpriuMoltres(venceu){
+  if(!venceu) return false;
+  const g = gymAtual();
+  if(!g || g.id !== "blaine") return false;
+  return (game.team || []).filter(p => p && ehDoTipo(p.speciesId, "Grass")).length >= 3;
+}
+/* ZAPDOS: três ginásios seguidos sem perder pra um líder. O contador anda AQUI e só aqui -- é isso
+   que faz "derrota em outro evento não quebra a sequência" sair de graça: a Elite, a Rocket, a
+   Torre e o Ginásio da Cidade não passam por este caminho. */
+function passoDoZapdos(venceu){
+  const m = missoesDaMontanha();
+  if(!venceu){ m.sequenciaDeGinasios = 0; return false; }
+  m.sequenciaDeGinasios = (m.sequenciaDeGinasios || 0) + 1;
+  return m.sequenciaDeGinasios >= 3;
+}
+/* ARTICUNO: o MESMO pokémon de Gelo derrubando 3 adversários seguidos numa única batalha.
+   ⚠️ A CONTA SAI DOS MATCHUPS, um por confronto e na ordem -- e a sequência zera quando o pokémon
+   MUDA ou quando ele perde um confronto, que é o que "consecutivos" quer dizer.
+   ⚠️ E ELA VALE NA TERCEIRA VITÓRIA, mesmo que ele desmaie depois: a conta olha o `playerWon` de
+   cada confronto, então o terceiro já contou antes de qualquer coisa que venha depois.
+   ⚠️ E É POR BATALHA: o `matchups` é de uma batalha só, então não há o que acumular entre elas. */
+function sequenciaDeGelo(matchups){
+  let melhor = 0, atual = 0, quem = null;
+  for(const m of (matchups || [])){
+    const venceu = !!m.playerWon;
+    const esp = m.playerSpecies;
+    if(venceu && esp && ehDoTipo(esp, "Ice")){
+      atual = (esp === quem) ? atual + 1 : 1;
+      quem = esp;
+      if(atual > melhor) melhor = atual;
+    } else {
+      quem = null; atual = 0;
+    }
+  }
+  return melhor;
+}
+function cumpriuArticuno(matchups){ return sequenciaDeGelo(matchups) >= 3; }
+/* A PORTA ÚNICA: chamada no fim de TODA batalha de ginásio da jornada, vitória ou derrota.
+   Devolve os ninhos que ACENDERAM agora -- é isso que a tela de vitória anuncia. */
+function conferirNinhos(venceu, matchups){
+  const acesos = [];
+  if(cumpriuMoltres(venceu) && acenderNinho("moltres")) acesos.push("moltres");
+  if(passoDoZapdos(venceu) && acenderNinho("zapdos")) acesos.push("zapdos");
+  if(venceu && cumpriuArticuno(matchups) && acenderNinho("articuno")) acesos.push("articuno");
+  return acesos;
+}
 const ROTA_DO_CORTE = {
   id: "mata_fechada", name: "Mata Fechada", icon: "🪓", types: ["Grass"],
   rumor: "Um paredão de galhos fecha a trilha. Ninguém sabe o que tem do outro lado.",
@@ -4046,6 +4255,10 @@ function temRotaDoCorte(leg){
 function cartasDeRota(leg){
   const ids = routesForLeg(leg).map(r => r.id);
   if(temRotaDoCorte(leg)) ids.push(ROTA_DO_CORTE.id);
+  /* ⚠️ A MONTANHA É A OUTRA TERCEIRA CARTA, e ela só sai onde a mata NÃO saiu (ver
+     `montanhaSaiNoTrecho`): com as duas no mesmo trecho seriam QUATRO, e a promessa é de uma
+     TERCEIRA. */
+  else if(montanhaSaiNoTrecho(leg)) ids.push(MONTANHA.id);
   return ids;
 }
 
@@ -4505,6 +4718,14 @@ function freshGameDefaults(){
     /* os dez da Vigília e o prêmio de quem venceu -- os dois vão pro save (ver montarAVigilia) */
     vigilia:null,
     vigiliaPremio:null,
+    /* A MONTANHA tem TRÊS campos, e os três vão pro save por motivos diferentes:
+       `montanha` é o PROGRESSO das missões (ele atravessa a jornada inteira -- a sequência do
+       Zapdos leva três ginásios pra fechar), e `montanhaGuarda`/`montanhaPremio` são os seis
+       voadores daquela visita: a tela dos ninhos é ponto seguro de gravação, e fechar a aba ali
+       não pode custar a luta que o jogador acabou de vencer. */
+    montanha:null,
+    montanhaGuarda:null,
+    montanhaPremio:null,
     startersSorteados:{},   // {"slot:modo": {bulbasaur:bool,...}} -- vem da conta, ver sorteioDosIniciais
     geracaoDosSlots:{},     // {"0": 3} -- quantas tentativas daquele slot já CONTARAM (ver encerrarTentativaDoSlot)
     newSaveNameError:null,
@@ -7029,6 +7250,36 @@ function effText(mult){
    ===================================================================== */
 const MORIBUNDO_ABAIXO_DE = 0.10;   // "com menos de 10% de HP"
 const MORIBUNDO_TETO_NO_CHEIO = 0.70;
+/* =====================================================================
+   VIDA CHEIA NÃO MORRE NUM GOLPE (17/09/2026)
+   ---------------------------------------------------------------------
+   Pedido assim: *"quando um pokemon esta de vida cheia, ele nunca morre com um só golpe, invente um
+   calculo que dependendo da diferença de level entre os pokemons, o de vida cheia ao tomar um golpe
+   que seria de 100% de hp, vai tomar no maximo 95% e no minimo 70%. Se a diferença entre o level
+   dos pokemons for maior que 15, ai pode desconsiderar essa regra e matar de primeira"*.
+
+   ⚠️ ELA É A GENERALIZAÇÃO DO `MORIBUNDO_TETO_NO_CHEIO`, que já fazia exatamente isto desde
+   14/09/2026 -- só que apenas quando o ATACANTE estava raspando (abaixo de 10%). A mecânica de
+   aparo é a mesma (o teto vale por TROCA, e é repartido entre os tapas); o que muda é QUANDO ela
+   vale e QUANTO ela deixa passar.
+
+   ⚠️ A CURVA É A VANTAGEM DE NÍVEL, e ela anda no sentido que o pedido descreve: quanto mais acima
+   o atacante está, mais ele consegue tirar.
+     diferença  0 (ou negativa) -> o alvo fica com 30% (teto de 70%)
+     diferença 15               -> o alvo fica com  5% (teto de 95%)
+     diferença > 15             -> SEM TRAVA: mata de primeira
+   Entre 0 e 15 é linear. Atacante MAIS FRACO cai no piso: um pokémon de nível menor matando um
+   alvo cheio num golpe é o caso mais absurdo dos dois, então ele cede o máximo.
+
+   ⚠️ E ELA CONVIVE COM A DE 14/09 PELO MENOR TETO, não a substitui. As duas olham coisas
+   diferentes -- aquela é sobre o ESTADO do atacante ("um pokémon muito ferido não deveria aguentar
+   tanto numa luta", que foi o pedido dela) e esta é sobre a diferença de PODER. Um atacante
+   raspando com 20 níveis de vantagem continua parando em 70%: a regra dele não tem nível nenhum na
+   conta, e deixar a nova liberar o que a antiga proíbe desfaria um pedido com o outro.
+   ===================================================================== */
+const CHEIO_TETO_MIN = 0.70;        // diferença de nível 0 ou negativa
+const CHEIO_TETO_MAX = 0.95;        // diferença de nível 15
+const CHEIO_DIF_MAXIMA = 15;        // acima disso a trava não vale
 /* O 4º parâmetro é o DIÁRIO da luta: um registro por golpe, na ordem em que aconteceram, pro log
    conseguir contar o passo a passo. É só escrita -- nada aqui é lido de volta pelo motor, e passar
    ou não passar o array não muda um ponto de dano.
@@ -8556,19 +8807,40 @@ function doExchange(active, enemy, rng, diario){
   /* APLICA OS GOLPES DE UMA TROCA, um a um, e PARA quando o alvo cai: o 4º tapa não sai num
      pokémon que caiu no 3º. Devolve o que saiu DE VERDADE de cada golpe mais a vida que sobrou --
      é desse par que saem a linha do diário e o passo da animação, uma barra por tapa. */
-  /* ⚠️ O TETO DE QUEM ESTÁ RASPANDO (ver MORIBUNDO_TETO_NO_CHEIO). Ele vale por TROCA e não por
-     golpe: um Tapa Duplo de 5 tapas também "leva o outro num ataque só", e limitar só o primeiro
-     tapa deixaria os outros quatro matarem do mesmo jeito.
-     AS TRÊS CONDIÇÕES: o atacante abaixo de 10% da barra DELE, o alvo com a vida CHEIA, e o ataque
-     matando. Fora disso nada muda -- um raspando que tira 90% de um alvo cheio continua tirando 90%,
-     e um raspando contra um alvo já machucado mata normalmente. */
+  /* ⚠️ O TETO DE QUEM ATACA UM ALVO DE VIDA CHEIA. São DUAS regras na mesma conta, e o teto que
+     vale é o MENOR delas (ver o comentário de CHEIO_TETO_MIN):
+       - a de 14/09: quem está RASPANDO (abaixo de 10% da barra dele) para em 70%, sempre;
+       - a de 17/09: qualquer um para entre 70% e 95%, conforme a vantagem de NÍVEL -- e some de vez
+         quando a diferença passa de 15.
+     Devolve `null` quando nenhuma se aplica, e aí o golpe sai inteiro (e mata).
+     ⚠️ Ela NÃO é "70% do dano": um golpe de 800 numa barra de 400 continuaria matando. O que se
+     limita é onde o ALVO PARA, que é o que o pedido descreve. */
+  const tetoNoAlvoCheio = (quemBate, alvo) => {
+    if(!quemBate || !alvo) return null;
+    if(alvo.hp < alvo.maxHp) return null;              // só vale contra quem está CHEIO
+    const raspando = quemBate.hp <= quemBate.maxHp * MORIBUNDO_ABAIXO_DE;
+    const dif = (quemBate.level || 0) - (alvo.level || 0);
+    /* a diferença é do ATACANTE sobre o alvo; negativa cai no piso pelo clamp abaixo */
+    let porNivel = null;
+    if(dif <= CHEIO_DIF_MAXIMA){
+      const t = Math.max(0, Math.min(CHEIO_DIF_MAXIMA, dif)) / CHEIO_DIF_MAXIMA;
+      porNivel = CHEIO_TETO_MIN + (CHEIO_TETO_MAX - CHEIO_TETO_MIN) * t;
+    }
+    if(raspando && porNivel != null) return Math.min(MORIBUNDO_TETO_NO_CHEIO, porNivel);
+    if(raspando) return MORIBUNDO_TETO_NO_CHEIO;
+    return porNivel;
+  };
+  /* APARA A TROCA no teto devolvido acima. Ele vale por TROCA e não por golpe: um Tapa Duplo de 5
+     tapas também "leva o outro num ataque só", e limitar só o primeiro tapa deixaria os outros
+     quatro matarem do mesmo jeito. */
   const tetoDeQuemRaspa = (quemBate, alvo, golpes) => {
     if(!quemBate || !alvo) return golpes;
-    if(quemBate.hp > quemBate.maxHp * MORIBUNDO_ABAIXO_DE) return golpes;
-    if(alvo.hp < alvo.maxHp) return golpes;               // só vale contra quem está CHEIO
+    const frac = tetoNoAlvoCheio(quemBate, alvo);
+    if(frac == null) return golpes;
     const total = golpes.reduce((a, d) => a + d, 0);
     if(total < alvo.hp) return golpes;                    // não ia matar: nada a fazer
-    const teto = Math.max(1, Math.round(alvo.maxHp * MORIBUNDO_TETO_NO_CHEIO));
+    const teto = Math.max(1, Math.round(alvo.maxHp * frac));
+    if(teto >= alvo.hp) return golpes;                    // o teto não aperta nada
     /* reparte o teto entre os tapas na MESMA proporção, pra a linha do log continuar coerente
        com o selo `Nx` -- e o último leva a sobra do arredondamento */
     const fora = golpes.map(d => Math.max(1, Math.round(d * teto / total)));
@@ -10473,10 +10745,15 @@ function chooseRoute(id){
   /* A tela já desabilita o card, mas quem VALIDA é a ação -- a mesma regra do `confirmarAtaques`
      e do `toggleRelease`. O card apagado é apresentação. */
   if(route.corte && !timeQueCorta(game.team)) return;
+  /* a montanha tem a MESMA guarda, com a outra chave: o card apagado é apresentação, e quem recusa
+     de verdade é a ação -- ela vale mesmo que o clique venha forjado */
+  if(route.voo && !podeVoar()) return;
   game.currentRoute = id;
   registrarRotaEscolhida(id);
   game.routeCards = null;
   if(route.corte){ entrarNaMataFechada(); return; }
+  /* a montanha tampouco tem pool: o que há do outro lado é a guarda, e não um encontro selvagem */
+  if(route.voo){ entrarNaMontanha(); return; }
   goToWildEncounter();
 }
 
@@ -10894,6 +11171,268 @@ function montarAVigilia(){
 /* A VIGÍLIA É GRAVADA NO SAVE, e não só no `specialBattle` (que NÃO é serializado): a tela da
    clareira e a do prêmio são pontos de leitura e de decisão, e fechar a aba numa delas não pode
    perder os dez -- muito menos o prêmio de quem já venceu. */
+/* ============================================================================
+   OS GUARDIÕES E AS TELAS DA MONTANHA
+   ============================================================================ */
+/* OS SEIS VOADORES, com a média de nível do time (*"uma equipe de seis Pokémon voadores cuja média
+   de nível seja equivalente à do time do treinador"*).
+   ⚠️ O SORTEIO É SEMEADO PELO SAVE, como o da Vigília: com `Math.random` bastaria fechar a aba
+   antes da gravação pra re-sortear até vir um painel fácil.
+   ⚠️ E OS DESVIOS SOMAM ZERO, também como a Vigília: a média dos seis é EXATAMENTE a do time, e não
+   "mais ou menos isso".
+   ⚠️ OS LENDÁRIOS FICAM DE FORA da guarda: os quatro deles são o prêmio do outro lado, e um
+   Articuno guardando a porta de um Articuno seria estranho -- fora que a média de nível não
+   sobreviveria a um BST 580 no meio. */
+function voadoresDaGuarda(){
+  return Object.keys(SPECIES).filter(id =>
+    (SPECIES[id].types || []).indexOf("Flying") >= 0 &&
+    LENDARIOS.indexOf(id) < 0 &&
+    ESPECIES_INTOCAVEIS.indexOf(id) < 0);
+}
+function montarOsGuardioes(){
+  const rng = makeSeededRng("montanha-guarda|" + game.currentSaveSlot + "|" + (game.saveGen||0) +
+                            "|" + game.gymIndex + "|" + (missoesDaMontanha().visitas || 0));
+  const media = Math.max(5, Math.round(avgTeamLevel(game.team || [])));
+  const pool = voadoresDaGuarda();
+  /* os desvios somam ZERO: a média dos seis é exatamente a do time */
+  const desvios = [-3, -2, -1, 1, 2, 3];
+  const mons = [];
+  const usados = new Set();
+  let voltas = 0;
+  while(mons.length < MONTANHA_GUARDIOES && voltas++ < 4000){
+    const id = pool[Math.floor(rng() * pool.length)];
+    const raiz = raizDaLinha(id);
+    if(usados.has(raiz)) continue;   // sem repetir LINHA, a regra do encontro selvagem
+    usados.add(raiz);
+    const nivel = Math.max(2, Math.min(NIVEL_MAXIMO, media + desvios[mons.length]));
+    /* a espécie tem que bater com o nível, como em toda oferta do jogo: um Pidgey nível 60 não
+       existe -- aos 18 ele virou Pidgeotto e aos 36, Pidgeot. */
+    mons.push({ speciesId: formaNoNivel(id, nivel), level: nivel, shiny: false });
+  }
+  /* se o pool não deu (não dá pra acontecer com 30+ voadores, mas a rede fica), completa repetindo */
+  while(mons.length < MONTANHA_GUARDIOES){
+    const nivel = media + desvios[mons.length];
+    mons.push({ speciesId: formaNoNivel(pool[0], nivel), level: nivel, shiny: false });
+  }
+  return mons;
+}
+function entrarNaMontanha(){
+  const m = missoesDaMontanha();
+  if(!game.montanhaGuarda) game.montanhaGuarda = montarOsGuardioes();
+  game.screen = "montanha";
+  render();
+  maybeAutoSave();
+}
+/* A CHEGADA: os seis guardiões e a ordem do time, o mesmo desenho da clareira da Vigília -- ali é
+   a única outra batalha em que o jogador vê a fila do adversário antes de lutar, e a razão é a
+   mesma: 6 contra 6 sem cura entre confrontos se decide na ORDEM. */
+function renderMontanha(){
+  const mons = game.montanhaGuarda || [];
+  const quem = voadorDoTime();
+  const meu = game.team || [];
+  const media = Math.round(avgTeamLevel(meu));
+  return `
+  <div class="encounter-banner montanha">
+    <span class="encounter-icon">🗻</span>
+    A Montanha Sagrada
+  </div>
+  <div class="box cursor">
+    <p>${quem ? `<strong>${escapeHtmlSafe(quem.name)}</strong> te levou até o topo.` : "Você chegou ao topo."}
+       A trilha termina num platô de pedra, e seis sombras descem da nuvem.</p>
+    <p class="hint-text">Os guardiões lutam na média do seu time (<strong>Lv.${media}</strong>). Se você perder, desce sem nada.</p>
+  </div>
+  <div class="box">
+    <h2>🪶 Os guardiões</h2>
+    ${mons.map((m, i) => `
+      <div class="order-row">
+        <div class="order-num">${i+1}º</div>
+        <div class="order-info">
+          <span class="mon-name">${spriteHtml(m, "sprite-sm")} ${escapeHtmlSafe(SPECIES[m.speciesId].name)} — Lv.${m.level}</span>
+          <span class="mon-sub">${typesHtml(SPECIES[m.speciesId].types)}</span>
+        </div>
+      </div>`).join("")}
+  </div>
+  <div class="box">
+    <h2>👥 Seu time</h2>
+    <p class="hint-text">O 1º deles encara o 1º seu. Dá pra reordenar aqui.</p>
+    ${meu.map((p, idx) => `
+      <div class="order-row">
+        <div class="order-num">${idx+1}º ${botaoDeItemHtml(p)}</div>
+        <div class="order-info">
+          <span class="mon-name">${spriteHtml(p, "sprite-sm")} ${escapeHtmlSafe(p.name)}${p.shiny?" 🌟":""} — Lv.${p.level}</span>
+          <span class="mon-sub">${typesHtml(p.types)}</span>
+        </div>
+        <div class="order-arrows">
+          <button class="circle-btn" ${idx===0?"disabled":""} onclick="moveTeam(${idx},-1)">▲</button>
+          <button class="circle-btn" ${idx===meu.length-1?"disabled":""} onclick="moveTeam(${idx},1)">▼</button>
+        </div>
+      </div>`).join("")}
+  </div>
+  <button class="btn danger" onclick="enfrentarOsGuardioes()">⚔️ Enfrentar os guardiões</button>
+  <button class="btn secondary" onclick="descerDaMontanha()">⬅ Descer sem lutar</button>`;
+}
+function enfrentarOsGuardioes(){
+  const mons = game.montanhaGuarda || [];
+  startSpecialBattle("montanha", mons.map(m => ({ speciesId:m.speciesId, level:m.level, shiny:m.shiny })),
+    { opponentName:"os Guardiões", icon:"🗻", title:"Os Guardiões do Topo",
+      intro:"Seis asas se abrem ao mesmo tempo. O vento para." });
+}
+/* DESCER SEM LUTAR (ou depois de perder) segue a jornada como se a rota tivesse sido andada: o
+   trecho já foi escolhido, e não há encontro selvagem aqui -- é a mesma regra da Mata Fechada. */
+function descerDaMontanha(){
+  game.montanhaGuarda = null;
+  game.montanhaPremio = null;
+  proceedAfterTeamLocked();
+}
+/* ============================================================================
+   OS NINHOS -- a tela do outro lado dos guardiões
+   ----------------------------------------------------------------------------
+   *"terá acesso a uma tela ilustrada com três ninhos, representando Moltres, Zapdos e Articuno.
+   Cada ninho começará vazio (cada ninho deve ser clicável, e quando clicar, exibir qual a missão
+   para liberar o ninho) e será ocupado pela ave quando sua missão for concluída"*.
+
+   ⚠️ O NINHO VAZIO É CLICÁVEL E O CHEIO TAMBÉM: o vazio conta a missão que falta, e o cheio conta a
+   que foi cumprida. Desligar o clique do cheio economizaria nada e tiraria do jogador o único lugar
+   onde ele relê o que fez.
+   ============================================================================ */
+function abrirNinho(id){ game.ninhoAberto = id; render(); }
+function fecharNinho(){ game.ninhoAberto = null; render(); }
+function renderNinhoModal(){
+  const n = NINHOS.find(x => x.id === game.ninhoAberto);
+  if(!n) return "";
+  const aceso = ninhoAceso(n.id);
+  const m = missoesDaMontanha();
+  /* ⚠️ O ZAPDOS MOSTRA O PROGRESSO, e os outros dois não: a missão dele é a única que ACUMULA entre
+     batalhas -- as outras são um sim-ou-não de uma luta só, e um "0 de 1" ali não diria nada. */
+  const progresso = (!aceso && n.id === "zapdos")
+    ? `<p class="hint-text"><strong>${m.sequenciaDeGinasios || 0} de 3</strong> ginásios seguidos.</p>` : "";
+  return `
+  <div class="modal-overlay" onclick="fecharNinho()">
+    <div class="modal-box" onclick="event.stopPropagation()">
+      <div class="modal-icon">${aceso ? spriteHtml({ speciesId:n.especie }, "sprite-md") : "🪹"}</div>
+      <h2>${n.icone} ${escapeHtmlSafe(n.ninho)}</h2>
+      ${aceso ? `<p class="win-text">${escapeHtmlSafe(n.nome)} está aqui.</p>` : ""}
+      ${aceso
+        ? `<p class="win-text">✅ O ninho está ocupado.</p>
+           <p class="hint-text">${n.missao}</p>`
+        : `<p>${n.missao}</p>
+           ${progresso}
+           <p class="hint-text">${n.dica}</p>`}
+      <button class="btn secondary" onclick="fecharNinho()">Fechar</button>
+    </div>
+  </div>`;
+}
+function renderNinhos(){
+  const acesos = ninhosAcesos();
+  const todos = acesos === NINHOS.length;
+  const guarda = game.montanhaPremio || [];
+  return `
+  <div class="encounter-banner montanha">
+    <span class="encounter-icon">🗻</span>
+    O Santuário
+  </div>
+  <div class="box cursor">
+    <p>Passando os guardiões, a trilha abre num platô de pedra com <strong>três ninhos</strong>.</p>
+    <p class="hint-text">Toque num ninho pra ver o que ele pede.</p>
+  </div>
+  <div class="box">
+    <div class="ninhos">
+      ${NINHOS.map(n => {
+        const aceso = ninhoAceso(n.id);
+        return `<div class="ninho ${aceso ? "cheio" : "vazio"}" role="button" tabindex="0"
+          onclick="abrirNinho('${escJs(n.id)}')"
+          onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();abrirNinho('${escJs(n.id)}');}">
+          <div class="ninho-cima">${aceso ? spriteHtml({ speciesId:n.especie }, "sprite-sm") : "🪹"}</div>
+          <div class="ninho-nome">${escapeHtmlSafe(n.ninho)}</div>
+        </div>`;
+      }).join("")}
+    </div>
+    <p class="hint-text ninhos-conta">${acesos} de ${NINHOS.length} ninhos ocupados.</p>
+  </div>
+  ${todos
+    /* ⚠️ COM OS TRÊS ACESOS A BATALHA SUBSTITUI O PRÊMIO, e não se soma a ele: o pedido diz que a
+       escolha entre os seis voadores é pra quem *"ainda não tenha liberado os três ninhos"*. */
+    ? `<div class="box">
+         <h2>⚡❄️🔥 Os três vieram</h2>
+         <p>As três aves estão nos ninhos — e algo muito maior desceu com elas.</p>
+         <p class="hint-text">Zapdos, Articuno, Moltres e <strong>Lugia</strong>, todos no nível ${MONTANHA_NIVEL_LENDARIO}, numa equipe só.</p>
+       </div>
+       <button class="btn danger" onclick="enfrentarOsLendarios()">⚔️ Enfrentar os quatro</button>
+       <button class="btn secondary" onclick="descerDaMontanha()">⬅ Descer</button>`
+    : `<div class="box">
+         <h2>🪶 Escolha quem desce com você</h2>
+         <p class="hint-text">Os ninhos ainda não estão cheios — mas um dos guardiões aceita te seguir.</p>
+         ${guarda.map((m, i) => `
+           <button class="btn" onclick="escolherOGuardiao(${i})">
+             ${spriteHtml(m, "sprite-sm")} ${escapeHtmlSafe(SPECIES[m.speciesId].name)} — Lv.${m.level}
+           </button>`).join("")}
+       </div>
+       <button class="btn secondary" onclick="descerDaMontanha()">⬅ Descer sem levar ninguém</button>`}`;
+}
+/* O PRÊMIO DE QUEM AINDA NÃO ACENDEU OS TRÊS: um dos seis guardiões. Ele entra como um selvagem
+   capturado -- mesmo nível, e passando pela MESMA tela de escolha de golpes. É o caminho da
+   Vigília, inteiro. */
+function escolherOGuardiao(i){
+  const mons = game.montanhaPremio || [];
+  const esc = mons[i];
+  if(!esc) return;
+  entregarDaMontanha(esc.speciesId, esc.level);
+}
+/* A BATALHA FINAL: os quatro, todos no mesmo nível, numa equipe só -- foi o pedido. */
+function enfrentarOsLendarios(){
+  const mons = MONTANHA_LENDARIOS.map(id => ({ speciesId:id, level:MONTANHA_NIVEL_LENDARIO, shiny:false }));
+  startSpecialBattle("montanhaLendarios", mons,
+    { opponentName:"os Lendários", icon:"🗻", title:"O Santuário",
+      intro:"Os três se levantam dos ninhos. E do alto da pedra, <strong>Lugia</strong> abre as asas." });
+}
+/* ⚠️ E O PRÊMIO DA BATALHA FINAL REINICIA AS TRÊS MISSÕES -- mas só quando o lendário é RECEBIDO,
+   e não quando a batalha é vencida: quem vence e fecha a aba antes de escolher não pode perder as
+   três missões que levou a jornada inteira pra acender. */
+function escolherOLendario(i){
+  const id = MONTANHA_LENDARIOS[i];
+  if(!id) return;
+  reiniciarMissoesDaMontanha();
+  entregarDaMontanha(id, MONTANHA_NIVEL_LENDARIO);
+}
+/* A ENTREGA, uma só pros dois prêmios: o guardião e o lendário entram do MESMO jeito -- e é isso
+   que faz o time cheio cair no Prof. Carvalho nos dois casos, sem um segundo caminho pra manter. */
+function entregarDaMontanha(speciesId, nivel){
+  const mon = createInstance(speciesId, nivel);
+  mon.maxHp = calcMaxHp(mon);
+  mon.hp = mon.maxHp;
+  mon.escolherAtaques = true;
+  game.team.push(mon);
+  markCaught(speciesId, false);
+  game.montanhaPremio = null;
+  game.montanhaGuarda = null;
+  missoesDaMontanha().visitas = (missoesDaMontanha().visitas || 0) + 1;
+  if(game.team.length > 6){
+    /* ⚠️ COM SEIS ELE ESCOLHE QUEM SAI, pelo fluxo que já existe (*"deverá escolher quem substituir
+       pelo fluxo já existente"*) -- é a mesma tela do Prof. Carvalho do encontro selvagem. */
+    game.releaseSelected = [];
+    game.releaseDepois = null;
+    game.screen = "release";
+    render();
+    return;
+  }
+  proceedAfterTeamLocked();
+}
+/* A TELA DE ESCOLHA DO LENDÁRIO, depois da batalha vencida. */
+function renderMontanhaLendarios(){
+  return `
+  <div class="encounter-banner montanha">
+    <span class="encounter-icon">🗻</span>
+    O Santuário
+  </div>
+  <div class="box cursor">
+    <h2>Escolha quem desce com você</h2>
+    <p class="hint-text">Só um deles. Os ninhos vão se esvaziar de novo.</p>
+    ${MONTANHA_LENDARIOS.map((id, i) => `
+      <button class="btn" onclick="escolherOLendario(${i})">
+        ${spriteHtml({ speciesId:id }, "sprite-sm")} ${escapeHtmlSafe(SPECIES[id].name)} — Lv.${MONTANHA_NIVEL_LENDARIO}
+      </button>`).join("")}
+  </div>`;
+}
 function entrarNaMataFechada(){
   if(!game.vigilia) game.vigilia = montarAVigilia();
   game.screen = "mataFechada";
@@ -11194,7 +11733,19 @@ function advanceSpecialReveal(){
     if(isLastHit){
       game.specialRevealPhase = 'result';
       setTimeout(animateSpecialHpBars, esperaNome);
-      setTimeout(render, esperaNome + hitDuration + 50);
+      /* ⚠️ E O `render()` TEM QUE ESPERAR A PAUSA JUNTO (17/09/2026, reportado: *"quando um pokemon
+         esta queimando ou envenenado e esse pokemon morre na batalha, nao esta esperando 1,5s depois
+         da frase ... ta aparecendo e rapidamente muda para Weezing venceu"*).
+         ⚠️ A PAUSA JÁ ESTAVA AQUI desde 14/09 -- o que faltava era ela alcançar a TROCA DA FRASE. Na
+         fase `result` a linha de status deixa de ser o `statusDoConfrontoHtml` e vira o
+         "X venceu!", e quem faz essa troca é ESTE render: ele rodava 50ms depois da barra, então o
+         1,5s do `advance` lá embaixo passava com o "venceu!" já na tela. A frase de status aparecia
+         e sumia no mesmo quadro.
+         Medido: **13,9% dos confrontos** terminam num passo de leitura -- 301 de veneno, 61 de
+         queimadura e 22 de sono em 2.760. Ou seja, não era um caso de canto.
+         O `+50` original existe pra o render não cair no meio da transição CSS da barra; somando a
+         pausa ele cai bem depois dela, então o salto visual que ele evita continua evitado. */
+      setTimeout(render, esperaNome + hitDuration + 50 + pausaDaFaixa(hit));
       /* ⚠️ A PAUSA DE LEITURA VALE NO ÚLTIMO PASSO TAMBÉM (14/09/2026, reportado: *"a mensagem de fim
          da dança da chuva não está esperando 1,5s para ela seguir com o processo depois"*).
          O ramo de baixo (o passo do meio) já somava o `pausaDaFaixa`; este aqui não, e por isso a
@@ -11461,6 +12012,9 @@ function finishSpecialBattle(){
 }
 function continueAfterSpecial(){
   const context = game.specialBattle ? game.specialBattle.context : null;
+  /* ⚠️ O RESULTADO TEM QUE SER LIDO ANTES DA LIMPEZA logo abaixo: o `specialBattleResult` é anulado
+     três linhas adiante, e quem perguntar depois pergunta a um null. */
+  const venceu = !!(game.specialBattleResult && game.specialBattleResult.win);
   const grantedLevels = game.specialGrantsLevels || 0;
   game.specialBattle = null;
   game.specialBattleResult = null;
@@ -11500,6 +12054,27 @@ function continueAfterSpecial(){
   if(context==='vigilia'){
     if(game.vigiliaPremio && game.vigiliaPremio.length){ game.screen = 'vigiliaPremio'; render(); return; }
     proceedAfterTeamLocked();
+    return;
+  }
+  /* ⚠️ A MONTANHA: quem VENCE os guardiões chega no santuário; quem PERDE desce sem nada, que foi o
+     pedido ao pé da letra (*"se perder, sairá sem recompensa"*). Descer segue a jornada como se a
+     rota tivesse sido andada -- não há encontro selvagem aqui, a mesma regra da Mata Fechada. */
+  if(context==='montanha'){
+    if(venceu){
+      game.montanhaPremio = (game.montanhaGuarda || []).slice();
+      game.screen = 'ninhos';
+      render();
+      return;
+    }
+    descerDaMontanha();
+    return;
+  }
+  /* ⚠️ A BATALHA DOS QUATRO: quem vence escolhe um deles, quem perde VOLTA PROS NINHOS -- eles
+     continuam acesos e a luta pode ser tentada de novo. "Sair sem recompensa" é perder a LUTA, não
+     as três missões que levaram a jornada inteira pra acender. */
+  if(context==='montanhaLendarios'){
+    game.screen = venceu ? 'montanhaLendarios' : 'ninhos';
+    render();
     return;
   }
   /* Resgate com o time cheio: o pokémon entra AGORA (o time fica com 7) e a MESMA tela do encontro
@@ -11691,8 +12266,8 @@ function advanceReveal(){
       // só acontece UMA VEZ (na virada pro resultado), não a cada golpe, então não causa o piscar
       game.revealPhase = 'result';
       setTimeout(animateHpBars, esperaNome);
-      setTimeout(render, esperaNome + hitDuration + 50); // espera a transição da barra terminar de verdade, pra não dar salto visual
-      // a pausa de leitura do último passo -- ver a nota no advanceSpecialReveal
+      // a pausa de leitura do último passo vale pros DOIS -- ver a nota no advanceSpecialReveal
+      setTimeout(render, esperaNome + hitDuration + 50 + pausaDaFaixa(hit));
       setTimeout(advanceReveal, esperaNome + hitDuration + 800 + pausaDaFaixa(hit));
     } else {
       setTimeout(animatePartialHpBars, esperaNome);
@@ -12002,6 +12577,16 @@ function finishBattle(){
      (que é o caminho especial) sem copiar nada. */
   registrarSketch((result && result.matchups) || []);
   evoluirQuemSubiuNoDesmaio(subiram);
+  /* ⚠️ AS TRÊS MISSÕES DA MONTANHA SÃO CONFERIDAS AQUI, e o lugar É a regra: este caminho é o da
+     batalha de GINÁSIO da jornada, e só ele. É assim que o *"desmaios individuais e derrotas em
+     outros eventos não quebram a sequência"* do Zapdos sai de graça -- a Elite, a Rocket, a Torre e
+     o Ginásio da Cidade não passam por aqui.
+     ⚠️ E ELE RODA NA VITÓRIA E NA DERROTA: é a DERROTA que zera a sequência do Zapdos, então pôr a
+     chamada dentro do `if(result.win)` a deixaria crescer pra sempre.
+     ⚠️ E SÓ NA JORNADA: o `aceitarConvite` pode cair neste finishBattle vindo do Ginásio da Cidade
+     (é a MESMA tela `battling`), e ali não há líder nenhum. É a mesma guarda que o sketch precisou,
+     pelo mesmo caminho. */
+  game.ninhosAcesosAgora = ehJornada() ? conferirNinhos(!!result.win, (result && result.matchups) || []) : [];
   if(result.win){
     game.badgesEarned.push(gymAtual().badge);
     /* OS HMs DE VITÓRIA SÃO DECIDIDOS AQUI, e o lugar não é escolha de estilo: o `game.losses` só
@@ -12210,8 +12795,8 @@ function advanceTrainerReveal(){
     if(isLastHit){
       game.trainerRevealPhase = 'result';
       setTimeout(animateTrainerHpBars, esperaNome);
-      setTimeout(render, esperaNome + hitDuration + 50);
-      // a pausa de leitura do último passo -- ver a nota no advanceSpecialReveal
+      // a pausa de leitura do último passo vale pros DOIS -- ver a nota no advanceSpecialReveal
+      setTimeout(render, esperaNome + hitDuration + 50 + pausaDaFaixa(hit));
       setTimeout(advanceTrainerReveal, esperaNome + hitDuration + 800 + pausaDaFaixa(hit));
     } else {
       setTimeout(animatePartialTrainerHpBars, esperaNome);
@@ -15643,7 +16228,7 @@ async function logout(){
    um ponto seguro de gravação: o autosave não rodava e o flushPendingAutoSave do beforeunload
    também não -- então a insígnia que o jogador ACABOU de ganhar ficava pendente enquanto ele
    pensava na escolha, e fechar a aba ali perdia a vitória. */
-const SAFE_SAVE_SCREENS = new Set(['start','walk','walkNext','gymChoice','wild','release','levels','evolution','evoChoice','eeveeChoice','escolhaDeAtaques','aprenderAtaque','golpeAprendido','teamOrder','preBattle','victory','defeat','gameover','journeyEnd','specialIntro','specialResult','mataFechada','vigiliaPremio','rocketHideout','eliteIntro','eliteHeal']);
+const SAFE_SAVE_SCREENS = new Set(['start','walk','walkNext','gymChoice','wild','release','levels','evolution','evoChoice','eeveeChoice','escolhaDeAtaques','aprenderAtaque','golpeAprendido','teamOrder','preBattle','victory','defeat','gameover','journeyEnd','specialIntro','specialResult','mataFechada','vigiliaPremio','montanha','ninhos','montanhaLendarios','rocketHideout','eliteIntro','eliteHeal']);
 function saveDocRef(uid, slot){
   return db.collection('users').doc(uid).collection('saves').doc(String(slot));
 }
@@ -16018,6 +16603,9 @@ function serializeGame(){
     releaseDepois: game.releaseDepois || null,
     vigilia: game.vigilia || null,
     vigiliaPremio: game.vigiliaPremio || null,
+    montanha: game.montanha || null,
+    montanhaGuarda: game.montanhaGuarda || null,
+    montanhaPremio: game.montanhaPremio || null,
     evolucaoDepois: game.evolucaoDepois || null,
     /* As duas telas de golpe são ponto seguro de gravação: o jogador PENSA nelas, e fechar a aba
        ali não pode perder a captura nem repetir a pergunta. */
@@ -16266,6 +16854,12 @@ function applySavedState(data){
     : null;
   game.vigilia = arrumarVigilia(data.vigilia);
   game.vigiliaPremio = arrumarVigilia(data.vigiliaPremio);
+  /* ⚠️ OS GUARDIÕES PASSAM PELO MESMO CONSERTO DA VIGÍLIA, e pela mesma razão: eles são sorteados
+     entre as evoluções finais voadoras e o nível sai da média do time, então um Charizard Lv.24 é
+     possível ali também. Quem está na tela dos ninhos escolheria um pokémon que não existe. */
+  game.montanha = data.montanha || null;
+  game.montanhaGuarda = arrumarVigilia(data.montanhaGuarda);
+  game.montanhaPremio = arrumarVigilia(data.montanhaPremio);
   game.evolucaoDepois = data.evolucaoDepois || null;
   game.escolhaDeAtaques = data.escolhaDeAtaques || null;
   game.escolhaDepois = data.escolhaDepois || null;
@@ -16952,7 +17546,7 @@ const ACHIEVEMENTS = [
   { id:'catch_30', nivel:'facil', icon:'📦', name:'Colecionador Dedicado', desc:'Capture 30 espécies diferentes.', check:a=>a.caughtCount>=30 },
   { id:'catch_60', nivel:'media', icon:'🗂️', name:'Colecionador Avançado', desc:'Capture 60 espécies diferentes.', check:a=>a.caughtCount>=60 },
   { id:'catch_100', nivel:'dificil', icon:'🗃️', name:'Quase Completo', desc:'Capture 100 espécies diferentes.', check:a=>a.caughtCount>=100 },
-  { id:'catch_all', nivel:'lendaria', icon:'🌟', name:'Mestre Pokémon', desc:'Capture tudo que dá pra capturar (Lugia e Celebi não se deixam pegar; o Ho-Oh só na Vigília).',
+  { id:'catch_all', nivel:'lendaria', icon:'🌟', name:'Mestre Pokémon', desc:'Capture tudo que dá pra capturar (o Celebi não se deixa pegar; o Ho-Oh só na Vigília e o Lugia só na Montanha).',
     check:a=>a.caughtCount>=a.totalCapturavel },
   { id:'evolve_1', nivel:'facil', icon:'✨', name:'Evolucionista', desc:'Evolua um Pokémon pela primeira vez.', check:a=>a.anyEvolution },
   { id:'eevee_choice', nivel:'facil', icon:'💧', name:'Escolha Dourada', desc:'Evolua um Eevee para uma de suas formas.', check:a=>a.anyEeveeEvo },
@@ -17056,21 +17650,26 @@ const ACHIEVEMENTS = [
    descobre o que está ganho, desconta o que já foi pago e paga a diferença -- o mesmo desenho do
    claimJourneyCoins. É isso que faz o número desenhado aqui ser só uma previsão, e é isso que
    impede uma linha no console de valer o bolo inteiro. */
-async function resgatarConquistas(){
-  if(!game.authUser || game.resgatandoConquistas) return;
-  game.resgatandoConquistas = true;
+/* ⚠️ UMA CONQUISTA POR VEZ desde 17/09/2026 (a pedido). O botão de "resgatar tudo" saiu -- ele era
+   uma ida ao servidor pra N conquistas, e virou uma por clique.
+   ⚠️ O `resgatandoConquistas` guarda o ID e não um booleano: com um botão por linha, um `true`
+   desabilitaria as 69 de uma vez enquanto UMA está sendo paga. Guardando o id, só a linha clicada
+   fica em espera e o resto continua clicável. */
+async function resgatarConquista(id){
+  if(!game.authUser || game.resgatandoConquistas || !id) return;
+  game.resgatandoConquistas = id;
   game.conquistaResgateErro = null;
   render();
   try{
-    const r = await functionsClient.httpsCallable('claimAchievementCoins')();
+    const r = await functionsClient.httpsCallable('claimAchievementCoins')({ id });
     game.moedas = r.data.moedas;
     game.achievementsPaid = r.data.pagas || [];
     game.conquistaResgateGanhou = r.data.ganhou || 0;
   }catch(e){
-    console.error('Erro ao resgatar conquistas:', e);
+    console.error('Erro ao resgatar conquista:', e);
     game.conquistaResgateErro = 'Não deu pra resgatar agora. Tente de novo.';
   }
-  game.resgatandoConquistas = false;
+  game.resgatandoConquistas = null;
   render();
 }
 async function openAchievements(){
@@ -17584,19 +18183,28 @@ function renderRouteCardsBlock(cards){
        encontraria o cadeado do jeito que ele estava. Lida no render, ela responde à pergunta certa:
        *este time, AGORA, sabe cortar?* */''}
   ${cards.map(r=>{
-    const trancada = r.corte && !timeQueCorta(game.team);
-    return `<button class="btn route-card${r.corte ? " route-corte" : ""}" ${trancada ? "disabled" : `onclick="chooseRoute(\'${r.id}\')"`}>
+    /* ⚠️ AS DUAS ROTAS DE CHAVE DIVIDEM O MESMO DESENHO: a mata pede o Corte e a montanha o Voo, e
+       a pergunta é a MESMA -- *este time, AGORA, tem a chave?* Escritas em separado, a segunda
+       nasceria com o cadeado de outra cor ou sem o nome de quem abre. */
+    const comChave = r.corte || r.voo;
+    const abre = r.corte ? cortadorDoTime() : (r.voo ? voadorDoTime() : null);
+    const trancada = comChave && !abre;
+    return `<button class="btn route-card${comChave ? " route-corte" : ""}" ${trancada ? "disabled" : `onclick="chooseRoute(\'${r.id}\')"`}>
       <span class="mon-name">${r.icon} ${r.name}</span>
       <span class="mon-sub">${typesHtml(r.types)}</span>
       <span class="route-rumor">💬 ${r.rumor}</span>
-      ${r.corte ? `<span class="route-cadeado">${trancada
+      ${comChave ? `<span class="route-cadeado">${trancada
           /* ⚠️ ELE DIZ O QUE FAZER, e não só o que falta (14/09/2026, a pedido: *"escreva que é
              necessário usar o HM01 em um Pokémon para liberar esse caminho"*). "Precisa de um
              pokémon que saiba Corte" descreve o estado; ela não diz que o HM01 mora na MOCHILA nem
              que ele se USA num pokémon -- e sem isso o jogador que tem a Máquina no bolso fica
              olhando o cadeado sem saber que a chave já é dele. */
-          ? "🔒 Use o <strong>HM01</strong> (na Mochila) em um pokémon do time pra liberar este caminho"
-          : "🪓 " + escapeHtmlSafe(cortadorDoTime().name) + " abre caminho"}</span>` : ""}
+          /* a frase nomeia a MÁQUINA daquela rota: mandar procurar o HM01 num caminho que pede o
+             HM02 seria pior que não dizer nada */
+          ? (r.corte
+             ? "🔒 Use o <strong>HM01</strong> (na Mochila) em um pokémon do time pra liberar este caminho"
+             : "🔒 Use o <strong>HM02</strong> (na Mochila) em um pokémon do time pra liberar este caminho")
+          : (r.corte ? "🪓 " : "🪶 ") + escapeHtmlSafe(abre.name) + " abre caminho"}</span>` : ""}
     </button>`;
   }).join('')}
   ${botaoSeuTimeHtml()}`;
@@ -17625,7 +18233,8 @@ function renderSpecialIntro(){
      isso o `.encounter-banner` base ganhou fundo (ver o CSS): o próximo contexto nasce legível
      mesmo sem ninguém lembrar de mapeá-lo aqui. */
   const CLASSE_DO_BANNER = { rocket:'rocket', hideout1:'rocket', hideout2:'rocket',
-                             rival:'rival', elite:'elite', vigilia:'vigilia' };
+                             rival:'rival', elite:'elite', vigilia:'vigilia',
+                             montanha:'montanha', montanhaLendarios:'montanha' };
   const bannerClass = CLASSE_DO_BANNER[cfg.context] || '';
   const showIcon = cfg.context !== 'rival';
   return `
@@ -21057,6 +21666,8 @@ const VOADORES = [
   "noctowl","togetic","xatu","murkrow","delibird","skarmory","lugia","hooh"
 ];
 const GOLPE_DO_CORTE = "cut";
+/* o golpe do HM02, que e a chave da Montanha Sagrada -- o espelho exato do de cima */
+const GOLPE_DO_VOO = "fly";
 /* SABER O CORTE É UMA PROPRIEDADE DA INSTÂNCIA, não da espécie -- dois Scyther do mesmo treinador
    podem estar um com e outro sem. É o mesmo desenho do `sketch` do Smeargle, e é por isso que ele
    viaja no save de graça: o `ataques` já é serializado. */
@@ -21384,6 +21995,30 @@ function hmGanhoHtml(){
     <p class="hint-text">Guardada na mochila, na prateleira <strong>TMs/HMs</strong>.</p>
   </div>`;
 }
+/* ⚠️ O NINHO QUE ACENDEU VIRA LINHA NA TELA DE RESULTADO, e ele é o único prêmio do jogo que pode
+   sair de uma DERROTA: a missão do Articuno é *"um mesmo Pokémon de Gelo derrotar três adversários
+   consecutivos em uma única batalha"*, e isso cabe numa batalha que o time acaba perdendo. Por isso
+   ele fica FORA do bloco de vitória.
+   Sem ele, uma missão que a jornada inteira levou pra cumprir acenderia em silêncio -- e o jogador
+   só descobriria na próxima vez que a Montanha aparecesse, que pode ser nunca. É o mesmo erro da
+   especialidade que valia 1% e não tinha selo.
+   Ele sai da MARCA do `finishBattle` (`ninhosAcesosAgora`), não de "o ninho está aceso": a tela é
+   relida a cada render, e lida do estado ela anunciaria o mesmo ninho em toda vitória dali pra
+   frente. Mesma regra do `ganhouHmAgora`. */
+function ninhosAcesosHtml(){
+  const ids = game.ninhosAcesosAgora || [];
+  if(!ids.length) return "";
+  return ids.map(id => {
+    const n = NINHOS.find(x => x.id === id);
+    if(!n) return "";
+    return `<div class="box hm-premio">
+      <p><span class="hm-premio-icone">${n.icone}</span> O <strong>${escapeHtmlSafe(n.ninho)}</strong> da Montanha Sagrada foi ocupado por <strong>${escapeHtmlSafe(n.nome)}</strong>!</p>
+      <p class="hint-text">${ninhosAcesos() === NINHOS.length
+        ? "Os três estão ocupados. Suba a montanha."
+        : `Faltam ${NINHOS.length - ninhosAcesos()} pra abrir o santuário.`}</p>
+    </div>`;
+  }).join("");
+}
 function moedasGanhasHtml(){
   const n = game.moedasGanhasAgora || 0;
   if(n <= 0) return '';
@@ -21402,6 +22037,7 @@ function renderBattleResult(win){
   </div>
   ${moedasGanhasHtml()}
   ${hmGanhoHtml()}` : ''}
+  ${ninhosAcesosHtml()}
   <div class="box">
     <h2>Log da batalha</h2>
     <div class="status-list">${renderMatchupLog(r.matchups)}</div>
@@ -22802,8 +23438,8 @@ function advanceLeagueWatch(){
     if(isLastHit){
       game.leagueWatchPhase = 'result';
       setTimeout(animateLeagueWatchHpBars, esperaNome);
-      setTimeout(render, esperaNome + hitDuration + 50);
-      // a pausa de leitura do último passo -- ver a nota no advanceSpecialReveal
+      // a pausa de leitura do último passo vale pros DOIS -- ver a nota no advanceSpecialReveal
+      setTimeout(render, esperaNome + hitDuration + 50 + pausaDaFaixa(hit));
       setTimeout(advanceLeagueWatch, esperaNome + hitDuration + 800 + pausaDaFaixa(hit));
     } else {
       setTimeout(animatePartialLeagueWatchHpBars, esperaNome);
@@ -24409,7 +25045,7 @@ Object.keys(TMS).forEach(id => {
        frase longa ele saía cortado no quadro de altura fixa (375px, medido a 320px) -- junto com o
        botão de quem pode aprender. O que sobra aqui é o que só o texto diz: que a Máquina SOME. */
     descricao: 'Ensina ' + nomeDoAtaque(tm.golpe) + ' a um pokémon que possa aprender. ' +
-      '⚠️ USO ÚNICO: a Máquina some depois de ensinar.',
+      '⚠️ USO ÚNICO: o TM some depois de ensinar.',
     comoGanhar: 'Na loja.'
   };
 });
@@ -24745,7 +25381,24 @@ function prateleirasDaMochila(){
   return MOSTRAR_TM_HM ? LOJA_PRATELEIRAS : LOJA_PRATELEIRAS.filter(p => p.id !== 'tms');
 }
 function pilhasDaPrateleira(aba){
-  if(aba === 'tms') return hmsDaConta().map(id => ({ item:id, quantidade:1, hm:true }));
+  /* ⚠️ A PRATELEIRA DAS MÁQUINAS TEM DUAS FONTES, e essa foi a causa do defeito de 17/09/2026
+     (*"ao comprar um TM, ele não foi para a Mochila, ele simplesmente sumiu"*): ela devolvia SÓ os
+     HMs -- foi escrita quando era só deles --, então o TM comprado caía no `prateleiraDoItem` certo
+     e o filtro do inventário NUNCA era alcançado. Ele estava no armazém o tempo todo (o
+     `quantoTenho` o via, o servidor tinha gravado); o que faltava era a mochila listá-lo.
+     O HM é da CONTA e é sempre 1; o TM vem do INVENTÁRIO e empilha. Os HMs vêm primeiro porque são
+     permanentes -- o TM some quando ensina, e uma lista que muda de ordem conforme o estoque é pior
+     que uma que não muda. */
+  if(aba === 'tms'){
+    /* ⚠️ OS TRÊS HMs APARECEM SEMPRE desde 17/09/2026 (a pedido: *"adicione os 3 HMs existentes no
+       jogo, porém se o jogador não tiver, deixar desativado o botão de usar, e escreva o que é
+       necessário fazer para obter"*). Antes só os conquistados entravam, e quem não tinha nenhum
+       via a prateleira vazia -- ela não dizia que eles EXISTEM, nem como pegá-los.
+       O `falta` é o que a tela usa pra apagar a linha e trocar o botão pelo caminho. */
+    const meus = new Set(hmsDaConta());
+    return Object.keys(HMS).map(id => ({ item:id, quantidade:1, hm:true, falta:!meus.has(id) }))
+      .concat(pilhasDoInventario().filter(p => prateleiraDoItem(p.item) === 'tms'));
+  }
   return pilhasDoInventario().filter(p => prateleiraDoItem(p.item) === aba);
 }
 /* TROCAR DE PRATELEIRA MOVE A SELEÇÃO JUNTO -- a mesma razão da loja: sem isso o quadro de cima
@@ -24873,11 +25526,24 @@ function renderInventario(){
       <span class="item-detalhe-icone">${it.icone}</span>
       <div class="item-detalhe-nome">
         <strong>${escapeHtmlSafe(it.nome)}</strong>
-        <span class="item-detalhe-qtd">${ehHm ? 'Máquina' : (sel.quantidade > 1 ? sel.quantidade + ' na mochila' : '1 na mochila')}</span>
+        ${/* ⚠️ A PALAVRA "M4QUINA" SAIU DO TEXTO DA TELA (17/09/2026, a pedido: *"não use a palavra
+             para descrever TM ou HM, ninguem entende isso"*). O rótulo passou a dizer o ESTADO: o
+             HM que você tem é permanente, o que falta ainda não é seu.
+             ⚠️ E ESTE COMENTÁRIO É JS, não HTML: comentário HTML vai pro DOM, e a varredura que
+             cobra a ausência da palavra acusaria o próprio comentário. Por isso o "4" ali em cima:
+             nem mesmo aqui ela pode ser escrita por extenso. */''}
+        <span class="item-detalhe-qtd">${ehHm ? (sel.falta ? 'você ainda não tem' : 'seu para sempre') : (sel.quantidade > 1 ? sel.quantidade + ' na mochila' : '1 na mochila')}</span>
       </div>
     </div>
     <div class="loja-miolo">
       <p class="item-detalhe-texto">${escapeHtmlSafe(ehHm ? it.resumo : it.descricao)}</p>
+      ${/* ⚠️ O CAMINHO PRA GANHAR aparece SÓ no HM que falta. No que você já tem ele seria história
+           -- e no HM01 ele já tinha saído da prateleira vazia por isso mesmo (a tela não entrega
+           de graça um achado que a jornada devia entregar). Aqui é o contrário: a linha existe
+           justamente pra dizer que o HM EXISTE, e sem o caminho ela seria uma promessa muda. */
+        (ehHm && sel.falta)
+          ? `<p class="hint-text">🔒 <strong>Como conseguir:</strong> ${escapeHtmlSafe(it.comoGanhar)}</p>`
+          : ""}
       ${/* ⚠️ O CARTÃO DO GOLPE QUE A MÁQUINA ENSINA (16/09/2026, a pedido). É o MESMO `cartaoDeGolpe`
            das três telas de golpe e da tela de ensinar -- e ser o mesmo é o ponto: o jogador
            compara o Surf daqui com os golpes que o pokémon já tem LÁ, e um formato próprio
@@ -24893,11 +25559,13 @@ function renderInventario(){
     <div class="loja-rodape">
       <div class="item-acoes loja-acoes">
         ${(ehHm || (it && it.tm))
-          /* ⚠️ A MÁQUINA NÃO SE USA: ela ENSINA. O HM ensina quantas vezes quiser; o TM ensina UMA
+          /* ⚠️ TM E HM NÃO SE USAM: eles ENSINAM. O HM ensina quantas vezes quiser; o TM ensina UMA
              (ele some depois), e o botão diz isso -- é a única coisa que separa os dois aqui.
              O TM mantém o Excluir porque ele é um item comum que ocupa espaço; o HM não tem o que
-             excluir, ele é da conta. */
-          ? `<button class="btn success" onclick="abrirEnsinarHm('${escJs(sel.item)}')">📀 Ensinar${it && it.tm ? ' (some depois)' : ''}</button>
+             excluir, ele é da conta.
+             ⚠️ E O HM QUE VOCÊ AINDA NÃO TEM mostra o botão DESABILITADO: sumir com ele faria a
+             linha não explicar o que ela é. Quem conta o caminho é o miolo, logo acima. */
+          ? `<button class="btn success" ${sel.falta?'disabled':''} onclick="abrirEnsinarHm('${escJs(sel.item)}')">📀 Ensinar${it && it.tm ? ' (some depois)' : ''}</button>
              ${it && it.tm ? `<button class="btn secondary" onclick="abrirAptosDaMaquina('${escJs(sel.item)}')">👥 Quem pode aprender</button>` : ''}`
           : `${it.equipável ? '' : `<button class="btn success" ${podeUsar?'':'disabled'} onclick="usarItem('${escJs(sel.item)}')">${game.inventarioUsando ? 'Usando...' : '✔ Usar'}</button>`}
              <button class="btn danger" ${podeExcluir(sel.item) && !game.inventarioUsando ?'':'disabled'}
@@ -24920,11 +25588,16 @@ function renderInventario(){
     </div>
     <div class="box loja-lista">
       ${pilhas.length ? pilhas.map(p => { const i2 = p.hm ? HMS[p.item] : ITENS[p.item]; return `
-        <button class="loja-linha ${p.item === game.inventarioSel ? 'sel' : ''}"
+        ${/* ⚠️ O HM QUE FALTA VEM APAGADO, e NAO desabilitado: tocar nele tem que abrir o quadro,
+             que e onde mora o caminho pra consegui-lo. Um botao morto ali esconderia justamente a
+             informacao que o pedido de 17/09 mandou escrever.
+             O apagado e a mesma leitura do resto do jogo (o pokemon descansando no montador, o que
+             nao aprende na tela de ensinar): de relance se ve o que ja e seu. */''}
+        <button class="loja-linha ${p.item === game.inventarioSel ? 'sel' : ''} ${p.falta ? 'nao-tem' : ''}"
           onclick="escolherItem('${escJs(p.item)}')">
           <span class="loja-icone">${i2.icone}</span>
           <span class="loja-nome">${escapeHtmlSafe(i2.nome)}</span>
-          <span class="loja-preco">${p.hm ? '' : (p.quantidade > 1 ? p.quantidade + 'x' : '')}</span>
+          <span class="loja-preco">${p.falta ? '🔒' : (p.hm ? '' : (p.quantidade > 1 ? p.quantidade + 'x' : ''))}</span>
         </button>`; }).join('')
       /* ⚠️ A FRASE DA PRATELEIRA VAZIA É CURTA, e a das Máquinas é *"Nenhum TM/HM"* ao pé da letra.
          Ela já foi *"Nenhuma Máquina ainda"* mais um parágrafo dizendo COMO ganhar o HM01 (o S.S.
@@ -25182,7 +25855,7 @@ function avisoDaMaquinaHtml(){
 function telaDosTimesDaMaquina(hm){
   const times = timesDaMaquina(game.hmEnsino.hm);
   const corpo = times.length === 0
-    ? `<div class="box"><p class="item-detalhe-vazio">Nenhum pokémon dos seus times aprende essa Máquina.</p>
+    ? `<div class="box"><p class="item-detalhe-vazio">Nenhum pokémon dos seus times aprende esse golpe.</p>
         ${/* ⚠️ A FRASE SAI DO PRÓPRIO HM (15/09/2026): ela citava os CORTADORES e o Corte com o nome
              escrito à mão, então a tela do HM03 diria "72 espécies aprendem o Corte" com o Surf na
              mão. Hoje o número vem do `hm.aprendem` e o nome do `hm.golpe`, e o próximo HM já nasce
@@ -25209,7 +25882,7 @@ function telaDosTimesDaMaquina(hm){
                  o que o `title` de cada sprite explica. */''}
             ${t.mons.map(m => `<div class="save-slot-mon${m.pode ? '' : ' caiu'}" title="${
               m.pode ? '' : (m.porque === 'ja' ? 'Já sabe o ' + escapeHtmlSafe(nomeDoAtaque(hm.golpe))
-                                               : escapeHtmlSafe(m.nome) + ' não aprende essa Máquina')}">
+                                               : escapeHtmlSafe(m.nome) + ' não aprende esse golpe')}">
               <div class="save-slot-mon-sprite">${spriteHtml(m,"sprite-sm")}</div>
               <div class="save-slot-mon-level">Lv.${m.level}</div>
             </div>`).join("")}
@@ -25316,12 +25989,14 @@ function renderExcluirItemModal(){
 const LOJA_PRATELEIRAS = [
   { id:'batalha',   nome:'Para as batalhas', icone:'⚔️' },
   { id:'especiais', nome:'Especiais',        icone:'✨' },
-  /* ⚠️ 'TMs/HMs' E NAO 'TMs' desde 14/09/2026: a MOCHILA passou a usar esta MESMA lista (ver
-     renderInventario), e la a prateleira tem HM de verdade dentro -- o HM01. Um rotulo que diz
-     so 'TMs' na tela que mostra um HM seria a tela discordando de si mesma. Uma lista so pras
-     duas telas e o que garante que elas nao divirjam no proximo ajuste, que e a licao das tres
-     telas de golpe. */
-  { id:'tms',       nome:'TMs/HMs',          icone:'💿' }
+  /* ⚠️ O ROTULO DEPENDE DA TELA desde 17/09/2026 (a pedido: *"mude o texto na loja do botao
+     TMs/HMs, para TMs"*), e a razao e que as duas telas mostram coisas diferentes na MESMA
+     prateleira: a LOJA vende TM e so TM (HM ninguem compra, ele vem da jornada), e a MOCHILA tem
+     HM de verdade dentro. Um rotulo unico mentiria numa das duas.
+     A LISTA continua sendo UMA -- o que varia e a palavra, e e por isso que ela e um campo e nao
+     uma segunda tabela: duas listas divergiriam no proximo item, que e a licao das tres telas de
+     golpe. */
+  { id:'tms',       nome:'TMs/HMs',          nomeLoja:'TMs', icone:'💿' }
 ];
 function prateleiraDoItem(id){
   const it = ITENS[id] || {};
@@ -25585,7 +26260,7 @@ function renderLoja(){
         <button class="loja-aba ${pr.id === aba ? 'sel' : ''}" onclick="escolherPrateleira('${escJs(pr.id)}')">
           <span class="loja-aba-icone">${pr.icone}</span>
           <span class="loja-aba-txt">
-            <span class="loja-aba-nome">${escapeHtmlSafe(pr.nome)}</span>
+            <span class="loja-aba-nome">${escapeHtmlSafe(pr.nomeLoja || pr.nome)}</span>
             <span class="loja-aba-qtd">${n ? n + (n === 1 ? ' item' : ' itens') : 'em breve'}</span>
           </span>
         </button>`; }).join('')}
@@ -28501,16 +29176,13 @@ function renderAchievements(){
     <h2>🏆 Conquistas</h2>
     <p>${unlockedCount} de ${ACHIEVEMENTS.length} desbloqueadas, somando todos os seus saves.${loadingExtra?' (calculando conquistas da Liga...)':''}</p>
   </div>
-  <!-- ⚠️ O RESGATE É UM BOTÃO SÓ, e ele só existe quando há o que pegar: um botão desabilitado
-       permanente ali seria mais uma coisa apagada na tela, e a ausência dele já diz "está tudo
-       pego". Ele fica ACIMA da lista porque é a resposta do círculo vermelho que trouxe o
-       jogador até aqui -- embaixo de 69 linhas ele chegaria depois da rolagem. -->
+  <!-- ⚠️ O BOTÃO DE "RESGATAR TUDO" SAIU (17/09/2026, a pedido): cada conquista tem o seu, na
+       própria linha. O que fica aqui é só o QUANTO está esperando -- ele é a resposta do círculo
+       vermelho que trouxe o jogador até esta tela, e embaixo de 69 linhas ele chegaria depois da
+       rolagem. -->
   <div class="box">
-    ${aResgatar > 0 ? `
-      <p class="hint-text">Você tem <strong>🪙 ${aResgatar}</strong> esperando em conquistas já desbloqueadas.</p>
-      <button class="btn success" ${game.resgatandoConquistas?'disabled':''} onclick="resgatarConquistas()">
-        ${game.resgatandoConquistas ? 'Resgatando...' : `🪙 Resgatar ${aResgatar} moedas`}
-      </button>`
+    ${aResgatar > 0
+      ? `<p class="hint-text">Você tem <strong>🪙 ${aResgatar}</strong> esperando — toque no valor de cada conquista pra pegar.</p>`
       : `<p class="hint-text">Tudo resgatado. As próximas conquistas já caem com a moeda esperando aqui.</p>`}
     ${ganhouAgora > 0 ? `<p class="success-text">✅ +🪙 ${ganhouAgora} resgatadas!</p>` : ''}
     ${game.conquistaResgateErro ? `<p class="error-text">${escapeHtmlSafe(game.conquistaResgateErro)}</p>` : ''}
@@ -28525,9 +29197,18 @@ function renderAchievements(){
            pena ir atrás daquela, e é a única informação da linha que o nome e a descrição não dão.
            Escondê-lo até destravar faria o nível (que é a feature) só existir depois que ele já
            não decide mais nada. */
+        /* ⚠️ SÃO TRÊS ESTADOS, e só um deles é botão:
+             PAGA      -> o ✓, sem clique (não há o que fazer)
+             GANHA     -> BOTÃO com o valor: é o resgate daquela conquista
+             TRANCADA  -> o selo do nível, sem clique -- ele diz por que vale a pena ir atrás,
+                          que é a razão de o prêmio aparecer na trancada desde que o nível existe. */
         const premio = paga
           ? `<span class="conquista-premio paga" title="Já resgatada">✓ 🪙 ${nivel.moedas}</span>`
-          : `<span class="conquista-premio ${unlocked?'pronta':''}" title="${nivel.nome}">${nivel.selo} 🪙 ${nivel.moedas}</span>`;
+          : unlocked
+          ? `<button class="conquista-premio pronta" ${game.resgatandoConquistas===ach.id?'disabled':''}
+                     onclick="resgatarConquista('${escJs(ach.id)}')"
+                     title="Resgatar ${nivel.moedas} moedas">${game.resgatandoConquistas===ach.id ? '...' : `${nivel.selo} 🪙 ${nivel.moedas}`}</button>`
+          : `<span class="conquista-premio" title="${nivel.nome}">${nivel.selo} 🪙 ${nivel.moedas}</span>`;
         return `<div class="status-row achievement-row ${unlocked?'':'locked'}">
           <span class="icon">${unlocked ? ach.icon : '🔒'}</span>
           <span class="achievement-text"><strong>${ach.name}</strong><br><span class="achievement-desc">${ach.desc}</span></span>
@@ -28602,6 +29283,9 @@ function render(){
     case 'hmTroca': html = renderHmTroca(); break;
     case 'mataFechada': html = renderMataFechada(); break;
     case 'vigiliaPremio': html = renderVigiliaPremio(); break;
+    case 'montanha': html = renderMontanha(); break;
+    case 'ninhos': html = renderNinhos(); break;
+    case 'montanhaLendarios': html = renderMontanhaLendarios(); break;
     case 'loja': html = renderLoja(); break;
     case 'neighborhoodGymChallengeHistory': html = renderNeighborhoodGymChallengeHistory(); break;
     case 'neighborhoodGymChallengeTeamPicker': html = renderNeighborhoodGymChallengeTeamPicker(); break;
@@ -28687,6 +29371,9 @@ function render(){
   /* DEPOIS da ficha de propósito: a caixa de explicação é aberta de DENTRO dela, e os modais
      empilham na ordem em que são anexados -- vindo antes, ela abriria atrás. É a mesma nota que a
      própria ficha carrega em relação ao modal da Pokédex. */
+  /* ⚠️ ANEXADO DEPOIS da tela dos ninhos: os modais empilham na ordem em que entram, e este é
+     aberto de DENTRO dela -- vindo antes, abriria ATRÁS. É a mesma nota da ficha da Pokédex. */
+  if(game.ninhoAberto){ html += renderNinhoModal(); }
   if(game.especialInfo){ html += renderEspecialInfoModal(); }
   /* ⚠️ O HM GANHO vem DEPOIS da ficha e da caixa do especial e ANTES do convite online: ele pode
      nascer em QUALQUER tela (a captura, ou o carregamento da conta), entao ele nao pode ficar

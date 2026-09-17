@@ -1922,6 +1922,301 @@ console.log('\nE O QUE O HO-OH CAPTURAVEL NAO PODE MEXER');
      agg.totalCapturavel === Object.keys(S.SPECIES).length - 3,
      String(agg.totalCapturavel));
 }
+console.log('\n=== A MONTANHA SAGRADA (17/09/2026) ===');
+{
+  /* A terceira rota que abre com o VOO, e o santuario do outro lado dos guardioes. Pedida assim:
+     *"sera uma rota especial que podera aparecer como terceira opcao durante a jornada, acessivel
+     apenas se o treinador tiver um Pokemon no time que saiba Fly, deve aparecer aleatoriamente a
+     partir do sexto ginasio"*. */
+  const g = S.__getGame();
+  const mk = (id, lv, ataques) => { const p = S.createInstance(id, lv); p.maxHp = S.calcMaxHp(p); p.hp = p.maxHp;
+                                    p.ataques = ataques || S.ataquesPadrao(p); return p; };
+  g.authUser = null; g.saveGen = 0; g.gymPath = new Array(8).fill('kanto');
+  g.montanha = null; g.montanhaGuarda = null; g.montanhaPremio = null;
+  g.team = ['venusaur','pidgeot','raichu','gyarados','machoke','haunter'].map(id => mk(id, 45));
+
+  /* ---------- 1) O SORTEIO ---------- */
+  const N = 4000;
+  let antesDo6 = 0, comMontanha = 0, dados = 0, dadoPassou = 0, juntoComAMata = 0;
+  for(let slot = 0; slot < N; slot++){
+    g.currentSaveSlot = slot;
+    for(let leg = 0; leg < 8; leg++){
+      if(leg < S.MONTANHA_A_PARTIR_DE){ if(S.montanhaSaiNoTrecho(leg)) antesDo6++; continue; }
+      dados++;
+      const tem = S.montanhaSaiNoTrecho(leg);
+      if(tem){ dadoPassou++; if(S.temRotaDoCorte(leg)) juntoComAMata++; }
+    }
+    g.currentSaveSlot = slot;
+    let quantas = 0;
+    for(let leg = 0; leg < 8; leg++) if(S.montanhaSaiNoTrecho(leg)) quantas++;
+    if(quantas > 0) comMontanha++;
+  }
+  ok('nunca antes do 6o ginasio', antesDo6 === 0, antesDo6 + ' em ' + N + ' saves');
+  const taxa = dadoPassou / dados;
+  ok('a chance por trecho e ~25%', Math.abs(taxa - S.CHANCE_MONTANHA) < 0.03,
+     (taxa*100).toFixed(1) + '% em ' + dados + ' dados');
+  /* ⚠️ A TRAVA QUE IMPORTA: com as duas no mesmo trecho seriam QUATRO cartas, e a promessa e de uma
+     TERCEIRA. A mata tem preferencia, e o `montanhaSaiNoTrecho` ja recusa. */
+  ok('nunca sai no MESMO trecho da mata', juntoComAMata === 0, juntoComAMata + ' colisoes');
+  ok('vista em parte das jornadas', comMontanha > N*0.4 && comMontanha < N*0.9,
+     (comMontanha/N*100).toFixed(1) + '% das jornadas');
+
+  /* a SEMENTE: sair do save e voltar devolve o MESMO trecho. O slot e escolhido pelo teste -- um
+     que NAO tem montanha nenhuma provaria a estabilidade sem provar coisa nenhuma. */
+  const perfil = () => [5,6,7].map(l => S.montanhaSaiNoTrecho(l) ? 1 : 0).join('');
+  let slotComMontanha = -1;
+  for(let s2 = 0; s2 < 200 && slotComMontanha < 0; s2++){ g.currentSaveSlot = s2; if(/1/.test(perfil())) slotComMontanha = s2; }
+  ok('existe save com montanha pra medir', slotComMontanha >= 0, 'slot ' + slotComMontanha);
+  g.currentSaveSlot = slotComMontanha;
+  const antes = perfil();
+  ok('o sorteio e semeado (sair e voltar da o mesmo)', antes === perfil() && /1/.test(antes), antes);
+  /* E A GERACAO DO SLOT MUDA O SORTEIO: sem ela, apagar o save e recriar no mesmo slot repetiria
+     a jornada trecho por trecho. E a mesma trava anti save-scumming da mata e do encontro. */
+  let mudou = false, ultimaGen = 0;
+  for(let gen = 1; gen <= 12 && !mudou; gen++){ g.saveGen = gen; ultimaGen = gen; if(perfil() !== antes) mudou = true; }
+  g.saveGen = 0;
+  ok('mas a GERACAO do slot muda o sorteio', mudou, antes + ' -> outra na geracao ' + ultimaGen);
+
+  /* ---------- 2) A CHAVE: quem VOA entra ---------- */
+  ok('sem ninguem que voe, nao abre', !S.podeVoar());
+  const comVoo = mk('pidgeot', 45, ['fly','wingattack']);
+  g.team = [comVoo, mk('venusaur', 45)];
+  ok('com um que voa, abre', S.podeVoar() && S.voadorDoTime() === comVoo);
+  /* ⚠️ QUEM VALIDA E A ACAO, nao a tela: o card apagado e apresentacao, e a guarda vale mesmo que o
+     clique venha forjado. E a mesma regra do `confirmarAtaques` e do `toggleRelease`. */
+  g.team = [mk('venusaur', 45)];
+  g.currentRoute = null; g.screen = 'walk';
+  S.chooseRoute(S.MONTANHA.id);
+  ok('a ACAO recusa quem nao voa', g.currentRoute == null, String(g.currentRoute));
+  g.team = [comVoo, mk('venusaur', 45)];
+  S.chooseRoute(S.MONTANHA.id);
+  ok('e aceita quem voa', g.currentRoute === S.MONTANHA.id, String(g.currentRoute));
+
+  /* a FRASE do cadeado nomeia o HM02, e nao o HM01: mandar procurar a Maquina errada e pior que
+     nao dizer nada */
+  g.team = [mk('venusaur', 45)];
+  const cartaDaMontanha = [S.MONTANHA];
+  const htmlTrancado = S.renderRouteCardsBlock(cartaDaMontanha);
+  ok('o cadeado da montanha nomeia o HM02', /HM02/.test(htmlTrancado) && !/HM01/.test(htmlTrancado));
+  ok('e o card fica desabilitado', /route-card[^>]*disabled/.test(htmlTrancado));
+  g.team = [comVoo, mk('venusaur', 45)];
+  const htmlAberto = S.renderRouteCardsBlock(cartaDaMontanha);
+  ok('e aberto nomeia QUEM abre', /Pidgeot abre caminho/.test(htmlAberto) && !/HM02/.test(htmlAberto));
+  /* ⚠️ A MATA CONTINUA NOMEANDO O HM01: as duas rotas dividem o desenho, e a frase e que muda. */
+  g.team = [mk('venusaur', 45)];
+  const htmlMata = S.renderRouteCardsBlock([S.ROTA_DO_CORTE]);
+  ok('e a mata continua no HM01', /HM01/.test(htmlMata) && !/HM02/.test(htmlMata));
+
+  /* ---------- 3) OS SEIS GUARDIOES ---------- */
+  g.team = ['venusaur','pidgeot','raichu','gyarados','machoke','haunter'].map(id => mk(id, 50));
+  g.currentSaveSlot = 7; g.gymIndex = 5;
+  const guarda = S.montarOsGuardioes();
+  ok('sao seis', guarda.length === S.MONTANHA_GUARDIOES, String(guarda.length));
+  ok('todos VOAM', guarda.every(m => (S.SPECIES[m.speciesId].types||[]).indexOf('Flying') >= 0),
+     guarda.map(m => S.SPECIES[m.speciesId].name).join(', '));
+  ok('nenhum lendario nem intocavel',
+     guarda.every(m => S.LENDARIOS.indexOf(m.speciesId) < 0 && S.ESPECIES_INTOCAVEIS.indexOf(m.speciesId) < 0));
+  const linhas = new Set(guarda.map(m => S.raizDaLinha(m.speciesId)));
+  ok('sem linha evolutiva repetida', linhas.size === guarda.length, linhas.size + ' linhas');
+  /* ⚠️ A MEDIA E EXATA, e nao "mais ou menos": os desvios somam ZERO de proposito. Foi o pedido --
+     *"cuja media de nivel seja equivalente a do time do treinador"*. */
+  const mediaGuarda = guarda.reduce((s,m)=>s+m.level,0) / guarda.length;
+  const mediaTime = S.avgTeamLevel(g.team);
+  ok('a media bate com a do time', Math.abs(mediaGuarda - Math.round(mediaTime)) < 0.01,
+     mediaGuarda.toFixed(2) + ' vs ' + mediaTime.toFixed(2));
+  /* ⚠️ A ESPECIE TEM QUE BATER COM O NIVEL: um Pidgey Lv.50 nao existe. E a mesma licao que a
+     Vigilia custou em 14/09 -- *"esta aparecendo Charizard no level 24"*. */
+  const forasDaForma = guarda.filter(m => S.formaNoNivel(m.speciesId, m.level) !== m.speciesId);
+  ok('a especie bate com o nivel', forasDaForma.length === 0,
+     forasDaForma.map(m => S.SPECIES[m.speciesId].name + ' Lv.' + m.level).join(', '));
+  /* e ele e SEMEADO: entrar, sair e voltar da a MESMA guarda */
+  const outra = S.montarOsGuardioes();
+  ok('a guarda e semeada', JSON.stringify(guarda) === JSON.stringify(outra));
+
+  /* ---------- 4) AS TRES MISSOES ---------- */
+  /* MOLTRES: o Blaine, com 3 de Planta no time. */
+  const blaineIdx = S.KANTO_GYMS.findIndex(x => x.id === 'blaine');
+  ok('o Blaine existe e e o ' + (blaineIdx+1) + 'o de Kanto', blaineIdx >= 0);
+  const porGinasio = (idx, time) => { g.gymPath = new Array(8).fill('kanto'); g.gymIndex = idx; g.team = time; };
+  const tresPlanta = ['venusaur','vileplume','victreebel','pidgeot','raichu','machoke'].map(id => mk(id, 50));
+  const doisPlanta = ['venusaur','vileplume','pidgeot','raichu','machoke','haunter'].map(id => mk(id, 50));
+  /* ⚠️ TIPO DUPLO CONTA (foi o pedido): o Venusaur e Planta/Veneno e entra na conta. */
+  ok('tipo duplo conta pro Moltres',
+     (S.SPECIES['venusaur'].types||[]).length === 2 && (S.SPECIES['venusaur'].types||[]).indexOf('Grass') >= 0,
+     (S.SPECIES['venusaur'].types||[]).join('/'));
+  porGinasio(blaineIdx, tresPlanta);
+  ok('Moltres: Blaine + 3 de Planta acende', S.cumpriuMoltres(true));
+  porGinasio(blaineIdx, doisPlanta);
+  ok('Moltres: com DOIS nao acende', !S.cumpriuMoltres(true));
+  porGinasio(blaineIdx, tresPlanta);
+  ok('Moltres: perdendo nao acende', !S.cumpriuMoltres(false));
+  porGinasio(0, tresPlanta);
+  ok('Moltres: em outro ginasio nao acende', !S.cumpriuMoltres(true));
+
+  /* ZAPDOS: tres ginasios seguidos sem perder pra um lider. */
+  g.montanha = null;
+  ok('Zapdos: uma vitoria nao basta', S.passoDoZapdos(true) === false);
+  ok('Zapdos: duas tambem nao', S.passoDoZapdos(true) === false);
+  ok('Zapdos: a terceira acende', S.passoDoZapdos(true) === true);
+  g.montanha = null;
+  S.passoDoZapdos(true); S.passoDoZapdos(true);
+  ok('Zapdos: a DERROTA zera', S.passoDoZapdos(false) === false && S.missoesDaMontanha().sequenciaDeGinasios === 0);
+  ok('Zapdos: e a contagem recomeca do zero', S.passoDoZapdos(true) === false && S.missoesDaMontanha().sequenciaDeGinasios === 1);
+
+  /* ARTICUNO: o MESMO de Gelo derrubando 3 seguidos numa unica batalha. */
+  const mu = (esp, venceu) => ({ playerSpecies: esp, playerWon: venceu });
+  ok('Articuno: 3 seguidos do mesmo acende',
+     S.cumpriuArticuno([mu('lapras',true), mu('lapras',true), mu('lapras',true)]));
+  ok('Articuno: dois nao bastam',
+     !S.cumpriuArticuno([mu('lapras',true), mu('lapras',true), mu('venusaur',true)]));
+  /* ⚠️ TROCAR DE POKEMON ZERA: "um MESMO pokemon de Gelo" foi o pedido. Tres vitorias de tres
+     pokemon de Gelo diferentes nao contam. */
+  ok('Articuno: tres de Gelo DIFERENTES nao contam',
+     !S.cumpriuArticuno([mu('lapras',true), mu('dewgong',true), mu('jynx',true)]));
+  ok('Articuno: perder um confronto no meio zera',
+     !S.cumpriuArticuno([mu('lapras',true), mu('lapras',false), mu('lapras',true), mu('lapras',true)]));
+  /* ⚠️ VALE NA TERCEIRA VITORIA, mesmo que ele desmaie depois -- foi o pedido ao pe da letra. */
+  ok('Articuno: vale mesmo se ele desmaia depois',
+     S.cumpriuArticuno([mu('lapras',true), mu('lapras',true), mu('lapras',true), mu('lapras',false)]));
+  ok('Articuno: quem nao e de Gelo nao conta',
+     !S.cumpriuArticuno([mu('gyarados',true), mu('gyarados',true), mu('gyarados',true)]));
+  /* tipo duplo conta aqui tambem: a Jynx e Gelo/Psiquico */
+  ok('Articuno: tipo duplo conta',
+     S.cumpriuArticuno([mu('jynx',true), mu('jynx',true), mu('jynx',true)]));
+
+  /* ---------- 5) A PORTA UNICA ---------- */
+  g.montanha = null;
+  porGinasio(blaineIdx, tresPlanta);
+  const acesos1 = S.conferirNinhos(true, [mu('lapras',true), mu('lapras',true), mu('lapras',true)]);
+  ok('conferirNinhos devolve os que acenderam AGORA', acesos1.indexOf('moltres') >= 0 && acesos1.indexOf('articuno') >= 0,
+     acesos1.join(','));
+  const acesos2 = S.conferirNinhos(true, [mu('lapras',true), mu('lapras',true), mu('lapras',true)]);
+  ok('e nao devolve de novo o que ja estava aceso', acesos2.indexOf('moltres') < 0 && acesos2.indexOf('articuno') < 0,
+     acesos2.join(','));
+
+  /* ---------- 6) O PREMIO ---------- */
+  g.montanha = null;
+  g.team = ['venusaur','pidgeot','raichu'].map(id => mk(id, 50));
+  g.montanhaPremio = [{ speciesId:'fearow', level:48, shiny:false }];
+  S.escolherOGuardiao(0);
+  ok('o guardiao entra no time', g.team.length === 4 && g.team[3].speciesId === 'fearow',
+     g.team.map(p=>p.speciesId).join(','));
+  ok('e ele passa pela escolha de golpes', !!g.team[3].escolherAtaques);
+  ok('o premio e a guarda sao limpos', g.montanhaPremio == null && g.montanhaGuarda == null);
+  /* ⚠️ COM SEIS ELE ESCOLHE QUEM SAI, pelo fluxo que ja existe -- foi o pedido. */
+  g.team = ['venusaur','pidgeot','raichu','gyarados','machoke','haunter'].map(id => mk(id, 50));
+  g.montanhaPremio = [{ speciesId:'fearow', level:48, shiny:false }];
+  g.screen = 'ninhos';
+  S.escolherOGuardiao(0);
+  ok('com o time cheio cai no Prof. Carvalho', g.screen === 'release' && g.team.length === 7,
+     g.screen + ' / ' + g.team.length);
+
+  /* ---------- 7) O LENDARIO ---------- */
+  ok('sao QUATRO, todos no nivel ' + S.MONTANHA_NIVEL_LENDARIO,
+     S.MONTANHA_LENDARIOS.length === 4 && S.MONTANHA_NIVEL_LENDARIO === 65,
+     S.MONTANHA_LENDARIOS.join(','));
+  ok('e o Lugia esta entre eles', S.MONTANHA_LENDARIOS.indexOf('lugia') >= 0);
+  /* ⚠️ E ELE E INTOCAVEL: esta e a SEGUNDA porta pela qual um intocavel se deixa capturar, depois
+     do Ho-Oh da Vigilia -- e a decisao e a MESMA de la. Ele e TROFEU, nao requisito: as metas de
+     "capturar tudo" continuam EXCLUINDO os tres, senao toda conta que ja as tem PERDERIA a
+     conquista ate vir aqui. */
+  ok('o Lugia e INTOCAVEL', S.ESPECIES_INTOCAVEIS.indexOf('lugia') >= 0);
+  /* AS TRES REINICIAM AO RECEBER, e nao ao vencer: quem vence e fecha a aba antes de escolher nao
+     pode perder as tres missoes que levaram a jornada inteira pra acender. */
+  g.montanha = null;
+  porGinasio(blaineIdx, tresPlanta);
+  /* QUEM ACENDE E A PORTA UNICA, e nao os ganchos soltos: o passoDoZapdos so anda o contador.
+     Sao tres vitorias de ginasio, e a primeira ja acendeu os outros dois. */
+  S.conferirNinhos(true, [mu('lapras',true), mu('lapras',true), mu('lapras',true)]);
+  S.conferirNinhos(true, []);
+  S.conferirNinhos(true, []);
+  ok('os tres ninhos acendem', S.ninhosAcesos() === 3, String(S.ninhosAcesos()));
+  g.team = ['venusaur','pidgeot','raichu'].map(id => mk(id, 50));
+  g.screen = 'montanhaLendarios';
+  ok('vencer a batalha NAO reinicia (a tela so abriu)', S.ninhosAcesos() === 3);
+  S.escolherOLendario(3);
+  ok('o Lugia entra no time', g.team.length === 4 && g.team[3].speciesId === 'lugia',
+     g.team.map(p=>p.speciesId).join(','));
+  ok('e ai sim as tres reiniciam', S.ninhosAcesos() === 0 && S.missoesDaMontanha().sequenciaDeGinasios === 0);
+
+  /* ---------- 8) A TELA ---------- */
+  g.montanha = null;
+  g.montanhaPremio = [{ speciesId:'fearow', level:48, shiny:false },
+                      { speciesId:'pidgeot', level:50, shiny:false }];
+  const telaVazia = S.renderNinhos();
+  ok('os tres ninhos sao desenhados', (telaVazia.match(/class="ninho /g)||[]).length === 3);
+  ok('todos vazios sao clicaveis', (telaVazia.match(/onclick="abrirNinho\(/g)||[]).length === 3);
+  ok('e a tela oferece os guardioes', /escolherOGuardiao\(0\)/.test(telaVazia) && /escolherOGuardiao\(1\)/.test(telaVazia));
+  ok('sem a batalha dos quatro', !/enfrentarOsLendarios/.test(telaVazia));
+  /* com os tres acesos a batalha SUBSTITUI o premio -- o pedido diz que a escolha entre os seis
+     e pra quem *"ainda nao tenha liberado os tres ninhos"* */
+  S.acenderNinho('moltres'); S.acenderNinho('zapdos'); S.acenderNinho('articuno');
+  const telaCheia = S.renderNinhos();
+  ok('com os tres acesos, a batalha aparece', /enfrentarOsLendarios/.test(telaCheia));
+  ok('e o premio dos guardioes some', !/escolherOGuardiao/.test(telaCheia));
+  /* o MODAL de cada ninho conta a missao */
+  g.ninhoAberto = 'zapdos';
+  const modalAceso = S.renderNinhoModal();
+  ok('o modal do ninho ACESO diz que esta ocupado', /ocupado/i.test(modalAceso));
+  g.montanha = null; g.ninhoAberto = 'zapdos';
+  S.passoDoZapdos(true);
+  const modalVazio = S.renderNinhoModal();
+  ok('o modal do ninho VAZIO conta a missao', /3 ginásios seguidos/.test(modalVazio));
+  /* ⚠️ SO O ZAPDOS MOSTRA PROGRESSO: a missao dele e a unica que ACUMULA entre batalhas. */
+  ok('e mostra o progresso da sequencia', /1 de 3/.test(modalVazio));
+  g.ninhoAberto = 'moltres';
+  ok('o do Moltres nao mostra progresso', !/de 3<\/strong> gin/.test(S.renderNinhoModal()));
+  g.ninhoAberto = null;
+
+  /* o ANUNCIO na tela de resultado */
+  g.ninhosAcesosAgora = ['moltres'];
+  const anuncio = S.ninhosAcesosHtml();
+  ok('o ninho que acendeu vira linha na tela', /Moltres/.test(anuncio) && /Montanha Sagrada/.test(anuncio));
+  g.ninhosAcesosAgora = [];
+  ok('e nada aparece quando nenhum acendeu', S.ninhosAcesosHtml() === '');
+
+  /* ---------- 9) O SAVE ---------- */
+  g.montanha = null;
+  S.acenderNinho('moltres');
+  S.passoDoZapdos(true); S.passoDoZapdos(true);
+  g.montanhaGuarda = [{ speciesId:'fearow', level:48, shiny:false }];
+  g.montanhaPremio = null;
+  const dados2 = S.serializeGame();
+  ok('os tres campos vao pro save', 'montanha' in dados2 && 'montanhaGuarda' in dados2 && 'montanhaPremio' in dados2,
+     Object.keys(dados2).filter(k => k.indexOf('montanha') === 0).join(','));
+  ok('o progresso atravessa', dados2.montanha && dados2.montanha.ninhos.moltres === true &&
+     dados2.montanha.sequenciaDeGinasios === 2, JSON.stringify(dados2.montanha));
+  g.montanha = null; g.montanhaGuarda = null;
+  S.applySavedState(dados2);
+  ok('e volta inteiro do save', S.ninhoAceso('moltres') && S.missoesDaMontanha().sequenciaDeGinasios === 2 &&
+     (g.montanhaGuarda||[]).length === 1);
+  /* ⚠️ A GUARDA PASSA PELO MESMO CONSERTO DA VIGILIA: a especie tem que bater com o nivel, senao
+     quem esta na tela dos ninhos escolheria um pokemon que nao existe. */
+  S.applySavedState(Object.assign({}, dados2, { montanhaGuarda: [{ speciesId:'charizard', level:24, shiny:false }] }));
+  ok('e forma impossivel no save e arrumada na leitura', g.montanhaGuarda[0].speciesId === 'charmeleon',
+     g.montanhaGuarda[0].speciesId + ' Lv.24');
+  /* as tres telas sao ponto seguro de gravacao */
+  ['montanha','ninhos','montanhaLendarios'].forEach(t =>
+    ok('a tela ' + t + ' e ponto seguro de gravacao', S.SAFE_SAVE_SCREENS.has(t)));
+
+  /* ---------- 10) O CODIGO ---------- */
+  const src = require('fs').readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  /* ⚠️ AS MISSOES SO VALEM NA JORNADA: o `aceitarConvite` pode cair no finishBattle vindo do
+     Ginasio da Cidade (e a MESMA tela `battling`), e ali nao ha lider nenhum. E a mesma guarda que
+     o sketch precisou, pelo mesmo caminho. */
+  ok('o gancho das missoes e guardado por ehJornada()',
+     /ninhosAcesosAgora\s*=\s*ehJornada\(\)\s*\?\s*conferirNinhos/.test(src));
+  /* ⚠️ E ELE RODA NA VITORIA E NA DERROTA: e a DERROTA que zera a sequencia do Zapdos. Dentro do
+     `if(result.win)` ela cresceria pra sempre. */
+  const iGancho = src.indexOf('ninhosAcesosAgora = ehJornada()');
+  const iWin = src.indexOf('if(result.win){', src.indexOf('function finishBattle'));
+  ok('e ele vem ANTES do if(result.win)', iGancho > 0 && iWin > 0 && iGancho < iWin,
+     iGancho + ' < ' + iWin);
+  /* o modal do ninho e anexado DEPOIS da tela: os modais empilham na ordem em que entram */
+  ok('o modal do ninho e anexado no render', /game\.ninhoAberto.*renderNinhoModal/.test(src));
+}
+
+
 console.log('\nO BOT COM --corte ATRAVESSA A MATA FECHADA');
 /* ⚠️ ESTA TRAVA NASCEU DE UM DEFEITO REAL (16/09/2026), e ela e de COMPORTAMENTO de proposito.
    Quando o HM03 entrou, o `podeAprenderCorte` morreu -- a lista passou a viver dentro do item

@@ -225,7 +225,8 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
   redutor 0,85. O Raichu entrou na lista quando a imunidade voltou a valer 0: Elétrico é o único
   tipo com imunidade cujo dono não tinha alternativa, e sem Normal ele ficava com 1 de dano por
   golpe contra qualquer pokémon de Terra.
-- Teto de nível: **99** (`MAX_POKEMON_LEVEL`).
+- Teto de nível: **99** (`NIVEL_MAXIMO`). ⚠️ Ele se chamava `MAX_POKEMON_LEVEL` neste arquivo e o
+  nome tinha caducado: até 17/09/2026 o 99 vivia escrito à mão no único lugar que precisava dele.
 
 ## Johto (#152-251) — em uso desde 30/08/2026
 
@@ -4022,6 +4023,12 @@ a olhar o HP no momento do revide, lido do diário.
 
 ### QUEM ESTÁ RASPANDO NÃO DERRUBA UM POKÉMON CHEIO NUM GOLPE (14/09/2026)
 
+> **⚠️ ELA VIROU A METADE DE BAIXO DE UMA REGRA MAIOR EM 17/09/2026** — hoje QUALQUER
+> atacante para entre 70% e 95% contra um alvo de vida cheia, conforme a diferença de nível (ver
+> **VIDA CHEIA NÃO MORRE NUM GOLPE**, logo abaixo). Esta continua valendo por cima, pelo MENOR teto:
+> quem raspa para em 70% mesmo com 20 níveis de vantagem, porque o que ela olha é o ESTADO do
+> atacante e não o nível.
+
 > **⚠️ ESTA CONTINUA VALENDO** — ela é sobre o **ATAQUE** de quem tem pouca vida, não sobre o revide
 > de quem caiu. O que mudou em 15/09/2026 é que ela deixou de ser "a outra metade do piso do revide"
 > e passou a ser a **única** metade: o piso saiu com o golpe moribundo.
@@ -4089,6 +4096,124 @@ para em 70%, ninguém morre, e a varredura foi de **300+ casos para ZERO**: o te
 do piso ter mudado. O fixture passou a entrar com o fraco em **60%** (onde a trava não vale) e a
 usar o `doExchange` direto — porque o `simulateGymBattle` **cura o time B** e o alvo voltava a entrar
 cheio. É a mesma armadilha do `preservePlayerHp` pelo **terceiro** caminho.
+
+### VIDA CHEIA NÃO MORRE NUM GOLPE (17/09/2026)
+
+Pedida assim: *"quando um pokemon esta de vida cheia, ele nunca morre com um só golpe, invente um
+calculo que dependendo da diferença de level entre os pokemons, o de vida cheia ao tomar um golpe
+que seria de 100% de hp, vai tomar no maximo 95% e no minimo 70%. Se a diferença entre o level dos
+pokemons for maior que 15, ai pode desconsiderar essa regra e matar de primeira"*.
+
+**⚠️ ELA NASCEU DE UM RELATO SOBRE VELOCIDADE**, e vale registrar o caminho: o pedido anterior era
+*"o charizard tem uma velocidade bem alta, e tem confrontos que ele leva o time inteiro só porque
+começa batendo"*. Medido na época: **um Charizard Lv.60 fazia 2,67 abates por vida** contra seis do
+mesmo nível, e o MESMO Charizard com velocidade 60 fazia **1,27** — ou seja, a velocidade dobrava.
+E com o revide moribundo de volta ele fazia **1,23**, praticamente o mesmo do lento: **era o revide
+que neutralizava a velocidade**, e ele saiu em 15/09. Esta regra ataca o mesmo sintoma por outro
+lado — pelo ALVO, e não pelo contra-golpe.
+
+**A CURVA É A VANTAGEM DE NÍVEL**, e ela anda no sentido que o pedido descreve:
+
+| diferença (atacante − alvo) | o alvo fica com | teto |
+|---|---|---|
+| 0 ou negativa | **30%** | 70% |
+| 5 | 21,7% | 78,3% |
+| 10 | 13,3% | 86,7% |
+| 15 | **5%** | 95% |
+| **> 15** | — | **sem trava: mata** |
+
+Entre 0 e 15 é linear (`CHEIO_TETO_MIN`, `CHEIO_TETO_MAX`, `CHEIO_DIF_MAXIMA`). **Atacante MAIS
+FRACO cai no piso**: um pokémon de nível menor matando um alvo cheio num golpe é o caso mais
+absurdo dos dois, então ele cede o máximo.
+
+- **⚠️ ELA É A GENERALIZAÇÃO DO `MORIBUNDO_TETO_NO_CHEIO`** (14/09/2026), que já fazia exatamente
+  isto — só que apenas quando o ATACANTE estava raspando. A mecânica de aparo é a mesma (o teto vale
+  por TROCA e é repartido entre os tapas, pra a linha do log continuar coerente com o selo `Nx`);
+  o que muda é QUANDO ela vale e QUANTO deixa passar.
+- **⚠️ E AS DUAS CONVIVEM PELO MENOR TETO, não se substituem.** Elas olham coisas diferentes: aquela
+  é sobre o ESTADO do atacante (*"um pokémon muito ferido não deveria aguentar tanto numa luta"*,
+  que foi o pedido dela) e esta é sobre a diferença de PODER. **Um atacante raspando com 20 níveis
+  de vantagem continua parando em 70%** — deixar a nova liberar o que a antiga proíbe desfaria um
+  pedido com o outro. Há trava pra exatamente isso.
+- **NÃO É "70% DO DANO"**: um golpe de 800 numa barra de 400 continuaria matando. O que se limita é
+  **onde o ALVO PARA**, que é o que o pedido descreve.
+- **⚠️ E ELA NÃO É UM TETO DE DANO** (o `DMG_CAP_PCT`, desligado em 09/09): ela só age quando o
+  golpe MATARIA. Um golpe que tira 99% e não mata sai inteiro.
+  **Consequência conhecida e aceita: isso é descontínuo** — um golpe de 99% deixa o alvo com 1%, e
+  um de 101% deixa com 30%. Tirar mais dano pode deixar o alvo com mais vida. É invisível pro
+  jogador (ele não sabe qual seria o dano sem o aparo, como no piso mascarado do revide), e o
+  `MORIBUNDO_TETO_NO_CHEIO` já tinha essa propriedade desde 14/09.
+
+**⚠️ O PREÇO NA JORNADA É GRANDE E VAI PRO LADO DIFÍCIL: −3,61 pontos de conclusão.**
+**57,56% → 53,95%**, **3,6σ** — 8 blocos de 800 jornadas de cada lado (**6.400 de cada**, o MESMO
+bot contra duas cópias congeladas, desvio tirado de ENTRE os blocos), com **7 de 8 blocos** pro
+lado difícil.
+
+**⚠️ E ISSO CONTRARIA A INTUIÇÃO — a regra PROTEGE, e mesmo assim endurece.** A explicação é a
+mesma do `MORIBUNDO_TETO_NO_CHEIO` ao contrário: ela cai dos DOIS lados, mas **quem matava de
+primeira era quem estava na frente**, e ao longo de uma fila isso era do jogador tanto quanto do
+líder. Sem o abate limpo, cada confronto custa uma troca a mais e o time se desgasta.
+
+**E A FORMA MUDA MAIS QUE O TOTAL** (1.500 jornadas de cada lado):
+
+| ginásio | sem | com | |
+|---|---|---|---|
+| 1º | 83 | 97 | +17% |
+| **5º** | 56 | **97** | **+73%** |
+| **6º** | 227 | **321** | **+41%** |
+| 7º | 10 | 8 | — |
+| **8º** | 236 | **184** | **−22%** |
+
+O meio da jornada aperta e **o 8º ginásio afrouxa**. Faz sentido: no fim os dois lados estão em
+nível parecido e a trava protege o jogador tanto quanto o líder; no meio, é o jogador que perdia o
+abate limpo com que ele compensava a desvantagem.
+
+**QUANTO ELA APARECE, medido** (mesmos times e mesma semente nos dois builds, 7.764 confrontos):
+o primeiro golpe matando de vida cheia vai de **33,80% para 22,95%**. Os ~23% que sobram são
+justamente os pares com **diferença acima de 15**, que é a regra.
+
+- **Se um dia incomodar**, as réguas são as três constantes — e a mais forte é a `CHEIO_DIF_MAXIMA`
+  (15): baixá-la devolve os abates limpos pra quem tem vantagem de nível, que é o caso mais comum
+  do jogador contra rota. Depois vem o `CHEIO_TETO_MIN` (70%).
+- `tools/test-especiais.js` tranca 17 pontas: as três constantes, o invariante em **10.632
+  confrontos** sorteados (zero mortes com dif ≤ 15), a **curva medida onde a trava AGE** (o alvo
+  para no resto EXATO em 4 diferenças), o outro lado da regra em 3 diferenças acima de 15, o alvo
+  machucado continuando a morrer, o golpe que não ia matar saindo inteiro, quem RASPA parando em
+  70% mesmo com 20 níveis, e as constantes no servidor.
+
+#### ⚠️ ELA APAGOU TRÊS CENÁRIOS DE TESTE, e os três pela mesma razão
+
+Esta é a segunda vez que uma trava de "vida cheia" faz isso — o `MORIBUNDO_TETO_NO_CHEIO` já tinha
+apagado um cenário inteiro em 14/09. **Trava que monta um caso de morte-num-golpe envelhece quando
+o jogo para de matar num golpe.**
+
+| trava | o que ela media | o que passou a acontecer |
+|---|---|---|
+| *"quem entra CHEIO não cura"* (drenagem) | o confronto INTEIRO | o Oddish cheio não mata mais de primeira, o confronto continua e ele cura na 2ª troca — **e ali curar está certo**. 292 de 400 "falhavam" |
+| *"os dois primeiros golpes são de quem usou o sono"* | **a duração** | o Paras matava o Onix no golpe livre (Planta é 4× nele) e não havia segundo golpe. Hoje há |
+| *"na tela ele acorda depois de apanhar"* | exigia a linha `sono` na mesma sequência | o adormecido **sobrevive** e leva o sono pro confronto seguinte, onde sai um `acordou` sem `sono` |
+
+**⚠️ A DO SONO É A QUARTA VEZ QUE ESSA FAMÍLIA MEDE A DURAÇÃO EM VEZ DA REGRA** (as anteriores: o
+sono virar de 1 a 3 trocas, a paralisia, e o despertar). A regra é *"enquanto ele dorme, só o dono
+bate"* — e quem marca o fim disso é o `acordou`, não um número.
+
+**⚠️ E A TERCEIRA REVELOU ALGO QUE JÁ ERA VERDADE: o `_dormindoPor` só é solto no fim da BATALHA**
+(`encerrarBatalha`), então quem dorme e **sobrevive** ao confronto entra no seguinte ainda dormindo.
+Isso é fiel (no jogo original o sono atravessa a troca de pokémon) e é anterior a esta mudança — o
+que mudou é que ficou comum, porque o adormecido parou de morrer.
+
+#### ⚠️ E DUAS TRAVAS MINHAS NASCERAM MEDINDO NADA — a armadilha do `simulateGymBattle`
+
+As duas que montavam HP à mão (*"alvo machucado"* e *"quem raspa"*) davam verde sem testar coisa
+alguma: **o `simulateGymBattle` CURA os dois times** na entrada (o A só sem `preservePlayerHp`, o B
+**sempre**). É a mesma armadilha que o CLAUDE.md já registra em três medições anteriores, e ela
+custou aqui `0 de 356` e `363 mortes de 363` — números que pareciam defeito do jogo.
+
+**E uma delas ainda não mordia depois de consertada**: com o alvo a 50%, o próprio
+`if(teto >= alvo.hp) return golpes` já o desprotege, então a trava passava **mesmo com a guarda do
+'vida cheia' removida**. Ela só distingue os dois caminhos com o alvo a **90%** e o atacante **10
+níveis acima** — a janela em que o teto morde e só a guarda decide. Conferido que ela acusa
+(`0 de 356`).
 
 ### HISTÓRIA: O DESEMPATE GANHOU LINHA (09/09/2026) — a mecânica acabou em 12/09, ver acima
 
@@ -7496,6 +7621,131 @@ ginásio da cidade"*.
 - Ela permuta o **código guardado**, não o time do save: o save pode ter mudado de ordem ou de
   nível desde que a defesa foi montada, e o líder está reordenando o que ele vê defendendo.
 
+### ⚠️ O DESAFIO DO GINÁSIO QUEBRAVA NA GRAVAÇÃO: ARRAY DENTRO DE ARRAY (17/09/2026)
+
+Reportado assim: *"o desafio do ginasio nao esta funcionando, estou clicando para desafiar e nada
+acontece depois de selecionar o time"*. **E o log da function tinha a resposta inteira:**
+
+```
+E challengeneighborhoodgym: Unhandled error
+Error: 3 INVALID_ARGUMENT: Nested arrays are not allowed
+```
+
+**⚠️ O FIRESTORE RECUSA ARRAY DENTRO DE ARRAY, e recusa a GRAVAÇÃO INTEIRA** — é a mesma família do
+`undefined` que matou as duas ligas em 13/09. A causa era uma linha nascida em **16/09**, junto com
+os golpes chegando na liga:
+
+```js
+leaderTeamAtaques: timeDoDesafiante.map(p => p.ataques || null)   // [['surf','tackle'], ...]
+```
+
+**Quem tinha golpe escolhido e VENCIA o desafio** batia nisso na hora de assumir a liderança; montar
+ou alterar a defesa também. Quem perdia, não — e é por isso que o relato diz "nada acontece" em vez
+de "deu erro": o caminho só estoura no fim.
+
+**O CONSERTO É O FORMATO, e ele fica numa função só** (`ataquesParaDoc` / `ataquesDoDoc`): os golpes
+de cada pokémon viram uma string separada por vírgula. A LEITURA aceita os dois formatos — documento
+no formato antigo não existe (a gravação sempre falhou), mas a regra da casa é que dado velho não
+some.
+
+#### ⚠️ E O TESTE PASSAVA 31/31, por DOIS motivos somados
+
+Este é o par que importa, e nenhum dos dois sozinho explicaria:
+
+1. **o `fake-firestore` não recusava array aninhado.** Ele já recusava `undefined` desde 13/09 —
+   pela mesma lição, e com o mesmo comentário no arquivo. Faltava a segunda regra.
+2. **o fixture não tinha golpe escolhido.** Com o campo vazio, `map(p => p.ataques || null)` dá
+   `[null, null, ...]`, que **não é array aninhado** e o Firestore aceita numa boa.
+
+Os dois foram fechados: o fake agora acusa `3 INVALID_ARGUMENT: Nested arrays are not allowed` com o
+caminho do campo, e o fixture do `test-ginasio-cidade` leva golpes. Conferido que, com o formato
+antigo religado, o teste **explode no primeiro caso**.
+
+**A LIÇÃO É A DE 13/09, de novo, e vale escrevê-la de outro jeito: o fake tem que doer onde a
+produção dói.** Toda vez que ele é mais permissivo que o Firestore, a bateria fica verde e o jogador
+encontra o defeito.
+
+---
+
+### OS TRÊS HMs APARECEM SEMPRE NA MOCHILA (17/09/2026)
+
+Pedido assim: *"na mochila, no botão de TMs/HMs, adcione os 3 HMs existentes no jogo, porém se o
+jogador não tiver, deixar desativado o botão de usar, e escreva o que é necessário fazer para obter
+o HM"*.
+
+- **A prateleira lista os três, tendo ou não.** Antes só os conquistados entravam, e quem não tinha
+  nenhum via a prateleira vazia — ela não dizia que eles EXISTEM, nem como pegá-los.
+- **O que falta vem APAGADO, e não desabilitado**: tocar nele abre o quadro, que é **onde mora o
+  caminho**. Um botão morto ali esconderia justamente a informação que o pedido mandou escrever.
+  O apagado é o mesmo `opacity:.55` do pokémon descansando no montador — o jogo já ensinou o olho a
+  ler esse cinza.
+- **O botão "Ensinar" é que fica desabilitado**, que foi o pedido ao pé da letra.
+- **O rótulo diz o ESTADO**: *"seu para sempre"* ou *"você ainda não tem"*.
+
+**⚠️ E ISSO REVERTE UMA DECISÃO DE 14/09, que vale registrar como reversão e não como descuido:**
+
+| | |
+|---|---|
+| **14/09** | *"não precisa dizer como ganhar o HM01"* — a tela não entrega de graça um achado que a jornada devia entregar |
+| **17/09** | *"escreva o que é necessário fazer para obter o HM"* |
+
+O de hoje é mais recente e explícito, e vale. O que o de 14/09 protegia deixou de fazer sentido
+quando a linha passou a existir **mesmo pra quem não tem o HM**: sem o caminho ela seria uma promessa
+muda. O `comoGanhar` só aparece no HM que FALTA — no que você já tem ele seria história.
+
+---
+
+### A PALAVRA "MÁQUINA" SAIU DAS TELAS (17/09/2026)
+
+Pedido: *"não use a palavra máquina para descrever TM ou HM, ninguem entende isso"*. Foram quatro
+textos: o rótulo da quantidade, o aviso de uso único do TM e as duas frases do modal de "quem pode
+aprender" (*"não aprende essa Máquina"* → *"não aprende esse golpe"*).
+
+**⚠️ E A TRAVA ACUSOU O PRÓPRIO COMENTÁRIO QUE EU TINHA ACABADO DE ESCREVER.** Comentário HTML
+(`<!-- -->`) **vai pro DOM**, e o meu explicava a mudança citando a palavra. É a mesma armadilha que
+este arquivo já registra duas vezes (o nome de líder na bifurcação, o código velho na trava do
+`slotDaConta`). A forma certa dentro de um template é o comentário JS (`${/* … */''}`), que o projeto
+já usa em vários lugares — e nem ali ela pode ser escrita por extenso.
+
+A varredura é por TELA RENDERIZADA, não por `indexOf` no arquivo: a regra é sobre o que o jogador lê.
+
+---
+
+### O RESGATE DE CONQUISTA É POR LINHA (17/09/2026)
+
+Pedido: *"tirar aquele botão que pega todas as moedas de uma vez, para cada conquista o usuario tem
+que clicar no botão que tem na mesma linha alinhado a direita mostra o tanto de dinheiro que ele vai
+ganhar"*.
+
+- **Três estados na coluna da direita, e só um é botão:** a PAGA mostra o ✓, a GANHA é o **botão**
+  com o valor, e a TRANCADA mostra o selo do nível sem clique — ele continua ali porque é o que diz
+  por que vale a pena ir atrás daquela.
+- **⚠️ O `resgatandoConquistas` guarda o ID, não um booleano:** com um botão por linha, um `true`
+  desabilitaria as 69 de uma vez enquanto UMA está sendo paga.
+- **O botão não usa o `.btn` da casa** — aquele é botão de AÇÃO, com moldura de 3px, e aqui ele
+  brigaria com as outras 68 linhas. Mesmo raciocínio dos cartões de golpe e das linhas da ficha.
+- **⚠️ NO SERVIDOR O `id` É OPCIONAL, e sem ele a função paga TUDO** — que é como ela nasceu, e é o
+  que um cliente antigo em cache continua mandando.
+- **⚠️ E QUEM DECIDE CONTINUA SENDO O SERVIDOR:** ele recalcula o que está ganho e **ignora qualquer
+  id fora dessa lista**. O que vem do cliente é o PEDIDO, nunca a resposta — a mesma regra do
+  `claimJourneyCoins`. Há trava com id inventado, com conquista trancada e com a mesma duas vezes.
+
+**Medido a 320px:** 8 botões numa conta com 8 conquistas, alinhados à direita, sem rolagem lateral.
+
+---
+
+### OS NINHOS TÊM NOME DE LUGAR (17/09/2026)
+
+Pedido: *"coloque os nomes assim: 'Ninho Queimado', 'Ninho Elétrico', 'Ninho Congelado'"*.
+
+Cada ninho passou a ter **dois nomes**, e eles dizem coisas diferentes: o `ninho` é o LUGAR e o
+`nome` é quem mora nele. **A tela dos três mostra o do LUGAR** — ele é o mesmo esteja o ninho cheio
+ou vazio, então a fileira não muda de rótulo quando uma missão acende; quem identifica a ave é o
+sprite. O nome do pokémon fica no modal, que é onde se lê sobre ele, e no anúncio da tela de
+resultado (*"O Ninho Queimado da Montanha Sagrada foi ocupado por Moltres!"*).
+
+Medido a 320px: os três cards em **78px**, uniformes, sem rolagem lateral.
+
 ## Slots de save
 
 - **São 20** (`MAX_SAVE_SLOTS`, 03/09/2026 — eram 10). O número é espelhado no servidor em DOIS
@@ -8718,11 +8968,100 @@ intermitente"). Ela virou `subiuAVida()`, numa função só, e o `dreno` entrou 
   **São os QUATRO laços de revelação**, e não só o da jornada: deixar em um só era garantir que a
   mesma frase durasse tempos diferentes na Elite, na Torre e na liga assistida — exceção em lista é
   onde a próxima omissão se esconde. O teste **lê o código** pra cobrar os quatro.
+  ⚠️ **MAS ESSA CORREÇÃO FICOU PELA METADE**, e a outra metade só apareceu em 17/09/2026: ela pôs a
+  pausa no ADVANCE e não no RENDER, que é quem TROCA a frase. Ver logo abaixo.
 - As duas valem **1 passo** no `passosDaAbertura` e ganham o segundo e meio de leitura pela marca
   `leitura`, como toda frase que não mexe barra. Fora da tabela, valeriam pra SEMPRE — o defeito que a
   anulação teve.
 - **⚠️ E O `!` DEIXOU DE DOBRAR.** As duas já vêm pontuadas do pedido, e a concatenação cega do
   `avisoDoConfronto` dava **"!!"** na tela. Hoje o `pontuada()` só acrescenta quando falta.
+
+#### ⚠️ E A PAUSA NÃO ALCANÇAVA A TROCA DA FRASE (17/09/2026)
+
+Reportado assim: *"quando um pokemon está por exemplo queimando ou envenenado, e esse pokemon morre
+na batalha, não está esperando 1,5s depois da frase 'Charizard perdeu 20 de dano por estar
+envenenado', tá aparecendo e rapidamente muda para 'Weezing venceu'"*.
+
+**⚠️ A PAUSA JÁ ESTAVA LÁ desde 14/09 — e ela estava no lugar errado.** A correção daquele dia pôs o
+`pausaDaFaixa` no **`advance`** (quem vira o confronto), e isso é metade da cena. A outra metade é o
+**`render()`** do mesmo ramo: na fase `result` a linha de status deixa de ser o
+`statusDoConfrontoHtml` e vira o **"X venceu!"**, e quem faz essa troca é ele. Ele rodava 50ms depois
+da barra, então **o 1,5s passava inteiro com o "venceu!" já na tela**.
+
+- **⚠️ POR QUE O `chuvafim` NÃO TINHA MOSTRADO ISSO:** aquela frase é a ÚLTIMA do confronto e não
+  mata ninguém — o `advance` atrasado bastava pra ela ser lida. Aqui a frase é o golpe **que mata**,
+  então o passo dela é o mesmo que vira a fase e troca o texto. **A trava de 14/09 media o `advance`,
+  que estava certo**, e por isso ela não pegou.
+
+**MEDIDO NO NAVEGADOR, o mesmo confronto (Charizard envenenado pelo Muk) nas duas versões:**
+
+| | frase do veneno | "Charizard venceu!" | tempo na tela |
+|---|---|---|---|
+| **antes** | 8.701ms | **8.936ms** | **235ms** |
+| **depois** | 8.754ms | 10.454ms | **1.700ms** |
+
+**E A CENA NÃO FICOU MAIS LONGA**, que é o número que fecha a correção: o "Aguardando o resultado"
+chega em **11.176ms antes e 11.204ms depois**. O tempo total já era esse — o que mudou é **o que
+está na tela durante ele**.
+
+- **⚠️ NÃO É UM CASO DE CANTO: 13,9% dos confrontos terminam num passo de leitura** — medido em
+  2.760 confrontos, **301 de veneno, 61 de queimadura e 22 de sono**. São exatamente as três marcas
+  que o relato nomeia.
+- **São os QUATRO laços**, pela mesma razão de sempre. E o **ramo do MEIO continua sem a pausa**, que
+  é o certo: lá a fase continua `animating` e a frase é **redesenhada igual** — ela não some, só é
+  repintada.
+- **O `+50` original existe pra o render não cair no meio da transição CSS da barra.** Somando a
+  pausa ele cai bem depois dela, então o salto visual que ele evita continua evitado.
+- **⚠️ O ONLINE É O QUINTO LAÇO E FICOU DE FORA, e é decisão:** ele não tem fase `result` que troque
+  a frase (o `render()` dele só acontece no fim do confronto inteiro) e **nunca usou `pausaDaFaixa`**
+  — lá tudo encolhe pelo `fator` do `ORCAMENTO_ANIM_ONLINE_MS`, porque há alguém esperando do outro
+  lado. Mexer na pausa ali é mexer na janela de escolha do jogador, e isso não foi pedido.
+
+**⚠️ A TRAVA DIRIGE O LAÇO E LÊ OS PRAZOS DOS TIMERS** (o sandbox os anota em `__timers`), em vez de
+descrever o código — e o A/B dela é o mesmo passo **com e sem a marca `leitura`**: mesma barra, mesmo
+golpe, só a marca mudando. Medido: **1.700ms com a marca, 200ms sem** — a diferença é exatamente a
+pausa, e os 200ms são o próprio sintoma do relato. Ela cobra também que **golpe comum que mata NÃO
+ganha os 1,5s** (senão toda batalha do jogo ficaria mais lenta por causa desta correção; o 1,2s que
+sobra ali é a pausa do NOME DO GOLPE, que é outra coisa) e, lendo o código, que os quatro laços
+somem a pausa. Conferido que ela acusa **4 falhas** com o defeito religado.
+
+**CONFERIDO QUE NÃO É MOTOR, por impressão:** o mesmo build antes e depois dá o **MESMO hash** em 900
+batalhas semeadas. Os quatro laços são apresentação inteira.
+
+#### ⚠️ ACHADO NO CAMINHO E NÃO MEXIDO: TRÊS TRAVAS DO `test-especiais` FALHAM ~1 RODADA EM 10
+
+Encontrado enquanto se media a correção acima (17/09/2026), e **elas são ANTERIORES** — o que vale
+registrar é isso e como se provou:
+
+| trava | o que ela reporta |
+|---|---|
+| `e ninguem ataca depois de cair` (bloco da Faixa) | `1 de 12.949 \| arcanine vs poliwrath` |
+| `NINGUEM ataca com a barra em zero` (varredura geral) | `1 cadaveres ex: Charmeleon 76->0 x Mankey 155->3` |
+| `NENHUM selo num numero < 1/3 do maior daquele atacante` | um `Rolamento ×16` ao lado de um golpe pequeno |
+
+**A PROVA DE QUE NÃO É DO TRABALHO DE HOJE, e ela tem três pernas:**
+1. **o diff**: zero mudanças em `sequenciaDoConfronto`, `passosVisiveis`, `marcarCriticos`,
+   `fatiaDoGolpe`, `doExchange`, `calcDamageNew` e `simulateGymBattle`;
+2. **a impressão do motor**: o mesmo hash em 900 batalhas semeadas, antes e depois;
+3. **a base**: rodando o teste de hoje contra o `index.html` do commit anterior, o flake **sai lá
+   também** — 1 em 20 rodadas, com a mesma mensagem.
+   (Hoje deu 3 em 20; com 1 e 3 eventos as duas taxas não se distinguem, e o `Math.random` do teste
+   sorteia confrontos diferentes a cada rodada.)
+
+**⚠️ E ELE NÃO REPRODUZ ISOLADO, que é a pista mais útil pra quem for atrás.** Um medidor à parte,
+com a MESMA conta do teste, deu **zero em 80.179 confrontos** sorteados e **zero em 40.000** do par
+exato do exemplo (Charmeleon × Mankey, entrando machucado). O que o medidor NÃO reproduz é o
+pokémon chegar ao confronto **com status herdado** (`_queimado`/`_envenenado` atravessam confrontos)
+— ou seja, a suspeita é a família *"HP que some sem ser golpe do adversário"*, e é bem possível que
+o errado seja a **conta do teste** (que reconstrói o HP linha a linha) e não o jogo.
+
+**⚠️ E O PRIMEIRO MEDIDOR DEU UM ZERO FALSO**, pela armadilha que este arquivo já registra: eu
+**copiei as listas à mão** e escrevi `'cura'` onde o teste diz `'recover'`. É literalmente a mesma
+lição do `danoSemGolpe` ("a lista estava copiada à mão em QUATRO contas"), agora do lado de fora.
+Quem for medir isto: **copie as três listas do teste, não as redigite.**
+
+**Não foi mexido porque não foi pedido** — mas elas são o que este arquivo chama de *o pior tipo de
+teste, o que passa quase sempre*, e vão sujar toda medição futura do `test-especiais`.
 
 ### O MAPA SAIU DA ABERTURA DA JORNADA (14/09/2026)
 
@@ -8828,7 +9167,7 @@ a um lado num PvP).
 ### ⚠️ O HO-OH APARECE EM 5% DAS VIGÍLIAS (16/09/2026)
 
 Pedido assim: *"adicione 5% de chance de o HoHo ser um dos pokemons que aparece na vigilia do arco
-iris"*. **E isso o torna o único dos três INTOCÁVEIS que se deixa capturar**, porque o prêmio da
+iris"*. **E isso o torna o PRIMEIRO dos três INTOCÁVEIS que se deixa capturar**, porque o prêmio da
 vigília é escolher 1 dos 10.
 
 - **É O PAGAMENTO DO MITO.** A vigília EXISTE por causa dele — os selvagens esperam a passagem do
@@ -8839,8 +9178,9 @@ vigília é escolher 1 dos 10.
   EXCLUINDO os três.** Contando o Ho-Oh, **toda conta que já tinha a Pokédex de Johto ou o Mestre
   Pokémon PERDERIA a conquista** até tirar 5% numa mata fechada — e conquista que se perde sozinha
   é pior que conquista nenhuma. Ele é **troféu, não requisito**. Há trava pras duas metas.
-  O Lugia e o Celebi continuam sem porta nenhuma, e ele continua fora das rotas selvagens
-  (`SEM_CAPTURA_SELVAGEM` não foi tocado) — a vigília é a única porta.
+  ⚠️ **O LUGIA GANHOU PORTA EM 17/09/2026** (a batalha dos quatro da Montanha Sagrada), e a decisão
+  lá foi a MESMA: troféu, não requisito. **O Celebi continua sem porta nenhuma.** Ele continua fora
+  das rotas selvagens (`SEM_CAPTURA_SELVAGEM` não foi tocado) — a vigília é a única porta dele.
 - **A descrição do "Mestre Pokémon" mudou junto**: ela dizia que os três não se deixam pegar, e
   isso deixou de ser verdade inteira. Hoje ela nomeia a exceção.
 - **⚠️ OS DOIS NÚMEROS DO SORTEIO SÃO LIDOS SEMPRE**, mesmo quando ele não vem: assim a sequência
@@ -9035,6 +9375,213 @@ exclusões dos dez, a média exata, os dois shiny, a espécie batendo com o nív
 cheio caindo no Prof. Carvalho e a derrota sem prêmio) e `tools/test-inventario.js` tranca a Máquina
 (os 72, as três surpresas da lista, a tela atravessando saves, quem tem vaga, o retirado recusado, e
 o slot aberto lendo o `game.team`).
+
+### A MONTANHA SAGRADA: A ROTA DO VOO, E O SANTUÁRIO (17/09/2026)
+
+Pedida assim: *"será uma rota especial que poderá aparecer como terceira opção durante a jornada,
+acessível apenas se o treinador tiver um Pokémon no time que saiba Fly, deve aparecer aleatoriamente
+a partir do sexto ginásio. Ao chegar, será necessário vencer uma equipe de seis Pokémon voadores
+cuja média de nível seja equivalente à do time do treinador... se vencer, terá acesso a uma tela
+ilustrada com três ninhos"*.
+
+**⚠️ ELA É A SEGUNDA ROTA DE CHAVE, e a primeira coisa que a Mata Fechada comprou foi isso:** o
+cadeado, a carta, a regra de "quem valida é a AÇÃO" e o card desabilitado já existiam. As duas
+dividem o MESMO desenho (`comChave`/`abre`), e o que muda é a frase — a mata manda buscar o **HM01**
+e a montanha o **HM02**. Escritas em separado, a segunda nasceria com o cadeado de outra cor ou
+mandando procurar a Máquina errada, que é pior que não dizer nada.
+
+- **A partir do 6º ginásio** (`MONTANHA_A_PARTIR_DE = 5`) e em **1 de cada 4 trechos**
+  (`CHANCE_MONTANHA`, a mesma régua da mata). Medido: **22,5%** por trecho e ela aparece em
+  **53,6%** das jornadas.
+- **⚠️ ELA NUNCA SAI NO MESMO TRECHO DA MATA, e isso não é estética: seriam QUATRO cartas, e a
+  promessa é de uma TERCEIRA.** A mata tem preferência porque ela é do trecho 4 em diante e a
+  montanha do 6º — onde as duas competem, a que já estava é a que fica. Medido: **0 colisões** em
+  12.000 dados. Há trava só pra isso.
+- **⚠️ O SORTEIO É SEMEADO PELO SAVE** (slot + **geração** do slot + trecho), como tudo nesta
+  jornada: com `Math.random` bastaria sair do save e voltar até a montanha aparecer. A geração entra
+  pelo motivo de sempre — sem ela, apagar e recriar no mesmo slot repetiria a jornada trecho por
+  trecho.
+- **ELA NÃO TEM POOL**, como a mata: escolhê-la **não leva ao encontro selvagem**. O que há do outro
+  lado é a guarda — e é isso que faz dela uma aposta, porque o trecho perde as duas capturas.
+
+#### OS SEIS GUARDIÕES
+
+- **Sorteados entre os 33 voadores** que não são lendários nem intocáveis, **sem repetir LINHA
+  evolutiva** (a regra do encontro selvagem) e com a **espécie batendo com o nível** — um Pidgey
+  Lv.50 não existe. Foi a lição que a Vigília custou em 14/09 (*"está aparecendo Charizard no level
+  24"*), e aqui ela veio de graça porque o `formaNoNivel` já existia.
+- **⚠️ A MÉDIA É EXATA, e não "mais ou menos": os desvios `[-3,-2,-1,1,2,3]` somam ZERO.** Foi o
+  pedido — *"cuja média de nível seja equivalente à do time do treinador"* —, e a soma zero é o que
+  transforma isso numa promessa em vez de uma tendência.
+- **A CHEGADA MOSTRA A FILA DOS SEIS e deixa reordenar a sua**, como a clareira da Vigília: são as
+  **duas únicas batalhas do jogo** em que o jogador vê a ordem do adversário antes de lutar, e a
+  razão é a mesma — 6 contra 6 sem cura entre confrontos se decide na ORDEM. O `botaoDeItemHtml` vem
+  junto pelo mesmo motivo de lá.
+
+**MEDIDO — e ela é MUITO mais equilibrada que a Vigília**, porque a média é a do time (não −5) e são
+6 contra 6 (não 10):
+
+| time | vence os guardiões |
+|---|---|
+| Lv.30 | 83,8% |
+| Lv.40 | 71,5% |
+| Lv.50 | 68,0% |
+| Lv.60 | 61,5% |
+| Lv.70 | 68,8% |
+
+Na jornada de verdade (400 jornadas com `--voo`): ela sai nos trechos **6, 7 e 8** quase em partes
+iguais, e o jogador vence **70,2%**. A Vigília, pra comparar, ia de 97,6% no 4º trecho a **22,0%** no
+8º — a diferença é aritmética e está registrada na seção dela.
+
+#### AS TRÊS MISSÕES
+
+**⚠️ ELAS SÃO DO SAVE, NÃO DA CONTA, e isso é decisão.** As três falam de coisas que acontecem
+DENTRO de uma jornada (*"vencer o Blaine"*, *"três ginásios seguidos"*, *"numa única batalha de
+ginásio"*), então guardá-las na conta faria uma jornada terminar a missão que outra começou — e a do
+Zapdos, que é uma sequência, deixaria de significar qualquer coisa.
+
+| ninho | o que pede |
+|---|---|
+| 🔥 **Moltres** | vencer o **Blaine** com **3 de Planta** no time |
+| ⚡ **Zapdos** | **3 ginásios seguidos** sem perder pra um líder |
+| ❄️ **Articuno** | o **MESMO** pokémon de Gelo derrubando **3 seguidos** numa única batalha |
+
+- **TIPO DUPLO CONTA nas duas que olham tipo** (foi o pedido), e sai de graça: o `ehDoTipo` pergunta
+  se o tipo ESTÁ na lista, não se ele é o único. O Venusaur (Planta/Veneno) e a Jynx (Gelo/Psíquico)
+  entram.
+- **⚠️ OS TRÊS GANCHOS LEEM O RESULTADO E NÃO MEXEM NO MOTOR**, e isso foi desenho: a impressão dele
+  é a coisa mais cara de manter neste projeto, e **nenhuma das três precisa de um número que o
+  `matchups` não traga**. Conferido por impressão: o mesmo build antes e depois dá o **MESMO hash**
+  em 900 batalhas semeadas.
+- **⚠️ A PORTA É ÚNICA (`conferirNinhos`) E ELA MORA NO `finishBattle`** — o caminho da batalha de
+  GINÁSIO da jornada, e só ele. **É assim que o *"derrotas em outros eventos não quebram a
+  sequência"* do Zapdos sai de graça**: a Elite, a Rocket, a Torre e o Ginásio da Cidade não passam
+  por ali.
+- **⚠️ E ELA RODA NA VITÓRIA E NA DERROTA: é a DERROTA que zera a sequência do Zapdos.** Dentro do
+  `if(result.win)` ela cresceria pra sempre, e o ninho acenderia pra quem perdeu quatro vezes. Há
+  trava sobre a POSIÇÃO no arquivo, porque um caso de comportamento passaria com a chamada no lugar
+  errado.
+- **⚠️ E SÓ NA JORNADA (`ehJornada()`)**: o `aceitarConvite` pode cair neste `finishBattle` vindo do
+  Ginásio da Cidade — é a **MESMA tela `battling`** —, e ali não há líder nenhum. É exatamente a
+  guarda que o **sketch** já precisou, pelo mesmo caminho.
+- **A ARTICUNO É A ÚNICA QUE PODE ACENDER NUMA DERROTA**, e é por isso que o anúncio fica FORA do
+  bloco de vitória: o pokémon de Gelo derruba três e o time perde a batalha depois.
+  Ela **vale na terceira vitória mesmo que ele desmaie em seguida** (o pedido ao pé da letra), e
+  **zera quando o pokémon MUDA** — três vitórias de três pokémon de Gelo diferentes não contam.
+
+**O NINHO QUE ACENDE VIRA LINHA NA TELA DE RESULTADO** (`ninhosAcesosHtml`), ao lado do prêmio de
+moedas e do HM. Sem ele, uma missão que levou a jornada inteira acenderia **em silêncio** — e o
+jogador só descobriria na próxima vez que a Montanha aparecesse, que pode ser nunca. É o mesmo erro
+da especialidade que valia 1% e não tinha selo. Ele sai da MARCA (`ninhosAcesosAgora`), e não de "o
+ninho está aceso": lido do estado, ele anunciaria o mesmo ninho em toda vitória dali pra frente —
+a regra do `ganhouHmAgora`.
+
+**⚠️ E O MODAL SÓ MOSTRA PROGRESSO NO ZAPDOS**: a missão dele é a única que ACUMULA entre batalhas.
+As outras duas são um sim-ou-não de uma luta só, e um "0 de 1" ali diria menos que nada.
+
+#### ⚠️ O GARGALO É O MOLTRES, E ELE É DE ESCOLHA — NÃO DE SORTE
+
+Medido em 400 jornadas com o bot (que **não planeja**: ele sorteia a região a cada etapa e monta o
+time por tipo/BST):
+
+| ninho | acende em |
+|---|---|
+| ⚡ Zapdos | **347 de 400 (87%)** |
+| ❄️ Articuno | 8 de 400 (2%) |
+| 🔥 Moltres | **1 de 400 (0,25%)** |
+| **os três juntos** | **0 de 400** |
+
+**E forçar Kanto não move o Moltres** (1 de 400 também), o que localiza a causa: não é encontrar o
+Blaine, é **ter 3 de Planta no time naquela hora**. Ou seja, a batalha dos quatro é rara **por
+escolha de time**, não por azar — que é exatamente o que um troféu deve pedir.
+**E ela é alcançável de propósito:** conferido nos pools, há Planta pra capturar nos trechos
+**1, 2, 4 e 5** (5, 3, 1 e 3 espécies), então quem quer o Moltres tem onde pegar.
+Se um dia isso for duro demais, a régua é o **3** da missão dele.
+
+#### A BATALHA DOS QUATRO
+
+**Zapdos, Articuno, Moltres e Lugia, todos no Lv.65, numa equipe só** — foi o pedido. É **4 contra
+6**, e ela pede um time maduro:
+
+| time | vence os quatro |
+|---|---|
+| Lv.55 | **0,0%** |
+| Lv.60 | 3,2% |
+| **Lv.65** | **56,6%** |
+| Lv.70 | 88,6% |
+| Lv.80 | 99,4% |
+
+O degrau entre 60 e 65 é o desenho: abaixo do nível deles ela é praticamente impossível, no mesmo
+nível é uma luta de verdade.
+
+**⚠️ O LUGIA É INTOCÁVEL, e esta é a SEGUNDA porta pela qual um deles se deixa capturar** — depois
+do Ho-Oh da Vigília (16/09/2026). **A decisão é a MESMA de lá, e ela é a que mantém tudo de pé: ele
+é TROFÉU, não requisito.** As metas de "capturar tudo" (a **Pokédex de Johto** e o **Mestre
+Pokémon**) continuam EXCLUINDO os três — contando o Lugia, toda conta que já tem essas conquistas
+**PERDERIA** a conquista até subir a montanha, e conquista que se perde sozinha é pior que conquista
+nenhuma. Há trava pras duas metas.
+
+**O QUE CADA PRÊMIO VALE** (1x1 contra um painel de 8, Lv.65):
+
+| | vitória |
+|---|---|
+| **Lugia** | **73,8%** |
+| Articuno | 62,1% |
+| Moltres | 49,8% |
+| Zapdos | 48,3% |
+| *(um guardião comum: Fearow)* | *25,2%* |
+| *(Pidgeot)* | *14,6%* |
+
+- **⚠️ AS TRÊS MISSÕES REINICIAM QUANDO O LENDÁRIO É RECEBIDO, e não quando a batalha é vencida.**
+  Quem vence e fecha a aba antes de escolher não pode perder as três missões que levaram a jornada
+  inteira pra acender. Há caso de teste pra exatamente isso.
+- **O PRÊMIO ENTRA COMO UM SELVAGEM CAPTURADO** — mesmo nível, e passando pela MESMA tela de escolha
+  de golpes. **Com o time cheio ele entra assim mesmo e o time fica com 7**: quem resolve é a tela
+  do Prof. Carvalho, *"pelo fluxo já existente"* que o pedido nomeia. É o caminho da Vigília,
+  inteiro, e os DOIS prêmios (o guardião e o lendário) usam a mesma entrega — sem um segundo caminho
+  pra manter.
+- **COM OS TRÊS ACESOS A BATALHA SUBSTITUI O PRÊMIO**, e não se soma a ele: o pedido diz que a
+  escolha entre os seis voadores é pra quem *"ainda não tenha liberado os três ninhos"*.
+- **PERDER A BATALHA DOS QUATRO VOLTA PROS NINHOS**, com eles ainda acesos — a luta pode ser tentada
+  de novo. *"Sair sem recompensa"* é perder a LUTA, não as três missões.
+
+#### O PREÇO NA JORNADA: NADA
+
+**58,19% sem a montanha contra 58,88% com** — **+0,69 ponto, 1,0σ** (8 blocos de 800 jornadas de
+cada lado, **6.400 de cada**, o MESMO bot contra a MESMA cópia congelada, desvio tirado de ENTRE os
+blocos, **5 de 8 blocos** pro lado da montanha). Ruído puro.
+Faz sentido: o jogador troca um encontro selvagem (duas capturas) por uma aposta de **70%** que
+rende **uma** — e é uma captura melhor. As duas coisas quase se cancelam.
+**E pra quem NÃO tem o HM02 o preço é zero por construção**: sem ninguém que voe, o card fica
+trancado e a rota nunca é escolhida.
+
+- **⚠️ O `MAX_POKEMON_LEVEL` NÃO EXISTIA** — este arquivo o citava ("Teto de nível: 99"), mas o nome
+  tinha caducado e o 99 vivia escrito à mão no único lugar que precisava dele. Ele nasceu de verdade
+  aqui (`NIVEL_MAXIMO`), porque a média do time com o desvio +3 pode encostar nele num save de Doce
+  Raro.
+- **⚠️ E O SMOKE PRECISOU DE `--voo`**, pelo mesmo motivo do `--corte`: o bot nunca ensina nada,
+  então sem a flag o card fica trancado e a rota **nunca é escolhida** — a montanha seria invisível
+  na medição. É a mesma armadilha que já custou um A/B inteiro medindo zero.
+- **⚠️ E O `continueAfterSpecial` NÃO TEM O RESULTADO**: ele anula o `specialBattleResult` três
+  linhas depois de começar, então quem perguntar por `win` lá embaixo pergunta a um null. O valor é
+  lido no topo, junto do `context`. O smoke pegou isso em 6 de 40 jornadas.
+
+**Medido a 320px, no navegador:** a chegada fica em **2.052px** (as duas filas de seis), os ninhos em
+**1.389px** com os três cards em **77×67px** — do MESMO tamanho vazio ou cheio, que é o que a altura
+fixa do `.ninho-cima` compra —, a tela do prêmio dos quatro em **804px** e o modal de um ninho em
+**265×370px** (cabe numa tela de 568 sem rolar). **Nenhuma rola pro lado.**
+O banner herda a regra de contraste da Vigília: **texto branco sobre gradiente escuro**, com o pior
+pedaço medido em **7,70:1** — o tom claro foi escurecido de `#5a6675` (que dava 5,85:1, passando no
+AA mas abaixo do alvo da casa) pra `#4a5460`.
+
+`tools/test-jornada.js` tranca 60 pontas: o sorteio (nunca antes do 6º, a taxa, a semente, a
+geração, **nunca junto com a mata**), a chave (o desenho, a AÇÃO, a frase nomeando o HM02 e a mata
+continuando no HM01), os guardiões (seis, todos voadores, sem lendário, sem linha repetida, a média
+exata, a espécie batendo com o nível, semeados), as três missões uma a uma com os casos que uma
+leitura ingênua erraria, a porta única não acendendo duas vezes, os dois prêmios, o time cheio
+caindo no Prof. Carvalho, o reinício **ao receber**, as telas, o save e — lendo o código — o
+`ehJornada()` e a posição do gancho. Conferido que ele acusa com cada um dos **sete** defeitos
+religados.
 
 ## TMs/HMs DENTRO DO "SEU TIME" (14/09/2026)
 

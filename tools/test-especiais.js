@@ -173,10 +173,19 @@ ok('e o log diz qual golpe foi', diario.some(g => g.x === 'sono' && g.g === 'Can
   const golpes = comSono.golpes.filter(g=>!g.x);
   ok('nenhuma linha de dano zero no registro', golpes.every(g=>g.d > 0),
      golpes.map(g=>g.d).join(','));
-  /* As DUAS primeiras trocas depois do sono sao so do lado de quem usou. */
-  const doisPrimeiros = golpes.slice(0,2);
-  ok('os dois primeiros golpes sao de quem usou o sono',
-     doisPrimeiros.every(g => g.q === 'p'), doisPrimeiros.map(g=>g.q).join(','));
+  /* ⚠️ AS TROCAS LIVRES SAO DE QUEM USOU O SONO -- e sao QUANTAS o sorteio deu, nao duas.
+     Esta trava dizia "as DUAS primeiras", e isso caducou em 15/09/2026, quando o sono virou de 1 a
+     3 trocas: com UMA, o segundo golpe e do adormecido que acabou de acordar. Ela so nao falhava
+     porque o Paras MATAVA o Onix no golpe livre (Planta e 4x contra Pedra/Terra) e nao havia
+     segundo golpe -- e isso acabou em 17/09, quando alvo de vida cheia parou de morrer num golpe.
+     ⚠️ E E A QUARTA VEZ QUE UMA TRAVA DO SONO MEDE A DURACAO EM VEZ DA REGRA. A regra e: enquanto
+     ele esta dormindo, so o dono bate. Quem marca o fim disso e o `acordou`, nao um numero. */
+  const jAcordou = comSono.golpes.findIndex(g => g.x === 'acordou');
+  const livres = jAcordou < 0 ? golpes
+                              : comSono.golpes.slice(0, jAcordou).filter(g => !g.x && g.d > 0);
+  ok('os golpes livres sao todos de quem usou o sono',
+     livres.length > 0 && livres.every(g => g.q === 'p'),
+     livres.length + ' livres: ' + livres.map(g=>g.q).join(','));
 })();
 /* E o alvo pode SOBREVIVER e ganhar -- o que antes era impossivel. */
 (function(){
@@ -5208,7 +5217,19 @@ console.log('\n=== AS DUAS FRASES NOVAS: acordou e chuva terminou ===');
              E a mesma licao da trava do despertar que caiu quando o sono virou de 1 a 3 trocas:
              ela media a DURACAO e nao a regra. */
           const travouAlguem = seq.some((g, k) => k > jS && k < jA && (g.x === 'paralisado' || g.x === 'gelado'));
-          if(!(jS >= 0 && (travouAlguem || (jG >= 0 && jG < jA)))){ fora++; if(!exemplo) exemplo = seq.map(g => g.x || (g.q + g.d)).join(','); }
+          /* ⚠️ E O SONO PODE NAO ESTAR NESTA SEQUENCIA: o `_dormindoPor` so e solto no fim da
+             BATALHA (ver encerrarBatalha), entao quem dorme e SOBREVIVE ao confronto entra no
+             seguinte ainda dormindo -- e ali sai um `acordou` sem `sono` nenhum antes. Isso e
+             fiel (no jogo original o sono atravessa a troca de pokemon), e ficou COMUM quando o
+             alvo de vida cheia parou de morrer num golpe: o adormecido passou a sobreviver.
+             ⚠️ E E A TERCEIRA VEZ QUE ESTA TRAVA MEDE A DURACAO EM VEZ DA REGRA -- a primeira foi
+             o sono virar de 1 a 3 trocas, a segunda a paralisia. A regra e "ele nao acorda antes
+             da vez dele"; de onde o sono veio nao muda isso. Sem `sono` na sequencia, o ponto de
+             partida e o COMECO do confronto. */
+          const inicio = jS >= 0 ? jS : -1;
+          const jGreal = seq.findIndex((g, k) => k > inicio && !g.x && g.d > 0);
+          const travouReal = seq.some((g, k) => k > inicio && k < jA && (g.x === 'paralisado' || g.x === 'gelado'));
+          if(!(travouReal || (jGreal >= 0 && jGreal < jA))){ fora++; if(!exemplo) exemplo = seq.map(g => g.x || (g.q + g.d)).join(','); }
         });
       }
       ok('amostra de sobra pra medir a ordem na tela', n > 100, n + ' confrontos com despertar');
@@ -5845,6 +5866,16 @@ console.log('\n=== A DRENAGEM NO GOLPE (15/09/2026) ===');
      Oddish cheio matava o Geodude com Absorver, tomava o revide moribundo e SO ENTAO curava,
      terminando cheio de novo. No jogo ele cura zero (ja estava cheio) e termina machucado.
      Aqui o Oddish e mais rapido que o Geodude, entao ele bate primeiro SEMPRE. */
+  /* ⚠️ A CONTA E DA PRIMEIRA TROCA, e nao do confronto inteiro (17/09/2026). Ela olhava
+     `golpes.some(dreno)` -- o confronto TODO --, e isso so funcionava porque o Oddish cheio MATAVA
+     o Geodude no primeiro golpe: nao havia segunda troca. Com a trava do alvo de vida cheia o
+     Geodude sobrevive, o Oddish toma o revide e cura na troca seguinte -- **e ai curar esta
+     certo**, ele ja nao esta mais cheio. Medido na virada: 292 de 400 "falhavam" sem nada da
+     regra cronologica ter mudado.
+     E a mesma licao que o MORIBUNDO_TETO_NO_CHEIO ja tinha custado em 14/09 ("ela apagou um
+     cenario inteiro do teste"): trava que monta um cenario de morte-num-golpe envelhece quando o
+     jogo para de matar num golpe.
+     O QUE SE COBRA CONTINUA SENDO A REGRA: enquanto ele esta CHEIO, a cura nao sai. */
   let cheios = 0, curaramATooa = 0;
   for(let i = 0; i < 400; i++){
     const o = inst('oddish', 30); o.ataques = S.ataquesPadrao(o);
@@ -5852,7 +5883,12 @@ console.log('\n=== A DRENAGEM NO GOLPE (15/09/2026) ===');
     const m = (r.matchups || [])[0];
     if(!m || m.playerHpBefore !== m.playerMaxHp) continue;
     cheios++;
-    if((m.golpes || []).some(g => g.x === 'dreno')) curaramATooa++;
+    /* a cura so e "a toa" se sair ANTES do primeiro golpe que ELE toma -- dali em diante ele
+       esta machucado e curar e o certo */
+    const gs = m.golpes || [];
+    const tomou = gs.findIndex(g => !g.x && g.q === 'e' && g.d > 0);
+    const curou = gs.findIndex(g => g.x === 'dreno');
+    if(curou >= 0 && (tomou < 0 || curou < tomou)) curaramATooa++;
   }
   ok('quem entra CHEIO nao cura (a cura vem antes do revide, nao depois)',
      cheios > 50 && curaramATooa === 0, curaramATooa + ' de ' + cheios + ' confrontos com o Oddish cheio');
@@ -8266,6 +8302,293 @@ console.log('\nE O ASTERISCO NO CARTAO DO GOLPE');
   ok('e golpe que nao mexe estagio nao avisa',
      !(S.obsDoGolpe('karatechop')||[]).some(o => /Defesa|Velocidade/.test(o)));
 }
+console.log('\n=== A FRASE DO STATUS QUE MATA FICA NA TELA (17/09/2026) ===');
+{
+  /* Reportado assim: *"quando um pokemon esta por exemplo queimando ou envenenado, e esse pokemon
+     morre na batalha, nao esta esperando 1,5s depois da frase 'Charizard perdeu 20 de dano por
+     estar envenenado', ta aparecendo e rapidamente muda para 'Weezing venceu'"*.
+
+     ⚠️ A PAUSA JA ESTAVA LA desde 14/09 -- o que faltava era ela alcancar a TROCA DA FRASE. Na fase
+     `result` a linha de status deixa de ser o `statusDoConfrontoHtml` e vira o "X venceu!", e quem
+     faz essa troca e o `render()` do ramo `isLastHit`: ele rodava 50ms depois da barra, entao o
+     1,5s do `advance` passava com o "venceu!" ja na tela.
+
+     ⚠️ O TESTE DIRIGE O LACO DE VERDADE e le os PRAZOS dos timers (o sandbox os anota em
+     `__timers`) -- e assim ele mede o COMPORTAMENTO em vez de descrever o codigo. Medido no
+     navegador antes do conserto: a frase ficava **235ms** na tela; depois, **1.700ms**. */
+  const g = S.__getGame();
+  const inst = (id, lv) => { const p = S.createInstance(id, lv); p.maxHp = S.calcMaxHp(p); p.hp = p.maxHp;
+                             p.ataques = S.ataquesPadrao(p); return p; };
+  /* monta a revelacao de UM confronto e devolve os prazos do ULTIMO passo */
+  const prazosDoUltimoPasso = (matchups, idx) => {
+    const m = matchups[idx];
+    g.authUser = { uid:'t' }; g.currentSaveSlot = 1; g.screen = 'battling';
+    g.battleResult = { matchups };
+    g.revealIndex = idx; g.revealPhase = 'animating'; g.revealHitStep = 0; g.revealLastHit = null;
+    g.revealHitSequence = S.buildAnimatedHitSequence(m);
+    g.revealCurrentPlayerHp = m.playerHpBefore; g.revealCurrentEnemyHp = m.enemyHpBefore;
+    const seq = g.revealHitSequence;
+    for(let i = 0; i < seq.length - 1; i++) S.advanceReveal();
+    S.__timers.length = 0;
+    S.advanceReveal();
+    const render = S.__timers.find(t => t.fn === S.render);
+    return { ultimo: seq[seq.length - 1], fase: g.revealPhase,
+             prazoDoRender: render ? render.ms : null, timers: S.__timers.length };
+  };
+
+  /* acha um confronto REAL em que o ultimo passo e de leitura (o veneno matando) */
+  let comLeitura = null, semLeitura = null;
+  for(let b = 0; b < 400 && !(comLeitura && semLeitura); b++){
+    const A = ['charizard','venusaur','blastoise'].map(id => inst(id, 50));
+    const B = ['weezing','muk','arcanine'].map(id => inst(id, 50));
+    const r = S.simulateGymBattle(A, B, S.makeSeededRng('cena|' + b));
+    (r.matchups || []).forEach((m, i) => {
+      const seq = S.buildAnimatedHitSequence(m);
+      if(!seq || !seq.length) return;
+      const u = seq[seq.length - 1];
+      if(u.leitura && !comLeitura) comLeitura = { matchups: r.matchups, i, team: A };
+      if(!u.leitura && !u.faixa && !semLeitura) semLeitura = { matchups: r.matchups, i, team: A };
+    });
+  }
+  ok('existe confronto que TERMINA num passo de leitura', !!comLeitura,
+     comLeitura ? 'confronto ' + comLeitura.i : '(nao achei)');
+  ok('e existe um que termina em golpe comum', !!semLeitura);
+
+  if(comLeitura){
+    g.team = comLeitura.team;
+    const p = prazosDoUltimoPasso(comLeitura.matchups, comLeitura.i);
+    ok('o ultimo passo e mesmo de leitura', !!p.ultimo.leitura, p.ultimo.x);
+    ok('e a fase vira result (e ai a linha vira "X venceu!")', p.fase === 'result', p.fase);
+    /* ⚠️ O INVARIANTE: a frase e pintada no instante 0 do passo (pelo `pintarStatusDoConfronto`) e
+       some quando o render roda. Entao "quanto tempo ela fica" E o prazo do render. */
+    ok('a frase fica na tela pelo menos 1,5s antes do "venceu"',
+       p.prazoDoRender != null && p.prazoDoRender >= S.PAUSA_LEITURA_ESPECIAL_MS,
+       p.prazoDoRender + 'ms (a pausa e ' + S.PAUSA_LEITURA_ESPECIAL_MS + ')');
+  }
+  /* ⚠️ E O A/B EXATO: o MESMO passo, com e sem a marca de leitura. E ele que separa "a frase espera"
+     de "esse confronto por acaso demora" -- a barra e a mesma, o golpe e o mesmo, so a marca muda.
+     A diferenca tem que ser EXATAMENTE a pausa. */
+  if(comLeitura){
+    g.team = comLeitura.team;
+    const comMarca = prazosDoUltimoPasso(comLeitura.matchups, comLeitura.i);
+    const m2 = comLeitura.matchups[comLeitura.i];
+    const seq2 = S.buildAnimatedHitSequence(m2);
+    seq2[seq2.length - 1].leitura = false;
+    g.battleResult = { matchups: comLeitura.matchups };
+    g.revealIndex = comLeitura.i; g.revealPhase = 'animating'; g.revealHitStep = 0; g.revealLastHit = null;
+    g.revealHitSequence = seq2;
+    g.revealCurrentPlayerHp = m2.playerHpBefore; g.revealCurrentEnemyHp = m2.enemyHpBefore;
+    for(let i = 0; i < seq2.length - 1; i++) S.advanceReveal();
+    S.__timers.length = 0;
+    S.advanceReveal();
+    const semMarca = S.__timers.find(t => t.fn === S.render);
+    ok('a marca de leitura vale EXATAMENTE a pausa, nem mais nem menos',
+       !!semMarca && (comMarca.prazoDoRender - semMarca.ms) === S.PAUSA_LEITURA_ESPECIAL_MS,
+       comMarca.prazoDoRender + 'ms com a marca, ' + (semMarca ? semMarca.ms : '?') + 'ms sem');
+  }
+  if(semLeitura){
+    g.team = semLeitura.team;
+    const p = prazosDoUltimoPasso(semLeitura.matchups, semLeitura.i);
+    /* ⚠️ E A PAUSA NAO VALE PRA TODO MUNDO: um golpe comum que mata nao ganha os 1,5s -- senao TODA
+       batalha do jogo ficaria mais lenta por causa desta correcao. (O 1,2s que sobra e a pausa do
+       NOME DO GOLPE, que e outra coisa e ja existia.) */
+    ok('golpe comum que mata NAO ganha a pausa de leitura',
+       p.prazoDoRender != null && p.prazoDoRender < S.PAUSA_LEITURA_ESPECIAL_MS,
+       p.prazoDoRender + 'ms (a do nome do golpe, que e outra)');
+  }
+
+  /* ⚠️ E OS QUATRO LACOS, lendo o codigo: deixar em um so era garantir que a mesma frase durasse
+     tempos diferentes na Elite, na Torre e na liga assistida. E a licao do `chuvafim`, de 14/09,
+     que e literalmente o mesmo bloco -- e ela nao pegou este defeito porque ela media o `advance`,
+     que ja estava certo. A varredura e do RAMO isLastHit: todo `setTimeout(render, ...)` dele tem
+     que somar a pausa. */
+  const src = require('fs').readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  const semPausa = (src.match(/setTimeout\(render, esperaNome \+ hitDuration \+ 50\)/g) || []).length;
+  const comPausa = (src.match(/setTimeout\(render, esperaNome \+ hitDuration \+ 50 \+ pausaDaFaixa\(hit\)\)/g) || []).length;
+  ok('os QUATRO lacos somam a pausa no render do ultimo passo', comPausa === 4, comPausa + ' de 4');
+  /* o ramo do MEIO continua sem a pausa, e esta certo: la a fase continua `animating` e a frase e
+     redesenhada igual -- ela nao some, so e repintada */
+  ok('e o ramo do meio continua sem ela (la a frase nao some)', semPausa === 4, semPausa + ' de 4');
+}
+
+
+console.log('\n=== VIDA CHEIA NAO MORRE NUM GOLPE (17/09/2026) ===');
+{
+  /* Pedido assim: *"quando um pokemon esta de vida cheia, ele nunca morre com um so golpe, invente
+     um calculo que dependendo da diferenca de level entre os pokemons, o de vida cheia ao tomar um
+     golpe que seria de 100% de hp, vai tomar no maximo 95% e no minimo 70%. Se a diferenca entre o
+     level dos pokemons for maior que 15, ai pode desconsiderar essa regra e matar de primeira"*. */
+  const inst2 = (id, lv) => { const p = S.createInstance(id, lv); p.maxHp = S.calcMaxHp(p); p.hp = p.maxHp;
+                              p.ataques = S.ataquesPadrao(p); return p; };
+  /* as aberturas tiram o alvo da vida CHEIA antes do golpe -- a regra nao fala delas */
+  const ABERTURA = new Set(['absorb','absorbdano','furiadragao','confusao','boom','boomself','dreno','recover','pocao']);
+
+  ok('as tres constantes existem e sao as pedidas',
+     S.CHEIO_TETO_MIN === 0.70 && S.CHEIO_TETO_MAX === 0.95 && S.CHEIO_DIF_MAXIMA === 15,
+     S.CHEIO_TETO_MIN + ' / ' + S.CHEIO_TETO_MAX + ' / ' + S.CHEIO_DIF_MAXIMA);
+
+  /* ---------- 1) O INVARIANTE: com diferenca <= 15, ninguem de vida cheia morre no 1o golpe ---------- */
+  const ids2 = Object.keys(S.SPECIES);
+  const rnd2 = n => Math.floor(Math.random()*n);
+  let n = 0, morreu = 0, comAbertura = 0; let exMorte = '';
+  for(let i = 0; i < 12000; i++){
+    const dif = rnd2(S.CHEIO_DIF_MAXIMA + 1);          // 0 a 15: a trava TEM que valer
+    const lvAlvo = 20 + rnd2(40);
+    const a = inst2(ids2[rnd2(ids2.length)], Math.min(99, lvAlvo + dif));
+    const b = inst2(ids2[rnd2(ids2.length)], lvAlvo);
+    const r = S.simulateGymBattle([a], [b], S.makeSeededRng('cheio|' + i));
+    const m = (r.matchups || [])[0]; if(!m) continue;
+    const gs = m.golpes || [];
+    if(gs.some(g => ABERTURA.has(g.x))){ comAbertura++; continue; }
+    const p1 = gs.find(g => !g.x && g.d > 0);
+    if(!p1) continue;
+    n++;
+    if(p1.hp === 0){
+      morreu++;
+      if(!exMorte){
+        const nvA = p1.q === 'p' ? m.playerLevel : m.enemyLevel;
+        const nvB = p1.q === 'p' ? m.enemyLevel : m.playerLevel;
+        exMorte = (p1.q === 'p' ? m.player : m.enemy) + ' Lv.' + nvA + ' matou ' +
+                  (p1.q === 'p' ? m.enemy : m.player) + ' Lv.' + nvB + ' (dif ' + (nvA - nvB) + ')';
+      }
+    }
+  }
+  ok('amostra de sobra', n > 8000, n + ' confrontos (' + comAbertura + ' com abertura, descartados)');
+  ok('com dif <= 15, NINGUEM de vida cheia morre no 1o golpe', morreu === 0, morreu + (exMorte ? '  ex: ' + exMorte : ''));
+
+  /* ---------- 2) A CURVA, medida onde a trava AGE ---------- */
+  /* ⚠️ QUANDO ELA AGE o alvo para EXATAMENTE em `maxHp - round(maxHp*teto)`. Contar quantos caem
+     nesse valor separa "a trava agiu" de "o golpe nao ia matar mesmo" -- e e isso que prova a
+     CURVA, nao so o piso. O par e limpo de proposito: nem Machamp nem Caterpie tem abertura. */
+  const tetoEsperado = dif => S.CHEIO_TETO_MIN +
+        (S.CHEIO_TETO_MAX - S.CHEIO_TETO_MIN) * Math.max(0, Math.min(S.CHEIO_DIF_MAXIMA, dif)) / S.CHEIO_DIF_MAXIMA;
+  [8, 10, 12, 15].forEach(dif => {
+    let travados = 0, casos = 0, mortes = 0;
+    for(let i = 0; i < 300; i++){
+      const r = S.simulateGymBattle([inst2('machamp', 40 + dif)], [inst2('caterpie', 40)],
+                                    S.makeSeededRng('curva|' + dif + '|' + i));
+      const m = (r.matchups || [])[0]; if(!m) continue;
+      const gs = m.golpes || [];
+      if(gs.some(g => ABERTURA.has(g.x))) continue;
+      const p1 = gs.find(g => !g.x && g.d > 0);
+      if(!p1 || p1.q !== 'p') continue;
+      casos++;
+      if(p1.hp === 0) mortes++;
+      const resto = m.enemyMaxHp - Math.max(1, Math.round(m.enemyMaxHp * tetoEsperado(dif)));
+      if(p1.hp === resto) travados++;
+    }
+    ok('dif ' + dif + ': o alvo para no teto da curva', casos > 100 && travados === casos && mortes === 0,
+       travados + ' de ' + casos + ' no resto exato, ' + mortes + ' mortes');
+  });
+
+  /* ---------- 3) O OUTRO LADO DA REGRA: acima de 15 ele MATA ---------- */
+  [16, 25, 40].forEach(dif => {
+    let casos = 0, mortes = 0;
+    for(let i = 0; i < 300; i++){
+      const lvAtk = Math.min(99, 40 + dif);
+      const r = S.simulateGymBattle([inst2('machamp', lvAtk)], [inst2('caterpie', 40)],
+                                    S.makeSeededRng('mata|' + dif + '|' + i));
+      const m = (r.matchups || [])[0]; if(!m) continue;
+      const gs = m.golpes || [];
+      if(gs.some(g => ABERTURA.has(g.x))) continue;
+      const p1 = gs.find(g => !g.x && g.d > 0);
+      if(!p1 || p1.q !== 'p') continue;
+      casos++;
+      if(p1.hp === 0) mortes++;
+    }
+    ok('dif ' + dif + ' (> 15): mata de primeira', casos > 100 && mortes === casos,
+       mortes + ' de ' + casos);
+  });
+
+  /* ---------- 4) O QUE ELA NAO TOCA ---------- */
+  /* ⚠️ ALVO MACHUCADO NAO E PROTEGIDO: a regra e sobre vida CHEIA, e sem esta trava alguem poderia
+     "consertar" a condicao pra valer sempre -- o que faria ninguem morrer nunca. */
+  /* ⚠️ O ALVO MACHUCADO VAI NO TIME A, COM `preservePlayerHp` -- e essa e a armadilha que o
+     CLAUDE.md ja registra tres vezes: o `simulateGymBattle` CURA os dois times (o A so sem a
+     opcao, o B SEMPRE). Montado do outro jeito, o Caterpie entrava cheio e a trava media a regra
+     de cima em vez desta. Medido antes do conserto: 0 de 356 mortes, num cenario que deveria
+     matar quase sempre.
+     O Machamp (vel 55) bate antes do Caterpie (45), entao o golpe do `e` e o primeiro da luta. */
+  let matouMachucado = 0, casosM = 0;
+  for(let i = 0; i < 400; i++){
+    const alvo = inst2('caterpie', 40);
+    /* ⚠️ 90%, E NAO 50%: a 50% o alvo ja nao e protegido pelo aparo em si (o teto de 70% do MAXIMO
+       fica ACIMA do HP dele, e a funcao devolve os golpes inteiros), entao a trava passaria mesmo
+       com a guarda do 'vida cheia' removida -- ela nao distinguiria os dois caminhos. A 90% o teto
+       morde, e ai so a guarda impede a protecao. Conferido: com a guarda removida, ela acusa. */
+    alvo.hp = Math.max(1, Math.round(alvo.maxHp * 0.9));     // machucado, mas ACIMA do teto
+    /* ⚠️ E O ATACANTE PRECISA MATAR DE VIDA CHEIA pra o teto ter o que aparar -- com Lv.40 contra
+       Lv.40 o Machamp raramente mata o Caterpie inteiro, e ai a trava media nada de novo. Com 10
+       niveis de vantagem ele mata, e o teto daquela diferenca (83,3%) fica ABAIXO dos 90% do alvo:
+       e exatamente a janela em que so a guarda do 'vida cheia' decide. */
+    const r = S.simulateGymBattle([alvo], [inst2('machamp', 50)], S.makeSeededRng('mach|' + i),
+                                  { preservePlayerHp: true });
+    const m = (r.matchups || [])[0]; if(!m) continue;
+    const gs = m.golpes || [];
+    if(gs.some(g => ABERTURA.has(g.x))) continue;
+    const p1 = gs.find(g => !g.x && g.d > 0);
+    if(!p1 || p1.q !== 'e') continue;   // o golpe do Machamp
+    casosM++;
+    if(p1.hp === 0) matouMachucado++;
+  }
+  ok('alvo MACHUCADO continua morrendo de um golpe', casosM > 100 && matouMachucado > casosM * 0.5,
+     matouMachucado + ' de ' + casosM);
+
+  /* ⚠️ E O GOLPE QUE NAO IA MATAR SAI INTEIRO: a trava so age quando o golpe mataria. Sem isso ela
+     viraria um teto de dano geral, que e outra coisa (e que este jogo desligou em 09/09). */
+  {
+    const a = inst2('caterpie', 40), b = inst2('snorlax', 40);   // o Caterpie nao chega perto de matar
+    let cortou = 0, casos = 0;
+    for(let i = 0; i < 200; i++){
+      const r = S.simulateGymBattle([inst2('caterpie', 40)], [inst2('snorlax', 40)], S.makeSeededRng('int|' + i));
+      const m = (r.matchups || [])[0]; if(!m) continue;
+      const gs = m.golpes || [];
+      if(gs.some(g => ABERTURA.has(g.x))) continue;
+      const p1 = gs.find(g => !g.x && g.d > 0);
+      if(!p1 || p1.q !== 'p') continue;
+      casos++;
+      if(p1.d > m.enemyMaxHp * S.CHEIO_TETO_MIN) cortou++;   // passou do teto? entao nao foi aparado
+    }
+    ok('golpe que NAO ia matar sai inteiro (a trava nao e teto de dano)', casos > 50 && cortou === 0,
+       casos + ' golpes fracos, nenhum perto do teto');
+  }
+
+  /* ---------- 5) A REGRA DE 14/09 CONTINUA VALENDO POR CIMA ---------- */
+  /* ⚠️ QUEM ESTA RASPANDO PARA EM 70% MESMO COM 20 NIVEIS DE VANTAGEM: as duas regras convivem
+     pelo MENOR teto, e deixar a nova liberar o que a antiga proibe desfaria um pedido com o outro. */
+  {
+    /* ⚠️ E O `preservePlayerHp` VALE AQUI TAMBEM: sem ele o Machamp raspando era curado antes do
+       primeiro golpe, e a trava media a regra por NIVEL (que com 20 de diferenca nem existe) em
+       vez da de 14/09. Medido antes do conserto: 363 mortes em 363. */
+    let casos = 0, matou = 0, noTeto = 0;
+    for(let i = 0; i < 400; i++){
+      const a = inst2('machamp', 60);                  // 20 niveis acima: sem a de 14/09, mataria
+      a.hp = Math.max(1, Math.round(a.maxHp * 0.05));  // mas ele esta RASPANDO
+      const r = S.simulateGymBattle([a], [inst2('caterpie', 40)], S.makeSeededRng('rasp|' + i),
+                                    { preservePlayerHp: true });
+      const m = (r.matchups || [])[0]; if(!m) continue;
+      const gs = m.golpes || [];
+      if(gs.some(g => ABERTURA.has(g.x))) continue;
+      const p1 = gs.find(g => !g.x && g.d > 0);
+      if(!p1 || p1.q !== 'p') continue;
+      casos++;
+      if(p1.hp === 0) matou++;
+      const resto = m.enemyMaxHp - Math.max(1, Math.round(m.enemyMaxHp * S.MORIBUNDO_TETO_NO_CHEIO));
+      if(p1.hp === resto) noTeto++;
+    }
+    ok('quem RASPA para em 70% mesmo com 20 niveis de vantagem',
+       casos > 100 && matou === 0 && noTeto === casos, noTeto + ' de ' + casos + ' no teto de 70%, ' + matou + ' mortes');
+  }
+
+  /* ---------- 6) OS DOIS MOTORES ---------- */
+  const srv = require('fs').readFileSync(path.join(__dirname, '..', 'functions', 'index.js'), 'utf8');
+  ['CHEIO_TETO_MIN = 0.70', 'CHEIO_TETO_MAX = 0.95', 'CHEIO_DIF_MAXIMA = 15'].forEach(c => {
+    ok('o servidor tem ' + c.split(' ')[0], srv.indexOf(c) >= 0);
+  });
+  ok('e ele tem a funcao do teto', /const tetoNoAlvoCheio = /.test(srv));
+}
+
+
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
 process.exit(falhas ? 1 : 0);
 })();

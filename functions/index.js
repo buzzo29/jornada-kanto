@@ -1446,6 +1446,36 @@ function calcDamage(attacker, defender, rng, op){
 }
 const MORIBUNDO_ABAIXO_DE = 0.10;   // "com menos de 10% de HP"
 const MORIBUNDO_TETO_NO_CHEIO = 0.70;
+/* =====================================================================
+   VIDA CHEIA NÃO MORRE NUM GOLPE (17/09/2026)
+   ---------------------------------------------------------------------
+   Pedido assim: *"quando um pokemon esta de vida cheia, ele nunca morre com um só golpe, invente um
+   calculo que dependendo da diferença de level entre os pokemons, o de vida cheia ao tomar um golpe
+   que seria de 100% de hp, vai tomar no maximo 95% e no minimo 70%. Se a diferença entre o level
+   dos pokemons for maior que 15, ai pode desconsiderar essa regra e matar de primeira"*.
+
+   ⚠️ ELA É A GENERALIZAÇÃO DO `MORIBUNDO_TETO_NO_CHEIO`, que já fazia exatamente isto desde
+   14/09/2026 -- só que apenas quando o ATACANTE estava raspando (abaixo de 10%). A mecânica de
+   aparo é a mesma (o teto vale por TROCA, e é repartido entre os tapas); o que muda é QUANDO ela
+   vale e QUANTO ela deixa passar.
+
+   ⚠️ A CURVA É A VANTAGEM DE NÍVEL, e ela anda no sentido que o pedido descreve: quanto mais acima
+   o atacante está, mais ele consegue tirar.
+     diferença  0 (ou negativa) -> o alvo fica com 30% (teto de 70%)
+     diferença 15               -> o alvo fica com  5% (teto de 95%)
+     diferença > 15             -> SEM TRAVA: mata de primeira
+   Entre 0 e 15 é linear. Atacante MAIS FRACO cai no piso: um pokémon de nível menor matando um
+   alvo cheio num golpe é o caso mais absurdo dos dois, então ele cede o máximo.
+
+   ⚠️ E ELA CONVIVE COM A DE 14/09 PELO MENOR TETO, não a substitui. As duas olham coisas
+   diferentes -- aquela é sobre o ESTADO do atacante ("um pokémon muito ferido não deveria aguentar
+   tanto numa luta", que foi o pedido dela) e esta é sobre a diferença de PODER. Um atacante
+   raspando com 20 níveis de vantagem continua parando em 70%: a regra dele não tem nível nenhum na
+   conta, e deixar a nova liberar o que a antiga proíbe desfaria um pedido com o outro.
+   ===================================================================== */
+const CHEIO_TETO_MIN = 0.70;        // diferença de nível 0 ou negativa
+const CHEIO_TETO_MAX = 0.95;        // diferença de nível 15
+const CHEIO_DIF_MAXIMA = 15;        // acima disso a trava não vale
 /* O 4º parâmetro é o DIÁRIO da luta: um registro por golpe, na ordem em que aconteceram, pro log
    conseguir contar o passo a passo. É só escrita -- nada aqui é lido de volta pelo motor, e passar
    ou não passar o array não muda um ponto de dano.
@@ -2925,19 +2955,40 @@ function doExchange(active, enemy, rng, diario){
   /* APLICA OS GOLPES DE UMA TROCA, um a um, e PARA quando o alvo cai: o 4º tapa não sai num
      pokémon que caiu no 3º. Devolve o que saiu DE VERDADE de cada golpe mais a vida que sobrou --
      é desse par que saem a linha do diário e o passo da animação, uma barra por tapa. */
-  /* ⚠️ O TETO DE QUEM ESTÁ RASPANDO (ver MORIBUNDO_TETO_NO_CHEIO). Ele vale por TROCA e não por
-     golpe: um Tapa Duplo de 5 tapas também "leva o outro num ataque só", e limitar só o primeiro
-     tapa deixaria os outros quatro matarem do mesmo jeito.
-     AS TRÊS CONDIÇÕES: o atacante abaixo de 10% da barra DELE, o alvo com a vida CHEIA, e o ataque
-     matando. Fora disso nada muda -- um raspando que tira 90% de um alvo cheio continua tirando 90%,
-     e um raspando contra um alvo já machucado mata normalmente. */
+  /* ⚠️ O TETO DE QUEM ATACA UM ALVO DE VIDA CHEIA. São DUAS regras na mesma conta, e o teto que
+     vale é o MENOR delas (ver o comentário de CHEIO_TETO_MIN):
+       - a de 14/09: quem está RASPANDO (abaixo de 10% da barra dele) para em 70%, sempre;
+       - a de 17/09: qualquer um para entre 70% e 95%, conforme a vantagem de NÍVEL -- e some de vez
+         quando a diferença passa de 15.
+     Devolve `null` quando nenhuma se aplica, e aí o golpe sai inteiro (e mata).
+     ⚠️ Ela NÃO é "70% do dano": um golpe de 800 numa barra de 400 continuaria matando. O que se
+     limita é onde o ALVO PARA, que é o que o pedido descreve. */
+  const tetoNoAlvoCheio = (quemBate, alvo) => {
+    if(!quemBate || !alvo) return null;
+    if(alvo.hp < alvo.maxHp) return null;              // só vale contra quem está CHEIO
+    const raspando = quemBate.hp <= quemBate.maxHp * MORIBUNDO_ABAIXO_DE;
+    const dif = (quemBate.level || 0) - (alvo.level || 0);
+    /* a diferença é do ATACANTE sobre o alvo; negativa cai no piso pelo clamp abaixo */
+    let porNivel = null;
+    if(dif <= CHEIO_DIF_MAXIMA){
+      const t = Math.max(0, Math.min(CHEIO_DIF_MAXIMA, dif)) / CHEIO_DIF_MAXIMA;
+      porNivel = CHEIO_TETO_MIN + (CHEIO_TETO_MAX - CHEIO_TETO_MIN) * t;
+    }
+    if(raspando && porNivel != null) return Math.min(MORIBUNDO_TETO_NO_CHEIO, porNivel);
+    if(raspando) return MORIBUNDO_TETO_NO_CHEIO;
+    return porNivel;
+  };
+  /* APARA A TROCA no teto devolvido acima. Ele vale por TROCA e não por golpe: um Tapa Duplo de 5
+     tapas também "leva o outro num ataque só", e limitar só o primeiro tapa deixaria os outros
+     quatro matarem do mesmo jeito. */
   const tetoDeQuemRaspa = (quemBate, alvo, golpes) => {
     if(!quemBate || !alvo) return golpes;
-    if(quemBate.hp > quemBate.maxHp * MORIBUNDO_ABAIXO_DE) return golpes;
-    if(alvo.hp < alvo.maxHp) return golpes;               // só vale contra quem está CHEIO
+    const frac = tetoNoAlvoCheio(quemBate, alvo);
+    if(frac == null) return golpes;
     const total = golpes.reduce((a, d) => a + d, 0);
     if(total < alvo.hp) return golpes;                    // não ia matar: nada a fazer
-    const teto = Math.max(1, Math.round(alvo.maxHp * MORIBUNDO_TETO_NO_CHEIO));
+    const teto = Math.max(1, Math.round(alvo.maxHp * frac));
+    if(teto >= alvo.hp) return golpes;                    // o teto não aperta nada
     /* reparte o teto entre os tapas na MESMA proporção, pra a linha do log continuar coerente
        com o selo `Nx` -- e o último leva a sobra do arredondamento */
     const fora = golpes.map(d => Math.max(1, Math.round(d * teto / total)));
@@ -5268,7 +5319,7 @@ exports.setNeighborhoodGymDefense = onCall(async (request) => {
     const resolvido = await resolverTimeDosSaves(uid, team, NEIGHBORHOOD_GYM_TEAM_SIZE, 'time de defesa', 1);
     newTeamCode = sanitizeTeamCode(encodeTeamCode(resolvido));
     /* os golpes congelam junto com o código: a defesa é um retrato do time que assumiu o ginásio */
-    newTeamAtaques = resolvido.map(p => p.ataques || null);
+    newTeamAtaques = ataquesParaDoc(resolvido.map(p => p.ataques || null));
     if(!newTeamCode){ throw new HttpsError('failed-precondition', 'Time inválido.'); }
   }
   const leaderName = (userSnap.exists && userSnap.data().trainerName) || 'Treinador';
@@ -5371,6 +5422,27 @@ exports.reorderNeighborhoodGymDefense = onCall(async (request) => {
    Os documentos das duas versões antigas ficam órfãos e inofensivos: ninguém mais lê eles. */
 function neighborhoodGymMonCooldownRef(gymRef, uid, chave){
   return gymRef.collection('challengeCooldowns').doc(String(uid) + '__' + String(chave));
+}
+/* ⚠️ OS GOLPES DA DEFESA VIRAM STRING PRA IR PRO FIRESTORE (17/09/2026), e isso não é estética:
+   o Firestore **RECUSA ARRAY DENTRO DE ARRAY** (`3 INVALID_ARGUMENT: Nested arrays are not
+   allowed`) e derruba a GRAVAÇÃO INTEIRA. O campo nasceu em 16/09 como
+   `time.map(p => p.ataques || null)` -- um array de arrays --, e com isso **todo desafio VENCIDO
+   estourava na hora de gravar a nova liderança**, além de montar/alterar a defesa.
+   Reportado em 17/09 como *"estou clicando para desafiar e nada acontece"*, e achado no log da
+   function: `Unhandled error ... Nested arrays are not allowed`.
+   ⚠️ E O TESTE PASSAVA 31/31 por DOIS motivos somados: o fake não recusava array aninhado (a mesma
+   falha que custou as duas ligas com o `undefined`, em 13/09) E o fixture dele não tinha golpe
+   escolhido nenhum -- `[null,null,...]` não é array aninhado. Os dois foram fechados.
+   A LEITURA aceita os dois formatos: documento gravado antes disso não existe (a gravação sempre
+   falhou), mas a regra da casa é que dado velho não pode sumir. */
+function ataquesParaDoc(lista){
+  return (lista || []).map(a => (Array.isArray(a) && a.length) ? a.join(",") : null);
+}
+function ataquesDoDoc(lista){
+  return (lista || []).map(a => {
+    if(Array.isArray(a)) return a.slice();          // formato antigo, se algum dia existir
+    return (typeof a === "string" && a) ? a.split(",") : null;
+  });
 }
 exports.challengeNeighborhoodGym = onCall(async (request) => {
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
@@ -5491,7 +5563,7 @@ exports.challengeNeighborhoodGym = onCall(async (request) => {
          e é com ele que ele defende, mesmo que o save mude depois. Ginásio anterior a esta data não
          tem o campo -- ali a defesa luta no motor de tipo, como lutava. */
       b: { uid: gymData.leaderUid, name: gymData.leaderName, code: gymData.leaderTeamCode,
-           specialties: gymData.leaderSpecialties || [], ataques: gymData.leaderTeamAtaques || null },
+           specialties: gymData.leaderSpecialties || [], ataques: ataquesDoDoc(gymData.leaderTeamAtaques) },
       winner:null, matchups:null, resolved:false, terrain // terreno do líder = vantagem de mandante
     };
     resolveLeagueMatch(match, `cidade-${city}-${uid}-${Date.now()}`, null);
@@ -5546,7 +5618,7 @@ exports.challengeNeighborhoodGym = onCall(async (request) => {
         leaderSpecialties: challengerSpecialties, // congelado ao assumir: quem defende o ginásio defende com o que tinha
         leaderTeamCode: challengerCode,
         // e com os golpes que ele usou pra vencer -- o time é o mesmo, os golpes também
-        leaderTeamAtaques: timeDoDesafiante.map(p => p.ataques || null),
+        leaderTeamAtaques: ataquesParaDoc(timeDoDesafiante.map(p => p.ataques || null)),
         leaderTeamSlot: null,   // defesa montada à mão não vem de save nenhum
         leaderTerrain: null,
         becameLeaderAt: Date.now(), defenseCount: 0
@@ -7806,10 +7878,17 @@ function moedasDasConquistas(ids){
    escrever só no documento da conta não compra nada, e conquista só CRESCE -- um save que mudou
    entre a leitura e a gravação no máximo adia uma conquista pro próximo resgate. O que a transação
    protege é o par (já pago, saldo), que é onde duas abas se atropelariam. */
+/* ⚠️ O RESGATE É POR CONQUISTA desde 17/09/2026 (a pedido: *"para cada conquista o usuario tem que
+   clicar no botão que tem na mesma linha"*). O `id` é OPCIONAL, e sem ele a função paga TUDO --
+   que é como ela nasceu, e é o que um cliente antigo em cache continua mandando.
+   ⚠️ O QUE NÃO MUDA É QUEM DECIDE: o servidor RECALCULA quais estão ganhas e ignora qualquer id
+   que não esteja na lista. O que vem do cliente é o PEDIDO, nunca a resposta -- a mesma regra do
+   `claimJourneyCoins`. */
 exports.claimAchievementCoins = onCall(async (request) => {
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   const uid = request.auth.uid;
   const userRef = db.collection('users').doc(uid);
+  const pedido = (request.data && typeof request.data.id === 'string') ? request.data.id : null;
 
   const [contaSnap, savesSnap] = await Promise.all([userRef.get(), userRef.collection('saves').get()]);
   const conta = contaSnap.exists ? (contaSnap.data() || {}) : {};
@@ -7821,7 +7900,9 @@ exports.claimAchievementCoins = onCall(async (request) => {
     const atual = snap.exists ? (snap.data() || {}) : {};
     const pagas = Array.isArray(atual.achievementsPaid) ? atual.achievementsPaid : [];
     const jaPagas = new Set(pagas);
-    const novas = ganhas.filter(id => !jaPagas.has(id));
+    /* o pedido só filtra o que JÁ está ganho: um id inventado, uma conquista trancada ou uma já
+       paga saem daqui como lista vazia, e a função devolve o saldo sem pagar nada */
+    const novas = ganhas.filter(id => !jaPagas.has(id) && (!pedido || id === pedido));
     const moedasAgora = atual.moedas || 0;
     if(!novas.length){
       return { moedas: moedasAgora, ganhou: 0, pagas: pagas };

@@ -31,12 +31,24 @@ function clone(o){ return o === undefined ? undefined : JSON.parse(JSON.stringif
    bateria inteira estava verde.
    A varredura é recursiva porque o campo estava a três níveis de profundidade
    (`matchups[0].chuva`), que é exatamente onde ninguém olha. */
-function recusaUndefined(v, caminho){
+/* ⚠️ E ELE RECUSA ARRAY DENTRO DE ARRAY PELA MESMA RAZÃO (17/09/2026). O Firestore devolve
+     `3 INVALID_ARGUMENT: Nested arrays are not allowed`
+   e derruba a gravação INTEIRA -- e o `clone` do fake (JSON) aceita array aninhado sem reclamar,
+   então de novo o fake aceitava o que a produção recusa.
+   ISSO CUSTOU O DESAFIO DO GINÁSIO DA CIDADE, de 16 a 17/09/2026: o `leaderTeamAtaques` era
+   `time.map(p => p.ataques)` -- um array de arrays --, e TODO desafio VENCIDO estourava na hora de
+   gravar a nova liderança. O teste passava 31/31.
+   A mesma lição do `undefined`, e a mesma resposta: o fake tem que doer onde a produção dói. */
+function recusaUndefined(v, caminho, dentroDeArray){
   if(v === undefined) throw new Error('Cannot use "undefined" as a Firestore value (found in field ' + caminho + ')');
   if(v === null || typeof v !== 'object') return;
   if(v.__op !== undefined || v instanceof Date) return;   // increment/delete/timestamp são marcas nossas
-  if(Array.isArray(v)){ v.forEach((x, i) => recusaUndefined(x, caminho + '.`' + i + '`')); return; }
-  Object.keys(v).forEach(k => recusaUndefined(v[k], caminho ? caminho + '.' + k : k));
+  if(Array.isArray(v)){
+    if(dentroDeArray) throw new Error('3 INVALID_ARGUMENT: Nested arrays are not allowed (found in field ' + caminho + ')');
+    v.forEach((x, i) => recusaUndefined(x, caminho + '.`' + i + '`', true));
+    return;
+  }
+  Object.keys(v).forEach(k => recusaUndefined(v[k], caminho ? caminho + '.' + k : k, false));
 }
 
 function ehMapaSimples(v){

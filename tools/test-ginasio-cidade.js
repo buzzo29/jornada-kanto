@@ -38,7 +38,13 @@ const chamar = (fn, uid, data)=> fn({ auth:{ uid }, data });
 async function recusa(fn, uid, data){
   try { await chamar(fn, uid, data); return null; } catch(e){ return e.message || String(e); }
 }
-const mon = (id, especie, nivel, shiny)=>({ id, speciesId:especie, level:nivel, shiny:!!shiny });
+/* ⚠️ O FIXTURE LEVA GOLPES ESCOLHIDOS, e sem isso ele nao testa o que importa (17/09/2026): o
+   campo `leaderTeamAtaques` e gravado como `time.map(p => p.ataques || null)`, e com o campo
+   VAZIO isso da `[null, null, ...]` -- que NAO e array aninhado, e o Firestore aceita numa boa.
+   Foi por isso que este teste passou 31/31 enquanto TODO desafio VENCIDO estourava em producao
+   com `Nested arrays are not allowed`. Com golpes de verdade, a trava do fake morde. */
+const GOLPES_FIXOS = ['tackle','bodyslam'];
+const mon = (id, especie, nivel, shiny)=>({ id, speciesId:especie, level:nivel, shiny:!!shiny, ataques: GOLPES_FIXOS.slice() });
 const escolher = (time, slot, quais)=> quais.map(i => ({
   speciesId: time[i].speciesId, level: time[i].level, slot: String(slot), idx: i,
   monId: time[i].id, shiny: !!time[i].shiny

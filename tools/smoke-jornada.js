@@ -31,6 +31,13 @@ const DIFICIL = args.includes('--dificil');
    nunca ensina nada, entao o card fica trancado e a rota nunca e escolhida. E o unico jeito de
    medir a Vigilia contra o encontro selvagem que ela substitui. */
 const CORTE = args.includes('--corte');
+/* --voo e o mesmo pra MONTANHA SAGRADA: finge um treinador que ja tem o HM02 e o ensinou. Sem ele
+   a montanha e invisivel na medicao -- o bot nunca ensina nada, entao o card fica trancado e a
+   rota nunca e escolhida. E o unico jeito de medir a montanha contra o encontro selvagem que ela
+   substitui. */
+const VOO = args.includes('--voo');
+/* quanto a Montanha foi jogada, e quantos ninhos acenderam pelo caminho */
+const montanha = { entrou:0, venceu:0, ninhos:0, lendario:0, porTrecho:{}, porNinho:{} };
 /* quanto a Vigilia foi jogada e como ela terminou -- o numero que interessa nao e so a conclusao */
 const vigilia = { entrou:0, venceu:0, niveis:[], porTrecho:{} , ultimoTrecho:null };
 
@@ -70,14 +77,22 @@ function act(g, log){
           quem.ataques = [g.GOLPE_DO_CORTE].concat((quem.ataques||[]).slice(0, g.MAX_GOLPES - 1));
         }
       }
+      if(VOO){
+        /* ensina o Voo a quem puder -- o que um treinador com o HM02 na mochila faria */
+        const voa = (game.team||[]).find(p => g.podeAprenderHM('hm02', p.speciesId));
+        if(voa && (voa.ataques||[]).indexOf(g.GOLPE_DO_VOO) < 0){
+          voa.ataques = [g.GOLPE_DO_VOO].concat((voa.ataques||[]).slice(0, g.MAX_GOLPES - 1));
+        }
+      }
       const abertas = game.routeCards.filter(id => {
         const r = g.routeById(id);
-        return r && (!r.corte || g.timeQueCorta(game.team));
+        return r && (!r.corte || g.timeQueCorta(game.team)) && (!r.voo || g.podeVoar());
       });
       /* com --corte a mata e SEMPRE preferida: o que se quer medir e o desvio, nao a chance de o
          bot aleatorio cair nele */
       const mata = CORTE && abertas.find(id => { const r = g.routeById(id); return r && r.corte; });
-      g.chooseRoute(mata || abertas[Math.floor(Math.random()*abertas.length)]);
+      const monte = VOO && abertas.find(id => { const r = g.routeById(id); return r && r.voo; });
+      g.chooseRoute(mata || monte || abertas[Math.floor(Math.random()*abertas.length)]);
       return true;
     }
     /* A VIGILIA: a clareira e a escolha do premio. O bot pega sempre o primeiro -- o que ele mede
@@ -91,6 +106,24 @@ function act(g, log){
       g.comecarAVigilia();
       return true;
     case 'vigiliaPremio': vigilia.venceu++; if(vigilia.porTrecho[vigilia.ultimoTrecho]) vigilia.porTrecho[vigilia.ultimoTrecho].v++; g.escolherOPremioDaVigilia(0); return true;
+    /* A MONTANHA: a chegada, os ninhos e a escolha do premio. O bot sempre luta e sempre pega o
+       primeiro -- o que ele mede e a taxa de CONCLUSAO da jornada. */
+    case 'montanha': {
+      montanha.entrou++;
+      const tm = montanha.porTrecho[game.gymIndex] = montanha.porTrecho[game.gymIndex] || {n:0,v:0};
+      tm.n++;
+      g.enfrentarOsGuardioes();
+      return true;
+    }
+    case 'ninhos': {
+      montanha.venceu++;
+      montanha.ninhos = Math.max(montanha.ninhos, g.ninhosAcesos());
+      if(g.ninhosAcesos() === g.NINHOS.length){ g.enfrentarOsLendarios(); return true; }
+      /* sem os tres, ele leva um dos seis guardioes */
+      g.escolherOGuardiao(0);
+      return true;
+    }
+    case 'montanhaLendarios': montanha.lendario++; g.escolherOLendario(0); return true;
     case 'routeEvent':   Math.random()<0.5 ? g.crossTunnelBlind() : g.crossTunnelSlow(); return true;
     case 'fossil':       Math.random()<0.8 ? g.chooseFossil(Math.random()<0.5?'omanyte':'kabuto') : g.skipFossil(); return true;
     case 'dojo':         g.chooseDojoPrize(Math.random()<0.5?'hitmonlee':'hitmonchan'); return true;
@@ -255,7 +288,12 @@ for(let run=0; run<RUNS; run++){
       const cur = g.__getGame();
       screensSeen.add(cur.screen);
       if(cur.eventBattle) eventsSeen.add(cur.eventBattle.id);
-      if(TERMINAL.has(cur.screen)) break;
+      if(TERMINAL.has(cur.screen)){
+        /* quantos ninhos cada jornada fechou -- o numero que diz se a batalha dos quatro e
+           alcancavel por quem NAO joga de proposito */
+        if(VOO) (g.NINHOS||[]).forEach(n => { if(g.ninhoAceso(n.id)) montanha.porNinho[n.id] = (montanha.porNinho[n.id]||0) + 1; });
+        break;
+      }
       if(!act(g, log)){ break; }
       // sanidade: o time nunca pode passar de 6 nem ficar com nível inválido
       const cur2 = g.__getGame();
@@ -285,6 +323,12 @@ if(vigilia.entrou){
   console.log(`  Vigilia: entrou ${vigilia.entrou}x, venceu ${vigilia.venceu} (${(100*vigilia.venceu/vigilia.entrou).toFixed(1)}%), nivel medio do time ${m.toFixed(1)}`);
   Object.keys(vigilia.porTrecho).sort().forEach(k=>{ const t=vigilia.porTrecho[k];
     console.log(`    trecho ${Number(k)+1}: ${t.n}x, venceu ${(100*t.v/t.n).toFixed(1)}%, time ~${(t.lv/t.n).toFixed(0)}`); });
+}
+if(montanha.entrou){
+  console.log('  ninhos ao fim da jornada: ' + JSON.stringify(montanha.porNinho||{}));
+  console.log(`  Montanha: entrou ${montanha.entrou}x, venceu ${montanha.venceu} (${(100*montanha.venceu/montanha.entrou).toFixed(1)}%), maior nº de ninhos acesos ${montanha.ninhos}, batalha dos quatro ${montanha.lendario}x`);
+  Object.keys(montanha.porTrecho).sort().forEach(k=>{ const t=montanha.porTrecho[k];
+    console.log(`    trecho ${Number(k)+1}: ${t.n}x`); });
 }
 console.log(`  Falhas: ${failures}`);
 console.log(`\n  Telas visitadas (${screensSeen.size}): ${[...screensSeen].sort().join(', ')}`);
