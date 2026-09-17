@@ -390,6 +390,15 @@ function pickTerrain(rng, allowedIds){
 function applyTerrainBuff(team, terrain){
   team.forEach(p=>{
     p.terrainBuffed = p.types.some(t=>terrain.types.includes(t));
+    /* ⚠️ E OS TIPOS DO TERRENO FICAM NA INSTÂNCIA (17/09/2026), em TODO MUNDO -- não só em quem
+       ganha o bônus. É o Poder Secreto (TM43) que os lê: o efeito dele depende do terreno, e esta
+       é a única porta por onde um terreno entra numa batalha, nos dois motores.
+       ⚠️ NA INSTÂNCIA E NÃO EM ESTADO DE MÓDULO, de propósito: uma variável de módulo seria uma
+       QUARTA porta de vazamento no servidor (onde a instância é reaproveitada entre invocações),
+       e o vazamento do clima foi REAL. Aqui o campo morre com o pokémon.
+       ⚠️ E COMEÇA COM `_`: é estado de batalha e não pode ir pro Firestore (o time do save é
+       serializado inteiro -- ver limparParaFirestore). */
+    p._terreno = terrain.types || [];
   });
 }
 
@@ -539,7 +548,11 @@ function melhorAtaque(attacker, defender){
     /* ⚠️ O ROLAMENTO entra pelos DOIS lados: o `poder` (que vira o dano) e a `nota` (que decide a
        escolha). Só no dano, o motor escolheria um Rolamento de 30 e aplicaria um de 480. */
     const escala = escalaDoRolamento(attacker, id);
-    const tipo = GOLPES[id][0], poder = GOLPES[id][1] * escala;
+    /* ⚠️ A FACHADA entra pelo MESMO lado que o Rolamento: o `poder` (que vira o dano, lá no
+       calcDamage) e a `nota` (que decide a escolha). Só no dano, um pokémon queimado deixaria de
+       escolher justamente o golpe que a queimadura torna o melhor dele. */
+    const tipo = GOLPES[id][0];
+    const poder = GOLPES[id][1] * escala * multDaFachada(id, attacker);
     let mult = 1;
     (defender.types || []).forEach(d => { mult *= typeVsType(tipo, d); });
     if(multForcado != null) mult = multForcado;
@@ -554,7 +567,10 @@ function melhorAtaque(attacker, defender){
              /* A CHUVA ENTRA NA NOTA, e não só no dano: se ela mudasse só o dano, o motor
                 escolheria o golpe por uma regra e aplicaria outra -- e sob chuva o Raio Solar
                 continuaria sendo escolhido como se valesse 120. É a lição do EXPOENTE_TIPO. */
-             nota: poderEfetivo(id) * escala * multDaChuva(tipo, id) * Math.pow(mult, EXPOENTE_TIPO) * (proprio ? 1.5 : SUBTYPE_PENALTY)
+             /* ⚠️ A NOTA USA O `poderEfetivo(id)`, e não a variável `poder` -- por isso o dobro da
+                Fachada tem que ser repetido AQUI. Sem ele a nota ficaria de fora e o motor
+                deixaria de escolher a Fachada justamente quando ela vale o dobro. */
+             nota: poderEfetivo(id) * escala * multDaFachada(id, attacker) * multDaChuva(tipo, id) * Math.pow(mult, EXPOENTE_TIPO) * (proprio ? 1.5 : SUBTYPE_PENALTY)
                    * (atk / Math.max(1, def)) };
   };
   let melhor = null;
@@ -832,11 +848,11 @@ function effectiveBaseHp(p){
 }
 function effectiveAttack(p){
   const v = (typeof p.attack==='number') ? p.attack : ((SPECIES[p.speciesId]&&SPECIES[p.speciesId].attack)||50);
-  return withQueimadura(withDanca(withFuria(withItemStat(withSpecialty(withBuffs(v, p), p), p, 'attack'), p), p), p);
+  return withEstagio(withQueimadura(withDanca(withFuria(withItemStat(withSpecialty(withBuffs(v, p), p), p, 'attack'), p), p), p), p, 'atk');
 }
 function effectiveDefense(p){
   const v = (typeof p.defense==='number') ? p.defense : ((SPECIES[p.speciesId]&&SPECIES[p.speciesId].defense)||50);
-  return withFuria(withItemStat(withSpecialty(withBuffs(v, p), p), p, 'defense'), p);
+  return withEstagio(withFuria(withItemStat(withSpecialty(withBuffs(v, p), p), p, 'defense'), p), p, 'def');
 }
 /* Sp.Atk e Sp.Def, oficiais da Gen 2. Instancia gravada ANTES do split nao tem os campos -- cai no
    valor da especie, mesma migracao ja usada pela velocidade. O 50 no fim so pega instancia de
@@ -847,19 +863,19 @@ function effectiveSpAtk(p){
   const sp = SPECIES[p.speciesId];
   const v = (typeof p.spAtk === 'number') ? p.spAtk
           : (sp && typeof sp.spAtk === 'number') ? sp.spAtk : 50;
-  return withFuria(withItemStat(withSpecialty(withBuffs(v, p), p), p, 'spAtk'), p);
+  return withEstagio(withFuria(withItemStat(withSpecialty(withBuffs(v, p), p), p, 'spAtk'), p), p, 'spAtk');
 }
 function effectiveSpDef(p){
   const sp = SPECIES[p.speciesId];
   const v = (typeof p.spDef === 'number') ? p.spDef
           : (sp && typeof sp.spDef === 'number') ? sp.spDef : 50;
-  return withFuria(withItemStat(withSpecialty(withBuffs(v, p), p), p, 'spDef'), p);
+  return withEstagio(withFuria(withItemStat(withSpecialty(withBuffs(v, p), p), p, 'spDef'), p), p, 'spDef');
 }
 function effectiveSpeed(p){
   // a velocidade buffada entra também na chance de crítico (rng < speed/512, regra da Gen 1):
   // quem está no terreno do tipo dele critica mais, além de bater mais forte
   const v = (typeof p.speed === 'number') ? p.speed : ((SPECIES[p.speciesId] && SPECIES[p.speciesId].speed) || 50);
-  return withParalisia(withFuria(withSpecialty(withBuffs(v, p), p), p), p);
+  return withEstagio(withParalisia(withFuria(withSpecialty(withBuffs(v, p), p), p), p), p, 'speed');
 }
 function calcMaxHp(p){ return Math.round(30 + p.level*5 + effectiveBaseHp(p)); }
 // HP na escala Gen 1 -- usado só internamente, pra converter o dano em fração da vida
@@ -884,7 +900,22 @@ function gen1MaxHp(p){ return Math.floor(2 * effectiveBaseHp(p) * p.level / 100)
    o Surf moderno é poder 90, e o mod da **gen5** devolve os **95** que valiam na Gen 3. Lido do
    arquivo moderno ele entraria 5 pontos fraco.
    (Conferido pelo mesmo método: o `cut` sai Normal 50, exatamente o que já estava aqui.) */
+/* ⚠️ OS GOLPES DE TM (17/09/2026): os SEIS que a base por NÍVEL nunca viu, porque ninguém os
+   aprende por nível -- eles vêm de MÁQUINA, exatamente como o `cut`, o `surf` e o `fly`. Os outros
+   17 TMs do jogo já estavam na tabela (alguém os aprende por nível também).
+   ⚠️ A GERAÇÃO IMPORTA EM TRÊS DELES, e lida do arquivo moderno a tabela sairia errada:
+   Rock Tomb é 60 hoje e era **50** na Gen 3; Thief é 60 hoje e era **40**; Overheat é 130 hoje e
+   era **140**. O caminho é o mesmo do resto da base -- o moves.json do Showdown com a cadeia de
+   mods 8→3 -- e ele devolve os valores da Gen 3.
+   ⚠️ E ELES DESLOCAM A SEMENTE DO METRÔNOMO (`POOL_METRONOMO` é derivado do `GOLPES`): 158 → 164.
+   É o preço conhecido de ele sortear "qualquer poder existente no jogo". */
 const GOLPES = {
+  dragonclaw: ['Dragon', 80],
+  rocktomb: ['Rock', 50],
+  facade: ['Normal', 70],
+  secretpower: ['Normal', 70],
+  thief: ['Dark', 40],
+  overheat: ['Fire', 140],
   cut: ['Normal', 50],
   surf: ['Water', 95],
   fly: ['Flying', 70],
@@ -974,7 +1005,7 @@ const GOLPES_PT = {
   rollout:'Rolamento',sacredfire:'Fogo Sagrado',sandtomb:'Tumba de Areia',scratch:'Arranhão',
   shadowball:'Bola Sombria',shadowpunch:'Soco Sombrio',signalbeam:'Feixe de Sinal',
   silverwind:'Vento Prateado',skullbash:'Quebra-Crânio',skyattack:'Ataque Celeste',
-  skyuppercut:'Cruzado Celeste',slam:'Batida',slash:'Talho',cut:'Corte',surf:'Surf',fly:'Voar',sludge:'Lodo',
+  dragonclaw:'Garra do Dragão',rocktomb:'Tumba de Rochas',facade:'Fachada',secretpower:'Poder Secreto',thief:'Ladrão',overheat:'Superaquecer',skyuppercut:'Cruzado Celeste',slam:'Batida',slash:'Talho',cut:'Corte',surf:'Surf',fly:'Voar',sludge:'Lodo',
   sludgebomb:'Bomba de Lodo',smog:'Fumaça Tóxica',snore:'Ronco',solarbeam:'Raio Solar',
   spark:'Faísca',spikecannon:'Canhão de Espinhos',steelwing:'Asa de Aço',stomp:'Pisão',
   submission:'Submissão',superpower:'Superpoder',swift:'Rapidez',tackle:'Investida',
@@ -1191,7 +1222,79 @@ const SURFISTAS = [
 ];
 /* golpe de HM -> quem pode aprender. Uma tabela, e não um `if` por golpe: o próximo HM entra numa
    linha, e o validador não precisa saber que HM existe. */
-const APRENDEM_HM = { cut: CORTADORES, surf: SURFISTAS, fly: VOADORES };
+/* ============================================================================
+   AS MÁQUINAS DE TÉCNICA (TMs) -- 17/09/2026
+   ----------------------------------------------------------------------------
+   Pedidas assim: *"implemente os TMs e coloque eles para vender, no mínimo 100 cada, conforme o
+   poder for maior, mais caro fica, e os TMs devem ser de uso único, usou uma vez, ele some e não
+   dá para usar mais, precisa comprar novamente"*.
+
+   ⚠️ ELAS SÃO O CONTRÁRIO DOS HMs EM TUDO QUE IMPORTA, e é por isso que não dava pra reusar o
+   `HMS`:
+
+     |                  | HM                          | TM                            |
+     |------------------|-----------------------------|-------------------------------|
+     | de onde vem      | conquista da jornada        | **compra na loja**            |
+     | onde mora        | na CONTA (`hms`)            | no **inventário** (empilha)   |
+     | quantas vezes    | infinitas                   | **UMA** (some ao ensinar)     |
+     | dá pra esquecer  | não, nunca                  | **sim**, é golpe comum        |
+
+   ⚠️ E A ÚLTIMA LINHA É A QUE MAIS SEPARA AS DUAS: o golpe de HM é a CHAVE de uma rota, então
+   perdê-lo numa tela de troca fecharia o caminho de novo (ver `ehGolpeDeMaquina`). O de TM é só um
+   golpe -- ele entra na fila de aprendizado como qualquer outro, e o jogador pode trocá-lo depois.
+   Quem pagou 300 numa Hiper Raio e a trocou por engano **perdeu a Máquina**: é o preço do uso
+   único, e é o que a tela avisa antes.
+
+   ⚠️ A LISTA DE QUEM APRENDE SAIU DA TAG "3M" DO SHOWDOWN (Gen 3), o MESMO caminho dos 72
+   cortadores, dos 65 surfistas e dos 24 voadores -- e o método foi conferido reproduzindo os três
+   sem uma divergência. Atenção à fonte: as tags `1M` e `2M` dão ZERO nas 250 do jogo, porque o
+   arquivo do Showdown é podado e só traz da Gen 3 pra frente.
+
+   ⚠️ O PREÇO É DERIVADO, nunca escrito à mão: `max(100, poder efetivo × 2)`, arredondado à dezena.
+   Ele usa o poder EFETIVO (`poderEfetivo`) e não o cru, que é a mesma régua que a escolha de golpe
+   usa -- sem isso a Semente-Bala (poder 10, mas 2 a 5 tapas) sairia como o golpe mais barato do
+   jogo por um número que não descreve o que ela tira. Vai de 🪙100 (Semente-Bala, Tumba de Rochas,
+   Ladrão) a 🪙300 (Hiper Raio), ou seja de **1,4 a 4,3 jornadas** de renda -- a mais cara empata
+   com o Doce Raro.
+
+   ⚠️ ESTA TABELA É DUPLICADA no servidor, e não é opcional: é o `golpesValidos` que deixa um golpe
+   sobreviver na liga e no online, e ele reconstrói o que a espécie pode ter a partir do
+   `APRENDIZADO` (que é por NÍVEL) mais os HMs. Sem os TMs ali, quem ensinasse um perderia o golpe
+   em TODA partida de liga, em silêncio -- foi exatamente o que quase aconteceu com o `fly`.
+   ============================================================================ */
+const TMS = {
+  tm02: { golpe:'dragonclaw', preco:160, aprendem:['aerodactyl','charizard','charmander','charmeleon','dragonite','feraligatr','tyranitar'] },
+  tm03: { golpe:'waterpulse', preco:120, aprendem:['aipom','articuno','azumarill','blastoise','blissey','celebi','chansey','chinchou','clefable','clefairy','cleffa','cloyster','corsola','croconaw','delibird','dewgong','dragonair','dragonite','dratini','dunsparce','feraligatr','furret','goldeen','golduck','granbull','gyarados','horsea','igglybuff','jigglypuff','jynx','kabuto','kabutops','kangaskhan','kingdra','kingler','krabby','lanturn','lapras','lickitung','lugia','mantine','marill','meowth','mewtwo','miltank','nidoking','nidoqueen','nidoranf','nidoranm','nidorina','nidorino','octillery','omanyte','omastar','persian','politoed','poliwag','poliwhirl','poliwrath','psyduck','quagsire','qwilfish','remoraid','seadra','seaking','seel','sentret','shellder','slowbro','slowking','slowpoke','smoochum','snorlax','snubbull','squirtle','starmie','staryu','suicune','tauros','tentacool','tentacruel','togepi','togetic','totodile','tyranitar','vaporeon','wartortle','wigglytuff','wooper'] },
+  tm09: { golpe:'bulletseed', preco:100, aprendem:['bayleef','bellossom','bellsprout','bulbasaur','chikorita','exeggcute','exeggutor','gloom','hoppip','ivysaur','jumpluff','meganium','octillery','oddish','paras','parasect','skiploom','sunflora','sunkern','tangela','venusaur','victreebel','vileplume','weepinbell'] },
+  tm13: { golpe:'icebeam', preco:190, aprendem:['articuno','azumarill','blastoise','blissey','chansey','chinchou','clefable','clefairy','cloyster','corsola','croconaw','cubone','delibird','dewgong','dragonair','dragonite','dratini','dunsparce','feraligatr','furret','goldeen','golduck','gyarados','horsea','jigglypuff','jynx','kabuto','kabutops','kangaskhan','kingdra','kingler','krabby','lanturn','lapras','lickitung','lugia','mantine','marill','marowak','mewtwo','miltank','nidoking','nidoqueen','nidoranf','nidoranm','nidorina','nidorino','octillery','omanyte','omastar','piloswine','politoed','poliwag','poliwhirl','poliwrath','porygon','porygon2','psyduck','quagsire','qwilfish','raticate','remoraid','rhydon','rhyhorn','seadra','seaking','seel','sentret','shellder','slowbro','slowking','slowpoke','smoochum','sneasel','snorlax','squirtle','starmie','staryu','suicune','swinub','tauros','tentacool','tentacruel','totodile','tyranitar','vaporeon','wartortle','wigglytuff','wooper'] },
+  tm14: { golpe:'blizzard', preco:240, aprendem:['articuno','azumarill','blastoise','blissey','chansey','chinchou','clefable','clefairy','cloyster','corsola','croconaw','cubone','delibird','dewgong','dragonair','dragonite','dratini','dunsparce','feraligatr','furret','goldeen','golduck','gyarados','horsea','jigglypuff','jynx','kabuto','kabutops','kangaskhan','kingdra','kingler','krabby','lanturn','lapras','lickitung','lugia','mantine','marill','marowak','mewtwo','miltank','nidoking','nidoqueen','nidoranf','nidoranm','nidorina','nidorino','octillery','omanyte','omastar','piloswine','politoed','poliwag','poliwhirl','poliwrath','porygon','porygon2','psyduck','quagsire','qwilfish','raticate','remoraid','rhydon','rhyhorn','seadra','seaking','seel','shellder','slowbro','slowking','slowpoke','smoochum','sneasel','snorlax','squirtle','starmie','staryu','suicune','swinub','tauros','tentacool','tentacruel','totodile','tyranitar','vaporeon','wartortle','wigglytuff','wooper'] },
+  tm15: { golpe:'hyperbeam', preco:300, aprendem:['aerodactyl','alakazam','ampharos','arbok','arcanine','ariados','articuno','azumarill','beedrill','bellossom','blastoise','blissey','butterfree','celebi','chansey','charizard','clefable','cloyster','crobat','dewgong','dodrio','donphan','dragonair','dragonite','dratini','dugtrio','electabuzz','electrode','entei','espeon','exeggutor','fearow','feraligatr','flareon','forretress','furret','gengar','golbat','golduck','golem','granbull','gyarados','heracross','hooh','houndoom','hypno','jolteon','jumpluff','jynx','kabutops','kangaskhan','kingdra','kingler','lanturn','lapras','larvitar','ledian','lickitung','lugia','machamp','magcargo','magmar','magneton','marowak','meganium','mewtwo','miltank','moltres','mrmime','muk','nidoking','nidoqueen','ninetales','noctowl','octillery','omastar','parasect','persian','pidgeot','piloswine','pinsir','politoed','poliwrath','porygon','porygon2','primeape','pupitar','quagsire','raichu','raikou','rapidash','raticate','remoraid','rhydon','sandslash','scizor','scyther','seadra','seaking','slowbro','slowking','snorlax','starmie','steelix','suicune','sunflora','tangela','tauros','tentacruel','togetic','typhlosion','tyranitar','umbreon','ursaring','vaporeon','venomoth','venusaur','victreebel','vileplume','weezing','wigglytuff','xatu','zapdos'] },
+  tm19: { golpe:'gigadrain', preco:120, aprendem:['arbok','ariados','bayleef','beedrill','bellossom','bellsprout','bulbasaur','butterfree','celebi','chikorita','crobat','ekans','exeggcute','exeggutor','forretress','gastly','gengar','gloom','golbat','grimer','haunter','hooh','hoppip','ivysaur','jumpluff','kabuto','kabutops','ledian','ledyba','lugia','meganium','muk','natu','oddish','paras','parasect','pineco','skiploom','spinarak','sunflora','sunkern','tangela','tentacool','tentacruel','venomoth','venonat','venusaur','victreebel','vileplume','weepinbell','xatu','yanma','zubat'] },
+  tm22: { golpe:'solarbeam', preco:240, aprendem:['aipom','ariados','bayleef','beedrill','bellossom','bellsprout','blissey','bulbasaur','butterfree','celebi','chansey','chikorita','clefable','clefairy','cleffa','dunsparce','entei','exeggcute','exeggutor','forretress','furret','gloom','granbull','hooh','hoppip','houndoom','houndour','igglybuff','ivysaur','jigglypuff','jumpluff','kangaskhan','ledian','ledyba','lickitung','meganium','mewtwo','miltank','mrmime','natu','oddish','paras','parasect','pineco','ponyta','porygon','porygon2','rapidash','sentret','skiploom','snorlax','snubbull','spinarak','stantler','sunflora','sunkern','tangela','tauros','togepi','togetic','venomoth','venonat','venusaur','victreebel','vileplume','weepinbell','wigglytuff','xatu','yanma'] },
+  tm23: { golpe:'irontail', preco:200, aprendem:['abra','aerodactyl','aipom','alakazam','ampharos','arbok','arcanine','azumarill','bayleef','blastoise','blissey','chansey','charizard','charmander','charmeleon','chikorita','clefable','clefairy','cleffa','croconaw','cubone','donphan','dragonair','dragonite','dratini','dunsparce','eevee','ekans','electabuzz','entei','espeon','farfetchd','feraligatr','flaaffy','flareon','furret','girafarig','gligar','golduck','granbull','growlithe','houndoom','houndour','jolteon','kadabra','kangaskhan','lapras','lickitung','lugia','magby','magmar','mankey','mareep','marill','marowak','meganium','meowth','mewtwo','miltank','nidoking','nidoqueen','nidoranf','nidoranm','nidorina','nidorino','ninetales','onix','persian','phanpy','pichu','pikachu','ponyta','porygon','porygon2','primeape','psyduck','quagsire','raichu','raikou','rapidash','raticate','rhydon','rhyhorn','sandshrew','sandslash','sentret','slowbro','slowking','slowpoke','sneasel','squirtle','stantler','steelix','suicune','tauros','totodile','tyranitar','umbreon','vaporeon','vulpix','wartortle','wooper'] },
+  tm24: { golpe:'thunderbolt', preco:190, aprendem:['aipom','ampharos','blissey','chansey','chinchou','clefable','clefairy','dragonair','dragonite','dratini','dunsparce','electabuzz','electrode','elekid','flaaffy','furret','gastly','gengar','girafarig','granbull','grimer','gyarados','haunter','hooh','jigglypuff','jolteon','kangaskhan','koffing','lanturn','lapras','lickitung','lugia','magnemite','magneton','mankey','mareep','meowth','mewtwo','miltank','misdreavus','mrmime','muk','nidoking','nidoqueen','nidoranf','nidoranm','nidorina','nidorino','persian','pichu','pikachu','porygon','porygon2','primeape','raichu','raikou','raticate','rhydon','rhyhorn','sentret','snorlax','snubbull','stantler','starmie','staryu','tauros','tyranitar','voltorb','weezing','wigglytuff','zapdos'] },
+  tm25: { golpe:'thunder', preco:240, aprendem:['aipom','ampharos','blissey','chansey','chinchou','clefable','clefairy','dragonair','dragonite','dratini','dunsparce','electabuzz','electrode','elekid','flaaffy','furret','gengar','girafarig','granbull','grimer','gyarados','hooh','jigglypuff','jolteon','kangaskhan','koffing','lanturn','lapras','lickitung','lugia','magnemite','magneton','mankey','mareep','meowth','mewtwo','miltank','misdreavus','mrmime','muk','nidoking','nidoqueen','nidoranf','nidoranm','nidorina','nidorino','persian','pichu','pikachu','porygon','porygon2','primeape','raichu','raikou','raticate','rhydon','rhyhorn','snorlax','snubbull','stantler','starmie','staryu','tauros','tyranitar','voltorb','weezing','wigglytuff','zapdos'] },
+  tm26: { golpe:'earthquake', preco:200, aprendem:['aerodactyl','arbok','blastoise','blissey','chansey','charizard','corsola','cubone','diglett','donphan','dragonite','dugtrio','dunsparce','ekans','feraligatr','forretress','geodude','girafarig','gligar','golem','granbull','graveler','gyarados','heracross','hitmonchan','hitmonlee','hitmontop','hooh','kangaskhan','larvitar','lickitung','lugia','machamp','machoke','machop','magcargo','mankey','mantine','marowak','meganium','mewtwo','miltank','nidoking','nidoqueen','onix','phanpy','piloswine','pineco','pinsir','politoed','poliwhirl','poliwrath','primeape','pupitar','quagsire','rhydon','rhyhorn','sandshrew','sandslash','shuckle','slowbro','slowking','slowpoke','snorlax','snubbull','stantler','steelix','sudowoodo','swinub','tauros','teddiursa','typhlosion','tyranitar','tyrogue','ursaring','venusaur','wooper'] },
+  tm29: { golpe:'psychic', preco:180, aprendem:['abra','alakazam','ariados','blissey','butterfree','celebi','chansey','clefable','clefairy','cleffa','corsola','drowzee','electabuzz','elekid','espeon','exeggcute','exeggutor','gastly','gengar','girafarig','haunter','hooh','hoothoot','hypno','igglybuff','jigglypuff','jynx','kadabra','lapras','lugia','magby','magmar','mewtwo','misdreavus','mrmime','natu','noctowl','octillery','politoed','poliwag','poliwhirl','poliwrath','porygon','porygon2','remoraid','slowbro','slowking','slowpoke','smoochum','snorlax','spinarak','stantler','starmie','staryu','togepi','togetic','umbreon','venomoth','venonat','wigglytuff','xatu','yanma'] },
+  tm30: { golpe:'shadowball', preco:160, aprendem:['abra','aipom','alakazam','blissey','butterfree','celebi','chansey','clefable','clefairy','cleffa','corsola','crobat','drowzee','dunsparce','eevee','espeon','flareon','furret','gastly','gengar','girafarig','golbat','granbull','haunter','hooh','hoothoot','houndoom','houndour','hypno','igglybuff','jigglypuff','jolteon','jynx','kadabra','kangaskhan','koffing','lickitung','lugia','meowth','mewtwo','miltank','misdreavus','mrmime','murkrow','natu','nidoking','nidoqueen','noctowl','persian','porygon','porygon2','qwilfish','raticate','sentret','slowbro','slowking','slowpoke','smoochum','sneasel','snorlax','snubbull','stantler','togepi','togetic','umbreon','vaporeon','weezing','wigglytuff','xatu','yanma','zubat'] },
+  tm35: { golpe:'flamethrower', preco:190, aprendem:['aerodactyl','arcanine','blissey','chansey','charizard','charmander','charmeleon','clefable','clefairy','cleffa','cubone','cyndaquil','dragonair','dragonite','dratini','dunsparce','entei','flareon','furret','geodude','golem','granbull','graveler','grimer','growlithe','gyarados','hooh','houndoom','houndour','igglybuff','jigglypuff','kangaskhan','koffing','lickitung','machamp','machoke','machop','magby','magcargo','magmar','marowak','mewtwo','moltres','muk','nidoking','nidoqueen','ninetales','octillery','ponyta','quilava','rapidash','remoraid','rhydon','rhyhorn','sentret','slowbro','slowking','slowpoke','slugma','snorlax','snubbull','tauros','togepi','togetic','typhlosion','tyranitar','vulpix','weezing','wigglytuff'] },
+  tm36: { golpe:'sludgebomb', preco:180, aprendem:['arbok','ariados','beedrill','bellossom','bellsprout','bulbasaur','crobat','diglett','dugtrio','ekans','exeggcute','exeggutor','gastly','gengar','gligar','gloom','golbat','granbull','grimer','haunter','houndoom','houndour','ivysaur','koffing','muk','nidoking','nidoqueen','nidoranf','nidoranm','nidorina','nidorino','octillery','oddish','paras','parasect','quagsire','qwilfish','shuckle','snubbull','spinarak','sunflora','sunkern','tangela','tentacool','tentacruel','venomoth','venonat','venusaur','victreebel','vileplume','weepinbell','weezing','wooper','zubat'] },
+  tm38: { golpe:'fireblast', preco:240, aprendem:['aerodactyl','arcanine','blissey','chansey','charizard','charmander','charmeleon','clefable','clefairy','cleffa','cubone','cyndaquil','dragonair','dragonite','dratini','dunsparce','entei','flareon','geodude','golem','granbull','graveler','grimer','growlithe','gyarados','hooh','houndoom','houndour','igglybuff','jigglypuff','kangaskhan','koffing','lickitung','machamp','machoke','machop','magby','magcargo','magmar','marowak','mewtwo','moltres','muk','nidoking','nidoqueen','ninetales','octillery','ponyta','quilava','rapidash','remoraid','rhydon','rhyhorn','slowbro','slowking','slowpoke','slugma','snorlax','snubbull','tauros','togepi','togetic','typhlosion','tyranitar','vulpix','weezing','wigglytuff'] },
+  tm39: { golpe:'rocktomb', preco:100, aprendem:['aerodactyl','blissey','chansey','corsola','cubone','diglett','donphan','dragonite','dugtrio','dunsparce','geodude','gligar','golem','granbull','graveler','grimer','heracross','hitmonchan','hitmonlee','kabuto','kabutops','kangaskhan','kingler','krabby','lickitung','machamp','machoke','machop','magcargo','mankey','marowak','mewtwo','miltank','muk','nidoking','nidoqueen','omanyte','omastar','onix','phanpy','piloswine','pinsir','poliwrath','primeape','quagsire','rhydon','rhyhorn','sandshrew','sandslash','shuckle','snorlax','steelix','sudowoodo','swinub','tauros','tyranitar','ursaring'] },
+  tm42: { golpe:'facade', preco:140, aprendem:['abra','aerodactyl','aipom','alakazam','ampharos','arbok','arcanine','ariados','articuno','azumarill','bayleef','beedrill','bellossom','bellsprout','blastoise','blissey','bulbasaur','butterfree','celebi','chansey','charizard','charmander','charmeleon','chikorita','chinchou','clefable','clefairy','cleffa','cloyster','corsola','crobat','croconaw','cubone','cyndaquil','delibird','dewgong','diglett','dodrio','doduo','donphan','dragonair','dragonite','dratini','drowzee','dugtrio','dunsparce','eevee','ekans','electabuzz','electrode','elekid','entei','espeon','exeggcute','exeggutor','farfetchd','fearow','feraligatr','flaaffy','flareon','forretress','furret','gastly','gengar','geodude','girafarig','gligar','gloom','golbat','goldeen','golduck','golem','granbull','graveler','grimer','growlithe','gyarados','haunter','heracross','hitmonchan','hitmonlee','hitmontop','hooh','hoothoot','hoppip','horsea','houndoom','houndour','hypno','igglybuff','ivysaur','jigglypuff','jolteon','jumpluff','jynx','kabuto','kabutops','kadabra','kangaskhan','kingdra','kingler','koffing','krabby','lanturn','lapras','larvitar','ledian','ledyba','lickitung','lugia','machamp','machoke','machop','magby','magcargo','magmar','magnemite','magneton','mankey','mantine','mareep','marill','marowak','meganium','meowth','mewtwo','miltank','misdreavus','moltres','mrmime','muk','murkrow','natu','nidoking','nidoqueen','nidoranf','nidoranm','nidorina','nidorino','ninetales','noctowl','octillery','oddish','omanyte','omastar','onix','paras','parasect','persian','phanpy','pichu','pidgeot','pidgeotto','pidgey','pikachu','piloswine','pineco','pinsir','politoed','poliwag','poliwhirl','poliwrath','ponyta','porygon','porygon2','primeape','psyduck','pupitar','quagsire','quilava','qwilfish','raichu','raikou','rapidash','raticate','remoraid','rhydon','rhyhorn','sandshrew','sandslash','scizor','scyther','seadra','seaking','seel','sentret','shellder','shuckle','skarmory','skiploom','slowbro','slowking','slowpoke','slugma','smoochum','sneasel','snorlax','snubbull','spearow','spinarak','squirtle','stantler','starmie','staryu','steelix','sudowoodo','suicune','sunflora','sunkern','swinub','tangela','tauros','teddiursa','tentacool','tentacruel','togepi','togetic','totodile','typhlosion','tyranitar','tyrogue','umbreon','ursaring','vaporeon','venomoth','venonat','venusaur','victreebel','vileplume','voltorb','vulpix','wartortle','weepinbell','weezing','wigglytuff','wooper','xatu','yanma','zapdos','zubat'] },
+  tm43: { golpe:'secretpower', preco:140, aprendem:['abra','aerodactyl','aipom','alakazam','ampharos','arbok','arcanine','ariados','articuno','azumarill','bayleef','beedrill','bellossom','bellsprout','blastoise','blissey','bulbasaur','butterfree','celebi','chansey','charizard','charmander','charmeleon','chikorita','chinchou','clefable','clefairy','cleffa','cloyster','corsola','crobat','croconaw','cubone','cyndaquil','delibird','dewgong','diglett','dodrio','doduo','donphan','dragonair','dragonite','dratini','drowzee','dugtrio','dunsparce','eevee','ekans','electabuzz','electrode','elekid','entei','espeon','exeggcute','exeggutor','farfetchd','fearow','feraligatr','flaaffy','flareon','forretress','furret','gastly','gengar','geodude','girafarig','gligar','gloom','golbat','goldeen','golduck','golem','granbull','graveler','grimer','growlithe','gyarados','haunter','heracross','hitmonchan','hitmonlee','hitmontop','hooh','hoothoot','hoppip','horsea','houndoom','houndour','hypno','igglybuff','ivysaur','jigglypuff','jolteon','jumpluff','jynx','kabuto','kabutops','kadabra','kangaskhan','kingdra','kingler','koffing','krabby','lanturn','lapras','larvitar','ledian','ledyba','lickitung','lugia','machamp','machoke','machop','magby','magcargo','magmar','magnemite','magneton','mankey','mantine','mareep','marill','marowak','meganium','meowth','mewtwo','miltank','misdreavus','moltres','mrmime','muk','murkrow','natu','nidoking','nidoqueen','nidoranf','nidoranm','nidorina','nidorino','ninetales','noctowl','octillery','oddish','omanyte','omastar','onix','paras','parasect','persian','phanpy','pichu','pidgeot','pidgeotto','pidgey','pikachu','piloswine','pineco','pinsir','politoed','poliwag','poliwhirl','poliwrath','ponyta','porygon','porygon2','primeape','psyduck','pupitar','quagsire','quilava','qwilfish','raichu','raikou','rapidash','raticate','remoraid','rhydon','rhyhorn','sandshrew','sandslash','scizor','scyther','seadra','seaking','seel','sentret','shellder','shuckle','skarmory','skiploom','slowbro','slowking','slowpoke','slugma','smoochum','sneasel','snorlax','snubbull','spearow','spinarak','squirtle','stantler','starmie','staryu','steelix','sudowoodo','suicune','sunflora','sunkern','swinub','tangela','tauros','teddiursa','tentacool','tentacruel','togepi','togetic','totodile','typhlosion','tyranitar','tyrogue','umbreon','ursaring','vaporeon','venomoth','venonat','venusaur','victreebel','vileplume','voltorb','vulpix','wartortle','weepinbell','weezing','wigglytuff','wooper','xatu','yanma','zapdos','zubat'] },
+  tm46: { golpe:'thief', preco:100, aprendem:['abra','aerodactyl','aipom','alakazam','arbok','arcanine','ariados','beedrill','bellsprout','butterfree','crobat','cubone','delibird','dewgong','diglett','dodrio','doduo','drowzee','dugtrio','dunsparce','ekans','electabuzz','electrode','elekid','exeggcute','exeggutor','farfetchd','fearow','furret','gastly','gengar','girafarig','gligar','golbat','granbull','grimer','growlithe','haunter','heracross','hitmonchan','hitmonlee','hitmontop','hoothoot','houndoom','houndour','hypno','jynx','kabuto','kabutops','kadabra','kangaskhan','kingler','koffing','krabby','ledian','ledyba','lickitung','machamp','machoke','machop','magby','magmar','mankey','marowak','meowth','misdreavus','mrmime','muk','murkrow','natu','nidoking','nidoqueen','nidoranf','nidoranm','nidorina','nidorino','noctowl','octillery','omanyte','omastar','paras','parasect','persian','pidgeot','pidgeotto','pidgey','pinsir','politoed','poliwag','poliwhirl','poliwrath','porygon','porygon2','primeape','raichu','raticate','remoraid','rhydon','rhyhorn','sandshrew','sandslash','scizor','scyther','seel','sentret','skarmory','smoochum','sneasel','snubbull','spearow','spinarak','stantler','sudowoodo','tangela','teddiursa','tentacool','tentacruel','tyrogue','ursaring','venomoth','venonat','victreebel','voltorb','weepinbell','weezing','xatu','yanma','zubat'] },
+  tm47: { golpe:'steelwing', preco:140, aprendem:['aerodactyl','articuno','charizard','crobat','dodrio','doduo','dragonite','farfetchd','fearow','gligar','golbat','hooh','hoothoot','lugia','moltres','murkrow','natu','noctowl','pidgeot','pidgeotto','pidgey','scizor','scyther','skarmory','spearow','togetic','xatu','yanma','zapdos','zubat'] },
+  tm50: { golpe:'overheat', preco:280, aprendem:['arcanine','charizard','charmander','charmeleon','cyndaquil','flareon','granbull','growlithe','hooh','houndoom','houndour','magcargo','mankey','moltres','ninetales','ponyta','primeape','quilava','rapidash','slugma','snubbull','typhlosion','vulpix'] },
+};
+/* ⚠️ HM **E** TM: o `golpesValidos` reconstrói o que a espécie pode ter a partir do APRENDIZADO
+   (que é por NÍVEL), e nem HM nem TM aparecem lá. Sem os dois aqui, o golpe some na liga e no
+   online em silêncio -- foi o que quase aconteceu com o `fly`.
+   Ela é DERIVADA do `TMS`, e não uma segunda lista: um TM novo já nasce coberto. */
+const APRENDEM_HM = Object.assign(
+  { cut: CORTADORES, surf: SURFISTAS, fly: VOADORES },
+  Object.fromEntries(Object.values(TMS).map(tm => [tm.golpe, tm.aprendem]))
+);
 /* ⚠️ O QUE O SERVIDOR ACEITA DE GOLPE ESCOLHIDO. Ele não confia na lista que chegou: reconstrói o
    que aquela espécie NAQUELE nível pode ter e fica só com a interseção.
    O que sobra de um time forjado é o motor de tipo -- ou seja, exatamente o que a liga já fazia
@@ -1314,6 +1417,8 @@ function calcDamage(attacker, defender, rng, op){
      diário ser escrito; lido de lá, o log mostraria sempre a escala seguinte. */
   attacker.lastRolamento = escalaDoRolamento(attacker, best.golpe);
   const Leff = attacker.level;   // o crítico da Gen 3 dobra o DANO no fim, não o nível aqui
+  /* ⚠️ O PODER JÁ VEM PRONTO DO melhorAtaque, com a escala do Rolamento E o dobro da Fachada --
+     multiplicar de novo aqui dobraria duas vezes (a armadilha do poder efetivo, 09/09/2026). */
   const potencia = best.poder || MOVE_POWER;   // o poder do GOLPE escolhido, ou o implícito de sempre
   /* CONTA O USO DEPOIS de o poder deste golpe já ter sido lido: o primeiro uso sai nos 20 secos, e
      é o SEGUINTE que vem com +6. */
@@ -1499,6 +1604,11 @@ const MULTI_GOLPE = {
      Os dois têm poder 15, igual ao Tapa Duplo e ao Ataque Fúria: o efetivo vai a 45. */
   firespin:    TAPAS_2A5,   // Redemoinho de Fogo  poder 15  -- 10 (a linha do Charmander, Vulpix/Ninetales, Ponyta/Rapidash, Moltres, Flareon, Entei)
   wrap:        TAPAS_2A5,   // Enrolar             poder 15  -- 11 (Bellsprout/Weepinbell, Ekans/Arbok, Tentacool/Tentacruel, Lickitung, a linha do Dratini, Shuckle)
+  /* ⚠️ O SEMENTE-BALA ENTROU COM OS TMs (17/09/2026): ele é 2 a 5 tapas na Gen 3 e o golpe já
+     estava na tabela (24 espécies o aprendem por máquina), mas como ninguém o aprende por NÍVEL
+     ele nunca tinha passado por aqui. O poder efetivo dele vai de 10 pra 30, que é o que ele tira
+     de verdade -- sem isso o motor nunca o escolheria e o TM09 seria dinheiro fora. */
+  bulletseed:  TAPAS_2A5,   // Semente-Bala        poder 10  -- 24 espécies, todas por TM
   doublekick:  TAPAS_SEMPRE_2,   // Chute Duplo      poder 30  -- 8 espécies (a linha do Nidoran, Hitmonlee, Jolteon)
   bonemerang:  TAPAS_SEMPRE_2,   // Ossomerangue     poder 50  -- 2 (Cubone, Marowak)
   twineedle:   TAPAS_SEMPRE_2    // Agulha Dupla     poder 25  -- 4 (a linha do Caterpie e o Beedrill)
@@ -1551,6 +1661,23 @@ const GOLPES_SO_DORMINDO = { dreameater: true };
    `_`, então ele não vai pro Firestore (ver limparParaFirestore) e é solto no fim da batalha
    junto com os outros marcadores -- sem isso um Golem sairia da luta com o Rolamento carregado e a
    próxima batalha começaria com 480 de poder. */
+/* ⚠️ A FACHADA (TM42) DOBRA COM STATUS, e ela é o PRIMEIRO golpe do jogo cujo poder depende do
+   ESTADO de quem usa (17/09/2026). Até aqui só o Rolamento variava, e ele depende do HISTÓRICO
+   (quantas vezes saiu seguido), não de uma condição.
+   No jogo oficial ela dobra com queimadura, veneno ou paralisia. O que ela também faz lá -- ignorar
+   o corte de ataque da queimadura -- fica de fora: ali seria um segundo caminho no effectiveAttack
+   só pra um golpe, e o ×2 que já está aqui cobre o efeito prático. Fica registrado.
+   ⚠️ E ELA ENTRA NA `nota` TAMBÉM, não só no dano: sem isso o motor deixaria de escolhê-la
+   justamente quando ela é o melhor golpe do pokémon -- e é a lição do EXPOENTE_TIPO, que vale pra
+   toda regra que mexe em poder. */
+const GOLPE_FACHADA = "facade";
+const FACHADA_MULT = 2;
+function comStatus(p){
+  return !!(p && (p._queimado || p._envenenado || p._paralisado));
+}
+function multDaFachada(golpeId, quemBate){
+  return (golpeId === GOLPE_FACHADA && comStatus(quemBate)) ? FACHADA_MULT : 1;
+}
 const GOLPE_ROLAMENTO = "rollout";
 const ROLAMENTO_USOS = 5;
 /* A escala do golpe DESTE pokémon AGORA: 1, 2, 4, 8, 16. Ela multiplica o poder E a nota -- se
@@ -1625,6 +1752,37 @@ const CURA_MAXIMO_DO_HP = 0.7;
    A LISTA saiu da base por script, não foi escrita à mão: são as 82 espécies que aprendem algum
    dos onze por NÍVEL na Gen 3. O MEWTWO e o MEW não entram -- o tentarGolpeEspecial corta o bloco
    inteiro quando qualquer um dos dois está no confronto, e a entrada seria letra morta. */
+/* ⚠️ OS GOLPES DE DANO QUE CONFUNDEM, com o nome que a frase mostra. Eles são os que estão na
+   tabela GOLPES (os de status -- Supersom, Raio Confuso, Bravata, Beijo Doce, Bajulação -- não
+   têm poder e por isso nunca entraram nela).
+   Ela existe pro pedido dos TMs: quem CARREGA um deles ganha a passiva de confusão, mesmo que a
+   espécie não esteja no CONFUSAO. Ver `golpeQueConfunde`.
+   O nome sai do GOLPES_PT, então ele é o MESMO que o log e o cartão mostram -- escrito à mão aqui,
+   a frase da confusão nomearia um golpe com uma palavra e o log com outra. */
+const GOLPES_QUE_CONFUNDEM = {
+  confusion: 1, psybeam: 1, signalbeam: 1, dynamicpunch: 1, waterpulse: 1, dizzypunch: 1
+};
+Object.keys(GOLPES_QUE_CONFUNDEM).forEach(id => { GOLPES_QUE_CONFUNDEM[id] = GOLPES_PT[id] || id; });
+/* ⚠️ COM QUE GOLPE ESTE POKÉMON CONFUNDE -- e a resposta tem DUAS fontes desde 17/09/2026.
+   A primeira é a de sempre: a espécie está no CONFUSAO, e o nome do golpe é o DELA (o Zubat
+   confunde com Supersom e o Alakazam com Confusão -- sem isso os dois confundiriam com a mesma
+   palavra, que foi o relato que criou a tabela).
+   A segunda é o pedido dos TMs: *"os TMs que dão habilidade passiva, como o TM03 (Water Pulse), o
+   pokemon também deve ganhar a habilidade passiva enquanto estiver com esse movimento"*. Ou seja,
+   quem CARREGA um golpe que confunde ganha a passiva -- mesmo que a espécie não esteja na tabela.
+   ⚠️ E ELA VALE PRA QUALQUER GOLPE QUE CONFUNDA, não só pro Water Pulse: a regra é "o golpe dá a
+   passiva", e limitar ao TM03 seria a mesma exceção que este projeto passa a vida tirando. Hoje
+   isso alcança os golpes de DANO que confundem (Confusão, Psicoraio, Feixe de Sinal, Soco
+   Dinâmico, Pulso de Água, Soco Tonto) -- os de status (Supersom, Raio Confuso, Bravata, Beijo
+   Doce, Bajulação) não entram na tabela de golpes e continuam vindo só pela espécie.
+   ⚠️ O GOLPE CARREGADO VEM PRIMEIRO: um Kabuto que ensinou o TM03 já confundia com "Pulso de Água"
+   pela espécie, e o resultado é o mesmo; mas um Blastoise que ensinou passa a confundir com o
+   NOME do golpe que ele leva, e não com nada. */
+function golpeQueConfunde(p){
+  const leva = (p && p.ataques) || [];
+  for(const id of leva){ if(GOLPES_QUE_CONFUNDEM[id]) return GOLPES_QUE_CONFUNDEM[id]; }
+  return CONFUSAO[p && p.speciesId] || null;
+}
 const CONFUSAO = {
   aerodactyl:'Supersom', alakazam:'Confusão', butterfree:'Confusão', celebi:'Confusão',
   chinchou:'Supersom', cleffa:'Beijo Doce', cloyster:'Supersom', crobat:'Supersom',
@@ -1800,6 +1958,62 @@ function estaChovendo(){ return chuvaRestante > 0; }
    invocacoes, entao sobra vira chuva na batalha de outra pessoa.
    Escrito a mao nos tres, o quarto caminho nasceria sem -- e o vazamento nao aparece como erro,
    aparece como um golpe de Fogo tirando metade sem nada na tela dizendo por que. */
+/* ============================================================================
+   O PODER SECRETO (TM43) -- 17/09/2026
+   ----------------------------------------------------------------------------
+   Pedido junto com os TMs: *"muitos desses TMs possuem efeito adicional, como o TM43 (Secret
+   Power), que tem chance de aplicar um efeito conforme o terreno da batalha"*.
+
+   ⚠️ AQUI O TERRENO É DE UM TIPO (são 51, seis de cada um dos 17), então o mapa é por TIPO.
+   ⚠️ E ELE SÓ USA OS QUATRO STATUS QUE ACONTECEM POR ATAQUE, que é onde este golpe vive:
+     Gelo → congela · Fogo → queima · Veneno → envenena · Elétrico → paralisa
+   O SONO e a CONFUSÃO ficaram de fora **de propósito**: no motor os dois são de ABERTURA (são
+   sorteados uma vez por confronto, antes do primeiro golpe), e aplicá-los no MEIO da troca seria
+   mecânica nova -- com linha de log, passo de animação e medição próprios. Não foi o que se pediu.
+   ⚠️ NOS OUTROS 13 TERRENOS ele é um golpe Normal de 70 e mais nada, e isso é honesto: inventar
+   efeito pra preencher a tabela seria pior que ter terreno em que ele é "só" um golpe.
+
+   ⚠️ E ELE SÓ VALE ONDE HÁ TERRENO: a jornada, a Elite e as ligas com terreno escolhido. Na TORRE
+   e no ONLINE não existe terreno -- é a mesma fronteira que o selo 🔺 já tem, e o `tipoDoTerreno()`
+   devolvendo null é o que a diz.
+
+   ⚠️ O TIPO DO TERRENO VIAJA PELA MESMA PORTA DA CHUVA (estado de módulo, definido pelo chamador e
+   LIMPO pelo `limparClima`), e isso é decisão: uma quarta variável de módulo com limpeza própria
+   seria uma quarta porta de vazamento -- e o vazamento do clima foi REAL no servidor, onde a
+   instância é reaproveitada entre invocações. Uma porta só, limpa nos mesmos três pontos.
+   ============================================================================ */
+const CHANCE_PODER_SECRETO = 0.30;
+const GOLPE_PODER_SECRETO = "secretpower";
+/* o valor é o CAMPO da instância e a guarda de imunidade -- os mesmos que cada status já usa */
+const EFEITO_DO_TERRENO = {
+  Ice:      { marca: "_congelado",  pode: podeCongelar },
+  Fire:     { marca: "_queimado",   pode: podeQueimar },
+  Poison:   { marca: "_envenenado", pode: podeEnvenenar },
+  Electric: { marca: "_paralisado", pode: podeParalisar }
+};
+/* OS TIPOS DO TERRENO DESTA BATALHA, lidos da INSTÂNCIA (ver applyTerrainBuff). Sem terreno --
+   na Torre e no online -- devolve lista vazia, e o TM43 vira um golpe Normal de 70 e mais nada. */
+function terrenoDe(p){ return (p && p._terreno) || []; }
+/* ⚠️ SORTEIA DEPOIS DE O GOLPE CONECTAR, e lê o rng da BATALHA -- e SAI ANTES do rng() quando o
+   golpe não é o Poder Secreto, quando não há terreno ou quando o alvo é imune. Lido sempre, ele
+   deslocaria a semente de TODA batalha que não tem o TM43 em campo: é a mesma armadilha do
+   congelamento e do Remoinho.
+   ⚠️ E A IMUNIDADE É A DE CADA STATUS, reusada: o Fogo não queima, o Gelo não congela, o Aço e o
+   Veneno não se envenenam. Sem isso o Poder Secreto seria a porta dos fundos das quatro.
+   Devolve a MARCA aplicada (o campo da instância) ou null -- é o que a linha do log precisa. */
+function tentarPoderSecreto(quemBate, alvo, rng){
+  if(!quemBate || quemBate.hp <= 0 || !alvo || alvo.hp <= 0) return null;
+  if(quemBate.lastMove !== GOLPE_PODER_SECRETO) return null;
+  /* ⚠️ COM MAIS DE UM TIPO NO TERRENO (46 dos 51 têm), vale o PRIMEIRO que dá efeito -- e a ordem
+     é a da tabela do TERRENO, não a do EFEITO_DO_TERRENO. Assim o Pântano (Veneno/Planta/Fantasma)
+     envenena e o Vulcão (Fogo/Terra) queima, que é o que o nome deles promete. */
+  const tipo = terrenoDe(quemBate).find(t => EFEITO_DO_TERRENO[t]);
+  const e = tipo && EFEITO_DO_TERRENO[tipo];
+  if(!e || !e.pode(alvo) || alvo[e.marca]) return null;
+  if(rng() >= CHANCE_PODER_SECRETO) return null;
+  alvo[e.marca] = GOLPE_PODER_SECRETO;
+  return e.marca;
+}
 function limparClima(){ chuvaRestante = 0; }
 /* PÕE o clima de volta. Existe pro ONLINE, que resolve UM confronto por invocação: sem um jeito de
    restaurar o contador, a chuva morria no fim de cada confronto e durava 1 em vez de 3.
@@ -1967,8 +2181,9 @@ function sorteiaGolpeEspecial(p, rng){
   /* A CONFUSÃO VEM POR ÚLTIMO, e isso é de propósito: acrescentar um efeito no FIM da fila não
      dilui nenhum dos que já estavam medidos -- quem cai na chance composta é ela. Um Alakazam
      (Disable + Recuperar + Confusão) confunde em 0,9 × 0,9 × 10% = 8,1%. */
-  if(CONFUSAO[p.speciesId] && rng() < CHANCE_CONFUSAO){
-    return { efeito:'confusao', golpe: CONFUSAO[p.speciesId] };
+  const confundeCom = golpeQueConfunde(p);
+  if(confundeCom && rng() < CHANCE_CONFUSAO){
+    return { efeito:'confusao', golpe: confundeCom };
   }
   /* A FÚRIA DO DRAGÃO É A ÚLTIMA DA FILA, pelo mesmo motivo que a confusão foi um dia: o efeito que
      entra no FIM não dilui nenhum dos que já estavam medidos -- quem paga a chance composta é ele.
@@ -2093,6 +2308,11 @@ function tentarRemoinho(team, brockTeam, iAtivo, iInimigo, rng, diario){
     if(!candidatos.length) continue;
     if(rng() >= CHANCE_REMOINHO) continue;
     const novo = candidatos[Math.floor(rng() * candidatos.length)];
+    /* ⚠️ QUEM SAI DE CAMPO PERDE OS ESTAGIOS (17/09/2026). E a regra do jogo original -- estagio
+       zera ao trocar de pokemon --, e este e o UNICO ponto do motor onde alguem sai de campo VIVO.
+       Sem isto, um pokemon com a Defesa em -3 seria soprado, voltaria depois e continuaria em -3:
+       o sopro viraria um jeito de GUARDAR o debuff em vez de tira-lo de campo. */
+    limparEstagios(timeAlvo[iAlvo]);
     /* A LINHA ENTRA NO DIÁRIO DO CONFRONTO QUE VEM -- o que a tela mostra é o pokémon NOVO, e a
        frase é o que explica por que ele está ali. Por isso ela carrega o nome e a espécie de QUEM
        SAIU: nenhum dos dois lados do matchup é ele. */
@@ -2446,6 +2666,87 @@ const VENENO_DANO = 1/8;             // do HP MAXIMO, por turno -- o DOBRO da qu
 /* ⚠️ POKÉMON DE GELO NÃO CONGELA, como no jogo original -- e aqui isso pesa mais que lá: quase
    todo dono de golpe de gelo É de Gelo (Articuno, Lapras, Dewgong, Jynx, Cloyster), então sem a
    imunidade o efeito mais comum seria dois pokémon de Gelo se congelando um ao outro. */
+/* ⚠️ OS ESTÁGIOS DE ATRIBUTO (17/09/2026) -- o PRIMEIRO sistema de estágios do motor.
+   Pedidos assim: *"Iron Tail: 30% de diminuir a Defesa do alvo em 1 estágio, Psychic: 10% de
+   diminuir a Defesa Especial, Shadow Ball: 20% ..., Steel Wing: 10% de aumentar a Defesa do
+   próprio usuário"*. As chances são as OFICIAIS, tiradas do dado (Showdown, mod da Gen 3) -- o
+   mesmo caminho das quatro listas de status.
+
+   ⚠️ ATÉ AQUI O MOTOR NÃO TINHA ESTÁGIO NENHUM. O que ele tinha eram MULTIPLICADORES fixos: a
+   Dança das Espadas é ×1,5 de Ataque e a Dança da Pluma ×0,5 -- que por acaso são o +1 e o -1 da
+   tabela oficial, mas não somam nem se acumulam. Estágio é outra coisa: ele ACUMULA, tem teto, e
+   a mesma escada serve a qualquer atributo.
+
+   A TABELA É A DA GEN 3, e ela não é linear: `+n` vale `(2+n)/2` e `-n` vale `2/(2+n)`. Ou seja
+   +1 é ×1,5 mas -1 é ×0,667 (e não ×0,5) -- baixar dói MENOS que subir rende, e é assim desde a
+   Gen 1. Escrever "-1 = ×0,5" é o erro mais comum aqui.
+
+   ⚠️ O TETO DE ±6 É ALCANÇÁVEL DE VERDADE, ao contrário dos estágios de crítico (que ficaram de
+   fora do jogo justamente por serem letra morta): a Cauda de Ferro usada seis vezes no mesmo
+   confronto chega no -6. Por isso a escada inteira existe.
+
+   ⚠️ E ELES DURAM A BATALHA, não o confronto -- o contrário das duas Danças. A diferença não é
+   gosto: no jogo original o estágio zera quando o pokémon SAI DE CAMPO, e aqui quem vence um
+   confronto CONTINUA em campo pro próximo (é por isso que o HP dele carrega). Quem sai de campo
+   é quem cai... e quem é soprado pelo Remoinho -- e lá eles zeram, ver `limparEstagios`. */
+const ESTAGIO_MIN = -6, ESTAGIO_MAX = 6;
+function multDoEstagio(n){
+  const e = Math.max(ESTAGIO_MIN, Math.min(ESTAGIO_MAX, n | 0));
+  return e >= 0 ? (2 + e) / 2 : 2 / (2 - e);
+}
+function estagioDe(p, qual){ return (p && p._estagios && p._estagios[qual]) || 0; }
+/* ⚠️ O MULTIPLICADOR ENTRA POR ÚLTIMO na cadeia, depois de shiny, terreno, especialidade, item e
+   fúria: "metade da Defesa" é metade do que o pokémon TEM na hora do golpe. É a MESMA regra do
+   corte da queimadura e das duas Danças, e o motivo é o mesmo -- entrando antes, ele multiplicaria
+   só a parte base e o +15 do item ficaria de fora da conta. */
+function withEstagio(v, p, qual){
+  const e = estagioDe(p, qual);
+  return e ? Math.round(v * multDoEstagio(e)) : v;
+}
+/* Move o estágio e devolve se ele REALMENTE mudou. No teto, nada muda -- e aí não sai linha: um
+   aviso de "a Defesa caiu" com a barra parada é o mesmo defeito do "-0 de HP". */
+function moverEstagio(p, qual, delta){
+  if(!p) return false;
+  if(!p._estagios) p._estagios = {};
+  const antes = p._estagios[qual] || 0;
+  const depois = Math.max(ESTAGIO_MIN, Math.min(ESTAGIO_MAX, antes + delta));
+  if(depois === antes) return false;
+  p._estagios[qual] = depois;
+  return true;
+}
+function limparEstagios(p){ if(p) p._estagios = null; }
+/* ⚠️ O `alvo` DIZ EM QUEM O EFEITO CAI, e o Asa de Aço é o único que cai em QUEM USA. Lido como se
+   fossem todos no adversário, ele baixaria a Defesa de quem levou o golpe em vez de subir a de
+   quem bateu -- e o defeito não apareceria como erro: apareceria como o golpe sendo bom demais. */
+const GOLPES_QUE_MUDAM_ESTAGIO = {
+  irontail:   { chance: 0.30, atributo: 'def',   delta: -1, noProprio: false },
+  psychic:    { chance: 0.10, atributo: 'spDef', delta: -1, noProprio: false },
+  shadowball: { chance: 0.20, atributo: 'spDef', delta: -1, noProprio: false },
+  steelwing:  { chance: 0.10, atributo: 'def',   delta: +1, noProprio: true },
+  /* ⚠️ OS DOIS DE TM (17/09/2026), e eles são os primeiros de chance **1**: no jogo oficial os dois
+     acontecem SEMPRE que o golpe conecta, não são sorteio. O `rocktomb` já estava escrito aqui em
+     13/09 e teve que sair no mesmo dia -- o golpe não existia na tabela, porque ninguém o aprende
+     por nível. O TM39 é o que lhe deu casa.
+     ⚠️ E O OVERHEAT É O PRIMEIRO QUE COBRA UM PREÇO DE QUEM USA: −2 estágios no PRÓPRIO Ataque
+     Especial, o que faz o segundo uso valer metade do primeiro. É o que equilibra um golpe de 140. */
+  rocktomb:   { chance: 1.00, atributo: 'speed', delta: -1, noProprio: false },
+  overheat:   { chance: 1.00, atributo: 'spAtk', delta: -2, noProprio: true }
+};
+/* ⚠️ SORTEIA DEPOIS DE O GOLPE CONECTAR, e lê o rng da BATALHA -- nunca Math.random: um dado a
+   mais num dos motores desloca a semente inteira. E SAI ANTES do rng() quando o golpe não está na
+   tabela, senão ele mudaria toda batalha que não tem nenhum destes cinco.
+   Devolve o que a linha do log precisa, ou null. */
+function tentarEstagio(quemBate, alvo, rng){
+  if(!quemBate || quemBate.hp <= 0) return null;
+  const golpe = quemBate.lastMove;
+  const efeito = GOLPES_QUE_MUDAM_ESTAGIO[golpe];
+  if(!efeito) return null;
+  const quem = efeito.noProprio ? quemBate : alvo;
+  if(!quem || quem.hp <= 0) return null;
+  if(rng() >= efeito.chance) return null;
+  if(!moverEstagio(quem, efeito.atributo, efeito.delta)) return null;   // ja estava no teto
+  return { golpe: golpe, atributo: efeito.atributo, delta: efeito.delta, noProprio: !!efeito.noProprio };
+}
 /* ⚠️ A PARALISIA (16/09/2026), a QUARTA mecanica POR ATAQUE. Regras da GEN 3:
      - a velocidade cai pra 25% (regra da Gen 1 a 6; so na Gen 7 virou 50%);
      - 25% de chance de NAO conseguir atacar no turno;
@@ -2707,6 +3008,11 @@ function doExchange(active, enemy, rng, diario){
   const queimouOSegundo = segundoCaiu ? null : tentarQueimar(first, second, rng);
   const envenenouOSegundo = segundoCaiu ? null : tentarEnvenenar(first, second, rng);
   const paralisouOSegundo = segundoCaiu ? null : tentarParalisar(first, second, rng);
+  const estagioDoSegundo = segundoCaiu ? null : tentarEstagio(first, second, rng);
+  /* ⚠️ O PODER SECRETO (TM43) vem DEPOIS dos quatro, e ele é o único golpe que pode aplicar
+     qualquer um deles -- qual, decide o TERRENO. Pondo-o antes, a marca dele bloquearia o
+     `tentar*` da mesma marca nesta troca. Fora de terreno ele não faz nada (nem lê o rng). */
+  const secretoNoSegundo = segundoCaiu ? null : tentarPoderSecreto(first, second, rng);
   const saiuNoPrimeiro = (segundoCaiu || congelouOSegundo) ? [] : aplicarGolpes(first, tetoDeQuemRaspa(second, first, dmgBySecond));
   /* O PISO DO REVIDE saiu junto com o revide -- sem revide não há o que limitar, e os dois nunca
      mais caem na mesma troca (por construção, não por aparo). A AUTODESTRUIÇÃO continua sendo o
@@ -2723,6 +3029,8 @@ function doExchange(active, enemy, rng, diario){
   const queimouOPrimeiro = (segundoCaiu || congelouOSegundo) ? null : tentarQueimar(second, first, rng);
   const envenenouOPrimeiro = (segundoCaiu || congelouOSegundo) ? null : tentarEnvenenar(second, first, rng);
   const paralisouOPrimeiro = (segundoCaiu || congelouOSegundo) ? null : tentarParalisar(second, first, rng);
+  const estagioDoPrimeiro = (segundoCaiu || congelouOSegundo) ? null : tentarEstagio(second, first, rng);
+  const secretoNoPrimeiro = (segundoCaiu || congelouOSegundo) ? null : tentarPoderSecreto(second, first, rng);
   const hpDoSecondAposDreno = second.hp;
   if(diario){
     /* O dano registrado é o que SAIU DE VERDADE da vida do alvo, não o número que a fórmula
@@ -2815,6 +3123,25 @@ function doExchange(active, enemy, rng, diario){
     const queimou = (p, q, mv) => { if(mv) diario.push({ q:q, d:0, hp:null, c:0, m:0, z:0, x:"queimou", g:p.name, mv:mv }); };
     const envenenou = (p, q, mv) => { if(mv) diario.push({ q:q, d:0, hp:null, c:0, m:0, z:0, x:"envenenou", g:p.name, mv:mv }); };
     const paralisou = (p, q, mv) => { if(mv) diario.push({ q:q, d:0, hp:null, c:0, m:0, z:0, x:"paralisou", g:p.name, mv:mv }); };
+    /* ⚠️ O PODER SECRETO REUSA A LINHA DO STATUS QUE ELE APLICOU: o jogador precisa ler "ficou
+       queimado", e não "sofreu o efeito do terreno" -- a mecânica é a mesma, o que muda é de onde
+       ela veio. O `mv` continua sendo o GOLPE, então a frase sai *"X ficou queimado com PODER
+       SECRETO!"*, que é verdade nas duas pontas.
+       A marca que o tentarPoderSecreto devolve É o campo da instância, e este mapa a traduz pro
+       nome da linha -- os dois saem das MESMAS quatro entradas do EFEITO_DO_TERRENO, então um
+       terreno novo lá já nasce com linha aqui. */
+    const LINHA_DA_MARCA = { _congelado:congelou, _queimado:queimou, _envenenado:envenenou, _paralisado:paralisou };
+    const secreto = (p, q, marca) => { if(marca && LINHA_DA_MARCA[marca]) LINHA_DA_MARCA[marca](p, q, GOLPE_PODER_SECRETO); };
+    /* ⚠️ O `q` DA LINHA DE ESTAGIO E DE QUEM TEVE O ATRIBUTO MEXIDO, e nao de quem usou o golpe:
+       no Asa de Aco os dois sao o MESMO pokemon, mas nos outros quatro sao lados opostos. Lido
+       como "quem bateu", a frase nomearia o pokemon errado em quatro dos cinco. */
+    const estagio = (quemBate, qBate, alvo, qAlvo, ef) => {
+      if(!ef) return;
+      const quem = ef.noProprio ? quemBate : alvo;
+      const q = ef.noProprio ? qBate : qAlvo;
+      diario.push({ q:q, d:0, hp:null, c:0, m:0, z:0, x:"estagio", g:quem.name, mv:ef.golpe,
+                    st:ef.atributo, dl:ef.delta });
+    };
     const travadoDe = (p, q) => {
       const t = (p === active) ? activeTravado : enemyTravado;
       if(t) diario.push({ q:q, d:0, hp:null, c:0, m:0, z:0, x:"paralisado", g:p.name });
@@ -2840,6 +3167,8 @@ function doExchange(active, enemy, rng, diario){
     queimou(second, qDoSecond, queimouOSegundo);
     envenenou(second, qDoSecond, envenenouOSegundo);
     paralisou(second, qDoSecond, paralisouOSegundo);
+    estagio(first, qDoFirst, second, qDoSecond, estagioDoSegundo);
+    secreto(second, qDoSecond, secretoNoSegundo);
     /* ⚠️ O "CONTINUA A DORMIR" DO SECOND VEM DEPOIS DO GOLPE DO FIRST, e nao junto do geloDe la
        em cima: a frase e sobre O TURNO DELE (*"caso o pokemon nao acorde no turno dele"*), e o
        turno dele e depois do golpe de quem e mais rapido. Junto do gelo, o log dizia "Onix
@@ -2857,6 +3186,8 @@ function doExchange(active, enemy, rng, diario){
     queimou(first, qDoFirst, queimouOPrimeiro);
     envenenou(first, qDoFirst, envenenouOPrimeiro);
     paralisou(first, qDoFirst, paralisouOPrimeiro);
+    estagio(second, qDoSecond, first, qDoFirst, estagioDoPrimeiro);
+    secreto(first, qDoFirst, secretoNoPrimeiro);
     // AGORA sim: ele apanhou nesta troca, e so entao acorda (ver o comentario do `acordaram`)
     /* ⚠️ QUEM MORREU DORMINDO NÃO ACORDA (14/09/2026, a pedido: *"quando um pokémon morre durante
        o sono, não precisa exibir que ele acordou e voltou para a luta, nem no log e nem na
@@ -2986,6 +3317,7 @@ function encerrarBatalha(team, inimigos){
        contrario das do cliente, que vao pro SAVE. Fica registrado pro dia em que algum caminho do
        servidor passar a reusar instancia: ali os tres vazam junto. */
     p._paralisado = null;
+    limparEstagios(p);   // os estagios duram a BATALHA (ver o cliente)
   });
 }
 function simulateGymBattle(team, enemyTeam, rng, opts){
@@ -4079,7 +4411,11 @@ async function trainersLeagueGatherEligibleCodesForUid(uid){
      override de ordem e o código do Mewtwo passam todos por ela sem índice nenhum pra desandar. */
   const golpes = {};
   for(const { dados: s } of porSlot){
-    if(s && s.team && (s.badgeCount||0) >= 8){
+    /* O TIME APOSENTADO FICA DE FORA (17/09/2026). Esta é a ÚNICA liga em que o SERVIDOR monta a
+       lista sozinho, lendo os saves -- nas outras o time vem de uma inscrição que o jogador fez.
+       Sem esta linha, um time aposentado voltaria pro sorteio de rodada por conta própria, o que é
+       exatamente o que a aposentadoria promete que não acontece. */
+    if(s && s.team && (s.badgeCount||0) >= 8 && !s.aposentado){
       // sanitiza na origem: reconstrói do zero (espécie+nível+shiny), nível limitado ao teto -- um save
       // adulterado com stats/níveis impossíveis entra na liga como um time normalizado, não como monstro
       const clean = sanitizeTeamCode(encodeTeamCode(s.team));
@@ -6808,7 +7144,14 @@ const LOJA = {
   /* O DOCE RARO NÃO MORA NO INVENTÁRIO: ele é um CONTADOR da conta (rareCandies), escrito pela
      Torre e descontado pelo useRareCandy -- comprar é somar nele, e a mochila continua lendo de um
      lugar só. */
-  doce_raro:   { preco: 300, contador: 'rareCandies' }
+  doce_raro:   { preco: 300, contador: 'rareCandies' },
+  /* ⚠️ AS 23 MÁQUINAS DE TÉCNICA (17/09/2026) ENTRAM POR DERIVAÇÃO, nunca escritas aqui uma a uma:
+     o preço sai da MESMA regra do cliente (`max(100, poder efetivo × 2)`, já gravada no `TMS`), e
+     uma segunda lista divergiria dela no primeiro TM novo -- a tela prometeria um preço que a
+     cobrança não pratica, que é o defeito que este catálogo existe pra evitar.
+     Elas moram no INVENTÁRIO como a Poção (empilham), e são de USO ÚNICO: quem gasta é o
+     `usarTM`. */
+  ...Object.fromEntries(Object.entries(TMS).map(([id, tm]) => [id, { preco: tm.preco, tm: true }]))
   /* ⚠️ O BÔNUS SHINY NÃO ESTÁ AQUI, e a ausência É a regra (12/09/2026, a pedido): ele não se
      compra nem se vende, e só vem de VENCER A ELITE 4 (ou uma liga online). O `buyItem` e o
      `sellItem` consultam este catálogo antes de qualquer outra coisa, então tirá-lo daqui fecha os
@@ -6916,6 +7259,39 @@ async function gastarItensEquipados(uid, gastos){
   await db.collection('users').doc(uid).update(patch).catch(e => logger.error('Erro ao gastar item equipado:', e));
 }
 
+
+/* ============================================================================
+   GASTAR UMA MÁQUINA DE TÉCNICA
+   ----------------------------------------------------------------------------
+   ⚠️ QUEM GASTA É O SERVIDOR, e não é opcional: o `inventario` está na trava de campos do
+   `firestore.rules` junto de `moedas` e `rareCandies` -- e tem que estar, porque um TM escrito pelo
+   cliente seria Hiper Raio infinito em todo mundo.
+   ⚠️ E A TRANSAÇÃO NÃO É ENFEITE: sem ela, duas abas leem o mesmo estoque e as duas passam -- um
+   TM ensinado DUAS vezes pelo preço de um. É o mesmo cuidado do buyItem e do sellItem.
+   ⚠️ O QUE ELE NÃO FAZ: ele não escreve o golpe no pokémon. Quem faz isso é o cliente, que já é
+   dono do save (o documento do save é livre pro dono) -- e ele grava o time ANTES de chamar aqui,
+   pela mesma razão de sempre: **errar pro lado de o jogador FICAR com a Máquina**. Se a chamada se
+   perder, ele aprendeu o golpe e não pagou; o contrário seria pagar e não aprender.
+   ============================================================================ */
+exports.usarTM = onCall(async (request) => {
+  if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
+  const uid = request.auth.uid;
+  const item = String(request.data?.tm ?? '');
+  if(!TMS[item]) throw new HttpsError('invalid-argument', 'Máquina desconhecida.');
+  const userRef = db.collection('users').doc(uid);
+  return db.runTransaction(async (tx) => {
+    const [snap] = await tx.getAll(userRef);
+    const d = snap.exists ? (snap.data() || {}) : {};
+    const tem = ((d.inventario || {})[item]) || 0;
+    if(tem < 1){
+      throw new HttpsError('failed-precondition', 'Você não tem essa Máquina.');
+    }
+    tx.set(userRef, { inventario: { [item]: admin.firestore.FieldValue.increment(-1) } }, { merge: true });
+    const inv = Object.assign({}, d.inventario || {});
+    inv[item] = tem - 1;
+    return { inventario: inv, restam: tem - 1 };
+  });
+});
 exports.buyItem = onCall(async (request) => {
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   const uid = request.auth.uid;

@@ -376,11 +376,26 @@ console.log('\n=== OS GOLPES ESCOLHIDOS CHEGAM NA LIGA E NO ONLINE (16/09/2026) 
        SILENCIO -- foi exatamente o que aconteceu com o `fly` quando ele nasceu, e so apareceu
        porque eu fui conferir. O proximo HM nasce coberto por esta trava. */
     {
-      const srv = require('fs').readFileSync(path.join(__dirname, '..', 'functions', 'index.js'), 'utf8');
-      const tab = (srv.match(/const APRENDEM_HM = \{[^}]*\}/) || [''])[0];
-      const semEntrada = Object.values(cli.HMS).map(h => h.golpe).filter(gp => tab.indexOf(gp + ':') < 0);
-      ok('  e todo HM do jogo tem entrada no APRENDEM_HM do servidor',
-         semEntrada.length === 0, semEntrada.length ? 'sem entrada: ' + semEntrada.join(',') : tab);
+      /* ⚠️ ELA PERGUNTA PELO COMPORTAMENTO, e nao lendo a tabela como texto -- a versao anterior
+         casava /const APRENDEM_HM = \{...\}/ e quebrou sozinha no dia em que a tabela virou um
+         Object.assign pra receber os TMs. O que importa nao e a FORMA dela: e o golpe sobreviver
+         ao golpesValidos, que e o que decide se ele existe na liga e no online.
+         ⚠️ E OS 23 TMs ENTRAM NA MESMA TRAVA: eles tem exatamente o mesmo problema dos HMs --
+         ninguem os aprende por NIVEL, entao sem entrada la o golpe some da liga EM SILENCIO. */
+      const maquinas = Object.entries(cli.HMS).map(([id, h]) => [id, h])
+        .concat(Object.entries(cli.TMS));
+      const furados = [];
+      maquinas.forEach(([id, m]) => {
+        const esp = (m.aprendem || [])[0];
+        if(!esp){ furados.push(id + ' (lista vazia)'); return; }
+        const sobreviveu = fns._golpesValidos(esp, 70, [m.golpe]) || [];
+        if(sobreviveu.indexOf(m.golpe) < 0) furados.push(id + ':' + m.golpe);
+      });
+      ok('  e todo HM e TM do jogo sobrevive ao golpesValidos do servidor',
+         furados.length === 0, furados.length ? 'some na liga: ' + furados.join(', ') : maquinas.length + ' maquinas');
+      /* e o contrario continua valendo: quem NAO aprende nao passa, mesmo forjando */
+      ok('  e quem NAO aprende continua sem o golpe',
+         (fns._golpesValidos('caterpie', 70, ['earthquake', 'cut']) || []).length === 0);
     }
     /* e a CHAVE tem que ser a mesma nos dois: divergindo, o golpe e procurado numa chave que nao
        existe e o time inteiro cai no motor de tipo, EM SILENCIO */

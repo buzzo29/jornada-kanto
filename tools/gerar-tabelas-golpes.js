@@ -39,7 +39,19 @@ const FORA = ['selfdestruct', 'explosion'];
    Sem estas linhas, regenerar as tabelas APAGA os dois em silêncio e o HM01/HM03 fica sem nada pra
    ensinar. Os valores saem do mesmo caminho do resto (mods 8→3): o Surf é 95 na Gen 3, não os 90
    do arquivo moderno. */
-const A_MAO = { cut: { tipo:'Normal', poder:50 }, surf: { tipo:'Water', poder:95 }, fly: { tipo:'Flying', poder:70 } };
+/* ⚠️ OS GOLPES ESCRITOS À MÃO: HM e TM ninguém aprende por NÍVEL, e a base só cadastra nível --
+   o gerador nunca os viu. Sem estas linhas, regenerar as tabelas APAGA os nove em silêncio.
+   Os valores saem do mesmo caminho do resto (mods 8→3): Rock Tomb 50 (é 60 hoje), Thief 40 (60
+   hoje) e Overheat 140 (130 hoje). */
+const A_MAO = {
+  cut: { tipo:'Normal', poder:50 }, surf: { tipo:'Water', poder:95 }, fly: { tipo:'Flying', poder:70 },
+  dragonclaw: { tipo:'Dragon', poder:80 },
+  rocktomb: { tipo:'Rock', poder:50 },
+  facade: { tipo:'Normal', poder:70 },
+  secretpower: { tipo:'Normal', poder:70 },
+  thief: { tipo:'Dark', poder:40 },
+  overheat: { tipo:'Fire', poder:140 },
+};
 const ehDano = id => D.golpes[id] && D.golpes[id].poder > 0 && FORA.indexOf(id) < 0;
 
 /* ---- quem aprende o quê, só dano ---- */

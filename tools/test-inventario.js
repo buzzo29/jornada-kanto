@@ -242,9 +242,19 @@ console.log('\n=== A PORTA DOS MODOS DE CAMPEAO (as 8 insignias) ===');
      que alguem quiser a mesma porta la ser uma DECISAO, e nao um descuido. */
   {
     const txt = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
-    const porta = /if\(!exigeTimeCampeao\(\)\) return;/g;
+    const porta = /if\(!exigeTimeCampeao\([^)]*\)\) return;/g;
     ok('a porta esta em exatamente tres lugares', (txt.match(porta) || []).length === 3,
        (txt.match(porta) || []).length + ' chamadas');
+    /* ⚠️ E DAS TRES, SO O GINASIO DA CIDADE PASSA O 'true' (o modo em que o time APOSENTADO ainda
+       vale -- ver a secao da aposentadoria). As ligas e o online tem que continuar recusando. */
+    const comTrue = txt.match(/if\(!exigeTimeCampeao\(true\)\) return;/g) || [];
+    ok('e so o Ginasio da Cidade inclui o aposentado', comTrue.length === 1,
+       comTrue.length + ' com true');
+    {
+      const gc = txt.slice(txt.indexOf('async function openNeighborhoodGymScreen('),
+                           txt.indexOf('async function openNeighborhoodGymScreen(') + 200);
+      ok('e o true e o DELE', gc.indexOf('exigeTimeCampeao(true)') >= 0);
+    }
     const torre = txt.slice(txt.indexOf('function openTrainerTower('), txt.indexOf('function openTrainerTower(') + 400);
     ok('e a Torre continua FORA dela (so os tres pedidos)', torre.indexOf('exigeTimeCampeao') < 0);
   }
@@ -281,7 +291,11 @@ console.log('\n=== AS TRES PRATELEIRAS DA LOJA ===');
   ok('e sao os nove', S.itensDaPrateleira('batalha').length === 9, S.itensDaPrateleira('batalha').length + ' itens');
   ok('"Especiais" tem o Doce Raro', S.itensDaPrateleira('especiais').indexOf('doce_raro') >= 0,
      S.itensDaPrateleira('especiais').join(', '));
-  ok('e as TMs estao vazias, como pedido', S.itensDaPrateleira('tms').length === 0,
+  /* ⚠️ ELA DEIXOU DE SER VAZIA em 17/09/2026: os 23 TMs entraram. A trava trocou de pergunta --
+     de "esta vazia, como pedido" pra "tem exatamente os TMs da tabela" --, e ela e DERIVADA: um TM
+     novo no TMS ja nasce coberto, e um que suma daqui e barulhento. */
+  ok('"TMs/HMs" tem exatamente os 23 TMs da tabela',
+     S.itensDaPrateleira('tms').slice().sort().join(',') === Object.keys(S.TMS).slice().sort().join(','),
      S.itensDaPrateleira('tms').join(', ') || '(vazia)');
 
   /* NA TELA: os tres botoes aparecem, e a lista mostra so a prateleira aberta. */
@@ -347,6 +361,12 @@ console.log('\n=== AS TRES PRATELEIRAS DA LOJA ===');
     const t = S.renderLoja();
     ok('e a lista passa a ser a dela', (t.match(/class="loja-linha/g)||[]).length === 1 && t.indexOf('>Doce Raro') >= 0);
   }
+  /* ⚠️ NENHUMA PRATELEIRA ESTA VAZIA DESDE 17/09/2026 (os TMs entraram na terceira), entao o teste
+     ESVAZIA uma na mao. O desenho que se cobra aqui e o de 13/09 -- o quadro fica, e fica vazio --
+     e ele tem que continuar valendo pra a PROXIMA prateleira que nasca sem nada, que e exatamente
+     como a das TMs nasceu. */
+  const tmsReais = Object.keys(S.TMS).map(id => [id, S.ITENS[id]]);
+  tmsReais.forEach(([id]) => { delete S.ITENS[id]; });
   S.escolherPrateleira('tms');
   ok('e na prateleira vazia nao sobra item selecionado', S.__getGame().lojaSel === null,
      String(S.__getGame().lojaSel));
@@ -376,6 +396,21 @@ console.log('\n=== AS TRES PRATELEIRAS DA LOJA ===');
        /display:flex/.test(bloco) && /flex-direction:column/.test(bloco), bloco.replace(/\s+/g, ' ').slice(0, 160));
     const miolo = (css.match(/\.loja-miolo\{[^}]*\}/) || [''])[0];
     ok('quem rola e o miolo, nao o quadro', /flex:\s*1/.test(miolo) && /overflow-y:\s*auto/.test(miolo), miolo);
+    /* ⚠️ O COMPRAR E O VENDER FICAM LADO A LADO (17/09/2026, a pedido) -- e isso REVERTE o
+       empilhamento de 13/09. Os dois sao a mesma decisao ("o que eu faco com este item?"), entao
+       dividem a linha como o Usar e o Excluir da mochila sempre dividiram.
+       ⚠️ A TRAVA LE O CSS porque isso nao aparece em assercao de HTML nenhuma: a marcacao e a mesma
+       nos dois casos, o que muda e a DIRECAO do flex. E ela cobra o valor por extenso -- um
+       'column' de volta aqui e o pedido desfeito.
+       ⚠️ E O LIMITE E [^}]*: sem ele o quantificador atravessa o arquivo e casa o 'column' de outra
+       regra centenas de linhas abaixo. Essa armadilha ja custou duas travas neste projeto. */
+    const acoes = (css.match(/\.loja-acoes\{[^}]*\}/) || [''])[0];
+    ok('o Comprar e o Vender dividem a LINHA (nao empilham)',
+       /flex-direction:\s*row/.test(acoes) && !/column/.test(acoes), acoes || '(regra nao achada)');
+    /* e o par continua sendo uma .item-acoes, que e quem da o display:flex e o flex:1 dos dois */
+    const itemAcoes = (css.match(/\.item-acoes\{[^}]*\}/) || [''])[0];
+    ok('e o par sai da .item-acoes (o mesmo da mochila)',
+       /display:\s*flex/.test(itemAcoes), itemAcoes || '(regra nao achada)');
     /* E A LISTA MOSTRA 6 E ROLA (a pedido). A linha mede 36px a 320px desde que o preco foi pro
        lado do nome -- era 63 com ele embaixo, e o teto velho de 390 deixava os 9 itens caberem: o
        limite de 6 tinha virado letra morta. Numero de tela envelhece junto com a tela. */
@@ -401,8 +436,29 @@ console.log('\n=== AS TRES PRATELEIRAS DA LOJA ===');
     ok('e o saldo continua na tela', /Você tem <strong>🪙/.test(t));
     /* E O BOTAO DE COMPRAR NAO PODE ESTAR LA: nao ha o que comprar. */
     ok('e nao ha botao de comprar', t.indexOf('abrirCompra') < 0);
+    /* devolve os 23 -- o resto do arquivo conta com a loja inteira */
+    tmsReais.forEach(([id, it]) => { S.ITENS[id] = it; });
   }
   S.escolherPrateleira('batalha');
+    /* ⚠️ E O TERCEIRO BOTAO (o "Quem pode aprender" dos TMs) NAO entra nesta linha: com tres na
+       mesma linha cada um fica com 76px a 320px, e "Vender por 100" nao cabe nisso. Ele tem linha
+       PROPRIA, em largura cheia. */
+    {
+      S.openLoja(); S.escolherPrateleira('tms'); S.escolherItemDaLoja('tm26');
+      const t = S.renderLoja();
+      ok('e o botao de aptos fica FORA do par, em linha propria',
+         /loja-acao-larga[^>]*><button[^>]*abrirAptosDaMaquina/.test(t.replace(/\s+/g, ' ')),
+         (t.match(/loja-acao-larga[\s\S]{0,80}/) || ['(nao achado)'])[0]);
+      /* e o par do TM continua com DOIS botoes, nao tres */
+      const rod = (t.match(/<div class="item-acoes loja-acoes">[\s\S]*?<\/div>/) || [''])[0];
+      ok('e o par tem exatamente Comprar e Vender',
+         (rod.match(/<button/g) || []).length === 2, (rod.match(/<button/g) || []).length + ' botoes');
+      ok('e eles sao o Comprar e o Vender',
+         /abrirCompra/.test(rod) && /abrirVenda/.test(rod) && !/abrirAptosDaMaquina/.test(rod));
+      S.escolherPrateleira('batalha'); S.escolherItemDaLoja('potion');
+      ok('e no item comum nao ha linha larga nenhuma',
+         S.renderLoja().indexOf('loja-acao-larga') < 0);
+    }
 }
 
 console.log('\n=== A LOJA ===');
@@ -2121,6 +2177,456 @@ console.log('\n=== A INSCRICAO RAPIDA PELO AVISO DA LIGA (14/09/2026) ===');
     ok('e as duas listas apontam pra funcoes que existem',
        COM_AVISO.concat(SEM_AVISO).every(n => corpoDe(n).length > 0),
        COM_AVISO.concat(SEM_AVISO).filter(n => !corpoDe(n).length).join(', ') || 'todas existem');
+  }
+}
+
+
+console.log('\n=== APOSENTAR O TIME (o Prof. Carvalho) ===');
+{
+  /* Pedido em 17/09/2026: *"quando um save ja nao tem mais o que fazer apos vencer as 8 insignias,
+     por exemplo, ele ja venceu a elite 4, ou perdeu para a elite 4, deve aparecer a opcao de
+     aposentar o time ... nao vai mais ser possivel utilizar esse time em ligas onlines e batalhas
+     onlines, porem podem ser utilizados na torre dos treinadores e no ginasio da cidade"*. */
+  const TIME = [{ speciesId:'venusaur', level:70, name:'Venusaur', types:['Grass','Poison'] }];
+  const monta = (slots) => {
+    const g = S.__getGame();
+    g.saveSlots = new Array(S.MAX_SAVE_SLOTS).fill(null);
+    slots.forEach((sv, i) => { g.saveSlots[i] = sv; });
+    g.saveSlotsCarregados = true;
+    g.modoBloqueado = null;
+    g.screen = 'saveSelect';
+    S.__setGame(g);
+  };
+  const tenta = (abrir) => {
+    S.__getGame().screen = 'saveSelect';
+    S.__getGame().modoBloqueado = null;
+    abrir();
+    return S.__getGame().screen;
+  };
+
+  /* ⚠️ 1) AS DUAS LISTAS SAO DIFERENTES, e e nisso que a feature inteira se apoia. */
+  monta([{ team:TIME, badgeCount:8 }, { team:TIME, badgeCount:8, aposentado:true }]);
+  ok('savesComOitoInsignias conta os DOIS', S.savesComOitoInsignias().length === 2,
+     S.savesComOitoInsignias().join(','));
+  ok('savesCampeoes conta so o ATIVO', S.savesCampeoes().length === 1 && S.savesCampeoes()[0] === 0,
+     S.savesCampeoes().join(','));
+  ok('saveAposentado le a marca', S.saveAposentado({ aposentado:true }) === true
+     && S.saveAposentado({}) === false && S.saveAposentado(null) === false);
+
+  /* ⚠️ 2) SO APOSENTADO: a Torre e o Ginasio da Cidade continuam abrindo, as Ligas e o Online nao.
+     E o pedido ao pe da letra, e e o unico caso em que as duas listas discordam na PORTA. */
+  monta([{ team:TIME, badgeCount:8, aposentado:true }]);
+  ok('Ginasio da Cidade: so com aposentado ENTRA',
+     tenta(() => S.openNeighborhoodGymScreen()) === 'neighborhoodGym', S.__getGame().screen);
+  ok('Ligas: so com aposentado NAO entra',
+     tenta(() => S.openLeagueTypesList()) !== 'leagueTypesList', S.__getGame().screen);
+  ok('Batalha Online: so com aposentado NAO entra',
+     tenta(() => S.openOnlineBattle()) !== 'onlineBattle', S.__getGame().screen);
+  ok('e a recusa das ligas diz por que', S.__getGame().modoBloqueado === S.AVISO_SEM_CAMPEAO,
+     String(S.__getGame().modoBloqueado));
+
+  /* ⚠️ 3) A TORRE TEM LACO PROPRIO e nunca leu a lista -- ela enxerga o aposentado de graca.
+     A trava existe pra o dia em que alguem unificar as duas e fechar a Torre sem querer. */
+  {
+    const g = S.__getGame();
+    g.saveSlots = new Array(S.MAX_SAVE_SLOTS).fill(null);
+    g.saveSlots[0] = { team:TIME, badgeCount:8, aposentado:true };
+    S.__setGame(g);
+    const eleg = S.towerEligiblePokemon();
+    ok('a Torre enxerga o pokemon do time aposentado', eleg.length === 1, eleg.length + ' elegiveis');
+  }
+
+  /* ⚠️ 4) E O MONTADOR DO DESAFIO TAMBEM -- entrar na tela nao basta: o time tem que APARECER na
+     lista de escolha. Ele le o mesmo towerEligiblePokemon do item 3, entao o que se cobra aqui e
+     que o caminho inteiro chegue na tela. */
+  {
+    const g = S.__getGame();
+    g.saveSlots = new Array(S.MAX_SAVE_SLOTS).fill(null);
+    g.saveSlots[0] = { team:TIME, badgeCount:8, aposentado:true, name:'Buzzo' };
+    g.neighborhoodGymCooldowns = { mons:{} };
+    g.neighborhoodGymChallengePick = [];
+    g.neighborhoodGymDetail = { leaderTerrain:null };
+    S.__setGame(g);
+    const html = S.renderNeighborhoodGymChallengeTeamPicker();
+    ok('o montador do desafio lista o pokemon do aposentado', html.indexOf('Venusaur') >= 0,
+       'nao achou o Venusaur na lista');
+  }
+
+  /* 5) O BOTAO SO APARECE COM A JORNADA RESOLVIDA. */
+  const jornada = (eliteStatus, aposentado) => {
+    const g = S.__getGame();
+    g.screen = 'journeyEnd';
+    g.badgesEarned = ['Rocha','Cascata','Trovao','Arco-Iris','Pantano','Alma','Vulcao','Terra'];
+    g.team = TIME.slice();
+    g.eliteStatus = eliteStatus;
+    g.aposentado = !!aposentado;
+    g.aposentarPergunta = false;
+    g.kantoBonusSeen = true;
+    S.__setGame(g);
+  };
+  jornada('champion');
+  ok('campeao da Elite PODE aposentar', S.podeAposentar() === true);
+  ok('e o botao esta na tela', S.renderJourneyEnd().indexOf('pedirAposentadoria()') >= 0);
+  jornada('defeated');
+  ok('quem PERDEU pra Elite tambem pode', S.podeAposentar() === true);
+  jornada('inProgress');
+  ok('com a Elite EM ANDAMENTO nao pode', S.podeAposentar() === false);
+  ok('e o botao NAO aparece', S.renderJourneyEnd().indexOf('pedirAposentadoria()') < 0);
+  jornada(null);
+  ok('sem ter chegado na Elite tambem nao', S.podeAposentar() === false);
+  {
+    const g = S.__getGame(); g.eliteStatus = 'champion'; g.badgesEarned = ['Rocha']; S.__setGame(g);
+    ok('e sem as 8 insignias tampouco', S.podeAposentar() === false);
+  }
+
+  /* 6) APOSENTADO: some o botao, entra a caixa que explica onde ele ainda vale. */
+  jornada('champion', true);
+  ok('ja aposentado nao oferece de novo', S.podeAposentar() === false);
+  {
+    const h = S.renderJourneyEnd();
+    ok('e a tela conta o estado', h.indexOf('Time aposentado') >= 0);
+    ok('e diz onde ele ainda vale', h.indexOf('Torre dos Treinadores') >= 0
+       && h.indexOf('Ginásio da Cidade') >= 0);
+    ok('e nao oferece aposentar de novo', h.indexOf('pedirAposentadoria()') < 0);
+  }
+
+  /* ⚠️ 7) A PERGUNTA ANTES: e um caminho so de ida, entao nao pode acontecer num clique. */
+  jornada('champion');
+  S.pedirAposentadoria();
+  ok('pedir abre a pergunta', S.__getGame().aposentarPergunta === true);
+  ok('e NAO aposenta ainda', S.__getGame().aposentado === false);
+  {
+    const m = S.renderAposentadoriaModal();
+    ok('o modal nomeia o time', m.indexOf('Venusaur') >= 0);
+    ok('e avisa que nao tem volta', /não tem volta/.test(m), m.slice(0, 120));
+    ok('e diz onde eles continuam valendo', m.indexOf('Torre dos Treinadores') >= 0);
+  }
+  S.fecharAposentadoria();
+  ok('cancelar fecha sem aposentar',
+     S.__getGame().aposentarPergunta === false && S.__getGame().aposentado === false);
+
+  /* 8) O CAMPO ATRAVESSA O SAVE. */
+  jornada('champion');
+  S.__getGame().aposentado = true;
+  ok('serializeGame leva a marca', S.serializeGame().aposentado === true);
+  S.__getGame().aposentado = false;
+  ok('e serializa false quando nao', S.serializeGame().aposentado === false);
+  S.applySavedState(Object.assign(S.serializeGame(), { aposentado:true }));
+  ok('applySavedState le a marca', S.__getGame().aposentado === true);
+  S.applySavedState(Object.assign(S.serializeGame(), { aposentado:undefined }));
+  ok('e save ANTIGO (sem o campo) nasce ATIVO', S.__getGame().aposentado === false);
+
+  /* ⚠️ 9) O MODAL ESTA NO render(): sem isso a pergunta e feita e nunca chega na tela. */
+  {
+    const src = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
+    ok('o render anexa o modal da aposentadoria',
+       /if\(game\.aposentarPergunta\)\{ html \+= renderAposentadoriaModal\(\); \}/.test(src));
+    /* e ele vem ANTES do convite online, que tem 15s de prazo e fica por cima de tudo */
+    ok('e antes do convite online',
+       src.indexOf('renderAposentadoriaModal()') < src.indexOf('renderConviteModal()'));
+  }
+
+  /* ⚠️ 10) O SERVIDOR TAMBEM: a Trainers League e a UNICA liga que monta a lista sozinha, lendo os
+     saves. Sem a guarda la, o time aposentado voltaria pro sorteio por conta propria. */
+  {
+    const srv = require('fs').readFileSync(path.join(raiz, 'functions', 'index.js'), 'utf8');
+    ok('a Trainers League do servidor exclui o aposentado',
+       /badgeCount\|\|0\) >= 8 && !s\.aposentado/.test(srv));
+    /* e o resolverTimeDosSaves (Torre + Ginasio da Cidade) NAO exclui -- la ele vale */
+    const resolver = srv.slice(srv.indexOf('async function resolverTimeDosSaves'),
+                               srv.indexOf('async function resolverTimeDosSaves') + 1800);
+    ok('e o resolverTimeDosSaves NAO exclui (Torre e Ginasio)',
+       resolver.length > 100 && resolver.indexOf('aposentado') < 0);
+  }
+}
+
+
+console.log('\n=== AS MAQUINAS DE TECNICA (TMs) ===');
+{
+  /* Pedidas em 17/09/2026: *"implemente os TMs e coloque eles para vender, no minimo 100 cada,
+     conforme o poder for maior, mais caro fica, e os TMs devem ser de uso unico"*. */
+  const PEDIDOS = ['tm02','tm03','tm09','tm13','tm14','tm15','tm19','tm22','tm23','tm24','tm25',
+                   'tm26','tm29','tm30','tm35','tm36','tm38','tm39','tm42','tm43','tm46','tm47','tm50'];
+
+  /* 1) OS 23 QUE FORAM PEDIDOS, nem um a mais nem um a menos. */
+  ok('sao exatamente os 23 pedidos',
+     Object.keys(S.TMS).slice().sort().join(',') === PEDIDOS.slice().sort().join(','),
+     Object.keys(S.TMS).join(','));
+  /* ⚠️ E TODO GOLPE DE TM EXISTE NA TABELA DE GOLPES -- a licao da Lamina Solar: cadastrar uma
+     Maquina pra golpe que o jogo nao tem e vender ar. */
+  ok('e todos ensinam um golpe que EXISTE',
+     Object.values(S.TMS).every(t => !!S.GOLPES[t.golpe]),
+     Object.entries(S.TMS).filter(([k,t]) => !S.GOLPES[t.golpe]).map(([k])=>k).join(',') || 'todos');
+  ok('e todos tem nome em portugues',
+     Object.values(S.TMS).every(t => !!S.GOLPES_PT[t.golpe]),
+     Object.values(S.TMS).filter(t => !S.GOLPES_PT[t.golpe]).map(t=>t.golpe).join(',') || 'todos');
+
+  /* ⚠️ 2) OS SEIS GOLPES NOVOS SAO DA GEN 3, e a geracao importa em tres deles: lidos do arquivo
+     moderno sairiam Rock Tomb 60 (era 50), Thief 60 (era 40) e Overheat 130 (era 140). */
+  const GEN3 = { dragonclaw:['Dragon',80], rocktomb:['Rock',50], facade:['Normal',70],
+                 secretpower:['Normal',70], thief:['Dark',40], overheat:['Fire',140] };
+  Object.entries(GEN3).forEach(([id, ficha]) => {
+    ok('  ' + id + ' e ' + ficha[0] + '/' + ficha[1] + ' (Gen 3)',
+       S.GOLPES[id] && S.GOLPES[id][0] === ficha[0] && S.GOLPES[id][1] === ficha[1],
+       JSON.stringify(S.GOLPES[id]));
+  });
+  /* ⚠️ E ELES FICAM FORA DO GOLPES_IDS, que e INDEXADO pelo APRENDIZADO: inserir um id no meio
+     deslocaria os indices e trocaria o moveset das 250 especies EM SILENCIO. E a mesma regra que
+     o cut, o surf e o fly ja seguem. */
+  ok('e os seis ficam FORA do GOLPES_IDS (que e indexado)',
+     Object.keys(GEN3).every(id => S.GOLPES_IDS.indexOf(id) < 0),
+     Object.keys(GEN3).filter(id => S.GOLPES_IDS.indexOf(id) >= 0).join(',') || 'todos fora');
+
+  /* ⚠️ 3) O PRECO E DERIVADO, nunca um numero solto: max(100, poder efetivo x 2). */
+  ok('o piso e 100, como pedido', S.TM_PISO === 100, String(S.TM_PISO));
+  ok('nenhum TM custa menos que o piso',
+     Object.values(S.TMS).every(t => t.preco >= S.TM_PISO),
+     Object.entries(S.TMS).filter(([k,t]) => t.preco < S.TM_PISO).map(([k,t])=>k+':'+t.preco).join(',') || 'todos');
+  ok('e a tabela bate com a REGRA nos 23',
+     Object.keys(S.TMS).every(id => S.TMS[id].preco === S.precoDoTM(id)),
+     Object.keys(S.TMS).filter(id => S.TMS[id].preco !== S.precoDoTM(id))
+       .map(id => id + ': tabela ' + S.TMS[id].preco + ' vs regra ' + S.precoDoTM(id)).join(', ') || 'os 23');
+  /* ⚠️ E ELE USA O PODER EFETIVO, nao o cru: a Semente-Bala e poder 10 e bate de 2 a 5 vezes --
+     pelo cru ela seria o golpe mais barato do jogo por um numero que nao descreve o que ela tira. */
+  ok('e ele usa o poder EFETIVO (a Semente-Bala vale 30, nao 10)',
+     S.poderEfetivo('bulletseed') === 30, String(S.poderEfetivo('bulletseed')));
+  /* "conforme o poder for maior, mais caro fica" -- a ordem tem que ser monotona */
+  {
+    const pares = Object.values(S.TMS).map(t => [S.poderEfetivo(t.golpe), t.preco]);
+    const furos = pares.filter(([po, pr]) => pares.some(([po2, pr2]) => po2 > po && pr2 < pr));
+    ok('e mais poder nunca custa MENOS', furos.length === 0, furos.length + ' inversoes');
+  }
+
+  /* 4) NA LOJA: prateleira propria, cartao do golpe e o botao de aptos. */
+  S.openLoja();
+  S.escolherPrateleira('tms');
+  S.escolherItemDaLoja('tm26');
+  {
+    const t = S.renderLoja();
+    ok('a loja desenha o cartao do golpe do TM', t.indexOf('golpe-cartao') >= 0);
+    /* ⚠️ E ELE E O MESMO cartaoDeGolpe das tres telas de golpe -- ser o mesmo e o ponto: o jogador
+       compara o Terremoto daqui com os golpes que o pokemon ja tem la. */
+    ok('e ele e o MESMO cartao das telas de golpe',
+       t.indexOf(S.cartaoDeGolpe('earthquake', true, true)) >= 0);
+    ok('e ha o botao de quem pode aprender', /abrirAptosDaMaquina\('tm26'\)/.test(t));
+    ok('e o preco na tela e o da tabela', t.indexOf('🪙 ' + S.TMS.tm26.preco) >= 0,
+       S.TMS.tm26.preco + '');
+  }
+  /* ⚠️ O ITEM COMUM NAO GANHA CARTAO: ele nao ensina golpe nenhum. */
+  S.escolherPrateleira('batalha');
+  S.escolherItemDaLoja('potion');
+  ok('e item comum NAO ganha cartao de golpe', S.renderLoja().indexOf('golpe-cartao') < 0);
+
+  /* 5) A LISTA DE APTOS -- o item 6 do pedido. */
+  {
+    const g = S.__getGame();
+    g.saveSlots = new Array(S.MAX_SAVE_SLOTS).fill(null);
+    g.saveSlots[0] = { team: [{ speciesId:'snorlax', level:70, name:'Snorlax' },
+                              { speciesId:'caterpie', level:70, name:'Caterpie' }],
+                       badgeCount: 8, name: 'Buzzo' };
+    g.currentSaveSlot = 9;   // NAO e o slot 0: a lista tem que varrer TODOS os saves
+    /* e o time ABERTO fica vazio: o timeDoSlot do slot corrente le o game.team, e um time
+       sobrando de outro bloco entraria na conta sem estar em save nenhum */
+    g.team = [];
+    S.__setGame(g);
+    S.abrirAptosDaMaquina('tm26');
+    const meus = S.meusQueAprendem('tm26');
+    ok('a lista varre TODOS os saves, nao o time aberto', meus.length === 1 && meus[0].mon.speciesId === 'snorlax',
+       meus.map(x => x.mon.speciesId).join(',') || 'nenhum');
+    const m = S.renderAptosModal();
+    ok('e o modal nomeia o golpe', m.indexOf('Terremoto') >= 0);
+    ok('e diz quantos SEUS aprendem', /<strong>1<\/strong>/.test(m), m.slice(0, 200));
+    ok('e mostra a grade das que aprendem',
+       (m.match(/pokedex-cell/g) || []).length === S.TMS.tm26.aprendem.length,
+       (m.match(/pokedex-cell/g) || []).length + ' celulas de ' + S.TMS.tm26.aprendem.length);
+    /* ⚠️ E QUANDO NENHUM DOS SEUS APRENDE ele DIZ isso -- e a informacao que decide a compra: um TM
+       de 300 que ninguem seu aprende e dinheiro fora, e sem esta tela o jogador so descobre DEPOIS
+       de pagar. */
+    S.abrirAptosDaMaquina('tm02');   // Garra do Dragao: 7 especies, nenhuma no time
+    ok('e avisa quando NENHUM seu aprende', /Nenhum pokémon seu/.test(S.renderAptosModal()));
+    S.fecharAptosDaMaquina();
+    ok('e fechar limpa', !S.__getGame().maquinaAptos);
+  }
+
+  /* ⚠️ 6) A TELA DE ENSINAR SERVE OS DOIS (HM e TM) PELA MESMA INTERFACE -- e isso e a decisao:
+     'golpe' + 'aprendem' nos dois, entao a tela nao tem uma linha de excecao. */
+  ok('maquinaPorId acha HM e TM',
+     S.maquinaPorId('hm01').golpe === 'cut' && S.maquinaPorId('tm26').golpe === 'earthquake');
+  ok('e podeAprenderMaquina vale pros dois',
+     S.podeAprenderMaquina('hm01','venusaur') === true &&
+     S.podeAprenderMaquina('tm26','snorlax') === true &&
+     S.podeAprenderMaquina('tm26','caterpie') === false);
+  /* ⚠️ 7) O GOLPE DE TM SE DESAPRENDE, e o de HM NAO. E a diferenca que mais separa os dois: o de
+     HM e a CHAVE de uma rota e perde-lo numa tela de troca a fecharia de novo. */
+  ok('o golpe de HM nao se desaprende', S.ehGolpeDeMaquina('cut') === true);
+  ok('e o de TM SE desaprende (e um golpe comum)',
+     Object.values(S.TMS).every(t => S.ehGolpeDeMaquina(t.golpe) === false),
+     Object.values(S.TMS).filter(t => S.ehGolpeDeMaquina(t.golpe)).map(t=>t.golpe).join(',') || 'todos');
+
+  /* 8) USO UNICO: a porta so abre com estoque, e o servidor e quem gasta. */
+  {
+    const g = S.__getGame();
+    g.inventario = {};
+    S.__setGame(g);
+    S.abrirEnsinarHm('tm26');
+    ok('sem estoque a tela NAO abre', S.__getGame().screen !== 'hmAlvo', S.__getGame().screen);
+    g.inventario = { tm26: 1 };
+    S.__setGame(g);
+    S.abrirEnsinarHm('tm26');
+    ok('com estoque ela abre', S.__getGame().screen === 'hmAlvo', S.__getGame().screen);
+    ok('e quantosTMs le o inventario', S.quantosTMs('tm26') === 1 && S.quantosTMs('tm15') === 0);
+    ok('e temMaquina vale pros dois tipos',
+       S.temMaquina('tm26') === true && S.temMaquina('tm15') === false);
+  }
+  /* ⚠️ QUEM GASTA E O SERVIDOR, e o cliente chama DEPOIS de gravar o time -- se a chamada se
+     perder, o jogador aprendeu e FICOU com a Maquina. O contrario seria pagar e nao aprender. */
+  {
+    const src = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
+    const i = src.indexOf('async function ensinarOGolpeDaMaquina');
+    const bloco = src.slice(i, i + 2600);
+    ok('o cliente chama o usarTM do servidor', /httpsCallable\('usarTM'\)/.test(bloco));
+    ok('e SO pra TM (o HM nao se gasta)', /if\(!ehTM\(e\.hm\)\) return;/.test(bloco));
+    ok('e DEPOIS de gravar o time',
+       bloco.indexOf('team: limparParaFirestore') < bloco.indexOf("httpsCallable('usarTM')"));
+    const srv = require('fs').readFileSync(path.join(raiz, 'functions', 'index.js'), 'utf8');
+    ok('e o servidor tem a callable', /exports\.usarTM = onCall/.test(srv));
+    ok('e ela roda em TRANSACAO (duas abas nao gastam um TM duas vezes)',
+       /exports\.usarTM[\s\S]{0,900}db\.runTransaction/.test(srv));
+    ok('e o catalogo do servidor tem os 23, derivados do TMS',
+       /Object\.entries\(TMS\)\.map\(\[?\(?\[id, tm\]\)? => \[id, \{ preco: tm\.preco/.test(srv)
+       || /Object\.fromEntries\(Object\.entries\(TMS\)/.test(srv), 'derivado');
+  }
+
+  /* 9) OS EFEITOS NOVOS. */
+  /* ⚠️ A FACHADA dobra com status -- e ela entra na ESCOLHA tambem, senao o motor deixaria de
+     escolhe-la justamente quando ela vale o dobro. */
+  {
+    const mk = (id, g2) => { const q = S.createInstance(id, 50); q.maxHp = S.calcMaxHp(q); q.hp = q.maxHp; q.ataques = [g2]; return q; };
+    const a = mk('snorlax', 'facade'), b = mk('machoke', 'tackle');
+    const limpo = S.calcDamage(a, b, S.makeSeededRng('f'), {});
+    a._queimado = 'flamethrower';
+    const queimado = S.calcDamage(a, b, S.makeSeededRng('f'), {});
+    /* o x2 do golpe cancela o /2 da queimadura: o dano fica IGUAL, que e o que a Fachada e */
+    ok('a Fachada anula a queimadura (o x2 cancela o /2)',
+       Math.abs(queimado / limpo - 1) < 0.15, limpo + ' -> ' + queimado);
+    ok('e o multiplicador e ' + S.FACHADA_MULT + 'x', S.multDaFachada('facade', a) === S.FACHADA_MULT);
+    ok('e so pra QUEM tem status', S.multDaFachada('facade', mk('snorlax','facade')) === 1);
+    ok('e so pra a FACHADA', S.multDaFachada('tackle', a) === 1);
+    ok('e os tres status contam',
+       ['_queimado','_envenenado','_paralisado'].every(m => {
+         const q = mk('snorlax','facade'); q[m] = 'x'; return S.multDaFachada('facade', q) === 2; }));
+    /* ⚠️ E O DOBRO ENTRA UMA VEZ SO: ele ja vem no 'poder' do melhorAtaque, e o calcDamage le esse
+       campo -- multiplicar la de novo daria 4x (a armadilha do poder efetivo, 09/09/2026). */
+    const c = mk('snorlax','facade'); c._queimado = 'x';
+    ok('e o poder do melhorAtaque ja vem dobrado (e o dano NAO dobra de novo)',
+       S.melhorAtaque(c, b).poder === S.GOLPES.facade[1] * 2,
+       String(S.melhorAtaque(c, b).poder));
+    /* a ESCOLHA muda: queimado, a Fachada passa a ganhar do golpe mais forte */
+    const d = S.createInstance('snorlax', 50); d.maxHp = S.calcMaxHp(d); d.hp = d.maxHp;
+    d.ataques = ['facade','bodyslam'];
+    ok('e a escolha muda com status',
+       S.melhorAtaque(d, b).golpe === 'bodyslam' && (d._queimado = 'x') && S.melhorAtaque(d, b).golpe === 'facade');
+  }
+  /* ⚠️ O PODER SECRETO depende do TERRENO, e o terreno vem da INSTANCIA (nunca de estado de
+     modulo): uma variavel de modulo seria uma quarta porta de vazamento no servidor. */
+  {
+    const mk = (id, g2) => { const q = S.createInstance(id, 50); q.maxHp = S.calcMaxHp(q); q.hp = q.maxHp; q.ataques = [g2]; q.lastMove = g2; return q; };
+    const vulcao = S.TERRAINS.find(t => t.id === 'vulcao');
+    const a = mk('snorlax','secretpower');
+    ok('sem terreno ele NAO faz nada', S.tentarPoderSecreto(a, mk('machoke','tackle'), () => 0.01) === null);
+    /* e NAO le o rng -- senao deslocaria a semente de toda batalha sem o TM43 */
+    { let n = 0; S.tentarPoderSecreto(a, mk('machoke','tackle'), () => { n++; return 0.01; });
+      ok('e nem le o rng (a semente nao se move)', n === 0, n + ' leituras'); }
+    { let n = 0; const z = mk('snorlax','tackle');
+      S.applyTerrainBuff([z], vulcao);
+      S.tentarPoderSecreto(z, mk('machoke','tackle'), () => { n++; return 0.01; });
+      ok('e outro golpe tambem nao le o rng', n === 0, n + ' leituras'); }
+    S.applyTerrainBuff([a], vulcao);
+    ok('o terreno fica na INSTANCIA, com prefixo de sublinhado (nao vai pro Firestore)',
+       Array.isArray(a._terreno) && a._terreno.indexOf('Fire') >= 0, JSON.stringify(a._terreno));
+    const alvo = mk('machoke','tackle');
+    ok('e no Vulcao ele QUEIMA', S.tentarPoderSecreto(a, alvo, () => 0.01) === '_queimado');
+    ok('e a marca fica no alvo', alvo._queimado === 'secretpower', String(alvo._queimado));
+    /* a chance e a declarada */
+    { let n = 0; for(let i = 0; i < 3000; i++){ const c = mk('machoke','tackle');
+        if(S.tentarPoderSecreto(a, c, S.makeSeededRng('ps' + i))) n++; }
+      ok('e a chance e ' + Math.round(S.CHANCE_PODER_SECRETO * 100) + '%',
+         Math.abs(n / 3000 - S.CHANCE_PODER_SECRETO) < 0.03, (100 * n / 3000).toFixed(1) + '%'); }
+    /* ⚠️ A IMUNIDADE DE CADA STATUS VALE: sem isso o TM43 seria a porta dos fundos das quatro */
+    const charizard = mk('charizard','tackle');
+    ok('e o Fogo continua imune a queimadura (pelo TM43 tambem)',
+       S.tentarPoderSecreto(a, charizard, () => 0.01) === null);
+    /* os quatro terrenos que dao efeito */
+    ok('sao QUATRO tipos de terreno com efeito',
+       Object.keys(S.EFEITO_DO_TERRENO).slice().sort().join(',') === 'Electric,Fire,Ice,Poison',
+       Object.keys(S.EFEITO_DO_TERRENO).join(','));
+  }
+  /* ⚠️ A PASSIVA DE CONFUSAO PELO GOLPE -- o pedido nomeia o TM03 (Water Pulse). */
+  {
+    const p2 = S.createInstance('blastoise', 50);
+    ok('sem o golpe, o Blastoise nao confunde', S.golpeQueConfunde(p2) === null);
+    p2.ataques = ['waterpulse','surf'];
+    ok('com o Pulso de Agua ele ganha a passiva', S.golpeQueConfunde(p2) === 'Pulso de Água',
+       String(S.golpeQueConfunde(p2)));
+    /* ⚠️ E A ESPECIE CONTINUA VALENDO pra quem nao carrega golpe nenhum */
+    ok('e a especie continua valendo (o Zubat confunde com Supersom)',
+       S.golpeQueConfunde(S.createInstance('zubat', 30)) === 'Supersom');
+    /* ⚠️ E VALE PRA QUALQUER GOLPE QUE CONFUNDA, nao so pro TM03: a regra e "o golpe da a passiva" */
+    ok('e vale pros seis golpes de dano que confundem',
+       Object.keys(S.GOLPES_QUE_CONFUNDEM).every(g => {
+         const q = S.createInstance('snorlax', 50); q.ataques = [g];
+         return S.golpeQueConfunde(q) === S.GOLPES_PT[g]; }),
+       Object.keys(S.GOLPES_QUE_CONFUNDEM).join(','));
+    ok('e todos eles existem na tabela de golpes',
+       Object.keys(S.GOLPES_QUE_CONFUNDEM).every(g => !!S.GOLPES[g]));
+  }
+
+  /* ⚠️ 10) O AVISO NO CARTAO -- o pedido diz *"coloque essas informacoes no card"*. */
+  {
+    /* ⚠️ A CONTA E DERIVADA, nao um numero solto: quem avisa e exatamente quem TEM efeito no
+       motor, e um numero escrito aqui envelheceria no proximo golpe que ganhar um -- a licao do
+       "59 especies" da ficha da Pokedex. */
+    const temEfeito = g2 => !!(S.MULTI_GOLPE[g2] || S.GOLPES_DRENO[g2] || S.GOLPES_SO_DORMINDO[g2] ||
+      S.GOLPES_QUE_QUEIMAM[g2] || S.GOLPES_QUE_CONGELAM[g2] || S.GOLPES_QUE_ENVENENAM[g2] ||
+      S.GOLPES_QUE_PARALISAM[g2] || S.GOLPES_QUE_MUDAM_ESTAGIO[g2] || S.GOLPES_QUE_CONFUNDEM[g2] ||
+      g2 === S.GOLPE_FACHADA || g2 === S.GOLPE_PODER_SECRETO || g2 === S.GOLPE_ROLAMENTO);
+    const comEfeito = Object.entries(S.TMS).filter(([id, t]) => S.obsDoGolpe(t.golpe).length);
+    ok('todo TM com efeito no motor AVISA no cartao',
+       Object.entries(S.TMS).every(([id, t]) => !temEfeito(t.golpe) || S.obsDoGolpe(t.golpe).length),
+       Object.entries(S.TMS).filter(([id, t]) => temEfeito(t.golpe) && !S.obsDoGolpe(t.golpe).length)
+         .map(([id]) => id).join(',') || comEfeito.length + ' avisam');
+    /* e o contrario: quem avisa TEM efeito -- senao o cartao prometeria o que o motor nao faz */
+    ok('e todo TM que avisa TEM efeito no motor',
+       comEfeito.every(([id, t]) => temEfeito(t.golpe)),
+       comEfeito.filter(([id, t]) => !temEfeito(t.golpe)).map(([id]) => id).join(',') || 'todos');
+    /* os dois que o pedido NOMEIA */
+    ok('  o TM50 (Overheat) avisa o -2 no PROPRIO',
+       /de quem usa/.test(S.obsDoGolpe('overheat').join(' ')), S.obsDoGolpe('overheat').join(' | '));
+    ok('  o TM43 (Poder Secreto) avisa o terreno',
+       /terreno/.test(S.obsDoGolpe('secretpower').join(' ')), S.obsDoGolpe('secretpower').join(' | '));
+    ok('  o TM03 (Pulso de Agua) avisa a passiva',
+       /confus/.test(S.obsDoGolpe('waterpulse').join(' ')), S.obsDoGolpe('waterpulse').join(' | '));
+    ok('  e o TM42 (Fachada) avisa o dobro',
+       S.obsDoGolpe('facade').join(' ').indexOf(String(S.FACHADA_MULT) + 'x') >= 0,
+       S.obsDoGolpe('facade').join(' | '));
+    /* ⚠️ E A CHANCE/ O MULTIPLICADOR SAEM DAS CONSTANTES, nunca de um texto fixo: mexer no
+       balanceamento sem a frase acompanhar e o defeito que a especialidade teve. */
+    ok('e a chance do TM43 sai da CONSTANTE',
+       S.obsDoGolpe('secretpower').join(' ').indexOf(Math.round(S.CHANCE_PODER_SECRETO * 100) + '%') >= 0);
+  }
+
+  /* ⚠️ 11) OS DOIS MOTORES: a tabela TMS tem que ser identica, senao o golpe some na liga. */
+  {
+    const srv = require('fs').readFileSync(path.join(raiz, 'functions', 'index.js'), 'utf8');
+    const cli = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
+    const tab = t => { const i = t.indexOf('const TMS = {'); const f = t.indexOf('\n};', i);
+                       return t.slice(i, f); };
+    ok('a tabela TMS e a MESMA nos dois motores', tab(cli) === tab(srv) && tab(cli).length > 1000,
+       'cliente ' + tab(cli).length + ' / servidor ' + tab(srv).length);
+    /* e os seis golpes novos tambem */
+    ok('e os seis golpes novos estao nos DOIS',
+       Object.keys(GEN3).every(id => srv.indexOf(id + ": ['") >= 0 || srv.indexOf(id + ':[') >= 0),
+       Object.keys(GEN3).filter(id => srv.indexOf(id) < 0).join(',') || 'todos');
   }
 }
 

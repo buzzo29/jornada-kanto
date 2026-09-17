@@ -1994,6 +1994,129 @@ contaminá-la.
   HP`, a marca solta em 400 batalhas, as duas saídas antecipadas do rng e 120 batalhas batendo golpe
   a golpe nos dois motores.
 
+### OS ESTÁGIOS DE ATRIBUTO (17/09/2026) — o primeiro sistema de estágios do motor
+
+Pedidos assim: *"Iron Tail: 30% de diminuir a Defesa do alvo em 1 estágio, Psychic: 10% de diminuir
+a Defesa Especial, Shadow Ball: 20% ..., Rock Tomb: Diminui a Velocidade do alvo ao acertar, Steel
+Wing: 10% de aumentar a Defesa do próprio usuário"*.
+
+**⚠️ ATÉ AQUI O MOTOR NÃO TINHA ESTÁGIO NENHUM.** O que ele tinha eram **multiplicadores fixos**: a
+Dança das Espadas é ×1,5 de Ataque e a Dança da Pluma ×0,5 — que por acaso são o +1 e o −1 da tabela
+oficial, mas **não somam e não acumulam**. Estágio é outra coisa: ele acumula, tem teto, e a mesma
+escada serve a qualquer atributo.
+
+**A TABELA É A DA GEN 3, e ela NÃO é simétrica:**
+
+| | −6 | −2 | **−1** | 0 | **+1** | +2 | +6 |
+|---|---|---|---|---|---|---|---|
+| | ×0,25 | ×0,5 | **×0,667** | ×1 | **×1,5** | ×2 | ×4 |
+
+`+n` vale `(2+n)/2` e `−n` vale `2/(2+n)`. **Escrever "−1 = metade" é o erro clássico aqui** —
+baixar dói MENOS que subir rende, e é assim desde a Gen 1. Quem vale ×0,5 é o **−2**.
+
+**⚠️ O TETO DE ±6 É ALCANÇÁVEL DE VERDADE**, ao contrário dos estágios de crítico (que ficaram de
+fora do jogo justamente por serem letra morta): a Cauda de Ferro usada seis vezes no mesmo confronto
+chega no −6. Por isso a escada inteira existe.
+
+| golpe | chance | efeito | quem leva no Lv.70 |
+|---|---|---|---|
+| **Cauda de Ferro** | 30% | Defesa do ALVO −1 | 3 (Onix, Forretress, Steelix) |
+| **Psíquico** | 10% | Defesa Especial do ALVO −1 | **20** |
+| **Bola Sombria** | 20% | Defesa Especial do ALVO −1 | 3 (a linha do Gastly) |
+| **Asa de Aço** | 10% | Defesa de **QUEM USA** +1 | 1 (Skarmory) |
+
+**⚠️ O ASA DE AÇO É O ÚNICO QUE CAI EM QUEM USA** (`noProprio`), e é a armadilha da feature: lido
+como os outros quatro, ele **baixaria a Defesa de quem levou o golpe** em vez de subir a de quem
+bateu — e o defeito não apareceria como erro, apareceria como o golpe sendo bom demais. Há trava
+nomeando isso, e ela acusa.
+
+**⚠️ ELES DURAM A BATALHA, não o confronto** — o contrário das duas Danças. A diferença não é gosto:
+no jogo original o estágio zera quando o pokémon **sai de campo**, e aqui quem vence um confronto
+CONTINUA em campo pro próximo (é por isso que o HP dele carrega). Quem sai de campo é quem cai… **e
+quem é soprado pelo Remoinho** — e lá eles zeram. Sem isso o sopro viraria um jeito de **guardar** o
+debuff em vez de tirá-lo de campo.
+
+**O MULTIPLICADOR ENTRA POR ÚLTIMO** na cadeia, depois de shiny, terreno, especialidade, item e
+fúria: *"metade da Defesa"* é metade do que o pokémon TEM na hora. É a mesma regra do corte da
+queimadura e das duas Danças — e há trava medindo isso **num shiny**, que é onde entrar antes daria
+outro número.
+
+#### ⚠️ E ELE QUEBROU A PREMISSA DA SUAVIZAÇÃO — o mesmo caso do Rolamento
+
+A suavização de 12/09 existe porque *"o mesmo golpe, do mesmo pokémon, contra o mesmo alvo, só
+difere pelo sorteio de 0,85 a 1,00"* (1,176×). **Com estágio isso deixa de valer**: quando a Cauda
+de Ferro baixa a Defesa, o golpe seguinte dói mais **de verdade** — medido, um Onix tirando **53, 78
+e 106** do mesmo Furret (razão 2,0×).
+
+A trava da banda pegou isso na primeira rodada (*Hypno × Forretress: 78 e 62*).
+
+**O CONSERTO FOI ISENTAR, e não pesar como o Rolamento fez** — e a escolha foi medida:
+
+- a suavização **só toca 0,68% dos confrontos hoje** (o revide moribundo, que era a razão dela
+  existir, acabou em 15/09);
+- confrontos com mudança de estágio são 1,02%, e ela mexia em **5 deles**;
+- ou seja, isentar custa **25% do que ela ainda faz**.
+
+E isentar é o **certo**, não só o barato: é o mesmo argumento do golpe que mata — *ele se explica
+sozinho*. Aqui **há uma linha na tela dizendo que a Defesa caiu**; a suavização existe pra esconder
+um corte **mascarado**, e aqui não há nada mascarado. Pesar exigiria carregar o multiplicador do
+defensor por linha no caminho do DANO, que é o código mais sensível do projeto.
+
+**⚠️ A ISENÇÃO É DO CONFRONTO, não do lado**: o estágio mexe na Defesa de um e no DANO do outro,
+então uma queda marcada no lado do inimigo é o que explica o golpe do jogador. As duas travas que
+mediam razão entre linhas aprenderam a mesma isenção.
+
+#### O QUE ELE VALE, MEDIDO
+
+1x1 contra um painel de 8, 250 batalhas por célula, ligando/desligando **um** efeito por vez:
+
+| | sem | com | |
+|---|---|---|---|
+| Onix (Cauda de Ferro) | 4,3% | 7,1% | **+2,8** |
+| Alakazam (Psíquico) | 58,9% | 60,8% | +1,9 |
+| Skarmory (Asa de Aço) | 48,0% | 49,4% | +1,4 |
+| Mewtwo (Psíquico) | 86,3% | 87,7% | +1,4 |
+| Steelix (Cauda de Ferro) | 51,0% | 52,2% | +1,3 |
+| **Gengar (Bola Sombria)** | 30,6% | 30,5% | **−0,1** |
+
+**⚠️ O ZERO DO GENGAR TEM CAUSA, e não é a mecânica:** o motor escolhe pelo dano, e o Gengar tem
+golpe melhor que a Bola Sombria (80) contra quase todo o painel — ele quase não a usa. É a mesma
+conclusão do Rolamento e dos golpes de prender: **o motor está certo em recusar**.
+
+**NA BATALHA: sai em 1,98% dos confrontos** e em 6,9% das batalhas 3x3. As linhas dela são 0,59% do
+log.
+
+**O PREÇO NA JORNADA: NADA — 58,48% contra 57,92%, −0,56 ponto, 0,6σ** (6 blocos de 800 jornadas de
+cada lado, **4.800 de cada**, desvio tirado de ENTRE os blocos, **3 de 6 blocos** pra cada lado).
+Ruído puro, e pelos dois motivos de sempre: são 26 espécies em 250 e elas caem dos DOIS lados -- o
+Alakazam da Sabrina, o Gengar da Agatha, o Steelix da Jasmine.
+
+#### ⚠️ O ROCK TOMB FICOU DE FORA, E NÃO É ESQUECIMENTO: ELE NÃO EXISTE NO JOGO
+
+Conferido em três lugares: ele **não está** no dicionário de golpes do `data/golpes.json`, **ninguém
+o aprende por nível** nas 250, e ele **não está** na tabela `GOLPES`. A razão é a de sempre: ele é
+**TM39 na Gen 3**, e a base só cadastra aprendizado por NÍVEL — o mesmo motivo que deixou o Pó
+Venenoso, o Tóxico e a Onda de Choque fora dos outros status.
+
+Cadastrar o efeito dele hoje seria **letra morta** — a mesma decisão que manteve os estágios 2 a 4
+do crítico fora do jogo, e que o CLAUDE.md registra em três lugares.
+
+**As duas saídas, se ele for pra valer:**
+
+1. **Dar dono a ele** — entra no `A_MAO` do `tools/gerar-tabelas-golpes.js` (como o `cut`, o `surf`
+   e o `fly`) e ganha espécies à mão. É inventar conteúdo de jogo: decide quem aprende o quê.
+2. **Esperar as TMs** — o dia em que o jogo tiver TMs, ele nasce com dono de graça. O `GOLPES_QUE_MUDAM_ESTAGIO`
+   já aceita `chance: 1` (o cartão do golpe afirma em vez de dizer "100% de chance de", que é uma
+   condicional que não existe).
+
+`tools/test-especiais.js` tranca 33 pontas: a escada da Gen 3 inteira (com o **−1 = ×0,667** cobrado
+por nome), o teto de ±6 e o `false` quando ele não move, os quatro golpes com chance e alvo, que os
+quatro **existem** na tabela e são **levados de verdade**, o corte nos três atributos, o corte
+**num shiny** (provando que ele entra por último), as três chances medidas com **um rng contínuo**,
+as duas saídas antecipadas do rng, **o Asa de Aço subindo a Defesa de quem usa e não encostando no
+alvo**, a linha no log sem `−0 de HP`, o `q` da linha sendo o de quem teve o atributo mexido, e o
+asterisco dizendo **em quem** o efeito cai.
+
 ### A PARALISIA: O STATUS QUE MEXE EM VELOCIDADE (16/09/2026)
 
 Pedida assim: *"implemente o status Paralysis, que alguns ataques tem uma chance de deixar o
@@ -4992,6 +5115,32 @@ chamado 'Histórico', quando clicado, exibir como foi o ranking do dia nos 5 úl
   largura rolando por dentro (o `max-height:80vh` já existia), e o histórico de 5 dias em **938px** de
   conteúdo.
 
+#### ⚠️ E ELE VIROU UM DIA POR VEZ, COM SETAS (17/09/2026)
+
+Pedido assim: *"no histórico do ranking da torre, ao invés de exibir todos os dias um embaixo do
+outro, coloque setinhas para ir paginando os dias"*.
+
+- **EMPILHADOS, OS CINCO DIAS SÃO ATÉ 50 LINHAS** num modal que já rola por dentro — e a pergunta
+  que se faz ali é sobre **UM** dia, não sobre os cinco ao mesmo tempo. Medido a 320px com cinco
+  dias cheios (10, 4, 0, 7 e 1 inscritos): o conteúdo vai de **~1.075px para 601px no pior dia**,
+  **−44%**, sem rolagem lateral.
+- **AS SETAS SÃO O `.circle-btn` DA CASA**, o mesmo das setas de ordem do time (32px) — não um
+  controle novo. A data fica **entre as duas**, numa grade de três colunas, e a conta ("1 de 5") vem
+  logo abaixo: sem ela o jogador não tem como saber quantos dias existem nem onde está.
+- **A SETA DA PONTA FICA DESABILITADA, não some.** Sumindo, a data pularia de lado a cada
+  navegação — e um controle que muda de posição num celular é o que faz errar o toque.
+- **⚠️ O ÍNDICE É CLAMPADO NO DESENHO, E O CLAMP GRAVA A CORREÇÃO.** O histórico é carregado **depois**
+  de a tela abrir, então a página pode apontar pra um dia que ainda não chegou (ou que sumiu) — sem
+  o clamp, a seta levaria a um modal vazio. E gravar não é detalhe: com o valor velho ainda
+  guardado, a **próxima seta partiria dele** e a página pularia sozinha. É literalmente o mesmo
+  cuidado que a paginação do montador de time carrega, e foi a trava que o pegou.
+- **A PÁGINA ZERA AO ENTRAR NO HISTÓRICO** (`abrirHistoricoDaTorre`): o "dia 3 de 5" de ontem não é
+  o mesmo de hoje, porque a lista anda.
+- **⚠️ E QUATRO TRAVAS MEDIAM O FORMATO EMPILHADO**, então elas não foram só "consertadas": passaram
+  a **ANDAR pela paginação** — cada dia continua sendo cobrado, um a um, e o pódio por dia ficou mais
+  visível do que era (o dia com um inscrito só leva ouro **e mais nada**; o dia vazio não tem
+  medalha nenhuma).
+
 ## Bifurcação Kanto / Johto
 
 - **Sete iniciais**: os três de Kanto, os três de Johto e o Pichu, agrupados por região na tela.
@@ -5765,7 +5914,248 @@ como é hoje"*.
   efeito prático — mas ele existe porque um item sem preço no catálogo deixava o quadro de cima
   VAZIO, e foi pego pelo teste no dia em que a loja passou a vender.
 
-### A MOCHILA VIROU A LOJA (14/09/2026)
+## AS MÁQUINAS DE TÉCNICA (TMs) — 17/09/2026
+
+Pedidas assim: *"implemente os TMs e coloque eles para vender, no mínimo 100 cada, conforme o poder
+for maior, mais caro fica, e os TMs devem ser de uso único, usou uma vez, ele some e não da para
+usar mais, precisa comprar novamente"*, com os 23 nomeados um a um. Mais dois pedidos junto:
+*"muitos desses TMs possuem efeito adicional ... coloque essas informações no card"*, *"os TMs que
+dão habilidade passiva, como o TM03 (Water Pulse), o pokemon também deve ganhar a habilidade passiva
+enquanto estiver com esse movimento"* e *"na loja, ao clicar no TM, colocar um botão onde vai exibir
+uma lista de quais pokemons estão aptos para receber esse movimento"*.
+
+### ⚠️ ELAS SÃO O CONTRÁRIO DOS HMs EM TUDO QUE IMPORTA
+
+É por isso que não deu pra reusar o `HMS` como tabela:
+
+| | HM | TM |
+|---|---|---|
+| de onde vem | conquista da jornada | **compra na loja** |
+| onde mora | na CONTA (`hms`) | no **inventário** (empilha, como a Poção) |
+| quantas vezes | infinitas | **UMA** (some ao ensinar) |
+| dá pra esquecer | **não, nunca** | sim, é golpe comum |
+
+**A última linha é a que mais separa as duas:** o golpe de HM é a CHAVE de uma rota, e perdê-lo numa
+tela de troca a fecharia de novo (é o que o `ehGolpeDeMaquina` existe pra impedir). O de TM é só um
+golpe — ele entra na fila de aprendizado como qualquer outro. **Quem pagou 🪙300 numa Hiper Raio e a
+trocou por engano perdeu a Máquina**, e é o preço do uso único.
+
+**⚠️ MAS A TELA DE ENSINAR É A MESMA, e isso foi a decisão estrutural.** HM e TM respondem à MESMA
+interface (`golpe` + `aprendem`), e quem despacha é o `maquinaPorId` — então a tela de três níveis
+(times → pokémon → troca) serve os dois **sem uma linha de exceção**. Onde as duas realmente diferem
+(de onde vêm, se gastam) quem responde é o `ehTM`, e são poucos lugares.
+
+### OS GOLPES: 17 JÁ EXISTIAM, 6 NASCERAM
+
+**⚠️ E OS SEIS SÃO DA GEN 3, o que importa em três deles** — lidos do arquivo moderno a tabela sairia
+errada:
+
+| | hoje | **Gen 3** |
+|---|---|---|
+| Tumba de Rochas (TM39) | 60 | **50** |
+| Ladrão (TM46) | 60 | **40** |
+| Superaquecer (TM50) | 130 | **140** |
+
+Mais Garra do Dragão (Dragon 80), Fachada (Normal 70) e Poder Secreto (Normal 70). O caminho é o
+mesmo do resto da base — o `moves.json` do Showdown com a cadeia de mods **8→3**.
+
+- **ELES ENTRAM NO `A_MAO` DO GERADOR**, ao lado do `cut`, do `surf` e do `fly`, e pelo mesmo motivo:
+  **TM ninguém aprende por NÍVEL**, e a base só cadastra nível — o gerador nunca os viu. Sem essas
+  linhas, regenerar as tabelas APAGA os nove em silêncio.
+- **E FICAM FORA DO `GOLPES_IDS`**, que é **indexado** pelo `APRENDIZADO`: inserir um id no meio
+  deslocaria os índices e trocaria o moveset das 250 espécies sem ninguém ver.
+- **⚠️ E O `POOL_METRONOMO` FOI DE 158 PRA 164**, porque ele é derivado do `GOLPES`. Isso desloca a
+  semente do sorteio — é o preço conhecido de o Metrônomo sortear "qualquer poder existente no jogo".
+- **⚠️ O TM39 (ROCK TOMB) RESOLVEU UMA PENDÊNCIA DE 13/09/2026**: ele tinha sido pedido junto com os
+  outros quatro golpes de estágio e **teve que sair no mesmo dia**, porque o golpe não existia na
+  tabela. O TM é o que lhe deu casa.
+
+### ⚠️ A LISTA DE QUEM APRENDE SAIU DA TAG "3M"
+
+O MESMO caminho dos 72 cortadores, dos 65 surfistas e dos 24 voadores — e o método foi conferido
+reproduzindo os três sem uma divergência. **Atenção à fonte: as tags `1M` e `2M` dão ZERO nas 250 do
+jogo**, porque o arquivo do Showdown é podado e só traz da Gen 3 pra frente.
+
+São **1.901 entradas** (de 7 no Dragon Claw a 240 na Fachada e no Poder Secreto), 20,5 KB por cópia.
+
+**⚠️ E ELA É DUPLICADA NO SERVIDOR, o que não é opcional:** o `golpesValidos` reconstrói o que a
+espécie pode ter a partir do `APRENDIZADO` (que é por NÍVEL) mais os HMs. Sem os TMs ali, **quem
+ensinasse um perderia o golpe em TODA partida de liga, em silêncio** — foi exatamente o que quase
+aconteceu com o `fly`. A tabela do servidor é DERIVADA do `TMS`, então um TM novo já nasce coberto.
+
+### O PREÇO É DERIVADO, NUNCA UM NÚMERO SOLTO
+
+`max(100, poder efetivo × 2)`, arredondado à dezena — de **🪙100** (Semente-Bala, Tumba de Rochas,
+Ladrão) a **🪙300** (Hiper Raio), ou seja de **1,4 a 4,3 jornadas** de renda. O mais caro empata com
+o Doce Raro.
+
+- **⚠️ ELE USA O PODER EFETIVO, não o cru**, e é a mesma régua que a escolha de golpe usa: a
+  **Semente-Bala é poder 10 e bate de 2 a 5 vezes**. Pelo cru ela seria o golpe mais barato do jogo
+  por um número que não descreve o que ela tira.
+- **A regra vive no cliente E no servidor**, e há trava cobrando que a tabela bata com ela nos 23 —
+  um preço solto divergiria no primeiro reajuste, e a tela prometeria o que a cobrança não pratica.
+- **⚠️ O SEMENTE-BALA ENTROU NO `MULTI_GOLPE` junto** (2 a 5 tapas, como na Gen 3). Sem isso o poder
+  efetivo dele seria 10, o motor nunca o escolheria e o TM09 seria dinheiro fora. **Ele é o primeiro
+  da tabela que ninguém aprende por nível** — a Sunflora é a única exceção, e é ela que faz o
+  acréscimo mexer no motor.
+
+### ⚠️ QUEM GASTA É O SERVIDOR, E DEPOIS DE GRAVAR O TIME
+
+O `inventario` está na trava de campos do `firestore.rules` — um TM descontado pelo cliente seria
+Hiper Raio infinito em todo mundo. A callable é o `usarTM`, **em transação** (sem ela, duas abas
+leem o mesmo estoque e as duas passam: um TM ensinado duas vezes pelo preço de um).
+
+**⚠️ E A ORDEM É A DECISÃO: o time é gravado ANTES da cobrança.** Se a chamada se perder (rede, aba
+fechada), o jogador **aprendeu o golpe e ficou com a Máquina**. O contrário — pagar e não aprender —
+é o lado errado pra errar, e é a mesma regra que o `consumeEquipped` já segue.
+
+### OS EFEITOS: 17 DOS 23 JÁ EXISTIAM NO MOTOR
+
+E isso não é sorte — os 23 pedidos são todos golpes de DANO, e o bloco de status do jogo já cobria
+quase tudo. Congelar (2), queimar (2), envenenar (1), paralisar (2), drenar (1), multi-tapa (1),
+estágio (4) e confundir (1) **já estavam**. Entraram **três mecânicas novas**:
+
+- **⚠️ O OVERHEAT (TM50) é o primeiro golpe que COBRA um preço de quem usa**: −2 estágios no PRÓPRIO
+  Ataque Especial, sempre. É ele que equilibra um golpe de 140 — o segundo uso vale metade do
+  primeiro. Ele entrou no `GOLPES_QUE_MUDAM_ESTAGIO` com `chance: 1` e `noProprio: true`.
+  **E ELE OBRIGOU O DEGRAU DO ESTÁGIO A ENTRAR NO `effectiveSpAtk` E NO `effectiveAttack`** — até
+  aqui só def/spDef/speed liam estágio, porque só esses eram mexidos. Sem o degrau, o motor gravaria
+  um estágio que **ninguém lê**, e o defeito não apareceria como erro: apareceria como um golpe que
+  anuncia um efeito e não faz nada. Há trava cobrando que os cinco atributos do `moverEstagio`
+  estejam todos no `NOME_DO_ATRIBUTO` e todos sejam lidos por uma `effective*`.
+- **⚠️ E ELE DESENTERROU UM DEFEITO NO AVISO DO CARTÃO**: o alvo da frase saía do **SINAL do delta**
+  (`delta > 0 ⇒ quem usa`), que era verdade **por acidente** — o único +1 era no próprio e os −1
+  eram no alvo. O Overheat quebra as duas metades, e o cartão dizia *"Reduz o Ataque Especial DO
+  ALVO"*, o contrário do que o golpe faz. Hoje quem responde é o `noProprio`, que a tabela já tinha.
+
+- **⚠️ A FACHADA (TM42) é o primeiro golpe cujo poder depende do ESTADO de quem usa.** Ela vale
+  **×2** com queimadura, veneno ou paralisia. Medido: um Snorlax queimado tira **o MESMO dano** com
+  ela (1,05×) enquanto o Golpe de Corpo cai pra 0,56× — o ×2 do golpe cancela o ÷2 da queimadura, que
+  é exatamente o que a Fachada é no original. **E a escolha muda junto**: limpo o motor escolhe Golpe
+  de Corpo (85), queimado escolhe a Fachada.
+  **⚠️ E O DOBRO ENTRA NUM LUGAR SÓ.** A primeira versão o pôs no `calcDamage` E na `nota`, e ele saiu
+  **4×** — é literalmente a armadilha do poder efetivo de 09/09/2026 (*"o `calcDamage` lê `best.poder`,
+  que o `melhorAtaque` já devolve multiplicado"*). Hoje ele vive no `melhorAtaque`, como a escala do
+  Rolamento. **Regra da casa: quem mexe em poder mexe lá, e só lá.**
+  ⚠️ O que ela também faz no original — ignorar o corte de ataque da queimadura — **ficou de fora**:
+  seria um segundo caminho no `effectiveAttack` só pra um golpe, e o ×2 já cobre o efeito prático.
+
+- **⚠️ O PODER SECRETO (TM43) muda de efeito conforme o TERRENO**, 30% por golpe. Aqui o terreno é de
+  um TIPO (51 terrenos, 17 tipos), então o mapa é por tipo — e ele **só usa os QUATRO status que
+  acontecem POR ATAQUE**, que é onde este golpe vive: **Gelo → congela · Fogo → queima · Veneno →
+  envenena · Elétrico → paralisa**.
+  **O SONO e a CONFUSÃO ficaram de fora de propósito**: no motor os dois são de **ABERTURA** (sorteados
+  uma vez por confronto, antes do primeiro golpe), e aplicá-los no MEIO da troca seria mecânica nova,
+  com linha de log, passo de animação e medição próprios. Nos outros 13 terrenos ele é um golpe
+  Normal de 70 e mais nada — e isso é honesto: inventar efeito pra preencher a tabela seria pior.
+  **⚠️ COM MAIS DE UM TIPO NO TERRENO (46 dos 51 têm), vale o PRIMEIRO que dá efeito, na ordem do
+  TERRENO** — assim o Pântano (Veneno/Planta/Fantasma) envenena e o Vulcão (Fogo/Terra) queima, que é
+  o que o nome deles promete.
+  **⚠️ E A IMUNIDADE DE CADA STATUS VALE**, reusada: o Fogo não queima, o Gelo não congela. Sem isso o
+  TM43 seria a porta dos fundos das quatro.
+
+**⚠️ E O TERRENO VEM DA INSTÂNCIA, NUNCA DE ESTADO DE MÓDULO — essa decisão mudou no meio do
+caminho.** A primeira versão usou uma variável de módulo (como a chuva) e teria criado uma **QUARTA
+porta de vazamento** no servidor, onde a instância é reaproveitada entre invocações: um terreno
+sobrando faria o TM43 de outra partida aplicar status aqui. E o vazamento do clima **foi real**.
+Marcado pelo `applyTerrainBuff` — a ÚNICA porta por onde um terreno entra numa batalha, nos dois
+motores —, o problema deixa de existir: o campo morre com o pokémon. Ele começa com `_` porque o time
+do save é serializado inteiro.
+
+- **⚠️ E O SORTEIO SÓ LÊ O RNG QUANDO PODE ACONTECER**: o `tentarPoderSecreto` sai antes do `rng()`
+  quando o golpe não é o TM43 ou quando não há terreno. Lido sempre, ele deslocaria a semente de TODA
+  batalha que não tem o TM43 em campo — a mesma armadilha do congelamento e do Remoinho. Há trava
+  pras duas saídas.
+- **A LINHA DO LOG REUSA A DO STATUS QUE ELE APLICOU**: o jogador precisa ler *"ficou queimado"*, não
+  *"sofreu o efeito do terreno"*. O `mv` continua sendo o GOLPE, então a frase sai *"X ficou queimado
+  com PODER SECRETO!"*, que é verdade nas duas pontas.
+
+### ⚠️ A PASSIVA PELO GOLPE (o TM03)
+
+*"Os TMs que dão habilidade passiva ... o pokemon também deve ganhar a habilidade passiva enquanto
+estiver com esse movimento"*. A confusão do jogo é por ESPÉCIE (`CONFUSAO`, 82 espécies, cada uma com
+o NOME do golpe dela); agora **quem CARREGA um golpe que confunde ganha a passiva**, mesmo não estando
+na tabela.
+
+- **⚠️ E VALE PRA QUALQUER GOLPE QUE CONFUNDA, não só pro TM03**: a regra é "o golpe dá a passiva", e
+  limitar ao Water Pulse seria a mesma exceção que este projeto passa a vida tirando. Alcança os seis
+  golpes de **dano** que confundem (Confusão, Psicoraio, Feixe de Sinal, Soco Dinâmico, Pulso de Água,
+  Soco Tonto); os de status (Supersom, Raio Confuso, Bravata, Beijo Doce, Bajulação) não estão na
+  tabela de golpes e continuam vindo só pela espécie.
+- **O GOLPE CARREGADO VEM PRIMEIRO**, e a espécie é o fallback: um Blastoise que ensinou o TM03 passa
+  a confundir com "Pulso de Água"; o Zubat sem golpe continua confundindo com "Supersom".
+- **⚠️ E ELA MEXEU EM UMA ESPÉCIE SEM TM NENHUM: o MEWTWO**, que aprende `confusion` por nível e não
+  estava no `CONFUSAO`. Na prática não roda — ele é imune ao bloco inteiro de especiais —, mas é a
+  única que o acréscimo alcança sozinha, e por isso ela fica fora do painel de impressão.
+
+### A LOJA E A LISTA DE APTOS
+
+- **OS 23 ENTRAM NO `ITENS` POR DERIVAÇÃO**, não escritos um a um: o nome é "TM26 — Terremoto", o
+  preço sai do `TMS` e a descrição é montada do golpe. Escritos à mão seriam 23 verbetes pra manter
+  em dia com a tabela de golpes, e o primeiro reajuste de poder deixaria a loja mentindo.
+- **ELES NÃO SÃO `equipável`** (o TM não vai num pokémon pelo `+`, ele ENSINA), e por isso o
+  `prateleiraDoItem` precisou de um ramo próprio — sem ele os 23 cairiam em "Especiais", ao lado do
+  Doce Raro, e a prateleira que leva o nome deles ficaria vazia.
+- **O QUADRO DA LOJA MOSTRA O CARTÃO DO GOLPE**, o MESMO `cartaoDeGolpe` das três telas de golpe e da
+  tela de ensinar — e ser o mesmo é o ponto: o jogador compara o Terremoto daqui com os golpes que o
+  pokémon já tem LÁ. É ele que carrega os avisos de efeito extra.
+- **⚠️ O "QUEM PODE APRENDER" FICA NO RODAPÉ, e não no miolo.** Ele é uma AÇÃO (como o Comprar e o
+  Vender), e o **miolo ROLA por dentro**: medido a 320px, com o cartão do golpe ali o botão ficava
+  **fora da área visível** — uma ação que o jogador não vê. O rodapé não rola. E ele vem **primeiro**,
+  porque é a pergunta que se faz ANTES de comprar.
+- **⚠️ A LISTA SEPARA "OS SEUS" DOS OUTROS, e os seus vêm primeiro.** A pergunta que se faz na loja não
+  é "quais das 250 aprendem", é **"algum dos MEUS aprende"** — um TM de 🪙300 que nenhum pokémon do
+  jogador aprende é dinheiro fora, e sem esta tela ele só descobriria isso DEPOIS de pagar, na tela de
+  ensinar, que abre vazia.
+- **E ELA VARRE TODOS OS SAVES**, não o time aberto: a Máquina é da CONTA e ensina em qualquer save,
+  como o HM. Um "0 dos seus" contado só do save carregado seria mentira pra quem tem o bicho certo em
+  outro slot.
+- **⚠️ E A ALTURA FIXA DO QUADRO SUBIU DE 375 PARA 438px** — o VALOR mudou, não a regra (a tela
+  continua sem dançar entre um item e outro, só ficou maior). Duas coisas do TM cresceram o pior caso:
+  o cartão do golpe no miolo (56px) e o terceiro botão no rodapé. Medido a 320px varrendo os 33 itens
+  com e sem dinheiro: o maior é o TM13 sem dinheiro (o rodapé ganha a linha do "Faltam").
+- **Medido a 320px:** a prateleira tem 23 linhas de 60px (o nome quebra em duas), nenhum nome
+  truncado, o modal de aptos em **265×483px** com a grade de 5 por fileira (célula de 39px) rolando
+  por dentro, e **nenhuma rolagem lateral**.
+
+### O AVISO NO CARTÃO: 18 DOS 23
+
+*"Coloque essas informações no card"* — e a trava é **derivada**: todo TM com efeito no motor avisa, e
+todo TM que avisa tem efeito. Um número escrito ali envelheceria no próximo golpe que ganhasse um.
+
+**⚠️ E AS CHANCES E O MULTIPLICADOR SAEM DAS CONSTANTES**, nunca de um texto fixo: mexer no
+balanceamento sem a frase acompanhar é o defeito que a especialidade teve. Os cinco que ficam mudos
+(Garra do Dragão, Hiper Raio, Raio Solar, Terremoto, Ladrão) não têm efeito nenhum — são dano puro.
+
+### ⚠️ O QUE FICOU DE FORA, E POR QUÊ
+
+- **O ROUBO DE ITEM DO THIEF (TM46) NÃO FOI IMPLEMENTADO**, e a razão é que ele seria **letra morta**:
+  item equipado **não existe** no adversário de jornada (NPC nunca tem item) nem nas ligas e no online
+  (lá itens não valem — ver "Onde os itens valem"). Ou seja, não há o que roubar em lugar nenhum. E
+  roubar mexeria no **armazém da conta de outro jogador**, que é economia e não batalha.
+  Ele entra como golpe de dano puro (**Sombrio 40**), e ainda vale: é o quarto golpe Sombrio da tabela
+  e 128 espécies o aprendem. Se um dia os itens valerem no online, é ali que a decisão se reabre.
+- **O RECHARGE DO HIPER RAIO e o CHARGE DO RAIO SOLAR** também não: este motor resolve o confronto em
+  trocas, não em turnos com estado. O Raio Solar já tem a metade na chuva, que é o que cabe.
+- **A CATEGORIA físico/especial continua sendo do TIPO**, como sempre — nenhum TM mudou isso.
+
+### O PREÇO NA JORNADA: NADA
+
+**57,94% contra 57,69%** de conclusão — **−0,25 ponto, 0,3σ**, 8 blocos de 800 jornadas de cada lado
+(**6.400 de cada**, desvio tirado de ENTRE os blocos, **5 de 8 blocos** pro lado do TM). Ruído puro,
+e **por construção**: o bot nunca compra nem ensina TM, e os NPCs levam o moveset por NÍVEL — então
+nenhum deles tem um. O que a medição captura é o deslocamento da semente do Metrônomo e o Semente-Bala
+da Sunflora.
+
+**⚠️ O EFEITO REAL DA FEATURE NÃO ESTÁ NESSE NÚMERO**, e é honesto dizer: ele está em quanto um golpe
+comprado muda um pokémon, e isso o simulador não joga. A régua que existe é a de 09/09/2026 — **o par
+de golpes vale 79 pontos de taxa de vitória entre o melhor e o pior**, e um TM é exatamente uma vaga
+desse par comprada com moeda.
+
+**A comparação dos dois motores (300 batalhas, mesma semente) passou intacta**, que é o que garante
+que a liga e a animação continuem concordando.
+
+## A MOCHILA VIROU A LOJA (14/09/2026)
 
 Pedida assim: *"A mochila, deixe igual a loja, o quadro em cima, e a lista com os itens que o
 usuário possui e os 3 botões de navegação (Para as batalhas, Especiais e TMs/HMs)"*.
@@ -5919,6 +6309,21 @@ item"*.
   nenhum". Só que **um botão que vai e vem muda a altura do rodapé**, e aí o Comprar mudava de lugar
   conforme o item: exatamente o que se pediu pra parar. Ele diz por que está apagado ("Você não tem
   pra vender") em vez de só ficar cinza.
+- **⚠️ E ELE VOLTOU A FICAR AO LADO DO COMPRAR em 17/09/2026** (a pedido: *"deixe o botão de Comprar
+  e vender, um ao lado do outro, ao invés de um em cima do outro"*), o que **reverte o empilhamento
+  de 13/09**. Os dois são a mesma decisão — *"o que eu faço com este item?"* —, então dividem a linha
+  como o Usar e o Excluir da mochila sempre dividiram; a `.item-acoes` sozinha já é uma LINHA, e a
+  `.loja-acoes` deixou de mandar direção nenhuma.
+  **⚠️ O QUE O EMPILHAMENTO COMPRAVA CONTINUA DE PÉ, e por outro caminho:** o que fazia o Comprar
+  dançar de lugar era o Vender **ir e vir** conforme o estoque — e isso acabou no MESMO 13/09, quando
+  ele passou a estar sempre na tela. Lado a lado, os dois continuam no mesmo lugar em todo item.
+  **⚠️ E O TERCEIRO BOTÃO (o "Quem pode aprender" dos TMs) NÃO entra nessa linha:** ele fica acima,
+  em largura cheia. Medido a 320px, três botões na mesma linha dão **76px cada** — "Vender por 100"
+  não cabe nisso.
+  **Medido a 320px, varrendo os 33 itens com e sem dinheiro:** os dois em **118px cada**, na mesma
+  linha, sem texto cortado, e o quadro fixo **caiu de 456 para 438px** (o rodapé encolheu um botão de
+  altura, e o valor foi remedido — deixá-lo em 456 seria 18px de ar em todo item, em nome de um pior
+  caso que deixou de existir).
 - **O PREÇO FOI PRO LADO DO NOME** na lista, e o "você tem N" saiu. Com os preços alinhados numa
   borda eles viram uma COLUNA que se compara de relance, que é pra isso que a lista existe.
 - **⚠️ ISSO CUSTOU LARGURA, e a conta foi feita.** O CSS tinha um comentário explicando por que o
@@ -6932,6 +7337,67 @@ batalhas onlines ... e não deixe entrar"*.
   insígnias, save com as 8 **sem time**, save campeão (entra e sem mensagem) e saves ainda não
   carregados (não bloqueia) — mais a mensagem na home, a posição dela e a limpeza ao voltar.
 
+## APOSENTAR O TIME: O PROF. CARVALHO (17/09/2026)
+
+Pedido assim: *"quando um save já não tem mais o que fazer após vencer as 8 insígnias, por exemplo,
+ele já venceu a elite 4, ou perdeu para a elite 4, deve aparecer a opção de aposentar o time, quando
+clicar nele, os pokémons vão para o professor carvalho e não vai mais ser possível utilizar esse
+time em ligas onlines e batalhas onlines, porém podem ser utilizados na torre dos treinadores e no
+ginásio da cidade"*.
+
+- **⚠️ O TIME NÃO É APAGADO, e é isso que faz o pedido fechar.** "Vão para o Prof. Carvalho" é o que
+  a APOSENTADORIA significa, não uma limpeza do save: esvaziando o time, ele sumiria da Torre e do
+  Ginásio da Cidade junto — o contrário do que se pediu. **O que muda é UMA marca** (`aposentado` no
+  save), e o time continua inteiro.
+- **⚠️ E ISSO PARTIU `savesCampeoes()` EM DUAS PERGUNTAS.** Ela era a porta única dos três modos, e
+  agora duas listas discordam **num caso só** — a conta que só tem time aposentado:
+
+  | | quem lê |
+  |---|---|
+  | **`savesComOitoInsignias()`** — todos, aposentado ou não | Torre, Ginásio da Cidade |
+  | **`savesCampeoes()`** — os de cima MENOS os aposentados | Ligas, Batalha Online |
+
+  O nome ficou em `savesCampeoes` porque ele é o que o resto do código já chamava: renomear os 9
+  chamadores só pra trocar a palavra deixaria a mudança maior do que ela é.
+- **A PORTA GANHOU UM PARÂMETRO** (`exigeTimeCampeao(incluirAposentados)`), e **só o Ginásio da
+  Cidade passa `true`**. Há trava contando as três chamadas E cobrando qual delas tem o `true` — sem
+  a segunda metade, "acrescentar em todo lugar" passaria.
+- **⚠️ A TORRE NÃO PRECISOU DE NADA, e isso foi conferido, não suposto:** o `towerEligiblePokemon`
+  tem **laço próprio** com `if(badges < 8) continue` e nunca leu a lista. Ela enxerga o aposentado
+  de graça — e a trava existe pra o dia em que alguém unificar as duas e fechar a Torre sem querer.
+- **⚠️ E O SERVIDOR PRECISOU DE UMA LINHA, num lugar só: a TRAINERS LEAGUE.** Ela é a única liga em
+  que o SERVIDOR monta a lista sozinho, **lendo os saves** (`trainersLeagueGatherEligibleCodesForUid`,
+  no refresh de 5 min antes de cada rodada) — nas outras o time vem de uma inscrição que o jogador
+  fez. Sem a guarda ali, o time aposentado **voltaria pro sorteio de rodada por conta própria**, que
+  é exatamente o que a aposentadoria promete que não acontece.
+  O `resolverTimeDosSaves` (Torre + Ginásio da Cidade) **não** exclui, e há trava cobrando as duas
+  coisas.
+- **⚠️ E O QUE FICA EM ABERTO, registrado pra ser decisão e não descuido:** na Clássica, nas
+  customizadas e no online a inscrição vem do CLIENTE, então um cliente forjado conseguiria
+  inscrever um time aposentado. O risco é baixíssimo — é o próprio jogador se devolvendo o que ele
+  mesmo abriu mão — e fechar isso custaria uma leitura de save por inscrição. Se um dia importar, o
+  lugar é o `registerForLeague`.
+- **É UM CAMINHO SÓ DE IDA, e por isso ele PERGUNTA antes.** Não há tela pra desfazer, de propósito:
+  se desse pra voltar, ela não seria uma decisão — seria um interruptor. O modal nomeia o time,
+  diz onde ele **continua** valendo e avisa que não tem volta.
+- **A GRAVAÇÃO É NA HORA** (`await saveCurrentGame()`), não pelo autosave: ele é debounced em 800ms
+  e só roda nas telas seguras, e uma decisão definitiva não pode depender disso.
+- **⚠️ O BOTÃO SÓ APARECE COM A JORNADA RESOLVIDA**: as 8 insígnias **E** a Elite vencida ou perdida
+  (`eliteStatus === 'champion' || 'defeated'`). Com a Elite **em andamento** ele some — aposentar no
+  meio do rush jogaria fora uma tentativa que ainda está de pé.
+- **A TELA DE FIM DE JORNADA É A ÚNICA PORTA.** Não há atalho na home nem na tela de time: uma
+  decisão sem volta se toma no lugar em que ela faz sentido, não num botão que se esbarra sem
+  querer. Depois de aposentado, a caixa troca de texto e conta onde o time ainda vale.
+- **SAVE ANTIGO NASCE ATIVO**: sem o campo, `aposentado` é false — como sempre foi.
+- **Medido a 320px, no navegador:** a caixa da oferta mede **257px**, a do estado aposentado
+  **205px** (a página vai de 1.971 pra 1.920px) e o modal **265×473px**, que cabe numa tela de 568
+  sem rolar. Sem rolagem lateral em nenhum dos três.
+- `tools/test-inventario.js` tranca as duas listas, a porta discordando só no caso do aposentado, a
+  Torre e o montador do desafio enxergando o time, o botão nos quatro estados de `eliteStatus`, a
+  pergunta antes da ação, o campo atravessando o save (e o save antigo nascendo ativo), o modal no
+  `render()` e as duas guardas do servidor. Conferido que ele acusa **4 falhas** com a lista velha
+  de volta, **3** com o Ginásio usando a lista restrita e **1** sem a guarda da Trainers League.
+
 ## Ginásio da Cidade
 
 - **O time dos DOIS lados é MONTADO, não é mais um save** (01/09/2026). Líder e desafiante escolhem
@@ -7752,8 +8218,24 @@ acessar caso tenha um pokémon equipado com o Cut"*.
 
 - **A partir do TRECHO 4** (`ROTA_DO_CORTE_A_PARTIR_DE = 3`) e em **1 de cada 4** trechos
   (`CHANCE_ROTA_DO_CORTE = 0,25`). Em cinco trechos elegíveis isso dá **~75% de chance de ver a mata
-  pelo menos uma vez** numa jornada — medido, 74,8%. Rara o bastante pra ser um achado, comum o
+  pelo menos uma vez** numa jornada — medido, 75,6%. Rara o bastante pra ser um achado, comum o
   bastante pra existir.
+- **⚠️ E ELA SAI NO MÁXIMO UMA VEZ POR JORNADA desde 17/09/2026**, reportado assim: *"a mata fechada
+  que precisa de cut para entrar, está aparecendo mais de uma vez por jornada, ela deve aparecer
+  somente 1x por jornada"*. **O motor estava fazendo exatamente o que tinha sido escrito** — o dado
+  era rolado em CADA trecho de forma independente —, então ver duas ou três era o desenho, não um
+  acidente. Medido antes: **24,5% das jornadas** com mata tinham mais de uma.
+- **⚠️ O CONSERTO É PEGAR O PRIMEIRO QUE SAIR (`legDaMataFechada`), e não sortear um trecho novo** —
+  e essa é a decisão que importa. O dado de cada trecho (`mataSaiNoTrecho`) continua **byte a byte
+  o que era**, então a PRIMEIRA mata de qualquer jornada cai onde sempre caiu: medido, **4.000 de
+  4.000** jornadas com a mata no mesmo trecho de antes. Um sorteio novo mudaria a jornada de todo
+  mundo que tem save aberto.
+  **E a chance de ver a mata ALGUMA vez não se move**, porque ela sempre foi "pelo menos um dos
+  cinco dados passou" — 75,6% antes e depois. O que mudou é só o **teto**.
+- **A distribuição fica torta de propósito, e é consequência do "primeiro":** medido em 4.000
+  jornadas, ela cai no trecho 4 em 1.039, no 5 em 680, no 6 em 546, no 7 em 451 e no 8 em 307. É a
+  cauda geométrica de quem para no primeiro sucesso — quanto mais tarde o trecho, menos chance de
+  os anteriores terem falhado todos.
 - **⚠️ O SORTEIO É SEMEADO PELO SAVE**, como o do encontro selvagem, e pelo mesmo motivo: com
   `Math.random` bastaria sair do save e voltar até a mata aparecer. A semente carrega o slot, a
   **GERAÇÃO** do slot (senão recriar no mesmo slot repetiria a jornada) e o trecho.
@@ -9877,7 +10359,8 @@ desafio do **Ginásio da Cidade**, a **Vigília**, a batalha por **código de tr
   Unown de NPC sai sempre A. Se um dia isso incomodar, o caminho é o servidor mandar um índice
   0–27 junto do time — e não uma segunda regra de sorteio no cliente, que divergiria da primeira.
 - **A Pokédex e a tela "Pokémons desta rota" mostram A**, e é o certo: ali a pergunta é sobre a
-  ESPÉCIE, não sobre um bicho.
+  ESPÉCIE, não sobre um bicho. **Quem responde "quais formas EU já vi" é a tela de Variações**, na
+  ficha dele — ver a seção própria, logo abaixo.
 - **O nome continua "Unown"**, sem a letra. No original é assim, e o glifo já é a identidade.
 
 `tools/test-jornada.js` tranca 37 pontas: a tabela, os sufixos (com a letra A explicitamente vazia),
@@ -9885,6 +10368,44 @@ as URLs nos dois domínios, a letra não vazando pra outra espécie, o `spriteHt
 id, a precedência do shiny explícito, a semente (mesma semente = mesma letra, 400 sementes = 28
 formas), a captura levando a letra, o save e a reidratação, a Vigília e o prêmio dela, e os clones.
 **Conferido que cada um dos sete defeitos religado derruba o teste** — inclusive o `201-a.png`.
+
+### AS VARIAÇÕES DO UNOWN (17/09/2026)
+
+Pedidas assim: *"o card do Unown na pokedex é diferente, quando clicar no card vai aparecer um botão
+com o nome: Variações, e quando clicar, vai abrir mais um modal com todas as formas de unown (as
+letras) em formato igual da Pokedex, com vários quadradinhos, e somente exibe a letra do unown que
+já foi pego ... se o treinador só pegou o Unown das letras G e O, só esses cards que ficam visíveis,
+os outros ficam igual na pokedex, exibindo apenas #A, #B e assim vai"*.
+
+- **ELA REUSA A GRADE E A CÉLULA DA POKÉDEX** (`pokedex-grid` / `pokedex-cell`), e isso é o pedido ao
+  pé da letra. Reusar as duas classes é o que faz a leitura ser a mesma: quem já sabe ler a Pokédex
+  sabe ler esta sem reaprender — letra pega mostra o sprite, letra que falta mostra o rótulo apagado.
+- **⚠️ E O RÓTULO É `#A`, NÃO `#201`.** Aqui o que distingue uma célula da outra é a **LETRA**, e 28
+  quadradinhos escritos "#201" não diriam nada.
+- **⚠️ ELA É O PRIMEIRO DADO DE POKÉDEX QUE NÃO É POR ESPÉCIE.** As 28 formas são o MESMO #201, então
+  o `pokedexCaught` **nunca as distinguiu** — nem tinha por que. A lista nova (`pokedexUnown`) vive
+  no documento da CONTA, ao lado da Pokédex, e como ela é **livre pro dono** no `firestore.rules`:
+  é registro de coleção, não poder de compra.
+- **⚠️ ELA É GRAVADA COM `arrayUnion`, NUNCA REESCREVENDO A LISTA.** É a lição que já custou 49
+  espécies da Pokédex de um jogador: um read-modify-write aqui poderia **ENCOLHER** a coleção se a
+  leitura viesse atrasada. (O `tools/fake-firestore.js` aprendeu `arrayUnion` por causa disto.)
+- **O PONTO DE ESCRITA É O `markCaught`, e ele ganhou um TERCEIRO argumento opcional.** É a única
+  porta por onde uma captura passa; as outras 249 espécies chamam sem o argumento e continuam
+  idênticas. Os dois pontos que capturam (o encontro selvagem e o prêmio da Vigília) passam a letra.
+- **⚠️ E HÁ UMA REDE DE SEGURANÇA NO CARREGAMENTO DA CONTA:** além do registro feito na captura, ela
+  varre os TIMES atuais atrás de Unown com letra. Ela recupera quem capturou um Unown **antes** deste
+  campo existir — e tem o mesmo limite do Pokédex shiny: um Unown já liberado pro Prof. Carvalho não
+  deixou rastro da letra em lugar nenhum, então aquele não volta.
+- **O `unownCaught` ENTROU NO `CAMPOS_DA_CONTA`**: sem isso o `resetGame` o apagaria ao abrir um
+  save, e a tela ficaria vazia pra quem tem mais de um.
+- **O BOTÃO SÓ EXISTE NO UNOWN.** Ele é a única espécie com mais de uma forma, e um "Variações" nas
+  outras 249 abriria uma tela de uma célula só.
+- **⚠️ O MODAL É ANEXADO DEPOIS DA FICHA no `render`**: os modais empilham na ordem em que entram, e
+  este é aberto de DENTRO dela — vindo antes, abriria ATRÁS. É a mesma nota que a caixa do especial e
+  a própria ficha já carregam.
+- **Medido a 320px, no navegador:** 28 células, 5 por fileira, 6 fileiras, célula de **41px**, modal
+  de **280×483px**, sem rolagem lateral (o `max-height:85vh` faz a grade rolar por dentro quando
+  precisa).
 
 ## Mapa de Kanto
 

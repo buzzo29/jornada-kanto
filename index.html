@@ -293,6 +293,12 @@
   /* AS DUAS ABAS do ranking da Torre. Elas NAO usam o `.btn` da casa: aquele e botao de ACAO com
      moldura de 3px, e aqui sao dois lugares onde se ENTRA -- o mesmo raciocinio que ja tinha
      tirado o `.btn` das prateleiras da loja e das linhas da ficha da Pokedex. */
+  /* ⚠️ A NAVEGACAO DO HISTORICO: as setas nas pontas e a data no meio. O `1fr` do meio e o que
+     mantem as duas setas ancoradas nas bordas -- com a data crescendo ("31/12"), um flex simples
+     empurraria a seta da direita pra dentro e ela dancaria de dia pra dia. */
+  .tower-hist-nav{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:6px;}
+  .tower-hist-dia{margin:0;text-align:center;}
+  .tower-hist-conta{text-align:center;margin:2px 0 6px;font-size:.6rem;}
   .tower-rank-abas{ display:flex; gap:6px; margin:2px 0 8px; }
   .tower-rank-aba{
     flex:1; border:2px solid var(--box-border); border-radius:3px; background:var(--box);
@@ -2171,6 +2177,22 @@
     background:#fff;
   }
   .pokedex-cell.unknown{background:#e8e4d0;opacity:.6;}
+  /* ⚠️ A GRADE DAS VARIACOES E MAIS APERTADA que a da Pokedex: sao 28 celulas num modal (que ja e
+     mais estreito que a tela), e com os 52px da Pokedex elas dariam 4 por linha a 320px. Com 40px
+     dao 5, e as 28 cabem em 6 fileiras sem rolar. */
+  .unown-grid{grid-template-columns:repeat(auto-fill,minmax(40px,1fr));gap:4px;}
+  .unown-box{max-height:85vh;overflow-y:auto;}/* AS MAQUINAS DE TECNICA (17/09/2026) */
+.aptos-box{max-height:85vh;overflow-y:auto}
+/* os SEUS primeiro, em linha: e a resposta da pergunta que se faz na loja */
+.aptos-meus{display:flex;flex-direction:column;gap:4px;margin:6px 0 10px}
+.aptos-meu{display:flex;align-items:center;gap:6px;text-align:left}
+.aptos-nome{flex:1 1 auto;min-width:0;font-weight:700;font-size:.72rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.aptos-save{flex:0 0 auto;font-size:.6rem;color:var(--muted);max-width:84px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.aptos-tit{margin-top:8px}
+/* a grade das 250 e a MESMA da Pokedex, so mais apertada: sao ate 240 celulas num modal */
+.aptos-grid{grid-template-columns:repeat(auto-fill,minmax(34px,1fr));gap:3px}
+.aptos-btn{margin-top:8px}
+
   /* ---- MOCHILA E LOJA ----
      ⚠️ A GRADE DE QUADRADINHOS (.item-grade / .item-slot) SAIU EM 14/09/2026, junto com o
      `gradeDeItensHtml`: a mochila virou uma LISTA como a loja (a pedido), e as duas telas passaram
@@ -2281,7 +2303,15 @@
      item clicado, com a lista inteira dançando junto.
      O `overflow-y:auto` é o que faz a altura ser uma PROMESSA: um item de descrição mais longa
      rola por dentro em vez de voltar a esticar o quadro. Com `min-height` o pulo voltaria no
-     primeiro item que passasse de 375.
+     primeiro item que passasse dela.
+     ⚠️ ELA SUBIU DE 375 PARA 438px EM 17/09/2026, com os TMs -- e o VALOR e que mudou, nao a regra:
+     a tela continua sem dancar entre um item e outro, so ficou maior. Duas coisas do TM cresceram o
+     pior caso: o CARTAO DO GOLPE no miolo (56px) e o TERCEIRO botao no rodape (o "Quem pode
+     aprender"). Medido a 320px, varrendo os 33 itens com e sem dinheiro pra comprar: o maior e o
+     TM13 sem dinheiro (o rodape ganha a linha do "Faltam").
+     ⚠️ E ELA CAIU DE 456 PRA 438 NO MESMO DIA, quando o Comprar e o Vender voltaram a dividir a
+     linha (a pedido): o rodape encolheu um botao de altura, e o valor foi remedido -- deixa-lo em
+     456 seria 18px de ar em TODO item, em nome de um pior caso que deixou de existir.
      Ela vale inclusive na prateleira VAZIA (as TMs), que foi o resto do pedido: o quadro fica lá,
      do mesmo tamanho, sem nada dentro. */
   /* ⚠️ COLUNA DE TRES ANDARES: topo, miolo que rola, e o RODAPE COLADO EMBAIXO (13/09/2026, a
@@ -2291,7 +2321,7 @@
      Comprar sempre no mesmo lugar.
      O `overflow` saiu daqui e foi pro miolo: com ele no quadro inteiro, o rodape rolava junto. */
   .loja-fixa{ position:sticky; top:0; z-index:5; box-shadow:0 6px 12px rgba(12,16,36,.45);
-    height:375px; display:flex; flex-direction:column; }
+    height:438px;   /* ver a nota da altura fixa, logo acima */ display:flex; flex-direction:column; }
   .loja-miolo{ flex:1; min-height:0; overflow-y:auto; }
   .loja-rodape{ flex-shrink:0; padding-top:6px; }
   /* SEIS ITENS E O RESTO ROLA (a pedido). A linha mede 36px a 320px, medida no navegador; 6 delas
@@ -2384,10 +2414,20 @@
      o Excluir ficava longe do item que ele apaga. */
   .item-acoes{ display:flex; gap:8px; margin-top:10px; }
   .item-acoes .btn{ flex:1; margin:0; }
-  /* NA LOJA os dois botoes EMPILHAM: o Vender fica EMBAIXO do Comprar, que foi o pedido. A
-     .item-acoes sozinha e uma LINHA -- ela nasceu na mochila, onde Usar e Excluir ficam lado a
-     lado --, entao a loja pede a propria direcao em vez de mudar a de la. */
-  .loja-acoes{ flex-direction:column; }
+  /* ⚠️ NA LOJA O COMPRAR E O VENDER FICAM LADO A LADO desde 17/09/2026, a pedido -- e isso REVERTE
+     o empilhamento de 13/09. Eles sao a mesma decisao ("o que eu faco com este item?"), entao dividem
+     a linha como o Usar e o Excluir da mochila sempre dividiram; a .item-acoes sozinha ja e uma
+     LINHA, e por isso a .loja-acoes deixou de mandar direcao nenhuma.
+     O QUE O EMPILHAMENTO COMPRAVA CONTINUA DE PE por outro caminho: o que fazia o Comprar dancar de
+     lugar era o Vender ir e vir conforme o estoque, e desde 13/09 ele esta SEMPRE na tela (cinza
+     quando nao ha o que vender). Lado a lado, os dois continuam no mesmo lugar em todo item.
+     ⚠️ E O TERCEIRO BOTAO (o "Quem pode aprender" dos TMs) NAO entra nesta linha: ele fica acima,
+     em largura cheia. Medido a 320px, tres botoes na mesma linha dao 76px cada -- "Vender por 100"
+     nao cabe nisso, e o alvo de toque fica menor que o minimo confortavel. */
+  .loja-acoes{ flex-direction:row; }
+  /* a linha propria do botao de aptos, acima do par */
+  .loja-acao-larga{ margin-top:10px; }
+  .loja-acao-larga .btn{ width:100%; margin:0; }
   .pokedex-cell.mystery{
     background:linear-gradient(135deg,#2b2f5c,#4a2f6b);
     border-color:#9b6bd6;
@@ -3943,10 +3983,30 @@ const CHANCE_ROTA_DO_CORTE = 0.25;
    GERAÇÃO do slot (senão recriar no mesmo slot repetiria a jornada) e o trecho.
    E ele NÃO olha o time: a mata aparece ou não aparece independente de o treinador saber cortar --
    quem decide se dá pra ENTRAR é o desenho da tela, e isso é a coisa toda. Ver `renderRouteCardsBlock`. */
-function temRotaDoCorte(leg){
-  if(leg < ROTA_DO_CORTE_A_PARTIR_DE) return false;
+/* O DADO DE UM TRECHO. Semeado pelo save (slot + geração + trecho), como tudo que é sorteado nesta
+   jornada: com `Math.random` bastaria sair do save e voltar até a mata aparecer. */
+function mataSaiNoTrecho(leg){
   const rng = makeSeededRng("mata|" + game.currentSaveSlot + "|" + (game.saveGen||0) + "|" + leg);
   return rng() < CHANCE_ROTA_DO_CORTE;
+}
+/* ⚠️ A MATA APARECE NO MÁXIMO UMA VEZ POR JORNADA (17/09/2026, reportado: *"está aparecendo mais de
+   uma vez por jornada, ela deve aparecer somente 1x"*). Antes o dado era rolado em CADA trecho de
+   forma independente -- 1 em 4 a partir do 4º --, então ver duas (ou três) era o desenho, não um
+   acidente.
+   ⚠️ E O CONSERTO É PEGAR O PRIMEIRO QUE SAIR, e não sortear um trecho novo: assim o dado de cada
+   trecho continua EXATAMENTE o que era, e a PRIMEIRA mata de qualquer jornada cai onde sempre caiu
+   -- some só a repetição. Um sorteio novo mudaria a jornada de todo mundo que tem save aberto.
+   Isso também preserva a chance de ver a mata ALGUMA vez (medida em 74,8%): ela é a chance de pelo
+   menos um dos cinco dados passar, e essa conta não mudou. O que mudou é o teto. */
+function legDaMataFechada(){
+  for(let l = ROTA_DO_CORTE_A_PARTIR_DE; l < LEGS.length; l++){
+    if(mataSaiNoTrecho(l)) return l;
+  }
+  return -1;
+}
+function temRotaDoCorte(leg){
+  if(leg < ROTA_DO_CORTE_A_PARTIR_DE) return false;
+  return leg === legDaMataFechada();
 }
 /* AS CARTAS DE ROTA DO TRECHO: as duas de sempre, mais a mata quando ela sai. Existe num lugar só
    porque o `routeCards` é montado em TRÊS pontos (a saída do laboratório, a chegada num trecho novo
@@ -4307,6 +4367,15 @@ function applyTerrainBuff(team, terrain){
   // se mutasse os atributos de verdade aqui, o bônus se acumularia a cada ginásio que usasse esse terreno
   team.forEach(p=>{
     p.terrainBuffed = p.types.some(t=>terrain.types.includes(t));
+    /* ⚠️ E OS TIPOS DO TERRENO FICAM NA INSTÂNCIA (17/09/2026), em TODO MUNDO -- não só em quem
+       ganha o bônus. É o Poder Secreto (TM43) que os lê: o efeito dele depende do terreno, e esta
+       é a única porta por onde um terreno entra numa batalha, nos dois motores.
+       ⚠️ NA INSTÂNCIA E NÃO EM ESTADO DE MÓDULO, de propósito: uma variável de módulo seria uma
+       QUARTA porta de vazamento no servidor (onde a instância é reaproveitada entre invocações),
+       e o vazamento do clima foi REAL. Aqui o campo morre com o pokémon.
+       ⚠️ E COMEÇA COM `_`: é estado de batalha e não pode ir pro Firestore (o time do save é
+       serializado inteiro -- ver limparParaFirestore). */
+    p._terreno = terrain.types || [];
   });
 }
 
@@ -4459,6 +4528,7 @@ function freshGameDefaults(){
     eliteStage:null,       // 0-3 = índice do PRÓXIMO oponente (0-2 membros, 3 = final contra o rival)
     elitePath:null,        // ['kanto','johto',...] -- a fila sorteada da Elite (ver sortearCaminhoDaElite)
     eliteStatus:null,      // null | 'inProgress' | 'champion' | 'defeated'
+    aposentado:false,      // o time foi pro Prof. Carvalho: sai das ligas e do online, fica na Torre
     eliteHealsLeft:0,      // escolhas de cura/revive disponíveis entre batalhas (2 após cada vitória)
     eliteAttemptsUsed:0,   // quantas das ELITE_MAX_ATTEMPTS tentativas (rush completo cada uma) já foram gastas em derrotas
     eliteBestStage:0,      // maior estágio já alcançado em QUALQUER tentativa (não reseta com a tentativa atual) -- usado pra mostrar até onde o jogador chegou de verdade, mesmo que a última tentativa tenha ido pior que uma anterior
@@ -4995,11 +5065,11 @@ function effectiveBaseHp(p){
 }
 function effectiveAttack(p){
   const v = (typeof p.attack === 'number') ? p.attack : ((SPECIES[p.speciesId] && SPECIES[p.speciesId].attack) || 50);
-  return withQueimadura(withDanca(withFuria(withItemStat(withSpecialty(withBuffs(v, p), p), p, 'attack'), p), p), p);
+  return withEstagio(withQueimadura(withDanca(withFuria(withItemStat(withSpecialty(withBuffs(v, p), p), p, 'attack'), p), p), p), p, 'atk');
 }
 function effectiveDefense(p){
   const v = (typeof p.defense === 'number') ? p.defense : ((SPECIES[p.speciesId] && SPECIES[p.speciesId].defense) || 50);
-  return withFuria(withItemStat(withSpecialty(withBuffs(v, p), p), p, 'defense'), p);
+  return withEstagio(withFuria(withItemStat(withSpecialty(withBuffs(v, p), p), p, 'defense'), p), p, 'def');
 }
 /* Sp.Atk e Sp.Def, oficiais da Gen 2. Instancia gravada ANTES do split nao tem os campos -- cai no
    valor da especie, mesma migracao ja usada pela velocidade. O 50 no fim so pega instancia de
@@ -5010,20 +5080,20 @@ function effectiveSpAtk(p){
   const sp = SPECIES[p.speciesId];
   const v = (typeof p.spAtk === 'number') ? p.spAtk
           : (sp && typeof sp.spAtk === 'number') ? sp.spAtk : 50;
-  return withFuria(withItemStat(withSpecialty(withBuffs(v, p), p), p, 'spAtk'), p);
+  return withEstagio(withFuria(withItemStat(withSpecialty(withBuffs(v, p), p), p, 'spAtk'), p), p, 'spAtk');
 }
 function effectiveSpDef(p){
   const sp = SPECIES[p.speciesId];
   const v = (typeof p.spDef === 'number') ? p.spDef
           : (sp && typeof sp.spDef === 'number') ? sp.spDef : 50;
-  return withFuria(withItemStat(withSpecialty(withBuffs(v, p), p), p, 'spDef'), p);
+  return withEstagio(withFuria(withItemStat(withSpecialty(withBuffs(v, p), p), p, 'spDef'), p), p, 'spDef');
 }
 function effectiveSpeed(p){
   // instâncias salvas ANTES da velocidade existir não têm o campo -- cai pro valor da espécie.
   // A velocidade buffada entra também na chance de crítico (rng < speed/512, regra da Gen 1):
   // quem está no terreno do tipo dele critica mais, além de bater mais forte
   const v = (typeof p.speed === 'number') ? p.speed : ((SPECIES[p.speciesId] && SPECIES[p.speciesId].speed) || 50);
-  return withParalisia(withFuria(withSpecialty(withBuffs(v, p), p), p), p);
+  return withEstagio(withParalisia(withFuria(withSpecialty(withBuffs(v, p), p), p), p), p, 'speed');
 }
 function calcMaxHp(p){
   // A ESCALA de HP é a clássica do jogo nos DOIS motores (Arcanine 67 = 455, como sempre foi) -- no
@@ -5035,7 +5105,14 @@ function calcMaxHp(p){
 // HP na escala Gen 1 -- usado SÓ internamente pelo motor novo, pra converter o dano em fração da vida
 function gen1MaxHp(p){ return Math.floor(2 * effectiveBaseHp(p) * p.level / 100) + p.level + 10; }
 
-function markCaught(speciesId, isShiny){
+/* ⚠️ A LETRA DO UNOWN ENTRA AQUI (17/09/2026), e ela e o primeiro dado da Pokedex que NAO e por
+   especie: as 28 formas sao o MESMO #201, entao `pokedexCaught` nunca as distinguiu. A tela de
+   Variacoes precisa saber QUAIS letras a conta ja viu, e e este o unico ponto por onde uma
+   captura passa.
+   Ela e opcional de proposito: as outras 249 especies chamam esta funcao sem terceiro argumento e
+   continuam identicas. */
+function markCaught(speciesId, isShiny, letra){
+  if(letra && speciesId === "unown"){ marcarLetraDoUnown(letra); }
   if(!game.caughtSpecies){ game.caughtSpecies = []; }
   if(!game.caughtSpecies.includes(speciesId)){ game.caughtSpecies.push(speciesId); }
   if(!game.permanentPokedex){ game.permanentPokedex = []; }
@@ -5052,6 +5129,20 @@ function markCaught(speciesId, isShiny){
       }
     });
   }
+}
+/* AS LETRAS DO UNOWN QUE A CONTA JA VIU. Mora no documento da conta, como a Pokedex -- e como ela,
+   e LIVRE pro dono no firestore.rules: e registro de colecao, nao poder de compra.
+   ⚠️ ARRAY_UNION e nao reescrita da lista: e a mesma licao que custou 49 especies da Pokedex de um
+   jogador -- um read-modify-write aqui poderia ENCOLHER a colecao se a leitura viesse atrasada. */
+function marcarLetraDoUnown(letra){
+  if(!letra) return;
+  if(!Array.isArray(game.unownCaught)) game.unownCaught = [];
+  if(game.unownCaught.indexOf(letra) >= 0) return;
+  game.unownCaught.push(letra);
+  if(!game.authUser) return;
+  userDocRef(game.authUser.uid).set(
+    { pokedexUnown: firebase.firestore.FieldValue.arrayUnion(letra) }, { merge: true }
+  ).catch(e => console.error("Erro ao registrar a letra do Unown:", e));
 }
 async function syncPermanentShinyDex(speciesId){
   if(!game.authUser) return;
@@ -5343,7 +5434,7 @@ function openNeighborhoodGymRemote(city, countryCode){
   loadNeighborhoodGymDetail();
 }
 async function openNeighborhoodGymScreen(){
-  if(!exigeTimeCampeao()) return;
+  if(!exigeTimeCampeao(true)) return;   // o time aposentado continua valendo aqui
   game.screen = 'neighborhoodGym';
   game.neighborhoodGymScreenState = 'locating';
   game.neighborhoodGymError = null;
@@ -5772,6 +5863,24 @@ async function loadPermanentUserData(){
     game.contaCarregada = true;
     game.rivalNameDefault = d.rivalNameDefault || '';   // preenche a tela de nome do rival (ver nomeDoRivalPadrao)
     game.hms = Array.isArray(d.hms) ? d.hms : [];       // as Máquinas Ocultas são da CONTA (ver darHM)
+    /* AS LETRAS DO UNOWN, mais a rede de seguranca: alem do registro feito na captura, varre os
+       times atuais. Ela recupera quem capturou um Unown ANTES deste campo existir -- e tem o mesmo
+       limite do Pokedex shiny: um Unown ja liberado pro Prof. Carvalho nao deixou rastro da letra
+       em lugar nenhum, entao aquele nao volta. */
+    const letras = new Set(Array.isArray(d.pokedexUnown) ? d.pokedexUnown : []);
+    const letrasNovas = [];
+    (game.saveSlots || []).forEach(sv => {
+      (sv && sv.team || []).forEach(q => {
+        if(q && q.speciesId === "unown" && q.unown && !letras.has(q.unown)){
+          letras.add(q.unown); letrasNovas.push(q.unown);
+        }
+      });
+    });
+    if(letrasNovas.length){
+      await userDocRef(game.authUser.uid).set(
+        { pokedexUnown: firebase.firestore.FieldValue.arrayUnion(...letrasNovas) }, { merge: true });
+    }
+    game.unownCaught = [...letras];
     /* ⚠️ O QUE JA FOI RESGATADO DE CONQUISTA. Ele mora na CONTA e sob a mesma trava das moedas no
        firestore.rules -- e a trava nao e enfeite pelo lado que parece: mentir pra MAIS nao paga
        nada, mas zerar a lista pelo console faria o bolo inteiro ficar resgatavel de novo, toda vez. */
@@ -6306,7 +6415,11 @@ function melhorAtaque(attacker, defender){
     /* ⚠️ O ROLAMENTO entra pelos DOIS lados: o `poder` (que vira o dano) e a `nota` (que decide a
        escolha). Só no dano, o motor escolheria um Rolamento de 30 e aplicaria um de 480. */
     const escala = escalaDoRolamento(attacker, id);
-    const tipo = GOLPES[id][0], poder = GOLPES[id][1] * escala;
+    /* ⚠️ A FACHADA entra pelo MESMO lado que o Rolamento: o `poder` (que vira o dano, lá no
+       calcDamage) e a `nota` (que decide a escolha). Só no dano, um pokémon queimado deixaria de
+       escolher justamente o golpe que a queimadura torna o melhor dele. */
+    const tipo = GOLPES[id][0];
+    const poder = GOLPES[id][1] * escala * multDaFachada(id, attacker);
     let mult = 1;
     (defender.types || []).forEach(d => { mult *= typeVsType(tipo, d); });
     if(multForcado != null) mult = multForcado;
@@ -6321,7 +6434,10 @@ function melhorAtaque(attacker, defender){
              /* A CHUVA ENTRA NA NOTA, e não só no dano: se ela mudasse só o dano, o motor
                 escolheria o golpe por uma regra e aplicaria outra -- e sob chuva o Raio Solar
                 continuaria sendo escolhido como se valesse 120. É a lição do EXPOENTE_TIPO. */
-             nota: poderEfetivo(id) * escala * multDaChuva(tipo, id) * Math.pow(mult, EXPOENTE_TIPO) * (proprio ? 1.5 : SUBTYPE_PENALTY)
+             /* ⚠️ A NOTA USA O `poderEfetivo(id)`, e não a variável `poder` -- por isso o dobro da
+                Fachada tem que ser repetido AQUI. Sem ele a nota ficaria de fora e o motor
+                deixaria de escolher a Fachada justamente quando ela vale o dobro. */
+             nota: poderEfetivo(id) * escala * multDaFachada(id, attacker) * multDaChuva(tipo, id) * Math.pow(mult, EXPOENTE_TIPO) * (proprio ? 1.5 : SUBTYPE_PENALTY)
                    * (atk / Math.max(1, def)) };
   };
   let melhor = null;
@@ -6445,7 +6561,22 @@ function bestMultiplier(atkTypes, defTypes){
    o Surf moderno é poder 90, e o mod da **gen5** devolve os **95** que valiam na Gen 3. Lido do
    arquivo moderno ele entraria 5 pontos fraco.
    (Conferido pelo mesmo método: o `cut` sai Normal 50, exatamente o que já estava aqui.) */
+/* ⚠️ OS GOLPES DE TM (17/09/2026): os SEIS que a base por NÍVEL nunca viu, porque ninguém os
+   aprende por nível -- eles vêm de MÁQUINA, exatamente como o `cut`, o `surf` e o `fly`. Os outros
+   17 TMs do jogo já estavam na tabela (alguém os aprende por nível também).
+   ⚠️ A GERAÇÃO IMPORTA EM TRÊS DELES, e lida do arquivo moderno a tabela sairia errada:
+   Rock Tomb é 60 hoje e era **50** na Gen 3; Thief é 60 hoje e era **40**; Overheat é 130 hoje e
+   era **140**. O caminho é o mesmo do resto da base -- o moves.json do Showdown com a cadeia de
+   mods 8→3 -- e ele devolve os valores da Gen 3.
+   ⚠️ E ELES DESLOCAM A SEMENTE DO METRÔNOMO (`POOL_METRONOMO` é derivado do `GOLPES`): 158 → 164.
+   É o preço conhecido de ele sortear "qualquer poder existente no jogo". */
 const GOLPES = {
+  dragonclaw: ['Dragon', 80],
+  rocktomb: ['Rock', 50],
+  facade: ['Normal', 70],
+  secretpower: ['Normal', 70],
+  thief: ['Dark', 40],
+  overheat: ['Fire', 140],
   cut: ['Normal', 50],
   surf: ['Water', 95],
   fly: ['Flying', 70],
@@ -6526,7 +6657,7 @@ const GOLPES_PT = {
   rollout:'Rolamento',sacredfire:'Fogo Sagrado',sandtomb:'Tumba de Areia',scratch:'Arranhão',
   shadowball:'Bola Sombria',shadowpunch:'Soco Sombrio',signalbeam:'Feixe de Sinal',
   silverwind:'Vento Prateado',skullbash:'Quebra-Crânio',skyattack:'Ataque Celeste',
-  skyuppercut:'Cruzado Celeste',slam:'Batida',slash:'Talho',cut:'Corte',surf:'Surf',fly:'Voar',sludge:'Lodo',
+  dragonclaw:'Garra do Dragão',rocktomb:'Tumba de Rochas',facade:'Fachada',secretpower:'Poder Secreto',thief:'Ladrão',overheat:'Superaquecer',skyuppercut:'Cruzado Celeste',slam:'Batida',slash:'Talho',cut:'Corte',surf:'Surf',fly:'Voar',sludge:'Lodo',
   sludgebomb:'Bomba de Lodo',smog:'Fumaça Tóxica',snore:'Ronco',solarbeam:'Raio Solar',
   spark:'Faísca',spikecannon:'Canhão de Espinhos',steelwing:'Asa de Aço',stomp:'Pisão',
   submission:'Submissão',superpower:'Superpoder',swift:'Rapidez',tackle:'Investida',
@@ -6823,6 +6954,10 @@ function calcDamageNew(attacker, defender, rng, op){
   const Leff = attacker.level;   // o crítico da Gen 3 dobra o DANO no fim, não o nível aqui
   /* O PODER agora vem do GOLPE quando existe um escolhido; o MOVE_POWER de 60 virou o fallback
      de quem não tem (save antigo e as oito espécies sem golpe de dano). */
+  /* ⚠️ O PODER JÁ VEM PRONTO DO `melhorAtaque`, com a escala do Rolamento E o dobro da Fachada --
+     multiplicar de novo aqui dobraria duas vezes. É a MESMA armadilha que o poder efetivo dos
+     multi-tapa custou em 09/09/2026 (cada tapa saía com 45 em vez de 15 E batia de 2 a 5 vezes).
+     Regra da casa: quem mexe em poder mexe no `melhorAtaque`, e só lá. */
   const potencia = best.poder || MOVE_POWER;
   const core = Math.floor(Math.floor(2*Leff/5 + 2) * potencia * A / D / 50) + 2;
   const typeMult = op.semTipo ? 1 : Math.pow(best.mult, EXPOENTE_TIPO);
@@ -7021,6 +7156,11 @@ const MULTI_GOLPE = {
      Os dois têm poder 15, igual ao Tapa Duplo e ao Ataque Fúria: o efetivo vai a 45. */
   firespin:    TAPAS_2A5,   // Redemoinho de Fogo  poder 15  -- 10 (a linha do Charmander, Vulpix/Ninetales, Ponyta/Rapidash, Moltres, Flareon, Entei)
   wrap:        TAPAS_2A5,   // Enrolar             poder 15  -- 11 (Bellsprout/Weepinbell, Ekans/Arbok, Tentacool/Tentacruel, Lickitung, a linha do Dratini, Shuckle)
+  /* ⚠️ O SEMENTE-BALA ENTROU COM OS TMs (17/09/2026): ele é 2 a 5 tapas na Gen 3 e o golpe já
+     estava na tabela (24 espécies o aprendem por máquina), mas como ninguém o aprende por NÍVEL
+     ele nunca tinha passado por aqui. O poder efetivo dele vai de 10 pra 30, que é o que ele tira
+     de verdade -- sem isso o motor nunca o escolheria e o TM09 seria dinheiro fora. */
+  bulletseed:  TAPAS_2A5,   // Semente-Bala        poder 10  -- 24 espécies, todas por TM
   doublekick:  TAPAS_SEMPRE_2,   // Chute Duplo      poder 30  -- 8 espécies (a linha do Nidoran, Hitmonlee, Jolteon)
   bonemerang:  TAPAS_SEMPRE_2,   // Ossomerangue     poder 50  -- 2 (Cubone, Marowak)
   twineedle:   TAPAS_SEMPRE_2    // Agulha Dupla     poder 25  -- 4 (a linha do Caterpie e o Beedrill)
@@ -7085,6 +7225,23 @@ const GOLPES_SO_DORMINDO = { dreameater: true };
    `_`, então ele não vai pro Firestore (ver limparParaFirestore) e é solto no fim da batalha
    junto com os outros marcadores -- sem isso um Golem sairia da luta com o Rolamento carregado e a
    próxima batalha começaria com 480 de poder. */
+/* ⚠️ A FACHADA (TM42) DOBRA COM STATUS, e ela é o PRIMEIRO golpe do jogo cujo poder depende do
+   ESTADO de quem usa (17/09/2026). Até aqui só o Rolamento variava, e ele depende do HISTÓRICO
+   (quantas vezes saiu seguido), não de uma condição.
+   No jogo oficial ela dobra com queimadura, veneno ou paralisia. O que ela também faz lá -- ignorar
+   o corte de ataque da queimadura -- fica de fora: ali seria um segundo caminho no effectiveAttack
+   só pra um golpe, e o ×2 que já está aqui cobre o efeito prático. Fica registrado.
+   ⚠️ E ELA ENTRA NA `nota` TAMBÉM, não só no dano: sem isso o motor deixaria de escolhê-la
+   justamente quando ela é o melhor golpe do pokémon -- e é a lição do EXPOENTE_TIPO, que vale pra
+   toda regra que mexe em poder. */
+const GOLPE_FACHADA = "facade";
+const FACHADA_MULT = 2;
+function comStatus(p){
+  return !!(p && (p._queimado || p._envenenado || p._paralisado));
+}
+function multDaFachada(golpeId, quemBate){
+  return (golpeId === GOLPE_FACHADA && comStatus(quemBate)) ? FACHADA_MULT : 1;
+}
 const GOLPE_ROLAMENTO = "rollout";
 const ROLAMENTO_USOS = 5;
 /* A escala do golpe DESTE pokémon AGORA: 1, 2, 4, 8, 16. Ela multiplica o poder E a nota -- se
@@ -7159,6 +7316,37 @@ const CURA_MAXIMO_DO_HP = 0.7;
    A LISTA saiu da base por script, não foi escrita à mão: são as 82 espécies que aprendem algum
    dos onze por NÍVEL na Gen 3. O MEWTWO e o MEW não entram -- o tentarGolpeEspecial corta o bloco
    inteiro quando qualquer um dos dois está no confronto, e a entrada seria letra morta. */
+/* ⚠️ OS GOLPES DE DANO QUE CONFUNDEM, com o nome que a frase mostra. Eles são os que estão na
+   tabela GOLPES (os de status -- Supersom, Raio Confuso, Bravata, Beijo Doce, Bajulação -- não
+   têm poder e por isso nunca entraram nela).
+   Ela existe pro pedido dos TMs: quem CARREGA um deles ganha a passiva de confusão, mesmo que a
+   espécie não esteja no CONFUSAO. Ver `golpeQueConfunde`.
+   O nome sai do GOLPES_PT, então ele é o MESMO que o log e o cartão mostram -- escrito à mão aqui,
+   a frase da confusão nomearia um golpe com uma palavra e o log com outra. */
+const GOLPES_QUE_CONFUNDEM = {
+  confusion: 1, psybeam: 1, signalbeam: 1, dynamicpunch: 1, waterpulse: 1, dizzypunch: 1
+};
+Object.keys(GOLPES_QUE_CONFUNDEM).forEach(id => { GOLPES_QUE_CONFUNDEM[id] = GOLPES_PT[id] || id; });
+/* ⚠️ COM QUE GOLPE ESTE POKÉMON CONFUNDE -- e a resposta tem DUAS fontes desde 17/09/2026.
+   A primeira é a de sempre: a espécie está no CONFUSAO, e o nome do golpe é o DELA (o Zubat
+   confunde com Supersom e o Alakazam com Confusão -- sem isso os dois confundiriam com a mesma
+   palavra, que foi o relato que criou a tabela).
+   A segunda é o pedido dos TMs: *"os TMs que dão habilidade passiva, como o TM03 (Water Pulse), o
+   pokemon também deve ganhar a habilidade passiva enquanto estiver com esse movimento"*. Ou seja,
+   quem CARREGA um golpe que confunde ganha a passiva -- mesmo que a espécie não esteja na tabela.
+   ⚠️ E ELA VALE PRA QUALQUER GOLPE QUE CONFUNDA, não só pro Water Pulse: a regra é "o golpe dá a
+   passiva", e limitar ao TM03 seria a mesma exceção que este projeto passa a vida tirando. Hoje
+   isso alcança os golpes de DANO que confundem (Confusão, Psicoraio, Feixe de Sinal, Soco
+   Dinâmico, Pulso de Água, Soco Tonto) -- os de status (Supersom, Raio Confuso, Bravata, Beijo
+   Doce, Bajulação) não entram na tabela de golpes e continuam vindo só pela espécie.
+   ⚠️ O GOLPE CARREGADO VEM PRIMEIRO: um Kabuto que ensinou o TM03 já confundia com "Pulso de Água"
+   pela espécie, e o resultado é o mesmo; mas um Blastoise que ensinou passa a confundir com o
+   NOME do golpe que ele leva, e não com nada. */
+function golpeQueConfunde(p){
+  const leva = (p && p.ataques) || [];
+  for(const id of leva){ if(GOLPES_QUE_CONFUNDEM[id]) return GOLPES_QUE_CONFUNDEM[id]; }
+  return CONFUSAO[p && p.speciesId] || null;
+}
 const CONFUSAO = {
   aerodactyl:'Supersom', alakazam:'Confusão', butterfree:'Confusão', celebi:'Confusão',
   chinchou:'Supersom', cleffa:'Beijo Doce', cloyster:'Supersom', crobat:'Supersom',
@@ -7334,6 +7522,62 @@ function estaChovendo(){ return chuvaRestante > 0; }
    invocacoes, entao sobra vira chuva na batalha de outra pessoa.
    Escrito a mao nos tres, o quarto caminho nasceria sem -- e o vazamento nao aparece como erro,
    aparece como um golpe de Fogo tirando metade sem nada na tela dizendo por que. */
+/* ============================================================================
+   O PODER SECRETO (TM43) -- 17/09/2026
+   ----------------------------------------------------------------------------
+   Pedido junto com os TMs: *"muitos desses TMs possuem efeito adicional, como o TM43 (Secret
+   Power), que tem chance de aplicar um efeito conforme o terreno da batalha"*.
+
+   ⚠️ AQUI O TERRENO É DE UM TIPO (são 51, seis de cada um dos 17), então o mapa é por TIPO.
+   ⚠️ E ELE SÓ USA OS QUATRO STATUS QUE ACONTECEM POR ATAQUE, que é onde este golpe vive:
+     Gelo → congela · Fogo → queima · Veneno → envenena · Elétrico → paralisa
+   O SONO e a CONFUSÃO ficaram de fora **de propósito**: no motor os dois são de ABERTURA (são
+   sorteados uma vez por confronto, antes do primeiro golpe), e aplicá-los no MEIO da troca seria
+   mecânica nova -- com linha de log, passo de animação e medição próprios. Não foi o que se pediu.
+   ⚠️ NOS OUTROS 13 TERRENOS ele é um golpe Normal de 70 e mais nada, e isso é honesto: inventar
+   efeito pra preencher a tabela seria pior que ter terreno em que ele é "só" um golpe.
+
+   ⚠️ E ELE SÓ VALE ONDE HÁ TERRENO: a jornada, a Elite e as ligas com terreno escolhido. Na TORRE
+   e no ONLINE não existe terreno -- é a mesma fronteira que o selo 🔺 já tem, e o `tipoDoTerreno()`
+   devolvendo null é o que a diz.
+
+   ⚠️ O TIPO DO TERRENO VIAJA PELA MESMA PORTA DA CHUVA (estado de módulo, definido pelo chamador e
+   LIMPO pelo `limparClima`), e isso é decisão: uma quarta variável de módulo com limpeza própria
+   seria uma quarta porta de vazamento -- e o vazamento do clima foi REAL no servidor, onde a
+   instância é reaproveitada entre invocações. Uma porta só, limpa nos mesmos três pontos.
+   ============================================================================ */
+const CHANCE_PODER_SECRETO = 0.30;
+const GOLPE_PODER_SECRETO = "secretpower";
+/* o valor é o CAMPO da instância e a guarda de imunidade -- os mesmos que cada status já usa */
+const EFEITO_DO_TERRENO = {
+  Ice:      { marca: "_congelado",  pode: podeCongelar },
+  Fire:     { marca: "_queimado",   pode: podeQueimar },
+  Poison:   { marca: "_envenenado", pode: podeEnvenenar },
+  Electric: { marca: "_paralisado", pode: podeParalisar }
+};
+/* OS TIPOS DO TERRENO DESTA BATALHA, lidos da INSTÂNCIA (ver applyTerrainBuff). Sem terreno --
+   na Torre e no online -- devolve lista vazia, e o TM43 vira um golpe Normal de 70 e mais nada. */
+function terrenoDe(p){ return (p && p._terreno) || []; }
+/* ⚠️ SORTEIA DEPOIS DE O GOLPE CONECTAR, e lê o rng da BATALHA -- e SAI ANTES do rng() quando o
+   golpe não é o Poder Secreto, quando não há terreno ou quando o alvo é imune. Lido sempre, ele
+   deslocaria a semente de TODA batalha que não tem o TM43 em campo: é a mesma armadilha do
+   congelamento e do Remoinho.
+   ⚠️ E A IMUNIDADE É A DE CADA STATUS, reusada: o Fogo não queima, o Gelo não congela, o Aço e o
+   Veneno não se envenenam. Sem isso o Poder Secreto seria a porta dos fundos das quatro.
+   Devolve a MARCA aplicada (o campo da instância) ou null -- é o que a linha do log precisa. */
+function tentarPoderSecreto(quemBate, alvo, rng){
+  if(!quemBate || quemBate.hp <= 0 || !alvo || alvo.hp <= 0) return null;
+  if(quemBate.lastMove !== GOLPE_PODER_SECRETO) return null;
+  /* ⚠️ COM MAIS DE UM TIPO NO TERRENO (46 dos 51 têm), vale o PRIMEIRO que dá efeito -- e a ordem
+     é a da tabela do TERRENO, não a do EFEITO_DO_TERRENO. Assim o Pântano (Veneno/Planta/Fantasma)
+     envenena e o Vulcão (Fogo/Terra) queima, que é o que o nome deles promete. */
+  const tipo = terrenoDe(quemBate).find(t => EFEITO_DO_TERRENO[t]);
+  const e = tipo && EFEITO_DO_TERRENO[tipo];
+  if(!e || !e.pode(alvo) || alvo[e.marca]) return null;
+  if(rng() >= CHANCE_PODER_SECRETO) return null;
+  alvo[e.marca] = GOLPE_PODER_SECRETO;
+  return e.marca;
+}
 function limparClima(){ chuvaRestante = 0; }
 /* PÕE o clima de volta. Existe pro ONLINE, que resolve UM confronto por invocação: sem um jeito de
    restaurar o contador, a chuva morria no fim de cada confronto e durava 1 em vez de 3.
@@ -7501,8 +7745,9 @@ function sorteiaGolpeEspecial(p, rng){
   /* A CONFUSÃO VEM POR ÚLTIMO, e isso é de propósito: acrescentar um efeito no FIM da fila não
      dilui nenhum dos que já estavam medidos -- quem cai na chance composta é ela. Um Alakazam
      (Disable + Recuperar + Confusão) confunde em 0,9 × 0,9 × 10% = 8,1%. */
-  if(CONFUSAO[p.speciesId] && rng() < CHANCE_CONFUSAO){
-    return { efeito:'confusao', golpe: CONFUSAO[p.speciesId] };
+  const confundeCom = golpeQueConfunde(p);
+  if(confundeCom && rng() < CHANCE_CONFUSAO){
+    return { efeito:'confusao', golpe: confundeCom };
   }
   /* A FÚRIA DO DRAGÃO É A ÚLTIMA DA FILA, pelo mesmo motivo que a confusão foi um dia: o efeito que
      entra no FIM não dilui nenhum dos que já estavam medidos -- quem paga a chance composta é ele.
@@ -7627,6 +7872,11 @@ function tentarRemoinho(team, brockTeam, iAtivo, iInimigo, rng, diario){
     if(!candidatos.length) continue;
     if(rng() >= CHANCE_REMOINHO) continue;
     const novo = candidatos[Math.floor(rng() * candidatos.length)];
+    /* ⚠️ QUEM SAI DE CAMPO PERDE OS ESTAGIOS (17/09/2026). E a regra do jogo original -- estagio
+       zera ao trocar de pokemon --, e este e o UNICO ponto do motor onde alguem sai de campo VIVO.
+       Sem isto, um pokemon com a Defesa em -3 seria soprado, voltaria depois e continuaria em -3:
+       o sopro viraria um jeito de GUARDAR o debuff em vez de tira-lo de campo. */
+    limparEstagios(timeAlvo[iAlvo]);
     /* A LINHA ENTRA NO DIÁRIO DO CONFRONTO QUE VEM -- o que a tela mostra é o pokémon NOVO, e a
        frase é o que explica por que ele está ali. Por isso ela carrega o nome e a espécie de QUEM
        SAIU: nenhum dos dois lados do matchup é ele. */
@@ -7964,6 +8214,87 @@ const QUEIMADURA_FISICO = 0.5;       // o que sobra do ataque fisico de quem est
 const GOLPES_QUE_ENVENENAM = { poisonsting: 0.30, twineedle: 0.20, smog: 0.40,
                                sludge: 0.30, sludgebomb: 0.30, poisonfang: 0.50 };
 const VENENO_DANO = 1/8;             // do HP MAXIMO, por turno -- o DOBRO da queimadura
+/* ⚠️ OS ESTÁGIOS DE ATRIBUTO (17/09/2026) -- o PRIMEIRO sistema de estágios do motor.
+   Pedidos assim: *"Iron Tail: 30% de diminuir a Defesa do alvo em 1 estágio, Psychic: 10% de
+   diminuir a Defesa Especial, Shadow Ball: 20% ..., Steel Wing: 10% de aumentar a Defesa do
+   próprio usuário"*. As chances são as OFICIAIS, tiradas do dado (Showdown, mod da Gen 3) -- o
+   mesmo caminho das quatro listas de status.
+
+   ⚠️ ATÉ AQUI O MOTOR NÃO TINHA ESTÁGIO NENHUM. O que ele tinha eram MULTIPLICADORES fixos: a
+   Dança das Espadas é ×1,5 de Ataque e a Dança da Pluma ×0,5 -- que por acaso são o +1 e o -1 da
+   tabela oficial, mas não somam nem se acumulam. Estágio é outra coisa: ele ACUMULA, tem teto, e
+   a mesma escada serve a qualquer atributo.
+
+   A TABELA É A DA GEN 3, e ela não é linear: `+n` vale `(2+n)/2` e `-n` vale `2/(2+n)`. Ou seja
+   +1 é ×1,5 mas -1 é ×0,667 (e não ×0,5) -- baixar dói MENOS que subir rende, e é assim desde a
+   Gen 1. Escrever "-1 = ×0,5" é o erro mais comum aqui.
+
+   ⚠️ O TETO DE ±6 É ALCANÇÁVEL DE VERDADE, ao contrário dos estágios de crítico (que ficaram de
+   fora do jogo justamente por serem letra morta): a Cauda de Ferro usada seis vezes no mesmo
+   confronto chega no -6. Por isso a escada inteira existe.
+
+   ⚠️ E ELES DURAM A BATALHA, não o confronto -- o contrário das duas Danças. A diferença não é
+   gosto: no jogo original o estágio zera quando o pokémon SAI DE CAMPO, e aqui quem vence um
+   confronto CONTINUA em campo pro próximo (é por isso que o HP dele carrega). Quem sai de campo
+   é quem cai... e quem é soprado pelo Remoinho -- e lá eles zeram, ver `limparEstagios`. */
+const ESTAGIO_MIN = -6, ESTAGIO_MAX = 6;
+function multDoEstagio(n){
+  const e = Math.max(ESTAGIO_MIN, Math.min(ESTAGIO_MAX, n | 0));
+  return e >= 0 ? (2 + e) / 2 : 2 / (2 - e);
+}
+function estagioDe(p, qual){ return (p && p._estagios && p._estagios[qual]) || 0; }
+/* ⚠️ O MULTIPLICADOR ENTRA POR ÚLTIMO na cadeia, depois de shiny, terreno, especialidade, item e
+   fúria: "metade da Defesa" é metade do que o pokémon TEM na hora do golpe. É a MESMA regra do
+   corte da queimadura e das duas Danças, e o motivo é o mesmo -- entrando antes, ele multiplicaria
+   só a parte base e o +15 do item ficaria de fora da conta. */
+function withEstagio(v, p, qual){
+  const e = estagioDe(p, qual);
+  return e ? Math.round(v * multDoEstagio(e)) : v;
+}
+/* Move o estágio e devolve se ele REALMENTE mudou. No teto, nada muda -- e aí não sai linha: um
+   aviso de "a Defesa caiu" com a barra parada é o mesmo defeito do "-0 de HP". */
+function moverEstagio(p, qual, delta){
+  if(!p) return false;
+  if(!p._estagios) p._estagios = {};
+  const antes = p._estagios[qual] || 0;
+  const depois = Math.max(ESTAGIO_MIN, Math.min(ESTAGIO_MAX, antes + delta));
+  if(depois === antes) return false;
+  p._estagios[qual] = depois;
+  return true;
+}
+function limparEstagios(p){ if(p) p._estagios = null; }
+/* ⚠️ O `alvo` DIZ EM QUEM O EFEITO CAI, e o Asa de Aço é o único que cai em QUEM USA. Lido como se
+   fossem todos no adversário, ele baixaria a Defesa de quem levou o golpe em vez de subir a de
+   quem bateu -- e o defeito não apareceria como erro: apareceria como o golpe sendo bom demais. */
+const GOLPES_QUE_MUDAM_ESTAGIO = {
+  irontail:   { chance: 0.30, atributo: 'def',   delta: -1, noProprio: false },
+  psychic:    { chance: 0.10, atributo: 'spDef', delta: -1, noProprio: false },
+  shadowball: { chance: 0.20, atributo: 'spDef', delta: -1, noProprio: false },
+  steelwing:  { chance: 0.10, atributo: 'def',   delta: +1, noProprio: true },
+  /* ⚠️ OS DOIS DE TM (17/09/2026), e eles são os primeiros de chance **1**: no jogo oficial os dois
+     acontecem SEMPRE que o golpe conecta, não são sorteio. O `rocktomb` já estava escrito aqui em
+     13/09 e teve que sair no mesmo dia -- o golpe não existia na tabela, porque ninguém o aprende
+     por nível. O TM39 é o que lhe deu casa.
+     ⚠️ E O OVERHEAT É O PRIMEIRO QUE COBRA UM PREÇO DE QUEM USA: −2 estágios no PRÓPRIO Ataque
+     Especial, o que faz o segundo uso valer metade do primeiro. É o que equilibra um golpe de 140. */
+  rocktomb:   { chance: 1.00, atributo: 'speed', delta: -1, noProprio: false },
+  overheat:   { chance: 1.00, atributo: 'spAtk', delta: -2, noProprio: true }
+};
+/* ⚠️ SORTEIA DEPOIS DE O GOLPE CONECTAR, e lê o rng da BATALHA -- nunca Math.random: um dado a
+   mais num dos motores desloca a semente inteira. E SAI ANTES do rng() quando o golpe não está na
+   tabela, senão ele mudaria toda batalha que não tem nenhum destes cinco.
+   Devolve o que a linha do log precisa, ou null. */
+function tentarEstagio(quemBate, alvo, rng){
+  if(!quemBate || quemBate.hp <= 0) return null;
+  const golpe = quemBate.lastMove;
+  const efeito = GOLPES_QUE_MUDAM_ESTAGIO[golpe];
+  if(!efeito) return null;
+  const quem = efeito.noProprio ? quemBate : alvo;
+  if(!quem || quem.hp <= 0) return null;
+  if(rng() >= efeito.chance) return null;
+  if(!moverEstagio(quem, efeito.atributo, efeito.delta)) return null;   // ja estava no teto
+  return { golpe: golpe, atributo: efeito.atributo, delta: efeito.delta, noProprio: !!efeito.noProprio };
+}
 /* ⚠️ A PARALISIA (16/09/2026), a QUARTA mecanica POR ATAQUE. Regras da GEN 3 (Bulbapedia,
    Paralysis), e ela e a unica das quatro que mexe em VELOCIDADE:
      - a velocidade cai pra 25% (`PARALISIA_VELOCIDADE`) -- a regra da Gen 1 a 6; so na Gen 7 ela
@@ -8287,6 +8618,11 @@ function doExchange(active, enemy, rng, diario){
   const queimouOSegundo = segundoCaiu ? null : tentarQueimar(first, second, rng);
   const envenenouOSegundo = segundoCaiu ? null : tentarEnvenenar(first, second, rng);
   const paralisouOSegundo = segundoCaiu ? null : tentarParalisar(first, second, rng);
+  const estagioDoSegundo = segundoCaiu ? null : tentarEstagio(first, second, rng);
+  /* ⚠️ O PODER SECRETO (TM43) vem DEPOIS dos quatro, e ele é o único golpe que pode aplicar
+     qualquer um deles -- qual, decide o TERRENO. Pondo-o antes, a marca dele bloquearia o
+     `tentar*` da mesma marca nesta troca. Fora de terreno ele não faz nada (nem lê o rng). */
+  const secretoNoSegundo = segundoCaiu ? null : tentarPoderSecreto(first, second, rng);
   const saiuNoPrimeiro = (segundoCaiu || congelouOSegundo) ? [] : aplicarGolpes(first, tetoDeQuemRaspa(second, first, dmgBySecond));
   /* O PISO DO REVIDE (1%-10%) SAIU JUNTO COM O REVIDE, em 15/09/2026 -- ver o bloco acima. Ele
      existia pra o revide de quem caiu não matar o outro ("jamais os 2 devem morrer juntos e um
@@ -8307,6 +8643,8 @@ function doExchange(active, enemy, rng, diario){
   const queimouOPrimeiro = (segundoCaiu || congelouOSegundo) ? null : tentarQueimar(second, first, rng);
   const envenenouOPrimeiro = (segundoCaiu || congelouOSegundo) ? null : tentarEnvenenar(second, first, rng);
   const paralisouOPrimeiro = (segundoCaiu || congelouOSegundo) ? null : tentarParalisar(second, first, rng);
+  const estagioDoPrimeiro = (segundoCaiu || congelouOSegundo) ? null : tentarEstagio(second, first, rng);
+  const secretoNoPrimeiro = (segundoCaiu || congelouOSegundo) ? null : tentarPoderSecreto(second, first, rng);
   const hpDoSecondAposDreno = second.hp;
   if(diario){
     /* O dano registrado é o que SAIU DE VERDADE da vida do alvo, não o número que a fórmula
@@ -8408,6 +8746,25 @@ function doExchange(active, enemy, rng, diario){
     /* A linha da PARALISIA tem a mesma forma das outras tres: dano 0, o `q` de QUEM FOI
        PARALISADO e o golpe no `mv` -- e o golpe que a frase nomeia. */
     const paralisou = (p, q, mv) => { if(mv) diario.push({ q:q, d:0, hp:null, c:0, m:0, z:0, x:"paralisou", g:p.name, mv:mv }); };
+    /* ⚠️ O PODER SECRETO REUSA A LINHA DO STATUS QUE ELE APLICOU: o jogador precisa ler "ficou
+       queimado", e não "sofreu o efeito do terreno" -- a mecânica é a mesma, o que muda é de onde
+       ela veio. O `mv` continua sendo o GOLPE, então a frase sai *"X ficou queimado com PODER
+       SECRETO!"*, que é verdade nas duas pontas.
+       A marca que o tentarPoderSecreto devolve É o campo da instância, e este mapa a traduz pro
+       nome da linha -- os dois saem das MESMAS quatro entradas do EFEITO_DO_TERRENO, então um
+       terreno novo lá já nasce com linha aqui. */
+    const LINHA_DA_MARCA = { _congelado:congelou, _queimado:queimou, _envenenado:envenenou, _paralisado:paralisou };
+    const secreto = (p, q, marca) => { if(marca && LINHA_DA_MARCA[marca]) LINHA_DA_MARCA[marca](p, q, GOLPE_PODER_SECRETO); };
+    /* ⚠️ O `q` DA LINHA DE ESTAGIO E DE QUEM TEVE O ATRIBUTO MEXIDO, e nao de quem usou o golpe:
+       no Asa de Aco os dois sao o MESMO pokemon, mas nos outros quatro sao lados opostos. Lido
+       como "quem bateu", a frase nomearia o pokemon errado em quatro dos cinco. */
+    const estagio = (quemBate, qBate, alvo, qAlvo, ef) => {
+      if(!ef) return;
+      const quem = ef.noProprio ? quemBate : alvo;
+      const q = ef.noProprio ? qBate : qAlvo;
+      diario.push({ q:q, d:0, hp:null, c:0, m:0, z:0, x:"estagio", g:quem.name, mv:ef.golpe,
+                    st:ef.atributo, dl:ef.delta });
+    };
     /* ⚠️ E A LINHA DE "NAO CONSEGUE ATACAR" SAI NO SLOT DE QUEM PERDEU O TURNO, como a do sono e
        a do gelo: ela e sobre a VEZ dele. O `q` e de quem esta paralisado -- estas linhas falam de
        UM pokemon, nao de um causador e um alvo. */
@@ -8436,6 +8793,8 @@ function doExchange(active, enemy, rng, diario){
     queimou(second, qDoSecond, queimouOSegundo);
     envenenou(second, qDoSecond, envenenouOSegundo);
     paralisou(second, qDoSecond, paralisouOSegundo);
+    estagio(first, qDoFirst, second, qDoSecond, estagioDoSegundo);
+    secreto(second, qDoSecond, secretoNoSegundo);
     /* ⚠️ O "CONTINUA A DORMIR" DO SECOND VEM DEPOIS DO GOLPE DO FIRST, e nao junto do geloDe la
        em cima: a frase e sobre O TURNO DELE (*"caso o pokemon nao acorde no turno dele"*), e o
        turno dele e depois do golpe de quem e mais rapido. Junto do gelo, o log dizia "Onix
@@ -8453,6 +8812,8 @@ function doExchange(active, enemy, rng, diario){
     queimou(first, qDoFirst, queimouOPrimeiro);
     envenenou(first, qDoFirst, envenenouOPrimeiro);
     paralisou(first, qDoFirst, paralisouOPrimeiro);
+    estagio(second, qDoSecond, first, qDoFirst, estagioDoPrimeiro);
+    secreto(first, qDoFirst, secretoNoPrimeiro);
     // AGORA sim: ele apanhou nesta troca, e só então acorda (ver o comentario do `acordaram`)
     /* ⚠️ QUEM MORREU DORMINDO NÃO ACORDA (14/09/2026, a pedido: *"quando um pokémon morre durante
        o sono, não precisa exibir que ele acordou e voltou para a luta, nem no log e nem na
@@ -8582,6 +8943,11 @@ function encerrarBatalha(team, inimigos){
        no F5 e congelado ate la. E o mesmo vazamento que o teto de HP da Furia teve. */
     p._congelado = null;
     p._paralisado = null;
+    /* ⚠️ OS ESTAGIOS junto: eles duram a BATALHA, e o time vai pro SAVE. Sem soltar, um
+       pokemon sairia da luta com a Defesa em -3 PRA SEMPRE -- e o campo comeca com _ (nao vai
+       pro Firestore), entao o save nem guardaria o motivo. O mesmo vazamento do teto de HP da
+       Furia. */
+    limparEstagios(p);
     /* A QUEIMADURA junto, e pelo mesmo motivo: ela dura a BATALHA, nao a jornada. Sem soltar, um
        pokemon sairia da luta queimado pra sempre -- e com o ataque fisico pela metade em todas as
        batalhas seguintes, o que nao apareceria como erro nenhum na tela. */
@@ -9338,7 +9704,7 @@ function confirmWild(){
       game.shinyFoundThisSave = true; // a partir daqui a escalada não volta neste save (ver currentShinyChance)
     }
     game.team.push(mon);
-    markCaught(id, mon.shiny);
+    markCaught(id, mon.shiny, mon.unown);
   });
   /* ⚠️ DEPOIS DE TODAS AS CAPTURAS, não dentro do laço: quem fecha a Zona de Safári pode fechá-la
      com os DOIS pokémon da mesma oferta, e conferir por captura anunciaria no meio da leva. */
@@ -10600,7 +10966,7 @@ function escolherOPremioDaVigilia(i){
   mon.escolherAtaques = true;
   if(mon.shiny){ game.shinyPityCount = 0; game.shinyFoundThisSave = true; }
   game.team.push(mon);
-  markCaught(esc.speciesId, mon.shiny);
+  markCaught(esc.speciesId, mon.shiny, mon.unown);
   game.vigiliaPremio = null;
   game.vigilia = null;
   if(game.team.length > 6){
@@ -11402,7 +11768,7 @@ function fatiaDoGolpe(semente){ return (1 - JITTER_DO_GOLPE) + ((Math.abs(sement
    elas SÃO um passo da animação com dano ZERO, então a frase cobre o passo delas e o segundo e meio
    de leitura vem da marca `leitura`. Fora desta tabela, a frase valeria PRA SEMPRE -- o defeito que
    a anulação teve. */
-const passosDaAbertura = { recover:1, pocao:1, absorb:2, disable:1, semSono:1, sono:1, furia:1, confusao:1, furiadragao:1, chuva:1, chuvafim:1, acordou:1, congelou:1, gelado:1, degelou:1, queimou:1, queima:1, dormindo:1, envenenou:1, veneno:1, paralisou:1, paralisado:1, remoinho:2, remoinhoEntra:1,
+const passosDaAbertura = { recover:1, pocao:1, absorb:2, disable:1, semSono:1, sono:1, furia:1, confusao:1, furiadragao:1, chuva:1, chuvafim:1, acordou:1, congelou:1, gelado:1, degelou:1, queimou:1, queima:1, dormindo:1, envenenou:1, veneno:1, paralisou:1, paralisado:1, estagio:1, remoinho:2, remoinhoEntra:1,
   espadas:1, pluma:1 };
 function buildAnimatedHitSequence(m){
   const seq = sequenciaDoConfronto(m).map(g => {
@@ -14866,11 +15232,26 @@ function showJourneyEnd(){
    `team`: um save com as 8 insignias e sem time passava por la e nao passava nas outras.
    O `team` faz parte da pergunta -- o que estes modos precisam e de um TIME pronto, nao de um
    troféu. */
-function savesCampeoes(){
+/* ⚠️ O TIME APOSENTADO (17/09/2026, a pedido: *"quando um save já não tem mais o que fazer após
+   vencer as 8 insígnias ... aposentar o time ... não vai mais ser possível utilizar esse time em
+   ligas onlines e batalhas onlines, porém podem ser utilizados na torre dos treinadores e no
+   ginásio da cidade"*).
+   ⚠️ O TIME NÃO É APAGADO, e isso é o que faz o pedido fechar: "vão para o Prof. Carvalho" é o que
+   a APOSENTADORIA significa, não uma limpeza do save. Esvaziando o time, ele sumiria da Torre e do
+   Ginásio junto -- que é exatamente o contrário do que se pediu. O que muda é UMA marca. */
+function saveAposentado(sv){ return !!(sv && sv.aposentado); }
+/* TODO SAVE COM AS 8 INSÍGNIAS E TIME -- aposentado ou não. É o que a Torre e o Ginásio da Cidade
+   enxergam. */
+function savesComOitoInsignias(){
   return Array.from({length:MAX_SAVE_SLOTS}, (_, i) => i).filter(slot => {
     const sv = game.saveSlots[slot];
     return !!(sv && sv.team && (sv.badgeCount || 0) >= 8);
   });
+}
+/* OS QUE AINDA COMPETEM: os de cima, MENOS os aposentados. É esta que as ligas e a batalha online
+   leem -- e o nome ficou porque ele é o que o resto do código já chamava. */
+function savesCampeoes(){
+  return savesComOitoInsignias().filter(slot => !saveAposentado(game.saveSlots[slot]));
 }
 const AVISO_SEM_CAMPEAO = 'É necessário vencer as 8 insígnias para entrar nesse modo de jogo.';
 /* A PORTA DOS TRES MODOS DE CAMPEAO (Ginásio da Cidade, Ligas e Batalha Online), pedida em
@@ -14884,8 +15265,11 @@ const AVISO_SEM_CAMPEAO = 'É necessário vencer as 8 insígnias para entrar nes
    carregamento levava a mensagem sendo campeão. Errar pro lado de DEIXAR ENTRAR é o certo aqui:
    a janela é de alguns centésimos, os três modos continuam recusando lá dentro, e o contrário
    seria trancar a porta na cara de quem tem o time. */
-function exigeTimeCampeao(){
-  if(!game.saveSlotsCarregados || savesCampeoes().length > 0){ game.modoBloqueado = null; return true; }
+/* ⚠️ O `incluirAposentados` É DO GINÁSIO DA CIDADE: lá o time aposentado continua valendo, então a
+   porta não pode recusar quem só tem aposentados. As ligas e a batalha online chamam sem ele. */
+function exigeTimeCampeao(incluirAposentados){
+  const quantos = incluirAposentados ? savesComOitoInsignias().length : savesCampeoes().length;
+  if(!game.saveSlotsCarregados || quantos > 0){ game.modoBloqueado = null; return true; }
   game.modoBloqueado = AVISO_SEM_CAMPEAO;
   render();
   return false;
@@ -14905,6 +15289,7 @@ const CAMPOS_DA_CONTA = [
   /* o que a conta JA resgatou de conquista -- ver as moedas das conquistas */
   'achievementsPaid',
   'hms',   // as Máquinas Ocultas são da CONTA, não do save -- ver darHM
+  'unownCaught',   // as letras do Unown que a conta ja viu (ver marcarLetraDoUnown)
   /* ⚠️ O AVISO DO HM TAMBÉM: o HM03 pode ser dado no CARREGAMENTO DA CONTA (pra quem já tinha as
      17 antes da feature), e aí o jogador está na home. Sem ele aqui, abrir um save apagaria a marca
      -- e o aviso não voltaria NUNCA, porque o `conferirHM03` vê o `temHM` e vai embora. Ele fica
@@ -15639,6 +16024,7 @@ function serializeGame(){
     eliteStage: game.eliteStage!=null ? game.eliteStage : null,
     elitePath: Array.isArray(game.elitePath) ? game.elitePath : null,   // ver sortearCaminhoDaElite
     eliteStatus: game.eliteStatus || null,
+    aposentado: !!game.aposentado,   // ver pedirAposentadoria
     eliteHealsLeft: game.eliteHealsLeft || 0,
     eliteAttemptsUsed: game.eliteAttemptsUsed || 0,
     eliteBestStage: game.eliteBestStage || 0,
@@ -15888,6 +16274,7 @@ function applySavedState(data){
   // save anterior ao sorteio não tem o campo: fica null e a próxima tentativa sorteia a fila dele
   game.elitePath = Array.isArray(data.elitePath) ? data.elitePath : null;
   game.eliteStatus = data.eliteStatus || null;
+  game.aposentado = !!data.aposentado;   // save antigo nao tem o campo: nasce ativo, como sempre foi
   game.eliteHealsLeft = data.eliteHealsLeft || 0;
   game.eliteAttemptsUsed = data.eliteAttemptsUsed || 0;
   game.eliteBestStage = data.eliteBestStage || 0;
@@ -18681,7 +19068,16 @@ function sequenciaDoConfronto(m){
      E ele CLONA em vez de mutar: esta função é chamada a cada desenho da tela, e o `m.golpes` é o
      diário de verdade -- mutar ali corromperia o log e a próxima chamada suavizaria o suavizado. */
   const suavizarAparados = (lista, semHp) => {
-    if(lista.some(g => g.x === 'faixa' || g.x === 'desempate')) return lista;
+    /* ⚠️ E O CONFRONTO COM MUDANCA DE ESTAGIO SAI INTEIRO (17/09/2026), pelo MESMO motivo do golpe
+       que mata: ele se EXPLICA SOZINHO. Quando a Cauda de Ferro baixa a Defesa do alvo, o golpe
+       seguinte doi mais de VERDADE -- e ha uma linha na tela dizendo isso. Repartir os dois faria o
+       contrario do que a suavizacao existe pra fazer: ela esconde um corte MASCARADO (o revide
+       moribundo, que nao existe mais desde 15/09), e aqui nao ha nada mascarado.
+       ⚠️ E ELE SAI DOS DOIS LADOS, nao so do lado da linha: o estagio mexe na DEFESA de um e no
+       DANO do outro, entao uma queda marcada no lado do inimigo e o que explica o golpe do jogador.
+       Custo medido: a suavizacao so toca 0,68% dos confrontos hoje, e isentar estes custa 25%
+       disso. */
+    if(lista.some(g => g.x === 'faixa' || g.x === 'desempate' || g.x === 'estagio')) return lista;
     let saida = lista;
     ['p','e'].forEach(lado => {
       const idx = [];
@@ -19078,6 +19474,14 @@ function sequenciaDoConfronto(m){
    'quem' é sempre quem USOU o golpe; 'alvo' é quem sofreu. Repare que a frase do Disable começa
    pelo ALVO ("Gengar teve seu melhor ataque anulado por Alakazam"): quem interessa ali é o
    prejudicado, e é o nome dele que o jogador procura na tela. */
+/* Os tres atributos que os estagios alcancam hoje. Por extenso porque `spDef` e vocabulario de
+   motor: o jogador le "Defesa Especial" na ficha e no cartao do golpe. */
+/* ⚠️ OS CINCO ATRIBUTOS QUE O `moverEstagio` ACEITA TEM QUE ESTAR TODOS AQUI E TODOS SER LIDOS POR
+   UMA `effective*` -- senao o motor grava um estagio que ninguem le, e o defeito nao aparece como
+   erro: aparece como um golpe que anuncia um efeito e nao faz nada. Ha trava cobrando as duas
+   pontas. */
+const NOME_DO_ATRIBUTO = { atk:'o Ataque', def:'a Defesa', spAtk:'o Ataque Especial',
+                           spDef:'a Defesa Especial', speed:'a Velocidade' };
 const ICONES_ESPECIAIS = { boom:'💥', sono:'😴', disable:'🚫', recover:'💚', absorb:'🌿', faixa:'🎗️', desempate:'⚖️', furia:'😤', confusao:'💫', furiadragao:'🐉', chuva:'🌧️', chuvafim:'☀️', acordou:'⏰', remoinho:'🌪️', espadas:'⚔️', pluma:'🪶',
   /* ⚠️ AS TRES LINHAS DO CONGELAMENTO DIVIDEM O MESMO ❄️, e e de proposito: elas sao o mesmo
      evento visto em tres momentos (pegou / perdeu a vez / passou). Icones diferentes fariam o
@@ -19097,7 +19501,10 @@ const ICONES_ESPECIAIS = { boom:'💥', sono:'😴', disable:'🚫', recover:'�
   /* ⚠️ O ⚡ SERVE AOS DOIS MOMENTOS da paralisia (pegou / perdeu a vez), como o ❄️ serve aos tres
      do gelo: e o MESMO evento visto em horas diferentes, e icones diferentes fariam procurar duas
      mecanicas onde ha uma. */
-  paralisou:'⚡', paralisado:'⚡' };
+  paralisou:'⚡', paralisado:'⚡',
+  /* ⚠️ O ESTAGIO E O UNICO DO BLOCO COM DOIS ICONES PRO MESMO `x`, e a razao e que ele vai nos
+     dois sentidos: a seta E a informacao. Quem escolhe e a frase, pelo sinal do delta. */
+  estagio:'📉', estagioSobe:'📈' };
 /* O TIPO de cada golpe especial, pro selo colorido do log. Vive só no CLIENTE, como o
    MOVE_BY_TYPE: o motor manda o que aconteceu, o cliente escolhe a palavra e a cor -- é o que
    evita mais uma tabela duplicada pra sair de sincronia.
@@ -19219,6 +19626,52 @@ function obsDoGolpe(id){
   if(GOLPES_QUE_CONGELAM[id])  obs.push(pct(GOLPES_QUE_CONGELAM[id])  + "congelamento "   + ICONES_ESPECIAIS.congelou);
   if(GOLPES_QUE_ENVENENAM[id]) obs.push(pct(GOLPES_QUE_ENVENENAM[id]) + "envenenamento "  + ICONES_ESPECIAIS.envenenou);
   if(GOLPES_QUE_PARALISAM[id]) obs.push(pct(GOLPES_QUE_PARALISAM[id]) + "paralisia "      + ICONES_ESPECIAIS.paralisou);
+  /* ⚠️ O AVISO DO ESTAGIO DIZ EM QUEM ELE CAI, e isso e o que decide a escolha: o Asa de Aco sobe
+     a Defesa de QUEM USA e os outros quatro baixam a do ALVO. Sem o "do alvo"/"sua", o cartao do
+     Asa de Aco se leria como um debuff.
+     ⚠️ E ELE NAO USA O `pct()`: aquele ajudante prefixa "X% de chance de CAUSAR", que casa com um
+     SUBSTANTIVO (queimadura, paralisia) e nao com o verbo daqui -- saia "de causar reduzir".
+     ⚠️ O GOLPE DE 100% NAO DIZ PORCENTAGEM: "100% de chance de" e uma condicional que nao existe;
+     ali o certo e afirmar. Nenhum dos quatro de hoje e 100%, mas o Rock Tomb e -- e ele entra numa
+     linha no dia em que tiver dono. */
+  /* ⚠️ A FACHADA E O PODER SECRETO (17/09/2026, pedido junto com os TMs: *"muitos desses TMs
+     possuem efeito adicional ... coloque essas informações no card"*). Os dois são o caso mais
+     forte desta função depois da drenagem: o cartão mostra **PODER 70** nos dois, e nenhum dos
+     seis números diz que um DOBRA com status e o outro aplica efeito conforme o terreno.
+     ⚠️ E OS DOIS SAEM DAS PRÓPRIAS CONSTANTES (o multiplicador e a chance), nunca de um texto
+     fixo: mexer no balanceamento sem a frase acompanhar é o defeito que a especialidade teve, e
+     que a chance dos três status já evitou aqui. */
+  /* ⚠️ O GOLPE QUE CONFUNDE avisa aqui, e ele é a "habilidade passiva" que o pedido dos TMs nomeia
+     (*"os TMs que dão habilidade passiva, como o TM03 (Water Pulse), o pokemon também deve ganhar a
+     habilidade passiva enquanto estiver com esse movimento"*). Carregar o golpe dá a passiva de
+     confusão -- e sem a frase, um Pulso de Água de poder 60 se lê como um golpe de Água qualquer.
+     A chance é a do bloco de especiais (CHANCE_CONFUSAO), lida da constante. */
+  if(GOLPES_QUE_CONFUNDEM[id]){
+    obs.push("Dá a passiva de confusão: " + Math.round(CHANCE_CONFUSAO * 100) +
+             "% por confronto de o adversário se acertar " + ICONES_ESPECIAIS.confusao);
+  }
+  if(id === GOLPE_FACHADA){
+    obs.push("Vale " + FACHADA_MULT + "x se quem usa estiver queimado, envenenado ou paralisado");
+  }
+  if(id === GOLPE_PODER_SECRETO){
+    obs.push(Math.round(CHANCE_PODER_SECRETO * 100) + "% de chance de um efeito que depende do terreno");
+  }
+  const est = GOLPES_QUE_MUDAM_ESTAGIO[id];
+  if(est){
+    const atr = NOME_DO_ATRIBUTO[est.atributo] || est.atributo;
+    /* ⚠️ DUAS FORMAS DO VERBO, e nao uma capitalizada na hora: com chance a frase pede INFINITIVO
+       ("de chance de reduzir") e sem chance pede o presente ("Reduz"). Conjugar por corte de
+       string dava "de chance de reduz". */
+    /* ⚠️ QUEM SOFRE SAI DO `noProprio`, NUNCA DO SINAL DO DELTA. A regra antiga (delta>0 ⇒ quem
+       usa) era verdade por acidente -- o único +1 era no próprio e os −1 eram no alvo. O OVERHEAT
+       quebrou as duas metades: ele é **−2 no PRÓPRIO usuário**, e o cartão dizia "Reduz o Ataque
+       Especial DO ALVO", o contrário do que o golpe faz. O campo já existia na tabela. */
+    const alvo = est.noProprio ? (atr + " de quem usa") : (atr + " do alvo");
+    const frase = est.chance >= 1
+      ? ((est.delta > 0 ? "Aumenta " : "Reduz ") + alvo)
+      : (Math.round(est.chance * 100) + "% de chance de " + (est.delta > 0 ? "aumentar " : "reduzir ") + alvo);
+    obs.push(frase + " " + (est.delta > 0 ? ICONES_ESPECIAIS.estagioSobe : ICONES_ESPECIAIS.estagio));
+  }
   return obs;
 }
 function cartaoDeGolpe(id, comTipo, destaque){
@@ -19272,7 +19725,7 @@ function seloDeChuvaClicavel(nome){
 /* Os quadros `remoinhoVazio` e `remoinhoEntra` NÃO entram aqui: esta função filtra o DIÁRIO, e o
    motor grava um registro só de remoinho -- quem reparte em três é a apresentação. Quem precisa do
    quadro do novo na lista de avisos o acrescenta à mão (ver avisoDoConfronto). */
-function ehGolpeEspecial(g){ return g && (g.x === 'boom' || g.x === 'sono' || g.x === 'disable' || g.x === 'recover' || g.x === 'furia' || g.x === 'confusao' || g.x === 'furiadragao' || g.x === 'chuva' || g.x === "chuvafim" || g.x === "acordou" || g.x === "congelou" || g.x === "gelado" || g.x === "degelou" || g.x === "queimou" || g.x === "queima" || g.x === "dormindo" || g.x === "envenenou" || g.x === "veneno" || g.x === "paralisou" || g.x === "paralisado" || g.x === 'remoinho' || g.x === 'espadas' || g.x === 'pluma' || g.x === 'semSono' || g.x === 'pocao' || g.x === 'absorb'); }
+function ehGolpeEspecial(g){ return g && (g.x === 'boom' || g.x === 'sono' || g.x === 'disable' || g.x === 'recover' || g.x === 'furia' || g.x === 'confusao' || g.x === 'furiadragao' || g.x === 'chuva' || g.x === "chuvafim" || g.x === "acordou" || g.x === "congelou" || g.x === "gelado" || g.x === "degelou" || g.x === "queimou" || g.x === "queima" || g.x === "dormindo" || g.x === "envenenou" || g.x === "veneno" || g.x === "paralisou" || g.x === "paralisado" || g.x === "estagio" || g.x === 'remoinho' || g.x === 'espadas' || g.x === 'pluma' || g.x === 'semSono' || g.x === 'pocao' || g.x === 'absorb'); }
 /* Os itens da mochila: o que cada um se chama na tela e quanto cura. O motor manda o id (g.g), o
    cliente escolhe a palavra -- mesmo caminho do MOVE_BY_TYPE. */
 const ITENS_DE_BATALHA = {
@@ -19338,6 +19791,21 @@ function fraseDoEspecial(g, quem, alvo, op){
     /* ⚠️ COM O NUMERO, pela mesma razao da queimadura: a linha de um especial nao ganha o "e tirou
        -N de HP" automatico, e sem ele a soma das linhas nao fecharia com a barra. */
     return escapeHtmlSafe(golpe || "Ele") + " perdeu " + (g.d || 0) + " de HP pelo veneno";
+  }
+  if(g.x === "estagio"){
+    /* ⚠️ A FRASE DIZ QUAL ATRIBUTO E PRA QUE LADO, e nomeia o GOLPE como as dos status. O nome do
+       atributo sai por extenso: "spDef" e vocabulario de motor, e o jogador le "Defesa Especial"
+       na ficha da Pokedex e no cartao do golpe.
+       ⚠️ E ELA NAO DIZ O NUMERO DO ESTAGIO. Um "-1" solto nao significa nada pra quem nunca viu a
+       tabela (e -1 NAO e metade: e 0,667). O que muda a decisao e o SENTIDO, e e isso que sai. */
+    const nomeE = escapeHtmlSafe(golpe || "Ele");
+    const atr = NOME_DO_ATRIBUTO[g.st] || g.st;
+    const subiu = (g.dl || 0) > 0;
+    const comGolpe = (g.mv && GOLPES[g.mv])
+      ? (" com " + (op.selo ? seloDeGolpe(nomeDoAtaque(g.mv), GOLPES[g.mv][0])
+                            : escapeHtmlSafe(nomeDoAtaque(g.mv).toUpperCase())))
+      : "";
+    return nomeE + (subiu ? " aumentou " : " teve ") + atr + (subiu ? "" : " reduzida") + comGolpe + "!";
   }
   if(g.x === "paralisou"){
     /* A FRASE NOMEIA O GOLPE, como as dos outros tres status, e com o "com" neutro pela mesma
@@ -20575,6 +21043,71 @@ function ataquesTrocaveis(p){
    jogador conferir o time golpe a golpe pra ter certeza. */
 function cortadorDoTime(){ return (game.team || []).find(sabeCortar) || null; }
 
+/* ============================================================================
+   AS MÁQUINAS DE TÉCNICA (TMs) -- 17/09/2026
+   ----------------------------------------------------------------------------
+   Pedidas assim: *"implemente os TMs e coloque eles para vender, no mínimo 100 cada, conforme o
+   poder for maior, mais caro fica, e os TMs devem ser de uso único, usou uma vez, ele some e não
+   dá para usar mais, precisa comprar novamente"*.
+
+   ⚠️ ELAS SÃO O CONTRÁRIO DOS HMs EM TUDO QUE IMPORTA, e é por isso que não dava pra reusar o
+   `HMS`:
+
+     |                  | HM                          | TM                            |
+     |------------------|-----------------------------|-------------------------------|
+     | de onde vem      | conquista da jornada        | **compra na loja**            |
+     | onde mora        | na CONTA (`hms`)            | no **inventário** (empilha)   |
+     | quantas vezes    | infinitas                   | **UMA** (some ao ensinar)     |
+     | dá pra esquecer  | não, nunca                  | **sim**, é golpe comum        |
+
+   ⚠️ E A ÚLTIMA LINHA É A QUE MAIS SEPARA AS DUAS: o golpe de HM é a CHAVE de uma rota, então
+   perdê-lo numa tela de troca fecharia o caminho de novo (ver `ehGolpeDeMaquina`). O de TM é só um
+   golpe -- ele entra na fila de aprendizado como qualquer outro, e o jogador pode trocá-lo depois.
+   Quem pagou 300 numa Hiper Raio e a trocou por engano **perdeu a Máquina**: é o preço do uso
+   único, e é o que a tela avisa antes.
+
+   ⚠️ A LISTA DE QUEM APRENDE SAIU DA TAG "3M" DO SHOWDOWN (Gen 3), o MESMO caminho dos 72
+   cortadores, dos 65 surfistas e dos 24 voadores -- e o método foi conferido reproduzindo os três
+   sem uma divergência. Atenção à fonte: as tags `1M` e `2M` dão ZERO nas 250 do jogo, porque o
+   arquivo do Showdown é podado e só traz da Gen 3 pra frente.
+
+   ⚠️ O PREÇO É DERIVADO, nunca escrito à mão: `max(100, poder efetivo × 2)`, arredondado à dezena.
+   Ele usa o poder EFETIVO (`poderEfetivo`) e não o cru, que é a mesma régua que a escolha de golpe
+   usa -- sem isso a Semente-Bala (poder 10, mas 2 a 5 tapas) sairia como o golpe mais barato do
+   jogo por um número que não descreve o que ela tira. Vai de 🪙100 (Semente-Bala, Tumba de Rochas,
+   Ladrão) a 🪙300 (Hiper Raio), ou seja de **1,4 a 4,3 jornadas** de renda -- a mais cara empata
+   com o Doce Raro.
+
+   ⚠️ ESTA TABELA É DUPLICADA no servidor, e não é opcional: é o `golpesValidos` que deixa um golpe
+   sobreviver na liga e no online, e ele reconstrói o que a espécie pode ter a partir do
+   `APRENDIZADO` (que é por NÍVEL) mais os HMs. Sem os TMs ali, quem ensinasse um perderia o golpe
+   em TODA partida de liga, em silêncio -- foi exatamente o que quase aconteceu com o `fly`.
+   ============================================================================ */
+const TMS = {
+  tm02: { golpe:'dragonclaw', preco:160, aprendem:['aerodactyl','charizard','charmander','charmeleon','dragonite','feraligatr','tyranitar'] },
+  tm03: { golpe:'waterpulse', preco:120, aprendem:['aipom','articuno','azumarill','blastoise','blissey','celebi','chansey','chinchou','clefable','clefairy','cleffa','cloyster','corsola','croconaw','delibird','dewgong','dragonair','dragonite','dratini','dunsparce','feraligatr','furret','goldeen','golduck','granbull','gyarados','horsea','igglybuff','jigglypuff','jynx','kabuto','kabutops','kangaskhan','kingdra','kingler','krabby','lanturn','lapras','lickitung','lugia','mantine','marill','meowth','mewtwo','miltank','nidoking','nidoqueen','nidoranf','nidoranm','nidorina','nidorino','octillery','omanyte','omastar','persian','politoed','poliwag','poliwhirl','poliwrath','psyduck','quagsire','qwilfish','remoraid','seadra','seaking','seel','sentret','shellder','slowbro','slowking','slowpoke','smoochum','snorlax','snubbull','squirtle','starmie','staryu','suicune','tauros','tentacool','tentacruel','togepi','togetic','totodile','tyranitar','vaporeon','wartortle','wigglytuff','wooper'] },
+  tm09: { golpe:'bulletseed', preco:100, aprendem:['bayleef','bellossom','bellsprout','bulbasaur','chikorita','exeggcute','exeggutor','gloom','hoppip','ivysaur','jumpluff','meganium','octillery','oddish','paras','parasect','skiploom','sunflora','sunkern','tangela','venusaur','victreebel','vileplume','weepinbell'] },
+  tm13: { golpe:'icebeam', preco:190, aprendem:['articuno','azumarill','blastoise','blissey','chansey','chinchou','clefable','clefairy','cloyster','corsola','croconaw','cubone','delibird','dewgong','dragonair','dragonite','dratini','dunsparce','feraligatr','furret','goldeen','golduck','gyarados','horsea','jigglypuff','jynx','kabuto','kabutops','kangaskhan','kingdra','kingler','krabby','lanturn','lapras','lickitung','lugia','mantine','marill','marowak','mewtwo','miltank','nidoking','nidoqueen','nidoranf','nidoranm','nidorina','nidorino','octillery','omanyte','omastar','piloswine','politoed','poliwag','poliwhirl','poliwrath','porygon','porygon2','psyduck','quagsire','qwilfish','raticate','remoraid','rhydon','rhyhorn','seadra','seaking','seel','sentret','shellder','slowbro','slowking','slowpoke','smoochum','sneasel','snorlax','squirtle','starmie','staryu','suicune','swinub','tauros','tentacool','tentacruel','totodile','tyranitar','vaporeon','wartortle','wigglytuff','wooper'] },
+  tm14: { golpe:'blizzard', preco:240, aprendem:['articuno','azumarill','blastoise','blissey','chansey','chinchou','clefable','clefairy','cloyster','corsola','croconaw','cubone','delibird','dewgong','dragonair','dragonite','dratini','dunsparce','feraligatr','furret','goldeen','golduck','gyarados','horsea','jigglypuff','jynx','kabuto','kabutops','kangaskhan','kingdra','kingler','krabby','lanturn','lapras','lickitung','lugia','mantine','marill','marowak','mewtwo','miltank','nidoking','nidoqueen','nidoranf','nidoranm','nidorina','nidorino','octillery','omanyte','omastar','piloswine','politoed','poliwag','poliwhirl','poliwrath','porygon','porygon2','psyduck','quagsire','qwilfish','raticate','remoraid','rhydon','rhyhorn','seadra','seaking','seel','shellder','slowbro','slowking','slowpoke','smoochum','sneasel','snorlax','squirtle','starmie','staryu','suicune','swinub','tauros','tentacool','tentacruel','totodile','tyranitar','vaporeon','wartortle','wigglytuff','wooper'] },
+  tm15: { golpe:'hyperbeam', preco:300, aprendem:['aerodactyl','alakazam','ampharos','arbok','arcanine','ariados','articuno','azumarill','beedrill','bellossom','blastoise','blissey','butterfree','celebi','chansey','charizard','clefable','cloyster','crobat','dewgong','dodrio','donphan','dragonair','dragonite','dratini','dugtrio','electabuzz','electrode','entei','espeon','exeggutor','fearow','feraligatr','flareon','forretress','furret','gengar','golbat','golduck','golem','granbull','gyarados','heracross','hooh','houndoom','hypno','jolteon','jumpluff','jynx','kabutops','kangaskhan','kingdra','kingler','lanturn','lapras','larvitar','ledian','lickitung','lugia','machamp','magcargo','magmar','magneton','marowak','meganium','mewtwo','miltank','moltres','mrmime','muk','nidoking','nidoqueen','ninetales','noctowl','octillery','omastar','parasect','persian','pidgeot','piloswine','pinsir','politoed','poliwrath','porygon','porygon2','primeape','pupitar','quagsire','raichu','raikou','rapidash','raticate','remoraid','rhydon','sandslash','scizor','scyther','seadra','seaking','slowbro','slowking','snorlax','starmie','steelix','suicune','sunflora','tangela','tauros','tentacruel','togetic','typhlosion','tyranitar','umbreon','ursaring','vaporeon','venomoth','venusaur','victreebel','vileplume','weezing','wigglytuff','xatu','zapdos'] },
+  tm19: { golpe:'gigadrain', preco:120, aprendem:['arbok','ariados','bayleef','beedrill','bellossom','bellsprout','bulbasaur','butterfree','celebi','chikorita','crobat','ekans','exeggcute','exeggutor','forretress','gastly','gengar','gloom','golbat','grimer','haunter','hooh','hoppip','ivysaur','jumpluff','kabuto','kabutops','ledian','ledyba','lugia','meganium','muk','natu','oddish','paras','parasect','pineco','skiploom','spinarak','sunflora','sunkern','tangela','tentacool','tentacruel','venomoth','venonat','venusaur','victreebel','vileplume','weepinbell','xatu','yanma','zubat'] },
+  tm22: { golpe:'solarbeam', preco:240, aprendem:['aipom','ariados','bayleef','beedrill','bellossom','bellsprout','blissey','bulbasaur','butterfree','celebi','chansey','chikorita','clefable','clefairy','cleffa','dunsparce','entei','exeggcute','exeggutor','forretress','furret','gloom','granbull','hooh','hoppip','houndoom','houndour','igglybuff','ivysaur','jigglypuff','jumpluff','kangaskhan','ledian','ledyba','lickitung','meganium','mewtwo','miltank','mrmime','natu','oddish','paras','parasect','pineco','ponyta','porygon','porygon2','rapidash','sentret','skiploom','snorlax','snubbull','spinarak','stantler','sunflora','sunkern','tangela','tauros','togepi','togetic','venomoth','venonat','venusaur','victreebel','vileplume','weepinbell','wigglytuff','xatu','yanma'] },
+  tm23: { golpe:'irontail', preco:200, aprendem:['abra','aerodactyl','aipom','alakazam','ampharos','arbok','arcanine','azumarill','bayleef','blastoise','blissey','chansey','charizard','charmander','charmeleon','chikorita','clefable','clefairy','cleffa','croconaw','cubone','donphan','dragonair','dragonite','dratini','dunsparce','eevee','ekans','electabuzz','entei','espeon','farfetchd','feraligatr','flaaffy','flareon','furret','girafarig','gligar','golduck','granbull','growlithe','houndoom','houndour','jolteon','kadabra','kangaskhan','lapras','lickitung','lugia','magby','magmar','mankey','mareep','marill','marowak','meganium','meowth','mewtwo','miltank','nidoking','nidoqueen','nidoranf','nidoranm','nidorina','nidorino','ninetales','onix','persian','phanpy','pichu','pikachu','ponyta','porygon','porygon2','primeape','psyduck','quagsire','raichu','raikou','rapidash','raticate','rhydon','rhyhorn','sandshrew','sandslash','sentret','slowbro','slowking','slowpoke','sneasel','squirtle','stantler','steelix','suicune','tauros','totodile','tyranitar','umbreon','vaporeon','vulpix','wartortle','wooper'] },
+  tm24: { golpe:'thunderbolt', preco:190, aprendem:['aipom','ampharos','blissey','chansey','chinchou','clefable','clefairy','dragonair','dragonite','dratini','dunsparce','electabuzz','electrode','elekid','flaaffy','furret','gastly','gengar','girafarig','granbull','grimer','gyarados','haunter','hooh','jigglypuff','jolteon','kangaskhan','koffing','lanturn','lapras','lickitung','lugia','magnemite','magneton','mankey','mareep','meowth','mewtwo','miltank','misdreavus','mrmime','muk','nidoking','nidoqueen','nidoranf','nidoranm','nidorina','nidorino','persian','pichu','pikachu','porygon','porygon2','primeape','raichu','raikou','raticate','rhydon','rhyhorn','sentret','snorlax','snubbull','stantler','starmie','staryu','tauros','tyranitar','voltorb','weezing','wigglytuff','zapdos'] },
+  tm25: { golpe:'thunder', preco:240, aprendem:['aipom','ampharos','blissey','chansey','chinchou','clefable','clefairy','dragonair','dragonite','dratini','dunsparce','electabuzz','electrode','elekid','flaaffy','furret','gengar','girafarig','granbull','grimer','gyarados','hooh','jigglypuff','jolteon','kangaskhan','koffing','lanturn','lapras','lickitung','lugia','magnemite','magneton','mankey','mareep','meowth','mewtwo','miltank','misdreavus','mrmime','muk','nidoking','nidoqueen','nidoranf','nidoranm','nidorina','nidorino','persian','pichu','pikachu','porygon','porygon2','primeape','raichu','raikou','raticate','rhydon','rhyhorn','snorlax','snubbull','stantler','starmie','staryu','tauros','tyranitar','voltorb','weezing','wigglytuff','zapdos'] },
+  tm26: { golpe:'earthquake', preco:200, aprendem:['aerodactyl','arbok','blastoise','blissey','chansey','charizard','corsola','cubone','diglett','donphan','dragonite','dugtrio','dunsparce','ekans','feraligatr','forretress','geodude','girafarig','gligar','golem','granbull','graveler','gyarados','heracross','hitmonchan','hitmonlee','hitmontop','hooh','kangaskhan','larvitar','lickitung','lugia','machamp','machoke','machop','magcargo','mankey','mantine','marowak','meganium','mewtwo','miltank','nidoking','nidoqueen','onix','phanpy','piloswine','pineco','pinsir','politoed','poliwhirl','poliwrath','primeape','pupitar','quagsire','rhydon','rhyhorn','sandshrew','sandslash','shuckle','slowbro','slowking','slowpoke','snorlax','snubbull','stantler','steelix','sudowoodo','swinub','tauros','teddiursa','typhlosion','tyranitar','tyrogue','ursaring','venusaur','wooper'] },
+  tm29: { golpe:'psychic', preco:180, aprendem:['abra','alakazam','ariados','blissey','butterfree','celebi','chansey','clefable','clefairy','cleffa','corsola','drowzee','electabuzz','elekid','espeon','exeggcute','exeggutor','gastly','gengar','girafarig','haunter','hooh','hoothoot','hypno','igglybuff','jigglypuff','jynx','kadabra','lapras','lugia','magby','magmar','mewtwo','misdreavus','mrmime','natu','noctowl','octillery','politoed','poliwag','poliwhirl','poliwrath','porygon','porygon2','remoraid','slowbro','slowking','slowpoke','smoochum','snorlax','spinarak','stantler','starmie','staryu','togepi','togetic','umbreon','venomoth','venonat','wigglytuff','xatu','yanma'] },
+  tm30: { golpe:'shadowball', preco:160, aprendem:['abra','aipom','alakazam','blissey','butterfree','celebi','chansey','clefable','clefairy','cleffa','corsola','crobat','drowzee','dunsparce','eevee','espeon','flareon','furret','gastly','gengar','girafarig','golbat','granbull','haunter','hooh','hoothoot','houndoom','houndour','hypno','igglybuff','jigglypuff','jolteon','jynx','kadabra','kangaskhan','koffing','lickitung','lugia','meowth','mewtwo','miltank','misdreavus','mrmime','murkrow','natu','nidoking','nidoqueen','noctowl','persian','porygon','porygon2','qwilfish','raticate','sentret','slowbro','slowking','slowpoke','smoochum','sneasel','snorlax','snubbull','stantler','togepi','togetic','umbreon','vaporeon','weezing','wigglytuff','xatu','yanma','zubat'] },
+  tm35: { golpe:'flamethrower', preco:190, aprendem:['aerodactyl','arcanine','blissey','chansey','charizard','charmander','charmeleon','clefable','clefairy','cleffa','cubone','cyndaquil','dragonair','dragonite','dratini','dunsparce','entei','flareon','furret','geodude','golem','granbull','graveler','grimer','growlithe','gyarados','hooh','houndoom','houndour','igglybuff','jigglypuff','kangaskhan','koffing','lickitung','machamp','machoke','machop','magby','magcargo','magmar','marowak','mewtwo','moltres','muk','nidoking','nidoqueen','ninetales','octillery','ponyta','quilava','rapidash','remoraid','rhydon','rhyhorn','sentret','slowbro','slowking','slowpoke','slugma','snorlax','snubbull','tauros','togepi','togetic','typhlosion','tyranitar','vulpix','weezing','wigglytuff'] },
+  tm36: { golpe:'sludgebomb', preco:180, aprendem:['arbok','ariados','beedrill','bellossom','bellsprout','bulbasaur','crobat','diglett','dugtrio','ekans','exeggcute','exeggutor','gastly','gengar','gligar','gloom','golbat','granbull','grimer','haunter','houndoom','houndour','ivysaur','koffing','muk','nidoking','nidoqueen','nidoranf','nidoranm','nidorina','nidorino','octillery','oddish','paras','parasect','quagsire','qwilfish','shuckle','snubbull','spinarak','sunflora','sunkern','tangela','tentacool','tentacruel','venomoth','venonat','venusaur','victreebel','vileplume','weepinbell','weezing','wooper','zubat'] },
+  tm38: { golpe:'fireblast', preco:240, aprendem:['aerodactyl','arcanine','blissey','chansey','charizard','charmander','charmeleon','clefable','clefairy','cleffa','cubone','cyndaquil','dragonair','dragonite','dratini','dunsparce','entei','flareon','geodude','golem','granbull','graveler','grimer','growlithe','gyarados','hooh','houndoom','houndour','igglybuff','jigglypuff','kangaskhan','koffing','lickitung','machamp','machoke','machop','magby','magcargo','magmar','marowak','mewtwo','moltres','muk','nidoking','nidoqueen','ninetales','octillery','ponyta','quilava','rapidash','remoraid','rhydon','rhyhorn','slowbro','slowking','slowpoke','slugma','snorlax','snubbull','tauros','togepi','togetic','typhlosion','tyranitar','vulpix','weezing','wigglytuff'] },
+  tm39: { golpe:'rocktomb', preco:100, aprendem:['aerodactyl','blissey','chansey','corsola','cubone','diglett','donphan','dragonite','dugtrio','dunsparce','geodude','gligar','golem','granbull','graveler','grimer','heracross','hitmonchan','hitmonlee','kabuto','kabutops','kangaskhan','kingler','krabby','lickitung','machamp','machoke','machop','magcargo','mankey','marowak','mewtwo','miltank','muk','nidoking','nidoqueen','omanyte','omastar','onix','phanpy','piloswine','pinsir','poliwrath','primeape','quagsire','rhydon','rhyhorn','sandshrew','sandslash','shuckle','snorlax','steelix','sudowoodo','swinub','tauros','tyranitar','ursaring'] },
+  tm42: { golpe:'facade', preco:140, aprendem:['abra','aerodactyl','aipom','alakazam','ampharos','arbok','arcanine','ariados','articuno','azumarill','bayleef','beedrill','bellossom','bellsprout','blastoise','blissey','bulbasaur','butterfree','celebi','chansey','charizard','charmander','charmeleon','chikorita','chinchou','clefable','clefairy','cleffa','cloyster','corsola','crobat','croconaw','cubone','cyndaquil','delibird','dewgong','diglett','dodrio','doduo','donphan','dragonair','dragonite','dratini','drowzee','dugtrio','dunsparce','eevee','ekans','electabuzz','electrode','elekid','entei','espeon','exeggcute','exeggutor','farfetchd','fearow','feraligatr','flaaffy','flareon','forretress','furret','gastly','gengar','geodude','girafarig','gligar','gloom','golbat','goldeen','golduck','golem','granbull','graveler','grimer','growlithe','gyarados','haunter','heracross','hitmonchan','hitmonlee','hitmontop','hooh','hoothoot','hoppip','horsea','houndoom','houndour','hypno','igglybuff','ivysaur','jigglypuff','jolteon','jumpluff','jynx','kabuto','kabutops','kadabra','kangaskhan','kingdra','kingler','koffing','krabby','lanturn','lapras','larvitar','ledian','ledyba','lickitung','lugia','machamp','machoke','machop','magby','magcargo','magmar','magnemite','magneton','mankey','mantine','mareep','marill','marowak','meganium','meowth','mewtwo','miltank','misdreavus','moltres','mrmime','muk','murkrow','natu','nidoking','nidoqueen','nidoranf','nidoranm','nidorina','nidorino','ninetales','noctowl','octillery','oddish','omanyte','omastar','onix','paras','parasect','persian','phanpy','pichu','pidgeot','pidgeotto','pidgey','pikachu','piloswine','pineco','pinsir','politoed','poliwag','poliwhirl','poliwrath','ponyta','porygon','porygon2','primeape','psyduck','pupitar','quagsire','quilava','qwilfish','raichu','raikou','rapidash','raticate','remoraid','rhydon','rhyhorn','sandshrew','sandslash','scizor','scyther','seadra','seaking','seel','sentret','shellder','shuckle','skarmory','skiploom','slowbro','slowking','slowpoke','slugma','smoochum','sneasel','snorlax','snubbull','spearow','spinarak','squirtle','stantler','starmie','staryu','steelix','sudowoodo','suicune','sunflora','sunkern','swinub','tangela','tauros','teddiursa','tentacool','tentacruel','togepi','togetic','totodile','typhlosion','tyranitar','tyrogue','umbreon','ursaring','vaporeon','venomoth','venonat','venusaur','victreebel','vileplume','voltorb','vulpix','wartortle','weepinbell','weezing','wigglytuff','wooper','xatu','yanma','zapdos','zubat'] },
+  tm43: { golpe:'secretpower', preco:140, aprendem:['abra','aerodactyl','aipom','alakazam','ampharos','arbok','arcanine','ariados','articuno','azumarill','bayleef','beedrill','bellossom','bellsprout','blastoise','blissey','bulbasaur','butterfree','celebi','chansey','charizard','charmander','charmeleon','chikorita','chinchou','clefable','clefairy','cleffa','cloyster','corsola','crobat','croconaw','cubone','cyndaquil','delibird','dewgong','diglett','dodrio','doduo','donphan','dragonair','dragonite','dratini','drowzee','dugtrio','dunsparce','eevee','ekans','electabuzz','electrode','elekid','entei','espeon','exeggcute','exeggutor','farfetchd','fearow','feraligatr','flaaffy','flareon','forretress','furret','gastly','gengar','geodude','girafarig','gligar','gloom','golbat','goldeen','golduck','golem','granbull','graveler','grimer','growlithe','gyarados','haunter','heracross','hitmonchan','hitmonlee','hitmontop','hooh','hoothoot','hoppip','horsea','houndoom','houndour','hypno','igglybuff','ivysaur','jigglypuff','jolteon','jumpluff','jynx','kabuto','kabutops','kadabra','kangaskhan','kingdra','kingler','koffing','krabby','lanturn','lapras','larvitar','ledian','ledyba','lickitung','lugia','machamp','machoke','machop','magby','magcargo','magmar','magnemite','magneton','mankey','mantine','mareep','marill','marowak','meganium','meowth','mewtwo','miltank','misdreavus','moltres','mrmime','muk','murkrow','natu','nidoking','nidoqueen','nidoranf','nidoranm','nidorina','nidorino','ninetales','noctowl','octillery','oddish','omanyte','omastar','onix','paras','parasect','persian','phanpy','pichu','pidgeot','pidgeotto','pidgey','pikachu','piloswine','pineco','pinsir','politoed','poliwag','poliwhirl','poliwrath','ponyta','porygon','porygon2','primeape','psyduck','pupitar','quagsire','quilava','qwilfish','raichu','raikou','rapidash','raticate','remoraid','rhydon','rhyhorn','sandshrew','sandslash','scizor','scyther','seadra','seaking','seel','sentret','shellder','shuckle','skarmory','skiploom','slowbro','slowking','slowpoke','slugma','smoochum','sneasel','snorlax','snubbull','spearow','spinarak','squirtle','stantler','starmie','staryu','steelix','sudowoodo','suicune','sunflora','sunkern','swinub','tangela','tauros','teddiursa','tentacool','tentacruel','togepi','togetic','totodile','typhlosion','tyranitar','tyrogue','umbreon','ursaring','vaporeon','venomoth','venonat','venusaur','victreebel','vileplume','voltorb','vulpix','wartortle','weepinbell','weezing','wigglytuff','wooper','xatu','yanma','zapdos','zubat'] },
+  tm46: { golpe:'thief', preco:100, aprendem:['abra','aerodactyl','aipom','alakazam','arbok','arcanine','ariados','beedrill','bellsprout','butterfree','crobat','cubone','delibird','dewgong','diglett','dodrio','doduo','drowzee','dugtrio','dunsparce','ekans','electabuzz','electrode','elekid','exeggcute','exeggutor','farfetchd','fearow','furret','gastly','gengar','girafarig','gligar','golbat','granbull','grimer','growlithe','haunter','heracross','hitmonchan','hitmonlee','hitmontop','hoothoot','houndoom','houndour','hypno','jynx','kabuto','kabutops','kadabra','kangaskhan','kingler','koffing','krabby','ledian','ledyba','lickitung','machamp','machoke','machop','magby','magmar','mankey','marowak','meowth','misdreavus','mrmime','muk','murkrow','natu','nidoking','nidoqueen','nidoranf','nidoranm','nidorina','nidorino','noctowl','octillery','omanyte','omastar','paras','parasect','persian','pidgeot','pidgeotto','pidgey','pinsir','politoed','poliwag','poliwhirl','poliwrath','porygon','porygon2','primeape','raichu','raticate','remoraid','rhydon','rhyhorn','sandshrew','sandslash','scizor','scyther','seel','sentret','skarmory','smoochum','sneasel','snubbull','spearow','spinarak','stantler','sudowoodo','tangela','teddiursa','tentacool','tentacruel','tyrogue','ursaring','venomoth','venonat','victreebel','voltorb','weepinbell','weezing','xatu','yanma','zubat'] },
+  tm47: { golpe:'steelwing', preco:140, aprendem:['aerodactyl','articuno','charizard','crobat','dodrio','doduo','dragonite','farfetchd','fearow','gligar','golbat','hooh','hoothoot','lugia','moltres','murkrow','natu','noctowl','pidgeot','pidgeotto','pidgey','scizor','scyther','skarmory','spearow','togetic','xatu','yanma','zapdos','zubat'] },
+  tm50: { golpe:'overheat', preco:280, aprendem:['arcanine','charizard','charmander','charmeleon','cyndaquil','flareon','granbull','growlithe','hooh','houndoom','houndour','magcargo','mankey','moltres','ninetales','ponyta','primeape','quilava','rapidash','slugma','snubbull','typhlosion','vulpix'] },
+};
 const HMS = {
   hm01: {
     nome: 'HM01 — Corte',
@@ -20630,6 +21163,44 @@ const HMS = {
    (15/09/2026, quando o HM03 entrou). As três portas da tela de ensinar chamavam
    `podeAprenderCorte` direto -- ou seja, o HM03 teria oferecido o SURF aos 72 cortadores.
    Com a lista ligada ao item, o próximo HM já nasce perguntando a lista certa. */
+
+/* ⚠️ A REGRA DO PREÇO, escrita aqui e NUNCA um número na tabela: o `preco` de cada TM é gerado por
+   ela (ver `tools/gerar-tabelas-tms.js`), e há trava cobrando que os 23 batam. Um preço solto na
+   tabela divergiria da regra no primeiro golpe novo, e ninguém veria.
+   Ela usa o poder EFETIVO -- o que o golpe realmente tira -- e não o cru: a Semente-Bala é poder 10
+   e bate de 2 a 5 vezes. */
+const TM_PISO = 100;      // o mínimo pedido
+const TM_POR_PODER = 2;   // quanto cada ponto de poder efetivo custa
+function precoDoTM(tmId){
+  const tm = TMS[tmId];
+  if(!tm) return 0;
+  return Math.max(TM_PISO, Math.round(poderEfetivo(tm.golpe) * TM_POR_PODER / 10) * 10);
+}
+function ehTM(id){ return !!TMS[id]; }
+/* ⚠️ A MÁQUINA POR ID: HM ou TM, a MESMA interface (`golpe` + `aprendem`). É ela que faz a tela de
+   ensinar servir aos dois sem uma linha de exceção -- a mesma decisão que fez as três telas de
+   golpe virarem uma cópia só. Onde as duas DIFEREM (de onde vêm, se gastam) quem responde é o
+   `ehTM`, e são poucos lugares. */
+function maquinaPorId(id){ return HMS[id] || TMS[id] || null; }
+function podeAprenderMaquina(id, speciesId){
+  const m = maquinaPorId(id);
+  return !!(m && Array.isArray(m.aprendem) && m.aprendem.indexOf(speciesId) >= 0);
+}
+/* QUANTAS DESTA MÁQUINA A CONTA TEM. O HM é da conta e é infinito (1 ou 0); o TM vem do INVENTÁRIO
+   e empilha -- é o mesmo campo da Poção, então ele já viaja, já é gravado pelo servidor e já está
+   na trava do firestore.rules. */
+function quantosTMs(tmId){
+  const inv = (game.inventario || {})[tmId];
+  return (typeof inv === 'number' && inv > 0) ? inv : 0;
+}
+function temMaquina(id){ return ehTM(id) ? quantosTMs(id) > 0 : temHM(id); }
+/* AS MÁQUINAS QUE A CONTA TEM AGORA, HMs primeiro. */
+function maquinasDaConta(){
+  return hmsDaConta().concat(Object.keys(TMS).filter(id => quantosTMs(id) > 0));
+}
+/* ⚠️ E O GOLPE DE TM NÃO É PERMANENTE, ao contrário do de HM. O `ehGolpeDeMaquina` existe porque o
+   golpe de HM é a CHAVE de uma rota e perdê-lo numa tela de troca a fecharia de novo; o de TM é um
+   golpe comum e pode ser trocado -- o que a pessoa perde é a Máquina, e a tela avisa antes. */
 function podeAprenderHM(hmId, speciesId){
   const hm = HMS[hmId];
   return !!(hm && Array.isArray(hm.aprendem) && hm.aprendem.indexOf(speciesId) >= 0);
@@ -21488,7 +22059,8 @@ function renderNeighborhoodGym(){
       } else {
         /* ⚠️ ESTA ERA A COPIA QUE NAO PEDIA O `team`: um save com as 8 insignias e sem time passava
            por aqui e era recusado nas outras telas. O savesCampeoes pergunta as duas coisas. */
-        const eligibleSlots = savesCampeoes();
+        /* AQUI ENTRA O APOSENTADO: este e o modo em que ele continua valendo (ver saveAposentado). */
+        const eligibleSlots = savesComOitoInsignias();
         out += eligibleSlots.length===0
           ? `<div class="box"><p class="hint-text">Você precisa de um time com as 8 insígnias pra desafiar.</p></div>`
           : `<button class="btn danger" onclick="startNeighborhoodGymChallenge()">⚔️ Desafiar Ginásio</button>`;
@@ -21714,6 +22286,45 @@ function renderNeighborhoodGymResult(){
   </div>
   <button class="btn success" onclick="openNeighborhoodGymScreen()">⬅ Voltar pro Ginásio da Cidade</button>`;
 }
+/* ⚠️ A APOSENTADORIA É UM CAMINHO SÓ DE IDA, e por isso ela pergunta antes. O time sai das ligas e
+   da batalha online pra sempre -- e não há tela pra desfazer, de propósito: se desse pra voltar,
+   ela não seria uma decisão, seria um interruptor. */
+function pedirAposentadoria(){ game.aposentarPergunta = true; render(); }
+function fecharAposentadoria(){ game.aposentarPergunta = false; render(); }
+async function aposentarOTime(){
+  game.aposentado = true;
+  game.aposentarPergunta = false;
+  /* GRAVA NA HORA: esta é uma decisão definitiva, e ela não pode depender do autosave (que é
+     debounced em 800ms e só roda nas telas seguras). */
+  try{ await saveCurrentGame(); }catch(e){ console.error("Erro ao aposentar o time:", e); }
+  await loadSaveSlots();
+  render();
+}
+function renderAposentadoriaModal(){
+  if(!game.aposentarPergunta) return "";
+  const time = (game.team || []).map(p => p.name || (SPECIES[p.speciesId] && SPECIES[p.speciesId].name) || "?");
+  return `
+  <div class="modal-overlay" onclick="fecharAposentadoria()">
+    <div class="modal-box" onclick="event.stopPropagation()">
+      <div class="modal-icon">🎓</div>
+      <h2>Aposentar o time?</h2>
+      <p>${escapeHtmlSafe(time.join(", "))} vão ficar com o <strong>Prof. Carvalho</strong>.</p>
+      <p class="hint-text">Eles <strong>continuam valendo</strong> na Torre dos Treinadores e no Ginásio da Cidade,
+         mas <strong>não poderão mais</strong> entrar em Ligas nem em Batalhas Online.</p>
+      <p class="hint-text">⚠️ Isso não tem volta.</p>
+      <button class="btn danger" onclick="aposentarOTime()">🎓 Aposentar</button>
+      <button class="btn secondary" onclick="fecharAposentadoria()">Cancelar</button>
+    </div>
+  </div>`;
+}
+/* ⚠️ O BOTÃO SÓ APARECE QUANDO NÃO HÁ MAIS O QUE FAZER: as 8 insígnias E a Elite resolvida (vencida
+   ou perdida). Com a Elite em ANDAMENTO ele some -- aposentar no meio do rush jogaria fora uma
+   tentativa que ainda está de pé. */
+function podeAposentar(){
+  return (game.badgesEarned || []).length >= numGinasios()
+    && (game.eliteStatus === "champion" || game.eliteStatus === "defeated")
+    && !game.aposentado;
+}
 function renderJourneyEnd(){
   const won = game.badgesEarned.length === numGinasios();
   /* A caixa do Bônus de Kanto aparece só NESTA renderização e é marcada como vista logo em seguida.
@@ -21761,6 +22372,25 @@ function renderJourneyEnd(){
       </div>`;
     }).join('')}
   </div>
+  ${/* ⚠️ A APOSENTADORIA MORA AQUI porque esta é a tela de quem não tem mais o que fazer -- e ela
+       é a ÚNICA porta: não há atalho na home nem na tela de time, de propósito. Uma decisão sem
+       volta se toma no lugar em que ela faz sentido, não num botão que se esbarra sem querer. */''}
+  ${game.aposentado
+    ? `<div class="box">
+         <h2>🎓 Time aposentado</h2>
+         <p>Este time está com o <strong>Prof. Carvalho</strong>. Ele continua valendo na
+            <strong>Torre dos Treinadores</strong> e no <strong>Ginásio da Cidade</strong>,
+            mas não entra mais em Ligas nem em Batalhas Online.</p>
+       </div>`
+    : (podeAposentar()
+      ? `<div class="box">
+           <h2>🎓 Aposentar o time</h2>
+           <p>A jornada deste time acabou. Dá pra deixá-lo com o <strong>Prof. Carvalho</strong>:
+              ele continua lutando na Torre e no Ginásio da Cidade, mas sai das Ligas e das
+              Batalhas Online.</p>
+           <button class="btn secondary" onclick="pedirAposentadoria()">🎓 Aposentar o time</button>
+         </div>`
+      : '')}
   ${/* ⚠️ E O FIM DA JORNADA ENTROU JUNTO, e ele é o lugar mais óbvio de todos: quem chega aqui
        ACABOU de fechar as 8 insígnias, ou seja é exatamente quem a Liga Clássica aceita. O convite
        estava em toda tela de batalha e faltava justamente na que produz o inscrito. */''}
@@ -22800,6 +23430,16 @@ function renderTrainerTower(){
   ${acao}
   <div class="tower-shaft">${andares}</div>`;
 }
+/* ⚠️ A PAGINA É ESTADO DE TELA, e ela ZERA ao entrar no histórico (ver abrirHistoricoDaTorre):
+   sem isso, reabrir o modal cairia no dia em que o jogador parou da última vez -- e o "dia 3 de
+   5" de ontem não é o mesmo de hoje, porque a lista anda. */
+function paginarHistoricoDaTorre(d){
+  const r = game.towerRanking;
+  if(!r || !r.historico || !r.historico.length) return;
+  const max = r.historico.length - 1;
+  r.histPag = Math.max(0, Math.min(max, (r.histPag || 0) + d));
+  render();
+}
 function renderTowerRankingModal(){
   const r = game.towerRanking;
   if(!r) return '';
@@ -22842,12 +23482,30 @@ function renderTowerRankingModal(){
     else if(r.histErro){ corpo = `<p class="error-text">Não deu pra carregar o histórico. Tente de novo.</p>`; }
     else {
       const dias = r.historico || [];
-      corpo = dias.map(d => `
-        <h3 class="tower-rank-tit">📅 ${escapeHtmlSafe(dia(d.dateId))}</h3>
-        ${(d.linhas||[]).length
-          ? lista(d.linhas, x=>x.bestFloor, '🏢', 'passado')
-          : `<p class="hint-text">Ninguém subiu nenhum andar neste dia.</p>`}`).join('');
-      if(!dias.length) corpo = `<p class="hint-text">Ainda não há dias anteriores pra mostrar.</p>`;
+      /* ⚠️ UM DIA POR VEZ, COM SETAS (17/09/2026, a pedido: *"ao invés de exibir todos os dias um
+         embaixo do outro, coloque setinhas para ir paginando os dias"*). Empilhados, os cinco dias
+         davam uma parede de até 50 linhas num modal que já rola por dentro -- e a pergunta que se
+         faz ali é sobre UM dia, não sobre os cinco ao mesmo tempo.
+         ⚠️ O ÍNDICE É CLAMPADO NO DESENHO: o histórico é carregado depois da tela abrir, então a
+         página pode apontar pra um dia que ainda não chegou (ou que sumiu). Sem o clamp, a seta
+         levaria a um modal vazio -- o mesmo cuidado que a paginação do montador de time já tem. */
+      const i = Math.max(0, Math.min(dias.length - 1, r.histPag || 0));
+      /* ⚠️ E O CLAMP GRAVA A CORRECAO, nao so corrige o que e desenhado: com o valor velho ainda
+         guardado, a proxima seta partiria DELE e a pagina pularia sozinha. E o mesmo cuidado que a
+         paginacao do montador de time carrega, e pela mesma razao. */
+      if(dias.length) r.histPag = i;
+      const d = dias[i];
+      corpo = !dias.length
+        ? `<p class="hint-text">Ainda não há dias anteriores pra mostrar.</p>`
+        : `<div class="tower-hist-nav">
+             <button class="circle-btn" ${i <= 0 ? 'disabled' : ''} onclick="paginarHistoricoDaTorre(-1)" aria-label="Dia anterior">◀</button>
+             <h3 class="tower-rank-tit tower-hist-dia">📅 ${escapeHtmlSafe(dia(d.dateId))}</h3>
+             <button class="circle-btn" ${i >= dias.length - 1 ? 'disabled' : ''} onclick="paginarHistoricoDaTorre(1)" aria-label="Próximo dia">▶</button>
+           </div>
+           <p class="hint-text tower-hist-conta">${i + 1} de ${dias.length}</p>
+           ${(d.linhas||[]).length
+             ? lista(d.linhas, x=>x.bestFloor, '🏢', 'passado')
+             : `<p class="hint-text">Ninguém subiu nenhum andar neste dia.</p>`}`;
     }
   }
   else {
@@ -23627,6 +24285,31 @@ const ITENS = {
     comoGanhar: 'Na loja. Equipa-se pelo + da tela de ordem de batalha.'
   }
 };
+/* ⚠️ AS 23 MÁQUINAS DE TÉCNICA ENTRAM POR DERIVAÇÃO (17/09/2026), e não escritas uma a uma: o nome
+   é "TM26 — Terremoto", o preço sai do TMS (que sai da regra) e a descrição é montada do TIPO e do
+   PODER do golpe. Escritas à mão seriam 23 verbetes pra manter em dia com a tabela de golpes -- e o
+   primeiro reajuste de poder deixaria a loja mentindo.
+   ⚠️ ELAS NÃO SÃO 'equipável': o TM não vai num pokémon pelo + da tela de ordem, ele ENSINA. É por
+   isso que o prateleiraDoItem precisou de um ramo próprio -- sem ele os 23 cairiam em "Especiais",
+   ao lado do Doce Raro, e a prateleira que leva o nome deles ficaria vazia.
+   ⚠️ E A DESCRIÇÃO AVISA O USO ÚNICO, sempre: é a única coisa dela que o jogador não consegue
+   deduzir olhando o golpe, e é a que decide se ele gasta 300 moedas. */
+Object.keys(TMS).forEach(id => {
+  const tm = TMS[id];
+  const ficha = GOLPES[tm.golpe] || ['Normal', 0];
+  ITENS[id] = {
+    nome: id.toUpperCase() + ' — ' + nomeDoAtaque(tm.golpe),
+    icone: '💿',
+    comprável: true, preco: tm.preco, tm: true,
+    resumo: 'Ensina ' + nomeDoAtaque(tm.golpe) + '. Uso único.',
+    /* ⚠️ A DESCRIÇÃO NÃO REPETE O TIPO NEM O PODER: o CARTÃO logo abaixo já traz os dois, e com a
+       frase longa ele saía cortado no quadro de altura fixa (375px, medido a 320px) -- junto com o
+       botão de quem pode aprender. O que sobra aqui é o que só o texto diz: que a Máquina SOME. */
+    descricao: 'Ensina ' + nomeDoAtaque(tm.golpe) + ' a um pokémon que possa aprender. ' +
+      '⚠️ USO ÚNICO: a Máquina some depois de ensinar.',
+    comoGanhar: 'Na loja.'
+  };
+});
 /* O QUE A CONTA TEM, em pilhas. Uma pilha é um item + quantos, e é ela que vira um quadradinho da
    grade -- cinco doces são UM slot com "5x", não cinco slots.
    `fontes` guarda de onde veio cada unidade do Bônus Shiny (a notificação ou o save), porque é
@@ -23674,6 +24357,71 @@ function botaoDeItemHtml(p){
     ' onclick="abrirEscolhaDeItem(\'' + escJs(slot) + '\',\'' + escJs(speciesId) + '\')"' +
     ' title="' + escapeHtmlSafe(rotulo) + '" aria-label="' + escapeHtmlSafe(rotulo) + '">' +
     (it ? it.icone : '+') + '</button>';
+}
+
+/* ============================================================================
+   QUEM PODE RECEBER ESTA MÁQUINA
+   ----------------------------------------------------------------------------
+   Pedido em 17/09/2026: *"na loja, ao clicar no TM, colocar um botão onde vai exibir uma lista de
+   quais pokemons estão aptos para receber esse movimento"*.
+
+   ⚠️ ELE É A INFORMAÇÃO QUE DECIDE A COMPRA, e é a única que nem o nome nem o poder dão: um TM de
+   🪙300 que nenhum pokémon do jogador aprende é dinheiro fora, e sem esta tela ele só descobre
+   isso DEPOIS de pagar -- na tela de ensinar, que abre vazia.
+   ⚠️ POR ISSO A LISTA SEPARA "OS SEUS" DOS OUTROS, e os seus vêm primeiro. A pergunta que se faz
+   na loja não é "quais das 250 aprendem", é "algum dos MEUS aprende" -- e a resposta é o número
+   que aparece no topo.
+   ⚠️ E ELA VARRE TODOS OS SAVES, não o time aberto: a Máquina é da CONTA e ensina em qualquer save,
+   exatamente como o HM. Um "0 dos seus" contado só do save carregado seria mentira pra quem tem o
+   bicho certo em outro slot.
+   ============================================================================ */
+function abrirAptosDaMaquina(id){ game.maquinaAptos = id; render(); }
+function fecharAptosDaMaquina(){ game.maquinaAptos = null; render(); }
+/* AS ESPÉCIES DA CONTA QUE APRENDEM, com o save de onde vieram. Uma entrada por POKÉMON (e não por
+   espécie): dois Machamp em saves diferentes são dois candidatos, e a tela de ensinar lista os dois. */
+function meusQueAprendem(id){
+  const m = maquinaPorId(id);
+  if(!m) return [];
+  const fora = [];
+  for(let slot = 0; slot < MAX_SAVE_SLOTS; slot++){
+    (timeDoSlot(slot) || []).forEach(p => {
+      if(p && podeAprenderMaquina(id, p.speciesId)) fora.push({ slot: slot, mon: p });
+    });
+  }
+  return fora;
+}
+function renderAptosModal(){
+  const id = game.maquinaAptos;
+  const m = id && maquinaPorId(id);
+  if(!m) return '';
+  const it = ITENS[id] || HMS[id] || {};
+  const meus = meusQueAprendem(id);
+  const todas = (m.aprendem || []).slice()
+    .filter(e => SPECIES[e])
+    .sort((a, b) => (SPECIES[a].dex || 0) - (SPECIES[b].dex || 0));
+  const jaTenho = new Set(meus.map(x => x.mon.speciesId));
+  return `
+  <div class="modal-overlay" onclick="fecharAptosDaMaquina()">
+    <div class="modal-box aptos-box" onclick="event.stopPropagation()">
+      <div class="modal-icon">${it.icone || '💿'}</div>
+      <h2>Quem aprende ${escapeHtmlSafe(nomeDoAtaque(m.golpe))}</h2>
+      ${meus.length
+        ? `<p class="hint-text"><strong>${meus.length}</strong> ${meus.length === 1 ? 'pokémon seu pode' : 'pokémons seus podem'} aprender.</p>
+           <div class="aptos-meus">${meus.map(x => `
+             <div class="aptos-meu">
+               ${spriteHtml(x.mon, 'sprite-sm')}
+               <span class="aptos-nome">${escapeHtmlSafe(x.mon.name || SPECIES[x.mon.speciesId].name)}${x.mon.shiny ? ' 🌟' : ''}</span>
+               <span class="aptos-save">${escapeHtmlSafe(nomeDoSave(x.slot))}</span>
+             </div>`).join('')}</div>`
+        : `<p class="hint-text">⚠️ <strong>Nenhum pokémon seu</strong> aprende este golpe.</p>`}
+      <p class="hint-text aptos-tit">As ${todas.length} espécies que aprendem:</p>
+      <div class="pokedex-grid aptos-grid">${todas.map(e => `
+        <div class="pokedex-cell ${jaTenho.has(e) ? 'caught' : 'unknown'}" title="${escapeHtmlSafe(SPECIES[e].name)}">
+          ${spriteHtml({ speciesId: e }, 'sprite-sm', false)}
+        </div>`).join('')}</div>
+      <button class="btn secondary" onclick="fecharAptosDaMaquina()">Fechar</button>
+    </div>
+  </div>`;
 }
 function abrirEscolhaDeItem(slot, speciesId){ game.escolhaDeItem = { slot: String(slot), speciesId: speciesId }; game.escolhaDeItemErro = null; render(); }
 function fecharEscolhaDeItem(){ game.escolhaDeItem = null; game.escolhaDeItemErro = null; render(); }
@@ -24041,10 +24789,13 @@ function renderInventario(){
     </div>
     <div class="loja-rodape">
       <div class="item-acoes loja-acoes">
-        ${ehHm
-          /* ⚠️ A MÁQUINA NÃO SE USA NEM SE EXCLUI: ela ENSINA, e ensina quantas vezes quiser. O
-             botão leva pra lista de times -- o mesmo caminho que a linha da tela antiga abria. */
-          ? `<button class="btn success" onclick="abrirEnsinarHm('${escJs(sel.item)}')">📀 Ensinar</button>`
+        ${(ehHm || (it && it.tm))
+          /* ⚠️ A MÁQUINA NÃO SE USA: ela ENSINA. O HM ensina quantas vezes quiser; o TM ensina UMA
+             (ele some depois), e o botão diz isso -- é a única coisa que separa os dois aqui.
+             O TM mantém o Excluir porque ele é um item comum que ocupa espaço; o HM não tem o que
+             excluir, ele é da conta. */
+          ? `<button class="btn success" onclick="abrirEnsinarHm('${escJs(sel.item)}')">📀 Ensinar${it && it.tm ? ' (some depois)' : ''}</button>
+             ${it && it.tm ? `<button class="btn secondary" onclick="abrirAptosDaMaquina('${escJs(sel.item)}')">👥 Quem pode aprender</button>` : ''}`
           : `${it.equipável ? '' : `<button class="btn success" ${podeUsar?'':'disabled'} onclick="usarItem('${escJs(sel.item)}')">${game.inventarioUsando ? 'Usando...' : '✔ Usar'}</button>`}
              <button class="btn danger" ${podeExcluir(sel.item) && !game.inventarioUsando ?'':'disabled'}
                onclick="pedirExclusaoDeItem('${escJs(sel.item)}')">🗑️ Excluir</button>`}
@@ -24134,7 +24885,7 @@ function timeDoSlot(slot){
 /* OS CANDIDATOS: quem pode aprender e ainda NÃO sabe. Quem já sabe fica de fora -- ensinar de novo
    não muda nada, e a linha só faria a lista parecer maior do que ela é. */
 function candidatosDaMaquina(hmId, slot){
-  const hm = HMS[hmId];
+  const hm = maquinaPorId(hmId);
   if(!hm || !hm.golpe) return [];
   const lista = [];
   const de = (slot == null) ? null : Number(slot);
@@ -24142,7 +24893,7 @@ function candidatosDaMaquina(hmId, slot){
     if(de != null && i !== de) continue;
     timeDoSlot(i).forEach((p, idx) => {
       if(!p || !SPECIES[p.speciesId]) return;
-      if(!podeAprenderHM(hmId, p.speciesId)) return;
+      if(!podeAprenderMaquina(hmId, p.speciesId)) return;
       if((p.ataques || []).indexOf(hm.golpe) >= 0) return;
       lista.push({ slot:i, idx, speciesId:p.speciesId, nome:p.name || SPECIES[p.speciesId].name,
                    level:p.level, shiny:!!p.shiny, ataques:(p.ataques || []).slice() });
@@ -24162,7 +24913,7 @@ function candidatosDaMaquina(hmId, slot){
    e o `porque` separa os dois pro título do sprite: sem isso, quem acabou de ensinar veria o
    pokémon apagado sem entender por quê. */
 function timesDaMaquina(hmId){
-  const hm = HMS[hmId];
+  const hm = maquinaPorId(hmId);
   if(!hm || !hm.golpe) return [];
   const candidatos = candidatosDaMaquina(hmId);
   const temCandidato = new Set(candidatos.map(c => c.slot));
@@ -24172,7 +24923,7 @@ function timesDaMaquina(hmId){
     const mons = timeDoSlot(i).map((p, idx) => {
       if(!p || !SPECIES[p.speciesId]) return null;
       const jaSabe = (p.ataques || []).indexOf(hm.golpe) >= 0;
-      const aprende = podeAprenderHM(hmId, p.speciesId);
+      const aprende = podeAprenderMaquina(hmId, p.speciesId);
       return { slot:i, idx, speciesId:p.speciesId, nome:p.name || SPECIES[p.speciesId].name,
                level:p.level, shiny:!!p.shiny, ataques:(p.ataques || []).slice(),
                pode: aprende && !jaSabe,
@@ -24195,7 +24946,9 @@ function nomeDoSave(slot){
    sprites) e só depois escolhe dentro dele.
    O `hmTimeAberto` é o nível: null = a lista de times, um número = a lista daquele time. */
 function abrirEnsinarHm(hmId){
-  if(!HMS[hmId] || !temHM(hmId)) return;
+  /* ⚠️ A PORTA VALE PRAS DUAS: o HM tem que estar na conta e o TM no inventário. Sem a segunda
+     metade, um TM gasto continuaria abrindo a tela e ensinando de graça. */
+  if(!maquinaPorId(hmId) || !temMaquina(hmId)) return;
   game.hmEnsino = { hm: hmId, slot: null, idx: null };
   game.hmAviso = null;
   game.hmTimeAberto = null;
@@ -24233,7 +24986,7 @@ function escolherAlvoDaMaquina(slot, idx){
   const e = game.hmEnsino;
   if(!e) return;
   const p = timeDoSlot(slot)[idx];
-  if(!p || !podeAprenderHM(e.hm, p.speciesId)) return;
+  if(!p || !podeAprenderMaquina(e.hm, p.speciesId)) return;
   e.slot = slot; e.idx = idx;
   if((p.ataques || []).length < MAX_GOLPES){ ensinarOGolpeDaMaquina(null); return; }
   game.screen = "hmTroca";
@@ -24258,13 +25011,13 @@ function escolherAlvoDaMaquina(slot, idx){
    faz. */
 async function ensinarOGolpeDaMaquina(golpeQueSai){
   const e = game.hmEnsino;
-  const hm = e && HMS[e.hm];
+  const hm = e && maquinaPorId(e.hm);
   if(!e || !hm || !hm.golpe || e.slot == null) return;
   /* o slot se guarda ANTES do reset: a tela volta pra lista e o alvo é limpo, mas a gravação lá
      embaixo ainda precisa saber em qual save escrever */
   const slot = e.slot;
   const p = timeDoSlot(slot)[e.idx];
-  if(!p || !podeAprenderHM(e.hm, p.speciesId)) return;
+  if(!p || !podeAprenderMaquina(e.hm, p.speciesId)) return;
   const ataques = (p.ataques || []).slice();
   if(golpeQueSai){
     const i = ataques.indexOf(golpeQueSai);
@@ -24288,10 +25041,21 @@ async function ensinarOGolpeDaMaquina(golpeQueSai){
   if(!Array.isArray(time) || !time.length) return;
   try{ await saveDocRef(game.authUser.uid, slot).set({ team: limparParaFirestore(time, "team", []) }, { merge:true }); }
   catch(err){ console.error("Erro ao gravar a Máquina no save " + slot + ":", err); }
+  /* ⚠️ O TM É DE USO ÚNICO, e quem o gasta é o SERVIDOR: o inventário está na trava de campos do
+     firestore.rules, e um TM descontado pelo cliente seria Hiper Raio infinito.
+     ⚠️ E ELE VEM DEPOIS DA GRAVAÇÃO DO TIME, de propósito: se esta chamada se perder, o jogador
+     aprendeu o golpe e FICOU com a Máquina. O contrário -- pagar e não aprender -- é o lado errado
+     pra errar, e é a mesma regra que o consumeEquipped já segue. */
+  if(!ehTM(e.hm)) return;
+  try{
+    const r = await functionsClient.httpsCallable('usarTM')({ tm: e.hm });
+    if(r && r.data && r.data.inventario) game.inventario = r.data.inventario;
+    render();
+  } catch(err){ console.error("Erro ao gastar o TM " + e.hm + ":", err); }
 }
 function renderHmAlvo(){
   const e = game.hmEnsino;
-  const hm = e && HMS[e.hm];
+  const hm = e && maquinaPorId(e.hm);
   if(!hm) return `<div class="box"><p>Carregando...</p></div>`;
   return (game.hmTimeAberto == null) ? telaDosTimesDaMaquina(hm) : telaDoTimeDaMaquina(hm, game.hmTimeAberto);
 }
@@ -24320,8 +25084,8 @@ function telaDosTimesDaMaquina(hm){
              escrito à mão, então a tela do HM03 diria "72 espécies aprendem o Corte" com o Surf na
              mão. Hoje o número vem do `hm.aprendem` e o nome do `hm.golpe`, e o próximo HM já nasce
              com a frase certa -- os exemplos ficam no item, que é quem sabe quem são. */''}
-        <p class="hint-text">São ${(HMS[game.hmEnsino.hm].aprendem || []).length} espécies que aprendem o ${escapeHtmlSafe(nomeDoAtaque(HMS[game.hmEnsino.hm].golpe))}${
-          HMS[game.hmEnsino.hm].exemplos ? ' — entre elas ' + escapeHtmlSafe(HMS[game.hmEnsino.hm].exemplos) : ''}.</p></div>`
+        <p class="hint-text">São ${(maquinaPorId(game.hmEnsino.hm).aprendem || []).length} espécies que aprendem o ${escapeHtmlSafe(nomeDoAtaque(maquinaPorId(game.hmEnsino.hm).golpe))}${
+          maquinaPorId(game.hmEnsino.hm).exemplos ? ' — entre elas ' + escapeHtmlSafe(maquinaPorId(game.hmEnsino.hm).exemplos) : ''}.</p></div>`
     : times.map(t => {
         /* A MÉDIA É A DO TIME INTEIRO, porque é o time inteiro que está desenhado -- ela descreve
            o que se vê, que é a mesma regra do card da home. Enquanto a fileira só trazia os
@@ -24397,7 +25161,7 @@ function telaDoTimeDaMaquina(hm, slot){
    reaprender a ler no meio da decisão. Ver "AS TRÊS TELAS DE GOLPE". */
 function renderHmTroca(){
   const e = game.hmEnsino;
-  const hm = e && HMS[e.hm];
+  const hm = e && maquinaPorId(e.hm);
   if(!hm || e.slot == null) return `<div class="box"><p>Carregando...</p></div>`;
   const p = timeDoSlot(e.slot)[e.idx];
   if(!p) return `<div class="box"><p>Carregando...</p></div>`;
@@ -24456,7 +25220,13 @@ const LOJA_PRATELEIRAS = [
      telas de golpe. */
   { id:'tms',       nome:'TMs/HMs',          icone:'💿' }
 ];
-function prateleiraDoItem(id){ return (ITENS[id] || {}).equipável ? 'batalha' : 'especiais'; }
+function prateleiraDoItem(id){
+  const it = ITENS[id] || {};
+  /* ⚠️ O TM VEM PRIMEIRO: ele não é 'equipável' (não vai num pokémon pelo +, ele ENSINA), então sem
+     este ramo os 23 cairiam em "Especiais", ao lado do Doce Raro. */
+  if(it.tm) return 'tms';
+  return it.equipável ? 'batalha' : 'especiais';
+}
 function itensDaPrateleira(p){ return Object.keys(ITENS).filter(id => ITENS[id].comprável && prateleiraDoItem(id) === p); }
 function openLoja(){
   game.screen = 'loja';
@@ -24656,12 +25426,31 @@ function renderLoja(){
         </div>
       </div>
       <div class="loja-miolo">
-        <p class="item-detalhe-texto">${escapeHtmlSafe(it.descricao)}</p>
+        ${/* o TM usa o RESUMO: o CARTAO abaixo ja traz tipo e poder, e com a descricao inteira ele
+             e o botao de aptos saiam CORTADOS no quadro de altura fixa (medido a 320px: o miolo
+             cabe 138px e o conteudo dava 184). O que so o texto diz -- o uso unico -- esta la. */''}
+        <p class="item-detalhe-texto">${escapeHtmlSafe(it.tm ? it.resumo : it.descricao)}</p>
+        ${/* o CARTAO DO GOLPE, o MESMO das tres telas de golpe e da tela de ensinar -- e ser o
+             mesmo e o ponto: o jogador compara o Terremoto daqui com os golpes que o pokemon ja
+             tem LA, e um formato proprio obrigaria a reaprender a ler no meio da decisao. E a
+             mesma decisao que o quadro da mochila ja tinha tomado com o HM.
+             E e ele que carrega os avisos de efeito extra (o -2 do Overheat, o terreno do Poder
+             Secreto, os tapas da Semente-Bala): eles saem do obsDoGolpe, entao um golpe novo com
+             efeito ja nasce avisando aqui. */''}
+        ${it.tm && GOLPES[TMS[sel.item].golpe] ? cartaoDeGolpe(TMS[sel.item].golpe, true, true) : ''}
         ${game.lojaErro ? `<p class="error-text">${escapeHtmlSafe(game.lojaErro)}</p>` : ''}
       </div>
       <div class="loja-rodape">
       ${(game.moedas||0) < it.preco ? `<p class="hint-text">Faltam 🪙 ${it.preco - (game.moedas||0)} pra comprar um.</p>` : ''}
       <p class="loja-saldo">Você tem <strong>🪙 ${moedas}</strong>.</p>
+      ${/* o QUEM PODE APRENDER fica no RODAPE, e nao no miolo: ele e uma ACAO (como o Comprar e o
+           Vender), e o miolo ROLA por dentro -- medido a 320px, com o cartao do golpe ali o botao
+           ficava fora da area visivel, ou seja uma acao que o jogador nao ve. O rodape nao rola.
+           E ele vem PRIMEIRO porque e a pergunta que se faz ANTES de comprar: um TM de 300 que
+           nenhum pokemon seu aprende e dinheiro fora.
+           ⚠️ E EM LINHA PROPRIA, fora do par Comprar/Vender: com os tres dividindo a mesma linha
+           cada um fica com 76px a 320px, e "Vender por 100" nao cabe nisso. */''}
+      ${it.tm ? `<div class="item-acoes loja-acao-larga"><button class="btn secondary" onclick="abrirAptosDaMaquina('${escJs(sel.item)}')">👥 Quem pode aprender</button></div>` : ''}
       <div class="item-acoes loja-acoes">
         <button class="btn success" ${(game.moedas||0) < it.preco || game.comprando ? 'disabled' : ''}
           onclick="abrirCompra('${escJs(sel.item)}')">${game.comprando ? 'Comprando...' : '🪙 Comprar'}</button>
@@ -24672,9 +25461,9 @@ function renderLoja(){
              ausencia dele ja dizia -voce nao tem nenhum-. So que um botao que vai e vem MUDA A
              ALTURA do rodape, e ai o Comprar dancava de lugar conforme o item -- que e justamente o
              que se pediu pra parar. Presente e cinza, a mao encontra os dois sempre no mesmo lugar.
-             Fica EMBAIXO do Comprar: a classe loja-acoes empilha em coluna, porque a item-acoes
-             sozinha e uma LINHA (ela nasceu na mochila, com Usar e Excluir lado a lado). No vermelho
-             do danger pelo mesmo motivo do Excluir: sai coisa da conta.
+             Fica AO LADO do Comprar desde 17/09/2026, a pedido -- ele ja esteve embaixo, e o que
+             aquilo comprava (o Comprar nao dancar de lugar) continua de pe porque o Vender esta
+             SEMPRE na tela. No vermelho do danger pelo mesmo motivo do Excluir: sai coisa da conta.
              O QUE ELE CONTA E O quantoPossoVender, NAO o quantoTenho -- o Bonus Shiny de CUPOM
              aparece na mochila e nao se vende. Ver a nota da funcao. -->
         <button class="btn danger" ${(vendaveis > 0 && !game.comprando) ? '' : 'disabled'}
@@ -25005,6 +25794,8 @@ async function abrirHistoricoDaTorre(){
   const r = game.towerRanking;
   if(!r) return;
   r.aba = 'historico';
+  /* a pagina zera a cada entrada: o "dia 3 de 5" de ontem nao e o mesmo de hoje, porque a lista anda */
+  r.histPag = 0;
   if(r.histCarregado){ render(); return; }
   r.histLoading = true;
   render();
@@ -27193,6 +27984,42 @@ function dexStatLinha(rotulo, valor){
     <span class="dex-stat-num">${valor}</span>
   </div>`;
 }
+/* ⚠️ AS VARIAÇÕES DO UNOWN (17/09/2026, a pedido). Ele é a ÚNICA espécie do jogo com mais de um
+   sprite -- 28 formas (as 26 letras mais `?` e `!`) --, e a Pokédex sempre mostrou só a forma A,
+   porque ali a pergunta é sobre a ESPÉCIE. Esta tela responde a outra: quais formas EU já vi.
+   ⚠️ ELA REUSA A GRADE E A CÉLULA DA POKÉDEX (`pokedex-grid` / `pokedex-cell`), e isso é o pedido
+   ao pé da letra (*"em formato igual da Pokédex, com vários quadradinhos"*). Reusar as duas classes
+   é o que faz a leitura ser a mesma: quem já sabe ler a Pokédex sabe ler esta sem reaprender --
+   letra pega mostra o sprite, letra que falta mostra o rótulo apagado.
+   ⚠️ E O RÓTULO É `#A`, e não `#201`: aqui o que distingue uma célula da outra é a LETRA, e 28
+   quadradinhos escritos "#201" não diriam nada. */
+function abrirUnownVariacoes(){ game.unownVariacoes = true; render(); }
+function fecharUnownVariacoes(){ game.unownVariacoes = false; render(); }
+function renderUnownVariacoesModal(){
+  if(!game.unownVariacoes) return "";
+  const pegas = new Set(game.unownCaught || []);
+  const formas = FORMAS_DO_UNOWN;   // e um ARRAY de letras, nao um objeto
+  const celulas = formas.map(f => {
+    const tem = pegas.has(f);
+    const rot = "#" + f.toUpperCase();
+    /* o sprite sai pelo MESMO caminho da Pokédex: uma instância com a letra, e o spriteHtml
+       resolve o `201-<letra>.png`. Assim a célula não conhece a tabela de sufixos. */
+    return `<div class="pokedex-cell ${tem ? "caught" : "unknown"}" title="${tem ? "Unown " + f.toUpperCase() : "???"}">
+      ${tem ? spriteHtml({ speciesId:"unown", unown:f }, "sprite-sm", false)
+            : `<span class="pokedex-number">${rot}</span>`}
+    </div>`;
+  }).join("");
+  return `
+  <div class="modal-overlay" onclick="fecharUnownVariacoes()">
+    <div class="modal-box unown-box" onclick="event.stopPropagation()">
+      <div class="modal-icon">🔠</div>
+      <h2>Variações do Unown</h2>
+      <p class="hint-text">As ${formas.length} formas. Você já encontrou <strong>${pegas.size}</strong>.</p>
+      <div class="pokedex-grid unown-grid">${celulas}</div>
+      <button class="btn secondary" onclick="fecharUnownVariacoes()">Fechar</button>
+    </div>
+  </div>`;
+}
 function renderPokedexFicha(){
   if(!game.pokedexFicha) return '';
   const { id, shiny } = game.pokedexFicha;
@@ -27203,6 +28030,9 @@ function renderPokedexFicha(){
   const spa = sp.spAtk, spd = sp.spDef;
   const total = sp.hp + sp.attack + sp.defense + spa + spd + sp.speed;
   const ehMewtwo = id === 'mewtwo' && game.mewtwoLoanUnlocked;
+  /* ⚠️ O BOTÃO SÓ EXISTE NO UNOWN: ele é a única espécie com mais de uma forma, e um "Variações"
+     nas outras 249 abriria uma tela de uma célula só. */
+  const ehUnown = id === "unown";
   return `
   <div class="modal-overlay" onclick="fecharPokedexFicha()">
     <div class="modal-box dex-ficha" onclick="event.stopPropagation()">
@@ -27287,6 +28117,7 @@ function renderPokedexFicha(){
         </div>`;
       })()}
       ${ehMewtwo ? '<button class="btn secondary" onclick="fecharPokedexFicha();openMewtwoLoanInfoModal()">🧬 Empréstimo do Mewtwo</button>' : ''}
+      ${ehUnown ? '<button class="btn secondary" onclick="abrirUnownVariacoes()">🔠 Variações</button>' : ''}
       <button class="btn primary" onclick="fecharPokedexFicha()">Fechar</button>
     </div>
   </div>`;
@@ -27746,6 +28577,10 @@ function render(){
   // ficha é aberta a partir de dentro dele -- se viesse antes, abriria atrás
   if(game.timeModal){ html += renderTimeModal(); }
   if(game.pokedexFicha){ html += renderPokedexFicha(); }
+  /* ⚠️ AS VARIACOES VEM DEPOIS DA FICHA: os modais empilham na ordem em que entram, e este e aberto
+     de DENTRO dela -- vindo antes, ele abriria ATRAS. E a mesma nota que a caixa do especial e a
+     propria ficha ja carregam. */
+  if(game.unownVariacoes){ html += renderUnownVariacoesModal(); }
   /* DEPOIS da ficha de propósito: a caixa de explicação é aberta de DENTRO dela, e os modais
      empilham na ordem em que são anexados -- vindo antes, ela abriria atrás. É a mesma nota que a
      própria ficha carrega em relação ao modal da Pokédex. */
@@ -27753,6 +28588,13 @@ function render(){
   /* ⚠️ O HM GANHO vem DEPOIS da ficha e da caixa do especial e ANTES do convite online: ele pode
      nascer em QUALQUER tela (a captura, ou o carregamento da conta), entao ele nao pode ficar
      preso a uma; e o convite, que tem 15 segundos de prazo, tem que ficar por cima dele. */
+  /* A PERGUNTA DA APOSENTADORIA. Ela nasce SO na tela de fim de jornada, entao a ordem aqui nao
+     disputa com ninguem -- fica antes do convite online pela mesma razao de sempre: o convite tem
+     15 segundos de prazo e precisa ficar por cima. */
+  /* A lista de aptos e aberta de DENTRO da loja e da mochila, entao ela vem depois delas na
+     pilha -- e antes do convite online, que tem 15s de prazo e fica por cima de tudo. */
+  if(game.maquinaAptos){ html += renderAptosModal(); }
+  if(game.aposentarPergunta){ html += renderAposentadoriaModal(); }
   if(game.hmGanhoModal){ html += renderHmGanhoModal(); }
   if(game.onlinePendente){ html += renderConviteModal(); }   // aparece por cima de qualquer tela
   if(game.desafioAviso){ html += renderAvisoDesafioModal(); }   // desafio de amigo, idem

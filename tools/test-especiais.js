@@ -1996,6 +1996,15 @@ console.log('\n=== O GOLPE APARADO NAO APARECE COM O NUMERO APARADO ===');
            uma Clefairy que tira 124 com Meteor Mash e 286 com Fire Blast nao esta mostrando numero
            impossivel -- sao dois golpes diferentes, com poderes diferentes. Medido: 20 dos 1.129
            pares fora da banda eram exatamente isso, e nenhum deles era defeito. */
+        /* ⚠️ E O CONFRONTO COM MUDANCA DE ESTAGIO SAI INTEIRO (17/09/2026), como o golpe que mata.
+           Quando a Cauda de Ferro baixa a Defesa do alvo, o golpe SEGUINTE doi mais de verdade --
+           medido, um Onix tirando 53, 78 e 106 do mesmo Furret. Isso NAO e numero impossivel: e a
+           mecanica, e ha uma linha na tela dizendo. A suavizacao isenta esses confrontos pelo
+           mesmo motivo, entao a trava tem que isentar junto -- senao ela cobra da tela uma
+           uniformidade que o motor (com razao) nao produz mais.
+           ⚠️ E A ISENCAO E DO CONFRONTO, nao do lado: o estagio mexe na DEFESA de um e no DANO do
+           outro. */
+        if((mm.golpes || []).some(g => g.x === 'estagio')) return;
         const porGolpe = {};
         g2.forEach(g => { const k = g.mv || '?'; (porGolpe[k] = porGolpe[k] || []).push(g.d / (g.rl || 1)); });
         let r = 1;
@@ -3726,7 +3735,12 @@ console.log('\n=== GOLPES DE VARIOS TAPAS: DE 2 A 5 NUMA TROCA ===');
          ⚠️ OS DONOS SAO LIMPOS de proposito: a Rapidash tambem tem Ataque Furia e o Shuckle tambem
          tem Missil Agulha -- com eles, o teste mediria o golpe que o motor escolhesse, nao o que
          ele quer cobrir. A NINETALES usa o Redemoinho em 96,6% dos ataques, medido. */
-      firespin: 'ninetales', wrap: 'arbok'
+      firespin: 'ninetales', wrap: 'arbok',
+      /* ⚠️ O SEMENTE-BALA (17/09/2026) e o PRIMEIRO da tabela que NINGUEM aprende por nivel --
+         ele so vem de MAQUINA (o TM09). O dono e equipado a mao aqui, como todos os outros, entao
+         isso nao muda o teste; o que muda e que ele so existe no jogo pra quem COMPROU o TM.
+         O MEGANIUM e limpo pela mesma regra dos outros: nenhum outro multi-tapa no moveset. */
+      bulletseed: 'meganium'
     };
     const semDono = MULTI.filter(g => !DONOS[g]);
     ok('todo golpe da tabela tem dono no teste', semDono.length === 0, semDono.join(', ') || '-');
@@ -5668,10 +5682,14 @@ console.log('\n=== O GOLPE QUE MATA MOSTRA O QUE SOBROU, E OS DE ANTES O TAMANHO
         if(alvoAntes - dela - perda + ganho === alvoDepois) fechou++;
         if(matou) comMorte++;
         /* NENHUM par pode ficar sem explicacao: ou cabe na banda, ou e o golpe final, ou tem
-           critico / Rolamento / multi-tapa pra explicar. */
+           critico / Rolamento / multi-tapa / ESTAGIO pra explicar.
+           ⚠️ O ESTAGIO ENTROU EM 17/09/2026: quando a Cauda de Ferro baixa a Defesa do alvo, o
+           golpe seguinte doi mais de verdade -- e a linha na tela e a explicacao. E ela vale pro
+           CONFRONTO e nao pro lado, porque o estagio mexe na Defesa de um e no Dano do outro. */
+        const teveEstagio = seq.some(g => g.x === 'estagio');
         const d = gs.map(g => g.d), mx = Math.max.apply(null, d), mn = Math.min.apply(null, d);
         if(mx > mn * 1.30){
-          const explicado = (matou && ultimo.d === mn) || gs.some(g => g.c || g.rl > 1 || g.tn > 1);
+          const explicado = teveEstagio || (matou && ultimo.d === mn) || gs.some(g => g.c || g.rl > 1 || g.tn > 1);
           if(!explicado) semExplicacao++;
         }
         if(!achei && matou && gs.length === 2 && gs[0].d > gs[1].d * 2) achei = gs.map(g => g.d);
@@ -6195,22 +6213,79 @@ console.log('\n=== O HISTORICO DO RANKING DA TORRE (15/09/2026) ===');
     historico: [{dateId:'2026-09-14', linhas:[{uid:'a',name:'A',bestFloor:12},{uid:'b',name:'B',bestFloor:9},{uid:'c',name:'C',bestFloor:5},{uid:'d',name:'D',bestFloor:3}]},
                 {dateId:'2026-09-13', linhas:[]},
                 {dateId:'2026-09-12', linhas:[{uid:'e',name:'E',bestFloor:7}]}] };
+  /* ⚠️ UM DIA POR VEZ, COM SETAS (17/09/2026, a pedido). Empilhados, os cinco dias davam uma parede
+     de ate 50 linhas num modal que ja rola por dentro. Estas travas ANDAM pela paginacao -- e por
+     isso cada dia continua sendo cobrado, um a um. */
   const hist = S.renderTowerRankingModal();
-  ok('o historico desenha um titulo por dia', (hist.match(/tower-rank-tit/g)||[]).length === 3,
+  ok('o historico desenha UM titulo so', (hist.match(/tower-rank-tit/g)||[]).length === 1,
      (hist.match(/tower-rank-tit/g)||[]).length + ' titulos');
+  ok('e diz em que pagina esta', /1 de 3/.test(semTag4(hist)), semTag4(hist).slice(0, 160));
+  ok('a seta de VOLTAR comeca desabilitada, a de AVANCAR nao',
+     /paginarHistoricoDaTorre\(-1\)/.test(hist)
+     && /disabled[^>]*onclick="paginarHistoricoDaTorre\(-1\)/.test(hist)
+     && !/disabled[^>]*onclick="paginarHistoricoDaTorre\(1\)/.test(hist));
   /* ⚠️ A DATA E FORMATADA DO TEXTO: `new Date('2026-09-14')` le como UTC e, num fuso a oeste,
      devolve o dia ANTERIOR -- o historico mostraria 13/09 no lugar de 14/09. */
   ok('e a data sai no formato do jogo, sem passar por Date()',
-     /14\/09/.test(semTag4(hist)) && /12\/09/.test(semTag4(hist)),
-     (semTag4(hist).match(/\d\d\/\d\d/g)||[]).join(' '));
-  ok('cada dia tem o PROPRIO podio (as medalhas reiniciam)',
-     (hist.match(/🥇/g)||[]).length === 2 && (hist.match(/🥈/g)||[]).length === 1,
-     (hist.match(/🥇/g)||[]).length + ' ouros, ' + (hist.match(/🥈/g)||[]).length + ' pratas');
-  /* ⚠️ DIA SEM NINGUEM FICA NA LISTA, com a lista vazia: sumir com ele faria o historico mostrar
-     cinco datas que nao sao as cinco ultimas. */
-  ok('dia sem ninguem fica, dizendo que ficou vazio', /Ninguém subiu nenhum andar neste dia/.test(semTag4(hist)));
+     /14\/09/.test(semTag4(hist)), (semTag4(hist).match(/\d\d\/\d\d/g)||[]).join(' '));
+  /* ⚠️ O PODIO E POR DIA, e com um dia por vez isso fica visivel: o dia 1 tem ouro/prata/bronze e
+     o dia 3 (com um inscrito so) tem ouro E MAIS NADA -- as medalhas reiniciam. */
+  ok('o dia 1 tem o podio dele',
+     (hist.match(/🥇/g)||[]).length === 1 && (hist.match(/🥈/g)||[]).length === 1
+     && (hist.match(/🥉/g)||[]).length === 1,
+     (hist.match(/🥇/g)||[]).length + '/' + (hist.match(/🥈/g)||[]).length + '/' + (hist.match(/🥉/g)||[]).length);
   ok('e o doce do historico fala no PASSADO (o dia ja virou)',
      /Ganhou um Doce Raro/.test(hist) && !/Ganha um Doce Raro/.test(hist));
+  /* ⚠️ DIA SEM NINGUEM FICA NA LISTA, com a lista vazia: sumir com ele faria o historico mostrar
+     cinco datas que nao sao as cinco ultimas -- e com a paginacao ele tem PAGINA propria. */
+  S.paginarHistoricoDaTorre(1);
+  {
+    const p2 = S.renderTowerRankingModal();
+    ok('a seta avanca pro dia seguinte', /13\/09/.test(semTag4(p2)) && /2 de 3/.test(semTag4(p2)),
+       semTag4(p2).slice(0, 160));
+    ok('e o dia sem ninguem fica, dizendo que ficou vazio',
+       /Ninguém subiu nenhum andar neste dia/.test(semTag4(p2)));
+    ok('e ali nao ha medalha nenhuma', (p2.match(/🥇/g)||[]).length === 0);
+  }
+  S.paginarHistoricoDaTorre(1);
+  {
+    const p3 = S.renderTowerRankingModal();
+    ok('a ultima pagina traz o ultimo dia', /12\/09/.test(semTag4(p3)) && /3 de 3/.test(semTag4(p3)),
+       semTag4(p3).slice(0, 160));
+    ok('e com UM inscrito so ele leva o ouro e mais nada',
+       (p3.match(/🥇/g)||[]).length === 1 && (p3.match(/🥈/g)||[]).length === 0,
+       (p3.match(/🥇/g)||[]).length + ' ouros, ' + (p3.match(/🥈/g)||[]).length + ' pratas');
+    ok('e agora a seta de AVANCAR e que esta desabilitada',
+       /disabled[^>]*onclick="paginarHistoricoDaTorre\(1\)/.test(p3)
+       && !/disabled[^>]*onclick="paginarHistoricoDaTorre\(-1\)/.test(p3));
+  }
+  /* ⚠️ A PAGINA NAO PASSA DAS PONTAS, nem pela acao. */
+  S.paginarHistoricoDaTorre(1); S.paginarHistoricoDaTorre(1);
+  ok('avancar na ultima nao passa', S.__getGame().towerRanking.histPag === 2,
+     String(S.__getGame().towerRanking.histPag));
+  S.paginarHistoricoDaTorre(-5);
+  ok('e voltar demais para na primeira', S.__getGame().towerRanking.histPag === 0,
+     String(S.__getGame().towerRanking.histPag));
+  /* ⚠️ E O DESENHO CLAMPA MESMO COM A PAGINA VELHA: o historico e carregado DEPOIS de a tela abrir,
+     entao o indice pode apontar pra um dia que ainda nao chegou (ou que sumiu). Sem o clamp, a seta
+     levaria a um modal vazio. */
+  S.__getGame().towerRanking.histPag = 99;
+  ok('pagina fora da lista cai no ultimo dia, e nao num modal vazio',
+     /12\/09/.test(semTag4(S.renderTowerRankingModal())),
+     semTag4(S.renderTowerRankingModal()).slice(0, 160));
+  ok('e o clamp GRAVA a correcao (senao ela ressurgiria na proxima seta)',
+     S.__getGame().towerRanking.histPag === 2, String(S.__getGame().towerRanking.histPag));
+  /* ⚠️ E A PAGINA ZERA AO ENTRAR NO HISTORICO: o "dia 3 de 5" de ontem nao e o mesmo de hoje. */
+  S.__getGame().towerRanking.histPag = 2;
+  S.abrirHistoricoDaTorre();
+  ok('reabrir o historico volta pro dia mais recente',
+     S.__getGame().towerRanking.histPag === 0, String(S.__getGame().towerRanking.histPag));
+  /* SEM HISTORICO NENHUM ela nao explode nem inventa pagina. */
+  S.__getGame().towerRanking.historico = [];
+  ok('historico vazio diz que nao ha dias',
+     /Ainda não há dias anteriores/.test(semTag4(S.renderTowerRankingModal())));
+  S.paginarHistoricoDaTorre(1);
+  ok('e paginar no vazio nao faz nada', (S.__getGame().towerRanking.histPag || 0) === 0);
   S.__getGame().towerRanking = null;
   /* O SERVIDOR: a callable existe e e SEPARADA do ranking -- ela custa ~50 leituras, e junto todo
      jogador que abrisse a Torre pagaria isso. */
@@ -6689,7 +6764,13 @@ console.log('\n=== ABRIR UM CONFRONTO ZERA O PASSO, ANTES DO DESENHO (15/09/2026
   {
     const fogo = Object.keys(S.GOLPES).filter(g => S.GOLPES[g][0] === 'Fire');
     const fora = fogo.filter(g => !S.GOLPES_QUE_QUEIMAM[g]);
-    ok('e o Fire Spin e o unico de Fogo que NAO queima', fora.length === 1 && fora[0] === 'firespin',
+    /* ⚠️ SAO DOIS DESDE 17/09/2026, e os dois por razao de dado: o REDEMOINHO DE FOGO e o de
+       PRENDER (virou multi-tapa aqui) e nao tem status nenhum, e o OVERHEAT tambem nao queima no
+       jogo oficial -- o que ele faz e cobrar -2 no Sp.Atk de QUEM USA.
+       A trava lista os dois de proposito: um golpe de Fogo novo que nasca sem queimar tem que ser
+       DECISAO, e nao descuido. */
+    ok('so o Redemoinho de Fogo e o Overheat NAO queimam',
+       fora.length === 2 && fora.indexOf('firespin') >= 0 && fora.indexOf('overheat') >= 0,
        fora.join(', '));
   }
   /* alguem tem que APRENDER e LEVAR, senao a mecanica seria a Furia de novo */
@@ -7959,6 +8040,231 @@ console.log('\nE A MARCA E SOLTA NO FIM DA BATALHA');
     t.concat(e).forEach(q => { total++; if(q._paralisado) sobrou++; });
   }
   ok('nenhum pokemon sai da batalha paralisado', sobrou === 0, sobrou + ' de ' + total);
+}
+
+/* =====================================================================
+   OS ESTAGIOS DE ATRIBUTO (17/09/2026) -- o primeiro sistema de estagios do motor.
+   ===================================================================== */
+console.log('\nA TABELA DE ESTAGIOS E A DA GEN 3');
+{
+  /* ⚠️ A ESCADA NAO E SIMETRICA, e e aqui que a intuicao mais erra: +1 e x1,5 mas -1 e x0,667
+     (2/3), e NAO x0,5. Escrever "-1 = metade" e o erro classico -- baixar doi MENOS que subir
+     rende, e e assim desde a Gen 1. */
+  ok('+1 vale x1,5', Math.abs(S.multDoEstagio(1) - 1.5) < 1e-9, String(S.multDoEstagio(1)));
+  ok('e -1 vale x0,667 (NAO x0,5)', Math.abs(S.multDoEstagio(-1) - 2/3) < 1e-9, S.multDoEstagio(-1).toFixed(4));
+  ok('-2 e que vale x0,5', Math.abs(S.multDoEstagio(-2) - 0.5) < 1e-9, String(S.multDoEstagio(-2)));
+  ok('+6 vale x4 e -6 vale x0,25',
+     S.multDoEstagio(6) === 4 && S.multDoEstagio(-6) === 0.25,
+     S.multDoEstagio(6) + ' / ' + S.multDoEstagio(-6));
+  ok('e 0 nao mexe em nada', S.multDoEstagio(0) === 1);
+  /* o teto e alcancavel de verdade (a Cauda de Ferro seis vezes), ao contrario dos estagios de
+     critico, que ficaram FORA do jogo por serem letra morta */
+  ok('o teto e -6 e +6', S.ESTAGIO_MIN === -6 && S.ESTAGIO_MAX === 6);
+  ok('e passar do teto nao mexe', S.multDoEstagio(-99) === S.multDoEstagio(-6) && S.multDoEstagio(99) === S.multDoEstagio(6));
+}
+
+console.log('\nOS CINCO GOLPES E O QUE CADA UM FAZ');
+{
+  const T = S.GOLPES_QUE_MUDAM_ESTAGIO;
+  /* ⚠️ AS CHANCES SAO AS OFICIAIS, tiradas do dado (Showdown, mod da Gen 3) */
+  ok('Cauda de Ferro: 30% na Defesa do ALVO',
+     T.irontail && T.irontail.chance === 0.30 && T.irontail.atributo === 'def' &&
+     T.irontail.delta === -1 && !T.irontail.noProprio);
+  ok('Psiquico: 10% na Defesa Especial do ALVO',
+     T.psychic && T.psychic.chance === 0.10 && T.psychic.atributo === 'spDef' && T.psychic.delta === -1);
+  ok('Bola Sombria: 20% na Defesa Especial do ALVO',
+     T.shadowball && T.shadowball.chance === 0.20 && T.shadowball.atributo === 'spDef' && T.shadowball.delta === -1);
+  /* ⚠️ O ASA DE ACO E O UNICO QUE CAI EM QUEM USA -- lido como os outros, ele baixaria a Defesa de
+     quem levou o golpe em vez de subir a de quem bateu, e o defeito nao apareceria como erro:
+     apareceria como o golpe sendo bom demais. */
+  ok('Asa de Aco: 10% na Defesa de QUEM USA',
+     T.steelwing && T.steelwing.chance === 0.10 && T.steelwing.atributo === 'def' &&
+     T.steelwing.delta === +1 && T.steelwing.noProprio === true);
+  /* ⚠️ E OS QUATRO EXISTEM NA TABELA DE GOLPES -- a licao da Lamina Solar: cadastrar efeito pra
+     golpe que o jogo nao tem e letra morta, e so se descobre no confronto que teria aquele golpe. */
+  ok('e todos existem na tabela GOLPES', Object.keys(T).every(id => !!S.GOLPES[id]),
+     Object.keys(T).filter(id => !S.GOLPES[id]).join(', ') || 'todos');
+  /* ⚠️ E SAO ALCANCAVEIS DE VERDADE (a licao da Furia, que ao pe da letra saia em 0,0%).
+     ⚠️ MAS "ALCANCAVEL" DEIXOU DE SER "LEVADO POR NIVEL" em 17/09/2026: o Rock Tomb e o Overheat
+     so vem de MAQUINA (TM39 e TM50), entao o ataquesPadrao -- que e por NIVEL -- devolve ZERO pros
+     dois, e estava certo. O que a trava quer garantir continua o mesmo: que o efeito nao seja letra
+     morta. Um golpe so de TM e alcancavel pra quem COMPRA o TM. */
+  const mk4 = (id, lv) => { const q = S.createInstance(id, lv); q.maxHp = S.calcMaxHp(q); q.hp = q.maxHp; return q; };
+  const tmDoGolpe = g => Object.keys(S.TMS).find(t => S.TMS[t].golpe === g);
+  Object.keys(T).forEach(id => {
+    const porNivel = Object.keys(S.SPECIES).filter(sp => (S.ataquesPadrao(mk4(sp, 70)) || []).indexOf(id) >= 0);
+    const tm = tmDoGolpe(id);
+    const porTM = tm ? (S.TMS[tm].aprendem || []).length : 0;
+    ok('  ' + (S.GOLPES_PT[id] || id) + ' e alcancavel',
+       porNivel.length > 0 || porTM > 0,
+       porNivel.length + ' por nivel, ' + porTM + ' por ' + (tm ? tm.toUpperCase() : 'nenhum TM'));
+  });
+}
+
+console.log('\nO ESTAGIO MEXE NO ATRIBUTO, E POR ULTIMO NA CADEIA');
+{
+  const mk4 = (id, lv, shiny) => { const q = S.createInstance(id, lv); if(shiny) q.shiny = true; q.maxHp = S.calcMaxHp(q); q.hp = q.maxHp; return q; };
+  const g = mk4('golem', 60);
+  const d0 = S.effectiveDefense(g);
+  S.moverEstagio(g, 'def', -1);
+  ok('a Defesa cai pra 2/3 com -1', S.effectiveDefense(g) === Math.round(d0 * 2/3),
+     d0 + ' -> ' + S.effectiveDefense(g));
+  const k = mk4('alakazam', 60);
+  const s0 = S.effectiveSpDef(k);
+  S.moverEstagio(k, 'spDef', -1);
+  ok('e a Defesa Especial tambem', S.effectiveSpDef(k) === Math.round(s0 * 2/3), s0 + ' -> ' + S.effectiveSpDef(k));
+  const j = mk4('jolteon', 60);
+  const v0 = S.effectiveSpeed(j);
+  S.moverEstagio(j, 'speed', -1);
+  ok('e a Velocidade tambem', S.effectiveSpeed(j) === Math.round(v0 * 2/3), v0 + ' -> ' + S.effectiveSpeed(j));
+  /* ⚠️ O MULTIPLICADOR ENTRA POR ULTIMO: "metade da Defesa" e metade do que o pokemon TEM na hora,
+     e nao da base. Num shiny (x1,20 em tudo) o corte tem que sair do valor JA buffado -- entrando
+     antes, ele multiplicaria so a base e o buff ficaria de fora da conta. */
+  const sh = mk4('golem', 60, true);
+  const sh0 = S.effectiveDefense(sh);
+  S.moverEstagio(sh, 'def', -1);
+  ok('e num shiny ele corta o valor JA buffado', S.effectiveDefense(sh) === Math.round(sh0 * 2/3),
+     sh0 + ' -> ' + S.effectiveDefense(sh));
+  /* o teto */
+  const t = mk4('onix', 60);
+  for(let i = 0; i < 9; i++) S.moverEstagio(t, 'def', -1);
+  ok('nove quedas param no -6', S.estagioDe(t, 'def') === -6, String(S.estagioDe(t, 'def')));
+  /* ⚠️ E MOVER NO TETO DEVOLVE FALSE -- e isso e o que impede uma linha de log dizendo que a
+     Defesa caiu com a barra parada, o mesmo defeito do "-0 de HP". */
+  ok('e mover no teto devolve false (sem linha)', S.moverEstagio(t, 'def', -1) === false);
+}
+
+console.log('\nO SORTEIO, E O rng SO LIDO QUANDO O GOLPE MUDA ESTAGIO');
+{
+  /* ⚠️ UM RNG CONTINUO, nao uma semente nova por volta: o PRIMEIRO valor de uma semente nova
+     correlaciona com a semente, e foi assim que a medicao do gelo deu 7,8% onde era 10%. */
+  let semente = 24680;
+  const rng = () => (semente = (semente * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+  const mede = (golpe, esperado) => {
+    let pegou = 0; const N = 20000;
+    for(let i = 0; i < N; i++){
+      const quem = S.createInstance('alakazam', 60); quem.maxHp = S.calcMaxHp(quem); quem.hp = quem.maxHp;
+      quem.lastMove = golpe;
+      const alvo = S.createInstance('machoke', 60); alvo.maxHp = S.calcMaxHp(alvo); alvo.hp = alvo.maxHp;
+      if(S.tentarEstagio(quem, alvo, rng)) pegou++;
+    }
+    const pct = 100 * pegou / N, sd = 100 * Math.sqrt(esperado * (1 - esperado) / N);
+    ok('o ' + (S.GOLPES_PT[golpe] || golpe) + ' muda estagio em ' + (esperado*100) + '%',
+       Math.abs(pct - esperado * 100) < 3 * sd,
+       pct.toFixed(2) + '% (' + ((pct - esperado*100)/sd).toFixed(1) + 'sigma)');
+  };
+  mede('irontail', 0.30);
+  mede('psychic', 0.10);
+  mede('shadowball', 0.20);
+
+  /* ⚠️ A ARMADILHA DA SEMENTE: lido sempre, o rng deslocaria toda batalha sem nenhum dos cinco. */
+  let leu = 0;
+  const conta = () => { leu++; return 0.99; };
+  const quem = S.createInstance('machoke', 60); quem.maxHp = S.calcMaxHp(quem); quem.hp = quem.maxHp;
+  const alvo = S.createInstance('machoke', 60); alvo.maxHp = S.calcMaxHp(alvo); alvo.hp = alvo.maxHp;
+  quem.lastMove = 'karatechop';
+  S.tentarEstagio(quem, alvo, conta);
+  ok('golpe que nao muda estagio nao le o rng', leu === 0, leu + ' leituras');
+  quem.lastMove = 'irontail';
+  S.tentarEstagio(quem, alvo, conta);
+  ok('mas o que muda LE', leu === 1, leu + ' leitura');
+
+  /* o Asa de Aco sobe a Defesa de QUEM USA, e o teste cobra isso pelo lado do sorteio */
+  const usa = S.createInstance('skarmory', 60); usa.maxHp = S.calcMaxHp(usa); usa.hp = usa.maxHp;
+  usa.lastMove = 'steelwing';
+  const outro = S.createInstance('machoke', 60); outro.maxHp = S.calcMaxHp(outro); outro.hp = outro.maxHp;
+  S.tentarEstagio(usa, outro, () => 0.01);
+  ok('o Asa de Aco sobe a Defesa de quem USA', S.estagioDe(usa, 'def') === 1, String(S.estagioDe(usa, 'def')));
+  ok('e nao encosta no alvo', S.estagioDe(outro, 'def') === 0, String(S.estagioDe(outro, 'def')));
+}
+
+console.log('\nNA BATALHA: A LINHA, A FRASE E A LIMPEZA');
+{
+  const mk4 = (id, lv) => { const q = S.createInstance(id, lv); q.maxHp = S.calcMaxHp(q); q.hp = q.maxHp; q.ataques = S.ataquesPadrao(q); return q; };
+  let comLinha = null, confrontos = 0, eventos = 0, sobrou = 0, total = 0;
+  for(let k = 0; k < 500; k++){
+    const t = ['steelix','gengar','alakazam'].map(id => mk4(id, 70));
+    const e = ['machamp','snorlax','lapras'].map(id => mk4(id, 68));
+    S.equiparNpc(e);
+    const r = S.simulateGymBattle(t, e, S.makeSeededRng('est|' + k));
+    (r.matchups || []).forEach(m => {
+      confrontos++;
+      const linhas = (m.golpes || []).filter(g => g.x === 'estagio');
+      eventos += linhas.length;
+      if(linhas.length && !comLinha) comLinha = m;
+    });
+    t.concat(e).forEach(q => { total++; if(q._estagios && Object.keys(q._estagios).some(x => q._estagios[x])) sobrou++; });
+  }
+  ok('a mecanica sai numa batalha de verdade', eventos > 50, eventos + ' mudancas em ' + confrontos + ' confrontos');
+  /* ⚠️ A MARCA E SOLTA NO FIM DA BATALHA: ela dura a BATALHA e o time vai pro SAVE. Sem soltar, um
+     pokemon sairia da luta com a Defesa em -3 PRA SEMPRE. */
+  ok('e nenhum pokemon sai da batalha com estagio guardado', sobrou === 0, sobrou + ' de ' + total);
+
+  if(comLinha){
+    const html = S.passosHtml(comLinha);
+    ok('a frase diz o atributo e o sentido', /teve a Defesa|teve a Defesa Especial|aumentou a Defesa/.test(html),
+       (html.match(/[^>]*(teve a|aumentou a)[^<]*/) || ['(sem frase)'])[0].slice(0, 70));
+    /* ⚠️ E ELA NAO VIRA UM "-0 de HP": a linha e de dano zero, e sem entrar no ehGolpeEspecial ela
+       cairia no ramo do golpe comum -- o defeito exato que o congelamento teve. */
+    ok('e nenhuma linha de estagio vira -0 de HP', !/(teve a|aumentou a)[^<]*−0 de HP/.test(html));
+    ok('e o ehGolpeEspecial conhece a marca', S.ehGolpeEspecial({ x:'estagio' }) === true);
+    ok('e ela vale 1 passo na animacao', S.passosDaAbertura && S.passosDaAbertura.estagio === 1);
+  }
+
+  /* ⚠️ O `q` DA LINHA E DE QUEM TEVE O ATRIBUTO MEXIDO, e nao de quem usou o golpe: nos quatro de
+     debuff sao lados OPOSTOS. Lido errado, a frase nomearia o pokemon errado. */
+  {
+    const atk = mk4('steelix', 70), def = mk4('machamp', 70);
+    const diario = [];
+    atk.ataques = ['irontail'];
+    let achou = null;
+    for(let k = 0; k < 200 && !achou; k++){
+      const t = [mk4('steelix', 70)]; t[0].ataques = ['irontail'];
+      const e = [mk4('machamp', 70)];
+      const r = S.simulateGymBattle(t, e, S.makeSeededRng('q|' + k));
+      (r.matchups || []).forEach(m => { const l = (m.golpes||[]).find(g => g.x === 'estagio'); if(l && !achou) achou = { m, l }; });
+    }
+    if(achou){
+      ok('o q da linha e de quem teve o atributo mexido (o alvo)', achou.l.q === 'e', achou.l.q + ' / ' + achou.l.g);
+      ok('e ela nomeia o alvo', achou.l.g === achou.m.enemy, achou.l.g + ' x ' + achou.m.enemy);
+    } else {
+      ok('achei um confronto com a Cauda de Ferro mudando estagio', false, '(nao achei)');
+    }
+  }
+}
+
+console.log('\nE O ASTERISCO NO CARTAO DO GOLPE');
+{
+  const T = S.GOLPES_QUE_MUDAM_ESTAGIO;
+  /* ⚠️ A TRAVA VARRE O NOME_DO_ATRIBUTO, e nao dois nomes escritos a mao: ela procurava
+     /Defesa|Velocidade/ e envelheceu no dia em que o Overheat entrou mexendo no ATAQUE ESPECIAL.
+     E a mesma licao do "59 especies" da ficha da Pokedex -- numero (ou lista) a mao envelhece
+     junto com a tabela que ele descreve. */
+  const temAtributo = id => (S.obsDoGolpe(id) || [])
+    .some(o => Object.values(S.NOME_DO_ATRIBUTO).some(n => o.indexOf(n) >= 0));
+  ok('todos avisam no cartao', Object.keys(T).every(temAtributo),
+     Object.keys(T).filter(id => !temAtributo(id)).join(', ') || 'todos');
+  /* ⚠️ E O AVISO DIZ EM QUEM O EFEITO CAI: o Overheat e -2 no PROPRIO usuario, e por um dia o
+     cartao dele disse "do alvo" -- o contrario. A regra antiga lia o SINAL do delta, que era
+     verdade so enquanto o unico + era no proprio. */
+  Object.entries(T).forEach(([id, e]) => {
+    const o = (S.obsDoGolpe(id) || []).join(' ');
+    ok('  ' + id + ': o aviso diz em quem cai',
+       e.noProprio ? /de quem usa/.test(o) : /do alvo/.test(o), o);
+  });
+  /* ⚠️ E O AVISO DIZ EM QUEM CAI: sem o "do alvo"/"de quem usa", o cartao do Asa de Aco se leria
+     como um debuff. */
+  ok('e o do alvo diz "do alvo"', (S.obsDoGolpe('irontail')||[]).some(o => /do alvo/.test(o)),
+     (S.obsDoGolpe('irontail')||[]).join(' | '));
+  ok('e o do proprio diz "de quem usa"', (S.obsDoGolpe('steelwing')||[]).some(o => /de quem usa/.test(o)),
+     (S.obsDoGolpe('steelwing')||[]).join(' | '));
+  /* ⚠️ A CHANCE SAI DA TABELA, nunca escrita a mao -- ela varia de 10% a 30% nestes quatro */
+  ok('e a chance e a da tabela',
+     (S.obsDoGolpe('irontail')||[]).some(o => /30%/.test(o)) &&
+     (S.obsDoGolpe('psychic')||[]).some(o => /10%/.test(o)) &&
+     (S.obsDoGolpe('shadowball')||[]).some(o => /20%/.test(o)));
+  ok('e golpe que nao mexe estagio nao avisa',
+     !(S.obsDoGolpe('karatechop')||[]).some(o => /Defesa|Velocidade/.test(o)));
 }
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
 process.exit(falhas ? 1 : 0);

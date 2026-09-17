@@ -1157,18 +1157,60 @@ console.log('\n=== A MATA FECHADA E A VIGILIA DO ARCO-IRIS (13/09/2026) ===');
 
   /* 1) O SORTEIO. Semeado pelo save, nunca Math.random: com o sorteio solto bastava sair do save e
      voltar ate a mata aparecer -- a mesma artimanha que a semente do encontro selvagem fecha. */
-  let antesDoTrecho4 = 0, saiu = 0, elegiveis = 0;
-  for(let slot = 0; slot < 200; slot++){
+  const N = 4000;
+  let antesDoTrecho4 = 0, comMata = 0, maisDeUma = 0, dados = 0, dadoPassou = 0;
+  const porTrecho = {};
+  for(let slot = 0; slot < N; slot++){
     g.currentSaveSlot = slot;
+    let quantas = 0;
     for(let leg = 0; leg < 8; leg++){
       if(leg < S.ROTA_DO_CORTE_A_PARTIR_DE){ if(S.temRotaDoCorte(leg)) antesDoTrecho4++; continue; }
-      elegiveis++; if(S.temRotaDoCorte(leg)) saiu++;
+      /* o DADO de cada trecho (a chance crua) e a MATA (o primeiro que passou) sao coisas diferentes
+         desde 17/09/2026 -- e e essa diferenca que o item 1.1 abaixo cobra. */
+      dados++; if(S.mataSaiNoTrecho(leg)) dadoPassou++;
+      if(S.temRotaDoCorte(leg)){ quantas++; porTrecho[leg] = (porTrecho[leg]||0) + 1; }
     }
+    if(quantas > 0) comMata++;
+    if(quantas > 1) maisDeUma++;
   }
   ok('ela NUNCA sai antes do trecho 4', antesDoTrecho4 === 0, String(antesDoTrecho4));
-  const taxa = saiu / elegiveis;
-  ok('e sai em ~1 de cada 4 trechos elegiveis', Math.abs(taxa - S.CHANCE_ROTA_DO_CORTE) < 0.05,
-     (100 * taxa).toFixed(1) + '% de ' + elegiveis);
+
+  /* ⚠️ 1.1) NO MAXIMO UMA POR JORNADA (17/09/2026, reportado: *"esta aparecendo mais de uma vez por
+     jornada, ela deve aparecer somente 1x"*). Antes o dado era rolado em CADA trecho de forma
+     independente, entao ver duas ou tres era o desenho, nao um acidente. */
+  ok('NUNCA mais de uma mata na mesma jornada', maisDeUma === 0, maisDeUma + ' de ' + N + ' jornadas');
+  /* ⚠️ E O DADO CRU CONTINUA EM 1/4: e ele que decide ONDE a mata cai, e mexer nele mudaria a
+     jornada de todo mundo que tem save aberto. O que mudou foi o TETO, nao a chance. */
+  const taxaDado = dadoPassou / dados;
+  ok('e o dado de cada trecho continua em ~1 de 4',
+     Math.abs(taxaDado - S.CHANCE_ROTA_DO_CORTE) < 0.03,
+     (100 * taxaDado).toFixed(1) + '% de ' + dados + ' dados');
+  /* ⚠️ E A CHANCE DE VER A MATA ALGUMA VEZ NAO SE MOVE -- ela e "pelo menos um dos cinco dados
+     passou", e essa conta nao mudou. Medida em 74,8% antes da correcao. */
+  const esperado = 1 - Math.pow(1 - S.CHANCE_ROTA_DO_CORTE, 8 - S.ROTA_DO_CORTE_A_PARTIR_DE);
+  ok('e a chance de ver a mata ALGUMA vez continua a mesma',
+     Math.abs(comMata / N - esperado) < 0.03,
+     (100 * comMata / N).toFixed(1) + '% (esperado ' + (100 * esperado).toFixed(1) + '%)');
+  /* ⚠️ E ELA CAI ONDE SEMPRE CAIU: como o conserto e "pegar o PRIMEIRO que sair" -- e nao sortear um
+     trecho novo --, a primeira mata de qualquer jornada continua no mesmo trecho de antes. A conta
+     de referencia aqui e a regra VELHA reproduzida na mao. */
+  let mesmoTrecho = 0, comparadas = 0;
+  for(let slot = 0; slot < N; slot++){
+    g.currentSaveSlot = slot;
+    let velho = -1, novo = -1;
+    for(let leg = S.ROTA_DO_CORTE_A_PARTIR_DE; leg < 8; leg++){
+      if(velho < 0 && S.mataSaiNoTrecho(leg)) velho = leg;   // a primeira da regra ANTIGA
+      if(novo < 0 && S.temRotaDoCorte(leg)) novo = leg;
+    }
+    if(velho < 0) continue;
+    comparadas++; if(velho === novo) mesmoTrecho++;
+  }
+  ok('e a PRIMEIRA mata cai exatamente onde caia antes',
+     comparadas > 2000 && mesmoTrecho === comparadas, mesmoTrecho + ' de ' + comparadas);
+  /* e ela aparece nos CINCO trechos elegiveis, nao so no primeiro que pode */
+  ok('e ela aparece em todos os trechos elegiveis',
+     Object.keys(porTrecho).length === 8 - S.ROTA_DO_CORTE_A_PARTIR_DE,
+     Object.keys(porTrecho).map(k => 'trecho ' + (+k + 1) + ': ' + porTrecho[k]).join(', '));
   g.currentSaveSlot = 7;
   const perfil = () => [0,1,2,3,4,5,6,7].map(l => S.temRotaDoCorte(l) ? 'M' : '.').join('');
   ok('o sorteio e ESTAVEL (sair do save e voltar nao re-sorteia)', perfil() === perfil(), perfil());
