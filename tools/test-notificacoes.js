@@ -235,11 +235,30 @@ console.log('\nO BOTAO QUE LEVA ATE O CAMPEONATO (16/09/2026)');
   const meta = id => ({ meta: { leagueTypeId: id } });
   /* AS CINCO DA FAMILIA: comecou, acabou, foi adiada, o resultado da partida e o campeao */
   const FAMILIA = ['league_started','league_ended','league_delayed','match_played','league_champion'];
+  /* ⚠️ A TRAVA VALIDA O ATRIBUTO, e nao so a presenca do nome da funcao -- e essa diferenca e o
+     defeito de 17/09/2026 inteiro (*"o botao que leva para a liga nao esta levando para lugar
+     nenhum, nada acontece"*). O HTML gerado era:
+       onclick="irParaALiga("classic")"
+     porque o valor saia de um JSON.stringify, que poe ASPAS DUPLAS -- e o atributo onclick e
+     delimitado por aspas duplas, entao a aspa do valor FECHAVA o atributo. O clique nao fazia nada,
+     em silencio. A trava velha procurava 'irParaALiga' no HTML, e ele estava la: ela media a
+     PRESENCA, nao a validade.
+     O que se cobra agora e a chamada INTEIRA, com aspas simples dentro das duplas -- que e o que o
+     escJs (o ajudante da casa pras duas camadas) produz. */
+  const chamada = /onclick="irParaALiga\('[^"']*'\)"/;
   FAMILIA.forEach(t => {
     const html = S.ctaDaNotificacao(notif('n', t, meta('classic')));
-    ok('a notificacao ' + t + ' leva ate a liga', html.indexOf('irParaALiga') >= 0,
-       html.indexOf('irParaALiga') >= 0 ? 'tem botao' : html.slice(0, 60) || '(vazio)');
+    ok('a notificacao ' + t + ' leva ate a liga', chamada.test(html),
+       (html.match(/onclick="irParaALiga[^>]*/) || ['(sem botao)'])[0]);
   });
+  /* ⚠️ E NENHUM onclick DO ARQUIVO INTEIRO pode ter aspas duplas no meio: e o mesmo defeito, e ele
+     pode nascer de novo em qualquer botao novo. Esta e a trava que teria pego o de hoje. */
+  {
+    const txt = require('fs').readFileSync(require('path').join(__dirname, '..', 'index.html'), 'utf8');
+    const ruins = (txt.match(/onclick="[^"]*\$\{JSON\.stringify/g) || []);
+    ok('e nenhum onclick do jogo usa JSON.stringify (a aspa dupla fecha o atributo)',
+       ruins.length === 0, ruins.join(' | ') || 'nenhum');
+  }
   /* ⚠️ O TEXTO NOMEIA O DESTINO: "Ver a liga" num aviso de Trainers League faria o jogador
      procurar qual delas. */
   ok('e o texto diz QUAL liga -- Classica',
@@ -290,7 +309,67 @@ console.log('\nE A LIGA CUSTOMIZADA CHEGA COM A CONFIG');
     return S.irParaALiga('liga_fogo');
   }).then(()=>{
     ok('com a leitura falhando, ele abre a liga mesmo assim', aberta && aberta.id === 'liga_fogo');
-    console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
+    
+console.log('\nA LISTA MOSTRA 6 E O QUADRO DE BAIXO E FIXO (17/09/2026)');
+{
+  /* Pedido assim: *"a lista de notificacoes, coloque para exibir no maximo 6, depois disso coloque
+     para rolar a barra. E deixe o quadro debaixo onde exibe as informacoes sobre a notificacao,
+     fixo na tela, hoje ele fica se movendo, aumentando e diminuindo, conforme deleta ou troca de
+     notificacao"*. */
+  const css = require('fs').readFileSync(require('path').join(__dirname, '..', 'index.html'), 'utf8');
+
+  /* ⚠️ 1) O TETO DA LISTA E EM PX, e nao em vh -- e essa e a diferenca que faz o "6" ser verdade.
+     Ele era '42vh', que e relativo a JANELA: a 320x568 dava 239px (5,8 linhas, por acaso perto de
+     6), e numa tela de 800px de altura daria 8. A linha mede 41px, entao 6 delas sao 246. */
+  const lista = (css.match(/\.notif-lista\{[^}]*\}/) || [''])[0];
+  ok('a lista tem teto em PX (nao em vh)', /max-height:\s*\d+px/.test(lista) && !/vh/.test(lista), lista);
+  const teto = +((lista.match(/max-height:\s*(\d+)px/) || [])[1] || 0);
+  ok('e o teto e 6 linhas de 41px', teto === 246, teto + 'px');
+  ok('e ela ROLA depois disso', /overflow-y:\s*auto/.test(lista), lista);
+
+  /* ⚠️ 2) O QUADRO DE BAIXO TEM ALTURA FIXA. Medido a 320px nos dez tipos, ele ia de 188 a 355px --
+     167px de diferenca, e a tela inteira pulava a cada troca de notificacao.
+     ⚠️ ALTURA E NAO MIN-HEIGHT: com min-height o pulo volta no primeiro texto que passar dela. */
+  const corpo = (css.match(/\.notif-corpo\{[^}]*\}/) || [''])[0];
+  ok('o quadro de baixo tem altura FIXA', /height:\s*\d+px/.test(corpo) && !/min-height/.test(corpo), corpo);
+  ok('e ele e uma coluna (topo, miolo, rodape)',
+     /display:flex/.test(corpo) && /flex-direction:column/.test(corpo), corpo);
+  /* ⚠️ E O 'overflow' VIVE NO MIOLO, nao no quadro: no quadro inteiro o rodape rolaria junto e o
+     botao de apagar voltaria a sair do lugar -- que e o que se pediu pra parar. */
+  const miolo = (css.match(/\.notif-corpo-miolo\{[^}]*\}/) || [''])[0];
+  ok('e quem rola e o MIOLO', /flex:\s*1/.test(miolo) && /overflow-y:\s*auto/.test(miolo), miolo);
+  ok('e o quadro inteiro NAO rola', !/overflow/.test(corpo), corpo);
+  const rodape = (css.match(/\.notif-corpo-rodape\{[^}]*\}/) || [''])[0];
+  ok('e o rodape nao cede espaco', /flex-shrink:\s*0/.test(rodape), rodape);
+
+  /* 3) NA TELA: a marcacao dos tres andares, e o apagar no rodape. */
+  {
+    const S2 = createSandbox();
+    const g2 = S2.__getGame();
+    g2.authUser = { uid:'x' };
+    g2.notificationsList = ['league_champion','friend_request','tower_top'].map((t,i)=>({
+      id:'n'+i, type:t, title:'T'+i, body:'corpo '.repeat(i*20+1),
+      createdAt:{ seconds:1758000000 }, meta:{ leagueTypeId:'classic' } }));
+    g2.notificationsLoaded = true;
+    g2.notificationSelected = 'n0';
+    g2.screen = 'notifications';
+    S2.__setGame(g2);
+    const h = S2.renderNotificationsScreen();
+    ok('o quadro de baixo usa a classe de altura fixa', h.indexOf('box notif-corpo') >= 0);
+    ok('e tem miolo e rodape', h.indexOf('notif-corpo-miolo') >= 0 && h.indexOf('notif-corpo-rodape') >= 0);
+    /* ⚠️ O APAGAR FICA NO RODAPE: e a acao que nao muda de notificacao pra notificacao, e e ela que
+       a mao procura sempre no mesmo lugar. */
+    ok('e o Apagar fica DENTRO do rodape',
+       /notif-corpo-rodape[\s\S]{0,200}requestDeleteNotification/.test(h),
+       (h.match(/notif-corpo-rodape[\s\S]{0,120}/) || ['?'])[0].replace(/\s+/g, ' '));
+    /* e o botao que leva pra liga continua no MIOLO, junto do texto que ele acompanha */
+    const ini = h.indexOf('notif-corpo-miolo'), fim = h.indexOf('notif-corpo-rodape');
+    ok('e o botao da liga continua no miolo',
+       h.slice(ini, fim).indexOf('irParaALiga') >= 0);
+  }
+}
+
+console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
     process.exit(falhas ? 1 : 0);
   });
 }

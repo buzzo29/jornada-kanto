@@ -10142,6 +10142,45 @@ está aberta (~2 leituras por tique, ~1.400/hora por aba). Ele já é só LEITUR
 de tentar avançar o ciclo — e é guardado por `game.screen`, mas continua sendo a maior torneira de
 leitura do jogo com a tela parada. A Trainers League já tem poll adaptativo; a Clássica não.
 
+## OS QUADROS QUE ABREM E FECHAM NAS LIGAS (17/09/2026)
+
+Pedidos assim: *"na liga classica e trainers league, nos quadros de Top 10, Suas ultimas ligas e
+Ultimas Ligas, coloque um quadrado azul com um sinal de + alinhado na direita do titulo, e quando o
+usuario clicar, abre as linhas que aparecem hoje"*.
+
+**São QUATRO**: os dois Top 10 (a Clássica e a Trainers League) mais os dois históricos da Clássica
+— e é por isso que eles dividem **uma** função (`quadroDobravelHtml`). Escritos um a um, o quinto
+nasceria com o `+` fora de lugar ou sem fechar: é a lição das três telas de golpe, que viraram uma
+cópia só **depois** de já terem divergido no texto.
+
+- **⚠️ O CABEÇALHO INTEIRO É O ALVO DO TOQUE**, e não o quadradinho. É a regra da casa (*"a linha
+  toda já é o alvo do toque, e mirar num quadradinho num celular é pedir erro"*), a mesma da ficha
+  da Pokédex, da lista de notificações e do card do log de batalha. **O `+` é a AFFORDANCE** — ele
+  diz que há o que abrir —, não o alvo.
+- **⚠️ E ELE É UMA `<div role="button">`, NUNCA UM `<button>`.** O conteúdo desses quadros **TEM
+  botões dentro**: o "▶ Rever" dos históricos, e o nome do treinador do Top 10, que abre o perfil.
+  `<button>` dentro de `<button>` é HTML inválido — o navegador fecha o de fora e o clique de dentro
+  se perde, com a tela continuando a **PARECER** certa. Essa armadilha já custou dois defeitos neste
+  projeto (a lupa do encontro selvagem e a do montador), e o card do log de batalha resolveu-a do
+  mesmo jeito. O preço da `div` é o teclado, que entra na mão (`tabindex` + Enter/Espaço).
+- **⚠️ E O CONTEÚDO É IRMÃO do cabeçalho, não filho:** assim nem o aninhamento nem o clique de
+  dentro dependem de `stopPropagation`.
+- **O CONTEÚDO SÓ É MONTADO QUANDO ABERTO**, e isso não é só estética: o Top 10 monta dez linhas com
+  o link de perfil de cada uma, e os históricos montam um botão por liga.
+- **ELES COMEÇAM FECHADOS**, que é o que o pedido descreve (*"quando clicar, ABRE as linhas que
+  aparecem hoje"*). O estado é de **TELA** — não vai pro save, ninguém volta amanhã querendo o Top
+  10 aberto — e **zera ao entrar na liga**: o "aberto" de ontem não é uma preferência, é o estado em
+  que o jogador largou a tela na vez passada.
+- **Medido a 320px, no navegador:** o quadrado tem **28×28px** no azul da casa, encostado na borda
+  direita do cabeçalho (folga 0), e a tela da Clássica com os três fechados vai de **2.099 para
+  1.027px — −51%**, sem rolagem lateral.
+- `tools/test-liga-inscricao.js` tranca 21 pontas: o `+` virando `−`, o conteúdo só quando aberto,
+  o cabeçalho não sendo um `<button>` e o conteúdo sendo irmão dele, o teclado, os **quatro ids sem
+  repetir**, **nenhum `<h2>` solto sobrando** com esses títulos (um deles fora da função seria um
+  quadro que não abre, e só quem abrisse aquela liga descobriria), o zerar nas duas portas, o estado
+  fora do save, o "▶ Rever" e o link de perfil continuando inteiros dentro do conteúdo, e — lendo o
+  CSS — o quadrado ser quadrado, ser azul, e o título empurrar o `+` pra direita.
+
 ## Trainers League
 
 ### UM `undefined` MATOU AS DUAS LIGAS — E MANDOU 376 NOTIFICAÇÕES (13/09/2026)
@@ -10561,6 +10600,21 @@ A tarja dizia **`Maximum call stack size exceeded`**, que é um `RangeError` —
   natural num e-mail, mas deixaria o sino da home aceso enquanto sobrasse uma não aberta — e a
   decisão antiga era não cobrar um clique por notificação. O selo **NOVA** devolve a informação que
   a marcação em bloco apaga: ele marca as que estavam por ler AO ABRIR a tela.
+  **⚠️ A LISTA MOSTRA 6 E ROLA, e o teto é em PX — não em `vh`** (17/09/2026, a pedido). Ele era
+  `42vh`, que é relativo à **JANELA**: a 320×568 dava 239px (5,8 linhas, por acaso perto de 6), e
+  numa tela de 800px de altura daria 8. A linha mede **41px**, então 6 delas são **246** — e aí o
+  "6" é verdade em toda tela. É a mesma conta da `.loja-lista`.
+  **⚠️ E O QUADRO DE BAIXO TEM ALTURA FIXA** (a pedido: *"deixe o quadro debaixo onde exibe as
+  informações sobre a notificação, fixo na tela, hoje ele fica se movendo, aumentando e diminuindo,
+  conforme deleta ou troca de notificação"*). Medido a 320px nos **dez tipos**: ele ia de **188 a
+  355px** — 167px de diferença, e a tela inteira pulava a cada troca.
+  **É exatamente o mesmo defeito que a LOJA teve em 13/09, e o conserto é o mesmo:** altura FIXA (o
+  maior caso medido, o campeão de liga com os dois botões) e uma **coluna de três andares** — topo,
+  miolo que ROLA, e o rodapé colado embaixo.
+  **⚠️ ALTURA E NÃO `min-height`:** com ela o pulo volta no primeiro texto que passar do valor.
+  **⚠️ E O `overflow` VIVE NO MIOLO**, nunca no quadro: no quadro inteiro o rodapé rolaria junto e o
+  **botão de apagar** voltaria a sair do lugar — que é o que se pediu pra parar. Medido depois: os
+  dez tipos em **355px** e o Apagar sempre no mesmo Y.
   O título do corpo usa a fonte de TEXTO, não a de pixel dos títulos de seção: é conteúdo, e a de
   pixel gastava três linhas a 320px. `tools/test-notificacoes.js` cobre os três estados da tela, a
   seleção, o selo e o CTA de cada tipo de notificação.
@@ -10605,6 +10659,30 @@ logado em vez de sumir.
   ligas conhecidas, a que não tem `leagueTypeId` sem botão, o prêmio antes da liga no campeão, o
   que não é de liga sem botão, a customizada chegando **com o `allowedTypes`**, a Trainers pela
   porta dela, a Clássica sem gastar leitura, e a leitura falhando sem travar.
+
+#### ⚠️ E ELE NÃO LEVAVA A LUGAR NENHUM (17/09/2026)
+
+Reportado assim: *"o botão que leva para a liga que a notificação está informando, não está levando
+para lugar nenhum, nada acontece"*.
+
+**A causa é de UMA linha, e ela não é de lógica: o valor saía de um `JSON.stringify`.** Ele põe
+**aspas duplas** numa string, e o atributo `onclick` é delimitado por aspas duplas:
+
+```html
+onclick="irParaALiga("classic")"
+```
+
+A aspa do valor **fechava o atributo**. O navegador lia `onclick="irParaALiga("` — sintaxe inválida —
+e o clique não fazia nada, **em silêncio, sem erro no console**.
+
+- **O conserto é o `escJs`**, o ajudante da casa que escapa as DUAS camadas (a string JS e o
+  atributo HTML), com aspas simples dentro das duplas. É o que todo o resto do arquivo já usa.
+- **⚠️ E A TRAVA QUE EXISTIA NÃO PEGOU PORQUE ELA MEDIA A PRESENÇA.** Ela procurava `irParaALiga` no
+  HTML, e ele **estava lá** — o que faltava era o atributo ser válido. Hoje ela cobra a chamada
+  inteira (`onclick="irParaALiga('...')"`), e há uma segunda varrendo o **arquivo todo**: nenhum
+  `onclick` do jogo pode usar `JSON.stringify`. Essa é a que teria pego o de hoje, e é a que pega o
+  próximo botão que nascer assim.
+- **Conferido que as duas acusam** com o `JSON.stringify` religado: 5 falhas.
 
 - **Não redesenhar a tela durante animações.** Cada `render()` recria o HTML e mata a transição
   CSS da barra de HP no meio. Animações atualizam o DOM diretamente. Já causou três bugs.

@@ -1301,7 +1301,38 @@
   }
   .notif-item.marcada{ background:var(--yellow); }
   .notif-item.marcada .notif-check{ background:var(--green); }
-  .notif-lista{ display:flex; flex-direction:column; max-height:42vh; overflow-y:auto; }
+  /* ⚠️ A LISTA MOSTRA 6 E ROLA (17/09/2026, a pedido) -- e o teto e em PX, nao em vh.
+     Ele era `42vh`, que e relativo a JANELA: a 320x568 dava 239px (5,8 linhas, por acaso perto de
+     6), e numa tela de 800px de altura daria 8. Em px ele e o que se pediu em toda tela.
+     A linha mede 41px a 320px, entao 6 delas sao 246. E a mesma conta da .loja-lista. */
+  /* OS QUADROS QUE ABREM E FECHAM (17/09/2026) -- ver quadroDobravelHtml.
+     O cabecalho INTEIRO e o alvo do toque; o + e so a affordance. */
+  .quadro-dobra-cab{ display:flex; align-items:center; gap:8px; cursor:pointer;
+    user-select:none; -webkit-tap-highlight-color:transparent; }
+  .quadro-dobra-cab:focus-visible{ outline:3px solid var(--blue); outline-offset:2px; }
+  /* o titulo mantem a fonte e o tamanho do <h2> de sempre -- o quadro nao muda de cara, muda de
+     arrumacao. O flex:1 e o que empurra o + pra DIREITA, que foi o pedido. */
+  .quadro-dobra-tit{ flex:1; min-width:0; margin:0; }
+  /* ⚠️ O QUADRADO AZUL: mesma largura e altura (e um QUADRADO, nao um circulo -- as redondas neste
+     jogo sao as setas de ordem do time, e duas formas iguais confundiriam). O 28px e o minimo que
+     ainda se acerta com o dedo sem competir com o titulo. */
+  .quadro-dobra-mais{ flex-shrink:0; width:28px; height:28px; line-height:24px; text-align:center;
+    font-family:var(--font-ui); font-size:1.1rem; font-weight:800; color:#fff;
+    background:var(--blue); border:2px solid var(--blue-dark); border-radius:4px; }
+  .notif-lista{ display:flex; flex-direction:column; max-height:246px; overflow-y:auto; }
+  /* ⚠️ E O QUADRO DE BAIXO TEM ALTURA FIXA (17/09/2026, a pedido: *"deixe o quadro debaixo onde
+     exibe as informacoes sobre a notificacao, fixo na tela, hoje ele fica se movendo, aumentando e
+     diminuindo, conforme deleta ou troca de notificacao"*).
+     Medido a 320px nos dez tipos: ele ia de 188 a 355px -- 167px de diferenca, e a tela inteira
+     pulava a cada troca de notificacao. E exatamente o mesmo defeito que a LOJA teve em 13/09, e o
+     conserto e o mesmo: altura FIXA (o maior caso medido, o campeao de liga com os dois botoes) e
+     uma coluna de tres andares -- topo, miolo que ROLA, e o rodape colado embaixo.
+     ⚠️ ALTURA E NAO MIN-HEIGHT: com min-height o pulo volta no primeiro texto que passar dela.
+     ⚠️ E O `overflow` VIVE NO MIOLO, nao no quadro: no quadro inteiro o rodape rolaria junto e o
+     botao de apagar voltaria a sair do lugar -- que e o que se pediu pra parar. */
+  .notif-corpo{ height:355px; display:flex; flex-direction:column; }
+  .notif-corpo-miolo{ flex:1; min-height:0; overflow-y:auto; }
+  .notif-corpo-rodape{ flex-shrink:0; }
   .notif-item{
     display:flex; align-items:center; gap:8px; width:100%; text-align:left;
     padding:9px 11px; background:var(--box); color:var(--ink);
@@ -13151,6 +13182,10 @@ function stopTrainersLeaguePolling(){
   if(trainersLeagueTickInterval){ clearInterval(trainersLeagueTickInterval); trainersLeagueTickInterval = null; }
 }
 function openTrainersLeague(){
+  /* os quadros que abrem e fecham (Top 10, historicos) zeram a cada entrada: eles comecam
+     FECHADOS, e um "aberto" de ontem nao e uma preferencia -- e o estado em que o jogador
+     largou a tela na vez passada. E estado de TELA, entao nao vai pro save. */
+  game.quadrosAbertos = {};
   game.screen = 'trainersLeague';
   game.trainersLeagueError = null;
   game.trainersLeagueLoadError = null;
@@ -14042,6 +14077,10 @@ function isMatchRevealed(matchKey, roundIndex, phaseTimes){
 }
 
 function openLeague(typeId, typeConfig){
+  /* os quadros que abrem e fecham (Top 10, historicos) zeram a cada entrada: eles comecam
+     FECHADOS, e um "aberto" de ontem nao e uma preferencia -- e o estado em que o jogador
+     largou a tela na vez passada. E estado de TELA, entao nao vai pro save. */
+  game.quadrosAbertos = {};
   const resolvedTypeId = typeId || CLASSIC_LEAGUE_TYPE;
   game.currentLeagueTypeId = resolvedTypeId;
   game.currentLeagueTypeConfig = typeConfig || null;
@@ -14463,8 +14502,8 @@ function renderTrainersLeagueScreen(){
     <p>Não é preciso indicar um time na inscrição. Se um time não for escolhido até 5 minutos antes, ou um terreno até 10 minutos antes, ambos são <strong>sorteados automaticamente</strong>.</p>
   </div>
   <div class="box">
-    <h2>🏆 Top 10 maiores vencedores</h2>
-    ${(game.trainersLeagueLeaderboard&&game.trainersLeagueLeaderboard.length>0) ? `
+    ${quadroDobravelHtml('tl_top10', '🏆 Top 10 maiores vencedores',
+      (game.trainersLeagueLeaderboard&&game.trainersLeagueLeaderboard.length>0) ? `
     <div class="leaderboard-list">
       ${game.trainersLeagueLeaderboard.map((entry,idx)=>`
         <div class="leaderboard-row">
@@ -14472,7 +14511,7 @@ function renderTrainersLeagueScreen(){
           <span class="leaderboard-name">${trainerNameHtml(entry)}</span>
           <span class="leaderboard-count">${entry.count}🏆</span>
         </div>`).join('')}
-    </div>` : `<p class="hint-text">Ninguém venceu uma Trainers League ainda. Seja o primeiro!</p>`}
+    </div>` : `<p class="hint-text">Ninguém venceu uma Trainers League ainda. Seja o primeiro!</p>`)}
   </div>`;
 
   if(data.status==='registering'){
@@ -21632,7 +21671,16 @@ function botaoDaLigaHtml(n){
   const nome = id === TRAINERS_LEAGUE_TYPE ? 'Trainers League'
              : id === CLASSIC_LEAGUE_TYPE ? 'Liga Clássica'
              : 'liga';
-  return `<button class="btn primary u-mt8" onclick="irParaALiga(${JSON.stringify(id)})">🏆 Ir para a ${nome}</button>`;
+  /* ⚠️ `escJs` E NAO `JSON.stringify` -- e este foi o defeito de 17/09/2026 (*"o botao que leva para
+     a liga nao esta levando para lugar nenhum, nada acontece"*). O JSON.stringify de uma string sai
+     COM ASPAS DUPLAS, e o atributo onclick e delimitado por aspas duplas: o HTML gerado era
+       onclick="irParaALiga("classic")"
+     ou seja a aspa do valor FECHAVA o atributo. O navegador lia `onclick="irParaALiga("`, que e
+     sintaxe invalida, e o clique nao fazia nada -- em silencio, sem erro no console.
+     ⚠️ E A TRAVA QUE EXISTIA NAO PEGOU porque ela media a PRESENCA do `irParaALiga` no HTML, e ele
+     estava la. Hoje ela valida o ATRIBUTO: aspas simples dentro das duplas, que e o que o escJs faz
+     (ele escapa as DUAS camadas -- a string JS e o atributo HTML). */
+  return `<button class="btn primary u-mt8" onclick="irParaALiga('${escJs(id)}')">🏆 Ir para a ${nome}</button>`;
 }
 function ctaDaNotificacao(n){
   if(n.type==='league_champion'){
@@ -21737,6 +21785,55 @@ async function confirmarApagarSelecionadas(){
    bloco, na abertura (ver openNotificationsScreen): se fosse uma a uma, o sino da home ficaria
    aceso enquanto sobrasse uma não aberta -- e a decisão antiga era não cobrar um clique por
    notificação. O selo é o que devolve a informação que a marcação em bloco apaga. */
+/* ============================================================================
+   OS QUADROS QUE ABREM E FECHAM (17/09/2026)
+   ----------------------------------------------------------------------------
+   Pedidos assim: *"na liga classica e trainers league, nos quadros de Top 10, Suas ultimas ligas e
+   Ultimas Ligas, coloque um quadrado azul com um sinal de + alinhado na direita do titulo, e quando
+   o usuario clicar, abre as linhas que aparecem hoje"*.
+
+   ⚠️ SÃO QUATRO, e é por isso que eles dividem UMA função: dois Top 10 (a Clássica e a Trainers
+   League) mais os dois históricos da Clássica. Escritos um a um, o quinto nasceria com o + fora de
+   lugar ou sem fechar -- é a lição das três telas de golpe, que viraram uma cópia só DEPOIS de já
+   terem divergido.
+
+   ⚠️ O CABEÇALHO INTEIRO É O ALVO DO TOQUE, e não só o quadradinho: é a regra da casa (*"a linha
+   toda já é o alvo do toque, e mirar num quadradinho num celular é pedir erro"*), a mesma da ficha
+   da Pokédex, da lista de notificações e do card do log de batalha. O + é a AFFORDANCE -- ele diz
+   que há o que abrir --, não o alvo.
+
+   ⚠️ E ELE É UMA `<div role="button">`, NUNCA UM `<button>`: o conteúdo desses quadros TEM botões
+   dentro (o "▶ Rever" dos históricos, e o nome do treinador do Top 10, que abre o perfil).
+   `<button>` dentro de `<button>` é HTML inválido -- o navegador fecha o de fora e o clique de
+   dentro se perde, com a tela continuando a PARECER certa. Essa armadilha já custou dois defeitos
+   neste projeto (a lupa do encontro selvagem e a do montador).
+   O preço da `div` é o teclado, que entra na mão (tabindex + Enter/Espaço).
+   ⚠️ E O CONTEÚDO É IRMÃO do cabeçalho, não filho: assim nem o aninhamento nem o clique de dentro
+   dependem de `stopPropagation`.
+
+   ⚠️ ELES COMEÇAM FECHADOS, que é o que o pedido descreve ("quando clicar, ABRE as linhas que
+   aparecem hoje"). O estado é de TELA e não vai pro save -- ninguém volta amanhã querendo o Top 10
+   aberto --, e zera ao entrar na liga (ver openLeague/openTrainersLeague).
+   ============================================================================ */
+function quadroAberto(id){ return !!(game.quadrosAbertos && game.quadrosAbertos[id]); }
+function alternarQuadro(id){
+  if(!game.quadrosAbertos) game.quadrosAbertos = {};
+  game.quadrosAbertos[id] = !game.quadrosAbertos[id];
+  render();
+}
+/* O CABEÇALHO. `conteudo` só é desenhado quando aberto -- e isso não é só estética: o Top 10 monta
+   dez linhas com o link de perfil de cada uma, e os históricos montam um botão por liga. */
+function quadroDobravelHtml(id, titulo, conteudo){
+  const aberto = quadroAberto(id);
+  const j = escJs(id);
+  return `<div class="quadro-dobra-cab" role="button" tabindex="0" aria-expanded="${aberto}"
+    onclick="alternarQuadro('${j}')"
+    onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();alternarQuadro('${j}');}">
+    <h2 class="quadro-dobra-tit">${titulo}</h2>
+    <span class="quadro-dobra-mais" aria-hidden="true">${aberto ? '−' : '+'}</span>
+  </div>
+  ${aberto ? conteudo : ''}`;
+}
 function renderNotificationsScreen(){
   const list = game.notificationsList;
   let out = `<div class="result-banner win">🔔 Notificações</div>`;
@@ -21779,12 +21876,18 @@ function renderNotificationsScreen(){
         }).join('')}
       </div>
     </div>
-    ${modo ? '' : `<div class="box">
-      <h2 class="notif-corpo-titulo">${notificationIcon(aberta.type)} ${escapeHtmlSafe(aberta.title)}</h2>
-      <p class="hint-text u-m0">${formatDateShort(aberta.createdAt)} às ${formatClock(aberta.createdAt)}</p>
-      <p class="notif-corpo-texto">${escapeHtmlSafe(aberta.body)}</p>
-      ${ctaDaNotificacao(aberta)}
-      <button class="btn secondary u-mt8" onclick="requestDeleteNotification('${escJs(aberta.id)}')">🗑️ Apagar esta notificação</button>
+    ${modo ? '' : `<div class="box notif-corpo">
+      <div class="notif-corpo-miolo">
+        <h2 class="notif-corpo-titulo">${notificationIcon(aberta.type)} ${escapeHtmlSafe(aberta.title)}</h2>
+        <p class="hint-text u-m0">${formatDateShort(aberta.createdAt)} às ${formatClock(aberta.createdAt)}</p>
+        <p class="notif-corpo-texto">${escapeHtmlSafe(aberta.body)}</p>
+        ${ctaDaNotificacao(aberta)}
+      </div>
+      ${/* o APAGAR fica no RODAPE, colado embaixo: ele e a acao que nao muda de notificacao pra
+           notificacao, e e ela que a mao procura sempre no mesmo lugar. O miolo e quem cede. */''}
+      <div class="notif-corpo-rodape">
+        <button class="btn secondary u-mt8" onclick="requestDeleteNotification('${escJs(aberta.id)}')">🗑️ Apagar esta notificação</button>
+      </div>
     </div>`}`;
   }
   out += `<button class="btn secondary" onclick="goToSaveMenu()">⬅ Voltar</button>`;
@@ -22965,8 +23068,8 @@ function renderLeague(){
     </div>
   </div>
   <div class="box">
-    <h2>🏆 Top 10 maiores vencedores</h2>
-    ${(game.leagueLeaderboard&&game.leagueLeaderboard.length>0) ? `
+    ${quadroDobravelHtml('classic_top10', '🏆 Top 10 maiores vencedores',
+      (game.leagueLeaderboard&&game.leagueLeaderboard.length>0) ? `
     <div class="leaderboard-list">
       ${game.leagueLeaderboard.map((entry,idx)=>`
         <div class="leaderboard-row">
@@ -22974,7 +23077,7 @@ function renderLeague(){
           <span class="leaderboard-name">${trainerNameHtml(entry)}</span>
           <span class="leaderboard-count">${entry.count}🏆</span>
         </div>`).join('')}
-    </div>` : `<p>Ninguém venceu uma Liga ainda. Seja o primeiro!</p>`}
+    </div>` : `<p>Ninguém venceu uma Liga ainda. Seja o primeiro!</p>`)}
   </div>`;
 
   if(registeringCycle){
@@ -23042,7 +23145,7 @@ function renderLeague(){
     if(myHistory.length>0){
       body += `
       <div class="box">
-        <h2>📜 Suas últimas Ligas</h2>
+        ${quadroDobravelHtml('minhas_ligas', '📜 Suas últimas Ligas', `
         <div class="status-list">
           ${myHistory.map(h=>`
             <div class="status-row">
@@ -23051,14 +23154,14 @@ function renderLeague(){
               <button class="league-history-btn" onclick="viewLeagueHistory('${h.leagueTypeId||CLASSIC_LEAGUE_TYPE}','${h.cycleId}',${h.leagueId},${h.cycleTime})">▶ Rever</button>
             </div>
           `).join('')}
-        </div>
+        </div>`)}
       </div>`;
     }
     const globalHistory = game.globalLeagueHistory || [];
     if(globalHistory.length>0){
       body += `
       <div class="box">
-        <h2>🌐 Últimas Ligas</h2>
+        ${quadroDobravelHtml('ultimas_ligas', '🌐 Últimas Ligas', `
         <div class="status-list">
           ${globalHistory.map(h=>`
             <div class="status-row">
@@ -23067,7 +23170,7 @@ function renderLeague(){
               <button class="league-history-btn" onclick="viewLeagueHistory('${CLASSIC_LEAGUE_TYPE}','${h.cycleId}',${h.league.id},${h.cycleTime})">▶ Rever</button>
             </div>
           `).join('')}
-        </div>
+        </div>`)}
       </div>`;
     }
   }
