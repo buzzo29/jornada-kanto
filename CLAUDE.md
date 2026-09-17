@@ -3260,15 +3260,69 @@ Achados na mesma varredura, com número, e deixados como estão porque não foi 
   A DEFESA congela os golpes junto com o código (`leaderTeamAtaques`), pelo mesmo motivo que ela
   congela o time: o líder montou aquele time e é com ele que defende. Ginásio tomado antes desta
   data não tem o campo e defende no motor de tipo, como defendia.
-- **O Doce Raro e a evolução no SERVIDOR sobem nível sem nunca oferecer o golpe novo.**
-  `evoluirNoSave` não conhece `nivelDosAtaques`/`especieDosAtaques`, o que deixa a pendência
-  CORRETA gravada — mas quem a resolve é só o `continueFromEvolution`, e abrir o save não passa por
-  ele (`escolhaDoSavePendente` só cuida da fila da CAPTURA). No save campeão, que é onde o Doce
-  Raro mais é usado, a pergunta nunca chega.
+- **⚠️ O DOCE RARO NÃO OFERECIA O GOLPE NOVO, E ISSO FOI CONSERTADO EM 17/09/2026** — ver a seção
+  própria, logo abaixo. O diagnóstico que estava aqui era exato (*"a pendência CORRETA gravada, e
+  quem a resolve é só o `continueFromEvolution`"*), e foi ele que apontou o conserto: uma fila nova
+  ao abrir o save, no molde da `escolhaDoSavePendente`.
 - **13 golpes ficam inalcançáveis pra LINHA INTEIRA** porque a evolução aqui é sempre automática por
   nível: o que a forma antiga ensinaria ACIMA do nível da evolução e a nova nunca ensina não tem
   como ser aprendido (a Starmie é o caso mais duro). É fiel ao jogo original, que também não volta
   atrás — mas lá existe Everstone.
+
+
+### ⚠️ O DOCE RARO NÃO OFERECIA O GOLPE DO NÍVEL NOVO (17/09/2026)
+
+Reportado assim: *"cheguei com um Zapdos no level 85 usando Rare Candy, e ele não aprendeu o golpe
+que deveria aprender no 85"*. **E era verdade**: o Zapdos aprende **Trovão (poder 120) no 85**, e
+ele nunca chegava.
+
+**⚠️ A PENDÊNCIA SEMPRE ESTEVE CERTA — o que faltava era alguém PERGUNTAR.** Reproduzido antes de
+mexer em qualquer coisa: depois do doce, o save fica com `Lv.85` e a janela `(84, 85]`, e
+`aprendizadosPendentes()` devolve `thunder (Lv.85)` corretamente. Só que o **único chamador** do
+`resolverAprendizados` era o `continueFromEvolution` — alcançado só pelo fluxo da jornada. Quem usa
+o doce no save campeão, que é onde ele mais é usado, **nunca passava por lá**.
+
+O conserto é uma fila nova (`aprendizadoDoSavePendente`), no molde exato da `escolhaDoSavePendente`
+que já resolve a fila da CAPTURA, e ela roda em **dois momentos**:
+
+- **na hora**, quando o pokémon é do save ABERTO — ele acabou de subir de nível na frente do
+  jogador, e adiar pra a próxima abertura seria a mesma falha silenciosa, só que mais curta;
+- **ao abrir o save**, pros outros casos — o doce usado pela Torre (que escolhe de qualquer save) e
+  a evolução feita no servidor.
+
+- **⚠️ ELA VEM DEPOIS DA FILA DA CAPTURA, não antes.** Aquela é a de quem não tem golpe NENHUM
+  (save antigo); esta é a de quem tem golpe e cruzou um nível novo. Perguntar *"qual retirar"* antes
+  de o pokémon ter os três primeiros seria pedir uma decisão sobre um time que ainda não existe.
+- **O destino é uma TELA, e por isso há lista de permissão** (`SCREENS_DE_VOLTA`): o
+  `evolucaoDepois` também carrega passos da jornada (`continueJourney`, `retry`, `special`), e um
+  nome desconhecido caindo no `game.screen` levaria a uma tela em branco. Vindo do doce o jogador
+  estava na mochila, no resumo da jornada ou na torre — mandá-lo pro `teamOrder` o tiraria do lugar
+  por ter aprendido um golpe.
+- **E o destino é LIMPO quando a tela não abre**, exatamente como o `escolhaDepois` precisou:
+  deixado gravado, ele **rouba a próxima passada** — foi esse vazamento que fez um jogador pular a
+  distribuição de níveis de um ginásio inteiro.
+
+#### ⚠️ E NO CAMINHO APARECEU UM SEGUNDO DEFEITO, PIOR QUE O RELATADO: O DOCE SE PERDIA
+
+O nível sobe no **SERVIDOR** (`useRareCandy`), e o `game.team` desta aba **continuava no nível
+velho**. Bastava voltar da mochila pra uma tela de gravação (`SAFE_SAVE_SCREENS` — `teamOrder`,
+`walk`, `journeyEnd`...) pro autosave **escrever o nível ANTIGO por cima** do que o servidor tinha
+subido: **o doce era gasto e o nível voltava, em silêncio.**
+
+Medido antes do conserto: com o save aberto, `game.team[0].level` ficava em **84** enquanto o
+servidor gravava **85**, e `serializeGame().team[0].level` devolvia **84**.
+
+- **⚠️ O NÍVEL VEM DA RESPOSTA DO SERVIDOR, e não de um `+= 1` local**: o servidor é quem manda, e
+  somar por aqui erraria se as duas cópias já estivessem fora de sincronia.
+- **E o `tryEvolve` logo depois é o MESMO caminho da jornada** — o servidor rodou o espelho dele
+  (`evoluirNoSave`), e os dois já são comparados em **24.750 casos** pelo teste.
+
+`tools/test-ataques.js` tranca 15 pontas: que o Zapdos **aprende mesmo** algo no 85 (o dado, antes
+da mecânica), o nível do save aberto acompanhando, a pergunta saindo na hora com o golpe certo, o
+destino guardado e a volta pra ele, a pergunta chegando ao abrir o save fechado, o destino **não**
+ficando gravado quando nada está pendente, quem tem vaga aprendendo sem perguntar **mas com
+anúncio**, e — lendo o código — a ordem entre as duas filas e as duas portas de abrir save.
+Conferido que elas acusam: 3 falhas com o time aberto sem acompanhar, 4 sem a pergunta.
 
 ### OS NPCs GANHARAM MOVESET (09/09/2026) — e é a maior mudança de dificuldade já medida aqui
 

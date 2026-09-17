@@ -953,5 +953,110 @@ console.log('\n=== O SKETCH DO SMEARGLE ===');
   }
 }
 
-console.log(falhas ? '\n' + falhas + ' FALHA(S).' : '\nTudo certo.');
-process.exit(falhas ? 1 : 0);
+
+/* =====================================================================
+   O DOCE RARO E O GOLPE DO NIVEL NOVO (17/09/2026)
+   Reportado: *"cheguei com um Zapdos no level 85 usando Rare Candy, e ele nao aprendeu o golpe
+   que deveria aprender no 85"*. O Zapdos aprende Trovao (poder 120) no 85.
+   ⚠️ A PENDENCIA SEMPRE ESTEVE CERTA -- faltava alguem PERGUNTAR: o unico chamador do
+   resolverAprendizados era o continueFromEvolution, so alcancado pelo fluxo da jornada.
+   ===================================================================== */
+console.log('\nO DOCE RARO OFERECE O GOLPE DO NIVEL NOVO');
+const novoS = () => require('./game-sandbox').createSandbox(path.join(__dirname, '..', 'index.html'));
+function zapdosCheio(S, nivel){
+  const z = S.createInstance('zapdos', nivel);
+  z.id = 'mon9';
+  z.ataques = ['drillpeck', 'peck', 'thundershock'];   // os tres cheios: TEM que perguntar
+  z.nivelDosAtaques = 84;
+  z.especieDosAtaques = 'zapdos';
+  z.maxHp = S.calcMaxHp(z); z.hp = z.maxHp;
+  return z;
+}
+
+/* o dado primeiro: ele aprende MESMO alguma coisa no 85? */
+{
+  const S = novoS();
+  const aprende = (S.APRENDIZADO.zapdos || []).filter(par => par[0] === 85).map(par => S.GOLPES_IDS[par[1]]);
+  ok('o Zapdos aprende um golpe no nivel 85', aprende.length === 1 && aprende[0] === 'thunder',
+     aprende.join(', ') || '(nenhum)');
+}
+
+/* CASO 1: o save ABERTO -- a pergunta sai na hora */
+const S1 = novoS();
+{
+  const g = S1.__getGame();
+  g.authUser = { uid:'u1' }; g.currentSaveSlot = '0';
+  g.team = [zapdosCheio(S1, 84)];
+  g.rareCandies = 3; g.screen = 'journeyEnd';
+  g.golpesAprendidos = []; g.evolucaoDepois = null;
+  S1.__setGame(g);
+  S1.functionsClient = { httpsCallable: () => () => Promise.resolve({
+    data: { rareCandies: 2, mon: { id:'mon9', level: 85, speciesId:'zapdos' } } }) };
+  S1.loadSaveSlots = () => Promise.resolve();
+  S1.checkLeagueRegistrationStatus = () => {};
+}
+
+S1.useRareCandyOn('0', 'mon9').then(() => {
+  const gg = S1.__getGame();
+  /* ⚠️ O NIVEL DO SAVE ABERTO TEM QUE ACOMPANHAR -- e este era um SEGUNDO defeito, achado no
+     caminho: o nivel sobe no SERVIDOR e o game.team desta aba ficava velho. Bastava voltar da
+     mochila pra uma tela de gravacao pro autosave escrever o nivel ANTIGO por cima -- o doce era
+     gasto e o nivel voltava, em silencio. */
+  ok('o nivel do save aberto acompanha o doce', gg.team[0].level === 85, 'Lv.' + gg.team[0].level);
+  ok('e a pergunta sai NA HORA', gg.screen === 'aprenderAtaque', gg.screen);
+  ok('e ela oferece o golpe do nivel 85', !!gg.aprenderAtaque && gg.aprenderAtaque.golpe === 'thunder',
+     gg.aprenderAtaque ? gg.aprenderAtaque.golpe : '(nenhum)');
+  /* ⚠️ E ELA VOLTA PRA TELA EM QUE O JOGADOR ESTAVA: mandar pro teamOrder tiraria ele do lugar
+     por ter aprendido um golpe. */
+  ok('e o destino guardado e a tela de origem', gg.evolucaoDepois === 'journeyEnd', String(gg.evolucaoDepois));
+  S1.responderAprendizado('peck');
+  const g3 = S1.__getGame();
+  ok('trocar poe o golpe novo no time', g3.team[0].ataques.indexOf('thunder') >= 0, g3.team[0].ataques.join(', '));
+  ok('e a tela volta pra onde estava', g3.screen === 'journeyEnd', g3.screen);
+
+  /* CASO 2: o save estava FECHADO (o doce da Torre escolhe de qualquer save) */
+  const S2 = novoS();
+  const g2 = S2.__getGame();
+  g2.team = [zapdosCheio(S2, 85)];      // o servidor ja subiu
+  g2.screen = 'journeyEnd'; g2.golpesAprendidos = []; g2.evolucaoDepois = null;
+  S2.__setGame(g2);
+  ok('abrindo o save depois, a pergunta chega', S2.aprendizadoDoSavePendente() === true);
+  ok('e e o mesmo golpe', (S2.__getGame().aprenderAtaque||{}).golpe === 'thunder');
+
+  /* ⚠️ CASO 3: sem nada pendente o destino NAO pode ficar gravado -- e o vazamento que o
+     `escolhaDepois` ja teve, e que roubava a distribuicao de niveis seguinte. */
+  const S3 = novoS();
+  const g5 = S3.__getGame();
+  const okMon = S3.createInstance('zapdos', 84);
+  okMon.id = 'm1'; okMon.ataques = ['drillpeck','peck','thundershock']; okMon.nivelDosAtaques = 84;
+  g5.team = [okMon]; g5.screen = 'journeyEnd'; g5.evolucaoDepois = null;
+  S3.__setGame(g5);
+  ok('sem nada pendente nao abre tela', S3.aprendizadoDoSavePendente() === false);
+  ok('e o destino nao fica gravado', S3.__getGame().evolucaoDepois === null, String(S3.__getGame().evolucaoDepois));
+
+  /* ⚠️ E QUEM TEM VAGA APRENDE SEM PERGUNTAR, como no resto do jogo -- mas com ANUNCIO */
+  const S4 = novoS();
+  const g6 = S4.__getGame();
+  const vaga = S4.createInstance('zapdos', 85);
+  vaga.id = 'm2'; vaga.ataques = ['drillpeck']; vaga.nivelDosAtaques = 84;
+  g6.team = [vaga]; g6.screen = 'journeyEnd'; g6.golpesAprendidos = []; g6.evolucaoDepois = null;
+  S4.__setGame(g6);
+  S4.aprendizadoDoSavePendente();
+  const g7 = S4.__getGame();
+  ok('com vaga livre ele aprende sem perguntar', g7.team[0].ataques.indexOf('thunder') >= 0, g7.team[0].ataques.join(', '));
+  ok('e o anuncio aparece', g7.screen === 'golpeAprendido', g7.screen);
+
+  /* ⚠️ E A ORDEM ENTRE AS DUAS FILAS: a da CAPTURA (quem nao tem golpe nenhum) vem primeiro.
+     Perguntar 'qual retirar' antes de o pokemon ter os tres seria pedir uma decisao sobre um time
+     que ainda nao existe. O teste le o CODIGO porque os casos chamam as funcoes direto. */
+  const src = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  const iEsc = src.indexOf('if(escolhaDoSavePendente()) return;');
+  const iApr = src.indexOf('if(aprendizadoDoSavePendente()) return;');
+  ok('a fila da captura e perguntada ANTES da do aprendizado', iEsc > 0 && iApr > iEsc);
+  const chamadas = (src.match(/if\(aprendizadoDoSavePendente\(\)\) return;/g) || []).length;
+  ok('e os DOIS caminhos de abrir save perguntam', chamadas >= 2, chamadas + ' chamadas');
+
+  console.log(falhas ? '\n' + falhas + ' FALHA(S).' : '\nTudo certo.');
+  process.exit(falhas ? 1 : 0);
+}).catch(e => { console.error(e); process.exit(1); });
+

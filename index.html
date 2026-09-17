@@ -9503,6 +9503,35 @@ function confirmarAtaques(){
    Guarda a tela do save pra voltar pra ela depois da última escolha -- inclusive quando o próprio
    save já estava parado numa das telas de escolha (F5 no meio), caso em que o destino já veio
    gravado e não pode ser sobrescrito pela própria tela de escolha. */
+/* ⚠️ A FILA DO APRENDIZADO PENDENTE, ao abrir o save (17/09/2026).
+   Reportado assim: *"cheguei com um Zapdos no level 85 usando Rare Candy, e ele não aprendeu o
+   golpe que deveria aprender no 85"*. E era verdade: o Zapdos aprende Trovão (poder 120) no 85.
+
+   ⚠️ A PENDÊNCIA SEMPRE ESTEVE CERTA -- o que faltava era alguém PERGUNTAR. O Doce Raro sobe o
+   nível no SERVIDOR (useRareCandy) e a janela `(nivelDosAtaques, level]` passa a conter o golpe
+   novo; só que o único chamador do `resolverAprendizados` era o `continueFromEvolution`, que só
+   é alcançado pelo fluxo da jornada. Quem usa o doce no save campeão -- que é onde ele mais é
+   usado -- nunca passava por lá, e a pergunta não chegava NUNCA.
+   Este arquivo já registrava o buraco em "O que foi medido e NÃO foi mexido"; ele saiu de lá.
+
+   ⚠️ E ELA TEM QUE VIR DEPOIS DA `escolhaDoSavePendente`, não antes: aquela é a fila de quem não
+   tem golpe NENHUM (save antigo), e esta é a de quem tem golpe e cruzou um nível novo. Perguntar
+   "qual retirar" antes de o pokémon ter os três primeiros seria pedir uma decisão sobre um time
+   que ainda não existe.
+   O `evolucaoDepois` guarda pra onde voltar, como o `escolhaDepois` da outra fila -- e pelo mesmo
+   motivo: a tela de aprendizado é ponto seguro de gravação, e função não sobrevive ao save. */
+function aprendizadoDoSavePendente(){
+  if(!aprendizadosPendentes().length) return false;
+  const anterior = game.evolucaoDepois || null;
+  if(!game.evolucaoDepois && game.screen !== 'aprenderAtaque' && game.screen !== 'golpeAprendido'){
+    game.evolucaoDepois = game.screen;
+  }
+  if(resolverAprendizados()) return true;
+  /* NÃO ABRIU TELA: o destino não é nosso, e deixá-lo gravado ROUBA a próxima passada -- é
+     exatamente o vazamento que o `escolhaDepois` teve e que está documentado ali embaixo. */
+  game.evolucaoDepois = anterior;
+  return false;
+}
 function escolhaDoSavePendente(){
   if(!escolhasDeAtaquePendentes().length) return false;
   const anterior = game.escolhaDepois || null;
@@ -9952,6 +9981,10 @@ function confirmLevels(){
    (o +1 do desmaio pode ser o nível da evolução), e aí o destino é pra onde o botão do resultado ia.
    É uma CHAVE e não a função: a tela de evolução é ponto seguro de gravação, e função não sobrevive
    ao save -- o mesmo motivo do releaseDepois. */
+/* PRA ONDE O APRENDIZADO PODE DEVOLVER O JOGADOR. É uma lista de PERMISSÃO, e não "qualquer
+   string": o `evolucaoDepois` também carrega os passos da jornada (continueJourney, retry,
+   special...), e um nome desconhecido caindo no `game.screen` levaria a uma tela em branco. */
+const SCREENS_DE_VOLTA = new Set(['journeyEnd','inventario','saveSelect','teamOrder','walk','walkNext','gymChoice','trainerTower']);
 function continueFromEvolution(){
   /* GOLPE NOVO PELO NÍVEL. Fica DEPOIS da evolução porque a evolução troca a espécie, e é a tabela
      da forma nova que vale daqui pra frente.
@@ -9965,6 +9998,10 @@ function continueFromEvolution(){
   if(depois === 'journeyEnd'){ showJourneyEnd(); return; }
   if(depois === 'retry'){ prepareRetry(); return; }
   if(depois === 'special'){ continueAfterSpecial(); return; }
+  /* ⚠️ VINDO DO DOCE RARO ou de abrir o save, o destino é uma TELA e não um passo da jornada --
+     o jogador estava na mochila, no resumo da jornada, na torre. Mandá-lo pro teamOrder tiraria
+     ele do lugar por ter aprendido um golpe. */
+  if(depois && typeof depois === "string" && SCREENS_DE_VOLTA.has(depois)){ game.screen = depois; render(); return; }
   game.screen = 'teamOrder';
   render();
 }
@@ -15956,6 +15993,8 @@ async function continueSave(slot){
     reconcileInstanceIdCounter();
     /* SAVE ANTIGO: cada pokémon sem golpe escolhido ganha a tela da captura, uma por vez. */
     if(escolhaDoSavePendente()) return;
+    /* E o que ficou pendente por FORA da jornada (Doce Raro, evolução no servidor) -- ver a nota */
+    if(aprendizadoDoSavePendente()) return;
     render();
   } catch(e){ console.error(e); }
 }
@@ -15976,6 +16015,7 @@ async function continueCompleteSave(slot){
     reconcileInstanceIdCounter();
     game.screen = 'journeyEnd';
     if(escolhaDoSavePendente()) return;
+    if(aprendizadoDoSavePendente()) return;
     render();
   } catch(e){ console.error(e); }
 }
@@ -22499,6 +22539,22 @@ async function useRareCandyOn(slot, monId){
   try{
     const r = await functionsClient.httpsCallable('useRareCandy')({ slot:String(slot), monId });
     game.rareCandies = r.data.rareCandies;
+    /* ⚠️ O SAVE ABERTO TEM QUE ACOMPANHAR, e sem isto o doce se PERDIA (achado em 17/09/2026 ao
+       investigar o golpe que não era oferecido). O nível sobe no SERVIDOR, e o `game.team` desta
+       aba continuava no nível velho: bastava voltar da mochila pra uma tela de gravação
+       (`SAFE_SAVE_SCREENS`) pro autosave escrever o nível ANTIGO por cima do que o servidor tinha
+       subido -- o doce era gasto e o nível voltava, em silêncio.
+       ⚠️ O NÍVEL VEM DA RESPOSTA e não de um `+= 1`: o servidor é quem manda, e somar por aqui
+       erraria se as duas cópias já estivessem fora de sincronia. O `tryEvolve` logo depois é o
+       MESMO caminho da jornada (o servidor rodou o espelho dele, o `evoluirNoSave`, e os dois são
+       comparados em 24.750 casos pelo teste). */
+    const noTimeAberto = (String(game.currentSaveSlot) === String(slot))
+      ? (game.team || []).find(x => x && x.id === monId) : null;
+    if(noTimeAberto && r.data.mon && typeof r.data.mon.level === "number"){
+      noTimeAberto.level = r.data.mon.level;
+      const evs = tryEvolve(noTimeAberto);
+      if(evs && evs.length){ game.evolutions = (game.evolutions || []).concat(evs); }
+    }
     if(game.tower) game.tower.rareCandies = r.data.rareCandies;   // a tela da Torre lê a cópia dela
     // o save mudou no servidor; recarrega os slots pra a home e a torre mostrarem o nível novo
     await loadSaveSlots();
@@ -22508,6 +22564,11 @@ async function useRareCandyOn(slot, monId){
     game.registeredTeam = null;
     if(game.currentLeagueTypeId){ checkLeagueRegistrationStatus(game.currentLeagueTypeId); }
     game.candyPicker = r.data.rareCandies > 0 ? { erro:null } : null;
+    /* ⚠️ E A PERGUNTA SAI NA HORA quando o pokémon é do save ABERTO: ele acabou de subir de nível
+       na frente do jogador, e adiar pra a próxima abertura do save seria a mesma falha silenciosa
+       de antes, só que mais curta. Com o save FECHADO (o doce da Torre, que escolhe de qualquer
+       save) não há o que perguntar aqui -- ali quem resolve é o `aprendizadoDoSavePendente`. */
+    if(noTimeAberto && aprendizadoDoSavePendente()) return;
     if(game.screen === 'inventario' && !(game.rareCandies > 0)){
       /* Gastou o último doce: a pilha some da grade, e a escolha tem que sair de cima dela --
          senão o quadro de cima fica descrevendo um item que não está mais no inventário. */
