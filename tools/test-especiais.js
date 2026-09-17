@@ -5183,7 +5183,18 @@ console.log('\n=== AS DUAS FRASES NOVAS: acordou e chuva terminou ===');
           const jS = seq.findIndex(g => g.x === 'sono');
           const jA = seq.findIndex(g => g.x === 'acordou');
           const jG = seq.findIndex((g, k) => k > jS && !g.x && g.d > 0);
-          if(!(jS >= 0 && jG >= 0 && jG < jA)){ fora++; if(!exemplo) exemplo = seq.map(g => g.x || (g.q + g.d)).join(','); }
+          /* ⚠️ MAS SO QUANDO ALGUEM PODIA BATER. Esta trava nasceu supondo que quem dorme SEMPRE
+             apanha antes de acordar -- e isso era verdade so enquanto nada podia travar o
+             ATACANTE. A paralisia (16/09/2026) e a primeira coisa que trava: o dono do sono perde
+             o turno, ninguem bate, e o adormecido acorda mesmo assim.
+             ⚠️ E ELE ACORDAR ALI ESTA CERTO: o sono compra TURNOS, nao golpes -- o contador anda
+             na entrada da troca, tenha havido golpe ou nao. O que a trava cobra continua sendo o
+             que ela existe pra cobrar (ele nao acorda ANTES da vez dele), so que agora ela sabe
+             que a vez pode ter passado em branco.
+             E a mesma licao da trava do despertar que caiu quando o sono virou de 1 a 3 trocas:
+             ela media a DURACAO e nao a regra. */
+          const travouAlguem = seq.some((g, k) => k > jS && k < jA && (g.x === 'paralisado' || g.x === 'gelado'));
+          if(!(jS >= 0 && (travouAlguem || (jG >= 0 && jG < jA)))){ fora++; if(!exemplo) exemplo = seq.map(g => g.x || (g.q + g.d)).join(','); }
         });
       }
       ok('amostra de sobra pra medir a ordem na tela', n > 100, n + ' confrontos com despertar');
@@ -7701,6 +7712,254 @@ console.log('\n=== ABRIR UM CONFRONTO ZERA O PASSO, ANTES DO DESENHO (15/09/2026
      /\.mlog-card:focus-visible\{outline:2px solid var\(--blue\)/.test(cliL));
 }
 
+
+/* =====================================================================
+   A PARALISIA (16/09/2026) -- a QUARTA mecanica POR ATAQUE, e a unica que mexe em VELOCIDADE.
+   ===================================================================== */
+console.log('\nA PARALISIA: OS DEZ GOLPES E AS REGRAS DA GEN 3');
+{
+  const P = S.GOLPES_QUE_PARALISAM;
+  ok('sao os dez golpes da Gen 3', Object.keys(P).length === 10, Object.keys(P).join(', '));
+  /* ⚠️ AS CHANCES SAO AS OFICIAIS, e VARIAM -- ao contrario do gelo (todos 10%) */
+  ok('e as chances sao as oficiais',
+     P.thunderbolt === 0.10 && P.thunder === 0.30 && P.bodyslam === 0.30 && P.zapcannon === 1.00,
+     'raio ' + P.thunderbolt + ' | trovao ' + P.thunder + ' | golpe de corpo ' + P.bodyslam + ' | canhao ' + P.zapcannon);
+  /* ⚠️ OS DEZ EXISTEM NA TABELA DE GOLPES -- a licao da Lamina Solar: cadastrar um golpe que o
+     jogo nao tem seria letra morta, e so se descobre no confronto que teria aquele golpe. */
+  ok('e todos existem na tabela GOLPES', Object.keys(P).every(id => !!S.GOLPES[id]),
+     Object.keys(P).filter(id => !S.GOLPES[id]).join(', ') || 'todos');
+  ok('e todos tem nome em portugues', Object.keys(P).every(id => !!S.GOLPES_PT[id]),
+     Object.keys(P).filter(id => !S.GOLPES_PT[id]).join(', ') || 'todos');
+  /* ⚠️ E ELES SAO LEVADOS DE VERDADE -- a licao da Furia, que ao pe da letra saia em 0,0% */
+  const ids = Object.keys(P);
+  const donos = Object.keys(S.SPECIES).filter(sp => {
+    const q = S.createInstance(sp, 70); q.maxHp = S.calcMaxHp(q); q.hp = q.maxHp;
+    return (S.ataquesPadrao(q) || []).some(a => ids.indexOf(a) >= 0);
+  });
+  ok('e 30+ especies LEVAM um deles no Lv.70', donos.length >= 30, donos.length + ' especies');
+
+  /* ⚠️ A VELOCIDADE CAI PRA 25% -- a regra da Gen 1 a 6. So na Gen 7 ela virou 50%. */
+  ok('a velocidade de quem esta paralisado e 25%', S.PARALISIA_VELOCIDADE === 0.25, String(S.PARALISIA_VELOCIDADE));
+  {
+    const q = S.createInstance('jolteon', 60); q.maxHp = S.calcMaxHp(q); q.hp = q.maxHp;
+    const antes = S.effectiveSpeed(q);
+    q._paralisado = 'thunderbolt';
+    const depois = S.effectiveSpeed(q);
+    ok('e ela cai de verdade', Math.abs(depois / antes - 0.25) < 0.02, antes + ' -> ' + depois);
+    /* ⚠️ O CORTE ENTRA POR ULTIMO na cadeia, depois de shiny/terreno/especialidade/furia: "25% da
+       velocidade" e 25% do que o pokemon TEM na hora. E a mesma regra do corte da queimadura. */
+    const sh = S.createInstance('jolteon', 60); sh.shiny = true; sh.maxHp = S.calcMaxHp(sh); sh.hp = sh.maxHp;
+    const shAntes = S.effectiveSpeed(sh);
+    sh._paralisado = 'thunderbolt';
+    ok('e num shiny ele corta o valor JA buffado', S.effectiveSpeed(sh) === Math.round(shAntes * 0.25),
+       shAntes + ' -> ' + S.effectiveSpeed(sh));
+  }
+  ok('a chance de perder o turno e 25%', S.CHANCE_PARALISIA_TRAVA === 0.25, String(S.CHANCE_PARALISIA_TRAVA));
+}
+
+console.log('\nNA GEN 3 NENHUM TIPO E IMUNE A PARALISIA');
+{
+  /* ⚠️ ESTA E A TRAVA QUE MAIS IMPORTA DESTE BLOCO, porque a intuicao erra: o tipo ELETRICO so
+     ficou imune a paralisia na GEN 6. Na Gen 3 ele apanha como todo mundo -- e como seis dos dez
+     golpes sao Eletricos e a maioria dos donos tambem e, o caso mais comum e justamente um
+     Eletrico paralisando outro. Alguem "consertando" isso pra parecer com o jogo moderno estaria
+     saindo da geracao que o resto do motor segue. */
+  ['raichu','jolteon','electrode','magneton','zapdos'].forEach(id => {
+    const q = S.createInstance(id, 55); q.maxHp = S.calcMaxHp(q); q.hp = q.maxHp;
+    ok('o ' + S.SPECIES[id].name + ' (Eletrico) PODE ser paralisado', S.podeParalisar(q) === true);
+  });
+  /* quem ja caiu e quem JA esta paralisado nao entram: a marca seria reescrita e o log passaria a
+     nomear o golpe errado -- a mesma regra dos outros tres status */
+  const caido = S.createInstance('pikachu', 50); caido.maxHp = S.calcMaxHp(caido); caido.hp = 0;
+  ok('quem ja caiu nao paralisa', S.podeParalisar(caido) === false);
+  const ja = S.createInstance('pikachu', 50); ja.maxHp = S.calcMaxHp(ja); ja.hp = ja.maxHp; ja._paralisado = 'thunder';
+  ok('e quem JA esta paralisado tambem nao', S.podeParalisar(ja) === false);
+}
+
+console.log('\nMAS O GOLPE QUE NAO AFETA O ALVO NAO PARALISA');
+{
+  /* ⚠️ ESTA E A UNICA DAS QUATRO MECANICAS QUE PRECISOU DISSO. O motor sempre "conecta" (piso de
+     1 de dano, golpe teimoso), entao sem a guarda um Raio paralisaria um Golem que ele nem
+     alcanca. Nenhum tipo e imune a Fogo ou a Gelo, e no veneno o Aco ja e barrado pela imunidade
+     ao STATUS -- so o Terra contra o Eletrico cai neste caso. */
+  const terra = ['golem','rhydon','dugtrio','marowak','steelix'];
+  terra.forEach(id => {
+    const q = S.createInstance(id, 60); q.maxHp = S.calcMaxHp(q); q.hp = q.maxHp;
+    ok('o ' + S.SPECIES[id].name + ' (Terra) nao e paralisado por Raio',
+       S.golpeAfetaOAlvo('thunderbolt', q) === false);
+  });
+  /* e o mesmo Golem APANHA de um golpe que o alcanca: a guarda e do TIPO, nao do pokemon */
+  {
+    const golem = S.createInstance('golem', 60); golem.maxHp = S.calcMaxHp(golem); golem.hp = golem.maxHp;
+    ok('mas o MESMO Golem e paralisado por Golpe de Corpo (Normal)',
+       S.golpeAfetaOAlvo('bodyslam', golem) === true);
+    /* a prova pelo lado do sorteio, e nao so do ajudante */
+    const quem = S.createInstance('raichu', 60); quem.maxHp = S.calcMaxHp(quem); quem.hp = quem.maxHp;
+    quem.lastMove = 'thunderbolt';
+    let pegou = 0;
+    for(let i = 0; i < 400; i++){
+      const alvo = S.createInstance('golem', 60); alvo.maxHp = S.calcMaxHp(alvo); alvo.hp = alvo.maxHp;
+      if(S.tentarParalisar(quem, alvo, () => 0.01)) pegou++;
+    }
+    ok('e nem com o dado viciado ele paralisa o Terra', pegou === 0, pegou + ' de 400');
+  }
+}
+
+console.log('\nAS DUAS CHANCES, MEDIDAS COM UM RNG CONTINUO');
+{
+  /* ⚠️ UM RNG CONTINUO, e nao uma semente nova por volta: o PRIMEIRO valor de uma semente nova
+     correlaciona com a semente, e foi assim que a medicao do gelo deu 7,8% onde era 10%. */
+  let semente = 987654321;
+  const rng = () => (semente = (semente * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+  const testa = (golpe, esperado) => {
+    let pegou = 0;
+    const N = 20000;
+    for(let i = 0; i < N; i++){
+      const quem = S.createInstance('raichu', 60); quem.maxHp = S.calcMaxHp(quem); quem.hp = quem.maxHp;
+      quem.lastMove = golpe;
+      const alvo = S.createInstance('machoke', 60); alvo.maxHp = S.calcMaxHp(alvo); alvo.hp = alvo.maxHp;
+      if(S.tentarParalisar(quem, alvo, rng)) pegou++;
+    }
+    const pct = 100 * pegou / N, sd = 100 * Math.sqrt(esperado * (1 - esperado) / N);
+    /* ⚠️ COM CHANCE 100% O DESVIO E ZERO, e ai a conta de sigma da NaN -- o Canhao de Choque cai
+       nesse caso. Ali o que se cobra e a igualdade exata: ele tem que paralisar SEMPRE. */
+    if(sd === 0){
+      ok(`o ${S.GOLPES_PT[golpe] || golpe} paralisa SEMPRE`, pegou === N, pegou + " de " + N);
+      return;
+    }
+    ok('o ' + (S.GOLPES_PT[golpe] || golpe) + ' paralisa em ' + (esperado * 100) + '%',
+       Math.abs(pct - esperado * 100) < 3 * sd,
+       pct.toFixed(2) + '% (' + ((pct - esperado*100)/sd).toFixed(1) + 'sigma)');
+  };
+  testa('thunderbolt', 0.10);
+  testa('thunder', 0.30);
+  testa('zapcannon', 1.00);
+}
+
+console.log('\nE O rng SO E LIDO QUANDO O GOLPE PODE PARALISAR');
+{
+  /* ⚠️ A ARMADILHA DA SEMENTE: lido sempre, ele deslocaria toda batalha sem golpe de paralisia
+     nenhuma -- e a mesma que o Remoinho e o congelamento ja registraram. */
+  let leu = 0;
+  const conta = () => { leu++; return 0.99; };
+  const quem = S.createInstance('machoke', 60); quem.maxHp = S.calcMaxHp(quem); quem.hp = quem.maxHp;
+  const alvo = S.createInstance('machoke', 60); alvo.maxHp = S.calcMaxHp(alvo); alvo.hp = alvo.maxHp;
+  quem.lastMove = 'karatechop';           // nao paralisa
+  S.tentarParalisar(quem, alvo, conta);
+  ok('golpe que nao paralisa nao le o rng', leu === 0, leu + ' leituras');
+  quem.lastMove = 'thunderbolt';
+  const terra = S.createInstance('golem', 60); terra.maxHp = S.calcMaxHp(terra); terra.hp = terra.maxHp;
+  S.tentarParalisar(quem, terra, conta);
+  ok('e alvo que o golpe nao afeta tambem nao', leu === 0, leu + ' leituras');
+  S.tentarParalisar(quem, alvo, conta);
+  ok('mas o caso que vale LE', leu === 1, leu + ' leitura');
+}
+
+console.log('\nA PARALISIA NA TELA: AS DUAS FRASES E O SELO');
+{
+  const mk2 = (id, lv) => { const q = S.createInstance(id, lv); q.maxHp = S.calcMaxHp(q); q.hp = q.maxHp; q.ataques = S.ataquesPadrao(q); return q; };
+  /* o Magneton leva o Canhao de Choque, que paralisa em 100% -- e o unico jeito de garantir o
+     caso sem depender de sorte de semente */
+  let comPegou = null, comTravou = null, comSelo = null;
+  for(let k = 0; k < 600 && !(comPegou && comTravou && comSelo); k++){
+    const t = [mk2('magneton', 70)];
+    const e = [mk2('machamp', 68), mk2('rhydon', 68), mk2('gengar', 68)];
+    S.equiparNpc(e);
+    const r = S.simulateGymBattle(t, e, S.makeSeededRng('partela|' + k));
+    (r.matchups || []).forEach(m => {
+      const g = m.golpes || [];
+      if(!comPegou && g.some(x => x.x === 'paralisou')) comPegou = m;
+      if(!comTravou && g.some(x => x.x === 'paralisado')) comTravou = m;
+      if(!comSelo){
+        const seq = S.sequenciaDoConfronto(m);
+        const i = seq.findIndex(x => x.x === 'paralisou' && x.q === 'e');
+        if(i > 0 && seq.length > i + 1) comSelo = { m, i };
+      }
+    });
+  }
+  ok('achei um confronto com a paralisia pegando', !!comPegou);
+  ok('e um com o turno perdido', !!comTravou);
+
+  if(comPegou){
+    const html = S.passosHtml(comPegou);
+    /* ⚠️ A FRASE NOMEIA O GOLPE, e o "com" neutro serve aos dez nomes sem tabela de genero:
+       RAIO e masculino, FAISCA e LAMBIDA sao femininas. */
+    ok('a frase nomeia o golpe que paralisou', /ficou paralisado com/.test(html),
+       (html.match(/[^>]*ficou paralisado[^<]*/) || ['(sem frase)'])[0].slice(0, 70));
+    /* ⚠️ E ELA NAO VIRA UM "-0 de HP": a linha e de dano zero, e sem entrar no ehGolpeEspecial ela
+       cairia no ramo do golpe comum -- o defeito exato que o congelamento teve. */
+    ok('e nenhuma linha de paralisia vira -0 de HP',
+       !/paralisad[oa][^<]*−0 de HP/.test(html) && !/ficou paralisado[^<]*−0 de HP/.test(html));
+    ok('e o ehGolpeEspecial conhece as duas',
+       S.ehGolpeEspecial({ x:'paralisou' }) === true && S.ehGolpeEspecial({ x:'paralisado' }) === true);
+  }
+  if(comTravou){
+    const html = S.passosHtml(comTravou);
+    /* ⚠️ ELA EXPLICA UMA BARRA PARADA, a mesma razao do "gelado" e do "continua a dormir" */
+    ok('a frase do turno perdido sai palavra por palavra',
+       /está paralisado e não consegue atacar/.test(html));
+  }
+  /* as duas valem 1 passo: fora da tabela a frase valeria PRA SEMPRE (o defeito da anulacao) */
+  ok('as duas frases valem 1 passo na animacao',
+     S.passosDaAbertura && S.passosDaAbertura.paralisou === 1 && S.passosDaAbertura.paralisado === 1);
+
+  /* ⚠️ O SELO ⚡ SO A PARTIR DO PASSO EM QUE ELA PEGA -- a paralisia acontece NO MEIO do confronto,
+     como a queimadura e o veneno. Lido do CAMPO sem o passo, ele anunciaria no primeiro quadro uma
+     paralisia que so vai acontecer seis golpes depois (reportado no 🔥 em 16/09/2026).
+     ⚠️ E O `fighterHtml` RECEBE UM OBJETO, nao o passo solto: passando o numero, `op.passo` fica
+     undefined e o selo aparece SEMPRE -- foi assim que a primeira medicao desta feature "achou" um
+     defeito que nao existia. Conferir a FORMA do parametro antes de medir. */
+  if(comSelo){
+    const { m, i } = comSelo;
+    const seq = S.sequenciaDoConfronto(m);
+    let antes = 0, depois = 0;
+    for(let passo = 0; passo <= seq.length; passo++){
+      const tem = S.fighterHtml(m, 'e', { passo }).indexOf('⚡') >= 0;
+      if(passo < i + 1 && tem) antes++;
+      if(passo >= i + 1 && !tem) depois++;
+    }
+    ok('o selo NAO aparece antes do passo em que a paralisia pega', antes === 0, antes + ' quadros cedo demais');
+    ok('e aparece em todos os quadros dali em diante', depois === 0, depois + ' quadros sem selo');
+    /* PARALISIA HERDADA (o pokemon entra ja paralisado, sem marca no diario) vale desde o quadro 0 */
+    const herdada = Object.assign({}, m, { golpes: (m.golpes||[]).filter(g => g.x !== 'paralisou'), enemyParalisado: true });
+    ok('mas a paralisia HERDADA vale desde o primeiro quadro',
+       S.fighterHtml(herdada, 'e', { passo: 0 }).indexOf('⚡') >= 0);
+    /* sem passo (o log relido dias depois) o selo vale: ali o confronto ja acabou */
+    ok('e sem passo ele vale', S.fighterHtml(m, 'e', {}).indexOf('⚡') >= 0);
+  }
+
+  /* ⚠️ E O ASTERISCO NO CARTAO DO GOLPE, como os outros tres status: e a informacao que mais muda
+     a escolha e que os numeros do cartao menos contam. */
+  ok('os dez golpes avisam no cartao',
+     Object.keys(S.GOLPES_QUE_PARALISAM).every(id => (S.obsDoGolpe(id) || []).some(o => /paralisia/.test(o))),
+     Object.keys(S.GOLPES_QUE_PARALISAM).filter(id => !(S.obsDoGolpe(id)||[]).some(o => /paralisia/.test(o))).join(', ') || 'todos');
+  /* ⚠️ A CHANCE SAI DA TABELA, nunca escrita a mao: ela VARIA de 10% a 100% nestes dez */
+  ok('e a chance do cartao e a da tabela',
+     (S.obsDoGolpe('thunderbolt')||[]).some(o => /10%/.test(o)) &&
+     (S.obsDoGolpe('thunder')||[]).some(o => /30%/.test(o)) &&
+     (S.obsDoGolpe('zapcannon')||[]).some(o => /100%/.test(o)),
+     (S.obsDoGolpe('zapcannon')||[]).join(' | '));
+  /* e golpe que NAO paralisa nao ganha o aviso */
+  ok('e um golpe que nao paralisa nao avisa',
+     !(S.obsDoGolpe('karatechop')||[]).some(o => /paralisia/.test(o)));
+}
+
+console.log('\nE A MARCA E SOLTA NO FIM DA BATALHA');
+{
+  /* ⚠️ Ela e um campo da instancia e o time vai pro SAVE: sem soltar, um pokemon sairia da batalha
+     paralisado PRA SEMPRE -- com a velocidade em 25% em todas as batalhas seguintes, o que nao
+     apareceria como erro nenhum na tela. E o mesmo vazamento que o teto de HP da Furia teve. */
+  const mk2 = (id, lv) => { const q = S.createInstance(id, lv); q.maxHp = S.calcMaxHp(q); q.hp = q.maxHp; q.ataques = S.ataquesPadrao(q); return q; };
+  let sobrou = 0, total = 0;
+  for(let k = 0; k < 400; k++){
+    const t = ['magneton','snorlax','raichu'].map(id => mk2(id, 60));
+    const e = ['machamp','gengar','lapras'].map(id => mk2(id, 60));
+    S.equiparNpc(e);
+    S.simulateGymBattle(t, e, S.makeSeededRng('limpa|' + k));
+    t.concat(e).forEach(q => { total++; if(q._paralisado) sobrou++; });
+  }
+  ok('nenhum pokemon sai da batalha paralisado', sobrou === 0, sobrou + ' de ' + total);
+}
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
 process.exit(falhas ? 1 : 0);
 })();

@@ -229,7 +229,71 @@ console.log('\nO APAGAR EM LOTE NO SERVIDOR');
     ok('e nada foi apagado nas recusas', (await quantas(minhas)) === 1);
 }
 
-console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
-process.exit(falhas ? 1 : 0);
+
+console.log('\nO BOTAO QUE LEVA ATE O CAMPEONATO (16/09/2026)');
+{
+  const meta = id => ({ meta: { leagueTypeId: id } });
+  /* AS CINCO DA FAMILIA: comecou, acabou, foi adiada, o resultado da partida e o campeao */
+  const FAMILIA = ['league_started','league_ended','league_delayed','match_played','league_champion'];
+  FAMILIA.forEach(t => {
+    const html = S.ctaDaNotificacao(notif('n', t, meta('classic')));
+    ok('a notificacao ' + t + ' leva ate a liga', html.indexOf('irParaALiga') >= 0,
+       html.indexOf('irParaALiga') >= 0 ? 'tem botao' : html.slice(0, 60) || '(vazio)');
+  });
+  /* ⚠️ O TEXTO NOMEIA O DESTINO: "Ver a liga" num aviso de Trainers League faria o jogador
+     procurar qual delas. */
+  ok('e o texto diz QUAL liga -- Classica',
+     S.ctaDaNotificacao(notif('n','league_started', meta('classic'))).indexOf('Liga Clássica') >= 0);
+  ok('e Trainers League',
+     S.ctaDaNotificacao(notif('n','league_ended', meta(S.TRAINERS_LEAGUE_TYPE))).indexOf('Trainers League') >= 0);
+  /* ⚠️ SEM leagueTypeId NAO HA BOTAO: notificacao antiga (gravada antes do meta) nao pode virar um
+     botao que leva pra lugar nenhum. */
+  ok('notificacao sem leagueTypeId nao ganha botao',
+     S.ctaDaNotificacao(notif('n','league_started')).indexOf('irParaALiga') < 0);
+  /* o campeao mantem o premio E ganha a liga -- o premio vem primeiro, porque e o que EXPIRA */
+  {
+    const html = S.ctaDaNotificacao(notif('n','league_champion', meta('classic')));
+    ok('o campeao continua com o botao da mochila', html.indexOf('openInventario') >= 0);
+    ok('e o premio vem ANTES da liga', html.indexOf('openInventario') < html.indexOf('irParaALiga'));
+  }
+  /* e o que NAO e de liga continua sem ele */
+  ok('friend_request nao ganha botao de liga',
+     S.ctaDaNotificacao(notif('n','friend_request')).indexOf('irParaALiga') < 0);
+}
+
+console.log('\nE A LIGA CUSTOMIZADA CHEGA COM A CONFIG');
+{
+  /* ⚠️ ESTA E A ARMADILHA DA FEATURE. O `currentLeagueTypeConfig` carrega o `allowedTypes`, e e ELE
+     que decide qual montador de time abre. Abrindo so com o id, uma liga restrita a um tipo cairia
+     no montador comum -- e o jogador inscreveria um time que ela nao aceita, descobrindo isso so
+     na hora de perder. */
+  let aberta = null;
+  S.openLeague = (id, config) => { aberta = { id, config }; };
+  S.openTrainersLeague = () => { aberta = { id: S.TRAINERS_LEAGUE_TYPE, config: null }; };
+  S.leagueTypeDocRef = (id) => ({
+    get: () => Promise.resolve({ exists: true, data: () => ({ name:'Liga do Fogo', allowedTypes:['Fire'] }) })
+  });
+  return S.irParaALiga('liga_fogo').then(()=>{
+    ok('a liga customizada abre COM a config', !!(aberta && aberta.config), JSON.stringify(aberta && aberta.config));
+    ok('e com o allowedTypes, que e o que decide o montador',
+       !!(aberta && aberta.config && aberta.config.allowedTypes),
+       aberta && aberta.config ? String(aberta.config.allowedTypes) : '(sem)');
+    return S.irParaALiga(S.TRAINERS_LEAGUE_TYPE);
+  }).then(()=>{
+    ok('a Trainers League abre pela porta dela', aberta && aberta.id === S.TRAINERS_LEAGUE_TYPE);
+    return S.irParaALiga('classic');
+  }).then(()=>{
+    ok('e a Classica nao gasta leitura de config', aberta && aberta.id === 'classic' && !aberta.config);
+    /* ⚠️ E SE A LEITURA FALHAR, ele abre assim mesmo: chegar na tela certa sem o cabecalho e
+       melhor que nao sair do lugar. */
+    S.leagueTypeDocRef = () => ({ get: () => Promise.reject(new Error('sem rede')) });
+    return S.irParaALiga('liga_fogo');
+  }).then(()=>{
+    ok('com a leitura falhando, ele abre a liga mesmo assim', aberta && aberta.id === 'liga_fogo');
+    console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
+    process.exit(falhas ? 1 : 0);
+  });
+}
+
 })();
 })();

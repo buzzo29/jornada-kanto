@@ -859,7 +859,7 @@ function effectiveSpeed(p){
   // a velocidade buffada entra também na chance de crítico (rng < speed/512, regra da Gen 1):
   // quem está no terreno do tipo dele critica mais, além de bater mais forte
   const v = (typeof p.speed === 'number') ? p.speed : ((SPECIES[p.speciesId] && SPECIES[p.speciesId].speed) || 50);
-  return withFuria(withSpecialty(withBuffs(v, p), p), p);
+  return withParalisia(withFuria(withSpecialty(withBuffs(v, p), p), p), p);
 }
 function calcMaxHp(p){ return Math.round(30 + p.level*5 + effectiveBaseHp(p)); }
 // HP na escala Gen 1 -- usado só internamente, pra converter o dano em fração da vida
@@ -2446,6 +2446,40 @@ const VENENO_DANO = 1/8;             // do HP MAXIMO, por turno -- o DOBRO da qu
 /* ⚠️ POKÉMON DE GELO NÃO CONGELA, como no jogo original -- e aqui isso pesa mais que lá: quase
    todo dono de golpe de gelo É de Gelo (Articuno, Lapras, Dewgong, Jynx, Cloyster), então sem a
    imunidade o efeito mais comum seria dois pokémon de Gelo se congelando um ao outro. */
+/* ⚠️ A PARALISIA (16/09/2026), a QUARTA mecanica POR ATAQUE. Regras da GEN 3:
+     - a velocidade cai pra 25% (regra da Gen 1 a 6; so na Gen 7 virou 50%);
+     - 25% de chance de NAO conseguir atacar no turno;
+     - dura ate o fim da BATALHA, como a queimadura e o veneno.
+   ⚠️ NAO EXISTE IMUNIDADE DE TIPO NA GEN 3: o Eletrico so ficou imune na GEN 6. O que existe e a
+   imunidade do GOLPE -- Terra nao toma Eletrico, e golpe que nao afeta nao paralisa.
+   ⚠️ O CANHAO DE CHOQUE E 100% e aqui nao existe errar (no original ele tem 50% de precisao, e e
+   esse o preco dele). Ver o CLAUDE.md.
+   ⚠️ ESTE BLOCO E COPIA DO CLIENTE, palavra por palavra na parte de MOTOR. */
+const GOLPES_QUE_PARALISAM = { lick: 0.30, thundershock: 0.10, dragonbreath: 0.30, spark: 0.30,
+                               thunderpunch: 0.10, bodyslam: 0.30, bounce: 0.30, thunderbolt: 0.10,
+                               zapcannon: 1.00, thunder: 0.30 };
+const PARALISIA_VELOCIDADE = 0.25;
+const CHANCE_PARALISIA_TRAVA = 0.25;
+function podeParalisar(p){
+  return !!p && p.hp > 0 && !p._paralisado;
+}
+function golpeAfetaOAlvo(golpe, alvo){
+  const g = GOLPES[golpe];
+  if(!g) return true;
+  return tiposDoPokemon(alvo).every(t => typeVsType(g[0], t) !== 0);
+}
+function tentarParalisar(quemBate, alvo, rng){
+  if(!quemBate || quemBate.hp <= 0) return null;
+  const golpe = quemBate.lastMove;
+  const chance = GOLPES_QUE_PARALISAM[golpe];
+  if(!chance || !podeParalisar(alvo) || !golpeAfetaOAlvo(golpe, alvo)) return null;
+  if(rng() >= chance) return null;
+  alvo._paralisado = golpe;
+  return golpe;
+}
+function withParalisia(v, p){
+  return (p && p._paralisado) ? Math.round(v * PARALISIA_VELOCIDADE) : v;
+}
 function podeCongelar(p){
   return !!p && p.hp > 0 && !p._congelado && (tiposDoPokemon(p).indexOf("Ice") < 0);
 }
@@ -2532,6 +2566,9 @@ function doExchange(active, enemy, rng, diario){
   };
   const activeGelo = degela(active), enemyGelo = degela(enemy);
   const activeCongelado = activeGelo === "preso", enemyCongelado = enemyGelo === "preso";
+  /* o rng SO e lido de quem esta paralisado: lido sempre, deslocaria a semente de toda batalha */
+  const trava = (p) => !!p._paralisado && rng() < CHANCE_PARALISIA_TRAVA;
+  const activeTravado = trava(active), enemyTravado = trava(enemy);
 
   const acordaram = [];
   if(activeDorme && active._dormindoPor <= 0) acordaram.push({ q:'p', nome: active.name, p: active });
@@ -2544,8 +2581,8 @@ function doExchange(active, enemy, rng, diario){
      `golpesDaTroca`: ele vale pra ESTA troca e mais nada. */
   active._dormeAgora = activeDorme;
   enemy._dormeAgora = enemyDorme;
-  const dmgToEnemy = (activeDorme || activeCongelado) ? [] : golpesDaTroca(active, enemy, rng);
-  const dmgToActive = (enemyDorme || enemyCongelado) ? [] : golpesDaTroca(enemy, active, rng);
+  const dmgToEnemy = (activeDorme || activeCongelado || activeTravado) ? [] : golpesDaTroca(active, enemy, rng);
+  const dmgToActive = (enemyDorme || enemyCongelado || enemyTravado) ? [] : golpesDaTroca(enemy, active, rng);
   active._dormeAgora = false;
   enemy._dormeAgora = false;
   const spdActive = effectiveSpeed(active);
@@ -2669,6 +2706,7 @@ function doExchange(active, enemy, rng, diario){
   const congelouOSegundo = segundoCaiu ? null : tentarCongelar(first, second, rng);
   const queimouOSegundo = segundoCaiu ? null : tentarQueimar(first, second, rng);
   const envenenouOSegundo = segundoCaiu ? null : tentarEnvenenar(first, second, rng);
+  const paralisouOSegundo = segundoCaiu ? null : tentarParalisar(first, second, rng);
   const saiuNoPrimeiro = (segundoCaiu || congelouOSegundo) ? [] : aplicarGolpes(first, tetoDeQuemRaspa(second, first, dmgBySecond));
   /* O PISO DO REVIDE saiu junto com o revide -- sem revide não há o que limitar, e os dois nunca
      mais caem na mesma troca (por construção, não por aparo). A AUTODESTRUIÇÃO continua sendo o
@@ -2684,6 +2722,7 @@ function doExchange(active, enemy, rng, diario){
   const congelouOPrimeiro = (segundoCaiu || congelouOSegundo) ? null : tentarCongelar(second, first, rng);
   const queimouOPrimeiro = (segundoCaiu || congelouOSegundo) ? null : tentarQueimar(second, first, rng);
   const envenenouOPrimeiro = (segundoCaiu || congelouOSegundo) ? null : tentarEnvenenar(second, first, rng);
+  const paralisouOPrimeiro = (segundoCaiu || congelouOSegundo) ? null : tentarParalisar(second, first, rng);
   const hpDoSecondAposDreno = second.hp;
   if(diario){
     /* O dano registrado é o que SAIU DE VERDADE da vida do alvo, não o número que a fórmula
@@ -2775,6 +2814,11 @@ function doExchange(active, enemy, rng, diario){
        e o golpe no mv -- e o golpe que a frase nomeia. */
     const queimou = (p, q, mv) => { if(mv) diario.push({ q:q, d:0, hp:null, c:0, m:0, z:0, x:"queimou", g:p.name, mv:mv }); };
     const envenenou = (p, q, mv) => { if(mv) diario.push({ q:q, d:0, hp:null, c:0, m:0, z:0, x:"envenenou", g:p.name, mv:mv }); };
+    const paralisou = (p, q, mv) => { if(mv) diario.push({ q:q, d:0, hp:null, c:0, m:0, z:0, x:"paralisou", g:p.name, mv:mv }); };
+    const travadoDe = (p, q) => {
+      const t = (p === active) ? activeTravado : enemyTravado;
+      if(t) diario.push({ q:q, d:0, hp:null, c:0, m:0, z:0, x:"paralisado", g:p.name });
+    };
     /* ⚠️ AS DUAS LINHAS DE ENTRADA (degelou / gelado) SAEM NO COMECO DA TROCA, antes de QUALQUER
        golpe -- dos dois lados. O sorteio do degelo acontece na entrada do doExchange, entao e ali
        que elas sao verdade; e e assim que o pedido descreve o ciclo: *"aparece a frase: Dragonite
@@ -2782,6 +2826,7 @@ function doExchange(active, enemy, rng, diario){
        ⚠️ POSTAS NO SLOT DE CADA UM elas saiam ao contrario no caso do RECONGELAMENTO: quem degelou
        e foi congelado de novo na mesma troca lia 'congelou / degelou', a ordem invertida da cena. */
     geloDe(first, qDoFirst);
+    travadoDe(first, qDoFirst);
     dormeDe(first, qDoFirst);
     geloDe(second, qDoSecond);
     if(!primeiroDormiu){
@@ -2794,12 +2839,14 @@ function doExchange(active, enemy, rng, diario){
     congelou(second, qDoSecond, congelouOSegundo);
     queimou(second, qDoSecond, queimouOSegundo);
     envenenou(second, qDoSecond, envenenouOSegundo);
+    paralisou(second, qDoSecond, paralisouOSegundo);
     /* ⚠️ O "CONTINUA A DORMIR" DO SECOND VEM DEPOIS DO GOLPE DO FIRST, e nao junto do geloDe la
        em cima: a frase e sobre O TURNO DELE (*"caso o pokemon nao acorde no turno dele"*), e o
        turno dele e depois do golpe de quem e mais rapido. Junto do gelo, o log dizia "Onix
        continua a dormir / Gengar atacou" -- a ordem invertida da cena.
        As duas do GELO ficam juntas la em cima de proposito, e por um caso que o sono nao tem: o
        recongelamento na mesma troca (ver o comentario delas). */
+    travadoDe(second, qDoSecond);
     dormeDe(second, qDoSecond);
     if(!segundoDormiu){
       gravar(qDoSecond, saiuNoPrimeiro, second, segundoCaiu?1:0);
@@ -2809,6 +2856,7 @@ function doExchange(active, enemy, rng, diario){
     congelou(first, qDoFirst, congelouOPrimeiro);
     queimou(first, qDoFirst, queimouOPrimeiro);
     envenenou(first, qDoFirst, envenenouOPrimeiro);
+    paralisou(first, qDoFirst, paralisouOPrimeiro);
     // AGORA sim: ele apanhou nesta troca, e so entao acorda (ver o comentario do `acordaram`)
     /* ⚠️ QUEM MORREU DORMINDO NÃO ACORDA (14/09/2026, a pedido: *"quando um pokémon morre durante
        o sono, não precisa exibir que ele acordou e voltou para a luta, nem no log e nem na
@@ -2931,6 +2979,13 @@ function encerrarBatalha(team, inimigos){
        jeito: sem esta linha um Golem que rolou quatro vezes sai da luta com 480 de poder guardado e
        a batalha SEGUINTE começa com ele -- o mesmo tipo de vazamento que o teto de HP da Fúria teve. */
     p._rolamento = 0;
+    /* ⚠️ A PARALISIA e solta aqui como no cliente: ela e um campo da instancia e dura a BATALHA.
+       ⚠️ E VALE UMA NOTA: o cliente solta tambem _congelado, _queimado e _envenenado, e este lado
+       NAO -- desde que os tres existem. Hoje isso e inofensivo porque as instancias do servidor
+       nascem a cada batalha (o resolverTimeDosSaves e o battleHydrate montam do zero), ao
+       contrario das do cliente, que vao pro SAVE. Fica registrado pro dia em que algum caminho do
+       servidor passar a reusar instancia: ali os tres vazam junto. */
+    p._paralisado = null;
   });
 }
 function simulateGymBattle(team, enemyTeam, rng, opts){
@@ -3060,6 +3115,7 @@ function simulateGymBattle(team, enemyTeam, rng, opts){
            jogador mais precisa saber que o ataque dele esta pela metade. */
         playerQueimado: !!active._queimado, enemyQueimado: !!enemy._queimado,
         playerEnvenenado: !!active._envenenado, enemyEnvenenado: !!enemy._envenenado,
+        playerParalisado: !!active._paralisado, enemyParalisado: !!enemy._paralisado,
         player:active.name, playerSpecies:active.speciesId, playerLevel:active.level, playerShiny: !!active.shiny, playerBuffed: !!active.terrainBuffed, playerSpecialty: !!active.specialtyBuffed,
         enemy:enemy.name, enemySpecies:enemy.speciesId, enemyLevel:enemy.level, enemyShiny: !!enemy.shiny, enemyBuffed: !!enemy.terrainBuffed, enemySpecialty: !!enemy.specialtyBuffed,
         playerTrainerStreak: playerStreak, enemyTrainerStreak: enemyStreak,

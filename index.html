@@ -5023,7 +5023,7 @@ function effectiveSpeed(p){
   // A velocidade buffada entra também na chance de crítico (rng < speed/512, regra da Gen 1):
   // quem está no terreno do tipo dele critica mais, além de bater mais forte
   const v = (typeof p.speed === 'number') ? p.speed : ((SPECIES[p.speciesId] && SPECIES[p.speciesId].speed) || 50);
-  return withFuria(withSpecialty(withBuffs(v, p), p), p);
+  return withParalisia(withFuria(withSpecialty(withBuffs(v, p), p), p), p);
 }
 function calcMaxHp(p){
   // A ESCALA de HP é a clássica do jogo nos DOIS motores (Arcanine 67 = 455, como sempre foi) -- no
@@ -7964,6 +7964,69 @@ const QUEIMADURA_FISICO = 0.5;       // o que sobra do ataque fisico de quem est
 const GOLPES_QUE_ENVENENAM = { poisonsting: 0.30, twineedle: 0.20, smog: 0.40,
                                sludge: 0.30, sludgebomb: 0.30, poisonfang: 0.50 };
 const VENENO_DANO = 1/8;             // do HP MAXIMO, por turno -- o DOBRO da queimadura
+/* ⚠️ A PARALISIA (16/09/2026), a QUARTA mecanica POR ATAQUE. Regras da GEN 3 (Bulbapedia,
+   Paralysis), e ela e a unica das quatro que mexe em VELOCIDADE:
+     - a velocidade cai pra 25% (`PARALISIA_VELOCIDADE`) -- a regra da Gen 1 a 6; so na Gen 7 ela
+       passou a ser 50%;
+     - 25% de chance de NAO conseguir atacar no turno (`CHANCE_PARALISIA_TRAVA`);
+     - dura ate o fim da BATALHA, como a queimadura e o veneno -- nao passa sozinha.
+
+   ⚠️ NAO EXISTE IMUNIDADE DE TIPO NA GEN 3, e este e o ponto onde a intuicao mais erra: o tipo
+   ELETRICO so ficou imune a paralisia na GEN 6. Como seis dos dez golpes abaixo sao Eletricos e a
+   maioria dos donos tambem e, o efeito mais comum aqui e justamente um Eletrico paralisando outro
+   -- e isso e o que a Gen 3 faz. (E o contrario do que o gelo precisou: la a imunidade do Gelo E
+   da geracao, e sem ela dois pokemon de Gelo se congelariam o tempo todo.)
+
+   ⚠️ O QUE EXISTE E A IMUNIDADE DO GOLPE: Terra nao toma Eletrico, e um golpe que nao afeta o alvo
+   nao paralisa. Sem essa guarda, um Raio "paralisaria" um Golem que ele nem alcanca -- o motor tem
+   piso de 1 de dano e golpe teimoso, entao o golpe CONECTA aqui mesmo valendo zero. E a unica das
+   quatro mecanicas que precisou disso: nenhum tipo e imune a Fogo ou a Gelo, e no veneno o Aco ja
+   e barrado pela imunidade ao STATUS.
+
+   AS CHANCES SAO AS OFICIAIS de cada golpe, tiradas do dado (Showdown, mod da Gen 3) -- o mesmo
+   caminho das outras tres listas. Elas variam de 10% a 100%.
+   ⚠️ O CANHAO DE CHOQUE E 100%, e aqui isso pesa MUITO mais que no jogo original: la ele tem 50%
+   de PRECISAO, e e esse o preco dele. Este motor nao tem errar -- todo golpe acerta --, entao ele
+   paralisa em todo ataque. Ver o preco medido no CLAUDE.md.
+   ⚠️ FICARAM DE FORA: Onda de Choque, Po do Estupor e Encarada (golpes de STATUS, poder 0, e a base
+   so cadastra dano), pela mesma regra que tirou o Po Venenoso do veneno e o Will-O-Wisp da
+   queimadura. */
+const GOLPES_QUE_PARALISAM = { lick: 0.30, thundershock: 0.10, dragonbreath: 0.30, spark: 0.30,
+                               thunderpunch: 0.10, bodyslam: 0.30, bounce: 0.30, thunderbolt: 0.10,
+                               zapcannon: 1.00, thunder: 0.30 };
+const PARALISIA_VELOCIDADE = 0.25;   // o que sobra da velocidade de quem esta paralisado
+const CHANCE_PARALISIA_TRAVA = 0.25; // chance de perder o turno
+/* ⚠️ SEM IMUNIDADE DE TIPO AO STATUS (ver a nota da tabela): na Gen 3 nem o Eletrico escapa. O que
+   se cobra aqui e o resto -- quem ja caiu nao paralisa, e quem JA esta paralisado tambem nao: a
+   marca seria reescrita e o log passaria a nomear o golpe errado. */
+function podeParalisar(p){
+  return !!p && p.hp > 0 && !p._paralisado;
+}
+/* ⚠️ O GOLPE TEM QUE AFETAR O ALVO. O motor sempre "conecta" (piso de 1 de dano, golpe teimoso),
+   entao sem isto um Raio paralisaria um Terra. Le os tipos do ALVO contra o tipo do golpe. */
+function golpeAfetaOAlvo(golpe, alvo){
+  const g = GOLPES[golpe];
+  if(!g) return true;
+  return tiposDoPokemon(alvo).every(t => typeVsType(g[0], t) !== 0);
+}
+/* Sorteia a paralisia DEPOIS de o golpe conectar. Devolve o id do golpe (pra frase nomea-lo) ou
+   null. Sai ANTES do rng() quando o golpe nao paralisa ou o alvo nao pode: lido sempre, ele
+   deslocaria a semente de toda batalha que nao tem golpe de paralisia nenhum. */
+function tentarParalisar(quemBate, alvo, rng){
+  if(!quemBate || quemBate.hp <= 0) return null;
+  const golpe = quemBate.lastMove;
+  const chance = GOLPES_QUE_PARALISAM[golpe];
+  if(!chance || !podeParalisar(alvo) || !golpeAfetaOAlvo(golpe, alvo)) return null;
+  if(rng() >= chance) return null;
+  alvo._paralisado = golpe;
+  return golpe;
+}
+/* A VELOCIDADE DE QUEM ESTA PARALISADO, e ela entra por ULTIMO na cadeia -- depois de shiny,
+   terreno, especialidade e furia. "25% da velocidade" e 25% do que o pokemon TEM na hora, que e a
+   mesma regra do corte da queimadura no ataque. */
+function withParalisia(v, p){
+  return (p && p._paralisado) ? Math.round(v * PARALISIA_VELOCIDADE) : v;
+}
 /* ⚠️ POKÉMON DE GELO NÃO CONGELA, como no jogo original -- e aqui isso pesa mais que lá: quase
    todo dono de golpe de gelo É de Gelo (Articuno, Lapras, Dewgong, Jynx, Cloyster), então sem a
    imunidade o efeito mais comum seria dois pokémon de Gelo se congelando um ao outro. */
@@ -8061,6 +8124,13 @@ function doExchange(active, enemy, rng, diario){
   };
   const activeGelo = degela(active), enemyGelo = degela(enemy);
   const activeCongelado = activeGelo === "preso", enemyCongelado = enemyGelo === "preso";
+  /* ⚠️ A PARALISIA SORTEIA NA ENTRADA DA TROCA, como o degelo e o despertar: quem está paralisado
+     já entra sabendo se joga. Ao contrário do gelo, ela NÃO passa -- na Gen 3 a paralisia dura até
+     o fim da batalha; o que se sorteia é só se ele perde ESTE turno.
+     ⚠️ E O `rng()` SÓ É LIDO DE QUEM ESTÁ PARALISADO. Lido sempre, ele deslocaria a semente de
+     toda batalha sem paralisia nenhuma -- a mesma armadilha do Remoinho e do congelamento. */
+  const trava = (p) => !!p._paralisado && rng() < CHANCE_PARALISIA_TRAVA;
+  const activeTravado = trava(active), enemyTravado = trava(enemy);
 
   const acordaram = [];
   if(activeDorme && active._dormindoPor <= 0) acordaram.push({ q:'p', nome: active.name, p: active });
@@ -8073,8 +8143,8 @@ function doExchange(active, enemy, rng, diario){
      depois dos dois `golpesDaTroca`: ele vale pra ESTA troca e mais nada. */
   active._dormeAgora = activeDorme;
   enemy._dormeAgora = enemyDorme;
-  const dmgToEnemy = (activeDorme || activeCongelado) ? [] : golpesDaTroca(active, enemy, rng);
-  const dmgToActive = (enemyDorme || enemyCongelado) ? [] : golpesDaTroca(enemy, active, rng);
+  const dmgToEnemy = (activeDorme || activeCongelado || activeTravado) ? [] : golpesDaTroca(active, enemy, rng);
+  const dmgToActive = (enemyDorme || enemyCongelado || enemyTravado) ? [] : golpesDaTroca(enemy, active, rng);
   active._dormeAgora = false;
   enemy._dormeAgora = false;
   const spdActive = effectiveSpeed(active);
@@ -8216,6 +8286,7 @@ function doExchange(active, enemy, rng, diario){
   const congelouOSegundo = segundoCaiu ? null : tentarCongelar(first, second, rng);
   const queimouOSegundo = segundoCaiu ? null : tentarQueimar(first, second, rng);
   const envenenouOSegundo = segundoCaiu ? null : tentarEnvenenar(first, second, rng);
+  const paralisouOSegundo = segundoCaiu ? null : tentarParalisar(first, second, rng);
   const saiuNoPrimeiro = (segundoCaiu || congelouOSegundo) ? [] : aplicarGolpes(first, tetoDeQuemRaspa(second, first, dmgBySecond));
   /* O PISO DO REVIDE (1%-10%) SAIU JUNTO COM O REVIDE, em 15/09/2026 -- ver o bloco acima. Ele
      existia pra o revide de quem caiu não matar o outro ("jamais os 2 devem morrer juntos e um
@@ -8235,6 +8306,7 @@ function doExchange(active, enemy, rng, diario){
   const congelouOPrimeiro = (segundoCaiu || congelouOSegundo) ? null : tentarCongelar(second, first, rng);
   const queimouOPrimeiro = (segundoCaiu || congelouOSegundo) ? null : tentarQueimar(second, first, rng);
   const envenenouOPrimeiro = (segundoCaiu || congelouOSegundo) ? null : tentarEnvenenar(second, first, rng);
+  const paralisouOPrimeiro = (segundoCaiu || congelouOSegundo) ? null : tentarParalisar(second, first, rng);
   const hpDoSecondAposDreno = second.hp;
   if(diario){
     /* O dano registrado é o que SAIU DE VERDADE da vida do alvo, não o número que a fórmula
@@ -8333,6 +8405,16 @@ function doExchange(active, enemy, rng, diario){
        e o golpe no mv -- e o golpe que a frase nomeia. */
     const queimou = (p, q, mv) => { if(mv) diario.push({ q:q, d:0, hp:null, c:0, m:0, z:0, x:"queimou", g:p.name, mv:mv }); };
     const envenenou = (p, q, mv) => { if(mv) diario.push({ q:q, d:0, hp:null, c:0, m:0, z:0, x:"envenenou", g:p.name, mv:mv }); };
+    /* A linha da PARALISIA tem a mesma forma das outras tres: dano 0, o `q` de QUEM FOI
+       PARALISADO e o golpe no `mv` -- e o golpe que a frase nomeia. */
+    const paralisou = (p, q, mv) => { if(mv) diario.push({ q:q, d:0, hp:null, c:0, m:0, z:0, x:"paralisou", g:p.name, mv:mv }); };
+    /* ⚠️ E A LINHA DE "NAO CONSEGUE ATACAR" SAI NO SLOT DE QUEM PERDEU O TURNO, como a do sono e
+       a do gelo: ela e sobre a VEZ dele. O `q` e de quem esta paralisado -- estas linhas falam de
+       UM pokemon, nao de um causador e um alvo. */
+    const travadoDe = (p, q) => {
+      const t = (p === active) ? activeTravado : enemyTravado;
+      if(t) diario.push({ q:q, d:0, hp:null, c:0, m:0, z:0, x:"paralisado", g:p.name });
+    };
     /* ⚠️ AS DUAS LINHAS DE ENTRADA (degelou / gelado) SAEM NO COMECO DA TROCA, antes de QUALQUER
        golpe -- dos dois lados. O sorteio do degelo acontece na entrada do doExchange, entao e ali
        que elas sao verdade; e e assim que o pedido descreve o ciclo: *"aparece a frase: Dragonite
@@ -8340,6 +8422,7 @@ function doExchange(active, enemy, rng, diario){
        ⚠️ POSTAS NO SLOT DE CADA UM elas saiam ao contrario no caso do RECONGELAMENTO: quem degelou
        e foi congelado de novo na mesma troca lia 'congelou / degelou', a ordem invertida da cena. */
     geloDe(first, qDoFirst);
+    travadoDe(first, qDoFirst);
     dormeDe(first, qDoFirst);
     geloDe(second, qDoSecond);
     if(!primeiroDormiu){
@@ -8352,12 +8435,14 @@ function doExchange(active, enemy, rng, diario){
     congelou(second, qDoSecond, congelouOSegundo);
     queimou(second, qDoSecond, queimouOSegundo);
     envenenou(second, qDoSecond, envenenouOSegundo);
+    paralisou(second, qDoSecond, paralisouOSegundo);
     /* ⚠️ O "CONTINUA A DORMIR" DO SECOND VEM DEPOIS DO GOLPE DO FIRST, e nao junto do geloDe la
        em cima: a frase e sobre O TURNO DELE (*"caso o pokemon nao acorde no turno dele"*), e o
        turno dele e depois do golpe de quem e mais rapido. Junto do gelo, o log dizia "Onix
        continua a dormir / Gengar atacou" -- a ordem invertida da cena.
        As duas do GELO ficam juntas la em cima de proposito, e por um caso que o sono nao tem: o
        recongelamento na mesma troca (ver o comentario delas). */
+    travadoDe(second, qDoSecond);
     dormeDe(second, qDoSecond);
     if(!segundoDormiu){
       gravar(qDoSecond, saiuNoPrimeiro, second, segundoCaiu?1:0);
@@ -8367,6 +8452,7 @@ function doExchange(active, enemy, rng, diario){
     congelou(first, qDoFirst, congelouOPrimeiro);
     queimou(first, qDoFirst, queimouOPrimeiro);
     envenenou(first, qDoFirst, envenenouOPrimeiro);
+    paralisou(first, qDoFirst, paralisouOPrimeiro);
     // AGORA sim: ele apanhou nesta troca, e só então acorda (ver o comentario do `acordaram`)
     /* ⚠️ QUEM MORREU DORMINDO NÃO ACORDA (14/09/2026, a pedido: *"quando um pokémon morre durante
        o sono, não precisa exibir que ele acordou e voltou para a luta, nem no log e nem na
@@ -8495,6 +8581,7 @@ function encerrarBatalha(team, inimigos){
        com _ (nao vai pro Firestore), entao o save nem guardaria o motivo: ele voltaria descongelado
        no F5 e congelado ate la. E o mesmo vazamento que o teto de HP da Furia teve. */
     p._congelado = null;
+    p._paralisado = null;
     /* A QUEIMADURA junto, e pelo mesmo motivo: ela dura a BATALHA, nao a jornada. Sem soltar, um
        pokemon sairia da luta queimado pra sempre -- e com o ataque fisico pela metade em todas as
        batalhas seguintes, o que nao apareceria como erro nenhum na tela. */
@@ -8665,6 +8752,7 @@ function simulateGymBattle(team, brockTeam, rng, opts){
            jogador mais precisa saber que o ataque dele esta pela metade. */
         playerQueimado: !!active._queimado, enemyQueimado: !!enemy._queimado,
         playerEnvenenado: !!active._envenenado, enemyEnvenenado: !!enemy._envenenado,
+        playerParalisado: !!active._paralisado, enemyParalisado: !!enemy._paralisado,
         player:active.name, playerSpecies:active.speciesId, playerLevel:active.level, playerShiny: !!active.shiny, playerBuffed: !!active.terrainBuffed, playerSpecialty: !!active.specialtyBuffed,
         enemy:enemy.name, enemySpecies:enemy.speciesId, enemyLevel:enemy.level, enemyShiny: !!enemy.shiny, enemyBuffed: !!enemy.terrainBuffed, enemySpecialty: !!enemy.specialtyBuffed,
         playerTrainerStreak: playerStreak, enemyTrainerStreak: enemyStreak,
@@ -11277,7 +11365,7 @@ function fatiaDoGolpe(semente){ return (1 - JITTER_DO_GOLPE) + ((Math.abs(sement
    elas SÃO um passo da animação com dano ZERO, então a frase cobre o passo delas e o segundo e meio
    de leitura vem da marca `leitura`. Fora desta tabela, a frase valeria PRA SEMPRE -- o defeito que
    a anulação teve. */
-const passosDaAbertura = { recover:1, pocao:1, absorb:2, disable:1, semSono:1, sono:1, furia:1, confusao:1, furiadragao:1, chuva:1, chuvafim:1, acordou:1, congelou:1, gelado:1, degelou:1, queimou:1, queima:1, dormindo:1, envenenou:1, veneno:1, remoinho:2, remoinhoEntra:1,
+const passosDaAbertura = { recover:1, pocao:1, absorb:2, disable:1, semSono:1, sono:1, furia:1, confusao:1, furiadragao:1, chuva:1, chuvafim:1, acordou:1, congelou:1, gelado:1, degelou:1, queimou:1, queima:1, dormindo:1, envenenou:1, veneno:1, paralisou:1, paralisado:1, remoinho:2, remoinhoEntra:1,
   espadas:1, pluma:1 };
 function buildAnimatedHitSequence(m){
   const seq = sequenciaDoConfronto(m).map(g => {
@@ -18965,7 +19053,11 @@ const ICONES_ESPECIAIS = { boom:'💥', sono:'😴', disable:'🚫', recover:'�
   /* O 🟣 e a cor do tipo Veneno, e nao uma cavera: ☠️ se le como MORTE, e o envenenado continua
      lutando. As duas linhas dividem o mesmo icone pela razao de sempre -- e um efeito so, visto em
      dois momentos. */
-  envenenou:'\ud83d\udfe3', veneno:'\ud83d\udfe3' };
+  envenenou:'\ud83d\udfe3', veneno:'\ud83d\udfe3',
+  /* ⚠️ O ⚡ SERVE AOS DOIS MOMENTOS da paralisia (pegou / perdeu a vez), como o ❄️ serve aos tres
+     do gelo: e o MESMO evento visto em horas diferentes, e icones diferentes fariam procurar duas
+     mecanicas onde ha uma. */
+  paralisou:'⚡', paralisado:'⚡' };
 /* O TIPO de cada golpe especial, pro selo colorido do log. Vive só no CLIENTE, como o
    MOVE_BY_TYPE: o motor manda o que aconteceu, o cliente escolhe a palavra e a cor -- é o que
    evita mais uma tabela duplicada pra sair de sincronia.
@@ -19086,6 +19178,7 @@ function obsDoGolpe(id){
   if(GOLPES_QUE_QUEIMAM[id])   obs.push(pct(GOLPES_QUE_QUEIMAM[id])   + "queimadura "     + ICONES_ESPECIAIS.queimou);
   if(GOLPES_QUE_CONGELAM[id])  obs.push(pct(GOLPES_QUE_CONGELAM[id])  + "congelamento "   + ICONES_ESPECIAIS.congelou);
   if(GOLPES_QUE_ENVENENAM[id]) obs.push(pct(GOLPES_QUE_ENVENENAM[id]) + "envenenamento "  + ICONES_ESPECIAIS.envenenou);
+  if(GOLPES_QUE_PARALISAM[id]) obs.push(pct(GOLPES_QUE_PARALISAM[id]) + "paralisia "      + ICONES_ESPECIAIS.paralisou);
   return obs;
 }
 function cartaoDeGolpe(id, comTipo, destaque){
@@ -19139,7 +19232,7 @@ function seloDeChuvaClicavel(nome){
 /* Os quadros `remoinhoVazio` e `remoinhoEntra` NÃO entram aqui: esta função filtra o DIÁRIO, e o
    motor grava um registro só de remoinho -- quem reparte em três é a apresentação. Quem precisa do
    quadro do novo na lista de avisos o acrescenta à mão (ver avisoDoConfronto). */
-function ehGolpeEspecial(g){ return g && (g.x === 'boom' || g.x === 'sono' || g.x === 'disable' || g.x === 'recover' || g.x === 'furia' || g.x === 'confusao' || g.x === 'furiadragao' || g.x === 'chuva' || g.x === "chuvafim" || g.x === "acordou" || g.x === "congelou" || g.x === "gelado" || g.x === "degelou" || g.x === "queimou" || g.x === "queima" || g.x === "dormindo" || g.x === "envenenou" || g.x === "veneno" || g.x === 'remoinho' || g.x === 'espadas' || g.x === 'pluma' || g.x === 'semSono' || g.x === 'pocao' || g.x === 'absorb'); }
+function ehGolpeEspecial(g){ return g && (g.x === 'boom' || g.x === 'sono' || g.x === 'disable' || g.x === 'recover' || g.x === 'furia' || g.x === 'confusao' || g.x === 'furiadragao' || g.x === 'chuva' || g.x === "chuvafim" || g.x === "acordou" || g.x === "congelou" || g.x === "gelado" || g.x === "degelou" || g.x === "queimou" || g.x === "queima" || g.x === "dormindo" || g.x === "envenenou" || g.x === "veneno" || g.x === "paralisou" || g.x === "paralisado" || g.x === 'remoinho' || g.x === 'espadas' || g.x === 'pluma' || g.x === 'semSono' || g.x === 'pocao' || g.x === 'absorb'); }
 /* Os itens da mochila: o que cada um se chama na tela e quanto cura. O motor manda o id (g.g), o
    cliente escolhe a palavra -- mesmo caminho do MOVE_BY_TYPE. */
 const ITENS_DE_BATALHA = {
@@ -19205,6 +19298,19 @@ function fraseDoEspecial(g, quem, alvo, op){
     /* ⚠️ COM O NUMERO, pela mesma razao da queimadura: a linha de um especial nao ganha o "e tirou
        -N de HP" automatico, e sem ele a soma das linhas nao fecharia com a barra. */
     return escapeHtmlSafe(golpe || "Ele") + " perdeu " + (g.d || 0) + " de HP pelo veneno";
+  }
+  if(g.x === "paralisou"){
+    /* A FRASE NOMEIA O GOLPE, como as dos outros tres status, e com o "com" neutro pela mesma
+       razao: RAIO e TROVAO sao masculinos, mas FAISCA e LAMBIDA sao femininas. */
+    const nomeP = escapeHtmlSafe(golpe || "Ele");
+    if(!(g.mv && GOLPES[g.mv])) return nomeP + " ficou paralisado!";
+    return nomeP + " ficou paralisado com " + (op.selo ? seloDeGolpe(nomeDoAtaque(g.mv), GOLPES[g.mv][0])
+                                                       : escapeHtmlSafe(nomeDoAtaque(g.mv).toUpperCase())) + "!";
+  }
+  if(g.x === "paralisado"){
+    /* ⚠️ ELA EXPLICA UMA BARRA PARADA, que e a mesma razao do "gelado" e do "continua a dormir":
+       sem ela o jogador ve o pokemon nao atacar e procura defeito onde e regra. */
+    return escapeHtmlSafe(golpe || "Ele") + " está paralisado e não consegue atacar";
   }
   if(g.x === "queimou"){
     /* A FRASE NOMEIA O GOLPE, como a do congelamento e pelo mesmo motivo: o que o jogador precisa
@@ -20192,6 +20298,11 @@ function selosDoConfronto(m, lado, passo){
      o primeiro quadro. */
   const envenenado = (lado === 'p') ? (m && m.playerEnvenenado) : (m && m.enemyEnvenenado);
   if(envenenado && statusAteAqui(m, lado, passo, 'envenenou')) out += ' \ud83d\udfe3';
+  /* ⚠️ O ⚡ SEGUE A MESMA REGRA DO 🔥 E DO 🟣: ele so aparece a partir do passo em que a paralisia
+     pega, porque ela acontece NO MEIO do confronto. Paralisia HERDADA (sem marca no diario) vale
+     desde o primeiro quadro -- o pokemon entra ja paralisado. */
+  const paralisado = (lado === 'p') ? (m && m.playerParalisado) : (m && m.enemyParalisado);
+  if(paralisado && statusAteAqui(m, lado, passo, 'paralisou')) out += ' ⚡';
   return out;
 }
 /* O PLACAR DE QUEM ESTÁ DE PÉ: nome centralizado e uma POKÉBOLA por pokémon do time (15/09/2026,
@@ -20878,12 +20989,55 @@ function notificationIcon(type){
 }
 /* O que cada notificação oferece pra FAZER. Fica separado do desenho da tela porque é a única
    parte que depende do estado do jogo (empréstimo ativo, desafio vencido, bônus já ativado). */
+/* ⚠️ O BOTÃO QUE LEVA ATÉ O CAMPEONATO DA NOTIFICAÇÃO (16/09/2026, a pedido).
+   Toda notificação de liga já carregava `meta.leagueTypeId` desde sempre -- o que faltava era a
+   porta. Ela abre as TRÊS famílias, e a terceira é a que tem armadilha:
+
+   ⚠️ LIGA CUSTOMIZADA PRECISA DA CONFIG, não só do id. O `currentLeagueTypeConfig` carrega o
+   `allowedTypes`, e é ELE que decide qual montador de time abre (ver openLeagueTeamPicker). Abrindo
+   só com o id, uma liga restrita a um tipo cairia no montador comum -- e o jogador inscreveria um
+   time que ela não aceita, descobrindo isso só na hora de perder. Por isso aqui há uma leitura a
+   mais, e ela só acontece nesse caso: a Clássica e a Trainers não têm config pra buscar.
+
+   Se a leitura falhar, ele abre a liga assim mesmo: chegar na tela certa sem o cabeçalho é melhor
+   que não sair do lugar -- mas o montador restrito é justamente o que se perde, então o erro é
+   logado em vez de sumir. */
+async function irParaALiga(leagueTypeId){
+  const id = leagueTypeId || CLASSIC_LEAGUE_TYPE;
+  if(id === TRAINERS_LEAGUE_TYPE){ openTrainersLeague(); return; }
+  if(id === CLASSIC_LEAGUE_TYPE){ openLeague(CLASSIC_LEAGUE_TYPE); return; }
+  let config = null;
+  try{
+    const snap = await leagueTypeDocRef(id).get();
+    if(snap.exists){ config = { id, ...snap.data() }; }
+  }catch(e){ console.error('Erro ao carregar a liga da notificação:', e); }
+  openLeague(id, config);
+}
+/* O BOTÃO É O MESMO PRAS CINCO notificações de liga, e o texto NOMEIA o destino: "Ver a liga" num
+   aviso de Trainers League mandaria o jogador procurar qual. */
+function botaoDaLigaHtml(n){
+  const id = (n.meta && n.meta.leagueTypeId) || null;
+  if(!id) return '';
+  const nome = id === TRAINERS_LEAGUE_TYPE ? 'Trainers League'
+             : id === CLASSIC_LEAGUE_TYPE ? 'Liga Clássica'
+             : 'liga';
+  return `<button class="btn primary u-mt8" onclick="irParaALiga(${JSON.stringify(id)})">🏆 Ir para a ${nome}</button>`;
+}
 function ctaDaNotificacao(n){
   if(n.type==='league_champion'){
-    return (n.meta && n.meta.activated)
+    /* ⚠️ AQUI SÃO DOIS BOTÕES, e a ordem importa: o prêmio vem primeiro porque é a ação que
+       EXPIRA (o bônus shiny vale uma hora depois de ativado), e a liga é só pra rever. */
+    const premio = (n.meta && n.meta.activated)
       ? `<p class="u-mt8 win-text">✅ Bônus já ativado</p>`
       : `<p class="u-mt8 hint-text">O <strong>Bônus Shiny</strong> está guardado na sua mochila.</p>
          <button class="btn success u-mt8" onclick="openInventario()">🎒 Abrir a mochila</button>`;
+    return premio + botaoDaLigaHtml(n);
+  }
+  /* as outras quatro da família: começou, acabou, foi adiada e o resultado de uma partida.
+     Todas já carregavam o leagueTypeId no meta -- faltava a porta. */
+  if(n.type==='league_started' || n.type==='league_ended' ||
+     n.type==='league_delayed' || n.type==='match_played'){
+    return botaoDaLigaHtml(n);
   }
   if(n.type==='friend_request'){
     // o botão leva pra lista, onde o pedido aparece com nome, presença e o que mais ajuda a

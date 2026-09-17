@@ -1994,6 +1994,156 @@ contaminá-la.
   HP`, a marca solta em 400 batalhas, as duas saídas antecipadas do rng e 120 batalhas batendo golpe
   a golpe nos dois motores.
 
+### A PARALISIA: O STATUS QUE MEXE EM VELOCIDADE (16/09/2026)
+
+Pedida assim: *"implemente o status Paralysis, que alguns ataques tem uma chance de deixar o
+oponente assim (Como Thunder Punch, Thunderbolt, etc..), no mesmo esquema que fizemos com o queimar
+e o poison ... Pode seguir a mesma mecanica que o site bulbapedia informa para a Geração 3"*.
+
+É a **quarta** mecânica POR ATAQUE, e a única das quatro que não mexe em dano:
+
+| | |
+|---|---|
+| a velocidade cai pra **25%** (`PARALISIA_VELOCIDADE`) | a regra da Gen 1 à 6 — só na Gen 7 ela virou 50% |
+| **25%** de chance de perder o turno (`CHANCE_PARALISIA_TRAVA`) | |
+| dura até o fim da **BATALHA** | como a queimadura e o veneno; não passa sozinha |
+
+**SÃO DEZ GOLPES** (`GOLPES_QUE_PARALISAM`), tirados do dado (Showdown, mod da Gen 3) com as chances
+oficiais — o mesmo caminho das outras três listas. Elas variam de **10% a 100%**:
+
+| golpe | poder | chance | espécies que levam |
+|---|---|---|---|
+| Golpe de Corpo | 85 | 30% | **12** |
+| Faísca | 65 | 30% | 7 |
+| Trovão | 120 | 30% | 7 |
+| Choque do Trovão | 40 | 10% | 7 |
+| **Canhão de Choque** | 100 | **100%** | 4 |
+| Raio | 95 | 10% | 4 |
+| Salto | 85 | 30% | 3 |
+| Soco Trovão | 75 | 10% | 3 |
+| Lambida | 20 | 30% | — |
+| Sopro do Dragão | 60 | 30% | — |
+
+**⚠️ SÃO 34 DAS 250 QUE LEVAM UM DELES no Lv.70 — a lista mais larga das quatro** (o gelo tem 10, a
+queimadura 22, o veneno 26), e a causa é o **Golpe de Corpo**: ele é Normal, poder 85, e meio
+bestiário o aprende.
+
+**⚠️ FICARAM DE FORA: Onda de Choque, Pó do Estupor e Encarada** — golpes de STATUS (poder 0), e a
+base só cadastra dano. A mesma regra que tirou o Pó Venenoso do veneno e o Will-O-Wisp da queimadura.
+
+#### ⚠️ NA GEN 3 NENHUM TIPO É IMUNE — e é aqui que a intuição mais erra
+
+O tipo **ELÉTRICO só ficou imune à paralisia na GEN 6**. Na Gen 3 ele apanha como todo mundo — e como
+seis dos dez golpes são Elétricos e a maioria dos donos também é, **o caso mais comum é justamente um
+Elétrico paralisando outro**.
+
+Isso é o **oposto** do que o gelo precisou: lá a imunidade do Gelo É da geração, e sem ela dois
+pokémon de Gelo se congelariam o tempo todo. Aqui, pôr a imunidade seria sair da geração que o resto
+do motor segue. Há trava nomeando cinco Elétricos, pra ninguém "consertar" isso pra parecer com o
+jogo moderno.
+
+**⚠️ O QUE EXISTE É A IMUNIDADE DO GOLPE, e ela precisou de código próprio** (`golpeAfetaOAlvo`):
+Terra não toma Elétrico, e **golpe que não afeta não paralisa**. Sem essa guarda um Raio paralisaria
+um Golem que ele nem alcança — porque este motor **sempre "conecta"** (piso de 1 de dano, golpe
+teimoso).
+É a **única das quatro mecânicas que precisou disso**: nenhum tipo é imune a Fogo ou a Gelo, e no
+veneno o Aço já é barrado pela imunidade ao STATUS.
+
+#### O QUE ELA CUSTA A QUEM APANHA — e a assimetria É a mecânica
+
+1x1 contra um painel de 8, Lv.55, paralisia forçada, 250 batalhas por célula:
+
+| paralisado | vitória cai | |
+|---|---|---|
+| **Alakazam** | 61,9% → **12,5%** | **−49,4** |
+| **Starmie** | 65,0% → 28,1% | −36,9 |
+| **Jolteon** | 57,6% → 22,6% | −35,0 |
+| Snorlax (lento) | 60,1% → 41,1% | −19,0 |
+| **Golem (lento)** | 73,0% → 60,8% | **−12,2** |
+
+**A distância entre o Alakazam (−49,4) e o Golem (−12,2) é o corte de velocidade**: quem dependia de
+bater primeiro perde tudo, quem já era lento quase não sente. É o mesmo desenho da queimadura (que
+separa físico de especial), com outro eixo.
+
+**MEDIDO NA BATALHA: sai em 3,20% dos confrontos** e em **12,0% das batalhas 3x3**, com 45 turnos
+perdidos em 3.778 confrontos. As linhas dela são 1,40% do log.
+
+**O PREÇO NA JORNADA: NADA — 58,81% contra 57,97%, −0,84 ponto, 0,7σ** (8 blocos de 800 jornadas de
+cada lado, **6.400 de cada**, desvio tirado de ENTRE os blocos, **4 de 8 blocos** pra cada lado).
+Ruído puro, e pela razão de sempre: ela cai dos DOIS lados — o Snorlax de rota, o Magneton da
+Jasmine, o Raichu do Surge.
+
+#### ⚠️ O CANHÃO DE CHOQUE É 100%, E AQUI ISSO PESA MUITO MAIS QUE NO ORIGINAL
+
+No jogo real ele tem **50% de precisão**, e é esse o preço dele. **Este motor não tem errar** — todo
+golpe acerta —, então ele paralisa em **todo ataque**. Medido (1x1 contra um painel de 8, Lv.70):
+
+| | sem o golpe | com | |
+|---|---|---|---|
+| **Magneton** | 32,5% | **57,3%** | **+24,7** |
+| Magnemite | 2,0% | 14,8% | +12,8 |
+| Porygon2 | 25,6% | 34,6% | +9,1 |
+| Porygon | 2,9% | 9,7% | +6,8 |
+
+**+24,7 pontos num golpe só** é a maior alavanca individual desta série. Ele ficou em 100% porque é o
+que a Gen 3 diz e o pedido foi seguir a Gen 3 — mas **se incomodar, a régua é uma linha**: baixar o
+`zapcannon` no `GOLPES_QUE_PARALISAM` pra 0.50 modela a precisão que este motor não tem.
+Quem leva: Magnemite, Magneton, Porygon, Porygon2 e Forretress (este só até o Lv.55).
+
+#### AS DUAS FRASES, E A TERCEIRA QUE NÃO TEM QUANDO SAIR
+
+| linha | quando | frase |
+|---|---|---|
+| `paralisou` | depois do golpe que causou | *⚡ Snorlax ficou paralisado com CANHÃO DE CHOQUE!* |
+| `paralisado` | no lugar do golpe dele | *⚡ Snorlax está paralisado e não consegue atacar* |
+
+**⚠️ E A TERCEIRA — "quando passou a paralisação" — NÃO FOI IMPLEMENTADA, e não é esquecimento: ela
+não tem quando acontecer na Gen 3.** Lá a paralisia **não passa sozinha** (só item ou cura a tira),
+e é exatamente isso que o pedido também pede ao dizer *"no mesmo esquema que fizemos com o queimar e
+o poison"* — os dois duram até o fim da batalha.
+Quem passa é o **congelamento**, que sorteia degelo a 25% por turno; a paralisia é o oposto dele.
+**Se for pra ter mesmo**, é uma constante nova no molde do `CHANCE_DESCONGELAR` mais uma linha
+`despalarisou` — e aí ela deixa de ser Gen 3.
+
+- **"COM" E NÃO "PELO"**, a mesma decisão do congelamento: RAIO e TROVÃO são masculinos, mas FAÍSCA e
+  LAMBIDA são femininas, e a preposição neutra serve aos dez sem uma tabela de gênero pra uma frase só.
+- **O SELO É ⚡ nos dois momentos**, como o ❄️ serve aos três do gelo: é o mesmo evento visto em horas
+  diferentes, e ícones diferentes fariam procurar duas mecânicas onde há uma.
+- **⚠️ E ELE SÓ APARECE A PARTIR DO PASSO EM QUE A PARALISIA PEGA** (`statusAteAqui`), como o 🔥 e o
+  🟣 — ela acontece NO MEIO do confronto. Paralisia **herdada** (sem marca no diário) vale desde o
+  primeiro quadro: o pokémon entra já paralisado.
+- **O asterisco entra no cartão do golpe** nos dez, com a chance **derivada da tabela** — ela varia de
+  10% a 100%, então um texto fixo mentiria em oito dos dez.
+
+#### ⚠️ E ELA DERRUBOU UMA TRAVA QUE MEDIA UMA SUPOSIÇÃO VELHA
+
+A trava do despertar cobrava que *"quem dorme SEMPRE apanha antes de acordar"* — e isso era verdade
+só enquanto nada podia travar o **ATACANTE**. A paralisia é a primeira coisa que trava: o dono do
+sono perde o turno, ninguém bate, e o adormecido acorda mesmo assim.
+
+**E ele acordar ali está certo: o sono compra TURNOS, não golpes** — o contador anda na entrada da
+troca, tenha havido golpe ou não. A trava passou a tolerar o caso, e continua cobrando o que ela
+existe pra cobrar (ele não acorda antes da vez dele). É a mesma lição da trava que caiu quando o sono
+virou de 1 a 3 trocas: **ela media a DURAÇÃO e não a regra**.
+
+#### ⚠️ E O SERVIDOR NÃO SOLTA OS OUTROS TRÊS STATUS — achado no caminho, e não mexido
+
+O `encerrarBatalha` do CLIENTE solta `_congelado`, `_queimado`, `_envenenado` e agora `_paralisado`;
+o do SERVIDOR **nunca soltou nenhum dos três**. Hoje isso é inofensivo porque as instâncias do
+servidor nascem a cada batalha (o `resolverTimeDosSaves` e o `battleHydrate` montam do zero), ao
+contrário das do cliente, que vão pro SAVE. **Só o `_paralisado` foi acrescentado lá** — mexer nos
+outros três seria mudar comportamento que ninguém pediu. Fica registrado pro dia em que algum caminho
+do servidor passar a reusar instância: ali os três vazam junto.
+
+`tools/test-especiais.js` tranca 44 pontas: os dez golpes e as chances oficiais, que eles existem na
+tabela e têm nome PT, que 30+ espécies os LEVAM (a lição da Fúria), os 25% de velocidade (inclusive
+num shiny, provando que o corte entra por último), os 25% de trava, **os cinco Elétricos podendo ser
+paralisados**, os cinco Terra não sendo paralisados por Raio nem com o dado viciado, as chances
+medidas com **um rng contínuo** (com o caso p=1 cobrado por igualdade exata, porque ali o σ é zero),
+as duas saídas antecipadas do rng, as duas frases palavra por palavra, o log sem `−0 de HP`, o selo
+só a partir do passo, a paralisia herdada, o asterisco nos dez com a chance derivada, e a marca
+solta em 2.400 pokémon.
+
 ### A FÚRIA DO DRAGÃO: 40 FIXOS NA ABERTURA (11/09/2026)
 
 Pedida assim: *"adicione a habilidade passiva furia do dragão para os pokemons que possuem esse
@@ -8575,8 +8725,6 @@ card de Amigos — um sinal que o jogador já sabe ler como "tem coisa aqui".
   horizontal, ao lado dos outros três selos da home.
 - `tools/test-inventario.js` conta o selo DENTRO do botão das ligas, e não na home inteira: o sino e
   o card de Amigos também usam o `.notif-badge`, e um teste que contasse todos daria verde por acaso.
-
-
 - **Cinco cards numa linha só**: Pokédex, Conquistas, Amigos, Mochila e Loja. A linha virou
   `grid-template-columns:repeat(5,minmax(0,1fr))` — com `1fr` (que é `minmax(auto,1fr)`) a coluna não
   encolhe abaixo do conteúdo, e "Conquistas" empurrava a linha inteira pra fora dos 320px.
@@ -9851,6 +9999,38 @@ A tarja dizia **`Maximum call stack size exceeded`**, que é um `RangeError` —
   que é uma só seria trocar um incômodo por outro. A confirmação NOMEIA o que tem prêmio dentro
   (bônus shiny não ativado, empréstimo do Mewtwo): apagar isso é perda definitiva, e num lote é
   ainda mais fácil levar junto sem ver.
+### O BOTÃO QUE LEVA ATÉ O CAMPEONATO (16/09/2026)
+
+Pedido assim: *"nas notificações das ligas pokemons adicione um botão para levar até o campeonato
+que a notificação está falando sobre"*.
+
+- **TODA notificação de liga já carregava `meta.leagueTypeId`** desde que elas existem — o que
+  faltava era a porta. São **cinco**: `league_started`, `league_ended`, `league_delayed`,
+  `match_played` e `league_champion`.
+- **O TEXTO NOMEIA O DESTINO** ("Ir para a Trainers League", "Ir para a Liga Clássica"): um "Ver a
+  liga" genérico num aviso de Trainers League mandaria o jogador procurar qual delas.
+- **NO CAMPEÃO SÃO DOIS BOTÕES, e a ordem importa**: o prêmio vem primeiro porque é a ação que
+  **EXPIRA** (o bônus shiny vale uma hora depois de ativado), e a liga é só pra rever.
+- **Notificação sem `leagueTypeId` não ganha botão** — as antigas, gravadas antes do campo. Um
+  botão que leva pra lugar nenhum é pior que nenhum.
+
+**⚠️ E A ARMADILHA É A LIGA CUSTOMIZADA: ela precisa da CONFIG, não só do id.** O
+`currentLeagueTypeConfig` carrega o `allowedTypes`, e é **ele** que decide qual montador de time
+abre (ver `openLeagueTeamPicker`). Abrindo só com o id, uma liga restrita a um tipo cairia no
+montador comum — e **o jogador inscreveria um time que ela não aceita**, descobrindo isso só na
+hora de perder. Por isso o `irParaALiga` faz uma leitura a mais, e **só nesse caso**: a Clássica e
+a Trainers não têm config pra buscar.
+Se a leitura falhar, ele abre a liga assim mesmo — chegar na tela certa sem o cabeçalho é melhor
+que não sair do lugar —, mas o montador restrito é justamente o que se perde, então o erro é
+logado em vez de sumir.
+
+- **A Torre ficou de fora**, e é escopo: o pedido diz "notificações das ligas". As duas dela
+  (`tower_top`, `tower_cleared`) têm a mesma forma de problema e nenhuma porta.
+- `tools/test-notificacoes.js` tranca 16 pontas: as cinco com botão, o texto nomeando as duas
+  ligas conhecidas, a que não tem `leagueTypeId` sem botão, o prêmio antes da liga no campeão, o
+  que não é de liga sem botão, a customizada chegando **com o `allowedTypes`**, a Trainers pela
+  porta dela, a Clássica sem gastar leitura, e a leitura falhando sem travar.
+
 - **Não redesenhar a tela durante animações.** Cada `render()` recria o HTML e mata a transição
   CSS da barra de HP no meio. Animações atualizam o DOM diretamente. Já causou três bugs.
 - Timers que dependem de `render()` param quando o render fica raro. Cronômetros têm laço próprio.
