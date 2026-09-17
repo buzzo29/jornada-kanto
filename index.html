@@ -12822,6 +12822,27 @@ async function migrateOldLeagueDataIfNeeded(){
   } catch(e){ console.error('Erro ao migrar dados antigos da Liga:', e); }
 }
 
+/* O PREÂMBULO DA INSCRIÇÃO, numa ida só ao calendário (16/09/2026).
+   Antes daqui o clique fazia: transação(2) + calendário de novo(1) + inscrito(1) + transação(2) =
+   SEIS idas em sequência. Três eram evitáveis:
+     - o `ensureRegisteringCycle` abria uma TRANSAÇÃO mesmo quando o ciclo já existe, que é o caso
+       comum -- transação custa duas idas (ler + confirmar) e uma leitura simples custa uma;
+     - o calendário era lido de novo pelo `isAccountActiveInLeague`;
+     - o documento do inscrito era lido por ele E pela transação da gravação.
+   ⚠️ LER ANTES É SEGURO AQUI: no SDK compat o `get()` vai ao SERVIDOR quando online (o cache só
+   entra offline), e quando o ciclo NÃO existe a criação continua dentro da transação -- que relê e
+   reconfere lá dentro, então duas abas não criam dois ciclos.
+   O que ele NÃO muda é a corrida que já existia: o ciclo pode travar entre o preâmbulo e a
+   gravação, exatamente como travava entre as duas transações de antes. */
+async function preambuloDaInscricao(typeId, uid){
+  const snap = await scheduleDocRef(typeId).get();
+  const cycles = snap.exists ? (snap.data().cycles || []) : [];
+  let entry = cycles.find(c => c.status === 'registering');
+  /* só quando falta: aí sim vale a transação, que é o que impede duas abas de criarem dois */
+  if(!entry){ entry = await ensureRegisteringCycle(typeId); }
+  const ativo = await isAccountActiveInLeague(typeId, uid, { cycles, pularInscricao: true });
+  return { entry, ativo };
+}
 async function ensureRegisteringCycle(typeId){
   return await db.runTransaction(async (tx)=>{
     const snap = await tx.get(scheduleDocRef(typeId));
@@ -12867,9 +12888,8 @@ async function registerForLeague(typeId, slot, ficarNaTela){
   // o time do save, e ponto: se o Mewtwo emprestado estiver nele, ele vai junto como qualquer outro
   const code = encodeTeamCode(saveData.team);
   try{
-    const cycleEntry = await ensureRegisteringCycle(typeId);
-    const activeElsewhere = await isAccountActiveInLeague(typeId, uid);
-    if(activeElsewhere){ throw new Error('ACTIVE_ELSEWHERE'); }
+    const { entry: cycleEntry, ativo } = await preambuloDaInscricao(typeId, uid);
+    if(ativo){ throw new Error('ACTIVE_ELSEWHERE'); }
     const regRef = registrantDocRef(typeId, cycleEntry.id, uid);
     await db.runTransaction(async (tx)=>{
       const snap = await tx.get(regRef);
@@ -14479,9 +14499,8 @@ async function registerCustomTeamForLeague(){
   const uid = game.authUser.uid;
   const code = encodeTeamCode(team);
   try{
-    const cycleEntry = await ensureRegisteringCycle(typeId);
-    const activeElsewhere = await isAccountActiveInLeague(typeId, uid);
-    if(activeElsewhere){ throw new Error('ACTIVE_ELSEWHERE'); }
+    const { entry: cycleEntry, ativo } = await preambuloDaInscricao(typeId, uid);
+    if(ativo){ throw new Error('ACTIVE_ELSEWHERE'); }
     const regRef = registrantDocRef(typeId, cycleEntry.id, uid);
     await db.runTransaction(async (tx)=>{
       const snap = await tx.get(regRef);
@@ -15872,14 +15891,29 @@ async function continueCompleteSave(slot){
     render();
   } catch(e){ console.error(e); }
 }
-async function isAccountActiveInLeague(typeId, uid){
+/* ⚠️ AS DUAS OPÇÕES EXISTEM POR TEMPO DE TELA, e cada uma corta UMA ida ao servidor (16/09/2026).
+   Medido no caminho do botão "Inscrever time": ele fazia SEIS idas em sequência, e a 150ms de RTT
+   (celular) isso é quase um segundo parado. Duas delas eram desperdício puro -- o calendário era
+   lido duas vezes e o documento do inscrito também.
+   `cycles` — os ciclos que quem chamou JÁ leu. Sem ele esta função relê o mesmo documento de 9,5 KB
+     que o preâmbulo acabou de ler.
+   `pularInscricao` — não confere o ciclo ABERTO. Quem vai GRAVAR não precisa: a transação da
+     gravação lê o mesmo documento e recusa com DUPLICATE, e as duas saídas dão a MESMA mensagem
+     na tela ("já está inscrita nessa Liga em outra rodada"). Quem só quer SABER (o aviso da
+     jornada) não passa a opção e continua conferindo tudo. */
+async function isAccountActiveInLeague(typeId, uid, opcoes){
   if(!uid) return false;
+  const op = opcoes || {};
   try{
-    const scheduleSnap = await scheduleDocRef(typeId).get();
-    if(!scheduleSnap.exists) return false;
-    const cycles = scheduleSnap.data().cycles || [];
+    let cycles = op.cycles;
+    if(!cycles){
+      const scheduleSnap = await scheduleDocRef(typeId).get();
+      if(!scheduleSnap.exists) return false;
+      cycles = scheduleSnap.data().cycles || [];
+    }
     const checks = await Promise.all(cycles.map(async (entry)=>{
       if(entry.status==='registering'){
+        if(op.pularInscricao) return false;
         const regSnap = await registrantDocRef(typeId, entry.id, uid).get();
         return regSnap.exists;
       } else if(entry.status==='drawn' || entry.status==='advancing'){

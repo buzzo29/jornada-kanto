@@ -9382,6 +9382,82 @@ a reidratação do online 1.
   o que ele tranca não é o que vai pro Firestore (isso o servidor já faz), é a tela não continuar
   mostrando uma inscrição que não existe mais.
 
+## O CLIQUE DE INSCREVER NA LIGA CUSTAVA SEIS IDAS AO SERVIDOR (16/09/2026)
+
+Relatado assim: *"pra se inscrever na liga a gente clica no botão Inscrever time e tá demorando um
+bom tempo até fazer a ação"*.
+
+**⚠️ E A PRIMEIRA COISA MEDIDA FOI SE A CULPA ERA DO QUE TINHA ACABADO DE SUBIR — não era.** As
+moedas das conquistas puseram um `getAchievementAggregate()` em todo desenho da home; medido no
+navegador com a conta no PIOR caso que o jogo permite (20 saves cheios, Pokédex inteira):
+
+| | |
+|---|---|
+| `getAchievementAggregate()` | **0,10ms** |
+| `temConquistaAResgatar()` | 0,11ms |
+| `renderSaveSelect()` inteiro | **0,35ms** |
+
+Ou seja: **não é CPU, é REDE** — e nenhuma das duas coisas do dia tinha relação com o relato.
+
+**O QUE O CLIQUE FAZIA, contado trocando o `db` por um que registra cada operação e a ordem:**
+
+```
+   0ms  TRANSACAO         tx.get  leagues/schedule_classic
+ 120ms  (commit)
+ 120ms  get               leagues/schedule_classic      <- de novo, o MESMO doc de 9,5 KB
+ 180ms  get               .../registrants/u1
+ 240ms  TRANSACAO         tx.get  .../registrants/u1    <- de novo, o MESMO doc
+ 360ms  (commit)
+```
+
+**SEIS idas EM SEQUÊNCIA**, cada uma esperando a anterior. Três eram desperdício:
+
+1. **O `ensureRegisteringCycle` abria uma TRANSAÇÃO mesmo quando o ciclo já existe**, que é o caso
+   comum. Transação custa **duas** idas (ler + confirmar); uma leitura custa **uma**. A transação
+   só é necessária pra CRIAR o ciclo — é ela que impede duas abas de criarem dois.
+2. **O calendário era lido duas vezes** — uma no `ensureRegisteringCycle` e outra no
+   `isAccountActiveInLeague`, de volta.
+3. **O documento do inscrito também** — uma no `isAccountActiveInLeague` e outra na transação que
+   grava.
+
+**O CONSERTO É UM PREÂMBULO SÓ (`preambuloDaInscricao`), usado pelos DOIS caminhos de inscrição**
+(o normal e o de time customizado, que tinham o mesmo trio copiado):
+
+- lê o calendário **uma vez**, e só cai na transação quando o ciclo **falta**;
+- passa os ciclos já lidos pro `isAccountActiveInLeague` (`{ cycles }`);
+- e diz a ele pra **não conferir o ciclo aberto** (`{ pularInscricao }`), porque a transação da
+  gravação lê o mesmo documento e recusa com `DUPLICATE` — **e as duas saídas já davam a MESMA
+  mensagem na tela**. Quem só quer SABER (o aviso da jornada) não passa a opção e continua
+  conferindo tudo.
+
+**⚠️ LER ANTES É SEGURO AQUI, e foi conferido:** o SDK é o **compat 10.7.1**, onde `get()` vai ao
+SERVIDOR quando online (o cache só entra offline). E a corrida que sobra não é nova — o ciclo já
+podia travar entre as duas transações de antes.
+
+**O RESULTADO, medido do mesmo jeito: 6 → 3 idas.**
+
+| RTT | antes | depois |
+|---|---|---|
+| 60ms (medido daqui até `firestore.googleapis.com`) | 360ms | **180ms** |
+| 150ms (celular) | 900ms | **450ms** |
+| 250ms (celular ruim) | 1.500ms | **750ms** |
+
+- **⚠️ A TRAVA É DE CONTAGEM, NÃO DE TEMPO, e isso é decisão.** Medir milissegundos num teste daria
+  um número que muda com a máquina e com o dia; o que decide o tempo aqui é **quantas idas em
+  sequência**, porque cada uma espera a anterior. `tools/test-liga-inscricao.js` troca o `db` por um
+  que conta, e cobra: no máximo **3** idas, o calendário lido **1×**, o inscrito **1×**, e a
+  gravação continuando dentro de uma transação. Conferido que ela acusa (5 idas) com o retrocesso.
+
+**O QUE A VARREDURA OLHOU E NÃO ENCONTROU**, pra não procurar de novo: **nenhum N+1 sequencial** no
+cliente — os dois lugares que leem dentro de `map` (`loadLeagueViewData` e o próprio
+`isAccountActiveInLeague`) estão em `Promise.all`, ou seja **uma ida** e não N. As funções com mais
+`await` são de fundo (`advanceCyclePhases`, `drawCycle`, as migrações), não de clique.
+
+**O QUE FICA EM ABERTO, e é custo e não lentidão:** a tela da Liga faz um **polling de 5s** enquanto
+está aberta (~2 leituras por tique, ~1.400/hora por aba). Ele já é só LEITURA — os clientes pararam
+de tentar avançar o ciclo — e é guardado por `game.screen`, mas continua sendo a maior torneira de
+leitura do jogo com a tela parada. A Trainers League já tem poll adaptativo; a Clássica não.
+
 ## Trainers League
 
 ### UM `undefined` MATOU AS DUAS LIGAS — E MANDOU 376 NOTIFICAÇÕES (13/09/2026)

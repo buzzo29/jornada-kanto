@@ -157,7 +157,81 @@ S.__setGame(g);
 await S.atualizarAvisoDaLiga();
 ok('e quem esta de fora ve', !!S.__getGame().avisoLiga, JSON.stringify(S.__getGame().avisoLiga));
 
-console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
-process.exit(falhas ? 1 : 0);
+
+/* =====================================================================
+   QUANTAS IDAS AO SERVIDOR O CLIQUE CUSTA (16/09/2026)
+   ⚠️ ESTA TRAVA E DE CONTAGEM, NAO DE TEMPO -- e de proposito. Medir milissegundos num teste
+   daria um numero que muda com a maquina e com o dia; o que decide o tempo aqui e o numero de
+   idas EM SEQUENCIA, porque cada uma espera a anterior. A 150ms de RTT (celular), cada ida a
+   mais e 150ms parado com o botao travado.
+   Ela nasceu de um relato: *"pra se inscrever na liga a gente clica no botao Inscrever time e ta
+   demorando um bom tempo"*. Medido na epoca: SEIS idas, das quais tres eram desperdicio -- o
+   calendario lido duas vezes, o documento do inscrito lido duas vezes, e uma TRANSACAO no lugar
+   de uma leitura no caso comum (transacao custa duas idas: ler + confirmar).
+   ===================================================================== */
+console.log('\nO CLIQUE EM INSCREVER NAO PODE VOLTAR A CUSTAR SEIS IDAS');
+{
+  const S2 = createSandbox();          // sandbox proprio: o de cima tem os colaboradores trocados
+  const g2 = S2.__getGame();
+  const idas = [];
+  /* o calendario de PRODUCAO: 48 ciclos concluidos mais o aberto (ver o CLAUDE.md) */
+  const CICLOS = [];
+  for(let i = 0; i < 48; i++) CICLOS.push({ id:'c'+i, status:'complete' });
+  CICLOS.push({ id:'agora', status:'registering' });
+  const doc = (caminho) => ({
+    __p: caminho,
+    collection(n){ return doc(caminho + '/' + n); },
+    doc(id){ return doc(caminho + '/' + id); },
+    get(){
+      idas.push('get ' + caminho);
+      if(caminho.indexOf('schedule') >= 0){
+        return Promise.resolve({ exists:true, data:()=>({ cycles: CICLOS }) });
+      }
+      return Promise.resolve({ exists:false, data:()=>({}) });
+    },
+    set(){ return Promise.resolve(); },
+    onSnapshot(){ return ()=>{}; }
+  });
+  S2.db = {
+    collection(n){ return doc(n); },
+    runTransaction(fn){
+      const tx = {
+        get(ref){
+          idas.push('tx.get ' + ref.__p);
+          if(String(ref.__p).indexOf('schedule') >= 0){
+            return Promise.resolve({ exists:true, data:()=>({ cycles: CICLOS }) });
+          }
+          return Promise.resolve({ exists:false, data:()=>({}) });
+        },
+        set(){}
+      };
+      return Promise.resolve(fn(tx)).then(r => { idas.push('commit'); return r; });
+    }
+  };
+  g2.authUser = { uid:"u1" };
+  g2.trainerName = "Buzzo";
+  g2.specialties = [];
+  g2.saveSlots = [{ badgeCount:8, trainerName:"Buzzo",
+    team:[{ speciesId:"gyarados", level:70, shiny:false }] }];
+  S2.__setGame(g2);
+  S2.checkLeagueRegistrationStatus = () => {};
+  S2.refreshLeagueView = () => {};
+
+  S2.registerForLeague(S2.CLASSIC_LEAGUE_TYPE, 0, true).then(()=>{
+    const emSequencia = idas.filter(x => /^get |^tx\.get |^commit$/.test(x)).length;
+    ok('o clique custa no maximo TRES idas ao servidor', emSequencia <= 3,
+       emSequencia + ' idas: ' + idas.join(' | '));
+    /* ⚠️ E CADA UMA DESSAS TEM DONO: o calendario UMA vez, e a gravacao (ler + confirmar). */
+    const calendario = idas.filter(x => x.indexOf('schedule') >= 0).length;
+    ok('o calendario e lido UMA vez so', calendario === 1, calendario + 'x');
+    const inscrito = idas.filter(x => x.indexOf('registrants') >= 0).length;
+    ok('e o documento do inscrito tambem', inscrito === 1, inscrito + 'x');
+    /* a gravacao continua sendo uma TRANSACAO: e ela que recusa a inscricao dupla */
+    ok('a gravacao continua dentro de uma transacao', idas.indexOf('commit') >= 0);
+    console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
+    process.exit(falhas ? 1 : 0);
+  }).catch(e => { console.error(e); process.exit(1); });
+}
+
 
 })();
