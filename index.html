@@ -3008,7 +3008,86 @@
     line-height:1.5;
     font-size:.55rem;
   }
+
+  /* ==========================================================================
+     CORRIDA POKÉMON (18/09/2026) -- o visual do protótipo, na paleta do jogo
+     ⚠️ Nada aqui inventa cor: tudo sai das variáveis da casa (--box, --box-border, --ink,
+     --muted, --yellow, --blue-dark), que é o que faz a tela não parecer um modo de outro jogo.
+     ========================================================================== */
+  .corrida-seg{display:flex;gap:6px;flex-wrap:wrap;}
+  .corrida-seg button{
+    flex:1 1 0;min-width:0;padding:8px 6px;font-size:.7rem;font-weight:700;
+    background:var(--box);border:2px solid var(--box-border);border-radius:5px;
+    color:var(--ink);cursor:pointer;
+  }
+  .corrida-seg button.ativa{background:var(--yellow);box-shadow:inset 0 0 0 1px var(--box-border);}
+  /* ⚠️ O canvas é 880x780 e desenha em escala 2 (setTransform), então ele ocupa 440x390 de layout.
+     O `width:100%` com `aspect-ratio` é o que o faz caber a 320px sem rolagem lateral. */
+  .corrida-pista{position:relative;padding:0;overflow:hidden;}
+  .corrida-pista canvas{display:block;width:100%;height:auto;aspect-ratio:440/390;image-rendering:pixelated;}
+  .corrida-hud{
+    position:absolute;top:0;left:0;right:0;display:flex;justify-content:space-between;
+    padding:6px 8px;font-size:.62rem;font-weight:800;color:#fff9e9;
+    text-shadow:1px 1px 0 #1a2434;pointer-events:none;
+  }
+  .corrida-overlay{
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    background:#101a2b88;pointer-events:none;
+  }
+  .corrida-overlay .bubble{
+    background:var(--box);border:2px solid var(--box-border);border-radius:6px;
+    padding:10px 16px;text-align:center;
+  }
+  .corrida-overlay strong{display:block;font-size:1.6rem;line-height:1;}
+  .corrida-overlay small{font-size:.6rem;color:var(--muted);}
+  .corrida-placar{display:flex;flex-direction:column;gap:5px;}
+  .racerRow{display:grid;grid-template-columns:10px 1fr auto;gap:5px;align-items:center;font-size:.64rem;}
+  .racerRow .dot{width:9px;height:9px;border-radius:50%;border:1px solid var(--box-border);}
+  .racerRow .runnerName{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .racerRow .runnerInfo{color:var(--muted);font-variant-numeric:tabular-nums;}
+  .racerRow .progress{grid-column:1/-1;height:5px;background:#0000001a;border-radius:3px;overflow:hidden;}
+  .racerRow .progress i{display:block;height:100%;width:0;transition:width .12s linear;}
+  .corrida-controles{display:flex;flex-direction:column;gap:7px;}
+  .corrida-feedback{display:flex;justify-content:space-between;gap:8px;font-size:.62rem;color:var(--muted);}
+  /* ⚠️ A BARRA: as faixas vêm INLINE, das constantes do motor -- um número escrito aqui divergiria
+     da detecção no primeiro ajuste, e a tela prometeria uma região que o motor não pontua. */
+  .corrida-barra{
+    position:relative;height:20px;background:#0000001f;border:2px solid var(--box-border);
+    border-radius:4px;overflow:hidden;
+  }
+  .corrida-barra .faixa-verde{position:absolute;top:0;bottom:0;background:#7ec85066;}
+  .corrida-barra .faixa-amarela{position:absolute;top:0;bottom:0;background:#f2c744cc;}
+  .corrida-agulha{
+    position:absolute;top:-2px;bottom:-2px;width:3px;margin-left:-1.5px;
+    background:var(--ink);box-shadow:0 0 0 1px #fff9e9;
+  }
+  /* ⚠️ ALVO DE TOQUE GRANDE: é o único controle da corrida e ele é apertado sob pressão.
+     48px é o mínimo confortável num celular, e a `touch-action` do jogo já impede o zoom
+     de toque duplo -- sem ela, dois impulsos seguidos dariam zoom no meio da prova. */
+  .corrida-boost{min-height:52px;font-size:.9rem;letter-spacing:.06em;margin:0;}
+  .corrida-trechos{display:flex;gap:5px;}
+  .corrida-trecho{
+    flex:1 1 0;min-width:0;padding:5px 4px;border:2px solid var(--box-border);border-radius:5px;
+    background:var(--box);font-size:.55rem;line-height:1.25;text-align:center;
+  }
+  .corrida-trecho b{display:block;font-size:.6rem;}
+  .corrida-trecho.ativo{background:var(--yellow);}
+  .corrida-trecho.feito{opacity:.5;}
+  .resultRow{display:flex;justify-content:space-between;gap:8px;font-size:.66rem;padding:3px 0;border-bottom:1px dashed var(--box-border);}
+  .resultRow:last-of-type{border-bottom:none;}
+  /* o Speed da corrida, que é o número pelo qual a lista se ordena */
+  .corrida-speed{margin-left:6px;font-size:.55rem;font-weight:800;color:var(--blue-dark);}
+  .corrida-speed-badge{
+    position:absolute;right:8px;top:50%;transform:translateY(-50%);
+    font-size:.6rem;font-weight:800;color:var(--blue-dark);
+    background:#ffffffcc;border:1px solid var(--box-border);border-radius:4px;padding:1px 5px;
+  }
+  .mont-linha .corrida-speed-badge{pointer-events:none;}
+
   .home-mode-icon{font-size:1.3rem;line-height:1;}
+  /* o selo do modo acompanha o `.dex-icon.modo` dos outros quatro botões (26px), senão a fileira
+     fica com um ícone menor que os vizinhos */
+  .selo.selo-modo{width:26px;height:26px;vertical-align:middle;}
   .league-type-card{
     display:block;
     width:100%;
@@ -5094,6 +5173,15 @@ const DESENHOS = {
     'kk****kk........kk****kk','kk***kk..........kk***kk','kk**kk............kk**kk',
     'kk*kk..............kk*kk','.kkk................kkk.','..k..................k..',
     '........................','........................','........................'],
+  corrida: [
+    '........................','....kkkkkkkkkkkkkkkkk...','...kkkkkkkkkkkkkkkkkkk..',
+    '..kkszwwwwwsssszwwwwWkk.','..kksZwWWWWszzzZWWWWvkk.','..kksZwWWWWszzzZWWWWvkk.',
+    '..kksZwWWWWszzzZWWWWvkk.','..kksZwWWWWzZZZZWWWWvkk.','..kksZsssszWWWWWsssszkk.',
+    '..kksZszzzZWWWWWszzzZkk.','..kksZszzzZWWWWWszzzZkk.','..kksZszzzZWWWWWszzzZkk.',
+    '..kksZzZZZZvvvvvzZZZZkk.','..kksZkkkkkkkkkkkkkkkk..','..kksZkkkkkkkkkkkkkkk...',
+    '..kksZkk................','..kksZkk................','..kksZkk................',
+    '..kksZkk................','..kksZkk................','..kkzZkk................',
+    '...kkkk.................','....kk..................','........................'],
   fogo: [
     '...........kk...........','..........kkkk..........','.........kkRrkk.........',
     '........kkRRrrkk........','........kkRrrqkk........','.......kkRRrrrrkk.......',
@@ -6896,6 +6984,12 @@ async function loadPermanentUserData(){
     game.mewtwoLoanUnlocked = !!d.mewtwoLoanUnlocked;
     game.specialties = d.specialties || [];      // valor já gravado; o syncSpecialties confirma depois
     game.specialtyCounts = d.specialtyCounts || {};
+    /* ⚠️ O `admin` É SÓ LEITURA AQUI, e isso é o que torna seguro lê-lo no cliente: ele está na
+       TRAVA DE CAMPOS do `firestore.rules` (ao lado de `moedas` e `rareCandies`), então o dono do
+       documento NÃO consegue escrevê-lo -- só o console do Firebase. Quem o tem lê o save de todo
+       mundo pela `adminListTrainers`.
+       Ele entrou em 18/09/2026 com a Corrida Pokémon, que é um modo administrativo. */
+    game.ehAdmin = d.admin === true;   // exatamente o booleano: 'sim', 1 ou 'true' não autorizam
     game.userTest = !!d.userTest; // conta de teste: sem efeito no momento (a Torre foi liberada pra todos), mantido pro próximo recurso em avaliação
     game.mewtwoLoanReadyToClaim = !!d.mewtwoLoanReadyToClaim;
     game.neighborhoodGymLocation = d.neighborhoodGymLocation || null; // cache de localização (lat/lon/cidade), pra não bater no serviço de geocodificação toda hora
@@ -16709,7 +16803,7 @@ const CAMPOS_DA_CONTA = [
      dos modos de campeão pararia de bloquear em silêncio */
   /* o aviso de versão nova é da ABA, não do save: sem ele aqui, abrir um save e voltar pra home
      apagaria a marca e o botão sumiria até a próxima pergunta (que é folgada em 1 minuto) */
-  'saveSlotsCarregados','contaCarregada','versaoNova',
+  'saveSlotsCarregados','contaCarregada','versaoNova','ehAdmin',
   /* o que a conta JA resgatou de conquista -- ver as moedas das conquistas */
   'achievementsPaid',
   'hms',   // as Máquinas Ocultas são da CONTA, não do save -- ver darHM
@@ -29679,6 +29773,18 @@ function renderSaveSelect(){
       <span class="home-mode-icon">${icone('torre','modo')}</span><span>Torre dos Treinadores</span></button>
     <button class="home-nav-btn leagues-big-btn" style="background:#7038f8;" onclick="openOnlineBattle()">
       <span class="home-mode-icon">${icone('batalha','modo')}</span><span>Batalha Online</span></button>
+    ${/* ⚠️ O BOTÃO SÓ EXISTE PRA QUEM TEM `admin === true` no Firestore, e ENQUANTO A CONTA NÃO
+         CARREGOU ele fica OCULTO -- o contrário da porta dos modos de campeão, que erra pro lado de
+         DEIXAR ENTRAR. Aqui o lado seguro é o outro: mostrar um botão administrativo a quem não é
+         admin, mesmo por meio segundo, é pior que escondê-lo de quem é.
+         ⚠️ E a visibilidade não é a trava: quem valida é o `abrirCorrida`, que refaz a pergunta. */''}
+    ${game.contaCarregada && game.ehAdmin ? `
+    <button class="home-nav-btn leagues-big-btn" style="background:#b8410f;" onclick="abrirCorrida()">
+      ${/* ⚠️ ELE USA O SELO, e não o `icone()` dos outros quatro modos: os selos são o sistema vivo
+           (é pra lá que os emojis foram em 17/09) e um PNG base64 novo seria pixel art à mão.
+           A classe fixa 26px, que é a medida do `.dex-icon.modo` -- em `1em` ele sairia menor
+           que os vizinhos e a fileira ficaria desalinhada. */''}
+      <span class="home-mode-icon">${selo('corrida','selo-modo')}</span><span>Corrida Pokemon</span></button>` : ''}
     ${ehDomingo() ? `
     <button class="home-nav-btn leagues-big-btn home-btn-largo" style="background:#c2185b;" onclick="openSundayBoss()">
       <span class="home-mode-icon">✨</span><span>Boss de Domingo</span></button>` : ''}
@@ -30298,6 +30404,844 @@ function reporRolagens(raizEl, guardadas){
   });
 }
 let telaDoUltimoRender = null;   // ver o fim do render: a rolagem só é preservada na MESMA tela
+
+/* ============================================================================
+   CORRIDA POKÉMON -- primeiro teste, modo ADMINISTRATIVO (18/09/2026)
+   ----------------------------------------------------------------------------
+   Pedido: um minigame de corrida integrado ao jogo, com o `corrida-pokemon.html` da raiz como
+   referência visual e funcional. Só contra NPC; nada de multiplayer nesta etapa.
+
+   ⚠️ O QUE FOI REUSADO DO JOGO, e é isso que separa esta tela do protótipo:
+     - a LISTA de pokémon do treinador é o `towerEligiblePokemon` + `montadorDeTimeHtml`, os mesmos
+       da Torre e do Ginásio da Cidade (inclusive os aposentados, desde 18/09);
+     - o SPEED sai do `effectiveSpeed`, que é a função do motor de batalha;
+     - os NPCs saem do `finalEvolutionOf`, a tabela de evoluções do jogo;
+     - o `raizDaLinha` é quem impede espécie repetida na equipe.
+
+   ⚠️ O QUE **NÃO** DEU PRA REUSAR, e foi medido antes de escrever:
+     - **O NÍVEL NÃO ENTRA NO SPEED DO JOGO.** Medido: um Jolteon Lv.5 e um Lv.99 devolvem
+       `effectiveSpeed` = 130 **igual** -- no motor de batalha só o HP escala com o nível
+       (`calcMaxHp`), e a velocidade é usada crua pra decidir quem bate primeiro e pro crítico.
+       Como o pedido diz "considerando seu nível", a escala precisou ser CRIADA: ver `SPEED_CORRIDA`.
+     - **O SPRITE.** O jogo usa PokeAPI (de frente, estático) e a corrida precisa de Walk de costas.
+       Ver a seção dos sprites, logo abaixo.
+   ============================================================================ */
+
+/* ⚠️ A ESCALA DE NÍVEL É A FÓRMULA OFICIAL DA GEN 1/2/3, sem IV nem EV:
+       stat = floor(base × 2 × nível / 100) + 5
+   No Lv.50 ela devolve ~base (que é a escala do protótipo, onde Jolteon 130 corre a 12,6 m/s) e no
+   Lv.99 devolve ~2× base. Escolhida por ser a do jogo original -- este projeto é fiel à Gen 1/2/3
+   em tudo, e inventar uma curva própria aqui seria a única exceção.
+   ⚠️ O `base` JÁ VEM DO `effectiveSpeed`, então shiny e especialidade entram ANTES da escala, que é
+   como o resto do jogo trata multiplicador de atributo. */
+function speedDaCorrida(p){
+  /* ⚠️ QUAIS MODIFICADORES ENTRAM, e por que sem risco de contar duas vezes: o `effectiveSpeed`
+     empilha buffs(shiny, terreno) → especialidade → fúria → paralisia → estágio. A instância da
+     corrida vem do `createInstance` e nasce LIMPA -- sem `terrainBuffed`, `_furia`, `_paralisado`
+     nem `_estagios` --, então os quatro últimos degraus são NO-OP por construção e o que sobra é
+     exatamente **shiny (1,20×) e especialidade (1,05×)**.
+     Medido: Jolteon limpo = 130, shiny = 156, e com a flag de terreno daria 150 -- a flag nunca é
+     posta aqui porque corrida não tem terreno.
+     É reuso de verdade: se um buff novo entrar no motor, ele entra aqui junto. */
+  const base = effectiveSpeed(p);
+  const nivel = Math.max(1, Math.min(NIVEL_MAXIMO, p.level || 1));
+  return Math.floor(base * 2 * nivel / 100) + 5;
+}
+/* Velocidade em metros por segundo. A fórmula é a do pedido, e o `8 +` é o que impede um Shuckle
+   de ficar parado na pista: sem ele a razão entre o mais rápido e o mais lento do jogo seria 5×. */
+const CORRIDA_V_BASE = 8, CORRIDA_V_FATOR = 4;
+function velocidadeNormal(speed){ return CORRIDA_V_BASE + CORRIDA_V_FATOR * Math.sqrt(speed / 100); }
+
+/* OS EFEITOS DO IMPULSO -- multiplicador e duração em segundos. Eles NÃO acumulam: um resultado
+   novo substitui o anterior e reinicia a duração (ver `aplicarEfeito`). */
+const CORRIDA_EFEITOS = {
+  perfect: { mult: 1.45, dur: 1.5 },
+  good:    { mult: 1.25, dur: 1.0 },
+  miss:    { mult: 0.80, dur: 0.5 },
+};
+/* A BARRA: ela vai e VOLTA, invertendo nas laterais -- nunca salta de uma ponta pra outra.
+   Cada travessia dura `CORRIDA_TRAVESSIA`; o ciclo completo é o dobro. */
+const CORRIDA_TRAVESSIA = 1.44;
+/* ⚠️ AS FAIXAS SÃO EM FRAÇÃO DA BARRA, e os números são os do pedido:
+     verde  30,4% a partir de 34,8%  → de 0,348 a 0,652
+     amarela 9,6% a partir de 45,2%  → de 0,452 a 0,548
+   As duas são centradas em 0,5, e a amarela fica DENTRO da verde. Guardadas como meia-largura a
+   partir do centro porque é assim que a detecção pergunta: `|posição − 0,5| <= meia`. */
+const CORRIDA_FAIXA = {
+  verde:   { ini: 0.348, tam: 0.304 },
+  amarela: { ini: 0.452, tam: 0.096 },
+};
+const meiaFaixa = (f) => f.tam / 2;
+/* ⚠️ A DETECÇÃO É PELA POSIÇÃO, não pelo tempo, e é isso que a faz valer NOS DOIS SENTIDOS: a
+   posição do marcador é um triângulo de 0 a 1 e de volta a 0, então a mesma conta serve na ida e
+   na volta sem um `if` de direção. */
+/* ⚠️ O EPSILON NÃO É FOLGA, É A BORDA: `Math.abs(0.348 - 0.5)` dá **0,15200000000000002** e a
+   meia-faixa verde dá 0,152 -- ou seja o início EXATO da faixa caía FORA dela, e o mesmo no
+   amarelo (0,452 virava "bom" em vez de "perfeito"). A borda pertence à faixa, e um décimo de
+   bilionésimo é menor que qualquer coisa que a barra consiga produzir. */
+const CORRIDA_EPS = 1e-9;
+function resultadoDoImpulso(pos){
+  const d = Math.abs(pos - 0.5);
+  if(d <= meiaFaixa(CORRIDA_FAIXA.amarela) + CORRIDA_EPS) return 'perfect';
+  if(d <= meiaFaixa(CORRIDA_FAIXA.verde) + CORRIDA_EPS) return 'good';
+  return 'miss';
+}
+/* A DIFICULDADE DO NPC -- as probabilidades do protótipo, deixadas como ponto de partida.
+   ⚠️ Elas somam menos que 1 de propósito: o resto é a OPORTUNIDADE NÃO USADA, que é o que impede
+   o NPC de ser um metrônomo perfeito. E ele usa a MESMA fórmula, os MESMOS multiplicadores e a
+   MESMA frequência do jogador -- em nenhum lugar a velocidade dele é inflada pra alcançar. */
+const CORRIDA_NPC = { perfect: 0.20, good: 0.52, miss: 0.14 };
+
+const CORRIDA_METROS = 300;          /* por trecho, e o total da individual */
+const CORRIDA_TRECHOS = 3;           /* no revezamento */
+const corridaTotal = () => corrida.formato === 'relay' ? CORRIDA_METROS * CORRIDA_TRECHOS : CORRIDA_METROS;
+
+/* ============================================================================
+   OS SPRITES -- PMD, buscados do MESMO CDN que o jogo já usa
+   ----------------------------------------------------------------------------
+   ⚠️ O PROTÓTIPO EMBUTE SEIS FOLHAS EM BASE64 (80 dos 104 KB dele), e o jogo tem 250 espécies --
+   embutir todas seria dezenas de MB. Elas são buscadas do `PMDCollab/SpriteCollab`, pelo
+   `cdn.jsdelivr.net` com fallback no `raw.githubusercontent.com`: exatamente o par que o
+   `handleSpriteLoadError` já usa pros sprites da PokeAPI.
+   ⚠️ COBERTURA MEDIDA ANTES DE CONSTRUIR: as **250 de 250** respondem 200 (o único 000 da primeira
+   varredura foi timeout do Porygon, que responde no retry). Peso: 6 a 11 KB por folha.
+   O `AnimData.xml` dá `FrameWidth`, `FrameHeight` e as `Durations` -- os mesmos campos que o
+   protótipo tem embutidos, e conferido que batem (Charizard 40×48, durações 8/10/8/10).
+   ⚠️ A QUINTA LINHA da folha é o norte (de costas), que é o índice 4 -- como no protótipo.
+   ⚠️ E NUNCA SE SUBSTITUI UM SPRITE POR OUTRO: se uma espécie falhar, a largada é bloqueada e a
+   tela DIZ QUAL faltou (o pedido é explícito nisso). */
+const PMD_CDN = 'https://cdn.jsdelivr.net/gh/PMDCollab/SpriteCollab@master/sprite/';
+const PMD_ALT = 'https://raw.githubusercontent.com/PMDCollab/SpriteCollab/master/sprite/';
+const PMD_LINHA_COSTAS = 4;
+const pmdPasta = (speciesId) => String((SPECIES[speciesId] || {}).dex || 0).padStart(4, '0');
+const pmdCache = {};        /* speciesId -> {img, w, h, durations, caixa} | 'erro' */
+
+function pmdBaixarTexto(url){
+  return fetch(url).then(r => r.ok ? r.text() : Promise.reject(new Error(r.status)));
+}
+/* ⚠️ A CAIXA DE CADA QUADRO É CALCULADA AQUI, uma vez por espécie, e não vem de tabela nenhuma.
+   O protótipo traz `boxes` embutido -- e manter uma tabela dessas pras 250 seria mais um dado pra
+   envelhecer. Ela é o retângulo dos pixels NÃO transparentes: é ela que centraliza o bicho na raia
+   e ancora os pés no chão, porque a célula do PMD tem margem em volta. */
+function pmdCaixas(img, w, h, quantos){
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const cx = c.getContext('2d', { willReadFrequently: true });
+  const caixas = [];
+  for(let f = 0; f < quantos; f++){
+    cx.clearRect(0, 0, w, h);
+    cx.drawImage(img, f * w, PMD_LINHA_COSTAS * h, w, h, 0, 0, w, h);
+    const d = cx.getImageData(0, 0, w, h).data;
+    let x0 = w, y0 = h, x1 = 0, y1 = 0, achou = false;
+    for(let y = 0; y < h; y++) for(let x = 0; x < w; x++){
+      if(d[(y * w + x) * 4 + 3] > 8){
+        achou = true;
+        if(x < x0) x0 = x; if(x > x1) x1 = x;
+        if(y < y0) y0 = y; if(y > y1) y1 = y;
+      }
+    }
+    /* quadro inteiro transparente não acontece na prática, mas um sprite quebrado travaria a
+       escala com uma caixa de largura zero */
+    caixas.push(achou ? [x0, y0, x1 + 1, y1 + 1] : [0, 0, w, h]);
+  }
+  return caixas;
+}
+async function pmdCarregar(speciesId){
+  if(pmdCache[speciesId] && pmdCache[speciesId] !== 'erro') return pmdCache[speciesId];
+  const pasta = pmdPasta(speciesId);
+  if(!pasta || pasta === '0000'){ pmdCache[speciesId] = 'erro'; throw new Error('sem dex'); }
+  let xml = null;
+  try{ xml = await pmdBaixarTexto(PMD_CDN + pasta + '/AnimData.xml'); }
+  catch(e){ xml = await pmdBaixarTexto(PMD_ALT + pasta + '/AnimData.xml'); }
+  /* ⚠️ O XML É LIDO POR REGEX E NÃO POR DOMParser: o bloco do Walk é uma ilha bem delimitada e o
+     parser traria uma árvore inteira pra ler três números. O `[\s\S]` cobre a quebra de linha. */
+  const bloco = xml.match(/<Anim>\s*<Name>Walk<\/Name>[\s\S]*?<\/Anim>/);
+  if(!bloco) throw new Error('sem Walk');
+  const w = Number((bloco[0].match(/<FrameWidth>(\d+)<\/FrameWidth>/) || [])[1]);
+  const h = Number((bloco[0].match(/<FrameHeight>(\d+)<\/FrameHeight>/) || [])[1]);
+  const durations = (bloco[0].match(/<Duration>\d+<\/Duration>/g) || []).map(d => Number(d.replace(/\D/g, '')));
+  if(!w || !h || !durations.length) throw new Error('AnimData incompleto');
+  const img = await new Promise((ok, falhou) => {
+    const im = new Image();
+    im.crossOrigin = 'anonymous';    /* sem isso o getImageData das caixas suja o canvas */
+    im.onload = () => ok(im);
+    im.onerror = () => {
+      const im2 = new Image();
+      im2.crossOrigin = 'anonymous';
+      im2.onload = () => ok(im2);
+      im2.onerror = falhou;
+      im2.src = PMD_ALT + pasta + '/Walk-Anim.png';
+    };
+    im.src = PMD_CDN + pasta + '/Walk-Anim.png';
+  });
+  const dados = { img, w, h, durations, caixas: pmdCaixas(img, w, h, durations.length) };
+  pmdCache[speciesId] = dados;
+  return dados;
+}
+/* O quadro de agora, pelas durações próprias da espécie (o protótipo conta em 1/60 de segundo). */
+function pmdQuadro(dados, t){
+  const soma = dados.durations.reduce((s, v) => s + v, 0);
+  let tick = (t * 60) % soma;
+  for(let i = 0; i < dados.durations.length; i++){ tick -= dados.durations[i]; if(tick < 0) return i; }
+  return 0;
+}
+
+/* ============================================================================
+   O ESTADO DA CORRIDA
+   ⚠️ Ele vive FORA do `game` de propósito: é um modo administrativo de teste, nada aqui vai pro
+   save nem pro Firestore, e o pedido é explícito -- "não modificar permanentemente HP, nível,
+   golpes ou atributos". Os pokémon do jogador entram como CÓPIAS (`corridaInstancia`).
+   ============================================================================ */
+/* ⚠️ O ESTADO É UM `const` QUE NUNCA É REATRIBUÍDO -- ele é MUTADO. Isso não é estilo: o
+   `corridaZerar` troca os campos e a REFERÊNCIA continua a mesma, e é isso que permite dirigir a
+   corrida de fora (o sandbox dos testes copia o valor na criação; reatribuir `corrida` lá deixaria
+   as funções internas olhando pro objeto velho, e as travas mediriam o nada).
+   O jogo ganha junto: some o `if(!corrida) corrida = ...` que teria que abrir toda função. */
+const corrida = {
+  formato: 'single', participantes: 2,
+  escolhidos: [], corredores: [],
+  fase: 'setup', tempo: 0, contagem: 0, ultimoQuadro: 0, animacao: 0,
+  tentativaDaTravessia: -1, perfeitos: 0, brilho: 0, brilhoTexto: '',
+  aviso: '', faltando: [], recado: '', picker: false, laco: null, _pintouFim: false,
+};
+function corridaZerar(){
+  if(corrida.laco){ cancelAnimationFrame(corrida.laco); }
+  Object.assign(corrida, {
+    formato: 'single', participantes: 2,
+    escolhidos: [],           /* o que o jogador marcou, na ordem do revezamento */
+    corredores: [],           /* montado na largada */
+    fase: 'setup',            /* setup | carregando | contagem | correndo | fim */
+    tempo: 0, contagem: 0, ultimoQuadro: 0, animacao: 0,
+    tentativaDaTravessia: -1, perfeitos: 0, brilho: 0, brilhoTexto: '',
+    aviso: '', faltando: [], recado: 'Acerte a faixa amarela para acelerar.',
+    picker: false, laco: null, _pintouFim: false,
+  });
+  return corrida;
+}
+/* ⚠️ A CÓPIA É O QUE PROTEGE O SAVE: o `createInstance` monta um bicho novo com os atributos da
+   espécie, e o shiny e o nível são recolados à mão -- a mesma armadilha que o `createInstance` já
+   custou três vezes neste projeto (ele não copia campo nenhum). Nada do time real é tocado. */
+/* ⚠️ O `ehDoJogador` NÃO TEM PADRÃO, e é de propósito: ele decide se a ESPECIALIDADE entra, e
+   ela é uma conquista da CONTA -- um NPC de tipo Elétrico não pode ganhar 1,05× porque o JOGADOR é
+   especialista em Elétrico. Com um padrão `true`, a próxima chamada esquecida daria o buff ao
+   adversário em silêncio. */
+function corridaInstancia(p, ehDoJogador){
+  const inst = createInstance(p.speciesId, p.level);
+  if(p.shiny) inst.shiny = true;
+  if(p.unown) inst.unown = p.unown;
+  inst.slotDaConta = p.slot != null ? String(p.slot) : null;   /* pro effectiveSpeed achar a especialidade */
+  inst.hp = inst.maxHp = calcMaxHp(inst);
+  /* ⚠️ A ESPECIALIDADE PRECISA SER APLICADA À MÃO, e este comentário já disse o contrário: o
+     `withSpecialty` lê a FLAG `p.specialtyBuffed`, e quem a põe é o `applySpecialtyBuff` -- ele
+     NÃO lê o `game.specialties` sozinho. Sem esta linha o buff simplesmente não existia aqui, e a
+     trava pegou (o Jolteon de um especialista em Elétrico dava o mesmo 135 de quem não é).
+     É exatamente o defeito que a raide do Mew teve por semanas, e por isso o jogo tem uma trava
+     cobrando um `applySpecialtyBuff` perto de cada chamada de batalha. */
+  if(ehDoJogador) applySpecialtyBuff([inst]);
+  return inst;
+}
+/* ⚠️ E ELA VALE SÓ PRO TIME DO JOGADOR: os NPCs são montados pelo `sortearNpcs`, que chama o
+   `corridaInstancia` também -- mas a especialidade é uma conquista da CONTA, e o adversário não
+   tem conta. Ver a nota no `sortearNpcs`. */
+
+/* AS FORMAS FINAIS, pra sortear os NPCs. Montada uma vez: são 250 espécies e o sorteio roda a cada
+   largada. ⚠️ Ela usa o `finalEvolutionOf` do jogo -- inventar uma segunda regra de "qual é a
+   forma final" seria a coisa exata que este projeto evita. */
+let _finaisDaCorrida = null;
+function finaisDaCorrida(){
+  if(_finaisDaCorrida) return _finaisDaCorrida;
+  const set = new Set();
+  Object.keys(SPECIES).forEach(id => {
+    const f = finalEvolutionOf(id);
+    /* ⚠️ OS INTOCÁVEIS FICAM DE FORA: o Mewtwo, o Lugia, o Ho-Oh e o Celebi não são bicho de rota,
+       e pôr um deles correndo contra o time do jogador num teste de balanceamento diria pouco. */
+    if(SPECIES[f] && SEM_CAPTURA_SELVAGEM.indexOf(f) < 0) set.add(f);
+  });
+  _finaisDaCorrida = [...set];
+  return _finaisDaCorrida;
+}
+/* ⚠️ O NÍVEL DO NPC É O DO POKÉMON DO JOGADOR NAQUELE TRECHO -- é a regra inicial de balanceamento
+   do pedido, e ela é CONFIGURÁVEL aqui: trocar por `() => 50` dá nível fixo, por `(lv) => lv + 5`
+   dá handicap. Ela existe como função justamente pra não ficar espalhada. */
+function nivelDoNpc(nivelDoJogador){ return nivelDoJogador; }
+
+function sortearNpcs(){
+  const finais = finaisDaCorrida();
+  const meus = corrida.escolhidos;
+  const quantos = corrida.formato === 'relay' ? CORRIDA_TRECHOS : 1;
+  const times = [];
+  for(let i = 1; i < corrida.participantes; i++){
+    const time = [], usadas = new Set();
+    /* ⚠️ SEM REPETIR ESPÉCIE DENTRO DA EQUIPE, e a conta é por RAIZ da linha: dois Gyarados de
+       origens diferentes são a mesma linha, e é a regra que o encontro selvagem e o montador já
+       usam. Entre equipes DIFERENTES pode repetir -- isso é escalação, não é o time do jogador. */
+    let tentativas = 0;
+    while(time.length < quantos && tentativas < 400){
+      tentativas++;
+      const id = finais[Math.floor(Math.random() * finais.length)];
+      const raiz = raizDaLinha(id);
+      if(usadas.has(raiz)) continue;
+      usadas.add(raiz);
+      const nivel = nivelDoNpc((meus[time.length] || meus[0] || {}).level || 50);
+      time.push(corridaInstancia({ speciesId: id, level: nivel }, false));
+    }
+    times.push(time);
+  }
+  return times;
+}
+
+/* ============================================================================
+   A FÍSICA -- avanço por `velocidade × tempo`, independente da taxa de quadros
+   ============================================================================ */
+function corridaVelocidade(c){
+  const p = c.time[c.trecho];
+  return velocidadeNormal(speedDaCorrida(p)) * (c.efeito > 0 ? c.mult : 1);
+}
+function aplicarEfeito(c, resultado){
+  const e = CORRIDA_EFEITOS[resultado];
+  /* ⚠️ SUBSTITUI, NUNCA SOMA: o pedido diz que os efeitos não acumulam -- um resultado novo troca
+     o multiplicador e REINICIA a duração. */
+  c.mult = e.mult; c.efeito = e.dur;
+}
+/* ⚠️ O QUADRO É FATIADO no vencimento do efeito e em cada troca de trecho, e isso é o que faz os
+   limites de 300/600/900 serem EXATOS mesmo quando caem no meio de um quadro. Ao trocar, o tempo
+   que sobra do quadro já corre com a velocidade do PRÓXIMO pokémon -- que é o pedido ao pé da
+   letra, e é o mesmo cuidado do protótipo ("No metres are lost at a change"). */
+function corridaAvancar(c, dt, t0){
+  if(c.chegada !== null) return;
+  let resta = dt, gasto = 0;
+  while(resta > 1e-9 && c.chegada === null){
+    const v = corridaVelocidade(c);
+    const limite = Math.min(corridaTotal(), (c.trecho + 1) * CORRIDA_METROS);
+    const ateLimite = Math.max(0, (limite - c.dist) / v);
+    const ateVencer = c.efeito > 0 ? c.efeito : Infinity;
+    const passo = Math.min(resta, ateLimite, ateVencer);
+    c.dist += v * passo;
+    c.efeito = Math.max(0, c.efeito - passo);
+    /* ⚠️ A CADÊNCIA DO WALK ACOMPANHA A VELOCIDADE (o 2,2 e o /12 são do protótipo), e ela NÃO
+       decide distância nenhuma -- é só o relógio da animação. */
+    c.quadroT += passo * 2.2 * (v / 12);
+    gasto += passo; resta -= passo;
+    if(limite - c.dist < 1e-7){
+      c.dist = limite;
+      if(limite === corridaTotal()){
+        c.chegada = t0 + gasto;      /* o instante EXATO, que é o que a classificação usa */
+      } else {
+        c.trecho++;
+        /* a troca encerra o impulso do anterior e aplica o Speed do próximo; nada de pausa nem
+           penalidade neste primeiro teste */
+        c.efeito = 0; c.mult = 1; c.quadroT = 0; c.avisoTroca = 1.6;
+        /* ⚠️ A TROCA É REGISTRADA COM A DISTÂNCIA E O INSTANTE EXATOS, e isso não é enfeite: medida
+           DE FORA, no fim do quadro, ela sai em 300,07 m -- porque o próximo já correu o resto do
+           quadro, que é exatamente o que o pedido manda fazer. Sem este registro não há como
+           provar que o limite foi respeitado, e foi assim que a primeira medição pareceu um
+           defeito que não existia. */
+        c.trocas.push({ em: limite, t: t0 + gasto, especie: c.time[c.trecho].speciesId });
+        if(c === corrida.corredores[0]){
+          corrida.recado = nomeDoCorredor(c) + ' entrou! Trecho ' + (c.trecho + 1) + ' de ' + CORRIDA_TRECHOS + '.';
+        }
+      }
+    } else if(passo < 1e-9) break;
+  }
+}
+/* A FREQUÊNCIA DO NPC é a MESMA do jogador -- uma oportunidade por travessia --, com o instante
+   sorteado dentro do terço central dela. */
+function planejarNpc(c, indice){
+  c.npcIndice = indice;
+  c.npcQuando = indice * CORRIDA_TRAVESSIA + CORRIDA_TRAVESSIA * (1 / 3 + Math.random() / 3);
+  c.npcSorteio = Math.random();
+}
+function corridaFisica(dt){
+  const fim = corrida.tempo + dt;
+  corrida.corredores.forEach((c, i) => {
+    let cursor = corrida.tempo;
+    if(i && c.chegada === null){
+      while(c.npcQuando <= fim){
+        corridaAvancar(c, Math.max(0, c.npcQuando - cursor), cursor);
+        cursor = c.npcQuando;
+        if(c.chegada === null){
+          const r = c.npcSorteio;
+          if(r < CORRIDA_NPC.perfect) aplicarEfeito(c, 'perfect');
+          else if(r < CORRIDA_NPC.perfect + CORRIDA_NPC.good) aplicarEfeito(c, 'good');
+          else if(r < CORRIDA_NPC.perfect + CORRIDA_NPC.good + CORRIDA_NPC.miss) aplicarEfeito(c, 'miss');
+          /* o resto é a oportunidade NÃO usada */
+        }
+        planejarNpc(c, c.npcIndice + 1);
+      }
+    }
+    corridaAvancar(c, Math.max(0, fim - cursor), cursor);
+    c.avisoTroca = Math.max(0, c.avisoTroca - dt);
+  });
+  corrida.tempo = fim;
+  corrida.brilho = Math.max(0, corrida.brilho - dt);
+  if(corrida.corredores.every(c => c.chegada !== null)) corridaTerminar();
+}
+/* ⚠️ A CLASSIFICAÇÃO É PELO INSTANTE DE CHEGADA, nunca pela ordem em que os corredores são
+   processados -- quem ainda corre é ordenado por distância, e sempre atrás de quem já chegou. */
+function corridaRanking(){
+  return corrida.corredores.map((c, i) => ({ c, i })).sort((a, b) =>
+    a.c.chegada !== null
+      ? (b.c.chegada !== null ? a.c.chegada - b.c.chegada : -1)
+      : (b.c.chegada !== null ? 1 : b.c.dist - a.c.dist));
+}
+const corridaPosicao = (i) => corridaRanking().findIndex(x => x.i === i) + 1;
+
+/* ============================================================================
+   A BARRA E O IMPULSO
+   ⚠️ A POSIÇÃO É UM TRIÂNGULO: vai de 0 a 1 e VOLTA de 1 a 0, invertendo nas laterais -- ela nunca
+   salta de uma ponta à outra. É esta conta que faz a detecção valer nos dois sentidos sem um `if`
+   de direção: a faixa é uma região da BARRA, não um intervalo de tempo.
+   ============================================================================ */
+const corridaTravessia = () => Math.floor(corrida.tempo / CORRIDA_TRAVESSIA);
+const corridaPosBarra = () => 1 - Math.abs(1 - (corrida.tempo / CORRIDA_TRAVESSIA) % 2);
+function corridaImpulso(){
+  /* ⚠️ UMA TENTATIVA POR TRAVESSIA: a trava é o ÍNDICE da travessia, então ela se solta sozinha
+     quando o marcador atinge a lateral e começa a próxima -- ida e volta são travessias
+     diferentes, e é isso que dá as duas tentativas por ciclo que o pedido descreve. */
+  if(corrida.fase !== 'correndo') return;
+  const eu = corrida.corredores[0];
+  if(!eu || eu.chegada !== null) return;                 /* chegou: o impulso morre */
+  if(corrida.tentativaDaTravessia === corridaTravessia()) return;
+  corrida.tentativaDaTravessia = corridaTravessia();
+  const r = resultadoDoImpulso(corridaPosBarra());
+  aplicarEfeito(eu, r);
+  if(r === 'perfect'){ corrida.perfeitos++; corrida.brilhoTexto = 'PERFEITO!'; corrida.recado = 'Perfeito! +45% por 1,5 s.'; }
+  else if(r === 'good'){ corrida.brilhoTexto = 'BOM!'; corrida.recado = 'Bom! +25% por 1 s.'; }
+  else { corrida.brilhoTexto = 'FORA DO TEMPO'; corrida.recado = 'Erro. −20% por meio segundo.'; }
+  corrida.brilho = 1;
+}
+/* ⚠️ SÓ CLIQUE OU TOQUE, e não há atalho de teclado nenhum (o pedido é explícito). O protótipo
+   tinha a barra de espaço; ela saiu.
+   ⚠️ E O BOTÃO PRECISA DE `type="button"` MAIS a guarda do `keydown`: um <button> focado dispara
+   `click` com Espaço e com Enter por padrão do navegador, então tirar o listener não basta -- sem
+   isso o atalho voltava pela porta dos fundos. */
+function corridaTeclaNoBotao(ev){
+  if(ev.key === ' ' || ev.code === 'Space' || ev.key === 'Enter'){ ev.preventDefault(); }
+}
+
+/* ============================================================================
+   A SELEÇÃO -- o mesmo montador da Torre e do Ginásio da Cidade
+   ============================================================================ */
+const corridaQuantos = () => corrida.formato === 'relay' ? CORRIDA_TRECHOS : 1;
+/* ⚠️ ORDENADA PELO SPEED **DA CORRIDA**, do maior pro menor -- e não pelo Speed base da espécie:
+   é o MESMO número que vai decidir a velocidade na pista, com nível, shiny e especialidade dentro.
+   O montador ordena por nível/nome/time; aqui a ordem é outra, então a lista vem pronta. */
+function corridaElegiveis(){
+  return towerEligiblePokemon()
+    .map(p => Object.assign({}, p, { speedCorrida: speedDaCorrida(corridaInstancia(p, true)) }))
+    .sort((a, b) => (b.speedCorrida - a.speedCorrida)
+                 || (b.level - a.level)
+                 || String(a.speciesId).localeCompare(String(b.speciesId)));
+}
+function corridaAbrirPicker(){ if(corrida.fase === 'correndo' || corrida.fase === 'contagem') return; corrida.picker = true; render(); }
+function corridaFecharPicker(){ corrida.picker = false; render(); }
+function corridaToggle(slot, idx){
+  if(corrida.fase === 'correndo' || corrida.fase === 'contagem') return;
+  const lista = corridaElegiveis();
+  const alvo = lista.find(p => String(p.slot) === String(slot) && p.idx === idx);
+  if(!alvo) return;
+  const ja = corrida.escolhidos.findIndex(p => String(p.slot) === String(slot) && p.idx === idx);
+  if(ja >= 0){ corrida.escolhidos.splice(ja, 1); render(); return; }
+  if(corrida.escolhidos.length >= corridaQuantos()) return;
+  /* sem repetir ESPÉCIE na equipe -- a mesma regra do montador, por raiz da linha */
+  if(corrida.escolhidos.some(p => raizDaLinha(p.speciesId) === raizDaLinha(alvo.speciesId))) return;
+  corrida.escolhidos.push(alvo);
+  render();
+}
+/* ⚠️ A ORDEM DO REVEZAMENTO É A DE SELEÇÃO, e dá pra reorganizar antes de confirmar -- as setas
+   são as `.circle-btn` das outras telas de ordenação, e elas mexem só na lista da corrida. */
+function corridaMover(i, passo){
+  if(corrida.fase === 'correndo' || corrida.fase === 'contagem') return;
+  const t = corrida.escolhidos, j = i + passo;
+  if(i < 0 || j < 0 || i >= t.length || j >= t.length) return;
+  const tmp = t[i]; t[i] = t[j]; t[j] = tmp;
+  render();
+}
+const corridaCompleto = () => corrida.escolhidos.length === corridaQuantos();
+function corridaTrocarFormato(f){
+  if(corrida.fase === 'correndo' || corrida.fase === 'contagem') return;
+  corrida.formato = f;
+  /* trocar de modalidade corta o que sobra: a individual leva UM, e três marcados virariam uma
+     escalação que a tela não sabe mostrar */
+  corrida.escolhidos = corrida.escolhidos.slice(0, corridaQuantos());
+  corrida.fase = 'setup'; render();
+}
+function corridaTrocarParticipantes(n){
+  if(corrida.fase === 'correndo' || corrida.fase === 'contagem') return;
+  corrida.participantes = n; corrida.fase = 'setup'; render();
+}
+
+/* ============================================================================
+   A LARGADA -- e o pré-carregamento que a antecede
+   ============================================================================ */
+function nomeDoCorredor(c){ const p = c.time[c.trecho]; return (SPECIES[p.speciesId] || {}).name || p.speciesId; }
+function corridaNovoCorredor(time, ehJogador){
+  return { time, trecho: 0, dist: 0, efeito: 0, mult: 1, quadroT: ehJogador ? 0 : Math.random() * 0.4,
+           chegada: null, avisoTroca: 0, trocas: [], npcIndice: 0, npcQuando: 0, npcSorteio: 0 };
+}
+async function corridaLargar(){
+  if(!corridaCompleto() || corrida.fase === 'correndo' || corrida.fase === 'contagem') return;
+  /* ⚠️ A PERMISSÃO É CONFERIDA DE NOVO AQUI: o botão da home é só a porta, e esta é a ação. */
+  if(!game.ehAdmin){ corrida.aviso = 'Este modo é administrativo.'; render(); return; }
+  /* ⚠️ O `map` NÃO PODE RECEBER A FUNÇÃO DIRETO: ele passa (item, ÍNDICE, array), e o índice
+     viraria o `ehDoJogador` -- o PRIMEIRO do time (índice 0, falso) perderia a especialidade e os
+     outros dois a ganhariam. É a armadilha clássica do `map(parseInt)`, e aqui ela custaria um
+     buff que aparece em dois dos três corredores. */
+  const meu = corrida.escolhidos.map(p => corridaInstancia(p, true));
+  const npcs = sortearNpcs();
+  corrida.corredores = [corridaNovoCorredor(meu, true)].concat(npcs.map(t => corridaNovoCorredor(t, false)));
+  corrida.corredores.forEach((c, i) => { if(i) planejarNpc(c, 0); });
+
+  /* ⚠️ OS SPRITES VÊM ANTES DA LARGADA, e se algum faltar a corrida NÃO começa -- o pedido é
+     explícito: "não substituir silenciosamente o sprite de uma espécie pelo de outra; se faltar
+     algum recurso, informar isso antes da largada". A tela diz QUAIS faltaram, pelo nome. */
+  corrida.fase = 'carregando'; corrida.faltando = []; corrida.aviso = ''; render();
+  const especies = [...new Set(corrida.corredores.flatMap(c => c.time.map(p => p.speciesId)))];
+  const faltou = [];
+  await Promise.all(especies.map(id => pmdCarregar(id).catch(() => { faltou.push(id); })));
+  if(faltou.length){
+    corrida.fase = 'setup';
+    corrida.faltando = faltou;
+    corrida.aviso = 'Faltou o sprite de: ' + faltou.map(id => (SPECIES[id] || {}).name || id).join(', ') + '.';
+    render(); return;
+  }
+  corrida.tempo = 0; corrida.perfeitos = 0; corrida.tentativaDaTravessia = -1;
+  corrida.brilho = 0; corrida.brilhoTexto = ''; corrida.ultimoQuadro = 0;
+  corrida.contagem = 3; corrida.fase = 'contagem';
+  corrida.recado = 'Prepare-se para a largada!';
+  render();
+  corridaLaco();
+}
+function corridaTerminar(){
+  corrida.fase = 'fim';
+  corrida.tempo = Math.max(...corrida.corredores.map(c => c.chegada));
+  corrida.recado = 'Mude os participantes em Configurar ou corra novamente.';
+  render();
+}
+function corridaReiniciar(){ corrida.fase = 'setup'; corrida.corredores = []; render(); }
+
+/* ⚠️ O LAÇO PAUSA COM A ABA OCULTA, e sem avançar distância: o `ultimoQuadro` é zerado, então a
+   volta seguinte tem dt=0 em vez de um salto do tamanho do tempo em que a aba ficou escondida. */
+function corridaLaco(){
+  if(corrida.laco) cancelAnimationFrame(corrida.laco);
+  const passo = (agora) => {
+    if(corrida.fase !== 'correndo' && corrida.fase !== 'contagem'){ corrida.laco = null; return; }
+    if(document.hidden){ corrida.ultimoQuadro = 0; corrida.laco = requestAnimationFrame(passo); return; }
+    const dt = corrida.ultimoQuadro ? Math.min((agora - corrida.ultimoQuadro) / 1000, 0.05) : 0;
+    corrida.ultimoQuadro = agora;
+    corrida.animacao += dt;
+    if(corrida.fase === 'contagem'){
+      corrida.contagem -= dt;
+      if(corrida.contagem <= 0){ corrida.fase = 'correndo'; corrida.recado = 'Acerte o centro amarelo. Vamos!'; }
+    } else {
+      corridaFisica(dt);
+    }
+    corridaPintar();
+    corrida.laco = requestAnimationFrame(passo);
+  };
+  corrida.laco = requestAnimationFrame(passo);
+}
+
+/* ============================================================================
+   O DESENHO -- pista vista de cima, corredores de costas
+   ⚠️ QUEM PINTA É O DOM, nunca o `render()`: a regra da casa ("não redesenhar a tela durante
+   animações") vale inteira aqui -- um `render()` por quadro recriaria o <canvas> e mataria o
+   contexto. O laço chama `corridaPintar`, que mexe só no canvas e em alguns textos.
+   ============================================================================ */
+const CORRIDA_W = 440, CORRIDA_H = 390;
+function corridaPintar(){
+  const cv = document.getElementById('corridaCanvas');
+  if(!cv) return;
+  const ctx = cv.getContext('2d');
+  ctx.setTransform(2, 0, 0, 2, 0, 0);
+  ctx.imageSmoothingEnabled = false;
+  const lider = corrida.corredores.length ? Math.max(...corrida.corredores.map(c => c.dist)) : 0;
+  const rolagem = lider * 11, lo = 44, hi = 396, vao = hi - lo, raia = vao / corrida.participantes;
+  const ret = (x, y, w, h, cor) => { ctx.fillStyle = cor; ctx.fillRect(Math.round(x), Math.round(y), w, h); };
+  const txt = (s, x, y, t, cor) => { ctx.fillStyle = cor; ctx.font = `800 ${t}px system-ui`; ctx.textAlign = 'center'; ctx.fillText(s, x, y); };
+
+  /* o mar dos dois lados, a areia, e a pista */
+  ret(0, 0, CORRIDA_W, CORRIDA_H, '#58b4b1');
+  for(const lado of [0, 1]) for(let k = 0; k < 9; k++){
+    const y = (k * 49 + rolagem * 0.5) % 460 - 30;
+    ret((lado ? 408 : 6) + Math.sin(k) * 5, y, 23, 3, '#91d8cc');
+    ret(lado ? 413 : 5, y + 17, 12, 2, '#369f9f');
+  }
+  ret(32, 0, 376, CORRIDA_H, '#f1d793');
+  ret(lo, 0, vao, CORRIDA_H, '#eacb8c');
+  for(let i = 0; i < 65; i++) ret(49 + (i * 73) % 340, (i * 41 + rolagem) % 440 - 20, 3 + i % 3, 2, i % 2 ? '#d6b276' : '#f3dca4');
+  for(const x of [lo, hi]) ret(x, 0, 2, CORRIDA_H, '#fff1c3');
+  for(let j = 1; j < corrida.participantes; j++) for(let k = 0; k < 12; k++) ret(lo + j * raia, (k * 44 + rolagem) % 500 - 50, 2, 20, '#fff3cd');
+  for(let k = 0; k < 12; k++){ const y = (k * 44 + rolagem) % 500 - 50; ret(35, y, 7, 16, k % 2 ? '#37876a' : '#f8edcd'); ret(398, y, 7, 16, k % 2 ? '#37876a' : '#f8edcd'); }
+  for(let k = 0; k < 5; k++){ const y = (k * 103 + rolagem * 0.8) % 550 - 70; for(const x of [20, 420]){ ret(x - 4, y - 6, 8, 16, '#287768'); ret(x - 8, y, 16, 5, '#328770'); } }
+
+  /* a linha de chegada, a de largada e a marca da troca */
+  const yChegada = 247 - (corridaTotal() - lider) * 5;
+  if(yChegada > -28){
+    ret(lo, yChegada - 16, vao, 22, '#fff9e9');
+    for(let l = 0; l < 2; l++) for(let c = 0; c < 32; c++) if((l + c) % 2 === 0) ret(lo + c * 11, yChegada - 16 + l * 11, 11, 11, '#243346');
+    if(yChegada > 52) txt('CHEGADA', 220, yChegada - 24, 13, '#253448');
+  }
+  if(corrida.fase === 'pronto' || corrida.fase === 'contagem' || corrida.fase === 'setup'){
+    ret(lo, 278, vao, 3, '#fff9e9'); txt('LARGADA', 220, 337, 12, '#8b7145');
+  }
+  if(corrida.formato === 'relay' && corrida.fase === 'correndo' && lider < CORRIDA_METROS * 2){
+    const prox = (Math.floor(lider / CORRIDA_METROS) + 1) * CORRIDA_METROS, yy = 247 - (prox - lider) * 5;
+    if(yy > 45){ ret(lo, yy, vao, 4, '#388670'); txt('TROCA AOS ' + prox + ' m', 220, yy - 10, 12, '#28674f'); }
+  }
+
+  /* ⚠️ A TELA COMPRIME A DISTÂNCIA (log1p) pra manter todo mundo visível, mas os METROS, as barras
+     e a classificação usam o progresso REAL -- é só o desenho que encolhe. */
+  corrida.corredores.forEach((c, i) => {
+    let y = (corrida.fase === 'pronto' || corrida.fase === 'contagem' || corrida.fase === 'setup')
+      ? 268 : 247 + Math.min(80, Math.log1p(Math.max(0, lider - c.dist)) * 17);
+    if(c.chegada !== null) y = 230;
+    corridaDesenharPokemon(ctx, c, i, lo + raia * (i + 0.5), y, raia, ret, txt);
+  });
+  if(corrida.brilho > 0){
+    ctx.globalAlpha = Math.min(1, corrida.brilho * 2);
+    txt(corrida.brilhoTexto, lo + raia * 0.5, 130 - corrida.brilho * 5, corrida.participantes === 4 ? 10 : 12, '#20323a');
+    ctx.globalAlpha = 1;
+  }
+  corridaPintarHud();
+}
+const CORRIDA_CORES = ['#267853', '#267ab2', '#b76534', '#8c5eab'];
+function corridaDesenharPokemon(ctx, c, i, x, y, raia, ret, txt){
+  const p = c.time[c.trecho], d = pmdCache[p.speciesId];
+  /* ⚠️ SEM SPRITE NÃO SE DESENHA OUTRO NO LUGAR: a largada só acontece com tudo carregado, então
+     isto aqui é a rede de segurança -- um marcador neutro, nunca o bicho errado. */
+  if(!d || d === 'erro'){
+    ret(x - 8, y - 16, 16, 16, CORRIDA_CORES[i]);
+    txt(i === 0 ? 'VOCÊ' : 'NPC ' + i, x, y + 26, 10, CORRIDA_CORES[i]);
+    return;
+  }
+  const f = pmdQuadro(d, c.quadroT), b = d.caixas[f];
+  const w = b[2] - b[0], h = b[3] - b[1];
+  const maiorW = Math.max(...d.caixas.map(q => q[2] - q[0]));
+  const escala = Math.min(corrida.participantes === 2 ? 3 : 2.5, (raia - 17) / maiorW);
+  const sobe = (corrida.fase === 'correndo' || corrida.fase === 'pronto') && c.chegada === null
+    ? Math.sin(c.quadroT * 20 + i) * 1.5 : 0;
+  ctx.fillStyle = '#4841263d'; ctx.beginPath();
+  ctx.ellipse(x, y + 3, Math.min(29, raia * 0.29), 7, 0, 0, Math.PI * 2); ctx.fill();
+  if(corrida.fase === 'correndo' && c.chegada === null){
+    for(let k = 0; k < 2; k++){ const q = (corrida.animacao * 2 + k * 0.5) % 1; ctx.globalAlpha = (1 - q) * 0.35; ret(x - 12 + k * 20, y + 8 + q * 20, 5 + q * 3, 3, '#fff6d6'); }
+    ctx.globalAlpha = 1;
+  }
+  if(c.efeito > 0 && c.mult > 1){
+    ctx.strokeStyle = '#fff3a0'; ctx.lineWidth = 3;
+    for(let k = 0; k < 2; k++){ ctx.beginPath(); ctx.moveTo(x - 15 + k * 30, y + 8); ctx.lineTo(x - 15 + k * 30, y + 24); ctx.stroke(); }
+  }
+  ctx.drawImage(d.img, f * d.w + b[0], PMD_LINHA_COSTAS * d.h + b[1], w, h,
+                Math.round(x - w * escala / 2), Math.round(y - h * escala + sobe), w * escala, h * escala);
+  if(i === 0){
+    const topo = y - h * escala - 10 + sobe;
+    ctx.fillStyle = '#ffdc52'; ctx.strokeStyle = '#1a2434'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(x - 6, topo - 7); ctx.lineTo(x + 6, topo - 7); ctx.lineTo(x, topo); ctx.closePath();
+    ctx.fill(); ctx.stroke();
+  }
+  txt(i === 0 ? 'VOCÊ' : 'NPC ' + i, x, y + 26, 10, CORRIDA_CORES[i]);
+  if(c.avisoTroca > 0){ ctx.globalAlpha = Math.min(1, c.avisoTroca); txt('TROCA!', x, y - h * escala - 28, 11, CORRIDA_CORES[i]); ctx.globalAlpha = 1; }
+}
+const corridaRelogio = (t) => Math.floor(t / 60).toString().padStart(2, '0') + ':' + (t % 60).toFixed(1).padStart(4, '0');
+/* ⚠️ O HUD É PINTADO NO DOM, não redesenhado: o `render()` recriaria o canvas no meio da corrida. */
+function corridaPintarHud(){
+  const põe = (id, txt) => { const e = document.getElementById(id); if(e && e.textContent !== txt) e.textContent = txt; };
+  põe('corridaRelogio', corridaRelogio(corrida.tempo));
+  corrida.corredores.forEach((c, i) => {
+    põe('corridaNome' + i, (i === 0 ? 'Você' : 'NPC ' + i) + ' · ' + nomeDoCorredor(c));
+    põe('corridaInfo' + i, c.chegada !== null
+      ? corridaPosicao(i) + 'º · ' + c.chegada.toFixed(2) + ' s'
+      : Math.floor(c.dist) + ' / ' + corridaTotal() + ' m');
+    const b = document.getElementById('corridaBarra' + i);
+    if(b) b.style.width = Math.min(100, c.dist / corridaTotal() * 100) + '%';
+  });
+  const ag = document.getElementById('corridaAgulha');
+  if(ag) ag.style.left = (corridaPosBarra() * 100) + '%';
+  põe('corridaRecado', corrida.recado);
+  põe('corridaPerfeitos', corrida.perfeitos + ' perfeitos');
+  const eu = corrida.corredores[0];
+  if(eu){
+    põe('corridaPosicao', corrida.fase === 'correndo'
+      ? (eu.chegada !== null ? corridaPosicao(0) + 'º · você chegou'
+        : corridaPosicao(0) + 'º · ' + (corrida.formato === 'relay'
+            ? 'trecho ' + (eu.trecho + 1) + '/' + CORRIDA_TRECHOS
+            : Math.ceil(corridaTotal() - eu.dist) + ' m restantes'))
+      : corridaTotal() + ' m');
+    const bt = document.getElementById('corridaBoost');
+    if(bt){
+      const travado = corrida.fase !== 'correndo' || eu.chegada !== null || corrida.tentativaDaTravessia === corridaTravessia();
+      bt.disabled = travado;
+      const rot = eu.chegada !== null ? 'CHEGOU' : (travado && corrida.fase === 'correndo' ? 'AGUARDE…' : 'IMPULSO');
+      if(bt.textContent !== rot) bt.textContent = rot;
+    }
+  }
+  if(corrida.fase === 'contagem'){
+    põe('corridaTitulo', String(Math.max(1, Math.ceil(corrida.contagem))));
+    põe('corridaSub', corrida.formato === 'relay' ? 'Primeiro trecho' : 'Vai!');
+  }
+  /* o fim precisa do render() de verdade: ele troca a tela inteira (aparece a classificação) */
+  if(corrida.fase === 'fim' && !corrida._pintouFim){ corrida._pintouFim = true; render(); }
+  if(corrida.fase !== 'fim') corrida._pintouFim = false;
+}
+
+/* ============================================================================
+   A TELA
+   ============================================================================ */
+/* ⚠️ A PORTA REFAZ A PERGUNTA: a visibilidade do botão da home não é a trava. Um cliente que
+   chame `abrirCorrida()` pelo console cai aqui, e aqui o `admin` é conferido de novo. */
+function abrirCorrida(){
+  if(!game.contaCarregada || !game.ehAdmin){
+    game.modoBloqueado = 'Este modo é administrativo.';
+    render(); return;
+  }
+  corrida.fase = 'setup'; corrida.picker = false; corrida.aviso = '';
+  game.modoBloqueado = null;
+  game.screen = 'corrida';
+  render();
+}
+function sairDaCorrida(){
+  corridaZerar();
+  openSaveSelect();
+}
+function corridaLinhaEscolhido(p, i){
+  const sp = SPECIES[p.speciesId] || {};
+  const setas = corrida.formato === 'relay' ? `
+    <div class="order-arrows">
+      <button class="circle-btn" ${i === 0 ? 'disabled' : ''} onclick="corridaMover(${i},-1)">▲</button>
+      <button class="circle-btn" ${i === corrida.escolhidos.length - 1 ? 'disabled' : ''} onclick="corridaMover(${i},1)">▼</button>
+    </div>` : '';
+  return `<div class="order-row">
+    <div class="order-num">${corrida.formato === 'relay' ? (i + 1) + 'º' : ''}</div>
+    <div class="order-info">
+      <span class="mon-name">${spriteHtml(p, 'sprite-sm')} ${escapeHtmlSafe(sp.name || p.speciesId)}${p.shiny ? ' ' + selo('shiny') : ''} <span class="mont-lv">— Lv.${p.level}</span></span>
+      <span class="mon-sub">${typesHtml(sp.types || [])}<span class="corrida-speed">Speed ${speedDaCorrida(corridaInstancia(p, true))}</span></span>
+    </div>
+    ${setas}
+  </div>`;
+}
+/* A LISTA DE ESCOLHA -- a mesma linha do montador da Torre, com o Speed DA CORRIDA em evidência. */
+function corridaPickerHtml(){
+  const lista = corridaElegiveis();
+  const marcados = corrida.escolhidos;
+  const usadas = new Set(marcados.map(p => raizDaLinha(p.speciesId)));
+  if(!lista.length){
+    return `<div class="box"><p class="error-text">Nenhum Pokémon elegível. É preciso um time com as 8 insígnias (ou um aposentado).</p>
+      <button class="btn secondary" onclick="corridaFecharPicker()">⬅ Voltar</button></div>`;
+  }
+  return `<div class="box">
+    <h2>${selo('corrida')} Escolher corredor</h2>
+    <p class="hint-text">${corrida.formato === 'relay'
+      ? 'Escolha <strong>3</strong> — a ordem é a de seleção, e dá pra reorganizar depois.'
+      : 'Escolha <strong>1</strong>.'} Ordenados pelo <strong>Speed da corrida</strong>.</p>
+    <div class="tower-pick-counter ${corridaCompleto() ? 'ok' : ''}">${marcados.length} de ${corridaQuantos()} escolhidos</div>
+    <div class="mont-lista">${lista.map(p => {
+      const sp = SPECIES[p.speciesId] || {};
+      const sel = marcados.findIndex(m => String(m.slot) === String(p.slot) && m.idx === p.idx);
+      const bloqueado = sel < 0 && (marcados.length >= corridaQuantos() || usadas.has(raizDaLinha(p.speciesId)));
+      return `<div class="mont-linha">
+        <button class="mont-card ${sel >= 0 ? 'sel' : ''} ${bloqueado ? 'off' : ''}"
+          onclick="corridaToggle('${escJs(String(p.slot))}',${p.idx})" ${bloqueado ? 'disabled' : ''}
+          title="${escapeHtmlSafe(sp.name || '?')} Lv.${p.level}">
+          <span class="mont-num">${sel >= 0 ? (sel + 1) + 'º' : ''}</span>
+          ${spriteHtml(p, 'sprite-sm')}
+          <span class="mont-info">
+            <span class="mont-nome">${escapeHtmlSafe(sp.name || '?')}${p.shiny ? ' ' + selo('shiny') : ''} <span class="mont-lv">— Lv.${p.level}</span></span>
+            <span class="mont-sub">${typesHtml(sp.types || [])}<span class="mont-time">${escapeHtmlSafe(p.teamName || '')}</span></span>
+          </span>
+          <span class="corrida-speed-badge">${p.speedCorrida}</span>
+        </button>
+      </div>`;
+    }).join('')}</div>
+    <button class="btn success" onclick="corridaFecharPicker()">${corridaCompleto() ? 'Confirmar' : 'Voltar'}</button>
+  </div>`;
+}
+function renderCorrida(){
+  if(corrida.picker) return `<div class="eyebrow">${selo('corrida')} CORRIDA POKÉMON</div>` + corridaPickerHtml()
+    + `<button class="btn secondary" onclick="sairDaCorrida()">⬅ Sair</button>`;
+
+  const correndo = corrida.fase === 'correndo' || corrida.fase === 'contagem';
+  const setup = !correndo && corrida.fase !== 'fim' ? `
+    <div class="box">
+      <h2>Modalidade</h2>
+      <div class="row seg corrida-seg">
+        <button class="${corrida.formato === 'single' ? 'ativa' : ''}" onclick="corridaTrocarFormato('single')">Individual · 300 m</button>
+        <button class="${corrida.formato === 'relay' ? 'ativa' : ''}" onclick="corridaTrocarFormato('relay')">Revezamento · 900 m</button>
+      </div>
+      <p class="hint-text">${corrida.formato === 'relay'
+        ? 'Três Pokémon por equipe, 300 m cada. A troca é automática.'
+        : 'Uma corrida de 300 m. Você controla os impulsos.'}</p>
+      <h2 class="u-mt8">${corrida.formato === 'relay' ? 'Equipes na pista' : 'Pokémon na pista'}</h2>
+      <div class="row seg corrida-seg">
+        ${[2, 3, 4].map(n => `<button class="${corrida.participantes === n ? 'ativa' : ''}" onclick="corridaTrocarParticipantes(${n})">${n}</button>`).join('')}
+      </div>
+    </div>
+    <div class="box">
+      <h2>${corrida.formato === 'relay' ? 'Sua equipe' : 'Seu corredor'}</h2>
+      ${corrida.escolhidos.length
+        ? corrida.escolhidos.map(corridaLinhaEscolhido).join('')
+        : '<p class="hint-text">Ninguém escolhido ainda.</p>'}
+      <button class="btn primary" onclick="corridaAbrirPicker()">Escolher corredor</button>
+      ${corrida.aviso ? `<p class="error-text">⚠️ ${escapeHtmlSafe(corrida.aviso)}</p>` : ''}
+      <button class="btn success" ${corridaCompleto() && corrida.fase !== 'carregando' ? '' : 'disabled'} onclick="corridaLargar()">
+        ${corrida.fase === 'carregando' ? 'Carregando os sprites…' : (corridaCompleto() ? '🏁 Largar' : 'Escolha ' + corridaQuantos() + (corridaQuantos() > 1 ? ' Pokémon' : ' Pokémon'))}
+      </button>
+    </div>` : '';
+
+  const placar = corrida.corredores.length ? `
+    <div class="box corrida-placar">
+      ${corrida.corredores.map((c, i) => `
+        <div class="racerRow">
+          <span class="dot" style="background:${CORRIDA_CORES[i]}"></span>
+          <span class="runnerName" id="corridaNome${i}">${i === 0 ? 'Você' : 'NPC ' + i} · ${escapeHtmlSafe(nomeDoCorredor(c))}</span>
+          <span class="runnerInfo" id="corridaInfo${i}">0 / ${corridaTotal()} m</span>
+          <div class="progress"><i id="corridaBarra${i}" style="background:${CORRIDA_CORES[i]}"></i></div>
+        </div>`).join('')}
+    </div>` : '';
+
+  const pista = corrida.corredores.length ? `
+    <div class="box corrida-pista">
+      <canvas id="corridaCanvas" width="880" height="780" aria-label="Corrida vista de cima"></canvas>
+      <div class="corrida-hud"><span id="corridaPosicao">${corridaTotal()} m</span><span id="corridaRelogio">00:00.0</span></div>
+      ${corrida.fase === 'contagem' ? `<div class="corrida-overlay"><div class="bubble"><strong id="corridaTitulo">3</strong><small id="corridaSub">Prepare-se</small></div></div>` : ''}
+    </div>
+    <div class="box corrida-controles">
+      ${corrida.formato === 'relay' ? `<div class="corrida-trechos">${corrida.escolhidos.map((p, i) => {
+        const eu = corrida.corredores[0];
+        const st = eu && eu.trecho === i ? ' ativo' : (eu && i < eu.trecho ? ' feito' : '');
+        return `<div class="corrida-trecho${st}"><b>${escapeHtmlSafe((SPECIES[p.speciesId] || {}).name || '')}</b>${i * CORRIDA_METROS}–${(i + 1) * CORRIDA_METROS} m</div>`;
+      }).join('')}</div>` : ''}
+      <div class="corrida-feedback"><span id="corridaRecado">${escapeHtmlSafe(corrida.recado)}</span><span id="corridaPerfeitos">${corrida.perfeitos} perfeitos</span></div>
+      ${/* ⚠️ AS FAIXAS SAEM DAS CONSTANTES, nunca de um número escrito no CSS: se a detecção e o
+           desenho divergirem, a barra promete uma região e o motor pontua outra -- é a mesma
+           lição do selo de terreno prometendo um bônus que a batalha não dá. */''}
+      <div class="corrida-barra" aria-hidden="true">
+        <div class="faixa-verde" style="left:${CORRIDA_FAIXA.verde.ini * 100}%;width:${CORRIDA_FAIXA.verde.tam * 100}%"></div>
+        <div class="faixa-amarela" style="left:${CORRIDA_FAIXA.amarela.ini * 100}%;width:${CORRIDA_FAIXA.amarela.tam * 100}%"></div>
+        <div id="corridaAgulha" class="corrida-agulha"></div>
+      </div>
+      ${/* ⚠️ `type="button"` MAIS o `onkeydown`: um <button> focado dispara click com Espaço e
+           Enter por padrão, então só tirar o listener de teclado não bastaria -- o atalho voltava
+           pela porta dos fundos, e o pedido proíbe qualquer atalho pra esta ação. */''}
+      <button type="button" id="corridaBoost" class="btn danger corrida-boost" onkeydown="corridaTeclaNoBotao(event)"
+        ${corrida.fase === 'correndo' ? '' : 'disabled'} onclick="corridaImpulso()">IMPULSO</button>
+      <p class="hint-text">Toque no botão para impulsionar · uma tentativa por ida e uma por volta</p>
+    </div>` : '';
+
+  const fim = corrida.fase === 'fim' ? `
+    <div class="box">
+      <h2>${corridaPosicao(0) === 1 ? '🏆 Você venceu!' : corridaPosicao(0) + 'º lugar'}</h2>
+      ${corridaRanking().map(({ c, i }, pos) => `
+        <div class="resultRow"><span>${pos + 1}º · ${i === 0 ? 'Você' : 'NPC ' + i} · ${escapeHtmlSafe(nomeDoCorredor(c))}</span><b>${c.chegada.toFixed(2)} s</b></div>`).join('')}
+      <button class="btn success" onclick="corridaLargar()">Correr de novo</button>
+      <button class="btn secondary" onclick="corridaReiniciar()">Configurar</button>
+    </div>` : '';
+
+  return `
+  <div class="eyebrow">${selo('corrida')} CORRIDA POKÉMON · TESTE ADMIN</div>
+  ${setup}${placar}${pista}${fim}
+  ${correndo ? '' : `<button class="btn secondary" onclick="sairDaCorrida()">⬅ Sair</button>`}`;
+}
+
 function render(){
   const app = document.getElementById('app');
   let html = '';
@@ -30322,6 +31266,7 @@ function render(){
     case 'journeyEnd': html = renderJourneyEnd(); break;
     case 'neighborhoodGym': html = renderNeighborhoodGym(); break;
     case 'trainerTower': html = renderTrainerTower(); break;
+    case 'corrida': html = renderCorrida(); break;
     case 'gymChoice': html = renderGymChoice(); break;
     case 'evoChoice': html = renderEvoChoice(); break;
     case 'escolhaDeAtaques': html = renderEscolhaDeAtaques(); break;

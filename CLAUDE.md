@@ -12015,6 +12015,149 @@ acompanha o tamanho da fonte (`1em`, ou `1.15em` com `.selo-g` no quadro do luta
 (Pokédex e Conquistas) usam o `.dex-icon.menu`, que é 32 — em `1em` o selo saía 27 e a fileira
 ficava desalinhada.
 
+## CORRIDA POKÉMON — o primeiro teste, modo ADMIN (18/09/2026)
+
+Pedida com o `corrida-pokemon.html` da raiz como referência visual e funcional: uma corrida vista
+de cima, só contra NPC, com uma barra de ritmo. **Nada de multiplayer nesta etapa.**
+
+### ⚠️ O QUE FOI MEDIDO ANTES DE ESCREVER — e duas medidas mudaram o desenho
+
+| pergunta | resposta medida |
+|---|---|
+| o `effectiveSpeed` do jogo escala com o **nível**? | **NÃO.** Jolteon Lv.5 e Lv.99 devolvem **130 igual** — no motor só o HP escala (`calcMaxHp`), e a velocidade é usada crua pra decidir quem bate primeiro e pro crítico |
+| dá pra usar os sprites PMD nas **250** espécies? | **SIM: 250 de 250** respondem 200 no `SpriteCollab`, pelo MESMO CDN que o jogo já usa. 6 a 11 KB por folha |
+| o campo `admin` chega no cliente? | **Não chegava** — só o servidor o lia (`adminListTrainers`) |
+
+A primeira obrigou a **criar** a escala de nível; a segunda liberou o modo pro bicharedo inteiro,
+em vez das seis espécies que o protótipo embute em base64.
+
+### O ACESSO
+
+- **`game.ehAdmin = d.admin === true`** — exatamente o booleano. `'sim'`, `'true'` e `1` **não**
+  autorizam, e há trava nomeando os quatro casos.
+- **⚠️ LER É SEGURO PORQUE ESCREVER NÃO É:** o `admin` está na **trava de campos** do
+  `firestore.rules`, ao lado de `moedas` e `rareCandies` — o dono do documento não consegue
+  escrevê-lo, só o console do Firebase. Sem essa trava, uma linha no console abriria o modo.
+- **⚠️ ENQUANTO A CONTA CARREGA O BOTÃO FICA OCULTO**, e isso é o **contrário** da porta dos modos
+  de campeão, que erra pro lado de DEIXAR ENTRAR. Aqui o lado seguro é o outro: mostrar um botão
+  administrativo a quem não é admin, mesmo por meio segundo, é pior que escondê-lo de quem é.
+- **A visibilidade não é a trava:** o `abrirCorrida` refaz a pergunta. Quem chamar pelo console não
+  entra.
+- **⚠️ NÃO HÁ OPERAÇÃO DE BACKEND NOVA**, e isso é o desenho: a corrida é **inteiramente offline** —
+  nenhuma Cloud Function, nenhuma escrita no Firestore, nada no save. Não há, portanto, uma terceira
+  checagem de permissão a fazer; o dia em que houver ranking ou recompensa, ela nasce junto.
+
+### O SPEED — o que é REUSO e o que é CRIAÇÃO
+
+```
+speedDaCorrida(p) = floor( effectiveSpeed(p) × 2 × nível / 100 ) + 5
+velocidade (m/s)  = 8 + 4 × √(Speed ÷ 100)
+```
+
+- **O `effectiveSpeed` é a função do motor de batalha**, e chamá-la é o que dá **shiny (1,20×) e
+  especialidade (1,05×)** de graça. Os outros degraus dela (terreno, fúria, paralisia, estágio) são
+  **no-op por construção**: a instância da corrida vem do `createInstance` e nasce LIMPA. É reuso de
+  verdade — um buff novo no motor entra aqui junto, e não há como aplicar duas vezes.
+- **⚠️ A ESCALA DE NÍVEL É CRIAÇÃO, não reuso**, porque o jogo não tem uma. É a fórmula oficial da
+  Gen 1/2/3 sem IV nem EV: no Lv.50 ela devolve ~base (a escala do protótipo, onde Jolteon 130 corre
+  a 12,6 m/s) e no Lv.99, ~2× base.
+- **⚠️ E A ESPECIALIDADE QUASE NÃO ENTROU.** O comentário do código chegou a dizer que ela entrava
+  "sozinha, porque o `withSpecialty` lê o `game.specialties`" — **e isso é falso**: ele lê a FLAG
+  `p.specialtyBuffed`, e quem a põe é o `applySpecialtyBuff`. A trava pegou (um Jolteon de
+  especialista em Elétrico dava o mesmo 135 de quem não é). É o defeito que a raide do Mew teve por
+  semanas, e por isso o jogo tem uma trava cobrando essa chamada perto de cada batalha.
+- **⚠️ E O NPC NÃO HERDA A ESPECIALIDADE:** ela é conquista da CONTA, e o adversário não tem conta.
+  O `corridaInstancia(p, ehDoJogador)` **não tem padrão** de propósito — com `true` implícito, a
+  próxima chamada esquecida daria o buff ao adversário em silêncio.
+- **⚠️ E O `map` NÃO PODE RECEBER A FUNÇÃO DIRETO:** ele passa `(item, ÍNDICE, array)`, e o índice
+  viraria o `ehDoJogador` — o PRIMEIRO do revezamento (índice 0, falso) perderia o buff e os outros
+  dois o ganhariam. É a armadilha do `map(parseInt)`.
+
+**A faixa que isso produz**, medida: de **8,9 m/s** (Shuckle Lv.5) a **~15 m/s** (Jolteon Lv.99
+shiny) — razão de 1,7×, e os 300 m levam de 20 a 34 s. O `8 +` da fórmula é o que impede um Shuckle
+de ficar parado na pista.
+
+### A FÍSICA — o quadro é FATIADO, e é isso que faz os limites serem exatos
+
+O avanço é `velocidade × tempo`, e o quadro é cortado no **vencimento do efeito** e em **cada troca
+de trecho**. Medido: a mesma corrida em passos de 1/60, 1/10 e 1/5 dá o **mesmo tempo de chegada**.
+
+- **⚠️ A TROCA É REGISTRADA com a distância e o instante EXATOS**, e isso não é enfeite: medida de
+  FORA, no fim do quadro, ela sai em **300,07 m** — porque o próximo já correu o resto do quadro,
+  que é exatamente o que o pedido manda fazer. Sem o registro não há como provar que o limite foi
+  respeitado, e foi assim que a primeira medição **pareceu um defeito que não existia**.
+- Medido com um quadro de 5 s (o limite cai bem no meio): a troca acontece em 300 exatos e os 2 s
+  que sobram correm com o Speed do **segundo**, não do primeiro.
+- **A classificação é pelo INSTANTE de chegada**, nunca pela ordem de processamento — há caso de
+  teste com o array propositalmente na ordem inversa do resultado.
+
+### A BARRA — ela vai e VOLTA
+
+A posição é um **triângulo**: de 0 a 1 e de volta a 0, invertendo nas laterais. É essa conta que faz
+a detecção valer **nos dois sentidos sem um `if` de direção** — a faixa é uma região da BARRA, não
+um intervalo de tempo. Medido: o maior passo entre amostras vizinhas é o próprio passo, nunca ~1.
+
+- **⚠️ AS BORDAS EXATAS QUASE FICARAM DE FORA, por float:** `Math.abs(0.348 − 0.5)` dá
+  **0,15200000000000002** contra uma meia-faixa de **0,152** — o início exato do verde caía FORA
+  dela, e o mesmo no amarelo (0,452 virava "bom" em vez de "perfeito"). O `CORRIDA_EPS` de 1e-9 não
+  é folga: é a borda pertencendo à faixa.
+- **As faixas do CSS saem das CONSTANTES**, inline — um número escrito na folha de estilo divergiria
+  da detecção no primeiro ajuste, e a barra prometeria uma região que o motor não pontua. É a mesma
+  lição do selo de terreno prometendo um bônus que a batalha não dá.
+- **⚠️ SÓ CLIQUE E TOQUE:** o atalho de Espaço do protótipo saiu. E **`type="button"` sozinho não
+  basta** — um `<button>` focado dispara `click` com Espaço **e com Enter** por padrão do
+  navegador, então a guarda de `keydown` é o que fecha a porta dos fundos. Conferido no navegador:
+  os dois são prevenidos e o clique/toque continua funcionando.
+- **Uma tentativa por travessia**, e a trava é o ÍNDICE da travessia — ela se solta sozinha quando o
+  marcador atinge a lateral, o que dá as duas tentativas por ciclo (uma na ida, uma na volta).
+
+### OS SPRITES — PMD, do mesmo CDN que o jogo já usa
+
+- **`PMDCollab/SpriteCollab`**, pelo `cdn.jsdelivr.net` com fallback no `raw.githubusercontent.com`
+  — exatamente o par que o `handleSpriteLoadError` já usa pros sprites da PokeAPI. A pasta é o
+  **dex com quatro dígitos**.
+- O `AnimData.xml` dá `FrameWidth`, `FrameHeight` e as `Durations` — os mesmos campos que o
+  protótipo embute, e **conferido que batem** (Charizard 40×48, durações 8/10/8/10).
+- **A quinta linha** da folha é o norte (de costas), índice 4 — como no protótipo.
+- **⚠️ A CAIXA DE CADA QUADRO É CALCULADA EM RUNTIME**, uma vez por espécie, varrendo os pixels não
+  transparentes. O protótipo traz `boxes` embutido, e manter uma tabela dessas pras 250 seria mais
+  um dado pra envelhecer. É ela que centraliza o bicho na raia e ancora os pés.
+- **⚠️ E NUNCA SE SUBSTITUI UM SPRITE POR OUTRO:** se uma espécie falhar, **a largada é bloqueada** e
+  a tela diz **qual** faltou, pelo nome. O pedido é explícito nisso.
+- A cadência do Walk acompanha a velocidade (o 2,2 e o /12 do protótipo) e **não decide distância
+  nenhuma** — há trava cobrando que `quadroT` não apareça na conta de `dist`.
+
+### ⚠️ O ESTADO É UM `const` QUE NUNCA É REATRIBUÍDO
+
+Ele é **mutado** (`corridaZerar` troca os campos e a referência continua a mesma). Isso não é
+estilo: o sandbox dos testes copia o valor na criação, então reatribuir `corrida` deixaria as
+funções internas olhando pro objeto velho — **as travas mediriam o nada**, e foi exatamente o que
+aconteceu na primeira rodada (a física "não terminava" e o número de corredores era sempre 2).
+O jogo ganha junto: some o `if(!corrida)` que teria que abrir toda função.
+
+**E ele vive FORA do `game`:** nada da corrida vai pro save nem pro Firestore, e os pokémon entram
+como CÓPIAS. Medido: o time do save fica **byte a byte idêntico** depois de uma corrida inteira.
+
+### O QUE FOI MEDIDO NO NAVEGADOR
+
+| | |
+|---|---|
+| as **seis** combinações (2/3/4 × individual/revezamento) | todas terminam, distância exata, trocas em 300 e 600 |
+| a lista de corredores | ordenada pelo **Speed da corrida** — o mesmo número que decide a pista |
+| os NPCs | forma final pelo `finalEvolutionOf`, sem repetir linha na equipe, nível do trecho |
+| a pausa da aba | **31 s** oculta = **zero** metros, e sem salto na volta |
+| a 320px | setup 657px, picker 872px, corrida 699px — **sem rolagem lateral** em nenhuma |
+| no **iPhone 16e** (390×844) | a corrida **cabe inteira sem rolar** (844px exatos), botão 328×52 |
+
+### O QUE FICA PENDENTE DA LIGA LARANJA
+
+Nada disto foi integrado, e é escopo desta etapa: **o acesso por Surf**, a **Liga Laranja** em si,
+insígnias, recompensas e cobranças. O modo abre **só** pelo botão administrativo da home.
+Quando a Liga existir, os pontos que mudam são: a **porta** (hoje `admin`), o **nível dos NPCs**
+(hoje `nivelDoNpc`, que é uma função justamente pra isso), a **dificuldade** (`CORRIDA_NPC`) e o que
+hoje não existe — **gravar resultado**, que é a primeira coisa que vai precisar de backend e de uma
+checagem de permissão do lado de lá.
+
 ## Frontend
 
 - **A tela de notificações é uma caixa de entrada**: lista de títulos em cima, corpo do que está

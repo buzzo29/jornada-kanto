@@ -191,6 +191,23 @@ selo('terreno', t => {
   pintar(t, poligono([[2,15],[12,3],[22,15],[22,20],[12,8],[2,20]]), '*', { liso: true });
 });
 
+selo('corrida', t => {
+  /* A BANDEIRA QUADRICULADA DE CHEGADA -- e a forma que diz "corrida" sem palavra nenhuma, e ela
+     sobrevive a reducao porque e um BLOCO solido: o xadrez vira textura a 16px, nao ruido.
+     ⚠️ O MASTRO E GROSSO (2px) pelo mesmo motivo do contorno: com 1px ele sumia na reducao e a
+     bandeira ficava flutuando. E ele fica a ESQUERDA, que e de onde a bandeira nasce.
+     O xadrez e 3x2 casas de 5px -- medido em ASCII, 4x3 casas de 4px vira mancha cinza. */
+  const MX = 4, TOPO = 3, CASA = 5, COLS = 3, LINS = 2;
+  pintar(t, retangulo(MX, TOPO, 2, 18), 'z');                 /* o mastro */
+  const x0 = MX + 2;
+  pintar(t, retangulo(x0, TOPO, COLS * CASA, LINS * CASA), 'w');
+  for(let c = 0; c < COLS; c++) for(let l = 0; l < LINS; l++){
+    /* ⚠️ AS CASAS ESCURAS SAO CINZA (`z`) E NAO PRETO: o contorno do jogo E preto, e com `k` o
+       xadrez FUNDIA com ele -- a bandeira perdia a borda do lado escuro e virava um bloco. */
+    if((c + l) % 2) pintar(t, retangulo(x0 + c * CASA, TOPO + l * CASA, CASA, CASA), 'z');
+  }
+});
+
 selo('fogo', t => {   /* chama: gota de fora, nucleo claro dentro */
   pintar(t, poligono([[12,1],[17,8],[19,13],[17.5,19],[12,22],[6.5,19],[5,13],[8,7]]), 'r');
   pintar(t, poligono([[12,8],[15,13],[14,19],[12,21],[10,19],[9,13]]), 'y');
