@@ -13,6 +13,9 @@
 const path = require('path');
 const { createSandbox } = require('./game-sandbox');
 const S = createSandbox(path.join(__dirname, '..', 'index.html'));
+/* ⚠️ a moeda virou DESENHO nosso (17/09/2026): a trava procura o <symbol>, que e a identidade
+   dele, em vez do caractere -- assim o desenho pode ser reajustado sem derrubar a trava. */
+const RE_MOEDA = '<svg[^>]*><use href="#s-moeda"\/><\/svg>';
 
 let falhas = 0;
 function ok(nome, cond, extra){
@@ -217,13 +220,13 @@ console.log('\n=== O PRECO DO MODO DIFICIL, E A CHANCE DE SHINY DELE ===');
                              g.novoSaveErro = null; S.__setGame(g); return S.renderNewSaveMode(); };
   const pobre = comMoedas(3);
   ok('sem moeda, o card do dificil sai desabilitado', /mode-card hard sem-moeda[^>]*disabled/.test(pobre));
-  ok('e diz quanto falta', /Faltam <strong>🪙 7<\/strong>/.test(pobre),
+  ok('e diz quanto falta', new RegExp('Faltam <strong>' + RE_MOEDA + ' 7<\\/strong>').test(pobre),
      (pobre.match(/Faltam[^<]*<strong>[^<]*<\/strong>[^<]*/) || [''])[0]);
   const rico = comMoedas(25);
   ok('com moeda, ele volta a clicar', !/sem-moeda/.test(rico) && !/mode-card hard[^>]*disabled/.test(rico));
-  ok('e mostra o preco e o saldo', /Custa <strong>🪙 10<\/strong> — você tem 🪙 25/.test(rico),
+  ok('e mostra o preco e o saldo', new RegExp('Custa <strong>' + RE_MOEDA + ' 10<\\/strong> — você tem ' + RE_MOEDA + ' 25').test(rico),
      (rico.match(/Custa[^<]*<strong>[^<]*<\/strong>[^<]*/) || [''])[0]);
-  ok('o preco aparece no titulo do card', /mode-card-preco">🪙 10</.test(rico));
+  ok('o preco aparece no titulo do card', new RegExp('mode-card-preco">' + RE_MOEDA + ' 10<').test(rico));
 
   /* E o pickGameMode RECUSA por fora da tela: a regra nao pode viver so no desenho. */
   comMoedas(3);

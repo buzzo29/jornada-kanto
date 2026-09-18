@@ -11,6 +11,9 @@
 const path = require('path');
 const { createSandbox } = require('./game-sandbox');
 const S = createSandbox(path.join(__dirname, '..', 'index.html'));
+/* ⚠️ a moeda virou DESENHO nosso (17/09/2026): a trava procura o <symbol>, que e a identidade
+   dele, em vez do caractere -- assim o desenho pode ser reajustado sem derrubar a trava. */
+const RE_MOEDA = '<svg[^>]*><use href="#s-moeda"\/><\/svg>';
 
 let falhas = 0;
 function ok(nome, cond, extra){
@@ -839,11 +842,11 @@ console.log('\n=== A OFERTA SELVAGEM ===');
   /* O NUMERO SAI DA CONSTANTE, nao escrito a mao: o preco ja subiu uma vez (3 -> 5 em
      11/09/2026) e o teste quebrou junto. Amarrado a constante, o proximo reajuste so muda o
      valor -- o que se cobra aqui e a FORMA do botao. */
-  ok('com o texto pedido', tela.includes('🪙 ' + S.MOEDAS_RESSORTEIO + ' - Sortear novamente'),
+  ok('com o texto pedido', tela.includes(S.selo('moeda') + ' ' + S.MOEDAS_RESSORTEIO + ' - Sortear novamente'),
      (tela.match(/Sortear[^<]*/g)||[]).join(' | '));
   ok('e o saldo do lado direito, dentro do mesmo botao',
-     /wild-reroll[^>]*>[\s\S]*?Possui: 🪙 1000[\s\S]*?<\/button>/.test(tela),
-     (tela.match(/Possui: 🪙 \d+/g)||[]).join(' '));
+     new RegExp('wild-reroll[^>]*>[\\s\\S]*?Possui: ' + RE_MOEDA + ' 1000[\\s\\S]*?<\\/button>').test(tela),
+     (tela.match(new RegExp('Possui: ' + RE_MOEDA + ' \\d+', 'g'))||[]).join(' '));
   /* A frase que explicava o re-sorteio saiu a pedido: o botao ja diz o preco e o saldo. */
   ok('e a frase antiga do saldo saiu', !/O re-sorteio troca as espécies/.test(tela));
   /* Abaixo do preco ele nasce desabilitado -- um botao que so recusa quando clicado e pior. */
@@ -2086,6 +2089,10 @@ console.log('\n=== A MONTANHA SAGRADA (17/09/2026) ===');
 
   /* ---------- 5) A PORTA UNICA ---------- */
   g.montanha = null;
+  /* ⚠️ VISITAR PRIMEIRO, que e o que o jogo faz: desde 18/09/2026 as missoes so comecam depois
+     que o treinador chega na tela dos ninhos. Sem esta linha a porta devolve [] -- e devolver []
+     e o CERTO ali, tanto que ha um bloco inteiro medindo isso mais abaixo. */
+  S.visitarOsNinhos();
   porGinasio(blaineIdx, tresPlanta);
   const acesos1 = S.conferirNinhos(true, [mu('lapras',true), mu('lapras',true), mu('lapras',true)]);
   ok('conferirNinhos devolve os que acenderam AGORA', acesos1.indexOf('moltres') >= 0 && acesos1.indexOf('articuno') >= 0,
@@ -2124,6 +2131,7 @@ console.log('\n=== A MONTANHA SAGRADA (17/09/2026) ===');
   /* AS TRES REINICIAM AO RECEBER, e nao ao vencer: quem vence e fecha a aba antes de escolher nao
      pode perder as tres missoes que levaram a jornada inteira pra acender. */
   g.montanha = null;
+  S.visitarOsNinhos();   /* ver a nota do bloco 5 */
   porGinasio(blaineIdx, tresPlanta);
   /* QUEM ACENDE E A PORTA UNICA, e nao os ganchos soltos: o passoDoZapdos so anda o contador.
      Sao tres vitorias de ginasio, e a primeira ja acendeu os outros dois. */
@@ -2138,6 +2146,234 @@ console.log('\n=== A MONTANHA SAGRADA (17/09/2026) ===');
   ok('o Lugia entra no time', g.team.length === 4 && g.team[3].speciesId === 'lugia',
      g.team.map(p=>p.speciesId).join(','));
   ok('e ai sim as tres reiniciam', S.ninhosAcesos() === 0 && S.missoesDaMontanha().sequenciaDeGinasios === 0);
+
+  /* ---------- 7b) AS MISSOES SO COMECAM DEPOIS DA PRIMEIRA VISITA (18/09/2026) ----------
+     Pedido: *"coloque que as missoes dos ninhos, so irao comecar a acontecer depois que o
+     treinador visita o ninho pela primeira vez"*.
+     ⚠️ Antes disso elas contavam desde o primeiro ginasio da jornada -- dava pra chegar na
+     Montanha com o Zapdos JA ACESO sem nunca ter sabido que existia uma missao. */
+  {
+    /* ⚠️ ZERA OS DOIS: as missoes sao do SAVE (g.montanha) e a VISITA e da CONTA
+       (g.visitouOsNinhos) -- zerar so o save deixaria a visita de um caso vazando pro seguinte. */
+    const zeraTudo = () => { g.montanha = null; g.visitouOsNinhos = false; S.missoesDaMontanha(); };
+    const tresGelo = [mu('lapras',true), mu('lapras',true), mu('lapras',true)];
+
+    /* 1) SEM VISITA, nenhum dos tres acende -- nem o que nao depende de sequencia */
+    zeraTudo();
+    porGinasio(blaineIdx, tresPlanta);
+    const semVisita = S.conferirNinhos(true, tresGelo);
+    ok('sem visitar, NENHUM ninho acende', semVisita.length === 0 && S.ninhosAcesos() === 0,
+       semVisita.join(',') + ' / acesos: ' + S.ninhosAcesos());
+
+    /* ⚠️ E A SEQUENCIA DO ZAPDOS NEM ANDA: a guarda sai ANTES do passoDoZapdos, que e o unico
+       dos tres que ESCREVE. Se ela saisse depois, a sequencia acumularia no escuro e o ninho
+       acenderia na primeira batalha DEPOIS da visita -- ou seja, a missao teria sido cumprida
+       antes de o jogador saber dela, que e exatamente o que o pedido tira. */
+    zeraTudo();
+    porGinasio(blaineIdx, tresPlanta);
+    S.conferirNinhos(true, []); S.conferirNinhos(true, []); S.conferirNinhos(true, []);
+    ok('e a sequencia do Zapdos nem anda antes da visita',
+       (S.missoesDaMontanha().sequenciaDeGinasios || 0) === 0,
+       'sequencia: ' + S.missoesDaMontanha().sequenciaDeGinasios);
+    /* ela comeca do ZERO na visita: as tres vitorias de cima nao contam pra nada */
+    S.visitarOsNinhos();
+    S.conferirNinhos(true, []);
+    ok('e comeca do zero depois dela', S.missoesDaMontanha().sequenciaDeGinasios === 1,
+       'sequencia: ' + S.missoesDaMontanha().sequenciaDeGinasios);
+
+    /* 2) DEPOIS DA VISITA tudo volta a valer -- sem isto bastaria apagar o conferirNinhos */
+    zeraTudo();
+    S.visitarOsNinhos();
+    porGinasio(blaineIdx, tresPlanta);
+    const comVisita = S.conferirNinhos(true, tresGelo);
+    ok('depois de visitar, os ninhos acendem normalmente',
+       comVisita.indexOf('moltres') >= 0 && comVisita.indexOf('articuno') >= 0, comVisita.join(','));
+
+    /* 3) A MARCA E UMA SO -- visitar de novo nao "reinicia" nada */
+    zeraTudo();
+    ok('a primeira visita marca', S.visitarOsNinhos() === true);
+    ok('e a segunda nao', S.visitarOsNinhos() === false);
+
+    /* 4) ⚠️ O CAMPO E NOVO, nao e o 'visitas': aquele conta LENDARIOS RECEBIDOS (quem o
+       incrementa e o entregarDaMontanha) e servia so pra variar a semente dos guardioes.
+       Lido como "ja visitou", ele so viraria 1 DEPOIS do premio. */
+    zeraTudo();
+    S.visitarOsNinhos();
+    ok('visitar nao mexe no contador de lendarios recebidos',
+       (S.missoesDaMontanha().visitas || 0) === 0, String(S.missoesDaMontanha().visitas));
+
+    /* 5) SAVE ANTIGO: quem ja tinha progresso nao perde nada. Sao as tres deducoes, uma a uma. */
+    const antigo = (campos) => {
+      g.visitouOsNinhos = false;   /* a conta NAO sabe: e o save velho que tem que responder */
+      g.montanha = Object.assign({ ninhos:{}, sequenciaDeGinasios:0 }, campos);
+    };
+    antigo({ ninhos: { zapdos: true } });
+    ok('save antigo com ninho ACESO ja conta como visitado', S.missoesComecaram());
+    antigo({ sequenciaDeGinasios: 2 });
+    ok('save antigo com sequencia ANDANDO tambem', S.missoesComecaram());
+    antigo({ visitas: 1 });
+    ok('e save antigo que ja RECEBEU um lendario tambem', S.missoesComecaram());
+    antigo({});
+    ok('mas save sem progresso nenhum nao', !S.missoesComecaram());
+
+    /* 6) ⚠️ O REINICIO DO PREMIO NAO ZERA A VISITA: ela e o CONHECIMENTO do jogador, nao o
+       progresso. Quem acaba de escolher um lendario esta justamente na tela dos ninhos --
+       zerando, ele teria que subir a montanha de novo pras missoes voltarem a contar, e ela sai
+       em 1 de cada 4 trechos. */
+    zeraTudo();
+    S.visitarOsNinhos();
+    S.reiniciarMissoesDaMontanha();
+    ok('reiniciar as missoes NAO apaga a visita', S.missoesComecaram());
+    porGinasio(blaineIdx, tresPlanta);
+    ok('e as missoes continuam contando depois do reinicio',
+       S.conferirNinhos(true, tresGelo).indexOf('moltres') >= 0);
+
+    /* 7) ⚠️ PONTA A PONTA -- e esta e a que importa, porque ela testa a TRANSICAO e nao as
+       pecas: quem chama o visitarOsNinhos e o continueAfterSpecial, e todos os casos acima o
+       chamariam na mao. Sem ela, a marca podia estar no lugar errado e tudo continuaria verde. */
+    {
+      zeraTudo();
+      porGinasio(blaineIdx, tresPlanta);
+      const antes = S.conferirNinhos(true, tresGelo);
+      ok('ponta a ponta: antes de subir a montanha, nada acende', antes.length === 0, antes.join(','));
+
+      /* a batalha dos guardioes acaba VENCENDO -- o caminho de verdade */
+      g.montanhaGuarda = S.montarOsGuardioes();
+      g.specialBattle = { context: 'montanha' };
+      g.specialBattleResult = { win: true };
+      g.screen = 'specialResult';
+      S.continueAfterSpecial();
+      ok('ponta a ponta: vencer os guardioes leva aos ninhos', g.screen === 'ninhos', g.screen);
+      ok('ponta a ponta: e a chegada marca a visita', S.missoesComecaram());
+
+      const depois = S.conferirNinhos(true, tresGelo);
+      ok('ponta a ponta: e dali em diante as missoes contam',
+         depois.indexOf('moltres') >= 0 && depois.indexOf('articuno') >= 0, depois.join(','));
+
+      /* ⚠️ E QUEM PERDE OS GUARDIOES NAO VE A TELA, entao nao visitou: as missoes continuam
+         paradas. E o pedido ao pe da letra -- ele nao chegou no ninho. */
+      zeraTudo();
+      g.montanhaGuarda = S.montarOsGuardioes();
+      g.specialBattle = { context: 'montanha' };
+      g.specialBattleResult = { win: false };
+      g.screen = 'specialResult';
+      S.continueAfterSpecial();
+      ok('ponta a ponta: quem PERDE os guardioes nao visitou', !S.missoesComecaram(),
+         'tela: ' + g.screen);
+    }
+
+    /* 7c) ⚠️ A VISITA E DA CONTA, NAO DO SAVE -- e este e o caso que decide a feature.
+       O pedido diz *"depois que o treinador visita o ninho PELA PRIMEIRA VEZ"*, e a primeira vez e
+       uma so na vida do treinador. Por save ela seria "a primeira de cada jornada" -- e ai a
+       mecanica quase deixava de existir: a Montanha cai no trecho 7 ou 8 em 58% das vezes que sai,
+       e dali NAO SOBRAM tres ginasios pro Zapdos (nem o Blaine, pro Moltres, quando cai no 8). */
+    {
+      zeraTudo();
+      S.visitarOsNinhos();
+      /* troca de save: o game.montanha e do SAVE e some; a visita e da CONTA e fica */
+      g.montanha = null;
+      S.missoesDaMontanha();
+      ok('a visita atravessa a troca de save', S.missoesComecaram());
+      porGinasio(blaineIdx, tresPlanta);
+      ok('e as missoes ja valem no primeiro ginasio da jornada seguinte',
+         S.conferirNinhos(true, tresGelo).indexOf('moltres') >= 0);
+
+      /* ⚠️ E ELA SOBREVIVE AO resetGame, que e o que abrir um save faz: sem o campo no
+         CAMPOS_DA_CONTA a marca sumiria e as missoes parariam de contar em silencio. */
+      ok('e o campo esta no CAMPOS_DA_CONTA',
+         (S.CAMPOS_DA_CONTA || []).indexOf('visitouOsNinhos') >= 0,
+         'fora da lista');
+      const snap = S.snapshotDaConta ? S.snapshotDaConta() : null;
+      if(snap){
+        g.visitouOsNinhos = false;
+        S.restauraDadosDaConta(snap);
+        ok('e o snapshot da conta a devolve', g.visitouOsNinhos === true);
+      }
+    }
+
+    /* 7d) ⚠️ A DEDUCAO VARRE A CONTA INTEIRA, e nao so o save aberto.
+       Foi o primeiro teste de verdade que pegou isto: quem subiu a Montanha ONTEM e hoje comecou
+       uma jornada NOVA nao era reconhecido -- o save novo nao tem progresso nenhum --, e o
+       jogador derrotava o Blaine com tres de Planta sem o ninho acender.
+       A marca e da CONTA, entao a pergunta tambem tem que ser. */
+    {
+      const semSaves = () => { g.saveSlots = new Array(20).fill(null); };
+      zeraTudo(); semSaves();
+      ok('save novo, sem nada em lugar nenhum: as missoes nao comecaram', !S.missoesComecaram());
+
+      /* um OUTRO slot tem ninho aceso -> a conta ja visitou */
+      zeraTudo(); semSaves();
+      g.saveSlots[7] = { montanha: { ninhos: { zapdos: true }, sequenciaDeGinasios: 0 } };
+      ok('outro save com ninho aceso conta pela CONTA inteira', S.missoesComecaram());
+
+      zeraTudo(); semSaves();
+      g.saveSlots[3] = { montanha: { ninhos: {}, sequenciaDeGinasios: 2 } };
+      ok('e outro save com a sequencia andando tambem', S.missoesComecaram());
+
+      zeraTudo(); semSaves();
+      g.saveSlots[0] = { montanha: { ninhos: {}, sequenciaDeGinasios: 0, visitas: 1 } };
+      ok('e outro save que ja recebeu um lendario tambem', S.missoesComecaram());
+
+      /* ⚠️ E O CASO QUE OS TRES DE CIMA NAO PEGAM: o save que ganhou o premio teve as missoes
+         REINICIADAS logo em seguida, o que apaga ninhos e sequencia. O que sobra e o lendario
+         no TIME -- e sem esta linha, quem fechou os tres ninhos era justamente quem perdia a
+         marca. (O `visitas` cobre a maioria, mas ele e do save, nao da conta.) */
+      zeraTudo(); semSaves();
+      g.saveSlots[5] = { montanha: { ninhos: {}, sequenciaDeGinasios: 0 },
+                         team: [{ speciesId:'pidgeot' }, { speciesId:'lugia' }] };
+      ok('e um LENDARIO da Montanha no time de qualquer save tambem', S.missoesComecaram());
+
+      zeraTudo(); semSaves();
+      g.saveSlots[5] = { montanha: { ninhos: {}, sequenciaDeGinasios: 0 },
+                         team: [{ speciesId:'pidgeot' }, { speciesId:'gyarados' }] };
+      ok('mas um time sem lendario da Montanha nao', !S.missoesComecaram());
+
+      /* o save aberto continua valendo, que e o caso de quem estava no meio */
+      zeraTudo(); semSaves();
+      S.missoesDaMontanha().ninhos.articuno = true;
+      ok('e o save ABERTO continua contando', S.missoesComecaram());
+    }
+
+    /* 7e) ⚠️ O NINHO CHEIO NAO REPETE A MISSAO (a pedido). Ela ja foi cumprida -- repeti-la
+       faria a tela parecer que ainda ha o que fazer. E ela VOLTA sozinha quando as tres
+       reiniciam, porque ai o ninho esvazia. */
+    {
+      zeraTudo();
+      const n0 = S.NINHOS[0];
+      g.ninhoAberto = n0.id;
+      let h = S.renderNinhoModal();
+      ok('o ninho VAZIO conta a missao', h.indexOf(n0.missao) >= 0 && h.indexOf(n0.dica) >= 0);
+      S.acenderNinho(n0.id);
+      h = S.renderNinhoModal();
+      ok('o ninho CHEIO nao repete a missao', h.indexOf(n0.missao) < 0);
+      ok('mas diz que esta ocupado e nomeia quem esta la',
+         h.indexOf('ninho est\u00e1 ocupado') >= 0 && h.indexOf(n0.nome) >= 0);
+      S.reiniciarMissoesDaMontanha();
+      h = S.renderNinhoModal();
+      ok('e a missao VOLTA depois de resetar as tres', h.indexOf(n0.missao) >= 0);
+      g.ninhoAberto = null;
+    }
+
+    /* 8) A GUARDA MORA DENTRO DA PORTA UNICA -- o teste LE O CODIGO, porque um caso de
+       comportamento passaria com ela escrita em qualquer chamador. E a licao do registrarSketch. */
+    const cli = require('fs').readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+    const i = cli.indexOf('function conferirNinhos(');
+    const corpo = i < 0 ? '' : cli.slice(i, cli.indexOf('return acesos;', i));
+    ok('a guarda mora DENTRO do conferirNinhos', corpo.indexOf('if(!missoesComecaram()) return [];') >= 0,
+       'sem a guarda');
+    /* a comparacao e com a CHAMADA, nao com a palavra: o comentario da propria guarda cita o
+       passoDoZapdos, e um indexOf solto acha o comentario primeiro. */
+    ok('e ela vem ANTES do passoDoZapdos (o unico que escreve)',
+       corpo.indexOf('if(!missoesComecaram()) return [];') < corpo.indexOf('if(passoDoZapdos(venceu)'),
+       'a guarda vem depois');
+    /* e a marca e posta na ACAO que alcanca a tela, nao no render */
+    const j = cli.indexOf("game.screen = 'ninhos';");
+    ok('a visita e marcada ao chegar na tela dos ninhos',
+       j > 0 && cli.slice(Math.max(0, j - 400), j).indexOf('visitarOsNinhos()') >= 0, 'sem a marca');
+    ok('e nao no render (render e apresentacao)',
+       (cli.match(/function renderNinhos\(\)[\s\S]{0,600}/) || [''])[0].indexOf('visitarOsNinhos') < 0,
+       'o render marca a visita');
+  }
 
   /* ---------- 8) A TELA ---------- */
   g.montanha = null;

@@ -1445,6 +1445,249 @@ maior chance do bloco: **30% por confronto**, empatada com o Metrônomo (que ren
   diverge faz a mesma batalha terminar diferente no cliente e no servidor.
 
 
+### A LISTA FICA ONDE ESTAVA (18/09/2026)
+
+Reportado assim: *"quando eu clico em um TM na lista de TMs na loja, se eu clicar no último da
+lista, a lista volta para o topo automaticamente ... e veja se tem outros pontos que usam a lista
+parecida que está assim também e arrume em todos"*.
+
+**O `render` já preservava a rolagem da PÁGINA** -- o que faltava era a de **DENTRO**. Medido no
+navegador, a 320px, com o último TM da lista: **906 → 0**. Hoje: **906 → 906**.
+
+- **⚠️ NÃO EXISTE LISTA DE CLASSES NO MECANISMO, e é de propósito.** São **dez** contêineres que
+  rolam por dentro hoje (a lista da loja e a da mochila, o miolo da loja, o ranking da Torre, as
+  notificações e o corpo delas, os golpes da ficha, "Pokémons desta rota", as Variações do Unown,
+  "Quem pode aprender") -- e uma lista à mão envelheceria na **próxima** que nascesse rolável.
+  É a mesma armadilha da lista à mão do `passosHtml` (que deixou as três linhas do congelamento
+  caírem no ramo do golpe comum) e do texto fixo do `obsDoGolpe`.
+  **Quem rolou tem `scrollTop > 0`, e é só isso que se pergunta.**
+- **A CHAVE é a classe MAIS a posição entre os irmãos de mesma classe** (`loja-lista#2`). Só a
+  classe faria duas listas iguais na mesma tela trocarem de rolagem entre si; ela sobrevive ao
+  redesenho porque o HTML é o mesmo.
+- **SÓ QUEM ROLOU É GUARDADO.** Guardar tudo faria o repor escrever `scrollTop` em ~185 elementos
+  a cada toque, e escrever `scrollTop` é mais caro que lê-lo.
+- **⚠️ E SÓ NA MESMA TELA** -- quem responde é o `mesmaTela`, que já guardava a rolagem da página:
+  os dois passaram a andar juntos. Trocar de tela tem que começar do topo.
+- **⚠️ TROCAR DE PRATELEIRA VOLTA AO TOPO**, e é o contrário: ali a lista é **OUTRA**, e manter a
+  rolagem largaria o jogador no meio de uma que ele nunca rolou. Quem escolhe um ITEM fica onde
+  estava; quem troca de PRATELEIRA volta. Medido: **906 → 0**, e é o certo.
+
+**CUSTO MEDIDO a 320px, na loja:** guardar **0,098ms** + repor **0,082ms** contra **4,44ms** do
+`render` inteiro -- **4%**. E ele é proporcional ao número de elementos com classe (185 naquela
+tela), não ao número de listas.
+
+**CONFERIDO QUE NÃO É MOTOR, por DUAS impressões:** a do MOTOR e a do DIÁRIO são **idênticas** em
+900 batalhas semeadas. É apresentação inteira.
+
+`tools/test-inventario.js` tranca 13 pontas, e **a que importa é a da classe NOVA**: um contêiner
+de uma classe que nunca foi cadastrada em lugar nenhum é preservado -- é ela que prova a cobertura
+das dez de uma vez, e é a **única** que cai se alguém trocar o mecanismo por uma lista à mão
+(conferido: 3 falhas). Mais as duas listas de mesma classe não trocando de rolagem, o `mesmaTela`,
+o repor vindo depois do `innerHTML`, e as duas prateleiras zerando.
+
+### AS MISSÕES DOS NINHOS SÓ COMEÇAM DEPOIS DA PRIMEIRA VISITA (18/09/2026)
+
+Pedido assim: *"coloque que as missões dos ninhos, só irão começar a acontecer depois que o
+treinador visita o ninho pela primeira vez"*.
+
+**⚠️ ANTES ELAS CONTAVAM DESDE O PRIMEIRO GINÁSIO DA JORNADA**, e o número diz o tamanho disso:
+medido em 2.000 jornadas com o bot, **19 terminavam com o Zapdos aceso e a Montanha tinha sido
+visitada 5 vezes**. Ou seja, quase todas cumpriam a missão **sem nunca ter visto um ninho** -- e as
+três são o oposto disso: a do Moltres pede um time montado de propósito, a do Zapdos uma sequência,
+a do Articuno um pokémon guardado pra três confrontos. Elas só valem como desafio pra quem sabe que
+existem.
+
+- **A GUARDA MORA DENTRO DO `conferirNinhos`**, que é a porta única por onde um ninho acende --
+  fechá-la por dentro é o que impede um chamador futuro de reabri-la sem ninguém ver. É a mesma
+  decisão do `registrarSketch`, que aprendeu isso do jeito caro.
+- **⚠️ E ELA SAI ANTES DO `passoDoZapdos`, que é o único dos três que ESCREVE.** Saindo depois, a
+  sequência **acumularia no escuro** e o ninho acenderia na primeira batalha DEPOIS da visita -- ou
+  seja, a missão teria sido cumprida antes de o jogador saber dela, que é exatamente o que o pedido
+  tira. Medido com a guarda no lugar errado: a sequência chega a **3** sem nenhuma visita.
+- **A MARCA É POSTA NA AÇÃO que alcança a tela**, não no `renderNinhos`: render é apresentação e
+  acontece de novo toda vez que a tela é redesenhada (voltar de um modal, perder a batalha dos
+  quatro). E **quem perde os guardiões não visitou** -- ele não chegou no ninho.
+
+#### ⚠️ A VISITA É DA CONTA, NÃO DO SAVE -- e é aqui que a decisão está
+
+O pedido diz *"o treinador visita o ninho **pela primeira vez**"*, e **a primeira vez é uma só na
+vida do treinador**: por save, seria "a primeira de cada jornada". É a mesma leitura (e o mesmo
+molde) do **HM01**, que nasceu por save e foi movido pra conta em 11/09/2026.
+
+**⚠️ E NÃO É SÓ LEITURA DE TEXTO: por save a mecânica quase deixava de existir.** A Montanha sai
+em **53,6%** das jornadas, e quando sai ela cai:
+
+| onde a Montanha sai | quantas vezes | ginásios que sobram |
+|---|---|---|
+| trecho 6 | 42% | 3 -- o Zapdos cabe, no limite |
+| trecho 7 | 31% | 2 -- **Zapdos impossível** |
+| trecho 8 | 26% | 1 -- **Zapdos e Moltres impossíveis** (o Blaine é o 7º de Kanto, já passou) |
+
+Ou seja: por save, o Zapdos ficava **matematicamente impossível em 58% das jornadas que TÊM
+montanha** -- e em 46,4% ela nem aparece.
+
+**O QUE A DECISÃO ENTREGA, medido** (uma jornada que vence os 8 ginásios com 3 de Planta no time):
+
+| a Montanha sai no | 1ª jornada | 2ª em diante |
+|---|---|---|
+| trecho 6 | 3 ninhos | 3 |
+| trecho 7 | 2 | **3** |
+| trecho 8 | 0 | **3** |
+| não sai | 0 | **3** |
+
+**A descoberta acontece UMA VEZ, e dali em diante o jogo é o de sempre.**
+
+- **⚠️ O CAMPO É NOVO, e não o `visitas`:** aquele tem nome enganoso -- ele conta **LENDÁRIOS
+  RECEBIDOS** (quem o incrementa é o `entregarDaMontanha`) e serve só pra variar a semente dos
+  guardiões. Lido como "já visitou", ele só viraria 1 **depois** do prêmio.
+- **⚠️ A DEDUÇÃO VARRE A CONTA INTEIRA, e não só o save aberto** -- ela nasceu olhando só o save,
+  e **o primeiro teste de verdade pegou o buraco**: reportado como *"eu derrotei o blaine com 3
+  pokemons de planta e não ativou o ninho de fogo"*. Quem subiu a Montanha **ontem** e hoje
+  começou uma jornada **nova** não era reconhecido, porque o save novo não tem progresso nenhum.
+  A marca é da CONTA, então a pergunta também tem que ser: basta **um** save mostrar que a tela
+  já foi vista. É a mesma razão pela qual o `repararEvolucoesAtrasadas` roda na HOME e não na
+  abertura do save.
+  São **quatro sinais**, e o quarto existe por um caso que os outros três não pegam: ninho aceso,
+  sequência andando, lendário recebido (`visitas`) e **um lendário da Montanha no time**. O save
+  que fechou os três ninhos teve as missões **reiniciadas** ao receber o prêmio -- o que apaga os
+  três primeiros sinais --, então sem o quarto justamente quem completou tudo perdia a marca.
+- **A varredura do relato não achou defeito na missão**, e vale registrar o que ela cobriu: as
+  **24 espécies de Planta** do jogo contam (inclusive as de tipo duplo e as de Johto), o Moltres
+  acende com 3, 4, 5 de Planta, com um ou dois deles **desmaiados**, com o time de 3, e com as
+  formas base. Os únicos "não acende" são os legítimos: dois de Planta, o trecho 7 jogado em
+  **Johto** (ali o líder é o Pryce), o ninho já aceso, e o contexto de Ginásio da Cidade sujo.
+- **⚠️ O NINHO CHEIO NÃO REPETE A MISSÃO** (a pedido: *"depois de eu conseguir completar uma
+  missão, não precisa mais exibir a mensagem dela, somente após resetar as missões"*). Ela já foi
+  cumprida -- o que o jogador precisa saber ali é **quem está no ninho**, e a missão de volta faria
+  a tela parecer que ainda há o que fazer. **Ela volta sozinha quando as três reiniciam**, porque
+  aí o ninho esvazia: o texto sai do MESMO `n.missao` e não há um segundo estado pra manter.
+  O CLAUDE.md dizia o contrário (*"o cheio conta a que foi cumprida"*) -- era o desenho de 17/09,
+  e durou um dia.
+  **Medido a 320px:** o modal do ninho cheio cai de **298 para 281px** e volta aos 298 depois do
+  reinício, sem rolagem lateral.
+- **O REINÍCIO DO PRÊMIO NÃO ZERA A VISITA**: ela é o CONHECIMENTO do jogador, não o progresso.
+  Quem acaba de escolher um lendário está justamente na tela dos ninhos.
+- **A gravação é best-effort**, como a do HM e a do rival padrão; e o campo entrou no
+  `CAMPOS_DA_CONTA` -- sem isso o `resetGame` o apagaria ao abrir um save e as missões parariam
+  de contar em silêncio.
+
+**NADA MUDA NA TELA**, e é consequência: antes da primeira visita a tela dos ninhos nunca é vista,
+e depois dela tudo é igual. **As duas impressões -- MOTOR e DIÁRIO -- são idênticas** em 900
+batalhas semeadas; o servidor não conhece ninho nenhum.
+
+`tools/test-jornada.js` tranca 37 pontas, e a que importa é a de **PONTA A PONTA**: ela vence os
+guardiões de verdade pelo `continueAfterSpecial` e cobra que a tela dos ninhos seja alcançada, que
+a chegada marque, e que dali em diante as missões contem -- todos os outros casos chamariam o
+`visitarOsNinhos` na mão, e aí a marca podia estar no lugar errado com tudo verde.
+Conferido que a bateria acusa com cada defeito religado: **5** falhas sem a guarda, **4** com ela
+depois do `passoDoZapdos`, **2** com o reinício zerando a visita e **3** sem a dedução do save
+antigo.
+
+### ⚠️ QUEM JÁ CAIU PERDIA O TURNO NA TELA (18/09/2026)
+
+Reportado com print, **na Torre**: a Jynx matou o Primeape (o cabeçalho já mostrava `0/435`) e a
+linha *"Primeape continua a dormir e não pode atacar"* saía **logo depois** do golpe que o derrubou.
+
+```
+Jynx atacou Primeape com Psíquico e tirou −391 de HP.
+Jynx atacou Primeape com Psíquico e tirou −44 de HP.     ← ele morre aqui (391+44 = 435)
+😴 Primeape continua a dormir e não pode atacar.          ← e perde o turno depois de morto
+```
+
+**⚠️ A CAUSA É A POSIÇÃO DA CHAMADA, e ela está certa:** o `dormeDe(second)` vem **depois** do golpe
+do first — e tem que vir, porque a frase é sobre **o turno dele**, que acontece depois do golpe de
+quem é mais rápido (foi assim que ela nasceu, em 16/09, justamente pra não sair na ordem invertida).
+O que faltava é que **o golpe do first pode ter derrubado o second**.
+
+Medido: a linha saía em **47% dos confrontos** em que o adormecido morre.
+
+**A guarda mora DENTRO das três funções** (`geloDe`, `dormeDe`, `travadoDe`), não nas chamadas: as
+do gelo rodam antes dos golpes e hoje estão seguras, **mas foi mover uma chamada que criou o
+defeito** — dentro da função ela não se perde.
+
+**É APRESENTAÇÃO PURA, e está conferido por DUAS impressões:** a do **MOTOR** (quem ganhou e com
+quanto de HP) é **idêntica** em 900 batalhas semeadas; só a do **DIÁRIO** muda, que é o que um
+conserto de log deve fazer. Medir as duas juntas teria dito que o motor mudou — ele não mudou.
+
+#### ⚠️ E O PAINEL DA TRAVA DA PARALISIA ESTAVA MEDINDO O PRÓPRIO BUG
+
+A trava *"achei um confronto com o turno perdido"* usava um **Magneton Lv.70 contra três de 68** — e
+ali ele **mata o paralisado no golpe** (495 de 559 confrontos). Os 121 "turnos perdidos" que ela
+achava eram, quase todos, **a linha saindo depois da queda**.
+
+Consertado o defeito, o painel foi a **ZERO** e a trava falhou **sem nada estar errado**: ela não
+tinha um só caso legítimo pra medir. Com o Magneton em **60 contra três duros de 70** ele sobrevive,
+e a linha sai 45 vezes.
+
+É a mesma armadilha do **painel forte demais** que este arquivo já registra na medição do Smeargle e
+na do revide — só que aqui ela **escondia um bug** em vez de um zero.
+
+### ⚠️ A TORRE SEGUE A MECÂNICA DA JORNADA — verificado (18/09/2026)
+
+Perguntado junto com o relato acima: *"verifique se a torre de treinadores está seguindo a mecânica
+de lutas da jornada, desconfio que tem coisa diferente"*.
+
+**Não tem.** A Torre roda no **servidor** (`fightTrainerTowerFloor` → `simulateGymBattle`, **sem
+opções**) e a jornada roda no **cliente** — e o defeito do print estava nos **dois** motores, igual.
+A suspeita era razoável e o que a produziu foi o defeito, não a Torre.
+
+A verificação virou trava: a MESMA batalha (mesmos times, mesma semente, o NPC com moveset como a
+Torre faz) roda nos dois e compara o **diário inteiro, golpe a golpe** — não só quem ganhou.
+Resultado: **0 divergências em 150 batalhas**, tocando em **25 mecânicas** (sono, gelo, queimadura,
+veneno, paralisia, chuva, fúria, confusão, dreno, multi-tapa, Remoinho, as duas danças, explosão,
+anulação, Recuperar, estágio, Fúria do Dragão…).
+
+**⚠️ E ELA COBRA QUE TENHA TOCADO NAS MECÂNICAS:** sem essa segunda linha, a comparação daria verde
+comparando 150 trocas de golpe comum — que é justamente o caso em que os dois motores nunca
+divergiriam.
+
+**O que a Torre tem de diferente é o CONTEXTO, não a mecânica:** o time vem de vários saves, não há
+terreno, e o NPC é montado no servidor. A luta em si é a mesma.
+
+### ⚠️ QUEM NÃO ATACOU APLICAVA STATUS (18/09/2026)
+
+Reportado com print: o **Dewgong estava dormindo e mesmo assim congelou o Gengar**. O log da tela
+dizia, em linhas seguidas:
+
+```
+😴 Dewgong continua a dormir e não pode atacar.
+❄️ Gengar ficou congelado com RAIO CONGELANTE!
+```
+
+**⚠️ A CAUSA É O `lastMove`, e ela vale pros SEIS `tentar*`.** Eles leem o último golpe do atacante
+pra saber a chance — e esse campo fica gravado da troca **ANTERIOR**, ou até de **outro confronto**
+(a instância atravessa a batalha inteira). Quem dorme não chama o `golpesDaTroca`, então o
+`lastMove` velho continua lá e o sorteio rodava em cima dele.
+
+**⚠️ E NÃO ERA SÓ O SONO NEM SÓ O GELO.** Medido antes do conserto: os **TRÊS** estados que zeram o
+golpe vazavam nos **QUATRO** status, cada um na chance cheia:
+
+| quem não ataca | gelo | queimadura | veneno | paralisia |
+|---|---|---|---|---|
+| **dormindo** | 9,5% | 9,5% | 30,1% | 30,1% |
+| **congelado** | 8,8% | 8,7% | 29,3% | 31,0% |
+| **paralisado** | 10,1% | 9,9% | 30,6% | 30,3% |
+
+Em 18.000 trocas, **1.208 aplicavam status sem um golpe ter saído**.
+
+**⚠️ A GUARDA É O GOLPE TER SAÍDO, e não uma lista dos três estados:** `dmgByFirst` já é `[]` quando
+ele não ataca, **seja por que for**. Assim o próximo estado que impedir um ataque nasce coberto —
+uma lista de estados ali ficaria para trás no primeiro que entrasse.
+
+**O CONSERTO É EXATO, e é isso que a medição prova:** os casos de status **sem** golpe vão de 1.208
+para **ZERO**, e os **611 casos legítimos** (quem degelou, ou não travou pela paralisia, e atacou)
+ficam **idênticos** — o conserto não tocou em nada que estava certo.
+
+**⚠️ E ELE MUDA A SEMENTE, o que é esperado num conserto de mecânica:** os `tentar*` deixam de ler o
+rng nesses casos. Medido: **1,2% das batalhas** de times sorteados mudam de resultado, e **45,8%**
+num painel propício (soníferos de um lado, golpe de status do outro). A impressão de 900 batalhas
+do painel geral **não mudou** — o caso é raro o bastante para não aparecer ali.
+
+**O PREÇO NA JORNADA: nada. 53,23% contra 54,28% de conclusão** — **+1,05 ponto, 1,6σ** (8 blocos
+de 800 jornadas de cada lado, **6.400 de cada**, o MESMO bot contra duas cópias congeladas, desvio
+tirado de ENTRE os blocos, **5 de 8 blocos** pro lado do conserto). Ruído, e a direção é a esperada:
+o que sumiu foi status aplicado **por quem não atacou**, e isso caía dos dois lados.
+
 ### O CONGELAMENTO: O PRIMEIRO STATUS POR ATAQUE (16/09/2026)
 
 Pedido assim: *"a qualquer momento da partida que for usado algum ataque que tenha a possibilidade
@@ -11135,6 +11378,232 @@ A tarja dizia **`Maximum call stack size exceeded`**, que é um `RangeError` —
   regravado idêntico — foi o que separou "não grava" de "grava sempre o mesmo estado".
 - O autosave é debounced em 800ms e **re-armado a cada `render()`**: uma tela que se redesenhe mais
   rápido que isso adia a gravação pra sempre. Ele também só roda nas telas de `SAFE_SAVE_SCREENS`.
+
+## OS SELOS DO JOGO (17/09/2026) — o emoji virou desenho nosso
+
+Pedido assim: *"tente trocar tudo quanto é emoji pronto, por desenhos próprios do nosso jogo, tente
+fazer algo legal, se der diferente de como é o emoji hoje"*. São **54 selos** em pixel art: a
+batalha inteira, a home, a Liga Clássica, a Trainers League, o Ginásio da Cidade, a Torre, as
+conquistas, o botão Home e **a loja e a mochila inteiras** — os 11 itens, os 23 TMs e os 3 HMs.
+
+### ⚠️ A PRIMEIRA LEVA FOI DESENHADA À MÃO, E FOI REPROVADA
+
+Ela era 16×16, pixel a pixel, e o retorno foi *"não ficou muito bom"*. **A causa não era só a
+resolução** — era que pixel a pixel **não se faz** um círculo redondo nem uma estrela simétrica, e
+sem sombreado tudo fica chapado. Dois selos já tinham sido refeitos por isso mesmo (a medalha
+parecia um inseto, a fúria era um X vermelho), e o problema ia continuar aparecendo um a um.
+
+**Hoje quem desenha é o `tools/gerar-selos.js`.** Cada selo é descrito por FORMAS — círculo,
+elipse, polígono, estrela de N pontas, traço grosso — e a ferramenta cuida das três coisas que dão
+qualidade e que a mão não entrega:
+
+| | |
+|---|---|
+| **a forma sai perfeita** | o círculo é redondo, a estrela é simétrica, o cone do remoinho é um cone |
+| **o sombreado é automático e DIRECIONAL** | luz em cima à esquerda, sombra embaixo à direita, **na mesma direção nos 29** — sem uma direção só, cada selo pareceria de um jogo diferente |
+| **o contorno é fechado e de um pixel** | em volta de tudo, sempre |
+
+A paleta ganhou **três tons por cor** (claro/médio/escuro, a maiúscula é o claro): é com eles que
+o gerador pinta a luz e a sombra. Com uma cor por material não haveria com o que sombrear.
+
+`node tools/gerar-selos.js` cospe o bloco pronto; `--html` abre a prévia dos 29 nos três tamanhos
+em que eles saem no jogo, e `--ver` mostra a grade em ASCII.
+**⚠️ A PRÉVIA EXISTE PORQUE ASCII NÃO SE JULGA** — a primeira leva foi avaliada lendo a grade, e é
+por isso que o sino saiu pinheiro e a garra saiu mão. **Três selos só foram consertados olhando a
+prévia**: o sino (a cúpula redonda é o que o identifica, não o triângulo), o remoinho (faixas retas
+empilhadas viram um funil de laboratório; elipses que encolhem E se deslocam viram um cone que
+gira) e o dragão (três dedos grossos saem como uma pata — o que se lê como garra são três RISCOS
+diagonais que afinam).
+
+**A ferramenta é a fonte, mas o que vai pro jogo é a TABELA** — o mesmo desenho do
+`tools/gerar-golpes.js` com o `data/golpes.json`. A grade continua legível no `index.html`, e
+continua sendo onde se ajusta um pixel na mão.
+
+### ⚠️ 24×24, E O viewBox SAI DA GRADE
+
+A grade foi de 16 para **24**: em 16 não cabia sombreado — sobrava um pixel por tom.
+
+O `viewBox` era **`0 0 16 16` escrito à mão**, e nessa virada isso teria mostrado **um quarto de
+cada desenho, em silêncio**. Hoje ele é derivado de `grade.length`, e com isso grades de tamanhos
+diferentes convivem. A trava que cobrava `=== 16` virou *"toda grade é QUADRADA"* pelo mesmo
+motivo: **fixar o lado ali era o mesmo erro do viewBox, do outro lado**.
+
+### ⚠️ O SVG PRECISOU DE RETÂNGULOS MÁXIMOS — 160 KB VIRARAM 38
+
+Uma `<rect>` por corrida horizontal dava **3.772 formas e 160 KB de DOM** com os selos em 24×24.
+Juntando também na **vertical** (retângulos máximos) e emitindo **um `<path>` por cor** — um
+`M x y h w v h -w z` custa ~12 caracteres contra ~45 de uma `<rect>` — o mesmo desenho sai em
+**38 KB**, que é **menos que a versão 16×16 gastava (47 KB)**, com 2,25× mais detalhe.
+
+| | |
+|---|---|
+| `<svg>` no DOM, injetado UMA vez | **38 KB** (159 paths, 2.448 retângulos) |
+| cada uso na tela | **95 bytes** (um `<use>`) |
+| `index.html` | **+29 KB (+1,6%)** |
+
+**⚠️ UMA JUNÇÃO ERRADA NÃO APARECE COMO ERRO** — aparece como um pixel de cor trocada num desenho
+de 24, que ninguém vê. Por isso a trava **desfaz o SVG de volta em grade** e compara com o
+`DESENHOS` (16.704 pixels), e cobra também que **nenhum retângulo se sobreponha**: dois paths
+pintando o mesmo pixel dariam o desenho certo por acaso, com a cor do último. Conferido — ela acusa
+10.336 pixels com o "consumido" marcado errado.
+**E há um teto de 60 KB pro SVG**, porque a trava do pixel **não pega** a otimização ser desfeita:
+com uma `<rect>` por pixel o desenho continua certo e só o DOM cresce. Conferido: ela acusa 111 KB.
+
+### ⚠️ O DISCO DO TM SAI NA COR DO TIPO — um desenho, 17 cores
+
+Pedido assim: *"para os TMs, deixe o disco da cor do tipo do ataque que ele ensina"*.
+
+**São 23 TMs e 17 tipos, e o desenho é UM só.** A cor entra no **uso**, não no símbolo:
+
+| na paleta | vira | serve pra |
+|---|---|---|
+| `*` | `currentColor` | o corpo do disco — o `<use>` herda do `style="color:…"` do `<svg>` de fora |
+| `+` | `#ffffff55` | o brilho |
+| `-` | `#00000038` | a sombra |
+
+**⚠️ O VOLUME PRECISA SER TRANSLÚCIDO, e é isso que faz a técnica funcionar:** o sombreado normal
+usa três tons de uma cor conhecida, e aqui a cor **ainda não se conhece**. Branco e preto com alpha
+clareiam e escurecem *o que estiver embaixo*, seja qual for — então o mesmo disco fica com volume
+em Fogo, em Água e em Dragão.
+
+Sem isso seriam **23 símbolos idênticos de cor diferente**, e o próximo TM nasceria sem cor.
+
+- **O HM usa o MESMO disco**, também na cor do tipo (ele também ensina um golpe). O que separa os
+  dois na tela é o **risco branco**: HM não se gasta.
+- **A cor do HM é aplicada num laço DEPOIS da tabela**: dentro dela o `GOLPES` ainda não foi lido.
+- **A Poção e a Super Poção são o MESMO frasco**, com o líquido de cor diferente — elas são o mesmo
+  item em duas forças, e formas diferentes fariam procurar duas coisas.
+- **O Atk Up e o Def Up reusam a espada e o escudo da BATALHA**: é a mesma ideia, e um segundo
+  desenho pra ela faria procurar duas coisas onde há uma.
+- **A troca foi na TABELA, não nos 12 renders** — todos leem `it.icone`/`hm.icone`. Mexer em cada
+  um seria garantir que o próximo nascesse com emoji, e o ícone do TM depende do tipo do golpe, que
+  só a tabela sabe.
+
+A trava cobra os 23 na cor certa, **que as cores VARIAM mesmo** (14 distintas — um bug que pintasse
+todos de Normal passaria na primeira metade), os 3 HMs, o `currentColor` no símbolo, o alpha nos
+dois tons de volume, e os 11 itens comuns sem emoji. Conferido que ela acusa com um TM de cor fixa.
+
+### ⚠️ O QUE FICA COM EMOJI, E POR QUÊ — a linha é INTERFACE × CONTEÚDO
+
+Depois de fechar as telas, sobraram **52 emojis**, e nenhum deles é acidente. Eles vêm de **TABELA**,
+não de marcação — ali o emoji não é ícone de interface, é **conteúdo**:
+
+| | |
+|---|---|
+| os **51 TERRENOS** (`TERRAINS[].icon`) | 🌋 Vulcão, 🐍 Pântano, 🪸 Recifes de Coral… são **lugares diferentes**, e em 24×24 "Pântano", "Pântano Radioativo" e "Manguezal" virariam três manchas verdes iguais. O card já traz os **selos de tipo coloridos** logo abaixo, que é a informação mecânica |
+| as **250 espécies** (`SPECIES[].emoji`) | vai pro `sprite-fallback`, que é **TEXTO** — um `<svg>` apareceria escrito |
+| as **69 conquistas** (`icon`) | cada uma tem a sua, e o que virou selo ali foi o **cadeado** da trancada e as **medalhas** do prêmio, que são a interface |
+| ~~os itens da loja~~ | **viraram desenho em 17/09/2026** — ver a seção do disco do TM, acima |
+| os **32 lugares do mapa** e os 4 membros da Elite | mesma família |
+
+**E os símbolos NEUTROS ficam**: `⬅` (34 botões de voltar), `➜`, `★`, `✔`, `⚠`, `❔`. Eles não são
+"emoji pronto colorido" — são sinais que já se leem como parte do texto.
+
+### ⚠️ O TAMANHO DO SELO NÃO PODE SER SEMPRE `1em` — o emoji é desenhado MAIOR que a fonte
+
+Isso custou dois relatos. O emoji tem **métricas próprias** e é pintado maior que a caixa da fonte,
+então trocá-lo por um `<svg>` de `1em` **ENCOLHE o ícone** — e nos lugares onde a fonte é pequena
+ele some.
+
+| onde | tamanho | por quê |
+|---|---|---|
+| no meio de uma frase | `1em` | ali ele é uma palavra |
+| no quadro do lutador (`.selo-g`) | `1.15em` | |
+| **no asterisco do cartão de golpe** | **15px fixos** | a observação é `.6rem` (~10px): em `1em` a chama saía com **10 pixels de lado**, e ela é justamente a informação que o asterisco existe pra dar. Reportado com print |
+| em título, banner e `h2` | `1.4em` | |
+| no `eyebrow` | **`2em`** | é a menor fonte de título do jogo (~8px) — em 1.4em o selo saía com 12px |
+| nos cards da home (`.selo-menu`) | **32px fixos** | os outros dois cards da fileira usam o `.dex-icon.menu`, que é 32 |
+
+### ⚠️ A ARMADILHA PRINCIPAL: o `${selo(...)}` numa string de ASPAS
+
+O selo é um `<svg>`, então ele só funciona em HTML — e `${...}` só interpola dentro de **crase**.
+Numa string de aspas ele sai **ESCRITO na tela**, e o **`node --check` passa** (a não ser que a aspa
+por acaso feche a string antes). **Aconteceu três vezes só no dia em que isso foi escrito**: a moeda
+da loja, o raro da rota e o cadeado das duas rotas com chave.
+
+Por isso existe uma trava que **lê o código** e diz em que tipo de string cada `${selo(` cai.
+**Ela precisou de uma PILHA**, e a primeira versão deu falso positivo em 4 linhas certas: dentro de
+`${...}` o parser **volta pro modo código**, e ali cabe outro template — com um estado só, a crase
+de dentro fechava o template de fora. E ela precisou **pular regex literal**: um `/['"]/g` tem aspa
+DENTRO, e sem isso o parser abre uma string que nunca fecha.
+**Ela varre o SCRIPT, não o `index.html` inteiro** — o `<body>` tem apóstrofo em texto corrido, que
+abre string falsa.
+
+#### ⚠️ E A SEGUNDA ARMADILHA SÓ UM PRINT PEGOU: O SELO **ESCAPADO**
+
+Reportado no mesmo dia, com print da tela de golpe novo do Charmander:
+
+```
+* 10% de chance de causar queimadura <svg class="selo " shape-rendering="crispEdges"
+  aria-hidden="true"><use href="#s-fogo"/></svg>
+```
+
+**Aqui o `${selo(...)}` estava CERTO no código** — ele interpolou, gerou o `<svg>`, e o
+`cartaoDeGolpe` passou um **`escapeHtmlSafe` em cima depois**. Nenhuma das travas de código viu,
+porque o código estava certo: elas olham onde a chamada CAI, não o que acontece com o resultado.
+
+- **A observação do cartão deixou de ser escapada**, e isso é o certo: **ela é HTML da casa, não
+  dado de fora** — o texto sai de constantes (`pct()` mais as tabelas de status) e o selo sai do
+  `ICONES_ESPECIAIS`. Não há um único pedaço ali que venha do jogador. **O nome do golpe continua
+  escapado**, que é o que um dia pode vir de outro lugar.
+  ⚠️ Quem acrescentar observação ao `obsDoGolpe` tem que saber disso: o que entrar na lista vai pra
+  tela como HTML.
+- **A trava nova olha o HTML PRONTO** (procura `&lt;svg`), que é onde este defeito aparece — nas
+  telas do sandbox, nos montadores avulsos e nos **61 cartões de golpe com asterisco**. Conferido
+  que ela acusa com o `escapeHtmlSafe` de volta.
+- **Varrido no navegador depois: 152 funções que devolvem HTML, os 61 cartões e as 250 fichas da
+  Pokédex — zero escapes.**
+
+**A lição das duas juntas:** o selo é HTML, então ele quebra de dois jeitos opostos — **caindo numa
+string** (não interpola, sai o código) e **caindo num escape** (interpola, e sai o HTML escrito).
+A primeira se vê lendo o código; a segunda, só olhando a tela.
+
+### AS OUTRAS TRÊS TRAVAS
+
+| | |
+|---|---|
+| **grade quadrada e cor da paleta** | o gerador não reclama: ele só desenha errado, ou nada. Ela NÃO fixa o lado — ver acima |
+| **todo desenho tem chamador** | letra morta — a mesma decisão que manteve os estágios 2 a 4 do crítico e o Rock Tomb fora do jogo. Ela pegou 3 órfãos no dia (moeda, coroa, brilho) e os três ganharam destino |
+| **o SVG bate pixel a pixel, sem sobreposição, e cabe em 60 KB** | ver a seção da otimização, acima |
+| **o servidor não conhece selo** | ele é apresentação pura, e o servidor não tem tela |
+
+Mais a varredura que **roda 112 das 127 telas** procurando o literal — ela não basta sozinha
+(a `renderLoja` é justamente uma das 15 que não rodam sem estado), e é por isso que a de código existe.
+
+### ⚠️ AS TRAVAS PARARAM DE PROCURAR O CARACTERE
+
+**23 travas quebraram** no dia, todas pelo mesmo motivo: elas procuravam `'🔥'`, `'⚡'`, `'😴'`.
+Hoje elas procuram o **id do `<symbol>`** (`#s-fogo`), que é a identidade do selo — assim o desenho
+pode ser reajustado sem derrubar 23 travas de uma vez.
+
+- **As de FRASE continuam cobrando a frase inteira**, palavra por palavra: o que mudou é o ícone vir
+  do `ICONES_ESPECIAIS` em vez de escrito à mão (`=== S.ICONES_ESPECIAIS.boom + ' Golem usou
+  auto-destruição!'`). Assim elas não envelhecem junto com o desenho.
+- **As de IDENTIDADE ficaram melhores:** `congelou === '❄️'` virou *"as três dividem o MESMO selo"*,
+  que é o que aquela trava sempre quis provar.
+- **⚠️ E METADE DELAS GUARDAVA O EMOJI COMO ESCAPE** (`'\ud83d\ude24'`), não como caractere — uma
+  varredura que procure só o caractere **não as encontra**. Foi isso que fez a primeira passada
+  deixar 9 de 23 para trás.
+
+### O QUE FICOU DE FORA, E POR QUÊ
+
+- **Os `emoji:'X'` das tabelas de espécie** — aquele valor vai pro `sprite-fallback`, que é **texto**:
+  um `<svg>` apareceria escrito. Ali o emoji é o certo.
+- **A seta `⬅` dos 67 botões de voltar, o `⚠`, o `❔` e o `★` do título** — não são "emoji pronto
+  colorido", são símbolos neutros que já se leem como parte do texto (o `★` é tipografia do
+  título, na fonte de pixel).
+- **Os cabeçalhos** (`⚔️ BATALHA ONLINE`, `💀 Difícil`) — ali o emoji funciona como ilustração de
+  título, não como ícone de estado.
+
+### CUSTO: NADA NO MOTOR, e está conferido
+
+**O mesmo build antes e depois dá o MESMO hash** em 900 batalhas semeadas — os selos são
+apresentação inteira, e isso foi conferido de novo depois da troca pro 24×24 e da otimização do SVG.
+Medido a 320px: um confronto mostra **6 selos**, a tela não passa a rolar pro lado, e o selo
+acompanha o tamanho da fonte (`1em`, ou `1.15em` com `.selo-g` no quadro do lutador).
+**⚠️ O DA HOME É A EXCEÇÃO: `.selo-menu` é 32px FIXOS**, porque os outros dois cards da fileira
+(Pokédex e Conquistas) usam o `.dex-icon.menu`, que é 32 — em `1em` o selo saía 27 e a fileira
+ficava desalinhada.
 
 ## Frontend
 

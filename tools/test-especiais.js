@@ -15,7 +15,7 @@
 const path = require('path');
 const Module = require('module');
 const raiz = path.join(__dirname, '..');
-const { createSandbox } = require('./game-sandbox');
+const { createSandbox, extractGameScript } = require('./game-sandbox');
 const S = createSandbox();
 
 let falhas = 0;
@@ -58,6 +58,15 @@ const logAberto = (lista) => {
   lista.forEach((m, i) => { if(!jaAbertos[i]) S.alternarLogDoConfronto(i); });
   return S.renderMatchupLog(lista);
 };
+/* ⚠️ OS SELOS VIRARAM DESENHO NOSSO (17/09/2026), entao as travas pararam de procurar o
+   CARACTERE e passaram a procurar o SELO -- o id do <symbol>, que e a identidade dele.
+   E melhor de duas formas: o desenho pode ser reajustado sem derrubar 23 travas, e a busca
+   deixa de depender de COMO o emoji foi escrito (uns estao como caractere e outros como
+   escape \uXXXX, e isso ja me custou uma busca que nao achava nada).
+   As travas de FRASE continuam cobrando a frase inteira: o que mudou e o icone vir do
+   ICONES_ESPECIAIS em vez de escrito a mao -- assim ela nao envelhece junto com o desenho. */
+const temSelo = (html, nome) => String(html || "").indexOf("#s-" + nome) >= 0;
+
 const danoSemGolpe = (g) => !!g && (g.x === 'absorbdano' || g.x === 'confusao' || g.x === 'furiadragao');
 /* ⚠️ A QUEIMADURA (16/09/2026) E A QUARTA DA FAMILIA, e ela e a PRIMEIRA em que o `q` e de QUEM
    PERDE -- nas outras tres ele e de quem CAUSOU, e por isso todas as contas deste arquivo invertem
@@ -598,12 +607,12 @@ const htmlBoom = S.passosHtml(mBoom);
 ok('explosao: "Golem usou auto-destruicao"', /usou <span class="type-pill"[^>]*>auto-destruição</.test(htmlBoom), '');
 ok('e uma linha so (o "caiu junto" nao vira outra)', (htmlBoom.match(/class="mlog-passo /g)||[]).length === 1);
 ok('o aviso do meio da batalha diz o mesmo',
-   S.avisoDoConfronto(mBoom) === '💥 Golem usou auto-destruição!', S.avisoDoConfronto(mBoom));
+   S.avisoDoConfronto(mBoom) === S.ICONES_ESPECIAIS.boom + ' Golem usou auto-destruição!', S.avisoDoConfronto(mBoom));
 
 const mSono = { player:'Butterfree', enemy:'Arbok', playerSpecies:'butterfree', enemySpecies:'arbok',
   golpes:[{ q:'p', d:100, hp:0, x:'sono', g:'Pó do Sono' }] };
 ok('sono: "Butterfree fez Arbok dormir"',
-   S.avisoDoConfronto(mSono) === '😴 Butterfree fez Arbok dormir!', S.avisoDoConfronto(mSono));
+   S.avisoDoConfronto(mSono) === S.ICONES_ESPECIAIS.sono + ' Butterfree fez Arbok dormir!', S.avisoDoConfronto(mSono));
 /* No log cabe o nome do golpe -- ele e por especie de proposito (o Paras dorme com Esporo). */
 ok('e no log ainda da pra ver com que golpe', /dormir com <span class="type-pill"[^>]*>Pó do Sono</.test(S.passosHtml(mSono)));
 
@@ -4564,8 +4573,8 @@ console.log('\n=== A DANCA DA CHUVA: O PRIMEIRO CLIMA DO JOGO (11/09/2026) ===')
     /* 3) O 🌧️ EM CIMA DO ×, em todo confronto com chuva. */
     /* o + do log comprimido entra logo depois do ×, no mesmo bloco central -- o invariante que
        importa e o 🌧️ vir ANTES dele, que e o que diz "este confronto teve chuva". */
-    ok('o 🌧️ fica em cima do ×',
-       /<span class="mlog-x"><span class="mlog-chuva">🌧️<\/span>×/.test(log));
+    ok('o selo da chuva fica em cima do ×',
+       /<span class="mlog-x"><span class="mlog-chuva">(?!<\/span>)[^<]*<svg[^>]*>[^<]*<use href="#s-chuva"\/><\/svg><\/span>×/.test(log));
     const semChuva = Object.assign({}, m, { chuva: false, golpes: m.golpes.slice(1) });
     const logSeco = logAberto([semChuva]);
     ok('e confronto sem chuva nao ganha o emoji', !/mlog-chuva/.test(logSeco));
@@ -5333,7 +5342,10 @@ console.log('\n=== OS SELOS DAS DUAS DANCAS (14/09/2026) ===');
      igual poria a pluma no pokemon errado -- e o defeito nao apareceria como erro, apareceria como
      o selo no lado que ficou mais FORTE. */
   const mk = (id, lv) => { const p = S.createInstance(id, lv); p.maxHp = S.calcMaxHp(p); p.hp = p.maxHp; p.ataques = S.ataquesPadrao(p); return p; };
-  const ESPADA = '\u2694', PLUMA = '\ud83e\udeb6';
+  /* ⚠️ SAO OS SELOS, nao os caracteres: eles viraram desenho nosso em 17/09/2026. As travas de
+     igualdade EXATA continuam exatas -- o valor vem do proprio `selo`, entao ela cobra a saida
+     inteira sem envelhecer junto com o desenho. */
+  const ESPADA = S.selo('espada', 'selo-g'), PLUMA = S.selo('pluma', 'selo-g');
 
   /* ⚠️ O CASO DURO E O MESMO POKEMON COM OS DOIS SELOS: o Pinsir danca as espadas E leva a pluma do
      Pidgeot, entao ele sai com ⚔️🪶 e o Pidgeot sai SEM NADA -- ele usou a pluma, mas quem foi
@@ -5345,16 +5357,16 @@ console.log('\n=== OS SELOS DAS DUAS DANCAS (14/09/2026) ===');
     const m = { player: a.name, enemy: b.name, golpes: d };
     ok('as duas dancas saem com a chance forcada', d.length === 2, d.map(g => g.x + '@' + g.q).join(','));
     ok('o Pinsir fica com os DOIS selos (dancou E levou a pluma)',
-       S.selosDoConfronto(m, 'p').indexOf(ESPADA) >= 0 && S.selosDoConfronto(m, 'p').indexOf(PLUMA) >= 0,
+       temSelo(S.selosDoConfronto(m, 'p'), 'espada') && temSelo(S.selosDoConfronto(m, 'p'), 'pluma'),
        JSON.stringify(S.selosDoConfronto(m, 'p')));
     ok('e o Pidgeot fica SEM NENHUM: ele usou a pluma, quem sofreu foi o outro',
        S.selosDoConfronto(m, 'e').trim() === '', JSON.stringify(S.selosDoConfronto(m, 'e')));
     /* e o selo tem que casar com o que o MOTOR marcou na instancia */
     ok('o selo casa com o _espadas/_pluma do motor',
-       (S.selosDoConfronto(m, 'p').indexOf(ESPADA) >= 0) === !!a._espadas &&
-       (S.selosDoConfronto(m, 'p').indexOf(PLUMA) >= 0) === !!a._pluma &&
-       (S.selosDoConfronto(m, 'e').indexOf(ESPADA) >= 0) === !!b._espadas &&
-       (S.selosDoConfronto(m, 'e').indexOf(PLUMA) >= 0) === !!b._pluma);
+       temSelo(S.selosDoConfronto(m, 'p'), 'espada') === !!a._espadas &&
+       temSelo(S.selosDoConfronto(m, 'p'), 'pluma') === !!a._pluma &&
+       temSelo(S.selosDoConfronto(m, 'e'), 'espada') === !!b._espadas &&
+       temSelo(S.selosDoConfronto(m, 'e'), 'pluma') === !!b._pluma);
   }
 
   /* OS LADOS INVERTIDOS: o mesmo par, trocando quem e p e quem e e */
@@ -5364,7 +5376,7 @@ console.log('\n=== OS SELOS DAS DUAS DANCAS (14/09/2026) ===');
     S.tentarDancas(a, b, () => 0.001, d);
     const m = { player: a.name, enemy: b.name, golpes: d };
     ok('com os lados trocados o selo acompanha',
-       S.selosDoConfronto(m, 'e').indexOf(ESPADA) >= 0 && S.selosDoConfronto(m, 'e').indexOf(PLUMA) >= 0 &&
+       temSelo(S.selosDoConfronto(m, 'e'), 'espada') && temSelo(S.selosDoConfronto(m, 'e'), 'pluma') &&
        S.selosDoConfronto(m, 'p').trim() === '',
        'p=' + JSON.stringify(S.selosDoConfronto(m, 'p')) + '  e=' + JSON.stringify(S.selosDoConfronto(m, 'e')));
   }
@@ -5374,7 +5386,7 @@ console.log('\n=== OS SELOS DAS DUAS DANCAS (14/09/2026) ===');
     const a = mk('scyther', 50), b = mk('machop', 50);
     const d = []; S.tentarDancas(a, b, () => 0.001, d);
     const m = { player: a.name, enemy: b.name, golpes: d };
-    ok('so espadas: o selo vai em quem usou', S.selosDoConfronto(m, 'p') === ' ' + ESPADA + '\ufe0f' &&
+    ok('so espadas: o selo vai em quem usou', S.selosDoConfronto(m, 'p') === ' ' + ESPADA &&
        S.selosDoConfronto(m, 'e') === '', JSON.stringify(S.selosDoConfronto(m, 'p')));
   }
   /* SO PLUMA: o selo vai no OUTRO */
@@ -5406,7 +5418,7 @@ console.log('\n=== OS SELOS DAS DUAS DANCAS (14/09/2026) ===');
     ok('achei uma batalha de verdade com as duas dancas', !!alvo);
     if(alvo){
       const html = S.fighterHtml(alvo, 'p', { hp: alvo.playerHpAfter, passo: 99, comTerreno: true });
-      ok('o quadro do lutador mostra os dois selos', html.indexOf(ESPADA) >= 0 && html.indexOf(PLUMA) >= 0,
+      ok('o quadro do lutador mostra os dois selos', temSelo(html, 'espada') && temSelo(html, 'pluma'),
          html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 50));
       /* ⚠️ QUEM ESTA SAINDO DE CAMPO (o quadro do Remoinho) NAO leva selo: o efeito e de quem esta
          lutando agora. */
@@ -5538,9 +5550,9 @@ console.log('\n=== O SELO DA FURIA (14/09/2026) ===');
     });
   }
   ok('achei os quatro casos', !!(umaVez && acumulada && herdada && semFuria));
-  ok('com a furia ativa o selo sai', umaVez && S.selosDoConfronto(umaVez, 'p').indexOf('\ud83d\ude24') >= 0,
+  ok('com a furia ativa o selo sai', umaVez && temSelo(S.selosDoConfronto(umaVez, 'p'), 'furia'),
      umaVez ? JSON.stringify(S.selosDoConfronto(umaVez, 'p')) : '');
-  ok('e so no lado dele', umaVez && S.selosDoConfronto(umaVez, 'e').indexOf('\ud83d\ude24') < 0);
+  ok('e so no lado dele', umaVez && !temSelo(S.selosDoConfronto(umaVez, 'e'), 'furia'));
   /* O NUMERO SAI A PARTIR DA SEGUNDA, como a frase do log ja faz: sem ele, um Tauros com +30 de
      tudo mostra o mesmo selo de um com +10. */
   ok('a partir da 2a vez o selo traz o numero',
@@ -5549,16 +5561,16 @@ console.log('\n=== O SELO DA FURIA (14/09/2026) ===');
   ok('e na primeira ele sai LIMPO', umaVez && S.selosDoConfronto(umaVez, 'p').indexOf('1') < 0);
   /* ⚠️ O CASO QUE A MARCA DO DIARIO NAO PEGA -- e o motivo do campo existir */
   ok('a furia HERDADA de um confronto anterior tambem mostra',
-     herdada && S.selosDoConfronto(herdada, 'p').indexOf('\ud83d\ude24') >= 0,
+     herdada && temSelo(S.selosDoConfronto(herdada, 'p'), 'furia'),
      herdada ? 'furia ' + herdada.playerFuria + ' sem marca no diario' : '');
-  ok('e sem furia nao sai selo nenhum', semFuria && S.selosDoConfronto(semFuria, 'p').indexOf('\ud83d\ude24') < 0);
+  ok('e sem furia nao sai selo nenhum', semFuria && !temSelo(S.selosDoConfronto(semFuria, 'p'), 'furia'));
   /* log VELHO, gravado antes do campo existir, sai sem selo -- nao pode sumir */
   ok('log velho (sem o campo) sai sem selo',
-     S.selosDoConfronto({ player:'A', enemy:'B', golpes:[] }, 'p').indexOf('\ud83d\ude24') < 0);
+     !temSelo(S.selosDoConfronto({ player:'A', enemy:'B', golpes:[] }, 'p'), 'furia'));
   /* e o quadro do lutador mostra */
   if(umaVez){
     const html = S.fighterHtml(umaVez, 'p', { hp: umaVez.playerHpAfter, passo: 99, comTerreno: true });
-    ok('o quadro do lutador mostra o selo da furia', html.indexOf('\ud83d\ude24') >= 0,
+    ok('o quadro do lutador mostra o selo da furia', temSelo(html, 'furia'),
        String(html).replace(/<[^>]+>/g, ' ').replace(/s+/g, ' ').trim().slice(0, 40));
   }
   /* OS DOIS MOTORES gravam o campo -- o online le o mesmo selo */
@@ -6267,9 +6279,9 @@ console.log('\n=== O HISTORICO DO RANKING DA TORRE (15/09/2026) ===');
   /* ⚠️ O PODIO E POR DIA, e com um dia por vez isso fica visivel: o dia 1 tem ouro/prata/bronze e
      o dia 3 (com um inscrito so) tem ouro E MAIS NADA -- as medalhas reiniciam. */
   ok('o dia 1 tem o podio dele',
-     (hist.match(/🥇/g)||[]).length === 1 && (hist.match(/🥈/g)||[]).length === 1
-     && (hist.match(/🥉/g)||[]).length === 1,
-     (hist.match(/🥇/g)||[]).length + '/' + (hist.match(/🥈/g)||[]).length + '/' + (hist.match(/🥉/g)||[]).length);
+     (hist.match(/#s-ouro/g)||[]).length === 1 && (hist.match(/#s-prata/g)||[]).length === 1
+     && (hist.match(/#s-bronze/g)||[]).length === 1,
+     (hist.match(/#s-ouro/g)||[]).length + '/' + (hist.match(/#s-prata/g)||[]).length + '/' + (hist.match(/#s-bronze/g)||[]).length);
   ok('e o doce do historico fala no PASSADO (o dia ja virou)',
      /Ganhou um Doce Raro/.test(hist) && !/Ganha um Doce Raro/.test(hist));
   /* ⚠️ DIA SEM NINGUEM FICA NA LISTA, com a lista vazia: sumir com ele faria o historico mostrar
@@ -6281,7 +6293,7 @@ console.log('\n=== O HISTORICO DO RANKING DA TORRE (15/09/2026) ===');
        semTag4(p2).slice(0, 160));
     ok('e o dia sem ninguem fica, dizendo que ficou vazio',
        /Ninguém subiu nenhum andar neste dia/.test(semTag4(p2)));
-    ok('e ali nao ha medalha nenhuma', (p2.match(/🥇/g)||[]).length === 0);
+    ok('e ali nao ha medalha nenhuma', (p2.match(/#s-ouro/g)||[]).length === 0);
   }
   S.paginarHistoricoDaTorre(1);
   {
@@ -6289,8 +6301,8 @@ console.log('\n=== O HISTORICO DO RANKING DA TORRE (15/09/2026) ===');
     ok('a ultima pagina traz o ultimo dia', /12\/09/.test(semTag4(p3)) && /3 de 3/.test(semTag4(p3)),
        semTag4(p3).slice(0, 160));
     ok('e com UM inscrito so ele leva o ouro e mais nada',
-       (p3.match(/🥇/g)||[]).length === 1 && (p3.match(/🥈/g)||[]).length === 0,
-       (p3.match(/🥇/g)||[]).length + ' ouros, ' + (p3.match(/🥈/g)||[]).length + ' pratas');
+       (p3.match(/#s-ouro/g)||[]).length === 1 && (p3.match(/#s-prata/g)||[]).length === 0,
+       (p3.match(/#s-ouro/g)||[]).length + ' ouros, ' + (p3.match(/#s-prata/g)||[]).length + ' pratas');
     ok('e agora a seta de AVANCAR e que esta desabilitada',
        /disabled[^>]*onclick="paginarHistoricoDaTorre\(1\)/.test(p3)
        && !/disabled[^>]*onclick="paginarHistoricoDaTorre\(-1\)/.test(p3));
@@ -6771,9 +6783,10 @@ console.log('\n=== ABRIR UM CONFRONTO ZERA O PASSO, ANTES DO DESENHO (15/09/2026
      /if\(g\.x === 'disable'\) return '';/.test(cliG));
   /* AS TRES DIVIDEM O MESMO SELO ❄️ -- elas sao o mesmo evento em tres momentos. Sem selo, seriam
      as unicas frases mudas da linha de status: todo o resto do bloco tem o dele. */
-  ok('e as tres tem o selo ❄️',
-     S.ICONES_ESPECIAIS && S.ICONES_ESPECIAIS.congelou === '❄️' &&
-     S.ICONES_ESPECIAIS.gelado === '❄️' && S.ICONES_ESPECIAIS.degelou === '❄️');
+  ok('e as tres dividem o MESMO selo de gelo',
+     S.ICONES_ESPECIAIS && temSelo(S.ICONES_ESPECIAIS.congelou, 'gelo') &&
+     S.ICONES_ESPECIAIS.gelado === S.ICONES_ESPECIAIS.congelou &&
+     S.ICONES_ESPECIAIS.degelou === S.ICONES_ESPECIAIS.congelou);
 }
 
 /* ============================= A QUEIMADURA (16/09/2026) ==============================
@@ -6947,8 +6960,9 @@ console.log('\n=== ABRIR UM CONFRONTO ZERA O PASSO, ANTES DO DESENHO (15/09/2026
      'Machamp perdeu 29 de HP pela queimadura');
   ok('log gravado antes do campo mv cai numa frase sem golpe',
      S.fraseDoEspecial({ x: 'queimou', g: 'Machamp' }, {}, {}) === 'Machamp ficou queimado!');
-  ok('e as duas tem o selo 🔥',
-     S.ICONES_ESPECIAIS.queimou === '🔥' && S.ICONES_ESPECIAIS.queima === '🔥');
+  ok('e as duas dividem o MESMO selo de fogo',
+     temSelo(S.ICONES_ESPECIAIS.queimou, 'fogo') &&
+     S.ICONES_ESPECIAIS.queima === S.ICONES_ESPECIAIS.queimou);
   ok('as duas valem 1 passo cada na animacao (a pausa de leitura)',
      S.passosDaAbertura.queimou === 1 && S.passosDaAbertura.queima === 1);
   ok('e sao reconhecidas como golpe especial',
@@ -7018,12 +7032,12 @@ console.log('\n=== ABRIR UM CONFRONTO ZERA O PASSO, ANTES DO DESENHO (15/09/2026
         furia: a queimadura ATRAVESSA confrontos, entao um pokemon pode lutar tres deles queimado
         com a marca so no primeiro. Lida do diario, o selo sumiria justamente nos confrontos em que
         o jogador mais precisa saber que o ataque dele esta pela metade. */
-  ok('o selo 🔥 sai do campo do matchup, e so no lado queimado',
-     S.selosDoConfronto({ playerQueimado: true, enemyQueimado: false }, 'p').indexOf('🔥') >= 0 &&
-     S.selosDoConfronto({ playerQueimado: true, enemyQueimado: false }, 'e').indexOf('🔥') < 0 &&
-     S.selosDoConfronto({ playerQueimado: false, enemyQueimado: true }, 'e').indexOf('🔥') >= 0);
+  ok('o selo de fogo sai do campo do matchup, e so no lado queimado',
+     temSelo(S.selosDoConfronto({ playerQueimado: true, enemyQueimado: false }, 'p'), 'fogo') &&
+     !temSelo(S.selosDoConfronto({ playerQueimado: true, enemyQueimado: false }, 'e'), 'fogo') &&
+     temSelo(S.selosDoConfronto({ playerQueimado: false, enemyQueimado: true }, 'e'), 'fogo'));
   ok('e confronto gravado antes do campo sai sem selo (log velho nao pode sumir)',
-     S.selosDoConfronto({}, 'p').indexOf('🔥') < 0);
+     !temSelo(S.selosDoConfronto({}, 'p'), 'fogo'));
   /* ⚠️ E A QUEIMADURA HERDADA -- o caso que uma leitura ingenua erraria: o pokemon entra no
      confronto JA queimado, sem nenhuma marca no diario dele, e o selo tem que sair assim mesmo. */
   {
@@ -7110,14 +7124,14 @@ console.log('\n=== ABRIR UM CONFRONTO ZERA O PASSO, ANTES DO DESENHO (15/09/2026
         confs++;
         /* ANTES do passo dela: sem selo. A PARTIR dele: com. */
         for(let k = 0; k <= seq.length; k++){
-          const tem = S.selosDoConfronto(m, 'e', k).indexOf('🔥') >= 0;
+          const tem = temSelo(S.selosDoConfronto(m, 'e', k), 'fogo');
           if(k < i0 + 1 && tem){ cedo++; if(!ex) ex = 'passo ' + k + ' de ' + (i0 + 1); break; }
           if(k >= i0 + 1 && !tem){ tarde++; if(!ex) ex = 'passo ' + k + ' de ' + (i0 + 1); break; }
         }
       }
     }
     ok('achei confrontos com queimadura pra medir o selo', confs >= 50, confs + ' confrontos');
-    ok('o 🔥 nunca aparece ANTES do passo da queimadura', cedo === 0, cedo + (ex ? '  |  ' + ex : ''));
+    ok('o selo de fogo nunca aparece ANTES do passo da queimadura', cedo === 0, cedo + (ex ? '  |  ' + ex : ''));
     ok('e nunca falta DEPOIS dele', tarde === 0, tarde + (ex ? '  |  ' + ex : ''));
   }
   /* ⚠️ MAS A QUEIMADURA HERDADA VALE DESDE O PRIMEIRO QUADRO: quem entra no confronto JA queimado
@@ -7130,8 +7144,8 @@ console.log('\n=== ABRIR UM CONFRONTO ZERA O PASSO, ANTES DO DESENHO (15/09/2026
     const m = (r.matchups || [])[0];
     ok('a queimadura HERDADA mostra o selo desde o passo 0',
        m && !(m.golpes || []).some(g => g.x === 'queimou' && g.q === 'p') &&
-       S.selosDoConfronto(m, 'p', 0).indexOf('🔥') >= 0 &&
-       S.selosDoConfronto(m, 'p', 1).indexOf('🔥') >= 0);
+       temSelo(S.selosDoConfronto(m, 'p', 0), 'fogo') &&
+       temSelo(S.selosDoConfronto(m, 'p', 1), 'fogo'));
   }
   /* SEM PASSO o selo vale, e isso e o log relido dias depois: ali o confronto ja acabou e ele e o
      resumo, nao um anuncio. */
@@ -7139,7 +7153,7 @@ console.log('\n=== ABRIR UM CONFRONTO ZERA O PASSO, ANTES DO DESENHO (15/09/2026
     const a = vq('snorlax', 70); a._queimado = 'ember';
     const m = { playerQueimado: true, golpes: [{ x: 'queimou', q: 'p', d: 0 }] };
     ok('e sem passo ele vale (o log relido nao anima nada)',
-       S.selosDoConfronto(m, 'p').indexOf('🔥') >= 0);
+       temSelo(S.selosDoConfronto(m, 'p'), 'fogo'));
   }
 }
 
@@ -7155,8 +7169,8 @@ console.log('\n=== ABRIR UM CONFRONTO ZERA O PASSO, ANTES DO DESENHO (15/09/2026
   /* 1) A FRASE, palavra por palavra -- ela foi pedida assim. */
   ok('a frase e a pedida', S.fraseDoEspecial({ x: 'dormindo', g: 'Onix' }, {}, {}) ===
      'Onix continua a dormir e não pode atacar');
-  ok('e o selo e o MESMO 😴 do sono (e o mesmo efeito, num turno do meio)',
-     S.ICONES_ESPECIAIS.dormindo === S.ICONES_ESPECIAIS.sono && S.ICONES_ESPECIAIS.dormindo === '😴');
+  ok('e o selo e o MESMO do sono (e o mesmo efeito, num turno do meio)',
+     S.ICONES_ESPECIAIS.dormindo === S.ICONES_ESPECIAIS.sono && temSelo(S.ICONES_ESPECIAIS.dormindo, 'sono'));
   /* o 1,5s de leitura vem da entrada na tabela -- sem ela a frase valeria pra SEMPRE */
   ok('e ela vale 1 passo na animacao (a pausa de 1,5s)', S.passosDaAbertura.dormindo === 1);
   ok('e e reconhecida como golpe especial', S.ehGolpeEspecial({ x: 'dormindo' }));
@@ -7451,8 +7465,9 @@ console.log('\n=== ABRIR UM CONFRONTO ZERA O PASSO, ANTES DO DESENHO (15/09/2026
   ok('log velho, sem o campo mv, cai numa frase sem golpe',
      S.fraseDoEspecial({ x: 'envenenou', g: 'Machamp' }, {}, {}) === 'Machamp foi envenenado!');
   /* o 🟣 e a cor do tipo, e nao uma cavera: ☠️ se le como MORTE e o envenenado continua lutando */
-  ok('e as duas tem o selo 🟣',
-     S.ICONES_ESPECIAIS.envenenou === '🟣' && S.ICONES_ESPECIAIS.veneno === '🟣');
+  ok('e as duas dividem o MESMO selo de veneno',
+     temSelo(S.ICONES_ESPECIAIS.envenenou, 'veneno') &&
+     S.ICONES_ESPECIAIS.veneno === S.ICONES_ESPECIAIS.envenenou);
   ok('as duas valem 1 passo cada (a pausa de 1,5s)',
      S.passosDaAbertura.envenenou === 1 && S.passosDaAbertura.veneno === 1);
   ok('e sao reconhecidas como golpe especial',
@@ -7478,13 +7493,13 @@ console.log('\n=== ABRIR UM CONFRONTO ZERA O PASSO, ANTES DO DESENHO (15/09/2026
         const i0 = seq.findIndex(x => x.x === 'envenenou' && x.q === 'e');
         if(i0 < 0) continue;
         confs++;
-        for(let k = 0; k < i0 + 1; k++) if(S.selosDoConfronto(m, 'e', k).indexOf('🟣') >= 0){ cedo++; break; }
+        for(let k = 0; k < i0 + 1; k++) if(temSelo(S.selosDoConfronto(m, 'e', k), 'veneno')){ cedo++; break; }
       }
     }
     ok('achei passos de veneno na animacao', passos >= 50, passos + ' passos');
     ok('e a barra que desce e a de QUEM ESTA ENVENENADO', ladoErrado === 0,
        ladoErrado + (ex ? '  |  ' + ex : ''));
-    ok('e o 🟣 nunca aparece ANTES do passo do envenenamento', cedo === 0,
+    ok('e o selo de veneno nunca aparece ANTES do passo do envenenamento', cedo === 0,
        cedo + ' de ' + confs + ' confrontos');
   }
 
@@ -7978,9 +7993,18 @@ console.log('\nA PARALISIA NA TELA: AS DUAS FRASES E O SELO');
   /* o Magneton leva o Canhao de Choque, que paralisa em 100% -- e o unico jeito de garantir o
      caso sem depender de sorte de semente */
   let comPegou = null, comTravou = null, comSelo = null;
+  /* ⚠️ O PAINEL MUDOU EM 18/09/2026, e a razao e uma licao: o antigo era um Magneton Lv.70 contra
+     tres de 68, e ali ele MATA o paralisado no golpe (495 de 559 confrontos). Os 121 "turnos
+     perdidos" que a trava achava eram entao, quase todos, O PROPRIO DEFEITO que ela deveria pegar:
+     a linha "esta paralisado" saindo DEPOIS de ele cair.
+     Consertado o defeito (quem ja caiu nao perde turno), o painel foi a ZERO e a trava falhou sem
+     nada estar errado -- ela nao tinha um so caso LEGITIMO pra medir.
+     O paralisado precisa SOBREVIVER pra perder o turno: com o Magneton em 60 contra tres DUROS de
+     70 ele sai 45 vezes. E a mesma armadilha do "painel forte demais" que este arquivo ja registra
+     na medicao do Smeargle e na do revide -- so que aqui ela escondia um bug em vez de um zero. */
   for(let k = 0; k < 600 && !(comPegou && comTravou && comSelo); k++){
-    const t = [mk2('magneton', 70)];
-    const e = [mk2('machamp', 68), mk2('rhydon', 68), mk2('gengar', 68)];
+    const t = [mk2('magneton', 60)];
+    const e = [mk2('snorlax', 70), mk2('rhydon', 70), mk2('steelix', 70)];
     S.equiparNpc(e);
     const r = S.simulateGymBattle(t, e, S.makeSeededRng('partela|' + k));
     (r.matchups || []).forEach(m => {
@@ -8031,7 +8055,7 @@ console.log('\nA PARALISIA NA TELA: AS DUAS FRASES E O SELO');
     const seq = S.sequenciaDoConfronto(m);
     let antes = 0, depois = 0;
     for(let passo = 0; passo <= seq.length; passo++){
-      const tem = S.fighterHtml(m, 'e', { passo }).indexOf('⚡') >= 0;
+      const tem = temSelo(S.fighterHtml(m, 'e', { passo }), 'raio');
       if(passo < i + 1 && tem) antes++;
       if(passo >= i + 1 && !tem) depois++;
     }
@@ -8040,9 +8064,9 @@ console.log('\nA PARALISIA NA TELA: AS DUAS FRASES E O SELO');
     /* PARALISIA HERDADA (o pokemon entra ja paralisado, sem marca no diario) vale desde o quadro 0 */
     const herdada = Object.assign({}, m, { golpes: (m.golpes||[]).filter(g => g.x !== 'paralisou'), enemyParalisado: true });
     ok('mas a paralisia HERDADA vale desde o primeiro quadro',
-       S.fighterHtml(herdada, 'e', { passo: 0 }).indexOf('⚡') >= 0);
+       temSelo(S.fighterHtml(herdada, 'e', { passo: 0 }), 'raio'));
     /* sem passo (o log relido dias depois) o selo vale: ali o confronto ja acabou */
-    ok('e sem passo ele vale', S.fighterHtml(m, 'e', {}).indexOf('⚡') >= 0);
+    ok('e sem passo ele vale', temSelo(S.fighterHtml(m, 'e', {}), 'raio'));
   }
 
   /* ⚠️ E O ASTERISCO NO CARTAO DO GOLPE, como os outros tres status: e a informacao que mais muda
@@ -8588,6 +8612,464 @@ console.log('\n=== VIDA CHEIA NAO MORRE NUM GOLPE (17/09/2026) ===');
   ok('e ele tem a funcao do teto', /const tetoNoAlvoCheio = /.test(srv));
 }
 
+
+/* ============================================================================
+   OS SELOS DO JOGO (17/09/2026) -- pixel art nossa no lugar dos emojis
+   ----------------------------------------------------------------------------
+   Quatro coisas podem dar errado aqui, e nenhuma delas aparece como erro:
+
+   1) DESENHO SEM CHAMADOR -- letra morta, a mesma decisao que manteve os estagios 2 a 4 do
+      critico e o Rock Tomb fora do jogo por anos.
+   2) GRADE FORA DE 16x16 ou com cor que nao existe na paleta -- o gerador nao reclama, ele
+      so desenha errado (ou nada).
+   3) O `${selo(...)}` NUMA STRING DE ASPAS em vez de um template: ele sai LITERAL na tela, e
+      o `node --check` so acusa quando a aspa por acaso fecha a string. Ja aconteceu duas vezes
+      nesta sessao (a moeda e o raro da rota).
+   4) O SELO NO SERVIDOR -- ele e apresentacao pura, e o servidor nao tem tela.
+   ============================================================================ */
+{
+  console.log('\n=== OS SELOS DO JOGO ===');
+  const nomes = Object.keys(S.DESENHOS || {});
+  ok('os desenhos existem', nomes.length >= 20, nomes.length + ' selos');
+
+  /* 1) GRADE QUADRADA e so cores da paleta.
+     ⚠️ ELA NAO FIXA O LADO, e isso mudou em 17/09/2026: a primeira versao cobrava `=== 16` e
+     virou mentira no dia em que os selos foram redesenhados em 24x24. O que importa nao e o
+     numero -- e a grade ser QUADRADA, porque o viewBox sai dela. Fixar o lado aqui seria o mesmo
+     erro que o viewBox de 16 escrito a mao cometeu, do outro lado. */
+  let fora = 0, corRuim = [], lados = {};
+  nomes.forEach(n => {
+    const g = S.DESENHOS[n];
+    if(!Array.isArray(g) || !g.length){ fora++; return; }
+    const lado = g.length;
+    lados[lado] = (lados[lado] || 0) + 1;
+    g.forEach(l => {
+      if(typeof l !== 'string' || l.length !== lado){ fora++; return; }
+      for(const c of l) if(c !== '.' && !S.PALETA_SELO[c] && corRuim.indexOf(n + ':' + c) < 0) corRuim.push(n + ':' + c);
+    });
+  });
+  ok('toda grade e quadrada', fora === 0, fora + ' linhas fora do lado do proprio selo');
+  ok('e o viewBox sai do lado de cada uma', Object.keys(lados).every(L =>
+       S.svgDosSelos().indexOf('viewBox="0 0 ' + L + ' ' + L + '"') >= 0),
+     Object.entries(lados).map(([L, q]) => q + ' de ' + L + 'x' + L).join(', '));
+  ok('e toda cor esta na paleta', corRuim.length === 0, corRuim.join(' '));
+
+  /* 2) LETRA MORTA: todo desenho tem chamador */
+  const src = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
+  const semDono = nomes.filter(n => src.split("selo('" + n + "'").length - 1 === 0);
+  ok('nenhum desenho fica sem chamador', semDono.length === 0, semDono.join(', '));
+
+  /* 3) O SIMBOLO: um <symbol> por desenho, com o id que o `selo()` procura */
+  const svg = S.svgDosSelos ? S.svgDosSelos() : '';
+  const simbolos = (svg.match(/<symbol id="s-/g) || []).length;
+  ok('o <svg> traz um <symbol> por desenho', simbolos === nomes.length, simbolos + ' de ' + nomes.length);
+  /* ⚠️ 3b) O SVG BATE PIXEL A PIXEL COM A GRADE -- a trava que a OTIMIZACAO obrigou.
+     O gerador nao emite uma <rect> por pixel: ele junta em RETANGULOS MAXIMOS (horizontal E
+     vertical) e cospe um <path> por cor. Sem isso, os selos em 24x24 davam 3.772 formas e 160 KB
+     de DOM; com isso dao 38 KB -- menos que a versao 16x16 tinha, com 2,25x mais detalhe.
+     So que uma juncao errada nao aparece como erro: aparece como um pixel de cor trocada num
+     desenho de 24 pixels, que ninguem ve. Esta trava DESFAZ o SVG de volta em grade e compara
+     com o DESENHOS, e ela cobra tambem que nenhum retangulo se SOBREPONHA -- dois paths pintando
+     o mesmo pixel dariam o desenho certo por acaso, com a cor do ultimo. */
+  {
+    const svgTxt = S.svgDosSelos();
+    const letraDe = {};
+    Object.entries(S.PALETA_SELO).forEach(([k, v]) => letraDe[v.toLowerCase()] = k);
+    let difs = 0, sobrepostos = 0, px = 0, exemplo = '';
+    Object.entries(S.DESENHOS).forEach(([nome, grade]) => {
+      const lado = grade.length;
+      const m = svgTxt.match(new RegExp('<symbol id="s-' + nome + '"[^>]*>([\\s\\S]*?)</symbol>'));
+      if(!m){ difs++; return; }
+      const tela = Array.from({ length: lado }, () => new Array(lado).fill('.'));
+      (m[1].match(/<path fill="([^"]+)" d="([^"]+)"\/>/g) || []).forEach(p => {
+        const partes = p.match(/<path fill="([^"]+)" d="([^"]+)"\/>/);
+        const letra = letraDe[partes[1].toLowerCase()];
+        (partes[2].match(/M(\d+) (\d+)h(\d+)v(\d+)h-\d+z/g) || []).forEach(r => {
+          const v = r.match(/M(\d+) (\d+)h(\d+)v(\d+)h-\d+z/).map(Number);
+          for(let j = 0; j < v[4]; j++) for(let i = 0; i < v[3]; i++){
+            if(tela[v[2] + j][v[1] + i] !== '.') sobrepostos++;
+            tela[v[2] + j][v[1] + i] = letra;
+          }
+        });
+      });
+      grade.forEach((linha, y) => { for(let x = 0; x < lado; x++){
+        px++;
+        const esperado = S.PALETA_SELO[linha[x]] ? linha[x] : '.';
+        if(tela[y][x] !== esperado){ difs++; if(!exemplo) exemplo = nome + ' (' + x + ',' + y + ')'; }
+      }});
+    });
+    ok('o SVG bate PIXEL A PIXEL com a grade', difs === 0, difs + ' de ' + px + (exemplo ? '  ex: ' + exemplo : ''));
+    ok('e nenhum retangulo se sobrepoe a outro', sobrepostos === 0, sobrepostos + ' pixels pintados duas vezes');
+    /* ⚠️ E A OTIMIZACAO TEM QUE ESTAR VALENDO, senao ela pode ser desfeita sem nada acusar: o
+       desenho continua CERTO com uma <rect> por pixel, so que o DOM vai a 160 KB. A trava de
+       cima nao pega isso (ela olha o pixel, e o pixel fica igual) -- quem pega e o tamanho. */
+    /* ⚠️ O TETO E POR SELO, nao um numero fixo: ele nasceu em 60 KB com 29 selos e quase
+       estourou no mesmo dia, com 44 -- um teto fixo envelhece junto com a lista. 1,8 KB por
+       selo da folga pra um desenho cheio e ainda pega a otimizacao desfeita, que custa ~5,4. */
+    const teto = nomes.length * 1800;
+    ok('e o SVG cabe no orcamento de DOM', svgTxt.length < teto,
+       Math.round(svgTxt.length / 1024) + ' KB de ' + Math.round(teto / 1024) +
+       ' (' + Math.round(svgTxt.length / nomes.length) + ' por selo; sem juntar retangulo daria ~5400)');
+  }
+  ok('e o selo aponta pro simbolo certo', S.selo('shiny').indexOf('#s-shiny') >= 0, S.selo('shiny'));
+  /* nome desconhecido devolve VAZIO, nunca um <use> quebrado: um <use> pra um symbol que nao
+     existe desenha NADA, e em silencio -- a mesma falha muda das insignias que davam 404. */
+  ok('e desenho que nao existe devolve vazio', S.selo('naoexiste') === '', JSON.stringify(S.selo('naoexiste')));
+
+  /* 4) O LITERAL: nenhuma tela pode mostrar o `${selo(` escrito */
+  const telas = Object.keys(S).filter(k => /^render[A-Z]/.test(k) && typeof S[k] === 'function');
+  const comLiteral = [];
+  let rodaram = 0;
+  telas.forEach(n => {
+    let html = '';
+    try { html = String(S[n]() || ''); rodaram++; } catch(e){ return; }
+    if(html.indexOf('${selo(') >= 0) comLiteral.push(n);
+  });
+  ok('rodei telas de sobra pra medir', rodaram >= 40, rodaram + ' de ' + telas.length + ' telas');
+  ok('e nenhuma mostra o ${selo(...)} escrito', comLiteral.length === 0, comLiteral.join(', '));
+
+  /* ⚠️ E A VARREDURA DO CODIGO, que e a que pega de verdade: a de cima so alcanca as telas que
+     RODAM no sandbox (112 das 127 -- o resto precisa de estado), e a `renderLoja` e uma das que
+     nao roda. Esta le o arquivo e diz em que tipo de string cada `${selo(` cai: dentro de crase
+     ele INTERPOLA; dentro de aspa ele sai ESCRITO na tela, e o `node --check` passa batido.
+     Ja aconteceu duas vezes so nesta sessao (a moeda da loja e o raro da rota).
+     ⚠️ ELA PRECISA DE UMA PILHA, e foi assim que a primeira versao deu falso positivo em 4 linhas
+     certas: dentro de `${...}` o parser VOLTA pro modo codigo, e ali cabe outro template. Com um
+     estado so, a crase de dentro fechava o template de fora. */
+  {
+    const pilha = [];   /* T=template  E=${} (com contador de chaves)  ' \" =string */
+    const topo = () => pilha.length ? pilha[pilha.length - 1] : null;
+    const emCodigo = () => !topo() || topo().t === 'E';
+    const js = extractGameScript(path.join(raiz, 'index.html'));
+    const tipoEm = new Array(js.length).fill(null);
+    let esc = false, com = null;
+    for(let i = 0; i < js.length; i++){
+      const c = js[i], t = topo();
+      tipoEm[i] = com ? com : (t ? t.t : null);
+      if(com === '//'){ if(c === '\n') com = null; continue; }
+      if(com === '/*'){ if(c === '*' && js[i+1] === '/'){ com = null; i++; } continue; }
+      if(esc){ esc = false; continue; }
+      if(c === '\\' && t && t.t !== 'E'){ esc = true; continue; }
+      if(t && (t.t === "'" || t.t === '\"')){ if(c === t.t) pilha.pop(); continue; }
+      if(t && t.t === 'T'){
+        if(c === '`'){ pilha.pop(); continue; }
+        if(c === '$' && js[i+1] === '{'){ pilha.push({ t:'E', n:0 }); i++; }
+        continue;
+      }
+      /* modo codigo (ou dentro de ${}) */
+      if(c === '/' && js[i+1] === '/'){ com = '//'; i++; continue; }
+      if(c === '/' && js[i+1] === '*'){ com = '/*'; i++; continue; }
+      /* ⚠️ O REGEX LITERAL, e foi ele que deu falso positivo em duas linhas certas: um `/['\"]/g`
+         tem aspa DENTRO, e sem pular o regex o parser abre uma string que nunca fecha. Saber se
+         `/` e divisao ou regex precisa do token anterior -- depois de `(`, `,`, `=` e companhia e
+         regex; depois de um nome ou `)` e divisao. */
+      if(c === '/'){
+        let k = i - 1;
+        while(k >= 0 && /\s/.test(js[k])) k--;
+        const ant = k >= 0 ? js[k] : '(';
+        if('(,=:[!&|?{};+-*%~^<>'.indexOf(ant) >= 0){
+          let j2 = i + 1, e2 = false, cls = false;
+          while(j2 < js.length){
+            const d = js[j2];
+            if(e2){ e2 = false; }
+            else if(d === '\\\\') e2 = true;
+            else if(d === '[') cls = true;
+            else if(d === ']') cls = false;
+            else if(d === '/' && !cls) break;
+            else if(d === '\n') break;   /* regex nao atravessa linha: era divisao mesmo */
+            j2++;
+          }
+          if(js[j2] === '/'){ i = j2; continue; }
+        }
+      }
+      if(c === "'" || c === '\"'){ pilha.push({ t:c }); continue; }
+      if(c === '`'){ pilha.push({ t:'T' }); continue; }
+      if(t && t.t === 'E'){
+        if(c === '{') t.n++;
+        else if(c === '}'){ if(t.n === 0) pilha.pop(); else t.n--; }
+      }
+    }
+    const fora = [];
+    let j = -1;
+    while((j = js.indexOf('${selo(', j + 1)) >= 0){
+      if(tipoEm[j] !== 'T') fora.push('L' + js.slice(0, j).split('\n').length + ' em ' + (tipoEm[j] || 'codigo'));
+    }
+    ok('e nenhum ${selo(...)} esta fora de um template', fora.length === 0, fora.slice(0, 4).join(', '));
+  }
+
+  /* ⚠️ 5) O SELO ESCAPADO -- a armadilha que a de cima NAO pega, e que so um print pegou.
+     Aqui o `${selo(...)}` esta CERTO no codigo: ele interpola, gera o <svg>, e alguem passa um
+     `escapeHtmlSafe` em cima DEPOIS. O resultado e o SVG escrito na tela:
+       * 10% de chance de causar queimadura <svg class="selo " shape-rendering="crispEdges"...
+     Foi exatamente isso que aconteceu com o asterisco do cartao de golpe, e nenhuma das quatro
+     travas anteriores viu -- elas olham o CODIGO e o codigo estava certo.
+     Esta olha o HTML PRONTO, que e onde o defeito aparece. */
+  {
+    const escapados = [];
+    telas.forEach(n => {
+      let html = '';
+      try { html = String(S[n]() || ''); } catch(e){ return; }
+      if(html.indexOf('&lt;svg') >= 0 || html.indexOf('&lt;use') >= 0) escapados.push(n);
+    });
+    /* e os montadores de HTML que nao sao tela: o cartao de golpe foi o caso do relato */
+    const avulsos = { 'cartaoDeGolpe': ['ember'], 'golpeSeloHtml': ['Fire'], 'seloDeGolpe': ['Fire'] };
+    Object.entries(avulsos).forEach(([n, args]) => {
+      if(typeof S[n] !== 'function') return;
+      let h = ''; try { h = String(S[n].apply(null, args) || ''); } catch(e){ return; }
+      if(h.indexOf('&lt;svg') >= 0) escapados.push(n);
+    });
+    /* varre TODOS os golpes com observacao: e ali que o selo entra no meio de um texto */
+    let comObs = 0;
+    Object.keys(S.GOLPES || {}).forEach(id => {
+      const o = S.obsDoGolpe(id);
+      if(!o || !o.length) return;
+      comObs++;
+      const c = S.cartaoDeGolpe(id);
+      if(c.indexOf('&lt;svg') >= 0 && escapados.indexOf('cartaoDeGolpe:' + id) < 0) escapados.push('cartaoDeGolpe:' + id);
+    });
+    ok('varri os cartoes com observacao', comObs >= 30, comObs + ' golpes com asterisco');
+    ok('e nenhum selo sai ESCAPADO na tela', escapados.length === 0, escapados.slice(0, 5).join(', '));
+  }
+
+  /* 5) APRESENTACAO PURA: o servidor nao tem tela, entao nao pode ter selo */
+  const srv = require('fs').readFileSync(path.join(raiz, 'functions', 'index.js'), 'utf8');
+  ok('o servidor nao conhece os selos', srv.indexOf('DESENHOS') < 0 && srv.indexOf('PALETA_SELO') < 0);
+}
+
+/* ============================================================================
+   QUEM NAO ATACOU NAO APLICA STATUS (18/09/2026)
+   ----------------------------------------------------------------------------
+   Reportado com print: o Dewgong estava DORMINDO e mesmo assim congelou o Gengar. O log da tela
+   dizia, em linhas seguidas, *"Dewgong continua a dormir e nao pode atacar"* e *"Gengar ficou
+   congelado com Raio Congelante!"*.
+
+   ⚠️ A CAUSA E O `lastMove`: os seis `tentar*` leem o ultimo golpe do atacante, e ele fica gravado
+   da troca ANTERIOR -- ou ate de outro confronto, porque a instancia atravessa a batalha. Quem
+   dormiu nao chama o `golpesDaTroca`, entao o `lastMove` velho continua la e o sorteio rodava em
+   cima dele.
+
+   ⚠️ E NAO ERA SO O SONO NEM SO O GELO. Medido antes do conserto: os TRES estados que zeram o golpe
+   (sono, congelamento e paralisia) vazavam nos QUATRO status, cada um na chance cheia do golpe --
+   9,5% no Raio Congelante, 30% no Trovao. Em 18.000 trocas, 1.208 aplicavam status sem golpe.
+
+   A TRAVA NAO OLHA OS TRES ESTADOS, e e de proposito: ela cobra o INVARIANTE -- ninguem aplica
+   status numa troca em que nao houve golpe dele. Assim o proximo estado que impedir um ataque
+   nasce coberto; uma lista de estados aqui ficaria pra tras no primeiro que entrasse.
+   ============================================================================ */
+{
+  console.log('\n=== QUEM NAO ATACOU NAO APLICA STATUS ===');
+  const mk = (id, lv, golpes) => {
+    const p = S.createInstance(id, lv); p.hp = p.maxHp = S.calcMaxHp(p);
+    if(golpes) p.ataques = golpes; return p;
+  };
+  /* os tres estados que zeram o golpe, e um golpe de status pra cada tipo de efeito */
+  const ESTADOS = [
+    ['dormindo',   (p) => { p._dormindoPor = 3; }],
+    ['congelado',  (p) => { p._congelado = 'icebeam'; }],
+    ['paralisado', (p) => { p._paralisado = true; }],
+  ];
+  const ATACANTES = [
+    ['dewgong',   57, 'icebeam',      '_congelado',  'gelo'],
+    ['charizard', 60, 'flamethrower', '_queimado',   'queimadura'],
+    ['muk',       55, 'sludgebomb',   '_envenenado', 'veneno'],
+    ['raichu',    55, 'thunder',      '_paralisado', 'paralisia'],
+  ];
+  let semGolpe = 0, comGolpe = 0, trocas = 0, ex = '';
+  ESTADOS.forEach(([nomeEstado, por]) => {
+    ATACANTES.forEach(([id, lv, mv, campo]) => {
+      for(let i = 0; i < 900; i++){
+        const alvo = mk('snorlax', 60, ['bodyslam']);
+        const b = mk(id, lv, [mv]);
+        por(b);
+        /* ⚠️ O `lastMove` DE ANTES e a coisa toda: sem ele o defeito nao acontece */
+        b.lastMove = mv;
+        const d = [];
+        S.doExchange(alvo, b, S.makeSeededRng('ns' + nomeEstado + id + i), d);
+        trocas++;
+        if(!alvo[campo]) continue;
+        const atacou = d.some(g => !g.x && g.q === 'e');
+        if(atacou) comGolpe++;
+        else { semGolpe++; if(!ex) ex = nomeEstado + ' + ' + id + ' (' + campo + ')'; }
+      }
+    });
+  });
+  ok('amostra de sobra', trocas >= 9000, trocas + ' trocas');
+  ok('NINGUEM aplica status sem ter atacado', semGolpe === 0, semGolpe + (ex ? '   ex: ' + ex : ''));
+  /* ⚠️ E O CASO CERTO CONTINUA ACONTECENDO -- sem esta segunda metade, bastaria desligar os seis
+     `tentar*` pra a trava passar. Quem DEGELA ou nao trava pela paralisia ataca, e aplica. */
+  ok('mas quem chegou a atacar continua aplicando', comGolpe >= 100, comGolpe + ' casos legitimos');
+
+  /* O CASO DO PRINT, ponta a ponta: o Gengar dorme o Dewgong e o Dewgong nao congela ninguem */
+  {
+    let congelouDormindo = 0, confrontos = 0;
+    for(let i = 0; i < 600; i++){
+      const g = mk('gengar', 51, ['dreameater', 'sludgebomb']);
+      const dw = mk('dewgong', 57, ['icebeam', 'surf']);
+      dw._dormindoPor = 3;
+      dw.lastMove = 'icebeam';
+      const d = [];
+      S.doExchange(g, dw, S.makeSeededRng('print' + i), d);
+      confrontos++;
+      const dormiu = d.some(x => x.x === 'dormindo' && x.q === 'e');
+      if(dormiu && g._congelado) congelouDormindo++;
+    }
+    ok('o caso do print: o Dewgong dormindo nao congela o Gengar', congelouDormindo === 0,
+       congelouDormindo + ' de ' + confrontos);
+  }
+
+  /* ⚠️ E A GUARDA E O GOLPE TER SAIDO, nao uma lista de estados -- o teste LE O CODIGO porque um
+     caso de comportamento passaria com a guarda escrita de qualquer jeito, e a lista de estados
+     e o jeito que envelhece. */
+  const cli = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
+  const srv = require('fs').readFileSync(path.join(raiz, 'functions', 'index.js'), 'utf8');
+  [['cliente', cli], ['servidor', srv]].forEach(([qual, txt]) => {
+    ok('o ' + qual + ' deriva a guarda do golpe que saiu',
+       txt.indexOf('const primeiroAtacou = dmgByFirst.length > 0;') >= 0 &&
+       txt.indexOf('const segundoAtacou  = dmgBySecond.length > 0;') >= 0);
+    /* os SEIS de cada lado -- e a contagem, pra um tentar* novo nao nascer sem a guarda */
+    const doFirst = txt.split('(segundoCaiu || !primeiroAtacou) ? null : tentar').length - 1;
+    const doSecond = txt.split('pulaOSegundo ? null : tentar').length - 1;
+    ok('  e os SEIS de cada lado passam por ela (' + qual + ')', doFirst === 6 && doSecond === 6,
+       doFirst + ' do first, ' + doSecond + ' do second');
+  });
+}
+
+/* ============================================================================
+   QUEM JA CAIU NAO PERDE TURNO (18/09/2026)
+   ----------------------------------------------------------------------------
+   Reportado com print, na TORRE: a Jynx matou o Primeape (0/435 no cabecalho) e a linha
+   *"Primeape continua a dormir e nao pode atacar"* saia LOGO DEPOIS do golpe que o derrubou.
+
+   ⚠️ NAO ERA DEFEITO DA TORRE. Ela chama o MESMO `simulateGymBattle` da jornada, sem opcoes --
+   os dois motores tinham isto igual. A suspeita do relato ("desconfio que tem coisa diferente")
+   foi verificada e esta trancada no bloco de baixo: 400 batalhas iguais golpe a golpe.
+
+   ⚠️ A CAUSA E A POSICAO DA CHAMADA: o `dormeDe(second)` vem DEPOIS do golpe do first -- e TEM que
+   vir, porque a frase e sobre o turno DELE, que acontece depois do golpe de quem e mais rapido.
+   So que o golpe do first pode ter derrubado o second. Medido: saia em 47% dos confrontos em que
+   o adormecido morre.
+
+   A GUARDA MORA DENTRO das tres funcoes (`geloDe`, `dormeDe`, `travadoDe`), e nao nas chamadas:
+   as do gelo rodam antes dos golpes e hoje estao seguras, mas foi mover uma chamada que criou o
+   defeito -- dentro da funcao ela nao se perde.
+   ============================================================================ */
+{
+  console.log('\n=== QUEM JA CAIU NAO PERDE TURNO ===');
+  const mk = (id, lv, golpes) => {
+    const p = S.createInstance(id, lv); p.hp = p.maxHp = S.calcMaxHp(p);
+    if(golpes) p.ataques = golpes; return p;
+  };
+  /* as TRES linhas que falam do turno de alguem */
+  const DO_TURNO = ['dormindo', 'paralisado', 'gelado'];
+
+  /* 1) O CASO DO PRINT: o adormecido entra machucado e o golpe do outro o mata */
+  let depoisDeCair = 0, confrontos = 0, ex = '';
+  for(let i = 0; i < 2500; i++){
+    const jynx = mk('jynx', 80, ['psychic']);
+    const prime = mk('primeape', 68, ['crosschop']);
+    prime._dormindoPor = 3;
+    prime.hp = 60;              /* machucado: o golpe da Jynx derruba */
+    const d = [];
+    S.doExchange(jynx, prime, S.makeSeededRng('turno' + i), d);
+    confrontos++;
+    /* percorre o diario na ordem, seguindo o HP do Primeape (o lado 'e') */
+    let caiu = false;
+    d.forEach(g => {
+      if(!g.x && g.q === 'p' && g.hp !== null && g.hp !== undefined && g.hp <= 0) caiu = true;
+      if(caiu && g.q === 'e' && DO_TURNO.indexOf(g.x) >= 0){
+        depoisDeCair++; if(!ex) ex = 'i=' + i + ' linha "' + g.x + '"';
+      }
+    });
+  }
+  ok('amostra do caso do print', confrontos >= 2000, confrontos + ' confrontos');
+  ok('nenhuma linha de turno sai DEPOIS de ele cair', depoisDeCair === 0, depoisDeCair + (ex ? '   ex: ' + ex : ''));
+
+  /* 2) E A LINHA CONTINUA SAINDO pra quem sobrevive -- sem isso bastaria apagar as tres funcoes.
+     ⚠️ O PAINEL PRECISA SER EQUILIBRADO: com um lado muito mais forte ele MATA o adormecido, e
+     a trava mede zero sem nada estar errado. Foi assim que o painel da paralisia escondeu este
+     defeito por dois dias (ver a nota dele, mais acima). */
+  {
+    let saiu = 0, vivos = 0;
+    for(let i = 0; i < 2500; i++){
+      const a = mk('butterfree', 60, ['gust']);        /* fraco: nao mata o Snorlax */
+      const b = mk('snorlax', 70, ['bodyslam']);
+      b._dormindoPor = 3;
+      const d = [];
+      S.doExchange(a, b, S.makeSeededRng('vivo' + i), d);
+      const acordou = d.some(g => g.x === 'acordou' && g.q === 'e');
+      if(b.hp > 0 && !acordou){ vivos++; if(d.some(g => g.x === 'dormindo' && g.q === 'e')) saiu++; }
+    }
+    ok('e quem SOBREVIVE dormindo continua perdendo o turno na tela', vivos > 100 && saiu === vivos,
+       saiu + ' de ' + vivos + ' que sobreviveram');
+  }
+
+  /* 3) A GUARDA MORA DENTRO das tres funcoes -- o teste LE O CODIGO porque um caso de
+     comportamento passaria com ela escrita em qualquer lugar, e o lugar e a coisa toda aqui. */
+  const cli = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
+  const srv = require('fs').readFileSync(path.join(raiz, 'functions', 'index.js'), 'utf8');
+  [['cliente', cli], ['servidor', srv]].forEach(([qual, txt]) => {
+    const dentro = (nome) => {
+      const i = txt.indexOf('const ' + nome + ' = (p, q) => {');
+      if(i < 0) return false;
+      /* a janela e generosa: a guarda do sono vem depois de um comentario grande */
+      return txt.slice(i, i + 1600).indexOf('if(p.hp <= 0) return;') >= 0;
+    };
+    ok('as tres funcoes do turno guardam quem caiu (' + qual + ')',
+       dentro('geloDe') && dentro('dormeDe') && dentro('travadoDe'),
+       ['geloDe','dormeDe','travadoDe'].filter(n => !dentro(n)).join(', ') || 'as tres');
+  });
+}
+
+/* ============================================================================
+   A TORRE SEGUE A MECANICA DA JORNADA (18/09/2026)
+   ----------------------------------------------------------------------------
+   Perguntado no relato acima: *"verifique se a torre de treinadores esta seguindo a mecanica de
+   lutas da jornada, desconfio que tem coisa diferente"*.
+
+   A TORRE roda no SERVIDOR (`fightTrainerTowerFloor` -> `simulateGymBattle`, sem opcoes) e a
+   JORNADA roda no CLIENTE. A comparacao das 300 batalhas que ja existia aqui cobre o motor, mas
+   ela monta os times de um jeito so -- esta monta como a TORRE monta (com `equiparNpc` no NPC,
+   que e o que a Torre faz) e compara o DIARIO inteiro, golpe a golpe, nao so quem ganhou.
+   ============================================================================ */
+{
+  console.log('\n=== A TORRE x A JORNADA, GOLPE A GOLPE ===');
+  const ids = Object.keys(S.SPECIES);
+  const resumo = (r) => (r.win ? '1' : '0') + '|' + (r.matchups || []).map(m =>
+    [m.playerHpAfter, m.enemyHpAfter,
+     (m.golpes || []).map(g => (g.q||'') + (g.x||'') + (g.d||0) + ':' + (g.mv||'')).join(',')
+    ].join(';')).join('/');
+  let dif = 0, n = 0, ex = '';
+  const tocou = {};
+  for(let i = 0; i < 150; i++){
+    const rng0 = S.makeSeededRng('tj' + i);
+    const escolhe = () => Array.from({length: 3}, () => ids[Math.floor(rng0() * ids.length)]);
+    const t1 = escolhe(), t2 = escolhe();
+    const nivel = 45 + Math.floor(rng0() * 30);
+    const monta = (lista, novo) => lista.map(id => { const p = novo(id, nivel); p.hp = p.maxHp = S.calcMaxHp(p); return p; });
+
+    const a1 = monta(t1, S.createInstance), b1 = monta(t2, S.createInstance);
+    S.equiparNpc(b1);
+    const r1 = S.simulateGymBattle(a1, b1, S.makeSeededRng('tb' + i));
+
+    const a2 = monta(t1, srv._createInstance), b2 = monta(t2, srv._createInstance);
+    b2.forEach((p, k) => { p.ataques = (b1[k].ataques || []).slice(); });
+    const r2 = srv._simulateGymBattle(a2, b2, srv._makeSeededRng('tb' + i));
+
+    n++;
+    const x = resumo(r1), y = resumo(r2);
+    if(x !== y){ dif++; if(!ex){
+      for(let k = 0; k < Math.max(x.length, y.length); k++) if(x[k] !== y[k]){
+        ex = 'i=' + i + ': cliente [' + x.slice(Math.max(0,k-30), k+30) + '] servidor [' + y.slice(Math.max(0,k-30), k+30) + ']';
+        break; }
+    }}
+    (r1.matchups || []).forEach(m => (m.golpes || []).forEach(g => { if(g.x) tocou[g.x] = (tocou[g.x]||0) + 1; }));
+  }
+  ok('a Torre (servidor) e a jornada (cliente) dao o MESMO diario', dif === 0, dif + ' de ' + n + (ex ? '   ' + ex : ''));
+  /* ⚠️ E A COMPARACAO PRECISA TER TOCADO nas mecanicas: sem esta linha ela daria verde comparando
+     300 trocas de golpe comum, que e o caso em que os dois motores nunca divergiriam. */
+  ok('e ela tocou em pelo menos 10 mecanicas diferentes', Object.keys(tocou).length >= 10,
+     Object.keys(tocou).length + ': ' + Object.keys(tocou).sort().join(' '));
+}
 
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
 process.exit(falhas ? 1 : 0);

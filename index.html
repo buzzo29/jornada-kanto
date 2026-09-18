@@ -2667,6 +2667,35 @@
   .conquista-premio.pronta:hover{ background:#fff3bf; }
   .conquista-premio.pronta:disabled{ opacity:.6; cursor:default; }
   .conquista-premio.paga{color:var(--green);}
+  /* ⚠️ O SELO ACOMPANHA A FONTE DA LINHA (`1em`), e nao tem tamanho fixo: ele vive no meio de
+     frases de tamanhos diferentes -- a linha de status, o log, o nome no quadro do lutador -- e um
+     px fixo ficaria grande numa e pequeno na outra. Era exatamente o que o emoji fazia de graca.
+     O `vertical-align:-.15em` alinha a base do desenho com a base do texto; sem ele o selo fica
+     boiando acima da linha. */
+  .selo{ width:1em; height:1em; vertical-align:-.15em; flex:0 0 auto; }
+  /* no quadro do lutador eles sao a informacao, e nao um enfeite no meio da frase */
+  .selo-g{ width:1.15em; height:1.15em; vertical-align:-.2em; }
+  /* ⚠️ O SELO DA HOME e maior e NAO desce a linha de base: ali ele nao esta no meio de uma
+     frase, ele e o icone do card -- centralizado, com o rotulo embaixo. */
+  /* ⚠️ 32px FIXOS, e nao 1em: os outros dois cards da fileira (Pokedex e Conquistas) usam o
+     `.dex-icon.menu`, que e 32px -- em `1em` o selo saia 27 e a fileira ficava desalinhada. */
+  .selo-menu{ width:32px; height:32px; vertical-align:middle; display:block; margin:0 auto; }
+  /* ⚠️ O SELO DO ASTERISCO NAO PODE SEGUIR A FONTE, e foi reportado com print: a observacao do
+     cartao e .6rem (~10px), entao em `1em` a chama saia com 10 pixels de lado -- ilegivel, e ela
+     e justamente a informacao que o asterisco existe pra dar. Aqui ele e um ICONE ao lado de uma
+     legenda, nao uma palavra no meio dela: 15px fixos, que e onde o desenho de 24x24 ainda se le. */
+  .golpe-cartao-obs .selo{ width:15px; height:15px; vertical-align:-3px; }
+  /* ⚠️ NO CABECALHO O SELO PRECISA DE 1.4em, e isso nao e gosto: o emoji e desenhado MAIOR que a
+     caixa da fonte (ele tem metricas proprias), entao trocar por um <svg> de `1em` ENCOLHE o
+     icone -- e ali a fonte e a de PIXEL, que ja e pequena. Medido na tela: em 1em ele saia com
+     metade do tamanho que o emoji tinha. */
+  .result-banner .selo, .home-title .selo,
+  h2 .selo, .box > h2 .selo, .modal-box h2 .selo{ width:1.4em; height:1.4em; vertical-align:-.3em; }
+  /* o EYEBROW tem a menor fonte de titulo do jogo (~8px): em 1.4em o selo saia com 12px, e um
+     desenho de 24x24 nao se le nisso. */
+  .eyebrow .selo{ width:2em; height:2em; vertical-align:-.55em; }
+  /* o modal-icon e o icone GRANDE de um modal: ali ele ocupa a caixa inteira */
+  .modal-icon .selo{ width:1em; height:1em; vertical-align:-.1em; }
   /* ⚠️ O HM QUE O JOGADOR AINDA NAO TEM (17/09/2026). E o MESMO apagado do pokemon desmaiado e do
      que esta descansando no montador -- o jogo ja ensinou o olho a ler esse cinza como "esse nao",
      e uma terceira forma pra a mesma ideia e o que faz a interface parecer montada por partes.
@@ -3181,7 +3210,7 @@
 <body>
 <div id="app"></div>
 <div id="version-banner">
-  <span>🔄 Tem uma versão nova do jogo.</span>
+  <span>${selo('recarregar')} Tem uma versão nova do jogo.</span>
   <button onclick="atualizarParaVersaoNova()">Atualizar agora</button>
 </div>
 
@@ -4138,6 +4167,68 @@ function missoesDaMontanha(){
   return game.montanha;
 }
 function ninhoAceso(id){ return !!missoesDaMontanha().ninhos[id]; }
+/* ⚠️ AS MISSÕES SÓ COMEÇAM DEPOIS DA PRIMEIRA VISITA (18/09/2026, a pedido: *"as missões dos
+   ninhos só irão começar a acontecer depois que o treinador visita o ninho pela primeira vez"*).
+   Antes disso elas contavam desde o primeiro ginásio da jornada, então dava pra chegar na Montanha
+   com o Zapdos JÁ ACESO sem nunca ter sabido que existia uma missão -- e as três são o oposto
+   disso: a do Moltres pede um time montado de propósito, a do Zapdos uma sequência, a do Articuno
+   um pokémon guardado pra três confrontos. Elas só valem como desafio pra quem sabe que existem.
+
+   ⚠️ E O CAMPO É NOVO, não é o `visitas`: aquele tem nome enganoso -- ele conta LENDÁRIOS
+   RECEBIDOS (o `entregarDaMontanha` é quem o incrementa) e serve só pra variar a semente dos
+   guardiões. Lido como "já visitou", ele só viraria 1 depois do prêmio. */
+/* ⚠️ E A VISITA É DA CONTA, NÃO DO SAVE -- é a mesma decisão (e o mesmo molde) do HM01, que
+   nasceu por save e foi movido em 11/09/2026. O pedido diz *"depois que o treinador visita o ninho
+   PELA PRIMEIRA VEZ"*, e "a primeira vez" é uma só na vida do treinador: por save, seria "a
+   primeira de cada jornada".
+   ⚠️ E ISSO NÃO É SÓ LEITURA DE TEXTO -- por save a mecânica quase deixava de existir, e está
+   medido: a Montanha sai em 53,6% das jornadas, e quando sai ela cai no trecho 6 em 42% das vezes,
+   no 7 em 31% e no 8 em 26%. Do trecho 7 em diante **não sobram três ginásios**, então o ZAPDOS
+   ficava matematicamente impossível em 58% das jornadas que TÊM montanha -- e o MOLTRES também nos
+   26% do trecho 8, porque o Blaine é o 7º ginásio de Kanto e já passou.
+   Pela conta, a primeira jornada é a descoberta e as seguintes valem inteiras. */
+function visitarOsNinhos(){
+  if(game.visitouOsNinhos) return false;
+  game.visitouOsNinhos = true;
+  /* best-effort, como a do HM e a do rival padrão: se falhar, a jornada não para e a marca volta
+     na próxima vez que o jogador chegar aos ninhos. */
+  if(game.authUser){
+    userDocRef(game.authUser.uid).set({ visitouOsNinhos: true }, { merge: true })
+      .catch(e => console.error('Erro ao gravar a visita aos ninhos:', e));
+  }
+  return true;
+}
+/* ⚠️ SAVE ANTIGO É DEDUZIDO, e não some com o progresso de quem estava no meio: quem tem ninho
+   aceso, sequência andando ou lendário recebido obviamente já passou pela tela. Quem não tem nada
+   disso também não tinha o que perder -- ele visita de novo e começa dali. É a mesma ideia do
+   `repararEvolucoesAtrasadas`: fechar a torneira não pode apagar o que já estava na bacia. */
+/* Um save (o aberto ou um dos guardados) mostra que a MONTANHA já foi visitada? */
+function saveMostraVisita(m){
+  if(!m) return false;
+  if((m.visitas || 0) > 0 || (m.sequenciaDeGinasios || 0) > 0) return true;
+  return Object.keys(m.ninhos || {}).length > 0;
+}
+/* ⚠️ A DEDUÇÃO VARRE A CONTA INTEIRA, e não só o save aberto -- foi assim que ela nasceu, e o
+   buraco apareceu no primeiro teste de verdade: quem subiu a Montanha ONTEM e hoje começou uma
+   jornada NOVA não era reconhecido, porque o save novo não tem progresso nenhum. O jogador
+   derrotava o Blaine com três de Planta e o ninho não acendia.
+   A marca é da CONTA, então a pergunta também tem que ser: basta UM save mostrar que a tela já
+   foi vista. É a mesma razão pela qual o `repararEvolucoesAtrasadas` roda na HOME e não na
+   abertura do save. */
+function missoesComecaram(){
+  if(game.visitouOsNinhos) return true;
+  if(saveMostraVisita(missoesDaMontanha())) return true;
+  const slots = game.saveSlots || [];
+  for(let i = 0; i < slots.length; i++){
+    const sv = slots[i];
+    if(sv && saveMostraVisita(sv.montanha)) return true;
+    /* e quem JÁ TEM um lendário da Montanha no time obviamente esteve lá -- este é o caso do
+       save que ganhou o prêmio e teve as missões reiniciadas logo em seguida, que apaga os
+       três sinais de cima. */
+    if(sv && Array.isArray(sv.team) && sv.team.some(p => p && MONTANHA_LENDARIOS.indexOf(p.speciesId) >= 0)) return true;
+  }
+  return false;
+}
 function ninhosAcesos(){ return NINHOS.filter(n => ninhoAceso(n.id)).length; }
 function acenderNinho(id){
   const m = missoesDaMontanha();
@@ -4151,6 +4242,10 @@ function reiniciarMissoesDaMontanha(){
   const m = missoesDaMontanha();
   m.ninhos = {};
   m.sequenciaDeGinasios = 0;
+  /* ⚠️ A VISITA NÃO ZERA AQUI, de propósito: ela é o CONHECIMENTO do jogador, não o progresso.
+     Quem acabou de escolher um lendário está justamente na tela dos ninhos -- mandá-lo subir a
+     montanha de novo só pra as missões voltarem a contar seria cobrar duas vezes pela mesma
+     descoberta, e a Montanha sai em 1 de cada 4 trechos: podia não aparecer mais. */
 }
 
 /* ---- os três ganchos, lidos no fim de uma batalha de GINÁSIO ---- */
@@ -4202,6 +4297,12 @@ function cumpriuArticuno(matchups){ return sequenciaDeGelo(matchups) >= 3; }
 /* A PORTA ÚNICA: chamada no fim de TODA batalha de ginásio da jornada, vitória ou derrota.
    Devolve os ninhos que ACENDERAM agora -- é isso que a tela de vitória anuncia. */
 function conferirNinhos(venceu, matchups){
+  /* ⚠️ A GUARDA MORA AQUI DENTRO, e não nos chamadores: esta é a ÚNICA porta por onde um ninho
+     acende, e fechá-la por dentro é o que impede um chamador futuro de reabri-la sem ninguém ver.
+     É a mesma decisão do `registrarSketch`, que aprendeu isso do jeito caro.
+     ⚠️ E ELA SAI ANTES DO `passoDoZapdos`, que é o único dos três que ESCREVE: assim a sequência
+     não anda nem zera antes da visita -- ela nasce em 0 na hora em que as missões começam. */
+  if(!missoesComecaram()) return [];
   const acesos = [];
   if(cumpriuMoltres(venceu) && acenderNinho("moltres")) acesos.push("moltres");
   if(passoDoZapdos(venceu) && acenderNinho("zapdos")) acesos.push("zapdos");
@@ -4752,6 +4853,7 @@ function freshGameDefaults(){
     currentRoute:null,
     routeHistory:[],       // rota escolhida por trecho -- o mapa lê, e desde 11/09/2026 a condição do HM01 também
     hms:[],                // as Máquinas Ocultas -- são da CONTA (ver darHM), e o resetGame as devolve
+    visitouOsNinhos:false, // a visita aos ninhos também é da CONTA (ver visitarOsNinhos)
     routeCards:null,
     rivalName:'',
     rivalNameError:null,
@@ -4897,6 +4999,607 @@ const ICONES = {
   torre: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAYAAADDPmHLAAACBUlEQVR4nO3dMYrUYBiA4VnxBBYWewCLKWSxFEsLQbabc4hHWfYc0y2Cp7CwmMJqqy09gag3yAhx9v9n3+dpQ0iKlw+S/EkuNk/c4e3Vn6Xt7+9/L+7/8PD94r+e0GSejT4BxhJAnADiBBAngDgBxAkg7vnoEzi1Y9f5dSZAnADiBBAngDgBxAkgTgBx0z/rvrx8vfg8f3azrycwAeIEECeAOAHECSBOAHECiDv79QCH3Zuhx9/uvw09/lomQJwA4gQQJ4A4AcQJIE4AcWd/H+Dcr8NHMwHiBBAngDgBxAkgTgBxAogTQJwA4gQQJ4A4AcQJIE4AcQKIO/v1AHdf74Ye//rD9dDjr2UCxAkgTgBxAogTQJwA4gQQJ4A4AcQJIE4AcQKIE0CcAOIEEDf1t+w3G/8LODUTIE4AcQKIE0CcAOIEECeAuKmvUf/FsfsEN7t1rz583v9a3D77df4xJkCcAOIEECeAOAHECSBOAHECiBNAnADiBBAngDgBxAkgTgBxAogTQJwA4gQQJ4A4AcQJIE4AccPXtB9b17/b/nysUzmJ/eHF4vbR7xWYAHECiBNAnADiBBAngDgBxE3/38B325er9r/98mPV/p8+vlq1//6w/H2B0UyAOAHECSBOAHECiBNAnADipl8P8NRZD8BQAogTQJwA4gQQJ4A4AQAAAABE/AUXzjG1xB1NoQAAAABJRU5ErkJggg==',
   batalha: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAYAAADDPmHLAAABxUlEQVR4nO3dvY0TQRiA4TO6Ko6ECkCiADogowZEMYiYPiAmJiAAAmISHFPASdCBNxh9Gt+9z5Na+ye/GmnW492bGwAAAAAAAADgsTlNH+Du7vm/6WNccj7/XLrGh37+R55M7pzrJ4A4AcQJIE4AcQKIE0Dc7e4T+P1p7RSevb6/+Pn0PH76/KcZAeIEECeAOAHECSBOAHECiLv69QC759m7j289AKMEECeAOAHECSBOAHECiDtN/15+NI/dfZ9g1fQ8f/r7MQLECSBOAHECiBNAnADiBBB3ev/579I888PbVxc/3/3//D8/3q1sfvP0xcel7aev/9eblyu7NwLUCSBOAHECiBNAnADiBBB3++XreesJXPt6gKP9rz6fYPU+wfnb95XNjQB1AogTQJwA4gQQJ4A4AcSNL6rfPc9f/T3/6PjT9wmmGQHiBBAngDgBxAkgTgBxAoh79O8LWHW0/+n7BNOMAHECiBNAnADiBBAngDgBxI0/J3D3PH/38wl2X/8RI0CcAOIEECeAOAHECSBOAHHL76Tbva59+r16Rx769RsB4gQQJ4A4AcQJIE4AcQIAAAAAAAAAAAAAAAAAAAAAuHL/AUWebDsmJ3hFAAAAAElFTkSuQmCC',
 };
+/* ============================================================================
+   OS SELOS DO JOGO -- pixel art nossa, no lugar dos emojis (17/09/2026)
+   ----------------------------------------------------------------------------
+   Pedido assim: *"tente trocar tudo quanto é emoji pronto, por desenhos próprios do nosso jogo"*.
+
+   ⚠️ POR QUE SVG E NÃO PNG COMO OS `ICONES` DA HOME: aqueles são base64 de ~2.800 caracteres CADA,
+   e aqui são dezoito. Em SVG cada um sai por ~2.000 e, principalmente, ele é NÍTIDO em qualquer
+   tamanho -- o selo aparece a 12px na linha de status e a 22px no quadro do lutador, e um PNG de
+   16px esticado borra. É também o que resolve de vez o problema que o comentário dos `ICONES`
+   registra ("diagonais finas viram um borrão de pontos").
+
+   ⚠️ O DESENHO É UMA GRADE DE TEXTO, e isso é a coisa mais importante daqui: dá pra VER o ícone
+   lendo o código, e mexer num pixel é trocar um caractere. Cada letra é uma cor da paleta; o ponto
+   é transparente. O gerador agrupa por cor e junta pixels vizinhos numa <rect> só, então o SVG que
+   sai é bem menor que a grade sugere.
+
+   ⚠️ E A LIÇÃO DO DESENHO, que custou duas passadas: em 16x16 NÃO cabe detalhe -- cabe UMA forma
+   sólida. A primeira versão tentou desenhar a coisa inteira e o dragão virou um tridente, a fúria
+   uma caixa com dentes e o gelo uma gota. Os que funcionaram de primeira (estrela, montanha, chama,
+   raio, moeda) tinham silhueta única e grossa. É a mesma regra dos `ICONES`, escrita de outro jeito.
+   ============================================================================ */
+const PALETA_SELO = {
+  '*': 'currentColor',
+  '+': '#ffffff55',
+  '-': '#00000038',
+  k: '#241f1c',
+  w: '#ffffff',
+  W: '#e6e1d6',
+  v: '#b8b2a4',
+  Y: '#ffe89a',
+  y: '#f2c744',
+  o: '#c98b16',
+  R: '#ff9b86',
+  r: '#d64541',
+  q: '#8f2b28',
+  C: '#d5f2ff',
+  c: '#8fd3f4',
+  b: '#3a86d8',
+  B: '#22508f',
+  E: '#b9e86e',
+  e: '#7ec850',
+  g: '#4f9226',
+  P: '#dc9bee',
+  p: '#a855c9',
+  n: '#6d2d87',
+  S: '#eef2f7',
+  s: '#c3ccd8',
+  z: '#8b95a8',
+  Z: '#5a6375',
+  F: '#e8a860',
+  f: '#c9832f',
+  h: '#8a5518',
+};
+const DESENHOS = {
+  shiny: [
+    '........................','...........kk...........','..........kYyk..........',
+    '..........kYok..........','..........kYok..........','.........kYYyyk.........',
+    '........kkYyyok.........','..kkkkkkwWYyyokkkkkkkk..','.kyyYYYYWvYyyyYYYYYyyyk.',
+    '..kkyyyyyyyyyyyyyyookk..','....kyyyyyyyyyyyyook....','.....kyyyyyyyyyyook.....',
+    '......kyyyyyyyyook......','.......kYyyyyyyok.......','......kYYyyyyyyyyk......',
+    '......kYyyoooyyyok......','......kYyookkyyyok......','......kyook..kyook......',
+    '.....kyykk....kkyyk.....','.....kyk........kyk.....','......k..........k......',
+    '........................','........................','........................'],
+  terreno: [
+    '........................','........................','........................',
+    '...........kk...........','..........kwWk..........','.........kwwWWk.........',
+    '.........kwWWvk.........','........kwWvvWWk........','........kWvggWvk........',
+    '.......kwWggggwWk.......','......kWWvggggWvWk......','......kEEggggggggk......',
+    '.....kEEggggggggggk.....','.....kEgggggggggggk.....','....kEEggggggggggggk....',
+    '....kEgggggggggggggk....','...kEEggggggggggggggk...','..kEEggggggggggggggggk..',
+    '..kEgggggggggggggggggk..','.kggggggggggggggggggggk.','..kkkkkkkkkkkkkkkkkkkk..',
+    '........................','........................','........................'],
+  fogo: [
+    '........................','...........kk...........','..........kRrk..........',
+    '.........kRRrrk.........','.........kRrrqk.........','........kRRrrrrk........',
+    '.......kRRrrrrrrk.......','.......kRrrrrrrrrk......','......kRRrrrrrrrqk......',
+    '......kRrrrYyrrrrrk.....','.....kRRrrYYorrrrqk.....','.....kRrrrYyyyrrrqk.....',
+    '....kRRrrYYyyyyrrrrk....','....kRrrrYyyyyorrrqk....','....krrrrYyyyyorrqqk....',
+    '.....kRrryyyyoorrqk.....','.....kRrrrYyyorrrqk.....','.....kRrrrYyyorrrqk.....',
+    '.....krrrrYyoorrqqk.....','......krqryoorqqqk......','.......kkrqyqqqkk.......',
+    '.........kkrqkk.........','...........kk...........','........................'],
+  raio: [
+    '..............kk........','.............kYyk.......','............kYyok.......',
+    '...........kYYok........','...........kYyok........','..........kYYook........',
+    '.........kYYyok.........','.........kYyyok.........','........kYYyyok.........',
+    '.......kYYyyyokkkkk.....','.......kYyyyyyYYYyyk....','......kYYyyyyyyyook.....',
+    '.....kyyoooyyyyook......','......kkkkkYyyyok.......','..........kYyyook.......',
+    '.........kYYyook........','.........kYyook.........','.........kYook..........',
+    '.........kYok...........','.........kyok...........','........kyyk............',
+    '........kyk.............','.........k..............','........................'],
+  gelo: [
+    '........................','......kk........kk......','.....kCck......kCck.....',
+    '.....kCcck....kCCbk.....','.....kccbk....kCbbk.....','......kCcck..kCCbk......',
+    '......kccbk..kCbbk......','.......kCcckkCCbk.......','.......kccbkkCbbk.......',
+    '........kccCccbk........','.kkkkkkkkkCCcckkkkkkkkk.','kCCCCCCCCCCccccCCCCCCCck',
+    'kcbbbbbbbccccbbbbbbbbbbk','.kkkkkkkkkccbbkkkkkkkkk.','........kCccbcck........',
+    '.......kCCbkkCcck.......','.......kCbbkkccbk.......','......kCCbk..kCcck......',
+    '......kCbbk..kccbk......','.....kCCbk....kCcck.....','.....kCbbk....kccbk.....',
+    '.....kcbk......kcbk.....','......kk........kk......','........................'],
+  veneno: [
+    '........................','........................','...........kk...........',
+    '..........kPpk..........','..........kPnk..........','..........kPnk..........',
+    '.........kPPppk.........','.........kPppnk.........','........kPPppppk........',
+    '.......kkPppppnkk.......','......kPPPpppppPpk......','......kPpPppppppnk......',
+    '.....kPPPPPpppppppk.....','.....kPpPPPppppppnk.....','.....kPppPpppppppnk.....',
+    '.....kPppppppppppnk.....','.....kPppppppppppnk.....','.....kppppppppppnnk.....',
+    '......kPppppppppnk......','......kpnpppppnnnk......','.......kkpnnnnnkk.......',
+    '.........kkkkkk.........','........................','........................'],
+  sono: [
+    '........................','...kkkkkkk..............','..kCCCCCCck.............',
+    '..kcbbccbbk.............','...kkkCbbk..............','....kCcbk...............',
+    '...kCCbkk...............','..kCCccCckkkkkkkkkkk....','.kcCccccbcCCCCCCCCCck...',
+    '..kcbbbbbbbbbbbbccbbk...','...kkkkkkkkkkkkkCbbk....','..............kCcbk.....',
+    '.............kCcbk......','............kCcbk.......','...........kCcbk........',
+    '..........kCcbk.........','.........kCcbk..........','........kCcbk...........',
+    '.......kCCbkkkkkkkkk....','......kCCccCCCCCCCCck...','......kcbbbbbbbbbbbbk...',
+    '.......kkkkkkkkkkkkk....','........................','........................'],
+  confusao: [
+    '........................','.............k..........','........kkkkkpkkk.......',
+    '.......kPPPPPPPPpk......','......kPPnnnnnnnppkk....','.....kPpnnkkkkkkppPpk...',
+    '....kPpnkkkkkkkkkppnk...','...kPPnkkkPPPPPpkkpppk..','k..kPnnkPPpnnnpppkkpppk.',
+    'pk.kPnkkPnnkkkppppkkPnk.','PpkkPnkkPnk.kkkppnkkPnk.','PnkkPnkkPnkkPpkkPnkkPnk.',
+    'PnkkPnkkPnkkPnpkPnkkPnpk','PnkkPnkkppPPPnkkPnkkPnk.','PnkkpppkkpnnnnkkPnkkPnk.',
+    'pppkkPppkkkpkkkPpnkkPnk.','kPnkkppppkkkkkPpnkkPpnk.','kpppkkpnpPPPPPpnk.kPnk..',
+    '.kPppkkkpnnnnnnkkkPpnk..','.kpnppkkkkkpkkkkPPpnk...','..kkppPpkkkkkkkPPnnk....',
+    '....kpnpPPPPPPPpnnk.....','.....kkpnnnnnnnnkk......','.......kkkkkpkkk........'],
+  explosao: [
+    '........k...............','.......krk..............','.......krk....k.........',
+    '........krk..krk........','........krk.kRrk....k...','....k...kRrkkRqk..kkrk..',
+    '...krkkkkRrRyRqkkkrrk...','....kRRrkRrryrqkRrrk....','....krrrRyrryrrRrqk.....',
+    '.....krrryYYyryyqk......','...kkkkRrrYyyYyrqkkkkk..','..kRRRyyyYYyyyorrRRRrrk.',
+    '.krrqqqrrYyyyooyyyqqqk..','..kkkkkRryoyyorrqkkkk...','......kRyyryooyrrrk.....',
+    '.....kRrqrryrryqrrrk....','....krrqkRryrrqkrqqk....','...krrkkkRqyqrqkkkkrk...',
+    '..krkk..kRqkkrqk...k....','...k....krqk.krk........','........krk..krk........',
+    '.........k....krk.......','..............krk.......','...............k........'],
+  furia: [
+    '...........k............','..........krk...........','.........kRRrk..........',
+    '........kRRrrrk.........','.......kRRrrrrrk........','......kRRrrrrrrrk.......',
+    '.....kRRrrrrrrrrrk......','....kRRrrrrrrrrrrrk.....','...kRRrrrrrrrrrrrrrk....',
+    '..kRRrrrrrrrrrrrrrrrk...','.krrqqqrrrrrrrrrqqqqrk..','..kkkkkRrrrrrrrrqkkkk...',
+    '......kRrrrrrrrrqk......','......kRrrrrrrrrqk......','......kRrrrrrrrrqk......',
+    '......kRrrrrrrrrqk......','......kRrrrrrrrrqk......','......kRrrrrrrrrqk......',
+    '......kRrrrrrrrrqk......','......kRrrrrrrrrqk......','......kRrrrrrrrrqk......',
+    '......krqqqqqqqqqk......','.......kkkkkkkkkk.......','........................'],
+  espada: [
+    '........................','...........kk...........','..........kSsk..........',
+    '.........kSSzk..........','.........kSsssk.........','........kSSssssk........',
+    '........kSsssszk........','........kSsssszk........','........kSsssszk........',
+    '........kSsssszk........','........kSsssszk........','........kSsssszk........',
+    '........kSsssszk........','........kSsssszk........','.....kkkkszzzzzkkkk.....',
+    '....kFFFFFFFFFFFFFfk....','....kFffffffffffffhk....','....kfhhhhhFFfhhhhhk....',
+    '.....kkkkkkFfhkkkkk.....','..........kFfhk.........','..........kFfhk.........',
+    '..........kfhhk.........','...........kkk..........','........................'],
+  pluma: [
+    '........................','........................','..................kk....',
+    '................kkWWk...','.............kkkCWWWk...','...........kkCCCCWWck...',
+    '..........kCCCccWWcbk...','.........kCCcccWWccbk...','........kCCcccWWccccck..',
+    '.......kCCcccWWccccbbk..','......kCCcccWWccccbbk...','......kCcccWWWccccbk....',
+    '.....kCCccWWWccccbbk....','....kCCcccWWccccbbk.....','...kCCcccWWcccccbk......',
+    '...kCcccWWcccccbbk......','...kcccWWcccccbbk.......','....kCWWccccbbbk........',
+    '....kWWccbbbbkk.........','...kWWWbbbkkk...........','...kWWckkk..............',
+    '....kkk.................','........................','........................'],
+  chuva: [
+    '........................','........................','..............kk........',
+    '........k...kkSskk......','......kkskkkSSSsSsk.....','.....kSSSSSSSssssssk....',
+    '....kSSsssssssssssssk...','...kSSssssssssssssszk...','...kSsssssssssssssszk...',
+    '...kSsssssssssssssszk...','...kSsssssssssssssszk...','..kSSssssssssssssssssk..',
+    '..ksssssssssssssssszzk..','...kszssssssssssszzzk...','....kkszzzssszzzzzkk....',
+    '......kkkkszzzkkkk......','.....k....kkkk...k......','....kck....k....kck.....',
+    '....kck...kck...kck.....','...kCCck..kck..kCCck....','...kcbbk.kCCck.kcbbk....',
+    '....kkk..kcbbk..kkk.....','..........kkk...........','........................'],
+  sol: [
+    '..........kYyk..........','..........kYok..........','...kk.....kYok.....kk...',
+    '..kYyk....kYok....kYyk..','..kyyyk...kYok...kYyok..','...kyyyk.kkyokk.kYyok...',
+    '....kyyykYYYYYykYyok....','.....kyYYYyyyyyYyok.....','......kYyyyyyyyyok......',
+    '.....kYYyyyyyyyyyyk.....','kkkkkkYyyyyyyyyyyokkkkkk','YYYYYyYyyyyyyyyyyoYYYYYy',
+    'yoooooYyyyyyyyyyyoyooooo','kkkkkkYyyyyyyyyyyokkkkkk','.....kyyyyyyyyyyook.....',
+    '......kYyyyyyyyyok......','.....kYyoyyyyyoooyk.....','....kYyokyoooookyyyk....',
+    '...kYyok.kkYykk.kyyyk...','..kYyok...kYok...kyyyk..','..kyok....kYok....kyok..',
+    '...kk.....kYok.....kk...','..........kYok..........','..........kyok..........'],
+  remoinho: [
+    '.....kkkkkkkkkkkkkk.....','...kkSSSSSSSSSSSSSskk...','..kSSSsssssssssssssSsk..',
+    '.kSSssssssssssssssssssk.','.ksssssssssssssssssszzk.','..kszssssssssssssszzzk..',
+    '...kkszzzzszzzzzzzzkk...','...kSSSSSSSSSSSSskk.....','..kSSsssssssssssssk.....',
+    '..kssssssssssssszzk.....','...kszzzzzzzzzzzzk......','....kkkkkkskkkkkkk......',
+    '.......kSSSSSSSSSsk.....','......ksSsssssssszsk....','.......kszzzzzzzzzk.....',
+    '........kkkkkkkkkk......','.......kSSSSsk..........','......ksSssszsk.........',
+    '.......kszzzzk..........','........kkkkkk..........','..........kSSsk.........',
+    '..........kszzk.........','...........kkk..........','........................'],
+  dragao: [
+    '...k......k.............','k.kekkk..kekkk..........','ek.kEEek.keEEek.........',
+    'ek.keeeek.kEeeek........','ek..kEegk.keeegk........','Eek.kEeeek.kEegk........',
+    'Egk.keeegk.keeeek.......','Eeek.kEegk..kEegk.......','Eegk.keeeek.kEeeek......',
+    'Eegk..kEegk.keeegk......','eeeek.keeeek.kEegk......','kEegk..kEegk.keeeek.....',
+    'keeeek.kEegk..kEegk.....','.kEegk.keeeek.keeeek....','.kEegk..kEegk..kEegk....',
+    '.keeeek.keeeek.kEegk....','..kEegk..kEegk.keeeek...','..keeeek.keegk..kEegk...',
+    '...kEegk..kEeek.keeeek..','...keegk..kEegk..kEegk..','....kEeek.keeeek.keegk..',
+    '....kEggk..keggk..kegek.','....kegk...kekk...kekk..','.....kk.....k......k....'],
+  vs: [
+    '..kk................kk..','.kSsk..............kSsk.','kSSssk............kSSssk',
+    'ksssssk..........kSSszzk','.ksssssk........kSSszzk.','..ksssssk......kSSszzk..',
+    '...ksssssk....kSSszzk...','....ksssssk..kSSszzk....','.....kssssskkSSszzk.....',
+    '......ksssssSSszzk......','.......ksssSSszzk.......','........ksSSszzk........',
+    '........kSSszzsk........','.....kkkSSszzssskkk.....','....kFFfSszzssssFFfk....',
+    '...kFFfhszzkksssFfffk...','..kFFfhhzzk..kssfffffk..','.kFFfhhzzk....kssfffffk.',
+    'kFFfhhszk......kszfffffk','kFfhhkkk........kkkfffhk','kfhhk..............kfhhk',
+    '.kkk................kkk.','........................','........................'],
+  moeda: [
+    '........................','........kkkkkkkk........','......kkYYYYYYYykk......',
+    '.....kYYYyyyyyyyYyk.....','....kYYyyyyyyyyyyyyk....','...kYYyyyyyooyyyyyyyk...',
+    '..kYYyyyooooooooyyyyyk..','..kYyyyoooyyyyoooyyyok..','.kYYyyoooyyyyyyoooyyyyk.',
+    '.kYyyyooyyyyyyyyooyyyok.','.kYyyyoyyyyyyyyyyoyyyok.','.kYyyooyyyyyyyyyyooyyok.',
+    '.kYyyooyyyyyyyyyyooyyok.','.kYyyyoyyyyyyyyyyoyyyok.','.kYyyyooyyyyyyyyooyyyok.',
+    '.kyyyyoooyyyyyyoooyyook.','..kYyyyoooyyyyoooyyyok..','..kyyyyyooooooooyyyook..',
+    '...kyyyyyyyooyyyyyook...','....kyyyyyyyyyyyyook....','.....kyoyyyyyyyoook.....',
+    '......kkyoooooookk......','........kkkkkkkk........','........................'],
+  trofeu: [
+    '........................','........................','......kkkkkkkkkkkk......',
+    '....kkYYYYYYYYYYYykk....','...kYYyyyyyyyyyyyYYyk...','..kyyooyyyyyyyyyyyooyk..',
+    '.kYykkYYyyyyyyyYyokkYyk.','.kYokkYYoyyyyyyYookkYok.','.kyokkYyoyyyyyyyookkyok.',
+    '..kyYYyyyyyyyyyyyYYyyk..','...kyooyyyyyyyyyyyook...','....kkyyyyyyyyyyookk....',
+    '......kyyyyyyyyook......','.......kyyyyyyook.......','........kyoyyook........',
+    '.........kkyohk.........','..........kyohk.........','.......kkkkohhkkk.......',
+    '......kYYYYYYYYYyk......','.....kkYyyyyyyyyokk.....','....kYYYyyyyyyyyyYyk....',
+    '....kYyyyyyyyyyyyyok....','....kyoooooooooooook....','.....kkkkkkkkkkkkkk.....'],
+  coroa: [
+    '........................','........................','........................',
+    '........................','...........kk...........','..........kYyk..........',
+    '..k......kYYyyk......k..','.kyk.....kYyyok.....kyk.','.kYyk...kYYyyyyk...kYyk.',
+    '.kYok...kYyyyyok...kYok.','.kYyyk.kYYyyyyyyk.kYYok.','.kYyyykYYyyyyyyyykYYyok.',
+    '.kYyyokYyyyyyyyyokYyyok.','.kYyyyYYyyyyyyyyyYYyyok.','.kYyyyryyyyRryyyyryyyok.',
+    '.kYyyRRryyRRrryyRRryyok.','.kYyyrqqyyrrqqyyrqqyyok.','.kYyyyryyyyrqyyyyryyyok.',
+    '.kyoooooooooooooooooook.','..kkkkkkkkkkkkkkkkkkkk..','........................',
+    '........................','........................','........................'],
+  cadeado: [
+    '........................','........................','.........kkkkkk.........',
+    '.......kkSSSSSskk.......','......kSSSzzzssSsk......','......kSzzzkkszszk......',
+    '.....kSSzkk..kkSssk.....','.....kSzzk....ksszk.....','.....kSzk......kSzk.....',
+    '.....kSzk......kSzk.....','....kkkkkkkkkkkkkkkk....','...kYYYYYYYYYYYYYYYyk...',
+    '...kYyyyyyyyyyyyyyyok...','...kYyyyyyyooyyyyyyok...','...kYyyyyyooooyyyyyok...',
+    '...kYyyyyyooooyyyyyok...','...kYyyyyyyooyyyyyyok...','...kYyyyyyyooyyyyyyok...',
+    '...kYyyyyyyooyyyyyyok...','...kYyyyyyyooyyyyyyok...','...kYyyyyyyyyyyyyyyok...',
+    '...kyoooooooooooooook...','....kkkkkkkkkkkkkkkk....','........................'],
+  brilho: [
+    '........................','........................','........kk..............',
+    '.......kYyk.............','.......kYok.............','.......kYok.............',
+    '....kkkkYokkkk..........','...kYYYYYyYYYyk.........','...kyoooyoooook.........',
+    '....kkkkYokkkk..........','.......kYok.............','.......kYok.............',
+    '.......kyok.............','........kk.......kk.....','................kYYk....',
+    '....k..........kYYYYk...','...kYk.........kYYYYk...','...kYk..........kYYk....',
+    '...kYk...........kk.....','...kYk..................','...kYk..................',
+    '...kYk..................','....k...................','........................'],
+  amigos: [
+    '........................','........................','.......kk...............',
+    '.....kkCckk.............','....kCCCcCck....kk......','...kCCcccccck.kkEekk....',
+    '...kCccccccbkkEEEeEek...','...kCccccccbkkEeeeegk...','...kCccccccbkEEeeeeeek..',
+    '...kccccccbbkeeeeeeggk..','....kcbcbbbk.kEeeeegk...','.....kkcbkk..kegegggk...',
+    '.......kk.....kkegkk....','................kk......','...kkkkkkkkkk...........',
+    '..kCCCCCCCCCckkkkkkkk...','..kCccccccccbEEEEEEEek..','..kCccccccccbEeeeeeegk..',
+    '.kCCccccccccbEeeeeeegk..','.kCcccccccccEEeeeeeeeek.','.kCcccccccccEeeeeeeeegk.',
+    '.kcbbbbbbbbbegggggggggk.','..kkkkkkkkkkkkkkkkkkkk..','........................'],
+  mochila: [
+    '........................','.........kkkkkk.........','........khhhhhhk........',
+    '.......khhhhhhhhk.......','......khhhhkkhhhhk......','.....kkhRRRRRRRrhkk.....',
+    '....kRRRRrrrrrrrRRrk....','...kRRrrrrrrrrrrrrrrk...','..kRRrrrrrrrrrrrrrrrrk..',
+    '..kRrrrrrrrrrrrrrrrrqk..','..kRrrrrrrrrrrrrrrrrqk..','..kRrrrrrrrrrrrrrrrrqk..',
+    '..kRrrrrrrrrrrrrrrrrqk..','..kRrrrrrrrrrrrrrrrrqk..','..kRrrrrqqqqqqqqqrrrqk..',
+    '..kRrrrrqqqqqqqqqrrrqk..','..kRrrrrqqqqqqqqqrrrqk..','..kRrrrrqqYYYYYqqrrrqk..',
+    '..kRrrrrqqYYYYYqqrrrqk..','..kRrrrrqqqqqqqqqrrrqk..','..kRrrrrqqqqqqqqqrrrqk..',
+    '..krqqqqqqqqqqqqqqqqqk..','...kkkkkkkkkkkkkkkkkk...','........................'],
+  loja: [
+    '........................','........................','.kkkkk..................',
+    'ksssszk.................','kzZZzszkkkkkkkkkkkkkkk..','.kkkksZEEEEEEEEEEEEEEek.',
+    '....ksZeeeeeeeeeeeeeggk.','....kzzzeeeeeeeeeeeegk..','.....ksZeeeeeeeeeeeegk..',
+    '.....ksZeeeeeeeeeeeggk..','.....kzzzeeeeeeeeeegk...','......ksZeeeeeeeeeegk...',
+    '......ksZeeeeeeeeeggk...','......ksZeeeeeeeeegk....','......kzzzgggggggggk....',
+    '.......ksZkkkkkkkkk.....','.......kzZk......kk.....','........kszk....kszk....',
+    '.......ksszzk..ksszzk...','.......kszzZk..kszzZk...','.......kzzZZk..kzzZZk...',
+    '........kzZk....kzZk....','.........kk......kk.....','........................'],
+  sino: [
+    '...........kk...........','..........kyok..........','..........kyhk..........',
+    '..........kyhk..........','........kkkYykkk........','.......kYYYYyYYyk.......',
+    '......kYYyyyyyyyyk......','.....kYYyyyyyyyyyyk.....','.....kYyyyyyyyyyyok.....',
+    '.....kYyyyyyyyyyyok.....','....kYYyyyyyyyyyyyyk....','....kYyyyyyyyyyyyyok....',
+    '....kYyyyyyyyyyyyyok....','....kYyyyyyyyyyyyyok....','...kYYyyyyyyyyyyyyyyk...',
+    '...kYyyyyyyyyyyyyyyok...','...kyooooooyooooooookk..','..kyyyyyyyyyyyyyyyyyyok.',
+    '..kyooooooooooooooooohk.','..kohhhhhhhhhhhhhhhhhhk.','...kkkkkkkYYYykkkkkkkk..',
+    '.........kYyyok.........','.........kyoook.........','..........kkkk..........'],
+  mais: [
+    '........................','........................','..........kkkkk.........',
+    '.........kEEEEek........','.........kEeeegk........','.........kEeeegk........',
+    '.........kEeeegk........','.........kEeeegk........','.........kEeeegk........',
+    '...kkkkkkkEeeegkkkkkk...','..kEEEEEEEEeeeeEEEEEek..','..kEeeeeeeeeeeeeeeeegk..',
+    '..kEeeeeeeeeeeeeeeeegk..','..kEeeeeeeeeeeeeeeeegk..','..keggggggeeeegggggggk..',
+    '...kkkkkkkEeeegkkkkkk...','.........kEeeegk........','.........kEeeegk........',
+    '.........kEeeegk........','.........kEeeegk........','.........keggggk........',
+    '..........kkkkk.........','........................','........................'],
+  disco: [
+    '........................','..kkkkkkkkkkkkkkkkkkkk..','.kcccccSSSSSSSSSSccccbk.',
+    '.kcbbbbSSSSSZZZSSbbbbBk.','.kcbbbbSSSSSZZZSSbbbbBk.','.kcbbbbSSSSSZZZSSbbbbBk.',
+    '.kcbbbbSSSSSZZZSSbbbbBk.','.kcbbbbSSSSSZZZSSbbbbBk.','.kcbbbbSSSSSSSSSSbbbbBk.',
+    '.kcbbbbSSSSSSSSSSbbbbBk.','.kcbbbbbbbbbbbbbbbbbbBk.','.kcbbbbbbbbbbbbbbbbbbBk.',
+    '.kcbbbbbbbbbbbbbbbbbbBk.','.kcbbSSSSSSSSSSSSSSbbBk.','.kcbbSSSSSSSSSSSSSSbbBk.',
+    '.kcbbSSSSSSSSSSSSSSbbBk.','.kcbbSSSSSSSSSSSSSSbbBk.','.kcbbSSSSSSSSSSSSSSbbBk.',
+    '.kcbbSSSSSSSSSSSSSSbbBk.','.kcbbSSSSSSSSSSSSSSbbBk.','.kcbbSSSSSSSSSSSSSSbbBk.',
+    '.kbBBSSSSSSSSSSSSSSBBBk.','..kkkkkkkkkkkkkkkkkkkk..','........................'],
+  casa: [
+    '........................','...........kk...........','..........kRrk..........',
+    '.........kRRrrk.........','........kRRrrrrkkkk.....','......kkRRrrrrrrqqqk....',
+    '.....kRRRrrrrrrrqqqk....','....kRRrrrrrrrrrqqqk....','...kRRrrrrrrrrrrqqqrk...',
+    '..kRRrrrrrrrrrrrrrrrrk..','.krrqqqqqqqqqqqqqqqqqrk.','..kkFFFFFFFFFFFFFFFFFk..',
+    '...kFFFFFFFFFFFFFFFFFk..','...kFFFFFFFFFFFFFFFFFk..','...kFFFFFFhhhhhFFFFFFk..',
+    '...kFFFFFFhhhhhFFFFFFk..','...kFFFFFFhhhhhFFFFFFk..','...kFFFFFFhhhhhFFFFFFk..',
+    '...kFFFFFFhhhhhFFFFFFk..','...kFFFFFFhhhhhFFFFFFk..','...kFFFFFFhhhhhFFFFFFk..',
+    '...kFFFFFFhhhhhFFFFFFk..','....kkkkkkkkkkkkkkkkk...','........................'],
+  ouro: [
+    '......kkkk....kkkk......','.....kRRRrk..kccbbk.....','.....krrrrrkkccbBk......',
+    '......kRrrqkkcbbBk......','......kRrrqkkcbBBk......','......krrrrrccbBk.......',
+    '.......kRrrqcbbBk.......','.......kRrrqcbBBk.......','.......krrYYYyBk........',
+    '.......kYYYyyyYyk.......','......kYYyyyyyyyyk......','.....kYYyyooooyyyyk.....',
+    '....kYYyyooyyooyyyyk....','....kYyyooyyyyooyyok....','....kYyyoyyyyyyoyyok....',
+    '....kYyooyyyyyyooyok....','....kYyyoyyyyyyoyyok....','....kYyyooyyyyooyyok....',
+    '....kyyyyooyyooyyook....','.....kyyyyooooyyook.....','......kyyyyyyyyook......',
+    '.......kyoyyyoook.......','........kkyoookk........','..........kkkk..........'],
+  prata: [
+    '......kkkk....kkkk......','.....kRRRrk..kccbbk.....','.....krrrrrkkccbBk......',
+    '......kRrrqkkcbbBk......','......kRrrqkkcbBBk......','......krrrrrccbBk.......',
+    '.......kRrrqcbbBk.......','.......kRrrqcbBBk.......','.......krrSSSsBk........',
+    '.......kSSSsssSsk.......','......kSSssssssssk......','.....kSSsszzzzssssk.....',
+    '....kSSsszzsszzssssk....','....kSsszzsssszzsszk....','....kSsszsssssszsszk....',
+    '....kSszzsssssszzszk....','....kSsszsssssszsszk....','....kSsszzsssszzsszk....',
+    '....ksssszzsszzsszzk....','.....ksssszzzzsszzk.....','......ksssssssszzk......',
+    '.......kszssszzzk.......','........kkszzzkk........','..........kkkk..........'],
+  bronze: [
+    '......kkkk....kkkk......','.....kRRRrk..kccbbk.....','.....krrrrrkkccbBk......',
+    '......kRrrqkkcbbBk......','......kRrrqkkcbBBk......','......krrrrrccbBk.......',
+    '.......kRrrqcbbBk.......','.......kRrrqcbBBk.......','.......krrFFFfBk........',
+    '.......kFFFfffFfk.......','......kFFffffffffk......','.....kFFffhhhhffffk.....',
+    '....kFFffhhffhhffffk....','....kFffhhffffhhffhk....','....kFffhffffffhffhk....',
+    '....kFfhhffffffhhfhk....','....kFffhffffffhffhk....','....kFffhhffffhhffhk....',
+    '....kffffhhffhhffhhk....','.....kffffhhhhffhhk.....','......kffffffffhhk......',
+    '.......kfhfffhhhk.......','........kkfhhhkk........','..........kkkk..........'],
+  diamante: [
+    '........................','........................','.......kkkkkkkkkk.......',
+    '......kCCCCCCCCCck......','.....kCCccccccccbbk.....','....kCCCCccccccbbbbk....',
+    '....kCCCCCccccbbbbbk....','...kCCCCCCCccbbbbbbbk...','..kCCCCCCCCCbbbbbbbbbk..',
+    '..kccccccccccccccccbbk..','...kccccccccccccccbbk...','....kccccccccccccbbk....',
+    '.....kCccccccccccbk.....','.....kccccccccccbbk.....','......kccccccccbbk......',
+    '.......kccccccbbk.......','........kCccccbk........','........kccccbbk........',
+    '.........kccbbk.........','..........kcbk..........','...........kk...........',
+    '........................','........................','........................'],
+  mapa: [
+    '........................','......kkk...............','...kkkEggkkk.........kk.',
+    '.kkEEEEggEEEkkk...kkkEEk','kEEEEEEggEEEEEEkkkEEEEEk','kEEEEEEggEEEEEEggEEEEEEk',
+    'kEEEEEEggEEEEEEggEEEEEEk','kEEEEEEggEEEEEEggEEEEEEk','kEEEEEEggEEEEEEggEEEEEEk',
+    'kEEEEEEggEEEEEEggEEEEEEk','kEEEEEEggERRRrEggEEEEEEk','kEEEEEEggERrrqEggEEEEEEk',
+    'kEEEEEEggERrrqEggEEEEEEk','kEEEEEEggErqqqEggEEEEEEk','kEEEEEEggEEEEEEggEEEEEEk',
+    'kEEEEEEggEEEEEEggEEEEEEk','kEEEEEEggEEEEEEggEEEEEEk','kEEEEEEggEEEEEEggEEEEEEk',
+    'kEEEEEEggEEEEEEggEEEEEEk','kEEEEEkkkEEEEEEggEEEEEEk','kEEkkk...kkkEEEggEEEEkk.',
+    '.kk.........kkkggEkkk...','...............kkk......','........................'],
+  escudo: [
+    '..........kkk...........','.......kkkccbkkk........','....kkkccccbbccbkkk.....',
+    '...kccccbbbbbbbbccbkk...','..kccbbbbbbbbbbbbbbcbk..','..kcbbbbbbbCCbbbbbbbBk..',
+    '..kcbbbbCCCCCCCCbbbbBk..','..kcbbbCCCCCCCCCCbbbBk..','..kcbbbCCCCCCCCCCbbbBk..',
+    '..kcbbbCCCCCCCCCCbbbBk..','..kcbbbCCCCCCCCCCbbbBk..','..kcbbbCCCCCCCCCCbbbBk..',
+    '..kbbbbCCCCCCCCCCbbBBk..','...kbbbbCCCCCCCCbbBBk...','....kbbbbCCCCCCbbBBk....',
+    '.....kbbbbCCCCbbBBk.....','......kbbbbCCbbBBk......','.......kbbbbbbBBk.......',
+    '........kbbbbBBk........','.........kbbBBk.........','..........kbBk..........',
+    '...........kk...........','........................','........................'],
+  lista: [
+    '........kkkkkkkk........','.......kSSSSSSSsk.......','...kkkkkSsssssszkkkkk...',
+    '..kWWWWWSsssssszWWWWWk..','..kWWWWWszzzzzzzWWWWWk..','..kWWWWWWWWWWWWWWWWWWk..',
+    '..kWWWWWWWWWWWWWWWWWWk..','..kWWWWWWWWWWWWWWWWWWk..','..kWWWbbbWWWWWWWWWWWWk..',
+    '..kWWWbbbWzzzzzzzzWWWk..','..kWWWWWWWWWWWWWWWWWWk..','..kWWWWWWWWWWWWWWWWWWk..',
+    '..kWWWbbbWWWWWWWWWWWWk..','..kWWWbbbWzzzzzzzzWWWk..','..kWWWWWWWWWWWWWWWWWWk..',
+    '..kWWWWWWWWWWWWWWWWWWk..','..kWWWbbbWWWWWWWWWWWWk..','..kWWWbbbWzzzzzzzzWWWk..',
+    '..kWWWWWWWWWWWWWWWWWWk..','..kWWWWWWWWWWWWWWWWWWk..','..kWWWWWWWWWWWWWWWWWWk..',
+    '..kWWWWWWWWWWWWWWWWWWk..','...kkkkkkkkkkkkkkkkkk...','........................'],
+  torre: [
+    '...........k............','..........krk...........','.........kRRrk..........',
+    '........kRRrrrk.........','.......kRRrrrrrk........','.......kRrrrrrrrk.......',
+    '.......krqqqqqqqk.......','........kSSSSSSk........','........kSSSSSSk........',
+    '........kSSSSSSk........','........kSSbbbSk........','.......kSSSbbbSSk.......',
+    '.......kSSSbbbSSk.......','.......kSSSSSSSSk.......','.......kSSSbbbSSk.......',
+    '.......kSSSbbbSSk.......','.......kSSSbbbSSk.......','.......kSSSSSSSSk.......',
+    '......kSSSSSSSSSSk......','......kSSSSSSSSSSk......','......kSSSSSSSSSSk......',
+    '......kSSSSSSSSSSk......','.......kkkkkkkkkk.......','........................'],
+  estadio: [
+    '........................','........................','........................',
+    '.......kkkkkkkkkk.......','.....kkSSSSSSSSSskk.....','...kkSSSsssssssssSskk...',
+    '..kSSSsssssssssssssSsk..','.kSSssssssssssssssssssk.','.kSsssssseeeeeesssssszk.',
+    'kSSsssseeeeeeeeeessssssk','kSsssseeeeeeeeeeeesssszk','kSSSSSSSSSSSSSSSSSSSSSsk',
+    'kSsssssssssssssssssssszk','kSsssssssssssssssssssszk','kSsssssSSSSSSSSSsssssszk',
+    'kSsSSSSSsssssssssSSSsszk','kSSSsssssssssssssssssszk','kSSssssssssssssssssssssk',
+    'ksssssssssssssssssssszzk','.ksssssssssssssssssszzk.','..kszzzssssssssszzzzzk..',
+    '...kkkkszzzzzzzzzkkkk...','.......kkkkkkkkkk.......','........................'],
+  cidade: [
+    '........................','........................','..........kkkkkk........',
+    '.........kcccccbk.......','.........kcbbbbBk.......','.........kcbbbbBk.......',
+    '.........kcbbbbBk.......','..kkkkkkkkcbbbbBk.......','.kSSSSSSskcbbbbBk.......',
+    '.kSssssszkcbbbbBk.......','.kSssssszkcbbbbBkkkkkk..','.kSssYYszkcYYbbBSYYSSsk.',
+    '.kSssYYszkcYYbbBSYYsszk.','.kSssssszkcbbbbBSsssszk.','.kSssssszkcbbbbBSsssszk.',
+    '.kSssYYszkcYYbbBSYYsszk.','.kSssYYszkcYYbbBSYYsszk.','.kSssssszkcbbbbBSsssszk.',
+    '.kSssssszkcbbbbBSsssszk.','.kSssYYszkcbbbbBSYYsszk.','.kSssYYszkcbbbbBSYYsszk.',
+    '.kszzzzzzkbBBBBBszzzzzk.','..kkkkkkk.kkkkkkkkkkkk..','........................'],
+  recarregar: [
+    '.............k..........','............kekk........','........kkkkkEEek.......',
+    '......kkEEEEEEeeekk.....','.....kEEEeeeeEeeeEekk...','....kEEeeggggEeeeeeEek..',
+    '...kEEegggkkkEeeeegggk..','...kEeggkk..kEeegggkk...','..kEEegk....kEeggkk.....',
+    '..kEeggk....keggk.......','..kEegk.....kekk........','..kEegk......k..........',
+    '..kEegk...........kkk...','..kEegk..........kEEek..','..kEeeek........kEEegk..',
+    '..keeegk........kEeggk..','...kEeeekk....kkEEegk...','...keeeeEekkkkEEEeggk...',
+    '....keeeeeEEEEEeeggk....','.....kegeeeeeeegggk.....','......kkegggggggkk......',
+    '........kkkkkkkk........','........................','........................'],
+  calendario: [
+    '......kkk.......kkk.....','.....ksszk.....ksszk....','.....kszZk.....kszZk....',
+    '..kkkkszZkkkkkkkszZkkk..','.kRRRRszZRRRRRRRszZRRrk.','.kRrrrzZZrrrrrrrzZZrrqk.',
+    '.kRrrrrrrrrrrrrrrrrrrqk.','.kRrrrrrrrrrrrrrrrrrrqk.','.krqqqqqqqqqqqqqqqqqqqk.',
+    '.kWWWWWWWWWWWWWWWWWWWWk.','.kWWWWWWWWWWWWWWWWWWWWk.','.kWWWzzWWWzzWWzzWWzzWWk.',
+    '.kWWWzzWWWzzWWzzWWzzWWk.','.kWWWWWWWWWWWWWWWWWWWWk.','.kWWWWWWWWWWWWWWWWWWWWk.',
+    '.kWWWzzWWWzzWWzzWWzzWWk.','.kWWWzzWWWzzWWzzWWzzWWk.','.kWWWWWWWWWWWWWWWWWWWWk.',
+    '.kWWWWWWWWWWWWWWWWWWWWk.','.kWWWzzWWWzzWWzzWWzzWWk.','.kWWWzzWWWzzWWzzWWzzWWk.',
+    '.kWWWWWWWWWWWWWWWWWWWWk.','..kkkkkkkkkkkkkkkkkkkk..','........................'],
+  bandeira: [
+    '........................','...kkk..................','..ksszkkkkkkkkkkkkkkkk..',
+    '..kszZkkkkwwwwkkkkwwwwk.','..kszZkkkkwwwwkkkkwwwwk.','..kszZkkkkwwwwkkkkwwwwk.',
+    '..kszZkkkkwwwwkkkkwwwwk.','..kszZwwwwkkkkwwwwkkkkk.','..kszZwwwwkkkkwwwwkkkkk.',
+    '..kszZwwwwkkkkwwwwkkkkk.','..kszZwwwwkkkkwwwwkkkkk.','..kszZkkkkwwwwkkkkwwwwk.',
+    '..kszZkkkkwwwwkkkkwwwwk.','..kszZkkkkwwwwkkkkwwwwk.','..kszZkkkkwwwwkkkkwwwwk.',
+    '..kszZkkkkkkkkkkkkkkkk..','..kszZk.................','..kszZk.................',
+    '..kszZk.................','..kszZk.................','..kszZk.................',
+    '..kszZk.................','..kzZZk.................','...kkk..................'],
+  balao: [
+    '........................','........................','.......kkkkkkkkkk.......',
+    '.....kkYYYYYYYYYYkk.....','....kYYYYYYYYYYYYYYk....','...kYYYYYYYYYYYYYYYYk...',
+    '..kYYYYYYYYYYYYYYYYYYk..','.kYYYYYYYYYYYYYYYYYYYYk.','.kYYYYYoYYYYYYYYoYYYYYk.',
+    '.kYYYYoooYYooYYoooYYYYk.','.kYYYYoooYYooYYoooYYYYk.','.kYYYYYoYYYYYYYYoYYYYYk.',
+    '.kYYYYYYYYYYYYYYYYYYYYk.','..kYYYYYYYYYYYYYYYYYYk..','...kYYYYYYYYYYYYYYYYk...',
+    '....kYYYYYYYYYYYYYYk....','.....kYYYYYYYYYYYkk.....','.....kYYYYkkkkkkk.......',
+    '.....kYYYk..............','......kYYk..............','......kYk...............',
+    '.......k................','........................','........................'],
+  tm: [
+    '.........kkkkkk.........','......kkk++++++kkk......','.....k++++++++++++k.....',
+    '....k++++++**++++++k....','...k++++********++++k...','..k+++************+++k..',
+    '.k+++**************+++k.','.k+++**************+++k.','.k++****************++k.',
+    'k+++******SSSS******+++k','k+++*****SSSSSS*****+++k','k++******SSkkSS******++k',
+    'k++******SSkkSS******+-k','k+++*****SSSSSS*****+--k','k+++******SSSS******---k',
+    '.k++***************----k','.k+++*************----k.','.k+++************----+k.',
+    '..k+++**********----+k..','...k++++*******----+k...','....k++++++**+----+k....',
+    '.....k+++++++----+k.....','......kkk+++----kk......','.........kkkkkkk........'],
+  hm: [
+    '.........kkkkkk.........','......kkk++++++kkk......','.....k++++++++++++k.....',
+    '....k++++++**++++++k....','...k++++********++wwk...','..k+++***********www+k..',
+    '.k+++***********www+++k.','.k+++**********www*+++k.','.k++**********www***++k.',
+    'k+++******SSSSww****+++k','k+++*****SSSSSS*****+++k','k++******SSkkSS******++k',
+    'k++******SSkkSS******+-k','k+++*****SSSSSS*****+--k','k+++****wwSSSS******---k',
+    '.k++***www*********----k','.k+++*www*********----k.','.k+++www*********----+k.',
+    '..k+www*********----+k..','...kww++*******----+k...','....k++++++**+----+k....',
+    '.....k+++++++----+k.....','......kkk+++----kk......','.........kkkkkkk........'],
+  doce: [
+    '........................','........................','........................',
+    '........................','........................','.k....................k.',
+    'kRk......kkkkkk......kRk','kRRk...kkRRRRRRkk...kRRk','kRRRk.kRRwwRRRRRRk.kRRRk',
+    'kRRRkkRRwwwwRRRRRRkkRRRk','kRRRRkRRwwwwRRRRRRkRRRRk','kRRRRRRRRwwRRRRRRRRRRRRk',
+    'kRRRRRRRRRRRRRRRRRRRRRRk','kRRRRkRRRRRRRRRRRRkRRRRk','kRRRkkRRRRRRRRRRRRkkRRRk',
+    'kRRRk.kRRRRRRRRRRk.kRRRk','kRRk...kkRRRRRRkk...kRRk','kRk......kkkkkk......kRk',
+    '.k....................k.','........................','........................',
+    '........................','........................','........................'],
+  pocao: [
+    '..........kkkkk.........','.........kSSSSsk........','.........kSssszk........',
+    '.........kSssszk........','.........kszzzzk........','........kkkkkkkk........',
+    '.......kSSSSSSSSk.......','.......kSSSSSSSSk.......','.......kSSSSSSSSk.......',
+    '......kSSSSSSSSSSk......','.....kSSSS****SSSSk.....','....kSSS*+******SSSk....',
+    '....kSS*+++*******Sk....','....kS**+++*******Sk....','...kSS**+++*******SSk...',
+    '...kSS***+********SSk...','....kS************Sk....','....kS************Sk....',
+    '....kS************Sk....','.....kS**********Sk.....','......kS********Sk......',
+    '.......kSS****SSk.......','........kkkkkkkk........','........................'],
+  despertador: [
+    '........................','.....k............k.....','...kkskk........kkskk...',
+    '..kSSSSsk......kSSSSsk..','..kSssszkkkkkkkkSssszk..','.ksSssszsSSSSSSsSssszsk.',
+    '..kSssszSSSSSSSSSssszk..','..kszzzzWWWWWWWWszzzzk..','...kksSWWWWkkWWWWSskk...',
+    '...kSSWWWWWkkWWWWWSSk...','...kSSWWWWWkkWWWWWSSk...','..kSSWWWWWWkkWWWWWWSSk..',
+    '..kSSWWWWWWkkWWWWWWSSk..','..kSSWWWWWWkkkWWWWWSSk..','..kSSWWWWWWWkkkkWWWSSk..',
+    '..kSSWWWWWWWWWkkkWWSSk..','...kSSWWWWWWWWWWWWSSk...','...kSSWWWWWWWWWWWWSSk...',
+    '....kSSWWWWWWWWWWSSk....','....kSSSWWWWWWWWSSSk....','.....kSSSSSSSSSSSSk.....',
+    '......kkSSSSSSSSkk......','........kkkkkkkk........','........................'],
+  coracao: [
+    '........................','........................','......kkkk....kkkk......',
+    '....kkRRRrk..kRRRrkk....','...kRRRRRrrkkRRrrrRrk...','..kRRrRRRrrRRRrrrrrrrk..',
+    '..kRrRRRRRrrrrrrrrrrqk..','.kRRrrRRRrrrrrrrrrrrrrk.','.kRrrrRRRrrrrrrrrrrrrqk.',
+    '.krrrrrrrrrrrrrrrrrrqqk.','..kRrrrrrrrrrrrrrrrrqk..','..krrrrrrrrrrrrrrrrqqk..',
+    '...krrrrrrrrrrrrrrqqk...','....krrrrrrrrrrrrqqk....','.....krrrrrrrrrrqqk.....',
+    '......krrrrrrrrqqk......','.......kRrrrrrrqk.......','.......krrrrrrqqk.......',
+    '........krrrrqqk........','.........krrqqk.........','..........krqk..........',
+    '...........kk...........','........................','........................'],
+  orbe: [
+    '........................','........................','........kkkkkkkk........',
+    '......kkPPPPPPPpkk......','.....kPPPpppppppPpk.....','....kPPPPPpppppppppk....',
+    '...kPPpPPPPpppppppppk...','...kPpPPPPPppppppppnk...','..kPPpPPPPPppppppppppk..',
+    '..kPppPPPPPpppppppppnk..','..kPpppPPPPpppppppppnk..','..kPppppPPppppppppppnk..',
+    '..kPppppppppppppppppnk..','..kPppppppppppppppppnk..','..kPppppppppppppppppnk..',
+    '..kppppppppppppppppnnk..','...kPppppppppppppppnk...','...kppppppppppppppnnk...',
+    '....kppppppppppppnnk....','.....kpnpppppppnnnk.....','.....kFFFFFFFFFFFfk.....',
+    '.....kFffffffffffhk.....','.....kfhhhhhhhhhhhk.....','......kkkkkkkkkkkk......'],
+  barreira: [
+    '...........kk...........','..........kCCk..........','........kkCCCCkk........',
+    '......kkCCCCCCCCkk......','.....kCCCCCCCCCCCCk.....','...kkCCCCCCccCCCCCCkk...',
+    '..kCCCCCCCccccCCCCCCCk..','..kCCCCCccccccccCCCCCk..','..kCCCcccccccccccCCCCk..',
+    '..kCCCcccccccccccCCCCk..','..kCCCcccccccccccCCCCk..','..kCCCcccccccccccCCCCk..',
+    '..kCCCcccccccccccCCCCk..','..kCCCcccccccccccCCCCk..','..kCCCcccccccccccCCCCk..',
+    '..kCCCcccccccccccCCCCk..','..kCCCCCccccccccCCCCCk..','..kCCCCCCCccccCCCCCCCk..',
+    '...kkCCCCCCccCCCCCCkk...','.....kCCCCCCCCCCCCk.....','......kkCCCCCCCCkk......',
+    '........kkCCCCkk........','..........kCCk..........','...........kk...........'],
+  faixa: [
+    '.........kkkkkk.........','........kRRRRRrk........','.......kRRrrrrrrk.......',
+    '......kRRqqqqqrrrk......','.....kRRqqkkkkrrrrk.....','.....kRrqk....kRrqk.....',
+    '.....kRrqk.kk.kRrqk.....','.....kRrqkkqqkkRrqk.....','.....kRrqkqqqqkRrqk.....',
+    '.....krrrrqqqqRRqqk.....','......krrrRRRRRqqk......','.......krrrrrrqqk.......',
+    '.......kRrqqqqqqk.......','.......kRrqqqqqqk.......','......kRRqqkkqqqqk......',
+    '......kRrqk..kqqqk......','.....kRRqqk..kqqqqk.....','....kRRrqk....kqqqqk....',
+    '....kRrqqk....kqqqqk....','...kRRrqk......kqqqqk...','...kRrqqk......kqqqqk...',
+    '..kRRrqk........kqqqqk..','..krrqqk........kqqqqk..','...krqk..........kqqk...'],
+  aviso: [
+    '........................','...........kk...........','..........kYyk..........',
+    '..........kYok..........','.........kYYyyk.........','.........kYyyok.........',
+    '........kYYyyyyk........','.......kYYykkkyyk.......','.......kYyykkkyok.......',
+    '......kYYyykkkyyyk......','......kYyyykkkyyok......','.....kYYyyykkkyyyyk.....',
+    '.....kYyyyykkkyyyok.....','....kYYyyyykkkyyyyyk....','....kYyyyyykkkyyyyok....',
+    '...kYYyyyyyyyyyyyyyyk...','..kYYyyyyyyyyyyyyyyyyk..','..kYyyyyyyykkkyyyyyyok..',
+    '.kYYyyyyyyykkkyyyyyyyyk.','.kYyyyyyyyykkkyyyyyyyok.','kyyoooooooooooooooooooyk',
+    '.kkkkkkkkkkkkkkkkkkkkkk.','........................','........................'],
+  porta: [
+    '........................','...kkkkkkkkkkkkk........','..kFFFFFFFFFFFFfk.......',
+    '..kFfffffffffffhk.......','..kFfffffffffffhk.......','..kFffhhhhhhhhfhk.......',
+    '..kFffhhhhhhhhfhk.......','..kFffhhhhhhhhfhk.k.....','..kFffhhhhhhhhfhkkek....',
+    '..kFffhhhhhhhhfhkkEek...','..kFffhhhhhhhhfhkkEeekk.','..kFffhhhhhYYYfhEEEeeEek',
+    '..kFffhhhhhYYYfhegeegggk','..kFffhhhhhhhhfhkkEggkk.','..kFffhhhhhhhhfhkkegk...',
+    '..kFffhhhhhhhhfhkkek....','..kFffhhhhhhhhfhk.k.....','..kFffhhhhhhhhfhk.......',
+    '..kFffhhhhhhhhfhk.......','..kFffhhhhhhhhfhk.......','..kFfffffffffffhk.......',
+    '..kfhhhhhhhhhhhhk.......','...kkkkkkkkkkkkk........','........................'],
+};
+/* Monta o <svg> com um <symbol> por desenho. O SVG inteiro entra no DOM UMA VEZ, e cada uso é um
+   <use> de ~40 bytes -- é isso que faz 70 selos numa tela custarem quase nada. */
+function svgDosSelos(){
+  return '<svg id="selos-svg" aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden">' +
+    Object.entries(DESENHOS).map(([nome, grade]) => {
+      const lado = grade.length;
+      /* ⚠️ RETANGULOS MAXIMOS, nao uma <rect> por pixel nem por corrida horizontal: com os selos
+         em 24x24 a versao por corrida dava 3.772 formas e 160 KB de DOM. Juntando na VERTICAL
+         tambem, e emitindo um <path> por cor (um `M x y h w v h -w z` custa ~12 caracteres contra
+         ~45 de uma <rect>), o mesmo desenho sai em uma fracao disso -- e o desenho e byte a byte
+         o mesmo, e a impressao do motor nao muda porque isto e apresentacao pura.
+         O algoritmo e o classico: varre de cima pra baixo, pega a maior largura livre, desce
+         enquanto a faixa inteira for da mesma cor, e marca o retangulo como consumido. */
+      const feito = grade.map(l => new Array(lado).fill(false));
+      const porCor = {};
+      for(let y = 0; y < lado; y++) for(let x = 0; x < lado; x++){
+        const c = grade[y][x];
+        if(feito[y][x] || !PALETA_SELO[c]) continue;
+        let w = 1;
+        while(x + w < lado && grade[y][x + w] === c && !feito[y][x + w]) w++;
+        let h = 1;
+        while(y + h < lado){
+          let cabe = true;
+          for(let i = 0; i < w; i++) if(grade[y + h][x + i] !== c || feito[y + h][x + i]){ cabe = false; break; }
+          if(!cabe) break;
+          h++;
+        }
+        for(let j = 0; j < h; j++) for(let i = 0; i < w; i++) feito[y + j][x + i] = true;
+        (porCor[c] = porCor[c] || []).push('M' + x + ' ' + y + 'h' + w + 'v' + h + 'h-' + w + 'z');
+      }
+      /* ⚠️ O viewBox SAI DA GRADE, nunca de um numero escrito a mao: ele era 16 fixo, e no dia
+         em que os selos foram redesenhados em 24x24 (17/09/2026) isso teria mostrado um QUARTO
+         de cada desenho, em silencio. Com ele derivado, grades de tamanhos diferentes convivem. */
+      return '<symbol id="s-' + nome + '" viewBox="0 0 ' + lado + ' ' + lado + '">' +
+        Object.entries(porCor).map(([c, ds]) => '<path fill="' + PALETA_SELO[c] + '" d="' + ds.join('') + '"/>').join('') +
+        '</symbol>';
+    }).join('') + '</svg>';
+}
+/* ⚠️ INJETADO UMA VEZ, e sempre ANTES do primeiro uso: um <use> que aponta pra um <symbol> que
+   ainda não existe desenha NADA, e em silêncio -- o mesmo tipo de falha muda das insígnias que
+   davam 404. Chamado no carregamento e defensivamente no `selo()`. */
+function montarSelos(){
+  if(typeof document === 'undefined' || !document.body) return;
+  if(document.getElementById('selos-svg')) return;
+  const caixa = document.createElement('div');
+  caixa.innerHTML = svgDosSelos();
+  document.body.insertBefore(caixa.firstChild, document.body.firstChild);
+}
+/* O SELO, pronto pra ir no meio de uma frase. `cls` serve pros tamanhos (selo-g no quadro do
+   lutador, o padrão na linha de status). */
+/* ⚠️ A COR E OPCIONAL, e e ela que faz o disco do TM sair na cor do tipo do golpe (pedido em
+   17/09/2026). O desenho usa `currentColor` no corpo e branco/preto TRANSLUCIDOS no volume, entao
+   um desenho so serve aos 23 TMs e aos 17 tipos -- em vez de 23 simbolos iguais de cor diferente.
+   Vale pro frasco da Pocao tambem: ela e a Super Pocao com outro liquido. */
+function selo(nome, cls, cor){
+  if(!DESENHOS[nome]) return '';
+  montarSelos();
+  return '<svg class="selo ' + (cls || '') + '" shape-rendering="crispEdges" aria-hidden="true"' +
+    (cor ? ' style="color:' + cor + '"' : '') + '><use href="#s-' + nome + '"/></svg>';
+}
 function icone(nome, cls){ return `<img class="dex-icon ${cls||''}" src="${ICONES[nome]}" alt="">`; }
 function typePill(t){
   return `<span class="type-pill" style="background:${TYPE_COLORS[t]||'#888'}">${TYPE_NAMES_PT[t]||t}</span>`;
@@ -6115,6 +6818,7 @@ async function loadPermanentUserData(){
     game.contaCarregada = true;
     game.rivalNameDefault = d.rivalNameDefault || '';   // preenche a tela de nome do rival (ver nomeDoRivalPadrao)
     game.hms = Array.isArray(d.hms) ? d.hms : [];       // as Máquinas Ocultas são da CONTA (ver darHM)
+    game.visitouOsNinhos = !!d.visitouOsNinhos;         // a visita aos ninhos também (ver visitarOsNinhos)
     /* AS LETRAS DO UNOWN, mais a rede de seguranca: alem do registro feito na captura, varre os
        times atuais. Ela recupera quem capturou um Unown ANTES deste campo existir -- e tem o mesmo
        limite do Pokedex shiny: um Unown ja liberado pro Prof. Carvalho nao deixou rastro da letra
@@ -8776,6 +9480,20 @@ function doExchange(active, enemy, rng, diario){
   const secondHpBefore = second.hp;
   const primeiroDormiu = (first === active) ? activeDorme : enemyDorme;
   const segundoDormiu  = (second === active) ? activeDorme : enemyDorme;
+  /* ⚠️ QUEM NAO ATACOU NESTA TROCA NAO APLICA STATUS (18/09/2026). Reportado com print: o Dewgong
+     estava DORMINDO e mesmo assim congelou o Gengar -- o log dizia *"Dewgong continua a dormir e
+     nao pode atacar"* e a linha seguinte era *"Gengar ficou congelado com Raio Congelante"*.
+     A CAUSA: os seis `tentar*` leem o `lastMove` do atacante, e ele fica gravado da troca ANTERIOR
+     (ou ate de outro confronto -- a instancia atravessa a batalha). Quem dormiu nao chama o
+     `golpesDaTroca`, entao o `lastMove` velho continua la e o sorteio rodava em cima dele.
+     ⚠️ E NAO ERA SO O SONO NEM SO O GELO: medido, os TRES estados que zeram o golpe (sono, gelo e
+     paralisia) vazavam nos QUATRO status, nas chances cheias de cada golpe -- 9,5% no Raio
+     Congelante e 30% no Trovao.
+     A GUARDA E O PROPRIO GOLPE TER SAIDO, e nao uma lista dos tres estados: `dmgByFirst` ja e `[]`
+     quando ele nao ataca, seja por que for. Assim o proximo estado que impedir um ataque nasce
+     coberto -- uma lista de estados aqui ficaria pra tras no primeiro que entrasse. */
+  const primeiroAtacou = dmgByFirst.length > 0;
+  const segundoAtacou  = dmgBySecond.length > 0;
   /* ⚠️ A DRENAGEM DEVOLVE METADE DO DANO EFETIVO, e ela roda em DOIS momentos diferentes -- um por
      lado --, porque ela é CRONOLÓGICA: quem bate primeiro cura primeiro, antes de o outro revidar.
      Numa versão anterior as duas curas rodavam juntas no fim, e isso dava vantagem indevida: um
@@ -8917,15 +9635,15 @@ function doExchange(active, enemy, rng, diario){
   /* A QUEIMADURA sai pela mesma porta do gelo e na mesma hora: depois de o golpe conectar. Um
      golpe so pode fazer UM dos dois (nenhum golpe esta nas duas tabelas), entao nao ha ordem a
      decidir entre elas -- o que existe e a ordem entre os dois LADOS, e essa e a de velocidade. */
-  const congelouOSegundo = segundoCaiu ? null : tentarCongelar(first, second, rng);
-  const queimouOSegundo = segundoCaiu ? null : tentarQueimar(first, second, rng);
-  const envenenouOSegundo = segundoCaiu ? null : tentarEnvenenar(first, second, rng);
-  const paralisouOSegundo = segundoCaiu ? null : tentarParalisar(first, second, rng);
-  const estagioDoSegundo = segundoCaiu ? null : tentarEstagio(first, second, rng);
+  const congelouOSegundo = (segundoCaiu || !primeiroAtacou) ? null : tentarCongelar(first, second, rng);
+  const queimouOSegundo = (segundoCaiu || !primeiroAtacou) ? null : tentarQueimar(first, second, rng);
+  const envenenouOSegundo = (segundoCaiu || !primeiroAtacou) ? null : tentarEnvenenar(first, second, rng);
+  const paralisouOSegundo = (segundoCaiu || !primeiroAtacou) ? null : tentarParalisar(first, second, rng);
+  const estagioDoSegundo = (segundoCaiu || !primeiroAtacou) ? null : tentarEstagio(first, second, rng);
   /* ⚠️ O PODER SECRETO (TM43) vem DEPOIS dos quatro, e ele é o único golpe que pode aplicar
      qualquer um deles -- qual, decide o TERRENO. Pondo-o antes, a marca dele bloquearia o
      `tentar*` da mesma marca nesta troca. Fora de terreno ele não faz nada (nem lê o rng). */
-  const secretoNoSegundo = segundoCaiu ? null : tentarPoderSecreto(first, second, rng);
+  const secretoNoSegundo = (segundoCaiu || !primeiroAtacou) ? null : tentarPoderSecreto(first, second, rng);
   const saiuNoPrimeiro = (segundoCaiu || congelouOSegundo) ? [] : aplicarGolpes(first, tetoDeQuemRaspa(second, first, dmgBySecond));
   /* O PISO DO REVIDE (1%-10%) SAIU JUNTO COM O REVIDE, em 15/09/2026 -- ver o bloco acima. Ele
      existia pra o revide de quem caiu não matar o outro ("jamais os 2 devem morrer juntos e um
@@ -8942,12 +9660,13 @@ function doExchange(active, enemy, rng, diario){
   const drenouOSecond = segundoDormiu ? 0 : drenar(saiuNoPrimeiro, second, primeiroDormiu);
   /* o golpe do SEGUNDO também pode congelar -- mas o primeiro já atacou nesta troca, então o efeito
      dele só aparece na próxima. Não há o que bloquear aqui: só a marca. */
-  const congelouOPrimeiro = (segundoCaiu || congelouOSegundo) ? null : tentarCongelar(second, first, rng);
-  const queimouOPrimeiro = (segundoCaiu || congelouOSegundo) ? null : tentarQueimar(second, first, rng);
-  const envenenouOPrimeiro = (segundoCaiu || congelouOSegundo) ? null : tentarEnvenenar(second, first, rng);
-  const paralisouOPrimeiro = (segundoCaiu || congelouOSegundo) ? null : tentarParalisar(second, first, rng);
-  const estagioDoPrimeiro = (segundoCaiu || congelouOSegundo) ? null : tentarEstagio(second, first, rng);
-  const secretoNoPrimeiro = (segundoCaiu || congelouOSegundo) ? null : tentarPoderSecreto(second, first, rng);
+  const pulaOSegundo = segundoCaiu || congelouOSegundo || !segundoAtacou;
+  const congelouOPrimeiro = pulaOSegundo ? null : tentarCongelar(second, first, rng);
+  const queimouOPrimeiro = pulaOSegundo ? null : tentarQueimar(second, first, rng);
+  const envenenouOPrimeiro = pulaOSegundo ? null : tentarEnvenenar(second, first, rng);
+  const paralisouOPrimeiro = pulaOSegundo ? null : tentarParalisar(second, first, rng);
+  const estagioDoPrimeiro = pulaOSegundo ? null : tentarEstagio(second, first, rng);
+  const secretoNoPrimeiro = pulaOSegundo ? null : tentarPoderSecreto(second, first, rng);
   const hpDoSecondAposDreno = second.hp;
   if(diario){
     /* O dano registrado é o que SAIU DE VERDADE da vida do alvo, não o número que a fórmula
@@ -9016,6 +9735,10 @@ function doExchange(active, enemy, rng, diario){
        pokemon, nao sobre um causador e um alvo. */
     const qDoFirst = activeFirst ? "p" : "e", qDoSecond = activeFirst ? "e" : "p";
     const geloDe = (p, q) => {
+      /* ⚠️ QUEM JA CAIU NAO PERDE TURNO -- ver a nota do dormeDe. Estas duas correm ANTES dos
+         golpes, entao hoje o pokemon esta sempre vivo aqui; a guarda existe pra o dia em que
+         alguem mover a chamada, que foi exatamente o que aconteceu com a do sono. */
+      if(p.hp <= 0) return;
       const g = (p === active) ? activeGelo : enemyGelo;
       if(g === "degelou") diario.push({ q:q, d:0, hp:null, c:0, m:0, z:0, x:"degelou", g:p.name });
       if(g === "preso")   diario.push({ q:q, d:0, hp:null, c:0, m:0, z:0, x:"gelado",  g:p.name });
@@ -9039,6 +9762,15 @@ function doExchange(active, enemy, rng, diario){
     const dormeDe = (p, q) => {
       const dormiu = (p === first) ? primeiroDormiu : segundoDormiu;
       if(!dormiu || p._dormindoPor <= 0) return;
+      /* ⚠️ E QUEM JA CAIU NAO PERDE TURNO (18/09/2026). Reportado com print na Torre: a Jynx matou
+         o Primeape e a linha *"Primeape continua a dormir e nao pode atacar"* saia LOGO DEPOIS --
+         o cabecalho ja mostrava 0/435.
+         A CAUSA E A POSICAO: esta chamada vem DEPOIS do golpe do first (e tem que vir -- a frase e
+         sobre o turno DELE, que e depois do golpe de quem e mais rapido), e o golpe do first pode
+         ter derrubado o second. Nao e defeito da Torre: ela chama o MESMO simulateGymBattle da
+         jornada, e os dois motores tinham isto igual.
+         Medido: saia em 47% dos confrontos em que o adormecido morre. */
+      if(p.hp <= 0) return;
       diario.push({ q:q, d:0, hp:null, c:0, m:0, z:0, x:"dormindo", g:p.name });
     };
     const congelou = (p, q, mv) => { if(mv) diario.push({ q:q, d:0, hp:null, c:0, m:0, z:0, x:"congelou", g:p.name, mv:mv }); };
@@ -9072,6 +9804,9 @@ function doExchange(active, enemy, rng, diario){
        a do gelo: ela e sobre a VEZ dele. O `q` e de quem esta paralisado -- estas linhas falam de
        UM pokemon, nao de um causador e um alvo. */
     const travadoDe = (p, q) => {
+      /* ⚠️ QUEM JA CAIU NAO PERDE TURNO -- ver a nota do dormeDe, logo abaixo. A do second corre
+         depois do golpe do first, entao ela alcanca quem acabou de ser derrubado. */
+      if(p.hp <= 0) return;
       const t = (p === active) ? activeTravado : enemyTravado;
       if(t) diario.push({ q:q, d:0, hp:null, c:0, m:0, z:0, x:"paralisado", g:p.name });
     };
@@ -9523,7 +10258,7 @@ function chooseStarter(id){
   /* ⚠️ A JORNADA NÃO ABRE MAIS NO MAPA (14/09/2026, a pedido: *"o mapa que aparece logo quando
      inicia o save, pode tirar, deixar apenas naquele botão do Mapa que já existe hoje"*).
      Ele existia como um beat de tela pra dar a Kanto o tamanho que o texto sozinho não dava -- de
-     onde se sai, quantas paradas há e onde fica o Planalto Índigo. O botão "🗺️ Ver o mapa" continua
+     onde se sai, quantas paradas há e onde fica o Planalto Índigo. O botão "Ver o mapa" continua
      em toda tela de escolha, então o mapa não sumiu: o que sumiu é a parada obrigatória nele.
      A TELA `kantoIntro` FICA DESENHÁVEL, e isso é de propósito: save antigo parado nela (ela era
      ponto seguro de gravação) precisa de uma tela pra abrir. Sem ela, quem fechou a aba ali volta
@@ -10521,7 +11256,7 @@ function renderEvoChoice(){
   const caught = getAllCaughtSpecies();
   const restantes = evolucoesPendentes().length - 1;
   return `
-  <div class="eyebrow">✨ EVOLUÇÃO</div>
+  <div class="eyebrow">${selo('brilho')} EVOLUÇÃO</div>
   <div class="box cursor">
     <h2>${spriteHtml(p.pendingEvoChoice,'sprite-sm',p.shiny)} Seu ${escapeHtmlSafe(de.name)} está evoluindo!</h2>
     <p>Essa linha evolutiva se divide em <strong>${EVOLUTION_CHOICES[p.pendingEvoChoice].length === 3 ? 'três' : 'duas'}</strong>. A escolha é definitiva.</p>
@@ -10713,7 +11448,7 @@ function renderRegisteredTeamOrderModal(){
         <div class="order-row">
           <div class="order-num">${idx+1}º</div>
           <div class="order-info">
-            <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${p.name}${p.shiny?' 🌟':''} — Lv.${p.level}</span>
+            <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${p.name}${p.shiny?' '+selo('shiny'):''} — Lv.${p.level}</span>
           </div>
           <div class="order-controls">
             <button class="circle-btn" onclick="moveRegisteredTeamOrder('${p.id}', -1)" ${idx===0?'disabled':''}>▲</button>
@@ -11242,7 +11977,7 @@ function renderMontanha(){
     <p class="hint-text">Os guardiões lutam na média do seu time (<strong>Lv.${media}</strong>). Se você perder, desce sem nada.</p>
   </div>
   <div class="box">
-    <h2>🪶 Os guardiões</h2>
+    <h2>${selo('pluma')} Os guardiões</h2>
     ${mons.map((m, i) => `
       <div class="order-row">
         <div class="order-num">${i+1}º</div>
@@ -11253,13 +11988,13 @@ function renderMontanha(){
       </div>`).join("")}
   </div>
   <div class="box">
-    <h2>👥 Seu time</h2>
+    <h2>${selo('amigos')} Seu time</h2>
     <p class="hint-text">O 1º deles encara o 1º seu. Dá pra reordenar aqui.</p>
     ${meu.map((p, idx) => `
       <div class="order-row">
         <div class="order-num">${idx+1}º ${botaoDeItemHtml(p)}</div>
         <div class="order-info">
-          <span class="mon-name">${spriteHtml(p, "sprite-sm")} ${escapeHtmlSafe(p.name)}${p.shiny?" 🌟":""} — Lv.${p.level}</span>
+          <span class="mon-name">${spriteHtml(p, "sprite-sm")} ${escapeHtmlSafe(p.name)}${p.shiny?" "+selo("shiny"):""} — Lv.${p.level}</span>
           <span class="mon-sub">${typesHtml(p.types)}</span>
         </div>
         <div class="order-arrows">
@@ -11268,7 +12003,7 @@ function renderMontanha(){
         </div>
       </div>`).join("")}
   </div>
-  <button class="btn danger" onclick="enfrentarOsGuardioes()">⚔️ Enfrentar os guardiões</button>
+  <button class="btn danger" onclick="enfrentarOsGuardioes()">${selo('vs')} Enfrentar os guardiões</button>
   <button class="btn secondary" onclick="descerDaMontanha()">⬅ Descer sem lutar</button>`;
 }
 function enfrentarOsGuardioes(){
@@ -11313,8 +12048,13 @@ function renderNinhoModal(){
       <h2>${n.icone} ${escapeHtmlSafe(n.ninho)}</h2>
       ${aceso ? `<p class="win-text">${escapeHtmlSafe(n.nome)} está aqui.</p>` : ""}
       ${aceso
-        ? `<p class="win-text">✅ O ninho está ocupado.</p>
-           <p class="hint-text">${n.missao}</p>`
+        /* ⚠️ O NINHO CHEIO NÃO REPETE A MISSÃO (18/09/2026, a pedido: *"depois de eu conseguir
+           completar uma missão, não precisa mais exibir a mensagem dela, somente após resetar as
+           missões"*). Ela já foi cumprida -- o que o jogador precisa saber ali é QUEM está no
+           ninho, e a missão de volta faria a tela parecer que ainda há o que fazer.
+           Ela VOLTA sozinha quando as três reiniciam (ao receber o lendário), porque aí o ninho
+           esvazia -- o texto sai do MESMO `n.missao` e não há um segundo estado pra manter. */
+        ? `<p class="win-text">✅ O ninho está ocupado.</p>`
         : `<p>${n.missao}</p>
            ${progresso}
            <p class="hint-text">${n.dica}</p>`}
@@ -11357,10 +12097,10 @@ function renderNinhos(){
          <p>As três aves estão nos ninhos — e algo muito maior desceu com elas.</p>
          <p class="hint-text">Zapdos, Articuno, Moltres e <strong>Lugia</strong>, todos no nível ${MONTANHA_NIVEL_LENDARIO}, numa equipe só.</p>
        </div>
-       <button class="btn danger" onclick="enfrentarOsLendarios()">⚔️ Enfrentar os quatro</button>
+       <button class="btn danger" onclick="enfrentarOsLendarios()">${selo('vs')} Enfrentar os quatro</button>
        <button class="btn secondary" onclick="descerDaMontanha()">⬅ Descer</button>`
     : `<div class="box">
-         <h2>🪶 Escolha quem desce com você</h2>
+         <h2>${selo('pluma')} Escolha quem desce com você</h2>
          <p class="hint-text">Os ninhos ainda não estão cheios — mas um dos guardiões aceita te seguir.</p>
          ${guarda.map((m, i) => `
            <button class="btn" onclick="escolherOGuardiao(${i})">
@@ -11461,7 +12201,7 @@ function renderMataFechada(){
     <p>Dezenas de pokémons em roda, calados, olhando pro céu. É a <strong>vigília do arco-íris</strong> — a espera que os selvagens fazem na noite em que <strong>Ho-Oh</strong> cruza o céu, e quem vê o rastro dele carrega a felicidade pra sempre.</p>
     <p>O galho cortado cai no meio da roda. O arco-íris se desfaz. E <strong>${mons.length}</strong> pares de olhos se viram pra você.</p>
   </div>
-  <div class="eyebrow">⚔️ A FILA DELES</div>
+  <div class="eyebrow">${selo('vs')} A FILA DELES</div>
   <div class="box">
     <p class="hint-text">Eles vêm <strong>nesta ordem</strong>, um atrás do outro, e seu time não descansa entre um e outro.</p>
     ${mons.map((m, i) => {
@@ -11469,13 +12209,13 @@ function renderMataFechada(){
       return `<div class="order-row">
         <div class="order-num">${i + 1}º</div>
         <div class="order-info">
-          <span class="mon-name">${spriteHtml(m,"sprite-sm")} ${escapeHtmlSafe(sp.name)}${m.shiny ? " 🌟" : ""} — Lv.${m.level}</span>
+          <span class="mon-name">${spriteHtml(m,"sprite-sm")} ${escapeHtmlSafe(sp.name)}${m.shiny ? " "+selo("shiny") : ""} — Lv.${m.level}</span>
           <span class="mon-sub">${typesHtml(sp.types)}</span>
         </div>
       </div>`;
     }).join("")}
   </div>
-  <div class="eyebrow">🛡️ A SUA</div>
+  <div class="eyebrow">${selo('escudo')} A SUA</div>
   <div class="box">
     <p class="hint-text">O <strong>1º</strong> seu encara o <strong>1º</strong> deles. Arrume a fila antes de entrar.</p>
     ${/* ⚠️ É A MESMA LINHA DA TELA DE ORDEM DE BATALHA (`order-row`), e não uma própria: a pergunta
@@ -11491,7 +12231,7 @@ function renderMataFechada(){
     ${meu.map((p, i) => `<div class="order-row">
       <div class="order-num">${i + 1}º${botaoDeItemHtml(p)}</div>
       <div class="order-info">
-        <span class="mon-name">${spriteHtml(p,"sprite-sm")} ${escapeHtmlSafe(p.name)}${p.shiny ? " 🌟" : ""} — Lv.${p.level}</span>
+        <span class="mon-name">${spriteHtml(p,"sprite-sm")} ${escapeHtmlSafe(p.name)}${p.shiny ? " "+selo("shiny") : ""} — Lv.${p.level}</span>
         <span class="mon-sub">${typesHtml(p.types || (SPECIES[p.speciesId] || {}).types || [])}</span>
       </div>
       <div class="order-controls">
@@ -11564,7 +12304,7 @@ function renderVigiliaPremio(){
       const sp = SPECIES[m.speciesId];
       return `<div class="evo-linha">
         <button class="btn" onclick="escolherOPremioDaVigilia(${i})">
-          <span class="mon-name">${spriteHtml(m,"sprite-sm")} ${escapeHtmlSafe(sp.name)}${m.shiny ? " 🌟" : ""} <span class="wild-lv">— Lv.${m.level}</span></span>
+          <span class="mon-name">${spriteHtml(m,"sprite-sm")} ${escapeHtmlSafe(sp.name)}${m.shiny ? " "+selo("shiny") : ""} <span class="wild-lv">— Lv.${m.level}</span></span>
           <span class="mon-sub">${typesHtml(sp.types)}</span>
         </button>
         <button class="wild-dex" onclick="abrirPokedexFicha(\'${escJs(m.speciesId)}\', ${m.shiny ? "true" : "false"})"
@@ -12062,6 +12802,10 @@ function continueAfterSpecial(){
   if(context==='montanha'){
     if(venceu){
       game.montanhaPremio = (game.montanhaGuarda || []).slice();
+      /* ⚠️ A VISITA É MARCADA AQUI, na AÇÃO, e não no `renderNinhos`: render é apresentação e
+         acontece de novo toda vez que a tela é redesenhada (voltar de um modal, perder a batalha
+         dos quatro). A marca é uma só e o lugar dela é o instante em que a tela é ALCANÇADA. */
+      visitarOsNinhos();
       game.screen = 'ninhos';
       render();
       return;
@@ -12710,7 +13454,7 @@ function backFromTrainerBattle(){
 function copyTrainerCode(){
   const code = encodeTeamCode(game.team);
   const btn = document.getElementById('copy-code-btn');
-  const finish = (msg)=>{ if(btn){ btn.textContent = msg; setTimeout(()=>{ if(btn) btn.textContent='📋 Copiar código'; }, 1500); } };
+  const finish = (msg)=>{ if(btn){ btn.textContent = msg; setTimeout(()=>{ if(btn) btn.textContent=selo('lista') + ' Copiar código'; }, 1500); } };
   if(navigator.clipboard && navigator.clipboard.writeText){
     navigator.clipboard.writeText(code).then(()=>finish('✅ Copiado!')).catch(()=>finish('Selecione manualmente'));
   } else {
@@ -14801,7 +15545,7 @@ function trainersLeagueMyTeamBoxHtml(data, roundIndex){
     </div>
     ${wasDrawn && !canSwap ? `<p class="hint-text">🎲 Time sorteado automaticamente (você não escolheu a tempo).</p>` : ''}` : `
     <p class="hint-text">Nenhum time escolhido pra essa rodada -- um dos seus times será sorteado automaticamente na hora da partida.</p>`}
-    ${canSwap ? `<button class="btn secondary" onclick="openTrainersLeagueTeamSwap('${data.dateId}',${roundIndex})">${team?'🔄 Trocar time (até 5min antes)':'🎯 Escolher time (até 5min antes)'}</button>` : `<p class="hint-text">⏳ Prazo de troca de time encerrado -- mas a <strong>ordem</strong> ainda pode mudar até a hora da batalha.</p>`}
+    ${canSwap ? `<button class="btn secondary" onclick="openTrainersLeagueTeamSwap('${data.dateId}',${roundIndex})">${team ? selo('recarregar') + ' Trocar time (até 5min antes)' : selo('mais') + ' Escolher time (até 5min antes)'}</button>` : `<p class="hint-text">⏳ Prazo de troca de time encerrado -- mas a <strong>ordem</strong> ainda pode mudar até a hora da batalha.</p>`}
     ${showReorderBtn ? `<button class="btn secondary" onclick="openTrainersLeagueOrderModal('${data.dateId}',${roundIndex})">🔀 Trocar ordem do time (até a batalha)</button>` : ''}
   </div>`;
 }
@@ -14865,7 +15609,7 @@ function renderTrainersLeagueOrderModal(){
         <div class="order-row">
           <div class="order-num">${idx+1}º</div>
           <div class="order-info">
-            <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${p.name}${p.shiny?' 🌟':''} — Lv.${p.level}</span>
+            <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${p.name}${p.shiny?' '+selo('shiny'):''} — Lv.${p.level}</span>
           </div>
           <div class="order-controls">
             <button class="circle-btn" onclick="moveTrainersLeagueOrder(${idx}, -1)" ${idx===0?'disabled':''}>▲</button>
@@ -14900,8 +15644,8 @@ function trainersLeagueMatchRow(match, roundLabel, dateId, roundIndex, matchInde
     const myTerrainPickId = canPickTerrain ? (game.trainersLeagueMyTerrainPicks||{})[String(roundIndex)] : null;
     const myPickedTerrain = myTerrainPickId ? TERRAINS.find(t=>t.id===myTerrainPickId) : null;
     const terrainBtnLabel = myPickedTerrain
-      ? `🗺️ Terreno: <span class="terrain-inline-badge" style="background:${terrainColor(myPickedTerrain)}">${myPickedTerrain.name}</span>`
-      : `🗺️ ${match.terrain?'Trocar':'Escolher'} terreno (até 10min antes)`;
+      ? `${selo('mapa')} Terreno: <span class="terrain-inline-badge" style="background:${terrainColor(myPickedTerrain)}">${myPickedTerrain.name}</span>`
+      : `${selo('mapa')} ${match.terrain?'Trocar':'Escolher'} terreno (até 10min antes)`;
     // pra quem NÃO é mandante (visitante) na SUA PRÓPRIA partida: mostra o terreno que o mandante já
     // escolheu, ao vivo (mesmo selo colorido da Liga Clássica), ou um aviso do prazo se ele ainda não
     // escolheu nada
@@ -14950,7 +15694,7 @@ function trainersLeagueMatchRow(match, roundLabel, dateId, roundIndex, matchInde
       <span class="vs">vs</span>
       <span class="player-link ${revealed && match.winner.uid===match.b.uid?'win-text':''}" onclick="showPlayerTeamModal('${escJs(match.b.code)}','${escJs(match.b.name)}','${match.terrain ? match.terrain.types.join(",") : ''}','${escJs(match.b.uid||'')}')">${nameB}</span>
     </div>
-    <div class="league-match-status">${revealed ? `🏅 ${escapeHtmlSafe(match.winner.name)} venceu!` : '🔒 Assista a batalha pra saber quem venceu'}</div>
+    <div class="league-match-status">${revealed ? `🏅 ${escapeHtmlSafe(match.winner.name)} venceu!` : selo('cadeado') + ' Assista a batalha pra saber quem venceu'}</div>
     ${((match.matchups && match.matchups.length>0) || match.logStored) ? `<button class="btn secondary league-watch-btn" onclick="watchTrainersLeagueMatch('${dateId}',${roundIndex},${matchIndex},'${matchKey}')">▶ Assistir batalha</button>` : ''}
   </div>`;
 }
@@ -15064,7 +15808,7 @@ function renderTrainersLeagueScreen(){
         <p class="error-text">${escapeHtmlSafe(game.trainersLeagueLoadError)}</p>
         <p class="hint-text">Se isso persistir, pode ser falta de permissão no banco de dados pra essa liga nova.</p>
       </div>
-      <button class="btn primary" onclick="refreshTrainersLeagueView()">🔄 Tentar de novo</button>
+      <button class="btn primary" onclick="refreshTrainersLeagueView()">${selo('recarregar')} Tentar de novo</button>
       <button class="btn secondary" onclick="leaveTrainersLeague()">⬅ Voltar</button>`;
     }
     return `<div class="box"><p class="hint-text">Carregando o Trainers League...</p></div>`;
@@ -15074,7 +15818,7 @@ function renderTrainersLeagueScreen(){
 
   const header = `
   <div class="home-header">
-    <div class="home-title">🏁 TRAINERS LEAGUE 🏁</div>
+    <div class="home-title">${selo('bandeira')} TRAINERS LEAGUE ${selo('bandeira')}</div>
     <div class="home-tagline">Pontos corridos • até 16 treinadores • ${formatDateIdBR(data.dateId)}</div>
   </div>
   <div class="box">
@@ -15094,7 +15838,7 @@ function renderTrainersLeagueScreen(){
         <div class="leaderboard-row">
           <span class="leaderboard-rank">${idx+1}º</span>
           <span class="leaderboard-name">${trainerNameHtml(entry)}</span>
-          <span class="leaderboard-count">${entry.count}🏆</span>
+          <span class="leaderboard-count">${entry.count}${selo('trofeu')}</span>
         </div>`).join('')}
     </div>` : `<p class="hint-text">Ninguém venceu uma Trainers League ainda. Seja o primeiro!</p>`)}
   </div>`;
@@ -15112,7 +15856,7 @@ function renderTrainersLeagueScreen(){
     <div class="box">
       <h2>📝 Inscrições abertas</h2>
       <p>A competição começa às <strong>11h</strong> com o sorteio das rodadas. A primeira rodada é às <strong>11h30</strong>.</p>
-      <p class="hint-text">👥 <strong>${game.trainersLeagueRegistrantCount!=null ? game.trainersLeagueRegistrantCount : '...'}</strong> treinador(es) inscrito(s).</p>
+      <p class="hint-text">${selo('amigos')} <strong>${game.trainersLeagueRegistrantCount!=null ? game.trainersLeagueRegistrantCount : '...'}</strong> treinador(es) inscrito(s).</p>
       ${game.trainersLeagueError ? `<p class="error-text">${game.trainersLeagueError}</p>` : ''}
       ${myReg ? `
         <p>Você está inscrito como <strong>${escapeHtmlSafe(myReg.name)}</strong>.</p>
@@ -15132,7 +15876,7 @@ function renderTrainersLeagueScreen(){
     const firstRoundLabel = data.roundTimes && data.roundTimes[0] ? new Date(data.roundTimes[0]).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) : '11h30';
     return `${header}
     <div class="box">
-      <h2>🔒 Times travados!</h2>
+      <h2>${selo('cadeado')} Times travados!</h2>
       <p>Chaveamento sorteado -- a primeira rodada é às <strong>${firstRoundLabel}</strong>.${hasSchedule ? ' Veja seu confronto abaixo e escolha time/terreno se ainda houver tempo.' : ''}</p>
       ${!hasSchedule ? `<div class="tl-locked-list">${(data.players||[]).map(p=>`<div class="tl-locked-row ${p.uid===myUid?'tl-match-mine':''}">${trainerNameHtml(p)}</div>`).join('')}</div>` : ''}
     </div>
@@ -15177,7 +15921,7 @@ function renderTrainersLeagueScreen(){
     ${game.trainersLeagueNextDayInfo ? `<div class="box">
       <h2>📝 Inscrições pra liga de amanhã já estão abertas!</h2>
       <p>A liga de <strong>${formatDateIdBR(game.trainersLeagueNextDayInfo.dateId)}</strong> começa às <strong>11h</strong> (primeira rodada às <strong>11h30</strong>).</p>
-      <p class="hint-text">👥 <strong>${game.trainersLeagueNextDayInfo.count}</strong> treinador(es) inscrito(s).</p>
+      <p class="hint-text">${selo('amigos')} <strong>${game.trainersLeagueNextDayInfo.count}</strong> treinador(es) inscrito(s).</p>
       ${game.trainersLeagueError ? `<p class="error-text">${game.trainersLeagueError}</p>` : ''}
       ${game.trainersLeagueNextDayInfo.myReg ? `
         <p>Você está inscrito como <strong>${escapeHtmlSafe(game.trainersLeagueNextDayInfo.myReg.name)}</strong>.</p>
@@ -15440,7 +16184,7 @@ function renderTrainersLeagueHistory(){
   const results = game.trainersLeagueHistoryData;
   return `
   <div class="home-header">
-    <div class="home-title">📜 HISTÓRICO — TRAINERS LEAGUE</div>
+    <div class="home-title">${selo('lista')} HISTÓRICO — TRAINERS LEAGUE</div>
   </div>
   ${results===null ? `<div class="box"><p class="hint-text">Carregando...</p></div>` : ''}
   ${results && results.length===0 ? `<div class="box"><p class="hint-text">Nenhuma liga concluída nos últimos 14 dias ainda.</p></div>` : ''}
@@ -15466,19 +16210,19 @@ function renderLeagueTypesList(){
   const custom = game.customLeagueTypes;
   return `
   <div class="home-header">
-    <div class="home-title">🏆 LIGAS POKÉMON 🏆</div>
+    <div class="home-title">${selo('trofeu')} LIGAS POKÉMON ${selo('trofeu')}</div>
     <div class="home-tagline">Escolha uma liga pra ver o ranking e se inscrever</div>
   </div>
   <div class="box">
-    <h2>🏆 Ligas Pokémon</h2>
+    <h2>${selo('trofeu')} Ligas Pokémon</h2>
     <p>Todos os treinadores que já venceram as 8 insígnias e chegaram até aqui. Entre na liga para se inscrever.</p>
   </div>
   <button class="btn league-type-card" onclick="openLeague('${CLASSIC_LEAGUE_TYPE}')">
-    <span class="mon-name">⚔️ Liga Clássica</span>
+    <span class="mon-name">${selo('vs')} Liga Clássica</span>
     <span class="mon-sub">Times de 8 ou 16 treinadores, mata-mata direto. Sempre rolando.</span>
   </button>
   <button class="btn league-type-card" onclick="openTrainersLeague()">
-    <span class="mon-name">🏁 Trainers League</span>
+    <span class="mon-name">${selo('bandeira')} Trainers League</span>
     <span class="mon-sub">Pontos corridos, até 16 treinadores, todos contra todos. Começa 11h; inscrições abrem quando a liga do dia anterior termina.</span>
   </button>
   ${custom===null ? `<div class="box"><p class="hint-text">Carregando outras ligas...</p></div>` : ''}
@@ -15591,7 +16335,7 @@ function renderCustomLeagueTeamPicker(typeConfig){
     const isSel = selected.includes(p.speciesId);
     const disabled = (!isSel && selected.length>=6) ? 'disabled' : '';
     return `<button class="btn ${isSel?'selected':''}" ${disabled} onclick="toggleCustomPickerMon('${p.speciesId}')">
-      <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${sp.name}${p.shiny?' 🌟':''} — Lv.${p.level} ${isSel?'✓':''}</span>
+      <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${sp.name}${p.shiny?' '+selo('shiny'):''} — Lv.${p.level} ${isSel?'✓':''}</span>
       <span class="mon-sub">${typesHtml(sp.types)} <span class="pool-origin-tag">${escapeHtmlSafe(slotDisplayName(p.sourceSlot))}</span></span>
     </button>`;
   }).join('')}
@@ -15913,6 +16657,10 @@ const CAMPOS_DA_CONTA = [
   /* o que a conta JA resgatou de conquista -- ver as moedas das conquistas */
   'achievementsPaid',
   'hms',   // as Máquinas Ocultas são da CONTA, não do save -- ver darHM
+  /* ⚠️ A VISITA AOS NINHOS É DA CONTA pelo mesmo motivo do `hms`: ela é o CONHECIMENTO do
+     treinador, não o progresso de uma jornada -- ver o `visitarOsNinhos`. Sem ela aqui, abrir
+     um save apagaria a marca e as missões parariam de contar em silêncio. */
+  'visitouOsNinhos',
   'unownCaught',   // as letras do Unown que a conta ja viu (ver marcarLetraDoUnown)
   /* ⚠️ O AVISO DO HM TAMBÉM: o HM03 pode ser dado no CARREGAMENTO DA CONTA (pra quem já tinha as
      17 antes da feature), e aí o jogador está na home. Sem ele aqui, abrir um save apagaria a marca
@@ -16455,12 +17203,12 @@ function renderNewSaveMode(){
         procurar o motivo -- é o mesmo erro que a recusa do re-sorteio já tinha corrigido. */
      return `
   <button class="box mode-card hard${pode?'':' sem-moeda'}" ${pode?'':'disabled'} onclick="pickGameMode('hard')">
-    <div class="mode-card-title">💀 Difícil <span class="mode-card-preco">🪙 ${MOEDA_MODO_DIFICIL}</span></div>`; })()}
+    <div class="mode-card-title">💀 Difícil <span class="mode-card-preco">${selo('moeda')} ${MOEDA_MODO_DIFICIL}</span></div>`; })()}
     <p>Menos níveis a cada vitória, e só <strong>3 por derrota</strong> em vez de 5. A partir do <strong>3º ginásio</strong> os ganhos caem pela metade. Os líderes vêm com <strong>metade do time shiny</strong>.</p>
-    <p class="mode-card-reward">✨ Em troca: <strong>8x mais chance</strong> de encontrar shiny selvagem.</p>
+    <p class="mode-card-reward">${selo('brilho')} Em troca: <strong>8x mais chance</strong> de encontrar shiny selvagem.</p>
     ${(game.moedas||0) >= MOEDA_MODO_DIFICIL
-      ? `<p class="mode-card-saldo">Custa <strong>🪙 ${MOEDA_MODO_DIFICIL}</strong> — você tem 🪙 ${game.moedas||0}.</p>`
-      : `<p class="mode-card-saldo falta">Faltam <strong>🪙 ${MOEDA_MODO_DIFICIL - (game.moedas||0)}</strong> — você tem 🪙 ${game.moedas||0}. Moeda vem de jogar: 5 por insígnia.</p>`}
+      ? `<p class="mode-card-saldo">Custa <strong>${selo('moeda')} ${MOEDA_MODO_DIFICIL}</strong> — você tem ${selo('moeda')} ${game.moedas||0}.</p>`
+      : `<p class="mode-card-saldo falta">Faltam <strong>${selo('moeda')} ${MOEDA_MODO_DIFICIL - (game.moedas||0)}</strong> — você tem ${selo('moeda')} ${game.moedas||0}. Moeda vem de jogar: 5 por insígnia.</p>`}
   </button>`;
 }
 /* SORTEIO DOS INICIAIS -- PRESO AO SLOT, não à tentativa.
@@ -17505,10 +18253,10 @@ async function computeLeagueAchievementExtra(trainerNames, uid){
    DESENHAR o valor, o servidor e quem PAGA. Se os dois divergirem, a tela promete um numero que a
    cobranca nao pratica -- e o teste cobra que sejam iguais conquista a conquista. */
 const NIVEL_DA_CONQUISTA = {
-  facil:    { moedas: 10,  nome: 'Fácil',    selo: '🥉' },
-  media:    { moedas: 25,  nome: 'Média',    selo: '🥈' },
-  dificil:  { moedas: 60,  nome: 'Difícil',  selo: '🥇' },
-  lendaria: { moedas: 150, nome: 'Lendária', selo: '💎' }
+  facil:    { moedas: 10,  nome: 'Fácil',    selo: selo('bronze') },
+  media:    { moedas: 25,  nome: 'Média',    selo: selo('prata') },
+  dificil:  { moedas: 60,  nome: 'Difícil',  selo: selo('ouro') },
+  lendaria: { moedas: 150, nome: 'Lendária', selo: selo('diamante') }
 };
 function moedasDaConquista(ach){
   const n = NIVEL_DA_CONQUISTA[ach && ach.nivel];
@@ -17982,7 +18730,7 @@ function kantoTrailHtml(compacta){
 }
 // botão que reabre o mapa de qualquer tela da jornada
 function kantoMapBotaoHtml(){
-  return `<button class="btn secondary kanto-abrir" onclick="openKantoMap()">🗺️ Ver o mapa</button>`;
+  return `<button class="btn secondary kanto-abrir" onclick="openKantoMap()">${selo('mapa')} Ver o mapa</button>`;
 }
 
 /* --------------------------------------------------------------------------
@@ -18080,7 +18828,7 @@ function renderKantoIntro(){
   /* NÃO nomeia o primeiro líder: a escolha entre Kanto e Johto vem na tela seguinte, e dizer
      "o primeiro é o Brock" aqui tornava a escolha uma formalidade. */
   return `
-  <div class="eyebrow">🗺️ KANTO E JOHTO</div>
+  <div class="eyebrow">${selo('mapa')} KANTO E JOHTO</div>
   <div class="box kanto-abertura">
     <h2>${sp ? spriteHtml(game.starterId,'sprite-sm') : ''} Dois continentes</h2>
     <p>Você sai de <strong>Pallet Town</strong>${sp ? ` com <strong>${escapeHtmlSafe(sp.name)}</strong> do lado` : ''}.
@@ -18098,7 +18846,7 @@ function renderKantoMapScreen(){
   const hist = game.routeHistory || [];
   const gym = gymOf(venc);
   return `
-  <div class="eyebrow">🗺️ MAPA DE KANTO E JOHTO</div>
+  <div class="eyebrow">${selo('mapa')} MAPA DE KANTO E JOHTO</div>
   <div class="box kanto-moldura">${kantoMapSvg(venc, hist, game.currentRoute)}</div>
   ${kantoTrailHtml()}
   <div class="box">
@@ -18192,7 +18940,7 @@ function renderRouteCardsBlock(cards){
     return `<button class="btn route-card${comChave ? " route-corte" : ""}" ${trancada ? "disabled" : `onclick="chooseRoute(\'${r.id}\')"`}>
       <span class="mon-name">${r.icon} ${r.name}</span>
       <span class="mon-sub">${typesHtml(r.types)}</span>
-      <span class="route-rumor">💬 ${r.rumor}</span>
+      <span class="route-rumor">${selo('balao')} ${r.rumor}</span>
       ${comChave ? `<span class="route-cadeado">${trancada
           /* ⚠️ ELE DIZ O QUE FAZER, e não só o que falta (14/09/2026, a pedido: *"escreva que é
              necessário usar o HM01 em um Pokémon para liberar esse caminho"*). "Precisa de um
@@ -18202,8 +18950,8 @@ function renderRouteCardsBlock(cards){
           /* a frase nomeia a MÁQUINA daquela rota: mandar procurar o HM01 num caminho que pede o
              HM02 seria pior que não dizer nada */
           ? (r.corte
-             ? "🔒 Use o <strong>HM01</strong> (na Mochila) em um pokémon do time pra liberar este caminho"
-             : "🔒 Use o <strong>HM02</strong> (na Mochila) em um pokémon do time pra liberar este caminho")
+             ? selo('cadeado') + " Use o <strong>HM01</strong> (na Mochila) em um pokémon do time pra liberar este caminho"
+             : selo('cadeado') + " Use o <strong>HM02</strong> (na Mochila) em um pokémon do time pra liberar este caminho")
           : (r.corte ? "🪓 " : "🪶 ") + escapeHtmlSafe(abre.name) + " abre caminho"}</span>` : ""}
     </button>`;
   }).join('')}
@@ -18287,7 +19035,7 @@ function renderSpecialBattling(){
     </div>
     <div class="battle-vs">
       ${fighterHtml(m, 'p', { hp: displayPlayerHp, passo: game.specialHitStep, hit: game.specialLastHit, comTerreno: false })}
-      <span class="vs-swords ${(loading||animating||emboscada)?'spin':''}">⚔️</span>
+      <span class="vs-swords ${(loading||animating||emboscada)?'spin':''}">${selo('vs', 'selo-g')}</span>
       ${fighterHtml(m, 'e', { hp: displayEnemyHp, passo: game.specialHitStep, hit: game.specialLastHit, comTerreno: false })}
     </div>
     <div class="battle-status-area">${loading
@@ -18477,7 +19225,7 @@ function renderPokemonsDaRotaModal(){
                card virar linha de lista em vez de cartão. */''}
           <span class="rota-mon-info">
             <span class="rota-mon-nome">${escapeHtmlSafe(sp.name)}${
-              x.raro ? ' <span class="rota-mon-raro" title="Aparece com menos frequência">✨</span>' : ''}</span>
+              x.raro ? ' <span class="rota-mon-raro" title="Aparece com menos frequência">' + selo('brilho') + '</span>' : ''}</span>
             <span class="rota-mon-tipos">${typesHtml(sp.types)}</span>
           </span>
           ${tem ? `<span class="pokedex-owned-badge" title="Já está na sua Pokédex">${pokedexIcon()}</span>`
@@ -18507,10 +19255,10 @@ function renderWild(){
          sobram ~170px pra a acao depois do texto da direita, e "Possui: 🪙 1000" ja ocupa isso.
          Quando ainda ha re-sorteio, o que decide e o dinheiro; quando acabou, o dinheiro deixou de
          importar e o que a pessoa precisa saber e POR QUE o botao apagou. -->
-    <span>${game.rerolando ? 'Re-sorteando...' : `🪙 ${precoDoRessorteio()} - Sortear novamente`}</span>
+    <span>${game.rerolando ? 'Re-sorteando...' : `${selo('moeda')} ${precoDoRessorteio()} - Sortear novamente`}</span>
     <span class="wild-reroll-saldo">${ressorteiosRestantes() < 1
       ? 'Acabaram os desta jornada'
-      : `Possui: 🪙 ${game.moedas||0}`}</span>
+      : `Possui: ${selo('moeda')} ${game.moedas||0}`}</span>
   </button>
   <!-- QUANTOS SOBRAM, e so quando ja se usou algum: numa jornada em que ninguem re-sorteou, dizer
        "8 de 8" seria anunciar um limite que ninguem estava perto de encostar. -->
@@ -18518,7 +19266,7 @@ function renderWild(){
     ? `<p class="hint-text wild-reroll-restam">Restam ${ressorteiosRestantes()} re-sorteio${ressorteiosRestantes()===1?'':'s'} nesta jornada.</p>`
     : ''}
   ${bonusShinyAtivo() && (game.wildRerolls||0) > 0
-    ? `<div class="box"><p class="hint-text">✨ Com o Bônus Shiny ligado, cada re-sorteio nesta rota custa 🪙 ${MOEDAS_RESSORTEIO} a mais. Na próxima rota volta a ${MOEDAS_RESSORTEIO}.</p></div>`
+    ? `<div class="box"><p class="hint-text">${selo('brilho')} Com o Bônus Shiny ligado, cada re-sorteio nesta rota custa 🪙 ${MOEDAS_RESSORTEIO} a mais. Na próxima rota volta a ${MOEDAS_RESSORTEIO}.</p></div>`
     : ''}
   ${game.rerollErro ? `<div class="box"><p class="error-text">${escapeHtmlSafe(game.rerollErro)}</p></div>` : ''}
   <div class="box">
@@ -18585,7 +19333,7 @@ function renderAvisoMinimoModal(){
    falta no meu time?" -- e a resposta estava a duas telas de distância. O modal em si já é
    anexado no render principal, então serve em qualquer tela sem mais nada. */
 function botaoSeuTimeHtml(){
-  return `<button class="btn secondary" onclick="abrirTimeModal()">👥 Seu time (${(game.team||[]).length})</button>`;
+  return `<button class="btn secondary" onclick="abrirTimeModal()">${selo('amigos')} Seu time (${(game.team||[]).length})</button>`;
 }
 /* ⚠️ O MODAL TEM DUAS ABAS desde 14/09/2026 (a pedido: *"quando o usuário clicar no Seu Time,
    adicione o botão TMs/HMs, e quando clicar, mostre a lista de TMs e HMs que o usuário possui na
@@ -18612,7 +19360,7 @@ function renderTimeModal(){
           <span class="time-modal-pos">${i+1}º</span>
           <span class="time-modal-sprite">${spriteHtml(p,'sprite-sm')}</span>
           <span class="time-modal-info">
-            <span class="time-modal-nome">${escapeHtmlSafe(sp.name)}${p.shiny?' 🌟':''}</span>
+            <span class="time-modal-nome">${escapeHtmlSafe(sp.name)}${p.shiny?' '+selo('shiny'):''}</span>
             <span class="time-modal-sub"><span class="time-modal-lv">Lv.${p.level}</span>${typesHtml(sp.types)}</span>
           </span>
         </div>`;
@@ -18741,7 +19489,7 @@ function renderRelease(){
       const isSel = game.releaseSelected.includes(p.id);
       const disabled = (!isSel && game.releaseSelected.length>=excess) ? 'disabled' : '';
       return `<button class="btn ${isSel?'selected':''}" ${disabled} onclick="toggleRelease('${p.id}')">
-        <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${p.name}${p.shiny?' 🌟':''} — Lv.${p.level} ${isSel?'📦':''}</span>
+        <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${p.name}${p.shiny?' '+selo('shiny'):''} — Lv.${p.level} ${isSel?'📦':''}</span>
         <span class="mon-sub">${typesHtml(p.types)}</span>
       </button>`;
     }).join('')}
@@ -18786,7 +19534,7 @@ function renderLevels(){
       const capLabel = atLevelCap ? ' (nível 55 — só sobe desmaiando em batalha)' : (atLevel40Cap ? ' (máx. +3 além do nível 40)' : (atPoolMax ? ' (máx.)' : ''));
       return `<div class="level-row">
         <div class="level-info">
-          <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${p.name}${p.shiny?' 🌟':''} — Lv.${current}${capLabel}</span>
+          <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${p.name}${p.shiny?' '+selo('shiny'):''} — Lv.${current}${capLabel}</span>
           <span class="mon-sub">${typesHtml(p.types)}</span>
         </div>
         <div class="level-controls">
@@ -18805,7 +19553,7 @@ function renderLevels(){
 
 function renderEvolution(){
   return `
-  <div class="eyebrow">✨ EVOLUÇÃO!</div>
+  <div class="eyebrow">${selo('brilho')} EVOLUÇÃO!</div>
   <div class="box cursor">
     <h2>Seu time evoluiu!</h2>
     ${game.evolutions.map(e=>`<p>${spriteHtml(e.toSpeciesId,'sprite-sm',e.shiny)} <strong>${e.fromName}</strong> atingiu o level ${e.atLevel} e evoluiu para <strong>${e.toName}</strong>!${e.shiny?' 🌟':''}</p>`).join('')}
@@ -18816,7 +19564,7 @@ function renderEvolution(){
 function renderTeamOrder(){
   return `
   <div class="box">
-    <h2>📋 Ordem de batalha</h2>
+    <h2>${selo('lista')} Ordem de batalha</h2>
     <p>Escolha a ordem em que seus Pokémons vão entrar na batalha. O primeiro da lista luta primeiro; quando ele desmaiar, o próximo da lista entra automaticamente.</p>
   </div>
   <div class="box">
@@ -18825,7 +19573,7 @@ function renderTeamOrder(){
       return `<div class="order-row">
         <div class="order-num">${idx+1}º${botaoDeItemHtml(p)}</div>
         <div class="order-info">
-          <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${p.name}${p.shiny?" 🌟":""} — Lv.${p.level}</span>
+          <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${p.name}${p.shiny?" "+selo("shiny"):""} — Lv.${p.level}</span>
           <span class="mon-sub">${typesHtml(p.types)}</span>
           ${golpesDoTimeHtml(p)}
         </div>
@@ -18868,7 +19616,7 @@ function renderPreBattle(){
           <span class="team-grid-num">${idx+1}</span>
           <span class="team-grid-sprite">${spriteHtml(p,'sprite-sm')}</span>
           <div class="team-grid-info">
-            <span class="team-grid-name">${p.name}${p.shiny?' 🌟':''}</span>
+            <span class="team-grid-name">${p.name}${p.shiny?' '+selo('shiny'):''}</span>
             <span class="team-grid-level">Lv.${p.level}</span>
           </div>
         </div>`;
@@ -18889,20 +19637,20 @@ function renderTrainerBattle(){
   const myCode = encodeTeamCode(game.team);
   return `
   <div class="box">
-    <h2>🤝 Batalha entre Treinadores</h2>
+    <h2>${selo('amigos')} Batalha entre Treinadores</h2>
     <p>Compartilhe o código abaixo com outro jogador — ele pode colar esse código no jogo dele pra batalhar contra o seu time atual, na ordem que você escolheu.</p>
   </div>
   <div class="box">
     <h2>Seu código</h2>
     <div class="trainer-code-box" onclick="this.select && this.select()">${myCode}</div>
-    <button class="btn secondary" id="copy-code-btn" onclick="copyTrainerCode()">📋 Copiar código</button>
+    <button class="btn secondary" id="copy-code-btn" onclick="copyTrainerCode()">${selo('lista')} Copiar código</button>
   </div>
   <div class="box">
     <h2>Batalhar contra um amigo</h2>
     <p>Cole aqui o código de time de outro jogador:</p>
     <textarea id="opponent-code-input" class="code-input" placeholder="Cole o código aqui..."></textarea>
     ${game.trainerBattleError ? `<p class="error-text">${game.trainerBattleError}</p>` : ''}
-    <button class="btn danger" onclick="startTrainerBattle()">Batalhar! ⚔️</button>
+    <button class="btn danger" onclick="startTrainerBattle()">Batalhar! ${selo('vs')}</button>
   </div>
   <button class="btn primary" onclick="backFromTrainerBattle()">⬅ Voltar</button>`;
 }
@@ -18918,7 +19666,7 @@ function renderTrainerBattling(){
   const displayEnemyHp = loading ? m.enemyHpBefore : (game.trainerCurrentEnemyHp!=null ? game.trainerCurrentEnemyHp : m.enemyHpAfter);
   return `
   <div class="eyebrow">${game.bossBattlePending ? '✨ BOSS DE DOMINGO'
-                       : game.towerBattlePending ? '🗼 TORRE DOS TREINADORES' : '🤝 BATALHA ENTRE TREINADORES'}</div>
+                       : game.towerBattlePending ? selo('torre') + ' TORRE DOS TREINADORES' : '🤝 BATALHA ENTRE TREINADORES'}</div>
   ${chuvaBadgeHtml(m)}
   <div class="box cursor">
     <div class="team-alive-row">
@@ -18932,7 +19680,7 @@ function renderTrainerBattling(){
     </div>
     <div class="battle-vs">
       ${fighterHtml(m, 'p', { hp: displayPlayerHp, passo: game.trainerHitStep, hit: game.trainerLastHit, comTerreno: false })}
-      <span class="vs-swords ${(loading||animating)?'spin':''}">⚔️</span>
+      <span class="vs-swords ${(loading||animating)?'spin':''}">${selo('vs', 'selo-g')}</span>
       ${fighterHtml(m, 'e', { hp: displayEnemyHp, passo: game.trainerHitStep, hit: game.trainerLastHit, comTerreno: false })}
     </div>
     <div class="battle-status-area">${loading
@@ -19413,7 +20161,7 @@ function renderMatchupLog(matchups){
     const hp = Math.max(0, m.hp || 0);
     return `<div class="mlog-lado ${hp<=0?'caiu':''}">
       <div class="mlog-spr">${SPECIES[m.sp] ? spriteHtml(m.sp,'sprite-sm',!!m.shiny) : '❔'}</div>
-      <div class="mlog-nome">${escapeHtmlSafe(m.nome||'')}${m.shiny?' 🌟':''}${m.lvl?` <span class="mlog-lv">Lv.${m.lvl}</span>`:''}</div>
+      <div class="mlog-nome">${escapeHtmlSafe(m.nome||'')}${m.shiny?' '+selo('shiny'):''}${m.lvl?` <span class="mlog-lv">Lv.${m.lvl}</span>`:''}</div>
       <div class="mlog-vida">
         ${renderHpBar(hp, maxHp, 'mlog-f-'+id, 'mlog-l-'+id)}
         <span class="mlog-hp">${hp}/${maxHp}</span>
@@ -19444,7 +20192,7 @@ function renderMatchupLog(matchups){
              primeiro (ver o registro x:chuva), e este emoji e o que conta os outros dois.
              Ele fica no × de proposito: e o unico ponto do cabecalho que pertence aos DOIS lados,
              e clima nao e de ninguem, e do campo. -->
-        <span class="mlog-x">${m.chuva ? '<span class="mlog-chuva">🌧️</span>' : ''}×</span>
+        <span class="mlog-x">${m.chuva ? '<span class="mlog-chuva">' + selo('chuva') + '</span>' : ''}×</span>
         ${lado({ nome:m.enemy, sp:m.enemySpecies, lvl:m.enemyLevel, shiny:m.enemyShiny,
                  hp:m.enemyHpAfter, hpBefore:m.enemyHpBefore, maxHp:m.enemyMaxHp,
                  tipo:m.enemyMove, golpeId:m.enemyMoveId, dano:danoDoEnemy, semPassos }, i+'b')}
@@ -20130,26 +20878,32 @@ function sequenciaDoConfronto(m){
    pontas. */
 const NOME_DO_ATRIBUTO = { atk:'o Ataque', def:'a Defesa', spAtk:'o Ataque Especial',
                            spDef:'a Defesa Especial', speed:'a Velocidade' };
-const ICONES_ESPECIAIS = { boom:'💥', sono:'😴', disable:'🚫', recover:'💚', absorb:'🌿', faixa:'🎗️', desempate:'⚖️', furia:'😤', confusao:'💫', furiadragao:'🐉', chuva:'🌧️', chuvafim:'☀️', acordou:'⏰', remoinho:'🌪️', espadas:'⚔️', pluma:'🪶',
+/* ⚠️ OS SELOS SÃO DESENHO NOSSO desde 17/09/2026 (ver DESENHOS): o que muda aqui é só a PALAVRA
+   virar um <svg>. Eles já eram montados dentro de HTML (o log e a linha de status usam innerHTML),
+   então nada no caminho precisou mudar.
+   Os que ficaram emoji são os que não têm desenho: o 🚫 da anulação, o 💚 do Recuperar, o 🌿 da
+   drenagem, o 🎗️ da Faixa, o ⚖️ do desempate e o ⏰ do despertar -- eles aparecem pouco, e cada
+   desenho custa uma iteração de verdade pra ficar legível a 12px. */
+const ICONES_ESPECIAIS = { boom:selo('explosao'), sono:selo('sono'), disable:'🚫', recover:'💚', absorb:'🌿', faixa:'🎗️', desempate:'⚖️', furia:selo('furia'), confusao:selo('confusao'), furiadragao:selo('dragao'), chuva:selo('chuva'), chuvafim:selo('sol'), acordou:'⏰', remoinho:selo('remoinho'), espadas:selo('espada'), pluma:selo('pluma'),
   /* ⚠️ AS TRES LINHAS DO CONGELAMENTO DIVIDEM O MESMO ❄️, e e de proposito: elas sao o mesmo
      evento visto em tres momentos (pegou / perdeu a vez / passou). Icones diferentes fariam o
      jogador procurar tres mecanicas onde ha uma. Todo o resto do bloco tem selo, e sem ele estas
      seriam as unicas frases mudas da linha de status. */
-  congelou:'❄️', gelado:'❄️', degelou:'❄️',
+  congelou:selo('gelo'), gelado:selo('gelo'), degelou:selo('gelo'),
   /* O 🔥 e o mesmo nas duas linhas da queimadura (pegou / doeu) pelo mesmo motivo do ❄️: e um
      efeito so, visto em dois momentos. */
-  queimou:'🔥', queima:'🔥',
+  queimou:selo('fogo'), queima:selo('fogo'),
   /* O 😴 e o MESMO do `sono`: e o mesmo efeito, visto num turno do meio. Um icone proprio faria
      procurar duas mecanicas onde ha uma -- a mesma razao do ❄️ repetido nas tres do gelo. */
-  dormindo:'\ud83d\ude34',
+  dormindo:selo('sono'),
   /* O 🟣 e a cor do tipo Veneno, e nao uma cavera: ☠️ se le como MORTE, e o envenenado continua
      lutando. As duas linhas dividem o mesmo icone pela razao de sempre -- e um efeito so, visto em
      dois momentos. */
-  envenenou:'\ud83d\udfe3', veneno:'\ud83d\udfe3',
+  envenenou:selo('veneno'), veneno:selo('veneno'),
   /* ⚠️ O ⚡ SERVE AOS DOIS MOMENTOS da paralisia (pegou / perdeu a vez), como o ❄️ serve aos tres
      do gelo: e o MESMO evento visto em horas diferentes, e icones diferentes fariam procurar duas
      mecanicas onde ha uma. */
-  paralisou:'⚡', paralisado:'⚡',
+  paralisou:selo('raio'), paralisado:selo('raio'),
   /* ⚠️ O ESTAGIO E O UNICO DO BLOCO COM DOIS ICONES PRO MESMO `x`, e a razao e que ele vai nos
      dois sentidos: a seta E a informacao. Quem escolhe e a frase, pelo sinal do delta. */
   estagio:'📉', estagioSobe:'📈' };
@@ -20334,7 +21088,17 @@ function cartaoDeGolpe(id, comTipo, destaque){
      Sai da TABELA, não de uma lista à parte: golpe novo no MULTI_GOLPE já ganha a observação. */
   /* UMA LINHA POR OBSERVAÇÃO -- o Comedor de Sonhos tem duas (cura e "só contra quem dorme"), e
      juntá-las numa frase só daria um parágrafo numa coluna de 167px a 320px. */
-  const obs = obsDoGolpe(id).map(t => '<span class="golpe-cartao-obs">* ' + escapeHtmlSafe(t) + '</span>').join('');
+  /* ⚠️ A OBSERVAÇÃO NÃO É ESCAPADA, e isso mudou em 17/09/2026 com os selos. Ela vinha por
+     `escapeHtmlSafe`, e no dia em que o ícone virou um <svg> o cartão passou a mostrar o SVG
+     ESCRITO na tela (`* 10% de chance de causar queimadura <svg class="selo "...>`), reportado
+     com print.
+     ELA É HTML DA CASA, não dado de fora: o texto todo sai de constantes (`pct()` mais as
+     tabelas de status) e o selo sai do `ICONES_ESPECIAIS` -- não há um único pedaço aqui que
+     venha do jogador. O que CONTINUA escapado é o nome do golpe, logo abaixo, que é o que um
+     dia pode vir de outro lugar.
+     ⚠️ Quem acrescentar observação aqui tem que saber disso: o que entrar na lista vai pra tela
+     como HTML. */
+  const obs = obsDoGolpe(id).map(t => '<span class="golpe-cartao-obs">* ' + t + '</span>').join('');
   /* A cor do risquinho vem INLINE porque muda de golpe pra golpe -- mesmo caminho do card de
      pokémon da tela de ordenar o time. */
   const risco = TYPE_COLORS[tipo] || 'var(--box-border)';
@@ -21427,10 +22191,10 @@ function statusAteAqui(m, lado, passo, marca){
 function selosDoConfronto(m, lado, passo){
   const g = (m && m.golpes) || [];
   let out = "";
-  if(g.some(x => x.x === 'espadas' && x.q === lado)) out += ' \u2694\ufe0f';
-  if(g.some(x => x.x === 'pluma' && x.q !== lado)) out += ' \ud83e\udeb6';
+  if(g.some(x => x.x === 'espadas' && x.q === lado)) out += ' ' + selo('espada', 'selo-g');
+  if(g.some(x => x.x === 'pluma' && x.q !== lado)) out += ' ' + selo('pluma', 'selo-g');
   const furia = (lado === 'p') ? (m && m.playerFuria) : (m && m.enemyFuria);
-  if(furia > 0) out += ' \ud83d\ude24' + (furia > 1 ? furia : '');
+  if(furia > 0) out += ' ' + selo('furia', 'selo-g') + (furia > 1 ? furia : '');
   /* ⚠️ A QUEIMADURA E O TERCEIRO SELO QUE VEM DE CAMPO e nao de marca, pelo mesmo motivo da furia:
      ela ATRAVESSA confrontos. E ela e a que mais precisa aparecer -- o jogador esta vendo o proprio
      pokemon bater metade do que batia, e sem o selo nao ha nada na tela dizendo por que.
@@ -21448,17 +22212,17 @@ function selosDoConfronto(m, lado, passo){
      JA queimado nao tem marca no diario, e ali o selo e verdade desde o comeco. E o campo que
      responde isso, e a marca que diz "foi AQUI". */
   const queimado = (lado === 'p') ? (m && m.playerQueimado) : (m && m.enemyQueimado);
-  if(queimado && statusAteAqui(m, lado, passo, 'queimou')) out += ' \ud83d\udd25';
+  if(queimado && statusAteAqui(m, lado, passo, 'queimou')) out += ' ' + selo('fogo', 'selo-g');
   /* O 🟣 segue a MESMA regra do 🔥: ele so aparece no passo em que o veneno pega, porque ele
      tambem acontece NO MEIO do confronto. Envenenamento HERDADO (sem marca no diario) vale desde
      o primeiro quadro. */
   const envenenado = (lado === 'p') ? (m && m.playerEnvenenado) : (m && m.enemyEnvenenado);
-  if(envenenado && statusAteAqui(m, lado, passo, 'envenenou')) out += ' \ud83d\udfe3';
+  if(envenenado && statusAteAqui(m, lado, passo, 'envenenou')) out += ' ' + selo('veneno', 'selo-g');
   /* ⚠️ O ⚡ SEGUE A MESMA REGRA DO 🔥 E DO 🟣: ele so aparece a partir do passo em que a paralisia
      pega, porque ela acontece NO MEIO do confronto. Paralisia HERDADA (sem marca no diario) vale
      desde o primeiro quadro -- o pokemon entra ja paralisado. */
   const paralisado = (lado === 'p') ? (m && m.playerParalisado) : (m && m.enemyParalisado);
-  if(paralisado && statusAteAqui(m, lado, passo, 'paralisou')) out += ' ⚡';
+  if(paralisado && statusAteAqui(m, lado, passo, 'paralisou')) out += ' ' + selo('raio', 'selo-g');
   return out;
 }
 /* O PLACAR DE QUEM ESTÁ DE PÉ: nome centralizado e uma POKÉBOLA por pokémon do time (15/09/2026,
@@ -21535,7 +22299,7 @@ function fighterHtml(m, lado, op){
   return `<div class="fighter${entrando ? ' fighter-entra' : ''}">
         ${/* os selos das duas danças vêm DEPOIS dos outros três e não saem em quem está SAINDO de
              campo (o quadro do Remoinho): o efeito é de quem está lutando agora */''}
-        <div class="fighter-emoji">${sp ? battleSpriteHtml(especie, contra, 'sprite-lg', shiny, doJogador) : ''}</div>${nome}${shiny?' 🌟':''}${(op.comTerreno && buffed)?' 🔺':''}${especialidade?' 🎖️':''}${saindo?'':selosDoConfronto(m, lado, op.passo)} <span class="fighter-level">Lv.${nivel}</span>
+        <div class="fighter-emoji">${sp ? battleSpriteHtml(especie, contra, 'sprite-lg', shiny, doJogador) : ''}</div>${nome}${shiny?' '+selo('shiny','selo-g'):''}${(op.comTerreno && buffed)?' '+selo('terreno','selo-g'):''}${especialidade?' '+selo('medalha','selo-g'):''}${saindo?'':selosDoConfronto(m, lado, op.passo)} <span class="fighter-level">Lv.${nivel}</span>
         <div class="fighter-types">${sp ? typesHtml(sp.types) : ''}</div>
         ${renderHpBar(hp, maxHp, doJogador ? 'hp-fill-player' : 'hp-fill-enemy', doJogador ? 'hp-label-player' : 'hp-label-enemy', entrando)}
       </div>`;
@@ -21551,7 +22315,7 @@ function renderBattling(){
   const enemySp = SPECIES[m.enemySpecies];
   const terrain = isNeighborhoodGym ? game.neighborhoodGymBattleTerrain : game.gymTerrain;
   const enemyLabel = isNeighborhoodGym ? game.neighborhoodGymBattleOpponentName : gym.leaderName;
-  const eyebrowText = isNeighborhoodGym ? `🏟️ GINÁSIO DA CIDADE — BATALHA` : `🥊 GINÁSIO ${gym.gymTypeName.toUpperCase()} — BATALHA`;
+  const eyebrowText = isNeighborhoodGym ? `${selo('estadio')} GINÁSIO DA CIDADE — BATALHA` : `🥊 GINÁSIO ${gym.gymTypeName.toUpperCase()} — BATALHA`;
   const displayPlayerHp = loading ? m.playerHpBefore : (game.revealCurrentPlayerHp!=null ? game.revealCurrentPlayerHp : m.playerHpAfter);
   const displayEnemyHp = loading ? m.enemyHpBefore : (game.revealCurrentEnemyHp!=null ? game.revealCurrentEnemyHp : m.enemyHpAfter);
   return `
@@ -21566,7 +22330,7 @@ function renderBattling(){
     </div>
     <div class="battle-vs">
       ${fighterHtml(m, 'p', { hp: displayPlayerHp, passo: game.revealHitStep, hit: game.revealLastHit, comTerreno: true })}
-      <span class="vs-swords ${(loading||animating)?'spin':''}">⚔️</span>
+      <span class="vs-swords ${(loading||animating)?'spin':''}">${selo('vs', 'selo-g')}</span>
       ${fighterHtml(m, 'e', { hp: displayEnemyHp, passo: game.revealHitStep, hit: game.revealLastHit, comTerreno: true })}
     </div>
     <div class="battle-status-area">${loading
@@ -21761,7 +22525,6 @@ const TMS = {
 const HMS = {
   hm01: {
     nome: 'HM01 — Corte',
-    icone: '📀',
     resumo: 'Ensina o Corte. Abre caminho onde a mata fecha.',
     golpe: 'cut',
     aprendem: CORTADORES,
@@ -21782,7 +22545,6 @@ const HMS = {
      antes do último ginásio. */
   hm02: {
     nome: 'HM02 — Voar',
-    icone: '📀',
     resumo: 'Ensina o Voar. Um golpe de Voador forte, pra quem tem asas.',
     golpe: 'fly',
     aprendem: VOADORES,
@@ -21791,7 +22553,6 @@ const HMS = {
   },
   hm03: {
     nome: 'HM03 — Surf',
-    icone: '📀',
     resumo: 'Ensina o Surf. Um golpe de Água forte, pra quem nada.',
     golpe: 'surf',
     aprendem: SURFISTAS,
@@ -21799,6 +22560,12 @@ const HMS = {
     comoGanhar: 'Capturando TODOS os pokémon da Zona de Safári — eles ficam na Pokédex da conta, então dá pra juntar em várias jornadas.'
   }
 };
+/* o disco de cada HM sai na cor do tipo do golpe que ele ensina -- ver a nota acima */
+Object.values(HMS).forEach(hm => {
+  const ficha = GOLPES[hm.golpe] || ['Normal', 0];
+  hm.icone = selo('hm', '', TYPE_COLORS[ficha[0]] || '#888');
+});
+
 /* ⚠️ OS HMs SÃO DA CONTA, NÃO DO SAVE (11/09/2026, a pedido: "depois que qualquer save conseguiu
    ele, ele fica permanentemente na conta do usuário"). Eles nasceram por save, e a razão escrita
    aqui era que a condição é uma conquista DAQUELA jornada -- o pedido decidiu o contrário, e a
@@ -22022,7 +22789,7 @@ function ninhosAcesosHtml(){
 function moedasGanhasHtml(){
   const n = game.moedasGanhasAgora || 0;
   if(n <= 0) return '';
-  return `<div class="box moeda-premio"><p>🪙 <strong>+${n} moeda${n===1?'':'s'}</strong> — já estão na sua conta.</p></div>`;
+  return `<div class="box moeda-premio"><p>${selo('moeda')} <strong>+${n} moeda${n===1?'':'s'}</strong> — já estão na sua conta.</p></div>`;
 }
 function renderBattleResult(win){
   const gym = gymAtual();
@@ -22129,7 +22896,7 @@ function eliteJourneyBoxHtml(){
     if(!game.eliteShinyGranted){ setTimeout(claimEliteShiny, 0); }
     let premioHtml = '';
     if(game.eliteShinyUsed){
-      premioHtml = `<p class="elite-shiny-done">✨ Bônus shiny já ativado nesta jornada.</p>`;
+      premioHtml = `<p class="elite-shiny-done">${selo('brilho')} Bônus shiny já ativado nesta jornada.</p>`;
     } else {
       premioHtml = `<div class="elite-shiny-block">
         <p class="hint-text">Sua vitória rendeu <strong>1 hora de bônus shiny</strong>: chance bem maior de encontrar shiny nos encontros selvagens. Ele está guardado na sua <strong>mochila</strong> — use quando for jogar.</p>
@@ -22243,7 +23010,7 @@ function renderEliteHeal(){
       return `<div class="order-row elite-row">
         <div class="order-num">${idx+1}º</div>
         <div class="order-info">
-          <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${p.name}${p.shiny?' 🌟':''} — Lv.${p.level}</span>
+          <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${p.name}${p.shiny?' '+selo('shiny'):''} — Lv.${p.level}</span>
           ${renderHpBar(hp, p.maxHp, `elite-hp-fill-${p.id}`, `elite-hp-label-${p.id}`)}
         </div>
         <div class="order-controls-compact">
@@ -22259,7 +23026,7 @@ function renderEliteHeal(){
   <div class="box">
     <p>Próximo desafio: <strong>${next.meta.icon} ${escapeHtmlSafe(next.meta.opponentName)}</strong>${next.meta.type ? ' '+typePill(next.meta.type) : ''}${(game.eliteStage||0)===ELITE_FOUR.length?' — <strong>A FINAL!</strong>':''}</p>
   </div>
-  <button class="btn success" onclick="startNextEliteBattle()">⚔️ Enfrentar ${escapeHtmlSafe(next.meta.opponentName)}</button>`;
+  <button class="btn success" onclick="startNextEliteBattle()">${selo('vs')} Enfrentar ${escapeHtmlSafe(next.meta.opponentName)}</button>`;
 }
 function notificationIcon(type){
   if(type==='league_champion') return '👑';
@@ -22472,7 +23239,7 @@ function quadroDobravelHtml(id, titulo, conteudo){
 }
 function renderNotificationsScreen(){
   const list = game.notificationsList;
-  let out = `<div class="result-banner win">🔔 Notificações</div>`;
+  let out = `<div class="result-banner win">${selo('sino')} Notificações</div>`;
   if(game.notificationsActionError){ out += `<div class="box"><p class="error-text">⚠️ ${escapeHtmlSafe(game.notificationsActionError)}</p></div>`; }
   if(!list){
     out += `<div class="box"><p class="hint-text">Carregando...</p></div>`;
@@ -22534,14 +23301,14 @@ function renderNeighborhoodGymLeaderboard(){
   const data = game.neighborhoodGymLeaderboardData;
   const tab = game.neighborhoodGymLeaderboardTab;
   const cityLine = loc && loc.city ? `${escapeHtmlSafe(loc.city)}${loc.stateAbbr?' - '+escapeHtmlSafe(loc.stateAbbr):''}` : '?';
-  let out = `<div class="result-banner win">🏆 RANKING</div>
+  let out = `<div class="result-banner win">${selo('trofeu')} RANKING</div>
   <div class="box u-center">
-    <h2 class="u-mb2">🏟️ Ginásio</h2>
+    <h2 class="u-mb2">${selo('estadio')} Ginásio</h2>
     <p style="margin:2px 0 0;font-size:1rem;font-weight:800;">${cityLine}</p>
   </div>`;
   out += `<div class="box" style="display:flex;gap:8px;">
-    <button class="btn ${tab==='wins'?'danger':'secondary'}" style="flex:1;" onclick="switchNeighborhoodGymLeaderboardTab('wins')">🛡️ Vitórias em sequência</button>
-    <button class="btn ${tab==='days'?'danger':'secondary'}" style="flex:1;" onclick="switchNeighborhoodGymLeaderboardTab('days')">📅 Dias na liderança</button>
+    <button class="btn ${tab==='wins'?'danger':'secondary'}" style="flex:1;" onclick="switchNeighborhoodGymLeaderboardTab('wins')">${selo('escudo')} Vitórias em sequência</button>
+    <button class="btn ${tab==='days'?'danger':'secondary'}" style="flex:1;" onclick="switchNeighborhoodGymLeaderboardTab('days')">${selo('calendario')} Dias na liderança</button>
   </div>`;
   if(!data){
     out += `<div class="box"><p class="hint-text">Carregando ranking...</p></div>`;
@@ -22594,9 +23361,9 @@ function renderNeighborhoodGymChallengeHistory(){
   const loc = game.neighborhoodGymLocation;
   const list = game.neighborhoodGymChallengeHistoryData;
   const cityLine = loc && loc.city ? `${escapeHtmlSafe(loc.city)}${loc.stateAbbr?' - '+escapeHtmlSafe(loc.stateAbbr):''}` : '?';
-  let out = `<div class="result-banner win">📜 HISTÓRICO DE DESAFIOS</div>
+  let out = `<div class="result-banner win">${selo('lista')} HISTÓRICO DE DESAFIOS</div>
   <div class="box u-center">
-    <h2 class="u-mb2">🏟️ Ginásio</h2>
+    <h2 class="u-mb2">${selo('estadio')} Ginásio</h2>
     <p style="margin:2px 0 0;font-size:1rem;font-weight:800;">${cityLine}</p>
   </div>`;
   if(!list){
@@ -22681,18 +23448,18 @@ function renderMeusGinasios(){
   const lista = game.meusGinasios;
   const voltar = `<button class="btn secondary" onclick="openNeighborhoodGymScreen()">⬅ Voltar</button>`;
   if(lista === null){
-    return `<div class="result-banner win">🏆 GINÁSIOS LIDERADOS</div>
+    return `<div class="result-banner win">${selo('trofeu', 'selo-g')} GINÁSIOS LIDERADOS</div>
     <div class="box"><p class="loading-text">Procurando seus ginásios...</p></div>${voltar}`;
   }
   if(!lista.length){
-    return `<div class="result-banner win">🏆 GINÁSIOS LIDERADOS</div>
+    return `<div class="result-banner win">${selo('trofeu', 'selo-g')} GINÁSIOS LIDERADOS</div>
     <div class="box">
       ${game.meusGinasiosErro ? `<p class="error-text">${escapeHtmlSafe(game.meusGinasiosErro)}</p>` : ''}
       <p>Você ainda não lidera nenhum ginásio.</p>
       <p class="hint-text">Pra conquistar um, você precisa estar na cidade dele. Depois disso ele fica nesta lista e dá pra cuidar dele de qualquer lugar.</p>
     </div>${voltar}`;
   }
-  return `<div class="result-banner win">🏆 GINÁSIOS LIDERADOS</div>
+  return `<div class="result-banner win">${selo('trofeu', 'selo-g')} GINÁSIOS LIDERADOS</div>
   <div class="box">
     <p class="hint-text">Toque num ginásio pra abrir: dá pra trocar o time, a ordem, o terreno e ver o histórico sem sair do lugar.</p>
   </div>
@@ -22713,31 +23480,31 @@ function renderMeusGinasios(){
 }
 function renderNeighborhoodGym(){
   const state = game.neighborhoodGymScreenState;
-  const header = `<div class="result-banner win">🏙️ GINÁSIO DA CIDADE</div>${botaoMeusGinasiosHtml()}`;
+  const header = `<div class="result-banner win">${selo('cidade')} GINÁSIO DA CIDADE</div>${botaoMeusGinasiosHtml()}`;
   if(state==='locating'){
     return `${header}<div class="box"><h2>📍 Localizando...</h2><p>Identificando sua cidade. Isso pode levar alguns segundos.</p></div>
     <button class="btn secondary" onclick="goToSaveMenu()">⬅ Voltar</button>`;
   }
   if(state==='noGeolocation'){
-    return `${header}<div class="box"><h2>😕 Sem suporte</h2><p>Seu navegador não suporta localização. Esse recurso precisa dela pra funcionar.</p></div>
+    return `${header}<div class="box"><h2>${selo('aviso')} Sem suporte</h2><p>Seu navegador não suporta localização. Esse recurso precisa dela pra funcionar.</p></div>
     <button class="btn secondary" onclick="goToSaveMenu()">⬅ Voltar</button>`;
   }
   if(state==='error'){
-    return `${header}<div class="box"><h2>😕 Não deu certo</h2><p>${escapeHtmlSafe(game.neighborhoodGymError||'Erro desconhecido.')}</p></div>
-    <button class="btn success" onclick="openNeighborhoodGymScreen()">🔄 Tentar de novo</button>
+    return `${header}<div class="box"><h2>${selo('aviso')} Não deu certo</h2><p>${escapeHtmlSafe(game.neighborhoodGymError||'Erro desconhecido.')}</p></div>
+    <button class="btn success" onclick="openNeighborhoodGymScreen()">${selo('recarregar')} Tentar de novo</button>
     <button class="btn secondary" onclick="goToSaveMenu()">⬅ Voltar</button>`;
   }
   const loc = game.neighborhoodGymLocation;
   if(!loc){
     return `${header}<div class="box"><h2>😕 Sem localização</h2><p>Não foi possível identificar onde você está.</p></div>
-    <button class="btn success" onclick="openNeighborhoodGymScreen()">🔄 Tentar de novo</button>
+    <button class="btn success" onclick="openNeighborhoodGymScreen()">${selo('recarregar')} Tentar de novo</button>
     <button class="btn secondary" onclick="goToSaveMenu()">⬅ Voltar</button>`;
   }
 
   // quadro só do título -- Ginásio + cidade(-estado)
   const cityLine = loc.city ? `${escapeHtmlSafe(loc.city)}${loc.stateAbbr?' - '+escapeHtmlSafe(loc.stateAbbr):''}` : '?';
   let out = `${header}<div class="box u-center">
-    <h2 class="u-mb2">🏟️ Ginásio</h2>
+    <h2 class="u-mb2">${selo('estadio')} Ginásio</h2>
     <p style="margin:2px 0 0;font-size:1rem;font-weight:800;">${cityLine}</p>
   </div>`;
 
@@ -22763,15 +23530,15 @@ function renderNeighborhoodGym(){
       // time já está definido (senão teria caído no ramo needsTeam acima) -- só falta o terreno,
       // e é a PRÓPRIA pessoa que precisa escolher, não faz sentido mandar ela "esperar"
       out += `<p class="u-left">Seu time de defesa já está pronto, mas ainda falta escolher o terreno!</p></div>
-      <button class="btn success" onclick="openNeighborhoodGymTerrainPicker()">🗺️ Escolher terreno</button>`;
+      <button class="btn success" onclick="openNeighborhoodGymTerrainPicker()">${selo('mapa')} Escolher terreno</button>`;
     } else if(detail.needsDefenseSetup){
-      out += `<p class="u-left">👑 Líder: <strong>${escapeHtmlSafe(detail.leaderName)}</strong> — ainda configurando a defesa. Tente de novo daqui a pouco.</p></div>`;
+      out += `<p class="u-left">${selo('coroa')} Líder: <strong>${escapeHtmlSafe(detail.leaderName)}</strong> — ainda configurando a defesa. Tente de novo daqui a pouco.</p></div>`;
     } else {
-      out += `<div class="badge-chip gym-leader-chip">👑 <span class="gym-leader-chip-name">${trainerProfileLink(escapeHtmlSafe(detail.leaderName), detail.leaderUid, detail.leaderName)}</span></div>
+      out += `<div class="badge-chip gym-leader-chip">${selo('coroa')} <span class="gym-leader-chip-name">${trainerProfileLink(escapeHtmlSafe(detail.leaderName), detail.leaderUid, detail.leaderName)}</span></div>
       <div class="trainer-streak-box box" style="margin:16px 0 10px;">
         <div class="trainer-streak-row gym-stat-row">
-          <span>🛡️ Vitórias em sequência: <strong>${detail.defenseCount}</strong></span>
-          <span>📅 Dias como líder: <strong>${detail.daysAsLeader||0}</strong></span>
+          <span>${selo('escudo')} Vitórias em sequência: <strong>${detail.defenseCount}</strong></span>
+          <span>${selo('calendario')} Dias como líder: <strong>${detail.daysAsLeader||0}</strong></span>
         </div>
       </div>
       <div class="save-slot-card" style="margin-top:0;">
@@ -22833,10 +23600,10 @@ function renderNeighborhoodGymDefenseOrder(){
   const lista = game.neighborhoodGymDefenseOrder || [];
   const terreno = game.neighborhoodGymDetail && game.neighborhoodGymDetail.leaderTerrain;
   return `
-  <div class="result-banner win">📋 Ordem do time de defesa</div>
+  <div class="result-banner win">${selo('lista')} Ordem do time de defesa</div>
   <div class="box">
     <p class="hint-text">O primeiro da lista enfrenta o desafiante primeiro; quando ele cair, entra o próximo.</p>
-    ${terreno ? `<p class="hint-text">🗺️ Terreno: <button class="terrain-inline-badge" style="background:${terrainColor(terreno)}" onclick="event.stopPropagation();openTerrainInfoModal('${terreno.id}')">${terreno.name}</button> — quem tem 🔺 luta com bônus.</p>` : ''}
+    ${terreno ? `<p class="hint-text">${selo('mapa')} Terreno: <button class="terrain-inline-badge" style="background:${terrainColor(terreno)}" onclick="event.stopPropagation();openTerrainInfoModal('${terreno.id}')">${terreno.name}</button> — quem tem 🔺 luta com bônus.</p>` : ''}
   </div>
   ${game.neighborhoodGymOrderError ? `<div class="box"><p class="error-text">${escapeHtmlSafe(game.neighborhoodGymOrderError)}</p></div>` : ''}
   <div class="box">
@@ -22846,7 +23613,7 @@ function renderNeighborhoodGymDefenseOrder(){
       return `<div class="order-row">
         <div class="order-num">${idx+1}º${botaoDeItemHtml(p)}</div>
         <div class="order-info">
-          <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${escapeHtmlSafe(sp?sp.name:'?')}${p.shiny?' 🌟':''} — Lv.${p.level}${buff?' 🔺':''}</span>
+          <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${escapeHtmlSafe(sp?sp.name:'?')}${p.shiny?' '+selo('shiny'):''} — Lv.${p.level}${buff?' 🔺':''}</span>
           <span class="mon-sub">${sp?typesHtml(sp.types):''}</span>
           ${golpesDoTimeHtml(p)}
         </div>
@@ -22896,12 +23663,12 @@ function renderNeighborhoodGymChallengeOrderPicker(){
   const detail = game.neighborhoodGymDetail;
   const team = game.neighborhoodGymChallengeTeam || [];
   return `
-  <div class="result-banner win">📋 Ordem de batalha</div>
+  <div class="result-banner win">${selo('lista')} Ordem de batalha</div>
   <div class="box">
-    <h2>👑 Time do líder</h2>
+    <h2>${selo('coroa')} Time do líder</h2>
     <p class="hint-text">É contra isso que você vai lutar -- organize sua ordem pensando nele.</p>
     ${timeComTerrenoHtml((detail && detail.leaderTeamPreview) || [], detail && detail.leaderTerrain)}
-    ${detail && detail.leaderTerrain ? `<p class="hint-text">🗺️ Terreno: <button class="terrain-inline-badge" style="background:${terrainColor(detail.leaderTerrain)}" onclick="event.stopPropagation();openTerrainInfoModal('${detail.leaderTerrain.id}')">${detail.leaderTerrain.name}</button></p>` : ''}
+    ${detail && detail.leaderTerrain ? `<p class="hint-text">${selo('mapa')} Terreno: <button class="terrain-inline-badge" style="background:${terrainColor(detail.leaderTerrain)}" onclick="event.stopPropagation();openTerrainInfoModal('${detail.leaderTerrain.id}')">${detail.leaderTerrain.name}</button></p>` : ''}
   </div>
   <div class="box">
     <h2>⚔️ Seu time — escolha a ordem</h2>
@@ -22909,7 +23676,7 @@ function renderNeighborhoodGymChallengeOrderPicker(){
     ${team.map((p,idx)=>`<div class="order-row">
       <div class="order-num">${idx+1}º${botaoDeItemHtml(p)}</div>
       <div class="order-info">
-        <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${p.name}${p.shiny?" 🌟":""} — Lv.${p.level}</span>
+        <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${p.name}${p.shiny?" "+selo("shiny"):""} — Lv.${p.level}</span>
         <span class="mon-sub">${typesHtml(p.types)}</span>
         ${golpesDoTimeHtml(p)}
       </div>
@@ -23088,7 +23855,7 @@ function renderJourneyEnd(){
   </div>` : ''}
   ${won ? eliteJourneyBoxHtml() : ''}
   <div class="box">
-    <h2>🎖️ Insígnias conquistadas</h2>
+    <h2>${selo('medalha')} Insígnias conquistadas</h2>
     ${won
       ? `<p class="journey-badges-note">As 8 insígnias na mão — você está classificado para a <strong>Liga Pokémon</strong>.</p>`
       : ''}
@@ -23097,7 +23864,7 @@ function renderJourneyEnd(){
       : `<p>Você não conquistou nenhuma insígnia dessa vez.</p>`}
   </div>
   <div class="box">
-    <h2>👥 Seu time no fim da jornada</h2>
+    <h2>${selo('amigos')} Seu time no fim da jornada</h2>
     ${game.eliteStatus==='champion'
       ? `<p>O time que venceu a Elite 4. A ordem abaixo é a que ele usa nas ligas online — dá pra mudar na tela do time antes de cada competição.</p>`
       : `<p>Essa é a sequência atual desse time. Dá pra reordenar a qualquer momento antes de cada batalha da Elite 4 (na sala de preparação), então não precisa se preocupar com isso aqui.</p>`}
@@ -23105,7 +23872,7 @@ function renderJourneyEnd(){
       return `<div class="order-row">
         <div class="order-num">${idx+1}º</div>
         <div class="order-info">
-          <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${p.name}${p.shiny?" 🌟":""} — Lv.${p.level}</span>
+          <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${p.name}${p.shiny?" "+selo("shiny"):""} — Lv.${p.level}</span>
           <span class="mon-sub">${typesHtml(p.types)}</span>
         </div>
       </div>`;
@@ -23284,7 +24051,7 @@ function leagueMatchRow(match, roundLabel, ct, li, rk, mi, leagueRounds, phaseTi
       <span class="vs">vs</span>
       <span class="player-link ${revealed && match.winner.name===match.b.name?'win-text':''}" onclick="showPlayerTeamModal('${escJs(match.b.code)}','${escJs(match.b.name)}','${match.terrain ? match.terrain.types.join(",") : ''}','${escJs(match.b.uid||'')}')">${nameB}</span>
     </div>
-    <div class="league-match-status">${revealed ? `🏅 ${match.winner.name} venceu!` : '🔒 Assista a batalha pra saber quem venceu'}</div>
+    <div class="league-match-status">${revealed ? `🏅 ${match.winner.name} venceu!` : selo('cadeado') + ' Assista a batalha pra saber quem venceu'}</div>
     ${((match.matchups && match.matchups.length>0) || match.logStored) ? `<button class="btn secondary league-watch-btn" onclick="watchLeagueMatch(${ct},${li},'${rk}',${mi},'${matchKey}')">▶ Assistir batalha</button>` : ''}
   </div>`;
 }
@@ -23347,7 +24114,7 @@ function renderPlayerTeamModal(){
         ${sorted.length>0 ? sorted.map(p=>{
           const sp = SPECIES[p.speciesId];
           const buffed = terrainTypes && sp && sp.types.some(t=>terrainTypes.includes(t));
-          return `<div class="status-row"><span class="icon">${spriteHtml(p,'sprite-sm')}</span><span>${p.name} — Lv.${p.level}${p.shiny?' 🌟':''}${buffed?' 🔺':''}</span></div>`;
+          return `<div class="status-row"><span class="icon">${spriteHtml(p,'sprite-sm')}</span><span>${p.name} — Lv.${p.level}${p.shiny?' '+selo('shiny'):''}${buffed?' 🔺':''}</span></div>`;
         }).join('') : '<p>Não foi possível carregar esse time.</p>'}
       </div>
       ${(anyBuffed || sorted.some(p=>p.shiny)) ? `<p class="hint-text">${anyBuffed?'🔺 Buffado pelo terreno da partida. ':''}${sorted.some(p=>p.shiny)?'🌟 Shiny (+20% em todos os atributos).':''}</p>` : ''}
@@ -23549,7 +24316,7 @@ function renderLeagueWatch(){
         <div class="fighter-types">${playerSp?typesHtml(playerSp.types):''}</div>
         ${renderHpBar(displayPlayerHp, m.playerMaxHp, 'hp-fill-player', 'hp-label-player')}
       </div>
-      <span class="vs-swords ${(loading||animating)?'spin':''}">⚔️</span>
+      <span class="vs-swords ${(loading||animating)?'spin':''}">${selo('vs', 'selo-g')}</span>
       <div class="fighter">
         <div class="fighter-emoji">${enemySp?battleSpriteHtml(m.enemySpecies, m.playerSpecies, 'sprite-lg', m.enemyShiny):''}</div>${m.enemy}${m.enemyShiny?' 🌟':''}${w.terrain && enemySp && enemySp.types.some(t=>w.terrain.types.includes(t))?' 🔺':''}${m.enemySpecialty?' 🎖️':''}${selosDoConfronto(m, 'e', game.leagueWatchHitStep)} <span class="fighter-level">Lv.${m.enemyLevel}</span>
         <div class="fighter-types">${enemySp?typesHtml(enemySp.types):''}</div>
@@ -23626,7 +24393,7 @@ function renderLeagueCycle(cycle){
   `).join('')}
   ${myLeague.champion ? `
   <div class="badge-earned">
-    <div class="badge-icon">👑</div>
+    <div class="badge-icon">${selo('coroa', 'selo-g')}</div>
     <div class="badge-text">Campeão da sua Liga:<br><strong>${championRevealed ? myLeague.champion.name : '❓ Assista a final pra descobrir'}</strong>!</div>
   </div>` : ''}
   ` : `<div class="box"><p>Você não está em nenhuma Liga dessa rodada.</p></div>`}
@@ -23659,7 +24426,7 @@ function renderLeagueHistoryScreen(){
   `).join('')}
   ${league.champion ? `
   <div class="badge-earned">
-    <div class="badge-icon">👑</div>
+    <div class="badge-icon">${selo('coroa', 'selo-g')}</div>
     <div class="badge-text">Campeão:<br><strong>${league.champion.name}</strong>!</div>
   </div>` : ''}
   <button class="btn primary" onclick="closeLeagueHistory()">⬅ Voltar</button>`;
@@ -23667,7 +24434,7 @@ function renderLeagueHistoryScreen(){
 function renderLeague(){
   const data = game.leagueData;
   if(game.leagueScreenLoading || !data){
-    return `<div class="box"><h2>🏆 Liga Pokémon</h2><p>Carregando...</p></div>
+    return `<div class="box"><h2>${selo('trofeu')} Liga Pokémon</h2><p>Carregando...</p></div>
     <button class="btn primary" onclick="leaveLeagueScreen()">⬅ Voltar</button>`;
   }
   const registeringCycle = data.cycles.find(c=>c.status==='registering');
@@ -23711,7 +24478,7 @@ function renderLeague(){
         <div class="leaderboard-row">
           <span class="leaderboard-rank">${idx+1}º</span>
           <span class="leaderboard-name">${trainerNameHtml(entry)}</span>
-          <span class="leaderboard-count">${entry.count}🏆</span>
+          <span class="leaderboard-count">${entry.count}${selo('trofeu')}</span>
         </div>`).join('')}
     </div>` : `<p>Ninguém venceu uma Liga ainda. Seja o primeiro!</p>`)}
   </div>`;
@@ -23761,7 +24528,7 @@ function renderLeague(){
         <div class="order-row">
           <div class="order-num">${idx+1}º</div>
           <div class="order-info">
-            <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${p.name}${p.shiny?' 🌟':''} — Lv.${p.level}</span>
+            <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${p.name}${p.shiny?' '+selo('shiny'):''} — Lv.${p.level}</span>
           </div>
           <div class="order-controls">
             <button class="circle-btn" onclick="moveRegisteredTeamOrder('${p.id}', -1)" ${idx===0?'disabled':''}>▲</button>
@@ -24006,7 +24773,7 @@ function renderTowerOrderModal(){
           return `<div class="order-row">
             <div class="order-num">${idx+1}º${botaoDeItemHtml(p)}</div>
             <div class="order-info">
-              <span class="mon-name">${sp?spriteHtml(p,'sprite-sm'):'❔'} ${escapeHtmlSafe(sp?sp.name:'?')}${p.shiny?' 🌟':''} — Lv.${p.level}</span>
+              <span class="mon-name">${sp?spriteHtml(p,'sprite-sm'):'❔'} ${escapeHtmlSafe(sp?sp.name:'?')}${p.shiny?' '+selo('shiny'):''} — Lv.${p.level}</span>
               ${golpesDoTimeHtml(p)}
             </div>
             <div class="order-controls">
@@ -24029,12 +24796,12 @@ function renderTrainerTower(){
   const escolhendo = run && !run.cleared && (!run.team || !!game.towerTrocandoTime);
 
   if(game.towerLoading && !t){
-    return `<div class="eyebrow">🗼 TORRE DOS TREINADORES</div>
+    return `<div class="eyebrow">${selo('torre')} TORRE DOS TREINADORES</div>
       <div class="box"><p class="loading-text">Subindo as escadas...</p></div>
 `;
   }
   if(!t){
-    return `<div class="eyebrow">🗼 TORRE DOS TREINADORES</div>
+    return `<div class="eyebrow">${selo('torre')} TORRE DOS TREINADORES</div>
       <div class="box"><p class="error-text">${escapeHtmlSafe(game.towerError||'Torre indisponível.')}</p></div>
 `;
   }
@@ -24156,7 +24923,7 @@ function renderTrainerTower(){
   </div>` : '';
 
   return `
-  <div class="eyebrow">🗼 TORRE DOS TREINADORES</div>
+  <div class="eyebrow">${selo('torre')} TORRE DOS TREINADORES</div>
   ${candyHtml}
   <div class="box tower-intro">
     <p>Um treinador por andar, e eles trocam <strong>todo dia</strong>.</p>
@@ -24197,7 +24964,7 @@ function renderTowerRankingModal(){
      🍬 fala no passado. A mesma marca com o texto de hoje anunciaria um prêmio que já saiu. */
   const lista = (linhas, valorDe, sufixo, comPodio) => {
     const degraus = comPodio ? degrausDe(linhas) : [];
-    const medalha = (andar) => ['🥇','🥈','🥉'][degraus.indexOf(andar)] || '';
+    const medalha = (andar) => [selo('ouro'),selo('prata'),selo('bronze')][degraus.indexOf(andar)] || '';
     const titulo = comPodio === 'passado' ? 'Ganhou um Doce Raro na virada do dia'
                                           : 'Ganha um Doce Raro na virada do dia';
     return `<div class="tower-rank-list">${(linhas||[]).map((x,i)=>{
@@ -24409,7 +25176,7 @@ function renderTrainerProfileModal(){
       ${lista.length ? `<div class="tp-gym-list">${lista.map(g=>`
         <div class="tp-gym-row">
           <span class="tp-gym-city">${escapeHtmlSafe(g.city)}</span>
-          ${g.current ? `<span class="tp-gym-now">👑 lidera hoje</span>` : `<span class="tp-gym-past">já liderou</span>`}
+          ${g.current ? `<span class="tp-gym-now">${selo('coroa')} lidera hoje</span>` : `<span class="tp-gym-past">já liderou</span>`}
         </div>`).join('')}</div>`
       : `<p class="tp-empty">Esse treinador nunca liderou um ginásio.</p>`}`;
     return `
@@ -24505,7 +25272,7 @@ function renderLeaveNeighborhoodGymModal(){
   return `
   <div class="modal-overlay">
     <div class="modal-box">
-      <div class="modal-icon">🚪</div>
+      <div class="modal-icon">${selo('porta')}</div>
       <h2>Sair da liderança?</h2>
       <p>Tem certeza que quer abandonar a liderança desse ginásio? Ele fica <strong>vago</strong> pra qualquer um reivindicar, e sua sequência de vitórias e dias como líder atuais${detail?` (${detail.defenseCount||0} vitórias, ${detail.daysAsLeader||0} dias)`:''} deixam de contar a partir de agora -- mas seu recorde histórico no ranking continua registrado.</p>
       <button class="btn danger" onclick="confirmLeaveNeighborhoodGymLeadership()">Sim, sair</button>
@@ -24792,11 +25559,11 @@ async function lutarSundayBoss(slot){
 }
 function renderSundayBoss(){
   if(game.bossLoading && !game.bossState){
-    return `<div class="eyebrow">✨ BOSS DE DOMINGO</div>
+    return `<div class="eyebrow">${selo('brilho')} BOSS DE DOMINGO</div>
       <div class="box cursor"><p>Procurando o Mew...</p></div>`;
   }
   if(game.bossError && !game.bossState){
-    return `<div class="eyebrow">✨ BOSS DE DOMINGO</div>
+    return `<div class="eyebrow">${selo('brilho')} BOSS DE DOMINGO</div>
       <div class="box cursor"><p class="lose-text">${escapeHtmlSafe(game.bossError)}</p></div>
       <button class="btn" onclick="sairDoBoss()">⬅ Voltar</button>`;
   }
@@ -24807,7 +25574,7 @@ function renderSundayBoss(){
   const pct = (b.hp / b.maxHp) * 100;
   const ultimo = game.bossUltimo;
   return `
-  <div class="eyebrow">✨ BOSS DE DOMINGO</div>
+  <div class="eyebrow">${selo('brilho')} BOSS DE DOMINGO</div>
   <div class="box cursor" style="text-align:center;">
     ${spriteHtml('mew','sprite-lg')}
     <h2>Mew <span class="fighter-level">Lv.${b.level}</span></h2>
@@ -24830,7 +25597,7 @@ function renderSundayBoss(){
   ${caiu || game.bossEscolhendoTime ? '' : `
   <button class="btn danger" ${game.bossLoading?'disabled':''} onclick="abrirEscolhaDeTimeDoBoss()">⚔️ Atacar Mew</button>`}
   ${caiu || !game.bossEscolhendoTime ? '' : `
-  <div class="home-section-row"><span class="home-section-label">💾 ESCOLHA O TIME</span></div>
+  <div class="home-section-row"><span class="home-section-label">${selo('disco')} ESCOLHA O TIME</span></div>
   ${(st.times||[]).length ? (st.times||[]).map(t=>{
     // MESMO card da home, de propósito: mesma estrela de média, mesmo nome, mesmas sprites.
     // O jogador reconhece o time pela cara dele -- inventar uma variação aqui só obrigaria a
@@ -24934,7 +25701,7 @@ const ITENS = {
      dos cupons MAIS o estoque comprado -- em vez de derivar tudo do inventario. */
   doce_raro: {
     nome: 'Doce Raro',
-    icone: '🍬',
+    icone: selo('doce'),
     comprável: true, preco: 300,
     descricao: 'Sobe 1 nível de um pokémon seu, na hora. Vale acima do teto de distribuição da jornada — é a única coisa, junto do desmaio e do Bônus de Kanto, que passa do nível 55.',
     comoGanhar: 'Chegando mais longe que todo mundo na Torre dos Treinadores no dia, ou na loja.'
@@ -24950,7 +25717,7 @@ const ITENS = {
      seria tirar o que já foi comprado. */
   bonus_shiny: {
     nome: 'Bônus Shiny',
-    icone: '✨',
+    icone: selo('brilho'),
     descricao: '1 hora de chance bem maior de encontrar shiny nos encontros selvagens. O contador aparece na home enquanto estiver valendo. Ativando um com outro já valendo, o tempo SOMA.',
     comoGanhar: 'Vencendo a Elite dos 4 ou uma liga online.'
   },
@@ -24962,19 +25729,19 @@ const ITENS = {
      de ordem de batalha. O item é de quem carrega, não da conta -- foi assim que a mecânica virou
      escolha ("quem eu protejo do sono?") em vez de um interruptor ligado no lado de fora. */
   awakening: {
-    nome: 'Despertar', icone: '⏰', comprável: true, equipável: true, preco: 50,
+    nome: 'Despertar', icone: selo('despertador'), comprável: true, equipável: true, preco: 50,
     resumo: 'Anula o sono do adversário neste pokémon.',
     descricao: 'Equipe num pokémon. Quando o adversário tentar fazer ele dormir, o sono falha e a luta segue normal. Os SEUS pokémon continuam podendo fazer o adversário dormir. O item some depois de trabalhar.',
     comoGanhar: 'Na loja. Equipa-se pelo + da tela de ordem de batalha.'
   },
   hyperpotion: {
-    nome: 'Super Poção', icone: '🧪', comprável: true, equipável: true, preco: 50,
+    nome: 'Super Poção', icone: selo('pocao', '', '#3a86d8'), comprável: true, equipável: true, preco: 50,
     resumo: 'Cura 80% quando ele entra com 25% ou menos.',
     descricao: 'Equipe num pokémon. Quando ele for começar um confronto com 25% ou menos de HP, recupera 80% da vida ANTES de a luta começar — a mesma hora em que o Recuperar acontece. O item some depois de trabalhar.',
     comoGanhar: 'Na loja. Equipa-se pelo + da tela de ordem de batalha.'
   },
   potion: {
-    nome: 'Poção', icone: '💊', comprável: true, equipável: true, preco: 30,
+    nome: 'Poção', icone: selo('pocao', '', '#e8607a'), comprável: true, equipável: true, preco: 30,
     resumo: 'Cura 55% quando ele entra com 25% ou menos.',
     descricao: 'Equipe num pokémon. Quando ele for começar um confronto com 25% ou menos de HP, recupera 55% da vida ANTES de a luta começar — a mesma hora em que o Recuperar acontece. O item some depois de trabalhar.',
     comoGanhar: 'Na loja. Equipa-se pelo + da tela de ordem de batalha.'
@@ -24986,31 +25753,31 @@ const ITENS = {
      Continuam presos à regra de UM ITEM POR POKÉMON, então não dá pra empilhar Atk Up com Def Up
      nem com uma poção: escolher qual é a graça. Tirar o item devolve ele pra mochila. */
   hp_up: {
-    nome: 'HP Up', icone: '❤️', comprável: true, equipável: true, preco: 30,
+    nome: 'HP Up', icone: selo('coracao'), comprável: true, equipável: true, preco: 30,
     resumo: '+15 de HP pela batalha inteira.',
     descricao: 'Equipe num pokémon: ele luta a batalha inteira com +15 de HP. O item some no fim da batalha, se ele tiver entrado — quem fica no banco continua com o dele. Mais vida também significa tomar uma fração menor da barra por golpe.',
     comoGanhar: 'Na loja. Equipa-se pelo + da tela de ordem de batalha.'
   },
   atk_up: {
-    nome: 'Atk Up', icone: '⚔️', comprável: true, equipável: true, preco: 30,
+    nome: 'Atk Up', icone: selo('espada'), comprável: true, equipável: true, preco: 30,
     resumo: '+15 de Ataque pela batalha inteira.',
     descricao: 'Equipe num pokémon: ele luta a batalha inteira com +15 de Ataque. O item some no fim da batalha, se ele tiver entrado — quem fica no banco continua com o dele.',
     comoGanhar: 'Na loja. Equipa-se pelo + da tela de ordem de batalha.'
   },
   def_up: {
-    nome: 'Def Up', icone: '🛡️', comprável: true, equipável: true, preco: 30,
+    nome: 'Def Up', icone: selo('escudo'), comprável: true, equipável: true, preco: 30,
     resumo: '+15 de Defesa pela batalha inteira.',
     descricao: 'Equipe num pokémon: ele luta a batalha inteira com +15 de Defesa. O item some no fim da batalha, se ele tiver entrado — quem fica no banco continua com o dele.',
     comoGanhar: 'Na loja. Equipa-se pelo + da tela de ordem de batalha.'
   },
   spatk_up: {
-    nome: 'Atk Special Up', icone: '🔮', comprável: true, equipável: true, preco: 30,
+    nome: 'Atk Special Up', icone: selo('orbe'), comprável: true, equipável: true, preco: 30,
     resumo: '+15 de Atk Especial pela batalha inteira.',
     descricao: 'Equipe num pokémon: ele luta a batalha inteira com +15 de Ataque Especial. O item some no fim da batalha, se ele tiver entrado — quem fica no banco continua com o dele.',
     comoGanhar: 'Na loja. Equipa-se pelo + da tela de ordem de batalha.'
   },
   spdef_up: {
-    nome: 'Def Special Up', icone: '✴️', comprável: true, equipável: true, preco: 30,
+    nome: 'Def Special Up', icone: selo('barreira'), comprável: true, equipável: true, preco: 30,
     resumo: '+15 de Def Especial pela batalha inteira.',
     descricao: 'Equipe num pokémon: ele luta a batalha inteira com +15 de Defesa Especial. O item some no fim da batalha, se ele tiver entrado — quem fica no banco continua com o dele.',
     comoGanhar: 'Na loja. Equipa-se pelo + da tela de ordem de batalha.'
@@ -25018,7 +25785,7 @@ const ITENS = {
   /* A FAIXA DE FOCO é o único item que age NO MEIO da luta -- os outros todos são abertura (poção,
      despertar) ou um número somado antes dela (os cinco de atributo). Por isso ela é a mais cara. */
   faixa_foco: {
-    nome: 'Faixa de Foco', icone: '🎗️', comprável: true, equipável: true, preco: 50,
+    nome: 'Faixa de Foco', icone: selo('faixa'), comprável: true, equipável: true, preco: 50,
     resumo: 'Segura um golpe fatal com 1 de HP.',
     descricao: 'Equipe num pokémon. Quando um golpe fosse derrubá-lo, ele fica com 1 de HP, revida e a luta continua. Vale uma vez: o próximo golpe fatal leva ele. O item some depois de segurar.',
     comoGanhar: 'Na loja. Equipa-se pelo + da tela de ordem de batalha.'
@@ -25038,7 +25805,7 @@ Object.keys(TMS).forEach(id => {
   const ficha = GOLPES[tm.golpe] || ['Normal', 0];
   ITENS[id] = {
     nome: id.toUpperCase() + ' — ' + nomeDoAtaque(tm.golpe),
-    icone: '💿',
+    icone: selo('tm', '', TYPE_COLORS[ficha[0]] || '#888'),
     comprável: true, preco: tm.preco, tm: true,
     resumo: 'Ensina ' + nomeDoAtaque(tm.golpe) + '. Uso único.',
     /* ⚠️ A DESCRIÇÃO NÃO REPETE O TIPO NEM O PODER: o CARTÃO logo abaixo já traz os dois, e com a
@@ -25406,6 +26173,7 @@ function pilhasDaPrateleira(aba){
 function escolherPrateleiraDaMochila(p){
   game.inventarioAba = p;
   game.inventarioErro = null;
+  zerarRolagemDaLista('loja-lista');   /* a mochila usa a MESMA lista da loja -- ver a nota lá */
   const dela = pilhasDaPrateleira(p);
   if(!dela.some(x => x.item === game.inventarioSel)) game.inventarioSel = dela.length ? dela[0].item : null;
   render();
@@ -25542,7 +26310,7 @@ function renderInventario(){
            de graça um achado que a jornada devia entregar). Aqui é o contrário: a linha existe
            justamente pra dizer que o HM EXISTE, e sem o caminho ela seria uma promessa muda. */
         (ehHm && sel.falta)
-          ? `<p class="hint-text">🔒 <strong>Como conseguir:</strong> ${escapeHtmlSafe(it.comoGanhar)}</p>`
+          ? `<p class="hint-text">${selo('cadeado')} <strong>Como conseguir:</strong> ${escapeHtmlSafe(it.comoGanhar)}</p>`
           : ""}
       ${/* ⚠️ O CARTÃO DO GOLPE QUE A MÁQUINA ENSINA (16/09/2026, a pedido). É o MESMO `cartaoDeGolpe`
            das três telas de golpe e da tela de ensinar -- e ser o mesmo é o ponto: o jogador
@@ -25560,20 +26328,21 @@ function renderInventario(){
       <div class="item-acoes loja-acoes">
         ${(ehHm || (it && it.tm))
           /* ⚠️ TM E HM NÃO SE USAM: eles ENSINAM. O HM ensina quantas vezes quiser; o TM ensina UMA
-             (ele some depois), e o botão diz isso -- é a única coisa que separa os dois aqui.
+             vez, e o "(some depois)" saiu do botão a pedido (17/09/2026) -- quem avisa é o asterisco
+             do cartão, logo acima, que é onde o resto das regras do golpe já está.
              O TM mantém o Excluir porque ele é um item comum que ocupa espaço; o HM não tem o que
              excluir, ele é da conta.
              ⚠️ E O HM QUE VOCÊ AINDA NÃO TEM mostra o botão DESABILITADO: sumir com ele faria a
              linha não explicar o que ela é. Quem conta o caminho é o miolo, logo acima. */
-          ? `<button class="btn success" ${sel.falta?'disabled':''} onclick="abrirEnsinarHm('${escJs(sel.item)}')">📀 Ensinar${it && it.tm ? ' (some depois)' : ''}</button>
-             ${it && it.tm ? `<button class="btn secondary" onclick="abrirAptosDaMaquina('${escJs(sel.item)}')">👥 Quem pode aprender</button>` : ''}`
+          ? `<button class="btn success" ${sel.falta?'disabled':''} onclick="abrirEnsinarHm('${escJs(sel.item)}')">📀 Ensinar</button>
+             ${it && it.tm ? `<button class="btn secondary" onclick="abrirAptosDaMaquina('${escJs(sel.item)}')">${selo('amigos')} Quem pode aprender</button>` : ''}`
           : `${it.equipável ? '' : `<button class="btn success" ${podeUsar?'':'disabled'} onclick="usarItem('${escJs(sel.item)}')">${game.inventarioUsando ? 'Usando...' : '✔ Usar'}</button>`}
              <button class="btn danger" ${podeExcluir(sel.item) && !game.inventarioUsando ?'':'disabled'}
                onclick="pedirExclusaoDeItem('${escJs(sel.item)}')">🗑️ Excluir</button>`}
       </div>
     </div>` : '';
   return `
-  <div class="eyebrow">🎒 MOCHILA</div>
+  <div class="eyebrow">${selo('mochila')} MOCHILA</div>
   <div class="box item-detalhe loja-fixa">${detalhe}</div>
   <div class="loja-corpo">
     <div class="loja-abas">
@@ -25597,7 +26366,7 @@ function renderInventario(){
           onclick="escolherItem('${escJs(p.item)}')">
           <span class="loja-icone">${i2.icone}</span>
           <span class="loja-nome">${escapeHtmlSafe(i2.nome)}</span>
-          <span class="loja-preco">${p.falta ? '🔒' : (p.hm ? '' : (p.quantidade > 1 ? p.quantidade + 'x' : ''))}</span>
+          <span class="loja-preco">${p.falta ? selo('cadeado') : (p.hm ? '' : (p.quantidade > 1 ? p.quantidade + 'x' : ''))}</span>
         </button>`; }).join('')
       /* ⚠️ A FRASE DA PRATELEIRA VAZIA É CURTA, e a das Máquinas é *"Nenhum TM/HM"* ao pé da letra.
          Ela já foi *"Nenhuma Máquina ainda"* mais um parágrafo dizendo COMO ganhar o HM01 (o S.S.
@@ -25987,8 +26756,8 @@ function renderExcluirItemModal(){
    As TMs ficam VAZIAS de proposito -- a prateleira existe antes do que vai nela, que e o mesmo
    desenho do HM01 (primeiro a porta, depois o que tem atras). */
 const LOJA_PRATELEIRAS = [
-  { id:'batalha',   nome:'Para as batalhas', icone:'⚔️' },
-  { id:'especiais', nome:'Especiais',        icone:'✨' },
+  { id:'batalha',   nome:'Para as batalhas', icone:selo('espada') },
+  { id:'especiais', nome:'Especiais',        icone:selo('brilho') },
   /* ⚠️ O ROTULO DEPENDE DA TELA desde 17/09/2026 (a pedido: *"mude o texto na loja do botao
      TMs/HMs, para TMs"*), e a razao e que as duas telas mostram coisas diferentes na MESMA
      prateleira: a LOJA vende TM e so TM (HM ninguem compra, ele vem da jornada), e a MOCHILA tem
@@ -25996,7 +26765,7 @@ const LOJA_PRATELEIRAS = [
      A LISTA continua sendo UMA -- o que varia e a palavra, e e por isso que ela e um campo e nao
      uma segunda tabela: duas listas divergiriam no proximo item, que e a licao das tres telas de
      golpe. */
-  { id:'tms',       nome:'TMs/HMs',          nomeLoja:'TMs', icone:'💿' }
+  { id:'tms',       nome:'TMs/HMs',          nomeLoja:'TMs', icone:selo('tm', '', '#8b95a8') }
 ];
 function prateleiraDoItem(id){
   const it = ITENS[id] || {};
@@ -26017,9 +26786,18 @@ function openLoja(){
 /* TROCAR DE PRATELEIRA MOVE A SELECAO JUNTO. Sem isso o quadro de cima continuava mostrando um
    item que a lista ao lado nem lista mais -- e na prateleira vazia ele mostraria o item da
    anterior, com botao de comprar e tudo. */
+/* ⚠️ A LISTA VOLTA AO TOPO ao trocar de prateleira (18/09/2026): a preservação de rolagem do
+   `render` mantém a lista onde estava quando é a mesma tela, e aqui a lista é OUTRA -- o jogador
+   cairia no meio de uma que ele nunca rolou. Marcar é mais simples que zerar depois: o render
+   repõe pelo que foi GUARDADO, e o que não for guardado nasce no topo. */
+function zerarRolagemDaLista(classe){
+  const el = document.querySelector('.' + classe);
+  if(el) el.scrollTop = 0;
+}
 function escolherPrateleira(p){
   game.lojaAba = p;
   game.lojaErro = null;
+  zerarRolagemDaLista('loja-lista');
   const dela = itensDaPrateleira(p);
   if(dela.indexOf(game.lojaSel) < 0) game.lojaSel = dela[0] || null;
   render();
@@ -26130,15 +26908,15 @@ function renderCompraModal(){
       <div class="modal-icon">${it.icone}</div>
       <h2>${escapeHtmlSafe(it.nome)}</h2>
       <p class="hint-text">${vendendo
-        ? `🪙 ${unidade} cada (metade do preço). Você tem <strong>${max}</strong> pra vender.`
-        : `🪙 ${unidade} cada. Você tem 🪙 ${game.moedas||0} — dá pra levar até <strong>${max}</strong>.`}</p>
+        ? `${selo('moeda')} ${unidade} cada (metade do preço). Você tem <strong>${max}</strong> pra vender.`
+        : `${selo('moeda')} ${unidade} cada. Você tem ${selo('moeda')} ${game.moedas||0} — dá pra levar até <strong>${max}</strong>.`}</p>
       <div class="compra-stepper">
         <button class="circle-btn" ${qtd<=1||ocupado?'disabled':''} onclick="mudarQtdCompra(-1)">−</button>
         <span class="compra-qtd">${qtd}</span>
         <button class="circle-btn" ${qtd>=max||ocupado?'disabled':''} onclick="mudarQtdCompra(1)">+</button>
         <button class="btn secondary compra-max" ${qtd>=max||ocupado?'disabled':''} onclick="qtdCompraMax()">Máx</button>
       </div>
-      <p class="compra-total">${vendendo ? 'Você recebe' : 'Total'}: <strong>🪙 ${total}</strong></p>
+      <p class="compra-total">${vendendo ? 'Você recebe' : 'Total'}: <strong>${selo('moeda')} ${total}</strong></p>
       ${game.lojaErro ? `<p class="error-text">${escapeHtmlSafe(game.lojaErro)}</p>` : ''}
       ${vendendo
         ? `<button class="btn danger" ${ocupado?'disabled':''} onclick="venderItem('${escJs(id)}')">
@@ -26183,7 +26961,7 @@ function renderLoja(){
      o `quantoTenho`: cupom de Bônus Shiny conta pra USAR e não pra vender. */
   const vendaveis = sel ? quantoPossoVender(sel.item) : 0;
   return `
-  <div class="eyebrow">🛒 LOJA</div>
+  <div class="eyebrow">${selo('loja')} LOJA</div>
   <!-- O QUADRO DE CIMA É FIXO (position:sticky): só a lista rola. Com 11 itens a lista passa da
        tela a 320px, e sem isto o jogador rolava até o item, clicava, e tinha que voltar pra cima
        pra ler o que ele faz e comprar -- duas viagens pra uma decisão. -->
@@ -26200,7 +26978,7 @@ function renderLoja(){
         <span class="item-detalhe-icone">${it.icone}</span>
         <div class="item-detalhe-nome">
           <strong>${escapeHtmlSafe(it.nome)}</strong>
-          <span class="item-detalhe-qtd">🪙 ${it.preco}</span>
+          <span class="item-detalhe-qtd">${selo('moeda')} ${it.preco}</span>
         </div>
       </div>
       <div class="loja-miolo">
@@ -26219,8 +26997,8 @@ function renderLoja(){
         ${game.lojaErro ? `<p class="error-text">${escapeHtmlSafe(game.lojaErro)}</p>` : ''}
       </div>
       <div class="loja-rodape">
-      ${(game.moedas||0) < it.preco ? `<p class="hint-text">Faltam 🪙 ${it.preco - (game.moedas||0)} pra comprar um.</p>` : ''}
-      <p class="loja-saldo">Você tem <strong>🪙 ${moedas}</strong>.</p>
+      ${(game.moedas||0) < it.preco ? `<p class="hint-text">Faltam ${selo('moeda')} ${it.preco - (game.moedas||0)} pra comprar um.</p>` : ''}
+      <p class="loja-saldo">Você tem <strong>${selo('moeda')} ${moedas}</strong>.</p>
       ${/* o QUEM PODE APRENDER fica no RODAPE, e nao no miolo: ele e uma ACAO (como o Comprar e o
            Vender), e o miolo ROLA por dentro -- medido a 320px, com o cartao do golpe ali o botao
            ficava fora da area visivel, ou seja uma acao que o jogador nao ve. O rodape nao rola.
@@ -26228,10 +27006,10 @@ function renderLoja(){
            nenhum pokemon seu aprende e dinheiro fora.
            ⚠️ E EM LINHA PROPRIA, fora do par Comprar/Vender: com os tres dividindo a mesma linha
            cada um fica com 76px a 320px, e "Vender por 100" nao cabe nisso. */''}
-      ${it.tm ? `<div class="item-acoes loja-acao-larga"><button class="btn secondary" onclick="abrirAptosDaMaquina('${escJs(sel.item)}')">👥 Quem pode aprender</button></div>` : ''}
+      ${it.tm ? `<div class="item-acoes loja-acao-larga"><button class="btn secondary" onclick="abrirAptosDaMaquina('${escJs(sel.item)}')">${selo('amigos')} Quem pode aprender</button></div>` : ''}
       <div class="item-acoes loja-acoes">
         <button class="btn success" ${(game.moedas||0) < it.preco || game.comprando ? 'disabled' : ''}
-          onclick="abrirCompra('${escJs(sel.item)}')">${game.comprando ? 'Comprando...' : '🪙 Comprar'}</button>
+          onclick="abrirCompra('${escJs(sel.item)}')">${game.comprando ? 'Comprando...' : selo('moeda') + ' Comprar'}</button>
         <!-- ATENCAO: este comentario vive DENTRO de um template literal, entao ele nao pode ter
              crase nenhuma -- elas fecham a string e o arquivo inteiro para de compilar.
              O VENDER ESTA SEMPRE NA TELA, e DESABILITADO quando nao ha o que vender (13/09/2026, a
@@ -26246,7 +27024,7 @@ function renderLoja(){
              aparece na mochila e nao se vende. Ver a nota da funcao. -->
         <button class="btn danger" ${(vendaveis > 0 && !game.comprando) ? '' : 'disabled'}
           onclick="abrirVenda('${escJs(sel.item)}')">${vendaveis > 0
-            ? `🪙 Vender por ${precoDeVenda(sel.item)}` : 'Você não tem pra vender'}</button>
+            ? `${selo('moeda')} Vender por ${precoDeVenda(sel.item)}` : 'Você não tem pra vender'}</button>
       </div>
       </div>`
     : ''}
@@ -26271,10 +27049,10 @@ function renderLoja(){
           onclick="escolherItemDaLoja('${escJs(p.item)}')">
           <span class="loja-icone">${i.icone}</span>
           <span class="loja-nome">${escapeHtmlSafe(i.nome)}</span>
-          <span class="loja-preco">🪙 ${i.preco}</span>
+          <span class="loja-preco">${selo('moeda')} ${i.preco}</span>
         </button>`; }).join('')
       : `<p class="loja-vazia">Ainda não há ${escapeHtmlSafe((LOJA_PRATELEIRAS.find(x => x.id === aba) || {}).nome || 'itens')} à venda.</p>
-         <p class="loja-saldo">Você tem <strong>🪙 ${moedas}</strong>.</p>`}
+         <p class="loja-saldo">Você tem <strong>${selo('moeda')} ${moedas}</strong>.</p>`}
     </div>
   </div>
   <button class="btn secondary u-mt8" onclick="openSaveSelect()">⬅ Voltar</button>`;
@@ -26439,7 +27217,7 @@ function montadorDeTimeHtml(escolhidos, nomeDoToggle, max, esperas){
         <span class="mont-num">${sel ? (posicao+1)+'º' : ''}</span>
         ${sp?spriteHtml(p,'sprite-sm'):'❔'}
         <span class="mont-info">
-          <span class="mont-nome">${escapeHtmlSafe(sp?sp.name:'?')}${p.shiny?' 🌟':''} <span class="mont-lv">— ${falta>0 ? '⏳'+Math.ceil(falta/60000)+'min' : 'Lv.'+p.level}</span></span>
+          <span class="mont-nome">${escapeHtmlSafe(sp?sp.name:'?')}${p.shiny?' '+selo('shiny'):''} <span class="mont-lv">— ${falta>0 ? '⏳'+Math.ceil(falta/60000)+'min' : 'Lv.'+p.level}</span></span>
           <span class="mont-sub">${sp?typesHtml(sp.types):''}<span class="mont-time">${escapeHtmlSafe(p.teamName)}</span></span>
         </span>
       </button>
@@ -27616,12 +28394,12 @@ function renderOnlineBattle(){
   </div>` : `<div class="box u-center">${game.onlineHistoricoErro
     ? `<p class="loading-text">Não deu pra carregar seu histórico.</p>
        <p class="hint-text">${escapeHtmlSafe(game.onlineHistoricoErro)}</p>
-       <button class="btn secondary" onclick="carregarHistoricoOnline()">🔄 Tentar de novo</button>`
+       <button class="btn secondary" onclick="carregarHistoricoOnline()">${selo('recarregar')} Tentar de novo</button>`
     : `<p class="loading-text">Carregando seu histórico...</p>`}</div>`}
 
   <div class="online-acoes">
     <button class="btn success" ${elegiveis.length?'':'disabled'} onclick="startOnlineSearch()">🔎 Buscar oponente</button>
-    <button class="btn primary" ${elegiveis.length?'':'disabled'} onclick="entrarNoLobby()">🏟️ Lobby de batalha</button>
+    <button class="btn primary" ${elegiveis.length?'':'disabled'} onclick="entrarNoLobby()">${selo('estadio')} Lobby de batalha</button>
   </div>
   <p class="hint-text online-acoes-sub">Buscar sorteia qualquer treinador da fila. No lobby você escolhe contra quem lutar. O time vem depois, com os dois conectados.</p>
   ${elegiveis.length === 0 ? `<div class="box"><p class="error-text">Você ainda não tem nenhum time com as 8 insígnias.</p></div>` : ''}
@@ -27759,7 +28537,7 @@ function renderOnlineCountdown(st){
     </div>
     <div class="battle-vs">
       ${fighterOnlineHtml(meu,'eu')}
-      <span class="vs-swords">⚔️</span>
+      <span class="vs-swords">${selo('vs', 'selo-g')}</span>
       ${fighterOnlineHtml(dele,'ele')}
     </div>
     <div class="online-countdown">${seg > 0 ? seg : 'COMEÇAR!'}</div>
@@ -27872,9 +28650,9 @@ function renderOnlineFight(){
     </div>
     <div class="battle-vs">
       ${ocultarLutadores
-        ? `${fighterOcultoHtml()}<span class="vs-swords">⚔️</span>${fighterOcultoHtml()}`
+        ? `${fighterOcultoHtml()}<span class="vs-swords">${selo('vs', 'selo-g')}</span>${fighterOcultoHtml()}`
         : `${meuCaiu ? fighterOcultoHtml() : fighterOnlineHtml(meu,'eu', anim ? anim.meuHp : undefined, st.eu.especialidades, anim && selosDoConfronto(anim.mVirado, 'p', anim.passo))}
-           <span class="vs-swords">⚔️</span>
+           <span class="vs-swords">${selo('vs', 'selo-g')}</span>
            ${deleCaiu ? fighterOcultoHtml() : fighterOnlineHtml(dele,'ele', anim ? anim.deleHp : undefined, st.oponente.especialidades, anim && selosDoConfronto(anim.mVirado, 'e', anim.passo))}`}
     </div>
     ${anim
@@ -27932,7 +28710,7 @@ function painelTimesHtml(st, anim, precisaEscolher, restam, padraoOnline){
       title="${escapeHtmlSafe(sp?sp.name:'?')} — ${p.hp}/${p.maxHp} HP">
       ${escolhido?'<span class="online-pick-check">✓</span>':''}
       ${sp?spriteHtml(p,'sprite-md'):'❔'}
-      <span class="online-pick-nome">${escapeHtmlSafe(sp?sp.name:'?')}${p.shiny?' 🌟':''}</span>
+      <span class="online-pick-nome">${escapeHtmlSafe(sp?sp.name:'?')}${p.shiny?' '+selo('shiny'):''}</span>
       <span class="online-pick-lvl">Lv.${p.level}</span>
       <span class="online-pick-hp"><span class="hp-bar-fill ${hpBarClass(pct)}" id="online-pickhp-${i}" style="transform:scaleX(${pct/100})"></span></span>
       <span class="tower-pick-lv" id="online-picklv-${i}">${morto?'✖ caiu':hpMostrado+'/'+p.maxHp}</span>
@@ -27945,7 +28723,7 @@ function painelTimesHtml(st, anim, precisaEscolher, restam, padraoOnline){
     const sp = SPECIES[p.speciesId];
     return `<div class="tower-pick online-pick sem-clique ${morto?'off':''}" title="${escapeHtmlSafe(sp?sp.name:'?')} — Lv.${p.level}">
       ${sp?spriteHtml(p,'sprite-md'):'❔'}
-      <span class="online-pick-nome">${escapeHtmlSafe(sp?sp.name:'?')}${p.shiny?' 🌟':''}</span>
+      <span class="online-pick-nome">${escapeHtmlSafe(sp?sp.name:'?')}${p.shiny?' '+selo('shiny'):''}</span>
       <span class="online-pick-lvl">Lv.${p.level}</span>
       <span class="tower-pick-lv">${morto?'✖ caiu':'&nbsp;'}</span>
     </div>`;
@@ -28344,7 +29122,7 @@ function friendRivalryHtml(r){
 }
 function renderFriendsScreen(){
   const d = game.friendsData;
-  let out = `<div class="result-banner win">👥 Amigos</div>`;
+  let out = `<div class="result-banner win">${selo('amigos')} Amigos</div>`;
   if(game.friendsError){ out += `<div class="box"><p class="error-text">⚠️ ${escapeHtmlSafe(game.friendsError)}</p></div>`; }
 
   // 1) desafio em aberto -- sempre no topo, é o único bloco com prazo correndo
@@ -28605,10 +29383,10 @@ function renderSaveSelect(){
   <div class="home-header-row">
     <button class="box trainer-name-box" onclick="openMyTrainerProfile()" aria-label="Ver meu perfil de treinador">
       <span class="trainer-name-value">${escapeHtmlSafe(game.trainerName||'')}</span>
-      <span class="moeda-conta" title="Suas moedas">🪙 ${game.moedas||0}</span>
+      <span class="moeda-conta" title="Suas moedas">${selo('moeda')} ${game.moedas||0}</span>
     </button>
     <button class="notif-bell-btn" onclick="openNotificationsScreen()" aria-label="Notificações">
-      🔔${(game.notificationsUnreadCount||0)>0 ? `<span class="notif-badge">${game.notificationsUnreadCount>9?'9+':game.notificationsUnreadCount}</span>` : ''}
+      ${selo('sino', 'selo-menu')}${(game.notificationsUnreadCount||0)>0 ? `<span class="notif-badge">${game.notificationsUnreadCount>9?'9+':game.notificationsUnreadCount}</span>` : ''}
     </button>
   </div>
   <div class="home-menu-row">
@@ -28627,15 +29405,15 @@ function renderSaveSelect(){
       ${achievementsTeaser ? `<span class="home-menu-stat">${achievementsTeaser}</span>` : ''}
     </button>
     <button class="home-menu-card friends" onclick="openFriends()">
-      <span class="home-menu-icon">👥${(game.friendRequestCount||0)>0 ? `<span class="notif-badge">${game.friendRequestCount>9?'9+':game.friendRequestCount}</span>` : ''}</span>
+      <span class="home-menu-icon">${selo('amigos', 'selo-menu')}${(game.friendRequestCount||0)>0 ? `<span class="notif-badge">${game.friendRequestCount>9?'9+':game.friendRequestCount}</span>` : ''}</span>
       <span class="home-menu-title">Amigos</span>
     </button>
     <button class="home-menu-card inventario" onclick="openInventario()">
-      <span class="home-menu-icon">🎒</span>
+      <span class="home-menu-icon">${selo('mochila', 'selo-menu')}</span>
       <span class="home-menu-title">Mochila</span>
     </button>
     <button class="home-menu-card loja" onclick="openLoja()">
-      <span class="home-menu-icon">🛒</span>
+      <span class="home-menu-icon">${selo('loja', 'selo-menu')}</span>
       <span class="home-menu-title">Loja</span>
     </button>
   </div>
@@ -28659,7 +29437,7 @@ function renderSaveSelect(){
       <span class="home-mode-icon">✨</span><span>Boss de Domingo</span></button>` : ''}
   </div>
   <div class="home-section-row">
-    <span class="home-section-label">💾 SEUS TIMES</span>
+    <span class="home-section-label">${selo('disco')} SEUS TIMES</span>
     ${shinyBonusCounterHtml()}
   </div>
   ${Array.from({length:MAX_SAVE_SLOTS}, (_, i) => i).map(slot=>{
@@ -28667,7 +29445,7 @@ function renderSaveSelect(){
     if(!s){
       return `<button class="save-slot-card empty" onclick="startNewSave(${slot})">
         <span class="save-slot-empty-text">Slot ${slot+1} — vazio</span>
-        <span class="save-slot-add">➕ Novo Jogo</span>
+        <span class="save-slot-add">${selo('mais')} Novo Jogo</span>
       </button>`;
     }
     // a contagem de insígnias não é mais lida aqui: quem interpreta o estado do save é o
@@ -28717,7 +29495,7 @@ function renderSaveSelect(){
     </div>`;
   }).join('')}
   <div class="home-nav-row">
-    <button class="home-nav-btn" onclick="logout()">🚪 Logout</button>
+    <button class="home-nav-btn" onclick="logout()">${selo('porta')} Logout</button>
     ${canShowInstallButton() ? `<button class="home-nav-btn install" onclick="promptInstallApp()">📲 Instalar app</button>` : ''}
   </div>`;
 }
@@ -29182,9 +29960,9 @@ function renderAchievements(){
        rolagem. -->
   <div class="box">
     ${aResgatar > 0
-      ? `<p class="hint-text">Você tem <strong>🪙 ${aResgatar}</strong> esperando — toque no valor de cada conquista pra pegar.</p>`
+      ? `<p class="hint-text">Você tem <strong>${selo('moeda')} ${aResgatar}</strong> esperando — toque no valor de cada conquista pra pegar.</p>`
       : `<p class="hint-text">Tudo resgatado. As próximas conquistas já caem com a moeda esperando aqui.</p>`}
-    ${ganhouAgora > 0 ? `<p class="success-text">✅ +🪙 ${ganhouAgora} resgatadas!</p>` : ''}
+    ${ganhouAgora > 0 ? `<p class="success-text">✅ +${selo('moeda')} ${ganhouAgora} resgatadas!</p>` : ''}
     ${game.conquistaResgateErro ? `<p class="error-text">${escapeHtmlSafe(game.conquistaResgateErro)}</p>` : ''}
   </div>
   <div class="box">
@@ -29203,14 +29981,14 @@ function renderAchievements(){
              TRANCADA  -> o selo do nível, sem clique -- ele diz por que vale a pena ir atrás,
                           que é a razão de o prêmio aparecer na trancada desde que o nível existe. */
         const premio = paga
-          ? `<span class="conquista-premio paga" title="Já resgatada">✓ 🪙 ${nivel.moedas}</span>`
+          ? `<span class="conquista-premio paga" title="Já resgatada">✓ ${selo('moeda')} ${nivel.moedas}</span>`
           : unlocked
           ? `<button class="conquista-premio pronta" ${game.resgatandoConquistas===ach.id?'disabled':''}
                      onclick="resgatarConquista('${escJs(ach.id)}')"
-                     title="Resgatar ${nivel.moedas} moedas">${game.resgatandoConquistas===ach.id ? '...' : `${nivel.selo} 🪙 ${nivel.moedas}`}</button>`
-          : `<span class="conquista-premio" title="${nivel.nome}">${nivel.selo} 🪙 ${nivel.moedas}</span>`;
+                     title="Resgatar ${nivel.moedas} moedas">${game.resgatandoConquistas===ach.id ? '...' : `${nivel.selo} ${selo('moeda')} ${nivel.moedas}`}</button>`
+          : `<span class="conquista-premio" title="${nivel.nome}">${nivel.selo} ${selo('moeda')} ${nivel.moedas}</span>`;
         return `<div class="status-row achievement-row ${unlocked?'':'locked'}">
-          <span class="icon">${unlocked ? ach.icon : '🔒'}</span>
+          <span class="icon">${unlocked ? ach.icon : selo('cadeado')}</span>
           <span class="achievement-text"><strong>${ach.name}</strong><br><span class="achievement-desc">${ach.desc}</span></span>
           ${premio}
         </div>`;
@@ -29232,12 +30010,42 @@ function renderNewSaveName(){
     ${game.rivalNameError ? `<p class="error-text">${game.rivalNameError}</p>` : ''}
     ${game.novoSaveErro ? `<p class="error-text">${escapeHtmlSafe(game.novoSaveErro)}</p>` : ''}
     ${game.pendingGameMode === 'hard'
-      ? `<p class="hint-text">💀 Modo difícil: <strong>🪙 ${MOEDA_MODO_DIFICIL}</strong> serão cobrados ao começar.</p>` : ''}
+      ? `<p class="hint-text">💀 Modo difícil: <strong>${selo('moeda')} ${MOEDA_MODO_DIFICIL}</strong> serão cobrados ao começar.</p>` : ''}
     <button class="btn success" ${game.criandoSave?'disabled':''} onclick="confirmNewSaveName()">${game.criandoSave?'Cobrando...':'Começar jornada ⚔️'}</button>
   </div>
   <button class="btn secondary" onclick="openSaveSelect()">⬅ Voltar</button>`;
 }
 
+/* ⚠️ A ROLAGEM DE DENTRO (18/09/2026) -- ver a chamada no fim do `render`.
+   Só olha quem ESTÁ rolado (`scrollTop > 0`): ler o `scrollTop` de um elemento força o layout uma
+   vez, e depois é barato, então varrer a tela inteira custa menos que manter uma lista de classes
+   que envelhece. Medido a 320px na loja: 0,2ms. */
+function chaveDaRolagem(el, vistos){
+  const cls = (el.className || '').toString().trim().replace(/\s+/g, '.');
+  if(!cls) return null;
+  vistos[cls] = (vistos[cls] || 0) + 1;
+  return cls + '#' + vistos[cls];
+}
+function guardarRolagens(raizEl){
+  const fora = {}, vistos = {};
+  raizEl.querySelectorAll('[class]').forEach(el => {
+    if(!el.scrollTop) return;                 /* só quem rolou */
+    const k = chaveDaRolagem(el, vistos);
+    if(k) fora[k] = el.scrollTop;
+  });
+  return Object.keys(fora).length ? fora : null;
+}
+function reporRolagens(raizEl, guardadas){
+  const vistos = {};
+  raizEl.querySelectorAll('[class]').forEach(el => {
+    const cls = (el.className || '').toString().trim().replace(/\s+/g, '.');
+    if(!cls) return;
+    vistos[cls] = (vistos[cls] || 0) + 1;
+    const v = guardadas[cls + '#' + vistos[cls]];
+    /* o navegador clampa sozinho se a lista encolheu -- não precisa conferir a altura */
+    if(v) el.scrollTop = v;
+  });
+}
 let telaDoUltimoRender = null;   // ver o fim do render: a rolagem só é preservada na MESMA tela
 function render(){
   const app = document.getElementById('app');
@@ -29345,7 +30153,7 @@ function render(){
   // clicou num slot por engano fica presa nela
   const noMenuScreens = new Set(['auth','saveSelect','newSaveName','battling','trainerBattling','leagueWatch','pokedex','achievements','mewtwoPicker','mewtwoBenchPicker']);
   if(game.authUser && !noMenuScreens.has(game.screen)){
-    html += `<button class="home-nav-btn" onclick="goToSaveMenu()">🏠 Home</button>`;
+    html += `<button class="home-nav-btn" onclick="goToSaveMenu()">${selo('casa')} Home</button>`;
   }
   if(game.showResetConfirm){ html += renderResetModal(); }
   if(game.deleteSaveTarget!=null){ html += renderDeleteSaveModal(); }
@@ -29410,9 +30218,21 @@ function render(){
      vazia embaixo do conteúdo. Trocar de tela não mexe em nada (fica como sempre foi). */
   const mesmaTela = game.screen === telaDoUltimoRender;
   const rolagemAntes = window.scrollY;
+  /* ⚠️ E A ROLAGEM DE DENTRO TAMBÉM (18/09/2026, reportado: *"quando eu clico em um TM na lista de
+     TMs na loja, se eu clicar no último da lista, a lista volta para o topo automaticamente"*).
+     A linha de cima cuida da rolagem da PÁGINA; dez listas do jogo rolam POR DENTRO (a da loja, a
+     da mochila, o ranking da Torre, as notificações, os golpes da ficha, "Pokémons desta rota", as
+     Variações do Unown, "Quem pode aprender"...), e o `innerHTML` novo zerava todas.
+     ⚠️ NÃO EXISTE LISTA DE CLASSES AQUI, e é de propósito: ela envelheceria na próxima lista que
+     nascesse rolável -- que é a mesma armadilha da lista à mão do `passosHtml` e do texto fixo do
+     `obsDoGolpe`. Quem rolou tem `scrollTop > 0`, e é só isso que se pergunta.
+     A CHAVE é a classe do elemento mais a posição entre os irmãos de mesma classe: ela sobrevive ao
+     redesenho (o HTML é o mesmo) e distingue duas listas iguais na mesma tela. */
+  const rolagensInternas = mesmaTela ? guardarRolagens(app) : null;
   app.innerHTML = html;
   telaDoUltimoRender = game.screen;
   if(mesmaTela && window.scrollY !== rolagemAntes){ window.scrollTo(0, rolagemAntes); }
+  if(rolagensInternas) reporRolagens(app, rolagensInternas);
   /* O campo de busca de amigo é recriado a cada render (innerHTML apaga o DOM inteiro), então o
      que a pessoa digitou é reposto aqui. Guardar o valor em game e repor depois é mais simples que
      evitar o render -- e é o que mantém a busca utilizável enquanto o poll do desafio roda. */

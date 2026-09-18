@@ -125,7 +125,9 @@ console.log('\n=== UMA LINHA POR POKEMON, COM TUDO QUE SE PRECISA PRA ESCOLHER =
   const tudo = todasAsPaginas();
   ok('e de que time ele e', contaEm(tudo, /mont-time">Kanto/g) === 6 && contaEm(tudo, /mont-time">Johto/g) === 6,
      contaEm(tudo, /mont-time">Kanto/g) + ' Kanto, ' + contaEm(tudo, /mont-time">Johto/g) + ' Johto');
-  ok('o shiny aparece com a estrela', contaEm(tudo, /🌟/g) === 1);
+  /* ⚠️ o selo VIROU DESENHO NOSSO (17/09/2026): a trava procura o <symbol>, que e a
+     identidade dele, em vez do caractere -- assim o desenho pode ser reajustado sem derrubar. */
+  ok('o shiny aparece com o selo', contaEm(tudo, /#s-shiny/g) === 1);
   /* A GRADE POR SAVE SAIU: se o agrupamento voltar sem querer, esta linha acusa. */
   ok('e a grade antiga por save nao existe mais', !tudo.includes('tower-pick-group'));
 }

@@ -2932,6 +2932,20 @@ function doExchange(active, enemy, rng, diario){
   const secondHpBefore = second.hp;
   const primeiroDormiu = (first === active) ? activeDorme : enemyDorme;
   const segundoDormiu  = (second === active) ? activeDorme : enemyDorme;
+  /* ⚠️ QUEM NAO ATACOU NESTA TROCA NAO APLICA STATUS (18/09/2026). Reportado com print: o Dewgong
+     estava DORMINDO e mesmo assim congelou o Gengar -- o log dizia *"Dewgong continua a dormir e
+     nao pode atacar"* e a linha seguinte era *"Gengar ficou congelado com Raio Congelante"*.
+     A CAUSA: os seis `tentar*` leem o `lastMove` do atacante, e ele fica gravado da troca ANTERIOR
+     (ou ate de outro confronto -- a instancia atravessa a batalha). Quem dormiu nao chama o
+     `golpesDaTroca`, entao o `lastMove` velho continua la e o sorteio rodava em cima dele.
+     ⚠️ E NAO ERA SO O SONO NEM SO O GELO: medido, os TRES estados que zeram o golpe (sono, gelo e
+     paralisia) vazavam nos QUATRO status, nas chances cheias de cada golpe -- 9,5% no Raio
+     Congelante e 30% no Trovao.
+     A GUARDA E O PROPRIO GOLPE TER SAIDO, e nao uma lista dos tres estados: `dmgByFirst` ja e `[]`
+     quando ele nao ataca, seja por que for. Assim o proximo estado que impedir um ataque nasce
+     coberto -- uma lista de estados aqui ficaria pra tras no primeiro que entrasse. */
+  const primeiroAtacou = dmgByFirst.length > 0;
+  const segundoAtacou  = dmgBySecond.length > 0;
   /* ⚠️ A DRENAGEM DEVOLVE METADE DO DANO EFETIVO, e ela roda em DOIS momentos diferentes -- um por
      lado --, porque ela é CRONOLÓGICA: quem bate primeiro cura primeiro, antes de o outro revidar.
      Rodando as duas juntas no fim, um Oddish CHEIO que matasse o Geodude com Absorver tomava o
@@ -3055,15 +3069,15 @@ function doExchange(active, enemy, rng, diario){
   /* A QUEIMADURA sai pela mesma porta do gelo e na mesma hora: depois de o golpe conectar. Um
      golpe so pode fazer UM dos dois (nenhum golpe esta nas duas tabelas), entao nao ha ordem a
      decidir entre elas -- o que existe e a ordem entre os dois LADOS, e essa e a de velocidade. */
-  const congelouOSegundo = segundoCaiu ? null : tentarCongelar(first, second, rng);
-  const queimouOSegundo = segundoCaiu ? null : tentarQueimar(first, second, rng);
-  const envenenouOSegundo = segundoCaiu ? null : tentarEnvenenar(first, second, rng);
-  const paralisouOSegundo = segundoCaiu ? null : tentarParalisar(first, second, rng);
-  const estagioDoSegundo = segundoCaiu ? null : tentarEstagio(first, second, rng);
+  const congelouOSegundo = (segundoCaiu || !primeiroAtacou) ? null : tentarCongelar(first, second, rng);
+  const queimouOSegundo = (segundoCaiu || !primeiroAtacou) ? null : tentarQueimar(first, second, rng);
+  const envenenouOSegundo = (segundoCaiu || !primeiroAtacou) ? null : tentarEnvenenar(first, second, rng);
+  const paralisouOSegundo = (segundoCaiu || !primeiroAtacou) ? null : tentarParalisar(first, second, rng);
+  const estagioDoSegundo = (segundoCaiu || !primeiroAtacou) ? null : tentarEstagio(first, second, rng);
   /* ⚠️ O PODER SECRETO (TM43) vem DEPOIS dos quatro, e ele é o único golpe que pode aplicar
      qualquer um deles -- qual, decide o TERRENO. Pondo-o antes, a marca dele bloquearia o
      `tentar*` da mesma marca nesta troca. Fora de terreno ele não faz nada (nem lê o rng). */
-  const secretoNoSegundo = segundoCaiu ? null : tentarPoderSecreto(first, second, rng);
+  const secretoNoSegundo = (segundoCaiu || !primeiroAtacou) ? null : tentarPoderSecreto(first, second, rng);
   const saiuNoPrimeiro = (segundoCaiu || congelouOSegundo) ? [] : aplicarGolpes(first, tetoDeQuemRaspa(second, first, dmgBySecond));
   /* O PISO DO REVIDE saiu junto com o revide -- sem revide não há o que limitar, e os dois nunca
      mais caem na mesma troca (por construção, não por aparo). A AUTODESTRUIÇÃO continua sendo o
@@ -3076,12 +3090,13 @@ function doExchange(active, enemy, rng, diario){
   const drenouOSecond = segundoDormiu ? 0 : drenar(saiuNoPrimeiro, second, primeiroDormiu);
   /* o golpe do SEGUNDO também pode congelar -- mas o primeiro já atacou nesta troca, então o efeito
      dele só aparece na próxima. Não há o que bloquear aqui: só a marca. */
-  const congelouOPrimeiro = (segundoCaiu || congelouOSegundo) ? null : tentarCongelar(second, first, rng);
-  const queimouOPrimeiro = (segundoCaiu || congelouOSegundo) ? null : tentarQueimar(second, first, rng);
-  const envenenouOPrimeiro = (segundoCaiu || congelouOSegundo) ? null : tentarEnvenenar(second, first, rng);
-  const paralisouOPrimeiro = (segundoCaiu || congelouOSegundo) ? null : tentarParalisar(second, first, rng);
-  const estagioDoPrimeiro = (segundoCaiu || congelouOSegundo) ? null : tentarEstagio(second, first, rng);
-  const secretoNoPrimeiro = (segundoCaiu || congelouOSegundo) ? null : tentarPoderSecreto(second, first, rng);
+  const pulaOSegundo = segundoCaiu || congelouOSegundo || !segundoAtacou;
+  const congelouOPrimeiro = pulaOSegundo ? null : tentarCongelar(second, first, rng);
+  const queimouOPrimeiro = pulaOSegundo ? null : tentarQueimar(second, first, rng);
+  const envenenouOPrimeiro = pulaOSegundo ? null : tentarEnvenenar(second, first, rng);
+  const paralisouOPrimeiro = pulaOSegundo ? null : tentarParalisar(second, first, rng);
+  const estagioDoPrimeiro = pulaOSegundo ? null : tentarEstagio(second, first, rng);
+  const secretoNoPrimeiro = pulaOSegundo ? null : tentarPoderSecreto(second, first, rng);
   const hpDoSecondAposDreno = second.hp;
   if(diario){
     /* O dano registrado é o que SAIU DE VERDADE da vida do alvo, não o número que a fórmula
@@ -3143,6 +3158,10 @@ function doExchange(active, enemy, rng, diario){
        pokemon, nao sobre um causador e um alvo. */
     const qDoFirst = activeFirst ? "p" : "e", qDoSecond = activeFirst ? "e" : "p";
     const geloDe = (p, q) => {
+      /* ⚠️ QUEM JA CAIU NAO PERDE TURNO -- ver a nota do dormeDe. Estas duas correm ANTES dos
+         golpes, entao hoje o pokemon esta sempre vivo aqui; a guarda existe pra o dia em que
+         alguem mover a chamada, que foi exatamente o que aconteceu com a do sono. */
+      if(p.hp <= 0) return;
       const g = (p === active) ? activeGelo : enemyGelo;
       if(g === "degelou") diario.push({ q:q, d:0, hp:null, c:0, m:0, z:0, x:"degelou", g:p.name });
       if(g === "preso")   diario.push({ q:q, d:0, hp:null, c:0, m:0, z:0, x:"gelado",  g:p.name });
@@ -3166,6 +3185,15 @@ function doExchange(active, enemy, rng, diario){
     const dormeDe = (p, q) => {
       const dormiu = (p === first) ? primeiroDormiu : segundoDormiu;
       if(!dormiu || p._dormindoPor <= 0) return;
+      /* ⚠️ E QUEM JA CAIU NAO PERDE TURNO (18/09/2026). Reportado com print na Torre: a Jynx matou
+         o Primeape e a linha *"Primeape continua a dormir e nao pode atacar"* saia LOGO DEPOIS --
+         o cabecalho ja mostrava 0/435.
+         A CAUSA E A POSICAO: esta chamada vem DEPOIS do golpe do first (e tem que vir -- a frase e
+         sobre o turno DELE, que e depois do golpe de quem e mais rapido), e o golpe do first pode
+         ter derrubado o second. Nao e defeito da Torre: ela chama o MESMO simulateGymBattle da
+         jornada, e os dois motores tinham isto igual.
+         Medido: saia em 47% dos confrontos em que o adormecido morre. */
+      if(p.hp <= 0) return;
       diario.push({ q:q, d:0, hp:null, c:0, m:0, z:0, x:"dormindo", g:p.name });
     };
     const congelou = (p, q, mv) => { if(mv) diario.push({ q:q, d:0, hp:null, c:0, m:0, z:0, x:"congelou", g:p.name, mv:mv }); };
@@ -3194,6 +3222,9 @@ function doExchange(active, enemy, rng, diario){
                     st:ef.atributo, dl:ef.delta });
     };
     const travadoDe = (p, q) => {
+      /* ⚠️ QUEM JA CAIU NAO PERDE TURNO -- ver a nota do dormeDe, logo abaixo. A do second corre
+         depois do golpe do first, entao ela alcanca quem acabou de ser derrubado. */
+      if(p.hp <= 0) return;
       const t = (p === active) ? activeTravado : enemyTravado;
       if(t) diario.push({ q:q, d:0, hp:null, c:0, m:0, z:0, x:"paralisado", g:p.name });
     };

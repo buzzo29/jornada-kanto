@@ -22,6 +22,9 @@ const path = require('path');
 const raiz = path.join(__dirname, '..');
 const { createSandbox } = require('./game-sandbox');
 const S = createSandbox();
+/* ⚠️ a moeda virou DESENHO nosso (17/09/2026): a trava procura o <symbol>, que e a identidade
+   dele, em vez do caractere -- assim o desenho pode ser reajustado sem derrubar a trava. */
+const RE_MOEDA = '<svg[^>]*><use href="#s-moeda"\/><\/svg>';
 
 let falhas = 0;
 function ok(titulo, cond, extra){
@@ -439,7 +442,7 @@ console.log('\n=== AS TRES PRATELEIRAS DA LOJA ===');
        'miolo em ' + iMiolo + ', rodape em ' + iRodape + ', botoes em ' + iAcoes);
     ok('deixando um recado so, que nomeia a prateleira', /Ainda não há TMs\/HMs à venda/.test(t),
        (t.match(/loja-vazia[^>]*>[^<]*/g)||[]).join(' | '));
-    ok('e o saldo continua na tela', /Você tem <strong>🪙/.test(t));
+    ok('e o saldo continua na tela', new RegExp('Você tem <strong>' + RE_MOEDA).test(t));
     /* E O BOTAO DE COMPRAR NAO PODE ESTAR LA: nao ha o que comprar. */
     ok('e nao ha botao de comprar', t.indexOf('abrirCompra') < 0);
     /* devolve os 23 -- o resto do arquivo conta com a loja inteira */
@@ -516,17 +519,17 @@ console.log('\n=== A LOJA ===');
   ok('e ele nao tem preco nenhum, dos dois lados',
      S.ITENS.bonus_shiny.preco === undefined && S.precoDeVenda('bonus_shiny') === 0 &&
      S.quantoPossoVender('bonus_shiny') === 0);
-  ok('o quadro de cima traz preco e descricao', /🪙 \d+/.test(t) && t.includes('item-detalhe-texto'));
+  ok('o quadro de cima traz preco e descricao', new RegExp(RE_MOEDA + ' \\d+').test(t) && t.includes('item-detalhe-texto'));
   /* SEM MOEDA o botao ja NASCE desabilitado -- um botao que so recusa depois do toque e pior. */
   ok('sem moeda o Comprar nasce desabilitado',
      /<button class="btn success" disabled[\s\S]{0,80}onclick="abrirCompra/.test(t),
      (t.match(/<button class="btn success"[^>]*/g)||[]).join(' | '));
-  ok('e a tela diz quanto falta', /Faltam 🪙 \d+/.test(t), (t.match(/Faltam[^<]*/g)||[]).join(' | '));
+  ok('e a tela diz quanto falta', new RegExp('Faltam ' + RE_MOEDA + ' \\d+').test(t), (t.match(/Faltam[^<]*/g)||[]).join(' | '));
   /* COM MOEDA ele acende. */
   const g = S.__getGame(); g.moedas = 999; S.__setGame(g);
   const rico = S.renderLoja();
   ok('com moeda ele acende', /onclick="abrirCompra/.test(rico) && !/disabled[\s\S]{0,80}onclick="abrirCompra/.test(rico));
-  ok('e mostrando quantas moedas voce tem', /Você tem <strong>🪙 999<\/strong>/.test(rico));
+  ok('e mostrando quantas moedas voce tem', new RegExp('Você tem <strong>' + RE_MOEDA + ' 999<\\/strong>').test(rico));
   /* OS PRECOS da tela tem que ser os mesmos que o servidor cobra -- se divergirem, a tela promete
      um preco que a cobranca nao pratica. */
   /* Precos revisados em 04/09/2026: Super Pocao 30 -> 50 e Pocao 15 -> 30. */
@@ -556,13 +559,13 @@ console.log('\n=== O POPUP DE QUANTIDADE ===');
   ok('o popup abre em 1', S.__getGame().compraQtd === 1, String(S.__getGame().compraQtd));
   const m = S.renderCompraModal();
   ok('e diz o teto', /até <strong>3<\/strong>/.test(m), (m.match(/até[^<]*<strong>[^<]*/g)||[]).join(' | '));
-  ok('e o total de 1', /Total: <strong>🪙 30<\/strong>/.test(m), (m.match(/Total:[^<]*<strong>[^<]*/g)||[]).join(' | '));
+  ok('e o total de 1', new RegExp('Total: <strong>' + RE_MOEDA + ' 30<\\/strong>').test(m), (m.match(/Total:[^<]*<strong>[^<]*/g)||[]).join(' | '));
   ok('o menos nasce travado em 1', /disabled[^>]*onclick="mudarQtdCompra\(-1\)"/.test(m),
      (m.match(/<button[^>]*mudarQtdCompra\(-1\)[^>]*/g)||[]).join(' | '));
 
   S.mudarQtdCompra(1);
   ok('o + sobe', S.__getGame().compraQtd === 2, String(S.__getGame().compraQtd));
-  ok('e o total acompanha', /Total: <strong>🪙 60<\/strong>/.test(S.renderCompraModal()));
+  ok('e o total acompanha', new RegExp('Total: <strong>' + RE_MOEDA + ' 60<\\/strong>').test(S.renderCompraModal()));
   /* NAO PASSA DO TETO, nem apertando muito: o + para no maximo. */
   for(let i = 0; i < 20; i++) S.mudarQtdCompra(1);
   ok('o + nunca passa do que o dinheiro compra', S.__getGame().compraQtd === 3, String(S.__getGame().compraQtd));
@@ -642,7 +645,9 @@ console.log('\n=== O + DA TELA DE ORDEM ===');
   ok('e abre a escolha pra AQUELE pokemon, com o slot',
      /abrirEscolhaDeItem\('3','charizard'\)/.test(semItem), semItem);
   const comItem = S.botaoDeItemHtml({ speciesId:'blastoise' });
-  ok('quem carrega mostra o icone do item', comItem.includes('⏰') && !/>\+<\/button>/.test(comItem), comItem);
+  /* ⚠️ o icone do item virou DESENHO nosso (17/09/2026): a trava procura o <symbol>, que e a
+     identidade dele, em vez do caractere. */
+  ok('quem carrega mostra o icone do item', comItem.includes('#s-despertador') && !/>\+<\/button>/.test(comItem), comItem);
   ok('e fica destacado', /com-item/.test(comItem), comItem);
 
   /* O MESMO POKEMON EM OUTRO SAVE NAO HERDA O ITEM -- e o defeito reportado em 04/09/2026: um
@@ -776,7 +781,7 @@ console.log('\n=== A HOME ===');
   conta({ doces: 3 });
   const g = S.__getGame(); g.moedas = 1250; S.__setGame(g);
   const home = S.renderSaveSelect();
-  ok('o contador de moedas fica no card do nome', /moeda-conta[^>]*>🪙 1250/.test(home),
+  ok('o contador de moedas fica no card do nome', new RegExp('moeda-conta[^>]*>' + RE_MOEDA + ' 1250').test(home),
      (home.match(/moeda-conta[^>]*>[^<]*/g)||[]).join(' '));
   ok('cinco cards na mesma linha', contaEm(home, /class="home-menu-card /g) === 5,
      contaEm(home, /class="home-menu-card /g) + ' cards');
@@ -2429,7 +2434,7 @@ console.log('\n=== AS MAQUINAS DE TECNICA (TMs) ===');
     ok('e ele e o MESMO cartao das telas de golpe',
        t.indexOf(S.cartaoDeGolpe('earthquake', true, true)) >= 0);
     ok('e ha o botao de quem pode aprender', /abrirAptosDaMaquina\('tm26'\)/.test(t));
-    ok('e o preco na tela e o da tabela', t.indexOf('🪙 ' + S.TMS.tm26.preco) >= 0,
+    ok('e o preco na tela e o da tabela', t.indexOf(S.selo('moeda') + ' ' + S.TMS.tm26.preco) >= 0,
        S.TMS.tm26.preco + '');
   }
   /* ⚠️ O ITEM COMUM NAO GANHA CARTAO: ele nao ensina golpe nenhum. */
@@ -2790,6 +2795,212 @@ console.log('\n=== OS TRES HMs NA MOCHILA, E A PALAVRA QUE SAIU (17/09/2026) ===
      sujas.length ? sujas.join(', ') : telas.length + ' telas varridas');
 }
 
+
+/* ============================================================================
+   O DISCO DO TM SAI NA COR DO TIPO (17/09/2026)
+   ----------------------------------------------------------------------------
+   Pedido assim: *"para os TMs, deixe o disco da cor do tipo do ataque que ele ensina"*.
+
+   ⚠️ O DESENHO E UM SO, e e isso que a trava protege: o `selo('tm')` usa `currentColor` no corpo
+   e branco/preto TRANSLUCIDOS no volume, entao a cor entra no USO e nao no simbolo. Sem isso
+   seriam 23 simbolos identicos de cor diferente -- e o proximo TM nasceria sem cor.
+   ============================================================================ */
+{
+  console.log('\n=== O DISCO DO TM NA COR DO TIPO ===');
+  const corDe = (html) => (String(html).match(/color:\s*([^";]+)/) || [])[1] || null;
+
+  /* 1) OS 23 TMs: cada um na cor do tipo do golpe que ele ensina */
+  const ids = Object.keys(S.TMS);
+  const semCor = [], corErrada = [];
+  ids.forEach(id => {
+    const it = S.ITENS[id];
+    const tipo = (S.GOLPES[S.TMS[id].golpe] || [])[0];
+    const c = corDe(it && it.icone);
+    if(!c) { semCor.push(id); return; }
+    if(c !== S.TYPE_COLORS[tipo]) corErrada.push(id + ' (' + tipo + ': ' + c + ' != ' + S.TYPE_COLORS[tipo] + ')');
+  });
+  ok('os ' + ids.length + ' TMs usam o disco', ids.every(id => String(S.ITENS[id].icone).indexOf('#s-tm') >= 0),
+     ids.filter(id => String(S.ITENS[id].icone).indexOf('#s-tm') < 0).join(', '));
+  ok('e cada um na cor do TIPO do golpe que ensina', !semCor.length && !corErrada.length,
+     semCor.concat(corErrada).slice(0, 4).join(' | '));
+  /* ⚠️ a cor tem que VARIAR de verdade: um bug que pintasse todos de Normal passaria na trava de
+     cima se o TYPE_COLORS fosse lido do mesmo lugar errado */
+  const cores = new Set(ids.map(id => corDe(S.ITENS[id].icone)));
+  ok('e as cores variam mesmo (nao e uma so)', cores.size >= 8, cores.size + ' cores distintas em ' + ids.length + ' TMs');
+
+  /* 2) OS 3 HMs: mesma regra, e o desenho e o do HM (com o risco) */
+  Object.entries(S.HMS).forEach(([id, hm]) => {
+    const tipo = (S.GOLPES[hm.golpe] || [])[0];
+    ok('  ' + id + ' usa o disco de HM na cor de ' + tipo,
+       String(hm.icone).indexOf('#s-hm') >= 0 && corDe(hm.icone) === S.TYPE_COLORS[tipo],
+       String(hm.icone).slice(0, 90));
+  });
+
+  /* 3) O DESENHO E UM SO -- o que separa TM de HM e o risco, nao 23 simbolos */
+  ok('o disco e UM desenho, nao um por tipo',
+     !!S.DESENHOS.tm && !Object.keys(S.DESENHOS).some(n => /^tm[0-9]/.test(n)),
+     Object.keys(S.DESENHOS).filter(n => /^tm/.test(n)).join(' '));
+  /* ⚠️ o corpo e currentColor: sem isso a cor do <use> nao pintaria nada */
+  ok('e o corpo dele e currentColor', S.DESENHOS.tm.some(l => l.indexOf('*') >= 0) &&
+     S.PALETA_SELO['*'] === 'currentColor');
+  ok('com o volume em branco e preto TRANSLUCIDOS (funciona sobre qualquer cor)',
+     S.DESENHOS.tm.some(l => l.indexOf('+') >= 0) && S.DESENHOS.tm.some(l => l.indexOf('-') >= 0) &&
+     /^#[0-9a-f]{8}$/i.test(S.PALETA_SELO['+']) && /^#[0-9a-f]{8}$/i.test(S.PALETA_SELO['-']),
+     S.PALETA_SELO['+'] + ' / ' + S.PALETA_SELO['-']);
+  /* e o SVG gerado repassa isso */
+  ok('e o <symbol> sai com fill="currentColor"', S.svgDosSelos().indexOf('fill="currentColor"') >= 0);
+  ok('e o selo com cor poe o style, sem cor nao poe',
+     corDe(S.selo('tm', '', '#F08030')) === '#F08030' && corDe(S.selo('tm')) === null,
+     S.selo('tm').slice(0, 70));
+
+  /* 4) OS 11 ITENS COMUNS tambem sao desenho -- nenhum sobrou com emoji */
+  const comuns = Object.entries(S.ITENS).filter(([id, i]) => !i.tm);
+  const comEmoji = comuns.filter(([id, i]) => String(i.icone).indexOf('#s-') < 0);
+  ok('os ' + comuns.length + ' itens comuns usam selo', comEmoji.length === 0,
+     comEmoji.map(([id, i]) => id + '=' + i.icone).join(' '));
+  /* ⚠️ a POCAO e a SUPER POCAO sao o MESMO frasco em cores diferentes: elas sao o mesmo item em
+     duas forcas, e dois desenhos fariam procurar duas coisas */
+  ok('e a Pocao e a Super Pocao dividem o frasco, com liquidos diferentes',
+     String(S.ITENS.potion.icone).indexOf('#s-pocao') >= 0 &&
+     String(S.ITENS.hyperpotion.icone).indexOf('#s-pocao') >= 0 &&
+     corDe(S.ITENS.potion.icone) !== corDe(S.ITENS.hyperpotion.icone),
+     corDe(S.ITENS.potion.icone) + ' x ' + corDe(S.ITENS.hyperpotion.icone));
+  /* e o Atk/Def Up reusam a espada e o escudo da BATALHA: mesma ideia, mesmo icone */
+  ok('e o Atk/Def Up reusam a espada e o escudo da batalha',
+     String(S.ITENS.atk_up.icone).indexOf('#s-espada') >= 0 &&
+     String(S.ITENS.def_up.icone).indexOf('#s-escudo') >= 0);
+}
+
+/* ============================================================================
+   A LISTA FICA ONDE ESTAVA (18/09/2026)
+   ----------------------------------------------------------------------------
+   Reportado: *"quando eu clico em um TM na lista de TMs na loja, se eu clicar no ultimo da
+   lista, a lista volta para o topo automaticamente"*.
+
+   ⚠️ O "render" ja preservava a rolagem da PAGINA desde sempre -- o que faltava era a rolagem
+   de DENTRO. Dez listas do jogo rolam por dentro ("overflow-y:auto"), e o 'innerHTML' novo
+   zerava todas.
+
+   ⚠️ E A TRAVA NAO NOMEIA NENHUMA DAS DEZ, de proposito: o mecanismo tambem nao tem lista de
+   classes, e e isso que faz ele cobrir a proxima que nascer rolavel. O que se cobra e o
+   INVARIANTE -- quem tem scrollTop > 0 e reposto --, e o caso de uma classe NOVA, que nunca
+   foi cadastrada em lugar nenhum, prova a cobertura inteira de uma vez.
+   ============================================================================ */
+{
+  console.log('\n=== A LISTA FICA ONDE ESTAVA ===');
+
+  /* um DOM de mentira: so o que os dois ajudantes usam (className, scrollTop, querySelectorAll) */
+  const elem = (cls, filhos) => ({
+    className: cls, scrollTop: 0, _filhos: filhos || [],
+    querySelectorAll(){ const fora = []; const anda = (n) => n._filhos.forEach(f => { fora.push(f); anda(f); }); anda(this); return fora; },
+  });
+  elem.prototype = null;
+  const arvore = () => {
+    const lista  = elem('loja-lista');
+    const miolo  = elem('loja-miolo');
+    const outra  = elem('loja-lista');          /* DUAS listas de mesma classe na mesma tela */
+    const raiz   = elem('app', [elem('loja-fixa', [miolo]), lista, outra]);
+    return { raiz, lista, miolo, outra };
+  };
+
+  {
+    const a = arvore();
+    a.lista.scrollTop = 906; a.miolo.scrollTop = 40;
+    const g = S.guardarRolagens(a.raiz);
+    const b = arvore();                          /* o redesenho: elementos NOVOS, HTML igual */
+    S.reporRolagens(b.raiz, g);
+    ok('a lista volta pra onde estava', b.lista.scrollTop === 906, b.lista.scrollTop + ' (esperado 906)');
+    ok('e cada conteiner volta pro SEU valor', b.miolo.scrollTop === 40, b.miolo.scrollTop + ' (esperado 40)');
+  }
+
+  /* ⚠️ DUAS LISTAS DE MESMA CLASSE NA MESMA TELA nao podem trocar de rolagem entre si -- e por
+     isso a chave leva a POSICAO entre os irmaos de mesma classe, e nao so a classe. */
+  {
+    const a = arvore();
+    a.lista.scrollTop = 100; a.outra.scrollTop = 700;
+    const g = S.guardarRolagens(a.raiz);
+    const b = arvore();
+    S.reporRolagens(b.raiz, g);
+    ok('duas listas de mesma classe nao trocam de rolagem',
+       b.lista.scrollTop === 100 && b.outra.scrollTop === 700,
+       b.lista.scrollTop + ' e ' + b.outra.scrollTop + ' (esperado 100 e 700)');
+  }
+
+  /* ⚠️ A PROVA DA COBERTURA: uma classe que nunca foi cadastrada em lugar nenhum. Se um dia
+     alguem trocar o mecanismo por uma lista de classes escritas a mao, ESTE caso cai -- e ele
+     e o unico que cai, porque os outros nomeiam classes que a lista teria. */
+  {
+    const nova = elem('lista-que-ninguem-cadastrou');
+    const raiz = elem('app', [nova]);
+    nova.scrollTop = 333;
+    const g = S.guardarRolagens(raiz);
+    const nova2 = elem('lista-que-ninguem-cadastrou');
+    /* g pode vir null se alguem trocar o mecanismo por uma lista de classes -- e e justamente
+       esse o retrocesso que este caso existe pra pegar, entao ele falha explicando em vez de
+       estourar no reporRolagens */
+    if(g) S.reporRolagens(elem('app', [nova2]), g);
+    ok('uma classe NOVA, nunca cadastrada, e preservada', nova2.scrollTop === 333,
+       g ? nova2.scrollTop + ' (esperado 333)' : 'nem foi guardada -- o mecanismo virou lista de classes?');
+  }
+
+  /* quem NAO rolou nao entra: guardar tudo faria o repor escrever scrollTop em 185 elementos */
+  {
+    const a = arvore();
+    ok('quem nao rolou nao e guardado', S.guardarRolagens(a.raiz) === null, 'guardou algo');
+    a.lista.scrollTop = 5;
+    ok('e so quem rolou entra', Object.keys(S.guardarRolagens(a.raiz)).length === 1, 'entrou mais de um');
+  }
+
+  /* elemento sem classe nao tem chave: ele seria indistinguivel de qualquer outro sem classe */
+  {
+    const sem = elem('');
+    sem.scrollTop = 50;
+    ok('elemento sem classe e ignorado', S.guardarRolagens(elem('app', [sem])) === null, 'guardou um sem classe');
+  }
+
+  /* ⚠️ A TROCA DE PRATELEIRA VOLTA AO TOPO: ali a lista e OUTRA, e manter a rolagem largaria o
+     jogador no meio de uma que ele nunca rolou. O teste LE O CODIGO porque o efeito so aparece
+     no navegador (o zerar marca, e quem zera e o render ao nao achar a chave). */
+  const cli = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
+  const script = cli.slice(cli.indexOf('<script>'), cli.lastIndexOf('</script>'));
+  ['escolherPrateleira(p){', 'escolherPrateleiraDaMochila(p){'].forEach(nome => {
+    const i = script.indexOf('function ' + nome);
+    const corpo = i < 0 ? '' : script.slice(i, i + 420);
+    ok('trocar de prateleira zera a lista (' + nome.replace('(p){','') + ')',
+       corpo.indexOf("zerarRolagemDaLista('loja-lista')") >= 0, 'sem o zerar');
+  });
+
+  /* ⚠️ E A PRESERVACAO SO VALE NA MESMA TELA: trocar de tela tem que comecar do topo, senao o
+     jogador cai no meio de uma tela que ele acabou de abrir. Quem responde e o "mesmaTela", que
+     ja guardava a rolagem da PAGINA -- os dois passaram a andar juntos. */
+  {
+    const i = script.indexOf('const rolagensInternas');
+    const trecho = i < 0 ? '' : script.slice(i, i + 200);
+    ok('a rolagem de dentro so e guardada na MESMA tela',
+       trecho.indexOf('mesmaTela ? guardarRolagens(app) : null') >= 0, 'sem o mesmaTela');
+    const j = script.indexOf('if(rolagensInternas) reporRolagens');
+    ok('e o repor vem DEPOIS do innerHTML', j > script.indexOf('app.innerHTML = html;') && j > 0,
+       'o repor nao vem depois do innerHTML');
+  }
+
+  /* ⚠️ NENHUMA LISTA DE CLASSES NO MECANISMO -- e a linha que garante as dez de uma vez. */
+  {
+    const i = script.indexOf('function guardarRolagens(');
+    const corpo = script.slice(i, script.indexOf('function reporRolagens('));
+    const nomeia = ['loja-lista','notif-lista','tower-rank-box','rota-mons-box','unown-box',
+                    'dex-golpes-lista','aptos-box','loja-miolo','notif-corpo-miolo','dex-modal-conteudo']
+                   .filter(c => corpo.indexOf(c) >= 0);
+    ok('o mecanismo nao nomeia nenhuma lista', nomeia.length === 0, 'nomeia: ' + nomeia.join(', '));
+  }
+
+  /* e as dez continuam existindo: se alguma parar de rolar por dentro, a trava avisa em vez de
+     a cobertura encolher em silencio */
+  {
+    const css = cli.slice(0, cli.indexOf('<script>'));
+    const rolam = (css.match(/overflow-y\s*:\s*auto/g) || []).length;
+    ok('o jogo tem listas que rolam por dentro (>= 8)', rolam >= 8, rolam + ' conteineres');
+  }
+}
 
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
 process.exit(falhas ? 1 : 0);
