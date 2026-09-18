@@ -9071,6 +9071,154 @@ console.log('\n=== VIDA CHEIA NAO MORRE NUM GOLPE (17/09/2026) ===');
      Object.keys(tocou).length + ': ' + Object.keys(tocou).sort().join(' '));
 }
 
+/* ============================================================================
+   O GALAO DO TERRENO SAI NA COR DO TERRENO (18/09/2026)
+   ----------------------------------------------------------------------------
+   Pedido: *"deixe a cor da setinha que indica que ele ta buffado pelo terreno, da mesma cor
+   que a cor do selo do terreno"*.
+
+   O corpo do galao e `currentColor` e o volume e branco e preto TRANSLUCIDOS -- a mesma tecnica
+   do disco do TM. Ela existe porque o sombreado normal precisa de tres tons de uma cor CONHECIDA,
+   e aqui a cor so se sabe na hora de desenhar.
+   ============================================================================ */
+{
+  console.log('\n=== O CONTORNO TEM 2px, PRA SOBREVIVER A 16px ===');
+  /* ⚠️ A GRADE E 24 E O SELO SAI A 16px -- 0,67 pixel de tela por pixel de grade. Um contorno
+     de 1px vira 0,67px e NAO CABE: com `crispEdges` ele e pintado em uns lugares e descartado em
+     outros (as pontas da estrela viraram perninhas pretas), e sem `crispEdges` ele vira um cinza
+     esfumado. Com 2px ele vira 1,33px -- sempre sobra um pixel inteiro.
+     Medidas as QUATRO combinacoes no navegador (1px/2px x crisp/suave): so 2px + crisp da uma
+     estrela com silhueta. */
+  {
+    /* a prova e GEOMETRICA: em toda borda do desenho ha DOIS pixels de contorno seguidos */
+    const G = S.DESENHOS.shiny;
+    const lado = G.length;
+    const contorno = '#241f1c';
+    const eh = (x, y) => x >= 0 && y >= 0 && x < lado && y < lado && S.PALETA_SELO[G[y][x]] === contorno;
+    const cheio = (x, y) => x >= 0 && y >= 0 && x < lado && y < lado &&
+                            G[y][x] !== '.' && S.PALETA_SELO[G[y][x]] !== contorno;
+    /* todo pixel de contorno que encosta no desenho tem um VIZINHO de contorno do lado de fora */
+    let finos = 0, grossos = 0;
+    for(let y = 0; y < lado; y++) for(let x = 0; x < lado; x++){
+      if(!eh(x, y)) continue;
+      const encosta = cheio(x-1,y) || cheio(x+1,y) || cheio(x,y-1) || cheio(x,y+1);
+      if(!encosta) continue;                       /* ja e a camada de fora */
+      const temFora = eh(x-1,y) || eh(x+1,y) || eh(x,y-1) || eh(x,y+1);
+      if(temFora) grossos++; else finos++;
+    }
+    ok('o contorno tem duas camadas em toda a borda', finos === 0 && grossos > 20,
+       finos + ' pontos de contorno fino, ' + grossos + ' grossos');
+
+    /* e o gerador faz isso em DUAS voltas -- o teste LE O CODIGO, porque uma volta so daria
+       um desenho valido, com contorno fino, e nada mais acusaria */
+    const ger = require('fs').readFileSync(path.join(raiz, 'tools', 'gerar-selos.js'), 'utf8');
+    const i = ger.indexOf('function contornar(');
+    const corpo = i < 0 ? '' : ger.slice(i, ger.indexOf('\n}', i));
+    ok('e o contornar da duas voltas', corpo.indexOf('volta < 2') >= 0, 'so uma volta');
+
+    /* ⚠️ E O SVG SAI SEM `crispEdges`, que e a OUTRA METADE da decisao: com ele o navegador nao
+       interpola, os 2px de contorno viram 2px de tela CHEIOS, e o preto ENGORDA ate dominar o
+       desenho -- a estrela some dentro dele (foi o segundo print do dia).
+       Sem ele o contorno vira 1,33px suavizado: escuro e continuo, mas fino o bastante pra o
+       desenho aparecer.
+       ⚠️ AS DUAS ANDAM JUNTAS: so o contorno de 2px, com crisp, fica pesado; so o suave, com 1px,
+       vira cinza esfumado. E a combinacao 2px + SUAVE, escolhida olhando as quatro na tela. */
+    const cli = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
+    const iSelo = cli.indexOf('<svg class="selo ');
+    const decl = iSelo < 0 ? '' : cli.slice(iSelo, iSelo + 150);
+    ok('e o selo sai SEM crispEdges', iSelo > 0 && decl.indexOf('crispEdges') < 0, decl.slice(0, 80));
+    ok('e nenhuma classe devolve o crispEdges pelo CSS',
+       cli.indexOf('shape-rendering:crispEdges') < 0, 'alguma classe devolve')
+  }
+
+  console.log('\n=== O GERADOR E A TABELA CONCORDAM ===');
+  /* ⚠️ A TRAVA QUE FALTAVA, e ela nasceu de um acidente de verdade (18/09/2026): um
+     `git checkout tools/gerar-selos.js` no meio de uma conferencia reverteu o GERADOR e deixou
+     o `index.html` com os desenhos novos. As duas metades ficaram discordando em silencio, e o
+     estrago so apareceria na proxima vez que alguem regenerasse as tabelas -- que APAGARIA os
+     desenhos novos sem ninguem ver.
+     O CLAUDE.md ja dizia "a ferramenta e a fonte, mas o que vai pro jogo e a TABELA"; o que
+     faltava era alguem conferir que as duas dizem a mesma coisa. E o mesmo papel que o
+     `tools/test-golpes.js` faz entre o `data/golpes.json` e as tabelas do jogo. */
+  {
+    let gerado = null;
+    try {
+      gerado = require('child_process').execSync('node tools/gerar-selos.js', { cwd: raiz, encoding: 'utf8' }).trimEnd();
+    } catch(e){ gerado = null; }
+    ok('o gerador roda', !!gerado && gerado.indexOf('const DESENHOS = {') >= 0, 'nao rodou');
+    if(gerado){
+      const cli = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
+      const i = cli.indexOf('\nconst DESENHOS = {');
+      const j = cli.indexOf('\n};\n', i);
+      const naTabela = i < 0 || j < 0 ? '' : cli.slice(i + 1, j + 3).trimEnd();
+      ok('e a tabela do index.html e EXATAMENTE o que ele cospe', gerado === naTabela,
+         gerado === naTabela ? '' : 'gerado ' + gerado.length + ' bytes x tabela ' + naTabela.length +
+           ' -- regenere com: node tools/gerar-selos.js');
+    }
+  }
+
+  console.log('\n=== O GALAO DO TERRENO NA COR DO TERRENO ===');
+  const simbolo = S.svgDosSelos().match(/<symbol id="s-terreno"[\s\S]*?<\/symbol>/);
+  ok('o simbolo do terreno existe', !!simbolo);
+  const sv = simbolo ? simbolo[0] : '';
+  ok('e o corpo dele e currentColor', sv.indexOf('currentColor') >= 0, 'sem currentColor');
+  /* ⚠️ E ELE E INTEIRO DA COR, sem volume (a pedido: *"as setas estao metade de uma cor e metade
+     branca, ela deve ser inteira da mesma cor"*). O disco do TM leva brilho e sombra translucidos
+     porque ele e um circulo GRANDE; num galao fino a mesma tecnica pinta METADE do desenho de
+     branco. Dentro do simbolo so pode haver a cor e o contorno. */
+  const cores = [...sv.matchAll(/fill="([^"]+)"/g)].map(m => m[1]);
+  const fora = [...new Set(cores)].filter(c => c !== 'currentColor' && c !== '#241f1c');
+  ok('e so ha a COR e o contorno dentro dele', fora.length === 0, 'sobrou: ' + fora.join(', '));
+
+  /* AS 17 CORES: o selo sai com a MESMA cor que a faixa do terreno usa */
+  const porTipo = {};
+  S.TERRAINS.forEach(t => { const tp = t.types[0]; if(!porTipo[tp]) porTipo[tp] = t; });
+  const tipos = Object.keys(porTipo);
+  ok('ha terreno de todos os 17 tipos', tipos.length === 17, String(tipos.length));
+  let erradas = [];
+  tipos.forEach(tp => {
+    const t = porTipo[tp];
+    const cor = S.terrainColor(t);
+    const html = S.selo('terreno', 'selo-g', cor);
+    if(html.indexOf('color:' + cor) < 0) erradas.push(tp);
+  });
+  ok('e o selo sai na cor da FAIXA nos 17', erradas.length === 0, erradas.join(', '));
+
+  /* ⚠️ SEM TERRENO ELE CAI NUM VERDE PADRAO, e isso nao e enfeite: sem cor nenhuma o
+     `currentColor` herdaria a cor do NOME do lutador -- azul no jogador e vermelho no
+     adversario --, e o selo mudaria de cor conforme o lado. */
+  const cli = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
+  ok('existe um verde padrao pro selo', cli.indexOf("const COR_TERRENO_PADRAO = '#7ec850'") >= 0,
+     'sem a constante');
+  const iq = cli.indexOf("(op.comTerreno && buffed)");
+  const trecho = iq < 0 ? '' : cli.slice(iq, iq + 130);
+  ok('e o quadro usa a cor do terreno, com ele de reserva',
+     trecho.indexOf('op.corDoTerreno || COR_TERRENO_PADRAO') >= 0, trecho.slice(0, 90));
+
+  /* e quem SABE o terreno manda a cor: as duas chamadas da tela da jornada */
+  const comCor = (cli.match(/comTerreno: true, corDoTerreno: terrain \? terrainColor\(terrain\) : null/g) || []).length;
+  ok('as duas chamadas da tela da jornada mandam a cor', comCor === 2, comCor + ' de 2');
+
+  /* e o selo continua saindo no quadro, com a cor, de ponta a ponta */
+  {
+    const mk = (id, lv) => { const p = S.createInstance(id, lv); p.hp = p.maxHp = S.calcMaxHp(p); return p; };
+    const a = mk('pidgeotto', 19), b = mk('snubbull', 15);
+    const m = { playerSpecies:'snubbull', playerName:'Snubbull', playerLevel:15,
+                enemySpecies:'pidgeotto', enemyName:'Pidgeotto', enemyLevel:19,
+                playerHpBefore:175, playerHpAfter:45, playerMaxHp:175,
+                enemyHpBefore:197, enemyHpAfter:197, enemyMaxHp:197,
+                enemyBuffed:true, golpes:[] };
+    const roxo = '#A040A0';
+    const q = S.fighterHtml(m, 'e', { hp: 197, passo: 0, comTerreno: true, corDoTerreno: roxo });
+    ok('o quadro do buffado mostra o galao', q.indexOf('#s-terreno') >= 0, 'sem o galao');
+    ok('e ele sai na cor mandada', q.indexOf('color:' + roxo) >= 0, 'sem a cor');
+    const semCor = S.fighterHtml(m, 'e', { hp: 197, passo: 0, comTerreno: true });
+    ok('e sem cor ele cai no verde padrao', semCor.indexOf('color:#7ec850') >= 0, 'sem o padrao');
+    const semBuff = S.fighterHtml(m, 'p', { hp: 45, passo: 0, comTerreno: true, corDoTerreno: roxo });
+    ok('e quem NAO esta buffado nao ganha galao', semBuff.indexOf('#s-terreno') < 0, 'ganhou sem buff');
+  }
+}
+
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
 process.exit(falhas ? 1 : 0);
 })();

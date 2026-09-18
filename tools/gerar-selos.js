@@ -127,13 +127,26 @@ function pintar(tela, forma, cor, opts){
 }
 
 /* CONTORNO: todo vazio encostado em cor vira preto. Fechado e de um pixel, sempre. */
+/* ⚠️ O CONTORNO TEM 2px NA GRADE, e isso é medição e não gosto (18/09/2026). Reportado com
+   print a zoom 100%: *"o desenho da estrela e muitos outros ficam feios o contorno quando ta
+   assim, da onde eu to vendo não parece uma estrela"*.
+   A grade é 24×24 e o selo sai a **16px** na fileira do time -- **0,67 pixel de tela por pixel de
+   grade**. Um contorno de 1px vira 0,67px, e aí ele **não cabe**: com `crispEdges` o navegador o
+   pinta em alguns lugares e descarta em outros (as pontas da estrela viraram perninhas pretas), e
+   sem `crispEdges` ele vira um cinza esfumado (a estrela borra).
+   Com 2px ele vira **1,33px** -- sempre sobra pelo menos um pixel inteiro, em qualquer posição.
+   ⚠️ Medidas as QUATRO combinações no navegador (1px/2px × crisp/suave): só **2px + crisp** dá
+   uma estrela com silhueta, contorno contínuo e moeda redonda. As outras três ou quebram ou
+   borram. É a lição de sempre aqui: ASCII não se julga, e 16px também não se adivinha. */
 function contornar(tela, cor){
   const c = cor || 'k';
-  const orig = tela.map(l => l.slice());
-  const cheio = (x, y) => x >= 0 && y >= 0 && x < N && y < N && orig[y][x] !== VAZIO;
-  for(let y = 0; y < N; y++) for(let x = 0; x < N; x++){
-    if(orig[y][x] !== VAZIO) continue;
-    if(cheio(x-1,y) || cheio(x+1,y) || cheio(x,y-1) || cheio(x,y+1)) tela[y][x] = c;
+  for(let volta = 0; volta < 2; volta++){
+    const orig = tela.map(l => l.slice());
+    const cheio = (x, y) => x >= 0 && y >= 0 && x < N && y < N && orig[y][x] !== VAZIO;
+    for(let y = 0; y < N; y++) for(let x = 0; x < N; x++){
+      if(orig[y][x] !== VAZIO) continue;
+      if(cheio(x-1,y) || cheio(x+1,y) || cheio(x,y-1) || cheio(x,y+1)) tela[y][x] = c;
+    }
   }
 }
 
@@ -146,14 +159,36 @@ const selo = (nome, fn) => { SELOS[nome] = fn; };
 
 /* ---- BATALHA ---- */
 
-selo('shiny', t => {   /* a estrela do shiny, com um brilho no canto */
-  pintar(t, estrela(C, C - 0.5, 10.5, 4.4, 5), 'y');
-  pintar(t, estrela(C - 3, C - 4, 2.2, 0.9, 4), 'w');
+selo('shiny', t => {
+  /* ⚠️ A ESTRELA É CHEIA (raio interno 6,0 de 10,5), e isso é medição: com o interno em 4,4 as
+     pontas ficavam FINAS, e num contorno de 2px de cada lado elas viravam quase só contorno -- em
+     16px as duas de baixo saíam como "perninhas pretas". Foi o que o print mostrou.
+     ⚠️ E O BRILHO BRANCO SAIU junto: ele é um detalhe de 2px que em 56px enfeita e em 16px vira
+     uma MANCHA CINZA na ponta esquerda -- dava pra ver nas duas variantes que o mantinham.
+     Comparadas quatro razões no navegador; 6,0 é a que se lê como estrela a 16px. */
+  pintar(t, estrela(C, C - 0.5, 10.5, 5.4, 5), 'y');
 });
 
-selo('terreno', t => {   /* montanha com neve no pico -- o triangulo rosa do emoji nao dizia nada */
-  pintar(t, poligono([[12,3],[22,20],[2,20]]), 'g');
-  pintar(t, menos(poligono([[12,3],[17,11],[7,11]]), poligono([[12,7],[14.5,11],[9.5,11]])), 'w');
+selo('terreno', t => {
+  /* ⚠️ UM GALÃO SÓ, e a escolha foi MEDIDA no navegador, não no gosto: o selo sai a 1em
+     (~13px) na fileira do time, e ali só uma forma Única e sólida se lê -- é por isso que a
+     estrela do shiny funciona. Desenhadas SEIS variantes e comparadas a 13px:
+       hexágono e losango viram um pontinho; tudo que tem CHÃO (dois galões + base, seta + base)
+       vira mancha, porque três elementos empilhados não cabem em 13 pixels; o triângulo lê bem
+       mas é o 🔺 do emoji, que "não dizia nada"; o GALÃO sozinho lê nos três tamanhos.
+     Ele substituiu uma MONTANHA com neve no pico, cujo recorte branco sumia em 13px.
+     ⚠️ E ele não é a seta que saiu da fúria: aquela era CHEIA (triângulo + haste) e esta é
+     vazada -- as duas nunca aparecem juntas no mesmo quadro por acaso, mas a forma separa. */
+  /* ⚠️ A COR VEM DE FORA (18/09/2026, a pedido: *"deixe a cor da setinha que indica que ele ta
+     buffado pelo terreno, da mesma cor que a cor do selo do terreno"*). O corpo é      e o volume é branco e preto TRANSLÚCIDOS -- a mesma técnica do disco do TM, e ela existe
+     porque o sombreado normal precisa de três tons de uma cor CONHECIDA, e aqui a cor só se sabe
+     na hora de desenhar. Branco e preto com alpha clareiam e escurecem o que estiver embaixo,
+     seja qual for. */
+  /* ⚠️ SEM VOLUME, e isso foi pedido: *"as setas estão metade de uma cor e metade branca, ela
+     deve ser inteira da mesma cor"*. O disco do TM leva brilho e sombra translúcidos porque ele
+     é um círculo GRANDE -- num galão fino a mesma técnica pinta metade do desenho de branco, que
+     é o que apareceu na tela. Aqui a cor é chapada e quem define a forma é o contorno preto. */
+  pintar(t, poligono([[2,15],[12,3],[22,15],[22,20],[12,8],[2,20]]), '*', { liso: true });
 });
 
 selo('fogo', t => {   /* chama: gota de fora, nucleo claro dentro */
@@ -178,13 +213,17 @@ selo('veneno', t => {   /* gota de veneno com bolha de luz */
   pintar(t, circulo(9.5, 13, 1.8), 'P', { liso: true });
 });
 
-selo('sono', t => {   /* os dois Z -- um grande e um pequeno, como no quadrinho */
+selo('sono', t => {
+  /* os dois Z -- um grande e um pequeno, como no quadrinho.
+     ⚠️ ELES PRECISAM DE 5px DE FOLGA ENTRE SI, e não menos: o contorno cresce 2px pra fora de
+     CADA um, então dois desenhos a 4px de distância encostam pelo contorno e viram um borrão só.
+     Era o que acontecia -- eles se sobrepunham em x=8..9 e saíam colados. */
   const z = (x0, y0, w, esp) => uniao(
     traco(x0, y0, x0 + w, y0, esp),
     traco(x0 + w, y0, x0, y0 + w, esp),
     traco(x0, y0 + w, x0 + w, y0 + w, esp));
-  pintar(t, z(8, 9, 11, 2.8), 'c');
-  pintar(t, z(3.5, 3, 5.5, 2.1), 'c');
+  pintar(t, z(12.5, 12.5, 9, 2.6), 'c');   /* o grande, embaixo à direita */
+  pintar(t, z(2.5, 2.5, 4.5, 1.9), 'c');   /* o pequeno, em cima à esquerda */
 });
 
 selo('confusao', t => {   /* a espiral da confusao */
@@ -202,8 +241,25 @@ selo('explosao', t => {   /* estouro de 10 pontas, nucleo amarelo */
   pintar(t, estrela(C, C, 6, 2.6, 8, 0.1), 'y');
 });
 
-selo('furia', t => {   /* SETA PRA CIMA -- e o que a furia FAZ (+10 em tudo). Era um X vermelho. */
-  pintar(t, uniao(poligono([[12,1],[22,11],[2,11]]), retangulo(7, 11, 10, 11)), 'r');
+selo('furia', t => {
+  /* ⚠️ A VEIA SALTADA -- o simbolo de raiva do anime, e literalmente a marca que o PRIMEAPE
+     tem sobre o olho. Pedido assim: *"no desenho do Primeape, ele possui em cima de um dos olhos
+     na diagonal, uma especie de 4 V onde as pontas estao juntos, simbolizando que ele e furioso"*.
+     Foi desenhada olhando o SPRITE de verdade, ampliado pixel a pixel: sao QUATRO CANTOS em L,
+     um por quadrante, com as quinas apontando pro centro e os bracos indo pra fora, deixando um
+     vazio em cruz no meio.
+     Ela substituiu uma SETA PRA CIMA, que dizia o que a furia FAZ (+10 em tudo) e nao o que ela
+     E -- e seta é o vocabulario de BUFF, nao de raiva. */
+  const T = 3.2;                     /* a espessura do traco */
+  const D = 2.0;                     /* o vazio, do centro ate a quina */
+  const q = (sx, sy) => {            /* um canto em L: sx/sy dizem pra que lado ele abre */
+    const qx = sx < 0 ? C - D - T : C + D;      /* a quina, no eixo x */
+    const qy = sy < 0 ? C - D - T : C + D;
+    const vert = sy < 0 ? retangulo(qx, 2, T, qy - 2 + T) : retangulo(qx, qy, T, 22 - qy);
+    const horz = sx < 0 ? retangulo(2, qy, qx - 2 + T, T) : retangulo(qx, qy, 22 - qx, T);
+    return uniao(vert, horz);
+  };
+  pintar(t, uniao(q(-1,-1), q(1,-1), q(-1,1), q(1,1)), 'r');
 });
 
 selo('espada', t => {   /* espada apontada pra cima */

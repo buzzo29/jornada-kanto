@@ -11428,26 +11428,174 @@ cada desenho, em silêncio**. Hoje ele é derivado de `grade.length`, e com isso
 diferentes convivem. A trava que cobrava `=== 16` virou *"toda grade é QUADRADA"* pelo mesmo
 motivo: **fixar o lado ali era o mesmo erro do viewBox, do outro lado**.
 
-### ⚠️ O SVG PRECISOU DE RETÂNGULOS MÁXIMOS — 160 KB VIRARAM 38
+### ⚠️ O SVG PRECISOU DE RETÂNGULOS MÁXIMOS — 383 KB VIRARAM 66
 
-Uma `<rect>` por corrida horizontal dava **3.772 formas e 160 KB de DOM** com os selos em 24×24.
-Juntando também na **vertical** (retângulos máximos) e emitindo **um `<path>` por cor** — um
-`M x y h w v h -w z` custa ~12 caracteres contra ~45 de uma `<rect>` — o mesmo desenho sai em
-**38 KB**, que é **menos que a versão 16×16 gastava (47 KB)**, com 2,25× mais detalhe.
+Uma `<rect>` por corrida horizontal daria **6.976 formas e ~383 KB de DOM** com os selos em
+24×24. Juntando também na **vertical** (retângulos máximos) e emitindo **um `<path>` por cor**
+— um `M x y h w v h -w z` custa ~12 caracteres contra ~45 de uma `<rect>` — o mesmo desenho sai
+em **66 KB**: **5,8× menor**.
+
+⚠️ **ESTES NÚMEROS JÁ ESTIVERAM ERRADOS AQUI** (dizia "160 KB viraram 38", com 3.772 formas e
+159 paths) — eram de uma versão intermediária, com menos selos, e sobreviveram ao arquivo
+crescer. Foram medidos de novo em 18/09/2026, contra o código que está no ar. É a mesma
+armadilha que este arquivo registra em outros três lugares: **número medido envelhece junto com
+o que ele mede**.
 
 | | |
 |---|---|
-| `<svg>` no DOM, injetado UMA vez | **38 KB** (159 paths, 2.448 retângulos) |
+| `<svg>` no DOM, injetado UMA vez | **66 KB** (295 paths, 4.302 retângulos) |
 | cada uso na tela | **95 bytes** (um `<use>`) |
-| `index.html` | **+29 KB (+1,6%)** |
+| `index.html` | **1,83 MB** |
 
 **⚠️ UMA JUNÇÃO ERRADA NÃO APARECE COMO ERRO** — aparece como um pixel de cor trocada num desenho
 de 24, que ninguém vê. Por isso a trava **desfaz o SVG de volta em grade** e compara com o
 `DESENHOS` (16.704 pixels), e cobra também que **nenhum retângulo se sobreponha**: dois paths
 pintando o mesmo pixel dariam o desenho certo por acaso, com a cor do último. Conferido — ela acusa
 10.336 pixels com o "consumido" marcado errado.
-**E há um teto de 60 KB pro SVG**, porque a trava do pixel **não pega** a otimização ser desfeita:
-com uma `<rect>` por pixel o desenho continua certo e só o DOM cresce. Conferido: ela acusa 111 KB.
+**E há um teto de ~95 KB pro SVG** (1.800 bytes por selo), porque a trava do pixel **não pega** a otimização ser desfeita:
+com uma `<rect>` por pixel o desenho continua certo e só o DOM cresce. Conferido: ela acusa com uma `<rect>` por pixel.
+
+### ⚠️ O CONTORNO TEM 2px, PORQUE 24 NÃO CABE EM 16 (18/09/2026)
+
+Reportado com print a **zoom 100%**: *"o desenho da estrela e muitos outros ficam feios o contorno
+quando ta assim, da onde eu to vendo não parece uma estrela"*.
+
+**⚠️ A CAUSA É UM NÚMERO: 0,67.** A grade é 24×24 e o selo sai a **16px** na fileira do time —
+ou seja **0,67 pixel de tela por pixel de grade**. Um contorno de 1px vira 0,67px, e aí ele
+**não cabe**: com `crispEdges` o navegador o pinta em alguns lugares e descarta em outros, e as
+pontas da estrela viram **perninhas pretas**; a moeda vira um polígono.
+
+**Medido nos OITO contextos onde o selo aparece: SEIS REDUZEM a grade** (0,60× a 0,77×) e só dois
+ampliam (os de 32px). O `crispEdges` estava certo em dois lugares e errado em seis — justamente
+os que o jogador mais vê.
+
+**⚠️ E A PRIMEIRA CORREÇÃO FOI A ERRADA, o que vale registrar:** tirar o `crispEdges` deixa o
+navegador suavizar, e o contorno de 1px vira um **cinza esfumado** — a estrela sai borrada em vez
+de quebrada. Trocou um defeito por outro.
+
+**AS QUATRO COMBINAÇÕES, comparadas no navegador a 16px:**
+
+| | resultado |
+|---|---|
+| 1px + `crispEdges` (como era) | contorno **tracejado**, pontas viram perninhas |
+| 1px + suave | contorno **cinza claro**, desenho borrado |
+| 2px + `crispEdges` | contorno **pesado**: o preto engorda e a estrela some dentro dele |
+| **2px + suave** | **contorno escuro e contínuo, fino o bastante pra o desenho aparecer** |
+
+**⚠️ AS DUAS METADES ANDAM JUNTAS, e foram DUAS voltas até acertar.** Com 2px o contorno vira
+**1,33px** na tela — sempre sobra um pixel inteiro, em qualquer posição. Mas com `crispEdges` o
+navegador **não interpola**: os 2px viram 2px de tela CHEIOS, e o preto engorda até dominar o
+desenho. Foi o segundo print do dia, e o pedido foi direto: *"eu gostei mais do 2px suave ao inves
+do Crisp"*.
+Só o suave, com 1px, vira cinza esfumado; só o 2px, com crisp, fica pesado. **É a combinação.**
+
+#### ⚠️ E A ESTRELA FICOU CHEIA, porque a forma também não cabia
+
+Com o contorno de 2px **de cada lado**, uma ponta fina vira quase só contorno — e as duas pontas
+de baixo da estrela saíam como **"perninhas pretas"** a 16px. Isso é do DESENHO, não do rendering.
+
+O raio interno foi de **4,4 para 6,0** (de 10,5), comparando quatro razões no navegador: 6,0 é a
+que se lê como estrela a 16px.
+
+**E o BRILHO BRANCO saiu junto** — ele é um detalhe de 2px que a 56px enfeita e a 16px vira uma
+**mancha cinza** na ponta esquerda. Dá pra ver nas variantes que o mantinham.
+
+⚠️ **A regra que fica: num selo de 16px, detalhe menor que ~3px da grade não é detalhe, é
+sujeira.** Vale pro próximo desenho.
+
+O raio interno acabou em **5,4** (e não 6,0): a estrela cheia lia bem mas ficava pesada ao lado do
+nome — *"pode deixar a estrela um pouco menos gorda"*. 5,4 é o ponto em que ela ainda tem ponta e
+já não tem perninha.
+
+#### ⚠️ E OS DOIS Z DO SONO PRECISAM DE 5px DE FOLGA
+
+Eles saíam **colados** — e a causa é a mesma do contorno: ele cresce **2px pra fora de cada um**,
+então dois desenhos a 4px de distância se encostam pelo contorno e viram um borrão só. Os dois Z
+ainda por cima se **sobrepunham** em x=8..9.
+
+Hoje o pequeno fica em cima à esquerda e o grande embaixo à direita, com **5,5px** entre eles — e
+é essa a conta pra qualquer selo que tenha duas formas soltas: **2 + 2 de contorno, mais 1 de
+vazio.**
+
+- **CUSTO: 1 KB** (o SVG vai de 65 para 66) e ~65 retângulos a mais. O contorno come um pouco
+  da área interna de cada desenho, o que é o preço — e em 16px ninguém vê o interior, vê a
+  silhueta.
+- **As duas impressões — MOTOR e DIÁRIO — continuam idênticas** em 900 batalhas semeadas.
+- **⚠️ SE UM DIA A GRADE MUDAR**, este número muda junto: o que importa é o contorno ter pelo
+  menos **1 pixel de tela** depois da redução. Numa grade de 16 (1:1 a 16px) ele voltaria a
+  poder ser 1px.
+- A trava é **geométrica**, e não um texto: ela varre a borda do desenho e cobra que **todo**
+  ponto de contorno que encosta no desenho tenha um vizinho de contorno do lado de fora. Mais uma
+  que **lê o código** (o `contornar` dá duas voltas), porque uma volta só geraria um desenho
+  válido — só que fino — e nada mais acusaria. E ela cobra a outra metade junto: **nenhum selo
+  sai com `crispEdges`**, nem pelo atributo nem por classe no CSS.
+
+### ⚠️ A FÚRIA É A VEIA DO PRIMEAPE, E O TERRENO É UM GALÃO (18/09/2026)
+
+Reportado com print: *"aquele emoji do Snubbull é de fúria, melhore o sinal, faça algo parecendo
+com fúria mesmo, e não uma seta, no desenho do Primeape, ele possui em cima de um dos olhos na
+diagonal, uma espécie de 4 V onde as pontas estão juntos"* e *"o sinal de buff do terreno de
+batalha também está feio"*.
+
+**A FÚRIA ERA UMA SETA PRA CIMA**, que dizia o que ela FAZ (+10 em tudo) e não o que ela É — e
+seta é vocabulário de **buff**, não de raiva. Hoje ela é a **veia saltada** (💢), o símbolo de
+raiva do anime e literalmente a marca que o Primeape tem sobre o olho.
+
+- **⚠️ ELA FOI DESENHADA OLHANDO O SPRITE, não de cabeça.** O #57 foi baixado do mesmo
+  `PokeAPI/sprites` que o jogo usa e ampliado pixel a pixel: são **quatro cantos em L**, um por
+  quadrante, com as quinas apontando pro centro e os braços indo pra fora, deixando um **vazio em
+  cruz** no meio. É exatamente o *"4 V onde as pontas estão juntos"* do pedido.
+- A cor continua vermelha, que é a convenção do símbolo e já era a da fúria.
+
+**O TERRENO ERA UMA MONTANHA com neve no pico**, e o problema dela era de TAMANHO: o selo sai a
+1em (~13px) na fileira do time, e ali o recorte branco do pico sumia — sobrava um triângulo verde
+chapado.
+
+**⚠️ A ESCOLHA FOI MEDIDA NO NAVEGADOR, e só por isso ela é o que é.** Foram desenhadas **seis**
+variantes e comparadas **a 13px**, que é o tamanho que importa:
+
+| variante | a 13px |
+|---|---|
+| hexágono, losango | viram **um pontinho** |
+| dois galões + chão, seta + chão, losango + galão | viram **mancha** — três elementos empilhados não cabem em 13 pixels |
+| triângulo | lê bem, mas é o 🔺 do emoji, que *"não dizia nada"* |
+| **um galão só** | **lê nos três tamanhos** |
+
+É a mesma razão pela qual a **estrela do shiny** funciona: uma forma **única e sólida**. E o
+galão não é a seta que saiu da fúria — aquela era CHEIA (triângulo + haste) e esta é **vazada**.
+
+- **⚠️ OS GALÕES SÃO POLÍGONO, e não `traco` diagonal:** com traços, o sombreado direcional
+  pinta o interior de cada um em separado e o meio do selo vira ruído. Isso apareceu já no ASCII,
+  antes do navegador.
+- **CUSTO: nada.** O SVG fica nos mesmos **65 KB**. **As duas impressões — MOTOR e DIÁRIO —
+  são idênticas** em 900 batalhas semeadas: selo é apresentação inteira.
+
+#### ⚠️ E O GALÃO SAI NA COR DO TERRENO
+
+Pedido logo depois: *"deixe a cor da setinha que indica que ele ta buffado pelo terreno, da mesma
+cor que a cor do selo do terreno"*.
+
+A faixa do terreno usa `terrainColor(t)`, que é a cor do **primeiro tipo** dele — e agora o
+galão do quadro do lutador sai na mesma. Ou seja, num Vulcão ele é laranja, na Usina Elétrica
+amarelo, no Dojo Tradicional vermelho.
+
+- **O CORPO É `currentColor`**, como o disco do TM — é o que faz UM desenho servir 17 cores.
+  Sem isso seriam 17 desenhos iguais de cor diferente.
+- **⚠️ MAS ELE NÃO LEVA VOLUME, e isso separa os dois:** o disco do TM tem brilho e sombra
+  translúcidos porque ele é um **círculo GRANDE**; num galão FINO a mesma técnica pinta **metade
+  do desenho de branco** — foi o que apareceu na tela, e o relato foi literal (*"as setas estão
+  metade de uma cor e metade branca, ela deve ser inteira da mesma cor"*).
+  Hoje a cor é chapada e quem define a forma é o **contorno preto**, que toda a pixel art do jogo
+  já tem. Dentro do símbolo só existem duas coisas: a cor e o contorno — e é isso que a trava
+  cobra, em vez de nomear o branco.
+- **⚠️ HÁ UM VERDE PADRÃO** (`COR_TERRENO_PADRAO`), e ele não é enfeite: sem cor nenhuma o
+  `currentColor` herdaria a cor do **NOME do lutador** — azul no jogador e vermelho no
+  adversário —, e o selo mudaria de cor conforme o lado. Ele também é o que mantém as chamadas
+  antigas (as que passam só `comTerreno: true`) desenhando o que sempre desenharam.
+- **Conferido nos 17 tipos, no navegador a 320px:** o galão sai na mesma cor da faixa nos 17, e
+  o contorno preto o segura mesmo nas claras (o Ferro-Velho e a Montanha Nevada).
+- **A trava do pixel a pixel pegou os dois de graça**: ela desfaz o SVG de volta em grade e
+  compara com o `DESENHOS` (31.104 pixels), então um desenho novo entra coberto sem uma linha.
 
 ### ⚠️ O DISCO DO TM SAI NA COR DO TIPO — um desenho, 17 cores
 
@@ -11566,6 +11714,15 @@ A primeira se vê lendo o código; a segunda, só olhando a tela.
 | **todo desenho tem chamador** | letra morta — a mesma decisão que manteve os estágios 2 a 4 do crítico e o Rock Tomb fora do jogo. Ela pegou 3 órfãos no dia (moeda, coroa, brilho) e os três ganharam destino |
 | **o SVG bate pixel a pixel, sem sobreposição, e cabe em 60 KB** | ver a seção da otimização, acima |
 | **o servidor não conhece selo** | ele é apresentação pura, e o servidor não tem tela |
+| **⚠️ o GERADOR e a TABELA concordam** | ela roda `node tools/gerar-selos.js` e compara com o `DESENHOS` do `index.html` |
+
+⚠️ **A ÚLTIMA NASCEU DE UM ACIDENTE DE VERDADE** (18/09/2026): um `git checkout
+tools/gerar-selos.js` no meio de uma conferência reverteu o **gerador** e deixou o `index.html`
+com os desenhos novos. As duas metades ficaram discordando **em silêncio**, e o estrago só
+apareceria na próxima vez que alguém regenerasse as tabelas — que **apagaria os desenhos novos**
+sem ninguém ver. Este arquivo já dizia *"a ferramenta é a fonte, mas o que vai pro jogo é a
+TABELA"*; o que faltava era alguém conferir que as duas dizem a mesma coisa. É o mesmo papel que
+o `tools/test-golpes.js` faz entre o `data/golpes.json` e as tabelas do jogo.
 
 Mais a varredura que **roda 112 das 127 telas** procurando o literal — ela não basta sozinha
 (a `renderLoja` é justamente uma das 15 que não rodam sem estado), e é por isso que a de código existe.
