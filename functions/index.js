@@ -4208,6 +4208,13 @@ async function advanceCyclePhases(typeId, cycleEntry, leagueTypeConfig, leagueTy
      `pendingMatchNotices` entrou nessa lista em 13/09/2026, junto com o irmão dela na Trainers
      League -- ver o comentário de lá pro estrago que a ordem antiga causou. */
   let pendingChampions = [], pendingPlacements = [], pendingStreakUpdates = [], pendingMatchNotices = [], changed = false;
+  /* ⚠️ A HORA DO CICLO, declarada AQUI e não lá dentro: ela alimenta o endereço do chaveamento que
+     as notificações passaram a carregar (18/09/2026), e essas são criadas antes do laço de
+     participantes -- onde ela morava. Deixada lá, seria zona morta temporal, o mesmo defeito que
+     travou as quatro telas de revelação em 09/09/2026.
+     O fallback é o mesmo de sempre: ciclo antigo pode estar sem `scheduledTime`, e o Firestore
+     recusa gravar `undefined` -- um único registro velho malformado quebrava a gravação inteira. */
+  const cycleTime = cycleEntry.scheduledTime != null ? cycleEntry.scheduledTime : Number(cycleEntry.id) || 0;
   try{
     const ref = cycleDocRef(typeId, cycleEntry.id);
     const snap = await ref.get();
@@ -4245,7 +4252,10 @@ async function advanceCyclePhases(typeId, cycleEntry, leagueTypeConfig, leagueTy
             } else {
               league.champion = match.winner;
               if(!match.winner.isBot){
-                pendingChampions.push({ name: match.winner.name, uid: match.winner.uid, slot: match.winner.slot });
+                /* o endereço do chaveamento viaja junto: o aviso do campeão é criado DEPOIS do
+                   laço, onde `league` já saiu do escopo. */
+                pendingChampions.push({ name: match.winner.name, uid: match.winner.uid, slot: match.winner.slot,
+                                        cycleId: cycleEntry.id, leagueId: league.id, cycleTime });
               }
               const participants = [];
               (league.rounds['0']||[]).forEach(m=>{ if(m.a) participants.push(m.a); if(m.b) participants.push(m.b); });
@@ -4256,7 +4266,6 @@ async function advanceCyclePhases(typeId, cycleEntry, leagueTypeConfig, leagueTy
                   // mesmo fallback defensivo do cliente -- alguns ciclos antigos podem estar sem "scheduledTime"/
                   // "size" (de antes desses campos existirem, ou de uma migração), e o Firestore recusa gravar
                   // "undefined" -- sem isso um único registro velho malformado quebrava a gravação inteira
-                  const cycleTime = cycleEntry.scheduledTime!=null ? cycleEntry.scheduledTime : Number(cycleEntry.id) || 0;
                   const leagueSize = league.size!=null ? league.size : ((league.rounds['0']||[]).length * 2 || REGULAR_LIGA_SIZE);
                   pendingPlacements.push({ uid: p.uid, record: { cycleId: cycleEntry.id, cycleTime, leagueId: league.id, leagueSize, placement, slot: p.slot, leagueTypeId: typeId, leagueTypeName: leagueTypeName||'Liga Clássica' } });
                 }
@@ -4273,7 +4282,13 @@ async function advanceCyclePhases(typeId, cycleEntry, leagueTypeConfig, leagueTy
                 corpo: aWon
                   ? `Seu confronto contra ${match.b.name} terminou: vitória!${nextPhaseInfo ? ` Sua ${nextPhaseInfo.label} é${nextPhaseInfo.time?` às ${nextPhaseInfo.time}`:''}, contra ${nextPhaseInfo.opponentName||'a definir'}.` : ''}`
                   : `Seu confronto contra ${match.b.name} terminou: derrota. Você foi eliminado na ${eliminatedPhaseLabel}.`,
-                meta: { leagueTypeId: typeId, opponentName: match.b.name, won: aWon, eliminatedPhase: aWon?null:eliminatedPhaseLabel } });
+                /* ⚠️ O ENDEREÇO DO CHAVEAMENTO vai junto desde 18/09/2026 (a pedido: *"mude para
+                   levar para a mesma tela é exibida quando clica no botão Rever"*). São os TRÊS
+                   campos que o `viewLeagueHistory` pede -- ciclo, liga e a hora dela --, e é o
+                   mesmo trio que o `pendingPlacements` já gravava logo acima.
+                   Notificação ANTIGA não tem: ela cai na tela da liga, como sempre caiu. */
+                meta: { leagueTypeId: typeId, opponentName: match.b.name, won: aWon, eliminatedPhase: aWon?null:eliminatedPhaseLabel,
+                        cycleId: cycleEntry.id, leagueId: league.id, cycleTime } });
             }
             if(!match.b.isBot){
               const bWon = match.winner.uid === match.b.uid;
@@ -4283,7 +4298,8 @@ async function advanceCyclePhases(typeId, cycleEntry, leagueTypeConfig, leagueTy
                 corpo: bWon
                   ? `Seu confronto contra ${match.a.name} terminou: vitória!${nextPhaseInfo ? ` Sua ${nextPhaseInfo.label} é${nextPhaseInfo.time?` às ${nextPhaseInfo.time}`:''}, contra ${nextPhaseInfo.opponentName||'a definir'}.` : ''}`
                   : `Seu confronto contra ${match.a.name} terminou: derrota. Você foi eliminado na ${eliminatedPhaseLabel}.`,
-                meta: { leagueTypeId: typeId, opponentName: match.a.name, won: bWon, eliminatedPhase: bWon?null:eliminatedPhaseLabel } });
+                meta: { leagueTypeId: typeId, opponentName: match.a.name, won: bWon, eliminatedPhase: bWon?null:eliminatedPhaseLabel,
+                        cycleId: cycleEntry.id, leagueId: league.id, cycleTime } });
             }
           }
         }
@@ -4309,7 +4325,7 @@ async function advanceCyclePhases(typeId, cycleEntry, leagueTypeConfig, leagueTy
         await createNotification(champ.uid, 'league_champion',
           '🏆 Você é o campeão!',
           `Você venceu a ${leagueTypeName||'Liga Pokémon'}! Ative o bônus e, na próxima hora, seus encontros selvagens terão chance bem maior de ser shiny.`,
-          { leagueTypeId: typeId, activated: false }
+          { leagueTypeId: typeId, activated: false, cycleId: champ.cycleId, leagueId: champ.leagueId, cycleTime: champ.cycleTime }
         );
       }
     }
@@ -6846,6 +6862,30 @@ async function resolverTimeDosSaves(uid, escolhidos, tamanho, ondeErro, minimo){
     // guarda DE ONDE veio: é isso que separa dois xarás de mesmo nível em saves diferentes
     (s.team || []).forEach((p, i) => disponiveis.push({ slot: doc.id, idx: i, mon: p }));
   });
+  /* ⚠️ OS APOSENTADOS ENTRAM AQUI, e é isso que os mantém valendo na Torre e no Ginásio da Cidade
+     mesmo com o save apagado (18/09/2026: *"os pokemons que são aposentados, podem sim ser
+     utilizados na torre de treinadores e ginasio da cidade, só nao pode mais participar de ligas
+     e batalhas online"*). O arquivo da conta é o único lugar onde eles ainda existem.
+     ⚠️ O SLOT DELES É SINTÉTICO (`ap:<slot de origem>`) pra não colidir com um save VIVO do mesmo
+     número -- o jogador pode ter começado uma jornada nova naquele slot. Mas o `slotOrigem` viaja
+     junto porque o ITEM EQUIPADO é por save: sem ele, o Venusaur aposentado do slot 11 perderia o
+     item que ele carregava.
+     ⚠️ E eles NÃO passam pelo filtro das 8 insígnias: só se aposenta quem já terminou a jornada,
+     então a condição já foi cumprida quando o time entrou no arquivo. */
+  /* ⚠️ A LEITURA SÓ ACONTECE QUANDO O PEDIDO TEM APOSENTADO. Ela é UMA leitura a mais por
+     chamada, e a Torre chama uma vez POR ANDAR -- pagar isso em toda subida de quem nunca
+     aposentou nada seria custo puro. Quem tem aposentado no time já mandou o slot `ap:`, então a
+     pergunta se responde sem ir ao banco. */
+  if((escolhidos || []).some(p => p && String(p.slot || '').indexOf('ap:') === 0)){
+    try{
+      const userSnap = await db.collection('users').doc(uid).get();
+      const arquivo = (userSnap.exists && Array.isArray(userSnap.data().aposentados)) ? userSnap.data().aposentados : [];
+      arquivo.forEach((p, i) => {
+        if(!p || !p.speciesId) return;
+        disponiveis.push({ slot: 'ap:' + (p.slot != null ? p.slot : '?'), slotOrigem: p.slot, idx: i, mon: p });
+      });
+    }catch(e){ logger.error('Erro ao ler os aposentados:', e); }
+  }
   if(!disponiveis.length){
     throw new HttpsError('failed-precondition', 'Você precisa de pelo menos um save com as 8 insígnias.');
   }
@@ -6888,12 +6928,21 @@ async function resolverTimeDosSaves(uid, escolhidos, tamanho, ondeErro, minimo){
     /* O slotDaConta viaja junto: o item equipado é por SAVE, e este time MISTURA saves -- sem ele
        o Venusaur do slot 11 usaria o item do Venusaur do slot 5. */
     time.push({ speciesId: real.speciesId, level: real.level, shiny: !!real.shiny,
-                slotDaConta: String(achado.slot),
+                slotDaConta: String(achado.slotOrigem != null ? achado.slotOrigem : achado.slot),
                 /* OS GOLPES viajam junto: eles são escolha do jogador e vivem na instância do
                    save. Sem esta linha, a Torre e o Ginásio da Cidade lutariam com o motor de
                    tipo enquanto a jornada luta com os golpes escolhidos -- o mesmo pokémon com
                    dois comportamentos. */
                 ataques: Array.isArray(real.ataques) ? real.ataques.slice(0, MAX_GOLPES) : null,
+                /* ⚠️ A CHAVE DA ESPERA USA O SLOT SINTETICO, ao contrario do `slotDaConta` logo
+                   acima -- e os dois querem dizer coisas diferentes.
+                   O ITEM e do SAVE de origem (o `equipados` da conta guarda `slot:raiz`, e ele
+                   sobrevive ao save morrer), entao ele usa a ORIGEM.
+                   A ESPERA de 10 min do ginasio e do POKEMON, e o aposentado tem que ter a dele:
+                   com a origem, um Venusaur aposentado do slot 3 dividiria a espera com um
+                   Venusaur de uma jornada NOVA naquele mesmo slot -- sao dois bichos diferentes.
+                   ⚠️ E o CLIENTE calcula a mesma chave a partir do `p.slot`, que ja e o sintetico:
+                   se as duas divergirem, a tela libera quem o desafio recusa. */
                 chave: chaveDoPokemonNaConta(achado.slot, real) });
   }
   return time;

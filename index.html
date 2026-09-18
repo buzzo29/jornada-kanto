@@ -2379,8 +2379,22 @@
      descricao muda de tamanho. Agora quem cede e o miolo (ele rola), e a mao do jogador encontra o
      Comprar sempre no mesmo lugar.
      O `overflow` saiu daqui e foi pro miolo: com ele no quadro inteiro, o rodape rolava junto. */
+  /* A LISTA DO PROF. CARVALHO. Ela reusa o `.mon-name` e os selos de tipo/golpe do resto do jogo:
+     quem já sabe ler a fileira do time sabe ler esta. */
+  .carvalho-lista{ display:flex; flex-direction:column; gap:8px; max-height:70vh; overflow-y:auto; }
+  .carvalho-linha{ display:flex; align-items:center; gap:8px; padding:6px;
+    border:2px solid var(--ink); border-radius:5px; background:var(--box); }
+  .carvalho-sprite{ flex:0 0 auto; }
+  .carvalho-info{ flex:1 1 0; min-width:0; text-align:left; }
+  .carvalho-tipos{ margin-top:3px; }
+  .carvalho-golpes{ margin-top:3px; display:flex; flex-wrap:wrap; gap:3px; }
   .loja-fixa{ position:sticky; top:0; z-index:5; box-shadow:0 6px 12px rgba(12,16,36,.45);
-    height:438px;   /* ver a nota da altura fixa, logo acima */ display:flex; flex-direction:column; }
+    /* ⚠️ 350px DESDE 18/09/2026 (a pedido: *"diminua 20% o tamanho daquele quadro"*). Era 438, o
+       MAIOR caso medido -- e o preço de caber o pior item era 438px de altura em TODOS os outros.
+       Baixar é seguro porque o quadro é uma COLUNA de três andares e quem cede é o MIOLO, que rola
+       por dentro: o rodapé (os botões) continua colado embaixo, que é a promessa que a altura fixa
+       existe pra cumprir. */
+    height:350px; display:flex; flex-direction:column; }
   .loja-miolo{ flex:1; min-height:0; overflow-y:auto; }
   .loja-rodape{ flex-shrink:0; padding-top:6px; }
   /* SEIS ITENS E O RESTO ROLA (a pedido). A linha mede 36px a 320px, medida no navegador; 6 delas
@@ -3219,7 +3233,7 @@
 <body>
 <div id="app"></div>
 <div id="version-banner">
-  <span>${selo('recarregar')} Tem uma versão nova do jogo.</span>
+  <span id="version-banner-txt">Tem uma versão nova do jogo.</span>
   <button onclick="atualizarParaVersaoNova()">Atualizar agora</button>
 </div>
 
@@ -6830,6 +6844,7 @@ async function loadPermanentUserData(){
     game.rivalNameDefault = d.rivalNameDefault || '';   // preenche a tela de nome do rival (ver nomeDoRivalPadrao)
     game.hms = Array.isArray(d.hms) ? d.hms : [];       // as Máquinas Ocultas são da CONTA (ver darHM)
     game.visitouOsNinhos = !!d.visitouOsNinhos;         // a visita aos ninhos também (ver visitarOsNinhos)
+    game.aposentados = Array.isArray(d.aposentados) ? d.aposentados : [];   // ver aposentarOTime
     /* AS LETRAS DO UNOWN, mais a rede de seguranca: alem do registro feito na captura, varre os
        times atuais. Ela recupera quem capturou um Unown ANTES deste campo existir -- e tem o mesmo
        limite do Pokedex shiny: um Unown ja liberado pro Prof. Carvalho nao deixou rastro da letra
@@ -16632,6 +16647,15 @@ function savesComOitoInsignias(){
 function savesCampeoes(){
   return savesComOitoInsignias().filter(slot => !saveAposentado(game.saveSlots[slot]));
 }
+/* ⚠️ A TORRE E O GINÁSIO DA CIDADE CONTAM O ARQUIVO DA CONTA, não só os saves (18/09/2026).
+   Aposentar passou a APAGAR o save, então quem aposentou tudo tem `savesComOitoInsignias` VAZIO e
+   um arquivo cheio -- e os dois modos montam a partir dele. Sem esta soma a porta fecharia
+   justamente pra quem o pedido quer deixar entrar.
+   ⚠️ E ela NÃO vale pras LIGAS nem pro ONLINE: ali a regra continua sendo o `savesCampeoes`, e
+   é esse o ponto inteiro da aposentadoria. */
+function quantosParaTorreOuGinasio(){
+  return savesComOitoInsignias().length + aposentados().length;
+}
 const AVISO_SEM_CAMPEAO = 'É necessário vencer as 8 insígnias para entrar nesse modo de jogo.';
 /* A PORTA DOS TRES MODOS DE CAMPEAO (Ginásio da Cidade, Ligas e Batalha Online), pedida em
    12/09/2026: *"caso a conta nao tenha nenhum time vencedor das 8 insignias, coloque uma mensagem
@@ -16644,10 +16668,14 @@ const AVISO_SEM_CAMPEAO = 'É necessário vencer as 8 insígnias para entrar nes
    carregamento levava a mensagem sendo campeão. Errar pro lado de DEIXAR ENTRAR é o certo aqui:
    a janela é de alguns centésimos, os três modos continuam recusando lá dentro, e o contrário
    seria trancar a porta na cara de quem tem o time. */
-/* ⚠️ O `incluirAposentados` É DO GINÁSIO DA CIDADE: lá o time aposentado continua valendo, então a
-   porta não pode recusar quem só tem aposentados. As ligas e a batalha online chamam sem ele. */
+/* ⚠️ O `incluirAposentados` É DO GINÁSIO DA CIDADE E DA TORRE: lá o time aposentado continua
+   valendo, então a porta não pode recusar quem só tem aposentados. As ligas e a batalha online
+   chamam sem ele -- é ali que a aposentadoria morde.
+   ⚠️ E DESDE 18/09/2026 ELE CONTA O ARQUIVO DA CONTA, não só os saves: aposentar passou a APAGAR
+   o save, então quem aposentou tudo tem `savesComOitoInsignias` vazio e um arquivo cheio. Sem
+   isso a porta fecharia justamente pra quem o pedido quer deixar entrar. */
 function exigeTimeCampeao(incluirAposentados){
-  const quantos = incluirAposentados ? savesComOitoInsignias().length : savesCampeoes().length;
+  const quantos = incluirAposentados ? quantosParaTorreOuGinasio() : savesCampeoes().length;
   if(!game.saveSlotsCarregados || quantos > 0){ game.modoBloqueado = null; return true; }
   game.modoBloqueado = AVISO_SEM_CAMPEAO;
   render();
@@ -16673,6 +16701,9 @@ const CAMPOS_DA_CONTA = [
      um save apagaria a marca e as missões parariam de contar em silêncio. */
   'visitouOsNinhos',
   'unownCaught',   // as letras do Unown que a conta ja viu (ver marcarLetraDoUnown)
+  /* os times que foram pro Prof. Carvalho -- ver `aposentarOTime`. Eles são da CONTA porque o
+     SAVE deles deixa de existir no instante da aposentadoria. */
+  'aposentados',
   /* ⚠️ O AVISO DO HM TAMBÉM: o HM03 pode ser dado no CARREGAMENTO DA CONTA (pra quem já tinha as
      17 antes da feature), e aí o jogador está na home. Sem ele aqui, abrir um save apagaria a marca
      -- e o aviso não voltaria NUNCA, porque o `conferirHM03` vê o `temHM` e vai embora. Ele fica
@@ -16950,6 +16981,20 @@ function mostrarAvisoDeVersao(){
   try{
     const faixa = document.getElementById('version-banner');
     if(faixa) faixa.style.display = 'flex';
+    /* ⚠️ O SELO ENTRA AQUI, PELO JS, e não no HTML da faixa -- ela vive no `<body>` ESTÁTICO,
+       fora de qualquer template literal, e uma **interpolação ali não interpola coisa nenhuma**:
+       o jogador via o código escrito na tela. Reportado em 18/09/2026 (*"o símbolo que aparece la
+       no topo numa faixa azul, esta quebrado, fica aparecendo umas coisas escritas"*).
+       ⚠️ E A TRAVA DA INTERPOLAÇÃO NÃO PEGOU porque ela varre o SCRIPT e não o `<body>` -- o body
+       tem apóstrofo em prosa e quebraria o parser dela. Hoje há uma trava própria: nada de
+       interpolação pode sobrar no body.
+       ⚠️ E ESTE COMENTÁRIO NÃO PODE ESCREVER A SEQUÊNCIA -- ele se acusaria na trava do script, e
+       essa é a QUARTA vez que isso acontece neste projeto (o nome de líder na bifurcação, o
+       código velho na trava do `slotDaConta`, a palavra "Máquina"). */
+    const txt = document.getElementById('version-banner-txt');
+    if(txt && txt.innerHTML.indexOf('<svg') < 0){
+      txt.innerHTML = selo('recarregar') + ' Tem uma versão nova do jogo.';
+    }
   }catch(e){}
   if(game.screen === 'saveSelect') render();
 }
@@ -18051,6 +18096,58 @@ function getAllCaughtSpecies(){
   (game.permanentPokedex || []).forEach(id=> set.add(id));
   (game.caughtSpecies || []).forEach(id=> set.add(id)); // cobre o que foi capturado nesta sessão antes de sincronizar
   return set;
+}
+/* =====================================================================
+   OS POKÉMONS COM O PROF. CARVALHO (18/09/2026)
+   Pedido: *"adicione um botão dentro da pokedex chamado (Pokemons com o Prof. Carvalho), quando
+   clicar, vai exibir a lista de todos os pokemons que estão aposentados, exibindo nome, tipos,
+   level, e ataques"*.
+
+   ⚠️ ELES VÊM DA CONTA, e não de save nenhum: aposentar APAGA o save (ver `aposentarOTime`), então
+   este arquivo é o único lugar onde esses pokémon ainda existem. É por isso que ele guarda o
+   resumo em vez de apontar pra o save.
+   ===================================================================== */
+function abrirAposentados(){ game.screen = 'aposentados'; render(); }
+function sairDosAposentados(){ openPokedex(); }
+/* ⚠️ OS GOLPES SAEM DO `ataques` GRAVADO, e não do que a espécie aprende hoje: o time foi
+   aposentado com AQUELES golpes, e a lista do `APRENDIZADO` muda quando a base de golpes muda.
+   Quem não tem o campo (save antigo, ou pokémon que nunca escolheu) sai sem a linha -- e é o
+   certo: ele lutava pelo motor de tipo mesmo. */
+function renderAposentados(){
+  const lista = aposentados();
+  /* o mais recente primeiro, e dentro de cada leva a ordem em que o time estava */
+  const ord = lista.map((p, i) => ({ p, i })).sort((a, b) => (b.p.em || 0) - (a.p.em || 0) || a.i - b.i);
+  const linhas = ord.map(({ p }) => {
+    const sp = SPECIES[p.speciesId];
+    if(!sp) return '';
+    const tipos = (sp.types || []).map(t => typePill(t)).join(' ');
+    /* ⚠️ O `golpeSeloHtml` É (especie, tipo, golpeId) -- os dois primeiros são pro caminho do
+       motor de tipo, onde o golpe não tem id e o nome sai da ESPÉCIE. Aqui há id, então ele vai
+       no TERCEIRO lugar; passá-lo no primeiro faz o selo nomear o golpe genérico da "espécie"
+       inexistente e sair errado em silêncio. */
+    const golpes = (p.ataques || []).map(id => {
+      const g = GOLPES[id];
+      return g ? golpeSeloHtml(p.speciesId, g[0], id) : '';
+    }).join(' ');
+    return `<div class="carvalho-linha">
+      <div class="carvalho-sprite">${spriteHtml(p, 'sprite-sm')}</div>
+      <div class="carvalho-info">
+        <div class="mon-name">${escapeHtmlSafe(sp.name)}${p.shiny ? ' ' + selo('shiny') : ''} <span class="mon-sub">Lv.${p.level}</span></div>
+        <div class="carvalho-tipos">${tipos}</div>
+        ${golpes ? `<div class="carvalho-golpes">${golpes}</div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+  return `
+  <div class="box">
+    <h2>${selo('medalha')} Pokémons com o Prof. Carvalho</h2>
+    <p class="hint-text">${lista.length} pokémon aposentado${lista.length === 1 ? '' : 's'}. A jornada
+       deles acabou -- eles ficam aqui como registro.</p>
+  </div>
+  <div class="box">
+    <div class="carvalho-lista">${linhas || '<p class="hint-text">Ninguém ainda.</p>'}</div>
+  </div>
+  <button class="btn secondary" onclick="sairDosAposentados()">⬅ Voltar</button>`;
 }
 function openPokedex(){
   game.screen = 'pokedex';
@@ -23099,9 +23196,24 @@ async function irParaALiga(leagueTypeId){
 }
 /* O BOTÃO É O MESMO PRAS CINCO notificações de liga, e o texto NOMEIA o destino: "Ver a liga" num
    aviso de Trainers League mandaria o jogador procurar qual. */
+/* ⚠️ COM O ENDEREÇO DO CHAVEAMENTO, o botão leva DIRETO pra ele -- a mesma tela do "▶ Rever" de
+   "Suas últimas Ligas" (18/09/2026, a pedido). Sem o endereço (notificação antiga, ou uma que não
+   fala de uma liga específica -- `league_started`, `league_delayed`) ele abre a tela da liga,
+   como sempre abriu.
+   ⚠️ A TRAINERS LEAGUE FICA DE FORA, e não é esquecimento: ela é um round-robin de um grupo só e
+   não tem `leagueId` por partida -- o histórico dela é outro. O pedido nomeia a Clássica. */
+function enderecoDoChaveamento(n){
+  const m = n && n.meta;
+  if(!m || !m.cycleId || m.leagueId == null) return null;
+  return { typeId: m.leagueTypeId || CLASSIC_LEAGUE_TYPE, cycleId: m.cycleId, leagueId: m.leagueId, cycleTime: m.cycleTime || 0 };
+}
 function botaoDaLigaHtml(n){
   const id = (n.meta && n.meta.leagueTypeId) || null;
   if(!id) return '';
+  const end = enderecoDoChaveamento(n);
+  if(end){
+    return `<button class="btn primary u-mt8" onclick="viewLeagueHistory('${escJs(end.typeId)}','${escJs(end.cycleId)}',${Number(end.leagueId)},${Number(end.cycleTime)})">🏆 Ver o chaveamento</button>`;
+  }
   const nome = id === TRAINERS_LEAGUE_TYPE ? 'Trainers League'
              : id === CLASSIC_LEAGUE_TYPE ? 'Liga Clássica'
              : 'liga';
@@ -23828,14 +23940,66 @@ function renderNeighborhoodGymResult(){
    ela não seria uma decisão, seria um interruptor. */
 function pedirAposentadoria(){ game.aposentarPergunta = true; render(); }
 function fecharAposentadoria(){ game.aposentarPergunta = false; render(); }
+/* ⚠️ O QUE VAI PRO ARQUIVO é o mínimo que a tela do Prof. Carvalho precisa desenhar -- espécie,
+   nível, shiny, golpes e a letra do Unown. O pokémon inteiro tem dezenas de campos de estado de
+   batalha (`_queimado`, `_furia`, HP do momento) que não dizem nada num arquivo, e o documento da
+   conta tem 1 MiB: 20 saves × 6 pokémon é o teto, e o resumo cabe com folga. */
+function paraOArquivo(p){
+  const o = { speciesId: p.speciesId, level: p.level || 1 };
+  if(p.shiny) o.shiny = true;
+  if(p.unown) o.unown = p.unown;
+  if(Array.isArray(p.ataques) && p.ataques.length) o.ataques = p.ataques.slice();
+  return o;
+}
+function aposentados(){ return Array.isArray(game.aposentados) ? game.aposentados : []; }
+/* ⚠️ APOSENTAR APAGA O SAVE (18/09/2026, a pedido: *"após aposentar um time, o save deve ser
+   deletado automaticamente"*). O que morre é a JORNADA, não o time: o pedido do mesmo dia diz que
+   eles *"podem sim ser utilizados na torre de treinadores e ginasio da cidade, só nao pode mais
+   participar de ligas e batalhas online"* -- e com o save apagado, o ARQUIVO DA CONTA virou a
+   origem de onde os dois modos montam (ver o `resolverTimeDosSaves` do servidor e o
+   `towerEligiblePokemon` aqui).
+   O que a aposentadoria custa de verdade é a LIGA e o ONLINE, que leem o `savesCampeoes`.
+
+   ⚠️ A ORDEM AQUI É A REGRA: o arquivo e a Pokédex são gravados ANTES de o save morrer. Se a
+   gravação falhar, o save FICA -- perder a jornada e não guardar o time seria o pior dos dois
+   mundos, e é o mesmo lado pra que o `usarTM` erra (grava o time antes de cobrar a Máquina). */
 async function aposentarOTime(){
-  game.aposentado = true;
+  const slot = game.currentSaveSlot;
+  if(slot == null || !game.authUser){ game.aposentarPergunta = false; render(); return; }
+  const doArquivo = (game.team || []).map(paraOArquivo);
+  const quando = Date.now();
+  const entradas = doArquivo.map(p => Object.assign({ slot: String(slot), em: quando }, p));
+  try{
+    /* 1) o time vai pro arquivo da conta, e a Pokédex recebe o que este save capturou -- a mesma
+       rede do `confirmDeleteSave`, porque daqui pra frente o save não existe mais pra contar. */
+    const capturou = (game.caughtSpecies || []).slice();
+    const patch = { aposentados: firebase.firestore.FieldValue.arrayUnion(...entradas) };
+    if(capturou.length) patch.pokedexCaught = firebase.firestore.FieldValue.arrayUnion(...capturou);
+    await userDocRef(game.authUser.uid).set(patch, { merge: true });
+    game.aposentados = aposentados().concat(entradas);
+    if(!game.permanentPokedex) game.permanentPokedex = [];
+    capturou.forEach(id => { if(game.permanentPokedex.indexOf(id) < 0) game.permanentPokedex.push(id); });
+
+    /* 2) e só ENTÃO o save morre -- vagando o ginásio antes, como o delete comum faz: doc de
+       ginásio é escrita exclusiva do servidor. */
+    try{
+      const r = await functionsClient.httpsCallable('checkNeighborhoodGymDefenseForSlot')({ slot });
+      if(r && r.data && r.data.defending){
+        await functionsClient.httpsCallable('vacateNeighborhoodGymForDeletedSave')({ slot });
+      }
+    }catch(e){ console.error('Erro ao vagar o ginásio ao aposentar:', e); }
+    await saveDocRef(game.authUser.uid, slot).delete();
+  }catch(e){
+    console.error('Erro ao aposentar o time:', e);
+    game.aposentarPergunta = false;
+    game.aposentarErro = 'Não foi possível aposentar agora. Sua jornada continua salva -- tente de novo.';
+    render();
+    return;
+  }
   game.aposentarPergunta = false;
-  /* GRAVA NA HORA: esta é uma decisão definitiva, e ela não pode depender do autosave (que é
-     debounced em 800ms e só roda nas telas seguras). */
-  try{ await saveCurrentGame(); }catch(e){ console.error("Erro ao aposentar o time:", e); }
+  game.aposentarErro = null;
   await loadSaveSlots();
-  render();
+  openSaveSelect();
 }
 function renderAposentadoriaModal(){
   if(!game.aposentarPergunta) return "";
@@ -23846,8 +24010,22 @@ function renderAposentadoriaModal(){
       <div class="modal-icon">🎓</div>
       <h2>Aposentar o time?</h2>
       <p>${escapeHtmlSafe(time.join(", "))} vão ficar com o <strong>Prof. Carvalho</strong>.</p>
-      <p class="hint-text">Eles <strong>continuam valendo</strong> na Torre dos Treinadores e no Ginásio da Cidade,
-         mas <strong>não poderão mais</strong> entrar em Ligas nem em Batalhas Online.</p>
+      ${/* ⚠️ O AVISO CONTA AS DUAS COISAS, e elas puxam pra lados opostos: a jornada MORRE
+            (o save é apagado) mas o TIME continua jogável nos dois modos que montam a partir dos
+            saves. Dizer só a primeira metade faria o jogador achar que perde os pokémon; dizer só
+            a segunda esconderia que a jornada acabou. Esta é a última tela antes de uma decisão
+            sem volta, então ela diz as duas. */''}
+      <p class="hint-text">⚠️ <strong>Esta jornada será apagada</strong> e o slot fica livre pra
+         uma nova.</p>
+      ${/* ⚠️ OS TRÊS RECADOS CABEM NUM PARÁGRAFO SÓ, e isso foi medido a 320px: em quatro
+            parágrafos o modal ia a 578px (a tela tem 568) e a 621 com um time de seis nomes
+            compridos. Juntando, ele fica em **523** com dois pokémon e 588 no pior caso -- e ali
+            quem rola é o overlay (`overflow-y:auto` + `flex-start`), então o botão continua
+            alcançável. */''}
+      <p class="hint-text">O time <strong>continua valendo</strong> na Torre dos Treinadores e no
+         Ginásio da Cidade -- o que acaba é <strong>liga</strong> e <strong>batalha online</strong>.
+         Eles ficam registrados na <strong>Pokédex</strong>, em
+         <em>Pokémons com o Prof. Carvalho</em>.</p>
       <p class="hint-text">⚠️ Isso não tem volta.</p>
       <button class="btn danger" onclick="aposentarOTime()">🎓 Aposentar</button>
       <button class="btn secondary" onclick="fecharAposentadoria()">Cancelar</button>
@@ -25709,6 +25887,16 @@ function towerEligiblePokemon(){
     // este bicho, e não um xará de mesmo nível guardado em outro save
     (s.team||[]).forEach((p, i) => out.push({ slot, idx:i, monId: p.id || null, speciesId:p.speciesId, level:p.level, shiny:!!p.shiny, teamName: s.customName || ('Time '+(slot+1)) }));
   }
+  /* ⚠️ OS APOSENTADOS CONTINUAM VALENDO NOS DOIS MODOS (18/09/2026, a pedido), e é aqui que eles
+     entram: o save deles foi apagado, então o arquivo da conta é a única origem que sobrou.
+     O `slot` sintético é o mesmo que o servidor monta (`resolverTimeDosSaves`) -- as duas pontas
+     têm que dizer a mesma coisa, senão a escolha da tela não é encontrada na hora de lutar. */
+  aposentados().forEach((p, i) => {
+    if(!p || !SPECIES[p.speciesId]) return;
+    out.push({ slot: 'ap:' + (p.slot != null ? p.slot : '?'), idx: i, monId: null,
+               speciesId: p.speciesId, level: p.level, shiny: !!p.shiny,
+               teamName: 'Prof. Carvalho' });
+  });
   return out;
 }
 /* ============================ INVENTÁRIO E LOJA ============================
@@ -27055,7 +27243,7 @@ function renderLoja(){
              aparece na mochila e nao se vende. Ver a nota da funcao. -->
         <button class="btn danger" ${(vendaveis > 0 && !game.comprando) ? '' : 'disabled'}
           onclick="abrirVenda('${escJs(sel.item)}')">${vendaveis > 0
-            ? `${selo('moeda')} Vender por ${precoDeVenda(sel.item)}` : 'Você não tem pra vender'}</button>
+            ? `${selo('moeda')} Vender (${precoDeVenda(sel.item)})` : 'Você não tem pra vender'}</button>
       </div>
       </div>`
     : ''}
@@ -27242,7 +27430,14 @@ function montadorDeTimeHtml(escolhidos, nomeDoToggle, max, esperas){
        que dá vontade de conferir os atributos de quem ficou de fora. */
     return `<div class="mont-linha">
       <button class="mont-card ${sel?'sel':''} ${bloqueado?'off':''} ${falta>0?'descansando':''}"
-        onclick="${nomeDoToggle}(${p.slot},${p.idx})"
+        ${/* ⚠️ O SLOT VAI ENTRE ASPAS, e isso deixou de ser opcional em 18/09/2026: ele sempre
+             foi um NUMERO, e desde que os aposentados entraram no montador ele pode ser
+             `ap:3`. Sem as aspas o atributo vira `towerTogglePick(ap:3,0)` -- sintaxe invalida --
+             e o clique nao faz NADA, sem erro no console. E a mesma familia do JSON.stringify que
+             matou o botao da notificacao da liga em 17/09: um valor que nao e o tipo esperado
+             quebrando o onclick em silencio.
+             Quem casa os dois lados e o `alternarEscolhaDeTime`, que compara por String(). */''}
+        onclick="${nomeDoToggle}('${escJs(String(p.slot))}',${p.idx})"
         ${bloqueado?'disabled':''}
         title="${escapeHtmlSafe(sp?sp.name:'?')} Lv.${p.level}${bloqueado?porque:''}">
         <span class="mont-num">${sel ? (posicao+1)+'º' : ''}</span>
@@ -27260,9 +27455,13 @@ function montadorDeTimeHtml(escolhidos, nomeDoToggle, max, esperas){
 /* Marca ou desmarca um pokémon na lista, com as DUAS regras da casa: teto de 6 e sem repetir
    espécie. Devolve a própria lista (mutada) pra quem chamou só ter que renderizar. */
 function alternarEscolhaDeTime(lista, slot, idx, max, esperas){
-  const alvo = towerEligiblePokemon().find(p => p.slot===slot && p.idx===idx);
+  /* ⚠️ A COMPARACAO E POR String(): o slot de um save e NUMERO e o de um aposentado e TEXTO
+     (`ap:3`), e o onclick manda os dois como texto. Com `===` cru, escolher um aposentado nao
+     faz nada -- e escolher um do save deixaria de funcionar se alguem passasse numero. */
+  const mesmo = (p) => String(p.slot) === String(slot) && p.idx === idx;
+  const alvo = towerEligiblePokemon().find(mesmo);
   if(!alvo) return lista;
-  const ja = lista.findIndex(p => p.slot===slot && p.idx===idx);
+  const ja = lista.findIndex(mesmo);
   if(ja >= 0){ lista.splice(ja, 1); return lista; }
   if(esperas && esperas[chaveDoPokemon(alvo)] > 0) return lista;   // descansando
   if(lista.length >= max) return lista;
@@ -29736,6 +29935,10 @@ function renderPokedex(){
         ? `${shinyCount} shiny${shinyCount===1?'':'s'} capturado${shinyCount===1?'':'s'}, somando todos os seus saves.`
         : `${caughtCount} de ${totalSpecies} espécies registradas, somando todos os seus saves.`}</p>
     <button class="btn secondary" onclick="togglePokedexShinyView()">${isShinyView ? '⬅ Ver Pokédex normal' : '✨ Shiny'}</button>
+    ${/* ⚠️ O BOTÃO SÓ APARECE COM ALGUÉM LÁ: uma tela que só diz "ninguém ainda" é pior que
+          um botão que não existe, e a aposentadoria é rara -- a maioria das contas nunca vai
+          ter um. */''}
+    ${aposentados().length ? `<button class="btn secondary" onclick="abrirAposentados()">${selo('medalha')} Pokémons com o Prof. Carvalho (${aposentados().length})</button>` : ''}
   </div>
   <div class="box">
     <div class="pokedex-grid">
@@ -30157,6 +30360,7 @@ function render(){
     case 'auth': html = renderAuth(); break;
     case 'accountSetup': html = renderAccountSetup(); break;
     case 'saveSelect': html = renderSaveSelect(); break;
+    case 'aposentados': html = renderAposentados(); break;
     case 'pokedex': html = renderPokedex(); break;
     case 'mewtwoPicker': html = renderMewtwoPicker(); break;
     case 'mewtwoBenchPicker': html = renderMewtwoBenchPicker(); break;

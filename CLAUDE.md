@@ -7713,17 +7713,112 @@ clicar nele, os pokémons vão para o professor carvalho e não vai mais ser pos
 time em ligas onlines e batalhas onlines, porém podem ser utilizados na torre dos treinadores e no
 ginásio da cidade"*.
 
-- **⚠️ O TIME NÃO É APAGADO, e é isso que faz o pedido fechar.** "Vão para o Prof. Carvalho" é o que
-  a APOSENTADORIA significa, não uma limpeza do save: esvaziando o time, ele sumiria da Torre e do
-  Ginásio da Cidade junto — o contrário do que se pediu. **O que muda é UMA marca** (`aposentado` no
-  save), e o time continua inteiro.
+- **⚠️ APOSENTAR APAGA O SAVE desde 18/09/2026** (a pedido: *"após aposentar um time, o save deve
+ser deletado automaticamente, então quando o usuário clicar para se aposentar, ele deve saber
+disso e clicar em confirmar"*). **Isso REVERTE a decisão de 17/09**, que mantinha o save de
+propósito — o texto dela era *"o time NÃO é apagado, e é isso que faz o pedido fechar"*, porque
+esvaziando o save ele sumiria da Torre e do Ginásio da Cidade.
+
+**⚠️ MAS O TIME CONTINUA JOGÁVEL NA TORRE E NO GINÁSIO DA CIDADE** — pedido no mesmo dia, horas
+depois: *"os pokemons que são aposentados, podem sim ser utilizados na torre de treinadores e
+ginasio da cidade, só nao pode mais participar de ligas e batalhas online"*.
+
+**⚠️ EU TINHA LIDO O DELETE COMO "SAI DOS DOIS MODOS", E ERA A LEITURA ERRADA.** As duas coisas
+parecem uma só e não são: o que morre é a **JORNADA**, não o time. Com o save apagado eles somem
+das listas que varrem `users/{uid}/saves` — então o **arquivo da conta virou a origem de onde os
+dois modos montam**.
+
+- **⚠️ O ARQUIVO ENTRA NO `disponiveis` do `resolverTimeDosSaves`**, ao lado dos saves vivos. É a
+  função única por onde a Torre e o Ginásio da Cidade montam time (as três chamadas: defesa,
+  desafio e subida da torre), e **nenhuma liga passa por ela** — conferido. Ou seja, o aposentado
+  vale exatamente onde o pedido manda e em lugar nenhum além.
+- **⚠️ O SLOT DELES É SINTÉTICO (`ap:<slot de origem>`), e isso não é estética:** o jogador pode ter
+  começado uma jornada NOVA naquele slot, e o casamento do servidor é por **slot+idx+espécie** —
+  com o slot cru, o pedido casaria com o pokémon errado. É o defeito de 01/09/2026 por outra porta.
+  Medido: um save vivo no slot 3 e dois aposentados do mesmo slot convivem com **8 identidades
+  distintas**.
+- **⚠️ MAS A ORIGEM VIAJA JUNTO (`slotOrigem`), porque o ITEM EQUIPADO é por SAVE.** A chave dele é
+  `slot:raiz-da-linha`, e o `equipados` é da CONTA — ele sobrevive ao save morrer. Sem a origem, um
+  Venusaur aposentado do slot 11 perderia o item que carregava. A **chave da espera do ginásio**
+  (save+espécie) sai do mesmo lugar, pelo mesmo motivo.
+- **⚠️ E ELES NÃO PASSAM PELO FILTRO DAS 8 INSÍGNIAS**, de propósito: só se aposenta quem já
+  terminou a jornada, então a condição foi cumprida quando o time entrou no arquivo — e o save que
+  a provava não existe mais pra ser consultado.
+- **A PORTA DOS MODOS CONTA O ARQUIVO** (`quantosParaTorreOuGinasio`): quem aposentou tudo tem
+  `savesComOitoInsignias` **vazio** e um arquivo cheio, e sem essa soma a porta fecharia justamente
+  pra quem o pedido quer deixar entrar. **As ligas e o online continuam lendo o `savesCampeoes`** —
+  é ali que a aposentadoria morde, e é o ponto inteiro dela.
+- **NA TELA eles aparecem como um time chamado "Prof. Carvalho"**, ao lado dos times de save. O
+  montador já agrupa por origem, então não houve tela nova.
+
+**E eles continuam virando um registro na Pokédex** (a tela do Prof. Carvalho) — o que mudou é que
+o registro deixou de ser a *única* coisa que sobra deles.
+
+#### ⚠️ E O SLOT SINTÉTICO QUEBROU O CLIQUE EM SILÊNCIO
+
+O montador monta o `onclick` assim: `${nomeDoToggle}(${p.slot},${p.idx})`. O slot **sempre foi um
+número**, então ele ia **sem aspas** — e com `ap:3` o atributo vira `towerTogglePick(ap:3,0)`, que
+é **sintaxe inválida**. O clique não fazia **nada**, e **não havia erro no console**.
+
+**⚠️ É A MESMA FAMÍLIA DO `JSON.stringify` que matou o botão da notificação da liga em 17/09**: um
+valor que não é o tipo esperado quebrando o `onclick` por dentro, com a tela continuando a
+**PARECER** certa. E ela passa em **qualquer** asserção de estado — foi o navegador que pegou.
+
+- Hoje o slot vai **entre aspas**, pelo `escJs`, como todo o resto do arquivo.
+- **E o `alternarEscolhaDeTime` compara por `String()`**: o slot de um save é NÚMERO e o de um
+  aposentado é TEXTO, e o `onclick` manda os dois como texto — com `===` cru, escolher um
+  aposentado não fazia nada.
+- A trava lê o **HTML gerado** e cobra que **todo** `onclick` do montador mande o slot entre aspas
+  — não só o do aposentado, senão o próximo tipo de origem nasce com o mesmo defeito.
+
+**⚠️ E ELE DERRUBOU UM EXTRATOR DE TESTE, que é a lição de sempre:** a trava do montador procurava
+`towerTogglePick\(\d+,\d+\)` pra contar identidades, e com as aspas ela passou a casar com
+**ZERO** — acusando *"0 de 0"*, que é o pior falso positivo possível: ela deixou de medir qualquer
+coisa e continuou vermelha por outro motivo.
+
+#### ⚠️ E AS DUAS CHAVES QUASE DIVERGIRAM — e elas querem dizer coisas diferentes
+
+O pokémon devolvido pelo resolver carrega **dois** identificadores de origem, e a tentação é fazer
+os dois iguais:
+
+| campo | qual slot | por quê |
+|---|---|---|
+| **`slotDaConta`** (o ITEM equipado) | a **ORIGEM** (`3`) | o `equipados` da conta guarda `slot:raiz-da-linha` e **sobrevive ao save morrer** — com o sintético, o aposentado perderia o item que carregava |
+| **`chave`** (a ESPERA de 10 min do ginásio) | o **SINTÉTICO** (`ap:3`) | ela é do POKÉMON: com a origem, um Venusaur aposentado do slot 3 dividiria a espera com um Venusaur de uma jornada **NOVA** naquele mesmo slot — são dois bichos diferentes |
+
+**⚠️ E A CHAVE TEM QUE BATER COM A DO CLIENTE**, que a monta do `p.slot` (já o sintético). O
+CLAUDE.md já avisava: *"se as duas divergirem, a tela libera quem o desafio recusa — ou apaga quem
+podia lutar"*. Eu tinha posto a origem nas duas e a divergência nasceu ali; hoje há trava lendo o
+código dos dois lados.
+
+**⚠️ E A TRAVA NASCEU MEDINDO O VAZIO:** ela fatiava **5.000 caracteres** do resolver e o `chave:`
+está no **6.579** — as duas asserções falhavam com o código **certo**. É a mesma armadilha da fatia
+vazia do `tentarGolpeEspecial`, e o conserto é o mesmo: fatiar **até o fim da função** e ter um
+`ok` cobrando que a fatia tem tamanho.
+
+- **O TIME VAI PRO ARQUIVO DA CONTA** (`users/{uid}.aposentados`), em **resumo**: espécie, nível,
+  shiny, golpes e a letra do Unown, mais o slot e a data. O pokémon inteiro tem dezenas de campos
+  de estado de batalha (`_queimado`, `_furia`, HP do momento) que não dizem nada num arquivo.
+- **⚠️ A ORDEM É A REGRA: o arquivo e a Pokédex são gravados ANTES de o save morrer.** Se a
+  gravação falhar, o save **fica** e o jogador é avisado — perder a jornada E não guardar o time
+  seria o pior dos dois mundos. É o mesmo lado pra que o `usarTM` erra.
+- **AS DUAS GRAVAÇÕES SÃO `arrayUnion`**, que é a única escrita de lista que não pode **encolher**
+  — a lição que custou 49 espécies da Pokédex de um jogador.
+- **O ginásio é vagado antes**, como no delete comum: doc de ginásio é escrita exclusiva do
+  servidor, e um save apagado não pode deixar um ginásio com líder fantasma.
+- **SAVE JÁ APOSENTADO ANTES DESTA DATA continua existindo** com a marca `aposentado`, e o
+  `saveAposentado` continua respondendo por ele — ninguém perde o que já tinha.
+
 - **⚠️ E ISSO PARTIU `savesCampeoes()` EM DUAS PERGUNTAS.** Ela era a porta única dos três modos, e
   agora duas listas discordam **num caso só** — a conta que só tem time aposentado:
 
   | | quem lê |
   |---|---|
-  | **`savesComOitoInsignias()`** — todos, aposentado ou não | Torre, Ginásio da Cidade |
-  | **`savesCampeoes()`** — os de cima MENOS os aposentados | Ligas, Batalha Online |
+  | **`quantosParaTorreOuGinasio()`** — os saves com 8 insígnias **+ o arquivo da conta** | Torre, Ginásio da Cidade |
+  | **`savesCampeoes()`** — os saves com 8 insígnias, MENOS os aposentados | Ligas, Batalha Online |
+
+  ⚠️ **A primeira ganhou o arquivo em 18/09/2026**, quando aposentar passou a apagar o save: sem
+  ele ela devolveria zero pra quem aposentou tudo, e os dois modos fechariam a porta.
 
   O nome ficou em `savesCampeoes` porque ele é o que o resto do código já chamava: renomear os 9
   chamadores só pra trocar a palavra deixaria a mudança maior do que ela é.
@@ -11454,6 +11549,75 @@ pintando o mesmo pixel dariam o desenho certo por acaso, com a cor do último. C
 10.336 pixels com o "consumido" marcado errado.
 **E há um teto de ~95 KB pro SVG** (1.800 bytes por selo), porque a trava do pixel **não pega** a otimização ser desfeita:
 com uma `<rect>` por pixel o desenho continua certo e só o DOM cresce. Conferido: ela acusa com uma `<rect>` por pixel.
+
+### OS POKÉMONS COM O PROF. CARVALHO (18/09/2026)
+
+Pedido junto com o delete do save: *"adicione um botão dentro da pokedex chamado (Pokemons com o
+Prof. Carvalho), quando clicar, vai exibir a lista de todos os pokemons que estão aposentados,
+exibindo nome, tipos, level, e ataques"*.
+
+- **⚠️ ELES VÊM DA CONTA, e não de save nenhum** — aposentar apaga o save, então este arquivo é
+  o **único lugar** onde esses pokémon ainda existem. É por isso que ele guarda o resumo em vez
+  de apontar pra o save.
+- **OS GOLPES SÃO OS QUE ELE TINHA**, lidos do `ataques` gravado — e não do que a espécie aprende
+  hoje: a base de golpes muda, e o time foi aposentado com AQUELES. Quem não tem o campo (save
+  antigo, ou quem nunca escolheu) sai sem a linha, que é o certo: ele lutava pelo motor de tipo.
+- **⚠️ O `golpeSeloHtml` É `(especie, tipo, golpeId)`**, e a primeira versão desta tela passou o
+  golpe no PRIMEIRO lugar: o selo nomeava outro golpe **em silêncio** (saiu "Chicote de Cipó" no
+  lugar de "Raio Solar"). Há trava com o nome esperado, e não só com "tem algum selo".
+- **O BOTÃO SÓ APARECE COM ALGUÉM LÁ**: a aposentadoria é rara, e uma tela que só diz "ninguém
+  ainda" é pior que um botão que não existe. Ele traz a contagem junto.
+- **A lista reusa o `.mon-name` e os selos de tipo/golpe** do resto do jogo: quem já sabe ler a
+  fileira do time sabe ler esta. Medido a 320px: linha de **228×116px**, 12 aposentados em
+  **822px**, sem rolagem lateral e sem texto cortado.
+
+### A NOTIFICAÇÃO DE LIGA LEVA AO CHAVEAMENTO (18/09/2026)
+
+Pedido: *"quando clicar na notificação para ir até a Liga Clássica, hoje esta levando para a tela
+principal ... mude para levar para a mesma tela é exibida quando clica no botão Rever"*.
+
+O `viewLeagueHistory` pede **quatro** coisas (tipo, ciclo, liga e a hora dela), e a notificação só
+carregava o **tipo**. Hoje o servidor manda as outras três no `meta` — e é o mesmo trio que o
+`pendingPlacements` já gravava dez linhas acima.
+
+- **NOTIFICAÇÃO ANTIGA CAI NA TELA DA LIGA**, como sempre caiu: sem o endereço, o botão volta a
+  ser o de antes. O mesmo vale pras que não falam de uma liga específica (`league_started`,
+  `league_delayed`).
+- **⚠️ A TRAINERS LEAGUE FICA DE FORA, e não é esquecimento:** ela é um round-robin de um grupo
+  só e **não tem `leagueId` por partida** — o histórico dela é outro. O pedido nomeia a Clássica.
+- **⚠️ O `cycleTime` TEVE QUE SUBIR DE ESCOPO.** Ele era declarado dentro do laço de
+  participantes, e as notificações são criadas **antes** dele — deixado lá, seria **zona morta
+  temporal**, o mesmo defeito que travou as quatro telas de revelação em 09/09/2026.
+- E o `onclick` usa **`escJs`**, não `JSON.stringify` — a lição de 17/09, com trava própria.
+
+### ⚠️ A FAIXA DE UPDATE MOSTRAVA O CÓDIGO (18/09/2026)
+
+Reportado: *"o símbolo que aparece la no topo numa faixa azul, esta quebrado, fica aparecendo umas
+coisas escritas"*. E era literal: a faixa vive no **`<body>` estático**, fora de qualquer template
+literal — a interpolação que eu pôs ali quando os emojis viraram selo **nunca interpolou**, e o
+jogador via o código escrito na tela.
+
+- **O SELO ENTRA PELO JS**, no `mostrarAvisoDeVersao`, que é quem acende a faixa.
+- **⚠️ A TRAVA DA INTERPOLAÇÃO NÃO PEGAVA**: ela varre o **SCRIPT** e não o `<body>` — o body tem
+  apóstrofo em prosa e quebraria o parser dela. Hoje há uma trava própria, e ela é simples:
+  **nada de interpolação pode sobrar no body**.
+- **⚠️ E O COMENTÁRIO DO CONSERTO SE ACUSOU NA TRAVA DO SCRIPT** — a **quarta** vez que isso
+  acontece neste projeto (o nome de líder na bifurcação, o código velho na trava do `slotDaConta`,
+  a palavra "Máquina"). Ele foi reescrito sem a sequência literal.
+
+### DUAS MEDIDAS DA LOJA (18/09/2026)
+
+- **O quadro do item foi de 438 para 350px** (−20%, a pedido). Ele é uma coluna de três andares e
+  quem cede é o **miolo**, que rola por dentro — o rodapé continua colado embaixo, que é a
+  promessa que a altura fixa existe pra cumprir. Conferido nos 33 itens: **350px em todos**, sem
+  rolagem lateral; o pior miolo a rolar é o do TM03, com 185px.
+- **"Vender por 25" virou "Vender (25)"**, a pedido.
+
+⚠️ **E O SANDBOX GANHOU `FieldValue`** (`arrayUnion`, `delete`, `increment`, `serverTimestamp`):
+o jogo grava listas com `arrayUnion` em vários caminhos, e sem ele qualquer teste que escreva uma
+lista morria com um TypeError sem relação com o que estava sendo testado. Ele devolve um objeto
+**reconhecível**, pra a trava poder afirmar *"isto foi um arrayUnion destes valores"* em vez de só
+não quebrar — a mesma lição do `fake-firestore`.
 
 ### ⚠️ A FRASE DE STATUS VOLTOU A PISCAR, E A CULPA FOI DO SELO (18/09/2026)
 

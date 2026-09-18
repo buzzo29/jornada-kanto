@@ -2324,7 +2324,25 @@ console.log('\n=== APOSENTAR O TIME (o Prof. Carvalho) ===');
     const m = S.renderAposentadoriaModal();
     ok('o modal nomeia o time', m.indexOf('Venusaur') >= 0);
     ok('e avisa que nao tem volta', /não tem volta/.test(m), m.slice(0, 120));
-    ok('e diz onde eles continuam valendo', m.indexOf('Torre dos Treinadores') >= 0);
+    /* ⚠️ ESTA TRAVA JA MEDIU AS DUAS COISAS OPOSTAS NO MESMO DIA, e vale saber por que: de manha
+       aposentar passou a APAGAR o save, e eu li isso como "o time sai da Torre e do Ginasio" --
+       a trava passou a cobrar essa frase. A tarde o pedido corrigiu: *"podem sim ser utilizados
+       na torre de treinadores e ginasio da cidade, so nao pode mais participar de ligas e
+       batalhas online"*.
+       Hoje ela cobra as DUAS metades, que puxam pra lados opostos: a jornada morre E o time
+       continua jogavel. Dizer so a primeira faria o jogador achar que perde os pokemon; so a
+       segunda esconderia que a jornada acabou. */
+    ok('avisa que a jornada sera apagada', m.indexOf('jornada será apagada') >= 0, 'sem o aviso');
+    ok('e que o time CONTINUA valendo na Torre e no Ginasio',
+       m.indexOf('continua valendo') >= 0 && m.indexOf('Torre dos') >= 0 && m.indexOf('Ginásio da Cidade') >= 0,
+       'sem o que continua');
+    ok('e que ele NAO faz mais liga nem batalha online',
+       m.indexOf('liga') >= 0 && m.indexOf('batalha online') >= 0, 'sem o que acaba');
+    /* ⚠️ e ele NAO pode voltar a dizer que o time sai dos dois modos -- foi a leitura errada */
+    ok('e NAO diz mais que o time sai dos dois modos',
+       m.indexOf('sai da Torre') < 0, 'ainda diz que sai');
+    ok('e aponta pra tela do Prof. Carvalho na Pokedex',
+       m.indexOf('Pokédex') >= 0 && m.indexOf('Prof. Carvalho') >= 0, 'sem o destino');
   }
   S.fecharAposentadoria();
   ok('cancelar fecha sem aposentar',
@@ -2357,12 +2375,158 @@ console.log('\n=== APOSENTAR O TIME (o Prof. Carvalho) ===');
     const srv = require('fs').readFileSync(path.join(raiz, 'functions', 'index.js'), 'utf8');
     ok('a Trainers League do servidor exclui o aposentado',
        /badgeCount\|\|0\) >= 8 && !s\.aposentado/.test(srv));
-    /* e o resolverTimeDosSaves (Torre + Ginasio da Cidade) NAO exclui -- la ele vale */
+    /* ⚠️ E O RESOLVER (Torre + Ginasio da Cidade) NAO EXCLUI -- la o aposentado VALE, e desde
+       18/09/2026 ele ate LE o arquivo da conta. A trava procura o PADRAO DE EXCLUSAO, nunca a
+       palavra: com `indexOf('aposentado')` ela se acusava no proprio comentario do codigo -- a
+       QUINTA vez dessa armadilha neste projeto. */
     const resolver = srv.slice(srv.indexOf('async function resolverTimeDosSaves'),
-                               srv.indexOf('async function resolverTimeDosSaves') + 1800);
+                               srv.indexOf('async function resolverTimeDosSaves') + 3000);
     ok('e o resolverTimeDosSaves NAO exclui (Torre e Ginasio)',
-       resolver.length > 100 && resolver.indexOf('aposentado') < 0);
+       resolver.length > 100 && !/!\s*s\.aposentado|\.aposentado\s*\)\s*return/.test(resolver),
+       'ele esta excluindo o aposentado');
+    /* ⚠️ E O ARQUIVO DA CONTA ENTRA NO `disponiveis`: e isso que mantem o aposentado jogavel
+       depois de o save morrer. Sem esta linha a Torre e o Ginasio ficariam vazios pra quem
+       aposentou tudo -- que e exatamente o que o pedido de 18/09 recusa. */
+    ok('e o arquivo da conta entra nos disponiveis',
+       /data\(\)\.aposentados/.test(resolver) && /disponiveis\.push\(\{ slot: 'ap:/.test(resolver),
+       'o arquivo nao entra -- o aposentado some dos dois modos');
   }
+}
+
+
+
+/* ============================================================================
+   O APOSENTADO CONTINUA VALENDO NA TORRE E NO GINASIO DA CIDADE (18/09/2026)
+   ----------------------------------------------------------------------------
+   Pedido: *"os pokemons que sao aposentados, podem sim ser utilizados na torre de treinadores e
+   ginasio da cidade, so nao pode mais participar de ligas e batalhas online"*.
+
+   ⚠️ ISSO CORRIGE A LEITURA DE MAIS CEDO NO MESMO DIA, quando aposentar passou a APAGAR o save e
+   eu li isso como "o time sai dos dois modos". O save continua sendo apagado -- o que muda e que
+   o ARQUIVO DA CONTA virou a origem de onde os dois modos montam.
+   ============================================================================ */
+{
+  console.log('\n=== O APOSENTADO NA TORRE E NO GINASIO DA CIDADE ===');
+  const g = S.__getGame();
+  const vazios = () => new Array(20).fill(null);
+
+  /* 1) O MONTADOR LISTA OS APOSENTADOS, mesmo sem save nenhum */
+  g.saveSlots = vazios();
+  g.aposentados = [
+    { speciesId:'venusaur', level:62, shiny:true, ataques:['solarbeam'], slot:'3', em:2000 },
+    { speciesId:'alakazam', level:55, slot:'1', em:1000 },
+  ];
+  let el = S.towerEligiblePokemon();
+  ok('sem save nenhum, o montador lista os aposentados', el.length === 2, el.length + ' elegiveis');
+  /* ⚠️ O `|| {}` NAO E DEFENSIVA A TOA: sem ele, a trava de cima falhando mata a bateria INTEIRA
+     com um TypeError -- e um teste que morre esconde todos os seguintes. Conferido: com o
+     arquivo tirado do montador, ela passava a matar 400 casos depois deste. */
+  const p0 = el[0] || {};
+  ok('com a especie, o nivel e o shiny de cada um',
+     p0.speciesId === 'venusaur' && p0.level === 62 && p0.shiny === true,
+     JSON.stringify(p0));
+  ok('e a origem deles aparece na tela', String(p0.teamName).indexOf('Carvalho') >= 0, String(p0.teamName));
+
+  /* ⚠️ 2) O SLOT E SINTETICO, e ele nao pode colidir com um save VIVO do mesmo numero -- o
+     jogador pode ter comecado uma jornada nova naquele slot. Sem isso o servidor casaria o
+     pedido com o pokemon errado, que e o defeito de 01/09/2026 por outra porta. */
+  {
+    const time = [];
+    for(let i = 0; i < 6; i++){ const p = S.createInstance('pidgey', 50); p.hp = p.maxHp = S.calcMaxHp(p); time.push(p); }
+    g.saveSlots = vazios();
+    g.saveSlots[3] = { team: time, badgeCount: 8, customName: 'Time novo' };
+    el = S.towerEligiblePokemon();
+    const doSave = el.filter(p => p.slot === 3);
+    const doArquivo = el.filter(p => String(p.slot).indexOf('ap:') === 0);
+    ok('save vivo e aposentado do MESMO slot convivem',
+       doSave.length === 6 && doArquivo.length === 2,
+       doSave.length + ' vivos, ' + doArquivo.length + ' do arquivo');
+    const chaves = new Set(el.map(p => String(p.slot) + '#' + p.idx));
+    ok('e nenhuma identidade (slot+idx) colide', chaves.size === el.length,
+       chaves.size + ' de ' + el.length);
+    /* ⚠️ mas a ORIGEM viaja junto: o item equipado e por SAVE, e sem ela o Venusaur do slot 3
+       perderia o item que ele carregava */
+    ok('o slot sintetico carrega a origem', String((doArquivo[0]||{}).slot) === 'ap:3',
+       String((doArquivo[0]||{}).slot));
+  }
+
+  /* 3) A PORTA DOS MODOS: quem so tem aposentado ENTRA na Torre e no Ginasio */
+  {
+    g.saveSlots = vazios(); g.saveSlotsCarregados = true; g.modoBloqueado = null;
+    ok('quem so tem aposentado entra no Ginasio da Cidade', S.exigeTimeCampeao(true) === true,
+       'a porta fechou pra quem o pedido quer deixar entrar');
+    ok('e a porta nao deixa recado', !g.modoBloqueado, String(g.modoBloqueado));
+    /* ⚠️ E ELE CONTINUA FORA DAS LIGAS E DO ONLINE -- e esse o ponto inteiro da aposentadoria */
+    g.modoBloqueado = null;
+    ok('mas NAO entra nas ligas nem no online', S.exigeTimeCampeao() === false,
+       'o aposentado vazou pra liga');
+    ok('e ali ele leva o recado', !!g.modoBloqueado, 'sem recado');
+    /* conta vazia de verdade continua fechada dos dois lados */
+    g.aposentados = []; g.modoBloqueado = null;
+    ok('conta sem nada continua fechada', S.exigeTimeCampeao(true) === false, 'entrou vazia');
+  }
+
+  /* ⚠️ 4) O ONCLICK DO MONTADOR: O SLOT VAI ENTRE ASPAS.
+     Ele sempre foi um NUMERO, e com o aposentado ele pode ser `ap:3` -- sem as aspas o atributo
+     vira `towerTogglePick(ap:3,0)`, que e SINTAXE INVALIDA: o clique nao faz nada e nao ha erro
+     no console. E a mesma familia do JSON.stringify que matou o botao da notificacao da liga em
+     17/09, e ela passa em qualquer assercao de estado -- so o navegador (ou esta trava) pega. */
+  {
+    g.saveSlots = vazios();
+    g.saveSlots[3] = { team: Array.from({length:2}, () => {
+      const p = S.createInstance('pidgey', 50); p.hp = p.maxHp = S.calcMaxHp(p); return p;
+    }), badgeCount: 8, customName: 'Time vivo' };
+    g.aposentados = [{ speciesId:'venusaur', level:62, shiny:true, slot:'3', em:2000 }];
+    g.montOrdem = 'nivel'; g.montTipo = ''; g.montPagina = 0;
+    const html = S.montadorDeTimeHtml([], 'towerTogglePick', 6);
+    const chamadas = (html.match(/towerTogglePick\([^)]*\)/g) || []);
+    ok('todo onclick do montador manda o slot entre aspas',
+       chamadas.length > 0 && chamadas.every(c => /^towerTogglePick\('[^']*',\d+\)$/.test(c)),
+       chamadas.slice(0, 3).join(' | '));
+    ok('e o do aposentado carrega o slot sintetico',
+       chamadas.some(c => c.indexOf("('ap:3'") >= 0), chamadas.join(' | '));
+
+    /* e o toggle TEM que aceitar o slot como texto -- e ele e chamado sempre assim */
+    let lista = S.alternarEscolhaDeTime([], 'ap:3', 0, 6);
+    ok('escolher um aposentado funciona', lista.length === 1 && lista[0].speciesId === 'venusaur',
+       JSON.stringify(lista.map(p => p.speciesId)));
+    ok('e ele entra com o shiny', lista[0].shiny === true, 'perdeu o shiny');
+    lista = S.alternarEscolhaDeTime(lista, '3', 0, 6);
+    ok('e um do save vivo entra junto', lista.length === 2, String(lista.length));
+    lista = S.alternarEscolhaDeTime(lista, 'ap:3', 0, 6);
+    ok('e clicar de novo desmarca', lista.length === 1 && lista[0].speciesId !== 'venusaur',
+       JSON.stringify(lista.map(p => p.speciesId)));
+  }
+
+  /* ⚠️ 5) A CHAVE DA ESPERA TEM QUE BATER NOS DOIS MOTORES.
+     O CLAUDE.md ja avisa: "se as duas divergirem, a tela libera quem o desafio recusa -- ou apaga
+     quem podia lutar". Com o aposentado ela quase divergiu: o cliente monta do `p.slot` (o
+     sintetico) e o servidor tinha passado a usar a ORIGEM.
+     ⚠️ E ela usa o SINTETICO de proposito -- com a origem, um Venusaur aposentado do slot 3
+     dividiria a espera de 10 min com um Venusaur de uma jornada NOVA no mesmo slot. */
+  {
+    const srv = require('fs').readFileSync(path.join(raiz, 'functions', 'index.js'), 'utf8');
+    /* ⚠️ A FATIA VAI ATE O FIM DA FUNCAO, e nao um numero de caracteres: a primeira versao
+       cortava em 5000 e o `chave:` esta no 6579 -- as duas travas falhavam com o codigo CERTO.
+       E a mesma armadilha da fatia vazia do `tentarGolpeEspecial`, que fez o teste passar sem
+       ler nada. O `ok` do tamanho existe pra ela nao voltar a medir o vazio. */
+    const iRes = srv.indexOf('async function resolverTimeDosSaves');
+    const resolver = srv.slice(iRes, srv.indexOf('\nasync function', iRes + 10));
+    ok('(a fatia do resolver tem tamanho)', resolver.length > 3000, resolver.length + ' chars');
+    ok('o servidor monta a chave da espera do slot SINTETICO',
+       /chave: chaveDoPokemonNaConta\(achado\.slot, real\)/.test(resolver),
+       'ele esta usando a origem -- a chave vai divergir do cliente');
+    /* ⚠️ mas o ITEM usa a ORIGEM, e sao coisas diferentes: o `equipados` da conta guarda
+       `slot:raiz` e sobrevive ao save morrer, entao o aposentado continua com o item dele */
+    ok('mas o slotDaConta (o item) usa a ORIGEM',
+       /slotDaConta: String\(achado\.slotOrigem != null \? achado\.slotOrigem : achado\.slot\)/.test(resolver),
+       'o aposentado vai perder o item que carregava');
+    /* e o cliente chega na MESMA chave */
+    const alvo = { slot:'ap:3', speciesId:'venusaur' };
+    ok('e o cliente monta a mesma chave', S.chaveDoPokemon(alvo) === 'g_ap:3_venusaur',
+       S.chaveDoPokemon(alvo));
+  }
+  g.aposentados = []; g.saveSlots = vazios();
 }
 
 
@@ -2999,6 +3163,162 @@ console.log('\n=== OS TRES HMs NA MOCHILA, E A PALAVRA QUE SAIU (17/09/2026) ===
     const css = cli.slice(0, cli.indexOf('<script>'));
     const rolam = (css.match(/overflow-y\s*:\s*auto/g) || []).length;
     ok('o jogo tem listas que rolam por dentro (>= 8)', rolam >= 8, rolam + ' conteineres');
+  }
+}
+
+/* ============================================================================
+   APOSENTAR APAGA O SAVE, E O TIME VAI PRO PROF. CARVALHO (18/09/2026)
+   ----------------------------------------------------------------------------
+   Pedido: *"apos aposentar um time, o save deve ser deletado automaticamente, entao quando o
+   usuario clicar para se aposentar, ele deve saber disso e clicar em confirmar"* e *"adicione um
+   botao dentro da pokedex chamado (Pokemons com o Prof. Carvalho) ... exibindo nome, tipos,
+   level, e ataques"*.
+
+   ⚠️ O SAVE MORRE, MAS O TIME NAO: o pedido do mesmo dia corrigiu a leitura -- eles continuam
+   valendo na Torre e no Ginasio da Cidade (montados do ARQUIVO da conta) e so perdem a liga e a
+   batalha online. O bloco que cobra isso e o "O APOSENTADO NA TORRE E NO GINASIO", logo abaixo.
+   ============================================================================ */
+{
+  console.log('\n=== APOSENTAR APAGA O SAVE ===');
+  const mk = (id, lv, ex) => { const p = S.createInstance(id, lv); p.hp = p.maxHp = S.calcMaxHp(p); return Object.assign(p, ex||{}); };
+
+  /* 1) O RESUMO que vai pro arquivo: o minimo que a tela precisa, e NADA de estado de batalha */
+  {
+    const r = S.paraOArquivo(mk('venusaur', 62, { shiny:true, ataques:['solarbeam','sludgebomb'] }));
+    ok('o arquivo guarda especie, nivel, shiny e golpes',
+       r.speciesId === 'venusaur' && r.level === 62 && r.shiny === true && (r.ataques||[]).length === 2,
+       JSON.stringify(r));
+    ok('e NAO leva estado de batalha', r.hp === undefined && r.maxHp === undefined && r._furia === undefined,
+       'levou estado');
+    const semNada = S.paraOArquivo(mk('rattata' in S.SPECIES ? 'rattata' : 'ratata', 10));
+    ok('quem nao tem shiny nem golpe sai enxuto', semNada.shiny === undefined && semNada.ataques === undefined,
+       JSON.stringify(semNada));
+  }
+
+  /* 2) PONTA A PONTA: grava o arquivo, garante a Pokedex e SO ENTAO apaga o save */
+  {
+    const g = S.__getGame();
+    const escrito = [], apagado = [], chamadas = [];
+    const userAntes = S.userDocRef, saveAntes = S.saveDocRef, fnAntes = S.functionsClient;
+    const loadAntes = S.loadSaveSlots, openAntes = S.openSaveSelect;
+    S.userDocRef = () => ({ set: async (p) => { escrito.push(p); } });
+    S.saveDocRef = () => ({ delete: async () => { apagado.push(1); } });
+    S.functionsClient = { httpsCallable: (n) => async () => { chamadas.push(n); return { data:{ defending:false } }; } };
+    S.loadSaveSlots = async () => {};
+    S.openSaveSelect = () => { g.screen = 'saveSelect'; };
+
+    g.authUser = { uid:'u1' }; g.currentSaveSlot = 3;
+    g.team = [mk('venusaur', 62, { ataques:['solarbeam'] }), mk('gyarados', 58, { shiny:true })];
+    g.caughtSpecies = ['venusaur','gyarados']; g.permanentPokedex = []; g.aposentados = [];
+    g.aposentarPergunta = true;
+
+    await S.aposentarOTime();
+      ok('o save e APAGADO', apagado.length === 1, apagado.length + ' deletes');
+      ok('e o time vai pro arquivo da CONTA', escrito.length === 1 && !!escrito[0].aposentados,
+         'nao gravou o arquivo');
+      ok('com a Pokedex garantida junto', !!escrito[0].pokedexCaught, 'sem a Pokedex');
+      ok('as duas gravacoes sao arrayUnion (so CRESCEM)',
+         escrito[0].aposentados.__op === 'arrayUnion' && escrito[0].pokedexCaught.__op === 'arrayUnion',
+         'nao sao arrayUnion -- uma lista pode ENCOLHER');
+      ok('o arquivo local recebe os dois', (g.aposentados||[]).length === 2, String((g.aposentados||[]).length));
+      ok('com o slot e a data de cada um', g.aposentados[0].slot === '3' && !!g.aposentados[0].em,
+         JSON.stringify(g.aposentados[0]));
+      /* ⚠️ o ginasio e conferido ANTES: doc de ginasio e escrita exclusiva do servidor, e um save
+         apagado nao pode deixar um ginasio com lider fantasma */
+      ok('o ginasio e conferido antes de apagar',
+         chamadas.indexOf('checkNeighborhoodGymDefenseForSlot') >= 0, chamadas.join(','));
+      ok('e o jogador volta pra home', g.screen === 'saveSelect', g.screen);
+
+      /* 3) ⚠️ SE A GRAVACAO FALHAR, O SAVE NAO MORRE. Perder a jornada E nao guardar o time
+         seria o pior dos dois mundos -- e o mesmo lado pra que o `usarTM` erra. */
+      const apagado2 = [];
+      S.userDocRef = () => ({ set: async () => { throw new Error('rede'); } });
+      S.saveDocRef = () => ({ delete: async () => { apagado2.push(1); } });
+      g.currentSaveSlot = 5; g.aposentarPergunta = true; g.aposentarErro = null;
+      g.team = [mk('alakazam', 55)];
+      await S.aposentarOTime();
+        ok('gravacao que falha NAO apaga o save', apagado2.length === 0, apagado2.length + ' deletes');
+        ok('e o jogador e avisado', !!g.aposentarErro, 'sem aviso');
+    S.userDocRef = userAntes; S.saveDocRef = saveAntes; S.functionsClient = fnAntes;
+    S.loadSaveSlots = loadAntes; S.openSaveSelect = openAntes;
+  }
+}
+
+/* ============================================================================
+   A TELA DO PROF. CARVALHO, A NOTIFICACAO DA LIGA E A FAIXA DE UPDATE (18/09/2026)
+   ============================================================================ */
+{
+  console.log('\n=== A TELA DO PROF. CARVALHO ===');
+  const g = S.__getGame();
+  g.aposentados = [
+    { speciesId:'venusaur', level:62, shiny:true, ataques:['solarbeam','sludgebomb'], slot:'3', em:2000 },
+    { speciesId:'gyarados', level:58, ataques:['hydropump'], slot:'3', em:2000 },
+    { speciesId:'alakazam', level:55, slot:'1', em:1000 },
+  ];
+  const h = S.renderAposentados();
+  const tem = (t) => h.indexOf(t) >= 0;
+  ok('nomeia os tres', tem('Venusaur') && tem('Gyarados') && tem('Alakazam'));
+  ok('e mostra o NIVEL de cada um', tem('Lv.62') && tem('Lv.58') && tem('Lv.55'));
+  ok('e os TIPOS', tem('>Planta<') && tem('>Veneno<') && tem('>Psíquico<'));
+  /* ⚠️ O GOLPE VEM DO `ataques` GRAVADO -- e o argumento importa: o `golpeSeloHtml` e
+     (especie, tipo, golpeId), e passar o golpe no PRIMEIRO lugar faz o selo nomear outro golpe
+     em silencio. Foi o defeito da primeira versao desta tela (saia "Chicote de Cipo" no lugar
+     de "Raio Solar"). */
+  ok('e os GOLPES que ele tinha quando se aposentou',
+     tem('Raio Solar') && tem('Bomba de Lodo') && tem('Hidro Bomba'),
+     'nomeou outro golpe -- confira a ordem dos argumentos do golpeSeloHtml');
+  ok('o shiny ganha selo', tem('#s-shiny'));
+  ok('quem NAO tem golpe sai sem a linha', h.split('carvalho-golpes').length - 1 === 2,
+     String(h.split('carvalho-golpes').length - 1));
+  ok('e o mais RECENTE vem primeiro', h.indexOf('Venusaur') < h.indexOf('Alakazam'));
+
+  /* o botao na Pokedex */
+  g.screen = 'pokedex'; g.pokedexView = 'normal';
+  g.permanentPokedex = ['venusaur']; g.saveSlots = new Array(20).fill(null);
+  const dex = S.renderPokedex();
+  ok('a Pokedex mostra o botao', dex.indexOf('abrirAposentados') >= 0, 'sem o botao');
+  ok('e conta quantos estao la', dex.indexOf('Carvalho (3)') >= 0, 'sem a contagem');
+  /* ⚠️ SEM NINGUEM O BOTAO SOME: uma tela que so diz "ninguem ainda" e pior que botao nenhum,
+     e a aposentadoria e rara -- a maioria das contas nunca vai ter um. */
+  g.aposentados = [];
+  ok('e SEM ninguem ele nao aparece', S.renderPokedex().indexOf('abrirAposentados') < 0, 'aparece vazio');
+
+  console.log('\n=== A NOTIFICACAO LEVA AO CHAVEAMENTO ===');
+  {
+    const comEnd = { meta:{ leagueTypeId:'classic', cycleId:'c123', leagueId:2, cycleTime:1700000 } };
+    const semEnd = { meta:{ leagueTypeId:'classic' } };
+    const trainers = { meta:{ leagueTypeId:'trainers' } };
+    const bCom = S.botaoDaLigaHtml(comEnd), bSem = S.botaoDaLigaHtml(semEnd), bTr = S.botaoDaLigaHtml(trainers);
+    ok('com o endereco, leva ao chaveamento', bCom.indexOf('viewLeagueHistory') >= 0, bCom.slice(0, 80));
+    ok('e passa os QUATRO na ordem certa',
+       /viewLeagueHistory\('classic','c123',2,1700000\)/.test(bCom), bCom.slice(0, 110));
+    /* ⚠️ E EM ASPAS SIMPLES dentro das duplas -- a licao de 17/09: um JSON.stringify ali fecharia
+       o atributo onclick e o clique nao faria nada, em silencio. */
+    ok('com aspas simples dentro do onclick', bCom.indexOf('onclick="viewLeagueHistory(\'') >= 0, bCom.slice(0, 60));
+    /* notificacao ANTIGA nao tem o endereco: ela cai na tela da liga, como sempre caiu */
+    ok('SEM o endereco, abre a tela da liga',
+       bSem.indexOf('irParaALiga') >= 0 && bSem.indexOf('viewLeagueHistory') < 0, bSem.slice(0, 80));
+    /* ⚠️ A TRAINERS FICA DE FORA, e nao e esquecimento: ela e um round-robin de um grupo so e nao
+       tem leagueId por partida -- o historico dela e outro. */
+    ok('e a Trainers League continua abrindo a liga', bTr.indexOf('irParaALiga') >= 0, bTr.slice(0, 80));
+  }
+
+  console.log('\n=== A FAIXA DE UPDATE ===');
+  {
+    /* ⚠️ A FAIXA VIVE NO `<body>` ESTATICO, fora de qualquer template literal -- um ${selo(...)}
+       ali NAO interpola, e o jogador ve o codigo escrito na tela. Foi o que aconteceu quando os
+       emojis viraram selo (18/09/2026).
+       ⚠️ E A TRAVA DO ${selo( NAO PEGA ISSO porque ela varre o SCRIPT e nao o body. */
+    const cli = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
+    const iBody = cli.indexOf('<body');
+    const iScript = cli.indexOf('<script', iBody);
+    const body = cli.slice(iBody, iScript);
+    const sobrou = body.match(/\$\{[^}]*\}/g) || [];
+    ok('nenhum ${...} sobra no body estatico', sobrou.length === 0, sobrou.join(' | '));
+    /* e o selo entra pelo JS, na hora de acender */
+    const i = cli.indexOf('function mostrarAvisoDeVersao(');
+    const corpo = i < 0 ? '' : cli.slice(i, cli.indexOf('\n}', i));
+    ok('e o selo da faixa e posto pelo JS', corpo.indexOf("selo('recarregar')") >= 0, 'sem o selo');
   }
 }
 

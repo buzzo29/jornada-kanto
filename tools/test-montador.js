@@ -96,7 +96,10 @@ console.log('\n=== PAGINA DE DEZ ===');
   /* Ninguem aparece em duas paginas. A conta e por SLOT+IDX e nao por nome: o Alakazam esta nos
      dois saves de proposito, entao doze linhas dao onze nomes -- e uma checagem por nome acusaria
      um defeito que nao existe. */
-  const identidades = (tudo.match(/towerTogglePick\(\d+,\d+\)/g)||[]);
+  /* O SLOT VEM ENTRE ASPAS desde 18/09/2026 (ele pode ser `ap:3`, de um aposentado), e o
+     extrator antigo procurava \d+ -- ele passou a casar com ZERO e a trava acusava "0 de 0",
+     que e o pior tipo de falso positivo: ela nao media mais nada. */
+  const identidades = (tudo.match(/towerTogglePick\('[^']*',\d+\)/g)||[]);
   ok('sem repetir ninguem entre as paginas', new Set(identidades).size === 12,
      new Set(identidades).size + ' de ' + identidades.length);
 }

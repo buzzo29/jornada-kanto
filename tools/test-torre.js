@@ -41,6 +41,74 @@ const chamar = (fn, uid, data)=> fn({ auth:{ uid }, data });
 (async ()=>{
 console.log('\nTORRE: escolha do time');
 
+/* ============================================================================
+   O APOSENTADO SOBE A TORRE (18/09/2026)
+   ----------------------------------------------------------------------------
+   Pedido: *"os pokemons que sao aposentados, podem sim ser utilizados na torre de treinadores e
+   ginasio da cidade, so nao pode mais participar de ligas e batalhas online"*.
+
+   ⚠️ E ELE NAO TEM SAVE: aposentar APAGA o save, entao o arquivo da conta (`users/{uid}.aposentados`)
+   e a UNICA origem que sobrou. Esta e a trava de COMPORTAMENTO -- a de codigo, no test-inventario,
+   nao provaria que o resolver realmente devolve o time.
+   ============================================================================ */
+{
+  const arq = [
+    { speciesId:'venusaur', level:62, shiny:true, ataques:['solarbeam'], slot:'3', em:2000 },
+    { speciesId:'alakazam', level:55, slot:'1', em:1000 },
+    { speciesId:'gyarados', level:58, slot:'3', em:2000 },
+    { speciesId:'snorlax',  level:60, slot:'3', em:2000 },
+    { speciesId:'gengar',   level:59, slot:'3', em:2000 },
+    { speciesId:'lapras',   level:57, slot:'3', em:2000 },
+  ];
+  await db.collection('users').doc('velho').set({ aposentados: arq });
+  const pedido = arq.map((p, i) => ({ speciesId:p.speciesId, level:p.level,
+                                      slot:'ap:' + p.slot, idx:i, monId:null, shiny:!!p.shiny }));
+  const rA = await chamar(fns.startTrainerTowerRun, 'velho', { team: pedido });
+  ok('sem save NENHUM, o aposentado sobe a torre', !!(rA && rA.run && rA.run.team),
+     'o resolver recusou');
+  const t = (rA && rA.run && rA.run.team) || [];
+  ok('e o time volta inteiro', t.length === 6, t.length + ' pokemon');
+  const ven = t.find(p => p.speciesId === 'venusaur');
+  ok('com o shiny preservado', !!ven && ven.shiny === true, 'perdeu o shiny');
+  ok('e com os golpes que ele tinha', !!ven && (ven.ataques||[]).indexOf('solarbeam') >= 0,
+     JSON.stringify(ven && ven.ataques));
+  /* ⚠️ O ITEM e por SAVE: o slotDaConta tem que ser a ORIGEM, nao o sintetico -- senao o
+     Venusaur aposentado do slot 3 perde o item que ele carregava. */
+  ok('e o slot do ITEM e a ORIGEM, nao o sintetico', !!ven && String(ven.slotDaConta) === '3',
+     String(ven && ven.slotDaConta));
+  /* ⚠️ E a chave da ESPERA e a sintetica: ela e do POKEMON, e o aposentado tem a dele -- com a
+     origem, ele dividiria a espera de 10 min com um Venusaur de uma jornada NOVA no slot 3. */
+  ok('mas a chave da ESPERA e a sintetica', !!ven && String(ven.chave) === 'g_ap:3_venusaur',
+     String(ven && ven.chave));
+
+  /* ⚠️ E O SAVE VIVO CONVIVE COM ELE: o jogador pode ter comecado uma jornada nova naquele slot,
+     e o casamento do servidor e por slot+idx -- com o slot cru, o pedido casaria com o bicho
+     errado (o defeito de 01/09/2026 por outra porta). */
+  /* ⚠️ O HELPER E LOCAL, e nao o `mon` do arquivo: ele e declarado com `const` DEPOIS deste
+     bloco, entao usa-lo aqui e ZONA MORTA TEMPORAL -- o mesmo defeito que travou as quatro telas
+     de revelacao em 09/09/2026 e que o `cycleTime` repetiu. Num teste ele e barato de ver (o
+     processo morre na hora); em producao ele mata a tela em silencio. */
+  const bicho = (id, especie, nivel, shiny) => ({ id, speciesId:especie, level:nivel, shiny:!!shiny });
+  const vivo = [bicho('n1','venusaur',62,false), bicho('n2','machamp',70), bicho('n3','starmie',71),
+                bicho('n4','vileplume',69), bicho('n5','rhydon',72), bicho('n6','ninetales',70)];
+  await db.collection('users').doc('velho').collection('saves').doc('3').set({ badgeCount:8, team:vivo });
+  const misto = [
+    { speciesId:'venusaur', level:62, slot:'ap:3', idx:0, monId:null, shiny:true },
+    { speciesId:'machamp',  level:70, slot:'3',    idx:1, monId:'n2' },
+    { speciesId:'starmie',  level:71, slot:'3',    idx:2, monId:'n3' },
+    { speciesId:'alakazam', level:55, slot:'ap:1', idx:1, monId:null },
+    { speciesId:'rhydon',   level:72, slot:'3',    idx:4, monId:'n5' },
+    { speciesId:'gengar',   level:59, slot:'ap:3', idx:4, monId:null },
+  ];
+  const rM = await chamar(fns.startTrainerTowerRun, 'velho', { team: misto });
+  const tm = (rM && rM.run && rM.run.team) || [];
+  ok('save vivo e aposentado no MESMO time', tm.length === 6, tm.length + ' pokemon');
+  const venM = tm.find(p => p.speciesId === 'venusaur');
+  ok('e o Venusaur que veio foi o APOSENTADO (shiny), nao o do save novo',
+     !!venM && venM.shiny === true, 'veio o do save vivo');
+}
+
+
 const mon = (id, especie, nivel, shiny)=>({ id, speciesId:especie, level:nivel, shiny:!!shiny });
 // save 0: o time com o Gyarados NORMAL. save 1: o mesmo Gyarados, mesmo nivel, SHINY.
 const time0 = [mon('a1','gyarados',73,false), mon('a2','alakazam',70), mon('a3','snorlax',71),
