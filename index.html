@@ -12023,9 +12023,17 @@ function renderMontanha(){
           <span class="mon-name">${spriteHtml(p, "sprite-sm")} ${escapeHtmlSafe(p.name)}${p.shiny?" "+selo("shiny"):""} — Lv.${p.level}</span>
           <span class="mon-sub">${typesHtml(p.types)}</span>
         </div>
+        ${/* ⚠️ ELAS CHAMAVAM `moveTeam`, QUE NUNCA EXISTIU (consertado em 18/09/2026, reportado:
+             *"não está sendo possível trocar a ordem dos pokémons nas batalhas na montanha
+             sagrada"*). O clique dava ReferenceError e não fazia NADA -- o erro fica no console
+             e a tela continua PARECENDO certa, a mesma classe do slot sem aspas no onclick do
+             montador e do JSON.stringify do botão da notificação da liga.
+             O nome saiu de um comentário da clareira que dizia que as setas eram "as mesmas da
+             tela de ordem do time (`moveTeam`)" -- e ele estava errado nas duas pontas: a tela
+             de ordem usa `moveOrder` (por id) e a clareira usa esta aqui (por índice). */''}
         <div class="order-arrows">
-          <button class="circle-btn" ${idx===0?"disabled":""} onclick="moveTeam(${idx},-1)">▲</button>
-          <button class="circle-btn" ${idx===meu.length-1?"disabled":""} onclick="moveTeam(${idx},1)">▼</button>
+          <button class="circle-btn" ${idx===0?"disabled":""} onclick="moverNaFila(${idx},-1)">▲</button>
+          <button class="circle-btn" ${idx===meu.length-1?"disabled":""} onclick="moverNaFila(${idx},1)">▼</button>
         </div>
       </div>`).join("")}
   </div>
@@ -12211,8 +12219,12 @@ function entrarNaMataFechada(){
    É a única batalha do jogo em que o jogador vê a fila do adversário ANTES de lutar -- e isso é a
    coisa toda: 10 contra 6 sem cura entre confrontos se decide na ORDEM, e sem ver a fila a escolha
    seria no escuro. O primeiro deles enfrenta o primeiro seu, e aí em diante.
-   AS SETAS SÃO AS MESMAS da tela de ordem do time (`moveTeam`), porque é a mesma ação -- e o
-   `game.team` é o que entra na batalha, então reordenar aqui basta. */
+   ⚠️ AS SETAS USAM O `moverNaFila`, e este comentário já mentiu: ele dizia "as mesmas da tela de
+   ordem do time (`moveTeam`)" -- e `moveTeam` **nunca existiu**. Foi ele que induziu as setas da
+   Montanha Sagrada a chamarem um nome inexistente, e lá elas ficaram mudas até 18/09/2026.
+   A tela de ordem de batalha usa `moveOrder`, que é por **id**; as duas telas de FILA (esta e a
+   Montanha) usam o `moverNaFila`, que é por **índice**. O `game.team` é o que entra na batalha,
+   então reordenar aqui basta. */
 function renderMataFechada(){
   const mons = game.vigilia || [];
   const quem = cortadorDoTime();
@@ -12261,8 +12273,8 @@ function renderMataFechada(){
         <span class="mon-sub">${typesHtml(p.types || (SPECIES[p.speciesId] || {}).types || [])}</span>
       </div>
       <div class="order-controls">
-        <button class="circle-btn" onclick="moverNaVigilia(${i}, -1)" ${i === 0 ? "disabled" : ""}>▲</button>
-        <button class="circle-btn" onclick="moverNaVigilia(${i}, 1)" ${i === meu.length - 1 ? "disabled" : ""}>▼</button>
+        <button class="circle-btn" onclick="moverNaFila(${i}, -1)" ${i === 0 ? "disabled" : ""}>▲</button>
+        <button class="circle-btn" onclick="moverNaFila(${i}, 1)" ${i === meu.length - 1 ? "disabled" : ""}>▼</button>
       </div>
     </div>`).join("")}
   </div>
@@ -12271,7 +12283,12 @@ function renderMataFechada(){
 /* Reordenar o time AQUI é reordenar o `game.team`, que é o que entra na batalha -- não há cópia no
    meio. E ele GRAVA: a clareira é ponto seguro de gravação (está no SAFE_SAVE_SCREENS), então
    fechar a aba depois de arrumar a fila não pode desfazer o que foi arrumado. */
-function moverNaVigilia(i, passo){
+/* ⚠️ O NOME DEIXOU DE SER DA VIGÍLIA em 18/09/2026: ela serve às DUAS telas que mostram a fila do
+   adversário antes da luta -- a clareira e a Montanha Sagrada. Um `moverNaVigilia` numa tela de
+   Montanha faria o próximo leitor procurar uma vigília que não está ali.
+   Ela é por ÍNDICE, e o `moveOrder` da tela de ordem de batalha é por ID: as duas convivem porque
+   mudar a chave de uma delas seria mexer em 8 chamadas de telas que funcionam. */
+function moverNaFila(i, passo){
   const t = game.team || [];
   const j = i + passo;
   if(i < 0 || j < 0 || i >= t.length || j >= t.length) return;

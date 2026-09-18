@@ -9469,10 +9469,15 @@ a um lado num PvP).
   liberar este caminho"*. Ele dizia *"precisa de um pokémon que saiba Corte"* — isso descreve o ESTADO,
   não diz que o HM01 mora na mochila nem que ele se USA num pokémon, e sem isso o jogador que tem a
   Máquina no bolso fica olhando o cadeado sem saber que a chave já é dele.
-- **A clareira mostra a ORDEM dos dez e deixa arrumar a sua.** É a **única batalha do jogo em que o
-  jogador vê a fila do adversário antes de lutar** — e isso é a coisa toda: 10 contra 6 sem cura entre
-  confrontos se decide na ORDEM, e sem ver a fila a escolha seria no escuro. O 1º dele encara o 1º seu.
-  As setas são as mesmas da tela de ordem do time, e reordenam o `game.team` — que é o que entra na
+- **A clareira mostra a ORDEM dos dez e deixa arrumar a sua.** É uma das **duas** batalhas em que o
+  jogador vê a fila do adversário antes de lutar (a outra é a Montanha Sagrada, de 17/09/2026 — este
+  item dizia "a única" e envelheceu no dia seguinte) — e isso é a coisa toda: 10 contra 6 sem cura
+  entre confrontos se decide na ORDEM, e sem ver a fila a escolha seria no escuro. O 1º dele encara
+  o 1º seu.
+  **⚠️ As setas são o `moverNaFila`, por ÍNDICE** — e NÃO o `moveOrder` da tela de ordem de batalha,
+  que é por id. Este item já disse que eram "as mesmas da tela de ordem", e o comentário no código
+  dizia pior: nomeava um `moveTeam` que **nunca existiu**, e foi de lá que as setas da Montanha
+  copiaram o nome errado (ver a seção própria). Elas reordenam o `game.team` — que é o que entra na
   batalha, sem cópia no meio. Elas **gravam**: a clareira está no `SAFE_SAVE_SCREENS`, então fechar a
   aba depois de arrumar a fila não pode desfazer o que foi arrumado.
 - **⚠️ E A FILA É A `order-row` DA TELA DE ORDEM DE BATALHA, não um formato próprio** (14/09/2026, a
@@ -11549,6 +11554,49 @@ pintando o mesmo pixel dariam o desenho certo por acaso, com a cor do último. C
 10.336 pixels com o "consumido" marcado errado.
 **E há um teto de ~95 KB pro SVG** (1.800 bytes por selo), porque a trava do pixel **não pega** a otimização ser desfeita:
 com uma `<rect>` por pixel o desenho continua certo e só o DOM cresce. Conferido: ela acusa com uma `<rect>` por pixel.
+
+### ⚠️ AS SETAS DA MONTANHA CHAMAVAM UMA FUNÇÃO QUE NUNCA EXISTIU (18/09/2026)
+
+Reportado: *"não está sendo possível trocar a ordem dos pokémons nas batalhas na montanha sagrada,
+coloque que seja possível igual nas outras telas de ordenação"*.
+
+**As setas estavam lá, desenhadas e habilitadas** — o que não existia era a função. Elas chamavam
+`moveTeam`, que **não está declarada em lugar nenhum do arquivo**: o clique dava
+`ReferenceError`, o erro ficava no console e **a tela continuava parecendo certa**.
+
+- **⚠️ É A TERCEIRA DESTA FAMÍLIA EM DOIS DIAS**, e as três passam em qualquer asserção de estado
+  porque o HTML sai perfeito: o `JSON.stringify` no `onclick` do botão da notificação da liga
+  (17/09), o **slot sem aspas** no `onclick` do montador (hoje de manhã), e esta. Em todas, o
+  atributo está sintaticamente quebrado ou aponta pro nada, e **só o navegador vê**.
+- **⚠️ E ELA NASCEU DE UM COMENTÁRIO QUE MENTIA.** O da clareira da Vigília dizia que as setas eram
+  *"as mesmas da tela de ordem do time (`moveTeam`)"* — **errado nas duas pontas**: a tela de ordem
+  usa `moveOrder` (por **id**) e a clareira usa a sua própria (por **índice**). Quem escreveu a
+  Montanha leu o comentário e copiou o nome.
+  É a mesma classe do "59 espécies das quatro listas" da ficha da Pokédex: **texto que descreve
+  código envelhece — e aqui ele nem era verdade no dia em que foi escrito.**
+
+**O CONSERTO É A FUNÇÃO DA CLAREIRA, RENOMEADA:** ela passou de `moverNaVigilia` pra
+**`moverNaFila`**, porque agora serve às **duas** telas que mostram a fila do adversário antes da
+luta. Um `moverNaVigilia` numa tela de Montanha faria o próximo leitor procurar uma vigília que não
+está ali.
+
+- **As duas convivem de propósito:** `moveOrder` é por **id** (5 chamadas, a tela de ordem de
+  batalha) e `moverNaFila` é por **índice** (4, as duas filas). Unificar exigiria escolher uma
+  chave e mexer em 9 chamadas de telas que **funcionam** — e foi um nome inventado que causou este
+  defeito, não a existência de duas funções.
+- A Montanha **já estava no `SAFE_SAVE_SCREENS`**, então reordenar ali sempre gravou — o que
+  faltava era reordenar.
+
+**⚠️ A TRAVA NOVA VALE PROS 277 HANDLERS, e não só pra este:** ela varre **todo** `on*="nome(` do
+`index.html` e cobra que `nome` esteja declarado. Medido: **277 handlers distintos**, e depois do
+conserto **nenhuma órfã** (`if` aparece porque existe um `onclick="if(...)"`, e palavra-chave não é
+função). Conferido que ela acusa: com o `moveTeam` religado ela reporta a órfã pelo nome.
+
+**Medido no navegador, a 320px:** as setas reordenam e desfazem, **zero erros** no console, sem
+rolagem lateral — e a fila dos **guardiões** continua sem setas, que é o certo: ela não se reordena.
+
+**CONFERIDO QUE NÃO É MOTOR, por impressão:** o mesmo build antes e depois dá o **MESMO hash** em
+900 batalhas semeadas.
 
 ### OS POKÉMONS COM O PROF. CARVALHO (18/09/2026)
 

@@ -1287,7 +1287,7 @@ console.log('\n=== A MATA FECHADA E A VIGILIA DO ARCO-IRIS (13/09/2026) ===');
   ok('e ela numera os dois lados', /1º/.test(tela) && /10º/.test(tela));
   ok('com as MESMAS setas da tela de ordem (circle-btn, duas por pokemon)',
      (tela.match(/class="circle-btn"/g) || []).length === 2 * (g.team||[]).length &&
-     (tela.match(/moverNaVigilia/g) || []).length === 2 * (g.team||[]).length,
+     (tela.match(/moverNaFila/g) || []).length === 2 * (g.team||[]).length,
      (tela.match(/class="circle-btn"/g) || []).length + ' setas');
   ok('e com o MESMO sprite (sprite-sm, 48px como na tela de ordem)',
      (tela.match(/sprite-sm/g) || []).length === v.length + (g.team||[]).length);
@@ -1305,10 +1305,10 @@ console.log('\n=== A MATA FECHADA E A VIGILIA DO ARCO-IRIS (13/09/2026) ===');
      require('fs').readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8').indexOf('vigilia-fila') < 0);
   {
     const antes = (g.team||[]).map(p => p.name).join(',');
-    S.moverNaVigilia(0, 1);
+    S.moverNaFila(0, 1);
     const depois = (g.team||[]).map(p => p.name).join(',');
     ok('e a seta reordena o game.team, que e o que entra na batalha', antes !== depois, antes + '  ->  ' + depois);
-    S.moverNaVigilia(1, -1);
+    S.moverNaFila(1, -1);
   }
   ok('e conta o mito do arco-iris de Ho-Oh', /Ho-Oh/.test(tela) && /arco-.ris/.test(tela));
 
@@ -2477,5 +2477,78 @@ console.log('\nO BOT COM --corte ATRAVESSA A MATA FECHADA');
   ok('8 jornadas com --corte, nenhuma falha', !!m && m[1] === '0',
      m ? m[1] + ' falha(s)' : saida.slice(0, 120));
 }
+
+/* ============================================================================
+   TODO HANDLER DE onclick APONTA PRA UMA FUNCAO QUE EXISTE (18/09/2026)
+   ----------------------------------------------------------------------------
+   Reportado: *"nao esta sendo possivel trocar a ordem dos pokemons nas batalhas na montanha
+   sagrada"*. As setas de la chamavam `moveTeam`, que **nunca existiu** -- o clique dava
+   ReferenceError e nao fazia NADA: o erro fica no console e a tela continua PARECENDO certa.
+
+   ⚠️ E ELE NASCEU DE UM COMENTARIO QUE MENTIA. O da clareira da Vigilia dizia que as setas eram
+   "as mesmas da tela de ordem do time (`moveTeam`)" -- errado nas duas pontas: a tela de ordem usa
+   `moveOrder` (por id) e a clareira usa `moverNaFila` (por indice). Quem escreveu a Montanha leu o
+   comentario e copiou o nome.
+
+   ⚠️ ESTA TRAVA VALE PROS 277 HANDLERS, e nao so pra este: e a mesma familia do slot sem aspas no
+   onclick do montador e do JSON.stringify do botao da notificacao da liga -- um onclick quebrado
+   passa em QUALQUER assercao de estado, porque o HTML sai certinho. So o navegador (ou isto) pega.
+   ============================================================================ */
+{
+  console.log('\n=== TODO onclick APONTA PRA FUNCAO QUE EXISTE ===');
+  const src = require('fs').readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  const chamadas = new Set();
+  const re = /\son(?:click|change|input|submit|keydown|keyup|blur|focus|error)="\s*([A-Za-z_$][\w$]*)\s*\(/g;
+  let m; while((m = re.exec(src))) chamadas.add(m[1]);
+  const B = String.fromCharCode(92);
+  const declarada = (n) => new RegExp(
+    '(?:function' + B + 's+' + n + B + 's*' + B + '(' +
+    '|(?:const|let|var)' + B + 's+' + n + B + 's*=' +
+    '|' + n + B + 's*:' + B + 's*function)').test(src);
+  /* `if`, `for` e companhia sao PALAVRA-CHAVE, nao funcao: existe onclick="if(...)" no arquivo */
+  const palavras = ['if','for','while','switch','return','typeof','event','this','window','document'];
+  const orfas = [...chamadas].filter(n => palavras.indexOf(n) < 0 && !declarada(n));
+  ok('a varredura acha os handlers (ela nao pode medir o vazio)', chamadas.size > 200,
+     chamadas.size + ' handlers');
+  ok('nenhum handler aponta pra funcao inexistente', orfas.length === 0, orfas.join(', '));
+
+  /* e o caso do relato, nomeado: as setas da Montanha Sagrada */
+  {
+    const i = src.indexOf('function renderMontanha(');
+    const corpo = src.slice(i, src.indexOf('\nfunction ', i + 10));
+    ok('(a fatia da Montanha tem tamanho)', corpo.length > 500, corpo.length + ' chars');
+    const setas = (corpo.match(/onclick="([A-Za-z_$][\w$]*)\(/g) || []);
+    ok('a Montanha tem as duas setas de ordem',
+       corpo.indexOf('order-arrows') >= 0 && corpo.indexOf('circle-btn') >= 0, 'sem as setas');
+    ok('e elas chamam a MESMA funcao da clareira', corpo.indexOf('moverNaFila(') >= 0,
+       setas.join(' '));
+    ok('e o `moveTeam` nao existe mais em handler nenhum',
+       !/onclick="moveTeam\(/.test(src), 'ainda chama moveTeam');
+  }
+
+  /* ⚠️ E A FUNCAO E UMA SO PRAS DUAS TELAS DE FILA -- uma terceira copia seria a proxima a
+     divergir, e foi um nome inventado que causou este defeito. */
+  {
+    const gTeste = S.__getGame();
+    const time = ['venusaur','charizard','blastoise'].map((id, i) => {
+      const p = S.createInstance(id, 60); p.hp = p.maxHp = S.calcMaxHp(p); p.id = 'mon' + i; return p;
+    });
+    gTeste.team = time.slice();
+    const antes = gTeste.team.map(p => p.speciesId).join(',');
+    S.moverNaFila(0, 1);
+    const depois = gTeste.team.map(p => p.speciesId).join(',');
+    ok('mover pra baixo troca com o de baixo', depois === 'charizard,venusaur,blastoise', depois);
+    S.moverNaFila(1, -1);
+    ok('e mover pra cima desfaz', gTeste.team.map(p => p.speciesId).join(',') === antes,
+       gTeste.team.map(p => p.speciesId).join(','));
+    /* fora da lista nao faz nada -- as setas da ponta ja vem desabilitadas, mas a acao e quem vale */
+    S.moverNaFila(0, -1);
+    S.moverNaFila(2, 1);
+    ok('e nas pontas ela nao faz nada', gTeste.team.map(p => p.speciesId).join(',') === antes,
+       gTeste.team.map(p => p.speciesId).join(','));
+    ok('e o time continua com os tres', gTeste.team.length === 3, String(gTeste.team.length));
+  }
+}
+
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
 process.exit(falhas ? 1 : 0);
