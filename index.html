@@ -21931,21 +21931,33 @@ function statusDoConfronto(m, passo, hit){
   if(golpe) return { classe: 'aviso-golpe', html: golpe };
   return { classe: '', html: '⚔️ Trocando golpes...' };
 }
+/* ⚠️ A CHAVE DA FRASE, e ela existe por um motivo específico: **o `innerHTML` do navegador NÃO
+   volta igual ao que foi escrito**. Ele normaliza a tag auto-fechada do selo --
+   `<use href="#s-raio"/>` vira `<use href="#s-raio"></use>` --, então comparar `el.innerHTML`
+   com o HTML gerado dá **sempre diferente** em toda frase que tem selo. E toda frase de status
+   tem.
+   Foi isso que quebrou a guarda de 12/09/2026 quando os emojis viraram SVG (18/09/2026): a
+   comparação nunca mais casou, a animação de entrada voltou a rodar a cada desenho, e a frase
+   voltou a **piscar duas vezes** -- reportado como *"Clefable está paralisado e não consegue
+   atacar! ... elas piscam 2x na tela"*.
+   A chave vai num `data-`, que o navegador devolve **literal**: nada de parser no meio. */
+function chaveDaFrase(st){ return (st.classe || '-') + '|' + st.html; }
 function statusDoConfrontoHtml(m, passo, hit){
   const st = statusDoConfronto(m, passo, hit);
   /* ⚠️ SE A FRASE JÁ ESTÁ NA TELA, ela não reentra. Quem responde isso é o próprio DOM: este
      HTML é montado ANTES de o `render()` trocar o conteúdo, então o elemento antigo ainda está lá
      com o que o jogador está vendo. Comparar com ele é exato e não guarda estado nenhum.
-     Sem isso a animação de entrada rodava a cada desenho: o pintor punha a frase no passo do
-     evento e o desenho de 50ms depois a fazia surgir de novo -- o piscar reportado em 12/09/2026.
+     Sem isso a animação de entrada roda a cada desenho: o pintor põe a frase no passo do evento e
+     o desenho de 50ms depois a faz surgir de novo -- o piscar de 12/09/2026.
      A frase MUDOU? entra normalmente, que é o que separa um golpe do seguinte. */
+  const chave = chaveDaFrase(st);
   let igual = false;
   try {
     const el = (typeof document !== 'undefined') && document.getElementById('battle-status-txt');
-    igual = !!el && el.innerHTML === st.html && el.className.indexOf(st.classe || 'x-nenhuma') >= 0;
+    igual = !!el && el.getAttribute('data-frase') === chave;
   } catch(e){ igual = false; }
   return '<p class="loading-text' + (st.classe ? ' ' + st.classe : '') + (igual ? ' aviso-sem-entrada' : '') +
-         '" id="battle-status-txt">' + st.html + '</p>';
+         '" id="battle-status-txt" data-frase="' + escapeHtmlSafe(chave) + '">' + st.html + '</p>';
 }
 /* PINTA A LINHA DIRETO NO DOM, sem render(). É obrigatório: um render() no meio da animação recria
    o HTML inteiro e MATA a transição CSS da barra de HP -- a regra da casa, e ela já custou três
@@ -21966,9 +21978,13 @@ function pintarStatusDoConfronto(m, passo, hit){
   if(!st.classe) return;
   /* ⚠️ E NADA A FAZER SE A LINHA JÁ DIZ ISSO. O reflow abaixo existe pra a animação rodar DE NOVO
      quando o texto troca sem trocar de classe (dois golpes seguidos do mesmo lado) -- mas rodando
-     no texto IGUAL ele faz a frase surgir duas vezes, que é o piscar de 12/09/2026. */
-  if(el.innerHTML === st.html && el.className.indexOf(st.classe) >= 0) return;
+     no texto IGUAL ele faz a frase surgir duas vezes, que é o piscar de 12/09/2026.
+     ⚠️ A COMPARAÇÃO É PELA CHAVE, e não pelo `innerHTML`: o navegador normaliza a tag do selo
+     e o HTML nunca volta igual ao que foi escrito -- ver o `chaveDaFrase`. */
+  const chave = chaveDaFrase(st);
+  if(el.getAttribute('data-frase') === chave) return;
   el.className = 'loading-text' + (st.classe ? ' ' + st.classe : '');
+  el.setAttribute('data-frase', chave);
   el.innerHTML = st.html;
   el.style.animation = 'none';
   void el.offsetWidth;

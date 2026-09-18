@@ -9219,6 +9219,78 @@ console.log('\n=== VIDA CHEIA NAO MORRE NUM GOLPE (17/09/2026) ===');
   }
 }
 
+/* ============================================================================
+   A FRASE DE STATUS NAO PISCA DUAS VEZES (18/09/2026)
+   ----------------------------------------------------------------------------
+   Reportado: *"as mensagens que aparece de estado dos pokemon como essa: Clefable esta
+   paralisado e nao consegue atacar!, quando elas aparecem, elas piscam 2x na tela"*.
+
+   ⚠️ A GUARDA JA EXISTIA desde 12/09/2026 -- e ela PAROU DE FUNCIONAR quando os emojis viraram
+   SVG (18/09). Ela comparava `el.innerHTML` com o HTML gerado, e **o navegador normaliza a tag
+   auto-fechada do selo**: `<use href="#s-raio"/>` volta como `<use href="#s-raio"></use>`.
+   A comparacao passou a dar SEMPRE diferente em toda frase com selo -- e toda frase de status
+   tem selo. Medido no navegador: a animacao de entrada rodava 3x por frase, e voltou a 1x.
+
+   Hoje a comparacao e por uma CHAVE guardada num `data-`, que o navegador devolve literal.
+   ============================================================================ */
+{
+  console.log('\n=== A FRASE DE STATUS NAO PISCA ===');
+
+  /* 1) O CASO DO RELATO, com o innerHTML NORMALIZADO na mao -- e isso que o navegador faz, e
+     sem simular aqui a trava passaria com o defeito de volta (o sandbox devolve o innerHTML
+     exatamente como foi escrito). */
+  const m = {
+    playerSpecies:'clefable', playerName:'Clefable', playerLevel:50,
+    enemySpecies:'machamp', enemyName:'Machamp', enemyLevel:50,
+    playerHpBefore:300, playerHpAfter:200, playerMaxHp:300,
+    enemyHpBefore:280, enemyHpAfter:280, enemyMaxHp:280,
+    golpes: [{ x:'paralisado', q:'p', d:0 }],
+  };
+  const html1 = S.fighterHtml ? null : null;   /* so pra deixar claro que isto nao depende do quadro */
+  const st = S.statusDoConfronto(m, 1, null);
+  ok('a frase do relato sai com selo', st.html.indexOf('<svg') >= 0 && st.html.indexOf('paralisado') >= 0,
+     st.html.slice(0, 70));
+
+  /* o elemento na tela, com o innerHTML NORMALIZADO como o navegador faz */
+  const primeiro = S.statusDoConfrontoHtml(m, 1, null);
+  const chave = (primeiro.match(/data-frase="([^"]*)"/) || [])[1];
+  ok('o elemento guarda a chave num data-', !!chave, 'sem data-frase');
+
+  const el = S.document.getElementById('battle-status-txt');
+  if(el){
+    el.className = 'loading-text aviso-especial';
+    /* ⚠️ A NORMALIZACAO: o navegador expande a tag auto-fechada */
+    el.innerHTML = st.html.replace(/<use ([^>]*)\/>/g, '<use $1></use>');
+    el.setAttribute && el.setAttribute('data-frase', chave.replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#39;/g, "'"));
+    const segundo = S.statusDoConfrontoHtml(m, 1, null);
+    ok('o SEGUNDO desenho da mesma frase NAO reentra', segundo.indexOf('aviso-sem-entrada') >= 0,
+       'reentrou -- a frase pisca');
+
+    /* e a frase NOVA entra normalmente: sem isso o conserto apagaria o que funciona */
+    const m2 = Object.assign({}, m, { golpes: [{ x:'queimou', q:'e', d:0, mv:'flamethrower' }] });
+    const outra = S.statusDoConfrontoHtml(m2, 1, null);
+    ok('mas uma frase NOVA entra', outra.indexOf('aviso-sem-entrada') < 0, 'nao entrou');
+  }
+
+  /* 2) E A COMPARACAO NAO PODE VOLTAR A SER POR innerHTML -- o teste LE O CODIGO, porque o
+     sandbox nao normaliza e um caso de comportamento passaria com o defeito de volta. */
+  const cli = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
+  [['statusDoConfrontoHtml', 'o montador'], ['pintarStatusDoConfronto', 'o pintor']].forEach(([nome, rot]) => {
+    const i = cli.indexOf('function ' + nome + '(');
+    const corpo = i < 0 ? '' : cli.slice(i, cli.indexOf('\n}', i));
+    ok(rot + ' compara pela CHAVE, nao pelo innerHTML',
+       corpo.indexOf("getAttribute('data-frase')") >= 0 && corpo.indexOf('.innerHTML ===') < 0,
+       corpo.indexOf('.innerHTML ===') >= 0 ? 'voltou a comparar innerHTML' : 'sem o data-frase');
+  });
+
+  /* 3) e a chave separa frases de classes diferentes com o mesmo texto */
+  {
+    const a = S.chaveDaFrase({ classe: 'aviso-especial', html: 'x' });
+    const b = S.chaveDaFrase({ classe: 'aviso-golpe', html: 'x' });
+    ok('a chave leva a CLASSE junto', a !== b, a + ' x ' + b);
+  }
+}
+
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
 process.exit(falhas ? 1 : 0);
 })();

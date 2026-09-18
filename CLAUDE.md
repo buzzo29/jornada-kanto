@@ -11455,6 +11455,47 @@ pintando o mesmo pixel dariam o desenho certo por acaso, com a cor do último. C
 **E há um teto de ~95 KB pro SVG** (1.800 bytes por selo), porque a trava do pixel **não pega** a otimização ser desfeita:
 com uma `<rect>` por pixel o desenho continua certo e só o DOM cresce. Conferido: ela acusa com uma `<rect>` por pixel.
 
+### ⚠️ A FRASE DE STATUS VOLTOU A PISCAR, E A CULPA FOI DO SELO (18/09/2026)
+
+Reportado: *"as mensagens que aparece de estado dos pokemon como essa: Clefable está paralisado e
+não consegue atacar!, quando elas aparecem, elas piscam 2x na tela"*.
+
+**⚠️ A GUARDA JÁ EXISTIA desde 12/09/2026 — e ela parou de funcionar quando os emojis viraram
+SVG, hoje de manhã.** Ela comparava `el.innerHTML` com o HTML gerado, e **o navegador NORMALIZA a
+tag auto-fechada do selo**:
+
+```
+a função gera:  <use href="#s-raio"/>
+o DOM devolve:  <use href="#s-raio"></use>
+```
+
+A comparação passou a dar **sempre diferente** em toda frase que tem selo — e **toda** frase de
+status tem. Medido no navegador, com o mesmo par de desenhos: a animação de entrada rodava
+**3 vezes** por frase, e voltou a **1**.
+
+- **HOJE A COMPARAÇÃO É POR UMA CHAVE** (`chaveDaFrase` = classe + HTML), guardada num
+  `data-frase`. Atributo o navegador devolve **literal**: não passa por parser, então não há o
+  que normalizar. As duas pontas usam a mesma chave — o montador (`statusDoConfrontoHtml`) e o
+  pintor (`pintarStatusDoConfronto`).
+- **A CLASSE ENTRA NA CHAVE** porque duas frases de classes diferentes podem ter o mesmo texto, e
+  a classe é o que decide a animação.
+- **A frase NOVA continua entrando normalmente** — é o que separa um golpe do seguinte, e sem
+  isso o conserto apagaria o que funciona.
+
+**⚠️ A LIÇÃO É MAIS GERAL QUE O DEFEITO: comparar HTML gerado com `innerHTML` lido nunca é
+exato.** O navegador reescreve a marcação ao parseá-la — tag auto-fechada, ordem de atributos,
+aspas. Funcionou por seis dias porque as frases só tinham **texto e emoji**; na primeira tag de
+verdade ela quebrou, e **em silêncio**: a guarda não falha, ela só deixa de pegar.
+
+- **⚠️ E O SANDBOX NÃO NORMALIZA**, então uma trava de comportamento passaria com o defeito de
+  volta. A trava **simula a normalização na mão** (expande o `<use/>`) e, além disso, **lê o
+  código** pra cobrar que nenhuma das duas pontas volte a comparar `innerHTML`. Conferido: com o
+  defeito religado ela acusa **3 falhas**.
+- **O stub de elemento do sandbox ganhou `getAttribute`/`setAttribute`** — sem eles o pintor
+  derrubava o teste com um TypeError sem relação com o que estava sendo testado. É a mesma lição
+  do `fake-firestore`: **o dublê tem que fazer o que o de verdade faz.**
+- **As duas impressões — MOTOR e DIÁRIO — continuam idênticas** em 900 batalhas semeadas.
+
 ### ⚠️ O CONTORNO TEM 2px, PORQUE 24 NÃO CABE EM 16 (18/09/2026)
 
 Reportado com print a **zoom 100%**: *"o desenho da estrela e muitos outros ficam feios o contorno
