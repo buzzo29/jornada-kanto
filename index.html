@@ -3030,6 +3030,14 @@
     padding:6px 8px;font-size:.62rem;font-weight:800;color:#fff9e9;
     text-shadow:1px 1px 0 #1a2434;pointer-events:none;
   }
+  /* ⚠️ O `[hidden]` PRECISA DESTA REGRA, e sem ela o modal da contagem NÃO SAÍA DA TELA -- foi
+     reportado DUAS vezes. O atributo `hidden` é `display:none` pela folha do NAVEGADOR, que tem a
+     menor prioridade que existe: **qualquer `display` do autor ganha dela**, e o `display:flex`
+     logo abaixo ganhava.
+     ⚠️ E A TRAVA TINHA PASSADO: ela conferia que o atributo estava no HTML -- e estava. O que
+     faltava era conferir se ele FAZIA EFEITO, e isso só se lê no CSS. É a terceira vez hoje que a
+     marcação está certa e quem erra é a folha de estilo. */
+  .corrida-overlay[hidden]{display:none;}
   .corrida-overlay{
     position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
     background:#101a2b88;pointer-events:none;
@@ -3073,8 +3081,31 @@
   .corrida-trecho b{display:block;font-size:.6rem;}
   .corrida-trecho.ativo{background:var(--yellow);}
   .corrida-trecho.feito{opacity:.5;}
-  .resultRow{display:flex;justify-content:space-between;gap:8px;font-size:.66rem;padding:3px 0;border-bottom:1px dashed var(--box-border);}
+  /* ⚠️ A FONTE SUBIU (18/09/2026, a pedido): de .66 pra .82rem, e o padding acompanhou pra as
+     linhas não colarem. No fim da corrida esta caixa é a ÚNICA coisa na tela -- ela deixou de
+     dividir espaço com o placar e a pista, então pode ser lida de longe.
+     ⚠️ O TEMPO TEM `tabular-nums`: sem isso os dígitos têm larguras diferentes e a coluna da
+     direita dança de linha pra linha, que é justamente onde o olho compara. */
+  /* ⚠️ A LINHA É UMA GRADE DE QUATRO COLUNAS, e não um flex livre: com flex, a largura da
+     medalha e a do número mudam de linha pra linha e os NOMES deixam de alinhar -- e é a coluna
+     dos nomes e a dos tempos que se comparam de relance. */
+  .resultRow{display:grid;grid-template-columns:auto 34px 1fr auto;align-items:center;gap:8px;
+    padding:7px 0;border-bottom:1px dashed var(--box-border);}
   .resultRow:last-of-type{border-bottom:none;}
+  /* ⚠️ O "1º" É A INFORMAÇÃO, e por isso ele é o maior texto da caixa (1,5rem contra os .82 de
+     antes). Ele também é a Única coluna de largura FIXA junto da medalha: sem `min-width`, o "4º"
+     e o "1º" têm larguras diferentes e a fileira inteira desanda. */
+  .resultRow .resultPos{font-size:1.5rem;font-weight:800;min-width:2.1em;color:var(--blue-dark);}
+  .resultRow .resultMed{display:flex;align-items:center;justify-content:center;}
+  .resultRow .resultMed .selo{width:30px;height:30px;}
+  .resultRow .resultNome{font-size:1rem;font-weight:700;line-height:1.15;overflow-wrap:anywhere;}
+  /* quem é quem fica embaixo do nome, pequeno: o nome é o que se procura na lista */
+  .resultRow .resultQuem{display:block;font-size:.62rem;font-weight:600;color:var(--muted);text-transform:uppercase;}
+  /* ⚠️ `tabular-nums` porque os dígitos têm larguras diferentes sem ele, e a coluna da direita
+     dança de linha pra linha -- justamente onde os tempos se comparam. */
+  .resultRow b{font-size:1.05rem;font-variant-numeric:tabular-nums;white-space:nowrap;}
+  /* a linha do jogador ganha um destaque leve: ela é a que ele procura primeiro */
+  .resultRow.eu{background:rgba(255,203,5,.2);border-radius:6px;padding-left:6px;padding-right:6px;}
   /* o Speed da corrida, que é o número pelo qual a lista se ordena */
   .corrida-speed{margin-left:6px;font-size:.55rem;font-weight:800;color:var(--blue-dark);}
   .corrida-speed-badge{
@@ -5326,6 +5357,33 @@ const DESENHOS = {
     'kkyyyyoooyyyyyyoooyyookk','.kkYyyyoooyyyyoooyyyokk.','.kkyyyyyooooooooyyyookk.',
     '..kkyyyyyyyooyyyyyookk..','...kkyyyyyyyyyyyyookk...','....kkyoyyyyyyyoookk....',
     '.....kkkyoooooookkk.....','......kkkkkkkkkkkk......','........kkkkkkkk........'],
+  medalha_ouro: [
+    '...kkRRRRRrkkRRRRRrkk...','...kkrrrrrqkkRrrrqqkk...','....kkRrrrqkkRrrrqkk....',
+    '....kkrrrrrrRRrrqqkk....','.....kkRrrrqRrrrqkk.....','.....kkrrrrqRrrqqkk.....',
+    '......kkRrrqRrrqkk......','......kkrrrRRrqqkk......','......kkkYYYYYykkk......',
+    '.....kkYYYyyyyyYykk.....','....kkYYyyyyyyyyyykk....','...kkYYyyyykkyyyyyykk...',
+    '...kkYyyyyykkyyyyyokk...','..kkYYyyykkkkkkyyyyykk..','..kkYyykkkkkkkkkkyyokk..',
+    '..kkYyyykkkkkkkkyyyokk..','..kkYyyyykkkkkkyyyyokk..','..kkyyyyykkkkkkyyyookk..',
+    '...kkYyyykkkkkkyyyokk...','...kkyyyykyyyykyyookk...','....kkyyyyyyyyyyookk....',
+    '.....kkyoyyyyyoookk.....','......kkkyoooookkk......','.......kkkkkkkkkk.......'],
+  medalha_prata: [
+    '...kkRRRRRrkkRRRRRrkk...','...kkrrrrrqkkRrrrqqkk...','....kkRrrrqkkRrrrqkk....',
+    '....kkrrrrrrRRrrqqkk....','.....kkRrrrqRrrrqkk.....','.....kkrrrrqRrrqqkk.....',
+    '......kkRrrqRrrqkk......','......kkrrrRRrqqkk......','......kkkSSSSSskkk......',
+    '.....kkSSSsssssSskk.....','....kkSSsssssssssskk....','...kkSSsssskksssssskk...',
+    '...kkSssssskkssssszkk...','..kkSSssskkkkkkssssskk..','..kkSsskkkkkkkkkksszkk..',
+    '..kkSssskkkkkkkkssszkk..','..kkSsssskkkkkksssszkk..','..kkssssskkkkkkssszzkk..',
+    '...kkSssskkkkkkssszkk...','...kksssskssssksszzkk...','....kksssssssssszzkk....',
+    '.....kkszssssszzzkk.....','......kkkszzzzzkkk......','.......kkkkkkkkkk.......'],
+  medalha_bronze: [
+    '...kkRRRRRrkkRRRRRrkk...','...kkrrrrrqkkRrrrqqkk...','....kkRrrrqkkRrrrqkk....',
+    '....kkrrrrrrRRrrqqkk....','.....kkRrrrqRrrrqkk.....','.....kkrrrrqRrrqqkk.....',
+    '......kkRrrqRrrqkk......','......kkrrrRRrqqkk......','......kkkFFFFFfkkk......',
+    '.....kkFFFfffffFfkk.....','....kkFFffffffffffkk....','...kkFFffffkkffffffkk...',
+    '...kkFfffffkkfffffhkk...','..kkFFfffkkkkkkfffffkk..','..kkFffkkkkkkkkkkffhkk..',
+    '..kkFfffkkkkkkkkfffhkk..','..kkFffffkkkkkkffffhkk..','..kkfffffkkkkkkfffhhkk..',
+    '...kkFfffkkkkkkfffhkk...','...kkffffkffffkffhhkk...','....kkffffffffffhhkk....',
+    '.....kkfhfffffhhhkk.....','......kkkfhhhhhkkk......','.......kkkkkkkkkk.......'],
   trofeu: [
     '........................','......kkkkkkkkkkkk......','....kkkkkkkkkkkkkkkk....',
     '...kkkYYYYYYYYYYYykkk...','..kkYYyyyyyyyyyyyYYykk..','.kkyyooyyyyyyyyyyyooykk.',
@@ -30462,30 +30520,89 @@ const CORRIDA_EFEITOS = {
 /* A BARRA: ela vai e VOLTA, invertendo nas laterais -- nunca salta de uma ponta pra outra.
    Cada travessia dura `CORRIDA_TRAVESSIA`; o ciclo completo é o dobro. */
 const CORRIDA_TRAVESSIA = 1.44;
-/* ⚠️ AS FAIXAS SÃO EM FRAÇÃO DA BARRA, e os números são os do pedido:
-     verde  30,4% a partir de 34,8%  → de 0,348 a 0,652
-     amarela 9,6% a partir de 45,2%  → de 0,452 a 0,548
+/* ⚠️ AS FAIXAS SÃO EM FRAÇÃO DA BARRA, e as duas já caíram pela METADE desde os números do pedido:
+     verde  **15,2%** a partir de 42,4%  → de 0,424 a 0,576   (era 30,4% a partir de 34,8%)
+     amarela **4,8%** a partir de 47,6%  → de 0,476 a 0,524   (era 9,6% a partir de 45,2%)
    As duas são centradas em 0,5, e a amarela fica DENTRO da verde. Guardadas como meia-largura a
    partir do centro porque é assim que a detecção pergunta: `|posição − 0,5| <= meia`. */
 const CORRIDA_FAIXA = {
-  verde:   { ini: 0.348, tam: 0.304 },
-  amarela: { ini: 0.452, tam: 0.096 },
+  verde:   { ini: 0.424, tam: 0.152 },
+  /* ⚠️ A AMARELA CAIU PELA METADE (18/09/2026, a pedido: *"pode diminuir o tamanho do quadrado
+     amarelo em 50% para acertar perfeito"*): de 9,6% pra **4,8%**, e o `ini` acompanha pra ela
+     continuar CENTRADA na verde -- 0,5 − 0,048/2 = 0,476. Guardar só o `tam` pela metade e deixar
+     o `ini` em 0,452 deslocaria o perfeito pra a esquerda do centro. */
+  amarela: { ini: 0.476, tam: 0.048 },
 };
 const meiaFaixa = (f) => f.tam / 2;
 /* ⚠️ A DETECÇÃO É PELA POSIÇÃO, não pelo tempo, e é isso que a faz valer NOS DOIS SENTIDOS: a
    posição do marcador é um triângulo de 0 a 1 e de volta a 0, então a mesma conta serve na ida e
    na volta sem um `if` de direção. */
-/* ⚠️ O EPSILON NÃO É FOLGA, É A BORDA: `Math.abs(0.348 - 0.5)` dá **0,15200000000000002** e a
-   meia-faixa verde dá 0,152 -- ou seja o início EXATO da faixa caía FORA dela, e o mesmo no
-   amarelo (0,452 virava "bom" em vez de "perfeito"). A borda pertence à faixa, e um décimo de
-   bilionésimo é menor que qualquer coisa que a barra consiga produzir. */
+/* ⚠️ O EPSILON NÃO É FOLGA, É A BORDA, e ele vale nas DUAS faixas -- medido nos valores de hoje:
+     `Math.abs(0.424 - 0.5)` dá **0,07600000000000001** contra uma meia-faixa de 0,076;
+     `Math.abs(0.476 - 0.5)` dá **0,02400000000000002** contra 0,024.
+   Ou seja o início EXATO de cada faixa cai FORA dela por alguns centésimos de bilionésimo. A borda
+   pertence à faixa, e o epsilon é menor que qualquer coisa que a barra consiga produzir.
+   ⚠️ E ELE SOBREVIVEU ÀS DUAS REDUÇÕES DE FAIXA: os números do exemplo mudaram, o problema não. */
 const CORRIDA_EPS = 1e-9;
-function resultadoDoImpulso(pos){
-  const d = Math.abs(pos - 0.5);
+/* ============================================================================
+   ⚠️ AS FAIXAS TAMBÉM SE MOVEM (18/09/2026, a pedido), e em velocidade DIFERENTE da agulha --
+   *"para não ficarem juntas"*. O centro delas oscila num SENO; a agulha é um TRIÂNGULO, então as
+   duas nunca andam no mesmo ritmo nem com a mesma forma.
+
+   ⚠️ E QUANTO MAIOR O NÍVEL, MAIS DEVAGAR ELAS FICAM: o período cresce com o nível do pokémon que
+   está correndo AGORA (no revezamento ele muda a cada trecho). É a primeira coisa no jogo em que o
+   nível dá uma vantagem que não é atributo.
+
+   ⚠️ O PERÍODO É UMA RAZÃO DA TRAVESSIA, e o intervalo dela NÃO CONTÉM UM INTEIRO -- é isso que
+   garante que as duas nunca entrem em sincronia. A primeira versão dava o período em SEGUNDOS
+   (3,7 → 9,3 s) e eu afirmei no comentário que ela evitava os múltiplos: **era falso, e a trava
+   pegou** -- oito níveis caíam em cima de 4,32 s, 5,76 s e 8,64 s.
+   A razão do erro vale guardar: **qualquer faixa CONTÍNUA que varie mais de 1 unidade de razão
+   cruza um inteiro**, não importa onde comece. Com razão inteira, a configuração barra+faixa se
+   repete exatamente a cada N travessias e o jogador decora o padrão -- que é o que o pedido
+   ("para não ficarem juntas") manda evitar.
+   O preço é a variação ser menor: é o máximo possível sem cruzar o inteiro.
+   ⚠️ E ELAS FICARAM MAIS RÁPIDAS (a pedido, no mesmo dia): a razão desceu de 2,15–2,90 pra
+   **1,15–1,90**, ou seja o período vai de 3,10–4,18 s pra **1,66 s no Lv.1 e 2,74 s no Lv.99** --
+   quase o dobro da velocidade. O intervalo novo continua entre os inteiros 1 e 2, então a regra
+   de não sincronizar com a agulha segue valendo (e a trava continua varrendo os 99 níveis). */
+const CORRIDA_FAIXA_AMPLITUDE = 0.17;   /* o quanto o centro passeia, pra cada lado */
+const CORRIDA_FAIXA_RAZAO_MIN = 1.15;   /* Lv.1 -- a faixa mais rápida */
+const CORRIDA_FAIXA_RAZAO_MAX = 1.90;   /* Lv.99 -- a mais lenta */
+function periodoDasFaixas(nivel){
+  const t = Math.max(0, Math.min(1, ((nivel || 1) - 1) / (NIVEL_MAXIMO - 1)));
+  return CORRIDA_TRAVESSIA * (CORRIDA_FAIXA_RAZAO_MIN + t * (CORRIDA_FAIXA_RAZAO_MAX - CORRIDA_FAIXA_RAZAO_MIN));
+}
+/* O centro das faixas AGORA -- o mesmo pras duas, que são concêntricas. É sobre ELE que a detecção
+   mede, e não sobre o 0,5 fixo. */
+function centroDasFaixas(){
+  const eu = corrida.corredores[0];
+  const p = eu ? eu.time[eu.trecho] : null;
+  return 0.5 + CORRIDA_FAIXA_AMPLITUDE * Math.sin(2 * Math.PI * corrida.tempo / periodoDasFaixas(p ? p.level : 1));
+}
+/* ⚠️ O `centro` TEM PADRÃO 0,5 porque a GEOMETRIA das faixas não depende de onde elas estão: as
+   travas medem as bordas com o centro parado, e a barra em jogo passa o centro móvel. */
+function resultadoDoImpulso(pos, centro){
+  const d = Math.abs(pos - (centro === undefined ? 0.5 : centro));
   if(d <= meiaFaixa(CORRIDA_FAIXA.amarela) + CORRIDA_EPS) return 'perfect';
   if(d <= meiaFaixa(CORRIDA_FAIXA.verde) + CORRIDA_EPS) return 'good';
   return 'miss';
 }
+/* ============================================================================
+   ⚠️ QUEM NÃO TENTA PERDE VELOCIDADE (18/09/2026, a pedido): a cada `CORRIDA_DESLEIXO_TRAVESSIAS`
+   travessias seguidas **sem uma tentativa**, o corredor perde `CORRIDA_DESLEIXO` de velocidade.
+
+   ⚠️ ELE É DIFERENTE DOS OUTROS EFEITOS EM TUDO: não tem duração (vale até o fim da prova), ACUMULA
+   (seis travessias paradas são dois cortes), e não é substituído por um impulso -- ele MULTIPLICA o
+   que vier. Um perfeito ainda ajuda quem está desleixado, só que sobre uma base menor.
+   ⚠️ E ELE TEM PISO: sem o `CORRIDA_DESLEIXO_MIN`, ficar parado o suficiente pararia o pokémon na
+   pista e a corrida não terminaria nunca.
+   ⚠️ TENTAR ZERA O CONTADOR, mesmo ERRANDO: o que se pune é não tentar, e um erro já tem a
+   penalidade dele (0,80 por meio segundo). */
+const CORRIDA_DESLEIXO_TRAVESSIAS = 3;
+const CORRIDA_DESLEIXO = 0.05;      /* -5% por bloco */
+const CORRIDA_DESLEIXO_MIN = 0.55;  /* o piso: nunca abaixo de 55% da velocidade normal */
+
 /* A DIFICULDADE DO NPC -- as probabilidades do protótipo, deixadas como ponto de partida.
    ⚠️ Elas somam menos que 1 de propósito: o resto é a OPORTUNIDADE NÃO USADA, que é o que impede
    o NPC de ser um metrônomo perfeito. E ele usa a MESMA fórmula, os MESMOS multiplicadores e a
@@ -30665,8 +30782,37 @@ function finaisDaCorrida(){
    dá handicap. Ela existe como função justamente pra não ficar espalhada. */
 function nivelDoNpc(nivelDoJogador){ return nivelDoJogador; }
 
-function sortearNpcs(){
+/* ⚠️ O NPC É PAREADO PELO **SPEED**, e não sorteado entre as 134 finais -- reportado assim:
+   *"deixe o NPC melhor, ele está bem ruinzinho"*.
+
+   ⚠️ E A CAUSA NÃO ERA A PILOTAGEM: medido no ESPELHO (Jolteon contra Jolteon, só a pilotagem
+   decidindo), o NPC ganha do jogador "bom" em **72%** das corridas. O que estava errado era o
+   BICHO dele. O jogador escolhe o mais rápido do time; o sorteio uniforme dava ao NPC a mediana
+   do bestiário -- e das 134 finais só **4 (3%)** alcançam um Jolteon, enquanto **68 (51%)** têm
+   menos de 60% do Speed dele. A mediana é Speed 80 contra 135, o que nos 300 m já vale 2,5 s.
+
+   ⚠️ ISSO NÃO É "aumentar artificialmente a velocidade do NPC", que o pedido proíbe com todas as
+   letras: ele continua correndo com o Speed REAL da espécie dele. O que mudou é a ESCALAÇÃO --
+   exatamente o que a Torre faz com o nível e a Montanha Sagrada faz com a média do time.
+
+   ⚠️ E O PAREAMENTO É POR TRECHO, não por equipe: no revezamento o NPC do trecho k é pareado com
+   o pokémon do jogador no trecho k. Senão o jogador guardaria o lento pro trecho em que o NPC
+   fosse rápido, e o pareamento viraria uma conta que dá pra burlar.
+
+   ⚠️ É "as N MAIS PRÓXIMAS", e não uma janela de ±x%: janela pode ficar VAZIA (um Shuckle de
+   Speed 10 não tem vizinho a ±15%) e aí precisaria de um fallback que, por definição, só roda
+   nos casos raros -- ou seja, o caminho menos testado do código. Por proximidade nunca falta. */
+const CORRIDA_NPC_VIZINHOS = 14;
+function npcParaOSpeed(alvo, usadas){
   const finais = finaisDaCorrida();
+  const nivel = 50;   /* o nível não muda a ORDEM: ele multiplica o Speed de todo mundo igual */
+  return finais
+    .filter(id => !usadas.has(raizDaLinha(id)))
+    .map(id => ({ id, d: Math.abs(speedDaCorrida(corridaInstancia({ speciesId: id, level: nivel }, false)) - alvo) }))
+    .sort((a, b) => a.d - b.d)
+    .slice(0, CORRIDA_NPC_VIZINHOS);
+}
+function sortearNpcs(){
   const meus = corrida.escolhidos;
   const quantos = corrida.formato === 'relay' ? CORRIDA_TRECHOS : 1;
   const times = [];
@@ -30675,14 +30821,19 @@ function sortearNpcs(){
     /* ⚠️ SEM REPETIR ESPÉCIE DENTRO DA EQUIPE, e a conta é por RAIZ da linha: dois Gyarados de
        origens diferentes são a mesma linha, e é a regra que o encontro selvagem e o montador já
        usam. Entre equipes DIFERENTES pode repetir -- isso é escalação, não é o time do jogador. */
-    let tentativas = 0;
-    while(time.length < quantos && tentativas < 400){
-      tentativas++;
-      const id = finais[Math.floor(Math.random() * finais.length)];
-      const raiz = raizDaLinha(id);
-      if(usadas.has(raiz)) continue;
-      usadas.add(raiz);
-      const nivel = nivelDoNpc((meus[time.length] || meus[0] || {}).level || 50);
+    while(time.length < quantos){
+      const meu = meus[time.length] || meus[0] || {};
+      const nivel = nivelDoNpc(meu.level || 50);
+      /* ⚠️ O ALVO SAI DO POKÉMON DO JOGADOR NO NÍVEL 50, e não no nível dele: o `speedDaCorrida`
+         multiplica pelo nível, então comparar um Lv.5 com a lista no Lv.50 daria sempre os mais
+         lentos. O que se quer parear é a ESPÉCIE -- o nível já é pareado à parte. */
+      const alvo = meu.speciesId
+        ? speedDaCorrida(corridaInstancia({ speciesId: meu.speciesId, level: 50 }, false))
+        : 80;
+      const perto = npcParaOSpeed(alvo, usadas);
+      if(!perto.length) break;              /* acabaram as espécies: time menor, nunca laço infinito */
+      const id = perto[Math.floor(Math.random() * perto.length)].id;
+      usadas.add(raizDaLinha(id));
       time.push(corridaInstancia({ speciesId: id, level: nivel }, false));
     }
     times.push(time);
@@ -30695,7 +30846,25 @@ function sortearNpcs(){
    ============================================================================ */
 function corridaVelocidade(c){
   const p = c.time[c.trecho];
-  return velocidadeNormal(speedDaCorrida(p)) * (c.efeito > 0 ? c.mult : 1);
+  /* ⚠️ O DESLEIXO MULTIPLICA POR FORA do efeito do impulso: um perfeito ainda ajuda quem está
+     desleixado, só que sobre uma base menor. Somar os dois num multiplicador só faria um perfeito
+     "curar" a inatividade, e o pedido é o contrário. */
+  return velocidadeNormal(speedDaCorrida(p)) * (c.efeito > 0 ? c.mult : 1) * (c.desleixo || 1);
+}
+/* ⚠️ O CONTADOR ANDA QUANDO A TRAVESSIA VIRA, e é o `corridaFisica` quem chama isto -- é lá que o
+   tempo passa. Ele é chamado uma vez por travessia VIRADA, não por quadro. */
+function corridaContarTravessia(c, tentou){
+  if(tentou){ c.paradas = 0; return; }
+  c.paradas = (c.paradas || 0) + 1;
+  if(c.paradas >= CORRIDA_DESLEIXO_TRAVESSIAS){
+    c.paradas = 0;
+    c.desleixo = Math.max(CORRIDA_DESLEIXO_MIN, (c.desleixo || 1) * (1 - CORRIDA_DESLEIXO));
+    if(c === corrida.corredores[0]){
+      corrida.recado = 'Sem impulso há ' + CORRIDA_DESLEIXO_TRAVESSIAS + ' passadas: −' +
+                       Math.round(CORRIDA_DESLEIXO * 100) + '% de velocidade.';
+      corrida.brilhoTexto = 'DESLEIXO!'; corrida.brilho = 1;
+    }
+  }
 }
 function aplicarEfeito(c, resultado){
   const e = CORRIDA_EFEITOS[resultado];
@@ -30751,7 +30920,45 @@ function planejarNpc(c, indice){
   c.npcQuando = indice * CORRIDA_TRAVESSIA + CORRIDA_TRAVESSIA * (1 / 3 + Math.random() / 3);
   c.npcSorteio = Math.random();
 }
+/* ⚠️ O QUADRO É FATIADO NAS VIRADAS DE TRAVESSIA, e isso não é zelo: o DESLEIXO muda a velocidade
+   no meio do quadro, exatamente como a troca de trecho muda -- e mudança de velocidade no meio de
+   um quadro tem que ser fatiada, senão o resultado passa a depender da TAXA DE QUADROS.
+   A trava pegou: sem fatiar, a mesma corrida dava 25,999 s a 1/60 e 26,027 s a 1/5, porque com dt
+   grande o corte do desleixo era aplicado ao quadro INTEIRO em vez de só ao pedaço depois da
+   virada. É o mesmo motivo pelo qual o `corridaAvancar` já fatia. */
 function corridaFisica(dt){
+  /* ⚠️ AS VIRADAS SÃO CALCULADAS DE UMA VEZ, a partir do INTERVALO -- e não procuradas "a próxima"
+     dentro de um `while`. A primeira versão fazia isso e TRAVAVA: quando o tempo caía um ulp antes
+     de uma virada (`1.4399999999999999`), o `Math.floor` devolvia a virada ANTERIOR, o passo saía
+     em ~1e-16, o tempo não avançava e o laço rodava até o teto de voltas -- em todo quadro.
+     Aqui o número de fatias é conhecido antes de começar, então não existe laço que não termina. */
+  const inicio = corrida.tempo, fim = inicio + dt;
+  const primeira = Math.floor(inicio / CORRIDA_TRAVESSIA) + 1;
+  const ultima = Math.floor(fim / CORRIDA_TRAVESSIA);
+  let cursor = inicio;
+  for(let k = primeira; k <= ultima; k++){
+    const quando = k * CORRIDA_TRAVESSIA;
+    if(quando > cursor) corridaFisicaPasso(quando - cursor);
+    cursor = quando;
+    /* ⚠️ A TRAVESSIA `k-1` ACABOU DE FECHAR. O contador anda AQUI, ENTRE as fatias, e é isso que faz
+       o corte do desleixo valer só do próximo pedaço em diante -- sem isso o resultado passaria a
+       depender da taxa de quadros (medido: 25,999 s a 1/60 contra 26,027 s a 1/5). */
+    corrida.corredores.forEach(c => {
+      if(c.chegada !== null) return;
+      /* ⚠️ O NPC TAMBÉM PERDE POR INATIVIDADE, e isso é simetria: a "oportunidade não usada" dele
+         (o resto das probabilidades do `CORRIDA_NPC`) É não tentar. Sem isto, a penalidade valeria
+         só pro jogador -- e a regra da casa é que o NPC usa o mesmo motor. */
+      corridaContarTravessia(c, c.tentouNaTravessia === k - 1);
+    });
+  }
+  if(fim > cursor) corridaFisicaPasso(fim - cursor);
+  /* ⚠️ E O TEMPO É CARIMBADO NO FIM: as fatias somam `dt` com erro de float, e sem isto o relógio
+     derivaria da soma dos quadros -- as viradas passariam a cair em lugares levemente diferentes
+     conforme a taxa de quadros, que é exatamente o que este fatiamento existe pra evitar. */
+  corrida.tempo = fim;
+  if(corrida.corredores.length && corrida.corredores.every(c => c.chegada !== null)) corridaTerminar();
+}
+function corridaFisicaPasso(dt){
   const fim = corrida.tempo + dt;
   corrida.corredores.forEach((c, i) => {
     let cursor = corrida.tempo;
@@ -30761,10 +30968,12 @@ function corridaFisica(dt){
         cursor = c.npcQuando;
         if(c.chegada === null){
           const r = c.npcSorteio;
+          const usou = r < CORRIDA_NPC.perfect + CORRIDA_NPC.good + CORRIDA_NPC.miss;
           if(r < CORRIDA_NPC.perfect) aplicarEfeito(c, 'perfect');
           else if(r < CORRIDA_NPC.perfect + CORRIDA_NPC.good) aplicarEfeito(c, 'good');
-          else if(r < CORRIDA_NPC.perfect + CORRIDA_NPC.good + CORRIDA_NPC.miss) aplicarEfeito(c, 'miss');
-          /* o resto é a oportunidade NÃO usada */
+          else if(usou) aplicarEfeito(c, 'miss');
+          /* o resto é a oportunidade NÃO usada -- e ela conta como "não tentou", igual ao jogador */
+          if(usou) c.tentouNaTravessia = Math.floor(cursor / CORRIDA_TRAVESSIA);
         }
         planejarNpc(c, c.npcIndice + 1);
       }
@@ -30774,7 +30983,8 @@ function corridaFisica(dt){
   });
   corrida.tempo = fim;
   corrida.brilho = Math.max(0, corrida.brilho - dt);
-  if(corrida.corredores.every(c => c.chegada !== null)) corridaTerminar();
+  /* ⚠️ QUEM TERMINA A CORRIDA É O `corridaFisica`, não esta fatia: chamado aqui, o
+     `corridaTerminar` rodaria no meio de um quadro fatiado e o laço continuaria andando depois. */
 }
 /* ⚠️ A CLASSIFICAÇÃO É PELO INSTANTE DE CHEGADA, nunca pela ordem em que os corredores são
    processados -- quem ainda corre é ordenado por distância, e sempre atrás de quem já chegou. */
@@ -30803,7 +31013,8 @@ function corridaImpulso(){
   if(!eu || eu.chegada !== null) return;                 /* chegou: o impulso morre */
   if(corrida.tentativaDaTravessia === corridaTravessia()) return;
   corrida.tentativaDaTravessia = corridaTravessia();
-  const r = resultadoDoImpulso(corridaPosBarra());
+  eu.tentouNaTravessia = corridaTravessia();   /* zera o contador de desleixo na virada */
+  const r = resultadoDoImpulso(corridaPosBarra(), centroDasFaixas());
   aplicarEfeito(eu, r);
   if(r === 'perfect'){ corrida.perfeitos++; corrida.brilhoTexto = 'PERFEITO!'; corrida.recado = 'Perfeito! +45% por 1,5 s.'; }
   else if(r === 'good'){ corrida.brilhoTexto = 'BOM!'; corrida.recado = 'Bom! +25% por 1 s.'; }
@@ -30833,7 +31044,20 @@ function corridaElegiveis(){
                  || (b.level - a.level)
                  || String(a.speciesId).localeCompare(String(b.speciesId)));
 }
-function corridaAbrirPicker(){ if(corrida.fase === 'correndo' || corrida.fase === 'contagem') return; corrida.picker = true; render(); }
+function corridaAbrirPicker(){
+  if(corrida.fase === 'correndo' || corrida.fase === 'contagem') return;
+  /* ⚠️ ZERA A PÁGINA, como o `abrirMontador`: o `game.montadorPagina` é COMPARTILHADO com a Torre
+     e o Ginásio, e uma página 3 sobrando de lá abriria esta lista no meio. */
+  game.montadorPagina = 0;
+  corrida.picker = true; render();
+}
+/* ⚠️ ELE NÃO PODE SER O `montadorIrPara`: aquele também zera nada e chama render(), o que serve --
+   mas ter o nosso deixa claro que a corrida tem picker próprio, e é onde entra a guarda de não
+   paginar no meio da corrida. */
+function corridaIrParaPagina(i){
+  if(corrida.fase === 'correndo' || corrida.fase === 'contagem') return;
+  game.montadorPagina = i; render();
+}
 function corridaFecharPicker(){ corrida.picker = false; render(); }
 function corridaToggle(slot, idx){
   if(corrida.fase === 'correndo' || corrida.fase === 'contagem') return;
@@ -30877,7 +31101,9 @@ function corridaTrocarParticipantes(n){
 function nomeDoCorredor(c){ const p = c.time[c.trecho]; return (SPECIES[p.speciesId] || {}).name || p.speciesId; }
 function corridaNovoCorredor(time, ehJogador){
   return { time, trecho: 0, dist: 0, efeito: 0, mult: 1, quadroT: ehJogador ? 0 : Math.random() * 0.4,
-           chegada: null, avisoTroca: 0, trocas: [], npcIndice: 0, npcQuando: 0, npcSorteio: 0 };
+           chegada: null, avisoTroca: 0, trocas: [],
+           desleixo: 1, paradas: 0, tentouNaTravessia: -1,
+           npcIndice: 0, npcQuando: 0, npcSorteio: 0 };
 }
 async function corridaLargar(){
   if(!corridaCompleto() || corrida.fase === 'correndo' || corrida.fase === 'contagem') return;
@@ -30949,6 +31175,59 @@ function corridaLaco(){
    contexto. O laço chama `corridaPintar`, que mexe só no canvas e em alguns textos.
    ============================================================================ */
 const CORRIDA_W = 440, CORRIDA_H = 390;
+/* ============================================================================
+   ⚠️ A CÂMERA SEGUE O JOGADOR, E A VISÃO É CURTA -- é isso que faz a pista PARECER 300 metros.
+
+   ⚠️ ESTA É A QUINTA VERSÃO, e as quatro anteriores erravam a MESMA pergunta: todas tentavam
+   **mostrar o pelotão inteiro**, e pra isso a escala tinha que ser minúscula. Com 0,83 px/m os
+   300 m ocupavam **0,6 de uma tela** -- a linha de chegada aparecia na largada e o pokémon corria
+   sem sair do lugar. Foi o relato: *"a pista está parecendo muito curta para ter 300 m ... parece
+   que os pokémons estão correndo muito mas a distância aparenta ser muito pequena"*.
+
+   As quatro tentativas, e por que cada uma quebrava:
+     1. `log1p` com teto -- quem ficava >100 m atrás saturava e não se mexia;
+     2. `vao / dispersão` -- encaixe exato: o ÚLTIMO fica congelado no mesmo pixel para sempre;
+     3. DEGRAUS -- a troca de degrau move todo mundo de uma vez: o adversário "indo e voltando";
+     4. escala fixa pequena -- a corrida inteira cabia numa tela.
+   A resposta é a de qualquer jogo de corrida: **não se mostra a prova toda, mostra-se o pedaço em
+   volta de quem você controla.** Com 8 px/m a tela mostra ~49 m e os 300 m viram **6,2 telas**;
+   a 12 m/s leva **4,1 s** pra atravessar uma -- é disso que vem a sensação de distância.
+
+   ⚠️ E O ADVERSÁRIO SAIR DA TELA É O DESENHO, não uma limitação -- o pedido diz isso com todas
+   as letras: *"não é necessário ficar os dois pokémons exibindo na tela, somente caso eles
+   realmente estejam próximos na metragem"*. Quem está fora vira um MARCADOR na borda com a
+   diferença em metros, e o placar de cima continua contando tudo.
+   ============================================================================ */
+const CORRIDA_PX_POR_M = 8;      /* ~49 m de pista na tela: os 300 m viram 6,2 telas */
+/* ⚠️ O JOGADOR FICA EM `CORRIDA_Y_EU` E NÃO NO MEIO DA TELA, de propósito: daqui ele vê **~37 m
+   à frente** e só ~11 m atrás. É pra frente que se corre, e é de lá que vem a chegada. */
+const CORRIDA_Y_EU = 300;
+function corridaEscala(){ return CORRIDA_PX_POR_M; }
+/* ⚠️ A CÂMERA É A METRAGEM DO JOGADOR, nunca a do líder: é a corrida DELE. Presa ao líder, o
+   jogador que estivesse perdendo escorregaria pra fora da própria tela.
+
+   ⚠️ MAS ELA TRAVA NA RETA FINAL, e isso é o que põe a linha de chegada NA METADE DE CIMA da
+   tela -- pedido assim: *"coloque para a linha de chegada ficar acima da metade do quadrado da
+   tela que exibe a corrida, hoje ela está ficando bem abaixo"*. E estava: seguindo o jogador até
+   o fim, a linha DESCE de 0 até `CORRIDA_Y_EU` (300 de 390) e ele a cruza lá embaixo, com 300px
+   de nada acima.
+   Travada, ela **para** em `CORRIDA_Y_CHEGADA` e é o jogador que sobe em direção a ela -- que é
+   o que um jogo de corrida faz na reta final: a câmera abre e você vê a linha se aproximar.
+   O tamanho da reta final NÃO É um número escolhido: ele CAI das duas alturas, senão as duas
+   divergiriam no primeiro ajuste e a linha pararia num lugar que não é o declarado. */
+const CORRIDA_Y_CHEGADA = 96;   /* 25% da altura: bem acima da metade (195) */
+const corridaRetaFinal = () => (CORRIDA_Y_EU - CORRIDA_Y_CHEGADA) / CORRIDA_PX_POR_M;
+function corridaCamera(){
+  const eu = corrida.corredores[0];
+  if(!eu) return 0;
+  /* ⚠️ O `Math.max(0, ...)` é pro caso de uma prova mais curta que a reta final: sem ele a
+     câmera começaria NEGATIVA e a largada nasceria no meio da tela. */
+  return Math.min(eu.dist, Math.max(0, corridaTotal() - corridaRetaFinal()));
+}
+/* A linha da tela onde uma metragem cai. Quem está à FRENTE tem y menor -- a pista sobe. */
+function corridaYdaMetragem(m){
+  return CORRIDA_Y_EU - (m - corridaCamera()) * CORRIDA_PX_POR_M;
+}
 function corridaPintar(){
   const cv = document.getElementById('corridaCanvas');
   if(!cv) return;
@@ -30956,7 +31235,12 @@ function corridaPintar(){
   ctx.setTransform(2, 0, 0, 2, 0, 0);
   ctx.imageSmoothingEnabled = false;
   const lider = corrida.corredores.length ? Math.max(...corrida.corredores.map(c => c.dist)) : 0;
-  const rolagem = lider * 11, lo = 44, hi = 396, vao = hi - lo, raia = vao / corrida.participantes;
+  /* ⚠️ O CHÃO ROLA PELA CÂMERA E NA MESMA ESCALA, sem multiplicador nenhum: é o chão passando
+     por baixo do JOGADOR na velocidade real dele. Ele já foi `lider * escala * 2` -- o líder porque
+     nada mais se mexia, e o dobro pra "dar sensação de velocidade" quando a escala era minúscula.
+     Com 8 px/m a sensação vem da própria corrida, e o dobro faria o chão correr mais que os pés. */
+  const escala = corridaEscala();
+  const rolagem = corridaCamera() * escala, lo = 44, hi = 396, vao = hi - lo, raia = vao / corrida.participantes;
   const ret = (x, y, w, h, cor) => { ctx.fillStyle = cor; ctx.fillRect(Math.round(x), Math.round(y), w, h); };
   const txt = (s, x, y, t, cor) => { ctx.fillStyle = cor; ctx.font = `800 ${t}px system-ui`; ctx.textAlign = 'center'; ctx.fillText(s, x, y); };
 
@@ -30976,27 +31260,80 @@ function corridaPintar(){
   for(let k = 0; k < 5; k++){ const y = (k * 103 + rolagem * 0.8) % 550 - 70; for(const x of [20, 420]){ ret(x - 4, y - 6, 8, 16, '#287768'); ret(x - 8, y, 16, 5, '#328770'); } }
 
   /* a linha de chegada, a de largada e a marca da troca */
-  const yChegada = 247 - (corridaTotal() - lider) * 5;
+  const yChegada = corridaYdaMetragem(corridaTotal());
   if(yChegada > -28){
     ret(lo, yChegada - 16, vao, 22, '#fff9e9');
     for(let l = 0; l < 2; l++) for(let c = 0; c < 32; c++) if((l + c) % 2 === 0) ret(lo + c * 11, yChegada - 16 + l * 11, 11, 11, '#243346');
     if(yChegada > 52) txt('CHEGADA', 220, yChegada - 24, 13, '#253448');
   }
-  if(corrida.fase === 'pronto' || corrida.fase === 'contagem' || corrida.fase === 'setup'){
-    ret(lo, 278, vao, 3, '#fff9e9'); txt('LARGADA', 220, 337, 12, '#8b7145');
+  /* ⚠️ A LARGADA É UMA METRAGEM (o zero), como tudo o mais nesta tela -- ela fica pra trás e SOME
+     alguns metros depois da partida, que é o que uma linha de largada faz. Ela era um y FIXO, e só
+     existia antes de largar: com a câmera, ela vive na pista. */
+  {
+    const yL = corridaYdaMetragem(0);
+    if(yL > -10 && yL < CORRIDA_H + 10){
+      ret(lo, yL, vao, 3, '#fff9e9');
+      if(yL > 40 && yL < CORRIDA_H - 14) txt('LARGADA', 220, yL + 18, 12, '#8b7145');
+    }
   }
-  if(corrida.formato === 'relay' && corrida.fase === 'correndo' && lider < CORRIDA_METROS * 2){
-    const prox = (Math.floor(lider / CORRIDA_METROS) + 1) * CORRIDA_METROS, yy = 247 - (prox - lider) * 5;
+  if(corrida.formato === 'relay' && corrida.fase === 'correndo' && corridaCamera() < CORRIDA_METROS * 2){
+    const prox = (Math.floor(corridaCamera() / CORRIDA_METROS) + 1) * CORRIDA_METROS, yy = corridaYdaMetragem(prox);
     if(yy > 45){ ret(lo, yy, vao, 4, '#388670'); txt('TROCA AOS ' + prox + ' m', 220, yy - 10, 12, '#28674f'); }
   }
 
-  /* ⚠️ A TELA COMPRIME A DISTÂNCIA (log1p) pra manter todo mundo visível, mas os METROS, as barras
-     e a classificação usam o progresso REAL -- é só o desenho que encolhe. */
+  /* ⚠️ NO REVEZAMENTO A EQUIPE INTEIRA FICA NA PISTA, e isso é a mecânica que o pedido descreve:
+     *"coloque o pokémon que é o próximo, esperando na linha de troca, e quando o outro pokémon
+     chegar, o outro fica parado e continua com o próximo do revezamento"*. Antes a troca era só
+     o sprite mudando de um quadro pro outro -- não havia entrega de bastão nenhuma na tela.
+     A metragem de cada um cai da REGRA do revezamento, sem estado novo:
+       • quem JÁ CORREU (k < trecho) parou na marca em que entregou -> (k + 1) × CORRIDA_METROS
+       • quem CORRE (k === trecho) está em `c.dist`
+       • quem ESPERA (k > trecho) está na marca em que recebe -> k × CORRIDA_METROS
+     ⚠️ E É DERIVADO, nunca gravado: gravado, ele só conseguiria ficar velho -- e a posição de
+     quem espera é uma constante da prova, não um estado. */
+  const membrosNaPista = (c) => {
+    if(corrida.formato !== 'relay') return [{ trecho: c.trecho, m: c.dist, parado: false }];
+    const fora = [];
+    for(let k = 0; k < c.time.length; k++){
+      if(k === c.trecho) fora.push({ trecho: k, m: c.dist, parado: false });
+      else fora.push({ trecho: k, m: (k < c.trecho ? k + 1 : k) * CORRIDA_METROS, parado: true });
+    }
+    return fora;
+  };
+  /* ⚠️ QUEM ESTÁ PARADO SAI DE LADO NA RAIA, e no instante da TROCA isso é obrigatório: os dois
+     estão na MESMA metragem (o que entrega e o que recebe), então sem o deslocamento eles
+     desenhariam um em cima do outro. Quem já correu vai pra um lado, quem espera pro outro. */
+  const desvioNaRaia = (k, trecho) => k === trecho ? 0 : (k < trecho ? -1 : 1) * Math.min(26, raia * 0.2);
+
   corrida.corredores.forEach((c, i) => {
-    let y = (corrida.fase === 'pronto' || corrida.fase === 'contagem' || corrida.fase === 'setup')
-      ? 268 : 247 + Math.min(80, Math.log1p(Math.max(0, lider - c.dist)) * 17);
-    if(c.chegada !== null) y = 230;
-    corridaDesenharPokemon(ctx, c, i, lo + raia * (i + 0.5), y, raia, ret, txt);
+    const x = lo + raia * (i + 0.5);
+    /* ⚠️ A POSIÇÃO É A METRAGEM, pela câmera -- sem teto, sem compressão e sem ajuste nenhum.
+       O jogador cai em `CORRIDA_Y_EU` por construção (a diferença dele pra ele mesmo é zero) e o
+       mundo é que rola por baixo. */
+    const y = corridaYdaMetragem(c.dist);
+    /* ⚠️ OS PARADOS SÃO DESENHADOS ANTES do corredor, e fora da guarda do marcador de borda: eles
+       têm metragem PRÓPRIA, então um deles pode estar na tela com o corredor fora dela (e vice-
+       versa). Amarrados à mesma guarda, o pokémon que espera na marca de troca sumiria justamente
+       quando o corredor está longe dela -- que é quase sempre. */
+    if(corrida.formato === 'relay') membrosNaPista(c).forEach(({ trecho, m, parado }) => {
+      if(!parado) return;
+      const yy = corridaYdaMetragem(m);
+      if(yy < 8 || yy > CORRIDA_H - 6) return;
+      corridaDesenharPokemon(ctx, c, i, x + desvioNaRaia(trecho, c.trecho), yy, raia, ret, txt,
+                             { trecho, parado: true });
+    });
+    /* ⚠️ QUEM SAIU DA TELA VIRA UM MARCADOR NA BORDA, com a diferença em metros. Sem ele o
+       adversário simplesmente sumiria, e o jogador não saberia se está ganhando ou perdendo sem
+       ler o placar -- que é justamente o que a pista existe pra contar sozinha. */
+    if(y < 18 || y > CORRIDA_H - 12){
+      if(i === 0) return;              /* o jogador nunca sai: ele É a câmera */
+      const acima = y < 18, yb = acima ? 16 : CORRIDA_H - 10;
+      const dif = Math.abs(Math.round(c.dist - corridaCamera()));
+      ret(x - 17, yb - 8, 34, 15, '#16233a');
+      txt((acima ? '▲ ' : '▼ ') + dif + 'm', x, yb + 3, 10, CORRIDA_CORES[i] || '#fff');
+      return;
+    }
+    corridaDesenharPokemon(ctx, c, i, x, y, raia, ret, txt);
   });
   if(corrida.brilho > 0){
     ctx.globalAlpha = Math.min(1, corrida.brilho * 2);
@@ -31006,8 +31343,14 @@ function corridaPintar(){
   corridaPintarHud();
 }
 const CORRIDA_CORES = ['#267853', '#267ab2', '#b76534', '#8c5eab'];
-function corridaDesenharPokemon(ctx, c, i, x, y, raia, ret, txt){
-  const p = c.time[c.trecho], d = pmdCache[p.speciesId];
+function corridaDesenharPokemon(ctx, c, i, x, y, raia, ret, txt, op){
+  /* ⚠️ O `op` DIZ QUAL MEMBRO DA EQUIPE DESENHAR, e não é luxo: no revezamento a MESMA função
+     desenha quem corre, quem espera na marca de troca e quem já entregou o bastão. Sem ele
+     seriam três cópias que divergiriam no primeiro ajuste de sprite. */
+  const o = op || {};
+  const trecho = o.trecho === undefined ? c.trecho : o.trecho;
+  const parado = !!o.parado;
+  const p = c.time[trecho], d = p && pmdCache[p.speciesId];
   /* ⚠️ SEM SPRITE NÃO SE DESENHA OUTRO NO LUGAR: a largada só acontece com tudo carregado, então
      isto aqui é a rede de segurança -- um marcador neutro, nunca o bicho errado. */
   if(!d || d === 'erro'){
@@ -31015,24 +31358,36 @@ function corridaDesenharPokemon(ctx, c, i, x, y, raia, ret, txt){
     txt(i === 0 ? 'VOCÊ' : 'NPC ' + i, x, y + 26, 10, CORRIDA_CORES[i]);
     return;
   }
-  const f = pmdQuadro(d, c.quadroT), b = d.caixas[f];
+  /* ⚠️ QUEM ESTÁ PARADO CONGELA NO QUADRO 0 -- é o que o faz LER como parado. Usando o
+     `c.quadroT` do corredor, os três membros da equipe animariam em sincronia, e quem está
+     esperando na marca pareceria estar correndo no lugar. */
+  const f = parado ? 0 : pmdQuadro(d, c.quadroT), b = d.caixas[f];
   const w = b[2] - b[0], h = b[3] - b[1];
   const maiorW = Math.max(...d.caixas.map(q => q[2] - q[0]));
   const escala = Math.min(corrida.participantes === 2 ? 3 : 2.5, (raia - 17) / maiorW);
-  const sobe = (corrida.fase === 'correndo' || corrida.fase === 'pronto') && c.chegada === null
+  const sobe = !parado && (corrida.fase === 'correndo' || corrida.fase === 'pronto') && c.chegada === null
     ? Math.sin(c.quadroT * 20 + i) * 1.5 : 0;
   ctx.fillStyle = '#4841263d'; ctx.beginPath();
   ctx.ellipse(x, y + 3, Math.min(29, raia * 0.29), 7, 0, 0, Math.PI * 2); ctx.fill();
-  if(corrida.fase === 'correndo' && c.chegada === null){
+  if(!parado && corrida.fase === 'correndo' && c.chegada === null){
     for(let k = 0; k < 2; k++){ const q = (corrida.animacao * 2 + k * 0.5) % 1; ctx.globalAlpha = (1 - q) * 0.35; ret(x - 12 + k * 20, y + 8 + q * 20, 5 + q * 3, 3, '#fff6d6'); }
     ctx.globalAlpha = 1;
   }
-  if(c.efeito > 0 && c.mult > 1){
+  if(!parado && c.efeito > 0 && c.mult > 1){
     ctx.strokeStyle = '#fff3a0'; ctx.lineWidth = 3;
     for(let k = 0; k < 2; k++){ ctx.beginPath(); ctx.moveTo(x - 15 + k * 30, y + 8); ctx.lineTo(x - 15 + k * 30, y + 24); ctx.stroke(); }
   }
+  /* ⚠️ QUEM ESTÁ PARADO SAI MAIS APAGADO, e isso é o que separa "quem corre" de "quem está na
+     pista" de relance. NÃO é o `.caiu` do resto do jogo (0,35): aqui ele precisa continuar
+     reconhecível -- o jogador quer ver QUAL pokémon está esperando pra saber o que vem. */
+  if(parado) ctx.globalAlpha = 0.72;
   ctx.drawImage(d.img, f * d.w + b[0], PMD_LINHA_COSTAS * d.h + b[1], w, h,
                 Math.round(x - w * escala / 2), Math.round(y - h * escala + sobe), w * escala, h * escala);
+  ctx.globalAlpha = 1;
+  /* ⚠️ A SETA, O NOME E O "TROCA!" SÃO DE QUEM ESTÁ CORRENDO. Num revezamento a equipe tem três
+     sprites na pista ao mesmo tempo, e três "VOCÊ" empilhados na mesma raia só confundem -- quem
+     está parado é cenário, não é o corredor. */
+  if(parado){ ctx.globalAlpha = 1; return; }
   if(i === 0){
     const topo = y - h * escala - 10 + sobe;
     ctx.fillStyle = '#ffdc52'; ctx.strokeStyle = '#1a2434'; ctx.lineWidth = 2;
@@ -31057,6 +31412,15 @@ function corridaPintarHud(){
   });
   const ag = document.getElementById('corridaAgulha');
   if(ag) ag.style.left = (corridaPosBarra() * 100) + '%';
+  /* ⚠️ AS FAIXAS SÃO MOVIDAS PELO DOM, como a agulha -- e pela MESMA função que a detecção usa.
+     Desenhadas por uma conta própria, a barra prometeria uma região e o motor pontuaria outra. */
+  const centro = centroDasFaixas();
+  const mover = (id, faixa) => {
+    const el = document.getElementById(id);
+    if(el) el.style.left = ((centro - faixa.tam / 2) * 100) + '%';
+  };
+  mover('corridaFaixaVerde', CORRIDA_FAIXA.verde);
+  mover('corridaFaixaAmarela', CORRIDA_FAIXA.amarela);
   põe('corridaRecado', corrida.recado);
   põe('corridaPerfeitos', corrida.perfeitos + ' perfeitos');
   const eu = corrida.corredores[0];
@@ -31075,6 +31439,10 @@ function corridaPintarHud(){
       if(bt.textContent !== rot) bt.textContent = rot;
     }
   }
+  /* ⚠️ E O PINTOR É QUEM O APAGA: `hidden` é a única coisa que tira o overlay da tela sem um
+     render(), e sem esta linha ele fica congelado no último número da contagem. */
+  const ov = document.getElementById('corridaOverlay');
+  if(ov) ov.hidden = corrida.fase !== 'contagem';
   if(corrida.fase === 'contagem'){
     põe('corridaTitulo', String(Math.max(1, Math.ceil(corrida.contagem))));
     põe('corridaSub', corrida.formato === 'relay' ? 'Primeiro trecho' : 'Vai!');
@@ -31124,6 +31492,20 @@ function corridaPickerHtml(){
   const lista = corridaElegiveis();
   const marcados = corrida.escolhidos;
   const usadas = new Set(marcados.map(p => raizDaLinha(p.speciesId)));
+  /* ⚠️ A PÁGINA É SEMPRE A VÁLIDA, calculada na hora -- e o `montadorPaginaValida` GRAVA a
+     correção. Sem isso, desmarcar um pokémon que estava na última página deixaria o índice velho
+     guardado, e a tela pularia sozinha quando a lista voltasse a crescer. */
+  const pagina = montadorPaginaValida(lista.length);
+  const paginas = Math.max(1, Math.ceil(lista.length / MONT_POR_PAGINA));
+  const daPagina = lista.slice(pagina * MONT_POR_PAGINA, (pagina + 1) * MONT_POR_PAGINA);
+  /* COM UMA PÁGINA SÓ os botões não aparecem -- um "1 de 1" é um controle que não controla nada */
+  const navegacao = paginas <= 1 ? '' : `
+    <div class="mont-paginas">
+      ${Array.from({ length: paginas }, (_, i) =>
+        `<button class="mont-pag ${i === pagina ? 'ativa' : ''}" onclick="corridaIrParaPagina(${i})"
+          aria-label="Página ${i + 1} de ${paginas}">${i + 1}</button>`).join('')}
+      <span class="mont-pag-conta">${pagina * MONT_POR_PAGINA + 1}–${pagina * MONT_POR_PAGINA + daPagina.length} de ${lista.length}</span>
+    </div>`;
   if(!lista.length){
     return `<div class="box"><p class="error-text">Nenhum Pokémon elegível. É preciso um time com as 8 insígnias (ou um aposentado).</p>
       <button class="btn secondary" onclick="corridaFecharPicker()">⬅ Voltar</button></div>`;
@@ -31134,7 +31516,7 @@ function corridaPickerHtml(){
       ? 'Escolha <strong>3</strong> — a ordem é a de seleção, e dá pra reorganizar depois.'
       : 'Escolha <strong>1</strong>.'} Ordenados pelo <strong>Speed da corrida</strong>.</p>
     <div class="tower-pick-counter ${corridaCompleto() ? 'ok' : ''}">${marcados.length} de ${corridaQuantos()} escolhidos</div>
-    <div class="mont-lista">${lista.map(p => {
+    <div class="mont-lista">${daPagina.map(p => {
       const sp = SPECIES[p.speciesId] || {};
       const sel = marcados.findIndex(m => String(m.slot) === String(p.slot) && m.idx === p.idx);
       const bloqueado = sel < 0 && (marcados.length >= corridaQuantos() || usadas.has(raizDaLinha(p.speciesId)));
@@ -31152,6 +31534,7 @@ function corridaPickerHtml(){
         </button>
       </div>`;
     }).join('')}</div>
+    ${navegacao}
     <button class="btn success" onclick="corridaFecharPicker()">${corridaCompleto() ? 'Confirmar' : 'Voltar'}</button>
   </div>`;
 }
@@ -31202,7 +31585,10 @@ function renderCorrida(){
     <div class="box corrida-pista">
       <canvas id="corridaCanvas" width="880" height="780" aria-label="Corrida vista de cima"></canvas>
       <div class="corrida-hud"><span id="corridaPosicao">${corridaTotal()} m</span><span id="corridaRelogio">00:00.0</span></div>
-      ${corrida.fase === 'contagem' ? `<div class="corrida-overlay"><div class="bubble"><strong id="corridaTitulo">3</strong><small id="corridaSub">Prepare-se</small></div></div>` : ''}
+      ${/* ⚠️ ELE EXISTE SEMPRE E É ESCONDIDO PELO PINTOR, nunca montado condicionalmente: a fase
+           vira 'correndo' DENTRO do laço, que não chama render() -- então um overlay montado só
+           na 'contagem' ficava na tela pra sempre, congelado no "1 / Vai!". Foi reportado. */''}
+      <div class="corrida-overlay" id="corridaOverlay" ${corrida.fase === 'contagem' ? '' : 'hidden'}><div class="bubble"><strong id="corridaTitulo">3</strong><small id="corridaSub">Prepare-se</small></div></div>
     </div>
     <div class="box corrida-controles">
       ${corrida.formato === 'relay' ? `<div class="corrida-trechos">${corrida.escolhidos.map((p, i) => {
@@ -31215,8 +31601,8 @@ function renderCorrida(){
            desenho divergirem, a barra promete uma região e o motor pontua outra -- é a mesma
            lição do selo de terreno prometendo um bônus que a batalha não dá. */''}
       <div class="corrida-barra" aria-hidden="true">
-        <div class="faixa-verde" style="left:${CORRIDA_FAIXA.verde.ini * 100}%;width:${CORRIDA_FAIXA.verde.tam * 100}%"></div>
-        <div class="faixa-amarela" style="left:${CORRIDA_FAIXA.amarela.ini * 100}%;width:${CORRIDA_FAIXA.amarela.tam * 100}%"></div>
+        <div class="faixa-verde" id="corridaFaixaVerde" style="left:${CORRIDA_FAIXA.verde.ini * 100}%;width:${CORRIDA_FAIXA.verde.tam * 100}%"></div>
+        <div class="faixa-amarela" id="corridaFaixaAmarela" style="left:${CORRIDA_FAIXA.amarela.ini * 100}%;width:${CORRIDA_FAIXA.amarela.tam * 100}%"></div>
         <div id="corridaAgulha" class="corrida-agulha"></div>
       </div>
       ${/* ⚠️ `type="button"` MAIS o `onkeydown`: um <button> focado dispara click com Espaço e
@@ -31227,18 +31613,41 @@ function renderCorrida(){
       <p class="hint-text">Toque no botão para impulsionar · uma tentativa por ida e uma por volta</p>
     </div>` : '';
 
+  /* ⚠️ AS TRÊS MEDALHAS SÃO DESENHO DA CASA, nunca emoji -- é a regra que tirou os 54 emojis das
+     telas em 17/09/2026, e o pedido a repete (*"crie, não use emoji prontos"*). Elas saem do
+     mesmo `selo()` de todo o resto, então herdam o contorno de 2px e o sombreado direcional.
+     ⚠️ DA QUARTA COLOCAÇÃO EM DIANTE NÃO HÁ MEDALHA, e o lugar dela fica VAZIO em vez de sumir:
+     sem o vazão, o "4º" encostaria no nome e as linhas deixariam de alinhar em coluna -- que é
+     justamente onde o olho compara. */
+  const MEDALHA_DO_POSTO = ['medalha_ouro', 'medalha_prata', 'medalha_bronze'];
   const fim = corrida.fase === 'fim' ? `
     <div class="box">
-      <h2>${corridaPosicao(0) === 1 ? '🏆 Você venceu!' : corridaPosicao(0) + 'º lugar'}</h2>
+      <h2>${corridaPosicao(0) === 1 ? selo('trofeu') + ' Você venceu!' : corridaPosicao(0) + 'º lugar'}</h2>
       ${corridaRanking().map(({ c, i }, pos) => `
-        <div class="resultRow"><span>${pos + 1}º · ${i === 0 ? 'Você' : 'NPC ' + i} · ${escapeHtmlSafe(nomeDoCorredor(c))}</span><b>${c.chegada.toFixed(2)} s</b></div>`).join('')}
+        <div class="resultRow${i === 0 ? ' eu' : ''}">
+          <span class="resultPos">${pos + 1}º</span>
+          <span class="resultMed">${MEDALHA_DO_POSTO[pos] ? selo(MEDALHA_DO_POSTO[pos]) : ''}</span>
+          <span class="resultNome">${escapeHtmlSafe(nomeDoCorredor(c))}
+            <span class="resultQuem">${i === 0 ? 'você' : 'NPC ' + i}</span></span>
+          <b>${c.chegada.toFixed(2)}s</b>
+        </div>`).join('')}
       <button class="btn success" onclick="corridaLargar()">Correr de novo</button>
       <button class="btn secondary" onclick="corridaReiniciar()">Configurar</button>
     </div>` : '';
 
+  /* ⚠️ NO FIM SÓ A CLASSIFICAÇÃO FICA NA TELA (18/09/2026, a pedido), e o print mostrou por quê:
+     os três quadros de cima ficam **vazios** ali -- o placar volta a "0 / 300 m" e o canvas fica
+     em BRANCO, porque quem os mantinha vivos era o pintor do laço, que já parou. Eles não estavam
+     só sobrando: estavam mostrando dado errado. */
+  if(corrida.fase === 'fim'){
+    return `
+  <div class="eyebrow">${selo('corrida')} CORRIDA POKÉMON · TESTE ADMIN</div>
+  ${fim}
+  <button class="btn secondary" onclick="sairDaCorrida()">⬅ Sair</button>`;
+  }
   return `
   <div class="eyebrow">${selo('corrida')} CORRIDA POKÉMON · TESTE ADMIN</div>
-  ${setup}${placar}${pista}${fim}
+  ${setup}${placar}${pista}
   ${correndo ? '' : `<button class="btn secondary" onclick="sairDaCorrida()">⬅ Sair</button>`}`;
 }
 

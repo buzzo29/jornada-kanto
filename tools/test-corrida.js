@@ -165,10 +165,37 @@ console.log('\n=== A BARRA VAI E VOLTA, E AS FAIXAS VALEM NOS DOIS SENTIDOS ==='
 {
   const T = S.CORRIDA_TRAVESSIA;
   ok('a travessia dura 1,44 s (o ciclo, 2,88)', T === 1.44, String(T));
-  ok('a faixa verde é 30,4% a partir de 34,8%',
-     S.CORRIDA_FAIXA.verde.ini === 0.348 && S.CORRIDA_FAIXA.verde.tam === 0.304);
-  ok('a amarela é 9,6% a partir de 45,2%',
-     S.CORRIDA_FAIXA.amarela.ini === 0.452 && S.CORRIDA_FAIXA.amarela.tam === 0.096);
+  /* ⚠️ A VERDE CAIU PELA METADE em 18/09/2026 (a pedido: *"diminua os quadrados verdes de bom em
+     50%"*) -- de 30,4% pra 15,2%, e o `ini` andou junto pra ela continuar CENTRADA, como a amarela
+     já tinha feito horas antes. É BALANCEAMENTO: o número fica fixado aqui pra uma mudança ser
+     barulhenta, e o INVARIANTE (centradas e aninhadas) fica cobrado logo abaixo. */
+  ok('a faixa verde é 15,2% a partir de 42,4%',
+     S.CORRIDA_FAIXA.verde.ini === 0.424 && S.CORRIDA_FAIXA.verde.tam === 0.152,
+     S.CORRIDA_FAIXA.verde.ini + ' / ' + S.CORRIDA_FAIXA.verde.tam);
+  ok('e ela é metade do que ELA era (30,4%)',
+     Math.abs(S.CORRIDA_FAIXA.verde.tam - 0.304 / 2) < 1e-9, String(S.CORRIDA_FAIXA.verde.tam));
+  /* ⚠️ A AMARELA CAIU PELA METADE em 18/09/2026 (a pedido) -- de 9,6% pra 4,8%, e o `ini` andou
+     junto pra ela continuar CENTRADA. Só encolher o `tam` deslocaria o perfeito pra a esquerda. */
+  ok('a amarela é 4,8% a partir de 47,6%',
+     S.CORRIDA_FAIXA.amarela.ini === 0.476 && S.CORRIDA_FAIXA.amarela.tam === 0.048,
+     S.CORRIDA_FAIXA.amarela.ini + ' / ' + S.CORRIDA_FAIXA.amarela.tam);
+  ok('e ela é metade da verde... não: metade do que ELA era (9,6%)',
+     Math.abs(S.CORRIDA_FAIXA.amarela.tam - 0.096 / 2) < 1e-9, String(S.CORRIDA_FAIXA.amarela.tam));
+  /* ⚠️ O INVARIANTE DAS DUAS, e é ele que sobrevive ao próximo ajuste de tamanho: as duas são
+     CENTRADAS em 0,5 e a amarela fica DENTRO da verde. Encolher só o `tam` de uma delas quebra a
+     primeira metade -- e o defeito não aparece como erro, aparece como o "perfeito" deslocado pra
+     a esquerda do centro da barra. */
+  for(const [nome, f] of [['verde', S.CORRIDA_FAIXA.verde], ['amarela', S.CORRIDA_FAIXA.amarela]])
+    ok('a ' + nome + ' é centrada em 0,5', Math.abs(f.ini + f.tam / 2 - 0.5) < 1e-9,
+       String(f.ini + f.tam / 2));
+  ok('e a amarela fica DENTRO da verde',
+     S.CORRIDA_FAIXA.amarela.tam < S.CORRIDA_FAIXA.verde.tam,
+     S.CORRIDA_FAIXA.amarela.tam + ' < ' + S.CORRIDA_FAIXA.verde.tam);
+  /* ⚠️ E ELA CONTINUA DENTRO DA VERDE -- fora dela, um "perfeito" cairia onde a barra desenha erro */
+  const v = S.CORRIDA_FAIXA.verde, am = S.CORRIDA_FAIXA.amarela;
+  ok('e a amarela continua dentro da verde',
+     am.ini >= v.ini - 1e-9 && am.ini + am.tam <= v.ini + v.tam + 1e-9,
+     am.ini + '–' + (am.ini + am.tam) + ' dentro de ' + v.ini + '–' + (v.ini + v.tam));
   ok('e as duas são centradas em 50%',
      Math.abs(S.CORRIDA_FAIXA.verde.ini + S.CORRIDA_FAIXA.verde.tam / 2 - 0.5) < 1e-9 &&
      Math.abs(S.CORRIDA_FAIXA.amarela.ini + S.CORRIDA_FAIXA.amarela.tam / 2 - 0.5) < 1e-9);
@@ -193,13 +220,21 @@ console.log('\n=== A BARRA VAI E VOLTA, E AS FAIXAS VALEM NOS DOIS SENTIDOS ==='
 
   /* ⚠️ AS BORDAS EXATAS PERTENCEM À FAIXA, e isso quase escapou: `Math.abs(0.348 - 0.5)` dá
      0,15200000000000002 contra uma meia-faixa de 0,152 -- o início exato do verde caía FORA. */
-  ok('o início exato do verde é "bom"', S.resultadoDoImpulso(0.348) === 'good');
-  ok('o fim exato do verde é "bom"', S.resultadoDoImpulso(0.652) === 'good');
-  ok('o início exato da amarela é "perfeito"', S.resultadoDoImpulso(0.452) === 'perfect');
-  ok('o fim exato da amarela é "perfeito"', S.resultadoDoImpulso(0.548) === 'perfect');
+  /* ⚠️ AS BORDAS SAEM DA TABELA, e não de números escritos aqui: estas quatro linhas tinham
+     0,452 e 0,548 fixos, e ENVELHECERAM no dia em que a faixa amarela caiu pela metade -- elas
+     passaram a acusar o que estava certo. É a mesma lição do "59 espécies" da ficha da Pokédex.
+     Derivadas, uma mudança de tamanho de faixa é acompanhada sozinha. */
+  const fv = S.CORRIDA_FAIXA.verde, fa = S.CORRIDA_FAIXA.amarela;
+  const umFio = 1e-4;
+  ok('o início exato do verde é "bom"', S.resultadoDoImpulso(fv.ini) === 'good', String(fv.ini));
+  ok('o fim exato do verde é "bom"', S.resultadoDoImpulso(fv.ini + fv.tam) === 'good');
+  ok('o início exato da amarela é "perfeito"', S.resultadoDoImpulso(fa.ini) === 'perfect', String(fa.ini));
+  ok('o fim exato da amarela é "perfeito"', S.resultadoDoImpulso(fa.ini + fa.tam) === 'perfect');
   ok('o centro é "perfeito"', S.resultadoDoImpulso(0.5) === 'perfect');
-  ok('e um fio fora do verde é erro', S.resultadoDoImpulso(0.3479) === 'miss' && S.resultadoDoImpulso(0.6521) === 'miss');
-  ok('e um fio fora da amarela é "bom"', S.resultadoDoImpulso(0.4519) === 'good' && S.resultadoDoImpulso(0.5481) === 'good');
+  ok('e um fio fora do verde é erro',
+     S.resultadoDoImpulso(fv.ini - umFio) === 'miss' && S.resultadoDoImpulso(fv.ini + fv.tam + umFio) === 'miss');
+  ok('e um fio fora da amarela é "bom"',
+     S.resultadoDoImpulso(fa.ini - umFio) === 'good' && S.resultadoDoImpulso(fa.ini + fa.tam + umFio) === 'good');
   ok('as pontas são erro', S.resultadoDoImpulso(0) === 'miss' && S.resultadoDoImpulso(1) === 'miss');
 }
 
@@ -215,9 +250,16 @@ console.log('\n=== UMA TENTATIVA POR TRAVESSIA (uma na ida, uma na volta) ===');
   S.corrida.corredores = [eu];
   S.corrida.fase = 'correndo';
 
-  S.corrida.tempo = T * 0.5;                       /* centro da 1ª travessia: perfeito */
+  /* ⚠️ ESTA TRAVA MEDIA A AGULHA NO MEIO DA BARRA e esperava "perfeito" -- e isso deixou de valer
+     quando as faixas passaram a SE MOVER (18/09/2026): 0,5 não é mais o centro delas.
+     Hoje ela cobra o que importa de verdade e é mais forte: o impulso aplica EXATAMENTE o que o
+     `resultadoDoImpulso` devolve pra aquele instante, com o MESMO centro que a barra desenha. Se
+     a detecção e o desenho divergirem, é aqui que aparece. */
+  S.corrida.tempo = T * 0.5;
+  const esperado = S.resultadoDoImpulso(S.corridaPosBarra(), S.centroDasFaixas());
   S.corridaImpulso();
-  ok('a 1ª tentativa vale', eu.mult === 1.45, String(eu.mult));
+  ok('a 1ª tentativa vale, com o resultado da barra naquele instante',
+     eu.mult === S.CORRIDA_EFEITOS[esperado].mult, esperado + ' -> ' + eu.mult);
   eu.mult = 7;                                      /* sentinela */
   S.corridaImpulso();
   ok('a 2ª na MESMA travessia não vale', eu.mult === 7, String(eu.mult));
@@ -544,9 +586,16 @@ console.log('\n=== A TELA ===');
 
   /* ⚠️ AS FAIXAS DO CSS SAEM DAS CONSTANTES -- um número escrito à mão divergiria da detecção */
   ok('as faixas da barra saem das constantes, não de números no CSS',
-     corrida.indexOf('CORRIDA_FAIXA') < 0 && /left:34\.8%/.test(corrida) && /width:30\.4%/.test(corrida),
+     corrida.indexOf('CORRIDA_FAIXA') < 0 &&
+     corrida.indexOf('left:' + (S.CORRIDA_FAIXA.verde.ini * 100) + '%') >= 0 &&
+     corrida.indexOf('width:' + (S.CORRIDA_FAIXA.verde.tam * 100) + '%') >= 0,
      'as faixas não bateram');
-  ok('e a amarela também', /left:45\.2%/.test(corrida) && /width:9\.6%/.test(corrida));
+  /* ⚠️ DERIVADO DA TABELA, pelo mesmo motivo das bordas: com os números fixos, esta linha acusava
+     o que estava certo assim que a faixa mudou de tamanho. */
+  ok('e a amarela também',
+     corrida.indexOf('left:' + (S.CORRIDA_FAIXA.amarela.ini * 100) + '%') >= 0 &&
+     corrida.indexOf('width:' + (S.CORRIDA_FAIXA.amarela.tam * 100) + '%') >= 0,
+     'a amarela não bateu');
 
   /* a tela está registrada no render */
   ok('a tela está registrada no render()', /case 'corrida': html = renderCorrida\(\); break;/.test(src));
@@ -593,6 +642,723 @@ console.log('\n=== OS SPRITES ===');
   ok('e não há Attack nem Charge no bloco dos sprites',
      bloco.indexOf('Attack') < 0 && bloco.indexOf('Charge') < 0, 'apareceu outra animação');
   ok('e não há seletor de animação na tela', src.indexOf('corridaTrocarAnimacao') < 0);
+}
+
+
+/* ============================================================================
+   13) AS FAIXAS SE MOVEM (18/09/2026)
+   ============================================================================ */
+console.log('\n=== AS FAIXAS SE MOVEM, E NUNCA EM SINCRONIA COM A AGULHA ===');
+{
+  contaDeTeste();
+  S.corridaZerar();
+  const eu = S.corridaNovoCorredor([S.corridaInstancia({ speciesId: 'jolteon', level: 50 }, true)], true);
+  S.corrida.corredores = [eu];
+
+  /* ⚠️ ELE SE MOVE: se o centro fosse fixo, o pedido não teria sido atendido */
+  const centros = [];
+  for(let t = 0; t < 12; t += 0.05){ S.corrida.tempo = t; centros.push(S.centroDasFaixas()); }
+  const min = Math.min(...centros), max = Math.max(...centros);
+  ok('o centro das faixas se move', max - min > 0.2, min.toFixed(3) + ' a ' + max.toFixed(3));
+
+  /* ⚠️ E ELE NUNCA LEVA A FAIXA PRA FORA DA BARRA -- a verde é a mais larga, e é ela que decide */
+  const meiaVerde = S.CORRIDA_FAIXA.verde.tam / 2;
+  ok('e a faixa verde nunca sai da barra',
+     centros.every(c => c - meiaVerde >= 0 && c + meiaVerde <= 1),
+     'extremos: ' + (min - meiaVerde).toFixed(3) + ' / ' + (max + meiaVerde).toFixed(3));
+
+  /* ⚠️ QUANTO MAIOR O NÍVEL, MAIS DEVAGAR (período maior) */
+  const p1 = S.periodoDasFaixas(1), p50 = S.periodoDasFaixas(50), p99 = S.periodoDasFaixas(99);
+  ok('quanto maior o nível, mais devagar a faixa', p1 < p50 && p50 < p99,
+     [p1, p50, p99].map(x => x.toFixed(2)).join(' < '));
+  ok('e o Lv.1 é o mais rápido dos dois extremos', p1 === S.CORRIDA_TRAVESSIA * S.CORRIDA_FAIXA_RAZAO_MIN);
+  /* ⚠️ E ELAS FICARAM MAIS RÁPIDAS (a pedido): o período do Lv.1 tem que ser MENOR que o ciclo da
+     agulha (2,88 s) -- antes ele era 3,10 s, ou seja a faixa passeava mais devagar que o marcador. */
+  ok('e a faixa é mais rápida que o ciclo da agulha', p1 < S.CORRIDA_TRAVESSIA * 2,
+     p1.toFixed(2) + ' s contra ' + (S.CORRIDA_TRAVESSIA * 2).toFixed(2) + ' s');
+  ok('e o Lv.99 é o mais lento', Math.abs(p99 - S.CORRIDA_TRAVESSIA * S.CORRIDA_FAIXA_RAZAO_MAX) < 1e-9);
+
+  /* ⚠️ E O PERÍODO NUNCA BATE COM O DA AGULHA, em nenhum dos 99 níveis: se batesse, as duas
+     andariam juntas e a barra viraria um alvo parado -- que é o que o pedido manda evitar.
+     O ciclo da agulha é 2×travessia; a checagem é contra ele E contra a travessia. */
+  const ciclo = S.CORRIDA_TRAVESSIA * 2;
+  const ruins = [];
+  for(let n = 1; n <= 99; n++){
+    const p = S.periodoDasFaixas(n);
+    for(const base of [S.CORRIDA_TRAVESSIA, ciclo]){
+      const razao = p / base;
+      if(Math.abs(razao - Math.round(razao)) < 0.02) ruins.push(n + ':' + p.toFixed(3) + '/' + base);
+    }
+  }
+  ok('e em nenhum nível ele fica em sincronia com a agulha', ruins.length === 0, ruins.join(' '));
+
+  /* ⚠️ A DETECÇÃO USA O CENTRO MÓVEL: no MESMO ponto da barra, o resultado muda conforme a faixa
+     passeia -- é isso que faz a mecânica existir. */
+  const noCentroDaBarra = [];
+  for(let t = 0; t < 10; t += 0.1){ S.corrida.tempo = t; noCentroDaBarra.push(S.resultadoDoImpulso(0.5, S.centroDasFaixas())); }
+  ok('no mesmo ponto da barra, o resultado muda com a faixa',
+     new Set(noCentroDaBarra).size > 1, [...new Set(noCentroDaBarra)].join(','));
+  /* e acertar o centro DELAS é sempre perfeito, em qualquer instante */
+  let semprePerfeito = true;
+  for(let t = 0; t < 10; t += 0.07){
+    S.corrida.tempo = t;
+    if(S.resultadoDoImpulso(S.centroDasFaixas(), S.centroDasFaixas()) !== 'perfect') semprePerfeito = false;
+  }
+  ok('e acertar o centro DELAS é sempre perfeito', semprePerfeito);
+
+  /* ⚠️ O NÍVEL LIDO É O DO POKÉMON QUE CORRE AGORA -- no revezamento ele muda a cada trecho */
+  const relay = S.corridaNovoCorredor([
+    S.corridaInstancia({ speciesId: 'jolteon', level: 5 }, true),
+    S.corridaInstancia({ speciesId: 'jolteon', level: 90 }, true),
+    S.corridaInstancia({ speciesId: 'jolteon', level: 50 }, true)], true);
+  S.corrida.corredores = [relay];
+  S.corrida.tempo = 1;
+  relay.trecho = 0; const c0 = S.centroDasFaixas();
+  relay.trecho = 1; const c1 = S.centroDasFaixas();
+  ok('e o período acompanha o pokémon do trecho atual', c0 !== c1,
+     'Lv.5 -> ' + c0.toFixed(4) + ' | Lv.90 -> ' + c1.toFixed(4));
+}
+
+/* ============================================================================
+   14) O DESLEIXO -- quem não tenta perde velocidade
+   ============================================================================ */
+console.log('\n=== QUEM NÃO TENTA PERDE VELOCIDADE ===');
+{
+  contaDeTeste();
+  S.corridaZerar();
+  const novo = () => {
+    const c = S.corridaNovoCorredor([S.corridaInstancia({ speciesId: 'jolteon', level: 50 }, true)], true);
+    S.corrida.corredores = [c]; S.corrida.fase = 'correndo'; S.corrida.tempo = 0;
+    return c;
+  };
+  ok('são 3 travessias e -5%', S.CORRIDA_DESLEIXO_TRAVESSIAS === 3 && S.CORRIDA_DESLEIXO === 0.05,
+     S.CORRIDA_DESLEIXO_TRAVESSIAS + ' / ' + S.CORRIDA_DESLEIXO);
+
+  /* ⚠️ DUAS TRAVESSIAS PARADAS NÃO CORTAM -- o corte é no bloco de três */
+  let c = novo();
+  S.corridaContarTravessia(c, false); S.corridaContarTravessia(c, false);
+  ok('duas travessias paradas não cortam', c.desleixo === 1, String(c.desleixo));
+  S.corridaContarTravessia(c, false);
+  ok('a terceira corta 5%', Math.abs(c.desleixo - 0.95) < 1e-9, String(c.desleixo));
+  /* ⚠️ E ACUMULA: seis paradas são dois cortes */
+  S.corridaContarTravessia(c, false); S.corridaContarTravessia(c, false); S.corridaContarTravessia(c, false);
+  ok('e ele acumula', Math.abs(c.desleixo - 0.95 * 0.95) < 1e-9, String(c.desleixo));
+
+  /* ⚠️ TENTAR ZERA O CONTADOR, mesmo ERRANDO: o que se pune é não tentar */
+  c = novo();
+  S.corridaContarTravessia(c, false); S.corridaContarTravessia(c, false);
+  S.corridaContarTravessia(c, true);        /* tentou */
+  S.corridaContarTravessia(c, false); S.corridaContarTravessia(c, false);
+  ok('tentar zera o contador', c.desleixo === 1, String(c.desleixo));
+
+  /* ⚠️ E TEM PISO: sem ele, ficar parado pararia o pokémon e a corrida não terminaria */
+  c = novo();
+  for(let i = 0; i < 300; i++) S.corridaContarTravessia(c, false);
+  ok('e há um piso', c.desleixo === S.CORRIDA_DESLEIXO_MIN, String(c.desleixo));
+  ok('e o piso deixa o pokémon correndo', S.corridaVelocidade(c) > 0, String(S.corridaVelocidade(c)));
+
+  /* ⚠️ ELE MULTIPLICA A VELOCIDADE, por FORA do efeito do impulso */
+  c = novo();
+  const cheia = S.corridaVelocidade(c);
+  c.desleixo = 0.9;
+  ok('o desleixo multiplica a velocidade', Math.abs(S.corridaVelocidade(c) - cheia * 0.9) < 1e-9,
+     cheia.toFixed(3) + ' -> ' + S.corridaVelocidade(c).toFixed(3));
+  /* e um perfeito ainda ajuda, sobre a base menor */
+  S.aplicarEfeito(c, 'perfect');
+  ok('e um perfeito ainda ajuda, sobre a base menor',
+     Math.abs(S.corridaVelocidade(c) - cheia * 0.9 * 1.45) < 1e-9, String(S.corridaVelocidade(c)));
+
+  /* ⚠️ PONTA A PONTA: quem NUNCA clica chega depois de quem clica sempre -- mesmo pokémon,
+     mesmo nível, sem NPC no caminho. É o que o pedido quer que aconteça. */
+  const correr = (clicando) => {
+    S.corridaZerar();
+    S.corrida.formato = 'single'; S.corrida.participantes = 1;
+    const r = S.corridaNovoCorredor([S.corridaInstancia({ speciesId: 'jolteon', level: 50 }, true)], true);
+    S.corrida.corredores = [r]; S.corrida.fase = 'correndo'; S.corrida.tempo = 0;
+    S.corrida.escolhidos = [{ speciesId: 'jolteon', level: 50, slot: 0, idx: 0 }];
+    let v = 0;
+    while(r.chegada === null && v < 60 * 300){
+      if(clicando){
+        /* clica sempre que a travessia permite -- sem acertar nada de propósito: o que se mede
+           aqui é o DESLEIXO, não o impulso */
+        if(S.corrida.tentativaDaTravessia !== S.corridaTravessia()){
+          S.corrida.tentativaDaTravessia = S.corridaTravessia();
+          r.tentouNaTravessia = S.corridaTravessia();
+        }
+      }
+      S.corridaFisica(1 / 60); v++;
+    }
+    return { t: r.chegada, desleixo: r.desleixo };
+  };
+  const ativo = correr(true), parado = correr(false);
+  ok('quem nunca tenta chega depois', parado.t > ativo.t,
+     'ativo ' + ativo.t.toFixed(2) + ' s | parado ' + parado.t.toFixed(2) + ' s');
+  ok('e quem tenta sempre não sofre corte', ativo.desleixo === 1, String(ativo.desleixo));
+  ok('e quem nunca tenta sofre', parado.desleixo < 1, String(parado.desleixo));
+}
+
+/* ============================================================================
+   15) A PISTA É PROPORCIONAL
+   ============================================================================ */
+/* ============================================================================
+   O NPC É PAREADO PELO SPEED -- é a ESCALAÇÃO, não um boost
+   ============================================================================ */
+console.log('\n=== O NPC É PAREADO PELO SPEED ===');
+{
+  const spDe = (id) => S.speedDaCorrida(S.corridaInstancia({ speciesId: id, level: 50 }, false));
+  const finais = S.finaisDaCorrida();
+
+  /* ⚠️ O QUE ESTAVA ERRADO NÃO ERA A PILOTAGEM, ERA O BICHO: das 134 finais só 4 alcançam um
+     Jolteon, e metade tem menos de 60% do Speed dele. O jogador escolhe o mais rápido do time; o
+     sorteio uniforme dava ao NPC a mediana do bestiário. */
+  const jol = spDe('jolteon');
+  const alcancam = finais.filter(id => spDe(id) >= jol).length;
+  ok('o bestiário é lento: poucas finais alcançam um Jolteon', alcancam <= 8,
+     alcancam + ' de ' + finais.length);
+
+  /* o pareamento em si, em várias faixas de Speed */
+  for(const meu of ['jolteon', 'starmie', 'arcanine', 'venusaur', 'machamp']){
+    const alvo = spDe(meu);
+    const perto = S.npcParaOSpeed(alvo, new Set());
+    ok('pareado com ' + meu + ' (Sp ' + alvo + '), os vizinhos ficam perto',
+       perto.every(v => Math.abs(spDe(v.id) - alvo) <= Math.max(25, alvo * 0.35)),
+       perto.slice(0, 3).map(v => v.id + ' ' + spDe(v.id)).join(', '));
+  }
+
+  /* ⚠️ A LISTA NUNCA VEM VAZIA -- é por isso que ela é "as N mais próximas" e não uma janela de
+     ±x%: um Shuckle de Speed 10 não tem vizinho a ±15%, e aí a janela precisaria de um fallback
+     que, por definição, só roda nos casos raros. */
+  ok('e nem pro outlier mais extremo do jogo (Shuckle, Sp ' + spDe('shuckle') + ')',
+     S.npcParaOSpeed(spDe('shuckle'), new Set()).length === S.CORRIDA_NPC_VIZINHOS);
+  ok('a lista tem exatamente CORRIDA_NPC_VIZINHOS',
+     S.npcParaOSpeed(spDe('jolteon'), new Set()).length === S.CORRIDA_NPC_VIZINHOS,
+     String(S.CORRIDA_NPC_VIZINHOS));
+  /* ⚠️ E ELA RESPEITA O "sem repetir espécie na equipe": quem já foi usado sai da lista. */
+  const usadas = new Set([S.raizDaLinha('jolteon')]);
+  ok('e quem já está na equipe sai da lista',
+     S.npcParaOSpeed(spDe('jolteon'), usadas).every(v => S.raizDaLinha(v.id) !== S.raizDaLinha('jolteon')));
+
+  /* ⚠️ O ALVO SAI DA ESPÉCIE, NÃO DO NÍVEL: o `speedDaCorrida` multiplica pelo nível, então um
+     jogador Lv.5 comparado com a lista no Lv.50 receberia sempre os mais lentos. */
+  S.corridaZerar();
+  S.corrida.formato = 'single'; S.corrida.participantes = 2;
+  for(const lv of [5, 50, 99]){
+    S.corrida.escolhidos = [{ speciesId: 'jolteon', level: lv, name: 'Jolteon' }];
+    const t = S.sortearNpcs()[0];
+    ok('com o jogador no Lv.' + lv + ' o NPC continua rápido E no mesmo nível',
+       spDe(t[0].speciesId) >= 100 && t[0].level === lv,
+       t[0].speciesId + ' Sp' + spDe(t[0].speciesId) + ' Lv.' + t[0].level);
+  }
+
+  /* ⚠️ E O PAREAMENTO É POR TRECHO no revezamento -- senão daria pra guardar o lento pro trecho
+     em que o NPC fosse rápido, e o pareamento viraria uma conta que dá pra burlar. */
+  S.corrida.formato = 'relay';
+  S.corrida.escolhidos = [
+    { speciesId: 'jolteon', level: 50, name: 'Jolteon' },   /* Sp 135 */
+    { speciesId: 'snorlax', level: 50, name: 'Snorlax' },   /* Sp  35 */
+    { speciesId: 'starmie', level: 50, name: 'Starmie' },   /* Sp 120 */
+  ];
+  const t = S.sortearNpcs()[0];
+  ok('no revezamento cada trecho é pareado com o SEU',
+     spDe(t[0].speciesId) > spDe(t[1].speciesId) && spDe(t[2].speciesId) > spDe(t[1].speciesId),
+     t.map((p, i) => p.speciesId + ' ' + spDe(p.speciesId)).join(' / '));
+  ok('e a equipe não repete linha', new Set(t.map(p => S.raizDaLinha(p.speciesId))).size === t.length);
+
+  /* ⚠️ E ELE CONTINUA CORRENDO COM O SPEED REAL DA ESPÉCIE -- o pedido proíbe "aumentar
+     artificialmente a velocidade do NPC", e o que mudou foi QUEM ele leva, não quanto ele corre.
+     Se um dia alguém puser um multiplicador no `corridaVelocidade` do NPC, é aqui que grita. */
+  S.corrida.formato = 'single';
+  const a = S.corridaNovoCorredor([S.corridaInstancia({ speciesId: 'jolteon', level: 50 }, true)], true);
+  const b = S.corridaNovoCorredor([S.corridaInstancia({ speciesId: 'jolteon', level: 50 }, false)], false);
+  S.corrida.corredores = [a, b];
+  ok('o NPC corre com o Speed REAL da espécie, sem boost',
+     Math.abs(S.corridaVelocidade(a) - S.corridaVelocidade(b)) < 1e-9,
+     S.corridaVelocidade(a).toFixed(3) + ' e ' + S.corridaVelocidade(b).toFixed(3));
+  /* ⚠️ E A PILOTAGEM DELE NÃO FOI MEXIDA, e isso é decisão medida: com o Speed pareado, subir o
+     perfil pra 25/57/13 derruba o jogador "bom" de 40% pra 11% de vitória. O pareamento já fez o
+     trabalho -- mexer nos dois deixaria o NPC forte demais. */
+  ok('a pilotagem do NPC continua 20/52/14 (e 14% de não tentar)',
+     S.CORRIDA_NPC.perfect === 0.20 && S.CORRIDA_NPC.good === 0.52 && S.CORRIDA_NPC.miss === 0.14,
+     JSON.stringify(S.CORRIDA_NPC));
+}
+
+/* ============================================================================
+   A LINHA DE CHEGADA FICA NA METADE DE CIMA
+   ============================================================================ */
+console.log('\n=== A CHEGADA FICA NA METADE DE CIMA ===');
+{
+  S.corridaZerar();
+  S.corrida.formato = 'single'; S.corrida.participantes = 2; S.corrida.fase = 'correndo';
+  const eu = S.corridaNovoCorredor([S.corridaInstancia({ speciesId: 'jolteon', level: 50 }, true)], true);
+  const npc = S.corridaNovoCorredor([S.corridaInstancia({ speciesId: 'rapidash', level: 50 }, false)], false);
+  S.corrida.corredores = [eu, npc];
+  const TOT = S.corridaTotal(), H = S.CORRIDA_H;
+
+  ok('a chegada trava acima da metade da tela', S.CORRIDA_Y_CHEGADA < H / 2,
+     S.CORRIDA_Y_CHEGADA + ' de ' + H + ' (metade: ' + (H / 2) + ')');
+
+  /* ⚠️ A RETA FINAL CAI DAS DUAS ALTURAS, e não é um número escolhido: escrito à mão, ele
+     divergiria no primeiro ajuste e a linha pararia num lugar que não é o declarado. */
+  ok('e o tamanho dela é DERIVADO das duas alturas',
+     Math.abs(S.corridaRetaFinal() - (S.CORRIDA_Y_EU - S.CORRIDA_Y_CHEGADA) / S.CORRIDA_PX_POR_M) < 1e-9,
+     S.corridaRetaFinal().toFixed(1) + ' m');
+
+  /* percorre a prova inteira e cobra que ela NUNCA apareça na metade de baixo */
+  let visivel = 0, baixo = 0;
+  for(let d = 0; d <= TOT; d += 0.5){
+    eu.dist = d;
+    const y = S.corridaYdaMetragem(TOT);
+    if(y > -28 && y < H){ visivel++; if(y >= H / 2) baixo++; }
+  }
+  ok('e ela nunca aparece na metade de BAIXO, em toda a prova', baixo === 0,
+     baixo + ' de ' + visivel + ' amostras visíveis');
+  ok('(e ela aparece de verdade)', visivel > 20, String(visivel));
+
+  /* ⚠️ A CÂMERA TRAVA, e é o JOGADOR que sobe até a linha -- a cena da reta final. */
+  eu.dist = TOT - S.corridaRetaFinal();
+  const camTrava = S.corridaCamera();
+  eu.dist = TOT - 5;
+  ok('a câmera PARA na reta final', Math.abs(S.corridaCamera() - camTrava) < 1e-9,
+     camTrava.toFixed(1) + ' -> ' + S.corridaCamera().toFixed(1));
+  ok('e a chegada fica parada em CORRIDA_Y_CHEGADA',
+     Math.abs(S.corridaYdaMetragem(TOT) - S.CORRIDA_Y_CHEGADA) < 1e-9,
+     S.corridaYdaMetragem(TOT).toFixed(0));
+  /* e o jogador SOBE em direção a ela */
+  eu.dist = TOT - 20; const y1 = S.corridaYdaMetragem(eu.dist);
+  eu.dist = TOT - 5;  const y2 = S.corridaYdaMetragem(eu.dist);
+  ok('e o JOGADOR sobe em direção a ela', y2 < y1, y1.toFixed(0) + ' -> ' + y2.toFixed(0));
+  eu.dist = TOT;
+  ok('e ele para EM CIMA da linha ao cruzar',
+     Math.abs(S.corridaYdaMetragem(eu.dist) - S.CORRIDA_Y_CHEGADA) < 1e-9,
+     S.corridaYdaMetragem(eu.dist).toFixed(0));
+
+  /* ⚠️ ANTES DA RETA FINAL a câmera É o jogador, e ele fica em CORRIDA_Y_EU -- senão a trava
+     valeria a prova inteira e a pista deixaria de rolar. */
+  eu.dist = 50;
+  ok('antes da reta final a câmera volta a seguir o jogador',
+     S.corridaCamera() === 50 && S.corridaYdaMetragem(50) === S.CORRIDA_Y_EU,
+     S.corridaCamera() + ' / y=' + S.corridaYdaMetragem(50));
+
+  /* ⚠️ E NO REVEZAMENTO a trava é nos últimos metros dos 900, não em cada trecho. */
+  S.corrida.formato = 'relay';
+  eu.dist = 320;
+  ok('no revezamento ela não trava na TROCA dos 300', S.corridaCamera() === 320, String(S.corridaCamera()));
+  eu.dist = S.corridaTotal() - 5;
+  ok('e trava só na chegada dos 900',
+     Math.abs(S.corridaYdaMetragem(S.corridaTotal()) - S.CORRIDA_Y_CHEGADA) < 1e-9);
+  S.corrida.formato = 'single';
+}
+
+/* ============================================================================
+   AS MEDALHAS -- desenho da casa, nunca emoji
+   ============================================================================ */
+console.log('\n=== AS MEDALHAS SÃO DESENHO DA CASA ===');
+{
+  const MED = ['medalha_ouro', 'medalha_prata', 'medalha_bronze'];
+  for(const m of MED){
+    ok(m + ' existe no DESENHOS', Array.isArray(S.DESENHOS[m]) && S.DESENHOS[m].length === 24,
+       S.DESENHOS[m] ? S.DESENHOS[m].length + ' linhas' : 'nao existe');
+    ok('  e vira um <symbol> no SVG', S.svgDosSelos().indexOf('id="s-' + m + '"') >= 0);
+  }
+  /* ⚠️ AS TRÊS SÃO A MESMA SILHUETA EM TRÊS METAIS: o que as agrupa é a FORMA, o que as separa
+     é a COR. Desenhos diferentes fariam procurar três coisas onde há uma escada. */
+  const silhueta = (n) => S.DESENHOS[n].map(l => l.replace(/[^.]/g, '#')).join('|');
+  ok('as três têm a MESMA silhueta', silhueta(MED[0]) === silhueta(MED[1]) && silhueta(MED[1]) === silhueta(MED[2]));
+  /* ...e cores diferentes, senão elas seriam o mesmo selo três vezes */
+  const corpo = (n) => S.DESENHOS[n].join('');
+  ok('e cores DIFERENTES', corpo(MED[0]) !== corpo(MED[1]) && corpo(MED[1]) !== corpo(MED[2]));
+
+  /* ⚠️ E NENHUMA É EMOJI -- é o pedido ao pé da letra (*"crie, não use emoji prontos"*) e a regra
+     que tirou os 54 emojis das telas. A varredura é sobre a TELA renderizada. */
+  S.corridaZerar();
+  S.corrida.formato = 'single'; S.corrida.participantes = 4; S.corrida.fase = 'fim';
+  S.corrida.corredores = [0, 1, 2, 3].map(i => {
+    const c = S.corridaNovoCorredor([S.corridaInstancia({ speciesId: 'jolteon', level: 50 }, i === 0)], i === 0);
+    c.chegada = 20 + i * 2; c.dist = S.corridaTotal();
+    return c;
+  });
+  const h = S.renderCorrida();
+  for(const m of MED) ok('a ' + m + ' aparece na tela de resultado', h.indexOf('#s-' + m) >= 0);
+  ok('e nenhum emoji de medalha sobrou', !/\u{1F947}|\u{1F948}|\u{1F949}|\u{1F3C5}/u.test(h));
+  /* ⚠️ DA QUARTA EM DIANTE NÃO HÁ MEDALHA, e a célula fica VAZIA em vez de sumir: sem o vazão,
+     o "4º" encostaria no nome e as linhas deixariam de alinhar em coluna. */
+  ok('são TRÊS medalhas pra quatro corredores',
+     (h.match(/resultMed/g) || []).length === 4 &&
+     (h.match(/#s-medalha_/g) || []).length === 3,
+     (h.match(/#s-medalha_/g) || []).length + ' medalhas em ' + (h.match(/resultMed/g) || []).length + ' células');
+  /* as quatro colocações, bem grandes */
+  for(const p of ['1º', '2º', '3º', '4º'])
+    ok('o "' + p + '" aparece', h.indexOf('<span class="resultPos">' + p + '</span>') >= 0);
+  ok('e a linha do jogador é destacada', h.indexOf('resultRow eu') >= 0);
+  /* ⚠️ E O TROFÉU DO TÍTULO TAMBÉM VIROU DESENHO -- ele era o último emoji desta tela. */
+  ok('o título da vitória usa o troféu desenhado',
+     h.indexOf('#s-trofeu') >= 0 && !/\u{1F3C6}/u.test(h), 'sobrou emoji de troféu');
+}
+
+/* ============================================================================
+   O REVEZAMENTO: a equipe inteira na pista
+   ============================================================================ */
+console.log('\n=== O REVEZAMENTO TEM A EQUIPE NA PISTA ===');
+{
+  S.corridaZerar();
+  S.corrida.formato = 'relay'; S.corrida.participantes = 2; S.corrida.fase = 'correndo';
+  const time = ['jolteon', 'starmie', 'arcanine'].map(id => S.corridaInstancia({ speciesId: id, level: 50 }, true));
+  const eu = S.corridaNovoCorredor(time, true);
+  const npc = S.corridaNovoCorredor(['rapidash', 'dodrio', 'persian']
+    .map(id => S.corridaInstancia({ speciesId: id, level: 50 }, false)), false);
+  S.corrida.corredores = [eu, npc];
+
+  /* ⚠️ A POSIÇÃO DE CADA MEMBRO CAI DA REGRA, sem estado novo. Quem desenha é a tela, então o
+     que se cobra aqui é a CONTA: quem espera está na marca em que RECEBE, quem já correu na marca
+     em que ENTREGOU. */
+  const onde = (trecho, dist, k) => k === trecho ? dist : (k < trecho ? k + 1 : k) * S.CORRIDA_METROS;
+
+  eu.trecho = 0; eu.dist = 120;
+  ok('no 1º trecho, o 2º espera na marca dos 300', onde(0, 120, 1) === 300);
+  ok('e o 3º espera na dos 600', onde(0, 120, 2) === 600);
+  ok('e o que corre está na metragem dele', onde(0, 120, 0) === 120);
+
+  eu.trecho = 1; eu.dist = 420;
+  ok('no 2º trecho, o 1º ficou PARADO nos 300 (onde entregou)', onde(1, 420, 0) === 300);
+  ok('o 2º corre', onde(1, 420, 1) === 420);
+  ok('e o 3º continua esperando nos 600', onde(1, 420, 2) === 600);
+
+  /* ⚠️ NO INSTANTE DA TROCA OS DOIS ESTÃO NA MESMA METRAGEM -- quem entrega e quem recebe. É por
+     isso que o desenho desloca os parados pro lado: sem isso eles sairiam um em cima do outro. */
+  eu.trecho = 1; eu.dist = 300;
+  ok('na troca, quem entregou e quem recebeu estão na MESMA metragem',
+     onde(1, 300, 0) === 300 && onde(1, 300, 1) === 300);
+
+  /* ⚠️ AGORA O DESENHO DE VERDADE, e essa é a parte que importa: a conta `onde` acima é uma
+     CÓPIA da regra dentro do teste -- ela daria verde mesmo se o jogo parasse de desenhar a equipe.
+     Aqui o canvas é um dublê que anota cada `drawImage`, e o `pmdCache` recebe folhas falsas pra
+     o desenho sair pelo caminho REAL (sem sprite ele cai no marcador neutro, que é outro ramo). */
+  const ch = [];
+  const ctx = { fillStyle: '', font: '', textAlign: '', globalAlpha: 1, strokeStyle: '', lineWidth: 1,
+    setTransform(){}, save(){}, restore(){}, translate(){}, scale(){}, beginPath(){}, arc(){},
+    ellipse(){}, fill(){}, stroke(){}, moveTo(){}, lineTo(){}, closePath(){},
+    fillRect(){}, fillText(s2, x, y){ ch.push({ t: 'txt', s: s2, x, y }); },
+    drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh){
+      ch.push({ t: 'img', x: dx + dw / 2, y: dy + dh, alpha: this.globalAlpha });
+    },
+    imageSmoothingEnabled: false };
+  const ant = S.document.getElementById;
+  S.document.getElementById = (id) => id === 'corridaCanvas'
+    ? { getContext: () => ctx, width: S.CORRIDA_W * 2, height: S.CORRIDA_H * 2 } : ant(id);
+  const folha = { img: {}, w: 32, h: 32, durations: [4, 4], caixas: [[4, 4, 28, 30], [4, 4, 28, 30]] };
+  for(const id of ['jolteon', 'starmie', 'arcanine', 'rapidash', 'dodrio', 'persian']) S.pmdCache[id] = folha;
+
+  /* o jogador no 2º trecho, com a marca dos 300 ainda na tela */
+  eu.trecho = 1; eu.dist = 305; npc.trecho = 1; npc.dist = 305;
+  ch.length = 0; S.corridaPintar();
+  const meus = ch.filter(c => c.t === 'img' && Math.abs(c.x - (44 + 176 * 0.5)) < 40);
+  ok('a equipe inteira aparece na pista, não só quem corre', meus.length >= 2,
+     meus.length + ' sprites na raia do jogador');
+  /* ⚠️ QUEM ESTÁ PARADO SAI MAIS APAGADO -- é o que separa "quem corre" de "quem está na pista". */
+  ok('e quem está parado sai mais apagado que quem corre',
+     meus.some(c => c.alpha === 1) && meus.some(c => c.alpha < 1),
+     meus.map(c => c.alpha).join(' / '));
+  /* ⚠️ E DESLOCADOS NA RAIA: na troca os dois estão na MESMA metragem, então sem o desvio eles
+     desenhariam um EM CIMA do outro. */
+  ok('e o parado é deslocado pro lado, nunca em cima do corredor',
+     new Set(meus.map(c => Math.round(c.x))).size === meus.length,
+     meus.map(c => Math.round(c.x)).join(' / '));
+
+  /* ⚠️ O QUE ESPERA FICA NA MARCA DE TROCA, e é disso que o pedido fala. Com o jogador nos 305,
+     o 3º membro espera nos 600 -- fora da tela; nos 580 ele entra, e na metragem certa. */
+  eu.dist = 585; npc.dist = 585;
+  ch.length = 0; S.corridaPintar();
+  const yEsperado = S.corridaYdaMetragem(600);
+  const naMarca = ch.filter(c => c.t === 'img' && Math.abs(c.y - yEsperado) < 2);
+  ok('quem espera está exatamente na marca dos 600', naMarca.length === 2,
+     naMarca.length + ' na marca (y=' + yEsperado.toFixed(0) + ')');
+
+  /* ⚠️ E QUEM JÁ ENTREGOU FICA PARADO ONDE ENTREGOU -- a outra metade do pedido.
+     ⚠️ E ELE SÓ FICA VISÍVEL POR ~11 m: a câmera vê 38 m pra frente e só 11 pra trás, então quem
+     entregou sai de vista logo depois da troca. É o certo -- ele ficou pra trás --, e é por isso
+     que o fixture usa 608 e não 620: aos 620 a marca cai em y=460, fora da tela de 390. */
+  eu.trecho = 2; eu.dist = 608; npc.trecho = 2; npc.dist = 608;
+  ch.length = 0; S.corridaPintar();
+  const y600 = S.corridaYdaMetragem(600);
+  ok('e quem entregou nos 600 ficou parado lá',
+     ch.some(c => c.t === 'img' && Math.abs(c.y - y600) < 2 && c.alpha < 1),
+     'y=' + y600.toFixed(0));
+
+  /* ⚠️ SEM SPRITE ele cai no marcador neutro, que desenha o NOME -- e o nome é só de quem CORRE.
+     Três "VOCÊ" empilhados na mesma raia só confundem: quem está parado é cenário. */
+  for(const id of ['jolteon', 'starmie', 'arcanine', 'rapidash', 'dodrio', 'persian']) delete S.pmdCache[id];
+  eu.trecho = 1; eu.dist = 320; npc.trecho = 1; npc.dist = 310;
+  ch.length = 0; S.corridaPintar();
+  ok('mesmo com a equipe na pista, só quem CORRE ganha o nome',
+     ch.filter(c => c.s === 'VOCÊ').length === 1,
+     ch.filter(c => c.s === 'VOCÊ').length + ' "VOCÊ"');
+  S.document.getElementById = ant;
+
+  /* ⚠️ E NADA DISSO VALE NA INDIVIDUAL: lá a equipe tem um membro só, e desenhar "os outros"
+     seria inventar pokémon que não existe. */
+  S.corrida.formato = 'single';
+  eu.trecho = 0; eu.dist = 100;
+  ok('na individual a regra nem se aplica (um membro só na pista)', S.corridaTotal() === S.CORRIDA_METROS);
+  S.corrida.formato = 'relay';
+}
+
+console.log('\n=== A PISTA É PROPORCIONAL À DISTÂNCIA ===');
+{
+  contaDeTeste();
+  S.corridaZerar();
+  S.corrida.participantes = 2;
+  const a = S.corridaNovoCorredor([S.corridaInstancia({ speciesId: 'jolteon', level: 50 }, true)], true);
+  const b = S.corridaNovoCorredor([S.corridaInstancia({ speciesId: 'venusaur', level: 50 }, false)], false);
+  S.corrida.corredores = [a, b];
+
+  /* ⚠️ A ESCALA É FIXA, e grande: 8 px/m. Quatro versões anteriores tentaram CABER O PELOTÃO na
+     tela ajustando a escala, e todas quebraram de um jeito diferente -- a última, fixa mas
+     minúscula, fazia os 300 m caberem em 0,6 tela: *"a pista está parecendo muito curta para ter
+     300 m"*. Escala grande + câmera no jogador é o que qualquer jogo de corrida faz. */
+  S.corrida.formato = 'single';
+  a.dist = 100; b.dist = 100;
+  const eJunto = S.corridaEscala();
+  a.dist = 400; b.dist = 100;
+  ok('a escala NÃO muda com a dispersão', S.corridaEscala() === eJunto,
+     eJunto + ' -> ' + S.corridaEscala());
+  S.corrida.formato = 'relay';
+  ok('nem com a modalidade', S.corridaEscala() === eJunto, String(S.corridaEscala()));
+  S.corrida.formato = 'single';
+
+  /* ⚠️ E ELA MOSTRA UM PEDAÇO CURTO DA PISTA -- é esse número que o relato cobrava. Com os 300 m
+     cabendo numa tela, a chegada aparecia na largada e ninguém parecia sair do lugar. */
+  const naTela = S.CORRIDA_H / eJunto;
+  ok('a tela mostra um pedaço curto da pista, não a prova inteira',
+     naTela < 70, naTela.toFixed(0) + ' m na tela');
+  ok('e os 300 m de um trecho ocupam várias telas',
+     S.CORRIDA_METROS / naTela >= 4, (S.CORRIDA_METROS / naTela).toFixed(1) + ' telas');
+
+  /* ⚠️ A CÂMERA É O JOGADOR, nunca o líder: presa ao líder, quem estivesse perdendo escorregaria
+     pra fora da própria tela.
+     ⚠️ E O FIXTURE TEM QUE FICAR FORA DA RETA FINAL (os últimos 25,5 m): lá a
+     câmera TRAVA de propósito, e um fixture com `dist` perto da chegada mediria a trava em vez da
+     câmera. A primeira versão usava 300 e 400 num total de 300 -- ou seja, sempre dentro dela. */
+  const foraDaReta = S.corridaTotal() - S.corridaRetaFinal();
+  a.dist = 120; b.dist = 250;
+  ok('a câmera segue o JOGADOR, mesmo perdendo', S.corridaCamera() === 120, String(S.corridaCamera()));
+  ok('e o jogador cai sempre na mesma linha da tela',
+     S.corridaYdaMetragem(a.dist) === S.CORRIDA_Y_EU, String(S.corridaYdaMetragem(a.dist)));
+  a.dist = 250; b.dist = 120;
+  ok('(inclusive liderando)', S.corridaYdaMetragem(a.dist) === S.CORRIDA_Y_EU,
+     String(S.corridaYdaMetragem(a.dist)));
+  ok('(e 250 m está mesmo fora da reta final)', 250 < foraDaReta, '250 < ' + foraDaReta.toFixed(1));
+
+  /* ⚠️ A POSIÇÃO É A METRAGEM, e a relação é EXATAMENTE linear: o dobro da diferença é o dobro
+     dos pixels, sem teto e sem compressão no caminho. */
+  a.dist = 200;
+  const d50  = S.CORRIDA_Y_EU - S.corridaYdaMetragem(150);
+  const d100 = S.CORRIDA_Y_EU - S.corridaYdaMetragem(100);
+  ok('o dobro da distância é o dobro dos pixels', Math.abs(d100 - 2 * d50) < 1e-9,
+     d50.toFixed(1) + ' e ' + d100.toFixed(1));
+  ok('e quem está à frente fica ACIMA na tela',
+     S.corridaYdaMetragem(210) < S.CORRIDA_Y_EU && S.corridaYdaMetragem(190) > S.CORRIDA_Y_EU);
+
+  /* ⚠️ E DEZ METROS VALEM OS MESMOS PIXELS PERTO E LONGE -- a medição direta do primeiro defeito
+     reportado, em que quem estava muito atrás saturava num teto e parava de se mexer. */
+  const perto = Math.abs(S.corridaYdaMetragem(200) - S.corridaYdaMetragem(190));
+  const longe = Math.abs(S.corridaYdaMetragem(120) - S.corridaYdaMetragem(110));
+  ok('dez metros valem os mesmos pixels perto e longe', Math.abs(perto - longe) < 1e-9,
+     perto.toFixed(2) + ' e ' + longe.toFixed(2));
+  ok('e eles não são zero', perto > 0.5, String(perto));
+
+  /* ⚠️ QUEM SAI DA TELA VIRA MARCADOR, e isso é o desenho -- o pedido autoriza com todas as
+     letras. Quem está 300 m atrás NÃO cabe, e aí a borda conta a diferença.
+     (No REVEZAMENTO, que é onde essa dispersão acontece de verdade -- e onde 400 m ainda está
+     longe da reta final dos 900.) */
+  S.corrida.formato = 'relay';
+  a.dist = 400; b.dist = 100;
+  const yLonge = S.corridaYdaMetragem(b.dist);
+  ok('quem está 300 m atrás fica fora do quadro', yLonge > S.CORRIDA_H,
+     yLonge.toFixed(0) + ' de ' + S.CORRIDA_H);
+  b.dist = 395;
+  ok('e quem está colado aparece', S.corridaYdaMetragem(b.dist) < S.CORRIDA_H,
+     S.corridaYdaMetragem(b.dist).toFixed(0));
+  S.corrida.formato = 'single';
+
+  /* ⚠️ A CHEGADA SÓ APARECE NO FIM -- era ela visível na largada que denunciava a escala velha. */
+  a.dist = 0;
+  ok('a chegada NÃO aparece na largada', S.corridaYdaMetragem(S.corridaTotal()) < 0,
+     S.corridaYdaMetragem(S.corridaTotal()).toFixed(0));
+  a.dist = S.corridaTotal() - 20;
+  ok('e aparece nos últimos metros', S.corridaYdaMetragem(S.corridaTotal()) > 0,
+     S.corridaYdaMetragem(S.corridaTotal()).toFixed(0));
+}
+
+
+/* ============================================================================
+   16) A LISTA É PAGINADA (18/09/2026, a pedido: "igual nas outras listas")
+   ============================================================================ */
+console.log('\n=== A LISTA DE CORREDORES É PAGINADA ===');
+{
+  const g2 = S.__getGame(), SP2 = S.SPECIES;
+  const bicho = (id, lv) => ({ speciesId: id, level: lv, name: SP2[id].name, types: SP2[id].types, id: 'p' + id + lv, hp: 1, maxHp: 1 });
+  const ids = Object.keys(SP2).slice(0, 12);
+  g2.saveSlots = new Array(20).fill(null);
+  g2.saveSlots[0] = { team: ids.slice(0, 6).map((id, i) => bicho(id, 50 + i)), badgeCount: 8, customName: 'A' };
+  g2.saveSlots[1] = { team: ids.slice(6, 12).map((id, i) => bicho(id, 40 + i)), badgeCount: 8, customName: 'B' };
+  g2.saveSlotsCarregados = true; g2.contaCarregada = true; g2.ehAdmin = true;
+  g2.aposentados = []; g2.specialties = [];
+  S.corridaZerar(); S.abrirCorrida(); S.corridaAbrirPicker();
+
+  /* ⚠️ ELA REUSA O MECANISMO da Torre e do Ginásio -- o mesmo MONT_POR_PAGINA e o mesmo
+     montadorPaginaValida. Uma paginação própria divergiria na primeira mexida. */
+  const p1 = S.renderCorrida();
+  const cards = (t) => (t.match(/mont-card/g) || []).length;
+  ok('a primeira página mostra o teto do montador', cards(p1) === S.MONT_POR_PAGINA,
+     cards(p1) + ' de ' + S.MONT_POR_PAGINA);
+  ok('e há dois botões de página', (p1.match(/class="mont-pag /g) || []).length === 2,
+     String((p1.match(/class="mont-pag /g) || []).length));
+  ok('e a conta aparece', p1.indexOf('1–10 de 12') >= 0, (p1.match(/mont-pag-conta">([^<]*)/) || [])[1]);
+  S.corridaIrParaPagina(1);
+  const p2 = S.renderCorrida();
+  ok('a segunda traz os dois que sobraram', cards(p2) === 2, String(cards(p2)));
+  ok('e a conta acompanha', p2.indexOf('11–12 de 12') >= 0, (p2.match(/mont-pag-conta">([^<]*)/) || [])[1]);
+  ok('e a página 2 está marcada',
+     /class="mont-pag ativa"[^>]*corridaIrParaPagina\(1\)/.test(p2), 'sem a marca');
+
+  /* ⚠️ E SOMANDO AS PÁGINAS, OS DOZE ESTÃO LÁ -- sem repetir ninguém entre elas. */
+  S.corridaIrParaPagina(0);
+  const ident = (t) => (t.match(/corridaToggle\('[^']*',\d+\)/g) || []);
+  const todas = ident(S.renderCorrida()).concat((S.corridaIrParaPagina(1), ident(S.renderCorrida())));
+  ok('somando as páginas, os doze estão lá', todas.length === 12, String(todas.length));
+  ok('e ninguém aparece em duas páginas', new Set(todas).size === 12, String(new Set(todas).size));
+
+  /* ⚠️ COM UMA PÁGINA SÓ os botões somem -- um "1 de 1" não controla nada */
+  g2.saveSlots[1] = null;
+  S.corridaZerar(); S.corridaAbrirPicker();
+  const curta = S.renderCorrida();
+  ok('com uma página só, os botões somem', curta.indexOf('mont-pag ') < 0, 'os botões ficaram');
+
+  /* ⚠️ ABRIR O PICKER ZERA A PÁGINA: o estado é COMPARTILHADO com a Torre e o Ginásio, e uma
+     página 3 sobrando de lá abriria esta lista no meio. */
+  g2.montadorPagina = 3;
+  S.corridaAbrirPicker();
+  ok('abrir o picker zera a página', g2.montadorPagina === 0, String(g2.montadorPagina));
+
+  /* ⚠️ E NÃO SE PAGINA NO MEIO DA CORRIDA */
+  S.corrida.fase = 'correndo';
+  g2.montadorPagina = 0;
+  S.corridaIrParaPagina(1);
+  ok('e não dá pra paginar durante a corrida', g2.montadorPagina === 0, String(g2.montadorPagina));
+  S.corrida.fase = 'setup';
+}
+
+/* ============================================================================
+   17) O MODAL DA CONTAGEM SAI DA TELA
+   ============================================================================ */
+console.log('\n=== O MODAL DA CONTAGEM SAI ===');
+{
+  contaDeTeste();
+  S.corridaZerar(); S.abrirCorrida();
+  S.corrida.escolhidos = [mk('jolteon', 60)];
+  S.corrida.corredores = [S.corridaNovoCorredor([S.corridaInstancia(S.corrida.escolhidos[0], true)], true)];
+
+  /* ⚠️ ELE EXISTE SEMPRE E É ESCONDIDO PELO `hidden`, nunca montado condicionalmente: a fase vira
+     'correndo' DENTRO do laço, que não chama render() -- então um overlay montado só na 'contagem'
+     ficava na tela pra sempre, congelado no "1 / Vai!". Foi reportado. */
+  S.corrida.fase = 'contagem';
+  const naContagem = S.renderCorrida();
+  ok('na contagem o overlay aparece',
+     naContagem.indexOf('corridaOverlay') >= 0 && !/id="corridaOverlay" hidden/.test(naContagem),
+     'não apareceu');
+  S.corrida.fase = 'correndo';
+  const correndo = S.renderCorrida();
+  ok('correndo ele continua no HTML', correndo.indexOf('corridaOverlay') >= 0, 'sumiu do HTML');
+  ok('mas escondido', /id="corridaOverlay" hidden/.test(correndo), 'ficou visível');
+
+  /* ⚠️ E QUEM O ESCONDE É O PINTOR, não um render(): o laço não redesenha a tela */
+  ok('e o pintor é quem mexe no hidden',
+     /ov\.hidden = corrida\.fase !== 'contagem'/.test(src), 'o pintor não o esconde');
+
+  /* ⚠️ E O `hidden` PRECISA DE UMA REGRA NO CSS PRA FUNCIONAR -- esta é a trava que faltava, e a
+     falta dela deixou o modal na tela por DUAS rodadas de conserto.
+     O atributo `hidden` é `display:none` pela folha do NAVEGADOR, que perde pra qualquer
+     `display` do autor -- e o `.corrida-overlay` é `display:flex`. A marcação estava CERTA: o
+     atributo estava no HTML, e a trava de cima passava. Quem errava era o CSS.
+     ⚠️ A ORDEM IMPORTA e faz parte da trava: as duas regras têm a mesma especificidade, então a
+     do `[hidden]` só ganha se vier... na verdade ela tem MAIS especificidade (classe + atributo
+     contra classe), e é por isso que funciona em qualquer ordem. O que não pode é ela sumir. */
+  const css = src.slice(src.indexOf('<style'), src.indexOf('</style>'));
+  ok('e o CSS tem a regra que faz o hidden valer',
+     /\.corrida-overlay\[hidden\]\s*\{[^}]*display:\s*none/.test(css),
+     'sem ela, o display:flex anula o hidden e o modal FICA NA TELA');
+  /* e a regra do overlay continua sendo flex quando visível */
+  ok('(e o overlay continua flex quando aparece)',
+     /\.corrida-overlay\{[^}]*display:flex/.test(css));
+  ok('e o laço não chama render() pra isso',
+     !/fase = 'correndo';[\s\S]{0,120}render\(\)/.test(src), 'o laço passou a redesenhar');
+}
+
+
+/* ============================================================================
+   18) NO FIM, SÓ A CLASSIFICAÇÃO (18/09/2026)
+   ----------------------------------------------------------------------------
+   Pedido com print: *"pode sumir com esses 3 primeiros quadros ao fim da corrida e deixar somente
+   o quadro escrito 2 lugar com os tempos de cada pokemon"*.
+   ⚠️ E ELES NÃO ESTAVAM SÓ SOBRANDO: estavam mostrando DADO ERRADO. O placar voltava a "0 / 300 m"
+   e o canvas ficava em BRANCO, porque quem os mantinha vivos era o pintor do laço -- que já parou.
+   ============================================================================ */
+console.log('\n=== NO FIM, SÓ A CLASSIFICAÇÃO ===');
+{
+  contaDeTeste();
+  S.corridaZerar(); S.abrirCorrida();
+  S.corrida.formato = 'single'; S.corrida.participantes = 3;
+  S.corrida.escolhidos = [mk('jolteon', 60)];
+  const eu = S.corridaNovoCorredor([S.corridaInstancia(S.corrida.escolhidos[0], true)], true);
+  S.corrida.corredores = [eu].concat(S.sortearNpcs().map(t => S.corridaNovoCorredor(t, false)));
+  S.corrida.corredores.forEach((c, i) => { c.dist = 300; c.chegada = 20 + i * 2; });
+
+  S.corrida.fase = 'correndo';
+  const correndo = S.renderCorrida();
+  ok('correndo, a pista e o placar estão na tela',
+     correndo.indexOf('corridaCanvas') >= 0 && correndo.indexOf('racerRow') >= 0);
+
+  S.corrida.fase = 'fim';
+  const fim = S.renderCorrida();
+  ok('no fim, a classificação aparece', fim.indexOf('resultRow') >= 0, 'sem a classificação');
+  ok('e a pista some', fim.indexOf('corridaCanvas') < 0, 'a pista ficou (e em branco)');
+  ok('e o placar some', fim.indexOf('racerRow') < 0, 'o placar ficou (e zerado)');
+  ok('e o botão de impulso some', fim.indexOf('corridaBoost') < 0, 'o impulso ficou');
+  ok('e o setup some', fim.indexOf('Escolher corredor') < 0, 'o setup ficou');
+  ok('mas dá pra correr de novo e configurar',
+     fim.indexOf('corridaLargar') >= 0 && fim.indexOf('corridaReiniciar') >= 0);
+  ok('e dá pra sair', fim.indexOf('sairDaCorrida') >= 0);
+
+  /* ⚠️ E OS TEMPOS ESTÃO LÁ, na ordem da classificação */
+  const tempos = (fim.match(/<b>([\d.]+)s<\/b>/g) || []);
+  ok('os três tempos aparecem', tempos.length === 3, tempos.join(' '));
+  ok('e em ordem crescente',
+     tempos.map(t => parseFloat(t.replace(/\D*([\d.]+).*/, '$1'))).every((v, i, a) => i === 0 || a[i-1] <= v),
+     tempos.join(' '));
+
+  /* ⚠️ A FONTE SUBIU -- e isso só se vê no CSS.
+     ⚠️ ELA SUBIU DUAS VEZES, e na segunda (18/09/2026, a pedido: *"aumente as fontes do resultado
+     final, pode colocar o 1, 2, 3 e 4 lugar bem grandes junto com os nomes"*) a linha deixou de
+     ter UMA fonte: hoje a colocação é o maior texto da caixa, o nome vem atrás, e o "você / NPC"
+     fica pequeno embaixo do nome. Por isso a trava mede as DUAS que importam, e não a da linha. */
+  const css2 = src.slice(src.indexOf('<style'), src.indexOf('</style>'));
+  const rPos = (css2.match(/\.resultRow \.resultPos\{[^}]*\}/) || [''])[0];
+  const rNome = (css2.match(/\.resultRow \.resultNome\{[^}]*\}/) || [''])[0];
+  const fonte = (r) => parseFloat((r.match(/font-size:([\d.]+)rem/) || [])[1] || 0);
+  ok('a colocação é o maior texto da caixa', fonte(rPos) >= 1.4, rPos || 'sem a regra');
+  ok('e o nome vem logo atrás dela', fonte(rNome) >= 0.95 && fonte(rNome) < fonte(rPos),
+     rNome || 'sem a regra');
+  /* ⚠️ A LINHA É UMA GRADE de colunas fixas, e não um flex livre: com flex, a largura da medalha
+     e a do número mudam de linha pra linha e os NOMES deixam de alinhar -- e é a coluna dos nomes
+     e a dos tempos que se comparam de relance. */
+  ok('e a linha é uma GRADE de colunas fixas',
+     /\.resultRow\{[^}]*display:grid/.test(css2) && /grid-template-columns:auto 34px 1fr auto/.test(css2),
+     (css2.match(/\.resultRow\{[^}]*\}/) || [''])[0].slice(0, 70));
+  ok('e o tempo usa tabular-nums (a coluna não dança)',
+     /\.resultRow b\{[^}]*tabular-nums/.test(css2), 'sem tabular-nums');
+
+  /* volta pro estado limpo pros blocos seguintes */
+  S.corridaZerar();
 }
 
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');

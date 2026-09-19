@@ -12149,6 +12149,414 @@ como CÓPIAS. Medido: o time do save fica **byte a byte idêntico** depois de um
 | a 320px | setup 657px, picker 872px, corrida 699px — **sem rolagem lateral** em nenhuma |
 | no **iPhone 16e** (390×844) | a corrida **cabe inteira sem rolar** (844px exatos), botão 328×52 |
 
+### AS CINCO DE 18/09/2026 — dois defeitos e três mecânicas
+
+#### ⚠️ O MODAL DA CONTAGEM NÃO SAÍA DA TELA -- e o conserto errou o alvo na primeira vez
+
+Reportado: *"após a largada, tem um modal no meio da tela que não sai, tá ficando escrito 1 e
+embaixo Vai!"*. O overlay era **montado condicionalmente** (`fase === 'contagem' ? ... : ''`), e a
+fase vira `'correndo'` **DENTRO do laço** — que não chama `render()`, pela regra da casa (redesenhar
+durante a animação recria o canvas e mata a transição). Resultado: o HTML ficava lá, congelado no
+último número.
+
+Hoje ele **existe sempre** e o **pintor** o esconde pelo `hidden`, como o resto do HUD. Nada de
+`render()`.
+
+**⚠️ E ISSO NÃO BASTOU: foi reportado DE NOVO.** O atributo `hidden` é `display:none` pela folha do
+**NAVEGADOR**, que tem a menor prioridade que existe -- e o `.corrida-overlay` é `display:flex`.
+**Qualquer `display` do autor anula o `hidden`.** Faltava `.corrida-overlay[hidden]{display:none}`.
+
+**⚠️ E A TRAVA TINHA PASSADO NAS DUAS VEZES**, porque ela conferia que o atributo estava no HTML --
+e estava. O que faltava era conferir se ele **fazia efeito**, e isso só se lê no CSS. É a terceira
+vez neste dia que a marcação está certa e quem erra é a folha de estilo (as outras duas foram o
+sprite que não encolhia e o nome que sumia no card da Máquina). Hoje a trava lê o CSS.
+
+#### ⚠️ A PISTA É PROPORCIONAL — e o defeito voltou por TRÊS pontas antes de fechar
+
+Reportado: *"no fim da corrida o pokémon que está atrás fica correndo no mesmo lugar por um tempo"*.
+
+| ponta | por que o último parava |
+|---|---|
+| **1ª — o `log1p` com teto de 80px** | quem ficava >100 m atrás **saturava no teto** e não se mexia mais, enquanto o cenário rolava pelo líder |
+| **2ª — o vão maior que a tela** | com `CORRIDA_VAO_PISTA` de 150 e o líder em 247, o fim do pelotão caía em 397 num quadro de 356 — e batia no limite |
+| **3ª — a escala de ENCAIXE EXATO** | `vao / dispersão` põe o último **sempre** a exatamente um vão do líder: ganhe ou perca terreno, a escala se ajusta e ele **não sai do pixel** |
+
+A terceira é a sutil, e só a trava pegou (`347 → 347`). A saída da vez foi **escala em DEGRAUS**
+(`CORRIDA_ESCALAS`): dentro de um degrau tudo é linear — dez metros ganhos são dez metros × escala
+de pixels, pra todo mundo. O preço é um salto na troca de degrau, que é o que um zoom faz.
+
+**⚠️ ISTO É HISTÓRIA: os degraus duraram algumas horas** e viraram a 4ª ponta do mesmo defeito — a
+troca de degrau move todo mundo de uma vez, e é ISSO que o jogador leu como o adversário "indo e
+voltando". Hoje não há escala que se ajuste: ver **A CÂMERA SEGUE O JOGADOR**, logo abaixo.
+
+#### ⚠️ A CÂMERA SEGUE O JOGADOR — cinco versões, e as quatro primeiras faziam a MESMA pergunta
+
+Dois relatos em sequência, e o segundo é o que virou a mecânica de hoje:
+
+> *"eu cheguei bem na frente do meu adversário, porém na tela ficou meu adversário indo e
+> voltando ... não dá para criar uma pista contínua e respeitar o lugar de cada pokémon nessa
+> pista conforme a metragem que ele está?"*
+
+> *"a pista está parecendo muito curta para ter 300 m. Logo quando larga já está aparecendo a
+> linha de chegada e o pokémon corre mas parece que não corre muito ... parece que os pokémons
+> estão correndo muito mas a distância aparenta ser muito pequena"*
+
+**⚠️ AS QUATRO PRIMEIRAS VERSÕES TENTAVAM MOSTRAR O PELOTÃO INTEIRO**, e essa era a pergunta
+errada: pra caber todo mundo, a escala tem que ser minúscula — e aí a prova inteira cabe numa
+tela e ninguém parece sair do lugar.
+
+| versão | o que quebrava |
+|---|---|
+| `log1p` com teto de 80px | quem ficava >100 m atrás **saturava** e parava de se mexer |
+| `vao / dispersão` (encaixe exato) | o **último** fica sempre a um vão do líder — congelado no pixel |
+| **degraus** | dentro do degrau é linear, mas a **troca** move todo mundo de uma vez: na tela isso se lê como o adversário **"indo e voltando"** |
+| **escala fixa pequena** (0,83 px/m) | os 300 m cabiam em **0,6 de uma tela**: a chegada visível na largada |
+
+**A resposta é a de qualquer jogo de corrida: não se mostra a prova toda, mostra-se o pedaço em
+volta de quem você controla.** A escala foi de 0,83 para **8 px/m** e a câmera passou a seguir o
+jogador.
+
+| | antes (0,83 px/m) | **hoje (8 px/m)** |
+|---|---|---|
+| pista visível na tela | 470 m | **49 m** (11 atrás, 38 à frente) |
+| os 300 m de um trecho | 0,6 tela | **6,2 telas** |
+| a 12 m/s, atravessar a tela | 39 s | **4,1 s** |
+| o chão rolando a 9,8 m/s | 16 px/s | **78 px/s** |
+
+**⚠️ A CÂMERA É O JOGADOR, NUNCA O LÍDER**, e essa é a diferença que importa: presa ao líder,
+quem estivesse perdendo escorregaria pra fora da própria tela. O jogador cai sempre em
+`CORRIDA_Y_EU` **por construção** — a diferença dele pra ele mesmo é zero — e o mundo é que rola.
+
+- **⚠️ E O CHÃO DEIXOU DE TER MULTIPLICADOR.** Ele era `lider * escala * 2`: pelo **líder** porque
+  nada mais se mexia, e o **dobro** pra "dar sensação de velocidade" quando a escala era minúscula.
+  Com 8 px/m a sensação vem da própria corrida, e o dobro faria o chão correr mais que os pés.
+- **⚠️ A LARGADA VIROU UMA METRAGEM (o zero), como tudo o mais.** Ela era um y FIXO na tela e só
+  existia ANTES de largar; hoje ela vive na pista, fica pra trás e some sozinha — medido, **0,8 s
+  depois da partida**. A chegada segue a mesma regra e só aparece nos **últimos 3,7 s**.
+
+**⚠️ E QUEM SAI DA TELA VIRA UM MARCADOR NA BORDA** (`▲ 64m` / `▼ 60m`) — o pedido autoriza com
+todas as letras (*"não é necessário ficar os dois pokémons exibindo na tela, somente caso eles
+realmente estejam próximos na metragem"*). Sem o marcador o adversário simplesmente sumiria, e o
+jogador não saberia se está ganhando sem ler o placar — que é o que a pista existe pra contar
+sozinha.
+
+**QUANTO ISSO ACONTECE, medido em 12 corridas de cada tipo:**
+
+| | duração | adversários NA TELA | maior diferença vista |
+|---|---|---|---|
+| individual 1x1 | 24 s | **84%** | 64 m |
+| individual, 4 | 24 s | 86% | 65 m |
+| revezamento 1x1 | 95 s | **26%** | 290 m |
+| revezamento, 4 | 95 s | 23% | 308 m |
+
+**A individual passa quase toda na tela; o revezamento, um quarto.** É aritmética e não defeito:
+a prova é 3× mais longa e a dispersão chega a **300 m**, ou seja seis telas de distância. Mostrar
+os dois ali exigiria de volta a escala minúscula que causou o relato.
+**Se um dia incomodar**, a régua é o `CORRIDA_PX_POR_M` — e a conta está aqui: cada px/m a menos
+mostra ~6 m a mais de pista e deixa a corrida ~12% mais lenta na tela.
+
+#### ⚠️ O NPC ERA RUIM PELO BICHO, NÃO PELA PILOTAGEM (18/09/2026)
+
+Reportado: *"deixe o NPC melhor, ele está bem ruinzinho"*.
+
+**⚠️ A PRIMEIRA MEDIÇÃO DESCARTOU A SUSPEITA ÓBVIA.** No **espelho** — Jolteon contra Jolteon, só
+a pilotagem decidindo — o NPC ganha do jogador "bom" em **72%** das corridas. Ele pilota bem.
+
+**O QUE ESTAVA ERRADO ERA O SORTEIO DA ESPÉCIE**, que era uniforme entre as 134 evoluções finais:
+
+| | |
+|---|---|
+| finais que alcançam um Jolteon (Sp 135) | **4 de 134 (3%)** |
+| finais com menos de 60% do Speed dele | **68 de 134 (51%)** |
+| mediana do bestiário | Sp **80**, contra 135 do Jolteon |
+| e isso nos 300 m | **2,5 s** de desvantagem antes de a corrida começar |
+
+O jogador escolhe o **mais rápido do time dele**; o NPC recebia a mediana. Hoje ele é **pareado
+pelo Speed** (`npcParaOSpeed`): medido, o Speed dele vai de **88% para 98%** do Speed do jogador.
+
+- **⚠️ ISSO NÃO É O BOOST QUE O PEDIDO ORIGINAL PROÍBE** (*"não aumentar artificialmente a
+  velocidade do NPC para acompanhar ou ultrapassar o jogador"*): ele continua correndo com o Speed
+  **REAL** da espécie dele. O que mudou é a **escalação** — exatamente o que a Torre faz com o
+  nível e a Montanha Sagrada faz com a média do time. Há trava cobrando que a velocidade dos dois
+  seja idêntica com a mesma espécie.
+- **⚠️ É "as N MAIS PRÓXIMAS" (14), e não uma janela de ±x%:** janela pode ficar **VAZIA** — um
+  Shuckle de Speed 10 não tem vizinho a ±15% — e aí precisaria de um fallback que, por definição,
+  só roda nos casos raros, ou seja o caminho menos testado do código. Por proximidade nunca falta.
+- **⚠️ O ALVO SAI DA ESPÉCIE NO Lv.50, não do nível do jogador:** o `speedDaCorrida` multiplica
+  pelo nível, então comparar um Lv.5 com a lista no Lv.50 daria **sempre os mais lentos**. O nível
+  já é pareado à parte pelo `nivelDoNpc`.
+- **⚠️ E O PAREAMENTO É POR TRECHO no revezamento**, não por equipe: senão o jogador guardaria o
+  lento pro trecho em que o NPC fosse rápido, e o pareamento viraria uma conta que dá pra burlar.
+- **O Shuckle (Sp 10) é o outlier que sobra**: o vizinho mais próximo dele tem Sp 35, ou seja
+  **345%** do dele. É inevitável e é justo — quem escolhe o Shuckle escolheu um pokémon que não corre.
+
+**⚠️ A PILOTAGEM NÃO FOI MEXIDA, e essa é a decisão medida desta seção.** Com o Speed pareado, o
+perfil de hoje (20/52/14, e 14% de não tentar) já entrega **perfeito 100% / humano 51% / bom 40%**.
+Subir um degrau derruba o jogador "bom" no chão:
+
+| perfil do NPC | jogador perfeito | humano | bom |
+|---|---|---|---|
+| **hoje 20/52/14** | 100% | **51%** | **40%** |
+| 25/57/13 | 100% | 46% | **11%** |
+| 30/55/10 | 100% | 31% | 4% |
+| 45/48/05 | 100% | 8% | 0% |
+
+**O pareamento já fez o trabalho — mexer nos dois deixaria o NPC forte demais**, e a tentação era
+justamente mexer nos dois. Há trava fixando o perfil, pra a próxima mudança ali ser deliberada.
+
+#### A FAIXA VERDE CAIU PELA METADE (18/09/2026)
+
+Pedido: *"diminua os quadrados verdes de bom em 50%"*. De **30,4% para 15,2%**, com o `ini` andando
+junto (0,348 → **0,424**) pra ela continuar **CENTRADA** — só encolher o `tam` deslocaria a faixa
+pra a esquerda do centro. É a mesma correção que a amarela precisou horas antes.
+
+| | janela na barra | janela em TEMPO |
+|---|---|---|
+| verde, antes | 30,4% | **438 ms** |
+| **verde, hoje** | **15,2%** | **219 ms** |
+| amarela (não mudou) | 4,8% | 69 ms |
+
+A faixa em que se **erra** foi de 69,6% para **84,8%** da barra.
+
+- **⚠️ O EPSILON CONTINUA SENDO NECESSÁRIO, e agora nas DUAS faixas:** `Math.abs(0.424 - 0.5)` dá
+  **0,07600000000000001** contra uma meia-faixa de 0,076, e a amarela tem o mesmo problema. Os
+  números do exemplo no código mudaram; o problema não.
+- **As faixas do CSS saem da TABELA** (inline), então o desenho acompanhou sozinho.
+
+#### ⚠️ O EFEITO COMBINADO É MUITO MAIOR QUE A SOMA — e a faixa é a régua, não o NPC
+
+Os dois pedidos do mesmo dia **puxam pro mesmo lado**, e medi-los juntos foi o que mostrou o
+tamanho disso. O jogador aqui é modelado pela **MIRA** (ele aponta pro centro com um desvio
+típico) e não por "acerta bom X% das vezes" — senão o A/B pressuporia o resultado da mudança de
+faixa em vez de medi-lo. 320 corridas por célula, oito espécies:
+
+| mira do jogador | antes | só a FAIXA | só o NPC | **os DOIS** |
+|---|---|---|---|---|
+| ±5% (muito boa) | 93% | — | — | **98%** |
+| ±10% | 78% | 60% | 81% | **46%** |
+| ±15% | 72% | **29%** | 73% | **8%** |
+| ±25% | 37% | 12% | 7% | **0%** |
+
+**⚠️ A FAIXA É A RÉGUA DOMINANTE, e isso é contra-intuitivo:** o **NPC pareado sozinho quase não
+move** quem tem mira boa (72% → 73% a ±15%) — ele só morde quem já jogava mal (37% → 7% a ±25%).
+Quem derruba o jogador mediano é a **faixa**: com ela grande, o jogador acertava "bom" quase
+sempre e o ×1,25 compensava qualquer adversário; pela metade ele passa a errar (×0,80), e aí o
+adversário pareado cobra.
+
+**Se ficar duro demais, o lugar de mexer é a VERDE** (`CORRIDA_FAIXA.verde`, lembrando de mover o
+`ini` junto), e não o NPC — devolver a faixa a 30,4% com o NPC pareado leva a mira ±15% de 8% de
+volta a **73%**. A segunda régua é o `CORRIDA_NPC_VIZINHOS`: mais vizinhos = pareamento mais frouxo.
+
+#### ⚠️ A LINHA DE CHEGADA FICA NA METADE DE CIMA (18/09/2026)
+
+Pedido: *"coloque para a linha de chegada ficar acima da metade do quadrado da tela que exibe a
+corrida, hoje ela está ficando bem abaixo"*. E estava: com a câmera seguindo o jogador até o fim,
+a linha **descia** de 0 até `CORRIDA_Y_EU` (300 de 390) e ele a cruzava lá embaixo, com 300px de
+nada acima.
+
+**A CÂMERA TRAVA NA RETA FINAL.** Nos últimos **25,5 m** ela para, a linha fica parada em
+`CORRIDA_Y_CHEGADA` (**96 de 390 — 25% da altura**) e é o **JOGADOR que sobe** em direção a ela.
+É o que um jogo de corrida faz na reta final: a câmera abre e você vê a linha se aproximar.
+
+- **⚠️ O TAMANHO DA RETA FINAL NÃO É UM NÚMERO ESCOLHIDO** — ele **cai das duas alturas**
+  (`(CORRIDA_Y_EU − CORRIDA_Y_CHEGADA) / CORRIDA_PX_POR_M`). Escrito à mão, ele divergiria no
+  primeiro ajuste de altura e a linha pararia num lugar que não é o declarado.
+- **Medido: ela fica na metade de cima 100% do tempo em que aparece**, varrendo a prova inteira de
+  meio em meio metro — e ela aparece por ~3,2 s.
+- **Ao cruzar, o jogador para EM CIMA da linha** (os dois em y=96), o que é exatamente o certo.
+- **No revezamento a trava é só na chegada dos 900**, nunca nas trocas dos 300 e 600 — a marca da
+  troca continua rolando com a câmera.
+
+**⚠️ E O FIXTURE DAS TRAVAS DA PISTA TEVE QUE SAIR DA RETA FINAL.** Ele usava `dist = 300` e
+`400` num total de **300** — ou seja, sempre **dentro** da faixa travada, onde a câmera não segue
+o jogador de propósito. Três travas passaram a acusar o que estava certo. É a mesma família dos
+fixtures que este arquivo já registra (o painel forte demais, o `preservePlayerHp` que cura o time
+B): **o cenário tem que cair na faixa em que a regra medida vale**.
+
+#### O PÓDIO GANHOU MEDALHAS DESENHADAS (18/09/2026)
+
+Pedido: *"aumente as fontes do resultado final, pode colocar o 1, 2, 3 e 4 lugar bem grandes junto
+com os nomes, e coloque uma imagem de medalha de ouro, prata e bronze (crie, não use emoji
+prontos)"*.
+
+**⚠️ AS TRÊS MEDALHAS SÃO A MESMA SILHUETA EM TRÊS METAIS**, e isso é decisão: o que as agrupa
+como "medalha" é a FORMA (a fita em V mais o disco com a estrela), e o que as separa é a COR.
+Desenhos diferentes fariam procurar três coisas onde há uma escada. Há trava comparando a
+silhueta das três e cobrando que as cores sejam diferentes.
+
+Elas saem do **mesmo `gerar-selos.js`** de todo o resto, então herdam o contorno de 2px, o
+sombreado direcional e o `<symbol>` do SVG único. E duas coisas foram aprendidas desenhando:
+
+- **⚠️ A FITA PRECISOU DE 6px POR TIRA.** Com 4px o contorno comia 2 de cada lado e sobravam 2 de
+  cor: as duas tiras liam como **dois riscos pretos**. É a regra que este arquivo já registra —
+  *num selo pequeno, detalhe menor que ~3px da grade não é detalhe, é sujeira*.
+- **⚠️ A ESTRELA É PRETA, e não no tom escuro do metal.** A primeira versão tinha uma borda
+  interna de relevo JUNTO com a estrela, as duas no tom escuro — e elas viravam uma mancha. Tirada
+  a borda, a estrela no tom escuro **ainda sumia**: o escuro do ouro (`#c98b16`) contra o médio
+  (`#f2c744`) tem pouco contraste. Comparados preto e branco no ASCII, só o **preto** lê nos três
+  metais — o branco some na prata. Ele é a cor do próprio contorno, então a estrela sai como um
+  relevo fundo, que é o que uma medalha tem.
+- **NÃO HÁ NÚMERO DENTRO DO DISCO**: num disco de ~15px o dígito sobra com 7px e o contorno come
+  metade. Quem diz a colocação é o "1º" gigante ao lado — a medalha é o reforço, não a informação.
+
+**⚠️ E O TROFÉU DO TÍTULO VIROU DESENHO JUNTO** — ele era o último emoji desta tela, e o pedido
+proíbe emoji pronto. Há trava cobrando que nenhum emoji de medalha ou troféu sobre no HTML.
+
+**A LINHA VIROU UMA GRADE DE QUATRO COLUNAS**, e não um flex livre: com flex, a largura da medalha
+e a do número mudam de linha pra linha e os **NOMES deixam de alinhar** — que é justamente onde o
+olho compara. Medido no Chrome a 320px:
+
+| | antes | **hoje** |
+|---|---|---|
+| a colocação ("1º") | ~13px | **24px** |
+| o nome do pokémon | ~13px | **16px** |
+| o tempo | ~13px | 16,8px |
+| a medalha | — | **30px** |
+| altura da linha | ~30px | 48px |
+| nomes cortados | — | **nenhum** |
+| rolagem lateral | não | **não** |
+
+- **DA QUARTA COLOCAÇÃO EM DIANTE NÃO HÁ MEDALHA, e a célula fica VAZIA** em vez de sumir: sem o
+  vazão, o "4º" encostaria no nome e as linhas deixariam de alinhar em coluna.
+- **A linha do jogador é destacada** — ela é a que ele procura primeiro. O realce sai do
+  `--yellow` da casa com alpha, e **não de uma variável inventada**: a primeira versão usava
+  `var(--yellow-soft, ...)`, que não existe na paleta — a mesma classe do `--cream` fantasma que
+  já deixou uma aba transparente e ilegível.
+- **⚠️ E A TRAVA DE LETRA MORTA DOS SELOS PRECISOU APRENDER A TABELA.** Ela procurava
+  `selo('nome')` literal e **acusou as três medalhas**, que estão em uso — elas são escolhidas
+  por `MEDALHA_DO_POSTO[pos]`, como o `icone` dos itens já fazia. Hoje ela aceita o nome citado
+  como VALOR, cortando antes o próprio bloco `DESENHOS` — sem o corte, todo selo contaria a si
+  mesmo pela chave da tabela e a trava daria verde pra qualquer coisa.
+
+#### ⚠️ O REVEZAMENTO PASSOU A TER A EQUIPE INTEIRA NA PISTA (18/09/2026)
+
+Reportado: *"quando acontecer o revezamento, hoje quando chega na liga de revezar, só está
+trocando a sprite, deixe fazendo mais sentido, coloque o pokémon que é o próximo, esperando na
+linha de troca, e quando o outro pokémon chegar, o outro fica parado e continua com o próximo"*.
+
+E era isso mesmo: a troca era `c.trecho++` e o sprite mudava de um quadro pro outro. **Não havia
+entrega de bastão nenhuma na tela.**
+
+**A METRAGEM DE CADA MEMBRO CAI DA REGRA DO REVEZAMENTO, sem estado novo:**
+
+| quem | onde | |
+|---|---|---|
+| já correu (`k < trecho`) | `(k + 1) × CORRIDA_METROS` | parou na marca em que **entregou** |
+| corre (`k === trecho`) | `c.dist` | |
+| espera (`k > trecho`) | `k × CORRIDA_METROS` | parado na marca em que **recebe** |
+
+**⚠️ E É DERIVADO, nunca gravado:** gravado, ele só conseguiria ficar velho — e a posição de
+quem espera é uma **constante da prova**, não um estado.
+
+- **⚠️ OS PARADOS SÃO DESLOCADOS NA RAIA, e no instante da troca isso é obrigatório:** ali quem
+  entrega e quem recebe estão na **MESMA metragem**, então sem o desvio eles desenhariam um em
+  cima do outro. Quem já correu vai pra um lado, quem espera pro outro.
+- **⚠️ ELES SÃO DESENHADOS FORA DA GUARDA DO MARCADOR DE BORDA**, e isso não é detalhe: eles têm
+  metragem PRÓPRIA, então um deles pode estar na tela com o corredor fora dela (e vice-versa).
+  Amarrados à mesma guarda, o pokémon que espera na marca sumiria justamente quando o corredor
+  está longe dela — que é quase sempre.
+- **QUEM ESTÁ PARADO CONGELA NO QUADRO 0**: usando o `quadroT` do corredor, os três membros
+  animariam em **sincronia** e quem espera pareceria correr no lugar.
+- **E SAI EM 72% de opacidade** — não é o `.caiu` do resto do jogo (35%): aqui ele precisa
+  continuar **reconhecível**, porque o jogador quer ver QUAL pokémon está esperando.
+- **A seta, o nome e o "TROCA!" são só de quem CORRE**: três "VOCÊ" empilhados na mesma raia só
+  confundem — quem está parado é cenário.
+- **⚠️ QUEM ENTREGOU SÓ FICA VISÍVEL POR ~11 m**, que é toda a visão pra trás da câmera (ela vê 38
+  m pra frente). É o certo — ele ficou pra trás —, e foi a trava que apontou isso: o fixture com
+  `dist = 620` põe a marca dos 600 em y=460, **fora da tela de 390**.
+
+**⚠️ A TRAVA PRECISOU LER O DESENHO REAL, e a primeira versão não lia.** Ela conferia uma conta
+`onde(trecho, dist, k)` escrita **dentro do próprio teste** — ou seja, uma CÓPIA da regra: ela
+daria verde mesmo se o jogo parasse de desenhar a equipe. Hoje o canvas é um dublê que anota cada
+`drawImage`, e o `pmdCache` recebe folhas falsas pra o desenho sair pelo caminho REAL — sem
+sprite ele cai no marcador neutro, que é outro ramo. É a mesma lição das travas que "mediam a
+duração em vez da regra".
+
+**CONFERIDO:** as duas impressões (MOTOR e DIARIO) continuam idênticas — nada disto é motor.
+
+#### NO FIM, SÓ A CLASSIFICAÇÃO
+
+Pedido com print: *"pode sumir com esses 3 primeiros quadros ao fim da corrida e deixar somente o
+quadro escrito 2 lugar com os tempos"*.
+
+**⚠️ E ELES NÃO ESTAVAM SÓ SOBRANDO — estavam mostrando DADO ERRADO.** No print, o placar mostrava
+`0 / 300 m` e o canvas estava **em branco**: quem os mantinha vivos era o pintor do laço, que já
+tinha parado. Sumir com eles conserta as duas coisas de uma vez.
+
+A fonte da classificação subiu de **.66 pra .82rem** (a caixa deixou de dividir espaço com a pista,
+então pode ser lida de longe), e o tempo ganhou `tabular-nums` — sem isso os dígitos têm larguras
+diferentes e a coluna da direita dança de linha pra linha, que é justamente onde o olho compara.
+
+#### QUEM NÃO TENTA PERDE VELOCIDADE
+
+Pedido: a cada **3 travessias sem uma tentativa**, −5% de velocidade.
+
+- **Ele é diferente de todo o resto:** não tem duração (vale até o fim da prova), **ACUMULA** (seis
+  travessias paradas são dois cortes) e **multiplica por fora** do impulso — um perfeito ainda
+  ajuda quem está desleixado, só que sobre uma base menor. Somar os dois faria um perfeito "curar"
+  a inatividade, e o pedido é o contrário.
+- **Tentar zera o contador, mesmo ERRANDO:** o que se pune é não tentar, e o erro já tem a
+  penalidade dele.
+- **Tem piso** (`CORRIDA_DESLEIXO_MIN`): sem ele, ficar parado pararia o pokémon e a corrida não
+  terminaria nunca.
+- **⚠️ O NPC TAMBÉM PERDE**, e isso é simetria: a "oportunidade não usada" dele (o resto das
+  probabilidades do `CORRIDA_NPC`) **É** não tentar. Sem isso a penalidade valeria só pro jogador.
+
+**⚠️ E ELE OBRIGOU A FÍSICA A SER FATIADA NAS VIRADAS DE TRAVESSIA.** O corte muda a velocidade no
+meio do quadro — exatamente como a troca de trecho muda —, e mudança de velocidade no meio de um
+quadro **tem que ser fatiada**, senão o resultado passa a depender da taxa de quadros. A trava
+pegou: sem fatiar, a mesma corrida dava **25,999 s a 1/60 e 26,027 s a 1/5**.
+
+**⚠️ E A PRIMEIRA VERSÃO DO FATIAMENTO TRAVOU O JOGO.** Ela procurava "a próxima virada" dentro de
+um `while`, e quando o tempo caía um ulp antes de uma (`1.4399999999999999`) o `Math.floor`
+devolvia a virada **anterior**: o passo saía em ~1e-16, o tempo não avançava e o laço rodava até o
+teto de voltas — **em todo quadro**. Hoje as viradas são calculadas **de uma vez**, a partir do
+intervalo, então o número de fatias é conhecido antes de começar e não existe laço que não termina.
+
+#### AS FAIXAS TAMBÉM SE MOVEM
+
+Pedido: as faixas verde e amarela passeiam, **em velocidade diferente da agulha** (*"para não
+ficarem juntas"*), e **quanto maior o nível, mais devagar**.
+
+O centro delas oscila num **SENO**; a agulha é um **TRIÂNGULO** — formas diferentes, além de
+períodos diferentes. É a primeira coisa no jogo em que o nível dá uma vantagem que não é atributo.
+
+**⚠️ E A PRIMEIRA VERSÃO SINCRONIZAVA EM OITO NÍVEIS, com o comentário afirmando o contrário.** Eu
+dei o período em SEGUNDOS (3,7 → 9,3 s) e escrevi que a faixa evitava os múltiplos de 1,44 — **era
+falso**, e a trava listou os níveis: 12, 37, 38, 62, 87 e 88 caíam em cima de 4,32 s, 5,76 s e
+8,64 s. Com razão inteira, a configuração barra+faixa **se repete exatamente** a cada N travessias
+e o jogador decora o padrão.
+
+**A razão do erro vale guardar: qualquer faixa CONTÍNUA que varie mais de 1 unidade de razão cruza
+um inteiro**, não importa onde comece. Hoje o período é uma **razão da travessia** num intervalo
+que não contém inteiro — **2,15× a 2,90×**, ou seja 3,10 s no Lv.1 e 4,18 s no Lv.99. O preço é a
+variação ser menor (35%): é o máximo possível sem cruzar o inteiro.
+
+**⚠️ E DUAS MEDIDAS MUDARAM NO MESMO DIA, a pedido:** a faixa **amarela caiu pela metade** (9,6% →
+**4,8%**, com o `ini` andando junto pra ela continuar CENTRADA — só encolher o `tam` deslocaria o
+perfeito pra a esquerda), e as faixas ficaram **mais rápidas**: a razão desceu de 2,15–2,90 pra
+**1,15–1,90**, ou seja o período foi de 3,10–4,18 s pra **1,66 s no Lv.1 e 2,74 s no Lv.99**.
+Com isso a faixa passou a ser **mais rápida que o ciclo da agulha** (2,88 s), o que antes não era.
+O intervalo novo continua entre os inteiros 1 e 2, então a regra de não sincronizar segue valendo.
+
+**⚠️ E TRÊS TRAVAS ENVELHECERAM JUNTO:** elas tinham 0,452 e 0,548 escritos à mão, e passaram a
+acusar o que estava certo. Hoje as bordas saem da TABELA — a mesma lição do "59 espécies" da ficha
+da Pokédex, que também era um número fixo descrevendo uma tabela que cresceu.
+
+**As faixas são movidas pelo DOM**, como a agulha, e **pela MESMA função que a detecção usa** —
+desenhadas por uma conta própria, a barra prometeria uma região e o motor pontuaria outra.
+
+#### A LISTA É PAGINADA
+
+Pedido: *"igual nas outras listas que já existem dessa maneira, como na torre de treinadores e
+ginásio da cidade"*. Ela reusa o **`MONT_POR_PAGINA`**, o **`montadorPaginaValida`** e o mesmo
+estado `game.montadorPagina` — uma paginação própria divergiria na primeira mexida.
+
+⚠️ O que **não** deu pra reusar é o `montadorDeTimeHtml` inteiro: ele ordena por nível/nome/time e
+aqui a ordem é pelo **Speed da corrida**. As peças de paginação são as mesmas; a lista é outra.
+⚠️ E **abrir o picker zera a página**, como o `abrirMontador` faz: o estado é compartilhado com a
+Torre e o Ginásio, e uma página 3 sobrando de lá abriria esta lista no meio.
+
 ### O QUE FICA PENDENTE DA LIGA LARANJA
 
 Nada disto foi integrado, e é escopo desta etapa: **o acesso por Surf**, a **Liga Laranja** em si,

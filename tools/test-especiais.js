@@ -8655,8 +8655,18 @@ console.log('\n=== VIDA CHEIA NAO MORRE NUM GOLPE (17/09/2026) ===');
   ok('e toda cor esta na paleta', corRuim.length === 0, corRuim.join(' '));
 
   /* 2) LETRA MORTA: todo desenho tem chamador */
-  const src = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
-  const semDono = nomes.filter(n => src.split("selo('" + n + "'").length - 1 === 0);
+  /* ⚠️ "CHAMADOR" INCLUI SER CITADO NUMA TABELA, e não só `selo('nome')` literal: os selos
+     escolhidos DINAMICAMENTE aparecem como valor (o `icone` dos itens, o `MEDALHA_DO_POSTO` da
+     corrida) e a chamada sai `selo(tabela[k])`. A primeira versão só olhava o literal e acusou as
+     três medalhas, que estão em uso.
+     ⚠️ E O BLOCO `DESENHOS` É CORTADO ANTES DA BUSCA -- senão todo selo contaria a si mesmo (a
+     própria chave da tabela) e a trava daria verde pra qualquer coisa. */
+  const srcCru = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
+  const iDes = srcCru.indexOf('const DESENHOS = {');
+  const fDes = iDes >= 0 ? srcCru.indexOf('\n};', iDes) + 3 : -1;
+  const src = iDes >= 0 ? srcCru.slice(0, iDes) + srcCru.slice(fDes) : srcCru;
+  const semDono = nomes.filter(n =>
+    src.split("selo('" + n + "'").length - 1 === 0 && src.split("'" + n + "'").length - 1 === 0);
   ok('nenhum desenho fica sem chamador', semDono.length === 0, semDono.join(', '));
 
   /* 3) O SIMBOLO: um <symbol> por desenho, com o id que o `selo()` procura */

@@ -333,6 +333,30 @@ selo('moeda', t => {   /* moeda de perfil com um vinco */
   pintar(t, menos(circulo(C, C, 6.6), circulo(C, C, 4.8)), 'o', { liso: true });
 });
 
+/* ⚠️ AS TRÊS MEDALHAS SÃO O MESMO DESENHO EM TRÊS METAIS, e isso é decisão: o que as agrupa
+   como "medalha" é a FORMA (a fita em V mais o disco), e o que as separa é a COR. Desenhos
+   diferentes fariam procurar três coisas onde há uma escada.
+   ⚠️ E NÃO HÁ NÚMERO DENTRO DO DISCO, de propósito: num disco de ~15px o dígito sobra com 7px de
+   altura e o contorno de 2px come metade dele. Quem diz a colocação é o "1º" gigante ao lado, na
+   própria tela de resultado -- a medalha é o reforço visual, não a informação.
+   A estrela dentro sai no tom ESCURO e LISA: sombreada, ela some dentro do disco. */
+function medalha(cor, escuro){
+  return t => {
+    /* ⚠️ A FITA É GROSSA (6px por tira) porque o contorno come 2px de CADA lado: com 4px
+       sobravam 2 de cor e as duas tiras liam como dois riscos pretos. */
+    pintar(t, poligono([[4.5, 0], [10.5, 0], [13.5, 10], [9.5, 10]]), 'r');
+    pintar(t, poligono([[13.5, 0], [19.5, 0], [14.5, 10], [10.5, 10]]), 'r');
+    pintar(t, circulo(12, 15.5, 7.8), cor);
+    /* ⚠️ SÓ A ESTRELA DENTRO, e grande: a primeira versão tinha uma borda interna de relevo
+       JUNTO com ela, e as duas no mesmo tom escuro viravam uma mancha -- é a regra de que detalhe
+       menor que ~3px da grade não é detalhe, é sujeira. */
+    pintar(t, estrela(12, 15.5, 5.4, 2.9, 5, 0), 'k', { liso: true });
+  };
+}
+selo('medalha_ouro',   medalha('y', 'o'));
+selo('medalha_prata',  medalha('s', 'z'));
+selo('medalha_bronze', medalha('f', 'h'));
+
 selo('trofeu', t => {   /* taca com alcas, haste e base */
   pintar(t, uniao(retangulo(6, 3, 12, 7), elipse(12, 10, 6, 5)), 'y');
   pintar(t, uniao(menos(circulo(5.5, 7.5, 3.6), circulo(5.5, 7.5, 1.9)),
