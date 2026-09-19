@@ -36,8 +36,15 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
   Descoberto em 04/09/2026, e ele já tinha custado um relatório de bug: o jogador mandou print de um
   defeito que estava consertado, porque o navegador dele ainda servia a versão anterior. Como o jogo
   INTEIRO é um arquivo só, uma hora de cache é uma hora de correção que não chega.
-  `no-cache` não quer dizer "não guarde": o navegador guarda e **revalida pelo ETag** a cada visita,
-  então o custo normal é um 304 vazio. O que muda é que o deploy passa a valer no próximo F5.
+  `no-cache` não quer dizer "não guarde": o navegador guarda e **revalida pelo ETag** a cada visita.
+  O que muda é que o deploy passa a valer no próximo F5.
+  **⚠️ ESTA LINHA DIZIA "o custo normal é um 304 vazio", E A MEDIÇÃO DERRUBOU ISSO (19/09/2026):**
+  o Hosting **nunca** devolve 304 pra este arquivo. Testado com `If-None-Match`, com
+  `If-Modified-Since` e com os dois juntos -- sempre **200 com 486 KB** (~1,1 s), e `X-Cache: MISS`
+  em toda resposta. Ou seja **toda abertura do jogo baixa o arquivo inteiro**, e a revalidação
+  barata que esta seção prometia nunca existiu. (Suspeita: o `Vary: x-fh-requested-host` da
+  borda do Firebase. NÃO foi investigado até o fim -- o que está medido é o efeito.)
+  Ver **PERFORMANCE: A GEOGRAFIA MANDA**.
 - **Deploy que demora não é deploy que acabou.** As ~67 functions levam vários minutos e o hosting
   entra no fim da leva: enquanto ela roda, o que está no ar ainda é a versão anterior. Testar nesse
   intervalo devolve o comportamento velho -- foi exatamente o que aconteceu no print da Faixa.
@@ -12565,6 +12572,179 @@ Quando a Liga existir, os pontos que mudam são: a **porta** (hoje `admin`), o *
 (hoje `nivelDoNpc`, que é uma função justamente pra isso), a **dificuldade** (`CORRIDA_NPC`) e o que
 hoje não existe — **gravar resultado**, que é a primeira coisa que vai precisar de backend e de uma
 checagem de permissão do lado de lá.
+
+
+## PERFORMANCE: A GEOGRAFIA MANDA (19/09/2026)
+
+Relatado assim: *"tenho sentido uma boa lentidão na inscrição para as ligas clássicas e trainers
+league"* e, depois, *"mesmo para carregar as informações na tela home está mais lento"*.
+
+### ⚠️ O NÚMERO QUE EXPLICA TUDO: `Location: nam5`
+
+```
+firebase firestore:databases:get "(default)"  →  Location: nam5
+```
+
+O Firestore está na **multi-região dos Estados Unidos**, e os jogadores estão no Brasil. **Medido
+daqui**, e este é o número que toda conta de latência deste projeto tem que usar:
+
+| | |
+|---|---|
+| operação Firestore, conexão reaproveitada | **~200 ms** |
+| operação abrindo conexão nova | **~1,0 s** |
+| callable us-central1, quente | ~250 ms |
+| callable us-central1, primeira | **1,25 s** |
+
+**⚠️ O CLAUDE.md ASSUMIA ~60 ms.** É 3× menos que a realidade, e toda estimativa de latência
+feita antes desta data está subestimada na mesma proporção.
+
+E `nam5` é **multi-região**: o *commit* de cada transação ainda paga consenso entre regiões.
+
+- **⚠️ A LOCALIZAÇÃO DE UM FIRESTORE É IMUTÁVEL.** Trocar exige projeto novo e migração de todos
+  os dados. Não é uma opção de curto prazo.
+- **⚠️ E MOVER AS FUNCTIONS PRA SÃO PAULO SOZINHAS DEIXARIA O JOGO MAIS LENTO.** Elas estão em
+  us-central1, ou seja **coladas no banco** -- ali uma operação Firestore custa ~5 ms. Em São Paulo
+  elas ficariam a 200 ms de cada leitura que fazem. O que está certo hoje é function perto do
+  banco; o que está longe é o **jogador**.
+- **A região das functions e o `minInstances` NÃO tocam na inscrição**, porque ela não passa por
+  Cloud Function nenhuma: `registerForLeague` é código do CLIENTE escrevendo direto no Firestore.
+  As únicas duas functions de liga são schedulers.
+
+### ⚠️ O QUE O JOGADOR SENTIA NÃO ERA A LENTIDÃO -- ERA O SILÊNCIO
+
+O relato decisivo veio depois: *"eu clico no time para inscrever ele na liga e **nada acontece**,
+fica na mesma tela de escolher o time e eu clicando, e depois de alguns segundos que vai"*.
+
+**O clique sempre funcionou no primeiro.** O que faltava era a tela dizer isso:
+
+```css
+.save-slot-card.clickable{cursor:pointer;}   /* era só isso */
+```
+
+O clique põe `disabled` no card -- mas `.save-slot-card` era **a única classe clicável do jogo sem
+regra de `:disabled`**. `.btn`, `.lobby-acao`, `.circle-btn`, `.friend-btn`, `.notif-barra-btn` e
+`.conquista-premio` todas já tinham a delas. Então o card ficava com o mesmo fundo, a mesma borda,
+a mesma sombra e o mesmo `cursor:pointer` -- **visualmente idêntico**. O jogador clicava de novo
+(sem efeito, porque já estava disabled) até a tela trocar.
+
+É a mesma lição que este arquivo já registrava pro `.btn.danger:disabled`: **botão desabilitado
+precisa parecer desabilitado**.
+
+- **O CARD CLICADO FICA ACESO** (borda amarela, fundo claro, "Inscrevendo…") e **os outros apagam**.
+  Feedback positivo, não só ausência: o que o jogador precisa saber é que **o clique dele** pegou.
+- **A SOMBRA SAI junto da opacidade**, e não é detalhe: é ela que dá o relevo que se lê como "dá pra
+  apertar". Só apagar deixaria um card que continua parecendo botão.
+- **⚠️ O ESTADO GUARDA QUAL SLOT, não um booleano** -- com `true` os seis cards ficariam iguais e o
+  jogador continuaria sem saber qual pegou. É a mesma razão do `resgatandoConquistas`.
+- **⚠️ E A COMPARAÇÃO É `=== slot`, NUNCA UM TERNÁRIO NO SLOT: ele pode ser 0, que é falsy** -- um
+  `slot ? ... : ...` trataria o **primeiro time** como "nenhum". Testado com o slot 0.
+- Vale nas **duas** telas que inscrevem (o picker da Liga e a inscrição rápida do aviso).
+
+### A HOME: CINCO IDAS EM SÉRIE VIRARAM DUAS
+
+```js
+loadSaveSlots().then(loadPermanentUserData).then(syncSpecialties)
+  .then(reconcileLeagueWinsFromHistory).then(() => loadMyActiveGymDefenses())
+```
+
+Cinco `.then()` encadeados, e **só uma das ligações era dependência de verdade**: o
+`loadPermanentUserData` **lê `game.saveSlots`** pra unir a Pokédex dos saves com a permanente da
+conta. As outras duas não tocam `saveSlots` (conferido) -- eram sequência por hábito. A ~200 ms
+por elo, isso é ~1 s antes de a home mostrar qualquer coisa.
+
+**⚠️ E O `reconcileLeagueWinsFromHistory` SAIU DA HOME.** Ele varre o histórico inteiro --
+`LEAGUE_HISTORY_RETENTION = 48` ciclos **por tipo de liga**, mais um `scheduleDocRef.get()`
+sequencial por tipo: até ~98 documentos **a cada visita**. E ele é, pelo próprio comentário dele,
+uma **rede de segurança pra uma Cloud Function que já faz o trabalho**.
+Ele continua rodando **ao abrir a Liga**, que é onde o número que ele conserta aparece -- e o total
+na home continua certo, porque vem do documento do usuário pelo `loadPermanentUserData`.
+
+### ⚠️ O `count()` QUE NUNCA EXISTIU
+
+```js
+if(typeof coll.count === 'function'){ ... }   // sempre falso
+else { const snap = await coll.get(); return snap.size; }   // sempre aqui
+```
+
+**Conferido baixando o SDK**: o jogo carrega `firebase-firestore-compat.js` **10.7.1**, e nele
+**`Query.prototype.count()` não existe** -- as únicas 10 ocorrências de "count" no arquivo são
+internas (IndexedDB, bloom filter do protocolo). A agregação só existe no SDK **modular**
+(`getCountFromServer`).
+
+Então o `countRegistrants` **sempre baixava a coleção inteira** -- e quem o chama é o
+`loadLeagueViewData`, que roda **a cada 5 segundos** pelo polling.
+
+| com 100 inscritos e 100 jogadores na tela | |
+|---|---|
+| antes | **~7,4 milhões de leituras/hora** |
+| a cota gratuita (50k/dia) durava | **24 segundos** |
+| depois (contador denormalizado) | 1 leitura por tique |
+
+- **O contador sobe por `increment` NA MESMA TRANSAÇÃO da inscrição** -- atômico, o Firestore
+  resolve sem ler, então duas inscrições simultâneas não se atropelam.
+- **⚠️ ISSO PÕE UMA ESCRITA NUM DOCUMENTO COMPARTILHADO que a inscrição não tinha, e o trade-off
+  foi medido**: o limite é ~1 escrita/s por documento, e 100 inscrições concentradas em 10 minutos
+  dão **0,17/s** -- cinco vezes abaixo. O cron escreve ~1/min no mesmo doc, o que deixa o total em
+  ~0,2/s.
+- **⚠️ O FALLBACK FICA**: ciclo criado antes desta data não tem o campo, e sem ele a tela mostraria
+  "0 inscritos" numa liga cheia.
+- **⚠️ SÓ A CLÁSSICA USA ISTO.** Em `trainersLeagueCycles` a regra é `allow write: if false` -- o
+  cliente não escreve lá, e tentar seria uma ida ao servidor que **nunca pode dar certo**.
+  (É o mesmo motivo pelo qual o `trainersLeagueEnsureCycleDoc` do cliente é uma ida morta.)
+
+### A GUARDA ANTI-PISCAR DA CLÁSSICA
+
+O `refreshLeagueView` chamava `render()` **incondicional a cada 5 s** -- recriando o HTML inteiro
+da tela (Top 10, dois históricos, chaveamento) mesmo sem nada mudar. A Trainers League já tinha a
+guarda dela (`trainersLeagueLastRenderSignature`); a Clássica ficou sem.
+
+**⚠️ A ASSINATURA INCLUI O CONTADOR DE INSCRITOS**, e é isso que faz ela funcionar: durante as
+inscrições o número é justamente a coisa que muda. Uma assinatura só de id+status deixaria a tela
+parada enquanto gente entra. E é a própria assinatura que faz o caso do **próprio jogador** passar
+(`amIRegistered` + `registrantCount` mudam), sem precisar de exceção.
+
+### O SCHEDULER LIA A MESMA AGENDA DUAS VEZES
+
+Os logs de produção mostram `advanceLeague` e `advanceTrainersLeague` rodando **de minuto em
+minuto com o jogo vazio**, dizendo "Nada a avançar ainda" -- **2.880 execuções/dia**.
+
+O `recoverStuckCycles` lia a agenda de 9,5 KB e o `advanceLeagueOnceForType` lia **o mesmo
+documento na linha seguinte**. Hoje o primeiro devolve o que leu.
+
+- **⚠️ O VALOR É CAPTURADO NUMA VARIÁVEL DE FORA da transação**: o Firestore **re-executa** o corpo
+  de uma transação em caso de contenção, então um `return` lá dentro poderia entregar o resultado
+  de uma tentativa **abortada**. Do lado de fora, o que sobra é a última execução -- a que valeu.
+- **Ele devolve `null` quando falha**, nunca um objeto vazio: o chamador precisa distinguir "li e a
+  agenda está assim" de "não consegui ler", e no segundo caso lê por conta própria.
+- **⚠️ O ACHADO DE QUE ELE "ESCREVE À TOA" ESTAVA ERRADO**: ele só escreve `if(changed)`. O que
+  custava era a **leitura repetida**, não a escrita.
+
+### ⚠️ OUTRAS TRÊS MEDIÇÕES QUE CONTRADIZEM O QUE ESTAVA ESCRITO AQUI
+
+1. **O `index.html` NUNCA devolve 304.** Testado com `If-None-Match`, com `If-Modified-Since` e com
+   os dois juntos: sempre **200 com 486 KB** (~1,1 s). Este arquivo afirma, na seção de Deploy, que
+   *"o custo normal é um 304 vazio"* -- **não é**. Toda abertura do jogo baixa o arquivo inteiro.
+   (O `X-Cache` vem `MISS` sempre, e o `Vary` inclui `x-fh-requested-host`.)
+2. **Não existe `firestore.indexes.json`, e o projeto tem ZERO índices compostos**
+   (`firebase firestore:indexes` devolve listas vazias). É a mesma armadilha que as **regras** já
+   tiveram antes de 30/08/2026: o que existe no console não está versionado, e um `deploy` não o
+   recria.
+3. **As regras estão limpas**: zero `get()`/`exists()` em 169 linhas, ou seja nenhuma leitura extra
+   nem latência adicional por operação do cliente.
+
+### ⚠️ O QUE FICOU EM ABERTO, E POR QUÊ
+
+- **A INSCRIÇÃO VIRAR UMA CALLABLE.** Do Brasil, 1 ida a us-central1 custa 250 ms medidos, e lá
+  dentro as 4 operações Firestore custam ~5 ms cada: de ~800 ms para ~300 ms. **NÃO foi feito**, e
+  a razão é a proporção entre risco e ganho: ela mexe na **trava de inscrição dupla** (hoje uma
+  transação client-side), e o sintoma que o jogador relatou já foi resolvido pelo **feedback do
+  clique** -- os 800 ms deixaram de incomodar quando a tela passou a responder na hora. O ganho
+  virou conforto, não conserto.
+- **Os achados de escala que NÃO foram verificados** (a auditoria multi-agente bateu no limite de
+  sessão e a fase de verificação adversarial não rodou): o documento do ciclo da Trainers League
+  supostamente **estourando 1 MiB** com o objeto do jogador duplicado 15×, e o refresh de times
+  elegíveis supostamente fazendo **~320 idas sequenciais** numa execução de cron com timeout de
+  60 s. Os dois são graves **se forem verdade** -- e nenhum foi confirmado lendo o código.
 
 ## Frontend
 

@@ -4032,9 +4032,25 @@ async function claimCycleForProcessing(typeId, cycleId, fromStatus, toStatus){
     return false;
   }
 }
+/* ⚠️ ELE DEVOLVE O QUE LEU (19/09/2026), e o chamador reusa em vez de reler. O documento da
+   agenda tem **9,5 KB** e é o mais lido do jogo; esta função lia ele e o `advanceLeagueOnceForType`
+   lia de novo **na linha seguinte** -- duas leituras do mesmo doc, por tipo de liga, a cada minuto,
+   **mesmo quando não há nada a avançar** (que é o caso em 99% das execuções: os logs de produção
+   mostram "Nada a avançar ainda" de minuto em minuto). Com dois tipos de liga são 2.880
+   leituras/dia só nesta repetição.
+
+   ⚠️ O VALOR É CAPTURADO NUMA VARIÁVEL DE FORA, e não devolvido de dentro da transação: o
+   Firestore **re-executa** o corpo de uma transação em caso de contenção, então um `return` lá
+   dentro poderia entregar o resultado de uma tentativa que foi abortada. Do lado de fora, o que
+   sobra é sempre a última execução -- que é a que valeu.
+   ⚠️ E ELE DEVOLVE `null` QUANDO FALHA, nunca um objeto vazio: o chamador tem que saber a
+   diferença entre "li e a agenda está assim" e "não consegui ler" -- no segundo caso ele lê por
+   conta própria, como sempre fez. */
 async function recoverStuckCycles(typeId){
+  let agenda = null;
   try{
     await db.runTransaction(async (tx)=>{
+      agenda = null;
       const snap = await tx.get(scheduleDocRef(typeId));
       if(!snap.exists) return;
       const data = snap.data();
@@ -4050,8 +4066,11 @@ async function recoverStuckCycles(typeId){
         }
       }
       if(changed){ data.updatedAt = Date.now(); tx.set(scheduleDocRef(typeId), data); }
+      /* já com as correções aplicadas, se houve: é este o estado que vale daqui pra frente */
+      agenda = data;
     });
-  } catch(e){ logger.error('Erro ao recuperar ciclos travados:', e); }
+  } catch(e){ logger.error('Erro ao recuperar ciclos travados:', e); return null; }
+  return agenda;
 }
 async function drawCycle(typeId, cycleEntry, leagueTypeConfig){
   const claimed = await claimCycleForProcessing(typeId, cycleEntry.id, 'registering', 'drawing');
@@ -4345,8 +4364,12 @@ async function advanceCyclePhases(typeId, cycleEntry, leagueTypeConfig, leagueTy
 async function advanceLeagueOnceForType(typeId, typeConfig){
   let anyChanged = false;
   try{
-    await recoverStuckCycles(typeId);
-    const scheduleSnap = await scheduleDocRef(typeId).get();
+    /* ⚠️ REUSA O QUE O `recoverStuckCycles` ACABOU DE LER -- ele lê a mesma agenda de 9,5 KB uma
+       linha acima. Quando ele não consegue ler (devolve null), aí sim vale a leitura própria. */
+    const agendaJaLida = await recoverStuckCycles(typeId);
+    const scheduleSnap = agendaJaLida
+      ? { exists: true, data: () => agendaJaLida }
+      : await scheduleDocRef(typeId).get();
     if(!scheduleSnap.exists){
       await scheduleDocRef(typeId).set({ cycles: [{ id: makeCycleId(computeNextScheduledTime()), scheduledTime: computeNextScheduledTime(), status:'registering' }], updatedAt: Date.now() });
       logger.info(`Agenda da Liga (${typeId}) criada do zero.`);

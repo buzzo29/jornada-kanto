@@ -1818,6 +1818,25 @@
   /* o card INTEIRO é o botão de abrir o save (ver openSaveCard). Os controles internos -- renomear,
      favoritar, apagar, ver ginásio -- chamam event.stopPropagation() pra não dispararem a abertura */
   .save-slot-card.clickable{cursor:pointer;}
+  /* ⚠️ CARD DESABILITADO PRECISA PARECER DESABILITADO (19/09/2026), e esta era a ÚNICA classe
+     clicável do jogo sem essa regra -- `.btn`, `.lobby-acao`, `.circle-btn`, `.friend-btn`,
+     `.notif-barra-btn` e `.conquista-premio` todas já tinham a delas.
+     Relatado assim: *"eu clico no time para inscrever ele na liga e nada acontece, fica na mesma
+     tela de escolher o time e eu clicando"*. E era isso: o clique punha `disabled` no card, mas
+     ele continuava com o mesmo fundo, a mesma borda, a mesma sombra e o mesmo `cursor:pointer` --
+     visualmente IDENTICO. O jogador clicava de novo (sem efeito, porque já estava disabled) até a
+     tela trocar, ~1,2 s depois.
+     ⚠️ A SOMBRA SAI JUNTO, e não é detalhe: é ela que dá o RELEVO que se lê como "dá pra
+     apertar". Só baixar a opacidade deixaria um card apagado que continua parecendo um botão.
+     É a mesma lição do `.btn.danger:disabled`, que já está no CLAUDE.md. */
+  .save-slot-card:disabled{opacity:.5;cursor:not-allowed;box-shadow:none;}
+  /* ⚠️ MAS O CARD QUE VOCÊ CLICOU NÃO APAGA -- ele é o único que fica ACESO, com a frase. Apagar
+     os seis igualmente diria "nada aqui responde"; o que o jogador precisa saber é que o clique
+     DELE pegou. Feedback positivo, não só ausência. */
+  .save-slot-card.enviando:disabled{opacity:1;border-color:var(--yellow-dark);background:#fffbe9;}
+  .save-slot-card .save-slot-enviando{
+    display:block;margin-top:5px;font-size:.72rem;font-weight:800;color:var(--yellow-dark);
+  }
   /* Cartão da escolha de ginásio. Reaproveita o card de save (mesma moldura, mesmo toque) porque
      é a mesma leitura: um bloco grande e clicável com uma decisão dentro. */
   /* Linha do encontro selvagem. A lupa fica DENTRO do card, flutuando sobre ele: como o card é um
@@ -4909,6 +4928,15 @@ function freshGameDefaults(){
     leagueData:null,
     leagueError:null,
     leagueSubmitting:false,
+    /* ⚠️ QUAL slot está sendo inscrito, e não só "algum": é ele que faz o card CLICADO mostrar a
+       frase enquanto os outros apagam. Com um booleano só, os seis cards ficariam iguais e o
+       jogador continuaria sem saber qual pegou.
+       ⚠️ E ELE É `null` QUANDO NÃO HÁ NENHUM, nunca `false`: o slot pode ser **0**, e `0` é
+       falsy -- `slot ? ... : ...` trataria o primeiro time como "nenhum". A comparação é sempre
+       `=== slot`. É a mesma razão pela qual o `resgatandoConquistas` guarda o ID e não um `true`. */
+    leagueSubmittingSlot:null,
+    /* a última assinatura desenhada da tela da Liga -- ver a guarda do `refreshLeagueView` */
+    leagueLastRenderSignature:null,
     leagueWatch:null,
     leagueWatchIndex:0,
     leagueWatchPhase:'loading',
@@ -14907,14 +14935,29 @@ async function ensureRegisteringCycle(typeId){
     return entry;
   });
 }
+/* ⚠️ O GUARD `typeof coll.count === 'function'` NUNCA FOI VERDADEIRO, e isso foi conferido
+   baixando o SDK (19/09/2026): o jogo carrega `firebase-firestore-compat.js` **10.7.1**, e nele
+   **`Query.prototype.count()` não existe** -- as únicas 10 ocorrências de "count" no arquivo são
+   internas (IndexedDB, bloom filter do protocolo). A agregação só existe no SDK **modular**, como
+   `getCountFromServer`.
+   Resultado: ele SEMPRE caía no `coll.get()`, que **baixa a coleção inteira de inscritos**. E quem
+   chama é o `loadLeagueViewData`, que roda a cada **5 segundos** pelo polling da tela da Liga.
+   Com 100 inscritos e 100 jogadores com a tela aberta isso dá ~7,4 milhões de leituras por hora --
+   a cota gratuita (50k/dia) morre em 24 segundos.
+
+   ⚠️ HOJE O NÚMERO VEM DE UM CONTADOR no próprio documento do ciclo, mantido por `increment` na
+   mesma transação da inscrição. Com 100 inscritos o tique vai de 100 leituras para **1**.
+   ⚠️ E O FALLBACK FICA, porque ciclo criado ANTES desta data não tem o campo: sem ele, a tela
+   mostraria "0 inscritos" numa liga cheia. Log velho não pode sumir, e contador velho também não.
+   ⚠️ SÓ A CLÁSSICA usa isto: em `trainersLeagueCycles` a regra é `allow write: if false` -- o
+   cliente não escreve lá, e uma tentativa seria uma ida ao servidor que nunca pode dar certo. */
 async function countRegistrants(typeId, cycleId){
   try{
-    const coll = registrantsCollRef(typeId, cycleId);
-    if(typeof coll.count === 'function'){
-      const snap = await coll.count().get();
-      return snap.data().count;
-    }
-    const snap = await coll.get();
+    const cycleSnap = await cycleDocRef(typeId, cycleId).get();
+    const n = cycleSnap.exists ? cycleSnap.data().registrantCount : null;
+    if(typeof n === 'number' && n >= 0) return n;
+    /* ciclo de antes do contador: conta varrendo, como sempre contou */
+    const snap = await registrantsCollRef(typeId, cycleId).get();
     return snap.size;
   } catch(e){ console.error('Erro ao contar inscritos:', e); return 0; }
 }
@@ -14932,6 +14975,7 @@ async function registerForLeague(typeId, slot, ficarNaTela){
     return;
   }
   game.leagueSubmitting = true;
+  game.leagueSubmittingSlot = slot;
   game.leagueError = null;
   render();
   const uid = game.authUser.uid;
@@ -14945,6 +14989,18 @@ async function registerForLeague(typeId, slot, ficarNaTela){
       const snap = await tx.get(regRef);
       if(snap.exists){ throw new Error('DUPLICATE'); }
       tx.set(regRef, { name, code, uid, slot, ataques: golpesDoTime(saveData.team), specialties: game.specialties||[], elite: !!game.accountEliteChampion, registeredAt: Date.now() });
+      /* ⚠️ O CONTADOR SOBE NA MESMA TRANSAÇÃO, e é ele que tira a varredura da coleção do
+         caminho do polling (ver `countRegistrants`). `increment` é atômico: o Firestore resolve
+         sem ler, então duas inscrições simultâneas não se atropelam.
+         ⚠️ E ISSO PÕE UMA ESCRITA NUM DOCUMENTO COMPARTILHADO, que a inscrição não tinha -- o
+         trade-off foi medido: o limite do Firestore é ~1 escrita/s por documento, e 100 inscrições
+         concentradas em 10 minutos dão **0,17/s**, cinco vezes abaixo. O cron escreve ~1/min no
+         mesmo doc, o que mantém o total em ~0,2/s.
+         ⚠️ `merge:true` porque o documento do ciclo pode ainda NÃO EXISTIR durante a inscrição:
+         ele só nasce de verdade no sorteio. Sem o merge, um `set` criaria o doc com só este campo
+         e apagaria o resto quando o sorteio chegasse. */
+      tx.set(cycleDocRef(typeId, cycleEntry.id),
+             { registrantCount: firebase.firestore.FieldValue.increment(1) }, { merge: true });
     });
     game.accountLeagueSlots = { ...(game.accountLeagueSlots||{}), [typeId]: slot };
     /* O aviso "inscrições abertas" vive numa cópia em memória com folga de 5 minutos (ver
@@ -14953,6 +15009,7 @@ async function registerForLeague(typeId, slot, ficarNaTela){
     if(typeId === CLASSIC_LEAGUE_TYPE){ game.avisoLiga = null; }
     game.ultimaChecagemDaLiga = 0;   // a próxima checagem relê de verdade, sem esperar a folga
     game.leagueSubmitting = false;
+    game.leagueSubmittingSlot = null;
     /* ⚠️ VINDO DO AVISO, a confirmação é o próprio modal: ele troca pro estado "Inscrito!" e o
        jogador fecha quando quiser. Sem isso o modal sumia e a única pista de que deu certo era o
        aviso ter desaparecido -- que é o mesmo que acontece quando ele EXPIRA. */
@@ -14967,6 +15024,7 @@ async function registerForLeague(typeId, slot, ficarNaTela){
     refreshLeagueView(typeId, false); // atualiza a tela na hora, sem esperar o próximo tick de 5s
   } catch(e){
     game.leagueSubmitting = false;
+    game.leagueSubmittingSlot = null;
     if(e.message==='DUPLICATE' || e.message==='ACTIVE_ELSEWHERE') game.leagueError = 'Sua conta já está inscrita nessa Liga em outra rodada.';
     else { console.error(e); game.leagueError = 'Erro ao se inscrever. Confira sua conexão e tente de novo.'; }
     /* O `leagueError` é lido pelas DUAS telas: a da Liga e o modal do aviso. Com o modal aberto,
@@ -14982,7 +15040,17 @@ async function cancelLeagueRegistration(typeId){
   try{
     const scheduleSnap = await scheduleDocRef(typeId).get();
     const cycleEntry = scheduleSnap.exists ? (scheduleSnap.data().cycles||[]).find(c=>c.status==='registering') : null;
-    if(cycleEntry){ await registrantDocRef(typeId, cycleEntry.id, game.authUser.uid).delete(); }
+    if(cycleEntry){
+      await registrantDocRef(typeId, cycleEntry.id, game.authUser.uid).delete();
+      /* ⚠️ O CONTADOR DESCE JUNTO -- senão ele só cresce e a tela passa a anunciar mais inscritos
+         do que existem. Ele vai DEPOIS do delete e com o erro engolido: o que importa é a
+         inscrição ter saído, e um contador que erra pra mais é melhor que um cancelamento que
+         falha. O próximo ciclo nasce zerado de qualquer jeito. */
+      try{
+        await cycleDocRef(typeId, cycleEntry.id).set(
+          { registrantCount: firebase.firestore.FieldValue.increment(-1) }, { merge: true });
+      } catch(e){ console.error('Erro ao baixar o contador de inscritos:', e); }
+    }
     game.accountLeagueSlots = { ...(game.accountLeagueSlots||{}), [typeId]: null };
     game.registeredTeam = null;   // senão a lista do time que acabou de sair continua na tela
     game.ultimaChecagemDaLiga = 0;     // saiu da liga: o aviso pode voltar a valer, então relê na próxima
@@ -16493,7 +16561,9 @@ function renderLeagueTeamPicker(){
        card que já era a coisa clicável em todo o resto do jogo. O botão do Mewtwo fica FORA dele:
        <button> dentro de <button> é HTML inválido e o clique de dentro se perde (mesma lição do
        card do encontro selvagem). */
-    return `<button class="save-slot-card ${team.length?'has-avg-star':''} clickable" ${game.leagueSubmitting?'disabled':''}
+    /* ⚠️ `=== slot` E NÃO UM TERNÁRIO NO PRÓPRIO SLOT: o slot pode ser 0, que é falsy. */
+    const enviandoEste = game.leagueSubmittingSlot === slot;
+    return `<button class="save-slot-card ${team.length?'has-avg-star':''} clickable${enviandoEste?' enviando':''}" ${game.leagueSubmitting?'disabled':''}
         onclick="registerForLeague(game.currentLeagueTypeId, ${slot})">
       <div class="save-slot-top">
         <span class="team-avg-star" title="Média de nível do time">${STAR_SVG}<span class="team-avg-star-num">${media}</span></span>
@@ -16508,6 +16578,7 @@ function renderLeagueTeamPicker(){
           </div>`;
         }).join('')}
       </div>
+      ${enviandoEste ? '<span class="save-slot-enviando">Inscrevendo…</span>' : ''}
     </button>
 `;
   }).join('')}
@@ -16596,7 +16667,24 @@ async function refreshLeagueView(typeId, includeHistory){
     refreshLeagueHistoriesInBackground(typeId);
   }
   if(game.currentLeagueTypeId !== typeId){ return; }
-  if(game.screen==='league'){ render(); }
+  /* ⚠️ SÓ REDESENHA SE MUDOU (19/09/2026). Este `render()` era incondicional e roda a cada **5
+     segundos** pelo polling: ele recria o HTML inteiro da tela da Liga -- com o Top 10, os dois
+     históricos e o chaveamento -- mesmo quando nada mudou. A Trainers League já tinha a guarda
+     dela (`trainersLeagueLastRenderSignature`); a Clássica ficou sem, e era ela que piscava.
+     ⚠️ A ASSINATURA INCLUI O CONTADOR DE INSCRITOS, e isso é o ponto: durante as inscrições o
+     número é justamente a coisa que muda, e uma assinatura só de id+status deixaria a tela parada
+     enquanto gente entra.
+     ⚠️ E É A PRÓPRIA ASSINATURA QUE FAZ O CASO DO JOGADOR PASSAR, sem precisar de exceção: quando
+     ele se inscreve, `amIRegistered` vira true E `registrantCount` sobe -- os dois estão aqui
+     dentro. O Firestore garante read-your-writes pro mesmo cliente, então a leitura que vem logo
+     depois da gravação já enxerga a própria escrita.
+     ⚠️ O `includeHistory` também passa direto, e isso é a ABERTURA da tela: ali ainda não há
+     assinatura anterior nenhuma, e a tela precisa desenhar de qualquer jeito. */
+  const assinatura = JSON.stringify((data.cycles||[]).map(c=>
+    [c.id, c.status, c.registrantCount, c.amIRegistered, c.leagues ? c.leagues.length : 0]));
+  const mudou = assinatura !== game.leagueLastRenderSignature;
+  game.leagueLastRenderSignature = assinatura;
+  if(game.screen==='league' && (mudou || includeHistory)){ render(); }
 }
 let leagueHistoryRefreshInFlight = false;
 async function refreshLeagueHistoriesInBackground(typeId){
@@ -17211,10 +17299,27 @@ function openSaveSelect(){
      ficaria na tela depois de o jogador ir conquistar a 8a insignia. */
   game.modoBloqueado = null;
   render();
+  /* ⚠️ ESTAS QUATRO ERAM UMA CORRENTE DE `.then()` (19/09/2026), e só UMA das ligações era
+     depêndência de verdade -- as outras três eram sequência por hábito. Cada elo custa um RTT
+     inteiro contra o Firestore, que está em **nam5 (EUA)**: medido do Brasil, ~200 ms por ida.
+     Cinco em série é ~1 s antes de a home mostrar qualquer coisa -- reportado como *"mesmo para
+     carregar as informações na tela home está mais lento"*.
+
+     A ÚNICA corrente real é `loadSaveSlots → loadPermanentUserData`: o segundo **lê
+     `game.saveSlots`** pra unir a Pokédex dos saves com a permanente da conta. As outras duas são
+     independentes -- conferido, nenhuma toca `saveSlots` (as duas são callables que leem do
+     servidor). Elas passam a correr junto com o resto do `Promise.all` que já existia aqui.
+
+     ⚠️ E O `reconcileLeagueWinsFromHistory` SAIU DA HOME. Ele varre o histórico INTEIRO --
+     `LEAGUE_HISTORY_RETENTION = 48` ciclos POR TIPO de liga, mais um `scheduleDocRef.get()`
+     sequencial por tipo: até ~98 documentos a cada visita. E ele é, pelo próprio comentário dele,
+     uma **rede de segurança pra uma Cloud Function que já faz o trabalho**. Ele continua rodando
+     ao ABRIR A LIGA, que é onde o número que ele conserta aparece -- e o total mostrado na home
+     continua certo, porque ele vem do documento do usuário pelo `loadPermanentUserData`. */
   Promise.all([
-    loadSaveSlots().then(loadPermanentUserData).then(syncSpecialties).then(reconcileLeagueWinsFromHistory).then(()=>{
-      return loadMyActiveGymDefenses();
-    }),
+    loadSaveSlots().then(loadPermanentUserData),
+    syncSpecialties(),
+    loadMyActiveGymDefenses(),
     loadLeagueLeaderboard().then(lb=>{ game.leagueLeaderboard = lb; }),
     loadNotificationsUnreadCount(),
     /* ⚠️ O AVISO DA LIGA PASSOU A SER CALCULADO NA HOME. Ele só rodava dentro do `runBattle`, pra o
@@ -28049,7 +28154,9 @@ function renderInscricaoLigaModal(){
            fileira de sprites. É por ele que o jogador reconhece um time, e um formato próprio aqui
            obrigaria a reaprender a ler no meio da decisão. */
         const media = time.length ? Math.round(time.reduce((a, p) => a + (p.level || 0), 0) / time.length) : 0;
-        return `<button class="save-slot-card ${time.length ? 'has-avg-star' : ''} clickable" ${game.leagueSubmitting ? 'disabled' : ''}
+        /* o mesmo feedback do picker da Liga -- as duas telas inscrevem pelo mesmo caminho */
+        const enviandoEste = game.leagueSubmittingSlot === slot;
+        return `<button class="save-slot-card ${time.length ? 'has-avg-star' : ''} clickable${enviandoEste ? ' enviando' : ''}" ${game.leagueSubmitting ? 'disabled' : ''}
             onclick="registerForLeague(CLASSIC_LEAGUE_TYPE, ${slot}, true)">
           <div class="save-slot-top">
             <span class="team-avg-star" title="Média de nível do time">${STAR_SVG}<span class="team-avg-star-num">${media}</span></span>
