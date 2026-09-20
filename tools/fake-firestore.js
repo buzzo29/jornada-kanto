@@ -144,6 +144,19 @@ function collRef(parts, filtros, limite, ordem, depoisDe, soIds){
        pagina -- o `startAfter` era ignorado e o teste da segunda pagina via a mesma coisa da
        primeira, o que se le como "funciona". */
     startAfter(v){ return collRef(parts, filtros, limite, ordem, v, soIds); },
+    /* ⚠️ A AGREGAÇÃO `count()` DO SERVIDOR. Ela existe no Admin SDK desde a v11 e é o que permite
+       contar uma coleção por ~1 leitura em vez de uma por documento -- é nela que o cron da Liga
+       se apoia pra reconciliar o contador de inscritos.
+       Sem ela aqui, qualquer função que a use morre com "count is not a function" e a trava dá
+       vermelho por um motivo que não é o do jogo. É a mesma lição do `increment` dentro de mapa,
+       do `arrayUnion`, do `FieldPath.documentId()` e do `getAll` da transação: o dublê tem que
+       fazer o que o de verdade faz.
+       ⚠️ E ela devolve `{ data: () => ({ count }) }`, que é a forma do `AggregateQuerySnapshot` --
+       um número cru aqui deixaria o teste passar com um código que a produção recusa. */
+    count(){
+      const consulta = collRef(parts, filtros, limite, ordem, depoisDe, soIds);
+      return { async get(){ const s = await consulta.get(); return { data: () => ({ count: s.size }) }; } };
+    },
     async get(){
       let docs = [];
       for(const [caminho, dados] of store){

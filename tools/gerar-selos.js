@@ -357,6 +357,22 @@ selo('medalha_ouro',   medalha('y', 'o'));
 selo('medalha_prata',  medalha('s', 'z'));
 selo('medalha_bronze', medalha('f', 'h'));
 
+/* ⚠️ O ANZOL, e não uma vara: a vara inteira num selo de 24px vira um risco diagonal e
+   nada mais. O anzol tem silhueta própria -- a haste reta, a curva em J e a farpa -- e é o que
+   se reconhece de relance. A linha sai do topo, que é o que o liga à ideia de pescar. */
+selo('pescaria', t => {
+  /* a linha, fina, descendo do topo */
+  pintar(t, retangulo(11, 1, 2, 5), 's');
+  /* a haste do anzol */
+  pintar(t, retangulo(10.5, 5, 3, 9), 'z');
+  /* a curva em J: um anel grosso, cortado na metade de cima pra virar U */
+  pintar(t, menos(menos(circulo(9, 15.5, 5.6), circulo(9, 15.5, 2.9)),
+                  retangulo(0, 0, 24, 15.5)), 'z');
+  /* a subida do outro lado do U, e a farpa */
+  pintar(t, retangulo(3.4, 12, 3, 4), 'z');
+  pintar(t, poligono([[3, 9], [7.5, 13], [3.5, 13]]), 'z');
+});
+
 selo('trofeu', t => {   /* taca com alcas, haste e base */
   pintar(t, uniao(retangulo(6, 3, 12, 7), elipse(12, 10, 6, 5)), 'y');
   pintar(t, uniao(menos(circulo(5.5, 7.5, 3.6), circulo(5.5, 7.5, 1.9)),

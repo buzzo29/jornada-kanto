@@ -509,6 +509,79 @@ console.log('\n=== OS GOLPES ESCOLHIDOS CHEGAM NA LIGA E NO ONLINE (16/09/2026) 
   }
 }
 
+  /* ============================================================================
+     ⚠️ O CONTADOR DE INSCRITOS DA LIGA CLÁSSICA (20/09/2026)
+     ============================================================================
+     Reportado assim: *"entrei para ver a liga clássica e estava com 4 treinadores inscritos, após
+     eu me inscrever, o numero caiu para 1"*. Lido dos dados de produção: o documento do ciclo
+     tinha `registrantCount: 1` e a coleção `registrants` tinha **5 documentos** -- ninguém foi
+     apagado, só o número estava errado. O `createTime` do documento entregou a causa: ele nasceu
+     no instante da 5ª inscrição, e `increment` sobre campo que NÃO EXISTE começa do zero.
+
+     Os quatro primeiros estavam em ABAS ABERTAS de antes do deploy -- e é essa a lição: um
+     contador mantido só pelo CLIENTE nunca é confiável, porque sempre existe cliente velho em
+     cache. Hoje quem manda nele é o servidor, de minuto em minuto.
+     ============================================================================ */
+  {
+    const typeId = fns._CLASSIC_LEAGUE_TYPE || 'classic';
+    const cicloId = '9999000000';
+    const cycleRef = db.collection('leagueCycles').doc(typeId + '__' + cicloId);
+    const insc = cycleRef.collection('registrants');
+    /* o cenário do relato: QUATRO inscritos e NENHUM contador (o documento do ciclo nem existe) */
+    for(const nome of ['ana', 'bruno', 'caio', 'duda']) await insc.doc(nome).set({ name: nome });
+    let snap = await cycleRef.get();
+    ok('o cenário do relato: 4 inscritos e o documento do ciclo sem contador',
+       !snap.exists || typeof (snap.data() || {}).registrantCount !== 'number');
+
+    /* é isto que a inscrição do cliente faz -- e é o defeito: increment sobre campo inexistente */
+    await cycleRef.set({ registrantCount: fake.FieldValue.increment(1) }, { merge: true });
+    await insc.doc('fausto').set({ name: 'fausto' });
+    snap = await cycleRef.get();
+    ok('  o increment sobre campo que não existe grava 1 (a causa, reproduzida)',
+       snap.data().registrantCount === 1, 'registrantCount=' + snap.data().registrantCount);
+    const real = (await insc.get()).size;
+    ok('  enquanto a coleção tem 5 -- ninguém foi apagado', real === 5, real + ' inscritos');
+
+    /* ⚠️ O CRON RECONCILIA, e é ele o dono do número */
+    const mudou = await fns._reconciliarContadorDeInscritos(typeId, { id: cicloId });
+    snap = await cycleRef.get();
+    ok('o cron ajusta o contador pro número de verdade', snap.data().registrantCount === 5,
+       'registrantCount=' + snap.data().registrantCount);
+    ok('  e ele avisa que mexeu', mudou === true);
+
+    /* ⚠️ E NÃO ESCREVE À TOA: ler antes de escrever é o que evita 1.440 escritas por dia num
+       documento que quase nunca muda -- escrita custa 3× mais que leitura no Firestore. */
+    const antes = (await cycleRef.get()).updateTime;
+    const denovo = await fns._reconciliarContadorDeInscritos(typeId, { id: cicloId });
+    ok('  e não escreve de novo quando já está certo', denovo === false);
+
+    /* o desvio pro outro lado (um cancelamento de cliente velho, que não decrementa) */
+    await insc.doc('ana').delete();
+    await fns._reconciliarContadorDeInscritos(typeId, { id: cicloId });
+    snap = await cycleRef.get();
+    ok('  e conserta o desvio pra baixo também', snap.data().registrantCount === 4,
+       'registrantCount=' + snap.data().registrantCount);
+
+    /* ⚠️ ELE CONTA PELO SERVIDOR, não varrendo: com 100 inscritos a varredura custaria 100
+       leituras por minuto. A trava LÊ O CÓDIGO porque o fake não cobra leitura. */
+    const fonte = require('fs').readFileSync('functions/index.js', 'utf8');
+    const f = fonte.slice(fonte.indexOf('async function reconciliarContadorDeInscritos'),
+                          fonte.indexOf('async function advanceLeagueOnceForType'));
+    ok('  (a fatia da função tem o que ler)', f.length > 200 && f.length < 2000, f.length + ' chars');
+    ok('  e ele usa a agregação count() do servidor', /\.count\(\)\.get\(\)/.test(f));
+    ok('  sem varrer a coleção', !/registrantsCollRef\([^)]*\)\.get\(\)/.test(f));
+
+    /* ⚠️ E O CRON O CHAMA -- os casos acima chamam a função na mão e passariam com a chamada órfã */
+    const doCron = fonte.slice(fonte.indexOf('async function advanceLeagueOnceForType'),
+                               fonte.indexOf('exports.advanceLeague'));
+    ok('  (a fatia do cron tem o que ler)', doCron.length > 500, doCron.length + ' chars');
+    ok('o cron chama a reconciliação no ciclo ABERTO',
+     /else if\(entry\.status===.registering.\)\{[\s\S]{0,600}?reconciliarContadorDeInscritos/.test(doCron));
+
+    await insc.doc('bruno').delete(); await insc.doc('caio').delete();
+    await insc.doc('duda').delete(); await insc.doc('fausto').delete();
+  }
+
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
   process.exit(falhas ? 1 : 0);
 })();

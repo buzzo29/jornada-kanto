@@ -239,21 +239,39 @@ async function multidao(){
      ⚠️ E UMA INVESTIDA PODE SAIR COM DANO ZERO (o time todo cai sem conectar um golpe), entao o laco
      guarda o menor dano NAO NULO e tem teto de voltas -- sem o teto, uma raide mal calibrada trava
      o teste em vez de acusar. */
-  let menorDano = Infinity, voltas = 0;
+  /* ⚠️ E O TETO DE PARADA OLHA A MAIOR INVESTIDA, não só a menor -- senão o laço MATA o Mew.
+     Ele parava em `N x menorDano`, e isso só era seguro enquanto esse número ficasse acima da
+     MAIOR investida já vista (o comentário acima registra 130 contra 68). Quando a raide ficou
+     mais variável, a menor caiu pra 2: o teto virou 20, a investida seguinte tirava 68, e a leva
+     estourava com "O Mew já foi derrotado" -- 3 rodadas em 8.
+     Hoje ele para quando a vida CABE na maior investida conhecida, ou seja quando atacar de novo
+     poderia matar. O que sobra é sempre `> 0`, que é o que a trava do fio de vida cobra. */
+  let menorDano = Infinity, maiorDano = 0, voltas = 0;
   while(voltas++ < 8000){
     const hpAgora = (await doc()).hp;
     if(menorDano < Infinity && hpAgora <= N * menorDano) break;
+    if(maiorDano > 0 && hpAgora <= maiorDano) break;
     const inv = await chamar('fightSundayBoss', 'm0', { slot:'0' });
     if(inv.dano > 0 && inv.dano < menorDano) menorDano = inv.dano;
+    if(inv.dano > maiorDano) maiorDano = inv.dano;
   }
   {
     const hpFio = (await doc()).hp;
     ok('o Mew chegou a um fio de vida, sem o laco derruba-lo',
-       hpFio > 0 && menorDano < Infinity && hpFio <= N * menorDano,
-       'vida ' + hpFio + ', menor investida ' + menorDano + ', teto ' + (N * menorDano));
+       hpFio > 0 && menorDano < Infinity && hpFio <= Math.max(N * menorDano, maiorDano),
+       'vida ' + hpFio + ', investida menor ' + menorDano + ' maior ' + maiorDano +
+       ', teto ' + Math.max(N * menorDano, maiorDano));
   }
-  antes = (await doc()).hp;
-  r = await todos();
+  /* ⚠️ E A LEVA INSISTE ATÉ DERRUBAR. Com o laço parando na MAIOR investida (acima), a vida que
+     sobra pode ser maior que `N x menorDano` -- e aí uma leva só pode não dar conta. As travas
+     abaixo valem pra a leva que MATOU, que é a que elas querem descrever; as anteriores só
+     desbastaram. O teto existe pra uma raide mal calibrada acusar em vez de travar o teste. */
+  let levas = 0;
+  do {
+    antes = (await doc()).hp;
+    r = await todos();
+  } while((await doc()).hp > 0 && ++levas < 50);
+  ok('a leva derrubou (em ' + (levas + 1) + ' leva(s))', (await doc()).hp === 0);
   const max = (await doc()).maxHp;
   ok('o Mew cai e nao fica negativo', (await doc()).hp === 0);
   ok('exatamente UM jogador derruba', r.filter(x=>x.derrubou).length === 1,

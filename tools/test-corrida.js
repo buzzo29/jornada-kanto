@@ -90,12 +90,18 @@ console.log('\n=== O SPEED É O DO JOGO, COM NÍVEL ===');
   contaDeTeste();
   const inst = (id, lv, ex) => { const p = S.createInstance(id, lv); Object.assign(p, ex || {}); p.hp = p.maxHp = S.calcMaxHp(p); return p; };
 
-  /* ⚠️ O NÍVEL ENTRA, e é a razão de esta função existir: medido antes de escrever, o
-     `effectiveSpeed` do motor devolve o MESMO número no Lv.5 e no Lv.99 -- no jogo só o HP escala
-     com o nível. A fórmula é a oficial da Gen 1/2/3, sem IV nem EV. */
-  ok('o effectiveSpeed do motor IGNORA o nível (é por isso que a escala existe)',
-     S.effectiveSpeed(inst('jolteon', 5)) === S.effectiveSpeed(inst('jolteon', 99)),
-     'ele passou a escalar -- reveja se a escala da corrida ainda é necessária');
+  /* ⚠️ ESTA TRAVA DIZIA O CONTRÁRIO ATÉ 20/09/2026, e a inversão dela é o registro da mudança:
+     a escala de nível NASCEU aqui, em 18/09, porque o motor de batalha não tinha nenhuma -- o
+     `effectiveSpeed` devolvia o MESMO número no Lv.5 e no Lv.99. Dois dias depois ela virou a regra
+     do motor inteiro (a fórmula da Gen 3), e o `speedDaCorrida` passou a ser o próprio
+     `effectiveSpeed`: mantida a conta antiga, a corrida escalaria DUAS vezes.
+     A mensagem de falha aponta pro lugar certo se alguém desfizer um dos dois lados. */
+  ok('o effectiveSpeed do motor ESCALA com o nível (a corrida não escala de novo)',
+     S.effectiveSpeed(inst('jolteon', 5)) < S.effectiveSpeed(inst('jolteon', 99)),
+     'se ele parou de escalar, o speedDaCorrida precisa da escala de volta');
+  ok('  e o speedDaCorrida é exatamente ele',
+     S.speedDaCorrida(inst('jolteon', 70)) === S.effectiveSpeed(inst('jolteon', 70)),
+     String(S.speedDaCorrida(inst('jolteon', 70))));
   const s5 = S.speedDaCorrida(inst('jolteon', 5)), s50 = S.speedDaCorrida(inst('jolteon', 50)), s99 = S.speedDaCorrida(inst('jolteon', 99));
   ok('e o Speed da corrida escala', s5 < s50 && s50 < s99, [s5, s50, s99].join(' < '));
   ok('no Lv.50 ele fica perto do base (a escala do protótipo)', Math.abs(s50 - (SP.jolteon.speed + 5)) < 1,
@@ -105,12 +111,15 @@ console.log('\n=== O SPEED É O DO JOGO, COM NÍVEL ===');
 
   /* ⚠️ QUAIS MODIFICADORES ENTRAM: o shiny e a especialidade, porque o `effectiveSpeed` os aplica
      e a instância da corrida nasce LIMPA -- os outros degraus (terreno, fúria, paralisia, estágio)
-     são no-op por construção. */
+     são no-op por construção.
+     ⚠️ E ELES ENTRAM DEPOIS DA ESCALA desde 20/09/2026, que é a ordem do jogo original: a fórmula
+     produz o ATRIBUTO, e o shiny multiplica ELE. Antes eles entravam na base e o `+5` da fórmula
+     era multiplicado junto -- medido no Jolteon Lv.50 shiny: 161 antes, 162 depois. */
   const normal = S.speedDaCorrida(inst('jolteon', 50));
   const shiny = S.speedDaCorrida(inst('jolteon', 50, { shiny: true }));
   ok('o SHINY entra (1,20×)', shiny > normal, normal + ' -> ' + shiny);
   ok('e ele é exatamente o 1,20× do atributo',
-     shiny === Math.floor(Math.round(SP.jolteon.speed * 1.20) * 2 * 50 / 100) + 5, String(shiny));
+     shiny === Math.round((Math.floor(SP.jolteon.speed * 2 * 50 / 100) + 5) * 1.20), String(shiny));
   /* ⚠️ A ESPECIALIDADE SÓ ENTRA PELO `corridaInstancia`, e esta trava já mediu errado: ela usava
      uma instância CRUA do `createInstance`, e o `withSpecialty` lê a FLAG `specialtyBuffed` --
      quem a põe é o `applySpecialtyBuff`. Medindo a instância crua, a trava dizia "não entra"

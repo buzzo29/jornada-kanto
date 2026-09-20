@@ -812,8 +812,11 @@ function withSpecialty(v, p){ return p.specialtyBuffed ? Math.round(v * SPECIALT
    O do HP entra no effectiveBaseHp, então mexe no TETO de vida (calcMaxHp) e também no gen1MaxHp,
    que é o divisor do dano: mais vida também significa tomar uma fração menor por golpe, que é o
    que mais vida tem que significar.
-   NÃO tem Velocidade: ela entra na taxa de crítico (velocidade/512, regra da Gen 1), e um item de
-   30 moedas mexendo na frequência de crítico é outro tipo de item -- não foi pedido. */
+   NÃO tem Velocidade, e ⚠️ a RAZÃO que estava escrita aqui venceu: ela dizia que a velocidade
+   alimenta a taxa de crítico, o que deixou de ser verdade em 10/09/2026 (o crítico virou estágio
+   da Gen 3 e não olha velocidade). A razão de hoje é outra e é maior: desde 20/09/2026 a
+   velocidade decide QUEM ABRE O CONFRONTO e escala com o nível, então um item que a mexesse
+   mudaria a ORDEM da troca -- a coisa mais sensível do motor. Não foi pedido. */
 const BONUS_DE_ATRIBUTO = 15;
 const ITENS_DE_ATRIBUTO = {
   hp_up:    'baseHp',
@@ -871,10 +874,16 @@ function effectiveSpDef(p){
           : (sp && typeof sp.spDef === 'number') ? sp.spDef : 50;
   return withEstagio(withFuria(withItemStat(withSpecialty(withBuffs(v, p), p), p, 'spDef'), p), p, 'spDef');
 }
+/* A FÓRMULA DA GEN 3 -- a cópia do cliente tem a nota inteira; as duas TÊM que ser idênticas. */
 function effectiveSpeed(p){
-  // a velocidade buffada entra também na chance de crítico (rng < speed/512, regra da Gen 1):
-  // quem está no terreno do tipo dele critica mais, além de bater mais forte
-  const v = (typeof p.speed === 'number') ? p.speed : ((SPECIES[p.speciesId] && SPECIES[p.speciesId].speed) || 50);
+  // instâncias salvas ANTES da velocidade existir não têm o campo -- cai pro valor da espécie
+  const base = (typeof p.speed === 'number') ? p.speed : ((SPECIES[p.speciesId] && SPECIES[p.speciesId].speed) || 50);
+  /* ⚠️ É O MESMO `statAtLevel` QUE OS OUTROS CINCO ATRIBUTOS JÁ USAVAM no cálculo de dano, e isso
+     não é economia de linha: escrita à mão aqui, a fórmula divergiria da deles no primeiro ajuste.
+     ⚠️ E É ELE QUE MOSTRA QUE ISTO ERA UMA LACUNA, não uma decisão: o cabeçalho do motor sempre
+     disse "o nível entra pelos ATRIBUTOS (2*base*L/100+5, como no jogo real)" -- a velocidade era a
+     ÚNICA que nunca passava por ele, porque é a única que não entra numa fórmula de dano. */
+  const v = statAtLevel(base, p.level || 1);
   return withEstagio(withParalisia(withFuria(withSpecialty(withBuffs(v, p), p), p), p), p, 'speed');
 }
 function calcMaxHp(p){ return Math.round(30 + p.level*5 + effectiveBaseHp(p)); }
@@ -4361,6 +4370,49 @@ async function advanceCyclePhases(typeId, cycleEntry, leagueTypeConfig, leagueTy
 /* ---------------------------------------------------
    FUNÇÃO AGENDADA — roda a cada minuto
 --------------------------------------------------- */
+/* ⚠️ O CONTADOR DE INSCRITOS TEM DONO NO SERVIDOR, e isso não é zelo -- é o conserto de um defeito
+   que foi pro ar em 19/09/2026 e foi reportado no dia seguinte: *"entrei para ver a liga clássica e
+   estava com 4 treinadores inscritos, após eu me inscrever, o numero caiu para 1"*.
+
+   O QUE ACONTECEU, lido dos dados de produção: o documento do ciclo tinha `registrantCount: 1` e a
+   coleção `registrants` tinha **5 documentos**. Ninguém foi apagado -- só o número estava errado.
+   E o `createTime` do documento entregou a causa: ele foi criado **no instante da 5ª inscrição**.
+
+   ⚠️ A RAIZ É O `increment` SOBRE CAMPO QUE NÃO EXISTE: o Firestore o trata como ZERO. Os quatro
+   primeiros inscritos estavam em ABAS ABERTAS de antes do deploy -- o `index.html` vai com
+   `no-cache`, mas aba aberta continua com o código velho até o F5 --, então eles escreveram na
+   subcoleção sem tocar no contador. O quinto, num carregamento novo, criou o documento em 1.
+
+   ⚠️ E A LIÇÃO É MAIOR QUE O CASO: um contador mantido SÓ pelo cliente nunca é confiável, porque
+   sempre existe cliente velho em cache. O mesmo vale pro `increment(-1)` do cancelamento.
+   Por isso quem manda nele agora é o SERVIDOR: o cron roda de minuto em minuto e reconcilia o
+   ciclo ABERTO, então qualquer desvio -- de cliente velho, de documento que nasceu tarde, do que
+   vier -- se conserta sozinho em no máximo 60 segundos.
+
+   ⚠️ E ELE CONTA PELO SERVIDOR (`.count()`), não varrendo a coleção: a agregação custa ~1 leitura
+   em vez de uma por inscrito. É exatamente o `getCountFromServer` que o SDK compat do CLIENTE não
+   tem (ver o `countRegistrants` do index.html) -- o Admin SDK tem desde a v11, e aqui é ele.
+   Custo: 2 leituras por minuto (a contagem e o documento), ~2.900 por dia.
+   ⚠️ Ele LÊ ANTES DE ESCREVER de propósito: escrita custa 3× mais que leitura no Firestore, e sem
+   isso seriam 1.440 escritas por dia num documento que quase nunca muda. */
+async function reconciliarContadorDeInscritos(typeId, entry){
+  try{
+    const agg = await registrantsCollRef(typeId, entry.id).count().get();
+    const real = agg.data().count;
+    const snap = await cycleDocRef(typeId, entry.id).get();
+    const atual = snap.exists && typeof snap.data().registrantCount === 'number'
+      ? snap.data().registrantCount : null;
+    if(atual === real) return false;
+    await cycleDocRef(typeId, entry.id).set({ registrantCount: real }, { merge: true });
+    logger.info(`Contador de inscritos ajustado (${typeId}/${entry.id}): ${atual} -> ${real}`);
+    return true;
+  } catch(e){
+    /* best-effort: um contador desatualizado é um número feio na tela, não uma liga quebrada --
+       e o `countRegistrants` do cliente ainda cai na varredura quando o campo não existe. */
+    logger.error(`Erro ao reconciliar o contador de inscritos (${typeId}):`, e);
+    return false;
+  }
+}
 async function advanceLeagueOnceForType(typeId, typeConfig){
   let anyChanged = false;
   try{
@@ -4393,6 +4445,12 @@ async function advanceLeagueOnceForType(typeId, typeConfig){
       if(entry.status==='registering' && now >= entry.scheduledTime){
         const ok = await drawCycle(typeId, entry, typeConfig);
         if(ok) anyChanged = true;
+      } else if(entry.status==='registering'){
+        /* ⚠️ O CICLO AINDA ABERTO: é o único que aceita inscrição, e por isso o único cujo contador
+           pode estar desviando agora. Ver o `reconciliarContadorDeInscritos`. Ele NÃO marca
+           `anyChanged`: ajustar um número não é "avançar a liga", e conflar os dois faria o log do
+           cron dizer que avançou quando ele só arrumou uma contagem. */
+        await reconciliarContadorDeInscritos(typeId, entry);
       } else if(entry.status==='drawn'){
         const ok = await advanceCyclePhases(typeId, entry, typeConfig, typeConfig.name);
         if(ok) anyChanged = true;
@@ -5224,10 +5282,12 @@ exports._chaveDoEquipado = chaveDoEquipado;
 exports._createInstance = createInstance;
 exports._makeSeededRng = makeSeededRng;
 /* Gancho de teste do Boss de Domingo -- ver BOSS_ATIVO. */
-exports._boss = { ativo(v){ if(v !== undefined) BOSS_ATIVO = !!v; return BOSS_ATIVO; } };
+exports._boss = { ativo(v){ if(v !== undefined) BOSS_ATIVO = !!v; return BOSS_ATIVO; },
+                  instancia: bossInstance, nivel: () => BOSS_LEVEL, maxHp: () => BOSS_MAX_HP };
 exports._golpesEspeciais = { AUTODESTRUICAO, SONIFEROS, METRONOMO, CHANCE_AUTODESTRUICAO, CHANCE_SONO, SONO_EM_TROCAS, sorteiaTrocasDeSono, MULTI_GOLPE, ataquesDisponiveis, GOLPES_CRIT_ALTO, FURIA, CHANCE_FURIA, FURIA_BONUS, sorteiaGolpeDoMetronomo, POOL_METRONOMO, CONFUSAO, CHANCE_CONFUSAO, DANCA_ESPADAS, DANCA_PLUMA, CHANCE_DANCA, DANCA_ESPADAS_MULT, DANCA_PLUMA_MULT, FURIA_DRAGAO, CHANCE_FURIA_DRAGAO, FURIA_DRAGAO_DANO, CHUVA, CHANCE_CHUVA, CHUVA_EM_CONFRONTOS, CHUVA_MULT, CHUVA_GOLPE_MULT, multDaChuva, estaChovendo, tentarChuva, limparClima, GOLPES_DRENO, GOLPES_SO_DORMINDO };
 exports._apagarSubcolecoes = apagarSubcolecoes;   // testado direto: no ar ele roda dentro da poda
 exports._SUBCOLECOES_DO_CICLO = SUBCOLECOES_DO_CICLO;
+exports._reconciliarContadorDeInscritos = reconciliarContadorDeInscritos;
 exports._trainersLeagueSplitGroups = trainersLeagueSplitGroups;
 exports._trainersLeagueGatherEligibleCodes = trainersLeagueGatherEligibleCodesForUid;
 exports._decodeTeamCode = decodeTeamCode;
@@ -10004,10 +10064,33 @@ const BOSS_BASE = { baseHp:100, attack:100, defense:100, spAtk:100, spDef:100, s
    duracao e o BOSS_LEVEL. Mas trocar EXIGE apagar globalBoss/mew: o maxHp fica gravado no
    documento, e o doc antigo continuaria valendo o valor velho. */
 const BOSS_MAX_HP = calcMaxHp({ level: BOSS_LEVEL, baseHp: BOSS_BASE.baseHp });
+/* ⚠️ A VELOCIDADE DO CHEFE É UM DIAL, e ela passou a PRECISAR de um em 20/09/2026, quando a
+   velocidade do jogo passou a escalar com o nível (a fórmula da Gen 3, ver `effectiveSpeed`).
+
+   O NÍVEL 4999 NUNCA FOI UMA AFIRMAÇÃO SOBRE O BICHO: ele é o dial que dá os 25.125 de HP e que
+   divide o dano por ataque. Enquanto a velocidade não escalava, isso não tinha efeito nenhum sobre
+   ela -- o chefe ficava com os 100 crus da espécie, e os pokémon rápidos do time batiam antes dele.
+
+   ⚠️ COM A ESCALA, O MESMO 4999 DAVA VELOCIDADE 10.003 -- mais que o jogo inteiro somado. Medido:
+   o Mew matava os SEIS antes de qualquer um agir, e uma investida tirava **ZERO** de dano. A raide
+   ficava matematicamente inganhável, e em silêncio: nada dá erro, o ataque só não machuca.
+
+   ⚠️ E NÃO HÁ DIAL QUE REPRODUZA A CALIBRAGEM ANTIGA, porque a velocidade do TIME também mudou:
+   um Jolteon Lv.70 era 130 e virou 187. O que este dial faz é pôr o chefe de volta numa faixa em
+   que a luta acontece -- ele se comporta como um Mew de nível `BOSS_SPEED_COMO_NIVEL`.
+   ⚠️ A RAIDE CONTINUA DESCALIBRADA, e isso é anterior a esta linha: desde 15/09/2026, quando o
+   golpe moribundo acabou, ela já precisava de recalibragem (o CLAUDE.md registra 3,2× mais lenta).
+   Ela está DESLIGADA (`BOSS_ATIVO`) e precisa ser recalibrada antes de voltar -- este dial impede
+   que ela volte INGANHÁVEL, não a conserta.
+
+   ⚠️ ELE FICA FORA DO `BOSS_BASE` de propósito: aquele objeto são os atributos OFICIAIS do Mew
+   (100 em tudo, Gen 2), e sobrescrever a velocidade lá faria a tabela mentir sobre a espécie. */
+const BOSS_SPEED_COMO_NIVEL = 50;
+const BOSS_SPEED_DIAL = Math.max(1, Math.round(100 * BOSS_SPEED_COMO_NIVEL / BOSS_LEVEL));
 function bossInstance(hpAtual){
   return Object.assign({ id:'boss-mew', speciesId:BOSS_ID, name:'Mew', types:['Psychic'],
                          level:BOSS_LEVEL, maxHp:BOSS_MAX_HP, hp:hpAtual, shiny:false },
-                       BOSS_BASE);
+                       BOSS_BASE, { speed: BOSS_SPEED_DIAL });
 }
 function bossDocRef(){ return db.collection('globalBoss').doc(BOSS_ID); }
 function bossPlayerRef(uid){ return bossDocRef().collection('players').doc(uid); }

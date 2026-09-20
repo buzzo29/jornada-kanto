@@ -155,7 +155,27 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
   salva o resto — 69 espécies têm um tipo alternativo pra recorrer.
   No log isso aparece como "**mas não teve efeito**", com o −1 do piso: sem essa frase o jogador
   vê um −1 solto e procura bug onde é regra.
-- Velocidade alta é mais valiosa do que parece, porque entra na taxa de crítico (ver acima).
+- **A VELOCIDADE ESCALA COM O NÍVEL desde 20/09/2026, e é a FÓRMULA OFICIAL DA GEN 3:**
+  `floor( (2×Base + IV + floor(EV/4)) × Nível / 100 ) + 5` — e como o jogo não tem IV, EV nem
+  natureza, sobra `floor(2×Base × Nível / 100) + 5`. Ela é a mesma que a Corrida já usava.
+  **⚠️ ATÉ AQUI ELA NÃO ESCALAVA, e era o último desvio de regra do motor**: um Jolteon Lv.5 e um
+  Lv.99 devolviam **130 igual**. Passou despercebido porque a velocidade é o **único atributo que
+  não entra numa fórmula** — os outros cinco entram no cálculo de dano, onde o nível já estava.
+  Ela entra numa **COMPARAÇÃO**, e comparar dois valores de base ignora o nível por completo.
+  **O que isso produzia:** um Jolteon **Lv.5** batia antes de um Snorlax **Lv.99** (130 contra 30;
+  na Gen 3 é 18 contra 64), e um Raichu Lv.64 **empatava** com um Tentacruel Lv.80 (os dois base
+  100) — o que fazia o desempate ser sorteado a cada troca e o log mostrar o mesmo pokémon atacando
+  duas vezes seguidas. Foi esse o relato que trouxe a mudança. Na Gen 3 seriam 133 contra 165.
+  **⚠️ O NÍVEL ENTRA ANTES DOS MULTIPLICADORES**, que é a ordem do original: a fórmula produz o
+  ATRIBUTO, e paralisia (×0,25), estágio e os nossos shiny/terreno/fúria são modificadores DELE.
+  Invertendo, o `+5` da fórmula seria multiplicado junto.
+  **⚠️ E ELA SÓ É LIDA EM COMPARAÇÃO**, o que é o que torna a mudança contida: os três pontos do
+  motor que a usam são a ordem da troca, a ordem do sorteio de especial e a do Remoinho. Nenhuma
+  conta de dano a lê.
+- **⚠️ E A VELOCIDADE NÃO ALIMENTA MAIS O CRÍTICO — esta linha dizia que sim, e estava caduca desde
+  10/09/2026**, quando o crítico virou os estágios da Gen 3 (1/16 fixo, 1/8 nos oito golpes de
+  crítico alto). Hoje o `chanceDeCritico` só olha o GOLPE. O mesmo texto vencido estava no
+  comentário do `effectiveSpeed` nos dois motores, e saiu junto.
 - **A especialidade vale 1,05× em todos os atributos, e agora tem selo.** Era **1,01×**, e a conta
   não fechava com o preço: 50 pokémon levados ao nível 65 são meses de jogo, e o retorno era **+1
   ponto de ataque** num Nidoking nível 60 (92 → 93). Os jogadores reclamaram que "não mudou nada" e
@@ -7067,9 +7087,11 @@ venda, do mesmo jeito.
 - **O HP Up entra no `effectiveBaseHp`**, então mexe no TETO de vida (`calcMaxHp`) **e** no
   `gen1MaxHp`, que é o divisor do dano: mais vida também significa tomar uma fração menor da barra
   por golpe, que é o que mais vida tem que significar.
-- **NÃO existe Speed Up**, e não é esquecimento: a velocidade entra na taxa de crítico
-  (velocidade/512, regra da Gen 1), e um item de 30 moedas mexendo na frequência de crítico é outro
-  tipo de item. Não foi pedido.
+- **NÃO existe Speed Up**, e não é esquecimento — mas ⚠️ **a RAZÃO que estava escrita aqui venceu**.
+  Ela dizia que a velocidade entra na taxa de crítico, e isso deixou de ser verdade em 10/09/2026,
+  quando o crítico virou os estágios da Gen 3. **A razão de hoje é outra e é maior:** desde
+  20/09/2026 a velocidade decide **quem abre o confronto** e escala com o nível — um item que a
+  mexesse mudaria a ORDEM da troca, que é a coisa mais sensível do motor. Não foi pedido.
 - **O time da jornada é sincronizado assim que os equipados mudam** (`equiparItens` no carregamento
   da conta, ao equipar, ao tirar e ao gastar). Sem isso o `p.item` da instância só era escrito no
   começo da batalha — e o `calcMaxHp` roda FORA dela (distribuição de níveis, Doce Raro), então a
@@ -7438,7 +7460,8 @@ falando 'Para enfrentar o primeiro ginásio, você deve ter no mínimo 2 pokémo
   **Atinge 107 dos 112 degraus de evolução (96%)**, desvio médio de 20,8 pontos, pior caso 70
   (Sentret 20 → Furret 90). **101 degraus aceleram** (+20,5 em média) e só **6 desaceleram** (−25,0),
   então o efeito é quase todo a favor do jogador — e a velocidade não decide só quem bate primeiro:
-  ela entra na taxa de crítico (velocidade/512, regra da Gen 1).
+  ela decide quem abre o confronto (e ⚠️ **a versão antiga desta linha dizia "a taxa de crítico",
+  o que venceu em 10/09/2026** — hoje o crítico é por estágio e não olha velocidade).
   **Custo medido: +1,0 ponto de conclusão** (68,6% contra 67,6%, 12.000 jornadas de cada lado,
   1,6σ) — dentro do ruído do simulador, e para o lado fácil, que é o esperado.
   Achado varrendo os saves de produção, não por teste. Hoje `tools/test-pos-batalha.js` confere os
@@ -12574,6 +12597,631 @@ hoje não existe — **gravar resultado**, que é a primeira coisa que vai preci
 checagem de permissão do lado de lá.
 
 
+## PESCARIA POKÉMON — o segundo teste admin (19/09/2026)
+
+Pedida com o `pescaria-pokemon.html` da raiz como referência, e com **quatro coisas mudadas** em
+relação a ele: a lista de parceiros passa a ser a do jogo (paginada, por nível), o NPC passa a ser
+sorteado (Lv.65, BST acima de 500), e — a principal — *"mude exatamente para ser a mesma mecanica
+que a gente usa hoje nas batalhas da jornada, vai ser 1x1, e se o pokemon do treinador vencer, vai
+pontuar na pescaria"*.
+
+**Você e o NPC pescam no MESMO lago por 90 segundos.** Seis pontos d'água, um peixe aparece num
+deles, quem chegar primeiro fisga — e aí a captura só vira ponto se o parceiro **vencer a batalha**.
+
+### ⚠️ A BATALHA É A DA JORNADA, E ISSO É A FEATURE INTEIRA
+
+O protótipo resolvia a luta com uma fórmula própria de três linhas. Aqui quem decide é o
+**`simulateGymBattle`** — o mesmo motor do ginásio, da Elite, da Torre e do Ginásio da Cidade —, e é
+por isso que ela herda **de graça** tudo o que este arquivo passou semanas medindo: os golpes
+escolhidos, o STAB, o subtipo, as catorze passivas, os quatro status por ataque, os estágios, o
+clima, o crítico da Gen 3 e o teto de quem raspa.
+
+- **⚠️ O PLACAR SEGUE O MOTOR, NUNCA A ANIMAÇÃO.** A batalha é **resolvida inteira** no instante da
+  fisgada, e o que a tela faz depois é **animar o diário REAL** dela, no ritmo da jornada. Quem
+  fecha o confronto é o `venceu` que veio do motor — não "quem chegou a zero na tela". Decidido pela
+  animação, um arredondamento de barra mudaria o resultado da partida, e o log do fim discordaria do
+  placar. Há trava cobrando exatamente isso.
+- **É 1x1**, e os dois entram **com HP cheio**: o `simulateGymBattle` cura os dois times na entrada,
+  o que aqui é exatamente o desejado — cada peixe é um confronto novo.
+- **ELA PASSA PELO `applySpecialtyBuff` E PELO `equiparItens`**, como toda chamada de batalha do
+  jogo: a especialidade de tipo e o item equipado do parceiro **valem**. O peixe entra limpo (ele não
+  é de ninguém). É a mesma trava que o `test-especiais` cobra pras outras oito chamadas.
+- **O LOG DO FIM É O `renderMatchupLog` DA CASA** — a MESMA tela que o jogador lê depois de toda
+  batalha do jogo. Como os matchups são do mesmo motor, eles servem direto, com os golpes, os selos
+  e as passivas de verdade. Um resumo próprio aqui seria uma segunda apresentação pra contar a mesma
+  coisa.
+
+### ⚠️ E ELA PASSOU A SER A DA JORNADA NA TELA TAMBÉM (19/09/2026)
+
+Pedido assim: *"a batalha pokemon que esta exibindo após a pesca, deve ser exatamente igual a
+batalha que ocorre na jornada, o mesmo layout, mesma velocidade, mesmos ataques, como se fosse uma
+batalha enfrentando um lider de ginasio, porém é uma batalha 1x1 contra um pokemon pescado"*.
+
+**O MOTOR já era o da jornada desde o primeiro dia; a TELA não era.** Ela tinha um desenho próprio:
+sprite pequeno, barra verde fixa por `width`, sem tipo, sem selo, sem HP em número, sem o NOME do
+golpe (*"X atacou e tirou −N de HP"*) e **0,42 s fixos por passo**.
+
+Hoje o quadro é montado pelas MESMAS funções do `renderBattling`, sem uma linha de marcação
+própria: `placarDoTreinador`, `fighterHtml` (sprite grande, selos, tipos e a barra de HP com os
+números), o `vs-swords` girando e a `battle-status-area` com o `statusDoConfrontoHtml`. O lado do
+peixe se chama **Selvagem** — ele não tem treinador.
+
+- **⚠️ `comTerreno: false`, como na Torre**: a pescaria não tem terreno escolhido, e o selo 🔺
+  prometeria um bônus que esta batalha não dá.
+- **⚠️ E OS ids DAS BARRAS SÃO OS GLOBAIS DA JORNADA** (`hp-fill-player`/`hp-fill-enemy`/
+  `hp-label-*`/`battle-status-txt`). Com os antigos (`pescHpA`/`pescHpB`), o `pintarStatusDoConfronto`
+  e a conta do `animatePartialHpBars` não achariam nada e falhariam **em silêncio** — a barra
+  simplesmente não se moveria. Só há uma batalha na tela por vez, então não há com o que colidir.
+
+#### ⚠️ E ISSO DESENTERROU UM DEFEITO: A BARRA ERRADA DESCIA
+
+A tela lia o **diário CRU** (`m.golpes`, filtrado por `g.x || g.d > 0`) e aplicava
+`if(doJogador) hpPeixe -= g.d; else hpMeu -= g.d`. Duas famílias quebram nisso, e as duas já
+estavam registradas neste arquivo:
+
+- **cura, fúria e dreno** — na jornada o `amount` vai **NEGATIVO** pra a barra SUBIR. Ali, como
+  `g.d > 0`, o `if` passava e ele **SUBTRAÍA**, e do lado OPOSTO: uma cura do jogador descia a
+  barra do PEIXE;
+- **queimadura e veneno** — o `q` deles é de **QUEM PERDE**, não de quem bate. A tela invertia como
+  nos outros, e a queimadura do jogador descia a barra do adversário.
+
+Hoje a sequência sai do **`buildAnimatedHitSequence`**, que é quem sabe disso — e ele traz junto a
+expansão dos multi-tapa, a suavização das fatias e o reordenamento do moribundo, que é o que faz o
+log parar de mostrar `−0 de HP`.
+
+**MEDIDO em 6.000 confrontos da pescaria** (parceiro sorteado entre as 250, peixe do pool real):
+o caminho antigo punha **0,69% das linhas** do diário no lado ou no sinal errado, e isso alcançava
+**2,38% dos confrontos**. As marcas que ele errava são a `furia`, o `dreno`, o `veneno` e a
+`queima` -- as duas primeiras porque a barra devia SUBIR, as duas últimas porque o `q` delas é de
+quem PERDE. A `confusao`, a `furiadragao`, a explosão e o resto ele acertava por acaso, porque elas
+seguem a inversão comum.
+
+#### ⚠️ O RITMO É O DA JORNADA, MAS O LAÇO NÃO PODE SER
+
+**Os dois modelos não se misturam, e isso é a decisão estrutural da feature.** A jornada anima por
+cadeia de `setTimeout` com `render()` em até cinco pontos por golpe; a pescaria roda um
+`requestAnimationFrame` contínuo e **nunca** chama `render()` — de propósito, porque um render por
+quadro recriaria o botão de puxar no meio do `pointerdown`.
+
+`render()` é `app.innerHTML = html`: wipe total. Medido em 1.200 confrontos 1x1 reais, o molde da
+jornada dispararia **2,48 render() por batalha (máx 11)** — cada um destruindo os cinco painéis, a
+boia, as seis zonas e a transição CSS da `.hp-bar-fill` no ar. Copiar a cadeia produziria uma
+batalha **pior** que a da jornada.
+
+**O que se copia são os TEMPOS, não o laço.** O `pescariaRitmoDoGolpe` guarda os mesmos quatro
+pedaços do `advanceReveal` — 550ms de abertura (mais a leitura quando o confronto abre com uma
+passiva), **1s do nome do golpe** antes de a barra andar (`PAUSA_ANTES_DO_GOLPE_MS`), a barra
+descendo a 94 pontos percentuais por segundo (`hpBarTransitionMs`, 150–1400ms), 150ms entre golpes
+e 800ms depois do último. Quem pinta são as MESMAS funções: `pintarStatusDoConfronto` pra a frase e
+a conta do `animatePartialHpBars` pra a barra.
+
+- **⚠️ ELES VIVEM EM CONSTANTES E O TESTE LÊ O `advanceReveal`** pra provar que são os mesmos.
+  Escritos à mão nos dois lugares, divergiriam no primeiro ajuste e o sintoma seria a batalha da
+  pescaria andando num compasso que a jornada não tem — **sem nada acusar**.
+- **⚠️ O ESTADO CONTINUA EM `p.batalha`, e não em campos do `game`** como nos cinco laços de
+  revelação. A razão não é estilo: **a pescaria tem DUAS batalhas simultâneas** (o NPC também
+  pesca). Num campo só, o passo de um avançaria o outro e o `venceu` do NPC sobrescreveria o seu —
+  e metade disso seria invisível, porque o NPC não tem quadro desenhado. Há caso de teste com os
+  dois batalhando no mesmo quadro.
+- **⚠️ O NPC PASSA PELO MESMO CAMINHO**, com `desenha` falso: a batalha dele leva exatamente o
+  mesmo tempo que a sua, e é isso que mantém o duelo simétrico. Torná-la instantânea daria ao
+  jogador **23s a menos de água** num duelo de 90s (as 5,36 fisgadas dele vezes os 4,3s a mais que
+  cada batalha passou a levar) — um efeito de balanceamento como consequência de uma mudança de
+  apresentação.
+- **E só o log do JOGADOR vai pra tela do fim.** O matchup do NPC existe e é real; ele é jogado
+  fora de propósito — a tela do fim é sobre as capturas dele, e seis logs do NPC ali seriam ruído.
+
+#### ⚠️ NENHUMA BATALHA EM CURSO SOME SEM PAGAR
+
+Os pontos são creditados no **FIM** da animação. Com o ritmo da jornada ela leva ~6s, e uma captura
+feita aos 88s ainda estaria animando quando o relógio acabasse: o jogador pesca, o motor diz que
+ele venceu, e ele recebe **ZERO** — sem erro e sem aviso.
+
+São duas redes: a **prorrogação não corta batalha nenhuma** (ela existe pra um encontro que travou,
+e uma batalha sempre termina — a sequência é finita), e o `pescariaTerminar` **fecha as que sobrarem
+pagando o que o MOTOR decidiu**. Medido em 600 duelos: **0 batalhas pendentes no fim**.
+
+#### O PREÇO MEDIDO
+
+| 1x1 da pescaria | passo fixo de 0,42s | ritmo da jornada |
+|---|---|---|
+| duração do confronto | ~1,9s | **~6,2s** (máx 16s) |
+| tempo do duelo em batalha | 10,0s | **27,3s** |
+| suas fisgadas | 6,21 | **5,36** |
+| seus pontos | 333,6 | **290,3** |
+| fisgadas do NPC | 3,84 | 3,66 |
+| **você vence o duelo** | **98,8%** | **97,8%** |
+| duração do duelo | 97,0s | 100,1s (p95 107,8s, máx 116s) |
+
+400 duelos de cada lado, o mesmo bot contra duas cópias congeladas. **A taxa de vitória quase não
+se move, e é esse o número que importa**: o custo cai nos DOIS lados igual, porque o NPC anima a
+batalha dele no mesmo relógio. O que o jogador sente é **uma captura a menos por duelo** — ele
+passa 27s dos 90 olhando a luta em vez de pescando.
+
+**Se um dia incomodar**, as réguas são o `PAUSA_ANTES_DO_GOLPE_MS` (o segundo do nome do golpe, que
+é metade do tempo) e o `PESCARIA_DURACAO`. Mexer no ritmo da batalha é desfazer o pedido.
+
+**CONFERIDO QUE NÃO É MOTOR, por impressão:** o mesmo build antes e depois dá o **MESMO hash** em
+900 batalhas semeadas, no MOTOR e no DIÁRIO. Tudo isto é apresentação — o que mudou de mecânica foi
+só a pesca, abaixo.
+
+### ⚠️ A REALIMENTAÇÃO DA PESCA, QUE NÃO TINHA VINDO (19/09/2026)
+
+Pedida assim: *"na hora que fisgou o peixe, no modelo que eu tinha te passado, a barra mudava de cor
+de acordo com o status da pesca, a cor dos textos mudava de cor, a barra de captura ja começava um
+pouco preenchida e ia descendo caso o usuário nao fazia nada"*. **As três existiam no protótipo e
+nenhuma tinha vindo.**
+
+| | protótipo | a tela até 19/09 |
+|---|---|---|
+| barra de tensão | verde ≤48, âmbar ≤72, vermelha acima | **vermelha desde 0%** |
+| texto de comportamento | verde, e **vermelho** no aviso e na arrancada | caixa amarela estática |
+| captura ao fisgar | **20%** (fisgada rápida) ou **10%** | **0%** |
+| tensão ao fisgar | **25%** | 0% |
+| botão de puxar | amarelo e **afundado** ao segurar, com outro texto | nunca muda |
+| barras | `transition: width .08s linear` | sem transição |
+
+- **⚠️ COMEÇANDO EM ZERO A QUEDA É INVISÍVEL, e esse era o defeito de verdade.** A decadência de
+  **3%/s** existia no motor desde sempre (`ganho = -3` quando ninguém puxa) e **não aparecia na
+  tela**, porque o clamp em 0 a escondia. Não faltava a queda: faltava de onde cair. Há caso de
+  teste que mede os dois — a queda a partir de 10% e o zero mudo a partir de 0%.
+- **A FISGADA PERFEITA VALE O DOBRO** (20% contra 10%), e o critério é o do protótipo: sobrar mais
+  de 0,72s da janela de 1,15s em que a boia fica afundada — ou seja, tocar nos primeiros 0,43s.
+  **Ela é COMPARTILHADA com o NPC** (`pescariaPuxarLinha`), e tem que ser: um NPC que sempre
+  acertasse a janela perfeita seria o boost artificial que o desenho destes minigames proíbe.
+- **⚠️ A COR DA TENSÃO VEM DE CLASSE, nunca de `style.background`.** Escrita nos dois lugares, a
+  folha ganharia do inline conforme a especificidade e o sintoma seria uma barra que muda de cor
+  **às vezes** — o pior tipo de defeito que existe. Os limiares são ESTRITOS: 48 ainda é verde,
+  48,1 já é âmbar.
+- **⚠️ E O `.pesc-puxar.puxando` PRECISA VIR DEPOIS DO `.btn.primary` NA FOLHA.** As duas regras têm
+  a MESMA especificidade (0-2-0), então quem vence é a que vem depois — e uma regra declarada certa
+  que não faz efeito é a família do `[hidden]` que deixou o modal da contagem da Corrida preso na
+  tela: ela passa em qualquer asserção de HTML e **só a captura de tela pega**. Há trava de ORDEM.
+- **⚠️ TODA CLASSE PASSA PELA GUARDA DE IGUALDADE**, como as larguras já passavam: o pintor roda 60
+  vezes por segundo, e um `classList.toggle` cego força recálculo de estilo em todo quadro.
+- **A LINHA SOLTA QUANDO A ABA SAI DE FOCO** (`visibilitychange` e `blur`). O botão só recebe
+  `pointerup` enquanto o dedo está nele: trocar de aba com o dedo apoiado deixaria a linha puxando
+  sozinha, e na volta o jogador encontraria a linha arrebentada sem ter feito nada. São duas das
+  cinco portas do protótipo.
+
+### AS CHANCES DE CADA PONTO — o último pedaço do protótipo que faltava
+
+O protótipo tem um **(i)** em cada ponto do lago que abre as chances de encontro dele, e era a
+única coisa dele que não tinha vindo. Ela responde a pergunta que se faz ANTES de lançar: o Abismo
+paga 83 pontos, mas o que mora lá?
+
+- **⚠️ AQUI A ESPÉCIE SAI DIRETO DO POOL**, sem a conversão de espécie-por-nível que o encontro
+  selvagem precisa — o `pescariaSurgir` sorteia o id e o nível **separados**. Ou seja, esta lista é
+  exatamente o que pode ser pescado, e é por isso que ela pode mostrar a **chance**; a tela
+  "Pokémons desta rota" não pode, porque lá o nível converte a espécie.
+- **A LINHA É A DA ROTA** (`.rota-mon`), e ela abre a MESMA ficha da Pokédex — é a mesma pergunta
+  ("esse cobre o tipo que falta no meu time?"), e um desenho próprio obrigaria a reaprender a ler.
+- **⚠️ O (i) É IRMÃO DO BOTÃO DA ZONA, nunca filho**: botão dentro de botão é HTML inválido — o
+  navegador fecha o de fora e o clique de dentro se perde, com a tela continuando a PARECER certa.
+  É a armadilha que a lupa do encontro selvagem e a do montador já custaram. De quebra ele
+  sobrevive ao card **desabilitado**, e é justamente enquanto você está pescando num ponto que dá
+  vontade de consultar os outros.
+
+**E VIERAM JUNTO as coisas do protótipo que a tela não tinha:** o chip do ponto no painel da boia,
+o chip do peixe (`Grande · DISPUTADO` quando o NPC está na mesma linha), a **linha de atividade de
+cada ponto do lago** (`VOCÊ PESCANDO` / `NPC PESCANDO` / `DISPUTA!` / `Médio · 4s`), o relógio
+**vermelho** nos últimos 15s, a contagem de prorrogação (`+7s`) depois dos 90, e o chip do
+cabeçalho virando `ÚLTIMOS ENCONTROS`. A função `pescariaTamanho` estava **órfã** desde que nasceu
+— agora ela tem chamador.
+
+**Medido a 320px, no navegador, nas 14 telas:** **nenhuma rola pro lado** e nenhum elemento estoura
+a largura. A tela da batalha é a mais alta (826px), o painel de puxar fica em 651px e o quadro dos
+dois lutadores em 199px. As cores conferidas no computado: tensão `rgb(47,158,68)` / `rgb(224,168,0)`
+/ `rgb(209,41,27)`, e o texto `#2d7449` → `var(--red)` na arrancada — os valores do protótipo.
+
+### O NPC: SEMPRE Lv.65, SEMPRE BST ACIMA DE 500
+
+Foi o pedido ao pé da letra, e são **36 espécies** — as 40 do `SPECIES` acima de BST 500 menos os
+**quatro INTOCÁVEIS**.
+
+- **⚠️ E TIRAR OS QUATRO NÃO É ZELO: eles são os MAIORES do pool.** Mewtwo, Lugia e Ho-oh são BST 680
+  e o Celebi 600 — ou seja, o filtro de BST os pegaria primeiro. São justamente os que o jogo inteiro
+  mantém fora de pool nenhum (o encontro selvagem, a Torre, a Vigília), e um Mewtwo Lv.65 como
+  parceiro do NPC seria um adversário que o jogador **não tem como ter**.
+- O sorteio é conferido em 400 voltas: todos Lv.65, todos acima de 500, todos com HP cheio — e
+  **varia de verdade** (20+ espécies distintas), que é o que uma trava de "sempre 65" sozinha não
+  pegaria.
+
+### O PICKER É O MONTADOR, ORDENADO POR NÍVEL
+
+*"Aquela lista igual fazemos para a corrida pokemon, todos os pokemons do time, paginando a cada 10
+pokemons, e ordenar pelo level mais alto."*
+
+- **REUSA O `MONT_POR_PAGINA`, o `montadorPaginaValida` e o `game.montadorPagina`** — o mesmo estado
+  que a Torre, o Ginásio e a Corrida. Uma paginação própria divergiria na primeira mexida.
+- **⚠️ MAS A ORDEM É O NÍVEL, e não o Speed da Corrida** — lá o Speed **É** a prova; aqui o que
+  decide é a batalha, e o nível é o que o jogador usa pra escolher.
+- **⚠️ ABRIR O PICKER ZERA A PÁGINA** (`pescariaAbrirPicker`): o `montadorPagina` é compartilhado, e
+  uma página 3 sobrando da Torre abriria esta lista no meio. É o mesmo cuidado do `abrirMontador`.
+- **O CARD É O DO MONTADOR, estrutura por estrutura** (`mont-num`, `mont-info`, `mont-nome`,
+  `mont-lv`, `mont-sub`, `mont-time`), com a **lupa IRMÃ** dele — `<button>` dentro de `<button>` é
+  HTML inválido e o clique de dentro se perde. A primeira versão inventou um wrapper `.mont-sprite`
+  que não existe na casa, e o sprite saiu solto no meio do card.
+- **⚠️ E O SLOT VAI ENTRE ASPAS NO `onclick`**: ele pode ser `ap:3` (um aposentado), e sem as aspas o
+  atributo vira sintaxe inválida e o clique **não faz nada, sem erro no console**. É a família que já
+  matou o botão da notificação da liga e as setas da Montanha Sagrada.
+
+### O ACESSO: `admin === true`, E NADA MAIS
+
+Mesma porta da Corrida, e **as duas foram endurecidas junto**: elas eram `!game.ehAdmin` (truthy), o
+que deixava um `'sim'` escrito no console passar. Hoje são `!== true`.
+
+- **⚠️ ENQUANTO A CONTA CARREGA O BOTÃO FICA OCULTO E A PORTA RECUSA** — o **contrário** da porta dos
+  modos de campeão, que erra pro lado de DEIXAR ENTRAR. Aqui o lado seguro é o outro: mostrar um modo
+  administrativo a quem não é admin, mesmo por meio segundo, é pior que escondê-lo de quem é.
+- O que protege de verdade é o `admin` estar na **trava de campos** do `firestore.rules`, ao lado de
+  `moedas` e `rareCandies`: o dono do documento não o escreve, só o console do Firebase.
+- **Nenhuma operação de backend nova**: a pescaria é offline inteira — nenhuma Cloud Function, nada
+  no Firestore, **nada no save**. Conferido: seis batalhas depois, o time do save fica byte a byte
+  igual, e o estado vive fora do `game`.
+
+### O QUE FOI MEDIDO
+
+**A CURVA DE HABILIDADE, 60 partidas por perfil** (o mesmo Jolteon Lv.70 nos quatro; o bot erra uma
+fração das decisões e lê o peixe com atraso):
+
+| perfil | você | NPC | fisgadas | vence a partida |
+|---|---|---|---|---|
+| domina o jogo | 221 | 115 | 4,5 | **92%** |
+| joga bem | 183 | 121 | 3,9 | 78% |
+| **mediano** | 148 | 139 | 3,0 | **57%** |
+| distraído | 87 | 139 | 2,1 | 25% |
+
+**O mediano empata**, quem domina ganha quase sempre e quem se distrai perde — e **quem só assiste
+faz ZERO**, porque não pescar é não pontuar.
+
+**⚠️ E A ESCOLHA DO PARCEIRO VALE 30 PONTOS**, que é a decisão que o pedido queria criar (mesmo
+jogador, perfil "joga bem", 80 partidas cada):
+
+| parceiro Lv.70 | vence a partida |
+|---|---|
+| **Elétrico** (Jolteon) | **86%** |
+| Normal (Snorlax) | 76% |
+| Voador (Pidgeot) | 66% |
+| Planta (Venusaur) | 61% |
+| **Fogo** (Arcanine) | **56%** |
+| *(Magikarp, pra calibrar o piso)* | *4%* |
+
+**⚠️ MAS A BATALHA SÓ FILTRA NO FUNDO DO LAGO, e é o desenho:** medida por zona, ela é 100% nas três
+águas rasas e só cobra nas três fundas — Abismo com **Elétrico 97%, Planta 25%, Fogo 9%, Voador 3%**.
+Ou seja, a margem é segura e o abismo é onde a escolha do parceiro aparece. É por isso que o prêmio
+escala junto: **Margem 20 pts, Juncos 30, Corais 37, Cachoeira 58, Gruta 67, Abismo 83**.
+
+- **Se um dia incomodar**, as réguas são o `PESCARIA_DURACAO` (90 s), o `PESCARIA_NPC` (a chance de o
+  NPC puxar) e as faixas de nível das seis zonas — e a régua mais forte é a **duração**, porque ela
+  decide quantas fisgadas cabem.
+
+### AS ARMADILHAS DO CAMINHO
+
+- **⚠️ O `.btn` DA CASA NUM CARD FLEX SOBE POR CIMA DO TEXTO.** O card do parceiro tinha um
+  `<button class="btn">Trocar</button>` na ponta, e o `.btn` é `display:block; width:100%` — medido
+  a 320px, ele cobria o nome e o nível. **O card inteiro virou o botão**, que é a regra que a ficha
+  da Pokédex, o card do log de batalha e as prateleiras da loja já seguem: aquele é botão de AÇÃO, e
+  aqui a linha é informação que por acaso se toca. De quebra o alvo de toque passou a ser a linha
+  toda. **Só a captura de tela pegou** — o HTML estava sintaticamente perfeito.
+- **⚠️ O `render()` NÃO É CHAMADO POR QUADRO.** Quem pinta é o DOM (`pescariaPintar`), como na
+  Corrida e pelo mesmo motivo: um render por quadro recriaria a tela 60 vezes por segundo e o botão
+  de puxar perderia o `pointerdown` no meio do toque.
+- **⚠️ PUXAR É `pointerdown`/`pointerup`, com `pointerleave` e `pointercancel` junto** — sem os dois
+  últimos, arrastar o dedo pra fora do botão deixaria a linha puxando sozinha até arrebentar. E o
+  botão tem `touch-action:none`: sem ele, segurar e mexer o dedo rola a página e o navegador cancela
+  o `pointerdown`.
+- **⚠️ O `dt` É LIMITADO A 0,1 s.** Com a aba em segundo plano o rAF para, e na volta o primeiro
+  quadro traria os segundos todos de uma vez — o peixe escaparia sozinho. É o mesmo aparo da Corrida.
+- **AS SEIS BARRAS NASCEM COM O VALOR REAL.** Quem as pinta a cada quadro é o DOM, mas o **PRIMEIRO**
+  desenho vem do `render()` — com `0%` fixo elas piscavam em zero ao entrar no painel, e o jogador
+  via a captura "voltar".
+- **AS SEIS ÁGUAS SÃO UMA GRADE DE 3, e não um mapa desenhado:** a 320px um mapa com áreas
+  irregulares vira alvo de toque impossível de acertar. Seis botões retangulares são o mesmo jogo e
+  se tocam com o polegar. A zona com peixe **pisca** (animação de `box-shadow`, que não recalcula
+  layout) e é a única pista de onde tocar.
+
+**NA DIFICULDADE DO JOGO, NADA — por construção**: as duas impressões continuam **idênticas**
+(`MOTOR 6df3fbe71528 / DIARIO a12b4df14369`). A pescaria é apresentação mais um **chamador novo** do
+motor, não uma mudança nele.
+
+**Medido a 320px, no navegador:** setup **505px**, picker **505px**, tela de jogo **850px** e o fim
+**1.101px** (o placar mais o log das batalhas) — e **nenhuma rola pra o lado**.
+
+**⚠️ E A PRIMEIRA MEDIDA DISSE QUE A TELA DE JOGO ESTOURAVA 3px, e era da MEDIÇÃO:** eu montei a
+página de teste embrulhando o HTML num `<div class="app-shell">` — uma classe que **não existe no
+jogo** (o container de verdade é `<div id="app">`). Sem CSS, ela cresceu até a largura do conteúdo e
+levou tudo junto. É a mesma família do *painel forte demais* que este arquivo já registra três vezes:
+**o harness errado inventa um defeito que não existe**, e aqui ele quase custou um conserto de
+layout em cima de um problema que só a minha página tinha.
+
+`tools/test-pescaria.js` tranca **127 pontas**, e as que importam são a batalha (o matchup ser do
+motor, o placar seguir o `venceu` e não a animação, o 1x1, o HP cheio, e — lendo o código — que não
+sobrou fórmula de dano própria), o acesso nos **10 estados** do campo, o NPC em 400 sorteios, o
+picker por nível com a paginação de 10, a pesca (fisgar cedo perde, puxar sem soltar arrebenta, quem
+lê o peixe captura), o nível do pescado batendo com a faixa da zona em 360 peixes, e o save intacto.
+
+### ⚠️ A TELA NÃO ACOMPANHAVA O MOTOR (19/09/2026)
+
+Reportado assim: *"a tela do sinal para fisgar não está acontecendo nada, tente deixar exatamente
+como funcionava no outro arquivo, e depois que eu não fisguei, não consigo mais clicar em nenhum
+botão do lago"*.
+
+**⚠️ SÃO DOIS SINTOMAS E UMA CAUSA SÓ, e ela é a consequência direta da regra da casa.** Os cinco
+painéis eram montados por **CONDIÇÃO** no `renderPescaria` — e o laço do jogo **não redesenha**, de
+propósito (um `render()` por quadro recriaria o botão de puxar no meio do toque e o `pointerup`
+nunca chegaria nele). Só que as duas transições que mais importam **acontecem no TEMPO**, não num
+clique:
+
+| transição | o que o jogador via |
+|---|---|
+| `espera` → `fisgada` | a boia afundava **no motor** e a tela continuava dizendo *"espere ela afundar"* — ou seja, **o sinal de fisgar não existia** |
+| `descanso` → `parado` | as zonas ficavam `disabled` **para sempre**, e o lago nunca reabria |
+
+**O CONSERTO É O DO PROTÓTIPO, E É O MESMO QUE A CORRIDA JÁ TINHA PAGO**: os painéis **existem
+sempre** e quem escolhe qual aparece é o **pintor**, pelo `hidden` (lá é `$('waitPanel').hidden`).
+Em 18/09 o modal da contagem da Corrida ficou preso na tela **exatamente por isto**, e a lição não
+foi aplicada à Pescaria no dia seguinte.
+
+- **⚠️ QUAL PAINEL CADA ESTADO MOSTRA VIVE NUMA FUNÇÃO SÓ** (`pescariaPainelDoEstado`), lida pelo
+  render (que dá o valor inicial) e pelo pintor (que troca a cada quadro). Escritas em separado elas
+  divergiriam no primeiro estado novo, e o sintoma seria a tela mostrando o painel de outro momento.
+- **`espera` e `fisgada` DIVIDEM o painel**, e é o que faz o sinal ser um sinal: é a MESMA cena, e o
+  que muda é a boia ter afundado. Em painéis separados, ele viraria uma troca de tela.
+- **⚠️ O PAINEL DA BATALHA É O ÚNICO PREENCHIDO PELO PINTOR** (sprite, nome e nível do pescado mudam
+  a cada captura), e **uma vez por peixe** — a guarda é o `id` dele. Refeito a cada quadro, ele
+  jogaria fora as barras de HP que o próprio pintor acabou de mexer.
+- **A CENA DA BOIA É A DO PROTÓTIPO**: a faixa d'água listrada, a boia balançando, e **a parada é o
+  sinal** (`animation:none` mais o halo amarelo). O movimento é o *"ainda não"*.
+
+**MEDIDO NO NAVEGADOR:** a tela do sinal mostra *"A boia afundou! Fisgue agora!"* com a boia
+afundada, e depois de não fisgar o lago reabre em **1,4 s**. As três travas novas **acusam** com
+cada defeito religado (2, 2 e 1 falhas).
+
+#### ⚠️ E O DUBLÊ DE ELEMENTO DO SANDBOX MENTIA — por isso nenhuma trava tinha pegado
+
+O `classList` do stub era três no-ops com um `contains` que **sempre devolvia false**, e `toggle`
+**nem existia**. O pintor faz `if(el.classList.contains('viva') !== viva) el.classList.toggle(...)`
+— ou seja ele **nunca quebrava enquanto nenhuma zona acendia**, e derrubava o teste com um
+TypeError no primeiro peixe que aparecesse. Resultado: **as 87 travas da Pescaria nunca chamaram o
+pintor**, e o defeito inteiro morava nele.
+
+Hoje o stub tem `classList` de verdade (com um `Set` por trás), mais `hidden`, `disabled` e
+`dataset`. **É a mesma lição do `fake-firestore` e do `getAttribute`: o dublê tem que doer onde a
+produção dói** — e um dublê que mente sobre o que já está na tela não consegue testar código que
+PERGUNTA o que já está na tela.
+
+#### ⚠️ E TRÊS ARMADILHAS CONHECIDAS APARECERAM DE NOVO, TODAS NO MESMO DIA
+
+1. **A FATIA DE CÓDIGO SAÍA VAZIA.** A trava nova fatiava de `/* jogando */` até
+   `function pescariaLargar` — e o `pescariaLargar` fica **ANTES** no arquivo, então a fatia tinha
+   **zero caracteres** e as seis asserções passavam **sem ler nada**. É literalmente a armadilha que
+   o teste do `tentarGolpeEspecial` já tinha custado, e o conserto é o mesmo: **um `ok()` só pra
+   dizer que há o que ler**. Hoje as duas fatias do arquivo são cobradas pelo tamanho.
+2. **UMA CLASSE DE BOTÃO QUE NÃO EXISTE.** O botão de fisgar nasceu com uma variante de cor que a
+   folha não declara (as da casa são `primary`/`secondary`/`success`/`danger`/`selected`), e saiu
+   **cinza** no momento em que a tela mais precisa gritar. Um nome que não existe **não dá erro**:
+   ele só não faz nada, e **só a captura de tela pega**. É a mesma família do `var(--yellow-soft)` e
+   do `var(--cream)` fantasmas. Há trava nova varrendo o **jogo inteiro** — ela achou um órfão
+   anterior (`mewtwo-loan-cta`, num botão que já tem o `.btn.success` fazendo o trabalho), que fica
+   **nomeado** nela em vez de a regra ser afrouxada.
+3. **O COMENTÁRIO DO CONSERTO SE ACUSOU NA PRÓPRIA VARREDURA** — a **quarta** vez neste projeto (o
+   nome de líder na bifurcação, o código velho na trava do `slotDaConta`, a palavra "Máquina").
+
+#### ⚠️ E O PLACAR ROLAVA PRA O LADO: `1fr` NÃO ENCOLHE
+
+Medido a 320px com o nome e o texto de estado mais longos (*"NPC · Dragonite"* e *"Procurando
+oportunidade"*): a tela ia a **337px**. O `.pesc-placar` era `grid-template-columns:1fr 1fr`, e
+**`1fr` é `minmax(auto,1fr)`** — o `auto` não encolhe abaixo do conteúdo. É literalmente a mesma
+armadilha que a fileira de cinco cards da home já teve.
+
+Hoje os três grids da Pescaria usam `minmax(0,1fr)`, e o texto do estado quebra
+(`overflow-wrap:anywhere`). Medido depois, nos **cinco** estados do painel: **320px em todos**.
+
+`tools/test-pescaria.js` tranca **268 pontas** — inclusive o bloco que **dirige o laço de verdade
+sem chamar `render()` nenhuma vez** (é isso que o torna uma prova: com um render no meio ele
+passaria com o defeito inteiro de volta) e a varredura das classes fantasma.
+
+### ⚠️ AS ONZE DA REVISÃO ADVERSARIAL (19/09/2026)
+
+Uma varredura adversarial em cima da pescaria pronta achou onze coisas, e **nenhuma delas dá erro,
+aparece num print ou quebra um teste** — é por isso que elas ficam registradas uma a uma. Duas são
+graves, e as duas nasceram do MESMO fato: a batalha da pescaria passou a usar as peças da jornada,
+e com elas vieram as responsabilidades delas.
+
+#### ⚠️ 1) O LAÇO CONTINUAVA VIVO PINTANDO DENTRO DE OUTRA BATALHA
+
+A guarda do `requestAnimationFrame` era só `if(pescaria.fase !== 'jogando')`. Ela **não olhava a
+tela** — e desde que a batalha virou a da jornada, o pintor escreve nos ids **globais** dela:
+`hp-fill-player`, `hp-fill-enemy` e `battle-status-txt`, que são os **mesmos** da batalha online, da
+Torre e do ginásio (13, 13 e 6 usos no arquivo).
+
+**Aceitar um convite online no meio de um duelo troca a `game.screen` e não avisa ninguém.** O laço
+seguia rodando e passava a mexer na barra de vida e na frase **da outra batalha**, por cima do que o
+jogador estava jogando.
+
+- Hoje a guarda é `fase !== 'jogando' || game.screen !== 'pescaria'` — a mesma que os cinco laços de
+  revelação têm desde sempre.
+- **Parar é seguro E completo**: só o `abrirPescaria` põe a tela de volta, e ele zera tudo.
+- ⚠️ **A Corrida não tem essa guarda tampouco** (`grep` por `game.screen !== 'corrida'` devolve nada).
+  Lá o laço pinta num `<canvas>` de id próprio, então o estrago é menor — mas é a mesma porta, e
+  fica dito pra ser decisão e não descuido.
+
+#### ⚠️ 2) A ESPECIALIDADE E O ITEM DO JOGADOR VALIAM NO PARCEIRO DO NPC
+
+**Os dois pescadores passam pelo MESMO caminho**, e o lado `a` do `pescariaBatalhar` é o parceiro de
+quem estiver lutando — inclusive o do NPC. O `pescariaInstancia(p, ehDoJogador)` **declarava o
+parâmetro e nunca o lia**, e o `pescariaBatalhar` aplicava `applySpecialtyBuff(a, game.specialties)`
+e `equiparItens(a, game.equipados)` sem condição.
+
+**Medido:** com uma especialidade em Elétrico e o NPC sorteado num Jolteon, a batalha **dele** saía
+com `playerSpecialty: true` — o selo 🎖️ no quadro do adversário e 1,05× em todos os atributos. E o
+parceiro do NPC é sorteado **uma vez por duelo**: caindo num tipo que o jogador domina, os 90
+segundos inteiros de batalha dele saíam buffados.
+
+⚠️ **É a armadilha que o `corridaInstancia` já registra** — *"com `true` implícito, a próxima chamada
+esquecida daria o buff ao adversário em silêncio"*. Aqui ela não foi esquecida: foi **declarada e
+ignorada**, que é pior — parecia tratada.
+
+#### ⚠️ 3) O PEIXE LUTAVA SEM MOVESET — e era metade do pedido que faltava
+
+O peixe e o parceiro do NPC entravam **sem `ataques`**, ou seja caíam no motor de tipo com o poder
+implícito de 60. A regra da casa desde 09/09/2026 é o contrário: **quem NÃO escolhe golpe luta com
+tudo que a espécie aprende por nível** (`equiparNpc`), e só quem ESCOLHE fica com o teto de três.
+
+⚠️ **E ISSO É O QUE FAZIA OS STATUS POR ATAQUE NÃO EXISTIREM DO LADO DO PEIXE:** sem id de golpe o
+motor não tem o que consultar nas tabelas de queimar/envenenar/paralisar/congelar. **Medido: 0 em
+4.000 batalhas antes, 4,1% depois.**
+
+**O PREÇO, medido** (5.400 batalhas de cada lado, mesmos pares e **mesmas sementes**, só o
+`equiparNpc` mudando):
+
+| | sem moveset | com | |
+|---|---|---|---|
+| **vitória do parceiro** | 84,8% | **82,9%** | **−1,9** |
+| passos por batalha | 3,09 | 3,08 | — |
+| Margem, Juncos | 100% | 100% | 0,0 |
+| Corais | 99,7% | 98,1% | −1,6 |
+| **Cachoeira** | 85,4% | **78,4%** | **−7,0** |
+| Gruta | 77,3% | 77,0% | −0,3 |
+| **Abismo** | 46,2% | **43,8%** | −2,4 |
+
+Ele **não alonga a animação** (3,09 → 3,08 passos) e o custo se concentra na água funda, que é onde
+o desafio mora. O parceiro do JOGADOR **nunca** passa pelo `equiparNpc`: os golpes dele são a
+escolha dele, e um save antigo sem `ataques` continua caindo no motor de tipo, que é o desenho.
+
+#### ⚠️ 4) OS SELOS 🔥🟣⚡ NUNCA APARECIAM NO QUADRO
+
+O `selosDoConfronto` só devolve esses três **a partir do passo em que o status pega** (é a regra de
+16/09/2026: mostrá-los antes entregaria uma queimadura que só acontece seis golpes depois). E o
+quadro da pescaria é montado **uma vez por peixe**, ou seja sempre no passo 0 — então eles não saíam
+**nunca**.
+
+Na jornada quem os faz aparecer é o `render()` do ramo `animating`, disparado justamente nesses
+passos, **porque `queimou`/`envenenou`/`paralisou` carregam a marca `leitura`** — que é a mesma que
+agenda o repinte da área aqui. Hoje o `pescariaPintarArea` repinta também o bloco `battle-vs`, pela
+**MESMA** função que o render monta (`pescariaLutadoresHtml`).
+
+⚠️ **E ele é seguro ali e só ali:** o instante é `nome + barra + 50ms`, ou seja **depois** de a
+transição da barra terminar — exatamente onde a jornada agenda o `render()` dela. Refazer os quadros
+no meio da transição a mataria, que é a regra da casa.
+
+**Medido: 244 de 244** confrontos com status têm o selo ausente no passo 0 e presente no quadro
+repintado. E no navegador, a 320px: *"Snorlax ficou paralisado com GOLPE DE CORPO!"* com o ⚡ no
+quadro do lutador.
+
+#### ⚠️ 5) O NPC TINHA UM RAMO QUE NUNCA RODAVA
+
+`pescariaNpcPuxa` abria com `if(p.falha && p.tempoDePesca > 4) return true;` e o comentário dizia
+*"teimou: vai arrebentar"*. **Ele é inalcançável**: o `falha` faz o NPC errar a **FISGADA**, e quem
+erra a fisgada nunca chega a puxar. **Medido: 0 de 400.**
+
+Eram **dois comentários descrevendo uma mecânica que não existe** — e é isso que fazia parecer que o
+NPC às vezes arrebenta a linha. **Ele nunca arrebenta, e é aritmética:** com o teto de 76 no cansado
+e 40 no resistindo, a tensão dele não alcança 100. A maior vista em 60 duelos foi **62,6**.
+
+#### ⚠️ 6) A TAXA DE ERRO DO NPC FICA EM 0,28, E NÃO NOS 0,15 DO PROTÓTIPO
+
+O pedido foi *"o mais parecido com o protótipo possível"*, e este é o ponto em que **seguir o
+protótipo piora o jogo** — medido, não achado no gosto. Com um bot que modela habilidade de verdade
+(atraso de reação na fisgada + erro de leitura ao puxar), 200 duelos por célula:
+
+| quem joga | **hoje (0,28)** | com 0,15 |
+|---|---|---|
+| domina o jogo | **86%** | 77% |
+| joga bem | **82%** | 76% |
+| mediano | **66%** | 74% |
+| distraído | **54%** | 47% |
+
+⚠️ **Com 0,15 a curva de habilidade quase some**: quem domina ganha 77% e quem é mediano ganha 74%.
+A causa é que o duelo é decidido pelo **número de capturas**, não pela perícia em cada uma — o NPC
+pescando mais afoga o diferencial do jogador. **Fica em 0,28, e a régua está aqui.**
+
+#### AS CINCO MENORES
+
+- ⚠️ **O `pescariaZerar` não zerava o parceiro nem a semente.** O `escolhido` é um objeto vindo do
+  `game.saveSlots`, **que é recarregado a cada volta à home** — mantido, ele apontava pro time de
+  uma leitura anterior. E o `pescariaReiniciar` já salvava e repunha o parceiro na mão: sem o zerar
+  limpá-lo, aquele save/restore **não fazia nada** e a intenção dele só se lia no comentário.
+  ⚠️ **E zerar a `semente` obrigou a limpar a marca do painel junto**, que é a consequência não
+  óbvia: o pintor só remonta o painel quando o `dataset.peixe` muda, e com a numeração recomeçando
+  do zero dois duelos passam pelos **mesmos** ids. No navegador o `render()` recria o elemento e
+  isso não aconteceria; a linha existe pra a garantia **não depender disso** — um painel que não
+  remonta não dá erro, só mostra o peixe errado.
+- ⚠️ **A prorrogação deixou de aceitar linha nova.** Ela existe pra **terminar o que está na água**,
+  não pra começar mais. E quem recusa é a **AÇÃO**, não o botão apagado: o `disabled` das zonas é
+  escrito pelo pintor, e um toque no quadro em que o relógio vira chegaria antes dele. **A fisgada
+  continua valendo** na prorrogação — quem lançou antes tem direito ao peixe dele.
+- ⚠️ **O `expira` saía de um sorteio próprio e cruzava com o `entradaAte`** (5,0–8,0 contra
+  3,4–5,4): a oportunidade podia **sumir com a janela de entrada ainda aberta**, e aí o ponto
+  continuava piscando (o `viva` lê o `entradaAte`) e o toque não fazia nada. Um botão que pisca e
+  não responde é pior que um botão apagado. Hoje ele é `entradaAte + 1,6 a 3,0`. **Medido: 0 de
+  3.000.**
+- **A rede do `pescariaTerminar` pagava e não registrava.** O ponto subia e o encontro não aparecia
+  no histórico nem o log na tela do fim — o jogador via o placar mexer sem nada explicando. Hoje as
+  duas portas (o fim da animação e a rede) chamam o **mesmo** `pescariaCreditar`.
+- **A tela do duelo ganhou saída.** Não havia nenhuma: o único jeito de sair era o relógio acabar.
+  Enquanto o laço está vivo isso só custa paciência — mas **se ele morrer, a tela congela e não há
+  mais nada que a tire dali**. ⚠️ Ele fica no **FIM** da tela, depois do lago E do painel: entre os
+  dois, que foi onde ele nasceu, ele cai exatamente onde o polegar está enquanto se joga.
+- ⚠️ **O ponto fechado parecia aberto, e o que enganava era o piscar:** um ponto com peixe
+  continuava pulsando *"toque aqui"* com o botão desabilitado. `.pesc-zona.viva` e
+  `.pesc-zona:disabled` têm a **mesma especificidade**, então quem ganha é a última — e a de
+  `:disabled` vinha antes. Hoje ela vem depois e desliga a animação. **Medido no navegador:** com
+  peixe e tocável, `opacity 1` + `pesc-pisca`; com a linha na água, `opacity 0.3` + `animation none`.
+
+#### O QUE ISSO CUSTOU NO DUELO, E O QUE NÃO CUSTOU
+
+**No motor, NADA — e está conferido por impressão:** o mesmo script contra o `index.html` do HEAD e
+contra o da árvore de trabalho dá `MOTOR 0c52f316db7b / DIARIO cf3c6f175124` nos **dois**. A pescaria
+inteira é apresentação mais um **chamador novo** do motor.
+
+**No duelo** (200 por perfil, com o bot de habilidade descrito acima):
+
+| quem joga | você | NPC | fisgadas | vence a batalha | vence o duelo |
+|---|---|---|---|---|---|
+| domina o jogo | 222 | 137 | 5,69 | 5,60 | **86%** |
+| joga bem | 208 | 147 | 5,41 | 5,28 | 82% |
+| mediano | 189 | 151 | 5,17 | 5,09 | **66%** |
+| distraído | 158 | 146 | 4,28 | 4,17 | 54% |
+
+**Medido a 320px, no navegador, nas 17 telas:** nenhuma rola pro lado, o botão de sair mede
+**320×52px**, e a tela do duelo vai a **914px** com a batalha aberta.
+
+⚠️ **E CADA UMA DAS ONZE TEM TRAVA QUE ACUSA:** religando os defeitos um a um, a bateria falha em
+todos (1, 2, 7, 1, 1, 2, 2, 1, 2, 2 e 1 falhas). Sem isso o bloco seria decoração — a metade delas
+é lida do **código** (a guarda do laço, o `ehDoJogador` nas duas linhas, o `equiparNpc` só no NPC, a
+ordem das regras de CSS), porque os casos chamam as funções na mão e passariam com a chamada órfã.
+
+#### ⚠️ E O PRÓPRIO RELIGAR PEGOU UMA TRAVA QUE MEDIA OUTRA COISA
+
+A do relógio (*"acabado o tempo, a AÇÃO recusa a linha nova"*) **passava com a guarda removida**, e
+passava de forma estável — 5 rodadas de cada lado, zero falhas. O fixture criava a oportunidade no
+instante **0** e só então empurrava o relógio pra 90,2s: aí a janela de entrada dela (`entradaAte`,
+3,4 a 5,4s) já tinha fechado, e o `pescariaEntrar` recusava **por conta própria**. A asserção nunca
+chegou perto da regra que ela diz medir.
+
+Hoje a oportunidade nasce a **1 segundo do fim** — janela até ~92,6s —, e há um `ok()` só pra
+afirmar que ela ainda está aberta quando o relógio vira. ⚠️ **A segunda asserção do mesmo bloco
+tinha o mesmo furo**: com o pescador em `puxando`, o `pescariaEntrar` e o `pescariaFisgar` voltavam
+pelo ESTADO e não pela fase.
+
+É a armadilha do **fixture que não cai na faixa em que a regra vale** — a mesma que este arquivo já
+registra no painel forte demais do Smeargle e no `preservePlayerHp` que cura o time B. **Trava que
+passa sempre não é trava**, e o jeito de descobrir é religar o defeito: foi ele que denunciou.
+
+#### ⚠️ E O COMENTÁRIO DA CORREÇÃO 5 CITAVA O CÓDIGO REMOVIDO
+
+Ele reproduzia o ramo morto ao pé da letra pra explicar por que ele saiu — e o `index.html` é
+**publicado inteiro**, então uma varredura futura atrás daquele nome acha o comentário e acusa o
+que está certo. É a **quinta** vez neste projeto (o nome de líder na bifurcação, o código velho na
+trava do `slotDaConta`, a palavra "Máquina", a interpolação da faixa de update).
+
+Hoje ele descreve o ramo sem reproduzi-lo, e a trava dele deixou de fatiar **400 caracteres a
+partir do nome** pra fatiar a **função inteira** (176 chars, até a próxima `function`) — assim ela
+não pode ser enganada por um comentário acima dela, e tem um `ok()` cobrando que a fatia tem o que
+ler.
+
 ## PERFORMANCE: A GEOGRAFIA MANDA (19/09/2026)
 
 Relatado assim: *"tenho sentido uma boa lentidão na inscrição para as ligas clássicas e trainers
@@ -12692,6 +13340,56 @@ Então o `countRegistrants` **sempre baixava a coleção inteira** -- e quem o c
   cliente não escreve lá, e tentar seria uma ida ao servidor que **nunca pode dar certo**.
   (É o mesmo motivo pelo qual o `trainersLeagueEnsureCycleDoc` do cliente é uma ida morta.)
 
+#### ⚠️ E O CONTADOR FOI PRO AR ERRADO — 4 inscritos viraram 1 (20/09/2026)
+
+Reportado no dia seguinte ao deploy: *"entrei para ver a liga clássica e estava com 4 treinadores
+inscritos, após eu me inscrever, o numero caiu para 1, nao sei se é na minha tela que exibiu errado
+ou se deletou os outros"*.
+
+**NINGUÉM FOI APAGADO, e isso foi PROVADO antes de qualquer conserto** — lido do Firestore de
+produção pelo MCP do Firebase:
+
+```
+INSCRITOS DE VERDADE NA COLEÇÃO: 5
+registrantCount no documento:    1
+createTime do documento:         2026-09-20T11:10:24Z   <- o instante da 5ª inscrição
+```
+
+**⚠️ O `createTime` ENTREGOU A CAUSA: o documento do ciclo NÃO EXISTIA.** Quem o criou foi o
+`increment(1)` daquela inscrição — e **`increment` sobre campo que não existe trata o campo como
+ZERO**. Os quatro primeiros estavam em **abas abertas de antes do deploy**: o `index.html` vai com
+`no-cache`, mas aba aberta continua com o código velho até o F5 — então eles escreveram na
+subcoleção sem tocar no contador. O quinto, num carregamento novo, criou o documento em 1.
+
+**⚠️ E A LIÇÃO É MAIOR QUE O CASO: um contador mantido só pelo CLIENTE nunca é confiável**, porque
+sempre existe cliente velho em cache. O mesmo vale pro `increment(-1)` do cancelamento, que
+desviaria pro outro lado.
+
+**Hoje quem manda no número é o SERVIDOR**: o cron, que já roda de minuto em minuto, reconcilia o
+ciclo **ABERTO** (`reconciliarContadorDeInscritos`). Qualquer desvio — de cliente velho, de
+documento que nasceu tarde, do que vier — se conserta sozinho em no máximo **60 segundos**.
+
+- **⚠️ ELE CONTA PELA AGREGAÇÃO `.count()` DO SERVIDOR**, não varrendo a coleção: ~1 leitura em vez
+  de uma por inscrito. É exatamente o `getCountFromServer` que o SDK **compat** do cliente não tem
+  (ver acima) — o **Admin SDK tem desde a v11**, e aqui é ele. Custo: 2 leituras por minuto.
+- **⚠️ E ELE LÊ ANTES DE ESCREVER**: escrita custa 3× mais que leitura no Firestore, e sem isso
+  seriam 1.440 escritas por dia num documento que quase nunca muda.
+- **O cliente continua incrementando**, pro número subir na hora em que você se inscreve. O que
+  mudou é ele ter deixado de ser a autoridade.
+- **O ciclo que estava aberto foi consertado na mão** (`registrantCount` = 6, os 6 inscritos reais),
+  pra o número não ficar errado até o deploy.
+
+**⚠️ E O `fake-firestore` APRENDEU `.count()` POR CAUSA DISTO** — sem ele a função morre com
+*"count is not a function"* e a trava fica vermelha por um motivo que não é o do jogo. Ele devolve
+`{ data: () => ({ count }) }`, que é a forma do `AggregateQuerySnapshot`: um número cru ali deixaria
+passar um código que a produção recusa. É a mesma lição do `increment` dentro de mapa, do
+`arrayUnion`, do `FieldPath.documentId()` e do `getAll` da transação.
+
+`tools/test-liga-treinadores.js` **reproduz o relato inteiro**: quatro inscritos e nenhum contador,
+o `increment` gravando 1, a coleção com 5, o cron ajustando pra 5, o desvio pra baixo, o não
+escrever quando já está certo, e — **lendo o código** — que ele usa a agregação e que o **cron o
+chama no ciclo aberto** (os casos chamam a função na mão e passariam com a chamada órfã).
+
 ### A GUARDA ANTI-PISCAR DA CLÁSSICA
 
 O `refreshLeagueView` chamava `render()` **incondicional a cada 5 s** -- recriando o HTML inteiro
@@ -12745,6 +13443,98 @@ documento na linha seguinte**. Hoje o primeiro devolve o que leu.
   supostamente **estourando 1 MiB** com o objeto do jogador duplicado 15×, e o refresh de times
   elegíveis supostamente fazendo **~320 idas sequenciais** numa execução de cron com timeout de
   60 s. Os dois são graves **se forem verdade** -- e nenhum foi confirmado lendo o código.
+
+## A VELOCIDADE PASSOU A ESCALAR COM O NÍVEL (20/09/2026)
+
+Pedida assim: *"pode fazer com que a velocidade escale com o nivel, o nosso jogo tem que sempre
+tentar se manter fiel ao jogo original nesse quesito de resultado de batalhas"*. Ela nasceu de um
+relato sobre o LOG — *"por que que o Tentacruel atacou 2x seguidas?"* —, e a resposta era um empate
+de velocidade que na Gen 3 não existiria.
+
+A mecânica está no item do **Motor de batalha**, acima. Aqui fica o que ela CUSTOU.
+
+### O TAMANHO DO DESVIO, ANTES DE MEXER
+
+| diferença de nível | a ordem inverte | empate hoje | empate na Gen 3 |
+|---|---|---|---|
+| mesmo nível | 0,00% | 3,70% | 3,82% |
+| **até 3 (a jornada)** | **0,90%** | 3,70% | 1,29% |
+| até 10 | 5,53% | 3,68% | 1,12% |
+| até 30 | 17,81% | 3,64% | 0,93% |
+| qualquer (5 a 99) | 27,84% | 3,74% | 0,68% |
+
+| no modo | inverte | empate |
+|---|---|---|
+| **jornada** (níveis pareados por desenho) | **2,61%** | 4,12% |
+| **pescaria** (parceiro Lv.55-70 × peixe da zona) | **23,04%** | 3,49% |
+
+Ou seja: **na jornada quase não importava**, porque os níveis são pareados de propósito. **Na
+pescaria importava muito**, porque o parceiro é Lv.55-70 e o peixe pode ser Lv.8. E os empates
+caem de 3,7% para ~0,7%, que é o que fazia o log mostrar dois golpes seguidos.
+
+### ⚠️ O PREÇO NA JORNADA: NADA NO TOTAL, MAS A FORMA MUDA MUITO
+
+**53,16% contra 54,22%** de conclusão — **+1,06 ponto, 1,1σ**, 8 blocos de 800 jornadas de cada
+lado (**6.400 de cada**, o MESMO bot contra duas cópias congeladas pelo `--html`, desvio tirado de
+ENTRE os blocos, **6 de 8 blocos** pro lado da escala). Ruído.
+
+**⚠️ MAS A DIFICULDADE SE REDISTRIBUI, e muito** (game overs, 6.400 jornadas de cada lado):
+
+| ginásio | sem a escala | com | |
+|---|---|---|---|
+| 1º | 397 | **330** | −17% |
+| 5º | 398 | **493** | +24% |
+| **6º** | 1.346 | **888** | **−34%** |
+| 7º | 21 | 34 | — |
+| **8º** | 814 | **1.169** | **+44%** |
+
+**⚠️ E O MECANISMO TEM NOME: quem tem o NÍVEL MAIOR ganha a iniciativa.** A distribuição de níveis
+trava em **55**, e os líderes vão de 18,3 no 1º a **59,8 no 8º** — ou seja a curva do jogador cruza
+a dos líderes entre o 6º e o 8º. Onde o jogador está acima (1º, 6º) ele passa a abrir os confrontos
+e a batalha afrouxa; onde o líder está acima (5º, 8º) é o contrário. Antes disso, o nível não
+contava pra nada nessa decisão.
+
+**A impressão do motor MUDA, e tem que mudar** (`MOTOR 0c52f316db7b → dbf789938bc5`): é mudança de
+motor, não de apresentação. E `effectiveSpeed` é **idêntico nos dois motores** — uma divergência
+ali faria a mesma partida de liga terminar diferente no cliente e no servidor.
+
+### ⚠️ A CORRIDA ESCALARIA DUAS VEZES
+
+O `speedDaCorrida` **já era a fórmula da Gen 3** — ele a CRIOU, em 18/09/2026, justamente porque o
+motor de batalha não tinha nenhuma. Mantida a conta dele, um Jolteon Lv.70 iria de **187 para 266**
+e a pista inteira precisaria ser recalibrada — e o defeito não apareceria como erro, apareceria
+como todo mundo correndo mais rápido.
+
+Hoje ele é **o próprio `effectiveSpeed`**. Medido: Jolteon Lv.70 **187 → 187** e Shuckle **12 → 12**,
+idênticos. O único número que se move é o do shiny (**223 → 224**), porque os multiplicadores
+passaram a entrar DEPOIS da escala e o `+5` deixou de ser multiplicado.
+
+**⚠️ E A TRAVA DA CORRIDA QUE DIZIA "o `effectiveSpeed` do motor IGNORA o nível" FOI INVERTIDA** —
+ela era a justificativa de a escala existir lá, e virou a prova de que ela mudou de dono. A
+mensagem de falha dela aponta pro outro lado se alguém desfizer um dos dois.
+
+### ⚠️ E ELA DEIXOU A RAIDE DO MEW INGANHÁVEL — o dial que consertou isso
+
+O Mew da raide é **Lv.4999**, e esse número nunca foi uma afirmação sobre o bicho: ele é o dial que
+dá os 25.125 de HP e que divide o dano por ataque. Com a escala, o mesmo 4999 dava velocidade
+**10.003** — mais que o jogo inteiro somado. Medido: o Mew matava os SEIS antes de qualquer um agir
+e uma investida tirava **ZERO** de dano, sempre.
+
+**Hoje a velocidade do chefe é um DIAL explícito** (`BOSS_SPEED_COMO_NIVEL`): ele se comporta como
+um Mew de nível 50. Medido, isso o devolve **exatamente onde ele estava** — 44 investidas e 41 com
+dano zero **dos dois lados** —, contra 41/41 (ou seja sempre zero) sem o dial.
+
+**⚠️ ELE FICA FORA DO `BOSS_BASE`** de propósito: aquele objeto são os atributos oficiais do Mew
+(100 em tudo, Gen 2), e sobrescrever a velocidade lá faria a tabela mentir sobre a espécie.
+**⚠️ E A RAIDE CONTINUA DESCALIBRADA** — isso é anterior, de 15/09/2026, quando o golpe moribundo
+acabou. Ela está DESLIGADA e o dial só impede que ela volte INGANHÁVEL; ele não a conserta.
+
+### ⚠️ O QUE FICA EM ABERTO
+
+O **desempate de velocidade** continua sendo sorteado a CADA troca. Com os empates caindo de 3,7%
+para ~0,7% isso ficou muito mais raro, mas no **espelho** (mesma espécie, mesmo nível) ele continua
+valendo 70% dos confrontos. A alternativa — sortear uma vez por confronto — está medida no item do
+log de batalha e não foi feita porque não foi pedida.
 
 ## Frontend
 

@@ -6385,9 +6385,17 @@ console.log('\n=== O TERRENO VALE NOS SEIS ATRIBUTOS, E O TEXTO DIZ ISSO (15/09/
      ' | SpDef ' + S.effectiveSpDef(nu) + '->' + S.effectiveSpDef(comT));
   /* E O SERVIDOR faz igual -- o buff entra no dano dos dois lados. */
   const srvT = require('fs').readFileSync(path.join(raiz, 'functions', 'index.js'), 'utf8');
+  /* ⚠️ A FATIA VAI ATÉ O FIM DA FUNÇÃO, nunca um número fixo de caracteres: ela era 400, e um
+     comentário acrescentado DENTRO do effectiveSpeed empurrou o withBuffs pra fora da janela --
+     a trava acusou o que estava certo. É a mesma armadilha da fatia de tamanho fixo que este
+     arquivo já pagou; o delimitador de verdade é a próxima declaração. */
+  const corpoDe = (txt, nome) => {
+    const i = txt.indexOf('function ' + nome + '(');
+    return i < 0 ? null : txt.slice(i, txt.indexOf(String.fromCharCode(10) + String.fromCharCode(125), i) + 2);
+  };
   const semEffective = efetivas.filter(n => {
-    const i = srvT.indexOf('function ' + n + '(');
-    return i < 0 || srvT.slice(i, i + 400).indexOf('withBuffs') < 0;
+    const corpo = corpoDe(srvT, n);
+    return !corpo || corpo.indexOf('withBuffs') < 0;
   });
   ok('e as SEIS do servidor tambem chamam o withBuffs', semEffective.length === 0, semEffective.join(', ') || 'as seis');
   /* O TEXTO DA TELA. Ele e a outra metade do pedido, e a trava le a frase PALAVRA POR PALAVRA:
@@ -9298,6 +9306,90 @@ console.log('\n=== VIDA CHEIA NAO MORRE NUM GOLPE (17/09/2026) ===');
     const a = S.chaveDaFrase({ classe: 'aviso-especial', html: 'x' });
     const b = S.chaveDaFrase({ classe: 'aviso-golpe', html: 'x' });
     ok('a chave leva a CLASSE junto', a !== b, a + ' x ' + b);
+  }
+}
+
+/* ============================================================================
+   ⚠️ A VELOCIDADE ESCALA COM O NÍVEL (20/09/2026) -- a fórmula da Gen 3
+   ============================================================================
+   Era o último desvio de regra do motor: um Jolteon Lv.5 e um Lv.99 devolviam 130 IGUAL. Passou
+   despercebido porque a velocidade é o ÚNICO atributo que não entra numa fórmula -- os outros
+   cinco entram no cálculo de dano, onde o nível já estava. Ela entra numa COMPARAÇÃO, e comparar
+   dois valores de base ignora o nível por completo.
+   ============================================================================ */
+console.log('\n=== A VELOCIDADE ESCALA COM O NÍVEL (a fórmula da Gen 3) ===');
+{
+  const gen3 = (base, nivel) => Math.floor(2 * base * nivel / 100) + 5;
+  const inst = (id, lv, ex) => { const p = S.createInstance(id, lv); Object.assign(p, ex || {});
+    p.hp = p.maxHp = S.calcMaxHp(p); return p; };
+
+  /* ⚠️ A FÓRMULA, cobrada nas 250 ESPÉCIES em oito níveis -- e não em dois exemplos escolhidos */
+  let fora = 0, conferidas = 0;
+  for(const id of Object.keys(S.SPECIES))
+    for(const lv of [1, 5, 20, 50, 64, 70, 80, 99]){
+      conferidas++;
+      if(S.effectiveSpeed(inst(id, lv)) !== gen3(S.SPECIES[id].speed, lv)) fora++;
+    }
+  ok('a fórmula é floor(2×base×nível/100)+5 nas 250 espécies', fora === 0,
+     (conferidas - fora) + ' de ' + conferidas);
+
+  ok('o mesmo pokémon é mais rápido em nível alto',
+     S.effectiveSpeed(inst('jolteon', 5)) < S.effectiveSpeed(inst('jolteon', 99)),
+     S.effectiveSpeed(inst('jolteon', 5)) + ' < ' + S.effectiveSpeed(inst('jolteon', 99)));
+  /* ⚠️ O CASO QUE MAIS SALTA AOS OLHOS, e que era o contrário: um Jolteon Lv.5 batia ANTES de um
+     Snorlax Lv.99 (130 contra 30). Na Gen 3 é 18 contra 64. */
+  ok('  e um Jolteon Lv.5 NÃO bate antes de um Snorlax Lv.99',
+     S.effectiveSpeed(inst('jolteon', 5)) < S.effectiveSpeed(inst('snorlax', 99)),
+     S.effectiveSpeed(inst('jolteon', 5)) + ' contra ' + S.effectiveSpeed(inst('snorlax', 99)));
+  /* ⚠️ O PAR DO RELATO: Raichu Lv.64 x Tentacruel Lv.80, os dois base 100. Eles EMPATAVAM, e o
+     desempate sorteado a cada troca fazia o log mostrar o mesmo pokémon atacando duas vezes. */
+  ok('  e o par do relato deixou de empatar (Raichu Lv.64 x Tentacruel Lv.80)',
+     S.effectiveSpeed(inst('raichu', 64)) < S.effectiveSpeed(inst('tentacruel', 80)),
+     S.effectiveSpeed(inst('raichu', 64)) + ' contra ' + S.effectiveSpeed(inst('tentacruel', 80)));
+
+  /* ⚠️ O NÍVEL ENTRA ANTES DOS MULTIPLICADORES, que é a ordem do jogo original: a fórmula produz o
+     ATRIBUTO, e shiny/terreno/paralisia/estágio são modificadores DELE. Invertendo, o `+5` da
+     fórmula seria multiplicado junto. */
+  {
+    const limpo = S.effectiveSpeed(inst('jolteon', 70));
+    const shiny = S.effectiveSpeed(inst('jolteon', 70, { shiny: true }));
+    const para = S.effectiveSpeed(inst('jolteon', 70, { _paralisado: true }));
+    ok('o shiny é 1,20× do ATRIBUTO (o nível entra antes)',
+       shiny === Math.round(limpo * S.SHINY_BUFF_MULT), limpo + ' -> ' + shiny);
+    ok('  e a paralisia é ' + S.PARALISIA_VELOCIDADE + '× dele',
+       para === Math.round(limpo * S.PARALISIA_VELOCIDADE), limpo + ' -> ' + para);
+  }
+
+  /* ⚠️ OS DOIS MOTORES TÊM QUE SER IDÊNTICOS: a ordem da troca decide a batalha inteira, e uma
+     divergência aqui faz a mesma partida de liga terminar diferente no cliente e no servidor. */
+  {
+    const pega = (t) => { const a = t.indexOf('function effectiveSpeed(p){');
+      return a < 0 ? null : t.slice(a, t.indexOf("\n}", a) + 2).replace(/\s+/g, ' '); };
+    const src = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
+    const cliente = pega(src);
+    const servidor = pega(require('fs').readFileSync(path.join(raiz, 'functions', 'index.js'), 'utf8'));
+    ok('(as duas cópias foram achadas)', !!cliente && !!servidor);
+    ok('o effectiveSpeed é idêntico nos dois motores', cliente === servidor,
+       cliente === servidor ? '' : 'C: ' + cliente + '  |  S: ' + servidor);
+  }
+
+  /* ⚠️ E A CORRIDA NÃO ESCALA DE NOVO: o `speedDaCorrida` JÁ era a fórmula da Gen 3 (ele a criou,
+     em 18/09). Mantida a conta antiga, um Jolteon Lv.70 iria de 187 pra 266 e a pista inteira
+     precisaria ser recalibrada -- e o defeito não apareceria como erro, apareceria como todo mundo
+     correndo mais rápido. */
+  ok('a Corrida usa o effectiveSpeed direto, sem escalar duas vezes',
+     S.speedDaCorrida(inst('jolteon', 70)) === S.effectiveSpeed(inst('jolteon', 70)),
+     String(S.speedDaCorrida(inst('jolteon', 70))));
+
+  /* ⚠️ E O COMENTÁRIO QUE DIZIA QUE ELA ALIMENTA O CRÍTICO SAIU: isso deixou de ser verdade em
+     10/09/2026, quando o crítico virou os estágios da Gen 3. Ele ficou catorze dias mentindo. */
+  {
+    const txt = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
+    const a = txt.indexOf('function effectiveSpeed(p){');
+    const antes = txt.slice(Math.max(0, a - 2200), a);
+    ok('  e o comentário não diz mais que ela alimenta o crítico', !/speed\s*\/\s*512/.test(antes));
+    ok('  (o crítico de verdade só olha o golpe)', S.chanceDeCritico('tackle') === S.CRIT_BASE &&
+       S.chanceDeCritico('slash') === S.CRIT_ALTO);
   }
 }
 
