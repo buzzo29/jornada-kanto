@@ -12814,11 +12814,14 @@ paga 83 pontos, mas o que mora lá?
   vontade de consultar os outros.
 
 **E VIERAM JUNTO as coisas do protótipo que a tela não tinha:** o chip do ponto no painel da boia,
-o chip do peixe (`Grande · DISPUTADO` quando o NPC está na mesma linha), a **linha de atividade de
-cada ponto do lago** (`VOCÊ PESCANDO` / `NPC PESCANDO` / `DISPUTA!` / `Médio · 4s`), o relógio
+o chip do peixe (`Grande · na linha`), a **linha de atividade de cada ponto do lago**
+(`<NOME> PESCANDO` / `Médio · 4s` / `Sem movimento`), o relógio
 **vermelho** nos últimos 15s, a contagem de prorrogação (`+7s`) depois dos 90, e o chip do
-cabeçalho virando `ÚLTIMOS ENCONTROS`. A função `pescariaTamanho` estava **órfã** desde que nasceu
-— agora ela tem chamador.
+cabeçalho virando `ÚLTIMOS ENCONTROS`. A função `pescariaTamanho` estava **órfã** desde que nasceu — agora ela tem chamador.
+
+**⚠️ AS DUAS ETIQUETAS DE DISPUTA QUE ESTE PARÁGRAFO CITAVA SAÍRAM EM 20/09/2026**, quando um ponto
+passou a ter UM pescador -- ver **AS SETE DE 20/09/2026**, no fim desta seção. E o `VOCÊ` virou o
+nome do treinador na mesma leva.
 
 **Medido a 320px, no navegador, nas 14 telas:** **nenhuma rola pro lado** e nenhum elemento estoura
 a largura. A tela da batalha é a mais alta (826px), o painel de puxar fica em 651px e o quadro dos
@@ -13405,6 +13408,85 @@ des-escalada muda os dois hashes. Tudo aqui é apresentação mais um **chamador
 3. **⚠️ UMA CLASSE DE BOTÃO SEM CSS** (`pesc-trocar`) foi pega pela varredura de classes fantasma --
    ela não fazia nada, porque o `.btn` da casa já traz a margem. Letra morta sai.
 
+#### AS SETE DE 20/09/2026 (a leva do placar quebrado)
+
+**⚠️ 1) O `(i)` NÃO ABRIA NADA NA PRIMEIRA TELA.** O estado sempre mudou (`pescaria.zonaAberta`) e
+o `render()` sempre rodou -- o que faltava era o `return` do **SETUP** desenhar o modal. Ele só
+estava no `return` do DUELO. O `(i)` é clicável nas duas telas de propósito (é justamente o que o
+setup tem a oferecer), e a metade que faltava era a de baixo.
+
+**⚠️ 2) O NÚMERO DO PONTO SAÍA COLADO NA ESQUERDA -- só na primeira tela, e com o MESMO CSS.**
+No duelo o ponto é um `<button>`, e botão centraliza texto pelo **estilo de fábrica do navegador**;
+na primeira tela ele é um `<span>`, que **não** centraliza. Hoje o `text-align:center` é explícito.
+
+**⚠️ 3) UM PONTO, UM PESCADOR** (*"quando o adversario de pesca entrar em um ponto, nenhum outro
+pode entrar até que acabe a pesca dele"*).
+
+- Quem responde é o `pescariaQuemEsta(k)`, e ele pergunta **pela ZONA, não pelo id da**
+  **oportunidade**: no instante da fisgada o `op` sai do `pescaria.oportunidades` (ele foi PESCADO)
+  e quem continua ali é o **pescador**. Perguntando pelo id, o ponto **reabriria justamente no meio**
+  **da pesca** que a regra protege.
+- **Quem recusa é a AÇÃO**, não a tela apagada: um toque no quadro em que o outro entra chegaria
+  antes do `disabled` do pintor. Vale pros dois lados -- o NPC passa pela mesma função.
+- **E a TELA fecha o ponto** (classe `ocupada`): sem isso ele continuava piscando e chamando pra um
+  lugar onde a ação ia recusar, que é pior que um ponto apagado. **⚠️ A regra vem DEPOIS da `.viva`**
+  **e da `:disabled`** -- as três têm a mesma especificidade, e quem vence é a última.
+
+**⚠️ E A DISPUTA VIROU LETRA MORTA NA MESMA LINHA.** Com um ponto por pescador, dois nunca estão no
+mesmo -- então saíram juntas a etiqueta `DISPUTA!` da zona, a do chip do peixe, a função que a
+respondia e o laço que tirava do ponto quem chegava depois. Eram **quatro formas da mesma**
+**mecânica**, e as quatro morreram de uma vez.
+
+**⚠️ 4) O PLACAR DE CIMA QUEBRAVA, e a causa era reuso demais.** Ele chamava o
+`placarDoTreinador` com o nome **VAZIO** -- e aquilo devolve o **CHIP INTEIRO**, com borda, fundo e
+`flex:1 1 0`. Dentro da coluna do placar isso virava uma **moldura alta e vazia** (o risco vertical
+do print) que ainda **comia a margem esquerda** do texto de estado ("rocurando oportunidade").
+Hoje ali vão só as pokébolas (`pokebolasHtml`), e o chip continua existindo inteiro pra quem o quer
+assim -- a batalha, a jornada, a Torre.
+
+- **E O PINTOR PASSOU A REPINTÁ-LAS**: ele repintava os pontos e o estado, mas não elas -- então
+  uma morte NO MEIO da batalha só aparecia no `render()` seguinte. Com a fila animada isso ficou
+  visível.
+
+**5) O NOME DO TREINADOR, NUNCA "VOCÊ"** -- ele aparecia em **seis** pontos da tela, e a conta cai
+num lugar só (`pescariaMeuNome()`, que lê o `game.trainerName`). Sem save aberto ele volta pro
+"Você", que é o que o resto do jogo faz quando não há nome.
+
+**6) SAIU O "TESTE ADMIN"** das quatro telas. A pescaria continua se identificando pelo nome.
+
+**7) O LOG DO FIM: O QUE CADA UM PESCOU** (*"somente pokemons, level e pontos que cada treinador
+fez"*). Um bloco por treinador, com o nome e o **total** no topo, e uma linha por captura --
+pokémon, **Lv.** e **pontos**.
+
+- **⚠️ É EMPILHADO, e não duas colunas**: a 320px uma coluna de captura tem ~140px e o nome com o
+  nível não cabe. Empilhado, cada linha tem a largura toda.
+- **A LINHA É A `.pesc-hist` QUE JÁ EXISTE** -- a mesma dos "Últimos encontros" do duelo. Ela já é
+  sprite + texto + pontos, já está medida, e reusá-la é o que faz as duas listas se lerem igual em
+  vez de o jogador reaprender no fim da partida.
+- **⚠️ E O HISTÓRICO DEIXOU DE SER CORTADO EM 8.** Ele guardava só os oito últimos porque a tela do
+  DUELO mostra "Últimos encontros" -- e o log do fim precisa de **todos**. O corte foi pra quem o
+  quer cortado (`PESCARIA_HIST_NA_TELA`); uma segunda lista divergiria da primeira no dia seguinte.
+- **A ORDEM É A DA PESCARIA** (o 1º peixe em cima): o `historico` empilha ao contrário.
+
+**Medido a 320px, no navegador:** o placar em **75px** com 6 bolas de cada lado, sem chip e sem
+corte no texto; o log do fim em **487px** (3 capturas + 2), nenhum nome truncado; e **nenhuma das
+21 telas rola pro lado**.
+
+**CONFERIDO QUE NÃO É MOTOR:** as duas impressões continuam **idênticas** em 900 batalhas semeadas.
+
+Conferido que as travas acusam, uma a uma: **2** falhas sem o modal no setup, **1** sem o
+`text-align`, **6** sem a guarda do ponto ocupado, **1** com o chip de volta no placar, **1** com o
+"VOCÊ" de volta, **3** com o "TESTE ADMIN" e **9** sem o log do fim.
+
+#### ⚠️ E OS COMENTÁRIOS SE ACUSARAM DE NOVO -- a sétima vez, no mesmo dia da sexta
+
+Três comentários meus citavam ao pé da letra os nomes que acabavam de sair (`DISPUTA!`, `DISPUTADO`,
+"pescou primeiro"), e as travas que cobram a remoção **acusaram o próprio comentário**. Um deles era
+pior: ele **descrevia a mecânica removida como se ela existisse** -- texto caduco no mesmo commit
+que o tornou caduco.
+
+A regra é a de sempre aqui, e ela já tem sete casos: **comentário não reproduz o que saiu**. O
+`index.html` é publicado inteiro, e a varredura seguinte não distingue o código do comentário.
 #### ⚠️ A LUPA DO iOS NO BOTÃO DE PUXAR (20/09/2026)
 
 Reportado: *"quando eu seguro o botão SEGURE PARA PUXAR, por estar em uma pagina web, fica

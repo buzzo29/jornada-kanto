@@ -649,7 +649,8 @@ console.log('\n=== A REALIMENTAÇÃO DA PESCA ===');
     const guarda = { tempo: S.pescaria.tempo, fase: S.pescaria.fase };
     S.pescaria.fase = 'jogando'; S.pescaria.tempo = 10;
     ok('  o chip nomeia o adversário durante o duelo',
-       S.pescariaChipDoDuelo() === 'VOCÊ × ' + S.PESCARIA_NPC_NOME.toUpperCase(), S.pescariaChipDoDuelo());
+       S.pescariaChipDoDuelo() === S.pescariaMeuNome().toUpperCase() + ' × ' + S.PESCARIA_NPC_NOME.toUpperCase(),
+     S.pescariaChipDoDuelo());
     S.pescaria.tempo = S.PESCARIA_DURACAO + 1;
     ok('  e ÚLTIMOS ENCONTROS na prorrogação', S.pescariaChipDoDuelo() === 'ÚLTIMOS ENCONTROS', S.pescariaChipDoDuelo());
     S.pescaria.fase = 'fim';
@@ -737,17 +738,35 @@ console.log('\n=== A REALIMENTAÇÃO DA PESCA ===');
   p = pescando();
   p.ate = S.pescaria.tempo; S.pescariaAtualizar(0.01); S.pescariaFisgar();
   S.pescaria.jogadores[1].op = null;   /* o NPC pode ter entrado no mesmo ponto durante o laço acima */
-  ok('o chip diz o tamanho do peixe e se há disputa',
-     /^(Pequeno|Médio|Grande) · (na linha|DISPUTADO)$/.test(S.pescariaChipDoPeixe(p.op)),
+  /* ⚠️ NÃO EXISTE MAIS DISPUTA (20/09/2026): quem chega primeiro FECHA o ponto, então dois nunca
+     estão no mesmo. O chip do peixe perdeu o `DISPUTADO`, a zona perdeu o `DISPUTA!` e o
+     `pescariaComecarBatalha` perdeu o "X pescou primeiro" -- as três eram a mesma mecânica. */
+  ok('o chip diz o tamanho do peixe',
+     /^(Pequeno|Médio|Grande) · na linha$/.test(S.pescariaChipDoPeixe(p.op)),
      S.pescariaChipDoPeixe(p.op));
+  ok('  e a zona diz o NOME do treinador',
+     S.pescariaAtividade(0) === S.pescariaMeuNome().toUpperCase() + ' PESCANDO',
+     S.pescariaAtividade(0));
   {
+    /* ⚠️ UM PONTO, UM PESCADOR -- e quem recusa é a AÇÃO, não a tela apagada. */
     const npc = S.pescaria.jogadores[1];
-    npc.op = p.op;
-    ok('  e ele GRITA quando o NPC está no mesmo peixe',
-       /DISPUTADO$/.test(S.pescariaChipDoPeixe(p.op)), S.pescariaChipDoPeixe(p.op));
-    ok('  e a zona também', S.pescariaAtividade(0) === 'DISPUTA!', S.pescariaAtividade(0));
-    npc.op = null;
-    ok('  sozinho, a zona diz que é você', S.pescariaAtividade(0) === 'VOCÊ PESCANDO', S.pescariaAtividade(0));
+    const zona = p.op.zona;
+    ok('  e o ponto tem dono', S.pescariaQuemEsta(zona) === 0, String(S.pescariaQuemEsta(zona)));
+    npc.estado = 'parado'; npc.op = null;
+    S.pescariaEntrar(1, zona);
+    ok('  o adversário NÃO entra no ponto que eu ocupei', npc.op === null,
+       npc.op ? 'entrou na zona ' + npc.op.zona : '(não entrou)');
+    /* e o contrário também: o ponto DELE fica fechado pra mim */
+    const eu = S.pescaria.jogadores[0];
+    S.pescaria.oportunidades = new Array(S.PESCARIA_ZONAS.length).fill(null);
+    S.pescariaSurgir(3);
+    npc.estado = 'espera'; npc.op = S.pescaria.oportunidades[3];
+    eu.estado = 'parado'; eu.op = null;
+    S.pescariaEntrar(0, 3);
+    ok('  e eu não entro no ponto que ele ocupou', eu.op === null,
+       eu.op ? 'entrou na zona ' + eu.op.zona : '(não entrou)');
+    ok('  a zona diz quem está lá', S.pescariaAtividade(3) === S.PESCARIA_NPC_NOME.toUpperCase() + ' PESCANDO',
+       S.pescariaAtividade(3));
   }
 }
 
@@ -865,7 +884,8 @@ console.log('\n=== A TELA ===');
   S.pescaria.fase = 'fim';
   const fim = S.renderPescaria();
   ok('o fim mostra o placar', fim.indexOf('>120<') >= 0 && fim.indexOf('>80<') >= 0);
-  ok('e diz quem venceu', fim.indexOf('Você venceu') >= 0);
+  /* ⚠️ O NOME DO TREINADOR, nunca "Você" (20/09/2026, a pedido) */
+  ok('e diz quem venceu, pelo NOME', fim.indexOf(S.pescariaMeuNome() + ' venceu') >= 0);
   ok('e a pista some', fim.indexOf('pescariaEntrar(0,') < 0);
   ok('mas dá pra pescar de novo e trocar parceiro',
      fim.indexOf('pescariaLargar()') >= 0 && fim.indexOf('pescariaReiniciar()') >= 0);
@@ -987,9 +1007,14 @@ console.log('\n=== A TELA ACOMPANHA O MOTOR SEM UM render() ===');
   /* ⚠️ E ENTÃO O DESCANSO PASSA, também por TEMPO */
   anda(1.6);
   ok('o descanso passa sozinho', p.estado === 'parado', p.estado);
-  ok('  ⚠️ E O LAGO REABRE NA TELA (o defeito relatado)',
-     [0,1,2,3,4,5].every(k => zona(k).disabled === false),
-     'travadas: ' + [0,1,2,3,4,5].filter(k => zona(k).disabled).join(',') || '(nenhuma)');
+  /* ⚠️ MENOS O QUE O ADVERSÁRIO OCUPA: desde 20/09/2026 um ponto tem UM pescador, então o dele
+     continua fechado enquanto ele pesca -- e é o certo. */
+  {
+    const livres = [0,1,2,3,4,5].filter(k => S.pescariaQuemEsta(k) < 0);
+    ok('  ⚠️ E O LAGO REABRE NA TELA (o defeito relatado)',
+       livres.length > 0 && livres.every(k => zona(k).disabled === false),
+       'travadas: ' + (livres.filter(k => zona(k).disabled).join(',') || '(nenhuma)'));
+  }
   ok('  e o painel volta a ser o de escolher', painel('Parado').hidden === false && painel('Espera').hidden === true);
 
   /* ---- 3) DEPOIS DOS 90s O LAGO FECHA DE NOVO ---- */
@@ -1681,6 +1706,197 @@ console.log('\n=== A LUPA DO iOS NO BOTÃO DE PUXAR ===');
   ok('a declaração da lupa aparece UMA vez no jogo inteiro',
      (src.match(/-webkit-touch-callout/g) || []).length === 1,
      (src.match(/-webkit-touch-callout/g) || []).length + ' vezes');
+}
+
+/* ============================================================================
+   ⚠️ AS SETE DE 20/09/2026 (a leva do relato do placar quebrado)
+   ============================================================================ */
+console.log('\n=== O (i) ABRE NA PRIMEIRA TELA ===');
+{
+  contaAdmin();
+  S.pescaria.fase = 'setup'; S.pescaria.escolhido = S.pescariaElegiveis()[0];
+  S.pescaria.zonaAberta = null;
+  ok('sem tocar no (i), não há modal', S.renderPescaria().indexOf('fecharZonaDaPescaria()') < 0);
+  /* ⚠️ O ESTADO SEMPRE MUDOU -- o que faltava era o `return` do SETUP desenhar o modal. */
+  S.abrirZonaDaPescaria(5);
+  const tela = S.renderPescaria();
+  ok('o (i) abre o modal NA PRIMEIRA TELA', tela.indexOf('fecharZonaDaPescaria()') >= 0);
+  ok('  com o nome do ponto', tela.indexOf(S.PESCARIA_ZONAS[5].nome) >= 0);
+  ok('  e as chances de cada espécie', S.chancesDaZona(5).every(x => tela.indexOf(x.pct + '%') >= 0));
+  S.fecharZonaDaPescaria();
+  ok('e fecha', S.renderPescaria().indexOf('fecharZonaDaPescaria()') < 0);
+}
+
+console.log('\n=== O NÚMERO DO PONTO É CENTRALIZADO ===');
+{
+  /* ⚠️ NA PRIMEIRA TELA o ponto é um `<span>`, e span NÃO centraliza texto -- só o `<button>` do
+     duelo herdava o `text-align:center` do estilo de fábrica do navegador. O número saía centrado
+     numa tela e colado na esquerda na outra, com o MESMO CSS. */
+  const css = src.slice(src.indexOf('<style'), src.indexOf('</style>'));
+  const i = css.indexOf('.pesc-mapa .pesc-zona{');
+  const regra = i < 0 ? '' : css.slice(i, css.indexOf('}', i));
+  ok('(a regra do ponto existe)', regra.length > 40, regra.length + ' chars');
+  ok('o ponto centraliza o texto explicitamente', /text-align:\s*center/.test(regra), regra.slice(0, 60));
+  /* e a primeira tela usa `<span>`, que é o que torna isso necessário */
+  contaAdmin();
+  const mapa = S.pescariaMapaHtml(false);
+  ok('  e a primeira tela desenha o ponto como <span>', /<span class="pesc-zona/.test(mapa));
+}
+
+console.log('\n=== UM PONTO, UM PESCADOR ===');
+{
+  const p = jogoNaTela();
+  const npc = S.pescaria.jogadores[1];
+  S.pescaria.oportunidades = new Array(S.PESCARIA_ZONAS.length).fill(null);
+  S.pescariaSurgir(2);
+  /* o NPC entra primeiro */
+  npc.estado = 'parado';
+  S.pescariaEntrar(1, 2);
+  ok('o adversário entrou', npc.op && npc.op.zona === 2, npc.op ? 'zona ' + npc.op.zona : '(nada)');
+  ok('  e o ponto tem dono', S.pescariaQuemEsta(2) === 1, String(S.pescariaQuemEsta(2)));
+  /* ⚠️ A AÇÃO recusa, e ela é quem manda: um toque no quadro em que ele entra chegaria antes do
+     `disabled` do pintor. */
+  p.estado = 'parado'; p.op = null;
+  S.pescariaEntrar(0, 2);
+  ok('  e eu NÃO entro', p.op === null, p.op ? 'entrei na zona ' + p.op.zona : '(não entrei)');
+  /* ⚠️ E A TELA FECHA O PONTO: sem isso ele continuava piscando e chamando pra um lugar onde a
+     ação ia recusar, que é pior que um ponto apagado. */
+  S.renderPescaria(); S.pescariaPintar();
+  const z = S.document.getElementById('pescZona2');
+  ok('  e a tela o fecha', z && z.disabled === true, z ? 'disabled=' + z.disabled : '(sem zona)');
+  ok('  com a marca de ocupado', z && z.classList.contains('ocupada'));
+  ok('  e ele NÃO pisca', z && !z.classList.contains('viva'));
+  /* e quando ele sai, o ponto reabre */
+  npc.estado = 'parado'; npc.op = null;
+  S.renderPescaria(); S.pescariaPintar();
+  const z2 = S.document.getElementById('pescZona2');
+  ok('quando ele sai, o ponto reabre', z2 && z2.disabled === false);
+  ok('  e a marca sai', z2 && !z2.classList.contains('ocupada'));
+  /* ⚠️ E A REGRA DO CSS VEM DEPOIS DA `.viva` E DA `:disabled`: as três têm a MESMA
+     especificidade, e quem vence é a última -- um ponto ocupado COM peixe não pode piscar. */
+  {
+    const css = src.slice(src.indexOf('<style'), src.indexOf('</style>'));
+    const viva = css.indexOf('.pesc-mapa .pesc-zona.viva{');
+    const off = css.indexOf('.pesc-mapa .pesc-zona:disabled{');
+    const ocu = css.indexOf('.pesc-mapa .pesc-zona.ocupada{');
+    ok('  e a regra dela vem por último no CSS', ocu > viva && ocu > off,
+       'viva`' + viva + ' off`' + off + ' ocupada`' + ocu);
+  }
+  /* ⚠️ E A DISPUTA VIROU LETRA MORTA -- as três formas dela saíram juntas. */
+  ok('o `pescariaDisputado` não existe mais', src.indexOf('function pescariaDisputado') < 0);
+  ok('  nem o DISPUTA! da zona', src.indexOf('DISPUTA!') < 0);
+  ok('  nem o DISPUTADO do chip', src.indexOf('DISPUTADO') < 0);
+  ok('  nem o "pescou primeiro"', src.indexOf('pescou primeiro') < 0);
+}
+
+console.log('\n=== O NOME DO TREINADOR, NUNCA "VOCÊ" ===');
+{
+  contaAdmin();
+  g.trainerName = 'Buzzo';
+  ok('o nome vem do game.trainerName', S.pescariaMeuNome() === 'Buzzo', S.pescariaMeuNome());
+  /* ⚠️ E SEM NOME ELE VOLTA PRO "Você" -- o modo admin abre da home, e pode não haver save. */
+  g.trainerName = null;
+  ok('  e sem nome ele volta pro padrão', S.pescariaMeuNome() === 'Você', S.pescariaMeuNome());
+  g.trainerName = 'Buzzo';
+  const p = jogoNaTela();
+  S.pescaria.tempo = 10;
+  ok('o chip do duelo usa o nome', S.pescariaChipDoDuelo().indexOf('BUZZO') >= 0, S.pescariaChipDoDuelo());
+  const tela = S.renderPescaria();
+  ok('  e o placar de cima também', tela.indexOf('BUZZO') >= 0);
+  /* ⚠️ E A PALAVRA "VOCÊ" NÃO SOBRA EM LUGAR NENHUM DA TELA. Ela aparecia em SEIS pontos, e uma
+     cópia esquecida é justamente o que o pedido tira. */
+  ok('  e a palavra VOCÊ não sobra na tela do duelo', !/VOCÊ/.test(tela), 'sobrou');
+  S.pescaria.fase = 'fim';
+  const fim = S.renderPescaria();
+  ok('  nem na tela do fim', !/VOCÊ|Você venceu/.test(fim), 'sobrou');
+}
+
+console.log('\n=== O EYEBROW NÃO DIZ MAIS TESTE ADMIN ===');
+{
+  contaAdmin();
+  for(const fase of ['setup', 'jogando', 'fim']){
+    if(fase !== 'setup'){ jogoNaTela(); S.pescaria.fase = fase; }
+    else { S.pescaria.fase = 'setup'; S.pescaria.escolhido = S.pescariaElegiveis()[0]; }
+    const t = S.renderPescaria();
+    ok('  a fase ' + fase + ' não diz TESTE ADMIN', t.indexOf('TESTE ADMIN') < 0);
+    ok('    mas continua se identificando', t.indexOf('PESCARIA POKÉMON') >= 0);
+  }
+}
+
+console.log('\n=== O PLACAR DE CIMA NÃO QUEBRA ===');
+{
+  /* ⚠️ O `placarDoTreinador` devolve o CHIP INTEIRO -- com borda, fundo e `flex:1 1 0`. Dentro da
+     coluna do placar isso virava uma moldura alta e VAZIA (o nome ia vazio ali), e era ela o
+     risco vertical do print de 20/09/2026 -- que ainda comia a margem esquerda do texto de
+     estado. Hoje ali vão só as POKÉBOLAS. */
+  const p = jogoNaTela();
+  const tela = S.renderPescaria();
+  /* ⚠️ A FATIA PARA NO MEU LADO: com 700 chars ela pegava os DOIS (12 bolas em vez de 6), e a
+     trava daria verde com o chip de volta num deles. */
+  const i = tela.indexOf('pescTime0');
+  const bloco = tela.slice(i, tela.indexOf('pescTime1'));
+  ok('o placar de cima não leva o chip do nome', bloco.indexOf('team-alive-chip') < 0);
+  ok('  e leva as pokébolas', (bloco.match(/class="pokeball/g) || []).length === 6,
+     (bloco.match(/class="pokeball/g) || []).length + ' bolas');
+  /* ⚠️ E O CHIP CONTINUA EXISTINDO pra quem o quer INTEIRO -- a batalha, a jornada, a Torre. */
+  ok('  e o chip continua existindo pro resto do jogo',
+     S.placarDoTreinador('Ash', 3, 6).indexOf('team-alive-chip') >= 0);
+  ok('    com o nome dentro', S.placarDoTreinador('Ash', 3, 6).indexOf('Ash') >= 0);
+  /* ⚠️ E O PINTOR REPINTA AS BOLAS: sem isso uma morte NO MEIO da batalha só aparecia no
+     `render()` seguinte -- e com a fila animada isso é visível. */
+  p.time[0].hp = 0; p.time[1].hp = 0;
+  S.pescariaPintar();
+  const el = S.document.getElementById('pescTime0');
+  ok('o pintor repinta as pokébolas', (el.innerHTML.match(/pokeball ko/g) || []).length === 2,
+     (el.innerHTML.match(/pokeball ko/g) || []).length + ' caídas');
+}
+
+console.log('\n=== O LOG DO FIM: O QUE CADA UM PESCOU ===');
+{
+  contaAdmin();
+  g.trainerName = 'Buzzo';
+  jogoNaTela();
+  /* uma pescaria inventada: 3 minhas (2 vitórias) e 2 dele */
+  S.pescaria.historico = [
+    { quem: 'Pescador Wilton', speciesId: 'seaking', nivel: 41, venceu: false, pts: 0 },
+    { quem: 'Buzzo', speciesId: 'gyarados', nivel: 62, venceu: true, pts: 83 },
+    { quem: 'Pescador Wilton', speciesId: 'tentacool', nivel: 30, venceu: true, pts: 24 },
+    { quem: 'Buzzo', speciesId: 'magikarp', nivel: 12, venceu: false, pts: 0 },
+    { quem: 'Buzzo', speciesId: 'poliwag', nivel: 22, venceu: true, pts: 20 },
+  ];
+  S.pescaria.fase = 'fim';
+  const fim = S.renderPescaria();
+  ok('o log do fim existe', fim.indexOf('O que cada um pescou') >= 0);
+  const i = fim.indexOf('pesc-resumo-lado');
+  const bloco = fim.slice(i);
+  ok('  com um bloco por treinador', (bloco.match(/pesc-resumo-lado/g) || []).length === 2,
+     (bloco.match(/pesc-resumo-lado/g) || []).length + ' blocos');
+  ok('  e uma linha por captura', (bloco.match(/pesc-hist /g) || []).length === 5,
+     (bloco.match(/pesc-hist /g) || []).length + ' linhas');
+  /* ⚠️ O QUE O PEDIDO PEDE: pokémon, LEVEL e PONTOS -- os três em cada linha. */
+  ok('  com o nome do pokémon', bloco.indexOf('Gyarados') >= 0 && bloco.indexOf('Seaking') >= 0);
+  ok('  com o LEVEL', bloco.indexOf('Lv.62') >= 0 && bloco.indexOf('Lv.41') >= 0);
+  ok('  e com os PONTOS', bloco.indexOf('+83') >= 0 && bloco.indexOf('+24') >= 0);
+  /* ⚠️ E O TOTAL DE CADA UM, que é o que resume a pescaria: 83+20 e 24. */
+  ok('  e o total de cada treinador', bloco.indexOf('>103<') >= 0 && bloco.indexOf('>24<') >= 0,
+     'esperava 103 e 24');
+  /* ⚠️ A ORDEM É A DA PESCARIA -- o 1º peixe em cima. O `historico` empilha ao contrário. */
+  const meu = bloco.slice(bloco.indexOf('Buzzo'));
+  ok('  na ordem em que aconteceram', meu.indexOf('Poliwag') < meu.indexOf('Magikarp')
+     && meu.indexOf('Magikarp') < meu.indexOf('Gyarados'), 'fora de ordem');
+  /* ⚠️ E O HISTÓRICO NÃO É MAIS CORTADO EM 8 -- o log do fim precisa da pescaria inteira. */
+  {
+    const c = src.slice(src.indexOf('function pescariaCreditar'), src.indexOf('function pescariaPassoDaBatalha'));
+    ok('o histórico não é mais cortado no motor', !/historico\.slice\(0, 8\)/.test(c));
+    ok('  e o corte foi pra TELA do duelo', /PESCARIA_HIST_NA_TELA/.test(src));
+  }
+  /* quem não pescou nada não fica sem bloco -- ele diz que não pescou */
+  S.pescaria.historico = [{ quem: 'Buzzo', speciesId: 'magikarp', nivel: 9, venceu: false, pts: 0 }];
+  const so = S.renderPescaria();
+  ok('quem não pescou nada ganha a linha do vazio', so.indexOf('Nenhuma captura') >= 0);
+  /* e sem NENHUMA captura o log não aparece */
+  S.pescaria.historico = [];
+  ok('sem captura nenhuma o log some', S.renderPescaria().indexOf('O que cada um pescou') < 0);
 }
 console.log(falhas ? '\n' + falhas + ' FALHA(S)' : '\nTudo certo.');
 process.exit(falhas ? 1 : 0);

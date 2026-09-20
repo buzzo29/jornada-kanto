@@ -3110,7 +3110,11 @@
      círculo -- num alvo de 56px não cabe texto, e o nome é o que identifica o ponto. */
   .pesc-ponto{position:absolute;left:var(--x);top:var(--y);width:60px;height:60px;
     transform:translate(-50%,-50%);}
-  .pesc-mapa .pesc-zona{position:absolute;inset:2px;width:56px;height:56px;padding:0;
+  /* ⚠️ O `text-align:center` É E''PLÍCITO (20/09/2026, reportado: *"o numero de cada ponto esta
+     colado na esquerda"*). No DUELO o ponto é um `<button>`, e botão centraliza texto pelo estilo
+     de fábrica do navegador; na primeira tela ele é um `<span>`, que NÃO centraliza. O número
+     saía centrado numa tela e colado na esquerda na outra, com o MESMO CSS. */
+  .pesc-mapa .pesc-zona{text-align:center;position:absolute;inset:2px;width:56px;height:56px;padding:0;
     border-radius:50%;border:3px solid #e7ead3;background:#174b6de8;color:#fff9e4;
     box-shadow:0 3px 0 #12364c99;display:block;overflow:visible;cursor:pointer;}
   .pesc-mapa .pesc-ponto-num{font:800 20px/48px var(--font-ui);color:#fff9e4;display:block;}
@@ -3128,6 +3132,11 @@
   .pesc-mapa .pesc-zona.viva .pesc-ponto-num{color:#173e51;}
   .pesc-mapa .pesc-zona.minha{background:var(--blue);border-color:#fff;}
   .pesc-mapa .pesc-zona:disabled{cursor:not-allowed;opacity:.45;animation:none;}
+  /* ⚠️ O PONTO OCUPADO PELO OUTRO: ele apaga como qualquer desabilitado, e ganha o traço que diz
+     "não é aqui". A regra vem DEPOIS da `.viva` pelo mesmo motivo que a do `:disabled`: as duas
+     têm a mesma especificidade, e quem vence é a última -- um ponto ocupado COM peixe não pode
+     continuar piscando. */
+  .pesc-mapa .pesc-zona.ocupada{opacity:.4;border-style:dashed;animation:none;cursor:default;}
   .pesc-mapa .pesc-info{position:absolute;right:-8px;top:-7px;bottom:auto;width:28px;height:28px;
     padding:0;border:2px solid #173e51;border-radius:50%;background:#fff9e9e8;color:#233647;
     font:800 .62rem/1 var(--font-ui);cursor:pointer;z-index:4;}
@@ -3264,6 +3273,20 @@
   .pesc-vazio{display:inline-flex;width:34px;height:34px;align-items:center;justify-content:center;
     border:2px dashed var(--muted);border-radius:5px;color:var(--muted);font-weight:800;}
   .pesc-hist{display:flex;align-items:center;gap:7px;padding:5px 0;border-bottom:1px dashed var(--box-border);}
+  /* ⚠️ O RESUMO DO FIM: um bloco por treinador, com o nome e o total no topo. As cores são as do
+     placar (azul pro jogador, vermelho pro adversário), pra o olho ligar os dois sem ler. */
+  .pesc-resumo-lado{background:#eef3fb;border:2px solid var(--box-border);border-radius:5px;
+    padding:6px 9px;margin-bottom:8px;}
+  .pesc-resumo-lado.npc{background:#fbeeee;}
+  .pesc-resumo-lado:last-child{margin-bottom:0;}
+  .pesc-resumo-topo{display:flex;justify-content:space-between;align-items:baseline;gap:8px;
+    border-bottom:2px solid var(--box-border);padding-bottom:4px;margin-bottom:2px;}
+  /* ⚠️ O NOME TRUNCA e o TOTAL não: o nome de treinador vai a 20 caracteres, e a 320px o bloco
+     tem ~250px. Quem cede é o nome -- o número é a informação. */
+  .pesc-resumo-topo b{font-size:.78rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;}
+  .pesc-resumo-pts{font-size:1.05rem;font-weight:800;font-variant-numeric:tabular-nums;flex:0 0 auto;}
+  .pesc-resumo-lv{color:var(--muted);font-weight:700;}
+  .pesc-resumo-vazio{margin:5px 0 2px;font-size:.66rem;}
   .pesc-hist:last-child{border-bottom:none;}
   .pesc-hist-txt{flex:1;font-size:.68rem;min-width:0;}
   .pesc-hist-pts{font-size:.7rem;font-weight:800;color:var(--muted);}
@@ -22928,13 +22951,23 @@ function placarDoTreinador(nome, vivos, total){
      com as vivas na frente, a fileira parecia encolher pelo lado errado. Nenhuma bolinha muda de
      lugar de um confronto pro outro nas duas ordens (a contagem é a mesma); o que muda é de que
      lado o escuro avança. */
-  let bolas = '';
-  const caidos = n - v;
-  for(let i = 0; i < n; i++) bolas += '<span class="pokeball' + (i < caidos ? ' ko' : '') + '"></span>';
   return `<span class="team-alive-chip">
       <span class="team-alive-nome">${escapeHtmlSafe(nome || '')}</span>
-      <span class="team-alive-bolas">${bolas}</span>
+      ${pokebolasHtml(v, n)}
     </span>`;
+}
+/* ⚠️ AS POKÉBOLAS SOZINHAS, sem o chip em volta -- e é uma função porque DOIS lugares as querem
+   assim: o placar de cima da pescaria e o do fim. Antes eles chamavam o `placarDoTreinador` com o
+   nome VAZIO, e levavam junto a borda, o fundo e o `flex:1 1 0` do chip: dentro daquela coluna
+   isso virava uma moldura alta e vazia, que é o risco vertical do print de 20/09/2026, e ela
+   ainda empurrava o texto do estado pra fora da margem esquerda.
+   O chip continua existindo pra quem o quer INTEIRO (a batalha, a jornada, a Torre). */
+function pokebolasHtml(vivos, total){
+  const n = Math.max(0, total|0), v = Math.max(0, Math.min(n, vivos|0));
+  let bolas = ``;
+  const caidos = n - v;
+  for(let i = 0; i < n; i++) bolas += `<span class="pokeball` + (i < caidos ? ` ko` : ``) + `"></span>`;
+  return `<span class="team-alive-bolas">` + bolas + `</span>`;
 }
 /* ⚠️ O VERDE DE SEMPRE, pra quando a cor do terreno não chega (chamada antiga, ou um caminho
    que não sabe qual é o terreno). Sem um padrão, o `currentColor` do selo herdaria a cor do NOME
@@ -32166,6 +32199,9 @@ const PESCARIA_SEM_GOLPES_MS = 1300;
    do `advanceReveal`. Ela existe pra o jogador VER quem entrou: sem ela os sprites trocariam no
    mesmo quadro em que o anterior cai, e a fila pareceria um confronto só com o bicho mudando. */
 const PESCARIA_ENTRE_CONFRONTOS_MS = 1200;
+/* Quantos encontros a tela do DUELO mostra. O histórico guarda todos (o log do fim os quer
+   inteiros); o corte é só da lista que fica embaixo do lago enquanto se joga. */
+const PESCARIA_HIST_NA_TELA = 8;
 
 /* ⚠️ O ESTADO É UM `const` QUE NUNCA É REATRIBUÍDO -- `pescariaZerar` troca os campos e a
    referência continua a mesma. Não é estilo: o sandbox dos testes copia o valor na criação, então
@@ -32433,6 +32469,12 @@ function pescariaEntrar(qual, zona){
   if(pescariaVivos(p) === 0) return;
   const op = pescaria.oportunidades[zona];
   if(!op || op.pego || pescaria.tempo > op.entradaAte) return;
+  /* ⚠️ UM PONTO, UM PESCADOR (20/09/2026, a pedido): quem chegou primeiro fecha o ponto até a
+     pesca dele acabar. Quem responde é a AÇÃO, como o relógio e o time no chão logo acima -- o
+     `disabled` da zona é do pintor, e um toque no quadro em que o outro entra chegaria antes
+     dele. Vale pros DOIS lados: o NPC passa por esta mesma função. */
+  const dono = pescariaQuemEsta(zona);
+  if(dono >= 0 && dono !== qual) return;
   p.estado = 'espera'; p.op = op;
   p.ate = pescaria.tempo + 1.1 + Math.random() * 1.2;   /* quando a boia afunda */
   p.tempoDePesca = 0; p.progresso = 0; p.tensao = PESCARIA_TENSAO_INICIAL;
@@ -32469,9 +32511,7 @@ function pescariaFisgar(){
 }
 /* Quem está no MESMO peixe que você. É a informação que transforma o chip do painel num aviso:
    se o NPC estiver na mesma linha, quem chegar aos 100% primeiro leva -- e o outro perde a vez. */
-function pescariaDisputado(op){
-  return !!(op && pescaria.jogadores.some((p, q) => q !== 0 && p.op && p.op.id === op.id));
-}
+
 function pescariaSegurar(v){
   if(pescaria.jogadores[0] && pescaria.jogadores[0].estado === 'puxando') pescaria.segurando = !!v;
 }
@@ -32558,11 +32598,9 @@ function pescariaComecarBatalha(qual, op){
   const p = pescaria.jogadores[qual];
   op.pego = true;
   pescaria.oportunidades[op.zona] = null;
-  /* quem estava no MESMO ponto perde a vez -- o peixe era um só */
-  pescaria.jogadores.forEach((outro, j) => {
-    if(j !== qual && outro.op && outro.op.id === op.id)
-      pescariaPerder(j, (qual === 0 ? 'Você' : PESCARIA_NPC_NOME) + ' pescou primeiro. Procure outro ponto.');
-  });
+  /* ⚠️ NINGUÉM PERDE A VEZ AQUI, e não pode perder: desde 20/09/2026 um ponto tem UM pescador --
+     o `pescariaEntrar` recusa quem chega depois. Havia um laço aqui que tirava do ponto quem
+     estivesse na mesma oportunidade, e ele virou letra morta na mesma linha que criou a regra. */
   p.fisgadas++;
   /* ⚠️ O TIME INTEIRO ENFRENTA O PEIXE, e o `simulateGymBattle` já sabe fazer isso: ele percorre
      a fila conforme cada um cai. O que muda é o `preservePlayerHp` -- sem ele o motor CURA os dois
@@ -32694,6 +32732,36 @@ function pescariaLutadoresHtml(b){
        + '<span class="vs-swords spin">' + selo('vs', 'selo-g') + '</span>'
        + fighterHtml(m, 'e', { hp: b.hpE, passo: b.passo, hit: b.hit });
 }
+/* ⚠️ O QUE CADA UM PESCOU (20/09/2026, a pedido: *"quando acabar o tempo, exiba um log mostrando
+   somente pokemons, level e pontos que cada treinador fez"*).
+   ⚠️ ELE É POR TREINADOR, EMPILHADO, e não duas colunas: a 320px uma coluna de captura tem ~140px
+   e o nome de um pokémon com o nível não cabe -- medido. Empilhado, cada linha tem a largura toda.
+   ⚠️ E A LINHA É A `.pesc-hist` QUE JÁ EXISTE -- a mesma dos "Últimos encontros" do duelo. Ela já
+   é sprite + texto + pontos, já está medida, e reusá-la é o que faz as duas listas se lerem igual
+   em vez de o jogador ter que reaprender no fim da partida. */
+function pescariaResumoHtml(){
+  if(!pescaria.historico.length) return '';
+  const nomes = [pescariaMeuNome(), PESCARIA_NPC_NOME];
+  const lado = (q) => {
+    /* ⚠️ A ORDEM É A DA PESCARIA: o `historico` empilha o mais recente na frente, e aqui o que se
+       lê é a sequência do duelo -- o 1º peixe em cima. */
+    const meus = pescaria.historico.filter(h => h.quem === nomes[q]).slice().reverse();
+    const pts = meus.reduce((a, h) => a + h.pts, 0);
+    const linhas = meus.length
+      ? meus.map(h => `<div class="pesc-hist ${h.venceu ? 'ok' : ''}">`
+          + spriteHtml({ speciesId: h.speciesId }, 'sprite-sm')
+          + `<span class="pesc-hist-txt"><b>${escapeHtmlSafe((SPECIES[h.speciesId] || {}).name || h.speciesId)}</b>`
+          + ` <span class="pesc-resumo-lv">Lv.${h.nivel}</span></span>`
+          + `<span class="pesc-hist-pts">${h.venceu ? '+' + h.pts : '—'}</span></div>`).join('')
+      : `<p class="hint-text pesc-resumo-vazio">Nenhuma captura.</p>`;
+    return `<div class="pesc-resumo-lado${q ? " npc" : ""}">`
+      + `<div class="pesc-resumo-topo"><b>${escapeHtmlSafe(nomes[q])}</b>`
+      + `<span class="pesc-resumo-pts">${pts}</span></div>`
+      + linhas + `</div>`;
+  };
+  return `<div class="box"><h2>${selo("pescaria")} O que cada um pescou</h2>`
+    + lado(0) + lado(1) + `</div>`;
+}
 const pescariaLinhaDoFim = (m) => '<p class="battle-result-line">' + matchupResultLine(m) + '!' + suddenDeathNote(m) + '</p>';
 /* O placar de pokébolas, o mesmo do cabeçalho da jornada. O lado do peixe se chama SELVAGEM --
    ele não tem treinador, e é a palavra que o jogo já usa pra isso. */
@@ -32721,9 +32789,11 @@ function pescariaCreditar(qual, p, b){
   const pts = b.venceu ? b.premio : 0;
   p.pontos += pts;
   if(b.venceu) p.vitorias++;
-  pescaria.historico.unshift({ quem: qual === 0 ? 'Você' : PESCARIA_NPC_NOME, speciesId: p.op.speciesId,
+  pescaria.historico.unshift({ quem: qual === 0 ? pescariaMeuNome() : PESCARIA_NPC_NOME, speciesId: p.op.speciesId,
                                nivel: p.op.nivel, venceu: b.venceu, pts });
-  pescaria.historico = pescaria.historico.slice(0, 8);
+  /* ⚠️ SEM CORTE: o log do fim precisa da pescaria INTEIRA (20/09/2026). O `slice(0, 8)` que
+     morava aqui foi pra quem o quer cortado -- a tela do duelo, que mostra "Últimos encontros".
+     Uma segunda lista, só pro fim, divergiria da primeira no dia seguinte. */
   /* ⚠️ O LOG LEVA A FILA INTEIRA, do último pro primeiro: o `pescaria.logs` é lido de trás pra
      frente na tela do fim (o mais recente em cima), então empilhar na ordem deixa o confronto 1
      acima do 2 dentro da mesma pescaria. */
@@ -33021,15 +33091,40 @@ function pescariaBatalhaHtml(p){
       ? pescariaLinhaDoFim(m)
       : statusDoConfrontoHtml(m, b.passo, b.hit)}</div>`;
 }
-/* A LINHA DE ATIVIDADE DE UM PONTO DO LAGO. Ela é o que faz o lago ser uma disputa: quando os
-   dois lançam no mesmo peixe ela grita DISPUTA!, e quem chegar aos 100% primeiro leva. */
+/* A LINHA DE ATIVIDADE DE UM PONTO DO LAGO: ela diz se há peixe, quanto tempo falta pra entrar,
+   e QUEM está pescando ali. É ela que faz o lago ser uma corrida pelos pontos e não seis botões.
+   ⚠️ ELA JÁ GRITOU UMA TERCEIRA COISA -- quando os dois lançavam no mesmo peixe --, e isso acabou
+   em 20/09/2026: um ponto tem UM pescador, então dois nunca estão no mesmo. */
+/* ⚠️ QUEM ESTÁ PESCANDO NESTE PONTO -- devolve o índice do pescador, ou -1. Ele é a base das DUAS
+   coisas que a regra de 20/09/2026 pede (*"quando o adversario de pesca entrar em um ponto,
+   nenhum outro pode entrar até que acabe a pesca dele"*): a AÇÃO recusa, e o ponto sai fechado
+   na tela. Escritas em separado, a tela liberaria o que a ação recusa -- ou o contrário.
+   ⚠️ A PERGUNTA É PELA ZONA, e não pelo id da oportunidade: quando a batalha começa o `op` sai do
+   `pescaria.oportunidades` (ele foi PESCADO), e quem continua ali é o pescador -- com o `op` dele
+   na mão. Perguntando pelo id da oportunidade, o ponto reabriria no instante da fisgada, que é
+   justamente o meio da pesca que a regra protege. */
+function pescariaQuemEsta(k){
+  for(let q = 0; q < pescaria.jogadores.length; q++){
+    const j = pescaria.jogadores[q];
+    if(j && j.op && j.op.zona === k) return q;
+  }
+  return -1;
+}
 function pescariaAtividade(k){
   const op = pescaria.oportunidades[k];
   const eu = pescaria.jogadores[0], npc = pescaria.jogadores[1];
-  const meu  = !!(op && eu  && eu.op  && eu.op.id  === op.id);
-  const dele = !!(op && npc && npc.op && npc.op.id === op.id);
-  if(meu && dele) return 'DISPUTA!';
-  if(meu) return 'VOCÊ PESCANDO';
+  /* ⚠️ A PERGUNTA É PELA ZONA, não pelo id da oportunidade -- o `op` some do
+     `pescaria.oportunidades` no instante da fisgada, e quem continua no ponto é o PESCADOR. */
+  const meu  = !!(eu  && eu.op  && eu.op.zona  === k);
+  const dele = !!(npc && npc.op && npc.op.zona === k);
+  /* ⚠️ NÃO EXISTE MAIS DISPUTA (20/09/2026): quem chega primeiro FECHA o ponto, então dois nunca
+     estão no mesmo. Saíram juntas a etiqueta da zona, a do chip do peixe e a frase que tirava do
+     ponto quem chegava depois -- as três eram a mesma mecânica, e as três viraram letra morta na
+     mesma linha de código.
+     ⚠️ E ELAS NÃO SÃO CITADAS AO PÉ DA LETRA aqui, de propósito: o `index.html` é publicado
+     inteiro, e comentário que reproduz o que saiu faz a próxima varredura acusar o que está certo
+     -- este projeto já pagou isso SETE vezes, e uma delas escondeu um defeito de verdade. */
+  if(meu) return pescariaMeuNome().toUpperCase() + ' PESCANDO';
   /* ⚠️ O nome do adversario sai da constante, nunca escrito aqui: ele aparece em SEIS lugares da
      tela, e uma copia a mais divergiria no dia em que ele mudar. Em CAIXA ALTA porque a linha do
      ponto e uma etiqueta curta, como as outras tres. */
@@ -33039,9 +33134,12 @@ function pescariaAtividade(k){
   return 'Sem movimento';
 }
 /* O chip do peixe na linha: o tamanho dele, e se o NPC está no MESMO peixe. */
+/* ⚠️ O CHIP SÓ DIZ O TAMANHO DESDE 20/09/2026: ele tinha uma segunda etiqueta, pra quando o outro
+   estava no mesmo peixe, e com um ponto por pescador ela não tinha mais como aparecer. A função
+   que a respondia saiu junto. */
 function pescariaChipDoPeixe(op){
   if(!op) return '';
-  return pescariaTamanho(op) + ' · ' + (pescariaDisputado(op) ? 'DISPUTADO' : 'na linha');
+  return pescariaTamanho(op) + ' · na linha';
 }
 /* ⚠️ AS CHANCES DE CADA PONTO -- o "(i) chances de encontro" do protótipo, que era a única coisa
    dele que não tinha vindo. Ela responde a pergunta que o jogador faz ANTES de lançar: o abismo
@@ -33112,6 +33210,11 @@ function pescariaPintar(){
   pescaria.jogadores.forEach((j, q) => {
     põe('pescPontos' + q, String(j.pontos));
     põe('pescEstado' + q, j.estado === 'descanso' && j.recadoDeEspera ? j.recadoDeEspera : (PESCARIA_ESTADO_TXT[j.estado] || ''));
+    const bolas = document.getElementById('pescTime' + q);
+    if(bolas){
+      const html = pokebolasHtml(pescariaVivos(j), (j.time || []).length);
+      if(bolas.innerHTML !== html) bolas.innerHTML = html;
+    }
   });
   const eu = pescaria.jogadores[0];
   if(!eu) return;
@@ -33145,9 +33248,17 @@ function pescariaPintar(){
     const e = document.getElementById('pescZona' + k);
     if(!e) return;
     const op = pescaria.oportunidades[k];
-    const viva = !!(op && !op.pego && pescaria.tempo < op.entradaAte);
+    const dono = pescariaQuemEsta(k);
+    const ocupada = dono >= 0, minhaZona = dono === 0;
+    const viva = !!(op && !op.pego && pescaria.tempo < op.entradaAte && !ocupada);
     if(e.classList.contains('viva') !== viva) e.classList.toggle('viva', viva);
-    if(e.disabled === posso) e.disabled = !posso;
+    /* ⚠️ O PONTO OCUPADO PELO OUTRO FICA FECHADO: quem chegou primeiro tem o ponto até a pesca
+       dele acabar (20/09/2026, a pedido). O `minhaZona` fica de FORA da trava -- o meu próprio
+       ponto já está fechado pelo `posso`, que é falso enquanto eu não estou `parado`. */
+    if(e.classList.contains('ocupada') !== (ocupada && !minhaZona))
+      e.classList.toggle('ocupada', ocupada && !minhaZona);
+    const pode = posso && !(ocupada && !minhaZona);
+    if(e.disabled === pode) e.disabled = !pode;
     põe('pescAtv' + k, pescariaAtividade(k));
   });
 
@@ -33182,9 +33293,15 @@ function pescariaPintar(){
   }
 }
 /* O chip do cabeçalho: ele diz em que momento do duelo a tela está. */
+/* ⚠️ O NOME DO TREINADOR, NUNCA "VOCÊ" (20/09/2026, a pedido). Ele vem do `game.trainerName`, que
+   é o mesmo que o placar da batalha, a home e as ligas usam -- e a conta cai num lugar só porque
+   ele aparece em SEIS pontos da tela. Sem save aberto (o modo admin abre da home) ele volta pro
+   "Você", que é o que o resto do jogo faz quando não há nome. */
+const pescariaMeuNome = () => game.trainerName || `Você`;
 function pescariaChipDoDuelo(){
   if(pescaria.fase === 'fim') return 'RESULTADO';
-  return pescaria.tempo >= PESCARIA_DURACAO ? 'ÚLTIMOS ENCONTROS' : 'VOCÊ × ' + PESCARIA_NPC_NOME.toUpperCase();
+  return pescaria.tempo >= PESCARIA_DURACAO ? 'ÚLTIMOS ENCONTROS'
+    : pescariaMeuNome().toUpperCase() + ' × ' + PESCARIA_NPC_NOME.toUpperCase();
 }
 /* E o título do painel de espera, que muda com o momento -- é a única coisa na tela que diz
    "os lançamentos fecharam" quando o relógio passa dos 90s. */
@@ -33220,17 +33337,21 @@ function pescariaMapaHtml(interativo){
   const eu = pescaria.jogadores[0];
   const pontos = PESCARIA_ZONAS.map((z, k) => {
     const op = pescaria.oportunidades[k];
-    const viva = !!(interativo && op && !op.pego && pescaria.tempo < op.entradaAte);
-    const minha = !!(interativo && eu && eu.op && eu.op.zona === k);
+    /* ⚠️ O PONTO OCUPADO NÃO PISCA e não se toca -- nem quando tem peixe. Sem isso ele continuava
+       chamando o jogador pra um lugar onde a ação ia recusar, que é pior que um ponto apagado. */
+    const dono = interativo ? pescariaQuemEsta(k) : -1;
+    const ocupada = dono >= 0;
+    const minha = dono === 0;
+    const viva = !!(interativo && op && !op.pego && pescaria.tempo < op.entradaAte && !ocupada);
     const pos = PESCARIA_PONTOS[k] || [50, 50];
-    const classe = (viva ? ` viva` : ``) + (minha ? ` minha` : ``);
+    const classe = (viva ? ` viva` : ``) + (minha ? ` minha` : ``) + (ocupada && !minha ? ` ocupada` : ``);
     const atv = interativo ? pescariaAtividade(k) : `Lv.${z.nivel[0]}–${z.nivel[1]}`;
     const dentro = `<span class="pesc-ponto-num">${k + 1}</span>`
       + `<b class="pesc-ponto-nome">${escapeHtmlSafe(z.nome)}</b>`
       + `<span class="pesc-zona-atv" id="pescAtv${k}">${atv}</span>`;
     const alvo = interativo
       ? `<button class="pesc-zona${classe}" id="pescZona${k}" onclick="pescariaEntrar(0,${k})"`
-        + ` ${eu && eu.estado === "parado" ? "" : "disabled"}>${dentro}</button>`
+        + ` ${(eu && eu.estado === "parado" && !(ocupada && !minha)) ? "" : "disabled"}>${dentro}</button>`
       : `<span class="pesc-zona${classe}">${dentro}</span>`;
     return `<div class="pesc-ponto" style="--x:${pos[0]}%;--y:${pos[1]}%">${alvo}`
       + `<button class="pesc-info" onclick="abrirZonaDaPescaria(${k})"`
@@ -33320,7 +33441,7 @@ function pescariaPickerHtml(){
 }
 function renderPescaria(){
   if(pescaria.picker) return `
-  <div class="eyebrow">${selo('pescaria')} PESCARIA POKÉMON · TESTE ADMIN</div>
+  <div class="eyebrow">${selo('pescaria')} PESCARIA POKÉMON</div>
   ${pescariaPickerHtml()}`;
 
   const eu = pescaria.jogadores[0], npc = pescaria.jogadores[1];
@@ -33337,7 +33458,7 @@ function renderPescaria(){
        `pescariaCarregarRank` (lista já lida, ou pedido em voo) é que impede a repetição. */
     pescariaCarregarRank(false);
     return `
-  <div class="eyebrow">${selo('pescaria')} PESCARIA POKÉMON · TESTE ADMIN</div>
+  <div class="eyebrow">${selo('pescaria')} PESCARIA POKÉMON</div>
   <div class="box">
     <h2>Seu time de pescaria</h2>
     <p class="hint-text">Pesque nos pontos que piscam e <strong>vença a batalha</strong> para pontuar.
@@ -33375,22 +33496,28 @@ function renderPescaria(){
     <button class="btn success" onclick="pescariaLargar()" ${temTime ? '' : 'disabled'}>Começar o duelo</button>
     <button class="btn secondary" onclick="sairDaPescaria()">⬅ Sair</button>
   </div>
+  ${/* ⚠️ O MODAL DO (i) PRECISA ESTAR AQUI TAMBÉM (20/09/2026, reportado: *"clico nos I de cada
+       ponto para ver os pokemons que tem em cada ponto, nao esta abrindo nada"*). O `(i)` do mapa
+       é clicável nas duas telas -- ele é justamente o que o setup tem a oferecer --, mas o modal
+       só era desenhado no `return` do DUELO. O estado mudava e o `render()` rodava; não havia o
+       que desenhar. */``}
+  ${renderPescariaZonaModal()}
   ${pescariaRankHtml()}`;
   }
 
   if(pescaria.fase === 'fim'){
     const venci = eu.pontos > npc.pontos, empate = eu.pontos === npc.pontos;
     return `
-  <div class="eyebrow">${selo('pescaria')} PESCARIA POKÉMON · TESTE ADMIN</div>
+  <div class="eyebrow">${selo('pescaria')} PESCARIA POKÉMON</div>
   <div class="box">
-    <h2>${empate ? "Empate!" : venci ? selo("trofeu") + " Você venceu!" : escapeHtmlSafe(PESCARIA_NPC_NOME) + " levou"}</h2>
+    <h2>${empate ? "Empate!" : venci ? selo("trofeu") + " " + escapeHtmlSafe(pescariaMeuNome()) + " venceu!" : escapeHtmlSafe(PESCARIA_NPC_NOME) + " levou"}</h2>
     <div class="pesc-placar-fim">
       <div class="pesc-fim-lado ${venci ? "eu" : ""}">
-        <span class="pesc-fim-time">${placarDoTreinador("", pescariaVivos(eu), (eu.time || []).length)}</span>
-        <b>${eu.pontos}</b><small>você · ${eu.vitorias}/${eu.fisgadas} batalhas</small>
+        <span class="pesc-fim-time">${pokebolasHtml(pescariaVivos(eu), (eu.time || []).length)}</span>
+        <b>${eu.pontos}</b><small>${escapeHtmlSafe(pescariaMeuNome())} · ${eu.vitorias}/${eu.fisgadas} batalhas</small>
       </div>
       <div class="pesc-fim-lado">
-        <span class="pesc-fim-time">${placarDoTreinador("", pescariaVivos(npc), (npc.time || []).length)}</span>
+        <span class="pesc-fim-time">${pokebolasHtml(pescariaVivos(npc), (npc.time || []).length)}</span>
         <b>${npc.pontos}</b><small>${escapeHtmlSafe(PESCARIA_NPC_NOME)} · ${npc.vitorias}/${npc.fisgadas} batalhas</small>
       </div>
     </div>
@@ -33401,13 +33528,14 @@ function renderPescaria(){
   ${/* ⚠️ O LOG É O DA CASA, e não um resumo próprio: `renderMatchupLog` é a MESMA tela que o
        jogador lê depois de toda batalha do jogo. Como as batalhas daqui são do mesmo motor, os
        matchups servem direto -- e ele mostra os golpes, os selos e as passivas de verdade. */''}
+  ${pescariaResumoHtml()}
   ${pescaria.logs.length ? `<div class="box"><h2>Suas batalhas</h2>${renderMatchupLog(pescaria.logs)}</div>` : ''}`;
   }
 
   /* jogando */
   const b = eu.batalha;
   return `
-  <div class="eyebrow">${selo('pescaria')} PESCARIA POKÉMON · TESTE ADMIN</div>
+  <div class="eyebrow">${selo('pescaria')} PESCARIA POKÉMON</div>
   <div class="box">
     <div class="pesc-topo"><span class="pesc-chip" id="pescChip">${pescariaChipDoDuelo()}</span><span class="pesc-relogio${pescaria.tempo >= PESCARIA_DURACAO - 15 ? ' tarde' : ''}" id="pescRelogio">${pescariaRelogio(pescaria.tempo)}</span></div>
     <div class="pesc-placar">
@@ -33420,9 +33548,9 @@ function renderPescaria(){
         const vivos = pescariaVivos(j);
         return `<div class="pesc-lado ${q ? "npc" : ""}">`
           + `<span class="pesc-lado-info">`
-          + `<small>${q ? escapeHtmlSafe(PESCARIA_NPC_NOME) : "VOCÊ"}</small>`
+          + `<small>${escapeHtmlSafe((q ? PESCARIA_NPC_NOME : pescariaMeuNome()).toUpperCase())}</small>`
           + `<b id="pescPontos${q}">${j.pontos}</b>`
-          + `<span class="pesc-lado-time" id="pescTime${q}">${placarDoTreinador("", vivos, (j.time || []).length)}</span>`
+          + `<span class="pesc-lado-time" id="pescTime${q}">${pokebolasHtml(vivos, (j.time || []).length)}</span>`
           + `<span class="pesc-lado-estado" id="pescEstado${q}">${PESCARIA_ESTADO_TXT[j.estado] || ""}</span>`
           + `</span></div>`;
       }).join(``)}
@@ -33511,7 +33639,7 @@ function renderPescaria(){
   <button class="btn secondary" onclick="sairDaPescaria()">⬅ Desistir do duelo</button>
   ${renderPescariaZonaModal()}
   ${pescaria.historico.length ? `<div class="box"><h2>Últimos encontros</h2>
-    ${pescaria.historico.map(h => `<div class="pesc-hist ${h.venceu ? 'ok' : ''}">
+    ${pescaria.historico.slice(0, PESCARIA_HIST_NA_TELA).map(h => `<div class="pesc-hist ${h.venceu ? 'ok' : ''}">
       <span>${spriteHtml({ speciesId: h.speciesId }, 'sprite-sm')}</span>
       <span class="pesc-hist-txt"><b>${escapeHtmlSafe(h.quem)}</b> · ${escapeHtmlSafe((SPECIES[h.speciesId] || {}).name || '')} Lv.${h.nivel}</span>
       <span class="pesc-hist-pts">${h.venceu ? '+' + h.pts : 'perdeu'}</span></div>`).join('')}
