@@ -12172,7 +12172,7 @@ como CÓPIAS. Medido: o time do save fica **byte a byte idêntico** depois de um
 
 | | |
 |---|---|
-| as **seis** combinações (2/3/4 × individual/revezamento) | todas terminam, distância exata, trocas em 300 e 600 |
+| as **seis** combinações (2/3/4 × individual/revezamento) | todas terminam, distância exata, trocas nos múltiplos de 300 |
 | a lista de corredores | ordenada pelo **Speed da corrida** — o mesmo número que decide a pista |
 | os NPCs | forma final pelo `finalEvolutionOf`, sem repetir linha na equipe, nível do trecho |
 | a pausa da aba | **31 s** oculta = **zero** metros, e sem salto na volta |
@@ -12278,6 +12278,10 @@ sozinha.
 | individual, 4 | 24 s | 86% | 65 m |
 | revezamento 1x1 | 95 s | **26%** | 290 m |
 | revezamento, 4 | 95 s | 23% | 308 m |
+
+**⚠️ ESTA TABELA É DE 18/09, com o revezamento de TRÊS (900m).** Em 20/09 ele virou o time inteiro
+(1.800m, ~249s) -- a conclusão fica IGUAL e o efeito cresce: com o dobro da prova, a dispersão cresce
+junto e o adversário passa ainda menos tempo na tela.
 
 **A individual passa quase toda na tela; o revezamento, um quarto.** É aritmética e não defeito:
 a prova é 3× mais longa e a dispersão chega a **300 m**, ou seja seis telas de distância. Mostrar
@@ -12394,7 +12398,7 @@ nada acima.
 - **Medido: ela fica na metade de cima 100% do tempo em que aparece**, varrendo a prova inteira de
   meio em meio metro — e ela aparece por ~3,2 s.
 - **Ao cruzar, o jogador para EM CIMA da linha** (os dois em y=96), o que é exatamente o certo.
-- **No revezamento a trava é só na chegada dos 900**, nunca nas trocas dos 300 e 600 — a marca da
+- **No revezamento a trava é só na CHEGADA**, nunca nas trocas dos múltiplos de 300 — a marca da
   troca continua rolando com a câmera.
 
 **⚠️ E O FIXTURE DAS TRAVAS DA PISTA TEVE QUE SAIR DA RETA FINAL.** Ele usava `dist = 300` e
@@ -12598,6 +12602,13 @@ checagem de permissão do lado de lá.
 
 
 ## PESCARIA POKÉMON — o segundo teste admin (19/09/2026)
+
+**⚠️ ATENÇÃO: ESTA SEÇÃO É DE 19/09, E O DIA SEGUINTE MUDOU O QUE ELA DESCREVE.** Em **20/09/2026**
+a pescaria virou **de TIME**: o parceiro deixou de ser UM pokémon, o adversário ganhou seis, o HP
+passa de uma fisgada pra a próxima e o picker é o card da Liga. **Tudo que este texto diz sobre "o
+parceiro", "1x1" e "HP cheio a cada batalha" é a régua de 19/09** -- ver **A PESCARIA PASSOU A SER
+DE TIME**, no fim desta seção. O que continua valendo inteiro é a MECÂNICA da pesca (a boia, a
+tensão, o comportamento), a batalha ser a da jornada e o ritmo dela.
 
 Pedida com o `pescaria-pokemon.html` da raiz como referência, e com **quatro coisas mudadas** em
 relação a ele: a lista de parceiros passa a ser a do jogo (paginada, por nível), o NPC passa a ser
@@ -12823,9 +12834,11 @@ Foi o pedido ao pé da letra, e são **36 espécies** — as 40 do `SPECIES` aci
   e o Celebi 600 — ou seja, o filtro de BST os pegaria primeiro. São justamente os que o jogo inteiro
   mantém fora de pool nenhum (o encontro selvagem, a Torre, a Vigília), e um Mewtwo Lv.65 como
   parceiro do NPC seria um adversário que o jogador **não tem como ter**.
-- O sorteio é conferido em 400 voltas: todos Lv.65, todos acima de 500, todos com HP cheio — e
-  **varia de verdade** (20+ espécies distintas), que é o que uma trava de "sempre 65" sozinha não
+- O sorteio é conferido em 200 voltas: todos Lv.65, todos acima de 500, todos com HP cheio — e
+  **varia de verdade** (15+ espécies distintas), que é o que uma trava de "sempre 65" sozinha não
   pegaria.
+- **⚠️ E DESDE 20/09/2026 ELE SORTEIA SEIS, não um** (`PESCARIA_TIME`), **sem repetir linha
+  evolutiva** dentro da equipe -- a regra do encontro selvagem e do montador.
 
 ### O PICKER É O MONTADOR, ORDENADO POR NÍVEL
 
@@ -12875,8 +12888,10 @@ fração das decisões e lê o peixe com atraso):
 **O mediano empata**, quem domina ganha quase sempre e quem se distrai perde — e **quem só assiste
 faz ZERO**, porque não pescar é não pontuar.
 
-**⚠️ E A ESCOLHA DO PARCEIRO VALE 30 PONTOS**, que é a decisão que o pedido queria criar (mesmo
-jogador, perfil "joga bem", 80 partidas cada):
+**⚠️ E A ESCOLHA DO PARCEIRO VALE 30 PONTOS**, que é a decisão que o pedido queria criar. **Esta
+tabela é de 19/09, quando o parceiro era UM pokémon** -- hoje entra o time inteiro, e a escolha
+passou a ser de TIME; o que ela continua mostrando é o quanto o TIPO do parceiro pesa contra as
+seis zonas. (Medida com o mesmo jogador, perfil "joga bem", 80 partidas cada.)
 
 | parceiro Lv.70 | vence a partida |
 |---|---|
@@ -12935,11 +12950,12 @@ levou tudo junto. É a mesma família do *painel forte demais* que este arquivo 
 **o harness errado inventa um defeito que não existe**, e aqui ele quase custou um conserto de
 layout em cima de um problema que só a minha página tinha.
 
-`tools/test-pescaria.js` tranca **127 pontas**, e as que importam são a batalha (o matchup ser do
-motor, o placar seguir o `venceu` e não a animação, o 1x1, o HP cheio, e — lendo o código — que não
-sobrou fórmula de dano própria), o acesso nos **10 estados** do campo, o NPC em 400 sorteios, o
-picker por nível com a paginação de 10, a pesca (fisgar cedo perde, puxar sem soltar arrebenta, quem
-lê o peixe captura), o nível do pescado batendo com a faixa da zona em 360 peixes, e o save intacto.
+`tools/test-pescaria.js` tranca a batalha (o matchup ser do motor, o placar seguir o `venceu` e não
+a animação, e — lendo o código — que não sobrou fórmula de dano própria), o acesso nos **10 estados**
+do campo, o NPC, o picker, a pesca (fisgar cedo perde, puxar sem soltar arrebenta, quem lê o peixe
+captura), o nível do pescado batendo com a faixa da zona em 360 peixes, e o save intacto.
+**⚠️ TRÊS DESSAS TRAVAS VIRARAM OUTRA COISA EM 20/09** -- o "1x1" virou "o TIME contra o peixe", o
+"HP cheio" virou "só o PEIXE entra cheio", e o picker paginado por nível virou o card de time.
 
 ### ⚠️ A TELA NÃO ACOMPANHAVA O MOTOR (19/09/2026)
 
@@ -13221,6 +13237,244 @@ Hoje ele descreve o ramo sem reproduzi-lo, e a trava dele deixou de fatiar **400
 partir do nome** pra fatiar a **função inteira** (176 chars, até a próxima `function`) — assim ela
 não pode ser enganada por um comentário acima dela, e tem um `ok()` cobrando que a fatia tem o que
 ler.
+
+### ⚠️ A PESCARIA PASSOU A SER DE TIME, E A CORRIDA TAMBÉM (20/09/2026)
+
+Nove pedidos numa leva, e o que os amarra é um só: **os dois minijogos deixaram de ser sobre UM
+pokémon e passaram a ser sobre um TIME** -- o mesmo time campeão que a Liga Clássica, o Ginásio da
+Cidade e a Batalha Online já exigem.
+
+#### ⚠️ O DESGASTE É A FEATURE, e ele sai do `preservePlayerHp` da Elite 4
+
+*"os pokémons que morrerem tem que permanecer morto até o fim da pesca, e os que sobreviveram mas
+tomaram dano, quando começar a próxima batalha depois de pescar um pokemon, deve permanecer com o
+mesmo hp que estava na luta anterior"*
+
+**Quem entrega isso é uma opção que já existia**: o `simulateGymBattle` **CURA os dois times na
+entrada**, e o `preservePlayerHp` segura o lado A -- ele carrega a FRAÇÃO de vida entre as lutas,
+que é o que a Elite 4 faz desde sempre. Sem ele o desgaste sumiria a cada fisgada.
+
+- **O PEIXE CONTINUA ENTRANDO CHEIO**, e essa assimetria é o desenho: cada peixe é um encontro novo.
+- **⚠️ A ÚNICA FONTE DE VERDADE DO HP É A INSTÂNCIA**: o `pescariaNovoPescador` guarda o time e o
+  `pescariaComecarBatalha` o passa **direto** pro motor. Uma cópia no meio do caminho desfaria o
+  desgaste **sem nada acusar** -- há trava exigindo que o HP nunca SUBA entre duas fisgadas, que é
+  a diferença entre "o desgaste existe" e "o desgaste PERSISTE".
+- **COM O TIME NO CHÃO NÃO SE PESCA MAIS**, e **com os DOIS times no chão o duelo termina**. Sem a
+  primeira guarda o jogador fisgaria e perderia toda batalha até o relógio acabar; sem a segunda o
+  relógio correria sozinho com as duas telas paradas.
+
+**O QUE ISSO CRIA DE DECISÃO, medido** (60 duelos por cenário, time Lv.55-70):
+
+| onde se pesca | time de pé no fim | varrido | vitórias | pontos |
+|---|---|---|---|---|
+| as seis zonas, 6 fisgadas | **4,9 de 6** | 0% | 6,0 | 292 |
+| as seis zonas, 10 fisgadas | 3,9 de 6 | 3% | 9,9 | 434 |
+| **só a Margem** (a mais rasa) | **6,0 de 6** | 0% | 10,0 | **206** |
+| **só o Abismo** (a mais funda) | **0,0 de 6** | **100%** | 3,4 | 278 |
+
+**⚠️ E É ESSA TABELA QUE FAZ O MINIJOGO TER JOGO.** A Margem não machuca ninguém e paga 206; o
+Abismo paga mais por peixe e **varre o time em 100% das vezes**. Antes, com um pokémon só, a escolha
+da zona era só "quanto vale este peixe" -- agora ela é "quanto disso meu time aguenta".
+
+#### ⚠️ O TIME É O `save-slot-card` DA LIGA, e só de quem tem as 8 insígnias
+
+*"a mesma tela de time para ser escolhido quando o usuário tem que escolher um time para inscrever
+na liga clássica"* e *"para ambos os jogos, só pode escolher um time vencedor das 8 insígnias"*.
+
+- **O CARD É O MESMO** (a estrela da média mais a fileira dos seis): é por ele que o jogador
+  reconhece um time na home e na Liga, e um desenho próprio obrigaria a reaprender a ler.
+- **A PORTA É O `savesCampeoes()`**, a MESMA da Liga, do Ginásio da Cidade e da Batalha Online --
+  não uma regra nova. E **quem valida é a AÇÃO**: um slot forjado no console levaria um time sem
+  insígnia pro duelo.
+- **⚠️ O PICKER DE POKÉMON PAGINADO MORREU**, nos dois jogos. Na Corrida o `corridaToggle` ficou
+  **INERTE no revezamento** (e recusa por dentro, não por tela apagada); na Pescaria ele saiu.
+- **A CORRIDA INDIVIDUAL NÃO PRECISOU DE NADA**: o `towerEligiblePokemon` tem laço próprio com um
+  `if(badges < 8) continue` e já era campeão-só. Fica dito pra o dia em que alguém unificar os dois.
+
+#### ⚠️ O ITEM EQUIPADO NÃO ESTAVA CHEGANDO -- o slot não viajava
+
+Achado ao escrever a trava, não relatado. A chave do item é **`slot:raiz-da-linha`**, e o
+`pescariaTimeDoSlot` montava as instâncias a partir do `sv.team`, que **não carrega slot nenhum**.
+Resultado: o `equiparItens` procurava com slot **nulo** e a poção que o jogador equipou no parceiro
+**simplesmente não valia ali**, em silêncio.
+
+Hoje o slot é carimbado na montagem, e o `pescariaBatalhar` deixou de passar um `slotPadrao` que era
+`meu.slotDaConta` -- de um POKÉMON, de quando o parceiro era um só. Há trava de ponta a ponta.
+
+#### ⚠️ O MEDALHA_DO_POSTO ERA LOCAL, E O RANKING QUEBRARIA NA PRIMEIRA LINHA
+
+Ele nasceu `const` **dentro** da tela de resultado da Corrida (17/09), e o ranking novo o lê. O
+`pescariaRankHtml` estourava com **`ReferenceError`** na primeira linha que desenhasse -- ou seja,
+**só quando alguém pontuasse**: a caixa vazia e a de "carregando" nunca chamam o desenho da linha,
+então nem a tela nem o teste de HTML encostavam nisso.
+
+Ele subiu pro escopo do módulo, com a razão escrita, e a indexação foi acertada (**a tabela é
+0-based** e o ranking é 1-based).
+
+#### O RANKING: um documento por jogador, e o recorde SÓ SOBE
+
+*"Na primeira tela, crie um ranking das maiores pontuações de pesca"*.
+
+- **⚠️ QUEM GRAVA É O SERVIDOR**, e o `firestore.rules` fecha a coleção (`allow write: if false`,
+  inclusive pro dono): pontuação é placar público, e uma linha no console poria qualquer número no
+  topo. É a mesma regra do `globalBoss`.
+- **É UM DOCUMENTO POR JOGADOR, com o MELHOR resultado dele** -- não um por partida. Assim a coleção
+  tem no máximo uma linha por conta, e o ranking é "os melhores JOGADORES", não "as melhores
+  partidas do mesmo jogador".
+- **O RECORDE SÓ SOBE**, em transação: uma partida ruim depois de uma boa não apaga a boa, e duas
+  abas não gravam por cima uma da outra.
+- **ZERO NÃO ENTRA**: um documento de quem nunca pontuou é linha morta, e um "0 pontos" no top não
+  diz nada.
+- **O NOME FICA DENORMALIZADO**, como no ranking do Mew: sem isso, ler o top 10 custaria 10 leituras
+  a mais em `users/` toda vez que alguém abrisse a tela. O preço é o de lá -- quem troca de nome só
+  aparece com o novo depois da próxima partida.
+- **⚠️ E O MEU RESULTADO VEM JUNTO MESMO FORA DO TOP**: quem está em 14º abriria a tela e não veria
+  **nada seu** -- e o próprio recorde é justamente o que ele mais procura ali.
+- **AS MEDALHAS SÃO AS DO PÓDIO DA CORRIDA**, desenhadas; da 4ª em diante sai o número.
+- **O ENVIO É BEST-EFFORT dos dois lados**: um ranking que não carrega é uma caixa a menos na tela,
+  e um envio que falha é um recorde perdido -- nenhum dos dois pode derrubar o duelo. O erro oferece
+  "tentar de novo" e o botão de começar continua lá.
+- **O QUE VAI É O QUE O MOTOR CONTOU** (o `pontos` do pescador), nunca um número montado na tela.
+
+#### O MAPA DA ILHA, E ELE APARECE ANTES DO DUELO
+
+*"quero exatamente como está lá, com uma imagem de uma ilha e os 6 botões em volta"* e *"nessa
+primeira tela apareça o mapa com as localizações, para os usuários já conseguirem visualizar antes
+os pontos"*.
+
+- A grade de três colunas virou a **ilha do protótipo** (o SVG dele, byte a byte) com os seis pontos
+  **por cima**, cada um em `--x/--y`.
+- **NO SETUP ELE É ILUSTRAÇÃO**: os pontos viram `<span>` (um botão que não faz nada convida um
+  toque que não responde) **e o (i) continua clicável** -- ele é justamente o que essa tela tem a
+  oferecer, porque escolher o time sabendo o que mora em cada ponto é a decisão que ela pede.
+- **⚠️ O ABISMO SUBIU DE 80% PRA 76%, e é a única posição que difere do protótipo.** A razão é
+  medida: os **rótulos são de tamanho FIXO** (a 77px do topo do ponto) e o **mapa ESCALA**. Com os
+  360px do protótipo o rótulo do 6º cabe; com os **282px** que sobram numa tela de 320 ele passa
+  **8px** do fim do mapa e o recorte do container o **corta** -- conferido no navegador, e o
+  protótipo tem o mesmo defeito nesse tamanho. Depois: **nenhum rótulo cortado**.
+
+#### O ADVERSÁRIO TEM NOME, E UM TIME
+
+*"Troque o nome de NPC pescando pelo nome de algum personagem pescador da série"* e *"o adversário
+também vai ter um time de 6 pokemons"*.
+
+- **`PESCARIA_NPC_NOME` = "Pescador Wilton"** -- a convenção da casa é classe + nome (os NPCs da
+  Torre são classes puras como `Pescador`). Ele vive numa constante: trocar é **uma linha**.
+- O time dele são **6**, Lv.65, BST > 500, **sem repetir linha evolutiva** (a regra do encontro
+  selvagem e do montador) e **sem os quatro INTOCÁVEIS** -- que não é zelo: Mewtwo, Lugia e Ho-oh são
+  **BST 680**, ou seja o filtro de BST os pegaria PRIMEIRO.
+- **⚠️ E A LINHA DA REGRA DO SORTEIO SAIU** (*"sorteado entre os de BST acima de 500"*): ela contava
+  o MOTOR, e o que o jogador precisa ver ali é QUEM ele vai enfrentar -- a fileira dos seis mostra.
+
+#### O REVEZAMENTO DA CORRIDA É O TIME INTEIRO
+
+*"ao invés de escolher 3 pokemons de qualquer time, vai ter que escolher 1 time e o revezamento vai
+ser entre os 6 do time"*. `CORRIDA_TRECHOS` foi de 3 pra **6**.
+
+**⚠️ E ISSO DOBRA A PROVA DUAS VEZES, não uma** (medido, 12 corridas de cada):
+
+| | antes | hoje |
+|---|---|---|
+| distância | 900m | **1.800m** |
+| duração | ~71s | **249s** |
+| Speed médio de quem corre | os **3 melhores** do time (150,0) | **os seis** (117,7) |
+
+A segunda metade é a que não se vê no número da distância: **não dá mais pra escolher a dedo os três
+mais rápidos**. No time medido, os três melhores somam Speed 150 de média e os seis somam 117,7 --
+porque o Snorlax Lv.58 corre a **39**. Ou seja, a prova ficou 2× mais longa E ~22% mais lenta.
+
+**Se 4 minutos incomodarem, a régua é o `CORRIDA_METROS`** (300m por trecho): 150m devolveria a
+prova pros ~125s, mantendo os seis integrantes -- que é o que o pedido pede. Mexer no
+`CORRIDA_TRECHOS` desfaria o pedido.
+
+#### O QUE ISSO CUSTOU NA DIFICULDADE DO JOGO: NADA, e está conferido
+
+As duas impressões -- **MOTOR** e **DIÁRIO** -- são **idênticas** em 900 batalhas semeadas, contra o
+build de antes desta leva. **E o instrumento é sensível**: a mesma medição com a velocidade
+des-escalada muda os dois hashes. Tudo aqui é apresentação mais um **chamador novo** do motor.
+
+#### AS TRÊS LIÇÕES DE TESTE QUE SAÍRAM DAQUI
+
+1. **⚠️ DOIS PAINÉIS MEDIAM UM TIME NO CHÃO.** Com o desgaste, o time cai na 3ª batalha -- e os
+   laços de 1.200 e 2.500 voltas seguiam rodando contra seis pokémon mortos, ou seja **medindo
+   nada**. Um deles falhava **1 rodada em 2** achando "1 confronto" onde devia achar dezenas: o pior
+   tipo de teste que existe, o que passa quase sempre. Eles passaram a **curar o time a cada volta**
+   -- ali se mede a BATALHA, não o desgaste.
+2. **⚠️ NOVE FIXTURES MONTAVAM O PAR À MÃO.** Viraram uma forma só; com nove cópias, a próxima
+   mudança no `pescariaNovoPescador` teria que ser feita nove vezes.
+3. **⚠️ UMA CLASSE DE BOTÃO SEM CSS** (`pesc-trocar`) foi pega pela varredura de classes fantasma --
+   ela não fazia nada, porque o `.btn` da casa já traz a margem. Letra morta sai.
+
+#### ⚠️ E A TELA PARAVA NO PRIMEIRO CONFRONTO -- o defeito que o time de 6 criou
+
+Reportado no mesmo dia: *"eu lutei contra um tentacruel e meu pokemon morreu, porém ainda tinha
+mais 5 para ser usado e a luta acabou"*.
+
+**⚠️ O MOTOR SEMPRE ESTEVE CERTO, e isso foi PROVADO antes de mexer em qualquer coisa:** o
+`simulateGymBattle` percorre o time conforme cada um cai, e devolvia os **6 confrontos**. Quem
+parava no primeiro era a **TELA** -- ela lia `matchups[0]` e fechava.
+
+**O estrago era maior que o incômodo:** os outros cinco **lutaram e apanharam de verdade** (o HP
+deles some do save, porque a instância é a mesma), e o jogador não viu nenhum deles. O log do fim
+trazia **UMA linha de seis**.
+
+- **⚠️ ELE NASCEU COM O TIME DE 6, algumas horas antes.** Com um parceiro só, `matchups[0]` **era**
+  a batalha inteira -- a linha estava certa no dia em que foi escrita e virou defeito no dia em que
+  a pescaria deixou de ser 1x1. É a mesma família do `MEDALHA_DO_POSTO` e do slot do item, que
+  saíram na mesma leva: **o que quebra numa mudança dessas é o que pressupunha o modelo antigo**.
+- **HOJE `matchups` É A FILA E `matchup` É O DE AGORA.** Os **seis** leitores da tela (o placar, a
+  barra, os dois quadros, a linha de status e o painel) continuam lendo "o confronto atual", que é
+  o que eles sempre quiseram dizer -- quem anda é o `i`.
+- **⚠️ ABRIR UM CONFRONTO VIROU FUNÇÃO** (`pescariaAbrirConfronto`), e ela serve o PRIMEIRO e os
+  SEGUINTES. Escrita duas vezes, a segunda esqueceria de zerar o `hit` -- e a tela abriria o
+  confronto novo **anunciando um golpe do anterior**. É literalmente o "golpe fantasma" de
+  09/09/2026, que nasceu de exatamente isso na jornada e levou o `abrirConfronto` a existir lá.
+  O teste **lê o código**: um caso de comportamento passaria com as duas cópias.
+- **A VIRADA REDESENHA A TELA** (`render()`), e ali isso é obrigatório: os **SPRITES trocam**, e
+  sprite só muda num redesenho -- o `pescariaPintarArea` mexe na caixa de status e em mais nada.
+  É o que a jornada faz no `loading` do `advanceReveal`, e a pausa é a **mesma de lá: 1200ms**
+  (`PESCARIA_ENTRE_CONFRONTOS_MS`). Sem ela os sprites trocariam no mesmo quadro em que o anterior
+  cai, e a fila pareceria um confronto só com o bicho mudando.
+- **A FILA INTEIRA VAI PRO PRELOAD**, como na jornada: o 2º entra 1,2s depois do 1º acabar, e um
+  sprite que só começasse a baixar ali apareceria **em branco** no quadro de entrada.
+- **O LOG DO FIM LEVA A FILA INTEIRA**, do último pro primeiro -- o `pescaria.logs` é lido de trás
+  pra frente na tela do fim, então empilhar na ordem deixa o confronto 1 acima do 2.
+- **O PLACAR DE POKÉBOLAS ACOMPANHA SOZINHO**: ele lê `playerAliveBefore`/`After` do confronto
+  ATUAL, então ele vai de 6 a 0 conforme a fila anda. Medido quadro a quadro.
+
+**⚠️ E A FILA PARA QUANDO O PEIXE CAI** -- ela não segue até o 6º só porque o time tem 6. Quem
+decide é o MOTOR; a tela só mostra o que ele lutou. Medido: contra um peixe que cai no 2º, a fila
+tem **2 confrontos** e sobram **5 de pé**.
+
+**⚠️ O PREÇO É TEMPO DE DUELO, e ele é grande** (20 batalhas por caso, medido na tela):
+
+| | confrontos | tempo de tela |
+|---|---|---|
+| o caso comum (um peixe fácil) | 1,0 | **3,4s** |
+| um peixe duro | 2,0 | 21,0s |
+| **o time VARRIDO** (o caso do relato) | **6,0** | **28,4s** |
+
+São **28s dos 90** do duelo. Antes o defeito os ESCONDIA -- a tela mostrava ~5s e os outros cinco
+confrontos aconteciam invisíveis, ou seja o jogador **ganhava tempo por causa dele**. Hoje não
+ganha, e é o certo: com o time varrido o duelo **acaba** de qualquer forma (a guarda dos dois times
+no chão), então o tempo não é perdido -- é o fim da partida sendo mostrado.
+
+**CONFERIDO QUE NÃO É MOTOR, por impressão:** o mesmo build antes e depois dá o **MESMO hash** em
+900 batalhas semeadas, no MOTOR e no DIÁRIO. Isto é apresentação inteira.
+
+`tools/test-pescaria.js` tranca: o motor lutando a fila, a tela mostrando TODOS na ORDEM dele, o log
+com uma linha por confronto, a fila CURTA quando o peixe cai no meio, e -- lendo o código -- o
+`pescariaAbrirConfronto` zerando o `hit`/`passo`/barras, a virada com `render()` depois da pausa de
+1200ms, e o preload da fila. Conferido que ele acusa: **2** falhas com a fila cortada no primeiro,
+**1** sem o `render()` da virada e **2** com o log só do primeiro.
+`tools/test-pescaria.js` tranca o time de 6 do adversário, o picker campeão, o desgaste (o HP que
+nunca sobe, quem caiu que não volta, o time no chão que não pesca, os dois times que encerram), o
+item equipado de ponta a ponta, o mapa nas duas telas e o ranking na tela. `tools/test-corrida.js`
+tranca o revezamento por time e a porta das 8 insígnias. E `tools/test-pescaria-rank.js` é novo: ele
+roda as duas callables contra o `fake-firestore` e **lê a regra como texto**.
+Conferido que cada defeito religado acusa: **2** sem o `preservePlayerHp`, **1** sem a guarda do time
+no chão, **2** sem o slot do item, **2** com o time de 1, **1** sem a porta das 8 insígnias na
+Corrida e **2** com o toggle ativo no revezamento.
 
 ## PERFORMANCE: A GEOGRAFIA MANDA (19/09/2026)
 

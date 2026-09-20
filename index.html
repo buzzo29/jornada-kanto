@@ -3083,10 +3083,11 @@
      selvagem e o cartão de golpe já usam. */
   .pesc-lado-estado{font-size:.55rem;color:var(--muted);line-height:1.2;
     overflow-wrap:anywhere;word-break:break-word;}
-  /* ⚠️ AS SEIS ÁGUAS SÃO UMA GRADE DE 3, e não um mapa desenhado: a 320px um mapa com áreas
-     irregulares vira alvo de toque impossível de acertar. Seis botões retangulares são o mesmo jogo
-     e se tocam com o polegar. */
-  .pesc-mapa{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-bottom:8px;}
+  /* ⚠️ ISTO ERA UMA GRADE DE 3 ATÉ 20/09/2026, e a razão escrita era boa: *"a 320px um mapa com
+     áreas irregulares vira alvo de toque impossível de acertar"*. O que a derrubou não foi a
+     razão -- foi o alvo deixar de ser irregular: os pontos da ilha são CÍRCULOS de 56px, maiores
+     que a recomendação de 44px, e cada um tem o nome por baixo. O mapa passou a dizer onde cada
+     ponto FICA, que é o que uma grade de retângulos não consegue dizer. */
   /* ⚠️ O (i) É IRMÃO DO BOTÃO DA ZONA, nunca filho: `<button>` dentro de `<button>` é HTML
      inválido -- o navegador fecha o de fora e o clique de dentro se perde, com a tela continuando
      a PARECER certa. É a mesma armadilha da lupa do encontro selvagem e da do montador, e é por
@@ -3094,34 +3095,75 @@
      De quebra ele sobrevive ao card DESABILITADO (descendente de botão desabilitado não recebe
      clique nenhum) -- e é justamente enquanto você está pescando num ponto que dá vontade de
      consultar os outros. */
-  .pesc-ponto{position:relative;display:flex;}
-  .pesc-ponto .pesc-zona{flex:1;padding-right:18px;}
+  /* ⚠️ O MAPA VIROU UMA ILHA em 20/09/2026, a pedido -- os seis pontos deixaram de ser uma grade
+     de retângulos e passaram a ficar EM VOLTA dela, cada um na costa dele. O desenho é do
+     protótipo `pescaria-pokemon.html`, em SVG (nenhuma imagem de fora, a regra da casa).
+     ⚠️ O `aspect-ratio` TEM QUE SER O DO `viewBox` (360/380): as posições dos pontos são
+     PERCENTUAIS, então uma caixa de outra proporção os tira do lugar -- o ponto da praia sul
+     cairia no mar. É a única regra aqui que não é estética. */
+  .pesc-mapa{position:relative;display:block;padding:0;width:100%;aspect-ratio:360/380;
+    overflow:hidden;background:#277c9f;border:3px solid #254650;border-radius:4px;
+    isolation:isolate;margin-bottom:8px;}
+  .pesc-mapa .island-art{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;
+    image-rendering:pixelated;}
+  /* o ponto: o alvo de toque é o círculo, e o nome e a atividade ficam ABAIXO dele, fora do
+     círculo -- num alvo de 56px não cabe texto, e o nome é o que identifica o ponto. */
+  .pesc-ponto{position:absolute;left:var(--x);top:var(--y);width:60px;height:60px;
+    transform:translate(-50%,-50%);}
+  .pesc-mapa .pesc-zona{position:absolute;inset:2px;width:56px;height:56px;padding:0;
+    border-radius:50%;border:3px solid #e7ead3;background:#174b6de8;color:#fff9e4;
+    box-shadow:0 3px 0 #12364c99;display:block;overflow:visible;cursor:pointer;}
+  .pesc-mapa .pesc-ponto-num{font:800 20px/48px var(--font-ui);color:#fff9e4;display:block;}
+  .pesc-mapa .pesc-ponto-nome{position:absolute;top:54px;left:50%;transform:translateX(-50%);
+    font-size:.62rem;line-height:17px;white-space:nowrap;color:#fff9e4;background:#133448e8;
+    border:1px solid #9ec5cb;border-radius:3px;padding:1px 5px;font-weight:800;}
+  .pesc-mapa .pesc-zona-atv{position:absolute;left:50%;top:77px;transform:translateX(-50%);
+    white-space:nowrap;font-size:.5rem;padding:2px 4px;line-height:13px;background:#133448e8;
+    color:#fff;min-width:65px;border-radius:3px;margin:0;font-weight:800;text-align:center;}
+  /* ⚠️ O PONTO COM PEIXE ACENDE (amarelo) e o que É SEU fica azul -- as duas coisas que o jogador
+     precisa ver de relance. A regra do `:disabled` vem DEPOIS, pelo mesmo motivo de sempre: mesma
+     especificidade, ganha a última, e um ponto desabilitado não pode continuar piscando. */
+  .pesc-mapa .pesc-zona.viva{background:#ffd347;border-color:#fff3b0;
+    box-shadow:0 0 0 4px #ffcb0538,0 3px 0 #16334b;animation:pesc-pisca 1.1s ease-in-out infinite;}
+  .pesc-mapa .pesc-zona.viva .pesc-ponto-num{color:#173e51;}
+  .pesc-mapa .pesc-zona.minha{background:var(--blue);border-color:#fff;}
+  .pesc-mapa .pesc-zona:disabled{cursor:not-allowed;opacity:.45;animation:none;}
+  .pesc-mapa .pesc-info{position:absolute;right:-8px;top:-7px;bottom:auto;width:28px;height:28px;
+    padding:0;border:2px solid #173e51;border-radius:50%;background:#fff9e9e8;color:#233647;
+    font:800 .62rem/1 var(--font-ui);cursor:pointer;z-index:4;}
+  /* ⚠️ NO MODO ILUSTRAÇÃO (a tela de setup) os pontos são `<span>` e não clicam -- um botão que
+     não faz nada convida um toque que não responde. O (i) continua clicável ali, e é ele que a
+     tela de setup tem a oferecer. */
+  .pesc-mapa.so-olhar .pesc-zona{cursor:default;}
   .pesc-info{position:absolute;top:3px;right:3px;width:16px;height:16px;padding:0;
     border:1px solid #ffffff99;border-radius:50%;background:#ffffff33;color:#fff;
     font:800 .55rem/1 var(--font-ui);cursor:pointer;z-index:2;}
   .pesc-info:hover{background:#ffffff66;}
+  /* O RANKING: uma linha por treinador, tres colunas fixas -- a posicao, o nome e os pontos.
+     ⚠️ GRADE e nao flex: com flex a coluna dos pontos muda de largura de linha pra linha e o olho
+     perde a coluna que ele esta comparando. O `minmax(0,1fr)` no nome e o que o deixa truncar em
+     vez de empurrar os pontos pra fora -- a armadilha do `1fr` que este projeto ja pagou duas
+     vezes (a fileira de cinco cards da home e o placar da pescaria). */
+  .pesc-rank{display:flex;flex-direction:column;gap:2px;}
+  .pesc-rank-linha{display:grid;grid-template-columns:34px minmax(0,1fr) auto;align-items:center;
+    gap:6px;padding:4px 6px;border-bottom:1px dashed var(--box-border-soft,#d9d5c4);}
+  .pesc-rank-linha:last-child{border-bottom:none;}
+  /* a linha de quem esta lendo e a que ele procura primeiro -- o mesmo realce do ranking da Torre */
+  .pesc-rank-linha.eu{background:rgba(255,203,5,.22);border-radius:4px;}
+  .pesc-rank-pos{font-weight:800;font-size:.7rem;text-align:center;color:var(--muted);}
+  .pesc-rank-nome{font-weight:700;font-size:.72rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .pesc-rank-pts{font-weight:800;font-size:.8rem;font-variant-numeric:tabular-nums;color:var(--blue-dark);}
+  .pesc-rank-sep{font-size:.55rem;font-weight:800;color:var(--muted);text-transform:uppercase;
+    letter-spacing:.5px;margin-top:6px;padding-top:6px;border-top:2px solid var(--box-border);}
+  .pesc-rank-novo{font-size:.7rem;font-weight:800;color:var(--green-dark,#1f6b2f);margin:0 0 6px;}
   .pesc-chance{flex:0 0 auto;font-size:.66rem;font-weight:800;color:var(--blue-dark);
     font-variant-numeric:tabular-nums;}
-  .pesc-zona{border:2px solid var(--box-border);border-radius:5px;padding:7px 4px;color:#fff;
-    display:flex;flex-direction:column;align-items:center;gap:1px;cursor:pointer;opacity:.55;
-    font-family:var(--font-ui);}
-  .pesc-zona b{font-size:.68rem;}
-  .pesc-zona small{font-size:.52rem;opacity:.85;}
-  /* A LINHA DE ATIVIDADE é o que faz o lago ser uma DISPUTA e não seis botões: ela diz se o ponto
-     está livre, quanto tempo falta pra entrar e -- principalmente -- quando os dois estão no
-     mesmo peixe. Ela tem altura fixa pra o card não pular de tamanho a cada troca de texto. */
-  .pesc-zona-atv{display:block;font-size:.47rem;font-weight:800;letter-spacing:.3px;
-    min-height:1.3em;line-height:1.3;opacity:.92;}
-  /* ⚠️ A ZONA COM PEIXE PISCA, e é a única pista de onde tocar -- o resto do mapa fica apagado
-     de propósito. A animação é do `box-shadow`, que não recalcula layout. */
-  .pesc-zona.viva{opacity:1;animation:pesc-pisca 1.1s ease-in-out infinite;}
-  /* ⚠️ E O PONTO FECHADO PARA DE PISCAR. Esta regra vem DEPOIS da `.viva` de propósito: as duas
-     têm a mesma especificidade, então quem ganha é a última -- e enquanto ela vinha antes, um
-     ponto com peixe continuava piscando "toque aqui" enquanto o jogador estava com a linha na
-     água e o botão desabilitado. Um alvo que pulsa e não responde é pior que um alvo apagado.
-     É a mesma regra que o `.btn.danger:disabled` já tinha aprendido: botão desabilitado precisa
-     PARECER desabilitado. */
-  .pesc-zona:disabled{cursor:not-allowed;opacity:.3;animation:none;}
+  /* ⚠️ A LINHA DE ATIVIDADE é o que faz a ilha ser uma DISPUTA e não seis botões: ela diz se o
+     ponto está livre, quanto tempo falta pra entrar e -- principalmente -- quando os dois estão
+     no mesmo peixe. O resto do estilo dela vive no bloco do mapa, acima.
+     ⚠️ E AS REGRAS DE RETÂNGULO SAÍRAM COM A GRADE (20/09/2026): mantidas, elas e as do mapa
+     disputavam `.pesc-zona` -- as duas com a mesma especificidade e a ordem decidindo, que é o
+     pior tipo de defeito de CSS (funciona até alguém mover um bloco). */
   @keyframes pesc-pisca{0%,100%{box-shadow:0 0 0 0 var(--yellow);}50%{box-shadow:0 0 0 4px var(--yellow);}}
   .pesc-recado{min-height:1.2em;font-size:.72rem;font-weight:700;color:var(--blue-dark);text-align:center;margin:0;}
   /* A CENA DA BOIA É A DO PROTÓTIPO: uma faixa d'água listrada com a boia balançando. Ela existe
@@ -30941,7 +30983,12 @@ const CORRIDA_DESLEIXO_MIN = 0.55;  /* o piso: nunca abaixo de 55% da velocidade
 const CORRIDA_NPC = { perfect: 0.20, good: 0.52, miss: 0.14 };
 
 const CORRIDA_METROS = 300;          /* por trecho, e o total da individual */
-const CORRIDA_TRECHOS = 3;           /* no revezamento */
+/* ⚠️ SEIS DESDE 20/09/2026, a pedido: *"no revezamento, ao invés de escolher 3 pokemons de
+   qualquer time, vai ter que escolher 1 time e o revezamento vai ser entre os 6 do time"*.
+   ⚠️ E ISSO DOBRA A PROVA: 6 × 300 m = 1.800 m, contra os 900 de antes. Medido, o revezamento vai
+   de ~95 s para ~190 s. É o preço de a equipe ser o time inteiro, e a régua pra encurtar é o
+   `CORRIDA_METROS` (150 por trecho devolveria os 900 m, com cada trecho em ~12 s). */
+const CORRIDA_TRECHOS = 6;           /* no revezamento: o time inteiro */
 const corridaTotal = () => corrida.formato === 'relay' ? CORRIDA_METROS * CORRIDA_TRECHOS : CORRIDA_METROS;
 
 /* ============================================================================
@@ -31133,6 +31180,18 @@ function nivelDoNpc(nivelDoJogador){ return nivelDoJogador; }
    ⚠️ É "as N MAIS PRÓXIMAS", e não uma janela de ±x%: janela pode ficar VAZIA (um Shuckle de
    Speed 10 não tem vizinho a ±15%) e aí precisaria de um fallback que, por definição, só roda
    nos casos raros -- ou seja, o caminho menos testado do código. Por proximidade nunca falta. */
+/* ⚠️ AS TRÊS MEDALHAS SÃO DESENHO DA CASA, nunca emoji -- é a regra que tirou os 54 emojis das
+   telas em 17/09/2026, e o pedido a repete (*"crie, não use emoji prontos"*). Elas saem do
+   mesmo `selo()` de todo o resto, então herdam o contorno de 2px e o sombreado direcional.
+   ⚠️ DA QUARTA COLOCAÇÃO EM DIANTE NÃO HÁ MEDALHA, e o lugar dela fica VAZIO em vez de sumir:
+   sem o vazio, o "4º" encostaria no nome e as linhas deixariam de alinhar em coluna -- que é
+   justamente onde o olho compara.
+   ⚠️ ELA É COMPARTILHADA COM O RANKING DA PESCARIA (20/09/2026), e por isso saiu de dentro da
+   tela de resultado da Corrida: ela nasceu `const` LOCAL ali, e o ranking, que a lê, quebrava com
+   `ReferenceError` na primeira linha que desenhasse -- um defeito que só aparece quando alguém
+   pontua, porque a caixa vazia nunca chama o desenho da linha.
+   ⚠️ E ELA É INDEXADA A PARTIR DO ZERO: quem tem a colocação em 1, 2, 3 subtrai. */
+const MEDALHA_DO_POSTO = ['medalha_ouro', 'medalha_prata', 'medalha_bronze'];
 const CORRIDA_NPC_VIZINHOS = 14;
 function npcParaOSpeed(alvo, usadas){
   const finais = finaisDaCorrida();
@@ -31390,8 +31449,27 @@ function corridaIrParaPagina(i){
   game.montadorPagina = i; render();
 }
 function corridaFecharPicker(){ corrida.picker = false; render(); }
+/* ⚠️ NO REVEZAMENTO A ESCOLHA É DE UM TIME INTEIRO (20/09/2026), e não de três pokémon avulsos:
+   o `corridaEscolherTime` põe os SEIS de uma vez, na ordem do save. O `corridaToggle` continua
+   valendo na INDIVIDUAL, onde a escolha é de um pokémon só.
+   ⚠️ E O TIME TEM QUE SER CAMPEÃO: quem valida é a AÇÃO, com o mesmo `savesCampeoes()` da Liga,
+   do Ginásio da Cidade e da Pescaria. Um slot forjado no console levaria um time sem as 8
+   insígnias pra pista. */
+function corridaEscolherTime(slot){
+  if(corrida.fase === 'correndo' || corrida.fase === 'contagem') return;
+  if(corrida.formato !== 'relay') return;
+  if(savesCampeoes().indexOf(Number(slot)) < 0) return;
+  const sv = (game.saveSlots && game.saveSlots[Number(slot)]) || {};
+  /* a ordem é a do SAVE -- é a que o jogador já arrumou na tela de ordem de batalha; as setas da
+     tela de revezamento continuam existindo pra mexer nela aqui. */
+  corrida.escolhidos = (sv.team || []).slice(0, CORRIDA_TRECHOS).map((p, idx) =>
+    Object.assign({}, p, { slot: Number(slot), idx, teamName: sv.customName || (`Time ${Number(slot) + 1}`) }));
+  corrida.picker = false;
+  render();
+}
 function corridaToggle(slot, idx){
   if(corrida.fase === 'correndo' || corrida.fase === 'contagem') return;
+  if(corrida.formato === 'relay') return;   /* lá a escolha é do time inteiro */
   const lista = corridaElegiveis();
   const alvo = lista.find(p => String(p.slot) === String(slot) && p.idx === idx);
   if(!alvo) return;
@@ -31819,7 +31897,27 @@ function corridaLinhaEscolhido(p, i){
   </div>`;
 }
 /* A LISTA DE ESCOLHA -- a mesma linha do montador da Torre, com o Speed DA CORRIDA em evidência. */
+/* O card de TIME do revezamento -- o mesmo `save-slot-card` da Liga, da home e da Pescaria. */
+function corridaPickerDeTimes(){
+  const slots = savesCampeoes();
+  if(!slots.length){
+    return `<div class="box"><p class="error-text">Nenhum time seu venceu as 8 insígnias ainda.`
+      + ` Termine uma jornada primeiro!</p>`
+      + `<button class="btn secondary" onclick="corridaFecharPicker()">⬅ Voltar</button></div>`;
+  }
+  const atual = corrida.escolhidos.length ? corrida.escolhidos[0].slot : null;
+  return `<div class="box">`
+    + `<h2>${selo("corrida")} Qual time faz o revezamento?</h2>`
+    + `<p class="hint-text">Correm os <strong>${CORRIDA_TRECHOS}</strong> do time, um por trecho de`
+    + ` ${CORRIDA_METROS} m. A ordem começa na do time e dá pra mexer antes de largar.</p>`
+    + slots.map(slot => pescariaCardDoTime(slot, String(atual) === String(slot),
+                                           `corridaEscolherTime(${slot})`)).join(``)
+    + `<button class="btn secondary" onclick="corridaFecharPicker()">⬅ Voltar</button></div>`;
+}
 function corridaPickerHtml(){
+  /* ⚠️ NO REVEZAMENTO A LISTA É DE TIMES (20/09/2026) -- ver o `corridaEscolherTime`. A individual
+     continua com a lista de POKÉMON, que é o que ela escolhe. */
+  if(corrida.formato === `relay`) return corridaPickerDeTimes();
   const lista = corridaElegiveis();
   const marcados = corrida.escolhidos;
   const usadas = new Set(marcados.map(p => raizDaLinha(p.speciesId)));
@@ -31944,13 +32042,7 @@ function renderCorrida(){
       <p class="hint-text">Toque no botão para impulsionar · uma tentativa por ida e uma por volta</p>
     </div>` : '';
 
-  /* ⚠️ AS TRÊS MEDALHAS SÃO DESENHO DA CASA, nunca emoji -- é a regra que tirou os 54 emojis das
-     telas em 17/09/2026, e o pedido a repete (*"crie, não use emoji prontos"*). Elas saem do
-     mesmo `selo()` de todo o resto, então herdam o contorno de 2px e o sombreado direcional.
-     ⚠️ DA QUARTA COLOCAÇÃO EM DIANTE NÃO HÁ MEDALHA, e o lugar dela fica VAZIO em vez de sumir:
-     sem o vazão, o "4º" encostaria no nome e as linhas deixariam de alinhar em coluna -- que é
-     justamente onde o olho compara. */
-  const MEDALHA_DO_POSTO = ['medalha_ouro', 'medalha_prata', 'medalha_bronze'];
+
   const fim = corrida.fase === 'fim' ? `
     <div class="box">
       <h2>${corridaPosicao(0) === 1 ? selo('trofeu') + ' Você venceu!' : corridaPosicao(0) + 'º lugar'}</h2>
@@ -32053,6 +32145,10 @@ const PESCARIA_ABERTURA_MS = 550;
 const PESCARIA_ENTRE_GOLPES_MS = 150;
 const PESCARIA_DEPOIS_DO_ULTIMO_MS = 800;
 const PESCARIA_SEM_GOLPES_MS = 1300;
+/* ⚠️ A PAUSA ENTRE UM CONFRONTO E O SEGUINTE -- os mesmos 1200ms que a jornada usa no `loading`
+   do `advanceReveal`. Ela existe pra o jogador VER quem entrou: sem ela os sprites trocariam no
+   mesmo quadro em que o anterior cai, e a fila pareceria um confronto só com o bicho mudando. */
+const PESCARIA_ENTRE_CONFRONTOS_MS = 1200;
 
 /* ⚠️ O ESTADO É UM `const` QUE NUNCA É REATRIBUÍDO -- `pescariaZerar` troca os campos e a
    referência continua a mesma. Não é estilo: o sandbox dos testes copia o valor na criação, então
@@ -32066,6 +32162,44 @@ const pescaria = {
   jogadores: [], segurando: false, recado: '', recadoAte: 0,
   historico: [], logs: [], zonaAberta: null,
 };
+/* =====================================================================
+   O RANKING (20/09/2026, a pedido: *"na primeira tela, crie um ranking das maiores pontuações"*)
+   ===================================================================== */
+/* ⚠️ ELE VIVE FORA DO `pescaria`, e de propósito: o `pescariaZerar` limpa o duelo, e o ranking
+   não é do duelo -- relê-lo a cada "jogar de novo" custaria 10 leituras por partida. */
+const pescariaRank = { lista: null, meu: null, carregando: false, erro: null, recorde: false };
+/* ⚠️ BEST-EFFORT dos dois lados: um ranking que não carrega é uma caixa a menos na tela, e um
+   envio que falha é um recorde perdido -- nenhum dos dois pode derrubar o duelo. */
+async function pescariaCarregarRank(forcar){
+  if(pescariaRank.carregando) return;
+  if(pescariaRank.lista && !forcar) return;
+  pescariaRank.carregando = true; pescariaRank.erro = null;
+  try{
+    const r = await functionsClient.httpsCallable('getFishingRanking')({});
+    pescariaRank.lista = (r.data && r.data.lista) || [];
+    pescariaRank.meu = (r.data && r.data.meu) || null;
+  } catch(e){
+    console.error(`Erro ao ler o ranking da pescaria:`, e);
+    pescariaRank.erro = `Não deu pra carregar o ranking agora.`;
+  }
+  pescariaRank.carregando = false;
+  if(game.screen === 'pescaria') render();
+}
+/* ⚠️ O ENVIO ACONTECE NO FIM DO DUELO, e o que vai é o que o MOTOR contou -- o `pontos` do
+   pescador, nunca um número montado na tela. O servidor ignora se não for recorde. */
+async function pescariaEnviarRank(){
+  const eu = pescaria.jogadores[0];
+  if(!eu || !game.authUser) return;
+  const venceu = !!(pescaria.jogadores[1] && eu.pontos > pescaria.jogadores[1].pontos);
+  try{
+    const r = await functionsClient.httpsCallable('submitFishingScore')({
+      pontos: eu.pontos, venceu, capturas: eu.fisgadas });
+    pescariaRank.recorde = !!(r.data && r.data.gravado);
+    /* o ranking mudou: a próxima abertura relê */
+    if(pescariaRank.recorde) pescariaRank.lista = null;
+  } catch(e){ console.error(`Erro ao enviar a pontuação:`, e); }
+  if(game.screen === 'pescaria') render();
+}
 function pescariaZerar(){
   if(pescaria.laco){ cancelAnimationFrame(pescaria.laco); pescaria.laco = null; }
   pescaria.fase = 'setup'; pescaria.picker = false; pescaria.npc = null;
@@ -32122,13 +32256,24 @@ function sairDaPescaria(){
 /* ⚠️ ORDENADO PELO NÍVEL MAIS ALTO, que foi o pedido -- e não pelo Speed como a Corrida, onde o
    Speed É a prova. Aqui quem decide a batalha é o pokémon inteiro, e nível é a melhor régua única.
    Os desempates existem pra a lista não dançar entre um desenho e outro. */
-function pescariaElegiveis(){
-  return towerEligiblePokemon()
-    .slice()
-    .sort((a, b) => (b.level - a.level)
-                 || String(a.speciesId).localeCompare(String(b.speciesId))
-                 || String(a.slot).localeCompare(String(b.slot)));
+/* ⚠️ SÃO TIMES, E SÓ OS CAMPEÕES DAS 8 INSÍGNIAS (20/09/2026, a pedido). Antes era um pokémon
+   avulso de qualquer save pelo `towerEligiblePokemon`; hoje é o MESMO `savesCampeoes()` que a Liga
+   Clássica, o Ginásio da Cidade e a Batalha Online usam -- ou seja o jogador traz um time que ele
+   levou até o fim, e não um bicho escolhido a dedo.
+   ⚠️ E ELE JÁ EXCLUI O APOSENTADO: quem aposentou o time abriu mão de competir com ele, e é o
+   mesmo `savesCampeoes` que fecha as ligas e o online pra ele. */
+function pescariaElegiveis(){ return savesCampeoes(); }
+/* O time de um slot, montado do zero -- instâncias PRÓPRIAS da pescaria, nunca as do save: elas
+   vão tomar dano e morrer, e o save não pode sentir nada disso (conferido por impressão). */
+/* ⚠️ O SLOT VIAJA JUNTO, e isso não é detalhe: a chave do ITEM equipado é `slot:raiz-da-linha`,
+   e sem ele o `equiparItens` procura o item com slot nulo -- ou seja, a poção que o jogador
+   equipou no parceiro simplesmente NÃO VALERIA aqui, em silêncio. */
+function pescariaTimeDoSlot(slot){
+  const sv = game.saveSlots && game.saveSlots[slot];
+  return ((sv && sv.team) || []).map(p => pescariaInstancia(Object.assign({}, p, { slot }), true));
 }
+/* quantos ainda estão de pé -- é o que decide se o pescador ainda pode fisgar */
+const pescariaVivos = (p) => ((p && p.time) || []).filter(x => x.hp > 0).length;
 function pescariaAbrirPicker(){
   if(pescaria.fase !== 'setup') return;
   /* ⚠️ ZERA A PÁGINA: o `game.montadorPagina` é COMPARTILHADO com a Torre, o Ginásio e a
@@ -32141,11 +32286,13 @@ function pescariaIrParaPagina(i){
   if(pescaria.fase !== 'setup') return;
   game.montadorPagina = i; render();
 }
-function pescariaEscolher(slot, idx){
+/* ⚠️ QUEM VALIDA É A AÇÃO: ela confere que o slot está mesmo na lista de campeões, e não confia
+   no que o clique mandou -- a regra da casa. Um slot forjado no console levaria um time sem as 8
+   insígnias pro duelo. */
+function pescariaEscolher(slot){
   if(pescaria.fase !== 'setup') return;
-  const p = pescariaElegiveis().find(x => String(x.slot) === String(slot) && x.idx === idx);
-  if(!p) return;
-  pescaria.escolhido = p;
+  if(pescariaElegiveis().indexOf(Number(slot)) < 0) return;
+  pescaria.escolhido = Number(slot);
   pescaria.picker = false;
   render();
 }
@@ -32162,13 +32309,32 @@ function pescariaPoolDoNpc(){
   return Object.keys(SPECIES).filter(id =>
     bstOf(id) > PESCARIA_NPC_BST_MIN && SEM_CAPTURA_SELVAGEM.indexOf(id) < 0);
 }
+/* ⚠️ O ADVERSÁRIO TEM NOME, e ele é uma CLASSE + um nome próprio -- a convenção da casa. Os NPCs
+   da Torre são classes puras (`Pescador`, `Marinheiro`, `Campista`); aqui o duelo é contra UMA
+   pessoa o tempo todo, e um "NPC" genérico no placar lia como marcador de sistema, não como
+   adversário. Wilton é um Pescador canônico de Johto (Gen 2/HGSS).
+   Trocá-lo é uma linha: o nome aparece SEMPRE por esta constante, nunca escrito na tela. */
+/* ⚠️ O TAMANHO DO TIME É O DO JOGO (6), e ele é constante porque aparece em quatro lugares: o
+   sorteio do time do NPC, a tela do placar, a validação do time escolhido e o teste. */
+const PESCARIA_TIME = 6;
+const PESCARIA_NPC_NOME = 'Pescador Wilton';
+/* ⚠️ E ELE TEM UM TIME DE 6, como o jogador -- sorteado entre as mesmas espécies de BST alto, sem
+   repetir LINHA evolutiva (a regra do encontro selvagem e do montador: dois Gyarados de origens
+   diferentes são a mesma linha). */
 function pescariaSortearNpc(){
   const pool = pescariaPoolDoNpc();
-  const id = pool[Math.floor(Math.random() * pool.length)];
-  /* `createInstance` não copia campo nenhum -- aqui não há o que copiar, o NPC nasce do zero. */
-  const inst = createInstance(id, PESCARIA_NPC_NIVEL);
-  inst.hp = inst.maxHp = calcMaxHp(inst);
-  return inst;
+  const time = [], usadas = new Set();
+  let voltas = 0;
+  while(time.length < PESCARIA_TIME && voltas++ < 400){
+    const id = pool[Math.floor(Math.random() * pool.length)];
+    if(usadas.has(raizDaLinha(id))) continue;
+    usadas.add(raizDaLinha(id));
+    /* `createInstance` não copia campo nenhum -- aqui não há o que copiar, o NPC nasce do zero. */
+    const inst = createInstance(id, PESCARIA_NPC_NIVEL);
+    inst.hp = inst.maxHp = calcMaxHp(inst);
+    time.push(inst);
+  }
+  return time;
 }
 
 
@@ -32180,8 +32346,16 @@ const pescariaSorteado = (pool) => {
   for(const [id, peso] of pool){ n -= peso; if(n < 0) return id; }
   return pool[pool.length - 1][0];
 };
-function pescariaNovoPescador(inst, ehDoJogador){
-  return { inst, ehDoJogador, pontos: 0, fisgadas: 0, vitorias: 0,
+/* ⚠️ O PESCADOR CARREGA UM TIME, e o HP dele ATRAVESSA as batalhas (20/09/2026, a pedido: *"os
+   pokemons que morrerem tem que permanecer morto até o fim da pesca, e os que sobreviveram mas
+   tomaram dano ... deve permanecer com o mesmo hp que estava na luta anterior"*).
+   ⚠️ E QUEM FAZ ISSO É O `preservePlayerHp` DA ELITE 4, não um controle próprio: ele carrega a
+   FRAÇÃO de vida (cheio continua cheio, metade continua metade, desmaiado continua desmaiado), que
+   é exatamente o que se quer aqui. Uma segunda mecânica de HP persistente divergiria da dela no
+   primeiro ajuste -- e a razão de ela guardar FRAÇÃO e não o número cru está na nota de lá.
+   ⚠️ O TIME É DA PESCARIA, nunca o do save: estas instâncias vão morrer. */
+function pescariaNovoPescador(time, ehDoJogador){
+  return { time: time || [], ehDoJogador, pontos: 0, fisgadas: 0, vitorias: 0,
            estado: 'parado', op: null, ate: 0, tempoDePesca: 0,
            progresso: 0, tensao: 0, batalha: null, recadoDeEspera: '' };
 }
@@ -32235,6 +32409,11 @@ function pescariaEntrar(qual, zona){
   const p = pescaria.jogadores[qual];
   if(pescaria.fase !== 'jogando' || pescaria.tempo >= PESCARIA_DURACAO) return;
   if(!p || p.estado !== 'parado') return;
+  /* ⚠️ SEM TIME DE PÉ NÃO SE PESCA, e é a consequência direta de as mortes serem permanentes: a
+     captura só vira ponto quem VENCE a batalha, e quem não tem com o que lutar não venceria
+     nenhuma. Deixá-lo lançar seria oferecer uma fisgada que já nasce perdida.
+     Quem responde é a AÇÃO, como o relógio logo acima -- o `disabled` das zonas é do pintor. */
+  if(pescariaVivos(p) === 0) return;
   const op = pescaria.oportunidades[zona];
   if(!op || op.pego || pescaria.tempo > op.entradaAte) return;
   p.estado = 'espera'; p.op = op;
@@ -32322,15 +32501,41 @@ function pescariaInstancia(p, ehDoJogador){
   inst.hp = inst.maxHp = calcMaxHp(inst);
   return inst;
 }
+/* ⚠️ O `a` JÁ É UM TIME (20/09/2026): ele era `[meu]`, um pokémon só. O `preservePlayerHp` é o que
+   faz o desgaste atravessar as fisgadas -- ver a nota do `pescariaNovoPescador`. */
 function pescariaBatalhar(meu, pescado, ehDoJogador){
-  const a = [meu], b = [pescado];
+  const a = Array.isArray(meu) ? meu : [meu], b = [pescado];
   /* ⚠️ SÓ O PARCEIRO DO JOGADOR LEVA A ESPECIALIDADE E O ITEM. O peixe nunca leva (ele não é de
      ninguém), e o parceiro do NPC também não -- ver a nota do `pescariaInstancia`. */
   applySpecialtyBuff(a, ehDoJogador ? (game.specialties || []) : []);
   applySpecialtyBuff(b, []);
-  equiparItens(a, ehDoJogador ? (game.equipados || {}) : {}, meu.slotDaConta);
+  /* ⚠️ SEM `slotPadrao`: cada instância já carrega o `slotDaConta` do save de onde ela veio
+     (o `pescariaTimeDoSlot` carimba), e o terceiro degrau do `equiparItens` é justamente esse.
+     Era `meu.slotDaConta` -- de um POKÉMON, quando o parceiro era um só. */
+  equiparItens(a, ehDoJogador ? (game.equipados || {}) : {});
   equiparItens(b, {});
-  return simulateGymBattle(a, b, makeSeededRng('pescaria-' + (pescaria.semente++)));
+  return simulateGymBattle(a, b, makeSeededRng('pescaria-' + (pescaria.semente++)),
+                           { preservePlayerHp: true });
+}
+/* ⚠️ ABRIR UM CONFRONTO É UMA FUNÇÃO SÓ, e ela serve o PRIMEIRO e os SEGUINTES. Escrita duas
+   vezes, a segunda esqueceria de zerar o `hit` -- e a tela abriria o confronto novo anunciando um
+   golpe do anterior. É literalmente o "golpe fantasma" de 09/09/2026, que nasceu de exatamente
+   isso na jornada e levou o `abrirConfronto` a existir lá. */
+function pescariaAbrirConfronto(b, i){
+  const m = b.matchups[i] || null;
+  b.i = i;
+  b.matchup = m;
+  b.seq = m ? buildAnimatedHitSequence(m) : [];
+  b.passo = 0;
+  b.hit = null;
+  b.barraEm = 0; b.areaEm = 0;
+  b.fim = !b.seq.length;
+  b.hpP = m ? m.playerHpBefore : 0;
+  b.hpE = m ? m.enemyHpBefore : 0;
+  /* a abertura é a do `advanceReveal`: 550ms, mais a pausa de leitura quando o confronto abre
+     com uma passiva. Sem golpe nenhum (confronto resolvido na abertura) vale o 1300ms de lá. */
+  b.proximo = pescaria.tempo + (b.seq.length ? (PESCARIA_ABERTURA_MS + pausaDoEspecial(m))
+                                             : PESCARIA_SEM_GOLPES_MS) / 1000;
 }
 function pescariaComecarBatalha(qual, op){
   const p = pescaria.jogadores[qual];
@@ -32339,10 +32544,13 @@ function pescariaComecarBatalha(qual, op){
   /* quem estava no MESMO ponto perde a vez -- o peixe era um só */
   pescaria.jogadores.forEach((outro, j) => {
     if(j !== qual && outro.op && outro.op.id === op.id)
-      pescariaPerder(j, (qual === 0 ? 'Você' : 'O NPC') + ' pescou primeiro. Procure outro ponto.');
+      pescariaPerder(j, (qual === 0 ? 'Você' : PESCARIA_NPC_NOME) + ' pescou primeiro. Procure outro ponto.');
   });
   p.fisgadas++;
-  const meu = pescariaInstancia(p.inst, qual === 0);
+  /* ⚠️ O TIME INTEIRO ENFRENTA O PEIXE, e o `simulateGymBattle` já sabe fazer isso: ele percorre
+     a fila conforme cada um cai. O que muda é o `preservePlayerHp` -- sem ele o motor CURA os dois
+     times na entrada, e o desgaste que esta feature existe pra criar sumiria a cada fisgada. */
+  const meuTime = p.time;
   const pescadoInst = pescariaInstancia({ speciesId: op.speciesId, level: op.nivel }, false);
   /* ⚠️ O PEIXE -- E O PARCEIRO DO NPC -- LEVAM O MOVESET DA ESPÉCIE, como todo NPC do jogo.
      É a regra de 09/09/2026 ("os NPCs ganharam moveset"): quem NÃO escolhe golpe luta com tudo que
@@ -32355,9 +32563,14 @@ function pescariaComecarBatalha(qual, op){
      O parceiro do JOGADOR nunca passa por aqui: os golpes dele são a escolha dele, e o
      `equiparNpc` respeita isso (ele só preenche quem está sem). */
   equiparNpc([pescadoInst]);
-  if(qual !== 0) equiparNpc([meu]);
-  const r = pescariaBatalhar(meu, pescadoInst, qual === 0);
-  const m = (r.matchups && r.matchups[0]) || null;
+  if(qual !== 0) equiparNpc(meuTime);
+  const r = pescariaBatalhar(meuTime, pescadoInst, qual === 0);
+  /* ⚠️ A FILA INTEIRA, e não só o primeiro confronto (20/09/2026, reportado: *"meu pokemon morreu,
+     porém ainda tinha mais 5 para ser usado e a luta acabou"*). O MOTOR sempre lutou a fila toda --
+     o `simulateGymBattle` percorre o time conforme cada um cai --, e quem parava no primeiro era a
+     TELA: ela lia `matchups[0]` e fechava. O jogador via o parceiro cair e o duelo seguir, com os
+     outros cinco tendo lutado (e apanhado) sem aparecer. */
+  const ms = (r.matchups || []).filter(Boolean);
   /* ⚠️ A SEQUÊNCIA É A DA JORNADA (`buildAnimatedHitSequence`), e não o diário cru. Ela é quem
      sabe que a cura e a fúria SOBEM a barra (o `amount` vai negativo), que a queimadura e o veneno
      têm o `q` de quem PERDE e não de quem bate, que um golpe de vários tapas vira N passos e
@@ -32365,23 +32578,26 @@ function pescariaComecarBatalha(qual, op){
      ⚠️ LENDO O DIÁRIO DIRETO -- que é o que esta tela fazia até 19/09/2026 -- a cura do jogador
      DESCIA a barra do peixe, e a queimadura dele descia a do adversário. O defeito não aparecia
      como erro: aparecia como o pokémon errado perdendo vida. */
-  const seq = m ? buildAnimatedHitSequence(m) : [];
   p.estado = 'batalha';
   p.op = op;
   p.batalha = {
     /* ⚠️ A BATALHA JÁ ESTÁ RESOLVIDA aqui -- o que a tela faz é ANIMAR o diário REAL dela, um
        golpe por vez. Ela não inventa nada, e não decide nada: quem venceu está em `venceu`. */
-    venceu: !!r.win, premio: pescariaPremio(op), matchup: m, seq, passo: 0,
-    hit: null, barraEm: 0, areaEm: 0, fim: !seq.length,
-    hpP: m ? m.playerHpBefore : 0, hpE: m ? m.enemyHpBefore : 0,
-    /* a abertura é a do `advanceReveal`: 550ms, mais a pausa de leitura quando o confronto abre
-       com uma passiva. Sem golpe nenhum (confronto resolvido na abertura) vale o 1300ms de lá. */
-    proximo: pescaria.tempo + (seq.length ? (PESCARIA_ABERTURA_MS + pausaDoEspecial(m))
-                                          : PESCARIA_SEM_GOLPES_MS) / 1000,
+    venceu: !!r.win, premio: pescariaPremio(op),
+    /* ⚠️ `matchups` é a FILA e `matchup` é o de AGORA: os seis leitores da tela (o placar, a barra,
+       os quadros, o status, o painel) continuam lendo "o confronto atual", que é o que eles querem
+       dizer -- quem anda é o `i`. */
+    matchups: ms, i: 0, matchup: null, seq: [], passo: 0,
+    hit: null, barraEm: 0, areaEm: 0, fim: !ms.length,
+    hpP: 0, hpE: 0, proximo: 0,
   };
+  pescariaAbrirConfronto(p.batalha, 0);
   if(qual === 0){
     pescaria.segurando = false;
-    if(m) preloadBattleSprites([m]);
+    /* ⚠️ A FILA INTEIRA vai pro preload, como a jornada faz com os matchups dela:
+       o 2º confronto entra 1,2s depois do 1º acabar, e um sprite que só começasse a baixar ali
+       apareceria em branco no quadro de entrada. */
+    if(ms.length) preloadBattleSprites(ms);
     const nome = (SPECIES[op.speciesId] || {}).name || op.speciesId;
     pescariaAvisar('Capturado! ' + nome + ' Lv.' + op.nivel + ' — vença para +' + p.batalha.premio + ' pontos.');
   }
@@ -32488,10 +32704,13 @@ function pescariaCreditar(qual, p, b){
   const pts = b.venceu ? b.premio : 0;
   p.pontos += pts;
   if(b.venceu) p.vitorias++;
-  pescaria.historico.unshift({ quem: qual === 0 ? 'Você' : 'NPC', speciesId: p.op.speciesId,
+  pescaria.historico.unshift({ quem: qual === 0 ? 'Você' : PESCARIA_NPC_NOME, speciesId: p.op.speciesId,
                                nivel: p.op.nivel, venceu: b.venceu, pts });
   pescaria.historico = pescaria.historico.slice(0, 8);
-  if(qual === 0 && b.matchup) pescaria.logs.unshift(b.matchup);
+  /* ⚠️ O LOG LEVA A FILA INTEIRA, do último pro primeiro: o `pescaria.logs` é lido de trás pra
+     frente na tela do fim (o mais recente em cima), então empilhar na ordem deixa o confronto 1
+     acima do 2 dentro da mesma pescaria. */
+  if(qual === 0) (b.matchups || []).slice().reverse().forEach(m => pescaria.logs.unshift(m));
   return pts;
 }
 function pescariaPassoDaBatalha(qual){
@@ -32525,7 +32744,19 @@ function pescariaPassoDaBatalha(qual){
     b.proximo = pescaria.tempo + r.total / 1000;
     return;
   }
-  /* acabaram os golpes: fecha pelo que o MOTOR decidiu */
+  /* ⚠️ ACABARAM OS GOLPES DESTE CONFRONTO -- mas a FILA pode continuar: quem caiu sai e o próximo
+     entra, até o peixe cair ou o time acabar. Quem decidiu isso foi o MOTOR; a tela só mostra.
+     O `render()` aqui é o que a jornada faz no `loading`: os SPRITES trocam, e sprite só muda num
+     redesenho -- o `pescariaPintarArea` mexe na caixa de status e em mais nada. */
+  if(b.i + 1 < b.matchups.length){
+    if(!b.entraEm){ b.entraEm = pescaria.tempo + PESCARIA_ENTRE_CONFRONTOS_MS / 1000; return; }
+    if(pescaria.tempo < b.entraEm) return;
+    b.entraEm = 0;
+    pescariaAbrirConfronto(b, b.i + 1);
+    if(desenha) render();
+    return;
+  }
+  /* a fila acabou: fecha pelo que o MOTOR decidiu */
   const pts = pescariaCreditar(qual, p, b);
   p.estado = 'descanso'; p.ate = pescaria.tempo + 1.35;
   p.recadoDeEspera = b.venceu ? 'Vitória! +' + pts + ' pontos.' : 'Seu parceiro perdeu. Nenhum ponto.';
@@ -32567,6 +32798,13 @@ function pescariaAtualizar(dt){
      mostraria um ponto a menos sem nada explicando. */
   if(pescaria.tempo >= PESCARIA_DURACAO + PESCARIA_SOBRA &&
      !pescaria.jogadores.some(p => p.estado === 'batalha')){ pescariaTerminar(); return; }
+  /* ⚠️ E ACABA TAMBÉM QUANDO OS DOIS FICAM SEM TIME -- a segunda condição de fim, que nasceu com
+     as mortes permanentes. Sem ela o relógio correria até o fim com ninguém podendo pescar: uma
+     tela viva em que nada mais pode acontecer. Ela espera as batalhas em curso terminarem, pelo
+     mesmo motivo da prorrogação (ninguém perde o ponto de uma captura que já está animando). */
+  if(pescaria.jogadores.length && pescaria.jogadores.every(p => pescariaVivos(p) === 0 && p.estado !== 'batalha')){
+    pescariaTerminar(); return;
+  }
 
   if(pescaria.tempo >= pescaria.proximoSpawn && pescaria.tempo < PESCARIA_DURACAO){
     pescariaSurgir();
@@ -32634,11 +32872,14 @@ function pescariaAtualizar(dt){
      pescaria.jogadores.every(p => p.estado === 'parado' || p.estado === 'descanso')) pescariaTerminar();
 }
 function pescariaLargar(){
-  if(!pescaria.escolhido) return;
+  if(pescaria.escolhido == null) return;
   pescaria.npc = pescaria.npc || pescariaSortearNpc();
+  /* ⚠️ O TIME É MONTADO AQUI, não guardado no `escolhido`: o `escolhido` é só o SLOT, e o
+     `game.saveSlots` é recarregado a cada volta à home -- guardar as instâncias faria o duelo
+     começar com o time de uma leitura anterior. */
   pescaria.jogadores = [
-    pescariaNovoPescador(pescaria.escolhido, true),
-    pescariaNovoPescador({ speciesId: pescaria.npc.speciesId, level: pescaria.npc.level }, false),
+    pescariaNovoPescador(pescariaTimeDoSlot(pescaria.escolhido), true),
+    pescariaNovoPescador(pescaria.npc.map(x => pescariaInstancia(x, false)), false),
   ];
   pescaria.fase = 'jogando';
   pescaria.tempo = 0; pescaria.proximoSpawn = 2; pescaria.npcPensa = 1.7;
@@ -32672,8 +32913,9 @@ function pescariaLargar(){
 function pescariaTerminar(){
   if(pescaria.laco){ cancelAnimationFrame(pescaria.laco); pescaria.laco = null; }
   /* ⚠️ NENHUMA BATALHA EM CURSO PODE SUMIR SEM PAGAR. Os pontos são creditados no FIM da
-     animação, e com o ritmo da jornada ela leva ~6s (16s no pior caso) -- uma captura pega aos
-     88s ainda estaria animando quando o relógio acabasse. O jogador pescou, o motor disse que ele
+     animação, e com o ritmo da jornada ela leva ~6s num confronto -- e desde 20/09/2026 a tela
+     anima a FILA inteira, então um time varrido leva 28s (medido, 6 confrontos). Uma captura pega
+     aos 88s ainda estaria animando quando o relógio acabasse. O jogador pescou, o motor disse que ele
      venceu, e ele receberia ZERO: sem erro, sem aviso, e sem como desconfiar.
      A prorrogação já não corta batalha nenhuma (ver o `pescariaAtualizar`); isto aqui é a rede
      pra as outras portas -- e o número que ela paga é o do MOTOR, nunca o da animação. */
@@ -32684,6 +32926,8 @@ function pescariaTerminar(){
   });
   pescaria.fase = 'fim';
   pescaria.segurando = false;
+  pescariaRank.recorde = false;
+  pescariaEnviarRank();   /* best-effort: o duelo não espera a rede */
   render();
 }
 function pescariaReiniciar(){
@@ -32769,7 +33013,10 @@ function pescariaAtividade(k){
   const dele = !!(op && npc && npc.op && npc.op.id === op.id);
   if(meu && dele) return 'DISPUTA!';
   if(meu) return 'VOCÊ PESCANDO';
-  if(dele) return 'NPC PESCANDO';
+  /* ⚠️ O nome do adversario sai da constante, nunca escrito aqui: ele aparece em SEIS lugares da
+     tela, e uma copia a mais divergiria no dia em que ele mudar. Em CAIXA ALTA porque a linha do
+     ponto e uma etiqueta curta, como as outras tres. */
+  if(dele) return PESCARIA_NPC_NOME.toUpperCase() + ' PESCANDO';
   if(op && !op.pego && pescaria.tempo < op.entradaAte)
     return pescariaTamanho(op) + ' · ' + Math.max(0, Math.ceil(op.entradaAte - pescaria.tempo)) + 's';
   return 'Sem movimento';
@@ -32920,7 +33167,7 @@ function pescariaPintar(){
 /* O chip do cabeçalho: ele diz em que momento do duelo a tela está. */
 function pescariaChipDoDuelo(){
   if(pescaria.fase === 'fim') return 'RESULTADO';
-  return pescaria.tempo >= PESCARIA_DURACAO ? 'ÚLTIMOS ENCONTROS' : 'VOCÊ × NPC';
+  return pescaria.tempo >= PESCARIA_DURACAO ? 'ÚLTIMOS ENCONTROS' : 'VOCÊ × ' + PESCARIA_NPC_NOME.toUpperCase();
 }
 /* E o título do painel de espera, que muda com o momento -- é a única coisa na tela que diz
    "os lançamentos fecharam" quando o relógio passa dos 90s. */
@@ -32930,52 +33177,129 @@ function pescariaTextoDoParado(){
   return 'Na margem, capturas fáceis. No abismo, mais risco e mais pontos. Uma captura só pontua se seu parceiro vencer o Pokémon pescado.';
 }
 
-function pescariaPickerHtml(){
-  const lista = pescariaElegiveis();
-  /* ⚠️ A PÁGINA É SEMPRE A VÁLIDA, calculada na hora -- e o `montadorPaginaValida` GRAVA a
-     correção, senão um índice velho ficaria guardado e a lista pularia sozinha depois. */
-  const pagina = montadorPaginaValida(lista.length);
-  const paginas = Math.max(1, Math.ceil(lista.length / MONT_POR_PAGINA));
-  const daPagina = lista.slice(pagina * MONT_POR_PAGINA, (pagina + 1) * MONT_POR_PAGINA);
-  const navegacao = paginas <= 1 ? '' : `
-    <div class="mont-paginas">
-      ${Array.from({ length: paginas }, (_, k) =>
-        `<button class="mont-pag ${k === pagina ? 'ativa' : ''}" onclick="pescariaIrParaPagina(${k})"
-          aria-label="Página ${k + 1} de ${paginas}">${k + 1}</button>`).join('')}
-      <span class="mont-pag-conta">${pagina * MONT_POR_PAGINA + 1}–${pagina * MONT_POR_PAGINA + daPagina.length} de ${lista.length}</span>
-    </div>`;
-  if(!lista.length){
-    return `<div class="box"><p class="error-text">Nenhum Pokémon elegível. É preciso um time com as 8 insígnias (ou um aposentado).</p>
-      <button class="btn secondary" onclick="pescariaFecharPicker()">⬅ Voltar</button></div>`;
+/* ⚠️ A ILHA É DESENHADA AQUI, em SVG -- nenhuma imagem de fora. É a regra da casa (já houve dois
+   episódios de hotlink que funcionava local e morria publicado), e é a mesma decisão do mapa de
+   Kanto e dos selos. Ela veio do protótipo `pescaria-pokemon.html`, é pixel art, e tem mar em
+   padrão, praia, mata, um farol, uma cabana, um píer e as rochas.
+   ⚠️ O `viewBox` É 360x380 E O CONTAINER TEM `aspect-ratio` IGUAL: as posições dos pontos são
+   PERCENTUAIS, então elas só caem no lugar certo se a proporção da caixa for a do desenho.
+   Ela mora numa constante porque é lida em DOIS lugares -- o mapa do duelo e o da tela de setup. */
+const PESCARIA_ILHA_SVG = '<svg class="island-art" viewBox="0 0 360 380" shape-rendering="crispEdges" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><defs><pattern id="sea" width="32" height="24" patternUnits="userSpaceOnUse"><rect width="32" height="24" fill="#308ebd"/><path d="M2 8h6v2h10V8h5M22 20h8" fill="none" stroke="#62bbd4" stroke-width="2"/><path d="M4 13h14" stroke="#257dad" stroke-width="2"/></pattern><pattern id="grass" width="16" height="16" patternUnits="userSpaceOnUse"><rect width="16" height="16" fill="#8ccc68"/><path d="M3 5v3h2V6m5 6v2h2v-3" fill="none" stroke="#70b858"/><path d="M10 2h3" stroke="#a4dc7b" stroke-width="2"/></pattern><pattern id="sand" width="16" height="16" patternUnits="userSpaceOnUse"><rect width="16" height="16" fill="#f4db99"/><path d="M3 4h2m5 7h2" stroke="#dabc7a"/><path d="M5 14h3" stroke="#fff0be"/></pattern><g id="tree"><path d="M-4 9h8v13h-8" fill="#775537"/><path d="M-2 10h3v10h-3" fill="#bc9352"/><path d="M-10-19H8v3h7v6h4V5h-3v9H8v4H-9v-4h-8V6h-3V-7h4v-8h6Z" fill="#255f46"/><path d="M-8-18H7v4h6v5h3V3h-5v6H3v4H-8V8h-7V-6h4v-8h3Z" fill="#438e4a"/><path d="M-6-16H6v4h6v6H6v3H-5v4h-8v-8h4v-6h3Z" fill="#78bd59"/><path d="M-4-13h8v3h-8M-11-4h5v3h-5" stroke="#a0d56e" stroke-width="2"/><path d="M2 4h6v3H2m-12 3h5v3h-5" stroke="#326f45" stroke-width="2"/></g><g id="palm"><path d="M0 3h5v10H2v12h-5v-8h3Z" fill="#956238"/><path d="M0 6h4m-5 9h4m-5 7h4" stroke="#d5a158" stroke-width="2"/><path d="M1 2H-5v-4h-12v4h-5v-7h6v-4h12v4h5v-8h5v-4h8v5H9v9h6v-3h10v4h4v8h-5V4H12v3H6v7H0Z" fill="#237648"/><path d="M-17-3h12m10-5v9m8 0h10" stroke="#83c86b" stroke-width="3"/></g><g id="rock"><path d="M-10 7V-5h4v-5H5v3h6V8Z" fill="#526c78"/><path d="M-8 2V-4h4v-4h8v3h5v7Z" fill="#9ab0a7"/><path d="M-6-3h4v-3h5" fill="none" stroke="#ccd2ad" stroke-width="2"/></g></defs><rect width="360" height="380" fill="url(#sea)"/><path d="M102 55h92v13h40v24h26v32h30v32h12v104h-20v36h-38v28h-35v22h-68v-18H94v-22H64v-35H48V146h18v-38h18V75h18Z" fill="#57bdc6"/><path d="M108 66h79v14h40v23h24v32h29v27h12v93h-20v32h-36v28h-33v22h-57v-18H101v-22H76v-35H60V151h18v-38h18V84h12Z" fill="url(#sand)" stroke="#c7f0d0" stroke-width="4"/><path d="M113 91h66v12h38v23h23v32h25v28h12v57h-22v32h-31v25h-28v18h-42v-20h-42v-23H92v-37H78v-65h17v-38h18Z" fill="#548f4a"/><path d="M113 86h66v12h38v23h23v32h25v28h12v57h-22v32h-31v25h-28v18h-42v-20h-42v-23H92v-37H78v-65h17v-38h18Z" fill="url(#grass)"/><path d="M167 312v-48h-17v-48h20v-39h-12v-29h31" fill="none" stroke="#e5cb8d" stroke-width="16"/><path d="M165 309v-44h-17v-48h20v-38" fill="none" stroke="#f4dda1" stroke-width="9"/><path d="M118 100h20V80h36v18h23v20h12v33h-18v10h-74v-18h-13v-25h14Z" fill="#9b9869" stroke="#626c54" stroke-width="3"/><path d="M118 101h20V81h36v18h23v19h-23v-8h-37v12h-19Z" fill="#d0c595"/><path d="M111 131h20m49 0h21m-60-37h26m-23 51h40" stroke="#777e5d" stroke-width="3"/><path d="M132 148v-19h5v-6h16v6h5v19Z" fill="#2a4247"/><path d="M199 144h16v26h-8v23h12v24h22v25h-18v-13h-20v-21h-12v-37h8Z" fill="#409dc3" stroke="#d3efd0" stroke-width="3"/><path d="M199 173h10v26h-10Z" fill="#e6fbec"/><path d="M201 176v20m5-20v20" stroke="#83d5e3" stroke-width="2"/><path d="M192 168h22v7h-22m0 26h22v6h-22" fill="#778e7c"/><g transform="translate(166 225)"><path d="M-24 0h48v31h-48" fill="#58655c"/><path d="M-22 0h44v27h-44" fill="#eee8c2"/><path d="M-28-2v-10h5v-8h46v8h5v10Z" fill="#a84547"/><path d="M-23-17h46v6h5v6h-51Z" fill="#e56b5a"/><path d="M-21-14h42m-42 6h45" stroke="#f29274" stroke-width="2"/><path d="M-17 7h9v9h-9m25-9h9v9H8" fill="#559dae" stroke="#4b6972" stroke-width="2"/><path d="M-5 11H5v16H-5Z" fill="#496274"/><rect x="-6" y="-7" width="12" height="11" fill="#fff5d7"/><path d="M-3-5h6v3h-6m-3 1H6" stroke="#d65756" stroke-width="2"/></g><path d="M163 311h25v48h-25Z" fill="#8c653f" stroke="#584d39" stroke-width="2"/><path d="M165 315h21m-21 7h21m-21 7h21m-21 7h21m-21 7h21m-21 7h21" stroke="#d2a365" stroke-width="4"/><path d="M158 313h5v7h-5m30-7h5v7h-5m-30 28h5v9h-5m30-9h5v9h-5" fill="#5b5039"/><use href="#tree" x="105" y="162"/><use href="#tree" x="128" y="175"/><use href="#tree" x="102" y="195"/><use href="#tree" x="120" y="225"/><use href="#tree" x="108" y="253"/><use href="#tree" x="135" y="276"/><use href="#tree" x="241" y="168"/><use href="#tree" x="251" y="195"/><use href="#tree" x="241" y="258"/><use href="#tree" x="221" y="282"/><use href="#palm" x="90" y="286"/><use href="#palm" x="208" y="318"/><use href="#palm" x="270" y="264"/><use href="#rock" x="63" y="109"/><use href="#rock" x="306" y="277"/><use href="#rock" x="322" y="292"/><use href="#rock" x="287" y="315"/><path d="M91 232h5v-9m-11 8h5v-8m-8 12h15m173-2h5v-9m-10 12h5v-6" stroke="#38845a" stroke-width="2"/><g fill="#fff4b6"><rect x="147" y="184" width="3" height="3"/><rect x="152" y="190" width="3" height="3"/><rect x="219" y="257" width="3" height="3"/></g><path d="M275 224h5v-10m-5 6h-5v-5m10 9h5v-7" stroke="#ec9a95" stroke-width="3"/><rect x="10" y="10" width="118" height="31" rx="2" fill="#164d67" opacity=".92"/><text x="18" y="23" fill="#fff4c8" font-family="monospace" font-weight="bold" font-size="10">ILHA MIKAN</text><text x="18" y="34" fill="#b7e6e4" font-family="monospace" font-size="7">ARQUIPÉLAGO LARANJA</text></svg>';
+/* ⚠️ ONDE CADA PONTO FICA NA ILHA, em % -- são as do protótipo, conferidas contra o desenho: 1 e 2
+   na costa oeste, 3 e 4 na leste, 5 ao norte e 6 ao sul. O índice casa com o `PESCARIA_ZONAS`. */
+/* ⚠️ AS POSIÇÕES SÃO AS DO PROTÓTIPO, com UMA exceção medida: o Abismo desceu a 80% lá e aqui
+   ele fica a 76%. A razão é que os RÓTULOS são de tamanho FIXO (a 77px do topo do ponto) e o
+   mapa ESCALA: com 360px de largura, como no protótipo, o rótulo do 6º cabe; com os 282px que
+   sobram numa tela de 320, ele passa 8px do fim do mapa e o recorte do container o CORTA --
+   medido no navegador. 4% sobem o ponto os mesmos ~12px e ele continua na água funda. */
+const PESCARIA_PONTOS = [[20,68],[20,39],[82,58],[68,34],[41,17],[58,76]];
+/* O mapa: a ilha ao fundo e os seis pontos por cima, cada um no lugar dele.
+   ⚠️ COM `interativo` FALSO ele é só a ILUSTRAÇÃO -- é o que a tela de setup mostra, pra o jogador
+   ver os pontos ANTES de começar (pedido em 20/09/2026). Ali os pontos viram `<span>`: um botão
+   que não faz nada convida um toque que não responde.
+   ⚠️ E O (i) CONTINUA CLICÁVEL nos dois casos -- ele é justamente o que a tela de setup tem a
+   oferecer: ver as chances de cada ponto antes de escolher onde pescar. */
+function pescariaMapaHtml(interativo){
+  const eu = pescaria.jogadores[0];
+  const pontos = PESCARIA_ZONAS.map((z, k) => {
+    const op = pescaria.oportunidades[k];
+    const viva = !!(interativo && op && !op.pego && pescaria.tempo < op.entradaAte);
+    const minha = !!(interativo && eu && eu.op && eu.op.zona === k);
+    const pos = PESCARIA_PONTOS[k] || [50, 50];
+    const classe = (viva ? ` viva` : ``) + (minha ? ` minha` : ``);
+    const atv = interativo ? pescariaAtividade(k) : `Lv.${z.nivel[0]}–${z.nivel[1]}`;
+    const dentro = `<span class="pesc-ponto-num">${k + 1}</span>`
+      + `<b class="pesc-ponto-nome">${escapeHtmlSafe(z.nome)}</b>`
+      + `<span class="pesc-zona-atv" id="pescAtv${k}">${atv}</span>`;
+    const alvo = interativo
+      ? `<button class="pesc-zona${classe}" id="pescZona${k}" onclick="pescariaEntrar(0,${k})"`
+        + ` ${eu && eu.estado === "parado" ? "" : "disabled"}>${dentro}</button>`
+      : `<span class="pesc-zona${classe}">${dentro}</span>`;
+    return `<div class="pesc-ponto" style="--x:${pos[0]}%;--y:${pos[1]}%">${alvo}`
+      + `<button class="pesc-info" onclick="abrirZonaDaPescaria(${k})"`
+      + ` aria-label="Chances em ${escapeHtmlSafe(z.nome)}" title="Chances de encontro">i</button></div>`;
+  }).join(``);
+  return `<div class="pesc-mapa${interativo ? "" : " so-olhar"}">${PESCARIA_ILHA_SVG}${pontos}</div>`;
+}
+/* ---------------------------------------------------------------------------
+   O PICKER -- um TIME, não um pokémon
+   --------------------------------------------------------------------------- */
+/* ⚠️ É O CARD DA LIGA CLÁSSICA, estrutura por estrutura (`save-slot-card` com a estrela da média e
+   a fileira dos seis) -- foi o pedido ao pé da letra: *"a mesma tela de time para ser escolhido
+   quando o usuário tem que escolher um time para inscrever na liga clássica"*. É por ele que o
+   jogador reconhece um time na home e na Liga, e um desenho próprio obrigaria a reaprender a ler.
+   ⚠️ E ELE NÃO PAGINA, ao contrário do picker de POKÉMON que ele substituiu: são no máximo 20
+   saves e só os campeões entram -- a Liga também não pagina. */
+/* A fileira dos seis sprites do card -- a MESMA da Liga e da home. Ela sai numa função porque o
+   card é montado em dois lugares (o picker e o resumo do setup). */
+function pescariaTimeSprites(time){
+  return (time || []).map(p => {
+    const sp = SPECIES[p.speciesId];
+    return `<div class="save-slot-mon"><div class="save-slot-mon-sprite">`
+      + (sp ? spriteHtml(p, `sprite-sm`) : `❔`)
+      + `</div><div class="save-slot-mon-level">Lv.${p.level}</div></div>`;
+  }).join(``);
+}
+function pescariaCardDoTime(slot, selecionado, acao){
+  const sv = (game.saveSlots && game.saveSlots[slot]) || {};
+  const time = sv.team || [];
+  const nome = sv.customName || (`Time ${slot + 1}`);
+  const media = time.length ? Math.round(time.reduce((a, p) => a + (p.level || 0), 0) / time.length) : 0;
+  return `<button class="save-slot-card ${time.length ? "has-avg-star" : ""} clickable${selecionado ? " selecionado" : ""}"`
+    + ` onclick="${acao}">`
+    + `<div class="save-slot-top">`
+    + `<span class="team-avg-star" title="Média de nível do time">${STAR_SVG}`
+    + `<span class="team-avg-star-num">${media}</span></span>`
+    + `<span class="save-slot-name"><span class="team-avg-star-name">${escapeHtmlSafe(nome)}</span></span>`
+    + `</div><div class="save-slot-team-row spread">${pescariaTimeSprites(time)}</div></button>`;
+}
+/* ⚠️ O RANKING É DA PRIMEIRA TELA, e é ele que dá razão pra voltar: sem placar, um duelo ganho
+   contra o Wilton morre na própria tela do fim. Ele mostra o TOP 10 por pontos.
+   ⚠️ E O SEU RESULTADO APARECE MESMO FORA DO TOP (o `meu` do servidor): quem está em 14º abre a
+   tela e não veria nada seu -- e o próprio recorde é o que ele mais procura ali. */
+function pescariaRankHtml(){
+  if(pescariaRank.erro){
+    return `<div class="box"><h2>${selo("trofeu")} Melhores pescarias</h2>`
+      + `<p class="hint-text">${escapeHtmlSafe(pescariaRank.erro)}</p>`
+      + `<button class="btn secondary" onclick="pescariaCarregarRank(true)">Tentar de novo</button></div>`;
   }
-  return `<div class="box">
-    <h2>${selo('pescaria')} Escolher parceiro</h2>
-    <p class="hint-text">Ele é quem luta por cada captura. Ordenados pelo <strong>nível mais alto</strong>.</p>
-    <div class="mont-lista">${daPagina.map(p => {
-      const sp = SPECIES[p.speciesId];
-      const sel = pescaria.escolhido && String(pescaria.escolhido.slot) === String(p.slot) && pescaria.escolhido.idx === p.idx;
-      return `<div class="mont-linha">
-        ${/* ⚠️ O CARD É O MESMO DO MONTADOR, estrutura por estrutura -- é assim que ele herda o
-             CSS de lá em vez de ganhar um desenho próprio que divergiria no primeiro ajuste. A
-             primeira versão inventou um wrapper .mont-sprite que não existe, e o sprite saiu solto.
-             A LUPA É IRMÃ do card, nunca filha: button dentro de button é HTML inválido e o clique
-             de dentro se perde -- a mesma armadilha do encontro selvagem e do montador. */''}
-        <button class="mont-card ${sel ? 'sel' : ''}" onclick="pescariaEscolher('${escJs(String(p.slot))}',${p.idx})"
-          title="${escapeHtmlSafe(sp ? sp.name : '?')} Lv.${p.level}">
-          <span class="mont-num">${sel ? '✓' : ''}</span>
-          ${sp ? spriteHtml(p, 'sprite-sm') : '❔'}
-          <span class="mont-info">
-            <span class="mont-nome">${escapeHtmlSafe(sp ? sp.name : '?')}${p.shiny ? ' ' + selo('shiny') : ''} <span class="mont-lv">— Lv.${p.level}</span></span>
-            <span class="mont-sub">${sp ? typesHtml(sp.types) : ''}<span class="mont-time">${escapeHtmlSafe(p.teamName || '')}</span></span>
-          </span>
-        </button>
-        <button class="wild-dex" onclick="abrirPokedexFicha('${escJs(p.speciesId)}', ${p.shiny ? 'true' : 'false'})"
-          aria-label="Ver a ficha de ${escapeHtmlSafe(sp ? sp.name : '?')}" title="Ver os atributos">${pokedexIcon()}</button>
-      </div>`;
-    }).join('')}</div>
-    ${navegacao}
-    <button class="btn secondary" onclick="pescariaFecharPicker()">⬅ Voltar</button>
-  </div>`;
+  if(!pescariaRank.lista){
+    return `<div class="box"><h2>${selo("trofeu")} Melhores pescarias</h2>`
+      + `<p class="hint-text">Carregando…</p></div>`;
+  }
+  if(!pescariaRank.lista.length){
+    return `<div class="box"><h2>${selo("trofeu")} Melhores pescarias</h2>`
+      + `<p class="hint-text">Ninguém pontuou ainda. O primeiro recorde pode ser o seu.</p></div>`;
+  }
+  /* ⚠️ AS MEDALHAS SÃO AS DO PÓDIO DA CORRIDA (`MEDALHA_DO_POSTO`), e não emoji: o jogo inteiro
+     desenha as suas desde 17/09/2026. Da 4ª em diante a célula fica VAZIA, como lá -- sem o vazio,
+     o número encostaria no nome e as linhas deixariam de alinhar em coluna. */
+  const linha = (x) => `<div class="pesc-rank-linha${x.eu ? " eu" : ""}">`
+    + `<span class="pesc-rank-pos">${x.pos ? (MEDALHA_DO_POSTO[x.pos - 1] ? selo(MEDALHA_DO_POSTO[x.pos - 1]) : x.pos + "º") : "—"}</span>`
+    + `<span class="pesc-rank-nome">${escapeHtmlSafe(x.nome)}</span>`
+    + `<span class="pesc-rank-pts">${x.pontos}</span></div>`;
+  return `<div class="box">`
+    + `<h2>${selo("trofeu")} Melhores pescarias</h2>`
+    + (pescariaRank.recorde ? `<p class="pesc-rank-novo">Recorde novo!</p>` : ``)
+    + `<div class="pesc-rank">${pescariaRank.lista.map(linha).join("")}`
+    + (pescariaRank.meu ? `<div class="pesc-rank-sep">você</div>` + linha(pescariaRank.meu) : ``)
+    + `</div></div>`;
+}
+function pescariaPickerHtml(){
+  const slots = pescariaElegiveis();
+  if(!slots.length){
+    return `<div class="box"><p class="error-text">Nenhum time seu venceu as 8 insígnias ainda.`
+      + ` Termine uma jornada primeiro!</p>`
+      + `<button class="btn secondary" onclick="pescariaFecharPicker()">⬅ Voltar</button></div>`;
+  }
+  return `<div class="box">`
+    + `<h2>${selo("pescaria")} Qual time vai pescar?</h2>`
+    + `<p class="hint-text">Ele luta por cada captura, e o desgaste é de verdade: <strong>quem cai`
+    + ` fica fora até o fim do duelo</strong>, e quem sobrevive machucado continua machucado na`
+    + ` próxima batalha.</p>`
+    + slots.map(slot => pescariaCardDoTime(slot, String(pescaria.escolhido) === String(slot),
+                                           `pescariaEscolher(${slot})`)).join(``)
+    + `<button class="btn secondary" onclick="pescariaFecharPicker()">⬅ Voltar</button></div>`;
 }
 function renderPescaria(){
   if(pescaria.picker) return `
@@ -32983,42 +33307,58 @@ function renderPescaria(){
   ${pescariaPickerHtml()}`;
 
   const eu = pescaria.jogadores[0], npc = pescaria.jogadores[1];
-  const esc = pescaria.escolhido, escSp = esc ? (SPECIES[esc.speciesId] || {}) : null;
-  const npcSp = pescaria.npc ? (SPECIES[pescaria.npc.speciesId] || {}) : null;
+  /* ⚠️ O `escolhido` É O SLOT (um número), não um pokémon -- desde 20/09/2026 o jogador traz um
+     TIME. `== null` e não um ternário no próprio valor: o slot pode ser 0, que é falsy. */
+  const esc = pescaria.escolhido;
+  const temTime = esc != null;
+  const svEsc = temTime ? ((game.saveSlots && game.saveSlots[esc]) || {}) : null;
 
   if(pescaria.fase === 'setup'){
     if(!pescaria.npc) pescaria.npc = pescariaSortearNpc();
-    const n = SPECIES[pescaria.npc.speciesId] || {};
+    /* ⚠️ O RANKING É PEDIDO AQUI, no desenho da tela, e não no `abrirPescaria`: assim ele volta a
+       carregar quando o jogador termina um duelo e cai de novo no setup -- e a guarda do
+       `pescariaCarregarRank` (lista já lida, ou pedido em voo) é que impede a repetição. */
+    pescariaCarregarRank(false);
     return `
   <div class="eyebrow">${selo('pescaria')} PESCARIA POKÉMON · TESTE ADMIN</div>
   <div class="box">
-    <h2>Seu parceiro de pescaria</h2>
-    <p class="hint-text">Pesque nos pontos que piscam e <strong>vença a batalha 1×1</strong> para pontuar.
-      Você e o NPC disputam os mesmos peixes por <strong>${PESCARIA_DURACAO} segundos</strong>.</p>
+    <h2>Seu time de pescaria</h2>
+    <p class="hint-text">Pesque nos pontos que piscam e <strong>vença a batalha</strong> para pontuar.
+      Você e o ${PESCARIA_NPC_NOME} disputam os mesmos peixes por <strong>${PESCARIA_DURACAO} segundos</strong>.</p>
+    ${/* ⚠️ O MAPA APARECE AQUI, antes de o duelo começar (20/09/2026, a pedido: *"quero que nessa
+         primeira tela apareça o mapa com as localizações, para os usuários já conseguirem
+         visualizar antes os pontos"*). Ele é o MESMO mapa do duelo, em modo ilustração: os pontos
+         não clicam (não há duelo pra entrar), mas o (i) de cada um SIM -- e é justamente ele que
+         esta tela tem a oferecer, porque escolher o time sabendo o que mora em cada ponto é a
+         decisão que ela pede. */''}
+    ${pescariaMapaHtml(false)}
     ${/* ⚠️ O CARD INTEIRO É O BOTÃO, e não um botão dentro dele: o `.btn` da casa é
          `display:block; width:100%` -- dentro de uma linha flex ele estoura e sobe POR CIMA do
          texto do card (medido a 320px: o nome e o nível saíam cortados). É a regra que a ficha da
          Pokédex, o card do log de batalha e as prateleiras da loja já seguem: aquele botão é de
          AÇÃO, e aqui a linha é informação que por acaso se toca. De quebra o alvo de toque passa a
          ser a linha toda, em vez de um botãozinho na ponta. */''}
-    <button class="pesc-parceiro" onclick="pescariaAbrirPicker()">
-      <span class="pesc-parceiro-sprite">${esc ? spriteHtml(esc, 'sprite-sm') : '<span class="pesc-vazio">?</span>'}</span>
-      <span class="pesc-parceiro-info">
-        <b>${esc ? escapeHtmlSafe(escSp.name || esc.speciesId) : 'Nenhum escolhido'}</b>
-        <small>${esc ? 'Lv.' + esc.level + ' · HP cheio a cada batalha' : 'Escolha quem vai lutar por você'}</small>
-      </span>
-      <span class="pesc-parceiro-acao">${esc ? 'Trocar' : 'Escolher'}</span>
-    </button>
+    ${temTime
+      ? pescariaCardDoTime(esc, false, `pescariaAbrirPicker()`)
+      : `<button class="pesc-parceiro" onclick="pescariaAbrirPicker()">`
+        + `<span class="pesc-parceiro-sprite"><span class="pesc-vazio">?</span></span>`
+        + `<span class="pesc-parceiro-info"><b>Nenhum time escolhido</b>`
+        + `<small>Escolha o time que vai lutar por você</small></span>`
+        + `<span class="pesc-parceiro-acao">Escolher</span></button>`}
+    ${temTime ? `<button class="btn secondary" onclick="pescariaAbrirPicker()">Trocar de time</button>` : ``}
+    ${/* O adversário: o mesmo card de time, com a fileira dos seis dele. ⚠️ E a linha do BST saiu
+         (a pedido) -- ela contava a REGRA do sorteio, que é detalhe de motor; o que o jogador
+         precisa ver é QUEM ele vai enfrentar, e isso a fileira já mostra. */''}
     <div class="pesc-parceiro npc">
-      <span class="pesc-parceiro-sprite">${spriteHtml(pescaria.npc, 'sprite-sm')}</span>
-      <span class="pesc-parceiro-info">
-        <b>NPC · ${escapeHtmlSafe(n.name || pescaria.npc.speciesId)}</b>
-        <small>Lv.${PESCARIA_NPC_NIVEL} · sorteado entre os de BST acima de ${PESCARIA_NPC_BST_MIN}</small>
+      <span class="pesc-parceiro-info pesc-npc-time">
+        <b>${escapeHtmlSafe(PESCARIA_NPC_NOME)}</b>
+        <span class="save-slot-team-row spread">${pescariaTimeSprites(pescaria.npc)}</span>
       </span>
     </div>
-    <button class="btn success" onclick="pescariaLargar()" ${esc ? '' : 'disabled'}>Começar o duelo</button>
+    <button class="btn success" onclick="pescariaLargar()" ${temTime ? '' : 'disabled'}>Começar o duelo</button>
     <button class="btn secondary" onclick="sairDaPescaria()">⬅ Sair</button>
-  </div>`;
+  </div>
+  ${pescariaRankHtml()}`;
   }
 
   if(pescaria.fase === 'fim'){
@@ -33026,19 +33366,19 @@ function renderPescaria(){
     return `
   <div class="eyebrow">${selo('pescaria')} PESCARIA POKÉMON · TESTE ADMIN</div>
   <div class="box">
-    <h2>${empate ? 'Empate!' : venci ? selo('trofeu') + ' Você venceu!' : 'O NPC levou'}</h2>
+    <h2>${empate ? "Empate!" : venci ? selo("trofeu") + " Você venceu!" : escapeHtmlSafe(PESCARIA_NPC_NOME) + " levou"}</h2>
     <div class="pesc-placar-fim">
-      <div class="pesc-fim-lado ${venci ? 'eu' : ''}">
-        <span>${esc ? spriteHtml(esc, 'sprite-sm') : ''}</span>
+      <div class="pesc-fim-lado ${venci ? "eu" : ""}">
+        <span class="pesc-fim-time">${placarDoTreinador("", pescariaVivos(eu), (eu.time || []).length)}</span>
         <b>${eu.pontos}</b><small>você · ${eu.vitorias}/${eu.fisgadas} batalhas</small>
       </div>
       <div class="pesc-fim-lado">
-        <span>${spriteHtml(pescaria.npc, 'sprite-sm')}</span>
-        <b>${npc.pontos}</b><small>NPC · ${npc.vitorias}/${npc.fisgadas} batalhas</small>
+        <span class="pesc-fim-time">${placarDoTreinador("", pescariaVivos(npc), (npc.time || []).length)}</span>
+        <b>${npc.pontos}</b><small>${escapeHtmlSafe(PESCARIA_NPC_NOME)} · ${npc.vitorias}/${npc.fisgadas} batalhas</small>
       </div>
     </div>
     <button class="btn success" onclick="pescariaLargar()">Pescar de novo</button>
-    <button class="btn secondary" onclick="pescariaReiniciar()">Trocar parceiro</button>
+    <button class="btn secondary" onclick="pescariaReiniciar()">Trocar de time</button>
     <button class="btn secondary" onclick="sairDaPescaria()">⬅ Sair</button>
   </div>
   ${/* ⚠️ O LOG É O DA CASA, e não um resumo próprio: `renderMatchupLog` é a MESMA tela que o
@@ -33054,37 +33394,34 @@ function renderPescaria(){
   <div class="box">
     <div class="pesc-topo"><span class="pesc-chip" id="pescChip">${pescariaChipDoDuelo()}</span><span class="pesc-relogio${pescaria.tempo >= PESCARIA_DURACAO - 15 ? ' tarde' : ''}" id="pescRelogio">${pescariaRelogio(pescaria.tempo)}</span></div>
     <div class="pesc-placar">
+      ${/* ⚠️ O LADO MOSTRA O TIME, não um pokémon -- e são as POKÉBOLAS do placar de batalha
+           (`placarDoTreinador`), as mesmas da jornada e da Torre. Elas contam quantos ainda estão
+           de pé, que desde 20/09/2026 é a informação que decide o duelo: quem fica sem time não
+           pesca mais. Reusar o placar é o que faz "3 de 6" se ler igual aqui e na batalha. */''}
       ${[0, 1].map(q => {
         const j = pescaria.jogadores[q];
-        const sp = SPECIES[j.inst.speciesId] || {};
-        return `<div class="pesc-lado ${q ? 'npc' : ''}">
-          <span class="pesc-lado-sprite">${spriteHtml(j.inst, 'sprite-sm')}</span>
-          <span class="pesc-lado-info">
-            <small>${q ? 'NPC' : 'VOCÊ'} · ${escapeHtmlSafe(sp.name || j.inst.speciesId)}</small>
-            <b id="pescPontos${q}">${j.pontos}</b>
-            <span class="pesc-lado-estado" id="pescEstado${q}">${PESCARIA_ESTADO_TXT[j.estado] || ''}</span>
-          </span></div>`;
-      }).join('')}
+        const vivos = pescariaVivos(j);
+        return `<div class="pesc-lado ${q ? "npc" : ""}">`
+          + `<span class="pesc-lado-info">`
+          + `<small>${q ? escapeHtmlSafe(PESCARIA_NPC_NOME) : "VOCÊ"}</small>`
+          + `<b id="pescPontos${q}">${j.pontos}</b>`
+          + `<span class="pesc-lado-time" id="pescTime${q}">${placarDoTreinador("", vivos, (j.time || []).length)}</span>`
+          + `<span class="pesc-lado-estado" id="pescEstado${q}">${PESCARIA_ESTADO_TXT[j.estado] || ""}</span>`
+          + `</span></div>`;
+      }).join(``)}
     </div>
   </div>
   <div class="box">
-    <h2>Lago das seis águas</h2>
+    <h2>Ilha Mikan</h2>
     ${/* ⚠️ O `disabled` DAS ZONAS É DO PINTOR, e este render só dá o valor inicial. A volta de
          `descanso` pra `parado` acontece no TEMPO, e o laço não redesenha -- gravado só aqui, o
          `disabled` ficava pra sempre e o jogador não conseguia mais tocar em ponto nenhum do lago.
-         Foi exatamente o que foi relatado. */''}
-    <div class="pesc-mapa">${PESCARIA_ZONAS.map((z, k) => {
-      const op = pescaria.oportunidades[k];
-      const viva = !!(op && !op.pego && pescaria.tempo < op.entradaAte);
-      return `<div class="pesc-ponto">
-        <button class="pesc-zona ${viva ? 'viva' : ''}" id="pescZona${k}" style="background:${z.cor}"
-          onclick="pescariaEntrar(0,${k})" ${eu.estado === 'parado' ? '' : 'disabled'}>
-          <b>${z.nome}</b><small>Lv.${z.nivel[0]}–${z.nivel[1]}</small>
-          <span class="pesc-zona-atv" id="pescAtv${k}">${pescariaAtividade(k)}</span></button>
-        <button class="pesc-info" onclick="abrirZonaDaPescaria(${k})"
-          aria-label="Chances em ${escapeHtmlSafe(z.nome)}" title="Chances de encontro">i</button>
-      </div>`;
-    }).join('')}</div>
+         Foi exatamente o que foi relatado.
+         ⚠️ E O LAGO VIROU UMA ILHA DESENHADA em 20/09/2026, a pedido: os seis pontos deixaram de
+         ser uma grade de retângulos e passaram a ficar EM VOLTA da ilha, cada um na costa dele.
+         A grade era alvo de toque confiável a 320px e não dizia nada sobre o lugar; a ilha diz --
+         e o `pescariaMapaHtml` é o MESMO que a tela de setup mostra. */''}
+    ${pescariaMapaHtml(true)}
     <p class="pesc-recado" id="pescRecado">${escapeHtmlSafe(pescaria.recado)}</p>
   </div>
   ${/* ⚠️ OS CINCO PAINÉIS EXISTEM SEMPRE, e quem escolhe qual aparece é o PINTOR pelo `hidden`.

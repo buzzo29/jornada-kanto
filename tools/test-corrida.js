@@ -299,7 +299,7 @@ console.log('\n=== A FÍSICA: TROCAS EXATAS EM 300 E 600 ===');
     S.corridaZerar();
     S.corrida.formato = formato; S.corrida.participantes = participantes;
     const meus = formato === 'relay'
-      ? [mk('jolteon', 60), mk('alakazam', 59), mk('gyarados', 61)]
+      ? g.saveSlots[0].team.slice(0, S.CORRIDA_TRECHOS)
       : [mk('jolteon', 60)];
     S.corrida.escolhidos = meus;
     const eu = S.corridaNovoCorredor(meus.map(S.corridaInstancia), true);
@@ -319,9 +319,12 @@ console.log('\n=== A FÍSICA: TROCAS EXATAS EM 300 E 600 ===');
       f, n,
       corredores: S.corrida.corredores.length,
       terminou: S.corrida.corredores.every(c => c.chegada !== null),
-      distExata: S.corrida.corredores.every(c => c.dist === (f === 'relay' ? 900 : 300)),
+      distExata: S.corrida.corredores.every(c => c.dist === (f === 'relay' ? S.corridaTotal() : S.CORRIDA_METROS)),
       trocas: trocas.length,
-      trocasExatas: trocas.every(t => t.em === 300 || t.em === 600),
+            /* ⚠️ A troca cai no MÚLTIPLO EXATO do trecho, mesmo caindo no meio do quadro. Medida de
+         FORA, no fim do quadro, ela sai em 300,07 -- porque o PRÓXIMO já correu o resto do
+         quadro, que é o que o pedido manda fazer. É por isso que a troca é REGISTRADA. */
+      trocasExatas: trocas.every(t => t.em % S.CORRIDA_METROS === 0 && t.em > 0 && t.em < S.corridaTotal()),
     });
   }
   ok('as seis combinações terminam', combos.every(c => c.terminou), JSON.stringify(combos.filter(c => !c.terminou)));
@@ -333,7 +336,7 @@ console.log('\n=== A FÍSICA: TROCAS EXATAS EM 300 E 600 ===');
      exatamente o que o pedido manda fazer. É por isso que a troca é REGISTRADA. */
   ok('e as trocas caem em 300 e 600 EXATOS', combos.every(c => c.trocasExatas),
      JSON.stringify(combos.filter(c => !c.trocasExatas)));
-  ok('e o revezamento tem 2 trocas por equipe', combos.filter(c => c.f === 'relay').every(c => c.trocas === c.n * 2),
+  ok('e o revezamento tem uma troca por degrau', combos.filter(c => c.f === 'relay').every(c => c.trocas === c.n * (S.CORRIDA_TRECHOS - 1)),
      combos.filter(c => c.f === 'relay').map(c => c.trocas).join(','));
   ok('e a individual não tem troca nenhuma', combos.filter(c => c.f === 'single').every(c => c.trocas === 0));
 
@@ -383,17 +386,17 @@ console.log('\n=== OS NPCs: FORMA FINAL, SEM REPETIR, E O MESMO MOTOR ===');
   contaDeTeste();
   S.corridaZerar();
   S.corrida.formato = 'relay'; S.corrida.participantes = 4;
-  S.corrida.escolhidos = [mk('jolteon', 60), mk('alakazam', 59), mk('gyarados', 61)];
+  S.corrida.escolhidos = g.saveSlots[0].team.slice(0, S.CORRIDA_TRECHOS);
   const times = S.sortearNpcs();
   ok('sorteia um time por adversário', times.length === 3, String(times.length));
-  ok('com três Pokémon cada', times.every(t => t.length === 3), times.map(t => t.length).join(','));
+  ok('com o time inteiro cada', times.every(t => t.length === S.CORRIDA_TRECHOS), times.map(t => t.length).join(','));
   /* ⚠️ TODOS NA ÚLTIMA EVOLUÇÃO -- pelo `finalEvolutionOf` do jogo, não por uma lista nova */
   ok('todos na última evolução da linha',
      times.every(t => t.every(p => S.finalEvolutionOf(p.speciesId) === p.speciesId)),
      times.flat().filter(p => S.finalEvolutionOf(p.speciesId) !== p.speciesId).map(p => p.speciesId).join(','));
   /* ⚠️ SEM REPETIR ESPÉCIE DENTRO DA EQUIPE, pela RAIZ da linha (a regra do montador) */
   ok('sem repetir espécie dentro da equipe',
-     times.every(t => new Set(t.map(p => S.raizDaLinha(p.speciesId))).size === 3));
+     times.every(t => new Set(t.map(p => S.raizDaLinha(p.speciesId))).size === S.CORRIDA_TRECHOS));
   /* ⚠️ O NÍVEL É O DO INTEGRANTE CORRESPONDENTE, que é a regra inicial de balanceamento */
   ok('e o nível é o do trecho correspondente',
      times.every(t => t.every((p, i) => p.level === S.corrida.escolhidos[i].level)),
@@ -469,26 +472,52 @@ console.log('\n=== A SELEÇÃO: ORDENADA PELO SPEED DA CORRIDA ===');
      true, 'corrida: ' + lista.map(p => p.speciesId).join(',') + ' | base: ' + porBase.map(p => p.speciesId).join(','));
 
   /* a quantidade exigida */
+  /* ⚠️ O NÚMERO É O TETO DO TIME DO JOGO (6), e não um número escolhido: o pedido é *"o
+     revezamento vai ser entre os 6 do time"*. Sem esta trava, as outras todas derivam do
+      e um 3 de volta passaria sem ninguém ver -- conferido. */
+  ok('o revezamento é o time INTEIRO (6)', S.CORRIDA_TRECHOS === 6, String(S.CORRIDA_TRECHOS));
+  ok('  e a pescaria leva o mesmo time', S.PESCARIA_TIME === S.CORRIDA_TRECHOS,
+     S.PESCARIA_TIME + ' x ' + S.CORRIDA_TRECHOS);
   ok('a individual pede 1', (S.corrida.formato = 'single', S.corridaQuantos()) === 1);
-  ok('o revezamento pede 3', (S.corrida.formato = 'relay', S.corridaQuantos()) === 3);
+  ok('o revezamento pede o time inteiro', (S.corrida.formato = 'relay', S.corridaQuantos()) === S.CORRIDA_TRECHOS,
+     String(S.corridaQuantos()));
 
-  /* escolher, desmarcar, e a trava de espécie repetida */
+  /* ============================================================================
+     ⚠️ NO REVEZAMENTO A ESCOLHA É DE UM TIME (20/09/2026, a pedido)
+     ============================================================================
+     *"na corrida a mesma coisa, no revezamento, ao invés de escolher 3 pokemons de qualquer time,
+     vai ter que escolher 1 time e o revezamento vai ser entre os 6 do time"*
+     ============================================================================ */
   S.corrida.formato = 'relay'; S.corrida.escolhidos = [];
-  const p0 = lista[0], p1 = lista[1];
+  /* ⚠️ O TOGGLE DE POKÉMON É INERTE NO REVEZAMENTO -- e quem recusa é a AÇÃO, não a tela: um
+     clique forjado no console montaria uma equipe de pokémon soltos de saves diferentes, que é
+     exatamente o que o pedido tirou. */
+  const p0 = lista[0];
   S.corridaToggle(p0.slot, p0.idx);
-  ok('escolher marca', S.corrida.escolhidos.length === 1, String(S.corrida.escolhidos.length));
-  S.corridaToggle(p0.slot, p0.idx);
-  ok('e clicar de novo desmarca', S.corrida.escolhidos.length === 0);
-  S.corridaToggle(p0.slot, p0.idx); S.corridaToggle(p1.slot, p1.idx);
-  ok('dois entram', S.corrida.escolhidos.length === 2);
-  ok('e a largada fica bloqueada abaixo de 3', !S.corridaCompleto());
-  S.corridaToggle(lista[2].slot, lista[2].idx);
-  ok('com três, ela libera', S.corridaCompleto());
-  /* ⚠️ nada além dos três: um quarto clique não entra */
-  S.corridaToggle(lista[3].slot, lista[3].idx);
-  ok('e um quarto não entra', S.corrida.escolhidos.length === 3, String(S.corrida.escolhidos.length));
+  ok('o toggle de pokémon é INERTE no revezamento', S.corrida.escolhidos.length === 0,
+     String(S.corrida.escolhidos.length));
 
-  /* a ORDEM do revezamento, e o reorganizar */
+  /* ⚠️ E O TIME TEM QUE SER CAMPEÃO -- as 8 insígnias, a mesma porta da Liga, do Ginásio da
+     Cidade e da Batalha Online (*"para ambos os jogos, só pode escolher um time vencedor das 8
+     insígnias"*). Quem responde é o `savesCampeoes`, e quem valida é a AÇÃO. */
+  g.saveSlots[1] = { team: [mk('pidgey', 30)], badgeCount: 3, customName: 'Meio do caminho' };
+  S.corridaEscolherTime(1);
+  ok('  e um time SEM as 8 insígnias é recusado', S.corrida.escolhidos.length === 0,
+     String(S.corrida.escolhidos.length));
+  S.corridaEscolherTime(0);
+  ok('escolher o time campeão traz os seis', S.corrida.escolhidos.length === S.CORRIDA_TRECHOS,
+     String(S.corrida.escolhidos.length));
+  ok('  na ordem do save', S.corrida.escolhidos.map(p => p.speciesId).join(',')
+     === g.saveSlots[0].team.slice(0, S.CORRIDA_TRECHOS).map(p => p.speciesId).join(','),
+     S.corrida.escolhidos.map(p => p.speciesId).join(','));
+  ok('  e a largada libera', S.corridaCompleto());
+  ok('  e o picker fecha', !S.corrida.picker);
+  /* ⚠️ O SLOT VIAJA EM CADA UM: ele é o que a fileira da tela usa pra dizer de que time o
+     revezamento é, e é ele que o `equiparItens` leria no dia em que item valer aqui. */
+  ok('  e cada um carrega o slot de onde veio',
+     S.corrida.escolhidos.every(p => p.slot === 0 && p.teamName));
+
+  /* a ORDEM do revezamento, e o reorganizar -- as setas continuam existindo */
   const antes = S.corrida.escolhidos.map(p => p.speciesId).join(',');
   S.corridaMover(0, 1);
   ok('mover pra baixo troca com o de baixo',
@@ -496,16 +525,16 @@ console.log('\n=== A SELEÇÃO: ORDENADA PELO SPEED DA CORRIDA ===');
      S.corrida.escolhidos.map(p => p.speciesId).join(','));
   S.corridaMover(1, -1);
   ok('e mover pra cima desfaz', S.corrida.escolhidos.map(p => p.speciesId).join(',') === antes);
-  S.corridaMover(0, -1); S.corridaMover(2, 1);
+  S.corridaMover(0, -1); S.corridaMover(S.CORRIDA_TRECHOS - 1, 1);
   ok('e nas pontas não faz nada', S.corrida.escolhidos.map(p => p.speciesId).join(',') === antes);
 
   /* ⚠️ DURANTE A CORRIDA NADA MUDA: nem a seleção, nem a ordem, nem a modalidade */
   S.corrida.fase = 'correndo';
   const trancado = S.corrida.escolhidos.map(p => p.speciesId).join(',');
-  S.corridaMover(0, 1); S.corridaToggle(lista[4].slot, lista[4].idx);
+  S.corridaMover(0, 1); S.corridaEscolherTime(0);
   S.corridaTrocarFormato('single'); S.corridaTrocarParticipantes(4);
   ok('durante a corrida a ordem não muda', S.corrida.escolhidos.map(p => p.speciesId).join(',') === trancado);
-  ok('nem a seleção', S.corrida.escolhidos.length === 3, String(S.corrida.escolhidos.length));
+  ok('nem a seleção', S.corrida.escolhidos.length === S.CORRIDA_TRECHOS, String(S.corrida.escolhidos.length));
   ok('nem a modalidade', S.corrida.formato === 'relay', S.corrida.formato);
   S.corrida.fase = 'setup';
 
@@ -523,7 +552,7 @@ console.log('\n=== A CORRIDA NÃO ENCOSTA NO SAVE ===');
   const antes = JSON.stringify(g.saveSlots[0].team);
   S.corridaZerar();
   S.corrida.formato = 'relay'; S.corrida.participantes = 4;
-  S.corrida.escolhidos = [mk('jolteon', 60), mk('alakazam', 59), mk('gyarados', 61)];
+  S.corrida.escolhidos = g.saveSlots[0].team.slice(0, S.CORRIDA_TRECHOS);
   const eu = S.corridaNovoCorredor(S.corrida.escolhidos.map(S.corridaInstancia), true);
   S.corrida.corredores = [eu].concat(S.sortearNpcs().map(t => S.corridaNovoCorredor(t, false)));
   S.corrida.corredores.forEach((c, i) => { if(i) S.planejarNpc(c, 0); });

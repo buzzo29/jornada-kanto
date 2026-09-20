@@ -5282,6 +5282,71 @@ exports._chaveDoEquipado = chaveDoEquipado;
 exports._createInstance = createInstance;
 exports._makeSeededRng = makeSeededRng;
 /* Gancho de teste do Boss de Domingo -- ver BOSS_ATIVO. */
+/* =====================================================================
+   O RANKING DA PESCARIA (20/09/2026, a pedido: *"na primeira tela, crie um ranking das maiores
+   pontuações de pesca"*)
+   =====================================================================
+   ⚠️ QUEM GRAVA É O SERVIDOR, e isso não é zelo: pontuação é placar público, e o `firestore.rules`
+   fecha a coleção pra escrita do cliente. Uma linha no console poria qualquer número lá.
+
+   ⚠️ É UM DOCUMENTO POR JOGADOR, com o MELHOR resultado dele -- não um por partida. Assim a
+   coleção não cresce sem limite (ela tem no máximo um documento por conta) e o ranking é "os
+   melhores jogadores", não "as melhores partidas do mesmo jogador".
+
+   ⚠️ E O NOME FICA GRAVADO JUNTO, como no ranking do Mew: sem isso, ler o top 10 custaria 10
+   leituras a mais em `users/` toda vez que alguém abrisse a tela. O preço é o de lá -- quem troca
+   de nome só aparece com o novo depois da próxima partida.
+   ===================================================================== */
+const PESCARIA_RANK_TOPO = 10;
+function pescariaRankCollRef(){ return db.collection('fishingRanking'); }
+function pescariaRankDocRef(uid){ return pescariaRankCollRef().doc(uid); }
+/* ⚠️ SÓ SOBE, nunca desce: o recorde é o MELHOR resultado, e uma partida ruim depois de uma boa
+   não pode apagar a boa. A transação é o que impede duas abas de gravarem por cima uma da outra. */
+exports.submitFishingScore = onCall(async (request) => {
+  const uid = request.auth && request.auth.uid;
+  if(!uid) throw new HttpsError('unauthenticated', 'Faça login.');
+  const pontos = Math.max(0, Math.floor(Number((request.data || {}).pontos) || 0));
+  const venceu = !!(request.data || {}).venceu;
+  const capturas = Math.max(0, Math.floor(Number((request.data || {}).capturas) || 0));
+  /* ⚠️ ZERO NÃO ENTRA NO RANKING: um documento por jogador que nunca pontuou é linha morta na
+     coleção e uma linha de "0 pontos" no top, que não diz nada. */
+  if(pontos <= 0) return { gravado: false, motivo: "zero" };
+  const conta = await db.collection('users').doc(uid).get();
+  const nome = (conta.exists && conta.data().trainerName) || 'Treinador';
+  let recorde = false;
+  await db.runTransaction(async (tx) => {
+    const ref = pescariaRankDocRef(uid);
+    const snap = await tx.get(ref);
+    const antes = snap.exists ? (Number(snap.data().pontos) || 0) : -1;
+    if(pontos <= antes) return;
+    recorde = true;
+    tx.set(ref, { uid, nome, pontos, venceu, capturas, quando: Date.now() });
+  });
+  return { gravado: recorde, pontos };
+});
+/* O top 10. ⚠️ Ele NÃO tem cache num documento à parte (ao contrário do ranking do Mew): lá o
+   documento do chefe é escrito a cada ataque e a consulta entraria no caminho crítico; aqui a
+   tela é aberta raramente e a consulta custa 10 leituras, uma por linha. */
+exports.getFishingRanking = onCall(async (request) => {
+  const uid = request.auth && request.auth.uid;
+  if(!uid) throw new HttpsError('unauthenticated', 'Faça login.');
+  const snap = await pescariaRankCollRef().orderBy('pontos', 'desc').limit(PESCARIA_RANK_TOPO).get();
+  const lista = snap.docs.map((d, i) => {
+    const x = d.data() || {};
+    return { pos: i + 1, uid: d.id, nome: x.nome || 'Treinador', pontos: x.pontos || 0,
+             capturas: x.capturas || 0, venceu: !!x.venceu, eu: d.id === uid };
+  });
+  /* ⚠️ E O MEU RESULTADO VEM JUNTO mesmo fora do top: sem ele, quem está em 14º abre a tela e não
+     vê nada seu -- e o próprio recorde é a informação que ele mais procura. */
+  let meu = null;
+  if(!lista.some(x => x.eu)){
+    const m = await pescariaRankDocRef(uid).get();
+    if(m.exists) meu = { nome: (m.data().nome || 'Você'), pontos: m.data().pontos || 0,
+                         capturas: m.data().capturas || 0, eu: true };
+  }
+  return { lista, meu };
+});
+exports._pescariaRank = { topo: PESCARIA_RANK_TOPO };
 exports._boss = { ativo(v){ if(v !== undefined) BOSS_ATIVO = !!v; return BOSS_ATIVO; },
                   instancia: bossInstance, nivel: () => BOSS_LEVEL, maxHp: () => BOSS_MAX_HP };
 exports._golpesEspeciais = { AUTODESTRUICAO, SONIFEROS, METRONOMO, CHANCE_AUTODESTRUICAO, CHANCE_SONO, SONO_EM_TROCAS, sorteiaTrocasDeSono, MULTI_GOLPE, ataquesDisponiveis, GOLPES_CRIT_ALTO, FURIA, CHANCE_FURIA, FURIA_BONUS, sorteiaGolpeDoMetronomo, POOL_METRONOMO, CONFUSAO, CHANCE_CONFUSAO, DANCA_ESPADAS, DANCA_PLUMA, CHANCE_DANCA, DANCA_ESPADAS_MULT, DANCA_PLUMA_MULT, FURIA_DRAGAO, CHANCE_FURIA_DRAGAO, FURIA_DRAGAO_DANO, CHUVA, CHANCE_CHUVA, CHUVA_EM_CONFRONTOS, CHUVA_MULT, CHUVA_GOLPE_MULT, multDaChuva, estaChovendo, tentarChuva, limparClima, GOLPES_DRENO, GOLPES_SO_DORMINDO };

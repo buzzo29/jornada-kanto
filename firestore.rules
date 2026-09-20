@@ -165,5 +165,17 @@ service cloud.firestore {
         allow write: if false;
       }
     }
+
+    // O RANKING DA PESCARIA (20/09/2026). Um documento por jogador, com o MELHOR resultado dele.
+    // ESCRITA NEGADA A TODOS, inclusive ao dono: pontuacao e placar publico, e uma linha no console
+    // poria qualquer numero no topo. Quem grava e o `submitFishingScore` pelo Admin SDK, e ele so
+    // sobe o recorde -- nunca baixa.
+    // A leitura e livre pra quem esta logado porque o ranking E publico; hoje a tela passa pelo
+    // `getFishingRanking` (que ja ordena e marca quem e voce), mas a regra fica explicita: sem ela
+    // vale o "negado por padrao", que protege igual e nao explica nada.
+    match /fishingRanking/{playerId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
   }
 }
