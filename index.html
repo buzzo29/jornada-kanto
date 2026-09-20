@@ -3391,14 +3391,23 @@
      48px é o mínimo confortável num celular, e a `touch-action` do jogo já impede o zoom
      de toque duplo -- sem ela, dois impulsos seguidos dariam zoom no meio da prova. */
   .corrida-boost{min-height:52px;font-size:.9rem;letter-spacing:.06em;margin:0;}
-  .corrida-trechos{display:flex;gap:5px;}
-  .corrida-trecho{
-    flex:1 1 0;min-width:0;padding:5px 4px;border:2px solid var(--box-border);border-radius:5px;
-    background:var(--box);font-size:.55rem;line-height:1.25;text-align:center;
+  /* o rodapé do card de time -- a velocidade total da equipe, na Corrida */
+  .card-rodape{
+    margin-top:5px;padding-top:5px;border-top:1px dashed var(--box-border);
+    font-size:.62rem;color:var(--muted);text-align:center;
   }
-  .corrida-trecho b{display:block;font-size:.6rem;}
-  .corrida-trecho.ativo{background:var(--yellow);}
-  .corrida-trecho.feito{opacity:.5;}
+  .card-rodape b{color:var(--blue-dark);font-size:.7rem;}
+  .corrida-trechos{display:flex;gap:4px;}
+  .corrida-trecho{
+    flex:1 1 0;min-width:0;padding:3px 2px;border:2px solid var(--box-border);border-radius:5px;
+    background:var(--box);line-height:1.1;text-align:center;
+  }
+  .corrida-trecho b{display:block;font-size:.5rem;white-space:nowrap;}
+  /* três seletores porque `.sprite-sm .sprite-img` da casa vem DEPOIS neste arquivo: com dois, a
+     regra de lá ganharia no empate de especificidade. É a lição da lista da rota. */
+  .corrida-trecho .corrida-trecho-spr .sprite-img{width:24px;height:24px;display:block;margin:0 auto;}
+  .corrida-trecho.ativo{background:var(--yellow);border-color:var(--blue-dark);}
+  .corrida-trecho.feito{opacity:.45;}
   /* ⚠️ A FONTE SUBIU (18/09/2026, a pedido): de .66 pra .82rem, e o padding acompanhou pra as
      linhas não colarem. No fim da corrida esta caixa é a ÚNICA coisa na tela -- ela deixou de
      dividir espaço com o placar e a pista, então pode ser lida de longe.
@@ -3425,7 +3434,6 @@
   /* a linha do jogador ganha um destaque leve: ela é a que ele procura primeiro */
   .resultRow.eu{background:rgba(255,203,5,.2);border-radius:6px;padding-left:6px;padding-right:6px;}
   /* o Speed da corrida, que é o número pelo qual a lista se ordena */
-  .corrida-speed{margin-left:6px;font-size:.55rem;font-weight:800;color:var(--blue-dark);}
   /* ⚠️ O POKÉMON NA LINHA DO RANKING é uma legenda, não a informação: quem se compara é o
      TREINADOR, e o tempo é o número. Ele trunca junto com o nome (o `.pesc-rank-nome` já é
      `minmax(0,1fr)` com ellipsis), então um time de seis no revezamento não empurra o tempo. */
@@ -31106,11 +31114,27 @@ const CORRIDA_DESLEIXO_TRAVESSIAS = 3;
 const CORRIDA_DESLEIXO = 0.05;      /* -5% por bloco */
 const CORRIDA_DESLEIXO_MIN = 0.55;  /* o piso: nunca abaixo de 55% da velocidade normal */
 
-/* A DIFICULDADE DO NPC -- as probabilidades do protótipo, deixadas como ponto de partida.
+/* A DIFICULDADE DO NPC -- as probabilidades do protótipo, subidas UM degrau em 20/09/2026 a
+   pedido (*"deixe o NPC um pouco melhor"*): o `perfect` foi de 0,20 pra **0,24**.
    ⚠️ Elas somam menos que 1 de propósito: o resto é a OPORTUNIDADE NÃO USADA, que é o que impede
    o NPC de ser um metrônomo perfeito. E ele usa a MESMA fórmula, os MESMOS multiplicadores e a
-   MESMA frequência do jogador -- em nenhum lugar a velocidade dele é inflada pra alcançar. */
-const CORRIDA_NPC = { perfect: 0.20, good: 0.52, miss: 0.14 };
+   MESMA frequência do jogador -- em nenhum lugar a velocidade dele é inflada pra alcançar.
+
+   ⚠️ E O QUE A MEDIÇÃO DIZ É QUE ESTA RÉGUA NÃO ALCANÇA QUEM DOMINA O JOGO (60 corridas por
+   célula, o jogador modelado pela MIRA -- o erro típico dele em fração da barra):
+
+     individual | hoje(20) |    24    |    28    |    32
+     domina     |   98%    |  100%    |  100%    |  100%
+     joga bem   |   97%    |   88%    |   78%    |   72%
+     mediano    |   37%    |   12%    |   10%    |    7%
+
+   Contra quem acerta quase toda travessia o NPC perde SEMPRE, em qualquer configuração -- a
+   pilotagem perfeita já é o teto, e o eixo do Speed já está pareado desde 18/09. O que subir a
+   régua faz é afundar o MEDIANO (37% -> 12%), então o 0,24 é o degrau que dá pra dar: ele tira o
+   jogador bom de 97% pra 88% na individual e de 80% pra 57% no revezamento.
+   ⚠️ A régua que alcançaria o "domina" é o NÍVEL do NPC (`nivelDoNpc`), e ela está fora: inflar a
+   velocidade dele é o que o pedido de 18/09 proíbe com todas as letras. */
+const CORRIDA_NPC = { perfect: 0.24, good: 0.56, miss: 0.12 };
 
 const CORRIDA_METROS = 300;          /* a INDIVIDUAL */
 const CORRIDA_TRECHOS = 6;           /* no revezamento: o time inteiro */
@@ -31148,8 +31172,19 @@ const corridaTotal = () => corridaTotalDo(corrida.formato);
 const PMD_CDN = 'https://cdn.jsdelivr.net/gh/PMDCollab/SpriteCollab@master/sprite/';
 const PMD_ALT = 'https://raw.githubusercontent.com/PMDCollab/SpriteCollab/master/sprite/';
 const PMD_LINHA_COSTAS = 4;
-const pmdPasta = (speciesId) => String((SPECIES[speciesId] || {}).dex || 0).padStart(4, '0');
-const pmdCache = {};        /* speciesId -> {img, w, h, durations, caixa} | 'erro' */
+/* ⚠️ O SHINY É UMA SUBPASTA, e ela foi conferida antes de virar código: `<dex>/0000/0001/` traz o
+   MESMO AnimData e as mesmas dimensões do normal -- só as cores mudam. `<dex>/0001/` é outra
+   coisa (uma FORMA alternativa, a Mega), e usar ela desenharia outro pokémon.
+   Medido: as **250 espécies** têm sprite shiny (250/250). */
+const pmdPasta = (speciesId, shiny) => String((SPECIES[speciesId] || {}).dex || 0).padStart(4, '0')
+  + (shiny ? '/0000/0001' : '');
+/* ⚠️ A CHAVE DO CACHE LEVA O SHINY, senão a segunda espécie sobrescreve a primeira: um Gyarados
+   normal e um shiny são duas FOLHAS diferentes, e com a chave só da espécie quem carregasse
+   depois ficaria com a cor do outro. */
+const pmdChave = (speciesId, shiny) => shiny ? speciesId + ':shiny' : speciesId;
+/* O cache DE UMA INSTÂNCIA -- os leitores perguntam por aqui e não montam a chave na mão. */
+const pmdDados = (p) => p ? pmdCache[pmdChave(p.speciesId, p.shiny)] : null;
+const pmdCache = {};        /* chave -> {img, w, h, durations, caixa} | 'erro' */
 
 function pmdBaixarTexto(url){
   return fetch(url).then(r => r.ok ? r.text() : Promise.reject(new Error(r.status)));
@@ -31185,13 +31220,26 @@ function pmdCaixas(img, w, h, quantos, linha){
   }
   return caixas;
 }
-async function pmdCarregar(speciesId){
-  if(pmdCache[speciesId] && pmdCache[speciesId] !== 'erro') return pmdCache[speciesId];
-  const pasta = pmdPasta(speciesId);
-  if(!pasta || pasta === '0000'){ pmdCache[speciesId] = 'erro'; throw new Error('sem dex'); }
+async function pmdCarregar(speciesId, shiny){
+  const chave = pmdChave(speciesId, shiny);
+  if(pmdCache[chave] && pmdCache[chave] !== 'erro') return pmdCache[chave];
+  const pasta = pmdPasta(speciesId, shiny);
+  if(!pasta || pasta.slice(0, 4) === '0000'){ pmdCache[chave] = 'erro'; throw new Error('sem dex'); }
   let xml = null;
   try{ xml = await pmdBaixarTexto(PMD_CDN + pasta + '/AnimData.xml'); }
-  catch(e){ xml = await pmdBaixarTexto(PMD_ALT + pasta + '/AnimData.xml'); }
+  catch(e){
+    try{ xml = await pmdBaixarTexto(PMD_ALT + pasta + '/AnimData.xml'); }
+    catch(e2){
+      /* ⚠️ O SHINY QUE FALTA CAI NO NORMAL, e essa é a diferença entre ele e o resto: a cor é
+         apresentação, a ESPÉCIE é identidade. Barrar a largada porque a variante colorida não
+         baixou seria trocar um pokémon shiny por corrida nenhuma. Substituir por OUTRA espécie
+         continua proibido -- é o mesmo bicho, com a paleta de sempre. */
+      if(!shiny) throw e2;
+      const dados = await pmdCarregar(speciesId, false);
+      pmdCache[chave] = dados;
+      return dados;
+    }
+  }
   /* ⚠️ O XML É LIDO POR REGEX E NÃO POR DOMParser: o bloco do Walk é uma ilha bem delimitada e o
      parser traria uma árvore inteira pra ler três números. O `[\s\S]` cobre a quebra de linha. */
   const bloco = xml.match(/<Anim>\s*<Name>Walk<\/Name>[\s\S]*?<\/Anim>/);
@@ -31212,7 +31260,13 @@ async function pmdCarregar(speciesId){
       im2.src = PMD_ALT + pasta + '/Walk-Anim.png';
     };
     im.src = PMD_CDN + pasta + '/Walk-Anim.png';
+  }).catch(async (e) => {
+    if(!shiny) throw e;
+    const dados = await pmdCarregar(speciesId, false);
+    pmdCache[chave] = dados;
+    return null;                       /* já está no cache: o resto da função sai logo abaixo */
   });
+  if(!img) return pmdCache[chave];
   /* ⚠️ QUANTAS LINHAS A FOLHA TEM, lido da IMAGEM e não suposto: o PMD é 8-direcional, mas uma
      espécie com menos direções existe -- e `drawImage` com o retângulo de origem fora da imagem
      não desenha NADA e não dá erro. É o índice fora da folha que essa conta impede. */
@@ -31221,7 +31275,7 @@ async function pmdCarregar(speciesId){
                   caixas: pmdCaixas(img, w, h, durations.length),
                   caixasPorLinha: {} };
   dados.caixasPorLinha[PMD_LINHA_COSTAS] = dados.caixas;
-  pmdCache[speciesId] = dados;
+  pmdCache[chave] = dados;
   return dados;
 }
 /* AS CAIXAS DE UMA LINHA QUALQUER, calculadas na primeira vez que ela é pedida e guardadas. São
@@ -31760,6 +31814,24 @@ function corridaTrocarParticipantes(n){
    A LARGADA -- e o pré-carregamento que a antecede
    ============================================================================ */
 function nomeDoCorredor(c){ const p = c.time[c.trecho]; return (SPECIES[p.speciesId] || {}).name || p.speciesId; }
+/* ⚠️ A CLASSIFICAÇÃO É DE TREINADORES, não de pokémon (20/09/2026, a pedido): ela mostrava o nome
+   do bicho que estava correndo NA HORA da chegada -- num revezamento isso é um dos seis, escolhido
+   por acaso, e ele não diz de quem era a equipe.
+   O nome do jogador sai do `nomeDoTreinador()`, o mesmo que a Pescaria usa; o adversario não tem
+   conta, então ele é numerado -- inventar um nome pra ele seria conteúdo novo, e o pedido é
+   sobre QUEM correu.
+   ⚠️ E ELE É "Rival" E NÃO "Adversário": medido a 320px, a coluna do nome tem **83px** e
+   "Adversário 1" quebrava em DUAS linhas -- a linha ia de 48 pra 63px e as linhas deixavam de
+   alinhar em coluna, que é justamente onde o olho compara. */
+function corridaTreinadorDe(i){ return i === 0 ? nomeDoTreinador() : 'Rival ' + i; }
+/* ⚠️ E EMBAIXO VAI COM QUEM ELE CORREU: no revezamento o NOME DO TIME (o jogador escolhe um time
+   inteiro desde 20/09), e na individual o pokémon. O time do adversario não tem nome de save --
+   ali o que dá pra dizer é quantos correram. */
+function corridaComQuemCorreu(c, i){
+  if(corrida.formato !== 'relay') return nomeDoCorredor(c);
+  if(i === 0) return (corrida.escolhidos[0] || {}).teamName || 'Sua equipe';
+  return 'Equipe rival';
+}
 function corridaNovoCorredor(time, ehJogador){
   return { time, trecho: 0, dist: 0, efeito: 0, mult: 1, quadroT: ehJogador ? 0 : Math.random() * 0.4,
            chegada: null, avisoTroca: 0, trocas: [],
@@ -31783,9 +31855,13 @@ async function corridaLargar(){
      explícito: "não substituir silenciosamente o sprite de uma espécie pelo de outra; se faltar
      algum recurso, informar isso antes da largada". A tela diz QUAIS faltaram, pelo nome. */
   corrida.fase = 'carregando'; corrida.faltando = []; corrida.aviso = ''; render();
-  const especies = [...new Set(corrida.corredores.flatMap(c => c.time.map(p => p.speciesId)))];
+  /* ⚠️ A LISTA É DE VARIANTES, não de espécies: um Gyarados shiny e um normal na mesma corrida
+     são duas folhas, e por espécie uma delas nunca seria baixada. */
+  const variantes = [...new Map(corrida.corredores.flatMap(c => c.time)
+    .map(p => [pmdChave(p.speciesId, p.shiny), p])).values()];
   const faltou = [];
-  await Promise.all(especies.map(id => pmdCarregar(id).catch(() => { faltou.push(id); })));
+  await Promise.all(variantes.map(p => pmdCarregar(p.speciesId, p.shiny)
+    .catch(() => { faltou.push(p.speciesId); })));
   if(faltou.length){
     corrida.fase = 'setup';
     corrida.faltando = faltou;
@@ -32007,6 +32083,14 @@ function corridaPintar(){
   }
   corridaPintarHud();
 }
+/* ⚠️ A CLASSE DO CHIP VIVE NUMA FUNÇÃO SÓ, lida pelo render (que dá o valor inicial) e pelo
+   PINTOR (que a troca a cada quadro). Escritas em separado, as duas divergiriam no primeiro
+   ajuste -- e o sintoma seria o chip certo no primeiro desenho e o errado dali em diante. */
+function corridaClasseDoTrecho(i){
+  const eu = corrida.corredores[0];
+  if(!eu) return '';
+  return eu.trecho === i ? ' ativo' : (i < eu.trecho ? ' feito' : '');
+}
 const CORRIDA_CORES = ['#267853', '#267ab2', '#b76534', '#8c5eab'];
 function corridaDesenharPokemon(ctx, c, i, x, y, raia, ret, txt, op){
   /* ⚠️ O `op` DIZ QUAL MEMBRO DA EQUIPE DESENHAR, e não é luxo: no revezamento a MESMA função
@@ -32015,7 +32099,7 @@ function corridaDesenharPokemon(ctx, c, i, x, y, raia, ret, txt, op){
   const o = op || {};
   const trecho = o.trecho === undefined ? c.trecho : o.trecho;
   const parado = !!o.parado;
-  const p = c.time[trecho], d = p && pmdCache[p.speciesId];
+  const p = c.time[trecho], d = pmdDados(p);
   /* ⚠️ SEM SPRITE NÃO SE DESENHA OUTRO NO LUGAR: a largada só acontece com tudo carregado, então
      isto aqui é a rede de segurança -- um marcador neutro, nunca o bicho errado. */
   if(!d || d === 'erro'){
@@ -32074,6 +32158,15 @@ function corridaPintarHud(){
       : Math.floor(c.dist) + ' / ' + corridaTotal() + ' m');
     const b = document.getElementById('corridaBarra' + i);
     if(b) b.style.width = Math.min(100, c.dist / corridaTotal() * 100) + '%';
+  });
+  /* ⚠️ OS CHIPS DO REVEZAMENTO SÃO REPINTADOS AQUI, e só quando a classe MUDA: um `className = x`
+     cego forçaria recálculo de estilo em 6 elementos por quadro, 60 vezes por segundo. É a mesma
+     guarda de igualdade que o `põe` acima usa pro texto. */
+  if(corrida.formato === 'relay') corrida.escolhidos.forEach((p, i) => {
+    const el = document.getElementById('corridaTrecho' + i);
+    if(!el) return;
+    const cls = 'corrida-trecho' + corridaClasseDoTrecho(i);
+    if(el.className !== cls) el.className = cls;
   });
   const ag = document.getElementById('corridaAgulha');
   if(ag) ag.style.left = (corridaPosBarra() * 100) + '%';
@@ -32147,12 +32240,24 @@ function corridaLinhaEscolhido(p, i){
     <div class="order-num">${corrida.formato === 'relay' ? (i + 1) + 'º' : ''}</div>
     <div class="order-info">
       <span class="mon-name">${spriteHtml(p, 'sprite-sm')} ${escapeHtmlSafe(sp.name || p.speciesId)}${p.shiny ? ' ' + selo('shiny') : ''} <span class="mont-lv">— Lv.${p.level}</span></span>
-      <span class="mon-sub">${typesHtml(sp.types || [])}<span class="corrida-speed">Speed ${speedDaCorrida(corridaInstancia(p, true))}</span></span>
+      <span class="mon-sub">${typesHtml(sp.types || [])}</span>
     </div>
     ${setas}
   </div>`;
 }
 /* A LISTA DE ESCOLHA -- a mesma linha do montador da Torre, com o Speed DA CORRIDA em evidência. */
+/* ⚠️ A VELOCIDADE TOTAL É A SOMA DO `speedDaCorrida` DOS SEIS, e não de um Speed base somado com o
+   nível: aquele é o MESMO número que decide a velocidade na pista, com o nível, o shiny e a
+   especialidade já dentro dele. Somar "nível + Speed" à mão seria uma segunda conta, e ela
+   divergiria da pista no primeiro ajuste -- é a lição do `EXPOENTE_TIPO` valendo num lugar e não
+   no outro.
+   ⚠️ E O SLOT É CARIMBADO, senão o `effectiveSpeed` não acha a especialidade da conta e o número
+   do card sairia MENOR que o da pista pra quem é especialista. */
+function corridaSpeedDoTime(slot){
+  const sv = (game.saveSlots && game.saveSlots[slot]) || {};
+  return (sv.team || []).reduce((a, p) =>
+    a + speedDaCorrida(corridaInstancia(Object.assign({}, p, { slot: Number(slot) }), true)), 0);
+}
 /* O card de TIME do revezamento -- o mesmo `save-slot-card` da Liga, da home e da Pescaria. */
 function corridaPickerDeTimes(){
   const slots = savesCampeoes();
@@ -32167,7 +32272,8 @@ function corridaPickerDeTimes(){
     + `<p class="hint-text">Correm os <strong>${CORRIDA_TRECHOS}</strong> do time, um por trecho de`
     + ` ${CORRIDA_METROS_TRECHO} m. A ordem começa na do time e dá pra mexer antes de largar.</p>`
     + slots.map(slot => pescariaCardDoTime(slot, String(atual) === String(slot),
-                                           `corridaEscolherTime(${slot})`)).join(``)
+                                           `corridaEscolherTime(${slot})`,
+                                           `Velocidade total do time: <b>${corridaSpeedDoTime(slot)}</b>`)).join(``)
     + `<button class="btn secondary" onclick="corridaFecharPicker()">⬅ Voltar</button></div>`;
 }
 function corridaPickerHtml(){
@@ -32224,8 +32330,10 @@ function corridaPickerHtml(){
   </div>`;
 }
 function renderCorrida(){
-  if(corrida.picker) return `<div class="eyebrow">${selo('corrida')} CORRIDA POKÉMON</div>` + corridaPickerHtml()
-    + `<button class="btn secondary" onclick="sairDaCorrida()">⬅ Sair</button>`;
+  /* ⚠️ SEM O "Sair" AQUI (20/09/2026, a pedido): o picker já termina com um "Voltar", e dois
+     botões cinzas empilhados dizendo coisas parecidas fazem escolher entre eles. O Sair continua
+     nas outras telas da Corrida, que é de onde se sai do modo. */
+  if(corrida.picker) return `<div class="eyebrow">${selo('corrida')} CORRIDA POKÉMON</div>` + corridaPickerHtml();
 
   const correndo = corrida.fase === 'correndo' || corrida.fase === 'contagem';
   /* ⚠️ O RANKING É PEDIDO NO DESENHO, e não no `abrirCorrida`: assim ele volta a carregar quando
@@ -32282,11 +32390,21 @@ function renderCorrida(){
       <div class="corrida-overlay" id="corridaOverlay" ${corrida.fase === 'contagem' ? '' : 'hidden'}><div class="bubble"><strong id="corridaTitulo">3</strong><small id="corridaSub">Prepare-se</small></div></div>
     </div>
     <div class="box corrida-controles">
-      ${corrida.formato === 'relay' ? `<div class="corrida-trechos">${corrida.escolhidos.map((p, i) => {
-        const eu = corrida.corredores[0];
-        const st = eu && eu.trecho === i ? ' ativo' : (eu && i < eu.trecho ? ' feito' : '');
-        return `<div class="corrida-trecho${st}"><b>${escapeHtmlSafe((SPECIES[p.speciesId] || {}).name || '')}</b>${i * corridaMetros()}–${(i + 1) * corridaMetros()} m</div>`;
-      }).join('')}</div>` : ''}
+      ${/* ⚠️ OS CHIPS SÃO MONTADOS AQUI E ATUALIZADOS PELO PINTOR: a classe `ativo` muda no MEIO
+           da corrida, e o laço NÃO chama render() (ele recriaria o canvas e o botão 60 vezes por
+           segundo). Montado com a classe fixa, o amarelo congelava no PRIMEIRO trecho a prova
+           inteira -- foi reportado, e é a mesma família do overlay da contagem.
+           ⚠️ E O CHIP MOSTRA O SPRITE MAIS A POSIÇÃO, nunca texto: medido no navegador, a 320px
+           o chip tem **37px** (33 de conteúdo) -- "Victreebel" não cabe em fonte nenhuma legível,
+           e era isso que saa quebrado no print. A faixa de metros ('150–300') também não cabe:
+           ela saa CORTADA em 5 dos 6. O que cabe é o '1º', que é o que a tela já fala em todo
+           lugar ('trecho 3/6' no HUD). O nome e a faixa inteira ficam no `title`. */''}
+      ${corrida.formato === 'relay' ? `<div class="corrida-trechos">${corrida.escolhidos.map((p, i) => `
+        <div class="corrida-trecho${corridaClasseDoTrecho(i)}" id="corridaTrecho${i}"
+             title="${escapeHtmlSafe((SPECIES[p.speciesId] || {}).name || '')} · ${i * corridaMetros()}–${(i + 1) * corridaMetros()} m">
+          ${spriteHtml(p, 'corrida-trecho-spr')}
+          <b>${i + 1}º</b>
+        </div>`).join('')}</div>` : ''}
       <div class="corrida-feedback"><span id="corridaRecado">${escapeHtmlSafe(corrida.recado)}</span><span id="corridaPerfeitos">${corrida.perfeitos} perfeitos</span></div>
       ${/* ⚠️ AS FAIXAS SAEM DAS CONSTANTES, nunca de um número escrito no CSS: se a detecção e o
            desenho divergirem, a barra promete uma região e o motor pontua outra -- é a mesma
@@ -32312,8 +32430,8 @@ function renderCorrida(){
         <div class="resultRow${i === 0 ? ' eu' : ''}">
           <span class="resultPos">${pos + 1}º</span>
           <span class="resultMed">${MEDALHA_DO_POSTO[pos] ? selo(MEDALHA_DO_POSTO[pos]) : ''}</span>
-          <span class="resultNome">${escapeHtmlSafe(nomeDoCorredor(c))}
-            <span class="resultQuem">${i === 0 ? 'você' : 'NPC ' + i}</span></span>
+          <span class="resultNome">${escapeHtmlSafe(corridaTreinadorDe(i))}
+            <span class="resultQuem">${escapeHtmlSafe(corridaComQuemCorreu(c, i))}</span></span>
           <b>${c.chegada.toFixed(2)}s</b>
         </div>`).join('')}
       <button class="btn success" onclick="corridaLargar()">Correr de novo</button>
@@ -33595,7 +33713,11 @@ function pescariaTimeSprites(time){
       + `</div><div class="save-slot-mon-level">Lv.${p.level}</div></div>`;
   }).join(``);
 }
-function pescariaCardDoTime(slot, selecionado, acao){
+/* ⚠️ O `rodape` É OPCIONAL E A PESCARIA NÃO O PASSA: ele nasceu pra a Corrida mostrar a
+   velocidade total da equipe (20/09/2026, a pedido). Um card próprio pra ela seria a terceira
+   cópia do mesmo desenho -- é por ele ser o MESMO card da Liga, da home e da Pescaria que o
+   jogador reconhece um time sem reaprender a ler. */
+function pescariaCardDoTime(slot, selecionado, acao, rodape){
   const sv = (game.saveSlots && game.saveSlots[slot]) || {};
   const time = sv.team || [];
   const nome = sv.customName || (`Time ${slot + 1}`);
@@ -33606,7 +33728,9 @@ function pescariaCardDoTime(slot, selecionado, acao){
     + `<span class="team-avg-star" title="Média de nível do time">${STAR_SVG}`
     + `<span class="team-avg-star-num">${media}</span></span>`
     + `<span class="save-slot-name"><span class="team-avg-star-name">${escapeHtmlSafe(nome)}</span></span>`
-    + `</div><div class="save-slot-team-row spread">${pescariaTimeSprites(time)}</div></button>`;
+    + `</div><div class="save-slot-team-row spread">${pescariaTimeSprites(time)}</div>`
+    + (rodape ? `<div class="card-rodape">${rodape}</div>` : ``)
+    + `</button>`;
 }
 /* ⚠️ O RANKING É DA PRIMEIRA TELA, e é ele que dá razão pra voltar: sem placar, um duelo ganho
    contra o Wilton morre na própria tela do fim. Ele mostra o TOP 10 por pontos.
@@ -34313,9 +34437,9 @@ async function resgateComecar(){
   const dele = resgateSortearNpc(resgate.escolhido.speciesId);
   resgate.fase = 'carregando'; resgate.aviso = ''; render();
   try{
-    await Promise.all([pmdCarregar(meu.speciesId), pmdCarregar(dele.speciesId)]);
+    await Promise.all([pmdCarregar(meu.speciesId, meu.shiny), pmdCarregar(dele.speciesId, dele.shiny)]);
   }catch(e){
-    const falhou = pmdCache[meu.speciesId] === 'erro' ? meu.speciesId : dele.speciesId;
+    const falhou = pmdDados(meu) === 'erro' ? meu.speciesId : dele.speciesId;
     resgate.fase = 'setup';
     resgate.aviso = 'Não consegui carregar o sprite de ' + ((SPECIES[falhou] || {}).name || falhou) + '.';
     render(); return;
@@ -34570,7 +34694,7 @@ function resgateDesenharAtor(ctx, a, i, t){
   ctx.fillStyle = '#12445d55';
   ctx.beginPath(); ctx.ellipse(a.x, a.y + 8, 17, 6, 0, 0, Math.PI * 2); ctx.fill();
   ctx.strokeStyle = i === 0 ? '#a2d7ff' : '#ffd39a'; ctx.lineWidth = 1.5; ctx.stroke();
-  const dados = pmdCache[a.inst.speciesId];
+  const dados = pmdDados(a.inst);
   if(dados && dados !== 'erro'){
     /* ⚠️ A LINHA DA FOLHA SAI DO RUMO, e a conta é a do protótipo -- ela casa com a ordem do PMD
        (0=sul, 2=leste, 4=norte, 6=oeste), que é a mesma que a Corrida já usa pro `PMD_LINHA_COSTAS`. */

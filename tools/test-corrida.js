@@ -913,12 +913,21 @@ console.log('\n=== O NPC É PAREADO PELO SPEED ===');
   ok('o NPC corre com o Speed REAL da espécie, sem boost',
      Math.abs(S.corridaVelocidade(a) - S.corridaVelocidade(b)) < 1e-9,
      S.corridaVelocidade(a).toFixed(3) + ' e ' + S.corridaVelocidade(b).toFixed(3));
-  /* ⚠️ E A PILOTAGEM DELE NÃO FOI MEXIDA, e isso é decisão medida: com o Speed pareado, subir o
-     perfil pra 25/57/13 derruba o jogador "bom" de 40% pra 11% de vitória. O pareamento já fez o
-     trabalho -- mexer nos dois deixaria o NPC forte demais. */
-  ok('a pilotagem do NPC continua 20/52/14 (e 14% de não tentar)',
-     S.CORRIDA_NPC.perfect === 0.20 && S.CORRIDA_NPC.good === 0.52 && S.CORRIDA_NPC.miss === 0.14,
+  /* ⚠️ A PILOTAGEM SUBIU UM DEGRAU EM 20/09/2026 (a pedido: *"deixe o NPC um pouco melhor"*), e o
+     número fica FIXADO aqui pra a próxima mudança ser deliberada -- foi esta trava que acusou a de
+     hoje. Medido, o degrau tira o jogador "bom" de 97% pra 88% na individual e de 80% pra 57% no
+     revezamento, e afunda o mediano de 37% pra 12%.
+     ⚠️ E CONTRA QUEM DOMINA O JOGO ELE NÃO ALCANÇA EM CONFIGURAÇÃO NENHUMA (100% em 20, 24, 28 e
+     32): a pilotagem perfeita já é o teto. A régua que alcançaria é o NÍVEL do NPC, e ela está
+     fora -- inflar a velocidade dele é o que o pedido de 18/09 proíbe com todas as letras. */
+  ok('a pilotagem do NPC é 24/56/12 (e 8% de não tentar)',
+     S.CORRIDA_NPC.perfect === 0.24 && S.CORRIDA_NPC.good === 0.56 && S.CORRIDA_NPC.miss === 0.12,
      JSON.stringify(S.CORRIDA_NPC));
+  /* ⚠️ E AS TRÊS SOMAM MENOS QUE 1: o resto é a OPORTUNIDADE NÃO USADA, que é o que impede o NPC
+     de ser um metrônomo perfeito. Somando 1 ele tentaria toda travessia, o que é outro jogo. */
+  ok('  e elas continuam somando menos que 1',
+     S.CORRIDA_NPC.perfect + S.CORRIDA_NPC.good + S.CORRIDA_NPC.miss < 1,
+     (S.CORRIDA_NPC.perfect + S.CORRIDA_NPC.good + S.CORRIDA_NPC.miss).toFixed(2));
 }
 
 /* ============================================================================
@@ -1599,5 +1608,224 @@ console.log('\n=== OS DOIS RANKINGS (cliente) ===');
   g.authUser = null;
   S.corridaZerar();
 }
+/* ============================================================================
+   21) AS SETE DE 20/09/2026 -- os chips que seguem, o nome cortado, a classificação por
+       TREINADOR, o Speed que saiu da lista, a velocidade total do time, o Sair que sumiu e o
+       sprite SHINY na pista.
+   ============================================================================ */
+console.log('\n=== OS CHIPS DO REVEZAMENTO SEGUEM O CORREDOR ===');
+{
+  contaDeTeste();
+  S.corridaZerar();
+  S.corrida.formato = 'relay'; S.corrida.participantes = 2;
+  S.corridaEscolherTime(0);
+  const time = S.corrida.escolhidos;
+  const eu = S.corridaNovoCorredor(time.map(p => S.corridaInstancia(p, true)), true);
+  S.corrida.corredores = [eu];
+  S.corrida.fase = 'correndo';
+
+  /* ⚠️ O DEFEITO ERA O CHIP SER MONTADO NO render() E NUNCA MAIS TROCAR: o laço não chama
+     render() (ele recriaria o canvas e o botão 60 vezes por segundo), então o amarelo congelava
+     no PRIMEIRO trecho a prova inteira. Foi reportado com print. */
+  ok('no trecho 0 o chip 0 é o ativo',
+     S.corridaClasseDoTrecho(0) === ' ativo' && S.corridaClasseDoTrecho(1) === '');
+  eu.trecho = 3;
+  ok('  no trecho 3 o ativo ANDOU', S.corridaClasseDoTrecho(3) === ' ativo');
+  ok('  e o 0 virou "feito"', S.corridaClasseDoTrecho(0) === ' feito');
+  ok('  e o 4 continua por correr', S.corridaClasseDoTrecho(4) === '');
+
+  /* ⚠️ E É O PINTOR QUEM TROCA A CLASSE -- é a única coisa que roda durante a corrida. Um caso
+     que chamasse só o `corridaClasseDoTrecho` passaria com o defeito inteiro de volta. */
+  eu.trecho = 0;
+  /* ⚠️ O VALOR INICIAL SE LÊ NO HTML, e não pelo `getElementById`: o sandbox guarda um stub por
+     id mas NÃO parseia o que o render escreveu, então a classe só existe no texto. Lido pelo
+     stub, isto mediria o nada -- e o pintor logo abaixo passaria por acaso. */
+  const idChip = (i) => 'id="corridaTrecho' + i + '"';
+  const inicial = S.renderCorrida();
+  ok('o render dá o valor inicial ao chip',
+     /class="corrida-trecho ativo" id="corridaTrecho0"/.test(inicial));
+  ok('  e o segundo nasce sem classe',
+     /class="corrida-trecho" id="corridaTrecho1"/.test(inicial));
+  /* daqui pra baixo é o PINTOR, que mexe no DOM -- e ali o stub por id é exatamente o certo */
+  S.render();
+  const el = (i) => S.document.getElementById('corridaTrecho' + i);
+  el(0).className = 'corrida-trecho ativo';
+  el(2).className = 'corrida-trecho';
+  eu.trecho = 2;
+  S.corridaPintarHud();
+  ok('  e o PINTOR o move sem render()', !!el(2) && /ativo/.test(el(2).className),
+     el(2) ? el(2).className : 'sem elemento');
+  ok('  e apaga o antigo', !!el(0) && /feito/.test(el(0).className) && !/ativo/.test(el(0).className));
+
+  /* ⚠️ SÓ QUANDO A CLASSE MUDA: um className cego força recálculo de estilo em 6 elementos por
+     quadro, 60 vezes por segundo. É a mesma guarda de igualdade que o texto do HUD usa. */
+  ok('  e ele só escreve quando a classe MUDA',
+     /if\(el\.className !== cls\) el\.className = cls;/.test(src));
+
+  /* ⚠️ O NOME SAIU DO CHIP: a 320px são SEIS em ~281px, ou seja ~35px de texto cada --
+     "Victreebel" não cabe em fonte nenhuma legível, e era isso que saía quebrado no print. */
+  const html = S.renderCorrida();
+  ok('o chip NÃO escreve o nome do pokémon',
+     html.indexOf('>Victreebel<') < 0 && html.indexOf('<b>Jolteon</b>') < 0);
+  ok('  e mostra o SPRITE no lugar', /corrida-trecho-spr/.test(html));
+  ok('  com o nome no title, que é onde ele cabe', /title="Jolteon ·/.test(html));
+  /* ⚠️ E NEM A FAIXA DE METROS COUBE: medido no navegador, "150–300" saía CORTADO em 5 dos 6
+     chips (o conteúdo de um chip tem 33px). O que cabe é a POSIÇÃO -- que é o que a tela já fala
+     em todo lugar ("trecho 3/6" no HUD) --, e a faixa inteira foi pro `title`. */
+  ok('  e o número do chip é a POSIÇÃO, que cabe', html.indexOf('<b>1º</b>') >= 0
+     && html.indexOf('<b>' + S.CORRIDA_TRECHOS + 'º</b>') >= 0);
+  /* ⚠️ SEM AMARRAR NO NOME: a primeira versão procurava `title="Jolteon · 150–300 m"` e o Jolteon
+     é o PRIMEIRO no time de teste (0–150) -- ela media a ordem do fixture, não a regra. */
+  ok('    e a faixa de metros foi pro title',
+     new RegExp('title="[^"]+ · ' + S.CORRIDA_METROS_TRECHO + '–' + (2 * S.CORRIDA_METROS_TRECHO) + ' m"').test(html));
+  ok('    e não sobrou faixa no corpo do chip',
+     html.indexOf('<b>0–' + S.CORRIDA_METROS_TRECHO + '</b>') < 0);
+  /* o sprite precisa de regra PRÓPRIA: a `.sprite-sm .sprite-img` da casa vem DEPOIS no arquivo */
+  ok('  e o CSS do sprite tem três seletores (senão a regra da casa ganha)',
+     /\.corrida-trecho \.corrida-trecho-spr \.sprite-img\{[^}]*width:24px/.test(src));
+}
+
+console.log('\n=== A CLASSIFICAÇÃO É DE TREINADORES ===');
+{
+  contaDeTeste();
+  g.trainerName = 'Buzzo';
+  S.corridaZerar();
+  S.corrida.formato = 'relay'; S.corrida.participantes = 2;
+  S.corridaEscolherTime(0);
+  const eu = S.corridaNovoCorredor(S.corrida.escolhidos.map(p => S.corridaInstancia(p, true)), true);
+  const npc = S.corridaNovoCorredor(S.sortearNpcs()[0], false);
+  eu.chegada = 60; npc.chegada = 65;
+  eu.trecho = npc.trecho = S.CORRIDA_TRECHOS - 1;
+  S.corrida.corredores = [eu, npc];
+  S.corrida.fase = 'fim';
+  const html = S.renderCorrida();
+
+  /* ⚠️ ELA MOSTRAVA O NOME DO POKÉMON QUE ESTAVA CORRENDO NA HORA DA CHEGADA -- num revezamento
+     isso é um dos seis, escolhido por acaso, e não diz de quem era a equipe. */
+  ok('a linha traz o NOME DO TREINADOR', html.indexOf('Buzzo') >= 0);
+  /* ⚠️ E ELE É "Rival", MEDIDO: a 320px a coluna do nome tem 83px e "Adversário 1" quebrava em
+     DUAS linhas -- a linha ia de 48 pra 63px e elas deixavam de alinhar em coluna, que é onde o
+     olho compara. Com "Rival N" as quatro ficam em 48px. */
+  ok('  e o adversário é "Rival N"', html.indexOf('Rival 1') >= 0);
+  ok('  e embaixo vai o NOME DO TIME do revezamento', html.indexOf('Time A') >= 0);
+  /* ⚠️ E O RÓTULO DO TIME RIVAL É CURTO PELO MESMO MOTIVO -- "Equipe rival · 6 pokémon" quebrava
+     em duas linhas, e ainda dizia uma coisa que TODO revezamento tem. */
+  ok('  e o time rival tem rótulo próprio', html.indexOf('Equipe rival') >= 0);
+  ok('    e ele é curto (não diz o que todo revezamento tem)',
+     html.indexOf('pokémon</span>') < 0);
+
+  /* na INDIVIDUAL o que faz sentido embaixo é o pokémon, que é o que ele escolheu */
+  S.corridaZerar();
+  S.corrida.formato = 'single'; S.corrida.participantes = 2;
+  const solo = S.corridaNovoCorredor([S.corridaInstancia(mk('jolteon', 60), true)], true);
+  solo.chegada = 20;
+  S.corrida.corredores = [solo];
+  S.corrida.fase = 'fim';
+  const h2 = S.renderCorrida();
+  ok('na individual o treinador vem em cima', h2.indexOf('Buzzo') >= 0);
+  ok('  e o POKÉMON embaixo', h2.indexOf('Jolteon') >= 0);
+  /* ⚠️ SEM NOME DE CONTA ELE CAI NO "Você" da casa -- é o mesmo `nomeDoTreinador` que a Pescaria
+     usa, e ele responde por quem ainda não nomeou a conta. */
+  g.trainerName = null;
+  ok('  e sem nome de conta ele cai no "Você"', S.corridaTreinadorDe(0) === 'Você');
+  g.trainerName = 'Buzzo';
+}
+
+console.log('\n=== O SPEED AZUL SAIU DA LISTA DE ORDEM ===');
+{
+  contaDeTeste();
+  S.corridaZerar();
+  S.corrida.formato = 'relay';
+  S.corridaEscolherTime(0);
+  const linha = S.corridaLinhaEscolhido(S.corrida.escolhidos[0], 0);
+  ok('a linha não escreve "Speed N"', !/Speed \d/.test(linha), linha.slice(0, 110));
+  ok('  e a classe virou letra morta no CSS', src.indexOf('.corrida-speed{') < 0);
+  /* ⚠️ E ELA NÃO LEVOU O `corrida-speed-badge` JUNTO: são coisas diferentes -- aquele é o número
+     da lista de POKÉMON (a individual e a Pescaria), e o pedido é sobre a lista de ORDEM. */
+  ok('  mas o selo da lista de escolha continua', src.indexOf('.corrida-speed-badge') >= 0);
+  ok('  e os tipos continuam na linha', linha.indexOf('mon-sub') >= 0);
+  ok('  e as setas de ordem continuam', linha.indexOf('corridaMover') >= 0);
+}
+
+console.log('\n=== A VELOCIDADE TOTAL DO TIME, E O SAIR QUE SUMIU ===');
+{
+  contaDeTeste();
+  S.corridaZerar();
+  S.corrida.formato = 'relay';
+  const esperado = g.saveSlots[0].team.reduce((a, p) =>
+    a + S.speedDaCorrida(S.corridaInstancia(Object.assign({}, p, { slot: 0 }), true)), 0);
+  ok('a soma é a dos seis `speedDaCorrida`', S.corridaSpeedDoTime(0) === esperado, String(esperado));
+  /* ⚠️ O SHINY ENTRA NELA, e é por isso que ela é o `speedDaCorrida` e não "nível + Speed base":
+     aquele é o MESMO número que decide a pista, com o nível, o shiny e a especialidade dentro.
+     O time de teste tem um Snorlax shiny. */
+  const semShiny = g.saveSlots[0].team.reduce((a, p) =>
+    a + S.speedDaCorrida(S.corridaInstancia(Object.assign({}, p, { slot: 0, shiny: false }), true)), 0);
+  ok('  e o SHINY entra na conta (1,20x)', esperado > semShiny, esperado + ' > ' + semShiny);
+
+  const picker = S.corridaPickerDeTimes();
+  ok('o card mostra a velocidade total', picker.indexOf('Velocidade total do time') >= 0);
+  ok('  com o número dentro', picker.indexOf('<b>' + esperado + '</b>') >= 0);
+  ok('  e ele é o mesmo card da Liga e da Pescaria', picker.indexOf('save-slot-card') >= 0);
+  /* ⚠️ O RODAPÉ É OPCIONAL, e a Pescaria NÃO o passa: um card próprio pra a Corrida seria a
+     terceira cópia do mesmo desenho. */
+  ok('  e a Pescaria continua sem rodapé',
+     S.pescariaCardDoTime(0, false, 'x()').indexOf('card-rodape') < 0);
+
+  S.corrida.picker = true;
+  const tela = S.renderCorrida();
+  ok('a tela de escolha NÃO tem mais o "Sair"', tela.indexOf('sairDaCorrida') < 0);
+  ok('  e continua com o "Voltar"', tela.indexOf('corridaFecharPicker') >= 0);
+  S.corrida.picker = false;
+  /* ⚠️ MAS O SAIR CONTINUA NAS OUTRAS TELAS -- é de lá que se sai do modo */
+  S.corrida.fase = 'setup';
+  ok('  e o setup continua podendo sair', S.renderCorrida().indexOf('sairDaCorrida') >= 0);
+}
+
+console.log('\n=== O SPRITE SHINY NA PISTA ===');
+{
+  /* ⚠️ A PASTA DO SHINY É A SUBPASTA `0000/0001`, e ela foi conferida antes de virar código:
+     mesmas dimensões e mesmo AnimData do normal. `<dex>/0001/` é outra COISA -- uma forma
+     alternativa (a Mega) --, e usar ela desenharia outro pokémon. */
+  ok('a pasta do shiny é a subpasta 0000/0001',
+     S.pmdPasta('gyarados', true) === '0130/0000/0001');
+  ok('  e a do normal não mudou', S.pmdPasta('gyarados') === '0130');
+  ok('  e ela continua valendo com shiny=false', S.pmdPasta('gyarados', false) === '0130');
+
+  /* ⚠️ A CHAVE DO CACHE LEVA O SHINY: sem isso um Gyarados shiny e um normal na mesma corrida
+     seriam a MESMA entrada, e quem carregasse depois ficaria com a cor do outro. */
+  ok('a chave do cache separa as duas variantes',
+     S.pmdChave('gyarados', true) !== S.pmdChave('gyarados', false));
+  ok('  e a do normal é o próprio id (o cache velho continua valendo)',
+     S.pmdChave('gyarados', false) === 'gyarados' && S.pmdChave('gyarados') === 'gyarados');
+
+  /* o leitor pergunta pela INSTÂNCIA, e não monta a chave na mão */
+  S.pmdCache['gyarados'] = { qual: 'normal' };
+  S.pmdCache['gyarados:shiny'] = { qual: 'shiny' };
+  ok('o leitor acha o normal', S.pmdDados({ speciesId: 'gyarados' }).qual === 'normal');
+  ok('  e acha o SHINY', S.pmdDados({ speciesId: 'gyarados', shiny: true }).qual === 'shiny');
+  delete S.pmdCache['gyarados']; delete S.pmdCache['gyarados:shiny'];
+
+  /* ⚠️ E O PRELOAD BAIXA VARIANTES, não espécies: por espécie, um Gyarados shiny e um normal na
+     mesma corrida dariam UMA folha, e um dos dois sairia com a cor errada. */
+  /* ⚠️ E ELA LÊ O BLOCO DO PRELOAD, não o arquivo inteiro: a primeira versão procurava
+     `pmdChave(p.speciesId, p.shiny)` solto, e isso CASA COM O `pmdDados` -- ou seja ela dava
+     verde com o preload voltando a juntar por espécie. É a armadilha do padrão largo demais que
+     as regex do `mlog-mais` e do `matchup-row` já custaram, e foi a conferência de acusação que
+     a pegou: o defeito religado passava em branco. */
+  const preload = (src.match(/const variantes = [\s\S]{0,420}?faltou\.push/) || [''])[0];
+  ok('  (e a trava lê o bloco do preload)', preload.length > 200, preload.length + ' chars');
+  ok('o preload junta por variante, não por espécie',
+     /pmdChave\(p\.speciesId, p\.shiny\)/.test(preload) && /pmdCarregar\(p\.speciesId, p\.shiny\)/.test(preload));
+  /* ⚠️ E O SHINY QUE FALTA CAI NO NORMAL: a cor é apresentação, a ESPÉCIE é identidade. Barrar a
+     largada porque a variante colorida não baixou seria trocar um shiny por corrida nenhuma --
+     substituir por OUTRA espécie continua proibido. */
+  ok('  e o shiny que falta cai no normal, nunca noutra espécie',
+     /if\(!shiny\) throw e2;[\s\S]{0,140}pmdCarregar\(speciesId, false\)/.test(src));
+  /* o Resgate entrou junto -- ele lê o mesmo cache */
+  ok('  e o Resgate também pede a variante',
+     /pmdCarregar\(meu\.speciesId, meu\.shiny\), pmdCarregar\(dele\.speciesId, dele\.shiny\)/.test(src));
+  ok('  e lê pelo `pmdDados`', /const dados = pmdDados\(a\.inst\);/.test(src));
+}
+
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
 process.exit(falhas ? 1 : 0);

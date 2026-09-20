@@ -12591,6 +12591,184 @@ aqui a ordem é pelo **Speed da corrida**. As peças de paginação são as mesm
 ⚠️ E **abrir o picker zera a página**, como o `abrirMontador` faz: o estado é compartilhado com a
 Torre e o Ginásio, e uma página 3 sobrando de lá abriria esta lista no meio.
 
+### AS SETE DA CORRIDA (20/09/2026) -- a leva do revezamento na tela
+
+Sete pedidos numa leva, com print de um revezamento em curso. Dois eram defeito de verdade, um é
+balanceamento medido, e os outros quatro são tela.
+
+#### ⚠️ OS QUADRADOS AMARELOS NÃO SEGUIAM O CORREDOR
+
+Reportado: *"aqueles quadrados amarelos deveriam trocar conforme troca o pokemon que esta correndo,
+porem nao esta, ele sempre fica amarelo no primeiro"*.
+
+**⚠️ É A MESMA FAMÍLIA DO MODAL DA CONTAGEM, que já tinha sido reportado e consertado em 18/09:**
+os chips eram montados **por condição no `render()`**, e o laço do jogo **não chama `render()`** —
+de propósito, porque ele recriaria o canvas e o botão de impulso 60 vezes por segundo. A classe
+`ativo` ficava congelada no primeiro chip a prova inteira.
+
+- **HOJE O PINTOR TROCA A CLASSE**, e **a conta vive numa função só** (`corridaClasseDoTrecho`),
+  lida pelo render (que dá o valor inicial) e pelo pintor (que a move). Escritas em separado, as
+  duas divergiriam no primeiro ajuste — e o sintoma seria o chip certo no primeiro desenho e o
+  errado dali em diante.
+- **E SÓ QUANDO A CLASSE MUDA**: um `className = x` cego forçaria recálculo de estilo em 6
+  elementos por quadro, 60 vezes por segundo. É a mesma guarda de igualdade que o texto do HUD usa.
+
+#### ⚠️ E O QUE CABE NUM CHIP DE 37px NÃO É TEXTO — duas medições até acertar
+
+Reportado junto: *"o nome dos pokemons esta cortando, como exibiu quebrado ali o Victreebel"*.
+
+**A conta é dura: a 320px são SEIS chips em 243px de fileira — 37px cada, 33 de conteúdo.**
+
+| o que eu pus | o que a medição disse |
+|---|---|
+| o **nome** (como era) | "Victreebel" não cabe em fonte nenhuma legível — era o print |
+| a **faixa de metros** ("150–300") | **CORTADA em 5 dos 6** chips |
+| **o sprite + a posição ("1º")** | **zero cortados**, chip de 37×43px |
+
+**⚠️ A SEGUNDA TENTATIVA PASSOU NO TESTE E FALHOU NO NAVEGADOR**, e é a lição: a trava cobrava
+`html.indexOf('>0–150<') >= 0` — **o texto estava lá, e estava cortado**. Texto que não cabe passa
+em qualquer asserção de HTML.
+
+- **O SPRITE IDENTIFICA MELHOR QUE UM NOME TRUNCADO**, e o `1º` é o que a tela **já fala em todo
+  lugar** (o HUD diz "trecho 3/6", a lista de ordem diz "1º").
+- **O nome E a faixa inteira ficam no `title`** — nada se perdeu, mudou de lugar.
+- **⚠️ E O CSS DO SPRITE PRECISA DE TRÊS SELETORES** (`.corrida-trecho .corrida-trecho-spr
+  .sprite-img`): com dois, a regra `.sprite-sm .sprite-img` da casa — declarada **depois** no
+  arquivo — ganharia o empate de especificidade e o sprite não encolheria. É a mesma armadilha que
+  a lista da rota já custou.
+
+#### ⚠️ A CLASSIFICAÇÃO ERA DE POKÉMON, E TINHA QUE SER DE TREINADORES
+
+Pedido: *"no final que aparece a colocação de cada treinador, esta aparecendo o nome do pokemon,
+tem que aparecer o nome do treinador e qual era o time do revezamento, ou se a corrida era
+individual, entao mostrar o nome do treinador e embaixo o pokemon que ele correu"*.
+
+Ela mostrava o `nomeDoCorredor`, que é **o bicho que estava correndo NA HORA DA CHEGADA** — num
+revezamento isso é um dos seis, escolhido por acaso, e não diz de quem era a equipe.
+
+| | em cima | embaixo |
+|---|---|---|
+| **revezamento** | o treinador | o **nome do time** (ou "Equipe rival") |
+| **individual** | o treinador | o **pokémon** |
+
+- **O nome sai do `nomeDoTreinador()`**, o mesmo que a Pescaria usa — e quem não nomeou a conta cai
+  no "Você" da casa.
+- **⚠️ O ADVERSÁRIO É "Rival N", E ISSO FOI MEDIDO:** a 320px a coluna do nome tem **83px**, e
+  "Adversário 1" **quebrava em duas linhas** — a linha ia de 48 pra 63px e as linhas deixavam de
+  alinhar em coluna, que é justamente onde o olho compara. Com "Rival N" as quatro ficam em 48px.
+  Pelo mesmo motivo "Equipe rival · 6 pokémon" virou **"Equipe rival"** — e ele ainda dizia uma
+  coisa que TODO revezamento tem.
+- **A linha do JOGADOR ainda pode ir a duas linhas**, e é aceito: ali o que quebra é o **nome do
+  save**, que é dele.
+
+#### O "Speed 98" SAIU, E A VELOCIDADE TOTAL ENTROU
+
+São o mesmo pedido visto dos dois lados: *"na lista para eu escolher a ordem da equipe tem um
+escrito 'speed 98' em azul que nao ta legal, pode tirar"* e *"coloque a velocidade total do time na
+tela onde escolhe o time"*.
+
+**⚠️ O NÚMERO NÃO SUMIU — ELE MUDOU DE TELA, e a tela nova é onde ele decide.** Na lista de ORDEM
+ele é ruído: ali a decisão é a sequência, e o Speed de cada um não muda o que ela pede. Na tela de
+escolha do TIME ele é a decisão inteira — medido nos dois times de teste, **699 contra 282**.
+
+- **A SOMA É A DOS SEIS `speedDaCorrida`**, e não "nível + Speed base": aquele é o **MESMO número**
+  que decide a velocidade na pista, com o nível, o shiny e a especialidade já dentro. Somar à mão
+  seria uma segunda conta, e ela divergiria da pista no primeiro ajuste.
+- **⚠️ E O SLOT É CARIMBADO**, senão o `effectiveSpeed` não acha a especialidade da conta e o número
+  do card sairia **menor** que o da pista pra quem é especialista.
+- **O RODAPÉ É UM PARÂMETRO OPCIONAL do `pescariaCardDoTime`**, e a Pescaria não o passa: um card
+  próprio pra a Corrida seria a terceira cópia do mesmo desenho — é por ele ser o MESMO card da
+  Liga, da home e da Pescaria que o jogador reconhece um time sem reaprender a ler.
+- **O "Sair" saiu da tela de escolha** (ela já termina com um "Voltar"), e **continua nas outras** —
+  é de lá que se sai do modo.
+- **Medido a 320px:** o rodapé cabe em **UMA linha** (18px), os dois cards ficam em **134px** e a
+  tela não rola pro lado.
+
+#### ⚠️ O SHINY NA PISTA: O CACHE ERA POR ESPÉCIE
+
+Reportado: *"quando o time possui um pokemon shiny, a sprite dele na corrida tbm deve exibir shiny,
+esta aparecendo a normal"*.
+
+**⚠️ A PASTA DO SHINY FOI CONFERIDA ANTES DE VIRAR CÓDIGO, e ela não é a óbvia:**
+
+| caminho | o que é |
+|---|---|
+| `sprite/<dex>/0001/` | uma **FORMA alternativa** (a Mega) — usar ela desenharia **outro pokémon** |
+| **`sprite/<dex>/0000/0001/`** | **o shiny** — mesmo `AnimData`, mesmas dimensões, outra paleta |
+
+**Medido no navegador, em quatro espécies:** as dimensões são **IDÊNTICAS** (Gyarados 352×1024 nas
+duas, Jolteon 128×320, Snorlax 128×384, Alakazam 128×320) — ou seja as caixas, as durações e o
+`pmdQuadro` continuam valendo sem tocar em nada — e **47% a 75% dos pixels da silhueta diferem**,
+que é o que prova que é outra paleta e não a mesma folha.
+**Cobertura: 250/250 espécies têm sprite shiny.**
+
+- **⚠️ A CHAVE DO CACHE PASSOU A LEVAR O SHINY** (`pmdChave`), e sem isso um Gyarados shiny e um
+  normal na mesma corrida seriam a **MESMA entrada**: quem carregasse depois ficaria com a cor do
+  outro. A chave do normal continua sendo o próprio id, então o cache velho continua valendo.
+- **Quem lê é o `pmdDados(instância)`** — os leitores perguntam por ele e não montam a chave na mão.
+- **⚠️ O PRELOAD JUNTA POR VARIANTE, não por espécie:** por espécie, um shiny e um normal do mesmo
+  bicho dariam UMA folha e um dos dois sairia com a cor errada.
+- **⚠️ E O SHINY QUE FALTA CAI NO NORMAL** — a única exceção à regra de "sem sprite não se larga".
+  A razão é que aqui a **cor é apresentação** e a **espécie é identidade**: barrar a largada porque
+  a variante colorida não baixou seria trocar um pokémon shiny por corrida nenhuma. Substituir por
+  **OUTRA espécie** continua proibido, e é isso que o pedido de 18/09 protege.
+- **O RESGATE ENTROU JUNTO** — ele lê o mesmo cache, e deixá-lo de fora seria a exceção onde a
+  próxima omissão se esconde.
+
+#### ⚠️ O NPC SUBIU UM DEGRAU — e a medição diz o que ele NÃO alcança
+
+Pedido: *"deixe o NPC um pouco melhor"*. O `perfect` foi de **0,20 pra 0,24**.
+
+**⚠️ E A PRIMEIRA COISA MEDIDA FOI O BOT DE MEDIÇÃO, porque ele estava errado DUAS vezes:**
+
+| o bot | o que ele dava |
+|---|---|
+| comparava a agulha com um limiar fixo | **nunca tocava** — os 4 perfis davam o MESMO tempo, o de quem não impulsiona |
+| mirava o centro do **início** da travessia | 2 perfeitos em 23 s — e o print do jogador mostra **18** |
+
+**A causa da segunda é a mecânica: o centro das faixas SE MOVE** (um seno de amplitude 0,17), então
+quando a agulha chegava onde ele mirou a faixa já tinha andado. O bot de hoje faz o que um jogador
+faz: **olha onde a faixa está AGORA** e toca quando a agulha passa por ela, com a precisão do perfil.
+
+**A TABELA (60 corridas por célula, o jogador modelado pela MIRA — o erro típico dele em fração da
+barra):**
+
+| individual | hoje(20) | **24** | 28 | 32 |
+|---|---|---|---|---|
+| domina (erro ≤2%) | 98% | **100%** | 100% | 100% |
+| joga bem (5%) | 97% | **88%** | 78% | 72% |
+| mediano (10%) | 37% | **12%** | 10% | 7% |
+| *(o tempo do NPC)* | *20,0s* | *19,7s* | *19,4s* | *19,2s* |
+
+| revezamento | hoje(20) | **24** | 28 | 32 |
+|---|---|---|---|---|
+| domina | 100% | 100% | 100% | 100% |
+| joga bem | 80% | **57%** | 47% | 42% |
+| mediano | 2% | 0% | 0% | 0% |
+
+**⚠️ CONTRA QUEM DOMINA O JOGO ELE NÃO ALCANÇA EM CONFIGURAÇÃO NENHUMA — 100% nas quatro.** A
+pilotagem perfeita já é o teto, e o eixo do **Speed já está pareado** desde 18/09
+(`npcParaOSpeed`). O que subir a régua faz é **afundar o MEDIANO**, então 0,24 é o degrau que dá
+pra dar: ele tira o jogador bom de 97% pra 88% na individual e de 80% pra 57% no revezamento.
+
+**⚠️ A RÉGUA QUE ALCANÇARIA O "DOMINA" É O NÍVEL DO NPC (`nivelDoNpc`), E ELA ESTÁ FORA:** inflar a
+velocidade dele é o que o pedido de 18/09 proíbe com todas as letras. Se um dia for pra valer, é
+ali — e a conta está aqui.
+
+**NA DIFICULDADE DO JOGO, NADA:** as duas impressões continuam **idênticas**
+(`MOTOR 25d909ef2d79 / DIARIO c35ba4008568`) em 900 batalhas semeadas. Tudo isto é apresentação
+mais uma constante de minijogo.
+
+`tools/test-corrida.js` foi a **365 travas**, e **os nove defeitos religados acusam** (1 a 4 falhas
+cada). Duas lições de teste saíram daqui:
+
+1. **⚠️ UMA TRAVA MEDIA O LUGAR ERRADO:** ela procurava `pmdChave(p.speciesId, p.shiny)` **solto no
+   arquivo**, e isso **casa com o `pmdDados`** — ou seja ela dava verde com o preload voltando a
+   juntar por espécie. Foi a **conferência de acusação** que a pegou: o defeito religado passava em
+   branco. Hoje ela lê o bloco do preload, com um `ok()` cobrando que a fatia tem o que ler.
+2. **⚠️ E OUTRA MEDIA A ORDEM DO FIXTURE:** ela procurava `title="Jolteon · 150–300 m"`, e o Jolteon
+   é o **primeiro** no time de teste. Hoje ela não amarra no nome.
+
 ### O QUE FICA PENDENTE DA LIGA LARANJA
 
 Nada disto foi integrado, e é escopo desta etapa: **o acesso por Surf**, a **Liga Laranja** em si,
@@ -12820,7 +12998,7 @@ o chip do peixe (`Grande · na linha`), a **linha de atividade de cada ponto do 
 cabeçalho virando `ÚLTIMOS ENCONTROS`. A função `pescariaTamanho` estava **órfã** desde que nasceu — agora ela tem chamador.
 
 **⚠️ AS DUAS ETIQUETAS DE DISPUTA QUE ESTE PARÁGRAFO CITAVA SAÍRAM EM 20/09/2026**, quando um ponto
-passou a ter UM pescador -- ver **AS SETE DE 20/09/2026**, no fim desta seção. E o `VOCÊ` virou o
+passou a ter UM pescador -- ver **AS SETE DA PESCARIA**, no fim desta seção. E o `VOCÊ` virou o
 nome do treinador na mesma leva.
 
 **Medido a 320px, no navegador, nas 14 telas:** **nenhuma rola pro lado** e nenhum elemento estoura
@@ -13408,7 +13586,7 @@ des-escalada muda os dois hashes. Tudo aqui é apresentação mais um **chamador
 3. **⚠️ UMA CLASSE DE BOTÃO SEM CSS** (`pesc-trocar`) foi pega pela varredura de classes fantasma --
    ela não fazia nada, porque o `.btn` da casa já traz a margem. Letra morta sai.
 
-#### AS SETE DE 20/09/2026 (a leva do placar quebrado)
+#### AS SETE DA PESCARIA (20/09/2026) -- a leva do placar quebrado
 
 **⚠️ 1) O `(i)` NÃO ABRIA NADA NA PRIMEIRA TELA.** O estado sempre mudou (`pescaria.zonaAberta`) e
 o `render()` sempre rodou -- o que faltava era o `return` do **SETUP** desenhar o modal. Ele só
