@@ -3296,6 +3296,66 @@
   .pesc-fim-lado.eu{background:rgba(255,203,5,.2);border-color:var(--yellow-dark);}
   .pesc-fim-lado b{display:block;font-size:1.7rem;line-height:1.1;font-variant-numeric:tabular-nums;}
   .pesc-fim-lado small{font-size:.58rem;color:var(--muted);}
+  /* ---------- RESGATE POKÉMON (20/09/2026) ---------- */
+  /* ⚠️ A PROPORÇÃO DA CAIXA TEM QUE SER A DO MAPA (360/390), e é a única regra daqui que não é
+     estética: os seis pontos e a praia são posicionados em PORCENTAGEM sobre ela, e uma caixa de
+     outra proporção os tira do lugar. É a mesma nota que a ilha da pescaria carrega. */
+  .resg-mapa{position:relative;width:100%;aspect-ratio:360/390;overflow:hidden;
+    border:3px solid #254650;border-radius:4px;background:#1b5f86;}
+  .resg-mapa canvas{display:block;width:100%;height:100%;}
+  /* O ponto de resgate: um botão redondo sobre o mar, centrado na coordenada dele. O
+     `translate(-50%,-50%)` é o que faz o `left/top` ser o CENTRO e não o canto. */
+  .resg-ponto{position:absolute;transform:translate(-50%,-50%);width:54px;height:54px;padding:0;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;
+    border:2px solid #17334b;border-radius:50%;background:#fff6d8d9;cursor:pointer;z-index:2;
+    font:800 .55rem/1 var(--font-ui);color:#233647;text-align:center;overflow:hidden;}
+  /* ⚠️ TRÊS CLASSES, e não `.resg-ponto img`: o `.sprite-sm .sprite-img` da casa é 0-2-0 e
+     ganharia de um seletor de um elemento -- o sprite sairia com 48px e estouraria o círculo de
+     54. Com 0-3-0 este vence independente da ORDEM dos blocos na folha, que é a armadilha que o
+     sprite da lista de rota já custou. */
+  .resg-ponto .sprite-wrap .sprite-img{width:30px;height:30px;}
+  .resg-ponto .sprite-wrap .sprite-fallback{font-size:1.2rem;}
+  /* ⚠️ VAZIO ELE FICA APAGADO E NÃO SOME: um ponto que desaparece faz o jogador procurar o que
+     mudou no mapa; apagado, ele diz "aqui não tem ninguém AGORA". */
+  .resg-ponto.vazio{opacity:.4;background:#dfe9eecc;cursor:default;}
+  .resg-ponto.alvo{border-color:var(--yellow);box-shadow:0 0 0 3px #ffcb0577;}
+  .resg-ponto.ocupado{border-style:dashed;}
+  .resg-medidor{position:absolute;left:4px;right:4px;bottom:5px;height:5px;background:#17334b55;
+    border-radius:3px;overflow:hidden;}
+  .resg-medidor i{display:block;height:100%;width:0;background:var(--green);transition:width .08s linear;}
+  .resg-medidor i.npc{background:#ffc16f;}
+  /* A PRAIA é o sétimo alvo, e ela é um retângulo e não um círculo de propósito: ela não é um
+     ponto de resgate, é o lugar pra onde se VOLTA -- forma diferente, leitura diferente. */
+  .resg-praia{position:absolute;transform:translate(-50%,-50%);padding:4px 8px;z-index:2;
+    border:2px solid #17334b;border-radius:4px;background:#ffe9b0e8;cursor:pointer;
+    font:800 .58rem/1 var(--font-ui);color:#4a3a15;white-space:nowrap;}
+  .resg-placar{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;}
+  .resg-lado{border:2px solid var(--box-border);border-radius:5px;padding:6px 7px;background:#eef3fb;min-width:0;}
+  .resg-lado.npc{background:#fbeeee;}
+  .resg-lado b{display:block;font-size:.72rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .resg-lado strong{display:block;font-size:1.25rem;line-height:1.1;font-variant-numeric:tabular-nums;}
+  .resg-lado small{display:block;font-size:.56rem;color:var(--muted);}
+  .resg-topo{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:7px;}
+  /* ⚠️ `tabular-nums` NO RELÓGIO: sem ele os dígitos têm larguras diferentes e o contador dança
+     de segundo em segundo, que é o que faz o olho voltar pra ele à toa. */
+  .resg-relogio{font:800 1.1rem/1 var(--font-ui);font-variant-numeric:tabular-nums;color:var(--blue-dark);}
+  .resg-relogio.urgente{color:var(--red);}
+  .resg-mar{font-size:.6rem;font-weight:800;color:#456579;}
+  .resg-mar.mudando{color:#b35c1c;}
+  /* A CARGA: uma vaga por passageiro, do tamanho do teto -- as vagas vazias mostram quanto ainda
+     cabe, que é a decisão que o jogador toma ao escolher entre voltar e buscar mais um. */
+  .resg-carga{display:flex;gap:6px;margin:6px 0;}
+  .resg-vaga{flex:1;min-width:0;height:44px;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;border:2px dashed var(--muted);border-radius:5px;color:var(--muted);
+    font:800 .6rem/1 var(--font-ui);}
+  .resg-vaga.cheia{border-style:solid;border-color:var(--box-border);background:#f4f7fc;color:var(--ink);}
+  .resg-vaga .sprite-wrap .sprite-img{width:26px;height:26px;}
+  .resg-vaga .sprite-wrap .sprite-fallback{font-size:1.1rem;}
+  .resg-estado{min-height:1.2em;font-size:.68rem;font-weight:700;color:var(--blue-dark);text-align:center;margin:0;}
+  .resg-recado{min-height:1.2em;font-size:.7rem;font-weight:700;text-align:center;margin:4px 0 0;color:var(--ink);}
+  .resg-acoes{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:7px;}
+  .resg-acoes .btn{margin:0;}
+  .resg-legenda{display:flex;justify-content:space-between;gap:6px;font-size:.55rem;color:var(--muted);margin-top:5px;}
   .corrida-overlay{
     position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
     background:#101a2b88;pointer-events:none;
@@ -5651,6 +5711,15 @@ const DESENHOS = {
     '..kkFfffkkkkkkkkfffhkk..','..kkFffffkkkkkkffffhkk..','..kkfffffkkkkkkfffhhkk..',
     '...kkFfffkkkkkkfffhkk...','...kkffffkffffkffhhkk...','....kkffffffffffhhkk....',
     '.....kkfhfffffhhhkk.....','......kkkfhhhhhkkk......','.......kkkkkkkkkk.......'],
+  resgate: [
+    '........kkkkkkkk........','......kkkkkkkkkkkk......','.....kkkRRwwwwWrkkk.....',
+    '....kkRRRrwWWWvrRrkk....','...kkRRrrrwWWWvrrrrkk...','..kkRRrrrrwWWWvrrrrrkk..',
+    '.kkRRrrrqqWvvvvrrrrrrkk.','.kkRrrrqqkkkkkkrrrrrqkk.','kkRRrrqqkkkkkkkkrrrrrrkk',
+    'kkRrrrqkk......kkRrrrqkk','kkwwwwWkk......kkwwwwWkk','kkwWWWvkk......kkwWWWvkk',
+    'kkwWWWvkk......kkwWWWvkk','kkwWWWvkk......kkwWWWvkk','kkWvvvvkk......kkWvvvvkk',
+    'kkrrrrrrkkkkkkkkRRrrqqkk','.kkRrrrrrkkkkkkRRrrrqkk.','.kkrrrrrrRwwwwWRrrrqqkk.',
+    '..kkrrrrrrwWWWvrrrqqkk..','...kkrrrrrwWWWvrrqqkk...','....kkrqrrwWWWvqqqkk....',
+    '.....kkkrqWvvvvqkkk.....','......kkkkkkkkkkkk......','........kkkkkkkk........'],
   pescaria: [
     '..........kkkk..........','.........kkSskk.........','.........kkSzkk.........',
     '.........kkSzkk.........','.........kkSzkk.........','.........kksszkk........',
@@ -30263,7 +30332,13 @@ function renderSaveSelect(){
            que os vizinhos e a fileira ficaria desalinhada. */''}
       <span class="home-mode-icon">${selo('corrida','selo-modo')}</span><span>Corrida Pokemon</span></button>
     <button class="home-nav-btn leagues-big-btn" style="background:#1c6b8f;" onclick="abrirPescaria()">
-      <span class="home-mode-icon">${selo('pescaria','selo-modo')}</span><span>Pescaria Pokemon</span></button>` : ''}
+      <span class="home-mode-icon">${selo('pescaria','selo-modo')}</span><span>Pescaria Pokemon</span></button>
+    ${/* ⚠️ O TERCEIRO ADMINISTRATIVO OCUPA A LINHA INTEIRA (`home-btn-largo`), como o Boss de
+         Domingo: a fileira de modos é de DUAS colunas, e três botões administrativos deixam o
+         terceiro sozinho com uma célula vazia do lado -- medido a 320px, um buraco de 137px.
+         Não é hierarquia: é a linha fechando. */''}
+    <button class="home-nav-btn leagues-big-btn home-btn-largo" style="background:#2f7d5b;" onclick="abrirResgate()">
+      <span class="home-mode-icon">${selo('resgate','selo-modo')}</span><span>Resgate Pokemon</span></button>` : ''}
     ${ehDomingo() ? `
     <button class="home-nav-btn leagues-big-btn home-btn-largo" style="background:#c2185b;" onclick="openSundayBoss()">
       <span class="home-mode-icon">✨</span><span>Boss de Domingo</span></button>` : ''}
@@ -31068,14 +31143,18 @@ function pmdBaixarTexto(url){
    O protótipo traz `boxes` embutido -- e manter uma tabela dessas pras 250 seria mais um dado pra
    envelhecer. Ela é o retângulo dos pixels NÃO transparentes: é ela que centraliza o bicho na raia
    e ancora os pés no chão, porque a célula do PMD tem margem em volta. */
-function pmdCaixas(img, w, h, quantos){
+/* ⚠️ A LINHA É PARÂMETRO desde 20/09/2026, e ela tem padrão: a Corrida desenha SEMPRE de costas
+   (o `PMD_LINHA_COSTAS`) e continua chamando sem ela, byte a byte como antes. Quem precisa das
+   oito é o RESGATE, onde o parceiro vira pra onde está indo. */
+function pmdCaixas(img, w, h, quantos, linha){
+  if(linha == null) linha = PMD_LINHA_COSTAS;
   const c = document.createElement('canvas');
   c.width = w; c.height = h;
   const cx = c.getContext('2d', { willReadFrequently: true });
   const caixas = [];
   for(let f = 0; f < quantos; f++){
     cx.clearRect(0, 0, w, h);
-    cx.drawImage(img, f * w, PMD_LINHA_COSTAS * h, w, h, 0, 0, w, h);
+    cx.drawImage(img, f * w, linha * h, w, h, 0, 0, w, h);
     const d = cx.getImageData(0, 0, w, h).data;
     let x0 = w, y0 = h, x1 = 0, y1 = 0, achou = false;
     for(let y = 0; y < h; y++) for(let x = 0; x < w; x++){
@@ -31119,9 +31198,35 @@ async function pmdCarregar(speciesId){
     };
     im.src = PMD_CDN + pasta + '/Walk-Anim.png';
   });
-  const dados = { img, w, h, durations, caixas: pmdCaixas(img, w, h, durations.length) };
+  /* ⚠️ QUANTAS LINHAS A FOLHA TEM, lido da IMAGEM e não suposto: o PMD é 8-direcional, mas uma
+     espécie com menos direções existe -- e `drawImage` com o retângulo de origem fora da imagem
+     não desenha NADA e não dá erro. É o índice fora da folha que essa conta impede. */
+  const linhas = Math.max(1, Math.round(img.naturalHeight / h));
+  const dados = { img, w, h, durations, linhas,
+                  caixas: pmdCaixas(img, w, h, durations.length),
+                  caixasPorLinha: {} };
+  dados.caixasPorLinha[PMD_LINHA_COSTAS] = dados.caixas;
   pmdCache[speciesId] = dados;
   return dados;
+}
+/* AS CAIXAS DE UMA LINHA QUALQUER, calculadas na primeira vez que ela é pedida e guardadas. São
+   8 varreduras de pixel por espécie no pior caso, e só pras duas que estão no mar -- barato o
+   bastante pra não valer uma tabela, que é a razão de as caixas serem calculadas em vez de
+   cadastradas. */
+function pmdCaixasDaLinha(dados, linha){
+  if(!dados.caixasPorLinha) dados.caixasPorLinha = {};
+  if(!dados.caixasPorLinha[linha]){
+    dados.caixasPorLinha[linha] = pmdCaixas(dados.img, dados.w, dados.h, dados.durations.length, linha);
+  }
+  return dados.caixasPorLinha[linha];
+}
+/* ⚠️ A LINHA SAI DO RUMO pela ordem do PMD -- 0=sul, 1=sudeste, 2=leste, 3=nordeste, 4=norte,
+   5=noroeste, 6=oeste, 7=sudoeste --, e a conta é a do protótipo do Resgate. Ela CASA com o
+   `PMD_LINHA_COSTAS` que a Corrida já usava: rumo -PI/2 (pra cima) devolve 4.
+   O `% linhas` é o que impede um índice fora de uma folha com menos direções. */
+function pmdLinhaDoRumo(dados, rumo){
+  const i = (Math.round((Math.PI / 2 - rumo) / (Math.PI / 4)) % 8 + 8) % 8;
+  return i % Math.max(1, dados.linhas || 8);
 }
 /* O quadro de agora, pelas durações próprias da espécie (o protótipo conta em 1/60 de segundo). */
 function pmdQuadro(dados, t){
@@ -33297,7 +33402,11 @@ function pescariaPintar(){
    é o mesmo que o placar da batalha, a home e as ligas usam -- e a conta cai num lugar só porque
    ele aparece em SEIS pontos da tela. Sem save aberto (o modo admin abre da home) ele volta pro
    "Você", que é o que o resto do jogo faz quando não há nome. */
-const pescariaMeuNome = () => game.trainerName || `Você`;
+/* ⚠️ ELE VIROU COMPARTILHADO em 20/09/2026, quando o Resgate passou a precisar do mesmo nome: o
+   `pescariaMeuNome` continua existindo como APELIDO porque os dois minigames fazem a MESMA
+   pergunta, e duas funções divergiriam no primeiro ajuste. */
+function nomeDoTreinador(){ return game.trainerName || `Você`; }
+const pescariaMeuNome = nomeDoTreinador;
 function pescariaChipDoDuelo(){
   if(pescaria.fase === 'fim') return 'RESULTADO';
   return pescaria.tempo >= PESCARIA_DURACAO ? 'ÚLTIMOS ENCONTROS'
@@ -33646,6 +33755,913 @@ function renderPescaria(){
   </div>` : ''}`;
 }
 
+/* ============================================================================
+   RESGATE POKÉMON -- o terceiro minigame, modo ADMIN (20/09/2026)
+   ----------------------------------------------------------------------------
+   Veio do `resgate-pokemon.html` da raiz, como a Corrida e a Pescaria vieram dos deles. O
+   protótipo é um HTML independente, com tabela própria de espécies e TRÊS parceiros de
+   demonstração embutidos em base64; aqui ele reusa o jogo:
+
+     • o parceiro sai dos TIMES do jogador, filtrado pelos que **aprendem Surf** (`SURFISTAS`);
+     • a velocidade sai do `speedDaCorrida`, que é o `effectiveSpeed` do motor -- e desde
+       20/09/2026 ele ESCALA COM O NÍVEL, que é o que o pedido pede ("quanto mais level, mais
+       rapido o pokemon vai andar");
+     • os sprites são os PMD da Corrida, do mesmo CDN -- o protótipo embute três folhas de
+       natação em base64, que é o que faz ele ter 148 KB.
+
+   ⚠️ TODO MUNDO CARREGA DOIS (o pedido ao pé da letra). No protótipo a capacidade era o preço da
+   velocidade -- o Lapras levava 3 e o Gyarados 1 --, e com ela fixa em 2 quem decide a escolha
+   passa a ser só a velocidade. É decisão do pedido, e é o que torna a lista de parceiros uma
+   lista de VELOCIDADES.
+
+   ⚠️ ELE É OFFLINE E NÃO TOCA O SAVE, como os outros dois: nada vai pro Firestore, nenhuma Cloud
+   Function nova, e os pokémon entram como CÓPIAS (`createInstance`). Não há ranking -- quando
+   houver, é aí que nasce a primeira operação de backend e com ela a checagem de permissão do
+   lado de lá.
+   ============================================================================ */
+
+/* O MAPA, em coordenadas de 360x390 -- as do protótipo, e é por isso que a caixa da tela tem que
+   ter essa proporção: os pontos são posicionados em porcentagem sobre ela. */
+const RESGATE_W = 360, RESGATE_H = 390;
+const RESGATE_PRAIA = { x: 180, y: 342 };
+/* ⚠️ OS PONTOS LONGE VALEM MAIS, e a escada é a do protótipo: 10 perto da praia, 20 no meio, 30
+   no alto. É ela que faz a decisão existir -- ir buscar 30 custa ~3x a distância de um 10. */
+const RESGATE_PONTOS = [
+  { x: 64,  y: 274, pts: 10 }, { x: 292, y: 268, pts: 10 },
+  { x: 57,  y: 161, pts: 20 }, { x: 295, y: 147, pts: 20 },
+  { x: 104, y: 62,  pts: 30 }, { x: 259, y: 57,  pts: 30 },
+];
+const RESGATE_DURACAO = 90;
+const RESGATE_CAPACIDADE = 2;          /* todo mundo leva 2 -- ver o cabeçalho */
+const RESGATE_NPC_NIVEL = 60;          /* o pedido: "aleatório algum no level 60" */
+const RESGATE_TEMPO_NO_PONTO = 1;      /* 1s parado pra concluir o resgate */
+const RESGATE_RESPAWN_MIN = 7, RESGATE_RESPAWN_EXTRA = 5;
+const RESGATE_CARGA_POR_PASSAGEIRO = 0.12, RESGATE_CARGA_MIN = 0.5;
+const RESGATE_REDEMOINHO_MULT = 0.28;
+const RESGATE_CORRENTE_H = 37, RESGATE_A_FAVOR = 1.35, RESGATE_CONTRA = 0.65;
+const RESGATE_MAR_MIN = 7, RESGATE_MAR_EXTRA = 4, RESGATE_MAR_AVISO = 2;
+/* ⚠️ OS RAIOS SÃO CONSTANTE, e não números soltos dentro do zerar: o planejador precisa deles pra
+   sortear o lugar do próximo redemoinho, e lendo-os DE VOLTA do estado ele estourava quando a
+   lista estava vazia. O estado descreve onde eles estão; o tamanho deles é do jogo. */
+const RESGATE_REDEMOINHO_RAIOS = [24, 22];
+/* quem é resgatado -- os cinco do protótipo, e os cinco existem no `SPECIES` (há trava) */
+const RESGATE_RESGATADOS = ['poliwag', 'goldeen', 'horsea', 'krabby', 'staryu'];
+
+/* ⚠️ A VELOCIDADE EM PIXELS POR SEGUNDO, e a fórmula é a mesma FORMA da Corrida (`8 + 4*sqrt`),
+   com outros números -- e ela existe porque a faixa crua do jogo é impossível de pôr num mapa:
+   medido, o Speed da corrida vai de **6** (Slowbro Lv.5) a **232** (Starmie Lv.99), ou seja 38x.
+   Linear, o mais lento levaria 74s pra uma ida e volta ao ponto mais longe e o mais rápido 1,3s.
+   Com a raiz a razão cai pra **2x**, e os dois extremos jogam:
+     • Slowbro Lv.5 (Speed 6)    -> 29,4 px/s  -- exatamente o mais lento do protótipo (29)
+     • a mediana no Lv.60 (85)   -> 44,3 px/s
+     • Starmie Lv.99 (232)       -> 57,5 px/s
+   O `RESGATE_VEL_BASE` é o que impede um Magikarp de ficar parado no mar; o fator é o que faz o
+   nível se ver. */
+const RESGATE_VEL_BASE = 24, RESGATE_VEL_FATOR = 22;
+function resgateVelocidade(inst){
+  return RESGATE_VEL_BASE + RESGATE_VEL_FATOR * Math.sqrt(speedDaCorrida(inst) / 100);
+}
+/* A carga é a do protótipo: 12% por passageiro, com piso. Com o teto em 2 isso dá 100% / 88% / 76%. */
+function resgateCarga(a){
+  return Math.max(RESGATE_CARGA_MIN, 1 - a.bag.length * RESGATE_CARGA_POR_PASSAGEIRO);
+}
+
+const resgate = {
+  fase: 'setup',        /* setup | carregando | correndo | voltando | fim */
+  picker: false,
+  escolhido: null,      /* o {slot, idx, speciesId, level, shiny} da lista */
+  atores: [],
+  ocupantes: [],
+  redemoinhos: [], corrente: { y: 180, dir: 1 },
+  relogioMar: 0, proximaMudanca: 0, mudancaPendente: null,
+  tempo: 0, ultimo: 0, anim: 0, laco: 0,
+  recado: '', recadoAte: 0, aviso: '',
+};
+
+const resgDist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+const resgSoma = (bag) => bag.reduce((n, v) => n + v.pts, 0);
+function resgateDizer(txt){ resgate.recado = txt; resgate.recadoAte = resgate.tempo + 4; }
+
+/* ---------------------------------------------------------------------------
+   O ACESSO -- idêntico ao da Corrida e ao da Pescaria, e pelas mesmas razões
+   --------------------------------------------------------------------------- */
+/* ⚠️ A VISIBILIDADE DO BOTÃO NÃO É A TRAVA: quem chamar `abrirResgate()` pelo console cai aqui, e
+   aqui o `admin` é conferido de novo. E ele é o booleano `true` e nada mais. Ler é seguro porque
+   ESCREVER não é: o campo está na trava do `firestore.rules`, ou seja só o console do Firebase o
+   escreve. */
+function abrirResgate(){
+  if(!game.contaCarregada || game.ehAdmin !== true){
+    game.modoBloqueado = 'Este modo é administrativo.';
+    render(); return;
+  }
+  resgateZerar();
+  game.modoBloqueado = null;
+  game.screen = 'resgate';
+  render();
+}
+function sairDoResgate(){
+  resgateZerar();
+  openSaveSelect();
+}
+function resgateZerar(){
+  if(resgate.laco){ cancelAnimationFrame(resgate.laco); resgate.laco = null; }
+  resgate.fase = 'setup'; resgate.picker = false; resgate.escolhido = null;
+  resgate.atores = []; resgate.ocupantes = [];
+  resgate.tempo = 0; resgate.ultimo = 0; resgate.anim = 0;
+  resgate.recado = ''; resgate.recadoAte = 0; resgate.aviso = '';
+  resgateMarZerar();
+}
+
+/* ---------------------------------------------------------------------------
+   O PARCEIRO -- quem aprende Surf, dentro dos times do jogador
+   --------------------------------------------------------------------------- */
+/* ⚠️ A LISTA É QUEM **APRENDE** SURF, e não quem já foi ENSINADO. O pedido diz "os pokemons que
+   tem surf entre todos dos times do treinador", e a leitura literal (carregar o golpe `surf` no
+   `ataques`) deixaria a tela VAZIA pra quase todo mundo: o HM03 só cai pra quem fechou as 17
+   espécies da Zona de Safári. É a mesma lista `SURFISTAS` que o HM03 usa pra decidir a quem
+   ensinar, e é a mesma que o pedido nomeia pro adversário ("na lista dos que aprendem surf") --
+   ou seja os dois lados saem da mesma lista, que é o que faz a disputa ser simétrica.
+   ⚠️ E A ORIGEM É O `towerEligiblePokemon`, o mesmo da Torre, da Corrida e do Ginásio da Cidade:
+   ele varre TODOS os saves (mais os aposentados) e já traz a regra das 8 insígnias, que é a
+   régua da casa pros modos competitivos. */
+function resgateElegiveis(){
+  return towerEligiblePokemon()
+    .filter(p => SURFISTAS.indexOf(p.speciesId) >= 0)
+    .map(p => Object.assign({}, p, { velocidade: resgateVelocidade(resgateInstancia(p, true)) }))
+    .sort((a, b) => (b.velocidade - a.velocidade)
+                 || (b.level - a.level)
+                 || String(a.speciesId).localeCompare(String(b.speciesId)));
+}
+/* ⚠️ A ESPECIALIDADE PRECISA SER APLICADA À MÃO -- o `withSpecialty` lê a FLAG que o
+   `applySpecialtyBuff` põe, e não o `game.specialties`. É o mesmo cuidado do `corridaInstancia`,
+   e lá ele já custou uma trava.
+   ⚠️ E O `ehDoJogador` NÃO TEM PADRÃO: com `true` implícito, a próxima chamada esquecida daria o
+   buff ao adversário em silêncio -- que é o defeito que a Pescaria teve. */
+function resgateInstancia(p, ehDoJogador){
+  const inst = createInstance(p.speciesId, p.level);
+  if(p.shiny) inst.shiny = true;
+  if(p.unown) inst.unown = p.unown;
+  inst.slotDaConta = p.slot != null ? String(p.slot) : null;
+  inst.hp = inst.maxHp = calcMaxHp(inst);
+  if(ehDoJogador) applySpecialtyBuff([inst]);
+  return inst;
+}
+function resgateAbrirPicker(){
+  if(resgate.fase === 'correndo' || resgate.fase === 'voltando') return;
+  /* ⚠️ ZERA A PÁGINA: o `game.montadorPagina` é COMPARTILHADO com a Torre, o Ginásio, a Corrida e
+     a Pescaria, e uma página 3 sobrando de lá abriria esta lista no meio. */
+  game.montadorPagina = 0;
+  resgate.picker = true; render();
+}
+function resgateIrParaPagina(i){
+  if(resgate.fase === 'correndo' || resgate.fase === 'voltando') return;
+  game.montadorPagina = i; render();
+}
+function resgateFecharPicker(){ resgate.picker = false; render(); }
+function resgateEscolher(slot, idx){
+  if(resgate.fase === 'correndo' || resgate.fase === 'voltando') return;
+  const alvo = resgateElegiveis().find(p => String(p.slot) === String(slot) && p.idx === idx);
+  if(!alvo) return;                     /* quem valida é a AÇÃO, não a tela */
+  resgate.escolhido = alvo;
+  resgate.picker = false;
+  resgate.aviso = '';
+  render();
+}
+
+/* ⚠️ O ADVERSÁRIO SAI DA MESMA LISTA (o pedido: "aleatório algum no level 60 e que esteja na
+   lista dos que aprendem surf"), menos duas coisas:
+     • os INTOCÁVEIS -- o Lugia está em `SURFISTAS`, e ele é um pokémon que o jogador não tem como
+       ter. É a mesma exclusão que a Pescaria faz no time do adversário;
+     • a espécie do jogador -- dois sprites idênticos no mesmo mar, distinguidos só pela etiqueta,
+       é uma tela que se lê errado. Custa uma linha e não muda o equilíbrio. */
+function resgateSortearNpc(meuId){
+  const bolo = SURFISTAS.filter(id => SPECIES[id]
+    && SEM_CAPTURA_SELVAGEM.indexOf(id) < 0
+    && id !== meuId);
+  const id = bolo[Math.floor(Math.random() * bolo.length)] || 'blastoise';
+  return resgateInstancia({ speciesId: id, level: RESGATE_NPC_NIVEL }, false);
+}
+
+/* ---------------------------------------------------------------------------
+   O MAR -- os dois redemoinhos e a correnteza, que mudam de lugar a cada 7-11 s
+   --------------------------------------------------------------------------- */
+function resgateMarZerar(){
+  resgate.relogioMar = 0;
+  resgate.proximaMudanca = RESGATE_MAR_MIN + Math.random() * RESGATE_MAR_EXTRA;
+  resgate.mudancaPendente = null;
+  resgate.corrente = { y: 180, dir: 1 };
+  resgate.redemoinhos = [{ x: 157, y: 123, r: RESGATE_REDEMOINHO_RAIOS[0] },
+                         { x: 237, y: 241, r: RESGATE_REDEMOINHO_RAIOS[1] }];
+}
+/* ⚠️ O PRÓXIMO MAR É SORTEADO COM 2 SEGUNDOS DE ANTECEDÊNCIA e desenhado tracejado: sem o aviso
+   um redemoinho nasce em cima de quem está nadando e o jogador não tem como reagir. É a única
+   mecânica do minigame que o jogador precisa LER antes de acontecer. */
+function resgateMarPlano(){
+  const novos = [];
+  for(let i = 0; i < RESGATE_REDEMOINHO_RAIOS.length; i++){
+    const r = RESGATE_REDEMOINHO_RAIOS[i];
+    const agora = resgate.redemoinhos[i] || { x: -999, y: -999, r };
+    const opcoes = [];
+    for(let x = 85; x <= 275; x += 19) for(let y = 40; y <= 294; y += 19){
+      const c = { x, y, r };
+      if(RESGATE_PONTOS.every(p => resgDist(c, p) > 43)
+        && novos.every(w => resgDist(c, w) > 58)
+        && resgDist(c, agora) > 55) opcoes.push(c);
+    }
+    /* de preferência longe de quem está nadando -- nascer em cima de alguém é castigo sem jogada */
+    const livres = opcoes.filter(c => resgate.atores.every(a => resgDist(a, c) > c.r + 18));
+    const bolo = livres.length ? livres : opcoes;
+    /* ⚠️ E SE NENHUM LUGAR SERVIR, ele FICA ONDE ESTÁ: um `undefined` na lista não dá erro na
+       hora -- ele estoura três quadros depois, dentro do laço, e aí a tela congela. */
+    novos.push(bolo.length ? bolo[Math.floor(Math.random() * bolo.length)] : agora);
+  }
+  const faixas = [65, 100, 135, 180, 225, 267];
+  const ys = faixas.filter(y => Math.abs(y - resgate.corrente.y) >= 45);
+  const bolo = ys.length ? ys : faixas;   /* nunca sortear de uma lista vazia */
+  return { redemoinhos: novos, y: bolo[Math.floor(Math.random() * bolo.length)],
+           dir: Math.random() < 0.5 ? -1 : 1 };
+}
+function resgateMarAtualizar(dt){
+  resgate.relogioMar += dt;
+  if(!resgate.mudancaPendente && resgate.relogioMar >= resgate.proximaMudanca - RESGATE_MAR_AVISO){
+    resgate.mudancaPendente = resgateMarPlano();
+  }
+  if(resgate.relogioMar >= resgate.proximaMudanca){
+    const m = resgate.mudancaPendente || resgateMarPlano();
+    resgate.redemoinhos = m.redemoinhos;
+    resgate.corrente = { y: m.y, dir: m.dir };
+    resgate.mudancaPendente = null;
+    resgate.proximaMudanca = resgate.relogioMar + RESGATE_MAR_MIN + Math.random() * RESGATE_MAR_EXTRA;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   OS ATORES
+   --------------------------------------------------------------------------- */
+function resgateAtor(inst, x){
+  return { inst, x, y: RESGATE_PRAIA.y, bag: [], pontos: 0, entregas: [],
+           alvo: null, resgatando: null, pensa: 0, estado: 'Na praia', rumo: Math.PI / 2 };
+}
+function resgateNovoOcupante(i){
+  const p = RESGATE_PONTOS[i];
+  return { speciesId: RESGATE_RESGATADOS[Math.floor(Math.random() * RESGATE_RESGATADOS.length)],
+           dono: null, falta: RESGATE_TEMPO_NO_PONTO, volta: 0, x: p.x, y: p.y, pts: p.pts };
+}
+/* ⚠️ SOLTAR É OBRIGATÓRIO ANTES DE TROCAR DE ALVO: quem estava resgatando tinha o ponto marcado
+   como dele, e sem soltar o ponto ficaria reservado pra sempre pra alguém que foi embora. */
+function resgateSoltar(i){
+  const a = resgate.atores[i];
+  if(a.resgatando === null) return;
+  const p = resgate.ocupantes[a.resgatando];
+  if(p && p.dono === i){ p.dono = null; p.falta = RESGATE_TEMPO_NO_PONTO; }
+  a.resgatando = null;
+}
+function resgateIrPara(i, alvo){
+  const a = resgate.atores[i];
+  resgateSoltar(i);
+  a.alvo = alvo;
+  if(resgDist(a, alvo) > 0.01) a.rumo = Math.atan2(alvo.y - a.y, alvo.x - a.x);
+  a.estado = 'Navegando';
+}
+function resgateChegou(i){
+  const a = resgate.atores[i], t = a.alvo;
+  a.alvo = null;
+  if(!t) return;
+  if(t.tipo === 'praia'){
+    /* ⚠️ OS PONTOS SÓ CONTAM NA PRAIA, e é a regra que dá jogo ao minigame: quem enche a carga e
+       não volta a tempo não pontua nada. */
+    if(a.bag.length){
+      const pts = resgSoma(a.bag);
+      a.pontos += pts;
+      a.entregas = a.entregas.concat(a.bag);
+      a.bag = [];
+      if(i === 0) resgateDizer('Resgates entregues! +' + pts + ' pontos.');
+    }
+    a.estado = 'Na praia';
+    return;
+  }
+  if(t.tipo === 'ponto'){
+    const p = resgate.ocupantes[t.indice];
+    if(p && p.speciesId && p.dono === null && a.bag.length < RESGATE_CAPACIDADE){
+      p.dono = i; p.falta = RESGATE_TEMPO_NO_PONTO;
+      a.resgatando = t.indice;
+      a.estado = 'Resgatando…';
+    } else {
+      a.estado = 'Local vazio';
+      if(i === 0) resgateDizer('Este local já não está livre. Escolha outro.');
+    }
+    return;
+  }
+  a.estado = 'Parado';
+}
+
+/* O PLANEJADOR DO NPC: entre os pontos livres, ele escolhe o de melhor razão CUSTO/PONTOS -- a
+   ida mais o caminho de volta contando 40%, dividido pelo que o ponto vale. É o do protótipo, e é
+   o que o faz preferir um 30 longe a um 10 perto quando a diferença de distância não compensa. */
+function resgateNpcPlano(){
+  const a = resgate.atores[1];
+  if(!a || a.alvo || a.resgatando !== null || resgate.tempo < a.pensa) return;
+  a.pensa = resgate.tempo + 0.5;
+  const falta = RESGATE_DURACAO - resgate.tempo;
+  const vel = resgateVelocidade(a.inst);
+  /* cheio, ou com carga e sem tempo pra mais uma ida: volta */
+  if(a.bag.length >= RESGATE_CAPACIDADE
+    || (a.bag.length && falta < resgDist(a, RESGATE_PRAIA) / (vel * 0.6) + 5)){
+    resgateIrPara(1, { x: RESGATE_PRAIA.x, y: RESGATE_PRAIA.y, tipo: 'praia' });
+    return;
+  }
+  const opcoes = resgate.ocupantes
+    .map((p, i) => ({ p, i }))
+    .filter(v => v.p.speciesId && v.p.dono === null);
+  if(!opcoes.length){
+    if(a.bag.length) resgateIrPara(1, { x: RESGATE_PRAIA.x, y: RESGATE_PRAIA.y, tipo: 'praia' });
+    return;
+  }
+  const nota = (v) => (resgDist(a, v.p) + resgDist(v.p, RESGATE_PRAIA) * 0.4) / v.p.pts;
+  opcoes.sort((v, w) => nota(v) - nota(w));
+  const alvo = opcoes[0];
+  resgateIrPara(1, { x: alvo.p.x, y: alvo.p.y, tipo: 'ponto', indice: alvo.i });
+}
+
+/* ---------------------------------------------------------------------------
+   O COMANDO DO JOGADOR
+   --------------------------------------------------------------------------- */
+/* ⚠️ QUEM RECUSA É A AÇÃO, nunca o botão apagado: um toque no quadro em que o estado muda chega
+   antes do `disabled` que o pintor escreve. É a mesma regra da Pescaria. */
+function resgateComando(alvo){
+  if(resgate.fase !== 'correndo') return;
+  const a = resgate.atores[0];
+  if(!a) return;
+  if(alvo.tipo === 'ponto'){
+    if(a.bag.length >= RESGATE_CAPACIDADE){ resgateDizer('Seu parceiro está cheio! Volte à praia.'); return; }
+    const p = resgate.ocupantes[alvo.indice];
+    if(!p || !p.speciesId){ resgateDizer('Este local está vazio. Escolha outro resgate.'); return; }
+  }
+  resgateIrPara(0, alvo);
+}
+function resgateTocarPonto(i){
+  const p = RESGATE_PONTOS[i];
+  if(!p) return;
+  resgateComando({ x: p.x, y: p.y, tipo: 'ponto', indice: i });
+}
+function resgateVoltarAPraia(){
+  resgateComando({ x: RESGATE_PRAIA.x, y: RESGATE_PRAIA.y, tipo: 'praia' });
+}
+function resgateParar(){
+  if(resgate.fase !== 'correndo') return;
+  resgateSoltar(0);
+  const a = resgate.atores[0];
+  if(a){ a.alvo = null; a.estado = 'Parado'; }
+}
+/* O desvio: tocar no mar manda o parceiro pra aquele ponto e nada mais -- é como se escapa de um
+   redemoinho que nasceu no caminho. As bordas são aparadas pra ninguém mandar o bicho pra a areia. */
+function resgateTocarMar(ev){
+  const cv = document.getElementById('resgateMar');
+  if(!cv || resgate.fase !== 'correndo') return;
+  const r = cv.getBoundingClientRect();
+  if(!r.width || !r.height) return;
+  resgateComando({
+    x: Math.max(12, Math.min(RESGATE_W - 12, (ev.clientX - r.left) / r.width * RESGATE_W)),
+    y: Math.max(12, Math.min(330, (ev.clientY - r.top) / r.height * RESGATE_H)),
+    tipo: 'mar',
+  });
+}
+
+/* ---------------------------------------------------------------------------
+   O MOTOR
+   --------------------------------------------------------------------------- */
+function resgateAtualizar(dt){
+  if(resgate.fase !== 'correndo' && resgate.fase !== 'voltando') return;
+  resgateMarAtualizar(dt);
+  if(resgate.fase === 'correndo'){
+    dt = Math.min(dt, RESGATE_DURACAO - resgate.tempo);
+    resgate.tempo += dt;
+    resgate.ocupantes.forEach((p, i) => {
+      if(!p.speciesId && resgate.tempo >= p.volta) resgate.ocupantes[i] = resgateNovoOcupante(i);
+    });
+    resgateNpcPlano();
+  }
+  resgate.atores.forEach((a, i) => {
+    if(a.resgatando !== null){
+      const p = resgate.ocupantes[a.resgatando];
+      if(!p){ a.resgatando = null; return; }
+      p.falta -= dt;
+      if(p.falta <= 0){
+        a.bag.push({ speciesId: p.speciesId, pts: p.pts });
+        p.speciesId = null; p.dono = null;
+        p.volta = resgate.tempo + RESGATE_RESPAWN_MIN + Math.random() * RESGATE_RESPAWN_EXTRA;
+        a.resgatando = null;
+        a.estado = 'Resgate concluído';
+        if(i === 0) resgateDizer(a.bag.length >= RESGATE_CAPACIDADE
+          ? 'Lotação completa! Volte à praia.' : 'Resgatado! Busque outro ou volte à praia.');
+      }
+      return;
+    }
+    if(!a.alvo) return;
+    const d = resgDist(a, a.alvo), dx = a.alvo.x - a.x, dy = a.alvo.y - a.y;
+    let mult = 1;
+    a.estado = 'Navegando';
+    /* A CORRENTEZA: ajuda quem vai no sentido das setas e atrapalha quem vai contra. O `along`
+       é a projeção do movimento no sentido dela -- cruzar de lado não muda nada. */
+    if(a.y > resgate.corrente.y && a.y < resgate.corrente.y + RESGATE_CORRENTE_H){
+      const along = dx * resgate.corrente.dir;
+      mult = along > 0 ? RESGATE_A_FAVOR : along < 0 ? RESGATE_CONTRA : 1;
+      a.estado = along > 0 ? 'A favor da corrente' : along < 0 ? 'Contra a corrente' : 'Cruzando a corrente';
+    }
+    if(resgate.redemoinhos.some(w => resgDist(a, w) < w.r)){
+      mult *= RESGATE_REDEMOINHO_MULT;
+      a.estado = 'Preso no redemoinho!';
+    }
+    const vel = resgateVelocidade(a.inst) * resgateCarga(a) * mult, passo = vel * dt;
+    if(d > 0.01) a.rumo = Math.atan2(dy, dx);
+    if(d <= passo){ a.x = a.alvo.x; a.y = a.alvo.y; resgateChegou(i); }
+    else { a.x += dx / d * passo; a.y += dy / d * passo; }
+  });
+  if(resgate.fase === 'correndo' && resgate.tempo >= RESGATE_DURACAO) resgateRetornoAutomatico();
+  else if(resgate.fase === 'voltando'
+    && resgate.atores.every(a => !a.alvo && resgDist(a, RESGATE_PRAIA) < 0.1)) resgateTerminar();
+}
+/* ⚠️ AOS 90s OS DOIS VOLTAM E ENTREGAM O QUE ESTÁ A BORDO -- e o mar continua mudando durante o
+   retorno, que é o do protótipo: ele não é uma cutscene, é a última travessia. */
+function resgateRetornoAutomatico(){
+  resgate.fase = 'voltando';
+  resgate.atores.forEach((a, i) => resgateIrPara(i, { x: RESGATE_PRAIA.x, y: RESGATE_PRAIA.y, tipo: 'praia' }));
+  resgateDizer('Tempo esgotado! Retorno automático com os passageiros a bordo.');
+  render();
+}
+function resgateTerminar(){
+  if(resgate.laco){ cancelAnimationFrame(resgate.laco); resgate.laco = null; }
+  resgate.fase = 'fim';
+  resgate.atores.forEach((a, i) => { resgateSoltar(i); a.alvo = null; a.estado = 'Na praia'; });
+  render();
+}
+
+/* ⚠️ A LARGADA ESPERA OS DOIS SPRITES, e se um falhar ela NÃO SUBSTITUI por outro: a tela diz
+   QUAL faltou, pelo nome. É a mesma regra da Corrida, e o pedido dela era explícito nisso. */
+async function resgateComecar(){
+  if(resgate.fase === 'correndo' || resgate.fase === 'voltando') return;
+  if(!resgate.escolhido){ resgate.aviso = 'Escolha quem vai levar você.'; render(); return; }
+  const meu = resgateInstancia(resgate.escolhido, true);
+  const dele = resgateSortearNpc(resgate.escolhido.speciesId);
+  resgate.fase = 'carregando'; resgate.aviso = ''; render();
+  try{
+    await Promise.all([pmdCarregar(meu.speciesId), pmdCarregar(dele.speciesId)]);
+  }catch(e){
+    const falhou = pmdCache[meu.speciesId] === 'erro' ? meu.speciesId : dele.speciesId;
+    resgate.fase = 'setup';
+    resgate.aviso = 'Não consegui carregar o sprite de ' + ((SPECIES[falhou] || {}).name || falhou) + '.';
+    render(); return;
+  }
+  resgateMarZerar();
+  resgate.ocupantes = RESGATE_PONTOS.map((s, i) => resgateNovoOcupante(i));
+  resgate.atores = [resgateAtor(meu, RESGATE_PRAIA.x - 14), resgateAtor(dele, RESGATE_PRAIA.x + 14)];
+  resgate.tempo = 0; resgate.anim = 0; resgate.recado = ''; resgate.recadoAte = 0;
+  resgate.fase = 'correndo';
+  resgateDizer('Toque num Pokémon para resgatar. Volte à praia para pontuar!');
+  render();
+  resgate.ultimo = 0;
+  const passo = (ts) => {
+    /* ⚠️ E ELE PARA QUANDO A TELA MUDA, não só quando a prova acaba: o pintor escreve em ids da
+       tela do resgate, e um convite online aceito no meio troca a `game.screen` sem avisar
+       ninguém. É a mesma guarda dos cinco laços de revelação e a da Pescaria. */
+    if((resgate.fase !== 'correndo' && resgate.fase !== 'voltando') || game.screen !== 'resgate'){
+      resgate.laco = null; return;
+    }
+    /* ⚠️ O `dt` É LIMITADO: com a aba em segundo plano o rAF para, e na volta o primeiro quadro
+       traria os segundos todos de uma vez -- os dois parceiros atravessariam o mapa num salto. */
+    const dt = resgate.ultimo ? Math.min(0.1, (ts - resgate.ultimo) / 1000) : 0;
+    resgate.ultimo = ts;
+    resgate.anim += dt;
+    resgateAtualizar(dt);
+    resgatePintar();
+    resgate.laco = requestAnimationFrame(passo);
+  };
+  resgate.laco = requestAnimationFrame(passo);
+}
+
+/* ---------------------------------------------------------------------------
+   O PINTOR -- tudo por DOM. O laço NÃO redesenha a tela: ele recriaria o canvas e os botões 60
+   vezes por segundo, e o toque no ponto se perderia no meio.
+   ⚠️ E ESTE COMENTÁRIO NÃO ESCREVE A CHAMADA POR EXTENSO, de propósito: a trava que cobra isso
+   varre o TEXTO do laço, e ela já acusou o comentário em vez do código. É a oitava vez que este
+   projeto paga um comentário que reproduz o que uma varredura procura.
+   --------------------------------------------------------------------------- */
+function resgateTexto(id, txt){
+  const el = document.getElementById(id);
+  if(el && el.textContent !== txt) el.textContent = txt;
+}
+function resgateClasse(el, nome, ligado){
+  if(el && el.classList.contains(nome) !== !!ligado) el.classList.toggle(nome, !!ligado);
+}
+function resgatePintar(){
+  const [a, b] = resgate.atores;
+  if(!a || !b) return;
+  const falta = Math.max(0, Math.ceil(RESGATE_DURACAO - resgate.tempo));
+  resgateTexto('resgateRelogio', String(Math.floor(falta / 60)).padStart(2, '0') + ':' + String(falta % 60).padStart(2, '0'));
+  resgateClasse(document.getElementById('resgateRelogio'), 'urgente', falta < 16);
+  resgateTexto('resgatePtsA', a.pontos + ' pts');
+  resgateTexto('resgatePtsB', b.pontos + ' pts');
+  resgateTexto('resgateCargaA', a.bag.length + '/' + RESGATE_CAPACIDADE + ' a bordo · ' + Math.round(100 * resgateCarga(a)) + '% de velocidade');
+  resgateTexto('resgateCargaB', b.bag.length + '/' + RESGATE_CAPACIDADE + ' a bordo · ' + Math.round(100 * resgateCarga(b)) + '% de velocidade');
+  const mar = document.getElementById('resgateMarEstado');
+  if(mar){
+    const s = resgate.mudancaPendente
+      ? 'Mudança em ' + Math.max(1, Math.ceil(resgate.proximaMudanca - resgate.relogioMar)) + ' s!'
+      : 'Mar muda em ' + Math.max(0, Math.ceil(resgate.proximaMudanca - resgate.relogioMar)) + ' s';
+    if(mar.textContent !== s) mar.textContent = s;
+    resgateClasse(mar, 'mudando', !!resgate.mudancaPendente);
+  }
+  resgateTexto('resgateEstado', (resgate.fase === 'voltando' ? 'Retorno automático · ' : '') + a.estado);
+  resgateTexto('resgateRecado', resgate.recado && resgate.tempo < resgate.recadoAte ? resgate.recado : '');
+  resgateTexto('resgateCargaPts', resgSoma(a.bag) + ' pts a entregar');
+  /* as vagas da carga -- só remonta quando o conteúdo muda, senão o sprite pisca a cada quadro */
+  const carga = document.getElementById('resgateCarga');
+  if(carga){
+    const html = resgateCargaHtml(a);
+    if(carga.dataset.conteudo !== html){ carga.innerHTML = html; carga.dataset.conteudo = html; }
+  }
+  /* os seis pontos */
+  resgate.ocupantes.forEach((p, i) => {
+    const el = document.getElementById('resgatePonto' + i);
+    if(!el) return;
+    const html = resgatePontoHtml(p);
+    if(el.dataset.conteudo !== html){ el.innerHTML = html; el.dataset.conteudo = html; }
+    resgateClasse(el, 'vazio', !p.speciesId);
+    resgateClasse(el, 'ocupado', p.dono !== null);
+    resgateClasse(el, 'alvo', !!(a.alvo && a.alvo.tipo === 'ponto' && a.alvo.indice === i));
+    const barra = el.querySelector('.resg-medidor i');
+    if(barra){
+      const pct = Math.max(0, Math.min(100, Math.round((1 - p.falta / RESGATE_TEMPO_NO_PONTO) * 100)));
+      if(barra.style.width !== pct + '%') barra.style.width = pct + '%';
+      resgateClasse(barra, 'npc', p.dono === 1);
+    }
+  });
+  const parar = document.getElementById('resgateParar');
+  const volta = document.getElementById('resgateVoltar');
+  const podeAgir = resgate.fase === 'correndo';
+  if(parar && parar.disabled !== !podeAgir) parar.disabled = !podeAgir;
+  if(volta && volta.disabled !== !podeAgir) volta.disabled = !podeAgir;
+  resgateDesenharMapa();
+}
+function resgateCargaHtml(a){
+  return Array.from({ length: RESGATE_CAPACIDADE }, (_, i) => {
+    const v = a.bag[i];
+    if(!v) return '<div class="resg-vaga">—</div>';
+    return '<div class="resg-vaga cheia">' + spriteHtml({ speciesId: v.speciesId }, 'sprite-sm') + '<span>' + v.pts + '</span></div>';
+  }).join('');
+}
+/* ⚠️ O PONTO DIZ QUANTO VALE, sempre -- inclusive enquanto está sendo resgatado. A palavra que
+   estava ali (dez letras) mede 57px num círculo de 50 e ESTOURAVA pra fora dele, medido a 320px;
+   e ela dizia o que a BARRA e a borda tracejada já dizem. O que não se descobre de outro jeito é
+   quanto o ponto vale, que é justamente a decisão do jogador.
+   Quem está resgatando se lê pela COR da barra -- verde é seu, âmbar é do rival. */
+function resgatePontoHtml(p){
+  if(!p.speciesId) return '<span>Vazio</span>';
+  return spriteHtml({ speciesId: p.speciesId }, 'sprite-sm')
+    + '<span>' + p.pts + ' pts</span>'
+    + (p.dono !== null ? '<span class="resg-medidor"><i></i></span>' : '');
+}
+
+/* ---------------------------------------------------------------------------
+   O DESENHO -- o mapa do protótipo, com os sprites PMD no lugar das folhas em base64
+   --------------------------------------------------------------------------- */
+/* ⚠️ O CONTEXTO É PEGO A CADA QUADRO e a transformação é REESCRITA: um `render()` entre dois
+   quadros recria o `<canvas>`, e um contexto guardado apontaria pro elemento velho -- o desenho
+   sumiria sem erro nenhum. O `setTransform` é o que deixa o resto do código falar em 360x390. */
+function resgateCtx(){
+  const cv = document.getElementById('resgateMar');
+  if(!cv) return null;
+  const ctx = cv.getContext('2d');
+  ctx.setTransform(2, 0, 0, 2, 0, 0);
+  ctx.imageSmoothingEnabled = false;
+  return ctx;
+}
+function resgRect(ctx, x, y, w, h, cor){ ctx.fillStyle = cor; ctx.fillRect(x, y, w, h); }
+function resgForma(ctx, pts, cor){
+  ctx.fillStyle = cor;
+  ctx.beginPath();
+  pts.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]));
+  ctx.closePath();
+  ctx.fill();
+}
+function resgPalmeira(ctx, x, y){
+  resgRect(ctx, x - 2, y, 5, 23, '#80583b');
+  resgRect(ctx, x, y + 3, 2, 18, '#c49256');
+  resgForma(ctx, [[x,y+2],[x-19,y+5],[x-15,y-4],[x-6,y-7],[x,y-2],[x+6,y-12],[x+17,y-11],[x+12,y-4],
+                  [x+3,y],[x+17,y-2],[x+23,y+7],[x+8,y+4],[x+3,y+7]], '#267953');
+  resgForma(ctx, [[x-15,y],[x-7,y-4],[x,y],[x+9,y-8],[x+14,y-8],[x+5,y+2],[x+17,y+3],[x+10,y+4]], '#72c274');
+}
+function resgateDesenharMapa(){
+  const ctx = resgateCtx();
+  if(!ctx) return;
+  const t = resgate.anim;
+  const grad = ctx.createLinearGradient(0, 0, RESGATE_W, RESGATE_H);
+  grad.addColorStop(0, '#185482'); grad.addColorStop(0.55, '#247eac'); grad.addColorStop(1, '#51bdbf');
+  ctx.fillStyle = grad; ctx.fillRect(0, 0, RESGATE_W, RESGATE_H);
+  /* as ondinhas do fundo, que é o que dá movimento ao mar parado */
+  for(let y = 9; y < 340; y += 21) for(let x = 3; x < RESGATE_W; x += 32){
+    const desl = Math.floor(t * 3 + y / 4) % 12;
+    resgRect(ctx, x + desl, y, 10, 1, '#85d7dc44');
+    resgRect(ctx, x + desl + 2, y + 1, 7, 1, '#84d5da33');
+  }
+  /* a correnteza */
+  resgRect(ctx, 0, resgate.corrente.y, RESGATE_W, RESGATE_CORRENTE_H, '#0f628330');
+  ctx.fillStyle = '#abedf276'; ctx.font = '18px monospace';
+  for(let x = -38; x < RESGATE_W + 38; x += 38){
+    ctx.fillText(resgate.corrente.dir === 1 ? '›' : '‹',
+      x + resgate.corrente.dir * (t * 12) % 38, resgate.corrente.y + 25);
+  }
+  /* o aviso do mar que vem: tracejado e piscando */
+  if(resgate.mudancaPendente){
+    const m = resgate.mudancaPendente;
+    ctx.save();
+    ctx.globalAlpha = 0.55 + 0.2 * Math.sin(t * 8);
+    ctx.strokeStyle = '#ffe19b'; ctx.lineWidth = 2; ctx.setLineDash([5, 5]);
+    m.redemoinhos.forEach(w => { ctx.beginPath(); ctx.arc(w.x, w.y, w.r + 3, 0, Math.PI * 2); ctx.stroke(); });
+    ctx.strokeRect(1, m.y, RESGATE_W - 2, RESGATE_CORRENTE_H);
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#ffe19b'; ctx.font = '16px monospace';
+    for(let x = 10; x < RESGATE_W; x += 45) ctx.fillText(m.dir === 1 ? '›' : '‹', x, m.y + 25);
+    ctx.restore();
+  }
+  /* as ilhotas dos seis pontos */
+  RESGATE_PONTOS.forEach((p, i) => {
+    ctx.fillStyle = '#67ccc08c';
+    ctx.beginPath(); ctx.ellipse(p.x, p.y + 12, 34, 24, 0, 0, Math.PI * 2); ctx.fill();
+    resgForma(ctx, [[p.x-25,p.y+2],[p.x-15,p.y-9],[p.x+12,p.y-10],[p.x+27,p.y+4],[p.x+28,p.y+22],
+                    [p.x+14,p.y+30],[p.x-19,p.y+26],[p.x-28,p.y+17]], '#d2e8b7');
+    resgForma(ctx, [[p.x-23,p.y+3],[p.x-12,p.y-7],[p.x+13,p.y-6],[p.x+24,p.y+7],[p.x+21,p.y+22],
+                    [p.x-17,p.y+23],[p.x-24,p.y+14]], '#eed395');
+    resgRect(ctx, p.x - 14, p.y + 17, 5, 2, '#c4a775');
+    resgRect(ctx, p.x + 15, p.y + 12, 3, 2, '#fff3c7');
+    if(i % 2 === 0) resgPalmeira(ctx, p.x - 18, p.y - 16);
+    else {
+      resgForma(ctx, [[p.x+12,p.y+3],[p.x+12,p.y-10],[p.x+19,p.y-17],[p.x+28,p.y-13],[p.x+31,p.y+2]], '#546f78');
+      resgForma(ctx, [[p.x+14,p.y-9],[p.x+20,p.y-15],[p.x+26,p.y-11],[p.x+27,p.y-5]], '#a5b8a8');
+    }
+  });
+  /* os redemoinhos */
+  resgate.redemoinhos.forEach(w => {
+    const glow = ctx.createRadialGradient(w.x, w.y, 2, w.x, w.y, w.r + 7);
+    glow.addColorStop(0, '#133651cc'); glow.addColorStop(1, '#13587d00');
+    ctx.fillStyle = glow;
+    ctx.beginPath(); ctx.arc(w.x, w.y, w.r + 7, 0, Math.PI * 2); ctx.fill();
+    ctx.save(); ctx.translate(w.x, w.y); ctx.rotate(-t * 0.65);
+    ctx.strokeStyle = '#9ae5e380'; ctx.lineWidth = 2;
+    ctx.beginPath();
+    for(let k = 0; k < Math.PI * 5; k += 0.1){
+      const r = k * w.r / 16;
+      if(k) ctx.lineTo(Math.cos(k) * r, Math.sin(k) * r); else ctx.moveTo(0, 0);
+    }
+    ctx.stroke(); ctx.restore();
+  });
+  /* a praia */
+  resgForma(ctx, [[0,337],[32,337],[32,342],[81,342],[81,347],[125,347],[125,353],[234,353],[234,347],
+                  [281,347],[281,340],[324,340],[324,335],[360,335],[360,390],[0,390]], '#ceefd5');
+  resgForma(ctx, [[0,343],[32,343],[32,348],[81,348],[81,354],[125,354],[125,360],[234,360],[234,353],
+                  [281,353],[281,346],[324,346],[324,341],[360,341],[360,390],[0,390]], '#efdb9f');
+  resgRect(ctx, 0, 377, RESGATE_W, 13, '#7fba6a');
+  for(let x = 3; x < RESGATE_W; x += 18){
+    resgRect(ctx, x, 367 + x % 7, 3, 2, '#c8b57f');
+    resgRect(ctx, x + 7, 373, 4, 2, '#fff0be');
+  }
+  resgPalmeira(ctx, 305, 349); resgPalmeira(ctx, 335, 353);
+  /* o posto de salvamento e o píer */
+  resgRect(ctx, 19, 350, 41, 28, '#7f8067');
+  resgRect(ctx, 21, 348, 37, 27, '#f4edce');
+  resgForma(ctx, [[15,351],[15,342],[22,342],[22,336],[56,336],[56,342],[64,342],[64,351]], '#b94449');
+  resgRect(ctx, 23, 338, 32, 5, '#ef8370');
+  resgRect(ctx, 27, 356, 9, 9, '#7cbec9');
+  resgRect(ctx, 43, 357, 9, 18, '#3e626e');
+  resgRect(ctx, 37, 344, 7, 5, '#fff4cf');
+  resgRect(ctx, 163, 330, 34, 39, '#8e673f');
+  for(let y = 331; y < 370; y += 7) resgRect(ctx, 165, y, 30, 4, '#d7ad71');
+  /* e os dois parceiros */
+  resgate.atores.forEach((a, i) => resgateDesenharAtor(ctx, a, i, t));
+}
+function resgateDesenharAtor(ctx, a, i, t){
+  const movendo = !!a.alvo;
+  if(movendo){
+    ctx.beginPath(); ctx.setLineDash([3, 6]);
+    ctx.strokeStyle = i === 0 ? '#fff4bfa0' : '#ffc19140';
+    ctx.lineWidth = 1.5;
+    ctx.moveTo(a.x, a.y); ctx.lineTo(a.alvo.x, a.alvo.y); ctx.stroke();
+    ctx.setLineDash([]);
+    /* a esteira atrás de quem nada */
+    ctx.save(); ctx.translate(a.x, a.y + 6); ctx.rotate(a.rumo);
+    for(let n = 0; n < 3; n++){
+      const d = (t * 14 + n * 8) % 25;
+      ctx.strokeStyle = 'rgba(211,251,242,' + (1 - d / 28) * 0.65 + ')';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-d - 6, -6 - d * 0.2); ctx.lineTo(-d - 11, 0); ctx.lineTo(-d - 6, 6 + d * 0.2);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+  ctx.fillStyle = '#12445d55';
+  ctx.beginPath(); ctx.ellipse(a.x, a.y + 8, 17, 6, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = i === 0 ? '#a2d7ff' : '#ffd39a'; ctx.lineWidth = 1.5; ctx.stroke();
+  const dados = pmdCache[a.inst.speciesId];
+  if(dados && dados !== 'erro'){
+    /* ⚠️ A LINHA DA FOLHA SAI DO RUMO, e a conta é a do protótipo -- ela casa com a ordem do PMD
+       (0=sul, 2=leste, 4=norte, 6=oeste), que é a mesma que a Corrida já usa pro `PMD_LINHA_COSTAS`. */
+    const linha = pmdLinhaDoRumo(dados, a.rumo);
+    const caixas = pmdCaixasDaLinha(dados, linha);
+    const quadro = movendo ? Math.floor(t * 7) % dados.durations.length : 0;
+    const c = caixas[quadro] || caixas[0];
+    const sw = c[2] - c[0], sh = c[3] - c[1], esc = Math.min(46 / sw, 46 / sh);
+    ctx.drawImage(dados.img, quadro * dados.w + c[0], linha * dados.h + c[1], sw, sh,
+      Math.round(a.x - sw * esc / 2), Math.round(a.y + 12 - sh * esc + Math.sin(t * 3)),
+      sw * esc, sh * esc);
+  }
+  ctx.font = 'bold 8px monospace'; ctx.textAlign = 'center';
+  ctx.fillStyle = i === 0 ? '#234c78' : '#9b5b28';
+  ctx.fillRect(a.x - 20, a.y + 16, 40, 12);
+  ctx.fillStyle = '#fff7df';
+  ctx.fillText(resgateEtiqueta(i), a.x, a.y + 25);
+  ctx.textAlign = 'left';
+}
+/* A etiqueta cabe em ~9 caracteres a 8px; o nome do treinador vai a 20, então ele é cortado.
+   ⚠️ E ELE É O NOME, nunca "VOCÊ" -- a mesma decisão de 20/09/2026 na Pescaria. */
+function resgateEtiqueta(i){
+  const n = i === 0 ? nomeDoTreinador() : 'Rival';
+  return n.length > 9 ? n.slice(0, 8) + '.' : n;
+}
+
+/* ---------------------------------------------------------------------------
+   A TELA
+   --------------------------------------------------------------------------- */
+function resgateLinhaDoEscolhido(p){
+  const sp = SPECIES[p.speciesId] || {};
+  return '<div class="pesc-parceiro">' + spriteHtml(p, 'sprite-sm')
+    + '<span class="pesc-parceiro-info"><b>' + escapeHtmlSafe(sp.name || '?')
+    + (p.shiny ? ' ' + selo('shiny') : '') + '</b>'
+    + '<small>Lv.' + p.level + ' · ' + escapeHtmlSafe(p.teamName || '')
+    + ' · ' + Math.round(p.velocidade) + ' de velocidade</small></span></div>';
+}
+function resgatePickerHtml(){
+  const lista = resgateElegiveis();
+  if(!lista.length){
+    return '<div class="box"><p class="error-text">Nenhum Pokémon do seu time aprende Surf. '
+      + 'É preciso um time com as 8 insígnias (ou um aposentado) com pelo menos um surfista.</p>'
+      + '<button class="btn secondary" onclick="resgateFecharPicker()">⬅ Voltar</button></div>';
+  }
+  const pagina = montadorPaginaValida(lista.length);
+  const paginas = Math.max(1, Math.ceil(lista.length / MONT_POR_PAGINA));
+  const daPagina = lista.slice(pagina * MONT_POR_PAGINA, (pagina + 1) * MONT_POR_PAGINA);
+  const navegacao = paginas <= 1 ? '' : `
+    <div class="mont-paginas">
+      ${Array.from({ length: paginas }, (_, i) =>
+        `<button class="mont-pag ${i === pagina ? 'ativa' : ''}" onclick="resgateIrParaPagina(${i})"
+          aria-label="Página ${i + 1} de ${paginas}">${i + 1}</button>`).join('')}
+      <span class="mont-pag-conta">${pagina * MONT_POR_PAGINA + 1}–${pagina * MONT_POR_PAGINA + daPagina.length} de ${lista.length}</span>
+    </div>`;
+  return `<div class="box">
+    <h2>${selo('resgate')} Quem vai levar você?</h2>
+    <p class="hint-text">Só quem aprende <strong>Surf</strong>. Quanto maior o <strong>nível</strong>,
+      mais rápido ele nada. Todos levam <strong>${RESGATE_CAPACIDADE}</strong> passageiros.</p>
+    <div class="mont-lista">${daPagina.map(p => {
+      const sp = SPECIES[p.speciesId] || {};
+      const sel = resgate.escolhido && String(resgate.escolhido.slot) === String(p.slot) && resgate.escolhido.idx === p.idx;
+      return `<div class="mont-linha">
+        <button class="mont-card ${sel ? 'sel' : ''}"
+          onclick="resgateEscolher('${escJs(String(p.slot))}',${p.idx})"
+          title="${escapeHtmlSafe(sp.name || '?')} Lv.${p.level}">
+          <span class="mont-num">${sel ? '✔' : ''}</span>
+          ${spriteHtml(p, 'sprite-sm')}
+          <span class="mont-info">
+            <span class="mont-nome">${escapeHtmlSafe(sp.name || '?')}${p.shiny ? ' ' + selo('shiny') : ''} <span class="mont-lv">— Lv.${p.level}</span></span>
+            <span class="mont-sub">${typesHtml(sp.types || [])}<span class="mont-time">${escapeHtmlSafe(p.teamName || '')}</span></span>
+          </span>
+          <span class="corrida-speed-badge">${Math.round(p.velocidade)}</span>
+        </button>
+      </div>`;
+    }).join('')}</div>
+    ${navegacao}
+    <button class="btn success" onclick="resgateFecharPicker()">${resgate.escolhido ? 'Confirmar' : 'Voltar'}</button>
+  </div>`;
+}
+/* O MAPA em modo ILUSTRAÇÃO (a tela de setup): os pontos são `<span>` e não clicam -- um botão que
+   não faz nada convida um toque que não responde. É a mesma decisão da ilha da Pescaria. */
+function resgateMapaHtml(jogando){
+  const pontos = RESGATE_PONTOS.map((p, i) => {
+    const pos = `left:${p.x / RESGATE_W * 100}%;top:${p.y / RESGATE_H * 100}%`;
+    const dentro = jogando ? '' : `<span>${p.pts} pts</span>`;
+    return jogando
+      ? `<button class="resg-ponto" id="resgatePonto${i}" style="${pos}" onclick="resgateTocarPonto(${i})"
+          aria-label="Resgatar no local de ${p.pts} pontos">${dentro}</button>`
+      : `<span class="resg-ponto" style="${pos}">${dentro}</span>`;
+  }).join('');
+  const praia = jogando
+    ? `<button class="resg-praia" style="left:${RESGATE_PRAIA.x / RESGATE_W * 100}%;top:${RESGATE_PRAIA.y / RESGATE_H * 100}%"
+        onclick="resgateVoltarAPraia()">⚑ PRAIA</button>`
+    : `<span class="resg-praia" style="left:${RESGATE_PRAIA.x / RESGATE_W * 100}%;top:${RESGATE_PRAIA.y / RESGATE_H * 100}%">⚑ PRAIA</span>`;
+  return `<div class="resg-mapa">
+    <canvas id="resgateMar" width="${RESGATE_W * 2}" height="${RESGATE_H * 2}"
+      ${jogando ? 'onclick="resgateTocarMar(event)"' : ''} aria-label="Enseada vista de cima"></canvas>
+    ${pontos}${praia}
+  </div>`;
+}
+function resgateResumoLado(a, i){
+  const nome = i === 0 ? nomeDoTreinador() : 'Rival';
+  return `<div class="pesc-resumo-lado ${i ? 'npc' : ''}">
+    <div class="pesc-resumo-topo"><b>${escapeHtmlSafe(nome)}</b><span class="pesc-resumo-pts">${a.pontos} pts</span></div>
+    ${a.entregas.length ? a.entregas.map(v => `<div class="pesc-hist">
+      ${spriteHtml({ speciesId: v.speciesId }, 'sprite-sm')}
+      <span class="pesc-hist-txt">${escapeHtmlSafe((SPECIES[v.speciesId] || {}).name || '?')}</span>
+      <span class="pesc-hist-pts">+${v.pts}</span></div>`).join('')
+      : '<p class="pesc-resumo-vazio muted">Nenhum resgate entregue.</p>'}
+  </div>`;
+}
+function renderResgate(){
+  if(resgate.picker) return `<div class="eyebrow">${selo('resgate')} RESGATE POKÉMON</div>`
+    + resgatePickerHtml()
+    + `<button class="btn secondary" onclick="sairDoResgate()">⬅ Sair</button>`;
+
+  const cabeca = `<div class="eyebrow">${selo('resgate')} RESGATE POKÉMON</div>`;
+
+  if(resgate.fase === 'fim'){
+    const [a, b] = resgate.atores;
+    const titulo = a.pontos > b.pontos ? selo('trofeu') + ' ' + escapeHtmlSafe(nomeDoTreinador()) + ' venceu!'
+      : a.pontos < b.pontos ? 'O Rival venceu!' : 'Empate!';
+    return `${cabeca}
+      <div class="box">
+        <h2>${titulo}</h2>
+        <div class="pesc-placar-fim">
+          <div class="pesc-fim-lado eu"><b>${a.pontos}</b><small>${escapeHtmlSafe(nomeDoTreinador())} · ${a.entregas.length} resgates</small></div>
+          <div class="pesc-fim-lado"><b>${b.pontos}</b><small>Rival · ${b.entregas.length} resgates</small></div>
+        </div>
+        ${resgateResumoLado(a, 0)}${resgateResumoLado(b, 1)}
+        <button class="btn success" onclick="resgateComecar()">Resgatar de novo</button>
+        <button class="btn secondary" onclick="resgateReiniciar()">Trocar parceiro</button>
+      </div>
+      <button class="btn secondary" onclick="sairDoResgate()">⬅ Sair</button>`;
+  }
+
+  const jogando = resgate.fase === 'correndo' || resgate.fase === 'voltando';
+  if(!jogando){
+    return `${cabeca}
+      <div class="box">
+        <h2>Enseada de Mikan · ${RESGATE_DURACAO} s</h2>
+        <p class="hint-text">Resgate os Pokémon das ilhotas e volte à praia para pontuar. Os pontos
+          só contam depois do desembarque. Seu parceiro leva <strong>${RESGATE_CAPACIDADE}</strong> por viagem.</p>
+        ${resgateMapaHtml(false)}
+        <div class="resg-legenda"><span>10 pts perto</span><span>20 pts no meio</span><span>30 pts no alto</span></div>
+      </div>
+      <div class="box">
+        <h2>Seu parceiro</h2>
+        ${resgate.escolhido ? resgateLinhaDoEscolhido(resgate.escolhido)
+          : '<p class="hint-text">Ninguém escolhido ainda.</p>'}
+        <button class="btn primary" onclick="resgateAbrirPicker()">Escolher parceiro</button>
+        ${resgate.aviso ? `<p class="error-text">⚠️ ${escapeHtmlSafe(resgate.aviso)}</p>` : ''}
+        <button class="btn success" ${resgate.escolhido && resgate.fase !== 'carregando' ? '' : 'disabled'}
+          onclick="resgateComecar()">${resgate.fase === 'carregando' ? 'Carregando os sprites…' : 'Começar resgate'}</button>
+      </div>
+      <button class="btn secondary" onclick="sairDoResgate()">⬅ Sair</button>`;
+  }
+
+  const [a, b] = resgate.atores;
+  const nomeDe = (x) => escapeHtmlSafe((SPECIES[x.inst.speciesId] || {}).name || '?');
+  return `${cabeca}
+    <div class="box">
+      <div class="resg-topo">
+        <b class="tag">${resgate.fase === 'voltando' ? 'RETORNO À PRAIA' : escapeHtmlSafe(nomeDoTreinador()) + ' × RIVAL'}</b>
+        <span class="resg-relogio" id="resgateRelogio">01:30</span>
+      </div>
+      <div class="resg-placar">
+        <div class="resg-lado"><b>${escapeHtmlSafe(nomeDoTreinador())} · ${nomeDe(a)}</b>
+          <strong id="resgatePtsA">0 pts</strong><small id="resgateCargaA"></small></div>
+        <div class="resg-lado npc"><b>Rival · ${nomeDe(b)}</b>
+          <strong id="resgatePtsB">0 pts</strong><small id="resgateCargaB"></small></div>
+      </div>
+    </div>
+    <div class="box">
+      <div class="resg-topo"><b>Enseada de Mikan</b><span class="resg-mar" id="resgateMarEstado"></span></div>
+      ${resgateMapaHtml(true)}
+      <div class="resg-legenda"><span>Azul: você · Laranja: rival</span><span>Setas: correnteza</span><span>Espiral: perigo</span></div>
+      <p class="resg-recado" id="resgateRecado"></p>
+    </div>
+    <div class="box">
+      ${/* o cabeçalho é um <b> e não um <h2>: a 320px o título da casa quebra em duas linhas e empurra o par -- medido, 56px contra 18px */''}
+      <div class="resg-topo"><b>Passageiros a bordo</b><b id="resgateCargaPts">0 pts</b></div>
+      <div class="resg-carga" id="resgateCarga"></div>
+      <p class="resg-estado" id="resgateEstado"></p>
+      <div class="resg-acoes">
+        <button class="btn primary" id="resgateVoltar" onclick="resgateVoltarAPraia()">Voltar à praia</button>
+        <button class="btn secondary" id="resgateParar" onclick="resgateParar()">Parar</button>
+      </div>
+      <p class="hint-text">Toque num Pokémon para buscá-lo, ou no mar para desviar dos redemoinhos.</p>
+    </div>`;
+}
+function resgateReiniciar(){
+  if(resgate.laco){ cancelAnimationFrame(resgate.laco); resgate.laco = null; }
+  resgate.fase = 'setup'; resgate.atores = []; resgate.ocupantes = [];
+  resgate.tempo = 0; resgate.recado = ''; resgate.aviso = '';
+  resgateMarZerar();
+  render();
+}
+
 function render(){
   const app = document.getElementById('app');
   let html = '';
@@ -33672,6 +34688,7 @@ function render(){
     case 'trainerTower': html = renderTrainerTower(); break;
     case 'corrida': html = renderCorrida(); break;
     case 'pescaria': html = renderPescaria(); break;
+    case 'resgate': html = renderResgate(); break;
     case 'gymChoice': html = renderGymChoice(); break;
     case 'evoChoice': html = renderEvoChoice(); break;
     case 'escolhaDeAtaques': html = renderEscolhaDeAtaques(); break;

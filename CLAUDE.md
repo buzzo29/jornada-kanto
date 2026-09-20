@@ -13602,6 +13602,203 @@ Conferido que cada defeito religado acusa: **2** sem o `preservePlayerHp`, **1**
 no chão, **2** sem o slot do item, **2** com o time de 1, **1** sem a porta das 8 insígnias na
 Corrida e **2** com o toggle ativo no revezamento.
 
+## RESGATE POKÉMON -- o terceiro teste admin (20/09/2026)
+
+Pedido com o `resgate-pokemon.html` da raiz como referência, e com **cinco coisas mudadas** em
+relação a ele: o parceiro sai dos times do jogador entre os que **têm Surf**, a velocidade **escala
+com o nível**, **todo mundo leva 2** (o protótipo tinha 3/2/1), o adversário é um **Lv.60 aleatório**
+da lista de quem aprende Surf, e o botão da home só existe pra `admin === true`.
+
+**Você e um rival disputam o mesmo mar por 90 s.** Seis ilhotas com um pokémon cada (10, 20 ou 30
+pontos conforme a distância), dois redemoinhos, uma faixa de correnteza -- e **os pontos só contam
+quando você volta à praia e desembarca**. O mar inteiro muda de lugar a cada 7 a 11 segundos, com
+2 s de aviso tracejado.
+
+### ⚠️ A VELOCIDADE: A FAIXA CRUA DO JOGO NÃO CABE NUM MAPA
+
+```
+px/s = 24 + 22 × √(speedDaCorrida / 100)
+```
+
+O `speedDaCorrida` é o `effectiveSpeed` do motor -- e **desde 20/09/2026 ele escala com o nível**,
+que é justamente o que o pedido pede. Reusá-lo é o que dá **shiny (1,20×) e especialidade (1,05×)**
+de graça, e é o que faz um buff novo do motor entrar aqui junto.
+
+**⚠️ MAS ELE NÃO PODE ENTRAR CRU, e o número diz por quê:** medido, o Speed da corrida vai de **6**
+(Slowbro Lv.5) a **232** (Starmie Lv.99) -- **38×**. Linear, o mais lento levaria **74 s** pra uma
+ida e volta ao ponto mais longe (296px) e o mais rápido **1,3 s**: os dois extremos ficam
+injogáveis. Com a raiz a razão cai pra **1,96×**:
+
+| | Speed | px/s | ida e volta | viagens em 90 s |
+|---|---|---|---|---|
+| Slowbro Lv.5 | 6 | **29,4** | 19,6 s | 4 |
+| Lapras Lv.55 | 55 | 42,5 | 13,9 s | 6 |
+| Blastoise Lv.70 | 108 | 47,5 | 12,5 s | 7 |
+| Starmie Lv.99 | 232 | **57,5** | 10,3 s | 8 |
+
+**⚠️ O 29,4 DO PIOR CASO É EXATAMENTE O PARCEIRO MAIS LENTO DO PROTÓTIPO (29)**, e isso não foi
+ajustado: caiu da fórmula. É o que dá confiança de que a escala do mapa continua sendo a que o
+protótipo foi desenhado pra ter.
+
+**E O NÍVEL SE VÊ:** um Lapras vai de **31,3 px/s no Lv.5 a 48,4 no Lv.99** -- 1,55×.
+
+### ⚠️ "OS POKEMONS QUE TEM SURF": É QUEM **APRENDE**, E A LEITURA LITERAL DEIXARIA A TELA VAZIA
+
+O pedido diz *"uma lista com os pokemons que tem surf entre todos dos times do treinador"*. A
+leitura ao pé da letra seria *carregar o golpe `surf` no `ataques`* -- e isso só acontece pra quem
+**fechou as 17 espécies da Zona de Safári** e ganhou o HM03. Pra todo o resto a tela abriria vazia,
+e o modo não existiria.
+
+A lista é a `SURFISTAS` (**65 espécies**), a MESMA que o HM03 usa pra decidir a quem ensinar -- e
+a mesma que o pedido nomeia pro adversário (*"na lista dos que aprendem surf"*). Os dois lados
+saem da mesma lista, que é o que faz a disputa ser simétrica.
+
+- **A ORIGEM É O `towerEligiblePokemon`**, o mesmo da Torre, da Corrida e do Ginásio da Cidade: ele
+  varre TODOS os saves (mais os aposentados) e já traz a régua das **8 insígnias**.
+- **⚠️ QUEM VALIDA É A AÇÃO**, nunca a tela: um slot forjado no console não vira parceiro.
+
+### ⚠️ TODO MUNDO LEVA DOIS -- e isso muda o que a escolha significa
+
+No protótipo a capacidade era o **preço da velocidade**: o Lapras levava 3 e nadava a 29, o
+Gyarados levava 1 e nadava a 43. Com ela fixa em 2 (o pedido), **a única coisa que separa um
+parceiro do outro é a velocidade** -- e é por isso que a lista de escolha é uma lista de
+velocidades.
+
+**⚠️ E ELA É UMA CONSTANTE, não um campo do parceiro.** Como campo, a mecânica do protótipo
+voltaria pela porta dos fundos no dia em que alguém quisesse "só um Lapras especial". Há trava.
+
+A carga continua freando: **100% / 88% / 76%** (12% por passageiro, o do protótipo), e ela freia
+**no motor** e não só no rótulo -- medido, 47,5 px/s vazio contra 36,1 cheio.
+
+### O ADVERSÁRIO
+
+Lv.60, sorteado entre os surfistas, **menos duas coisas**:
+
+- **os INTOCÁVEIS** -- o **Lugia está em `SURFISTAS`**, e ele é um pokémon que o jogador não tem
+  como ter. É a mesma exclusão que a Pescaria faz;
+- **a espécie do jogador** -- dois sprites idênticos no mesmo mar, separados só pela etiqueta, é
+  uma tela que se lê errado.
+
+Sobram **64 espécies**, e a velocidade delas no Lv.60 vai de **34,6** (Slowpoke) a **50,3**
+(Sneasel) -- **1,46×**. Ou seja a dificuldade do rival varia de partida pra partida, e isso é o
+pedido ("deixe aleatório"). **Se um dia incomodar**, a régua é parear como a Pescaria faz
+(`npcParaOSpeed`) -- mas lá o pareamento foi pedido DEPOIS, e aqui o pedido diz aleatório.
+
+### O QUE ISSO VALE, MEDIDO
+
+**A CURVA DE HABILIDADE** (Blastoise Lv.70 dos dois lados, 60 duelos por linha; o jogador é
+modelado pelo ATRASO de reação e pela chance de escolher o ponto errado):
+
+| quem joga | eu | rival | resgates | vence |
+|---|---|---|---|---|
+| domina (reage na hora, nunca erra) | 208 | 169 | 7,8 | **85%** |
+| joga bem (0,4 s, 10% de erro) | 200 | 175 | 8,0 | 77% |
+| **mediano (0,9 s, 25%)** | 185 | 185 | 8,2 | **43%** |
+| distraído (2,0 s, 45%) | 179 | 195 | 8,8 | 30% |
+
+**O mediano empata** -- que é onde um minijogo contra NPC tem que ficar.
+
+**E O PARCEIRO DECIDE MUITO** (mesmo jogador "joga bem", rival Blastoise Lv.60):
+
+| parceiro | eu | rival | vence |
+|---|---|---|---|
+| **Starmie Lv.99** | 245 | 165 | **92%** |
+| Gyarados Lv.70 | 204 | 172 | 75% |
+| Blastoise Lv.70 | 200 | 177 | 75% |
+| **Lapras Lv.55** | 156 | 196 | **8%** |
+| Slowbro Lv.30 | 131 | 200 | 3% |
+| Slowbro Lv.5 | 104 | 201 | **0%** |
+
+⚠️ **A queda entre o Blastoise Lv.70 (75%) e o Lapras Lv.55 (8%) é de NÍVEL**, não de espécie: são
+5 px/s de diferença, e em 90 s isso é uma viagem inteira. É exatamente o que o pedido pede pra
+existir.
+
+### O QUE ELE CUSTA AO JOGO: NADA, e está conferido
+
+As duas impressões -- **MOTOR** e **DIÁRIO** -- são **idênticas** em 900 batalhas semeadas
+(`25d909ef2d79` / `c35ba4008568`), antes e depois. O Resgate é apresentação mais um chamador novo
+do `createInstance`: **nada vai pro Firestore, nenhuma Cloud Function nova, e o time do save fica
+byte a byte igual** depois de uma prova inteira (há trava).
+
+### ⚠️ OS SPRITES: O PMD PASSOU A TER OITO DIREÇÕES
+
+A Corrida desenha SEMPRE de costas (`PMD_LINHA_COSTAS`, a quinta linha da folha); aqui o parceiro
+**vira pra onde está indo**. O `pmdCaixas` ganhou a **linha como parâmetro COM PADRÃO** -- a
+Corrida continua chamando sem ela, byte a byte como antes -- e as caixas de cada linha são
+calculadas na primeira vez que ela é pedida (`caixasPorLinha`).
+
+- **A conta da linha é a do protótipo, e ela CASA com a da Corrida**: rumo pra cima devolve
+  exatamente o `PMD_LINHA_COSTAS`. Há trava nas quatro direções cardeais -- se as duas telas
+  discordassem sobre a mesma folha, uma delas desenharia o bicho virado pro lado errado.
+- **⚠️ E O ÍNDICE É APARADO PELO NÚMERO DE LINHAS DA FOLHA**, lido da IMAGEM: `drawImage` com o
+  retângulo de origem fora da imagem **não desenha NADA e não dá erro** -- o sprite sumiria em
+  silêncio numa espécie com menos direções.
+- **A largada espera os DOIS sprites**, e se um falhar ela **não substitui**: a tela diz QUAL
+  faltou, pelo nome. É a regra da Corrida.
+
+### ⚠️ O MAR PODIA TRAVAR O JOGO, e foi a trava que pegou
+
+O `resgateMarPlano` lia o **raio** do redemoinho DE VOLTA do estado (`resgate.redemoinhos[i].r`) e
+sorteava o próximo lugar de uma lista que podia sair **vazia**. Nos dois casos o resultado não é
+um erro na hora: é um `undefined` na lista, que estoura **três quadros depois, dentro do laço** --
+e aí a tela congela com o mar no meio de uma mudança.
+
+Hoje os raios são **constante** (`RESGATE_REDEMOINHO_RAIOS` -- o estado diz ONDE eles estão, o
+tamanho é do jogo) e, se nenhum lugar servir, **o redemoinho fica onde está**.
+
+### ⚠️ E O BOTÃO NOVO OCUPA A LINHA INTEIRA
+
+A fileira de modos da home é de **duas colunas**, e três botões administrativos deixam o terceiro
+sozinho com uma célula vazia do lado -- medido a 320px, um buraco de 137px. O Resgate usa o
+`home-btn-largo`, como o Boss de Domingo. **Não é hierarquia: é a linha fechando.**
+
+**Medido a 320px, no navegador, nas cinco telas:** **nenhuma rola pro lado**; o mapa em
+**243×263px** com os seis pontos e a praia DENTRO dele, a tela do jogo em **876px**, o picker em
+**1.025px** sem um nome truncado, e o botão da home em **281px**.
+
+### AS QUATRO LIÇÕES DE TESTE QUE SAÍRAM DAQUI
+
+1. **⚠️ UMA TRAVA DA CORRIDA ACUSOU O RESGATE.** Ela procurava a fase `correndo` pelo nome curto, no arquivo
+   INTEIRO -- e o Resgate também tem uma fase chamada `correndo`. Ancorada em `corrida.fase`, ela
+   volta a medir o laço dela. É a armadilha do padrão largo demais, que este projeto já pagou nas
+   regex do `mlog-mais` e do `matchup-row`.
+2. **⚠️ E UM COMENTÁRIO MEU ACUSOU A SI MESMO -- a OITAVA vez.** O cabeçalho do pintor escrevia a
+   chamada de redesenho por extenso pra dizer que ela NÃO acontece ali, e a trava que cobra isso
+   varre o texto do laço: ela apontou o comentário. A regra da casa é essa, e ela vale também pro
+   que a varredura procura **não** achar.
+3. **⚠️ O HARNESS DA PRÉVIA MEDIU CAIXAS VAZIAS.** A carga e os seis pontos são preenchidos pelo
+   PINTOR, não pelo render -- a primeira medição olhou círculos sem nada dentro e disse que estava
+   tudo bem. Foi só depois de a prévia fazer o que o pintor faz que apareceu o texto "Resgatando"
+   **estourando** pra fora do círculo (57px num espaço de 50).
+4. **⚠️ E AS SEIS TELAS NUMA PÁGINA SÓ INVENTARAM UM DEFEITO.** O jogo tem **UM** `#app`; seis
+   irmãos com o mesmo id se espremem lado a lado, e a medição saiu com o mapa em 149px e dois
+   pontos "fora dele". Uma tela por arquivo, e o problema não existe. É a mesma família do
+   `.app-shell` inventado que a Pescaria já tinha pago.
+
+**O ponto continua dizendo QUANTO VALE mesmo enquanto é resgatado** -- a palavra que estava ali
+dizia o que a BARRA e a borda tracejada já dizem, e o que não se descobre de outro jeito é o valor
+do ponto, que é justamente a decisão do jogador. Quem está resgatando se lê pela **cor da barra**.
+
+### O QUE FICA EM ABERTO
+
+- **Não há ranking** -- o pedido não pediu, e é por isso que o modo continua sem uma única
+  operação de backend. Quando houver, é aí que nasce a terceira checagem de permissão (a Pescaria
+  já tem o molde: `fishingRanking` com `allow write: if false`).
+- **A Liga Laranja**, as insígnias e as recompensas continuam fora de escopo, como na Corrida e na
+  Pescaria. Os pontos de mexer no dia em que ela existir são a **porta** (hoje `admin`), o **nível**
+  **do adversário** (`RESGATE_NPC_NIVEL`) e a **duração** (`RESGATE_DURACAO`).
+- **Se ficar fácil ou difícil demais**, as réguas medidas são: a **duração** (é ela que decide
+  quantas viagens cabem), o **`RESGATE_VEL_FATOR`** (o quanto o nível se vê) e a **capacidade** --
+  e esta última desfaria o pedido.
+
+`tools/test-resgate.js` tranca **118 pontas**: o acesso nos 10 estados do campo, o parceiro (só
+surfista, de todos os saves, as 8 insígnias, a ordem, e a AÇÃO recusando), a velocidade escalando
+e cabendo no mapa, a capacidade e a carga freando no motor, o adversário (Lv.60, da lista, sem
+intocável, sem a minha espécie, variando, e sem a minha especialidade), os pontos só contando na
+praia, um ponto por resgatador, a corrente e o redemoinho medidos por razão, o mar avisado batendo
+com o que chega, o retorno automático, o duelo inteiro terminando, o save intacto, o laço parando
+quando a tela muda, as oito direções do sprite e as cinco telas.
+**Conferido que ele acusa: 17 de 17 defeitos religados** derrubam pelo menos uma trava.
 ## PERFORMANCE: A GEOGRAFIA MANDA (19/09/2026)
 
 Relatado assim: *"tenho sentido uma boa lentidão na inscrição para as ligas clássicas e trainers

@@ -1329,7 +1329,11 @@ console.log('\n=== O MODAL DA CONTAGEM SAI ===');
   ok('(e o overlay continua flex quando aparece)',
      /\.corrida-overlay\{[^}]*display:flex/.test(css));
   ok('e o laço não chama render() pra isso',
-     !/fase = 'correndo';[\s\S]{0,120}render\(\)/.test(src), 'o laço passou a redesenhar');
+     /* ⚠️ O ALVO É `corrida.fase`, e não `fase` solto: com o nome curto a varredura pega o
+        arquivo INTEIRO -- o Resgate também tem uma fase chamada `correndo`, e esta trava passou
+        a acusar um laço que não é o dela. É a mesma armadilha do padrão largo demais que este
+        projeto já pagou duas vezes (as regex do `mlog-mais` e do `matchup-row`). */
+     !/corrida\.fase = 'correndo';[\s\S]{0,120}render\(\)/.test(src), 'o laço passou a redesenhar');
 }
 
 

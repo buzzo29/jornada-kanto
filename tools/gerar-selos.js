@@ -360,6 +360,21 @@ selo('medalha_bronze', medalha('f', 'h'));
 /* ⚠️ O ANZOL, e não uma vara: a vara inteira num selo de 24px vira um risco diagonal e
    nada mais. O anzol tem silhueta própria -- a haste reta, a curva em J e a farpa -- e é o que
    se reconhece de relance. A linha sai do topo, que é o que o liga à ideia de pescar. */
+/* ⚠️ A BOIA SALVA-VIDAS, e não um barco nem uma onda: ela é a forma que diz "resgate no mar" sem
+   palavra nenhuma, e sobrevive à redução porque é um ANEL SÓLIDO -- a 16px o que se lê é a
+   silhueta, e um círculo vazado é o que há de mais reconhecível.
+   ⚠️ A PAREDE TEM 5px (raio 10,5 por fora e 5,4 por dentro), e é o mínimo: o contorno come 2px de
+   CADA lado, então com 4 sobrariam 0 de cor e o anel viraria dois círculos pretos. É a mesma
+   conta que engrossou a fita das medalhas.
+   As quatro faixas brancas saem da INTERSEÇÃO do anel com uma cruz -- `menos(a, negado(b))`, que é
+   o ∩ que o gerador não tem. Pintadas soltas, elas atravessariam o buraco do meio. */
+selo('resgate', t => {
+  const anel = menos(circulo(12, 12, 10.5), circulo(12, 12, 5.4));
+  const cruz = uniao(retangulo(9.5, 0, 5, 24), retangulo(0, 9.5, 24, 5));
+  pintar(t, anel, 'r');
+  pintar(t, menos(anel, (x, y) => !cruz(x, y)), 'w');
+});
+
 selo('pescaria', t => {
   /* a linha, fina, descendo do topo */
   pintar(t, retangulo(11, 1, 2, 5), 's');
