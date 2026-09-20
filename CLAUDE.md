@@ -13602,13 +13602,13 @@ Conferido que cada defeito religado acusa: **2** sem o `preservePlayerHp`, **1**
 no chão, **2** sem o slot do item, **2** com o time de 1, **1** sem a porta das 8 insígnias na
 Corrida e **2** com o toggle ativo no revezamento.
 
-### O TRECHO DO REVEZAMENTO CAIU PRA 150 m, E NASCERAM OS DOIS RANKINGS (20/09/2026)
+## A CORRIDA: O TRECHO DE 150 m E OS DOIS RANKINGS (20/09/2026)
 
 Quatro pedidos numa leva: *"o revezamento troque para 150m cada pokemon, e atualize aqui nessa
 tela tambem, tire o TESTE ADMIN la de cima. E tambem crie o ranking individual de 300m e o ranking
 do revezamento, o tempo dos npc nao coloque no ranking, apenas dos treinadores"*.
 
-#### ⚠️ SÃO DUAS CONSTANTES, e o rótulo da tela ESTAVA MENTINDO
+### ⚠️ SÃO DUAS CONSTANTES, e o rótulo da tela ESTAVA MENTINDO
 
 `CORRIDA_METROS` era uma só -- a individual E o trecho do revezamento. Com o trecho em 150 ela
 encolheria a individual junto, e é ela que o ranking chama de *"individual de 300 m"*. Hoje são
@@ -13638,7 +13638,7 @@ A previsão que este arquivo já tinha (*"150 por trecho devolveria os 900 m, co
 ~12 s"*) acertou a distância e **errou o tempo por trecho**: 12 s era a conta de um corredor
 rápido, e a média de um time real cai em 20,4 s porque ele leva o Shuckle e o Snorlax junto.
 
-#### OS DOIS RANKINGS
+### OS DOIS RANKINGS
 
 ⚠️ **É UM DOCUMENTO POR JOGADOR com as DUAS modalidades dentro** (`raceRanking/{uid}`, campos
 `single` e `relay`), e o `merge` é obrigatório: um recorde no revezamento não pode apagar o da
@@ -13681,11 +13681,11 @@ vez de o jogador reaprender.
 **Medido a 320px, no navegador, nas três telas:** **nenhuma rola pro lado**, todo `<h2>` em uma
 linha só, nenhum tempo truncado, e a página em **873px** no setup.
 
-#### ⚠️ E O "TESTE ADMIN" SAIU das duas telas da Corrida
+### ⚠️ E O "TESTE ADMIN" SAIU das duas telas da Corrida
 
 A Pescaria já tinha tirado o dela horas antes. O modo continua se identificando pelo nome.
 
-#### AS TRÊS LIÇÕES DE TESTE QUE SAÍRAM DAQUI
+### AS TRÊS LIÇÕES DE TESTE QUE SAÍRAM DAQUI
 
 1. **⚠️ CINCO TRAVAS DO REVEZAMENTO MEDIAM O NÚMERO, NÃO A REGRA.** Elas tinham **300 e 600**
    escritos à mão -- as marcas de troca --, e caíram todas de uma vez quando o trecho virou 150,

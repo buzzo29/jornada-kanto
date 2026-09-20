@@ -31115,9 +31115,11 @@ const CORRIDA_NPC = { perfect: 0.20, good: 0.52, miss: 0.14 };
 const CORRIDA_METROS = 300;          /* a INDIVIDUAL */
 const CORRIDA_TRECHOS = 6;           /* no revezamento: o time inteiro */
 /* ⚠️ O TRECHO DO REVEZAMENTO É 150 m DESDE 20/09/2026, a pedido -- e a régua tinha sido prevista
-   aqui mesmo quando a equipe virou o time inteiro: com 6 × 300 a prova dobrou pra 1.800 m e
-   ~190 s, e 150 por trecho devolve os 900 m. Medido na volta: o revezamento cai de ~249 s pra
-   ~125 s e cada trecho leva ~12 s.
+   aqui mesmo quando a equipe virou o time inteiro: com 6 × 300 a prova dobrou pra 1.800 m, e 150
+   por trecho devolve os 900. Medido na volta (12 provas do mesmo time): o revezamento cai de
+   ~249 s pra **122,4 s** e cada trecho leva **~20,4 s**.
+   ⚠️ A PREVISÃO QUE ESTAVA AQUI DIZIA "~12 s por trecho", e ela era a conta de um corredor
+   RÁPIDO -- um time de verdade leva o Shuckle e o Snorlax junto, e a média sobe pro dobro.
    ⚠️ E SÃO DUAS CONSTANTES, não uma: a INDIVIDUAL continua em 300 m (é ela que o ranking chama
    de "individual de 300 m"), e mudar o trecho do revezamento não pode encolher a outra. */
 const CORRIDA_METROS_TRECHO = 150;   /* cada trecho do revezamento */
