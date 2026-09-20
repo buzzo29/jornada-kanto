@@ -907,10 +907,10 @@ console.log('\n=== A TELA ===');
   const dentroDoPasso = laco.slice(laco.indexOf('const passo ='));
   ok('o laço pinta pelo DOM, nunca por render()',
      dentroDoPasso.indexOf('pescariaPintar()') >= 0 && dentroDoPasso.indexOf('render()') < 0);
-  /* ⚠️ E O `dt` É LIMITADO: com a aba em segundo plano o rAF para, e na volta o primeiro quadro
-     traria os segundos todos de uma vez -- o peixe escaparia sozinho. */
-  ok('e o dt é limitado (a aba em segundo plano não mata o peixe)',
-     /Math\.min\(0\.1,/.test(dentroDoPasso));
+  /* ⚠️ A TRAVA DO `dt` MORREU EM 20/09/2026, quando o relógio passou a RECUPERAR o tempo da aba
+     oculta. Ela media `Math.min(0.1, ...)` LENDO O CÓDIGO, e por isso não distinguia "o passo é
+     limitado" (que continua sendo, e tem que ser) de "o tempo é jogado fora" (que era o defeito).
+     A que ficou no lugar dela DIRIGE o laço e salta o tempo -- ver o bloco do relógio real. */
 }
 
 /* ============================================================================
@@ -1188,21 +1188,40 @@ console.log('\n=== O PEIXE LEVA O MOVESET DA ESPÉCIE ===');
      (chamada.match(/equiparNpc\(meuTime\)/g) || []).length === 1 &&
      /if\(qual !== 0\) equiparNpc\(meuTime\)/.test(chamada));
   /* ⚠️ E ELE É O QUE FAZ OS STATUS POR ATAQUE EXISTIREM: sem id de golpe não há o que consultar
-     nas tabelas de queimar/envenenar/paralisar. */
-  let comStatus = 0;
-  for(let i = 0; i < 1200; i++){
-    S.pescaria.oportunidades = new Array(6).fill(null);
-    S.pescariaSurgir(i % 6);
-    const z = S.pescaria.oportunidades.findIndex(o => o);
-    S.pescariaComecarBatalha(0, S.pescaria.oportunidades[z]);
-    const mm = S.pescaria.jogadores[0].batalha.matchup;
-    if(((mm && mm.golpes) || []).some(x => ['queimou','envenenou','paralisou','congelou'].indexOf(x.x) >= 0)) comStatus++;
-    const j = S.pescaria.jogadores[0]; j.estado = 'parado'; j.op = null; j.batalha = null;
-    /* ⚠️ CURA O TIME A CADA VOLTA: este painel mede a BATALHA, não o desgaste. Sem isso o time
-       cai na 3ª rodada e as outras 1.197 medem um time inteiro no chão -- ou seja, medem nada. */
-    j.time.forEach(x => { x.hp = x.maxHp; });
+     nas tabelas de queimar/envenenar/paralisar.
+     ⚠️ E O PAINEL É DIRIGIDO, porque medir a FREQUÊNCIA num pool sorteado é o pior tipo de trava:
+     ela rodava as seis zonas com um time Lv.55-70 e caiu de 5,5 pra 2,25 eventos em 1.200 quando
+     os 18 pescáveis novos entraram (20/09) -- ou seja passou a falhar 1 rodada em 10 SEM NADA
+     ESTAR ERRADO. É a armadilha do painel forte demais, agora pelo lado da amostragem.
+     ⚠️ E O QUE IMPORTA NÃO É A TAXA: é que um peixe que ESCOLHE um golpe de status realmente o
+     aplica. O motor escolhe pelo DANO, então quase todo golpe de status perde a vaga -- medido,
+     só três pescáveis escolhem um: Poliwag e Chinchou (Golpe de Corpo e Faísca, 30% de paralisar)
+     e o Gyarados Lv.53 (Salto). Com o dono certo a trava vira determinística: 51% em 300. */
+  {
+    /* um parceiro que NÃO mata em um golpe -- com o time forte a luta acaba antes de o peixe agir */
+    const q = jogoNaTela([{ speciesId: 'snorlax', level: 45, id: 'p0' }]);
+    let comStatus = 0, escolheu = 0;
+    for(let i = 0; i < 300; i++){
+      S.pescaria.oportunidades = new Array(6).fill(null);
+      S.pescariaSurgir(1);
+      const o = S.pescaria.oportunidades[1];
+      o.speciesId = 'poliwag'; o.nivel = 35;
+      S.pescariaComecarBatalha(0, o);
+      const mm = S.pescaria.jogadores[0].batalha.matchup || {};
+      if(mm.enemyMoveId === 'bodyslam') escolheu++;
+      if(((mm && mm.golpes) || []).some(x => ['queimou','envenenou','paralisou','congelou'].indexOf(x.x) >= 0)) comStatus++;
+      const j = S.pescaria.jogadores[0]; j.estado = 'parado'; j.op = null; j.batalha = null;
+      /* ⚠️ CURA O TIME A CADA VOLTA: este painel mede a BATALHA, não o desgaste. Sem isso o time
+         cai na 3ª rodada e as outras 297 medem um time inteiro no chão -- ou seja, medem nada. */
+      j.time.forEach(x => { x.hp = x.maxHp; });
+    }
+    /* ⚠️ O GOLPE ESCOLHIDO É COBRADO À PARTE: sem isso a trava mediria o sorteio da espécie em vez
+       da regra -- um moveset vazio daria zero pelos dois motivos e ela não saberia distinguir. */
+    ok('  o peixe ESCOLHE o golpe de status que ele leva', escolheu === 300,
+       escolheu + ' de 300 com Golpe de Corpo');
+    ok('  e status por ataque ACONTECE', comStatus > 30,
+       comStatus + ' de 300 (a chance do golpe é 30%)');
   }
-  ok('  e status por ataque passou a ACONTECER', comStatus > 0, comStatus + ' de 1200 batalhas');
 }
 
 console.log('\n=== OS SELOS 🔥🟣⚡ APARECEM NO QUADRO ===');
@@ -1898,5 +1917,189 @@ console.log('\n=== O LOG DO FIM: O QUE CADA UM PESCOU ===');
   S.pescaria.historico = [];
   ok('sem captura nenhuma o log some', S.renderPescaria().indexOf('O que cada um pescou') < 0);
 }
+console.log('\n=== O QUADRADO VAZIO SAIU DO "NENHUM TIME ESCOLHIDO" ===');
+{
+  contaAdmin();
+  S.abrirPescaria();
+  S.pescaria.escolhido = null;
+  const h = S.renderPescaria();
+  const linha = h.slice(h.indexOf('Nenhum time escolhido') - 400, h.indexOf('Nenhum time escolhido') + 200);
+  ok('  (e a trava lê a linha)', linha.length > 300, linha.length + ' chars');
+  /* PEDIDO: o quadradinho quadriculado com o `?` à esquerda da frase sai. Ele era um lugar
+     RESERVADO pra um sprite que ali não existe -- sem time escolhido não há bicho pra mostrar,
+     e o tracejado vazio se lia como algo faltando carregar. */
+  ok('não há sprite vazio à esquerda da frase', linha.indexOf('pesc-vazio') < 0);
+  ok('  nem o lugar dele', linha.indexOf('pesc-parceiro-sprite') < 0);
+  /* ⚠️ E A REGRA DE CSS SAIU JUNTO: regra sem usuário é letra morta, a mesma decisão que a trava
+     dos selos cobra ("todo desenho tem chamador"). */
+  ok('  e a regra de CSS não sobrou órfã',
+     src.indexOf('.pesc-vazio{') < 0 && src.indexOf('pesc-parceiro-sprite') < 0);
+  /* e a linha continua sendo um BOTÃO que abre o picker: o que saiu foi o vazio, não a ação */
+  ok('a linha continua abrindo o picker', linha.indexOf('pescariaAbrirPicker()') >= 0);
+  ok('  e ainda diz o que fazer', h.indexOf('Escolha o time que vai lutar por você') >= 0);
+}
+
+console.log('\n=== O RELÓGIO NÃO PAUSA COM A ABA OCULTA (20/09/2026) ===');
+{
+  /* ⚠️ ELE SOMAVA `dt` DE QUADRO EM QUADRO com teto de 0,1 s -- e o `requestAnimationFrame` PARA
+     quando a aba não está visível. O duelo inteiro congelava: voltando depois de 30 s, o relógio
+     marcava os mesmos 12 s e o adversário não tinha pescado nada. Foi reportado.
+     ⚠️ E ESTA TRAVA DIRIGE O LAÇO DE VERDADE, saltando o tempo -- ela não lê o código. A versão
+     velha lia (`/Math\.min\(0\.1,/`), e por isso ela não conseguia distinguir "o passo é limitado"
+     (que continua sendo, e tem que ser) de "o tempo é jogado fora" (que era o defeito). */
+  contaAdmin();
+  S.abrirPescaria();
+  S.pescariaEscolher(0);
+  S.pescariaLargar();
+  ok('o laço registrou um quadro', S.__rafs.length === 1, S.__rafs.length + ' na fila');
+
+  S.__quadro(1000);
+  S.__quadro(2000);
+  const antes = S.pescaria.tempo;
+  ok('o relógio anda com os quadros', Math.abs(antes - 1) < 0.05, antes.toFixed(2) + 's');
+
+  /* a aba fica 20 s oculta: NENHUM quadro acontece nesse intervalo */
+  S.__quadro(22000);
+  const depois = S.pescaria.tempo;
+  ok('e RECUPERA o tempo da aba oculta', Math.abs(depois - 21) < 0.2,
+     antes.toFixed(2) + 's -> ' + depois.toFixed(2) + 's (a aba ficou 20 s fora)');
+
+  /* ⚠️ MAS O PASSO CONTINUA LIMITADO: a física é por passo (a tensão sobe por segundo, a boia
+     afunda num instante), e entregar 20 s num `dt` só daria outro resultado -- a linha estouraria
+     sem ninguém ter tocado, que é o que a guarda velha evitava. */
+  ok('  e o PASSO da simulação continua limitado',
+     src.indexOf('const PESCARIA_PASSO_MAX = 0.1;') >= 0);
+  const laco = src.slice(src.indexOf('function pescariaLargar'), src.indexOf('function pescariaTerminar'));
+  const passo = laco.slice(laco.indexOf('const passo ='));
+  ok('  (e a trava lê o laço)', passo.length > 300, passo.length + ' chars');
+  ok('  e ele roda em VOLTAS até alcançar o relógio real',
+     /while\(pescaria\.tempo < alvo/.test(passo));
+  /* ⚠️ COM TETO: sem ele, uma aba esquecida por uma hora tentaria 36.000 iterações num quadro só */
+  ok('  com teto de voltas', /voltas < PESCARIA_PASSOS_MAX/.test(passo));
+  ok('    e o teto cobre o duelo inteiro',
+     S.PESCARIA_PASSOS_MAX * S.PESCARIA_PASSO_MAX >= S.PESCARIA_DURACAO + S.PESCARIA_SOBRA,
+     S.PESCARIA_PASSOS_MAX + ' passos = ' + (S.PESCARIA_PASSOS_MAX * S.PESCARIA_PASSO_MAX).toFixed(0) + 's');
+
+  /* ⚠️ E UMA AUSÊNCIA LONGA NÃO TRAVA O QUADRO: o duelo termina sozinho quando o relógio passa */
+  S.__quadro(600000);   /* dez minutos fora */
+  ok('uma ausência de 10 min encerra o duelo em vez de travar',
+     S.pescaria.fase !== 'jogando', 'fase: ' + S.pescaria.fase);
+
+  /* o campo nasce limpo -- senão a partida seguinte herdaria o relógio da anterior */
+  S.pescariaZerar();
+  ok('e o marco do relógio zera com o resto', !S.pescaria.inicioReal);
+}
+
+console.log('\n=== O MAPA SOME ENQUANTO A PESCA ACONTECE ===');
+{
+  contaAdmin();
+  S.abrirPescaria();
+  S.pescariaEscolher(0);
+  S.pescariaLargar();
+  S.__quadro(100);
+  const mapa = S.document.getElementById('pescMapa');
+  const eu = S.pescaria.jogadores[0];
+
+  ok('parado, o mapa está na tela', mapa && mapa.hidden !== true, 'hidden=' + (mapa && mapa.hidden));
+  /* ⚠️ FORA DO `parado` não há nada pra decidir no lago: todos os pontos estão fechados pelo
+     `posso`, e o que importa está no painel de baixo (a boia, a tensão ou a batalha). */
+  for(const estado of ['espera', 'fisgada', 'puxando', 'batalha']){
+    eu.estado = estado;
+    S.pescariaPintar();
+    ok('  em `' + estado + '` ele some', mapa.hidden === true);
+  }
+  /* o descanso é o fim do ciclo (o recado do resultado): o mapa só volta no `parado` */
+  eu.estado = 'descanso';
+  S.pescariaPintar();
+  ok('  e no `descanso` também (o ciclo ainda não acabou)', mapa.hidden === true);
+  eu.estado = 'parado';
+  S.pescariaPintar();
+  ok('  e VOLTA quando eu fico parado', mapa.hidden === false);
+
+  /* ⚠️ QUEM ESCONDE É O PINTOR: o estado muda DENTRO do laço, que não chama render() */
+  /* ⚠️ O PARÊNTESE NÃO É ENFEITE:  é PREFIXO de ,
+     que vem 600 linhas ANTES no arquivo -- sem ele a fatia começava na função errada e a trava
+     acusava o que estava certo. É a armadilha do padrão largo demais, a mesma do . */
+  const fonte = src.slice(src.indexOf('function pescariaPintar(){'), src.indexOf('function nomeDoTreinador'));
+  ok('  (e a trava lê o pintor)', fonte.length > 500 && fonte.length < 9000, fonte.length + ' chars');
+  ok('é o PINTOR que esconde (não o render)', /mapa\.hidden = esconder/.test(fonte));
+  /* ⚠️ E O `hidden` PRECISA DA REGRA: o `.pesc-mapa` é `display:block`, e qualquer display do
+     autor anula o `hidden` da folha do navegador. Foi o defeito do modal da contagem da Corrida,
+     reportado DUAS vezes porque a primeira correção mexeu na marcação e não no CSS. */
+  ok('  e o CSS tem a regra do [hidden]', src.indexOf('.pesc-mapa[hidden]{display:none;}') >= 0);
+}
+
+console.log('\n=== O PONTO DE ONDE EU SAÍ NÃO FICA AZUL ===');
+{
+  contaAdmin();
+  S.abrirPescaria();
+  S.pescariaEscolher(0);
+  S.pescariaLargar();
+  S.__quadro(100);
+  const eu = S.pescaria.jogadores[0];
+  const zona = () => S.document.getElementById('pescZona0');
+
+  /* entro no ponto 0 */
+  S.pescariaSurgir(0);
+  S.pescariaEntrar(0, 0);
+  S.pescariaPintar();
+  ok('o meu ponto fica azul enquanto eu estou nele', zona().classList.contains('minha'));
+
+  /* ⚠️ E SAI QUANDO EU SAIO: ela era posta no `render()` e o pintor não a tirava -- o laço não
+     chama render(), então o azul ficava preso no ponto de onde eu já tinha saído. É a mesma
+     família dos chips da Corrida e do modal da contagem. */
+  eu.op = null; eu.estado = 'parado';
+  S.pescariaPintar();
+  ok('  e SAI quando eu saio dele', !zona().classList.contains('minha'));
+
+  /* ⚠️ E ISSO ERA METADE DO RELATO: o azul vem DEPOIS na folha, então num ponto com peixe sobrava
+     só a borda amarela. Com a `minha` fora, a `viva` volta a pintar o fundo. */
+  S.pescariaSurgir(0);
+  S.pescariaPintar();
+  ok('  e o ponto com peixe volta a acender inteiro',
+     zona().classList.contains('viva') && !zona().classList.contains('minha'));
+  /* lendo o pintor: ela é mantida por lá, como as outras três */
+  ok('a `minha` é mantida pelo PINTOR',
+     /classList\.contains\('minha'\) !== minhaZona/.test(src));
+}
+
+console.log('\n=== OS 18 PESCÁVEIS NOVOS ===');
+{
+  const pedidos = ['dratini', 'marill', 'azumarill', 'staryu', 'starmie', 'mantine', 'remoraid',
+                   'chinchou', 'lanturn', 'kingdra', 'poliwag', 'poliwhirl', 'poliwrath',
+                   'omanyte', 'omastar', 'kabuto', 'kabutops', 'dragonair'];
+  const todos = new Set();
+  S.PESCARIA_ZONAS.forEach(z => z.pool.forEach(([id]) => todos.add(id)));
+  ok('os 18 pedidos estão em alguma zona',
+     pedidos.every(id => todos.has(id)),
+     pedidos.filter(id => !todos.has(id)).join(',') || 'todos');
+  ok('  e todos existem no SPECIES',
+     [...todos].every(id => !!S.SPECIES[id]), [...todos].filter(id => !S.SPECIES[id]).join(',') || 'todos');
+  /* ⚠️ O PESO NÃO PRECISA SOMAR 100 -- o `chancesDaZona` normaliza --, mas a soma tem que ser > 0
+     em toda zona, senão o sorteio divide por zero. */
+  ok('  e toda zona tem peso', S.PESCARIA_ZONAS.every(z => z.pool.reduce((a, x) => a + x[1], 0) > 0));
+  /* ⚠️ E A DISTRIBUIÇÃO É POR PROFUNDIDADE: o BST médio da zona sobe da Margem pro Abismo, senão
+     a escada de prêmio (20 a 83 pts) mentiria -- um Starmie na Margem pagaria 20. */
+  const medio = S.PESCARIA_ZONAS.map(z =>
+    z.pool.reduce((a, [id, p]) => a + S.bstOf(id) * p, 0) / z.pool.reduce((a, x) => a + x[1], 0));
+  ok('a força média sobe da Margem pro Abismo',
+     medio.every((v, i) => i === 0 || v >= medio[i - 1] - 1),
+     medio.map(v => Math.round(v)).join(' < '));
+  /* o sorteio só devolve quem está na zona */
+  for(let k = 0; k < S.PESCARIA_ZONAS.length; k++){
+    const daZona = new Set(S.PESCARIA_ZONAS[k].pool.map(x => x[0]));
+    let fora = null;
+    for(let i = 0; i < 200; i++){
+      S.pescaria.oportunidades[k] = null;
+      S.pescariaSurgir(k);
+      const op = S.pescaria.oportunidades[k];
+      if(op && !daZona.has(op.speciesId)){ fora = op.speciesId; break; }
+    }
+    if(fora){ ok('o sorteio da zona ' + k + ' respeita o pool', false, fora); break; }
+    if(k === S.PESCARIA_ZONAS.length - 1) ok('o sorteio de cada zona respeita o pool dela', true,
+      '6 zonas x 200 sorteios');
+  }
+}
+
 console.log(falhas ? '\n' + falhas + ' FALHA(S)' : '\nTudo certo.');
 process.exit(falhas ? 1 : 0);

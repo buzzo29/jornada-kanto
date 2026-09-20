@@ -14042,6 +14042,160 @@ servidor: o acesso, a regra lida como texto, "melhor é menor", o `merge`, o que
 tops ordenados, quem não correu não aparecendo, o meu tempo fora do top, e o tempo do NPC não
 tendo por onde entrar.
 **Conferido que elas acusam: 16 de 16 defeitos religados** derrubam pelo menos uma trava.
+
+#### AS CINCO DA PESCARIA (20/09/2026) -- a leva do relógio que parava
+
+**⚠️ DUAS DAS CINCO SÃO A MESMA FAMÍLIA, e é a QUINTA vez que ela aparece:** o laço do jogo
+**não chama `render()`** -- de propósito, porque ele recriaria a boia, os seis pontos e o botão de
+puxar 60 vezes por segundo, e o `pointerdown` se perderia no meio do toque. Então **tudo que muda
+DURANTE a partida tem que ser trocado pelo PINTOR**. As quatro anteriores: o modal da contagem da
+Corrida (18/09, reportado DUAS vezes), os chips de trecho do revezamento (20/09 de manhã), o quadro
+vazio da corrida (20/09 à tarde) e, agora, o mapa e o azul do ponto.
+
+##### ⚠️ O RELÓGIO PARAVA COM A ABA OCULTA
+
+Reportado: *"quando eu saio da tela, troco de aba ou minimizo, o relógio esta pausando, isso nao
+deve acontecer"*.
+
+O laço somava `dt` de quadro em quadro -- e o `requestAnimationFrame` **PARA** quando a aba não
+está visível. O duelo inteiro congelava: voltando depois de 30 s, o relógio marcava os mesmos 12 s
+e o adversário não tinha pescado nada.
+
+- **HOJE O RELÓGIO É O REAL** (`inicioReal`, carimbado no primeiro quadro): o alvo é
+  `(ts - inicioReal) / 1000`, e o laço roda em VOLTAS até alcançá-lo. Medido: `1,00s -> 21,00s`
+  depois de 20 segundos de aba oculta.
+- **⚠️ MAS O PASSO DA SIMULAÇÃO CONTINUA LIMITADO a 0,1 s**, e isso não é conservadorismo: a física
+  é POR PASSO (a tensão sobe por segundo, a boia afunda num instante) -- entregar 20 s num `dt` só
+  daria outro resultado, com a linha arrebentando sem ninguém ter tocado.
+- **⚠️ E O NÚMERO DE VOLTAS TEM TETO** (`PESCARIA_PASSOS_MAX`, derivado da duração + a prorrogação):
+  sem ele, uma aba esquecida por uma hora tentaria **36.000 iterações num quadro só**. O excedente
+  é descartado pelo próprio fim -- medido, uma ausência de 10 min **encerra o duelo** em vez de
+  travar.
+- **⚠️ E A TRAVA DIRIGE O LAÇO, saltando o tempo -- ela não lê o código.** A versão velha lia
+  (`/Math\.min\(0\.1,/`) e por isso **não conseguia distinguir** *"o passo é limitado"* (que continua
+  sendo, e tem que ser) de *"o tempo é jogado fora"* (que era o defeito).
+
+##### ⚠️ O MAPA SOME ENQUANTO A PESCA ACONTECE
+
+Pedido: *"quando o usuario clicar em algum ponto de pesca e exibir a bóia, deixe o quadro da ilha
+invisivel, até acabar o confronto contra o pokemon pescado ou arrebentar a linha"*.
+
+Fora do `parado` **não há nada pra decidir no lago**: todos os pontos já estão fechados pelo
+`posso`, e o que importa está no painel de baixo (a boia, a tensão ou a batalha).
+
+- **⚠️ E O `hidden` PRECISA DA REGRA `.pesc-mapa[hidden]{display:none}`.** O elemento é
+  `display:block`, e **qualquer `display` do autor anula o `hidden` da folha do NAVEGADOR**, que
+  tem a menor prioridade que existe. **Provado no navegador, desligando só essa regra:** com ela o
+  mapa é `display:none` e mede 0px; sem ela ele volta a `block` com **298px** na tela. É
+  literalmente o defeito do modal da contagem da Corrida, que custou dois relatos porque a primeira
+  correção mexeu na marcação e não no CSS.
+- **⚠️ E O MAPA GANHOU `id`:** o pintor o achava por `querySelector('.pesc-mapa')`, e **todo o resto
+  dele usa `getElementById`** -- varrer a árvore por classe a cada quadro pra achar o mesmo elemento
+  é o caminho caro, e o barato já existia.
+- **Medido a 320px:** a tela cai de **800 para 614px** enquanto a boia está na água.
+
+##### ⚠️ O PONTO DE ONDE EU SAÍ FICAVA AZUL
+
+Reportado: *"após eu entrar em um ponto e fazer todo o ciclo dele, quando volta para o mapa, o ponto
+que eu estava antes esta ficando com um azul mais vivo ... inclusive se tem peixe naquele ponto, ta
+ficando amarelo só nas bordas"*.
+
+A classe `minha` era posta no `render()` e o pintor **não a tirava** -- então o azul ficava preso no
+ponto de onde o jogador já tinha saído.
+
+**⚠️ E A SEGUNDA METADE DO RELATO É CONSEQUÊNCIA DA ORDEM DA FOLHA:** a regra da `minha` vem
+**DEPOIS** da `viva`, então num ponto com peixe sobrava só a borda amarela. Com a `minha` fora, a
+`viva` volta a pintar o fundo -- medido: `rgb(42,95,214)` (azul) → `rgb(255,211,71)` (o amarelo da
+`viva`).
+
+##### O QUADRADO VAZIO SAIU DO "NENHUM TIME ESCOLHIDO"
+
+Ele era um lugar **RESERVADO pra um sprite que ali não existe** -- sem time escolhido não há bicho
+pra mostrar, e o tracejado vazio se lia como algo faltando carregar.
+
+**⚠️ E A REGRA DE CSS SAIU JUNTO** (`.pesc-vazio`): regra sem usuário é **letra morta**, a mesma
+decisão que a trava dos selos cobra (*"todo desenho tem chamador"*) e que tirou o `pesc-trocar`.
+
+##### OS 18 PESCÁVEIS NOVOS: DE 12 PRA 28 ESPÉCIES
+
+Foram os pedidos, distribuídos pelas seis zonas por **profundidade** -- e é isso que mantém a escada
+de prêmio (20 a 83 pts) honesta. Medido, o BST médio por zona:
+
+| Margem | Juncos | Corais | Cachoeira | Gruta | Abismo |
+|---|---|---|---|---|---|
+| 253 | 319 | 332 | 416 | 460 | **520** |
+
+- **Os evolutivos ficam nas zonas fundas** (Kingdra, Starmie, Poliwrath, Omastar, Kabutops no
+  Abismo; Lanturn, Mantine e Dragonair na Gruta) e as formas base nas rasas (Marill, Remoraid e
+  Poliwag na Margem).
+- **⚠️ O PESO NÃO PRECISA SOMAR 100** -- o `chancesDaZona` normaliza --, mas toda zona precisa de
+  soma **maior que zero**, senão o sorteio divide por zero. Há trava.
+
+
+##### ⚠️ E OS 18 TRANSFORMARAM UMA TRAVA ESTÁVEL NUM FLAKE
+
+A trava do **moveset do peixe** (19/09) rodava as seis zonas com o time Lv.55-70 e contava quantas
+de 1.200 batalhas tinham um status por ataque. Ela caiu de **5,5 para 2,25 eventos** quando o pool
+cresceu -- e com média 2,25 a chance de dar ZERO é `e^-2,25 = 10%`: ela passou a **falhar uma
+rodada em dez, sem nada estar errado**. Pego rodando a bateria cinco vezes, não por relato.
+
+**A CAUSA É ARITMÉTICA E ERA PREVISÍVEL:** os novos das zonas rasas (Marill, Remoraid, Poliwag,
+Chinchou, Staryu) são fracos, o parceiro Lv.70 **mata em um golpe em 90% das vezes** na Margem, e
+**status por ataque precisa que o golpe do PEIXE saia**.
+
+**⚠️ MAS O CONSERTO NÃO É AUMENTAR A AMOSTRA -- é a trava medir a REGRA e não a FREQUÊNCIA.** E a
+medição achou por que a taxa é estruturalmente baixa: **o motor escolhe pelo DANO**, então quase
+todo golpe de status perde a vaga. Varrendo as 28 espécies pescáveis no nível médio da zona delas,
+**só TRÊS escolhem um golpe que causa status**:
+
+| | escolhe | vira status |
+|---|---|---|
+| **Poliwag Lv.35** | Golpe de Corpo | **51%** |
+| **Chinchou Lv.35** | Faísca | 46% |
+| Gyarados Lv.53 | Salto | 26% |
+
+**É a mesma conclusão do Rolamento e dos golpes de prender: o motor está certo em recusar** -- um
+Ferrão Venenoso de poder 15 nunca vai ganhar de uma Hidro Bomba, e é por isso que Tentacruel,
+Kingdra, Starmie e Poliwrath dão **zero** mesmo com 4,9 golpes por batalha.
+
+⚠️ **E DOIS DOS TRÊS DONOS SÃO NOVOS** (Poliwag e Chinchou entraram nesta leva): os 18 não
+enfraqueceram a mecânica, eles **acrescentaram** donos de status. O que caiu foi a taxa MÉDIA do
+painel, porque entrou muito peixe fraco nas zonas rasas.
+
+Hoje a trava é **dirigida** -- Snorlax Lv.45 (um parceiro que não mata em um golpe) contra um
+Poliwag Lv.35 -- e ela cobra **duas coisas separadas**, que é o que a versão velha não conseguia
+distinguir:
+
+1. **o peixe ESCOLHE o golpe de status que ele leva** (300 de 300 com Golpe de Corpo) -- sem isso um
+   moveset vazio daria zero pelos dois motivos e a trava não saberia qual;
+2. **e o status ACONTECE** (158 de 300, determinístico em 16 rodadas).
+
+**Conferido que ela acusa:** removendo o `equiparNpc` do peixe, as duas viram `0 de 300`.
+
+##### O QUE ISSO CUSTOU
+
+**Nada no motor:** `MOTOR 25d909ef2d79 / DIARIO c35ba4008568`, idêntico em 900 batalhas semeadas.
+
+##### ⚠️ E DUAS LIÇÕES DE FERRAMENTA SAÍRAM DAQUI
+
+1. **⚠️ O `querySelector` DO SANDBOX DEVOLVIA UM STUB NOVO A CADA CHAMADA** -- exatamente a
+   armadilha que o `getElementById` já teve e que foi consertada em 12/09. O pintor escrevia
+   `hidden` num descartável e a trava, chamando de novo, recebia outro: **6 falhas num código que
+   estava certo**. Hoje ele lembra, como o irmão.
+2. **⚠️ `function pescariaPintar` É PREFIXO DE `pescariaPintarArea`**, que vem **600 linhas antes**
+   no arquivo -- a fatia da trava começava na função errada e acusava o que estava certo. É a
+   armadilha do **padrão largo demais**, a mesma das regex do `mlog-mais`, do `matchup-row` e da
+   fase `correndo` que o Resgate roubou da Corrida. Hoje ela ancora no parêntese, com um `ok()`
+   cobrando o tamanho da fatia.
+
+`tools/test-pescaria.js` foi a **363 pontas**, 31 delas novas: o quadradinho e a regra órfã, o
+relógio real (o laço dirigido de verdade, o teto de voltas e a ausência de 10 min), o mapa nos cinco
+estados mais o `[hidden]` no CSS, o azul saindo e o ponto com peixe acendendo inteiro, e os 18 com o
+BST subindo por zona -- mais a do moveset do peixe, reescrita pra ser dirigida.
+**Conferido que elas acusam: 5 de 5 defeitos religados** (3, 6, 5, 2 e 1 falhas), e o do
+`equiparNpc` do peixe derruba 6.
+
+
 ## RESGATE POKÉMON -- o terceiro teste admin (20/09/2026)
 
 Pedido com o `resgate-pokemon.html` da raiz como referência, e com **cinco coisas mudadas** em

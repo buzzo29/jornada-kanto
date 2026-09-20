@@ -3101,6 +3101,11 @@
      ⚠️ O `aspect-ratio` TEM QUE SER O DO `viewBox` (360/380): as posições dos pontos são
      PERCENTUAIS, então uma caixa de outra proporção os tira do lugar -- o ponto da praia sul
      cairia no mar. É a única regra aqui que não é estética. */
+  /* ⚠️ O [hidden] PRECISA SER EXPLÍCITO: o display:block abaixo é do AUTOR e anula o hidden da
+     folha do navegador, que tem a menor prioridade que existe. Sem esta linha o mapa continuaria
+     na tela com o atributo posto -- que foi o defeito do modal da contagem da Corrida, reportado
+     DUAS vezes porque a primeira correção mexeu na marcação e não no CSS. */
+  .pesc-mapa[hidden]{display:none;}
   .pesc-mapa{position:relative;display:block;padding:0;width:100%;aspect-ratio:360/380;
     overflow:hidden;background:#277c9f;border:3px solid #254650;border-radius:4px;
     isolation:isolate;margin-bottom:8px;}
@@ -3270,8 +3275,6 @@
   button.pesc-parceiro:hover,button.pesc-parceiro:active{background:#e6edf9;}
   .pesc-parceiro-acao{flex-shrink:0;font-size:.62rem;font-weight:800;color:var(--blue-dark);
     text-transform:uppercase;letter-spacing:.4px;}
-  .pesc-vazio{display:inline-flex;width:34px;height:34px;align-items:center;justify-content:center;
-    border:2px dashed var(--muted);border-radius:5px;color:var(--muted);font-weight:800;}
   .pesc-hist{display:flex;align-items:center;gap:7px;padding:5px 0;border-bottom:1px dashed var(--box-border);}
   /* ⚠️ O RESUMO DO FIM: um bloco por treinador, com o nome e o total no topo. As cores são as do
      placar (azul pro jogador, vermelho pro adversário), pra o olho ligar os dois sem ler. */
@@ -32587,19 +32590,36 @@ function renderCorrida(){
 /* ⚠️ AS SEIS ÁGUAS SÃO AS DO PROTÓTIPO, com as chances dele: o que muda é que as espécies agora
    são lidas do `SPECIES` (conferido: as 13 existem). A faixa de nível é por zona, e é ela que faz
    a margem ser segura e o abismo valer a pena. */
+/* ⚠️ O PESO NÃO PRECISA SOMAR 100: o `chancesDaZona` normaliza pela soma, e é ele que a tela do
+   `(i)` lê. Escrever pesos que somem 100 seria uma conta a refazer a cada espécie nova.
+   ⚠️ E A DISTRIBUIÇÃO É POR PROFUNDIDADE, como era: as 18 espécies pedidas em 20/09/2026 entraram
+   na zona cujo NÍVEL combina com o BST delas -- o Marill (250) na Margem, o Kingdra (540) no
+   Abismo. Sem isso a Margem entregaria um Starmie e a escada de prêmio (20 a 83 pts) mentiria. */
 const PESCARIA_ZONAS = [
-  { nome: 'Margem',     nivel: [20, 35], cor: '#519eae', pool: [['magikarp', 60], ['goldeen', 25], ['poliwag', 15]] },
-  { nome: 'Juncos',     nivel: [25, 45], cor: '#408f96', pool: [['poliwag', 40], ['goldeen', 35], ['krabby', 25]] },
-  { nome: 'Corais',     nivel: [30, 55], cor: '#388ab0', pool: [['tentacool', 40], ['horsea', 35], ['staryu', 25]] },
-  { nome: 'Cachoeira',  nivel: [40, 65], cor: '#317eaa', pool: [['seaking', 40], ['poliwhirl', 35], ['gyarados', 25]] },
-  { nome: 'Gruta',      nivel: [45, 75], cor: '#346b91', pool: [['seadra', 40], ['kingler', 35], ['tentacruel', 25]] },
-  { nome: 'Abismo',     nivel: [60, 80], cor: '#284f7c', pool: [['gyarados', 55], ['tentacruel', 30], ['seaking', 15]] },
+  { nome: 'Margem',     nivel: [20, 35], cor: '#519eae',
+    pool: [['magikarp', 45], ['goldeen', 20], ['poliwag', 15], ['marill', 12], ['remoraid', 8]] },
+  { nome: 'Juncos',     nivel: [25, 45], cor: '#408f96',
+    pool: [['poliwag', 30], ['goldeen', 22], ['krabby', 18], ['chinchou', 16], ['staryu', 14]] },
+  { nome: 'Corais',     nivel: [30, 55], cor: '#388ab0',
+    pool: [['tentacool', 28], ['horsea', 24], ['staryu', 18], ['omanyte', 15], ['kabuto', 15]] },
+  { nome: 'Cachoeira',  nivel: [40, 65], cor: '#317eaa',
+    pool: [['seaking', 26], ['poliwhirl', 22], ['azumarill', 20], ['dratini', 17], ['gyarados', 15]] },
+  { nome: 'Gruta',      nivel: [45, 75], cor: '#346b91',
+    pool: [['seadra', 24], ['kingler', 20], ['lanturn', 18], ['mantine', 16], ['dragonair', 12], ['tentacruel', 10]] },
+  { nome: 'Abismo',     nivel: [60, 80], cor: '#284f7c',
+    pool: [['gyarados', 24], ['kingdra', 18], ['starmie', 15], ['poliwrath', 14],
+           ['omastar', 12], ['kabutops', 11], ['tentacruel', 6]] },
 ];
 const PESCARIA_DURACAO = 90;       /* segundos de duelo, como no protótipo */
 const PESCARIA_NPC_NIVEL = 65;     /* pedido: o parceiro do NPC é SEMPRE 65 */
 const PESCARIA_NPC_BST_MIN = 500;  /* pedido: e sempre de BST acima de 500 */
 const PESCARIA_TENSAO_MAX = 100;
 const PESCARIA_SOBRA = 10;         /* segundos de prorrogação depois que os lançamentos fecham */
+/* ⚠️ O PASSO DA SIMULAÇÃO e quantos deles cabem num quadro -- ver o laço. O teto de passos é
+   generoso de propósito: ele existe contra uma aba esquecida por horas, não contra uma troca de
+   aba normal, e o próprio fim do duelo corta antes dele na prática. */
+const PESCARIA_PASSO_MAX = 0.1;
+const PESCARIA_PASSOS_MAX = Math.ceil((PESCARIA_DURACAO + PESCARIA_SOBRA) / PESCARIA_PASSO_MAX) + 10;
 
 /* ⚠️ OS NÚMEROS DA PESCA SÃO OS DO PROTÓTIPO, e os dois primeiros são o pedido de 19/09/2026
    (*"a barra de captura já começava um pouco preenchida e ia descendo caso o usuário não fazia
@@ -32697,7 +32717,7 @@ async function pescariaEnviarRank(){
 function pescariaZerar(){
   if(pescaria.laco){ cancelAnimationFrame(pescaria.laco); pescaria.laco = null; }
   pescaria.fase = 'setup'; pescaria.picker = false; pescaria.npc = null;
-  pescaria.tempo = 0; pescaria.ultimo = 0;
+  pescaria.tempo = 0; pescaria.ultimo = 0; pescaria.inicioReal = 0;
   pescaria.oportunidades = new Array(6).fill(null);
   pescaria.proximoSpawn = 0; pescaria.npcPensa = 0;
   pescaria.jogadores = []; pescaria.segurando = false;
@@ -33415,7 +33435,7 @@ function pescariaLargar(){
   pescaria.historico = []; pescaria.logs = []; pescaria.recado = '';
   pescariaSurgir(0); pescariaSurgir(3);
   render();
-  pescaria.ultimo = 0;
+  pescaria.ultimo = 0; pescaria.inicioReal = 0;
   const passo = (ts) => {
     /* ⚠️ E ELE PARA QUANDO A TELA MUDA, não só quando o duelo acaba. Desde que a batalha virou a
        da jornada, o pintor escreve nos ids GLOBAIS dela -- `hp-fill-player`, `hp-fill-enemy` e
@@ -33427,12 +33447,32 @@ function pescariaLargar(){
        porta de fora e o duelo acabou.
        Parar é seguro e completo: só o `abrirPescaria` põe a tela de volta, e ele zera tudo. */
     if(pescaria.fase !== 'jogando' || game.screen !== 'pescaria'){ pescaria.laco = null; return; }
-    /* ⚠️ O `dt` É LIMITADO: com a aba em segundo plano o `requestAnimationFrame` para, e na volta
-       o primeiro quadro traria os segundos todos de uma vez -- o peixe escaparia sozinho e a
-       tensão estouraria sem ninguém ter tocado. É a mesma guarda da Corrida. */
-    const dt = pescaria.ultimo ? Math.min(0.1, (ts - pescaria.ultimo) / 1000) : 0;
+    /* ⚠️ O RELÓGIO É O REAL, e o jogo RECUPERA o que passou com a aba escondida (20/09/2026,
+       reportado: *"quando eu saio da tela, troco de aba ou minimizo, o relógio está pausando,
+       isso não deve acontecer"*).
+
+       Ele somava `dt` de quadro em quadro com teto de 0,1 s -- e o `requestAnimationFrame` PARA
+       quando a aba não está visível. Ou seja o duelo inteiro congelava: voltando depois de 30 s,
+       o relógio marcava os mesmos 12 s e o adversário não tinha pescado nada.
+
+       ⚠️ O TETO DE 0,1 s FICA, e ele é o PASSO -- não o limite do tempo. A física da pesca é por
+       passo (a tensão sobe por segundo, a boia afunda num instante), e entregar 30 s num `dt` só
+       daria outro resultado: a linha estouraria sem ninguém ter tocado, que é o que a guarda
+       velha evitava. O que mudou é que agora ele roda N passos até ALCANÇAR o relógio real, em
+       vez de jogar fora o que sobrou.
+
+       ⚠️ E O NÚMERO DE PASSOS TEM TETO: o duelo tem 90 s mais a prorrogação, então recuperar mais
+       que isso é tempo que não existe -- sem o teto, uma aba esquecida por uma hora tentaria
+       36.000 iterações num quadro só. O `pescariaAtualizar` encerra o duelo sozinho quando o
+       relógio passa, então o excedente é descartado pelo próprio fim. */
+    if(!pescaria.inicioReal) pescaria.inicioReal = ts - pescaria.tempo * 1000;
+    const alvo = (ts - pescaria.inicioReal) / 1000;
+    let voltas = 0;
+    while(pescaria.tempo < alvo && pescaria.fase === 'jogando' && voltas < PESCARIA_PASSOS_MAX){
+      pescariaAtualizar(Math.min(PESCARIA_PASSO_MAX, alvo - pescaria.tempo));
+      voltas++;
+    }
     pescaria.ultimo = ts;
-    pescariaAtualizar(dt);
     pescariaPintar();
     pescaria.laco = requestAnimationFrame(passo);
   };
@@ -33698,10 +33738,33 @@ function pescariaPintar(){
        ponto já está fechado pelo `posso`, que é falso enquanto eu não estou `parado`. */
     if(e.classList.contains('ocupada') !== (ocupada && !minhaZona))
       e.classList.toggle('ocupada', ocupada && !minhaZona);
+    /* ⚠️ A `minha` TAMBÉM É DO PINTOR (20/09/2026, reportado: *"o ponto que eu estava antes está
+       ficando com um azul mais vivo, diferente dos outros"*). Ela era posta no `render()` e o
+       pintor não a tirava -- e o laço não chama render(), então o azul ficava preso no ponto de
+       onde eu já tinha saído. É a mesma família dos chips da Corrida e do modal da contagem.
+       ⚠️ E ELA AINDA ESCONDIA A `.viva`: o azul vem DEPOIS na folha, então num ponto com peixe
+       sobrava só a borda amarela -- que foi a segunda metade do relato. */
+    if(e.classList.contains('minha') !== minhaZona) e.classList.toggle('minha', minhaZona);
     const pode = posso && !(ocupada && !minhaZona);
     if(e.disabled === pode) e.disabled = !pode;
     põe('pescAtv' + k, pescariaAtividade(k));
   });
+  /* ⚠️ O MAPA SOME ENQUANTO A PESCA ACONTECE (20/09/2026, a pedido: *"quando o usuario clicar em
+     algum ponto de pesca e exibir a bóia, deixe o quadro da ilha invisivel, até acabar o confronto
+     ... ou arrebentar a linha"*). Fora do `parado` não há nada pra decidir no lago -- todos os
+     pontos estão fechados pelo `posso` --, e o que importa está no painel de baixo: a boia, a
+     tensão ou a batalha.
+     ⚠️ QUEM ESCONDE É O PINTOR e não o render: o estado muda DENTRO do laço, e montado por
+     condição o mapa ficaria preso no que estava quando a tela foi desenhada. É a mesma lição do
+     modal da contagem da Corrida.
+     ⚠️ E O `hidden` PRECISA DA REGRA NO CSS: o `.pesc-mapa` é `display:block`, e qualquer display
+     do autor anula o `hidden` da folha do navegador -- foi exatamente o que deixou aquele modal
+     preso na tela depois de ele já ter sido "consertado" uma vez. */
+  const mapa = document.getElementById('pescMapa');
+  if(mapa){
+    const esconder = eu.estado !== 'parado';
+    if(mapa.hidden !== esconder) mapa.hidden = esconder;
+  }
 
   /* ⚠️ O PAINEL DO MOMENTO. É esta troca que faz o SINAL de fisgar existir: a boia afunda no
      motor por TEMPO, e sem repintar aqui a tela continuava pedindo pra esperar. */
@@ -33802,7 +33865,7 @@ function pescariaMapaHtml(interativo){
       + `<button class="pesc-info" onclick="abrirZonaDaPescaria(${k})"`
       + ` aria-label="Chances em ${escapeHtmlSafe(z.nome)}" title="Chances de encontro">i</button></div>`;
   }).join(``);
-  return `<div class="pesc-mapa${interativo ? "" : " so-olhar"}">${PESCARIA_ILHA_SVG}${pontos}</div>`;
+  return `<div class="pesc-mapa${interativo ? "" : " so-olhar"}" id="pescMapa">${PESCARIA_ILHA_SVG}${pontos}</div>`;
 }
 /* ---------------------------------------------------------------------------
    O PICKER -- um TIME, não um pokémon
@@ -33930,7 +33993,6 @@ function renderPescaria(){
     ${temTime
       ? pescariaCardDoTime(esc, false, `pescariaAbrirPicker()`)
       : `<button class="pesc-parceiro" onclick="pescariaAbrirPicker()">`
-        + `<span class="pesc-parceiro-sprite"><span class="pesc-vazio">?</span></span>`
         + `<span class="pesc-parceiro-info"><b>Nenhum time escolhido</b>`
         + `<small>Escolha o time que vai lutar por você</small></span>`
         + `<span class="pesc-parceiro-acao">Escolher</span></button>`}
