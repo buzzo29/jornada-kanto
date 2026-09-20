@@ -1634,5 +1634,53 @@ console.log('\n=== A TELA ANIMA A FILA INTEIRA ===');
                             src.indexOf('function pescariaPlacarHtml'));
   ok('o preload leva a fila inteira', /preloadBattleSprites\(ms\)/.test(comecar));
 }
+
+/* ============================================================================
+   ⚠️ A LUPA DO iOS NO BOTÃO DE PUXAR (20/09/2026)
+   ============================================================================
+   Reportado: *"quando eu seguro o botão SEGURE PARA PUXAR, por estar em uma pagina web, fica
+   aparecendo a lupa de zoom e selecionando o texto do botão"*.
+
+   ⚠️ E ESTA TRAVA LÊ O ARQUIVO, não o navegador -- é o único jeito que existe. O
+   `-webkit-touch-callout` é do WebKit, e o Chromium **DESCARTA a declaração ao parsear**:
+   conferido, ela some do CSSOM e o `getComputedStyle` devolve string VAZIA. Ou seja, uma trava
+   de navegador daria FALSO NEGATIVO -- ela acusaria o que está certo, ou (pior) passaria com a
+   regra removida sem conseguir distinguir os dois casos.
+   ============================================================================ */
+console.log('\n=== A LUPA DO iOS NO BOTÃO DE PUXAR ===');
+{
+  const i = src.indexOf('.pesc-puxar{');
+  const regra = i < 0 ? '' : src.slice(i, src.indexOf('}', i) + 1);
+  ok('(a regra do botão de puxar existe)', regra.length > 40, regra.length + ' chars');
+  /* ⚠️ AS DUAS `-webkit-` SÃO O QUE O iOS LÊ: o `user-select:none` sem prefixo NÃO basta no
+     Safari, e NADA nele desliga a lupa -- quem faz isso é o `-webkit-touch-callout`. */
+  ok('o texto do botão não se seleciona', regra.indexOf('user-select:none') >= 0);
+  ok('  inclusive no Safari (o prefixo)', regra.indexOf('-webkit-user-select:none') >= 0);
+  ok('  e a LUPA não aparece', regra.indexOf('-webkit-touch-callout:none') >= 0);
+  /* ⚠️ E O REALCE DE TOQUE: é a caixa cinza que o iOS põe POR CIMA do botão enquanto o dedo está
+     nele -- e aqui o dedo fica SEGUNDOS, cobrindo justamente o amarelo do `.puxando`. */
+  ok('  e o realce cinza do toque não cobre o amarelo',
+     regra.indexOf('-webkit-tap-highlight-color:transparent') >= 0);
+  /* a que já existia, e que o pedido não pode desfazer: sem ela, segurar e mexer o dedo rola a
+     página e o navegador CANCELA o `pointerdown` -- a linha soltaria sozinha no meio do puxão */
+  ok('  e segurar-e-mexer continua não rolando a página', regra.indexOf('touch-action:none') >= 0);
+
+  /* ⚠️ ELAS FICAM SÓ NO BOTÃO, e não no `body`: este é o ÚNICO botão do jogo que se SEGURA (o
+     `onpointerdown` aparece UMA vez no arquivo inteiro). Globais, elas tirariam a seleção de
+     texto de tudo -- e há coisa no jogo que se copia, como o código de treinador. */
+  ok('o jogo tem UM botão que se segura', (src.match(/onpointerdown=/g) || []).length === 1,
+     (src.match(/onpointerdown=/g) || []).length + ' botões');
+  /* ⚠️ A CONTA É A MAIS SIMPLES QUE EXISTE, e de propósito: a declaração aparece UMA vez no
+     arquivo inteiro, e é a do botão. Uma regex sobre SELETORES pra achar a regra global seria
+     frágil -- a primeira versão não acusava NADA --, e esta pega qualquer forma de espalhá-la,
+     inclusive uma que eu não previ.
+     ⚠️ E ELA COBRA QUE O COMENTÁRIO DO JOGO NÃO A REPRODUZA: ele reproduzia o CSS do protótipo ao
+     pé da letra, e a conferência de acusação ABSORVEU o defeito religado -- o replace pegou o
+     comentário em vez da regra, e a trava passou com o defeito de volta. É a sexta vez que este
+     projeto paga um comentário assim, e a primeira em que ele mente pro TESTE. */
+  ok('a declaração da lupa aparece UMA vez no jogo inteiro',
+     (src.match(/-webkit-touch-callout/g) || []).length === 1,
+     (src.match(/-webkit-touch-callout/g) || []).length + ' vezes');
+}
 console.log(falhas ? '\n' + falhas + ' FALHA(S)' : '\nTudo certo.');
 process.exit(falhas ? 1 : 0);

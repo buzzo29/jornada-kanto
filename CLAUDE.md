@@ -13405,6 +13405,50 @@ des-escalada muda os dois hashes. Tudo aqui é apresentação mais um **chamador
 3. **⚠️ UMA CLASSE DE BOTÃO SEM CSS** (`pesc-trocar`) foi pega pela varredura de classes fantasma --
    ela não fazia nada, porque o `.btn` da casa já traz a margem. Letra morta sai.
 
+#### ⚠️ A LUPA DO iOS NO BOTÃO DE PUXAR (20/09/2026)
+
+Reportado: *"quando eu seguro o botão SEGURE PARA PUXAR, por estar em uma pagina web, fica
+aparecendo a lupa de zoom e selecionando o texto do botão, e isso ta bagunçando e complicando a
+pescaria"*.
+
+**⚠️ O `user-select:none` SEM PREFIXO NÃO BASTA NO SAFARI, e NADA nele desliga a LUPA** -- quem
+faz isso é o `-webkit-touch-callout:none`. As duas estavam no protótipo e **se perderam na**
+**portagem**: conferido, o `-webkit-touch-callout` não aparecia **uma vez no jogo inteiro**.
+
+- **O `-webkit-tap-highlight-color:transparent` FOI JUNTO**, e ele é do mesmo problema: é a caixa
+  cinza que o iOS põe **por cima** do botão enquanto o dedo está nele -- e aqui o dedo fica
+  **segundos**, cobrindo justamente o amarelo do `.puxando`, que é a única pista de que a linha
+  está sendo recolhida.
+- **⚠️ ELAS FICAM SÓ NO BOTÃO, e não no `body`.** Este é o **único** botão do jogo que se SEGURA
+  (o `onpointerdown` aparece UMA vez no arquivo inteiro). Globais, elas tirariam a seleção de texto
+  de tudo -- e há coisa no jogo que se **copia**, como o código de treinador.
+- O `touch-action:none` que já existia continua: sem ele, segurar e mexer o dedo rola a página e o
+  navegador **cancela** o `pointerdown` -- a linha soltaria sozinha no meio do puxão.
+
+**⚠️ E NENHUM TESTE DE NAVEGADOR CONSEGUE PROVAR ISSO -- a trava tem que ler o ARQUIVO.** O
+`-webkit-touch-callout` é do WebKit, e o **Chromium DESCARTA a declaração ao parsear**: conferido,
+ela some do CSSOM (`cssRules` devolve a regra sem ela) e o `getComputedStyle` devolve string
+**vazia**. Uma trava de navegador daria **falso negativo** -- ela não consegue distinguir "a regra
+está lá" de "a regra foi removida".
+
+#### ⚠️ E O COMENTÁRIO ABSORVEU O DEFEITO RELIGADO -- a sexta vez, e a pior
+
+O comentário que eu escrevi ao lado da regra **reproduzia o CSS do protótipo ao pé da letra**. Na
+conferência de acusação, o `replace` que remove a declaração pegou **o comentário em vez da regra**
+-- e a trava **passou com o defeito de volta**, relatando zero falhas.
+
+Este projeto já pagou isso cinco vezes (o nome de líder na bifurcação, o código velho na trava do
+`slotDaConta`, a palavra "Máquina", a interpolação da faixa de update, o ramo morto do
+`pescariaNpcPuxa`) -- **e nas cinco o comentário acusava o que estava certo**. Esta é a primeira em
+que ele faz o contrário: **ele mente pro TESTE, escondendo um defeito real**.
+
+Hoje a trava cobra as duas coisas de uma vez, e com a conta mais simples que existe: **a declaração
+aparece UMA vez no arquivo inteiro**. Isso pega o comentário que a reproduz E a regra espalhada pro
+`body`, sem precisar de uma regex sobre seletores -- e a primeira versão, que era exatamente essa
+regex, **não acusava nada**.
+
+Conferido que ela acusa: **2** falhas sem as duas `-webkit-`, **1** sem o realce, **1** sem o
+`touch-action` e **1** com a regra espalhada pro `body`.
 #### ⚠️ E A TELA PARAVA NO PRIMEIRO CONFRONTO -- o defeito que o time de 6 criou
 
 Reportado no mesmo dia: *"eu lutei contra um tentacruel e meu pokemon morreu, porém ainda tinha

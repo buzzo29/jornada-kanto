@@ -3218,8 +3218,25 @@
   .pesc-barra i.tens.aviso{background:#e0a800;}
   .pesc-barra i.tens.perigo{background:var(--red);}
   /* ⚠️ `touch-action:none` NO BOTÃO DE PUXAR: sem ele, segurar e mexer o dedo rola a página e o
-     navegador cancela o `pointerdown` -- a linha soltaria sozinha no meio do puxão. */
-  .pesc-puxar{touch-action:none;user-select:none;text-align:center;}
+     navegador cancela o `pointerdown` -- a linha soltaria sozinha no meio do puxão.
+     ⚠️ E AS DUAS PROPRIEDADES `-webkit-` SÃO O QUE O iOS DE FATO LÊ (20/09/2026, reportado:
+     *"quando eu seguro o botão SEGURE PARA PUXAR, fica aparecendo a lupa de zoom e selecionando o
+     texto do botão"*). O `user-select:none` sem prefixo NÃO basta no Safari, e nada nele desliga
+     a LUPA -- quem faz isso é o callout do WebKit. O `.pull` do protótipo tem as quatro, e elas
+     se perderam na portagem; conferido, a do callout não aparecia UMA vez no jogo inteiro.
+     ⚠️ E O COMENTÁRIO NÃO AS REPRODUZ AO PÉ DA LETRA, de propósito: ele fazia isso, e a
+     conferência de acusação ABSORVEU o defeito religado -- o replace pegou o comentário em vez da
+     regra e a trava passou com o defeito de volta. É a sexta vez que este projeto paga isso, e a
+     primeira em que o comentário mente pro TESTE em vez de pra uma varredura.
+     ⚠️ ELAS FICAM SÓ AQUI, e não no `body`: este é o ÚNICO botão do jogo que se SEGURA (o
+     `onpointerdown` aparece uma vez no arquivo inteiro). Globais, elas tirariam a seleção de texto
+     de tudo -- e há coisa no jogo que se copia, como o código de treinador.
+     ⚠️ E O `-webkit-tap-highlight-color` VAI JUNTO: ele é a caixa cinza que o iOS põe POR CIMA do
+     botão enquanto o dedo está nele, e aqui o dedo fica segundos -- ela cobriria justamente o
+     amarelo do `.puxando`, que é a única pista de que a linha está sendo recolhida. */
+  .pesc-puxar{touch-action:none;text-align:center;
+    user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;
+    -webkit-tap-highlight-color:transparent;}
   /* ⚠️ ELE AFUNDA ENQUANTO O DEDO ESTÁ NELE -- o `.pull.held` do protótipo. Sem isso o botão não
      responde ao toque de jeito nenhum: puxar é SEGURAR, e a única pista de que a linha estava
      sendo recolhida era a barra andando. O amarelo é o do `.btn.selected` e o deslocamento é o do
