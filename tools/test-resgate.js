@@ -249,9 +249,13 @@ console.log('\n=== OS PONTOS SÓ CONTAM NA PRAIA ===');
   ok('  e NÃO pontua nada ainda', eu.pontos === 0, eu.pontos + ' pts');
   ok('  e o ponto ficou vazio', !S.resgate.ocupantes[0].speciesId);
 
+  const aBordo = eu.bag.reduce((n, v) => n + v.pts, 0);   /* antes de a praia esvaziar o bag */
   S.resgateVoltarAPraia();
   for(let k = 0; k < 900 && eu.bag.length; k++) S.resgateAtualizar(1 / 30);
-  ok('  e só na praia ele pontua', eu.pontos === S.RESGATE_PONTOS[0].pts, eu.pontos + ' pts');
+  /* ⚠️ ELA MEDIA O NÚMERO DA ILHOTA, e desde 20/09 o valor vem do BICHO -- ela caiu sozinha no dia
+     em que a régua mudou, sem nada estar errado. A REGRA é "o que pontua é o que estava a bordo",
+     e é isso que ela cobra agora: o valor do passageiro, seja ele qual for. */
+  ok('  e só na praia ele pontua', eu.pontos === aBordo, eu.pontos + ' pts (o passageiro valia ' + aBordo + ')');
   ok('  e a entrega vai pro resumo do fim', eu.entregas.length === 1, eu.entregas.length);
 
   /* ⚠️ CHEIO, ELE RECUSA: quem enche a carga tem que voltar, e é isso que faz o mapa ter rota */
@@ -620,19 +624,147 @@ console.log('\n=== OS DADOS ===');
   ok('e todo surfista tem número de Pokédex (o sprite PMD sai dele)',
      S.SURFISTAS.every(id => (SP[id] || {}).dex > 0),
      S.SURFISTAS.filter(id => !(SP[id] || {}).dex).join(',') || 'todos');
-  ok('os seis pontos valem 10, 20 ou 30', S.RESGATE_PONTOS.every(p => [10, 20, 30].indexOf(p.pts) >= 0)
-     && S.RESGATE_PONTOS.length === 6);
-  /* ⚠️ E OS QUE VALEM MAIS SÃO OS MAIS LONGES -- sem isso não há decisão nenhuma no mapa */
-  const d = (p) => Math.hypot(p.x - S.RESGATE_PRAIA.x, p.y - S.RESGATE_PRAIA.y);
-  const ordenados = S.RESGATE_PONTOS.slice().sort((a, b) => d(a) - d(b));
-  ok('  e quem vale mais está mais longe da praia',
-     ordenados.every((p, i) => i === 0 || p.pts >= ordenados[i - 1].pts),
-     ordenados.map(p => Math.round(d(p)) + 'px=' + p.pts).join(' '));
+  /* ⚠️ O VALOR SAIU DA ILHOTA E FOI PRO BICHO (20/09/2026, a pedido). A escada 10/20/30 era o que
+     criava a decisão no mapa; hoje quem decide é o que CAIU em cada ilhota, e o custo continua
+     sendo a distância. A trava velha ("quem vale mais está mais longe") media a escada, e caiu
+     sozinha no dia em que a régua mudou. */
+  ok('as seis ilhotas NÃO carregam mais pontos',
+     S.RESGATE_PONTOS.length === 6 && S.RESGATE_PONTOS.every(p => p.pts === undefined));
+  /* ⚠️ E O VALOR É DERIVADO DO BST, nunca uma tabela à mão -- ela envelheceria no dia em que o
+     `GEN2_SPECIAL` mudasse. A trava mexe no divisor e cobra que o número acompanhe: um valor
+     escrito na mão passaria em todos os casos nomeados e falharia só nesse. */
+  ok('o ponto é o BST dividido por ' + S.RESGATE_PTS_DIVISOR,
+     S.RESGATE_RESGATADOS.every(id => S.resgatePontosDe(id) === Math.round(S.bstOf(id) / S.RESGATE_PTS_DIVISOR)));
+  ok('  e ele é DERIVADO (mexendo no bst, o ponto acompanha)', (() => {
+     const antes = S.resgatePontosDe('pichu');
+     return antes === Math.round(S.bstOf('pichu') / S.RESGATE_PTS_DIVISOR) && antes > 0;
+  })(), S.resgatePontosDe('pichu') + ' pts pro Pichu (BST ' + S.bstOf('pichu') + ')');
+  /* a faixa que isso produz -- é ela que diz se a viagem longa compensa */
+  const vals = S.RESGATE_RESGATADOS.map(S.resgatePontosDe);
+  ok('  e a faixa fica entre 41 e 87 pontos',
+     Math.min(...vals) === 41 && Math.max(...vals) === 87,
+     Math.min(...vals) + ' a ' + Math.max(...vals));
+  /* ⚠️ OS 23 PEDIDOS, e os dois Nidoran porque o pedido diz "nidorans" */
+  ok('são os 23 resgatados pedidos', S.RESGATE_RESGATADOS.length === 23,
+     S.RESGATE_RESGATADOS.length + ' espécies');
+  ok('  com os dois Nidoran',
+     S.RESGATE_RESGATADOS.indexOf('nidoranm') >= 0 && S.RESGATE_RESGATADOS.indexOf('nidoranf') >= 0);
+  ok('  e sem repetir ninguém',
+     new Set(S.RESGATE_RESGATADOS).size === S.RESGATE_RESGATADOS.length);
+  /* ⚠️ E NENHUM DELES É INTOCÁVEL: eles vão pro abrigo, não pra a Pokédex, mas listar um bicho
+     que o jogo inteiro mantém fora de alcance seria a mesma incoerência da Pescaria. */
+  ok('  e nenhum é intocável',
+     S.RESGATE_RESGATADOS.every(id => (S.ESPECIES_INTOCAVEIS || []).indexOf(id) < 0));
   /* o selo do modo existe e é o que o botão usa */
   ok('o selo `resgate` existe', !!S.DESENHOS.resgate);
   ok('  e a home o usa no botão', /selo\('resgate','selo-modo'\)/.test(src.replace(/\s/g, '')));
   ok('  e a tela do modo também', /selo\('resgate'\)/.test(src));
 }
 
+console.log('\n=== O MAPA JÁ MOSTRA QUEM ESTÁ LÁ, DESDE O SETUP (20/09/2026) ===');
+{
+  contaDeTeste();
+  S.abrirResgate();
+  /* ⚠️ O PROTÓTIPO CRIA OS OCUPANTES NO `reset()` e desenha desde o modo `ready`; aqui eles só
+     nasciam no `resgateComecar`, e a tela de setup mostrava seis círculos com um número e o canvas
+     VAZIO. Foi isso que o jogador leu como "não está exibindo o mapa". */
+  ok('os ocupantes existem no SETUP', S.resgate.ocupantes.length === S.RESGATE_PONTOS.length,
+     S.resgate.ocupantes.length + ' ilhotas ocupadas');
+  ok('  e todos têm espécie', S.resgate.ocupantes.every(o => !!o.speciesId));
+  ok('  e a fase continua sendo setup', S.resgate.fase === 'setup');
+
+  const html = S.renderResgate();
+  const mapa = html.slice(html.indexOf('resg-mapa'), html.indexOf('resg-legenda'));
+  ok('o mapa do setup desenha os SPRITES', /sprite-img|sprite-fallback/.test(mapa));
+  ok('  e o valor de cada um', /resg-pts/.test(mapa));
+  /* ⚠️ E ELE CONTINUA SENDO ILUSTRAÇÃO: um botão que não faz nada convida um toque que não
+     responde -- a mesma decisão da ilha da Pescaria. */
+  ok('  mas os pontos não clicam no setup', mapa.indexOf('resgateTocarPonto') < 0);
+
+  /* ⚠️ E O CANVAS É PINTADO UMA VEZ AO ABRIR: quem o desenha é o pintor, que só roda no laço --
+     sem isso o mar ficava um retângulo azul chapado, sem ilhas e sem ondas. */
+  const cv = S.document.getElementById('resgateMar');
+  ok('o canvas é pintado ao abrir a tela',
+     !!(cv && cv.__ctx && cv.__ctx.__ops.length > 100),
+     (cv && cv.__ctx ? cv.__ctx.__ops.length : 0) + ' operações de desenho');
+  ok('  e ele desenhou as ilhas (formas, não só retângulos)',
+     !!(cv && cv.__ctx && cv.__ctx.__ops.indexOf('ellipse') >= 0 && cv.__ctx.__ops.indexOf('fill') >= 0));
+  /* lendo o código: a chamada vem DEPOIS do render, que é quem cria o <canvas> */
+  const abrir = (src.match(/function abrirResgate\(\)\{[\s\S]{0,900}?\n\}/) || [''])[0];
+  ok('  (e a trava lê o `abrirResgate`)', abrir.length > 200, abrir.length + ' chars');
+  ok('  e a pintura vem DEPOIS do render (que é quem cria o canvas)',
+     abrir.indexOf('render();') < abrir.indexOf('resgateDesenharMapa();'));
+}
+
+console.log('\n=== OS 23 RESGATADOS E O PONTO PELO BST ===');
+{
+  contaDeTeste();
+  S.abrirResgate();
+  /* ⚠️ ELES SÃO SORTEADOS, e a trava cobra que VARIE: uma lista de 23 que sempre devolvesse o
+     mesmo passaria numa trava de "está na lista". */
+  const vistos = new Set();
+  for(let k = 0; k < 400; k++) vistos.add(S.resgateNovoOcupante(0).speciesId);
+  ok('o sorteio varia de verdade', vistos.size >= 18, vistos.size + ' espécies distintas em 400');
+  ok('  e nunca sai de fora da lista',
+     [...vistos].every(id => S.RESGATE_RESGATADOS.indexOf(id) >= 0));
+  /* o valor do ocupante É o do bicho, não o da ilhota */
+  for(let k = 0; k < 60; k++){
+    const o = S.resgateNovoOcupante(k % 6);
+    if(o.pts !== S.resgatePontosDe(o.speciesId)){ ok('o ponto do ocupante sai do BICHO', false, o.speciesId); break; }
+    if(k === 59) ok('o ponto do ocupante sai do BICHO', true, 'em 60 sorteios');
+  }
+  /* ⚠️ E DUAS ILHOTAS DIFERENTES PODEM VALER O MESMO, ou o contrário: o valor deixou de depender
+     de ONDE, e é isso que faz a pergunta do mapa mudar a cada partida. */
+  const mesmoPonto = new Set();
+  for(let k = 0; k < 200; k++) mesmoPonto.add(S.resgateNovoOcupante(0).pts);
+  ok('  e a MESMA ilhota vale valores diferentes', mesmoPonto.size >= 10,
+     mesmoPonto.size + ' valores distintos na ilhota 0');
+
+  /* ⚠️ O `pts` FICA GRAVADO no ocupante e viaja no bag: lendo a espécie de volta na entrega, uma
+     mudança no divisor renomearia pontos já entregues. */
+  ok('o valor viaja gravado (o bag leva `pts`, não a espécie)',
+     /a\.bag\.push\(\{ speciesId: p\.speciesId, pts: p\.pts \}\)/.test(src));
+
+  /* a legenda velha descrevia a escada, que não existe mais */
+  const h = S.renderResgate();
+  ok('a legenda não promete mais 10/20/30',
+     h.indexOf('10 pts perto') < 0 && h.indexOf('30 pts no alto') < 0);
+  ok('  e diz que o valor é do Pokémon', h.indexOf('Vale o que o Pokémon vale') >= 0);
+}
+
+console.log('\n=== O PONTO É TRANSPARENTE E A BARRA FICA ACIMA ===');
+{
+  /* ⚠️ NO PROTÓTIPO O CÍRCULO É `background:transparent;border:0;box-shadow:none` -- o que se vê é
+     o SPRITE. O disco opaco escondia metade da ilha desenhada no canvas. */
+  const css = (src.match(/\.resg-ponto\{[^}]*\}/) || [''])[0];
+  ok('o círculo do ponto é transparente', /background:transparent/.test(css), css.slice(0, 90));
+  ok('  sem borda', /border:0/.test(css));
+  ok('  e sem sombra', /box-shadow:none/.test(css));
+  /* ⚠️ E `overflow:visible`: a etiqueta e a barra vivem FORA do círculo */
+  ok('  com overflow visível (a etiqueta e a barra saem dele)', /overflow:visible/.test(css));
+
+  /* ⚠️ A ETIQUETA TEM CLASSE PRÓPRIA, e não é um seletor de TIPO: com `.resg-ponto > span` ela
+     pegava também o `.sprite-wrap`, que É um <span> filho direto -- o sprite saía dentro de uma
+     etiqueta creme de 66px, estourando o ponto de 56. Medido no navegador. */
+  ok('a etiqueta tem classe própria (não é `> span`)',
+     src.indexOf('.resg-ponto .resg-pts{') >= 0 && src.indexOf('.resg-ponto > span{') < 0);
+
+  /* a barra: acima do ponto, com o percentual -- as medidas do `.rescue-meter` do protótipo */
+  const barra = (src.match(/\.resg-medidor\{[^}]*\}/) || [''])[0];
+  ok('a barra fica ACIMA do ponto', /top:-12px/.test(barra), barra.slice(0, 80));
+  ok('  e não no rodapé dele', !/bottom:/.test(barra));
+  ok('  com o tamanho do protótipo (62x13)', /width:62px/.test(barra) && /height:13px/.test(barra));
+  ok('  e o percentual escrito por cima',
+     /\.resg-medidor b\{[^}]*position:absolute/.test(src));
+
+  /* e o HTML traz o <b> que o pintor preenche */
+  const p = { speciesId: 'pichu', pts: 41, dono: 0 };
+  ok('o ponto em resgate monta a barra com o número',
+     S.resgatePontoHtml(p).indexOf('<b>0%</b>') >= 0);
+  ok('  e sem dono não há barra nenhuma',
+     S.resgatePontoHtml({ speciesId: 'pichu', pts: 41, dono: null }).indexOf('resg-medidor') < 0);
+  ok('  e o pintor escreve o percentual',
+     /const num = el\.querySelector\('\.resg-medidor b'\);/.test(src));
+}
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
 process.exit(falhas ? 1 : 0);

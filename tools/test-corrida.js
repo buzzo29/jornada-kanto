@@ -539,9 +539,12 @@ console.log('\n=== A SELEÇÃO: ORDENADA PELO SPEED DA CORRIDA ===');
   ok('nem a modalidade', S.corrida.formato === 'relay', S.corrida.formato);
   S.corrida.fase = 'setup';
 
-  /* trocar de modalidade corta o excedente */
+  /* ⚠️ ELA MEDIA O CORTE ("trocar pra individual corta pra 1"), e cortar seis pra um DEIXA o
+     primeiro -- que era justamente o defeito reportado em 20/09. Hoje cada modalidade tem a
+     própria seleção, e a trava do que ficou no lugar está no bloco 23. */
   S.corridaTrocarFormato('single');
-  ok('trocar pra individual corta pra 1', S.corrida.escolhidos.length === 1, String(S.corrida.escolhidos.length));
+  ok('trocar de modalidade não traz ninguém do outro lado', S.corrida.escolhidos.length === 0,
+     String(S.corrida.escolhidos.length));
 }
 
 /* ============================================================================
@@ -2013,6 +2016,61 @@ console.log('\n=== A LARGADA VAI PRO TOPO, E O QUADRO VAZIO SUMIU ===');
   ok('a largada rola a página pro topo', /window\.scrollTo\(0, 0\);/.test(ordem.slice(0, 700)));
   ok('  e DEPOIS do render (senão o próprio render desfaz)',
      ordem.indexOf('render();') < ordem.indexOf('window.scrollTo(0, 0);'));
+}
+
+/* ============================================================================
+   23) CADA MODALIDADE TEM A PRÓPRIA SELEÇÃO (20/09/2026)
+   ============================================================================ */
+console.log('\n=== A SELEÇÃO NÃO VAZA ENTRE AS MODALIDADES ===');
+{
+  contaDeTeste();
+  S.abrirCorrida();
+  const nomes = (a) => a.map(p => (SP[p.speciesId] || {}).name).join(',');
+
+  /* ⚠️ ELA CORTAVA A LISTA (`slice(0, corridaQuantos())`), e cortar seis pra UM deixa o primeiro --
+     ou seja a individual herdava um corredor que ninguém escolheu pra ela. Foi reportado com print:
+     o Umbreon do revezamento aparecendo sozinho na individual. */
+  S.corridaTrocarFormato('relay');
+  S.corridaEscolherTime(0);
+  const time = nomes(S.corrida.escolhidos);
+  ok('o revezamento tem os seis', S.corrida.escolhidos.length === S.CORRIDA_TRECHOS, time);
+
+  S.corridaTrocarFormato('single');
+  ok('a individual abre VAZIA (não herda o primeiro do time)',
+     S.corrida.escolhidos.length === 0, nomes(S.corrida.escolhidos) || '(vazio)');
+
+  S.corridaToggle(0, 0);
+  ok('  e escolher nela não mexe no revezamento', S.corrida.escolhidos.length === 1);
+  const solo = nomes(S.corrida.escolhidos);
+
+  /* ⚠️ E GUARDAR (em vez de zerar) é o que faz a ida e volta não custar nada */
+  S.corridaTrocarFormato('relay');
+  ok('voltando ao revezamento, o time está como ficou',
+     nomes(S.corrida.escolhidos) === time, nomes(S.corrida.escolhidos));
+  S.corridaTrocarFormato('single');
+  ok('  e voltando à individual, o corredor também',
+     nomes(S.corrida.escolhidos) === solo, nomes(S.corrida.escolhidos));
+
+  /* trocar o número de participantes NÃO mexe na seleção -- é outro eixo */
+  S.corridaTrocarParticipantes(4);
+  ok('trocar de participantes não mexe na seleção', nomes(S.corrida.escolhidos) === solo);
+
+  /* ⚠️ O CAMPO PRECISA EXISTIR NA DECLARAÇÃO do objeto, e não só no `corridaZerar`: o
+     `abrirCorrida` NÃO zera, então na primeira entrada ele seria `undefined` -- e o
+     `corridaTrocarFormato` escreve nele antes de qualquer outra coisa. */
+  const decl = src.slice(src.indexOf('const corrida = {'), src.indexOf('const corrida = {') + 700);
+  ok('o campo existe na declaração do objeto (não só no zerar)',
+     decl.indexOf('escolhaPorFormato') >= 0);
+  ok('  e no `corridaZerar` também',
+     src.slice(src.indexOf('function corridaZerar')).slice(0, 900).indexOf('escolhaPorFormato') >= 0);
+  /* e ele NÃO corta mais */
+  ok('  e a troca não CORTA mais a lista',
+     src.indexOf('corrida.escolhidos.slice(0, corridaQuantos())') < 0);
+
+  /* sair do modo zera as duas */
+  S.corridaZerar();
+  ok('sair do modo zera as duas seleções',
+     S.corrida.escolhaPorFormato.single.length === 0 && S.corrida.escolhaPorFormato.relay.length === 0);
 }
 
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');

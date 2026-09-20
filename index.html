@@ -3305,24 +3305,42 @@
   .resg-mapa canvas{display:block;width:100%;height:100%;}
   /* O ponto de resgate: um botão redondo sobre o mar, centrado na coordenada dele. O
      `translate(-50%,-50%)` é o que faz o `left/top` ser o CENTRO e não o canto. */
-  .resg-ponto{position:absolute;transform:translate(-50%,-50%);width:54px;height:54px;padding:0;
+  /* ⚠️ O CÍRCULO É TRANSPARENTE, como no protótipo (20/09/2026, a pedido: *"os circulos do
+     prototipo estavam mais transparentes que essa que voce colocou"*). Lá ele é literalmente
+     `background:transparent;border:0;box-shadow:none` -- o que se vê é o SPRITE, com um
+     drop-shadow, e a etiqueta de pontos logo abaixo dele. O disco opaco que estava aqui
+     escondia metade da ilha desenhada no canvas.
+     ⚠️ E O `overflow` É `visible`: a etiqueta e a barra ficam FORA do círculo. */
+  .resg-ponto{position:absolute;transform:translate(-50%,-50%);width:56px;height:57px;padding:0;
     display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;
-    border:2px solid #17334b;border-radius:50%;background:#fff6d8d9;cursor:pointer;z-index:2;
-    font:800 .55rem/1 var(--font-ui);color:#233647;text-align:center;overflow:hidden;}
+    border:0;background:transparent;box-shadow:none;cursor:pointer;z-index:2;
+    font:800 .55rem/1 var(--font-ui);color:#233647;text-align:center;overflow:visible;}
   /* ⚠️ TRÊS CLASSES, e não `.resg-ponto img`: o `.sprite-sm .sprite-img` da casa é 0-2-0 e
      ganharia de um seletor de um elemento -- o sprite sairia com 48px e estouraria o círculo de
      54. Com 0-3-0 este vence independente da ORDEM dos blocos na folha, que é a armadilha que o
      sprite da lista de rota já custou. */
-  .resg-ponto .sprite-wrap .sprite-img{width:30px;height:30px;}
-  .resg-ponto .sprite-wrap .sprite-fallback{font-size:1.2rem;}
+  .resg-ponto .sprite-wrap .sprite-img{width:52px;height:52px;
+    filter:drop-shadow(0 2px 0 #223e4c55);}
+  .resg-ponto .sprite-wrap .sprite-fallback{font-size:1.6rem;}
+  /* a etiqueta de pontos fica ABAIXO do sprite, como a `.point span` do protótipo */
+  .resg-ponto .resg-pts{position:absolute;top:44px;border:1px solid #7c734e;background:#fff1bd;
+    color:#374b4f;padding:1px 6px;border-radius:3px;white-space:nowrap;
+    box-shadow:0 2px #18384a44;}
   /* ⚠️ VAZIO ELE FICA APAGADO E NÃO SOME: um ponto que desaparece faz o jogador procurar o que
-     mudou no mapa; apagado, ele diz "aqui não tem ninguém AGORA". */
-  .resg-ponto.vazio{opacity:.4;background:#dfe9eecc;cursor:default;}
-  .resg-ponto.alvo{border-color:var(--yellow);box-shadow:0 0 0 3px #ffcb0577;}
-  .resg-ponto.ocupado{border-style:dashed;}
-  .resg-medidor{position:absolute;left:4px;right:4px;bottom:5px;height:5px;background:#17334b55;
-    border-radius:3px;overflow:hidden;}
-  .resg-medidor i{display:block;height:100%;width:0;background:var(--green);transition:width .08s linear;}
+     mudou no mapa; apagado, ele diz "aqui não tem ninguém AGORA". Sem o disco, quem marca o
+     lugar é um tracejado -- é o `.point.empty` do protótipo. */
+  .resg-ponto.vazio{cursor:default;border:1px dashed #e1ead05c;border-radius:50%;}
+  .resg-ponto.vazio .resg-pts{background:#ceead2bd;color:#446760;border:0;}
+  .resg-ponto.alvo{outline:2px dashed var(--yellow);outline-offset:1px;border-radius:50%;}
+  .resg-ponto.ocupado .resg-pts{background:#ffe0a8;}
+  /* ⚠️ A BARRA FICA ACIMA DO PONTO, fora do círculo -- ela ficava no rodapé DELE, e foi
+     reportada como "no meio do círculo e feia". São as medidas do `.rescue-meter` do protótipo. */
+  .resg-medidor{position:absolute;top:-12px;left:50%;transform:translateX(-50%);
+    width:62px;height:13px;border:2px solid #16394c;border-radius:3px;background:#17334be8;
+    overflow:hidden;pointer-events:none;z-index:4;}
+  .resg-medidor i{display:block;height:100%;width:0;background:var(--green);transition:width .07s linear;}
+  .resg-medidor b{position:absolute;inset:0;text-align:center;
+    font:800 8px/11px var(--font-ui);color:#fff;text-shadow:1px 1px #17334b,-1px -1px #17334b;}
   .resg-medidor i.npc{background:#ffc16f;}
   /* A PRAIA é o sétimo alvo, e ela é um retângulo e não um círculo de propósito: ela não é um
      ponto de resgate, é o lugar pra onde se VOLTA -- forma diferente, leitura diferente. */
@@ -31339,6 +31357,10 @@ const corrida = {
   fase: 'setup', tempo: 0, contagem: 0, ultimoQuadro: 0, animacao: 0,
   tentativaDaTravessia: -1, perfeitos: 0, brilho: 0, brilhoTexto: '',
   aviso: '', faltando: [], recado: '', picker: false, laco: null, _pintouFim: false,
+  /* ⚠️ ELE PRECISA EXISTIR AQUI TAMBÉM, e não só no `corridaZerar`: o `abrirCorrida` NÃO zera
+     (ele só mexe na fase e no picker), então um campo que só nasça lá é `undefined` na primeira
+     entrada -- e o `corridaTrocarFormato` escreve nele antes de qualquer outra coisa. */
+  escolhaPorFormato: { single: [], relay: [] },
 };
 /* ============================================================================
    O RANKING DOS DOIS TEMPOS (20/09/2026, a pedido)
@@ -31478,6 +31500,8 @@ function corridaZerar(){
     tentativaDaTravessia: -1, perfeitos: 0, brilho: 0, brilhoTexto: '',
     aviso: '', faltando: [], recado: 'Acerte a faixa amarela para acelerar.',
     picker: false, laco: null, _pintouFim: false, timeDoRank: null,
+    /* a seleção de cada modalidade, guardada em separado -- ver o `corridaTrocarFormato` */
+    escolhaPorFormato: { single: [], relay: [] },
   });
   return corrida;
 }
@@ -31859,12 +31883,20 @@ function corridaMover(i, passo){
   render();
 }
 const corridaCompleto = () => corrida.escolhidos.length === corridaQuantos();
+/* ⚠️ CADA MODALIDADE TEM A PRÓPRIA SELEÇÃO (20/09/2026, reportado: *"eu estava na tela do
+   revezamento e escolhi um time, depois troquei para a individual e apareceu automaticamente o
+   PRIMEIRO pokémon do time do revezamento"*).
+   Ela CORTAVA a lista (`slice(0, corridaQuantos())`), e cortar seis pra um deixa o primeiro --
+   ou seja a individual herdava um corredor que ninguém escolheu pra ela. E a razão escrita era
+   boa ("três marcados virariam uma escalação que a tela não sabe mostrar"), só que a saída era
+   a errada: o que não cabe não é pra ser APARADO, é pra ficar guardado no lugar dele.
+   ⚠️ E GUARDAR (em vez de zerar) é o que faz a ida e volta não custar nada: quem escolheu um
+   time, foi ver a individual e voltou, reencontra o time como deixou. */
 function corridaTrocarFormato(f){
   if(corrida.fase === 'correndo' || corrida.fase === 'contagem') return;
+  corrida.escolhaPorFormato[corrida.formato] = corrida.escolhidos;
   corrida.formato = f;
-  /* trocar de modalidade corta o que sobra: a individual leva UM, e três marcados virariam uma
-     escalação que a tela não sabe mostrar */
-  corrida.escolhidos = corrida.escolhidos.slice(0, corridaQuantos());
+  corrida.escolhidos = corrida.escolhaPorFormato[f] || [];
   corrida.fase = 'setup'; render();
 }
 function corridaTrocarParticipantes(n){
@@ -34094,12 +34126,16 @@ function renderPescaria(){
    ter essa proporção: os pontos são posicionados em porcentagem sobre ela. */
 const RESGATE_W = 360, RESGATE_H = 390;
 const RESGATE_PRAIA = { x: 180, y: 342 };
-/* ⚠️ OS PONTOS LONGE VALEM MAIS, e a escada é a do protótipo: 10 perto da praia, 20 no meio, 30
-   no alto. É ela que faz a decisão existir -- ir buscar 30 custa ~3x a distância de um 10. */
+/* ⚠️ AS SEIS ILHOTAS SÃO AS DO PROTÓTIPO, mas o VALOR não mora mais nelas (20/09/2026, a pedido:
+   *"os pontos que eles dao devem ser de acordo com o bst deles, o bst dividido por 5"*).
+   Elas eram 10 perto / 20 no meio / 30 no alto, e era a escada que criava a decisão. Hoje quem
+   decide é o BICHO que caiu ali -- o custo continua sendo a distância, e a pergunta virou "o que
+   está longe vale a viagem?", que é uma pergunta que muda a cada partida.
+   As posições ficam porque elas são o mapa. */
 const RESGATE_PONTOS = [
-  { x: 64,  y: 274, pts: 10 }, { x: 292, y: 268, pts: 10 },
-  { x: 57,  y: 161, pts: 20 }, { x: 295, y: 147, pts: 20 },
-  { x: 104, y: 62,  pts: 30 }, { x: 259, y: 57,  pts: 30 },
+  { x: 64,  y: 274 }, { x: 292, y: 268 },
+  { x: 57,  y: 161 }, { x: 295, y: 147 },
+  { x: 104, y: 62  }, { x: 259, y: 57  },
 ];
 const RESGATE_DURACAO = 90;
 const RESGATE_CAPACIDADE = 2;          /* todo mundo leva 2 -- ver o cabeçalho */
@@ -34114,8 +34150,22 @@ const RESGATE_MAR_MIN = 7, RESGATE_MAR_EXTRA = 4, RESGATE_MAR_AVISO = 2;
    sortear o lugar do próximo redemoinho, e lendo-os DE VOLTA do estado ele estourava quando a
    lista estava vazia. O estado descreve onde eles estão; o tamanho deles é do jogo. */
 const RESGATE_REDEMOINHO_RAIOS = [24, 22];
-/* quem é resgatado -- os cinco do protótipo, e os cinco existem no `SPECIES` (há trava) */
-const RESGATE_RESGATADOS = ['poliwag', 'goldeen', 'horsea', 'krabby', 'staryu'];
+/* ⚠️ QUEM É RESGATADO -- os 23 pedidos em 20/09/2026, no lugar dos cinco do protótipo (que eram
+   todos de Água). Eles existem no `SPECIES` e há trava; os dois Nidoran entram porque o pedido
+   diz "nidorans", no plural. */
+const RESGATE_RESGATADOS = [
+  'pichu', 'mankey', 'nidoranm', 'nidoranf', 'oddish', 'paras', 'meowth', 'doduo',
+  'voltorb', 'tangela', 'vulpix', 'eevee', 'chikorita', 'cyndaquil', 'bulbasaur',
+  'charmander', 'togepi', 'cleffa', 'igglybuff', 'teddiursa', 'phanpy', 'larvitar', 'elekid',
+];
+/* ⚠️ O VALOR É O BST DIVIDIDO POR 5, e ele é DERIVADO -- nunca uma tabela à mão, que envelheceria
+   no dia em que o `GEN2_SPECIAL` mudasse. Medido nos 23: de **41** (Pichu, BST 205) a **87**
+   (Tangela, 435), com a maioria entre 55 e 66.
+   ⚠️ E A FAIXA É MAIS ESTREITA QUE A ESCADA VELHA (2,1x contra 3x), o que é de propósito: a
+   distância continua sendo o custo, e com um leque de 41 a 87 nenhum bicho torna a viagem longa
+   obrigatória nem inútil. */
+const RESGATE_PTS_DIVISOR = 5;
+const resgatePontosDe = (id) => Math.round(bstOf(id) / RESGATE_PTS_DIVISOR);
 
 /* ⚠️ A VELOCIDADE EM PIXELS POR SEGUNDO, e a fórmula é a mesma FORMA da Corrida (`8 + 4*sqrt`),
    com outros números -- e ela existe porque a faixa crua do jogo é impossível de pôr num mapa:
@@ -34168,6 +34218,11 @@ function abrirResgate(){
   game.modoBloqueado = null;
   game.screen = 'resgate';
   render();
+  /* ⚠️ E O CANVAS É PINTADO UMA VEZ AQUI: quem o desenha é o `resgatePintar`, que só roda dentro
+     do laço do jogo -- então na tela de setup ele ficava um retângulo azul chapado, sem ilhas,
+     sem ondas e sem os redemoinhos. O protótipo desenha desde o modo `ready`.
+     Depois do `render()` porque é ele que cria o `<canvas>`. */
+  resgateDesenharMapa();
 }
 function sairDoResgate(){
   resgateZerar();
@@ -34176,10 +34231,15 @@ function sairDoResgate(){
 function resgateZerar(){
   if(resgate.laco){ cancelAnimationFrame(resgate.laco); resgate.laco = null; }
   resgate.fase = 'setup'; resgate.picker = false; resgate.escolhido = null;
-  resgate.atores = []; resgate.ocupantes = [];
+  resgate.atores = [];
   resgate.tempo = 0; resgate.ultimo = 0; resgate.anim = 0;
   resgate.recado = ''; resgate.recadoAte = 0; resgate.aviso = '';
   resgateMarZerar();
+  /* ⚠️ OS OCUPANTES NASCEM AQUI, e não só no `resgateComecar`: é o que o protótipo faz no
+     `reset()`, e é o que faz o mapa da tela de setup mostrar QUEM está em cada ilhota. Vazios,
+     ele mostrava seis círculos com um número e nada dentro -- e foi isso que o jogador leu como
+     "não está exibindo o mapa". Com o valor vindo do BICHO, eles são a informação da tela. */
+  resgate.ocupantes = RESGATE_PONTOS.map((p, i) => resgateNovoOcupante(i));
 }
 
 /* ---------------------------------------------------------------------------
@@ -34314,8 +34374,11 @@ function resgateAtor(inst, x){
 }
 function resgateNovoOcupante(i){
   const p = RESGATE_PONTOS[i];
-  return { speciesId: RESGATE_RESGATADOS[Math.floor(Math.random() * RESGATE_RESGATADOS.length)],
-           dono: null, falta: RESGATE_TEMPO_NO_PONTO, volta: 0, x: p.x, y: p.y, pts: p.pts };
+  const id = RESGATE_RESGATADOS[Math.floor(Math.random() * RESGATE_RESGATADOS.length)];
+  /* ⚠️ O `pts` FICA GRAVADO NO OCUPANTE, e não é recalculado na entrega: ele viaja no `bag` e no
+     histórico, e lendo a espécie de volta uma mudança no divisor renomearia pontos já entregues. */
+  return { speciesId: id, dono: null, falta: RESGATE_TEMPO_NO_PONTO, volta: 0,
+           x: p.x, y: p.y, pts: resgatePontosDe(id) };
 }
 /* ⚠️ SOLTAR É OBRIGATÓRIO ANTES DE TROCAR DE ALVO: quem estava resgatando tinha o ponto marcado
    como dele, e sem soltar o ponto ficaria reservado pra sempre pra alguém que foi embora. */
@@ -34604,6 +34667,9 @@ function resgatePintar(){
       const pct = Math.max(0, Math.min(100, Math.round((1 - p.falta / RESGATE_TEMPO_NO_PONTO) * 100)));
       if(barra.style.width !== pct + '%') barra.style.width = pct + '%';
       resgateClasse(barra, 'npc', p.dono === 1);
+      /* o número sai junto, como no protótipo: encher sem dizer quanto falta é metade da conta */
+      const num = el.querySelector('.resg-medidor b');
+      if(num && num.textContent !== pct + '%') num.textContent = pct + '%';
     }
   });
   const parar = document.getElementById('resgateParar');
@@ -34625,11 +34691,15 @@ function resgateCargaHtml(a){
    e ela dizia o que a BARRA e a borda tracejada já dizem. O que não se descobre de outro jeito é
    quanto o ponto vale, que é justamente a decisão do jogador.
    Quem está resgatando se lê pela COR da barra -- verde é seu, âmbar é do rival. */
+/* ⚠️ A BARRA FICA ACIMA DO PONTO, com o percentual escrito -- é o `.rescue-meter` do protótipo
+   (`top:-10px`, 62x13px, com um `<b>` por cima). Ela ficava DENTRO do círculo, no rodapé dele, e
+   foi reportada: *"a barra que carrega quando ta resgatando ... ta ficando no meio do circulo e
+   ta feia"*. Fora do círculo ela cabe inteira, e o número diz quanto falta em vez de só encher. */
 function resgatePontoHtml(p){
-  if(!p.speciesId) return '<span>Vazio</span>';
+  if(!p || !p.speciesId) return '<span class="resg-pts">Vazio</span>';
   return spriteHtml({ speciesId: p.speciesId }, 'sprite-sm')
-    + '<span>' + p.pts + ' pts</span>'
-    + (p.dono !== null ? '<span class="resg-medidor"><i></i></span>' : '');
+    + '<span class="resg-pts">' + p.pts + ' pts</span>'
+    + (p.dono !== null ? '<span class="resg-medidor"><i></i><b>0%</b></span>' : '');
 }
 
 /* ---------------------------------------------------------------------------
@@ -34853,15 +34923,23 @@ function resgatePickerHtml(){
   </div>`;
 }
 /* O MAPA em modo ILUSTRAÇÃO (a tela de setup): os pontos são `<span>` e não clicam -- um botão que
-   não faz nada convida um toque que não responde. É a mesma decisão da ilha da Pescaria. */
+   não faz nada convida um toque que não responde. É a mesma decisão da ilha da Pescaria.
+   ⚠️ MAS ELE MOSTRA OS OCUPANTES DE VERDADE (20/09/2026, reportado: *"logo quando eu abro a tela
+   não está exibindo o mapa"*). O protótipo cria os ocupantes no `reset()` e desenha desde o modo
+   `ready`; aqui eles só nasciam no `resgateComecar`, então o setup mostrava seis círculos com um
+   número e o canvas VAZIO -- sem ilhas, sem ondas, sem ninguém pra resgatar.
+   E com o valor vindo do BICHO (e não da ilhota), mostrar quem está lá deixou de ser enfeite: é
+   ELE que diz quanto aquela viagem vale. */
 function resgateMapaHtml(jogando){
   const pontos = RESGATE_PONTOS.map((p, i) => {
     const pos = `left:${p.x / RESGATE_W * 100}%;top:${p.y / RESGATE_H * 100}%`;
-    const dentro = jogando ? '' : `<span>${p.pts} pts</span>`;
+    const o = (resgate.ocupantes || [])[i];
+    const rotulo = o && o.speciesId ? (SPECIES[o.speciesId] || {}).name || '?' : 'Vazio';
     return jogando
       ? `<button class="resg-ponto" id="resgatePonto${i}" style="${pos}" onclick="resgateTocarPonto(${i})"
-          aria-label="Resgatar no local de ${p.pts} pontos">${dentro}</button>`
-      : `<span class="resg-ponto" style="${pos}">${dentro}</span>`;
+          aria-label="Resgatar ${escapeHtmlSafe(rotulo)}">${resgatePontoHtml(o)}</button>`
+      : `<span class="resg-ponto${o && o.speciesId ? '' : ' vazio'}" style="${pos}"
+          title="${escapeHtmlSafe(rotulo)}">${resgatePontoHtml(o)}</span>`;
   }).join('');
   const praia = jogando
     ? `<button class="resg-praia" style="left:${RESGATE_PRAIA.x / RESGATE_W * 100}%;top:${RESGATE_PRAIA.y / RESGATE_H * 100}%"
@@ -34915,9 +34993,10 @@ function renderResgate(){
       <div class="box">
         <h2>Enseada de Mikan · ${RESGATE_DURACAO} s</h2>
         <p class="hint-text">Resgate os Pokémon das ilhotas e volte à praia para pontuar. Os pontos
-          só contam depois do desembarque. Seu parceiro leva <strong>${RESGATE_CAPACIDADE}</strong> por viagem.</p>
+          só contam depois do desembarque, e cada um vale conforme o Pokémon.
+          Seu parceiro leva <strong>${RESGATE_CAPACIDADE}</strong> por viagem.</p>
         ${resgateMapaHtml(false)}
-        <div class="resg-legenda"><span>10 pts perto</span><span>20 pts no meio</span><span>30 pts no alto</span></div>
+        <div class="resg-legenda"><span>Vale o que o Pokémon vale</span><span>Longe custa mais</span></div>
       </div>
       <div class="box">
         <h2>Seu parceiro</h2>

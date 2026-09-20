@@ -12895,6 +12895,28 @@ uniformes em 26–27px, e **nenhuma tela rola pro lado**.
    nunca casa. Foi a **terceira** vez nesta sessão que um escape se perdeu assim. O jeito seguro é o
    editor de arquivo, e o sintoma é sempre o mesmo: uma trava certa que acusa o que está certo.
 
+### ⚠️ CADA MODALIDADE TEM A PRÓPRIA SELEÇÃO (20/09/2026)
+
+Reportado com dois prints: *"eu primeiro estava na tela do revezamento, e escolhi um time, depois
+eu troquei para a tela da corrida individual e apareceu automaticamente o primeiro pokemon do time
+do revezamento"*.
+
+**A troca CORTAVA a lista** (`escolhidos.slice(0, corridaQuantos())`) -- e cortar seis pra **um**
+deixa o primeiro. A razão escrita era boa (*"três marcados virariam uma escalação que a tela não
+sabe mostrar"*), mas a saída era a errada: **o que não cabe não é pra ser aparado, é pra ficar
+guardado no lugar dele.**
+
+- **E GUARDAR (em vez de zerar) é o que faz a ida e volta não custar nada:** quem escolheu um time,
+  foi ver a individual e voltou, reencontra o time como deixou. Medido: relay(6) → single(vazio) →
+  escolhe 1 → relay(os 6 de volta) → single(o 1 de volta).
+- **⚠️ O CAMPO PRECISA EXISTIR NA DECLARAÇÃO do objeto, e não só no `corridaZerar`:** o
+  `abrirCorrida` **não zera** (ele só mexe na fase e no picker), então um campo que só nasça lá é
+  `undefined` na primeira entrada -- e o `corridaTrocarFormato` escreve nele antes de tudo. A
+  primeira versão estourou exatamente assim.
+- **Trocar o número de PARTICIPANTES não mexe na seleção** -- é outro eixo, e há trava.
+
+---
+
 ### O QUE FICA PENDENTE DA LIGA LARANJA
 
 Nada disto foi integrado, e é escopo desta etapa: **o acesso por Surf**, a **Liga Laranja** em si,
@@ -14027,8 +14049,9 @@ relação a ele: o parceiro sai dos times do jogador entre os que **têm Surf**,
 com o nível**, **todo mundo leva 2** (o protótipo tinha 3/2/1), o adversário é um **Lv.60 aleatório**
 da lista de quem aprende Surf, e o botão da home só existe pra `admin === true`.
 
-**Você e um rival disputam o mesmo mar por 90 s.** Seis ilhotas com um pokémon cada (10, 20 ou 30
-pontos conforme a distância), dois redemoinhos, uma faixa de correnteza -- e **os pontos só contam
+**Você e um rival disputam o mesmo mar por 90 s.** Seis ilhotas com um pokémon cada (⚠️ **elas
+valiam 10/20/30 conforme a distância até 20/09/2026**, e hoje o valor é o do BICHO -- ver **AS
+QUATRO DO RESGATE**, no fim desta seção), dois redemoinhos, uma faixa de correnteza -- e **os pontos só contam
 quando você volta à praia e desembarca**. O mar inteiro muda de lugar a cada 7 a 11 segundos, com
 2 s de aviso tracejado.
 
@@ -14196,6 +14219,103 @@ sozinho com uma célula vazia do lado -- medido a 320px, um buraco de 137px. O R
 **O ponto continua dizendo QUANTO VALE mesmo enquanto é resgatado** -- a palavra que estava ali
 dizia o que a BARRA e a borda tracejada já dizem, e o que não se descobre de outro jeito é o valor
 do ponto, que é justamente a decisão do jogador. Quem está resgatando se lê pela **cor da barra**.
+
+### AS QUATRO DO RESGATE (20/09/2026)
+
+#### ⚠️ O MAPA JÁ MOSTRA QUEM ESTÁ LÁ, DESDE O SETUP
+
+Reportado: *"logo quando eu abro a tela nao esta exibindo o map, só esta exibindo depois que eu
+clico em 'Começar resgate'"*.
+
+**São DUAS coisas faltando, e as duas vêm da mesma origem -- o estado do jogo só nascia no
+`resgateComecar`:**
+
+1. **os OCUPANTES**: o protótipo cria as seis pessoas no `reset()` e desenha desde o modo `ready`;
+   aqui as ilhotas do setup mostravam só um número, sem ninguém;
+2. **o CANVAS**: quem o desenha é o `resgatePintar`, que só roda dentro do laço -- então o mar era
+   um retângulo azul chapado, **sem ilhas, sem ondas e sem os redemoinhos**.
+
+Hoje os ocupantes nascem no `resgateZerar` e o `abrirResgate` pinta o mapa **uma vez**, depois do
+`render()` (que é quem cria o `<canvas>`). Medido: **2.370 operações de desenho** na abertura.
+
+⚠️ **E com o valor vindo do BICHO, mostrar quem está lá deixou de ser enfeite:** é ELE que diz
+quanto aquela viagem vale.
+
+#### ⚠️ O VALOR SAIU DA ILHOTA E FOI PRO POKÉMON
+
+Pedido: *"troque os pokemons que vao ser resgatados por [os 23] ... e os pontos que eles dao devem
+ser de acordo com o bst deles, o bst dividido por 5"*.
+
+**Isto muda a mecânica, não só a tabela.** A escada do protótipo era **10 perto / 20 no meio / 30
+no alto**, e era ela que criava a decisão (*"ir buscar 30 custa ~3x a distância de um 10"*). Hoje:
+
+| | antes | agora |
+|---|---|---|
+| o que decide o valor | a ILHOTA (a distância) | o **BICHO** que caiu nela |
+| faixa | 10 a 30 (**3,0×**) | **41 a 87** (2,1×) |
+| a pergunta do mapa | "vale a pena ir longe?" (sempre a mesma) | "**o que** está longe vale a viagem?" (muda a cada partida) |
+
+- **⚠️ O VALOR É DERIVADO** (`round(bstOf(id) / 5)`), nunca uma tabela à mão -- ela envelheceria no
+  dia em que o `GEN2_SPECIAL` mudasse. Há trava que mede isso pela derivação, não pelos números.
+- **⚠️ MAS ELE FICA GRAVADO NO OCUPANTE**, e não é recalculado na entrega: ele viaja no `bag` e no
+  histórico, e lendo a espécie de volta uma mudança no divisor **renomearia pontos já entregues**.
+- **Medido: de 41 (Pichu, BST 205) a 87 (Tangela, 435)**, com a maioria entre 55 e 66. A faixa mais
+  estreita é de propósito -- a distância continua sendo o custo, e nenhum bicho torna a viagem longa
+  obrigatória nem inútil.
+- **São 23 e não 22:** o pedido diz *"nidorans"*, no plural, então os dois entram.
+- **O DUELO CONTINUA EQUILIBRADO, medido** (40 duelos por perfil, Blastoise Lv.70 dos dois lados):
+  **"joga bem" vence 60%** e **"mediano" 43%** -- o mediano quase empata, que é onde um minijogo
+  contra NPC tem que ficar. Os placares sobem (de ~200 pra ~550 pts), o que é aritmética.
+- **A LEGENDA VELHA SAIU** (*"10 pts perto · 20 no meio · 30 no alto"*): texto fixo que descreve uma
+  régua envelhece quando a régua muda -- a mesma família do *"Golpe repete entre 2-5x"* e do
+  *"Revezamento · 900 m"*. Hoje ela diz a REGRA, que não tem número pra envelhecer.
+
+#### ⚠️ O CÍRCULO É TRANSPARENTE, COMO NO PROTÓTIPO
+
+Pedido: *"tente manter os sprites o mais parecido possivel com o prototipo ... os circulos do
+prototipo estavam mais transparentes que essa que voce colocou"*.
+
+**No protótipo o `.point` é literalmente `background:transparent;border:0;box-shadow:none`** -- ele
+tem duas declarações e a segunda desfaz a primeira. O que se vê é o **SPRITE** (58×51px com
+drop-shadow) e a etiqueta numa faixa **abaixo** dele. O disco opaco que estava aqui escondia metade
+da ilha desenhada no canvas.
+
+- **`overflow:visible`**: a etiqueta e a barra vivem FORA do círculo.
+- **O ponto VAZIO vira um tracejado** (o `.point.empty` do protótipo) em vez de um disco apagado.
+- **⚠️ E A ETIQUETA PRECISOU DE CLASSE PRÓPRIA.** Com `.resg-ponto > span` ela pegava também o
+  **`.sprite-wrap`**, que É um `<span>` filho direto -- o sprite saía **dentro de uma etiqueta creme
+  de 66px**, estourando o ponto de 56. Só a medição no navegador pegou: **seletor de TIPO pega o que
+  não devia assim que o HTML tem dois daquele tipo.**
+
+#### A BARRA SAIU DO MEIO DO CÍRCULO
+
+Pedido: *"a barra que carrega quando ta resgatando deixa ela mais bonita, hoje ela ta ficando no
+meio do circulo e ta feia"*.
+
+São as medidas do `.rescue-meter` do protótipo: **acima do ponto** (`top:-12px`), **62×13px**, com o
+**percentual escrito por cima** (um `<b>` centralizado com sombra). Ela ficava no rodapé de dentro
+do círculo, com 5px de altura e sem número.
+
+- **O número não é enfeite:** encher sem dizer quanto falta é metade da conta, e ele é o que o
+  protótipo mostra.
+- A cor continua separando os dois lados (verde eu, laranja o rival).
+- **Medido a 320px:** os seis pontos com etiqueta e barra ficam **todos dentro do mapa**, nenhum se
+  sobrepõe, e a tela não rola pro lado.
+
+#### O QUE ISSO CUSTOU
+
+**Nada no motor:** `MOTOR 25d909ef2d79 / DIARIO c35ba4008568`, idêntico em 900 batalhas semeadas.
+O Resgate continua sem tocar o save e sem uma operação de backend.
+
+#### ⚠️ E O SANDBOX GANHOU UM CONTEXTO 2D
+
+`cv.getContext('2d')` era um **TypeError** no dublê, e o `abrirResgate` -- que agora pinta o mapa ao
+abrir a tela -- derrubava o `test-resgate` na PRIMEIRA linha. Ele existe pela mesma razão do
+`classList` de verdade (19/09) e do `getAttribute` (18/09): **o dublê tem que fazer o que o de
+verdade faz.**
+
+E ele **anota as chamadas** (`__ops`), como o `__timers` e o `__recargas`: assim a trava afirma *"o
+mapa FOI desenhado, com 2.370 operações, e ele desenhou ELIPSES"* em vez de só não quebrar.
 
 ### O QUE FICA EM ABERTO
 
