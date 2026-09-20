@@ -218,6 +218,68 @@ console.log('\n=== O TEMPO DO NPC NÃO ENTRA ===');
      vis.single.lista.map(x => x.tempo).join(','));
 }
 
+console.log('\n=== O TIME QUE FEZ O TEMPO (20/09/2026) ===');
+{
+  /* ⚠️ ELE É SÓ APRESENTAÇÃO (o modal do ranking), então não dá vantagem nenhuma -- mas o
+     documento é PÚBLICO e todo mundo o lê, então ele é saneado e tem teto. */
+  await conta('t1').set({ trainerName: 'Ash' });
+  const seis = [
+    { speciesId: 'jolteon', level: 60, shiny: true },
+    { speciesId: 'venusaur', level: 58, shiny: false },
+    { speciesId: 'snorlax', level: 62 },
+    { speciesId: 'alakazam', level: 59 },
+    { speciesId: 'gyarados', level: 61 },
+    { speciesId: 'shuckle', level: 55 },
+  ];
+  await enviar('t1', { modalidade: 'relay', tempo: 120.5, time: seis });
+  const d = (await rank('t1').get()).data();
+  const info = d.relayInfo || {};
+  ok('o time é gravado junto do tempo', Array.isArray(info.time) && info.time.length === 6,
+     JSON.stringify((info.time || []).slice(0, 2)));
+  ok('  com espécie, nível e shiny', info.time[0].speciesId === 'jolteon'
+     && info.time[0].level === 60 && info.time[0].shiny === true);
+  ok('  e o shiny ausente vira false (nunca undefined -- o Firestore recusa)',
+     info.time[2].shiny === false);
+
+  /* ⚠️ E ELE VOLTA NA LEITURA, nas DUAS pontas: a lista e o "meu" fora do top */
+  const vis = await ler('t1');
+  const eu = vis.relay.lista.find(x => x.eu);
+  ok('o time volta na lista do top', Array.isArray(eu.time) && eu.time.length === 6);
+
+  /* ⚠️ O TETO É 6: o revezamento leva seis, e o resto seria lixo num documento público */
+  await conta('t2').set({ trainerName: 'Gary' });
+  const muitos = [];
+  for(let i = 0; i < 40; i++) muitos.push({ speciesId: 'pidgey', level: 5 });
+  await enviar('t2', { modalidade: 'single', tempo: 30, time: muitos });
+  const d2 = ((await rank('t2').get()).data().singleInfo) || {};
+  ok('o teto corta em ' + fns._corridaRank.timeMax, d2.time.length === fns._corridaRank.timeMax,
+     d2.time.length + ' guardados');
+
+  /* ⚠️ E UM TIME MALFORMADO NÃO JOGA FORA O TEMPO: o ranking é sobre o TEMPO, e perder um recorde
+     por causa da legenda seria o lado errado pra errar. */
+  await conta('t3').set({ trainerName: 'Lixo' });
+  await enviar('t3', { modalidade: 'single', tempo: 21.0,
+                       time: ['isto não é objeto', null, 42, { level: 9 }, { speciesId: 'x'.repeat(200), level: 'abc' }] });
+  const d3 = (await rank('t3').get()).data();
+  ok('time malformado não derruba o tempo', d3.single === 21.0, String(d3.single));
+  const t3 = (d3.singleInfo || {}).time || [];
+  ok('  e o que sobra é só o que tem espécie', t3.length === 1, JSON.stringify(t3));
+  ok('  com a espécie cortada em 40', t3[0].speciesId.length === 40, t3[0].speciesId.length + ' chars');
+  ok('  e o nível lixo virando 1', t3[0].level === 1, String(t3[0].level));
+
+  /* sem time nenhum: o campo existe e é lista vazia -- nunca undefined */
+  await conta('t4').set({ trainerName: 'Sem' });
+  await enviar('t4', { modalidade: 'single', tempo: 22.0 });
+  const t4 = ((await rank('t4').get()).data().singleInfo || {}).time;
+  ok('sem time vem lista vazia, nunca undefined', Array.isArray(t4) && t4.length === 0);
+
+  /* ⚠️ E O SANEADOR É O MESMO em qualquer chamador -- ele é exportado pra a trava não repetir a regra */
+  const s = fns._corridaRank.saneia;
+  ok('o saneador recusa o que não é lista', s(null).length === 0 && s('abc').length === 0 && s(7).length === 0);
+  ok('  e o nível é aparado nos dois extremos',
+     s([{ speciesId: 'a', level: -5 }])[0].level === 1
+     && s([{ speciesId: 'a', level: 99999 }])[0].level === 999);
+}
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
 process.exit(falhas ? 1 : 0);
 

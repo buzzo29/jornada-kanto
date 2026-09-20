@@ -1707,12 +1707,8 @@ console.log('\n=== A CLASSIFICAÇÃO É DE TREINADORES ===');
      DUAS linhas -- a linha ia de 48 pra 63px e elas deixavam de alinhar em coluna, que é onde o
      olho compara. Com "Rival N" as quatro ficam em 48px. */
   ok('  e o adversário é "Rival N"', html.indexOf('Rival 1') >= 0);
-  ok('  e embaixo vai o NOME DO TIME do revezamento', html.indexOf('Time A') >= 0);
-  /* ⚠️ E O RÓTULO DO TIME RIVAL É CURTO PELO MESMO MOTIVO -- "Equipe rival · 6 pokémon" quebrava
-     em duas linhas, e ainda dizia uma coisa que TODO revezamento tem. */
-  ok('  e o time rival tem rótulo próprio', html.indexOf('Equipe rival') >= 0);
-  ok('    e ele é curto (não diz o que todo revezamento tem)',
-     html.indexOf('pokémon</span>') < 0);
+  /* ⚠️ O RÓTULO DE TEXTO DUROU ALGUMAS HORAS: em 20/09 ele virou a FILEIRA DE SPRITES, a pedido.
+     A trava do que ficou no lugar dele está no bloco 22. */
 
   /* na INDIVIDUAL o que faz sentido embaixo é o pokémon, que é o que ele escolheu */
   S.corridaZerar();
@@ -1825,6 +1821,198 @@ console.log('\n=== O SPRITE SHINY NA PISTA ===');
   ok('  e o Resgate também pede a variante',
      /pmdCarregar\(meu\.speciesId, meu\.shiny\), pmdCarregar\(dele\.speciesId, dele\.shiny\)/.test(src));
   ok('  e lê pelo `pmdDados`', /const dados = pmdDados\(a\.inst\);/.test(src));
+}
+
+/* ============================================================================
+   22) AS QUATRO DE 20/09/2026 (a leva do ranking) -- os sprites no resultado, o modal do time no
+       ranking, a página no topo ao largar, e o quadro vazio na tela de escolha.
+   ============================================================================ */
+console.log('\n=== OS SPRITES DO TIME NA CLASSIFICAÇÃO ===');
+{
+  contaDeTeste();
+  g.trainerName = 'Buzzo';
+  S.corridaZerar();
+  S.corrida.formato = 'relay'; S.corrida.participantes = 2;
+  S.corridaEscolherTime(0);
+  const eu = S.corridaNovoCorredor(S.corrida.escolhidos.map(p => S.corridaInstancia(p, true)), true);
+  const npc = S.corridaNovoCorredor(S.sortearNpcs()[0], false);
+  eu.chegada = 118; npc.chegada = 124;
+  eu.trecho = npc.trecho = S.CORRIDA_TRECHOS - 1;
+  S.corrida.corredores = [eu, npc];
+  S.corrida.fase = 'fim';
+  const html = S.renderCorrida();
+
+  /* ⚠️ O RÓTULO DE TEXTO SAIU: ele respondia "de QUEM era a equipe" e os sprites respondem QUAL
+     era -- que é a pergunta que se faz olhando uma classificação. */
+  ok('a linha NÃO escreve mais o nome do time', html.indexOf('Time A') < 0);
+  ok('  nem o rótulo do rival', html.indexOf('Equipe rival') < 0);
+  ok('  e o `corridaComQuemCorreu` virou letra morta', src.indexOf('function corridaComQuemCorreu') < 0);
+  ok('o treinador continua em cima', html.indexOf('Buzzo') >= 0 && html.indexOf('Rival 1') >= 0);
+
+  /* a fileira é a MESMA do card de time -- o jogador reconhece um time por ela */
+  /* ⚠️ A CLASSE É PROCURADA NA LISTA, nunca por igualdade exata: ela leva a `save-slot-team-row
+     spread` junto, e um `class="resultTime"` cravado passou a casar com ZERO no dia em que a
+     segunda classe entrou. É a mesma armadilha das regex do `mlog-mais` e do `matchup-row`. */
+  const fileiras = (html.match(/class="[^"]*\bresultTime\b[^"]*"/g) || []).length;
+  ok('e embaixo vem a FILEIRA de sprites', fileiras === 2, fileiras + ' fileira(s)');
+  const dentro = html.slice(html.search(/class="[^"]*\bresultTime\b/));
+  ok('  com um sprite por membro do time',
+     (dentro.match(/save-slot-mon"/g) || []).length >= S.CORRIDA_TRECHOS,
+     (dentro.match(/save-slot-mon"/g) || []).length + ' membros nas duas fileiras');
+  /* ⚠️ E ELA É A FILEIRA DO CARD DE VERDADE (`save-slot-team-row spread`), que é uma GRADE de 6
+     colunas -- é isso que faz seis sprites caberem em 243px. Com um flex-wrap próprio eles saíam
+     em 48px e a fileira quebrava em DUAS linhas (a linha de resultado ia a 180px). */
+  ok('  e ela É a fileira do card de time',
+     /class="resultTime save-slot-team-row spread"/.test(html));
+  ok('  e ela reusa o `pescariaTimeSprites` (o mesmo do card)',
+     html.indexOf('save-slot-mon-level') >= 0);
+  /* ⚠️ ELA OCUPA A LINHA INTEIRA: na coluna do nome (83px a 320px) seis sprites dariam 13px cada */
+  ok('  e o CSS a põe na linha inteira do grid',
+     /\.resultRow \.resultTime\{[^}]*grid-column:1\/-1/.test(src));
+
+  /* na INDIVIDUAL é a mesma fileira, com UM sprite -- sem exceção nenhuma */
+  S.corridaZerar();
+  S.corrida.formato = 'single'; S.corrida.participantes = 2;
+  const solo = S.corridaNovoCorredor([S.corridaInstancia(mk('jolteon', 60), true)], true);
+  solo.chegada = 19;
+  S.corrida.corredores = [solo];
+  S.corrida.fase = 'fim';
+  const h2 = S.renderCorrida();
+  ok('na individual é a mesma fileira, com um sprite só',
+     (h2.match(/class="[^"]*\bresultTime\b[^"]*"/g) || []).length === 1
+     && (h2.match(/save-slot-mon"/g) || []).length === 1);
+}
+
+console.log('\n=== O MODAL DO TIME NO RANKING ===');
+{
+  contaDeTeste();
+  S.corridaZerar();
+  S.corrida.formato = 'single';
+  /* ⚠️ O BLOCO 20 TERMINA COM `corridaRank.erro` SETADO, e a caixa devolve a mensagem de erro
+     antes de chegar nas linhas -- sem isto as três travas do botão mediam a tela de erro. */
+  S.corridaRank.erro = null; S.corridaRank.relay = null;
+  const time = [{ speciesId: 'jolteon', level: 70, shiny: true }];
+  const timeRelay = g.saveSlots[0].team.map(p => ({ speciesId: p.speciesId, level: p.level, shiny: !!p.shiny }));
+  S.corridaRank.single = {
+    lista: [{ pos: 1, nome: 'Ash', tempo: 18.5, time, eu: false },
+            /* ⚠️ RECORDE ANTIGO NÃO TEM O CAMPO: ele é anterior a esta data, e um botão que abre
+               um modal vazio é pior que botão nenhum. */
+            { pos: 2, nome: 'Gary', tempo: 19.1, time: [], eu: false }],
+    meu: { nome: 'Buzzo', tempo: 25.0, time: timeRelay, eu: true, pos: null },
+  };
+  const html = S.corridaRankHtml();
+
+  /* ⚠️ A LEGENDA DO TIME SAIU DA LINHA: ali se compara TREINADOR e TEMPO. */
+  ok('a linha NÃO traz mais a legenda do time', html.indexOf('corrida-rank-mon') < 0);
+  ok('  e a classe virou letra morta no CSS', src.indexOf('.corrida-rank-mon{') < 0);
+  ok('quem TEM time gravado vira botão', html.indexOf("corridaVerTimeDoRank('lista',0)") >= 0);
+  ok('  com o ⓘ dizendo que há o que ver', html.indexOf('corrida-rank-info') >= 0);
+  ok('  e quem NÃO tem continua sendo texto', html.indexOf("corridaVerTimeDoRank('lista',1)") < 0);
+  ok('  e o MEU tem a própria âncora', html.indexOf("corridaVerTimeDoRank('meu',0)") >= 0);
+  /* ⚠️ E ELE NÃO USA O `.btn` DA CASA: aquele é botão de AÇÃO, com moldura de 3px */
+  ok('  e o botão não é o `.btn` da casa',
+     /\.corrida-rank-btn\{[^}]*background:none;border:none/.test(src));
+
+  /* o modal */
+  S.corridaVerTimeDoRank('lista', 0);
+  ok('clicar abre o modal', !!S.corrida.timeDoRank);
+  const m = S.renderCorridaTimeModal();
+  ok('  com o nome do treinador', m.indexOf('Ash') >= 0);
+  ok('  o tempo dele', m.indexOf('18.50s') >= 0);
+  ok('  a colocação', m.indexOf('1º') >= 0);
+  ok('  e a MESMA fileira de sprites', m.indexOf('resultTime') >= 0 && m.indexOf('save-slot-mon') >= 0);
+  /* ⚠️ E É O TIME DAQUELE TEMPO, não o time de hoje do jogador -- por isso ele viaja no envio */
+  ok('  e o shiny gravado é respeitado', m.indexOf('shiny/') >= 0);
+  S.corridaFecharTimeDoRank();
+  ok('  e fecha', !S.corrida.timeDoRank);
+
+  /* ⚠️ SEM TIME O CLIQUE NÃO ABRE NADA -- nem se alguém chamar pela ação */
+  S.corridaVerTimeDoRank('lista', 1);
+  ok('a AÇÃO recusa quem não tem time', !S.corrida.timeDoRank);
+  S.corridaVerTimeDoRank('lista', 99);
+  ok('  e um índice que não existe também', !S.corrida.timeDoRank);
+
+  /* ⚠️ O ESTADO GUARDA ONDE ACHAR, e o modal é anexado ao RENDER PRINCIPAL: os modais empilham na
+     ordem em que entram, e este é aberto de DENTRO da tela da corrida. */
+  ok('o modal é anexado ao render principal',
+     /if\(corrida\.timeDoRank\)\{ html \+= renderCorridaTimeModal\(\); \}/.test(src));
+  ok('  e o campo zera com o resto do estado da corrida',
+     /timeDoRank: null,/.test(src));
+  S.corridaRank.single = null;
+}
+
+console.log('\n=== O TIME VIAJA NO ENVIO ===');
+{
+  contaDeTeste();
+  g.authUser = { uid: 'u1' };
+  const enviados = [];
+  const original = S.functionsClient.httpsCallable;
+  S.functionsClient.httpsCallable = (nome) => (payload) => {
+    enviados.push({ nome, payload });
+    return Promise.resolve({ data: { gravado: true } });
+  };
+  S.corridaZerar();
+  S.corrida.formato = 'relay'; S.corrida.participantes = 2;
+  S.corridaEscolherTime(0);
+  const eu = S.corridaNovoCorredor(S.corrida.escolhidos.map(p => S.corridaInstancia(p, true)), true);
+  eu.chegada = 111; eu.trecho = S.CORRIDA_TRECHOS - 1;
+  S.corrida.corredores = [eu];
+  S.corridaEnviarRank();
+  const p = (enviados[0] || {}).payload || {};
+  ok('o envio leva o time', Array.isArray(p.time) && p.time.length === S.CORRIDA_TRECHOS,
+     JSON.stringify((p.time || []).slice(0, 2)));
+  /* ⚠️ E SÓ O MÍNIMO PRA DESENHAR UM SPRITE: o documento é público e todo mundo o lê */
+  /* ⚠️ AS DUAS DE BAIXO LEEM UMA LISTA QUE PODE NÃO EXISTIR, e uma trava que ESTOURA é pior que
+     uma que falha: o processo morre, o arquivo não imprime a contagem, e a conferência de
+     acusação lê isso como "passou em branco". Foi exatamente o que aconteceu aqui. */
+  const oTime = Array.isArray(p.time) ? p.time : [];
+  ok('  e só com espécie, nível e shiny',
+     oTime.length > 0 && oTime.every(x => Object.keys(x).sort().join(',') === 'level,shiny,speciesId'));
+  ok('  e o shiny do time chega', oTime.some(x => x.shiny === true));
+  S.functionsClient.httpsCallable = original;
+  g.authUser = null;
+  S.corridaZerar();
+}
+
+console.log('\n=== A LARGADA VAI PRO TOPO, E O QUADRO VAZIO SUMIU ===');
+{
+  contaDeTeste();
+  S.corridaZerar();
+  S.corrida.formato = 'relay'; S.corrida.participantes = 2;
+  S.corridaEscolherTime(0);
+  const eu = S.corridaNovoCorredor(S.corrida.escolhidos.map(p => S.corridaInstancia(p, true)), true);
+
+  /* ⚠️ O PLACAR E A PISTA SAEM DA FASE, nunca de `corredores.length`: os corredores são montados
+     ANTES da fase virar `carregando` e SOBREVIVEM a ela -- e um sprite que falta devolve pra
+     `setup` sem zerá-los, deixando o canvas em branco na tela de escolha. Foi reportado. */
+  const temPista = () => {
+    const h = S.renderCorrida();
+    return h.indexOf('corridaCanvas') >= 0;
+  };
+  const temPlacar = () => S.renderCorrida().indexOf('corridaBarra0') >= 0;
+  S.corrida.corredores = [eu];
+  for(const fase of ['setup', 'carregando']){
+    S.corrida.fase = fase;
+    ok('na fase ' + fase + ' NÃO há canvas (mesmo com corredores montados)', !temPista());
+    ok('  nem placar', !temPlacar());
+  }
+  for(const fase of ['contagem', 'correndo']){
+    S.corrida.fase = fase;
+    ok('na fase ' + fase + ' a pista está lá', temPista());
+    ok('  e o placar também', temPlacar());
+  }
+  /* o caso EXATO do relato: o sprite falhou e voltou pro setup com os corredores de pé */
+  S.corrida.fase = 'setup'; S.corrida.faltando = ['jolteon'];
+  S.corrida.aviso = 'Faltou o sprite de: Jolteon.';
+  ok('e o caso do relato (sprite faltou, voltou pro setup) não deixa quadro vazio', !temPista());
+  S.corrida.faltando = []; S.corrida.aviso = '';
+
+  /* ⚠️ E A LARGADA ROLA PRA O TOPO, DEPOIS do render: a corrida não troca de `game.screen`, então
+     o render trata como a MESMA tela e repõe a rolagem anterior -- antes dele, ele desfaria. */
+  const ordem = src.slice(src.indexOf("corrida.recado = 'Prepare-se para a largada!';"));
+  ok('a largada rola a página pro topo', /window\.scrollTo\(0, 0\);/.test(ordem.slice(0, 700)));
+  ok('  e DEPOIS do render (senão o próprio render desfaz)',
+     ordem.indexOf('render();') < ordem.indexOf('window.scrollTo(0, 0);'));
 }
 
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');

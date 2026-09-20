@@ -12648,16 +12648,20 @@ revezamento isso é um dos seis, escolhido por acaso, e não diz de quem era a e
 
 | | em cima | embaixo |
 |---|---|---|
-| **revezamento** | o treinador | o **nome do time** (ou "Equipe rival") |
-| **individual** | o treinador | o **pokémon** |
+| **revezamento** | o treinador | ~~o nome do time~~ |
+| **individual** | o treinador | ~~o pokémon~~ |
+
+**⚠️ A COLUNA DA DIREITA DUROU ALGUMAS HORAS: o rótulo de TEXTO virou a FILEIRA DE SPRITES no
+mesmo dia** -- ver **AS QUATRO DA CORRIDA**, logo abaixo. O que continua valendo desta seção é a
+coluna da ESQUERDA (o treinador em cima) e a medida do "Rival N".
 
 - **O nome sai do `nomeDoTreinador()`**, o mesmo que a Pescaria usa — e quem não nomeou a conta cai
   no "Você" da casa.
 - **⚠️ O ADVERSÁRIO É "Rival N", E ISSO FOI MEDIDO:** a 320px a coluna do nome tem **83px**, e
   "Adversário 1" **quebrava em duas linhas** — a linha ia de 48 pra 63px e as linhas deixavam de
   alinhar em coluna, que é justamente onde o olho compara. Com "Rival N" as quatro ficam em 48px.
-  Pelo mesmo motivo "Equipe rival · 6 pokémon" virou **"Equipe rival"** — e ele ainda dizia uma
-  coisa que TODO revezamento tem.
+  Pelo mesmo motivo "Equipe rival · 6 pokémon" virou "Equipe rival" — e ele ainda dizia uma coisa
+  que TODO revezamento tem. (⚠️ Os dois são HISTÓRIA: o rótulo inteiro saiu horas depois.)
 - **A linha do JOGADOR ainda pode ir a duas linhas**, e é aceito: ali o que quebra é o **nome do
   save**, que é dele.
 
@@ -12768,6 +12772,128 @@ cada). Duas lições de teste saíram daqui:
    branco. Hoje ela lê o bloco do preload, com um `ok()` cobrando que a fatia tem o que ler.
 2. **⚠️ E OUTRA MEDIA A ORDEM DO FIXTURE:** ela procurava `title="Jolteon · 150–300 m"`, e o Jolteon
    é o **primeiro** no time de teste. Hoje ela não amarra no nome.
+
+### AS QUATRO DA CORRIDA (20/09/2026) -- a leva do ranking
+
+Quatro pedidos na mesma leva. Dois são tela, um cria dado novo no servidor, e um é um defeito de
+verdade -- com uma causa que já tinha mordido este modo duas vezes.
+
+#### OS SPRITES DO TIME, E NÃO O NOME DELE
+
+Pedido: *"na tela de resultados, nao exiba o nome do treinador e embaixo o nome do time, coloque
+embaixo as sprites dos 6 pokemons que era do time"*.
+
+O rótulo de texto durou **algumas horas** (ele tinha nascido nesta mesma data). A diferença é a
+pergunta: o nome respondia **de QUEM era a equipe** e os sprites respondem **QUAL era** -- que é a
+que se faz olhando uma classificação.
+
+- **VALE PROS DOIS FORMATOS, sem exceção nenhuma:** 6 sprites no revezamento, 1 na individual.
+- **O `corridaComQuemCorreu` VIROU LETRA MORTA e saiu** -- ele tinha um chamador só.
+- **⚠️ E A FILEIRA É A DO CARD DE TIME DE VERDADE** (`save-slot-team-row spread`), não uma parecida.
+  Isso não é só coerência: aquela classe é uma **GRADE de 6 colunas** com `min-width:0` nos filhos,
+  e é ela que faz seis sprites caberem em 243px. Com um `flex-wrap` próprio, medido a 320px, cada
+  sprite saía em **48px** e a fileira quebrava em **DUAS linhas** -- a linha de resultado ia a
+  **180px**. Com a classe da casa ela fica em **124px**.
+  ⚠️ Os sprites saem **cortados** pelo `overflow:hidden` (célula de 36px, sprite de 48px) -- e isso
+  é o comportamento de SEMPRE do card: medido, o card do picker corta os seis do mesmo jeito. A
+  margem transparente do sprite absorve, e é por isso que ninguém nota.
+- **A `.resultTime` só POSICIONA** (`grid-column:1/-1`): na coluna do nome, que tem 83px a 320px,
+  seis sprites dariam 13px cada.
+
+#### O RANKING PERDEU A LEGENDA E GANHOU UM MODAL
+
+Pedido: *"no ranking dos melhores tempos, nao exibir tambem o nome do time, apenas o nome do
+treinador e quando clicar em cima do nome, abrir um modal exibindo o time que o treinador usou para
+fazer aquele tempo"*.
+
+Na linha do ranking se compara **TREINADOR** e **TEMPO** -- a legenda era ruído numa coluna que já
+trunca. Quem responde *"com o que ele correu?"* é o modal, e ele só abre pra quem quer saber.
+
+- **⚠️ O TIME VIAJA NO ENVIO, e é por isso que ele é o time DAQUELE TEMPO** -- não o time de hoje
+  daquele jogador. Buscar na hora daria a resposta errada pra todo recorde antigo.
+- **⚠️ E O SERVIDOR SANEIA O QUE CHEGA.** Ele é só apresentação (não dá vantagem nenhuma), mas o
+  documento é **PÚBLICO** -- todo mundo lê o ranking --, então sem teto ele seria um jeito de gravar
+  lixo grande lá dentro. Fica o mínimo pra desenhar um sprite: **espécie (40 chars), nível (1–999) e
+  shiny**, no máximo **6** (`CORRIDA_RANK_TIME_MAX`).
+- **⚠️ E UM TIME MALFORMADO NÃO JOGA FORA O TEMPO:** ele vira lista vazia e o recorde é gravado do
+  mesmo jeito. O ranking é sobre o TEMPO -- perder um recorde por causa da legenda seria o lado
+  errado pra errar.
+- **O `shiny` ausente vira `false`, nunca `undefined`** -- o Firestore **recusa a gravação inteira**
+  com `undefined`, e foi isso que matou as duas ligas em 13/09.
+- **⚠️ SÓ QUEM TEM TIME GRAVADO VIRA BOTÃO:** recorde anterior a esta data não tem o campo, e um
+  botão que abre um modal vazio é pior que botão nenhum. **Quem recusa é a AÇÃO**, não a tela.
+- **A affordance é o `ⓘ` da ficha da Pokédex**, e o botão **não usa o `.btn` da casa**: aquele é
+  botão de AÇÃO, com moldura de 3px, e aqui a linha é informação que por acaso se toca -- o mesmo
+  raciocínio que já tirou o `.btn` das linhas da ficha, dos cartões de golpe e das prateleiras.
+- **⚠️ O ESTADO GUARDA ONDE ACHAR (lista/meu + índice), nunca uma cópia da linha:** a lista é relida
+  e uma cópia ficaria velha em silêncio.
+- **O modal é anexado ao RENDER PRINCIPAL**, como a caixa do especial: ele é aberto de DENTRO da
+  tela da corrida, e os modais empilham na ordem em que entram.
+- **Medido a 320px:** modal de **280×239px** (cabe numa tela de 568 sem rolar), com a mesma fileira
+  de sprites do card.
+
+#### A LARGADA VAI PRO TOPO
+
+Pedido: *"ao começar a corrida, consegue levar a pagina para o topo? Porque dependendo de como tava
+a barra de rolagem, as vezes o quadro da corrida começa pela metade porque herdou a posição
+anterior"*.
+
+**⚠️ E O "HERDOU" É LITERAL: a largada NÃO troca de `game.screen`**, então o `render()` trata isso
+como a MESMA tela e **repõe a rolagem anterior** (é o `mesmaTela` do `reporRolagens`, que existe
+desde 18/09 pra a lista da loja não voltar ao topo). Quem estava embaixo na lista de ordem via a
+pista começar pela metade.
+
+**⚠️ O `window.scrollTo(0, 0)` VEM DEPOIS DO `render()`, e a ordem é a regra:** antes dele, o
+próprio render desfaria. Há trava sobre a posição, não só sobre a presença.
+
+#### ⚠️ O QUADRO VAZIO NA TELA DE ESCOLHA -- a terceira vez da mesma causa
+
+Reportado: *"quando eu clico para jogar a corrida de novo, na tela em que eu seleciono o time, esta
+exibindo um quadrado vazio embaixo que seria o quadro da corrida"*.
+
+**A causa é o placar e a pista serem montados por `corrida.corredores.length`** -- e os corredores
+são montados **ANTES** de a fase virar `carregando`, e **SOBREVIVEM** a ela. Dois caminhos
+desenhavam um canvas em branco fora da corrida:
+
+| caminho | o que se via |
+|---|---|
+| a fase `carregando` | os corredores já existem e o laço ainda não roda: canvas **branco** |
+| **um sprite que falta** | o `corridaLargar` devolve pra `setup` **sem zerar os corredores** -- e aí o quadro vazio fica na tela de escolha **pra valer** |
+
+**Quem responde "há corrida agora?" é a FASE, e só ela** (`emPista`). Medido nas cinco: o canvas e
+o placar existem em `contagem` e `correndo`, e em mais nenhuma.
+
+**⚠️ É A TERCEIRA VEZ QUE ESTE MODO PAGA A MESMA LIÇÃO**, e vale listar as três juntas porque elas
+têm a mesma forma -- *um estado que sobrevive ao momento em que ele valia*:
+
+1. **o modal da contagem** (18/09): montado por condição no `render()`, que o laço não chama;
+2. **os chips do revezamento** (20/09, de manhã): idem;
+3. **este**: montado por um estado (`corredores`) que não é a pergunta certa.
+
+#### O QUE ISSO CUSTOU
+
+**Nada no motor:** as duas impressões continuam **idênticas** (`MOTOR 25d909ef2d79 / DIARIO
+c35ba4008568`) em 900 batalhas semeadas. O único dado novo é uma lista de até 6 objetos por recorde
+no `raceRanking`, que é uma coleção com um documento por jogador.
+
+**Medido a 320px, no navegador:** a linha de resultado em **124px** (era 180 com a fileira errada),
+a classificação do revezamento em **767px**, o modal em **280×239px**, o ranking com as linhas
+uniformes em 26–27px, e **nenhuma tela rola pro lado**.
+
+#### AS TRÊS LIÇÕES DE TESTE QUE SAÍRAM DAQUI
+
+1. **⚠️ UMA TRAVA QUE ESTOURA É PIOR QUE UMA QUE FALHA.** A do envio fazia `p.time.every(...)` numa
+   lista que pode não existir: com o defeito religado ela dava **TypeError**, o processo morria
+   antes de imprimir a contagem, e a conferência de acusação lia isso como **"passou em branco"** --
+   um defeito real quase passou por aí. Ela agora tolera a ausência, e o próprio script de acusação
+   passou a tratar *"o teste morreu"* como acusação.
+2. **⚠️ CLASSE SE PROCURA NA LISTA, nunca por igualdade exata.** `class="resultTime"` cravado passou
+   a casar com **ZERO** no dia em que a segunda classe entrou na mesma lista. É a mesma armadilha
+   das regex do `mlog-mais` e do `matchup-row`.
+3. **⚠️ REGEX EM TRAVA NÃO SE ESCREVE POR SHELL.** O `\b` virou o caractere **BACKSPACE (0x08)** ao
+   passar por um `node -e`, e a trava passou a procurar `resultTime` com backspaces em volta -- que
+   nunca casa. Foi a **terceira** vez nesta sessão que um escape se perdeu assim. O jeito seguro é o
+   editor de arquivo, e o sintoma é sempre o mesmo: uma trava certa que acusa o que está certo.
 
 ### O QUE FICA PENDENTE DA LIGA LARANJA
 

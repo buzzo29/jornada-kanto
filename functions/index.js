@@ -5366,11 +5366,28 @@ exports._pescariaRank = { topo: PESCARIA_RANK_TOPO };
    ===================================================================== */
 const CORRIDA_RANK_TOPO = 10;
 const CORRIDA_MODALIDADES = ['single', 'relay'];
-const CORRIDA_TEMPO_MAX = 3600;          /* um tempo acima disso é dado corrompido, não recorde */
+const CORRIDA_TEMPO_MAX = 3600;
+/* o teto do time guardado -- o revezamento leva 6, e o resto seria lixo num documento público */
+const CORRIDA_RANK_TIME_MAX = 6;          /* um tempo acima disso é dado corrompido, não recorde */
 function corridaRankCollRef(){ return db.collection('raceRanking'); }
 function corridaRankDocRef(uid){ return corridaRankCollRef().doc(uid); }
 /* ⚠️ SÓ MELHORA, e aqui MELHOR É MENOR: o recorde é o tempo mais BAIXO, e uma corrida ruim depois
    de uma boa não pode apagar a boa. A transação é o que impede duas abas de gravarem por cima. */
+/* ⚠️ O TIME QUE VEM DO CLIENTE É SANEADO, e não confiado: ele é só APRESENTAÇÃO (o modal do
+   ranking), então não dá vantagem nenhuma -- mas sem teto ele seria um jeito de gravar lixo
+   grande num documento público que todo mundo lê. Fica o mínimo pra desenhar um sprite: a
+   espécie, o nível e o shiny.
+   ⚠️ E ELE NUNCA JOGA FORA A CHAMADA INTEIRA: um time malformado vira lista vazia e o tempo é
+   gravado do mesmo jeito -- o ranking é sobre o TEMPO, e perder um recorde por causa da legenda
+   seria o lado errado pra errar. */
+function corridaTimeSaneado(bruto){
+  if(!Array.isArray(bruto)) return [];
+  return bruto.slice(0, CORRIDA_RANK_TIME_MAX).map((p) => {
+    const o = p && typeof p === 'object' ? p : {};
+    const nivel = Math.max(1, Math.min(999, Math.round(Number(o.level) || 1)));
+    return { speciesId: String(o.speciesId || '').slice(0, 40), level: nivel, shiny: !!o.shiny };
+  }).filter(p => p.speciesId);
+}
 exports.submitRaceTime = onCall(async (request) => {
   const uid = request.auth && request.auth.uid;
   if(!uid) throw new HttpsError('unauthenticated', 'Faça login.');
@@ -5384,6 +5401,7 @@ exports.submitRaceTime = onCall(async (request) => {
   const conta = await db.collection('users').doc(uid).get();
   const nome = (conta.exists && conta.data().trainerName) || 'Treinador';
   const especie = String(d.especie || '').slice(0, 40);
+  const time = corridaTimeSaneado(d.time);
   const venceu = !!d.venceu;
   let recorde = false;
   await db.runTransaction(async (tx) => {
@@ -5394,7 +5412,7 @@ exports.submitRaceTime = onCall(async (request) => {
     recorde = true;
     const dados = { uid, nome, quando: Date.now() };
     dados[modalidade] = tempo;
-    dados[modalidade + 'Info'] = { especie, venceu, quando: Date.now() };
+    dados[modalidade + 'Info'] = { especie, venceu, time, quando: Date.now() };
     /* ⚠️ `merge` -- sem ele o recorde de uma modalidade APAGA o da outra */
     tx.set(ref, dados, { merge: true });
   });
@@ -5416,7 +5434,8 @@ exports.getRaceRanking = onCall(async (request) => {
       const x = doc.data() || {};
       const info = x[m + 'Info'] || {};
       return { pos: i + 1, uid: doc.id, nome: x.nome || 'Treinador', tempo: Number(x[m]) || 0,
-               especie: info.especie || '', venceu: !!info.venceu, eu: doc.id === uid };
+               especie: info.especie || '', time: info.time || [],
+               venceu: !!info.venceu, eu: doc.id === uid };
     });
     /* ⚠️ E O MEU TEMPO VEM JUNTO mesmo fora do top: quem está em 14º abre a tela e não vê nada
        seu, e o próprio recorde é o que ele mais procura. */
@@ -5424,14 +5443,15 @@ exports.getRaceRanking = onCall(async (request) => {
     if(meu && Number(meu[m]) > 0 && !lista.some(x => x.eu)){
       const info = meu[m + 'Info'] || {};
       oMeu = { nome: meu.nome || 'Você', tempo: Number(meu[m]), especie: info.especie || '',
-               venceu: !!info.venceu, eu: true };
+               time: info.time || [], venceu: !!info.venceu, eu: true };
     }
     saida[m] = { lista, meu: oMeu };
   }
   return saida;
 });
 exports._corridaRank = { topo: CORRIDA_RANK_TOPO, modalidades: CORRIDA_MODALIDADES,
-                         tempoMax: CORRIDA_TEMPO_MAX };
+                         tempoMax: CORRIDA_TEMPO_MAX, timeMax: CORRIDA_RANK_TIME_MAX,
+                         saneia: corridaTimeSaneado };
 exports._boss = { ativo(v){ if(v !== undefined) BOSS_ATIVO = !!v; return BOSS_ATIVO; },
                   instancia: bossInstance, nivel: () => BOSS_LEVEL, maxHp: () => BOSS_MAX_HP };
 exports._golpesEspeciais = { AUTODESTRUICAO, SONIFEROS, METRONOMO, CHANCE_AUTODESTRUICAO, CHANCE_SONO, SONO_EM_TROCAS, sorteiaTrocasDeSono, MULTI_GOLPE, ataquesDisponiveis, GOLPES_CRIT_ALTO, FURIA, CHANCE_FURIA, FURIA_BONUS, sorteiaGolpeDoMetronomo, POOL_METRONOMO, CONFUSAO, CHANCE_CONFUSAO, DANCA_ESPADAS, DANCA_PLUMA, CHANCE_DANCA, DANCA_ESPADAS_MULT, DANCA_PLUMA_MULT, FURIA_DRAGAO, CHANCE_FURIA_DRAGAO, FURIA_DRAGAO_DANO, CHUVA, CHANCE_CHUVA, CHUVA_EM_CONFRONTOS, CHUVA_MULT, CHUVA_GOLPE_MULT, multDaChuva, estaChovendo, tentarChuva, limparClima, GOLPES_DRENO, GOLPES_SO_DORMINDO };

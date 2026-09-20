@@ -3431,13 +3431,30 @@
   /* ⚠️ `tabular-nums` porque os dígitos têm larguras diferentes sem ele, e a coluna da direita
      dança de linha pra linha -- justamente onde os tempos se comparam. */
   .resultRow b{font-size:1.05rem;font-variant-numeric:tabular-nums;white-space:nowrap;}
+  /* ⚠️ A FILEIRA DO TIME OCUPA A LINHA INTEIRA do grid: na coluna do nome (83px a 320px) seis
+     sprites dariam 13px cada. Ela reusa o `.save-slot-mon` do card de time -- é a MESMA fileira
+     da home e da Liga, e o jogador reconhece um time por ela sem reaprender a ler. */
+  /* ⚠️ ELA SÓ POSICIONA: quem desenha é a `.save-slot-team-row.spread` do card de time, que é uma
+     GRADE de 6 colunas -- e é ela que faz seis sprites caberem em 243px. Um flex-wrap próprio
+     deixava cada sprite em 48px e a fileira quebrava em duas linhas. */
+  .resultRow .resultTime{ grid-column:1/-1; margin-top:2px; }
   /* a linha do jogador ganha um destaque leve: ela é a que ele procura primeiro */
   .resultRow.eu{background:rgba(255,203,5,.2);border-radius:6px;padding-left:6px;padding-right:6px;}
   /* o Speed da corrida, que é o número pelo qual a lista se ordena */
   /* ⚠️ O POKÉMON NA LINHA DO RANKING é uma legenda, não a informação: quem se compara é o
      TREINADOR, e o tempo é o número. Ele trunca junto com o nome (o `.pesc-rank-nome` já é
      `minmax(0,1fr)` com ellipsis), então um time de seis no revezamento não empurra o tempo. */
-  .corrida-rank-mon{font-weight:600;font-size:.62rem;color:var(--muted);}
+  /* ⚠️ O NOME DO RANKING VIRA BOTÃO, e ele NÃO usa o `.btn` da casa: aquele é botão de AÇÃO, com
+     moldura de 3px, e aqui a linha é informação que por acaso se toca -- o mesmo raciocínio que já
+     tirou o `.btn` das linhas da ficha, dos cartões de golpe e das prateleiras da loja.
+     Ele herda o `.pesc-rank-nome` (que já trunca), então o tempo nunca é empurrado. */
+  .corrida-rank-btn{
+    background:none;border:none;padding:0;margin:0;font:inherit;color:inherit;text-align:left;
+    cursor:pointer;display:flex;align-items:center;gap:4px;min-width:0;
+  }
+  .corrida-rank-btn:hover{ text-decoration:underline; }
+  /* o ⓘ é a affordance, não a informação -- o mesmo da ficha da Pokédex */
+  .corrida-rank-info{ font-size:.66rem; color:var(--muted); opacity:.75; flex:none; }
   .corrida-rank-mod{font-size:.66rem;font-weight:800;color:var(--blue-dark);margin:0 0 6px;}
   .corrida-speed-badge{
     position:absolute;right:8px;top:50%;transform:translateY(-50%);
@@ -31357,16 +31374,20 @@ async function corridaEnviarRank(){
   /* ⚠️ SÓ QUEM COMPLETOU: sem `chegada` não há tempo, e um documento de quem desistiu seria
      linha morta no ranking. */
   if(!eu || eu.chegada === null || !game.authUser) return;
-  /* ⚠️ A LEGENDA É O TIME NO REVEZAMENTO E A ESPÉCIE NA INDIVIDUAL. Os seis nomes juntos medem
-     mais que a coluna inteira a 320px -- ela truncava no segundo pokémon e não dizia nada. O nome
-     do time diz mais e cabe. */
+  /* ⚠️ O TIME VIAJA JUNTO (20/09/2026, a pedido: *"quando clicar em cima do nome, abrir um modal
+     exibindo o time que o treinador usou para fazer aquele tempo"*), e vai o MÍNIMO pra desenhar
+     um sprite. Sem isso, o modal teria que adivinhar -- e o time de um recorde é de quando ele foi
+     feito, não o time de hoje daquele jogador.
+     A `especie` continua indo porque ela é o que o ranking ANTIGO já tem gravado; o time só existe
+     nos recordes daqui pra frente. */
   const comQuem = corrida.formato === 'relay'
     ? ((corrida.escolhidos[0] || {}).teamName || 'Equipe')
     : ((SPECIES[(eu.time && eu.time[0] || {}).speciesId] || {}).name || '');
+  const time = (eu.time || []).map(p => ({ speciesId: p.speciesId, level: p.level, shiny: !!p.shiny }));
   try{
     const r = await functionsClient.httpsCallable('submitRaceTime')({
       modalidade: corrida.formato, tempo: eu.chegada,
-      venceu: corridaPosicao(0) === 1, especie: comQuem });
+      venceu: corridaPosicao(0) === 1, especie: comQuem, time });
     corridaRank.recorde = (r.data && r.data.gravado) ? corrida.formato : null;
     /* o ranking mudou: a próxima abertura relê */
     if(corridaRank.recorde) corridaRank.single = null;
@@ -31396,14 +31417,55 @@ function corridaRankHtml(){
   /* ⚠️ A LINHA É A DO RANKING DA PESCARIA (`pesc-rank-*`), e as medalhas são as do pódio: o jogo
      inteiro desenha as suas desde 17/09/2026, e reusar a linha é o que faz os dois rankings se
      lerem igual em vez de o jogador reaprender. */
-  const linha = (x) => `<div class="pesc-rank-linha${x.eu ? ' eu' : ''}">`
-    + `<span class="pesc-rank-pos">${x.pos ? (MEDALHA_DO_POSTO[x.pos - 1] ? selo(MEDALHA_DO_POSTO[x.pos - 1]) : x.pos + 'º') : '—'}</span>`
-    + `<span class="pesc-rank-nome">${escapeHtmlSafe(x.nome)}${x.especie ? ` <span class="corrida-rank-mon">${escapeHtmlSafe(x.especie)}</span>` : ''}</span>`
-    + `<span class="pesc-rank-pts">${corridaTempoTxt(x.tempo)}</span></div>`;
+  /* ⚠️ A LEGENDA DO TIME SAIU DA LINHA (20/09/2026, a pedido): ali se compara TREINADOR e TEMPO,
+     e o resto era ruído numa coluna que já trunca. Quem responde "com o que ele correu?" é o
+     MODAL, e ele só abre pra quem quer saber.
+     ⚠️ E SÓ QUEM TEM TIME GRAVADO VIRA BOTÃO: recorde anterior a esta data não tem o campo, e um
+     botão que abre um modal vazio é pior que nenhum. */
+  const linha = (x, onde, i) => {
+    const temTime = Array.isArray(x.time) && x.time.length;
+    const nome = temTime
+      ? `<button type="button" class="pesc-rank-nome corrida-rank-btn" onclick="corridaVerTimeDoRank('${onde}',${i})">`
+        + `${escapeHtmlSafe(x.nome)}<span class="corrida-rank-info">ⓘ</span></button>`
+      : `<span class="pesc-rank-nome">${escapeHtmlSafe(x.nome)}</span>`;
+    return `<div class="pesc-rank-linha${x.eu ? ' eu' : ''}">`
+      + `<span class="pesc-rank-pos">${x.pos ? (MEDALHA_DO_POSTO[x.pos - 1] ? selo(MEDALHA_DO_POSTO[x.pos - 1]) : x.pos + 'º') : '—'}</span>`
+      + nome
+      + `<span class="pesc-rank-pts">${corridaTempoTxt(x.tempo)}</span></div>`;
+  };
   return caixa((corridaRank.recorde === corrida.formato ? `<p class="pesc-rank-novo">Recorde novo!</p>` : ``)
-    + `<div class="pesc-rank">${r.lista.map(linha).join('')}`
-    + (r.meu ? `<div class="pesc-rank-sep">você</div>` + linha(r.meu) : ``)
+    + `<div class="pesc-rank">${r.lista.map((x, i) => linha(x, 'lista', i)).join('')}`
+    + (r.meu ? `<div class="pesc-rank-sep">você</div>` + linha(r.meu, 'meu', 0) : ``)
     + `</div>`);
+}
+/* ⚠️ O MODAL DO TIME DO RANKING (20/09/2026, a pedido). O time é o que foi GRAVADO com aquele
+   tempo, não o time de hoje daquele jogador -- é por isso que ele viaja no `submitRaceTime` em
+   vez de ser buscado na hora.
+   ⚠️ E O ESTADO GUARDA ONDE ACHAR (lista/meu + índice), nunca uma cópia da linha: a lista é
+   relida e uma cópia ficaria velha em silêncio. */
+function corridaVerTimeDoRank(onde, i){
+  const r = corridaRank[corrida.formato];
+  if(!r) return;
+  const x = onde === 'meu' ? r.meu : (r.lista || [])[i];
+  if(!x || !Array.isArray(x.time) || !x.time.length) return;
+  corrida.timeDoRank = { nome: x.nome, tempo: x.tempo, pos: x.pos || null, time: x.time };
+  render();
+}
+function corridaFecharTimeDoRank(){ corrida.timeDoRank = null; render(); }
+function renderCorridaTimeModal(){
+  const t = corrida.timeDoRank;
+  if(!t) return '';
+  return `
+  <div class="modal-overlay" onclick="corridaFecharTimeDoRank()">
+    <div class="modal-box" onclick="event.stopPropagation();">
+      <h2>${escapeHtmlSafe(t.nome)}</h2>
+      <p class="corrida-rank-mod">${t.pos ? t.pos + 'º · ' : ''}${corridaTempoTxt(t.tempo)}</p>
+      ${/* ⚠️ A MESMA FILEIRA do card de time e da tela de resultado: o jogador reconhece um time
+           por ela, e um desenho próprio aqui o faria reaprender a ler. */''}
+      <div class="resultTime save-slot-team-row spread">${pescariaTimeSprites(t.time)}</div>
+      <button class="btn secondary" onclick="corridaFecharTimeDoRank()">Fechar</button>
+    </div>
+  </div>`;
 }
 function corridaZerar(){
   if(corrida.laco){ cancelAnimationFrame(corrida.laco); }
@@ -31415,7 +31477,7 @@ function corridaZerar(){
     tempo: 0, contagem: 0, ultimoQuadro: 0, animacao: 0,
     tentativaDaTravessia: -1, perfeitos: 0, brilho: 0, brilhoTexto: '',
     aviso: '', faltando: [], recado: 'Acerte a faixa amarela para acelerar.',
-    picker: false, laco: null, _pintouFim: false,
+    picker: false, laco: null, _pintouFim: false, timeDoRank: null,
   });
   return corrida;
 }
@@ -31824,14 +31886,10 @@ function nomeDoCorredor(c){ const p = c.time[c.trecho]; return (SPECIES[p.specie
    "Adversário 1" quebrava em DUAS linhas -- a linha ia de 48 pra 63px e as linhas deixavam de
    alinhar em coluna, que é justamente onde o olho compara. */
 function corridaTreinadorDe(i){ return i === 0 ? nomeDoTreinador() : 'Rival ' + i; }
-/* ⚠️ E EMBAIXO VAI COM QUEM ELE CORREU: no revezamento o NOME DO TIME (o jogador escolhe um time
-   inteiro desde 20/09), e na individual o pokémon. O time do adversario não tem nome de save --
-   ali o que dá pra dizer é quantos correram. */
-function corridaComQuemCorreu(c, i){
-  if(corrida.formato !== 'relay') return nomeDoCorredor(c);
-  if(i === 0) return (corrida.escolhidos[0] || {}).teamName || 'Sua equipe';
-  return 'Equipe rival';
-}
+/* ⚠️ E EMBAIXO DELE VAI A FILEIRA DE SPRITES DO TIME, não um rótulo de texto -- ver a `resultTime`
+   na tela de resultado. O rótulo (o nome do time, ou "Equipe rival") durou algumas horas e saiu a
+   pedido: ele respondia "de QUEM era a equipe" e os sprites respondem **QUAL era**, que é a
+   pergunta que se faz olhando uma classificação. */
 function corridaNovoCorredor(time, ehJogador){
   return { time, trecho: 0, dist: 0, efeito: 0, mult: 1, quadroT: ehJogador ? 0 : Math.random() * 0.4,
            chegada: null, avisoTroca: 0, trocas: [],
@@ -31874,6 +31932,11 @@ async function corridaLargar(){
   corrida.contagem = 3; corrida.fase = 'contagem';
   corrida.recado = 'Prepare-se para a largada!';
   render();
+  /* ⚠️ E A PÁGINA VAI PRO TOPO (20/09/2026, a pedido): a largada NÃO troca de `game.screen`, então
+     o `render()` trata isso como a MESMA tela e **repõe a rolagem anterior** -- quem estava embaixo
+     na lista de ordem via a pista começar pela metade. Ele vem DEPOIS do render justamente por
+     isso: antes, o próprio render desfaria. */
+  window.scrollTo(0, 0);
   corridaLaco();
 }
 function corridaTerminar(){
@@ -32369,7 +32432,16 @@ function renderCorrida(){
     </div>
     ${corridaRankHtml()}` : '';
 
-  const placar = corrida.corredores.length ? `
+  /* ⚠️ O PLACAR E A PISTA SAEM DA **FASE**, nunca de `corredores.length` (20/09/2026, reportado:
+     *"na tela em que eu seleciono o time, está exibindo um quadrado vazio que seria o quadro da
+     corrida"*). Os corredores são montados ANTES da fase virar `carregando` e SOBREVIVEM a ela --
+     então dois caminhos desenhavam um canvas em branco fora da corrida:
+       • a fase `carregando`, onde eles já existem e o laço ainda não roda;
+       • e o pior: um sprite que falta devolve pra `setup` SEM zerar os corredores, e aí o quadro
+         vazio fica na tela de escolha pra valer.
+     Quem responde "há corrida agora?" é a fase, e só ela. */
+  const emPista = corrida.fase === 'contagem' || corrida.fase === 'correndo';
+  const placar = emPista ? `
     <div class="box corrida-placar">
       ${corrida.corredores.map((c, i) => `
         <div class="racerRow">
@@ -32380,7 +32452,7 @@ function renderCorrida(){
         </div>`).join('')}
     </div>` : '';
 
-  const pista = corrida.corredores.length ? `
+  const pista = emPista ? `
     <div class="box corrida-pista">
       <canvas id="corridaCanvas" width="880" height="780" aria-label="Corrida vista de cima"></canvas>
       <div class="corrida-hud"><span id="corridaPosicao">${corridaTotal()} m</span><span id="corridaRelogio">00:00.0</span></div>
@@ -32430,9 +32502,15 @@ function renderCorrida(){
         <div class="resultRow${i === 0 ? ' eu' : ''}">
           <span class="resultPos">${pos + 1}º</span>
           <span class="resultMed">${MEDALHA_DO_POSTO[pos] ? selo(MEDALHA_DO_POSTO[pos]) : ''}</span>
-          <span class="resultNome">${escapeHtmlSafe(corridaTreinadorDe(i))}
-            <span class="resultQuem">${escapeHtmlSafe(corridaComQuemCorreu(c, i))}</span></span>
+          <span class="resultNome">${escapeHtmlSafe(corridaTreinadorDe(i))}</span>
           <b>${c.chegada.toFixed(2)}s</b>
+          ${/* ⚠️ OS SPRITES DO TIME, e não o nome dele (20/09/2026, a pedido): o nome respondia
+               "de quem era a equipe" e os sprites respondem **QUAL era** -- que é a pergunta que
+               se faz olhando uma classificação. Vale pros dois formatos: 6 no revezamento, 1 na
+               individual, sem exceção nenhuma.
+               ⚠️ E ELA OCUPA A LINHA INTEIRA (`grid-column:1/-1`): a coluna do nome tem **83px** a
+               320px, e seis sprites ali dariam 13px cada. */''}
+          <div class="resultTime save-slot-team-row spread">${pescariaTimeSprites(c.time)}</div>
         </div>`).join('')}
       <button class="btn success" onclick="corridaLargar()">Correr de novo</button>
       <button class="btn secondary" onclick="corridaReiniciar()">Configurar</button>
@@ -35034,6 +35112,7 @@ function render(){
      aberto de DENTRO dela -- vindo antes, abriria ATRÁS. É a mesma nota da ficha da Pokédex. */
   if(game.ninhoAberto){ html += renderNinhoModal(); }
   if(game.especialInfo){ html += renderEspecialInfoModal(); }
+  if(corrida.timeDoRank){ html += renderCorridaTimeModal(); }
   /* ⚠️ O HM GANHO vem DEPOIS da ficha e da caixa do especial e ANTES do convite online: ele pode
      nascer em QUALQUER tela (a captura, ou o carregamento da conta), entao ele nao pode ficar
      preso a uma; e o convite, que tem 15 segundos de prazo, tem que ficar por cima dele. */
