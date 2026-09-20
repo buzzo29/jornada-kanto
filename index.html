@@ -3426,6 +3426,11 @@
   .resultRow.eu{background:rgba(255,203,5,.2);border-radius:6px;padding-left:6px;padding-right:6px;}
   /* o Speed da corrida, que é o número pelo qual a lista se ordena */
   .corrida-speed{margin-left:6px;font-size:.55rem;font-weight:800;color:var(--blue-dark);}
+  /* ⚠️ O POKÉMON NA LINHA DO RANKING é uma legenda, não a informação: quem se compara é o
+     TREINADOR, e o tempo é o número. Ele trunca junto com o nome (o `.pesc-rank-nome` já é
+     `minmax(0,1fr)` com ellipsis), então um time de seis no revezamento não empurra o tempo. */
+  .corrida-rank-mon{font-weight:600;font-size:.62rem;color:var(--muted);}
+  .corrida-rank-mod{font-size:.66rem;font-weight:800;color:var(--blue-dark);margin:0 0 6px;}
   .corrida-speed-badge{
     position:absolute;right:8px;top:50%;transform:translateY(-50%);
     font-size:.6rem;font-weight:800;color:var(--blue-dark);
@@ -31107,14 +31112,22 @@ const CORRIDA_DESLEIXO_MIN = 0.55;  /* o piso: nunca abaixo de 55% da velocidade
    MESMA frequência do jogador -- em nenhum lugar a velocidade dele é inflada pra alcançar. */
 const CORRIDA_NPC = { perfect: 0.20, good: 0.52, miss: 0.14 };
 
-const CORRIDA_METROS = 300;          /* por trecho, e o total da individual */
-/* ⚠️ SEIS DESDE 20/09/2026, a pedido: *"no revezamento, ao invés de escolher 3 pokemons de
-   qualquer time, vai ter que escolher 1 time e o revezamento vai ser entre os 6 do time"*.
-   ⚠️ E ISSO DOBRA A PROVA: 6 × 300 m = 1.800 m, contra os 900 de antes. Medido, o revezamento vai
-   de ~95 s para ~190 s. É o preço de a equipe ser o time inteiro, e a régua pra encurtar é o
-   `CORRIDA_METROS` (150 por trecho devolveria os 900 m, com cada trecho em ~12 s). */
+const CORRIDA_METROS = 300;          /* a INDIVIDUAL */
 const CORRIDA_TRECHOS = 6;           /* no revezamento: o time inteiro */
-const corridaTotal = () => corrida.formato === 'relay' ? CORRIDA_METROS * CORRIDA_TRECHOS : CORRIDA_METROS;
+/* ⚠️ O TRECHO DO REVEZAMENTO É 150 m DESDE 20/09/2026, a pedido -- e a régua tinha sido prevista
+   aqui mesmo quando a equipe virou o time inteiro: com 6 × 300 a prova dobrou pra 1.800 m e
+   ~190 s, e 150 por trecho devolve os 900 m. Medido na volta: o revezamento cai de ~249 s pra
+   ~125 s e cada trecho leva ~12 s.
+   ⚠️ E SÃO DUAS CONSTANTES, não uma: a INDIVIDUAL continua em 300 m (é ela que o ranking chama
+   de "individual de 300 m"), e mudar o trecho do revezamento não pode encolher a outra. */
+const CORRIDA_METROS_TRECHO = 150;   /* cada trecho do revezamento */
+/* ⚠️ ELES RECEBEM O FORMATO, e não leem o `corrida.formato`: a tela de setup precisa dizer o
+   tamanho das DUAS modalidades ao mesmo tempo, nos dois botões -- lendo o estado, os dois
+   rótulos mostrariam o da que está selecionada. */
+const corridaMetrosDo = (f) => f === 'relay' ? CORRIDA_METROS_TRECHO : CORRIDA_METROS;
+const corridaTotalDo = (f) => f === 'relay' ? CORRIDA_METROS_TRECHO * CORRIDA_TRECHOS : CORRIDA_METROS;
+const corridaMetros = () => corridaMetrosDo(corrida.formato);
+const corridaTotal = () => corridaTotalDo(corrida.formato);
 
 /* ============================================================================
    OS SPRITES -- PMD, buscados do MESMO CDN que o jogo já usa
@@ -31254,6 +31267,88 @@ const corrida = {
   tentativaDaTravessia: -1, perfeitos: 0, brilho: 0, brilhoTexto: '',
   aviso: '', faltando: [], recado: '', picker: false, laco: null, _pintouFim: false,
 };
+/* ============================================================================
+   O RANKING DOS DOIS TEMPOS (20/09/2026, a pedido)
+   ----------------------------------------------------------------------------
+   São DOIS rankings -- a individual de 300 m e o revezamento --, e a tela mostra o da modalidade
+   escolhida. As duas listas vêm numa chamada só: trocar de modalidade não pode custar outra ida.
+
+   ⚠️ O TEMPO DO NPC NÃO ENTRA, e isso é por CONSTRUÇÃO: o que vai é `corredores[0].chegada`, e
+   o servidor grava no documento de quem chamou. O adversário não tem conta.
+   ⚠️ E O QUE VAI É O QUE O MOTOR CONTOU, nunca um número montado na tela.
+   ============================================================================ */
+const corridaRank = { single: null, relay: null, carregando: false, erro: null, recorde: null };
+/* ⚠️ BEST-EFFORT dos dois lados, como o da pescaria: um ranking que não carrega é uma caixa a
+   menos na tela, e um envio que falha é um recorde perdido -- nenhum dos dois pode derrubar a
+   corrida. */
+async function corridaCarregarRank(forcar){
+  if(corridaRank.carregando) return;
+  if(corridaRank.single && !forcar) return;
+  corridaRank.carregando = true; corridaRank.erro = null;
+  try{
+    const r = await functionsClient.httpsCallable('getRaceRanking')({});
+    corridaRank.single = (r.data && r.data.single) || { lista: [], meu: null };
+    corridaRank.relay = (r.data && r.data.relay) || { lista: [], meu: null };
+  } catch(e){
+    console.error('Erro ao ler o ranking da corrida:', e);
+    corridaRank.erro = 'Não deu pra carregar o ranking agora.';
+  }
+  corridaRank.carregando = false;
+  if(game.screen === 'corrida') render();
+}
+async function corridaEnviarRank(){
+  const eu = corrida.corredores[0];
+  /* ⚠️ SÓ QUEM COMPLETOU: sem `chegada` não há tempo, e um documento de quem desistiu seria
+     linha morta no ranking. */
+  if(!eu || eu.chegada === null || !game.authUser) return;
+  /* ⚠️ A LEGENDA É O TIME NO REVEZAMENTO E A ESPÉCIE NA INDIVIDUAL. Os seis nomes juntos medem
+     mais que a coluna inteira a 320px -- ela truncava no segundo pokémon e não dizia nada. O nome
+     do time diz mais e cabe. */
+  const comQuem = corrida.formato === 'relay'
+    ? ((corrida.escolhidos[0] || {}).teamName || 'Equipe')
+    : ((SPECIES[(eu.time && eu.time[0] || {}).speciesId] || {}).name || '');
+  try{
+    const r = await functionsClient.httpsCallable('submitRaceTime')({
+      modalidade: corrida.formato, tempo: eu.chegada,
+      venceu: corridaPosicao(0) === 1, especie: comQuem });
+    corridaRank.recorde = (r.data && r.data.gravado) ? corrida.formato : null;
+    /* o ranking mudou: a próxima abertura relê */
+    if(corridaRank.recorde) corridaRank.single = null;
+  } catch(e){ console.error('Erro ao enviar o tempo:', e); }
+  if(game.screen === 'corrida') render();
+}
+/* o tempo como o jogo escreve em toda tela de corrida: segundos com dois decimais */
+const corridaTempoTxt = (t) => Number(t).toFixed(2) + 's';
+function corridaRankHtml(){
+  /* ⚠️ A MODALIDADE FICA NUMA LINHA PRÓPRIA, e não no `<h2>`: a 320px o título na fonte de pixel
+     quebrava em duas linhas com o "m" sozinho embaixo. O `<h2>` fica com o nome curto (como o
+     "Melhores pescarias") e a modalidade desce pra o texto, que é onde ela se lê melhor. */
+  const modalidade = corrida.formato === 'relay'
+    ? 'Revezamento · ' + corridaTotalDo('relay') + ' m'
+    : 'Individual · ' + corridaTotalDo('single') + ' m';
+  const caixa = (dentro) => `<div class="box"><h2>${selo('trofeu')} Melhores tempos</h2>`
+    + `<p class="corrida-rank-mod">${modalidade}</p>${dentro}</div>`;
+  if(corridaRank.erro){
+    return caixa(`<p class="hint-text">${escapeHtmlSafe(corridaRank.erro)}</p>`
+      + `<button class="btn secondary" onclick="corridaCarregarRank(true)">Tentar de novo</button>`);
+  }
+  const r = corridaRank[corrida.formato];
+  if(!r) return caixa(`<p class="hint-text">Carregando…</p>`);
+  if(!r.lista.length && !r.meu){
+    return caixa(`<p class="hint-text">Ninguém correu esta modalidade ainda. O primeiro tempo pode ser o seu.</p>`);
+  }
+  /* ⚠️ A LINHA É A DO RANKING DA PESCARIA (`pesc-rank-*`), e as medalhas são as do pódio: o jogo
+     inteiro desenha as suas desde 17/09/2026, e reusar a linha é o que faz os dois rankings se
+     lerem igual em vez de o jogador reaprender. */
+  const linha = (x) => `<div class="pesc-rank-linha${x.eu ? ' eu' : ''}">`
+    + `<span class="pesc-rank-pos">${x.pos ? (MEDALHA_DO_POSTO[x.pos - 1] ? selo(MEDALHA_DO_POSTO[x.pos - 1]) : x.pos + 'º') : '—'}</span>`
+    + `<span class="pesc-rank-nome">${escapeHtmlSafe(x.nome)}${x.especie ? ` <span class="corrida-rank-mon">${escapeHtmlSafe(x.especie)}</span>` : ''}</span>`
+    + `<span class="pesc-rank-pts">${corridaTempoTxt(x.tempo)}</span></div>`;
+  return caixa((corridaRank.recorde === corrida.formato ? `<p class="pesc-rank-novo">Recorde novo!</p>` : ``)
+    + `<div class="pesc-rank">${r.lista.map(linha).join('')}`
+    + (r.meu ? `<div class="pesc-rank-sep">você</div>` + linha(r.meu) : ``)
+    + `</div>`);
+}
 function corridaZerar(){
   if(corrida.laco){ cancelAnimationFrame(corrida.laco); }
   Object.assign(corrida, {
@@ -31426,7 +31521,7 @@ function corridaAvancar(c, dt, t0){
   let resta = dt, gasto = 0;
   while(resta > 1e-9 && c.chegada === null){
     const v = corridaVelocidade(c);
-    const limite = Math.min(corridaTotal(), (c.trecho + 1) * CORRIDA_METROS);
+    const limite = Math.min(corridaTotal(), (c.trecho + 1) * corridaMetros());
     const ateLimite = Math.max(0, (limite - c.dist) / v);
     const ateVencer = c.efeito > 0 ? c.efeito : Infinity;
     const passo = Math.min(resta, ateLimite, ateVencer);
@@ -31697,6 +31792,7 @@ async function corridaLargar(){
   }
   corrida.tempo = 0; corrida.perfeitos = 0; corrida.tentativaDaTravessia = -1;
   corrida.brilho = 0; corrida.brilhoTexto = ''; corrida.ultimoQuadro = 0;
+  corridaRank.recorde = null;   /* o aviso é DESTA corrida, não da anterior */
   corrida.contagem = 3; corrida.fase = 'contagem';
   corrida.recado = 'Prepare-se para a largada!';
   render();
@@ -31707,6 +31803,9 @@ function corridaTerminar(){
   corrida.tempo = Math.max(...corrida.corredores.map(c => c.chegada));
   corrida.recado = 'Mude os participantes em Configurar ou corra novamente.';
   render();
+  /* ⚠️ DEPOIS DO `render()`: o envio é assíncrono e best-effort, e a tela do resultado não pode
+     esperar a rede pra aparecer. Ele redesenha sozinho quando a resposta chega. */
+  corridaEnviarRank();
 }
 function corridaReiniciar(){ corrida.fase = 'setup'; corrida.corredores = []; render(); }
 
@@ -31840,8 +31939,8 @@ function corridaPintar(){
       if(yL > 40 && yL < CORRIDA_H - 14) txt('LARGADA', 220, yL + 18, 12, '#8b7145');
     }
   }
-  if(corrida.formato === 'relay' && corrida.fase === 'correndo' && corridaCamera() < CORRIDA_METROS * 2){
-    const prox = (Math.floor(corridaCamera() / CORRIDA_METROS) + 1) * CORRIDA_METROS, yy = corridaYdaMetragem(prox);
+  if(corrida.formato === 'relay' && corrida.fase === 'correndo' && corridaCamera() < corridaMetros() * 2){
+    const prox = (Math.floor(corridaCamera() / corridaMetros()) + 1) * corridaMetros(), yy = corridaYdaMetragem(prox);
     if(yy > 45){ ret(lo, yy, vao, 4, '#388670'); txt('TROCA AOS ' + prox + ' m', 220, yy - 10, 12, '#28674f'); }
   }
 
@@ -31850,9 +31949,9 @@ function corridaPintar(){
      chegar, o outro fica parado e continua com o próximo do revezamento"*. Antes a troca era só
      o sprite mudando de um quadro pro outro -- não havia entrega de bastão nenhuma na tela.
      A metragem de cada um cai da REGRA do revezamento, sem estado novo:
-       • quem JÁ CORREU (k < trecho) parou na marca em que entregou -> (k + 1) × CORRIDA_METROS
+       • quem JÁ CORREU (k < trecho) parou na marca em que entregou -> (k + 1) × o trecho
        • quem CORRE (k === trecho) está em `c.dist`
-       • quem ESPERA (k > trecho) está na marca em que recebe -> k × CORRIDA_METROS
+       • quem ESPERA (k > trecho) está na marca em que recebe -> k × o trecho
      ⚠️ E É DERIVADO, nunca gravado: gravado, ele só conseguiria ficar velho -- e a posição de
      quem espera é uma constante da prova, não um estado. */
   const membrosNaPista = (c) => {
@@ -31860,7 +31959,7 @@ function corridaPintar(){
     const fora = [];
     for(let k = 0; k < c.time.length; k++){
       if(k === c.trecho) fora.push({ trecho: k, m: c.dist, parado: false });
-      else fora.push({ trecho: k, m: (k < c.trecho ? k + 1 : k) * CORRIDA_METROS, parado: true });
+      else fora.push({ trecho: k, m: (k < c.trecho ? k + 1 : k) * corridaMetros(), parado: true });
     }
     return fora;
   };
@@ -32064,7 +32163,7 @@ function corridaPickerDeTimes(){
   return `<div class="box">`
     + `<h2>${selo("corrida")} Qual time faz o revezamento?</h2>`
     + `<p class="hint-text">Correm os <strong>${CORRIDA_TRECHOS}</strong> do time, um por trecho de`
-    + ` ${CORRIDA_METROS} m. A ordem começa na do time e dá pra mexer antes de largar.</p>`
+    + ` ${CORRIDA_METROS_TRECHO} m. A ordem começa na do time e dá pra mexer antes de largar.</p>`
     + slots.map(slot => pescariaCardDoTime(slot, String(atual) === String(slot),
                                            `corridaEscolherTime(${slot})`)).join(``)
     + `<button class="btn secondary" onclick="corridaFecharPicker()">⬅ Voltar</button></div>`;
@@ -32127,16 +32226,21 @@ function renderCorrida(){
     + `<button class="btn secondary" onclick="sairDaCorrida()">⬅ Sair</button>`;
 
   const correndo = corrida.fase === 'correndo' || corrida.fase === 'contagem';
+  /* ⚠️ O RANKING É PEDIDO NO DESENHO, e não no `abrirCorrida`: assim ele volta a carregar quando
+     o jogador termina uma corrida e cai de novo no setup. A guarda do `corridaCarregarRank`
+     (lista já lida, ou pedido em voo) é que impede a repetição -- e ele NÃO é pedido enquanto a
+     corrida roda, porque ali o laço está pintando e uma resposta de rede chamaria render(). */
+  if(!correndo) corridaCarregarRank(false);
   const setup = !correndo && corrida.fase !== 'fim' ? `
     <div class="box">
       <h2>Modalidade</h2>
       <div class="row seg corrida-seg">
-        <button class="${corrida.formato === 'single' ? 'ativa' : ''}" onclick="corridaTrocarFormato('single')">Individual · 300 m</button>
-        <button class="${corrida.formato === 'relay' ? 'ativa' : ''}" onclick="corridaTrocarFormato('relay')">Revezamento · 900 m</button>
+        <button class="${corrida.formato === 'single' ? 'ativa' : ''}" onclick="corridaTrocarFormato('single')">Individual · ${corridaTotalDo('single')}&nbsp;m</button>
+        <button class="${corrida.formato === 'relay' ? 'ativa' : ''}" onclick="corridaTrocarFormato('relay')">Revezamento · ${corridaTotalDo('relay')}&nbsp;m</button>
       </div>
       <p class="hint-text">${corrida.formato === 'relay'
-        ? 'Três Pokémon por equipe, 300 m cada. A troca é automática.'
-        : 'Uma corrida de 300 m. Você controla os impulsos.'}</p>
+        ? `Os ${CORRIDA_TRECHOS} do time, ${CORRIDA_METROS_TRECHO} m cada. A troca é automática.`
+        : `Uma corrida de ${CORRIDA_METROS} m. Você controla os impulsos.`}</p>
       <h2 class="u-mt8">${corrida.formato === 'relay' ? 'Equipes na pista' : 'Pokémon na pista'}</h2>
       <div class="row seg corrida-seg">
         ${[2, 3, 4].map(n => `<button class="${corrida.participantes === n ? 'ativa' : ''}" onclick="corridaTrocarParticipantes(${n})">${n}</button>`).join('')}
@@ -32152,7 +32256,8 @@ function renderCorrida(){
       <button class="btn success" ${corridaCompleto() && corrida.fase !== 'carregando' ? '' : 'disabled'} onclick="corridaLargar()">
         ${corrida.fase === 'carregando' ? 'Carregando os sprites…' : (corridaCompleto() ? '🏁 Largar' : 'Escolha ' + corridaQuantos() + (corridaQuantos() > 1 ? ' Pokémon' : ' Pokémon'))}
       </button>
-    </div>` : '';
+    </div>
+    ${corridaRankHtml()}` : '';
 
   const placar = corrida.corredores.length ? `
     <div class="box corrida-placar">
@@ -32178,7 +32283,7 @@ function renderCorrida(){
       ${corrida.formato === 'relay' ? `<div class="corrida-trechos">${corrida.escolhidos.map((p, i) => {
         const eu = corrida.corredores[0];
         const st = eu && eu.trecho === i ? ' ativo' : (eu && i < eu.trecho ? ' feito' : '');
-        return `<div class="corrida-trecho${st}"><b>${escapeHtmlSafe((SPECIES[p.speciesId] || {}).name || '')}</b>${i * CORRIDA_METROS}–${(i + 1) * CORRIDA_METROS} m</div>`;
+        return `<div class="corrida-trecho${st}"><b>${escapeHtmlSafe((SPECIES[p.speciesId] || {}).name || '')}</b>${i * corridaMetros()}–${(i + 1) * corridaMetros()} m</div>`;
       }).join('')}</div>` : ''}
       <div class="corrida-feedback"><span id="corridaRecado">${escapeHtmlSafe(corrida.recado)}</span><span id="corridaPerfeitos">${corrida.perfeitos} perfeitos</span></div>
       ${/* ⚠️ AS FAIXAS SAEM DAS CONSTANTES, nunca de um número escrito no CSS: se a detecção e o
@@ -32211,7 +32316,8 @@ function renderCorrida(){
         </div>`).join('')}
       <button class="btn success" onclick="corridaLargar()">Correr de novo</button>
       <button class="btn secondary" onclick="corridaReiniciar()">Configurar</button>
-    </div>` : '';
+    </div>
+    ${corridaRankHtml()}` : '';
 
   /* ⚠️ NO FIM SÓ A CLASSIFICAÇÃO FICA NA TELA (18/09/2026, a pedido), e o print mostrou por quê:
      os três quadros de cima ficam **vazios** ali -- o placar volta a "0 / 300 m" e o canvas fica
@@ -32219,12 +32325,12 @@ function renderCorrida(){
      só sobrando: estavam mostrando dado errado. */
   if(corrida.fase === 'fim'){
     return `
-  <div class="eyebrow">${selo('corrida')} CORRIDA POKÉMON · TESTE ADMIN</div>
+  <div class="eyebrow">${selo('corrida')} CORRIDA POKÉMON</div>
   ${fim}
   <button class="btn secondary" onclick="sairDaCorrida()">⬅ Sair</button>`;
   }
   return `
-  <div class="eyebrow">${selo('corrida')} CORRIDA POKÉMON · TESTE ADMIN</div>
+  <div class="eyebrow">${selo('corrida')} CORRIDA POKÉMON</div>
   ${setup}${placar}${pista}
   ${correndo ? '' : `<button class="btn secondary" onclick="sairDaCorrida()">⬅ Sair</button>`}`;
 }

@@ -4,7 +4,7 @@
  * O que ele existe pra pegar, em ordem de importância:
  *   1. o acesso: o botão e a porta dependem de `admin === true`, e NADA MAIS autoriza;
  *   2. o Speed: é o do JOGO (com nível, shiny e especialidade) e não o do protótipo;
- *   3. a física: as trocas caem EXATAS em 300 e 600, mesmo quando o limite cai no meio do quadro;
+ *   3. a física: as trocas caem EXATAS nos múltiplos do trecho, mesmo com o limite no meio do quadro;
  *   4. a barra: ela vai e VOLTA, e a detecção vale nos dois sentidos -- inclusive nas bordas;
  *   5. uma tentativa por travessia;
  *   6. nada do save é tocado.
@@ -292,7 +292,7 @@ console.log('\n=== UMA TENTATIVA POR TRAVESSIA (uma na ida, uma na volta) ===');
 /* ============================================================================
    6) A FÍSICA -- avanço por velocidade × tempo, e os limites EXATOS
    ============================================================================ */
-console.log('\n=== A FÍSICA: TROCAS EXATAS EM 300 E 600 ===');
+console.log('\n=== A FÍSICA: AS TROCAS CAEM NOS MÚLTIPLOS DO TRECHO ===');
 {
   contaDeTeste();
   const montar = (formato, participantes) => {
@@ -319,22 +319,22 @@ console.log('\n=== A FÍSICA: TROCAS EXATAS EM 300 E 600 ===');
       f, n,
       corredores: S.corrida.corredores.length,
       terminou: S.corrida.corredores.every(c => c.chegada !== null),
-      distExata: S.corrida.corredores.every(c => c.dist === (f === 'relay' ? S.corridaTotal() : S.CORRIDA_METROS)),
+      distExata: S.corrida.corredores.every(c => c.dist === S.corridaTotal()),
       trocas: trocas.length,
             /* ⚠️ A troca cai no MÚLTIPLO EXATO do trecho, mesmo caindo no meio do quadro. Medida de
-         FORA, no fim do quadro, ela sai em 300,07 -- porque o PRÓXIMO já correu o resto do
+         FORA, no fim do quadro, ela sai um tiquinho além -- porque o PRÓXIMO já correu o resto do
          quadro, que é o que o pedido manda fazer. É por isso que a troca é REGISTRADA. */
-      trocasExatas: trocas.every(t => t.em % S.CORRIDA_METROS === 0 && t.em > 0 && t.em < S.corridaTotal()),
+      trocasExatas: trocas.every(t => t.em % S.corridaMetros() === 0 && t.em > 0 && t.em < S.corridaTotal()),
     });
   }
   ok('as seis combinações terminam', combos.every(c => c.terminou), JSON.stringify(combos.filter(c => !c.terminou)));
   ok('e o número de corredores bate', combos.every(c => c.corredores === c.n));
   ok('e todos param na distância EXATA', combos.every(c => c.distExata),
      JSON.stringify(combos.filter(c => !c.distExata)));
-  /* ⚠️ E AS TROCAS CAEM EM 300 E 600 EXATOS, mesmo caindo no meio do quadro. Medida de FORA, no fim
-     do quadro, a distância sai em 300,07 -- porque o PRÓXIMO já correu o resto do quadro, que é
-     exatamente o que o pedido manda fazer. É por isso que a troca é REGISTRADA. */
-  ok('e as trocas caem em 300 e 600 EXATOS', combos.every(c => c.trocasExatas),
+  /* ⚠️ E AS TROCAS CAEM NO MÚLTIPLO EXATO DO TRECHO, mesmo caindo no meio do quadro. Medida de
+     FORA, no fim do quadro, a distância passa um pouco -- porque o PRÓXIMO já correu o resto do
+     quadro, que é exatamente o que o pedido manda fazer. É por isso que a troca é REGISTRADA. */
+  ok('e as trocas caem nos múltiplos EXATOS do trecho', combos.every(c => c.trocasExatas),
      JSON.stringify(combos.filter(c => !c.trocasExatas)));
   ok('e o revezamento tem uma troca por degrau', combos.filter(c => c.f === 'relay').every(c => c.trocas === c.n * (S.CORRIDA_TRECHOS - 1)),
      combos.filter(c => c.f === 'relay').map(c => c.trocas).join(','));
@@ -354,8 +354,8 @@ console.log('\n=== A FÍSICA: TROCAS EXATAS EM 300 E 600 ===');
   ok('o tempo não depende da taxa de quadros', Math.abs(t60 - t10) < 1e-6 && Math.abs(t60 - t5) < 1e-6,
      [t60, t10, t5].map(t => t.toFixed(6)).join(' / '));
 
-  /* ⚠️ E A VELOCIDADE DO PRÓXIMO VALE NO RESTO DO QUADRO. Com um quadro ENORME (5 s) o limite dos
-     300 m cai no meio dele -- e o que sobra tem que correr com o Speed do segundo, não do primeiro. */
+  /* ⚠️ E A VELOCIDADE DO PRÓXIMO VALE NO RESTO DO QUADRO. Com um quadro ENORME o limite do trecho
+     cai no meio dele -- e o que sobra tem que correr com o Speed do segundo, não do primeiro. */
   {
     S.corridaZerar();
     S.corrida.formato = 'relay'; S.corrida.participantes = 1;
@@ -365,16 +365,17 @@ console.log('\n=== A FÍSICA: TROCAS EXATAS EM 300 E 600 ===');
     S.corrida.corredores = [eu]; S.corrida.fase = 'correndo'; S.corrida.tempo = 0;
     const vLento = S.velocidadeNormal(S.speedDaCorrida(lento));
     const vRapido = S.velocidadeNormal(S.speedDaCorrida(rapido));
-    const tAte300 = 300 / vLento;
+    const trecho = S.CORRIDA_METROS_TRECHO;
+    const tAteOLimite = trecho / vLento;
     /* um único quadro que passa 2 s DEPOIS do limite */
-    S.corridaAvancar(eu, tAte300 + 2, 0);
-    ok('a troca acontece no limite exato', eu.trocas.length === 1 && eu.trocas[0].em === 300,
+    S.corridaAvancar(eu, tAteOLimite + 2, 0);
+    ok('a troca acontece no limite exato', eu.trocas.length === 1 && eu.trocas[0].em === trecho,
        JSON.stringify(eu.trocas));
     ok('e os 2 s que sobraram correram com o Speed do SEGUNDO',
-       Math.abs(eu.dist - (300 + vRapido * 2)) < 1e-6,
-       eu.dist.toFixed(4) + ' contra ' + (300 + vRapido * 2).toFixed(4));
+       Math.abs(eu.dist - (trecho + vRapido * 2)) < 1e-6,
+       eu.dist.toFixed(4) + ' contra ' + (trecho + vRapido * 2).toFixed(4));
     ok('(e não com o do primeiro, que daria outro número)',
-       Math.abs(eu.dist - (300 + vLento * 2)) > 1);
+       Math.abs(eu.dist - (trecho + vLento * 2)) > 1);
   }
 }
 
@@ -977,12 +978,14 @@ console.log('\n=== A CHEGADA FICA NA METADE DE CIMA ===');
      S.corridaCamera() === 50 && S.corridaYdaMetragem(50) === S.CORRIDA_Y_EU,
      S.corridaCamera() + ' / y=' + S.corridaYdaMetragem(50));
 
-  /* ⚠️ E NO REVEZAMENTO a trava é nos últimos metros dos 900, não em cada trecho. */
+  /* ⚠️ E NO REVEZAMENTO a trava é nos últimos metros da PROVA, não em cada trecho. */
   S.corrida.formato = 'relay';
-  eu.dist = 320;
-  ok('no revezamento ela não trava na TROCA dos 300', S.corridaCamera() === 320, String(S.corridaCamera()));
+  const passouUmTrecho = S.CORRIDA_METROS_TRECHO + 20;
+  eu.dist = passouUmTrecho;
+  ok('no revezamento ela não trava na TROCA de um trecho',
+     S.corridaCamera() === passouUmTrecho, String(S.corridaCamera()));
   eu.dist = S.corridaTotal() - 5;
-  ok('e trava só na chegada dos 900',
+  ok('e trava só na chegada da prova',
      Math.abs(S.corridaYdaMetragem(S.corridaTotal()) - S.CORRIDA_Y_CHEGADA) < 1e-9);
   S.corrida.formato = 'single';
 }
@@ -1049,23 +1052,26 @@ console.log('\n=== O REVEZAMENTO TEM A EQUIPE NA PISTA ===');
   /* ⚠️ A POSIÇÃO DE CADA MEMBRO CAI DA REGRA, sem estado novo. Quem desenha é a tela, então o
      que se cobra aqui é a CONTA: quem espera está na marca em que RECEBE, quem já correu na marca
      em que ENTREGOU. */
-  const onde = (trecho, dist, k) => k === trecho ? dist : (k < trecho ? k + 1 : k) * S.CORRIDA_METROS;
+  const onde = (trecho, dist, k) => k === trecho ? dist : (k < trecho ? k + 1 : k) * S.corridaMetros();
+  /* ⚠️ AS MARCAS SAEM DA CONSTANTE, nunca escritas à mão: elas eram 300 e 600 e viraram 150 e
+     300 quando o trecho mudou -- cinco travas caíram de uma vez sem nada estar errado. */
+  const M1 = S.CORRIDA_METROS_TRECHO, M2 = 2 * S.CORRIDA_METROS_TRECHO;
 
   eu.trecho = 0; eu.dist = 120;
-  ok('no 1º trecho, o 2º espera na marca dos 300', onde(0, 120, 1) === 300);
-  ok('e o 3º espera na dos 600', onde(0, 120, 2) === 600);
+  ok('no 1º trecho, o 2º espera na marca do 1º trecho', onde(0, 120, 1) === M1);
+  ok('e o 3º espera na do 2º', onde(0, 120, 2) === M2);
   ok('e o que corre está na metragem dele', onde(0, 120, 0) === 120);
 
-  eu.trecho = 1; eu.dist = 420;
-  ok('no 2º trecho, o 1º ficou PARADO nos 300 (onde entregou)', onde(1, 420, 0) === 300);
-  ok('o 2º corre', onde(1, 420, 1) === 420);
-  ok('e o 3º continua esperando nos 600', onde(1, 420, 2) === 600);
+  eu.trecho = 1; eu.dist = M1 + 120;
+  ok('no 2º trecho, o 1º ficou PARADO onde entregou', onde(1, M1 + 120, 0) === M1);
+  ok('o 2º corre', onde(1, M1 + 120, 1) === M1 + 120);
+  ok('e o 3º continua esperando na marca dele', onde(1, M1 + 120, 2) === M2);
 
   /* ⚠️ NO INSTANTE DA TROCA OS DOIS ESTÃO NA MESMA METRAGEM -- quem entrega e quem recebe. É por
      isso que o desenho desloca os parados pro lado: sem isso eles sairiam um em cima do outro. */
-  eu.trecho = 1; eu.dist = 300;
+  eu.trecho = 1; eu.dist = M1;
   ok('na troca, quem entregou e quem recebeu estão na MESMA metragem',
-     onde(1, 300, 0) === 300 && onde(1, 300, 1) === 300);
+     onde(1, M1, 0) === M1 && onde(1, M1, 1) === M1);
 
   /* ⚠️ AGORA O DESENHO DE VERDADE, e essa é a parte que importa: a conta `onde` acima é uma
      CÓPIA da regra dentro do teste -- ela daria verde mesmo se o jogo parasse de desenhar a equipe.
@@ -1102,25 +1108,25 @@ console.log('\n=== O REVEZAMENTO TEM A EQUIPE NA PISTA ===');
      new Set(meus.map(c => Math.round(c.x))).size === meus.length,
      meus.map(c => Math.round(c.x)).join(' / '));
 
-  /* ⚠️ O QUE ESPERA FICA NA MARCA DE TROCA, e é disso que o pedido fala. Com o jogador nos 305,
-     o 3º membro espera nos 600 -- fora da tela; nos 580 ele entra, e na metragem certa. */
-  eu.dist = 585; npc.dist = 585;
+  /* ⚠️ O QUE ESPERA FICA NA MARCA DE TROCA, e é disso que o pedido fala. O 3º membro espera na
+     marca do 2º trecho -- fora da tela; a 15 m dela ele entra, e na metragem certa. */
+  eu.dist = M2 - 15; npc.dist = M2 - 15;
   ch.length = 0; S.corridaPintar();
-  const yEsperado = S.corridaYdaMetragem(600);
+  const yEsperado = S.corridaYdaMetragem(M2);
   const naMarca = ch.filter(c => c.t === 'img' && Math.abs(c.y - yEsperado) < 2);
-  ok('quem espera está exatamente na marca dos 600', naMarca.length === 2,
+  ok('quem espera está exatamente na marca do 2º trecho', naMarca.length === 2,
      naMarca.length + ' na marca (y=' + yEsperado.toFixed(0) + ')');
 
   /* ⚠️ E QUEM JÁ ENTREGOU FICA PARADO ONDE ENTREGOU -- a outra metade do pedido.
      ⚠️ E ELE SÓ FICA VISÍVEL POR ~11 m: a câmera vê 38 m pra frente e só 11 pra trás, então quem
      entregou sai de vista logo depois da troca. É o certo -- ele ficou pra trás --, e é por isso
-     que o fixture usa 608 e não 620: aos 620 a marca cai em y=460, fora da tela de 390. */
-  eu.trecho = 2; eu.dist = 608; npc.trecho = 2; npc.dist = 608;
+     que o fixture fica 8 m depois da marca: mais que isso e ela cai fora da tela de 390. */
+  eu.trecho = 2; eu.dist = M2 + 8; npc.trecho = 2; npc.dist = M2 + 8;
   ch.length = 0; S.corridaPintar();
-  const y600 = S.corridaYdaMetragem(600);
-  ok('e quem entregou nos 600 ficou parado lá',
-     ch.some(c => c.t === 'img' && Math.abs(c.y - y600) < 2 && c.alpha < 1),
-     'y=' + y600.toFixed(0));
+  const yM2 = S.corridaYdaMetragem(M2);
+  ok('e quem entregou na marca ficou parado lá',
+     ch.some(c => c.t === 'img' && Math.abs(c.y - yM2) < 2 && c.alpha < 1),
+     'y=' + yM2.toFixed(0));
 
   /* ⚠️ SEM SPRITE ele cai no marcador neutro, que desenha o NOME -- e o nome é só de quem CORRE.
      Três "VOCÊ" empilhados na mesma raia só confundem: quem está parado é cenário. */
@@ -1163,19 +1169,21 @@ console.log('\n=== A PISTA É PROPORCIONAL À DISTÂNCIA ===');
   ok('nem com a modalidade', S.corridaEscala() === eJunto, String(S.corridaEscala()));
   S.corrida.formato = 'single';
 
-  /* ⚠️ E ELA MOSTRA UM PEDAÇO CURTO DA PISTA -- é esse número que o relato cobrava. Com os 300 m
-     cabendo numa tela, a chegada aparecia na largada e ninguém parecia sair do lugar. */
+  /* ⚠️ E ELA MOSTRA UM PEDAÇO CURTO DA PISTA -- é esse número que o relato cobrava. Com a prova
+     inteira cabendo numa tela, a chegada aparecia na largada e ninguém parecia sair do lugar. */
   const naTela = S.CORRIDA_H / eJunto;
   ok('a tela mostra um pedaço curto da pista, não a prova inteira',
      naTela < 70, naTela.toFixed(0) + ' m na tela');
-  ok('e os 300 m de um trecho ocupam várias telas',
+  ok('e um trecho do revezamento ocupa várias telas',
+     S.CORRIDA_METROS_TRECHO / naTela >= 2, (S.CORRIDA_METROS_TRECHO / naTela).toFixed(1) + ' telas');
+  ok('  e a individual, mais ainda',
      S.CORRIDA_METROS / naTela >= 4, (S.CORRIDA_METROS / naTela).toFixed(1) + ' telas');
 
   /* ⚠️ A CÂMERA É O JOGADOR, nunca o líder: presa ao líder, quem estivesse perdendo escorregaria
      pra fora da própria tela.
      ⚠️ E O FIXTURE TEM QUE FICAR FORA DA RETA FINAL (os últimos 25,5 m): lá a
      câmera TRAVA de propósito, e um fixture com `dist` perto da chegada mediria a trava em vez da
-     câmera. A primeira versão usava 300 e 400 num total de 300 -- ou seja, sempre dentro dela. */
+     câmera. A primeira versão usava fixtures de 300 e 400 num total de 300 -- sempre dentro dela. */
   const foraDaReta = S.corridaTotal() - S.corridaRetaFinal();
   a.dist = 120; b.dist = 250;
   ok('a câmera segue o JOGADOR, mesmo perdendo', S.corridaCamera() === 120, String(S.corridaCamera()));
@@ -1403,5 +1411,193 @@ console.log('\n=== NO FIM, SÓ A CLASSIFICAÇÃO ===');
   S.corridaZerar();
 }
 
+/* ============================================================================
+   19) O TRECHO DO REVEZAMENTO É 150 m, E OS RÓTULOS SÃO DERIVADOS (20/09/2026)
+   ----------------------------------------------------------------------------
+   Pedido: *"o revezamento troque para 150m cada pokemon, e atualize aqui nessa tela tambem"*.
+   ⚠️ E O "atualize aqui" ERA UM DEFEITO DE VERDADE: o botão dizia "Revezamento · 900 m" desde que
+   a equipe virou o time inteiro, e a prova era de 1.800 m. Texto fixo que descreve uma constante
+   envelhece quando a constante muda -- a mesma família do "59 espécies" da ficha da Pokédex.
+   ============================================================================ */
+console.log('\n=== O TRECHO DE 150 m E OS RÓTULOS ===');
+{
+  contaDeTeste();
+  S.corridaZerar();
+  ok('a individual continua em ' + S.CORRIDA_METROS + ' m', S.CORRIDA_METROS === 300);
+  ok('e o trecho do revezamento é 150', S.CORRIDA_METROS_TRECHO === 150, String(S.CORRIDA_METROS_TRECHO));
+  /* ⚠️ SÃO DUAS CONSTANTES: mudar o trecho não pode encolher a individual, que é a que o ranking
+     chama de "individual de 300 m". */
+  ok('  e são DUAS constantes, não uma', S.CORRIDA_METROS !== S.CORRIDA_METROS_TRECHO);
+  ok('o total do revezamento é ' + (S.CORRIDA_METROS_TRECHO * S.CORRIDA_TRECHOS) + ' m',
+     S.corridaTotalDo('relay') === S.CORRIDA_METROS_TRECHO * S.CORRIDA_TRECHOS,
+     String(S.corridaTotalDo('relay')));
+  ok('  e o da individual é ' + S.CORRIDA_METROS, S.corridaTotalDo('single') === S.CORRIDA_METROS);
+
+  S.corrida.formato = 'single';
+  ok('o ajudante segue o formato escolhido (individual)', S.corridaMetros() === S.CORRIDA_METROS);
+  S.corrida.formato = 'relay';
+  ok('  e o revezamento', S.corridaMetros() === S.CORRIDA_METROS_TRECHO);
+  S.corrida.formato = 'single';
+
+  /* ⚠️ OS DOIS RÓTULOS SÃO DERIVADOS, e é isso que impede o próximo ajuste de deixar um deles
+     mentindo. A trava procura o NÚMERO calculado, não um texto fixo -- se ela procurasse "900 m"
+     ela envelheceria junto com o rótulo. */
+  const tela = S.renderCorrida();
+  ok('o botão da individual diz o total dela',
+     tela.indexOf('Individual · ' + S.corridaTotalDo('single') + '&nbsp;m') >= 0);
+  ok('  e o do revezamento, o dele',
+     tela.indexOf('Revezamento · ' + S.corridaTotalDo('relay') + '&nbsp;m') >= 0);
+  ok('  e nenhum dos dois está escrito à mão no arquivo',
+     src.indexOf('Revezamento \u00b7 900 m') < 0 && src.indexOf('Individual \u00b7 300 m') < 0,
+     'texto fixo que descreve constante envelhece');
+  S.corrida.formato = 'relay';
+  ok('  e a explicação do revezamento diz os ' + S.CORRIDA_METROS_TRECHO + ' m',
+     S.renderCorrida().indexOf(S.CORRIDA_METROS_TRECHO + ' m cada') >= 0);
+  S.corrida.formato = 'single';
+
+  /* ⚠️ E O "TESTE ADMIN" SAIU das duas telas (a pescaria já tinha saído no mesmo dia) */
+  ok('o cabeçalho não diz mais TESTE ADMIN', S.renderCorrida().indexOf('TESTE ADMIN') < 0);
+  S.corrida.fase = 'fim'; S.corrida.corredores = [];
+  ok('  nem o da tela de resultado', S.renderCorrida().indexOf('TESTE ADMIN') < 0);
+  ok('  e ele não sobrou no arquivo', src.indexOf('TESTE ADMIN') < 0);
+  S.corridaZerar();
+}
+
+/* ============================================================================
+   20) OS DOIS RANKINGS -- o lado de cá (20/09/2026)
+   ----------------------------------------------------------------------------
+   Pedido: *"crie o ranking individual de 300m e o ranking do revezamento, o tempo dos npc nao
+   coloque no ranking, apenas dos treinadores"*.
+   O SERVIDOR é trancado no `tools/test-corrida-rank.js`; aqui é o que SAI daqui e o que a tela
+   desenha.
+   ⚠️ E NADA AQUI USA `await`: o `httpsCallable(...)(...)` é chamado de forma SÍNCRONA dentro do
+   `corridaCarregarRank`, então o espião registra na hora -- e o que depende da resposta é montado
+   à mão. Um `await` no topo deste arquivo (que é CommonJS) seria erro de sintaxe.
+   ============================================================================ */
+console.log('\n=== OS DOIS RANKINGS (cliente) ===');
+{
+  contaDeTeste();
+  S.corridaZerar();
+  const enviados = [];
+  const original = S.functionsClient.httpsCallable;
+  S.functionsClient.httpsCallable = (nome) => (dados) => {
+    enviados.push({ nome, dados: dados || {} });
+    return Promise.resolve({ data: { gravado: true } });
+  };
+  g.authUser = { uid: 'u1' };
+
+  /* ⚠️ O QUE VAI É O TEMPO DE `corredores[0]`, e SÓ ele: o adversário não tem conta, e o servidor
+     grava no documento de quem chamou. Um segundo tempo não tem por onde entrar. */
+  S.corrida.formato = 'single';
+  S.corrida.escolhidos = [mk('jolteon', 60)];
+  const eu = S.corridaNovoCorredor([S.corridaInstancia(mk('jolteon', 60), true)], true);
+  const npc = S.corridaNovoCorredor([S.corridaInstancia(mk('shuckle', 60), false)], false);
+  eu.chegada = 24.5; npc.chegada = 31.0;
+  S.corrida.corredores = [eu, npc];
+  S.corridaEnviarRank();
+  const envio = enviados.find(x => x.nome === 'submitRaceTime');
+  ok('o envio manda o MEU tempo', !!envio && envio.dados.tempo === 24.5, JSON.stringify(envio && envio.dados));
+  ok('  e a modalidade', !!envio && envio.dados.modalidade === 'single');
+  ok('  e diz que venci', !!envio && envio.dados.venceu === true);
+  /* ⚠️ A TRAVA QUE IMPORTA: o tempo do NPC não sai daqui de jeito nenhum */
+  ok('  e o tempo do NPC NÃO vai junto',
+     !!envio && JSON.stringify(envio.dados).indexOf('31') < 0,
+     JSON.stringify(envio && envio.dados));
+  ok('  e o pedido leva UM tempo só',
+     !!envio && Object.keys(envio.dados).filter(k => /tempo/i.test(k)).length === 1,
+     Object.keys((envio || {}).dados || {}).join(','));
+
+  /* quem não completou não vira linha no ranking */
+  enviados.length = 0;
+  eu.chegada = null;
+  S.corridaEnviarRank();
+  ok('quem NÃO completou não envia nada', !enviados.some(x => x.nome === 'submitRaceTime'),
+     'um documento de quem desistiu seria linha morta');
+  eu.chegada = 24.5;
+
+  /* ⚠️ UMA CHAMADA SÓ TRAZ AS DUAS LISTAS: trocar de modalidade não pode custar outra ida */
+  enviados.length = 0;
+  S.corridaRank.single = null; S.corridaRank.relay = null; S.corridaRank.carregando = false;
+  S.corridaCarregarRank(true);
+  ok('uma chamada só pra os dois rankings',
+     enviados.filter(x => x.nome === 'getRaceRanking').length === 1,
+     enviados.filter(x => x.nome === 'getRaceRanking').length + ' chamada(s)');
+
+  /* daqui pra baixo a resposta é montada à mão -- o que se testa é o DESENHO */
+  S.corridaRank.carregando = false;
+  S.corridaRank.single = { lista: [{ pos: 1, nome: 'Ana', tempo: 18.5, especie: 'Jolteon', eu: false }], meu: null };
+  S.corridaRank.relay  = { lista: [{ pos: 1, nome: 'Beto', tempo: 99.5, especie: 'Time B', eu: true }], meu: null };
+  enviados.length = 0;
+  S.corridaCarregarRank(false);
+  ok('  e a segunda vez não vai à rede', !enviados.length);
+
+  S.corrida.fase = 'setup'; S.corrida.corredores = [];
+  S.corrida.formato = 'single';
+  let caixa = S.corridaRankHtml();
+  ok('a caixa nomeia a INDIVIDUAL e o tamanho dela',
+     caixa.indexOf('Individual · ' + S.corridaTotalDo('single') + ' m') >= 0, caixa.slice(0, 220));
+  ok('  e mostra o tempo em segundos', caixa.indexOf('18.50s') >= 0);
+  ok('  e o nome do treinador', caixa.indexOf('Ana') >= 0);
+  ok('  e não mistura o do revezamento', caixa.indexOf('Beto') < 0);
+  S.corrida.formato = 'relay';
+  caixa = S.corridaRankHtml();
+  ok('trocando de modalidade, a caixa troca de lista',
+     caixa.indexOf('Beto') >= 0 && caixa.indexOf('Ana') < 0);
+  ok('  e nomeia o REVEZAMENTO', caixa.indexOf('Revezamento · ' + S.corridaTotalDo('relay') + ' m') >= 0);
+  /* ⚠️ A LINHA É A DO RANKING DA PESCARIA: reusá-la é o que faz os dois se lerem igual */
+  ok('  e reusa a linha do ranking da pescaria', caixa.indexOf('pesc-rank-linha') >= 0);
+  S.corrida.formato = 'single';
+
+  /* e a caixa aparece nas DUAS telas em que o jogador está parado */
+  S.corrida.fase = 'setup';
+  ok('a caixa aparece na tela de setup', S.renderCorrida().indexOf('Melhores tempos') >= 0);
+  S.corrida.fase = 'fim'; S.corrida.corredores = [eu, npc];
+  ok('  e na tela de resultado', S.renderCorrida().indexOf('Melhores tempos') >= 0);
+  /* ⚠️ E NÃO É PEDIDO DURANTE A CORRIDA: ali o laço está pintando, e uma resposta de rede chamaria
+     render() no meio da animação -- a regra da casa, que já custou três defeitos. */
+  S.corrida.fase = 'correndo';
+  enviados.length = 0;
+  /* ⚠️ A LISTA PRECISA ESTAR VAZIA AQUI, senão quem barra a chamada é a guarda do próprio
+     `corridaCarregarRank` (lista já lida) e a trava passa com o defeito religado -- conferido. */
+  const guardadas = { s: S.corridaRank.single, r: S.corridaRank.relay };
+  S.corridaRank.single = null; S.corridaRank.relay = null; S.corridaRank.carregando = false;
+  S.renderCorrida();
+  ok('  e o ranking NÃO é pedido durante a corrida', !enviados.length,
+     'render() no meio da animação mata a transição da barra');
+  /* e o controle: parado, ele PEDE -- sem esta metade a de cima passaria com a chamada removida */
+  S.corrida.fase = 'setup';
+  S.renderCorrida();
+  ok('  (mas é pedido quando o jogador está parado)', enviados.length === 1,
+     enviados.length + ' chamada(s)');
+  S.corridaRank.single = guardadas.s; S.corridaRank.relay = guardadas.r;
+  S.corridaRank.carregando = false;
+  enviados.length = 0;
+  S.corrida.fase = 'setup'; S.corrida.corredores = [];
+
+  /* o aviso de recorde é DESTA corrida, e da modalidade dela */
+  S.corridaRank.recorde = 'single';
+  ok('o aviso de recorde sai na modalidade dele', S.corridaRankHtml().indexOf('Recorde novo') >= 0);
+  S.corrida.formato = 'relay';
+  ok('  e não na outra', S.corridaRankHtml().indexOf('Recorde novo') < 0);
+  S.corrida.formato = 'single';
+  /* ⚠️ E ELE ZERA NA LARGADA: sem isso o "Recorde novo!" grudaria na corrida seguinte */
+  ok('  e a largada zera o aviso',
+     /corridaRank\.recorde = null;[\s\S]{0,120}corrida\.fase = 'contagem'/.test(src),
+     'o aviso é desta corrida, não da anterior');
+
+  /* os três estados da caixa */
+  S.corridaRank.recorde = null;
+  S.corridaRank.single = null; S.corridaRank.relay = null; S.corridaRank.erro = null;
+  ok('sem lista ainda, ela diz que está carregando', S.corridaRankHtml().indexOf('Carregando') >= 0);
+  S.corridaRank.single = { lista: [], meu: null };
+  ok('  com a lista vazia, ela convida', S.corridaRankHtml().indexOf('Ninguém correu') >= 0);
+  S.corridaRank.erro = 'Não deu.';
+  ok('  e com erro, oferece tentar de novo',
+     S.corridaRankHtml().indexOf('corridaCarregarRank(true)') >= 0);
+
+  S.functionsClient.httpsCallable = original;
+  g.authUser = null;
+  S.corridaZerar();
+}
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
 process.exit(falhas ? 1 : 0);

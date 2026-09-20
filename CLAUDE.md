@@ -13602,6 +13602,120 @@ Conferido que cada defeito religado acusa: **2** sem o `preservePlayerHp`, **1**
 no chão, **2** sem o slot do item, **2** com o time de 1, **1** sem a porta das 8 insígnias na
 Corrida e **2** com o toggle ativo no revezamento.
 
+### O TRECHO DO REVEZAMENTO CAIU PRA 150 m, E NASCERAM OS DOIS RANKINGS (20/09/2026)
+
+Quatro pedidos numa leva: *"o revezamento troque para 150m cada pokemon, e atualize aqui nessa
+tela tambem, tire o TESTE ADMIN la de cima. E tambem crie o ranking individual de 300m e o ranking
+do revezamento, o tempo dos npc nao coloque no ranking, apenas dos treinadores"*.
+
+#### ⚠️ SÃO DUAS CONSTANTES, e o rótulo da tela ESTAVA MENTINDO
+
+`CORRIDA_METROS` era uma só -- a individual E o trecho do revezamento. Com o trecho em 150 ela
+encolheria a individual junto, e é ela que o ranking chama de *"individual de 300 m"*. Hoje são
+`CORRIDA_METROS` (300, a individual) e `CORRIDA_METROS_TRECHO` (150, cada trecho), com quatro
+ajudantes: `corridaMetrosDo(f)` / `corridaTotalDo(f)` recebem o FORMATO, e os sem sufixo leem o
+`corrida.formato`.
+
+**⚠️ O `Do(f)` NÃO É ENFEITE:** a tela de setup mostra os DOIS botões ao mesmo tempo, e lendo o
+estado os dois rótulos mostrariam o tamanho da modalidade selecionada.
+
+**⚠️ E O "atualize aqui nessa tela" ERA UM DEFEITO DE VERDADE:** o botão dizia **"Revezamento ·
+900 m"** desde 20/09, quando a equipe virou o time inteiro -- e a prova era de **1.800**. Texto
+fixo que descreve uma constante envelhece quando a constante muda; é a mesma família do "59
+espécies" da ficha da Pokédex e do `Golpe repete entre 2-5x` dos multi-tapa. Hoje os dois rótulos
+são derivados, e há trava cobrando que eles **não** estejam escritos à mão no arquivo.
+
+**O PREÇO, medido** (12 provas de cada, mesmo time):
+
+| | antes | hoje |
+|---|---|---|
+| distância do revezamento | 1.800 m | **900 m** |
+| duração | ~249 s | **122,4 s** |
+| por trecho | ~41 s | **~20,4 s** |
+| a individual | 300 m, ~26 s | **igual** |
+
+A previsão que este arquivo já tinha (*"150 por trecho devolveria os 900 m, com cada trecho em
+~12 s"*) acertou a distância e **errou o tempo por trecho**: 12 s era a conta de um corredor
+rápido, e a média de um time real cai em 20,4 s porque ele leva o Shuckle e o Snorlax junto.
+
+#### OS DOIS RANKINGS
+
+⚠️ **É UM DOCUMENTO POR JOGADOR com as DUAS modalidades dentro** (`raceRanking/{uid}`, campos
+`single` e `relay`), e o `merge` é obrigatório: um recorde no revezamento não pode apagar o da
+individual. Cada campo é ordenado por conta própria, e **quem nunca correu uma modalidade não tem
+o campo dela** -- o Firestore já o exclui daquele ranking, que é exatamente o certo.
+
+- **MELHOR É MENOR**, e é a diferença pro ranking da pescaria: lá o recorde SOBE, aqui ele DESCE.
+  O empate exato não regrava (não melhora nada e só gastaria uma escrita).
+- **QUEM GRAVA É O SERVIDOR** e a coleção é `allow write: if false` **inclusive pro dono** -- tempo
+  é placar público, e uma linha no console poria 0,01 s no topo. Mesma regra do `fishingRanking`.
+- **⚠️ O TEMPO DO NPC NÃO ENTRA, e isso é por CONSTRUÇÃO e não por filtro:** o que chega na callable
+  é UM tempo, e ele é gravado no documento de **quem chamou**. O adversário não tem conta e não tem
+  como ter documento. A trava manda um `tempoNpc` junto de propósito e cobra que nada nasça pra ele.
+- **Zero, negativo, texto, infinito e absurdo não entram** -- um documento de quem não completou é
+  linha morta, e um tempo lixo no topo trancaria o ranking pra sempre.
+- **O nome fica DENORMALIZADO**, como no da pescaria e no do Mew: sem isso o top 10 custaria 10
+  leituras a mais em `users/`. O preço é o de lá -- quem troca de nome só aparece com o novo depois
+  da próxima corrida.
+- **AS DUAS LISTAS VÊM NUMA CHAMADA SÓ**: a caixa mostra a da modalidade escolhida, e trocar de
+  modalidade não pode custar outra ida ao servidor.
+- **E O MEU TEMPO VOLTA JUNTO mesmo fora do top** -- quem está em 14º abriria a tela e não veria
+  nada seu, que é justamente o que ele mais procura ali.
+
+**NA TELA** a caixa aparece no **setup** e no **resultado**, e reusa a linha do ranking da pescaria
+(`pesc-rank-*`) com as medalhas do pódio: reusá-la é o que faz os dois rankings se lerem igual em
+vez de o jogador reaprender.
+
+- **⚠️ ELE NÃO É PEDIDO DURANTE A CORRIDA**: ali o laço está pintando, e uma resposta de rede
+  chamaria `render()` no meio da animação -- a regra da casa, que já custou três defeitos.
+- **⚠️ O "Recorde novo!" ZERA NA LARGADA**, senão ele gruda na corrida seguinte. E ele guarda a
+  MODALIDADE, não um booleano: um recorde na individual não pode piscar no ranking do revezamento.
+- **⚠️ E A LEGENDA É O TIME NO REVEZAMENTO E A ESPÉCIE NA INDIVIDUAL.** Os seis nomes juntos medem
+  mais que a coluna inteira a 320px -- ela truncava no segundo pokémon e não dizia nada.
+- **⚠️ O TÍTULO SAIU DO `<h2>`**: a 320px "Melhores tempos · Individual 300 m" na fonte de PIXEL
+  quebrava em duas linhas com o **"m" sozinho embaixo**. O `<h2>` ficou com o nome curto (como o
+  "Melhores pescarias") e a modalidade desceu pra uma linha de texto.
+- **E o rótulo do botão usa espaço FINO entre o número e a unidade**: com o espaço normal ele saía
+  "Revezamento · 900" numa linha e "m" na outra.
+
+**Medido a 320px, no navegador, nas três telas:** **nenhuma rola pro lado**, todo `<h2>` em uma
+linha só, nenhum tempo truncado, e a página em **873px** no setup.
+
+#### ⚠️ E O "TESTE ADMIN" SAIU das duas telas da Corrida
+
+A Pescaria já tinha tirado o dela horas antes. O modo continua se identificando pelo nome.
+
+#### AS TRÊS LIÇÕES DE TESTE QUE SAÍRAM DAQUI
+
+1. **⚠️ CINCO TRAVAS DO REVEZAMENTO MEDIAM O NÚMERO, NÃO A REGRA.** Elas tinham **300 e 600**
+   escritos à mão -- as marcas de troca --, e caíram todas de uma vez quando o trecho virou 150,
+   **sem nada estar errado**. A correção não foi trocar os números: foi elas lerem a CONSTANTE
+   (`M1`/`M2` derivados do `CORRIDA_METROS_TRECHO`), que é o que faz a próxima mudança de régua
+   não derrubar cinco travas certas. É a mesma família das travas que "mediam a DURAÇÃO e não a
+   regra" no sono e na paralisia.
+2. **⚠️ UMA TRAVA MINHA PASSOU COM O DEFEITO RELIGADO**, e a causa foi o fixture: o
+   `corridaCarregarRank` já tinha a lista em mãos, então ele voltava pela guarda DELE (lista já
+   lida) e não pela guarda que a trava diz medir. Hoje ela zera a lista antes, e tem a metade do
+   controle junto ("parado, ele PEDE") -- sem ela, a primeira passaria com a chamada removida.
+3. **⚠️ O `orderBy` DO FAKE NÃO EXCLUÍA QUEM NÃO TEM O CAMPO**, e o Firestore de verdade exclui.
+   Isso é o dublê sendo **mais permissivo que a produção** pelo lado que mais engana: no ranking,
+   quem nunca correu o revezamento aparecia nele com tempo **0**. Um teste escrito em cima disso
+   acreditaria numa lista que o servidor nunca devolve. É a mesma lição do `undefined` que matou as
+   duas ligas, do `arrayUnion`, do `getAll` e do `count()`: **o fake tem que doer onde a produção
+   dói** -- e aqui ele tinha que EXCLUIR onde ela exclui.
+
+**CONFERIDO QUE NÃO É MOTOR, por impressão:** as duas -- MOTOR e DIÁRIO -- são **idênticas** em 900
+batalhas semeadas. A mudança de metragem é de apresentação e de física do minijogo, que não passa
+pelo motor de batalha.
+
+`tools/test-corrida.js` ganhou **39 pontas** novas (as duas constantes, os rótulos
+derivados e não escritos à mão, o "TESTE ADMIN" fora, o envio com UM tempo só, quem não completou
+não enviando, a caixa seguindo a modalidade, o ranking não sendo pedido durante a corrida, e os
+três estados da caixa) e `tools/test-corrida-rank.js` é novo, com **44 pontas** no
+servidor: o acesso, a regra lida como texto, "melhor é menor", o `merge`, o que não entra, os dois
+tops ordenados, quem não correu não aparecendo, o meu tempo fora do top, e o tempo do NPC não
+tendo por onde entrar.
+**Conferido que elas acusam: 16 de 16 defeitos religados** derrubam pelo menos uma trava.
 ## RESGATE POKÉMON -- o terceiro teste admin (20/09/2026)
 
 Pedido com o `resgate-pokemon.html` da raiz como referência, e com **cinco coisas mudadas** em

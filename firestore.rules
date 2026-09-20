@@ -177,5 +177,11 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow write: if false;
     }
+    // Ranking da Corrida: os dois tempos (individual e revezamento). Mesma regra do da pescaria --
+    // tempo e placar publico, e escrita do cliente poria 0,01 s no topo. So a callable escreve.
+    match /raceRanking/{playerId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
   }
 }

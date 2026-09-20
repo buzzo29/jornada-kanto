@@ -182,11 +182,14 @@ function collRef(parts, filtros, limite, ordem, depoisDe, soIds){
       if(ordem){
         const [campo, dir] = ordem;
         const valor = d => (campo && campo.__documentId) ? d.id : d.bruto[campo];
+        /* ⚠️ QUEM NÃO TEM O CAMPO FICA DE FORA -- é o que o Firestore faz, e não um detalhe: um
+           `orderBy` num campo opcional é como se filtra "quem já fez isso". Sem esta linha o fake
+           devolvia esses documentos com `undefined` no fim, e um teste escrito em cima disso
+           acreditaria numa lista que a produção nunca devolve. */
+        if(!(campo && campo.__documentId)) docs = docs.filter(d => valor(d) !== undefined);
         docs.sort((a,b)=>{
           const x = valor(a), y = valor(b);
           if(x === y) return a.id < b.id ? -1 : 1;      // desempate estável, como o Firestore (pelo id)
-          if(x === undefined) return 1;
-          if(y === undefined) return -1;
           return (x < y ? -1 : 1) * dir;
         });
         /* O CURSOR CORTA DEPOIS DA ORDENACAO e ANTES do limite -- essa ordem e a coisa toda: cortando

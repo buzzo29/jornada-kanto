@@ -5347,6 +5347,91 @@ exports.getFishingRanking = onCall(async (request) => {
   return { lista, meu };
 });
 exports._pescariaRank = { topo: PESCARIA_RANK_TOPO };
+/* =====================================================================
+   RANKING DA CORRIDA (20/09/2026, a pedido) -- DOIS rankings: a individual de
+   300 m e o revezamento.
+
+   ⚠️ QUEM GRAVA É O SERVIDOR, e a coleção é FECHADA pra escrita do cliente nas regras: tempo é
+   placar público, e uma linha no console poria 0,01 s no topo. É a mesma trava do `fishingRanking`
+   e do `globalBoss`.
+
+   ⚠️ E O TEMPO DO NPC NUNCA ENTRA -- isso é por CONSTRUÇÃO e não por filtro: o que chega é UM
+   tempo, e ele é gravado no documento de quem CHAMOU. O adversário não tem conta e não tem como
+   ter documento.
+
+   ⚠️ É UM DOCUMENTO POR JOGADOR com as DUAS modalidades dentro, e o `merge` é obrigatório: um
+   recorde no revezamento não pode apagar o da individual. Cada campo é ordenado por conta própria,
+   e quem nunca correu uma modalidade simplesmente não tem o campo dela -- o Firestore já o exclui
+   daquele ranking.
+   ===================================================================== */
+const CORRIDA_RANK_TOPO = 10;
+const CORRIDA_MODALIDADES = ['single', 'relay'];
+const CORRIDA_TEMPO_MAX = 3600;          /* um tempo acima disso é dado corrompido, não recorde */
+function corridaRankCollRef(){ return db.collection('raceRanking'); }
+function corridaRankDocRef(uid){ return corridaRankCollRef().doc(uid); }
+/* ⚠️ SÓ MELHORA, e aqui MELHOR É MENOR: o recorde é o tempo mais BAIXO, e uma corrida ruim depois
+   de uma boa não pode apagar a boa. A transação é o que impede duas abas de gravarem por cima. */
+exports.submitRaceTime = onCall(async (request) => {
+  const uid = request.auth && request.auth.uid;
+  if(!uid) throw new HttpsError('unauthenticated', 'Faça login.');
+  const d = request.data || {};
+  const modalidade = CORRIDA_MODALIDADES.indexOf(d.modalidade) >= 0 ? d.modalidade : null;
+  if(!modalidade) throw new HttpsError('invalid-argument', 'Modalidade desconhecida.');
+  const tempo = Number(d.tempo);
+  /* ⚠️ ZERO E LIXO NÃO ENTRAM: um documento de quem não completou é linha morta, e um tempo
+     absurdo no topo trancaria o ranking pra sempre. */
+  if(!(tempo > 0) || !isFinite(tempo) || tempo > CORRIDA_TEMPO_MAX) return { gravado: false, motivo: 'invalido' };
+  const conta = await db.collection('users').doc(uid).get();
+  const nome = (conta.exists && conta.data().trainerName) || 'Treinador';
+  const especie = String(d.especie || '').slice(0, 40);
+  const venceu = !!d.venceu;
+  let recorde = false;
+  await db.runTransaction(async (tx) => {
+    const ref = corridaRankDocRef(uid);
+    const snap = await tx.get(ref);
+    const antes = snap.exists ? Number(snap.data()[modalidade]) : NaN;
+    if(isFinite(antes) && antes > 0 && tempo >= antes) return;
+    recorde = true;
+    const dados = { uid, nome, quando: Date.now() };
+    dados[modalidade] = tempo;
+    dados[modalidade + 'Info'] = { especie, venceu, quando: Date.now() };
+    /* ⚠️ `merge` -- sem ele o recorde de uma modalidade APAGA o da outra */
+    tx.set(ref, dados, { merge: true });
+  });
+  return { gravado: recorde, tempo, modalidade };
+});
+/* Os dois tops numa chamada só: a tela mostra o da modalidade escolhida, e trocar de modalidade
+   não pode custar outra ida ao servidor. */
+exports.getRaceRanking = onCall(async (request) => {
+  const uid = request.auth && request.auth.uid;
+  if(!uid) throw new HttpsError('unauthenticated', 'Faça login.');
+  const meuDoc = await corridaRankDocRef(uid).get();
+  const meu = meuDoc.exists ? (meuDoc.data() || {}) : null;
+  const saida = {};
+  for(const m of CORRIDA_MODALIDADES){
+    /* ⚠️ ASCENDENTE: no tempo, o MENOR é o primeiro. E quem não tem o campo fica de fora desta
+       consulta por conta do Firestore, que é exatamente o certo. */
+    const snap = await corridaRankCollRef().orderBy(m, 'asc').limit(CORRIDA_RANK_TOPO).get();
+    const lista = snap.docs.map((doc, i) => {
+      const x = doc.data() || {};
+      const info = x[m + 'Info'] || {};
+      return { pos: i + 1, uid: doc.id, nome: x.nome || 'Treinador', tempo: Number(x[m]) || 0,
+               especie: info.especie || '', venceu: !!info.venceu, eu: doc.id === uid };
+    });
+    /* ⚠️ E O MEU TEMPO VEM JUNTO mesmo fora do top: quem está em 14º abre a tela e não vê nada
+       seu, e o próprio recorde é o que ele mais procura. */
+    let oMeu = null;
+    if(meu && Number(meu[m]) > 0 && !lista.some(x => x.eu)){
+      const info = meu[m + 'Info'] || {};
+      oMeu = { nome: meu.nome || 'Você', tempo: Number(meu[m]), especie: info.especie || '',
+               venceu: !!info.venceu, eu: true };
+    }
+    saida[m] = { lista, meu: oMeu };
+  }
+  return saida;
+});
+exports._corridaRank = { topo: CORRIDA_RANK_TOPO, modalidades: CORRIDA_MODALIDADES,
+                         tempoMax: CORRIDA_TEMPO_MAX };
 exports._boss = { ativo(v){ if(v !== undefined) BOSS_ATIVO = !!v; return BOSS_ATIVO; },
                   instancia: bossInstance, nivel: () => BOSS_LEVEL, maxHp: () => BOSS_MAX_HP };
 exports._golpesEspeciais = { AUTODESTRUICAO, SONIFEROS, METRONOMO, CHANCE_AUTODESTRUICAO, CHANCE_SONO, SONO_EM_TROCAS, sorteiaTrocasDeSono, MULTI_GOLPE, ataquesDisponiveis, GOLPES_CRIT_ALTO, FURIA, CHANCE_FURIA, FURIA_BONUS, sorteiaGolpeDoMetronomo, POOL_METRONOMO, CONFUSAO, CHANCE_CONFUSAO, DANCA_ESPADAS, DANCA_PLUMA, CHANCE_DANCA, DANCA_ESPADAS_MULT, DANCA_PLUMA_MULT, FURIA_DRAGAO, CHANCE_FURIA_DRAGAO, FURIA_DRAGAO_DANO, CHUVA, CHANCE_CHUVA, CHUVA_EM_CONFRONTOS, CHUVA_MULT, CHUVA_GOLPE_MULT, multDaChuva, estaChovendo, tentarChuva, limparClima, GOLPES_DRENO, GOLPES_SO_DORMINDO };
