@@ -727,7 +727,7 @@ console.log('\n=== O MAPA JÁ MOSTRA QUEM ESTÁ LÁ, DESDE O SETUP (20/09/2026) 
 
   const html = S.renderResgate();
   const mapa = html.slice(html.indexOf('resg-mapa'), html.indexOf('resg-legenda'));
-  /* ⚠️ E O SETUP NÃO MOSTRA MAIS UM BICHO POR ILHOTA (20/09/2026, a pedido). Ele era descartável
+  /* ⚠️ E O SETUP NÃO MOSTRA MAIS UM BICHO POR ILHOTA (21/09/2026, a pedido). Ele era descartável
      e enganoso: os ocupantes são sorteados de NOVO no `resgateComecar`, então o que a tela
      mostrava ali não era o que o jogador ia encontrar. */
   ok('o mapa do setup NÃO mostra um Pokémon por ilhota', !/sprite-img|sprite-fallback/.test(mapa),
@@ -908,7 +908,7 @@ console.log('\n=== A ESCADA: CADA ALTURA TEM A SUA FAIXA DE PONTOS ===');
 }
 
 /* ============================================================================
-   ⚠️ A DESCARGA DE 2s NA PRAIA (20/09/2026, a pedido: *"coloque tambem um timer de 2s para
+   ⚠️ A DESCARGA DE 2s NA PRAIA (21/09/2026, a pedido: *"coloque tambem um timer de 2s para
    descarregar os pokemons resgatados na praia"*). Chegar deixou de ser entregar.
    ============================================================================ */
 console.log('\n=== A DESCARGA DE 2s NA PRAIA ===');
