@@ -14677,6 +14677,72 @@ HTML nenhuma, que é a lição do `[hidden]` que deixou o modal da contagem da C
 
 **Conferido que os 9 defeitos religados acusam** (1 a 9 falhas cada).
 
+### ⚠️ E ELE REABRIA: A RELEITURA DA CONTA REBAIXAVA A MARCA (21/09/2026)
+
+Pedido assim: *"após o usuário ver a mensagem de novidades e clicar em Ok, esse modal não deve mais
+aparecer, deve aparecer somente 1x e depois não exibir mais"*.
+
+**A marca já existia** (o `fecharNovidades` grava desde o primeiro dia) — **o que faltava era ela
+SOBREVIVER à releitura da conta**, e o furo foi reproduzido antes de qualquer conserto:
+
+```
+1) primeira home    -> abre
+2) fechou           -> marca = "ilhas-laranja"
+3) releu a conta    -> marca = null        <- aqui
+4) de volta na home -> abre DE NOVO
+```
+
+- **⚠️ A JANELA É COMUM, não um caso de canto.** A gravação é **best-effort** (sem `await`, o molde
+  do `darHM`) e o `loadPermanentUserData` roda **toda vez que se volta pra HOME** e ao abrir a
+  **Pokédex** e as **Conquistas** — quem voltasse antes de ela propagar tinha
+  `d.novidadeVista` vazio e a linha `|| null` **zerava a marca em memória**.
+- **O conserto é `|| game.novidadeVista` no meio**: esta marca **só CRESCE**. É a mesma regra do
+  `arrayUnion` da Pokédex — a única escrita que não pode encolher —, e é por não ser assim que um
+  jogador já perdeu 49 espécies.
+- **⚠️ E ELA NÃO É "o campo vazio não sobrescreve": um valor vindo do BANCO continua ganhando** do
+  que está em memória, senão um anúncio novo publicado noutra aba nunca chegaria nesta.
+
+**⚠️ E O PRIMEIRO REPRO MEDIU UMA CÓPIA DA REGRA.** Ele simulava a linha à mão
+(`g.novidadeVista = d.novidadeVista || null`) em vez de chamar o `loadPermanentUserData` — ou seja
+**ele continuaria "acusando" com o conserto aplicado**, porque media o que estava escrito nele
+mesmo. É a armadilha do *"trava que pergunta à função que ela mede não é trava"*, e só a
+conferência de acusação separa os dois casos.
+
+**⚠️ E A SEGUNDA VERSÃO DELE MEDIU A PORTA, NÃO A MARCA:** chamando o `loadPermanentUserData` de
+verdade, o stub do Firestore devolve um documento **VAZIO** — então ele zera o **`ehAdmin`** junto,
+e o anúncio deixava de abrir pelo motivo errado. Os dois lados davam `false` e o furo sumia. Repor o
+`ehAdmin` depois da releitura (na vida real ele vem do documento) é o que faz o caso cair na faixa
+em que a regra vale — a mesma lição dos fixtures do `preservePlayerHp` e do painel forte demais.
+
+### O ÍCONE NO TÍTULO E O LARANJA (21/09/2026)
+
+Pedido junto: *"como estamos falando das ilhas laranjas, adicione o mesmo ícone que está no botão,
+no título dessa mensagem, e também adicione algum elemento da cor laranja"*.
+
+- **O selo foi pro `<h2>`, e o `modal-icon` de cima SAIU** — senão o mesmo ícone apareceria duas
+  vezes na mesma caixa. **De quebra isso devolveu 45px**, e a lista passou de **2,9 para 4,4 das 5
+  ilhas** visíveis a 320px.
+- **⚠️ A TRAVA COMPARA COM O SELO DA HOME, não com o nome `ilhas` escrito nela:** se o botão trocar
+  de selo um dia, é o anúncio que tem que acompanhar.
+- **⚠️ A COR GANHOU DONO** (`COR_ILHAS`). Ela pinta a **borda da caixa** e o **botão principal** do
+  anúncio **e** o botão da home — escrita à mão nos dois, a segunda divergiria no primeiro ajuste e
+  **o anúncio deixaria de casar com o botão que ele manda procurar**. Há trava cobrando que o valor
+  apareça **uma vez só** no arquivo.
+
+**⚠️ E O NÚMERO DO CONTRASTE FICA REGISTRADO, porque ele é baixo:** o texto branco sobre o laranja
+dá **3,01:1** — medido no navegador. **Ele não é regressão desta feature**: é exatamente o que o
+**botão da home já pratica** desde 21/09 (o roxo da Batalha Online, pra comparar, dá **5,82**).
+
+Ele fica porque é a **identidade** das ilhas, e porque trocar só no modal desfaria o casamento com
+o botão. O que entrou foi a **sombra no texto** — o mesmo remendo das plaquinhas de nome da
+Corrida —, que melhora a leitura sem mexer na cor.
+**Se um dia incomodar, a régua é o `COR_ILHAS`: escurecê-lo conserta os DOIS lugares de uma vez**
+(pra 4,5:1 com branco ele precisa ir de L=0,297 pra ~0,183).
+
+**MEDIDO A 320px DEPOIS:** modal **265×483px**, título em **1 linha**, a lista em **4,4 de 5**, os
+dois botões dentro da tela e **nenhuma rolagem lateral**. `tools/test-ilhas.js` ganhou **10 pontas**,
+e **os 7 defeitos religados acusam**.
+
 ## SELEÇÃO POKÉMON: O DRAFT DA ILHA KUMQUAT (21/09/2026)
 
 Pedido assim: *"vai ser uma batalha contra um líder, e vão ser sorteados 12 pokémons aleatoriamente,

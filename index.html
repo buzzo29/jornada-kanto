@@ -3152,6 +3152,15 @@
   .novidades-lista li{display:grid;grid-template-columns:22px minmax(0,1fr);gap:8px;
     align-items:start;margin-bottom:10px;}
   .novidades-lista .selo{width:20px;height:20px;vertical-align:0;}
+  /* o selo do título acompanha a fonte de PIXEL do h2 -- em 1em ele sai menor que as letras */
+  .selo-titulo{width:1.2em;height:1.2em;vertical-align:-.2em;}
+  /* ⚠️ O LARANJA DAS ILHAS COM TEXTO BRANCO DA 3,01:1 -- medido, e e o MESMO numero que o botao
+     da home ja pratica desde 21/09 (o roxo da Batalha Online, pra comparar, da 5,82). Ele fica
+     porque e a identidade das ilhas e porque trocar so no modal faria o anuncio deixar de casar
+     com o botao que ele manda procurar; a sombra e o que melhora a leitura sem mexer na cor --
+     o mesmo remendo das plaquinhas de nome da Corrida. Se um dia o numero incomodar, a regua e
+     o COR_ILHAS, e escurece-lo conserta os DOIS lugares de uma vez. */
+  .novidades-box .btn.primary{text-shadow:0 1px 2px rgba(0,0,0,.55);}
   .novidades-lista b{display:block;font-size:.7rem;line-height:1.3;}
   .novidades-lista .novidades-resumo{display:block;font-size:.66rem;line-height:1.35;color:var(--muted);}
   .ilhas-mapa .ilha-selo{display:block;line-height:46px;font:800 18px/46px var(--font-ui);}
@@ -7851,7 +7860,13 @@ async function loadPermanentUserData(){
     game.contaCarregada = true;
     game.rivalNameDefault = d.rivalNameDefault || '';   // preenche a tela de nome do rival (ver nomeDoRivalPadrao)
     game.hms = Array.isArray(d.hms) ? d.hms : [];       // as Máquinas Ocultas são da CONTA (ver darHM)
-    game.novidadeVista = d.novidadeVista || null;       // o último anúncio que esta conta leu (ver conferirNovidades)
+    /* ⚠️ O `|| game.novidadeVista` NAO E ZELO: sem ele o anúncio REABRE, e o caso é comum.
+       A gravação do `fecharNovidades` é best-effort (sem await), e este carregamento roda de novo
+       toda vez que o jogador volta pra HOME e ao abrir a Pokédex ou as Conquistas -- se ele voltar
+       antes de a gravação propagar, `d.novidadeVista` vem vazio e a marca em memória seria
+       ZERADA. Reproduzido: fecha, a releitura apaga, e o modal abre de novo.
+       A regra é a do `arrayUnion` da Pokédex: esta marca só CRESCE. */
+    game.novidadeVista = d.novidadeVista || game.novidadeVista || null;   // ver conferirNovidades
     game.visitouOsNinhos = !!d.visitouOsNinhos;         // a visita aos ninhos também (ver visitarOsNinhos)
     game.aposentados = Array.isArray(d.aposentados) ? d.aposentados : [];   // ver aposentarOTime
     /* AS LETRAS DO UNOWN, mais a rede de seguranca: alem do registro feito na captura, varre os
@@ -30835,7 +30850,7 @@ function renderSaveSelect(){
          admin, mesmo por meio segundo, é pior que escondê-lo de quem é.
          ⚠️ E a visibilidade não é a trava: quem valida é o `abrirCorrida`, que refaz a pergunta. */''}
     ${game.contaCarregada && game.ehAdmin ? `
-    <button class="home-nav-btn leagues-big-btn home-btn-largo" style="background:#e07a1e;" onclick="abrirIlhas()">
+    <button class="home-nav-btn leagues-big-btn home-btn-largo" style="background:${COR_ILHAS};" onclick="abrirIlhas()">
       ${/* ⚠️ ELE USA O SELO, e não o `icone()` dos outros quatro modos: os selos são o sistema vivo
            (é pra lá que os emojis foram em 17/09) e um PNG base64 novo seria pixel art à mão.
            A classe fixa 26px, que é a medida do `.dex-icon.modo` -- em `1em` ele sairia menor
@@ -34832,6 +34847,10 @@ const ILHA_DEFS = '<defs><pattern id="sea" width="32" height="24" patternUnits="
    que saem as duas coisas: o desenho do arquipélago e a posição do pino. Escritos em separado,
    um ajuste no mapa deixaria o pino boiando no mar -- e isso não aparece como erro, aparece como
    um botão fora do lugar. */
+/* ⚠️ A COR DAS ILHAS TEM DONO desde 21/09/2026: ela pinta o botão da home E o anúncio das
+   novidades, e escrita à mão nos dois a segunda divergiria no primeiro ajuste -- o anúncio
+   deixaria de casar com o botão que ele manda procurar. */
+const COR_ILHAS = '#e07a1e';
 const ILHAS_LARANJA = [
   { id:'mikan',   nome:'Mikan',   lider:'Cissy', jogo:'Resgate',  selo:'resgate',  abrir:abrirResgate,  cx:96,  cy:96,  r:52, giro:0.4 },
   { id:'navel',   nome:'Navel',   lider:'Danny', jogo:'Corrida',  selo:'corrida',  abrir:abrirCorrida,  cx:266, cy:92,  r:48, giro:1.9 },
@@ -35092,12 +35111,11 @@ function renderNovidadesModal(){
   const quantas = ILHAS_LARANJA.filter(i => ILHAS_COMO[i.id]).length;
   return `
   <div class="modal-overlay" onclick="fecharNovidades()">
-    <div class="modal-box novidades-box" onclick="event.stopPropagation()">
-      <div class="modal-icon">${selo('ilhas')}</div>
-      <h2>Novidades</h2>
+    <div class="modal-box novidades-box" style="border-color:${COR_ILHAS}" onclick="event.stopPropagation()">
+      <h2>${selo('ilhas', 'selo-titulo')} Novidades</h2>
       <p>As <strong>Ilhas Laranja</strong> abriram — ${quantas} desafios novos:</p>
       <ul class="novidades-lista">${linhas}</ul>
-      <button class="btn primary" onclick="novidadesIrParaAsIlhas()">Ver as Ilhas Laranja</button>
+      <button class="btn primary" style="background:${COR_ILHAS}" onclick="novidadesIrParaAsIlhas()">Ver as Ilhas Laranja</button>
       <button class="btn secondary" onclick="fecharNovidades()">Fechar</button>
     </div>
   </div>`;

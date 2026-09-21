@@ -557,5 +557,83 @@ console.log('=== O ANUNCIO DAS NOVIDADES ===');
      JSON.stringify(S.serializeGame() || {}).indexOf('novidadeVista') < 0);
 }
 
-console.log(falhas ? '\n' + falhas + ' FALHA(S)' : '\nTudo certo.');
-process.exit(falhas ? 1 : 0);
+/* ============================================================================
+   A CARA DO ANUNCIO (21/09/2026, a pedido: "adicione o mesmo icone que esta no botao, no titulo
+   dessa mensagem, e tambem adicione algum elemento da cor laranja")
+   ============================================================================ */
+console.log('');
+console.log('=== O ICONE NO TITULO E O LARANJA ===');
+{
+  contaAdmin(); g.novidadeVista = null; g.novidadesModal = false;
+  S.conferirNovidades();
+  const m = S.renderNovidadesModal();
+
+  /* ⚠️ O MESMO SELO DO BOTAO DA HOME -- e a trava le o selo DA HOME em vez de escrever 'ilhas'
+     aqui: se o botao trocar de selo um dia, e o anuncio que tem que acompanhar. */
+  const seloDaHome = (S.renderSaveSelect().match(/#s-([a-z0-9-]+)"\/><\/svg><\/span><span>Ilhas Laranja/) || [])[1];
+  ok('o titulo leva o MESMO selo do botao da home',
+     !!seloDaHome && new RegExp('<h2>[^<]*<svg[^>]*><use href="#s-' + seloDaHome + '"').test(m),
+     'selo da home: ' + seloDaHome);
+  ok('  e o icone nao aparece DUAS vezes na caixa', m.indexOf('modal-icon') < 0,
+     'ele foi pro titulo, entao o modal-icon saiu -- e isso devolveu 45px de lista');
+
+  /* ⚠️ A COR SAI DA CONSTANTE, e o BOTAO DA HOME le a mesma: escrita a mao nos dois, a segunda
+     divergiria no primeiro ajuste e o anuncio deixaria de casar com o botao que manda procurar. */
+  ok('a caixa tem a borda na cor das ilhas', m.indexOf('border-color:' + S.COR_ILHAS) >= 0);
+  ok('  e o botao principal tambem', m.indexOf('background:' + S.COR_ILHAS) >= 0);
+  ok('  e o botao da HOME le a MESMA constante',
+     S.renderSaveSelect().indexOf('background:' + S.COR_ILHAS) >= 0, 'a cor tem UM dono');
+  ok('    e o valor nao esta escrito a mao em lugar nenhum',
+     (src.match(/#e07a1e/g) || []).length === 1,
+     'so a declaracao da constante pode carregar o valor');
+
+  /* ⚠️ O TEXTO BRANCO SOBRE O LARANJA DA 3,01:1 -- medido no navegador, e e o MESMO numero que o
+     botao da home ja pratica desde 21/09. A sombra melhora a leitura sem mexer na identidade. */
+  ok('  e o texto do botao tem sombra (o laranja da 3,01:1 com branco)',
+     /\.novidades-box \.btn\.primary\{text-shadow:/.test(src));
+}
+
+/* ============================================================================
+   ⚠️ E ELE APARECE UMA VEZ SO -- a releitura da conta NAO pode rebaixar a marca (21/09/2026)
+
+   Pedido assim: "apos o usuario ver a mensagem de novidades e clicar em Ok, esse modal nao deve
+   mais aparecer, deve aparecer somente 1x". A marca ja existia; o que faltava era ela SOBREVIVER
+   a releitura: a gravacao do `fecharNovidades` e best-effort (sem await) e o
+   `loadPermanentUserData` roda de novo toda vez que se volta pra HOME e ao abrir a Pokedex ou as
+   Conquistas. Quem voltasse antes de a gravacao propagar tinha a marca ZERADA, e o anuncio
+   reabria. Reproduzido antes do conserto.
+
+   ⚠️ ELE E O ULTIMO BLOCO DO ARQUIVO porque e o unico ASYNC: o rodape (a contagem e o exit) vive
+   DENTRO dele, senao o process.exit sincrono correria antes do await e este caso nao contaria.
+   ============================================================================ */
+console.log('');
+console.log('=== O ANUNCIO APARECE UMA VEZ SO ===');
+(async () => {
+  contaAdmin();
+  g.authUser = { uid: 'u1' };
+  g.team = []; g.equipados = {};
+  g.novidadeVista = null; g.novidadesModal = false;
+  g.screen = 'saveSelect';
+
+  /* ⚠️ DE PONTA A PONTA, com o `loadPermanentUserData` DE VERDADE: a primeira versao deste caso
+     simulava a linha a mao e media uma COPIA da regra escrita no proprio teste -- ela continuaria
+     "acusando" com o conserto aplicado. Trava que pergunta a si mesma nao e trava. */
+  const abriu = S.conferirNovidades();
+  S.fecharNovidades();
+  const marcado = g.novidadeVista;
+
+  await S.loadPermanentUserData();
+  /* o stub do Firestore devolve um documento VAZIO -- que e exatamente a janela de quem voltou
+     antes de a gravacao propagar. Na vida real o `admin` vem do documento; aqui ele nao vem,
+     entao repo-lo e o que faz este caso medir a MARCA, e nao a porta. */
+  g.ehAdmin = true; g.screen = 'saveSelect';
+
+  ok('o anuncio abre na primeira home', abriu === true && marcado === S.NOVIDADES_VERSAO);
+  ok('  e a releitura da conta NAO apaga a marca', g.novidadeVista === S.NOVIDADES_VERSAO,
+     'marca depois da releitura: ' + JSON.stringify(g.novidadeVista));
+  ok('  entao ele NAO reabre depois de lido',
+     S.conferirNovidades() === false && !g.novidadesModal);
+
+  console.log(falhas ? '\n' + falhas + ' FALHA(S)' : '\nTudo certo.');
+  process.exit(falhas ? 1 : 0);
+})();
