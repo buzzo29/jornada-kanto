@@ -55,10 +55,12 @@ console.log('\n=== O ACESSO É SÓ DE QUEM TEM admin === true ===');
 {
   contaAdmin(); g.ehAdmin = false; g.screen = 'ilhas';
   S.abrirSelecao();
-  ok('a AÇÃO recusa quem não é admin', g.screen !== 'selecao', 'tela: ' + g.screen);
+  /* ⚠️ AS ILHAS ABRIRAM PRA TODO MUNDO em 21/09/2026 -- estas travas cobravam a RECUSA e
+     viraram a trava da regra nova. O teste das ilhas cobre as SEIS portas num laço só. */
+  ok('a AÇÃO ABRE pra quem não é admin', g.screen === 'selecao', 'tela: ' + g.screen);
   contaAdmin(); g.contaCarregada = false; g.screen = 'ilhas';
   S.abrirSelecao();
-  ok('  e recusa enquanto a conta carrega', g.screen !== 'selecao', 'tela: ' + g.screen);
+  ok('  e a conta carregando tambem abre', g.screen === 'selecao', 'tela: ' + g.screen);
   contaAdmin(); S.abrirSelecao();
   ok('  e deixa entrar quem é', g.screen === 'selecao', 'tela: ' + g.screen);
   /* ⚠️ E ELE NÃO PEDE TIME CAMPEÃO, ao contrário dos outros três: o bolo é sorteado na hora, e

@@ -7936,9 +7936,9 @@ async function loadPermanentUserData(){
        Ele vem DEPOIS de o `game.permanentPokedex` e o `game.hms` serem escritos, senão a condição
        leria uma Pokédex vazia e o `temHM` não saberia que ele já foi dado. */
     conferirHM03();
-    /* ⚠️ DEPOIS do `game.ehAdmin` e do `game.contaCarregada`, que é o que ele pergunta -- e por
-       isso ele mora aqui e não no `openSaveSelect`: ali os dois ainda não existem. Quem redesenha
-       é o `.then()` do `Promise.all` da home, que já chama `render()` quando a tela é a home. */
+    /* ⚠️ DEPOIS do `novidadeVista` e do `contaCarregada`, que é o que ele pergunta -- e por isso
+       ele mora aqui e não no `openSaveSelect`: ali os dois ainda não existem. Quem redesenha é o
+       `.then()` do `Promise.all` da home, que já chama `render()` quando a tela é a home. */
     conferirNovidades();
   } catch(e){ console.error('Erro ao carregar dados permanentes da conta:', e); }
 }
@@ -30844,18 +30844,19 @@ function renderSaveSelect(){
       <span class="home-mode-icon">${icone('torre','modo')}</span><span>Torre dos Treinadores</span></button>
     <button class="home-nav-btn leagues-big-btn" style="background:#7038f8;" onclick="openOnlineBattle()">
       <span class="home-mode-icon">${icone('batalha','modo')}</span><span>Batalha Online</span></button>
-    ${/* ⚠️ O BOTÃO SÓ EXISTE PRA QUEM TEM `admin === true` no Firestore, e ENQUANTO A CONTA NÃO
-         CARREGOU ele fica OCULTO -- o contrário da porta dos modos de campeão, que erra pro lado de
-         DEIXAR ENTRAR. Aqui o lado seguro é o outro: mostrar um botão administrativo a quem não é
-         admin, mesmo por meio segundo, é pior que escondê-lo de quem é.
-         ⚠️ E a visibilidade não é a trava: quem valida é o `abrirCorrida`, que refaz a pergunta. */''}
-    ${game.contaCarregada && game.ehAdmin ? `
+    ${/* ⚠️ AS ILHAS ABRIRAM PRA TODO MUNDO em 21/09/2026, a pedido -- o botão era `admin === true`
+         desde 21/09 de manhã, e a porta saiu das SEIS entradas (este botão, o `abrirIlhas` e os
+         cinco jogos) na mesma leva em que o MONITOR nasceu. A ordem foi essa de propósito: o
+         monitor veio primeiro porque é ele que diz se o arquipélago pegou -- ver
+         `registrarPartidaDaIlha`.
+         ⚠️ O QUE NÃO SAIU foram as portas de JOGO: a Corrida individual, a Pescaria e o Resgate
+         continuam pedindo um time com as 8 insígnias, porque elas montam a partir dos saves. */''}
     <button class="home-nav-btn leagues-big-btn home-btn-largo" style="background:${COR_ILHAS};" onclick="abrirIlhas()">
       ${/* ⚠️ ELE USA O SELO, e não o `icone()` dos outros quatro modos: os selos são o sistema vivo
            (é pra lá que os emojis foram em 17/09) e um PNG base64 novo seria pixel art à mão.
            A classe fixa 26px, que é a medida do `.dex-icon.modo` -- em `1em` ele sairia menor
            que os vizinhos e a fileira ficaria desalinhada. */''}
-      <span class="home-mode-icon">${selo('ilhas','selo-modo')}</span><span>Ilhas Laranja</span></button>` : ''}
+      <span class="home-mode-icon">${selo('ilhas','selo-modo')}</span><span>Ilhas Laranja</span></button>
     ${ehDomingo() ? `
     <button class="home-nav-btn leagues-big-btn home-btn-largo" style="background:#c2185b;" onclick="openSundayBoss()">
       <span class="home-mode-icon">✨</span><span>Boss de Domingo</span></button>` : ''}
@@ -32484,8 +32485,7 @@ function corridaNovoCorredor(time, ehJogador){
 }
 async function corridaLargar(){
   if(!corridaCompleto() || corrida.fase === 'correndo' || corrida.fase === 'contagem') return;
-  /* ⚠️ A PERMISSÃO É CONFERIDA DE NOVO AQUI: o botão da home é só a porta, e esta é a ação. */
-  if(!game.ehAdmin){ corrida.aviso = 'Este modo é administrativo.'; render(); return; }
+
   /* ⚠️ O `map` NÃO PODE RECEBER A FUNÇÃO DIRETO: ele passa (item, ÍNDICE, array), e o índice
      viraria o `ehDoJogador` -- o PRIMEIRO do time (índice 0, falso) perderia a especialidade e os
      outros dois a ganhariam. É a armadilha clássica do `map(parseInt)`, e aqui ela custaria um
@@ -32519,6 +32519,7 @@ async function corridaLargar(){
   corrida.sequencia = 0; corrida.faseFaixas = 0;
   corridaRank.recorde = null;   /* o aviso é DESTA corrida, não da anterior */
   corrida.contagem = 3; corrida.fase = 'contagem';
+  registrarPartidaDaIlha('navel');
   corrida.recado = 'Prepare-se para a largada!';
   render();
   /* ⚠️ E A PÁGINA VAI PRO TOPO (20/09/2026, a pedido): a largada NÃO troca de `game.screen`, então
@@ -32865,13 +32866,9 @@ function corridaPintarHud(){
 /* ============================================================================
    A TELA
    ============================================================================ */
-/* ⚠️ A PORTA REFAZ A PERGUNTA: a visibilidade do botão da home não é a trava. Um cliente que
-   chame `abrirCorrida()` pelo console cai aqui, e aqui o `admin` é conferido de novo. */
+/* A porta é livre desde 21/09/2026 -- ver o botão da home. O que continua valendo é a régua de
+   JOGO: o revezamento e a individual montam a partir dos saves com as 8 insígnias. */
 function abrirCorrida(){
-  if(!game.contaCarregada || game.ehAdmin !== true){
-    game.modoBloqueado = 'Este modo é administrativo.';
-    render(); return;
-  }
   corrida.fase = 'setup'; corrida.picker = false; corrida.aviso = '';
   game.modoBloqueado = null;
   game.screen = 'corrida';
@@ -33305,15 +33302,9 @@ function pescariaZerar(){
 /* ---------------------------------------------------------------------------
    O ACESSO -- idêntico ao da Corrida, e pelas mesmas razões
    --------------------------------------------------------------------------- */
-/* ⚠️ A VISIBILIDADE DO BOTÃO NÃO É A TRAVA: quem chamar `abrirPescaria()` pelo console cai aqui,
-   e aqui o `admin` é conferido de novo. E ele é o booleano `true` e nada mais -- 'sim', 'true' e
-   1 não autorizam. Ler é seguro porque ESCREVER não é: o campo está na trava do `firestore.rules`,
-   ou seja só o console do Firebase o escreve. */
+/* A porta é livre desde 21/09/2026 -- ver o botão da home. A régua que fica é a de JOGO: o
+   parceiro sai de um time com as 8 insígnias. */
 function abrirPescaria(){
-  if(!game.contaCarregada || game.ehAdmin !== true){
-    game.modoBloqueado = 'Este modo é administrativo.';
-    render(); return;
-  }
   pescariaZerar();
   game.modoBloqueado = null;
   game.screen = 'pescaria';
@@ -33992,6 +33983,7 @@ function pescariaLargar(){
     pescariaNovoPescador(pescaria.npc.map(x => pescariaInstancia(x, false)), false),
   ];
   pescaria.fase = 'jogando';
+  registrarPartidaDaIlha('trovita');
   pescaria.tempo = 0; pescaria.proximoSpawn = 2; pescaria.npcPensa = 1.7;
   pescaria.oportunidades = new Array(PESCARIA_ZONAS.length).fill(null);
   pescaria.historico = []; pescaria.logs = []; pescaria.recado = '';
@@ -34799,12 +34791,9 @@ function renderSelecaoResultado(){
   ${renderMatchupLog(r.matchups)}
   <button class="btn" onclick="sairDaSelecao()">⬅ Voltar às ilhas</button>`;
 }
-/* ⚠️ A VISIBILIDADE DO BOTÃO NÃO É A TRAVA: quem chamar pelo console cai aqui. */
+/* A porta é livre desde 21/09/2026 -- ver o botão da home. E aqui NÃO há régua de jogo nenhuma:
+   o bolo é sorteado na hora, então esta ilha nunca pediu time nem insígnia. */
 function abrirSelecao(){
-  if(!game.contaCarregada || game.ehAdmin !== true){
-    game.modoBloqueado = 'Este modo é administrativo.';
-    render(); return;
-  }
   game.modoBloqueado = null;
   selecaoZerar();
   game.screen = 'selecao';
@@ -34819,6 +34808,7 @@ function selecaoComecar(){
   selecao.restam = SELECAO_ORDEM[0][1];
   selecao.meu = []; selecao.dele = [];
   selecao.fase = 'draft';
+  registrarPartidaDaIlha('kumquat');
   render();
   selecaoAgendarNpc();
 }
@@ -34851,6 +34841,23 @@ const ILHA_DEFS = '<defs><pattern id="sea" width="32" height="24" patternUnits="
    novidades, e escrita à mão nos dois a segunda divergiria no primeiro ajuste -- o anúncio
    deixaria de casar com o botão que ele manda procurar. */
 const COR_ILHAS = '#e07a1e';
+/* ⚠️ O MONITOR DAS ILHAS (21/09/2026, a pedido: *"crie um monitor para eu conseguir ver quais
+   treinadores já jogaram algum jogo das ilhas laranjas e quantas vezes ele jogou cada jogo"*).
+   ⚠️ QUEM CONTA É O SERVIDOR (`registerIslandPlay`), e o campo está na TRAVA do firestore.rules:
+   um contador que o próprio jogador escreve não mede nada, e a métrica é o motivo da feature.
+   ⚠️ E É UMA FUNÇÃO SÓ, chamada pelos CINCO jogos: cinco chamadas escritas à mão garantiriam que
+   o próximo jogo nascesse sem contar -- e ele sumiria do monitor em silêncio, que é a pior forma
+   de uma métrica falhar. O teste cobra as cinco.
+   ⚠️ E ELA É BEST-EFFORT: falhar aqui não pode atrapalhar a partida. O pior caso é uma partida
+   que não entra na conta, e esse é o lado certo pra errar -- travar a largada por causa do
+   monitor seria o monitor atrapalhando o que ele existe pra medir. */
+function registrarPartidaDaIlha(ilhaId){
+  if(!game.authUser || !ilhaId) return;
+  try{
+    functionsClient.httpsCallable('registerIslandPlay')({ ilha: ilhaId })
+      .catch(e => console.error('Não deu pra registrar a partida da ilha:', e));
+  } catch(e){ console.error('Não deu pra registrar a partida da ilha:', e); }
+}
 const ILHAS_LARANJA = [
   { id:'mikan',   nome:'Mikan',   lider:'Cissy', jogo:'Resgate',  selo:'resgate',  abrir:abrirResgate,  cx:96,  cy:96,  r:52, giro:0.4 },
   { id:'navel',   nome:'Navel',   lider:'Danny', jogo:'Corrida',  selo:'corrida',  abrir:abrirCorrida,  cx:266, cy:92,  r:48, giro:1.9 },
@@ -34951,16 +34958,9 @@ const ILHAS_SVG = '<svg class="island-art" viewBox="0 0 ' + ILHAS_W + ' ' + ILHA
   + '<text x="18" y="23" fill="#fff4c8" font-family="monospace" font-weight="bold" font-size="10">ILHAS LARANJA</text>'
   + '<text x="18" y="34" fill="#b7e6e4" font-family="monospace" font-size="7">ARQUIPELAGO DO MAR DO SUL</text>'
   + '</svg>';
-/* ⚠️ A VISIBILIDADE DO BOTAO NAO E A TRAVA: quem chamar `abrirIlhas()` pelo console cai aqui, e
-   aqui o `admin` e conferido de novo. E ENQUANTO A CONTA NAO CARREGOU ele recusa -- o contrario
-   da porta dos modos de campeao, que erra pro lado de DEIXAR ENTRAR: mostrar um modo
-   administrativo a quem nao e admin, mesmo por meio segundo, e pior que esconde-lo de quem e. */
+/* O MAPA é livre desde 21/09/2026 -- ver o botão da home. */
 function abrirIlhas(){
   ilhaAberta = null;
-  if(!game.contaCarregada || game.ehAdmin !== true){
-    game.modoBloqueado = 'Este modo é administrativo.';
-    render(); return;
-  }
   game.modoBloqueado = null;
   game.screen = 'ilhas';
   render();
@@ -35074,7 +35074,12 @@ const NOVIDADES_VERSAO = 'ilhas-laranja';
    outra tela -- e um modal cobre a tela inteira. */
 function conferirNovidades(){
   if(game.screen !== 'saveSelect') return false;
-  if(!game.contaCarregada || game.ehAdmin !== true) return false;
+  /* ⚠️ A GUARDA DE ADMIN SAIU em 21/09/2026, junto com a abertura das ilhas: o anúncio agora fala
+     de um modo que TODO MUNDO abre.
+     ⚠️ MAS O `contaCarregada` FICA, e a razão dele MUDOU: antes ele era parte da guarda de admin;
+     hoje ele existe porque o `novidadeVista` vem do documento da conta -- sem esperar a leitura
+     ele é `undefined` no primeiro desenho, e o anúncio abriria de novo PRA QUEM JÁ LEU. */
+  if(!game.contaCarregada) return false;
   if(game.novidadeVista === NOVIDADES_VERSAO) return false;
   game.novidadesModal = true;
   return true;
@@ -35648,15 +35653,9 @@ function resgateDizer(txt){ resgate.recado = txt; resgate.recadoAte = resgate.te
 /* ---------------------------------------------------------------------------
    O ACESSO -- idêntico ao da Corrida e ao da Pescaria, e pelas mesmas razões
    --------------------------------------------------------------------------- */
-/* ⚠️ A VISIBILIDADE DO BOTÃO NÃO É A TRAVA: quem chamar `abrirResgate()` pelo console cai aqui, e
-   aqui o `admin` é conferido de novo. E ele é o booleano `true` e nada mais. Ler é seguro porque
-   ESCREVER não é: o campo está na trava do `firestore.rules`, ou seja só o console do Firebase o
-   escreve. */
+/* A porta é livre desde 21/09/2026 -- ver o botão da home. A régua que fica é a de JOGO: o
+   parceiro sai de um time com as 8 insígnias e precisa saber Surf. */
 function abrirResgate(){
-  if(!game.contaCarregada || game.ehAdmin !== true){
-    game.modoBloqueado = 'Este modo é administrativo.';
-    render(); return;
-  }
   resgateZerar();
   game.modoBloqueado = null;
   game.screen = 'resgate';
@@ -36066,6 +36065,7 @@ async function resgateComecar(){
   resgate.atores = [resgateAtor(meu, RESGATE_PRAIA.x - 14), resgateAtor(dele, RESGATE_PRAIA.x + 14)];
   resgate.tempo = 0; resgate.anim = 0; resgate.recado = ''; resgate.recadoAte = 0;
   resgate.fase = 'correndo';
+  registrarPartidaDaIlha('mikan');
   resgateDizer('Toque num Pokémon para resgatar. Volte à praia para pontuar!');
   render();
   resgate.ultimo = 0;
@@ -37315,8 +37315,7 @@ function queimadaZerar(){
 }
 async function queimadaComecar(){
   if(!queimada.escolhido || queimada.fase === 'jogando' || queimada.fase === 'carregando') return;
-  /* ⚠️ A PERMISSÃO É CONFERIDA DE NOVO AQUI: o pino da ilha é só a porta, e esta é a ação. */
-  if(game.ehAdmin !== true){ queimada.aviso = 'Este modo é administrativo.'; render(); return; }
+
   const meu = queimadaInstancia(queimada.escolhido, true);
   const dele = queimadaSortearNpc(queimada.escolhido.speciesId, queimada.escolhido.level);
 
@@ -37340,6 +37339,7 @@ async function queimadaComecar(){
      vai no rótulo do botão. Recalculado a cada arremesso, ele dançaria com o sorteio do motor. */
   queimada.golpes = [queimadaGolpeContra(meu, dele), queimadaGolpeContra(dele, meu)];
   queimada.fase = 'jogando';
+  registrarPartidaDaIlha('pummelo');
   queimada.proximaBola = 1.2; queimada.proximoPasso = 0.5;
   queimadaDizer('Você joga embaixo. Mova-se e toque em ' + queimada.golpes[0].nome.toUpperCase() + '!');
   render();
@@ -37907,15 +37907,9 @@ function renderQueimada(){
     </div>
     ${anunciando ? queimadaAnuncioHtml() : ''}`;
 }
-/* ⚠️ A VISIBILIDADE DO PINO NÃO É A TRAVA: quem chamar `abrirQueimada()` pelo console cai aqui, e
-   aqui o `admin` é conferido de novo. E ENQUANTO A CONTA NÃO CARREGOU ele recusa -- o contrário da
-   porta dos modos de campeão, que erra pro lado de DEIXAR ENTRAR: mostrar um modo administrativo a
-   quem não é admin, mesmo por meio segundo, é pior que escondê-lo de quem é. */
+/* A porta é livre desde 21/09/2026 -- ver o botão da home. A régua que fica é a de JOGO: o
+   pokémon sai de um time com as 8 insígnias. */
 function abrirQueimada(){
-  if(!game.contaCarregada || game.ehAdmin !== true){
-    game.modoBloqueado = 'Este modo é administrativo.';
-    render(); return;
-  }
   queimadaZerar();
   game.modoBloqueado = null;
   game.screen = 'queimada';

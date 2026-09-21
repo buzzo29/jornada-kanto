@@ -56,8 +56,10 @@ console.log('\n=== O ACESSO É SÓ DE QUEM TEM admin === true ===');
   S.entrarNaIlha(S.ILHAS_LARANJA.indexOf(navel));
   ok('  e entrar nela abre a Corrida', g.screen === 'corrida', 'tela: ' + g.screen);
 
+  /* ⚠️ AS ILHAS ABRIRAM PRA TODO MUNDO em 21/09/2026 -- estas travas cobravam a RECUSA e
+     viraram a trava da regra nova. O teste das ilhas cobre as SEIS portas num laço só. */
   g.ehAdmin = false;
-  ok('sem admin o botão some', home().indexOf('Ilhas Laranja') < 0, 'aparece pra quem não é admin');
+  ok('e sem admin o botão CONTINUA lá', home().indexOf('Ilhas Laranja') >= 0, 'sumiu pra quem não é admin');
   g.ehAdmin = true; g.screen = 'saveSelect';
 
   /* ⚠️ CAMPO AUSENTE, FALSO OU DE OUTRO TIPO NÃO AUTORIZA. O `admin` é lido como
@@ -74,15 +76,15 @@ console.log('\n=== O ACESSO É SÓ DE QUEM TEM admin === true ===');
   /* ⚠️ ENQUANTO A CONTA CARREGA, O BOTÃO FICA OCULTO -- o contrário da porta dos modos de campeão,
      que erra pro lado de DEIXAR ENTRAR. Aqui o lado seguro é o outro. */
   g.ehAdmin = true; g.contaCarregada = false;
-  ok('carregando ainda, o botão fica oculto', home().indexOf('Corrida Pokemon') < 0, 'apareceu cedo');
+  ok('e a conta carregando não esconde mais o botão', home().indexOf('Ilhas Laranja') >= 0, 'sumiu');
   g.contaCarregada = true;
 
   /* ⚠️ E A VISIBILIDADE NÃO É A TRAVA: a AÇÃO refaz a pergunta. Quem chamar `abrirCorrida()` pelo
      console sem ser admin não entra. */
   g.ehAdmin = false; g.screen = 'saveSelect'; g.modoBloqueado = null;
   S.abrirCorrida();
-  ok('a porta recusa quem não é admin', g.screen !== 'corrida', g.screen);
-  ok('e diz por quê', !!g.modoBloqueado, 'sem recado');
+  ok('a porta ABRE pra quem não é admin', g.screen === 'corrida', g.screen);
+  ok('e não sobra o recado de modo administrativo', !g.modoBloqueado, String(g.modoBloqueado));
   g.ehAdmin = true; g.modoBloqueado = null;
   S.abrirCorrida();
   ok('e deixa o admin entrar', g.screen === 'corrida', g.screen);

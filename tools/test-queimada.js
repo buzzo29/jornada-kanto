@@ -68,10 +68,12 @@ console.log('\n=== O ACESSO É SÓ DE QUEM TEM admin === true ===');
   /* ⚠️ OS DEZ ESTADOS, e a regra é `=== true`: um `admin` escrito como texto no console não pode
      abrir o modo. É a mesma trava que a Corrida e a Pescaria ganharam quando as duas portas foram
      endurecidas (19/09/2026) -- elas eram `!game.ehAdmin`, ou seja truthy. */
-  const ESTADOS = [['true (o certo)', true, true], ['false', false, false], ['a string sim', 'sim', false],
-    ['a string true', 'true', false], ['o número 1', 1, false], ['o número 0', 0, false],
-    ['null', null, false], ['undefined', undefined, false], ['um objeto', {}, false],
-    ['a string admin', 'admin', false]];
+  /* ⚠️ AS ILHAS ABRIRAM PRA TODO MUNDO em 21/09/2026 -- estas travas cobravam a RECUSA e
+     viraram a trava da regra nova. O teste das ilhas cobre as SEIS portas num laço só. */
+  const ESTADOS = [['true', true, true], ['false', false, true], ['a string sim', 'sim', true],
+    ['a string true', 'true', true], ['o número 1', 1, true], ['o número 0', 0, true],
+    ['null', null, true], ['undefined', undefined, true], ['um objeto', {}, true],
+    ['a string admin', 'admin', true]];
   for(const [nome, valor, abre] of ESTADOS){
     contaDeTeste(); g.ehAdmin = valor; g.screen = 'ilhas';
     S.abrirQueimada();
@@ -79,11 +81,12 @@ console.log('\n=== O ACESSO É SÓ DE QUEM TEM admin === true ===');
   }
   contaDeTeste(); g.contaCarregada = false; g.screen = 'ilhas';
   S.abrirQueimada();
-  ok('a conta ainda carregando NÃO abre', g.screen !== 'queimada', 'tela: ' + g.screen);
+  ok('e a conta carregando tambem abre', g.screen === 'queimada', 'tela: ' + g.screen);
   /* ⚠️ E ISSO É O CONTRÁRIO da porta dos modos de campeão, que erra pro lado de DEIXAR ENTRAR:
      mostrar um modo administrativo a quem não é admin, mesmo por meio segundo, é pior que
      escondê-lo de quem é. */
-  ok('  e a mensagem diz por quê', String(g.modoBloqueado || '').indexOf('administrativo') >= 0, g.modoBloqueado);
+  ok('  e não sobra o recado de modo administrativo',
+     String(g.modoBloqueado || '').indexOf('administrativo') < 0, String(g.modoBloqueado));
 }
 console.log('\n=== E A LARGADA CONFERE DE NOVO ===');
 (async () => {
@@ -91,8 +94,9 @@ console.log('\n=== E A LARGADA CONFERE DE NOVO ===');
   S.queimadaEscolher(0, 0);
   g.ehAdmin = false;
   await S.queimadaComecar();
-  ok('a AÇÃO recusa mesmo com o pokémon já escolhido', S.queimada.fase !== 'jogando', 'fase: ' + S.queimada.fase);
-  ok('  e ela diz por quê', String(S.queimada.aviso).indexOf('administrativo') >= 0, S.queimada.aviso);
+  ok('a largada acontece mesmo sem admin', S.queimada.fase === 'jogando', 'fase: ' + S.queimada.fase);
+  ok('  e sem recado de modo administrativo',
+     String(S.queimada.aviso || '').indexOf('administrativo') < 0, String(S.queimada.aviso));
 
 /* ============================================================================
    2) A VELOCIDADE -- o Speed do jogo, COM o nível, comprimido pra caber na quadra

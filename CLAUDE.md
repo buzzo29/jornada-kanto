@@ -14565,6 +14565,124 @@ os três velhos, a tabela (líderes casando com a Corrida, `abrir` sendo funçã
 ilhas), a ação recusando, o mapa, o pino DERIVADO do centro, os defs numa cópia só, e a volta.
 **Conferido que ele acusa os 7 defeitos religados.**
 
+## AS ILHAS LARANJA ABRIRAM PRA TODO MUNDO, E O MONITOR NASCEU JUNTO (21/09/2026)
+
+Pedido assim: *"crie um monitor para eu conseguir ver quais treinadores já jogaram algum jogo das
+ilhas laranjas e quantas vezes ele jogou cada jogo. Após isso, pode tirar que só quem é admin =
+true consegue ver os botões das ilhas laranjas e exiba também o modal das novidades"*.
+
+**⚠️ A ORDEM DO PEDIDO É A RAZÃO DE ELE EXISTIR**: o monitor veio ANTES da abertura porque é ele
+que diz se o arquipélago pegou. Sem ele, abrir os cinco jogos pra todo mundo seria uma mudança
+sem instrumento — e este projeto não faz isso.
+
+### ⚠️ O MONITOR: QUEM CONTA É O SERVIDOR
+
+- **Um contador mantido pelo CLIENTE nunca é confiável**, e essa lição o `registrantCount` da Liga
+  Clássica já custou em 20/09: sempre existe cliente velho em cache. Aqui é pior — **a MÉTRICA é o
+  motivo da feature**, então uma linha no console a tornaria inútil. Quem escreve é a callable
+  `registerIslandPlay`, e o campo entrou na **trava do `firestore.rules`** ao lado de `moedas` e
+  `admin`.
+  ⚠️ **E ele é o primeiro campo da trava que NÃO dá poder de compra**: mentir nele não compra nada.
+  Ele está lá só pela métrica, e isso vale ser dito porque o comentário daquela lista fala em
+  "campos de prêmio".
+- **⚠️ E ELE MORA NO DOCUMENTO DO USUÁRIO** (`ilhasJogadas`), não numa coleção própria: o painel de
+  treinadores **já lê esse documento** por treinador, então o monitor custa **ZERO leitura a mais**
+  nele. Numa coleção à parte seriam 20 leituras por página do painel.
+- **⚠️ É UM `increment`, NÃO UMA TRANSAÇÃO**: o Firestore o resolve **sem ler**, então duas abas
+  contando ao mesmo tempo não se atropelam — e ele não paga a leitura que uma transação pagaria. É
+  a mesma escolha do contador de inscritos.
+- **⚠️ O ID DA ILHA É VALIDADO CONTRA UMA LISTA FECHADA**, e a lista é **duplicada** no cliente e no
+  servidor. Sem a validação, um cliente forjado escreveria chave qualquer dentro do mapa e ele
+  viraria lixo que ninguém limpa de fora; sem a comparação das duas listas, **uma ilha que nascesse
+  só no cliente seria recusada com `invalid-argument` e sumiria do monitor EM SILÊNCIO**. O teste
+  compara as duas.
+- **⚠️ E O `merge` NÃO É DETALHE**: sem ele o `set` do contador **substituiria o documento inteiro**
+  e apagaria a conta do jogador. Há caso de teste pra exatamente isso, e ele acusa.
+
+**QUANDO ELE CONTA: onde a partida LARGA, não onde a tela abre.** Abrir e fechar o setup não é
+"jogou", e o que o monitor mede é partida jogada. São os cinco pontos em que a fase vira jogando:
+`corrida.fase='contagem'`, `pescaria.fase='jogando'`, `selecao.fase='draft'`,
+`resgate.fase='correndo'` e `queimada.fase='jogando'`.
+
+- **⚠️ E AS CINCO CHAMAM UMA FUNÇÃO SÓ** (`registrarPartidaDaIlha`). Cinco `httpsCallable` escritos
+  à mão garantiriam que **o próximo jogo nascesse sem contar** — e ele sumiria do monitor em
+  silêncio, que é a pior forma de uma métrica falhar. A trava varre os cinco e cobra que cada
+  chamada esteja **colada na largada**.
+- **ELA É BEST-EFFORT**: falhar não pode atrapalhar a partida, e o pior caso é uma partida que não
+  entra na conta. Travar a largada por causa do monitor seria o monitor atrapalhando o que ele
+  existe pra medir. **E sem login ela nem tenta** — a callable recusaria, e uma ida ao servidor que
+  nunca pode dar certo é desperdício.
+
+**NA TELA DO PAINEL são DUAS coisas, porque a pergunta tem duas metades:**
+
+| | responde |
+|---|---|
+| a **ficha** na conta de cada treinador (`Mikan · Resgate: 12`) | *quantas vezes ELE jogou cada jogo* |
+| o **resumo** no topo (`🏝️ Ilhas Laranja: 2 treinadores · 23 partidas`) | *QUAIS treinadores já jogaram* |
+
+Sem o resumo, responder a primeira metade exigiria abrir os 20 cards um a um.
+
+- **⚠️ E O RESUMO DIZ QUE CONTA SÓ O QUE ESTÁ CARREGADO** (`(dos 3 carregados)`): o painel é
+  **PAGINADO**, então um número apresentado como total do jogo mentiria em toda página que não
+  fosse a última. É o mesmo cuidado do aviso de online truncado, logo acima dele.
+- **O zero fica de fora**, como no inventário: o `increment` deixa a chave em 0 e um "0× Corrida"
+  seria ruído. E **quem nunca jogou vem com lista VAZIA**, nunca `undefined` — a tela faz
+  `.forEach` nela.
+- Os cinco nomes vivem no painel, como os onze de item: ele não carrega a tabela do jogo.
+
+### A ABERTURA: AS SEIS PORTAS
+
+Saíram o botão da home, o `abrirIlhas`, os cinco `abrir*` e as duas guardas de **largada** (a da
+Corrida e a da Arena) — **dez pontos**. O `game.ehAdmin` **continua existindo**: ele é a porta do
+**painel**, que é onde o monitor se lê. O que saiu foi só o uso dele como porta das ilhas.
+
+- **⚠️ O QUE NÃO ABRIU foram as réguas de JOGO**: a Corrida individual, a Pescaria, o Resgate e a
+  Arena continuam pedindo um time com as **8 insígnias**, porque montam a partir dos saves. A
+  **Seleção nunca pediu** — o bolo dela é sorteado na hora.
+- **⚠️ E O `conferirNovidades` MANTEVE O `contaCarregada`, com a razão TROCADA**: antes ele era
+  parte da guarda de admin; hoje ele existe porque o `novidadeVista` vem do documento da conta —
+  sem esperar a leitura ele é `undefined` no primeiro desenho, e **o anúncio abriria de novo pra
+  quem já leu**.
+
+**MEDIDO A 320px, numa conta COMUM (`ehAdmin = false`):** os cinco botões de modo, o das Ilhas em
+**281px** ocupando a linha inteira (a fileira é de duas colunas, e com quatro modos normais ele
+ficaria sozinho na quinta célula), **nenhum texto cortado e sem rolagem lateral**.
+
+### O QUE ISSO CUSTOU AO JOGO: NADA
+
+**`MOTOR d159ac3d1cb5 / DIARIO a0c57e0f0362`, idêntico** em 900 batalhas semeadas — e o instrumento
+é sensível (com o `CRIT_BASE` mexido os dois hashes mudam).
+
+### ⚠️ E DEZESSEIS TRAVAS MEDIAM A PORTA QUE ACABOU
+
+Elas cobravam a RECUSA em seis arquivos (`test-ilhas`, `test-corrida`, `test-pescaria`,
+`test-queimada`, `test-resgate`, `test-selecao`) — **e não foram apagadas: viraram a trava da regra
+NOVA**, senão alguém reintroduz a porta e ninguém vê. É a mesma decisão das cinco que caíram quando
+o trecho da Corrida virou 150 m.
+
+A que importa é a do `test-ilhas`: ela varre **as SEIS portas num laço só**. Cada uma tinha a guarda
+escrita separadamente, então uma que ficasse pra trás não apareceria em teste nenhum dos outros
+arquivos — só pra quem não é admin, em produção.
+
+**⚠️ E UMA DELAS FIXAVA UM NÚMERO:** o `test-inventario` cobrava que a home tem **exatamente 4**
+botões de modo, e caiu quando a fileira ganhou o quinto — **sem nada estar errado**. Hoje ela
+**NOMEIA os quatro**, que é o que ela sempre quis provar (a recusa dos modos de campeão não esconde
+os botões). É a terceira vez que esta família de trava envelhece aqui.
+
+### ⚠️ E A FERRAMENTA DE ACUSAÇÃO MENTIU DUAS VEZES, pelas DUAS armadilhas já registradas
+
+Os 10 defeitos religados acusam — mas o script de acusação disse *"4 passaram em branco"* na
+primeira rodada e *"3"* na segunda, e **as duas vezes o errado era ele**:
+
+1. **ele contava só `FALHOU`, e metade dos testes imprime `FALHA`** — é literalmente a mesma
+   armadilha que este arquivo já registra ("a ferramenta de acusação mentiu junto");
+2. **o `\b` do regex virou o caractere BACKSPACE (0x08)** ao passar por um `node -e` no shell, e o
+   padrão virou `/FALHOU|FALHA^H/` — que nunca casa. Foi o **`cat -A`** que revelou, exatamente
+   como o arquivo sugere.
+
+**A regra fica mais forte: um "passou em branco" é suspeito ANTES de o defeito ser suspeito** — e
+o jeito de separar os dois é religar o defeito **na mão** e olhar a saída.
+
 ## O ANÚNCIO DAS NOVIDADES NA HOME (21/09/2026)
 
 Pedido assim: *"quando os usuários abrirem o jogo pela primeira vez, coloque para exibir um modal

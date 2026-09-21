@@ -5364,6 +5364,46 @@ exports._pescariaRank = { topo: PESCARIA_RANK_TOPO };
    razão entre campos. Ele é derivado na MESMA transação que conta a partida, então não tem como
    ficar velho.
    ===================================================================== */
+
+/* =====================================================================
+   O MONITOR DAS ILHAS LARANJA (21/09/2026, a pedido: *"crie um monitor para eu conseguir ver
+   quais treinadores ja jogaram algum jogo das ilhas laranjas e quantas vezes ele jogou cada
+   jogo"*). Ele nasceu JUNTO com a abertura das ilhas pra todo mundo, no mesmo pedido -- e essa
+   ordem e a razao dele existir: e ele que diz se o arquipelago pegou.
+
+   ⚠️ QUEM CONTA E O SERVIDOR. Um contador mantido pelo CLIENTE nunca e confiavel, e essa licao o
+   `registrantCount` da Liga Classica ja custou (20/09/2026): sempre existe cliente velho em cache,
+   e aqui uma linha no console tornaria a metrica inutil -- e a METRICA e o motivo da feature.
+
+   ⚠️ E ELE MORA NO DOCUMENTO DO USUARIO (`ilhasJogadas`), nao numa colecao propria: o painel de
+   treinadores JA le esse documento por treinador, entao o monitor custa ZERO leitura a mais nele.
+   Numa colecao a parte seriam 20 leituras por pagina do painel.
+
+   ⚠️ E O ID DA ILHA E VALIDADO CONTRA UMA LISTA FECHADA: sem isso um cliente forjado escreveria
+   chave qualquer dentro do mapa, e ele viraria lixo que ninguem consegue limpar de fora.
+
+   ⚠️ E ELE E UM `increment`, NAO UMA TRANSACAO: o Firestore o resolve SEM LER, entao duas abas
+   contando ao mesmo tempo nao se atropelam -- e ele nao paga a leitura que uma transacao pagaria.
+   E a mesma escolha do contador de inscritos da Liga.
+
+   ⚠️ A LISTA E DUPLICADA NO CLIENTE (`ILHAS_LARANJA`), e o teste compara as duas: uma ilha nova
+   que nasca so la seria contada como 'invalid-argument' e sumiria do monitor EM SILENCIO.
+   ===================================================================== */
+const ILHAS_DO_ARQUIPELAGO = ['mikan', 'navel', 'trovita', 'kumquat', 'pummelo'];
+
+exports.registerIslandPlay = onCall(async (request) => {
+  const uid = request.auth && request.auth.uid;
+  if(!uid) throw new HttpsError('unauthenticated', 'Faça login.');
+  const ilha = String((request.data && request.data.ilha) || '');
+  if(!ILHAS_DO_ARQUIPELAGO.includes(ilha)){
+    throw new HttpsError('invalid-argument', 'Ilha desconhecida: ' + ilha);
+  }
+  await db.collection('users').doc(uid).set(
+    { ilhasJogadas: { [ilha]: admin.firestore.FieldValue.increment(1) } },
+    { merge: true });
+  return { ok: true, ilha };
+});
+
 const SELECAO_RANK_TOPO = 10;
 function selecaoRankCollRef(){ return db.collection('selecaoRanking'); }
 function selecaoRankDocRef(uid){ return selecaoRankCollRef().doc(uid); }
@@ -9964,6 +10004,13 @@ exports.adminListTrainers = onCall(async (request) => {
                 esperaAte: d.mewtwoLoanCooldownUntil || 0, aResgatar: !!d.mewtwoLoanReadyToClaim },
       cidade: (d.neighborhoodGymLocation && d.neighborhoodGymLocation.city) || '',
       admin: d.admin === true,
+      /* O MONITOR DAS ILHAS: quantas partidas de cada jogo esta conta ja jogou (ver
+         registerIslandPlay). Vem como LISTA de pares, como o inventario, e com o zero fora --
+         um "0x Corrida" na tela seria ruido. Ordenado pelo MAIS jogado, que e a pergunta. */
+      ilhas: Object.keys(d.ilhasJogadas || {})
+        .filter(k => (d.ilhasJogadas[k] || 0) > 0)
+        .map(k => ({ ilha: k, vezes: d.ilhasJogadas[k] }))
+        .sort((x, y) => y.vezes - x.vezes),
       ginasios: [],   // preenchido abaixo, numa consulta so pra pagina inteira
       saves: lista
     };

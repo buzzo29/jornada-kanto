@@ -235,8 +235,12 @@ console.log('\n=== A PORTA DOS MODOS DE CAMPEAO (as 8 insignias) ===');
     ok('a home mostra a recusa', home.indexOf(S.AVISO_SEM_CAMPEAO) >= 0,
        (home.match(/error-text[^>]*>[^<]*/) || ['(nada)'])[0]);
     ok('e ela vem ANTES dos botoes de modo', home.indexOf('error-text') < home.indexOf('home-modes-row'));
-    ok('e os quatro botoes continuam la', (home.match(/leagues-big-btn/g) || []).length === 4,
-       (home.match(/leagues-big-btn/g) || []).length + ' botoes');
+    /* ⚠️ ELA NOMEIA OS QUATRO em vez de contar: a contagem era === 4 e caiu no dia em que as
+       Ilhas Laranja abriram pra todo mundo (21/09/2026) e a fileira ganhou um quinto botao --
+       sem nada estar errado. O que esta trava quer provar e que a RECUSA nao esconde os modos,
+       e isso se cobra pelo nome. E a licao das cinco travas que caíram com o trecho de 150 m. */
+    ['openLeagueTypesList', 'openNeighborhoodGymScreen', 'openTrainerTower', 'openOnlineBattle']
+      .forEach(fn => ok('  e o botao ' + fn + ' continua la', home.indexOf(fn + '()') >= 0));
   }
   S.openSaveSelect();
   ok('e voltando pra home ela some', !S.__getGame().modoBloqueado, String(S.__getGame().modoBloqueado));

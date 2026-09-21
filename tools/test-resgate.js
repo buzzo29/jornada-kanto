@@ -52,11 +52,11 @@ const inst = (id, lv, ex) => S.resgateInstancia(Object.assign({ speciesId: id, l
 console.log('\n=== O ACESSO ===');
 {
   contaDeTeste();
-  /* ⚠️ O CAMPO É O BOOLEANO `true` E NADA MAIS: 'sim', 'true' e 1 são o que um cliente forjado
-     mandaria, e o `!game.ehAdmin` (truthy) os deixaria passar. */
+  /* ⚠️ AS ILHAS ABRIRAM PRA TODO MUNDO em 21/09/2026: este laço cobrava a RECUSA em nove dos dez
+     valores e virou a trava da regra nova -- nenhum deles fecha mais a porta. */
   const casos = [
-    [true, true], [false, false], ['sim', false], ['true', false], [1, false],
-    [0, false], [null, false], [undefined, false], ['', false], [{}, false],
+    [true, true], [false, true], ['sim', true], ['true', true], [1, true],
+    [0, true], [null, true], [undefined, true], ['', true], [{}, true],
   ];
   casos.forEach(([valor, entra]) => {
     g.contaCarregada = true; g.ehAdmin = valor; g.screen = 'saveSelect'; g.modoBloqueado = null;
@@ -69,7 +69,7 @@ console.log('\n=== O ACESSO ===');
      por meio segundo, é pior que escondê-lo de quem é. */
   g.contaCarregada = false; g.ehAdmin = true; g.screen = 'saveSelect';
   S.abrirResgate();
-  ok('  conta ainda carregando: recusa', g.screen !== 'resgate', 'tela: ' + g.screen);
+  ok('  e a conta carregando tambem entra', g.screen === 'resgate', 'tela: ' + g.screen);
 
   /* ⚠️ A PORTA VIROU UMA ILHA (21/09/2026): os tres botoes administrativos da home viraram um so,
      o `Ilhas Laranja`, e cada jogo mora numa ilha do mapa. O que esta trava prova continua sendo o
@@ -85,10 +85,10 @@ console.log('\n=== O ACESSO ===');
   S.entrarNaIlha(S.ILHAS_LARANJA.indexOf(ilha_));
   ok('  e entrar nela abre o modo', g.screen === 'resgate', 'tela: ' + g.screen);
   g.ehAdmin = false;
-  ok('  e o botao das Ilhas some pra quem nao e admin',
-     S.renderSaveSelect().indexOf('abrirIlhas()') < 0);
-  g.ehAdmin = true; g.contaCarregada = false;
-  ok('  nem enquanto a conta carrega', S.renderSaveSelect().indexOf('abrirIlhas()') < 0);
+  ok('  e o botao das Ilhas CONTINUA pra quem nao e admin',
+     S.renderSaveSelect().indexOf('abrirIlhas()') >= 0);
+  g.contaCarregada = false;
+  ok('  e enquanto a conta carrega tambem', S.renderSaveSelect().indexOf('abrirIlhas()') >= 0);
   /* ⚠️ E O BLOCO DEVOLVE A TELA: o `entrarNaIlha` acima a deixou no modo, e a trava do save la
      embaixo procura o nome do modo no `serializeGame()` -- que inclui o `screen`. */
   g.contaCarregada = true; g.screen = 'saveSelect';

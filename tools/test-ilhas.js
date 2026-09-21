@@ -43,53 +43,66 @@ function contaAdmin(){
 const home = () => { g.screen = 'saveSelect'; return S.renderSaveSelect(); };
 
 /* ============================================================================
-   1) O ACESSO -- é o item que mais importa, porque a home ganhou um modo ADMINISTRATIVO
+   1) O ACESSO -- ⚠️ AS ILHAS ABRIRAM PRA TODO MUNDO em 21/09/2026, a pedido
+
+   Este bloco cobrava o CONTRARIO ate hoje: o botao e as seis portas so existiam pra
+   `admin === true`. Ele nao foi apagado quando a porta saiu -- ele VIROU a trava da regra nova,
+   senao alguem reintroduz a porta e ninguem ve. E a mesma decisao das cinco travas que caíram
+   quando o trecho da Corrida virou 150 m: trava que envelhece vira a trava do que a substituiu.
+
+   ⚠️ O QUE NAO ABRIU foram as reguas de JOGO -- a Corrida individual, a Pescaria e o Resgate
+   continuam pedindo um time com as 8 insignias, porque montam a partir dos saves. Elas sao
+   cobradas nos testes de cada jogo.
    ============================================================================ */
-console.log('\n=== O ACESSO É SÓ DE QUEM TEM admin === true ===');
+console.log('\n=== AS ILHAS SAO DE TODO MUNDO ===');
 {
   contaAdmin();
   ok('com admin=true o botão aparece', home().indexOf('abrirIlhas()') >= 0, 'sem o botão');
   ok('  e com o nome EXATO', /Ilhas Laranja</.test(home()), 'o nome mudou');
   /* ⚠️ ELE OCUPA A LINHA INTEIRA: a fileira de modos é de DUAS colunas, e com os quatro modos
-     normais o administrativo fica sozinho na quinta célula -- medido a 320px, um buraco de 137px
-     do lado. Não é hierarquia: é a linha fechando, a mesma razão do Boss de Domingo. */
+     normais o das ilhas fica sozinho na quinta célula -- medido a 320px, um buraco de 137px do
+     lado. Não é hierarquia: é a linha fechando, a mesma razão do Boss de Domingo. */
   ok('  e ocupa a linha inteira',
      /home-btn-largo[^>]*abrirIlhas\(\)|abrirIlhas\(\)[^>]*home-btn-largo/.test(home()),
      'sem o home-btn-largo');
 
-  g.ehAdmin = false;
-  ok('sem admin o botão some', home().indexOf('abrirIlhas()') < 0, 'aparece pra quem não é admin');
-  /* ⚠️ E ENQUANTO A CONTA NÃO CARREGOU ele fica OCULTO -- o contrário da porta dos modos de
-     campeão, que erra pro lado de DEIXAR ENTRAR. Aqui o lado seguro é o outro: mostrar um modo
-     administrativo a quem não é admin, mesmo por meio segundo, é pior que escondê-lo de quem é. */
-  g.ehAdmin = true; g.contaCarregada = false;
-  ok('  nem enquanto a conta carrega', home().indexOf('abrirIlhas()') < 0);
-
-  /* ⚠️ CAMPO AUSENTE, FALSO OU DE OUTRO TIPO NÃO AUTORIZA. O `admin` é lido como `d.admin === true`
-     -- exatamente o booleano --, então 'sim', 1 e 'true' não entram. É a MESMA leitura dos três
-     minigames, e ela vale porque o campo está na trava do `firestore.rules`: ler é seguro porque
-     escrever não é. */
+  /* ⚠️ E ELE APARECE PRA QUALQUER CONTA -- os mesmos valores que ANTES eram recusados. Sem este
+     laço, a porta voltaria num `if` e só quem não é admin descobriria. */
   [['ausente', undefined], ['false', false], ['a string "sim"', 'sim'], ['a string "true"', 'true'],
    ['o número 1', 1], ['null', null], ['o objeto {}', {}]].forEach(([nome, v]) => {
     contaAdmin(); g.ehAdmin = ({ admin: v }).admin === true;
-    ok('  ' + nome + ' não autoriza', home().indexOf('abrirIlhas()') < 0);
+    ok('  e com admin ' + nome + ' ele CONTINUA lá', home().indexOf('abrirIlhas()') >= 0);
   });
 
-  /* ⚠️ E A VISIBILIDADE NÃO É A TRAVA: quem chamar `abrirIlhas()` pelo console cai na função, e
-     ela refaz a pergunta. */
-  contaAdmin(); g.ehAdmin = false; g.screen = 'saveSelect';
-  S.abrirIlhas();
-  ok('a AÇÃO recusa quem não é admin', g.screen !== 'ilhas', 'tela: ' + g.screen);
-  contaAdmin(); g.contaCarregada = false; g.screen = 'saveSelect';
-  S.abrirIlhas();
-  ok('  e recusa enquanto a conta carrega', g.screen !== 'ilhas', 'tela: ' + g.screen);
-  contaAdmin();
-  S.abrirIlhas();
-  ok('  e deixa entrar quem é', g.screen === 'ilhas', 'tela: ' + g.screen);
+  /* ⚠️ E NEM O `contaCarregada` segura mais: ele fazia parte da guarda de admin, e não havia
+     outra razão pra esconder o botão. */
+  contaAdmin(); g.ehAdmin = false; g.contaCarregada = false;
+  ok('  e nem enquanto a conta carrega ele some', home().indexOf('abrirIlhas()') >= 0);
 
-  /* ⚠️ E O `admin` CONTINUA FORA DO ALCANCE DO CLIENTE: é isso que faz ler ser seguro. */
+  /* ⚠️ AS SEIS PORTAS ABREM, e o laço as cobre de uma vez: o mapa mais os cinco jogos. Cada uma
+     tinha a guarda ESCRITA SEPARADAMENTE, então uma que ficasse pra trás não apareceria em teste
+     nenhum dos outros arquivos -- só pra quem não é admin, em produção. */
+  [['abrirIlhas', 'ilhas'], ['abrirCorrida', 'corrida'], ['abrirPescaria', 'pescaria'],
+   ['abrirSelecao', 'selecao'], ['abrirResgate', 'resgate'], ['abrirQueimada', 'queimada']
+  ].forEach(([fn, tela]) => {
+    contaAdmin(); g.ehAdmin = false; g.contaCarregada = true; g.screen = 'saveSelect';
+    S[fn]();
+    ok('  ' + fn + ' abre pra quem NÃO é admin', g.screen === tela, 'tela: ' + g.screen);
+  });
+
+  /* ⚠️ E NENHUMA DELAS DEIXA O RECADO ANTIGO na tela: ele dizia "Este modo é administrativo." */
+  contaAdmin(); g.ehAdmin = false; g.modoBloqueado = null;
+  S.abrirIlhas();
+  ok('  e nenhuma diz mais que o modo é administrativo', !g.modoBloqueado, String(g.modoBloqueado));
+
+  /* ⚠️ O `admin` CONTINUA EXISTINDO e continua fora do alcance do cliente -- ele é a porta do
+     PAINEL de treinadores, que é onde o monitor das ilhas se lê. O que saiu foi só o uso dele
+     como porta das ilhas. */
   const regras = require('fs').readFileSync(path.join(raiz, 'firestore.rules'), 'utf8');
-  ok('e o `admin` está na trava de campos das regras', /admin/.test(regras));
+  ok('e o `admin` continua na trava de campos das regras', /'admin'/.test(regras));
+  ok('  e nenhuma porta das ilhas pergunta por ele',
+     !/function abrir(Ilhas|Corrida|Pescaria|Selecao|Resgate|Queimada)\(\)\{[\s\S]{0,400}?ehAdmin/.test(src),
+     'sobrou uma guarda de admin numa das seis portas');
 }
 
 /* ============================================================================
@@ -457,12 +470,14 @@ console.log('=== O ANUNCIO DAS NOVIDADES ===');
   contaLimpa();
   ok('admin=true na home abre o anuncio', S.conferirNovidades() === true && g.novidadesModal === true);
 
-  /* ⚠️ EXATAMENTE O BOOLEANO, como a porta das ilhas: 'sim', 1 e 'true' nao autorizam */
+  /* ⚠️ E ELE ABRE PRA TODA CONTA desde 21/09/2026, junto com as ilhas -- este laço cobrava o
+     CONTRÁRIO (os oito valores que NÃO autorizavam) e virou a trava da regra nova: o anúncio fala
+     de um modo que todo mundo abre, então esconde-lo de alguém seria esconder a novidade. */
   for(const v of [false, undefined, null, 'sim', 1, 'true', 0, '']){
     contaLimpa(); g.ehAdmin = v;
-    ok('  e ' + JSON.stringify(v) + ' nao abre', S.conferirNovidades() === false && !g.novidadesModal);
+    ok('  e com admin ' + JSON.stringify(v) + ' ele CONTINUA abrindo',
+       S.conferirNovidades() === true && g.novidadesModal === true);
   }
-
   /* ⚠️ ENQUANTO A CONTA NAO CARREGOU ele NAO nasce -- o contrario da porta dos modos de campeao,
      que erra pro lado de deixar entrar. Aqui o lado seguro e o outro. */
   contaLimpa(); g.contaCarregada = false;
@@ -591,6 +606,78 @@ console.log('=== O ICONE NO TITULO E O LARANJA ===');
      botao da home ja pratica desde 21/09. A sombra melhora a leitura sem mexer na identidade. */
   ok('  e o texto do botao tem sombra (o laranja da 3,01:1 com branco)',
      /\.novidades-box \.btn\.primary\{text-shadow:/.test(src));
+}
+
+/* ============================================================================
+   O MONITOR, DO LADO DO CLIENTE (21/09/2026)
+
+   ⚠️ A TRAVA QUE IMPORTA E A DAS CINCO CHAMADAS. Cinco `httpsCallable` escritos a mao garantiriam
+   que o proximo jogo nascesse sem contar -- e ele sumiria do monitor EM SILENCIO, que e a pior
+   forma de uma metrica falhar. Por isso ela varre os CINCO e cobra que todos passem pela MESMA
+   funcao, e que ela seja chamada onde a partida LARGA (nao onde a tela abre).
+   ============================================================================ */
+console.log('');
+console.log('=== O MONITOR CONTA AS CINCO ILHAS ===');
+{
+  /* espiona o que o cliente manda pro servidor */
+  const mandadas = [];
+  const originalFC = S.functionsClient;
+  S.functionsClient = { httpsCallable(nome){
+    return (dados) => { mandadas.push({ nome, dados }); return Promise.resolve({ data: {} }); };
+  } };
+
+  contaAdmin(); g.authUser = { uid: 'u1' };
+  S.registrarPartidaDaIlha('mikan');
+  ok('a chamada vai pro registerIslandPlay',
+     mandadas.length === 1 && mandadas[0].nome === 'registerIslandPlay',
+     JSON.stringify(mandadas));
+  ok('  com o id da ilha', mandadas[0] && mandadas[0].dados && mandadas[0].dados.ilha === 'mikan');
+
+  /* ⚠️ SEM LOGIN ELA NEM TENTA: a callable recusaria, e uma ida ao servidor que nunca pode dar
+     certo e desperdicio -- a mesma razao pela qual o cliente nao escreve no ciclo da Trainers. */
+  mandadas.length = 0;
+  g.authUser = null;
+  S.registrarPartidaDaIlha('mikan');
+  ok('  e sem login ela nem tenta', mandadas.length === 0, JSON.stringify(mandadas));
+
+  /* ⚠️ E ELA E BEST-EFFORT: se o servidor recusar, a partida NAO pode parar. */
+  g.authUser = { uid: 'u1' };
+  S.functionsClient = { httpsCallable(){ return () => Promise.reject(new Error('caiu')); } };
+  let explodiu = false;
+  try { S.registrarPartidaDaIlha('mikan'); } catch(e){ explodiu = true; }
+  ok('  e um erro do servidor nao derruba a partida', !explodiu);
+
+  S.functionsClient = originalFC;
+
+  /* ⚠️ AS CINCO CHAMADAS EXISTEM, uma por ilha -- lido do CODIGO, porque cada jogo larga por um
+     caminho proprio e um caso de comportamento por jogo nao provaria que nenhuma FALTA. */
+  const chamadas = (src.match(/registrarPartidaDaIlha\('[a-z]+'\)/g) || []);
+  const ilhasContadas = [...new Set(chamadas.map(c => c.match(/'([a-z]+)'/)[1]))].sort();
+  const ilhasDoMapa = S.ILHAS_LARANJA.map(i => i.id).sort();
+  ok('as CINCO ilhas contam partida', ilhasContadas.join(',') === ilhasDoMapa.join(','),
+     'contam: ' + ilhasContadas.join(',') + ' | mapa: ' + ilhasDoMapa.join(','));
+  ok('  e nenhuma conta duas vezes', chamadas.length === ilhasDoMapa.length,
+     chamadas.length + ' chamadas pra ' + ilhasDoMapa.length + ' ilhas');
+
+  /* ⚠️ E CADA UMA FICA ONDE A PARTIDA LARGA, nao onde a tela abre: abrir e fechar o setup nao e
+     "jogou", e o que o monitor mede e partida jogada. */
+  [['navel', "corrida.fase = 'contagem';"], ['trovita', "pescaria.fase = 'jogando';"],
+   ['kumquat', "selecao.fase = 'draft';"], ['mikan', "resgate.fase = 'correndo';"],
+   ['pummelo', "queimada.fase = 'jogando';"]
+  ].forEach(([ilha, largada]) => {
+    const i = src.indexOf(largada);
+    ok('  ' + ilha + ' conta na LARGADA',
+       i >= 0 && src.slice(i, i + 220).indexOf("registrarPartidaDaIlha('" + ilha + "')") >= 0,
+       i < 0 ? 'a largada mudou de forma' : 'na largada da fase');
+  });
+
+  /* ⚠️ E A LISTA DO SERVIDOR BATE COM A DO MAPA: uma ilha que nasca so no cliente seria recusada
+     com 'invalid-argument' e sumiria do monitor em silencio. */
+  const srv = require('fs').readFileSync(path.join(raiz, 'functions', 'index.js'), 'utf8');
+  const noServidor = (srv.match(/const ILHAS_DO_ARQUIPELAGO = \[([^\]]*)\]/) || [])[1] || '';
+  const idsSrv = (noServidor.match(/'([a-z]+)'/g) || []).map(x => x.replace(/'/g, '')).sort();
+  ok('  e a lista do SERVIDOR bate com a do mapa', idsSrv.join(',') === ilhasDoMapa.join(','),
+     'servidor: ' + idsSrv.join(',') + ' | mapa: ' + ilhasDoMapa.join(','));
 }
 
 /* ============================================================================

@@ -59,6 +59,10 @@
 
   /* O RESUMO no topo: as três perguntas da página em três números. */
   .resumo{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  /* a ficha da ilha usa o laranja do arquipélago -- é o que a faz se achar no meio das outras */
+  .ficha.ilha{ background:#fff0dd; border-color:#e07a1e; color:#7a3f05; }
+  .ilhas-resumo{ display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin:10px 0 0;
+    padding:8px 10px; border:2px solid #e07a1e; border-radius:4px; background:#fff8ef; font-size:13px; }
   .num{ display:flex; flex-direction:column; align-items:center; min-width:74px;
         padding:6px 10px; border:2px solid #ddd7c2; border-radius:5px; }
   .num b{ font-size:1.25rem; line-height:1.1; }
@@ -148,6 +152,15 @@ const TYPE_COLORS = {
 /* O NOME DOS ITENS. São onze e eles NÃO viajam do servidor: a `LOJA` de lá só guarda preço, e o
    catálogo com nome/descrição é do cliente do jogo -- mandar tudo isso pro painel seria duplicar
    uma tabela de apresentação. Item novo sem nome aqui sai com o id, que é legível o bastante. */
+/* ⚠️ O MONITOR DAS ILHAS (21/09/2026, a pedido: *"crie um monitor para eu conseguir ver quais
+   treinadores já jogaram algum jogo das ilhas laranjas e quantas vezes ele jogou cada jogo"*).
+   Os nomes vivem aqui, como os onze de item: o painel não carrega a tabela do jogo, e mandar o
+   `ILHAS_COMO` inteiro do servidor seria duplicar apresentação por causa de cinco palavras.
+   Ilha que chegue sem nome sai com o id, que é o que o ITEM_PT já faz. */
+const ILHA_PT = {
+  mikan:'Mikan · Resgate', navel:'Navel · Corrida', trovita:'Trovita · Pescaria',
+  kumquat:'Kumquat · Seleção', pummelo:'Pummelo · Arena 1x1'
+};
 const ITEM_PT = {
   doce_raro:'Doce Raro', bonus_shiny:'Bônus Shiny', awakening:'Despertar', hyperpotion:'Super Poção',
   potion:'Poção', hp_up:'HP Up', atk_up:'Atk Up', def_up:'Def Up', spatk_up:'Atk Special Up',
@@ -248,12 +261,39 @@ function contaHtml(t){
   (t.itens || []).forEach(i => põe(`${i.qtd}× ${esc(ITEM_PT[i.item] || i.item)}`));
   (t.equipados || []).forEach(e => põe(`${esc(ITEM_PT[e.item] || e.item)} em ${esc(e.chave)}`));
   (t.hms || []).forEach(h => põe(esc(h.toUpperCase())));
+  /* O MONITOR DAS ILHAS: uma ficha por jogo, com quantas partidas. Ela vem ORDENADA pelo mais
+     jogado (quem ordena é o servidor) -- e só aparece o que existe, como todo o resto daqui. */
+  (t.ilhas || []).forEach(i => põe(`${esc(ILHA_PT[i.ilha] || i.ilha)}: <b>${i.vezes}</b>`, 'ilha'));
   (t.ginasios || []).forEach(g => põe(`🏟️ lidera ${esc(g.cidade)}`, 'destaque'));
   if(t.bonusShinyAte > (estado.agora || Date.now())) põe('✨ bônus shiny valendo', 'destaque');
   if(t.mewtwo && t.mewtwo.emprestado) põe('Mewtwo emprestado', 'alerta');
   else if(t.mewtwo && t.mewtwo.aResgatar) põe('Mewtwo a resgatar', 'alerta');
   else if(t.mewtwo && t.mewtwo.liberado) põe('Mewtwo liberado');
   return f.join('');
+}
+/* ⚠️ O RESUMO DO ARQUIPELAGO. A pergunta do pedido tem DUAS metades -- *quais* treinadores já
+   jogaram e *quantas vezes cada um* --, e a fichinha dentro do card só responde a segunda: pra
+   responder a primeira alguém teria que abrir os 20 cards um a um.
+   ⚠️ E ELE CONTA SÓ O QUE ESTÁ CARREGADO, e diz isso: o painel é PAGINADO, então um número
+   apresentado como total do jogo mentiria em toda página que não fosse a última. É o mesmo
+   cuidado do aviso de online truncado, logo acima. */
+function ilhasResumoHtml(){
+  const porJogo = {};
+  let jogaram = 0;
+  for(const t of estado.treinadores){
+    const lista = t.ilhas || [];
+    if(lista.length) jogaram++;
+    for(const i of lista) porJogo[i.ilha] = (porJogo[i.ilha] || 0) + (i.vezes || 0);
+  }
+  const ilhas = Object.keys(ILHA_PT).filter(k => porJogo[k]);
+  if(!ilhas.length) return '<p class="muted" style="margin:8px 0 0">🏝️ Ninguém jogou nas Ilhas Laranja ainda (entre os carregados).</p>';
+  const partidas = ilhas.reduce((a, k) => a + porJogo[k], 0);
+  return `<div class="ilhas-resumo">
+    <b>🏝️ Ilhas Laranja:</b> ${jogaram} treinador${jogaram === 1 ? '' : 'es'} · ${partidas} partida${partidas === 1 ? '' : 's'}
+    ${ilhas.sort((a, b) => porJogo[b] - porJogo[a])
+           .map(k => `<span class="ficha ilha">${esc(ILHA_PT[k])}: <b>${porJogo[k]}</b></span>`).join('')}
+    <span class="muted">(dos ${estado.treinadores.length} carregados)</span>
+  </div>`;
 }
 function treinadorHtml(t){
   const aberto = !!estado.abertos[t.uid];
@@ -303,6 +343,7 @@ function render(){
         <button class="btn secondary" onclick="sair()">Sair</button>
       </div>
       ${estado.erro ? `<p class="erro">${esc(estado.erro)}</p>` : ''}
+      ${ilhasResumoHtml()}
       <p class="muted" style="margin:8px 0 0">Logado como ${esc(estado.user.email || estado.user.uid)} · online = visto nos últimos 10 min · quem está online vem sempre primeiro</p>
       ${estado.onlineTruncado ? '<p class="muted" style="margin:4px 0 0">⚠️ Tem mais gente online do que cabe no bloco da frente — o resto aparece pelo "Carregar mais".</p>' : ''}
     </div>

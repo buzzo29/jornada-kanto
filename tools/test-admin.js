@@ -257,6 +257,71 @@ const erroDe = async (p) => { try { await p; return null; } catch(e){ return e.c
   ok('o limite tem teto', tudo.treinadores.length === 5 && tudo.proximo === null,
      tudo.treinadores.length + ' treinadores');
 
+
+  /* ============================================================================
+     O MONITOR DAS ILHAS LARANJA (21/09/2026, a pedido)
+
+     ⚠️ QUEM CONTA E O SERVIDOR, e e isso que a trava cobra: um contador que o cliente escreve nao
+     mede nada, e a METRICA e o motivo da feature. E a licao do registrantCount da Liga Classica.
+     ============================================================================ */
+  console.log('');
+  console.log('=== O MONITOR DAS ILHAS ===');
+  {
+    await db.collection('users').doc('m1').set({ trainerName: 'Monitorado', lastSeenAt: Date.now() });
+
+    /* sem login nao conta */
+    let recusou = false;
+    try { await fns.registerIslandPlay({ data: { ilha: 'mikan' } }); }
+    catch(e){ recusou = e.code === 'unauthenticated'; }
+    ok('sem login a callable recusa', recusou);
+
+    /* ⚠️ ILHA DESCONHECIDA RECUSA: sem a lista fechada, um cliente forjado escreveria chave
+       qualquer no documento e o mapa viraria lixo que ninguem limpa de fora. */
+    for(const lixo of ['', 'xxx', 'MIKAN', '__proto__', 'a'.repeat(200)]){
+      let barrou = false;
+      try { await fns.registerIslandPlay({ auth: { uid: 'm1' }, data: { ilha: lixo } }); }
+      catch(e){ barrou = e.code === 'invalid-argument'; }
+      ok('  e ' + JSON.stringify(lixo.slice(0, 12)) + ' e recusado', barrou);
+    }
+
+    /* conta de verdade, e ACUMULA */
+    await fns.registerIslandPlay({ auth: { uid: 'm1' }, data: { ilha: 'mikan' } });
+    await fns.registerIslandPlay({ auth: { uid: 'm1' }, data: { ilha: 'mikan' } });
+    await fns.registerIslandPlay({ auth: { uid: 'm1' }, data: { ilha: 'navel' } });
+    const doc = (await db.collection('users').doc('m1').get()).data() || {};
+    ok('a partida e contada por jogo', (doc.ilhasJogadas || {}).mikan === 2,
+       JSON.stringify(doc.ilhasJogadas));
+    ok('  e cada jogo tem a sua conta', (doc.ilhasJogadas || {}).navel === 1);
+    /* ⚠️ E O RESTO DO DOCUMENTO NAO E TOCADO -- o `merge` e o que impede o contador de apagar a
+       conta inteira, e um `set` sem ele faria exatamente isso. */
+    ok('  e o resto da conta continua inteiro', doc.trainerName === 'Monitorado', doc.trainerName);
+
+    /* ⚠️ E O PAINEL O DEVOLVE -- ZERO leitura a mais: o documento ja estava em maos. */
+    const lista = await fns.adminListTrainers({ auth: { uid: 'a_admin' }, data: {} });
+    const eu = (lista.treinadores || []).find(t => t.uid === 'm1');
+    ok('o painel devolve o monitor', !!eu && Array.isArray(eu.ilhas), eu ? JSON.stringify(eu.ilhas) : 'sem o treinador');
+    ok('  ordenado pelo MAIS jogado', !!eu && eu.ilhas[0] && eu.ilhas[0].ilha === 'mikan' && eu.ilhas[0].vezes === 2,
+       eu ? JSON.stringify(eu.ilhas) : '');
+    /* ⚠️ E COM O ZERO FORA: o `increment` deixa a chave em 0 quando um contador zera, e um
+       "0x Corrida" na tela seria ruido -- e a mesma regra do inventario. */
+    await db.collection('users').doc('m1').set({ ilhasJogadas: { trovita: 0 } }, { merge: true });
+    const lista2 = await fns.adminListTrainers({ auth: { uid: 'a_admin' }, data: {} });
+    const eu2 = (lista2.treinadores || []).find(t => t.uid === 'm1');
+    ok('  e o zero fica de fora', !!eu2 && !eu2.ilhas.some(i => i.ilha === 'trovita'),
+       eu2 ? JSON.stringify(eu2.ilhas) : '');
+
+    /* quem nunca jogou vem com a lista vazia, e nao com undefined -- a tela faz `.forEach` nela */
+    await db.collection('users').doc('m2').set({ trainerName: 'Nunca jogou' });
+    const lista3 = await fns.adminListTrainers({ auth: { uid: 'a_admin' }, data: {} });
+    const outro = (lista3.treinadores || []).find(t => t.uid === 'm2');
+    ok('  e quem nunca jogou vem com lista VAZIA', !!outro && Array.isArray(outro.ilhas) && outro.ilhas.length === 0);
+
+    /* ⚠️ E O CAMPO ESTA NA TRAVA DAS REGRAS: e ela que faz o contador valer alguma coisa. */
+    const regras = require('fs').readFileSync(path.join(__dirname, '..', 'firestore.rules'), 'utf8');
+    const trechos = regras.split('ilhasJogadas').length - 1;
+    ok('e o `ilhasJogadas` esta travado no write E no create', trechos >= 2, trechos + ' ocorrencia(s)');
+  }
+
   console.log('');
   console.log(falhas === 0 ? 'Tudo certo.' : falhas + ' FALHA(S)');
   process.exit(falhas === 0 ? 0 : 1);
