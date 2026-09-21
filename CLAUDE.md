@@ -15797,15 +15797,36 @@ pra manter em dia com aquela. É a técnica do disco do TM; o que muda é cada t
   identificador, então sem aspas a tabela **não compila** -- o mesmo cuidado que o `--paleta` já
   tinha pro `*`.
 
-#### ⚠️ O RECEBER SAIU DO AMARELO DA CASA
+#### ⚠️ O RECEBER: DUAS RODADAS, E A SEGUNDA É A LIÇÃO
 
-Medido: com um golpe **ELÉTRICO** ele ficava em `rgb(255,203,5)` ao lado de um ATACAR em
-`rgb(248,208,48)` -- **a mesma cor, a olho** --, e os três botões viravam uma fileira amarela.
+Ele saiu do **amarelo da casa** porque com um golpe **ELÉTRICO** ele ficava em `rgb(255,203,5)` ao
+lado de um ATACAR em `rgb(248,208,48)` -- **a mesma cor, a olho** --, e os três botões viravam uma
+fileira amarela. **Cor de tipo ele não pode ser**: são 17, e qualquer uma colide com o golpe de
+alguém.
 
-**⚠️ E O SUBSTITUTO NÃO PODE SER UMA COR DE TIPO:** são 17, e qualquer uma delas colide com o golpe
-de alguém. Ele foi pra um **cinza-ardósia** (`#4a5460`) que não é tipo nenhum (o Aço é `#B8B8D0`,
-bem mais claro). **O ESPECIAL fica na MESMA cor do ATACAR** -- ele é o mesmo golpe ×1,5 --, e o que
-o separa é a **moldura branca por dentro**: um roxo ali diria que é outro ataque.
+**⚠️ O SUBSTITUTO FOI UM CINZA-ARDÓSIA, E ELE FOI REPORTADO NO MESMO DIA: *"parece que tá
+desabilitado"*.** E aqui está o número que importa: **ele NÃO era cor de tipo nenhuma** -- ele
+passava na trava que existia -- e mesmo assim lia como desabilitado, porque o que diz "dá pra
+apertar" **não é a matiz, é a SATURAÇÃO**:
+
+| | saturação |
+|---|---|
+| o `:disabled` da casa (`#e2e2e2`) | **0%** |
+| o cinza-ardósia que foi reportado (`#4a5460`) | **13%** |
+| média dos 17 tipos | **59%** |
+| o verde-azulado de hoje (`#0e7a6e`) | **79%** |
+
+E ele fica a **ΔE 38** do tipo mais próximo (Gelo) -- **2,5× a distância entre os DOIS tipos mais
+parecidos do jogo entre si** (Pedra × Terra, ΔE 15), e ΔE 61 do Planta, que é o caso mais comum na
+tela. **O vermelho da casa foi medido e reprovado**: ΔE **12** do Lutador, ou seja mais perto do que
+aqueles dois -- ele colidiria.
+
+**⚠️ E A TRAVA GANHOU A METADE QUE FALTAVA:** ela cobrava "não é cor de tipo" e o defeito relatado
+passava por ela. Hoje ela cobra também que a saturação seja **pelo menos a do tipo menos saturado do
+jogo** (20%, o Aço) -- um piso DERIVADO da tabela, não um número escrito nela.
+
+**O ESPECIAL fica na MESMA cor do ATACAR** -- ele é o mesmo golpe ×1,5 --, e o que o separa é a
+**moldura branca por dentro**: um roxo ali diria que é outro ataque.
 
 #### O PLACAR OCUPA O CARD, E OS BOTÕES COLARAM NA QUADRA
 
@@ -15827,6 +15848,92 @@ o separa é a **moldura branca por dentro**: um roxo ali diria que é outro ataq
 
 **Medido a 320px, no navegador:** documento em **305px** (sem rolagem lateral), botões de
 **86×62px**, card do placar 118px com a barra em 104, e a tela de jogo em **935px**.
+
+### ⚠️ O QUE VOA NA ARENA É O DESENHO DO TIPO (21/09/2026)
+
+Pedido em duas etapas, e a segunda corrigiu a primeira: *"os ataques que quero que fique da cor do
+ataque do pokemon é os que são animados que aparecem na arena indo na direção do oponente"* e, com
+a bola já colorida, *"não coloque somente uma bolinha com a cor do tipo do ataque, coloque alguma
+referência -- ataque de grama sair umas folhas, de fogo umas chamas, de água umas gotas, voador
+umas rajadas de vento"*.
+
+**⚠️ A RESPOSTA JÁ ESTAVA PRONTA E FOI POR ISSO QUE ELA CABE: são os 17 SELOS DE TIPO** que tinham
+nascido horas antes pros botões. **A folha que se aperta é a folha que voa** -- um desenho só serve
+os dois lugares, e um tipo novo ganha os dois de graça. Um segundo desenho aqui divergiria do
+primeiro no dia em que qualquer um dos dois fosse ajustado.
+
+- **⚠️ ELE É ASSADO UMA VEZ POR TIPO E POR TAMANHO**, num canvas fora de tela. A grade é 24×24, ou
+  seja **228 células pintadas** por desenho -- medido no navegador, **assar custa 100 µs e desenhar
+  custa 1,7 µs: 58×**. Pintado célula a célula a cada quadro, com três bolas a 60fps, seriam
+  **18,1 ms por segundo de pintura**; assado, **0,31**. O quadro inteiro com três bolas fica em
+  **0,34 ms**, contra os 16,7 de orçamento a 60fps.
+- **⚠️ A COR NÃO MORA NO DESENHO:** ele é `currentColor`, e é isso que faz UM desenho servir aos 17.
+  Com a cor dentro seriam 17 tabelas pra manter em dia com o `TYPE_COLORS`. É a técnica do disco do
+  TM, e é ela que fez os dois pedidos virarem uma coisa só.
+- **⚠️ E O CONTORNO VEM DE DENTRO DO DESENHO** (o `k` da paleta), o que resolve de graça um problema
+  medido: a quadra é **areia clara**, e **10 dos 17 tipos somem nela** sem contorno -- o Elétrico dá
+  **1,09:1**, o Gelo 1,17 e o Terra 1,29. Os outros 7 são escuros e se leem pelo próprio
+  preenchimento. **Nenhum tipo fica sem leitura**, e é esse o par que a trava cobra.
+- **⚠️ E ELE GIRA PRA ONDE VAI.** O desenho tem um "em cima" (a ponta da chama, o bico da gota), e
+  sem girar ele atravessa a quadra como um adesivo parado em vez de um golpe arremessado.
+- **⚠️ O TAMANHO DO DESENHO NÃO É O ALCANCE DO ACERTO**: quem decide se a bola pegou é o
+  `QUEIMADA_RAIO`, e ele é outro. Mexer no que se vê não mexe na mecânica -- e há trava, senão a
+  próxima mudança de tamanho mudaria a dificuldade sem ninguém notar.
+- **O especial é maior e ganha um halo**; na tela o botão dele diz a mesma coisa com a moldura
+  branca. A devolvida também é maior: ela bate mais.
+
+#### ⚠️ E A COR SOZINHA NÃO PODIA DIZER DE QUEM A BOLA É
+
+Antes disto a cor da bola dizia o **DONO** (azul minha, laranja dele). Passando a dizer o TIPO, essa
+leitura -- que é a mais importante da tela numa queimada -- ficaria sem dono. **Medido: os dois
+lados escolhem golpe do MESMO tipo em 8,9% dos pares**, ou seja quase uma partida em onze com os
+dois desenhos iguais voando.
+
+**⚠️ E A SAÍDA ÓBVIA FOI MEDIDA E REPROVADA: um ANEL da cor do dono não funciona.** Um anel tem que
+contrastar com o PREENCHIMENTO, e nenhum tom consegue isso com os 17 ao mesmo tempo -- as cores das
+plaquinhas de nome dão **1,11:1** contra o Sombrio e **1,30:1** contra o Veneno, e mesmo o tom mais
+escuro que se testou ainda dá **2,3:1** contra o Sombrio, que é ele próprio um marrom escuro.
+
+Quem diz de quem ela é passou a ser a **CAUDA**, nas MESMAS cores das plaquinhas de nome embaixo de
+cada pokémon -- é o que liga a bola a quem a jogou.
+
+- **⚠️ ELA É OPACA, e o alpha que estava ali era herdado** de quando o rastro tinha a cor da própria
+  bola: ali ele era decoração. Medido na tela, com alpha **um rastro contra o outro cai de 1,70 para
+  1,44:1** e o dele cai a 2,27:1 contra a areia -- e é justamente a discriminação entre os dois que
+  carrega a informação.
+- **⚠️ E ELA AFINA.** Um traço RETO de 5px atrás de um símbolo vira um **cabinho**, e a folha do
+  Planta passa a se ler como uma flor num talo -- foi o que a primeira captura mostrou. Larga junto
+  do desenho (e **começando atrás do centro**, escondida sob a borda de baixo dele) e em ponta atrás,
+  ela lê como movimento. Continua sendo um preenchimento só.
+
+#### ⚠️ E O DUBLÊ DE CANVAS PRECISOU ANOTAR A TINTA
+
+O `__ops` do sandbox guardava só o NOME da chamada, e com ele a trava consegue dizer *"algo foi
+desenhado"* e nada mais -- ela não distingue uma bola pintada na cor do golpe de uma pintada em
+qualquer outra. Ele ganhou o **`__tintas`**, que guarda o que estava no pincel em cada verbo que
+PINTA, e é isso que deixa a trava **AFIRMAR** a cor. (E o `strokeText`, que faltava e derrubava o
+pintor inteiro no primeiro "−N HP".)
+
+**⚠️ E TRÊS ARMADILHAS CONHECIDAS APARECERAM DE NOVO:**
+
+1. **`const` NÃO VIRA GLOBAL** -- as constantes novas voltavam `undefined` e a trava media o nada.
+   É a mesma lição que o `queimada` já tinha custado no dia em que o modo nasceu.
+2. **`${...}` NUM `<style>` ESTÁTICO NÃO INTERPOLA** -- o comentário que eu pus ao lado da regra do
+   RECEBER sairia **literal no CSS**. É o defeito da faixa de update de 18/09 entrando por outra
+   porta, e o conserto é o comentário CSS de verdade.
+3. **A TRAVA MEDIA A COR DE ORIGEM, não a que aparece** -- com alpha, source e rendered são coisas
+   diferentes. Hoje a cauda é opaca, então as duas coincidem **por construção**, e a trava cobra a
+   igualdade exata (o que exclui qualquer alpha).
+
+**E a conferência de acusação pegou um furo de verdade**: a trava do carimbo do tipo cobrava o
+CAMPO e pintava só uma bola NOVA -- um pintor que lesse o tipo do DONO passava por ela em branco.
+Hoje ela **pinta a bola DEVOLVIDA** e compara o sprite, **com o par de tipos forçado a ser
+diferente**: sem isso ela seria um flake nos 8,9% em que os dois lados escolhem o mesmo tipo.
+**E foi a própria trava que pegou o tamanho:** a devolvida é desenhada maior, e o sprite é assado
+POR TAMANHO -- ela comparava com o do tamanho comum.
+
+**Medido a 320px, no navegador:** os 17 desenhos giram e se leem na quadra, a página fica em
+**305×935px** sem rolagem lateral, e os botões continuam em 86×62.
 
 ### O QUE ISSO CUSTOU AO JOGO: NADA
 

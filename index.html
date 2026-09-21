@@ -3631,13 +3631,16 @@
   /* ⚠️ O ESPECIAL É O MESMO GOLPE ×1,5, então ele leva a MESMA cor -- o que o separa é a moldura
      branca por dentro. Um roxo aqui diria que é outro ataque. */
   .q-especial{box-shadow:inset 0 0 0 3px rgba(255,255,255,.9);}
-  /* ⚠️ O RECEBER SAIU DO AMARELO DA CASA, e a razão é medida: com um golpe ELÉTRICO ele ficava em
-     `rgb(255,203,5)` ao lado de um ATACAR em `rgb(248,208,48)` -- a mesma cor, a olho, e os três
-     botões viravam uma fileira amarela.
-     ⚠️ E O SUBSTITUTO NÃO PODE SER UMA COR DE TIPO: são 17, e qualquer uma delas colide com o
-     golpe de alguém. Este cinza-ardósia não é tipo nenhum (o Aço é `#B8B8D0`, bem mais claro) e é
-     a cor que o jogo já usa pra "defesa". */
-  .q-receber{background:#4a5460;color:#fff;text-shadow:0 1px 1px rgba(0,0,0,.35);}
+  /* ⚠️ O RECEBER NÃO É COR DE TIPO E NÃO É CINZA, e as duas metades são medidas.
+     Tipo ele não pode ser porque são 17 e qualquer uma colide com o golpe de alguém: no amarelo
+     da casa, um ATACAR Elétrico ficava em rgb(248,208,48) ao lado dele em rgb(255,203,5) -- a
+     mesma cor, a olho, e os três botões viravam uma fileira amarela.
+     ⚠️ E O CINZA-ARDÓSIA QUE ENTROU NO LUGAR LIA COMO DESABILITADO -- o que causava isso não
+     era a cor, era a SATURAÇÃO: 13%, contra 59% de média dos 17 tipos e 0% do :disabled da casa.
+     Este verde-azulado tem 79% e fica a ΔE 38 do tipo mais próximo (Gelo), que é 2,5× a distância
+     entre os DOIS tipos mais parecidos do jogo entre si (Pedra × Terra, ΔE 15). O vermelho da
+     casa foi medido e reprovado: ΔE 12 do Lutador, ou seja ele colidiria. */
+  .q-receber{background:#0e7a6e;color:#fff;text-shadow:0 1px 1px rgba(0,0,0,.35);}
   .q-folego{height:6px;background:#dfded3;border:1px solid var(--box-border);
     border-radius:2px;overflow:hidden;margin:3px 0 2px;}
   .q-folego i{display:block;height:100%;background:#398dcc;}
@@ -36456,6 +36459,27 @@ function queimadaGolpeContra(inst, alvo){
 }
 
 /* A BOLA e o resto do ritmo -- os números do protótipo, sem exceção. */
+/* ⚠️ A BOLA SAI NA COR DO GOLPE, e quem diz DE QUEM ela é passou a ser o RASTRO.
+   A cor do tipo foi o pedido; o rastro é o que impede a leitura mais importante da tela de se
+   perder, porque medido os DOIS lados escolhem golpe do mesmo tipo em 8,9% dos pares -- quase
+   uma partida em onze com as duas bolas da mesma cor.
+   ⚠️ E ELE NÃO PODE SER UM ANEL: anel tem que contrastar com o PREENCHIMENTO, e nenhum tom
+   consegue isso com os 17 ao mesmo tempo -- o mais escuro que se mede ainda dá 2,3:1 contra o
+   Sombrio, que é ele próprio um marrom escuro.
+   As duas cores são as MESMAS das plaquinhas de nome embaixo de cada pokémon, pra a bola se
+   ligar a quem a jogou. */
+const QUEIMADA_RASTRO_MEU = '#28588a';
+const QUEIMADA_RASTRO_DELE = '#a66d30';
+/* ⚠️ E O CONTORNO É O DA PIXEL ART DA CASA, pelo mesmo motivo dela: a quadra é areia CLARA, e
+   um Elétrico (1,09:1), um Gelo (1,17) ou um Terra (1,29) somem nela sem ele. Medido, os 17
+   tipos ficam legíveis por um dos dois -- o contorno serve os 12 claros e o próprio
+   preenchimento serve os 5 escuros, que são justamente os que o contorno não alcança. */
+const QUEIMADA_CONTORNO_BOLA = '#254354';
+/* ⚠️ O TAMANHO DO DESENHO NÃO É O ALCANCE DO ACERTO: quem decide se a bola pegou é o
+   `QUEIMADA_RAIO`, e ele é outro. Mexer aqui é mexer só no que se vê -- a mecânica não sente. */
+const QUEIMADA_BOLA_LADO = 20;
+const QUEIMADA_BOLA_LADO_DEV = 24;
+const QUEIMADA_BOLA_LADO_ESP = 28;
 const QUEIMADA_TIRO_RECARGA = 0.85;
 const QUEIMADA_ESPECIAL_RECARGA = 45;   /* e ele começa INDISPONÍVEL, carregando */
 const QUEIMADA_BOLA_V = 170, QUEIMADA_BOLA_V_ESP = 280;
@@ -36665,6 +36689,10 @@ function queimadaAtacar(i, especial){
     id: ++queimada.proxId, dono: i, x: a.x, y: a.y,
     vx: Math.cos(ang) * vel, vy: Math.sin(ang) * vel,
     dano: dano, base: dano, nasceu: queimada.t, devolvida: 0, especial: !!especial,
+    /* ⚠️ O TIPO É CARIMBADO NO NASCIMENTO, nunca lido do `golpes[bola.dono]` na hora de pintar:
+       o `queimadaDevolver` TROCA o dono, e aí a mesma bola mudaria de cor no meio do voo -- ela
+       é o MESMO golpe voltando. Quem muda com o dono é o rastro, que é o certo. */
+    tipo: queimada.golpes[i].tipo,
   });
   a.tiroPronto = queimada.t + QUEIMADA_TIRO_RECARGA;
   if(especial){
@@ -36970,6 +36998,44 @@ function queimadaTeclaNoBotao(ev){
    animações") vale inteira aqui. Um `render()` por quadro recriaria o <canvas> e os botões 60
    vezes por segundo, e o `pointerdown` de ATACAR se perderia no meio do toque.
    ============================================================================ */
+/* ⚠️ O QUE VOA NA ARENA É O MESMO DESENHO DO BOTÃO (21/09/2026, a pedido: *"não coloque somente
+   uma bolinha com a cor do tipo do ataque, coloque alguma referência -- ataque de grama sair umas
+   folhas, de fogo umas chamas, de água umas gotas"*). A folha, a chama e a gota são os selos de
+   tipo que já existem: um desenho só serve o botão que se aperta E o que sai voando dele.
+   ⚠️ E ELE É ASSADO UMA VEZ POR TIPO, num canvas fora de tela. A grade é 24×24, ou seja até 576
+   retângulos -- pintados a cada quadro, com três bolas em campo a 60fps, isso seria ~100 mil
+   `fillRect` por segundo. Assado, cada bola custa UM `drawImage`, que é mais barato do que os
+   arcos que estavam aqui antes.
+   ⚠️ E O CONTORNO VEM DE DENTRO DO DESENHO (o `k` da paleta), que é o que faz um Elétrico ou um
+   Gelo não sumirem na areia clara da quadra sem nenhuma linha a mais. */
+const queimadaSprites = {};
+function queimadaSpriteDoTipo(tipo, lado){
+  const nome = SELO_DO_TIPO[tipo];
+  if(!nome || !DESENHOS[nome]) return null;
+  const chave = nome + ':' + lado;
+  if(queimadaSprites[chave]) return queimadaSprites[chave];
+  const grade = DESENHOS[nome], n = grade.length;
+  const cv = document.createElement('canvas');
+  cv.width = lado; cv.height = lado;
+  const c = cv.getContext('2d');
+  const passo = lado / n;
+  for(let y = 0; y < n; y++){
+    const linha = grade[y];
+    for(let x = 0; x < linha.length; x++){
+      const ch = linha[x];
+      if(ch === '.') continue;
+      const cor = PALETA_SELO[ch];
+      if(!cor) continue;
+      /* ⚠️ `currentColor` É A COR DO TIPO: é ela que faz UM desenho servir aos 17. Com a cor
+         dentro do desenho seriam 17 tabelas pra manter em dia com o `TYPE_COLORS`. */
+      c.fillStyle = (cor === 'currentColor') ? (TYPE_COLORS[tipo] || '#888') : cor;
+      c.fillRect(Math.floor(x * passo), Math.floor(y * passo),
+                 Math.ceil(passo), Math.ceil(passo));
+    }
+  }
+  queimadaSprites[chave] = cv;
+  return cv;
+}
 function queimadaPintar(){
   const cv = document.getElementById('queimadaCanvas');
   if(!cv) return;
@@ -37006,13 +37072,55 @@ function queimadaPintar(){
   }
   queimada.atores.forEach((a, i) => queimadaDesenharAtor(ctx, a, i, t));
   queimada.bolas.forEach(b => {
-    const cor = b.especial ? '#b254ed' : b.devolvida ? '#e05df2' : b.dono ? '#ed7a37' : '#328bea';
-    ctx.strokeStyle = cor + '77'; ctx.lineWidth = 5;
-    ctx.beginPath(); ctx.moveTo(b.x - b.vx * 0.08, b.y - b.vy * 0.08); ctx.lineTo(b.x, b.y); ctx.stroke();
-    ctx.fillStyle = cor;
-    ctx.beginPath(); ctx.arc(b.x, b.y, b.devolvida ? 9 : 7, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#fff9dc';
-    ctx.beginPath(); ctx.arc(b.x - 2, b.y - 2, 3, 0, Math.PI * 2); ctx.fill();
+    const rastro = b.dono ? QUEIMADA_RASTRO_DELE : QUEIMADA_RASTRO_MEU;
+    const lado = b.especial ? QUEIMADA_BOLA_LADO_ESP
+               : b.devolvida ? QUEIMADA_BOLA_LADO_DEV : QUEIMADA_BOLA_LADO;
+    /* ⚠️ O RASTRO É OPACO, e o alpha que estava aqui era herdado de quando ele tinha a cor da
+       PRÓPRIA bola -- ali ele era decoração. Agora ele é a única coisa dizendo de quem a bola é,
+       e o alpha custava justamente na discriminação: medido na tela, um rastro contra o outro cai
+       de 1,70 para 1,44:1, e o dele cai a 2,27:1 contra a areia. */
+    /* ⚠️ A CAUDA AFINA, e isso deixou de ser estética quando o desenho do tipo entrou: um traço
+       RETO de 5px atrás de um símbolo vira um CABINHO, e a folha do Planta passa a se ler como uma
+       flor num talo. Larga junto do desenho e em ponta atrás, ela lê como movimento -- e continua
+       sendo um preenchimento só. */
+    const nv = Math.hypot(b.vx, b.vy) || 1;
+    const ux = b.vx / nv, uy = b.vy / nv;
+    const meia = lado * 0.28;
+    ctx.fillStyle = rastro;
+    ctx.beginPath();
+    /* ⚠️ ELA COMEÇA ATRÁS DO CENTRO, e não nele: a base larga fica ESCONDIDA sob a borda de baixo
+       do desenho, e o que sai pra fora é só o afinamento. Começando no centro e indo longe, ela
+       vira uma agulha -- e a folha do Planta passa a se ler como flor num talo. */
+    const bx = b.x - ux * lado * 0.22, by = b.y - uy * lado * 0.22;
+    ctx.moveTo(bx - uy * meia, by + ux * meia);
+    ctx.lineTo(bx + uy * meia, by - ux * meia);
+    ctx.lineTo(b.x - ux * lado * 0.78, b.y - uy * lado * 0.78);
+    ctx.closePath(); ctx.fill();
+    /* o especial ganha um halo, que é o que o separa na quadra -- na tela o botão dele usa a
+       moldura branca pra dizer a mesma coisa */
+    if(b.especial){
+      ctx.fillStyle = '#ffffffc4';
+      ctx.beginPath(); ctx.arc(b.x, b.y, lado * 0.46, 0, Math.PI * 2); ctx.fill();
+    }
+    const spr = queimadaSpriteDoTipo(b.tipo, lado);
+    if(spr){
+      /* ⚠️ ELE GIRA PRA ONDE VAI: o desenho tem um "em cima" (a ponta da chama, o bico da gota),
+         e sem girar ele parece um adesivo parado atravessando a quadra em vez de um golpe
+         arremessado. O `+PI/2` é porque o topo do desenho é -Y e o ângulo do voo é medido em +X. */
+      ctx.save();
+      ctx.translate(b.x, b.y);
+      ctx.rotate(Math.atan2(b.vy, b.vx) + Math.PI / 2);
+      ctx.drawImage(spr, -lado / 2, -lado / 2, lado, lado);
+      ctx.restore();
+    } else {
+      /* ⚠️ SEM DESENHO ELA VOLTA A SER UM DISCO, e o contorno é obrigatório aí: os 17 tipos do
+         jogo têm selo, então isto só alcança um tipo que o motor invente -- e um disco de cor
+         clara sem contorno some na areia da quadra. */
+      ctx.fillStyle = TYPE_COLORS[b.tipo] || '#888';
+      ctx.beginPath(); ctx.arc(b.x, b.y, lado * 0.35, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = QUEIMADA_CONTORNO_BOLA; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(b.x, b.y, lado * 0.35, 0, Math.PI * 2); ctx.stroke();
+    }
   });
   /* ⚠️ O "−N HP" SOBE E APAGA, e é ele que responde ao pedido de "exibir quanto de HP tirou" NA
      QUADRA -- a linha de recado diz a mesma coisa em palavras, embaixo. */

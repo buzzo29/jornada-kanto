@@ -26,14 +26,25 @@ function extractGameScript(htmlPath){
    afirmar "o mapa FOI desenhado" em vez de só não quebrar. */
 function makeCtxStub(){
   const ops = [];
-  const ctx = { __ops: ops,
+  /* ⚠️ E ELE ANOTA A TINTA, não só o nome da chamada: com `ops` sozinho a trava consegue dizer
+     "algo foi desenhado" e nada mais -- ela não distingue uma bola pintada na cor do golpe de uma
+     pintada em qualquer outra. `tintas` guarda o que estava no pincel na hora de cada verbo que
+     PINTA, e é isso que deixa a trava AFIRMAR a cor. Os dois convivem porque `ops` é lido como
+     lista de strings por quem já existe. */
+  const tintas = [];
+  const ctx = { __ops: ops, __tintas: tintas,
     fillStyle:'', strokeStyle:'', lineWidth:1, font:'', textAlign:'', globalAlpha:1,
     imageSmoothingEnabled:true };
+  const PINTAM = ['fill','stroke','fillRect','fillText','strokeRect','strokeText','drawImage'];
   for(const m of ['arc','beginPath','closePath','drawImage','ellipse','fill','fillRect','fillText',
                   'lineTo','moveTo','restore','rotate','save','setLineDash','setTransform',
-                  'stroke','strokeRect','translate','clearRect','rect','quadraticCurveTo',
+                  'stroke','strokeRect','strokeText','translate','clearRect','rect','quadraticCurveTo',
                   'bezierCurveTo','clip','arcTo','scale','transform']){
-    ctx[m] = (...a) => { ops.push(m); };
+    ctx[m] = (...a) => {
+      ops.push(m);
+      if(PINTAM.indexOf(m) >= 0) tintas.push({ m: m, fill: ctx.fillStyle, stroke: ctx.strokeStyle,
+                                               lineWidth: ctx.lineWidth, args: a });
+    };
   }
   const grad = { addColorStop(){}, __gradiente:true };
   ctx.createLinearGradient = () => { ops.push('createLinearGradient'); return grad; };
@@ -294,14 +305,14 @@ function createSandbox(htmlPath){
        de FUNCAO no topo de um script ja vira propriedade do global sozinha, e const/let nao
        -- eles ficam no escopo lexical. Foi assim que queimadaVelocidade respondia enquanto o
        ESTADO vinha undefined, o que faria a suite medir o nada. */
-    'queimada','queimadaLider','queimadaAtiva','queimadaLava','queimadaFadiga','SELO_DO_TIPO',
+    'queimada','queimadaLider','queimadaAtiva','queimadaLava','queimadaFadiga','SELO_DO_TIPO','PALETA_SELO','queimadaSpriteDoTipo','QUEIMADA_BOLA_LADO','QUEIMADA_BOLA_LADO_DEV','QUEIMADA_BOLA_LADO_ESP',
     'QUEIMADA_DURACAO','QUEIMADA_KOS','QUEIMADA_W','QUEIMADA_H',
     'QUEIMADA_V_BASE','QUEIMADA_V_FATOR',
     'QUEIMADA_FOLEGO_GASTO','QUEIMADA_FOLEGO_VOLTA','QUEIMADA_FOLEGO_DESCANSO','QUEIMADA_FOLEGO_PISO',
     'QUEIMADA_GUARDA_BASE','QUEIMADA_GUARDA_FATOR','QUEIMADA_GUARDA_MIN','QUEIMADA_GUARDA_MAX',
     'QUEIMADA_GUARDA_RECARGA','QUEIMADA_GOLPES_MIN','QUEIMADA_GOLPES_MAX','QUEIMADA_ESPECIAL_MULT',
     'QUEIMADA_TIRO_RECARGA','QUEIMADA_ESPECIAL_RECARGA','QUEIMADA_BOLA_V','QUEIMADA_BOLA_V_ESP',
-    'QUEIMADA_BOLA_V_DEVOLVIDA','QUEIMADA_REFLEXO_MULT','QUEIMADA_REFLEXO_TETO',
+    'QUEIMADA_BOLA_V_DEVOLVIDA','QUEIMADA_RASTRO_MEU','QUEIMADA_RASTRO_DELE','QUEIMADA_CONTORNO_BOLA','QUEIMADA_REFLEXO_MULT','QUEIMADA_REFLEXO_TETO',
     'QUEIMADA_REFLEXO_DESCONTO','QUEIMADA_ATORDOA','QUEIMADA_RAIO',
     'QUEIMADA_LAVA_A_CADA','QUEIMADA_LAVA_AVISO','QUEIMADA_SPRITE_K','QUEIMADA_NPC_VIZINHOS'
   ];

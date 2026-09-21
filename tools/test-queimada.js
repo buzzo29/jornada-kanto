@@ -756,6 +756,164 @@ console.log('\n=== E O BOTÃO DE ATAQUE SAI NA COR DO GOLPE ===');
   ok('o RECEBER não usa cor de tipo nenhuma',
      Object.values(S.TYPE_COLORS).every(c => receber.toLowerCase().indexOf(c.toLowerCase()) < 0),
      receber);
+  /* ⚠️ E ELE TEM QUE TER SATURAÇÃO DE BOTÃO. Esta é a metade que faltava, e ela é a lição: o
+     cinza-ardósia que esteve aqui NÃO era cor de tipo nenhuma -- ele passava na trava acima -- e
+     mesmo assim foi reportado como "parece desabilitado", porque tinha 13% de saturação contra os
+     0% do :disabled da casa. É a saturação que diz "dá pra apertar", não a matiz. */
+  const satDoCss = (css) => {
+    const m = css.match(/background:#([0-9a-f]{6})/i); if(!m) return -1;
+    const [r, g, b] = [0, 2, 4].map(i => parseInt(m[1].slice(i, i + 2), 16) / 255);
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2;
+    return mx === mn ? 0 : (mx - mn) / (l > 0.5 ? 2 - mx - mn : mx + mn);
+  };
+  /* ⚠️ O PISO SAI DOS PRÓPRIOS TIPOS, nunca de um número escrito aqui: ele é "tão saturado quanto
+     o botão de ataque mais apagado que o jogo consegue produzir", e isso acompanha a tabela. */
+  const piso = Math.min.apply(null, Object.values(S.TYPE_COLORS).map(c => satDoCss('background:' + c)));
+  ok('  e a saturação dele é de botão, não de desabilitado', satDoCss(receber) >= piso,
+     Math.round(satDoCss(receber) * 100) + '%, e o tipo menos saturado do jogo tem '
+       + Math.round(piso * 100) + '%');
+}
+
+/* ============================================================================
+   16) A BOLA SAI NA COR DO GOLPE -- e o rastro é quem diz de quem ela é
+   ============================================================================ */
+console.log('\n=== O QUE VOA NA ARENA É O DESENHO DO TIPO ===');
+{
+  const [eu, ele] = await partida(0, 1);
+  S.queimada.t = 5; S.queimada.rodadaAte = 0;
+  eu.tiroPronto = 0; ele.tiroPronto = 0;
+  S.queimadaAtacar(0, false);
+  const bola = S.queimada.bolas[S.queimada.bolas.length - 1];
+  ok('a bola nasce carimbada com o TIPO do golpe', bola.tipo === S.queimada.golpes[0].tipo,
+     bola.tipo + ' -> ' + S.SELO_DO_TIPO[bola.tipo]);
+
+  /* ⚠️ O DESENHO É O MESMO DO BOTÃO, e é isso que faz o pedido virar UMA coisa: a folha do Planta
+     que se aperta é a folha que voa. Um segundo desenho aqui divergiria do primeiro no dia em que
+     algum dos dois fosse ajustado. */
+  const spr = S.queimadaSpriteDoTipo(bola.tipo, S.QUEIMADA_BOLA_LADO);
+  ok('  e o que voa é o SELO daquele tipo, não um disco', !!spr,
+     'assado a ' + S.QUEIMADA_BOLA_LADO + 'px');
+  const tintasDoSpr = (spr && spr.__ctx) ? spr.__ctx.__tintas : [];
+  const corDoTipo = S.TYPE_COLORS[bola.tipo].toLowerCase();
+  ok('  e ele é assado na cor do tipo',
+     tintasDoSpr.some(t => String(t.fill).toLowerCase() === corDoTipo), corDoTipo);
+  /* ⚠️ E O CONTORNO VEM DE DENTRO DO DESENHO (o `k` da paleta), não de uma linha a mais: é ele que
+     faz um Elétrico ou um Gelo não sumirem na areia clara da quadra. */
+  ok('  e o contorno vem de dentro do desenho',
+     tintasDoSpr.some(t => String(t.fill).toLowerCase() === S.PALETA_SELO.k.toLowerCase()),
+     S.PALETA_SELO.k);
+  /* ⚠️ E ELE É ASSADO UMA VEZ: são até 576 retângulos por desenho, e três bolas a 60fps dariam
+     ~100 mil `fillRect` por segundo se ele fosse pintado a cada quadro. */
+  ok('  e o mesmo tipo e tamanho devolvem o MESMO sprite (assado uma vez)',
+     S.queimadaSpriteDoTipo(bola.tipo, S.QUEIMADA_BOLA_LADO) === spr);
+
+  /* ⚠️ O CARIMBO É NO NASCIMENTO: a devolução TROCA o dono, e um pintor que lesse o tipo do dono
+     mudaria a cor da MESMA bola no meio do voo -- ela é o mesmo golpe voltando. */
+  const tipoAntes = bola.tipo, donoAntes = bola.dono;
+  S.queimadaDevolver(bola, 1);
+  ok('  e a devolução NÃO troca o desenho dela', bola.tipo === tipoAntes,
+     'era ' + tipoAntes + ', virou ' + bola.tipo);
+  ok('  mas troca o dono, que é quem manda no rastro', bola.dono !== donoAntes);
+  /* ⚠️ E A COBRANÇA É NO QUE SE PINTA, não no campo: um pintor que lesse o tipo do DONO deixaria
+     `bola.tipo` intacto e trocaria o DESENHO na tela no meio do voo. Uma trava que só olha o campo
+     passa por isso -- foi a conferência de acusação que mostrou.
+     ⚠️ E O PAR DE TIPOS É FORÇADO A SER DIFERENTE: medido, os dois lados escolhem golpe do mesmo
+     tipo em 8,9% dos pares, e nesses o defeito seria invisível -- a trava viraria um flake. */
+  {
+    const outro = Object.keys(S.TYPE_CHART).find(t => t !== tipoAntes);
+    S.queimada.golpes[1] = Object.assign({}, S.queimada.golpes[1], { tipo: outro });
+    const cv0 = S.document.getElementById('queimadaCanvas');
+    if(cv0 && cv0.__ctx) cv0.__ctx.__tintas.length = 0;
+    S.queimadaPintar();
+    const t0 = (cv0 && cv0.__ctx) ? cv0.__ctx.__tintas : [];
+    /* ⚠️ NO TAMANHO DA DEVOLVIDA, que é outro: ela bate mais, então ela é desenhada maior -- e o
+       sprite é assado POR TAMANHO. Foi a própria trava que pegou isso. */
+    const doOriginal = S.queimadaSpriteDoTipo(tipoAntes, S.QUEIMADA_BOLA_LADO_DEV);
+    const doDono = S.queimadaSpriteDoTipo(outro, S.QUEIMADA_BOLA_LADO_DEV);
+    ok('  e na TELA ela continua com o desenho do golpe original',
+       t0.some(t => t.m === 'drawImage' && t.args[0] === doOriginal)
+       && !t0.some(t => t.m === 'drawImage' && t.args[0] === doDono),
+       tipoAntes + ', e o do dono agora seria ' + outro);
+  }
+
+  /* e a prova de que ela CHEGA assim na tela: o pintor de verdade, com a tinta anotada */
+  S.queimada.bolas = [];
+  eu.tiroPronto = 0;
+  S.queimadaAtacar(0, false);
+  const b2 = S.queimada.bolas[0];
+  const cv = S.document.getElementById('queimadaCanvas');
+  if(cv && cv.__ctx){ cv.__ctx.__tintas.length = 0; cv.__ctx.__ops.length = 0; }
+  S.queimadaPintar();
+  const tintas = (cv && cv.__ctx) ? cv.__ctx.__tintas : [];
+  const ops = (cv && cv.__ctx) ? cv.__ctx.__ops : [];
+  ok('  e o quadro DESENHA o sprite dela',
+     tintas.some(t => t.m === 'drawImage' && t.args[0] === S.queimadaSpriteDoTipo(b2.tipo, S.QUEIMADA_BOLA_LADO)));
+  /* ⚠️ E ELE GIRA PRA ONDE VAI: sem o giro o desenho atravessa a quadra como um adesivo parado.
+     O par save/rotate/restore é o que o teste consegue ver de um giro. */
+  ok('  e ele gira pra direção do voo',
+     ops.indexOf('rotate') >= 0 && ops.indexOf('translate') >= 0);
+
+  /* ⚠️ O RASTRO É QUEM DIZ DE QUEM ELA É, e sem ele a leitura mais importante da tela se perde:
+     medido, os dois lados escolhem golpe do MESMO tipo em 8,9% dos pares -- quase uma partida em
+     onze com os dois desenhos iguais na quadra. */
+  /* ⚠️ E É UM `fill` DE CAMINHO, não um `fillRect`: a plaquinha do nome embaixo do pokémon usa a
+     MESMA cor (é de lá que ela veio), e sem separar os dois verbos a trava daria verde com a
+     cauda removida. */
+  ok('  e a cauda sai na cor do dono',
+     tintas.some(t => t.m === 'fill' && String(t.fill) === S.QUEIMADA_RASTRO_MEU),
+     S.QUEIMADA_RASTRO_MEU);
+  /* ⚠️ E ELE É OPACO -- a igualdade acima já cobra isso, e o comentário diz por quê: com alpha a
+     cor MISTURA com a areia, e medido na tela um rastro contra o outro cai de 1,70 para 1,44:1.
+     É justamente a discriminação entre os dois que carrega "de quem é a bola". */
+  ok('  e as duas cores de dono são diferentes',
+     S.QUEIMADA_RASTRO_MEU !== S.QUEIMADA_RASTRO_DELE,
+     S.QUEIMADA_RASTRO_MEU + ' x ' + S.QUEIMADA_RASTRO_DELE);
+
+  /* ⚠️ E OS 17 TIPOS TÊM O QUE VOAR: um tipo sem desenho cai no disco de reserva, e aí o pedido
+     deixa de valer PRA AQUELE. A trava varre a tabela em vez de nomear tipos. */
+  const semDesenho = Object.keys(S.TYPE_CHART)
+    .filter(t => !S.queimadaSpriteDoTipo(t, S.QUEIMADA_BOLA_LADO));
+  ok('  e os ' + Object.keys(S.TYPE_CHART).length + ' tipos têm desenho pra voar',
+     semDesenho.length === 0, semDesenho.join(',') || '(todos)');
+  /* e o especial é maior que a bola comum, que é o que o separa na quadra */
+  ok('  e o especial é maior que o golpe comum',
+     S.QUEIMADA_BOLA_LADO_ESP > S.QUEIMADA_BOLA_LADO,
+     S.QUEIMADA_BOLA_LADO + 'px contra ' + S.QUEIMADA_BOLA_LADO_ESP);
+  /* ⚠️ E O TAMANHO DO DESENHO NÃO É O ALCANCE DO ACERTO: quem decide se a bola pegou é o
+     `QUEIMADA_RAIO`. Sem isso, mexer no que se vê mexeria na mecânica sem ninguém notar. */
+  ok('  e o desenho não é o alcance do acerto',
+     src.indexOf('QUEIMADA_BOLA_LADO') > 0
+       && !/QUEIMADA_BOLA_LADO[A-Z_]*\s*\)?\s*\)?\s*$/m.test('')
+       && /< QUEIMADA_RAIO/.test(src),
+     'o acerto continua no QUEIMADA_RAIO');
+}
+
+console.log('\n=== E OS 17 TIPOS SÃO LEGÍVEIS NA QUADRA ===');
+{
+  /* ⚠️ A QUADRA É AREIA CLARA, e é isso que obriga o contorno a existir: um Elétrico, um Gelo ou um
+     Terra somem nela. Mas o contorno sozinho também não basta -- ele é escuro, e contra os tipos
+     escuros é ele que some. A trava é sobre o PAR: cada tipo tem que ser legível por um dos dois,
+     e é isso que faz a bola aparecer nas 17 cores.
+     ⚠️ E O CONTORNO QUE CONTA É O DE DENTRO DO DESENHO (o `k` da paleta), não o do disco de
+     reserva: é ele que aparece na tela em todo tipo que tem selo, ou seja nos 17. */
+  const hex = (h) => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+  const lum = (h) => { const [r, g, b] = hex(h).map(v => { v /= 255;
+      return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+  const k = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+  /* a cor do piso, lida do PINTOR e não escrita aqui -- senão ela envelhece quando a quadra mudar */
+  const areia = (src.match(/ret\(22, 23, 316, 304, '(#[0-9a-f]{6})'\)/i) || [null, '#efdba6'])[1];
+  const sem = Object.entries(S.TYPE_COLORS)
+    .filter(([, c]) => k(c, areia) < 2 && k(S.PALETA_SELO.k, c) < 2)
+    .map(([t]) => t);
+  ok('os 17 são legíveis pelo contorno ou pelo próprio preenchimento', sem.length === 0,
+     sem.length ? sem.join(',') : 'sobre a areia ' + areia);
+  const somem = Object.entries(S.TYPE_COLORS).filter(([, c]) => k(c, areia) < 2).map(([t]) => t);
+  ok('  e o contorno não é enfeite: ' + somem.length + ' tipos sumiriam na areia sem ele',
+     somem.length > 0, somem.slice(0, 4).join(','));
+  ok('  e os dois rastros se leem na areia',
+     k(S.QUEIMADA_RASTRO_MEU, areia) >= 2.5 && k(S.QUEIMADA_RASTRO_DELE, areia) >= 2.5,
+     k(S.QUEIMADA_RASTRO_MEU, areia).toFixed(2) + ':1 e ' + k(S.QUEIMADA_RASTRO_DELE, areia).toFixed(2) + ':1');
 }
 
 /* ============================================================================
