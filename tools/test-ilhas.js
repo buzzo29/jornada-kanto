@@ -163,10 +163,28 @@ console.log('\n=== AS CINCO ILHAS ===');
 console.log('\n=== A ILHA SEM JOGO ===');
 {
   const L = S.ILHAS_LARANJA;
-  const semJogo = L.findIndex(i => !i.abrir);
+  /* ⚠️ DESDE 21/09/2026 NÃO HÁ ILHA EM BRANCO -- a Queimada fechou o arquipélago --, e isso quase
+     apagou esta trava em silêncio: o `findIndex` passou a devolver **-1**, o `entrarNaIlha(-1)`
+     volta sem trocar de tela, e as cinco asserções abaixo passavam **medindo nada**.
+     É a armadilha do "zero perfeito" que este projeto já registra três vezes. A regra continua
+     valendo -- ela é o que segura a próxima ilha que nascer antes do jogo dela --, então ela é
+     testada com uma ilha POSTIÇA, posta e tirada aqui mesmo. */
+  const postica = { id:'zz', nome:'Postiça', lider:'—', jogo:null, selo:null, abrir:null,
+                    cx:180, cy:180, r:20, giro:0 };
+  L.push(postica);
+  const semJogo = L.indexOf(postica);
+  ok('(há uma ilha sem jogo pra medir)', semJogo >= 0 && !L[semJogo].abrir);
   contaAdmin(); g.screen = 'ilhas';
   S.entrarNaIlha(semJogo);
   ok('a ilha sem jogo não leva a lugar nenhum', g.screen === 'ilhas', 'tela: ' + g.screen);
+  /* ⚠️ E ELA CONTINUA SENDO UM <span>, não um botão apagado: é a decisão que o mapa carrega, e
+     ela precisa sobreviver ao dia em que a sexta ilha nascer. */
+  const comPosticaa = S.renderIlhas();
+  ok('  e ela é um SPAN no mapa', comPosticaa.indexOf('<span class="ilha-pino em-breve"') >= 0);
+  ok('  e DIZ "Em breve"', comPosticaa.indexOf('>Em breve<') >= 0);
+  ok('  e não tem onclick', !/em-breve[^>]*onclick/.test(comPosticaa));
+  L.pop();
+  ok('(a postiça saiu da tabela)', L.indexOf(postica) < 0 && L.every(i => typeof i.abrir === 'function'));
   /* ⚠️ E UM ÍNDICE FORJADO TAMBÉM NÃO: o toque pode vir do console. */
   [-1, 99, null, undefined, 'mikan'].forEach(v => {
     g.screen = 'ilhas';

@@ -404,6 +404,153 @@ selo('ilhas', t => {
   pintar(t, elipse(15.5, 6, 6, 3.5), 'e');                                   /* a copa, fora do centro */
   pintar(t, menos(elipse(11, 22, 10.5, 8), retangulo(0, 22, 24, 2)), 'y');    /* a duna, larga e baixa */
 });
+/* A BOLA EM VOO, e nao uma quadra nem dois bonecos: o que a Queimada tem de proprio e a BOLA
+   atravessando o campo, e uma silhueta redonda com rastro le isso a 16px sem palavra nenhuma.
+   O RASTRO SAO DOIS TRACOS DE 3px, o minimo que sobrevive ao contorno de 2px -- com 2 eles
+   viravam dois riscos pretos, que e a regra dos 16px que a fita das medalhas ja pagou.
+   A FAIXA BRANCA SAI DA INTERSECAO da bola com uma barra inclinada, pelo mesmo caminho das
+   quatro faixas do selo do Resgate: pintada solta, ela passaria da borda da bola. */
+selo('queimada', t => {
+  const bola = circulo(14.5, 10.5, 7.8);
+  pintar(t, traco(2, 20.5, 8, 16, 3), 'c');    /* o rastro, atras e embaixo */
+  pintar(t, traco(3.5, 14.5, 9, 11.5, 3), 'c');
+  pintar(t, bola, 'r');
+  const faixa = traco(8.5, 16.5, 20.5, 5, 3.4);
+  pintar(t, menos(bola, (x, y) => !faixa(x, y)), 'w');   /* a faixa da bola */
+});
+
+/* ============================================================================
+   OS 17 TIPOS -- um desenho por tipo, TODOS em `currentColor`
+   ----------------------------------------------------------------------------
+   Pedidos em 21/09/2026 junto com a Queimada: *"crie um sprite para cada tipo de ataque, e a cor
+   do golpe deve seguir a mesma cor que o tipo dele"*.
+   ⚠️ A COR NAO MORA NO DESENHO, e e isso que faz os dois pedidos virarem UMA coisa so: o corpo e
+   `currentColor`, entao quem define a cor e o `style="color:..."` de fora -- e la ele sai do
+   `TYPE_COLORS`, a MESMA tabela que pinta o selo de tipo do jogo inteiro. Com a cor dentro do
+   desenho seriam 17 tabelas de cor pra manter em dia com aquela.
+   E o disco do TM ja fazia isso desde 21/09; o que muda e que aqui cada tipo tem forma PROPRIA.
+   ⚠️ E ELES SAO CHAPADOS, sem o volume translucido do disco: a licao do galao do terreno
+   (20/09/2026) e que num simbolo FINO o brilho pinta metade do desenho de branco. Quem define a
+   forma e o contorno preto, que toda a pixel art da casa ja tem.
+   ⚠️ E NADA MENOR QUE ~3px DA GRADE: a 16px isso nao e detalhe, e sujeira (a regra da estrela).
+   ============================================================================ */
+const hexagono = (cx, cy, r) => poligono([0, 1, 2, 3, 4, 5].map(i => {
+  const a = i * Math.PI / 3 - Math.PI / 2;
+  return [cx + Math.cos(a) * r, cy + Math.sin(a) * r];
+}));
+
+/* NORMAL -- a bola lisa. O mais neutro que existe: nao imita nenhum elemento. */
+selo('tipo-normal', t => { pintar(t, circulo(12, 12, 7.6), '*', { liso: true }); });
+
+/* FOGO -- a chama, e ela precisou de SILHUETA e nao de duas gotas grudadas: a primeira versao
+   era um circulo com um bico em cima, e no navegador isso le como blob, nao como fogo. O que a
+   separa da gota da Agua e o lado ESQUERDO ondulado e a ponta pendendo pra direita. */
+selo('tipo-fogo', t => {
+  /* ⚠️ O QUE A SEPARA DA GOTA E O ENTALHE DE BAIXO, e ele tem que ser GRANDE: as ondinhas da
+     primeira versao sumiram na grade de 24 e as duas viraram a mesma silhueta. Um V de 9px de
+     largura sobrevive a reducao pra 16px -- a regra dos ~3px. */
+  const chama = poligono([[13, 1.5], [17, 7], [19.5, 13.5], [18, 19], [12, 22.5],
+                          [6, 19], [4.5, 13.5], [8, 7], [10, 4]]);
+  pintar(t, menos(chama, poligono([[7.5, 24], [12, 14.5], [16.5, 24]])), '*', { liso: true });
+});
+
+/* AGUA -- a gota, lisa e simetrica. */
+selo('tipo-agua', t => {
+  pintar(t, uniao(circulo(12, 15, 6.4), poligono([[12, 2.5], [17.5, 15], [6.5, 15]])),
+         '*', { liso: true });
+});
+
+/* PLANTA -- a folha, com a nervura marcada no contorno. */
+selo('tipo-planta', t => {
+  pintar(t, poligono([[12, 2], [19.5, 11], [12, 21.5], [4.5, 11]]), '*', { liso: true });
+  pintar(t, traco(12, 5, 12, 19, 2.2), 'k', { liso: true });
+});
+
+/* ELETRICO -- o raio. */
+selo('tipo-eletrico', t => {
+  pintar(t, poligono([[15.5, 1.5], [6.5, 13], [11, 13], [8.5, 22.5], [18, 10], [13, 10]]),
+         '*', { liso: true });
+});
+
+/* GELO -- o floco de SEIS pontas, que e o que ele tem. */
+selo('tipo-gelo', t => {
+  for(let i = 0; i < 3; i++){
+    const a = i * Math.PI / 3 - Math.PI / 2;
+    pintar(t, traco(12 - Math.cos(a) * 9.5, 12 - Math.sin(a) * 9.5,
+                    12 + Math.cos(a) * 9.5, 12 + Math.sin(a) * 9.5, 3.2), '*', { liso: true });
+  }
+});
+
+/* LUTADOR -- a luva, com o polegar e o punho. */
+selo('tipo-lutador', t => {
+  pintar(t, uniao(elipse(13.5, 11, 6.2, 7.2), circulo(6.5, 12.5, 3.6),
+                  retangulo(6, 17, 14, 5)), '*', { liso: true });
+  pintar(t, traco(7, 17.5, 19, 17.5, 2.2), 'k', { liso: true });
+});
+
+/* VENENO -- a bolha que goteja. */
+selo('tipo-veneno', t => {
+  pintar(t, uniao(circulo(11, 14.5, 7), circulo(18, 6.5, 3.6)), '*', { liso: true });
+});
+
+/* TERRA -- as tres camadas do solo, em piramide. */
+selo('tipo-terra', t => {
+  pintar(t, uniao(retangulo(2.5, 16, 19, 5), retangulo(5.5, 10.5, 13, 4.5),
+                  retangulo(8.5, 5, 7, 4.5)), '*', { liso: true });
+});
+
+/* VOADOR -- a asa. */
+selo('tipo-voador', t => {
+  pintar(t, poligono([[2, 18], [6, 10.5], [12, 6], [20, 4], [21, 9], [15, 13.5], [9.5, 17]]),
+         '*', { liso: true });
+  pintar(t, traco(5.5, 15.5, 18.5, 6.5, 2), 'k', { liso: true });
+});
+
+/* PSIQUICO -- o olho. A pupila e do PRETO DO CONTORNO, nao de um tom da cor: em cor ela some nos
+   tipos claros, que e a licao da estrela da medalha. */
+selo('tipo-psiquico', t => {
+  pintar(t, elipse(12, 12, 9.5, 6.5), '*', { liso: true });
+  pintar(t, circulo(12, 12, 3.4), 'k', { liso: true });
+});
+
+/* INSETO -- corpo, cabeca e as duas antenas. */
+selo('tipo-inseto', t => {
+  pintar(t, uniao(elipse(12, 15, 5.6, 6.8), circulo(12, 6.5, 3.6),
+                  traco(10, 4, 6, 1.5, 2.4), traco(14, 4, 18, 1.5, 2.4)), '*', { liso: true });
+  pintar(t, traco(12, 10, 12, 20, 2), 'k', { liso: true });
+});
+
+/* PEDRA -- a rocha, angular de proposito: e a angulosidade que a separa do circulo do Normal. */
+selo('tipo-pedra', t => {
+  pintar(t, poligono([[4.5, 18.5], [2.5, 10.5], [8, 3.5], [16.5, 3], [21.5, 10], [19, 19.5]]),
+         '*', { liso: true });
+});
+
+/* FANTASMA -- a cabeca redonda com a barra ondulada embaixo. */
+selo('tipo-fantasma', t => {
+  pintar(t, menos(uniao(circulo(12, 10.5, 7.4), retangulo(4.6, 10.5, 14.8, 8.5)),
+                  uniao(circulo(7.4, 19, 2.8), circulo(12, 19, 2.8), circulo(16.6, 19, 2.8))),
+         '*', { liso: true });
+  pintar(t, uniao(circulo(9.5, 9.5, 1.9), circulo(14.5, 9.5, 1.9)), 'k', { liso: true });
+});
+
+/* DRAGAO -- a garra: TRES riscos diagonais. Tres dedos grossos saem como uma pata, e isso ja foi
+   medido quando o selo da Furia do Dragao nasceu. */
+selo('tipo-dragao', t => {
+  pintar(t, uniao(traco(5.5, 3.5, 9.5, 20.5, 3), traco(12, 2.5, 12.5, 21.5, 3),
+                  traco(18.5, 3.5, 15, 20.5, 3)), '*', { liso: true });
+});
+
+/* SOMBRIO -- a lua minguante. */
+selo('tipo-sombrio', t => {
+  pintar(t, menos(circulo(11, 12, 8.4), circulo(15.8, 9.6, 7.8)), '*', { liso: true });
+});
+
+/* ACO -- a porca sextavada com o furo. */
+selo('tipo-aco', t => {
+  pintar(t, menos(hexagono(12, 12, 10), circulo(12, 12, 3.6)), '*', { liso: true });
+});
+
 selo('trofeu', t => {   /* taca com alcas, haste e base */
   pintar(t, uniao(retangulo(6, 3, 12, 7), elipse(12, 10, 6, 5)), 'y');
   pintar(t, uniao(menos(circulo(5.5, 7.5, 3.6), circulo(5.5, 7.5, 1.9)),
@@ -669,7 +816,10 @@ const linhas = [];
 ordem.forEach(nome => {
   const g = gerar(nome);
   g.forEach(l => { for(const c of l) if(c !== VAZIO) usadas.add(c); });
-  linhas.push('  ' + nome + ': [');
+  /* ⚠️ NOME COM HIFEN PRECISA DE ASPAS: os 17 selos de tipo sao `tipo-fogo` e companhia, e
+     sem as aspas a tabela nao compila -- e o mesmo cuidado que o `--paleta` ja tinha pro `*`. */
+  const chaveDoSelo = /^[A-Za-z_$][w$]*$/.test(nome) ? nome : "'" + nome + "'";
+  linhas.push('  ' + chaveDoSelo + ': [');
   for(let i = 0; i < N; i += 3) linhas.push("    '" + g.slice(i, i + 3).join("','") + "',");
   linhas[linhas.length - 1] = linhas[linhas.length - 1].replace(/,$/, '],');
 });

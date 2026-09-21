@@ -1722,22 +1722,51 @@ console.log('\n=== A LUPA DO iOS NO BOTÃO DE PUXAR ===');
      página e o navegador CANCELA o `pointerdown` -- a linha soltaria sozinha no meio do puxão */
   ok('  e segurar-e-mexer continua não rolando a página', regra.indexOf('touch-action:none') >= 0);
 
-  /* ⚠️ ELAS FICAM SÓ NO BOTÃO, e não no `body`: este é o ÚNICO botão do jogo que se SEGURA (o
-     `onpointerdown` aparece UMA vez no arquivo inteiro). Globais, elas tirariam a seleção de
-     texto de tudo -- e há coisa no jogo que se copia, como o código de treinador. */
-  ok('o jogo tem UM botão que se segura', (src.match(/onpointerdown=/g) || []).length === 1,
-     (src.match(/onpointerdown=/g) || []).length + ' botões');
-  /* ⚠️ A CONTA É A MAIS SIMPLES QUE EXISTE, e de propósito: a declaração aparece UMA vez no
-     arquivo inteiro, e é a do botão. Uma regex sobre SELETORES pra achar a regra global seria
-     frágil -- a primeira versão não acusava NADA --, e esta pega qualquer forma de espalhá-la,
-     inclusive uma que eu não previ.
-     ⚠️ E ELA COBRA QUE O COMENTÁRIO DO JOGO NÃO A REPRODUZA: ele reproduzia o CSS do protótipo ao
-     pé da letra, e a conferência de acusação ABSORVEU o defeito religado -- o replace pegou o
-     comentário em vez da regra, e a trava passou com o defeito de volta. É a sexta vez que este
-     projeto paga um comentário assim, e a primeira em que ele mente pro TESTE. */
-  ok('a declaração da lupa aparece UMA vez no jogo inteiro',
-     (src.match(/-webkit-touch-callout/g) || []).length === 1,
-     (src.match(/-webkit-touch-callout/g) || []).length + ' vezes');
+  /* ⚠️ ESTA TRAVA CONTAVA "UMA VEZ NO ARQUIVO INTEIRO" ATÉ 21/09/2026, e o número era um PROXY:
+     enquanto a Pescaria era o único botão do jogo que se SEGURA, contar 1 provava de graça que a
+     declaração não tinha sido espalhada pro `body`. A QUEIMADA nasceu com duas setas que também se
+     seguram, e o proxy venceu -- ela caiu de 1 pra 4 **sem nada estar errado**.
+     É a mesma lição das cinco travas que caíram quando o trecho da Corrida virou 150 m: **trava
+     que fixa um número envelhece com ele.** Hoje ela cobra a REGRA, que é o que o proxy media:
+       1) nenhuma das declarações é GLOBAL -- nem em `body`, nem em `html`, nem em `*`;
+       2) e onde ela aparece, ela aparece com o BLOCO INTEIRO: sozinha ela não faz o trabalho, e é
+          assim que a próxima seta que nascer pela metade fica barulhenta.
+     ⚠️ E O COMENTÁRIO DO JOGO CONTINUA NÃO PODENDO REPRODUZIR O CSS: ele reproduzia o do protótipo
+     ao pé da letra, e a conferência de acusação ABSORVEU o defeito religado -- o replace pegou o
+     comentário em vez da regra, e a trava passou com o defeito de volta. Pra isso a conta abaixo
+     olha só o que está DENTRO de uma regra (o `{...}`), e não o arquivo cru. */
+  const regrasDaLupa = [];
+  for(let k = src.indexOf('-webkit-touch-callout'); k >= 0; k = src.indexOf('-webkit-touch-callout', k + 1)){
+    const abre = src.lastIndexOf('{', k);
+    if(abre < 0) continue;
+    const corpo = src.slice(abre, src.indexOf('}', k) + 1);
+    const antes = src.slice(0, abre);
+    /* o seletor começa depois do que vier por último: o `}` da regra anterior ou o fim de um
+       comentário. O `+ 2` do fecha-comentário é o que impede a barra dele de virar o começo do
+       seletor -- sem ele a regra saía como `/ .pesc-puxar` e uma varredura por nome não a acharia */
+    const fimComentario = antes.lastIndexOf('*/');
+    const corte = Math.max(antes.lastIndexOf('}') + 1, fimComentario < 0 ? 0 : fimComentario + 2);
+    regrasDaLupa.push({ seletor: antes.slice(corte).trim().replace(/\s+/g, ' '), corpo: corpo });
+  }
+  ok('(alguma regra declara a lupa)', regrasDaLupa.length > 0, regrasDaLupa.length + ' regras');
+  ok('e NENHUMA delas é global (body, html ou *)',
+     regrasDaLupa.every(r => !/(^|[,{\s])(body|html|\*)\s*(,|$)/.test(r.seletor)),
+     regrasDaLupa.map(r => r.seletor).join(' | '));
+  /* ⚠️ O BLOCO VIAJA INTEIRO: só o `-webkit-touch-callout` desliga a LUPA, só o `touch-action`
+     impede a rolagem de cancelar o `pointerdown`, e só o `tap-highlight` tira a caixa cinza que o
+     iOS põe por cima. Uma seta com metade do bloco tem metade do defeito. */
+  regrasDaLupa.forEach(r => {
+    ok('  `' + r.seletor + '` leva o bloco inteiro',
+       ['user-select:none', '-webkit-user-select:none', 'touch-action:none',
+        '-webkit-tap-highlight-color:transparent'].every(d => r.corpo.indexOf(d) >= 0),
+       r.corpo.replace(/\s+/g, ' ').slice(0, 90));
+  });
+  /* ⚠️ E TODO BOTÃO QUE SE SEGURA TEM QUE ESTAR COBERTO: o `onpointerdown` é o que identifica um,
+     e é ele que a lista acima precisa alcançar. Sem esta linha, um botão novo que se segure nasce
+     sem o bloco e nada acusa -- que é exatamente o que o proxy de "UMA vez" deixava passar. */
+  ok('e o jogo continua tendo botão que se segura',
+     (src.match(/onpointerdown=/g) || []).length >= 1,
+     (src.match(/onpointerdown=/g) || []).length + ' pontos de toque segurado');
 }
 
 /* ============================================================================

@@ -114,6 +114,7 @@ function createSandbox(htmlPath){
   const rafs = [];
   const qsCache = {};   // ver o querySelector abaixo
   const recargas = [];  // location.reload() anotado, ver o aviso de versao nova
+  const rolagens = [];  // window.scrollTo anotado, ver o scrollTo abaixo
   const firestoreStub = (caminho) => ({
     collection(nome){ return firestoreStub(nome); },
     doc(id){ return firestoreStub(id); },
@@ -137,6 +138,12 @@ function createSandbox(htmlPath){
     clearTimeout: noop, setInterval:()=>0, clearInterval: noop,
     requestAnimationFrame:(fn)=>{ rafs.push(fn); return rafs.length; },
     cancelAnimationFrame: noop,
+    /* ANOTADO, NAO EXECUTADO -- a mesma razao do location.reload() logo abaixo. Quem o chama
+       e a largada dos minigames (a pagina vai pro topo) e o reporRolagens; sem ele, qualquer
+       teste que dirija uma largada de verdade morre com um TypeError que nao tem nada a ver
+       com o que estava sendo testado. E a licao do fake-firestore de novo: o duble tem que
+       fazer o que o de verdade faz -- e aqui fazer e existir sem rolar nada. */
+    scrollTo:(x, y)=>{ rolagens.push({ x: x || 0, y: y || 0 }); },
     btoa:(str)=>Buffer.from(str,'binary').toString('base64'),
     atob:(str)=>Buffer.from(str,'base64').toString('binary'),
     document:{
@@ -282,7 +289,21 @@ function createSandbox(htmlPath){
     // aviso de versao nova na home (ver test-inventario.js)
     'conferirVersaoNoAr','atualizarParaVersaoNova','CHECAGEM_DE_VERSAO_MS',
     'renderSpecialBattling','renderSpecialResult','triggerRocketSleepAmbush','fraseDoCantoDaRocket',
-    'ROCKET_SLEEP_CHANCE','ROCKET_SLEEP_AVISO_MS','ROCKET_POOL','avgTeamLevel'
+    'ROCKET_SLEEP_CHANCE','ROCKET_SLEEP_AVISO_MS','ROCKET_POOL','avgTeamLevel',
+    /* QUEIMADA POKEMON (ver test-queimada.js). SO OS const PRECISAM ENTRAR AQUI: declaracao
+       de FUNCAO no topo de um script ja vira propriedade do global sozinha, e const/let nao
+       -- eles ficam no escopo lexical. Foi assim que queimadaVelocidade respondia enquanto o
+       ESTADO vinha undefined, o que faria a suite medir o nada. */
+    'queimada','queimadaLider','queimadaAtiva','queimadaLava','queimadaFadiga','SELO_DO_TIPO',
+    'QUEIMADA_DURACAO','QUEIMADA_KOS','QUEIMADA_W','QUEIMADA_H',
+    'QUEIMADA_V_BASE','QUEIMADA_V_FATOR',
+    'QUEIMADA_FOLEGO_GASTO','QUEIMADA_FOLEGO_VOLTA','QUEIMADA_FOLEGO_DESCANSO','QUEIMADA_FOLEGO_PISO',
+    'QUEIMADA_GUARDA_BASE','QUEIMADA_GUARDA_FATOR','QUEIMADA_GUARDA_MIN','QUEIMADA_GUARDA_MAX',
+    'QUEIMADA_GUARDA_RECARGA','QUEIMADA_GOLPES_MIN','QUEIMADA_GOLPES_MAX','QUEIMADA_ESPECIAL_MULT',
+    'QUEIMADA_TIRO_RECARGA','QUEIMADA_ESPECIAL_RECARGA','QUEIMADA_BOLA_V','QUEIMADA_BOLA_V_ESP',
+    'QUEIMADA_BOLA_V_DEVOLVIDA','QUEIMADA_REFLEXO_MULT','QUEIMADA_REFLEXO_TETO',
+    'QUEIMADA_REFLEXO_DESCONTO','QUEIMADA_ATORDOA','QUEIMADA_RAIO',
+    'QUEIMADA_LAVA_A_CADA','QUEIMADA_LAVA_AVISO','QUEIMADA_SPRITE_K','QUEIMADA_NPC_VIZINHOS'
   ];
   const epilogue = '\n;globalThis.render = function(){};\n' +
     EXPORTS.map(n=>`try{ globalThis[${JSON.stringify(n)}] = ${n}; }catch(e){}`).join('\n') +
@@ -293,6 +314,7 @@ function createSandbox(htmlPath){
   sandbox.__escritas = escritas;
   sandbox.__timers = timers;
   sandbox.__recargas = recargas;
+  sandbox.__rolagens = rolagens;
   sandbox.__rafs = rafs;
   /* ⚠️ DISPARA UM QUADRO com o carimbo que a suite quiser -- é isso que permite SALTAR o tempo e
      medir o que um laço faz quando a aba volta de segundo plano. Ele consome a fila: o laço

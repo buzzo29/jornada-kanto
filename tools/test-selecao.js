@@ -384,9 +384,15 @@ console.log('\n=== A ILHA KUMQUAT ===');
   S.sairDaSelecao();
   ok('  e sair volta pra as ilhas', g.screen === 'ilhas', 'tela: ' + g.screen);
   ok('  e zera o draft', S.selecao.fase === 'setup' && S.selecao.pool.length === 0);
-  /* sobra UMA em branco -- o quinto jogo */
-  ok('sobra uma ilha em branco', S.ILHAS_LARANJA.filter(i => !i.abrir).length === 1,
-     S.ILHAS_LARANJA.filter(i => !i.abrir).map(i => i.nome).join(','));
+  /* ⚠️ ESTA TRAVA DIZIA "sobra UMA em branco" e caiu em 21/09/2026, quando a Queimada fechou o
+     arquipélago -- **sem nada estar errado**. Ela fixava um NÚMERO (o de ilhas que faltavam), e
+     esse número é justamente o que muda quando um jogo novo nasce: é a mesma família das cinco
+     que caíram quando o trecho da Corrida virou 150 m.
+     Hoje ela cobra o que ela sempre quis dizer -- que a Kumquat é uma ilha do mapa como as outras,
+     e que o arquipélago não tem buraco. Quem cuida do caso da ilha SEM jogo é o `test-ilhas`, que
+     é o dono do mapa. */
+  ok('o arquipélago não tem buraco', S.ILHAS_LARANJA.every(i => typeof i.abrir === 'function'),
+     S.ILHAS_LARANJA.filter(i => !i.abrir).map(i => i.nome).join(',') || '(nenhuma vazia)');
 }
 
 console.log(falhas ? '\n' + falhas + ' FALHA(S)' : '\nTudo certo.');

@@ -15632,6 +15632,232 @@ para ~0,7% isso ficou muito mais raro, mas no **espelho** (mesma espécie, mesmo
 valendo 70% dos confrontos. A alternativa — sortear uma vez por confronto — está medida no item do
 log de batalha e não foi feita porque não foi pedida.
 
+## QUEIMADA POKÉMON: O JOGO DA ILHA PUMMELO (21/09/2026)
+
+Pedida com o `queimada-pokemon.html` da raiz como referência, e com seis coisas mudadas em relação
+a ele: o pokémon sai da **lista da Corrida individual** (paginada de 10), a **velocidade** e o
+**HP** saem dos atributos do jogo **com o nível**, o botão ATACAR recebe o **nome do golpe que o
+`melhorAtaque` escolhe** (e o especial é ele ×1,5), o **RECEBER** dura conforme a **Defesa
+Especial**, e quando um acerta o outro a tela **diz quanto de HP saiu**.
+
+Com ela o arquipélago fechou: são as **cinco** ilhas com jogo.
+
+### ⚠️ OS QUATRO ATRIBUTOS CHEGAM DO MOTOR -- e dois precisaram de compressão
+
+O que é reuso puro e o que precisou de conta própria:
+
+| | de onde vem | precisou de quê |
+|---|---|---|
+| **HP** | `calcMaxHp` do jogo | nada |
+| **Defesa Especial** | `effectiveSpDef` | nada -- a fórmula do protótipo entra **VERBATIM** |
+| **golpe e dano** | `melhorAtaque` + `calcDamageNew` | **compressão do dano** |
+| **velocidade** | `speedDaCorrida` (o `effectiveSpeed`) | **compressão da faixa** |
+
+- **⚠️ O ESCUDO PÔDE SER VERBATIM porque a ENTRADA está na mesma escala.** O `effectiveSpDef` é a
+  Defesa Especial **BASE** da espécie -- conferido: ele **não escala com o nível** (só a velocidade
+  e o HP escalam) --, exatamente como o campo `spd` do protótipo. Medido nas 250: **20 a 230**,
+  mediana 65, contra os 20 a 125 dele. O clamp (`0,22 a 0,44 s`) é o dele, e é o que impede o
+  Shuckle (230) de ficar com meio segundo de escudo enquanto o Caterpie fica com quase nada --
+  **os dois extremos batem no clamp**, e há trava pros dois lados.
+- **⚠️ E O HP VARIA MENOS DO QUE PARECE: o NÍVEL pesa mais que a espécie.** O `calcMaxHp` é
+  `30 + nível×5 + HP base`, então no Lv.60 os 330 do nível são comuns a todo mundo e só o HP base
+  separa os extremos -- Shuckle (20) e Chansey (250) ficam em **350 contra 580, 1,66×**. É a
+  ESCOLHA DO NÍVEL que decide quanto o pokémon aguenta; a espécie afina. (O protótipo tinha 100
+  fixo pra todo mundo.)
+
+### ⚠️ A VELOCIDADE: A FAIXA CRUA DO JOGO NÃO CABE NUMA QUADRA
+
+Medido nas 250 espécies em três níveis, o `speedDaCorrida` vai de **5** (Shuckle Lv.5) a **282**
+(Electrode Lv.99) -- **56×**. O protótipo trabalha entre **85 e 160 px/s (1,9×)**, e é isso que faz
+os dois caberem no mesmo campo: linear, o mais lento levaria 18 s pra atravessar o lado dele e o
+mais rápido meio segundo.
+
+**A COMPRESSÃO É A RAIZ**, a mesma do `velocidadeNormal` da Corrida e do `RESGATE_SPRITE_K`:
+
+```
+px/s = 72 + 48 × √(speed / 100)
+```
+
+⚠️ **E AS DUAS CONSTANTES NÃO FORAM ESCOLHIDAS NO GOSTO:** em Speed 100 ela devolve **120 px/s
+exatos**, que é o que o `baseSpeed` do protótipo devolve ali -- ou seja ela passa pelo **ponto de
+ancoragem** dele. A faixa fica em **83 a 153 px/s (1,85×)**, contra 1,88× dele.
+
+**E o nível se vê:** um Jolteon vai de **107 px/s no Lv.5 a 148 no Lv.99**.
+
+### ⚠️ O DANO É COMPRIMIDO, E ESSE É O ÚNICO DESVIO DESTA TELA EM RELAÇÃO AO MOTOR
+
+Medido **antes de escrever**, porque era o risco real da feature. Com o dano CRU, 1.200 pares
+sorteados no Lv.60 dão:
+
+| | |
+|---|---|
+| mediana | **2,0 golpes** pra derrubar |
+| p10 / p90 | 0,7 / 6,9 |
+| pior caso | **81** |
+| **one-shot** | **15,5% dos pares** |
+
+Ou seja: o Snorlax mata um Alakazam num golpe e um Magikarp precisa de 60 num Dragonite. Numa
+queimada de 120 s decidida por **3 eliminações**, o primeiro caso acaba a partida em três
+arremessos e o segundo nunca move a barra.
+
+**⚠️ E PAREAR O ADVERSÁRIO NÃO RESOLVE SOZINHO:** com o NPC pareado por BST o one-shot cai de
+15,5% pra **9,0%**, e a cauda continua em **135 golpes**. Ele ajuda, e está lá -- mas a trava é
+esta:
+
+> **Uma eliminação nunca leva menos de 2 nem mais de 8 golpes.**
+
+O dano do motor vale **INTEIRO dentro dessa faixa** -- é lá que a escolha do pokémon decide --, e
+só os extremos são aparados. Medido em 9.000 pares (5 níveis × NPC pareado): **55,4% caem dentro**,
+34,5% no piso e 10,1% no teto.
+
+- **⚠️ É A MESMA FORMA DO `MORIBUNDO_TETO_NO_CHEIO` e do `CHEIO_TETO_*`** do motor: um teto
+  expresso em **FRAÇÃO DA BARRA** do alvo, e não um número solto.
+- **⚠️ O RNG É FIXO NO MEIO DA FAIXA** (`() => 0.5`), e `semCritico`: este número vai no **RÓTULO
+  do botão** e no cálculo do especial, então ele precisa ser o mesmo do começo ao fim da partida.
+  Sorteado a cada arremesso, o botão prometeria um dano e a barra mostraria outro -- e um crítico
+  dobraria o número sem a tela poder avisar.
+- **OS DOIS GOLPES SÃO CALCULADOS UMA VEZ**, na largada, pelo mesmo motivo.
+- **⚠️ E A TRAVA DA FAIXA É SOBRE O DANO, não sobre o quociente:** o número de golpes derrapa
+  alguns centésimos por **arredondamento** (`round(305/8)` é 38, e 305/38 dá 8,03) -- a mesma cauda
+  que a suavização do log já registra. Medir o quociente com uma folga inventada seria medir o
+  arredondamento.
+
+### ⚠️ OS DOIS CASOS DA JORNADA CONTINUAM SENDO OS DOIS CASOS AQUI
+
+O golpe é o **`melhorAtaque(a, b)`**, a MESMA função que decide o golpe numa batalha de jornada --
+é ela que olha poder × tipo × STAB × (ataque/defesa) e devolve o que tira mais dano **daquele**
+adversário. **Sem golpe escolhido** ela devolve null, o `calcDamageNew` cai no motor de TIPO e o
+nome sai do `nomeDoGolpe`, que é o mesmo caminho do log.
+
+**⚠️ E O `towerEligiblePokemon` NÃO DEVOLVE OS GOLPES ESCOLHIDOS** -- ele traz espécie, nível e
+shiny e mais nada. Sem a volta ao save (`queimadaOriginalDoSave`), o pokémon do jogador entraria
+**SEM `ataques`** e o botão ATACAR mostraria o nome genérico do TIPO em vez do golpe que ele
+escolheu, que é o contrário do pedido.
+
+### O ADVERSÁRIO: PAREADO POR BST, NO MESMO NÍVEL
+
+- **⚠️ AQUI O QUE DECIDE NÃO É UM ATRIBUTO SÓ:** o HP decide quanto ele aguenta, o Speed o quanto
+  ele desvia, a Defesa Especial o escudo e o ataque o dano. O **BST** é o único número que cobre os
+  quatro -- e é a mesma régua que a líder da Seleção já usa.
+- **NUNCA A MESMA ESPÉCIE DO JOGADOR**: dois sprites idênticos na mesma quadra, separados só pela
+  etiqueta, é uma tela que se lê errado -- a mesma razão do Resgate. Com 14 vizinhos por BST,
+  excluir uma não custa nada.
+- **ELE LEVA O MOVESET DA ESPÉCIE** (`equiparNpc`): sem ele o adversário cairia no motor de tipo
+  com o poder implícito de 60, e o pareamento por BST seria uma promessa que o ataque não cumpre.
+- **⚠️ E A ESPECIALIDADE E OS ITENS VALEM SÓ PRO POKÉMON DO JOGADOR** -- ela é conquista da CONTA,
+  e um adversário de tipo Elétrico não pode ganhar 1,05× porque o JOGADOR é especialista em
+  Elétrico. O `ehDoJogador` **não tem padrão**, pela mesma razão do `corridaInstancia`: com `true`
+  implícito, a próxima chamada esquecida daria o buff ao adversário em silêncio.
+
+### AS SEIS DE 21/09/2026 -- a leva do relato
+
+#### ⚠️ O TOQUE MARCA UM DESTINO, ELE NÃO ARRASTA
+
+Reportado: *"quando eu clico na arena com o mouse, ele fica seguindo o rastro do mouse, ele deve ir
+até onde foi clicado e só trocar a direção caso o usuário toque novamente em outro canto"*.
+
+**⚠️ E ISSO NÃO É SÓ TIRAR O `pointermove`:** com o arrasto, o alvo era reescrito **60 vezes por
+segundo** e o pokémon **nunca CHEGAVA** -- ele perseguia o cursor. Marcando o destino uma vez, ele
+anda até lá e **PARA**, que é o que devolve a mão do jogador pros botões.
+
+Medido no navegador: um toque em (90, 297) marca o destino; mexer o ponteiro não o move; o pokémon
+**para exatamente em (90, 297)**; um segundo toque leva pra (288, 306).
+
+#### AS SETAS DE ESQUERDA/DIREITA SAÍRAM
+
+E elas saíram **inteiras**, não só da tela: um estado que ninguém escreve é a forma mais silenciosa
+de código morto que existe -- ele ficaria no `queimadaZerar` e nas duas pausas esperando alguém
+tentar mexer nele de novo.
+
+**⚠️ E A TRAVA PEGOU LETRA MORTA QUE EU TINHA DEIXADO:** o `queimadaPintarHud` continuava chamando
+`queimadaLigar('queimadaBtEsq', ...)` -- escrevendo num botão que não existe mais.
+
+#### ⚠️ UM SPRITE POR TIPO, E A COR DO GOLPE É A DO TIPO
+
+Pedidos juntos, e eles viraram **UMA** coisa só: os 17 desenhos são feitos em **`currentColor`**,
+então quem define a cor é o `color` de fora -- e lá ela sai do **`TYPE_COLORS`**, a MESMA tabela
+que pinta o selo de tipo do jogo inteiro. Com a cor dentro do desenho seriam **17 tabelas de cor**
+pra manter em dia com aquela. É a técnica do disco do TM; o que muda é cada tipo ter forma própria.
+
+- **ELES SÃO CHAPADOS**, sem o volume translúcido do disco: a lição do galão do terreno
+  (20/09/2026) é que num símbolo FINO o brilho pinta metade do desenho de branco. Quem define a
+  forma é o **contorno preto**, que toda a pixel art da casa já tem.
+- **⚠️ O `fogo` CUSTOU TRÊS VERSÕES, e a razão vale guardar:** a chama e a gota da Água são a
+  **mesma silhueta** (base redonda, ponta em cima). As ondinhas da primeira versão **sumiram na
+  grade de 24** e as duas ficaram idênticas. O que as separa hoje é um **entalhe em V de 9px** na
+  base da chama -- grande o bastante pra sobreviver à redução pra 16px, que é a regra dos ~3px.
+- **A TABELA `SELO_DO_TIPO` cita cada nome como VALOR**, que é o que a trava de "todo desenho tem
+  chamador" pede. Tipo desconhecido sai **VAZIO**, nunca com um símbolo genérico: um ícone errado
+  ao lado do nome de um golpe é pior que ícone nenhum.
+- **O TEXTO DO BOTÃO É BRANCO COM SOMBRA**, a MESMA convenção do `.type-pill`: as 17 cores vão de
+  um Gelo quase branco a um Dragão escuro, e um preto/branco escolhido por luminância daria duas
+  leituras diferentes na mesma fileira. E é o branco que faz o selo aparecer -- ele é
+  `currentColor`, então sai **por cima** da cor do tipo em vez de sumir nela.
+- **⚠️ E O `gerar-selos.js` PRECISOU CITAR AS CHAVES:** `tipo-fogo` tem hífen e não é
+  identificador, então sem aspas a tabela **não compila** -- o mesmo cuidado que o `--paleta` já
+  tinha pro `*`.
+
+#### ⚠️ O RECEBER SAIU DO AMARELO DA CASA
+
+Medido: com um golpe **ELÉTRICO** ele ficava em `rgb(255,203,5)` ao lado de um ATACAR em
+`rgb(248,208,48)` -- **a mesma cor, a olho** --, e os três botões viravam uma fileira amarela.
+
+**⚠️ E O SUBSTITUTO NÃO PODE SER UMA COR DE TIPO:** são 17, e qualquer uma delas colide com o golpe
+de alguém. Ele foi pra um **cinza-ardósia** (`#4a5460`) que não é tipo nenhum (o Aço é `#B8B8D0`,
+bem mais claro). **O ESPECIAL fica na MESMA cor do ATACAR** -- ele é o mesmo golpe ×1,5 --, e o que
+o separa é a **moldura branca por dentro**: um roxo ali diria que é outro ataque.
+
+#### O PLACAR OCUPA O CARD, E OS BOTÕES COLARAM NA QUADRA
+
+- **⚠️ A CAUSA DO PLACAR ERA O `.pesc-lado-info` NÃO TER LARGURA:** ele é uma coluna flex
+  dimensionada pelo **CONTEÚDO**, e o conteúdo mais largo era o `"400/400 HP"` -- as barras
+  herdavam essa largura e sobrava metade do card vazia ao lado. Medido: a barra vai de **~55% para
+  88%** do card.
+  **A regra é ESCOPADA no `.q-placar`**: o `.pesc-lado` é da **PESCARIA**, onde o lado do card é
+  ocupado por um sprite e a informação fica mesmo à direita dele.
+- **OS BOTÕES MORAM DENTRO DA CAIXA DA QUADRA** (a pedido: *"se não fica longe para movimentar o
+  pokémon e clicar nos botões ao mesmo tempo"*). Numa caixa própria eles ficavam a ~40px do campo;
+  hoje são **19px**. O recado desceu pra BAIXO deles pelo mesmo motivo -- e o que ele diz já
+  aparece flutuando na quadra, no `−189 HP`.
+- **⚠️ E O CARTAZ TEVE QUE SER ANCORADO NO CAMPO, não na caixa:** com os botões dentro dela, o
+  `top:44%` passou a medir uma caixa 25% mais alta e ele descia pra cima dos botões. Nasceu o
+  `.q-campo{position:relative}`.
+- **A FONTE DO NOME FOI DE ~10,5 PRA 12,2px E CENTROU**, e ela **só coube porque o par de setas
+  saiu**: com cinco botões a coluna tinha ~75px, e nenhum nome de golpe cabia em nada legível.
+
+**Medido a 320px, no navegador:** documento em **305px** (sem rolagem lateral), botões de
+**86×62px**, card do placar 118px com a barra em 104, e a tela de jogo em **935px**.
+
+### O QUE ISSO CUSTOU AO JOGO: NADA
+
+As duas impressões -- **MOTOR** e **DIÁRIO** -- são **idênticas** em 900 batalhas semeadas
+(`2bc051b58136 / 51dc1030cf1e`). A Queimada é apresentação mais um **chamador novo** do motor:
+nada vai pro save, nenhuma Cloud Function, e o time do save fica byte a byte igual depois de uma
+partida inteira.
+
+### ⚠️ E O SANDBOX PRECISOU APRENDER DUAS COISAS
+
+1. **`const` NÃO VIRA PROPRIEDADE GLOBAL.** Declaração de **FUNÇÃO** no topo de um script vira
+   sozinha; `const`/`let` ficam no escopo lexical. Foi assim que `queimadaVelocidade` respondia
+   enquanto `queimada` (o **ESTADO**) vinha `undefined` -- e a suíte mediria o nada.
+2. **`window.scrollTo` ANOTADO, não executado** (`__rolagens`), pela razão do `location.reload()`:
+   a largada dos minigames manda a página pro topo, e sem ele qualquer teste que dirija uma largada
+   de verdade morre com um TypeError que não tem nada a ver com o que estava sendo testado.
+
+`tools/test-queimada.js` tranca **157 pontas**: o acesso nos 10 estados do campo, as quatro
+fórmulas (com o clamp mordendo nos dois extremos e o ponto de ancoragem dos 120 px/s), a compressão
+do dano (**com o painel tendo one-shot cru pra aparar** -- sem isso ela daria verde medindo pares
+que nunca precisaram de aparo), o adversário, o picker, os golpes voltando do save, o RECEBER
+devolvendo e o especial atravessando, a mensagem de dano **nos dois lados**, a eliminação e o fim,
+o laço parando quando a tela muda, o toque que não arrasta, os 17 selos e a tela (lendo o CSS).
+
+**⚠️ E A CONFERÊNCIA DE ACUSAÇÃO PEGOU DUAS ÂNCORAS ERRADAS NO PRÓPRIO SCRIPT DE ACUSAÇÃO** -- os
+defeitos nunca foram religados, e isso se lê como *"a trava passou em branco"*. Hoje ele confere
+que a troca **mudou o arquivo** antes de rodar o teste. Com isso, **os 12 defeitos acusam** -- e um
+deles (o selo tirado de UM dos dois botões) só foi pego porque a trava passou a **contar** os dois
+em vez de usar `indexOf`.
+
+
 ## Frontend
 
 - **A tela de notificações é uma caixa de entrada**: lista de títulos em cima, corpo do que está

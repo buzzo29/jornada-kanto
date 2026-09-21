@@ -3581,6 +3581,84 @@
   }
   .mont-linha .corrida-speed-badge{pointer-events:none;}
 
+  /* ===== QUEIMADA ===== */
+  /* ⚠️ O canvas é 720x700 e desenha em escala 2 (setTransform), então ele ocupa 360x350 de layout.
+     O `width:100%` com `aspect-ratio` é o que o faz caber a 320px sem rolagem lateral -- a mesma
+     conta da pista da Corrida. */
+  .q-quadra{padding:0;overflow:hidden;}
+  /* ⚠️ O CAMPO É QUEM É `relative`, e não a caixa: o cartaz do meio é `absolute` e se ancora
+     nele. Ancorado na caixa, ele passou a medir a altura COM os botões e descia pra cima
+     deles -- um defeito que só a captura de tela pega. */
+  .q-campo{position:relative;}
+  /* o canvas é o primeiro filho e os botões vêm colados nele -- ver a nota do `.q-acoes` */
+  .q-quadra .q-acoes{margin:0;}
+  .q-quadra canvas{display:block;width:100%;height:auto;aspect-ratio:360/350;
+    image-rendering:pixelated;touch-action:none;}
+  /* ⚠️ O `[hidden]` PRECISA DESTA REGRA: o atributo é `display:none` pela folha do NAVEGADOR, que
+     tem a menor prioridade que existe, e QUALQUER `display` do autor ganha dela -- o `display:flex`
+     logo abaixo ganhava. É o defeito que o modal da contagem da Corrida custou DUAS vezes, e que a
+     barra da descarga do Resgate custou de novo. */
+  .q-cartaz[hidden]{display:none;}
+  .q-cartaz{
+    position:absolute;top:44%;left:6%;width:88%;padding:9px;text-align:center;
+    display:flex;justify-content:center;
+    background:#fff4cded;border:2px solid var(--box-border);border-radius:4px;
+    font-weight:800;font-size:.78rem;pointer-events:none;
+  }
+  .q-recado{font-size:.68rem;color:var(--blue-dark);margin:0 0 7px;min-height:2.2em;
+    overflow-wrap:anywhere;}
+  /* ⚠️ `minmax(0,1fr)` E NÃO `1fr`: o `1fr` é `minmax(auto,1fr)` e o `auto` não encolhe abaixo do
+     conteúdo -- o nome de um golpe comprido ("Deslizamento de Rochas") empurraria a linha e a tela
+     rolaria pra o lado. A mesma armadilha da fileira de cinco cards da home. */
+  .q-acoes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;
+    padding:6px;border-top:2px solid var(--box-border);}
+  /* ⚠️ A FONTE MAIOR E CENTRADA foi pedida (21/09/2026), e ela só coube porque o par de setas saiu
+     da tela: com cinco botões a coluna tinha ~75px, e o nome de um golpe não cabia em nada
+     legível. Medido a 320px: a coluna vai a ~97px e o nome fica em duas linhas no pior caso. */
+  .q-acoes .btn{margin:0;min-height:62px;padding:6px 3px;font-size:.62rem;line-height:1.15;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;}
+  .q-acoes .btn small{display:block;font-size:.5rem;font-weight:600;margin-top:3px;
+    opacity:.85;overflow-wrap:anywhere;}
+  .q-bt-nome{display:block;font-size:.76rem;font-weight:800;letter-spacing:.2px;
+    text-transform:uppercase;overflow-wrap:anywhere;}
+  /* o selo do tipo entra na linha do nome, do tamanho da fonte dele */
+  .q-selo-tipo{width:1.15em;height:1.15em;vertical-align:-.2em;margin-right:3px;}
+  /* ⚠️ O TEXTO É BRANCO COM SOMBRA, a MESMA convenção do `.type-pill`: as 17 cores de tipo vão de
+     um Gelo quase branco a um Dragão escuro, e um preto/branco escolhido por luminância daria duas
+     leituras diferentes na mesma fileira. E é o branco que faz o selo aparecer: ele é
+     `currentColor`, então ele sai branco POR CIMA da cor do tipo em vez de sumir nela. */
+  .q-atacar{color:#fff;text-shadow:0 1px 1px rgba(0,0,0,.35);}
+  /* ⚠️ O ESPECIAL É O MESMO GOLPE ×1,5, então ele leva a MESMA cor -- o que o separa é a moldura
+     branca por dentro. Um roxo aqui diria que é outro ataque. */
+  .q-especial{box-shadow:inset 0 0 0 3px rgba(255,255,255,.9);}
+  /* ⚠️ O RECEBER SAIU DO AMARELO DA CASA, e a razão é medida: com um golpe ELÉTRICO ele ficava em
+     `rgb(255,203,5)` ao lado de um ATACAR em `rgb(248,208,48)` -- a mesma cor, a olho, e os três
+     botões viravam uma fileira amarela.
+     ⚠️ E O SUBSTITUTO NÃO PODE SER UMA COR DE TIPO: são 17, e qualquer uma delas colide com o
+     golpe de alguém. Este cinza-ardósia não é tipo nenhum (o Aço é `#B8B8D0`, bem mais claro) e é
+     a cor que o jogo já usa pra "defesa". */
+  .q-receber{background:#4a5460;color:#fff;text-shadow:0 1px 1px rgba(0,0,0,.35);}
+  .q-folego{height:6px;background:#dfded3;border:1px solid var(--box-border);
+    border-radius:2px;overflow:hidden;margin:3px 0 2px;}
+  .q-folego i{display:block;height:100%;background:#398dcc;}
+  /* ⚠️ O PLACAR OCUPA O CARD INTEIRO E É CENTRADO (21/09/2026, reportado com print: *"a barra de hp
+     e a barra de fôlego está bem menor que espaço do card reservado, deixe para pegar o tamanho
+     total do card, e centralize todas as informações"*).
+     ⚠️ A CAUSA ERA O `.pesc-lado-info` não ter largura: ele é uma coluna flex dimensionada pelo
+     CONTEÚDO, e o conteúdo mais largo era o "400/400 HP" -- as barras herdavam essa largura e
+     sobrava metade do card vazia ao lado.
+     ⚠️ E A REGRA É ESCOPADA no `.q-placar`: o `.pesc-lado` é da PESCARIA, onde o lado do card é
+     ocupado por um sprite e a informação fica mesmo à direita dele. */
+  .q-placar .pesc-lado{display:block;padding:6px 5px;}
+  .q-placar .pesc-lado-info{width:100%;text-align:center;align-items:stretch;}
+  .q-placar .pesc-lado-info small{white-space:normal;overflow-wrap:anywhere;}
+  .q-placar .hp-bar-wrap{margin-top:4px;width:100%;}
+  .q-placar .pesc-lado-estado{text-align:center;}
+  .q-ficha{display:flex;justify-content:space-between;gap:6px;margin:7px 0;
+    font-size:.62rem;color:var(--muted);text-align:center;}
+  .q-ficha b{display:block;font-size:.82rem;color:var(--blue-dark);
+    font-variant-numeric:tabular-nums;}
+
   .home-mode-icon{font-size:1.3rem;line-height:1;}
   /* o selo do modo acompanha o `.dex-icon.modo` dos outros quatro botões (26px), senão a fileira
      fica com um ícone menor que os vizinhos */
@@ -5661,7 +5739,7 @@ const PALETA_SELO = {
   h: '#8a5518',
 };
 const DESENHOS = {
-  shiny: [
+  'shiny': [
     '...........kk...........','..........kkkk..........','.........kkYykk.........',
     '.........kkYokk.........','........kkYYyykk........','.......kkkYyyokkk.......',
     '..kkkkkkkYYyyyykkkkkkk..','.kkkkkkYYYyyyyyYykkkkkk.','kkyYYYYYyyyyyyyyyYYYyykk',
@@ -5670,7 +5748,7 @@ const DESENHOS = {
     '.....kkYyyyyyyyyokk.....','....kkYYyyoooyyyyykk....','....kkYyoookkyoyyokk....',
     '....kkyookkkkkkyookk....','....kkykkkk..kkkkykk....','.....kkkk......kkkk.....',
     '......k..........k......','........................','........................'],
-  terreno: [
+  'terreno': [
     '........................','........................','...........kk...........',
     '..........kkkk..........','.........kk**kk.........','........kk****kk........',
     '.......kk******kk.......','......kk********kk......','.....kk**********kk.....',
@@ -5679,7 +5757,7 @@ const DESENHOS = {
     'kk****kk........kk****kk','kk***kk..........kk***kk','kk**kk............kk**kk',
     'kk*kk..............kk*kk','.kkk................kkk.','..k..................k..',
     '........................','........................','........................'],
-  corrida: [
+  'corrida': [
     '........................','....kkkkkkkkkkkkkkkkk...','...kkkkkkkkkkkkkkkkkkk..',
     '..kkszwwwwwsssszwwwwWkk.','..kksZwWWWWszzzZWWWWvkk.','..kksZwWWWWszzzZWWWWvkk.',
     '..kksZwWWWWszzzZWWWWvkk.','..kksZwWWWWzZZZZWWWWvkk.','..kksZsssszWWWWWsssszkk.',
@@ -5688,7 +5766,7 @@ const DESENHOS = {
     '..kksZkk................','..kksZkk................','..kksZkk................',
     '..kksZkk................','..kksZkk................','..kkzZkk................',
     '...kkkk.................','....kk..................','........................'],
-  fogo: [
+  'fogo': [
     '...........kk...........','..........kkkk..........','.........kkRrkk.........',
     '........kkRRrrkk........','........kkRrrqkk........','.......kkRRrrrrkk.......',
     '......kkRRrrrrrrkk......','......kkRrrrrrrrrkk.....','.....kkRRrrrrrrrqkk.....',
@@ -5697,7 +5775,7 @@ const DESENHOS = {
     '....kkRrryyyyoorrqkk....','....kkRrrrYyyorrrqkk....','....kkRrrrYyyorrrqkk....',
     '....kkrrrrYyoorrqqkk....','.....kkrqryoorqqqkk.....','......kkkrqyqqqkkk......',
     '.......kkkkrqkkkk.......','.........kkkkkk.........','...........kk...........'],
-  raio: [
+  'raio': [
     '.............kkkk.......','............kkYykk......','...........kkYyokk......',
     '..........kkYYokk.......','..........kkYyokk.......','.........kkYYookk.......',
     '........kkYYyokk........','........kkYyyokk........','.......kkYYyyokkkkk.....',
@@ -5706,7 +5784,7 @@ const DESENHOS = {
     '........kkYYyookk.......','........kkYyookk........','........kkYookk.........',
     '........kkYokk..........','........kkyokk..........','.......kkyykk...........',
     '.......kkykk............','........kkk.............','.........k..............'],
-  gelo: [
+  'gelo': [
     '......kk........kk......','.....kkkk......kkkk.....','....kkCckk....kkCckk....',
     '....kkCcckk..kkCCbkk....','....kkccbkk..kkCbbkk....','.....kkCcckkkkCCbkk.....',
     '.....kkccbkkkkCbbkk.....','......kkCcckkCCbkk......','......kkccbkkCbbkk......',
@@ -5715,7 +5793,7 @@ const DESENHOS = {
     '......kkCCbkkCcckk......','......kkCbbkkccbkk......','.....kkCCbkkkkCcckk.....',
     '.....kkCbbkkkkccbkk.....','....kkCCbkk..kkCcckk....','....kkCbbkk..kkccbkk....',
     '....kkcbkk....kkcbkk....','.....kkkk......kkkk.....','......kk........kk......'],
-  veneno: [
+  'veneno': [
     '........................','...........kk...........','..........kkkk..........',
     '.........kkPpkk.........','.........kkPnkk.........','.........kkPnkk.........',
     '........kkPPppkk........','........kkPppnkk........','.......kkPPppppkk.......',
@@ -5724,7 +5802,7 @@ const DESENHOS = {
     '....kkPppppppppppnkk....','....kkPppppppppppnkk....','....kkppppppppppnnkk....',
     '.....kkPppppppppnkk.....','.....kkpnpppppnnnkk.....','......kkkpnnnnnkkk......',
     '.......kkkkkkkkkk.......','.........kkkkkk.........','........................'],
-  sono: [
+  'sono': [
     '..kkkkkk................','.kkkkkkkk...............','kkcccCcckk..............',
     '.kkkkcbkk...............','..kkcckk................','.kkCckkkk...............',
     'kkCCcCCckk..............','kkcbbbbbkk..............','.kkkkkkkk...............',
@@ -5733,7 +5811,7 @@ const DESENHOS = {
     '............kkkkkCcbkk..','..............kkCcbkk...','.............kkCcbkk....',
     '............kkCcbkkkkk..','...........kkCCbkkkkkkk.','..........kkCCccCCCCCckk',
     '.........kkcCccccccccbck','..........kkcbbbbbbbbbkk','...........kkkkkkkkkkkk.'],
-  confusao: [
+  'confusao': [
     '.............k..........','........kkkkkkkkk.......','.......kkkkkkpkkkk......',
     '......kkPPPPPPPPpkkk....','.....kkPPnnnnnnnppkkk...','....kkPpnnkkkkkkppPpkk..',
     '...kkPpnkkkkkkkkkppnkk..','k.kkPPnkkkPPPPPpkkpppkk.','kkkkPnnkPPpnnnpppkkpppkk',
@@ -5742,7 +5820,7 @@ const DESENHOS = {
     'pppkkPppkkkpkkkPpnkkPnkk','kPnkkppppkkkkkPpnkkPpnkk','kpppkkpnpPPPPPpnkkkPnkk.',
     'kkPppkkkpnnnnnnkkkPpnkk.','kkpnppkkkkkpkkkkPPpnkk..','.kkkppPpkkkkkkkPPnnkk...',
     '..kkkpnpPPPPPPPpnnkk....','....kkkpnnnnnnnnkkk.....','.....kkkkkkkpkkkkk......'],
-  explosao: [
+  'explosao': [
     '.......kkk..............','......kkrkk...k.........','......kkrkk..kkk........',
     '.......kkrkkkkrkk...k...','....k..kkrkkkRrkk.kkkk..','...kkkkkkRrkkRqkkkkkrkk.',
     '..kkrkkkkRrRyRqkkkrrkk..','...kkRRrkRrryrqkRrrkk...','...kkrrrRyrryrrRrqkk....',
@@ -5751,7 +5829,7 @@ const DESENHOS = {
     '....kkRrqrryrryqrrrkk...','...kkrrqkRryrrqkrqqkk...','..kkrrkkkRqyqrqkkkkrkk..',
     '.kkrkkkkkRqkkrqkkkkkk...','..kkkk.kkrqkkkrkk..k....','...k...kkrkkkkrkk.......',
     '........kkk..kkrkk......','.........k...kkrkk......','..............kkk.......'],
-  furia: [
+  'furia': [
     '.......kkk....kkkk......','......kkkkk..kkkkkk.....','.....kkRRrkkkkRRRrkk....',
     '.....kkRrqkkkkRrrqkk....','.....kkRrqkkkkRrrqkk....','..kkkkkRrqkkkkRrrqkkkk..',
     '.kkkkkkRrqkkkkRrrqkkkkk.','kkRRRRRRrqkkkkRrrrRRRrkk','kkRrrrrrrqkkkkRrrrrrrqkk',
@@ -5760,7 +5838,7 @@ const DESENHOS = {
     'kkRrrrrrrqkkkkRrrrrrrqkk','kkRrrrrrrqkkkkRrrrrrrqkk','kkrqqqqrrqkkkkRrrqqqqqkk',
     '.kkkkkkRrqkkkkRrrqkkkkk.','..kkkkkRrqkkkkRrrqkkkk..','.....kkRrqkkkkRrrqkk....',
     '.....kkrqqkkkkrqqqkk....','......kkkkk..kkkkkk.....','.......kkk....kkkk......'],
-  espada: [
+  'espada': [
     '...........kk...........','..........kkkk..........','.........kkSskk.........',
     '........kkSSzkk.........','........kkSssskk........','.......kkSSsssskk.......',
     '.......kkSsssszkk.......','.......kkSsssszkk.......','.......kkSsssszkk.......',
@@ -5769,7 +5847,7 @@ const DESENHOS = {
     '...kkFFFFFFFFFFFFFfkk...','...kkFffffffffffffhkk...','...kkfhhhhhFFfhhhhhkk...',
     '....kkkkkkkFfhkkkkkk....','.....kkkkkkFfhkkkkk.....','.........kkFfhkk........',
     '.........kkfhhkk........','..........kkkkk.........','...........kkk..........'],
-  pluma: [
+  'pluma': [
     '........................','..................kk....','................kkkkk...',
     '.............kkkkkWWkk..','...........kkkkkCWWWkk..','..........kkkCCCCWWckk..',
     '.........kkCCCccWWcbkk..','........kkCCcccWWccbkk..','.......kkCCcccWWccccckk.',
@@ -5778,7 +5856,7 @@ const DESENHOS = {
     '..kkCcccWWcccccbbkk.....','..kkcccWWcccccbbkk......','...kkCWWccccbbbkk.......',
     '...kkWWccbbbbkkk........','..kkWWWbbbkkkkk.........','..kkWWckkkkkk...........',
     '...kkkkkkk..............','....kkk.................','........................'],
-  chuva: [
+  'chuva': [
     '........................','..............kk........','........k...kkkkkk......',
     '......kkkkkkkkSskkk.....','.....kkkskkkSSSsSskk....','....kkSSSSSSSsssssskk...',
     '...kkSSssssssssssssskk..','..kkSSssssssssssssszkk..','..kkSsssssssssssssszkk..',
@@ -5787,7 +5865,7 @@ const DESENHOS = {
     '....kkkkkkszzzkkkkkk....','....kkkkkkkkkkkkkkk.....','...kkckk..kkkk.kkckk....',
     '...kkckk.kkckk.kkckk....','..kkCCckkkkckkkkCCckk...','..kkcbbkkkCCckkkcbbkk...',
     '...kkkkkkkcbbkkkkkkk....','....kkk..kkkkk..kkk.....','..........kkk...........'],
-  sol: [
+  'sol': [
     '.........kkYykk.........','...kk....kkYokk....kk...','..kkkk...kkYokk...kkkk..',
     '.kkYykk..kkYokk..kkYykk.','.kkyyykk.kkYokk.kkYyokk.','..kkyyykkkkyokkkkYyokk..',
     '...kkyyykYYYYYykYyokk...','....kkyYYYyyyyyYyokk....','.....kkYyyyyyyyyokk.....',
@@ -5796,7 +5874,7 @@ const DESENHOS = {
     '.....kkYyyyyyyyyokk.....','....kkYyoyyyyyoooykk....','...kkYyokyoooookyyykk...',
     '..kkYyokkkkYykkkkyyykk..','.kkYyokk.kkYokk.kkyyykk.','.kkyokk..kkYokk..kkyokk.',
     '..kkkk...kkYokk...kkkk..','...kk....kkYokk....kk...','.........kkyokk.........'],
-  remoinho: [
+  'remoinho': [
     '...kkkkkkkkkkkkkkkkkk...','..kkkSSSSSSSSSSSSSskkk..','.kkSSSsssssssssssssSskk.',
     'kkSSsssssssssssssssssskk','kksssssssssssssssssszzkk','.kkszssssssssssssszzzkk.',
     '..kkkszzzzszzzzzzzzkkk..','..kkSSSSSSSSSSSSskkkk...','.kkSSssssssssssssskk....',
@@ -5805,7 +5883,7 @@ const DESENHOS = {
     '.......kkkkkkkkkkkk.....','......kkSSSSskkkkk......','.....kksSssszskk........',
     '......kkszzzzkk.........','.......kkkkkkkk.........','........kkkSSskk........',
     '.........kkszzkk........','..........kkkkk.........','...........kkk..........'],
-  dragao: [
+  'dragao': [
     'k.kkkkk..kkkkk..........','kkkekkkkkkekkkk.........','ekkkEEekkkeEEekk........',
     'ekkkeeeekkkEeeekk.......','ekkkkEegkkkeeegkk.......','EekkkEeeekkkEegkk.......',
     'Egkkkeeegkkkeeeekk......','EeekkkEegkkkkEegkk......','EegkkkeeeekkkEeeekk.....',
@@ -5814,7 +5892,7 @@ const DESENHOS = {
     'kkeeeekkkeeeekkkEegkk...','.kkEegkkkkEegkkkeeeekk..','.kkeeeekkkeegkkkkEegkk..',
     '..kkEegkkkkEeekkkeeeekk.','..kkeegkkkkEegkkkkEegkk.','...kkEeekkkeeeekkkeegkk.',
     '...kkEggkkkkeggkkkkegekk','...kkegkk.kkekkk.kkekkk.','....kkkk...kkkk...kkkk..'],
-  vs: [
+  'vs': [
     '.kkkk..............kkkk.','kkSskk............kkSskk','kSSsskk..........kkSSssk',
     'kssssskk........kkSSszzk','kkssssskk......kkSSszzkk','.kkssssskk....kkSSszzkk.',
     '..kkssssskk..kkSSszzkk..','...kkssssskkkkSSszzkk...','....kkssssskkSSszzkk....',
@@ -5823,7 +5901,7 @@ const DESENHOS = {
     '..kkFFfhszzkksssFfffkk..','.kkFFfhhzzkkkkssfffffkk.','kkFFfhhzzkk..kkssfffffkk',
     'kFFfhhszkk....kkszfffffk','kFfhhkkkk......kkkkfffhk','kfhhkkkk........kkkkfhhk',
     'kkkkk..............kkkkk','.kkk................kkk.','........................'],
-  moeda: [
+  'moeda': [
     '........kkkkkkkk........','......kkkkkkkkkkkk......','.....kkkYYYYYYYykkk.....',
     '....kkYYYyyyyyyyYykk....','...kkYYyyyyyyyyyyyykk...','..kkYYyyyyyooyyyyyyykk..',
     '.kkYYyyyooooooooyyyyykk.','.kkYyyyoooyyyyoooyyyokk.','kkYYyyoooyyyyyyoooyyyykk',
@@ -5832,7 +5910,7 @@ const DESENHOS = {
     'kkyyyyoooyyyyyyoooyyookk','.kkYyyyoooyyyyoooyyyokk.','.kkyyyyyooooooooyyyookk.',
     '..kkyyyyyyyooyyyyyookk..','...kkyyyyyyyyyyyyookk...','....kkyoyyyyyyyoookk....',
     '.....kkkyoooooookkk.....','......kkkkkkkkkkkk......','........kkkkkkkk........'],
-  medalha_ouro: [
+  'medalha_ouro': [
     '...kkRRRRRrkkRRRRRrkk...','...kkrrrrrqkkRrrrqqkk...','....kkRrrrqkkRrrrqkk....',
     '....kkrrrrrrRRrrqqkk....','.....kkRrrrqRrrrqkk.....','.....kkrrrrqRrrqqkk.....',
     '......kkRrrqRrrqkk......','......kkrrrRRrqqkk......','......kkkYYYYYykkk......',
@@ -5841,7 +5919,7 @@ const DESENHOS = {
     '..kkYyyykkkkkkkkyyyokk..','..kkYyyyykkkkkkyyyyokk..','..kkyyyyykkkkkkyyyookk..',
     '...kkYyyykkkkkkyyyokk...','...kkyyyykyyyykyyookk...','....kkyyyyyyyyyyookk....',
     '.....kkyoyyyyyoookk.....','......kkkyoooookkk......','.......kkkkkkkkkk.......'],
-  medalha_prata: [
+  'medalha_prata': [
     '...kkRRRRRrkkRRRRRrkk...','...kkrrrrrqkkRrrrqqkk...','....kkRrrrqkkRrrrqkk....',
     '....kkrrrrrrRRrrqqkk....','.....kkRrrrqRrrrqkk.....','.....kkrrrrqRrrqqkk.....',
     '......kkRrrqRrrqkk......','......kkrrrRRrqqkk......','......kkkSSSSSskkk......',
@@ -5850,7 +5928,7 @@ const DESENHOS = {
     '..kkSssskkkkkkkkssszkk..','..kkSsssskkkkkksssszkk..','..kkssssskkkkkkssszzkk..',
     '...kkSssskkkkkkssszkk...','...kksssskssssksszzkk...','....kksssssssssszzkk....',
     '.....kkszssssszzzkk.....','......kkkszzzzzkkk......','.......kkkkkkkkkk.......'],
-  medalha_bronze: [
+  'medalha_bronze': [
     '...kkRRRRRrkkRRRRRrkk...','...kkrrrrrqkkRrrrqqkk...','....kkRrrrqkkRrrrqkk....',
     '....kkrrrrrrRRrrqqkk....','.....kkRrrrqRrrrqkk.....','.....kkrrrrqRrrqqkk.....',
     '......kkRrrqRrrqkk......','......kkrrrRRrqqkk......','......kkkFFFFFfkkk......',
@@ -5859,7 +5937,7 @@ const DESENHOS = {
     '..kkFfffkkkkkkkkfffhkk..','..kkFffffkkkkkkffffhkk..','..kkfffffkkkkkkfffhhkk..',
     '...kkFfffkkkkkkfffhkk...','...kkffffkffffkffhhkk...','....kkffffffffffhhkk....',
     '.....kkfhfffffhhhkk.....','......kkkfhhhhhkkk......','.......kkkkkkkkkk.......'],
-  resgate: [
+  'resgate': [
     '........kkkkkkkk........','......kkkkkkkkkkkk......','.....kkkRRwwwwWrkkk.....',
     '....kkRRRrwWWWvrRrkk....','...kkRRrrrwWWWvrrrrkk...','..kkRRrrrrwWWWvrrrrrkk..',
     '.kkRRrrrqqWvvvvrrrrrrkk.','.kkRrrrqqkkkkkkrrrrrqkk.','kkRRrrqqkkkkkkkkrrrrrrkk',
@@ -5868,7 +5946,7 @@ const DESENHOS = {
     'kkrrrrrrkkkkkkkkRRrrqqkk','.kkRrrrrrkkkkkkRRrrrqkk.','.kkrrrrrrRwwwwWRrrrqqkk.',
     '..kkrrrrrrwWWWvrrrqqkk..','...kkrrrrrwWWWvrrqqkk...','....kkrqrrwWWWvqqqkk....',
     '.....kkkrqWvvvvqkkk.....','......kkkkkkkkkkkk......','........kkkkkkkk........'],
-  pescaria: [
+  'pescaria': [
     '..........kkkk..........','.........kkSskk.........','.........kkSzkk.........',
     '.........kkSzkk.........','.........kkSzkk.........','.........kksszkk........',
     '.........kkszZkk........','...k.....kkszZkk........','..kkk....kkszZkk........',
@@ -5877,7 +5955,7 @@ const DESENHOS = {
     '..kkzZZkk..kkkkk........','.kkzszkkkkkkszzkk.......','..kkszzkkkkssZkk........',
     '..kkzzzsssssZZkk........','...kkzzzzzzZZkk.........','....kkzZZZZZkk..........',
     '.....kkkkkkkk...........','......kkkkkk............','........................'],
-  ilhas: [
+  'ilhas': [
     '...............k........','...........kkkkkkkkk....','..........kkkkkekkkkk...',
     '.........kkEEEEEEEEekk..','........kkEEeeeeeeeeekk.','........kkEeeeeeeeeegkk.',
     '........kkEeeeeeeeeegkk.','........kkeeeeeeeeeggkk.','.........kkeggggggggkk..',
@@ -5886,7 +5964,169 @@ const DESENHOS = {
     '..kkkYYYyyyyyyyYykkk....','.kkYYYyyyyyyyyyyyYykk...','kkYYyyyyyyyyyyyyyyyykk..',
     'kkYyyyyyyyyyyyyyyyyokk..','kYYyyyyyyyyyyyyyyyyyykk.','kYyyyyyyyyyyyyyyyyyyokk.',
     'kyoooooooooooooooooookk.','kkkkkkkkkkkkkkkkkkkkkk..','.kkkkkkkkkkkkkkkkkkkk...'],
-  trofeu: [
+  'queimada': [
+    '........................','...........kkkkkkk......','..........kkkkkkkkk.....',
+    '.........kkRRRRRRrkk....','........kkRRrrrrrrrkk...','.......kkRRrrrrrrrwWkk..',
+    '......kkRRrrrrrrwwwvWkk.','.....kkRRrrrrrrwwWvvrrkk','.....kkRrrrrrrwwWvvrrqkk',
+    '.....kkRrrrrrwwWvvrrrqkk','....kkkRrrrrwwWvvrrrrqkk','..kkkkCRrrrwwWvvrrrrrqkk',
+    '.kkkCCCRrrwwWvvrrrrrrqkk','kkCCCcbrrwwWvvrrrrrrqqkk','kkCcbbbkWwWvvrrrrrrqqkk.',
+    'kkcbbkCCcWvvrrrrrrqqkk..','.kkkkCCcbkWrrrrrrqqkk...','.kkCCCbbbkkrqqqqqqkk....',
+    'kkCCcbbkkkkkkkkkkkk.....','kCCcbbkkk..kkkkkkk......','cCbbbkk.................',
+    'kcbkkk..................','kkkkk...................','.kk.....................'],
+  'tipo-normal': [
+    '........................','........................','...........kk...........',
+    '........kkkkkkkk........','.......kkkk**kkkk.......','......kk********kk......',
+    '.....kk**********kk.....','....kk************kk....','...kk**************kk...',
+    '...kk**************kk...','...kk**************kk...','..kk****************kk..',
+    '..kk****************kk..','...kk**************kk...','...kk**************kk...',
+    '...kk**************kk...','....kk************kk....','.....kk**********kk.....',
+    '......kk********kk......','.......kkkk**kkkk.......','........kkkkkkkk........',
+    '...........kk...........','........................','........................'],
+  'tipo-fogo': [
+    '............kk..........','...........kkkk.........','..........kk**kk........',
+    '.........kk***kk........','........kk*****kk.......','.......kk*******kk......',
+    '......kk*********kk.....','......kk*********kk.....','.....kk***********kk....',
+    '.....kk***********kk....','....kk************kk....','....kk*************kk...',
+    '...kk**************kk...','..kk***************kk...','...kk**************kk...',
+    '...kk**************kk...','...kk******kk******kk...','....kk*****kk*****kk....',
+    '....kk****kkkk****kk....','.....kk***kkkk***kk.....','......kkkkk..kkkkk......',
+    '.......kkk....kkk.......','........................','........................'],
+  'tipo-agua': [
+    '........................','........................','...........kk...........',
+    '..........kkkk..........','.........kk**kk.........','.........kk**kk.........',
+    '........kk****kk........','........kk****kk........','.......kk******kk.......',
+    '......kkk******kkk......','.....kk**********kk.....','.....kk**********kk.....',
+    '....kk************kk....','....kk************kk....','....kk************kk....',
+    '....kk************kk....','....kk************kk....','....kk************kk....',
+    '.....kk**********kk.....','.....kk**********kk.....','......kkk******kkk......',
+    '.......kkkkkkkkkk.......','.........kkkkkk.........','........................'],
+  'tipo-planta': [
+    '........................','...........kk...........','..........kkkk..........',
+    '.........kk**kk.........','........kk*kk*kk........','.......kk**kk**kk.......',
+    '......kk***kk***kk......','.....kk****kk****kk.....','.....kk****kk****kk.....',
+    '....kk*****kk*****kk....','...kk******kk******kk...','...kk******kk******kk...',
+    '....kk*****kk*****kk....','....kk*****kk*****kk....','.....kk****kk****kk.....',
+    '......kk***kk***kk......','......kk***kk***kk......','.......kk**kk**kk.......',
+    '........kk*kk*kk........','.........kkkkkk.........','.........kk**kk.........',
+    '..........kkkk..........','...........kk...........','........................'],
+  'tipo-eletrico': [
+    '........................','..............k.........','.............kkk........',
+    '............kk*kk.......','...........kk**kk.......','..........kk**kk........',
+    '..........kk**kk........','.........kk***kk........','........kk***kkkkk......',
+    '.......kk****kkkkkk.....','......kk**********kk....','......kk*********kk.....',
+    '.....kk*********kk......','......kkkkk****kk.......','.......kkkk****kk.......',
+    '........kk****kk........','........kk***kk.........','........kk**kk..........',
+    '........kk**kk..........','.......kk**kk...........','.......kk*kk............',
+    '........kkk.............','.........k..............','........................'],
+  'tipo-gelo': [
+    '..........kkkk..........','.........kk**kk.........','........kk****kk........',
+    '........kk****kk........','..kkkk..kk****kk..kkkk..','.kkkkkk.kk****kk.kkkkkk.',
+    'kk****kkkk****kkkk****kk','kk*****kkk****kkk*****kk','.kk******k****k******kk.',
+    '..kk****************kk..','...kkk************kkk...','....kkkk********kkkk....',
+    '....kkkk********kkkk....','...kkk************kkk...','..kk****************kk..',
+    '.kk******k****k******kk.','kk*****kkk****kkk*****kk','kk****kkkk****kkkk****kk',
+    '.kkkkkk.kk****kk.kkkkkk.','..kkkk..kk****kk..kkkk..','........kk****kk........',
+    '........kk****kk........','.........kk**kk.........','..........kkkk..........'],
+  'tipo-lutador': [
+    '........................','........................','...........kkkkk........',
+    '.........kkkkkkkkk......','........kkk*****kkk.....','.......kk*********kk....',
+    '.......kk*********kk....','.....kkk***********kk...','....kkkk***********kk...',
+    '...kk***************kk..','..kk****************kk..','.kk*****************kk..',
+    '.kk*****************kk..','.kk****************kk...','..kk***************kk...',
+    '...kk***k*********kk....','....kkkkkkkkkkkkkkkkk...','....kkkkkkkkkkkkkkkkkk..',
+    '....kk*kkkkkkkkkkkk*kk..','....kk**************kk..','....kk**************kk..',
+    '....kk**************kk..','.....kkkkkkkkkkkkkkkk...','......kkkkkkkkkkkkkk....'],
+  'tipo-veneno': [
+    '........................','................kkkk....','...............kkkkkk...',
+    '..............kk****kk..','.............kk******kk.','.............kk******kk.',
+    '.......kkkkkkk********kk','......kkkkkkkkk******kk.','.....kk**************kk.',
+    '....kk**************kk..','...kk************kkkk...','...kk************kkk....',
+    '..kk**************kk....','..kk**************kk....','..kk**************kk....',
+    '..kk**************kk....','..kk**************kk....','...kk************kk.....',
+    '...kk************kk.....','....kk**********kk......','.....kk********kk.......',
+    '......kkkkkkkkkk........','.......kkkkkkkk.........','........................'],
+  'tipo-terra': [
+    '........................','........................','........................',
+    '.........kkkkkkk........','........kkkkkkkkk.......','.......kk*******kk......',
+    '.......kk*******kk......','.......kk*******kk......','.......kk*******kk......',
+    '......kkk*******kkk.....','.....kkkkkkkkkkkkkkk....','....kk*************kk...',
+    '....kk*************kk...','....kk*************kk...','...kkk*************kkk..',
+    '..kkkkkkkkkkkkkkkkkkkkk.','.kk*******************kk','.kk*******************kk',
+    '.kk*******************kk','.kk*******************kk','.kk*******************kk',
+    '..kkkkkkkkkkkkkkkkkkkkk.','...kkkkkkkkkkkkkkkkkkk..','........................'],
+  'tipo-voador': [
+    '........................','........................','..................kk....',
+    '..............kkkkkkk...','...........kkkkkkk**kk..','..........kkkk****k*kk..',
+    '.........kk******kkkkk..','.......kkk*****kkkk**kk.','......kkk*****kkk****kk.',
+    '.....kk*****kkkk****kk..','....kk*****kkk*****kk...','...kk*****kkk*****kk....',
+    '...kk***kkkk****kkk.....','..kk***kkk*****kkk......','..kk*kkkk****kkk........',
+    '.kk*kkk*****kkk.........','.kk**k****kkk...........','kk****kkkkkk............',
+    '.kkkkkkkkk..............','..kkkk..................','........................',
+    '........................','........................','........................'],
+  'tipo-psiquico': [
+    '........................','........................','........................',
+    '........................','.......kkkkkkkkkk.......','.....kkkkkkkkkkkkkk.....',
+    '....kkk**********kkk....','...kk**************kk...','..kk****************kk..',
+    '.kk*******kkkk*******kk.','.kk******kkkkkk******kk.','.kk******kkkkkk******kk.',
+    '.kk******kkkkkk******kk.','.kk******kkkkkk******kk.','.kk*******kkkk*******kk.',
+    '..kk****************kk..','...kk**************kk...','....kkk**********kkk....',
+    '.....kkkkkkkkkkkkkk.....','.......kkkkkkkkkk.......','........................',
+    '........................','........................','........................'],
+  'tipo-inseto': [
+    '...kk**kkk....kkk**kk...','...kk***kkkkkkkk***kk...','...kk*****kkkk*****kk...',
+    '....kkk**********kkk....','.....kkkk******kkkk.....','.......kk******kk.......',
+    '......kk********kk......','.......kk******kk.......','.......kk******kk.......',
+    '.......kk**kk**kk.......','......kk***kk***kk......','.....kk****kk****kk.....',
+    '.....kk****kk****kk.....','.....kk****kk****kk.....','....kk*****kk*****kk....',
+    '....kk*****kk*****kk....','.....kk****kk****kk.....','.....kk****kk****kk.....',
+    '.....kk****kk****kk.....','......kk***kk***kk......','.......kk**kk**kk.......',
+    '........kk****kk........','.........kkkkkk.........','..........kkkk..........'],
+  'tipo-pedra': [
+    '........................','........kkkkkkkkk.......','.......kkkkkkkkkkk......',
+    '......kk*********kk.....','.....kk***********kk....','....kk************kk....',
+    '....kk*************kk...','...kk***************kk..','..kk****************kk..',
+    '.kk******************kk.','kk*******************kk.','.kk******************kk.',
+    '.kk******************kk.','.kk******************kk.','.kk*****************kk..',
+    '..kk****************kk..','..kk****************kk..','..kk****************kk..',
+    '..kk***************kk...','...kkkkkkkkkkkkkkkkk....','....kkkkkkkkkkkkkkk.....',
+    '........................','........................','........................'],
+  'tipo-fantasma': [
+    '........................','..........kkkk..........','........kkkkkkkk........',
+    '.......kkk****kkk.......','......kk********kk......','.....kk**********kk.....',
+    '....kk************kk....','...kk**************kk...','...kk***kkk**kkk***kk...',
+    '...kk***kkk**kkk***kk...','...kk***kkk**kkk***kk...','...kk***************kk..',
+    '...kk***************kk..','...kk***************kk..','...kk***************kk..',
+    '...kk***************kk..','...kk*kkk**kk**kkk**kk..','....kkkkkkkkkkkkkkk*kk..',
+    '.....k...kk..kk..kk*kk..','..................kkk...','...................k....',
+    '........................','........................','........................'],
+  'tipo-dragao': [
+    '....kkk...kkkk...kkk....','...kkkkk.kk**kk.kkkkk...','..kk***kkk****kkk***kk..',
+    '..kk***kkkk***kkk***kk..','..kk***kkkk***kkk***kk..','..kk****kkk***kkk***kk..',
+    '...kk***kkk***kk***kk...','...kk***kkk***kk***kk...','...kk***kkk***kk***kk...',
+    '...kk***kkk***kk***kk...','....kk***kk***kk***kk...','....kk***kk***k***kk....',
+    '....kk***kk***k***kk....','....kk***kk***k***kk....','.....kk***k***k***kk....',
+    '.....kk***k*******kk....','.....kk***k******kk.....','.....kk***k******kk.....',
+    '.....kk**********kk.....','......kk*********kk.....','......kk*********kk.....',
+    '......kk********kk......','.......kkkk***kkk.......','........kkkkkkkk........'],
+  'tipo-sombrio': [
+    '........................','........................','.......kkk..............',
+    '......kkkkk.............','.....kk***kk............','....kk***kk.............',
+    '...kk****kk.............','..kk****kk..............','.kk*****kk..............',
+    '.kk*****kk..............','.kk*****kk..............','.kk*****kk..............',
+    '.kk******kk.............','.kk******kk.............','.kk*******kk............',
+    '.kk********kkkkkk.......','..kk********kkkkkk......','...kk************kk.....',
+    '....kk**********kk......','.....kk********kk.......','......kkkkkkkkkk........',
+    '.......kkkkkkkk.........','........................','........................'],
+  'tipo-aco': [
+    '...........kk...........','.........kkkkkk.........','........kkk**kkk........',
+    '......kkk******kkk......','....kkkk********kkkk....','...kkk************kkk...',
+    '..kk****************kk..','.kk******************kk.','.kk********kk********kk.',
+    '.kk******kkkkkk******kk.','.kk******kk..kk******kk.','.kk*****kk....kk*****kk.',
+    '.kk*****kk....kk*****kk.','.kk******kk..kk******kk.','.kk******kkkkkk******kk.',
+    '.kk********kk********kk.','.kk******************kk.','..kk****************kk..',
+    '...kkk************kkk...','....kkkk********kkkk....','......kkk******kkk......',
+    '........kkk**kkk........','.........kkkkkk.........','...........kk...........'],
+  'trofeu': [
     '........................','......kkkkkkkkkkkk......','....kkkkkkkkkkkkkkkk....',
     '...kkkYYYYYYYYYYYykkk...','..kkYYyyyyyyyyyyyYYykk..','.kkyyooyyyyyyyyyyyooykk.',
     'kkYykkYYyyyyyyyYyokkYykk','kkYokkYYoyyyyyyYookkYokk','kkyokkYyoyyyyyyyookkyokk',
@@ -5895,7 +6135,7 @@ const DESENHOS = {
     '........kkkyohkk........','.......kkkkyohkkk.......','......kkkkkohhkkkk......',
     '.....kkYYYYYYYYYykk.....','....kkkYyyyyyyyyokkk....','...kkYYYyyyyyyyyyYykk...',
     '...kkYyyyyyyyyyyyyokk...','...kkyoooooooooooookk...','....kkkkkkkkkkkkkkkk....'],
-  coroa: [
+  'coroa': [
     '........................','........................','........................',
     '...........kk...........','..........kkkk..........','..k......kkYykk......k..',
     '.kkk....kkYYyykk....kkk.','kkykk...kkYyyokk...kkykk','kkYykk.kkYYyyyykk.kkYykk',
@@ -5904,7 +6144,7 @@ const DESENHOS = {
     'kkYyyRRryyRRrryyRRryyokk','kkYyyrqqyyrrqqyyrqqyyokk','kkYyyyryyyyrqyyyyryyyokk',
     'kkyoooooooooooooooooookk','.kkkkkkkkkkkkkkkkkkkkkk.','..kkkkkkkkkkkkkkkkkkkk..',
     '........................','........................','........................'],
-  cadeado: [
+  'cadeado': [
     '........................','.........kkkkkk.........','.......kkkkkkkkkk.......',
     '......kkkSSSSSskkk......','.....kkSSSzzzssSskk.....','.....kkSzzzkkszszkk.....',
     '....kkSSzkkkkkkSsskk....','....kkSzzkk..kksszkk....','....kkSzkk....kkSzkk....',
@@ -5913,7 +6153,7 @@ const DESENHOS = {
     '..kkYyyyyyooooyyyyyokk..','..kkYyyyyyyooyyyyyyokk..','..kkYyyyyyyooyyyyyyokk..',
     '..kkYyyyyyyooyyyyyyokk..','..kkYyyyyyyooyyyyyyokk..','..kkYyyyyyyyyyyyyyyokk..',
     '..kkyoooooooooooooookk..','...kkkkkkkkkkkkkkkkkk...','....kkkkkkkkkkkkkkkk....'],
-  brilho: [
+  'brilho': [
     '........................','........kk..............','.......kkkk.............',
     '......kkYykk............','......kkYokk............','....kkkkYokkkk..........',
     '...kkkkkYokkkkk.........','..kkYYYYYyYYYykk........','..kkyoooyoooookk........',
@@ -5922,7 +6162,7 @@ const DESENHOS = {
     '...kkk........kkYYYYkk..','..kkYkk.......kkYYYYkk..','..kkYkk........kkYYkk...',
     '..kkYkk.........kkkk....','..kkYkk..........kk.....','..kkYkk.................',
     '..kkYkk.................','...kkk..................','....k...................'],
-  amigos: [
+  'amigos': [
     '........................','.......kk...............','.....kkkkkk.............',
     '....kkkCckkk....kk......','...kkCCCcCckk.kkkkkk....','..kkCCcccccckkkkEekkk...',
     '..kkCccccccbkkEEEeEekk..','..kkCccccccbkkEeeeegkk..','..kkCccccccbkEEeeeeeekk.',
@@ -5931,7 +6171,7 @@ const DESENHOS = {
     '.kkCCCCCCCCCckkkkkkkkk..','.kkCccccccccbEEEEEEEekk.','.kkCccccccccbEeeeeeegkk.',
     'kkCCccccccccbEeeeeeegkk.','kkCcccccccccEEeeeeeeeekk','kkCcccccccccEeeeeeeeegkk',
     'kkcbbbbbbbbbegggggggggkk','.kkkkkkkkkkkkkkkkkkkkkk.','..kkkkkkkkkkkkkkkkkkkk..'],
-  mochila: [
+  'mochila': [
     '.........kkkkkk.........','........kkkkkkkk........','.......kkhhhhhhkk.......',
     '......kkhhhhhhhhkk......','.....kkhhhhkkhhhhkk.....','....kkkhRRRRRRRrhkkk....',
     '...kkRRRRrrrrrrrRRrkk...','..kkRRrrrrrrrrrrrrrrkk..','.kkRRrrrrrrrrrrrrrrrrkk.',
@@ -5940,7 +6180,7 @@ const DESENHOS = {
     '.kkRrrrrqqqqqqqqqrrrqkk.','.kkRrrrrqqqqqqqqqrrrqkk.','.kkRrrrrqqYYYYYqqrrrqkk.',
     '.kkRrrrrqqYYYYYqqrrrqkk.','.kkRrrrrqqqqqqqqqrrrqkk.','.kkRrrrrqqqqqqqqqrrrqkk.',
     '.kkrqqqqqqqqqqqqqqqqqkk.','..kkkkkkkkkkkkkkkkkkkk..','...kkkkkkkkkkkkkkkkkk...'],
-  loja: [
+  'loja': [
     '........................','.kkkkk..................','kkkkkkk.................',
     'ksssszkkkkkkkkkkkkkkkk..','kzZZzszkkkkkkkkkkkkkkkk.','kkkkksZEEEEEEEEEEEEEEekk',
     '.kkkksZeeeeeeeeeeeeeggkk','...kkzzzeeeeeeeeeeeegkk.','....kksZeeeeeeeeeeeegkk.',
@@ -5949,7 +6189,7 @@ const DESENHOS = {
     '......kksZkkkkkkkkkk....','......kkzZkkkkkkkkkk....','.......kkszkk..kkszkk...',
     '......kksszzkkkksszzkk..','......kkszzZkkkkszzZkk..','......kkzzZZkkkkzzZZkk..',
     '.......kkzZkk..kkzZkk...','........kkkk....kkkk....','.........kk......kk.....'],
-  sino: [
+  'sino': [
     '..........kkkk..........','.........kkyokk.........','.........kkyhkk.........',
     '........kkkyhkkk........','.......kkkkYykkkk.......','......kkYYYYyYYykk......',
     '.....kkYYyyyyyyyykk.....','....kkYYyyyyyyyyyykk....','....kkYyyyyyyyyyyokk....',
@@ -5958,7 +6198,7 @@ const DESENHOS = {
     '..kkYyyyyyyyyyyyyyyokk..','..kkyooooooyooooooookkk.','.kkyyyyyyyyyyyyyyyyyyokk',
     '.kkyooooooooooooooooohkk','.kkohhhhhhhhhhhhhhhhhhkk','..kkkkkkkkYYYykkkkkkkkk.',
     '...kkkkkkkYyyokkkkkkkk..','........kkyoookk........','.........kkkkkk.........'],
-  mais: [
+  'mais': [
     '........................','..........kkkkk.........','.........kkkkkkk........',
     '........kkEEEEekk.......','........kkEeeegkk.......','........kkEeeegkk.......',
     '........kkEeeegkk.......','........kkEeeegkk.......','...kkkkkkkEeeegkkkkkk...',
@@ -5967,7 +6207,7 @@ const DESENHOS = {
     '..kkkkkkkkEeeegkkkkkkk..','...kkkkkkkEeeegkkkkkk...','........kkEeeegkk.......',
     '........kkEeeegkk.......','........kkEeeegkk.......','........kkeggggkk.......',
     '.........kkkkkkk........','..........kkkkk.........','........................'],
-  disco: [
+  'disco': [
     '..kkkkkkkkkkkkkkkkkkkk..','.kkkkkkkkkkkkkkkkkkkkkk.','kkcccccSSSSSSSSSSccccbkk',
     'kkcbbbbSSSSSZZZSSbbbbBkk','kkcbbbbSSSSSZZZSSbbbbBkk','kkcbbbbSSSSSZZZSSbbbbBkk',
     'kkcbbbbSSSSSZZZSSbbbbBkk','kkcbbbbSSSSSZZZSSbbbbBkk','kkcbbbbSSSSSSSSSSbbbbBkk',
@@ -5976,7 +6216,7 @@ const DESENHOS = {
     'kkcbbSSSSSSSSSSSSSSbbBkk','kkcbbSSSSSSSSSSSSSSbbBkk','kkcbbSSSSSSSSSSSSSSbbBkk',
     'kkcbbSSSSSSSSSSSSSSbbBkk','kkcbbSSSSSSSSSSSSSSbbBkk','kkcbbSSSSSSSSSSSSSSbbBkk',
     'kkbBBSSSSSSSSSSSSSSBBBkk','.kkkkkkkkkkkkkkkkkkkkkk.','..kkkkkkkkkkkkkkkkkkkk..'],
-  casa: [
+  'casa': [
     '...........kk...........','..........kkkk..........','.........kkRrkk.........',
     '........kkRRrrkkkkk.....','......kkkRRrrrrkkkkk....','.....kkkRRrrrrrrqqqkk...',
     '....kkRRRrrrrrrrqqqkk...','...kkRRrrrrrrrrrqqqkk...','..kkRRrrrrrrrrrrqqqrkk..',
@@ -5985,7 +6225,7 @@ const DESENHOS = {
     '..kkFFFFFFhhhhhFFFFFFkk.','..kkFFFFFFhhhhhFFFFFFkk.','..kkFFFFFFhhhhhFFFFFFkk.',
     '..kkFFFFFFhhhhhFFFFFFkk.','..kkFFFFFFhhhhhFFFFFFkk.','..kkFFFFFFhhhhhFFFFFFkk.',
     '..kkFFFFFFhhhhhFFFFFFkk.','...kkkkkkkkkkkkkkkkkkk..','....kkkkkkkkkkkkkkkkk...'],
-  ouro: [
+  'ouro': [
     '.....kkkkkk..kkkkkk.....','....kkRRRrkkkkccbbkk....','....kkrrrrrkkccbBkk.....',
     '.....kkRrrqkkcbbBkk.....','.....kkRrrqkkcbBBkk.....','.....kkrrrrrccbBkk......',
     '......kkRrrqcbbBkk......','......kkRrrqcbBBkk......','......kkrrYYYyBkk.......',
@@ -5994,7 +6234,7 @@ const DESENHOS = {
     '...kkYyooyyyyyyooyokk...','...kkYyyoyyyyyyoyyokk...','...kkYyyooyyyyooyyokk...',
     '...kkyyyyooyyooyyookk...','....kkyyyyooooyyookk....','.....kkyyyyyyyyookk.....',
     '......kkyoyyyoookk......','.......kkkyoookkk.......','........kkkkkkkk........'],
-  prata: [
+  'prata': [
     '.....kkkkkk..kkkkkk.....','....kkRRRrkkkkccbbkk....','....kkrrrrrkkccbBkk.....',
     '.....kkRrrqkkcbbBkk.....','.....kkRrrqkkcbBBkk.....','.....kkrrrrrccbBkk......',
     '......kkRrrqcbbBkk......','......kkRrrqcbBBkk......','......kkrrSSSsBkk.......',
@@ -6003,7 +6243,7 @@ const DESENHOS = {
     '...kkSszzsssssszzszkk...','...kkSsszsssssszsszkk...','...kkSsszzsssszzsszkk...',
     '...kksssszzsszzsszzkk...','....kksssszzzzsszzkk....','.....kksssssssszzkk.....',
     '......kkszssszzzkk......','.......kkkszzzkkk.......','........kkkkkkkk........'],
-  bronze: [
+  'bronze': [
     '.....kkkkkk..kkkkkk.....','....kkRRRrkkkkccbbkk....','....kkrrrrrkkccbBkk.....',
     '.....kkRrrqkkcbbBkk.....','.....kkRrrqkkcbBBkk.....','.....kkrrrrrccbBkk......',
     '......kkRrrqcbbBkk......','......kkRrrqcbBBkk......','......kkrrFFFfBkk.......',
@@ -6012,7 +6252,7 @@ const DESENHOS = {
     '...kkFfhhffffffhhfhkk...','...kkFffhffffffhffhkk...','...kkFffhhffffhhffhkk...',
     '...kkffffhhffhhffhhkk...','....kkffffhhhhffhhkk....','.....kkffffffffhhkk.....',
     '......kkfhfffhhhkk......','.......kkkfhhhkkk.......','........kkkkkkkk........'],
-  diamante: [
+  'diamante': [
     '........................','.......kkkkkkkkkk.......','......kkkkkkkkkkkk......',
     '.....kkCCCCCCCCCckk.....','....kkCCccccccccbbkk....','...kkCCCCccccccbbbbkk...',
     '...kkCCCCCccccbbbbbkk...','..kkCCCCCCCccbbbbbbbkk..','.kkCCCCCCCCCbbbbbbbbbkk.',
@@ -6021,7 +6261,7 @@ const DESENHOS = {
     '......kkccccccbbkk......','.......kkCccccbkk.......','.......kkccccbbkk.......',
     '........kkccbbkk........','.........kkcbkk.........','..........kkkk..........',
     '...........kk...........','........................','........................'],
-  mapa: [
+  'mapa': [
     '......kkk...............','...kkkkkkkkk.........kk.','.kkkkkEggkkkkkk...kkkkkk',
     'kkkEEEEggEEEkkkkkkkkkEEk','kEEEEEEggEEEEEEkkkEEEEEk','kEEEEEEggEEEEEEggEEEEEEk',
     'kEEEEEEggEEEEEEggEEEEEEk','kEEEEEEggEEEEEEggEEEEEEk','kEEEEEEggEEEEEEggEEEEEEk',
@@ -6030,7 +6270,7 @@ const DESENHOS = {
     'kEEEEEEggEEEEEEggEEEEEEk','kEEEEEEggEEEEEEggEEEEEEk','kEEEEEEggEEEEEEggEEEEEEk',
     'kEEEEEEggEEEEEEggEEEEEEk','kEEEEEkkkEEEEEEggEEEEEEk','kEEkkkkkkkkkEEEggEEEEkkk',
     'kkkkkk...kkkkkkggEkkkkk.','.kk.........kkkkkkkkk...','...............kkk......'],
-  escudo: [
+  'escudo': [
     '.......kkkkkkkkk........','....kkkkkkccbkkkkkk.....','...kkkkccccbbccbkkkkk...',
     '..kkccccbbbbbbbbccbkkk..','.kkccbbbbbbbbbbbbbbcbkk.','.kkcbbbbbbbCCbbbbbbbBkk.',
     '.kkcbbbbCCCCCCCCbbbbBkk.','.kkcbbbCCCCCCCCCCbbbBkk.','.kkcbbbCCCCCCCCCCbbbBkk.',
@@ -6039,7 +6279,7 @@ const DESENHOS = {
     '....kkbbbbCCCCbbBBkk....','.....kkbbbbCCbbBBkk.....','......kkbbbbbbBBkk......',
     '.......kkbbbbBBkk.......','........kkbbBBkk........','.........kkbBkk.........',
     '..........kkkk..........','...........kk...........','........................'],
-  lista: [
+  'lista': [
     '.......kkkkkkkkkk.......','...kkkkkSSSSSSSskkkkk...','..kkkkkkSsssssszkkkkkk..',
     '.kkWWWWWSsssssszWWWWWkk.','.kkWWWWWszzzzzzzWWWWWkk.','.kkWWWWWWWWWWWWWWWWWWkk.',
     '.kkWWWWWWWWWWWWWWWWWWkk.','.kkWWWWWWWWWWWWWWWWWWkk.','.kkWWWbbbWWWWWWWWWWWWkk.',
@@ -6048,7 +6288,7 @@ const DESENHOS = {
     '.kkWWWWWWWWWWWWWWWWWWkk.','.kkWWWbbbWWWWWWWWWWWWkk.','.kkWWWbbbWzzzzzzzzWWWkk.',
     '.kkWWWWWWWWWWWWWWWWWWkk.','.kkWWWWWWWWWWWWWWWWWWkk.','.kkWWWWWWWWWWWWWWWWWWkk.',
     '.kkWWWWWWWWWWWWWWWWWWkk.','..kkkkkkkkkkkkkkkkkkkk..','...kkkkkkkkkkkkkkkkkk...'],
-  torre: [
+  'torre': [
     '..........kkk...........','.........kkrkk..........','........kkRRrkk.........',
     '.......kkRRrrrkk........','......kkRRrrrrrkk.......','......kkRrrrrrrrkk......',
     '......kkrqqqqqqqkk......','.......kkSSSSSSkk.......','.......kkSSSSSSkk.......',
@@ -6057,7 +6297,7 @@ const DESENHOS = {
     '......kkSSSbbbSSkk......','......kkSSSbbbSSkk......','......kkSSSSSSSSkk......',
     '.....kkSSSSSSSSSSkk.....','.....kkSSSSSSSSSSkk.....','.....kkSSSSSSSSSSkk.....',
     '.....kkSSSSSSSSSSkk.....','......kkkkkkkkkkkk......','.......kkkkkkkkkk.......'],
-  estadio: [
+  'estadio': [
     '........................','........................','.......kkkkkkkkkk.......',
     '.....kkkkkkkkkkkkkk.....','...kkkkSSSSSSSSSskkkk...','..kkkSSSsssssssssSskkk..',
     '.kkSSSsssssssssssssSskk.','kkSSsssssssssssssssssskk','kkSsssssseeeeeesssssszkk',
@@ -6066,7 +6306,7 @@ const DESENHOS = {
     'kSsSSSSSsssssssssSSSsszk','kSSSsssssssssssssssssszk','kSSssssssssssssssssssssk',
     'ksssssssssssssssssssszzk','kksssssssssssssssssszzkk','.kkszzzssssssssszzzzzkk.',
     '..kkkkkszzzzzzzzzkkkkk..','...kkkkkkkkkkkkkkkkkk...','.......kkkkkkkkkk.......'],
-  cidade: [
+  'cidade': [
     '........................','..........kkkkkk........','.........kkkkkkkk.......',
     '........kkcccccbkk......','........kkcbbbbBkk......','........kkcbbbbBkk......',
     '..kkkkkkkkcbbbbBkk......','.kkkkkkkkkcbbbbBkk......','kkSSSSSSskcbbbbBkk......',
@@ -6075,7 +6315,7 @@ const DESENHOS = {
     'kkSssYYszkcYYbbBSYYsszkk','kkSssYYszkcYYbbBSYYsszkk','kkSssssszkcbbbbBSsssszkk',
     'kkSssssszkcbbbbBSsssszkk','kkSssYYszkcbbbbBSYYsszkk','kkSssYYszkcbbbbBSYYsszkk',
     'kkszzzzzzkbBBBBBszzzzzkk','.kkkkkkkkkkkkkkkkkkkkkk.','..kkkkkkk.kkkkkkkkkkkk..'],
-  recarregar: [
+  'recarregar': [
     '............kkkk........','........kkkkkekkk.......','......kkkkkkkEEekkk.....',
     '.....kkkEEEEEEeeekkkk...','....kkEEEeeeeEeeeEekkk..','...kkEEeeggggEeeeeeEekk.',
     '..kkEEegggkkkEeeeegggkk.','..kkEeggkkkkkEeegggkkk..','.kkEEegkkk.kkEeggkkkk...',
@@ -6084,7 +6324,7 @@ const DESENHOS = {
     '.kkeeegkkk....kkkEeggkk.','..kkEeeekkkkkkkkEEegkk..','..kkeeeeEekkkkEEEeggkk..',
     '...kkeeeeeEEEEEeeggkk...','....kkegeeeeeeegggkk....','.....kkkegggggggkkk.....',
     '......kkkkkkkkkkkk......','........kkkkkkkk........','........................'],
-  calendario: [
+  'calendario': [
     '.....kkkkk.....kkkkk....','....kksszkk...kksszkk...','..kkkkszZkkkkkkkszZkkk..',
     '.kkkkkszZkkkkkkkszZkkkk.','kkRRRRszZRRRRRRRszZRRrkk','kkRrrrzZZrrrrrrrzZZrrqkk',
     'kkRrrrrrrrrrrrrrrrrrrqkk','kkRrrrrrrrrrrrrrrrrrrqkk','kkrqqqqqqqqqqqqqqqqqqqkk',
@@ -6093,7 +6333,7 @@ const DESENHOS = {
     'kkWWWzzWWWzzWWzzWWzzWWkk','kkWWWzzWWWzzWWzzWWzzWWkk','kkWWWWWWWWWWWWWWWWWWWWkk',
     'kkWWWWWWWWWWWWWWWWWWWWkk','kkWWWzzWWWzzWWzzWWzzWWkk','kkWWWzzWWWzzWWzzWWzzWWkk',
     'kkWWWWWWWWWWWWWWWWWWWWkk','.kkkkkkkkkkkkkkkkkkkkkk.','..kkkkkkkkkkkkkkkkkkkk..'],
-  bandeira: [
+  'bandeira': [
     '...kkk..................','..kkkkkkkkkkkkkkkkkkkk..','.kksszkkkkkkkkkkkkkkkkk.',
     '.kkszZkkkkwwwwkkkkwwwwkk','.kkszZkkkkwwwwkkkkwwwwkk','.kkszZkkkkwwwwkkkkwwwwkk',
     '.kkszZkkkkwwwwkkkkwwwwkk','.kkszZwwwwkkkkwwwwkkkkkk','.kkszZwwwwkkkkwwwwkkkkkk',
@@ -6102,7 +6342,7 @@ const DESENHOS = {
     '.kkszZkkkkkkkkkkkkkkkkk.','.kkszZkkkkkkkkkkkkkkkk..','.kkszZkk................',
     '.kkszZkk................','.kkszZkk................','.kkszZkk................',
     '.kkszZkk................','.kkzZZkk................','..kkkkk.................'],
-  balao: [
+  'balao': [
     '........................','.......kkkkkkkkkk.......','.....kkkkkkkkkkkkkk.....',
     '....kkkYYYYYYYYYYkkk....','...kkYYYYYYYYYYYYYYkk...','..kkYYYYYYYYYYYYYYYYkk..',
     '.kkYYYYYYYYYYYYYYYYYYkk.','kkYYYYYYYYYYYYYYYYYYYYkk','kkYYYYYoYYYYYYYYoYYYYYkk',
@@ -6111,7 +6351,7 @@ const DESENHOS = {
     '...kkYYYYYYYYYYYYYYkk...','....kkYYYYYYYYYYYkkk....','....kkYYYYkkkkkkkkk.....',
     '....kkYYYkkkkkkkk.......','.....kkYYkk.............','.....kkYkk..............',
     '......kkk...............','.......k................','........................'],
-  tm: [
+  'tm': [
     '......kkkkkkkkkkkk......','.....kkkk++++++kkkk.....','....kk++++++++++++kk....',
     '...kk++++++**++++++kk...','..kk++++********++++kk..','.kk+++************+++kk.',
     'kk+++**************+++kk','kk+++**************+++kk','kk++****************++kk',
@@ -6120,7 +6360,7 @@ const DESENHOS = {
     'kk++***************----k','kk+++*************----kk','kk+++************----+kk',
     '.kk+++**********----+kk.','..kk++++*******----+kk..','...kk++++++**+----+kk...',
     '....kk+++++++----+kk....','.....kkkk+++----kkk.....','......kkkkkkkkkkkk......'],
-  hm: [
+  'hm': [
     '......kkkkkkkkkkkk......','.....kkkk++++++kkkk.....','....kk++++++++++++kk....',
     '...kk++++++**++++++kk...','..kk++++********++wwkk..','.kk+++***********www+kk.',
     'kk+++***********www+++kk','kk+++**********www*+++kk','kk++**********www***++kk',
@@ -6129,7 +6369,7 @@ const DESENHOS = {
     'kk++***www*********----k','kk+++*www*********----kk','kk+++www*********----+kk',
     '.kk+www*********----+kk.','..kkww++*******----+kk..','...kk++++++**+----+kk...',
     '....kk+++++++----+kk....','.....kkkk+++----kkk.....','......kkkkkkkkkkkk......'],
-  doce: [
+  'doce': [
     '........................','........................','........................',
     '........................','.k....................k.','kkk......kkkkkk......kkk',
     'kRkk...kkkkkkkkkk...kkRk','kRRkk.kkkRRRRRRkkk.kkRRk','kRRRkkkRRwwRRRRRRkkkRRRk',
@@ -6138,7 +6378,7 @@ const DESENHOS = {
     'kRRRkkkRRRRRRRRRRkkkRRRk','kRRkk.kkkRRRRRRkkk.kkRRk','kRkk...kkkkkkkkkk...kkRk',
     'kkk......kkkkkk......kkk','.k....................k.','........................',
     '........................','........................','........................'],
-  pocao: [
+  'pocao': [
     '.........kkkkkkk........','........kkSSSSskk.......','........kkSssszkk.......',
     '........kkSssszkk.......','........kkszzzzkk.......','.......kkkkkkkkkk.......',
     '......kkSSSSSSSSkk......','......kkSSSSSSSSkk......','......kkSSSSSSSSkk......',
@@ -6147,7 +6387,7 @@ const DESENHOS = {
     '..kkSS***+********SSkk..','...kkS************Skk...','...kkS************Skk...',
     '...kkS************Skk...','....kkS**********Skk....','.....kkS********Skk.....',
     '......kkSS****SSkk......','.......kkkkkkkkkk.......','........kkkkkkkk........'],
-  despertador: [
+  'despertador': [
     '.....k............k.....','...kkkkk........kkkkk...','..kkkskkk......kkkskkk..',
     '.kkSSSSskkkkkkkkSSSSskk.','.kkSssszkkkkkkkkSssszkk.','kksSssszsSSSSSSsSssszskk',
     '.kkSssszSSSSSSSSSssszkk.','.kkszzzzWWWWWWWWszzzzkk.','..kkksSWWWWkkWWWWSskkk..',
@@ -6156,7 +6396,7 @@ const DESENHOS = {
     '.kkSSWWWWWWWWWkkkWWSSkk.','..kkSSWWWWWWWWWWWWSSkk..','..kkSSWWWWWWWWWWWWSSkk..',
     '...kkSSWWWWWWWWWWSSkk...','...kkSSSWWWWWWWWSSSkk...','....kkSSSSSSSSSSSSkk....',
     '.....kkkSSSSSSSSkkk.....','......kkkkkkkkkkkk......','........kkkkkkkk........'],
-  coracao: [
+  'coracao': [
     '........................','......kkkk....kkkk......','....kkkkkkk..kkkkkkk....',
     '...kkkRRRrkkkkRRRrkkk...','..kkRRRRRrrkkRRrrrRrkk..','.kkRRrRRRrrRRRrrrrrrrkk.',
     '.kkRrRRRRRrrrrrrrrrrqkk.','kkRRrrRRRrrrrrrrrrrrrrkk','kkRrrrRRRrrrrrrrrrrrrqkk',
@@ -6165,7 +6405,7 @@ const DESENHOS = {
     '.....kkrrrrrrrrqqkk.....','......kkRrrrrrrqkk......','......kkrrrrrrqqkk......',
     '.......kkrrrrqqkk.......','........kkrrqqkk........','.........kkrqkk.........',
     '..........kkkk..........','...........kk...........','........................'],
-  orbe: [
+  'orbe': [
     '........................','........kkkkkkkk........','......kkkkkkkkkkkk......',
     '.....kkkPPPPPPPpkkk.....','....kkPPPpppppppPpkk....','...kkPPPPPpppppppppkk...',
     '..kkPPpPPPPpppppppppkk..','..kkPpPPPPPppppppppnkk..','.kkPPpPPPPPppppppppppkk.',
@@ -6174,7 +6414,7 @@ const DESENHOS = {
     '.kkppppppppppppppppnnkk.','..kkPppppppppppppppnkk..','..kkppppppppppppppnnkk..',
     '...kkppppppppppppnnkk...','....kkpnpppppppnnnkk....','....kkFFFFFFFFFFFfkk....',
     '....kkFffffffffffhkk....','....kkfhhhhhhhhhhhkk....','.....kkkkkkkkkkkkkk.....'],
-  barreira: [
+  'barreira': [
     '..........kkkk..........','........kkkCCkkk........','......kkkkCCCCkkkk......',
     '.....kkkCCCCCCCCkkk.....','...kkkCCCCCCCCCCCCkkk...','..kkkCCCCCCccCCCCCCkkk..',
     '.kkCCCCCCCccccCCCCCCCkk.','.kkCCCCCccccccccCCCCCkk.','.kkCCCcccccccccccCCCCkk.',
@@ -6183,7 +6423,7 @@ const DESENHOS = {
     '.kkCCCcccccccccccCCCCkk.','.kkCCCCCccccccccCCCCCkk.','.kkCCCCCCCccccCCCCCCCkk.',
     '..kkkCCCCCCccCCCCCCkkk..','...kkkCCCCCCCCCCCCkkk...','.....kkkCCCCCCCCkkk.....',
     '......kkkkCCCCkkkk......','........kkkCCkkk........','..........kkkk..........'],
-  faixa: [
+  'faixa': [
     '........kkkkkkkk........','.......kkRRRRRrkk.......','......kkRRrrrrrrkk......',
     '.....kkRRqqqqqrrrkk.....','....kkRRqqkkkkrrrrkk....','....kkRrqkkkkkkRrqkk....',
     '....kkRrqkkkkkkRrqkk....','....kkRrqkkqqkkRrqkk....','....kkRrqkqqqqkRrqkk....',
@@ -6192,7 +6432,7 @@ const DESENHOS = {
     '.....kkRrqkkkkqqqkk.....','....kkRRqqkkkkqqqqkk....','...kkRRrqkk..kkqqqqkk...',
     '...kkRrqqkk..kkqqqqkk...','..kkRRrqkk....kkqqqqkk..','..kkRrqqkk....kkqqqqkk..',
     '.kkRRrqkk......kkqqqqkk.','.kkrrqqkk......kkqqqqkk.','..kkrqkk........kkqqkk..'],
-  aviso: [
+  'aviso': [
     '...........kk...........','..........kkkk..........','.........kkYykk.........',
     '.........kkYokk.........','........kkYYyykk........','........kkYyyokk........',
     '.......kkYYyyyykk.......','......kkYYykkkyykk......','......kkYyykkkyokk......',
@@ -6201,7 +6441,7 @@ const DESENHOS = {
     '..kkYYyyyyyyyyyyyyyykk..','.kkYYyyyyyyyyyyyyyyyykk.','.kkYyyyyyyykkkyyyyyyokk.',
     'kkYYyyyyyyykkkyyyyyyyykk','kkYyyyyyyyykkkyyyyyyyokk','kyyoooooooooooooooooooyk',
     'kkkkkkkkkkkkkkkkkkkkkkkk','.kkkkkkkkkkkkkkkkkkkkkk.','........................'],
-  porta: [
+  'porta': [
     '...kkkkkkkkkkkkk........','..kkkkkkkkkkkkkkk.......','.kkFFFFFFFFFFFFfkk......',
     '.kkFfffffffffffhkk......','.kkFfffffffffffhkk......','.kkFffhhhhhhhhfhkk......',
     '.kkFffhhhhhhhhfhkkk.....','.kkFffhhhhhhhhfhkkkk....','.kkFffhhhhhhhhfhkkekk...',
@@ -6274,6 +6514,25 @@ function selo(nome, cls, cor){
     (cor ? ' style="color:' + cor + '"' : '') + '><use href="#s-' + nome + '"/></svg>';
 }
 function icone(nome, cls){ return `<img class="dex-icon ${cls||''}" src="${ICONES[nome]}" alt="">`; }
+/* ⚠️ UM DESENHO POR TIPO (21/09/2026, a pedido: *"crie um sprite para cada tipo de ataque, e a
+   cor do golpe deve seguir a mesma cor que o tipo dele"*).
+   ⚠️ A COR NÃO MORA NO SELO: ele é desenhado em `currentColor`, então quem a define é o
+   `color` de fora -- e lá ela sai do `TYPE_COLORS`, a MESMA tabela que pinta o selo de tipo do
+   jogo inteiro. É a mesma técnica do disco do TM, e é ela que faz os dois pedidos virarem UMA
+   coisa só: com a cor dentro do desenho seriam 17 tabelas de cor pra manter em dia com aquela. */
+const SELO_DO_TIPO = {
+  Normal: 'tipo-normal', Fire: 'tipo-fogo', Water: 'tipo-agua', Grass: 'tipo-planta',
+  Electric: 'tipo-eletrico', Ice: 'tipo-gelo', Fighting: 'tipo-lutador', Poison: 'tipo-veneno',
+  Ground: 'tipo-terra', Flying: 'tipo-voador', Psychic: 'tipo-psiquico', Bug: 'tipo-inseto',
+  Rock: 'tipo-pedra', Ghost: 'tipo-fantasma', Dragon: 'tipo-dragao', Dark: 'tipo-sombrio',
+  Steel: 'tipo-aco',
+};
+/* O selo do tipo, já na cor dele -- o `selo()` da casa já recebe a cor como terceiro argumento.
+   ⚠️ Sem tipo conhecido ele sai VAZIO, nunca com um símbolo genérico: um ícone errado ao lado do
+   nome de um golpe é pior que ícone nenhum. */
+function seloDoTipo(t, classe, cor){
+  return SELO_DO_TIPO[t] ? selo(SELO_DO_TIPO[t], classe, cor || TYPE_COLORS[t] || '#888') : '';
+}
 function typePill(t){
   return `<span class="type-pill" style="background:${TYPE_COLORS[t]||'#888'}">${TYPE_NAMES_PT[t]||t}</span>`;
 }
@@ -34454,9 +34713,10 @@ const ILHA_DEFS = '<defs><pattern id="sea" width="32" height="24" patternUnits="
    Cissy já era a líder da Ilha Mikan -- que é justamente a Enseada de Mikan onde o Resgate
    acontece. O par ilha->jogo não foi escolhido no gosto: o Resgate JÁ era em Mikan, e o desafio
    da Navel no original é uma subida contra o tempo, que é a Corrida.
-   ⚠️ DUAS FICAM EM BRANCO de propósito -- os dois jogos que faltam. Uma ilha apagada que DIZ
-   'em breve' é melhor que três ilhas e um buraco: o mapa é o arquipélago, não a lista do que já
-   existe.
+   ⚠️ E O ARQUIPÉLAGO FECHOU EM 21/09/2026, com a Queimada na Pummelo -- as CINCO têm jogo.
+   O ramo da ilha SEM jogo (o `<span>` apagado que diz 'em breve', em vez de um botão que não
+   responde) FICA no `ilhasMapaHtml`: ele é o que segura a próxima ilha que nascer antes do jogo
+   dela, e tirá-lo agora seria apagar a decisão junto com o caso dela.
    ⚠️ O `abrir` É A FUNÇÃO, nunca o NOME dela: um nome em texto viraria uma busca no `window` (que
    não existe no sandbox dos testes) ou um `onclick` montado com o nome dentro -- e handler que
    aponta pro nada é a família de defeito que este projeto mais paga (o `moveTeam` da Montanha, o
@@ -34471,7 +34731,7 @@ const ILHAS_LARANJA = [
   { id:'navel',   nome:'Navel',   lider:'Danny', jogo:'Corrida',  selo:'corrida',  abrir:abrirCorrida,  cx:266, cy:92,  r:48, giro:1.9 },
   { id:'trovita', nome:'Trovita', lider:'Rudy',  jogo:'Pescaria', selo:'pescaria', abrir:abrirPescaria, cx:180, cy:192, r:44, giro:3.1 },
   { id:'kumquat', nome:'Kumquat', lider:'Luana', jogo:'Seleção', selo:'estadio',  abrir:abrirSelecao,  cx:82,  cy:274, r:50, giro:0.9 },
-  { id:'pummelo', nome:'Pummelo', lider:'Drake', jogo:null,       selo:null,       abrir:null,          cx:274, cy:268, r:47, giro:2.5 },
+  { id:'pummelo', nome:'Pummelo', lider:'Drake', jogo:'Queimada', selo:'queimada', abrir:abrirQueimada, cx:274, cy:268, r:47, giro:2.5 },
 ];
 const ILHAS_W = 360, ILHAS_H = 380;   /* o viewBox do arquipélago */
 /* ⚠️ O PINO SAI DO CENTRO DA ILHA, em %. É esta função que faz as duas coisas terem UMA fonte. */
@@ -34557,8 +34817,10 @@ function renderIlhas(){
   <div class="box cursor">
     <h2>${selo('ilhas')} Ilhas Laranja</h2>
     <p>Cada ilha do arquipélago tem um desafio próprio. Toque na ilha pra encarar o dela.</p>
-    <p class="hint-text">${prontas} de ${ILHAS_LARANJA.length} abertas — as outras estão sendo
-       preparadas.</p>
+    ${/* a linha só existe enquanto FALTA alguma: com as cinco abertas, "5 de 5" é um contador
+         que não conta nada -- e "as outras estão sendo preparadas" seria mentira */''}
+    ${prontas < ILHAS_LARANJA.length ? `<p class="hint-text">${prontas} de ${ILHAS_LARANJA.length}
+       abertas — as outras estão sendo preparadas.</p>` : ''}
   </div>
   ${ilhasMapaHtml()}
   <button class="btn" onclick="sairDasIlhas()">⬅ Voltar</button>`;
@@ -36073,6 +36335,1032 @@ function resgateReiniciar(){
   render();
 }
 
+
+/* ============================================================================
+   QUEIMADA POKÉMON -- o quinto e último desafio das Ilhas Laranja (21/09/2026)
+   ----------------------------------------------------------------------------
+   Veio do `queimada-pokemon.html` da raiz, como os outros quatro vieram dos deles, e fecha o
+   arquipélago: a Ilha Pummelo, de Drake. Os dois se enfrentam num campo dividido ao meio, jogando
+   a bola um no outro -- desvia, RECEBE no tempo certo e devolve mais forte. Primeiro a 3
+   eliminações, com 120 s de limite e a lava fechando as bordas a cada 30 s.
+
+   ⚠️ O PROTÓTIPO É UM HTML INDEPENDENTE, com uma tabela própria de 18 espécies, HP fixo em 100 pra
+   todo mundo e cinco parceiros de demonstração em base64. Aqui ele reusa o jogo, e o pedido diz
+   exatamente onde:
+     • a LISTA é a da Corrida individual -- `towerEligiblePokemon` + a paginação de 10 do montador;
+     • a VELOCIDADE sai do atributo Speed, COM o nível (o `effectiveSpeed` do motor);
+     • o HP sai do `calcMaxHp`, a fórmula do jogo, COM o nível;
+     • o botão ATACAR recebe o NOME do golpe que o `melhorAtaque` escolheria contra aquele
+       adversário -- a MESMA função que decide o golpe numa batalha de jornada -- e o ESPECIAL é
+       esse ataque ×1,5;
+     • o tempo do escudo RECEBER sai da Defesa Especial;
+     • e quando um acerta o outro, a tela DIZ quanto de HP saiu.
+
+   ⚠️ O QUE **NÃO** DEU PRA REUSAR CRU, e foi medido antes de escrever -- é a mesma lição que a
+   velocidade da Corrida e a escala do sprite do Resgate já custaram: **a faixa crua do jogo não
+   cabe numa quadra.** Os dois números estão nas seções `QUEIMADA_V_*` e `QUEIMADA_GOLPES_*`.
+   ============================================================================ */
+
+const QUEIMADA_DURACAO = 120;        /* segundos de partida, como no protótipo */
+const QUEIMADA_KOS = 3;              /* primeiro a 3 eliminações vence */
+const QUEIMADA_W = 360, QUEIMADA_H = 350;   /* a quadra, no sistema do protótipo */
+
+/* ============================================================================
+   A VELOCIDADE DE MOVIMENTO -- o Speed do jogo, COM o nível
+   ----------------------------------------------------------------------------
+   ⚠️ ELA NÃO PODE ENTRAR CRUA, e o número diz por quê. O `effectiveSpeed` escala com o nível
+   desde 20/09/2026, e medido nas 250 espécies ele vai de **5** (Shuckle Lv.5) a **282**
+   (Electrode Lv.99) -- **56×**. O protótipo trabalha numa faixa de **85 a 160 px/s (1,9×)**, que é
+   o que faz os dois caberem na mesma quadra: linear, o mais lento levaria 18 segundos pra
+   atravessar o campo e o mais rápido meio segundo.
+   ⚠️ A COMPRESSÃO É A RAIZ, a mesma do `velocidadeNormal` da Corrida e do `RESGATE_SPRITE_K`.
+   E as constantes não foram escolhidas no gosto: com `72 + 48·√(speed/100)` o valor em Speed 100
+   é **120 px/s exatos**, que é o que o `baseSpeed` do protótipo devolve ali -- ou seja ela passa
+   pelo ponto de ancoragem dele --, e a faixa fica em **83 a 153 px/s (1,85×)**, contra os
+   1,88× dele.
+   ============================================================================ */
+const QUEIMADA_V_BASE = 72, QUEIMADA_V_FATOR = 48;
+function queimadaVelocidade(inst){
+  /* ⚠️ É O `speedDaCorrida`, que é o `effectiveSpeed` do motor: o shiny (1,20×) e a especialidade
+     (1,05×) entram de graça, e um buff novo do motor entra aqui junto. Uma segunda leitura de
+     Speed escrita à mão divergiria dele no primeiro ajuste. */
+  return QUEIMADA_V_BASE + QUEIMADA_V_FATOR * Math.sqrt(Math.max(0, speedDaCorrida(inst)) / 100);
+}
+/* O FÔLEGO -- o do protótipo, inteiro: ele cai andando e volta depois de um instante parado, e
+   com ele zerado o pokémon ainda anda a 45% da velocidade dele. */
+const QUEIMADA_FOLEGO_GASTO = 10, QUEIMADA_FOLEGO_VOLTA = 16;
+const QUEIMADA_FOLEGO_DESCANSO = 0.35, QUEIMADA_FOLEGO_PISO = 0.45;
+const queimadaFadiga = (a) => QUEIMADA_FOLEGO_PISO + (1 - QUEIMADA_FOLEGO_PISO) * a.folego / 100;
+
+/* ============================================================================
+   O TEMPO DO ESCUDO -- a Defesa Especial, e ela é a FÓRMULA DO PROTÓTIPO, verbatim
+   ----------------------------------------------------------------------------
+   ⚠️ E ELA PODE SER VERBATIM porque a ENTRADA é a mesma escala: o `effectiveSpDef` do jogo é a
+   Defesa Especial BASE da espécie (conferido: ele NÃO escala com o nível -- só a velocidade e o HP
+   escalam), exatamente como o campo do protótipo. Medido nas 250: **20 a 230**, mediana 65 -- e o
+   protótipo trabalha com 20 a 125.
+   O clamp é o dele, e é o que impede o Shuckle (230) de ficar com meio segundo de escudo.
+   ============================================================================ */
+const QUEIMADA_GUARDA_BASE = 0.14, QUEIMADA_GUARDA_FATOR = 0.002;
+const QUEIMADA_GUARDA_MIN = 0.22, QUEIMADA_GUARDA_MAX = 0.44;
+const QUEIMADA_GUARDA_RECARGA = 5;   /* 5 s entre um RECEBER e o próximo */
+function queimadaJanelaDeGuarda(inst){
+  return Math.max(QUEIMADA_GUARDA_MIN, Math.min(QUEIMADA_GUARDA_MAX,
+    QUEIMADA_GUARDA_BASE + effectiveSpDef(inst) * QUEIMADA_GUARDA_FATOR));
+}
+
+/* ============================================================================
+   O ATAQUE -- o golpe é o do motor, o dano é o dele comprimido
+   ----------------------------------------------------------------------------
+   ⚠️ O GOLPE É O `melhorAtaque(a, b)`, a MESMA função que decide o golpe numa batalha de jornada:
+   é ela que olha poder × tipo × STAB × (ataque/defesa) e devolve o que tira mais dano daquele
+   adversário. É isso que o pedido nomeia, e é de onde sai o rótulo do botão.
+   ⚠️ SEM GOLPE ESCOLHIDO ele devolve null -- e aí o `calcDamageNew` cai no motor de TIPO sozinho,
+   exatamente como faz na jornada com save antigo. O nome então sai do `nomeDoGolpe`, que é o
+   mesmo caminho do log. Ou seja: os dois casos da jornada continuam sendo os dois casos aqui.
+
+   ⚠️ O DANO É COMPRIMIDO, E ESSE É O ÚNICO DESVIO DESTA TELA -- medido antes de escrever, porque
+   era o risco real da feature. Com o dano CRU do motor, 1.200 pares sorteados no Lv.60 dão:
+       mediana **2,0 golpes** pra derrubar · p10 **0,7** · p90 **6,9** · pior caso **81**
+   ou seja **15,5% dos pares são ONE-SHOT** (o Snorlax mata um Alakazam num golpe) e um Magikarp
+   precisa de 60 golpes num Dragonite. Numa queimada de 120 s decidida por 3 eliminações, o
+   primeiro caso acaba a partida em três arremessos e o segundo nunca move a barra.
+   ⚠️ E PAREAR O ADVERSÁRIO NÃO RESOLVE SOZINHO: com o NPC pareado por BST o one-shot cai de
+   15,5% pra **9,0%**, e a cauda continua em 135 golpes. Ele ajuda, e está aqui -- mas a trava é
+   esta.
+   A REGRA É UMA SÓ: **uma eliminação nunca leva menos de 2 nem mais de 8 golpes.** O dano do motor
+   vale INTEIRO dentro dessa faixa -- é lá que a escolha do pokémon decide --, e só os extremos são
+   aparados. Medido em 9.000 pares (5 níveis × NPC pareado): **55,4% caem dentro**, 34,5% no piso e
+   10,1% no teto.
+   ⚠️ É A MESMA FORMA DO `MORIBUNDO_TETO_NO_CHEIO` e do `CHEIO_TETO_*` do motor: um teto expresso
+   em FRAÇÃO DA BARRA do alvo, e não um número solto.
+   ============================================================================ */
+const QUEIMADA_GOLPES_MIN = 2, QUEIMADA_GOLPES_MAX = 8;
+const QUEIMADA_ESPECIAL_MULT = 1.5;   /* "o especial é esse atk × 1,5" */
+function queimadaGolpeContra(inst, alvo){
+  const m = melhorAtaque(inst, alvo);
+  const op = { semCritico: true };
+  if(m) op.golpeFixo = m.golpe;
+  /* ⚠️ O RNG É FIXO NO MEIO DA FAIXA, e não `Math.random`: este número vai no RÓTULO do botão e
+     no cálculo do especial, então ele precisa ser o MESMO do começo ao fim da partida. Sorteado a
+     cada arremesso, o botão prometeria um dano e a barra mostraria outro.
+     E `semCritico` pelo mesmo motivo -- um crítico dobraria o número sem a tela poder avisar. */
+  const bruto = calcDamageNew(inst, alvo, () => 0.5, op);
+  const dano = Math.round(Math.max(alvo.maxHp / QUEIMADA_GOLPES_MAX,
+                                   Math.min(alvo.maxHp / QUEIMADA_GOLPES_MIN, bruto)));
+  /* sem golpe escolhido, o tipo é o que o motor de tipo acabou de gravar na instância */
+  const tipo = m ? GOLPES[m.golpe][0] : inst.lastMoveType;
+  const golpe = m ? m.golpe : null;
+  return { dano: Math.max(1, dano), bruto: bruto, golpe: golpe, tipo: tipo,
+           nome: (golpe ? nomeDoAtaque(golpe) : nomeDoGolpe(inst.speciesId, tipo)) || 'Ataque' };
+}
+
+/* A BOLA e o resto do ritmo -- os números do protótipo, sem exceção. */
+const QUEIMADA_TIRO_RECARGA = 0.85;
+const QUEIMADA_ESPECIAL_RECARGA = 45;   /* e ele começa INDISPONÍVEL, carregando */
+const QUEIMADA_BOLA_V = 170, QUEIMADA_BOLA_V_ESP = 280;
+const QUEIMADA_BOLA_V_DEVOLVIDA = 180;
+const QUEIMADA_REFLEXO_MULT = 1.25, QUEIMADA_REFLEXO_TETO = 1.6;
+const QUEIMADA_REFLEXO_DESCONTO = 5;    /* segundos que uma devolução tira da recarga do especial */
+const QUEIMADA_ATORDOA = 0.28;
+const QUEIMADA_RAIO = 20;               /* o alcance do acerto, em px da quadra */
+const QUEIMADA_LAVA_A_CADA = 30;
+const QUEIMADA_LAVA_AVISO = 3;
+/* ⚠️ O TAMANHO DO SPRITE É PROPORCIONAL, e é a conta do Resgate: `K·√lado`. Ela existe porque a
+   caixa do PMD vai de 17 a 73 px entre as 250 -- uniforme, um Squirtle sai do tamanho de um Lugia,
+   que foi reportado lá. */
+const QUEIMADA_SPRITE_K = 7;
+
+/* ============================================================================
+   O ESTADO
+   ⚠️ Ele vive FORA do `game`, como os outros quatro minigames: é um modo administrativo de teste,
+   nada aqui vai pro save nem pro Firestore, e os pokémon do jogador entram como CÓPIAS.
+   ⚠️ E É UM `const` QUE NUNCA É REATRIBUÍDO -- ele é MUTADO. O sandbox dos testes copia o valor na
+   criação, então reatribuir deixaria as funções internas olhando pro objeto velho e as travas
+   mediriam o nada. É a mesma decisão do `corrida` e do `pescaria`.
+   ============================================================================ */
+const queimada = {
+  fase: 'setup',        /* setup | carregando | jogando | fim */
+  escolhido: null,      /* o pokémon da lista, como o `towerEligiblePokemon` devolve */
+  picker: false,
+  atores: [], bolas: [], fx: [],
+  t: 0, decorrido: 0, ultimoQuadro: 0,
+  /* ⚠️ OS DOIS TEMPORIZADORES DO NPC E OS GOLPES PRECISAM EXISTIR AQUI TAMBÉM, e não só no
+     `queimadaZerar`: um campo que só nasça lá é `undefined` na primeira leitura, e o pintor do HUD
+     lê o primeiro golpe já no primeiro quadro. É a mesma nota do `escolhaPorFormato` da Corrida. */
+  proximaBola: 0, proximoPasso: 0, golpes: [],
+  rodadaAte: 0, proxId: 0,
+  recado: '', recadoAte: 0, aviso: '', faltando: [],
+  vistas: null,         /* as bolas que o NPC já reagiu -- um Set, montado no `queimadaZerar` */
+  laco: null, pausado: false,
+};
+/* O adversário é o líder da ilha onde este jogo mora -- lido da tabela, nunca escrito à mão:
+   trocar o nome dele lá tem que trocar aqui junto. */
+const queimadaLider = () => ((ILHAS_LARANJA || []).find(i => i.id === 'pummelo') || {}).lider || 'Drake';
+
+/* ============================================================================
+   O ADVERSÁRIO -- pareado por BST, no nível do pokémon do jogador
+   ----------------------------------------------------------------------------
+   ⚠️ O PEDIDO NÃO DIZ QUEM É O NPC, e a Corrida já ensinou o que acontece quando ele é sorteado
+   uniformemente: *"deixe o NPC melhor, ele está bem ruinzinho"* -- o jogador escolhe o melhor do
+   time dele e o sorteio dava ao NPC a mediana do bestiário.
+   ⚠️ AQUI O QUE DECIDE NÃO É UM ATRIBUTO SÓ: o HP decide quanto ele aguenta, o Speed o quanto ele
+   desvia, a Defesa Especial o escudo e o ataque o dano. O **BST** é o único número que cobre os
+   quatro -- e ele é a mesma régua que a líder da Seleção já usa pra montar o time dela.
+   Medido: o pareamento derruba o one-shot de **15,5% pra 9,0%**.
+   ⚠️ E ELE NÃO PODE SER A MESMA ESPÉCIE DO JOGADOR: dois sprites idênticos na mesma quadra,
+   separados só pela etiqueta, é uma tela que se lê errado -- a mesma razão do Resgate. Com 14
+   vizinhos por BST, excluir uma não custa nada.
+   ============================================================================ */
+const QUEIMADA_NPC_VIZINHOS = 14;
+function queimadaSortearNpc(speciesId, nivel){
+  const alvo = bstOf(speciesId);
+  const perto = finaisDaCorrida()
+    .filter(f => f !== speciesId)
+    .map(f => ({ f: f, d: Math.abs(bstOf(f) - alvo) }))
+    .sort((a, b) => a.d - b.d || String(a.f).localeCompare(String(b.f)))
+    .slice(0, QUEIMADA_NPC_VIZINHOS);
+  const escolhido = perto.length ? perto[Math.floor(Math.random() * perto.length)].f : speciesId;
+  const inst = createInstance(escolhido, nivel);
+  inst.hp = inst.maxHp = calcMaxHp(inst);
+  /* ⚠️ O NPC LEVA O MOVESET DA ESPÉCIE POR NÍVEL, que é a regra da casa pra quem NÃO escolhe golpe
+     (`equiparNpc`). Sem ele o adversário cairia no motor de tipo e o dano dele sairia do poder
+     implícito de 60 -- o que tornaria o pareamento por BST uma promessa que o ataque não cumpre. */
+  equiparNpc([inst]);
+  return inst;
+}
+/* ⚠️ A ESPECIALIDADE E O ITEM SÓ VALEM PRO POKÉMON DO JOGADOR, e o `ehDoJogador` NÃO TEM PADRÃO:
+   ela é conquista da CONTA, e um adversário de tipo Elétrico não pode ganhar 1,05× porque o
+   JOGADOR é especialista em Elétrico. É a mesma nota do `corridaInstancia`. */
+function queimadaInstancia(p, ehDoJogador){
+  const inst = createInstance(p.speciesId, p.level);
+  /* o `createInstance` não copia campo nenhum -- a armadilha que o shiny já custou três vezes */
+  if(p.shiny) inst.shiny = true;
+  if(p.ataques) inst.ataques = p.ataques.slice();
+  if(p.unown) inst.unown = p.unown;
+  if(p.slot != null) inst.slotDaConta = String(p.slot);
+  inst.hp = inst.maxHp = calcMaxHp(inst);
+  if(ehDoJogador){
+    applySpecialtyBuff([inst], game.specialties || []);
+    equiparItens([inst], game.equipados || {});
+  }
+  return inst;
+}
+/* ⚠️ O `towerEligiblePokemon` NÃO DEVOLVE OS GOLPES ESCOLHIDOS -- ele traz espécie, nível e shiny
+   e mais nada. Sem esta volta ao save, o pokémon do jogador entraria SEM `ataques` e cairia no
+   motor de tipo: o botão ATACAR mostraria o nome genérico do tipo em vez do golpe que ele
+   escolheu, que é exatamente o contrário do pedido. */
+function queimadaOriginalDoSave(p){
+  if(!p) return null;
+  const s = String(p.slot);
+  if(s.slice(0, 3) === 'ap:') return (aposentados() || [])[p.idx] || null;
+  const sv = game.saveSlots && game.saveSlots[Number(p.slot)];
+  return ((sv && sv.team) || [])[p.idx] || null;
+}
+
+/* ============================================================================
+   A ESCOLHA -- a MESMA lista da Corrida individual, paginada de 10 em 10
+   ----------------------------------------------------------------------------
+   ⚠️ ELA REUSA O `MONT_POR_PAGINA` e o `montadorPaginaValida` da Torre, do Ginásio da Cidade e da
+   Corrida: uma paginação própria divergiria delas na primeira mexida.
+   ============================================================================ */
+function queimadaElegiveis(){
+  /* ⚠️ ORDENADA PELO SPEED **DA QUEIMADA**, que é o número que decide o movimento na quadra -- a
+     mesma decisão da Corrida, e pelo mesmo motivo: o montador ordena por nível/nome/time, e aqui
+     a ordem útil é outra. */
+  return towerEligiblePokemon().map(p => {
+    const original = queimadaOriginalDoSave(p);
+    const cheio = original ? Object.assign({}, p, { ataques: original.ataques, unown: original.unown }) : p;
+    return Object.assign({}, cheio, { velocidade: Math.round(queimadaVelocidade(queimadaInstancia(cheio, true))) });
+  }).sort((a, b) => (b.velocidade - a.velocidade)
+                 || (b.level - a.level)
+                 || String(a.speciesId).localeCompare(String(b.speciesId)));
+}
+function queimadaAbrirPicker(){
+  if(queimada.fase === 'jogando' || queimada.fase === 'carregando') return;
+  /* ⚠️ ZERA A PÁGINA: o `game.montadorPagina` é COMPARTILHADO com a Torre, o Ginásio, a Corrida e
+     a Pescaria, e uma página 3 sobrando de lá abriria esta lista no meio. */
+  game.montadorPagina = 0;
+  queimada.picker = true; render();
+}
+function queimadaFecharPicker(){ queimada.picker = false; render(); }
+function queimadaIrParaPagina(i){
+  if(queimada.fase === 'jogando' || queimada.fase === 'carregando') return;
+  game.montadorPagina = i; render();
+}
+/* ⚠️ QUEM VALIDA É A AÇÃO, nunca a tela: um clique forjado no console não pode pôr na quadra um
+   pokémon que a conta não tem. A régua das 8 insígnias já vem no `towerEligiblePokemon`. */
+function queimadaEscolher(slot, idx){
+  if(queimada.fase === 'jogando' || queimada.fase === 'carregando') return;
+  const alvo = queimadaElegiveis().find(p => String(p.slot) === String(slot) && p.idx === idx);
+  if(!alvo) return;
+  queimada.escolhido = alvo;
+  queimada.picker = false;
+  queimada.aviso = '';
+  render();
+}
+
+/* ============================================================================
+   O MOTOR DA PARTIDA -- a mecânica do protótipo, com os números do jogo
+   ============================================================================ */
+/* ⚠️ O ATOR GUARDA A INSTÂNCIA, e o HP dele é o `maxHp` do jogo (o protótipo tinha 100 fixo pra
+   todo mundo). A instância é a mesma o jogo inteiro: ela é quem responde Speed, Sp.Def e dano. */
+function queimadaAtor(inst, i){
+  return {
+    inst: inst, lado: i,
+    x: 180, y: i ? 75 : 277, tx: 180, ty: i ? 75 : 277,
+    rumo: i ? Math.PI / 2 : -Math.PI / 2, andando: false, passo: 0, descanso: 0,
+    folego: 100, hp: inst.maxHp, maxHp: inst.maxHp, pontos: 0,
+    guardaAte: 0, guardaPronta: 0, especialPronto: QUEIMADA_ESPECIAL_RECARGA,
+    tiroPronto: 0, atordoadoAte: 0, piscaAte: 0, devolucoes: 0,
+  };
+}
+function queimadaDizer(s){ queimada.recado = s; queimada.recadoAte = queimada.t + 2.4; }
+const queimadaAtiva = () => queimada.fase === 'jogando' && !queimada.pausado && queimada.t >= queimada.rodadaAte;
+/* A LAVA: ela avança a cada 30 s e fecha as bordas EXTERNAS dos dois lados. */
+const queimadaLava = () => Math.min(3, Math.floor(queimada.decorrido / QUEIMADA_LAVA_A_CADA));
+function queimadaLimites(i){
+  const n = queimadaLava();
+  return { esq: 37 + 22 * n, dir: 323 - 22 * n,
+           topo: i ? 44 + 17 * n : 210, base: i ? 139 : 306 - 17 * n };
+}
+function queimadaIrPara(i, x, y){
+  const a = queimada.atores[i], b = queimadaLimites(i);
+  if(!a) return;
+  a.tx = Math.max(b.esq, Math.min(b.dir, x));
+  a.ty = Math.max(b.topo, Math.min(b.base, y));
+}
+/* quando a lava avança, quem estava na borda é trazido pra dentro -- sem dano, como no protótipo */
+function queimadaConter(){
+  queimada.atores.forEach((a, i) => {
+    const b = queimadaLimites(i);
+    a.x = Math.max(b.esq, Math.min(b.dir, a.x));
+    a.y = Math.max(b.topo, Math.min(b.base, a.y));
+    queimadaIrPara(i, a.tx, a.ty);
+  });
+}
+
+/* O ARREMESSO. O dano sai do `queimadaGolpeContra`, calculado uma vez no começo da partida --
+   ver a nota dele: o número precisa ser o mesmo que o botão promete. */
+function queimadaAtacar(i, especial){
+  if(!queimadaAtiva()) return;
+  const a = queimada.atores[i], b = queimada.atores[1 - i];
+  if(!a || !b) return;
+  if(queimada.t < a.tiroPronto || queimada.t < a.atordoadoAte || queimada.t < a.guardaAte) return;
+  if(especial && queimada.t < a.especialPronto) return;
+  const vel = especial ? QUEIMADA_BOLA_V_ESP : QUEIMADA_BOLA_V;
+  let x = b.x, y = b.y;
+  /* o especial mira ONDE O ALVO VAI ESTAR -- é o que o protótipo faz, e é o que o torna
+     perseguidor de verdade em vez de um tiro mais rápido */
+  if(especial && b.andando && queimada.t >= b.atordoadoAte){
+    const voo = Math.hypot(b.x - a.x, b.y - a.y) / vel;
+    const dx = b.tx - b.x, dy = b.ty - b.y, d = Math.hypot(dx, dy);
+    const passo = Math.min(d, queimadaVelocidade(b.inst) * queimadaFadiga(b) * voo);
+    if(d > 0){ x += dx / d * passo; y += dy / d * passo; }
+  }
+  const ang = Math.atan2(y - a.y, x - a.x);
+  const base = queimada.golpes[i].dano;
+  const dano = especial ? Math.round(base * QUEIMADA_ESPECIAL_MULT) : base;
+  queimada.bolas.push({
+    id: ++queimada.proxId, dono: i, x: a.x, y: a.y,
+    vx: Math.cos(ang) * vel, vy: Math.sin(ang) * vel,
+    dano: dano, base: dano, nasceu: queimada.t, devolvida: 0, especial: !!especial,
+  });
+  a.tiroPronto = queimada.t + QUEIMADA_TIRO_RECARGA;
+  if(especial){
+    a.especialPronto = queimada.t + QUEIMADA_ESPECIAL_RECARGA;
+    queimadaDizer(i ? queimadaLider() + ' lançou um Especial!'
+                    : 'Especial! ' + queimada.golpes[0].nome + ' ×' + QUEIMADA_ESPECIAL_MULT
+                      + ' -- persegue o alvo e atravessa o RECEBER.');
+  }
+}
+/* O RECEBER. A janela sai da Defesa Especial (ver `queimadaJanelaDeGuarda`). */
+function queimadaReceber(i){
+  if(!queimadaAtiva()) return;
+  const a = queimada.atores[i];
+  if(!a || queimada.t < a.guardaPronta || queimada.t < a.atordoadoAte) return;
+  a.guardaAte = queimada.t + queimadaJanelaDeGuarda(a.inst);
+  a.guardaPronta = queimada.t + QUEIMADA_GUARDA_RECARGA;
+  if(i === 0) queimadaDizer('Receber ativo! O golpe precisa tocar você agora.');
+}
+/* A DEVOLUÇÃO: a bola troca de dono, ganha 25% de dano (teto de 160% do original) e desconta 5 s
+   da recarga do especial de quem devolveu. O especial NÃO se devolve -- ele atravessa. */
+function queimadaDevolver(bola, i){
+  if(bola.especial) return;
+  const a = queimada.atores[i], b = queimada.atores[1 - i];
+  const ang = Math.atan2(b.y - a.y, b.x - a.x);
+  bola.dono = i;
+  bola.dano = Math.min(Math.round(bola.dano * QUEIMADA_REFLEXO_MULT),
+                       Math.round(bola.base * QUEIMADA_REFLEXO_TETO));
+  bola.devolvida++;
+  bola.vx = Math.cos(ang) * QUEIMADA_BOLA_V_DEVOLVIDA;
+  bola.vy = Math.sin(ang) * QUEIMADA_BOLA_V_DEVOLVIDA;
+  bola.x = a.x + Math.cos(ang) * 24;
+  bola.y = a.y + Math.sin(ang) * 24;
+  bola.nasceu = queimada.t;
+  a.guardaAte = 0;
+  a.devolucoes++;
+  const poupado = Math.min(QUEIMADA_REFLEXO_DESCONTO, Math.max(0, a.especialPronto - queimada.t));
+  a.especialPronto = Math.max(queimada.t, a.especialPronto - QUEIMADA_REFLEXO_DESCONTO);
+  queimada.fx.push({ x: a.x, y: a.y, txt: 'DEVOLVEU!', vida: 0.8, cor: '#ffdf73' });
+  if(i === 0){
+    queimadaDizer('Defesa perfeita! Devolveu com ' + bola.dano + ' de dano.'
+      + (poupado > 0 ? ' Especial em ' + Math.ceil(a.especialPronto - queimada.t) + ' s.' : ''));
+  }
+}
+
+/* O ADVERSÁRIO. O ritmo e as chances são os do protótipo: ele atira a cada ~1 s, se mexe, tenta
+   RECEBER quando dá tempo e desvia do especial. */
+function queimadaNpc(){
+  const a = queimada.atores[1];
+  if(queimada.t >= queimada.proximaBola){
+    queimadaAtacar(1, queimada.t >= a.especialPronto);
+    queimada.proximaBola = queimada.t + 0.95 + Math.random() * 0.6;
+  }
+  if(queimada.t >= queimada.proximoPasso){
+    queimada.proximoPasso = queimada.t + 0.7 + Math.random() * 0.6;
+    if(Math.random() < 0.55) queimadaIrPara(1, 65 + Math.random() * 230, 55 + Math.random() * 65);
+  }
+  for(const bola of queimada.bolas){
+    if(bola.dono !== 0 || queimada.t - bola.nasceu < 0.24) continue;
+    if(Math.abs(bola.vy) < 1) continue;
+    const eta = (a.y - bola.y) / bola.vy;
+    if(eta < 0 || eta > 1) continue;
+    if(Math.abs(bola.x + bola.vx * eta - a.x) >= 27) continue;
+    if(bola.especial){
+      if(!queimada.vistas.has(bola.id)){
+        queimada.vistas.add(bola.id);
+        queimadaIrPara(1, a.x + (a.x < 180 ? 90 : -90), a.y);
+      }
+      continue;
+    }
+    if(queimada.vistas.has(bola.id)) continue;
+    if(eta < queimadaJanelaDeGuarda(a.inst) * 0.75 && queimada.t >= a.guardaPronta){
+      queimada.vistas.add(bola.id);
+      if(Math.random() < 0.58) queimadaReceber(1);
+    } else if(eta > 0.38){
+      queimada.vistas.add(bola.id);
+      if(Math.random() < 0.6) queimadaIrPara(1, a.x + (a.x < 180 ? 65 : -65), a.y);
+    }
+  }
+}
+
+function queimadaAndar(a, i, dt){
+  a.andando = false;
+  const dx = a.tx - a.x, dy = a.ty - a.y, d = Math.hypot(dx, dy);
+  const vel = queimadaVelocidade(a.inst) * queimadaFadiga(a);
+  const passo = Math.min(vel * dt, d);
+  if(d > 0.05 && queimada.t >= a.atordoadoAte){
+    a.x += dx / d * passo; a.y += dy / d * passo;
+    a.rumo = Math.atan2(dy, dx);
+    a.passo += passo / 12;
+    a.andando = true; a.descanso = 0;
+    a.folego = Math.max(0, Math.min(100, a.folego - QUEIMADA_FOLEGO_GASTO * (passo / vel)));
+  } else {
+    a.descanso += dt;
+    if(a.descanso > QUEIMADA_FOLEGO_DESCANSO){
+      a.folego = Math.max(0, Math.min(100, a.folego
+        + QUEIMADA_FOLEGO_VOLTA * Math.min(dt, a.descanso - QUEIMADA_FOLEGO_DESCANSO)));
+    }
+  }
+}
+/* o especial corrige a rota durante o voo -- e a curva tem limite, então ainda dá pra desviar */
+function queimadaGuiar(bola, dt){
+  if(!bola.especial) return;
+  const alvo = queimada.atores[1 - bola.dono];
+  const quer = Math.atan2(alvo.y - bola.y, alvo.x - bola.x);
+  const ang = Math.atan2(bola.vy, bola.vx);
+  const dif = Math.atan2(Math.sin(quer - ang), Math.cos(quer - ang));
+  const novo = ang + Math.max(-2.8 * dt, Math.min(2.8 * dt, dif));
+  bola.vx = Math.cos(novo) * QUEIMADA_BOLA_V_ESP;
+  bola.vy = Math.sin(novo) * QUEIMADA_BOLA_V_ESP;
+}
+
+/* A ELIMINAÇÃO: quem zerou marca ponto e os dois voltam ao centro com HP e fôlego cheios. A
+   recarga do especial NÃO reinicia entre eliminações -- é o protótipo. */
+function queimadaEliminacao(){
+  const [a, b] = queimada.atores;
+  if(a.hp > 0 && b.hp > 0) return;
+  if(b.hp <= 0) a.pontos++;
+  if(a.hp <= 0) b.pontos++;
+  queimada.bolas = [];
+  if(a.pontos >= QUEIMADA_KOS || b.pontos >= QUEIMADA_KOS){ queimadaTerminar(); return; }
+  queimada.rodadaAte = queimada.t + 1.2;
+  queimadaDizer(a.hp <= 0 && b.hp <= 0 ? 'Eliminação dupla!'
+    : b.hp <= 0 ? 'Você queimou o rival!' : 'Você foi queimado!');
+  queimada.atores = queimada.atores.map((velho, i) => {
+    const novo = queimadaAtor(velho.inst, i);
+    novo.pontos = velho.pontos; novo.devolucoes = velho.devolucoes;
+    novo.especialPronto = velho.especialPronto;
+    novo.tiroPronto = queimada.rodadaAte;
+    return novo;
+  });
+  queimadaConter();
+  queimada.proximaBola = queimada.rodadaAte + 0.8;
+}
+function queimadaTerminar(){
+  queimada.fase = 'fim';
+  queimada.bolas = [];
+  if(queimada.laco){ cancelAnimationFrame(queimada.laco); queimada.laco = null; }
+  queimadaDizer('Partida encerrada.');
+  render();
+}
+
+function queimadaPasso(dt){
+  if(queimada.fase !== 'jogando' || queimada.pausado) return;
+  dt = Math.min(dt, QUEIMADA_DURACAO - queimada.decorrido);
+  const antes = queimadaLava();
+  queimada.t += dt; queimada.decorrido += dt;
+  if(queimadaLava() !== antes){ queimadaConter(); queimadaDizer('A lava avançou! A quadra ficou menor.'); }
+  queimada.fx.forEach(f => { f.vida -= dt; });
+  queimada.fx = queimada.fx.filter(f => f.vida > 0);
+  if(queimada.t >= queimada.rodadaAte){
+    queimadaNpc();
+    queimada.atores.forEach((a, i) => queimadaAndar(a, i, dt));
+    const mortas = new Set();
+    for(const bola of queimada.bolas){
+      queimadaGuiar(bola, dt);
+      const x0 = bola.x, y0 = bola.y;
+      bola.x += bola.vx * dt; bola.y += bola.vy * dt;
+      const i = 1 - bola.dono, a = queimada.atores[i];
+      /* o acerto é medido contra o SEGMENTO do quadro, não contra o ponto final: a bola anda até
+         5 px por quadro a 60 fps e bem mais num quadro lento, e ponto a ponto ela atravessaria */
+      const dx = bola.x - x0, dy = bola.y - y0, l = dx * dx + dy * dy;
+      const u = l ? Math.max(0, Math.min(1, ((a.x - x0) * dx + (a.y - y0) * dy) / l)) : 0;
+      if(Math.hypot(x0 + dx * u - a.x, y0 + dy * u - a.y) < QUEIMADA_RAIO){
+        if(!bola.especial && queimada.t <= a.guardaAte && a.guardaAte > 0){
+          queimadaDevolver(bola, i);
+        } else {
+          a.hp = Math.max(0, a.hp - bola.dano);
+          a.atordoadoAte = queimada.t + QUEIMADA_ATORDOA;
+          a.piscaAte = queimada.t + 0.18;
+          mortas.add(bola.id);
+          /* ⚠️ QUANTO DE HP SAIU, na quadra E na linha de recado -- foi o pedido, e ele vale pros
+             DOIS lados: o protótipo só dizia quando era o jogador que apanhava. */
+          queimada.fx.push({ x: a.x, y: a.y - 25, txt: '−' + bola.dano + ' HP', vida: 0.8, cor: '#fff4da' });
+          const quem = (j) => j === 0 ? escapeHtmlSafe(nomeDoTreinador()) : queimadaLider();
+          queimadaDizer(quem(bola.dono) + ' acertou ' + quem(i) + ' e tirou ' + bola.dano + ' de HP'
+            + (bola.devolvida ? ' (devolvida)' : '') + '.');
+        }
+      }
+      if(bola.x < 0 || bola.x > QUEIMADA_W || bola.y < 12 || bola.y > QUEIMADA_H - 12
+         || queimada.t - bola.nasceu > 4) mortas.add(bola.id);
+    }
+    queimada.bolas = queimada.bolas.filter(b => !mortas.has(b.id));
+    queimadaEliminacao();
+  }
+  if(queimada.decorrido >= QUEIMADA_DURACAO && queimada.fase === 'jogando') queimadaTerminar();
+}
+/* QUEM VENCEU: eliminações primeiro, HP como desempate -- e empate de verdade existe. */
+function queimadaVencedor(){
+  const [a, b] = queimada.atores;
+  if(!a || !b) return 0;
+  return a.pontos !== b.pontos ? Math.sign(a.pontos - b.pontos) : Math.sign(a.hp - b.hp);
+}
+
+/* ============================================================================
+   A LARGADA e o LAÇO
+   ============================================================================ */
+function queimadaZerar(){
+  if(queimada.laco){ cancelAnimationFrame(queimada.laco); queimada.laco = null; }
+  queimada.fase = 'setup'; queimada.atores = []; queimada.bolas = []; queimada.fx = [];
+  queimada.t = 0; queimada.decorrido = 0; queimada.ultimoQuadro = 0;
+  queimada.proximaBola = 0; queimada.proximoPasso = 0; queimada.rodadaAte = 0;
+  queimada.pausado = false;
+  queimada.recado = ''; queimada.recadoAte = 0; queimada.aviso = ''; queimada.faltando = [];
+  queimada.vistas = new Set();
+  queimada.golpes = [];
+}
+async function queimadaComecar(){
+  if(!queimada.escolhido || queimada.fase === 'jogando' || queimada.fase === 'carregando') return;
+  /* ⚠️ A PERMISSÃO É CONFERIDA DE NOVO AQUI: o pino da ilha é só a porta, e esta é a ação. */
+  if(game.ehAdmin !== true){ queimada.aviso = 'Este modo é administrativo.'; render(); return; }
+  const meu = queimadaInstancia(queimada.escolhido, true);
+  const dele = queimadaSortearNpc(queimada.escolhido.speciesId, queimada.escolhido.level);
+
+  /* ⚠️ OS SPRITES VÊM ANTES DA PARTIDA, e se algum faltar ela NÃO começa -- a mesma regra dos
+     outros minigames: nunca se substitui o sprite de uma espécie pelo de outra, e a tela diz QUAL
+     faltou, pelo nome. */
+  queimada.fase = 'carregando'; queimada.faltando = []; queimada.aviso = ''; render();
+  const faltou = [];
+  await Promise.all([meu, dele].map(p => pmdCarregar(p.speciesId, p.shiny)
+    .catch(() => { faltou.push(p.speciesId); })));
+  if(faltou.length){
+    queimada.fase = 'setup';
+    queimada.faltando = faltou;
+    queimada.aviso = 'Faltou o sprite de: ' + faltou.map(id => (SPECIES[id] || {}).name || id).join(', ') + '.';
+    render(); return;
+  }
+
+  queimadaZerar();
+  queimada.atores = [queimadaAtor(meu, 0), queimadaAtor(dele, 1)];
+  /* ⚠️ OS DOIS GOLPES SÃO CALCULADOS UMA VEZ, aqui: o par é fixo pela partida inteira, e o número
+     vai no rótulo do botão. Recalculado a cada arremesso, ele dançaria com o sorteio do motor. */
+  queimada.golpes = [queimadaGolpeContra(meu, dele), queimadaGolpeContra(dele, meu)];
+  queimada.fase = 'jogando';
+  queimada.proximaBola = 1.2; queimada.proximoPasso = 0.5;
+  queimadaDizer('Você joga embaixo. Mova-se e toque em ' + queimada.golpes[0].nome.toUpperCase() + '!');
+  render();
+  /* ⚠️ E A PÁGINA VAI PRO TOPO: a largada NÃO troca de `game.screen`, então o `render()` trata isso
+     como a MESMA tela e repõe a rolagem anterior -- quem estava embaixo na lista via a quadra
+     começar pela metade. Ele vem DEPOIS do render, senão o próprio render desfaria. */
+  window.scrollTo(0, 0);
+  queimadaLaco();
+}
+function queimadaReiniciar(){ queimadaZerar(); render(); }
+function queimadaPausar(){
+  if(queimada.fase !== 'jogando') return;
+  queimada.pausado = !queimada.pausado;
+  queimada.ultimoQuadro = 0;
+  render();
+}
+/* ⚠️ O LAÇO PAUSA COM A ABA OCULTA, e sem avançar tempo: o `ultimoQuadro` é zerado, então a volta
+   seguinte tem dt=0 em vez de um salto do tamanho do tempo em que a aba ficou escondida.
+   ⚠️ E ELE PÁRA QUANDO A TELA MUDA: sem isso ele continuaria pintando num canvas que já não está
+   na página -- e, pior, escrevendo nos ids do HUD de outra tela. É a guarda que o Resgate ganhou. */
+function queimadaLaco(){
+  if(queimada.laco) cancelAnimationFrame(queimada.laco);
+  const passo = (agora) => {
+    if(queimada.fase !== 'jogando' || game.screen !== 'queimada'){ queimada.laco = null; return; }
+    if(document.hidden){ queimada.ultimoQuadro = 0; queimada.laco = requestAnimationFrame(passo); return; }
+    const dt = queimada.ultimoQuadro ? Math.min((agora - queimada.ultimoQuadro) / 1000, 0.05) : 0;
+    queimada.ultimoQuadro = agora;
+    queimadaPasso(dt);
+    queimadaPintar();
+    queimadaPintarHud();
+    queimada.laco = requestAnimationFrame(passo);
+  };
+  queimada.laco = requestAnimationFrame(passo);
+}
+
+/* ============================================================================
+   OS CONTROLES
+   ⚠️ ARRASTAR VALE SÓ NA SUA METADE DA QUADRA -- é a regra do protótipo, e é ela que impede o
+   jogador de mandar o pokémon pro campo do adversário.
+   ============================================================================ */
+function queimadaMirar(ev){
+  const cv = document.getElementById('queimadaCanvas');
+  if(!cv) return;
+  const r = cv.getBoundingClientRect();
+  const x = (ev.clientX - r.left) / r.width * QUEIMADA_W;
+  const y = (ev.clientY - r.top) / r.height * QUEIMADA_H;
+  if(y < QUEIMADA_H / 2) return;
+  queimadaIrPara(0, x, y);
+}
+/* ⚠️ O TOQUE MARCA UM DESTINO, ELE NÃO ARRASTA (21/09/2026, reportado: *"quando eu clico na arena
+   com o mouse, ele fica seguindo o rastro do mouse, ele deve ir até onde foi clicado e só trocar a
+   direção caso o usuário toque novamente em outro canto da arena"*).
+   ⚠️ E ISSO NÃO É SÓ TIRAR O `pointermove`: com o arrasto, o alvo era reescrito 60 vezes por
+   segundo e o pokémon nunca CHEGAVA -- ele perseguia o cursor. Marcando o destino uma vez, ele
+   anda até lá e PARA, que é o que devolve a mão do jogador pros botões. */
+function queimadaPonteiroDesce(ev){
+  if(!queimadaAtiva()) return;
+  ev.preventDefault();
+  queimadaMirar(ev);
+}
+/* ⚠️ `type="button"` MAIS a guarda do `keydown`: um <button> focado dispara `click` com Espaço e
+   com Enter por padrão do navegador, e aqui isso daria um arremesso sem o jogador ter tocado. */
+function queimadaTeclaNoBotao(ev){
+  if(ev.key === ' ' || ev.code === 'Space' || ev.key === 'Enter'){ ev.preventDefault(); }
+}
+
+/* ============================================================================
+   O DESENHO -- quadra vista de cima
+   ⚠️ QUEM PINTA É O DOM, nunca o `render()`: a regra da casa ("não redesenhar a tela durante
+   animações") vale inteira aqui. Um `render()` por quadro recriaria o <canvas> e os botões 60
+   vezes por segundo, e o `pointerdown` de ATACAR se perderia no meio do toque.
+   ============================================================================ */
+function queimadaPintar(){
+  const cv = document.getElementById('queimadaCanvas');
+  if(!cv) return;
+  const ctx = cv.getContext('2d');
+  ctx.setTransform(2, 0, 0, 2, 0, 0);
+  ctx.imageSmoothingEnabled = false;
+  const t = queimada.t;
+  const ret = (x, y, w, h, cor) => { ctx.fillStyle = cor; ctx.fillRect(x, y, w, h); };
+
+  /* a grama em volta, o piso e as duas metades */
+  ret(0, 0, QUEIMADA_W, QUEIMADA_H, '#69a76b');
+  for(let y = 0; y < QUEIMADA_H; y += 16) for(let x = 0; x < QUEIMADA_W; x += 16){
+    ret(x + 3, y + 4, 2, 3, '#82bb7555'); ret(x + 10, y + 11, 3, 2, '#37785033');
+  }
+  ret(16, 17, 328, 318, '#d7b879');
+  ret(22, 23, 316, 304, '#efdba6');
+  ret(27, 28, 306, 142, '#f1d4a0');
+  ret(27, 181, 306, 142, '#e4ddb1');
+  ctx.strokeStyle = '#fff9dc'; ctx.lineWidth = 3;
+  ctx.strokeRect(29, 30, 302, 290);
+  ctx.beginPath(); ctx.moveTo(29, 175); ctx.lineTo(331, 175); ctx.stroke();
+  ctx.beginPath(); ctx.arc(180, 175, 32, 0, Math.PI * 2); ctx.stroke();
+  ctx.font = 'bold 9px monospace'; ctx.textAlign = 'center';
+  ctx.fillStyle = '#aa7a47'; ctx.fillText('CAMPO DE ' + queimadaLider().toUpperCase(), 180, 43);
+  ctx.fillStyle = '#64827d'; ctx.fillText('SEU CAMPO', 180, 313);
+  queimadaPintarLava(ctx);
+
+  /* o traço até onde o jogador mandou o pokémon ir */
+  const eu = queimada.atores[0];
+  if(eu && queimada.fase === 'jogando'){
+    ctx.setLineDash([3, 4]); ctx.strokeStyle = '#3478b87a'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(eu.x, eu.y); ctx.lineTo(eu.tx, eu.ty); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  queimada.atores.forEach((a, i) => queimadaDesenharAtor(ctx, a, i, t));
+  queimada.bolas.forEach(b => {
+    const cor = b.especial ? '#b254ed' : b.devolvida ? '#e05df2' : b.dono ? '#ed7a37' : '#328bea';
+    ctx.strokeStyle = cor + '77'; ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.moveTo(b.x - b.vx * 0.08, b.y - b.vy * 0.08); ctx.lineTo(b.x, b.y); ctx.stroke();
+    ctx.fillStyle = cor;
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.devolvida ? 9 : 7, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#fff9dc';
+    ctx.beginPath(); ctx.arc(b.x - 2, b.y - 2, 3, 0, Math.PI * 2); ctx.fill();
+  });
+  /* ⚠️ O "−N HP" SOBE E APAGA, e é ele que responde ao pedido de "exibir quanto de HP tirou" NA
+     QUADRA -- a linha de recado diz a mesma coisa em palavras, embaixo. */
+  queimada.fx.forEach(f => {
+    const y = f.y - 15 - (0.8 - f.vida) * 16;
+    ctx.font = 'bold 12px monospace'; ctx.textAlign = 'center';
+    ctx.lineWidth = 3; ctx.strokeStyle = '#254354';
+    ctx.strokeText(f.txt, f.x, y);
+    ctx.fillStyle = f.cor; ctx.fillText(f.txt, f.x, y);
+  });
+  ctx.textAlign = 'left';
+}
+function queimadaPintarLava(ctx){
+  const n = queimadaLava();
+  const x = 29 + n * 22, y = 30 + n * 17, w = 302 - n * 44, h = 290 - n * 34;
+  if(n){
+    ctx.fillStyle = '#b43725';
+    ctx.fillRect(16, 17, 328, y - 17);
+    ctx.fillRect(16, y + h, 328, 335 - y - h);
+    ctx.fillRect(16, y, x - 16, h);
+    ctx.fillRect(x + w, y, 344 - x - w, h);
+    for(let yy = 20; yy < 332; yy += 12) for(let xx = 18; xx < 342; xx += 17){
+      if(xx < x - 5 || xx > x + w || yy < y - 4 || yy > y + h){
+        ctx.fillStyle = (Math.floor(queimada.t * 3) + xx + yy) % 3 ? '#ed672c' : '#ffbd4b';
+        ctx.fillRect(xx, yy, 8, 4);
+      }
+    }
+    ctx.strokeStyle = '#ffdd80'; ctx.lineWidth = 3; ctx.strokeRect(x, y, w, h);
+  }
+  const falta = QUEIMADA_LAVA_A_CADA - queimada.decorrido % QUEIMADA_LAVA_A_CADA;
+  if(queimada.fase === 'jogando' && n < 3 && falta <= QUEIMADA_LAVA_AVISO){
+    ctx.save();
+    ctx.strokeStyle = '#df4d25'; ctx.setLineDash([6, 4]); ctx.lineWidth = 2;
+    ctx.strokeRect(x + 22, y + 17, w - 44, h - 34);
+    ctx.font = 'bold 11px monospace'; ctx.textAlign = 'center'; ctx.fillStyle = '#923a29';
+    ctx.fillText('LAVA EM ' + Math.ceil(falta) + ' s', 180, 165);
+    ctx.restore();
+  }
+}
+/* ⚠️ A LINHA DA FOLHA SAI DO RUMO (`pmdLinhaDoRumo`), que é o mesmo caminho do Resgate: aqui o
+   pokémon vira pra onde está indo, ao contrário da Corrida, que desenha sempre de costas. */
+function queimadaDesenharAtor(ctx, a, i, t){
+  const dados = pmdDados(a.inst);
+  ctx.fillStyle = i ? '#cd8b4355' : '#3879ba55';
+  ctx.beginPath(); ctx.ellipse(a.x, a.y + 12, 21, 7, 0, 0, Math.PI * 2); ctx.fill();
+  if(a.guardaAte > queimada.t){
+    ctx.fillStyle = '#ffe47755'; ctx.strokeStyle = '#efb230'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(a.x, a.y, 26, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  }
+  if(dados && dados !== 'erro'){
+    const linha = pmdLinhaDoRumo(dados, a.rumo);
+    const caixas = pmdCaixasDaLinha(dados, linha);
+    const quadro = a.andando ? Math.floor(a.passo) % dados.durations.length : 0;
+    const c = caixas[quadro] || caixas[0];
+    const sw = c[2] - c[0], sh = c[3] - c[1];
+    const lado = Math.max(8, Math.max(sw, sh));
+    const esc = QUEIMADA_SPRITE_K / Math.sqrt(lado);
+    ctx.save();
+    ctx.globalAlpha = a.piscaAte > queimada.t ? 0.45 : 1;
+    ctx.drawImage(dados.img, quadro * dados.w + c[0], linha * dados.h + c[1], sw, sh,
+      Math.round(a.x - sw * esc / 2), Math.round(a.y + 17 - sh * esc), sw * esc, sh * esc);
+    ctx.restore();
+  }
+  ctx.fillStyle = i ? '#a66d30' : '#28588a';
+  ctx.fillRect(a.x - 19, a.y + 25, 38, 10);
+  ctx.font = 'bold 8px monospace'; ctx.textAlign = 'center'; ctx.fillStyle = 'white';
+  ctx.fillText(queimadaEtiqueta(i), a.x, a.y + 33);
+  ctx.textAlign = 'left';
+}
+/* a etiqueta cabe em ~9 caracteres a 8px -- e ela é o NOME do treinador, nunca "VOCÊ": a mesma
+   decisão de 20/09/2026 na Pescaria e no Resgate */
+function queimadaEtiqueta(i){
+  const n = i === 0 ? nomeDoTreinador() : queimadaLider();
+  return n.length > 9 ? n.slice(0, 8) + '.' : n;
+}
+
+/* ============================================================================
+   O HUD -- pintado pelo laço, nunca remontado
+   ⚠️ TUDO QUE MUDA DURANTE A PARTIDA PASSA POR AQUI, e não por um `render()` condicional: a fase,
+   o placar, as barras e os rótulos dos botões mudam DENTRO do laço, que não redesenha a tela.
+   Montado por condição, o valor congelaria no primeiro quadro -- é a família de defeito que o
+   modal da contagem da Corrida e os chips do revezamento já custaram, duas vezes cada.
+   ============================================================================ */
+function queimadaEscrever(id, txt){
+  const el = document.getElementById(id);
+  if(el && el.textContent !== txt) el.textContent = txt;
+}
+function queimadaLigar(id, ligado){
+  const el = document.getElementById(id);
+  if(el && el.disabled !== !ligado) el.disabled = !ligado;
+}
+function queimadaPintarHud(){
+  const [a, b] = queimada.atores;
+  if(!a || !b || !queimada.golpes.length) return;
+  const t = queimada.t, ativo = queimadaAtiva();
+  const falta = Math.max(0, Math.ceil(QUEIMADA_DURACAO - queimada.decorrido));
+  queimadaEscrever('queimadaRelogio',
+    String(Math.floor(falta / 60)).padStart(2, '0') + ':' + String(falta % 60).padStart(2, '0'));
+  queimadaEscrever('queimadaFase', queimada.fase === 'fim' ? 'RESULTADO'
+    : queimada.pausado ? 'PAUSADO' : 'LAVA ' + queimadaLava() + '/3 · PRIMEIRO A ' + QUEIMADA_KOS);
+
+  queimada.atores.forEach((p, i) => {
+    const pre = i ? 'queimadaNpc' : 'queimadaEu';
+    queimadaEscrever(pre + 'Pontos', p.pontos + ' / ' + QUEIMADA_KOS);
+    queimadaEscrever(pre + 'HpTxt', Math.max(0, p.hp) + '/' + p.maxHp + ' HP');
+    const barra = document.getElementById(pre + 'Hp');
+    if(barra){
+      const pct = Math.max(0, Math.min(100, p.hp / p.maxHp * 100));
+      barra.style.transform = 'scaleX(' + (pct / 100) + ')';
+      /* a classe muda de faixa (verde/amarelo/vermelho) -- e só é tocada quando muda mesmo */
+      const cls = hpBarClass(pct);
+      if(!barra.classList.contains(cls)){
+        ['hp-high', 'hp-mid', 'hp-low'].forEach(c => barra.classList.remove(c));
+        barra.classList.add(cls);
+      }
+    }
+    const fol = document.getElementById(pre + 'Folego');
+    if(fol) fol.style.width = p.folego + '%';
+    queimadaEscrever(pre + 'FolegoTxt', 'Fôlego ' + Math.round(p.folego) + '%');
+  });
+
+  /* OS BOTÕES: o nome do golpe é fixo pela partida (ele está no HTML), e o que muda aqui é a
+     recarga e o estado. */
+  const podeAgir = ativo && t >= a.atordoadoAte && t >= a.guardaAte;
+  queimadaLigar('queimadaBtAtacar', podeAgir && t >= a.tiroPronto);
+  queimadaLigar('queimadaBtEspecial', podeAgir && t >= a.tiroPronto && t >= a.especialPronto);
+  queimadaLigar('queimadaBtReceber', ativo && t >= a.guardaPronta && t >= a.atordoadoAte);
+  queimadaEscrever('queimadaAtacarDica', t < a.tiroPronto
+    ? 'Recarga ' + (a.tiroPronto - t).toFixed(1) + ' s'
+    : queimada.golpes[0].dano + ' de dano');
+  queimadaEscrever('queimadaEspecialDica', t < a.especialPronto
+    ? 'Recarga ' + Math.ceil(a.especialPronto - t) + ' s'
+    : Math.round(queimada.golpes[0].dano * QUEIMADA_ESPECIAL_MULT) + ' de dano · persegue');
+  queimadaEscrever('queimadaReceberDica', t < a.guardaPronta
+    ? 'Recarga ' + (a.guardaPronta - t).toFixed(1) + ' s'
+    : Math.round(queimadaJanelaDeGuarda(a.inst) * 1000) + ' ms de proteção');
+  queimadaEscrever('queimadaRecado', queimada.recado && t < queimada.recadoAte
+    ? queimada.recado : 'Desvie dos golpes, ou receba no momento do impacto.');
+
+  /* o cartaz do meio: ele EXISTE sempre e é escondido aqui -- montado por condição, ele ficaria
+     congelado na tela, porque a fase muda dentro do laço */
+  const cartaz = document.getElementById('queimadaCartaz');
+  if(cartaz){
+    const mostrar = queimada.pausado || t < queimada.rodadaAte;
+    if(cartaz.hidden !== !mostrar) cartaz.hidden = !mostrar;
+    if(mostrar) queimadaEscrever('queimadaCartazTxt', queimada.pausado ? 'PAUSADO' : 'Preparando a próxima rodada…');
+  }
+}
+
+/* ============================================================================
+   A TELA
+   ============================================================================ */
+function queimadaCabecalho(){
+  return `<div class="eyebrow">${selo('queimada')} QUEIMADA POKÉMON</div>`;
+}
+/* A LISTA DE ESCOLHA -- a MESMA linha do montador da Torre e da Corrida individual. */
+function queimadaPickerHtml(){
+  const lista = queimadaElegiveis();
+  if(!lista.length){
+    return `<div class="box"><p class="error-text">Nenhum Pokémon elegível. É preciso um time com as
+      8 insígnias (ou um aposentado).</p>
+      <button class="btn secondary" onclick="queimadaFecharPicker()">⬅ Voltar</button></div>`;
+  }
+  /* ⚠️ A PÁGINA É SEMPRE A VÁLIDA, calculada na hora -- e o `montadorPaginaValida` GRAVA a
+     correção: sem isso um índice velho ressurgiria quando a lista voltasse a crescer. */
+  const pagina = montadorPaginaValida(lista.length);
+  const paginas = Math.max(1, Math.ceil(lista.length / MONT_POR_PAGINA));
+  const daPagina = lista.slice(pagina * MONT_POR_PAGINA, (pagina + 1) * MONT_POR_PAGINA);
+  /* com uma página só os botões não aparecem -- um "1 de 1" é um controle que não controla nada */
+  const navegacao = paginas <= 1 ? '' : `
+    <div class="mont-paginas">
+      ${Array.from({ length: paginas }, (_, i) =>
+        `<button class="mont-pag ${i === pagina ? 'ativa' : ''}" onclick="queimadaIrParaPagina(${i})"
+          aria-label="Página ${i + 1} de ${paginas}">${i + 1}</button>`).join('')}
+      <span class="mont-pag-conta">${pagina * MONT_POR_PAGINA + 1}–${pagina * MONT_POR_PAGINA + daPagina.length} de ${lista.length}</span>
+    </div>`;
+  const atual = queimada.escolhido;
+  return `<div class="box">
+    <h2>${selo('queimada')} Escolher quem entra na quadra</h2>
+    <p class="hint-text">Ordenados pela <strong>velocidade de movimento</strong> — ela sai do
+      atributo Speed com o nível, e é a mesma que vale na quadra.</p>
+    <div class="mont-lista">${daPagina.map(p => {
+      const sp = SPECIES[p.speciesId] || {};
+      const sel = atual && String(atual.slot) === String(p.slot) && atual.idx === p.idx;
+      return `<div class="mont-linha">
+        <button class="mont-card ${sel ? 'sel' : ''}"
+          onclick="queimadaEscolher('${escJs(String(p.slot))}',${p.idx})"
+          title="${escapeHtmlSafe(sp.name || '?')} Lv.${p.level}">
+          <span class="mont-num">${sel ? '✔' : ''}</span>
+          ${spriteHtml(p, 'sprite-sm')}
+          <span class="mont-info">
+            <span class="mont-nome">${escapeHtmlSafe(sp.name || '?')}${p.shiny ? ' ' + selo('shiny') : ''} <span class="mont-lv">— Lv.${p.level}</span></span>
+            <span class="mont-sub">${typesHtml(sp.types || [])}<span class="mont-time">${escapeHtmlSafe(p.teamName || '')}</span></span>
+          </span>
+          <span class="corrida-speed-badge">${p.velocidade}</span>
+        </button>
+      </div>`;
+    }).join('')}</div>
+    ${navegacao}
+    <button class="btn success" onclick="queimadaFecharPicker()">${atual ? 'Confirmar' : 'Voltar'}</button>
+  </div>`;
+}
+/* O CARTÃO DO ESCOLHIDO -- e ele diz os QUATRO números que a partida usa, porque são eles que a
+   escolha decide. O golpe é calculado contra o adversário de VERDADE só na largada (ele ainda não
+   foi sorteado aqui), então a ficha mostra o que não depende dele. */
+function queimadaFichaHtml(){
+  const p = queimada.escolhido;
+  if(!p){
+    return `<p class="hint-text">Nenhum escolhido ainda.</p>
+      <button class="btn primary" onclick="queimadaAbrirPicker()">Escolher Pokémon</button>`;
+  }
+  const sp = SPECIES[p.speciesId] || {};
+  const inst = queimadaInstancia(p, true);
+  return `
+    <div class="order-row">
+      <div class="order-info">
+        <span class="mon-name">${spriteHtml(p, 'sprite-sm')} ${escapeHtmlSafe(sp.name || p.speciesId)}${p.shiny ? ' ' + selo('shiny') : ''} <span class="mont-lv">— Lv.${p.level}</span></span>
+        <span class="mon-sub">${typesHtml(sp.types || [])}</span>
+      </div>
+    </div>
+    <div class="q-ficha">
+      <span><b>${inst.maxHp}</b> HP</span>
+      <span><b>${Math.round(queimadaVelocidade(inst))}</b> px/s</span>
+      <span><b>${Math.round(queimadaJanelaDeGuarda(inst) * 1000)}</b> ms de escudo</span>
+    </div>
+    <p class="hint-text">O HP vem da fórmula do jogo, a velocidade do Speed e o tempo do RECEBER da
+      Defesa Especial — os três com o nível dentro. O golpe é escolhido contra o adversário, na
+      largada.</p>
+    <button class="btn secondary" onclick="queimadaAbrirPicker()">Trocar Pokémon</button>`;
+}
+function renderQueimada(){
+  if(queimada.picker) return queimadaCabecalho() + queimadaPickerHtml();
+  const jogando = queimada.fase === 'jogando';
+
+  if(queimada.fase === 'fim'){
+    const [a, b] = queimada.atores;
+    const v = queimadaVencedor();
+    return `${queimadaCabecalho()}
+    <div class="box">
+      <h2>${v > 0 ? selo('trofeu') + ' Você venceu!' : v < 0 ? queimadaLider() + ' venceu' : 'Empate'}</h2>
+      <p><b>${a.pontos} × ${b.pontos}</b> eliminações</p>
+      <p class="hint-text">HP final: ${Math.max(0, a.hp)} × ${Math.max(0, b.hp)} ·
+        ${a.devolucoes} ${a.devolucoes === 1 ? 'devolução sua' : 'devoluções suas'}.</p>
+      <button class="btn success" onclick="queimadaComecar()">Jogar de novo</button>
+      <button class="btn secondary" onclick="queimadaReiniciar()">Trocar Pokémon</button>
+    </div>
+    <button class="btn secondary" onclick="sairDaQueimada()">⬅ Sair</button>`;
+  }
+
+  if(!jogando){
+    return `${queimadaCabecalho()}
+    <div class="box">
+      <h2>Ilha Pummelo · ${escapeHtmlSafe(queimadaLider())}</h2>
+      <p>Campo dividido ao meio e uma bola só. Desvie, <b>receba</b> no tempo certo e devolva mais
+         forte. Primeiro a <b>${QUEIMADA_KOS}</b> eliminações, em ${QUEIMADA_DURACAO} segundos — e a
+         lava fecha as bordas a cada ${QUEIMADA_LAVA_A_CADA} s.</p>
+      ${queimada.aviso ? `<p class="error-text">${escapeHtmlSafe(queimada.aviso)}</p>` : ''}
+      ${queimadaFichaHtml()}
+      <button class="btn primary" onclick="queimadaComecar()" ${queimada.escolhido && queimada.fase !== 'carregando' ? '' : 'disabled'}>
+        ${queimada.fase === 'carregando' ? 'Carregando os sprites…' : 'Entrar na quadra'}</button>
+    </div>
+    <button class="btn secondary" onclick="sairDaQueimada()">⬅ Sair</button>`;
+  }
+
+  const [a, b] = queimada.atores;
+  const nomeDe = (x) => escapeHtmlSafe((SPECIES[x.inst.speciesId] || {}).name || '?');
+  const lado = (i, p) => {
+    const pre = i ? 'queimadaNpc' : 'queimadaEu';
+    const quem = i ? queimadaLider() : nomeDoTreinador();
+    return `<div class="pesc-lado ${i ? 'npc' : ''}">
+      <div class="pesc-lado-info">
+        <small>${escapeHtmlSafe(quem)} · ${nomeDe(p)}</small>
+        <b id="${pre}Pontos">0 / ${QUEIMADA_KOS}</b>
+        ${renderHpBar(p.hp, p.maxHp, pre + 'Hp', pre + 'HpTxt')}
+        <div class="q-folego"><i id="${pre}Folego" style="width:100%"></i></div>
+        <span class="pesc-lado-estado" id="${pre}FolegoTxt">Fôlego 100%</span>
+      </div>
+    </div>`;
+  };
+  /* ⚠️ O GOLPE MANDA NA COR DOS DOIS BOTÕES DE ATAQUE (21/09/2026, a pedido: *"a cor do golpe deve
+     seguir a mesma cor que o tipo dele"*). O ESPECIAL é o MESMO golpe ×1,5, então ele leva a mesma
+     cor -- o que o separa do ATACAR é a moldura branca por dentro, não um roxo que não quer dizer
+     nada. O RECEBER fica no amarelo da casa: ele não é golpe, é defesa. */
+  const tipoDoGolpe0 = queimada.golpes[0].tipo;
+  const corDoTipo = TYPE_COLORS[tipoDoGolpe0] || '#888';
+  const seloTipo = seloDoTipo(tipoDoGolpe0, 'q-selo-tipo', '#fff');
+  const nomeDoGolpe0 = escapeHtmlSafe(queimada.golpes[0].nome);
+  return `${queimadaCabecalho()}
+    <div class="box">
+      <div class="pesc-topo">
+        <b class="pesc-chip" id="queimadaFase">LAVA 0/3 · PRIMEIRO A ${QUEIMADA_KOS}</b>
+        <span class="pesc-relogio" id="queimadaRelogio">02:00</span>
+      </div>
+      <div class="pesc-placar q-placar">${lado(0, a)}${lado(1, b)}</div>
+    </div>
+    <div class="box q-quadra">
+      <div class="q-campo">
+      <canvas id="queimadaCanvas" width="720" height="700"
+        aria-label="Quadra de queimada. Toque na sua metade para mover o Pokémon até lá."
+        onpointerdown="queimadaPonteiroDesce(event)"></canvas>
+      ${/* ele EXISTE sempre e quem o esconde e o pintor -- ver a nota do HUD */''}
+      <div class="q-cartaz" id="queimadaCartaz" hidden><span id="queimadaCartazTxt">Preparando…</span></div>
+      </div>
+    </div>
+      ${/* ⚠️ OS BOTÕES MORAM DENTRO DA CAIXA DA QUADRA, colados no canvas (21/09/2026, a pedido:
+            *"coloque os 3 botões mais próximos da arena, porque se não fica longe para movimentar o
+            pokémon e clicar nos botões ao mesmo tempo"*). Numa caixa própria eles ficavam a 40px do
+            campo, e a mão tinha que viajar entre um toque e outro. O recado desceu pra BAIXO deles
+            pelo mesmo motivo -- e o que ele diz já aparece flutuando na quadra, no "−189 HP". */''}
+      <div class="q-acoes">
+        <button type="button" class="btn q-atacar" id="queimadaBtAtacar" onkeydown="queimadaTeclaNoBotao(event)"
+          style="background:${corDoTipo}" onclick="queimadaAtacar(0,false)"
+          ><span class="q-bt-nome">${seloTipo}${nomeDoGolpe0}</span><small id="queimadaAtacarDica">${queimada.golpes[0].dano} de dano</small></button>
+        <button type="button" class="btn q-atacar q-especial" id="queimadaBtEspecial" onkeydown="queimadaTeclaNoBotao(event)"
+          style="background:${corDoTipo}" onclick="queimadaAtacar(0,true)"
+          ><span class="q-bt-nome">${seloTipo}ESPECIAL</span><small id="queimadaEspecialDica">Recarga ${QUEIMADA_ESPECIAL_RECARGA} s</small></button>
+        <button type="button" class="btn q-receber" id="queimadaBtReceber" onkeydown="queimadaTeclaNoBotao(event)"
+          onclick="queimadaReceber(0)"
+          ><span class="q-bt-nome">RECEBER</span><small id="queimadaReceberDica">${Math.round(queimadaJanelaDeGuarda(a.inst) * 1000)} ms de proteção</small></button>
+      </div>
+    </div>
+    <div class="box">
+      <p class="q-recado" id="queimadaRecado">Toque na sua metade da quadra pra se mover.</p>
+      <p class="hint-text">O ataque mira no adversário; o RECEBER devolve mais forte se o golpe
+        tocar você durante a proteção — e o Especial atravessa essa proteção.</p>
+      <button class="btn secondary" onclick="queimadaPausar()">${queimada.pausado ? 'Continuar' : 'Pausar'}</button>
+    </div>`;
+}
+/* ⚠️ A VISIBILIDADE DO PINO NÃO É A TRAVA: quem chamar `abrirQueimada()` pelo console cai aqui, e
+   aqui o `admin` é conferido de novo. E ENQUANTO A CONTA NÃO CARREGOU ele recusa -- o contrário da
+   porta dos modos de campeão, que erra pro lado de DEIXAR ENTRAR: mostrar um modo administrativo a
+   quem não é admin, mesmo por meio segundo, é pior que escondê-lo de quem é. */
+function abrirQueimada(){
+  if(!game.contaCarregada || game.ehAdmin !== true){
+    game.modoBloqueado = 'Este modo é administrativo.';
+    render(); return;
+  }
+  queimadaZerar();
+  game.modoBloqueado = null;
+  game.screen = 'queimada';
+  render();
+}
+/* ⚠️ VOLTA PRA AS ILHAS, e não pra home: o jogo mora numa ilha, e sair dele é voltar pro mapa. */
+function sairDaQueimada(){
+  queimadaZerar();
+  abrirIlhas();
+}
+
 function render(){
   const app = document.getElementById('app');
   let html = '';
@@ -36103,6 +37391,7 @@ function render(){
     case 'corrida': html = renderCorrida(); break;
     case 'pescaria': html = renderPescaria(); break;
     case 'resgate': html = renderResgate(); break;
+    case 'queimada': html = renderQueimada(); break;
     case 'gymChoice': html = renderGymChoice(); break;
     case 'evoChoice': html = renderEvoChoice(); break;
     case 'escolhaDeAtaques': html = renderEscolhaDeAtaques(); break;
