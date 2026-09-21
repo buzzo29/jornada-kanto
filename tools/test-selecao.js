@@ -105,7 +105,7 @@ console.log('\n=== OS 12 SORTEADOS ===');
   const tamanhos = new Set();
   const vistos = new Set();
   for(let i = 0; i < 400; i++){
-    const pool = S.selecaoSortearPool();
+    const pool = S.selecaoSortearPool().bolo;
     tamanhos.add(pool.length);
     pool.forEach(p => vistos.add(p.id));
     /* ⚠️ NEM LENDÁRIO NEM INTOCÁVEL: um Mewtwo no bolo decidiria o draft sozinho, e os três
@@ -124,10 +124,45 @@ console.log('\n=== OS 12 SORTEADOS ===');
   ok('  nem espécie', especieRepetida === 0, especieRepetida + ' de 400');
   /* e ele VARIA de verdade -- um sorteio preso devolveria os mesmos 12 sempre */
   ok('  e ele varia entre os sorteios', vistos.size > 100, vistos.size + ' espécies distintas');
-  /* ⚠️ TODO MUNDO ENTRA NO MESMO NÍVEL: o desafio é a ESCOLHA, não a conta de nível. */
-  ok('e todos entram no nível ' + S.SELECAO_NIVEL, (() => {
+  /* ============================================================================
+     ⚠️ AS TRÊS FAIXAS DE NÍVEL (21/09/2026, a pedido). Uma partida inteira roda numa faixa SÓ, e
+     a ESPÉCIE tem que acompanhar -- foi na Vigília que isso custou um relato (*"está aparecendo
+     Charizard no level 24"*), porque o `especieNoNivel` só anda PRA FRENTE.
+     ============================================================================ */
+  {
+    const vistas = new Set();
+    let foraDaFaixa = 0, formaErrada = 0, misturou = 0;
+    for(let i = 0; i < 300; i++){
+      const so = S.selecaoSortearPool();
+      const f = so.faixa;
+      vistas.add(f.join('-'));
+      /* ⚠️ A PARTIDA INTEIRA RODA NUMA FAIXA SÓ: um bolo com níveis de duas faixas seria o
+         contrário do pedido, e a escolha viraria uma conta de nível. */
+      if(so.bolo.some(p => p.nivel < f[0] || p.nivel > f[1])) foraDaFaixa++;
+      if(new Set(so.bolo.map(p => (p.nivel >= 55 ? 3 : p.nivel >= 35 ? 2 : 1))).size > 1) misturou++;
+      /* ⚠️ E A ESPÉCIE BATE COM O NÍVEL: nada de Charizard no 24 nem de Caterpie no 58. */
+      so.bolo.forEach(p => { if(S.formaNoNivel(p.id, p.nivel) !== p.id) formaErrada++; });
+    }
+    ok('as três faixas são sorteadas', vistas.size === S.SELECAO_FAIXAS.length,
+       [...vistas].join(' | '));
+    ok('  e a partida inteira roda numa faixa só', foraDaFaixa === 0 && misturou === 0,
+       foraDaFaixa + ' fora / ' + misturou + ' misturados');
+    ok('  e a espécie acompanha o nível', formaErrada === 0, formaErrada + ' formas impossíveis');
+    /* a prova de que a conversão MORDE: na faixa baixa nada sai evoluído demais, e na alta as
+       formas base somem -- é o que faz as três faixas serem três jogos diferentes */
+    const bstDa = (f) => { let s = 0, n = 0;
+      for(let i = 0; i < 80; i++) S.selecaoSortearPool(null, f).bolo.forEach(p => { s += S.bstOf(p.id); n++; });
+      return s / n; };
+    const baixa = bstDa(S.SELECAO_FAIXAS[0]), alta = bstDa(S.SELECAO_FAIXAS[2]);
+    ok('  e a faixa alta traz formas MAIS evoluídas', alta > baixa + 40,
+       'BST médio ' + baixa.toFixed(0) + ' (baixa) x ' + alta.toFixed(0) + ' (alta)');
+  }
+  /* ⚠️ E O NÍVEL DE CADA UM É O QUE O CARD MOSTRA: a instância nasce no SORTEIO, não no fim do
+     draft -- senão o card mostraria um moveset que o time não levaria. */
+  ok('a instância nasce no sorteio, com o nível e o moveset do card', (() => {
     draftar(melhorBst);
-    return S.selecao.meu.concat(S.selecao.dele).every(p => p.level === S.SELECAO_NIVEL);
+    const doBolo = S.selecao.pool.filter(p => p.dono === 'eu').map(p => p.mon);
+    return S.selecao.meu.every((p, i) => p === doBolo[i]);
   })());
 }
 
@@ -238,7 +273,13 @@ console.log('\n=== A ORDEM E A LUTA ===');
   ok('  e o fim leva ao resultado', g.screen === 'selecaoResultado', 'tela: ' + g.screen);
   const h = S.renderSelecaoResultado();
   ok('  que traz o log da casa', h.indexOf('matchup-row') >= 0);
-  ok('  e um botão pra sortear outro bolo', h.indexOf('selecaoReiniciar()') >= 0);
+  /* ⚠️ O "SORTEAR OUTRO BOLO" SAIU (21/09/2026, a pedido) -- e a função foi junto, porque ela não
+     tinha outro chamador. Função de apresentação sem chamador é exatamente o tipo de coisa que
+     fica anos no arquivo. */
+  ok('  e NÃO tem mais o "sortear outro bolo"', h.indexOf('selecaoReiniciar') < 0);
+  ok('  e a função foi junto', src.indexOf('function selecaoReiniciar') < 0);
+  /* ⚠️ E ELE MOSTRA O TOP 10 CONTRA A LUANA, que é o que a tela passou a ter no lugar. */
+  ok('  e mostra o Top 10 contra a Luana', h.indexOf('Top 10 contra Luana') >= 0);
 }
 
 /* ============================================================================
@@ -255,8 +296,25 @@ console.log('\n=== A TELA ===');
   S.selecaoComecar();
   while(S.selecaoVez() === 'npc') S.selecaoPicaNpc();
   const h = S.renderSelecao();
-  ok('o bolo desenha os ' + S.SELECAO_POOL, (h.match(/tower-pick[" ]/g) || []).length === S.SELECAO_POOL,
-     (h.match(/tower-pick[" ]/g) || []).length);
+  /* ⚠️ O CARD TEM CLASSE PRÓPRIA desde 21/09/2026 (`.selecao-card`): ele cresceu pra caber nível,
+     tipos e ataques, e o `.tower-pick` da casa é um quadro de sprite e nome. */
+  ok('o bolo desenha os ' + S.SELECAO_POOL, (h.match(/selecao-card/g) || []).length === S.SELECAO_POOL,
+     (h.match(/selecao-card/g) || []).length);
+  /* ⚠️ E CADA CARD MOSTRA NÍVEL, TIPOS E ATAQUES -- as três coisas que a escolha usa. */
+  ok('  com o nível de cada um', S.selecao.pool.every(x => h.indexOf('Lv.' + x.nivel) >= 0));
+  ok('  com os tipos', (h.match(/selecao-tipos/g) || []).length === S.SELECAO_POOL);
+  ok('  e com os ataques', (h.match(/selecao-golpes/g) || []).length === S.SELECAO_POOL);
+  /* ⚠️ ORDENADOS POR PODER, o mais forte primeiro: num card de 12 candidatos o olho lê os dois
+     primeiros, e ali tem que estar o que decide. */
+  ok('  e os ataques vêm do mais forte pro mais fraco', (() => {
+    const comGolpe = S.selecao.pool.find(x => (x.mon.ataques || []).length > 1);
+    if(!comGolpe) return true;
+    const pot = comGolpe.mon.ataques.map(S.poderEfetivo);
+    const html = S.selecaoGolpesHtml(comGolpe.mon);
+    const ordenado = comGolpe.mon.ataques.slice().sort((a, b) => S.poderEfetivo(b) - S.poderEfetivo(a));
+    return html.indexOf(S.nomeDoAtaque(ordenado[0])) < html.indexOf(S.nomeDoAtaque(ordenado[ordenado.length - 1]))
+        || pot[0] === pot[pot.length - 1];
+  })());
   /* ⚠️ QUEM JÁ FOI LEVADO NÃO SOME: ele apaga e ganha a faixa de quem levou. Sumindo, o jogador
      perderia a única coisa que um draft tem a contar -- o que o outro lado está montando. */
   const levados = S.selecao.pool.filter(p => p.dono).length;
@@ -279,6 +337,18 @@ console.log('\n=== A TELA ===');
   ok('a tela de ordem tem as setas', (ho.match(/selecaoMover\(/g) || []).length === S.SELECAO_TIME * 2,
      (ho.match(/selecaoMover\(/g) || []).length);
   ok('  e mostra o time do líder', S.selecao.dele.every(p => ho.indexOf(p.name) >= 0));
+  /* ⚠️ OS DOIS TÍTULOS SÃO `<h2>`, a MESMA fonte do "A ordem de entrada" logo acima (21/09/2026,
+     a pedido). Eles eram uma `div` de classe própria -- e a classe NUNCA teve regra na folha, ou
+     seja eles saíam em texto de corpo ao lado de um título. Classe que não existe não dá erro:
+     ela só não faz nada. A varredura de classe fantasma do `test-pescaria` cobre só `class="btn
+     ..."`, então ela não pegava esta.
+     ⚠️ E O "Seu time" VIROU "Time de Treinador", também a pedido. */
+  ok('  e os títulos dos dois times são `h2`, como o da ordem',
+     ho.indexOf('<h2>Time de Treinador</h2>') >= 0 &&
+     ho.indexOf('<h2>Time de Luana</h2>') >= 0,
+     (ho.split('<h2>').length - 1) + ' blocos h2');
+  ok('  e o `section-title` saiu da tela', ho.indexOf('section-title') < 0);
+  ok('  e não diz mais "Seu time"', !/Seu [Tt]ime/.test(ho));
   ok('  e o botão de lutar', ho.indexOf('selecaoLutar()') >= 0);
 }
 

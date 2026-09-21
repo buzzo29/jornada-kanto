@@ -3141,14 +3141,40 @@
      o jogador perderia a única coisa que um draft tem a contar: o que o outro lado está montando.
      A opacidade é a mesma `.off` do `.tower-pick`, e a faixa vem POR CIMA dela (a regra do `.off`
      vem antes na folha, e as duas têm a mesma especificidade -- ganha a última). */
-  .selecao-bolo{justify-content:center;}
-  .selecao-bolo .tower-pick{width:72px;}
-  .selecao-bolo .tower-pick-lv{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:66px;}
-  .selecao-dono{position:absolute;left:0;right:0;bottom:0;font:800 .5rem/13px var(--font-ui);
+  /* ⚠️ TRÊS POR LINHA, SEMPRE (21/09/2026, a pedido: 3 cards por linha, 4 linhas). É uma GRADE e
+     não um flex que quebra: com `flex-wrap` a última linha fica com um card sozinho e as colunas
+     deixam de alinhar -- e é a coluna que o olho usa pra comparar dois candidatos. */
+  .selecao-bolo{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;}
+  .selecao-card{position:relative;background:var(--box);border:2px solid var(--box-border);
+    border-radius:4px;padding:4px 3px 16px;display:flex;flex-direction:column;align-items:center;
+    gap:2px;cursor:pointer;text-align:center;min-width:0;}
+  .selecao-card .sprite-img{width:40px;height:40px;}
+  .selecao-topo{display:block;}
+  .selecao-nome{display:block;font:800 .58rem/13px var(--font-ui);color:var(--ink);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;}
+  .selecao-lv{display:block;font-size:.52rem;color:var(--muted);font-weight:800;}
+  /* os selos ficam MENORES aqui, como os de golpe da fileira do time: são dois ou três nomes
+     numa coluna que a 320px mede ~90px, e no tamanho do jogo um par comprido quebraria em três */
+  .selecao-tipos, .selecao-golpes{display:flex;flex-wrap:wrap;gap:2px;justify-content:center;}
+  /* ⚠️ O RISCO SEPARA OS TIPOS DOS GOLPES, e ele não é enfeite: os dois são selos coloridos do
+     mesmo tamanho, e sem ele o card vira uma coluna de pílulas em que não dá pra saber onde o
+     tipo acaba e o moveset começa -- que é justamente a leitura que a escolha precisa fazer. */
+  .selecao-golpes{border-top:1px dashed var(--box-border);padding-top:3px;margin-top:1px;width:100%;}
+  .selecao-tipos .type-pill, .selecao-golpes .type-pill{font-size:.45rem;padding:0 3px;line-height:11px;}
+  .selecao-sem-golpe{font-size:.45rem;color:var(--muted);font-weight:800;}
+  .selecao-dono{position:absolute;left:0;right:0;bottom:0;font:800 .5rem/14px var(--font-ui);
     color:#fff;text-align:center;border-radius:0 0 2px 2px;}
   .selecao-dono.eu{background:var(--blue);}
   .selecao-dono.npc{background:var(--red);}
-  .selecao-bolo .tower-pick.off{opacity:.55;}
+  /* ⚠️ A REGRA DO APAGADO VEM DEPOIS DAS DUAS DE CIMA: mesma especificidade, ganha a última -- e a
+     FAIXA precisa continuar legível por cima do card apagado, que é a única coisa que ela conta. */
+  .selecao-card.off{opacity:.5;cursor:default;}
+  .selecao-card.off .selecao-dono{opacity:1;}
+  /* o ranking reusa a linha do ranking da Pescaria e da Corrida -- mesma leitura, uma cópia só */
+  .selecao-rank-col{display:flex;gap:6px;align-items:center;font-size:.6rem;font-weight:800;}
+  .selecao-rank-col b{font-size:.72rem;color:var(--ink);font-variant-numeric:tabular-nums;}
+  .selecao-rank-v{color:var(--green-dark);}
+  .selecao-rank-d{color:var(--red);}
   /* o ponto: o alvo de toque é o círculo, e o nome e a atividade ficam ABAIXO dele, fora do
      círculo -- num alvo de 56px não cabe texto, e o nome é o que identifica o ponto. */
   .pesc-ponto{position:absolute;left:var(--x);top:var(--y);width:60px;height:60px;
@@ -14359,6 +14385,9 @@ function finishTrainerBattle(){
   if(game.selecaoBattlePending){
     game.selecaoBattlePending = false;
     game.screen = 'selecaoResultado';
+    /* ⚠️ O ENVIO ACONTECE AQUI, na virada -- uma vez por batalha. No `render` da tela ele sairia
+       de novo a cada desenho, e o jogador ganharia uma partida por toque. */
+    selecaoEnviarResultado(!!(game.trainerBattleResult && game.trainerBattleResult.win));
     render();
     return;
   }
@@ -34029,9 +34058,15 @@ function pescariaTextoDoParado(){
    =========================================================================== */
 const SELECAO_POOL = 12;        /* quantos entram no sorteio */
 const SELECAO_TIME = 6;         /* e quantos cada lado leva */
-/* ⚠️ TODO MUNDO NO MESMO NÍVEL, e isso é decisão: o desafio é o DRAFT. Com níveis diferentes o
-   bolo deixaria de ser o mesmo pros dois e a escolha viraria uma conta de nível. */
-const SELECAO_NIVEL = 60;
+/* ⚠️ AS TRÊS FAIXAS DE NÍVEL (21/09/2026, a pedido). Uma partida inteira roda numa faixa SÓ: ou
+   todos entre 20 e 30, ou todos entre 35 e 45, ou todos entre 55 e 60. O bolo continua sendo o
+   mesmo pros dois lados -- o que muda é o JOGO que se joga em cada faixa, porque a faixa decide
+   QUAIS FORMAS aparecem.
+   ⚠️ E É POR ISSO QUE A ESPÉCIE TEM QUE ACOMPANHAR: um Charizard Lv.24 não existe, e um Caterpie
+   Lv.58 também não. A conversão é o `formaNoNivel`, o MESMO da Vigília -- e foi lá que ela custou
+   um relato (*"está aparecendo Charizard no level 24"*), porque o `especieNoNivel` só anda PRA
+   FRENTE e aqui o bolo sorteia da dex inteira. */
+const SELECAO_FAIXAS = [[20, 30], [35, 45], [55, 60]];
 /* ⚠️ A ORDEM DO DRAFT É A DO PEDIDO, e ela é uma TABELA -- escrita como um laço com `if`, a
    próxima mudança de ritmo viraria três ramos. Ela tem uma propriedade bonita que foi MEDIDA e
    não escolhida: com os dois lados pegando sempre o melhor disponível, a soma das POSIÇÕES fica
@@ -34045,6 +34080,7 @@ const SELECAO_PAUSA_NPC = 700;  /* o líder escolhe na frente do jogador, não d
    velho (a lição que a Corrida pagou). */
 const selecao = {
   fase: 'setup',   /* setup | draft | ordem */
+  faixa: null,     /* a faixa de nível desta partida */
   pool: [],        /* os 12: { id, dono: null | eu | npc } */
   passo: 0,        /* onde estamos na SELECAO_ORDEM */
   restam: 0,       /* quantos faltam nesta vez */
@@ -34055,27 +34091,39 @@ const selecao = {
 function selecaoZerar(){
   if(selecao.timer){ clearTimeout(selecao.timer); selecao.timer = null; }
   selecao.fase = 'setup'; selecao.pool = []; selecao.passo = 0; selecao.restam = 0;
+  selecao.faixa = null;
   selecao.meu = []; selecao.dele = []; selecao.aviso = '';
 }
 /* ⚠️ NEM LENDÁRIO NEM INTOCÁVEL, e as duas listas: o `ehLendario` pega os oito capturáveis e o
    `ESPECIES_INTOCAVEIS` os três que ninguém pega. Um Mewtwo no bolo decidiria o draft sozinho.
    ⚠️ E SEM REPETIR LINHA EVOLUTIVA: com Magikarp e Gyarados no mesmo bolo, os 12 viram 11 opções
    de verdade -- é a mesma regra do encontro selvagem e dos guardiões da Montanha. */
-function selecaoSortearPool(rng){
+/* ⚠️ A INSTÂNCIA NASCE AQUI, no sorteio -- e não no fim do draft, que era onde ela nascia até
+   21/09/2026. O card do bolo passou a mostrar NÍVEL, TIPOS e ATAQUES (a pedido), e nenhuma das
+   três coisas existe antes de o pokémon existir: o moveset sai do `equiparNpc`, que precisa do
+   nível. Criar no fim obrigaria a tela a adivinhar o que a instância vai ser. */
+function selecaoSortearPool(rng, faixa){
   const r = rng || Math.random;
+  const f = faixa || SELECAO_FAIXAS[Math.floor(r() * SELECAO_FAIXAS.length)];
   const candidatos = Object.keys(SPECIES).filter(id =>
     !ehLendario(id) && (ESPECIES_INTOCAVEIS || []).indexOf(id) < 0);
   const linhas = new Set();
   const escolhidos = [];
   let voltas = 0;
   while(escolhidos.length < SELECAO_POOL && voltas++ < 4000){
-    const id = candidatos[Math.floor(r() * candidatos.length)];
-    const raiz = raizDaLinha(id);
+    const sorteado = candidatos[Math.floor(r() * candidatos.length)];
+    /* ⚠️ A LINHA É CHECADA NA RAIZ, e por isso a conversão pode vir depois: caterpie e metapod
+       têm a MESMA raiz, então os dois nunca entram juntos -- e é isso que impede o bolo de ter
+       dois Butterfree na faixa alta. Foi esse o defeito que a Vigília pagou por converter tarde. */
+    const raiz = raizDaLinha(sorteado);
     if(linhas.has(raiz)) continue;
     linhas.add(raiz);
-    escolhidos.push({ id: id, dono: null });
+    const nivel = f[0] + Math.floor(r() * (f[1] - f[0] + 1));
+    const p = createInstance(formaNoNivel(sorteado, nivel), nivel);
+    equiparNpc([p]);
+    escolhidos.push({ id: p.speciesId, nivel: nivel, mon: p, dono: null });
   }
-  return escolhidos;
+  return { faixa: f, bolo: escolhidos };
 }
 const selecaoVez = () => SELECAO_ORDEM[selecao.passo] ? SELECAO_ORDEM[selecao.passo][0] : null;
 const selecaoLivres = () => selecao.pool.filter(p => !p.dono);
@@ -34129,10 +34177,12 @@ function selecaoEscolher(i){
    ESCOLHEU golpe (o bolo é sorteado, não vem de save nenhum), e a regra da casa é que quem não
    escolhe leva o moveset inteiro da espécie. Dar a um lado e não ao outro seria a assimetria que
    o pedido não pede. */
+/* ⚠️ ELE SÓ SEPARA: as instâncias já existem desde o sorteio, e recriá-las aqui jogaria fora o
+   moveset que o card do bolo mostrou durante o draft inteiro -- o jogador escolheria por um golpe
+   e levaria outro. */
 function selecaoFecharDraft(){
-  selecao.meu  = selecao.pool.filter(p => p.dono === 'eu').map(p => createInstance(p.id, SELECAO_NIVEL));
-  selecao.dele = selecao.pool.filter(p => p.dono === 'npc').map(p => createInstance(p.id, SELECAO_NIVEL));
-  equiparNpc(selecao.meu); equiparNpc(selecao.dele);
+  selecao.meu  = selecao.pool.filter(p => p.dono === 'eu').map(p => p.mon);
+  selecao.dele = selecao.pool.filter(p => p.dono === 'npc').map(p => p.mon);
   selecao.fase = 'ordem';
 }
 /* a ordem de entrada: as mesmas setas da clareira e da Montanha, por ÍNDICE */
@@ -34174,15 +34224,36 @@ function selecaoLutar(){
    próprio obrigaria a reaprender a ler no meio da decisão.
    ⚠️ E QUEM JÁ FOI ESCOLHIDO NÃO SOME: ele fica apagado, com a FAIXA de quem levou. Sumindo, o
    jogador perderia a única coisa que um draft tem a contar -- o que o outro lado está montando. */
+/* ⚠️ O CARD MOSTRA NÍVEL, TIPOS E ATAQUES (21/09/2026, a pedido) -- e as três coisas são o que a
+   escolha PEDE: sem os golpes o jogador escolhe por sprite, e num draft de 12 isso é sorteio.
+   ⚠️ OS SELOS SÃO OS DA CASA (`typesHtml` e `golpeSeloHtml`): o tipo aqui tem que ser o mesmo
+   marrom de Sombrio da Pokédex, e o golpe o mesmo nome e a mesma cor do log da batalha.
+   ⚠️ E O CARD INTEIRO É O BOTÃO, como em toda lista de escolha da casa -- mirar num quadradinho
+   num celular é pedir erro. */
+/* ⚠️ ORDENADOS POR PODER, o mais forte primeiro -- é a mesma ordem da tela de escolha de golpe, e
+   pelo mesmo motivo: num card de 12 candidatos o olho lê os dois primeiros, e ali tem que estar o
+   que decide. E é o `poderEfetivo`, não o poder cru: um Tapa Duplo de 15 bate de 2 a 5 vezes.
+   ⚠️ E ELES SÃO TODOS -- o `equiparNpc` dá o moveset inteiro da espécie, e mostrar quatro de dez
+   seria mentir por omissão justamente no dado que a escolha usa. O card cresce; é o preço. */
+function selecaoGolpesHtml(mon){
+  const ids = ((mon && mon.ataques) || []).slice()
+    .sort((a, b) => poderEfetivo(b) - poderEfetivo(a));
+  if(!ids.length) return '<span class="selecao-sem-golpe">sem golpe de nível</span>';
+  return ids.map(id => golpeSeloHtml(mon.speciesId, (GOLPES[id] || [])[0], id)).join('');
+}
 function selecaoCardHtml(p, i){
+  const mon = p.mon || {};
   const sp = SPECIES[p.id] || {};
   const vezDele = selecaoVez() === 'eu' && !p.dono && selecao.fase === 'draft';
-  const dentro = '<span class="mon-name">' + spriteHtml(p.id, 'sprite-sm') + '</span>'
-    + '<span class="tower-pick-lv">' + escapeHtmlSafe(sp.name || p.id) + '</span>'
+  const dentro = '<span class="selecao-topo">' + spriteHtml(mon, 'sprite-sm')
+      + '<span class="selecao-nome">' + escapeHtmlSafe(mon.name || sp.name || p.id)
+      + '<span class="selecao-lv">Lv.' + (p.nivel || mon.level || '?') + '</span></span></span>'
+    + '<span class="selecao-tipos">' + typesHtml(mon.types || sp.types || []) + '</span>'
+    + '<span class="selecao-golpes">' + selecaoGolpesHtml(mon) + '</span>'
     + (p.dono ? '<span class="selecao-dono ' + p.dono + '">' + (p.dono === 'eu' ? 'VOCÊ' : 'LUANA') + '</span>' : '');
-  if(!vezDele) return '<span class="tower-pick' + (p.dono ? ' off ' + p.dono : '') + '">' + dentro + '</span>';
-  return '<button class="tower-pick" onclick="selecaoEscolher(' + i + ')"'
-    + ' aria-label="Escolher ' + escapeHtmlSafe(sp.name || p.id) + '">' + dentro + '</button>';
+  if(!vezDele) return '<span class="selecao-card' + (p.dono ? ' off ' + p.dono : '') + '">' + dentro + '</span>';
+  return '<button class="selecao-card" onclick="selecaoEscolher(' + i + ')"'
+    + ' aria-label="Escolher ' + escapeHtmlSafe(mon.name || p.id) + '">' + dentro + '</button>';
 }
 function renderSelecao(){
   const ilha = ILHAS_LARANJA.find(i => i.id === 'kumquat') || { nome: 'Kumquat', lider: 'Luana' };
@@ -34195,8 +34266,10 @@ function renderSelecao(){
       <p><strong>${escapeHtmlSafe(ilha.lider)}</strong> não traz time: os dois montam do MESMO bolo.
          São <strong>${SELECAO_POOL}</strong> sorteados na hora, sem lendário, e cada um leva
          <strong>${SELECAO_TIME}</strong>.</p>
-      <p class="hint-text">Ela escolhe 1, você escolhe 2, ela 2, você 2 — até o bolo acabar. Todos
-         entram no nível ${SELECAO_NIVEL}: o que decide aqui é a escolha.</p>
+      <p class="hint-text">Ela escolhe 1, você escolhe 2, ela 2, você 2 — até o bolo acabar. Ela
+         sempre leva o de maior BST disponível.</p>
+      <p class="hint-text">A faixa de nível é sorteada junto: ${SELECAO_FAIXAS.map(f => f[0] + '–' + f[1]).join(', ')}.
+         A partida inteira roda numa faixa só, e as formas acompanham — nada de Charizard no 24.</p>
     </div>
     <button class="btn primary" onclick="selecaoComecar()">Sortear os ${SELECAO_POOL}</button>
     <button class="btn" onclick="sairDaSelecao()">⬅ Voltar</button>`;
@@ -34211,10 +34284,11 @@ function renderSelecao(){
       <h2>${minha ? 'Sua vez' : escapeHtmlSafe(ilha.lider) + ' está escolhendo…'}</h2>
       <p class="hint-text">${minha ? 'Escolha <strong>' + selecao.restam + '</strong>.'
         : 'Ela leva <strong>' + selecao.restam + '</strong>.'}
-        Você tem ${meus} de ${SELECAO_TIME}, ela tem ${dele}.</p>
+        Você tem ${meus} de ${SELECAO_TIME}, ela tem ${dele}.
+        ${selecao.faixa ? 'Faixa <strong>Lv.' + selecao.faixa[0] + '–' + selecao.faixa[1] + '</strong>.' : ''}</p>
     </div>
     <div class="box">
-      <div class="tower-pick-row selecao-bolo">${selecao.pool.map(selecaoCardHtml).join('')}</div>
+      <div class="selecao-bolo">${selecao.pool.map(selecaoCardHtml).join('')}</div>
     </div>
     <button class="btn" onclick="sairDaSelecao()">⬅ Desistir</button>`;
   }
@@ -34247,11 +34321,86 @@ function renderSelecao(){
     <h2>A ordem de entrada</h2>
     <p class="hint-text">O 1º seu encara o 1º dela. Sem cura entre os confrontos.</p>
   </div>
-  <div class="box"><div class="section-title">SEU TIME</div>${linhas}</div>
-  <div class="box"><div class="section-title">TIME DE ${escapeHtmlSafe(ilha.lider.toUpperCase())}</div>${dela}</div>
+  ${/* ⚠️ OS DOIS TÍTULOS SÃO `<h2>`, a MESMA fonte do "A ordem de entrada" logo acima (21/09/2026,
+       a pedido). Eles eram uma `div` de classe PRÓPRIA -- e essa classe nunca teve regra na folha,
+       ou seja eles saíam em texto de corpo ao lado de um título. Classe que não existe não dá
+       erro: ela só não faz nada. */''}
+  <div class="box"><h2>Time de Treinador</h2>${linhas}</div>
+  <div class="box"><h2>Time de ${escapeHtmlSafe(ilha.lider)}</h2>${dela}</div>
   <button class="btn primary" onclick="selecaoLutar()">Começar a batalha</button>
   <button class="btn" onclick="sairDaSelecao()">⬅ Desistir</button>`;
 }
+/* ===========================================================================
+   O TOP 10 CONTRA A LUANA (21/09/2026, a pedido: *"exiba um quadro mostrando o top10 melhores
+   aproveitamentos contra a Luana, onde mostra a quantidade de partidas, o número de vitórias, e o
+   número de derrotas e o aproveitamento"*).
+
+   ⚠️ QUEM GRAVA É O SERVIDOR, e a coleção é `allow write: if false` INCLUSIVE pro dono: placar
+   público escrito pelo cliente é uma linha no console valendo o topo. É a mesma regra do
+   `fishingRanking` e do `raceRanking`.
+   ⚠️ E ELE É ORDENADO PELO APROVEITAMENTO, ao pé da letra do pedido -- com o NÚMERO DE PARTIDAS
+   como desempate. Isso tem uma consequência conhecida e aceita: **1 vitória em 1 partida (100%)
+   fica acima de 90 em 100 (90%)**. A tabela mostra as partidas justamente por isso -- quem lê vê o
+   denominador. Se um dia incomodar, a régua é um mínimo de partidas pra entrar na lista.
+   =========================================================================== */
+const selecaoRank = { lista: null, meu: null, carregando: false, erro: '' };
+const selecaoPct = (v, p) => p > 0 ? (v / p * 100) : 0;
+function selecaoCarregarRank(){
+  if(selecaoRank.carregando || selecaoRank.lista) return;
+  selecaoRank.carregando = true; selecaoRank.erro = '';
+  functionsClient.httpsCallable('getSelecaoRanking')({}).then(r => {
+    selecaoRank.carregando = false;
+    selecaoRank.lista = (r && r.data && r.data.top) || [];
+    selecaoRank.meu = (r && r.data && r.data.meu) || null;
+    if(game.screen === 'selecaoResultado') render();
+  }).catch(() => {
+    selecaoRank.carregando = false;
+    selecaoRank.erro = 'Não deu pra carregar o ranking.';
+    if(game.screen === 'selecaoResultado') render();
+  });
+}
+/* ⚠️ BEST-EFFORT dos dois lados: um ranking que não carrega é uma caixa a menos na tela, e um
+   envio que falha é uma partida perdida -- nenhum dos dois pode derrubar o resultado da batalha. */
+function selecaoEnviarResultado(venceu){
+  selecaoRank.lista = null; selecaoRank.meu = null;   /* a lista mudou: relê */
+  functionsClient.httpsCallable('sendSelecaoResult')({ venceu: !!venceu })
+    .then(() => selecaoCarregarRank())
+    .catch(() => selecaoCarregarRank());
+}
+function selecaoLinhaRankHtml(e, pos, ehMeu){
+  const pct = selecaoPct(e.vitorias, e.partidas);
+  return '<div class="pesc-rank-linha' + (ehMeu ? ' eu' : '') + '">'
+    + '<span class="pesc-rank-pos">' + (pos <= 3 ? selo(MEDALHA_DO_POSTO[pos - 1], 'selo-rank') : pos + 'º') + '</span>'
+    + '<span class="pesc-rank-nome">' + escapeHtmlSafe(e.nome || 'Treinador') + '</span>'
+    + '<span class="selecao-rank-col">'
+      + '<span class="selecao-rank-v">' + e.vitorias + 'V</span>'
+      + '<span class="selecao-rank-d">' + Math.max(0, e.partidas - e.vitorias) + 'D</span>'
+      + '<b>' + pct.toFixed(0) + '%</b>'
+    + '</span></div>';
+}
+function selecaoRankHtml(){
+  if(selecaoRank.erro){
+    return '<div class="box"><h2>Top 10 contra Luana</h2><p class="error-text">'
+      + escapeHtmlSafe(selecaoRank.erro) + '</p></div>';
+  }
+  if(!selecaoRank.lista){
+    return '<div class="box"><h2>Top 10 contra Luana</h2><p class="hint-text">Carregando…</p></div>';
+  }
+  const top = selecaoRank.lista;
+  const meu = selecaoRank.meu;
+  /* ⚠️ E O MEU RESULTADO VEM JUNTO MESMO FORA DO TOP: quem está em 14º abriria a tela e não veria
+     nada seu -- e o próprio aproveitamento é o que ele mais procura ali. */
+  const jaNoTop = meu && top.some(e => e.uid === meu.uid);
+  return '<div class="box"><h2>Top 10 contra Luana</h2>'
+    + (top.length ? '<div class="pesc-rank">'
+        + top.map((e, i) => selecaoLinhaRankHtml(e, i + 1, meu && e.uid === meu.uid)).join('')
+        + '</div>' : '<p class="hint-text">Ninguém pontuou ainda.</p>')
+    + (meu && !jaNoTop ? '<div class="pesc-rank">'
+        + selecaoLinhaRankHtml(meu, meu.pos || 0, true) + '</div>' : '')
+    + '<p class="hint-text">' + (meu ? meu.partidas + ' partida' + (meu.partidas === 1 ? '' : 's')
+        + ' suas contra ela.' : 'Ordenado pelo aproveitamento.') + '</p></div>';
+}
+
 /* ⚠️ O RESULTADO REUSA O LOG DA CASA (`renderMatchupLog`), o mesmo que a jornada, a Torre e o
    Ginásio da Cidade mostram depois de toda batalha. Um resumo próprio seria uma segunda
    apresentação pra contar a mesma coisa. */
@@ -34266,8 +34415,8 @@ function renderSelecaoResultado(){
     <p class="hint-text">${r.win ? 'O time que você montou do bolo deu conta.'
       : 'Ela montou melhor desta vez.'}</p>
   </div>
+  ${(selecaoCarregarRank(), selecaoRankHtml())}
   ${renderMatchupLog(r.matchups)}
-  <button class="btn primary" onclick="selecaoReiniciar()">Sortear outro bolo</button>
   <button class="btn" onclick="sairDaSelecao()">⬅ Voltar às ilhas</button>`;
 }
 /* ⚠️ A VISIBILIDADE DO BOTÃO NÃO É A TRAVA: quem chamar pelo console cai aqui. */
@@ -34283,7 +34432,9 @@ function abrirSelecao(){
 }
 function sairDaSelecao(){ selecaoZerar(); abrirIlhas(); }
 function selecaoComecar(){
-  selecao.pool = selecaoSortearPool();
+  const sorteio = selecaoSortearPool();
+  selecao.faixa = sorteio.faixa;
+  selecao.pool = sorteio.bolo;
   selecao.passo = 0;
   selecao.restam = SELECAO_ORDEM[0][1];
   selecao.meu = []; selecao.dele = [];
@@ -34291,7 +34442,6 @@ function selecaoComecar(){
   render();
   selecaoAgendarNpc();
 }
-function selecaoReiniciar(){ selecaoZerar(); selecaoComecar(); }
 /* ⚠️ OS DEFS SÃO OS MESMOS DA ILHA DA PESCARIA -- os padrões de mar, areia e grama e as árvores.
    Extraídos pra cá quando o arquipélago nasceu (21/09/2026): duas cópias divergiriam no primeiro
    ajuste, e o mar de uma tela deixaria de ser o mar da outra.

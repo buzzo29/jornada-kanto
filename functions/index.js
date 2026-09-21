@@ -5347,6 +5347,91 @@ exports.getFishingRanking = onCall(async (request) => {
   return { lista, meu };
 });
 exports._pescariaRank = { topo: PESCARIA_RANK_TOPO };
+
+/* =====================================================================
+   RANKING DA SELEÇÃO (21/09/2026, a pedido) -- o aproveitamento contra a Luana.
+
+   ⚠️ QUEM GRAVA É O SERVIDOR, e a coleção é FECHADA pra escrita do cliente nas regras: é a mesma
+   trava do `fishingRanking` e do `raceRanking`. Aqui ela pesa mais que nos outros dois, porque o
+   que se grava não é um recorde que só sobe -- é um CONTADOR, e um cliente forjado poria 999
+   vitórias e 0 derrotas.
+
+   ⚠️ E O QUE CHEGA É UM BOOLEANO, não um placar: o cliente diz `venceu` e o servidor faz a conta.
+   Aceitar `partidas`/`vitorias` do cliente seria deixá-lo escrever o próprio aproveitamento por
+   outro caminho.
+
+   ⚠️ O `aproveitamento` É GRAVADO, e não calculado na leitura: o Firestore não ordena por uma
+   razão entre campos. Ele é derivado na MESMA transação que conta a partida, então não tem como
+   ficar velho.
+   ===================================================================== */
+const SELECAO_RANK_TOPO = 10;
+function selecaoRankCollRef(){ return db.collection('selecaoRanking'); }
+function selecaoRankDocRef(uid){ return selecaoRankCollRef().doc(uid); }
+
+exports.sendSelecaoResult = onCall(async (request) => {
+  const uid = request.auth && request.auth.uid;
+  if(!uid) throw new HttpsError('unauthenticated', 'Faça login.');
+  const venceu = !!(request.data && request.data.venceu);
+  /* ⚠️ A TRANSAÇÃO É O QUE IMPEDE DUAS ABAS de contarem a mesma partida por cima uma da outra --
+     aqui ela é obrigatória de verdade, porque o que se escreve depende do que se leu. */
+  const ref = selecaoRankDocRef(uid);
+  let userData = {};
+  try { const u = await db.collection('users').doc(uid).get(); userData = u.data() || {}; }
+  catch(e){ userData = {}; }
+  const resultado = await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const atual = snap.exists ? (snap.data() || {}) : {};
+    const partidas = (Number(atual.partidas) || 0) + 1;
+    const vitorias = (Number(atual.vitorias) || 0) + (venceu ? 1 : 0);
+    const dados = {
+      /* ⚠️ O NOME FICA DENORMALIZADO, como nos outros dois rankings: sem ele, ler o top 10
+         custaria 10 leituras a mais em `users/`. O preço é o de lá -- quem troca de nome só
+         aparece com o novo depois da próxima partida. */
+      nome: userData.trainerName || 'Treinador',
+      partidas, vitorias,
+      derrotas: partidas - vitorias,
+      aproveitamento: partidas > 0 ? vitorias / partidas : 0,
+    };
+    tx.set(ref, dados, { merge: true });
+    return dados;
+  });
+  return { partidas: resultado.partidas, vitorias: resultado.vitorias,
+           derrotas: resultado.derrotas, aproveitamento: resultado.aproveitamento };
+});
+
+exports.getSelecaoRanking = onCall(async (request) => {
+  const uid = request.auth && request.auth.uid;
+  if(!uid) throw new HttpsError('unauthenticated', 'Faça login.');
+  /* ⚠️ ORDENADO PELO APROVEITAMENTO, ao pé da letra do pedido, com as PARTIDAS como desempate.
+     Consequência conhecida e aceita: 1 vitória em 1 partida (100%) fica acima de 90 em 100 (90%).
+     A tabela mostra as partidas justamente por isso -- quem lê vê o denominador. Se um dia
+     incomodar, a régua é um mínimo de partidas pra entrar na lista. */
+  const snap = await selecaoRankCollRef()
+    .orderBy('aproveitamento', 'desc').orderBy('partidas', 'desc')
+    .limit(SELECAO_RANK_TOPO).get();
+  const top = snap.docs.map((d, i) => {
+    const x = d.data() || {};
+    const partidas = Number(x.partidas) || 0, vitorias = Number(x.vitorias) || 0;
+    return { pos: i + 1, uid: d.id, nome: x.nome || 'Treinador',
+             partidas, vitorias, derrotas: Math.max(0, partidas - vitorias) };
+  });
+  /* ⚠️ E O MEU VEM JUNTO MESMO FORA DO TOP: quem está em 14º abriria a tela e não veria nada seu
+     -- e o próprio aproveitamento é o que ele mais procura ali. */
+  let meu = null;
+  if(!top.some(x => x.uid === uid)){
+    const m = await selecaoRankDocRef(uid).get();
+    if(m.exists){
+      const x = m.data() || {};
+      const partidas = Number(x.partidas) || 0, vitorias = Number(x.vitorias) || 0;
+      meu = { uid, nome: x.nome || 'Você', partidas, vitorias,
+              derrotas: Math.max(0, partidas - vitorias) };
+    }
+  } else {
+    meu = top.find(x => x.uid === uid) || null;
+  }
+  return { top, meu };
+});
+exports._selecaoRank = { topo: SELECAO_RANK_TOPO };
 /* =====================================================================
    RANKING DA CORRIDA (20/09/2026, a pedido) -- DOIS rankings: a individual de
    300 m e o revezamento.

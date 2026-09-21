@@ -138,7 +138,8 @@ function collRef(parts, filtros, limite, ordem, depoisDe, soIds){
     select(){ return collRef(parts, filtros, limite, ordem, depoisDe, true); },
     /* ORDENA DE VERDADE. Era um no-op que so devolvia a colecao: um teste de ranking passava sem
        nunca conferir a ordem, e o limit(10) cortava dez QUALQUER em vez dos dez primeiros. */
-    orderBy(campo, dir){ return collRef(parts, filtros, limite, [campo, dir === 'desc' ? -1 : 1], depoisDe, soIds); },
+    orderBy(campo, dir){ return collRef(parts, filtros, limite,
+      (ordem || []).concat([[campo, dir === 'desc' ? -1 : 1]]), depoisDe, soIds); },
     limit(n){ return collRef(parts, filtros, n, ordem, depoisDe, soIds); },
     /* PAGINACAO POR CURSOR. Sem ela, uma funcao paginada passava no teste lendo sempre a PRIMEIRA
        pagina -- o `startAfter` era ignorado e o teste da segunda pagina via a mesma coisa da
@@ -179,18 +180,30 @@ function collRef(parts, filtros, limite, ordem, depoisDe, soIds){
         if(ok) docs.push({ id, bruto: dados, ref: docRef(parts.concat([id])),
                            data(){ return soIds ? {} : clone(dados); }, exists:true });
       }
-      if(ordem){
-        const [campo, dir] = ordem;
-        const valor = d => (campo && campo.__documentId) ? d.id : d.bruto[campo];
+      if(ordem && ordem.length){
+        const criterios = ordem;
+        const [campo, dir] = criterios[0];   /* o cursor e o filtro de ausência usam o PRIMÁRIO */
+        const valorDe = (c) => (d) => (c && c.__documentId) ? d.id : d.bruto[c];
+        const valor = valorDe(campo);
         /* ⚠️ QUEM NÃO TEM O CAMPO FICA DE FORA -- é o que o Firestore faz, e não um detalhe: um
            `orderBy` num campo opcional é como se filtra "quem já fez isso". Sem esta linha o fake
            devolvia esses documentos com `undefined` no fim, e um teste escrito em cima disso
-           acreditaria numa lista que a produção nunca devolve. */
-        if(!(campo && campo.__documentId)) docs = docs.filter(d => valor(d) !== undefined);
+           acreditaria numa lista que a produção nunca devolve.
+           ⚠️ E ELE VALE PRA TODOS OS CRITÉRIOS, não só o primeiro: no Firestore um documento sem
+           QUALQUER um dos campos ordenados fica fora da consulta. */
+        criterios.forEach(([c]) => {
+          if(c && c.__documentId) return;
+          docs = docs.filter(d => valorDe(c)(d) !== undefined);
+        });
         docs.sort((a,b)=>{
-          const x = valor(a), y = valor(b);
-          if(x === y) return a.id < b.id ? -1 : 1;      // desempate estável, como o Firestore (pelo id)
-          return (x < y ? -1 : 1) * dir;
+          /* ⚠️ EM SEQUÊNCIA: o primeiro critério manda, e os seguintes só desempatam -- é o que
+             `.orderBy(x).orderBy(y)` quer dizer. Guardando só o último, a lista sairia ordenada
+             pelo DESEMPATE, que é uma ordem que a produção nunca devolve. */
+          for(const [c, d] of criterios){
+            const x = valorDe(c)(a), y = valorDe(c)(b);
+            if(x !== y) return (x < y ? -1 : 1) * d;
+          }
+          return a.id < b.id ? -1 : 1;                  // desempate estável, como o Firestore (pelo id)
         });
         /* O CURSOR CORTA DEPOIS DA ORDENACAO e ANTES do limite -- essa ordem e a coisa toda: cortando
            depois do limite, a segunda pagina viria vazia sempre que a primeira estivesse cheia. */

@@ -183,5 +183,12 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow write: if false;
     }
+    // Ranking da Selecao (o aproveitamento contra a Luana). Mesma regra dos outros dois -- e aqui
+    // ela pesa MAIS: o que se grava nao e um recorde que so sobe, e um CONTADOR de partidas e
+    // vitorias. Escrita do cliente poria 999 vitorias e 0 derrotas.
+    match /selecaoRanking/{playerId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
   }
 }

@@ -8764,6 +8764,14 @@ uma vez, tirava zero, e a trava do *"cada jogador tem o dano dele"* caía lá em
 
 Medido depois de tudo: **0 falhas em 25 rodadas**, contra 2 em 12 no começo.
 
+**⚠️ MAS ELE NÃO MORREU -- ele ficou raro, e isso foi remedido em 21/09/2026: ~1 falha em 17
+rodadas** (uma numa bateria completa, zero em 16 rodadas isoladas), **e ela é IDÊNTICA no build de
+antes e no de depois** de todo o trabalho daquele dia, ou seja não é regressão de ninguém.
+A razão é que o `N × menorDano` pressupõe que **o menor não é absurdamente menor que o maior** --
+e quando a leva sorteia `menor 6 / maior 75` (12×), o alvo vira 60 e **uma investida forte sozinha
+mata o Mew** antes de a leva rodar. Se um dia for pra consertar, o alvo tem que ser maior que a
+MAIOR investida já vista naquela rodada, e não só `N ×` a menor.
+
 **O que isto NÃO conserta é a raide**, que continua descalibrada e por isso **DESLIGADA**
 (`BOSS_ATIVO`). Recalibrar é mexer no nível do Mew ou no `BOSS_MAX_HP`, e exige apagar
 `globalBoss/mew`, `globalBoss/mewRank` e a subcoleção `players` — o `maxHp` fica gravado no
@@ -14581,22 +14589,13 @@ pegando sempre o melhor disponível, o snake `1-2-2-2-2-2-1` distribui as posiç
 **fechar** com o bolo (12) e dar 6 pra cada lado. Uma ordem que some 11 ou 13 deixa o jogador com 5
 ou o bolo com sobra, e isso **não aparece como erro**: aparece como uma tela que não avança.
 
-**⚠️ O QUE A ESCOLHA VALE, MEDIDO** (400 drafts, os dois lados com a mesma política):
-
-| o jogador | vence |
-|---|---|
-| pegando o de maior BST, como o líder | **48,0%** |
-| pegando o PIOR de cada vez | **1,8%** |
-| *(BST médio do time: 396,8 x 395,5)* | |
-
-**48% é moeda ao ar** -- a consequência do snake ser justo -- e **46 pontos de amplitude** é o que
-a decisão vale. Sem esses dois números o draft seria enfeite.
+**⚠️ O QUE A ESCOLHA VALE, MEDIDO** (400 drafts, os dois lados com a mesma política):,,| o jogador | vence | na faixa baixa | média | alta |,|---|---|---|---|---|,| pegando o de maior BST, como o líder | **50,0%** | 51,7% | 52,6% | 46,0% |,| pegando o PIOR de cada vez | **11,5%** | 4,5% | 8,2% | 19,5% |,,**50% é moeda ao ar** -- a consequência do snake ser justo -- e **38,5 pontos de amplitude** é o,que a decisão vale. Sem esses dois números o draft seria enfeite.,,**⚠️ ELA VALIA 46 PONTOS ATÉ AS TRÊS FAIXAS ENTRAREM (48,0% x 1,8%), e a queda tem causa:** com o,nível fixo em 60 a lista crua punha um **Caterpie (BST 195) ao lado de um Dragonite (600)** no,mesmo bolo; com a espécie acompanhando o nível, aquele Caterpie vira Butterfree e a amplitude de,BST **dentro** de um bolo cai pra ~217. Escolher mal continua sendo ruim, só deixou de ser,suicídio -- e na **faixa alta** (onde quase tudo já está evoluído) o pior time ainda ganha 19,5%.
 
 - **⚠️ O LÍDER PEGA O DE MAIOR BST, e isso é uma linha de propósito**: é a régua mais simples que
   existe, ela é MEDÍVEL, e com ela o snake sai empatado. Se um dia ele precisar ser mais esperto, é
   no `selecaoEscolhaDoLider` -- e a régua está aqui.
-- **⚠️ TODO MUNDO ENTRA NO MESMO NÍVEL** (`SELECAO_NIVEL`, 60): com níveis diferentes o bolo
-  deixaria de ser o mesmo pros dois e a escolha viraria uma conta de nível.
+- **⚠️ O NÍVEL SAI DE UMA DAS TRÊS FAIXAS, e uma partida inteira roda numa faixa só** -- ver **AS
+  TRÊS FAIXAS DE NÍVEL**, logo abaixo. Ele foi fixo em 60 (`SELECAO_NIVEL`) até 21/09/2026.
 - **NEM LENDÁRIO NEM INTOCÁVEL** -- um Mewtwo no bolo decidiria o draft sozinho --, **e sem repetir
   LINHA evolutiva**: com Magikarp e Gyarados no mesmo bolo, os 12 viram 11 opções de verdade. É a
   mesma regra do encontro selvagem e dos guardiões da Montanha. Medido em 400 bolos: sempre 12,
@@ -14623,9 +14622,10 @@ sobreviviam e o primeiro quadro anunciaria um golpe que ninguém deu. É o defei
 trava do `test-especiais` -- que conta os `RevealPhase` contra os `abrirConfronto` -- é exatamente
 o que existe pra pegá-lo. **Ela pagou o preço dela hoje.**
 
-**Medido a 320px, no navegador:** o draft em **641px** com os 12 cards de 72×71px em 3 colunas,
-nenhum nome truncado, a faixa de quem levou visível; a tela de ordem em **1.687px** (os 6 seus com
-setas mais os 6 dela), sem rolagem lateral em nenhuma das duas.
+**Medido a 320px, no navegador:** o draft em **1.268px** com os 12 cards de **78×200 a 259px** em
+**3 colunas e 4 fileiras**, nenhum nome truncado, a faixa de quem levou visível; a tela de ordem em
+**1.715px** (os 6 seus com setas mais os 6 dela) e a de resultado em **1.667px** -- sem rolagem
+lateral em nenhuma das três. (Os cards mediam 72×71px até 21/09/2026.)
 
 **No motor, nada:** `MOTOR 385943f3e1fa / DIARIO 850af0fd1763`, idêntico em 900 batalhas semeadas.
 
@@ -14634,11 +14634,134 @@ tivessem moveset, e o `equiparNpc` dá o moveset **por NÍVEL** -- há espécie 
 dano nenhum (o Ditto). Ela falharia num bolo que sorteasse um deles: **um flake, o pior tipo de
 teste que existe**. Hoje ela compara com o que a espécie OFERECE.
 
-`tools/test-selecao.js` tranca 59 pontas: o acesso (e a ausência da régua de insígnias), a ordem
-fechando e sendo justa, o bolo em 400 sorteios, a ação recusando nos quatro casos, o draft fechando
-em 6x6 com os dois levando moveset, **o que a escolha vale**, as setas da ordem, a batalha caindo no
-ciclo da casa com o 1º de cada lado se encarando, e nada indo pro save.
-**Conferido que ele acusa os 7 defeitos religados.**
+`tools/test-selecao.js` tranca **69 pontas**: o acesso (e a ausência da régua de insígnias), a
+ordem fechando e sendo justa, o bolo em 400 sorteios, a ação recusando nos quatro casos, o draft
+fechando em 6x6 com os dois levando moveset, **o que a escolha vale**, as três faixas, o card, os
+dois `<h2>`, as setas da ordem, a batalha caindo no ciclo da casa com o 1º de cada lado se
+encarando, e nada indo pro save. `tools/test-selecao-rank.js` tranca **25** no servidor.
+**Conferido que os 12 defeitos religados acusam** (as 7 de 21/09 mais as 5 de hoje).
+
+### AS SEIS DA SELEÇÃO (21/09/2026) -- o card grande, as três faixas e o ranking
+
+Pedidas na mesma leva, horas depois de o modo nascer: *"pode aumentar o card de cada pokemon que
+enfrenta a Luana na Ilha Kumquat, e exiba level, tipos e ataques que cada um possui. A líder sempre
+vai optar pelo maior bst disponível. Exiba 3 cards de pokemon por linha, totalizando 4 linhas. Será
+sorteado 3 faixas de level ... A fonte do Seu Time e Time de Luana, pode deixar igual as outras
+fontes ... e troque o texto "Seu Time" por "Time de Treinador". Após a batalha, exiba um quadro
+mostrando o top10 melhores aproveitamentos contra a Luana ... Pode retirar o botão "Sortear outro
+bolo""*.
+
+#### ⚠️ AS TRÊS FAIXAS DE NÍVEL, E A ESPÉCIE TEM QUE ACOMPANHAR
+
+`SELECAO_FAIXAS` são **[20-30], [35-45] e [55-60]**, e uma partida inteira roda numa faixa **SÓ** --
+que é o pedido ao pé da letra (*"então uma batalha contra sempre vai ser todos os pokemons entre o
+level 20-30 ou..."*). O `SELECAO_NIVEL = 60` morreu.
+
+- **⚠️ E A ESPÉCIE ACOMPANHA O NÍVEL** (`formaNoNivel`), que é a outra metade do pedido (*"sempre
+  exibir as evoluções de acordo com a faixa de level"*). **Foi na Vigília que isso custou um
+  relato** -- *"está aparecendo Charizard no level 24, Poliwrath no level 25"* --, e a lição de lá
+  vale inteira aqui: o `especieNoNivel` só anda **PRA FRENTE**, então quem sorteia da dex INTEIRA
+  precisa do `formaNoNivel`, que **DESCE** a linha até a forma que existe naquele nível.
+- **O QUE ISSO PRODUZ, medido** (400 bolos por faixa):
+
+  | faixa | BST médio | espécies distintas |
+  |---|---|---|
+  | **20-30** | **378,7** | 159 |
+  | 35-45 | 448,9 | 166 |
+  | **55-60** | **471,1** | 133 |
+
+  As três são três jogos diferentes: na baixa entram as formas base e na alta elas somem. É
+  justamente esse degrau que a trava cobra (`alta > baixa + 40`) -- um número fixo ali envelheceria
+  no primeiro ajuste de faixa.
+
+**⚠️ E A INSTÂNCIA PASSOU A NASCER NO SORTEIO, não no fim do draft.** Ela nascia no
+`selecaoFecharDraft`, o que era inofensivo enquanto o card mostrava só o nome; **com o card
+mostrando os GOLPES**, o `equiparNpc` rodaria duas vezes -- uma pro card e outra pro time -- e a
+tela prometeria um moveset que a batalha não levaria. Hoje o draft só SEPARA (`.map(p => p.mon)`), e
+há trava cobrando que o objeto do time seja **o mesmo** do bolo.
+
+#### O CARD
+
+Ele traz **sprite, nome, nível, os selos de tipo e os golpes** (em ordem de poder efetivo
+decrescente, a mesma do cartão de golpe). Medido: **3,78 golpes por card**, o maior com 10, e **13
+cards em 2.400 sem golpe nenhum** -- o `equiparNpc` dá o moveset por NÍVEL, e há espécie que não
+aprende golpe de dano em nível nenhum (o Ditto). Esses saem com a linha vazia em vez de mentir.
+
+- **O SELO DO GOLPE É O `golpeSeloHtml` DA CASA**, o mesmo do log de batalha e das três telas de
+  golpe: reusá-lo é o que faz o Talho aqui ser o mesmo Talho de lá.
+- **3 POR LINHA, 4 FILEIRAS** -- `repeat(3, minmax(0,1fr))`, e o `minmax(0,...)` não é detalhe:
+  `1fr` é `minmax(auto,1fr)` e **não encolhe abaixo do conteúdo**, então um nome comprido empurraria
+  a grade pra fora dos 320px. É a armadilha que a fileira de cinco cards da home já pagou.
+- **A GRADE DEIXOU DE SER A `tower-pick-row`**: aquela é a grade de quadradinhos do montador, e o
+  card aqui tem quatro linhas de conteúdo.
+
+#### ⚠️ OS DOIS TÍTULOS ERAM UMA CLASSE FANTASMA
+
+O pedido foi *"deixe igual as outras fontes, mais bonita, maior"*, e a causa do relato é melhor
+que "eles eram menores": eles eram `<div class="section-title">`, **e essa classe nunca teve regra**
+**na folha** -- ela existia em exatamente dois lugares do arquivo, os dois criados por mim no dia
+anterior. Ou seja eles saíam em **texto de corpo**, ao lado de um "A ordem de entrada" que já é
+`<h2>`.
+
+⚠️ **CLASSE QUE NÃO EXISTE NÃO DÁ ERRO: ela só não faz nada**, e só a captura de tela pega. É a
+mesma família do `var(--cream)` que deixou uma aba transparente, do `var(--yellow-soft)` que não
+realçava e da variante de cor do botão de fisgar da Pescaria.
+
+⚠️ **E A VARREDURA DE CLASSE FANTASMA QUE EXISTE NÃO PEGAVA ESTA:** a do `test-pescaria` varre o
+jogo inteiro, mas só o que está em `class="btn ..."`. Medido hoje, um sweep de TODAS as classes
+acha **16 órfãs em 765** -- todas anteriores a isto e nenhuma tocada aqui. Fica registrado como
+lacuna conhecida: estendê-la exigiria uma lista de 16 nomes conhecidos, que é uma manutenção que
+ninguém pediu.
+
+Hoje os dois são `<h2>`, e conferido no navegador: os **três** títulos da tela saem em Press Start
+2P 12.8px peso 700, e `section-title` **não aparece mais em lugar nenhum do arquivo**.
+
+#### O TOP 10 CONTRA A LUANA
+
+⚠️ **É O TERCEIRO RANKING DO PROJETO, E O PRIMEIRO QUE GRAVA UM CONTADOR.** O da Pescaria guarda o
+melhor PLACAR e o da Corrida o melhor TEMPO -- os dois são recordes que **só andam pra um lado**, e
+um cliente forjado no máximo poria um número bom. Aqui o que se grava são **partidas, vitórias e
+derrotas**, e um cliente forjado poria **999 vitórias e 0 derrotas**.
+
+- **⚠️ O QUE CHEGA É UM BOOLEANO (`venceu`), e a conta é do SERVIDOR.** Aceitar `partidas`/
+  `vitorias` do cliente seria deixá-lo escrever o próprio aproveitamento por outro caminho -- e há
+  trava mandando os quatro campos juntos e cobrando que nenhum entre.
+- **E `venceu` AUSENTE OU DE OUTRO TIPO CONTA COMO DERROTA**: ele é lido como `!!`, senão um
+  `'sim'` viraria vitória por ser truthy num campo que o servidor não controla.
+- **⚠️ O `aproveitamento` É GRAVADO, não calculado na leitura: o Firestore não ordena por uma RAZÃO
+  entre campos.** Ele é derivado na MESMA transação que conta a partida, então não tem como ficar
+  velho. É a primeira vez que este projeto precisa disso.
+- **A ORDEM É PELO APROVEITAMENTO, com as PARTIDAS como desempate** -- e a **consequência é
+  conhecida e aceita: 1 vitória em 1 (100%) fica ACIMA de 18 em 20 (90%)**. A tabela mostra as
+  partidas justamente por isso: quem lê vê o denominador. Se um dia incomodar, a régua é um mínimo
+  de partidas pra entrar na lista.
+- **A TRANSAÇÃO É OBRIGATÓRIA aqui**, e não conveniência: o que se escreve **depende do que se
+  leu**. Nos outros dois ela protege um empate; aqui ela protege a contagem.
+- **O NOME FICA DENORMALIZADO** e o **MEU resultado volta junto mesmo fora do top** -- as duas
+  regras dos outros dois rankings, pelos mesmos motivos (10 leituras a menos; quem está em 14º
+  abriria a tela e não veria nada seu).
+- **A coleção é `allow write: if false` INCLUSIVE pro dono**, e a trava **lê a regra como texto**.
+- **É UM DOCUMENTO POR JOGADOR**: quatro envios deixam um documento, e a coleção não cresce sem
+  limite.
+
+**O "SORTEAR OUTRO BOLO" SAIU, e a função foi junto** -- ela não tinha outro chamador, e função de
+apresentação sem chamador é exatamente o tipo de coisa que fica anos no arquivo. Há trava pros dois.
+
+#### ⚠️ E O `fake-firestore` GUARDAVA SÓ O ÚLTIMO `orderBy`
+
+Este ranking é o primeiro do projeto com **dois critérios** (`aproveitamento` desc, `partidas`
+desc), e o fake substituía um pelo outro em vez de **encadear**: a lista saía ordenada pelo
+**DESEMPATE**, que é uma ordem que a produção nunca devolve. Um teste escrito em cima disso
+"provaria" uma ordem errada.
+
+⚠️ **É A SÉTIMA VEZ QUE O DUBLÊ É MAIS PERMISSIVO QUE A PRODUÇÃO** -- depois do `increment` dentro
+de mapa, do ponto no `update()`, do `getAll` da transação, do `arrayUnion`, do `count()` e do
+`undefined` que matou as duas ligas. **O fake tem que doer onde a produção dói**, e aqui ele tinha
+que ordenar como ela ordena. De quebra a exclusão de quem não tem o campo passou a valer pra
+**TODOS** os critérios, que é o que o Firestore faz.
+
+**No motor, nada:** `MOTOR 385943f3e1fa / DIARIO 850af0fd1763`, idêntico em 900 batalhas semeadas.
+
 
 ## RESGATE POKÉMON -- o terceiro teste admin (20/09/2026)
 
