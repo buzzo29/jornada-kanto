@@ -32002,6 +32002,29 @@ function corridaVerTimeDoRank(onde, i){
   render();
 }
 function corridaFecharTimeDoRank(){ corrida.timeDoRank = null; render(); }
+/* ⚠️ O RETRATO DE UM TIME NUM MODAL -- e ele decide pela QUANTIDADE, num lugar só (21/09/2026).
+   A `save-slot-team-row.spread` é uma GRADE DE 6 COLUNAS: com UM pokémon ele ocupa 1/6 da largura
+   e fica encostado na esquerda, com cinco colunas vazias ao lado -- foi exatamente o relato ("está
+   ficando na esquerda com muito espaço em branco na direita").
+   ⚠️ E A REGRA JÁ EXISTIA, escrita à mão no anúncio de vitória: lá a fileira é do revezamento e o
+   sprite grande é do individual. Duas cópias da mesma decisão divergiriam no primeiro ajuste, então
+   as duas telas passaram a ler esta função -- o anúncio sai BYTE A BYTE o que ele já saía.
+   ⚠️ O NÍVEL É OPCIONAL, e só o RANKING o pede: lá ele é informação (a velocidade da Corrida escala
+   com o nível, então ele diz com o que aquele tempo foi feito); no anúncio, que é sobre quem GANHOU
+   agora, ele seria ruído. */
+function corridaRetratoDoTime(time, comNivel){
+  const lista = (time || []).filter(Boolean);
+  if(!lista.length) return ``;
+  /* vários ⇒ a MESMA fileira do card de time da casa: o jogador reconhece um time por ela */
+  if(lista.length > 1) return `<div class="save-slot-team-row spread">${pescariaTimeSprites(lista)}</div>`;
+  /* ⚠️ UM SÓ ⇒ `modal-icon`, que é a classe do retrato de um modal e JÁ CENTRALIZA (o `.modal-box`
+     é `text-align:center`). O `font-size:2rem` dela não é enfeite: quando o sprite não carrega, o
+     fallback é TEXTO (o emoji da espécie), e é ele que dá tamanho a esse caso. */
+  const p = lista[0];
+  return `<div class="modal-icon">${spriteHtml(p, `sprite-lg`)}`
+    + (comNivel ? `<div class="save-slot-mon-level">Lv.${p.level}</div>` : ``)
+    + `</div>`;
+}
 function renderCorridaTimeModal(){
   const t = corrida.timeDoRank;
   if(!t) return '';
@@ -32010,9 +32033,10 @@ function renderCorridaTimeModal(){
     <div class="modal-box" onclick="event.stopPropagation();">
       <h2>${escapeHtmlSafe(t.nome)}</h2>
       <p class="corrida-rank-mod">${t.pos ? t.pos + 'º · ' : ''}${corridaTempoTxt(t.tempo)}</p>
-      ${/* ⚠️ A MESMA FILEIRA do card de time e da tela de resultado: o jogador reconhece um time
-           por ela, e um desenho próprio aqui o faria reaprender a ler. */''}
-      <div class="resultTime save-slot-team-row spread">${pescariaTimeSprites(t.time)}</div>
+      ${/* ⚠️ VÁRIOS ⇒ a MESMA fileira do card de time; UM ⇒ o retrato grande e centrado. Ver o
+           `corridaRetratoDoTime`, que é onde a decisão mora. O nível vai junto: ele diz com o que
+           aquele tempo foi feito, e a velocidade da Corrida escala com ele. */''}
+      ${corridaRetratoDoTime(t.time, true)}
       <button class="btn secondary" onclick="corridaFecharTimeDoRank()">Fechar</button>
     </div>
   </div>`;
@@ -32582,10 +32606,7 @@ function corridaAnuncioHtml(){
                        : 'Vitória ' + escapeHtmlSafe(nomeDoCorredor(c)) + '!';
   /* ⚠️ E O RETRATO ACOMPANHA: no revezamento é a fileira dos seis (a MESMA `save-slot-team-row` da
      classificação e do card de time da casa), no individual é o sprite grande de quem correu. */
-  const retrato = relay
-    ? `<div class="corrida-anuncio-time save-slot-team-row spread">${pescariaTimeSprites(c.time)}</div>`
-    : (c.time && c.time[0]
-        ? `<div class="modal-icon">${spriteHtml(c.time[0], 'sprite-lg', c.time[0].shiny)}</div>` : '');
+  const retrato = corridaRetratoDoTime(c.time, false);
   return `
   <div class="modal-overlay" onclick="corridaFecharAnuncio()">
     <div class="modal-box" onclick="event.stopPropagation()">

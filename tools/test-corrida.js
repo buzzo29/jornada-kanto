@@ -2161,9 +2161,28 @@ console.log('\n=== O MODAL DO TIME NO RANKING ===');
   ok('  com o nome do treinador', m.indexOf('Ash') >= 0);
   ok('  o tempo dele', m.indexOf('18.50s') >= 0);
   ok('  a colocação', m.indexOf('1º') >= 0);
-  ok('  e a MESMA fileira de sprites', m.indexOf('resultTime') >= 0 && m.indexOf('save-slot-mon') >= 0);
+  /* ⚠️ UM SÓ ⇒ RETRATO GRANDE E CENTRADO (21/09/2026, a pedido). A `save-slot-team-row.spread` é
+     uma GRADE DE 6 COLUNAS: com um pokémon ele ocupava 1/6 da largura e ficava encostado na
+     esquerda, com cinco colunas vazias ao lado. Medido a 320px: sprite de 48px a 95px do centro
+     da caixa; hoje, 110px e desvio ZERO. */
+  ok('  UM pokémon ⇒ o retrato grande', m.indexOf('modal-icon') >= 0 && m.indexOf('sprite-lg') >= 0);
+  ok('    e NÃO a fileira de 6 colunas', m.indexOf('save-slot-team-row') < 0,
+     'com um só ele fica em 1/6 da largura, encostado na esquerda');
+  ok('    com o nível junto', m.indexOf('Lv.70') >= 0,
+     'ele diz com o que aquele tempo foi feito, e a velocidade da Corrida escala com o nível');
   /* ⚠️ E É O TIME DAQUELE TEMPO, não o time de hoje do jogador -- por isso ele viaja no envio */
   ok('  e o shiny gravado é respeitado', m.indexOf('shiny/') >= 0);
+
+  /* ⚠️ VÁRIOS ⇒ A FILEIRA, que é a MESMA do card de time da casa: o jogador reconhece um time por
+     ela, e um desenho próprio o faria reaprender a ler. */
+  S.corridaFecharTimeDoRank();
+  S.corridaVerTimeDoRank('meu', 0);
+  const mSeis = S.renderCorridaTimeModal();
+  ok('  VÁRIOS ⇒ a fileira do card de time', mSeis.indexOf('save-slot-team-row spread') >= 0);
+  ok('    e NÃO o retrato grande', mSeis.indexOf('sprite-lg') < 0);
+  ok('    com os seis', (mSeis.match(/save-slot-mon"/g) || []).length === 6,
+     (mSeis.match(/save-slot-mon"/g) || []).length + ' sprites');
+  S.corridaVerTimeDoRank('lista', 0);
   S.corridaFecharTimeDoRank();
   ok('  e fecha', !S.corrida.timeDoRank);
 
@@ -2180,6 +2199,71 @@ console.log('\n=== O MODAL DO TIME NO RANKING ===');
   ok('  e o campo zera com o resto do estado da corrida',
      /timeDoRank: null,/.test(src));
   S.corridaRank.single = null;
+}
+
+/* ============================================================================
+   O RETRATO DE UM TIME NUM MODAL (21/09/2026)
+
+   ⚠️ A REGRA JÁ EXISTIA, escrita à mão no anúncio de vitória: lá a fileira é do revezamento e o
+   sprite grande é do individual. O modal do ranking usava a fileira nos DOIS casos -- foi o
+   relato. Duas cópias da mesma decisão divergiriam no primeiro ajuste, então as duas telas
+   passaram a ler o `corridaRetratoDoTime`.
+   ============================================================================ */
+console.log('\n=== O RETRATO DE UM TIME ===');
+{
+  contaDeTeste();
+  const um = [{ speciesId: 'jolteon', level: 70, shiny: false }];
+  const seis = ['blastoise','snorlax','jolteon','alakazam','gyarados','shuckle']
+    .map((id, i) => ({ speciesId: id, level: 60 + i, shiny: false }));
+
+  /* a decisão é pela QUANTIDADE, não pela modalidade: com um pokémon o retrato grande é o certo
+     nos dois modos, e é o que a fileira de 6 colunas não consegue fazer. */
+  const r1 = S.corridaRetratoDoTime(um, false);
+  ok('UM ⇒ retrato grande', r1.indexOf('modal-icon') >= 0 && r1.indexOf('sprite-lg') >= 0);
+  ok('  e não a fileira', r1.indexOf('save-slot-team-row') < 0);
+  const r6 = S.corridaRetratoDoTime(seis, false);
+  ok('VÁRIOS ⇒ a fileira', r6.indexOf('save-slot-team-row spread') >= 0);
+  ok('  e não o retrato grande', r6.indexOf('sprite-lg') < 0);
+  ok('  com o sprite pequeno da fileira', r6.indexOf('sprite-sm') >= 0);
+
+  /* ⚠️ O NÍVEL É OPCIONAL, e só o RANKING o pede: lá ele diz com o que aquele tempo foi feito (a
+     velocidade da Corrida escala com o nível); no anúncio, que é sobre quem GANHOU agora, ele
+     seria ruído. */
+  ok('o nível é opcional: com', S.corridaRetratoDoTime(um, true).indexOf('Lv.70') >= 0);
+  ok('  e sem', S.corridaRetratoDoTime(um, false).indexOf('Lv.70') < 0);
+
+  /* ⚠️ TIME VAZIO ⇒ NADA: o anúncio dependia disso (ele fazia `: ''` quando não havia time). */
+  ok('time vazio ⇒ string vazia', S.corridaRetratoDoTime([], false) === '');
+  ok('  e null também', S.corridaRetratoDoTime(null, false) === '');
+  ok('  e um buraco na lista não vira sprite fantasma',
+     S.corridaRetratoDoTime([null, um[0]], false).indexOf('modal-icon') >= 0,
+     'um item nulo contaria como segundo pokémon e mandaria pra fileira');
+
+  /* ⚠️ AS DUAS TELAS LEEM A MESMA FUNÇÃO -- e isso se lê no CÓDIGO: um caso de comportamento
+     passaria com a decisão copiada de volta pro anúncio. */
+  ok('o anúncio lê a MESMA função',
+     /const retrato = corridaRetratoDoTime\(/.test(src),
+     'a decisão voltaria a ter duas cópias');
+  ok('  e o modal do ranking também',
+     /\$\{corridaRetratoDoTime\(t\.time, true\)\}/.test(src));
+  ok('  e ninguém mais monta a fileira à mão nesses dois',
+     (src.match(/corrida-anuncio-time/g) || []).length === 0,
+     'a classe do anúncio era FANTASMA: 1 uso, zero regras no CSS');
+
+  /* ⚠️ E O COMPORTAMENTO DO ANÚNCIO NÃO MUDOU: revezamento ⇒ fileira, individual ⇒ retrato. */
+  S.corridaZerar();
+  S.corrida.fase = 'anuncio';
+  S.corrida.formato = 'single';
+  S.corrida.corredores = [{ nome: 'Você', time: um, chegada: 16.7, dist: 300, trecho: 0 }];
+  const aSingle = S.corridaAnuncioHtml();
+  ok('o anúncio individual ⇒ retrato grande', aSingle.indexOf('sprite-lg') >= 0);
+  ok('  e sem o nível (ali ele seria ruído)', aSingle.indexOf('Lv.70') < 0);
+  S.corrida.formato = 'relay';
+  S.corrida.corredores = [{ nome: 'Você', time: seis, chegada: 118.4, dist: 1800, trecho: 5 }];
+  const aRelay = S.corridaAnuncioHtml();
+  ok('o anúncio do revezamento ⇒ a fileira', aRelay.indexOf('save-slot-team-row spread') >= 0);
+  ok('  e não o retrato grande', aRelay.indexOf('sprite-lg') < 0);
+  S.corridaZerar();
 }
 
 console.log('\n=== O TIME VIAJA NO ENVIO ===');
@@ -2358,7 +2442,10 @@ console.log('=== O ANÚNCIO DO VENCEDOR ===');
   h = S.renderCorrida();
   const quem = (h.match(/Vitória ([^!<]*)!/) || [, '?'])[1];
   ok('  e nomeia o TREINADOR no revezamento', quem === S.corridaTreinadorDe(2), quem);
-  ok('    com a fileira dos seis', h.indexOf('corrida-anuncio-time') >= 0);
+  /* ⚠️ ELA PROCURAVA A CLASSE `corrida-anuncio-time`, que era FANTASMA -- 1 uso no HTML e ZERO
+     regras no CSS. Medir uma classe que não faz nada é medir a forma, não a regra; hoje ela
+     cobra a fileira de verdade, que é a MESMA do card de time da casa. */
+  ok('    com a fileira dos seis', h.indexOf('save-slot-team-row spread') >= 0);
   ok('    e não com um sprite só', (h.match(/sprite-lg/g) || []).length === 0);
 
   /* 3) o Ok fecha e a classificação aparece */

@@ -254,7 +254,7 @@ function createSandbox(htmlPath){
     'corridaClasseDoTrecho','corridaTreinadorDe','corridaSpeedDoTime',
     'corridaPintarHud','corridaLinhaEscolhido','corridaPickerDeTimes','pmdChave','pmdDados',
     'corridaEscolherTime','MEDALHA_DO_POSTO',
-    'corridaVerTimeDoRank','corridaFecharTimeDoRank','renderCorridaTimeModal',
+    'corridaVerTimeDoRank','corridaFecharTimeDoRank','renderCorridaTimeModal','corridaRetratoDoTime',
     'pescariaTimeSprites',
     // o salvamento: o ciclo do _especialContra ja custou save de jogador (ver test-especiais.js)
     'limparParaFirestore','serializeGame','encerrarBatalha','placarDoTreinador','renderTowerRankingModal','openTowerRanking','abrirHistoricoDaTorre','paginarHistoricoDaTorre','abrirHojeDaTorre','closeTowerRanking','renderHpBar','renderTerrainInfoModal','abrirConfronto','formasDaRota','abrirPokemonsDaRota','fecharPokemonsDaRota','renderPokemonsDaRotaModal','faixaDeNivelSelvagem','spriteHtml','FORMAS_DO_UNOWN','sufixoDoUnown','sorteiaFormaDoUnown','spriteMarkupByDex','typesHtml','pokedexIcon','SEM_CAPTURA_SELVAGEM','SURFISTAS','conquistouHM03','formasDoHM03','conferirHM03','darHMComAviso','renderHmGanhoModal','fecharHmGanho','HM03_ROTA','HM03_LEG','markCaught','game','hydrateTeam',

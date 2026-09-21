@@ -16986,6 +16986,81 @@ que é a acusação mais forte que existe). Duas lições de teste saíram daí:
    a regra do cache ANTES da idade. **É a terceira vez que essa família envelhece aqui** -- as
    outras duas foram quando o trecho da Corrida virou 150 m e quando a lista do Resgate cresceu.
 
+### ⚠️ O RETRATO DE UM TIME NUM MODAL: UM SÓ NÃO CABE NUMA GRADE DE SEIS (21/09/2026)
+
+Reportado com print do modal do ranking **individual**: *"aumente o sprite do pokémon que o treinador
+usou e centralize, está ficando na esquerda com muito espaço em branco na direita"*.
+
+**⚠️ A CAUSA É A `save-slot-team-row.spread` SER UMA GRADE DE 6 COLUNAS** (`repeat(6, 1fr)`) — ela
+existe pra mostrar um TIME, e o modal a usava nos dois modos. Com um pokémon ele ocupa **1/6 da
+largura** e as outras cinco colunas ficam vazias. Medido a 320px:
+
+| | antes | depois |
+|---|---|---|
+| colunas da grade | **6 de 37,2px** | — |
+| o `<img>` | 48px | **110px** (`sprite-lg`) |
+| distância do centro da caixa | **95px à esquerda** | **ZERO** |
+| altura do modal | 241px | 301px (cabe nos 568) |
+| rolagem lateral | nenhuma | nenhuma |
+
+**⚠️ E A REGRA JÁ EXISTIA NO JOGO, escrita à mão no ANÚNCIO DE VITÓRIA** — lá a fileira é do
+revezamento e o sprite grande é do individual, com a razão registrada no comentário dele desde
+21/09. O modal do ranking nasceu sem ela. Duas cópias da mesma decisão divergiriam no primeiro
+ajuste, então as duas telas passaram a ler o **`corridaRetratoDoTime`**, e o anúncio saiu do jeito
+que ele já saía.
+
+- **⚠️ A DECISÃO É PELA QUANTIDADE, não pela modalidade.** É mais honesta e cobre um caso que a
+  antiga errava: um revezamento com um pokémon só cairia na grade de seis do mesmo jeito.
+- **⚠️ O `filter(Boolean)` NÃO É ZELO:** um buraco na lista contaria como segundo pokémon e mandaria
+  a tela pra fileira — com **um sprite e cinco colunas vazias**, que é exatamente o defeito relatado
+  entrando por outra porta.
+- **A classe do retrato é a `modal-icon` que já existe**, e ela **já centraliza** (o `.modal-box` é
+  `text-align:center`). O `font-size:2rem` dela não é enfeite: quando o sprite não carrega, o
+  fallback é **TEXTO** (o emoji da espécie), e é ele que dá tamanho a esse caso.
+- **⚠️ O NÍVEL É OPCIONAL, e só o RANKING o pede:** lá ele diz **com o que aquele tempo foi feito**,
+  e a velocidade da Corrida **escala com o nível** — ou seja ele é o que separa um recorde de outro.
+  No anúncio, que é sobre quem ganhou agora, ele seria ruído.
+
+#### ⚠️ E O TAMANHO APARENTE É DA ESPÉCIE, NÃO DO CSS — medido
+
+O sprite do PokeAPI é sempre um quadro de **96×96**, e o bicho ocupa uma fração dele que **varia por
+espécie**. Medido no navegador (decodificando o PNG servido do mesmo origin — o do CDN deixa o
+canvas *tainted*):
+
+| espécie | o bicho ocupa do quadro | a 48px | **a 110px** |
+|---|---|---|---|
+| **Nidoran♀** (o do print) | **35%** | 17px | **39px** |
+| Jolteon | 51% | 25px | 56px |
+| Blastoise | 69% | 33px | 76px |
+| Snorlax | 70% | 34px | **77px** |
+
+**⚠️ E ISSO É FIEL, não é defeito: a margem guarda a PROPORÇÃO ENTRE AS ESPÉCIES.** Um Nidoran♀ é
+pequeno e um Snorlax é grande, e o jogo inteiro usa esse quadro fixo (a Pokédex, a fileira de time,
+a batalha). Recortar a margem aqui faria o Nidoran♀ aparecer do tamanho de um Snorlax — um desenho
+próprio só desta tela, destoando de todas as outras.
+
+O `sprite-lg` (110px) é o **maior tamanho que a casa tem**, e é o que o anúncio já usava. Se um dia
+110 parecer pouco, a régua é ele — e a conta está aqui: o que se vê é `110 × a fração da espécie`.
+
+**⚠️ E O MEU PRIMEIRO INSTRUMENTO MENTIU:** escrevi um decodificador de PNG à mão e ele devolveu
+**100% do quadro** pro Nidoran♀ — quatro vezes o valor real. Foi o **navegador** que deu o número
+certo. Escrever um decodificador é inventar um instrumento; servir o arquivo do mesmo origin e usar
+o `getImageData` é medir com o que já funciona.
+
+#### ⚠️ E A CLASSE DO ANÚNCIO ERA FANTASMA
+
+A `corrida-anuncio-time` tinha **1 uso no HTML e ZERO regras no CSS** — ela não fazia nada desde que
+nasceu, em 21/09. Saiu junto.
+
+**E uma trava media JUSTAMENTE ela** (*"com a fileira dos seis"*, procurando o nome da classe), ou
+seja ela media uma classe morta em vez da fileira de verdade. Hoje ela cobra a
+`save-slot-team-row spread`. É a **quarta** vez que essa família envelhece aqui — as outras foram o
+texto do botão de modalidade, o *"tem lista ⇒ não relê"* do cache e as cinco que fixavam a metragem
+do revezamento.
+
+**CONFERIDO QUE NÃO É MOTOR:** `MOTOR 079861051846 / DIARIO cfedb1fdcab2`, idêntico. **Os 8 defeitos
+religados acusam** (2 a 9 falhas, e um **mata** o teste).
+
 ## O ADVERSÁRIO DO RESGATE TEM NOME, E O SAIR DA PESCARIA DESCEU (21/09/2026)
 
 Três pedidos de tela: *"no jogo o resgate, aumente o botão PRAIA que tem na ilha. Troque também
