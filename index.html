@@ -3165,7 +3165,10 @@
   /* a linha de quem esta lendo e a que ele procura primeiro -- o mesmo realce do ranking da Torre */
   .pesc-rank-linha.eu{background:rgba(255,203,5,.22);border-radius:4px;}
   .pesc-rank-pos{font-weight:800;font-size:.7rem;text-align:center;color:var(--muted);}
-  .pesc-rank-nome{font-weight:700;font-size:.72rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  /* ⚠️ O TAMANHO VIRA VARIÁVEL porque a Corrida deriva o dela deste (--1px), e um segundo número
+     escrito à mão lá divergiria deste no primeiro ajuste. */
+  .pesc-rank-nome{--rank-nome:.72rem;font-weight:700;font-size:var(--rank-nome);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .pesc-rank-pts{font-weight:800;font-size:.8rem;font-variant-numeric:tabular-nums;color:var(--blue-dark);}
   .pesc-rank-sep{font-size:.55rem;font-weight:800;color:var(--muted);text-transform:uppercase;
     letter-spacing:.5px;margin-top:6px;padding-top:6px;border-top:2px solid var(--box-border);}
@@ -3469,13 +3472,27 @@
      moldura de 3px, e aqui a linha é informação que por acaso se toca -- o mesmo raciocínio que já
      tirou o `.btn` das linhas da ficha, dos cartões de golpe e das prateleiras da loja.
      Ele herda o `.pesc-rank-nome` (que já trunca), então o tempo nunca é empurrado. */
+  /* ⚠️ ELE NÃO PODE USAR `font:inherit` (20/09/2026, reportado: *"deixe o nome do treinador em
+     Negrito e diminua 1 no tamanho da fonte"*). O atalho `font` REESCREVE peso e tamanho junto, e
+     como esta regra vem DEPOIS da `.pesc-rank-nome` com a mesma especificidade, ela ganhava o
+     empate: medido no navegador, a linha COM time saía em **16px peso 400** e a linha SEM time em
+     **11,5px peso 700** -- duas fontes na mesma lista, e a maior delas era a que não era negrito.
+     Aqui só o que um <button> precisa mesmo: a família e a entrelinha. Peso e tamanho continuam
+     sendo os da `.pesc-rank-nome`. */
   .corrida-rank-btn{
-    background:none;border:none;padding:0;margin:0;font:inherit;color:inherit;text-align:left;
+    background:none;border:none;padding:0;margin:0;font-family:inherit;line-height:inherit;
+    color:inherit;text-align:left;
     cursor:pointer;display:flex;align-items:center;gap:4px;min-width:0;
   }
   .corrida-rank-btn:hover{ text-decoration:underline; }
-  /* o ⓘ é a affordance, não a informação -- o mesmo da ficha da Pokédex */
-  .corrida-rank-info{ font-size:.66rem; color:var(--muted); opacity:.75; flex:none; }
+  /* ⚠️ E O RANKING DA CORRIDA TEM O NOME UM PIXEL MENOR E MAIS PESADO -- o pedido. Ele é DERIVADO
+     do `--rank-nome`, nunca reescrito: um número aqui envelheceria no primeiro ajuste de lá. A
+     regra é do container (`.pesc-rank.corrida`), então ela pega o <span> e o <button> de uma vez
+     -- e a lista deixa de ter duas fontes. A Pescaria não muda. */
+  .pesc-rank.corrida .pesc-rank-nome{ font-size:calc(var(--rank-nome) - 1px); font-weight:800; }
+  /* o ⓘ é a affordance, não a informação -- o mesmo da ficha da Pokédex. Ele desceu junto com o
+     nome: do mesmo tamanho dele, ele deixaria de se ler como enfeite. */
+  .corrida-rank-info{ font-size:.6rem; color:var(--muted); opacity:.75; flex:none; }
   .corrida-rank-mod{font-size:.66rem;font-weight:800;color:var(--blue-dark);margin:0 0 6px;}
   .corrida-speed-badge{
     position:absolute;right:8px;top:50%;transform:translateY(-50%);
@@ -31122,12 +31139,46 @@ function periodoDasFaixas(nivel){
   const t = Math.max(0, Math.min(1, ((nivel || 1) - 1) / (NIVEL_MAXIMO - 1)));
   return CORRIDA_TRAVESSIA * (CORRIDA_FAIXA_RAZAO_MIN + t * (CORRIDA_FAIXA_RAZAO_MAX - CORRIDA_FAIXA_RAZAO_MIN));
 }
+/* ============================================================================
+   ⚠️ ENQUANTO O JOGADOR NÃO ERRA, AS FAIXAS ACELERAM (20/09/2026, a pedido: *"enquanto o treinador
+   não errar, ou seja, só ficar acertando o perfeito e bom, a barra amarela e verde vai ficando
+   mais rapida, e quando o treinador erra, ela volta a ficar na velocidade normal"*).
+
+   ⚠️ ELA PUNE O PRÓPRIO SUCESSO, e é isso que a torna uma mecânica e não um prêmio: cada acerto
+   encolhe o período das faixas, ou seja o alvo do PRÓXIMO impulso passa mais rápido. A sequência
+   se quebra sozinha quando ela fica difícil demais -- e o erro que a quebra já tem a penalidade
+   dele (0,80 por meio segundo).
+
+   ⚠️ SÓ UM `miss` ZERA. Não tentar não zera, e é literal: o pedido fala de ERRAR. Quem para de
+   tocar já é punido pelo DESLEIXO, e somar as duas coisas seria uma regra que ninguém pediu.
+   ⚠️ E ELA É DO JOGADOR, não do NPC: o NPC não usa a barra -- ele sorteia --, então não há faixa
+   dele pra acelerar. A sequência vive no `corrida`, não no corredor, pelo mesmo motivo.
+   ============================================================================ */
+const CORRIDA_SEQUENCIA_PASSO = 0.12;   /* -12% de período por acerto seguido */
+const CORRIDA_SEQUENCIA_MIN = 0.45;     /* o piso: nunca mais rápida que ~2,2x a normal */
+function fatorDaSequencia(n){
+  return Math.max(CORRIDA_SEQUENCIA_MIN, Math.pow(1 - CORRIDA_SEQUENCIA_PASSO, Math.max(0, n || 0)));
+}
+/* O período que vale AGORA -- o do nível de quem corre, encolhido pela sequência. */
+function periodoDasFaixasAgora(){
+  const eu = corrida.corredores[0];
+  const p = eu ? eu.time[eu.trecho] : null;
+  return periodoDasFaixas(p ? p.level : 1) * fatorDaSequencia(corrida.sequencia);
+}
+/* ⚠️ A FASE É ACUMULADA, e não calculada do `corrida.tempo`: com o período mudando no meio da
+   prova (a sequência agora, e a troca de trecho desde sempre), `sin(2π·t/P)` SALTA quando P muda
+   -- a faixa teleportaria até um terço da barra no instante do acerto, e o jogador leria isso
+   como a tela piscando. Integrando a VELOCIDADE angular, o que muda é o ritmo daí pra frente e a
+   faixa continua de onde estava. De quebra some o salto que a troca de trecho já causava.
+   ⚠️ QUEM A ADIANTA É O `corridaFisicaPasso`, ou seja ela anda com o relógio da prova e não com
+   o do navegador -- as travas dirigem o laço e medem isto sem depender de quadro nenhum. */
+function corridaAvancarFaixas(dt){
+  corrida.faseFaixas = (corrida.faseFaixas || 0) + 2 * Math.PI * dt / periodoDasFaixasAgora();
+}
 /* O centro das faixas AGORA -- o mesmo pras duas, que são concêntricas. É sobre ELE que a detecção
    mede, e não sobre o 0,5 fixo. */
 function centroDasFaixas(){
-  const eu = corrida.corredores[0];
-  const p = eu ? eu.time[eu.trecho] : null;
-  return 0.5 + CORRIDA_FAIXA_AMPLITUDE * Math.sin(2 * Math.PI * corrida.tempo / periodoDasFaixas(p ? p.level : 1));
+  return 0.5 + CORRIDA_FAIXA_AMPLITUDE * Math.sin(corrida.faseFaixas || 0);
 }
 /* ⚠️ O `centro` TEM PADRÃO 0,5 porque a GEOMETRIA das faixas não depende de onde elas estão: as
    travas medem as bordas com o centro parado, e a barra em jogo passa o centro móvel. */
@@ -31359,6 +31410,8 @@ const corrida = {
   escolhidos: [], corredores: [],
   fase: 'setup', tempo: 0, contagem: 0, ultimoQuadro: 0, animacao: 0,
   tentativaDaTravessia: -1, perfeitos: 0, brilho: 0, brilhoTexto: '',
+  /* a sequência de acertos e a fase das faixas -- ver `fatorDaSequencia` */
+  sequencia: 0, faseFaixas: 0,
   aviso: '', faltando: [], recado: '', picker: false, laco: null, _pintouFim: false,
   /* ⚠️ ELE PRECISA EXISTIR AQUI TAMBÉM, e não só no `corridaZerar`: o `abrirCorrida` NÃO zera
      (ele só mexe na fase e no picker), então um campo que só nasça lá é `undefined` na primeira
@@ -31459,7 +31512,7 @@ function corridaRankHtml(){
       + `<span class="pesc-rank-pts">${corridaTempoTxt(x.tempo)}</span></div>`;
   };
   return caixa((corridaRank.recorde === corrida.formato ? `<p class="pesc-rank-novo">Recorde novo!</p>` : ``)
-    + `<div class="pesc-rank">${r.lista.map((x, i) => linha(x, 'lista', i)).join('')}`
+    + `<div class="pesc-rank corrida">${r.lista.map((x, i) => linha(x, 'lista', i)).join('')}`
     + (r.meu ? `<div class="pesc-rank-sep">você</div>` + linha(r.meu, 'meu', 0) : ``)
     + `</div>`);
 }
@@ -31501,6 +31554,7 @@ function corridaZerar(){
     fase: 'setup',            /* setup | carregando | contagem | correndo | fim */
     tempo: 0, contagem: 0, ultimoQuadro: 0, animacao: 0,
     tentativaDaTravessia: -1, perfeitos: 0, brilho: 0, brilhoTexto: '',
+    sequencia: 0, faseFaixas: 0,
     aviso: '', faltando: [], recado: 'Acerte a faixa amarela para acelerar.',
     picker: false, laco: null, _pintouFim: false, timeDoRank: null,
     /* a seleção de cada modalidade, guardada em separado -- ver o `corridaTrocarFormato` */
@@ -31744,6 +31798,9 @@ function corridaFisica(dt){
   if(corrida.corredores.length && corrida.corredores.every(c => c.chegada !== null)) corridaTerminar();
 }
 function corridaFisicaPasso(dt){
+  /* ⚠️ ANTES DE MOVER NINGUÉM, e com o período do começo da fatia: é o mesmo cuidado do
+     fatiamento do `corridaAvancar` -- o que muda no meio da fatia vale da próxima em diante. */
+  corridaAvancarFaixas(dt);
   const fim = corrida.tempo + dt;
   corrida.corredores.forEach((c, i) => {
     let cursor = corrida.tempo;
@@ -31787,6 +31844,15 @@ const corridaPosicao = (i) => corridaRanking().findIndex(x => x.i === i) + 1;
    salta de uma ponta à outra. É esta conta que faz a detecção valer nos dois sentidos sem um `if`
    de direção: a faixa é uma região da BARRA, não um intervalo de tempo.
    ============================================================================ */
+/* ⚠️ O CHIP VIVE NUMA FUNÇÃO SÓ porque ele tem DOIS desenhistas: o `render()` dá o valor inicial
+   e o pintor o move durante a prova (o laço não redesenha a tela). Escritos em separado, os dois
+   divergiriam no primeiro ajuste -- e o sintoma seria o chip certo no primeiro quadro e errado
+   dali em diante, que é a família do modal da contagem e dos chips do revezamento.
+   A sequência só aparece a partir do SEGUNDO acerto: "1 seguido" não é uma sequência. */
+function corridaChipDosPerfeitos(){
+  return corrida.perfeitos + ' perfeitos'
+    + ((corrida.sequencia || 0) >= 2 ? ' · ' + corrida.sequencia + ' seguidos' : '');
+}
 const corridaTravessia = () => Math.floor(corrida.tempo / CORRIDA_TRAVESSIA);
 const corridaPosBarra = () => 1 - Math.abs(1 - (corrida.tempo / CORRIDA_TRAVESSIA) % 2);
 function corridaImpulso(){
@@ -31801,9 +31867,20 @@ function corridaImpulso(){
   eu.tentouNaTravessia = corridaTravessia();   /* zera o contador de desleixo na virada */
   const r = resultadoDoImpulso(corridaPosBarra(), centroDasFaixas());
   aplicarEfeito(eu, r);
-  if(r === 'perfect'){ corrida.perfeitos++; corrida.brilhoTexto = 'PERFEITO!'; corrida.recado = 'Perfeito! +45% por 1,5 s.'; }
-  else if(r === 'good'){ corrida.brilhoTexto = 'BOM!'; corrida.recado = 'Bom! +25% por 1 s.'; }
-  else { corrida.brilhoTexto = 'FORA DO TEMPO'; corrida.recado = 'Erro. −20% por meio segundo.'; }
+  /* ⚠️ A SEQUÊNCIA ANDA AQUI, e só aqui: é a única porta por onde o JOGADOR pontua na barra. O NPC
+     não passa por ela (ele sorteia no `corridaFisicaPasso`), e é isso que a mantém do jogador. */
+  if(r === 'miss') corrida.sequencia = 0;
+  else corrida.sequencia = (corrida.sequencia || 0) + 1;
+  /* o quanto a faixa acelerou entra no recado a partir do SEGUNDO acerto: no primeiro não há
+     sequência pra anunciar, e um "1 seguido" diria menos que nada */
+  /* ⚠️ E ELE É O MULTIPLICADOR, não a porcentagem: "189% mais rápida" se lê como +189%, que é
+     o dobro do que a faixa realmente acelerou. O 'x' diz a mesma coisa em três caracteres. */
+  const seq = corrida.sequencia >= 2
+    ? ' ' + corrida.sequencia + ' seguidos: faixa ' + (1 / fatorDaSequencia(corrida.sequencia)).toFixed(1).replace('.', ',') + 'x.'
+    : '';
+  if(r === 'perfect'){ corrida.perfeitos++; corrida.brilhoTexto = 'PERFEITO!'; corrida.recado = 'Perfeito! +45% por 1,5 s.' + seq; }
+  else if(r === 'good'){ corrida.brilhoTexto = 'BOM!'; corrida.recado = 'Bom! +25% por 1 s.' + seq; }
+  else { corrida.brilhoTexto = 'FORA DO TEMPO'; corrida.recado = 'Erro. −20% por meio segundo. A faixa voltou ao normal.'; }
   corrida.brilho = 1;
 }
 /* ⚠️ SÓ CLIQUE OU TOQUE, e não há atalho de teclado nenhum (o pedido é explícito). O protótipo
@@ -31963,6 +32040,9 @@ async function corridaLargar(){
   }
   corrida.tempo = 0; corrida.perfeitos = 0; corrida.tentativaDaTravessia = -1;
   corrida.brilho = 0; corrida.brilhoTexto = ''; corrida.ultimoQuadro = 0;
+  /* ⚠️ A SEQUÊNCIA É DESTA CORRIDA: sem zerar, a faixa da largada já nasceria na velocidade que a
+     prova anterior tinha deixado -- e a fase junto, senão ela salta no primeiro quadro. */
+  corrida.sequencia = 0; corrida.faseFaixas = 0;
   corridaRank.recorde = null;   /* o aviso é DESTA corrida, não da anterior */
   corrida.contagem = 3; corrida.fase = 'contagem';
   corrida.recado = 'Prepare-se para a largada!';
@@ -32278,7 +32358,7 @@ function corridaPintarHud(){
   mover('corridaFaixaVerde', CORRIDA_FAIXA.verde);
   mover('corridaFaixaAmarela', CORRIDA_FAIXA.amarela);
   põe('corridaRecado', corrida.recado);
-  põe('corridaPerfeitos', corrida.perfeitos + ' perfeitos');
+  põe('corridaPerfeitos', corridaChipDosPerfeitos());
   const eu = corrida.corredores[0];
   if(eu){
     põe('corridaPosicao', corrida.fase === 'correndo'
@@ -32512,7 +32592,7 @@ function renderCorrida(){
           ${spriteHtml(p, 'corrida-trecho-spr')}
           <b>${i + 1}º</b>
         </div>`).join('')}</div>` : ''}
-      <div class="corrida-feedback"><span id="corridaRecado">${escapeHtmlSafe(corrida.recado)}</span><span id="corridaPerfeitos">${corrida.perfeitos} perfeitos</span></div>
+      <div class="corrida-feedback"><span id="corridaRecado">${escapeHtmlSafe(corrida.recado)}</span><span id="corridaPerfeitos">${escapeHtmlSafe(corridaChipDosPerfeitos())}</span></div>
       ${/* ⚠️ AS FAIXAS SAEM DAS CONSTANTES, nunca de um número escrito no CSS: se a detecção e o
            desenho divergirem, a barra promete uma região e o motor pontua outra -- é a mesma
            lição do selo de terreno prometendo um bônus que a batalha não dá. */''}
@@ -34229,6 +34309,49 @@ const RESGATE_RESGATADOS = [
 const RESGATE_PTS_DIVISOR = 5;
 const resgatePontosDe = (id) => Math.round(bstOf(id) / RESGATE_PTS_DIVISOR);
 
+/* ============================================================================
+   ⚠️ CADA ALTURA DE ILHOTA TEM A SUA FAIXA DE PONTOS (20/09/2026, a pedido: *"as ilhas mais
+   proximas, vao aparecer os pokemons que dão menos de 50 pontos, os da ilha centrais, são os
+   pokemons que dao menos de 70 pontos, e os mais alto, sao os de 70 ou mais pontos"*).
+
+   Até aqui o bicho era sorteado da lista inteira em qualquer ilhota, então o 87 da Tangela podia
+   cair na ilhota colada na praia e o 41 do Pichu lá no alto -- ou seja a distância não dizia nada
+   sobre o prêmio, e a decisão do mapa virava sorte. Com as faixas ela volta a ser uma ESCADA: o
+   que está longe paga mais, sempre.
+
+   ⚠️ AS TRÊS SÃO BANDAS, e não três filtros soltos: perto é abaixo de 50, o centro é de 50 a 69 e
+   o alto é 70 pra cima. As duas leituras do texto do pedido são verdade pro centro ("dão menos de
+   70 pontos" vale nos dois casos); o que a banda acrescenta é tirar os baratos do meio do mapa --
+   sem isso um Pichu de 41 pts podia nascer numa ilhota central, que é uma viagem mais longa pelo
+   MESMO prêmio da ilhota de baixo, e a escada deixaria de existir onde ela mais decide. */
+const RESGATE_FAIXA_PTS = [50, 70];
+/* ⚠️ A FAIXA SAI DA POSIÇÃO DA ILHOTA, nunca de índices escritos à mão: as posições são o mapa, e
+   mover uma ilhota tem que mover a faixa dela junto. O ranking é por Y, com a praia embaixo (y=342)
+   -- as duas de Y maior são as de PERTO, as duas do meio o CENTRO, as duas de topo as ALTAS. */
+const RESGATE_FAIXA_DO_PONTO = (() => {
+  const porFaixa = Math.max(1, Math.round(RESGATE_PONTOS.length / (RESGATE_FAIXA_PTS.length + 1)));
+  const faixa = [];
+  RESGATE_PONTOS.map((p, i) => i)
+    .sort((a, b) => RESGATE_PONTOS[b].y - RESGATE_PONTOS[a].y)
+    .forEach((i, posto) => { faixa[i] = Math.min(RESGATE_FAIXA_PTS.length, Math.floor(posto / porFaixa)); });
+  return faixa;                       /* 0 = perto · 1 = centro · 2 = alto */
+})();
+/* ⚠️ E O BOLO DE CADA FAIXA CAI DAS DUAS COISAS ACIMA -- ele não é uma quarta lista pra manter em
+   dia. Um bicho novo no `RESGATE_RESGATADOS` entra na faixa dele sozinho, e um ajuste no divisor
+   redistribui os 23 sem tocar aqui.
+   ⚠️ FAIXA SEM NINGUÉM CAI NA LISTA INTEIRA: com os 23 de hoje as três têm dono (4 / 17 / 2), mas
+   uma edição futura pode esvaziar uma -- e sortear de uma lista vazia devolve `undefined`, que não
+   dá erro na hora: ele estoura quadros depois, dentro do laço. É a mesma rede do `resgateMarPlano`. */
+const RESGATE_BOLO_DA_FAIXA = (() => {
+  const dentro = (pts, f) =>
+    (f === 0 || pts >= RESGATE_FAIXA_PTS[f - 1]) &&
+    (f === RESGATE_FAIXA_PTS.length || pts < RESGATE_FAIXA_PTS[f]);
+  return Array.from({ length: RESGATE_FAIXA_PTS.length + 1 }, (_, f) => {
+    const bolo = RESGATE_RESGATADOS.filter(id => dentro(resgatePontosDe(id), f));
+    return bolo.length ? bolo : RESGATE_RESGATADOS.slice();
+  });
+})();
+
 /* ⚠️ A VELOCIDADE EM PIXELS POR SEGUNDO, e a fórmula é a mesma FORMA da Corrida (`8 + 4*sqrt`),
    com outros números -- e ela existe porque a faixa crua do jogo é impossível de pôr num mapa:
    medido, o Speed da corrida vai de **6** (Slowbro Lv.5) a **232** (Starmie Lv.99), ou seja 38x.
@@ -34279,12 +34402,12 @@ function abrirResgate(){
   resgateZerar();
   game.modoBloqueado = null;
   game.screen = 'resgate';
+  /* ⚠️ O CANVAS É PINTADO PELO PRÓPRIO `render()`, que tem um gancho pra esta tela: quem o desenha
+     no jogo é o `resgatePintar`, e ele só roda dentro do laço -- então na tela de setup ele ficava
+     um retângulo azul chapado, sem ilhas, sem ondas e sem os redemoinhos. O protótipo desenha
+     desde o modo `ready`. A chamada morava AQUI e cobria só a abertura: qualquer outra ação da
+     tela (escolher parceiro, voltar do picker) apagava o mapa de novo. */
   render();
-  /* ⚠️ E O CANVAS É PINTADO UMA VEZ AQUI: quem o desenha é o `resgatePintar`, que só roda dentro
-     do laço do jogo -- então na tela de setup ele ficava um retângulo azul chapado, sem ilhas,
-     sem ondas e sem os redemoinhos. O protótipo desenha desde o modo `ready`.
-     Depois do `render()` porque é ele que cria o `<canvas>`. */
-  resgateDesenharMapa();
 }
 function sairDoResgate(){
   resgateZerar();
@@ -34436,7 +34559,9 @@ function resgateAtor(inst, x){
 }
 function resgateNovoOcupante(i){
   const p = RESGATE_PONTOS[i];
-  const id = RESGATE_RESGATADOS[Math.floor(Math.random() * RESGATE_RESGATADOS.length)];
+  /* ⚠️ O BOLO É O DA FAIXA DAQUELA ILHOTA, e não a lista inteira -- ver `RESGATE_FAIXA_PTS`. */
+  const bolo = RESGATE_BOLO_DA_FAIXA[RESGATE_FAIXA_DO_PONTO[i]] || RESGATE_RESGATADOS;
+  const id = bolo[Math.floor(Math.random() * bolo.length)];
   /* ⚠️ O `pts` FICA GRAVADO NO OCUPANTE, e não é recalculado na entrega: ele viaja no `bag` e no
      histórico, e lendo a espécie de volta uma mudança no divisor renomearia pontos já entregues. */
   return { speciesId: id, dono: null, falta: RESGATE_TEMPO_NO_PONTO, volta: 0,
@@ -34881,6 +35006,35 @@ function resgateDesenharMapa(){
   /* e os dois parceiros */
   resgate.atores.forEach((a, i) => resgateDesenharAtor(ctx, a, i, t));
 }
+/* ============================================================================
+   ⚠️ A ESCALA DO SPRITE SAI DO TAMANHO DO BICHO, e não de uma caixa fixa (20/09/2026, reportado
+   com print: *"o squirtle que é um pokemon pequeno ta muito grande, e a lugia que é um pokemon
+   grande ta muito pequeno, ajuste para que fique mais proporcional"*).
+   Ela era `Math.min(46 / sw, 46 / sh)`, ou seja TODO mundo saía com **46px de maior lado** -- o
+   Qwilfish e o Gyarados do mesmo tamanho, que é exatamente o que o print mostra.
+
+   ⚠️ E ELA NÃO PODE SER LINEAR, pelo mesmo motivo que a VELOCIDADE daqui não pode ser: medido no
+   navegador nos **65 surfistas**, a caixa do sprite vai de **17px** (Qwilfish) a **73px** (Lugia)
+   -- 4,3x. Numa escala linear que caiba o maior no mapa, o menor sai com 13px. Com a RAIZ a razão
+   cai pra **2,1x** e os dois extremos aparecem: **28px** o menor e **58px** o maior, com a maioria
+   entre 30 e 37. É a mesma forma -- e a mesma razão -- do `resgateVelocidade`.
+
+   ⚠️ E O TAMANHO É POR ESPÉCIE, nunca por quadro nem por direção: lido do QUADRO (que é o que a
+   conta velha fazia), a escala mudava a cada passo da animação e o bicho respirava; lido da LINHA,
+   ele mudava de tamanho ao virar. As `dados.caixas` são sempre as do norte e já vêm calculadas do
+   carregamento, então isto não custa uma varredura de pixel a mais.
+   ============================================================================ */
+const RESGATE_SPRITE_K = 6.8;
+function resgateLadoDoSprite(dados){
+  if(dados.ladoResgate == null){
+    /* o piso de 8 é a rede pra uma folha quebrada: caixa de lado zero faria a escala ir a Infinity */
+    dados.ladoResgate = Math.max(8, ...dados.caixas.map(q => Math.max(q[2] - q[0], q[3] - q[1])));
+  }
+  return dados.ladoResgate;
+}
+function resgateEscalaDoSprite(dados){
+  return RESGATE_SPRITE_K / Math.sqrt(resgateLadoDoSprite(dados));
+}
 function resgateDesenharAtor(ctx, a, i, t){
   const movendo = !!a.alvo;
   if(movendo){
@@ -34901,10 +35055,16 @@ function resgateDesenharAtor(ctx, a, i, t){
     }
     ctx.restore();
   }
-  ctx.fillStyle = '#12445d55';
-  ctx.beginPath(); ctx.ellipse(a.x, a.y + 8, 17, 6, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.strokeStyle = i === 0 ? '#a2d7ff' : '#ffd39a'; ctx.lineWidth = 1.5; ctx.stroke();
+  /* ⚠️ A SOMBRA ACOMPANHA O TAMANHO, com teto e piso: ela era 17px fixos, e um Lugia de 58px
+     boiando sobre a mesma elipse de um Qwilfish desfazia na sombra a proporção que o sprite
+     acabou de ganhar. O contorno continua sendo a cor do lado -- é ele que diz quem é quem. */
   const dados = pmdDados(a.inst);
+  const raio = dados && dados !== 'erro'
+    ? Math.max(11, Math.min(26, resgateLadoDoSprite(dados) * resgateEscalaDoSprite(dados) * 0.46))
+    : 17;
+  ctx.fillStyle = '#12445d55';
+  ctx.beginPath(); ctx.ellipse(a.x, a.y + 8, raio, raio * 0.36, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = i === 0 ? '#a2d7ff' : '#ffd39a'; ctx.lineWidth = 1.5; ctx.stroke();
   if(dados && dados !== 'erro'){
     /* ⚠️ A LINHA DA FOLHA SAI DO RUMO, e a conta é a do protótipo -- ela casa com a ordem do PMD
        (0=sul, 2=leste, 4=norte, 6=oeste), que é a mesma que a Corrida já usa pro `PMD_LINHA_COSTAS`. */
@@ -34912,7 +35072,7 @@ function resgateDesenharAtor(ctx, a, i, t){
     const caixas = pmdCaixasDaLinha(dados, linha);
     const quadro = movendo ? Math.floor(t * 7) % dados.durations.length : 0;
     const c = caixas[quadro] || caixas[0];
-    const sw = c[2] - c[0], sh = c[3] - c[1], esc = Math.min(46 / sw, 46 / sh);
+    const sw = c[2] - c[0], sh = c[3] - c[1], esc = resgateEscalaDoSprite(dados);
     ctx.drawImage(dados.img, quadro * dados.w + c[0], linha * dados.h + c[1], sw, sh,
       Math.round(a.x - sw * esc / 2), Math.round(a.y + 12 - sh * esc + Math.sin(t * 3)),
       sw * esc, sh * esc);
@@ -35055,10 +35215,15 @@ function renderResgate(){
       <div class="box">
         <h2>Enseada de Mikan · ${RESGATE_DURACAO} s</h2>
         <p class="hint-text">Resgate os Pokémon das ilhotas e volte à praia para pontuar. Os pontos
-          só contam depois do desembarque, e cada um vale conforme o Pokémon.
+          só contam depois do desembarque, e cada um vale conforme o Pokémon —
+          <strong>quanto mais longe a ilhota, mais valioso quem está nela</strong>.
           Seu parceiro leva <strong>${RESGATE_CAPACIDADE}</strong> por viagem.</p>
         ${resgateMapaHtml(false)}
-        <div class="resg-legenda"><span>Vale o que o Pokémon vale</span><span>Longe custa mais</span></div>
+        ${/* ⚠️ A LEGENDA SAI DAS CONSTANTES, nunca de números escritos aqui: ela envelheceria no
+             primeiro ajuste de faixa -- é o defeito que o rótulo de metragem do revezamento da
+             Corrida teve, e que a trava de lá cobra procurando o texto fixo no arquivo inteiro
+             (ou seja: este comentário não pode reproduzi-lo). */''}
+        <div class="resg-legenda"><span>Perto: até ${RESGATE_FAIXA_PTS[0] - 1} pts</span><span>Centro: até ${RESGATE_FAIXA_PTS[1] - 1}</span><span>Alto: ${RESGATE_FAIXA_PTS[1]}+</span></div>
       </div>
       <div class="box">
         <h2>Seu parceiro</h2>
@@ -35308,6 +35473,16 @@ function render(){
      que a pessoa digitou é reposto aqui. Guardar o valor em game e repor depois é mais simples que
      evitar o render -- e é o que mantém a busca utilizável enquanto o poll do desafio roda. */
   if(game.screen==='friends') reporValorBuscaAmigo();
+  /* ⚠️ O MAPA DO RESGATE É REDESENHADO A CADA RENDER, e ele é o único canvas do jogo que
+     precisa disso: `app.innerHTML = html` cria um `<canvas>` NOVO e VAZIO, e quem o pinta
+     (`resgatePintar`) só roda dentro do laço do jogo -- ou seja, na tela de setup ele ficava um
+     retângulo azul chapado assim que qualquer ação redesenhasse a tela. Foi reportado: *"depois
+     que eu escolho meu parceiro, o desenho do mapa some e fica somente aquela toda azul"*.
+     ⚠️ E O GANCHO FICA AQUI, e não em cada ação do Resgate: são oito portas que redesenham aquela
+     tela (escolher, abrir e fechar o picker, paginar, reiniciar, o aviso de sprite que falhou, a
+     fase `carregando`), e uma lista à mão envelheceria na nona -- a nona nasceria com o mapa em
+     branco e ninguém veria. Fora da tela do Resgate não há canvas e a função volta sem desenhar. */
+  if(game.screen === 'resgate') resgateDesenharMapa();
   maybeAutoSave();
 }
 

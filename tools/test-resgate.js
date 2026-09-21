@@ -540,6 +540,58 @@ console.log('\n=== OS SPRITES ===');
      && /if\(linha == null\) linha = PMD_LINHA_COSTAS/.test(src),
      'sem o padrão, a Corrida teria que mudar junto');
   ok('  e as caixas de cada linha são guardadas', /caixasPorLinha/.test(src));
+
+  /* ============================================================================
+     ⚠️ A ESCALA É PROPORCIONAL AO BICHO (20/09/2026, reportado com print: *"o squirtle que é um
+     pokemon pequeno ta muito grande, e a lugia que é um pokemon grande ta muito pequeno"*).
+     Ela era `min(46/sw, 46/sh)`, ou seja TODO mundo saía com 46px de maior lado.
+     ⚠️ A TRAVA MEDE A REGRA, não os números: ela usa as caixas REAIS medidas no navegador nos 65
+     surfistas e cobra (1) que maior caixa dê maior desenho, (2) que os dois extremos caibam no
+     mapa e (3) que a razão entre eles seja de VERDADE -- uma escala que voltasse a normalizar
+     todo mundo daria razão 1,00 e passaria em qualquer trava de "o sprite aparece". */
+  const CAIXAS = { qwilfish: [15, 17], squirtle: [16, 19], starmie: [21, 21], totodile: [18, 23],
+                   blastoise: [26, 29], kingdra: [16, 35], lapras: [43, 40], mantine: [56, 44],
+                   gyarados: [39, 72], lugia: [73, 63] };
+  const falso = (c) => ({ caixas: [[0, 0, c[0], c[1]]] });
+  const desenhado = {};
+  Object.keys(CAIXAS).forEach(n => {
+    const d = falso(CAIXAS[n]);
+    desenhado[n] = Math.max(CAIXAS[n][0], CAIXAS[n][1]) * S.resgateEscalaDoSprite(d);
+  });
+  const nomes = Object.keys(CAIXAS).sort((a, b) => desenhado[a] - desenhado[b]);
+  ok('maior caixa, maior sprite desenhado',
+     nomes.every((n, i) => i === 0
+       || Math.max(...CAIXAS[n]) >= Math.max(...CAIXAS[nomes[i - 1]])),
+     nomes.map(n => n + ':' + desenhado[n].toFixed(0)).join(' '));
+  const menor = desenhado[nomes[0]], maior = desenhado[nomes[nomes.length - 1]];
+  ok('  o menor continua visível', menor >= 24, menor.toFixed(1) + 'px (Qwilfish)');
+  ok('  o maior cabe no mapa', maior <= 62, maior.toFixed(1) + 'px (Lugia)');
+  ok('  e a razão entre eles é real', maior / menor >= 1.7 && maior / menor <= 2.6,
+     (maior / menor).toFixed(2) + 'x');
+  /* ⚠️ E ELA NÃO PODE SER LINEAR: com a caixa indo de 17 a 73 (4,3x medido), o linear que caiba o
+     maior no mapa deixa o menor com 13px. A trava cobra que a compressão exista. */
+  ok('  (ou seja: não é linear)', maior / menor < 73 / 17 * 0.8,
+     'a caixa varia ' + (73 / 17).toFixed(1) + 'x e o desenho ' + (maior / menor).toFixed(2) + 'x');
+
+  /* ⚠️ O TAMANHO É POR ESPÉCIE, nunca por quadro nem por direção: lido do quadro, a escala mudava
+     a cada passo da animação e o bicho respirava. A trava dá QUATRO caixas de tamanhos diferentes
+     e cobra que a escala seja UMA só. */
+  const varios = { caixas: [[0, 0, 20, 24], [0, 0, 26, 21], [0, 0, 18, 30], [0, 0, 24, 22]] };
+  const e1 = S.resgateEscalaDoSprite(varios), e2 = S.resgateEscalaDoSprite(varios);
+  ok('a escala é a mesma em todos os quadros da espécie', e1 === e2 && S.resgateLadoDoSprite(varios) === 30,
+     'lado ' + S.resgateLadoDoSprite(varios) + ' (o maior dos quatro quadros)');
+  /* ⚠️ E UMA FOLHA QUEBRADA NÃO MANDA A ESCALA PRO INFINITO: caixa de lado zero dá 1/0. */
+  ok('  e uma caixa vazia cai no piso', isFinite(S.resgateEscalaDoSprite({ caixas: [[0, 0, 0, 0]] })),
+     'escala ' + S.resgateEscalaDoSprite({ caixas: [[0, 0, 0, 0]] }).toFixed(2));
+
+  /* ⚠️ E O DESENHO USA ESSA ESCALA, não a caixa fixa: a conta velha ainda passaria nas travas
+     acima se ela tivesse ficado no `drawImage`. */
+  const ator = (src.match(/function resgateDesenharAtor\(ctx, a, i, t\)\{[\s\S]*?\n\}/) || [''])[0];
+  ok('  (e a trava lê o desenhista do ator)', ator.length > 400, ator.length + ' chars');
+  ok('  o `drawImage` usa a escala da espécie', /esc = resgateEscalaDoSprite\(dados\)/.test(ator));
+  ok('  e a caixa fixa de 46px não voltou', ator.indexOf('46 / sw') < 0 && ator.indexOf('46 / sh') < 0);
+  /* a sombra acompanha, senão ela desfaz na elipse a proporção que o sprite ganhou */
+  ok('  e a sombra acompanha o tamanho', /resgateLadoDoSprite\(dados\) \* resgateEscalaDoSprite\(dados\)/.test(ator));
 }
 
 /* ============================================================================
@@ -681,55 +733,150 @@ console.log('\n=== O MAPA JÁ MOSTRA QUEM ESTÁ LÁ, DESDE O SETUP (20/09/2026) 
      responde -- a mesma decisão da ilha da Pescaria. */
   ok('  mas os pontos não clicam no setup', mapa.indexOf('resgateTocarPonto') < 0);
 
-  /* ⚠️ E O CANVAS É PINTADO UMA VEZ AO ABRIR: quem o desenha é o pintor, que só roda no laço --
-     sem isso o mar ficava um retângulo azul chapado, sem ilhas e sem ondas. */
+  /* ⚠️ E O CANVAS É PINTADO A CADA RENDER, não só ao abrir (20/09/2026, reportado: *"depois que
+     eu escolho meu parceiro, o desenho do mapa some e fica somente aquela toda azul"*). Quem o
+     desenha no jogo é o pintor, que só roda dentro do laço -- e `app.innerHTML = html` cria um
+     <canvas> NOVO e vazio, então QUALQUER ação da tela apagava o mapa.
+     ⚠️ A TRAVA TEM DUAS METADES, e ela precisa das duas: o `render` do sandbox é um NO-OP (o
+     epílogo o substitui), então um caso de comportamento nunca alcançaria o gancho -- quem prova
+     que ele existe é a leitura do código. */
   const cv = S.document.getElementById('resgateMar');
-  ok('o canvas é pintado ao abrir a tela',
+  S.resgateDesenharMapa();
+  ok('o mapa é desenhado de verdade',
      !!(cv && cv.__ctx && cv.__ctx.__ops.length > 100),
      (cv && cv.__ctx ? cv.__ctx.__ops.length : 0) + ' operações de desenho');
   ok('  e ele desenhou as ilhas (formas, não só retângulos)',
      !!(cv && cv.__ctx && cv.__ctx.__ops.indexOf('ellipse') >= 0 && cv.__ctx.__ops.indexOf('fill') >= 0));
-  /* lendo o código: a chamada vem DEPOIS do render, que é quem cria o <canvas> */
-  const abrir = (src.match(/function abrirResgate\(\)\{[\s\S]{0,900}?\n\}/) || [''])[0];
+  /* ⚠️ LENDO O CÓDIGO: o gancho mora no fim do `render()`, DEPOIS do `innerHTML` -- é ele que
+     cria o <canvas>, e antes dele o desenho seria jogado fora no mesmo quadro. */
+  const rend = (src.match(/\n  app\.innerHTML = html;[\s\S]*?\n  maybeAutoSave\(\);/) || [''])[0];
+  ok('  (e a trava lê o fim do `render`)', rend.length > 200, rend.length + ' chars');
+  ok('  o render redesenha o mapa quando a tela é a do Resgate',
+     /game\.screen === 'resgate'\) resgateDesenharMapa\(\)/.test(rend));
+  /* ⚠️ E A CHAMADA NÃO VOLTOU PRO `abrirResgate`: duas portas fariam a próxima ação nascer
+     confiando na errada, e o gancho é o que cobre as oito que já existem. */
+  const abrir = (src.match(/function abrirResgate\(\)\{[\s\S]{0,1200}?\n\}/) || [''])[0];
   ok('  (e a trava lê o `abrirResgate`)', abrir.length > 200, abrir.length + ' chars');
-  ok('  e a pintura vem DEPOIS do render (que é quem cria o canvas)',
-     abrir.indexOf('render();') < abrir.indexOf('resgateDesenharMapa();'));
+  ok('  e ele não desenha por conta própria', abrir.indexOf('resgateDesenharMapa()') < 0);
 }
 
 console.log('\n=== OS 23 RESGATADOS E O PONTO PELO BST ===');
 {
   contaDeTeste();
   S.abrirResgate();
-  /* ⚠️ ELES SÃO SORTEADOS, e a trava cobra que VARIE: uma lista de 23 que sempre devolvesse o
-     mesmo passaria numa trava de "está na lista". */
-  const vistos = new Set();
-  for(let k = 0; k < 400; k++) vistos.add(S.resgateNovoOcupante(0).speciesId);
-  ok('o sorteio varia de verdade', vistos.size >= 18, vistos.size + ' espécies distintas em 400');
+  /* ⚠️ ELES SÃO SORTEADOS, e a trava cobra que VARIE: uma lista que sempre devolvesse o mesmo
+     passaria numa trava de "está na lista".
+     ⚠️ E O BOLO É O DA FAIXA DAQUELA ILHOTA desde 20/09/2026 -- a trava media a lista INTEIRA e
+     caiu sozinha no dia em que as faixas entraram, sem nada estar errado. Ela passou a medir a
+     REGRA: cada ilhota varia dentro do bolo DELA. */
+  const todos = new Set();
+  S.RESGATE_PONTOS.forEach((_, i) => {
+    const bolo = S.RESGATE_BOLO_DA_FAIXA[S.RESGATE_FAIXA_DO_PONTO[i]];
+    const vistos = new Set();
+    for(let k = 0; k < 400; k++){ const id = S.resgateNovoOcupante(i).speciesId; vistos.add(id); todos.add(id); }
+    if(i === 0 || i === 2 || i === 4){
+      ok('a ilhota ' + i + ' varre o bolo da faixa dela', vistos.size === bolo.length,
+         vistos.size + ' de ' + bolo.length + ' espécies em 400 sorteios');
+    }
+  });
   ok('  e nunca sai de fora da lista',
-     [...vistos].every(id => S.RESGATE_RESGATADOS.indexOf(id) >= 0));
+     [...todos].every(id => S.RESGATE_RESGATADOS.indexOf(id) >= 0));
   /* o valor do ocupante É o do bicho, não o da ilhota */
   for(let k = 0; k < 60; k++){
     const o = S.resgateNovoOcupante(k % 6);
     if(o.pts !== S.resgatePontosDe(o.speciesId)){ ok('o ponto do ocupante sai do BICHO', false, o.speciesId); break; }
     if(k === 59) ok('o ponto do ocupante sai do BICHO', true, 'em 60 sorteios');
   }
-  /* ⚠️ E DUAS ILHOTAS DIFERENTES PODEM VALER O MESMO, ou o contrário: o valor deixou de depender
-     de ONDE, e é isso que faz a pergunta do mapa mudar a cada partida. */
+  /* ⚠️ E A MESMA ILHOTA CONTINUA VARIANDO DE VALOR dentro da faixa dela: se o valor virasse
+     constante por ilhota, a escada teria voltado a ser a das POSIÇÕES -- que é justamente o
+     desenho que o BST substituiu. */
   const mesmoPonto = new Set();
-  for(let k = 0; k < 200; k++) mesmoPonto.add(S.resgateNovoOcupante(0).pts);
-  ok('  e a MESMA ilhota vale valores diferentes', mesmoPonto.size >= 10,
-     mesmoPonto.size + ' valores distintos na ilhota 0');
+  for(let k = 0; k < 200; k++) mesmoPonto.add(S.resgateNovoOcupante(1).pts);
+  ok('  e a MESMA ilhota vale valores diferentes', mesmoPonto.size >= 3,
+     mesmoPonto.size + ' valores distintos na ilhota 1');
 
   /* ⚠️ O `pts` FICA GRAVADO no ocupante e viaja no bag: lendo a espécie de volta na entrega, uma
      mudança no divisor renomearia pontos já entregues. */
   ok('o valor viaja gravado (o bag leva `pts`, não a espécie)',
      /a\.bag\.push\(\{ speciesId: p\.speciesId, pts: p\.pts \}\)/.test(src));
 
-  /* a legenda velha descrevia a escada, que não existe mais */
+  /* a legenda velha descrevia a escada das POSIÇÕES, que não existe mais */
   const h = S.renderResgate();
   ok('a legenda não promete mais 10/20/30',
      h.indexOf('10 pts perto') < 0 && h.indexOf('30 pts no alto') < 0);
-  ok('  e diz que o valor é do Pokémon', h.indexOf('Vale o que o Pokémon vale') >= 0);
+  /* ⚠️ E ELA SAI DAS CONSTANTES, nunca escrita à mão: um número aqui envelheceria no primeiro
+     ajuste de faixa, que é o defeito que o rótulo "Revezamento · 900 m" da Corrida teve. A trava
+     monta o texto esperado a PARTIR do `RESGATE_FAIXA_PTS`, então ela acompanha sozinha. */
+  ok('  e diz a faixa de cada altura',
+     h.indexOf('Perto: até ' + (S.RESGATE_FAIXA_PTS[0] - 1) + ' pts') >= 0
+     && h.indexOf('Centro: até ' + (S.RESGATE_FAIXA_PTS[1] - 1)) >= 0
+     && h.indexOf('Alto: ' + S.RESGATE_FAIXA_PTS[1] + '+') >= 0);
+}
+
+/* ============================================================================
+   ⚠️ A ESCADA DAS FAIXAS (20/09/2026, a pedido: *"as ilhas mais proximas, vao aparecer os
+   pokemons que dão menos de 50 pontos, os da ilha centrais, são os pokemons que dao menos de 70
+   pontos, e os mais alto, sao os de 70 ou mais pontos"*).
+   ============================================================================ */
+console.log('\n=== A ESCADA: CADA ALTURA TEM A SUA FAIXA DE PONTOS ===');
+{
+  contaDeTeste();
+  S.abrirResgate();
+  /* ⚠️ A FAIXA SAI DA POSIÇÃO, não de índices escritos à mão: mover uma ilhota tem que mover a
+     faixa dela junto. A trava cobra a ORDEM -- quanto mais alta na tela (Y menor), maior a faixa. */
+  const porY = S.RESGATE_PONTOS.map((p, i) => ({ i, y: p.y, f: S.RESGATE_FAIXA_DO_PONTO[i] }))
+    .sort((a, b) => b.y - a.y);
+  ok('a faixa acompanha a altura da ilhota',
+     porY.every((v, k) => k === 0 || v.f >= porY[k - 1].f),
+     porY.map(v => 'y' + v.y + '=f' + v.f).join(' '));
+  ok('  e as três faixas existem', new Set(S.RESGATE_FAIXA_DO_PONTO).size === 3,
+     S.RESGATE_FAIXA_DO_PONTO.join(','));
+  ok('  duas ilhotas em cada uma',
+     [0, 1, 2].every(f => S.RESGATE_FAIXA_DO_PONTO.filter(x => x === f).length === 2));
+
+  /* ⚠️ AS BANDAS SÃO O PEDIDO, e a trava as mede pelo VALOR e não pela lista: perto < 50, o
+     centro de 50 a 69, o alto 70 pra cima. */
+  const lim = S.RESGATE_FAIXA_PTS;
+  const pts = (f) => S.RESGATE_BOLO_DA_FAIXA[f].map(id => S.resgatePontosDe(id));
+  ok('perto: todo mundo abaixo de ' + lim[0], pts(0).every(v => v < lim[0]),
+     Math.min(...pts(0)) + '..' + Math.max(...pts(0)) + ' (' + pts(0).length + ' espécies)');
+  ok('centro: de ' + lim[0] + ' a ' + (lim[1] - 1),
+     pts(1).every(v => v >= lim[0] && v < lim[1]),
+     Math.min(...pts(1)) + '..' + Math.max(...pts(1)) + ' (' + pts(1).length + ' espécies)');
+  ok('alto: ' + lim[1] + ' pra cima', pts(2).every(v => v >= lim[1]),
+     Math.min(...pts(2)) + '..' + Math.max(...pts(2)) + ' (' + pts(2).length + ' espécies)');
+  /* ⚠️ E NINGUÉM SOBRA NEM REPETE: os três bolos juntos são a lista, sem interseção -- se um
+     bicho caísse em duas faixas, a escada deixaria de ser uma escada naquele valor. */
+  const juntos = [].concat(...S.RESGATE_BOLO_DA_FAIXA);
+  ok('os três bolos são a lista inteira, sem repetir',
+     juntos.length === S.RESGATE_RESGATADOS.length
+     && new Set(juntos).size === S.RESGATE_RESGATADOS.length,
+     juntos.length + ' de ' + S.RESGATE_RESGATADOS.length);
+  /* ⚠️ NENHUM BOLO VAZIO: sortear de uma lista vazia devolve `undefined`, que não dá erro na hora
+     -- ele estoura quadros depois, dentro do laço. A rede é cair na lista inteira; esta trava
+     existe pra a rede NÃO precisar ser usada. */
+  ok('  e nenhuma faixa ficou sem dono',
+     S.RESGATE_BOLO_DA_FAIXA.every(b => b.length > 0),
+     S.RESGATE_BOLO_DA_FAIXA.map(b => b.length).join('/'));
+
+  /* A REGRA NA PRÁTICA: 600 sorteios por ilhota, e o valor NUNCA sai da banda dela. É a trava que
+     pega um `resgateNovoOcupante` que volte a sortear da lista inteira. */
+  let fora = 0, exemplo = '';
+  S.RESGATE_PONTOS.forEach((_, i) => {
+    const f = S.RESGATE_FAIXA_DO_PONTO[i];
+    for(let k = 0; k < 600; k++){
+      const o = S.resgateNovoOcupante(i);
+      const ok2 = (f === 0 ? o.pts < lim[0] : f === 1 ? (o.pts >= lim[0] && o.pts < lim[1]) : o.pts >= lim[1]);
+      if(!ok2){ fora++; if(!exemplo) exemplo = 'ilhota ' + i + ' (faixa ' + f + ') -> ' + o.speciesId + ':' + o.pts; }
+    }
+  });
+  ok('em 3.600 sorteios, ninguém fora da faixa da ilhota', fora === 0, exemplo || '0 de 3600');
+
+  /* ⚠️ E A ESCADA TEM QUE SER ESTRITA: o pior da faixa de cima vale mais que o melhor da de
+     baixo. Sem isso as bandas existiriam no código e não na tela. */
+  ok('a ilhota mais longe sempre paga mais que a mais perto',
+     Math.min(...pts(2)) > Math.max(...pts(1)) && Math.min(...pts(1)) > Math.max(...pts(0)),
+     Math.max(...pts(0)) + ' < ' + Math.min(...pts(1)) + ' .. ' + Math.max(...pts(1)) + ' < ' + Math.min(...pts(2)));
 }
 
 console.log('\n=== O PONTO É TRANSPARENTE E A BARRA FICA ACIMA ===');

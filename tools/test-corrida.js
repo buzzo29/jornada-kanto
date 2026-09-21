@@ -697,9 +697,14 @@ console.log('\n=== AS FAIXAS SE MOVEM, E NUNCA EM SINCRONIA COM A AGULHA ===');
   const eu = S.corridaNovoCorredor([S.corridaInstancia({ speciesId: 'jolteon', level: 50 }, true)], true);
   S.corrida.corredores = [eu];
 
-  /* ⚠️ ELE SE MOVE: se o centro fosse fixo, o pedido não teria sido atendido */
+  /* ⚠️ ELE SE MOVE: se o centro fosse fixo, o pedido não teria sido atendido.
+     ⚠️ E A TRAVA ADIANTA A FASE em vez de escrever o `corrida.tempo` (20/09/2026): desde que as
+     faixas aceleram com a sequência, o centro é a integral da velocidade angular e não uma conta
+     do relógio -- é isso que impede a faixa de TELEPORTAR quando o período muda. Escrever o tempo
+     deixou de mover qualquer coisa, e a trava passou a medir o mecanismo de verdade. */
   const centros = [];
-  for(let t = 0; t < 12; t += 0.05){ S.corrida.tempo = t; centros.push(S.centroDasFaixas()); }
+  S.corrida.faseFaixas = 0;
+  for(let t = 0; t < 12; t += 0.05){ S.corridaAvancarFaixas(0.05); centros.push(S.centroDasFaixas()); }
   const min = Math.min(...centros), max = Math.max(...centros);
   ok('o centro das faixas se move', max - min > 0.2, min.toFixed(3) + ' a ' + max.toFixed(3));
 
@@ -733,32 +738,181 @@ console.log('\n=== AS FAIXAS SE MOVEM, E NUNCA EM SINCRONIA COM A AGULHA ===');
     }
   }
   ok('e em nenhum nível ele fica em sincronia com a agulha', ruins.length === 0, ruins.join(' '));
+  /* ⚠️ E O PISO DA SEQUÊNCIA TAMBÉM NÃO (20/09/2026). Com a aceleração, o período efetivo é o do
+     nível VEZES o fator -- e o intervalo inteiro (0,52 a 1,90 da travessia) ATRAVESSA o inteiro 1,
+     ou seja existem combinações nível+sequência em sincronia. Elas são toleradas porque duram UMA
+     travessia: cada acerto muda a sequência, então a configuração não fica parada tempo suficiente
+     pra ser decorada.
+     ⚠️ O QUE NÃO PODE FICAR EM SINCRONIA É O PISO, porque ele é o único estado que PERSISTE: a
+     partir de `CORRIDA_SEQUENCIA_MIN` o fator para de mudar, e ali o jogador passa o resto da
+     prova (medido: a sequência chega ao piso em 100% das corridas de quem joga bem). */
+  const noPiso = [];
+  for(let n = 1; n <= 99; n++){
+    const pp = S.periodoDasFaixas(n) * S.CORRIDA_SEQUENCIA_MIN;
+    for(const base of [S.CORRIDA_TRAVESSIA, ciclo]){
+      const razao = pp / base;
+      if(Math.abs(razao - Math.round(razao)) < 0.02 && Math.round(razao) >= 1) noPiso.push(n + ':' + pp.toFixed(3));
+    }
+  }
+  ok('  nem no PISO da sequência, que é o estado que dura', noPiso.length === 0, noPiso.join(' '));
 
   /* ⚠️ A DETECÇÃO USA O CENTRO MÓVEL: no MESMO ponto da barra, o resultado muda conforme a faixa
      passeia -- é isso que faz a mecânica existir. */
   const noCentroDaBarra = [];
-  for(let t = 0; t < 10; t += 0.1){ S.corrida.tempo = t; noCentroDaBarra.push(S.resultadoDoImpulso(0.5, S.centroDasFaixas())); }
+  S.corrida.faseFaixas = 0;
+  for(let t = 0; t < 10; t += 0.1){ S.corridaAvancarFaixas(0.1); noCentroDaBarra.push(S.resultadoDoImpulso(0.5, S.centroDasFaixas())); }
   ok('no mesmo ponto da barra, o resultado muda com a faixa',
      new Set(noCentroDaBarra).size > 1, [...new Set(noCentroDaBarra)].join(','));
   /* e acertar o centro DELAS é sempre perfeito, em qualquer instante */
   let semprePerfeito = true;
+  S.corrida.faseFaixas = 0;
   for(let t = 0; t < 10; t += 0.07){
-    S.corrida.tempo = t;
+    S.corridaAvancarFaixas(0.07);
     if(S.resultadoDoImpulso(S.centroDasFaixas(), S.centroDasFaixas()) !== 'perfect') semprePerfeito = false;
   }
   ok('e acertar o centro DELAS é sempre perfeito', semprePerfeito);
 
-  /* ⚠️ O NÍVEL LIDO É O DO POKÉMON QUE CORRE AGORA -- no revezamento ele muda a cada trecho */
+  /* ⚠️ O NÍVEL LIDO É O DO POKÉMON QUE CORRE AGORA -- no revezamento ele muda a cada trecho.
+     ⚠️ E A TRAVA MEDE O RITMO, não o centro instantâneo: com a fase acumulada, trocar de trecho
+     muda a VELOCIDADE da faixa daí pra frente e ela continua de onde estava. A versão velha
+     cobrava justamente o SALTO (`c0 !== c1`), que é o defeito que a fase acumulada tirou. */
   const relay = S.corridaNovoCorredor([
     S.corridaInstancia({ speciesId: 'jolteon', level: 5 }, true),
     S.corridaInstancia({ speciesId: 'jolteon', level: 90 }, true),
     S.corridaInstancia({ speciesId: 'jolteon', level: 50 }, true)], true);
   S.corrida.corredores = [relay];
-  S.corrida.tempo = 1;
-  relay.trecho = 0; const c0 = S.centroDasFaixas();
-  relay.trecho = 1; const c1 = S.centroDasFaixas();
-  ok('e o período acompanha o pokémon do trecho atual', c0 !== c1,
-     'Lv.5 -> ' + c0.toFixed(4) + ' | Lv.90 -> ' + c1.toFixed(4));
+  const andou = (trecho) => {
+    relay.trecho = trecho; S.corrida.faseFaixas = 0; S.corridaAvancarFaixas(1);
+    return S.corrida.faseFaixas;
+  };
+  const a0 = andou(0), a1 = andou(1);
+  ok('e o período acompanha o pokémon do trecho atual', a0 > a1,
+     'Lv.5 anda ' + a0.toFixed(3) + ' rad/s | Lv.90 anda ' + a1.toFixed(3));
+  /* ⚠️ E A TROCA DE TRECHO NÃO TELEPORTA A FAIXA: o centro imediatamente antes e depois é o MESMO.
+     Com o centro calculado do relógio, ele saltava a cada troca -- e ninguém tinha reportado
+     porque o salto passava por uma travessia inteira. */
+  S.corrida.faseFaixas = 2.1; relay.trecho = 0;
+  const antes = S.centroDasFaixas(); relay.trecho = 1;
+  ok('  e trocar de trecho não teleporta a faixa', S.centroDasFaixas() === antes,
+     antes.toFixed(4) + ' -> ' + S.centroDasFaixas().toFixed(4));
+}
+
+/* ============================================================================
+   ⚠️ A SEQUÊNCIA ACELERA AS FAIXAS (20/09/2026, a pedido: *"enquanto o treinador não errar, ou
+   seja, só ficar acertando o perfeito e bom, a barra amarela e verde vai ficando mais rapida, e
+   quando o treinador erra, ela volta a ficar na velocidade normal"*).
+   ============================================================================ */
+console.log('\n=== A SEQUÊNCIA ACELERA AS FAIXAS ===');
+{
+  contaDeTeste();
+  S.corridaZerar();
+  const eu = S.corridaNovoCorredor([S.corridaInstancia({ speciesId: 'jolteon', level: 50 }, true)], true);
+  S.corrida.corredores = [eu];
+  S.corrida.fase = 'correndo';
+
+  /* o fator cai a cada acerto e tem piso -- sem ele a faixa viraria um borrão */
+  ok('sem sequência, o fator é 1', S.fatorDaSequencia(0) === 1);
+  const f = [0, 1, 2, 3, 4, 5, 6, 7, 8, 12, 40].map(n => S.fatorDaSequencia(n));
+  ok('  e ele só encolhe', f.every((v, i) => i === 0 || v <= f[i - 1]),
+     f.map(v => v.toFixed(3)).join(' '));
+  ok('  com piso', Math.min(...f) === S.CORRIDA_SEQUENCIA_MIN,
+     'piso ' + S.CORRIDA_SEQUENCIA_MIN + ' (a faixa nunca passa de ' + (1 / S.CORRIDA_SEQUENCIA_MIN).toFixed(2) + 'x)');
+  ok('  e um passo é ' + Math.round(S.CORRIDA_SEQUENCIA_PASSO * 100) + '%',
+     Math.abs(S.fatorDaSequencia(1) - (1 - S.CORRIDA_SEQUENCIA_PASSO)) < 1e-9);
+
+  /* ⚠️ O PERÍODO ENCOLHE DE VERDADE -- é ele que a barra desenha */
+  S.corrida.sequencia = 0; const p0 = S.periodoDasFaixasAgora();
+  S.corrida.sequencia = 4; const p4 = S.periodoDasFaixasAgora();
+  ok('quatro acertos seguidos deixam a faixa mais rápida', p4 < p0,
+     p0.toFixed(2) + ' s -> ' + p4.toFixed(2) + ' s');
+  ok('  e é exatamente o fator', Math.abs(p4 - p0 * S.fatorDaSequencia(4)) < 1e-9);
+
+  /* ⚠️ ACERTAR SOBE, ERRAR ZERA -- e é a única porta do JOGADOR na barra */
+  const bater = (pos) => {
+    /* põe a barra na posição pedida sem mexer na fase das faixas */
+    S.corrida.tempo = pos * S.CORRIDA_TRAVESSIA;
+    S.corrida.tentativaDaTravessia = -1;
+    eu.chegada = null;
+    S.corridaImpulso();
+  };
+  S.corrida.faseFaixas = 0; S.corrida.sequencia = 0;
+  /* o centro está em 0,5 com a fase zerada, então a barra em 0,5 é perfeito */
+  bater(0.5); const s1 = S.corrida.sequencia;
+  bater(1.5); const s2 = S.corrida.sequencia;
+  bater(2.5); const s3 = S.corrida.sequencia;
+  ok('cada acerto sobe a sequência', s1 === 1 && s2 === 2 && s3 === 3, [s1, s2, s3].join(','));
+  /* e um erro (a barra na ponta) zera */
+  S.corrida.tempo = 4 * S.CORRIDA_TRAVESSIA; S.corrida.tentativaDaTravessia = -1;
+  S.corridaImpulso();
+  ok('  e um erro zera', S.corrida.sequencia === 0, 'sequência ' + S.corrida.sequencia);
+  ok('  e o recado diz que a faixa voltou ao normal',
+     S.corrida.recado.indexOf('voltou ao normal') >= 0, S.corrida.recado);
+
+  /* ⚠️ O BOM TAMBÉM CONTA, e não só o perfeito: o pedido diz "só ficar acertando o perfeito e
+     bom". A barra vai pra dentro da verde mas fora da amarela. */
+  S.corrida.faseFaixas = 0; S.corrida.sequencia = 0;
+  const meioVerde = 0.5 + (S.CORRIDA_FAIXA.amarela.tam / 2 + S.CORRIDA_FAIXA.verde.tam / 2) / 2;
+  ok('  (o ponto escolhido é mesmo um BOM)',
+     S.resultadoDoImpulso(meioVerde, 0.5) === 'good', S.resultadoDoImpulso(meioVerde, 0.5));
+  bater(meioVerde);
+  ok('um BOM também conta na sequência', S.corrida.sequencia === 1, 'sequência ' + S.corrida.sequencia);
+
+  /* ⚠️ A LARGADA ZERA: sem isso a faixa da corrida nova já nasceria na velocidade da anterior */
+  const largada = src.slice(src.indexOf('corrida.tempo = 0; corrida.perfeitos = 0;'));
+  ok('a largada zera a sequência e a fase',
+     largada.slice(0, 500).indexOf('corrida.sequencia = 0; corrida.faseFaixas = 0;') >= 0);
+  const iDecl2 = src.indexOf('const corrida = {');
+  ok('  e os dois campos nascem na declaração do objeto',
+     src.slice(iDecl2, src.indexOf('\n};', iDecl2)).indexOf('sequencia: 0, faseFaixas: 0') >= 0);
+
+  /* ⚠️ É DO JOGADOR, NÃO DO NPC: o NPC não usa a barra -- ele sorteia --, então a sequência não
+     pode andar no caminho dele. A trava roda a física com o NPC acertando e cobra que ela fique
+     parada. */
+  S.corridaZerar();
+  const meu = S.corridaNovoCorredor([S.corridaInstancia({ speciesId: 'jolteon', level: 50 }, true)], true);
+  const npc = S.corridaNovoCorredor([S.corridaInstancia({ speciesId: 'jolteon', level: 50 }, false)], false);
+  S.corrida.corredores = [meu, npc];
+  S.corrida.fase = 'correndo'; S.corrida.sequencia = 0;
+  S.planejarNpc(npc, 0);
+  npc.npcSorteio = 0;                      /* perfeito garantido */
+  for(let k = 0; k < 200; k++) S.corridaFisica(0.05);
+  ok('o NPC não move a sequência do jogador', S.corrida.sequencia === 0,
+     'sequência ' + S.corrida.sequencia + ' depois de 10 s de NPC acertando');
+
+  /* ⚠️ E A FASE ANDA COM O RELÓGIO DA PROVA, não com o do navegador: quem a adianta é o
+     `corridaFisicaPasso`, que é a fatia do motor. */
+  ok('  e a fase andou junto com a prova', S.corrida.faseFaixas > 0,
+     S.corrida.faseFaixas.toFixed(2) + ' rad');
+  const passo = src.slice(src.indexOf('function corridaFisicaPasso'), src.indexOf('function corridaFisicaPasso') + 400);
+  ok('  (e a trava lê o `corridaFisicaPasso`)', passo.length > 200);
+  ok('  e ele adianta as faixas', passo.indexOf('corridaAvancarFaixas(dt)') >= 0);
+
+  /* ⚠️ E ACELERAR NÃO TELEPORTA: o centro imediatamente antes e depois de a sequência mudar é o
+     MESMO -- o que muda é o ritmo daí pra frente. Com `sin(2*PI*t/P)` ele saltava até um terço da
+     barra no instante do acerto, e o jogador leria isso como a tela piscando. */
+  S.corrida.faseFaixas = 1.7; S.corrida.sequencia = 0;
+  const antesDaSeq = S.centroDasFaixas();
+  S.corrida.sequencia = 6;
+  ok('acelerar a faixa não a teleporta', S.centroDasFaixas() === antesDaSeq,
+     antesDaSeq.toFixed(4) + ' -> ' + S.centroDasFaixas().toFixed(4));
+  /* mas o passo seguinte anda mais: é a aceleração */
+  const anda = (seq) => { S.corrida.sequencia = seq; S.corrida.faseFaixas = 0; S.corridaAvancarFaixas(0.1); return S.corrida.faseFaixas; };
+  ok('  mas o próximo instante anda mais', anda(6) > anda(0),
+     anda(0).toFixed(4) + ' -> ' + anda(6).toFixed(4) + ' rad em 0,1 s');
+
+  /* o chip do HUD: ele vive numa função só, lida pelo render E pelo pintor */
+  S.corrida.perfeitos = 3; S.corrida.sequencia = 0;
+  ok('sem sequência, o chip só conta os perfeitos',
+     S.corridaChipDosPerfeitos() === '3 perfeitos', S.corridaChipDosPerfeitos());
+  S.corrida.sequencia = 1;
+  ok('  e um acerto só ainda não é sequência',
+     S.corridaChipDosPerfeitos() === '3 perfeitos', S.corridaChipDosPerfeitos());
+  S.corrida.sequencia = 4;
+  ok('  a partir do segundo ele aparece',
+     S.corridaChipDosPerfeitos().indexOf('4 seguidos') >= 0, S.corridaChipDosPerfeitos());
+  ok('  e o pintor e o render leem a MESMA função',
+     (src.match(/corridaChipDosPerfeitos\(\)/g) || []).length >= 3,
+     (src.match(/corridaChipDosPerfeitos\(\)/g) || []).length + ' usos');
 }
 
 /* ============================================================================
@@ -1916,6 +2070,36 @@ console.log('\n=== O MODAL DO TIME NO RANKING ===');
   ok('  e o botão não é o `.btn` da casa',
      /\.corrida-rank-btn\{[^}]*background:none;border:none/.test(src));
 
+  /* ============================================================================
+     ⚠️ O NOME DO TREINADOR É NEGRITO E UM PIXEL MENOR (20/09/2026, a pedido).
+     A causa do relato estava no CSS e só a medição no navegador a pegava: `.corrida-rank-btn`
+     usava `font:inherit`, e o ATALHO `font` reescreve peso e tamanho junto -- como ele vem DEPOIS
+     da `.pesc-rank-nome` com a mesma especificidade, ele ganhava o empate. Medido a 320px: a
+     linha COM time saía em **16px peso 400** e a linha SEM time em **11,5px peso 700**, ou seja
+     duas fontes na mesma lista e a maior delas não era negrito.
+     ⚠️ A TRAVA LÊ O CSS, e tem que ler: peso e tamanho de fonte não aparecem em asserção de HTML
+     nenhuma -- é a mesma razão pela qual a do `-webkit-touch-callout` da Pescaria lê o arquivo. */
+  const cssBtn = (src.match(/\.corrida-rank-btn\{[^}]*\}/) || [''])[0];
+  ok('  (e a trava lê a regra do botão)', cssBtn.length > 60, cssBtn.length + ' chars');
+  ok('  e ele NÃO usa o atalho `font:inherit`', cssBtn.indexOf('font:inherit') < 0,
+     'o atalho reescreve peso e tamanho junto');
+  ok('  mas herda a família e a entrelinha',
+     /font-family:inherit/.test(cssBtn) && /line-height:inherit/.test(cssBtn));
+  /* ⚠️ O TAMANHO É DERIVADO do `--rank-nome`, nunca reescrito: um número aqui envelheceria no
+     primeiro ajuste de lá -- e a regra é do CONTAINER, então ela pega o <span> e o <button> de
+     uma vez e a lista deixa de ter duas fontes. */
+  ok('  o nome da Corrida é um pixel menor, DERIVADO',
+     /\.pesc-rank\.corrida \.pesc-rank-nome\{[^}]*font-size:calc\(var\(--rank-nome\) - 1px\)/.test(src));
+  ok('  e é negrito',
+     /\.pesc-rank\.corrida \.pesc-rank-nome\{[^}]*font-weight:800/.test(src));
+  ok('  e a variável existe na regra de origem',
+     /\.pesc-rank-nome\{[^}]*--rank-nome:[^;]+;[^}]*font-size:var\(--rank-nome\)/.test(src));
+  /* e o container da CORRIDA leva a classe -- sem ela a regra acima não pega em nada */
+  ok('  e o ranking da Corrida leva a classe', html.indexOf('class="pesc-rank corrida"') >= 0);
+  /* ⚠️ E A PESCARIA NÃO MUDA: ela usa a MESMA linha, e a regra é escopada ao container da Corrida */
+  ok('  e o da Pescaria continua sem ela',
+     S.pescariaRankHtml === undefined || S.pescariaRankHtml.toString().indexOf('pesc-rank corrida') < 0);
+
   /* o modal */
   S.corridaVerTimeDoRank('lista', 0);
   ok('clicar abre o modal', !!S.corrida.timeDoRank);
@@ -2058,7 +2242,12 @@ console.log('\n=== A SELEÇÃO NÃO VAZA ENTRE AS MODALIDADES ===');
   /* ⚠️ O CAMPO PRECISA EXISTIR NA DECLARAÇÃO do objeto, e não só no `corridaZerar`: o
      `abrirCorrida` NÃO zera, então na primeira entrada ele seria `undefined` -- e o
      `corridaTrocarFormato` escreve nele antes de qualquer outra coisa. */
-  const decl = src.slice(src.indexOf('const corrida = {'), src.indexOf('const corrida = {') + 700);
+  /* ⚠️ A FATIA VAI ATÉ O FECHA-CHAVES, e não a 700 caracteres: ela era fixa e ENVELHECEU no dia
+     em que o objeto ganhou dois campos -- a trava acusou o que estava certo. É a armadilha da
+     fatia curta demais, que este projeto já pagou no `tentarGolpeEspecial`. */
+  const iDecl = src.indexOf('const corrida = {');
+  const decl = src.slice(iDecl, src.indexOf('\n};', iDecl));
+  ok('  (e a trava lê a declaração inteira)', decl.length > 300, decl.length + ' chars');
   ok('o campo existe na declaração do objeto (não só no zerar)',
      decl.indexOf('escolhaPorFormato') >= 0);
   ok('  e no `corridaZerar` também',

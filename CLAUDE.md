@@ -14196,6 +14196,171 @@ BST subindo por zona -- mais a do moveset do peixe, reescrita pra ser dirigida.
 `equiparNpc` do peixe derruba 6.
 
 
+## AS DUAS DA CORRIDA (20/09/2026) -- o ranking e a faixa que acelera
+
+### ⚠️ O NOME DO RANKING NÃO ERA NEGRITO -- e a causa era um ATALHO DE CSS
+
+Pedido assim: *"no ranking dos melhores tempos, deixe o nome do treinador em Negrito e diminua 1
+no tamanho da fonte"*.
+
+**⚠️ MEDIDO A 320px ANTES DE MEXER, e a lista tinha DUAS FONTES:**
+
+| a linha | elemento | fonte | peso |
+|---|---|---|---|
+| **com** time gravado (abre o modal) | `<button>` | **16px** | **400** |
+| **sem** time gravado | `<span>` | 11,5px | 700 |
+
+Ou seja a linha que virava botão saía **maior que a coluna dos tempos (12,8px) e NÃO era negrito**,
+e a de baixo saía normal -- duas leituras na mesma lista.
+
+**A CAUSA É O ATALHO `font`.** O `.corrida-rank-btn` usava `font:inherit`, e `font` **reescreve
+peso e tamanho junto**; como ele é declarado DEPOIS da `.pesc-rank-nome` e tem a mesma
+especificidade, ele ganhava o empate -- o `font-weight:700` e o `font-size:.72rem` da classe iam
+junto com ele. O botão passou a herdar só o que um `<button>` precisa mesmo: a **família** e a
+**entrelinha**.
+
+- **⚠️ O "-1" É DERIVADO, nunca reescrito:** o `.pesc-rank-nome` ganhou um `--rank-nome`, e o
+  ranking da Corrida usa `calc(var(--rank-nome) - 1px)`. Um `0.655rem` escrito à mão divergiria
+  no primeiro ajuste do outro.
+- **⚠️ E A REGRA É DO CONTAINER** (`.pesc-rank.corrida`), não do elemento: assim ela pega o
+  `<span>` e o `<button>` de uma vez, e **a lista deixa de ter duas fontes**. A Pescaria usa a
+  MESMA linha e não muda.
+- **O ⓘ desceu junto** (de .66 pra .6rem): do mesmo tamanho do nome, ele deixaria de se ler como
+  affordance.
+- **⚠️ A TRAVA LÊ O CSS, e tem que ler:** peso e tamanho de fonte **não aparecem em asserção de
+  HTML nenhuma** -- é a mesma razão pela qual a do `-webkit-touch-callout` da Pescaria lê o
+  arquivo, e a mesma família do `[hidden]` que deixou o modal da contagem preso na tela.
+
+**Medido a 320px depois:** as quatro linhas em **10,52px peso 800**, uniformes; a altura da linha
+vai de 24/28/29 pra **23-24 em todas**; **nenhum nome truncando** ("TreinadorNomeComprido" passou a
+caber); sem rolagem lateral.
+
+### ⚠️ ENQUANTO O JOGADOR NÃO ERRA, AS FAIXAS ACELERAM
+
+Pedido assim: *"enquanto o treinador não errar, ou seja, só ficar acertando o perfeito e bom, a
+barra amarela e verde vai ficando mais rapida, e quando o treinador erra, ela volta a ficar na
+velocidade normal"*.
+
+**⚠️ ELA PUNE O PRÓPRIO SUCESSO, e é isso que a torna uma mecânica e não um prêmio:** cada acerto
+encolhe o período das faixas em **12%** (`CORRIDA_SEQUENCIA_PASSO`), ou seja o alvo do PRÓXIMO
+impulso passa mais rápido. A sequência se quebra sozinha quando fica difícil demais -- e o erro que
+a quebra já tem a penalidade dele (0,80 por meio segundo).
+
+- **⚠️ SÓ UM `miss` ZERA.** Não tentar **não** zera, e é literal: o pedido fala de ERRAR. Quem para
+  de tocar já é punido pelo DESLEIXO, e somar as duas coisas seria uma regra que ninguém pediu.
+- **⚠️ É DO JOGADOR, NÃO DO NPC:** o NPC não usa a barra -- ele sorteia --, então não há faixa dele
+  pra acelerar. A sequência vive no `corrida`, não no corredor, pelo mesmo motivo. Há trava com o
+  NPC acertando 10 segundos seguidos e a sequência do jogador parada em zero.
+- **⚠️ TEM PISO** (`CORRIDA_SEQUENCIA_MIN`, 0,45): a faixa nunca passa de **2,22x** a velocidade
+  normal. Sem ele ela viraria um borrão e o impulso deixaria de ser uma decisão.
+
+#### ⚠️ A FASE TEVE QUE VIRAR ACUMULADA -- senão a faixa TELEPORTA
+
+O centro era `0,5 + A·sin(2π·t / P)`. **Com o período mudando no meio da prova, essa conta SALTA**:
+em t=10s, trocar P de 2,0 pra 1,6 leva o argumento de 31,4 pra 39,3 rad -- outro ponto qualquer do
+seno. A faixa pularia **até um terço da barra** no instante do acerto, e o jogador leria isso como
+a tela piscando.
+
+Hoje a fase é **integrada** (`corridaAvancarFaixas`, chamada pelo `corridaFisicaPasso`): o que muda
+é a VELOCIDADE angular daí pra frente, e a faixa continua de onde estava.
+**⚠️ E DE QUEBRA ISSO CONSERTOU UM SALTO QUE JÁ EXISTIA:** a troca de TRECHO no revezamento também
+muda o período (o nível do pokémon novo), e ela saltava do mesmo jeito desde 18/09 -- ninguém tinha
+reportado porque o salto passava por uma travessia inteira. A trava velha cobrava justamente esse
+salto (`c0 !== c1`); ela passou a medir o **RITMO**, que é a regra.
+
+#### ⚠️ E A SINCRONIA COM A AGULHA: o que importa é o PISO
+
+A regra de 18/09 é que o período das faixas **nunca** pode ser múltiplo inteiro da travessia, senão
+a configuração barra+faixa se repete e o jogador decora o padrão. Com a aceleração, o período
+efetivo vai de **0,52 a 1,90** travessias -- ou seja **atravessa o inteiro 1**, e existem 30
+combinações nível+sequência em sincronia.
+
+**Elas são toleradas porque duram UMA travessia:** cada acerto muda a sequência, então a
+configuração não fica parada tempo suficiente pra ser decorada.
+**⚠️ O QUE NÃO PODE FICAR EM SINCRONIA É O PISO**, porque ele é o único estado que PERSISTE -- e
+medido, a sequência chega ao piso em **100% das corridas** de quem joga bem. No piso o intervalo é
+**0,52 a 0,86** da travessia, que não contém inteiro nenhum. Há trava pros 99 níveis.
+
+#### O QUE ISSO CUSTA, MEDIDO
+
+O jogador é modelado pela **MIRA** (o erro típico dele em fração da barra) -- e não por "acerta bom
+X% das vezes", senão o A/B pressuporia o resultado em vez de medi-lo. É a mesma modelagem que o
+degrau do NPC usou. 120 corridas por célula, Jolteon Lv.60 dos dois lados:
+
+| mira do jogador | sem acelerar | com acelerar | |
+|---|---|---|---|
+| ±2% (domina o jogo) | 100,0% | **99,2%** | −0,8 |
+| **±5% (joga bem)** | 90,0% | **74,2%** | **−15,8** |
+| ±10% (mediano) | 30,8% | 27,5% | −3,3 |
+| ±18% (distraído) | 3,3% | 0,8% | −2,5 |
+
+**⚠️ ELA MORDE QUEM JOGA BEM, e quase não toca nos extremos** -- e isso é o desenho: quem domina
+acerta em qualquer velocidade, quem é mediano erra cedo e a sequência nem chega a crescer. Quem
+joga bem constrói uma sequência longa e **a faixa acelerada passa a cobrar**.
+
+**E O EFEITO COLATERAL BONITO ESTÁ NA CONTAGEM DE TOQUES:** o bot de ±2% vai de **14,3 pra 11,3
+impulsos** por corrida -- com a faixa mais rápida, sobram menos instantes em que a agulha e ela se
+encontram, e as travessias puladas caem no **DESLEIXO**. A mecânica se auto-regula por dois
+caminhos que já existiam.
+
+**QUANTO ELA ACUMULA:** medido, a maior sequência de uma corrida tem **mediana 10-11** pra quem
+joga bem (maior vista: 13), e o piso é alcançado em **100%** das corridas dele; pra o mediano, em
+**42%**.
+
+- **Se um dia incomodar**, as réguas são o **passo** (`CORRIDA_SEQUENCIA_PASSO`, 12% por acerto) e
+  o **piso** (`CORRIDA_SEQUENCIA_MIN`, 0,45). O passo é o que decide quantos acertos a rampa dura;
+  o piso, o quão rápida ela fica no fim.
+- **NA TELA** a sequência entra em dois lugares: o **recado** ("5 seguidos: faixa 1,9x.", a partir
+  do SEGUNDO acerto -- "1 seguido" não é uma sequência) e o **chip dos perfeitos** ("7 perfeitos ·
+  5 seguidos"). O erro diz "A faixa voltou ao normal.".
+  **⚠️ O CHIP VIVE NUMA FUNÇÃO SÓ** (`corridaChipDosPerfeitos`), porque ele tem DOIS desenhistas: o
+  `render()` dá o valor inicial e o pintor o move durante a prova (o laço não redesenha a tela).
+  Escritos em separado, o chip sairia certo no primeiro quadro e errado dali em diante -- que é a
+  família do modal da contagem e dos chips do revezamento.
+  **⚠️ E O NÚMERO É O MULTIPLICADOR, não a porcentagem:** "189% mais rápida" se lê como +189%, o
+  dobro do que ela acelerou.
+- **Medido a 320px:** o recado cai em 2 linhas e o chip em 2, a faixa de feedback fica em
+  **243x24px** e a tela não rola pro lado.
+
+#### O QUE ISSO CUSTOU NO MOTOR: NADA
+
+`MOTOR 4e1b30e2729d / DIARIO 603f5c7e563f`, idêntico em 900 batalhas semeadas. A Corrida é um
+chamador do motor, não o motor.
+
+`tools/test-corrida.js` foi a **451 pontas**, e as novas cobrem: o fator só encolhendo e com piso,
+o período encolhendo pelo fator exato, cada acerto subindo e o erro zerando, o **BOM** contando
+junto com o perfeito, a largada zerando os dois campos, o NPC não movendo a sequência, a fase
+andando com o relógio da PROVA, **acelerar não teleportando a faixa** (nem trocar de trecho), o
+chip nos três estados, e o CSS do ranking (o atalho `font` fora, o tamanho derivado, o negrito, a
+classe no container e a Pescaria intacta).
+**Conferido que ele acusa: 6 de 6 defeitos novos religados** (3, 3, 4, 2, 6 e 3 falhas).
+
+#### ⚠️ E UMA LIÇÃO DE MEDIÇÃO SAIU DAQUI, cara de pagar
+
+O `tools/test-especiais.js` tem um flake conhecido desde 17/09 (*"NINGUEM ataca com a barra em
+zero"*, sempre no par Charmeleon × Mankey). Medindo-o **sem semente**, ele deu **0 de 17 no HEAD
+e 6 de 12 no meu build** -- o que parecia uma regressão clara e custou meia hora de bissecção.
+
+**Não era.** Três coisas provaram isso, e vale a ordem:
+
+1. a **impressão do motor** (900 batalhas semeadas) é idêntica nos dois builds;
+2. rodando o MESMO teste com o `Math.random` SEMEADO, os dois builds dão o **mesmo resultado
+   semente por semente** -- 8 de 8 sementes concordam, e a taxa real é ~25% nos dois;
+3. o diff não encosta em `doExchange`, `sequenciaDoConfronto`, `passosVisiveis`, `simulateGymBattle`
+   nem `calcDamage`.
+
+**⚠️ COMPARAR UM TESTE FLAKY SEM SEMENTE ENTRE DOIS BUILDS NÃO É MEDIÇÃO** -- é a mesma armadilha
+do "amostra única não é medição" que este arquivo já registra no σ binomial, agora do lado do
+teste. O `tools/semear-random.js` (um preload que troca o `Math.random`) é o que transforma a
+comparação em medição -- e ele NÃO entra em bateria nenhuma: semeado, o teste varre sempre os
+MESMOS confrontos, e é a variedade que faz uma trava de invariante valer alguma coisa.
+
+**⚠️ E A PRIMEIRA BISSECÇÃO MEDIU O VAZIO, pelo motivo de sempre:** a árvore de teste que eu montei
+não tinha o `functions/index.js`, o teste **morria na linha 1329** e devolvia **156 asserções em
+vez de 1271** -- ou seja ele "passava" sem nunca chegar na trava. É literalmente a lição que este
+arquivo já registra (*"uma trava que estoura é pior que uma que falha"*), agora aplicada à árvore
+inteira: **conferir a CONTAGEM de asserções antes de acreditar num verde**.
+
 ## RESGATE POKÉMON -- o terceiro teste admin (20/09/2026)
 
 Pedido com o `resgate-pokemon.html` da raiz como referência, e com **cinco coisas mudadas** em
@@ -14483,6 +14648,116 @@ mapa FOI desenhado, com 2.370 operações, e ele desenhou ELIPSES"* em vez de s�
   quantas viagens cabem), o **`RESGATE_VEL_FATOR`** (o quanto o nível se vê) e a **capacidade** --
   e esta última desfaria o pedido.
 
+### AS TRÊS DO RESGATE (20/09/2026) -- a escada, o mapa que sumia e os sprites
+
+#### ⚠️ CADA ALTURA DE ILHOTA TEM A SUA FAIXA DE PONTOS
+
+Pedida assim: *"as ilhas mais proximas, vao aparecer os pokemons que dão menos de 50 pontos, os da
+ilha centrais, são os pokemons que dao menos de 70 pontos, e os mais alto, sao os de 70 ou mais
+pontos"*.
+
+**⚠️ ATÉ AQUI O BICHO ERA SORTEADO DA LISTA INTEIRA EM QUALQUER ILHOTA**, então o 87 da Tangela
+podia cair na ilhota colada na praia e o 41 do Pichu lá no alto. Ou seja a **distância não dizia
+nada sobre o prêmio**, e a decisão do mapa virava sorte. É o outro lado da moeda de 20/09/2026,
+quando o valor saiu da ILHOTA e foi pro BICHO: aquilo tirou a escada das posições e não pôs nada
+no lugar. Agora ela volta, e pelo bicho.
+
+- **⚠️ AS TRÊS SÃO BANDAS, e não três filtros soltos:** perto **< 50**, centro **50 a 69**, alto
+  **70 pra cima**. As duas leituras do texto do pedido dão o mesmo resultado no centro ("dão menos
+  de 70" vale nos dois casos); o que a banda acrescenta é **tirar os baratos do meio do mapa** --
+  sem isso um Pichu de 41 pts podia nascer numa ilhota central, que é uma viagem mais longa pelo
+  MESMO prêmio da de baixo, e a escada deixaria de existir onde ela mais decide.
+- **⚠️ A FAIXA SAI DA POSIÇÃO DA ILHOTA, nunca de índices escritos à mão:** as posições **são** o
+  mapa, e mover uma ilhota tem que mover a faixa dela junto. O ranking é por Y, com a praia
+  embaixo (y=342) -- as duas de Y maior são as de PERTO, as duas do meio o CENTRO, as duas de topo
+  as ALTAS. Há trava cobrando a ORDEM, não os índices.
+- **E O BOLO DE CADA FAIXA CAI DAS DUAS COISAS ACIMA** -- ele não é uma quarta lista pra manter em
+  dia. Um bicho novo no `RESGATE_RESGATADOS` entra na faixa dele sozinho, e um ajuste no divisor
+  redistribui os 23 sem tocar em nada.
+- **⚠️ FAIXA SEM NINGUÉM CAI NA LISTA INTEIRA**, e há trava pra a rede NÃO precisar ser usada:
+  sortear de uma lista vazia devolve `undefined`, que **não dá erro na hora** -- ele estoura
+  quadros depois, dentro do laço, e aí a tela congela. É a mesma rede do `resgateMarPlano`.
+
+**⚠️ O QUE ISSO CUSTA, E ELE É VISÍVEL NA TELA: a faixa ALTA tem DUAS espécies.** Medido nos 23:
+
+| faixa | espécies | pts |
+|---|---|---|
+| perto (< 50) | **4** | 41 a 49 (Pichu, Igglybuff, Cleffa, Togepi) |
+| centro (50-69) | **17** | 55 a 66 |
+| **alto (≥ 70)** | **2** | **Elekid 72 e Tangela 87** |
+
+Ou seja **as duas ilhotas mais valiosas mostram Elekid ou Tangela quase sempre** -- conferido no
+navegador, a primeira tela já saiu com 87 nas duas. A regra está certa; o que falta é gente na
+faixa de cima.
+**A RÉGUA É A LISTA, e ela é uma linha:** acrescentar ao `RESGATE_RESGATADOS` qualquer espécie de
+BST ≥ 350 povoa a faixa alta. Medidos, os candidatos naturais (todos já no `SPECIES`):
+**Growlithe 70 · Farfetch'd 70 · Aipom 72 · Magby 73 · Onix 77 · Lickitung 77 · Porygon 79 ·
+Murkrow 81 · Ponyta 82 · Marowak 85 · Gligar 86 · Sneasel 86 · Misdreavus 87**. A da faixa de
+baixo (4 espécies) tem o mesmo problema, menor: ali os candidatos são de BST < 250.
+
+- **A LEGENDA DA TELA SAI DAS CONSTANTES** (`Perto: até 49 pts · Centro: até 69 · Alto: 70+`),
+  nunca escrita à mão -- ela envelheceria no primeiro ajuste de faixa, que é o defeito que o
+  rótulo de metragem do revezamento da Corrida teve. **Medido a 320px:** os três cabem numa linha
+  só (243x11px), e a tela vai de 970 pra **990px**, sem rolagem lateral.
+
+#### ⚠️ O MAPA SUMIA DEPOIS DE ESCOLHER O PARCEIRO
+
+Reportado: *"depois que eu escolho meu parceiro, o desenho do mapa some e fica somente aquela toda
+azul com os pokemons"*.
+
+**A CAUSA É `app.innerHTML = html`: ele cria um `<canvas>` NOVO e VAZIO.** Quem o pinta no jogo é o
+`resgatePintar`, que só roda dentro do laço -- e na tela de setup não há laço. A chamada de desenho
+morava no `abrirResgate` e cobria só a ABERTURA: **qualquer outra ação da tela apagava o mapa**.
+
+- **⚠️ O GANCHO FOI PRO `render()`, e não pra cada ação do Resgate:** são **oito** portas que
+  redesenham aquela tela (escolher parceiro, abrir e fechar o picker, paginar, reiniciar, o aviso
+  de sprite que falhou, a fase `carregando`), e uma lista à mão envelheceria na nona -- a nona
+  nasceria com o mapa em branco e ninguém veria. É a mesma decisão do `abrirConfronto` da Corrida,
+  que nasceu depois de o conserto do golpe fantasma ter ficado pela metade em 09/09/2026.
+- **Fora da tela do Resgate não há canvas** e a função volta sem desenhar -- é isso que faz o
+  gancho custar nada nas outras 126 telas.
+- **⚠️ E A TRAVA TEM DUAS METADES, porque o `render` do sandbox é um NO-OP** (o epílogo o
+  substitui): um caso de comportamento **nunca alcançaria o gancho**. Quem prova que ele existe é
+  a leitura do código; quem prova que o desenho funciona é o dublê de canvas.
+
+**Medido no navegador, a 320px:** o `<canvas>` depois de escolher o parceiro é um elemento NOVO e
+tem **exatamente os mesmos 619.534 bytes** de imagem que antes da escolha -- contra **18.818** de
+um canvas em branco do mesmo tamanho (**33x**).
+
+#### ⚠️ O SQUIRTLE ERA DO TAMANHO DA LUGIA
+
+Reportado com print: *"os sprites estao estranhos, o squirtle que é um pokemon pequeno ta muito
+grande, e a lugia que é um pokemon grande ta muito pequeno, ajuste para que fique mais
+proporcional"*.
+
+**A conta era `Math.min(46 / sw, 46 / sh)`** -- ou seja **TODO mundo saía com 46px de maior lado**.
+Não é aproximadamente o mesmo tamanho: é o MESMO tamanho, por construção.
+
+- **⚠️ E ELA NÃO PODE SER LINEAR, pelo mesmo motivo que a VELOCIDADE daqui não pode:** medido no
+  navegador nos **65 surfistas** (baixando as folhas e varrendo os pixels), a caixa do sprite vai
+  de **17px** (Qwilfish) a **73px** (Lugia) -- **4,3x**. Numa escala linear que caiba o maior no
+  mapa, o menor sai com 13px.
+- **COM A RAIZ a razão cai pra 2,1x e os dois extremos aparecem:** medido, **28px** o menor e
+  **58px** o maior, com a maioria entre 30 e 37. É a mesma forma -- e a mesma razão -- do
+  `resgateVelocidade`, que já resolve exatamente este problema com os Speeds do jogo.
+- **⚠️ E O TAMANHO É POR ESPÉCIE, nunca por quadro nem por direção:** lido do QUADRO (que é o que a
+  conta velha fazia), a escala mudava a cada passo da animação e **o bicho respirava**; lido da
+  LINHA, ele mudava de tamanho ao virar. As `dados.caixas` são sempre as do norte e já vêm
+  calculadas do carregamento, então isto não custa uma varredura de pixel a mais.
+- **A SOMBRA ACOMPANHA**, com teto e piso: ela era 17px fixos, e um Lugia de 58px boiando sobre a
+  mesma elipse de um Qwilfish desfazia na sombra a proporção que o sprite acabou de ganhar.
+
+**Conferido no navegador, lado a lado:** com a conta velha o Squirtle sai quase do tamanho do
+Lugia; com a nova o Lugia é o dobro dele.
+
+**Se um dia incomodar**, a régua é o `RESGATE_SPRITE_K` (6,8): ele é o tamanho de um sprite de
+caixa 1px, então o desenhado é `K × √caixa` -- subi-lo cresce todo mundo na mesma proporção.
+
+#### O QUE ISSO CUSTOU
+
+**Nada no motor:** `MOTOR 4e1b30e2729d / DIARIO 603f5c7e563f`, idêntico em 900 batalhas semeadas.
+O Resgate continua sem tocar o save e sem uma operação de backend.
+
 `tools/test-resgate.js` tranca **118 pontas**: o acesso nos 10 estados do campo, o parceiro (só
 surfista, de todos os saves, as 8 insígnias, a ordem, e a AÇÃO recusando), a velocidade escalando
 e cabendo no mapa, a capacidade e a carga freando no motor, o adversário (Lv.60, da lista, sem
@@ -14491,6 +14766,14 @@ praia, um ponto por resgatador, a corrente e o redemoinho medidos por razão, o 
 com o que chega, o retorno automático, o duelo inteiro terminando, o save intacto, o laço parando
 quando a tela muda, as oito direções do sprite e as cinco telas.
 **Conferido que ele acusa: 17 de 17 defeitos religados** derrubam pelo menos uma trava.
+
+⚠️ **DESDE 20/09/2026 ELE TEM 178**, e as novas cobrem a escada (a faixa saindo da POSIÇÃO, as três
+bandas medidas pelo VALOR, os três bolos sendo a lista inteira sem repetir, nenhum vazio, 3.600
+sorteios sem ninguém fora da faixa da ilhota, e a escada ESTRITA -- o pior de cima vale mais que o
+melhor de baixo), o mapa (o desenho de verdade + o gancho no `render`, lido do código) e a escala
+do sprite (maior caixa = maior desenho, os dois extremos cabendo, a razão sendo REAL e não linear,
+uma escala por espécie, e a caixa de 46px não voltando).
+**Conferido que ele acusa: 5 de 5 defeitos novos religados** (2, 5, 3, 3 e 2 falhas).
 ## PERFORMANCE: A GEOGRAFIA MANDA (19/09/2026)
 
 Relatado assim: *"tenho sentido uma boa lentidão na inscrição para as ligas clássicas e trainers
