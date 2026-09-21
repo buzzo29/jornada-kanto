@@ -693,6 +693,115 @@ console.log('=== O MONITOR CONTA AS CINCO ILHAS ===');
    ⚠️ ELE E O ULTIMO BLOCO DO ARQUIVO porque e o unico ASYNC: o rodape (a contagem e o exit) vive
    DENTRO dele, senao o process.exit sincrono correria antes do await e este caso nao contaria.
    ============================================================================ */
+
+/* ============================================================================
+   O CACHE DO RANKING TEM IDADE (21/09/2026, reportado: *"os rankings que existem nos jogos das
+   ilhas laranja nao estao sendo atualizados em tempo real, ta precisando fechar o jogo e abrir de
+   novo pra atualizar"*)
+
+   ⚠️ ELE VALIA PRA SEMPRE DENTRO DA SESSAO. A guarda era `if(lista) return`, e a unica coisa que
+   a invalidava era EU bater MEU recorde -- entao um recorde de OUTRO jogador so chegava depois de
+   recarregar a pagina, que e o que zera o modulo. Reproduzido nos TRES antes do conserto.
+
+   ⚠️ E A TRAVA COBRE OS QUATRO NUM LACO SO: a regra e a mesma, e escrita em cada teste de jogo
+   uma ficaria pra tras no primeiro ajuste -- que e como o defeito nasceu (caches iguais, cada um
+   com a sua invalidacao).
+   ============================================================================ */
+async function blocoDoRanking(){
+  console.log('');
+  console.log('=== O RANKING NAO FICA CONGELADO NA SESSAO ===');
+
+  const RANKS = [
+    { nome: 'pescaria', rank: () => S.pescariaRank, ler: (f) => S.pescariaCarregarRank(f),
+      abrir: () => S.abrirPescaria(), tela: 'pescaria', temLista: (r) => !!r.lista },
+    { nome: 'corrida',  rank: () => S.corridaRank,  ler: (f) => S.corridaCarregarRank(f),
+      abrir: () => S.abrirCorrida(),  tela: 'corrida',  temLista: (r) => !!r.single },
+    { nome: 'resgate',  rank: () => S.resgateRank,  ler: (f) => S.resgateCarregarRank(f),
+      abrir: () => S.abrirResgate(),  tela: 'resgate',  temLista: (r) => !!r.lista },
+    { nome: 'selecao',  rank: () => S.selecaoRank,  ler: () => S.selecaoCarregarRank(),
+      abrir: () => S.abrirSelecao(),  tela: 'selecao',  temLista: (r) => !!r.lista },
+  ];
+
+  /* um servidor de mentira que conta os pedidos e muda de resposta quando mandarem */
+  let pedidos = 0, topo = 'Ana';
+  const originalFC = S.functionsClient;
+  S.functionsClient = { httpsCallable(){ return () => {
+    pedidos++;
+    const l = { nome: topo, pontos: 9, tempo: 1.5, partidas: 1, vitorias: 1, aproveitamento: 1 };
+    return Promise.resolve({ data: { lista: [l], meu: null, top: [l],
+      single: { lista: [l], meu: null }, relay: { lista: [], meu: null } } });
+  }; } };
+  const esperar = () => new Promise(r => setImmediate(() => setImmediate(r)));
+  /* o relogio anda na mao: e o que faz a validade de 30s ser medivel */
+  const relogioReal = Date.now;
+  let agora = relogioReal();
+  Date.now = () => agora;
+
+  ok('a validade mora numa constante', typeof S.RANK_VALIDADE_MS === 'number' && S.RANK_VALIDADE_MS > 0,
+     String(S.RANK_VALIDADE_MS));
+
+  for(const r of RANKS){
+    contaAdmin(); g.authUser = { uid: 'u1' };
+    pedidos = 0; topo = 'Ana';
+    const est = r.rank();
+    est.lidoEm = 0; est.lista = null; est.single = null; est.relay = null;
+
+    /* 1) a primeira leitura pede */
+    g.screen = r.tela;
+    r.ler(false); await esperar();
+    ok(r.nome + ': a primeira leitura pede ao servidor', pedidos === 1, pedidos + ' pedido(s)');
+    ok('  e a idade fica carimbada', !!est.lidoEm, String(est.lidoEm));
+
+    /* 2) DENTRO do prazo, nao pede de novo -- senao cada toque na tela custa uma chamada */
+    r.ler(false); await esperar();
+    r.ler(false); await esperar();
+    ok('  e dentro do prazo ele NAO repete', pedidos === 1, pedidos + ' pedido(s)');
+
+    /* 3) PASSADO o prazo, ele rele sozinho */
+    agora += S.RANK_VALIDADE_MS + 1000;
+    r.ler(false); await esperar();
+    ok('  e passado o prazo ele rele', pedidos === 2, pedidos + ' pedido(s)');
+
+    /* 4) ⚠️ O CASO DO RELATO: outro jogador bate o recorde e o jogador SAI E VOLTA ao modo -- sem
+       fechar o app. Antes do conserto a tela seguia no dado velho. */
+    topo = 'Bruno';
+    g.screen = 'saveSelect';
+    r.abrir();
+    g.screen = r.tela;
+    r.ler(false); await esperar();
+    const visto = JSON.stringify(est.lista || est.single || {});
+    ok('  e ENTRAR NO MODO rele (o caso do relato)', visto.indexOf('Bruno') >= 0, visto.slice(0, 60));
+
+    /* 5) ⚠️ INVALIDAR ZERA A IDADE, NAO A LISTA: apagando a lista, a caixa pisca vazia a cada
+       abertura enquanto o novo nao chega. */
+    S.rankInvalidar(est);
+    ok('  e invalidar nao apaga o que esta na tela', r.temLista(est), 'a lista sumiu');
+    ok('    mas marca como vencido', S.rankVencido(est));
+  }
+
+  Date.now = relogioReal;
+  S.functionsClient = originalFC;
+
+  /* ⚠️ E TODA PARTIDA INVALIDA, nao so a que bate recorde: minha POSICAO muda quando outro joga,
+     mesmo sem eu melhorar nada. Lido do codigo, porque o caminho passa por uma callable de envio
+     que o caso de comportamento teria que dublar inteira. */
+  const envios = [
+    ['pescaria', 'async function pescariaEnviarRank', 'function pescariaZerar'],
+    ['corrida',  'async function corridaEnviarRank',  'const corridaTempoTxt'],
+    ['resgate',  'async function resgateEnviarRank',  'function resgateRankHtml'],
+    ['selecao',  'function selecaoEnviarResultado',   'function selecaoLinhaRankHtml'],
+  ];
+  for(const [nome, de, ate] of envios){
+    const i = src.indexOf(de), j = src.indexOf(ate, i);
+    const corpo = (i >= 0 && j > i) ? src.slice(i, j) : '';
+    ok(nome + ': o envio invalida o ranking', corpo.length > 40 && /rankInvalidar\(/.test(corpo),
+       corpo.length ? 'sem o rankInvalidar' : 'nao achei o corpo do envio');
+    ok('  e NAO so quando bate recorde',
+       corpo.length > 40 && !/if\s*\(\w+Rank\.recorde\)\s*\w+Rank\.(lista|single)\s*=\s*null/.test(corpo),
+       'a invalidacao voltou a depender do recorde');
+  }
+}
+
 console.log('');
 console.log('=== O ANUNCIO APARECE UMA VEZ SO ===');
 (async () => {
@@ -720,6 +829,8 @@ console.log('=== O ANUNCIO APARECE UMA VEZ SO ===');
      'marca depois da releitura: ' + JSON.stringify(g.novidadeVista));
   ok('  entao ele NAO reabre depois de lido',
      S.conferirNovidades() === false && !g.novidadesModal);
+
+  await blocoDoRanking();
 
   console.log(falhas ? '\n' + falhas + ' FALHA(S)' : '\nTudo certo.');
   process.exit(falhas ? 1 : 0);

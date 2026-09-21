@@ -1,0 +1,13 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "selecaoRanking",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "aproveitamento", "order": "DESCENDING" },
+        { "fieldPath": "partidas", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

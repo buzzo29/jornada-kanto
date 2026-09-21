@@ -16672,6 +16672,223 @@ deles (o selo tirado de UM dos dois botões) só foi pego porque a trava passou 
 em vez de usar `indexOf`.
 
 
+## OS QUATRO RANKINGS DAS ILHAS (21/09/2026) -- o que não atualizava e o que nunca funcionou
+
+Quatro pedidos numa leva, e dois deles eram defeito de verdade -- um relatado, outro **suspeitado**:
+
+> *"os rankings que existem nos jogos das ilhas laranja não estão sendo atualizados em tempo real,
+> tá precisando fechar o jogo e abrir de novo pra atualizar"*
+
+> *"adicione o ranking de aproveitamento contra a Luana também na tela principal, **e verifique se
+> ele está funcionando, porque acho que está com problemas**"*
+
+### ⚠️ O DA LUANA NUNCA CARREGOU -- e a causa é um índice que o projeto não tinha
+
+```
+getSelecaoRanking:  .orderBy('aproveitamento','desc').orderBy('partidas','desc')
+firebase firestore:indexes  ->  { "indexes": [], "fieldOverrides": [] }
+```
+
+**⚠️ DOIS `orderBy` EM CAMPOS DIFERENTES EXIGEM ÍNDICE COMPOSTO.** Sem ele a consulta morre com
+`FAILED_PRECONDITION: The query requires an index`, o cliente cai no `catch` e a caixa mostra *"não
+deu pra carregar o ranking"*. **Em toda abertura, desde o dia em que o ranking nasceu.**
+
+- **⚠️ E O CLAUDE.md JÁ APONTAVA A ARMADILHA, em 19/09: *"não existe `firestore.indexes.json`, e o
+  projeto tem ZERO índices compostos... é a mesma armadilha que as REGRAS já tiveram antes de
+  30/08"*.** O que faltava era alguém precisar de um -- e o primeiro que precisou nasceu quebrado.
+- **HOJE O ARQUIVO EXISTE** e o `firebase.json` o aponta (sem a linha ele é letra morta: o deploy não
+  publica índice que ele não conhece). Ele entrou no `hosting.ignore` junto, pela razão do
+  `firestore.rules` -- a raiz do repo é publicada, e ele não precisa ficar baixável.
+- **⚠️ SÓ UMA QUERY DO PROJETO INTEIRO ENCADEIA DOIS `orderBy`**, e é essa. A outra (`lastSeenAt` do
+  painel) usa `where` + `orderBy` no **MESMO** campo, que o índice de campo único já cobre.
+
+**⚠️ E O TESTE PASSAVA, PORQUE O FAKE NÃO EXIGIA ÍNDICE.** É a **OITAVA** vez que o dublê é mais
+permissivo que a produção (depois do `increment` em mapa, do ponto no `update`, do `getAll` da
+transação, do `arrayUnion`, do `count()`, do `undefined` que matou as duas ligas e do `orderBy`
+encadeado). Hoje ele **lê o próprio `firestore.indexes.json` do repo** e recusa igual:
+
+```
+9 FAILED_PRECONDITION: The query requires an index. Declare em firestore.indexes.json:
+selecaoRanking (aproveitamento DESC, partidas DESC)
+```
+
+Reproduzido tirando o arquivo: o `test-selecao-rank.js` **morre na linha 5451**, que é exatamente a
+linha que a produção executava.
+
+- **⚠️ O QUE O FAKE NÃO COBRE, e fica dito:** `where` num campo mais `orderBy` em OUTRO também exige
+  composto. **Nenhuma query do projeto faz isso hoje**, e implementar regra que não roda é o tipo de
+  código que fica anos no arquivo sem ninguém saber que está morto -- a mesma decisão dos estágios
+  2 a 4 do crítico.
+- **E A TRAVA TEM DUAS METADES:** o fake pega a query que algum teste EXERCITA; a varredura do
+  `test-selecao-rank` pega a que **nenhum teste toca** -- ela lê o servidor, acha todo
+  `.orderBy(a).orderBy(b)` e cobra o índice de cada um.
+  ⚠️ **A primeira versão dela achou ZERO queries** (a coleção quase nunca está colada na query --
+  ela vem de um ajudante como o `selecaoRankCollRef()`), ou seja ela passaria em branco sobre o
+  defeito que existe pra pegar. Quem denunciou foi o `ok` de *"a varredura achou o que ler"*.
+
+**⚠️ E ELE ERA O ÚNICO DOS QUATRO RANKINGS SEM SAÍDA NO ERRO** -- mostrava a mensagem e parava ali.
+Ou seja a tela dizia que deu errado e não oferecia nada, **justamente no estado em que o jogador
+sempre a via**. Hoje ele tem o "Tentar de novo" dos outros três.
+
+### ⚠️ E O CACHE DOS RANKINGS VALIA PRA SEMPRE DENTRO DA SESSÃO
+
+A guarda era `if(lista && !forcar) return`, e a **única** coisa que invalidava era EU bater MEU
+recorde. Então um recorde de outro jogador -- ou eu perder uma posição sem melhorar nada -- só
+chegava depois de **recarregar a página**, que é o que zera o módulo. Era literalmente o relato.
+
+Reproduzido nos três, com um servidor dublê que troca "Ana" por "Bruno" entre as aberturas:
+
+| | pedidos ao servidor | o que a tela mostra |
+|---|---|---|
+| **antes** | 1 | **Ana** (não atualizou) |
+| depois | 2 | Bruno |
+
+**O CONSERTO SÃO TRÊS PEÇAS, e elas moram numa função só** (`rankVencido`/`rankInvalidar`) lida
+pelos quatro -- três prazos escritos à mão divergiriam no primeiro ajuste, e aí um ranking
+atualizaria num ritmo que os outros não:
+
+1. **o cache tem IDADE** (`RANK_VALIDADE_MS`, 30 s);
+2. **entrar no modo força a releitura** (o `abrirX` invalida) -- é o caso do relato, "fechar o jogo
+   e abrir de novo" virou "entrar no modo";
+3. **toda partida invalida**, e não só a que bate recorde: minha POSIÇÃO muda quando outro joga.
+
+- **⚠️ INVALIDAR ZERA A IDADE, NUNCA A LISTA.** Apagando a lista, a caixa **pisca vazia** a cada
+  abertura enquanto o novo não chega -- a tela continua mostrando o que tem até a resposta chegar.
+- **⚠️ E O `rankInvalidar` FICA NA PRIMEIRA LINHA DO `abrirX`**, antes de qualquer guarda: ele só
+  marca uma idade, não muda estado nenhum, e assim a releitura não depende da ordem das guardas.
+- **O PRAZO É UM MEIO-TERMO, e a razão é que o `render()` não roda sozinho:** curto demais gasta uma
+  chamada por toque na tela; longo demais não parece tempo real. Em 30 s, abrir o modo relê, tocar
+  várias vezes seguidas não, e uma partida sempre relê -- o duelo da pescaria sozinho dura 90 s.
+
+**O CUSTO MEDIDO, numa sessão de 10 partidas (com 3 toques na tela entre elas) mais 5 aberturas:**
+
+| | chamadas | leituras |
+|---|---|---|
+| antes | 1 | **~11** |
+| **depois** | **16** | **~176** |
+
+São **16×** -- e em absoluto é pequeno: a tela da Liga Clássica faz ~1.400 leituras/hora sozinha
+pelo polling de 5 s. O que segura é a validade: os **3 toques entre partidas não geram chamada
+nenhuma**.
+
+**⚠️ E O QUE ISSO NÃO FAZ, que é honesto dizer: parado na tela ele não atualiza.** O `render()` não
+roda por conta própria, então o ranking só se refaz quando alguma coisa redesenha a tela -- entrar
+no modo ou terminar uma partida. Um ranking **de verdade** em tempo real seria `onSnapshot` (as
+regras já permitem: as quatro coleções são `read: if request.auth != null`), e o preço é outro --
+uma assinatura viva por jogador com a tela aberta, e o `render()` no meio de uma animação, que é a
+regra que este projeto mais protege.
+
+### ⚠️ E O `Infinity` PASSAVA NO RANKING DA PESCARIA
+
+Achado por um caso de teste que eu escrevi pro ranking NOVO do Resgate e que **acusou o da Pescaria
+junto**: `Math.max(0, Math.floor(Number(x) || 0))` deixa `Infinity` passar (`Math.floor(Infinity)` é
+`Infinity`, e `Infinity > 0`). Um cliente forjado gravava um recorde que **nenhuma partida supera** e
+trancava o topo pra sempre.
+
+A **Corrida já tratava** (ela tem `isFinite` e um teto desde 20/09); a Pescaria estava no ar sem
+isso desde que nasceu. Hoje os dois passam pelo `pontosDeRankingValidos`, com teto folgado
+(`RANK_PONTOS_MAX`, 100.000 -- um duelo rende 200 a 550, então ele não recusa nenhuma partida
+possível e recusa qualquer absurdo).
+
+## O RANKING DO RESGATE, O ANÚNCIO DA CORRIDA E OS DOIS BOTÕES (21/09/2026)
+
+### O RESGATE GANHOU A PRIMEIRA OPERAÇÃO DE SERVIDOR DELE
+
+Pedido: *"na página principal do resgate, adicione também um ranking com as maiores pontuações"*.
+
+**⚠️ ELE ERA O ÚNICO DOS CINCO JOGOS SEM RANKING**, e o CLAUDE.md registrava isso como decisão em
+aberto: *"não há ranking -- o pedido não pediu, e é por isso que o modo continua sem uma única
+operação de backend. Quando houver, é aí que nasce a terceira checagem de permissão"*. É esse dia.
+
+- **É O MOLDE DA PESCARIA, linha por linha** -- as duas métricas são a MESMA coisa (pontos, e melhor
+  é MAIOR), então um desenho próprio divergiria dela no primeiro ajuste. O que muda é o segundo
+  número: lá são capturas, aqui são RESGATES.
+- **UM `orderBy` SÓ**, de propósito: índice de campo único, que o Firestore cria sozinho. É
+  justamente o que o da Seleção não pôde fazer.
+- **A caixa fica nas DUAS telas** -- a principal (onde o pedido a quer) e a de FIM, porque é ali que
+  o "Recorde novo!" acabou de acontecer; mandar o jogador voltar ao setup pra ver a própria marca
+  seria esconder o prêmio da jogada. É o que a Corrida já fazia.
+- **⚠️ E ELE NÃO É PEDIDO DURANTE A PROVA**: ali o laço está pintando, e uma resposta de rede
+  chamaria `render()` no meio da animação -- a regra da casa.
+
+### ⚠️ A CORRIDA TERMINA NUM ANÚNCIO
+
+Pedido: *"quando os 4 corredores cruzarem a linha final, exibir um modal com o pokémon/equipe
+vencedora"*.
+
+**"QUANDO OS 4 CRUZAREM" JÁ ERA A CONDIÇÃO** -- quem chama o `corridaTerminar` é o `corridaFisica`,
+com `corredores.every(c => c.chegada !== null)`. O que faltava era o modal.
+
+- **⚠️ A FASE É PRÓPRIA (`anuncio`), como na Arena 1x1**, e não um sinalizador sobre a `fim`: com o
+  sinalizador a **classificação ficaria desenhada atrás do modal**, que é exatamente o que o pedido
+  tira. Aqui a pista congela no último quadro e o modal vem por cima dela.
+- **E ELA PARA O LAÇO SOZINHA**: a guarda dele é `!== 'correndo' && !== 'contagem'`, então não foi
+  preciso guarda nova -- a mesma propriedade que a Arena aproveitou.
+- **⚠️ E O `corridaTerminar` REPINTA DEPOIS DO `render()`**: ele recria o `<canvas>` em branco e o
+  laço que o pintava acabou de parar. Sem a pintura a pista sairia vazia **e o placar mostraria
+  "0 / 300 m"** -- que é o defeito que o CLAUDE.md já registra na tela de fim ("eles não estavam só
+  sobrando: estavam mostrando dado errado"). Uma chamada cobre os dois, porque o `corridaPintar`
+  termina no `corridaPintarHud`.
+- **⚠️ O QUE O TÍTULO NOMEIA MUDA COM A MODALIDADE**, e é o pedido ao pé da letra ("o pokémon/equipe
+  vencedora"): no revezamento quem ganha é a EQUIPE, então vale o **treinador** -- nomear um dos seis
+  seria escolher um por acaso, que é o defeito que a classificação já teve em 20/09. No individual
+  vale o **pokémon**, que é quem correu. O retrato acompanha: a fileira dos seis ou o sprite grande.
+- **Empate exato de tempo não é tratado**, e não precisa: as chegadas são `float` interpolado no
+  quadro.
+
+**Medido a 320px:** modal de **265×311px** numa tela de 568 (cabe sem rolar), overlay `fixed`, a
+pista atrás e o setup **fora**.
+
+### OS DOIS BOTÕES DE MODALIDADE: DE 32 PARA 81px
+
+Pedido: *"deixe mais evidente os botões de modalidade individual e revezamento na corrida, acho que
+eles estão pequenos, coloque símbolos nos dois também"*.
+
+| | antes | depois |
+|---|---|---|
+| tamanho | **130×32px** | **130×81px** |
+| selo | nenhum | **24px, desenhado** |
+| o ativo | só o fundo amarelo | fundo **+ moldura escura** |
+
+- **⚠️ O SELO SOBE, NÃO FICA EM LINHA**: é a lição das prateleiras da loja -- num botão de ~118px o
+  ícone e o padding comem metade e o rótulo fica com o que sobra ("Revezamento" não caberia).
+  Empilhado, o texto fica com a largura toda.
+- **A BANDEIRA no individual** (a linha de chegada de quem corre sozinho) e o **`amigos` no
+  revezamento** (a equipe que se reveza) -- os selos da casa, não emoji. Conferidos no navegador,
+  porque **desenho não se julga por medição**.
+- **⚠️ O ATIVO GANHOU MOLDURA, e não só o fundo**: era ele sozinho, e num par de botões claros isso
+  se lê como *"os dois são iguais, um está mais claro"*.
+- **A METRAGEM CONTINUA DERIVADA** do `corridaTotalDo` -- ela já envelheceu uma vez (o botão dizia
+  "900 m" quando a prova virou 1.800).
+
+### O RANKING DA LUANA NA TELA PRINCIPAL
+
+- **⚠️ E O REDESENHO TEVE QUE APRENDER A SEGUNDA TELA.** O carregamento é assíncrono e o
+  `selecaoCarregarRank` só chamava `render()` na tela do RESULTADO -- na principal a caixa ficaria
+  em **"Carregando…" pra sempre**, porque nada mais a redesenha. Vale nos DOIS caminhos (o que dá
+  certo e o `catch`), senão um erro de rede deixaria a tela sem a mensagem.
+- **Ela continua no resultado**: a principal é onde MAIS uma, não no lugar da outra -- depois da
+  partida é ali que a posição nova aparece.
+
+### O QUE ISSO CUSTOU AO JOGO: NADA
+
+**`MOTOR 079861051846 / DIARIO cfedb1fdcab2`, idêntico ao HEAD** em 900 batalhas semeadas -- e o
+instrumento é sensível (com o `CRIT_BASE` em 1/8 os dois hashes mudam).
+
+**Medido a 320px, no navegador, nas sete telas:** **nenhuma rola pro lado**, nenhum nome truncado
+(inclusive "TreinadorNomeComprido"), linhas de ranking uniformes em 23-24px.
+
+**⚠️ E OS 14 DEFEITOS ACUSAM**, religados um a um (1 a 7 falhas cada, e o do índice **mata** o teste,
+que é a acusação mais forte que existe). Duas lições de teste saíram daí:
+
+1. **⚠️ UMA TRAVA MINHA LIA ONDE DEVIA EXECUTAR.** A do fake procurava `function exigeIndice(` no
+   arquivo -- e desligando só a CHAMADA (a função continua declarada) ela **passava em branco** com
+   o dublê permissivo de volta. Hoje ela FAZ a query numa coleção sem índice e cobra a recusa.
+2. **⚠️ E TRÊS TRAVAS DA CORRIDA MEDIAM A FORMA, NÃO A REGRA:** duas liam o texto do botão
+   (`"Individual · 300 m"`, que virou `<b>/<small>`) e uma cobrava *"tem lista ⇒ não relê"*, que era
+   a regra do cache ANTES da idade. **É a terceira vez que essa família envelhece aqui** -- as
+   outras duas foram quando o trecho da Corrida virou 150 m e quando a lista do Resgate cresceu.
+
 ## Frontend
 
 - **A tela de notificações é uma caixa de entrada**: lista de títulos em cima, corpo do que está

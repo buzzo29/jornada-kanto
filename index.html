@@ -3034,12 +3034,23 @@
      --muted, --yellow, --blue-dark), que é o que faz a tela não parecer um modo de outro jogo.
      ========================================================================== */
   .corrida-seg{display:flex;gap:6px;flex-wrap:wrap;}
+  /* ⚠️ EMPILHADO, e nao em linha: a 320px cada botao tem ~118px, e com o selo ao lado do texto o
+     rotulo ficava com ~70px -- "Revezamento" nao cabe nisso. Empilhado ele fica com a largura
+     toda. E a mesma conta que subiu o icone das prateleiras da loja. */
   .corrida-seg button{
-    flex:1 1 0;min-width:0;padding:8px 6px;font-size:.7rem;font-weight:700;
+    flex:1 1 0;min-width:0;padding:10px 6px;font-size:.72rem;font-weight:700;
     background:var(--box);border:2px solid var(--box-border);border-radius:5px;
     color:var(--ink);cursor:pointer;
+    display:flex;flex-direction:column;align-items:center;gap:3px;line-height:1.15;
   }
-  .corrida-seg button.ativa{background:var(--yellow);box-shadow:inset 0 0 0 1px var(--box-border);}
+  .corrida-seg button .selo{width:24px;height:24px;}
+  .corrida-seg button b{font-size:.8rem;}
+  .corrida-seg button small{font-size:.66rem;color:var(--muted);font-weight:700;}
+  /* ⚠️ O ATIVO GANHOU MOLDURA, e nao so o fundo amarelo: era ele sozinho, e num par de botoes
+     claros isso se le como "os dois sao iguais, um esta mais claro". A borda escura diz qual esta
+     escolhido antes de o olho comparar o fundo. */
+  .corrida-seg button.ativa{background:var(--yellow);border-color:var(--ink);box-shadow:inset 0 0 0 2px var(--box);}
+  .corrida-seg button.ativa small{color:var(--ink);}
   /* ⚠️ O canvas é 880x780 e desenha em escala 2 (setTransform), então ele ocupa 440x390 de layout.
      O `width:100%` com `aspect-ratio` é o que o faz caber a 320px sem rolagem lateral. */
   .corrida-pista{position:relative;padding:0;overflow:hidden;}
@@ -31886,18 +31897,19 @@ const corrida = {
    o servidor grava no documento de quem chamou. O adversário não tem conta.
    ⚠️ E O QUE VAI É O QUE O MOTOR CONTOU, nunca um número montado na tela.
    ============================================================================ */
-const corridaRank = { single: null, relay: null, carregando: false, erro: null, recorde: null };
+const corridaRank = { single: null, relay: null, carregando: false, erro: null, recorde: null, lidoEm: 0 };
 /* ⚠️ BEST-EFFORT dos dois lados, como o da pescaria: um ranking que não carrega é uma caixa a
    menos na tela, e um envio que falha é um recorde perdido -- nenhum dos dois pode derrubar a
    corrida. */
 async function corridaCarregarRank(forcar){
   if(corridaRank.carregando) return;
-  if(corridaRank.single && !forcar) return;
+  if(corridaRank.single && !forcar && !rankVencido(corridaRank)) return;
   corridaRank.carregando = true; corridaRank.erro = null;
   try{
     const r = await functionsClient.httpsCallable('getRaceRanking')({});
     corridaRank.single = (r.data && r.data.single) || { lista: [], meu: null };
     corridaRank.relay = (r.data && r.data.relay) || { lista: [], meu: null };
+    corridaRank.lidoEm = Date.now();
   } catch(e){
     console.error('Erro ao ler o ranking da corrida:', e);
     corridaRank.erro = 'Não deu pra carregar o ranking agora.';
@@ -31925,8 +31937,9 @@ async function corridaEnviarRank(){
       modalidade: corrida.formato, tempo: eu.chegada,
       venceu: corridaPosicao(0) === 1, especie: comQuem, time });
     corridaRank.recorde = (r.data && r.data.gravado) ? corrida.formato : null;
-    /* o ranking mudou: a próxima abertura relê */
-    if(corridaRank.recorde) corridaRank.single = null;
+    /* ⚠️ INVALIDA SEMPRE (ver a nota do `rankVencido`), e pela IDADE e não zerando o `single`:
+       zerar o campo que a guarda olha funcionava por acidente -- e deixava o `relay` velho. */
+    rankInvalidar(corridaRank);
   } catch(e){ console.error('Erro ao enviar o tempo:', e); }
   if(game.screen === 'corrida') render();
 }
@@ -32530,13 +32543,58 @@ async function corridaLargar(){
   corridaLaco();
 }
 function corridaTerminar(){
-  corrida.fase = 'fim';
+  corrida.fase = 'anuncio';
   corrida.tempo = Math.max(...corrida.corredores.map(c => c.chegada));
   corrida.recado = 'Troque a modalidade ou a equipe, ou corra de novo.';
   render();
+  /* ⚠️ O `render()` RECRIA O <canvas> EM BRANCO e o laço que o pintava acabou de parar -- sem esta
+     pintura a pista do anúncio sairia vazia. É o mesmo cuidado da Arena e do mapa do Resgate. */
+  corridaPintar();
   /* ⚠️ DEPOIS DO `render()`: o envio é assíncrono e best-effort, e a tela do resultado não pode
      esperar a rede pra aparecer. Ele redesenha sozinho quando a resposta chega. */
   corridaEnviarRank();
+}
+/* ⚠️ A CORRIDA TERMINA NUM ANÚNCIO (21/09/2026, a pedido: *"quando os 4 corredores cruzarem a linha
+   final, exibir um modal com o pokémon/equipe vencedora"*), e não direto na classificação.
+   ⚠️ A FASE É PRÓPRIA (`anuncio`), como na Arena 1x1, e não um sinalizador sobre a `fim`: com o
+   sinalizador a classificação ficaria DESENHADA atrás do modal, que é exatamente o que o pedido
+   tira. Aqui a pista congela no último quadro e o modal vem por cima dela.
+   ⚠️ E ELA PARA O LAÇO SOZINHA: a guarda dele é `!== 'correndo' && !== 'contagem'`, então nenhuma
+   guarda nova foi preciso -- a mesma propriedade que a Arena aproveitou.
+   ⚠️ "QUANDO OS 4 CRUZAREM" JÁ ERA A CONDIÇÃO: quem chama o terminar é o `corridaFisica`, com
+   `corredores.every(c => c.chegada !== null)`. O que faltava era o modal. */
+function corridaFecharAnuncio(){
+  if(corrida.fase !== 'anuncio') return;
+  corrida.fase = 'fim';
+  render();
+}
+function corridaAnuncioHtml(){
+  const primeiro = corridaRanking()[0];
+  if(!primeiro) return '';
+  const { c, i } = primeiro;
+  const relay = corrida.formato === 'relay';
+  /* ⚠️ O QUE O TÍTULO NOMEIA MUDA COM A MODALIDADE, e é o pedido ao pé da letra ("o pokémon/equipe
+     vencedora"): no revezamento quem ganha é a EQUIPE, então vale o treinador -- nomear um dos seis
+     seria escolher um por acaso, que é o defeito que a classificação já teve em 20/09. No
+     individual vale o pokémon, que é quem correu. */
+  const titulo = relay ? 'Vitória ' + escapeHtmlSafe(corridaTreinadorDe(i)) + '!'
+                       : 'Vitória ' + escapeHtmlSafe(nomeDoCorredor(c)) + '!';
+  /* ⚠️ E O RETRATO ACOMPANHA: no revezamento é a fileira dos seis (a MESMA `save-slot-team-row` da
+     classificação e do card de time da casa), no individual é o sprite grande de quem correu. */
+  const retrato = relay
+    ? `<div class="corrida-anuncio-time save-slot-team-row spread">${pescariaTimeSprites(c.time)}</div>`
+    : (c.time && c.time[0]
+        ? `<div class="modal-icon">${spriteHtml(c.time[0], 'sprite-lg', c.time[0].shiny)}</div>` : '');
+  return `
+  <div class="modal-overlay" onclick="corridaFecharAnuncio()">
+    <div class="modal-box" onclick="event.stopPropagation()">
+      ${retrato}
+      <h2>${titulo}</h2>
+      <p class="hint-text">${i === 0 ? 'Você venceu!' : corridaPosicao(0) + 'º lugar pra você.'}
+         ${c.chegada.toFixed(2)}s</p>
+      <button class="btn primary" onclick="corridaFecharAnuncio()">Ok</button>
+    </div>
+  </div>`;
 }
 function corridaReiniciar(){ corrida.fase = 'setup'; corrida.corredores = []; render(); }
 
@@ -32859,8 +32917,9 @@ function corridaPintarHud(){
     põe('corridaSub', corrida.formato === 'relay' ? 'Primeiro trecho' : 'Vai!');
   }
   /* o fim precisa do render() de verdade: ele troca a tela inteira (aparece a classificação) */
-  if(corrida.fase === 'fim' && !corrida._pintouFim){ corrida._pintouFim = true; render(); }
-  if(corrida.fase !== 'fim') corrida._pintouFim = false;
+  const acabou = corrida.fase === 'anuncio' || corrida.fase === 'fim';
+  if(acabou && !corrida._pintouFim){ corrida._pintouFim = true; render(); }
+  if(!acabou) corrida._pintouFim = false;
 }
 
 /* ============================================================================
@@ -32869,6 +32928,7 @@ function corridaPintarHud(){
 /* A porta é livre desde 21/09/2026 -- ver o botão da home. O que continua valendo é a régua de
    JOGO: o revezamento e a individual montam a partir dos saves com as 8 insígnias. */
 function abrirCorrida(){
+  rankInvalidar(corridaRank);   /* entrar no modo relê: é o caso do relato */
   corrida.fase = 'setup'; corrida.picker = false; corrida.aviso = '';
   game.modoBloqueado = null;
   game.screen = 'corrida';
@@ -32992,12 +33052,16 @@ function renderCorrida(){
      (lista já lida, ou pedido em voo) é que impede a repetição -- e ele NÃO é pedido enquanto a
      corrida roda, porque ali o laço está pintando e uma resposta de rede chamaria render(). */
   if(!correndo) corridaCarregarRank(false);
-  const setup = !correndo && corrida.fase !== 'fim' ? `
+  const setup = !correndo && corrida.fase !== 'fim' && corrida.fase !== 'anuncio' ? `
     <div class="box">
       <h2>Modalidade</h2>
       <div class="row seg corrida-seg">
-        <button class="${corrida.formato === 'single' ? 'ativa' : ''}" onclick="corridaTrocarFormato('single')">Individual · ${corridaTotalDo('single')}&nbsp;m</button>
-        <button class="${corrida.formato === 'relay' ? 'ativa' : ''}" onclick="corridaTrocarFormato('relay')">Revezamento · ${corridaTotalDo('relay')}&nbsp;m</button>
+        ${/* ⚠️ OS DOIS SELOS SAO O QUE SEPARA AS DUAS MODALIDADES DE RELANCE (21/09/2026, a pedido:
+             *"deixe mais evidente os botões de modalidade, acho que eles estão pequenos, coloque
+             símbolos nos dois também"*). A bandeira é a linha de chegada de quem corre sozinho; o
+             `amigos` é a equipe que se reveza. Eles são os selos da casa, não emoji. */''}
+        <button class="${corrida.formato === 'single' ? 'ativa' : ''}" onclick="corridaTrocarFormato('single')">${selo('bandeira')}<b>Individual</b><small>${corridaTotalDo('single')}&nbsp;m</small></button>
+        <button class="${corrida.formato === 'relay' ? 'ativa' : ''}" onclick="corridaTrocarFormato('relay')">${selo('amigos')}<b>Revezamento</b><small>${corridaTotalDo('relay')}&nbsp;m</small></button>
       </div>
       <p class="hint-text">${corrida.formato === 'relay'
         ? `Os ${CORRIDA_TRECHOS} do time, ${CORRIDA_METROS_TRECHO} m cada. A troca é automática.`
@@ -33032,7 +33096,9 @@ function renderCorrida(){
        • e o pior: um sprite que falta devolve pra `setup` SEM zerar os corredores, e aí o quadro
          vazio fica na tela de escolha pra valer.
      Quem responde "há corrida agora?" é a fase, e só ela. */
-  const emPista = corrida.fase === 'contagem' || corrida.fase === 'correndo';
+  /* ⚠️ O `anuncio` CONTA COMO PISTA: é ela que o modal cobre. Sem isso ele apareceria sobre a tela
+     de SETUP, que é onde uma fase desconhecida cai -- e o pedido é o contrário. */
+  const emPista = corrida.fase === 'contagem' || corrida.fase === 'correndo' || corrida.fase === 'anuncio';
   const placar = emPista ? `
     <div class="box corrida-placar">
       ${corrida.corredores.map((c, i) => `
@@ -33122,7 +33188,8 @@ function renderCorrida(){
   return `
   <div class="eyebrow">${selo('corrida')} CORRIDA POKÉMON</div>
   ${setup}${placar}${pista}
-  ${correndo ? '' : `<button class="btn secondary" onclick="sairDaCorrida()">⬅ Sair</button>`}`;
+  ${correndo ? '' : `<button class="btn secondary" onclick="sairDaCorrida()">⬅ Sair</button>`}
+  ${corrida.fase === 'anuncio' ? corridaAnuncioHtml() : ''}`;
 }
 
 
@@ -33238,17 +33305,37 @@ const pescaria = {
    ===================================================================== */
 /* ⚠️ ELE VIVE FORA DO `pescaria`, e de propósito: o `pescariaZerar` limpa o duelo, e o ranking
    não é do duelo -- relê-lo a cada "jogar de novo" custaria 10 leituras por partida. */
-const pescariaRank = { lista: null, meu: null, carregando: false, erro: null, recorde: false };
+/* ⚠️ O CACHE DO RANKING PASSOU A TER IDADE (21/09/2026, reportado: *"os rankings que existem nos
+   jogos das ilhas laranja não estão sendo atualizados em tempo real, tá precisando fechar o jogo
+   e abrir de novo pra atualizar"*).
+   ⚠️ ELE VALIA PRA SEMPRE DENTRO DA SESSÃO: a guarda era `if(lista) return`, e a única coisa que
+   a invalidava era EU bater MEU recorde. Um recorde de outro jogador -- ou eu perder uma posição
+   sem bater o meu -- só chegava depois de recarregar a página, porque é ela que zera o módulo.
+   Reproduzido nos TRÊS antes do conserto: 1 pedido ao servidor, e a tela seguia no dado velho
+   depois de sair e voltar.
+   ⚠️ E A IDADE MORA NUMA FUNÇÃO SÓ, lida pelos três: três prazos escritos à mão divergiriam no
+   primeiro ajuste, e aí um dos rankings atualizaria num ritmo que os outros não.
+   ⚠️ O PRAZO É UM MEIO-TERMO MEDIDO: o `render()` não roda sozinho, então prazo curto demais
+   gasta uma chamada por toque na tela e longo demais não parece tempo real. Em 30s, abrir o modo
+   relê (o `abrirX` força), tocar várias vezes seguidas não, e uma partida sempre relê -- o duelo
+   da pescaria sozinho dura 90s. */
+const RANK_VALIDADE_MS = 30000;
+function rankVencido(r){ return !r || !r.lidoEm || (Date.now() - r.lidoEm) > RANK_VALIDADE_MS; }
+/* zera a IDADE, não a lista: a tela continua mostrando o que tem enquanto o novo não chega --
+   apagar a lista faria a caixa piscar vazia a cada abertura. */
+function rankInvalidar(r){ if(r) r.lidoEm = 0; }
+const pescariaRank = { lista: null, meu: null, carregando: false, erro: null, recorde: false, lidoEm: 0 };
 /* ⚠️ BEST-EFFORT dos dois lados: um ranking que não carrega é uma caixa a menos na tela, e um
    envio que falha é um recorde perdido -- nenhum dos dois pode derrubar o duelo. */
 async function pescariaCarregarRank(forcar){
   if(pescariaRank.carregando) return;
-  if(pescariaRank.lista && !forcar) return;
+  if(pescariaRank.lista && !forcar && !rankVencido(pescariaRank)) return;
   pescariaRank.carregando = true; pescariaRank.erro = null;
   try{
     const r = await functionsClient.httpsCallable('getFishingRanking')({});
     pescariaRank.lista = (r.data && r.data.lista) || [];
     pescariaRank.meu = (r.data && r.data.meu) || null;
+    pescariaRank.lidoEm = Date.now();
   } catch(e){
     console.error(`Erro ao ler o ranking da pescaria:`, e);
     pescariaRank.erro = `Não deu pra carregar o ranking agora.`;
@@ -33266,8 +33353,9 @@ async function pescariaEnviarRank(){
     const r = await functionsClient.httpsCallable('submitFishingScore')({
       pontos: eu.pontos, venceu, capturas: eu.fisgadas });
     pescariaRank.recorde = !!(r.data && r.data.gravado);
-    /* o ranking mudou: a próxima abertura relê */
-    if(pescariaRank.recorde) pescariaRank.lista = null;
+    /* ⚠️ INVALIDA SEMPRE, e não só no recorde: mesmo sem eu melhorar, outro jogador pode ter
+       entrado no top 10 ou me ultrapassado enquanto eu jogava. */
+    rankInvalidar(pescariaRank);
   } catch(e){ console.error(`Erro ao enviar a pontuação:`, e); }
   if(game.screen === 'pescaria') render();
 }
@@ -33305,6 +33393,7 @@ function pescariaZerar(){
 /* A porta é livre desde 21/09/2026 -- ver o botão da home. A régua que fica é a de JOGO: o
    parceiro sai de um time com as 8 insígnias. */
 function abrirPescaria(){
+  rankInvalidar(pescariaRank);   /* entrar no modo relê: é o caso do relato */
   pescariaZerar();
   game.modoBloqueado = null;
   game.screen = 'pescaria';
@@ -34634,6 +34723,7 @@ function renderSelecao(){
          A partida inteira roda numa faixa só, e as formas acompanham — nada de Charizard no 24.</p>
     </div>
     <button class="btn primary" onclick="selecaoComecar()">Sortear os ${SELECAO_POOL}</button>
+    ${(selecaoCarregarRank(), selecaoRankHtml())}
     <button class="btn" onclick="sairDaSelecao()">⬅ Voltar</button>`;
   }
 
@@ -34715,26 +34805,28 @@ function renderSelecao(){
    fica acima de 90 em 100 (90%)**. A tabela mostra as partidas justamente por isso -- quem lê vê o
    denominador. Se um dia incomodar, a régua é um mínimo de partidas pra entrar na lista.
    =========================================================================== */
-const selecaoRank = { lista: null, meu: null, carregando: false, erro: '' };
+const selecaoRank = { lista: null, meu: null, carregando: false, erro: '', lidoEm: 0 };
 const selecaoPct = (v, p) => p > 0 ? (v / p * 100) : 0;
 function selecaoCarregarRank(){
-  if(selecaoRank.carregando || selecaoRank.lista) return;
+  if(selecaoRank.carregando) return;
+  if(selecaoRank.lista && !rankVencido(selecaoRank)) return;
   selecaoRank.carregando = true; selecaoRank.erro = '';
   functionsClient.httpsCallable('getSelecaoRanking')({}).then(r => {
     selecaoRank.carregando = false;
     selecaoRank.lista = (r && r.data && r.data.top) || [];
     selecaoRank.meu = (r && r.data && r.data.meu) || null;
-    if(game.screen === 'selecaoResultado') render();
+    selecaoRank.lidoEm = Date.now();
+    if(game.screen === 'selecaoResultado' || game.screen === 'selecao') render();
   }).catch(() => {
     selecaoRank.carregando = false;
     selecaoRank.erro = 'Não deu pra carregar o ranking.';
-    if(game.screen === 'selecaoResultado') render();
+    if(game.screen === 'selecaoResultado' || game.screen === 'selecao') render();
   });
 }
 /* ⚠️ BEST-EFFORT dos dois lados: um ranking que não carrega é uma caixa a menos na tela, e um
    envio que falha é uma partida perdida -- nenhum dos dois pode derrubar o resultado da batalha. */
 function selecaoEnviarResultado(venceu){
-  selecaoRank.lista = null; selecaoRank.meu = null;   /* a lista mudou: relê */
+  rankInvalidar(selecaoRank);   /* a lista mudou: relê -- pela IDADE, pra a caixa não piscar vazia */
   functionsClient.httpsCallable('sendSelecaoResult')({ venceu: !!venceu })
     .then(() => selecaoCarregarRank())
     .catch(() => selecaoCarregarRank());
@@ -34753,7 +34845,8 @@ function selecaoLinhaRankHtml(e, pos, ehMeu){
 function selecaoRankHtml(){
   if(selecaoRank.erro){
     return '<div class="box"><h2>Top 10 contra Luana</h2><p class="error-text">'
-      + escapeHtmlSafe(selecaoRank.erro) + '</p></div>';
+      + escapeHtmlSafe(selecaoRank.erro) + '</p>'
+      + '<button class="btn secondary" onclick="selecaoCarregarRank()">Tentar de novo</button></div>';
   }
   if(!selecaoRank.lista){
     return '<div class="box"><h2>Top 10 contra Luana</h2><p class="hint-text">Carregando…</p></div>';
@@ -34794,6 +34887,7 @@ function renderSelecaoResultado(){
 /* A porta é livre desde 21/09/2026 -- ver o botão da home. E aqui NÃO há régua de jogo nenhuma:
    o bolo é sorteado na hora, então esta ilha nunca pediu time nem insígnia. */
 function abrirSelecao(){
+  rankInvalidar(selecaoRank);   /* entrar no modo relê: é o caso do relato */
   game.modoBloqueado = null;
   selecaoZerar();
   game.screen = 'selecao';
@@ -35656,6 +35750,7 @@ function resgateDizer(txt){ resgate.recado = txt; resgate.recadoAte = resgate.te
 /* A porta é livre desde 21/09/2026 -- ver o botão da home. A régua que fica é a de JOGO: o
    parceiro sai de um time com as 8 insígnias e precisa saber Surf. */
 function abrirResgate(){
+  rankInvalidar(resgateRank);   /* entrar no modo relê: é o caso do relato de 21/09 */
   resgateZerar();
   game.modoBloqueado = null;
   game.screen = 'resgate';
@@ -36034,6 +36129,83 @@ function resgateRetornoAutomatico(){
   resgateDizer('Tempo esgotado! Retorno automático com os passageiros a bordo.');
   render();
 }
+/* =====================================================================
+   O RANKING DO RESGATE (21/09/2026, a pedido: *"na página principal do resgate, adicione também um
+   ranking com as maiores pontuações"*)
+   =====================================================================
+   ⚠️ COM ELE O RESGATE GANHOU A PRIMEIRA OPERAÇÃO DE SERVIDOR DELE. Até aqui o modo era offline
+   inteiro -- nenhuma callable, nada no Firestore, nada no save --, e o CLAUDE.md registrava isso
+   como decisão em aberto (*"quando houver, é aí que nasce a terceira checagem de permissão"*).
+   É esse dia.
+
+   ⚠️ E ELE É O MOLDE DA PESCARIA, linha por linha: as duas métricas são a MESMA coisa (pontos, e
+   melhor é MAIOR), então um desenho próprio divergiria dela no primeiro ajuste. O que muda é o
+   segundo número -- lá são capturas, aqui são RESGATES.
+   ===================================================================== */
+/* ⚠️ VIVE FORA DO `resgate`, e de propósito: o `resgateZerar` limpa a prova, e o ranking não é da
+   prova -- relê-lo a cada "resgatar de novo" custaria 11 leituras por partida. */
+const resgateRank = { lista: null, meu: null, carregando: false, erro: null, recorde: false, lidoEm: 0 };
+/* ⚠️ BEST-EFFORT dos dois lados: um ranking que não carrega é uma caixa a menos na tela, e um envio
+   que falha é um recorde perdido -- nenhum dos dois pode derrubar a prova. */
+async function resgateCarregarRank(forcar){
+  if(resgateRank.carregando) return;
+  if(resgateRank.lista && !forcar && !rankVencido(resgateRank)) return;
+  resgateRank.carregando = true; resgateRank.erro = null;
+  try{
+    const r = await functionsClient.httpsCallable('getRescueRanking')({});
+    resgateRank.lista = (r.data && r.data.lista) || [];
+    resgateRank.meu = (r.data && r.data.meu) || null;
+    resgateRank.lidoEm = Date.now();
+  } catch(e){
+    console.error('Erro ao ler o ranking do resgate:', e);
+    resgateRank.erro = 'Não deu pra carregar o ranking agora.';
+  }
+  resgateRank.carregando = false;
+  if(game.screen === 'resgate') render();
+}
+/* ⚠️ O QUE VAI É O QUE O MOTOR CONTOU -- o `pontos` do ator, nunca um número montado na tela. E o
+   servidor ignora se não for recorde. */
+async function resgateEnviarRank(){
+  const eu = resgate.atores[0], rival = resgate.atores[1];
+  if(!eu || !game.authUser) return;
+  try{
+    const r = await functionsClient.httpsCallable('submitRescueScore')({
+      pontos: eu.pontos, venceu: !!(rival && eu.pontos > rival.pontos),
+      resgatados: eu.entregas.length });
+    resgateRank.recorde = !!(r.data && r.data.gravado);
+    /* ⚠️ INVALIDA SEMPRE, e não só no recorde: mesmo sem eu melhorar, outro jogador pode ter
+       entrado no top 10 ou me ultrapassado enquanto eu jogava. */
+    rankInvalidar(resgateRank);
+  } catch(e){ console.error('Erro ao enviar a pontuação do resgate:', e); }
+  if(game.screen === 'resgate') render();
+}
+function resgateRankHtml(){
+  if(resgateRank.erro){
+    return `<div class="box"><h2>${selo('trofeu')} Melhores resgates</h2>`
+      + `<p class="hint-text">${escapeHtmlSafe(resgateRank.erro)}</p>`
+      + `<button class="btn secondary" onclick="resgateCarregarRank(true)">Tentar de novo</button></div>`;
+  }
+  if(!resgateRank.lista){
+    return `<div class="box"><h2>${selo('trofeu')} Melhores resgates</h2>`
+      + `<p class="hint-text">Carregando…</p></div>`;
+  }
+  if(!resgateRank.lista.length){
+    return `<div class="box"><h2>${selo('trofeu')} Melhores resgates</h2>`
+      + `<p class="hint-text">Ninguém pontuou ainda. O primeiro recorde pode ser o seu.</p></div>`;
+  }
+  /* ⚠️ A LINHA É A `pesc-rank-linha` DOS OUTROS TRÊS RANKINGS, com as medalhas do pódio da Corrida:
+     reusá-la é o que faz os quatro se lerem igual em vez de o jogador reaprender a ler. */
+  const linha = (x) => `<div class="pesc-rank-linha${x.eu ? ' eu' : ''}">`
+    + `<span class="pesc-rank-pos">${x.pos ? (MEDALHA_DO_POSTO[x.pos - 1] ? selo(MEDALHA_DO_POSTO[x.pos - 1]) : x.pos + 'º') : '—'}</span>`
+    + `<span class="pesc-rank-nome">${escapeHtmlSafe(x.nome)}</span>`
+    + `<span class="pesc-rank-pts">${x.pontos}</span></div>`;
+  return `<div class="box">`
+    + `<h2>${selo('trofeu')} Melhores resgates</h2>`
+    + (resgateRank.recorde ? `<p class="pesc-rank-novo">Recorde novo!</p>` : ``)
+    + `<div class="pesc-rank">${resgateRank.lista.map(linha).join('')}`
+    + (resgateRank.meu ? `<div class="pesc-rank-sep">você</div>` + linha(resgateRank.meu) : ``)
+    + `</div></div>`;
+}
 function resgateTerminar(){
   if(resgate.laco){ cancelAnimationFrame(resgate.laco); resgate.laco = null; }
   resgate.fase = 'fim';
@@ -36042,6 +36214,9 @@ function resgateTerminar(){
      `pescariaTerminar`, e sem ela um desembarque feito aos 89s valeria zero. */
   resgate.atores.forEach((a, i) => { resgateSoltar(i); a.alvo = null; resgateEntregar(i); });
   render();
+  /* ⚠️ DEPOIS DO `render()`: o envio é assíncrono e best-effort, e a tela do resultado não pode
+     esperar a rede pra aparecer. Ele redesenha sozinho quando a resposta chega. */
+  resgateEnviarRank();
 }
 
 /* ⚠️ A LARGADA ESPERA OS DOIS SPRITES, e se um falhar ela NÃO SUBSTITUI por outro: a tela diz
@@ -36580,10 +36755,13 @@ function renderResgate(){
         <button class="btn success" onclick="resgateComecar()">Resgatar de novo</button>
         <button class="btn secondary" onclick="resgateReiniciar()">Trocar parceiro</button>
       </div>
+      ${resgateRankHtml()}
       <button class="btn secondary" onclick="sairDoResgate()">⬅ Sair</button>`;
   }
 
   const jogando = resgate.fase === 'correndo' || resgate.fase === 'voltando';
+  /* o ranking e pedido fora da prova: durante o laco um `render()` da rede mataria a animacao */
+  if(!jogando) resgateCarregarRank(false);
   if(!jogando){
     return `${cabeca}
       <div class="box">
@@ -36609,6 +36787,7 @@ function renderResgate(){
         <button class="btn success" ${resgate.escolhido && resgate.fase !== 'carregando' ? '' : 'disabled'}
           onclick="resgateComecar()">${resgate.fase === 'carregando' ? 'Carregando os sprites…' : 'Começar resgate'}</button>
       </div>
+      ${resgateRankHtml()}
       <button class="btn secondary" onclick="sairDoResgate()">⬅ Sair</button>
       ${renderResgateIlhotaModal()}`;
   }

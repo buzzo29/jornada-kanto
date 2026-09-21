@@ -194,5 +194,11 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow write: if false;
     }
+    // Ranking do Resgate: a maior pontuacao. Mesma regra dos outros tres -- e com ele o Resgate
+    // ganhou a PRIMEIRA operacao de servidor dele: ate 21/09/2026 o modo era offline inteiro.
+    match /rescueRanking/{playerId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
   }
 }

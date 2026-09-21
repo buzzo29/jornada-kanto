@@ -1645,10 +1645,11 @@ console.log('\n=== O TRECHO DE 150 m E OS RÓTULOS ===');
      mentindo. A trava procura o NÚMERO calculado, não um texto fixo -- se ela procurasse "900 m"
      ela envelheceria junto com o rótulo. */
   const tela = S.renderCorrida();
+  const seg = tela.slice(tela.indexOf('corrida-seg'), tela.indexOf('</div>', tela.indexOf('corrida-seg')) + 6);
   ok('o botão da individual diz o total dela',
-     tela.indexOf('Individual · ' + S.corridaTotalDo('single') + '&nbsp;m') >= 0);
+     seg.indexOf('<b>Individual</b><small>' + S.corridaTotalDo('single') + '&nbsp;m</small>') >= 0, seg.slice(0, 120));
   ok('  e o do revezamento, o dele',
-     tela.indexOf('Revezamento · ' + S.corridaTotalDo('relay') + '&nbsp;m') >= 0);
+     seg.indexOf('<b>Revezamento</b><small>' + S.corridaTotalDo('relay') + '&nbsp;m</small>') >= 0);
   ok('  e nenhum dos dois está escrito à mão no arquivo',
      src.indexOf('Revezamento \u00b7 900 m') < 0 && src.indexOf('Individual \u00b7 300 m') < 0,
      'texto fixo que descreve constante envelhece');
@@ -1729,9 +1730,16 @@ console.log('\n=== OS DOIS RANKINGS (cliente) ===');
   S.corridaRank.carregando = false;
   S.corridaRank.single = { lista: [{ pos: 1, nome: 'Ana', tempo: 18.5, especie: 'Jolteon', eu: false }], meu: null };
   S.corridaRank.relay  = { lista: [{ pos: 1, nome: 'Beto', tempo: 99.5, especie: 'Time B', eu: true }], meu: null };
+  S.corridaRank.lidoEm = Date.now();
   enviados.length = 0;
   S.corridaCarregarRank(false);
-  ok('  e a segunda vez não vai à rede', !enviados.length);
+  ok('  e a segunda vez não vai à rede (a lista está fresca)', !enviados.length);
+  /* ⚠️ E VENCIDA ELA VAI: é o conserto de 21/09 -- antes o cache valia pra sempre dentro da
+     sessão, e um recorde de outro jogador só chegava depois de recarregar a página. */
+  S.corridaRank.lidoEm = Date.now() - S.RANK_VALIDADE_MS - 1000;
+  S.corridaCarregarRank(false);
+  ok('    mas vencida ela vai', enviados.length === 1, enviados.length + ' chamada(s)');
+  S.corridaRank.lidoEm = Date.now();
 
   S.corrida.fase = 'setup'; S.corrida.corredores = [];
   S.corrida.formato = 'single';
@@ -2303,6 +2311,128 @@ console.log('\n=== A SELEÇÃO NÃO VAZA ENTRE AS MODALIDADES ===');
   S.corridaZerar();
   ok('sair do modo zera as duas seleções',
      S.corrida.escolhaPorFormato.single.length === 0 && S.corrida.escolhaPorFormato.relay.length === 0);
+}
+
+
+/* ============================================================================
+   O ANÚNCIO DO VENCEDOR (21/09/2026, a pedido: *"quando os 4 corredores cruzarem a linha final,
+   exibir um modal com o pokémon/equipe vencedora"*)
+
+   ⚠️ "QUANDO OS 4 CRUZAREM" JÁ ERA A CONDIÇÃO -- quem chama o `corridaTerminar` é o
+   `corridaFisica`, com `corredores.every(c => c.chegada !== null)`. O que faltava era o modal.
+   ⚠️ E A FASE É PRÓPRIA (`anuncio`), como na Arena: com um sinalizador sobre a `fim` a
+   classificação ficaria DESENHADA atrás do modal, que é o contrário do pedido.
+   ============================================================================ */
+console.log('');
+console.log('=== O ANÚNCIO DO VENCEDOR ===');
+{
+  const g2 = S.__getGame();
+  function montar(formato, vencedor){
+    S.corridaZerar();
+    S.corrida.formato = formato;
+    const t = ['blastoise', 'lapras', 'jolteon', 'gyarados', 'starmie', 'slowbro']
+      .map((id, k) => S.createInstance(id, 60 + k));
+    S.corrida.corredores = [0, 1, 2, 3].map(i => ({
+      time: formato === 'relay' ? t : [t[i]],
+      trecho: 0, dist: S.corridaTotalDo(formato),
+      chegada: 20 + i * 1.5 - (i === vencedor ? 10 : 0),
+      speed: 120, trocas: [],
+    }));
+    S.corrida.fase = 'anuncio';
+    g2.screen = 'corrida';
+  }
+
+  /* 1) INDIVIDUAL: o modal nomeia o POKÉMON, que é quem correu */
+  montar('single', 0);
+  let h = S.renderCorrida();
+  ok('o modal aparece na fase `anuncio`', h.indexOf('modal-overlay') >= 0 && h.indexOf('corridaFecharAnuncio') >= 0);
+  ok('  e ele nomeia o POKÉMON no individual', h.indexOf('Vitória Blastoise!') >= 0,
+     (h.match(/Vitória [^!<]*/) || ['?'])[0]);
+  ok('  e a PISTA continua desenhada atrás dele', h.indexOf('corridaCanvas') >= 0);
+  ok('  e o SETUP não volta', h.indexOf('corrida-seg') < 0,
+     'a tela de escolha apareceu atrás do modal');
+
+  /* 2) REVEZAMENTO: quem ganha é a EQUIPE, então o título é do treinador -- nomear um dos seis
+     seria escolher um por acaso, que é o defeito que a classificação já teve em 20/09 */
+  montar('relay', 2);
+  h = S.renderCorrida();
+  const quem = (h.match(/Vitória ([^!<]*)!/) || [, '?'])[1];
+  ok('  e nomeia o TREINADOR no revezamento', quem === S.corridaTreinadorDe(2), quem);
+  ok('    com a fileira dos seis', h.indexOf('corrida-anuncio-time') >= 0);
+  ok('    e não com um sprite só', (h.match(/sprite-lg/g) || []).length === 0);
+
+  /* 3) o Ok fecha e a classificação aparece */
+  S.corridaFecharAnuncio();
+  ok('o Ok leva pra classificação', S.corrida.fase === 'fim', S.corrida.fase);
+  const fim = S.renderCorrida();
+  ok('  e ali o modal já não está', fim.indexOf('corridaFecharAnuncio') < 0);
+  ok('  e a classificação está', fim.indexOf('resultRow') >= 0);
+
+  /* ⚠️ E FECHAR DE NOVO NÃO FAZ NADA: a guarda é a fase, como na Arena */
+  S.corrida.fase = 'setup';
+  S.corridaFecharAnuncio();
+  ok('  e fechar fora da fase não mexe em nada', S.corrida.fase === 'setup', S.corrida.fase);
+
+  /* ⚠️ O `corridaTerminar` VAI PRO ANÚNCIO E REPINTA -- lido do código. O `render()` recria o
+     <canvas> em branco e o laço que o pintava acabou de parar; sem a pintura, a pista do anúncio
+     sairia vazia E o placar mostraria "0 / 300 m", que é o defeito que o CLAUDE.md já registra
+     na tela de fim. O `corridaPintar()` chama o `corridaPintarHud()` no fim dele, então uma
+     chamada cobre os dois. */
+  const i = src.indexOf('function corridaTerminar(){');
+  const j = src.indexOf('function corridaFecharAnuncio', i);
+  const corpo = (i >= 0 && j > i) ? src.slice(i, j) : '';
+  ok('(e a trava lê o corpo do terminar)', corpo.length > 80, corpo.length + ' chars');
+  ok('o terminar vai pra fase `anuncio`', /corrida\.fase = 'anuncio'/.test(corpo));
+  ok('  e repinta a pista depois do render()',
+     corpo.indexOf('render()') >= 0 && corpo.indexOf('corridaPintar()') > corpo.indexOf('render()'));
+  ok('  e o `corridaPintar` termina no HUD (o placar sai dele)',
+     /corridaPintarHud\(\);\s*\}/.test(src.slice(src.indexOf('function corridaPintar('),
+                                                 src.indexOf('function corridaPintarHud('))));
+}
+
+/* ============================================================================
+   OS BOTÕES DE MODALIDADE (21/09/2026, a pedido: *"deixe mais evidente os botões de modalidade
+   individual e revezamento na corrida, acho que eles estão pequenos, coloque símbolos nos dois
+   também"*)
+   ============================================================================ */
+console.log('');
+console.log('=== OS DOIS BOTÕES DE MODALIDADE ===');
+{
+  const g2 = S.__getGame();
+  S.corridaZerar();
+  g2.screen = 'corrida';
+  const h = S.renderCorrida();
+  const seg = h.slice(h.indexOf('corrida-seg'), h.indexOf('</div>', h.indexOf('corrida-seg')) + 6);
+
+  ok('os dois têm selo', (seg.match(/<svg class="selo/g) || []).length === 2,
+     (seg.match(/<svg class="selo/g) || []).length + ' selos');
+  ok('  e são selos DESENHADOS, não emoji', !/[\u{1F300}-\u{1FAFF}]/u.test(seg), 'sobrou emoji');
+  ok('  a bandeira no individual (a linha de chegada)', /#s-bandeira/.test(seg));
+  ok('  e o `amigos` no revezamento (a equipe)', /#s-amigos/.test(seg));
+  ok('  cada um com o nome e a metragem em linhas próprias',
+     (seg.match(/<b>/g) || []).length === 2 && (seg.match(/<small>/g) || []).length === 2);
+
+  /* ⚠️ A METRAGEM CONTINUA DERIVADA, nunca escrita à mão: ela já envelheceu uma vez (o botão
+     dizia "900 m" quando a prova virou 1.800). */
+  ok('  e a metragem sai do `corridaTotalDo`',
+     seg.indexOf(String(S.corridaTotalDo('single'))) >= 0 && seg.indexOf(String(S.corridaTotalDo('relay'))) >= 0,
+     'single ' + S.corridaTotalDo('single') + ' / relay ' + S.corridaTotalDo('relay'));
+
+  /* o ativo acompanha a modalidade escolhida */
+  S.corrida.formato = 'relay';
+  const h2 = S.renderCorrida();
+  const seg2 = h2.slice(h2.indexOf('corrida-seg'), h2.indexOf('</div>', h2.indexOf('corrida-seg')) + 6);
+  const ativas = [...seg2.matchAll(/<button class="(ativa)?"/g)].map(m => !!m[1]);
+  ok('  e só UM fica ativo por vez', ativas.filter(Boolean).length === 1, JSON.stringify(ativas));
+  ok('    e é o escolhido', ativas[1] === true, JSON.stringify(ativas));
+
+  /* ⚠️ O CSS: empilhado (a 320px o rótulo não cabe ao lado do selo) e o ativo com MOLDURA -- o
+     fundo amarelo sozinho lê como "os dois são iguais, um está mais claro". Lido da folha, porque
+     nem peso de fonte nem direção de flex aparecem em asserção de HTML. */
+  const css = src.slice(src.indexOf('.corrida-seg button{'), src.indexOf('.corrida-pista{'));
+  ok('(e a trava lê o CSS)', css.length > 80, css.length + ' chars');
+  ok('  o botão empilha', /flex-direction:column/.test(css));
+  ok('  e o ativo ganha moldura', /\.corrida-seg button\.ativa\{[^}]*border-color:/.test(css));
 }
 
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');

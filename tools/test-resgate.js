@@ -1064,5 +1064,113 @@ console.log('\n=== O PONTO É TRANSPARENTE E A BARRA FICA ACIMA ===');
   ok('  e o pintor escreve o percentual',
      /const num = el\.querySelector\('\.resg-medidor b'\);/.test(src));
 }
+
+/* ============================================================================
+   O RANKING DO RESGATE, do lado do CLIENTE (21/09/2026, a pedido: *"na página principal do
+   resgate, adicione também um ranking com as maiores pontuações"*)
+
+   ⚠️ ELE ERA O ÚNICO DOS CINCO JOGOS SEM RANKING, e com ele o Resgate ganhou a PRIMEIRA operação
+   de servidor dele.
+   ============================================================================ */
+console.log('');
+console.log('=== O RANKING DO RESGATE ===');
+{
+  const g2 = S.__getGame();
+  const RANK = { lista: [
+    { pos: 1, nome: 'Ana', pontos: 820, eu: false },
+    { pos: 2, nome: 'Bruno', pontos: 640, eu: false },
+  ], meu: { nome: 'Matheus', pontos: 210, eu: true } };
+
+  /* a caixa nas DUAS telas: a principal (onde o pedido a quer) e a de fim (onde o recorde
+     acabou de acontecer -- mandar o jogador voltar ao setup pra ver a própria marca seria
+     esconder o prêmio da jogada) */
+  S.resgateRank.lista = RANK.lista; S.resgateRank.meu = RANK.meu;
+  S.resgateRank.lidoEm = Date.now(); S.resgateRank.erro = null; S.resgateRank.recorde = false;
+  S.resgateZerar();
+  g2.screen = 'resgate';
+  const setup = S.renderResgate();
+  ok('a caixa aparece na tela principal', setup.indexOf('Melhores resgates') >= 0);
+  ok('  com as linhas do top', (setup.match(/pesc-rank-linha/g) || []).length === 3,
+     (setup.match(/pesc-rank-linha/g) || []).length + ' linhas');
+  ok('  e o MEU separado', setup.indexOf('pesc-rank-sep') >= 0);
+
+  S.resgate.fase = 'fim';
+  S.resgate.atores = [
+    { inst: S.createInstance('blastoise', 70), pontos: 210, entregas: [1, 2, 3], bag: [] },
+    { inst: S.createInstance('lapras', 60), pontos: 180, entregas: [1, 2], bag: [] },
+  ];
+  S.resgateRank.recorde = true;
+  const fim = S.renderResgate();
+  ok('  e na tela de fim também', fim.indexOf('Melhores resgates') >= 0);
+  ok('    com o "Recorde novo!" quando ele acabou de acontecer', fim.indexOf('Recorde novo!') >= 0);
+  S.resgateRank.recorde = false;
+
+  /* os três estados da caixa */
+  S.resgate.fase = 'setup';
+  S.resgateRank.lista = null; S.resgateRank.erro = null;
+  ok('  sem lista ela diz que está carregando', S.renderResgate().indexOf('Carregando') >= 0);
+  S.resgateRank.lista = [];
+  ok('  vazia ela convida', S.renderResgate().indexOf('Ninguém pontuou ainda') >= 0);
+  S.resgateRank.erro = 'deu ruim';
+  ok('  e com erro ela oferece tentar de novo',
+     S.renderResgate().indexOf('resgateCarregarRank(true)') >= 0);
+  S.resgateRank.erro = null; S.resgateRank.lista = RANK.lista; S.resgateRank.lidoEm = Date.now();
+
+  /* ⚠️ O ENVIO MANDA O QUE O MOTOR CONTOU, nunca um número montado na tela -- e o `venceu` sai da
+     comparação dos dois lados, não de um campo separado que poderia discordar do placar. */
+  const mandadas = [];
+  const fcOriginal = S.functionsClient;
+  S.functionsClient = { httpsCallable(nome){
+    return (dados) => { mandadas.push({ nome, dados }); return Promise.resolve({ data: { gravado: true } }); };
+  } };
+  g2.authUser = { uid: 'u1' };
+  S.resgate.atores = [
+    { inst: S.createInstance('blastoise', 70), pontos: 333, entregas: [1, 2, 3, 4], bag: [] },
+    { inst: S.createInstance('lapras', 60), pontos: 180, entregas: [1], bag: [] },
+  ];
+  S.resgateEnviarRank();
+  ok('o envio vai pro submitRescueScore',
+     mandadas.length === 1 && mandadas[0].nome === 'submitRescueScore', JSON.stringify(mandadas));
+  ok('  com os pontos do MOTOR', mandadas[0] && mandadas[0].dados.pontos === 333,
+     JSON.stringify(mandadas[0] && mandadas[0].dados));
+  ok('  e os resgates contados das entregas', mandadas[0] && mandadas[0].dados.resgatados === 4);
+  ok('  e o `venceu` saindo da comparação', mandadas[0] && mandadas[0].dados.venceu === true);
+
+  /* ⚠️ SEM LOGIN ELE NEM TENTA: a callable recusaria, e uma ida ao servidor que nunca pode dar
+     certo é desperdício. É a mesma regra do monitor das ilhas. */
+  mandadas.length = 0;
+  g2.authUser = null;
+  S.resgateEnviarRank();
+  ok('  e sem login ele nem tenta', mandadas.length === 0, JSON.stringify(mandadas));
+
+  /* ⚠️ E ELE É BEST-EFFORT: um erro do servidor não pode derrubar a prova. */
+  g2.authUser = { uid: 'u1' };
+  S.functionsClient = { httpsCallable(){ return () => Promise.reject(new Error('caiu')); } };
+  let explodiu = false;
+  try { S.resgateEnviarRank(); } catch(e){ explodiu = true; }
+  ok('  e um erro do servidor não derruba a prova', !explodiu);
+  S.functionsClient = fcOriginal;
+
+  /* ⚠️ E O `resgateTerminar` CHAMA O ENVIO -- lido do código, porque o caso de comportamento
+     chama a função na mão e passaria com a chamada órfã. A ORDEM importa: o envio vem DEPOIS do
+     `render()`, senão a tela do resultado esperaria a rede pra aparecer. */
+  const i = src.indexOf('function resgateTerminar(){');
+  const j = src.indexOf('async function resgateComecar', i);
+  const corpo = (i >= 0 && j > i) ? src.slice(i, j) : '';
+  ok('(e a trava lê o corpo do terminar)', corpo.length > 80, corpo.length + ' chars');
+  ok('o `resgateTerminar` envia a pontuação', /resgateEnviarRank\(\)/.test(corpo));
+  ok('  e o envio vem DEPOIS do render()',
+     corpo.indexOf('render()') >= 0 && corpo.indexOf('render()') < corpo.indexOf('resgateEnviarRank()'));
+
+  /* ⚠️ E O RANKING NÃO É PEDIDO DURANTE A PROVA: ali o laço está pintando, e uma resposta de rede
+     chamaria `render()` no meio da animação -- a regra da casa. */
+  const k = src.indexOf('function renderResgate(){');
+  const l = src.indexOf('resgateCarregarRank(false)', k);
+  const antes = (k >= 0 && l > k) ? src.slice(k, l) : '';
+  ok('  e o ranking só é pedido FORA da prova', /if\(!jogando\)\s*$/.test(antes.trim()) ||
+     /const jogando[\s\S]*if\(!jogando\)\s*$/.test(antes.trim()),
+     'ele é pedido dentro do laço: um render da rede mataria a animação');
+}
+
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
 process.exit(falhas ? 1 : 0);

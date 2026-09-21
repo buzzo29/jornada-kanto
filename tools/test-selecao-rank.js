@@ -176,6 +176,81 @@ console.log('\n=== A REGRA FECHA A COLEÇÃO ===');
   ok('  e de escrita NEGADA a todos', /allow write: if false;/.test(bloco));
 }
 
+
+/* ============================================================================
+   ⚠️ O INDICE COMPOSTO -- E O RANKING DA LUANA NUNCA CARREGOU SEM ELE (21/09/2026)
+
+   Reportado assim: *"adicione o ranking de aproveitamento contra a Luana tambem na tela principal,
+   e verifique se ele esta funcionando, porque acho que esta com problemas"*. E estava:
+
+     `getSelecaoRanking` pede `.orderBy('aproveitamento','desc').orderBy('partidas','desc')`
+
+   ⚠️ DOIS `orderBy` EM CAMPOS DIFERENTES EXIGEM INDICE COMPOSTO, e o projeto tinha **ZERO**
+   (`firebase firestore:indexes` devolvia `"indexes": []`, e nao existia `firestore.indexes.json`).
+   Em producao a consulta morria com `FAILED_PRECONDITION: The query requires an index` e o cliente
+   caia no catch mostrando "nao deu pra carregar o ranking" -- **em toda abertura, desde o dia em
+   que o ranking nasceu**.
+
+   ⚠️ E O TESTE PASSAVA, porque o `fake-firestore` nao exigia indice nenhum: ele era mais
+   permissivo que a producao pelo lado que mais engana. Hoje ele exige (le o proprio
+   `firestore.indexes.json` do repo), entao rodar esta suite sem o arquivo ja falha sozinho -- e
+   esta trava e a segunda metade: ela pega a query que NENHUM teste exercita.
+   ============================================================================ */
+console.log('\n=== TODA QUERY DE DOIS `orderBy` TEM INDICE DECLARADO ===');
+{
+  const fs2 = require('fs');
+  const srv = fs2.readFileSync(path.join(__dirname, '..', 'functions', 'index.js'), 'utf8');
+  const arquivo = path.join(__dirname, '..', 'firestore.indexes.json');
+
+  ok('o `firestore.indexes.json` existe', fs2.existsSync(arquivo));
+  const decl = JSON.parse(fs2.readFileSync(arquivo, 'utf8'));
+  const declarados = (decl.indexes || []).map(i => i.collectionGroup + ':' +
+    (i.fields || []).map(f => f.fieldPath + ':' + (f.order === 'DESCENDING' ? 'desc' : 'asc')).join(','));
+
+  /* ⚠️ E O `firebase.json` TEM QUE APONTAR O ARQUIVO: sem a linha ele e letra morta -- o deploy
+     nao publica indice que ele nao conhece, e o arquivo ficaria no repo sem nunca chegar ao ar. */
+  const fb = JSON.parse(fs2.readFileSync(path.join(__dirname, '..', 'firebase.json'), 'utf8'));
+  ok('  e o `firebase.json` o aponta', (fb.firestore || {}).indexes === 'firestore.indexes.json',
+     JSON.stringify(fb.firestore));
+  ok('  e o hosting NAO o publica', ((fb.hosting || {}).ignore || []).includes('firestore.indexes.json'),
+     'ele ficaria baixavel em jornadakanto.com, como o rules ja ficou');
+
+  /* ⚠️ A COLECAO NEM SEMPRE ESTA COLADA NA QUERY: ela costuma vir de um ajudante
+     (`selecaoRankCollRef()`), entao a varredura precisa dos DOIS caminhos. A primeira versao so
+     olhava o `collection('X')` inline e achou **ZERO** queries -- ou seja ela passaria em branco
+     sobre o defeito que ela existe pra pegar. Quem denunciou foi o `ok` de "a varredura achou o
+     que ler", que e a rede que este projeto poe em toda fatia de codigo. */
+  const ajudantes = {};
+  [...srv.matchAll(/function\s+(\w+)\s*\(\)\s*\{\s*return\s+db\.collection\('([A-Za-z]+)'\)/g)]
+    .forEach(m => { ajudantes[m[1]] = m[2]; });
+  const encadeadas = [...srv.matchAll(/\.orderBy\('([^']+)',\s*'(asc|desc)'\)\s*\.orderBy\('([^']+)',\s*'(asc|desc)'\)/g)];
+  ok('  (e a varredura achou o que ler)', encadeadas.length >= 1, encadeadas.length + ' query(s)');
+  encadeadas.forEach(m => {
+    const antes = srv.slice(Math.max(0, m.index - 400), m.index);
+    const inline = [...antes.matchAll(/db\.collection\('([A-Za-z]+)'\)/g)].pop();
+    const chamada = [...antes.matchAll(/(\w+)\(\)/g)].filter(x => ajudantes[x[1]]).pop();
+    const col = (chamada && ajudantes[chamada[1]]) || (inline && inline[1]) || '?';
+    const chave = col + ':' + m[1] + ':' + m[2] + ',' + m[3] + ':' + m[4];
+    ok('  ' + col + ' (' + m[1] + ', ' + m[3] + ') tem indice', declarados.includes(chave),
+       'pedido: ' + chave + ' | declarados: ' + declarados.join(' | '));
+  });
+
+  /* ⚠️ E O FAKE EXIGE JUNTO -- e o que faz o teste e a producao concordarem daqui pra frente.
+     ⚠️ ELA EXECUTA, nao LE: a primeira versao procurava `function exigeIndice(` no arquivo, e a
+     conferencia de acusacao pegou -- desligando so a CHAMADA (a funcao continua declarada) ela
+     passava em branco com o dublê permissivo de volta. */
+  await db.collection('semIndiceNenhum').doc('x').set({ a: 1, b: 2 });
+  let recusou = null;
+  try { await db.collection('semIndiceNenhum').orderBy('a', 'desc').orderBy('b', 'desc').get(); }
+  catch(e){ recusou = e; }
+  ok('  e o fake RECUSA dois orderBy sem indice', !!recusou && /requires an index/i.test(recusou.message),
+     recusou ? recusou.message.slice(0, 60) : 'o dublê voltou a ser mais permissivo que a producao');
+  /* e um orderBy so nunca precisa: o indice de campo unico o Firestore cria sozinho */
+  let umSo = null;
+  try { await db.collection('semIndiceNenhum').orderBy('a', 'desc').get(); } catch(e){ umSo = e; }
+  ok('    e um orderBy so passa', !umSo, umSo && umSo.message);
+}
+
 console.log(falhas ? '\n' + falhas + ' FALHA(S)' : '\nTudo certo.');
 process.exit(falhas ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(1); });

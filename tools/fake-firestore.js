@@ -8,12 +8,53 @@
  * feature moram -- amizade gravada de um lado só, pedido que sobrevive ao aceite, desafio que
  * fica pendurado depois de recusado -- e nenhum deles aparece num teste de tela.
  */
+const fs = require('fs');
+const path = require('path');
 const INCREMENT = Symbol('increment');
 const ARRAY_UNION = Symbol('arrayUnion');
 const DELETE = Symbol('delete');
 const store = new Map();   // 'caminho/do/doc' -> objeto
 let filaDeTransacoes = Promise.resolve();   // ver runTransaction
 
+/* ⚠️ O FIRESTORE EXIGE INDICE COMPOSTO PRA QUERY COM DOIS `orderBy`, e o fake precisava exigir
+   junto. Sem esta checagem ele era mais permissivo que a producao pelo lado que mais engana: o
+   `getSelecaoRanking` pedia `.orderBy('aproveitamento').orderBy('partidas')`, o teste passava, e
+   em producao a consulta morria com
+     `FAILED_PRECONDITION: The query requires an index`
+   -- ou seja o ranking da Luana NUNCA carregou, e o cliente caia no catch mostrando "nao deu pra
+   carregar". Foi o jogador que percebeu (21/09/2026), nao o teste.
+   ⚠️ E A FONTE E O `firestore.indexes.json` DO REPO, nunca uma lista escrita aqui: o arquivo e o
+   que o deploy publica, entao exigir dele e o que garante que o teste e a producao concordem.
+   ⚠️ O QUE ELA NAO COBRE, e fica dito: `where` num campo mais `orderBy` em OUTRO tambem exige
+   composto. Nenhuma query do projeto faz isso hoje (a unica where+orderBy usa o MESMO campo, o
+   `lastSeenAt` do painel), e implementar regra que nao roda e o tipo de codigo que fica anos no
+   arquivo sem ninguem saber que esta morto. */
+let indicesDeclarados = null;
+function indicesDoRepo(){
+  if(indicesDeclarados) return indicesDeclarados;
+  try{
+    const j = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'firestore.indexes.json'), 'utf8'));
+    indicesDeclarados = (j.indexes || []).map(i => ({
+      col: i.collectionGroup,
+      campos: (i.fields || []).map(f => f.fieldPath + ':' + (f.order === 'DESCENDING' ? -1 : 1)).join(','),
+    }));
+  } catch(e){ indicesDeclarados = []; }
+  return indicesDeclarados;
+}
+function exigeIndice(parts, ordem){
+  const criterios = (ordem || []).filter(([c]) => !(c && c.__documentId));
+  const campos = [...new Set(criterios.map(([c]) => c))];
+  if(campos.length < 2) return;                 /* um campo so: indice automatico */
+  const col = parts[parts.length - 1];
+  const pedido = criterios.map(([c, d]) => c + ':' + d).join(',');
+  const tem = indicesDoRepo().some(i => i.col === col && i.campos === pedido);
+  if(!tem){
+    const e = new Error('9 FAILED_PRECONDITION: The query requires an index. Declare em '
+      + 'firestore.indexes.json: ' + col + ' (' + criterios.map(([c, d]) => c + ' ' + (d < 0 ? 'DESC' : 'ASC')).join(', ') + ')');
+    e.code = 9;
+    throw e;
+  }
+}
 function pathOf(parts){ return parts.join('/'); }
 function clone(o){ return o === undefined ? undefined : JSON.parse(JSON.stringify(o)); }
 
@@ -181,6 +222,7 @@ function collRef(parts, filtros, limite, ordem, depoisDe, soIds){
                            data(){ return soIds ? {} : clone(dados); }, exists:true });
       }
       if(ordem && ordem.length){
+        exigeIndice(parts, ordem);   /* ⚠️ antes de ordenar: e o que a producao faz */
         const criterios = ordem;
         const [campo, dir] = criterios[0];   /* o cursor e o filtro de ausência usam o PRIMÁRIO */
         const valorDe = (c) => (d) => (c && c.__documentId) ? d.id : d.bruto[c];

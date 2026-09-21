@@ -5297,6 +5297,19 @@ exports._makeSeededRng = makeSeededRng;
    leituras a mais em `users/` toda vez que alguém abrisse a tela. O preço é o de lá -- quem troca
    de nome só aparece com o novo depois da próxima partida.
    ===================================================================== */
+/* ⚠️ UM TETO DE PONTOS, E ELE FECHA UM BURACO DE VERDADE (21/09/2026, achado por um caso de teste
+   que eu escrevi pro ranking novo do Resgate e que acusou o da Pescaria junto).
+   `Math.max(0, Math.floor(Number(x) || 0))` deixa **`Infinity` passar**: `Math.floor(Infinity)` é
+   `Infinity`, e `Infinity > 0` -- então um cliente forjado gravava um recorde que NENHUMA partida
+   supera e trancava o topo do ranking pra sempre. A Corrida já tratava (ela tem `isFinite` e um
+   teto desde 20/09); a Pescaria estava no ar sem isso.
+   O valor é folgado de propósito: um duelo rende 200 a 550 pontos, então 100.000 não recusa
+   nenhuma partida possível e recusa qualquer absurdo. */
+const RANK_PONTOS_MAX = 100000;
+function pontosDeRankingValidos(x){
+  const n = Number(x);
+  return Number.isFinite(n) && n > 0 && n <= RANK_PONTOS_MAX ? Math.floor(n) : 0;
+}
 const PESCARIA_RANK_TOPO = 10;
 function pescariaRankCollRef(){ return db.collection('fishingRanking'); }
 function pescariaRankDocRef(uid){ return pescariaRankCollRef().doc(uid); }
@@ -5305,9 +5318,9 @@ function pescariaRankDocRef(uid){ return pescariaRankCollRef().doc(uid); }
 exports.submitFishingScore = onCall(async (request) => {
   const uid = request.auth && request.auth.uid;
   if(!uid) throw new HttpsError('unauthenticated', 'Faça login.');
-  const pontos = Math.max(0, Math.floor(Number((request.data || {}).pontos) || 0));
+  const pontos = pontosDeRankingValidos((request.data || {}).pontos);
   const venceu = !!(request.data || {}).venceu;
-  const capturas = Math.max(0, Math.floor(Number((request.data || {}).capturas) || 0));
+  const capturas = Math.max(0, Math.min(9999, Math.floor(Number((request.data || {}).capturas) || 0)));
   /* ⚠️ ZERO NÃO ENTRA NO RANKING: um documento por jogador que nunca pontuou é linha morta na
      coleção e uma linha de "0 pontos" no top, que não diz nada. */
   if(pontos <= 0) return { gravado: false, motivo: "zero" };
@@ -5347,6 +5360,71 @@ exports.getFishingRanking = onCall(async (request) => {
   return { lista, meu };
 });
 exports._pescariaRank = { topo: PESCARIA_RANK_TOPO };
+/* =====================================================================
+   O RANKING DO RESGATE (21/09/2026, a pedido: *"na página principal do resgate, adicione também um
+   ranking com as maiores pontuações"*)
+   =====================================================================
+   ⚠️ ELE ERA O ÚNICO DOS CINCO JOGOS SEM RANKING, e o CLAUDE.md registrava isso como decisão em
+   aberto (*"não há ranking -- o pedido não pediu, e é por isso que o modo continua sem uma única
+   operação de backend"*). Com ele, o Resgate ganha a PRIMEIRA operação de servidor dele -- e, junto,
+   a terceira checagem de permissão que aquela nota previa.
+
+   ⚠️ É O MOLDE DA PESCARIA, linha por linha, e isso é a decisão: as duas métricas são a MESMA
+   coisa (pontos, e melhor é MAIOR), então um desenho próprio divergiria dela no primeiro ajuste.
+   O que muda é o segundo número -- lá são capturas, aqui são RESGATADOS.
+   ===================================================================== */
+const RESGATE_RANK_TOPO = 10;
+function resgateRankCollRef(){ return db.collection('rescueRanking'); }
+function resgateRankDocRef(uid){ return resgateRankCollRef().doc(uid); }
+/* ⚠️ SÓ SOBE, nunca desce, e em TRANSAÇÃO: o recorde é o MELHOR resultado, uma partida ruim depois
+   de uma boa não pode apagar a boa, e duas abas não podem gravar por cima uma da outra. */
+exports.submitRescueScore = onCall(async (request) => {
+  const uid = request.auth && request.auth.uid;
+  if(!uid) throw new HttpsError('unauthenticated', 'Faça login.');
+  const pontos = pontosDeRankingValidos((request.data || {}).pontos);
+  const venceu = !!(request.data || {}).venceu;
+  const resgatados = Math.max(0, Math.min(9999, Math.floor(Number((request.data || {}).resgatados) || 0)));
+  /* ⚠️ ZERO NÃO ENTRA: um documento de quem não resgatou ninguém é linha morta na coleção, e um
+     "0 pontos" no top não diz nada. É a mesma regra da Pescaria. */
+  if(pontos <= 0) return { gravado: false, motivo: 'zero' };
+  const conta = await db.collection('users').doc(uid).get();
+  const nome = (conta.exists && conta.data().trainerName) || 'Treinador';
+  let recorde = false;
+  await db.runTransaction(async (tx) => {
+    const ref = resgateRankDocRef(uid);
+    const snap = await tx.get(ref);
+    const antes = snap.exists ? (Number(snap.data().pontos) || 0) : -1;
+    if(pontos <= antes) return;
+    recorde = true;
+    tx.set(ref, { uid, nome, pontos, venceu, resgatados, quando: Date.now() });
+  });
+  return { gravado: recorde, pontos };
+});
+/* ⚠️ UM `orderBy` SÓ, num campo só: isso usa o índice de campo único que o Firestore cria sozinho,
+   e é de propósito. O ranking da Seleção pedia DOIS e por isso precisou de um índice composto
+   declarado no `firestore.indexes.json` -- sem ele a consulta morre com `FAILED_PRECONDITION` e o
+   ranking não carrega NUNCA, que é justamente o defeito que o jogador reportou em 21/09/2026. */
+exports.getRescueRanking = onCall(async (request) => {
+  const uid = request.auth && request.auth.uid;
+  if(!uid) throw new HttpsError('unauthenticated', 'Faça login.');
+  const snap = await resgateRankCollRef().orderBy('pontos', 'desc').limit(RESGATE_RANK_TOPO).get();
+  const lista = snap.docs.map((d, i) => {
+    const x = d.data() || {};
+    return { pos: i + 1, uid: d.id, nome: x.nome || 'Treinador', pontos: x.pontos || 0,
+             resgatados: x.resgatados || 0, venceu: !!x.venceu, eu: d.id === uid };
+  });
+  /* ⚠️ E O MEU VEM JUNTO mesmo fora do top: quem está em 14º abre a tela e não vê nada seu -- e o
+     próprio recorde é o que ele mais procura ali. */
+  let meu = null;
+  if(!lista.some(x => x.eu)){
+    const m = await resgateRankDocRef(uid).get();
+    if(m.exists) meu = { nome: (m.data().nome || 'Você'), pontos: m.data().pontos || 0,
+                         resgatados: m.data().resgatados || 0, eu: true };
+  }
+  return { lista, meu };
+});
+exports._resgateRank = { topo: RESGATE_RANK_TOPO };
+
 
 /* =====================================================================
    RANKING DA SELEÇÃO (21/09/2026, a pedido) -- o aproveitamento contra a Luana.

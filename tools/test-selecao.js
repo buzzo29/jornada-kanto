@@ -550,5 +550,69 @@ console.log('=== O TITULO DIZ QUANTOS FALTAM NESTA VEZ ===');
      antes + ' -> ' + tituloAgora());
 }
 
+
+/* ============================================================================
+   O RANKING NA TELA PRINCIPAL (21/09/2026, a pedido: *"adicione o ranking de aproveitamento
+   contra a Luana também na tela principal, e verifique se ele está funcionando, porque acho que
+   está com problemas"*)
+
+   ⚠️ E ESTAVA COM PROBLEMA, mas não era o desenho: o `getSelecaoRanking` pede DOIS `orderBy` e
+   isso exige índice composto -- que o projeto não tinha. A consulta morria com
+   `FAILED_PRECONDITION` em toda abertura, desde o dia em que o ranking nasceu. O conserto é o
+   `firestore.indexes.json`, e a trava dele está no `test-selecao-rank.js`.
+   ============================================================================ */
+console.log('');
+console.log('=== O RANKING NA TELA PRINCIPAL ===');
+{
+  const g2 = S.__getGame();
+  S.selecaoRank.lista = [
+    { pos: 1, nome: 'Ana', partidas: 8, vitorias: 8 },
+    { pos: 2, nome: 'Bruno', partidas: 20, vitorias: 18 },
+  ];
+  S.selecaoRank.meu = { nome: 'Matheus', partidas: 3, vitorias: 1 };
+  S.selecaoRank.lidoEm = Date.now();
+  S.selecaoRank.erro = '';
+
+  S.selecaoZerar();
+  g2.screen = 'selecao';
+  const principal = S.renderSelecao();
+  ok('a caixa aparece na tela principal', principal.indexOf('Top 10 contra') >= 0);
+  ok('  com as linhas do top', (principal.match(/pesc-rank-linha/g) || []).length >= 2,
+     (principal.match(/pesc-rank-linha/g) || []).length + ' linhas');
+
+  /* ⚠️ ELA CONTINUA NO RESULTADO: a tela principal é ONDE MAIS uma, não no lugar da outra --
+     depois da partida é ali que a posição nova aparece. */
+  g2.screen = 'selecaoResultado';
+  S.selecao.fase = 'fim';
+  S.selecao.venceu = true;
+  S.selecao.meu = ['pikachu', 'onix'].map(id => S.createInstance(id, 40));
+  S.selecao.dele = ['machop', 'geodude'].map(id => S.createInstance(id, 40));
+  S.selecao.log = [];
+  ok('  e continua no resultado', S.renderSelecaoResultado().indexOf('Top 10 contra') >= 0);
+
+  /* ⚠️ E O REDESENHO TEVE QUE APRENDER A SEGUNDA TELA. O carregamento é assíncrono e o
+     `selecaoCarregarRank` só chamava `render()` na tela do RESULTADO -- na principal a caixa
+     ficaria em "Carregando…" PRA SEMPRE, porque nada mais a redesenha. */
+  const i = src.indexOf('function selecaoCarregarRank(){');
+  const j = src.indexOf('function selecaoEnviarResultado', i);
+  const corpo = (i >= 0 && j > i) ? src.slice(i, j) : '';
+  ok('(e a trava lê o corpo do carregador)', corpo.length > 80, corpo.length + ' chars');
+  const redesenhos = [...corpo.matchAll(/if\(game\.screen === '([^']+)'( \|\| game\.screen === '([^']+)')? \) render\(\);|if\(game\.screen === '([^']+)'( \|\| game\.screen === '([^']+)')?\) render\(\);/g)];
+  ok('  as DUAS telas redesenham', (corpo.match(/game\.screen === 'selecao'/g) || []).length === 2,
+     'a principal ficaria em "Carregando…" pra sempre');
+  ok('    nos DOIS caminhos (o que deu certo e o que falhou)',
+     (corpo.match(/game\.screen === 'selecaoResultado'/g) || []).length === 2,
+     'um erro de rede deixaria a tela sem a mensagem');
+
+  /* os três estados da caixa continuam valendo na tela principal */
+  g2.screen = 'selecao';
+  S.selecaoZerar();
+  S.selecaoRank.lista = null; S.selecaoRank.erro = '';
+  ok('  sem lista ela diz que está carregando', S.renderSelecao().indexOf('Carregando') >= 0);
+  S.selecaoRank.erro = 'deu ruim'; S.selecaoRank.lista = null;
+  ok('  e com erro ela oferece tentar de novo', S.renderSelecao().indexOf('selecaoCarregarRank') >= 0);
+  S.selecaoRank.erro = ''; S.selecaoRank.lidoEm = Date.now();
+}
+
 console.log(falhas ? '\n' + falhas + ' FALHA(S)' : '\nTudo certo.');
 process.exit(falhas ? 1 : 0);
