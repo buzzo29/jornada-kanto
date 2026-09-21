@@ -19,6 +19,11 @@ const { createSandbox } = require(path.join(__dirname, 'game-sandbox.js'));
 const S = createSandbox();
 const src = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
 
+/* O PISO de espécies por faixa. Ele nasceu do relato de 21/09/2026 (*"o pool de pokemons que pode
+   aparecer nelas ficou pequena"*) -- com 4 e 2, a caixa do (i) da ilhota alta mostrava duas linhas
+   de 50%. É um PISO e não uma contagem de propósito: assim ele sobrevive ao próximo acréscimo. */
+const MINIMO_POR_FAIXA = 5;
+
 let falhas = 0;
 function ok(titulo, cond, extra){
   if(cond){ console.log('  OK     ' + titulo + (extra ? '   ' + extra : '')); }
@@ -691,14 +696,42 @@ console.log('\n=== OS DADOS ===');
      const antes = S.resgatePontosDe('pichu');
      return antes === Math.round(S.bstOf('pichu') / S.RESGATE_PTS_DIVISOR) && antes > 0;
   })(), S.resgatePontosDe('pichu') + ' pts pro Pichu (BST ' + S.bstOf('pichu') + ')');
-  /* a faixa que isso produz -- é ela que diz se a viagem longa compensa */
+  /* ⚠️ A FAIXA QUE ISSO PRODUZ -- e a trava cobra a RAZÃO, não os extremos: os números mudam
+     toda vez que a lista cresce (já foram 41-87 com 23 espécies e são 36-93 com 40), e uma
+     trava que os fixasse cairia sozinha no próximo acréscimo sem nada estar errado. É a mesma
+     lição das cinco que caíram quando o trecho da Corrida virou 150 m.
+     O que NÃO pode mudar é ela continuar mais estreita que a escada velha das ilhotas (30/10 =
+     3x), que foi o que a mudança de 20/09 comprou: a distância é o custo, e nenhum bicho pode
+     tornar a viagem longa obrigatória. */
   const vals = S.RESGATE_RESGATADOS.map(S.resgatePontosDe);
-  ok('  e a faixa fica entre 41 e 87 pontos',
-     Math.min(...vals) === 41 && Math.max(...vals) === 87,
-     Math.min(...vals) + ' a ' + Math.max(...vals));
-  /* ⚠️ OS 23 PEDIDOS, e os dois Nidoran porque o pedido diz "nidorans" */
-  ok('são os 23 resgatados pedidos', S.RESGATE_RESGATADOS.length === 23,
-     S.RESGATE_RESGATADOS.length + ' espécies');
+  const razao = Math.max(...vals) / Math.min(...vals);
+  ok('  e a faixa continua mais estreita que a escada velha de 3x', razao < 3,
+     Math.min(...vals) + ' a ' + Math.max(...vals) + ' = ' + razao.toFixed(2) + 'x');
+  /* ⚠️ E NENHUMA FAIXA PODE FICAR PEQUENA: foi isso que trouxe os 17 de 21/09/2026 (*"o pool de
+     pokemons que pode aparecer nelas ficou pequena"*). Com 4 e 2 espécies, a caixa do (i) da
+     ilhota alta mostrava DUAS linhas de 50% cada. A trava é um PISO, não uma contagem: ela
+     sobrevive ao próximo acréscimo, e cai no dia em que alguém esvaziar uma faixa. */
+  ok('nenhuma faixa fica com menos de ' + MINIMO_POR_FAIXA + ' espécies',
+     S.RESGATE_BOLO_DA_FAIXA.every(b => b.length >= MINIMO_POR_FAIXA),
+     S.RESGATE_BOLO_DA_FAIXA.map(b => b.length).join(' / '));
+  /* ⚠️ A REGRA QUE NINGUÉM TINHA ESCRITO ATÉ 21/09/2026: todo resgatado é forma BASE. Era
+     verdade nos 23 originais por acaso de escolha, e é ela que explica por que a faixa alta
+     nascia com duas espécies -- formas base de BST alto são poucas. Escrita, o próximo
+     acréscimo que puser um Charizard na lista fica barulhento. */
+  ok('todo resgatado é forma BASE',
+     S.RESGATE_RESGATADOS.every(id => S.raizDaLinha(id) === id),
+     S.RESGATE_RESGATADOS.filter(id => S.raizDaLinha(id) !== id).join(',') || 'todos');
+  /* ⚠️ E NINGUÉM DE ÁGUA NEM VOADOR (21/09/2026, a pedido): quem nada ou voa não precisa de
+     resgate. O DODUO é a exceção HERDADA -- ele já estava na lista antes da regra existir, e no
+     original ele não voa. Ele é NOMEADO aqui de propósito: sem isso, o próximo Voador entraria
+     de carona na exceção dele. */
+  ok('ninguém de Água nem Voador, fora o Doduo herdado', (() => {
+     const molhados = S.RESGATE_RESGATADOS.filter(id =>
+       (S.SPECIES[id].types || []).some(t => t === 'Water' || t === 'Flying'));
+     return molhados.length === 1 && molhados[0] === 'doduo';
+  })(), S.RESGATE_RESGATADOS.filter(id =>
+     (S.SPECIES[id].types || []).some(t => t === 'Water' || t === 'Flying')).join(','));
+  /* os dois Nidoran porque o pedido de 20/09 diz "nidorans", no plural */
   ok('  com os dois Nidoran',
      S.RESGATE_RESGATADOS.indexOf('nidoranm') >= 0 && S.RESGATE_RESGATADOS.indexOf('nidoranf') >= 0);
   ok('  e sem repetir ninguém',

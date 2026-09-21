@@ -7578,12 +7578,23 @@ const EQUIPAVEIS = ['awakening', 'hyperpotion', 'potion',
 /* A RAIZ da linha evolutiva -- a chave que identifica "é o mesmo bicho" mesmo depois de evoluir.
    É a MESMA função do cliente, palavra por palavra, e pelo mesmo motivo: se as duas discordarem,
    um lado procura o item equipado numa chave e o outro noutra. */
+/* AS CINCO EVOLUÇÕES DO EEVEE, e a lista mora AQUI porque o `raizDaLinha` (logo abaixo) precisa
+   dela. Elas NÃO estão no `EVOLUTIONS` (não evoluem por nível) nem no `EVOLUTION_CHOICES` (a
+   bifurcação do Eevee tem tela própria, a `chooseEeveeEvolution`, por causa do relógio do
+   Espeon/Umbreon) -- então sem esta linha a raiz de um Jolteon é ele mesmo, e o item equipado se
+   perde na evolução: é o defeito do Charmeleon->Charizard de 03/09/2026, que ficou aberto nesta
+   linha. ⚠️ Ela tem as CINCO: a versão antiga listava só as três da pedra e deixava de fora
+   justamente as duas que o nome dela promete.
+   ⚠️ E ela é declarada ANTES do `raizDaLinha`: `const` tem zona morta temporal, e este projeto já
+   pagou isso duas vezes (as quatro telas de revelação e o aviso de versão). */
+const EEVEE_EVOLUTIONS = ['vaporeon', 'jolteon', 'flareon', 'espeon', 'umbreon'];
 let _raizDaLinha = null;
 function raizDaLinha(id){
   if(!_raizDaLinha){
     const pai = {};
     for(const de in EVOLUTIONS){ pai[EVOLUTIONS[de].into] = de; }
     for(const de in EVOLUTION_CHOICES){ EVOLUTION_CHOICES[de].forEach(dest=>{ pai[dest] = de; }); }
+    EEVEE_EVOLUTIONS.forEach(dest=>{ pai[dest] = 'eevee'; });
     _raizDaLinha = {};
     Object.keys(SPECIES).forEach(sp=>{
       let cur = sp, guarda = 0;

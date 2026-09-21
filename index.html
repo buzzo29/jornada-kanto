@@ -10955,6 +10955,16 @@ function finalEvolutionOf(id){
    têm finais diferentes mas são o MESMO Slowpoke, e Vileplume e Bellossom o mesmo Oddish. A raiz
    junta os dois lados da bifurcação, que é o que interessa pra não repetir espécie no time.
    O mapa é montado uma vez e guardado: são 250 espécies e isso roda a cada oferta selvagem. */
+/* AS CINCO EVOLUÇÕES DO EEVEE, e a lista mora AQUI porque o `raizDaLinha` (logo abaixo) precisa
+   dela. Elas NÃO estão no `EVOLUTIONS` (não evoluem por nível) nem no `EVOLUTION_CHOICES` (a
+   bifurcação do Eevee tem tela própria, a `chooseEeveeEvolution`, por causa do relógio do
+   Espeon/Umbreon) -- então sem esta linha a raiz de um Jolteon é ele mesmo, e o item equipado se
+   perde na evolução: é o defeito do Charmeleon->Charizard de 03/09/2026, que ficou aberto nesta
+   linha. ⚠️ Ela tem as CINCO: a versão antiga listava só as três da pedra e deixava de fora
+   justamente as duas que o nome dela promete.
+   ⚠️ E ela é declarada ANTES do `raizDaLinha`: `const` tem zona morta temporal, e este projeto já
+   pagou isso duas vezes (as quatro telas de revelação e o aviso de versão). */
+const EEVEE_EVOLUTIONS = ['vaporeon', 'jolteon', 'flareon', 'espeon', 'umbreon'];
 let _raizDaLinha = null;
 function raizDaLinha(id){
   if(!_raizDaLinha){
@@ -10962,6 +10972,8 @@ function raizDaLinha(id){
     for(const de in EVOLUTIONS){ pai[EVOLUTIONS[de].into] = de; }
     // os destinos da bifurcação não aparecem como `into` no EVOLUTIONS -- entram aqui
     for(const de in EVOLUTION_CHOICES){ EVOLUTION_CHOICES[de].forEach(dest=>{ pai[dest] = de; }); }
+    // e o Eevee é a bifurcação que nem no EVOLUTION_CHOICES está (ele tem tela própria)
+    EEVEE_EVOLUTIONS.forEach(dest=>{ pai[dest] = 'eevee'; });
     _raizDaLinha = {};
     Object.keys(SPECIES).forEach(sp=>{
       let cur = sp, guarda = 0;
@@ -11983,7 +11995,6 @@ function startLevelDistribution(){
   game.screen = 'levels';
   render();
 }
-const EEVEE_EVOLUTIONS = ['vaporeon', 'jolteon', 'flareon'];
 function cannotEvolveFurther(speciesId){
   // não tem mais pra onde evoluir -- seja porque já chegou na forma final de uma linha evolutiva
   // (ex: Butterfree, Venusaur), seja porque nunca evoluiu (ex: Pinsir, Scyther), ou é uma das
@@ -34352,13 +34363,23 @@ const RESGATE_RESGATADOS = [
   'pichu', 'mankey', 'nidoranm', 'nidoranf', 'oddish', 'paras', 'meowth', 'doduo',
   'voltorb', 'tangela', 'vulpix', 'eevee', 'chikorita', 'cyndaquil', 'bulbasaur',
   'charmander', 'togepi', 'cleffa', 'igglybuff', 'teddiursa', 'phanpy', 'larvitar', 'elekid',
+  /* 21/09/2026: as faixas de PERTO e de ALTO tinham 4 e 2 espécies, e a caixa do (i) mostrava
+     duas linhas de 50% na ilhota mais cara. Os 17 daqui saem da MESMA régua que os 23 de cima --
+     forma BASE, nem Água nem Voador (quem nada ou voa não precisa de resgate) -- e ficam de fora
+     os lendários e os adultos pesados: com Snorlax e Tauros dentro, o teto ia a 108 e a ilhota
+     longe passaria a pagar 2,6x a de perto, quase a escada velha de 3x que foi estreitada de
+     propósito em 20/09. Medido: a escada vai de 1,81x a 1,95x -- variedade sem inflação. */
+  'sunkern', 'caterpie', 'weedle', 'tyrogue', 'sentret',
+  'growlithe', 'aipom', 'magby', 'lickitung', 'wobbuffet', 'ponyta', 'dunsparce',
+  'sneasel', 'misdreavus', 'chansey', 'mrmime', 'stantler',
 ];
 /* ⚠️ O VALOR É O BST DIVIDIDO POR 5, e ele é DERIVADO -- nunca uma tabela à mão, que envelheceria
    no dia em que o `GEN2_SPECIAL` mudasse. Medido nos 23: de **41** (Pichu, BST 205) a **87**
    (Tangela, 435), com a maioria entre 55 e 66.
-   ⚠️ E A FAIXA É MAIS ESTREITA QUE A ESCADA VELHA (2,1x contra 3x), o que é de propósito: a
-   distância continua sendo o custo, e com um leque de 41 a 87 nenhum bicho torna a viagem longa
-   obrigatória nem inútil. */
+   ⚠️ E A FAIXA CONTINUA MAIS ESTREITA QUE A ESCADA VELHA (2,6x contra 3x), o que é de propósito: a
+   distância continua sendo o custo, e com um leque de 36 a 93 nenhum bicho torna a viagem longa
+   obrigatória nem inútil. ⚠️ Os números desta frase envelhecem com a lista -- quem mexer nela
+   remede; o que a trava cobra é a RAZÃO ficar abaixo dos 3x da escada velha, não o valor. */
 const RESGATE_PTS_DIVISOR = 5;
 const resgatePontosDe = (id) => Math.round(bstOf(id) / RESGATE_PTS_DIVISOR);
 

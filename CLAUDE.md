@@ -6240,6 +6240,71 @@ como é hoje"*.
 - **CHAVE VELHA (sem slot) CONTINUA VALENDO na leitura**, pra ninguém perder item no deploy: ela casa
   com qualquer slot, que é como se comportava. Na primeira vez que o jogador mexer naquele item ela é
   apagada e nasce a nova — o dado se conserta sozinho, sem migração.
+#### ⚠️ E O EEVEE PERDIA O ITEM AO EVOLUIR (21/09/2026) — o mesmo defeito, aberto por 18 dias
+
+Achado no caminho de outra coisa (a varredura de candidatos do Resgate), não por relato. Conferido
+antes de mexer em qualquer coisa:
+
+```
+Charmander equipado → Charizard  : potion   (certo, desde 03/09)
+Gloom      equipado → Bellossom  : potion   (certo)
+Eevee      equipado → Jolteon    : null     ← o item some
+```
+
+- **⚠️ A CAUSA É QUE O EEVEE É A BIFURCAÇÃO QUE NEM NO `EVOLUTION_CHOICES` ESTÁ.** Aquela tabela é
+  o que ensina o `raizDaLinha` que Slowbro e Slowking são o mesmo Slowpoke — e o Eevee não está
+  nela **de propósito**: a escolha dele tem tela PRÓPRIA (`chooseEeveeEvolution`), por causa do
+  relógio do Espeon/Umbreon. Resultado: `raizDaLinha('jolteon')` devolvia **`jolteon`**, e a poção
+  ficava presa numa chave que ninguém mais procura.
+- **⚠️ A LISTA NÃO FOI PRO `EVOLUTION_CHOICES`, e isso é decisão.** Aquela tabela tem um SEGUNDO
+  emprego: ela dirige o `tryEvolve` (a marca `pendingEvoChoice`), a tela genérica de bifurcação e a
+  descida do `formaNoNivel`. Pôr o Eevee ali seria mexer em três caminhos que funcionam pra
+  consertar um quarto — a classe de defeito que este projeto mais paga. O `raizDaLinha` ganhou a
+  lista direto.
+- **⚠️ E A LISTA JÁ EXISTIA, PELA METADE.** O `EEVEE_EVOLUTIONS` tinha o nome do conjunto inteiro e
+  só as **TRÊS da pedra** — faltavam justamente Espeon e Umbreon, que são as que o nome promete.
+  Ela passou a ter as cinco e a servir os dois leitores (o `raizDaLinha` e o `cannotEvolveFurther`),
+  em vez de virar uma segunda lista pra divergir da primeira. **Conferido que o**
+  **`cannotEvolveFurther` dá a mesma resposta com as cinco** — Espeon e Umbreon já caíam no
+  `!EVOLUTIONS[id]` e acertavam por acidente.
+- **⚠️ ELA É DECLARADA ANTES DO `raizDaLinha`**: `const` tem zona morta temporal, e este projeto já
+  pagou isso duas vezes (as quatro telas de revelação em 09/09 e o aviso de versão em 13/09).
+- **O DADO VELHO SE CONSERTA SOZINHO, nos dois sentidos:** quem equipou num Jolteon já evoluído
+  gravou `3:jolteon`, e a leitura aceita QUALQUER chave da mesma linha — medido, `3:jolteon` agora
+  responde pelo Jolteon **e** pelo Eevee.
+
+**⚠️ E A SEGUNDA CONSEQUÊNCIA É MAIOR QUE A PRIMEIRA — a OFERTA SELVAGEM.** O `linhasDoTime` usa a
+mesma raiz, então a linha do Eevee contava como **seis linhas diferentes**. Medido nas 7 rotas que
+têm alguém dela (2.800 ofertas):
+
+| | antes | depois |
+|---|---|---|
+| oferece a linha que o time **já tem** | **810** | **0** |
+| **DOIS da mesma linha na MESMA tela** | **40** | **0** |
+| ofertas com alguém da linha | 1.217 | 1.213 |
+
+**A Mansão Pokémon tem `eevee` E `flareon` no MESMO pool** — ou seja os dois saíam juntos na tela,
+que é o defeito dos dois Kingdra de 01/09/2026 entrando por outra porta. E a última linha é o que
+prova que o conserto não escondeu ninguém: a linha do Eevee continua aparecendo igual.
+
+**O PREÇO NA JORNADA: nada. 53,59% contra 55,23%** — **+1,64 ponto, 1,6σ** (10 blocos de 800
+jornadas de cada lado, **8.000 de cada**, o MESMO bot contra duas cópias congeladas, desvio tirado
+de ENTRE os blocos, **5 de 10 blocos** pra cada lado). Ruído puro, e a direção é a esperada: a
+oferta deixou de gastar uma das quatro cartas com uma linha que o jogador já tinha.
+
+**No motor, nada:** `MOTOR 385943f3e1fa / DIARIO 850af0fd1763`, idêntico em 900 batalhas semeadas.
+
+⚠️ **E A TRAVA NASCEU MEDINDO A SI MESMA.** A primeira versão perguntava ao `raizDaLinha` quem era
+da linha do Eevee pra contar os repetidos da oferta — com o defeito religado,
+`raizDaLinha('flareon')` é `'flareon'` e a conta **nunca passa de 1**: ela passava em branco com o
+defeito inteiro de volta. Hoje a linha vai escrita no teste. **Trava que pergunta à função que ela**
+**mede não é trava.**
+
+⚠️ **E A FERRAMENTA DE ACUSAÇÃO MENTIU JUNTO:** ela contava `FALHOU` e o `test-jornada.js` imprime
+**`FALHA`** — três defeitos religados apareceram como passando em branco quando na verdade dois
+deles acusavam. É a mesma família do harness que media o vazio, e o sintoma é o mesmo: **um zero**
+**perfeito é mais suspeito que um número feio.**
+
 - **O `raizDaLinha` virou a base da CHAVE, então os dois motores têm que concordar sobre ele.**
   Discordância ali faz o cliente gravar numa chave e o servidor procurar noutra, e o item some sem
   ninguém entender. `tools/test-especiais.js` compara a raiz das **250 espécies** entre os dois — por
@@ -14905,6 +14970,63 @@ parceiro ficava sem alvo -- o que agora **cancela a descarga**, e ele nunca entr
 esperar (`a.descarga <= 0`). É a mesma família dos fixtures que este arquivo já registra: **o bot
 do teste é um jogador, e ele precisa conhecer a regra nova como um jogador conhece.**
 
+### AS FAIXAS DE PERTO E DE ALTO ESTAVAM PEQUENAS (21/09/2026)
+
+Pedido assim: *"veja quais outros pokemons nao aquaticos e voador que podemos adicionar no resgate
+pokemon nas ilhas mais proximas e nas mais distantes, porque o pool de pokemons que pode aparecer
+nelas ficou pequena"*. A lista foi de **23 para 40**.
+
+**⚠️ E A MEDIÇÃO MUDOU A PERGUNTA: o filtro que esvaziou as faixas não era Água/Voador — era que os
+23 eram TODOS forma BASE** (23 de 23), uma regra que ninguém tinha escrito. É ela que explica a
+faixa alta nascer com duas espécies: formas base de BST ≥ 350 são poucas, e quase todas são bicho
+adulto e grande. **Hoje ela está escrita, e o teste a cobra** — o próximo acréscimo que puser um
+Charizard na lista fica barulhento.
+
+**⚠️ E O DODUO JÁ ESTAVA LÁ, E É Normal/VOADOR.** Ele entrou antes de a regra existir, e ficou (no
+original ele não voa). Ele é **NOMEADO** na trava de propósito: sem isso, o próximo Voador entraria
+de carona na exceção dele.
+
+| | perto (<50) | centro | alto (70+) |
+|---|---|---|---|
+| antes | **4** espécies, média 44,0 | 17 | **2** espécies, média 79,5 |
+| depois | **9**, média 41,7 | 17 (intocado) | **14**, média 81,8 |
+| chance de cada um na caixa do (i) | 25% → **11%** | 6% | **50% → 7%** |
+
+**Entraram:** Sunkern, Caterpie, Weedle, Tyrogue e Sentret (perto); Growlithe, Aipom, Magby,
+Lickitung, Wobbuffet, Ponyta, Dunsparce, Sneasel, Misdreavus, Chansey, Mr. Mime e Stantler (alto).
+
+**⚠️ O QUE FICOU DE FORA, e por quê:**
+
+- **Raikou, Entei (116) e Mewtwo (136)** — lendário. A Vigília já exclui lendário do sorteio dela,
+  e um Raikou resgatado por um Lapras desfaz o que o modo é.
+- **Tauros, Kangaskhan, Miltank, Pinsir, Heracross, Shuckle, Snorlax e as quatro evoluções do**
+  **Eevee** (98 a 108) — são adultos, e com eles o teto ia a 108: a ilhota longe passaria a pagar
+  **2,6×** a de perto, quase a escada velha de 3× que foi estreitada de propósito em 20/09.
+- **Porygon (79)** — é artificial, não naufraga. E **Onix, Sudowoodo e Girafarig** saíram da lista
+  proposta a pedido.
+
+**⚠️ O CUSTO MEDIDO, e ele é o argumento a favor: a escada quase não se move.** O que a ilhota longe
+paga a mais vai de **1,81× para 1,96×** — variedade sem inflação, que é o que a faixa estreita de
+20/09 comprou. O leque de pontos vai de 41-87 para **36-93** (2,58×, ainda abaixo dos 3× da escada
+velha). **Nenhum sorteio cai fora da faixa da ilhota** (0 de 3.600).
+
+⚠️ **E O FILTRO ÁGUA/VOADOR INVALIDOU METADE DA LISTA DE CANDIDATOS QUE ESTE ARQUIVO GUARDAVA:** dos
+13 que a seção da escada nomeava, **Farfetchd, Murkrow e Gligar são Voador** e caíram. O filtro
+tirou **18 formas base** da faixa alta no total — entre elas Lapras, Scyther, Aerodactyl, Suicune e
+as três aves.
+
+⚠️ **E DUAS TRAVAS FIXAVAM OS NÚMEROS DA LISTA VELHA** (*a faixa fica entre 41 e 87*, *são os 23
+resgatados*) e caíram de uma vez, **sem nada estar errado**. É a mesma lição das cinco que caíram
+quando o trecho da Corrida virou 150 m. Hoje elas cobram a REGRA: a razão ficando **abaixo dos 3×**
+da escada velha, e **nenhuma faixa com menos de `MINIMO_POR_FAIXA` (5) espécies** — um PISO, que
+sobrevive ao próximo acréscimo e cai no dia em que alguém esvaziar uma faixa.
+
+**Medido a 320px, no navegador:** o setup em **986px** sem rolagem lateral, os seis (i) dentro do
+mapa, e a caixa de cada ilhota em **265×483px** (cabe numa tela de 568, rolando por dentro) com
+**9 / 17 / 14** linhas de 42px e **nenhum nome truncado**.
+
+**No motor, nada:** `MOTOR 385943f3e1fa / DIARIO 850af0fd1763`, idêntico em 900 batalhas semeadas.
+
 ⚠️ **DESDE 20/09/2026 ELE TEM 178**, e as novas cobrem a escada (a faixa saindo da POSIÇÃO, as três
 bandas medidas pelo VALOR, os três bolos sendo a lista inteira sem repetir, nenhum vazio, 3.600
 sorteios sem ninguém fora da faixa da ilhota, e a escada ESTRITA -- o pior de cima vale mais que o
@@ -14915,7 +15037,10 @@ uma escala por espécie, e a caixa de 46px não voltando).
 (i) sendo IRMÃO do ponto, a caixa listando o bolo inteiro e ninguém de outra faixa) e a descarga
 (ela abre em vez de entregar, dura o que a constante diz, sair cancela, o fim da prova paga o que
 sobrou, o retorno espera, o NPC espera, e o `[hidden]` da barra vence o display).
-**Conferido que ele acusa: 14 de 14 defeitos novos religados**.
+⚠️ **E 203 DESDE 21/09/2026**, com a lista de 40: a razão abaixo dos 3×, o piso de 5 por faixa,
+**todo resgatado sendo forma BASE** e **ninguém de Água nem Voador fora o Doduo herdado** -- e as
+duas travas que fixavam 41-87 e 23 saíram, porque elas mediam o NÚMERO e não a regra.
+**Conferido que ele acusa: 17 de 17 defeitos novos religados**.
 ## PERFORMANCE: A GEOGRAFIA MANDA (19/09/2026)
 
 Relatado assim: *"tenho sentido uma boa lentidão na inscrição para as ligas clássicas e trainers

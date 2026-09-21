@@ -173,6 +173,68 @@ ok('a raiz junta os dois lados da bifurcacao',
    S.raizDaLinha('politoed') === S.raizDaLinha('poliwrath'));
 ok('linhas diferentes continuam diferentes',
    S.raizDaLinha('bulbasaur') !== S.raizDaLinha('charmander'));
+/* ============================================================================
+   ⚠️ A LINHA DO EEVEE (21/09/2026). Ela é a bifurcação que nem no `EVOLUTION_CHOICES` está --
+   a escolha dele tem tela PRÓPRIA (`chooseEeveeEvolution`), por causa do relógio do
+   Espeon/Umbreon. Sem a lista das cinco, a raiz de um Jolteon era ELE MESMO, e o item equipado
+   se perdia na evolução: é o defeito do Charmeleon->Charizard de 03/09/2026, que ficou aberto
+   nesta linha por mais de duas semanas.
+   ============================================================================ */
+ok('a raiz junta as CINCO evolucoes do Eevee ao Eevee',
+   ['vaporeon','jolteon','flareon','espeon','umbreon'].every(id => S.raizDaLinha(id) === 'eevee'),
+   ['vaporeon','jolteon','flareon','espeon','umbreon'].map(id=>S.raizDaLinha(id)).join(','));
+/* ⚠️ A LISTA TEM AS CINCO E MORA NUM LUGAR SÓ: a versão antiga tinha o nome do conjunto inteiro
+   (`EEVEE_EVOLUTIONS`) e só as TRÊS da pedra -- duas listas para a mesma coisa divergem no
+   primeiro ajuste, e esta já nascia divergindo de si mesma. */
+ok('  e a lista das cinco e uma so', S.EEVEE_EVOLUTIONS.length === 5 &&
+   ['vaporeon','jolteon','flareon','espeon','umbreon'].every(id => S.EEVEE_EVOLUTIONS.includes(id)),
+   S.EEVEE_EVOLUTIONS.join(','));
+ok('  e o cannotEvolveFurther le a MESMA lista',
+   S.EEVEE_EVOLUTIONS.every(id => S.cannotEvolveFurther(id) === true) &&
+   S.cannotEvolveFurther('eevee') === false);
+/* O QUE O DEFEITO CUSTAVA: o item equipado. A chave é `slot:raizDaLinha`, e é ela que faz a
+   poção sobreviver à evolução -- com a raiz errada, ela ficava presa numa chave que ninguém
+   mais procura. O Charmander é o CONTROLE: ele sempre funcionou. */
+ok('o item equipado sobrevive a evolucao do Eevee',
+   S.EEVEE_EVOLUTIONS.every(id => S.itemEquipado({ '3:eevee': 'potion' }, '3', id) === 'potion'),
+   S.EEVEE_EVOLUTIONS.map(id => id + ':' + S.itemEquipado({ '3:eevee':'potion' }, '3', id)).join(' '));
+ok('  (controle) e continua sobrevivendo no Charmander e no Oddish',
+   S.itemEquipado({ '3:charmander':'potion' }, '3', 'charizard') === 'potion' &&
+   S.itemEquipado({ '3:oddish':'potion' }, '3', 'bellossom') === 'potion');
+/* ⚠️ E O DADO VELHO SE CONSERTA SOZINHO: quem equipou num Jolteon já evoluído gravou a chave
+   `3:jolteon`, e a leitura aceita QUALQUER chave da mesma linha -- nos dois sentidos. */
+ok('  e a chave velha gravada na evolucao continua achando o item',
+   S.itemEquipado({ '3:jolteon':'potion' }, '3', 'jolteon') === 'potion' &&
+   S.itemEquipado({ '3:jolteon':'potion' }, '3', 'eevee') === 'potion');
+/* A SEGUNDA CONSEQUÊNCIA, medida: a oferta selvagem. A Mansão Pokémon tem `eevee` E `flareon`
+   no MESMO pool -- antes disso, os dois podiam sair na mesma tela, que é o defeito dos "dois
+   Kingdra" de 01/09/2026 por outra porta. */
+{
+  const gE = S.freshGameDefaults();
+  gE.team = [{speciesId:'eevee'}];
+  S.__setGame(gE);
+  const poolE = ['eevee','flareon','vaporeon','jolteon','geodude','zubat','onix','paras'];
+  /* ⚠️ A LINHA VAI ESCRITA AQUI, e não sai do `raizDaLinha`: a trava mede justamente ele, e
+     perguntando a ele quem é da linha do Eevee ela passaria em branco com o defeito de volta
+     (com a raiz quebrada, `raizDaLinha('flareon')` é 'flareon' e a conta nunca passa de 1). */
+  const LINHA_EEVEE = ['eevee','vaporeon','jolteon','flareon','espeon','umbreon'];
+  let repetiu = 0;
+  for(let i=0;i<400;i++){
+    const of = S.buildOfferFromPool(poolE, 4);
+    if(of.some(id => LINHA_EEVEE.includes(id) && id !== 'eevee')) repetiu++;
+  }
+  ok('a oferta nao traz a linha do Eevee pra quem ja tem um', repetiu === 0, repetiu + ' de 400');
+  gE.team = []; S.__setGame(gE);
+  let dois2 = 0;
+  for(let i=0;i<400;i++){
+    const of = S.buildOfferFromPool(poolE, 4);
+    if(of.filter(id => LINHA_EEVEE.includes(id)).length > 1) dois2++;
+  }
+  ok('  e nunca dois da linha do Eevee na MESMA tela', dois2 === 0, dois2 + ' de 400');
+}
+/* ⚠️ E OS DOIS MOTORES TÊM QUE CONCORDAR -- a raiz é a base da chave do item, e um lado
+   procurando numa chave e o outro noutra é o defeito original de volta. A comparação das 250
+   espécies vive no `test-especiais.js`; aqui fica a ponta do Eevee, que é a que mudou. */
 const gW = S.freshGameDefaults();
 gW.team = [{speciesId:'gyarados'},{speciesId:'slowking'},{speciesId:'bellossom'}];
 S.__setGame(gW);
