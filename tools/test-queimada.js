@@ -530,14 +530,18 @@ console.log('\n=== A ELIMINAÇÃO E O FIM ===');
   S.queimada.bolas = [{ id: 2, dono: 0, x: S.queimada.atores[1].x, y: S.queimada.atores[1].y - 4,
                         vx: 0, vy: 60, dano: 999, base: 999, nasceu: 20, devolvida: 0, especial: false }];
   S.queimadaPasso(0.05);
-  ok('o ' + S.QUEIMADA_KOS + 'º ponto encerra a partida', S.queimada.fase === 'fim', 'fase: ' + S.queimada.fase);
+  /* ⚠️ ELA TERMINA NO ANÚNCIO desde 21/09/2026, e o resultado vem depois do Ok -- a trava cobra
+     a CADEIA inteira, porque parar no 'anuncio' deixaria de provar que dá pra sair dele. */
+  ok('o ' + S.QUEIMADA_KOS + 'º ponto encerra a partida', S.queimada.fase === 'anuncio', 'fase: ' + S.queimada.fase);
+  S.queimadaFecharAnuncio();
+  ok('  e o Ok do anúncio leva ao resultado', S.queimada.fase === 'fim', 'fase: ' + S.queimada.fase);
   ok('  e o vencedor é quem tem mais pontos', S.queimadaVencedor() > 0, 'vencedor: ' + S.queimadaVencedor());
 
   /* e o relógio também encerra */
   const atores = await partida(0, 0);
   S.queimada.decorrido = S.QUEIMADA_DURACAO - 0.01;
   S.queimadaPasso(1);
-  ok('e os ' + S.QUEIMADA_DURACAO + ' s encerram sozinhos', S.queimada.fase === 'fim',
+  ok('e os ' + S.QUEIMADA_DURACAO + ' s encerram sozinhos', S.queimada.fase === 'anuncio',
     'decorrido ' + S.queimada.decorrido.toFixed(0) + ' s');
   ok('  e o passo NÃO passa do relógio', S.queimada.decorrido <= S.QUEIMADA_DURACAO + 1e-9,
     S.queimada.decorrido.toFixed(2));
@@ -1078,6 +1082,7 @@ console.log('\n=== A TELA DE FIM MOSTRA OS DOIS QUE SE ENFRENTARAM ===');
   const [a, b] = await partida(0, 0);
   a.pontos = S.QUEIMADA_KOS; b.pontos = 1; a.devolucoes = 4;
   S.queimadaTerminar();
+  S.queimadaFecharAnuncio();   /* o resultado vem depois do Ok */
   const html = S.renderQueimada();
   ok('ela desenha os DOIS lados', (html.match(/q-fim-lado/g) || []).length === 2);
   ok('  com o sprite de cada um', (html.match(/sprite-img/g) || []).length >= 2);
@@ -1091,7 +1096,9 @@ console.log('\n=== A TELA DE FIM MOSTRA OS DOIS QUE SE ENFRENTARAM ===');
   /* ⚠️ A LINHA DA VIDA RESTANTE SAIU (a pedido): o duelo é decidido por ELIMINAÇÕES, e o número do
      último instante não diz nada -- o perdedor termina sempre em zero. */
   ok('  e a linha da vida restante saiu', html.indexOf('HP final') < 0);
-  ok('  e a das devoluções ficou', /devolu/.test(html));
+  /* ⚠️ E A DAS DEVOLUÇÕES SAIU JUNTO (21/09/2026, a pedido): a tela de resultado ficou sendo só
+     a classificação, e o que ela conta está todo dentro dos dois cards. */
+  ok('  e a das devoluções saiu também', /devolu/.test(html) === false);
 
   /* no EMPATE não sai medalha nenhuma -- ali não houve vencedor */
   const c = S.queimada.atores;
@@ -1148,6 +1155,162 @@ console.log('\n=== E A PRIMEIRA TELA NÃO EXPLICA A FÓRMULA ===');
      html.indexOf('vem da fórmula do jogo') < 0 && html.indexOf('os três com o nível dentro') < 0);
   /* mas a ficha com os três continua lá -- é ela que responde "o que este pokémon é na quadra" */
   ok('  e a ficha dos três continua', /ms de escudo/.test(html) && /px\/s/.test(html));
+}
+
+
+/* ============================================================================
+   21) O FREIO DA RECARGA, A DEVOLVIDA MAIS RÁPIDA E O ANÚNCIO (21/09/2026)
+   ============================================================================ */
+console.log('\n=== RECARREGAR CUSTA MOBILIDADE ===');
+{
+  const [eu] = await partida(0, 0);
+  S.queimada.fase = 'jogando'; S.queimada.rodadaAte = 0;
+  /* mede o passo de um segundo com o pente cheio e com ele vazio, no MESMO ator e no mesmo lugar */
+  const anda = (recarregando) => {
+    eu.x = 180; eu.y = 250; eu.tx = 180; eu.ty = 40; eu.folego = 100; eu.atordoadoAte = 0;
+    eu.recargaAte = recarregando ? S.queimada.t + 3 : 0;
+    const antes = eu.y, fol = eu.folego;
+    S.queimadaAndar(eu, 0, 1);
+    return { px: antes - eu.y, folego: fol - eu.folego };
+  };
+  const cheio = anda(false), vazio = anda(true);
+  /* ⚠️ A TRAVA COBRA AS DUAS COISAS: que o freio EXISTE (a constante abaixo de 1) e que ele vale
+     no passo. Só a segunda metade, ela compara a constante COM ELA MESMA -- com o freio desligado
+     (1) a razão também vira 1 e a trava passa em branco. Conferido religando o defeito. */
+  ok('o freio realmente freia', S.QUEIMADA_RECARGA_FREIO < 1, 'x' + S.QUEIMADA_RECARGA_FREIO);
+  ok('quem recarrega anda pela metade',
+     Math.abs(vazio.px / cheio.px - S.QUEIMADA_RECARGA_FREIO) < 0.02 && vazio.px < cheio.px,
+     cheio.px.toFixed(1) + ' px contra ' + vazio.px.toFixed(1) + ' px em 1 s');
+  /* ⚠️ E O FÔLEGO NÃO ACELERA JUNTO: o gasto é `passo / vel`, então freando os dois ele continua
+     o mesmo POR SEGUNDO. Aplicado só no passo, a recarga seria DUAS punições de uma vez. */
+  ok('  e o fôlego continua gastando igual',
+     Math.abs(vazio.folego - cheio.folego) < 0.01,
+     cheio.folego.toFixed(2) + ' contra ' + vazio.folego.toFixed(2) + ' por segundo');
+  ok('  e o freio vale pros DOIS lados (é a mesma função)',
+     /queimada\.atores\.forEach\(\(a, i\) => queimadaAndar/.test(src),
+     'o laço anda os dois pelo mesmo queimadaAndar');
+}
+
+console.log('\n=== A BARRA DA RECARGA, NOS DOIS ATORES ===');
+{
+  const atores = await partida(0, 0);
+  S.queimada.fase = 'jogando';
+  /* ⚠️ ELA SÓ EXISTE ENQUANTO RECARREGA: cheia e parada o tempo todo ela diria "o pente está
+     cheio", que é o estado comum. */
+  const pinta = (a) => {
+    const cv = S.document.createElement('canvas');
+    const ctx = cv.getContext('2d');
+    ctx.__ops.length = 0; ctx.__tintas.length = 0;
+    S.queimadaDesenharAtor(ctx, a, a.lado, S.queimada.t);
+    return ctx.__tintas.filter(t => t.m === 'fillRect' && t.fill === '#ffc93f');
+  };
+  atores.forEach(a => { a.recargaAte = 0; });
+  ok('com o pente cheio não há barra', pinta(atores[0]).length === 0 && pinta(atores[1]).length === 0);
+  atores.forEach(a => { a.recargaAte = S.queimada.t + S.QUEIMADA_RECARGA; });
+  const meu = pinta(atores[0]), dele = pinta(atores[1]);
+  ok('  e recarregando ela sai nos DOIS', meu.length === 1 && dele.length === 1,
+     'jogador ' + meu.length + ', adversário ' + dele.length);
+  /* ela ENCHE: no começo da recarga é ~0 e no fim é o comprimento todo */
+  atores[0].recargaAte = S.queimada.t + S.QUEIMADA_RECARGA * 0.1;
+  const quase = pinta(atores[0])[0];
+  ok('  e ela enche conforme a recarga anda',
+     quase && meu[0] && quase.args[2] > meu[0].args[2] * 5,
+     'no começo ' + meu[0].args[2].toFixed(1) + ' px, quase pronta ' + quase.args[2].toFixed(1) + ' px');
+  /* ⚠️ ELA FICA EMBAIXO DO SPRITE e ACIMA da etiqueta do nome -- entre y+19 e y+24, que é o vão
+     que sobra entre os dois. Fora dele ela cobriria um ou outro. */
+  ok('  e ela cabe no vão entre o sprite e a etiqueta',
+     meu[0].args[1] >= atores[0].y + 18 && meu[0].args[1] + meu[0].args[3] <= atores[0].y + 25,
+     'y ' + (meu[0].args[1] - atores[0].y).toFixed(0) + ' a '
+       + (meu[0].args[1] + meu[0].args[3] - atores[0].y).toFixed(0) + ' do centro');
+}
+
+console.log('\n=== A DEVOLVIDA SAI MAIS RÁPIDA QUE O GOLPE QUE ENTROU ===');
+{
+  const atores = await partida(0, 0);
+  S.queimada.fase = 'jogando'; S.queimada.rodadaAte = 0;
+  S.queimadaAtacar(1, false);
+  const bola = S.queimada.bolas[0];
+  const vEntrando = Math.hypot(bola.vx, bola.vy);
+  S.queimadaDevolver(bola, 0);
+  const vVoltando = Math.hypot(bola.vx, bola.vy);
+  /* ⚠️ A TRAVA É A RAZÃO, e não o número: fixado, ele envelheceria no próximo ajuste -- e o que o
+     ajuste tem que preservar é a devolvida voltar MAIS RÁPIDA do que veio. */
+  ok('a devolvida volta mais rápida que a que entrou', vVoltando > vEntrando,
+     Math.round(vEntrando) + ' px/s entrando, ' + Math.round(vVoltando) + ' voltando');
+  /* ⚠️ E ELA CONTINUA ABAIXO DO ESPECIAL: se passasse, a devolvida seria o golpe mais rápido do
+     modo e o especial deixaria de ter o que o separa. */
+  ok('  e ela continua abaixo do especial',
+     S.QUEIMADA_BOLA_V_DEVOLVIDA < S.QUEIMADA_BOLA_V_ESP,
+     S.QUEIMADA_BOLA_V_DEVOLVIDA + ' contra ' + S.QUEIMADA_BOLA_V_ESP);
+  ok('  e ela continua voltando mais FORTE também', bola.dano > bola.base,
+     'base ' + bola.base + ', devolvida ' + bola.dano);
+}
+
+console.log('\n=== A PARTIDA TERMINA NUM ANÚNCIO, ANTES DO RESULTADO ===');
+{
+  const atores = await partida(0, 0);
+  S.queimada.fase = 'jogando';
+  atores[0].pontos = S.QUEIMADA_KOS; atores[1].pontos = 1;
+  S.queimadaTerminar();
+  ok('a fase vira ANÚNCIO, não resultado', S.queimada.fase === 'anuncio', S.queimada.fase);
+  const html = S.renderQueimada();
+  /* ⚠️ A QUADRA CONTINUA DESENHADA -- é ela que o modal cobre. Numa fase desconhecida o render
+     cairia na tela de SETUP, e o modal apareceria sobre ela. */
+  ok('  e a quadra continua na tela, com o modal por cima',
+     html.indexOf('id="queimadaCanvas"') >= 0 && html.indexOf('modal-overlay') >= 0);
+  const sp = S.SPECIES[atores[0].inst.speciesId];
+  ok('  e ele nomeia o POKÉMON que venceu',
+     html.indexOf('Vitória ' + sp.name + '!') >= 0, 'Vitória ' + sp.name + '!');
+  ok('  e a tela de RESULTADO ainda não apareceu', html.indexOf('Jogar de novo') < 0);
+  S.queimadaFecharAnuncio();
+  ok('  e o Ok leva ao resultado', S.queimada.fase === 'fim');
+  ok('  onde o resultado enfim aparece',
+     S.renderQueimada().indexOf('Jogar de novo') >= 0);
+}
+console.log('\n=== E O EMPATE NÃO INVENTA VENCEDOR ===');
+{
+  const atores = await partida(0, 0);
+  S.queimada.fase = 'jogando';
+  atores[0].pontos = atores[1].pontos = 1;
+  atores[0].hp = atores[1].hp = 100;
+  S.queimadaTerminar();
+  const html = S.renderQueimada();
+  ok('empate anuncia "Empate!"', html.indexOf('Empate!') >= 0 && html.indexOf('Vitória') < 0);
+  S.queimadaFecharAnuncio();
+}
+console.log('\n=== E A QUADRA DO ANÚNCIO NÃO SAI EM BRANCO ===');
+{
+  /* ⚠️ O `render()` RECRIA O <canvas>, e o laço que o pintava acabou de ser cancelado -- sem uma
+     pintura o anúncio apareceria sobre um retângulo vazio. É o mesmo cuidado do mapa do Resgate. */
+  /* ⚠️ A FATIA VEM PRIMEIRO, e isso não é estilo: um `[\s\S]*?` sem limite ATRAVESSA a função e
+     acha o `queimadaPintar()` do LAÇO, centenas de linhas abaixo -- a trava passava em branco com
+     as duas pinturas removidas. É a mesma armadilha do `mlog-mais` e do `matchup-row`.
+     O `ok` do tamanho existe pela outra metade dela: uma fatia vazia passa em branco também. */
+  const fTerm = src.slice(src.indexOf('function queimadaTerminar()'));
+  const corpoTerm = fTerm.slice(0, fTerm.indexOf(String.fromCharCode(10) + '}'));
+  ok('  (a fatia do terminar tem o que ler)', corpoTerm.length > 200, corpoTerm.length + ' chars');
+  ok('o terminar pinta a quadra depois do render',
+     corpoTerm.indexOf('queimadaPintar();') > corpoTerm.indexOf('render();'),
+     'queimadaPintar() vem depois do render()');
+  /* ⚠️ E O HUD VAI JUNTO: o ponto que ENCERRA a partida é contado DENTRO do `queimadaPasso`, ou
+     seja depois do último quadro pintado -- sem repintar, o placar do anúncio mostra o placar de
+     ANTES do ponto da vitória. Foi o navegador que pegou (2/3 numa partida que acabou em 3/3). */
+  ok('  e o placar também',
+     corpoTerm.indexOf('queimadaPintarHud();') > corpoTerm.indexOf('render();'));
+}
+
+console.log('\n=== E A TELA DE RESULTADO É SÓ A CLASSIFICAÇÃO ===');
+{
+  const atores = await partida(0, 0);
+  atores[0].devolucoes = 3;
+  atores[0].pontos = S.QUEIMADA_KOS;
+  S.queimada.fase = 'fim';
+  const html = S.renderQueimada();
+  /* ⚠️ AS DUAS LINHAS DE TEXTO SAÍRAM (a pedido): a da vida restante e a das devoluções. */
+  ok('a tela não conta as devoluções', html.indexOf('volta mais forte') < 0
+     && html.indexOf('devolução sua') < 0 && html.indexOf('devoluções suas') < 0);
+  ok('  nem a vida restante', html.indexOf('HP final') < 0);
+  ok('  e os dois cards continuam', /q-fim-lado/.test(html) && /q-fim-ko/.test(html));
 }
 
   console.log(falhas ? '\n' + falhas + ' FALHA(S)' : '\nTudo certo.');

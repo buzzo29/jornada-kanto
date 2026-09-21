@@ -427,5 +427,79 @@ console.log('\n=== A ILHA KUMQUAT ===');
      S.ILHAS_LARANJA.filter(i => !i.abrir).map(i => i.nome).join(',') || '(nenhuma vazia)');
 }
 
+
+/* ============================================================================
+   AS DUAS FILEIRAS DO DRAFT (21/09/2026)
+   ============================================================================ */
+console.log('=== O TIME SE MONTA NA FRENTE DO JOGADOR ===');
+{
+  contaAdmin();
+  S.selecaoComecar();
+  const html0 = S.renderSelecao();
+  ok('a tela do draft traz as DUAS fileiras',
+     (html0.match(/selecao-fileira /g) || []).length === 2,
+     (html0.match(/selecao-fileira /g) || []).length + ' fileiras');
+  /* as VAGAS vazias ficam desenhadas: sem elas, duas fileiras de tamanhos diferentes se leem como
+     "ela tem mais", e nao como "faltam 4" */
+  /* ⚠️ ELAS SAO O CARD DE TIME DA CASA (21/09/2026, a pedido) -- o mesmo da home e da tela de
+     inscricao das ligas. A trava cobra as PECAS dele, e nao uma classe propria: se o card
+     da casa mudar, as duas previas mudam junto, que e o ponto de reusar. */
+  ok('  e elas sao o card de time da casa',
+     (html0.match(/save-slot-card/g) || []).length >= 2
+     && (html0.match(/team-avg-star/g) || []).length >= 2
+     && (html0.match(/save-slot-team-row spread/g) || []).length === 2);
+  /* ⚠️ SEM ACAO O CARD E UMA <div>, nunca um <button> apagado: aqui ele e uma PREVIA, e um botao
+     que nao faz nada convida um toque que nao responde -- a mesma decisao da ilhota do setup do
+     Resgate e da ilha sem jogo do mapa das Laranja. */
+  ok('  e elas nao sao botoes',
+     !/<button[^>]*selecao-fileira/.test(html0)
+     && (html0.match(/<div class="save-slot-card[^"]*selecao-fileira/g) || []).length === 2);
+  ok('  e as 6 vagas de cada um ja estao la',
+     (html0.match(/save-slot-mon vazia/g) || []).length === S.SELECAO_TIME * 2,
+     (html0.match(/save-slot-mon vazia/g) || []).length + ' vagas vazias');
+  ok('  e nenhuma cheia antes da primeira escolha',
+     (html0.match(/save-slot-mon-sprite/g) || []).length === 0);
+
+  /* ⚠️ EM TEMPO REAL: a cada escolha uma vaga a mais fica cheia -- e ela sai do `pool`, que e a
+     UNICA fonte durante o draft (o `selecao.meu` so e montado no fim). */
+  const passos = [];
+  let v = 0;
+  while(S.selecao.fase === 'draft' && v++ < 60){
+    if(S.selecaoVez() === 'npc') S.selecaoPicaNpc();
+    else S.selecaoEscolher(S.selecao.pool.findIndex(p => !p.dono));
+    if(S.selecao.fase !== 'draft') break;
+    const h = S.renderSelecao();
+    passos.push((h.match(/save-slot-mon-sprite/g) || []).length);
+  }
+  const sobe = passos.every((n, i) => i === 0 || n >= passos[i - 1]);
+  ok('  e ela so cresce, escolha a escolha', sobe && passos.length > 3,
+     passos.join(' '));
+
+  /* e no FIM as duas fileiras estao cheias, e batem com os times de verdade */
+  ok('  o draft fecha as duas fileiras',
+     S.selecao.meu.length === S.SELECAO_TIME && S.selecao.dele.length === S.SELECAO_TIME);
+}
+
+console.log('=== E A LINHA DE TEXTO DO DRAFT SAIU ===');
+{
+  contaAdmin();
+  S.selecaoComecar();
+  const html = S.renderSelecao();
+  /* ⚠️ A FRASE SAIU (a pedido) -- ela dizia quantos faltam, quantos cada um tem e a faixa de
+     nivel. As duas fileiras contam as tres coisas melhor, e o nivel esta em cada sprite. */
+  ok('a tela nao repete a contagem em texto',
+     html.indexOf('Voce tem') < 0 && html.indexOf('ela tem') < 0
+     && html.indexOf(String.fromCharCode(86,111,99,234) + ' tem') < 0);
+  ok('  nem a faixa de nivel em texto', !/Faixa <strong>Lv\./.test(html));
+  /* mas o NIVEL continua na tela, em cada vaga cheia -- e e ele que a frase dizia */
+  S.selecaoPicaNpc();
+  const h2 = S.renderSelecao();
+  ok('  e o nivel continua, na etiqueta do card',
+     /save-slot-mon-level">Lv\.\d+</.test(h2));
+  /* e a VEZ continua sendo dita: e a unica coisa da frase que as fileiras nao contam */
+  ok('  e de quem e a vez continua no titulo',
+     /Sua vez|escolhendo/.test(h2));
+}
+
 console.log(falhas ? '\n' + falhas + ' FALHA(S)' : '\nTudo certo.');
 process.exit(falhas ? 1 : 0);

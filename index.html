@@ -3156,6 +3156,15 @@
      não um flex que quebra: com `flex-wrap` a última linha fica com um card sozinho e as colunas
      deixam de alinhar -- e é a coluna que o olho usa pra comparar dois candidatos. */
   .selecao-bolo{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;}
+  /* ⚠️ AS DUAS PRÉVIAS DO DRAFT SÃO O `.save-slot-card` DA CASA -- estas regras só ACRESCENTAM o
+     que é próprio delas: a margem entre as duas e a vaga vazia. O desenho (moldura, estrela da
+     média, fileira de sprites) vem todo de lá, e é isso que faz o card ser o mesmo da home. */
+  .selecao-fileira{margin-top:6px;}
+  .selecao-fileira.eu{border-color:var(--blue-dark);}
+  /* a vaga VAZIA ocupa a célula da grade de 6 e se lê como "falta um" -- sem ela a fileira de um
+     time pela metade fica só com espaço em branco, que se lê como "acabou" */
+  .save-slot-mon.vazia{min-width:0;height:62px;border:1px dashed var(--box-border);
+    border-radius:5px;background:#00000008;}
   .selecao-card{position:relative;background:var(--box);border:2px solid var(--box-border);
     border-radius:4px;padding:4px 3px 16px;display:flex;flex-direction:column;align-items:center;
     gap:2px;cursor:pointer;text-align:center;min-width:0;}
@@ -34557,6 +34566,20 @@ function selecaoCardHtml(p, i){
   return '<button class="selecao-card" onclick="selecaoEscolher(' + i + ')"'
     + ' aria-label="Escolher ' + escapeHtmlSafe(mon.name || p.id) + '">' + dentro + '</button>';
 }
+/* ⚠️ AS DUAS PRÉVIAS DO DRAFT (21/09/2026, a pedido: *"vai montando 2 linhas com os times que
+   estão se formando, conforme a escolha dos treinadores em tempo real"*), e elas são o CARD DE TIME
+   DA CASA -- o mesmo da home e da tela de inscrição das ligas (pedido no mesmo dia).
+   ⚠️ ELAS SAEM DO `pool`, nunca de uma lista à parte: o `selecao.meu`/`selecao.dele` só são montados
+   no FIM do draft (`selecaoFecharDraft`), então durante ele a única fonte de verdade é o campo
+   `dono` de cada carta -- e derivar é o que faz as prévias não terem como ficar velhas.
+   ⚠️ E A ORDEM É A DA ESCOLHA, que é a do pool: a carta escolhida primeiro está antes no bolo. */
+function selecaoFileiraHtml(dono, n){
+  const ilha = ILHAS_LARANJA.find(i => i.id === 'kumquat') || { lider: 'Luana' };
+  const quem = dono === 'eu' ? nomeDoTreinador() : ilha.lider;
+  const time = selecao.pool.filter(p => p.dono === dono).map(p => p.mon);
+  return cardDeTimeHtml(time, quem + ' · ' + n + '/' + SELECAO_TIME,
+    { vagas: SELECAO_TIME, classe: 'selecao-fileira ' + dono });
+}
 function renderSelecao(){
   const ilha = ILHAS_LARANJA.find(i => i.id === 'kumquat') || { nome: 'Kumquat', lider: 'Luana' };
   const cabeca = `<div class="eyebrow">${selo('estadio')} ILHA ${escapeHtmlSafe(ilha.nome.toUpperCase())}</div>`;
@@ -34586,10 +34609,11 @@ function renderSelecao(){
     return cabeca + `
     <div class="box cursor">
       <h2>${minha ? 'Sua vez' : escapeHtmlSafe(ilha.lider) + ' está escolhendo…'}</h2>
-      <p class="hint-text">${minha ? 'Escolha <strong>' + selecao.restam + '</strong>.'
-        : 'Ela leva <strong>' + selecao.restam + '</strong>.'}
-        Você tem ${meus} de ${SELECAO_TIME}, ela tem ${dele}.
-        ${selecao.faixa ? 'Faixa <strong>Lv.' + selecao.faixa[0] + '–' + selecao.faixa[1] + '</strong>.' : ''}</p>
+      ${/* ⚠️ A LINHA DE TEXTO SAIU (21/09/2026, a pedido) -- ela dizia quantos faltam, quantos cada
+           um tem e a faixa de nível. As DUAS FILEIRAS abaixo contam as mesmas três coisas melhor:
+           o time se monta na frente do jogador, e o nível está escrito em cada sprite. */''}
+      ${selecaoFileiraHtml('eu', meus)}
+      ${selecaoFileiraHtml('npc', dele)}
     </div>
     <div class="box">
       <div class="selecao-bolo">${selecao.pool.map(selecaoCardHtml).join('')}</div>
@@ -35024,20 +35048,44 @@ function pescariaTimeSprites(time){
    velocidade total da equipe (20/09/2026, a pedido). Um card próprio pra ela seria a terceira
    cópia do mesmo desenho -- é por ele ser o MESMO card da Liga, da home e da Pescaria que o
    jogador reconhece um time sem reaprender a ler. */
-function pescariaCardDoTime(slot, selecionado, acao, rodape){
-  const sv = (game.saveSlots && game.saveSlots[slot]) || {};
-  const time = sv.team || [];
-  const nome = sv.customName || (`Time ${slot + 1}`);
+/* ⚠️ O CARD DE TIME DA CASA -- o MESMO da home, da tela de inscrição das ligas, da Pescaria e da
+   Corrida. Ele passou a receber o TIME em vez do slot em 21/09/2026, e a razão é o draft da Ilha
+   Kumquat: lá o time que está sendo montado NÃO É DE SAVE NENHUM -- ele sai do bolo, carta a
+   carta --, então não havia slot pra ler. Um card próprio ali seria a QUINTA cópia do mesmo
+   desenho, e é justamente por ele ser o mesmo em todo lugar que o jogador reconhece um time sem
+   reaprender a ler. */
+function cardDeTimeHtml(time, nome, opcoes){
+  const o = opcoes || {};
+  time = time || [];
   const media = time.length ? Math.round(time.reduce((a, p) => a + (p.level || 0), 0) / time.length) : 0;
-  return `<button class="save-slot-card ${time.length ? "has-avg-star" : ""} clickable${selecionado ? " selecionado" : ""}"`
-    + ` onclick="${acao}">`
-    + `<div class="save-slot-top">`
+  /* ⚠️ AS VAGAS VAZIAS SÃO PEDIDAS PELO CHAMADOR (`o.vagas`), e só o draft as pede: a fileira é uma
+     grade de 6 colunas, então um time de 2 já deixa 4 células em branco -- o que basta pra quem
+     olha um time PRONTO. Num time que está sendo MONTADO, o branco se lê como "acabou" e o
+     tracejado se lê como "faltam 4", que é a informação que a linha de texto dava. */
+  const vazias = o.vagas
+    ? Array.from({ length: Math.max(0, o.vagas - time.length) },
+        () => `<div class="save-slot-mon vazia"></div>`).join('')
+    : '';
+  const corpo = `<div class="save-slot-top">`
     + `<span class="team-avg-star" title="Média de nível do time">${STAR_SVG}`
     + `<span class="team-avg-star-num">${media}</span></span>`
     + `<span class="save-slot-name"><span class="team-avg-star-name">${escapeHtmlSafe(nome)}</span></span>`
-    + `</div><div class="save-slot-team-row spread">${pescariaTimeSprites(time)}</div>`
-    + (rodape ? `<div class="card-rodape">${rodape}</div>` : ``)
-    + `</button>`;
+    + `</div><div class="save-slot-team-row spread">${pescariaTimeSprites(time)}${vazias}</div>`
+    + (o.rodape ? `<div class="card-rodape">${o.rodape}</div>` : ``);
+  const cls = `save-slot-card ${time.length ? 'has-avg-star' : ''}`
+    + (o.acao ? ' clickable' : '') + (o.selecionado ? ' selecionado' : '')
+    + (o.classe ? ' ' + o.classe : '');
+  /* ⚠️ SEM AÇÃO ELE É UMA <div>, nunca um <button> apagado: no draft ele é uma PRÉVIA, e um botão
+     que não faz nada convida um toque que não responde -- a mesma decisão da ilhota do setup do
+     Resgate e da ilha sem jogo do mapa das Laranja. */
+  return o.acao
+    ? `<button class="${cls}" onclick="${o.acao}">${corpo}</button>`
+    : `<div class="${cls}">${corpo}</div>`;
+}
+function pescariaCardDoTime(slot, selecionado, acao, rodape){
+  const sv = (game.saveSlots && game.saveSlots[slot]) || {};
+  return cardDeTimeHtml(sv.team, sv.customName || (`Time ${slot + 1}`),
+    { selecionado: selecionado, acao: acao, rodape: rodape });
 }
 /* ⚠️ O RANKING É DA PRIMEIRA TELA, e é ele que dá razão pra voltar: sem placar, um duelo ganho
    contra o Wilton morre na própria tela do fim. Ele mostra o TOP 10 por pontos.
@@ -36636,6 +36684,11 @@ const QUEIMADA_BOLA_LADO_ESP = 28;
    evitando nos minigames. */
 const QUEIMADA_MUNICAO = 10;
 const QUEIMADA_RECARGA = 5;             /* segundos, com o pente vazio */
+/* ⚠️ RECARREGAR CUSTA MOBILIDADE (21/09/2026, a pedido): quem está com o pente vazio anda pela
+   METADE da velocidade. Sem o freio a recarga era só uma espera -- o pokémon continuava fugindo no
+   mesmo ritmo e o que ele perdia era só o tiro; com ele, ela vira uma JANELA, que é o momento em
+   que o outro lado consegue alcançar. Vale pros DOIS lados, como o pente. */
+const QUEIMADA_RECARGA_FREIO = 0.5;
 const QUEIMADA_TIRO_RECARGA = 0.85;
 const QUEIMADA_ESPECIAL_RECARGA = 45;   /* e ele começa INDISPONÍVEL, carregando */
 /* ⚠️ A BOLA COMUM FOI A 255 em 21/09/2026 (+50%, a pedido). O ESPECIAL NÃO subiu junto -- o
@@ -36643,7 +36696,12 @@ const QUEIMADA_ESPECIAL_RECARGA = 45;   /* e ele começa INDISPONÍVEL, carregan
    de VELOCIDADE dele quase some (255 contra 280), e o que o separa passa a ser o que ele ja tinha
    de proprio: perseguir o alvo e atravessar o RECEBER. */
 const QUEIMADA_BOLA_V = 255, QUEIMADA_BOLA_V_ESP = 280;
-const QUEIMADA_BOLA_V_DEVOLVIDA = 180;
+/* ⚠️ A DEVOLVIDA SAI 50% MAIS RÁPIDA (21/09/2026, a pedido): 180 -> 270. Ela já voltava mais FORTE
+   (×1,25 de dano, com teto); agora ela volta mais DEPRESSA também, e é isso que transforma a defesa
+   perfeita num contra-ataque de verdade em vez de um empurrão. O preço está medido na seção do
+   modo: devolver uma devolvida ficou bem mais duro, porque a janela do RECEBER é a mesma e o voo
+   encurtou -- ou seja quem acerta a primeira defesa leva vantagem de verdade. */
+const QUEIMADA_BOLA_V_DEVOLVIDA = 270;
 const QUEIMADA_REFLEXO_MULT = 1.25, QUEIMADA_REFLEXO_TETO = 1.6;
 const QUEIMADA_REFLEXO_DESCONTO = 5;    /* segundos que uma devolução tira da recarga do especial */
 const QUEIMADA_ATORDOA = 0.28;
@@ -36951,7 +37009,11 @@ function queimadaNpc(){
 function queimadaAndar(a, i, dt){
   a.andando = false;
   const dx = a.tx - a.x, dy = a.ty - a.y, d = Math.hypot(dx, dy);
-  const vel = queimadaVelocidade(a.inst) * queimadaFadiga(a);
+  /* ⚠️ O FREIO DA RECARGA ENTRA NA VELOCIDADE, nunca no passo: o gasto de fôlego é `passo / vel`,
+     então freando os dois ele continua o mesmo POR SEGUNDO -- quem recarrega anda mais devagar, e
+     não se cansa mais rápido. Aplicado só no passo, a recarga viraria duas punições de uma vez. */
+  const vel = queimadaVelocidade(a.inst) * queimadaFadiga(a)
+            * (a.recargaAte > queimada.t ? QUEIMADA_RECARGA_FREIO : 1);
   const passo = Math.min(vel * dt, d);
   if(d > 0.05 && queimada.t >= a.atordoadoAte){
     a.x += dx / d * passo; a.y += dy / d * passo;
@@ -37005,12 +37067,47 @@ function queimadaEliminacao(){
   queimadaConter();
   queimada.proximaBola = queimada.rodadaAte + 0.8;
 }
+/* ⚠️ A PARTIDA TERMINA NUM ANÚNCIO, e não direto na tela de resultado (21/09/2026, a pedido).
+   A fase é PRÓPRIA (`anuncio`) em vez de um sinalizador sobre a `fim`, e a diferença é o que se vê:
+   com o sinalizador a tela de resultado ficaria DESENHADA atrás do modal, que é exatamente o que o
+   pedido tira. Aqui a quadra congela no último quadro e o modal vem por cima dela.
+   ⚠️ E ELA PARA O JOGO SOZINHA: o laço, o `queimadaPasso` e o `queimadaAtiva` guardam em
+   `=== 'jogando'`, então nenhum deles roda com a fase nova -- não foi preciso uma segunda guarda. */
 function queimadaTerminar(){
-  queimada.fase = 'fim';
+  queimada.fase = 'anuncio';
   queimada.bolas = [];
   if(queimada.laco){ cancelAnimationFrame(queimada.laco); queimada.laco = null; }
   queimadaDizer('Partida encerrada.');
   render();
+  /* ⚠️ O `render()` RECRIA O <canvas> EM BRANCO, e o laço que o pintava acabou de ser cancelado --
+     sem esta pintura a quadra do anúncio sairia vazia. É o mesmo cuidado do mapa do Resgate.
+     ⚠️ E O HUD VAI JUNTO: o ponto que ENCERRA a partida é contado dentro do `queimadaPasso`, ou
+     seja depois do último quadro pintado -- sem repintar aqui, o placar do anúncio mostraria o
+     placar de ANTES do ponto da vitória. Hoje o laço ainda repinta por acidente (ele chama os dois
+     pintores depois do passo), e é justamente disso que esta linha tira a dependência: quem chama
+     o terminar por outro caminho continua vendo a tela certa. */
+  queimadaPintar();
+  queimadaPintarHud();
+}
+function queimadaFecharAnuncio(){
+  if(queimada.fase !== 'anuncio') return;
+  queimada.fase = 'fim';
+  render();
+}
+/* o anúncio nomeia o POKÉMON que venceu, não o treinador: é ele que estava na quadra */
+function queimadaAnuncioHtml(){
+  const v = queimadaVencedor();
+  const p = v > 0 ? queimada.atores[0] : v < 0 ? queimada.atores[1] : null;
+  const sp = p ? (SPECIES[p.inst.speciesId] || {}) : {};
+  const titulo = p ? 'Vitória ' + escapeHtmlSafe(sp.name || p.inst.speciesId) + '!' : 'Empate!';
+  return `
+  <div class="modal-overlay" onclick="queimadaFecharAnuncio()">
+    <div class="modal-box" onclick="event.stopPropagation()">
+      ${p ? '<div class="modal-icon">' + spriteHtml(p.inst, 'sprite-lg', p.inst.shiny) + '</div>' : ''}
+      <h2>${titulo}</h2>
+      <button class="btn primary" onclick="queimadaFecharAnuncio()">Ok</button>
+    </div>
+  </div>`;
 }
 
 function queimadaPasso(dt){
@@ -37364,6 +37461,19 @@ function queimadaDesenharAtor(ctx, a, i, t){
       Math.round(a.x - sw * esc / 2), Math.round(a.y + 17 - sh * esc), sw * esc, sh * esc);
     ctx.restore();
   }
+  /* ⚠️ A BARRA DA RECARGA (21/09/2026, a pedido), e ela só existe ENQUANTO ele recarrega: cheia e
+     parada o tempo todo ela diria "o pente está cheio", que é o estado comum e não precisa de
+     aviso -- é a mesma decisão da barra do RECEBER na praia do Resgate.
+     ⚠️ ELA MORA NO ATOR, não no HUD, e é por isso que ela vale pros DOIS lados: o HUD é do
+     jogador, e a do adversário não teria onde caber ali. E é justamente a do adversário que conta
+     a JANELA -- é ela que diz quando dá pra avançar. */
+  if(a.recargaAte > queimada.t){
+    const p = Math.max(0, Math.min(1, 1 - (a.recargaAte - queimada.t) / QUEIMADA_RECARGA));
+    ctx.fillStyle = '#2f2a24cc';                /* trilho escuro: a quadra é areia clara */
+    ctx.fillRect(a.x - 16, a.y + 19, 32, 5);
+    ctx.fillStyle = '#ffc93f';
+    ctx.fillRect(a.x - 15, a.y + 20, 30 * p, 3);
+  }
   ctx.fillStyle = i ? '#a66d30' : '#28588a';
   ctx.fillRect(a.x - 19, a.y + 25, 38, 10);
   ctx.font = 'bold 8px monospace'; ctx.textAlign = 'center'; ctx.fillStyle = 'white';
@@ -37558,6 +37668,9 @@ function queimadaFimHtml(a, b, v){
 function renderQueimada(){
   if(queimada.picker) return queimadaCabecalho() + queimadaPickerHtml();
   const jogando = queimada.fase === 'jogando';
+  /* ⚠️ A QUADRA CONTINUA DESENHADA NO ANÚNCIO: é ela que o modal cobre. Sem isso ele apareceria
+     sobre a tela de SETUP, que é onde a fase desconhecida cairia -- e o pedido é o contrário. */
+  const anunciando = queimada.fase === 'anuncio';
 
   if(queimada.fase === 'fim'){
     const [a, b] = queimada.atores;
@@ -37567,19 +37680,17 @@ function renderQueimada(){
       <h2>${v > 0 ? selo('trofeu') + ' Você venceu!'
         : v < 0 ? escapeHtmlSafe(queimadaLider()) + ' venceu' : 'Empate'}</h2>
       ${queimadaFimHtml(a, b, v)}
-      ${/* ⚠️ A LINHA DA VIDA RESTANTE SAIU (21/09/2026, a pedido): o duelo é decidido por
-           ELIMINAÇÕES, e o número do último instante não diz nada sobre a partida -- o perdedor
-           termina sempre em zero e o vencedor num valor qualquer. O que ficou é a única linha
-           que conta COMO se jogou: as devoluções. */''}
-      ${a.devolucoes ? `<p class="hint-text">${a.devolucoes}
-        ${a.devolucoes === 1 ? 'devolução sua' : 'devoluções suas'} — cada uma volta mais forte.</p>` : ''}
+      ${/* ⚠️ A TELA DE RESULTADO É SÓ A CLASSIFICAÇÃO (21/09/2026, a pedido). Saíram as DUAS linhas
+           de texto que ela tinha: a da vida restante (o duelo é decidido por ELIMINAÇÕES, e o
+           perdedor termina sempre em zero) e a contagem de devoluções. O que sobrou está todo
+           dentro dos dois cards -- sprite, medalha, KOs, treinador e pokémon. */''}
       <button class="btn success" onclick="queimadaComecar()">Jogar de novo</button>
       <button class="btn secondary" onclick="queimadaReiniciar()">Trocar Pokémon</button>
     </div>
     <button class="btn secondary" onclick="sairDaQueimada()">⬅ Sair</button>`;
   }
 
-  if(!jogando){
+  if(!jogando && !anunciando){
     return `${queimadaCabecalho()}
     <div class="box">
       <h2>Ilha Pummelo · ${escapeHtmlSafe(queimadaLider())}</h2>
@@ -37656,7 +37767,8 @@ function renderQueimada(){
       <p class="hint-text">O ataque mira no adversário; o RECEBER devolve mais forte se o golpe
         tocar você durante a proteção — e o Especial atravessa essa proteção.</p>
       <button class="btn secondary" onclick="queimadaPausar()">${queimada.pausado ? 'Continuar' : 'Pausar'}</button>
-    </div>`;
+    </div>
+    ${anunciando ? queimadaAnuncioHtml() : ''}`;
 }
 /* ⚠️ A VISIBILIDADE DO PINO NÃO É A TRAVA: quem chamar `abrirQueimada()` pelo console cai aqui, e
    aqui o `admin` é conferido de novo. E ENQUANTO A CONTA NÃO CARREGOU ele recusa -- o contrário da

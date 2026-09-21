@@ -16158,6 +16158,154 @@ contra 80–88% recebendo) — antes ele era quase um luxo.
 - **E o texto técnico saiu da primeira tela** (*"O HP vem da fórmula do jogo..."*): ele explicava de
   ONDE os três números vêm, e os três já estão logo acima dele, com o nome de cada um.
 
+### AS SEIS DE 21/09/2026 -- a recarga que freia, o anúncio e as prévias do draft
+
+#### ⚠️ RECARREGAR PASSOU A CUSTAR MOBILIDADE
+
+Pedido assim: *"enquanto o pokémon tá carregando o ataque principal, a velocidade de movimento dele
+cai em 50%. E coloque uma barra embaixo do desenho do pokémon carregando o ataque principal, tanto
+para o adversário quanto para o usuário"*.
+
+**⚠️ ATÉ AQUI A RECARGA ERA SÓ UMA ESPERA:** o pente acabava, o pokémon continuava fugindo no mesmo
+ritmo, e o que ele perdia era só o tiro. Com o freio ela vira uma **JANELA** — o momento em que o
+outro lado consegue alcançar. Medido, o que ele custa em chão de quadra:
+
+| durante os 5 s de recarga | |
+|---|---|
+| antes | **665 px** (a quadra tem 300 de lado — ele a atravessava duas vezes) |
+| hoje | **332 px** |
+
+- **⚠️ O FREIO ENTRA NA VELOCIDADE, nunca no passo**, e isso não é detalhe: o gasto de fôlego é
+  `passo / vel`, então freando os dois ele continua o mesmo **POR SEGUNDO**. Aplicado só no passo,
+  a recarga seria **duas punições de uma vez** — andar menos E cansar mais. Há trava medindo o
+  fôlego por segundo nos dois estados.
+- **ELE VALE PROS DOIS LADOS por construção**, como o pente: o laço anda os dois pelo MESMO
+  `queimadaAndar`.
+
+**A BARRA SÓ EXISTE ENQUANTO ELE RECARREGA.** Cheia e parada o tempo todo ela diria *"o pente está
+cheio"*, que é o estado comum e não precisa de aviso — é a mesma decisão da barra do RECEBER na
+praia do Resgate.
+
+- **⚠️ ELA MORA NO ATOR, não no HUD, e é por isso que ela vale pros DOIS lados:** o HUD é do
+  jogador, e a do adversário não teria onde caber ali. **E é justamente a dele que conta a janela**
+  — é ela que diz quando dá pra avançar.
+- Ela fica no **vão entre o sprite e a etiqueta do nome** (y+19 a y+24 do centro), que é o único
+  espaço livre ali; fora dele ela cobriria um dos dois. Trilho escuro e enchimento âmbar, porque a
+  quadra é areia clara.
+- **Medido no navegador:** com 4,0 s restando ela sai com **20% de enchimento** e com 1,0 s
+  restando, **80%** — exato, nos dois lados.
+
+#### ⚠️ A DEVOLVIDA SAI 50% MAIS RÁPIDA
+
+*"Quando um ataque é recebido, a devolução dele sai 50% mais rápido"*: 180 → **270 px/s**.
+
+Ela já voltava mais **FORTE** (×1,25 de dano, com teto); agora ela volta mais **DEPRESSA** também,
+e é isso que transforma a defesa perfeita num contra-ataque de verdade em vez de um empurrão.
+
+| | antes | hoje |
+|---|---|---|
+| a devolvida cruza a quadra em | 1,67 s | **1,11 s** (−33% de tempo de reação) |
+| e o escudo cobre | 40% do voo dela | **59%** |
+
+**⚠️ OS DOIS NÚMEROS ANDAM PRA LADOS OPOSTOS, e é isso que a torna difícil de devolver de volta:**
+a FRAÇÃO que o escudo cobre subiu (o voo encurtou e a janela é a mesma), mas o TEMPO ABSOLUTO pra
+reagir caiu um terço. Quem acerta a primeira defesa leva vantagem de verdade.
+
+- **⚠️ ELA CONTINUA ABAIXO DO ESPECIAL** (270 contra 280): se passasse, a devolvida seria o golpe
+  mais rápido do modo e o especial deixaria de ter o que o separa. Há trava.
+
+**O PREÇO DAS DUAS JUNTAS NO DUELO: NADA.** **77,67% → 83,67%**, **+6,0 pontos, 1,7σ** (12 blocos
+de 25 duelos de cada lado, o MESMO bot contra duas cópias congeladas, desvio tirado de ENTRE os
+blocos). Dentro do ruído, e pela razão de sempre neste projeto: **as duas caem dos DOIS lados** —
+o NPC também recarrega e também devolve.
+
+#### ⚠️ A PARTIDA TERMINA NUM ANÚNCIO, E ELE É UMA FASE PRÓPRIA
+
+*"No fim da batalha, antes de ir para a última tela, exiba um modal 'Vitória Raichu!' e quando o
+usuário clicar em Ok, fecha o modal e abre a última tela"*.
+
+- **⚠️ A FASE É PRÓPRIA (`anuncio`), e não um sinalizador sobre a `fim`** — a diferença é o que se
+  vê: com o sinalizador a tela de **resultado ficaria desenhada atrás do modal**, que é exatamente o
+  que o pedido tira. Aqui a quadra **congela no último quadro** e o modal vem por cima dela.
+- **E ELA PARA O JOGO SOZINHA:** o laço, o `queimadaPasso` e o `queimadaAtiva` já guardam em
+  `=== 'jogando'`, então nenhum deles roda com a fase nova. Não foi preciso uma segunda guarda.
+- **⚠️ O `render()` RECRIA O `<canvas>` EM BRANCO** e o laço que o pintava acabou de ser cancelado
+  — sem uma pintura a quadra do anúncio sairia vazia. É o mesmo cuidado do mapa do Resgate.
+- **⚠️ E O HUD VAI JUNTO, por um motivo que só o navegador mostrou:** o ponto que ENCERRA a partida
+  é contado **dentro** do `queimadaPasso`, ou seja depois do último quadro pintado — sem repintar,
+  o placar do anúncio mostrava **2/3 numa partida que acabou em 3/3**. O laço ainda repinta por
+  acidente (ele chama os dois pintores depois do passo), e é dessa dependência que a linha tira.
+- **O anúncio nomeia o POKÉMON**, não o treinador: é ele que estava na quadra. **No empate ele diz
+  "Empate!"** e não desenha sprite nenhum — ali não houve vencedor.
+
+#### E A TELA DE RESULTADO FICOU SENDO SÓ A CLASSIFICAÇÃO
+
+Saiu a linha *"N devoluções suas — cada uma volta mais forte"*, a pedido. Com ela vai embora a
+**última** linha de texto daquela tela (a da vida restante já tinha saído horas antes): o que ela
+conta está todo dentro dos dois cards — sprite, medalha, KOs, treinador e pokémon.
+
+#### ⚠️ AS DUAS PRÉVIAS DO DRAFT SÃO O CARD DE TIME DA CASA
+
+Pedidas em duas etapas no mesmo dia: *"na tela que exibe os 12 pokémons, vai montando 2 linhas com
+os times que estão se formando, conforme a escolha dos treinadores em tempo real"* e, com elas na
+tela, *"coloque o card que vai exibir a prévia do time igual os cards que tem na tela home e os
+cards para selecionar o time que vai ser inscrito nas ligas"*.
+
+**⚠️ A SEGUNDA METADE OBRIGOU O CARD DA CASA A RECEBER O TIME EM VEZ DO SLOT.** Ele lia
+`game.saveSlots[slot]` — e o time do draft **não é de save nenhum**: ele sai do bolo, carta a
+carta. Um card próprio ali seria a **QUINTA cópia** do mesmo desenho (home, ligas, Pescaria,
+Corrida), e é por ele ser o mesmo em todo lugar que o jogador reconhece um time sem reaprender a
+ler. Hoje o `cardDeTimeHtml` recebe o time e o `pescariaCardDoTime` é um invólucro que lê o save.
+
+- **⚠️ ELAS SAEM DO `pool`, nunca de uma lista à parte:** o `selecao.meu`/`selecao.dele` só são
+  montados no **FIM** do draft (`selecaoFecharDraft`), então durante ele a única fonte de verdade é
+  o campo `dono` de cada carta — e derivar é o que faz as prévias não terem como ficar velhas.
+- **⚠️ SEM AÇÃO O CARD É UMA `<div>`, nunca um `<button>` apagado:** aqui ele é uma PRÉVIA, e um
+  botão que não faz nada convida um toque que não responde — a mesma decisão da ilhota do setup do
+  Resgate e da ilha sem jogo do mapa das Laranja.
+- **⚠️ AS VAGAS VAZIAS SÃO PEDIDAS PELO CHAMADOR, e só o draft as pede:** a fileira é uma grade de
+  6 colunas, então um time de 2 já deixa 4 células em branco — o que basta pra quem olha um time
+  **PRONTO**. Num time que está sendo **MONTADO**, o branco se lê como *"acabou"* e o tracejado se
+  lê como *"faltam 4"*, que é a informação que a linha de texto dava.
+
+**E A LINHA DE TEXTO SAIU** (*"Escolha 2. Você tem 0 de 6, ela tem 1. Faixa Lv.35–45."*), a pedido.
+Os dois cards contam as três coisas melhor: a contagem está no nome (`Buzzo · 2/6`), o nível está
+em cada sprite e a média na estrela. **O que sobrou no título é a VEZ**, que é a única coisa da
+frase que as prévias não contam.
+
+**Medido a 320px, no navegador:** os dois cards em **243×116px**, iguais, com a estrela da média
+(56 e 57), nenhum nome truncado e **sem rolagem lateral**. O modal do anúncio fica em **265×256px**.
+
+#### O QUE ISSO CUSTOU AO JOGO: NADA
+
+`MOTOR 2bc051b58136 / DIARIO 51dc1030cf1e`, idêntico em 900 batalhas semeadas.
+
+#### ⚠️ E TRÊS TRAVAS MINHAS PASSARAM EM BRANCO — só a conferência de acusação pegou
+
+As três estavam VERDES com o código certo e continuaram verdes com o defeito religado, que é o
+pior tipo de trava que existe. Elas ficam registradas porque as três causas já têm precedente aqui:
+
+| trava | por que ela não media nada |
+|---|---|
+| *"quem recarrega anda pela metade"* | ela comparava a razão medida **com a própria constante** — desligando o freio (`1`), a razão também vira 1 e ela passa. É a lição do *"trava que pergunta à função que ela mede não é trava"*. Hoje ela cobra **as duas coisas**: que a constante é menor que 1 e que a razão bate |
+| *"o terminar pinta a quadra"* | um `[\s\S]*?` **sem limite atravessa a função** e acha o `queimadaPintar()` do LAÇO, centenas de linhas abaixo. É a armadilha do `mlog-mais` e do `matchup-row`. Hoje ela **fatia a função primeiro**, com um `ok` cobrando que a fatia tem o que ler |
+| *"a prévia é uma `<div>`"* | ela simplesmente **não existia** — eu tinha a decisão escrita no comentário e nenhuma asserção sobre ela |
+
+#### ⚠️ E O `process.argv[1]` MORDEU DE NOVO, no mesmo dia
+
+Escrevendo o script de acusação desta leva, usei `process.argv[1]` pro primeiro argumento — e com
+o script vindo do **stdin** (`node - <<EOF`) ele vale **`-`**. O erro foi barulhento desta vez
+(`ENOENT: open '.../-/acusar-leva5.js'`), ao contrário da vez em que ele apagou a tabela de
+desenhos. **Com stdin o argumento é `argv[2]`.**
+
+#### ⚠️ E O HEREDOC COME AS BARRAS DUPLAS
+
+Três vezes nesta sessão: um `\\n` escrito dentro de um `node - <<'EOF'` chega no node como `\n` e
+vira uma **quebra de linha de verdade** na string — a âncora deixa de casar, ou pior, o arquivo
+sai com a linha partida no meio. O mesmo vale pro `\\(` de uma regex.
+**Pra texto literal com escape, o caminho é a ferramenta de edição de arquivo**, não o heredoc — e
+o sintoma é sempre o mesmo: uma âncora certa que não encontra nada.
+
 #### ⚠️ E UM `process.argv[1]` QUASE APAGOU A TABELA DE DESENHOS
 
 Aplicando a tabela regerada, escrevi `process.argv[1]` onde queria o primeiro ARGUMENTO — e
