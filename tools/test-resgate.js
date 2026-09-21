@@ -422,7 +422,7 @@ console.log('\n=== O DUELO INTEIRO ===');
     let voltas = 0;
     while(S.resgate.fase !== 'fim' && voltas < 20000){
       const a = S.resgate.atores[0];
-      if(!a.alvo && a.resgatando === null){
+      if(!a.alvo && a.resgatando === null && a.descarga <= 0){
         if(a.bag.length >= S.RESGATE_CAPACIDADE) S.resgateVoltarAPraia();
         else {
           const livres = S.resgate.ocupantes.map((p, i) => ({ p, i })).filter(v => v.p.speciesId && v.p.dono === null);
@@ -727,11 +727,39 @@ console.log('\n=== O MAPA JÁ MOSTRA QUEM ESTÁ LÁ, DESDE O SETUP (20/09/2026) 
 
   const html = S.renderResgate();
   const mapa = html.slice(html.indexOf('resg-mapa'), html.indexOf('resg-legenda'));
-  ok('o mapa do setup desenha os SPRITES', /sprite-img|sprite-fallback/.test(mapa));
-  ok('  e o valor de cada um', /resg-pts/.test(mapa));
+  /* ⚠️ E O SETUP NÃO MOSTRA MAIS UM BICHO POR ILHOTA (20/09/2026, a pedido). Ele era descartável
+     e enganoso: os ocupantes são sorteados de NOVO no `resgateComecar`, então o que a tela
+     mostrava ali não era o que o jogador ia encontrar. */
+  ok('o mapa do setup NÃO mostra um Pokémon por ilhota', !/sprite-img|sprite-fallback/.test(mapa),
+     'o bicho do setup voltou');
+  ok('  e cada ilhota tem o (i)',
+     (mapa.match(/abrirIlhotaDoResgate\(/g) || []).length === S.RESGATE_PONTOS.length,
+     (mapa.match(/abrirIlhotaDoResgate\(/g) || []).length + ' de ' + S.RESGATE_PONTOS.length);
+  /* ⚠️ MAS ELE MOSTRA A FAIXA: seis ilhotas vazias se leriam iguais, e é justamente a ESCADA que
+     o mapa tem a dizer antes da largada. O rótulo sai das constantes. */
+  ok('  e a faixa dela', mapa.indexOf(S.resgateRotuloDaFaixa(0)) >= 0 && mapa.indexOf(S.resgateRotuloDaFaixa(4)) >= 0,
+     S.resgateRotuloDaFaixa(0) + ' / ' + S.resgateRotuloDaFaixa(2) + ' / ' + S.resgateRotuloDaFaixa(4));
+  /* ⚠️ E O (i) É IRMÃO do ponto, nunca filho: no jogo o ponto é um <button>, e <button> dentro de
+     <button> é HTML inválido -- o navegador fecha o de fora e o clique de dentro se perde. */
+  ok('  e o (i) é irmão do ponto, não filho',
+     /<span class="resg-ponto so-faixa">[\s\S]*?<\/span>\s*<button class="pesc-info"/.test(mapa));
   /* ⚠️ E ELE CONTINUA SENDO ILUSTRAÇÃO: um botão que não faz nada convida um toque que não
-     responde -- a mesma decisão da ilha da Pescaria. */
+     responde -- a mesma decisão da ilha da Pescaria. O (i) é a exceção, e é o que a tela oferece. */
   ok('  mas os pontos não clicam no setup', mapa.indexOf('resgateTocarPonto') < 0);
+
+  /* A CAIXA DO (i): o bolo inteiro da faixa daquela ilhota, com o valor e a chance */
+  S.abrirIlhotaDoResgate(4);
+  const cx = S.renderResgate();
+  const bolo = S.RESGATE_BOLO_DA_FAIXA[S.RESGATE_FAIXA_DO_PONTO[4]];
+  ok('a caixa do (i) lista o bolo inteiro da faixa',
+     bolo.every(id => cx.indexOf((S.SPECIES[id] || {}).name) >= 0), bolo.join(','));
+  ok('  e ninguém de outra faixa',
+     S.RESGATE_BOLO_DA_FAIXA[0].every(id => cx.indexOf((S.SPECIES[id] || {}).name) < 0));
+  ok('  com o valor de cada um', cx.indexOf(S.resgatePontosDe(bolo[0]) + ' pts') >= 0);
+  ok('  e a chance, que é uniforme', cx.indexOf(Math.round(100 / bolo.length) + '%') >= 0);
+  ok('  e a linha abre a ficha da Pokédex', cx.indexOf('abrirPokedexFicha') >= 0);
+  S.fecharIlhotaDoResgate();
+  ok('  e ela fecha', S.resgate.ilhotaAberta === null && S.renderResgate().indexOf('rota-mons-box') < 0);
 
   /* ⚠️ E O CANVAS É PINTADO A CADA RENDER, não só ao abrir (20/09/2026, reportado: *"depois que
      eu escolho meu parceiro, o desenho do mapa some e fica somente aquela toda azul"*). Quem o
@@ -877,6 +905,84 @@ console.log('\n=== A ESCADA: CADA ALTURA TEM A SUA FAIXA DE PONTOS ===');
   ok('a ilhota mais longe sempre paga mais que a mais perto',
      Math.min(...pts(2)) > Math.max(...pts(1)) && Math.min(...pts(1)) > Math.max(...pts(0)),
      Math.max(...pts(0)) + ' < ' + Math.min(...pts(1)) + ' .. ' + Math.max(...pts(1)) + ' < ' + Math.min(...pts(2)));
+}
+
+/* ============================================================================
+   ⚠️ A DESCARGA DE 2s NA PRAIA (20/09/2026, a pedido: *"coloque tambem um timer de 2s para
+   descarregar os pokemons resgatados na praia"*). Chegar deixou de ser entregar.
+   ============================================================================ */
+console.log('\n=== A DESCARGA DE 2s NA PRAIA ===');
+{
+  contaDeTeste();
+  S.resgate.escolhido = S.resgateElegiveis()[0];
+  S.resgate.atores = [S.resgateAtor(S.resgateInstancia({ speciesId: 'lapras', level: 60 }, true), 170),
+                      S.resgateAtor(S.resgateInstancia({ speciesId: 'lapras', level: 60 }, false), 190)];
+  S.resgate.ocupantes = S.RESGATE_PONTOS.map((_, i) => S.resgateNovoOcupante(i));
+  S.resgate.fase = 'correndo'; S.resgate.tempo = 0;
+  const eu = S.resgate.atores[0];
+
+  /* chega na praia com carga: a descarga ABRE, e os pontos ainda NÃO contaram */
+  eu.bag = [{ speciesId: 'pichu', pts: 41 }];
+  eu.x = S.RESGATE_PRAIA.x; eu.y = S.RESGATE_PRAIA.y;
+  S.resgateVoltarAPraia();
+  S.resgateAtualizar(1 / 30);
+  ok('chegar na praia abre a descarga, e não entrega',
+     eu.descarga > 0 && eu.pontos === 0 && eu.bag.length === 1,
+     'descarga ' + eu.descarga.toFixed(2) + 's, ' + eu.pontos + ' pts');
+  ok('  e o estado diz isso', eu.estado === 'Descarregando…', eu.estado);
+
+  /* ⚠️ ELA LEVA `RESGATE_DESCARGA` SEGUNDOS, medidos no motor -- e a trava lê a constante, nunca
+     um número escrito aqui. */
+  let t = 1 / 30;
+  while(eu.descarga > 0 && t < 10){ S.resgateAtualizar(1 / 30); t += 1 / 30; }
+  ok('  e ela leva ' + S.RESGATE_DESCARGA + 's', Math.abs(t - S.RESGATE_DESCARGA) < 0.1, t.toFixed(2) + 's');
+  ok('  e só então os pontos contam', eu.pontos === 41 && eu.bag.length === 0,
+     eu.pontos + ' pts, ' + eu.bag.length + ' a bordo');
+  ok('  e as entregas guardam o que foi entregue', eu.entregas.length === 1);
+
+  /* ⚠️ SAIR NO MEIO DELA CANCELA, e leva a carga de volta pro mar: é a mesma regra do resgate na
+     ilhota, e é o que faz os 2s serem um CUSTO e não uma espera decorativa. */
+  eu.bag = [{ speciesId: 'togepi', pts: 49 }];
+  eu.x = S.RESGATE_PRAIA.x; eu.y = S.RESGATE_PRAIA.y;
+  S.resgateVoltarAPraia(); S.resgateAtualizar(1 / 30);
+  ok('a descarga está em curso', eu.descarga > 0);
+  S.resgateTocarPonto(0);
+  ok('  e sair dela cancela', eu.descarga === 0 && eu.bag.length === 1 && eu.pontos === 41,
+     'descarga ' + eu.descarga + ', ' + eu.bag.length + ' a bordo, ' + eu.pontos + ' pts');
+
+  /* ⚠️ E NINGUÉM FICA COM CARGA SEM PAGAR: o retorno automático espera a descarga, e o
+     encerramento entrega o que sobrou -- um desembarque feito aos 89s não pode valer zero. */
+  eu.alvo = null; eu.descarga = 0;
+  eu.bag = [{ speciesId: 'tangela', pts: 87 }];
+  S.resgate.atores[1].bag = [{ speciesId: 'elekid', pts: 72 }];
+  S.resgate.atores.forEach(x => { x.x = S.RESGATE_PRAIA.x; x.y = S.RESGATE_PRAIA.y; x.alvo = null; });
+  S.resgateTerminar();
+  ok('o fim da prova entrega o que estava a bordo',
+     eu.bag.length === 0 && eu.pontos === 41 + 87 && S.resgate.atores[1].pontos === 72,
+     eu.pontos + ' x ' + S.resgate.atores[1].pontos);
+
+  /* ⚠️ E O RETORNO AUTOMÁTICO NÃO FECHA ANTES DA DESCARGA: sem essa espera, o `voltando`
+     terminaria no instante em que os dois encostam na areia e os 2s nunca correriam. */
+  S.resgate.fase = 'voltando';
+  S.resgate.atores.forEach(x => { x.alvo = null; x.descarga = 0; x.bag = []; x.x = S.RESGATE_PRAIA.x; x.y = S.RESGATE_PRAIA.y; });
+  eu.descarga = 1;
+  S.resgateAtualizar(1 / 30);
+  ok('o retorno automático espera a descarga', S.resgate.fase === 'voltando', S.resgate.fase);
+  eu.descarga = 0;
+  S.resgateAtualizar(1 / 30);
+  ok('  e fecha quando ela acaba', S.resgate.fase === 'fim', S.resgate.fase);
+
+  /* ⚠️ O NPC TAMBÉM ESPERA: sem a guarda, o planejador dele mandaria o parceiro embora no quadro
+     seguinte e ele nunca entregaria nada. */
+  const plano = src.slice(src.indexOf('function resgateNpcPlano'), src.indexOf('function resgateNpcPlano') + 400);
+  ok('  (e a trava lê o planejador do NPC)', plano.length > 200);
+  ok('  e o NPC espera a descarga antes de planejar', plano.indexOf('a.descarga > 0') >= 0);
+
+  /* A BARRA NA PRAIA -- sem ela os 2s são uma espera sem explicação. É o MESMO `.resg-medidor`
+     da ilhota, e o `[hidden]` precisa de regra própria pra vencer o `display` do autor. */
+  ok('a praia tem a barra da descarga', src.indexOf('id="resgateDescarga"') >= 0);
+  ok('  e ela é o mesmo medidor da ilhota', /id="resgateDescarga"[^>]*><i><\/i><b>/.test(src));
+  ok('  e o `[hidden]` dela vence o display', /\.resg-medidor\[hidden\]\{display:none;?\}/.test(src));
 }
 
 console.log('\n=== O PONTO É TRANSPARENTE E A BARRA FICA ACIMA ===');

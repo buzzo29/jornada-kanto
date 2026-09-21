@@ -14361,6 +14361,66 @@ vez de 1271** -- ou seja ele "passava" sem nunca chegar na trava. É literalment
 arquivo já registra (*"uma trava que estoura é pior que uma que falha"*), agora aplicada à árvore
 inteira: **conferir a CONTAGEM de asserções antes de acreditar num verde**.
 
+## AS TRÊS DA CORRIDA (21/09/2026) -- a pista fixa, o rótulo e os líderes
+
+### ⚠️ SÃO SEMPRE QUATRO NA PISTA
+
+Pedido assim: *"pode retirar os botoes de 2 e 3 pokemons/equipes, pode deixar sempre 4"*. Era um
+segmentado de 2/3/4 no setup.
+
+- **⚠️ O NÚMERO VIROU CONSTANTE, e não um campo do `corrida` fixado em 4:** campo é ESTADO, e
+  estado que nunca muda é a forma mais silenciosa de código morto que existe -- ele ficaria no
+  `corridaZerar`, no `escolhaPorFormato` e nas quatro contas de pista esperando alguém tentar
+  mudá-lo de novo. O `corridaTrocarParticipantes` saiu junto.
+- **AS DUAS CONTAS QUE PERGUNTAVAM PELO NÚMERO viraram o valor que elas já davam com 4:** a escala
+  do sprite (`participantes === 2 ? 3 : 2.5`) e a fonte do brilho (`=== 4 ? 10 : 12`).
+- **O QUE SOBRA NO SETUP É UMA FRASE**, porque a pista com quatro raias é o que o jogador vai ver:
+  *"4 equipes na pista: você e 3 líderes da Liga Laranja"* -- derivada da constante.
+- **⚠️ E DEZESSETE TRAVAS ESCREVIAM `corrida.participantes` À MÃO.** Elas passaram a escrever num
+  campo que ninguém lê -- verde, e medindo nada. Saíram todas, e a que media as **seis**
+  combinações (2/3/4 × individual/revezamento) virou **duas**, cobrando que o número de corredores
+  seja o da CONSTANTE. É a mesma lição das cinco travas que caíram quando o trecho virou 150 m:
+  **trava que fixa um número envelhece com ele.**
+
+### O RÓTULO DO BOTÃO SEGUE A MODALIDADE
+
+*"Quando clicar no botao de revezamento, trocar o texto do botao de 'Escolher corredor' para
+'Escolher equipe'"*. No revezamento o que se escolhe é uma EQUIPE inteira, e o singular descrevia
+a individual.
+
+**⚠️ E AS DUAS TELAS PRA ONDE ELE LEVA JÁ ERAM DIFERENTES** -- a lista de POKÉMON na individual, a
+de TIMES no revezamento, cada uma com o título dela. O que dizia a mesma coisa nas duas
+modalidades era só o botão. (A primeira versão pôs a função também no título do picker da
+individual, onde ela só pode devolver um valor: o revezamento nem passa por aquela tela. Saiu.)
+
+### OS NPCs SÃO OS LÍDERES DA LIGA LARANJA
+
+*"coloque que o nome dos npcs, ao inves de 1, 2 e 3, seja nomes de lideres das ilhas laranjas"*.
+São os cinco do Orange Crew: **Cissy, Danny, Rudy, Luana e Drake**.
+
+- **⚠️ E O NOME JÁ ESTAVA NO JOGO ANTES DELES:** a **Cissy** é a líder da **Ilha Mikan**, que é
+  justamente a *Enseada de Mikan* onde o Resgate acontece.
+- **⚠️ A ORDEM É FIXA, e não sorteada:** o adversário da raia 2 é sempre o mesmo, e é isso que
+  deixa o jogador reconhecê-lo de uma corrida pra outra. Sortear faria o placar mudar de gente
+  sem nada explicando.
+- **⚠️ E A ETIQUETA DA PISTA E A DO HUD PASSARAM A LER A MESMA FUNÇÃO.** O rótulo estava escrito à
+  mão em TRÊS lugares (o quadro do corredor, o marcador de borda e a linha do placar) -- três
+  cópias divergem no primeiro ajuste. O lado 0 continua sendo "VOCÊ" na PISTA (ali o nome do
+  treinador pode ter 20 caracteres num rótulo de 10px) e "Você" no HUD.
+- **A LISTA TEM FOLGA sobre as raias** (cinco nomes pra três adversários), e o `%` é a rede pro dia
+  em que a pista crescer -- sem ele a raia a mais sairia com `undefined`.
+- **⚠️ E O TAMANHO IMPORTAVA:** o "Rival N" tinha sido escolhido porque *"Adversário 1"* quebrava
+  em duas linhas na coluna de 83px da classificação. Os cinco cabem -- o mais longo tem cinco
+  letras --, e há trava cobrando o teto.
+
+**Medido a 320px, no navegador:** a pista com quatro raias, o placar com "Você · Jolteon / Cissy ·
+Dugtrio / Danny · Alakazam / Rudy · Raikou", nenhum nome truncando e **sem rolagem lateral**.
+
+**No motor, nada:** `MOTOR 4e1b30e2729d / DIARIO 603f5c7e563f`, idêntico em 900 batalhas semeadas.
+
+`tools/test-corrida.js` foi a **458 pontas**. **Conferido que ele acusa os 3 defeitos religados**
+(2, 2 e 3 falhas).
+
 ## RESGATE POKÉMON -- o terceiro teste admin (20/09/2026)
 
 Pedido com o `resgate-pokemon.html` da raiz como referência, e com **cinco coisas mudadas** em
@@ -14767,13 +14827,95 @@ com o que chega, o retorno automático, o duelo inteiro terminando, o save intac
 quando a tela muda, as oito direções do sprite e as cinco telas.
 **Conferido que ele acusa: 17 de 17 defeitos religados** derrubam pelo menos uma trava.
 
+### AS DUAS DO RESGATE (21/09/2026) -- o (i) da ilhota e os 2s da descarga
+
+#### ⚠️ O SETUP MOSTRAVA UM BICHO QUE O JOGADOR NUNCA IA ENCONTRAR
+
+Pedido assim: *"antes de começar, aparece o mapa e as ilhas e um pokemon em cada ilha, tire esse
+pokemon que exibe e adicione um i de informações, e quando clicar, vai exibir quais pokemons sao
+possiveis de aparecer em cada ilha, assim como acontece na pescaria"*.
+
+**⚠️ E O BICHO DO SETUP ERA DESCARTÁVEL E ENGANOSO -- isso é pior do que o pedido diz.** Os
+ocupantes nascem no `resgateZerar` (é o que faz o mapa da abertura mostrar alguém) e são sorteados
+**DE NOVO** no `resgateComecar`. Ou seja: a tela prometia UM pokémon e a corrida entregava outro.
+
+- **NO LUGAR DELE A ILHOTA MOSTRA A FAIXA** (`até 49 pts` / `50–69 pts` / `70+ pts`) e um **(i)**.
+  A faixa fica porque seis ilhotas vazias se leriam **iguais** -- e é justamente a ESCADA que o
+  mapa tem a dizer antes da largada. O rótulo sai das constantes, como a legenda embaixo dele.
+- **⚠️ O (i) É IRMÃO DO PONTO, nunca filho.** No jogo o ponto é um `<button>`, e `<button>` dentro
+  de `<button>` é HTML inválido -- o navegador fecha o de fora e o clique de dentro se perde, com a
+  tela continuando a PARECER certa. No setup ele é um `<span>`, mas a estrutura é a mesma nos dois
+  modos de propósito: é a armadilha que a lupa do encontro selvagem já custou duas vezes.
+- **A CAIXA É A DA ZONA DA PESCARIA**, linha por linha (`.rota-mon`), e ela abre a MESMA ficha da
+  Pokédex -- é a mesma pergunta (*"esse cobre o tipo que falta no meu time?"*), e um desenho
+  próprio obrigaria a reaprender a ler.
+- **⚠️ E ELA PODE MOSTRAR A LISTA EXATA**, não uma aproximação: aqui a espécie sai DIRETO do bolo
+  (o `resgateNovoOcupante` sorteia um id e pronto), sem a conversão de espécie-por-nível que o
+  encontro selvagem precisa. É a mesma propriedade da lista de zona da Pescaria.
+- **⚠️ A CHANCE SAIU DA LINHA E FOI PRA DICA**, e por dois motivos: dentro de uma faixa ela é
+  **idêntica em todas as linhas** (o sorteio é uniforme), então a coluna repetia o mesmo número 17
+  vezes -- ruído puro; e ela custava largura: medido a 320px, `87 pts · 50%` espremia o nome e o
+  **"Charmander" truncava por 3px**. O que decide ali é o VALOR, que é o que a ilhota paga.
+
+**Medido a 320px, no navegador:** seis ilhotas, seis (i) de 24px **todos dentro do mapa**, ZERO
+sprites no mapa do setup, a caixa da ilhota do meio em **265x544px** (cabe numa tela de 568,
+rolando por dentro) com os 17 em ordem de valor e **nenhum nome truncando**; a página do setup vai
+de 990 pra **1.032px**, sem rolagem lateral.
+
+#### ⚠️ CHEGAR NA PRAIA DEIXOU DE SER ENTREGAR
+
+Pedido: *"coloque tambem um timer de 2s para descarregar os pokemons resgatados na praia"*. Antes
+o desembarque era instantâneo -- encostar na areia já pontuava.
+
+- **ELE TEM A MESMA FORMA DO RESGATE NA ILHOTA:** chegar ABRE a descarga, o ator fica parado
+  enquanto ela corre, e só então os pontos entram.
+- **⚠️ SAIR NO MEIO DELA CANCELA**, e leva a carga de volta pro mar (o `resgateIrPara` a zera). É o
+  que faz os 2s serem um **custo** e não uma espera decorativa -- e é a mesma regra da ilhota.
+- **⚠️ E NINGUÉM FICA COM CARGA SEM PAGAR:** o retorno automático dos 90s passou a esperar a
+  descarga, e o `resgateTerminar` entrega o que sobrou. Sem isso um desembarque feito aos 89s
+  valeria **zero**. É a mesma rede do `pescariaTerminar`, e é por isso que a entrega virou uma
+  função só (`resgateEntregar`): ela tem DUAS portas, e escrita nas duas elas divergiriam.
+- **O NPC TAMBÉM ESPERA** -- sem a guarda, o planejador dele mandaria o parceiro embora no quadro
+  seguinte e ele nunca entregaria nada.
+- **A PRAIA GANHOU A BARRA DA ILHOTA** (o mesmo `.resg-medidor`): sem ela os 2s viram uma espera
+  sem explicação -- o parceiro para na areia e nada acontece.
+  **⚠️ E O `[hidden]` DELA PRECISOU DE REGRA PRÓPRIA:** o medidor é `display:block`, e QUALQUER
+  `display` do autor anula o `hidden` da folha do navegador, que tem a menor prioridade que existe.
+  É o defeito do modal da contagem da Corrida, que custou dois relatos.
+
+**⚠️ O QUE ELE MUDA NA DECISÃO, MEDIDO** (60 duelos por célula, Lapras Lv.60 dos dois lados, o bot
+voltando quando tem N a bordo):
+
+| o bot volta com | sem a descarga | com a descarga | |
+|---|---|---|---|
+| **1 a bordo** | 459,8 pts · 8,6 resgates | 401,1 pts · 7,5 | **−12,8%** |
+| **2 a bordo (cheio)** | 578,0 pts · 10,1 resgates | 536,1 pts · 9,5 | **−7,3%** |
+
+**Os 2s custam o mesmo com um ou com dois a bordo**, então encher a carga ficou relativamente mais
+barato -- a pergunta *"volto agora ou busco mais um?"* ganhou um peso a favor de buscar, e é isso
+que o timer acrescenta de jogo. A vitória não piora (62% → 67% com o bot que enche): o NPC paga a
+mesma taxa, e ele às vezes volta com um só.
+
+- **Se um dia incomodar**, a régua é o `RESGATE_DESCARGA`.
+
+**No motor, nada:** `MOTOR 4e1b30e2729d / DIARIO 603f5c7e563f`, idêntico em 900 batalhas semeadas.
+
+⚠️ **E UMA TRAVA DO DUELO PRECISOU APRENDER A REGRA:** o bot dela tocava noutro ponto assim que o
+parceiro ficava sem alvo -- o que agora **cancela a descarga**, e ele nunca entregava. Ele passou a
+esperar (`a.descarga <= 0`). É a mesma família dos fixtures que este arquivo já registra: **o bot
+do teste é um jogador, e ele precisa conhecer a regra nova como um jogador conhece.**
+
 ⚠️ **DESDE 20/09/2026 ELE TEM 178**, e as novas cobrem a escada (a faixa saindo da POSIÇÃO, as três
 bandas medidas pelo VALOR, os três bolos sendo a lista inteira sem repetir, nenhum vazio, 3.600
 sorteios sem ninguém fora da faixa da ilhota, e a escada ESTRITA -- o pior de cima vale mais que o
 melhor de baixo), o mapa (o desenho de verdade + o gancho no `render`, lido do código) e a escala
 do sprite (maior caixa = maior desenho, os dois extremos cabendo, a razão sendo REAL e não linear,
 uma escala por espécie, e a caixa de 46px não voltando).
-**Conferido que ele acusa: 5 de 5 defeitos novos religados** (2, 5, 3, 3 e 2 falhas).
+⚠️ **E 201 DESDE 21/09/2026**, com o (i) da ilhota (o setup sem bicho, os seis botões, a faixa, o
+(i) sendo IRMÃO do ponto, a caixa listando o bolo inteiro e ninguém de outra faixa) e a descarga
+(ela abre em vez de entregar, dura o que a constante diz, sair cancela, o fim da prova paga o que
+sobrou, o retorno espera, o NPC espera, e o `[hidden]` da barra vence o display).
+**Conferido que ele acusa: 14 de 14 defeitos novos religados**.
 ## PERFORMANCE: A GEOGRAFIA MANDA (19/09/2026)
 
 Relatado assim: *"tenho sentido uma boa lentidão na inscrição para as ligas clássicas e trainers

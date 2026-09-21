@@ -3338,6 +3338,18 @@
   .resg-ponto.vazio{cursor:default;border:1px dashed #e1ead05c;border-radius:50%;}
   .resg-ponto.vazio .resg-pts{background:#ceead2bd;color:#446760;border:0;}
   .resg-ponto.alvo{outline:2px dashed var(--yellow);outline-offset:1px;border-radius:50%;}
+  /* ⚠️ NO SETUP A ILHOTA É UM CONTÊINER, e o (i) é IRMÃO do ponto -- ver o `resgateMapaHtml`.
+     Ele só POSICIONA: quem desenha continua sendo o `.resg-ponto`. */
+  .resg-ilhota{position:absolute;transform:translate(-50%,-50%);width:56px;height:57px;z-index:2;}
+  .resg-ilhota .resg-ponto{position:absolute;inset:0;transform:none;cursor:default;}
+  /* ⚠️ SEM SPRITE A ETIQUETA PERDE A ÂNCORA: ela é `top:44px` porque fica ABAIXO de um sprite de
+     52px, e num ponto vazio isso a deixava pendurada fora do círculo. Aqui ela volta pro meio. */
+  .resg-ponto.so-faixa{border:1px dashed #e1ead05c;border-radius:50%;}
+  .resg-ponto.so-faixa .resg-pts{position:static;top:auto;background:#fff1bde8;}
+  /* o (i) é o MESMO da Pescaria -- reusar é o que faz os dois mapas se lerem igual */
+  .resg-ilhota .pesc-info{position:absolute;right:-6px;top:-6px;width:24px;height:24px;
+    padding:0;border:2px solid #173e51;border-radius:50%;background:#fff9e9e8;color:#233647;
+    font:800 .6rem/1 var(--font-ui);cursor:pointer;z-index:4;}
   .resg-ponto.ocupado .resg-pts{background:#ffe0a8;}
   /* ⚠️ A BARRA FICA ACIMA DO PONTO, fora do círculo -- ela ficava no rodapé DELE, e foi
      reportada como "no meio do círculo e feia". São as medidas do `.rescue-meter` do protótipo. */
@@ -3352,7 +3364,11 @@
      ponto de resgate, é o lugar pra onde se VOLTA -- forma diferente, leitura diferente. */
   .resg-praia{position:absolute;transform:translate(-50%,-50%);padding:4px 8px;z-index:2;
     border:2px solid #17334b;border-radius:4px;background:#ffe9b0e8;cursor:pointer;
-    font:800 .58rem/1 var(--font-ui);color:#4a3a15;white-space:nowrap;}
+    font:800 .58rem/1 var(--font-ui);color:#4a3a15;white-space:nowrap;overflow:visible;}
+  /* ⚠️ O `[hidden]` PRECISA DE REGRA PRÓPRIA: o `.resg-medidor` é `display:block` e QUALQUER
+     `display` do autor anula o `hidden` da folha do navegador, que tem a menor prioridade que
+     existe. É o defeito do modal da contagem da Corrida, que custou dois relatos. */
+  .resg-medidor[hidden]{display:none;}
   .resg-placar{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;}
   .resg-lado{border:2px solid var(--box-border);border-radius:5px;padding:6px 7px;background:#eef3fb;min-width:0;}
   .resg-lado.npc{background:#fbeeee;}
@@ -31085,6 +31101,14 @@ const CORRIDA_EFEITOS = {
 };
 /* A BARRA: ela vai e VOLTA, invertendo nas laterais -- nunca salta de uma ponta pra outra.
    Cada travessia dura `CORRIDA_TRAVESSIA`; o ciclo completo é o dobro. */
+/* ⚠️ SÃO SEMPRE QUATRO NA PISTA (20/09/2026, a pedido: *"pode retirar os botoes de 2 e 3
+   pokemons/equipes, pode deixar sempre 4"*). Era uma escolha de 2, 3 ou 4 no setup.
+   ⚠️ ELE VIROU CONSTANTE, e não um campo do `corrida` fixado em 4: campo é estado, e estado que
+   nunca muda é a forma mais silenciosa de código morto que existe -- ele fica no `corridaZerar`,
+   no `escolhaPorFormato` e nas quatro contas de pista esperando alguém tentar mudá-lo de novo.
+   As duas contas que perguntavam pelo número (a escala do sprite e a fonte do brilho) viraram o
+   valor que elas já davam com 4. */
+const CORRIDA_PARTICIPANTES = 4;
 const CORRIDA_TRAVESSIA = 1.44;
 /* ⚠️ AS FAIXAS SÃO EM FRAÇÃO DA BARRA, e as duas já caíram pela METADE desde os números do pedido:
      verde  **15,2%** a partir de 42,4%  → de 0,424 a 0,576   (era 30,4% a partir de 34,8%)
@@ -31406,7 +31430,7 @@ function pmdQuadro(dados, t){
    as funções internas olhando pro objeto velho, e as travas mediriam o nada).
    O jogo ganha junto: some o `if(!corrida) corrida = ...` que teria que abrir toda função. */
 const corrida = {
-  formato: 'single', participantes: 2,
+  formato: 'single',
   escolhidos: [], corredores: [],
   fase: 'setup', tempo: 0, contagem: 0, ultimoQuadro: 0, animacao: 0,
   tentativaDaTravessia: -1, perfeitos: 0, brilho: 0, brilhoTexto: '',
@@ -31548,7 +31572,7 @@ function renderCorridaTimeModal(){
 function corridaZerar(){
   if(corrida.laco){ cancelAnimationFrame(corrida.laco); }
   Object.assign(corrida, {
-    formato: 'single', participantes: 2,
+    formato: 'single',
     escolhidos: [],           /* o que o jogador marcou, na ordem do revezamento */
     corredores: [],           /* montado na largada */
     fase: 'setup',            /* setup | carregando | contagem | correndo | fim */
@@ -31655,7 +31679,7 @@ function sortearNpcs(){
   const meus = corrida.escolhidos;
   const quantos = corrida.formato === 'relay' ? CORRIDA_TRECHOS : 1;
   const times = [];
-  for(let i = 1; i < corrida.participantes; i++){
+  for(let i = 1; i < CORRIDA_PARTICIPANTES; i++){
     const time = [], usadas = new Set();
     /* ⚠️ SEM REPETIR ESPÉCIE DENTRO DA EQUIPE, e a conta é por RAIZ da linha: dois Gyarados de
        origens diferentes são a mesma linha, e é a regra que o encontro selvagem e o montador já
@@ -31896,6 +31920,8 @@ function corridaTeclaNoBotao(ev){
    A SELEÇÃO -- o mesmo montador da Torre e do Ginásio da Cidade
    ============================================================================ */
 const corridaQuantos = () => corrida.formato === 'relay' ? CORRIDA_TRECHOS : 1;
+/* O rótulo da escolha -- lido pelo botão do setup E pelo título do picker. */
+const corridaRotuloDaEscolha = () => corrida.formato === 'relay' ? 'Escolher equipe' : 'Escolher corredor';
 /* ⚠️ ORDENADA PELO SPEED **DA CORRIDA**, do maior pro menor -- e não pelo Speed base da espécie:
    é o MESMO número que vai decidir a velocidade na pista, com nível, shiny e especialidade dentro.
    O montador ordena por nível/nome/time; aqui a ordem é outra, então a lista vem pronta. */
@@ -31979,10 +32005,6 @@ function corridaTrocarFormato(f){
   corrida.escolhidos = corrida.escolhaPorFormato[f] || [];
   corrida.fase = 'setup'; render();
 }
-function corridaTrocarParticipantes(n){
-  if(corrida.fase === 'correndo' || corrida.fase === 'contagem') return;
-  corrida.participantes = n; corrida.fase = 'setup'; render();
-}
 
 /* ============================================================================
    A LARGADA -- e o pré-carregamento que a antecede
@@ -31997,7 +32019,26 @@ function nomeDoCorredor(c){ const p = c.time[c.trecho]; return (SPECIES[p.specie
    ⚠️ E ELE É "Rival" E NÃO "Adversário": medido a 320px, a coluna do nome tem **83px** e
    "Adversário 1" quebrava em DUAS linhas -- a linha ia de 48 pra 63px e as linhas deixavam de
    alinhar em coluna, que é justamente onde o olho compara. */
-function corridaTreinadorDe(i){ return i === 0 ? nomeDoTreinador() : 'Rival ' + i; }
+/* ⚠️ OS ADVERSÁRIOS SÃO OS LÍDERES DA LIGA LARANJA (20/09/2026, a pedido: *"coloque que o nome
+   dos npcs, ao inves de 1, 2 e 3, seja nomes de lideres das ilhas laranjas"*). Eram "Rival 1/2/3".
+   São os cinco do Orange Crew do anime, na ordem das ilhas -- e o primeiro deles, a **Cissy**, é a
+   líder da **Ilha Mikan**, que é justamente a enseada onde o Resgate acontece. Ou seja o nome já
+   estava no jogo antes deles.
+   ⚠️ A ORDEM É FIXA, e não sorteada: o adversário da raia 2 é sempre o mesmo, e é isso que deixa
+   o jogador reconhecê-lo de uma corrida pra outra. Sortear faria o placar mudar de gente sem
+   nada explicando.
+   ⚠️ E A LISTA TEM FOLGA sobre as raias (cinco nomes pra três adversários): o
+   `%` é a rede pro dia em que a pista crescer, e sem ele a raia a mais sairia com `undefined`. */
+const CORRIDA_NPC_NOMES = ['Cissy', 'Danny', 'Rudy', 'Luana', 'Drake'];
+const corridaNomeDoNpc = (i) => CORRIDA_NPC_NOMES[(i - 1) % CORRIDA_NPC_NOMES.length];
+function corridaTreinadorDe(i){ return i === 0 ? nomeDoTreinador() : corridaNomeDoNpc(i); }
+/* ⚠️ A ETIQUETA DA PISTA E A DO HUD LEEM A MESMA FUNÇÃO. O rótulo do adversário estava escrito à
+   mão em TRÊS lugares (o quadro do corredor, o marcador de borda e a linha do placar), e três
+   cópias divergem no primeiro ajuste -- este comentário não reproduz o texto que saiu, de
+   propósito: o arquivo é publicado inteiro e a varredura seguinte não distingue código de
+   comentário. O lado 0 continua sendo "VOCÊ" na PISTA (ali o nome do treinador pode ter 20
+   caracteres num rótulo de 10px) e "Você" no HUD, como sempre foi. */
+const corridaEtiquetaDe = (i) => i === 0 ? 'VOCÊ' : corridaNomeDoNpc(i).toUpperCase();
 /* ⚠️ E EMBAIXO DELE VAI A FILEIRA DE SPRITES DO TIME, não um rótulo de texto -- ver a `resultTime`
    na tela de resultado. O rótulo (o nome do time, ou "Equipe rival") durou algumas horas e saiu a
    pedido: ele respondia "de QUEM era a equipe" e os sprites respondem **QUAL era**, que é a
@@ -32057,7 +32098,7 @@ async function corridaLargar(){
 function corridaTerminar(){
   corrida.fase = 'fim';
   corrida.tempo = Math.max(...corrida.corredores.map(c => c.chegada));
-  corrida.recado = 'Mude os participantes em Configurar ou corra novamente.';
+  corrida.recado = 'Troque a modalidade ou a equipe, ou corra de novo.';
   render();
   /* ⚠️ DEPOIS DO `render()`: o envio é assíncrono e best-effort, e a tela do resultado não pode
      esperar a rede pra aparecer. Ele redesenha sozinho quando a resposta chega. */
@@ -32159,7 +32200,7 @@ function corridaPintar(){
      nada mais se mexia, e o dobro pra "dar sensação de velocidade" quando a escala era minúscula.
      Com 8 px/m a sensação vem da própria corrida, e o dobro faria o chão correr mais que os pés. */
   const escala = corridaEscala();
-  const rolagem = corridaCamera() * escala, lo = 44, hi = 396, vao = hi - lo, raia = vao / corrida.participantes;
+  const rolagem = corridaCamera() * escala, lo = 44, hi = 396, vao = hi - lo, raia = vao / CORRIDA_PARTICIPANTES;
   const ret = (x, y, w, h, cor) => { ctx.fillStyle = cor; ctx.fillRect(Math.round(x), Math.round(y), w, h); };
   const txt = (s, x, y, t, cor) => { ctx.fillStyle = cor; ctx.font = `800 ${t}px system-ui`; ctx.textAlign = 'center'; ctx.fillText(s, x, y); };
 
@@ -32174,7 +32215,7 @@ function corridaPintar(){
   ret(lo, 0, vao, CORRIDA_H, '#eacb8c');
   for(let i = 0; i < 65; i++) ret(49 + (i * 73) % 340, (i * 41 + rolagem) % 440 - 20, 3 + i % 3, 2, i % 2 ? '#d6b276' : '#f3dca4');
   for(const x of [lo, hi]) ret(x, 0, 2, CORRIDA_H, '#fff1c3');
-  for(let j = 1; j < corrida.participantes; j++) for(let k = 0; k < 12; k++) ret(lo + j * raia, (k * 44 + rolagem) % 500 - 50, 2, 20, '#fff3cd');
+  for(let j = 1; j < CORRIDA_PARTICIPANTES; j++) for(let k = 0; k < 12; k++) ret(lo + j * raia, (k * 44 + rolagem) % 500 - 50, 2, 20, '#fff3cd');
   for(let k = 0; k < 12; k++){ const y = (k * 44 + rolagem) % 500 - 50; ret(35, y, 7, 16, k % 2 ? '#37876a' : '#f8edcd'); ret(398, y, 7, 16, k % 2 ? '#37876a' : '#f8edcd'); }
   for(let k = 0; k < 5; k++){ const y = (k * 103 + rolagem * 0.8) % 550 - 70; for(const x of [20, 420]){ ret(x - 4, y - 6, 8, 16, '#287768'); ret(x - 8, y, 16, 5, '#328770'); } }
 
@@ -32256,7 +32297,7 @@ function corridaPintar(){
   });
   if(corrida.brilho > 0){
     ctx.globalAlpha = Math.min(1, corrida.brilho * 2);
-    txt(corrida.brilhoTexto, lo + raia * 0.5, 130 - corrida.brilho * 5, corrida.participantes === 4 ? 10 : 12, '#20323a');
+    txt(corrida.brilhoTexto, lo + raia * 0.5, 130 - corrida.brilho * 5, 10, '#20323a');
     ctx.globalAlpha = 1;
   }
   corridaPintarHud();
@@ -32282,7 +32323,7 @@ function corridaDesenharPokemon(ctx, c, i, x, y, raia, ret, txt, op){
      isto aqui é a rede de segurança -- um marcador neutro, nunca o bicho errado. */
   if(!d || d === 'erro'){
     ret(x - 8, y - 16, 16, 16, CORRIDA_CORES[i]);
-    txt(i === 0 ? 'VOCÊ' : 'NPC ' + i, x, y + 26, 10, CORRIDA_CORES[i]);
+    txt(corridaEtiquetaDe(i), x, y + 26, 10, CORRIDA_CORES[i]);
     return;
   }
   /* ⚠️ QUEM ESTÁ PARADO CONGELA NO QUADRO 0 -- é o que o faz LER como parado. Usando o
@@ -32291,7 +32332,7 @@ function corridaDesenharPokemon(ctx, c, i, x, y, raia, ret, txt, op){
   const f = parado ? 0 : pmdQuadro(d, c.quadroT), b = d.caixas[f];
   const w = b[2] - b[0], h = b[3] - b[1];
   const maiorW = Math.max(...d.caixas.map(q => q[2] - q[0]));
-  const escala = Math.min(corrida.participantes === 2 ? 3 : 2.5, (raia - 17) / maiorW);
+  const escala = Math.min(2.5, (raia - 17) / maiorW);
   const sobe = !parado && (corrida.fase === 'correndo' || corrida.fase === 'pronto') && c.chegada === null
     ? Math.sin(c.quadroT * 20 + i) * 1.5 : 0;
   ctx.fillStyle = '#4841263d'; ctx.beginPath();
@@ -32321,7 +32362,7 @@ function corridaDesenharPokemon(ctx, c, i, x, y, raia, ret, txt, op){
     ctx.beginPath(); ctx.moveTo(x - 6, topo - 7); ctx.lineTo(x + 6, topo - 7); ctx.lineTo(x, topo); ctx.closePath();
     ctx.fill(); ctx.stroke();
   }
-  txt(i === 0 ? 'VOCÊ' : 'NPC ' + i, x, y + 26, 10, CORRIDA_CORES[i]);
+  txt(corridaEtiquetaDe(i), x, y + 26, 10, CORRIDA_CORES[i]);
   if(c.avisoTroca > 0){ ctx.globalAlpha = Math.min(1, c.avisoTroca); txt('TROCA!', x, y - h * escala - 28, 11, CORRIDA_CORES[i]); ctx.globalAlpha = 1; }
 }
 const corridaRelogio = (t) => Math.floor(t / 60).toString().padStart(2, '0') + ':' + (t % 60).toFixed(1).padStart(4, '0');
@@ -32330,7 +32371,7 @@ function corridaPintarHud(){
   const põe = (id, txt) => { const e = document.getElementById(id); if(e && e.textContent !== txt) e.textContent = txt; };
   põe('corridaRelogio', corridaRelogio(corrida.tempo));
   corrida.corredores.forEach((c, i) => {
-    põe('corridaNome' + i, (i === 0 ? 'Você' : 'NPC ' + i) + ' · ' + nomeDoCorredor(c));
+    põe('corridaNome' + i, (i === 0 ? 'Você' : corridaNomeDoNpc(i)) + ' · ' + nomeDoCorredor(c));
     põe('corridaInfo' + i, c.chegada !== null
       ? corridaPosicao(i) + 'º · ' + c.chegada.toFixed(2) + ' s'
       : Math.floor(c.dist) + ' / ' + corridaTotal() + ' m');
@@ -32529,17 +32570,21 @@ function renderCorrida(){
       <p class="hint-text">${corrida.formato === 'relay'
         ? `Os ${CORRIDA_TRECHOS} do time, ${CORRIDA_METROS_TRECHO} m cada. A troca é automática.`
         : `Uma corrida de ${CORRIDA_METROS} m. Você controla os impulsos.`}</p>
-      <h2 class="u-mt8">${corrida.formato === 'relay' ? 'Equipes na pista' : 'Pokémon na pista'}</h2>
-      <div class="row seg corrida-seg">
-        ${[2, 3, 4].map(n => `<button class="${corrida.participantes === n ? 'ativa' : ''}" onclick="corridaTrocarParticipantes(${n})">${n}</button>`).join('')}
-      </div>
+      ${/* ⚠️ A ESCOLHA DE QUANTOS CORREM SAIU (20/09/2026, a pedido): são sempre
+           ${CORRIDA_PARTICIPANTES}. O que sobra é a frase, porque a pista com quatro raias é o
+           que o jogador vai ver. */''}
+      <p class="hint-text">${CORRIDA_PARTICIPANTES} ${corrida.formato === 'relay' ? 'equipes' : 'Pokémon'} na pista: você e ${CORRIDA_PARTICIPANTES - 1} líderes da Liga Laranja.</p>
     </div>
     <div class="box">
       <h2>${corrida.formato === 'relay' ? 'Sua equipe' : 'Seu corredor'}</h2>
       ${corrida.escolhidos.length
         ? corrida.escolhidos.map(corridaLinhaEscolhido).join('')
         : '<p class="hint-text">Ninguém escolhido ainda.</p>'}
-      <button class="btn primary" onclick="corridaAbrirPicker()">Escolher corredor</button>
+      ${/* ⚠️ O RÓTULO SEGUE A MODALIDADE (20/09/2026, a pedido): no revezamento o que se escolhe
+           é uma EQUIPE inteira, e "corredor" no singular descrevia a individual. As duas telas
+           pra onde ele leva já são diferentes (a lista de POKÉMON na individual, a de TIMES no
+           revezamento) -- o botão é que dizia a mesma coisa pras duas. */''}
+      <button class="btn primary" onclick="corridaAbrirPicker()">${corridaRotuloDaEscolha()}</button>
       ${corrida.aviso ? `<p class="error-text">⚠️ ${escapeHtmlSafe(corrida.aviso)}</p>` : ''}
       <button class="btn success" ${corridaCompleto() && corrida.fase !== 'carregando' ? '' : 'disabled'} onclick="corridaLargar()">
         ${corrida.fase === 'carregando' ? 'Carregando os sprites…' : (corridaCompleto() ? '🏁 Largar' : 'Escolha ' + corridaQuantos() + (corridaQuantos() > 1 ? ' Pokémon' : ' Pokémon'))}
@@ -32561,7 +32606,7 @@ function renderCorrida(){
       ${corrida.corredores.map((c, i) => `
         <div class="racerRow">
           <span class="dot" style="background:${CORRIDA_CORES[i]}"></span>
-          <span class="runnerName" id="corridaNome${i}">${i === 0 ? 'Você' : 'NPC ' + i} · ${escapeHtmlSafe(nomeDoCorredor(c))}</span>
+          <span class="runnerName" id="corridaNome${i}">${i === 0 ? 'Você' : escapeHtmlSafe(corridaNomeDoNpc(i))} · ${escapeHtmlSafe(nomeDoCorredor(c))}</span>
           <span class="runnerInfo" id="corridaInfo${i}">0 / ${corridaTotal()} m</span>
           <div class="progress"><i id="corridaBarra${i}" style="background:${CORRIDA_CORES[i]}"></i></div>
         </div>`).join('')}
@@ -34283,6 +34328,14 @@ const RESGATE_DURACAO = 90;
 const RESGATE_CAPACIDADE = 2;          /* todo mundo leva 2 -- ver o cabeçalho */
 const RESGATE_NPC_NIVEL = 60;          /* o pedido: "aleatório algum no level 60" */
 const RESGATE_TEMPO_NO_PONTO = 1;      /* 1s parado pra concluir o resgate */
+/* ⚠️ E 2s PRA DESCARREGAR NA PRAIA (20/09/2026, a pedido: *"coloque tambem um timer de 2s para
+   descarregar os pokemons resgatados na praia"*). Antes o desembarque era instantâneo: encostar
+   na areia já pontuava.
+   ⚠️ ELE MUDA A CONTA DA VIAGEM, e é isso que o torna uma mecânica: com ele, voltar com UM a
+   bordo passa a custar os mesmos 2s de voltar com dois -- ou seja encher a carga ficou mais
+   barato por passageiro, e a decisão "volto agora ou busco mais um?" ganhou um peso a favor de
+   buscar. Medido no fim desta seção. */
+const RESGATE_DESCARGA = 2;
 const RESGATE_RESPAWN_MIN = 7, RESGATE_RESPAWN_EXTRA = 5;
 const RESGATE_CARGA_POR_PASSAGEIRO = 0.12, RESGATE_CARGA_MIN = 0.5;
 const RESGATE_REDEMOINHO_MULT = 0.28;
@@ -34381,6 +34434,7 @@ const resgate = {
   relogioMar: 0, proximaMudanca: 0, mudancaPendente: null,
   tempo: 0, ultimo: 0, anim: 0, laco: 0,
   recado: '', recadoAte: 0, aviso: '',
+  ilhotaAberta: null,
 };
 
 const resgDist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -34419,6 +34473,7 @@ function resgateZerar(){
   resgate.atores = [];
   resgate.tempo = 0; resgate.ultimo = 0; resgate.anim = 0;
   resgate.recado = ''; resgate.recadoAte = 0; resgate.aviso = '';
+  resgate.ilhotaAberta = null;
   resgateMarZerar();
   /* ⚠️ OS OCUPANTES NASCEM AQUI, e não só no `resgateComecar`: é o que o protótipo faz no
      `reset()`, e é o que faz o mapa da tela de setup mostrar QUEM está em cada ilhota. Vazios,
@@ -34555,7 +34610,7 @@ function resgateMarAtualizar(dt){
    --------------------------------------------------------------------------- */
 function resgateAtor(inst, x){
   return { inst, x, y: RESGATE_PRAIA.y, bag: [], pontos: 0, entregas: [],
-           alvo: null, resgatando: null, pensa: 0, estado: 'Na praia', rumo: Math.PI / 2 };
+           alvo: null, resgatando: null, descarga: 0, pensa: 0, estado: 'Na praia', rumo: Math.PI / 2 };
 }
 function resgateNovoOcupante(i){
   const p = RESGATE_PONTOS[i];
@@ -34579,9 +34634,26 @@ function resgateSoltar(i){
 function resgateIrPara(i, alvo){
   const a = resgate.atores[i];
   resgateSoltar(i);
+  a.descarga = 0;                       /* sair no meio da descarga leva a carga de volta */
   a.alvo = alvo;
   if(resgDist(a, alvo) > 0.01) a.rumo = Math.atan2(alvo.y - a.y, alvo.x - a.x);
   a.estado = 'Navegando';
+}
+/* ⚠️ A ENTREGA VIVE NUMA FUNÇÃO SÓ porque ela tem DUAS portas: a descarga que termina e o FIM da
+   prova, que paga o que sobrou. Escrita nas duas, a segunda divergiria da primeira no primeiro
+   ajuste -- e a regra da casa é que nada em curso some sem pagar (a mesma da batalha da
+   Pescaria, que fecha as pendentes no `pescariaTerminar`). */
+function resgateEntregar(i){
+  const a = resgate.atores[i];
+  if(!a || !a.bag.length){ if(a) a.estado = 'Na praia'; return 0; }
+  const pts = resgSoma(a.bag);
+  a.pontos += pts;
+  a.entregas = a.entregas.concat(a.bag);
+  a.bag = [];
+  a.descarga = 0;
+  a.estado = 'Na praia';
+  if(i === 0) resgateDizer('Resgates entregues! +' + pts + ' pontos.');
+  return pts;
 }
 function resgateChegou(i){
   const a = resgate.atores[i], t = a.alvo;
@@ -34589,15 +34661,12 @@ function resgateChegou(i){
   if(!t) return;
   if(t.tipo === 'praia'){
     /* ⚠️ OS PONTOS SÓ CONTAM NA PRAIA, e é a regra que dá jogo ao minigame: quem enche a carga e
-       não volta a tempo não pontua nada. */
-    if(a.bag.length){
-      const pts = resgSoma(a.bag);
-      a.pontos += pts;
-      a.entregas = a.entregas.concat(a.bag);
-      a.bag = [];
-      if(i === 0) resgateDizer('Resgates entregues! +' + pts + ' pontos.');
-    }
-    a.estado = 'Na praia';
+       não volta a tempo não pontua nada.
+       ⚠️ E DESDE 20/09/2026 CHEGAR NÃO É ENTREGAR: chegar ABRE a descarga, que leva
+       `RESGATE_DESCARGA` segundos -- quem sai antes dela acabar leva a carga de volta pro mar. É
+       a mesma forma do resgate na ilhota, e é o que faz os 2s serem um custo e não uma espera. */
+    if(a.bag.length){ a.descarga = RESGATE_DESCARGA; a.estado = 'Descarregando…'; }
+    else a.estado = 'Na praia';
     return;
   }
   if(t.tipo === 'ponto'){
@@ -34620,7 +34689,7 @@ function resgateChegou(i){
    o que o faz preferir um 30 longe a um 10 perto quando a diferença de distância não compensa. */
 function resgateNpcPlano(){
   const a = resgate.atores[1];
-  if(!a || a.alvo || a.resgatando !== null || resgate.tempo < a.pensa) return;
+  if(!a || a.alvo || a.resgatando !== null || a.descarga > 0 || resgate.tempo < a.pensa) return;
   a.pensa = resgate.tempo + 0.5;
   const falta = RESGATE_DURACAO - resgate.tempo;
   const vel = resgateVelocidade(a.inst);
@@ -34702,6 +34771,17 @@ function resgateAtualizar(dt){
     resgateNpcPlano();
   }
   resgate.atores.forEach((a, i) => {
+    /* ⚠️ A DESCARGA VEM ANTES DE TUDO, e ela é a mesma forma do resgate na ilhota: o ator fica
+       parado enquanto ela corre e só então os pontos entram. Quem toca noutro lugar no meio dela
+       CANCELA (o `resgateIrPara` a zera) e leva a carga de volta pro mar -- é isso que faz os 2s
+       serem um custo e não uma espera decorativa. */
+    if(a.descarga > 0){
+      a.descarga -= dt;
+      if(a.descarga > 0){ a.estado = 'Descarregando…'; return; }
+      a.descarga = 0;
+      resgateEntregar(i);
+      return;
+    }
     if(a.resgatando !== null){
       const p = resgate.ocupantes[a.resgatando];
       if(!p){ a.resgatando = null; return; }
@@ -34739,7 +34819,7 @@ function resgateAtualizar(dt){
   });
   if(resgate.fase === 'correndo' && resgate.tempo >= RESGATE_DURACAO) resgateRetornoAutomatico();
   else if(resgate.fase === 'voltando'
-    && resgate.atores.every(a => !a.alvo && resgDist(a, RESGATE_PRAIA) < 0.1)) resgateTerminar();
+    && resgate.atores.every(a => !a.alvo && a.descarga <= 0 && resgDist(a, RESGATE_PRAIA) < 0.1)) resgateTerminar();
 }
 /* ⚠️ AOS 90s OS DOIS VOLTAM E ENTREGAM O QUE ESTÁ A BORDO -- e o mar continua mudando durante o
    retorno, que é o do protótipo: ele não é uma cutscene, é a última travessia. */
@@ -34752,7 +34832,10 @@ function resgateRetornoAutomatico(){
 function resgateTerminar(){
   if(resgate.laco){ cancelAnimationFrame(resgate.laco); resgate.laco = null; }
   resgate.fase = 'fim';
-  resgate.atores.forEach((a, i) => { resgateSoltar(i); a.alvo = null; a.estado = 'Na praia'; });
+  /* ⚠️ NINGUÉM FICA COM CARGA A BORDO SEM PAGAR: o retorno automático espera a descarga, mas se
+     alguém chegar aqui com ela em curso (ou a bordo), a entrega acontece. É a mesma rede do
+     `pescariaTerminar`, e sem ela um desembarque feito aos 89s valeria zero. */
+  resgate.atores.forEach((a, i) => { resgateSoltar(i); a.alvo = null; resgateEntregar(i); });
   render();
 }
 
@@ -34859,6 +34942,23 @@ function resgatePintar(){
       if(num && num.textContent !== pct + '%') num.textContent = pct + '%';
     }
   });
+  /* a barra da descarga -- ela some quando ninguém está descarregando, e o `hidden` é o único
+     jeito de tirá-la sem um render() (a regra do modal da contagem da Corrida) */
+  const dsc = document.getElementById('resgateDescarga');
+  if(dsc){
+    const quem = resgate.atores.find(x => x.descarga > 0);
+    const mostrar = !!quem;
+    if(dsc.hidden === mostrar) dsc.hidden = !mostrar;
+    if(quem){
+      const pct = Math.max(0, Math.min(100, Math.round((1 - quem.descarga / RESGATE_DESCARGA) * 100)));
+      const barra = dsc.querySelector('i'), num = dsc.querySelector('b');
+      if(barra){
+        if(barra.style.width !== pct + '%') barra.style.width = pct + '%';
+        resgateClasse(barra, 'npc', quem !== a);
+      }
+      if(num && num.textContent !== pct + '%') num.textContent = pct + '%';
+    }
+  }
   const parar = document.getElementById('resgateParar');
   const volta = document.getElementById('resgateVoltar');
   const podeAgir = resgate.fase === 'correndo';
@@ -34882,6 +34982,60 @@ function resgateCargaHtml(a){
    (`top:-10px`, 62x13px, com um `<b>` por cima). Ela ficava DENTRO do círculo, no rodapé dele, e
    foi reportada: *"a barra que carrega quando ta resgatando ... ta ficando no meio do circulo e
    ta feia"*. Fora do círculo ela cabe inteira, e o número diz quanto falta em vez de só encher. */
+/* ⚠️ O RÓTULO DA FAIXA SAI DAS CONSTANTES, nunca escrito à mão: ele envelheceria no primeiro
+   ajuste de `RESGATE_FAIXA_PTS`, que é o defeito que o rótulo de metragem do revezamento da
+   Corrida teve. É a MESMA conta que a legenda embaixo do mapa usa. */
+function resgateRotuloDaFaixa(i){
+  const f = RESGATE_FAIXA_DO_PONTO[i];
+  return f === 0 ? 'até ' + (RESGATE_FAIXA_PTS[0] - 1) + ' pts'
+       : f === 1 ? (RESGATE_FAIXA_PTS[0] + '–' + (RESGATE_FAIXA_PTS[1] - 1) + ' pts')
+       : RESGATE_FAIXA_PTS[1] + '+ pts';
+}
+/* ---------------------------------------------------------------------------
+   QUEM PODE APARECER NESTA ILHOTA -- a caixa do (i) do setup
+   ⚠️ ELA MOSTRA O BOLO INTEIRO DA FAIXA, e não uma amostra: aqui a espécie sai DIRETO do bolo (o
+   `resgateNovoOcupante` sorteia um id e pronto), sem a conversão de espécie-por-nível que o
+   encontro selvagem precisa -- então esta lista é exatamente o que pode aparecer, e é por isso
+   que ela pode mostrar a CHANCE. É a mesma propriedade da lista de zona da Pescaria.
+   ⚠️ E A CHANCE É UNIFORME dentro da faixa (o sorteio não tem peso), então ela é 1/N -- escrever
+   um peso aqui seria inventar um dado que o sorteio não tem.
+   A LINHA É A DA ROTA (`.rota-mon`), de propósito: é a mesma pergunta ("esse cobre o tipo que
+   falta no meu time?") e ela abre a MESMA ficha da Pokédex. */
+function abrirIlhotaDoResgate(i){ resgate.ilhotaAberta = i; render(); }
+function fecharIlhotaDoResgate(){ resgate.ilhotaAberta = null; render(); }
+function renderResgateIlhotaModal(){
+  const i = resgate.ilhotaAberta;
+  if(i == null || !RESGATE_PONTOS[i]) return '';
+  const bolo = RESGATE_BOLO_DA_FAIXA[RESGATE_FAIXA_DO_PONTO[i]] || [];
+  const pct = Math.round(100 / Math.max(1, bolo.length));
+  const pego = getAllCaughtSpecies();
+  const ondes = ['Ilhota perto da praia', 'Ilhota do meio', 'Ilhota do alto'];
+  return `
+  <div class="modal-overlay" onclick="fecharIlhotaDoResgate()">
+    <div class="modal-box rota-mons-box" onclick="event.stopPropagation()">
+      <div class="modal-icon">${selo('resgate')}</div>
+      <h2>${ondes[RESGATE_FAIXA_DO_PONTO[i]]}</h2>
+      <p class="hint-text">Quem pode estar aqui vale <strong>${escapeHtmlSafe(resgateRotuloDaFaixa(i))}</strong>.
+        São <strong>${bolo.length}</strong>, todos com a mesma chance (<strong>${pct}%</strong>), e
+        quem aparece é sorteado quando a corrida começa.</p>
+      <div class="rota-mons-lista">${bolo.slice().sort((a, b) => resgatePontosDe(b) - resgatePontosDe(a)).map(id => {
+        const sp = SPECIES[id] || {};
+        const tem = pego.has(id);
+        return `<button class="rota-mon ${tem ? 'tem' : ''}" onclick="abrirPokedexFicha('${escJs(id)}', false)">
+          <span class="rota-mon-sprite">${spriteHtml(id, 'sprite-sm', false)}</span>
+          <span class="rota-mon-info">
+            <span class="rota-mon-nome">${escapeHtmlSafe(sp.name || id)}</span>
+            <span class="rota-mon-tipos">${sp.types ? typesHtml(sp.types) : ''}</span>
+          </span>
+          <span class="pesc-chance">${resgatePontosDe(id)} pts</span>
+          ${tem ? `<span class="pokedex-owned-badge" title="Já está na sua Pokédex">${pokedexIcon()}</span>`
+                : '<span class="rota-mon-falta"></span>'}
+        </button>`;
+      }).join('')}</div>
+      <button class="btn secondary" onclick="fecharIlhotaDoResgate()">Fechar</button>
+    </div>
+  </div>`;
+}
 function resgatePontoHtml(p){
   if(!p || !p.speciesId) return '<span class="resg-pts">Vazio</span>';
   return spriteHtml({ speciesId: p.speciesId }, 'sprite-sm')
@@ -35146,26 +35300,40 @@ function resgatePickerHtml(){
 }
 /* O MAPA em modo ILUSTRAÇÃO (a tela de setup): os pontos são `<span>` e não clicam -- um botão que
    não faz nada convida um toque que não responde. É a mesma decisão da ilha da Pescaria.
-   ⚠️ MAS ELE MOSTRA OS OCUPANTES DE VERDADE (20/09/2026, reportado: *"logo quando eu abro a tela
-   não está exibindo o mapa"*). O protótipo cria os ocupantes no `reset()` e desenha desde o modo
-   `ready`; aqui eles só nasciam no `resgateComecar`, então o setup mostrava seis círculos com um
-   número e o canvas VAZIO -- sem ilhas, sem ondas, sem ninguém pra resgatar.
-   E com o valor vindo do BICHO (e não da ilhota), mostrar quem está lá deixou de ser enfeite: é
-   ELE que diz quanto aquela viagem vale. */
+   ⚠️ E NO SETUP ELE NÃO MOSTRA MAIS UM BICHO POR ILHOTA (20/09/2026, a pedido: *"antes de começar,
+   aparece o mapa e as ilhas e um pokemon em cada ilha, tire esse pokemon que exibe e adicione um i
+   de informações"*). O bicho do setup era **descartável e enganoso**: os ocupantes são sorteados de
+   novo no `resgateComecar`, então o que a tela mostrava ali não era o que o jogador ia encontrar --
+   ele prometia UM pokémon e entregava outro.
+   No lugar dele a ilhota mostra a FAIXA dela (o que ela pode pagar) e um **(i)** que abre a lista
+   inteira, como as zonas da Pescaria. A faixa fica porque uma ilhota vazia faria as seis se lerem
+   iguais -- e é justamente a escada que o mapa tem a dizer antes da largada. */
 function resgateMapaHtml(jogando){
   const pontos = RESGATE_PONTOS.map((p, i) => {
     const pos = `left:${p.x / RESGATE_W * 100}%;top:${p.y / RESGATE_H * 100}%`;
     const o = (resgate.ocupantes || [])[i];
     const rotulo = o && o.speciesId ? (SPECIES[o.speciesId] || {}).name || '?' : 'Vazio';
-    return jogando
-      ? `<button class="resg-ponto" id="resgatePonto${i}" style="${pos}" onclick="resgateTocarPonto(${i})"
-          aria-label="Resgatar ${escapeHtmlSafe(rotulo)}">${resgatePontoHtml(o)}</button>`
-      : `<span class="resg-ponto${o && o.speciesId ? '' : ' vazio'}" style="${pos}"
-          title="${escapeHtmlSafe(rotulo)}">${resgatePontoHtml(o)}</span>`;
+    if(jogando){
+      return `<button class="resg-ponto" id="resgatePonto${i}" style="${pos}" onclick="resgateTocarPonto(${i})"
+          aria-label="Resgatar ${escapeHtmlSafe(rotulo)}">${resgatePontoHtml(o)}</button>`;
+    }
+    /* ⚠️ O (i) É IRMÃO do ponto, nunca filho: no jogo o ponto é um `<button>`, e `<button>` dentro
+       de `<button>` é HTML inválido -- o navegador fecha o de fora e o clique de dentro se perde,
+       com a tela continuando a PARECER certa. Aqui ele é um `<span>`, mas a estrutura é a mesma nos
+       dois modos de propósito: é a armadilha que a lupa do encontro selvagem já custou duas vezes.
+       O contêiner é o `.resg-ilhota`, que só posiciona. */
+    return `<div class="resg-ilhota" style="${pos}">
+        <span class="resg-ponto so-faixa"><span class="resg-pts">${resgateRotuloDaFaixa(i)}</span></span>
+        <button class="pesc-info" onclick="abrirIlhotaDoResgate(${i})"
+          aria-label="Quem pode aparecer nesta ilhota" title="Quem pode aparecer aqui">i</button>
+      </div>`;
   }).join('');
+  /* ⚠️ A PRAIA GANHA A MESMA BARRA DO PONTO enquanto alguém descarrega: sem ela os 2s viram uma
+     espera sem explicação -- o parceiro para na areia e nada acontece. É o mesmo `.resg-medidor`
+     da ilhota, e reusá-lo é o que faz os dois tempos de espera se lerem igual. */
   const praia = jogando
-    ? `<button class="resg-praia" style="left:${RESGATE_PRAIA.x / RESGATE_W * 100}%;top:${RESGATE_PRAIA.y / RESGATE_H * 100}%"
-        onclick="resgateVoltarAPraia()">⚑ PRAIA</button>`
+    ? `<button class="resg-praia" id="resgatePraia" style="left:${RESGATE_PRAIA.x / RESGATE_W * 100}%;top:${RESGATE_PRAIA.y / RESGATE_H * 100}%"
+        onclick="resgateVoltarAPraia()">⚑ PRAIA<span class="resg-medidor" id="resgateDescarga" hidden><i></i><b>0%</b></span></button>`
     : `<span class="resg-praia" style="left:${RESGATE_PRAIA.x / RESGATE_W * 100}%;top:${RESGATE_PRAIA.y / RESGATE_H * 100}%">⚑ PRAIA</span>`;
   return `<div class="resg-mapa">
     <canvas id="resgateMar" width="${RESGATE_W * 2}" height="${RESGATE_H * 2}"
@@ -35224,6 +35392,7 @@ function renderResgate(){
              Corrida teve, e que a trava de lá cobra procurando o texto fixo no arquivo inteiro
              (ou seja: este comentário não pode reproduzi-lo). */''}
         <div class="resg-legenda"><span>Perto: até ${RESGATE_FAIXA_PTS[0] - 1} pts</span><span>Centro: até ${RESGATE_FAIXA_PTS[1] - 1}</span><span>Alto: ${RESGATE_FAIXA_PTS[1]}+</span></div>
+        <p class="hint-text">Toque no <strong>i</strong> de cada ilhota pra ver quem pode aparecer nela.</p>
       </div>
       <div class="box">
         <h2>Seu parceiro</h2>
@@ -35234,7 +35403,8 @@ function renderResgate(){
         <button class="btn success" ${resgate.escolhido && resgate.fase !== 'carregando' ? '' : 'disabled'}
           onclick="resgateComecar()">${resgate.fase === 'carregando' ? 'Carregando os sprites…' : 'Começar resgate'}</button>
       </div>
-      <button class="btn secondary" onclick="sairDoResgate()">⬅ Sair</button>`;
+      <button class="btn secondary" onclick="sairDoResgate()">⬅ Sair</button>
+      ${renderResgateIlhotaModal()}`;
   }
 
   const [a, b] = resgate.atores;

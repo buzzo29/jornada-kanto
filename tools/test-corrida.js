@@ -295,9 +295,9 @@ console.log('\n=== UMA TENTATIVA POR TRAVESSIA (uma na ida, uma na volta) ===');
 console.log('\n=== A FÍSICA: AS TROCAS CAEM NOS MÚLTIPLOS DO TRECHO ===');
 {
   contaDeTeste();
-  const montar = (formato, participantes) => {
+  const montar = (formato) => {
     S.corridaZerar();
-    S.corrida.formato = formato; S.corrida.participantes = participantes;
+    S.corrida.formato = formato;
     const meus = formato === 'relay'
       ? g.saveSlots[0].team.slice(0, S.CORRIDA_TRECHOS)
       : [mk('jolteon', 60)];
@@ -310,13 +310,15 @@ console.log('\n=== A FÍSICA: AS TROCAS CAEM NOS MÚLTIPLOS DO TRECHO ===');
   };
   const rodar = () => { let v = 0; while(S.corrida.corredores.some(c => c.chegada === null) && v < 60 * 600){ S.corridaFisica(1 / 60); v++; } };
 
-  /* ⚠️ AS SEIS COMBINAÇÕES do pedido */
+  /* ⚠️ AS DUAS MODALIDADES. Eram SEIS combinações (2, 3 ou 4 na pista) -- a escolha de quantos
+     correm saiu em 20/09/2026 e são sempre `CORRIDA_PARTICIPANTES`. A trava media um botão que
+     não existe mais; ela passou a medir a REGRA, que é o número ser o da constante. */
   const combos = [];
-  for(const f of ['single', 'relay']) for(const n of [2, 3, 4]){
-    montar(f, n); rodar();
+  for(const f of ['single', 'relay']){
+    montar(f); rodar();
     const trocas = S.corrida.corredores.flatMap(c => c.trocas);
     combos.push({
-      f, n,
+      f, n: S.CORRIDA_PARTICIPANTES,
       corredores: S.corrida.corredores.length,
       terminou: S.corrida.corredores.every(c => c.chegada !== null),
       distExata: S.corrida.corredores.every(c => c.dist === S.corridaTotal()),
@@ -327,8 +329,10 @@ console.log('\n=== A FÍSICA: AS TROCAS CAEM NOS MÚLTIPLOS DO TRECHO ===');
       trocasExatas: trocas.every(t => t.em % S.corridaMetros() === 0 && t.em > 0 && t.em < S.corridaTotal()),
     });
   }
-  ok('as seis combinações terminam', combos.every(c => c.terminou), JSON.stringify(combos.filter(c => !c.terminou)));
-  ok('e o número de corredores bate', combos.every(c => c.corredores === c.n));
+  ok('as duas modalidades terminam', combos.every(c => c.terminou), JSON.stringify(combos.filter(c => !c.terminou)));
+  ok('e são sempre ' + S.CORRIDA_PARTICIPANTES + ' na pista',
+     combos.every(c => c.corredores === S.CORRIDA_PARTICIPANTES),
+     combos.map(c => c.f + ':' + c.corredores).join(' '));
   ok('e todos param na distância EXATA', combos.every(c => c.distExata),
      JSON.stringify(combos.filter(c => !c.distExata)));
   /* ⚠️ E AS TROCAS CAEM NO MÚLTIPLO EXATO DO TRECHO, mesmo caindo no meio do quadro. Medida de
@@ -358,7 +362,7 @@ console.log('\n=== A FÍSICA: AS TROCAS CAEM NOS MÚLTIPLOS DO TRECHO ===');
      cai no meio dele -- e o que sobra tem que correr com o Speed do segundo, não do primeiro. */
   {
     S.corridaZerar();
-    S.corrida.formato = 'relay'; S.corrida.participantes = 1;
+    S.corrida.formato = 'relay';
     const lento = S.corridaInstancia({ speciesId: 'shuckle', level: 50 });
     const rapido = S.corridaInstancia({ speciesId: 'jolteon', level: 50 });
     const eu = S.corridaNovoCorredor([lento, rapido, rapido], true);
@@ -386,7 +390,7 @@ console.log('\n=== OS NPCs: FORMA FINAL, SEM REPETIR, E O MESMO MOTOR ===');
 {
   contaDeTeste();
   S.corridaZerar();
-  S.corrida.formato = 'relay'; S.corrida.participantes = 4;
+  S.corrida.formato = 'relay';
   S.corrida.escolhidos = g.saveSlots[0].team.slice(0, S.CORRIDA_TRECHOS);
   const times = S.sortearNpcs();
   ok('sorteia um time por adversário', times.length === 3, String(times.length));
@@ -434,7 +438,6 @@ console.log('\n=== OS NPCs: FORMA FINAL, SEM REPETIR, E O MESMO MOTOR ===');
 console.log('\n=== A CLASSIFICAÇÃO É PELO INSTANTE DE CHEGADA ===');
 {
   S.corridaZerar();
-  S.corrida.participantes = 3;
   const c = (dist, chegada) => Object.assign(S.corridaNovoCorredor([S.corridaInstancia({ speciesId: 'jolteon', level: 50 })], false), { dist, chegada });
   /* ⚠️ A ORDEM DO ARRAY É PROPOSITALMENTE A INVERSA do resultado: se a classificação usasse a
      ordem de processamento, este caso passaria errado. */
@@ -533,7 +536,7 @@ console.log('\n=== A SELEÇÃO: ORDENADA PELO SPEED DA CORRIDA ===');
   S.corrida.fase = 'correndo';
   const trancado = S.corrida.escolhidos.map(p => p.speciesId).join(',');
   S.corridaMover(0, 1); S.corridaEscolherTime(0);
-  S.corridaTrocarFormato('single'); S.corridaTrocarParticipantes(4);
+  S.corridaTrocarFormato('single');
   ok('durante a corrida a ordem não muda', S.corrida.escolhidos.map(p => p.speciesId).join(',') === trancado);
   ok('nem a seleção', S.corrida.escolhidos.length === S.CORRIDA_TRECHOS, String(S.corrida.escolhidos.length));
   ok('nem a modalidade', S.corrida.formato === 'relay', S.corrida.formato);
@@ -555,7 +558,7 @@ console.log('\n=== A CORRIDA NÃO ENCOSTA NO SAVE ===');
   contaDeTeste();
   const antes = JSON.stringify(g.saveSlots[0].team);
   S.corridaZerar();
-  S.corrida.formato = 'relay'; S.corrida.participantes = 4;
+  S.corrida.formato = 'relay';
   S.corrida.escolhidos = g.saveSlots[0].team.slice(0, S.CORRIDA_TRECHOS);
   const eu = S.corridaNovoCorredor(S.corrida.escolhidos.map(S.corridaInstancia), true);
   S.corrida.corredores = [eu].concat(S.sortearNpcs().map(t => S.corridaNovoCorredor(t, false)));
@@ -585,11 +588,32 @@ console.log('\n=== A TELA ===');
   S.corridaZerar();          /* cada bloco comeca do zero: sem isto ele herda a selecao do bloco 9 */
   S.abrirCorrida();
   const t = S.renderCorrida();
-  ok('o botão diz "Escolher corredor", exato', t.indexOf('Escolher corredor') >= 0, 'sem o botão');
+  /* ⚠️ O RÓTULO SEGUE A MODALIDADE (20/09/2026): "corredor" na individual, "equipe" no
+     revezamento -- e ele sai da MESMA função nos dois lugares que o mostram (o botão do setup e o
+     título do picker), senão o botão e a tela pra onde ele leva diriam coisas diferentes. */
+  ok('na individual o botão diz "Escolher corredor"', t.indexOf('Escolher corredor') >= 0, 'sem o botão');
+  S.corridaTrocarFormato('relay');
+  const tRelay = S.renderCorrida();
+  ok('  e no revezamento, "Escolher equipe"',
+     tRelay.indexOf('Escolher equipe') >= 0 && tRelay.indexOf('Escolher corredor') < 0,
+     'rótulo do revezamento');
+  /* ⚠️ E A TELA PRA ONDE ELE LEVA JÁ ERA OUTRA: no revezamento o picker é o de TIMES, com título
+     próprio -- o que dizia a mesma coisa nas duas modalidades era só o botão. */
+  S.corridaAbrirPicker();
+  ok('  e o picker do revezamento é o de TIMES', S.renderCorrida().indexOf('Qual time faz o revezamento?') >= 0);
+  S.corridaFecharPicker(); S.corridaTrocarFormato('single');
+  S.corridaAbrirPicker();
+  ok('  e o da individual é a lista de Pokémon', S.renderCorrida().indexOf('Escolher corredor') >= 0);
+  S.corridaFecharPicker();
   /* ⚠️ E NÃO SOBRAM OS SELETORES FIXOS DO PROTÓTIPO */
   ok('e não há <select> de Pokémon', t.indexOf('<select') < 0, 'o seletor do protótipo ficou');
   ok('as duas modalidades estão na tela', t.indexOf('Individual') >= 0 && t.indexOf('Revezamento') >= 0);
-  ok('e as três quantidades', /corridaTrocarParticipantes\(2\)/.test(t) && /corridaTrocarParticipantes\(3\)/.test(t) && /corridaTrocarParticipantes\(4\)/.test(t));
+  /* ⚠️ E A ESCOLHA DE QUANTOS CORREM SAIU (20/09/2026, a pedido): são sempre
+     `CORRIDA_PARTICIPANTES`. A trava cobrava os três botões e passou a cobrar que eles NÃO
+     existam -- nem o controle, nem a ação que ele chamava. */
+  ok('e não há mais escolha de quantos correm',
+     t.indexOf('corridaTrocarParticipantes') < 0 && src.indexOf('function corridaTrocarParticipantes') < 0);
+  ok('  e a tela diz quantos são', t.indexOf(S.CORRIDA_PARTICIPANTES + ' Pokémon na pista') >= 0);
   /* ⚠️ O REGEX EXIGIA A ORDEM INVERSA dos atributos e dava falso positivo: o HTML sai
      `<button class="..." disabled onclick="corridaLargar()">`, com o `disabled` ANTES. Aqui o que
      se cobra é o par -- o botão da largada existe E está desabilitado. */
@@ -968,7 +992,7 @@ console.log('\n=== QUEM NÃO TENTA PERDE VELOCIDADE ===');
      mesmo nível, sem NPC no caminho. É o que o pedido quer que aconteça. */
   const correr = (clicando) => {
     S.corridaZerar();
-    S.corrida.formato = 'single'; S.corrida.participantes = 1;
+    S.corrida.formato = 'single';
     const r = S.corridaNovoCorredor([S.corridaInstancia({ speciesId: 'jolteon', level: 50 }, true)], true);
     S.corrida.corredores = [r]; S.corrida.fase = 'correndo'; S.corrida.tempo = 0;
     S.corrida.escolhidos = [{ speciesId: 'jolteon', level: 50, slot: 0, idx: 0 }];
@@ -1037,7 +1061,7 @@ console.log('\n=== O NPC É PAREADO PELO SPEED ===');
   /* ⚠️ O ALVO SAI DA ESPÉCIE, NÃO DO NÍVEL: o `speedDaCorrida` multiplica pelo nível, então um
      jogador Lv.5 comparado com a lista no Lv.50 receberia sempre os mais lentos. */
   S.corridaZerar();
-  S.corrida.formato = 'single'; S.corrida.participantes = 2;
+  S.corrida.formato = 'single';
   for(const lv of [5, 50, 99]){
     S.corrida.escolhidos = [{ speciesId: 'jolteon', level: lv, name: 'Jolteon' }];
     const t = S.sortearNpcs()[0];
@@ -1093,7 +1117,7 @@ console.log('\n=== O NPC É PAREADO PELO SPEED ===');
 console.log('\n=== A CHEGADA FICA NA METADE DE CIMA ===');
 {
   S.corridaZerar();
-  S.corrida.formato = 'single'; S.corrida.participantes = 2; S.corrida.fase = 'correndo';
+  S.corrida.formato = 'single'; S.corrida.fase = 'correndo';
   const eu = S.corridaNovoCorredor([S.corridaInstancia({ speciesId: 'jolteon', level: 50 }, true)], true);
   const npc = S.corridaNovoCorredor([S.corridaInstancia({ speciesId: 'rapidash', level: 50 }, false)], false);
   S.corrida.corredores = [eu, npc];
@@ -1178,7 +1202,7 @@ console.log('\n=== AS MEDALHAS SÃO DESENHO DA CASA ===');
   /* ⚠️ E NENHUMA É EMOJI -- é o pedido ao pé da letra (*"crie, não use emoji prontos"*) e a regra
      que tirou os 54 emojis das telas. A varredura é sobre a TELA renderizada. */
   S.corridaZerar();
-  S.corrida.formato = 'single'; S.corrida.participantes = 4; S.corrida.fase = 'fim';
+  S.corrida.formato = 'single'; S.corrida.fase = 'fim';
   S.corrida.corredores = [0, 1, 2, 3].map(i => {
     const c = S.corridaNovoCorredor([S.corridaInstancia({ speciesId: 'jolteon', level: 50 }, i === 0)], i === 0);
     c.chegada = 20 + i * 2; c.dist = S.corridaTotal();
@@ -1208,7 +1232,7 @@ console.log('\n=== AS MEDALHAS SÃO DESENHO DA CASA ===');
 console.log('\n=== O REVEZAMENTO TEM A EQUIPE NA PISTA ===');
 {
   S.corridaZerar();
-  S.corrida.formato = 'relay'; S.corrida.participantes = 2; S.corrida.fase = 'correndo';
+  S.corrida.formato = 'relay'; S.corrida.fase = 'correndo';
   const time = ['jolteon', 'starmie', 'arcanine'].map(id => S.corridaInstancia({ speciesId: id, level: 50 }, true));
   const eu = S.corridaNovoCorredor(time, true);
   const npc = S.corridaNovoCorredor(['rapidash', 'dodrio', 'persian']
@@ -1261,7 +1285,10 @@ console.log('\n=== O REVEZAMENTO TEM A EQUIPE NA PISTA ===');
   /* o jogador no 2º trecho, com a marca dos 300 ainda na tela */
   eu.trecho = 1; eu.dist = 305; npc.trecho = 1; npc.dist = 305;
   ch.length = 0; S.corridaPintar();
-  const meus = ch.filter(c => c.t === 'img' && Math.abs(c.x - (44 + 176 * 0.5)) < 40);
+  /* ⚠️ O CENTRO DA RAIA SAI DA CONSTANTE, nunca escrito à mão: ele era `44 + 176*0.5` -- a raia
+     de DOIS na pista --, e caiu sozinho no dia em que a pista virou sempre quatro. */
+  const raiaT = (396 - 44) / S.CORRIDA_PARTICIPANTES;
+  const meus = ch.filter(c => c.t === 'img' && Math.abs(c.x - (44 + raiaT * 0.5)) < raiaT * 0.45);
   ok('a equipe inteira aparece na pista, não só quem corre', meus.length >= 2,
      meus.length + ' sprites na raia do jogador');
   /* ⚠️ QUEM ESTÁ PARADO SAI MAIS APAGADO -- é o que separa "quem corre" de "quem está na pista". */
@@ -1316,7 +1343,6 @@ console.log('\n=== A PISTA É PROPORCIONAL À DISTÂNCIA ===');
 {
   contaDeTeste();
   S.corridaZerar();
-  S.corrida.participantes = 2;
   const a = S.corridaNovoCorredor([S.corridaInstancia({ speciesId: 'jolteon', level: 50 }, true)], true);
   const b = S.corridaNovoCorredor([S.corridaInstancia({ speciesId: 'venusaur', level: 50 }, false)], false);
   S.corrida.corredores = [a, b];
@@ -1523,7 +1549,7 @@ console.log('\n=== NO FIM, SÓ A CLASSIFICAÇÃO ===');
 {
   contaDeTeste();
   S.corridaZerar(); S.abrirCorrida();
-  S.corrida.formato = 'single'; S.corrida.participantes = 3;
+  S.corrida.formato = 'single';
   S.corrida.escolhidos = [mk('jolteon', 60)];
   const eu = S.corridaNovoCorredor([S.corridaInstancia(S.corrida.escolhidos[0], true)], true);
   S.corrida.corredores = [eu].concat(S.sortearNpcs().map(t => S.corridaNovoCorredor(t, false)));
@@ -1540,14 +1566,14 @@ console.log('\n=== NO FIM, SÓ A CLASSIFICAÇÃO ===');
   ok('e a pista some', fim.indexOf('corridaCanvas') < 0, 'a pista ficou (e em branco)');
   ok('e o placar some', fim.indexOf('racerRow') < 0, 'o placar ficou (e zerado)');
   ok('e o botão de impulso some', fim.indexOf('corridaBoost') < 0, 'o impulso ficou');
-  ok('e o setup some', fim.indexOf('Escolher corredor') < 0, 'o setup ficou');
+  ok('e o setup some', fim.indexOf(S.corridaRotuloDaEscolha()) < 0, 'o setup ficou');
   ok('mas dá pra correr de novo e configurar',
      fim.indexOf('corridaLargar') >= 0 && fim.indexOf('corridaReiniciar') >= 0);
   ok('e dá pra sair', fim.indexOf('sairDaCorrida') >= 0);
 
   /* ⚠️ E OS TEMPOS ESTÃO LÁ, na ordem da classificação */
   const tempos = (fim.match(/<b>([\d.]+)s<\/b>/g) || []);
-  ok('os três tempos aparecem', tempos.length === 3, tempos.join(' '));
+  ok('os ' + S.CORRIDA_PARTICIPANTES + ' tempos aparecem', tempos.length === S.CORRIDA_PARTICIPANTES, tempos.join(' '));
   ok('e em ordem crescente',
      tempos.map(t => parseFloat(t.replace(/\D*([\d.]+).*/, '$1'))).every((v, i, a) => i === 0 || a[i-1] <= v),
      tempos.join(' '));
@@ -1774,7 +1800,7 @@ console.log('\n=== OS CHIPS DO REVEZAMENTO SEGUEM O CORREDOR ===');
 {
   contaDeTeste();
   S.corridaZerar();
-  S.corrida.formato = 'relay'; S.corrida.participantes = 2;
+  S.corrida.formato = 'relay';
   S.corridaEscolherTime(0);
   const time = S.corrida.escolhidos;
   const eu = S.corridaNovoCorredor(time.map(p => S.corridaInstancia(p, true)), true);
@@ -1847,7 +1873,7 @@ console.log('\n=== A CLASSIFICAÇÃO É DE TREINADORES ===');
   contaDeTeste();
   g.trainerName = 'Buzzo';
   S.corridaZerar();
-  S.corrida.formato = 'relay'; S.corrida.participantes = 2;
+  S.corrida.formato = 'relay';
   S.corridaEscolherTime(0);
   const eu = S.corridaNovoCorredor(S.corrida.escolhidos.map(p => S.corridaInstancia(p, true)), true);
   const npc = S.corridaNovoCorredor(S.sortearNpcs()[0], false);
@@ -1860,16 +1886,26 @@ console.log('\n=== A CLASSIFICAÇÃO É DE TREINADORES ===');
   /* ⚠️ ELA MOSTRAVA O NOME DO POKÉMON QUE ESTAVA CORRENDO NA HORA DA CHEGADA -- num revezamento
      isso é um dos seis, escolhido por acaso, e não diz de quem era a equipe. */
   ok('a linha traz o NOME DO TREINADOR', html.indexOf('Buzzo') >= 0);
-  /* ⚠️ E ELE É "Rival", MEDIDO: a 320px a coluna do nome tem 83px e "Adversário 1" quebrava em
-     DUAS linhas -- a linha ia de 48 pra 63px e elas deixavam de alinhar em coluna, que é onde o
-     olho compara. Com "Rival N" as quatro ficam em 48px. */
-  ok('  e o adversário é "Rival N"', html.indexOf('Rival 1') >= 0);
+  /* ⚠️ E O ADVERSÁRIO TEM NOME DE LÍDER DA LIGA LARANJA (20/09/2026, a pedido). Ele era numerado
+     -- e o número tinha sido escolhido porque "Adversário 1" quebrava em duas linhas na coluna de
+     83px. Os cinco do Orange Crew cabem: o mais longo tem cinco letras.
+     ⚠️ A TRAVA LÊ A LISTA, nunca um nome escrito aqui: trocar um deles não pode derrubá-la. */
+  ok('  e o adversário tem nome de líder da Liga Laranja',
+     html.indexOf(S.corridaNomeDoNpc(1)) >= 0, S.corridaNomeDoNpc(1));
+  ok('    e ele não é mais numerado', !/Rival \d/.test(html) && !/NPC \d/.test(html));
+  ok('    e a ordem é FIXA (o mesmo nome na mesma raia)',
+     S.corridaNomeDoNpc(1) === S.CORRIDA_NPC_NOMES[0] && S.corridaNomeDoNpc(2) === S.CORRIDA_NPC_NOMES[1]);
+  ok('    e a lista tem folga sobre as raias',
+     S.CORRIDA_NPC_NOMES.length >= S.CORRIDA_PARTICIPANTES - 1,
+     S.CORRIDA_NPC_NOMES.length + ' nomes pra ' + (S.CORRIDA_PARTICIPANTES - 1) + ' adversários');
+  ok('    e nenhum nome cabe em mais de 8 caracteres (a coluna de 83px)',
+     S.CORRIDA_NPC_NOMES.every(n2 => n2.length <= 8), S.CORRIDA_NPC_NOMES.join(','));
   /* ⚠️ O RÓTULO DE TEXTO DUROU ALGUMAS HORAS: em 20/09 ele virou a FILEIRA DE SPRITES, a pedido.
      A trava do que ficou no lugar dele está no bloco 22. */
 
   /* na INDIVIDUAL o que faz sentido embaixo é o pokémon, que é o que ele escolheu */
   S.corridaZerar();
-  S.corrida.formato = 'single'; S.corrida.participantes = 2;
+  S.corrida.formato = 'single';
   const solo = S.corridaNovoCorredor([S.corridaInstancia(mk('jolteon', 60), true)], true);
   solo.chegada = 20;
   S.corrida.corredores = [solo];
@@ -1989,7 +2025,7 @@ console.log('\n=== OS SPRITES DO TIME NA CLASSIFICAÇÃO ===');
   contaDeTeste();
   g.trainerName = 'Buzzo';
   S.corridaZerar();
-  S.corrida.formato = 'relay'; S.corrida.participantes = 2;
+  S.corrida.formato = 'relay';
   S.corridaEscolherTime(0);
   const eu = S.corridaNovoCorredor(S.corrida.escolhidos.map(p => S.corridaInstancia(p, true)), true);
   const npc = S.corridaNovoCorredor(S.sortearNpcs()[0], false);
@@ -2004,7 +2040,7 @@ console.log('\n=== OS SPRITES DO TIME NA CLASSIFICAÇÃO ===');
   ok('a linha NÃO escreve mais o nome do time', html.indexOf('Time A') < 0);
   ok('  nem o rótulo do rival', html.indexOf('Equipe rival') < 0);
   ok('  e o `corridaComQuemCorreu` virou letra morta', src.indexOf('function corridaComQuemCorreu') < 0);
-  ok('o treinador continua em cima', html.indexOf('Buzzo') >= 0 && html.indexOf('Rival 1') >= 0);
+  ok('o treinador continua em cima', html.indexOf('Buzzo') >= 0 && html.indexOf(S.corridaNomeDoNpc(1)) >= 0);
 
   /* a fileira é a MESMA do card de time -- o jogador reconhece um time por ela */
   /* ⚠️ A CLASSE É PROCURADA NA LISTA, nunca por igualdade exata: ela leva a `save-slot-team-row
@@ -2029,7 +2065,7 @@ console.log('\n=== OS SPRITES DO TIME NA CLASSIFICAÇÃO ===');
 
   /* na INDIVIDUAL é a mesma fileira, com UM sprite -- sem exceção nenhuma */
   S.corridaZerar();
-  S.corrida.formato = 'single'; S.corrida.participantes = 2;
+  S.corrida.formato = 'single';
   const solo = S.corridaNovoCorredor([S.corridaInstancia(mk('jolteon', 60), true)], true);
   solo.chegada = 19;
   S.corrida.corredores = [solo];
@@ -2139,7 +2175,7 @@ console.log('\n=== O TIME VIAJA NO ENVIO ===');
     return Promise.resolve({ data: { gravado: true } });
   };
   S.corridaZerar();
-  S.corrida.formato = 'relay'; S.corrida.participantes = 2;
+  S.corrida.formato = 'relay';
   S.corridaEscolherTime(0);
   const eu = S.corridaNovoCorredor(S.corrida.escolhidos.map(p => S.corridaInstancia(p, true)), true);
   eu.chegada = 111; eu.trecho = S.CORRIDA_TRECHOS - 1;
@@ -2165,7 +2201,7 @@ console.log('\n=== A LARGADA VAI PRO TOPO, E O QUADRO VAZIO SUMIU ===');
 {
   contaDeTeste();
   S.corridaZerar();
-  S.corrida.formato = 'relay'; S.corrida.participantes = 2;
+  S.corrida.formato = 'relay';
   S.corridaEscolherTime(0);
   const eu = S.corridaNovoCorredor(S.corrida.escolhidos.map(p => S.corridaInstancia(p, true)), true);
 
@@ -2235,9 +2271,6 @@ console.log('\n=== A SELEÇÃO NÃO VAZA ENTRE AS MODALIDADES ===');
   ok('  e voltando à individual, o corredor também',
      nomes(S.corrida.escolhidos) === solo, nomes(S.corrida.escolhidos));
 
-  /* trocar o número de participantes NÃO mexe na seleção -- é outro eixo */
-  S.corridaTrocarParticipantes(4);
-  ok('trocar de participantes não mexe na seleção', nomes(S.corrida.escolhidos) === solo);
 
   /* ⚠️ O CAMPO PRECISA EXISTIR NA DECLARAÇÃO do objeto, e não só no `corridaZerar`: o
      `abrirCorrida` NÃO zera, então na primeira entrada ele seria `undefined` -- e o
