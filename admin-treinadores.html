@@ -61,6 +61,15 @@
   .resumo{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
   /* a ficha da ilha usa o laranja do arquipélago -- é o que a faz se achar no meio das outras */
   .ficha.ilha{ background:#fff0dd; border-color:#e07a1e; color:#7a3f05; }
+  /* A FILA DA LIGA: uma linha por inscrito -- nome, save e a ação. Grade e não flex livre: com
+     flex a coluna do save dança de linha pra linha, e é ali que o olho compara. */
+  .fila-linha{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;align-items:center;
+    padding:6px 0;border-bottom:1px dashed #d8d2c0;}
+  .fila-linha:last-child{border-bottom:none;}
+  .fila-nome{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .fila-linha .btn{margin:0;padding:6px 10px;font-size:.78rem;width:auto;}
+  .btn.perigo{background:#c0392b;color:#fff;border-color:#8e2b20;}
+  .onde.ok{color:#1f7a3d;font-weight:700;}
   .ilhas-resumo{ display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin:10px 0 0;
     padding:8px 10px; border:2px solid #e07a1e; border-radius:4px; background:#fff8ef; font-size:13px; }
   .num{ display:flex; flex-direction:column; align-items:center; min-width:74px;
@@ -176,7 +185,10 @@ const estado = {
   authChecked: false, user: null,
   carregando: false, erro: null,
   treinadores: [], online: 0, onlineTruncado: false, proximo: null, agora: 0,
-  abertos: {}, busca: ''
+  abertos: {}, busca: '',
+  /* A FILA DA LIGA CLÁSSICA. Ela é carregada à parte da lista de treinadores: são duas perguntas
+     diferentes, e juntar as duas numa chamada só faria a página inteira esperar pela mais lenta. */
+  fila: null, filaCarregando: false, filaErro: null, filaAcao: null
 };
 
 const esc = (s) => String(s == null ? '' : s)
@@ -229,7 +241,7 @@ function ondeHtml(s){
   if(s.capturados) p.push(s.capturados + ' capturados neste save');
   return p.length ? `<p class="onde">${esc(p.join(' · '))}</p>` : '';
 }
-function saveHtml(s){
+function saveHtml(s, uidDono){
   return `<div class="save">
     <div class="save-cab">
       <span class="save-slot">Slot ${s.slot + 1}</span>
@@ -243,6 +255,7 @@ function saveHtml(s){
     ${s.insigniasNomes && s.insigniasNomes.length ? `<p class="onde">insígnias: ${esc(s.insigniasNomes.join(', '))}</p>` : ''}
     ${s.time.length ? `<div class="time">${s.time.map(monHtml).join('')}</div>`
                     : '<p class="vazio">sem time ainda</p>'}
+    ${botaoDaLigaHtml(s, uidDono)}
   </div>`;
 }
 
@@ -295,6 +308,59 @@ function ilhasResumoHtml(){
     <span class="muted">(dos ${estado.treinadores.length} carregados)</span>
   </div>`;
 }
+/* ⚠️ A FILA DA LIGA CLÁSSICA (21/09/2026, a pedido). Ela mostra o ciclo ABERTO -- o único em que dá
+   pra inscrever alguém -- e cada inscrito com o save de onde o time saiu.
+   ⚠️ E ELA COMPARA O CONTADOR COM A CONTAGEM REAL, de propósito: o `registrantCount` é o número que
+   a TELA DO JOGO mostra, e ele já nasceu desalinhado uma vez (20/09, quando abas velhas inscreviam
+   sem tocá-lo). Ver os dois lado a lado é o que transforma esse defeito em algo que se enxerga. */
+function filaHtml(){
+  if(estado.filaCarregando && !estado.fila) return '<div class="box"><p class="muted">Carregando a fila da Liga...</p></div>';
+  if(estado.filaErro) return `<div class="box"><div class="secao">Liga Clássica</div>`
+    + `<p class="erro">${esc(estado.filaErro)}</p>`
+    + `<button class="btn secondary" onclick="carregarFila()">Tentar de novo</button></div>`;
+  if(!estado.fila) return '';
+  const f = estado.fila;
+  if(!f.ciclo){
+    return `<div class="box"><div class="secao">Liga Clássica</div>`
+      + `<p class="vazio">Nenhum ciclo com inscrições abertas agora.</p>`
+      + `<button class="btn secondary" onclick="carregarFila()">🔄 Atualizar</button></div>`;
+  }
+  const hora = f.ciclo.hora ? new Date(f.ciclo.hora).toLocaleString('pt-BR') : 'sem horário';
+  const desalinhado = (f.contador !== null && f.contador !== f.real);
+  return `<div class="box">
+    <div class="resumo">
+      <div class="num on"><b>${f.real}</b><span>inscritos</span></div>
+      <div class="num"><b>${f.inscritos.filter(x => x.bot).length}</b><span>bots</span></div>
+      <div style="flex:1"></div>
+      <button class="btn secondary" onclick="carregarFila()" ${estado.filaCarregando ? 'disabled' : ''}>${
+        estado.filaCarregando ? 'Carregando...' : '🔄 Atualizar'}</button>
+    </div>
+    <div class="secao">Liga Clássica · sorteio ${esc(hora)}</div>
+    <p class="muted">ciclo ${esc(f.ciclo.id)} · ${esc(f.ciclo.status)}</p>
+    ${desalinhado ? `<p class="erro">⚠️ O contador do ciclo diz <b>${f.contador}</b> e a coleção tem <b>${f.real}</b>.`
+      + ` O cron reconcilia sozinho em até 1 minuto.</p>` : ''}
+    ${estado.filaAcao ? `<p class="muted">${esc(estado.filaAcao)}</p>` : ''}
+    ${f.inscritos.length ? f.inscritos.map(linhaDaFilaHtml).join('')
+                         : '<p class="vazio">Ninguém inscrito ainda.</p>'}
+    <p class="muted" style="margin:8px 0 0">Pra inscrever alguém, abra o treinador na lista abaixo
+       e use o botão do save que vai entrar.</p>
+  </div>`;
+}
+/* o slot como o RESTO do painel o escreve. O 'bot' nao e numero e sai como esta. */
+function rotuloDoSlot(slot){
+  if(slot == null || slot === '') return 'save ?';
+  const n = parseInt(slot, 10);
+  return Number.isInteger(n) ? ('Slot ' + (n + 1)) : String(slot);
+}
+function linhaDaFilaHtml(x){
+  return `<div class="fila-linha">
+    <span class="fila-nome">${esc(x.nome)}${x.elite ? ' 🏆' : ''}${x.bot ? ' <span class="ficha">bot</span>' : ''}</span>
+    <span class="muted">${esc(rotuloDoSlot(x.slot))}</span>
+    ${x.bot ? '<span class="muted">—</span>'
+            : `<button class="btn perigo" onclick="removerDaFila('${esc(x.uid)}', '${esc(x.nome)}')"`
+              + ` ${estado.filaCarregando ? 'disabled' : ''}>Remover</button>`}
+  </div>`;
+}
 function treinadorHtml(t){
   const aberto = !!estado.abertos[t.uid];
   return `<div class="tre ${aberto ? 'aberto' : ''}">
@@ -308,7 +374,7 @@ function treinadorHtml(t){
       <p class="tre-meta">uid ${esc(t.uid)}${t.cidade ? ' · ' + esc(t.cidade) : ''}${t.admin ? ' · ADMIN' : ''}</p>
       <div class="fichas">${contaHtml(t)}</div>
       ${t.saves.length ? `<div class="secao">${t.saves.length} save${t.saves.length === 1 ? '' : 's'}</div>` : ''}
-      ${t.saves.length ? t.saves.map(saveHtml).join('') : '<p class="vazio">nenhum save nesta conta.</p>'}
+      ${t.saves.length ? t.saves.map(sv => saveHtml(sv, t.uid)).join('') : '<p class="vazio">nenhum save nesta conta.</p>'}
     </div>` : ''}
   </div>`;
 }
@@ -347,6 +413,7 @@ function render(){
       <p class="muted" style="margin:8px 0 0">Logado como ${esc(estado.user.email || estado.user.uid)} · online = visto nos últimos 10 min · quem está online vem sempre primeiro</p>
       ${estado.onlineTruncado ? '<p class="muted" style="margin:4px 0 0">⚠️ Tem mais gente online do que cabe no bloco da frente — o resto aparece pelo "Carregar mais".</p>' : ''}
     </div>
+    ${filaHtml()}
     <div class="box">
       <div class="filtros">
         <input id="busca" placeholder="Filtrar por nome ou uid..." value="${esc(estado.busca)}"
@@ -363,6 +430,61 @@ function render(){
   if(b && document.activeElement !== b && termo){ b.focus(); b.selectionStart = b.selectionEnd = b.value.length; }
 }
 
+/* ⚠️ O BOTÃO SÓ APARECE NO SAVE QUE PODE ENTRAR: 8 insígnias, time montado e não aposentado -- as
+   MESMAS exigências que o servidor faz. Oferecer a ação num save que a callable vai recusar é
+   pior que não oferecer: o admin clica e leva um erro que a tela já sabia.
+   ⚠️ E QUEM JÁ ESTÁ NA FILA vê o estado, não o botão -- a inscrição é UMA por conta por ciclo. */
+function botaoDaLigaHtml(s, uidDono){
+  if(!uidDono) return '';
+  if(!estado.fila || !estado.fila.ciclo) return '';
+  const jaInscrito = (estado.fila.inscritos || []).find(x => x.uid === uidDono);
+  if(jaInscrito){
+    return String(jaInscrito.slot) === String(s.slot)
+      ? '<p class="onde ok">✅ este save está inscrito na Liga Clássica</p>'
+      : `<p class="onde">já inscrito na Liga com o ${esc(rotuloDoSlot(jaInscrito.slot))}</p>`;
+  }
+  if(s.aposentado) return '<p class="onde">time aposentado — não entra na Liga</p>';
+  if((s.insignias || 0) < 8 || !s.time.length) return '';
+  return `<button class="btn secondary" onclick="inscreverNaFila('${esc(uidDono)}', '${esc(String(s.slot))}')"`
+    + ` ${estado.filaCarregando ? 'disabled' : ''}>🏆 Inscrever este time na Liga Clássica</button>`;
+}
+/* ⚠️ AS DUAS AÇÕES RECARREGAM A FILA, e não remendam a lista em memória: o que a tela mostra passa
+   a ser o que o servidor tem, e não o que ela supôs que aconteceu. É uma ida a mais por clique numa
+   ação manual e rara -- o preço certo pela tela não mentir. */
+async function inscreverNaFila(uid, slot){
+  estado.filaCarregando = true; estado.filaErro = null; estado.filaAcao = null; render();
+  try{
+    const r = await fns.httpsCallable('adminAddLeagueRegistration')({ uid, slot });
+    /* o recado usa o MESMO rotulo do resto do painel -- o valor cru so vai pro servidor */
+    estado.filaAcao = '✅ ' + (r.data && r.data.nome ? r.data.nome : uid) + ' inscrito com o ' + rotuloDoSlot(slot) + '.';
+  }catch(e){ estado.filaErro = 'Não deu pra inscrever: ' + (e && e.message ? e.message : e); }
+  estado.filaCarregando = false;
+  await carregarFila();
+}
+async function removerDaFila(uid, nome){
+  /* ⚠️ PERGUNTA ANTES: é a inscrição de OUTRA pessoa, e ela não tem como saber que saiu. */
+  if(!confirm('Tirar ' + (nome || uid) + ' da fila da Liga Clássica?')) return;
+  estado.filaCarregando = true; estado.filaErro = null; estado.filaAcao = null; render();
+  try{
+    await fns.httpsCallable('adminRemoveLeagueRegistration')({ uid });
+    estado.filaAcao = '🗑️ ' + (nome || uid) + ' saiu da fila.';
+  }catch(e){ estado.filaErro = 'Não deu pra remover: ' + (e && e.message ? e.message : e); }
+  estado.filaCarregando = false;
+  await carregarFila();
+}
+async function carregarFila(){
+  estado.filaCarregando = true; estado.filaErro = null; render();
+  try{
+    const r = await fns.httpsCallable('adminLeagueQueue')({});
+    estado.fila = r.data;
+  }catch(e){
+    /* a fila é uma caixa a mais na página: um erro aqui não pode derrubar a lista de treinadores */
+    estado.filaErro = (e && e.code === 'functions/permission-denied')
+      ? 'Esta conta não é administradora.'
+      : ('Não deu pra ler a fila: ' + (e && e.message ? e.message : e));
+  }
+  estado.filaCarregando = false; render();
+}
 function alternar(uid){ estado.abertos[uid] = !estado.abertos[uid]; render(); }
 function filtrar(v){ estado.busca = v; render(); }
 
@@ -397,7 +519,7 @@ async function carregar(cursor){
   }
   estado.carregando = false; render();
 }
-function recarregar(){ estado.treinadores = []; estado.proximo = null; carregar(null); }
+function recarregar(){ estado.treinadores = []; estado.proximo = null; carregar(null); carregarFila(); }
 function maisUma(){ carregar(estado.proximo); }
 
 function entrar(){
@@ -418,8 +540,11 @@ function sair(){ auth.signOut(); }
 auth.onAuthStateChanged(u => {
   estado.user = u; estado.authChecked = true;
   estado.treinadores = []; estado.proximo = null; estado.erro = null;
+  /* ⚠️ A FILA ZERA JUNTO: ela é de uma CONTA de admin que acabou de sair, e deixá-la na tela
+     mostraria dado de uma sessão anterior enquanto a nova carrega. */
+  estado.fila = null; estado.filaErro = null; estado.filaAcao = null;
   render();
-  if(u) carregar(null);
+  if(u){ carregar(null); carregarFila(); }
 });
 render();
 </script>

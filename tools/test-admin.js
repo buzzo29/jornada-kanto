@@ -323,6 +323,87 @@ const erroDe = async (p) => { try { await p; return null; } catch(e){ return e.c
   }
 
   console.log('');
+
+/* ============================================================================
+   A SEÇÃO DA FILA NO PAINEL (21/09/2026)
+
+   ⚠️ O PAINEL NÃO TEM SUÍTE DE TELA -- ele é uma página à parte, sem o sandbox do jogo. O que dá
+   pra trancar aqui é o CÓDIGO dele, e são justamente as três coisas que o navegador não perdoaria:
+   o `onclick` com o argumento entre ASPAS, a porta sendo a mesma do resto, e o botão só aparecendo
+   onde a callable aceitaria.
+   ============================================================================ */
+console.log('\n=== A FILA DA LIGA NO PAINEL ===');
+{
+  const painel = require('fs').readFileSync(path.join(__dirname, '..', 'admin-treinadores.html'), 'utf8');
+
+  ok('(e a trava lê o painel)', painel.length > 5000, painel.length + ' chars');
+  ok('a caixa da fila existe', /function filaHtml\(\)/.test(painel));
+  ok('  e ela é desenhada na tela', /\$\{filaHtml\(\)\}/.test(painel));
+  ok('  e carregada no login', /if\(u\)\{ carregar\(null\); carregarFila\(\); \}/.test(painel),
+     'a fila só apareceria depois de um clique em Atualizar');
+  ok('  e zerada quando a conta muda', /estado\.fila = null;/.test(painel),
+     'a fila de uma sessão anterior ficaria na tela');
+
+  /* ⚠️ O ARGUMENTO VAI ENTRE ASPAS NO `onclick`. É a lição do montador de time (20/09): um valor
+     sem aspas vira sintaxe inválida no atributo, o clique NÃO FAZ NADA e **não há erro no
+     console** -- a tela continua parecendo certa. Aqui os dois argumentos são strings (uid e
+     ⚠️ E O PADRAO NAO PODE PARAR NO PRIMEIRO parêntese: os argumentos TEM parênteses dentro, e a
+     primeira versao casava com ZERO handlers -- passando em branco sobre o defeito que ela existe
+     pra pegar. Quem denunciou foi o `ok` de "os handlers existem", a rede de toda varredura daqui.
+     slot), e é exatamente o caso em que isso morde. */
+  const handlers = [...painel.matchAll(/on\w+="(inscreverNaFila|removerDaFila)\((.*?)\)"/g)];
+  ok('os handlers da fila existem', handlers.length >= 2, handlers.length + ' handlers');
+  handlers.forEach(m => {
+    const args = m[2].split(',').map(a => a.trim());
+    ok('  ' + m[1] + ' manda os argumentos entre aspas',
+       args.every(a => /^'.*'$/.test(a)), m[2]);
+  });
+
+  /* ⚠️ E O `esc` CORRE EM CIMA: o nome do treinador é texto que ele escolheu, e ele entra no
+     `onclick` do Remover. Sem escapar, uma aspa no nome fecha o atributo. */
+  ok('  e o conteúdo passa pelo `esc`',
+     /removerDaFila\('\$\{esc\(x\.uid\)\}', '\$\{esc\(x\.nome\)\}'\)/.test(painel),
+     'nome de treinador é texto do jogador');
+
+  /* ⚠️ O BOTÃO SÓ ONDE A CALLABLE ACEITARIA: 8 insígnias, com time, não aposentado -- e quem já
+     está na fila vê o estado, não o botão. Oferecer a ação num save que o servidor vai recusar é
+     pior que não oferecer. */
+  const i = painel.indexOf('function botaoDaLigaHtml');
+  const corpo = i >= 0 ? painel.slice(i, painel.indexOf('async function inscreverNaFila', i)) : '';
+  ok('(e a trava lê o botão do save)', corpo.length > 100, corpo.length + ' chars');
+  ok('o botão exige as 8 insígnias', /insignias \|\| 0\) < 8/.test(corpo));
+  ok('  e um time montado', /!s\.time\.length/.test(corpo));
+  ok('  e recusa o time aposentado', /s\.aposentado/.test(corpo));
+  ok('  e quem já está na fila vê o ESTADO, não o botão', /jaInscrito/.test(corpo));
+
+  /* ⚠️ E O SLOT SAI COM O MESMO RÓTULO DO RESTO DO PAINEL: ele mostra `Slot ${slot + 1}` (o slot 0
+     é o "Slot 1", como o jogador vê na home), e a fila mostrava o número CRU -- a mesma inscrição
+     aparecia como "save 0" na fila e "Slot 1" no card. */
+  ok('o rótulo do slot é o mesmo do painel', /function rotuloDoSlot\(slot\)/.test(painel));
+  ok('  e a fila o usa', /rotuloDoSlot\(x\.slot\)/.test(painel));
+  ok('  e o aviso do card também', /rotuloDoSlot\(jaInscrito\.slot\)/.test(painel));
+
+  /* ⚠️ E AS DUAS AÇÕES RECARREGAM A FILA em vez de remendar a lista em memória: o que a tela
+     mostra passa a ser o que o servidor tem. */
+  ['inscreverNaFila', 'removerDaFila'].forEach(nome => {
+    const j = painel.indexOf('async function ' + nome);
+    const c = j >= 0 ? painel.slice(j, j + 900) : '';
+    ok('  ' + nome + ' recarrega a fila no fim', /await carregarFila\(\);/.test(c),
+       c.length ? 'ela ficaria mostrando o estado de antes' : 'não achei a função');
+  });
+
+  /* ⚠️ REMOVER PERGUNTA ANTES: é a inscrição de OUTRA pessoa, e ela não tem como saber que saiu. */
+  const k = painel.indexOf('async function removerDaFila');
+  ok('  e remover pergunta antes', /confirm\(/.test(painel.slice(k, k + 400)));
+
+  /* ⚠️ O `aposentado` TEM QUE CHEGAR DO SERVIDOR, senão o painel nunca sabe que aquele time é
+     recusado -- ele tem as 8 insígnias e parece elegível. */
+  const srv = require('fs').readFileSync(path.join(__dirname, '..', 'functions', 'index.js'), 'utf8');
+  const res = srv.slice(srv.indexOf('function adminResumoDoSave'), srv.indexOf('exports.adminListTrainers'));
+  ok('o resumo do save manda o `aposentado`', /aposentado: !!\(s && s\.aposentado\)/.test(res),
+     'o painel ofereceria a inscrição de um time aposentado');
+}
+
   console.log(falhas === 0 ? 'Tudo certo.' : falhas + ' FALHA(S)');
   process.exit(falhas === 0 ? 0 : 1);
 })().catch(e => { console.error(e); process.exit(1); });

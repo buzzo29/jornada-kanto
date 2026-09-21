@@ -5361,6 +5361,181 @@ exports.getFishingRanking = onCall(async (request) => {
 });
 exports._pescariaRank = { topo: PESCARIA_RANK_TOPO };
 /* =====================================================================
+   A FILA DA LIGA CLÁSSICA, PELO PAINEL (21/09/2026, a pedido: *"no admin-treinadores, coloque uma
+   sessão para eu ver a fila de inscrição da liga clássica atual, e conseguir adicionar e remover
+   inscrições de treinadores"*)
+   =====================================================================
+   ⚠️ ISTO SÓ PODE SER CLOUD FUNCTION, e não é escolha: o `firestore.rules` deixa cada um escrever
+   **só no PRÓPRIO registro** de inscrição (`registrantId == request.auth.uid.lower()`). Um admin
+   inscrevendo ou removendo alguém pelo cliente seria recusado pela regra -- e afrouxá-la abriria a
+   inscrição de todo mundo pra qualquer jogador logado, que é o oposto do que ela protege. O Admin
+   SDK ignora as regras; é o mesmo caminho do `adminListTrainers`.
+
+   ⚠️ E O TIME NÃO VEM DO PAINEL: ele é lido do SAVE, aqui dentro. O painel manda `uid` e `slot`, e
+   mais nada -- aceitar um código de time do cliente seria deixar o admin (ou quem forjasse a
+   chamada) inscrever um time que a conta não tem. É a mesma regra que a Trainers League já segue,
+   e é o que faz esta inscrição ser idêntica à que o jogador faria sozinho.
+   ===================================================================== */
+/* ⚠️ A PORTA VIVE NUMA FUNÇÃO SÓ: ela estava escrita à mão no `adminListTrainers`, e três cópias
+   novas garantiriam que a quarta chamada nascesse sem ela -- numa função administrativa, isso não
+   é um defeito de tela, é a porta aberta. */
+async function exigeAdmin(request){
+  if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
+  const uid = request.auth.uid;
+  const eu = await db.collection('users').doc(uid).get();
+  /* A RECUSA NÃO DIZ O QUE FALTA -- quem não é admin não precisa saber que existe um campo. */
+  if(!eu.exists || eu.data().admin !== true){
+    throw new HttpsError('permission-denied', 'Esta página é só para administradores.');
+  }
+  return uid;
+}
+
+/* o ciclo ABERTO da clássica -- é nele que se inscreve, e só nele */
+async function adminCicloAberto(){
+  const agenda = await scheduleDocRef(CLASSIC_LEAGUE_TYPE).get();
+  if(!agenda.exists) return null;
+  return (agenda.data().cycles || []).find(c => c.status === 'registering') || null;
+}
+
+/* ⚠️ A MESMA TRAVA QUE O JOGADOR TEM: quem está disputando um ciclo já sorteado não pode entrar no
+   próximo -- senão a mesma conta aparece em dois chaveamentos. O cliente faz isso no
+   `isAccountActiveInLeague`; aqui é a versão de servidor, e ela varre os tipos TODOS (a trava é da
+   CONTA, não de um tipo de liga). */
+async function adminAtivoEmAlgumaLiga(uid, pularCicloAberto){
+  const tipos = [CLASSIC_LEAGUE_TYPE];
+  try{
+    const ts = await leagueTypesCollRef().get();
+    ts.forEach(d => { if(d.id !== CLASSIC_LEAGUE_TYPE) tipos.push(d.id); });
+  } catch(e){ /* sem os tipos customizados a trava vale pra clássica, que é o que importa aqui */ }
+  for(const typeId of tipos){
+    const agenda = await scheduleDocRef(typeId).get();
+    if(!agenda.exists) continue;
+    for(const c of (agenda.data().cycles || [])){
+      if(c.status === 'registering'){
+        if(pularCicloAberto && typeId === CLASSIC_LEAGUE_TYPE) continue;
+        const r = await registrantDocRef(typeId, c.id, uid).get();
+        if(r.exists) return { typeId, cycleId: c.id, status: c.status };
+      } else if(c.status === 'drawn' || c.status === 'advancing'){
+        const det = await cycleDocRef(typeId, c.id).get();
+        if(!det.exists) continue;
+        const achou = (det.data().leagues || []).some(l =>
+          Object.values(l.rounds || {}).some(r =>
+            r.some(m => (m.a && m.a.uid === uid) || (m.b && m.b.uid === uid))));
+        if(achou) return { typeId, cycleId: c.id, status: c.status };
+      }
+    }
+  }
+  return null;
+}
+
+/* a contagem real, pela agregacao do servidor: ~1 leitura, e nao uma por inscrito */
+async function adminContarInscritos(ciclo){
+  try{ const a = await registrantsCollRef(CLASSIC_LEAGUE_TYPE, ciclo.id).count().get();
+       return a.data().count; } catch(e){ return null; }
+}
+exports.adminLeagueQueue = onCall(async (request) => {
+  await exigeAdmin(request);
+  const ciclo = await adminCicloAberto();
+  if(!ciclo) return { ciclo: null, inscritos: [], contador: null, real: 0 };
+  const snap = await registrantsCollRef(CLASSIC_LEAGUE_TYPE, ciclo.id).get();
+  const inscritos = snap.docs.map(d => {
+    const x = d.data() || {};
+    return { id: d.id, uid: x.uid || d.id, nome: x.name || '(sem nome)',
+             slot: (x.slot === undefined || x.slot === null) ? null : String(x.slot),
+             elite: !!x.elite, bot: !!x.isBot, quando: x.registeredAt || 0,
+             /* o código do time é o que vai pra batalha -- mostrá-lo é o que deixa conferir de
+                fora que a inscrição feita pelo painel é igual à que o jogador faria */
+             code: String(x.code || '').slice(0, 120) };
+  }).sort((a, b) => (a.quando || 0) - (b.quando || 0));
+  const doc = await cycleDocRef(CLASSIC_LEAGUE_TYPE, ciclo.id).get();
+  const contador = doc.exists && typeof doc.data().registrantCount === 'number'
+    ? doc.data().registrantCount : null;
+  return { ciclo: { id: ciclo.id, hora: ciclo.scheduledTime || null, status: ciclo.status },
+           inscritos, contador, real: inscritos.length };
+});
+
+exports.adminAddLeagueRegistration = onCall(async (request) => {
+  await exigeAdmin(request);
+  const alvo = String((request.data || {}).uid || '').trim();
+  const slot = String((request.data || {}).slot || '').trim();
+  if(!alvo || !slot) throw new HttpsError('invalid-argument', 'Informe o treinador e o save.');
+
+  const ciclo = await adminCicloAberto();
+  if(!ciclo) throw new HttpsError('failed-precondition', 'Não há ciclo com inscrições abertas.');
+
+  /* ⚠️ O TIME SAI DO SAVE, e passa pelas MESMAS exigências do jogador: 8 insígnias, time montado e
+     não aposentado. Sem isso o painel poria na liga um time que o próprio jogo recusaria. */
+  const saveSnap = await db.collection('users').doc(alvo).collection('saves').doc(slot).get();
+  if(!saveSnap.exists) throw new HttpsError('not-found', 'Esse save não existe.');
+  const s = saveSnap.data() || {};
+  if(!s.team || !s.team.length) throw new HttpsError('failed-precondition', 'Esse save não tem time.');
+  if((s.badgeCount || 0) < 8) throw new HttpsError('failed-precondition', 'Esse time não tem as 8 insígnias.');
+  if(s.aposentado) throw new HttpsError('failed-precondition', 'Esse time está aposentado.');
+
+  /* ⚠️ SANITIZADO NA ORIGEM, como na Trainers League: o código é reconstruído do zero
+     (espécie+nível+shiny), então um save adulterado entra normalizado e não como monstro. */
+  const code = sanitizeTeamCode(encodeTeamCode(s.team));
+  if(!code) throw new HttpsError('failed-precondition', 'Não consegui montar o time desse save.');
+
+  /* os golpes escolhidos, no mesmo formato que o jogador grava: um mapa espécie:nível -> golpes */
+  const ataques = {};
+  for(const mon of s.team){
+    if(!mon || !mon.speciesId || !Array.isArray(mon.ataques) || !mon.ataques.length) continue;
+    ataques[chaveDosGolpes(mon)] = mon.ataques.slice(0, MAX_GOLPES);
+  }
+
+  const conta = await db.collection('users').doc(alvo).get();
+  const cd = conta.exists ? (conta.data() || {}) : {};
+  const nome = (cd.trainerName || s.trainerName || '').trim();
+  if(!nome) throw new HttpsError('failed-precondition', 'Esse treinador não tem nome definido.');
+
+  /* ⚠️ E A TRAVA DE "JÁ ESTÁ EM OUTRA LIGA" VALE IGUAL: o admin não pode pôr alguém em dois
+     chaveamentos. O ciclo aberto da clássica é pulado porque a duplicata nele é tratada na
+     transação abaixo, com uma mensagem mais útil. */
+  const ativo = await adminAtivoEmAlgumaLiga(alvo, true);
+  if(ativo) throw new HttpsError('failed-precondition',
+    'Esse treinador já está numa liga em andamento (' + ativo.typeId + ' / ' + ativo.cycleId + ').');
+
+  const ref = registrantDocRef(CLASSIC_LEAGUE_TYPE, ciclo.id, alvo);
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if(snap.exists) throw new HttpsError('already-exists', 'Esse treinador já está inscrito.');
+    tx.set(ref, { name: nome, code, ataques, uid: alvo, slot,
+                  specialties: Array.isArray(cd.specialties) ? cd.specialties : [],
+                  elite: !!cd.accountEliteChampion, registeredAt: Date.now() });
+  });
+
+  /* ⚠️ O CONTADOR É RECONCILIADO, e não incrementado: ele já nasceu desalinhado uma vez (20/09) e
+     a agregação `count()` custa ~1 leitura. Aqui a ação é manual e rara -- deixar o número certo
+     vale mais que a escrita a menos. */
+  /* ⚠️ O `reconciliar` devolve se MUDOU, nao o numero -- entao o numero e lido logo depois, pela
+     mesma agregacao. Devolver o booleano dali seria uma resposta que parece uma contagem. */
+  await reconciliarContadorDeInscritos(CLASSIC_LEAGUE_TYPE, ciclo);
+  const contador = await adminContarInscritos(ciclo);
+  return { ok: true, uid: alvo, slot, nome, cycleId: ciclo.id, contador };
+});
+
+exports.adminRemoveLeagueRegistration = onCall(async (request) => {
+  await exigeAdmin(request);
+  const alvo = String((request.data || {}).uid || '').trim();
+  if(!alvo) throw new HttpsError('invalid-argument', 'Informe o treinador.');
+  const ciclo = await adminCicloAberto();
+  if(!ciclo) throw new HttpsError('failed-precondition', 'Não há ciclo com inscrições abertas.');
+
+  /* ⚠️ APAGA PELO ID DO DOCUMENTO, que é o uid sanitizado -- e é o mesmo caminho do
+     `registrantDocRef`, pra a remoção alcançar exatamente o que a inscrição criou. */
+  const ref = registrantDocRef(CLASSIC_LEAGUE_TYPE, ciclo.id, alvo);
+  const snap = await ref.get();
+  if(!snap.exists) throw new HttpsError('not-found', 'Esse treinador não está inscrito neste ciclo.');
+  await ref.delete();
+  /* ⚠️ O `reconciliar` devolve se MUDOU, nao o numero -- entao o numero e lido logo depois, pela
+     mesma agregacao. Devolver o booleano dali seria uma resposta que parece uma contagem. */
+  await reconciliarContadorDeInscritos(CLASSIC_LEAGUE_TYPE, ciclo);
+  const contador = await adminContarInscritos(ciclo);
+  return { ok: true, uid: alvo, cycleId: ciclo.id, contador };
+});
+
+/* =====================================================================
    O RANKING DO RESGATE (21/09/2026, a pedido: *"na página principal do resgate, adicione também um
    ranking com as maiores pontuações"*)
    =====================================================================
@@ -9953,6 +10128,9 @@ function adminResumoDoSave(slot, s){
     insigniasNomes: (s && Array.isArray(s.badgesEarned)) ? s.badgesEarned : [],
     modo: (s && s.gameMode) || 'normal',
     campeao: !!(s && s.eliteStatus === 'champion'),
+    /* ⚠️ O PAINEL PRECISA DISSO pra oferecer a inscricao na liga so pra quem pode entrar: um time
+       aposentado tem as 8 insignias e mesmo assim e recusado (o `savesCampeoes` do jogo o exclui). */
+    aposentado: !!(s && s.aposentado),
     tela: (s && s.screen) || '',
     trecho: (s && s.gymIndex != null) ? s.gymIndex : null,
     rota: (s && s.currentRoute) || null,

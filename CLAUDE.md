@@ -7763,6 +7763,103 @@ de cada save, com nível, shiny, tipos e barra de vida.
   contagem é a da coleção, o resto da página vem cheio, e -- caminhando todas as páginas -- ninguém
   repete nem some. Conferido que ele acusa 4 falhas com o bloco de online removido.
 
+## A FILA DA LIGA CLÁSSICA NO PAINEL (21/09/2026)
+
+Pedido assim: *"no admin-treinadores, coloque uma sessão para eu ver a fila de inscrição da liga
+clássica atual, e conseguir adicionar e remover inscrições de treinadores para a liga clássica
+atual"*.
+
+### ⚠️ ISTO SÓ PODE SER CLOUD FUNCTION, e não é escolha de arquitetura
+
+```
+firestore.rules:  match /registrants/{registrantId} {
+                    allow write: if request.auth != null && registrantId == request.auth.uid.lower();
+```
+
+**Cada um escreve só no PRÓPRIO registro de inscrição.** Um admin inscrevendo ou removendo alguém
+pelo cliente seria **recusado pela regra** — e afrouxá-la abriria a inscrição de todo mundo pra
+qualquer jogador logado, que é exatamente o oposto do que ela protege. O Admin SDK ignora as
+regras; é o mesmo caminho do `adminListTrainers`.
+
+São **três** callables: `adminLeagueQueue`, `adminAddLeagueRegistration` e
+`adminRemoveLeagueRegistration`.
+
+### ⚠️ O TIME NÃO VEM DO PAINEL — ele é lido do SAVE
+
+O painel manda **`uid` e `slot`, e mais nada**. Aceitar um código de time do cliente seria deixar
+inscrever um time que a conta não tem — e é a mesma regra que a Trainers League já segue (*"os
+golpes escolhidos saem daqui, do SAVE, e não do cliente... não há o que forjar, e por isso não há o
+que validar"*).
+
+A inscrição sai **idêntica à que o jogador faria sozinho**: o `code` sanitizado na origem (o time é
+reconstruído do zero, então um save adulterado entra normalizado), os golpes escolhidos no mesmo
+mapa `espécie:nível → golpes`, as especialidades e o `elite` da conta.
+
+**E ela passa pelas MESMAS exigências:** 8 insígnias, time montado e **não aposentado**. Sem isso o
+painel poria na liga um time que o próprio jogo recusa. Há caso de teste mandando um `code` forjado
+junto — ele é ignorado.
+
+### ⚠️ E A TRAVA DE "JÁ ESTÁ EM OUTRA LIGA" VALE IGUAL
+
+É ela que protege o chaveamento: quem está disputando um ciclo já sorteado não pode entrar no
+próximo, senão a mesma conta aparece em dois. O jogador tem essa trava (`isAccountActiveInLeague`);
+o painel ganhou a versão de servidor dela, e ela **varre os tipos todos** — a trava é da CONTA, não
+de um tipo de liga. A mensagem diz **onde** ele está, senão o admin não tem o que fazer com a
+recusa.
+
+### ⚠️ A PORTA VIVE NUMA FUNÇÃO SÓ
+
+Ela estava escrita à mão dentro do `adminListTrainers`, e três cópias novas garantiriam que a
+quarta callable nascesse sem ela — **numa função administrativa isso não é um defeito de tela, é a
+porta aberta**. Hoje é o `exigeAdmin`, e ele cobra `admin === true` **exatamente o booleano**:
+`'sim'`, `'true'`, `1` e `{}` não abrem (há caso de teste pros oito valores).
+
+### O CONTADOR É RECONCILIADO, NÃO INCREMENTADO
+
+O `registrantCount` é o número que a **tela do jogo** mostra, e ele já nasceu desalinhado uma vez
+(20/09, quando abas velhas inscreviam sem tocá-lo). Aqui a ação é manual e rara, então depois de
+cada uma ele é recontado pela agregação `count()` — ~1 leitura, e o número fica certo.
+
+**E a caixa da fila mostra os DOIS lado a lado** quando eles divergem. É o que transforma aquele
+defeito em algo que se enxerga de fora, em vez de esperar um relato.
+
+### A TELA: a fila em cima, o botão no SAVE
+
+- **A caixa da fila** traz o ciclo aberto, a hora do sorteio, quantos inscritos (e quantos bots), e
+  uma linha por inscrito com **Remover**.
+- **O bot não tem Remover**: ele é gerado pelo sorteio, não é uma inscrição de alguém.
+- **⚠️ E O BOTÃO DE INSCREVER FICA NO CARD DO TREINADOR**, num save por vez — não num campo de uid.
+  Digitar uid é pedir erro, e o painel **já tem** o uid e os saves com as insígnias na mão: o botão
+  só aparece no save que a callable aceitaria, e quem já está na fila vê o ESTADO em vez do botão.
+  Oferecer a ação onde o servidor vai recusar é pior que não oferecer.
+- **⚠️ REMOVER PERGUNTA ANTES:** é a inscrição de outra pessoa, e ela não tem como saber que saiu.
+- **⚠️ E AS DUAS AÇÕES RECARREGAM A FILA** em vez de remendar a lista em memória: o que a tela
+  mostra passa a ser o que o servidor tem, e não o que ela supôs que aconteceu.
+
+### ⚠️ E A NUMERAÇÃO DO SLOT QUASE SAIU ERRADA
+
+O painel escreve `Slot ${slot + 1}` (o slot 0 é o "Slot 1", como o jogador vê na home), e a fila
+nasceu mostrando o número **cru** — a mesma inscrição aparecia como **"save 0" na fila e "Slot 1"
+no card**. Hoje as duas leem o mesmo `rotuloDoSlot`; o valor cru só vai pro servidor.
+
+**Medido no navegador** (com o Firebase e as callables dublados, pra ver a tela de verdade): a fila
+com 3 inscritos desenha as três linhas, o bot sem botão, os quatro estados do save aparecem certos
+(inscrito / inscrito noutro slot / aposentado / elegível), e os dois cliques funcionam **sem um erro
+de JS**.
+
+### ⚠️ E UMA TRAVA MINHA CASOU COM ZERO HANDLERS
+
+A varredura do `onclick` usava `[^)]*` — e os argumentos são `'${esc(uidDono)}'`, ou seja eles
+**têm parênteses dentro**. Ela achava **ZERO** handlers e passava em branco sobre o defeito que
+existe pra pegar (o argumento sem aspas, que é a lição do montador de 20/09: o clique não faz nada
+e **não há erro no console**).
+
+Quem denunciou foi o `ok` de *"os handlers existem"* — a rede que este projeto põe em toda
+varredura, e a **segunda vez em dois dias** que ela paga (a outra foi a varredura do índice
+composto, que também achou zero).
+
+**Os 16 defeitos religados acusam** (2 a 12 falhas cada).
+
 ## A porta dos modos de campeão (as 8 insígnias)
 
 Pedida em 12/09/2026: *"caso a conta não tenha nenhum time vencedor das 8 insígnias, coloque uma
