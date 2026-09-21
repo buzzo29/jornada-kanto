@@ -71,14 +71,27 @@ console.log('\n=== O ACESSO É SÓ DE QUEM TEM admin === true ===');
   S.abrirPescaria();
   ok('conta ainda carregando: recusa', g.screen !== 'pescaria', 'tela: ' + g.screen);
 
-  /* o botão na home */
+  /* ⚠️ A PORTA VIROU UMA ILHA (21/09/2026): os tres botoes administrativos da home viraram um so,
+     o `Ilhas Laranja`, e cada jogo mora numa ilha do mapa. O que esta trava prova continua sendo o
+     mesmo -- existe UM caminho ate aqui, e ele passa pela mesma checagem de admin. */
   contaAdmin(); g.screen = 'saveSelect';
-  const comAdmin = S.renderSaveSelect();
-  ok('o botão aparece na home pra admin', comAdmin.indexOf('abrirPescaria()') >= 0);
+  ok('a home leva as Ilhas Laranja, e nao mais direto ao modo',
+     S.renderSaveSelect().indexOf('abrirIlhas()') >= 0 &&
+     S.renderSaveSelect().indexOf('abrirPescaria()') < 0);
+  const ilha_ = S.ILHAS_LARANJA.find(i => i.id === 'trovita');
+  ok('  e a ilha trovita e a que leva ate aqui', !!ilha_ && ilha_.abrir === S.abrirPescaria,
+     ilha_ ? ilha_.jogo : 'sem ilha');
+  g.screen = 'saveSelect';
+  S.entrarNaIlha(S.ILHAS_LARANJA.indexOf(ilha_));
+  ok('  e entrar nela abre o modo', g.screen === 'pescaria', 'tela: ' + g.screen);
   g.ehAdmin = false;
-  ok('e NÃO aparece pra quem não é', S.renderSaveSelect().indexOf('abrirPescaria()') < 0);
+  ok('  e o botao das Ilhas some pra quem nao e admin',
+     S.renderSaveSelect().indexOf('abrirIlhas()') < 0);
   g.ehAdmin = true; g.contaCarregada = false;
-  ok('nem enquanto a conta carrega', S.renderSaveSelect().indexOf('abrirPescaria()') < 0);
+  ok('  nem enquanto a conta carrega', S.renderSaveSelect().indexOf('abrirIlhas()') < 0);
+  /* ⚠️ E O BLOCO DEVOLVE A TELA: o `entrarNaIlha` acima a deixou no modo, e a trava do save la
+     embaixo procura o nome do modo no `serializeGame()` -- que inclui o `screen`. */
+  g.contaCarregada = true; g.screen = 'saveSelect';
 }
 
 /* ============================================================================

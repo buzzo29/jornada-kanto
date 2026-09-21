@@ -45,12 +45,20 @@ console.log('\n=== O ACESSO É SÓ DE QUEM TEM admin === true ===');
   const home = () => { g.screen = 'saveSelect'; return S.renderSaveSelect(); };
 
   g.ehAdmin = true;
-  ok('com admin=true o botão aparece', home().indexOf('Corrida Pokemon') >= 0, 'sem o botão');
-  /* ⚠️ E ELE TEM O NOME EXATO do pedido -- "Corrida Pokemon", sem acento em Pokemon. */
-  ok('e com o nome EXATO', /Corrida Pokemon</.test(home()), 'o nome mudou');
+  /* ⚠️ A PORTA VIROU UMA ILHA (21/09/2026): a home tem UM botao administrativo, o `Ilhas Laranja`,
+     e a Corrida mora na Ilha Navel -- cujo desafio no original e uma subida contra o tempo. */
+  ok('com admin=true a home mostra as Ilhas Laranja', home().indexOf('Ilhas Laranja') >= 0, 'sem o botão');
+  ok('  e nao mais o botao direto da Corrida', home().indexOf('abrirCorrida()') < 0, 'o botão velho voltou');
+  const navel = S.ILHAS_LARANJA.find(i => i.id === 'navel');
+  ok('  e a Ilha Navel e a que leva ate aqui', !!navel && navel.abrir === S.abrirCorrida,
+     navel ? navel.jogo : 'sem ilha');
+  g.screen = 'saveSelect';
+  S.entrarNaIlha(S.ILHAS_LARANJA.indexOf(navel));
+  ok('  e entrar nela abre a Corrida', g.screen === 'corrida', 'tela: ' + g.screen);
 
   g.ehAdmin = false;
-  ok('sem admin o botão some', home().indexOf('Corrida Pokemon') < 0, 'aparece pra quem não é admin');
+  ok('sem admin o botão some', home().indexOf('Ilhas Laranja') < 0, 'aparece pra quem não é admin');
+  g.ehAdmin = true; g.screen = 'saveSelect';
 
   /* ⚠️ CAMPO AUSENTE, FALSO OU DE OUTRO TIPO NÃO AUTORIZA. O `admin` é lido como
      `d.admin === true` -- exatamente o booleano --, então 'sim', 1 e 'true' não entram. */

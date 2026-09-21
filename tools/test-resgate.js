@@ -71,15 +71,27 @@ console.log('\n=== O ACESSO ===');
   S.abrirResgate();
   ok('  conta ainda carregando: recusa', g.screen !== 'resgate', 'tela: ' + g.screen);
 
-  /* e o botão da home segue a mesma regra */
-  contaDeTeste();
+  /* ⚠️ A PORTA VIROU UMA ILHA (21/09/2026): os tres botoes administrativos da home viraram um so,
+     o `Ilhas Laranja`, e cada jogo mora numa ilha do mapa. O que esta trava prova continua sendo o
+     mesmo -- existe UM caminho ate aqui, e ele passa pela mesma checagem de admin. */
+  contaDeTeste(); g.screen = 'saveSelect';
+  ok('a home leva as Ilhas Laranja, e nao mais direto ao modo',
+     S.renderSaveSelect().indexOf('abrirIlhas()') >= 0 &&
+     S.renderSaveSelect().indexOf('abrirResgate()') < 0);
+  const ilha_ = S.ILHAS_LARANJA.find(i => i.id === 'mikan');
+  ok('  e a ilha mikan e a que leva ate aqui', !!ilha_ && ilha_.abrir === S.abrirResgate,
+     ilha_ ? ilha_.jogo : 'sem ilha');
   g.screen = 'saveSelect';
-  const comAdmin = S.renderSaveSelect();
-  ok('o botão aparece na home pra quem é admin', comAdmin.indexOf('abrirResgate()') >= 0);
+  S.entrarNaIlha(S.ILHAS_LARANJA.indexOf(ilha_));
+  ok('  e entrar nela abre o modo', g.screen === 'resgate', 'tela: ' + g.screen);
   g.ehAdmin = false;
-  ok('  e some pra quem não é', S.renderSaveSelect().indexOf('abrirResgate()') < 0);
+  ok('  e o botao das Ilhas some pra quem nao e admin',
+     S.renderSaveSelect().indexOf('abrirIlhas()') < 0);
   g.ehAdmin = true; g.contaCarregada = false;
-  ok('  e some enquanto a conta carrega', S.renderSaveSelect().indexOf('abrirResgate()') < 0);
+  ok('  nem enquanto a conta carrega', S.renderSaveSelect().indexOf('abrirIlhas()') < 0);
+  /* ⚠️ E O BLOCO DEVOLVE A TELA: o `entrarNaIlha` acima a deixou no modo, e a trava do save la
+     embaixo procura o nome do modo no `serializeGame()` -- que inclui o `screen`. */
+  g.contaCarregada = true; g.screen = 'saveSelect';
 
   /* ⚠️ E O `admin` CONTINUA FORA DO ALCANCE DO CLIENTE -- ler é seguro porque escrever não é */
   const regras = require('fs').readFileSync(path.join(raiz, 'firestore.rules'), 'utf8');
@@ -742,7 +754,7 @@ console.log('\n=== OS DADOS ===');
      S.RESGATE_RESGATADOS.every(id => (S.ESPECIES_INTOCAVEIS || []).indexOf(id) < 0));
   /* o selo do modo existe e é o que o botão usa */
   ok('o selo `resgate` existe', !!S.DESENHOS.resgate);
-  ok('  e a home o usa no botão', /selo\('resgate','selo-modo'\)/.test(src.replace(/\s/g, '')));
+  ok('  e o pino da ilha dele o usa', /selo\(ilha\.selo,'selo-ilha'\)/.test(src.replace(/\s/g, '')));
   ok('  e a tela do modo também', /selo\('resgate'\)/.test(src));
 }
 

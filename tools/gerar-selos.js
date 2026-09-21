@@ -388,6 +388,22 @@ selo('pescaria', t => {
   pintar(t, poligono([[3, 9], [7.5, 13], [3.5, 13]]), 'z');
 });
 
+/* ⚠️ A ILHA COM A PALMEIRA, e nao uma laranja (a fruta): o botao leva a um MAPA, e a silhueta de
+   uma ilha e a que diz isso. A laranja diria o NOME do arquipelago e nao o que ha atras da porta.
+   ⚠️ E ELA E ASSIMETRICA DE PROPOSITO -- a primeira versao era uma copa REDONDA no centro de uma
+   duna, e a 16px isso le como CABECA SOBRE OMBROS: uma pessoa, nao uma ilha. Foi a previa no
+   navegador que pegou (a regra da casa: ASCII nao se julga). Hoje a duna e larga e baixa e a
+   palmeira sai INCLINADA pra direita, com a copa passando da borda da duna -- nenhuma silhueta
+   de pessoa faz isso.
+   ⚠️ SAO TRES FORMAS SOLIDAS e nenhum detalhe fino, a regra dos 16px (detalhe menor que ~3px da
+   grade vira sujeira). O tronco tem 3px, que e o minimo que sobrevive ao contorno.
+   ⚠️ E NAO HA AGUA: uma faixa de mar encostaria nas bordas da grade, e o `contornar` poria
+   contorno no quadro inteiro. O que diz 'ilha' e a DUNA -- a meia-elipse apoiada numa linha. */
+selo('ilhas', t => {
+  pintar(t, traco(12, 16, 15, 7, 3), 'f');                                    /* o tronco inclinado */
+  pintar(t, elipse(15.5, 6, 6, 3.5), 'e');                                   /* a copa, fora do centro */
+  pintar(t, menos(elipse(11, 22, 10.5, 8), retangulo(0, 22, 24, 2)), 'y');    /* a duna, larga e baixa */
+});
 selo('trofeu', t => {   /* taca com alcas, haste e base */
   pintar(t, uniao(retangulo(6, 3, 12, 7), elipse(12, 10, 6, 5)), 'y');
   pintar(t, uniao(menos(circulo(5.5, 7.5, 3.6), circulo(5.5, 7.5, 1.9)),

@@ -3109,8 +3109,46 @@
   .pesc-mapa{position:relative;display:block;padding:0;width:100%;aspect-ratio:360/380;
     overflow:hidden;background:#277c9f;border:3px solid #254650;border-radius:4px;
     isolation:isolate;margin-bottom:8px;}
-  .pesc-mapa .island-art{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;
-    image-rendering:pixelated;}
+  .pesc-mapa .island-art, .ilhas-mapa .island-art{position:absolute;inset:0;width:100%;height:100%;
+    pointer-events:none;image-rendering:pixelated;}
+  /* ---- O MAPA DAS ILHAS LARANJA -------------------------------------------------------
+     ⚠️ O CONTEINER E O MESMO DESENHO DO `.pesc-mapa`: a mesma proporcao (360/380, que e a do
+     viewBox), a mesma moldura e o mesmo `overflow:hidden`. Classe propria porque o PINO e outro --
+     la o alvo e um circulo com numero, aqui e um circulo com o selo do jogo e duas linhas de
+     rotulo -- mas a caixa em volta se le igual de proposito. */
+  .ilhas-mapa{position:relative;display:block;width:100%;aspect-ratio:360/380;overflow:hidden;
+    background:#277c9f;border:3px solid #254650;border-radius:4px;isolation:isolate;margin-bottom:8px;}
+  /* o pino: o alvo de toque e o circulo, e os dois rotulos ficam ABAIXO dele, fora do circulo --
+     num alvo de 52px nao cabe texto, e e o NOME que identifica a ilha. E a anatomia do ponto da
+     Pescaria (circulo + nome + atividade), que e a mesma pergunta feita no mesmo tipo de mapa. */
+  .ilhas-mapa .ilha-pino{position:absolute;transform:translate(-50%,-50%);width:52px;height:52px;
+    padding:0;border-radius:50%;border:3px solid #e7ead3;background:#174b6de8;color:#fff9e4;
+    box-shadow:0 3px 0 #12364c99;display:block;overflow:visible;cursor:pointer;text-align:center;}
+  .ilhas-mapa .ilha-selo{display:block;line-height:46px;font:800 18px/46px var(--font-ui);}
+  .ilhas-mapa .ilha-selo .selo-ilha{width:26px;height:26px;vertical-align:-6px;}
+  .ilhas-mapa .ilha-nome{position:absolute;top:47px;left:50%;transform:translateX(-50%);
+    font-size:.62rem;line-height:16px;white-space:nowrap;color:#fff9e4;background:#133448e8;
+    border:1px solid #9ec5cb;border-radius:3px;padding:0 5px;font-weight:800;}
+  .ilhas-mapa .ilha-jogo{position:absolute;left:50%;top:67px;transform:translateX(-50%);
+    white-space:nowrap;font-size:.5rem;line-height:13px;padding:1px 4px;background:#133448e8;
+    color:#fff;border-radius:3px;font-weight:800;}
+  /* ⚠️ A ILHA SEM JOGO APAGA E GANHA O TRACEJADO, que e o que diz 'nao e aqui' -- o mesmo par
+     (opacidade + borda tracejada) do ponto ocupado da Pescaria. E ela e um `<span>`: cursor de
+     texto, sem realce de toque. */
+  .ilhas-mapa .ilha-pino.em-breve{opacity:.5;border-style:dashed;cursor:default;}
+  /* ---- SELEÇÃO POKÉMON: o bolo do draft ------------------------------------------------
+     ⚠️ QUEM JÁ FOI ESCOLHIDO NÃO SOME DO BOLO, apaga e ganha a FAIXA de quem levou -- sumindo,
+     o jogador perderia a única coisa que um draft tem a contar: o que o outro lado está montando.
+     A opacidade é a mesma `.off` do `.tower-pick`, e a faixa vem POR CIMA dela (a regra do `.off`
+     vem antes na folha, e as duas têm a mesma especificidade -- ganha a última). */
+  .selecao-bolo{justify-content:center;}
+  .selecao-bolo .tower-pick{width:72px;}
+  .selecao-bolo .tower-pick-lv{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:66px;}
+  .selecao-dono{position:absolute;left:0;right:0;bottom:0;font:800 .5rem/13px var(--font-ui);
+    color:#fff;text-align:center;border-radius:0 0 2px 2px;}
+  .selecao-dono.eu{background:var(--blue);}
+  .selecao-dono.npc{background:var(--red);}
+  .selecao-bolo .tower-pick.off{opacity:.55;}
   /* o ponto: o alvo de toque é o círculo, e o nome e a atividade ficam ABAIXO dele, fora do
      círculo -- num alvo de 56px não cabe texto, e o nome é o que identifica o ponto. */
   .pesc-ponto{position:absolute;left:var(--x);top:var(--y);width:60px;height:60px;
@@ -5813,6 +5851,15 @@ const DESENHOS = {
     '..kkzZZkk..kkkkk........','.kkzszkkkkkkszzkk.......','..kkszzkkkkssZkk........',
     '..kkzzzsssssZZkk........','...kkzzzzzzZZkk.........','....kkzZZZZZkk..........',
     '.....kkkkkkkk...........','......kkkkkk............','........................'],
+  ilhas: [
+    '...............k........','...........kkkkkkkkk....','..........kkkkkekkkkk...',
+    '.........kkEEEEEEEEekk..','........kkEEeeeeeeeeekk.','........kkEeeeeeeeeegkk.',
+    '........kkEeeeeeeeeegkk.','........kkeeeeeeeeeggkk.','.........kkeggggggggkk..',
+    '..........kkkFhekkkkk...','..........kkFFhkkkkk....','..........kkFfhkk.......',
+    '.......kkkkkFhhkk.......','.....kkkkkkFFhkkk.......','...kkkkYYYYYYYykkkk.....',
+    '..kkkYYYyyyyyyyYykkk....','.kkYYYyyyyyyyyyyyYykk...','kkYYyyyyyyyyyyyyyyyykk..',
+    'kkYyyyyyyyyyyyyyyyyokk..','kYYyyyyyyyyyyyyyyyyyykk.','kYyyyyyyyyyyyyyyyyyyokk.',
+    'kyoooooooooooooooooookk.','kkkkkkkkkkkkkkkkkkkkkk..','.kkkkkkkkkkkkkkkkkkkk...'],
   trofeu: [
     '........................','......kkkkkkkkkkkk......','....kkkkkkkkkkkkkkkk....',
     '...kkkYYYYYYYYYYYykkk...','..kkYYyyyyyyyyyyyYYykk..','.kkyyooyyyyyyyyyyyooykk.',
@@ -14307,6 +14354,14 @@ function finishTrainerBattle(){
      Ela voltava DIRETO pra torre, sem log: a animação passava e o andar só dizia se venceu ou não.
      Era a única batalha do jogo sem o log depois -- a jornada, a Elite, o ginásio da cidade, o
      online e a raide todos têm o seu. Agora ela tem a mesma leitura, e o botão volta pra torre. */
+  /* ⚠️ A SELEÇÃO REUSA O MESMO CICLO, como a Torre e a raide: o que a distingue é a marca. Sem
+     ela a batalha voltaria pro destino do vizinho -- é por isso que cada modo tem a sua. */
+  if(game.selecaoBattlePending){
+    game.selecaoBattlePending = false;
+    game.screen = 'selecaoResultado';
+    render();
+    return;
+  }
   if(game.towerBattlePending){
     game.towerBattlePending = false;
     game.screen = 'towerBattleResult';
@@ -20514,6 +20569,7 @@ function renderTrainerBattling(){
   const displayEnemyHp = loading ? m.enemyHpBefore : (game.trainerCurrentEnemyHp!=null ? game.trainerCurrentEnemyHp : m.enemyHpAfter);
   return `
   <div class="eyebrow">${game.bossBattlePending ? '✨ BOSS DE DOMINGO'
+                       : game.selecaoBattlePending ? selo('selecao') + ' SELEÇÃO POKÉMON'
                        : game.towerBattlePending ? selo('torre') + ' TORRE DOS TREINADORES' : '🤝 BATALHA ENTRE TREINADORES'}</div>
   ${chuvaBadgeHtml(m)}
   <div class="box cursor">
@@ -30420,20 +30476,12 @@ function renderSaveSelect(){
          admin, mesmo por meio segundo, é pior que escondê-lo de quem é.
          ⚠️ E a visibilidade não é a trava: quem valida é o `abrirCorrida`, que refaz a pergunta. */''}
     ${game.contaCarregada && game.ehAdmin ? `
-    <button class="home-nav-btn leagues-big-btn" style="background:#b8410f;" onclick="abrirCorrida()">
+    <button class="home-nav-btn leagues-big-btn home-btn-largo" style="background:#e07a1e;" onclick="abrirIlhas()">
       ${/* ⚠️ ELE USA O SELO, e não o `icone()` dos outros quatro modos: os selos são o sistema vivo
            (é pra lá que os emojis foram em 17/09) e um PNG base64 novo seria pixel art à mão.
            A classe fixa 26px, que é a medida do `.dex-icon.modo` -- em `1em` ele sairia menor
            que os vizinhos e a fileira ficaria desalinhada. */''}
-      <span class="home-mode-icon">${selo('corrida','selo-modo')}</span><span>Corrida Pokemon</span></button>
-    <button class="home-nav-btn leagues-big-btn" style="background:#1c6b8f;" onclick="abrirPescaria()">
-      <span class="home-mode-icon">${selo('pescaria','selo-modo')}</span><span>Pescaria Pokemon</span></button>
-    ${/* ⚠️ O TERCEIRO ADMINISTRATIVO OCUPA A LINHA INTEIRA (`home-btn-largo`), como o Boss de
-         Domingo: a fileira de modos é de DUAS colunas, e três botões administrativos deixam o
-         terceiro sozinho com uma célula vazia do lado -- medido a 320px, um buraco de 137px.
-         Não é hierarquia: é a linha fechando. */''}
-    <button class="home-nav-btn leagues-big-btn home-btn-largo" style="background:#2f7d5b;" onclick="abrirResgate()">
-      <span class="home-mode-icon">${selo('resgate','selo-modo')}</span><span>Resgate Pokemon</span></button>` : ''}
+      <span class="home-mode-icon">${selo('ilhas','selo-modo')}</span><span>Ilhas Laranja</span></button>` : ''}
     ${ehDomingo() ? `
     <button class="home-nav-btn leagues-big-btn home-btn-largo" style="background:#c2185b;" onclick="openSundayBoss()">
       <span class="home-mode-icon">✨</span><span>Boss de Domingo</span></button>` : ''}
@@ -32455,9 +32503,11 @@ function abrirCorrida(){
   game.screen = 'corrida';
   render();
 }
+/* ⚠️ VOLTA PRA AS ILHAS, e nao pra home: o jogo mora numa ilha, e sair dele e voltar pro mapa
+   -- quem quer a home aperta o Voltar de la. O `abrirIlhas` refaz a checagem de admin. */
 function sairDaCorrida(){
   corridaZerar();
-  openSaveSelect();
+  abrirIlhas();
 }
 function corridaLinhaEscolhido(p, i){
   const sp = SPECIES[p.speciesId] || {};
@@ -32895,9 +32945,11 @@ function abrirPescaria(){
   game.screen = 'pescaria';
   render();
 }
+/* ⚠️ VOLTA PRA AS ILHAS, e nao pra home: o jogo mora numa ilha, e sair dele e voltar pro mapa
+   -- quem quer a home aperta o Voltar de la. O `abrirIlhas` refaz a checagem de admin. */
 function sairDaPescaria(){
   pescariaZerar();
-  openSaveSelect();
+  abrirIlhas();
 }
 
 /* ---------------------------------------------------------------------------
@@ -33962,7 +34014,407 @@ function pescariaTextoDoParado(){
    ⚠️ O `viewBox` É 360x380 E O CONTAINER TEM `aspect-ratio` IGUAL: as posições dos pontos são
    PERCENTUAIS, então elas só caem no lugar certo se a proporção da caixa for a do desenho.
    Ela mora numa constante porque é lida em DOIS lugares -- o mapa do duelo e o da tela de setup. */
-const PESCARIA_ILHA_SVG = '<svg class="island-art" viewBox="0 0 360 380" shape-rendering="crispEdges" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><defs><pattern id="sea" width="32" height="24" patternUnits="userSpaceOnUse"><rect width="32" height="24" fill="#308ebd"/><path d="M2 8h6v2h10V8h5M22 20h8" fill="none" stroke="#62bbd4" stroke-width="2"/><path d="M4 13h14" stroke="#257dad" stroke-width="2"/></pattern><pattern id="grass" width="16" height="16" patternUnits="userSpaceOnUse"><rect width="16" height="16" fill="#8ccc68"/><path d="M3 5v3h2V6m5 6v2h2v-3" fill="none" stroke="#70b858"/><path d="M10 2h3" stroke="#a4dc7b" stroke-width="2"/></pattern><pattern id="sand" width="16" height="16" patternUnits="userSpaceOnUse"><rect width="16" height="16" fill="#f4db99"/><path d="M3 4h2m5 7h2" stroke="#dabc7a"/><path d="M5 14h3" stroke="#fff0be"/></pattern><g id="tree"><path d="M-4 9h8v13h-8" fill="#775537"/><path d="M-2 10h3v10h-3" fill="#bc9352"/><path d="M-10-19H8v3h7v6h4V5h-3v9H8v4H-9v-4h-8V6h-3V-7h4v-8h6Z" fill="#255f46"/><path d="M-8-18H7v4h6v5h3V3h-5v6H3v4H-8V8h-7V-6h4v-8h3Z" fill="#438e4a"/><path d="M-6-16H6v4h6v6H6v3H-5v4h-8v-8h4v-6h3Z" fill="#78bd59"/><path d="M-4-13h8v3h-8M-11-4h5v3h-5" stroke="#a0d56e" stroke-width="2"/><path d="M2 4h6v3H2m-12 3h5v3h-5" stroke="#326f45" stroke-width="2"/></g><g id="palm"><path d="M0 3h5v10H2v12h-5v-8h3Z" fill="#956238"/><path d="M0 6h4m-5 9h4m-5 7h4" stroke="#d5a158" stroke-width="2"/><path d="M1 2H-5v-4h-12v4h-5v-7h6v-4h12v4h5v-8h5v-4h8v5H9v9h6v-3h10v4h4v8h-5V4H12v3H6v7H0Z" fill="#237648"/><path d="M-17-3h12m10-5v9m8 0h10" stroke="#83c86b" stroke-width="3"/></g><g id="rock"><path d="M-10 7V-5h4v-5H5v3h6V8Z" fill="#526c78"/><path d="M-8 2V-4h4v-4h8v3h5v7Z" fill="#9ab0a7"/><path d="M-6-3h4v-3h5" fill="none" stroke="#ccd2ad" stroke-width="2"/></g></defs><rect width="360" height="380" fill="url(#sea)"/><path d="M102 55h92v13h40v24h26v32h30v32h12v104h-20v36h-38v28h-35v22h-68v-18H94v-22H64v-35H48V146h18v-38h18V75h18Z" fill="#57bdc6"/><path d="M108 66h79v14h40v23h24v32h29v27h12v93h-20v32h-36v28h-33v22h-57v-18H101v-22H76v-35H60V151h18v-38h18V84h12Z" fill="url(#sand)" stroke="#c7f0d0" stroke-width="4"/><path d="M113 91h66v12h38v23h23v32h25v28h12v57h-22v32h-31v25h-28v18h-42v-20h-42v-23H92v-37H78v-65h17v-38h18Z" fill="#548f4a"/><path d="M113 86h66v12h38v23h23v32h25v28h12v57h-22v32h-31v25h-28v18h-42v-20h-42v-23H92v-37H78v-65h17v-38h18Z" fill="url(#grass)"/><path d="M167 312v-48h-17v-48h20v-39h-12v-29h31" fill="none" stroke="#e5cb8d" stroke-width="16"/><path d="M165 309v-44h-17v-48h20v-38" fill="none" stroke="#f4dda1" stroke-width="9"/><path d="M118 100h20V80h36v18h23v20h12v33h-18v10h-74v-18h-13v-25h14Z" fill="#9b9869" stroke="#626c54" stroke-width="3"/><path d="M118 101h20V81h36v18h23v19h-23v-8h-37v12h-19Z" fill="#d0c595"/><path d="M111 131h20m49 0h21m-60-37h26m-23 51h40" stroke="#777e5d" stroke-width="3"/><path d="M132 148v-19h5v-6h16v6h5v19Z" fill="#2a4247"/><path d="M199 144h16v26h-8v23h12v24h22v25h-18v-13h-20v-21h-12v-37h8Z" fill="#409dc3" stroke="#d3efd0" stroke-width="3"/><path d="M199 173h10v26h-10Z" fill="#e6fbec"/><path d="M201 176v20m5-20v20" stroke="#83d5e3" stroke-width="2"/><path d="M192 168h22v7h-22m0 26h22v6h-22" fill="#778e7c"/><g transform="translate(166 225)"><path d="M-24 0h48v31h-48" fill="#58655c"/><path d="M-22 0h44v27h-44" fill="#eee8c2"/><path d="M-28-2v-10h5v-8h46v8h5v10Z" fill="#a84547"/><path d="M-23-17h46v6h5v6h-51Z" fill="#e56b5a"/><path d="M-21-14h42m-42 6h45" stroke="#f29274" stroke-width="2"/><path d="M-17 7h9v9h-9m25-9h9v9H8" fill="#559dae" stroke="#4b6972" stroke-width="2"/><path d="M-5 11H5v16H-5Z" fill="#496274"/><rect x="-6" y="-7" width="12" height="11" fill="#fff5d7"/><path d="M-3-5h6v3h-6m-3 1H6" stroke="#d65756" stroke-width="2"/></g><path d="M163 311h25v48h-25Z" fill="#8c653f" stroke="#584d39" stroke-width="2"/><path d="M165 315h21m-21 7h21m-21 7h21m-21 7h21m-21 7h21m-21 7h21" stroke="#d2a365" stroke-width="4"/><path d="M158 313h5v7h-5m30-7h5v7h-5m-30 28h5v9h-5m30-9h5v9h-5" fill="#5b5039"/><use href="#tree" x="105" y="162"/><use href="#tree" x="128" y="175"/><use href="#tree" x="102" y="195"/><use href="#tree" x="120" y="225"/><use href="#tree" x="108" y="253"/><use href="#tree" x="135" y="276"/><use href="#tree" x="241" y="168"/><use href="#tree" x="251" y="195"/><use href="#tree" x="241" y="258"/><use href="#tree" x="221" y="282"/><use href="#palm" x="90" y="286"/><use href="#palm" x="208" y="318"/><use href="#palm" x="270" y="264"/><use href="#rock" x="63" y="109"/><use href="#rock" x="306" y="277"/><use href="#rock" x="322" y="292"/><use href="#rock" x="287" y="315"/><path d="M91 232h5v-9m-11 8h5v-8m-8 12h15m173-2h5v-9m-10 12h5v-6" stroke="#38845a" stroke-width="2"/><g fill="#fff4b6"><rect x="147" y="184" width="3" height="3"/><rect x="152" y="190" width="3" height="3"/><rect x="219" y="257" width="3" height="3"/></g><path d="M275 224h5v-10m-5 6h-5v-5m10 9h5v-7" stroke="#ec9a95" stroke-width="3"/><rect x="10" y="10" width="118" height="31" rx="2" fill="#164d67" opacity=".92"/><text x="18" y="23" fill="#fff4c8" font-family="monospace" font-weight="bold" font-size="10">ILHA MIKAN</text><text x="18" y="34" fill="#b7e6e4" font-family="monospace" font-size="7">ARQUIPÉLAGO LARANJA</text></svg>';
+/* ===========================================================================
+   SELEÇÃO POKÉMON -- o quarto desafio das Ilhas Laranja (21/09/2026), na Ilha Kumquat.
+
+   Pedido assim: *"vai ser uma batalha contra um líder, e vão ser sorteados 12 pokémons
+   aleatoriamente, menos os lendários, e então o treinador e o líder vão ter que montar o time
+   selecionando 1 desses 12 até ficar 6x6. O líder escolhe 1 e o usuário escolhe 2, depois o líder
+   escolhe 2 e o usuário escolhe 2, e assim vai até acabar os pokémons, depois o treinador escolhe
+   a ordem que vai entrar na luta"*.
+
+   ⚠️ É O ÚNICO DOS QUATRO QUE NÃO USA O TIME DO JOGADOR. Os 12 são sorteados na hora e os dois
+   lados montam do MESMO bolo -- então não há picker de save, e não há régua de 8 insígnias: o que
+   se mede aqui é a ESCOLHA, não a coleção.
+   =========================================================================== */
+const SELECAO_POOL = 12;        /* quantos entram no sorteio */
+const SELECAO_TIME = 6;         /* e quantos cada lado leva */
+/* ⚠️ TODO MUNDO NO MESMO NÍVEL, e isso é decisão: o desafio é o DRAFT. Com níveis diferentes o
+   bolo deixaria de ser o mesmo pros dois e a escolha viraria uma conta de nível. */
+const SELECAO_NIVEL = 60;
+/* ⚠️ A ORDEM DO DRAFT É A DO PEDIDO, e ela é uma TABELA -- escrita como um laço com `if`, a
+   próxima mudança de ritmo viraria três ramos. Ela tem uma propriedade bonita que foi MEDIDA e
+   não escolhida: com os dois lados pegando sempre o melhor disponível, a soma das POSIÇÕES fica
+   39 x 39 -- o snake 1-2-2-2-2-2-1 é exatamente justo. */
+const SELECAO_ORDEM = [['npc',1],['eu',2],['npc',2],['eu',2],['npc',2],['eu',2],['npc',1]];
+const SELECAO_PAUSA_NPC = 700;  /* o líder escolhe na frente do jogador, não de uma vez */
+
+/* ⚠️ O ESTADO VIVE FORA DO `game`, como nos outros três: nada disto vai pro save nem pro
+   Firestore -- o modo é offline inteiro. E ele é MUTADO, nunca reatribuído: o sandbox dos testes
+   copia o valor na criação, e trocar a referência deixaria as funções internas olhando pro objeto
+   velho (a lição que a Corrida pagou). */
+const selecao = {
+  fase: 'setup',   /* setup | draft | ordem */
+  pool: [],        /* os 12: { id, dono: null | eu | npc } */
+  passo: 0,        /* onde estamos na SELECAO_ORDEM */
+  restam: 0,       /* quantos faltam nesta vez */
+  meu: [], dele: [],
+  aviso: '',
+  timer: null,
+};
+function selecaoZerar(){
+  if(selecao.timer){ clearTimeout(selecao.timer); selecao.timer = null; }
+  selecao.fase = 'setup'; selecao.pool = []; selecao.passo = 0; selecao.restam = 0;
+  selecao.meu = []; selecao.dele = []; selecao.aviso = '';
+}
+/* ⚠️ NEM LENDÁRIO NEM INTOCÁVEL, e as duas listas: o `ehLendario` pega os oito capturáveis e o
+   `ESPECIES_INTOCAVEIS` os três que ninguém pega. Um Mewtwo no bolo decidiria o draft sozinho.
+   ⚠️ E SEM REPETIR LINHA EVOLUTIVA: com Magikarp e Gyarados no mesmo bolo, os 12 viram 11 opções
+   de verdade -- é a mesma regra do encontro selvagem e dos guardiões da Montanha. */
+function selecaoSortearPool(rng){
+  const r = rng || Math.random;
+  const candidatos = Object.keys(SPECIES).filter(id =>
+    !ehLendario(id) && (ESPECIES_INTOCAVEIS || []).indexOf(id) < 0);
+  const linhas = new Set();
+  const escolhidos = [];
+  let voltas = 0;
+  while(escolhidos.length < SELECAO_POOL && voltas++ < 4000){
+    const id = candidatos[Math.floor(r() * candidatos.length)];
+    const raiz = raizDaLinha(id);
+    if(linhas.has(raiz)) continue;
+    linhas.add(raiz);
+    escolhidos.push({ id: id, dono: null });
+  }
+  return escolhidos;
+}
+const selecaoVez = () => SELECAO_ORDEM[selecao.passo] ? SELECAO_ORDEM[selecao.passo][0] : null;
+const selecaoLivres = () => selecao.pool.filter(p => !p.dono);
+/* ⚠️ O LÍDER PEGA O DE MAIOR BST entre os que restam, e isso é uma linha de propósito: é a régua
+   mais simples que existe, ela é MEDÍVEL, e com ela o snake do pedido sai exatamente empatado.
+   Se um dia ele precisar ser mais esperto, é aqui -- e a régua está no CLAUDE.md. */
+function selecaoEscolhaDoLider(){
+  const livres = selecaoLivres();
+  if(!livres.length) return null;
+  return livres.reduce((a, b) => bstOf(b.id) > bstOf(a.id) ? b : a);
+}
+/* avança a vez: desconta o que foi pego e, se acabou, passa pro próximo passo da ordem */
+function selecaoDescontar(){
+  selecao.restam--;
+  while(selecao.restam <= 0 && selecao.passo < SELECAO_ORDEM.length - 1){
+    selecao.passo++;
+    selecao.restam = SELECAO_ORDEM[selecao.passo][1];
+  }
+  if(!selecaoLivres().length) selecaoFecharDraft();
+}
+/* ⚠️ QUEM ESCOLHE PELO LÍDER É UMA FUNÇÃO PRÓPRIA, chamada por um timer: sem a pausa ele leva os
+   dele todos no mesmo quadro e o jogador não vê o draft acontecer -- vê uma lista que se preenche
+   sozinha. É o mesmo motivo da contagem da Corrida. */
+function selecaoPicaNpc(){
+  selecao.timer = null;
+  if(selecao.fase !== 'draft' || selecaoVez() !== 'npc') return;
+  const alvo = selecaoEscolhaDoLider();
+  if(!alvo){ selecaoFecharDraft(); render(); return; }
+  alvo.dono = 'npc';
+  selecaoDescontar();
+  render();
+  selecaoAgendarNpc();
+}
+function selecaoAgendarNpc(){
+  if(selecao.fase !== 'draft' || selecaoVez() !== 'npc') return;
+  if(selecao.timer) clearTimeout(selecao.timer);
+  selecao.timer = setTimeout(selecaoPicaNpc, SELECAO_PAUSA_NPC);
+}
+/* ⚠️ QUEM RECUSA É A AÇÃO: fora da vez, fora da fase ou num índice forjado, nada acontece. O card
+   apagado na tela é apresentação. */
+function selecaoEscolher(i){
+  if(selecao.fase !== 'draft' || selecaoVez() !== 'eu') return;
+  const p = selecao.pool[i];
+  if(!p || p.dono) return;
+  p.dono = 'eu';
+  selecaoDescontar();
+  render();
+  selecaoAgendarNpc();
+}
+/* ⚠️ AS INSTÂNCIAS SÓ NASCEM AQUI, no fim do draft -- e as duas com `equiparNpc`: ninguém
+   ESCOLHEU golpe (o bolo é sorteado, não vem de save nenhum), e a regra da casa é que quem não
+   escolhe leva o moveset inteiro da espécie. Dar a um lado e não ao outro seria a assimetria que
+   o pedido não pede. */
+function selecaoFecharDraft(){
+  selecao.meu  = selecao.pool.filter(p => p.dono === 'eu').map(p => createInstance(p.id, SELECAO_NIVEL));
+  selecao.dele = selecao.pool.filter(p => p.dono === 'npc').map(p => createInstance(p.id, SELECAO_NIVEL));
+  equiparNpc(selecao.meu); equiparNpc(selecao.dele);
+  selecao.fase = 'ordem';
+}
+/* a ordem de entrada: as mesmas setas da clareira e da Montanha, por ÍNDICE */
+function selecaoMover(i, d){
+  const j = i + d;
+  if(selecao.fase !== 'ordem' || j < 0 || j >= selecao.meu.length) return;
+  const t = selecao.meu[i]; selecao.meu[i] = selecao.meu[j]; selecao.meu[j] = t;
+  render();
+}
+/* ⚠️ A BATALHA É A DA CASA, sem uma linha de motor próprio: `simulateGymBattle` e o MESMO ciclo
+   de revelação da Torre (`trainerBattling`), que já sabe animar um resultado com `matchups`.
+   ⚠️ E A ESPECIALIDADE E OS ITENS VÃO VAZIOS, de propósito: os 12 são sorteados, não são do
+   jogador -- uma especialidade de tipo faria o MESMO bolo valer mais numa conta que na outra, e
+   o que se mede aqui é a escolha. */
+function selecaoLutar(){
+  if(selecao.fase !== 'ordem' || selecao.meu.length !== SELECAO_TIME) return;
+  applySpecialtyBuff(selecao.meu, []);
+  applySpecialtyBuff(selecao.dele, []);
+  equiparItens(selecao.meu, {});
+  equiparItens(selecao.dele, {});
+  const r = simulateGymBattle(selecao.meu, selecao.dele);
+  game.trainerBattleResult = r;
+  game.trainerBattlePlayerName = null;
+  game.trainerRevealIndex = 0;
+  /* ⚠️ O `abrirConfronto` VEM ANTES DO `render`, e não é enfeite: sem ele o passo e o último
+     golpe do confronto ANTERIOR sobrevivem, e o primeiro quadro anuncia um golpe que ninguém
+     deu -- é o golpe fantasma de 09/09/2026. A trava do `test-especiais` conta os `RevealPhase`
+     contra os `abrirConfronto`, e foi ela que pegou este aqui. */
+  abrirConfronto('trainer');
+  game.trainerRevealPhase = 'loading';
+  game.selecaoBattlePending = true;
+  game.screen = 'trainerBattling';
+  render();
+  setTimeout(advanceTrainerReveal, 100);
+}
+
+/* ⚠️ O CARD DO BOLO É O `.tower-pick` DA CASA -- o mesmo quadro do Doce Raro e da escolha de
+   pokémon do online. A pergunta é a mesma (reconhecer um pokémon pelo sprite e tocar), e um card
+   próprio obrigaria a reaprender a ler no meio da decisão.
+   ⚠️ E QUEM JÁ FOI ESCOLHIDO NÃO SOME: ele fica apagado, com a FAIXA de quem levou. Sumindo, o
+   jogador perderia a única coisa que um draft tem a contar -- o que o outro lado está montando. */
+function selecaoCardHtml(p, i){
+  const sp = SPECIES[p.id] || {};
+  const vezDele = selecaoVez() === 'eu' && !p.dono && selecao.fase === 'draft';
+  const dentro = '<span class="mon-name">' + spriteHtml(p.id, 'sprite-sm') + '</span>'
+    + '<span class="tower-pick-lv">' + escapeHtmlSafe(sp.name || p.id) + '</span>'
+    + (p.dono ? '<span class="selecao-dono ' + p.dono + '">' + (p.dono === 'eu' ? 'VOCÊ' : 'LUANA') + '</span>' : '');
+  if(!vezDele) return '<span class="tower-pick' + (p.dono ? ' off ' + p.dono : '') + '">' + dentro + '</span>';
+  return '<button class="tower-pick" onclick="selecaoEscolher(' + i + ')"'
+    + ' aria-label="Escolher ' + escapeHtmlSafe(sp.name || p.id) + '">' + dentro + '</button>';
+}
+function renderSelecao(){
+  const ilha = ILHAS_LARANJA.find(i => i.id === 'kumquat') || { nome: 'Kumquat', lider: 'Luana' };
+  const cabeca = `<div class="eyebrow">${selo('estadio')} ILHA ${escapeHtmlSafe(ilha.nome.toUpperCase())}</div>`;
+
+  if(selecao.fase === 'setup'){
+    return cabeca + `
+    <div class="box cursor">
+      <h2>${selo('estadio')} Seleção Pokémon</h2>
+      <p><strong>${escapeHtmlSafe(ilha.lider)}</strong> não traz time: os dois montam do MESMO bolo.
+         São <strong>${SELECAO_POOL}</strong> sorteados na hora, sem lendário, e cada um leva
+         <strong>${SELECAO_TIME}</strong>.</p>
+      <p class="hint-text">Ela escolhe 1, você escolhe 2, ela 2, você 2 — até o bolo acabar. Todos
+         entram no nível ${SELECAO_NIVEL}: o que decide aqui é a escolha.</p>
+    </div>
+    <button class="btn primary" onclick="selecaoComecar()">Sortear os ${SELECAO_POOL}</button>
+    <button class="btn" onclick="sairDaSelecao()">⬅ Voltar</button>`;
+  }
+
+  if(selecao.fase === 'draft'){
+    const minha = selecaoVez() === 'eu';
+    const meus = selecao.pool.filter(p => p.dono === 'eu').length;
+    const dele = selecao.pool.filter(p => p.dono === 'npc').length;
+    return cabeca + `
+    <div class="box cursor">
+      <h2>${minha ? 'Sua vez' : escapeHtmlSafe(ilha.lider) + ' está escolhendo…'}</h2>
+      <p class="hint-text">${minha ? 'Escolha <strong>' + selecao.restam + '</strong>.'
+        : 'Ela leva <strong>' + selecao.restam + '</strong>.'}
+        Você tem ${meus} de ${SELECAO_TIME}, ela tem ${dele}.</p>
+    </div>
+    <div class="box">
+      <div class="tower-pick-row selecao-bolo">${selecao.pool.map(selecaoCardHtml).join('')}</div>
+    </div>
+    <button class="btn" onclick="sairDaSelecao()">⬅ Desistir</button>`;
+  }
+
+  /* a ORDEM: as mesmas setas por índice da clareira e da Montanha */
+  const linhas = selecao.meu.map((p, i) => `
+    <div class="order-row">
+      <div class="order-num">${i + 1}º</div>
+      <div class="order-info">
+        <span class="mon-name">${spriteHtml(p, 'sprite-sm')} ${escapeHtmlSafe(p.name)}
+          <span class="wild-lv">— Lv.${p.level}</span></span>
+        <span class="mon-sub">${typesHtml(p.types)}</span>
+      </div>
+      <div class="order-arrows">
+        <button class="circle-btn" ${i === 0 ? 'disabled' : ''} onclick="selecaoMover(${i},-1)">▲</button>
+        <button class="circle-btn" ${i === selecao.meu.length - 1 ? 'disabled' : ''} onclick="selecaoMover(${i},1)">▼</button>
+      </div>
+    </div>`).join('');
+  const dela = selecao.dele.map((p, i) => `
+    <div class="order-row">
+      <div class="order-num">${i + 1}º</div>
+      <div class="order-info">
+        <span class="mon-name">${spriteHtml(p, 'sprite-sm')} ${escapeHtmlSafe(p.name)}
+          <span class="wild-lv">— Lv.${p.level}</span></span>
+        <span class="mon-sub">${typesHtml(p.types)}</span>
+      </div>
+    </div>`).join('');
+  return cabeca + `
+  <div class="box cursor">
+    <h2>A ordem de entrada</h2>
+    <p class="hint-text">O 1º seu encara o 1º dela. Sem cura entre os confrontos.</p>
+  </div>
+  <div class="box"><div class="section-title">SEU TIME</div>${linhas}</div>
+  <div class="box"><div class="section-title">TIME DE ${escapeHtmlSafe(ilha.lider.toUpperCase())}</div>${dela}</div>
+  <button class="btn primary" onclick="selecaoLutar()">Começar a batalha</button>
+  <button class="btn" onclick="sairDaSelecao()">⬅ Desistir</button>`;
+}
+/* ⚠️ O RESULTADO REUSA O LOG DA CASA (`renderMatchupLog`), o mesmo que a jornada, a Torre e o
+   Ginásio da Cidade mostram depois de toda batalha. Um resumo próprio seria uma segunda
+   apresentação pra contar a mesma coisa. */
+function renderSelecaoResultado(){
+  const r = game.trainerBattleResult;
+  if(!r) return '<div class="box"><p>Carregando...</p></div>';
+  const ilha = ILHAS_LARANJA.find(i => i.id === 'kumquat') || { lider: 'Luana' };
+  return `
+  <div class="eyebrow">${selo('estadio')} SELEÇÃO POKÉMON</div>
+  <div class="box cursor">
+    <h2>${r.win ? 'Você venceu!' : escapeHtmlSafe(ilha.lider) + ' venceu'}</h2>
+    <p class="hint-text">${r.win ? 'O time que você montou do bolo deu conta.'
+      : 'Ela montou melhor desta vez.'}</p>
+  </div>
+  ${renderMatchupLog(r.matchups)}
+  <button class="btn primary" onclick="selecaoReiniciar()">Sortear outro bolo</button>
+  <button class="btn" onclick="sairDaSelecao()">⬅ Voltar às ilhas</button>`;
+}
+/* ⚠️ A VISIBILIDADE DO BOTÃO NÃO É A TRAVA: quem chamar pelo console cai aqui. */
+function abrirSelecao(){
+  if(!game.contaCarregada || game.ehAdmin !== true){
+    game.modoBloqueado = 'Este modo é administrativo.';
+    render(); return;
+  }
+  game.modoBloqueado = null;
+  selecaoZerar();
+  game.screen = 'selecao';
+  render();
+}
+function sairDaSelecao(){ selecaoZerar(); abrirIlhas(); }
+function selecaoComecar(){
+  selecao.pool = selecaoSortearPool();
+  selecao.passo = 0;
+  selecao.restam = SELECAO_ORDEM[0][1];
+  selecao.meu = []; selecao.dele = [];
+  selecao.fase = 'draft';
+  render();
+  selecaoAgendarNpc();
+}
+function selecaoReiniciar(){ selecaoZerar(); selecaoComecar(); }
+/* ⚠️ OS DEFS SÃO OS MESMOS DA ILHA DA PESCARIA -- os padrões de mar, areia e grama e as árvores.
+   Extraídos pra cá quando o arquipélago nasceu (21/09/2026): duas cópias divergiriam no primeiro
+   ajuste, e o mar de uma tela deixaria de ser o mar da outra.
+   ⚠️ E OS `id` DELES SÃO GLOBAIS NO DOCUMENTO, então os dois SVG nunca podem estar na tela ao
+   mesmo tempo -- e não estão: um é da tela `ilhas` e o outro da `pescaria`. */
+const ILHA_DEFS = '<defs><pattern id="sea" width="32" height="24" patternUnits="userSpaceOnUse"><rect width="32" height="24" fill="#308ebd"/><path d="M2 8h6v2h10V8h5M22 20h8" fill="none" stroke="#62bbd4" stroke-width="2"/><path d="M4 13h14" stroke="#257dad" stroke-width="2"/></pattern><pattern id="grass" width="16" height="16" patternUnits="userSpaceOnUse"><rect width="16" height="16" fill="#8ccc68"/><path d="M3 5v3h2V6m5 6v2h2v-3" fill="none" stroke="#70b858"/><path d="M10 2h3" stroke="#a4dc7b" stroke-width="2"/></pattern><pattern id="sand" width="16" height="16" patternUnits="userSpaceOnUse"><rect width="16" height="16" fill="#f4db99"/><path d="M3 4h2m5 7h2" stroke="#dabc7a"/><path d="M5 14h3" stroke="#fff0be"/></pattern><g id="tree"><path d="M-4 9h8v13h-8" fill="#775537"/><path d="M-2 10h3v10h-3" fill="#bc9352"/><path d="M-10-19H8v3h7v6h4V5h-3v9H8v4H-9v-4h-8V6h-3V-7h4v-8h6Z" fill="#255f46"/><path d="M-8-18H7v4h6v5h3V3h-5v6H3v4H-8V8h-7V-6h4v-8h3Z" fill="#438e4a"/><path d="M-6-16H6v4h6v6H6v3H-5v4h-8v-8h4v-6h3Z" fill="#78bd59"/><path d="M-4-13h8v3h-8M-11-4h5v3h-5" stroke="#a0d56e" stroke-width="2"/><path d="M2 4h6v3H2m-12 3h5v3h-5" stroke="#326f45" stroke-width="2"/></g><g id="palm"><path d="M0 3h5v10H2v12h-5v-8h3Z" fill="#956238"/><path d="M0 6h4m-5 9h4m-5 7h4" stroke="#d5a158" stroke-width="2"/><path d="M1 2H-5v-4h-12v4h-5v-7h6v-4h12v4h5v-8h5v-4h8v5H9v9h6v-3h10v4h4v8h-5V4H12v3H6v7H0Z" fill="#237648"/><path d="M-17-3h12m10-5v9m8 0h10" stroke="#83c86b" stroke-width="3"/></g><g id="rock"><path d="M-10 7V-5h4v-5H5v3h6V8Z" fill="#526c78"/><path d="M-8 2V-4h4v-4h8v3h5v7Z" fill="#9ab0a7"/><path d="M-6-3h4v-3h5" fill="none" stroke="#ccd2ad" stroke-width="2"/></g></defs>';
+
+/* ⚠️ AS CINCO ILHAS SÃO AS CANÔNICAS DO ARQUIPÉLAGO LARANJA, e os líderes delas já estavam no
+   jogo: são os MESMOS cinco nomes que a Corrida usa nos adversários (`CORRIDA_NPC_NOMES`), e a
+   Cissy já era a líder da Ilha Mikan -- que é justamente a Enseada de Mikan onde o Resgate
+   acontece. O par ilha->jogo não foi escolhido no gosto: o Resgate JÁ era em Mikan, e o desafio
+   da Navel no original é uma subida contra o tempo, que é a Corrida.
+   ⚠️ DUAS FICAM EM BRANCO de propósito -- os dois jogos que faltam. Uma ilha apagada que DIZ
+   'em breve' é melhor que três ilhas e um buraco: o mapa é o arquipélago, não a lista do que já
+   existe.
+   ⚠️ O `abrir` É A FUNÇÃO, nunca o NOME dela: um nome em texto viraria uma busca no `window` (que
+   não existe no sandbox dos testes) ou um `onclick` montado com o nome dentro -- e handler que
+   aponta pro nada é a família de defeito que este projeto mais paga (o `moveTeam` da Montanha, o
+   slot sem aspas do montador). As três são `function` declarada, então já estão hasteadas quando
+   esta linha roda, mesmo elas vindo depois no arquivo.
+   ⚠️ E `cx`/`cy`/`r` SÃO A GEOMETRIA DA ILHA DESENHADA, no sistema do viewBox (360x380). É DELES
+   que saem as duas coisas: o desenho do arquipélago e a posição do pino. Escritos em separado,
+   um ajuste no mapa deixaria o pino boiando no mar -- e isso não aparece como erro, aparece como
+   um botão fora do lugar. */
+const ILHAS_LARANJA = [
+  { id:'mikan',   nome:'Mikan',   lider:'Cissy', jogo:'Resgate',  selo:'resgate',  abrir:abrirResgate,  cx:96,  cy:96,  r:52, giro:0.4 },
+  { id:'navel',   nome:'Navel',   lider:'Danny', jogo:'Corrida',  selo:'corrida',  abrir:abrirCorrida,  cx:266, cy:92,  r:48, giro:1.9 },
+  { id:'trovita', nome:'Trovita', lider:'Rudy',  jogo:'Pescaria', selo:'pescaria', abrir:abrirPescaria, cx:180, cy:192, r:44, giro:3.1 },
+  { id:'kumquat', nome:'Kumquat', lider:'Luana', jogo:'Seleção', selo:'estadio',  abrir:abrirSelecao,  cx:82,  cy:274, r:50, giro:0.9 },
+  { id:'pummelo', nome:'Pummelo', lider:'Drake', jogo:null,       selo:null,       abrir:null,          cx:274, cy:268, r:47, giro:2.5 },
+];
+const ILHAS_W = 360, ILHAS_H = 380;   /* o viewBox do arquipélago */
+/* ⚠️ O PINO SAI DO CENTRO DA ILHA, em %. É esta função que faz as duas coisas terem UMA fonte. */
+const ilhaPino = (o) => 'left:' + (o.cx / ILHAS_W * 100).toFixed(2) + '%;top:' + (o.cy / ILHAS_H * 100).toFixed(2) + '%';
+
+/* ⚠️ AS TRÊS CAMADAS SÃO O MESMO POLÍGONO EM TRÊS TAMANHOS -- água rasa, areia e grama. É o
+   desenho da ilha da Pescaria, que também empilha as três: reusar a forma é o que faz as ilhas
+   das duas telas se lerem como o mesmo arquipélago.
+   ⚠️ E O RAIO VARIA POR VÉRTICE com uma conta FIXA (o `giro` da ilha entra nela): é o que dá
+   silhueta própria a cada uma sem sortear nada -- o mapa tem que ser o mesmo em toda abertura. */
+function ilhaPoligono(o, raio){
+  const p = [];
+  for(let k = 0; k < 8; k++){
+    const ang = (k / 8) * Math.PI * 2 + o.giro;
+    const v = raio * (0.78 + 0.22 * Math.abs(Math.sin(k * 1.7 + o.giro * 3)));
+    p.push(Math.round(o.cx + Math.cos(ang) * v) + ' ' + Math.round(o.cy + Math.sin(ang) * v * 0.86));
+  }
+  return 'M' + p.join('L') + 'Z';
+}
+function ilhaArte(o){
+  const usar = (t, x, y) => '<use href="#' + t + '" x="' + Math.round(x) + '" y="' + Math.round(y) + '"/>';
+  return '<path d="' + ilhaPoligono(o, o.r + 7) + '" fill="#57bdc6"/>'
+    + '<path d="' + ilhaPoligono(o, o.r) + '" fill="url(#sand)" stroke="#c7f0d0" stroke-width="3"/>'
+    + '<path d="' + ilhaPoligono(o, o.r - 9) + '" fill="#548f4a"/>'
+    + '<path d="' + ilhaPoligono(o, o.r - 11) + '" fill="url(#grass)"/>'
+    /* ⚠️ AS ÁRVORES FICAM ACIMA DO CENTRO e as pedras FORA da ilha: o pino cobre o meio, e um
+       enfeite embaixo dele seria desenho que ninguém vê. */
+    + usar('tree', o.cx - o.r * 0.5, o.cy - o.r * 0.42)
+    + usar('tree', o.cx + o.r * 0.34, o.cy - o.r * 0.30)
+    + usar('palm', o.cx - o.r * 0.18, o.cy + o.r * 0.72)
+    + usar('rock', o.cx + (o.giro > 1.5 ? o.r + 13 : -o.r - 13), o.cy + 14);
+}
+const ILHAS_SVG = '<svg class="island-art" viewBox="0 0 ' + ILHAS_W + ' ' + ILHAS_H + '" shape-rendering="crispEdges" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">'
+  + ILHA_DEFS
+  + '<rect width="' + ILHAS_W + '" height="' + ILHAS_H + '" fill="url(#sea)"/>'
+  + ILHAS_LARANJA.map(ilhaArte).join('')
+  + '<rect x="10" y="10" width="152" height="31" rx="2" fill="#164d67" opacity=".92"/>'
+  + '<text x="18" y="23" fill="#fff4c8" font-family="monospace" font-weight="bold" font-size="10">ILHAS LARANJA</text>'
+  + '<text x="18" y="34" fill="#b7e6e4" font-family="monospace" font-size="7">ARQUIPELAGO DO MAR DO SUL</text>'
+  + '</svg>';
+/* ⚠️ A VISIBILIDADE DO BOTAO NAO E A TRAVA: quem chamar `abrirIlhas()` pelo console cai aqui, e
+   aqui o `admin` e conferido de novo. E ENQUANTO A CONTA NAO CARREGOU ele recusa -- o contrario
+   da porta dos modos de campeao, que erra pro lado de DEIXAR ENTRAR: mostrar um modo
+   administrativo a quem nao e admin, mesmo por meio segundo, e pior que esconde-lo de quem e. */
+function abrirIlhas(){
+  if(!game.contaCarregada || game.ehAdmin !== true){
+    game.modoBloqueado = 'Este modo é administrativo.';
+    render(); return;
+  }
+  game.modoBloqueado = null;
+  game.screen = 'ilhas';
+  render();
+}
+function sairDasIlhas(){ openSaveSelect(); }
+/* ⚠️ QUEM RECUSA E A ACAO, nunca a ilha apagada na tela: um toque forjado no console nao pode
+   abrir um jogo que nao existe. E a checagem de admin volta pelo `abrir` de cada um -- as tres
+   portas a refazem por conta propria. */
+function entrarNaIlha(i){
+  const ilha = ILHAS_LARANJA[i];
+  if(!ilha || typeof ilha.abrir !== 'function') return;
+  ilha.abrir();
+}
+/* O MAPA: o arquipelago ao fundo e as cinco ilhas por cima, cada uma no lugar dela.
+   ⚠️ A ILHA SEM JOGO E UM `<span>`, e nao um botao apagado -- um botao que nao faz nada convida um
+   toque que nao responde. E a mesma decisao da ilha da Pescaria e da ilhota do Resgate no setup.
+   ⚠️ E O ROTULO DIZ O QUE FALTA ('Em breve'): uma ilha apagada sem motivo faz procurar defeito. */
+function ilhasMapaHtml(){
+  const pinos = ILHAS_LARANJA.map((ilha, i) => {
+    const pos = ilhaPino(ilha);
+    const miolo = '<span class="ilha-selo">' + (ilha.selo ? selo(ilha.selo, 'selo-ilha') : '?') + '</span>'
+      + '<span class="ilha-nome">' + escapeHtmlSafe(ilha.nome) + '</span>'
+      + '<span class="ilha-jogo">' + (ilha.jogo ? escapeHtmlSafe(ilha.jogo) : 'Em breve') + '</span>';
+    if(!ilha.abrir) return '<span class="ilha-pino em-breve" style="' + pos + '">' + miolo + '</span>';
+    const rotulo = escapeHtmlSafe(ilha.jogo + ' — Ilha ' + ilha.nome + ', de ' + ilha.lider);
+    return '<button class="ilha-pino" style="' + pos + '" onclick="entrarNaIlha(' + i + ')"'
+      + ' aria-label="' + rotulo + '">' + miolo + '</button>';
+  }).join('');
+  return '<div class="ilhas-mapa">' + ILHAS_SVG + pinos + '</div>';
+}
+function renderIlhas(){
+  const prontas = ILHAS_LARANJA.filter(i => i.abrir).length;
+  return `
+  <div class="box cursor">
+    <h2>${selo('ilhas')} Ilhas Laranja</h2>
+    <p>Cada ilha do arquipélago tem um desafio próprio. Toque na ilha pra encarar o dela.</p>
+    <p class="hint-text">${prontas} de ${ILHAS_LARANJA.length} abertas — as outras estão sendo
+       preparadas.</p>
+  </div>
+  ${ilhasMapaHtml()}
+  <button class="btn" onclick="sairDasIlhas()">⬅ Voltar</button>`;
+}
+
+const PESCARIA_ILHA_SVG = '<svg class="island-art" viewBox="0 0 360 380" shape-rendering="crispEdges" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">' + ILHA_DEFS + '<rect width="360" height="380" fill="url(#sea)"/><path d="M102 55h92v13h40v24h26v32h30v32h12v104h-20v36h-38v28h-35v22h-68v-18H94v-22H64v-35H48V146h18v-38h18V75h18Z" fill="#57bdc6"/><path d="M108 66h79v14h40v23h24v32h29v27h12v93h-20v32h-36v28h-33v22h-57v-18H101v-22H76v-35H60V151h18v-38h18V84h12Z" fill="url(#sand)" stroke="#c7f0d0" stroke-width="4"/><path d="M113 91h66v12h38v23h23v32h25v28h12v57h-22v32h-31v25h-28v18h-42v-20h-42v-23H92v-37H78v-65h17v-38h18Z" fill="#548f4a"/><path d="M113 86h66v12h38v23h23v32h25v28h12v57h-22v32h-31v25h-28v18h-42v-20h-42v-23H92v-37H78v-65h17v-38h18Z" fill="url(#grass)"/><path d="M167 312v-48h-17v-48h20v-39h-12v-29h31" fill="none" stroke="#e5cb8d" stroke-width="16"/><path d="M165 309v-44h-17v-48h20v-38" fill="none" stroke="#f4dda1" stroke-width="9"/><path d="M118 100h20V80h36v18h23v20h12v33h-18v10h-74v-18h-13v-25h14Z" fill="#9b9869" stroke="#626c54" stroke-width="3"/><path d="M118 101h20V81h36v18h23v19h-23v-8h-37v12h-19Z" fill="#d0c595"/><path d="M111 131h20m49 0h21m-60-37h26m-23 51h40" stroke="#777e5d" stroke-width="3"/><path d="M132 148v-19h5v-6h16v6h5v19Z" fill="#2a4247"/><path d="M199 144h16v26h-8v23h12v24h22v25h-18v-13h-20v-21h-12v-37h8Z" fill="#409dc3" stroke="#d3efd0" stroke-width="3"/><path d="M199 173h10v26h-10Z" fill="#e6fbec"/><path d="M201 176v20m5-20v20" stroke="#83d5e3" stroke-width="2"/><path d="M192 168h22v7h-22m0 26h22v6h-22" fill="#778e7c"/><g transform="translate(166 225)"><path d="M-24 0h48v31h-48" fill="#58655c"/><path d="M-22 0h44v27h-44" fill="#eee8c2"/><path d="M-28-2v-10h5v-8h46v8h5v10Z" fill="#a84547"/><path d="M-23-17h46v6h5v6h-51Z" fill="#e56b5a"/><path d="M-21-14h42m-42 6h45" stroke="#f29274" stroke-width="2"/><path d="M-17 7h9v9h-9m25-9h9v9H8" fill="#559dae" stroke="#4b6972" stroke-width="2"/><path d="M-5 11H5v16H-5Z" fill="#496274"/><rect x="-6" y="-7" width="12" height="11" fill="#fff5d7"/><path d="M-3-5h6v3h-6m-3 1H6" stroke="#d65756" stroke-width="2"/></g><path d="M163 311h25v48h-25Z" fill="#8c653f" stroke="#584d39" stroke-width="2"/><path d="M165 315h21m-21 7h21m-21 7h21m-21 7h21m-21 7h21m-21 7h21" stroke="#d2a365" stroke-width="4"/><path d="M158 313h5v7h-5m30-7h5v7h-5m-30 28h5v9h-5m30-9h5v9h-5" fill="#5b5039"/><use href="#tree" x="105" y="162"/><use href="#tree" x="128" y="175"/><use href="#tree" x="102" y="195"/><use href="#tree" x="120" y="225"/><use href="#tree" x="108" y="253"/><use href="#tree" x="135" y="276"/><use href="#tree" x="241" y="168"/><use href="#tree" x="251" y="195"/><use href="#tree" x="241" y="258"/><use href="#tree" x="221" y="282"/><use href="#palm" x="90" y="286"/><use href="#palm" x="208" y="318"/><use href="#palm" x="270" y="264"/><use href="#rock" x="63" y="109"/><use href="#rock" x="306" y="277"/><use href="#rock" x="322" y="292"/><use href="#rock" x="287" y="315"/><path d="M91 232h5v-9m-11 8h5v-8m-8 12h15m173-2h5v-9m-10 12h5v-6" stroke="#38845a" stroke-width="2"/><g fill="#fff4b6"><rect x="147" y="184" width="3" height="3"/><rect x="152" y="190" width="3" height="3"/><rect x="219" y="257" width="3" height="3"/></g><path d="M275 224h5v-10m-5 6h-5v-5m10 9h5v-7" stroke="#ec9a95" stroke-width="3"/><rect x="10" y="10" width="118" height="31" rx="2" fill="#164d67" opacity=".92"/><text x="18" y="23" fill="#fff4c8" font-family="monospace" font-weight="bold" font-size="10">ILHA MIKAN</text><text x="18" y="34" fill="#b7e6e4" font-family="monospace" font-size="7">ARQUIPÉLAGO LARANJA</text></svg>';
 /* ⚠️ ONDE CADA PONTO FICA NA ILHA, em % -- são as do protótipo, conferidas contra o desenho: 1 e 2
    na costa oeste, 3 e 4 na leste, 5 ao norte e 6 ao sul. O índice casa com o `PESCARIA_ZONAS`. */
 /* ⚠️ AS POSIÇÕES SÃO AS DO PROTÓTIPO, com UMA exceção medida: o Abismo desceu a 80% lá e aqui
@@ -34484,9 +34936,11 @@ function abrirResgate(){
      tela (escolher parceiro, voltar do picker) apagava o mapa de novo. */
   render();
 }
+/* ⚠️ VOLTA PRA AS ILHAS, e nao pra home: o jogo mora numa ilha, e sair dele e voltar pro mapa
+   -- quem quer a home aperta o Voltar de la. O `abrirIlhas` refaz a checagem de admin. */
 function sairDoResgate(){
   resgateZerar();
-  openSaveSelect();
+  abrirIlhas();
 }
 function resgateZerar(){
   if(resgate.laco){ cancelAnimationFrame(resgate.laco); resgate.laco = null; }
@@ -35493,6 +35947,9 @@ function render(){
     case 'journeyEnd': html = renderJourneyEnd(); break;
     case 'neighborhoodGym': html = renderNeighborhoodGym(); break;
     case 'trainerTower': html = renderTrainerTower(); break;
+    case 'ilhas': html = renderIlhas(); break;
+    case 'selecao': html = renderSelecao(); break;
+    case 'selecaoResultado': html = renderSelecaoResultado(); break;
     case 'corrida': html = renderCorrida(); break;
     case 'pescaria': html = renderPescaria(); break;
     case 'resgate': html = renderResgate(); break;

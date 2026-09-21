@@ -14486,6 +14486,160 @@ Dugtrio / Danny · Alakazam / Rudy · Raikou", nenhum nome truncando e **sem rol
 `tools/test-corrida.js` foi a **458 pontas**. **Conferido que ele acusa os 3 defeitos religados**
 (2, 2 e 3 falhas).
 
+## AS ILHAS LARANJA: UM MAPA NO LUGAR DE TRÊS BOTÕES (21/09/2026)
+
+Pedido assim: *"coloque um botão no home chamado Ilhas Laranja, e crie um mapa com 5 ilhas com o
+gráfico parecido do que já temos na pescaria e no resgate. E para cada ilha, você vai adicionar um
+desses novos jogos que criamos até agora ... e então pode tirar esses 3 botões de Pescaria, corrida
+e resgate que tem na tela home e substitui por apenas um chamado Ilhas Laranja. Esse botão vai ser
+exibido apenas para quem tem admin = true"*.
+
+| ilha | líder | jogo | por quê |
+|---|---|---|---|
+| **Mikan** | Cissy | **Resgate** | o Resgate JÁ acontecia na *Enseada de Mikan* -- estava no jogo antes do mapa |
+| **Navel** | Danny | **Corrida** | o desafio da Navel no original é uma subida contra o tempo |
+| **Trovita** | Rudy | **Pescaria** | |
+| **Kumquat** | Luana | **Seleção** | ver a seção do draft, abaixo |
+| **Pummelo** | Drake | *em breve* | o quinto jogo |
+
+**⚠️ OS CINCO LÍDERES JÁ ESTAVAM NO JOGO, e isso não é coincidência: são os MESMOS nomes que a
+Corrida usa nos adversários** (`CORRIDA_NPC_NOMES`, de 21/09 de manhã). Há trava comparando as duas
+listas -- divergindo, o jogador corre contra um líder que não tem ilha.
+
+- **⚠️ A GEOMETRIA DA ILHA (`cx`/`cy`/`r`/`giro`) MORA NA TABELA, e é dela que saem as DUAS coisas:
+  o desenho do arquipélago e a posição do pino.** Escritas em separado, um ajuste no mapa deixaria
+  o botão boiando no mar -- e isso não aparece como erro, aparece como um pino fora do lugar. Há
+  trava lendo o código (o mapa chama o `ilhaPino`, e não monta a posição à mão).
+- **⚠️ OS DEFS DO SVG SÃO UMA CÓPIA SÓ** (`ILHA_DEFS`): os padrões de mar, areia e grama e as
+  árvores são os MESMOS da ilha da Pescaria, extraídos pra uma constante quando o arquipélago
+  nasceu. Duas cópias divergiriam no primeiro ajuste, e o mar de uma tela deixaria de ser o mar da
+  outra. **⚠️ E os `id` deles são GLOBAIS no documento**, então os dois SVG nunca podem estar na
+  tela ao mesmo tempo -- e não estão: um é da tela `ilhas` e o outro da `pescaria`.
+- **AS TRÊS CAMADAS DE CADA ILHA SÃO O MESMO POLÍGONO EM TRÊS TAMANHOS** (água rasa, areia, grama),
+  que é o desenho da ilha da Pescaria. O raio varia por vértice com uma conta **FIXA** (o `giro` da
+  ilha entra nela): é o que dá silhueta própria a cada uma sem sortear nada -- um mapa que muda de
+  forma a cada render não é um mapa.
+- **⚠️ A ILHA SEM JOGO É UM `<span>`, e não um botão apagado**: um botão que não faz nada convida um
+  toque que não responde. É a mesma decisão da ilha da Pescaria e da ilhota do Resgate no setup. E
+  **o rótulo diz o que falta** (*"Em breve"*) -- uma ilha apagada sem motivo faz procurar defeito.
+- **⚠️ O `abrir` É A FUNÇÃO, nunca o NOME dela.** Um nome em texto viraria uma busca no `window`
+  (que não existe no sandbox dos testes) ou um `onclick` montado com ele dentro -- e handler que
+  aponta pro nada é a família do `moveTeam` da Montanha e do slot sem aspas do montador.
+- **QUEM RECUSA É A AÇÃO**: o `entrarNaIlha` recusa a ilha sem jogo e o índice forjado, e cada
+  `abrir*` refaz a checagem de admin por conta própria.
+- **⚠️ SAIR DE UM JOGO VOLTA PRA AS ILHAS, e não pra home**: o jogo mora numa ilha. Quem quer a
+  home aperta o Voltar de lá.
+
+**O BOTÃO DA HOME OCUPA A LINHA INTEIRA** (`home-btn-largo`), como o Boss de Domingo: a fileira de
+modos é de DUAS colunas, e com os quatro modos normais o administrativo fica sozinho na quinta
+célula -- medido a 320px, um buraco de 137px do lado. **Não é hierarquia: é a linha fechando.**
+
+**⚠️ O SELO `ilhas` FOI REFEITO DEPOIS DA PRÉVIA, e a razão é a regra dos 16px.** A primeira versão
+era uma copa REDONDA no centro de uma duna -- e a 16px isso lê como **CABEÇA SOBRE OMBROS**: uma
+pessoa, não uma ilha. Hoje a duna é larga e baixa e a palmeira sai **INCLINADA** pra direita, com a
+copa passando da borda da duna; nenhuma silhueta de pessoa faz isso. **Foi a prévia no navegador
+que pegou** -- a regra da casa é que ASCII não se julga, e ela pagou de novo.
+
+**Medido a 320px, no navegador:** a tela em **658px**, o mapa em **281×297px**, os cinco pinos com
+nome e jogo **todos dentro do mapa**, **zero** pinos colidindo e **nenhuma rolagem lateral**. O
+botão da home fica em **281×76px** com o selo em 26×26.
+
+**No motor, nada:** `MOTOR 385943f3e1fa / DIARIO 850af0fd1763`, idêntico em 900 batalhas semeadas.
+
+⚠️ **E TRÊS TRAVAS DOS MINIGAMES MEDIAM O BOTÃO NA HOME** -- elas viraram *"a ilha leva até mim"*,
+que é o que elas sempre quiseram provar: existe UM caminho até o modo, e ele passa pela mesma
+checagem de admin. **E duas do mapa fixavam 3 e 2** (com jogo / em breve) e caíram no MESMO DIA,
+quando a Kumquat ganhou o draft: hoje elas contam a TABELA. É a lição das cinco que caíram quando o
+trecho da Corrida virou 150 m -- **trava que fixa um número envelhece com ele.**
+
+`tools/test-ilhas.js` tranca 91 pontas: o acesso nos 10 estados do campo, a home com UM botão e sem
+os três velhos, a tabela (líderes casando com a Corrida, `abrir` sendo função, nenhum jogo em duas
+ilhas), a ação recusando, o mapa, o pino DERIVADO do centro, os defs numa cópia só, e a volta.
+**Conferido que ele acusa os 7 defeitos religados.**
+
+## SELEÇÃO POKÉMON: O DRAFT DA ILHA KUMQUAT (21/09/2026)
+
+Pedido assim: *"vai ser uma batalha contra um líder, e vão ser sorteados 12 pokémons aleatoriamente,
+menos os lendários, e então o treinador e o líder vão ter que montar o time selecionando 1 desses 12
+até ficar 6x6. O líder do ginásio vai escolher 1 e o usuário vai escolher 2, depois o líder escolhe
+2 e o usuário escolhe 2 e assim vai até acabar os pokémons, depois o treinador vai escolher a ordem
+que vai entrar na luta"*.
+
+**⚠️ É O ÚNICO DOS QUATRO QUE NÃO USA O TIME DO JOGADOR.** Os 12 são sorteados na hora e os dois
+lados montam do MESMO bolo -- então não há picker de save, e **não há régua de 8 insígnias**: exigir
+uma coleção que o modo não usa seria uma porta sem razão. O que se mede aqui é a ESCOLHA.
+
+**⚠️ A ORDEM DO PEDIDO É EXATAMENTE JUSTA, e isso foi MEDIDO e não escolhido.** Com os dois lados
+pegando sempre o melhor disponível, o snake `1-2-2-2-2-2-1` distribui as posições assim:
+
+| | pega as posições | soma |
+|---|---|---|
+| **líder** | 1, 4, 5, 8, 9, 12 | **39** |
+| **você** | 2, 3, 6, 7, 10, 11 | **39** |
+
+É essa propriedade que faz o modo não ser decidido pela vez -- e ela é uma trava: a ordem tem que
+**fechar** com o bolo (12) e dar 6 pra cada lado. Uma ordem que some 11 ou 13 deixa o jogador com 5
+ou o bolo com sobra, e isso **não aparece como erro**: aparece como uma tela que não avança.
+
+**⚠️ O QUE A ESCOLHA VALE, MEDIDO** (400 drafts, os dois lados com a mesma política):
+
+| o jogador | vence |
+|---|---|
+| pegando o de maior BST, como o líder | **48,0%** |
+| pegando o PIOR de cada vez | **1,8%** |
+| *(BST médio do time: 396,8 x 395,5)* | |
+
+**48% é moeda ao ar** -- a consequência do snake ser justo -- e **46 pontos de amplitude** é o que
+a decisão vale. Sem esses dois números o draft seria enfeite.
+
+- **⚠️ O LÍDER PEGA O DE MAIOR BST, e isso é uma linha de propósito**: é a régua mais simples que
+  existe, ela é MEDÍVEL, e com ela o snake sai empatado. Se um dia ele precisar ser mais esperto, é
+  no `selecaoEscolhaDoLider` -- e a régua está aqui.
+- **⚠️ TODO MUNDO ENTRA NO MESMO NÍVEL** (`SELECAO_NIVEL`, 60): com níveis diferentes o bolo
+  deixaria de ser o mesmo pros dois e a escolha viraria uma conta de nível.
+- **NEM LENDÁRIO NEM INTOCÁVEL** -- um Mewtwo no bolo decidiria o draft sozinho --, **e sem repetir
+  LINHA evolutiva**: com Magikarp e Gyarados no mesmo bolo, os 12 viram 11 opções de verdade. É a
+  mesma regra do encontro selvagem e dos guardiões da Montanha. Medido em 400 bolos: sempre 12,
+  zero lendários, zero linhas repetidas.
+- **⚠️ OS DOIS LADOS LEVAM O MOVESET INTEIRO DA ESPÉCIE** (`equiparNpc`): ninguém ESCOLHEU golpe
+  aqui (o bolo é sorteado, não vem de save), e a regra da casa é que quem não escolhe cai no
+  moveset por nível. Dar a um lado e não ao outro seria a assimetria que o pedido não pede.
+- **⚠️ A ESPECIALIDADE E OS ITENS VÃO VAZIOS**, de propósito: os 12 não são do jogador. Uma
+  especialidade de tipo faria o MESMO bolo valer mais numa conta que na outra.
+- **⚠️ QUEM JÁ FOI ESCOLHIDO NÃO SOME DO BOLO**: ele apaga e ganha a FAIXA de quem levou. Sumindo,
+  o jogador perderia a única coisa que um draft tem a contar -- o que o outro lado está montando.
+- **O LÍDER ESCOLHE NA FRENTE DO JOGADOR** (`SELECAO_PAUSA_NPC`, 700ms por escolha): sem a pausa
+  ele leva os dele todos no mesmo quadro e o que se vê é uma lista que se preenche sozinha.
+- **QUEM RECUSA É A AÇÃO**: fora da vez, fora da fase, no card já levado e no índice forjado.
+
+**A BATALHA É A DA CASA, sem uma linha de motor próprio**: `simulateGymBattle` e o MESMO ciclo de
+revelação da Torre (`trainerBattling`), que já sabe animar um resultado com `matchups`. O que a
+distingue é a marca (`selecaoBattlePending`), como a Torre e a raide -- sem ela a batalha voltaria
+pro destino do vizinho. E o resultado reusa o `renderMatchupLog` de sempre.
+
+**⚠️ E A TRAVA DO GOLPE FANTASMA PEGOU UM DEFEITO DE VERDADE AQUI.** O `selecaoLutar` entrava em
+`loading` sem chamar o `abrirConfronto`, então o passo e o último golpe do confronto ANTERIOR
+sobreviviam e o primeiro quadro anunciaria um golpe que ninguém deu. É o defeito de 09/09/2026, e a
+trava do `test-especiais` -- que conta os `RevealPhase` contra os `abrirConfronto` -- é exatamente
+o que existe pra pegá-lo. **Ela pagou o preço dela hoje.**
+
+**Medido a 320px, no navegador:** o draft em **641px** com os 12 cards de 72×71px em 3 colunas,
+nenhum nome truncado, a faixa de quem levou visível; a tela de ordem em **1.687px** (os 6 seus com
+setas mais os 6 dela), sem rolagem lateral em nenhuma das duas.
+
+**No motor, nada:** `MOTOR 385943f3e1fa / DIARIO 850af0fd1763`, idêntico em 900 batalhas semeadas.
+
+⚠️ **E UMA TRAVA MINHA NASCEU MEDINDO O QUE A ESPÉCIE NÃO TEM:** ela cobrava que os 6 de cada lado
+tivessem moveset, e o `equiparNpc` dá o moveset **por NÍVEL** -- há espécie que não aprende golpe de
+dano nenhum (o Ditto). Ela falharia num bolo que sorteasse um deles: **um flake, o pior tipo de
+teste que existe**. Hoje ela compara com o que a espécie OFERECE.
+
+`tools/test-selecao.js` tranca 59 pontas: o acesso (e a ausência da régua de insígnias), a ordem
+fechando e sendo justa, o bolo em 400 sorteios, a ação recusando nos quatro casos, o draft fechando
+em 6x6 com os dois levando moveset, **o que a escolha vale**, as setas da ordem, a batalha caindo no
+ciclo da casa com o 1º de cada lado se encarando, e nada indo pro save.
+**Conferido que ele acusa os 7 defeitos religados.**
+
 ## RESGATE POKÉMON -- o terceiro teste admin (20/09/2026)
 
 Pedido com o `resgate-pokemon.html` da raiz como referência, e com **cinco coisas mudadas** em
