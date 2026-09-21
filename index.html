@@ -3485,9 +3485,10 @@
   .resg-medidor i.npc{background:#ffc16f;}
   /* A PRAIA é o sétimo alvo, e ela é um retângulo e não um círculo de propósito: ela não é um
      ponto de resgate, é o lugar pra onde se VOLTA -- forma diferente, leitura diferente. */
-  .resg-praia{position:absolute;transform:translate(-50%,-50%);padding:4px 8px;z-index:2;
-    border:2px solid #17334b;border-radius:4px;background:#ffe9b0e8;cursor:pointer;
-    font:800 .58rem/1 var(--font-ui);color:#4a3a15;white-space:nowrap;overflow:visible;}
+  .resg-praia{position:absolute;transform:translate(-50%,-50%);padding:8px 14px;z-index:2;
+    border:2px solid #17334b;border-radius:5px;background:#ffe9b0e8;cursor:pointer;
+    font:800 .78rem/1 var(--font-ui);color:#4a3a15;white-space:nowrap;overflow:visible;
+    box-shadow:0 2px 0 #17334b;}
   /* ⚠️ O `[hidden]` PRECISA DE REGRA PRÓPRIA: o `.resg-medidor` é `display:block` e QUALQUER
      `display` do autor anula o `hidden` da folha do navegador, que tem a menor prioridade que
      existe. É o defeito do modal da contagem da Corrida, que custou dois relatos. */
@@ -35425,7 +35426,6 @@ function renderPescaria(){
       </span>
     </div>
     <button class="btn success" onclick="pescariaLargar()" ${temTime ? '' : 'disabled'}>Começar o duelo</button>
-    <button class="btn secondary" onclick="sairDaPescaria()">⬅ Sair</button>
   </div>
   ${/* ⚠️ O MODAL DO (i) PRECISA ESTAR AQUI TAMBÉM (20/09/2026, reportado: *"clico nos I de cada
        ponto para ver os pokemons que tem em cada ponto, nao esta abrindo nada"*). O `(i)` do mapa
@@ -35433,7 +35433,8 @@ function renderPescaria(){
        só era desenhado no `return` do DUELO. O estado mudava e o `render()` rodava; não havia o
        que desenhar. */``}
   ${renderPescariaZonaModal()}
-  ${pescariaRankHtml()}`;
+  ${pescariaRankHtml()}
+  <button class="btn secondary" onclick="sairDaPescaria()">⬅ Sair</button>`;
   }
 
   if(pescaria.fase === 'fim'){
@@ -35619,6 +35620,15 @@ const RESGATE_PONTOS = [
 ];
 const RESGATE_DURACAO = 90;
 const RESGATE_CAPACIDADE = 2;          /* todo mundo leva 2 -- ver o cabeçalho */
+/* ⚠️ O ADVERSARIO TEM NOME (21/09/2026, a pedido: a Cissy, líder da ilha Mikan, no lugar da palavra
+   genérica que ele usava em SEIS pontos da tela.
+   ⚠️ E O NOME SAI DA TABELA DAS ILHAS: a Cissy é a líder da Mikan, que é justamente onde o Resgate
+   acontece -- derivar dali é o que impede o dia em que ela mudar de nome no mapa e o minigame
+   continuar chamando outra pessoa. É o mesmo desenho do `PESCARIA_NPC_NOME`, só que sem a cópia. */
+function resgateNomeDoNpc(){
+  const ilha = ILHAS_LARANJA.find(i => i.id === 'mikan');
+  return (ilha && ilha.lider) || 'Cissy';
+}
 const RESGATE_NPC_NIVEL = 60;          /* o pedido: "aleatório algum no level 60" */
 const RESGATE_TEMPO_NO_PONTO = 1;      /* 1s parado pra concluir o resgate */
 /* ⚠️ E 2s PRA DESCARREGAR NA PRAIA (20/09/2026, a pedido: *"coloque tambem um timer de 2s para
@@ -36622,7 +36632,7 @@ function resgateDesenharAtor(ctx, a, i, t){
 /* A etiqueta cabe em ~9 caracteres a 8px; o nome do treinador vai a 20, então ele é cortado.
    ⚠️ E ELE É O NOME, nunca "VOCÊ" -- a mesma decisão de 20/09/2026 na Pescaria. */
 function resgateEtiqueta(i){
-  const n = i === 0 ? nomeDoTreinador() : 'Rival';
+  const n = i === 0 ? nomeDoTreinador() : resgateNomeDoNpc();
   return n.length > 9 ? n.slice(0, 8) + '.' : n;
 }
 
@@ -36723,7 +36733,7 @@ function resgateMapaHtml(jogando){
   </div>`;
 }
 function resgateResumoLado(a, i){
-  const nome = i === 0 ? nomeDoTreinador() : 'Rival';
+  const nome = i === 0 ? nomeDoTreinador() : resgateNomeDoNpc();
   return `<div class="pesc-resumo-lado ${i ? 'npc' : ''}">
     <div class="pesc-resumo-topo"><b>${escapeHtmlSafe(nome)}</b><span class="pesc-resumo-pts">${a.pontos} pts</span></div>
     ${a.entregas.length ? a.entregas.map(v => `<div class="pesc-hist">
@@ -36743,13 +36753,13 @@ function renderResgate(){
   if(resgate.fase === 'fim'){
     const [a, b] = resgate.atores;
     const titulo = a.pontos > b.pontos ? selo('trofeu') + ' ' + escapeHtmlSafe(nomeDoTreinador()) + ' venceu!'
-      : a.pontos < b.pontos ? 'O Rival venceu!' : 'Empate!';
+      : a.pontos < b.pontos ? escapeHtmlSafe(resgateNomeDoNpc()) + ' venceu!' : 'Empate!';
     return `${cabeca}
       <div class="box">
         <h2>${titulo}</h2>
         <div class="pesc-placar-fim">
           <div class="pesc-fim-lado eu"><b>${a.pontos}</b><small>${escapeHtmlSafe(nomeDoTreinador())} · ${a.entregas.length} resgates</small></div>
-          <div class="pesc-fim-lado"><b>${b.pontos}</b><small>Rival · ${b.entregas.length} resgates</small></div>
+          <div class="pesc-fim-lado"><b>${b.pontos}</b><small>${escapeHtmlSafe(resgateNomeDoNpc())} · ${b.entregas.length} resgates</small></div>
         </div>
         ${resgateResumoLado(a, 0)}${resgateResumoLado(b, 1)}
         <button class="btn success" onclick="resgateComecar()">Resgatar de novo</button>
@@ -36797,20 +36807,20 @@ function renderResgate(){
   return `${cabeca}
     <div class="box">
       <div class="resg-topo">
-        <b class="tag">${resgate.fase === 'voltando' ? 'RETORNO À PRAIA' : escapeHtmlSafe(nomeDoTreinador()) + ' × RIVAL'}</b>
+        <b class="tag">${resgate.fase === 'voltando' ? 'RETORNO À PRAIA' : escapeHtmlSafe(nomeDoTreinador()) + ' × ' + escapeHtmlSafe(resgateNomeDoNpc().toUpperCase())}</b>
         <span class="resg-relogio" id="resgateRelogio">01:30</span>
       </div>
       <div class="resg-placar">
         <div class="resg-lado"><b>${escapeHtmlSafe(nomeDoTreinador())} · ${nomeDe(a)}</b>
           <strong id="resgatePtsA">0 pts</strong><small id="resgateCargaA"></small></div>
-        <div class="resg-lado npc"><b>Rival · ${nomeDe(b)}</b>
+        <div class="resg-lado npc"><b>${escapeHtmlSafe(resgateNomeDoNpc())} · ${nomeDe(b)}</b>
           <strong id="resgatePtsB">0 pts</strong><small id="resgateCargaB"></small></div>
       </div>
     </div>
     <div class="box">
       <div class="resg-topo"><b>Enseada de Mikan</b><span class="resg-mar" id="resgateMarEstado"></span></div>
       ${resgateMapaHtml(true)}
-      <div class="resg-legenda"><span>Azul: você · Laranja: rival</span><span>Setas: correnteza</span><span>Espiral: perigo</span></div>
+      <div class="resg-legenda"><span>Azul: você · Laranja: ${escapeHtmlSafe(resgateNomeDoNpc())}</span><span>Setas: correnteza</span><span>Espiral: perigo</span></div>
       <p class="resg-recado" id="resgateRecado"></p>
     </div>
     <div class="box">

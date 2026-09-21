@@ -1172,5 +1172,95 @@ console.log('=== O RANKING DO RESGATE ===');
      'ele é pedido dentro do laço: um render da rede mataria a animação');
 }
 
+
+/* ============================================================================
+   O ADVERSÁRIO TEM NOME, E O BOTÃO DA PRAIA CRESCEU (21/09/2026)
+
+   Pedido: *"no jogo o resgate, aumente o botão PRAIA que tem na ilha. Troque também tudo onde tá
+   escrito RIVAL pelo nome de um líder da ilha Mikan, Cissy"*.
+
+   ⚠️ A VARREDURA É SOBRE A TELA RENDERIZADA, e não sobre o arquivo: o nome de VARIÁVEL (`const
+   rival = resgate.atores[1]`) e um comentário JS continuam dizendo a palavra, e devem continuar --
+   renomear código interno é churn pra trocar uma palavra que só aparece na tela. É a mesma decisão
+   que a Arena 1x1 tomou quando mudou de nome.
+   ⚠️ E ELA IGNORA A CAIXA: a legenda do mapa dizia "Laranja: rival" em MINÚSCULA, e a primeira
+   varredura (que procurava a palavra em maiúscula no arquivo) passou por cima dela. Quem pegou foi
+   o navegador.
+   ============================================================================ */
+console.log('');
+console.log('=== O ADVERSÁRIO SE CHAMA CISSY ===');
+{
+  const g2 = S.__getGame();
+
+  /* ⚠️ O NOME SAI DA TABELA DAS ILHAS, nunca escrito à mão em seis lugares: seis cópias
+     divergiriam no primeiro ajuste, e o minigame continuaria chamando quem o mapa já não chama. */
+  const daTabela = (S.ILHAS_LARANJA.find(i => i.id === 'mikan') || {}).lider;
+  ok('o nome sai da tabela das ilhas', S.resgateNomeDoNpc() === daTabela, S.resgateNomeDoNpc());
+  ok('  e é a líder da Mikan (onde o Resgate acontece)', daTabela === 'Cissy', String(daTabela));
+
+  /* monta as três telas e varre o TEXTO delas */
+  const semTag = (h) => h.replace(/<[^>]*>/g, ' ');
+  S.resgateRank.lista = []; S.resgateRank.meu = null; S.resgateRank.lidoEm = Date.now();
+  S.resgateRank.erro = null;
+
+  S.resgateZerar();
+  g2.screen = 'resgate';
+  S.resgate.escolhido = { speciesId: 'blastoise', level: 70, name: 'Blastoise', slot: 0, idx: 0 };
+  const setup = semTag(S.renderResgate());
+
+  S.resgate.fase = 'correndo';
+  S.resgate.atores = [
+    { inst: S.createInstance('blastoise', 70), x: S.RESGATE_PRAIA.x - 14, y: S.RESGATE_PRAIA.y,
+      bag: [], pontos: 40, entregas: [1], descarga: 0 },
+    { inst: S.createInstance('lapras', 60), x: S.RESGATE_PRAIA.x + 14, y: S.RESGATE_PRAIA.y,
+      bag: [], pontos: 20, entregas: [], descarga: 0 },
+  ];
+  S.resgate.ocupantes = S.RESGATE_PONTOS.map((_, i) => S.resgateNovoOcupante(i));
+  const duelo = semTag(S.renderResgate());
+
+  S.resgate.fase = 'fim';
+  const fim = semTag(S.renderResgate());
+
+  /* ⚠️ A VARREDURA IGNORA A CAIXA -- foi assim que a legenda em minúscula escapou da primeira. */
+  [['setup', setup], ['duelo', duelo], ['fim', fim]].forEach(([nome, t]) => {
+    ok('  a tela do ' + nome + ' não diz mais a palavra genérica', !/rival/i.test(t),
+       (t.match(/[^.]{0,30}rival[^.]{0,30}/i) || [''])[0]);
+  });
+
+  /* e ela aparece onde tem que aparecer */
+  ok('  a tag do topo traz o nome dela', /×\s*CISSY/i.test(duelo), 'a tag do duelo');
+  ok('  o placar do duelo também', duelo.indexOf('Cissy · ') >= 0);
+  ok('  a legenda do mapa também', /Laranja:\s*Cissy/.test(duelo));
+  ok('  e o placar do fim', fim.indexOf('Cissy · ') >= 0);
+
+  /* ⚠️ E O TÍTULO DO FIM NOMEIA ELA quando ela ganha -- antes ele dizia "O Rival venceu!". */
+  S.resgate.atores[0].pontos = 10; S.resgate.atores[1].pontos = 99;
+  ok('  e o título do fim, quando ela vence',
+     semTag(S.renderResgate()).indexOf('Cissy venceu!') >= 0);
+  S.resgate.atores[0].pontos = 99; S.resgate.atores[1].pontos = 10;
+  ok('    e ele nomeia VOCÊ quando você vence',
+     semTag(S.renderResgate()).indexOf(S.nomeDoTreinador() + ' venceu!') >= 0);
+
+  /* ============================================================================
+     O BOTÃO DA PRAIA
+     ⚠️ LIDO DO CSS: tamanho de fonte e padding não aparecem em asserção de HTML nenhuma -- é a
+     mesma razão pela qual a trava do `[hidden]` do medidor lê a folha.
+     ============================================================================ */
+  const css = src.slice(src.indexOf('.resg-praia{'), src.indexOf('.resg-medidor[hidden]'));
+  ok('(e a trava lê o CSS da praia)', css.length > 60, css.length + ' chars');
+  const fonte = parseFloat((css.match(/font:800 ([\d.]+)rem/) || [, '0'])[1]);
+  ok('a fonte da praia é maior que a de antes (.58rem)', fonte > 0.58, fonte + 'rem');
+  const padY = parseInt((css.match(/padding:(\d+)px (\d+)px/) || [, '0'])[1], 10);
+  const padX = parseInt((css.match(/padding:(\d+)px (\d+)px/) || [, , '0'])[2], 10);
+  ok('  e o padding também (era 4px 8px)', padY > 4 && padX > 8, padY + 'px ' + padX + 'px');
+
+  /* ⚠️ E ELA CONTINUA SENDO UM RETÂNGULO, não um círculo: ela não é um ponto de resgate, é o lugar
+     pra onde se VOLTA -- forma diferente, leitura diferente. O `border-radius` diz isso. */
+  ok('  e ela continua retangular (não virou um ponto)',
+     /border-radius:[0-6]px/.test(css), 'virou círculo');
+
+  S.resgate.fase = 'setup';
+}
+
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
 process.exit(falhas ? 1 : 0);

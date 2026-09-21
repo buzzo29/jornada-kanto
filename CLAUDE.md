@@ -16889,6 +16889,75 @@ que é a acusação mais forte que existe). Duas lições de teste saíram daí:
    a regra do cache ANTES da idade. **É a terceira vez que essa família envelhece aqui** -- as
    outras duas foram quando o trecho da Corrida virou 150 m e quando a lista do Resgate cresceu.
 
+## O ADVERSÁRIO DO RESGATE TEM NOME, E O SAIR DA PESCARIA DESCEU (21/09/2026)
+
+Três pedidos de tela: *"no jogo o resgate, aumente o botão PRAIA que tem na ilha. Troque também
+tudo onde tá escrito RIVAL pelo nome de um líder da ilha Mikan, Cissy"* e *"na primeira tela da
+pescaria, coloque o botão de Sair depois do ranking de Melhores Pescarias"*.
+
+### ⚠️ O NOME SAI DA TABELA DAS ILHAS, e não escrito em seis lugares
+
+A **Cissy é a líder da Mikan**, que é justamente onde o Resgate acontece -- e ela já existia no
+jogo, no `ILHAS_LARANJA` e nos adversários da Corrida. Derivar dali é o que impede o dia em que ela
+mudar de nome no mapa e o minigame continuar chamando outra pessoa. É o mesmo desenho do
+`PESCARIA_NPC_NOME`, só que **sem a cópia**.
+
+- **⚠️ E É FUNÇÃO, não `const` derivada.** A `ILHAS_LARANJA` vem antes no arquivo hoje, mas `const`
+  tem zona morta temporal e este projeto já pagou isso **três vezes** (as quatro telas de revelação
+  em 09/09, o aviso de versão em 13/09, o `cycleTime` da liga em 18/09). Função é imune à ordem.
+- **O FALLBACK É O NOME CERTO, e não a palavra genérica:** se a ilha sumir da tabela, ter o nome de
+  verdade é melhor que ter de volta exatamente a palavra que o pedido acabou de tirar.
+
+**São SEIS pontos de tela** -- a tag do topo (`Matheus × CISSY`), o placar do duelo, a legenda do
+mapa, o placar do fim, o título do fim e o nome que o pintor escreve.
+
+### ⚠️ E A SEXTA SÓ APARECEU NO NAVEGADOR: a varredura tem que ignorar a CAIXA
+
+A legenda do mapa dizia **`Laranja: rival`** em MINÚSCULA, e a varredura que eu tinha feito no
+arquivo procurava a palavra em maiúscula. Ela passou limpa pelo `grep` e foi o **navegador** que a
+achou, lendo o texto da tela renderizada.
+
+**Varredura de texto de TELA se faz sem distinguir maiúsculas** -- e a trava faz assim.
+
+### ⚠️ E O NOME DE CÓDIGO CONTINUA, de propósito
+
+`const rival = resgate.atores[1]` e um comentário JS seguem dizendo a palavra, e **devem seguir**:
+renomear código interno é churn pra trocar uma palavra que só aparece na tela. É a mesma decisão
+que a Arena 1x1 tomou quando ela mudou de nome (*"renomeá-los seria churn em ~200 referências pra
+trocar uma palavra que só aparece na tela"*).
+
+Por isso a trava varre a **TELA RENDERIZADA**, nunca o arquivo -- varrendo o arquivo ela pegaria os
+três e obrigaria o churn que a decisão evita.
+
+### O BOTÃO DA PRAIA
+
+| | antes | depois |
+|---|---|---|
+| tamanho | *(padding 4px 8px, fonte .58rem)* | **83×32px** |
+| fonte | .58rem (~9px) | **.78rem (12,5px)** |
+| relevo | nenhum | sombrinha de 2px |
+
+- **⚠️ ELE CONTINUA RETANGULAR**, e isso é o desenho: *"ela não é um ponto de resgate, é o lugar pra
+  onde se VOLTA -- forma diferente, leitura diferente"*. Crescer não podia virar um sétimo ponto.
+- **Medido a 320px, no navegador:** ele fica **dentro do mapa** e **não encosta em nenhum dos seis
+  pontos** -- que era o risco de aumentá-lo, já que ele vive sobre o mesmo retângulo que eles.
+
+### O SAIR DA PESCARIA FECHA A TELA
+
+Ele estava **DENTRO da caixa** do setup, o que punha o ranking **abaixo do botão de sair** -- e um
+botão de saída no meio da tela corta a leitura: quem chega nele para de rolar e não vê o que vem
+depois. Fora da caixa ele fecha a tela, que é onde um "Sair" pertence, e é o que a **Corrida**, o
+**Resgate** e a **Arena** já faziam.
+
+**Medido a 320px:** Começar o duelo (y=771) → Melhores pescarias (y=887) → **Sair (y=1060)**, ele é
+o último elemento da tela, 304×52px, sem rolagem lateral.
+
+- **⚠️ E ELE CONTINUA LÁ COM O RANKING VAZIO OU EM ERRO:** ele é da TELA, não da caixa -- se
+  dependesse dela, um erro de rede deixaria o jogador **sem saída**. Há caso de teste pros dois.
+
+**No motor, nada:** `MOTOR 079861051846 / DIARIO cfedb1fdcab2`, idêntico. **Os 8 defeitos religados
+acusam** (2 a 7 falhas cada).
+
 ## Frontend
 
 - **A tela de notificações é uma caixa de entrada**: lista de títulos em cima, corpo do que está

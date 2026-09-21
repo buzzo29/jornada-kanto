@@ -2145,5 +2145,53 @@ console.log('\n=== OS 18 PESCÁVEIS NOVOS ===');
   }
 }
 
+
+/* ============================================================================
+   O SAIR FECHA A TELA, DEPOIS DO RANKING (21/09/2026, a pedido: *"na primeira tela da pescaria,
+   coloque o botão de Sair depois do ranking de Melhores Pescarias"*)
+
+   ⚠️ ELE ESTAVA DENTRO DA CAIXA do setup, o que punha o ranking ABAIXO do botão de sair -- e um
+   botão de saída no meio da tela corta a leitura: quem chega nele para de rolar e não vê o que vem
+   depois. Fora da caixa ele fecha a tela, que é onde um "Sair" pertence -- e é o que a Corrida, o
+   Resgate e a Arena já faziam.
+   ============================================================================ */
+console.log('');
+console.log('=== O SAIR VEM DEPOIS DO RANKING ===');
+{
+  const g2 = S.__getGame();
+  S.pescariaRank.lista = [{ pos: 1, nome: 'Ana', pontos: 820, eu: false }];
+  S.pescariaRank.meu = null; S.pescariaRank.lidoEm = Date.now(); S.pescariaRank.erro = null;
+  S.pescariaZerar();
+  g2.screen = 'pescaria';
+  const h = S.renderPescaria();
+
+  const iRank = h.indexOf('Melhores pescarias');
+  const iSair = h.indexOf('sairDaPescaria()');
+  ok('o ranking está na tela', iRank >= 0);
+  ok('  e o Sair vem DEPOIS dele', iSair > iRank, 'ranking em ' + iRank + ', Sair em ' + iSair);
+  ok('  e ele é UM só', (h.match(/sairDaPescaria\(\)/g) || []).length === 1,
+     (h.match(/sairDaPescaria\(\)/g) || []).length + ' botões');
+
+  /* ⚠️ E ELE FICA FORA DA CAIXA: dentro dela ele se lê como mais uma ação do setup; solto no fim,
+     ele fecha a tela. O último `</div>` do setup tem que vir ANTES dele. */
+  const fechaCaixa = h.lastIndexOf('</div>', iSair);
+  ok('  e fora da caixa do setup', fechaCaixa >= 0 && fechaCaixa < iSair && fechaCaixa > iRank,
+     'ele voltou pra dentro da caixa');
+
+  /* e o "Começar o duelo" continua onde estava -- ele é a ação da tela, não a saída */
+  const iComecar = h.indexOf('pescariaLargar()');
+  ok('  e o "Começar o duelo" continua ANTES do ranking', iComecar >= 0 && iComecar < iRank,
+     'começar em ' + iComecar);
+
+  /* ⚠️ E COM O RANKING EM ERRO OU VAZIO O SAIR CONTINUA LÁ: ele é da TELA, não do ranking -- se
+     ele dependesse da caixa, um erro de rede deixaria o jogador sem saída. */
+  S.pescariaRank.lista = [];
+  ok('  e ele continua com o ranking vazio',
+     S.renderPescaria().indexOf('sairDaPescaria()') >= 0);
+  S.pescariaRank.erro = 'deu ruim'; S.pescariaRank.lista = null;
+  ok('    e com o ranking em erro', S.renderPescaria().indexOf('sairDaPescaria()') >= 0);
+  S.pescariaRank.erro = null;
+}
+
 console.log(falhas ? '\n' + falhas + ' FALHA(S)' : '\nTudo certo.');
 process.exit(falhas ? 1 : 0);
