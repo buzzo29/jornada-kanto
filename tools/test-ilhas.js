@@ -428,5 +428,134 @@ console.log('\n=== E A CAIXA ABRE, EXPLICA E FECHA ===');
   })(), 'a guarda vive dentro do abrirIlhaInfo');
 }
 
+/* ============================================================================
+   O ANUNCIO DAS NOVIDADES NA HOME (21/09/2026, a pedido)
+
+   O que ele existe pra pegar, em ordem de importancia:
+     1. o ACESSO: ele so nasce pra `admin === true`, e NAO nasce enquanto a conta carrega --
+        anunciar as Ilhas Laranja a quem nao consegue abri-las manda o jogador procurar na home
+        um botao que nao esta la;
+     2. a MARCA E A VERSAO, e nao um "ja viu": e ela que deixa o PROXIMO anuncio reaparecer sem
+        ninguem limpar campo de conta na mao;
+     3. o RESUMO SAI DO `ILHAS_COMO`, nao de uma segunda lista -- que divergiria dela no dia em
+        que uma ilha trocasse de jogo;
+     4. ele e da CONTA e entra no CAMPOS_DA_CONTA: sem isso abrir um save o apagaria e o anuncio
+        voltaria pra quem ja leu.
+   ============================================================================ */
+console.log('');
+console.log('=== O ANUNCIO DAS NOVIDADES ===');
+{
+  function contaLimpa(){
+    contaAdmin();
+    g.novidadeVista = null;
+    g.novidadesModal = false;
+    g.authUser = { uid: 'u1' };
+    S.__escritas.length = 0;
+  }
+
+  /* ---- 1) o acesso ---- */
+  contaLimpa();
+  ok('admin=true na home abre o anuncio', S.conferirNovidades() === true && g.novidadesModal === true);
+
+  /* ⚠️ EXATAMENTE O BOOLEANO, como a porta das ilhas: 'sim', 1 e 'true' nao autorizam */
+  for(const v of [false, undefined, null, 'sim', 1, 'true', 0, '']){
+    contaLimpa(); g.ehAdmin = v;
+    ok('  e ' + JSON.stringify(v) + ' nao abre', S.conferirNovidades() === false && !g.novidadesModal);
+  }
+
+  /* ⚠️ ENQUANTO A CONTA NAO CARREGOU ele NAO nasce -- o contrario da porta dos modos de campeao,
+     que erra pro lado de deixar entrar. Aqui o lado seguro e o outro. */
+  contaLimpa(); g.contaCarregada = false;
+  ok('  e nao abre enquanto a conta carrega', S.conferirNovidades() === false && !g.novidadesModal);
+
+  /* ⚠️ E SO NA HOME: o loadPermanentUserData roda tambem na Pokedex e nas Conquistas, e um modal
+     cobre a tela inteira. */
+  for(const tela of ['pokedex', 'achievements', 'ilhas', 'battling']){
+    contaLimpa(); g.screen = tela;
+    ok('  e nao abre na tela ' + tela, S.conferirNovidades() === false && !g.novidadesModal);
+  }
+
+  /* ---- 2) a versao: quem leu nao rele, e um anuncio NOVO reaparece ---- */
+  contaLimpa(); g.novidadeVista = S.NOVIDADES_VERSAO;
+  ok('quem ja leu ESTA versao nao ve de novo', S.conferirNovidades() === false && !g.novidadesModal);
+
+  contaLimpa(); g.novidadeVista = 'um-anuncio-velho';
+  ok('  mas quem leu um anuncio ANTIGO ve o novo', S.conferirNovidades() === true && g.novidadesModal === true,
+     'e isso que a VERSAO compra -- com um booleano de "ja viu" este seria o unico anuncio da vida do jogo');
+
+  /* ---- 3) fechar marca, grava na conta, e nao reabre ---- */
+  contaLimpa();
+  S.conferirNovidades();
+  S.fecharNovidades();
+  ok('fechar marca como lido', g.novidadeVista === S.NOVIDADES_VERSAO && g.novidadesModal === false);
+  ok('  e grava na CONTA, com merge',
+     S.__escritas.some(e => e.dados && e.dados.novidadeVista === S.NOVIDADES_VERSAO && e.opcoes && e.opcoes.merge),
+     JSON.stringify(S.__escritas.map(e => e.dados)));
+  ok('  e nao reabre depois disso', S.conferirNovidades() === false);
+
+  /* ⚠️ O BOTAO PRINCIPAL TAMBEM MARCA: o que marca e ter LIDO, nao o caminho tomado -- senao quem
+     clica em "Ver as Ilhas" reencontra o anuncio na proxima vez que abrir a home. */
+  contaLimpa();
+  S.conferirNovidades();
+  S.novidadesIrParaAsIlhas();
+  ok('o botao que leva as ilhas tambem marca', g.novidadeVista === S.NOVIDADES_VERSAO && !g.novidadesModal);
+  ok('  e leva mesmo pras ilhas', g.screen === 'ilhas', 'tela: ' + g.screen);
+
+  /* ---- 4) o conteudo sai do ILHAS_COMO ---- */
+  contaLimpa(); S.conferirNovidades();
+  const modal = S.renderNovidadesModal();
+  ok('o anuncio lista as ' + S.ILHAS_LARANJA.length + ' ilhas',
+     S.ILHAS_LARANJA.every(i => modal.indexOf(i.nome) >= 0));
+  ok('  com o lider de cada uma', S.ILHAS_LARANJA.every(i => modal.indexOf(i.lider) >= 0));
+  ok('  e o jogo de cada uma', S.ILHAS_LARANJA.every(i => modal.indexOf(i.jogo) >= 0));
+  ok('  e o RESUMO de cada uma, palavra por palavra',
+     S.ILHAS_LARANJA.every(i => !S.ILHAS_COMO[i.id] || modal.indexOf(S.ILHAS_COMO[i.id].resumo) >= 0));
+
+  /* ⚠️ E ELE E DERIVADO: mexendo na TABELA o anuncio acompanha. Sem este caso, uma segunda lista
+     escrita a mao passaria em todos os de cima -- e divergiria no dia em que uma ilha trocasse
+     de jogo. E a mesma prova que a trava do asterisco dos status usa. */
+  const guardado = S.ILHAS_COMO.mikan.resumo;
+  S.ILHAS_COMO.mikan.resumo = 'Um resumo trocado so pra este caso.';
+  ok('  e o texto vem da TABELA, nao de uma copia',
+     S.renderNovidadesModal().indexOf('Um resumo trocado so pra este caso.') >= 0);
+  S.ILHAS_COMO.mikan.resumo = guardado;
+
+  /* ⚠️ ILHA SEM ENTRADA NO ILHAS_COMO NAO ENTRA: ali nao ha o que resumir. E a mesma regra que
+     faz o (i) do mapa nao aparecer nela. */
+  const semComo = S.ILHAS_COMO.pummelo;
+  delete S.ILHAS_COMO.pummelo;
+  const sem = S.renderNovidadesModal();
+  ok('  e a ilha sem resumo fica de fora', sem.indexOf('Pummelo') < 0);
+  ok('    e as outras continuam', sem.indexOf('Mikan') >= 0);
+  S.ILHAS_COMO.pummelo = semComo;
+
+  /* ---- 5) a tela ---- */
+  ok('o anuncio tem os dois botoes',
+     modal.indexOf('novidadesIrParaAsIlhas()') >= 0 && modal.indexOf('fecharNovidades()') >= 0);
+  ok('  e usa o modal-overlay da casa -- classe que nao existe nao da erro, so nao faz nada',
+     modal.indexOf('modal-overlay') >= 0 && modal.indexOf('novidades-box') >= 0);
+
+  /* ⚠️ TRES ANDARES: quem rola e a LISTA, nao a caixa -- senao os dois botoes caem fora da tela
+     (medido a 320px). Isso nao aparece em asserção de HTML nenhuma, entao a trava le o CSS. */
+  const css = (src.match(/\.novidades-box\{[^}]*\}/) || [''])[0];
+  const cssLista = (src.match(/\.novidades-lista\{[^}]*\}/) || [''])[0];
+  ok('  e a CAIXA e uma coluna com teto, nao um bloco que rola',
+     /max-height:85vh/.test(css) && /flex-direction:column/.test(css) && !/overflow-y:auto/.test(css), css);
+  ok('    e quem rola e a LISTA, com min-height:0',
+     /overflow-y:auto/.test(cssLista) && /min-height:0/.test(cssLista), cssLista);
+
+  /* ---- 6) o que o codigo tem que dizer (os casos chamam as funcoes na mao e passariam sem isso) ---- */
+  ok('os dois campos estao no CAMPOS_DA_CONTA',
+     S.CAMPOS_DA_CONTA.indexOf('novidadeVista') >= 0 && S.CAMPOS_DA_CONTA.indexOf('novidadesModal') >= 0,
+     'sem isso abrir um save apaga a marca e o anuncio volta');
+  ok('  e o carregamento da conta CONFERE o anuncio',
+     /conferirHM03\(\);[\s\S]{0,600}conferirNovidades\(\);/.test(src),
+     'a chamada ficou orfa');
+  ok('  e o render principal ANEXA o modal',
+     /if\(game\.novidadesModal\)\{ html \+= renderNovidadesModal\(\); \}/.test(src));
+  ok('  e a marca NAO vai pro save (e da conta, nao do save)',
+     JSON.stringify(S.serializeGame() || {}).indexOf('novidadeVista') < 0);
+}
+
 console.log(falhas ? '\n' + falhas + ' FALHA(S)' : '\nTudo certo.');
 process.exit(falhas ? 1 : 0);

@@ -501,5 +501,52 @@ console.log('=== E A LINHA DE TEXTO DO DRAFT SAIU ===');
      /Sua vez|escolhendo/.test(h2));
 }
 
+/* ============================================================================
+   O TITULO DA VEZ (21/09/2026, a pedido: "quando for a vez do usuario escolher os times,
+   apareca assim: Sua vez: Escolha 2 pokemons")
+
+   ⚠️ A TRAVA QUE IMPORTA NAO E A FRASE, E O NUMERO SER DERIVADO. Com o 2 escrito a mao o
+   titulo passaria nos dois casos nomeados ("2" na entrada da vez) e mentiria na segunda
+   metade de TODA vez do jogador -- e mentiria de novo no dia em que a SELECAO_ORDEM
+   tivesse um passo de 1 ou de 3. E a mesma armadilha do "Golpe repete entre 2-5x" e do
+   "Revezamento 900 m": texto fixo que descreve uma tabela envelhece com ela.
+   ============================================================================ */
+console.log('');
+console.log('=== O TITULO DIZ QUANTOS FALTAM NESTA VEZ ===');
+{
+  contaAdmin();
+  S.selecaoComecar();
+  const tituloAgora = () => ((S.renderSelecao().match(/<h2>([\s\S]*?)<\/h2>/) || [])[1] || '').trim();
+
+  /* o passo 0 da SELECAO_ORDEM e dela -- e ali o titulo continua sendo o nome dela */
+  S.selecao.passo = 0; S.selecao.restam = S.SELECAO_ORDEM[0][1];
+  ok('na vez dela o titulo e o nome dela', /escolhendo/.test(tituloAgora()), tituloAgora());
+  ok('  e nao diz Sua vez', tituloAgora().indexOf('Sua vez') < 0, tituloAgora());
+
+  /* a primeira vez do jogador: a SELECAO_ORDEM da 2, que e a frase do pedido */
+  S.selecao.passo = 1; S.selecao.restam = 2;
+  ok('na minha vez com 2 faltando, a frase do pedido',
+     tituloAgora() === 'Sua vez: Escolha 2 pokémons', tituloAgora());
+
+  /* ⚠️ ESCOLHIDO O PRIMEIRO DO PAR, O TITULO ANDA -- e o plural anda junto */
+  S.selecao.restam = 1;
+  ok('  e com 1 faltando ele ANDA, no singular',
+     tituloAgora() === 'Sua vez: Escolha 1 pokémon', tituloAgora());
+
+  /* ⚠️ E ELE SEGUE O ESTADO, nao o numero 2: um passo de 3 diria 3. E este caso que um texto
+     fixo NAO passa -- os dois de cima ele passaria se a frase fosse escrita a mao com o 2. */
+  S.selecao.restam = 3;
+  ok('  e um passo de 3 diria 3 -- o numero sai do estado, nao do texto',
+     tituloAgora() === 'Sua vez: Escolha 3 pokémons', tituloAgora());
+
+  /* e pelo caminho de verdade: escolher UM no meio do par move o titulo sozinho */
+  S.selecao.passo = 1; S.selecao.restam = 2;
+  const antes = tituloAgora();
+  S.selecaoEscolher(S.selecao.pool.findIndex(p => !p.dono));
+  ok('  e escolher um DE VERDADE move o titulo',
+     antes.indexOf(' 2 ') >= 0 && tituloAgora().indexOf(' 1 ') >= 0,
+     antes + ' -> ' + tituloAgora());
+}
+
 console.log(falhas ? '\n' + falhas + ' FALHA(S)' : '\nTudo certo.');
 process.exit(falhas ? 1 : 0);

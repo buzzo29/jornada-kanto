@@ -3135,6 +3135,25 @@
   .ilhas-mapa .ilha-info:hover{background:#eab949;}
   .ilha-como{margin:6px 0 10px;padding-left:18px;text-align:left;}
   .ilha-como li{font-size:.72rem;line-height:1.35;margin-bottom:5px;}
+  /* O ANUNCIO DAS NOVIDADES (ver conferirNovidades).
+     ⚠️ SAO TRES ANDARES -- topo, miolo que cede, rodape colado --, e nao a caixa inteira rolando
+     como a das Variacoes do Unown. A diferenca e que la o unico botao e Fechar e aqui o principal
+     LEVA a outro lugar: medido a 320px, com a caixa rolando inteira os dois botoes caiam abaixo
+     dos 568 da tela, e o jogador teria que rolar pra descobrir que existe um. E o desenho da loja
+     e do quadro da notificacao, pela mesma razao que esta escrita la. */
+  .novidades-box{max-height:85vh;display:flex;flex-direction:column;}
+  /* ⚠️ `min-height:0` num filho de flex que rola: sem ele o item NAO encolhe abaixo do conteudo e
+     a caixa estoura o teto -- a mesma familia do `1fr` que nao encolhe. */
+  .novidades-lista{list-style:none;margin:10px 0;padding:0;text-align:left;
+    flex:1 1 auto;min-height:0;overflow-y:auto;}
+  /* ⚠️ `minmax(0,1fr)` e nao `1fr`: `1fr` e `minmax(auto,1fr)` e NAO encolhe abaixo do conteudo,
+     entao um resumo comprido empurraria a linha pra fora dos 320px -- a armadilha que a fileira
+     de cinco cards da home e o placar da Pescaria ja pagaram. */
+  .novidades-lista li{display:grid;grid-template-columns:22px minmax(0,1fr);gap:8px;
+    align-items:start;margin-bottom:10px;}
+  .novidades-lista .selo{width:20px;height:20px;vertical-align:0;}
+  .novidades-lista b{display:block;font-size:.7rem;line-height:1.3;}
+  .novidades-lista .novidades-resumo{display:block;font-size:.66rem;line-height:1.35;color:var(--muted);}
   .ilhas-mapa .ilha-selo{display:block;line-height:46px;font:800 18px/46px var(--font-ui);}
   .ilhas-mapa .ilha-selo .selo-ilha{width:26px;height:26px;vertical-align:-6px;}
   .ilhas-mapa .ilha-nome{position:absolute;top:47px;left:50%;transform:translateX(-50%);
@@ -7832,6 +7851,7 @@ async function loadPermanentUserData(){
     game.contaCarregada = true;
     game.rivalNameDefault = d.rivalNameDefault || '';   // preenche a tela de nome do rival (ver nomeDoRivalPadrao)
     game.hms = Array.isArray(d.hms) ? d.hms : [];       // as Máquinas Ocultas são da CONTA (ver darHM)
+    game.novidadeVista = d.novidadeVista || null;       // o último anúncio que esta conta leu (ver conferirNovidades)
     game.visitouOsNinhos = !!d.visitouOsNinhos;         // a visita aos ninhos também (ver visitarOsNinhos)
     game.aposentados = Array.isArray(d.aposentados) ? d.aposentados : [];   // ver aposentarOTime
     /* AS LETRAS DO UNOWN, mais a rede de seguranca: alem do registro feito na captura, varre os
@@ -7901,6 +7921,10 @@ async function loadPermanentUserData(){
        Ele vem DEPOIS de o `game.permanentPokedex` e o `game.hms` serem escritos, senão a condição
        leria uma Pokédex vazia e o `temHM` não saberia que ele já foi dado. */
     conferirHM03();
+    /* ⚠️ DEPOIS do `game.ehAdmin` e do `game.contaCarregada`, que é o que ele pergunta -- e por
+       isso ele mora aqui e não no `openSaveSelect`: ali os dois ainda não existem. Quem redesenha
+       é o `.then()` do `Promise.all` da home, que já chama `render()` quando a tela é a home. */
+    conferirNovidades();
   } catch(e){ console.error('Erro ao carregar dados permanentes da conta:', e); }
 }
 async function recordLeagueChampionWin(name, uid, typeId){
@@ -17817,7 +17841,11 @@ const CAMPOS_DA_CONTA = [
      17 antes da feature), e aí o jogador está na home. Sem ele aqui, abrir um save apagaria a marca
      -- e o aviso não voltaria NUNCA, porque o `conferirHM03` vê o `temHM` e vai embora. Ele fica
      FORA do `serializeGame` (que é uma lista de permissão): é estado de tela, não vai pro banco. */
-  'hmGanhoModal'
+  'hmGanhoModal',
+  /* ⚠️ O ANÚNCIO DAS NOVIDADES: `novidadeVista` é a marca de quem já leu (da CONTA, como o `hms`)
+     e `novidadesModal` é o estado de tela. Sem os dois aqui o `resetGame` os apagaria ao abrir um
+     save, e o anúncio voltaria a aparecer pra quem já o leu. Ver conferirNovidades. */
+  'novidadeVista','novidadesModal'
 ];
 function snapshotDaConta(){
   const o = {};
@@ -34608,7 +34636,16 @@ function renderSelecao(){
     const dele = selecao.pool.filter(p => p.dono === 'npc').length;
     return cabeca + `
     <div class="box cursor">
-      <h2>${minha ? 'Sua vez' : escapeHtmlSafe(ilha.lider) + ' está escolhendo…'}</h2>
+      ${/* ⚠️ O NÚMERO SAI DO selecao.restam, nunca escrito à mão (21/09/2026, a pedido: "quando
+           for a vez do usuário escolher os times, apareça assim: Sua vez: Escolha 2 pokemons").
+           Ele é quantos FALTAM nesta vez, e o selecaoDescontar o move: escolhido o primeiro do
+           par, o título passa a dizer "Escolha 1 pokémon" -- que é o que o jogador quer saber ali.
+           Com o 2 fixo ele mentiria na segunda metade de TODA vez, e mentiria de novo no dia em
+           que a SELECAO_ORDEM tivesse um passo de 1 ou de 3 -- a mesma armadilha do "Golpe repete
+           entre 2-5x" e do "Revezamento 900 m": texto fixo que descreve uma tabela envelhece com
+           ela. O plural acompanha pela mesma razão. */''}
+      <h2>${minha ? 'Sua vez: Escolha ' + selecao.restam + ' pokémon' + (selecao.restam === 1 ? '' : 's')
+                  : escapeHtmlSafe(ilha.lider) + ' está escolhendo…'}</h2>
       ${/* ⚠️ A LINHA DE TEXTO SAIU (21/09/2026, a pedido) -- ela dizia quantos faltam, quantos cada
            um tem e a faixa de nível. As DUAS FILEIRAS abaixo contam as mesmas três coisas melhor:
            o time se monta na frente do jogador, e o nível está escrito em cada sprite. */''}
@@ -34982,6 +35019,88 @@ function renderIlhas(){
   ${ilhasMapaHtml()}
   <button class="btn" onclick="sairDasIlhas()">⬅ Voltar</button>
   ${renderIlhaInfoModal()}`;
+}
+
+/* ------------------------------------------------------------------
+   O ANÚNCIO DAS NOVIDADES NA HOME (21/09/2026, a pedido: *"quando os usuários abrirem o jogo pela
+   primeira vez, coloque para exibir um modal na tela home com os updates, fale das ilhas laranjas
+   e de um breve resumo sobre cada ilha"*).
+
+   ⚠️ ELE APARECE SÓ PRA QUEM TEM `admin === true`, e essa foi a decisão desta feature. As Ilhas
+   Laranja são administrativas: o botão da home só existe pra admin e as SEIS portas (o `abrirIlhas`
+   mais os cinco jogos) recusam quem não é. Anunciá-las a todo mundo seria anunciar cinco jogos que
+   ninguém consegue abrir -- o jogador leria o modal e procuraria na home um botão que não está lá.
+   O anúncio chega a quem consegue entrar, e no dia em que as ilhas abrirem é UMA LINHA aqui.
+   ⚠️ E ENQUANTO A CONTA NÃO CARREGOU ele não nasce, exatamente como o botão -- e aqui o lado seguro
+   é o CONTRÁRIO do da porta dos modos de campeão: mostrar um anúncio administrativo a quem não é
+   admin, mesmo por meio segundo, é pior que atrasá-lo meio segundo pra quem é.
+
+   ⚠️ A MARCA É A VERSÃO DO ANÚNCIO, nunca um booleano de "já viu". Com um booleano este seria o
+   único anúncio da vida do jogo: o próximo update não teria como reaparecer, e alguém teria que
+   limpar o campo de todas as contas na mão. Com a versão, o próximo é uma linha nesta constante --
+   e conta nova, que não tem campo nenhum, vê este.
+
+   ⚠️ E O CAMPO É DA CONTA (`users/{uid}.novidadeVista`), não do save: quem leu não pode reler ao
+   abrir outro save. É a mesma razão do `hms` e do `visitouOsNinhos` -- e, como eles, ele é registro
+   de LEITURA e não poder de compra, então continua LIVRE pro dono no `firestore.rules`: não houve
+   uma linha a mexer nas regras nem no servidor.
+
+   ⚠️ E O RESUMO DE CADA ILHA SAI DO `ILHAS_COMO`, nunca escrito aqui. Uma segunda lista divergiria
+   dela no dia em que uma ilha nascesse ou trocasse de jogo -- é a mesma razão pela qual aquele
+   texto mora na tabela, ao lado do nome e do líder. Ilha sem entrada lá não entra no anúncio,
+   porque ali não há o que resumir. */
+const NOVIDADES_VERSAO = 'ilhas-laranja';
+/* ⚠️ A GUARDA DE TELA É A HOME, e ela é necessária: o `loadPermanentUserData` roda também ao abrir
+   a Pokédex e as Conquistas, e o pedido diz "na tela home". Sem ela o anúncio nasceria por cima de
+   outra tela -- e um modal cobre a tela inteira. */
+function conferirNovidades(){
+  if(game.screen !== 'saveSelect') return false;
+  if(!game.contaCarregada || game.ehAdmin !== true) return false;
+  if(game.novidadeVista === NOVIDADES_VERSAO) return false;
+  game.novidadesModal = true;
+  return true;
+}
+/* ⚠️ LER É O QUE MARCA, e a gravação é best-effort (o molde do `darHM` e do rival padrão): se ela
+   falhar, o anúncio volta na próxima abertura -- que é o lado certo pra errar, porque ver duas
+   vezes é melhor que nunca ver. O `game` é escrito NA HORA pra ele não reabrir nesta sessão mesmo
+   que o banco não confirme. */
+function marcarNovidadesLidas(){
+  game.novidadesModal = false;
+  game.novidadeVista = NOVIDADES_VERSAO;
+  if(game.authUser){
+    userDocRef(game.authUser.uid).set({ novidadeVista: NOVIDADES_VERSAO }, { merge: true })
+      .catch(e => console.error('Erro ao gravar as novidades lidas:', e));
+  }
+}
+function fecharNovidades(){ marcarNovidadesLidas(); render(); }
+/* fecha E vai pras ilhas: o anúncio é sobre um modo que tem botão logo atrás dele, e fazer o
+   jogador fechar pra depois procurar o botão seria uma volta a mais. Os DOIS botões marcam como
+   lido -- o que marca é ter LIDO, não o caminho tomado. O `abrirIlhas` já redesenha. */
+function novidadesIrParaAsIlhas(){ marcarNovidadesLidas(); abrirIlhas(); }
+function renderNovidadesModal(){
+  const linhas = ILHAS_LARANJA.map(ilha => {
+    const como = ILHAS_COMO[ilha.id];
+    if(!como) return '';
+    return `<li>
+      <span>${ilha.selo ? selo(ilha.selo) : ''}</span>
+      <span>
+        <b>${escapeHtmlSafe(ilha.nome)} · ${escapeHtmlSafe(ilha.lider)} — ${escapeHtmlSafe(ilha.jogo)}</b>
+        <span class="novidades-resumo">${escapeHtmlSafe(como.resumo)}</span>
+      </span>
+    </li>`;
+  }).join('');
+  const quantas = ILHAS_LARANJA.filter(i => ILHAS_COMO[i.id]).length;
+  return `
+  <div class="modal-overlay" onclick="fecharNovidades()">
+    <div class="modal-box novidades-box" onclick="event.stopPropagation()">
+      <div class="modal-icon">${selo('ilhas')}</div>
+      <h2>Novidades</h2>
+      <p>As <strong>Ilhas Laranja</strong> abriram — ${quantas} desafios novos:</p>
+      <ul class="novidades-lista">${linhas}</ul>
+      <button class="btn primary" onclick="novidadesIrParaAsIlhas()">Ver as Ilhas Laranja</button>
+      <button class="btn secondary" onclick="fecharNovidades()">Fechar</button>
+    </div>
+  </div>`;
 }
 
 const PESCARIA_ILHA_SVG = '<svg class="island-art" viewBox="0 0 360 380" shape-rendering="crispEdges" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">' + ILHA_DEFS + '<rect width="360" height="380" fill="url(#sea)"/><path d="M102 55h92v13h40v24h26v32h30v32h12v104h-20v36h-38v28h-35v22h-68v-18H94v-22H64v-35H48V146h18v-38h18V75h18Z" fill="#57bdc6"/><path d="M108 66h79v14h40v23h24v32h29v27h12v93h-20v32h-36v28h-33v22h-57v-18H101v-22H76v-35H60V151h18v-38h18V84h12Z" fill="url(#sand)" stroke="#c7f0d0" stroke-width="4"/><path d="M113 91h66v12h38v23h23v32h25v28h12v57h-22v32h-31v25h-28v18h-42v-20h-42v-23H92v-37H78v-65h17v-38h18Z" fill="#548f4a"/><path d="M113 86h66v12h38v23h23v32h25v28h12v57h-22v32h-31v25h-28v18h-42v-20h-42v-23H92v-37H78v-65h17v-38h18Z" fill="url(#grass)"/><path d="M167 312v-48h-17v-48h20v-39h-12v-29h31" fill="none" stroke="#e5cb8d" stroke-width="16"/><path d="M165 309v-44h-17v-48h20v-38" fill="none" stroke="#f4dda1" stroke-width="9"/><path d="M118 100h20V80h36v18h23v20h12v33h-18v10h-74v-18h-13v-25h14Z" fill="#9b9869" stroke="#626c54" stroke-width="3"/><path d="M118 101h20V81h36v18h23v19h-23v-8h-37v12h-19Z" fill="#d0c595"/><path d="M111 131h20m49 0h21m-60-37h26m-23 51h40" stroke="#777e5d" stroke-width="3"/><path d="M132 148v-19h5v-6h16v6h5v19Z" fill="#2a4247"/><path d="M199 144h16v26h-8v23h12v24h22v25h-18v-13h-20v-21h-12v-37h8Z" fill="#409dc3" stroke="#d3efd0" stroke-width="3"/><path d="M199 173h10v26h-10Z" fill="#e6fbec"/><path d="M201 176v20m5-20v20" stroke="#83d5e3" stroke-width="2"/><path d="M192 168h22v7h-22m0 26h22v6h-22" fill="#778e7c"/><g transform="translate(166 225)"><path d="M-24 0h48v31h-48" fill="#58655c"/><path d="M-22 0h44v27h-44" fill="#eee8c2"/><path d="M-28-2v-10h5v-8h46v8h5v10Z" fill="#a84547"/><path d="M-23-17h46v6h5v6h-51Z" fill="#e56b5a"/><path d="M-21-14h42m-42 6h45" stroke="#f29274" stroke-width="2"/><path d="M-17 7h9v9h-9m25-9h9v9H8" fill="#559dae" stroke="#4b6972" stroke-width="2"/><path d="M-5 11H5v16H-5Z" fill="#496274"/><rect x="-6" y="-7" width="12" height="11" fill="#fff5d7"/><path d="M-3-5h6v3h-6m-3 1H6" stroke="#d65756" stroke-width="2"/></g><path d="M163 311h25v48h-25Z" fill="#8c653f" stroke="#584d39" stroke-width="2"/><path d="M165 315h21m-21 7h21m-21 7h21m-21 7h21m-21 7h21m-21 7h21" stroke="#d2a365" stroke-width="4"/><path d="M158 313h5v7h-5m30-7h5v7h-5m-30 28h5v9h-5m30-9h5v9h-5" fill="#5b5039"/><use href="#tree" x="105" y="162"/><use href="#tree" x="128" y="175"/><use href="#tree" x="102" y="195"/><use href="#tree" x="120" y="225"/><use href="#tree" x="108" y="253"/><use href="#tree" x="135" y="276"/><use href="#tree" x="241" y="168"/><use href="#tree" x="251" y="195"/><use href="#tree" x="241" y="258"/><use href="#tree" x="221" y="282"/><use href="#palm" x="90" y="286"/><use href="#palm" x="208" y="318"/><use href="#palm" x="270" y="264"/><use href="#rock" x="63" y="109"/><use href="#rock" x="306" y="277"/><use href="#rock" x="322" y="292"/><use href="#rock" x="287" y="315"/><path d="M91 232h5v-9m-11 8h5v-8m-8 12h15m173-2h5v-9m-10 12h5v-6" stroke="#38845a" stroke-width="2"/><g fill="#fff4b6"><rect x="147" y="184" width="3" height="3"/><rect x="152" y="190" width="3" height="3"/><rect x="219" y="257" width="3" height="3"/></g><path d="M275 224h5v-10m-5 6h-5v-5m10 9h5v-7" stroke="#ec9a95" stroke-width="3"/><rect x="10" y="10" width="118" height="31" rx="2" fill="#164d67" opacity=".92"/><text x="18" y="23" fill="#fff4c8" font-family="monospace" font-weight="bold" font-size="10">ILHA MIKAN</text><text x="18" y="34" fill="#b7e6e4" font-family="monospace" font-size="7">ARQUIPÉLAGO LARANJA</text></svg>';
@@ -37946,6 +38065,10 @@ function render(){
   if(game.maquinaAptos){ html += renderAptosModal(); }
   if(game.aposentarPergunta){ html += renderAposentadoriaModal(); }
   if(game.hmGanhoModal){ html += renderHmGanhoModal(); }
+  /* AS NOVIDADES: nascem só na home (o `conferirNovidades` guarda a tela), então a ordem aqui não
+     disputa com ninguém -- ficam antes do convite online pela razão de sempre: ele tem 15 segundos
+     de prazo e precisa ficar por cima de tudo. */
+  if(game.novidadesModal){ html += renderNovidadesModal(); }
   if(game.onlinePendente){ html += renderConviteModal(); }   // aparece por cima de qualquer tela
   if(game.desafioAviso){ html += renderAvisoDesafioModal(); }   // desafio de amigo, idem
   html += renderAvisoDeSaveHtml();   // "não estou conseguindo salvar" -- por cima de tudo

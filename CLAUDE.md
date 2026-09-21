@@ -14565,6 +14565,118 @@ os três velhos, a tabela (líderes casando com a Corrida, `abrir` sendo funçã
 ilhas), a ação recusando, o mapa, o pino DERIVADO do centro, os defs numa cópia só, e a volta.
 **Conferido que ele acusa os 7 defeitos religados.**
 
+## O ANÚNCIO DAS NOVIDADES NA HOME (21/09/2026)
+
+Pedido assim: *"quando os usuários abrirem o jogo pela primeira vez, coloque para exibir um modal
+na tela home com os updates, fale das ilhas laranjas e de um breve resumo sobre cada ilha"*.
+
+### ⚠️ ELE APARECE SÓ PRA QUEM É ADMIN, e essa é a decisão que o pedido obrigou a tomar
+
+As Ilhas Laranja são **administrativas**: o botão da home só existe com `admin === true` e as
+**SEIS** portas (o `abrirIlhas` mais os cinco jogos) recusam quem não é. Então um anúncio pra "os
+usuários" falando delas **anunciaria cinco jogos que ninguém consegue abrir** — o jogador leria o
+modal e procuraria na home um botão que não está lá.
+
+Perguntado antes de escrever, com as três saídas medidas em custo (abrir as ilhas pra todos /
+anunciar como "em breve" / anunciar só pra quem entra), **a escolha foi a terceira**. O anúncio
+chega a quem consegue entrar, e **no dia em que as ilhas abrirem é uma linha** no
+`conferirNovidades`.
+
+- **⚠️ E ENQUANTO A CONTA NÃO CARREGOU ele não nasce**, exatamente como o botão — e aqui o lado
+  seguro é o **CONTRÁRIO** do da porta dos modos de campeão, que erra pro lado de DEIXAR ENTRAR:
+  mostrar um anúncio administrativo a quem não é admin, mesmo por meio segundo, é pior que
+  atrasá-lo meio segundo pra quem é.
+- **⚠️ É `=== true`, exatamente o booleano:** `'sim'`, `1`, `'true'` e `''` **não** abrem. É a
+  mesma régua da porta das ilhas, e há caso de teste pros oito valores.
+- **⚠️ E SÓ NA HOME**: o `loadPermanentUserData` roda também ao abrir a **Pokédex** e as
+  **Conquistas**, e um modal cobre a tela inteira. Sem a guarda de tela o anúncio nasceria por cima
+  de outra — há caso pras quatro telas.
+
+### ⚠️ A MARCA É A VERSÃO DO ANÚNCIO, NUNCA UM BOOLEANO DE "JÁ VIU"
+
+Com um booleano este seria o **único anúncio da vida do jogo**: o próximo update não teria como
+reaparecer, e alguém teria que limpar o campo de todas as contas na mão. Com a versão
+(`NOVIDADES_VERSAO`), o próximo é **uma linha** — e conta nova, que não tem campo nenhum, vê este.
+
+- **⚠️ O CAMPO É DA CONTA** (`users/{uid}.novidadeVista`), **não do save**: quem leu não pode reler
+  ao abrir outro save. É a mesma razão do `hms` e do `visitouOsNinhos` — e, como eles, ele é
+  registro de **LEITURA** e não poder de compra, então continua **LIVRE pro dono** no
+  `firestore.rules`: **não houve uma linha a mexer nas regras nem no servidor**.
+- **⚠️ E OS DOIS CAMPOS ENTRARAM NO `CAMPOS_DA_CONTA`** (`novidadeVista` e o `novidadesModal` de
+  tela): sem isso o `resetGame` os apagaria ao abrir um save e o anúncio voltaria pra quem já leu.
+  É a lição do `hms`, do `visitouOsNinhos` e do `hmGanhoModal`.
+- **A gravação é best-effort** (o molde do `darHM` e do rival padrão): falhando, o anúncio volta na
+  próxima abertura — **que é o lado certo pra errar**, porque ver duas vezes é melhor que nunca
+  ver. O `game` é escrito **na hora** pra ele não reabrir nesta sessão mesmo sem a confirmação.
+- **OS DOIS BOTÕES MARCAM COMO LIDO** — o que marca é ter **LIDO**, não o caminho tomado. Sem isso
+  quem clica em "Ver as Ilhas" reencontraria o anúncio na próxima vez que abrisse a home.
+
+### ⚠️ O RESUMO DE CADA ILHA SAI DO `ILHAS_COMO`, NUNCA ESCRITO NO MODAL
+
+Ele já existia, ao lado do nome e do líder — é o mesmo texto que o **(i)** do mapa mostra. Uma
+segunda lista divergiria dela no dia em que uma ilha nascesse ou trocasse de jogo, que é
+literalmente a razão pela qual aquele campo mora na tabela. **Ilha sem entrada lá não entra no
+anúncio**, porque ali não há o que resumir — a mesma regra que faz o (i) não aparecer nela.
+
+A trava que prova isso **mexe no resumo da tabela e cobra que o modal acompanhe**: sem esse caso,
+uma cópia escrita à mão passaria em todos os outros.
+
+### ⚠️ TRÊS ANDARES, E NÃO A CAIXA INTEIRA ROLANDO
+
+O padrão dos modais compridos da casa é `max-height:85vh; overflow-y:auto` na caixa (as Variações
+do Unown, os aptos do TM, a lista da rota) — e **aqui ele não serve**: lá o único botão é *Fechar*,
+e aqui o principal **LEVA a outro lugar**.
+
+**Medido a 320×568 com a caixa rolando inteira: os DOIS botões caíam abaixo da tela** — o jogador
+teria que rolar pra descobrir que existe um. Hoje é o desenho da **loja** e do quadro da
+**notificação**: topo, miolo que cede, rodapé colado.
+
+- **⚠️ `min-height:0` no filho de flex que rola** — sem ele o item **não encolhe** abaixo do
+  conteúdo e a caixa estoura o teto. É a mesma família do `1fr` que não encolhe.
+- **⚠️ E O MIOLO CEDE ATÉ SUMIR:** na primeira medição a lista ficou com **45px — UMA linha de
+  cinco**. Não foi o flex que estava errado, foi o conteúdo ser grande demais pra 568px. O que
+  saiu foi o que a própria lista já dizia.
+
+**O QUE FOI CORTADO, e por quê:**
+
+| | ganho |
+|---|---|
+| o `<h2>` foi de *"Novidades: as Ilhas Laranja"* pra **"Novidades"** | **27px** — na fonte de PIXEL o título longo quebra em duas linhas a 320px, e quem nomeia as ilhas é a frase logo abaixo |
+| a frase de abertura encurtou pra *"As **Ilhas Laranja** abriram — 5 desafios novos:"* | 21px |
+| **saiu** o rodapé que explicava o **ⓘ** do mapa | **57px** — mais de uma linha de ilha, e ele contava uma coisa que a tela das ilhas conta no instante em que o jogador chega lá |
+
+**MEDIDO NO NAVEGADOR depois dos cortes:**
+
+| | 320×568 | 390×844 (iPhone 16e) |
+|---|---|---|
+| modal | **265×483px** | 335×589px |
+| a lista mostra | **2,9 de 5** ilhas, rolando | **as 5 inteiras** (251 de 251) |
+| os dois botões | **dentro da tela** | dentro da tela |
+| rolagem lateral | **nenhuma** (305 de 320) | nenhuma |
+| linha de ilha | 43px, nenhum nome truncado, nenhum resumo cortado | — |
+
+- **⚠️ E O SELO DE CADA ILHA SÓ APARECEU NA SEGUNDA CAPTURA.** A primeira saiu com as cinco linhas
+  **sem ícone** — e não era o código: o `montarSelos()` injeta o `<svg>` dos símbolos no
+  `document.body` **de verdade**, e a página de prévia é montada pelo sandbox, que não tem body.
+  A prévia passou a injetá-los na mão. **Quem for medir uma tela com selo fora do jogo precisa
+  disso, senão todo `<use href="#s-x">` sai vazio** — e isso se lê como um defeito que não existe.
+
+### O QUE ISSO CUSTOU AO JOGO: NADA
+
+**`MOTOR d159ac3d1cb5 / DIARIO a0c57e0f0362`, idêntico** ao build anterior em 900 batalhas
+semeadas — **e o instrumento é sensível**: a mesma medição com o `CRIT_BASE` mexido muda os dois
+hashes. Sem essa segunda metade, um hash que nunca muda não prova nada.
+
+`tools/test-ilhas.js` ganhou **34 pontas**: o acesso nos 8 valores do campo, a conta carregando, as
+4 telas, a versão (quem leu não relê, quem leu uma ANTIGA vê), o fechar marcando e gravando **com
+merge**, o botão que leva às ilhas marcando também, o conteúdo derivado do `ILHAS_COMO` (com a
+tabela mexida), a ilha sem resumo ficando de fora, e — **lendo o código** — os dois campos no
+`CAMPOS_DA_CONTA`, a chamada não ficando órfã no `loadPermanentUserData`, o modal anexado ao render
+e a marca não indo pro save. **E, lendo o CSS**, os três andares — isso não aparece em asserção de
+HTML nenhuma, que é a lição do `[hidden]` que deixou o modal da contagem da Corrida preso na tela.
+
+**Conferido que os 9 defeitos religados acusam** (1 a 9 falhas cada).
+
 ## SELEÇÃO POKÉMON: O DRAFT DA ILHA KUMQUAT (21/09/2026)
 
 Pedido assim: *"vai ser uma batalha contra um líder, e vão ser sorteados 12 pokémons aleatoriamente,
@@ -14762,6 +14874,32 @@ que ordenar como ela ordena. De quebra a exclusão de quem não tem o campo pass
 
 **No motor, nada:** `MOTOR 385943f3e1fa / DIARIO 850af0fd1763`, idêntico em 900 batalhas semeadas.
 
+
+### O TÍTULO DO DRAFT DIZ QUANTOS FALTAM (21/09/2026)
+
+Pedido assim: *"na tela de escolher os pokemons na ilha kumquat, coloque para quando for a vez do
+usuário escolher os times, apareça assim: Sua vez: Escolha 2 pokemons"*. Ele era **"Sua vez"**, e a
+linha que dizia quantos faltavam tinha saído horas antes — as duas prévias de time a substituíram.
+
+**⚠️ O NÚMERO É DERIVADO DO `selecao.restam`, nunca escrito à mão — e é isso que a trava cobra.**
+Ele é **quantos FALTAM nesta vez**, e o `selecaoDescontar` o move: escolhido o primeiro do par, o
+título passa a dizer **"Escolha 1 pokémon"**, que é justamente o que o jogador quer saber ali.
+
+Com o **2 fixo** ele mentiria **na segunda metade de TODA vez** do jogador, e mentiria de novo no
+dia em que a `SELECAO_ORDEM` tivesse um passo de 1 ou de 3. É a mesma armadilha do
+*"Golpe repete entre 2-5x"*, do *"Revezamento · 900 m"* e da legenda das faixas do Resgate:
+**texto fixo que descreve uma tabela envelhece com ela.** O plural acompanha pela mesma razão.
+
+- **A vez DELA não mudou**: continua *"Luana está escolhendo…"*, e a caixa não muda de altura entre
+  as duas vezes — as duas frases caem em **2 linhas** na fonte de pixel.
+- **Medido a 320px:** o título em **243×44px (2 linhas)**, sem corte e sem rolagem lateral. O
+  antigo *"Sua vez"* era 1 linha, então a caixa ganhou 22px.
+
+**⚠️ E A TRAVA QUE IMPORTA NÃO É A FRASE, É O NÚMERO ANDAR.** Um texto fixo com o 2 passaria nos
+dois casos nomeados; o que ele **não** passa é o caso de `restam = 3`, e é ele que prova que o
+número sai do estado. Mais o caminho de verdade: escolher um de verdade no meio do par move o
+título sozinho (`Escolha 2 pokémons` → `Escolha 1 pokémon`). Conferido que o defeito religado
+derruba **3** travas.
 
 ## RESGATE POKÉMON -- o terceiro teste admin (20/09/2026)
 
