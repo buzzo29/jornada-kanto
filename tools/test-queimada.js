@@ -224,8 +224,15 @@ console.log('\n=== O BOTÃO ATACAR RECEBE O NOME DO GOLPE DO MOTOR ===');
   ok('e o número não dança entre duas leituras', a1.dano === a2.dano && a1.bruto === a2.bruto, a1.dano + ' de dano');
 
   ok('o ESPECIAL é o atk × 1,5', S.QUEIMADA_ESPECIAL_MULT === 1.5);
-  ok('  e a tela usa a constante, não um 1.5 solto',
-    /QUEIMADA_ESPECIAL_MULT/.test(src.slice(src.indexOf('function queimadaAtacar'), src.indexOf('function queimadaAtacar') + 1400)));
+  /* ⚠️ A FATIA VAI ATÉ O FIM DA FUNÇÃO, nunca um número de caracteres: ela era 1400 fixos, e o
+     bloco da munição empurrou a constante pra fora da janela -- a trava caiu com o código CERTO.
+     É a mesma armadilha da fatia vazia do `tentarGolpeEspecial`, e o `ok` do tamanho é o que
+     impede a outra metade dela (uma fatia que não lê nada e passa em branco). */
+  const fAtacar = (() => { const i = src.indexOf('function queimadaAtacar');
+    const j = src.indexOf(String.fromCharCode(10) + 'function ', i + 10);
+    return src.slice(i, j < 0 ? i + 3000 : j); })();
+  ok('  a fatia do queimadaAtacar tem o que ler', fAtacar.length > 400, fAtacar.length + ' chars');
+  ok('  e a tela usa a constante, não um 1.5 solto', /QUEIMADA_ESPECIAL_MULT/.test(fAtacar));
 }
 
 console.log('\n=== O DANO É COMPRIMIDO: NUNCA MENOS DE 2 NEM MAIS DE 8 GOLPES ===');
@@ -853,21 +860,32 @@ console.log('\n=== O QUE VOA NA ARENA É O DESENHO DO TIPO ===');
   ok('  e ele gira pra direção do voo',
      ops.indexOf('rotate') >= 0 && ops.indexOf('translate') >= 0);
 
-  /* ⚠️ O RASTRO É QUEM DIZ DE QUEM ELA É, e sem ele a leitura mais importante da tela se perde:
-     medido, os dois lados escolhem golpe do MESMO tipo em 8,9% dos pares -- quase uma partida em
-     onze com os dois desenhos iguais na quadra. */
-  /* ⚠️ E É UM `fill` DE CAMINHO, não um `fillRect`: a plaquinha do nome embaixo do pokémon usa a
-     MESMA cor (é de lá que ela veio), e sem separar os dois verbos a trava daria verde com a
-     cauda removida. */
-  ok('  e a cauda sai na cor do dono',
-     tintas.some(t => t.m === 'fill' && String(t.fill) === S.QUEIMADA_RASTRO_MEU),
-     S.QUEIMADA_RASTRO_MEU);
-  /* ⚠️ E ELE É OPACO -- a igualdade acima já cobra isso, e o comentário diz por quê: com alpha a
-     cor MISTURA com a areia, e medido na tela um rastro contra o outro cai de 1,70 para 1,44:1.
-     É justamente a discriminação entre os dois que carrega "de quem é a bola". */
-  ok('  e as duas cores de dono são diferentes',
-     S.QUEIMADA_RASTRO_MEU !== S.QUEIMADA_RASTRO_DELE,
-     S.QUEIMADA_RASTRO_MEU + ' x ' + S.QUEIMADA_RASTRO_DELE);
+  /* ⚠️ A CAUDA É A COR DO PRÓPRIO GOLPE, num tom mais fundo. Ela JÁ FOI a cor do DONO, e isso foi
+     reportado como *"um rabinho de outra cor"*: um matiz diferente atrás do símbolo não se lê como
+     rastro, se lê como um pedaço solto grudado nele.
+     ⚠️ E O QUE ELA RESOLVIA FOI MEDIDO ANTES DE SAIR: duas bolas no ar, de donos diferentes E do
+     mesmo tipo, acontecem em 3,15% dos quadros -- nos outros o desenho já separa e a direção do voo
+     diz o resto. */
+  const caudaDoTipo = S.queimadaCorDaCauda(b2.tipo);
+  ok('  e a cauda sai na cor do próprio golpe',
+     tintas.some(t => t.m === 'fill' && String(t.fill) === caudaDoTipo),
+     S.TYPE_COLORS[b2.tipo] + ' -> ' + caudaDoTipo);
+  ok('    e ela é mais ESCURA que a bola, não de outro matiz', (() => {
+    const par = (h) => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+    const lum = (h) => { const [r, g, bb] = par(h).map(v => { v /= 255;
+        return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); });
+      return 0.2126 * r + 0.7152 * g + 0.0722 * bb; };
+    return lum(caudaDoTipo) < lum(S.TYPE_COLORS[b2.tipo]);
+  })(), 'a cor crua é ' + S.TYPE_COLORS[b2.tipo]);
+  /* ⚠️ E A COR DO DONO NÃO VOLTA: a bola inteira é de uma cor só, e é isso que a faz ler como UM
+     objeto. Duas bolas de donos diferentes com o MESMO tipo saem iguais de propósito -- quem as
+     separa é a direção do voo. */
+  ok('    e a cauda não depende de quem atirou', (() => {
+    const meu = { tipo: b2.tipo, dono: 0 }, dele = { tipo: b2.tipo, dono: 1 };
+    return S.queimadaCorDaCauda(meu.tipo) === S.queimadaCorDaCauda(dele.tipo);
+  })());
+  ok('    e as constantes de cor de dono não existem mais',
+     src.indexOf('QUEIMADA_RASTRO_MEU') < 0 && src.indexOf('QUEIMADA_RASTRO_DELE') < 0);
 
   /* ⚠️ E OS 17 TIPOS TÊM O QUE VOAR: um tipo sem desenho cai no disco de reserva, e aí o pedido
      deixa de valer PRA AQUELE. A trava varre a tabela em vez de nomear tipos. */
@@ -911,9 +929,13 @@ console.log('\n=== E OS 17 TIPOS SÃO LEGÍVEIS NA QUADRA ===');
   const somem = Object.entries(S.TYPE_COLORS).filter(([, c]) => k(c, areia) < 2).map(([t]) => t);
   ok('  e o contorno não é enfeite: ' + somem.length + ' tipos sumiriam na areia sem ele',
      somem.length > 0, somem.slice(0, 4).join(','));
-  ok('  e os dois rastros se leem na areia',
-     k(S.QUEIMADA_RASTRO_MEU, areia) >= 2.5 && k(S.QUEIMADA_RASTRO_DELE, areia) >= 2.5,
-     k(S.QUEIMADA_RASTRO_MEU, areia).toFixed(2) + ':1 e ' + k(S.QUEIMADA_RASTRO_DELE, areia).toFixed(2) + ':1');
+  /* ⚠️ E A CAUDA DE CADA TIPO SE LÊ NA AREIA -- é por isso que o tom é mais ESCURO e não mais
+     claro: medido, 30% mais clara some em 11 dos 17 tipos e a cor crua some em 5. */
+  const caudasFracas = Object.entries(S.TYPE_COLORS)
+    .filter(([t]) => k(S.queimadaCorDaCauda(t), areia) < 1.6).map(([t]) => t);
+  ok('  e a cauda dos 17 tipos se lê na areia', caudasFracas.length === 0,
+     caudasFracas.join(',') || 'a pior é ' + Math.min.apply(null,
+       Object.keys(S.TYPE_COLORS).map(t => +k(S.queimadaCorDaCauda(t), areia).toFixed(2))) + ':1');
 }
 
 /* ============================================================================
@@ -952,6 +974,182 @@ console.log('\n=== A TELA (lendo o CSS) ===');
   ok('  e a regra não encosta na Pescaria', src.indexOf('.q-placar .pesc-lado-info') > 0);
   ok('  e a tela pede a classe', html.indexOf('pesc-placar q-placar') > 0);
 }
+
+/* ============================================================================
+   18) A MUNIÇÃO DO ATACAR -- um pente que acaba, e uma recarga (21/09/2026)
+   ============================================================================ */
+console.log('\n=== O ATACAR TEM PENTE, E ELE ACABA ===');
+{
+  const [eu, ele] = await partida(0, 0);
+  S.queimada.t = 5; S.queimada.rodadaAte = 0;
+  ok('o pente nasce cheio', eu.municao === S.QUEIMADA_MUNICAO, eu.municao + ' tiros');
+  ok('  e o NPC também tem o dele', ele.municao === S.QUEIMADA_MUNICAO);
+
+  /* gasta o pente inteiro */
+  let saiu = 0;
+  for(let k = 0; k < S.QUEIMADA_MUNICAO + 5; k++){
+    eu.tiroPronto = 0;
+    const antes = S.queimada.bolas.length;
+    S.queimadaAtacar(0, false);
+    if(S.queimada.bolas.length > antes) saiu++;
+  }
+  ok('  e ele dá exatamente ' + S.QUEIMADA_MUNICAO + ' tiros', saiu === S.QUEIMADA_MUNICAO, saiu + ' tiros');
+  ok('  e o ' + (S.QUEIMADA_MUNICAO + 1) + 'º não sai', eu.municao === 0);
+  ok('  e a recarga abre na hora que ele esvazia',
+     Math.abs(eu.recargaAte - (S.queimada.t + S.QUEIMADA_RECARGA)) < 0.01,
+     'volta em ' + S.QUEIMADA_RECARGA + ' s');
+
+  /* ⚠️ A RECARGA É RESOLVIDA PELO PASSO, não pelo atacar: o HUD lê o número a cada quadro, e
+     resolvida dentro do `queimadaAtacar` ela só aconteceria no primeiro TOQUE depois de acabar. */
+  S.queimada.t = eu.recargaAte - 0.5;
+  S.queimadaPasso(0.01);
+  ok('  e ela NÃO volta antes da hora', eu.municao === 0, eu.municao);
+  S.queimada.t = eu.recargaAte + 0.01;
+  S.queimadaPasso(0.01);
+  ok('  e o passo devolve o pente cheio', eu.municao === S.QUEIMADA_MUNICAO && !eu.recargaAte,
+     eu.municao + ' tiros');
+
+  /* ⚠️ O ESPECIAL NÃO GASTA MUNIÇÃO: ele já tem a recarga de 45 s, e cobrar as duas coisas o
+     puniria duas vezes. Em troca ele vira o botão de emergência com o pente vazio. */
+  eu.municao = 0; eu.recargaAte = S.queimada.t + 5;
+  eu.especialPronto = 0; eu.tiroPronto = 0;
+  const antesEsp = S.queimada.bolas.length;
+  S.queimadaAtacar(0, true);
+  ok('  e o ESPECIAL sai mesmo com o pente vazio', S.queimada.bolas.length > antesEsp);
+  ok('    e ele não desconta do pente', eu.municao === 0);
+}
+
+console.log('\n=== E O PENTE ATRAVESSA A ELIMINAÇÃO ===');
+{
+  /* ⚠️ ELE ATRAVESSA, como a recarga do especial: medido, uma rodada leva ~4 tiros -- recarregado
+     a cada queda, o limite de 10 quase nunca chegaria a morder e a mecânica seria enfeite. */
+  const [eu, ele] = await partida(0, 0);
+  S.queimada.t = 5; S.queimada.rodadaAte = 0;
+  for(let k = 0; k < 6; k++){ eu.tiroPronto = 0; S.queimadaAtacar(0, false); }
+  const sobrou = eu.municao;
+  ok('gastou 6 do pente', sobrou === S.QUEIMADA_MUNICAO - 6, sobrou + ' de ' + S.QUEIMADA_MUNICAO);
+  ele.hp = 0;
+  S.queimadaEliminacao();
+  ok('  e depois da eliminação ele continua onde estava',
+     S.queimada.atores[0].municao === sobrou, S.queimada.atores[0].municao);
+}
+
+console.log('\n=== E O BOTÃO CONTA O PENTE ===');
+{
+  const [eu] = await partida(0, 0);
+  S.queimada.t = 5; S.queimada.rodadaAte = 0;
+  const dica = () => { S.queimadaPintarHud();
+    const el = S.document.getElementById('queimadaAtacarDica');
+    return el ? String(el.textContent || el.innerHTML || '') : ''; };
+  eu.tiroPronto = 0;
+  ok('cheio, ele mostra o pente', dica().indexOf(S.QUEIMADA_MUNICAO + '/' + S.QUEIMADA_MUNICAO) >= 0, dica());
+  for(let k = 0; k < 4; k++){ eu.tiroPronto = 0; S.queimadaAtacar(0, false); }
+  eu.tiroPronto = 0;
+  ok('  e ele conta pra baixo', dica().indexOf((S.QUEIMADA_MUNICAO - 4) + '/') >= 0, dica());
+  eu.municao = 0; eu.recargaAte = S.queimada.t + 7;
+  /* ⚠️ A RECARGA LONGA OCUPA A LINHA SOZINHA: ali o que o jogador precisa saber é quando ele volta,
+     e o dano é fixo a partida inteira. */
+  ok('  e a recarga ocupa a linha', /Recarregando/.test(dica()), dica());
+  /* e o botão desliga -- a tela não pode convidar pra uma ação que a AÇÃO recusa */
+  S.queimadaPintarHud();
+  const bt = S.document.getElementById('queimadaBtAtacar');
+  ok('  e o botão desliga com o pente vazio', !!(bt && bt.disabled));
+}
+
+/* ============================================================================
+   19) O NOME DA TELA E A TELA DE FIM (21/09/2026)
+   ============================================================================ */
+console.log('\n=== A TELA SE CHAMA ARENA 1X1 ===');
+{
+  await partida(0, 0);
+  const html = S.renderQueimada();
+  ok('o cabeçalho diz ARENA 1X1', html.indexOf('ARENA 1X1') >= 0);
+  /* ⚠️ E A ILHA DIZ O MESMO: é a tabela que alimenta o pino do mapa e o rótulo dele. */
+  const ilha = S.ILHAS_LARANJA.find(i => i.id === 'pummelo');
+  ok('  e a ilha dela também', ilha.jogo === 'Arena 1x1', ilha.jogo);
+  /* ⚠️ O QUE NÃO MUDOU FORAM OS NOMES DE CÓDIGO: renomeá-los seria churn em ~200 referências pra
+     trocar uma palavra que só aparece na tela. */
+  ok('  e o código não foi renomeado junto', typeof S.abrirQueimada === 'function'
+     && typeof S.QUEIMADA_MUNICAO === 'number');
+}
+
+console.log('\n=== A TELA DE FIM MOSTRA OS DOIS QUE SE ENFRENTARAM ===');
+{
+  const [a, b] = await partida(0, 0);
+  a.pontos = S.QUEIMADA_KOS; b.pontos = 1; a.devolucoes = 4;
+  S.queimadaTerminar();
+  const html = S.renderQueimada();
+  ok('ela desenha os DOIS lados', (html.match(/q-fim-lado/g) || []).length === 2);
+  ok('  com o sprite de cada um', (html.match(/sprite-img/g) || []).length >= 2);
+  /* ⚠️ ELES SE OLHAM: o da esquerda é espelhado. Dois sprites virados pro mesmo lado se leem como
+     uma fila, não como um duelo. */
+  ok('  e o da esquerda é espelhado', html.indexOf('sprite-flip') >= 0);
+  ok('  e o vencedor leva a medalha do pódio',
+     html.indexOf('#s-' + S.MEDALHA_DO_POSTO[0]) >= 0 && (html.match(/q-fim-lado ganhou/g) || []).length === 1);
+  ok('  e o placar de eliminações está nos dois',
+     (html.match(/q-fim-ko/g) || []).length === 2);
+  /* ⚠️ A LINHA DA VIDA RESTANTE SAIU (a pedido): o duelo é decidido por ELIMINAÇÕES, e o número do
+     último instante não diz nada -- o perdedor termina sempre em zero. */
+  ok('  e a linha da vida restante saiu', html.indexOf('HP final') < 0);
+  ok('  e a das devoluções ficou', /devolu/.test(html));
+
+  /* no EMPATE não sai medalha nenhuma -- ali não houve vencedor */
+  const c = S.queimada.atores;
+  /* ⚠️ O EMPATE PRECISA DO HP IGUAL TAMBÉM: com pontos iguais o `queimadaVencedor` desempata
+     pela vida, então só zerar os pontos ainda dá um vencedor. A trava estava certa; o fixture é
+     que não caía no caso que ele diz medir. */
+  c[0].pontos = 2; c[1].pontos = 2; c[0].hp = c[1].hp = 100;
+  const empate = S.renderQueimada();
+  ok('  e no empate ninguém leva medalha',
+     empate.indexOf('#s-' + S.MEDALHA_DO_POSTO[0]) < 0 && empate.indexOf('q-fim-lado ganhou') < 0);
+}
+
+
+/* ============================================================================
+   20) A BOLA MAIS RÁPIDA E O ESCUDO DOBRADO (21/09/2026)
+   ============================================================================ */
+console.log('\n=== O ESCUDO COBRE UMA FATIA ÚTIL DO VOO ===');
+{
+  /* ⚠️ A TRAVA NÃO FIXA OS DOIS NÚMEROS, ela cobra a RAZÃO -- que é o que decide se dá pra
+     defender. Fixados, eles envelheceriam no próximo ajuste de qualquer um dos dois, e a razão é
+     justamente o que o ajuste tem que preservar. */
+  const TRAVESSIA = 300;                       /* a quadra, de ponta a ponta */
+  const voo = TRAVESSIA / S.QUEIMADA_BOLA_V;
+  const cobre = (id, lv) => {
+    const i = S.createInstance(id, lv); i.hp = i.maxHp = S.calcMaxHp(i);
+    return S.queimadaJanelaDeGuarda(i) / voo;
+  };
+  const fraco = cobre('caterpie', 20), duro = cobre('shuckle', 60);
+  ok('até o corpo mais frágil consegue defender', fraco >= 0.25,
+     Math.round(fraco * 100) + '% do voo (Caterpie Lv.20)');
+  ok('  e o mais duro não cobre o voo inteiro', duro < 1,
+     Math.round(duro * 100) + '% do voo (Shuckle Lv.60)');
+  /* ⚠️ E A DEFESA ESPECIAL AINDA SEPARA OS DOIS: se o clamp engolisse todo mundo, o atributo que o
+     pedido original nomeia deixaria de decidir alguma coisa. */
+  ok('  e a Sp.Def ainda separa um do outro', duro > fraco * 1.5,
+     Math.round(fraco * 100) + '% contra ' + Math.round(duro * 100) + '%');
+
+  /* ⚠️ O ESPECIAL CONTINUA MAIS RÁPIDO QUE O COMUM -- ele subiu de 170 pra 255 e o especial ficou
+     em 280, então a margem encolheu. Se um dia o comum passar o especial, ele deixa de ser
+     "especial" em tudo menos no nome. */
+  ok('  e o especial continua mais rápido que o comum',
+     S.QUEIMADA_BOLA_V_ESP > S.QUEIMADA_BOLA_V,
+     S.QUEIMADA_BOLA_V + ' contra ' + S.QUEIMADA_BOLA_V_ESP);
+}
+
+console.log('\n=== E A PRIMEIRA TELA NÃO EXPLICA A FÓRMULA ===');
+{
+  await partida(0, 0);
+  S.queimada.fase = 'setup';
+  const html = S.renderQueimada();
+  /* ⚠️ O TEXTO TÉCNICO SAIU (a pedido): ele explicava de ONDE os três números vêm, e os três já
+     estão logo acima dele, cada um com o nome. */
+  ok('a tela não explica de onde vêm os números',
+     html.indexOf('vem da fórmula do jogo') < 0 && html.indexOf('os três com o nível dentro') < 0);
+  /* mas a ficha com os três continua lá -- é ela que responde "o que este pokémon é na quadra" */
+  ok('  e a ficha dos três continua', /ms de escudo/.test(html) && /px\/s/.test(html));
+}
+
   console.log(falhas ? '\n' + falhas + ' FALHA(S)' : '\nTudo certo.');
   process.exit(falhas ? 1 : 0);
 })();

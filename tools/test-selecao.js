@@ -306,15 +306,47 @@ console.log('\n=== A TELA ===');
   ok('  e com os ataques', (h.match(/selecao-golpes/g) || []).length === S.SELECAO_POOL);
   /* ⚠️ ORDENADOS POR PODER, o mais forte primeiro: num card de 12 candidatos o olho lê os dois
      primeiros, e ali tem que estar o que decide. */
-  ok('  e os ataques vêm do mais forte pro mais fraco', (() => {
-    const comGolpe = S.selecao.pool.find(x => (x.mon.ataques || []).length > 1);
-    if(!comGolpe) return true;
-    const pot = comGolpe.mon.ataques.map(S.poderEfetivo);
-    const html = S.selecaoGolpesHtml(comGolpe.mon);
-    const ordenado = comGolpe.mon.ataques.slice().sort((a, b) => S.poderEfetivo(b) - S.poderEfetivo(a));
-    return html.indexOf(S.nomeDoAtaque(ordenado[0])) < html.indexOf(S.nomeDoAtaque(ordenado[ordenado.length - 1]))
-        || pot[0] === pot[pot.length - 1];
-  })());
+  /* ⚠️ SÃO OS TRÊS MAIS FORTES desde 21/09/2026 (a pedido), e a trava mudou de forma junto: ela
+     procurava o golpe MAIS FRACO no HTML, e ele deixou de estar lá -- `indexOf` devolvia -1 e ela
+     caía com o código certo. Hoje ela cobra a regra: no máximo três, e eles são o topo da lista.
+     ⚠️ E O QUE O CARD ESCONDE FOI MEDIDO: o motor escolhe pelo DANO, então o golpe fraco quase
+     nunca sai -- o escolhido está fora dos três mais fortes em 2,0% dos pares. */
+  {
+    /* ⚠️ OS NOMES SÃO EXTRAÍDOS DO HTML, um por selo -- nunca procurados com `indexOf`: "Investida"
+       é SUBSTRING de "Investida Dupla", e com a busca por nome um golpe ESCONDIDO contava como
+       mostrado sempre que o nome dele fosse pedaço do nome de outro. Isso derrubava a trava ~1
+       rodada em 8, com o card certo o tempo todo. */
+    const nomesDoHtml = (html) => (html.match(/<span class="type-pill"[^>]*>([^<]*)<\/span>/g) || [])
+      .map(t => t.replace(/^[^>]*>/, '').replace(/<\/span>$/, ''));
+    const comGolpe = S.selecao.pool.find(x => (x.mon.ataques || []).length > 1) || S.selecao.pool[0];
+    const ordenado = (comGolpe.mon.ataques || []).slice()
+      .sort((a, b) => S.poderEfetivo(b) - S.poderEfetivo(a));
+    const mostrados = nomesDoHtml(S.selecaoGolpesHtml(comGolpe.mon));
+    ok('  e o card mostra no máximo ' + S.SELECAO_GOLPES_NO_CARD + ' golpes',
+       mostrados.length <= S.SELECAO_GOLPES_NO_CARD,
+       mostrados.length + ' de ' + ordenado.length);
+    /* ⚠️ E A COMPARAÇÃO PASSA PELO MESMO `escapeHtmlSafe` DO JOGO: o nome sai ESCAPADO no HTML, e
+       "Jato d'Água" vira "Jato d&#39;Água". Comparado com o nome cru, a trava caía ~1 rodada em 10
+       -- só nos bolos que sorteavam um golpe com apóstrofo. */
+    ok('  e eles são os mais fortes, do mais forte pro mais fraco',
+       mostrados.every((n, k) => n === S.escapeHtmlSafe(S.nomeDoAtaque(ordenado[k]))),
+       mostrados.join(' > '));
+    /* ⚠️ E QUEM TEM MAIS QUE TRÊS TEM MESMO ALGO DE FORA -- sem isso a trava acima passaria num bolo
+       que por acaso não tivesse ninguém com quatro golpes, e não mediria nada. */
+    const gordo = S.selecao.pool.find(x => (x.mon.ataques || []).length > S.SELECAO_GOLPES_NO_CARD);
+    if(gordo){
+      const vistos = nomesDoHtml(S.selecaoGolpesHtml(gordo.mon));
+      ok('  e o que sobra do topo fica de fora',
+         vistos.length === S.SELECAO_GOLPES_NO_CARD,
+         gordo.mon.ataques.length + ' golpes, ' + (gordo.mon.ataques.length - vistos.length) + ' fora');
+    }
+    /* ⚠️ E A BATALHA NÃO FOI TOCADA: o corte é do CARD. Cortar o moveset seria mexer no
+       balanceamento da ilha, que não foi o que se pediu. */
+    ok('  e o pokémon continua LEVANDO o moveset inteiro',
+       S.selecao.pool.every(x => (x.mon.ataques || []).length
+         === S.ataquesDisponiveis(x.mon.speciesId, x.mon.level).length),
+       'o card corta, o time não');
+  }
   /* ⚠️ QUEM JÁ FOI LEVADO NÃO SOME: ele apaga e ganha a faixa de quem levou. Sumindo, o jogador
      perderia a única coisa que um draft tem a contar -- o que o outro lado está montando. */
   const levados = S.selecao.pool.filter(p => p.dono).length;

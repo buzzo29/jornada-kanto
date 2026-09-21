@@ -15935,6 +15935,243 @@ POR TAMANHO -- ela comparava com o do tamanho comum.
 **Medido a 320px, no navegador:** os 17 desenhos giram e se leem na quadra, a página fica em
 **305×935px** sem rolagem lateral, e os botões continuam em 86×62.
 
+### AS CINCO DE 21/09/2026 -- a munição, o nome e o (i) das ilhas
+
+#### ⚠️ O ATACAR GANHOU UM PENTE DE 10, E ELE É A RÉGUA MAIS PESADA DESTE MODO
+
+Pedido assim: *"o usuário pode usar o atacar 10x seguidas, depois ele precisa recarregar, esperando
+10s para recarregar os ataques novamente"*.
+
+⚠️ **ELE É DIFERENTE DO `QUEIMADA_TIRO_RECARGA`, que já existia**: aquele é a CADÊNCIA entre dois
+tiros (0,85 s); este é um pente que ACABA. E os dois se multiplicam — é daí que sai o número que
+importa:
+
+| | |
+|---|---|
+| o pente inteiro, na cadência | 10 × 0,85 s = **8,5 s de fogo** |
+| a recarga | **5 s** |
+| ou seja, o jogador atira no máximo | **63% do tempo** |
+
+**⚠️ A RECARGA NASCEU EM 10 s E FOI A 5 NO MESMO DIA, a pedido — e a diferença é grande**, porque o
+ciclo é a razão entre os dois números:
+
+| ritmo do jogador | recarregando (10 s) | recarregando (5 s) | vitória (10 s) | vitória (5 s) |
+|---|---|---|---|---|
+| martelando o botão | 49% | **33%** | 98% | **95%** |
+| um tiro a cada 0,85 s | 50% | **33%** | 90% | **98%** |
+| um tiro a cada 1,2 s | 42% | **26%** | 80% | **88%** |
+| um tiro a cada 2 s | 31% | **18%** | 60% | **45%** |
+
+Com 10 s ele passava **metade do duelo** sem poder atirar e perdia 10 a 20 pontos de vitória; com
+5 s ele passa **um quarto** e perde de 2 a 15. A régua continua existindo — ela só deixou de ser a
+coisa mais pesada do modo.
+
+- **⚠️ ELE VALE PROS DOIS LADOS, por construção:** o NPC atira pelo MESMO `queimadaAtacar`. Valendo
+  só pro jogador ele seria uma desvantagem de um lado só, que é o que este projeto evita em todos
+  os minigames.
+- **⚠️ O ESPECIAL NÃO GASTA MUNIÇÃO, e isso é decisão:** ele já tem a recarga de 45 s, muito mais
+  apertada que um pente de 10, e cobrar as duas coisas o puniria duas vezes. Em troca ele vira o
+  **botão de emergência** — a recarga do ATACAR deixa de ser um bloqueio total.
+- **⚠️ O PENTE ATRAVESSA A ELIMINAÇÃO**, como a recarga do especial: medido, uma rodada leva **~4
+  tiros** — recarregado a cada queda, o limite de 10 quase nunca morderia e a mecânica seria
+  enfeite.
+- **⚠️ A RECARGA É RESOLVIDA PELO PASSO, nunca dentro do `queimadaAtacar`:** posta lá ela só
+  aconteceria quando alguém TENTASSE atirar, e o HUD — que lê o número a cada quadro — mostraria o
+  pente vazio até o primeiro toque depois de ela ter acabado.
+- **NA TELA o pente vem PRIMEIRO na dica** (`8/10 · 117 de dano`), porque é ele que muda: o dano é
+  fixo a partida inteira. Com o pente vazio a recarga ocupa a linha sozinha (`Recarregando 7 s`) e
+  o botão desliga — a tela não pode convidar pra uma ação que a AÇÃO recusa.
+  Medido a 320px: a dica fica em **71px** num botão de 86, sem cortar.
+- **Se um dia incomodar**, as réguas são `QUEIMADA_MUNICAO` e `QUEIMADA_RECARGA` — e a conta do
+  ciclo é a razão entre os dois: `(municao × 0,85) / (municao × 0,85 + recarga)`. É ela que diz o
+  quanto do duelo o jogador passa podendo atirar, e é o número a olhar antes de mexer em qualquer
+  um dos dois.
+
+#### O NOME DA TELA É "ARENA 1X1"
+
+Trocado a pedido. **⚠️ O que NÃO mudou foram os nomes de CÓDIGO** — as funções, as constantes e o
+selo continuam com o nome antigo: renomeá-los seria churn em ~200 referências pra trocar uma
+palavra que só aparece na tela. Há trava pras duas metades (a tela diz o nome novo, o código
+continua respondendo pelo antigo).
+
+#### A TELA DE FIM MOSTRA OS DOIS QUE SE ENFRENTARAM
+
+*"Deixe ele mais bonito, coloque as sprites dos pokemons que se enfrentaram, e pode retirar o
+texto: HP final"*.
+
+- **Eles se OLHAM**: o da esquerda é espelhado, que é o que a batalha da jornada já faz — dois
+  sprites virados pro mesmo lado se leem como uma fila, não como um duelo.
+- **A MEDALHA É A DO PÓDIO DA CORRIDA**, não um desenho novo: é o mesmo ouro que o jogo já usa pra
+  dizer "este ganhou". **No empate não sai nenhuma** — ali não houve vencedor.
+  ⚠️ E o empate exige **HP igual também**: com pontos iguais o `queimadaVencedor` desempata pela
+  vida. O fixture da trava não caía no caso que ele dizia medir, e foi a própria trava que mostrou.
+- **⚠️ A CAIXA DA MEDALHA TEM ALTURA FIXA mesmo vazia** — sem ela o lado sem medalha sobe e os dois
+  deixam de alinhar, que é justamente onde o olho compara. É a mesma nota da célula vazia do pódio
+  da Corrida.
+- **A LINHA DA VIDA RESTANTE SAIU, e a razão é que ela não dizia nada:** o duelo é decidido por
+  ELIMINAÇÕES, e o perdedor termina **sempre em zero**. O que ficou é a única linha que conta COMO
+  se jogou — as devoluções.
+- **Medido a 320px:** os dois lados em **114×159px**, iguais, sem rolagem lateral.
+
+#### O CARD DA SELEÇÃO MOSTRA 3 GOLPES -- e o que ele esconde foi medido ANTES
+
+*"Na ilha kumquat, quando exibir os pokemons, tem que exibir somente 3 ataques que ele possui ...
+os que tem mais poder de acordo com o level"*.
+
+**⚠️ O CARD É A SUPERFÍCIE DE DECISÃO DO DRAFT, então cortar informação dele precisava de número.**
+Medido em 1.135 pares nas três faixas de nível:
+
+| | |
+|---|---|
+| golpes por pokémon | **4,08** em média |
+| quantos passam de três | **62%** |
+| **o motor escolhe um golpe FORA dos 3 mais fortes** | **2,0%** |
+
+Ou seja: o motor escolhe pelo DANO, então o golpe fraco quase nunca sai — **o card continua
+contando a decisão em 98% dos casos**.
+
+- **⚠️ E A BATALHA NÃO FOI TOCADA:** o `equiparNpc` continua dando o moveset inteiro aos dois lados.
+  Cortar lá seria mexer no balanceamento da ilha, que não foi o que se pediu; se um dia for, é o
+  mesmo `slice` aplicado no `selecaoFecharDraft`. **Há trava cobrando que o time continue inteiro.**
+- **A legenda da tela diz que são os 3 mais fortes**, em vez de uma etiqueta "+2" em cada card —
+  que seria mostrar MAIS de três coisas justamente onde se pediu três.
+- **O ganho não é altura** (medido, ~4px por card num bolo típico): é o card se ler de uma vez.
+
+#### O (i) DE CADA ILHA, E A CLASSE QUE NÃO EXISTIA
+
+*"No mapa da ilha laranja, adicione um i no canto de cada ilha explicando como é o jogo, não precisa
+entrar nada técnico"*.
+
+- **⚠️ O TEXTO MORA NA TABELA** (`ILHAS_COMO`), ao lado do nome e do líder: uma segunda lista
+  indexada por id divergiria dela no dia em que uma ilha nascesse ou trocasse de jogo. E é por isso
+  que a ilha SEM jogo não precisa de entrada — ali o (i) não aparece, porque não há o que explicar.
+- **⚠️ E ELE É SOBRE O QUE SE FAZ, nunca sobre como está feito:** nada de nome de atributo, de
+  fórmula ou de constante. Quem quer o número abre a tela do jogo, que já os mostra.
+- **⚠️ O (i) É IRMÃO DO PINO, nunca filho:** `<button>` dentro de `<button>` é HTML inválido — o
+  navegador fecha o de fora e o clique de dentro se perde, com a tela continuando a PARECER certa.
+  É a armadilha que a lupa do encontro selvagem e a do montador já custaram.
+- **⚠️ E ELE SAI DO MESMO `left/top` DO PINO**, com o deslocamento no `transform`: mover uma ilha na
+  tabela move os dois juntos. Com posição própria ele ficaria boiando no mar no primeiro ajuste.
+- **⚠️ E A CAIXA NASCEU COM UMA CLASSE FANTASMA.** Eu usei `modal-backdrop`, que **não existe na
+  folha** — e classe que não existe não dá erro: ela só não faz nada. A caixa renderizava **no
+  FLUXO**, embaixo do botão de voltar, em vez de sobrepor. **Só a captura de tela pega**, e é a
+  mesma família do `--cream` que já deixou uma aba ilegível e do `--yellow-soft` que não realçava.
+  A classe da casa é `modal-overlay`, e hoje há trava cobrando que a regra dela exista no CSS.
+- **Medido a 320px:** o (i) em **22×22px** no canto do pino, os cinco DENTRO do mapa, e a caixa em
+  **280×487px** — cabe numa tela de 568 sem rolar.
+
+#### ⚠️ E UMA FATIA POR OFFSET ENVELHECEU, de novo
+
+A trava do `QUEIMADA_ESPECIAL_MULT` fatiava **1400 caracteres fixos** a partir do `queimadaAtacar`
+— e o bloco da munição empurrou a constante pra fora da janela: **ela caiu com o código certo**.
+
+É a terceira vez desta família no projeto (a fatia vazia do `tentarGolpeEspecial`, o prefixo do
+`pescariaPintar`). Hoje ela vai **até o fim da função**, com um `ok` cobrando que a fatia tem o que
+ler — que é a outra metade da armadilha: uma fatia que não lê nada e passa em branco.
+
+**E o comentário do conserto reproduzia o literal que a trava procura** ("HP final"), o que a faria
+acusar a si mesma — a **nona** vez dessa armadilha aqui. Ele foi reescrito sem citá-lo.
+
+### ⚠️ A CAUDA VIROU A COR DO PRÓPRIO GOLPE (21/09/2026)
+
+Reportado com print: *"por que que tanto o ataque de raio quanto o ataque de inseto tem um rabinho
+de outra cor? no raio tem um negócio azul e no inseto tem um negócio marrom"*.
+
+**Era a CAUDA, e ela estava fazendo o trabalho que lhe foi dado** — dizer de quem é a bola (azul
+minha, marrom dele). Só que **um matiz diferente atrás de um símbolo não se lê como rastro: se lê
+como um pedaço solto grudado nele**, e foi exatamente isso que o print mostrou.
+
+**⚠️ O QUE ELA RESOLVIA FOI MEDIDO ANTES DE SAIR**, porque ela existia por uma razão medida (8,9%
+dos pares escolhem golpe do mesmo tipo). A pergunta certa é outra: **com que frequência a
+ambiguidade aparece de fato na tela?** Ela precisa de duas bolas no ar, de donos diferentes **E do
+mesmo tipo** — medido em 30 duelos, 45.862 quadros:
+
+| | |
+|---|---|
+| quadros com alguma bola no ar | **90,4%** |
+| com bola dos DOIS lados | 49,9% |
+| **... e do MESMO tipo** | **3,15%** |
+
+Ou seja: **a cauda colorida aparecia em 90% dos quadros pra resolver 3%**. Nos outros 46,7% em que
+há bola dos dois lados, o DESENHO já separa sozinho — e a **direção do voo** diz o resto, porque o
+que desce é dele e o que sobe é meu.
+
+Hoje ela é **a cor do próprio golpe, num tom mais fundo**, e a bola inteira lê como um objeto só.
+
+- **⚠️ O TOM É MAIS ESCURO, nunca mais claro, e isso é medido:** a quadra é areia clara. Uma cauda
+  30% mais clara **some em 11 dos 17 tipos** e a cor crua some em 5. A 45% rumo ao preto do contorno
+  o pior caso (Elétrico) fica em **2,81:1** e **nenhum tipo some**.
+- **E ela é assada uma vez por tipo**, como o sprite: é uma conta de mistura por cor, não por quadro.
+- **As constantes de cor de dono morreram** — elas não tinham outro leitor.
+
+#### ⚠️ E TRÊS DESENHOS FORAM REFEITOS: eles sumiam no tamanho em que voam
+
+O mesmo pedido dizia *"deixe mais bonito esses sprites de ataques"*, e a prévia a 20px mostrou
+quais não se sustentavam:
+
+| | o que estava errado |
+|---|---|
+| **Elétrico** | o raio era um polígono FINO, e com o contorno de 2px comendo os dois lados sobrava um risco. Hoje ele é montado como **duas faixas grossas que se cruzam** — a de cima reta e larga, a de baixo afinando em ponta |
+| **Inseto** | ia **de ponta a ponta da grade** (as antenas chegavam nas bordas) e virava uma massa escura. As antenas encolheram pra dentro, o corpo ficou mais redondo e a linha do meio afinou |
+| **Sombrio** | o crescente era fino e sobrava quase só contorno. O círculo que o morde saiu mais pra fora e encolheu |
+
+**Medido depois: os três ficaram com 54% a 58% de COR** (o resto é contorno), que é a mesma faixa
+dos que já estavam bons — a Folha tem 49% e a Chama 62%. É esse número que diz se um desenho de
+24×24 sobrevive à redução: abaixo de ~45% o contorno domina e o tipo deixa de se reconhecer.
+
+### ⚠️ A BOLA FICOU 50% MAIS RÁPIDA E O ESCUDO DOBROU (21/09/2026)
+
+Pedidos juntos, e eles puxam pra lados opostos — **o que importa é a RAZÃO entre os dois**, não
+cada um isolado.
+
+| | antes | hoje |
+|---|---|---|
+| a bola comum | 170 px/s | **255** |
+| o voo numa travessia de 300px | 1,76 s | **1,18 s** |
+| o escudo de um Jolteon | 330 ms | **660 ms** |
+| **quanto do voo o escudo cobre** | **19%** | **56%** |
+
+E em quatro corpos diferentes, que é o que mostra que a mudança vale pro bestiário inteiro:
+
+| | antes | hoje |
+|---|---|---|
+| Shuckle (Sp.Def 230) | 25% do voo | **75%** |
+| Snorlax (110) | 20% | **61%** |
+| Jolteon (95) | 19% | **56%** |
+| Caterpie (20) | 12% | **37%** |
+
+**⚠️ Ou seja: apesar de a bola ficar 50% mais rápida, DEFENDER ficou cerca de 3× mais fácil.** A
+bola rápida tirou tempo de reação e o escudo dobrado devolveu muito mais do que ela tirou.
+Medido no duelo, **usar o RECEBER passou a valer 12 a 20 pontos de vitória** (68% sem receber
+contra 80–88% recebendo) — antes ele era quase um luxo.
+
+- **⚠️ O QUE DOBROU FOI A FÓRMULA INTEIRA** (base, fator e os dois limites), e não só o teto:
+  dobrando só o teto, quem já batia nele ganharia o dobro e o resto ganharia menos. O pedido diz
+  "dobrar o valor que tá exibindo", e isso tem que valer pra TODO pokémon — conferido em cinco
+  Sp.Def diferentes, todos exatamente 2×.
+- **⚠️ E ISSO SAIU DO CLAMP DO PROTÓTIPO** (0,22 a 0,44 s), que era o último número dele que este
+  modo ainda usava cru.
+- **⚠️ O ESPECIAL NÃO SUBIU JUNTO**, porque o pedido fala do *ataque principal* — e a consequência é
+  conhecida: a vantagem de VELOCIDADE dele quase some (**255 contra 280**). O que o separa passa a
+  ser o que ele já tinha de próprio: perseguir o alvo e atravessar o RECEBER. Se um dia isso
+  incomodar, é uma linha (`QUEIMADA_BOLA_V_ESP`).
+- **E o texto técnico saiu da primeira tela** (*"O HP vem da fórmula do jogo..."*): ele explicava de
+  ONDE os três números vêm, e os três já estão logo acima dele, com o nome de cada um.
+
+#### ⚠️ E UM `process.argv[1]` QUASE APAGOU A TABELA DE DESENHOS
+
+Aplicando a tabela regerada, escrevi `process.argv[1]` onde queria o primeiro ARGUMENTO — e
+`argv[1]` é o **próprio script**. O patch escreveu o próprio código por cima do `DESENHOS`:
+**55.642 caracteres viraram 472**.
+
+**⚠️ E O `node --check` PASSOU**, porque o que foi escrito no lugar era JavaScript válido. O que
+pegou foi **ler o número** que o próprio patch imprimiu — "tabela trocada: 55642 -> 472".
+
+A trava que existe pra isso (*o GERADOR e a TABELA concordam*, nascida de um `git checkout`
+acidental em 18/09) teria pego na bateria seguinte. **Verificação de sintaxe não é verificação de
+conteúdo**, e um patch que imprime o tamanho do que trocou é o que transforma uma corrupção
+silenciosa numa linha que dá pra ler.
+
 ### O QUE ISSO CUSTOU AO JOGO: NADA
 
 As duas impressões -- **MOTOR** e **DIÁRIO** -- são **idênticas** em 900 batalhas semeadas

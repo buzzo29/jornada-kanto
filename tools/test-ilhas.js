@@ -349,5 +349,84 @@ console.log('\n=== A TELA ===');
   ok('  e ela tem um Voltar', h.indexOf('sairDasIlhas()') >= 0);
 }
 
+
+/* ============================================================================
+   O (i) DE CADA ILHA -- como o minijogo funciona (21/09/2026)
+   ============================================================================ */
+console.log('\n=== O (i) EXPLICA CADA MINIJOGO ===');
+{
+  S.abrirIlhas();
+  const html = S.renderIlhas();
+  /* ⚠️ A TRAVA CONTA A TABELA, nunca um número escrito aqui: ela envelheceria na próxima ilha que
+     nascesse. É a mesma lição das duas que fixavam "3 com jogo e 2 em breve". */
+  const comJogo = S.ILHAS_LARANJA.filter(i => i.abrir);
+  ok('toda ilha com jogo tem um (i)',
+     (html.match(/class="ilha-info"/g) || []).length === comJogo.length,
+     (html.match(/class="ilha-info"/g) || []).length + ' de ' + comJogo.length);
+  ok('  e todas elas têm texto', comJogo.every(i => !!S.ILHAS_COMO[i.id]),
+     comJogo.filter(i => !S.ILHAS_COMO[i.id]).map(i => i.id).join(',') || '(todas)');
+  ok('  e nenhum texto sobra sem ilha',
+     Object.keys(S.ILHAS_COMO).every(id => S.ILHAS_LARANJA.some(i => i.id === id)));
+  ok('  e cada um tem resumo e passos',
+     Object.values(S.ILHAS_COMO).every(c => c.resumo && c.passos && c.passos.length >= 2));
+
+  /* ⚠️ O (i) É IRMÃO DO PINO, nunca filho: `<button>` dentro de `<button>` é HTML inválido -- o
+     navegador fecha o de fora e o clique de dentro se perde, com a tela continuando a PARECER
+     certa. É a armadilha que a lupa do encontro selvagem e a do montador já custaram. */
+  const pinoAberto = html.indexOf('<button class="ilha-pino"');
+  const fimDoPino = html.indexOf('</button>', pinoAberto);
+  const infoDepois = html.indexOf('class="ilha-info"', pinoAberto);
+  ok('  e ele fica FORA do botão do pino', infoDepois > fimDoPino,
+     'o pino fecha em ' + fimDoPino + ' e o (i) começa em ' + infoDepois);
+
+  /* ⚠️ E ELE SAI DO MESMO left/top DO PINO: o deslocamento vem do transform, então mover uma ilha
+     na tabela move os dois juntos. Com posição própria ele ficaria boiando no mar. */
+  const pos = S.ilhaPino(comJogo[0]);
+  ok('  e ele usa a mesma posição do pino', html.indexOf('class="ilha-info" style="' + pos + '"') >= 0
+     || html.indexOf('ilha-info" style="' + pos + '"') >= 0, pos);
+}
+
+console.log('\n=== E A CAIXA ABRE, EXPLICA E FECHA ===');
+{
+  S.abrirIlhas();
+  ok('ela nasce fechada', S.renderIlhas().indexOf('ilha-como') < 0);
+  const i = S.ILHAS_LARANJA.findIndex(x => x.id === 'pummelo');
+  S.abrirIlhaInfo(i);
+  const aberta = S.renderIlhas();
+  const como = S.ILHAS_COMO.pummelo;
+  ok('  e abre com o nome do jogo', aberta.indexOf(S.ILHAS_LARANJA[i].jogo) >= 0);
+  ok('  com o resumo', aberta.indexOf(como.resumo) >= 0);
+  ok('  e com os ' + como.passos.length + ' passos',
+     (aberta.match(/<li>/g) || []).length === como.passos.length);
+  /* ⚠️ A CLASSE É A DA CASA (`modal-overlay`), e isso não é detalhe: a primeira versão usou um nome
+     que NÃO EXISTE na folha, e classe que não existe não dá erro -- ela só não faz nada. A caixa
+     renderizava no FLUXO, embaixo do botão de voltar, em vez de sobrepor. */
+  ok('  e ela usa o overlay da casa', aberta.indexOf('modal-overlay') >= 0);
+  ok('    e o CSS dele existe de verdade', /\.modal-overlay\s*\{/.test(src),
+     'sem a regra ela renderiza no fluxo');
+  S.fecharIlhaInfo();
+  ok('  e fecha', S.renderIlhas().indexOf('ilha-como') < 0);
+
+  /* ⚠️ E O ESTADO ZERA AO ENTRAR NO MAPA: ninguém volta amanhã querendo a caixa de uma ilha
+     aberta, e ela é estado de TELA -- não vai pro save. */
+  S.abrirIlhaInfo(i);
+  S.abrirIlhas();
+  ok('  e entrar no mapa zera a caixa', S.renderIlhas().indexOf('ilha-como') < 0);
+  ok('  e ela não vai pro save', JSON.stringify(S.serializeGame() || {}).indexOf('ilhaAberta') < 0);
+
+  /* ⚠️ ÍNDICE FORJADO NÃO ABRE NADA -- e a defesa está em DOIS lugares: a ação recusa e o render
+     também. Por isso a trava tem duas metades: o comportamento prova o que o jogador vê, e a
+     leitura do código prova a guarda da AÇÃO -- sem ela, a conferência de acusação passa em branco,
+     porque o render sozinho já segura. Foi ela que mostrou isso. */
+  S.abrirIlhaInfo(99);
+  ok('  e um índice inventado não abre nada', S.renderIlhas().indexOf('ilha-como') < 0);
+  ok('    e quem recusa é a AÇÃO, não só a tela', (() => {
+    const i = src.indexOf('function abrirIlhaInfo');
+    if(i < 0) return false;
+    const corpo = src.slice(i, src.indexOf('function fecharIlhaInfo', i));
+    return corpo.length > 20 && corpo.indexOf('ILHAS_COMO[') >= 0;
+  })(), 'a guarda vive dentro do abrirIlhaInfo');
+}
+
 console.log(falhas ? '\n' + falhas + ' FALHA(S)' : '\nTudo certo.');
 process.exit(falhas ? 1 : 0);

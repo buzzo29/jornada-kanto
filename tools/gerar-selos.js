@@ -468,8 +468,14 @@ selo('tipo-planta', t => {
 
 /* ELETRICO -- o raio. */
 selo('tipo-eletrico', t => {
-  pintar(t, poligono([[15.5, 1.5], [6.5, 13], [11, 13], [8.5, 22.5], [18, 10], [13, 10]]),
-         '*', { liso: true });
+  /* ⚠️ ELE ERA UM POLIGONO FINO, e a 20px virava um risco: um raio precisa de MASSA, senao o
+     contorno de 2px come quase tudo que sobra. Ele e montado como duas FAIXAS grossas que se
+     cruzam -- a de cima reta e larga, a de baixo afinando em ponta --, que e o que da ao raio a
+     silhueta que se reconhece sem ler. */
+  pintar(t, uniao(
+    poligono([[12.5, 1.5], [20, 1.5], [12, 13.5], [4.5, 13.5]]),
+    poligono([[19.5, 9.5], [10, 9.5], [7.5, 22.5]])
+  ), '*', { liso: true });
 });
 
 /* GELO -- o floco de SEIS pontas, que e o que ele tem. */
@@ -515,9 +521,13 @@ selo('tipo-psiquico', t => {
 
 /* INSETO -- corpo, cabeca e as duas antenas. */
 selo('tipo-inseto', t => {
-  pintar(t, uniao(elipse(12, 15, 5.6, 6.8), circulo(12, 6.5, 3.6),
-                  traco(10, 4, 6, 1.5, 2.4), traco(14, 4, 18, 1.5, 2.4)), '*', { liso: true });
-  pintar(t, traco(12, 10, 12, 20, 2), 'k', { liso: true });
+  /* ⚠️ ELE IA DE PONTA A PONTA DA GRADE (as antenas chegavam nas bordas) e a 20px virava uma massa
+     escura. As antenas encolheram pra dentro, o corpo ficou mais REDONDO e a linha do meio afinou:
+     e ela que o faz ler como besouro, mas grossa ela come a cor que identifica o tipo. */
+  pintar(t, uniao(elipse(12, 14.5, 6.2, 7), circulo(12, 6, 3.7),
+                  traco(10, 3.6, 7.5, 1.5, 2.2), traco(14, 3.6, 16.5, 1.5, 2.2)),
+         '*', { liso: true });
+  pintar(t, traco(12, 9.5, 12, 20, 1.8), 'k', { liso: true });
 });
 
 /* PEDRA -- a rocha, angular de proposito: e a angulosidade que a separa do circulo do Normal. */
@@ -543,7 +553,9 @@ selo('tipo-dragao', t => {
 
 /* SOMBRIO -- a lua minguante. */
 selo('tipo-sombrio', t => {
-  pintar(t, menos(circulo(11, 12, 8.4), circulo(15.8, 9.6, 7.8)), '*', { liso: true });
+  /* ⚠️ O CRESCENTE ERA FINO e a 20px sobrava quase so contorno. O circulo que morde saiu mais pra
+     fora e encolheu: a lua engorda sem deixar de ser lua. */
+  pintar(t, menos(circulo(11.5, 12, 9), circulo(17.5, 8.5, 7.8)), '*', { liso: true });
 });
 
 /* ACO -- a porca sextavada com o furo. */
