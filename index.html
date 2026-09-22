@@ -5007,7 +5007,27 @@ function missoesDaMontanha(){
   if(!game.montanha.ninhos) game.montanha.ninhos = {};
   return game.montanha;
 }
-function ninhoAceso(id){ return !!missoesDaMontanha().ninhos[id]; }
+/* ⚠️ OS NINHOS ACESOS SÃO DA CONTA, NÃO DO SAVE (22/09/2026, a pedido: *"os 3 ninhos dos lendários
+   lá só tá valendo pro save, tem que ser por conta ... se em outro save ele conseguiu abrir um dos
+   ninhos tem que aparecer para todos"*). É a mesma decisão (e o mesmo molde) do HM01 e da VISITA,
+   que nasceram por save e foram movidos pelo mesmo motivo.
+
+   ⚠️ E ELE É O NINHO, NUNCA A MISSÃO -- essa é a linha que separa as duas coisas, e ela é o
+   cuidado inteiro desta mudança. O `game.montanha` guardava DUAS coisas de naturezas diferentes:
+     • os NINHOS acesos, que são um prêmio conquistado -- e prêmio é do treinador: foi ele que
+       montou o time de Planta e venceu o Blaine, e refazer isso em toda jornada nova é cobrar
+       duas vezes pela mesma conquista;
+     • a SEQUÊNCIA do Zapdos (`sequenciaDeGinasios`), que é "três ginásios SEGUIDOS sem perder"
+       -- ela continua NO SAVE, e tem que continuar: na conta, o jogador venceria um ginásio no
+       save A, um no B e um no C e levaria o Zapdos sem nunca ter emendado três; pior, uma derrota
+       no save A zeraria a sequência que o save B estava construindo. A missão deixaria de
+       significar uma sequência.
+   Ou seja: o QUE VOCÊ JÁ GANHOU atravessa as jornadas; o QUE VOCÊ ESTÁ FAZENDO, não. */
+function ninhosDaConta(){
+  if(!game.ninhosDaConta) game.ninhosDaConta = {};
+  return game.ninhosDaConta;
+}
+function ninhoAceso(id){ return !!ninhosDaConta()[id]; }
 /* ⚠️ AS MISSÕES SÓ COMEÇAM DEPOIS DA PRIMEIRA VISITA (18/09/2026, a pedido: *"as missões dos
    ninhos só irão começar a acontecer depois que o treinador visita o ninho pela primeira vez"*).
    Antes disso elas contavam desde o primeiro ginásio da jornada, então dava pra chegar na Montanha
@@ -5058,6 +5078,8 @@ function saveMostraVisita(m){
    abertura do save. */
 function missoesComecaram(){
   if(game.visitouOsNinhos) return true;
+  /* quem tem ninho aceso na CONTA obviamente já esteve lá -- e desde 22/09/2026 é lá que eles moram */
+  if(Object.keys(ninhosDaConta()).length > 0) return true;
   if(saveMostraVisita(missoesDaMontanha())) return true;
   const slots = game.saveSlots || [];
   for(let i = 0; i < slots.length; i++){
@@ -5071,16 +5093,38 @@ function missoesComecaram(){
   return false;
 }
 function ninhosAcesos(){ return NINHOS.filter(n => ninhoAceso(n.id)).length; }
+/* ⚠️ E A GRAVAÇÃO É BEST-EFFORT, o molde do `visitarOsNinhos`, do HM e do rival padrão: se ela
+   falhar, a jornada não para e o ninho continua aceso NESTA sessão -- ele volta a apagar só no
+   próximo carregamento, e aí a missão pode ser cumprida de novo. Travar a batalha por causa do
+   prêmio seria o prêmio atrapalhando o que ele existe pra celebrar. */
+function gravarNinhosDaConta(){
+  if(!game.authUser) return;
+  userDocRef(game.authUser.uid)
+    .set({ ninhosDaConta: ninhosDaConta(), ninhosMigrados: true }, { merge: true })
+    .catch(e => console.error("Erro ao gravar os ninhos da conta:", e));
+}
 function acenderNinho(id){
-  const m = missoesDaMontanha();
-  if(m.ninhos[id]) return false;
-  m.ninhos[id] = true;
+  const n = ninhosDaConta();
+  if(n[id]) return false;
+  n[id] = true;
+  gravarNinhosDaConta();
   return true;
 }
 /* ⚠️ AS TRÊS REINICIAM QUANDO O LENDÁRIO É RECEBIDO, e não quando a batalha é vencida: quem vence e
    fecha a aba antes de escolher não pode perder as três missões. */
 function reiniciarMissoesDaMontanha(){
   const m = missoesDaMontanha();
+  /* ⚠️ OS NINHOS ZERAM NA CONTA (eles são de lá), e a SEQUÊNCIA no save (ela é de lá). Zerar só um
+     dos dois deixaria o outro lado com progresso de uma missão que já foi paga.
+     ⚠️ E ISSO VALE PRA CONTA INTEIRA, que é a consequência de os ninhos serem dela: receber um
+     lendário num save esvazia os três ninhos pra todos. É o mesmo pote -- e é justamente por ser
+     o mesmo pote que um ninho aceso no save A aparece no save B. */
+  game.ninhosDaConta = {};
+  gravarNinhosDaConta();
+  /* ⚠️ E O `ninhos` DO SAVE ZERA JUNTO, mesmo já não sendo lido: ele é o que a DEDUÇÃO de save
+     antigo varre, e deixá-lo cheio faria os três ninhos ressuscitarem na conta de um jogador que
+     acabou de gastá-los. A marca `ninhosMigrados` já fecha essa porta; esta linha é a segunda,
+     porque o dado errado no save também mentiria pro `saveMostraVisita`. */
   m.ninhos = {};
   m.sequenciaDeGinasios = 0;
   /* ⚠️ A VISITA NÃO ZERA AQUI, de propósito: ela é o CONHECIMENTO do jogador, não o progresso.
@@ -7997,7 +8041,34 @@ async function loadPermanentUserData(){
        ZERADA. Reproduzido: fecha, a releitura apaga, e o modal abre de novo.
        A regra é a do `arrayUnion` da Pokédex: esta marca só CRESCE. */
     game.novidadeVista = d.novidadeVista || game.novidadeVista || null;   // ver conferirNovidades
-    game.visitouOsNinhos = !!d.visitouOsNinhos;         // a visita aos ninhos também (ver visitarOsNinhos)
+    /* ⚠️ `|| game.visitouOsNinhos` PELA MESMA RAZÃO DA LINHA ACIMA, e ela valia aqui desde sempre:
+       o `visitarOsNinhos` grava best-effort (sem await) e este carregamento roda toda vez que se
+       volta pra HOME -- quem visitasse e voltasse antes de a gravação propagar tinha a marca
+       ZERADA, e as missões paravam de contar em silêncio. Esta marca só CRESCE. */
+    game.visitouOsNinhos = !!d.visitouOsNinhos || !!game.visitouOsNinhos;
+    /* ⚠️ OS NINHOS ACESOS, E A DEDUÇÃO DE QUEM JÁ TINHA (22/09/2026). Ela varre os SAVES e une o
+       que estiver aceso em cada um -- sem isso, quem tinha o Moltres num save perderia o prêmio
+       no dia em que os ninhos mudaram de dono. É a mesma ideia do `repararEvolucoesAtrasadas` e da
+       rede das letras do Unown logo abaixo: fechar a torneira não pode apagar o que já estava na
+       bacia.
+       ⚠️ E ELA RODA UMA VEZ SÓ (`ninhosMigrados`), e isso não é economia: sem a marca, a varredura
+       RESSUSCITARIA os ninhos que o jogador acabou de gastar -- o `reiniciarMissoesDaMontanha`
+       esvazia a conta, mas o save que os tinha continua no `saveSlots` até o próximo autosave.
+       ⚠️ E ELA PRECISA DOS SAVES NA MÃO: este carregamento roda DEPOIS do `loadSaveSlots` (ele
+       depende disso pra unir a Pokédex, logo abaixo), então `game.saveSlots` já está preenchido. */
+    game.ninhosDaConta = (d.ninhosDaConta && typeof d.ninhosDaConta === "object") ? d.ninhosDaConta : {};
+    if(!d.ninhosMigrados){
+      let achou = false;
+      (game.saveSlots || []).forEach(sv => {
+        const ns = (sv && sv.montanha && sv.montanha.ninhos) || {};
+        Object.keys(ns).forEach(k => { if(ns[k] && !game.ninhosDaConta[k]){ game.ninhosDaConta[k] = true; achou = true; } });
+      });
+      /* ⚠️ A MARCA É GRAVADA MESMO SEM ACHAR NADA: é ela que diz "a dedução já rodou". Só gravando
+         quando acha, a varredura voltaria a rodar pra sempre em quem nunca acendeu um ninho -- e
+         aí ela ressuscitaria o primeiro que ele acendesse e gastasse. */
+      gravarNinhosDaConta();
+      if(achou) console.log("Ninhos da conta deduzidos dos saves:", Object.keys(game.ninhosDaConta).join(", "));
+    }
     game.aposentados = Array.isArray(d.aposentados) ? d.aposentados : [];   // ver aposentarOTime
     /* AS LETRAS DO UNOWN, mais a rede de seguranca: alem do registro feito na captura, varre os
        times atuais. Ela recupera quem capturou um Unown ANTES deste campo existir -- e tem o mesmo
@@ -17981,6 +18052,9 @@ const CAMPOS_DA_CONTA = [
   /* o que a conta JA resgatou de conquista -- ver as moedas das conquistas */
   'achievementsPaid',
   'hms',   // as Máquinas Ocultas são da CONTA, não do save -- ver darHM
+  /* ⚠️ OS NINHOS ACESOS são da CONTA desde 22/09/2026 (ver `ninhoAceso`): sem eles aqui, abrir um
+     save apagaria os três e o jogador perderia um lendário que ele já tinha conquistado. */
+  'ninhosDaConta','ninhosMigrados',
   /* ⚠️ A VISITA AOS NINHOS É DA CONTA pelo mesmo motivo do `hms`: ela é o CONHECIMENTO do
      treinador, não o progresso de uma jornada -- ver o `visitarOsNinhos`. Sem ela aqui, abrir
      um save apagaria a marca e as missões parariam de contar em silêncio. */

@@ -1537,6 +1537,10 @@ existem.
 
 #### ⚠️ A VISITA É DA CONTA, NÃO DO SAVE -- e é aqui que a decisão está
 
+**⚠️ E OS NINHOS ACESOS TAMBÉM, desde 22/09/2026** -- ver **AS TRÊS MISSÕES**, na seção da
+Montanha Sagrada. O que continua no SAVE é a **sequência do Zapdos**, e por uma razão que vale
+saber: na conta, três ginásios em três saves diferentes levariam o Zapdos.
+
 O pedido diz *"o treinador visita o ninho **pela primeira vez**"*, e **a primeira vez é uma só na
 vida do treinador**: por save, seria "a primeira de cada jornada". É a mesma leitura (e o mesmo
 molde) do **HM01**, que nasceu por save e foi movido pra conta em 11/09/2026.
@@ -9978,10 +9982,54 @@ iguais, e o jogador vence **70,2%**. A Vigília, pra comparar, ia de 97,6% no 4�
 
 #### AS TRÊS MISSÕES
 
-**⚠️ ELAS SÃO DO SAVE, NÃO DA CONTA, e isso é decisão.** As três falam de coisas que acontecem
-DENTRO de uma jornada (*"vencer o Blaine"*, *"três ginásios seguidos"*, *"numa única batalha de
-ginásio"*), então guardá-las na conta faria uma jornada terminar a missão que outra começou — e a do
-Zapdos, que é uma sequência, deixaria de significar qualquer coisa.
+**⚠️ O NINHO ACESO É DA CONTA; A MISSÃO É DO SAVE (22/09/2026)** — e essa linha entre as duas coisas
+é o cuidado inteiro. Pedido assim: *"os 3 ninhos dos lendários lá só tá valendo pro save, tem que
+ser por conta ... se em outro save ele conseguiu abrir um dos ninhos tem que aparecer para todos"*.
+
+Até aqui o `game.montanha` guardava **duas coisas de naturezas diferentes** no mesmo lugar, e é isso
+que a mudança separou:
+
+| | onde mora | por quê |
+|---|---|---|
+| **os NINHOS acesos** | **na CONTA** (`ninhosDaConta`) | é um **prêmio conquistado**, e prêmio é do treinador: foi ele que montou o time de Planta e venceu o Blaine, e refazer isso em toda jornada nova é cobrar duas vezes pela mesma conquista |
+| **a SEQUÊNCIA do Zapdos** | **no SAVE** | ela é *"três ginásios SEGUIDOS sem perder"* |
+
+**⚠️ E A SEQUÊNCIA NÃO PODE IR JUNTO, o que é o contrário do que parece.** Na conta, o jogador
+venceria um ginásio no save A, um no B e um no C e levaria o Zapdos **sem nunca ter emendado três**
+— e, pior, uma **derrota** no save A zeraria a sequência que o save B estava construindo. A missão
+deixaria de significar uma sequência. Ou seja: **o que você já GANHOU atravessa as jornadas; o que
+você está FAZENDO, não.** Há trava pras duas metades.
+
+*(A decisão anterior era guardar tudo no save, pela razão da sequência — ela valia pra ela e foi
+estendida aos ninhos sem a distinção acima. Isto é a correção.)*
+
+- **O REINÍCIO ZERA OS DOIS DONOS**: receber o lendário esvazia os três ninhos **pra todos os
+  saves** — é o mesmo pote, que é justamente por que um ninho do save A aparece no save B.
+- **⚠️ E ELE ZERA O `ninhos` DO SAVE TAMBÉM**, mesmo já não sendo lido: é o que a DEDUÇÃO varre, e
+  deixá-lo cheio faria os três ressuscitarem na conta de quem acabou de gastá-los.
+- **A gravação é best-effort**, o molde do `visitarOsNinhos`, do HM e do rival padrão: falhando, a
+  batalha não para e o ninho vale nesta sessão. Travar a luta por causa do prêmio seria o prêmio
+  atrapalhando o que ele existe pra celebrar.
+- **Os dois campos entraram no `CAMPOS_DA_CONTA`** — sem isso o `resetGame` os apagaria ao abrir um
+  save, e o jogador perderia um lendário que já tinha conquistado.
+
+**⚠️ A DEDUÇÃO DE QUEM JÁ TINHA, E ELA RODA UMA VEZ SÓ.** No carregamento da conta ela varre os
+SAVES e une o que estiver aceso em cada um — sem isso, quem tinha o Moltres num save o perderia no
+dia do deploy. É a mesma ideia do `repararEvolucoesAtrasadas` e da rede das letras do Unown: fechar
+a torneira não pode apagar o que já estava na bacia.
+A marca `ninhosMigrados` **não é economia**: sem ela a varredura **ressuscitaria os ninhos que o
+jogador acabou de gastar** — o reinício esvazia a conta, mas o save que os tinha continua no
+`saveSlots` até o próximo autosave. E ela é gravada **mesmo sem achar nada**, senão a varredura
+voltaria a rodar pra sempre em quem nunca acendeu um ninho.
+
+**⚠️ E ELA PRECISA DOS SAVES NA MÃO:** o `loadPermanentUserData` roda **depois** do `loadSaveSlots`
+(ele já depende disso pra unir a Pokédex), então `game.saveSlots` está preenchido ali.
+
+**⚠️ E O `visitouOsNinhos` TINHA O MESMO DEFEITO DO `novidadeVista`, desde sempre:** ele era lido
+como `!!d.visitouOsNinhos`, e a gravação dele é **best-effort (sem await)**. Quem visitasse os
+ninhos e voltasse pra home antes de a gravação propagar tinha a marca **ZERADA** pela releitura —
+e as missões paravam de contar em silêncio. Hoje é `|| game.visitouOsNinhos`: **esta marca só
+CRESCE**, a regra do `arrayUnion` da Pokédex.
 
 | ninho | o que pede |
 |---|---|

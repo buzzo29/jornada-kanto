@@ -1997,7 +1997,16 @@ console.log('\n=== A MONTANHA SAGRADA (17/09/2026) ===');
   const mk = (id, lv, ataques) => { const p = S.createInstance(id, lv); p.maxHp = S.calcMaxHp(p); p.hp = p.maxHp;
                                     p.ataques = ataques || S.ataquesPadrao(p); return p; };
   g.authUser = null; g.saveGen = 0; g.gymPath = new Array(8).fill('kanto');
-  g.montanha = null; g.montanhaGuarda = null; g.montanhaPremio = null;
+  /* ⚠️ ZERAR A MONTANHA SAO DUAS COISAS, EM DOIS DONOS (22/09/2026): a SEQUENCIA do Zapdos mora
+     no save (`g.montanha`) e os NINHOS acesos moram na CONTA (`g.ninhosDaConta`). Doze travas
+     faziam `g.montanha = null` esperando que isso zerasse os ninhos -- e elas comecaram a acusar
+     o que estava certo no dia em que os ninhos mudaram de dono. Um ajudante e o que impede a
+     proxima de nascer zerando so metade. */
+  const zerarMontanha = () => {
+    g.montanha = null; g.ninhosDaConta = {}; g.ninhosMigrados = true;
+    S.missoesDaMontanha();
+  };
+  zerarMontanha(); g.montanhaGuarda = null; g.montanhaPremio = null;
   g.team = ['venusaur','pidgeot','raichu','gyarados','machoke','haunter'].map(id => mk(id, 45));
 
   /* ---------- 1) O SORTEIO ---------- */
@@ -2119,11 +2128,11 @@ console.log('\n=== A MONTANHA SAGRADA (17/09/2026) ===');
   ok('Moltres: em outro ginasio nao acende', !S.cumpriuMoltres(true));
 
   /* ZAPDOS: tres ginasios seguidos sem perder pra um lider. */
-  g.montanha = null;
+  zerarMontanha();
   ok('Zapdos: uma vitoria nao basta', S.passoDoZapdos(true) === false);
   ok('Zapdos: duas tambem nao', S.passoDoZapdos(true) === false);
   ok('Zapdos: a terceira acende', S.passoDoZapdos(true) === true);
-  g.montanha = null;
+  zerarMontanha();
   S.passoDoZapdos(true); S.passoDoZapdos(true);
   ok('Zapdos: a DERROTA zera', S.passoDoZapdos(false) === false && S.missoesDaMontanha().sequenciaDeGinasios === 0);
   ok('Zapdos: e a contagem recomeca do zero', S.passoDoZapdos(true) === false && S.missoesDaMontanha().sequenciaDeGinasios === 1);
@@ -2150,7 +2159,7 @@ console.log('\n=== A MONTANHA SAGRADA (17/09/2026) ===');
      S.cumpriuArticuno([mu('jynx',true), mu('jynx',true), mu('jynx',true)]));
 
   /* ---------- 5) A PORTA UNICA ---------- */
-  g.montanha = null;
+  zerarMontanha();
   /* ⚠️ VISITAR PRIMEIRO, que e o que o jogo faz: desde 18/09/2026 as missoes so comecam depois
      que o treinador chega na tela dos ninhos. Sem esta linha a porta devolve [] -- e devolver []
      e o CERTO ali, tanto que ha um bloco inteiro medindo isso mais abaixo. */
@@ -2163,8 +2172,78 @@ console.log('\n=== A MONTANHA SAGRADA (17/09/2026) ===');
   ok('e nao devolve de novo o que ja estava aceso', acesos2.indexOf('moltres') < 0 && acesos2.indexOf('articuno') < 0,
      acesos2.join(','));
 
+  /* ---------- 5b) OS NINHOS SAO DA CONTA (22/09/2026) ---------- */
+  /* ⚠️ A PERGUNTA DO PEDIDO: um ninho aceso numa jornada aparece nas OUTRAS. O que a trava faz e
+     acender num save, TROCAR de save, e cobrar que ele continue la. */
+  {
+    zerarMontanha(); g.visitouOsNinhos = true;
+    g.currentSaveSlot = 0;
+    g.authUser = { uid: 'u1' };
+    const escAntes = (S.__escritas || []).length;
+    porGinasio(blaineIdx, tresPlanta);
+    S.conferirNinhos(true, []);
+    ok('o Moltres acende no save 0', S.ninhoAceso('moltres'));
+    /* ⚠️ E ACENDER GRAVA NA CONTA (best-effort, o molde do `visitarOsNinhos`): sem isso o ninho
+       valeria so nesta sessao e apagaria no proximo carregamento -- a missao teria que ser
+       cumprida de novo, que e o oposto do pedido. */
+    const gravou = (S.__escritas || []).slice(escAntes)
+      .filter(e => e.dados && e.dados.ninhosDaConta && e.dados.ninhosDaConta.moltres === true);
+    ok('  e a conta e GRAVADA no ato', gravou.length > 0,
+       'escritas novas: ' + ((S.__escritas || []).length - escAntes));
+
+    /* ⚠️ E UM NINHO ACESO NA CONTA JA DIZ QUE AS MISSOES COMECARAM: quem tem um ninho obviamente
+       esteve na tela. Sem isso, um save novo (sem `montanha`) com a visita esquecida pararia de
+       contar as missoes de quem ja tem um lendario esperando. */
+    {
+      const visitaAntes = g.visitouOsNinhos, montAntes = g.montanha, slotsAntes = g.saveSlots;
+      g.visitouOsNinhos = false; g.montanha = null; g.saveSlots = []; S.missoesDaMontanha();
+      ok('  e o ninho aceso na conta diz que as missoes comecaram', S.missoesComecaram(),
+         'so o ninho, sem visita, sem save e sem slots');
+      g.visitouOsNinhos = visitaAntes; g.montanha = montAntes; g.saveSlots = slotsAntes;
+    }
+
+    /* TROCA DE SAVE: o `resetGame` e quem apaga o que e do save e preserva o que e da conta */
+    const foto = S.snapshotDaConta();
+    g.montanha = null;                       /* o save novo nao tem montanha nenhuma */
+    g.currentSaveSlot = 7;
+    S.restauraDadosDaConta(foto);
+    ok('  e ele CONTINUA aceso no save 7', S.ninhoAceso('moltres'),
+       'era a coisa toda do pedido: o premio e do treinador, nao da jornada');
+    ok('  e a tela dos ninhos mostra ele cheio', S.renderNinhos().indexOf('moltres') >= 0);
+
+    /* ⚠️ E A SEQUENCIA DO ZAPDOS *NAO* ATRAVESSA -- e essa e a metade que protege a missao.
+       Na conta, o jogador venceria um ginasio no save A, um no B e um no C e levaria o Zapdos
+       sem nunca ter emendado tres; e uma derrota no save A zeraria a sequencia do save B. */
+    g.currentSaveSlot = 0; g.montanha = null; S.missoesDaMontanha();
+    S.passoDoZapdos(true); S.passoDoZapdos(true);
+    ok('a sequencia do Zapdos anda no save 0', S.missoesDaMontanha().sequenciaDeGinasios === 2);
+    g.montanha = null; g.currentSaveSlot = 7;   /* outro save */
+    ok('  e ela NAO atravessa pro save 7', (S.missoesDaMontanha().sequenciaDeGinasios || 0) === 0,
+       'na conta, tres ginasios em tres saves diferentes levariam o Zapdos');
+    ok('  o ninho, por outro lado, continua', S.ninhoAceso('moltres'));
+
+    /* ⚠️ E OS DOIS CAMPOS ESTAO NO CAMPOS_DA_CONTA: sem isso o `resetGame` os apagaria ao abrir
+       um save e o jogador perderia um lendario que ele ja tinha conquistado. */
+    ok('os ninhos estao no CAMPOS_DA_CONTA',
+       (S.CAMPOS_DA_CONTA || []).indexOf('ninhosDaConta') >= 0 &&
+       (S.CAMPOS_DA_CONTA || []).indexOf('ninhosMigrados') >= 0);
+
+    /* ⚠️ O REINICIO ZERA A CONTA (receber um lendario esvazia os tres ninhos pra todos os saves --
+       e o mesmo pote, que e justamente por que um ninho do save A aparece no save B) */
+    /* ⚠️ O FIXTURE PRECISA SUJAR O SAVE: o `zerarMontanha` zera os dois lados, e sem esta linha a
+       trava de baixo passaria em branco com o `m.ninhos = {}` do reinicio REMOVIDO -- ela estaria
+       cobrando um objeto que ja nascia vazio. Foi a conferencia de acusacao que pegou. */
+    S.missoesDaMontanha().ninhos.moltres = true;
+    S.reiniciarMissoesDaMontanha();
+    ok('receber o lendario esvazia os ninhos da CONTA', !S.ninhoAceso('moltres') && S.ninhosAcesos() === 0);
+    ok('  e o save aberto tambem zera', Object.keys(S.missoesDaMontanha().ninhos || {}).length === 0,
+       'senao a deducao os ressuscitaria na proxima leitura da conta');
+
+    g.currentSaveSlot = 0;
+  }
+
   /* ---------- 6) O PREMIO ---------- */
-  g.montanha = null;
+  zerarMontanha();
   g.team = ['venusaur','pidgeot','raichu'].map(id => mk(id, 50));
   g.montanhaPremio = [{ speciesId:'fearow', level:48, shiny:false }];
   S.escolherOGuardiao(0);
@@ -2192,7 +2271,7 @@ console.log('\n=== A MONTANHA SAGRADA (17/09/2026) ===');
   ok('o Lugia e INTOCAVEL', S.ESPECIES_INTOCAVEIS.indexOf('lugia') >= 0);
   /* AS TRES REINICIAM AO RECEBER, e nao ao vencer: quem vence e fecha a aba antes de escolher nao
      pode perder as tres missoes que levaram a jornada inteira pra acender. */
-  g.montanha = null;
+  zerarMontanha();
   S.visitarOsNinhos();   /* ver a nota do bloco 5 */
   porGinasio(blaineIdx, tresPlanta);
   /* QUEM ACENDE E A PORTA UNICA, e nao os ganchos soltos: o passoDoZapdos so anda o contador.
@@ -2217,7 +2296,7 @@ console.log('\n=== A MONTANHA SAGRADA (17/09/2026) ===');
   {
     /* ⚠️ ZERA OS DOIS: as missoes sao do SAVE (g.montanha) e a VISITA e da CONTA
        (g.visitouOsNinhos) -- zerar so o save deixaria a visita de um caso vazando pro seguinte. */
-    const zeraTudo = () => { g.montanha = null; g.visitouOsNinhos = false; S.missoesDaMontanha(); };
+    const zeraTudo = () => { zerarMontanha(); g.visitouOsNinhos = false; };
     const tresGelo = [mu('lapras',true), mu('lapras',true), mu('lapras',true)];
 
     /* 1) SEM VISITA, nenhum dos tres acende -- nem o que nao depende de sequencia */
@@ -2333,7 +2412,7 @@ console.log('\n=== A MONTANHA SAGRADA (17/09/2026) ===');
       zeraTudo();
       S.visitarOsNinhos();
       /* troca de save: o game.montanha e do SAVE e some; a visita e da CONTA e fica */
-      g.montanha = null;
+      zerarMontanha();
       S.missoesDaMontanha();
       ok('a visita atravessa a troca de save', S.missoesComecaram());
       porGinasio(blaineIdx, tresPlanta);
@@ -2438,7 +2517,7 @@ console.log('\n=== A MONTANHA SAGRADA (17/09/2026) ===');
   }
 
   /* ---------- 8) A TELA ---------- */
-  g.montanha = null;
+  zerarMontanha();
   g.montanhaPremio = [{ speciesId:'fearow', level:48, shiny:false },
                       { speciesId:'pidgeot', level:50, shiny:false }];
   const telaVazia = S.renderNinhos();
@@ -2456,7 +2535,7 @@ console.log('\n=== A MONTANHA SAGRADA (17/09/2026) ===');
   g.ninhoAberto = 'zapdos';
   const modalAceso = S.renderNinhoModal();
   ok('o modal do ninho ACESO diz que esta ocupado', /ocupado/i.test(modalAceso));
-  g.montanha = null; g.ninhoAberto = 'zapdos';
+  zerarMontanha(); g.ninhoAberto = 'zapdos';
   S.passoDoZapdos(true);
   const modalVazio = S.renderNinhoModal();
   ok('o modal do ninho VAZIO conta a missao', /3 ginásios seguidos/.test(modalVazio));
@@ -2474,7 +2553,7 @@ console.log('\n=== A MONTANHA SAGRADA (17/09/2026) ===');
   ok('e nada aparece quando nenhum acendeu', S.ninhosAcesosHtml() === '');
 
   /* ---------- 9) O SAVE ---------- */
-  g.montanha = null;
+  zerarMontanha();
   S.acenderNinho('moltres');
   S.passoDoZapdos(true); S.passoDoZapdos(true);
   g.montanhaGuarda = [{ speciesId:'fearow', level:48, shiny:false }];
@@ -2482,12 +2561,24 @@ console.log('\n=== A MONTANHA SAGRADA (17/09/2026) ===');
   const dados2 = S.serializeGame();
   ok('os tres campos vao pro save', 'montanha' in dados2 && 'montanhaGuarda' in dados2 && 'montanhaPremio' in dados2,
      Object.keys(dados2).filter(k => k.indexOf('montanha') === 0).join(','));
-  ok('o progresso atravessa', dados2.montanha && dados2.montanha.ninhos.moltres === true &&
-     dados2.montanha.sequenciaDeGinasios === 2, JSON.stringify(dados2.montanha));
-  g.montanha = null; g.montanhaGuarda = null;
+  /* ⚠️ CADA DONO LEVA O QUE E DELE (22/09/2026). Estas duas travas mediam o ninho indo e voltando
+     pelo SAVE, e elas nasceram certas -- envelheceram no dia em que o ninho mudou de dono. Hoje
+     elas cobram o desenho: o SAVE leva a sequencia, a CONTA leva os ninhos. */
+  ok('o SAVE leva a sequencia do Zapdos', dados2.montanha && dados2.montanha.sequenciaDeGinasios === 2,
+     JSON.stringify(dados2.montanha));
+  ok('  e o ninho aceso NAO vai no save', !(dados2.montanha && dados2.montanha.ninhos && dados2.montanha.ninhos.moltres),
+     'ele e da conta desde 22/09/2026');
+  ok('  que e quem o leva', g.ninhosDaConta && g.ninhosDaConta.moltres === true);
+
+  zerarMontanha(); g.montanhaGuarda = null;
   S.applySavedState(dados2);
-  ok('e volta inteiro do save', S.ninhoAceso('moltres') && S.missoesDaMontanha().sequenciaDeGinasios === 2 &&
+  ok('a sequencia volta do save', S.missoesDaMontanha().sequenciaDeGinasios === 2 &&
      (g.montanhaGuarda||[]).length === 1);
+  /* ⚠️ E O SAVE NAO RESSUSCITA UM NINHO: o `zerarMontanha` acabou de esvaziar a conta, e aplicar um
+     save que TEM o ninho nao pode trazer o premio de volta -- senao receber o lendario e reabrir o
+     save devolveria os tres. */
+  ok('  mas o ninho NAO volta do save', !S.ninhoAceso('moltres'),
+     'quem manda nos ninhos e a conta, e ela foi zerada');
   /* ⚠️ A GUARDA PASSA PELO MESMO CONSERTO DA VIGILIA: a especie tem que bater com o nivel, senao
      quem esta na tela dos ninhos escolheria um pokemon que nao existe. */
   S.applySavedState(Object.assign({}, dados2, { montanhaGuarda: [{ speciesId:'charizard', level:24, shiny:false }] }));
@@ -2612,5 +2703,79 @@ console.log('\nO BOT COM --corte ATRAVESSA A MATA FECHADA');
   }
 }
 
-console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
-process.exit(falhas ? 1 : 0);
+/* ========================================================================================
+   A DEDUCAO DOS NINHOS DE SAVE ANTIGO (22/09/2026) -- e o bloco que protege o dado de producao:
+   quem ja tinha um ninho aceso num save nao pode perde-lo no dia em que eles mudaram de dono.
+   ⚠️ E ELE PRECISA SER ASYNC: o `loadPermanentUserData` e uma funcao assincrona de verdade, e a
+   alternativa -- simular o que ela faz -- mediria uma COPIA da regra escrita no proprio teste.
+   ======================================================================================== */
+(async () => {
+  /* ⚠️ O GAME ATIVO, nunca o `g` do topo: varios blocos deste arquivo chamam `__setGame` com outro
+     objeto, e o `g` da linha 64 pode ja nao ser o game que o jogo esta usando. A primeira versao
+     deste bloco usava ele e MEDIU O VAZIO -- ela nao estourou, so nao achou nada, que e o pior
+     jeito de uma trava falhar. */
+  const g = S.__getGame();
+  g.authUser = { uid: 'u1' };
+  g.montanha = null; g.ninhosDaConta = {}; g.ninhosMigrados = false;
+  g.saveSlots = [
+    { team: [], montanha: { ninhos: { moltres: true }, sequenciaDeGinasios: 2 } },
+    null,
+    { team: [], montanha: { ninhos: { articuno: true } } }
+  ];
+  const antes = S.__escritas ? S.__escritas.length : 0;
+  /* o stub do Firestore devolve um documento VAZIO -- que e exatamente a conta de quem nunca
+     passou pela deducao: sem `ninhosDaConta` e sem `ninhosMigrados`. */
+  await S.loadPermanentUserData();
+
+  ok('a deducao traz o ninho de um save antigo', S.ninhoAceso('moltres'),
+     'quem ja tinha o Moltres nao pode perde-lo no deploy');
+  ok('  e UNE os de saves diferentes', S.ninhoAceso('articuno') && S.ninhosAcesos() === 2,
+     Object.keys(g.ninhosDaConta || {}).join(','));
+  ok('  e nao inventa o que ninguem tinha', !S.ninhoAceso('zapdos'));
+
+  /* ⚠️ E ELA GRAVA A MARCA, que e o mecanismo do UMA VEZ SO: sem ela a varredura rodaria em toda
+     volta pra home e RESSUSCITARIA os ninhos que o jogador acabou de gastar -- o
+     `reiniciarMissoesDaMontanha` esvazia a conta, mas o save que os tinha continua no `saveSlots`
+     ate o proximo autosave. */
+  const novas = (S.__escritas || []).slice(antes);
+  const grav = novas.filter(e => e.dados && e.dados.ninhosMigrados === true);
+  ok('  e ela grava a marca de MIGRADO', grav.length > 0,
+     'escritas novas: ' + novas.length);
+  ok('  com os ninhos junto', grav.some(e => e.dados.ninhosDaConta && e.dados.ninhosDaConta.moltres === true));
+
+  /* ⚠️ A MARCA E GRAVADA MESMO SEM ACHAR NADA -- senao a varredura voltaria a rodar pra sempre em
+     quem nunca acendeu um ninho, e ai ela ressuscitaria o primeiro que ele acendesse e gastasse. */
+  g.ninhosDaConta = {}; g.ninhosMigrados = false;
+  g.saveSlots = [{ team: [], montanha: { ninhos: {} } }];
+  const antes2 = (S.__escritas || []).length;
+  await S.loadPermanentUserData();
+  ok('a marca e gravada mesmo sem achar ninho nenhum',
+     (S.__escritas || []).slice(antes2).some(e => e.dados && e.dados.ninhosMigrados === true));
+
+  /* ⚠️ E A VISITA SOBREVIVE A RELEITURA DA CONTA -- defeito pre-existente, da mesma familia do
+     `novidadeVista`: o `visitarOsNinhos` grava best-effort (sem await) e este carregamento roda
+     toda vez que se volta pra HOME. Quem visitasse e voltasse antes de a gravacao propagar tinha
+     a marca ZERADA (o stub devolve um documento vazio, que e exatamente essa janela) e as missoes
+     paravam de contar em silencio. Esta marca so CRESCE. */
+  g.visitouOsNinhos = true;
+  await S.loadPermanentUserData();
+  ok('a visita NAO e apagada pela releitura da conta', g.visitouOsNinhos === true,
+     'o documento vem vazio: e a janela de quem voltou antes de a gravacao propagar');
+
+  /* ⚠️ E QUEM DECIDE SE ELA RODA E O `ninhosMigrados` DO DOCUMENTO -- isso nao da pra medir por
+     comportamento aqui (o stub devolve sempre um documento vazio), entao a trava LE O CODIGO.
+     Sem a guarda, a varredura roda em toda volta pra home e ressuscita ninho gasto. */
+  {
+    const txt = require('fs').readFileSync('index.html', 'utf8');
+    const i = txt.indexOf('game.ninhosDaConta = (d.ninhosDaConta');
+    const fatia = i >= 0 ? txt.slice(i, i + 900) : '';
+    ok('(a fatia da deducao tem o que ler)', fatia.length > 400, fatia.length + ' chars');
+    ok('a deducao roda dentro do if(!d.ninhosMigrados)', /if\(!d\.ninhosMigrados\)/.test(fatia),
+       'sem a guarda ela ressuscitaria ninho gasto em toda volta pra home');
+    ok('  e ela varre os SAVES, nao so o aberto', /game\.saveSlots\s*\|\|\s*\[\]/.test(fatia),
+       'quem subiu a Montanha ontem e hoje abriu um save novo nao seria reconhecido');
+  }
+
+  console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
+  process.exit(falhas ? 1 : 0);
+})();
