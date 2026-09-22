@@ -19141,6 +19141,42 @@ async function logout(){
    também não -- então a insígnia que o jogador ACABOU de ganhar ficava pendente enquanto ele
    pensava na escolha, e fechar a aba ali perdia a vitória. */
 const SAFE_SAVE_SCREENS = new Set(['start','walk','walkNext','gymChoice','wild','release','levels','evolution','evoChoice','eeveeChoice','escolhaDeAtaques','aprenderAtaque','golpeAprendido','teamOrder','preBattle','victory','defeat','gameover','journeyEnd','specialIntro','specialResult','mataFechada','vigiliaPremio','montanha','ninhos','montanhaLendarios','ilhas','ilhasFim','rocketHideout','eliteIntro','eliteHeal']);
+/* ⚠️ AS DUAS TELAS DAS ILHAS SO SAO PONTO SEGURO DENTRO DA VISITA PELA JORNADA, e e isso que
+   separa as duas formas de chegar nelas. Ir pra HOME **nao descarrega o save** -- o `game`
+   continua com o time, o trecho e o `currentSaveSlot`, so o `game.screen` muda --, entao abrir as
+   Ilhas pelo botao da home com um save carregado punha `screen` na tela delas e o `render()` do
+   `abrirIlhas` disparava o autosave: o save era GRAVADO APONTANDO PRA LA, e ao reabri-lo o jogador
+   caia direto nas ilhas sem travessia nenhuma. Reportado em 22/09/2026 (*"clico nele e esta
+   entrando diretamente nas ilhas laranjas, sendo que nem tinha aparecido a rota"*).
+   ⚠️ MEDIDO NO BANCO ANTES DE MEXER: 2 saves presos assim, em 177 contas -- e o que corrompe e so
+   a TELA. O time, as insignias, o trecho e o `wildOffer` estavam intactos nos dois; o save do
+   relato tinha `gymIndex 5`, 6 pokemon e o `ilhasJornada` NULO, que e a prova de que ele nunca
+   entrou pela rota. O alcance e pequeno porque as Ilhas abriram pra todo mundo em 21/09 -- mas ele
+   cresce sozinho: todo jogador que abrir um save, voltar pra home e tocar no botao fica preso.
+   E a mesma familia do HM01, que gravava a tela dele por cima da jornada, e a regra que ficou de la
+   vale aqui inteira: **nada chamado de FORA da jornada pode gravar o estado da jornada**.
+   ⚠️ E A GUARDA RESPONDE AS DUAS PERGUNTAS -- "posso gravar nesta tela?" e "esta tela gravada
+   vale?" --, porque elas sao a MESMA vista dos dois lados: fechando so a torneira, os dois saves
+   ja presos continuariam presos; consertando so a leitura, o save continuaria sendo gravado errado
+   e o jogador perderia a tela real toda vez que passasse pelas ilhas. */
+/* ⚠️ O ESTADO E PARAMETRO e nao tem padrao, de proposito: os tres chamadores do autosave
+   perguntam pelo estado VIVO (`game`) e o `applySavedState` pergunta pelo DOCUMENTO (`data`) --
+   e ali o padrao erraria em silencio, porque a tela e decidida no TOPO dele, antes de o
+   `game.ilhasJornada` ser restaurado: ele ainda seria o do save anterior. E a mesma decisao do
+   `corridaInstancia`, e ela so funciona porque os dois objetos usam os MESMOS nomes de campo.
+   ⚠️ E CADA TELA PERGUNTA PELO CAMPO QUE A JUSTIFICA, nunca as duas pela visita: o `ilhasFim`
+   acontece DEPOIS de o `sairDasIlhas` zerar o `ilhasJornada` -- e e exatamente ali que os +3
+   niveis do premio acabaram de entrar no time. Perguntando pela visita, a guarda barraria a
+   gravacao da maior recompensa da jornada fora do Bonus de Kanto. */
+function telaSegura(screen, estado){
+  if(!SAFE_SAVE_SCREENS.has(screen)) return false;
+  if(screen === 'ilhas')    return !!estado.ilhasJornada;    /* a visita em curso */
+  if(screen === 'ilhasFim') return !!estado.ilhasResultado;  /* a visita que acabou de terminar */
+  return true;
+}
+/* os dois lados da mesma pergunta, cada um lendo a fonte certa */
+function podeGravarNaTela(){ return telaSegura(game.screen, game); }
+function telaDeVolta(data){ return telaSegura(data.screen, data) ? data.screen : 'preBattle'; }
 function saveDocRef(uid, slot){
   return db.collection('users').doc(uid).collection('saves').doc(String(slot));
 }
@@ -19728,13 +19764,13 @@ async function tentarSalvarAgora(){
 let autoSaveDebounceTimer = null;
 function maybeAutoSave(){
   if(!game.authUser || game.currentSaveSlot==null) return;
-  if(!SAFE_SAVE_SCREENS.has(game.screen)) return;
+  if(!podeGravarNaTela()) return;
   // agrupa cliques rápidos (ex: distribuir vários pontos de level seguidos) numa única gravação,
   // em vez de escrever no Firestore a cada clique individual
   if(autoSaveDebounceTimer){ clearTimeout(autoSaveDebounceTimer); }
   autoSaveDebounceTimer = setTimeout(()=>{
     autoSaveDebounceTimer = null;
-    if(game.authUser && game.currentSaveSlot!=null && SAFE_SAVE_SCREENS.has(game.screen)){
+    if(game.authUser && game.currentSaveSlot!=null && podeGravarNaTela()){
       saveCurrentGame();
     }
   }, 800);
@@ -19743,7 +19779,7 @@ function flushPendingAutoSave(){
   if(!autoSaveDebounceTimer) return;
   clearTimeout(autoSaveDebounceTimer);
   autoSaveDebounceTimer = null;
-  if(game.authUser && game.currentSaveSlot!=null && SAFE_SAVE_SCREENS.has(game.screen)){
+  if(game.authUser && game.currentSaveSlot!=null && podeGravarNaTela()){
     saveCurrentGame();
   }
 }
@@ -19751,7 +19787,7 @@ function applySavedState(data){
   // trainerName NÃO é mais lido daqui -- é por conta agora (já carregado antes, via loadPermanentUserData).
   // Saves antigos ainda têm esse campo salvo (de antes dessa mudança), mas não deve mais sobrescrever o
   // nome da conta ao continuar um save antigo
-  game.screen = SAFE_SAVE_SCREENS.has(data.screen) ? data.screen : 'preBattle';
+  game.screen = telaDeVolta(data);
   game.routeCards = data.routeCards || null;
   game.gymIndex = data.gymIndex || 0;
   // saves anteriores a essa regra não têm o campo -- deduz pelo time: se já existe shiny nele, a
@@ -19810,6 +19846,13 @@ function applySavedState(data){
      que a regra de uma-vez-por-jornada existe pra impedir. */
   game.ilhasTrecho = (data.ilhasTrecho == null) ? null : data.ilhasTrecho;
   game.ilhasJornada = data.ilhasJornada || null;
+  /* ⚠️ E O `ilhasResultado` TINHA O MESMO DEFEITO DO VIZINHO, deixado pra tras quando ele foi
+     consertado: ele era GRAVADO e nunca lido de volta. O comentario do `serializeGame` promete
+     que sem ele "um F5 ali engoliria o anuncio do premio" -- e ele era engolido do mesmo jeito,
+     porque ninguem o restaurava: quem reabria o save na tela do premio via o fallback dela,
+     `0 de 5` e nenhum nivel, mesmo tendo vencido as cinco ilhas. Os +3 niveis em si nunca se
+     perderam (eles estao no `team`); o que se perdia era o ANUNCIO deles. */
+  game.ilhasResultado = data.ilhasResultado || null;
   game.evolucaoDepois = data.evolucaoDepois || null;
   game.escolhaDeAtaques = data.escolhaDeAtaques || null;
   game.escolhaDepois = data.escolhaDepois || null;

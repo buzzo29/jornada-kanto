@@ -1115,6 +1115,117 @@ function blocoDaTravessia(){
   S.applySavedState(velho);
   ok('  e save anterior à regra nasce sem marca', g.ilhasTrecho === null, String(g.ilhasTrecho));
 
+
+  /* ---------------------------------------------------------------- 11) ⚠️ A TELA GRAVADA
+     O DEFEITO DO RELATO (22/09/2026): *"o último save, quando eu clico nele, está entrando
+     diretamente nas ilhas laranjas, sendo que nem tinha aparecido pra mim a rota"*.
+
+     Ir pra HOME **não descarrega o save**: o `currentSaveSlot` continua preenchido, então abrir as
+     Ilhas pelo botão da home punha `screen:'ilhas'` e o `render()` do `abrirIlhas` disparava o
+     autosave -- o save era gravado apontando pra lá, e ao reabri-lo o jogador caía direto nas
+     ilhas. Medido no banco: 2 saves t11Presos assim em 177 contas, com o time e as insígnias
+     INTACTOS -- o que corrompe é só a tela.
+
+     ⚠️ E A TRAVA COBRA OS DOIS LADOS, porque eles são a mesma pergunta: fechando só a torneira os
+     saves já t11Presos continuariam t11Presos; consertando só a leitura, o save continuaria sendo
+     gravado errado toda vez que o jogador passasse pelas ilhas. */
+  zerar();
+
+  /* o caminho do relato, de ponta a ponta: save carregado -> home -> botão das Ilhas */
+  /* ⚠️ MEDIDO PELO AUTOSAVE DE VERDADE, e não pela guarda: a primeira versão desta trava chamava
+     o `podeGravarNaTela()` direto -- e religando o `maybeAutoSave` pro `SAFE_SAVE_SCREENS` cru a
+     função continuava certa e ela passava EM BRANCO. Trava que pergunta à função que ela mede não
+     é trava. O observável é o TIMER: a guarda de entrada é síncrona, então barrada ela não chega
+     a armar o debounce. */
+  g.authUser = { uid:'u1' }; g.currentSaveSlot = 0;
+  const armados = () => S.__timers.length;
+  g.screen = 'saveSelect';
+  S.abrirIlhas();
+  const t0 = armados(); S.maybeAutoSave();
+  ok('pela HOME o autosave NÃO grava a tela das ilhas',
+     g.screen === 'ilhas' && armados() === t0,
+     'era assim que o save era gravado apontando pra cá -- e reabri-lo caía direto nas ilhas');
+
+  /* e pela JORNADA ela é: a visita tem cinco partidas dentro e fechar a aba não pode perdê-las */
+  zerar();
+  S.entrarNasIlhasDaJornada();
+  const t1 = armados(); S.maybeAutoSave();
+  ok('  mas pela JORNADA ele grava', g.screen === 'ilhas' && armados() > t1,
+     'a travessia tem cinco partidas dentro -- um F5 no meio não pode zerá-las');
+
+  /* ⚠️ E O `ilhasFim` PERGUNTA PELO RESULTADO, nunca pela visita: ele acontece DEPOIS de o
+     `sairDasIlhas` zerar o `ilhasJornada`, e é exatamente ali que os +3 níveis do prêmio acabaram
+     de entrar no time. Pela visita, a guarda barraria a gravação da maior recompensa da jornada
+     fora do Bônus de Kanto -- este caso é o que separa as duas leituras. */
+  zerar();
+  S.entrarNasIlhasDaJornada();
+  S.ilhasComJogo().forEach(i => S.registrarResultadoDaIlha(i.id, true));
+  const t11Niveis = g.team.map(p => p.level);
+  S.sairDasIlhas();
+  ok('o prêmio das cinco ilhas entra no time',
+     g.team.every((p, i) => p.level === t11Niveis[i] + S.ILHAS_PREMIO_NIVEIS),
+     JSON.stringify(g.team.map(p => p.level)));
+  const t2 = armados(); S.maybeAutoSave();
+  ok('  e a tela do prêmio É gravada',
+     g.screen === 'ilhasFim' && !S.naJornadaDasIlhas() && armados() > t2,
+     'a visita já foi zerada aqui -- perguntar por ela engoliria os +3 níveis');
+
+  /* e sem resultado nenhum ela não vale: é o mesmo save preso, pela outra tela */
+  g.ilhasResultado = null;
+  const t3 = armados(); S.maybeAutoSave();
+  ok('  e sem resultado ela não é', armados() === t3);
+
+  /* ⚠️ NENHUMA OUTRA TELA MUDOU -- a guarda é das duas das ilhas e de mais nenhuma. Sem esta
+     varredura, "barrar tudo" passaria nos casos acima e quebraria a jornada inteira em silêncio. */
+  const t11Outras = [...S.SAFE_SAVE_SCREENS].filter(t => t !== 'ilhas' && t !== 'ilhasFim');
+  const t11Quebrou = t11Outras.filter(t => { g.screen = t; const n = armados();
+                                             S.maybeAutoSave(); return armados() === n; });
+  ok('as outras ' + t11Outras.length + ' telas seguras continuam seguras',
+     t11Quebrou.length === 0, t11Quebrou.join(','));
+  g.screen = 'naoExiste';
+  const t4 = armados(); S.maybeAutoSave();
+  ok('  e tela desconhecida continua recusada', armados() === t4);
+
+  /* ---- a LEITURA: é ela que solta os dois saves que já estão t11Presos no banco ---- */
+  /* ⚠️ O DOCUMENTO É O DO RELATO, campo por campo: `screen:'ilhas'` com a visita NULA e o
+     `ilhasTrecho` nulo -- os dois nulos são a prova de que a travessia nunca foi oferecida. */
+  /* ⚠️ PELO `applySavedState` DE VERDADE, pelo mesmo motivo do autosave acima: medindo o
+     `telaDeVolta` direto, religar a leitura pro `SAFE_SAVE_SCREENS` cru passava em branco. */
+  const abrir = doc => { S.applySavedState(JSON.parse(JSON.stringify(doc))); return g.screen; };
+  const t11Preso = { screen:'ilhas', ilhasJornada:null, ilhasTrecho:null, gymIndex:5, team:[] };
+  ok('o save PRESO cai no fallback ao abrir', abrir(t11Preso) === 'preBattle',
+     'devolveu ' + g.screen + ' -- ele se conserta sozinho na primeira abertura');
+  /* save anterior à feature nem tem o campo, e é o mesmo caso */
+  ok('  e o save sem o campo também', abrir({ screen:'ilhasFim' }) === 'preBattle');
+  /* mas quem está MESMO no meio da travessia volta pra lá */
+  ok('  e quem está na travessia volta pra ela',
+     abrir({ screen:'ilhas', ilhasJornada:{ vencidas:[], tentativas:{} } }) === 'ilhas');
+  ok('  e quem parou na tela do prêmio também',
+     abrir({ screen:'ilhasFim', ilhasResultado:{ tudo:true, niveis:3 } }) === 'ilhasFim');
+
+  /* ⚠️ E O `ilhasResultado` TINHA O MESMO DEFEITO DO VIZINHO, achado ao escrever esta trava: ele
+     era GRAVADO e NUNCA LIDO DE VOLTA -- o `applySavedState` é explícito campo a campo, e quando o
+     `ilhasJornada` foi consertado o vizinho ficou pra trás. Quem reabria o save na tela do prêmio
+     via o fallback dela (`0 de 5`, nenhum nível) mesmo tendo vencido as cinco.
+     **Trava de save tem que fazer a IDA E A VOLTA** -- olhar só o `serializeGame` prova que o
+     campo SAI, nunca que ele VOLTA. */
+  zerar();
+  S.entrarNasIlhasDaJornada();
+  S.ilhasComJogo().forEach(i => S.registrarResultadoDaIlha(i.id, true));
+  S.sairDasIlhas();
+  const t11Premio = JSON.parse(JSON.stringify(S.serializeGame()));
+  ok('o resultado do prêmio vai pro save', !!t11Premio.ilhasResultado &&
+     t11Premio.ilhasResultado.niveis === S.ILHAS_PREMIO_NIVEIS);
+  g.ilhasResultado = null;
+  S.applySavedState(t11Premio);
+  ok('  e VOLTA do save', !!g.ilhasResultado &&
+     g.ilhasResultado.niveis === S.ILHAS_PREMIO_NIVEIS && g.ilhasResultado.tudo === true,
+     'sem isso um F5 na tela do prêmio mostrava "0 de ' + S.ilhasComJogo().length + '"');
+  ok('  então a tela do prêmio não cai no fallback dela',
+     S.renderIlhasFim().indexOf('+' + S.ILHAS_PREMIO_NIVEIS + ' níveis') >= 0);
+
+  g.ilhasJornada = null; g.ilhasResultado = null; g.ilhasTrecho = null;
+
   g.ilhasJornada = null; g.ilhasTrecho = null;
 }
 

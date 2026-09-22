@@ -15423,6 +15423,118 @@ aplica de volta e cobra a visita e o surfista de pé), e o trecho 0 passa pelo m
   o que está medido é cada peça e o estado, não a travessia inteira num navegador;
 - **a Seleção não tem restrição de time**, e é o desenho — mas ela conta pro prêmio.
 
+## ⚠️ O SAVE ENTRAVA DIRETO NAS ILHAS LARANJA (22/09/2026)
+
+Reportado assim: *"o último save (slot 20) da minha conta, quando eu clico nele, está entrando
+diretamente nas ilhas laranjas, sendo que nem tinha aparecido pra mim a rota da liga laranja"*.
+
+**⚠️ A CAUSA É A HOME NÃO DESCARREGAR O SAVE — e isso já estava escrito neste arquivo.** A nota do
+HM01 diz, com todas as letras: *"a mochila é aberta da HOME, e ir pra home NÃO descarrega o save: o
+`game` continua com o time, o trecho, as cartas de rota e tudo o mais — só o `game.screen` muda"*.
+Então, com um save aberto e o jogador de volta na home, o `currentSaveSlot` **continua preenchido**:
+
+```
+clica em "Ilhas Laranja"  ->  abrirIlhas()  ->  game.screen = 'ilhas'  ->  render()
+render()                  ->  maybeAutoSave()
+maybeAutoSave()           ->  'ilhas' ESTÁ no SAFE_SAVE_SCREENS  ->  GRAVA o save do slot aberto
+```
+
+O save era gravado **apontando pra tela das ilhas**, e o `applySavedState` (que devolve qualquer
+tela do `SAFE_SAVE_SCREENS`) levava o jogador direto pra lá na próxima abertura.
+
+**⚠️ E O JOGADOR ESTAVA CERTO NAS DUAS METADES DO RELATO — o documento prova.** Lido no Firestore
+antes de mexer em qualquer coisa:
+
+| campo | valor | o que ele diz |
+|---|---|---|
+| `screen` | **`ilhas`** | o sintoma |
+| **`ilhasJornada`** | **`null`** | ele **nunca** entrou pela travessia |
+| **`ilhasTrecho`** | **`null`** | a carta **nunca chegou a ser oferecida** |
+| `gymIndex` / `badgeCount` | 5 / 5 | 6º trecho, Dojo Lutador, `losses: 1` |
+| `team` | 6 pokémon Lv.46–57 | intacto |
+
+**NADA DE PROGRESSO SE PERDEU: o que corrompe é só a TELA.** O time, as insígnias, o trecho, o
+`rivalPool` e o `wildOffer` estavam todos lá.
+
+**MEDIDO NO BANCO, em 177 contas: 2 saves presos assim** — o do relato e um de outra conta, no 8º
+trecho. O alcance é pequeno porque as Ilhas abriram pra todo mundo em 21/09; **ele cresce sozinho**,
+porque todo jogador que abrir um save, voltar pra home e tocar no botão fica preso.
+
+**⚠️ E A JANELA DE RECUPERAÇÃO NÃO ALCANÇOU.** O `readTime` do Firestore lê o documento como ele
+estava em qualquer instante da **última hora** — e a sobrescrita foi às **16:53**, quase três horas
+antes do relato. A versão mais antiga alcançável já tinha `screen:'ilhas'`. Não fez falta (o estado
+estava inteiro), mas fica registrado: **neste projeto o diagnóstico de dado perdido tem uma hora de
+prazo**, e é a primeira coisa a tentar.
+
+### O CONSERTO SÃO OS DOIS LADOS DA MESMA PERGUNTA
+
+As duas telas das ilhas **precisam** ser ponto seguro de gravação **dentro da visita** — ela tem
+cinco partidas dentro e um prêmio no fim, e fechar a aba no meio não pode zerá-las. Então tirá-las
+do `SAFE_SAVE_SCREENS` não serve: o que muda é **de onde se chegou nelas**.
+
+- **`telaSegura(screen, estado)`** responde às duas perguntas, porque elas são a MESMA vista dos
+  dois lados: *"posso gravar nesta tela?"* (o autosave) e *"esta tela gravada vale?"* (o
+  `applySavedState`). **Fechando só a torneira, os dois saves já presos continuariam presos;
+  consertando só a leitura, o save continuaria sendo gravado errado toda vez.**
+- **⚠️ E CADA TELA PERGUNTA PELO CAMPO QUE A JUSTIFICA**, nunca as duas pela visita — e este é o
+  ponto em que o conserto **quase nasceu com um defeito maior que o original**. O `ilhasFim`
+  acontece **DEPOIS** de o `sairDasIlhas` zerar o `ilhasJornada`, e é exatamente ali que os **+3
+  níveis do prêmio** acabaram de entrar no time. Perguntando pela visita, a guarda **barraria a
+  gravação da maior recompensa da jornada fora do Bônus de Kanto**. Hoje o `ilhas` pergunta pelo
+  `ilhasJornada` e o `ilhasFim` pelo `ilhasResultado`.
+- **⚠️ O ESTADO É PARÂMETRO E NÃO TEM PADRÃO**, pela mesma razão do `corridaInstancia`: os três
+  chamadores do autosave perguntam pelo estado **VIVO** (`game`) e o `applySavedState` pergunta pelo
+  **DOCUMENTO** (`data`) — e ali o padrão erraria **em silêncio**, porque a tela é decidida no TOPO
+  dele, antes de o `game.ilhasJornada` ser restaurado: ele ainda seria o do save **anterior**. Isso
+  só funciona porque os dois objetos usam os mesmos nomes de campo.
+- **OS SAVES PRESOS SE SOLTAM SOZINHOS**, na primeira abertura depois do deploy: sem visita, a tela
+  cai no `preBattle` — que é o fallback que o `applySavedState` já tinha pra qualquer tela não
+  segura, e que no save do relato é **exatamente onde ele deveria estar** (time completo, golpes
+  escolhidos, `pendingLevels` ausente, 1 derrota no 6º ginásio). Nada foi escrito no banco à mão.
+- **⚠️ E O QUE ELE NÃO CONSERTA, registrado:** se o save estivesse parado no **encontro selvagem**
+  quando isso acontecesse, o fallback custaria a oferta daquele trecho. É o comportamento que o jogo
+  já tem pra toda tela não segura, e deduzir a tela a partir do estado seria mecânica nova.
+
+**⚠️ A REGRA DO HM01 VALE AQUI INTEIRA, e é a terceira vez que ela é paga:** *nada chamado de FORA
+da jornada pode gravar o estado da jornada.*
+
+### ⚠️ E O `ilhasResultado` TINHA O MESMO DEFEITO DO VIZINHO
+
+Achado ao escrever a trava, não por relato: ele era **GRAVADO e nunca lido de volta** — o
+`applySavedState` é explícito campo a campo, e quando o `ilhasJornada` foi consertado (21/09) o
+**vizinho ficou pra trás**.
+
+O comentário do `serializeGame` promete que sem ele *"um F5 ali engoliria o anúncio do prêmio"* — e
+ele era engolido do mesmo jeito, porque ninguém o restaurava: quem reabria o save na tela do prêmio
+via o **fallback** dela (`0 de 5`, nenhum nível) mesmo tendo vencido as cinco ilhas. Os +3 níveis
+nunca se perderam (eles estão no `team`); o que se perdia era o **anúncio**.
+
+**CONFERIDO QUE NÃO É MOTOR, por impressão:** `MOTOR d19915312988 / DIARIO 741ec5a626c3`, idêntico
+ao build anterior em 900 batalhas semeadas — e o instrumento é sensível (com o `CRIT_BASE` mexido os
+dois hashes mudam). Bateria: **37 de 37**.
+
+### ⚠️ E AS DUAS TRAVAS PRINCIPAIS NASCERAM MEDINDO A FUNÇÃO, NÃO OS CHAMADORES
+
+Na conferência de acusação, **os dois defeitos que importam passaram em branco**: religando o
+autosave e o `applySavedState` pro `SAFE_SAVE_SCREENS` cru, o `podeGravarNaTela` e o `telaDeVolta`
+**continuavam certos** — e era só eles que as travas chamavam.
+
+É a armadilha do *"trava que pergunta à função que ela mede não é trava"*, e o conserto é exercitar
+o caminho real:
+
+- **o autosave** é dirigido de verdade, e o observável é o **TIMER**: a guarda de entrada é
+  síncrona, então barrada ela não chega a armar o debounce (`S.__timers`);
+- **a leitura** passa pelo `applySavedState` de verdade, com o documento do relato campo por campo.
+
+Com isso os **5 defeitos religados acusam** (2 a 3 falhas cada) — incluindo o do excesso: uma guarda
+que barrasse **todas** as telas passaria nos casos nomeados e quebraria a jornada inteira em
+silêncio, e é a varredura das outras 29 telas seguras que a pega.
+
+**⚠️ E UM RENOMEADOR GLOBAL ENTROU NUM COMENTÁRIO.** Ao desfazer uma colisão de nome no teste, o
+`split/join` da palavra `preso` trocou também a palavra dentro de um comentário em prosa. É a
+armadilha do padrão largo demais, a mesma das regex do `mlog-mais` e do `matchup-row` — e a que já
+fez um comentário acusar a si mesmo cinco vezes neste arquivo.
+
 ## AS ILHAS LARANJA ABRIRAM PRA TODO MUNDO, E O MONITOR NASCEU JUNTO (21/09/2026)
 
 Pedido assim: *"crie um monitor para eu conseguir ver quais treinadores já jogaram algum jogo das
