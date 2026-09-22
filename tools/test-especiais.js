@@ -9145,8 +9145,20 @@ console.log('\n=== VIDA CHEIA NAO MORRE NUM GOLPE (17/09/2026) ===');
     const iSelo = cli.indexOf('<svg class="selo ');
     const decl = iSelo < 0 ? '' : cli.slice(iSelo, iSelo + 150);
     ok('e o selo sai SEM crispEdges', iSelo > 0 && decl.indexOf('crispEdges') < 0, decl.slice(0, 80));
-    ok('e nenhuma classe devolve o crispEdges pelo CSS',
-       cli.indexOf('shape-rendering:crispEdges') < 0, 'alguma classe devolve')
+    /* ⚠️ E A VARREDURA E DO SELO, NAO DO ARQUIVO (22/09/2026). Ela grepava
+       `shape-rendering:crispEdges` no index.html INTEIRO -- e isso era um proxy CERTO
+       enquanto o selo era o unico SVG com regra de CSS no arquivo. Deixou de ser no dia
+       em que a cena nova de batalha trouxe os icones de status (`.battle-status-effect
+       svg`): eles sao pixel art de 16x16 desenhada PRA ter crispEdges, e nao tem contorno
+       de 2px pra perder -- ou seja a trava passou a acusar o que estava certo, que e a
+       mesma familia de trava-que-envelhece que este arquivo ja registra varias vezes.
+       Hoje ela pergunta o que sempre quis perguntar: nenhuma REGRA QUE ALCANCE UM `.selo`
+       pode devolver o crispEdges. O resto do arquivo pode ter o seu. */
+    const regras = cli.match(/[^{}]+\{[^{}]*\}/g) || [];
+    const devolvem = regras.filter(r => r.indexOf('shape-rendering:crispEdges') >= 0
+                                     && /\.selo\b/.test(r.slice(0, r.indexOf('{'))));
+    ok('e nenhuma regra do selo devolve o crispEdges pelo CSS',
+       devolvem.length === 0, devolvem.map(r => r.trim().slice(0, 70)).join(' | '))
   }
 
   console.log('\n=== O GERADOR E A TABELA CONCORDAM ===');

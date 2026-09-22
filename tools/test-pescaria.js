@@ -283,7 +283,15 @@ console.log('\n=== A BATALHA DA TELA É A DA JORNADA ===');
   S.pescariaSurgir(5);
   S.pescariaComecarBatalha(0, S.pescaria.oportunidades[5]);
   const p0 = S.pescaria.jogadores[0];
+  /* ⚠️ O GATE DA CENA NOVA TROCA A MARCAÇÃO, e o contaAdmin() acima o LIGA. As travas abaixo
+     descrevem o visual de quem NÃO é admin -- o que todo jogador vê --, então o bloco desliga o
+     gate pra medi-lo. A cena entra logo em seguida, pela MESMA função. Sem isso elas mediriam a
+     cena e acusariam o que está certo, que é a trava que envelhece junto com a tela. */
+  g.ehAdmin = false;
   const html = S.pescariaBatalhaHtml(p0);
+  g.ehAdmin = true;
+  const htmlCena = S.pescariaBatalhaHtml(p0);
+  g.ehAdmin = false;
 
   /* ---- O LAYOUT: são as MESMAS funções do renderBattling ---- */
   ok('o quadro usa o fighterHtml da casa', (html.match(/class="fighter"/g) || []).length === 2,
@@ -310,6 +318,16 @@ console.log('\n=== A BATALHA DA TELA É A DA JORNADA ===');
      bônus que esta batalha não dá. */
   ok('  e sem o selo de terreno (não há terreno aqui)', html.indexOf('#s-terreno') < 0);
   ok('o prêmio está na tela da luta', html.indexOf('PTS') >= 0);
+
+  /* ---- E COM O GATE LIGADO É A MESMA fighterHtml, na cena nova (22/09/2026) ---- */
+  ok('com admin o quadro vira a CENA, pela mesma fighterHtml',
+     (htmlCena.match(/class="fighter battle-fighter/g) || []).length === 2,
+     (htmlCena.match(/class="fighter battle-fighter/g) || []).length + ' lutadores');
+  /* ⚠️ E O CENÁRIO É O MANGUEZAL, sempre: aqui o id do terreno é uma COORDENADA DE IMAGEM.
+     O atlas 3 é o recorte dele -- e o fallback (campo_aberto) cai no atlas 0, então este número
+     também prova que a tabela reconheceu o id. */
+  ok('  no cenário do Manguezal (atlas 3)', /--battle-atlas:3;/.test(htmlCena));
+  ok('  e ele é SÓ cenário: nenhum selo de terreno', htmlCena.indexOf('#s-terreno') < 0);
 
   /* ---- O RITMO: os números são os do advanceReveal ---- */
   /* ⚠️ ESTA TRAVA LÊ O CÓDIGO DA JORNADA. Escritos à mão nos dois lugares, os números divergiriam
@@ -1278,11 +1296,29 @@ console.log('\n=== OS SELOS 🔥🟣⚡ APARECEM NO QUADRO ===');
   ok('  o selo FALTA no passo 0 e SAI no quadro repintado', achados > 0 && certos === achados,
      certos + ' de ' + achados);
   /* e quem repinta é o passo da área, no mesmo instante em que a jornada chama o render() */
-  const fa = src.slice(src.indexOf('function pescariaPintarArea'), src.indexOf('function pescariaPintarArea') + 1600);
+  /* ⚠️ A FATIA É A FUNÇÃO INTEIRA, e não um número de caracteres: com 1600 fixos ela já
+     envelheceu uma vez -- o bloco da cena empurrou o que ela procura pra FORA da janela e ela
+     caiu com o código certo. É a mesma armadilha que este projeto já pagou três vezes. */
+  const iPa = src.indexOf('function pescariaPintarArea');
+  const fa = src.slice(iPa, src.indexOf('\nfunction ', iPa + 1));
+  ok('(a fatia do pescariaPintarArea tem o que ler)', fa.length > 600, fa.length + ' chars');
   ok('  e o pescariaPintarArea repinta o bloco dos lutadores', /pescBatalhaVs/.test(fa));
+  /* ⚠️ E A LINHA DO RENDER É LIDA INTEIRA, sem cravar o texto do atributo: ele ganhou o
+     cenaNova da cena, e uma trava que compara a string crua acusa o que está certo. */
+  const linhaVs = (src.match(/^.*id="pescBatalhaVs".*$/m) || [''])[0];
   ok('  pela MESMA função que o render monta',
-     /pescariaLutadoresHtml\(b\)/.test(fa) &&
-     src.indexOf('id="pescBatalhaVs">${pescariaLutadoresHtml(b)}') >= 0);
+     /pescariaLutadoresHtml\(b\)/.test(fa) && linhaVs.indexOf('${pescariaLutadoresHtml(b)}') >= 0,
+     linhaVs.trim().slice(0, 64));
+  /* ⚠️ E NA CENA ELE NÃO REFAZ O QUADRO INTEIRO -- trocar o innerHTML RECRIA os <img>, e um GIF
+     recriado volta pro primeiro quadro: o sprite ficaria preso no começo do laço, com um tranco a
+     cada golpe. Só o painel e a classe do lutador são repintados; o palco do sprite fica de pé.
+     Medido no navegador: com o innerHTML inteiro o <img> é OUTRO elemento em 3 de 3 passos; assim
+     ele é o MESMO nos 3 -- e o painel atualiza igual nos dois. */
+  ok('  e na CENA ele repinta só o painel, sem recriar o sprite',
+     /\.battle-mon-panel'\)\.innerHTML =/.test(fa) && /battle-scene/.test(fa));
+  /* ⚠️ COM A ESTRUTURA DIFERENTE ele refaz tudo: a vaga vazia do Remoinho não tem painel, e sem
+     essa saída o quadro ficaria com o painel de quem acabou de ser soprado pra fora. */
+  ok('  e volta a refazer o quadro quando a estrutura muda', /vs\.innerHTML = fonte/.test(fa));
 }
 
 /* ============================================================================

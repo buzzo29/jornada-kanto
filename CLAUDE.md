@@ -5540,6 +5540,346 @@ outro, coloque setinhas para ir paginando os dias"*.
   visível do que era (o dia com um inscrito só leva ouro **e mais nada**; o dia vazio não tem
   medalha nenhuma).
 
+## A CENA NOVA DE BATALHA, ATRÁS DO GATE DE ADMIN (22/09/2026)
+
+Pedida assim: *"ele possui um cenário gráfico diferente do index atual no momento das batalhas, com
+sprites, cenários e animações diferentes ... pegue SOMENTE essa parte gráfica ... coloque que somente
+quem está com admin=true veja essa nova animação, que não tem admin=true continua vendo a batalha
+como ela é hoje"*, e depois: *"quero que a batalha fique EXATAMENTE como está nesse arquivo"*.
+
+A origem é o `index-novos-graficos.html` da raiz — um branch **ANTIGO** do mesmo arquivo (39.906
+linhas contra 39.026), com a cena nova pronta e **sem** várias features recentes (Montanha Sagrada,
+Ilhas Laranja, HM03, Home 2.0). Ou seja: o diff entre os dois é quase todo **REMOÇÃO**, e o port é
+uma colheita seletiva — não um merge.
+
+**O QUE A CENA É:** sprites animados da Gen V (o adversário de frente, o jogador **de costas**),
+fundo de pixel art por TERRENO, placas de HP separadas em vez do bloco central, avanço do atacante,
+tremor e flash no alvo, número de dano subindo, desmaio, explosão da autodestruição, e seis ícones
+de status flutuando sobre o sprite (sono, veneno, queimadura, paralisia, gelo, confusão).
+
+### ⚠️ ELA VALE EM DUAS TELAS, E SÓ NELAS
+
+`renderBattling` (jornada + Ginásio da Cidade) e `renderSpecialBattling` (Elite, Rocket, rival,
+Vigília). A **Torre**, a **liga assistida**, o **online** e a **pescaria** continuam no desenho
+antigo — e isso não é corte meu: **é o que o próprio arquivo de origem faz**, declarado no comentário
+do CSS dele (*"a classe `.battle-scene` isola tudo: pescaria, online e telas antigas que ainda usam
+`.battle-vs` continuam com o desenho anterior até serem migradas de propósito"*).
+
+É por isso que só **DOIS** dos quatro laços de revelação chamam o `animarGolpeNaCena`
+(`advanceSpecialReveal` e `advanceReveal`): os outros dois não têm cena pra animar.
+
+### ⚠️ O GATE É UMA FUNÇÃO SÓ, E O PONTO QUE ELE PROTEGE NÃO É ÓBVIO
+
+```js
+function visualNovoDeBatalha(){ return game.ehAdmin === true; }
+```
+
+`=== true` exatamente, como as portas das Ilhas Laranja: `'sim'`, `1` e `'true'` não abrem. Ele é
+lido em **seis** pontos (os dois containers, os dois `fighterHtml`, o sprite com status e o preload
+dos GIFs) — escrito em cada um, o próximo ponto nasceria sem ele e a cena vazaria pra todo mundo.
+
+**⚠️ O PONTO QUE SUSTENTA A IDENTIDADE DO NÃO-ADMIN É O `spriteComStatusHtml`.** No arquivo de
+origem ele envolve o sprite **também no caminho ANTIGO** (o `fighterHtml` de sempre, a liga assistida
+e o online) — ou seja, colado sem gate ele poria os ícones de status na tela de **todo jogador**.
+A guarda mora **dentro** dele:
+
+```js
+if(!visualNovoDeBatalha()) return sprite;
+```
+
+Uma linha, e com ela qualquer caminho antigo que venha a chamá-lo volta a devolver o HTML de hoje
+byte a byte, sem precisar de um `if` em cada chamador.
+
+### ⚠️ E OS ÍCONES DE STATUS FICARAM SÓ NA CENA — o que o navegador pegou
+
+O `fighterHtml` tem **seis** chamadores, e só quatro passam `visualNovo`: os outros dois são a
+**TORRE** (`renderTrainerBattling`, que serve também o boss e a Seleção) e a **PESCARIA**. O arquivo
+de origem envolve o sprite com `spriteComStatusHtml` no caminho antigo também — então, portado ao pé
+da letra, um **admin** passaria a ver os seis ícones na Torre e na Pescaria.
+
+**Medido a 320px no navegador, e é feio:** na Torre os ícones caem **EM CIMA do placar de
+pokébolas**. A causa é estrutural — o `.battle-status-fx` é `bottom:calc(100% + 3px)` do sprite, e no
+layout antigo **o sprite é o PRIMEIRO elemento do `.fighter`**, então o "acima dele" é justamente a
+linha do placar. Na cena nova isso não acontece: lá o sprite fica no rodapé do palco e sobra campo
+acima dele.
+
+Então **o wrap do caminho antigo ficou de fora**, e essa é a única diferença estrutural em relação à
+origem. Com ela, **as telas que seguem no desenho antigo continuam byte a byte iguais pra todo
+mundo, admin inclusive** — e os ícones ficam onde a cena está, que é onde eles foram desenhados pra
+caber.
+**⚠️ A TORRE E A PESCARIA ESTAVAM NESSA LISTA QUANDO ISTO FOI ESCRITO, e saíram dela horas depois**,
+quando ganharam cenário (ver as seções abaixo). Hoje os que sobram no caminho antigo são o **Boss de
+Domingo**, a **Seleção** da Ilha Kumquat, o desafio por **código de treinador** e o **online**. Se um dia forem pra valer nas telas antigas, o que falta não é o wrap: é reposicionar o
+`.battle-status-fx` pra aquele layout.
+
+**⚠️ E ELE COBROU DUAS VEZES O MESMO TIPO DE PEDÁGIO, os dois já registrados neste arquivo:**
+o comentário que explica a decisão nasceu como um `${…}` **separado** e acrescentou **uma linha de
+indentação ao HTML de todo mundo** — a medição de identidade caiu de 80/80 pra 0/82 e apontou na
+hora; ele passou a viver dentro do comentário que já existia ali. E, escrito com **crase** em volta
+dos nomes de classe, ele **fechou o template literal** — e essa é a armadilha pior, porque com um
+número PAR de crases o `node --check` **passa** e a tela só quebra no navegador.
+
+### ⚠️ OS 18 MB DE ATLAS VIRARAM SEIS PNG — e é a decisão mais cara desta leva
+
+O arquivo de origem embute os 6 atlas de terreno como `data:image/png;base64` **dentro do CSS**:
+**13,5 MB de PNG que viram 18,05 MB de base64**. Colados aqui, o `index.html` iria de 2,48 MB para
+**20,5 MB**.
+
+**E isso não seria "um arquivo maior": seria o jogo inteiro parando de abrir.** Este arquivo já
+registra, na seção de Deploy, que o Hosting **NUNCA devolve 304** pro `index.html` — *toda abertura
+do jogo baixa o arquivo inteiro*. Medido, o que trafega:
+
+| | gzip (o que desce em toda abertura) |
+|---|---|
+| hoje | **799 KB** |
+| com os atlas em arquivo (o que está no ar) | **812 KB** (+1,7%) |
+| **com os atlas embutidos, como na origem** | **15,0 MB** (**18,5×**) |
+
+Os 15 MB cairiam em **todo jogador, admin ou não, em toda abertura** — inclusive em quem nunca vai
+ver a cena. Os atlas saíram pra `assets/batalha/atlas-0..5.png` e o CSS os pede por caminho relativo.
+
+- **O `firebase.json` publica a RAIZ** (`"public": "."`) e o `hosting.ignore` não cobre `assets/`,
+  então eles são servidos em `jornadakanto.com/assets/batalha/…` sem mexer em nada.
+- **⚠️ E ELES SÓ BAIXAM QUANDO A CENA DESENHA:** `background-image` de uma regra que ninguém casa não
+  é requisitada. Pro não-admin o custo é **ZERO** — os 13 KB de gzip acima são só o CSS e o JS.
+- **O visual é IDÊNTICO** — é o mesmo PNG, byte a byte, só que num arquivo em vez de numa string.
+- **⚠️ E O SELETOR ACOPLA NO FORMATO DA STRING INLINE:** ele é
+  `[style*="--battle-atlas:0;"]` — **sem espaço depois dos dois-pontos e COM ponto-e-vírgula**. Quem
+  mexer no `terrainBattleSceneStyle` tem que manter esse formato, senão o fundo some sem erro nenhum.
+
+### ⚠️ O DRIFT QUE TERIA APAGADO O SELO DA ESPECIALIDADE
+
+Os dois arquivos derivaram, e o `fighterHtml` da origem usa **`selo('medalha','selo-g')`** pro selo
+🎖️ da especialidade. **`'medalha'` não existe na tabela `DESENHOS` — nem aqui, nem no arquivo de
+origem** (conferido nos dois): `selo()` de um nome desconhecido sai **VAZIO, sem erro**, que é o
+defeito do selo fantasma que este arquivo já registra em produção.
+
+Ou seja: **a cena nova, no arquivo de origem, perde o selo da especialidade e ninguém notou.** Aqui
+ele foi portado como **`selo('medalha_ouro','selo-g')`**, que é o nome que o caminho antigo já usa.
+É a **única** diferença deliberada em relação à origem, e ela é pra o selo continuar aparecendo.
+
+### O QUE FOI MEDIDO ANTES DE COLAR
+
+- **OS 51 TERRENOS BATEM EXATO.** `TERRAIN_SCENE_META` e `TERRAIN_SCENE_TILES` têm 51 entradas cada,
+  e o conjunto de ids é **idêntico** ao do `TERRAINS` daqui: **0 terrenos sem cenário**, 0 cenários
+  órfãos. Nenhum cai no fallback do `campo_aberto`.
+- **O CSS NÃO TEM COMO VAZAR: os 125 seletores do bloco contêm uma classe `battle-*` nova.** As
+  únicas três `.battle-*` que já existiam (`.battle-vs`, `.battle-status-area`,
+  `.battle-result-line`) não são tocadas, e os 10 `@keyframes` novos têm nome livre.
+  **⚠️ E a `.battle-status-area` é IRMÃ da `.battle-vs`, não filha** — o `overflow:hidden` da cena
+  não corta a linha de status.
+- **O MOTOR NÃO FOI TOCADO, e o instrumento é sensível:** `MOTOR 47d16bcb4c3f / DIARIO 053483c8b60c`,
+  **idêntico** antes e depois em 900 batalhas semeadas — e a mesma medição com o `CRIT_BASE` mexido
+  muda os dois hashes, que é o que impede o hash imóvel de não provar nada.
+
+### ⚠️ A IDENTIDADE DO NÃO-ADMIN FOI MEDIDA, NÃO ARGUMENTADA
+
+82 telas renderizadas nos dois builds com o mesmo estado (4 fases × 3 terrenos × 4 confrontos, mais
+o `fighterHtml` cru nos dois lados e em quatro passos): **80 de 80 saem byte a byte iguais** (as
+duas restantes são a própria função nova, que não existe no build de antes).
+
+**E a primeira medição pegou uma diferença de verdade: +14 bytes por tela.** Não era elemento
+nenhum — eram **duas linhas em branco**, das interpolações `${cenaNova ? … : ''}` da grade e da
+camada de efeitos, que deixavam a linha vazia quando o gate estava fechado. Hoje a quebra de linha
+faz parte do próprio condicional (`${cenaNova ? '\n      <div …>' : ''}`), e aí sem cena não sobra
+nem a linha. **Whitespace não muda o que a tela desenha — mas "byte a byte" só vale se for medido.**
+
+**E do lado do ADMIN a conta fecha pro outro lado:** contra o `index-novos-graficos.html`, **todas as
+telas da CENA saem idênticas — zero diferenças**. As únicas que diferem são as do caminho ANTIGO, e
+elas diferem de propósito: são os ícones de status que ficaram de fora do **caminho antigo** (item
+acima).
+
+### O QUE FICOU DE FORA, E É DECISÃO — não esquecimento
+
+O arquivo de origem tem, na MESMA camada, mais duas coisas que **não** trocam cenário nenhum (são só
+os seis ícones de status sobre o sprite antigo):
+
+1. **A LIGA ASSISTIDA.** Custo **zero** e auto-gateada pelo `spriteComStatusHtml`. Ficou de fora só
+   porque o pedido é sobre a batalha da jornada; são duas linhas quando se quiser.
+2. **⚠️ O ONLINE — e este NÃO é gateável.** Ele depende do refactor `virarMatchup`, e **ele não é só
+   refactor: ele muda o online pra TODO MUNDO** (só pro lado B). Medido em 4.000 confrontos, o que
+   ele consertaria:
+
+   | | hoje (lado B) | com o refactor |
+   |---|---|---|
+   | a sequência que o lado B vê difere da real | **100%** | — |
+   | frase de passiva com a contagem de passos fora de sincronia | 86,8% delas | 0 |
+   | selos de status no pokémon ERRADO | **8,30%** dos confrontos | 0 |
+
+   Ou seja: **hoje os dois jogadores da mesma partida assistem a lutas diferentes** — o lado A vê os
+   golpes reais e o lado B vê a reconstrução. Isso é defeito de produção, e este arquivo já o
+   registrava em aberto na seção da drenagem (*"o conserto é uma linha, mas ele muda o que metade dos
+   jogadores vê numa batalha PvP e merece medição própria"*). **Esta é a medição.**
+
+   Ficou de fora porque o pedido foi explícito em não mexer em mais nada, e porque gateá-lo seria
+   pior que as duas opções: a MESMA partida PvP animaria diferente conforme quem assiste ser admin.
+   O preço de fazê-lo um dia está medido: o lado B ganha a luta de verdade e paga ~12% de compressão
+   a mais na animação (fator 0,906 → 0,801), **com a janela de escolha intacta** — é pra isso que o
+   `ORCAMENTO_ANIM_ONLINE_MS` existe.
+
+### ⚠️ E UMA TRAVA ENVELHECEU NO MESMO DIA
+
+`tools/test-especiais.js` cobrava *"nenhuma classe devolve o crispEdges pelo CSS"* grepando
+`shape-rendering:crispEdges` no **arquivo inteiro** — e isso era um proxy **certo** enquanto o selo
+era o único SVG com regra de CSS aqui. Os ícones de status novos (`.battle-status-effect svg`) são
+pixel art de 16×16 desenhada **pra** ter crispEdges, e não têm contorno de 2px pra perder: a trava
+passou a acusar o que estava certo.
+
+Hoje ela pergunta o que sempre quis perguntar — **nenhuma REGRA QUE ALCANCE UM `.selo`** pode
+devolver o crispEdges — e continua acusando quando ele volta pro selo (conferido religando o
+defeito). É a mesma família de trava-que-envelhece que este arquivo já registra meia dúzia de vezes.
+
+### A CENA CHEGOU NA TORRE, NA LIGA E NO GINÁSIO DA CIDADE (22/09/2026)
+
+Três pedidos em sequência, no mesmo dia: *"na torre dos treinadores, pode deixar o cenário sendo
+sempre o dojo, porém sem os atributos que o dojo proporciona"* e *"as batalhas das ligas e ginásio
+da cidade também fique nesse modelo de gráfico novo"*.
+
+**O GINÁSIO DA CIDADE JÁ ESTAVA PRONTO, e isso não é sorte:** o desafio dele passa pelo MESMO
+`renderBattling` da jornada (`game.battleResultContext === 'neighborhoodGym'`), que só troca o
+rótulo e o terreno. Ele entrou junto com a jornada e usa o `game.neighborhoodGymBattleTerrain` —
+conferido na tela.
+
+#### ⚠️ A TORRE LUTA SEMPRE NO DOJO, e é SÓ o cenário
+
+`CENARIO_DA_TORRE = 'dojo_tradicional'`, passado direto pro `terrainBattleSceneStyle`.
+
+**E ele não dá bônus nenhum por CONSTRUÇÃO, não por cuidado:** quem pinta o fundo é o
+`terrainBattleSceneStyle`, que só devolve variáveis de CSS (qual atlas e que pedaço dele recortar).
+O 1,15× vem do `applyTerrainBuff`, no motor, e ele é chamado por quem **MONTA** a batalha.
+**Conferido nos DOIS motores:** as chamadas do cliente são `runSpecialBattle`, `runBattle`,
+`resolveTrainersLeagueMatch` e `resolveLeagueMatch` — nenhuma é a Torre; e no servidor o
+`fightTrainerTowerFloor` tem **ZERO** chamadas. Não havia o que desligar: o id do dojo aqui é uma
+**coordenada de imagem**, não um terreno.
+
+**E o selo 🔺 continua fora** porque os dois `fighterHtml` seguem com `comTerreno:false` — ele
+prometeria um bônus que esta batalha não dá, que é a mesma regra pela qual ele já não aparecia lá.
+
+**⚠️ SÓ A TORRE, e a distinção importa:** o `renderTrainerBattling` serve **QUATRO** telas — a
+Torre, o **Boss de Domingo**, a **Seleção** da Ilha Kumquat e a batalha por **código de treinador**
+(que é também a reprise de um desafio do Ginásio da Cidade). O pedido nomeia a Torre, então o
+cenário é ligado pelo `towerBattlePending` e os outros três seguem no desenho antigo — conferido:
+das 16 telas medidas, só as duas da Torre com admin mudaram. Pra estendê-lo a eles, é tirar esse
+termo da conta do `cenaNova`.
+
+#### A LIGA ASSISTIDA, e o que ela já fazia por fora
+
+Ela é a única das telas de batalha que montava os lutadores **INLINE**, sem passar pelo
+`fighterHtml` — por isso ela tinha ficado de fora da primeira leva. No ramo da cena ela passou a
+usar o `fighterHtml` como todas as outras; **o bloco antigo foi preservado inteiro no `else`**, então
+quem não é admin recebe o HTML de hoje byte a byte.
+
+- **O terreno dela é REAL** (a liga tem terreno escolhido), então a cena usa o `w.terrain` de
+  verdade e o 🔺 continua honesto — ao contrário da Torre, que é só cenário.
+- **⚠️ E O SELO DO TERRENO TROCOU DE FONTE, o que é um conserto de graça:** o bloco inline
+  recalculava o buff na mão (`playerSp.types.some(t => w.terrain.types.includes(t))`) — uma cópia da
+  regra do `applyTerrainBuff`. O `fighterHtml` lê o **`m.playerBuffed`**, que é a flag que o próprio
+  motor gravou. Conferido que ela existe no log guardado: o `storeMatchLogAndStrip` grava os
+  `matchups` inteiros, o campo é de **28/08/2026** e os logs de liga são podados em 48 ciclos
+  (~2 dias) — ou seja **nenhum log no ar é velho o bastante pra não ter o campo**.
+- **E a liga ganhou os selos DESENHADOS:** o bloco inline ainda usava os emojis crus `🌟` e `🎖️`,
+  esquecidos quando os emojis viraram desenho em 18/09. No ramo da cena eles saem pelo `selo()`,
+  como no resto do jogo.
+
+#### ⚠️ O LAÇO DE REVELAÇÃO NÃO PRECISA SABER QUEM TEM CENA
+
+Os quatro laços agora chamam o `animarGolpeNaCena`, **sem `if` nenhum**: ele sai na primeira linha
+quando não acha um `.battle-vs.battle-scene` na tela. Um teste no chamador seria uma segunda regra
+dizendo a mesma coisa — e ela envelheceria no dia em que o Boss ou a Seleção também ganhassem
+cenário.
+
+#### O QUE FOI MEDIDO
+
+| | |
+|---|---|
+| Torre: telas medidas nos dois builds | **14 de 16 idênticas** — só as duas do admin mudaram |
+| Liga + Ginásio da Cidade | **4 de 8 idênticas** — só as quatro do admin mudaram |
+| o dojo cai no atlas certo | atlas **1**, recorte `0% 0%` — e **não** é o fallback (o `campo_aberto` é `50% 0%`) |
+| selo de terreno na Torre | **zero**, nas duas fases |
+| motor | `MOTOR 47d16bcb4c3f / DIARIO 053483c8b60c`, **idêntico** em 900 batalhas semeadas |
+| baterias | **36 de 36** passam |
+
+### A PESCARIA LUTA NO MANGUEZAL (22/09/2026)
+
+Pedido junto do resto: *"online não precisa, e na pescaria coloque apenas o cenário do manguezal,
+sem colocar os atributos"*.
+
+`CENARIO_DA_PESCARIA = 'porto_abandonado'` — o **"Manguezal"** da tabela `TERRAINS` (Água/Inseto),
+que cai no **atlas 3**. É a mesma decisão do dojo da Torre, e pelo mesmo motivo: **o
+`terrainBattleSceneStyle` só devolve variáveis de CSS**, e o 1,15× vem do `applyTerrainBuff` — que a
+pescaria **nunca chamou**. Não havia o que desligar; o id aqui é uma **coordenada de imagem**.
+E o **selo 🔺 continua fora** porque os dois `fighterHtml` daqui não passam `comTerreno`: sem ele o
+selo nem é montado. Medido: **zero** `#s-terreno` nas duas fases.
+
+#### ⚠️ E ELA FOI A ÚNICA QUE PRECISOU MEXER NO PINTOR — por causa do GIF
+
+O `pescariaPintarArea` trocava o **`innerHTML` inteiro** do `#pescBatalhaVs` a cada passo. Isso
+**recria os `<img>`** — e um GIF recriado **volta pro primeiro quadro**: o sprite ficaria preso no
+começo do laço, com um tranco a cada golpe.
+
+**⚠️ ISSO NÃO EXISTE NA JORNADA, e a diferença é de CADÊNCIA — não de desenho.** Lá o passo é
+**PINTADO** e o `render()` só roda nos passos marcados (`cura`/`faixa`/`leitura`/`troca`/`posFaixa`);
+aqui o pintor roda em **TODO** passo. Medido em 400 confrontos 1x1 (2.058 passos):
+
+| | reconstruções do sprite |
+|---|---|
+| **jornada** | **0 de 2.058** (0,0% dos passos) |
+| **pescaria, sem o conserto** | **2.058 de 2.058** — 5,14× por confronto |
+
+E a tela antiga podia se dar ao luxo de refazer, porque o sprite dela é um **PNG parado**.
+
+**Hoje só o que MUDA por passo é repintado:** o `.battle-mon-panel` (nome, selos, barra) e a
+**classe** do lutador — é ela que carrega o `battle-fainted`. O palco do sprite fica de pé, e os
+ícones de status têm pintor próprio.
+**Medido no navegador**, com as duas estratégias sobre a mesma marcação: com o `innerHTML` inteiro o
+`<img>` é **OUTRO elemento em 3 de 3** passos; assim ele é **o MESMO nos 3** — e o painel atualiza
+igual nos dois, com a grade e a camada de efeitos vivas dos dois jeitos.
+
+**⚠️ E COM A ESTRUTURA DIFERENTE ELE REFAZ TUDO:** a vaga vazia do Remoinho não tem painel, e sem
+essa saída o quadro ficaria com o painel de quem acabou de ser soprado pra fora.
+
+**⚠️ E A GRADE E A CAMADA DE EFEITOS MORAM NO `pescariaLutadoresHtml`**, não no container: o pintor
+troca o miolo, então qualquer filho que ficasse só no render seria destruído no primeiro golpe.
+
+#### ⚠️ E ELA DERRUBOU TRÊS TRAVAS QUE MEDIAM A FORMA, NÃO A REGRA
+
+As três estavam certas e caíram com o código certo — a família que este arquivo já registra quatro
+vezes:
+
+| trava | por que ela envelheceu |
+|---|---|
+| *"o quadro usa o fighterHtml da casa"* (`class="fighter"` ×2) | o fixture chama `contaAdmin()`, que **LIGA o gate** — ela passou a medir a cena. Hoje o bloco **desliga o gate** pra medir o visual de quem não é admin, e a cena entra **ao lado**, pela mesma função |
+| *"com o sprite GRANDE da batalha"* (`sprite-lg`) | idem |
+| *"pela MESMA função que o render monta"* | **fatia por OFFSET**: `slice(i, i + 1600)` — o bloco da cena empurrou o que ela procura pra **fora da janela**. Hoje ela fatia a **função inteira**, com um `ok` cobrando que a fatia tem o que ler |
+
+A segunda metade dessa última cravava `id="pescBatalhaVs">${pescariaLutadoresHtml(b)}` como string
+crua, e o atributo ganhou o `cenaNova` — hoje ela lê a **linha** do render e procura só a chamada.
+
+**Conferido que as travas novas acusam:** gate desligado **2 falhas**, cenário trocado **1**, o
+pintor refazendo o quadro inteiro **2**.
+
+**⚠️ E A PRIMEIRA CONFERÊNCIA DO TERCEIRO DEFEITO DEU ZERO, e o errado era ela:** a injeção comeu o
+`}` do `if(vs){`, o teste **estourou** com `SyntaxError` e o `grep -c FALHOU` leu isso como *"passou
+em branco"*. É a lição que este arquivo já registra — **uma trava que estoura é pior que uma que
+falha** —, agora do lado da ferramenta de acusação: confira que o defeito **compila** antes de
+acreditar num zero.
+
+#### ⚠️ O QUE CONTINUA FORA
+
+Só o **online** (`renderOnlineFight`/`renderOnlineCountdown`), e não é teimosia: ele depende do
+refactor `virarMatchup`, que **não é gateável** — ele muda o que o lado B vê pra TODO MUNDO. A
+medição está na seção acima.
+
+### ⚠️ O QUE FICA EM ABERTO
+
+- **A janela do `ehAdmin`.** Ele é lido de forma assíncrona no `loadPermanentUserData`, então uma
+  batalha que rodasse antes da conta carregar sairia no desenho antigo pra um admin. O erro é pro
+  lado conservador (ninguém vê a cena por engano) e a jornada sempre passa pela home antes, mas fica
+  dito: se um dia incomodar, o molde é o `contaCarregada` que as outras portas usam.
+- **O `id="battle-fx-layer"` é global** e está nas duas telas. Hoje é inofensivo — o `render()` troca
+  o `innerHTML` inteiro e só existe uma tela de batalha por vez —, mas é o tipo de coisa que quebra
+  no dia em que duas convivirem.
+
 ## Bifurcação Kanto / Johto
 
 - **Sete iniciais**: os três de Kanto, os três de Johto e o Pichu, agrupados por região na tela.

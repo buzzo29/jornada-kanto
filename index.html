@@ -896,6 +896,222 @@
   .vs-swords{font-size:1.4rem;display:inline-block;}
   .vs-swords.spin{animation:swordSpin .9s linear infinite;}
   @keyframes swordSpin{ from{transform:rotate(0deg);} to{transform:rotate(360deg);} }
+
+  /* =====================================================================
+     BATALHA VISUAL NOVA — Jornada / encontros especiais
+     ---------------------------------------------------------------------
+     A lógica continua sendo a mesma. Este bloco só muda apresentação:
+     - sprites animados da geração V (frente no adversário / costas no jogador);
+     - campo com profundidade, placas de HP separadas e plataformas;
+     - avanço do atacante, impacto, tremor e número de dano;
+     - desmaio visual quando o HP chega a zero.
+     A classe `.battle-scene` isola tudo: pescaria, online e telas antigas que ainda usam
+     `.battle-vs` continuam com o desenho anterior até serem migradas de propósito. */
+  .battle-vs.battle-scene{
+    position:relative;
+    display:block;
+    height:330px;
+    margin:10px 0 12px;
+    overflow:hidden;
+    border:3px solid var(--box-border);
+    border-radius:8px;
+    background-image:linear-gradient(180deg,#8fd4fb 0 42%,#8bbb62 43% 100%);
+    background-size:var(--battle-terrain-size, 300% 300%);
+    background-position:var(--battle-terrain-position, 50% 0%);
+    background-repeat:no-repeat;
+    image-rendering:pixelated;
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.35), 3px 3px 0 rgba(0,0,0,.12);
+    isolation:isolate;
+  }
+  .battle-scene-grid{
+    position:absolute;inset:0;pointer-events:none;z-index:1;
+    background:
+      linear-gradient(90deg,transparent 49.7%,rgba(255,255,255,.12) 50%,transparent 50.3%),
+      linear-gradient(0deg,transparent 58%,rgba(255,255,255,.10) 58.3%,transparent 58.6%);
+    opacity:0;
+  }
+  .battle-scene .battle-fighter{
+    position:absolute;inset:0;z-index:3;text-align:left;pointer-events:none;
+    min-width:0;
+  }
+  .battle-scene .battle-fighter .battle-mon-panel{
+    position:absolute;width:56%;max-width:220px;
+    background:rgba(254,251,240,.96);
+    border:3px solid var(--box-border);border-radius:6px;
+    box-shadow:3px 3px 0 rgba(0,0,0,.18);
+    padding:7px 9px 8px;
+    z-index:6;
+  }
+  .battle-scene .battle-fighter.player .battle-mon-panel{right:8px;bottom:11px;}
+  .battle-scene .battle-fighter.enemy .battle-mon-panel{left:8px;top:9px;}
+  .battle-mon-head{display:flex;align-items:center;gap:6px;min-width:0;margin-bottom:3px;}
+  .battle-mon-name{font-weight:800;font-size:.85rem;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .battle-mon-head .fighter-level{margin-left:auto;flex-shrink:0;font-size:.62rem;}
+  .battle-mon-badges{display:flex;align-items:center;gap:3px;flex-wrap:wrap;min-height:2px;}
+  .battle-scene .battle-mon-panel .fighter-types{justify-content:flex-start;margin:4px 0 3px;}
+  .battle-scene .battle-mon-panel .type-pill{font-size:.48rem;padding:1px 5px;}
+  .battle-scene .battle-mon-panel .hp-bar-wrap{margin-top:4px;}
+  .battle-scene .battle-mon-panel .hp-bar-track{height:10px;border-width:2px;}
+  .battle-scene .battle-mon-panel .hp-bar-label{text-align:right;font-size:.56rem;margin-top:2px;}
+
+  /* Os pés e as sombras compartilham âncoras proporcionais ao cenário.
+     O piso faz parte da arte: espécies terrestres recebem só sombra de contato. */
+  .battle-ground-base{position:absolute;z-index:4;pointer-events:none;}
+  .battle-ground-base.ground{display:none;}
+  .battle-ground-base.water{
+    width:24%;height:15px;border-radius:50%;
+    background:repeating-linear-gradient(0deg,#8cdeec 0 2px,#46a8ce 2px 5px);
+    border:2px solid #bcebf2;box-shadow:0 2px 0 #377eaa;
+    margin-left:-12%;margin-top:-7px;
+  }
+  .battle-ground-base.air{
+    width:18%;height:9px;border-radius:50%;background:rgba(24,35,43,.28);
+    margin-left:-9%;margin-top:-4px;
+  }
+  .battle-fighter.player .battle-ground-base{left:22%;top:84%;}
+  .battle-fighter.enemy .battle-ground-base{left:78%;top:64%;}
+  .battle-sprite-stage{
+    position:absolute;width:36%;height:148px;margin:0;
+    display:flex;align-items:flex-end;justify-content:center;
+    z-index:5;transform-origin:50% 100%;
+    will-change:transform,filter,opacity;
+  }
+  .battle-fighter.player .battle-sprite-stage{left:4%;bottom:16%;}
+  .battle-fighter.enemy .battle-sprite-stage{right:4%;top:auto;bottom:36%;}
+  .battle-sprite-stage::after{
+    content:'';position:absolute;left:28%;right:28%;bottom:-3px;height:7px;
+    border-radius:50%;background:rgba(24,32,39,.3);z-index:-1;
+  }
+  .battle-ground-base.air + .battle-sprite-stage::after,
+  .battle-ground-base.water + .battle-sprite-stage::after{display:none;}
+  .battle-ground-base.air + .battle-sprite-stage .battle-sprite-wrap{padding-bottom:10px;}
+  .battle-sprite-wrap{display:flex;justify-content:center;align-items:flex-end;max-width:100%;line-height:0;}
+  .battle-sprite-stage .battle-sprite-animated{
+    display:block;max-width:100%;max-height:136px;width:auto;height:auto;
+    image-rendering:pixelated;image-rendering:crisp-edges;
+    transform-origin:50% 100%;filter:none;
+  }
+  .battle-fighter.player .battle-sprite-stage .battle-sprite-animated{max-width:100%;max-height:142px;}
+  .battle-fighter.enemy .battle-sprite-stage .battle-sprite-animated{max-width:100%;max-height:124px;}
+  .battle-sprite-fallback{display:none;font-size:2.6rem;line-height:1;}
+
+  .battle-vs.battle-scene .vs-swords{
+    position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+    z-index:2;opacity:.18;font-size:1rem;
+  }
+  .battle-vs.battle-scene .vs-swords.spin{animation:none;}
+
+  /* Ataque: quem bate avança. O jogador vai para a direita/cima; o inimigo para a esquerda/baixo. */
+  .battle-sprite-stage.battle-attack-player{animation:battleAttackPlayer .46s cubic-bezier(.2,.8,.2,1);}
+  .battle-sprite-stage.battle-attack-enemy{animation:battleAttackEnemy .46s cubic-bezier(.2,.8,.2,1);}
+  @keyframes battleAttackPlayer{
+    0%{transform:translate(0,0) scale(1)} 36%{transform:translate(48px,-25px) scale(1.08)}
+    56%{transform:translate(58px,-30px) scale(1.05)} 100%{transform:translate(0,0) scale(1)}
+  }
+  @keyframes battleAttackEnemy{
+    0%{transform:translate(0,0) scale(1)} 36%{transform:translate(-46px,27px) scale(1.08)}
+    56%{transform:translate(-55px,31px) scale(1.05)} 100%{transform:translate(0,0) scale(1)}
+  }
+  /* Dano: flash curto + recoil. A animação fica no palco, não no <img>, para o GIF continuar
+     rodando sem ser reiniciado. */
+  .battle-sprite-stage.battle-hit{animation:battleHit .36s steps(2,end);}
+  @keyframes battleHit{
+    0%{transform:translateX(0);filter:none;opacity:1}
+    18%{transform:translateX(-8px);filter:brightness(2.1) saturate(.4);opacity:.48}
+    38%{transform:translateX(8px);filter:none;opacity:1}
+    58%{transform:translateX(-5px);filter:brightness(1.8);opacity:.62}
+    78%{transform:translateX(4px);filter:none;opacity:1}
+    100%{transform:translateX(0);filter:none;opacity:1}
+  }
+  .battle-fighter.battle-fainted .battle-sprite-stage{animation:battleFaint .7s ease-in forwards;}
+  @keyframes battleFaint{to{transform:translateY(30px) scale(.84);opacity:0;filter:grayscale(1) brightness(.65);}}
+  .battle-fighter.battle-fainted .battle-mon-panel{opacity:.72;}
+
+  /* Camada de impacto. A cor vem do tipo do golpe, então os 17 tipos usam a mesma mecânica sem
+     dezessete blocos de CSS independentes. */
+  .battle-fx-layer{position:absolute;inset:0;z-index:8;pointer-events:none;overflow:hidden;}
+  .battle-impact{
+    --fx-color:#fff;position:absolute;width:74px;height:74px;border-radius:50%;
+    transform:translate(-50%,-50%) scale(.35);opacity:0;
+    border:4px solid var(--fx-color);
+    box-shadow:0 0 0 5px rgba(255,255,255,.55),0 0 22px var(--fx-color);
+    animation:battleImpact .48s ease-out forwards;
+  }
+  .battle-impact.player{left:26%;top:65%;}
+  .battle-impact.enemy{left:76%;top:40%;}
+  .battle-impact::before,.battle-impact::after{
+    content:'';position:absolute;left:50%;top:50%;width:8px;height:34px;border-radius:5px;
+    background:var(--fx-color);transform-origin:50% 50%;
+  }
+  .battle-impact-icon{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:2;filter:drop-shadow(0 1px 0 rgba(0,0,0,.35));}
+  .battle-impact-icon .selo{width:24px;height:24px;}
+  .battle-impact::before{transform:translate(-50%,-50%) rotate(45deg);}
+  .battle-impact::after{transform:translate(-50%,-50%) rotate(-45deg);}
+  @keyframes battleImpact{
+    0%{opacity:0;transform:translate(-50%,-50%) scale(.25) rotate(-18deg)}
+    28%{opacity:1;transform:translate(-50%,-50%) scale(1.05) rotate(0)}
+    100%{opacity:0;transform:translate(-50%,-50%) scale(1.65) rotate(18deg)}
+  }
+  .battle-damage-pop{
+    position:absolute;z-index:10;font-family:var(--font-pixel);font-size:.66rem;font-weight:800;
+    color:#fff;text-shadow:2px 2px 0 var(--red-dark),-1px -1px 0 var(--red-dark);
+    animation:battleDamagePop .8s ease-out forwards;white-space:nowrap;
+  }
+  .battle-damage-pop.player{left:18%;top:47%;}
+  .battle-damage-pop.enemy{right:12%;top:23%;}
+  .battle-damage-pop.crit{color:var(--yellow);font-size:.72rem;}
+  @keyframes battleDamagePop{
+    0%{opacity:0;transform:translateY(10px) scale(.7)} 20%{opacity:1;transform:translateY(0) scale(1.12)}
+    100%{opacity:0;transform:translateY(-32px) scale(.95)}
+  }
+  .battle-heal-pop{color:#eaffdf;text-shadow:2px 2px 0 var(--green-dark),-1px -1px 0 var(--green-dark);}
+
+  /* Entrada e troca ganham um pequeno pouso, separado do fighter-entra antigo. */
+  .battle-fighter.fighter-entra .battle-sprite-stage{animation:battleEnter .66s ease-out;}
+  @keyframes battleEnter{from{opacity:0;transform:translateY(-18px) scale(.72)}60%{opacity:1;transform:translateY(4px) scale(1.04)}to{transform:none}}
+  .battle-fighter.battle-empty .battle-empty-mark{
+    position:absolute;font-size:2.4rem;opacity:.45;filter:grayscale(.4);
+  }
+  .battle-fighter.player.battle-empty .battle-empty-mark{left:54px;bottom:80px;}
+  .battle-fighter.enemy.battle-empty .battle-empty-mark{right:54px;top:82px;}
+
+  @media (max-width:380px){
+    .battle-vs.battle-scene{height:306px;}
+    .battle-sprite-stage{height:128px;}
+    .battle-sprite-stage .battle-sprite-animated{max-height:118px;}
+    .battle-fighter.player .battle-sprite-stage .battle-sprite-animated{max-height:124px;}
+    .battle-fighter.enemy .battle-sprite-stage .battle-sprite-animated{max-height:112px;}
+    .battle-scene .battle-fighter .battle-mon-panel{width:54%;padding:6px 7px;}
+    .battle-mon-name{font-size:.76rem;}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .battle-sprite-stage.battle-attack-player,.battle-sprite-stage.battle-attack-enemy,
+    .battle-sprite-stage.battle-hit,.battle-fighter.battle-fainted .battle-sprite-stage,
+    .battle-fighter.fighter-entra .battle-sprite-stage,.battle-impact,.battle-damage-pop{animation:none!important;}
+  }
+
+  /* Autodestruição: uma explosão compartilhada pelos dois registros de dano. */
+  .battle-explosion{position:absolute;inset:0;pointer-events:none;}
+  .battle-explosion-burst{position:absolute;width:128px;height:128px;transform:translate(-50%,-50%);}
+  .battle-explosion-fire{position:absolute;inset:0;background:#ff6430;clip-path:polygon(38% 0,62% 0,62% 12%,78% 12%,78% 24%,90% 24%,90% 38%,100% 38%,100% 62%,88% 62%,88% 78%,76% 78%,76% 90%,62% 90%,62% 100%,38% 100%,38% 88%,22% 88%,22% 76%,10% 76%,10% 62%,0 62%,0 38%,12% 38%,12% 22%,24% 22%,24% 10%,38% 10%);animation:battleExplosionFire .7s steps(5,end) both;}
+  .battle-explosion-fire::before,.battle-explosion-fire::after{content:'';position:absolute;inset:15%;background:#ffce45;clip-path:inherit;}
+  .battle-explosion-fire::after{inset:32%;background:#fff6c1;}
+  .battle-explosion-smoke{position:absolute;left:50%;top:50%;width:28px;height:28px;background:#b8adb2;box-shadow:8px 0 #ded5cf,-8px 8px #70687e,0 -8px #ded5cf;opacity:0;animation:battleExplosionSmoke 1s steps(7,end) both;}
+  .battle-explosion-smoke:nth-child(2){--smoke-x:-52px;--smoke-y:-64px;}
+  .battle-explosion-smoke:nth-child(3){--smoke-x:40px;--smoke-y:-70px;}
+  .battle-explosion-smoke:nth-child(4){--smoke-x:-8px;--smoke-y:-88px;}
+  .battle-sprite-stage.battle-explosion-recoil{animation:battleExplosionRecoil .48s steps(4,end);}
+  .battle-explosion-recoil .battle-status-fx{visibility:hidden;}
+  .battle-fighter .battle-sprite-stage.battle-exploded{opacity:0!important;visibility:hidden;animation:none!important;}
+  @media(max-width:380px){.battle-explosion-burst{width:100px;height:100px;}}
+  @keyframes battleExplosionFire{0%{transform:scale(.2);opacity:0;}15%{opacity:1;}45%{transform:scale(1.2);opacity:1;}75%{transform:scale(1.35);opacity:.85;}100%{transform:scale(1.5);opacity:0;}}
+  @keyframes battleExplosionSmoke{0%,25%{opacity:0;transform:translate(-50%,-50%) scale(.4);}40%{opacity:.95;}100%{opacity:0;transform:translate(var(--smoke-x),var(--smoke-y)) scale(1.5);}}
+  @keyframes battleExplosionRecoil{0%{filter:brightness(1);}25%{transform:translateX(-5px);filter:brightness(2);}50%{transform:translateX(5px);}75%{transform:translateX(-3px);}100%{transform:none;filter:none;}}
+  @media(prefers-reduced-motion:reduce){
+    .battle-sprite-stage.battle-explosion-recoil{animation:none;}
+    .battle-explosion-fire{animation:none;opacity:.85;}
+    .battle-explosion-smoke{animation:none;display:none;}
+  }
   .loading-dots{display:flex;justify-content:center;gap:6px;margin:16px 0 8px;}
   .loading-dots span{
     width:8px;height:8px;border-radius:50%;
@@ -3979,6 +4195,43 @@
   .u-m0{margin:0;}
   .u-mt8{margin:8px 0 0;}
   .u-mb2{margin:0 0 2px;}
+
+/* Atlas embutidos: seletor direto evita o limite de tamanho de variáveis CSS. */
+.battle-vs.battle-scene[style*="--battle-atlas:0;"]{background-image:url("assets/batalha/atlas-0.png");}
+.battle-vs.battle-scene:not([style*="--battle-atlas:"]),.battle-vs.battle-scene[style*="--battle-atlas:1;"]{background-image:url("assets/batalha/atlas-1.png");}
+.battle-vs.battle-scene[style*="--battle-atlas:2;"]{background-image:url("assets/batalha/atlas-2.png");}
+.battle-vs.battle-scene[style*="--battle-atlas:3;"]{background-image:url("assets/batalha/atlas-3.png");}
+.battle-vs.battle-scene[style*="--battle-atlas:4;"]{background-image:url("assets/batalha/atlas-4.png");}
+.battle-vs.battle-scene[style*="--battle-atlas:5;"]{background-image:url("assets/batalha/atlas-5.png");}
+
+/* Status de batalha: acompanha a caixa real do sprite, sem recriar o GIF. */
+.battle-status-host{position:relative;display:inline-flex;align-items:flex-end;justify-content:center;max-width:100%;vertical-align:bottom;line-height:0;}
+.battle-status-host>.battle-sprite-wrap{max-width:100%;}
+/* Amplia o Pokémon de costas em 20%, ancorado pelos pés; a largura máxima protege o painel de HP. */
+.battle-scene .battle-fighter.player .battle-status-host{max-width:83.333%;transform:scale(1.2);transform-origin:50% 100%;}
+.battle-status-fx{position:absolute;bottom:calc(100% + 3px);left:50%;transform:translateX(-50%);display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:3px;width:max-content;max-width:100px;z-index:8;pointer-events:none;line-height:1;}
+.battle-status-fx:empty{display:none;}
+.battle-status-effect{position:relative;display:inline-flex;align-items:center;justify-content:center;width:27px;height:28px;filter:drop-shadow(1px 2px 0 rgba(22,25,55,.5));}
+.battle-status-effect svg{width:23px;height:23px;overflow:visible;shape-rendering:crispEdges;}
+.battle-status-sleep{width:51px;color:#f3f7ff;font-family:var(--font-pixel),monospace;font-weight:900;text-shadow:-1px -1px 0 #344179,1px -1px 0 #344179,-1px 1px 0 #344179,2px 2px 0 #344179;}
+.battle-status-sleep b{position:absolute;bottom:0;left:3px;font-size:13px;animation:statusSleepRise 2.4s steps(6,end) infinite;}
+.battle-status-sleep b:nth-child(2){left:19px;font-size:18px;animation-delay:-.8s;}
+.battle-status-sleep b:nth-child(3){left:38px;font-size:12px;animation-delay:-1.6s;}
+.battle-status-poison i{position:absolute;width:9px;height:9px;background:#c76aff;border:2px solid #643395;box-shadow:inset 2px 2px #ecc6ff;left:2px;bottom:2px;animation:statusBubbleRise 1.8s steps(5,end) infinite;}
+.battle-status-poison i:nth-child(2){left:11px;width:11px;height:11px;animation-delay:-.6s;}
+.battle-status-poison i:nth-child(3){left:21px;width:6px;height:6px;animation-delay:-1.2s;}
+.battle-status-burn svg{animation:statusEmber 1.1s steps(3,end) infinite;transform-origin:50% 100%;}
+.battle-status-paralysis svg{animation:statusSpark 1.4s steps(2,end) infinite;}
+.battle-status-freeze svg{animation:statusIce 2.2s steps(4,end) infinite;}
+.battle-status-confusion svg{animation:statusStars 2.1s steps(8,end) infinite;}
+.battle-fainted .battle-status-fx{display:none;}
+@keyframes statusSleepRise{0%{transform:translate(0,4px);opacity:.65}65%{opacity:1}100%{transform:translate(3px,-11px);opacity:.2}}
+@keyframes statusBubbleRise{0%{transform:translateY(3px);opacity:.35}50%{opacity:1}100%{transform:translateY(-13px);opacity:.25}}
+@keyframes statusEmber{0%,100%{transform:scale(1) translateY(0)}50%{transform:scale(.88,1.08) translateY(-2px)}}
+@keyframes statusSpark{0%,100%{transform:translateX(-1px);opacity:1}50%{transform:translateX(2px);opacity:.6}}
+@keyframes statusIce{0%,100%{transform:translateY(0);opacity:1}50%{transform:translateY(-3px);opacity:.75}}
+@keyframes statusStars{0%,100%{transform:rotate(-12deg) translateX(-2px)}50%{transform:rotate(12deg) translateX(2px)}}
+@media(prefers-reduced-motion:reduce){.battle-status-effect *{animation:none!important;}}
 </style>
 </head>
 <body>
@@ -5601,6 +5854,404 @@ const TERRAINS = [
   { id:'torre_de_radio', name:'Torre de Rádio', icon:'📡', types:['Steel','Flying'] },
   { id:'ninho_blindado', name:'Ninho Blindado', icon:'🐲', types:['Steel','Dragon'] }
 ];
+/* 51 cenários em pixel art com câmera frontal. Cada cenário reserva chão livre
+   para jogador (22%,84%) e adversário (78%,64%). Os atlas ficam no CSS uma
+   única vez, embutidos no HTML; nenhuma imagem de terreno depende da rede. */
+const TERRAIN_SCENE_META = {
+  vulcao:              ['volcano','#9ed8f5','#6b6670','#9a6547','#744436','#c48a61','#84523c','#ef6a32'],
+  arena_suspensa:      ['floating','#9fddff','#ccecff','#b8d78d','#86ad68','#c9e3a5','#7fa35f','#ffffff'],
+  pantano:             ['swamp','#b8d9ca','#78978c','#6f8d61','#526d4a','#8fa36d','#5f744d','#8269a7'],
+  recifes_coral:       ['coast','#a8ddff','#6eb6de','#e7d899','#cbbd7e','#eadca8','#a89b6e','#ef8c88'],
+  caverna_cristais:    ['crystal','#9ab6d7','#5e6888','#69637f','#4d4960','#8a82a4','#514b6a','#76d9ef'],
+  usina_eletrica:      ['power','#a9d8ef','#6f8aa4','#87949d','#68757d','#aeb7bb','#626d72','#f5cc45'],
+  floresta_ancestral:  ['forest','#a9ddf3','#6fa776','#72a95d','#4f8246','#8dbb6c','#547e45','#d6ef93'],
+  deserto:             ['desert','#b9e4f6','#e4c277','#dcbf7c','#c99e5f','#e8cd91','#aa7d49','#f2df9d'],
+  montanha_nevada:     ['snow','#afdffc','#89aeca','#e8eef0','#cbd9df','#ffffff','#aebec6','#b7e8ff'],
+  dojo_tradicional:    ['dojo','#e8d0aa','#bb8d68','#c99a68','#a06e49','#dfb57f','#865a3c','#bb3434'],
+  campo_aberto:        ['field','#aee1fb','#83b577','#9ecb72','#76a758','#b4d887','#678f4d','#e6d46f'],
+  mina_subterranea:    ['mine','#9f9a92','#6d665c','#776b55','#51483b','#9a865e','#5a4d39','#d8b66a'],
+  castelo_assombrado:  ['haunted','#8b9bc3','#566286','#5d6572','#404653','#7c8190','#484d59','#9f80cb'],
+  templo_mistico:      ['mystic','#c3b4ea','#8b76ba','#d3c7de','#a79ab9','#e0d6e7','#8e7da5','#b78cff'],
+  jardim_venenoso:     ['poisonGarden','#b7d8d0','#6f9b79','#79a568','#566f50','#99b776','#5e744d','#9a72b7'],
+  cachoeira_congelada: ['river','#aee3fb','#68b7dc','#91c8d8','#68a0b1','#c1e4ea','#6d9da8','#ffffff'],
+  pico_tempestade:     ['storm','#93b8d4','#596e86','#8b9b9c','#657579','#b6c1bb','#687773','#f1d84b'],
+  caverna_dragao:      ['dragonCave','#9688ad','#5f516f','#706276','#4e4457','#9885a0','#5d4d67','#d0876d'],
+  tundra:              ['tundra','#b9e3f7','#91b6c5','#dce8e6','#bdcecf','#f0f6f4','#a7b8ba','#ccefff'],
+  ilha_vulcanica:      ['volcanicCoast','#acdffc','#5f95b6','#8a7356','#66543e','#b8996e','#71583d','#ef6a32'],
+  navio_fantasma:      ['ghostShip','#90a6c1','#576b83','#6e7f83','#536267','#8f9c9d','#5d696b','#9c8bc7'],
+  mansao_incendiada:   ['burningHouse','#d4b3a2','#8b645b','#7b6558','#5d4b42','#9f826e','#655143','#ed7540'],
+  arena_subterranea:   ['underground','#aaa39a','#766e64','#8c7b68','#675949','#ac9477','#725e47','#c08c52'],
+  jardim_zen:          ['zen','#b8e1ef','#82ad83','#a8c98e','#7fa66e','#c1d8a3','#718f5d','#d8bfa5'],
+  colmeia_chamas:      ['hive','#d6c38e','#9b7b45','#9a7442','#6d4e2d','#c39a55','#76502e','#ef7b35'],
+  torre_toxica:        ['toxicTower','#b8cad7','#768b98','#73826e','#566653','#929d82','#5d6c56','#9a70b0'],
+  cidade_iluminada:    ['city','#a9dcf4','#7da5bd','#9ba5a2','#727e7b','#bcc3bc','#737c75','#f2cf61'],
+  arena_campeoes:      ['stadium','#b9e4f6','#90b9cc','#b8b28e','#8f896d','#d2caa2','#817a5e','#e2b94d'],
+  falesias_glaciais:   ['iceCliffs','#afe0f8','#7da9c3','#dbe9ea','#b8ced4','#edf7f7','#a5bac0','#c3efff'],
+  santuario_draconico: ['sanctuary','#b9c5e6','#7b85aa','#a099a0','#77727c','#c0b6b5','#706872','#9d83d0'],
+  termas_vulcanicas:   ['hotspring','#b5ddeb','#7ea0a3','#9f8e74','#796a55','#c4ad8a','#796650','#ef8a58'],
+  canion_rochoso:      ['icyCanyon','#b5def1','#92a8b0','#c2c9c4','#9ca7a5','#dde3df','#8a9692','#d4f1ff'],
+  reserva_natural:     ['reserve','#afe0f4','#79ad7d','#8fc072','#6e9b58','#add28c','#678d51','#d6ed9c'],
+  porto_abandonado:    ['mangrove','#b9e3ed','#78999c','#759373','#5a755a','#9aa979','#657657','#6faeb0'],
+  jardim_borboletas:   ['butterfly','#b9e3f6','#83b486','#9bc97c','#74a363','#b9d99a','#6d9658','#e69bc1'],
+  templo_monges:       ['monkTemple','#dfd0b0','#9f8668','#b58f62','#8c6946','#d0ad7c','#7e5b3d','#c44f42'],
+  pantano_radioativo:  ['radioactive','#b8d5c4','#7a927b','#70865f','#526447','#91a873','#5b6d4e','#b8dd4d'],
+  ninho_ancestral:     ['crypt','#9a9abc','#61617e','#686677','#4b4958','#8d8896','#565162','#9c78b5'],
+  floresta_eletrificada:['electricForest','#acd9ea','#6e9b84','#6f9b61','#52794e','#8eb479','#5b7d50','#f0d34d'],
+  beco_sombrio:        ['alley','#8396ad','#4f6075','#636c70','#484f52','#7f8888','#4e5556','#7f6a96'],
+  torre_queimada:      ['burnedTower','#aa9a94','#705f5a','#78685d','#564941','#9a8170','#604f44','#d06c49'],
+  mata_fechada:        ['denseForest','#96c9d6','#5e8b6b','#587c50','#3e603c','#779665','#476746','#b4d87f'],
+  gruta_sem_luz:       ['darkCave','#7f8b9d','#535c68','#595a5d','#404143','#777679','#49494c','#7f87a8'],
+  noite_lua_cheia:     ['moon','#798fb5','#46597b','#657768','#4a5c4e','#879583','#526354','#d9e4f2'],
+  covil_dos_lobos:     ['den','#9ab8c7','#647d82','#7f816b','#60614f','#9d9d82','#696a54','#d9cf9e'],
+  ferro_velho:         ['scrapyard','#b5d9eb','#8499a4','#9b9079','#786e5b','#b7aa8d','#746853','#d19c4c'],
+  fortaleza_ferro:     ['ironFort','#b8d5e0','#8799a1','#8b8f88','#676c68','#afb1a8','#6c706a','#c0a86d'],
+  submarino_afundado:  ['submerged','#82bdd7','#4c8198','#5f8f91','#456a6d','#82aaa7','#4c7474','#9fdbe3'],
+  hangar_gelado:       ['iceHangar','#bddfeb','#8fa7b0','#c9d5d5','#a7b8bb','#e0e8e6','#9aa8aa','#d9f2f5'],
+  torre_de_radio:      ['radioTower','#aad6e8','#728e9c','#8c9692','#69736f','#adb6af','#68726c','#e3c85d'],
+  ninho_blindado:      ['armoredNest','#aebfd8','#758099','#89868e','#65626b','#aaa5ad','#6d6872','#a98dc3']
+};
+const TERRAIN_SCENE_TILES = {
+  "vulcao": [
+    0,
+    0,
+    0,
+    3
+  ],
+  "arena_suspensa": [
+    0,
+    1,
+    0,
+    3
+  ],
+  "pantano": [
+    0,
+    2,
+    0,
+    3
+  ],
+  "recifes_coral": [
+    0,
+    0,
+    1,
+    3
+  ],
+  "caverna_cristais": [
+    0,
+    1,
+    1,
+    3
+  ],
+  "usina_eletrica": [
+    0,
+    2,
+    1,
+    3
+  ],
+  "floresta_ancestral": [
+    0,
+    0,
+    2,
+    3
+  ],
+  "deserto": [
+    0,
+    1,
+    2,
+    3
+  ],
+  "montanha_nevada": [
+    0,
+    2,
+    2,
+    3
+  ],
+  "dojo_tradicional": [
+    1,
+    0,
+    0,
+    3
+  ],
+  "campo_aberto": [
+    1,
+    1,
+    0,
+    3
+  ],
+  "mina_subterranea": [
+    1,
+    2,
+    0,
+    3
+  ],
+  "castelo_assombrado": [
+    1,
+    0,
+    1,
+    3
+  ],
+  "templo_mistico": [
+    1,
+    1,
+    1,
+    3
+  ],
+  "jardim_venenoso": [
+    1,
+    2,
+    1,
+    3
+  ],
+  "cachoeira_congelada": [
+    1,
+    0,
+    2,
+    3
+  ],
+  "pico_tempestade": [
+    1,
+    1,
+    2,
+    3
+  ],
+  "caverna_dragao": [
+    1,
+    2,
+    2,
+    3
+  ],
+  "tundra": [
+    2,
+    0,
+    0,
+    3
+  ],
+  "ilha_vulcanica": [
+    2,
+    1,
+    0,
+    3
+  ],
+  "navio_fantasma": [
+    2,
+    2,
+    0,
+    3
+  ],
+  "mansao_incendiada": [
+    2,
+    0,
+    1,
+    3
+  ],
+  "arena_subterranea": [
+    2,
+    1,
+    1,
+    3
+  ],
+  "jardim_zen": [
+    2,
+    2,
+    1,
+    3
+  ],
+  "colmeia_chamas": [
+    2,
+    0,
+    2,
+    3
+  ],
+  "torre_toxica": [
+    2,
+    1,
+    2,
+    3
+  ],
+  "cidade_iluminada": [
+    2,
+    2,
+    2,
+    3
+  ],
+  "arena_campeoes": [
+    3,
+    0,
+    0,
+    3
+  ],
+  "falesias_glaciais": [
+    3,
+    1,
+    0,
+    3
+  ],
+  "santuario_draconico": [
+    3,
+    2,
+    0,
+    3
+  ],
+  "termas_vulcanicas": [
+    3,
+    0,
+    1,
+    3
+  ],
+  "canion_rochoso": [
+    3,
+    1,
+    1,
+    3
+  ],
+  "reserva_natural": [
+    3,
+    2,
+    1,
+    3
+  ],
+  "porto_abandonado": [
+    3,
+    0,
+    2,
+    3
+  ],
+  "jardim_borboletas": [
+    3,
+    1,
+    2,
+    3
+  ],
+  "templo_monges": [
+    3,
+    2,
+    2,
+    3
+  ],
+  "pantano_radioativo": [
+    4,
+    0,
+    0,
+    3
+  ],
+  "ninho_ancestral": [
+    4,
+    1,
+    0,
+    3
+  ],
+  "floresta_eletrificada": [
+    4,
+    2,
+    0,
+    3
+  ],
+  "beco_sombrio": [
+    4,
+    0,
+    1,
+    3
+  ],
+  "torre_queimada": [
+    4,
+    1,
+    1,
+    3
+  ],
+  "mata_fechada": [
+    4,
+    2,
+    1,
+    3
+  ],
+  "gruta_sem_luz": [
+    4,
+    0,
+    2,
+    3
+  ],
+  "noite_lua_cheia": [
+    4,
+    1,
+    2,
+    3
+  ],
+  "covil_dos_lobos": [
+    4,
+    2,
+    2,
+    3
+  ],
+  "ferro_velho": [
+    5,
+    0,
+    0,
+    2
+  ],
+  "fortaleza_ferro": [
+    5,
+    1,
+    0,
+    2
+  ],
+  "submarino_afundado": [
+    5,
+    2,
+    0,
+    2
+  ],
+  "hangar_gelado": [
+    5,
+    0,
+    1,
+    2
+  ],
+  "torre_de_radio": [
+    5,
+    1,
+    1,
+    2
+  ],
+  "ninho_blindado": [
+    5,
+    2,
+    1,
+    2
+  ]
+};
+function terrainBattleSceneStyle(terrain){
+  const id = terrain && terrain.id;
+  const tile = TERRAIN_SCENE_TILES[id] || TERRAIN_SCENE_TILES.campo_aberto;
+  const [atlas, col, row, rows] = tile;
+  const m = TERRAIN_SCENE_META[id] || TERRAIN_SCENE_META.campo_aberto;
+  return `--battle-atlas:${atlas};--battle-terrain-size:300% ${rows*100}%;--battle-terrain-position:${col*50}% ${row*100/(rows-1)}%;--battle-platform:${m[5]};--battle-platform-dark:${m[6]};--battle-platform-accent:${m[7]};`;
+}
+
+/* Espécies que visualmente precisam de água sob o sprite. Não é regra de
+   batalha; é só apresentação. Pokémon aquáticos capazes de ficar em terra
+   (Blastoise, Feraligatr etc.) continuam usando a base normal. */
+const AQUATIC_BATTLE_SPECIES = new Set([
+  'magikarp','goldeen','seaking','tentacool','tentacruel','horsea','seadra',
+  'remoraid','mantine','qwilfish','chinchou','lanturn'
+]);
+function battleGroundBaseClass(speciesId){
+  if(AQUATIC_BATTLE_SPECIES.has(speciesId)) return 'water';
+  const sp = SPECIES[speciesId];
+  if(sp && sp.types && sp.types.includes('Flying')) return 'air';
+  return 'ground';
+}
+
+/* ---------------------------------------------------------------------------
+   O GATE DA CENA NOVA DE BATALHA.
+   A cena nova (sprites animados, cenario por terreno, animacoes de golpe e de
+   status) so e desenhada para quem tem admin === true na conta. Quem nao tem
+   continua vendo a batalha exatamente como ela era -- e "exatamente" aqui e
+   literal: toda chamada nova ou some do HTML, ou devolve o texto de antes.
+   Uma funcao SO, porque ela e lida em seis lugares: os dois containers de
+   batalha, os dois fighterHtml, o sprite com status e o preload dos GIFs.
+   Escrita em cada lugar, o proximo ponto nasceria sem o gate e a cena
+   vazaria para todo mundo -- que e o defeito que este arquivo mais paga. */
+function visualNovoDeBatalha(){ return game.ehAdmin === true; }
+
 function hexToRgba(hex, alpha){
   const clean = hex.replace('#','');
   const r = parseInt(clean.substring(0,2),16);
@@ -6784,6 +7435,7 @@ function typePill(t){
 function typesHtml(types){ return types.map(typePill).join(''); }
 
 function preloadBattleSprites(matchups){
+  const cenaNova = visualNovoDeBatalha();
   // assim que o resultado de uma batalha é calculado, já sabemos TODAS as espécies que vão aparecer --
   // pré-carrega os sprites delas em segundo plano, pra evitar o "flash" de imagem quebrada que aparece
   // em conexões/dispositivos mais lentos quando o navegador só começa a buscar a imagem na hora exata
@@ -6794,9 +7446,14 @@ function preloadBattleSprites(matchups){
     const enemySp = especieParaTela(m.enemySpecies);
     if(playerSp){
       urls.add(`https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/${m.playerShiny?'shiny/':''}${playerSp.dex}.png`);
+      /* A cena nova usa o sprite de COSTAS do jogador. Pre-carregar o GIF aqui evita o primeiro
+         confronto abrir com o fallback estatico enquanto o animado ainda baixa. So pra quem ve a
+         cena: pro resto ele seria banda gasta com uma imagem que nunca entra na tela. */
+      if(cenaNova) urls.add(`https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/versions/generation-v/black-white/animated/back/${m.playerShiny?'shiny/':''}${playerSp.dex}.gif`);
     }
     if(enemySp){
       urls.add(`https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/${m.enemyShiny?'shiny/':''}${enemySp.dex}.png`);
+      if(cenaNova) urls.add(`https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/versions/generation-v/black-white/animated/${m.enemyShiny?'shiny/':''}${enemySp.dex}.gif`);
     }
   });
   urls.forEach((url, i) => {
@@ -6917,6 +7574,41 @@ function battleSpriteHtml(ownSpeciesId, opponentSpeciesId, sizeClass, isShiny, f
   // Ditto usa Transformar: na tela de batalha mostra o sprite do adversário, mas o nome continua "Ditto"
   const displaySpecies = (ownSpeciesId === 'ditto' && opponentSpeciesId && SPECIES[opponentSpeciesId]) ? opponentSpeciesId : ownSpeciesId;
   return spriteHtml(displaySpecies, sizeClass, isShiny, flip);
+}
+
+/* Sprite animado EXCLUSIVO da cena nova de batalha.
+   Usa a coleção oficial/preexistente do repositório PokeAPI para Black/White, porque ela traz
+   frente E costas animadas. Se o GIF falhar, cai automaticamente pro PNG de batalha e, por fim,
+   pro sprite padrão que o jogo já usava — a luta nunca fica sem imagem por causa de um GIF. */
+function handleAnimatedBattleSpriteError(img){
+  const stage = parseInt(img.dataset.battleFallbackStage || '0', 10);
+  const chain = [img.dataset.gifFallback, img.dataset.staticSrc, img.dataset.staticFallback].filter(Boolean);
+  if(stage < chain.length){
+    img.dataset.battleFallbackStage = String(stage + 1);
+    img.src = chain[stage];
+    return;
+  }
+  img.style.display = 'none';
+  const fb = img.nextElementSibling;
+  if(fb) fb.style.display = 'inline-flex';
+}
+function battleAnimatedSpriteHtml(ownSpeciesId, opponentSpeciesId, isShiny, playerSide){
+  const displaySpecies = (ownSpeciesId === 'ditto' && opponentSpeciesId && SPECIES[opponentSpeciesId]) ? opponentSpeciesId : ownSpeciesId;
+  const sp = especieParaTela(displaySpecies);
+  if(!sp) return '';
+  /* As formas alternativas do Unown não existem de forma consistente no diretório animado.
+     A forma A/default funciona, mas para não trocar a letra de um save silenciosamente o fallback
+     continua sendo o sprite padrão quando a espécie é Unown. */
+  const shiny = !!isShiny;
+  const lado = playerSide ? 'back/' : '';
+  const brilho = shiny ? 'shiny/' : '';
+  const raizGif = `sprites/pokemon/versions/generation-v/black-white/animated/${lado}${brilho}${sp.dex}.gif`;
+  const raizPng = `sprites/pokemon/versions/generation-v/black-white/${lado}${brilho}${sp.dex}.png`;
+  const gif = `https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/${raizGif}`;
+  const gifFallback = `https://raw.githubusercontent.com/PokeAPI/sprites/master/${raizGif}`;
+  const png = `https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/${raizPng}`;
+  const pngFallback = `https://raw.githubusercontent.com/PokeAPI/sprites/master/${raizPng}`;
+  return `<span class="battle-sprite-wrap"><img class="battle-sprite-animated" src="${gif}" data-gif-fallback="${gifFallback}" data-static-src="${png}" data-static-fallback="${pngFallback}" data-battle-fallback-stage="0" alt="${escapeHtmlSafe(sp.name)}" onerror="handleAnimatedBattleSpriteError(this)"><span class="battle-sprite-fallback">${sp.emoji||'❔'}</span></span>`;
 }
 // selo de cada insígnia -- cor e símbolo próprios, sem depender de imagem de nenhum site de fora (a
 // versão anterior usava um <img> hotlinkado de pokemythology.net, que funcionava rodando o HTML local
@@ -13775,6 +14467,7 @@ function advanceSpecialReveal(){
     /* O nome do golpe já está na tela (pintarStatusDoConfronto, acima). A barra e tudo que vem
        depois dela deslizam um segundo, pra a frase ser lida antes de a vida começar a cair. */
     const esperaNome = pausaDoNomeDoGolpe(m, hit);
+    animarGolpeNaCena(m, hit, esperaNome);
     if(isLastHit){
       game.specialRevealPhase = 'result';
       setTimeout(animateSpecialHpBars, esperaNome);
@@ -14306,6 +14999,7 @@ function advanceReveal(){
     /* O nome do golpe já está na tela (pintarStatusDoConfronto, acima). A barra e tudo que vem
        depois dela deslizam um segundo, pra a frase ser lida antes de a vida começar a cair. */
     const esperaNome = pausaDoNomeDoGolpe(m, hit);
+    animarGolpeNaCena(m, hit, esperaNome);
     if(isLastHit){
       // esse é o golpe que decide a luta -- muda pra fase 'result' JÁ AQUI, então precisa ser o
       // animador da fase 'result' (animateHpBars) a aplicar esse valor, e não o animatePartialHpBars
@@ -14841,6 +15535,11 @@ function advanceTrainerReveal(){
     /* O nome do golpe já está na tela (pintarStatusDoConfronto, acima). A barra e tudo que vem
        depois dela deslizam um segundo, pra a frase ser lida antes de a vida começar a cair. */
     const esperaNome = pausaDoNomeDoGolpe(m, hit);
+    /* ⚠️ ESTE LAÇO SERVE QUATRO TELAS e só UMA delas tem cena (a Torre, desde 22/09/2026) -- e ele
+       não precisa saber disso: o animarGolpeNaCena sai na primeira linha quando não acha um
+       .battle-vs.battle-scene na tela. Um if aqui seria uma segunda regra dizendo a mesma coisa,
+       e ela envelheceria no dia em que o Boss ou a Seleção também ganhassem cenário. */
+    animarGolpeNaCena(m, hit, esperaNome);
     if(isLastHit){
       game.trainerRevealPhase = 'result';
       setTimeout(animateTrainerHpBars, esperaNome);
@@ -20519,6 +21218,7 @@ function renderSpecialIntro(){
   ${botaoBuscaOnlineHtml()}`;
 }
 function renderSpecialBattling(){
+  const cenaNova = visualNovoDeBatalha();
   const matchups = game.specialBattleResult.matchups;
   const m = matchups[game.specialRevealIndex];
   const loading = game.specialRevealPhase === 'loading';
@@ -20542,10 +21242,10 @@ function renderSpecialBattling(){
       ${placarDoTreinador(game.trainerName||'Você', (loading||animating||emboscada)?m.playerAliveBefore:m.playerAliveAfter, m.playerTeamSize)}
       ${placarDoTreinador(cfg.meta.opponentName||'Adversário', (loading||animating||emboscada)?m.enemyAliveBefore:m.enemyAliveAfter, m.enemyTeamSize)}
     </div>
-    <div class="battle-vs">
-      ${fighterHtml(m, 'p', { hp: displayPlayerHp, passo: game.specialHitStep, hit: game.specialLastHit, comTerreno: false })}
+    <div class="battle-vs${cenaNova ? ' battle-scene' : ''}"${cenaNova ? ` style="${terrainBattleSceneStyle(cfg.context==='elite' ? game.eliteTerrain : null)}"` : ''}>${cenaNova ? '\n      <div class="battle-scene-grid"></div>' : ''}
+      ${fighterHtml(m, 'p', { hp: displayPlayerHp, passo: game.specialHitStep, hit: game.specialLastHit, comTerreno: false, visualNovo: cenaNova })}
       <span class="vs-swords ${(loading||animating||emboscada)?'spin':''}">${selo('vs', 'selo-g')}</span>
-      ${fighterHtml(m, 'e', { hp: displayEnemyHp, passo: game.specialHitStep, hit: game.specialLastHit, comTerreno: false })}
+      ${fighterHtml(m, 'e', { hp: displayEnemyHp, passo: game.specialHitStep, hit: game.specialLastHit, comTerreno: false, visualNovo: cenaNova })}${cenaNova ? '\n      <div class="battle-fx-layer" id="battle-fx-layer"></div>' : ''}
     </div>
     <div class="battle-status-area">${loading
       ? `<div class="loading-dots"><span></span><span></span><span></span></div><p class="loading-text">Aguardando o resultado da batalha...</p>`
@@ -21164,7 +21864,26 @@ function renderTrainerBattle(){
   <button class="btn primary" onclick="backFromTrainerBattle()">⬅ Voltar</button>`;
 }
 
+/* ---------------------------------------------------------------------------
+   O CENÁRIO DA TORRE É SEMPRE O DOJO -- e é SÓ o cenário (22/09/2026, a pedido:
+   "pode deixar o cenário sendo sempre o dojo, porém sem os atributos que o dojo
+   proporciona").
+   ⚠️ E ELE NÃO DÁ BÔNUS NENHUM, por construção e não por cuidado: quem pinta o
+   fundo é o terrainBattleSceneStyle, que só devolve variáveis de CSS (o atlas e
+   o recorte dele). O 1,15× do terreno vem do applyTerrainBuff, lá no motor, e
+   ele é chamado por quem MONTA a batalha -- a Torre nunca o chamou, então não
+   há o que desligar aqui. Este id é uma coordenada de imagem, não um terreno.
+   ⚠️ E O SELO 🔺 CONTINUA FORA porque os dois fighterHtml passam comTerreno:false
+   -- ele prometeria um bônus que esta batalha não dá, que é a mesma regra pela
+   qual ele já não aparecia na Torre antes desta mudança.
+   ⚠️ SÓ A TORRE: esta MESMA tela serve o Boss de Domingo, a Seleção da Ilha
+   Kumquat e a batalha por código de treinador. O pedido nomeia a Torre, então o
+   cenário é ligado pelo towerBattlePending e os outros três seguem no desenho
+   antigo. Pra estendê-lo a eles, é tirar esse termo da conta do cenaNova. */
+const CENARIO_DA_TORRE = 'dojo_tradicional';
+
 function renderTrainerBattling(){
+  const cenaNova = visualNovoDeBatalha() && !!game.towerBattlePending;
   const matchups = game.trainerBattleResult.matchups;
   const m = matchups[game.trainerRevealIndex];
   const loading = game.trainerRevealPhase === 'loading';
@@ -21188,10 +21907,10 @@ function renderTrainerBattling(){
       ${placarDoTreinador(game.trainerBattlePlayerName||game.trainerName||'Você', (loading||animating)?m.playerAliveBefore:m.playerAliveAfter, m.playerTeamSize)}
       ${placarDoTreinador(game.trainerBattleOpponentName||'Adversário', (loading||animating)?m.enemyAliveBefore:m.enemyAliveAfter, m.enemyTeamSize)}
     </div>
-    <div class="battle-vs">
-      ${fighterHtml(m, 'p', { hp: displayPlayerHp, passo: game.trainerHitStep, hit: game.trainerLastHit, comTerreno: false })}
+    <div class="battle-vs${cenaNova ? ' battle-scene' : ''}"${cenaNova ? ` style="${terrainBattleSceneStyle({ id: CENARIO_DA_TORRE })}"` : ''}>${cenaNova ? '\n      <div class="battle-scene-grid"></div>' : ''}
+      ${fighterHtml(m, 'p', { hp: displayPlayerHp, passo: game.trainerHitStep, hit: game.trainerLastHit, comTerreno: false, visualNovo: cenaNova })}
       <span class="vs-swords ${(loading||animating)?'spin':''}">${selo('vs', 'selo-g')}</span>
-      ${fighterHtml(m, 'e', { hp: displayEnemyHp, passo: game.trainerHitStep, hit: game.trainerLastHit, comTerreno: false })}
+      ${fighterHtml(m, 'e', { hp: displayEnemyHp, passo: game.trainerHitStep, hit: game.trainerLastHit, comTerreno: false, visualNovo: cenaNova })}${cenaNova ? '\n      <div class="battle-fx-layer" id="battle-fx-layer"></div>' : ''}
     </div>
     <div class="battle-status-area">${loading
       ? `<div class="loading-dots"><span></span><span></span><span></span></div><p class="loading-text">Aguardando o resultado da batalha...</p>`
@@ -23465,6 +24184,7 @@ function statusDoConfrontoHtml(m, passo, hit){
    O reflow no meio existe pra a animação de entrada rodar DE NOVO quando a classe não muda: dois
    golpes seguidos do mesmo lado deixariam a frase parada e o jogador não veria que ela trocou. */
 function pintarStatusDoConfronto(m, passo, hit){
+  pintarEfeitosDeStatus(m, passo);
   const el = document.getElementById('battle-status-txt');
   if(!el) return;
   const st = statusDoConfronto(m, passo, hit);
@@ -23488,6 +24208,124 @@ function pintarStatusDoConfronto(m, passo, hit){
   el.style.animation = 'none';
   void el.offsetWidth;
   el.style.animation = '';
+}
+/* A animação visual do golpe usa o MESMO `hit` que move a barra. Não inventa dano, não altera
+   passo e não chama render(): ela só adiciona classes/efeitos no DOM que já está na tela. */
+function tipoVisualDoHit(m, hit){
+  if(!hit) return 'Normal';
+  if(hit.mv && GOLPES[hit.mv]) return GOLPES[hit.mv][0];
+  if(hit.x === 'queima' || hit.x === 'queimou') return 'Fire';
+  if(hit.x === 'veneno' || hit.x === 'envenenou') return 'Poison';
+  if(hit.x === 'paralisado' || hit.x === 'paralisou') return 'Electric';
+  if(hit.x === 'congelou' || hit.x === 'gelado' || hit.x === 'degelou') return 'Ice';
+  if(hit.x === 'confusao') return 'Psychic';
+  const especie = hit.q === 'p' ? m.playerSpecies : m.enemySpecies;
+  const sp = especieParaTela(especie);
+  return (sp && sp.types && sp.types[0]) || 'Normal';
+}
+function reiniciarClasseAnimada(el, classe){
+  if(!el) return;
+  el.classList.remove(classe);
+  void el.offsetWidth;
+  el.classList.add(classe);
+}
+function limparClasseDepois(el, classe, ms){
+  if(!el) return;
+  setTimeout(()=>{ try{ el.classList.remove(classe); }catch(e){} }, ms);
+}
+function criarFxDeImpacto(lado, tipo, hit){
+  const layer = document.getElementById('battle-fx-layer');
+  if(!layer) return;
+  const cor = TYPE_COLORS[tipo] || '#ffffff';
+  const fx = document.createElement('span');
+  fx.className = 'battle-impact ' + lado;
+  fx.style.setProperty('--fx-color', cor);
+  fx.innerHTML = '<span class="battle-impact-icon">' + (seloDoTipo(tipo,'selo-g',cor) || '') + '</span>';
+  layer.appendChild(fx);
+  setTimeout(()=>{ try{ fx.remove(); }catch(e){} }, 650);
+  if(hit && hit.amount){
+    const pop = document.createElement('span');
+    pop.className = 'battle-damage-pop ' + lado + (hit.c ? ' crit' : '') + (hit.amount < 0 ? ' battle-heal-pop' : '');
+    pop.textContent = (hit.amount < 0 ? '+' : '−') + Math.abs(hit.amount) + (hit.c ? ' CRÍTICO!' : '');
+    layer.appendChild(pop);
+    setTimeout(()=>{ try{ pop.remove(); }catch(e){} }, 900);
+  }
+}
+/* boom e boomself são a mesma ação; o segundo registro só completa o HP. */
+function caiuNaExplosao(m, lado){
+  return (m.golpes || []).some(g => (g.x === 'boom' || g.x === 'boomself') &&
+    (g.q === 'p' ? 'enemy' : 'player') === lado && g.hp === 0);
+}
+function animarAutodestruicao(m, atraso){
+  const cena = document.querySelector('.battle-vs.battle-scene');
+  if(!cena || cena._explosaoMatchup === m) return;
+  cena._explosaoMatchup = m;
+  setTimeout(()=>{
+    if(!cena.isConnected) return;
+    const layer = cena.querySelector('.battle-fx-layer');
+    if(!layer) return;
+    const fx = document.createElement('div');
+    fx.className = 'battle-explosion';
+    fx.setAttribute('aria-hidden', 'true');
+    layer.appendChild(fx);
+    const bounds = layer.getBoundingClientRect();
+    ['player','enemy'].forEach(lado=>{
+      const stage = cena.querySelector('#battle-sprite-' + lado);
+      if(!stage) return;
+      const sprite = stage.querySelector('.battle-status-host') || stage;
+      const rect = sprite.getBoundingClientRect();
+      const burst = document.createElement('span');
+      burst.className = 'battle-explosion-burst';
+      burst.style.left = (rect.left + rect.width / 2 - bounds.left) + 'px';
+      burst.style.top = (rect.top + rect.height / 2 - bounds.top) + 'px';
+      burst.innerHTML = '<i class="battle-explosion-fire"></i><i class="battle-explosion-smoke"></i><i class="battle-explosion-smoke"></i><i class="battle-explosion-smoke"></i>';
+      fx.appendChild(burst);
+      stage.classList.remove('battle-attack-player','battle-attack-enemy','battle-hit');
+      reiniciarClasseAnimada(stage, 'battle-explosion-recoil');
+      setTimeout(()=>{
+        if(!cena.isConnected) return;
+        stage.classList.remove('battle-explosion-recoil');
+        if(caiuNaExplosao(m, lado)) stage.classList.add('battle-exploded');
+      },480);
+    });
+    setTimeout(()=>fx.remove(),1050);
+  },Math.max(0, atraso || 0));
+}
+function animarGolpeNaCena(m, hit, atrasoImpacto){
+  if(!m || !hit || !document.querySelector('.battle-vs.battle-scene')) return;
+  if(hit.x === 'boom'){ animarAutodestruicao(m, atrasoImpacto); return; }
+  if(hit.x === 'boomself') return;
+  const alvo = hit.side === 'player' ? 'player' : 'enemy';
+  const cura = hit.amount < 0 || hit.cura;
+  const dano = hit.amount > 0;
+  const efeitoSemAtacante = hit.x === 'queima' || hit.x === 'veneno' || hit.x === 'gelado' || hit.x === 'paralisado';
+  const atacante = hit.q === 'p' ? 'player' : 'enemy';
+  const tipo = tipoVisualDoHit(m, hit);
+  const delay = Math.max(0, atrasoImpacto || 0);
+
+  /* Golpe comum: o sprite avança enquanto o nome do golpe está sendo lido. O impacto coincide
+     com o começo da queda da barra, exatamente onde o laço já agenda animatePartialHpBars. */
+  if(dano && !efeitoSemAtacante && atacante !== alvo){
+    const stageAtk = document.getElementById('battle-sprite-' + atacante);
+    const classeAtk = atacante === 'player' ? 'battle-attack-player' : 'battle-attack-enemy';
+    const inicio = Math.max(0, delay - 330);
+    setTimeout(()=>{
+      if(!document.body.contains(stageAtk)) return;
+      reiniciarClasseAnimada(stageAtk, classeAtk);
+      limparClasseDepois(stageAtk, classeAtk, 520);
+    }, inicio);
+  }
+
+  setTimeout(()=>{
+    const stageAlvo = document.getElementById('battle-sprite-' + alvo);
+    if(dano){
+      reiniciarClasseAnimada(stageAlvo, 'battle-hit');
+      limparClasseDepois(stageAlvo, 'battle-hit', 430);
+      criarFxDeImpacto(alvo, tipo, hit);
+    } else if(cura && hit.amount){
+      criarFxDeImpacto(alvo, 'Grass', hit);
+    }
+  }, delay);
 }
 /* O NOME VEM PRIMEIRO, A BARRA DEPOIS. Pedido em 09/09/2026: "aparece 'Venusaur usou FOLHA
    NAVALHA', espera 1s, e aí começa a descer o HP do adversário".
@@ -23705,6 +24543,87 @@ function trocaDoRemoinho(m, lado, passo){
    qualquer tela que desenhe o quadro sem passo). Ali o confronto ja acabou e o selo e o resumo.
    A convencao do passo e a de sempre: `passo === k + 1` quer dizer "animando seq[k]", porque os
    lacos fazem HitStep++ antes de pintar. Entao a marca no indice i aparece a partir de `i + 1`. */
+/* Apenas apresentação: os status são reconstruídos até o passo mostrado, nunca
+   a partir do estado final sozinho. Sono/confusão afetam o oposto de q; os
+   eventos de queimadura/veneno/paralisia/gelo identificam o próprio afetado. */
+function statusVisuaisDaSequencia(m, lado, passo, seq){
+  if(!m) return [];
+  const prefix = lado === 'p' ? 'player' : 'enemy';
+  const n = Math.max(0, Math.min(seq.length, passo == null ? seq.length : passo));
+  const proprio = g => g.q === lado;
+  const herdado = (campo, inicio, continua) =>
+    !seq.some(g => proprio(g) && g.x === inicio) &&
+    (!!m[prefix + campo] || seq.some(g => proprio(g) && g.x === continua));
+  const primeiroSono = seq.find(g => (g.x === 'sono' && !proprio(g)) ||
+    (proprio(g) && (g.x === 'dormindo' || g.x === 'acordou')));
+  const primeiroGelo = seq.find(g => proprio(g) && ['congelou','gelado','degelou'].includes(g.x));
+  const st = {
+    sleep: !!primeiroSono && primeiroSono.x !== 'sono',
+    poison: herdado('Envenenado','envenenou','veneno'),
+    burn: herdado('Queimado','queimou','queima'),
+    paralysis: herdado('Paralisado','paralisou','paralisado'),
+    freeze: !!primeiroGelo && primeiroGelo.x !== 'congelou',
+    confusion: false
+  };
+  for(let i=0;i<n;i++){
+    const g=seq[i];
+    if(g.x==='sono' && !proprio(g)) st.sleep=true;
+    if(g.x==='confusao' && !proprio(g) && i===n-1) st.confusion=true;
+    if(!proprio(g)) continue;
+    if(g.x==='dormindo') st.sleep=true;
+    if(g.x==='acordou') st.sleep=false;
+    if(g.x==='congelou' || g.x==='gelado') st.freeze=true;
+    if(g.x==='degelou') st.freeze=false;
+    if(g.x==='envenenou' || g.x==='veneno') st.poison=true;
+    if(g.x==='queimou' || g.x==='queima') st.burn=true;
+    if(g.x==='paralisou' || g.x==='paralisado') st.paralysis=true;
+  }
+  return Object.keys(st).filter(k=>st[k]);
+}
+function efeitosVisuaisDeStatusHtml(status){
+  const svg = body => '<svg viewBox="0 0 16 16" aria-hidden="true">'+body+'</svg>';
+  const arte = {
+    sleep:'<b>z</b><b>Z</b><b>z</b>',
+    poison:'<i></i><i></i><i></i>',
+    burn:svg('<path fill="#913543" d="M7 0h3v4h2v3h2v6h-2v3H4v-2H2V8h2V5h3z"/><path fill="#ff8c32" d="M8 2h1v5h3v6h-2v2H5v-2H4V9h3V6h1z"/><path fill="#fff096" d="M8 8h2v4h1v2H6v-4h2z"/>'),
+    paralysis:svg('<path fill="#805336" d="M8 0h7l-4 6h4L5 16l2-7H2z"/><path fill="#ffe76c" d="M9 1h4L8 7h4l-5 6 2-6H5z"/>'),
+    freeze:svg('<path fill="#328ab4" d="M7 0h2v4l3-3 2 2-4 4h6v2h-6l4 4-2 2-3-3v4H7v-4l-3 3-2-2 4-4H0V7h6L2 3l2-2 3 3z"/><path fill="#c9f9ff" d="M7 2h2v5h5v2H9v5H7V9H2V7h5z"/><rect x="6" y="6" width="4" height="4" fill="#fff"/>'),
+    confusion:svg('<path fill="#9e588c" d="M1 7h14v2H1z"/><path fill="#ffea77" d="M3 0h2v2h2v2H5v2H3V4H1V2h2zM11 8h2v2h3v2h-3v3h-2v-3H8v-2h3z"/><rect x="11" y="2" width="2" height="2" fill="#f8baff"/>')
+  };
+  const nomes={sleep:'Dormindo',poison:'Envenenado',burn:'Queimado',paralysis:'Paralisado',freeze:'Congelado',confusion:'Confuso'};
+  return status.map(k=>`<span class="battle-status-effect battle-status-${k}" role="img" aria-label="${nomes[k]}" title="${nomes[k]}">${arte[k]}</span>`).join('');
+}
+function spriteComStatusHtml(sprite, m, lado, passo, hp, saindo){
+  if(!visualNovoDeBatalha()) return sprite;
+  const status = m && !saindo && !(hp <= 0)
+    ? statusVisuaisDaSequencia(m,lado,passo,sequenciaDoConfronto(m)) : [];
+  return `<span class="battle-status-host" data-battle-status-side="${lado}" data-status-exiting="${saindo?'1':'0'}"><span class="battle-status-fx" data-status-key="${status.join(' ')}">${efeitosVisuaisDeStatusHtml(status)}</span>${sprite}</span>`;
+}
+function pintarEfeitosDeStatus(m, passo, vidaAtual){
+  if(!m || !visualNovoDeBatalha()) return;
+  const hosts=document.querySelectorAll('.battle-vs [data-battle-status-side]');
+  if(!hosts.length) return;
+  const seq=sequenciaDoConfronto(m);
+  const hits=vidaAtual ? null : buildAnimatedHitSequence(m);
+  for(const host of hosts){
+    const lado=host.dataset.battleStatusSide;
+    const prefix=lado==='p'?'player':'enemy';
+    let hp=vidaAtual ? vidaAtual[lado] : m[prefix+'HpBefore'];
+    if(hits && Number.isFinite(hp)){
+      for(const hit of hits.slice(0,Math.max(0,passo || 0))){
+        if(hit.side===prefix) hp=Math.max(0,hp-hit.amount);
+      }
+    }
+    const status=host.dataset.statusExiting==='1' || hp<=0 ? [] : statusVisuaisDaSequencia(m,lado,passo,seq);
+    const fx=host.querySelector('.battle-status-fx');
+    const key=status.join(' ');
+    if(fx && fx.dataset.statusKey!==key){
+      fx.innerHTML=efeitosVisuaisDeStatusHtml(status);
+      fx.dataset.statusKey=key;
+    }
+  }
+}
+
 function statusAteAqui(m, lado, passo, marca){
   if(passo == null) return true;
   const g = (m && m.golpes) || [];
@@ -23813,6 +24732,11 @@ function fighterHtml(m, lado, op){
      O quadro continua reservando a MESMA altura: sem isso o cabeçalho encolhe no meio da animação e
      a tela inteira pula de tamanho por um quadro. */
   if(troca && troca.quadro === 'vazio'){
+    if(op.visualNovo){
+      return `<div class="fighter battle-fighter ${doJogador?'player':'enemy'} battle-empty" id="battle-fighter-${doJogador?'player':'enemy'}">
+        <span class="battle-empty-mark">❔</span>
+      </div>`;
+    }
     return `<div class="fighter fighter-oculto fighter-vaga">
         <div class="fighter-emoji fighter-vazio">❔</div>
         <span class="fighter-oculto-l">entrando...</span>
@@ -23836,9 +24760,50 @@ function fighterHtml(m, lado, op){
   const especialidade = saindo ? false : (doJogador ? m.playerSpecialty : m.enemySpecialty);
   const hp = saindo ? (g.shp != null ? g.shp : 0) : op.hp;
   const maxHp = saindo ? (g.smx || 1) : (doJogador ? m.playerMaxHp : m.enemyMaxHp);
+
+  /* A cena nova so e pedida pelas batalhas da Jornada e das telas especiais, e so pra quem tem
+     admin. O mesmo fighterHtml continua servindo a pescaria e as outras telas no formato antigo,
+     sem efeito colateral: sem `op.visualNovo` este ramo inteiro nao existe. */
+  if(op.visualNovo){
+    const side = doJogador ? 'player' : 'enemy';
+    const badges = `${shiny ? selo('shiny','selo-g') : ''}${(op.comTerreno && buffed) ? selo('terreno','selo-g', op.corDoTerreno || COR_TERRENO_PADRAO) : ''}${especialidade ? selo('medalha_ouro','selo-g') : ''}${saindo ? '' : selosDoConfronto(m, lado, op.passo)}`;
+    const morto = hp <= 0 && !saindo;
+    const explodiu = !saindo && caiuNaExplosao(m, side) && sequenciaDoConfronto(m).slice(0, op.passo == null ? Infinity : op.passo).some(g => g.x === 'boom');
+    return `<div class="fighter battle-fighter ${side}${entrando ? ' fighter-entra' : ''}${morto ? ' battle-fainted' : ''}" id="battle-fighter-${side}">
+      <div class="battle-mon-panel">
+        <div class="battle-mon-head">
+          <span class="battle-mon-name">${nome}</span>
+          <span class="fighter-level">Lv.${nivel}</span>
+        </div>
+        <div class="battle-mon-badges">${badges}</div>
+        <div class="fighter-types">${sp ? typesHtml(sp.types) : ''}</div>
+        ${renderHpBar(hp, maxHp, doJogador ? 'hp-fill-player' : 'hp-fill-enemy', doJogador ? 'hp-label-player' : 'hp-label-enemy', entrando)}
+      </div>
+      <div class="battle-ground-base ${battleGroundBaseClass(especie)}"></div>
+      <div class="fighter-emoji battle-sprite-stage${explodiu ? ' battle-exploded' : ''}" id="battle-sprite-${side}">
+        ${sp ? spriteComStatusHtml(battleAnimatedSpriteHtml(especie, contra, shiny, doJogador), m, lado, op.passo, hp, saindo) : ''}
+      </div>
+    </div>`;
+  }
+
   return `<div class="fighter${entrando ? ' fighter-entra' : ''}">
         ${/* os selos das duas danças vêm DEPOIS dos outros três e não saem em quem está SAINDO de
-             campo (o quadro do Remoinho): o efeito é de quem está lutando agora */''}
+             campo (o quadro do Remoinho): o efeito é de quem está lutando agora.
+             ⚠️ E OS ÍCONES DE STATUS NÃO ENTRAM AQUI, o que é diferença DELIBERADA em relação ao
+             arquivo da cena nova (22/09/2026). Lá o spriteComStatusHtml envolve o sprite também
+             neste caminho antigo -- e medido a 320px no navegador, na TORRE, os ícones caem EM CIMA
+             do placar de pokébolas: a camada deles é posicionada acima do topo do sprite, e no
+             layout antigo o sprite é o PRIMEIRO elemento do .fighter -- então o "acima dele" é
+             justamente a linha do placar. Na cena nova isso não acontece, porque lá o sprite fica no
+             rodapé do palco e sobra campo acima dele.
+             Ou seja: os ícones são da CENA, e ficam onde a cena está. Assim a Torre, a Pescaria e o
+             desafio de treinador continuam byte a byte iguais pra TODO MUNDO -- admin inclusive.
+             ⚠️ E ESTE TEXTO TEM QUE VIVER DENTRO DO COMENTÁRIO QUE JÁ EXISTIA: um bloco novo ao lado
+             dele acrescenta UMA LINHA de indentação ao HTML de todo mundo, e foi exatamente isso que
+             a medição de identidade pegou quando ele nasceu separado.
+             ⚠️ E ELE NÃO PODE TER CRASE NENHUMA: o comentário vive dentro de um template literal, e
+             uma crase ímpar aqui FECHA a string -- o node --check acusa, mas com um número PAR de
+             crases ele passa e a tela quebra só no navegador. */''}
         <div class="fighter-emoji">${sp ? battleSpriteHtml(especie, contra, 'sprite-lg', shiny, doJogador) : ''}</div>${nome}${shiny?' '+selo('shiny','selo-g'):''}${(op.comTerreno && buffed)?' '+selo('terreno','selo-g', op.corDoTerreno || COR_TERRENO_PADRAO):''}${especialidade?' '+selo('medalha_ouro','selo-g'):''}${saindo?'':selosDoConfronto(m, lado, op.passo)} <span class="fighter-level">Lv.${nivel}</span>
         <div class="fighter-types">${sp ? typesHtml(sp.types) : ''}</div>
         ${renderHpBar(hp, maxHp, doJogador ? 'hp-fill-player' : 'hp-fill-enemy', doJogador ? 'hp-label-player' : 'hp-label-enemy', entrando)}
@@ -23856,6 +24821,7 @@ function renderBattling(){
   const terrain = isNeighborhoodGym ? game.neighborhoodGymBattleTerrain : game.gymTerrain;
   const enemyLabel = isNeighborhoodGym ? game.neighborhoodGymBattleOpponentName : gym.leaderName;
   const eyebrowText = isNeighborhoodGym ? `${selo('estadio')} GINÁSIO DA CIDADE — BATALHA` : `🥊 GINÁSIO ${gym.gymTypeName.toUpperCase()} — BATALHA`;
+  const cenaNova = visualNovoDeBatalha();
   const displayPlayerHp = loading ? m.playerHpBefore : (game.revealCurrentPlayerHp!=null ? game.revealCurrentPlayerHp : m.playerHpAfter);
   const displayEnemyHp = loading ? m.enemyHpBefore : (game.revealCurrentEnemyHp!=null ? game.revealCurrentEnemyHp : m.enemyHpAfter);
   return `
@@ -23868,10 +24834,10 @@ function renderBattling(){
       ${placarDoTreinador(game.trainerName||'Você', (loading||animating)?m.playerAliveBefore:m.playerAliveAfter, m.playerTeamSize)}
       ${placarDoTreinador(enemyLabel, (loading||animating)?m.enemyAliveBefore:m.enemyAliveAfter, m.enemyTeamSize)}
     </div>
-    <div class="battle-vs">
-      ${fighterHtml(m, 'p', { hp: displayPlayerHp, passo: game.revealHitStep, hit: game.revealLastHit, comTerreno: true, corDoTerreno: terrain ? terrainColor(terrain) : null })}
+    <div class="battle-vs${cenaNova ? ' battle-scene' : ''}"${cenaNova ? ` style="${terrainBattleSceneStyle(terrain)}"` : ''}>${cenaNova ? '\n      <div class="battle-scene-grid"></div>' : ''}
+      ${fighterHtml(m, 'p', { hp: displayPlayerHp, passo: game.revealHitStep, hit: game.revealLastHit, comTerreno: true, corDoTerreno: terrain ? terrainColor(terrain) : null, visualNovo: cenaNova })}
       <span class="vs-swords ${(loading||animating)?'spin':''}">${selo('vs', 'selo-g')}</span>
-      ${fighterHtml(m, 'e', { hp: displayEnemyHp, passo: game.revealHitStep, hit: game.revealLastHit, comTerreno: true, corDoTerreno: terrain ? terrainColor(terrain) : null })}
+      ${fighterHtml(m, 'e', { hp: displayEnemyHp, passo: game.revealHitStep, hit: game.revealLastHit, comTerreno: true, corDoTerreno: terrain ? terrainColor(terrain) : null, visualNovo: cenaNova })}${cenaNova ? '\n      <div class="battle-fx-layer" id="battle-fx-layer"></div>' : ''}
     </div>
     <div class="battle-status-area">${loading
       ? `<div class="loading-dots"><span></span><span></span><span></span></div><p class="loading-text">Aguardando o resultado da batalha...</p>`
@@ -25825,6 +26791,7 @@ function advanceLeagueWatch(){
     /* O nome do golpe já está na tela (pintarStatusDoConfronto, acima). A barra e tudo que vem
        depois dela deslizam um segundo, pra a frase ser lida antes de a vida começar a cair. */
     const esperaNome = pausaDoNomeDoGolpe(m, hit);
+    animarGolpeNaCena(m, hit, esperaNome);
     if(isLastHit){
       game.leagueWatchPhase = 'result';
       setTimeout(animateLeagueWatchHpBars, esperaNome);
@@ -25913,6 +26880,7 @@ function leaveLeagueWatch(){
   if(dest==='pokedex'){ loadSaveSlots(); }
 }
 function renderLeagueWatch(){
+  const cenaNova = visualNovoDeBatalha();
   const w = game.leagueWatch;
   const matchups = w.matchups;
   const m = matchups[game.leagueWatchIndex];
@@ -25933,7 +26901,13 @@ function renderLeagueWatch(){
       ${placarDoTreinador(w.playerAName, (loading||animating)?m.playerAliveBefore:m.playerAliveAfter, m.playerTeamSize)}
       ${placarDoTreinador(w.playerBName, (loading||animating)?m.enemyAliveBefore:m.enemyAliveAfter, m.enemyTeamSize)}
     </div>
-    <div class="battle-vs">
+    ${cenaNova ? `<div class="battle-vs battle-scene" style="${terrainBattleSceneStyle(w.terrain)}">
+      <div class="battle-scene-grid"></div>
+      ${fighterHtml(m, 'p', { hp: displayPlayerHp, passo: game.leagueWatchHitStep, hit: game.leagueWatchLastHit, comTerreno: true, corDoTerreno: w.terrain ? terrainColor(w.terrain) : null, visualNovo: true })}
+      <span class="vs-swords ${(loading||animating)?'spin':''}">${selo('vs', 'selo-g')}</span>
+      ${fighterHtml(m, 'e', { hp: displayEnemyHp, passo: game.leagueWatchHitStep, hit: game.leagueWatchLastHit, comTerreno: true, corDoTerreno: w.terrain ? terrainColor(w.terrain) : null, visualNovo: true })}
+      <div class="battle-fx-layer" id="battle-fx-layer"></div>
+    </div>` : `<div class="battle-vs">
       <div class="fighter">
         <div class="fighter-emoji">${playerSp?battleSpriteHtml(m.playerSpecies, m.enemySpecies, 'sprite-lg', m.playerShiny, true):''}</div>${m.player}${m.playerShiny?' 🌟':''}${w.terrain && playerSp && playerSp.types.some(t=>w.terrain.types.includes(t))?' 🔺':''}${m.playerSpecialty?' 🎖️':''}${selosDoConfronto(m, 'p', game.leagueWatchHitStep)} <span class="fighter-level">Lv.${m.playerLevel}</span>
         <div class="fighter-types">${playerSp?typesHtml(playerSp.types):''}</div>
@@ -25945,7 +26919,7 @@ function renderLeagueWatch(){
         <div class="fighter-types">${enemySp?typesHtml(enemySp.types):''}</div>
         ${renderHpBar(displayEnemyHp, m.enemyMaxHp, 'hp-fill-enemy', 'hp-label-enemy')}
       </div>
-    </div>
+    </div>`}
     <div class="battle-status-area">${loading
       ? `<div class="loading-dots"><span></span><span></span><span></span></div><p class="loading-text">Aguardando o resultado da batalha...</p>`
       : (animating
@@ -34081,18 +35055,62 @@ function pescariaPintarArea(b){
      transição da barra terminar -- exatamente onde a jornada agenda o `render()` dela. Refazer os
      quadros no meio da transição a mataria, que é a regra da casa. */
   const vs = document.getElementById('pescBatalhaVs');
-  if(vs) vs.innerHTML = pescariaLutadoresHtml(b);
+  if(vs){
+    /* ⚠️ NA CENA O QUADRO NÃO É REFEITO INTEIRO, e a razão é o GIF: trocar o innerHTML RECRIA os
+       <img>, e um GIF recriado volta pro primeiro quadro -- o sprite ficaria preso no começo do
+       laço, com um tranco a cada golpe. Isso não existe na jornada porque lá o passo é PINTADO,
+       nunca redesenhado (é a regra da casa); aqui a tela antiga podia se dar ao luxo de refazer,
+       porque o sprite dela é um PNG parado.
+       Então só o que MUDA por passo é repintado: o painel (nome, selos, barra) e a classe do
+       lutador -- é ela que carrega o `battle-fainted`. O palco do sprite fica de pé, e os ícones
+       de status têm pintor próprio, que troca o conteúdo sem recriar elemento nenhum.
+       ⚠️ E SE A ESTRUTURA MUDAR ele refaz tudo: a vaga vazia do Remoinho não tem painel, e sem
+       essa saída o quadro ficaria com o painel do pokémon que acabou de ser soprado pra fora. */
+    const cena = vs.classList.contains('battle-scene');
+    const fonte = cena ? document.createElement('div') : null;
+    if(fonte) fonte.innerHTML = pescariaLutadoresHtml(b);
+    const podePintar = cena && ['player','enemy'].every(side =>
+      fonte.querySelector('#battle-fighter-' + side + ' .battle-mon-panel') &&
+      vs.querySelector('#battle-fighter-' + side + ' .battle-mon-panel'));
+    if(podePintar){
+      ['player','enemy'].forEach(side => {
+        const de = fonte.querySelector('#battle-fighter-' + side);
+        const para = vs.querySelector('#battle-fighter-' + side);
+        para.className = de.className;
+        para.querySelector('.battle-mon-panel').innerHTML = de.querySelector('.battle-mon-panel').innerHTML;
+      });
+      pintarEfeitosDeStatus(m, b.passo);
+    } else {
+      vs.innerHTML = fonte ? fonte.innerHTML : pescariaLutadoresHtml(b);
+    }
+  }
   if(b.fim){
     const pl = document.getElementById('pescBatalhaPlacar');
     if(pl) pl.innerHTML = pescariaPlacarHtml(m, true);
   }
 }
-/* os dois quadros e o VS, numa função só: o render da tela e o repinte do passo leem a MESMA */
+/* ---------------------------------------------------------------------------
+   O CENÁRIO DA PESCARIA É SEMPRE O MANGUEZAL -- e é SÓ o cenário (22/09/2026, a
+   pedido: "na pescaria coloque apenas o cenario do manguezal, sem colocar os
+   atributos"). Mesma regra do dojo da Torre: o terrainBattleSceneStyle só devolve
+   variáveis de CSS, e o 1,15× vem do applyTerrainBuff -- que a pescaria nunca
+   chamou. Este id é uma coordenada de imagem, não um terreno.
+   ⚠️ E O SELO 🔺 CONTINUA FORA porque os dois fighterHtml daqui não passam
+   comTerreno: sem ele o selo do terreno nem é montado. */
+const CENARIO_DA_PESCARIA = 'porto_abandonado';   /* o "Manguezal" da tabela TERRAINS */
+
+/* os dois quadros e o VS, numa função só: o render da tela e o repinte do passo leem a MESMA.
+   ⚠️ E A GRADE E A CAMADA DE EFEITOS MORAM AQUI DENTRO, não no container: o pescariaPintarArea
+   troca o innerHTML do #pescBatalhaVs a cada passo, então qualquer filho que ficasse só no render
+   seria destruído no primeiro golpe. Emitidos aqui, os dois voltam junto com os lutadores. */
 function pescariaLutadoresHtml(b){
   const m = b.matchup;
-  return fighterHtml(m, 'p', { hp: b.hpP, passo: b.passo, hit: b.hit })
+  const cenaNova = visualNovoDeBatalha();
+  return (cenaNova ? '<div class="battle-scene-grid"></div>' : '')
+       + fighterHtml(m, 'p', { hp: b.hpP, passo: b.passo, hit: b.hit, visualNovo: cenaNova })
        + '<span class="vs-swords spin">' + selo('vs', 'selo-g') + '</span>'
-       + fighterHtml(m, 'e', { hp: b.hpE, passo: b.passo, hit: b.hit });
+       + fighterHtml(m, 'e', { hp: b.hpE, passo: b.passo, hit: b.hit, visualNovo: cenaNova })
+       + (cenaNova ? '<div class="battle-fx-layer" id="battle-fx-layer"></div>' : '');
 }
 /* ⚠️ O QUE CADA UM PESCOU (20/09/2026, a pedido: *"quando acabar o tempo, exiba um log mostrando
    somente pokemons, level e pontos que cada treinador fez"*).
@@ -34465,6 +35483,7 @@ const PESCARIA_BOIA = {
    ⚠️ O PRÊMIO VIRA UM CHIP no cabeçalho (o `battlePrize` do protótipo): a captura só pontua se o
    parceiro vencer, então o número que está em jogo tem que estar na tela da luta. */
 function pescariaBatalhaHtml(p){
+  const cenaNova = visualNovoDeBatalha();
   const b = p && p.batalha;
   if(!b || !b.matchup || !p.op) return '';
   const m = b.matchup;
@@ -34473,7 +35492,7 @@ function pescariaBatalhaHtml(p){
       <span class="pesc-chip">VALE ${b.premio} PTS</span></div>
     ${chuvaBadgeHtml(m)}
     <div class="team-alive-row" id="pescBatalhaPlacar">${pescariaPlacarHtml(m, b.fim)}</div>
-    <div class="battle-vs" id="pescBatalhaVs">${pescariaLutadoresHtml(b)}</div>
+    <div class="battle-vs${cenaNova ? ' battle-scene' : ''}" id="pescBatalhaVs"${cenaNova ? ` style="${terrainBattleSceneStyle({ id: CENARIO_DA_PESCARIA })}"` : ''}>${pescariaLutadoresHtml(b)}</div>
     <div class="battle-status-area" id="pescBatalhaStatus">${b.fim
       ? pescariaLinhaDoFim(m)
       : statusDoConfrontoHtml(m, b.passo, b.hit)}</div>`;
