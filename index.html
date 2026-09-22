@@ -3185,6 +3185,21 @@
   /* ⚠️ A ILHA SEM JOGO APAGA E GANHA O TRACEJADO, que e o que diz 'nao e aqui' -- o mesmo par
      (opacidade + borda tracejada) do ponto ocupado da Pescaria. E ela e um `<span>`: cursor de
      texto, sem realce de toque. */
+  /* O CHECKLIST DA TRAVESSIA: uma linha por ilha -- marca, nome, jogo e o que sobrou de chance.
+     Grade e nao flex livre: com flex as colunas dancam de linha pra linha, e e ali que o olho
+     compara. */
+  .ilhas-chk-linha{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;gap:6px;
+    align-items:center;padding:5px 0;border-bottom:1px dashed #d8d2c0;font-size:.72rem;}
+  .ilhas-chk-linha:last-of-type{border-bottom:none;}
+  .ilhas-chk-nome{font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .ilhas-chk-jogo{color:var(--muted);font-size:.66rem;}
+  .ilhas-chk-nota{font-size:.62rem;font-weight:700;color:var(--muted);white-space:nowrap;}
+  /* A COR DIZ O ESTADO, e o vencido NAO usa so opacidade: apagado se le como desabilitado, e
+     vencido e o contrario disso. */
+  .ilhas-chk-linha.venceu .ilhas-chk-nota{color:#1f7a3d;}
+  .ilhas-chk-linha.perdeu{opacity:.55;}
+  .ilhas-chk-linha.perdeu .ilhas-chk-nota{color:var(--red);}
+  .ilhas-premio{font-weight:800;color:#1f7a3d;}
   .ilhas-mapa .ilha-pino.em-breve{opacity:.5;border-style:dashed;cursor:default;}
   /* ---- SELEÇÃO POKÉMON: o bolo do draft ------------------------------------------------
      ⚠️ QUEM JÁ FOI ESCOLHIDO NÃO SOME DO BOLO, apaga e ganha a FAIXA de quem levou -- sumindo,
@@ -4816,6 +4831,7 @@ function routesForLeg(legIndex){
   return mapa[legIndex] || mapa[mapa.length-1];
 }
 function routeById(routeId){
+  if(routeId === ROTA_DAS_ILHAS.id) return ROTA_DAS_ILHAS;
   if(routeId === ROTA_DO_CORTE.id) return ROTA_DO_CORTE;
   if(routeId === MONTANHA.id) return MONTANHA;
   for(const pair of ROUTE_MAP){ const found = pair.find(r=>r.id===routeId); if(found) return found; }
@@ -4878,6 +4894,57 @@ function voadorDoTime(){
   return (game.team || []).find(p => p && (p.ataques || []).indexOf(GOLPE_DO_VOO) >= 0) || null;
 }
 function podeVoar(){ return !!voadorDoTime(); }
+
+/* ============================================================================
+   A ROTA DAS ILHAS LARANJA (21/09/2026)
+   ----------------------------------------------------------------------------
+   Pedida assim: *"em qualquer momento quando o treinador tiver 6 pokemons, vai aparecer
+   aleatoriamente uma terceira rota quando ele tem 2 para escolher, essa rota sera para as ilhas
+   laranjas, e só chega la usando o surf(HM03)"*.
+
+   ⚠️ ELA É A TERCEIRA ROTA DE CHAVE, e a primeira cuja condição NÃO é o trecho: a mata é do 4º em
+   diante e a montanha do 6º, e esta pede um TIME COMPLETO. É o pedido ao pé da letra ("em qualquer
+   momento"), e faz sentido pelo que há do outro lado -- os cinco desafios usam o time da jornada,
+   e entrar com quatro pokémon seria entrar pra perder.
+
+   ⚠️ E SÓ PRA `admin === true` POR ENQUANTO (a pedido, no mesmo dia). A guarda mora no SORTEIO, ou
+   seja a carta não chega a existir pra quem não é: sem isso ela apareceria trancada, e um cadeado
+   que ninguém consegue abrir é pior que carta nenhuma.
+   ============================================================================ */
+const ROTA_DAS_ILHAS = {
+  id: "ilhas_laranja", name: "Ilhas Laranja", icon: "🏝️", types: ["Water"],
+  rumor: "O mar abre num arquipélago ao longe. Cinco ilhas, cinco desafios -- e só se chega nadando.",
+  surf: true
+};
+/* ⚠️ O TIME CHEIO É A CONDIÇÃO, e o número vive numa constante porque ele é a régua: baixá-lo pra
+   5 faria a rota aparecer antes de o time estar pronto pros cinco desafios. */
+const ILHAS_TIME_MINIMO = 6;
+const CHANCE_ILHAS = 0.25;
+/* ⚠️ SEMEADO PELO SAVE, como as outras duas: com `Math.random` bastaria sair do save e voltar até
+   a rota aparecer. A semente carrega o slot, a GERAÇÃO do slot e o trecho.
+   ⚠️ E A CONDIÇÃO DE TIME É LIDA FORA DA SEMENTE, de propósito: o dado de cada trecho é sempre o
+   mesmo, e o que muda é a carta ser OFERECIDA ou não. Assim capturar o sexto pokémon não re-sorteia
+   nada -- ele só destrava o que o dado já havia decidido. */
+function ilhasSaemNoTrecho(leg){
+  if(game.ehAdmin !== true) return false;
+  if(((game.team) || []).length < ILHAS_TIME_MINIMO) return false;
+  /* ⚠️ UMA TERCEIRA CARTA POR TRECHO, e a ordem é a de antiguidade: a mata (4º) tem preferência
+     sobre a montanha (6º), e as duas sobre esta. Com duas no mesmo trecho seriam QUATRO cartas, e
+     a promessa é de uma TERCEIRA -- a tela deixaria de ser a que o jogador conhece. */
+  if(temRotaDoCorte(leg)) return false;
+  if(montanhaSaiNoTrecho(leg)) return false;
+  const rng = makeSeededRng("ilhas|" + game.currentSaveSlot + "|" + (game.saveGen||0) + "|" + leg);
+  return rng() < CHANCE_ILHAS;
+}
+/* QUEM ABRE O CAMINHO: alguém do time que saiba Surf. O espelho exato do `cortadorDoTime` e do
+   `voadorDoTime`, e a pergunta é feita NO DESENHO -- este time, AGORA, sabe nadar?
+   ⚠️ E ELE NÃO É SÓ O CADEADO: é este pokémon que o Resgate vai EXIGIR do outro lado (o pedido diz
+   *"ele vai ser obrigado a ir com o pokemon que ele usou o surf para conseguir acesso"*), então ele
+   é guardado no contexto da visita. */
+function surfistaDoTime(){
+  return (game.team || []).find(p => p && (p.ataques || []).indexOf(GOLPE_DO_SURF) >= 0) || null;
+}
+function podeSurfar(){ return !!surfistaDoTime(); }
 
 /* ============================================================================
    OS TRÊS NINHOS
@@ -5112,6 +5179,23 @@ function temRotaDoCorte(leg){
    porque o `routeCards` é montado em TRÊS pontos (a saída do laboratório, a chegada num trecho novo
    e a auto-recuperação de save antigo) -- três cópias fariam a mata aparecer em dois deles e sumir
    no terceiro, que é o tipo de defeito que ninguém liga a nada. */
+/* ⚠️ AS TRÊS ROTAS DE CHAVE NUMA TABELA (21/09/2026), e não numa escada de ternários.
+   Ela nasceu com a terceira: o card e a ação decidiam com `r.corte ? ... : ...`, que dá o certo
+   com DUAS e deixa a terceira cair no ramo errado -- é literalmente o defeito dos banners de
+   intro (`CLASSE_DO_BANNER`), onde três contextos caíam numa string vazia e a tela saía ilegível.
+   Com a tabela, a quarta rota de chave nasce com o cadeado certo, a frase certa e o nome de quem
+   abre -- e o que a mata e a montanha desenham hoje não muda em um caractere (há trava). */
+const ROTAS_DE_CHAVE = {
+  corte: { hm: "HM01", icone: "🪓", quem: () => cortadorDoTime(), entrar: () => entrarNaMataFechada() },
+  voo:   { hm: "HM02", icone: "🪶", quem: () => voadorDoTime(),   entrar: () => entrarNaMontanha() },
+  surf:  { hm: "HM03", icone: "🌊", quem: () => surfistaDoTime(), entrar: () => entrarNasIlhasDaJornada() }
+};
+/* a chave que ESTA rota pede, ou null quando ela é uma rota comum */
+function chaveDaRota(r){
+  if(!r) return null;
+  const k = Object.keys(ROTAS_DE_CHAVE).find(k => r[k]);
+  return k ? Object.assign({ campo: k }, ROTAS_DE_CHAVE[k]) : null;
+}
 function cartasDeRota(leg){
   const ids = routesForLeg(leg).map(r => r.id);
   if(temRotaDoCorte(leg)) ids.push(ROTA_DO_CORTE.id);
@@ -5119,6 +5203,10 @@ function cartasDeRota(leg){
      `montanhaSaiNoTrecho`): com as duas no mesmo trecho seriam QUATRO, e a promessa é de uma
      TERCEIRA. */
   else if(montanhaSaiNoTrecho(leg)) ids.push(MONTANHA.id);
+  /* ⚠️ E AS ILHAS SÃO A TERCEIRA CONCORRENTE -- a última do `else if` porque ela é a mais nova e a
+     que tem a condição mais larga (qualquer trecho, com o time cheio): posta na frente, ela
+     roubaria trechos da mata e da montanha e mudaria a jornada de quem já tem save aberto. */
+  else if(ilhasSaemNoTrecho(leg)) ids.push(ROTA_DAS_ILHAS.id);
   return ids;
 }
 
@@ -5594,6 +5682,8 @@ function freshGameDefaults(){
        não pode custar a luta que o jogador acabou de vencer. */
     montanha:null,
     montanhaGuarda:null,
+    /* a visita as Ilhas Laranja pela jornada (ver `entrarNasIlhasDaJornada`) */
+    ilhasJornada:null, ilhasResultado:null,
     montanhaPremio:null,
     startersSorteados:{},   // {"slot:modo": {bulbasaur:bool,...}} -- vem da conta, ver sorteioDosIniciais
     geracaoDosSlots:{},     // {"0": 3} -- quantas tentativas daquele slot já CONTARAM (ver encerrarTentativaDoSlot)
@@ -12577,16 +12667,17 @@ function chooseRoute(id){
   if(!route) return;
   /* A tela já desabilita o card, mas quem VALIDA é a ação -- a mesma regra do `confirmarAtaques`
      e do `toggleRelease`. O card apagado é apresentação. */
-  if(route.corte && !timeQueCorta(game.team)) return;
-  /* a montanha tem a MESMA guarda, com a outra chave: o card apagado é apresentação, e quem recusa
-     de verdade é a ação -- ela vale mesmo que o clique venha forjado */
-  if(route.voo && !podeVoar()) return;
+  /* ⚠️ AS TRÊS ROTAS DE CHAVE PASSAM PELA MESMA GUARDA, lida da tabela: o card apagado é
+     apresentação, e quem recusa de verdade é a AÇÃO -- ela vale mesmo que o clique venha forjado.
+     Escrita rota a rota, a quarta nasceria SEM guarda e o cadeado dela seria só enfeite. */
+  const chave = chaveDaRota(route);
+  if(chave && !chave.quem()) return;
   game.currentRoute = id;
   registrarRotaEscolhida(id);
   game.routeCards = null;
-  if(route.corte){ entrarNaMataFechada(); return; }
-  /* a montanha tampouco tem pool: o que há do outro lado é a guarda, e não um encontro selvagem */
-  if(route.voo){ entrarNaMontanha(); return; }
+  /* ⚠️ NENHUMA DAS TRÊS TEM POOL: o que há do outro lado é a guarda, a montanha ou o arquipélago --
+     e não um encontro selvagem. */
+  if(chave){ chave.entrar(); return; }
   goToWildEncounter();
 }
 
@@ -14740,7 +14831,13 @@ function finishTrainerBattle(){
     game.screen = 'selecaoResultado';
     /* ⚠️ O ENVIO ACONTECE AQUI, na virada -- uma vez por batalha. No `render` da tela ele sairia
        de novo a cada desenho, e o jogador ganharia uma partida por toque. */
-    selecaoEnviarResultado(!!(game.trainerBattleResult && game.trainerBattleResult.win));
+    const venciASelecao = !!(game.trainerBattleResult && game.trainerBattleResult.win);
+    selecaoEnviarResultado(venciASelecao);
+    /* ⚠️ NA MESMA VIRADA, e pelo mesmo motivo do envio: no `render` da tela ele contaria uma
+       tentativa por toque. A Seleção é a única das cinco que NÃO usa o time do jogador (o bolo é
+       sorteado), então ela não tem restrição de time -- mas ela É um dos cinco desafios, e sem
+       vencê-la o prêmio não sai. */
+    registrarResultadoDaIlha('kumquat', venciASelecao);
     render();
     return;
   }
@@ -18196,7 +18293,7 @@ async function logout(){
    um ponto seguro de gravação: o autosave não rodava e o flushPendingAutoSave do beforeunload
    também não -- então a insígnia que o jogador ACABOU de ganhar ficava pendente enquanto ele
    pensava na escolha, e fechar a aba ali perdia a vitória. */
-const SAFE_SAVE_SCREENS = new Set(['start','walk','walkNext','gymChoice','wild','release','levels','evolution','evoChoice','eeveeChoice','escolhaDeAtaques','aprenderAtaque','golpeAprendido','teamOrder','preBattle','victory','defeat','gameover','journeyEnd','specialIntro','specialResult','mataFechada','vigiliaPremio','montanha','ninhos','montanhaLendarios','rocketHideout','eliteIntro','eliteHeal']);
+const SAFE_SAVE_SCREENS = new Set(['start','walk','walkNext','gymChoice','wild','release','levels','evolution','evoChoice','eeveeChoice','escolhaDeAtaques','aprenderAtaque','golpeAprendido','teamOrder','preBattle','victory','defeat','gameover','journeyEnd','specialIntro','specialResult','mataFechada','vigiliaPremio','montanha','ninhos','montanhaLendarios','ilhas','ilhasFim','rocketHideout','eliteIntro','eliteHeal']);
 function saveDocRef(uid, slot){
   return db.collection('users').doc(uid).collection('saves').doc(String(slot));
 }
@@ -18590,6 +18687,11 @@ function serializeGame(){
     vigiliaPremio: game.vigiliaPremio || null,
     montanha: game.montanha || null,
     montanhaGuarda: game.montanhaGuarda || null,
+    /* ⚠️ A VISITA VAI PRO SAVE: ela tem cinco partidas dentro e um premio no fim, e fechar a aba
+       no meio nao pode perder o progresso. O `ilhasResultado` e de TELA e vai junto porque ela e
+       ponto seguro de gravacao -- sem ele, um F5 ali engoliria o anuncio do premio. */
+    ilhasJornada: game.ilhasJornada || null,
+    ilhasResultado: game.ilhasResultado || null,
     montanhaPremio: game.montanhaPremio || null,
     evolucaoDepois: game.evolucaoDepois || null,
     /* As duas telas de golpe são ponto seguro de gravação: o jogador PENSA nelas, e fechar a aba
@@ -19321,7 +19423,7 @@ function renderAposentados(){
   }).join('');
   return `
   <div class="box">
-    <h2>${selo('medalha')} Pokémons com o Prof. Carvalho</h2>
+    <h2>${selo('medalha_ouro')} Pokémons com o Prof. Carvalho</h2>
     <p class="hint-text">${lista.length} pokémon aposentado${lista.length === 1 ? '' : 's'}. A jornada
        deles acabou -- eles ficam aqui como registro.</p>
   </div>
@@ -20220,11 +20322,13 @@ function renderRouteCardsBlock(cards){
        encontraria o cadeado do jeito que ele estava. Lida no render, ela responde à pergunta certa:
        *este time, AGORA, sabe cortar?* */''}
   ${cards.map(r=>{
-    /* ⚠️ AS DUAS ROTAS DE CHAVE DIVIDEM O MESMO DESENHO: a mata pede o Corte e a montanha o Voo, e
-       a pergunta é a MESMA -- *este time, AGORA, tem a chave?* Escritas em separado, a segunda
-       nasceria com o cadeado de outra cor ou sem o nome de quem abre. */
-    const comChave = r.corte || r.voo;
-    const abre = r.corte ? cortadorDoTime() : (r.voo ? voadorDoTime() : null);
+    /* ⚠️ AS TRÊS ROTAS DE CHAVE DIVIDEM O MESMO DESENHO, e desde 21/09/2026 ele sai da TABELA
+       (`ROTAS_DE_CHAVE`): a pergunta é a MESMA nas três -- *este time, AGORA, tem a chave?* -- e o
+       que muda é só QUAL Máquina e QUEM abre. Enquanto isso era uma escada de ternários, a
+       terceira rota caía no ramo da segunda: ela pediria o HM02 e nomearia o voador. */
+    const chave = chaveDaRota(r);
+    const comChave = !!chave;
+    const abre = chave ? chave.quem() : null;
     const trancada = comChave && !abre;
     return `<button class="btn route-card${comChave ? " route-corte" : ""}" ${trancada ? "disabled" : `onclick="chooseRoute(\'${r.id}\')"`}>
       <span class="mon-name">${r.icon} ${r.name}</span>
@@ -20238,10 +20342,8 @@ function renderRouteCardsBlock(cards){
              olhando o cadeado sem saber que a chave já é dele. */
           /* a frase nomeia a MÁQUINA daquela rota: mandar procurar o HM01 num caminho que pede o
              HM02 seria pior que não dizer nada */
-          ? (r.corte
-             ? selo('cadeado') + " Use o <strong>HM01</strong> (na Mochila) em um pokémon do time pra liberar este caminho"
-             : selo('cadeado') + " Use o <strong>HM02</strong> (na Mochila) em um pokémon do time pra liberar este caminho")
-          : (r.corte ? "🪓 " : "🪶 ") + escapeHtmlSafe(abre.name) + " abre caminho"}</span>` : ""}
+          ? selo('cadeado') + " Use o <strong>" + chave.hm + "</strong> (na Mochila) em um pokémon do time pra liberar este caminho"
+          : chave.icone + " " + escapeHtmlSafe(abre.name) + " abre caminho"}</span>` : ""}
     </button>`;
   }).join('')}
   ${botaoSeuTimeHtml()}`;
@@ -20955,7 +21057,7 @@ function renderTrainerBattling(){
   const displayEnemyHp = loading ? m.enemyHpBefore : (game.trainerCurrentEnemyHp!=null ? game.trainerCurrentEnemyHp : m.enemyHpAfter);
   return `
   <div class="eyebrow">${game.bossBattlePending ? '✨ BOSS DE DOMINGO'
-                       : game.selecaoBattlePending ? selo('selecao') + ' SELEÇÃO POKÉMON'
+                       : game.selecaoBattlePending ? selo('estadio') + ' SELEÇÃO POKÉMON'
                        : game.towerBattlePending ? selo('torre') + ' TORRE DOS TREINADORES' : '🤝 BATALHA ENTRE TREINADORES'}</div>
   ${chuvaBadgeHtml(m)}
   <div class="box cursor">
@@ -23619,7 +23721,7 @@ function fighterHtml(m, lado, op){
   return `<div class="fighter${entrando ? ' fighter-entra' : ''}">
         ${/* os selos das duas danças vêm DEPOIS dos outros três e não saem em quem está SAINDO de
              campo (o quadro do Remoinho): o efeito é de quem está lutando agora */''}
-        <div class="fighter-emoji">${sp ? battleSpriteHtml(especie, contra, 'sprite-lg', shiny, doJogador) : ''}</div>${nome}${shiny?' '+selo('shiny','selo-g'):''}${(op.comTerreno && buffed)?' '+selo('terreno','selo-g', op.corDoTerreno || COR_TERRENO_PADRAO):''}${especialidade?' '+selo('medalha','selo-g'):''}${saindo?'':selosDoConfronto(m, lado, op.passo)} <span class="fighter-level">Lv.${nivel}</span>
+        <div class="fighter-emoji">${sp ? battleSpriteHtml(especie, contra, 'sprite-lg', shiny, doJogador) : ''}</div>${nome}${shiny?' '+selo('shiny','selo-g'):''}${(op.comTerreno && buffed)?' '+selo('terreno','selo-g', op.corDoTerreno || COR_TERRENO_PADRAO):''}${especialidade?' '+selo('medalha_ouro','selo-g'):''}${saindo?'':selosDoConfronto(m, lado, op.passo)} <span class="fighter-level">Lv.${nivel}</span>
         <div class="fighter-types">${sp ? typesHtml(sp.types) : ''}</div>
         ${renderHpBar(hp, maxHp, doJogador ? 'hp-fill-player' : 'hp-fill-enemy', doJogador ? 'hp-label-player' : 'hp-label-enemy', entrando)}
       </div>`;
@@ -23752,6 +23854,8 @@ const VOADORES = [
 const GOLPE_DO_CORTE = "cut";
 /* o golpe do HM02, que e a chave da Montanha Sagrada -- o espelho exato do de cima */
 const GOLPE_DO_VOO = "fly";
+/* o golpe do HM03, que e a chave das Ilhas Laranja -- a terceira da familia */
+const GOLPE_DO_SURF = "surf";
 /* SABER O CORTE É UMA PROPRIEDADE DA INSTÂNCIA, não da espécie -- dois Scyther do mesmo treinador
    podem estar um com e outro sem. É o mesmo desenho do `sketch` do Smeargle, e é por isso que ele
    viaja no save de graça: o `ataques` já é serializado. */
@@ -25256,7 +25360,7 @@ function renderJourneyEnd(){
   </div>` : ''}
   ${won ? eliteJourneyBoxHtml() : ''}
   <div class="box">
-    <h2>${selo('medalha')} Insígnias conquistadas</h2>
+    <h2>${selo('medalha_ouro')} Insígnias conquistadas</h2>
     ${won
       ? `<p class="journey-badges-note">As 8 insígnias na mão — você está classificado para a <strong>Liga Pokémon</strong>.</p>`
       : ''}
@@ -31145,7 +31249,7 @@ function renderPokedex(){
     ${/* ⚠️ O BOTÃO SÓ APARECE COM ALGUÉM LÁ: uma tela que só diz "ninguém ainda" é pior que
           um botão que não existe, e a aposentadoria é rara -- a maioria das contas nunca vai
           ter um. */''}
-    ${aposentados().length ? `<button class="btn secondary" onclick="abrirAposentados()">${selo('medalha')} Pokémons com o Prof. Carvalho (${aposentados().length})</button>` : ''}
+    ${aposentados().length ? `<button class="btn secondary" onclick="abrirAposentados()">${selo('medalha_ouro')} Pokémons com o Prof. Carvalho (${aposentados().length})</button>` : ''}
   </div>
   <div class="box">
     <div class="pokedex-grid">
@@ -32398,7 +32502,10 @@ const corridaRotuloDaEscolha = () => corrida.formato === 'relay' ? 'Escolher equ
    é o MESMO número que vai decidir a velocidade na pista, com nível, shiny e especialidade dentro.
    O montador ordena por nível/nome/time; aqui a ordem é outra, então a lista vem pronta. */
 function corridaElegiveis(){
-  return towerEligiblePokemon()
+  /* ⚠️ PELA JORNADA, só o time da jornada (21/09/2026, a pedido): *"na corrida, ele tbm vai ter que
+     selecionar 1 pokemon do time atual da jornada e na corrida de revezamento, vai ter que usar o
+     time atual da jornada"*. Fora dela nada muda -- é a MESMA lista de sempre. */
+  return (naJornadaDasIlhas() ? ilhasTimeDaJornada() : towerEligiblePokemon())
     .map(p => Object.assign({}, p, { speedCorrida: speedDaCorrida(corridaInstancia(p, true)) }))
     .sort((a, b) => (b.speedCorrida - a.speedCorrida)
                  || (b.level - a.level)
@@ -32568,6 +32675,9 @@ async function corridaLargar(){
   corridaLaco();
 }
 function corridaTerminar(){
+  /* ⚠️ O VENCEDOR É O MOTOR, não a tela: `corridaRanking()` ordena pelo INSTANTE de chegada, e o
+     índice 0 é o jogador. Lido da classificação desenhada, um empate visual mudaria o placar. */
+  registrarResultadoDaIlha('navel', (corridaRanking()[0] || {}).i === 0);
   corrida.fase = 'anuncio';
   corrida.tempo = Math.max(...corrida.corredores.map(c => c.chegada));
   corrida.recado = 'Troque a modalidade ou a equipe, ou corra de novo.';
@@ -33440,7 +33550,16 @@ function sairDaPescaria(){
    levou até o fim, e não um bicho escolhido a dedo.
    ⚠️ E ELE JÁ EXCLUI O APOSENTADO: quem aposentou o time abriu mão de competir com ele, e é o
    mesmo `savesCampeoes` que fecha as ligas e o online pra ele. */
-function pescariaElegiveis(){ return savesCampeoes(); }
+/* ⚠️ PELA JORNADA é o save da jornada, e só ele: *"na pescaria, ele vai usar o time que ele esta na
+   jornada agora, nao vai poder escolher o time igual acessando diretamente pela tela home"*. A
+   Pescaria escolhe por SAVE (não por pokémon), então a restrição é a lista de saves. */
+function pescariaElegiveis(){
+  if(naJornadaDasIlhas()){
+    const sv = game.saveSlots && game.saveSlots[game.currentSaveSlot];
+    return sv ? [sv] : [];
+  }
+  return savesCampeoes();
+}
 /* O time de um slot, montado do zero -- instâncias PRÓPRIAS da pescaria, nunca as do save: elas
    vão tomar dano e morrer, e o save não pode sentir nada disso (conferido por impressão). */
 /* ⚠️ O SLOT VIAJA JUNTO, e isso não é detalhe: a chave do ITEM equipado é `slot:raiz-da-linha`,
@@ -34159,6 +34278,10 @@ function pescariaTerminar(){
   });
   pescaria.fase = 'fim';
   pescaria.segurando = false;
+  /* ⚠️ DEPOIS das batalhas pendentes acima: a rede do `pescariaCreditar` acabou de pagar capturas
+     que ainda estavam animando, e elas podem virar o placar. */
+  registrarResultadoDaIlha('trovita',
+    ((pescaria.jogadores[0] || {}).pontos || 0) > ((pescaria.jogadores[1] || {}).pontos || 0));
   pescariaRank.recorde = false;
   pescariaEnviarRank();   /* best-effort: o duelo não espera a rede */
   render();
@@ -35075,25 +35198,218 @@ const ILHAS_SVG = '<svg class="island-art" viewBox="0 0 ' + ILHAS_W + ' ' + ILHA
   + '<text x="18" y="34" fill="#b7e6e4" font-family="monospace" font-size="7">ARQUIPELAGO DO MAR DO SUL</text>'
   + '</svg>';
 /* O MAPA é livre desde 21/09/2026 -- ver o botão da home. */
+/* ============================================================================
+   A VISITA PELA JORNADA (21/09/2026)
+   ----------------------------------------------------------------------------
+   ⚠️ COPIAR OS CINCO JOGOS OU PÔR UM CONTEXTO? Foi a pergunta do pedido, e ela foi MEDIDA: os
+   cinco blocos somam **6.363 linhas** (16,5% do `index.html`) e são cobertos por **1.503**
+   asserções. Copiar acrescentaria 6.363 linhas SEM trava nenhuma -- e a cópia divergiria da
+   original no primeiro conserto, deixando dois jogos com a mesma cara e comportamentos
+   diferentes. É a armadilha que este arquivo registra em dezenas de lugares.
+
+   ⚠️ E O CONTEXTO CABE porque cada jogo JÁ TEM UMA PORTA ÚNICA pro time: `corridaElegiveis`,
+   `pescariaElegiveis`, `resgateElegiveis` e `queimadaElegiveis`. São quatro funções, não quatro
+   mil linhas. (A Seleção não entra: o bolo dela é sorteado e não usa o time de ninguém.)
+
+   ⚠️ O QUE GARANTE QUE NADA QUEBRA é o campo ser UM e nascer nulo: fora da visita todas as
+   perguntas respondem exatamente o que respondiam, e isso é cobrado pelas 1.503 travas que já
+   existem mais a impressão do motor.
+
+   ⚠️ E ELE VIVE NO SAVE (`serializeGame`), não em memória: a visita é um desvio da jornada com
+   cinco partidas dentro, e fechar a aba no meio não pode perder o progresso -- nem o prêmio.
+   ============================================================================ */
+/* as 2 chances por desafio: "o treinador vai ter apenas 2 chances de vencer os confrontos".
+   ⚠️ É POR DESAFIO, não no total: 2 no total pra cinco ilhas tornaria o prêmio impossível de
+   alcançar, e o pedido fala dos "confrontos" no plural. */
+const ILHAS_CHANCES = 2;
+/* o prêmio: "caso ele vença todos, todos os pokemons dele ganha + 3 levels" */
+const ILHAS_PREMIO_NIVEIS = 3;
+/* ⚠️ A ORDEM É A DO MAPA (`ILHAS_LARANJA`), e o checklist é derivado dela: uma segunda lista de ids
+   divergiria no dia em que uma ilha nascesse ou trocasse de jogo. */
+function ilhasDaJornada(){ return game.ilhasJornada || null; }
+function naJornadaDasIlhas(){ return !!game.ilhasJornada; }
+/* o estado de uma ilha nesta visita: "venceu" | "perdeu" | "aberto" */
+function estadoDaIlha(id){
+  const v = ilhasDaJornada();
+  if(!v) return "aberto";
+  if(v.vencidas && v.vencidas.indexOf(id) >= 0) return "venceu";
+  if(((v.tentativas || {})[id] || 0) >= ILHAS_CHANCES) return "perdeu";
+  return "aberto";
+}
+function tentativasDaIlha(id){
+  const v = ilhasDaJornada();
+  return (v && (v.tentativas || {})[id]) || 0;
+}
+/* quantas ilhas já foram vencidas -- e o prêmio pede TODAS as do mapa que têm jogo */
+function ilhasComJogo(){ return ILHAS_LARANJA.filter(i => typeof i.abrir === "function"); }
+function ilhasVencidas(){ const v = ilhasDaJornada(); return (v && v.vencidas) ? v.vencidas.length : 0; }
+function ilhasFechouTudo(){ return ilhasVencidas() >= ilhasComJogo().length; }
+/* ⚠️ A ENTRADA GUARDA O SURFISTA, e é isso que o Resgate vai exigir do outro lado: o pedido diz que
+   ele "vai ser obrigado a ir com o pokemon que ele usou o surf". Guardado o `monId` e a POSIÇÃO,
+   porque o `monId` repete entre saves (é um contador que recomeça a cada carregamento) -- a lição
+   que custou oito pokémon apagados no Ginásio da Cidade. */
+/* ⚠️ O TIME DA VISITA, no formato do `towerEligiblePokemon` -- é ele que as quatro portas dos jogos
+   consomem, então a forma tem que ser a MESMA (slot, idx, monId, speciesId, level, shiny). Um
+   formato próprio aqui obrigaria cada jogo a saber de dois. */
+function ilhasTimeDaJornada(){
+  const slot = game.currentSaveSlot;
+  return (game.team || []).map((p, i) => ({
+    slot, idx: i, monId: p.id || null, speciesId: p.speciesId, level: p.level, shiny: !!p.shiny,
+    ataques: p.ataques, unown: p.unown, teamName: "Seu time"
+  }));
+}
+/* ⚠️ E O SURFISTA É CASADO POR POSIÇÃO+ESPÉCIE, nunca só pelo `monId`: ele é um contador que
+   RECOMEÇA a cada carregamento de página e repete entre saves -- foi assim que um jogador viu oito
+   pokémon marcados por causa de seis. A posição basta porque o time não se reordena durante a
+   visita (as telas de ordem ficam na jornada, não aqui). */
+function ilhasSurfistaDaVisita(){
+  const v = ilhasDaJornada();
+  if(!v || !v.surfista) return null;
+  const time = ilhasTimeDaJornada();
+  const s = v.surfista;
+  return time.find(p => p.idx === s.idx && p.speciesId === s.speciesId)
+      || time.find(p => p.speciesId === s.speciesId)
+      || null;
+}
+/* ⚠️ O REGISTRO DA PARTIDA É UMA PORTA ÚNICA, e ela conta a TENTATIVA mesmo na derrota -- são as 2
+   chances do pedido. Fechada por dentro (`if(!naJornadaDasIlhas()) return`), ela é inofensiva pros
+   cinco jogos abertos pela home: é a mesma decisão do `registrarSketch`, que aprendeu isso do jeito
+   caro quando o Ginásio da Cidade reusou a tela da jornada.
+   ⚠️ E A VITÓRIA NÃO REPETE: vencer duas vezes a mesma ilha não conta duas. */
+function registrarResultadoDaIlha(id, venceu){
+  if(!naJornadaDasIlhas()) return;
+  const v = game.ilhasJornada;
+  if(!ILHAS_LARANJA.some(i => i.id === id)) return;
+  if((v.vencidas || []).indexOf(id) >= 0) return;          /* ja vencida: nada a contar */
+  if(tentativasDaIlha(id) >= ILHAS_CHANCES) return;        /* as chances acabaram */
+  v.tentativas = v.tentativas || {};
+  v.tentativas[id] = (v.tentativas[id] || 0) + 1;
+  if(venceu){ v.vencidas = (v.vencidas || []).concat([id]); }
+  maybeAutoSave();
+}
+/* qual ilha está sendo jogada agora -- é ela que recebe o resultado */
+function ilhaEmJogo(){ const v = ilhasDaJornada(); return (v && v.ilha) || null; }
+function entrarNasIlhasDaJornada(){
+  const quem = surfistaDoTime();
+  if(!quem) return;   /* a AÇÃO recusa de novo: o card apagado é apresentação */
+  const idx = (game.team || []).indexOf(quem);
+  game.ilhasJornada = {
+    surfista: { idx, monId: quem.id || null, speciesId: quem.speciesId, level: quem.level, shiny: !!quem.shiny },
+    vencidas: [], tentativas: {},
+    /* ⚠️ PRA ONDE VOLTAR quando as ilhas acabarem: a jornada segue pro encontro selvagem do trecho,
+       como as outras duas rotas de chave fazem quando terminam. */
+    trecho: game.gymIndex
+  };
+  abrirIlhas();
+  maybeAutoSave();
+}
 function abrirIlhas(){
   ilhaAberta = null;
   game.modoBloqueado = null;
   game.screen = 'ilhas';
   render();
 }
-function sairDasIlhas(){ openSaveSelect(); }
+/* ⚠️ A SAÍDA DEPENDE DE COMO SE ENTROU: pelo botão da home ela volta pra home; pela JORNADA ela
+   volta pra jornada -- devolver o jogador à home no meio de um trecho seria tirá-lo da partida.
+   E é aqui que a visita se ENCERRA, com o prêmio: os cinco `sairDa*` já chamam o `abrirIlhas`,
+   então esta é a única porta de volta que existe. */
+function sairDasIlhas(){
+  if(!naJornadaDasIlhas()){ openSaveSelect(); return; }
+  const tudo = ilhasFechouTudo();
+  game.ilhasResultado = { tudo, vencidas: ilhasVencidas(), total: ilhasComJogo().length, niveis: 0 };
+  /* ⚠️ O PRÊMIO É PAGO UMA VEZ SÓ, e quem garante isso é o CONTEXTO SER ANULADO três linhas
+     abaixo: a segunda chamada não acha visita nenhuma e não paga. Houve aqui uma marca
+     `premiado` de cinto-e-suspensório, e a conferência de acusação a pegou -- religando o
+     defeito, a trava passava em branco, porque a marca nunca era o que impedia o pagamento
+     duplo. Rede que não dá pra exercitar é letra morta. */
+  if(tudo){
+    game.ilhasResultado.niveis = ILHAS_PREMIO_NIVEIS;
+    (game.team || []).forEach(p => { if(p) p.level = Math.min(NIVEL_MAXIMO, (p.level || 1) + ILHAS_PREMIO_NIVEIS); });
+  }
+  game.ilhasJornada = null;
+  game.screen = "ilhasFim";
+  render();
+  maybeAutoSave();
+}
+/* a tela de fecho da visita: o que ele venceu e o que o prêmio deu. Ela existe porque +3 níveis no
+   time inteiro é a maior recompensa da jornada fora do Bônus de Kanto -- pagá-la em silêncio seria
+   o erro da especialidade que valia 1% e não tinha selo. */
+function seguirDasIlhas(){
+  game.ilhasResultado = null;
+  goToWildEncounter();
+}
+function renderIlhasFim(){
+  const r = game.ilhasResultado || { tudo:false, vencidas:0, total:5, niveis:0 };
+  return `
+  <div class="encounter-banner ilhas">
+    <span class="encounter-icon">${selo("ilhas", "selo-tit")}</span>
+    ${r.tudo ? "As Ilhas Laranja foram conquistadas!" : "De volta ao continente"}
+  </div>
+  <div class="box">
+    <h2>${r.vencidas} de ${r.total}</h2>
+    <p>${r.tudo
+      ? "Os cinco líderes foram batidos. O arquipélago inteiro é seu."
+      : "Alguns desafios ficaram pra trás -- e as Ilhas Laranja não abrem duas vezes na mesma travessia."}</p>
+    ${r.niveis ? `<p class="ilhas-premio">${selo("shiny")} Todo o time subiu <strong>+${r.niveis} níveis</strong>!</p>` : ""}
+  </div>
+  ${r.niveis ? `<div class="box">${timeComTerrenoHtml(game.team, null)}</div>` : ""}
+  <button class="btn primary" onclick="seguirDasIlhas()">Continuar a jornada ➜</button>`;
+}
 /* ⚠️ QUEM RECUSA E A ACAO, nunca a ilha apagada na tela: um toque forjado no console nao pode
    abrir um jogo que nao existe. E a checagem de admin volta pelo `abrir` de cada um -- as tres
    portas a refazem por conta propria. */
 function entrarNaIlha(i){
   const ilha = ILHAS_LARANJA[i];
   if(!ilha || typeof ilha.abrir !== 'function') return;
+  /* ⚠️ NA VISITA PELA JORNADA a ilha SEM CHANCES não abre, e quem recusa é a AÇÃO: o card apagado
+     é apresentação, e um toque forjado no console não pode dar uma terceira tentativa. */
+  if(naJornadaDasIlhas()){
+    if(estadoDaIlha(ilha.id) !== 'aberto') return;
+    /* qual ilha vai receber o resultado -- sem isso o jogo não sabe onde creditar a vitória */
+    game.ilhasJornada.ilha = ilha.id;
+  }
   ilha.abrir();
 }
 /* O MAPA: o arquipelago ao fundo e as cinco ilhas por cima, cada uma no lugar dela.
    ⚠️ A ILHA SEM JOGO E UM `<span>`, e nao um botao apagado -- um botao que nao faz nada convida um
    toque que nao responde. E a mesma decisao da ilha da Pescaria e da ilhota do Resgate no setup.
    ⚠️ E O ROTULO DIZ O QUE FALTA ('Em breve'): uma ilha apagada sem motivo faz procurar defeito. */
+/* ⚠️ O CHECKLIST (21/09/2026, a pedido: *"no mapa das ilhas laranjas, voce vai ter que criar tipo
+   um check list do que ele ja jogou e venceu"*). Ele só existe na visita pela JORNADA: pela home
+   não há nada a marcar -- ali os cinco jogos são avulsos e se jogam quantas vezes se quiser.
+   ⚠️ E ELE É DERIVADO do `ILHAS_LARANJA` + do estado da visita, nunca de uma segunda lista: uma
+   lista de ids à parte divergiria no dia em que uma ilha nascesse ou trocasse de jogo. */
+function ilhasChecklistHtml(){
+  if(!naJornadaDasIlhas()) return '';
+  const jogos = ilhasComJogo();
+  const feitas = ilhasVencidas();
+  const linhas = jogos.map(ilha => {
+    const e = estadoDaIlha(ilha.id);
+    const t = tentativasDaIlha(ilha.id);
+    const marca = e === 'venceu' ? selo('trofeu') : (e === 'perdeu' ? selo('cadeado') : selo('bandeira'));
+    /* ⚠️ A LINHA DIZ AS CHANCES QUE SOBRARAM, e não as gastas: o que o jogador decide com isso é se
+       ainda vale tentar. `1 de 2` obrigaria a subtrair de cabeça. */
+    const sobra = ILHAS_CHANCES - t;
+    const nota = e === 'venceu' ? 'vencido'
+               : e === 'perdeu' ? 'sem chances'
+               : (t ? ('resta ' + sobra + (sobra === 1 ? ' chance' : ' chances')) : (ILHAS_CHANCES + ' chances'));
+    return '<div class="ilhas-chk-linha ' + e + '">'
+      + '<span class="ilhas-chk-marca">' + marca + '</span>'
+      + '<span class="ilhas-chk-nome">' + escapeHtmlSafe(ilha.nome) + '</span>'
+      + '<span class="ilhas-chk-jogo">' + escapeHtmlSafe(ilha.jogo) + '</span>'
+      + '<span class="ilhas-chk-nota">' + nota + '</span>'
+      + '</div>';
+  }).join('');
+  /* ⚠️ O PRÊMIO É ANUNCIADO ANTES, e não só na hora de pagar: ele é o que dá sentido a atravessar
+     os cinco desafios -- e sem saber dele o jogador não tem por que insistir numa ilha difícil. */
+  return '<div class="box ilhas-chk">'
+    + '<div class="secao">Sua travessia: ' + feitas + ' de ' + jogos.length + '</div>'
+    + linhas
+    + '<p class="hint-text">' + (ilhasFechouTudo()
+        ? (selo('shiny') + ' Os cinco caíram! Volte ao continente pra receber os +' + ILHAS_PREMIO_NIVEIS + ' níveis.')
+        : ('Vença os ' + jogos.length + ' para o time inteiro subir <strong>+' + ILHAS_PREMIO_NIVEIS + ' níveis</strong>. Cada desafio tem ' + ILHAS_CHANCES + ' chances.'))
+    + '</p></div>';
+}
 function ilhasMapaHtml(){
   const pinos = ILHAS_LARANJA.map((ilha, i) => {
     const pos = ilhaPino(ilha);
@@ -35152,7 +35468,12 @@ function renderIlhas(){
        abertas — as outras estão sendo preparadas.</p>` : ''}
   </div>
   ${ilhasMapaHtml()}
-  <button class="btn" onclick="sairDasIlhas()">⬅ Voltar</button>
+  ${ilhasChecklistHtml()}
+  ${/* ⚠️ O VOLTAR DIZ PRA ONDE VAI: pela jornada ele ENCERRA a travessia (e paga o premio), e
+       um "Voltar" seco ali pareceria que da pra sair e voltar depois -- o que nao da. */''}
+  <button class="btn" onclick="sairDasIlhas()">${naJornadaDasIlhas()
+    ? (ilhasFechouTudo() ? 'Receber o prêmio e seguir ➜' : '⬅ Encerrar a travessia e seguir')
+    : '⬅ Voltar'}</button>
   ${renderIlhaInfoModal()}`;
 }
 
@@ -35826,6 +36147,13 @@ function resgateZerar(){
    ele varre TODOS os saves (mais os aposentados) e já traz a regra das 8 insígnias, que é a
    régua da casa pros modos competitivos. */
 function resgateElegiveis(){
+  /* ⚠️ PELA JORNADA É UM SÓ, e não uma lista: *"ele vai ser obrigado a ir com o pokemon que ele usou
+     o surf para conseguir acesso as ilhas laranjas"*. Devolver a lista inteira filtrada por
+     SURFISTAS daria a ele os OUTROS surfistas do time -- e quem abriu o caminho foi um. */
+  if(naJornadaDasIlhas()){
+    const quem = ilhasSurfistaDaVisita();
+    return quem ? [Object.assign({}, quem, { velocidade: resgateVelocidade(resgateInstancia(quem, true)) })] : [];
+  }
   return towerEligiblePokemon()
     .filter(p => SURFISTAS.indexOf(p.speciesId) >= 0)
     .map(p => Object.assign({}, p, { velocidade: resgateVelocidade(resgateInstancia(p, true)) }))
@@ -36244,6 +36572,9 @@ function resgateTerminar(){
      alguém chegar aqui com ela em curso (ou a bordo), a entrega acontece. É a mesma rede do
      `pescariaTerminar`, e sem ela um desembarque feito aos 89s valeria zero. */
   resgate.atores.forEach((a, i) => { resgateSoltar(i); a.alvo = null; resgateEntregar(i); });
+  /* ⚠️ DEPOIS DA ENTREGA, e não antes: quem está desembarcando ainda pode virar o placar -- é
+     justamente o que a linha de cima acabou de pagar. */
+  registrarResultadoDaIlha('mikan', (resgate.atores[0].pontos || 0) > (resgate.atores[1].pontos || 0));
   render();
   /* ⚠️ DEPOIS DO `render()`: o envio é assíncrono e best-effort, e a tela do resultado não pode
      esperar a rede pra aparecer. Ele redesenha sozinho quando a resposta chega. */
@@ -37157,7 +37488,9 @@ function queimadaElegiveis(){
   /* ⚠️ ORDENADA PELO SPEED **DA QUEIMADA**, que é o número que decide o movimento na quadra -- a
      mesma decisão da Corrida, e pelo mesmo motivo: o montador ordena por nível/nome/time, e aqui
      a ordem útil é outra. */
-  return towerEligiblePokemon().map(p => {
+  /* ⚠️ PELA JORNADA, só o time da jornada -- o pedido põe a Arena junto da Corrida: *"na arena 1x1,
+     e na corrida, ele tbm vai ter que selecionar 1 pokemon do time atual"*. */
+  return (naJornadaDasIlhas() ? ilhasTimeDaJornada() : towerEligiblePokemon()).map(p => {
     const original = queimadaOriginalDoSave(p);
     const cheio = original ? Object.assign({}, p, { ataques: original.ataques, unown: original.unown }) : p;
     return Object.assign({}, cheio, { velocidade: Math.round(queimadaVelocidade(queimadaInstancia(cheio, true))) });
@@ -37421,6 +37754,8 @@ function queimadaEliminacao(){
    ⚠️ E ELA PARA O JOGO SOZINHA: o laço, o `queimadaPasso` e o `queimadaAtiva` guardam em
    `=== 'jogando'`, então nenhum deles roda com a fase nova -- não foi preciso uma segunda guarda. */
 function queimadaTerminar(){
+  /* o `queimadaVencedor` devolve 1 (eu), -1 (ele) ou 0 (empate) -- e empate NÃO é vitória */
+  registrarResultadoDaIlha('pummelo', queimadaVencedor() > 0);
   queimada.fase = 'anuncio';
   queimada.bolas = [];
   if(queimada.laco){ cancelAnimationFrame(queimada.laco); queimada.laco = null; }
@@ -38156,6 +38491,7 @@ function render(){
     case 'neighborhoodGym': html = renderNeighborhoodGym(); break;
     case 'trainerTower': html = renderTrainerTower(); break;
     case 'ilhas': html = renderIlhas(); break;
+    case 'ilhasFim': html = renderIlhasFim(); break;
     case 'selecao': html = renderSelecao(); break;
     case 'selecaoResultado': html = renderSelecaoResultado(); break;
     case 'corrida': html = renderCorrida(); break;

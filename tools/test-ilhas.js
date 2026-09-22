@@ -804,6 +804,253 @@ async function blocoDoRanking(){
 
 console.log('');
 console.log('=== O ANUNCIO APARECE UMA VEZ SO ===');
+
+/* ============================================================================
+   A TRAVESSIA PELAS ILHAS LARANJA, A PARTIR DA JORNADA (21/09/2026)
+
+   ⚠️ O QUE ESTE BLOCO EXISTE PRA PEGAR, em ordem:
+     1. **fora da visita nada muda** -- é a promessa que justifica o contexto ter sido escolhido em
+        vez de copiar os 6.363 linhas dos cinco jogos. As quatro portas de time respondem
+        exatamente o que respondiam;
+     2. a PORTA: sem `admin`, sem time cheio ou sem surfista ela não existe -- e quem recusa é a
+        AÇÃO, não o card apagado;
+     3. as QUATRO restrições, uma por jogo, cada uma com a sua regra;
+     4. as 2 chances e o prêmio pago UMA vez.
+   ============================================================================ */
+function blocoDaTravessia(){
+  console.log('\n=== A TRAVESSIA PELA JORNADA ===');
+  const timeDe = (n, comSurf) => Array.from({ length: n }, (_, i) => ({
+    id: 'm' + i, speciesId: ['venusaur','jolteon','snorlax','lapras','gengar','onix'][i],
+    level: 40 + i, ataques: (comSurf && i === 3) ? ['surf','icebeam'] : ['tackle']
+  }));
+  /* ⚠️ O FIXTURE PRECISA DE SAVES CAMPEÕES, senão o `towerEligiblePokemon` devolve ZERO e as
+     quatro travas de restrição não distinguem nada -- foi assim que três delas passaram em branco
+     na conferência de acusação. Com dois saves de 6, fora da visita são 12 e dentro são 6. */
+  const saveDe = (nome, n) => ({ team: Array.from({length:n}, (_,i) => ({
+      id: nome + i, speciesId: ['pidgeot','machamp','alakazam','golem','blastoise','arcanine'][i],
+      level: 60 + i, ataques: ['tackle'] })), badgeCount: 8, customName: nome });
+  const zerar = () => {
+    g.saveSlots = [saveDe('A', 6), saveDe('B', 6)];
+    g.aposentados = [];
+    g.ilhasJornada = null; g.ilhasResultado = null;
+    g.ehAdmin = true; g.currentSaveSlot = 0; g.saveGen = 0; g.gymIndex = 3;
+    g.team = timeDe(6, true);
+  };
+
+  /* ---------------------------------------------------------------- 1) FORA DA VISITA NADA MUDA */
+  zerar();
+  const antesCorrida = S.corridaElegiveis().length;
+  const antesArena   = S.queimadaElegiveis().length;
+  const antesResgate = S.resgateElegiveis().length;
+  const antesPesca   = S.pescariaElegiveis().length;
+  ok('(a trava tem o que comparar)', antesCorrida + antesArena >= 0, 'corrida=' + antesCorrida);
+  ok('fora da visita o contexto é nulo', !S.naJornadaDasIlhas());
+
+  /* ---------------------------------------------------------------- 2) A PORTA */
+  /* ⚠️ VARRENDO, e não um trecho de um save: a primeira versão testava só o trecho 3 do slot 0,
+     cujo dado JÁ dava não -- ela passava em branco com a guarda removida. É a terceira vez que
+     a amostra única engana nesta feature. */
+  const varre = () => { let n = 0;
+    for(let slot = 0; slot < 10; slot++) for(let gen = 0; gen < 10; gen++){
+      g.currentSaveSlot = slot; g.saveGen = gen;
+      for(let l = 0; l < 8; l++) if(S.ilhasSaemNoTrecho(l)) n++; }
+    g.currentSaveSlot = 0; g.saveGen = 0; return n; };
+  g.ehAdmin = false;
+  ok('sem admin a rota não existe EM LUGAR NENHUM', varre() === 0,
+     'por enquanto ela é administrativa -- e a guarda mora no SORTEIO, não no cadeado: uma carta '
+   + 'trancada que ninguém consegue abrir é pior que carta nenhuma');
+  g.ehAdmin = true;
+  g.team = timeDe(5, true);
+  ok('com o time incompleto tampouco', varre() === 0,
+     'são ' + S.ILHAS_TIME_MINIMO + ' pokémon: os cinco desafios usam o time da jornada');
+  g.team = timeDe(6, true);
+
+  /* ⚠️ A CHANCE É MEDIDA EM MUITOS SAVES, nunca num só: o primeiro smoke usou o slot 0/geração 0,
+     os oito dados dele deram acima de 0,25 e a conclusão foi "a rota nunca sai". É a mesma lição
+     que este projeto registra sobre o σ binomial -- amostra única não é medição. */
+  let saiu = 0, tot = 0;
+  for(let slot = 0; slot < 20; slot++) for(let gen = 0; gen < 20; gen++){
+    g.currentSaveSlot = slot; g.saveGen = gen;
+    for(let l = 0; l < 8; l++){ tot++; if(S.ilhasSaemNoTrecho(l)) saiu++; }
+  }
+  const taxa = saiu / tot;
+  ok('a taxa fica perto da constante', taxa > 0.15 && taxa < S.CHANCE_ILHAS + 0.03,
+     (100*taxa).toFixed(1) + '% (a constante é ' + (100*S.CHANCE_ILHAS) + '%, e a mata/montanha comem parte)');
+
+  /* ⚠️ SEMEADO: sem isso bastaria sair do save e voltar até a rota aparecer */
+  g.currentSaveSlot = 3; g.saveGen = 7;
+  const a1 = [0,1,2,3,4,5,6,7].map(l => S.ilhasSaemNoTrecho(l)).join('');
+  const a2 = [0,1,2,3,4,5,6,7].map(l => S.ilhasSaemNoTrecho(l)).join('');
+  ok('  e o sorteio é SEMEADO pelo save', a1 === a2, a1);
+  g.saveGen = 8;
+  const a3 = [0,1,2,3,4,5,6,7].map(l => S.ilhasSaemNoTrecho(l)).join('');
+  ok('  e a geração do slot troca o perfil', a1 !== a3, a1 + ' vs ' + a3);
+
+  /* ⚠️ UMA TERCEIRA CARTA POR TRECHO: com duas seriam QUATRO, e a promessa é de uma terceira */
+  let colisao = 0, cartas3 = 0;
+  for(let slot = 0; slot < 20; slot++) for(let gen = 0; gen < 20; gen++){
+    g.currentSaveSlot = slot; g.saveGen = gen;
+    for(let l = 0; l < 8; l++){
+      const n = [S.temRotaDoCorte(l), S.montanhaSaiNoTrecho(l), S.ilhasSaemNoTrecho(l)].filter(Boolean).length;
+      if(n > 1) colisao++;
+      const cs = S.cartasDeRota(l);
+      if(cs.length > 3) cartas3++;
+    }
+  }
+  ok('nunca duas rotas de chave no mesmo trecho', colisao === 0, colisao + ' colisões');
+  ok('  e nenhum trecho passa de TRÊS cartas', cartas3 === 0, cartas3 + ' trechos com 4+');
+
+  /* ---------------------------------------------------------------- 3) A CHAVE */
+  g.currentSaveSlot = 0; g.saveGen = 0;
+  ok('o surfista do time é quem tem o Surf', (S.surfistaDoTime() || {}).speciesId === 'lapras');
+  g.team = timeDe(6, false);
+  ok('  e sem ninguém que surfe não há chave', !S.podeSurfar());
+  /* ⚠️ QUEM RECUSA É A AÇÃO: um clique forjado no console não pode abrir a rota */
+  S.entrarNasIlhasDaJornada();
+  ok('  a AÇÃO recusa a entrada sem surfista', !S.naJornadaDasIlhas());
+  g.team = timeDe(6, true);
+
+  /* a tabela das três chaves -- e as duas antigas não podem ter mudado de Máquina */
+  ok('a mata continua pedindo o HM01', S.chaveDaRota(S.routeById('mata_fechada')).hm === 'HM01');
+  ok('  a montanha o HM02', S.chaveDaRota(S.routeById('montanha_sagrada')).hm === 'HM02');
+  ok('  e as ilhas o HM03', S.chaveDaRota(S.routeById('ilhas_laranja')).hm === 'HM03');
+  ok('  e rota comum não tem chave', S.chaveDaRota({ id: 'x' }) === null);
+
+  /* ---------------------------------------------------------------- 4) A VISITA */
+  S.entrarNasIlhasDaJornada();
+  ok('entrar marca a visita', S.naJornadaDasIlhas() && g.screen === 'ilhas');
+  /* ⚠️ O SURFISTA É GUARDADO porque o Resgate vai EXIGI-LO do outro lado */
+  ok('  e guarda QUEM abriu o caminho', g.ilhasJornada.surfista.speciesId === 'lapras'
+     && g.ilhasJornada.surfista.idx === 3);
+  ok('  o checklist começa vazio', S.ilhasVencidas() === 0 && !S.ilhasFechouTudo());
+  S.ILHAS_LARANJA.forEach(i => ok('  ' + i.id + ' começa aberta', S.estadoDaIlha(i.id) === 'aberto'));
+
+  /* ---------------------------------------------------------------- 5) AS QUATRO RESTRIÇÕES */
+  /* ⚠️ A TRAVA SÓ DISTINGUE OS DOIS LADOS SE ELES DIFEREM: com o save de teste devolvendo os
+     mesmos 6 do time da jornada, ela passava em branco com a restrição removida. Aqui o
+     `towerEligiblePokemon` tem que ter MAIS gente que o time. */
+  ok('(o fixture tem mais pokémon fora da jornada que dentro)',
+     antesCorrida > 6, antesCorrida + ' elegíveis fora contra 6 no time');
+  const naVisita = { corrida: S.corridaElegiveis(), arena: S.queimadaElegiveis(),
+                     resgate: S.resgateElegiveis(), pesca: S.pescariaElegiveis() };
+  ok('a Corrida passa a ver só o time da jornada', naVisita.corrida.length === 6,
+     naVisita.corrida.length + ' (fora da visita eram ' + antesCorrida + ')');
+  ok('  e a Arena também', naVisita.arena.length === 6, naVisita.arena.length + '');
+  /* ⚠️ O RESGATE É UM SÓ, e não a lista de surfistas: quem abriu o caminho foi UM pokémon */
+  ok('o Resgate é obrigado a levar QUEM ABRIU o caminho', naVisita.resgate.length === 1,
+     naVisita.resgate.length + ' candidatos');
+  ok('  e ele é o surfista', (naVisita.resgate[0] || {}).speciesId === 'lapras');
+  ok('a Pescaria fica no save da jornada', naVisita.pesca.length <= 1, naVisita.pesca.length + ' saves');
+
+  /* ⚠️ E DOIS SURFISTAS NO TIME NÃO DÃO ESCOLHA: o Resgate continua sendo um só */
+  const doisQueSurfam = timeDe(6, true);
+  doisQueSurfam[0].ataques = ['surf'];
+  g.team = doisQueSurfam;
+  ok('  mesmo com DOIS surfistas no time', S.resgateElegiveis().length === 1,
+     'quem abriu o caminho foi um, e é ele que atravessa');
+  g.team = timeDe(6, true);
+
+  /* ---------------------------------------------------------------- 6) AS 2 CHANCES */
+  ok('a ilha nasce com ' + S.ILHAS_CHANCES + ' chances', S.tentativasDaIlha('navel') === 0);
+  S.registrarResultadoDaIlha('navel', false);
+  ok('  perder gasta uma', S.tentativasDaIlha('navel') === 1 && S.estadoDaIlha('navel') === 'aberto');
+  S.registrarResultadoDaIlha('navel', false);
+  ok('  perder as duas fecha a ilha', S.estadoDaIlha('navel') === 'perdeu');
+  S.registrarResultadoDaIlha('navel', true);
+  ok('  e depois disso nem vencer conta', S.estadoDaIlha('navel') === 'perdeu' && S.ilhasVencidas() === 0,
+     'um toque forjado não pode dar uma terceira tentativa');
+  /* ⚠️ E A AÇÃO RECUSA A ILHA SEM CHANCES -- o card apagado é apresentação */
+  const telaAntes = g.screen;
+  S.entrarNaIlha(1);   /* navel */
+  ok('  e a AÇÃO recusa entrar nela', g.screen === telaAntes, 'tela: ' + g.screen);
+
+  /* vencer não gasta a segunda chance, e não conta duas vezes */
+  S.registrarResultadoDaIlha('trovita', true);
+  ok('vencer credita a ilha', S.estadoDaIlha('trovita') === 'venceu' && S.ilhasVencidas() === 1);
+  S.registrarResultadoDaIlha('trovita', true);
+  ok('  e vencer de novo não conta duas', S.ilhasVencidas() === 1);
+
+  /* ---------------------------------------------------------------- 7) O PRÊMIO */
+  ['mikan','kumquat','pummelo'].forEach(id => S.registrarResultadoDaIlha(id, true));
+  ok('quatro de cinco ainda não fecha', !S.ilhasFechouTudo(), S.ilhasVencidas() + ' de ' + S.ilhasComJogo().length);
+  /* a navel foi perdida: refaço a visita pra fechar as cinco */
+  g.ilhasJornada = null;
+  S.entrarNasIlhasDaJornada();
+  S.ILHAS_LARANJA.forEach(i => S.registrarResultadoDaIlha(i.id, true));
+  ok('as cinco fecham a travessia', S.ilhasFechouTudo());
+
+  const niveisAntes = g.team.map(p => p.level);
+  S.sairDasIlhas();
+  ok('  e sair paga o prêmio', g.team.every((p, i) => p.level === niveisAntes[i] + S.ILHAS_PREMIO_NIVEIS),
+     'de [' + niveisAntes.join(',') + '] para [' + g.team.map(p => p.level).join(',') + ']');
+  ok('  a tela de fecho anuncia', g.screen === 'ilhasFim' && g.ilhasResultado.niveis === S.ILHAS_PREMIO_NIVEIS,
+     '+3 no time inteiro é a maior recompensa da jornada fora do Bônus de Kanto -- pagá-la em '
+   + 'silêncio seria o erro da especialidade que valia 1% e não tinha selo');
+  ok('  e a visita ENCERRA', !S.naJornadaDasIlhas());
+
+  /* ⚠️ O PRÊMIO NÃO REPETE, e quem impede é o CONTEXTO ter sido anulado -- a trava mede o
+     MECANISMO: com a visita de pé de novo (o caso em que um `sairDasIlhas` extra poderia
+     pagar), ele só paga se as cinco estiverem vencidas ALI. */
+  const depoisDoPremio = g.team.map(p => p.level);
+  S.sairDasIlhas();
+  ok('  e ele não é pago duas vezes', g.team.every((p, i) => p.level === depoisDoPremio[i]),
+     'a visita foi encerrada: não há o que pagar');
+  /* e uma visita NOVA, sem vencer nada, tampouco paga */
+  S.entrarNasIlhasDaJornada();
+  S.sairDasIlhas();
+  ok('  nem numa visita nova sem vitórias', g.team.every((p, i) => p.level === depoisDoPremio[i]));
+
+  /* perder tudo não paga nada */
+  g.team = timeDe(6, true);
+  S.entrarNasIlhasDaJornada();
+  S.ILHAS_LARANJA.forEach(i => { S.registrarResultadoDaIlha(i.id, false); S.registrarResultadoDaIlha(i.id, false); });
+  const antesDeFalhar = g.team.map(p => p.level);
+  S.sairDasIlhas();
+  ok('perder tudo não paga nível nenhum', g.team.every((p, i) => p.level === antesDeFalhar[i])
+     && g.ilhasResultado.niveis === 0);
+
+  /* ---------------------------------------------------------------- 8) VOLTOU AO NORMAL */
+  g.ilhasJornada = null;
+  ok('fora da visita a Corrida volta ao que era', S.corridaElegiveis().length === antesCorrida);
+  ok('  a Arena também', S.queimadaElegiveis().length === antesArena);
+  ok('  o Resgate também', S.resgateElegiveis().length === antesResgate);
+  ok('  e a Pescaria também', S.pescariaElegiveis().length === antesPesca);
+  /* ⚠️ E O REGISTRO É INOFENSIVO FORA DA VISITA -- os cinco jogos abertos pela HOME passam por ele */
+  S.registrarResultadoDaIlha('navel', true);
+  ok('  e o registro não faz nada fora dela', !S.naJornadaDasIlhas());
+
+  /* ---------------------------------------------------------------- 9) O CHECKLIST NA TELA */
+  ok('pela home não há checklist', S.ilhasChecklistHtml() === '');
+  g.team = timeDe(6, true);
+  S.entrarNasIlhasDaJornada();
+  S.registrarResultadoDaIlha('mikan', true);
+  S.registrarResultadoDaIlha('navel', false);
+  const chk = S.ilhasChecklistHtml();
+  ok('na visita ele existe', chk.indexOf('ilhas-chk') >= 0);
+  S.ilhasComJogo().forEach(i => ok('  com a ' + i.nome, chk.indexOf(i.nome) >= 0));
+  ok('  a vencida sai marcada', /ilhas-chk-linha venceu/.test(chk));
+  ok('  e a que perdeu uma diz quantas sobram', chk.indexOf('resta 1 chance') >= 0, 'sobra 1 de ' + S.ILHAS_CHANCES);
+  ok('  e ele anuncia o prêmio ANTES', chk.indexOf('+' + S.ILHAS_PREMIO_NIVEIS + ' níveis') >= 0,
+     'sem saber dele o jogador não tem por que insistir numa ilha difícil');
+  const tela = S.renderIlhas();
+  ok('  e a tela das ilhas o desenha', tela.indexOf('ilhas-chk') >= 0);
+  ok('  com o Voltar dizendo que ENCERRA', tela.indexOf('Encerrar a travessia') >= 0,
+     'um "Voltar" seco pareceria que dá pra sair e voltar depois');
+  g.ilhasJornada = null;
+  ok('  e pela home ele volta a ser "Voltar"', S.renderIlhas().indexOf('⬅ Voltar') >= 0);
+
+  /* ---------------------------------------------------------------- 10) O SAVE */
+  g.team = timeDe(6, true);
+  S.entrarNasIlhasDaJornada();
+  S.registrarResultadoDaIlha('mikan', true);
+  const salvo = S.serializeGame();
+  ok('a visita vai pro SAVE', !!salvo.ilhasJornada && (salvo.ilhasJornada.vencidas || []).indexOf('mikan') >= 0,
+     'ela tem cinco partidas dentro e um prêmio no fim -- fechar a aba no meio não pode perder isso');
+  ok('  e as duas telas são ponto seguro de gravação',
+     S.SAFE_SAVE_SCREENS.has('ilhas') && S.SAFE_SAVE_SCREENS.has('ilhasFim'));
+  g.ilhasJornada = null;
+}
+
 (async () => {
   contaAdmin();
   g.authUser = { uid: 'u1' };
@@ -830,6 +1077,7 @@ console.log('=== O ANUNCIO APARECE UMA VEZ SO ===');
   ok('  entao ele NAO reabre depois de lido',
      S.conferirNovidades() === false && !g.novidadesModal);
 
+  blocoDaTravessia();
   await blocoDoRanking();
 
   console.log(falhas ? '\n' + falhas + ' FALHA(S)' : '\nTudo certo.');

@@ -14662,6 +14662,163 @@ os três velhos, a tabela (líderes casando com a Corrida, `abrir` sendo funçã
 ilhas), a ação recusando, o mapa, o pino DERIVADO do centro, os defs numa cópia só, e a volta.
 **Conferido que ele acusa os 7 defeitos religados.**
 
+## A TRAVESSIA PELAS ILHAS LARANJA, A PARTIR DA JORNADA (21/09/2026)
+
+Pedida assim: *"em qualquer momento quando o treinador tiver 6 pokemons, vai aparecer aleatoriamente
+uma terceira rota quando ele tem 2 para escolher, essa rota sera para as ilhas laranjas, e só chega
+la usando o surf(HM03) ... quando o usuario for jogar o resgate pokemon, ele vai ser obrigado a ir
+com o pokemon que ele usou o surf ... na pescaria, ele vai usar o time que ele esta na jornada agora
+... na arena 1x1, e na corrida, ele tbm vai ter que selecionar 1 pokemon do time atual ... o
+treinador vai ter apenas 2 chances de vencer os confrontos, e caso ele vença todos, todos os
+pokemons dele ganha + 3 levels"*.
+
+**⚠️ POR ENQUANTO SÓ PRA `admin === true`** (a pedido, no mesmo dia), e a guarda mora no **SORTEIO**:
+a carta não chega a existir pra quem não é. Sem isso ela apareceria trancada — e um cadeado que
+ninguém consegue abrir é pior que carta nenhuma.
+
+### ⚠️ COPIAR OS CINCO JOGOS OU PÔR UM CONTEXTO? A pergunta foi do pedido, e ela foi MEDIDA
+
+| | |
+|---|---|
+| os cinco blocos de minigame somam | **6.363 linhas** — **16,5%** do `index.html` |
+| as travas que os cobrem hoje | **1.503 asserções** |
+| o que uma cópia teria de cobertura | **zero** |
+
+**Copiar acrescentaria 6.363 linhas sem trava nenhuma**, e a cópia divergiria da original no
+primeiro conserto — deixando dois jogos com a mesma cara e comportamentos diferentes. É a armadilha
+que este arquivo registra em dezenas de lugares.
+
+**⚠️ E O CONTEXTO COUBE PORQUE CADA JOGO JÁ TEM UMA PORTA ÚNICA PRO TIME:** `corridaElegiveis`,
+`pescariaElegiveis`, `resgateElegiveis` e `queimadaElegiveis`. São **quatro funções**, não quatro mil
+linhas. (A **Seleção fica de fora**: o bolo dela é sorteado e não usa o time de ninguém — ela é um
+dos cinco desafios, mas não tem restrição a aplicar.)
+
+**O que garante que nada quebra** é o campo ser UM e nascer nulo: fora da visita as quatro portas
+respondem exatamente o que respondiam. Isso é cobrado pelas 1.503 travas que já existiam, pela
+impressão do motor (**`MOTOR 079861051846 / DIARIO cfedb1fdcab2`, idêntica**) e por um bloco próprio
+que mede as quatro **antes e depois**.
+
+### A ROTA: a terceira de chave, e a primeira cuja condição não é o trecho
+
+A mata é do 4º trecho em diante e a montanha do 6º; esta pede um **TIME COMPLETO**
+(`ILHAS_TIME_MINIMO = 6`), em qualquer trecho. É o pedido ao pé da letra, e faz sentido pelo que há
+do outro lado — os cinco desafios usam o time da jornada, e entrar com quatro pokémon é entrar
+pra perder.
+
+- **⚠️ UMA TERCEIRA CARTA POR TRECHO, e a ordem é a de antiguidade:** mata > montanha > ilhas. Com
+  duas no mesmo trecho seriam QUATRO cartas, e a promessa é de uma terceira. **As ilhas vão por
+  último no `else if` porque a condição delas é a mais larga**: postas na frente, elas roubariam
+  trechos das outras duas e mudariam a jornada de quem já tem save aberto.
+- **⚠️ A CONDIÇÃO DE TIME É LIDA FORA DA SEMENTE**, de propósito: o dado de cada trecho é sempre o
+  mesmo, e o que muda é a carta ser OFERECIDA ou não. Assim capturar o sexto pokémon não re-sorteia
+  nada — ele destrava o que o dado já havia decidido.
+
+**MEDIDO** (800 saves, time cheio a partir do trecho 3):
+
+| | |
+|---|---|
+| a rota sai por trecho | **20,1%** (a constante é 25%; a mata come 14,8% dos trechos e a montanha 13,0%) |
+| jornadas que veem as Ilhas **alguma** vez | **60,6%** |
+| travessias por jornada | 0× em 39,4%, 1× em 38,8%, **2× em 18,3%, 3× em 3,6%** (média 0,86) |
+
+**⚠️ E ELA PODE SAIR MAIS DE UMA VEZ, ao contrário da mata (que é 1× por jornada desde 18/09).** É o
+pedido ao pé da letra ("em qualquer momento"), e o custo está na tabela: **até 3 travessias = até
++9 níveis**, contra +4 do Bônus de Kanto. Se um dia incomodar, a régua é a mesma da mata — guardar
+o trecho da primeira e recusar as seguintes —, e o número pra decidir está aqui.
+
+### AS TRÊS ROTAS DE CHAVE VIRARAM UMA TABELA
+
+O card e a ação decidiam com `r.corte ? ... : ...` — **o que dá o certo com DUAS e deixa a terceira
+cair no ramo errado**: ela pediria o HM02 e nomearia o voador. É literalmente o defeito dos banners
+de intro (`CLASSE_DO_BANNER`), onde três contextos caíam numa string vazia e a tela saía ilegível.
+
+Hoje é o **`ROTAS_DE_CHAVE`** (HM, ícone, quem abre, pra onde vai), e a quarta rota de chave nasce
+com o cadeado certo, a frase certa e o nome de quem abre. **A mata e a montanha não mudam um
+caractere** — há trava comparando as três.
+
+### AS QUATRO RESTRIÇÕES, uma regra por jogo
+
+| jogo | pela home | **pela jornada** |
+|---|---|---|
+| **Corrida** | todos os saves campeões | **só o time da jornada** (12 → 6 no fixture) |
+| **Arena 1x1** | idem | **só o time da jornada** |
+| **Resgate** | todos os surfistas de todos os saves | **UM: quem abriu o caminho** |
+| **Pescaria** | escolhe o save | **o save da jornada** |
+| Seleção | — | — (o bolo é sorteado) |
+
+- **⚠️ O RESGATE É UM SÓ, e não a lista filtrada por `SURFISTAS`:** devolver a lista daria a ele os
+  OUTROS surfistas do time, e quem abriu o caminho foi **um**. Há trava com dois surfistas no time.
+- **⚠️ E O SURFISTA É CASADO POR POSIÇÃO+ESPÉCIE, nunca só pelo `monId`**: ele é um contador que
+  recomeça a cada carregamento de página e repete entre saves — a lição que custou oito pokémon
+  marcados no Ginásio da Cidade.
+
+### AS 2 CHANCES E O PRÊMIO
+
+- **⚠️ SÃO 2 POR DESAFIO, não no total:** 2 no total pra cinco ilhas tornaria o prêmio impossível, e
+  o pedido fala dos "confrontos" no plural.
+- **A tentativa é contada mesmo na DERROTA** — é isso que as 2 chances são —, e **vencer duas vezes
+  não conta duas**.
+- **⚠️ O REGISTRO É UMA PORTA ÚNICA fechada por dentro** (`if(!naJornadaDasIlhas()) return`): os
+  cinco jogos abertos pela HOME passam por ela e nada acontece. É a mesma decisão do
+  `registrarSketch`, que aprendeu isso do jeito caro quando o Ginásio da Cidade reusou a tela da
+  jornada.
+- **⚠️ E ELA MORA NO `*Terminar` DE CADA JOGO**, que é a porta por onde cada um já passa quando a
+  partida acaba. Posta no `sairDa*`, o jogador escaparia da tentativa só fechando a tela.
+- **O vencedor sai do MOTOR, nunca da tela**: `corridaRanking()[0].i === 0`, `queimadaVencedor() > 0`,
+  os pontos do Resgate **depois** da entrega final, os da Pescaria **depois** das batalhas pendentes.
+- **O prêmio são +3 níveis no time inteiro**, pagos ao sair, **só com as cinco vencidas**.
+
+**⚠️ E O `premiado` QUE EU TINHA POSTO ERA LETRA MORTA — a conferência de acusação pegou:** quem
+impede o pagamento duplo não é a marca, é o **contexto ser anulado** na mesma função. Religando o
+defeito, a trava passava em branco. Rede que não dá pra exercitar é letra morta, e ela saiu.
+
+### ⚠️ A VARREDURA DE SELO FANTASMA, E OS DOIS QUE ELA ACHOU EM PRODUÇÃO
+
+Escrevi o checklist com `selo('certo')`, `selo('errado')`, `selo('vazio')` e `selo('estrela')` — e
+**nenhum dos quatro existe**. `selo()` de um nome que não está no `DESENHOS` **sai vazio, sem erro**.
+
+A varredura que nasceu daí achou **dois fantasmas que já estavam no ar**:
+
+| | usos | o certo |
+|---|---|---|
+| **`selo('medalha')`** | **4** | `medalha_ouro` |
+| `selo('selecao')` | 1 | `estadio` |
+
+**⚠️ E UM DELES É O SELO 🎖️ DA ESPECIALIDADE NO QUADRO DO LUTADOR** — aquele que este arquivo
+descreve aparecendo "nas CINCO telas de batalha". Ele estava **invisível** desde que os emojis
+viraram desenho (18/09). Os cinco foram consertados.
+
+### ⚠️ E CINCO LIÇÕES DE MÉTODO SAÍRAM DAQUI
+
+1. **⚠️ O MEU PATCH IMPRIMIU CINCO "ok" E NÃO GRAVOU NADA.** Ele grava no FIM, e um `process.exit` num
+   passo posterior abortou antes — os "ok" eram de INTENÇÃO, não de efeito. Foi a bateria que
+   pegou. **Conferir o ARQUIVO depois do patch, não a saída dele.**
+2. **⚠️ COLISÃO DE NOME COM UMA FUNÇÃO DO MESMO DIA:** eu criei um `registrarPartidaDaIlha` que
+   **sobrescreveu o do monitor** (declaração duplicada — a última vence), e o monitor parou de
+   contar. A trava do monitor pegou no mesmo minuto. Hoje o novo é `registrarResultadoDaIlha`.
+3. **⚠️ AMOSTRA ÚNICA, TRÊS VEZES.** O primeiro smoke disse "a rota nunca sai" — era o slot 0/gen 0,
+   cujos oito dados deram acima de 0,25. E duas travas da porta mediam **um trecho de um save**, e
+   por isso passaram em branco. **Sorteio semeado se mede varrendo.**
+4. **⚠️ O FIXTURE TEM QUE DISTINGUIR OS DOIS LADOS:** três travas de restrição comparavam com `=== 6`
+   e o sandbox devolvia **ZERO** elegíveis — os dois lados davam o mesmo e elas não mediam nada.
+   Hoje o fixture tem dois saves campeões (12 fora contra 6 dentro).
+5. **A conferência de acusação achou 6 travas mudas de 18.** Sem ela, um terço deste bloco seria
+   decoração.
+
+**Medido a 320px, no navegador:** a tela das ilhas com checklist em **305×851px** (sem rolagem
+lateral), o checklist em 281×228px com 5 linhas de 25px, nenhum nome truncado, **nenhum selo sem
+desenho**; a carta nova sai **trancada** sem surfista e **aberta** com ele, em 145px.
+
+`tools/test-ilhas.js` foi a **281 asserções**, e **os 18 defeitos religados acusam** (2 a 8 falhas
+cada).
+
+### O QUE FICA PENDENTE
+
+- **o fluxo de ponta a ponta no navegador** (entrar → jogar os cinco → voltar) não foi exercitado:
+  o que está medido é cada peça e o estado, não a travessia inteira num navegador;
+- **a Seleção não tem restrição de time**, e é o desenho — mas ela conta pro prêmio;
+- **a rota pode sair até 3× por jornada** (+9 níveis no teto), e a régua está acima.
+
 ## AS ILHAS LARANJA ABRIRAM PRA TODO MUNDO, E O MONITOR NASCEU JUNTO (21/09/2026)
 
 Pedido assim: *"crie um monitor para eu conseguir ver quais treinadores já jogaram algum jogo das
