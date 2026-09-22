@@ -952,10 +952,36 @@
   }
   .battle-scene .battle-fighter.player .battle-mon-panel{right:8px;bottom:11px;}
   .battle-scene .battle-fighter.enemy .battle-mon-panel{left:8px;top:9px;}
+  /* ⚠️ O TREINADOR E AS POKÉBOLAS, DENTRO DO PAINEL (22/09/2026). Ele fica ACIMA do nome do
+     pokémon porque é essa a relação: o treinador é dono do que está embaixo. O risco embaixo da
+     barra de HP separa a linha dele do bloco do pokémon sem gastar uma borda inteira.
+     ⚠️ E AS POKÉBOLAS ENCOLHEM AQUI, o que não é estética: o painel mede ~158px de conteúdo a
+     320px, e as de 13px do chip de cima somam 93px com os vãos -- sobrariam ~59px pro nome, que
+     é meia dúzia de letras. Em 9px elas somam 64px e o nome fica com ~88px. Quem cede espaço é o
+     NOME (ele trunca); as pokébolas são a informação, a mesma regra do chip de cima. */
+  .battle-mon-treinador{
+    display:flex;align-items:center;gap:6px;min-width:0;
+    margin:0 0 4px;padding-bottom:4px;
+    border-bottom:1px dashed rgba(43,43,43,.28);
+  }
+  .battle-mon-treinador-nome{
+    font-size:.56rem;font-weight:700;letter-spacing:.02em;
+    color:var(--muted);text-transform:uppercase;
+    min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  /* as bolas vão pra direita e nunca quebram: o `margin-top` do chip de cima nao vale aqui */
+  .battle-mon-treinador .team-alive-bolas{margin:0 0 0 auto;gap:2px;flex-wrap:nowrap;}
+  .battle-mon-treinador .pokeball{width:9px;height:9px;border-width:1px;}
+  .battle-mon-treinador .pokeball::after{width:2.5px;height:2.5px;border-width:1px;}
+
   .battle-mon-head{display:flex;align-items:center;gap:6px;min-width:0;margin-bottom:3px;}
   .battle-mon-name{font-weight:800;font-size:.85rem;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .battle-mon-head .fighter-level{margin-left:auto;flex-shrink:0;font-size:.62rem;}
-  .battle-mon-badges{display:flex;align-items:center;gap:3px;flex-wrap:wrap;min-height:2px;}
+  /* ⚠️ OS SELOS SÃO INLINE, AO LADO DO NOME (22/09/2026) -- eles eram uma linha própria embaixo
+     dele. `flex-shrink:0` e `nowrap` porque quem cede espaço é o NOME: sem os dois, uma luta com
+     queimadura + veneno + fúria empurrava os selos pra uma segunda linha e o painel crescia no
+     meio da batalha, com o cenário atrás dele. */
+  .battle-mon-badges{display:flex;align-items:center;gap:3px;flex-wrap:nowrap;flex-shrink:0;}
   .battle-scene .battle-mon-panel .fighter-types{justify-content:flex-start;margin:4px 0 3px;}
   .battle-scene .battle-mon-panel .type-pill{font-size:.48rem;padding:1px 5px;}
   .battle-scene .battle-mon-panel .hp-bar-wrap{margin-top:4px;}
@@ -21258,14 +21284,14 @@ function renderSpecialBattling(){
   ${eliteTerrainBadgeHtml()}
   ${chuvaBadgeHtml(m)}
   <div class="box cursor" style="${terrainBattleBgStyle(cfg.context==='elite' ? game.eliteTerrain : null)}">
-    <div class="team-alive-row">
+    ${/* a fileira de cima só existe onde a cena não desenha -- ver a nota no renderBattling */''}${cenaNova ? '' : `<div class="team-alive-row">
       ${placarDoTreinador(game.trainerName||'Você', (loading||animating||emboscada)?m.playerAliveBefore:m.playerAliveAfter, m.playerTeamSize)}
       ${placarDoTreinador(cfg.meta.opponentName||'Adversário', (loading||animating||emboscada)?m.enemyAliveBefore:m.enemyAliveAfter, m.enemyTeamSize)}
-    </div>
+    </div>`}
     <div class="battle-vs${cenaNova ? ' battle-scene' : ''}"${cenaNova ? ` style="${terrainBattleSceneStyle(cfg.context==='elite' ? game.eliteTerrain : null)}"` : ''}>${cenaNova ? '\n      <div class="battle-scene-grid"></div>' : ''}
-      ${fighterHtml(m, 'p', { hp: displayPlayerHp, passo: game.specialHitStep, hit: game.specialLastHit, comTerreno: false, visualNovo: cenaNova })}
+      ${fighterHtml(m, 'p', { hp: displayPlayerHp, passo: game.specialHitStep, hit: game.specialLastHit, comTerreno: false, visualNovo: cenaNova, treinador: cenaNova ? (game.trainerName||'Você') : null, vivos: (loading||animating||emboscada)?m.playerAliveBefore:m.playerAliveAfter, total: m.playerTeamSize })}
       <span class="vs-swords ${(loading||animating||emboscada)?'spin':''}">${selo('vs', 'selo-g')}</span>
-      ${fighterHtml(m, 'e', { hp: displayEnemyHp, passo: game.specialHitStep, hit: game.specialLastHit, comTerreno: false, visualNovo: cenaNova })}${cenaNova ? '\n      <div class="battle-fx-layer" id="battle-fx-layer"></div>' : ''}
+      ${fighterHtml(m, 'e', { hp: displayEnemyHp, passo: game.specialHitStep, hit: game.specialLastHit, comTerreno: false, visualNovo: cenaNova, treinador: cenaNova ? (cfg.meta.opponentName||'Adversário') : null, vivos: (loading||animating||emboscada)?m.enemyAliveBefore:m.enemyAliveAfter, total: m.enemyTeamSize })}${cenaNova ? '\n      <div class="battle-fx-layer" id="battle-fx-layer"></div>' : ''}
     </div>
     <div class="battle-status-area">${loading
       ? `<div class="loading-dots"><span></span><span></span><span></span></div><p class="loading-text">Aguardando o resultado da batalha...</p>`
@@ -21918,19 +21944,21 @@ function renderTrainerBattling(){
                        : game.towerBattlePending ? selo('torre') + ' TORRE DOS TREINADORES' : '🤝 BATALHA ENTRE TREINADORES'}</div>
   ${chuvaBadgeHtml(m)}
   <div class="box cursor">
-    <div class="team-alive-row">
-      <!-- o lado esquerdo NEM SEMPRE é quem está logado: na reprise de um desafio do Ginásio da
-           Cidade quem aparece aqui é o DESAFIANTE daquela luta, que quase nunca é você (o servidor
-           grava os confrontos na perspectiva de quem atacou o ginásio). Por isso o nome vem de
-           trainerBattlePlayerName quando existe, e só cai pro seu quando não existe -- jornada,
-           Torre e reprise da Online são sempre batalhas suas e deixam esse campo nulo -->
+    ${/* ⚠️ AQUI A FILEIRA DE CIMA CONTINUA EXISTINDO NA MAIORIA DAS VEZES: esta função serve
+          QUATRO telas e só a TORRE tem cenário -- o Boss, a Seleção e o desafio por código seguem
+          no desenho antigo, e é neles que ela fica. Ver a nota no renderBattling.
+          ⚠️ E O LADO ESQUERDO NEM SEMPRE É QUEM ESTÁ LOGADO: na reprise de um desafio do Ginásio
+          da Cidade quem aparece é o DESAFIANTE daquela luta, que quase nunca é você (o servidor
+          grava os confrontos na perspectiva de quem atacou o ginásio). Por isso o nome vem do
+          trainerBattlePlayerName quando existe, e só cai pro seu quando não existe -- jornada,
+          Torre e reprise da Online são sempre batalhas suas e deixam esse campo nulo. */''}${cenaNova ? '' : `<div class="team-alive-row">
       ${placarDoTreinador(game.trainerBattlePlayerName||game.trainerName||'Você', (loading||animating)?m.playerAliveBefore:m.playerAliveAfter, m.playerTeamSize)}
       ${placarDoTreinador(game.trainerBattleOpponentName||'Adversário', (loading||animating)?m.enemyAliveBefore:m.enemyAliveAfter, m.enemyTeamSize)}
-    </div>
+    </div>`}
     <div class="battle-vs${cenaNova ? ' battle-scene' : ''}"${cenaNova ? ` style="${terrainBattleSceneStyle({ id: CENARIO_DA_TORRE })}"` : ''}>${cenaNova ? '\n      <div class="battle-scene-grid"></div>' : ''}
-      ${fighterHtml(m, 'p', { hp: displayPlayerHp, passo: game.trainerHitStep, hit: game.trainerLastHit, comTerreno: false, visualNovo: cenaNova })}
+      ${fighterHtml(m, 'p', { hp: displayPlayerHp, passo: game.trainerHitStep, hit: game.trainerLastHit, comTerreno: false, visualNovo: cenaNova, treinador: cenaNova ? (game.trainerBattlePlayerName||game.trainerName||'Você') : null, vivos: (loading||animating)?m.playerAliveBefore:m.playerAliveAfter, total: m.playerTeamSize })}
       <span class="vs-swords ${(loading||animating)?'spin':''}">${selo('vs', 'selo-g')}</span>
-      ${fighterHtml(m, 'e', { hp: displayEnemyHp, passo: game.trainerHitStep, hit: game.trainerLastHit, comTerreno: false, visualNovo: cenaNova })}${cenaNova ? '\n      <div class="battle-fx-layer" id="battle-fx-layer"></div>' : ''}
+      ${fighterHtml(m, 'e', { hp: displayEnemyHp, passo: game.trainerHitStep, hit: game.trainerLastHit, comTerreno: false, visualNovo: cenaNova, treinador: cenaNova ? (game.trainerBattleOpponentName||'Adversário') : null, vivos: (loading||animating)?m.enemyAliveBefore:m.enemyAliveAfter, total: m.enemyTeamSize })}${cenaNova ? '\n      <div class="battle-fx-layer" id="battle-fx-layer"></div>' : ''}
     </div>
     <div class="battle-status-area">${loading
       ? `<div class="loading-dots"><span></span><span></span><span></span></div><p class="loading-text">Aguardando o resultado da batalha...</p>`
@@ -24789,13 +24817,35 @@ function fighterHtml(m, lado, op){
     const badges = `${shiny ? selo('shiny','selo-g') : ''}${(op.comTerreno && buffed) ? selo('terreno','selo-g', op.corDoTerreno || COR_TERRENO_PADRAO) : ''}${especialidade ? selo('medalha_ouro','selo-g') : ''}${saindo ? '' : selosDoConfronto(m, lado, op.passo)}`;
     const morto = hp <= 0 && !saindo;
     const explodiu = !saindo && caiuNaExplosao(m, side) && sequenciaDoConfronto(m).slice(0, op.passo == null ? Infinity : op.passo).some(g => g.x === 'boom');
+    /* ⚠️ O TREINADOR E AS POKÉBOLAS MORAM NO PAINEL (22/09/2026, a pedido: *"vamos agora colocar
+       essas informações dentro do quadro com o nome do pokemon durante a batalha, o nome e as
+       pokebolas"*). Antes eles viviam numa fileira PRÓPRIA acima da cena -- e com o cenário atrás,
+       aquela fileira passou a ser a única coisa fora dele: a batalha inteira acontecia dentro do
+       quadro e o placar ficava de fora, olhando.
+       ⚠️ ELE SÓ SAI QUANDO O CHAMADOR MANDA (`op.treinador`): quem não manda continua desenhando o
+       painel byte a byte como antes -- e é isso que deixa a fileira de cima viver onde a cena não
+       desenha (o Boss, a Seleção, o desafio por código e o online), sem dizer a mesma coisa duas
+       vezes em tela nenhuma. */
+    const placar = op.treinador == null ? '' : `
+        <div class="battle-mon-treinador">
+          <span class="battle-mon-treinador-nome">${escapeHtmlSafe(op.treinador)}</span>
+          ${pokebolasHtml(op.vivos, op.total)}
+        </div>`;
     return `<div class="fighter battle-fighter ${side}${entrando ? ' fighter-entra' : ''}${morto ? ' battle-fainted' : ''}" id="battle-fighter-${side}">
-      <div class="battle-mon-panel">
+      <div class="battle-mon-panel">${placar}
+        ${/* ⚠️ OS SELOS FICAM AO LADO DO NOME (22/09/2026, a pedido: *"os status que o pokemon ta
+             tendo, como queimado, buff pelo terreno, shiny, deixe ao lado do nome, hoje esta
+             exibindo numa linha embaixo"*). Eles moravam numa linha PRÓPRIA embaixo -- e ali eles
+             se liam como uma segunda informação, quando o que eles são é um adjetivo do pokémon
+             que está escrito ao lado.
+             ⚠️ QUEM CEDE ESPAÇO É O NOME, nunca os selos: a mesma regra do chip do placar. O nome
+             já trunca (`min-width:0` + ellipsis) e os selos não encolhem -- eles são a informação
+             que muda durante a luta, e o nome é o que o jogador já sabe. */''}
         <div class="battle-mon-head">
           <span class="battle-mon-name">${nome}</span>
+          <span class="battle-mon-badges">${badges}</span>
           <span class="fighter-level">Lv.${nivel}</span>
         </div>
-        <div class="battle-mon-badges">${badges}</div>
         <div class="fighter-types">${sp ? typesHtml(sp.types) : ''}</div>
         ${renderHpBar(hp, maxHp, doJogador ? 'hp-fill-player' : 'hp-fill-enemy', doJogador ? 'hp-label-player' : 'hp-label-enemy', entrando)}
       </div>
@@ -24850,14 +24900,16 @@ function renderBattling(){
   ${terrain ? `<div class="terrain-badge-row"><button class="terrain-inline-badge" style="background:${terrainColor(terrain)}" onclick="openTerrainInfoModal('${terrain.id}')">${terrain.icon} ${terrain.name}</button></div>` : ''}
   ${chuvaBadgeHtml(m)}
   <div class="box cursor" style="${terrainBattleBgStyle(terrain)}">
-    <div class="team-alive-row">
+    ${/* ⚠️ A FILEIRA DE CIMA SÓ EXISTE ONDE A CENA NÃO DESENHA: com o cenário atrás, o treinador e
+          as pokébolas moram DENTRO do painel de cada lutador (22/09/2026, a pedido). Emitir os dois
+          seria dizer a mesma coisa duas vezes na mesma tela. */''}${cenaNova ? '' : `<div class="team-alive-row">
       ${placarDoTreinador(game.trainerName||'Você', (loading||animating)?m.playerAliveBefore:m.playerAliveAfter, m.playerTeamSize)}
       ${placarDoTreinador(enemyLabel, (loading||animating)?m.enemyAliveBefore:m.enemyAliveAfter, m.enemyTeamSize)}
-    </div>
+    </div>`}
     <div class="battle-vs${cenaNova ? ' battle-scene' : ''}"${cenaNova ? ` style="${terrainBattleSceneStyle(terrain)}"` : ''}>${cenaNova ? '\n      <div class="battle-scene-grid"></div>' : ''}
-      ${fighterHtml(m, 'p', { hp: displayPlayerHp, passo: game.revealHitStep, hit: game.revealLastHit, comTerreno: true, corDoTerreno: terrain ? terrainColor(terrain) : null, visualNovo: cenaNova })}
+      ${fighterHtml(m, 'p', { hp: displayPlayerHp, passo: game.revealHitStep, hit: game.revealLastHit, comTerreno: true, corDoTerreno: terrain ? terrainColor(terrain) : null, visualNovo: cenaNova, treinador: cenaNova ? (game.trainerName||'Você') : null, vivos: (loading||animating)?m.playerAliveBefore:m.playerAliveAfter, total: m.playerTeamSize })}
       <span class="vs-swords ${(loading||animating)?'spin':''}">${selo('vs', 'selo-g')}</span>
-      ${fighterHtml(m, 'e', { hp: displayEnemyHp, passo: game.revealHitStep, hit: game.revealLastHit, comTerreno: true, corDoTerreno: terrain ? terrainColor(terrain) : null, visualNovo: cenaNova })}${cenaNova ? '\n      <div class="battle-fx-layer" id="battle-fx-layer"></div>' : ''}
+      ${fighterHtml(m, 'e', { hp: displayEnemyHp, passo: game.revealHitStep, hit: game.revealLastHit, comTerreno: true, corDoTerreno: terrain ? terrainColor(terrain) : null, visualNovo: cenaNova, treinador: cenaNova ? enemyLabel : null, vivos: (loading||animating)?m.enemyAliveBefore:m.enemyAliveAfter, total: m.enemyTeamSize })}${cenaNova ? '\n      <div class="battle-fx-layer" id="battle-fx-layer"></div>' : ''}
     </div>
     <div class="battle-status-area">${loading
       ? `<div class="loading-dots"><span></span><span></span><span></span></div><p class="loading-text">Aguardando o resultado da batalha...</p>`
@@ -26917,15 +26969,15 @@ function renderLeagueWatch(){
   ${w.terrain ? `<div class="terrain-badge-row"><button class="terrain-inline-badge" style="background:${terrainColor(w.terrain)}" onclick="openTerrainInfoModal('${w.terrain.id}')">${w.terrain.icon} ${w.terrain.name}</button></div>` : ''}
   ${chuvaBadgeHtml(m)}
   <div class="box cursor" style="${terrainBattleBgStyle(w.terrain)}">
-    <div class="team-alive-row">
+    ${/* a fileira de cima só existe onde a cena não desenha -- ver a nota no renderBattling */''}${cenaNova ? '' : `<div class="team-alive-row">
       ${placarDoTreinador(w.playerAName, (loading||animating)?m.playerAliveBefore:m.playerAliveAfter, m.playerTeamSize)}
       ${placarDoTreinador(w.playerBName, (loading||animating)?m.enemyAliveBefore:m.enemyAliveAfter, m.enemyTeamSize)}
-    </div>
+    </div>`}
     ${cenaNova ? `<div class="battle-vs battle-scene" style="${terrainBattleSceneStyle(w.terrain)}">
       <div class="battle-scene-grid"></div>
-      ${fighterHtml(m, 'p', { hp: displayPlayerHp, passo: game.leagueWatchHitStep, hit: game.leagueWatchLastHit, comTerreno: true, corDoTerreno: w.terrain ? terrainColor(w.terrain) : null, visualNovo: true })}
+      ${fighterHtml(m, 'p', { hp: displayPlayerHp, passo: game.leagueWatchHitStep, hit: game.leagueWatchLastHit, comTerreno: true, corDoTerreno: w.terrain ? terrainColor(w.terrain) : null, visualNovo: true, treinador: w.playerAName, vivos: (loading||animating)?m.playerAliveBefore:m.playerAliveAfter, total: m.playerTeamSize })}
       <span class="vs-swords ${(loading||animating)?'spin':''}">${selo('vs', 'selo-g')}</span>
-      ${fighterHtml(m, 'e', { hp: displayEnemyHp, passo: game.leagueWatchHitStep, hit: game.leagueWatchLastHit, comTerreno: true, corDoTerreno: w.terrain ? terrainColor(w.terrain) : null, visualNovo: true })}
+      ${fighterHtml(m, 'e', { hp: displayEnemyHp, passo: game.leagueWatchHitStep, hit: game.leagueWatchLastHit, comTerreno: true, corDoTerreno: w.terrain ? terrainColor(w.terrain) : null, visualNovo: true, treinador: w.playerBName, vivos: (loading||animating)?m.enemyAliveBefore:m.enemyAliveAfter, total: m.enemyTeamSize })}
       <div class="battle-fx-layer" id="battle-fx-layer"></div>
     </div>` : `<div class="battle-vs">
       <div class="fighter">
@@ -35126,10 +35178,20 @@ const CENARIO_DA_PESCARIA = 'porto_abandonado';   /* o "Manguezal" da tabela TER
 function pescariaLutadoresHtml(b){
   const m = b.matchup;
   const cenaNova = visualNovoDeBatalha();
+  /* ⚠️ O TREINADOR E AS POKÉBOLAS ENTRAM NO PAINEL DE CADA LUTADOR (22/09/2026), e a fileira de
+     cima sai -- ver a nota no fighterHtml. A contagem segue a MESMA regra do pescariaPlacarHtml
+     (o `fim` escolhe entre o antes e o depois); escrita de outro jeito, o placar do fim discordaria
+     do que a barra acabou de mostrar.
+     ⚠️ E ISSO FAZ O PLACAR DO FIM SE ATUALIZAR SOZINHO: quem o repintava era o ramo `b.fim` do
+     pescariaPintarArea, e agora ele vem junto do painel, que o pintor já repinta a cada passo. */
+  const vivosP = b.fim ? m.playerAliveAfter : m.playerAliveBefore;
+  const vivosE = b.fim ? m.enemyAliveAfter : m.enemyAliveBefore;
   return (cenaNova ? '<div class="battle-scene-grid"></div>' : '')
-       + fighterHtml(m, 'p', { hp: b.hpP, passo: b.passo, hit: b.hit, visualNovo: cenaNova })
+       + fighterHtml(m, 'p', { hp: b.hpP, passo: b.passo, hit: b.hit, visualNovo: cenaNova,
+                               treinador: cenaNova ? (game.trainerName || 'Você') : null, vivos: vivosP, total: m.playerTeamSize })
        + '<span class="vs-swords spin">' + selo('vs', 'selo-g') + '</span>'
-       + fighterHtml(m, 'e', { hp: b.hpE, passo: b.passo, hit: b.hit, visualNovo: cenaNova })
+       + fighterHtml(m, 'e', { hp: b.hpE, passo: b.passo, hit: b.hit, visualNovo: cenaNova,
+                               treinador: cenaNova ? 'Selvagem' : null, vivos: vivosE, total: m.enemyTeamSize })
        + (cenaNova ? '<div class="battle-fx-layer" id="battle-fx-layer"></div>' : '');
 }
 /* ⚠️ O QUE CADA UM PESCOU (20/09/2026, a pedido: *"quando acabar o tempo, exiba um log mostrando
@@ -35511,7 +35573,7 @@ function pescariaBatalhaHtml(p){
     <div class="pesc-painel-topo"><h2>Batalha pela captura</h2>
       <span class="pesc-chip">VALE ${b.premio} PTS</span></div>
     ${chuvaBadgeHtml(m)}
-    <div class="team-alive-row" id="pescBatalhaPlacar">${pescariaPlacarHtml(m, b.fim)}</div>
+    ${/* a fileira de cima só existe onde a cena não desenha -- ver a nota no fighterHtml */''}${cenaNova ? '' : `<div class="team-alive-row" id="pescBatalhaPlacar">${pescariaPlacarHtml(m, b.fim)}</div>`}
     <div class="battle-vs${cenaNova ? ' battle-scene' : ''}" id="pescBatalhaVs"${cenaNova ? ` style="${terrainBattleSceneStyle({ id: CENARIO_DA_PESCARIA })}"` : ''}>${pescariaLutadoresHtml(b)}</div>
     <div class="battle-status-area" id="pescBatalhaStatus">${b.fim
       ? pescariaLinhaDoFim(m)

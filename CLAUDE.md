@@ -5933,6 +5933,93 @@ Mexer no `background-size` pra empilhar o gradiente como segunda camada daria um
 bonito e **tocaria justamente as duas propriedades que o seletor `[style*="--battle-atlas:N;"]`
 acopla** — não valeu o risco por menos de um segundo de tela.
 
+### O PLACAR E OS SELOS ENTRARAM NO PAINEL DO LUTADOR (22/09/2026)
+
+Dois pedidos em sequência, e eles resolvem o mesmo desconforto: com o cenário atrás, **tudo que
+estava fora do quadro passou a parecer solto**.
+
+#### O TREINADOR E AS POKÉBOLAS
+
+*"Durante a batalha, exibe aqueles quadros com o nome dos treinadores e as pokebolas representando
+quantos pokemons eles ainda tem. Vamos agora colocar essas informações dentro do quadro com o nome
+do pokemon durante a batalha, o nome e as pokebolas."*
+
+Eles viviam numa **fileira própria acima da cena** (o `team-alive-row` com dois `team-alive-chip`),
+e com o cenário ela virou a única coisa fora dele: a batalha acontecia dentro do quadro e o placar
+ficava olhando de fora.
+
+- **⚠️ A REGRA É "UM LUGAR SÓ", e é ela que o teste cobra — não a posição.** Onde a cena desenha, o
+  placar mora no painel e a fileira **sai**; onde ela não desenha (o **Boss**, a **Seleção**, o
+  desafio por **código** e o **online**), a fileira fica e o painel nem existe. Emitir os dois seria
+  dizer a mesma coisa duas vezes na mesma tela.
+- **⚠️ O PAINEL SÓ GANHA O PLACAR QUANDO O CHAMADOR MANDA** (`op.treinador`): quem não manda desenha
+  byte a byte como antes. É isso que deixa as duas formas conviverem sem um `if` por tela.
+- **⚠️ AS POKÉBOLAS ENCOLHEM AQUI, e não é estética:** o painel tem ~158px de conteúdo a 320px, e as
+  de 13px do chip somam **93px** com os vãos — sobrariam ~59px pro nome, meia dúzia de letras. Em
+  **9px** elas somam 64px e o nome fica com ~88px. Quem cede espaço é o **NOME** (ele trunca); as
+  pokébolas são a informação — a mesma regra do chip de cima.
+- **A contagem segue a fase** (`antes` durante a luta, `depois` no fim), a mesma do chip. Na
+  **pescaria** isso ainda comprou uma coisa: quem repintava o placar do fim era o ramo `b.fim` do
+  `pescariaPintarArea`, e agora ele vem junto do painel, que o pintor já repinta a cada passo.
+
+**MEDIDO A 320px, o mesmo confronto nos dois builds:**
+
+| | antes | depois |
+|---|---|---|
+| altura da caixa da batalha | 510px | **452px** (**−58px, −11%**) |
+| a fileira de cima | 48px | **0** |
+| o painel | 88px | 109px (dentro da cena, que é de altura fixa) |
+| sobreposição painel × sprite | — | **0% dos dois lados**, nas quatro telas |
+
+#### OS SELOS AO LADO DO NOME
+
+*"Os status que o pokemon ta tendo, como queimado, buff pelo terreno, shiny, deixe ao lado do nome,
+hoje esta exibindo numa linha embaixo do nome do pokemon durante a tela de batalha."*
+
+Eles eram uma linha própria (`battle-mon-badges`) embaixo do nome — e ali se liam como uma segunda
+informação, quando o que eles são é um **adjetivo do pokémon escrito ao lado**. Hoje a linha do nome
+é `[Nome] [selos] ......... [Lv.60]`.
+
+- **⚠️ `flex-wrap:nowrap` + `flex-shrink:0` nos selos:** sem os dois, uma luta com queimadura +
+  veneno + fúria empurrava os selos pra uma segunda linha e **o painel crescia no meio da batalha**,
+  com o cenário atrás dele. Quem cede é o nome, que já truncava.
+- **DE QUEBRA O PAINEL ENCOLHEU 5px** (109 → 104), porque a linha dos selos deixou de existir.
+
+**⚠️ E O PIOR CASO QUE DÁ MEDO É TEÓRICO — medido em 19.650 quadros de batalha real:**
+
+| selos ao lado do nome | |
+|---|---|
+| **nenhum** | **91,54%** |
+| um | 8,11% |
+| dois | 0,35% |
+| **quatro ou mais** (onde o nome começa a sofrer) | **0,00%** — o maior visto foi **2** |
+
+Com os três "permanentes" (shiny + terreno + especialidade) o nome **cabe inteiro** a 320px
+("Venusaur ⭐🔺🎖️ Lv.60", conferido no navegador). Com cinco ele vira "V." — e esse é o caso que a
+medição diz que não acontece. **Se um dia acontecer**, a régua é o tamanho do selo dentro do painel.
+
+**NO MOTOR, NADA:** `MOTOR 47d16bcb4c3f / DIARIO 053483c8b60c`, idêntico em 900 batalhas semeadas.
+
+#### ⚠️ E DOIS EXTRATORES DE TESTE ENVELHECERAM JUNTO
+
+| trava | por que ela caiu |
+|---|---|
+| *"o placar de pokébolas em cima"* (pescaria) | ela media a **POSIÇÃO**. Hoje cobra a regra: o placar existe, um por lutador, e a fileira de cima saiu |
+| *"com o placar de quem esta de pe ANTES do canto"* (jornada) | ela fatiava a tela por **`team-alive-chip`** pra achar o lado do Buzzo — sem chip, o `find` casava com a tela INTEIRA e ela contava as pokébolas dos **dois** lados ("4 vivas, 1 pretas"). Hoje ela fatia por `id="battle-fighter-`, com o chip como fallback |
+
+**⚠️ E A SEGUNDA TEM UMA ARMADILHA QUE VALE GUARDAR: o primeiro pedaço do `split` é descartado.** Ele
+é tudo que vem ANTES do primeiro lutador — com a fileira de cima de volta, ele conteria os dois
+chips e a conta sairia dos dois lados de novo.
+
+#### ⚠️ E A PRÉVIA MOSTRAVA OS SELOS VAZIOS — a lição que este arquivo já registra
+
+A primeira captura saiu com a linha do nome **sem ícone nenhum**, e não era o código: o
+`montarSelos()` injeta o `<svg>` dos símbolos no `document.body` **de verdade**, e a prévia é montada
+pelo sandbox, que não tem body. Todo `<use href="#s-x">` sai **vazio, do tamanho certo** — então a
+MEDIÇÃO de largura estava certa e a TELA parecia quebrada.
+A prévia passou a injetar o `svgDosSelos()` na mão (79 símbolos). **É a mesma nota que a seção do
+anúncio das Ilhas já carrega**, e ela custou uma rodada aqui de novo.
+
 ### ⚠️ O QUE FICA EM ABERTO
 
 - ~~**A janela do `ehAdmin`**~~ — ela era o risco de uma batalha rodar antes de a conta carregar e
@@ -14986,6 +15073,18 @@ não tinha o `functions/index.js`, o teste **morria na linha 1329** e devolvia *
 vez de 1271** -- ou seja ele "passava" sem nunca chegar na trava. É literalmente a lição que este
 arquivo já registra (*"uma trava que estoura é pior que uma que falha"*), agora aplicada à árvore
 inteira: **conferir a CONTAGEM de asserções antes de acreditar num verde**.
+
+**⚠️ E A TAXA DELE NÃO É ESTÁVEL -- remedida em 22/09/2026: 3 de 6 rodadas.** Ela já foi registrada
+como "~1 em 17" e como "6 de 12", e as três medições são do MESMO defeito: o teste sorteia
+confrontos novos a cada rodada, então a taxa observada num punhado de rodadas não diz nada.
+**Não use essa taxa como sinal de regressão.** O que separa os dois casos continua sendo o trio
+acima -- e a terceira perna é a mais barata de todas: **ver se o diff encosta no código que a trava
+lê**. Aqui ela lê `sequenciaDoConfronto`, o diário e o `fraseDoEspecial`; um diff que só mexe em
+`fighterHtml`, nos containers e no CSS não tem por onde alcançá-la.
+**⚠️ E O SEMEADO TEM UM LIMITE QUE VALE SABER:** com a semente fixa o teste varre sempre os MESMOS
+confrontos, então "8 de 8 sementes concordam" prova que os dois builds se comportam igual **naquelas
+amostras** -- ele não exercita o flake. A prova de que não é regressão é a impressão do motor mais o
+diff, não o semeado sozinho.
 
 ## AS TRÊS DA CORRIDA (21/09/2026) -- a pista fixa, o rótulo e os líderes
 

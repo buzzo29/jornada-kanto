@@ -6148,6 +6148,79 @@ console.log('\n=== O PLACAR VIROU POKEBOLAS (15/09/2026) ===');
      (css.match(/\.pokeball\.ko\{background:#[0-9a-f]{6}/)||[''])[0]);
   ok('o chip tem min-width:0 (senao o nome comprido rouba a largura do outro)',
      /\.team-alive-chip\{[\s\S]*?min-width:0;[\s\S]*?\n  \}/.test(css));
+
+  /* ============================================================================
+     ⚠️ O PLACAR MUDOU DE LUGAR: ELE MORA NO PAINEL DO LUTADOR (22/09/2026)
+     ============================================================================
+     *"vamos agora colocar essas informacoes dentro do quadro com o nome do pokemon durante a
+     batalha, o nome e as pokebolas"*. Com o cenario atras, a fileira de cima era a unica coisa
+     FORA dele: a batalha acontecia dentro do quadro e o placar ficava olhando.
+     ⚠️ A REGRA E "UM LUGAR SO", e e ela que a trava cobra -- nao a posicao. Onde a cena desenha,
+     o placar esta no painel e a fileira sai; onde ela nao desenha (o Boss, a Selecao, o desafio
+     por codigo e o online), a fileira fica e o painel nem existe. Emitir os dois seria dizer a
+     mesma coisa duas vezes na mesma tela. */
+  {
+    const trilha = (h) => ({
+      fileira: (String(h).match(/team-alive-row/g) || []).length,
+      painel:  (String(h).match(/battle-mon-treinador"/g) || []).length,
+    });
+    /* o painel so sai quando o chamador MANDA o treinador -- quem nao manda desenha como antes */
+    const mFake = { player:'A', enemy:'B', playerSpecies:'pikachu', enemySpecies:'onix',
+                    playerLevel:5, enemyLevel:5, playerMaxHp:20, enemyMaxHp:20,
+                    playerShiny:false, enemyShiny:false, golpes:[] };
+    const sem = S.fighterHtml(mFake, 'p', { hp: 20, passo: 0, visualNovo: true });
+    const com = S.fighterHtml(mFake, 'p', { hp: 20, passo: 0, visualNovo: true, treinador: 'Ash', vivos: 4, total: 6 });
+    ok('sem `treinador` o painel sai como antes', trilha(sem).painel === 0);
+    ok('  e com ele o placar entra no painel', trilha(com).painel === 1);
+    ok('  com uma pokebola por pokemon', (com.match(/class="pokeball(?: ko)?"/g) || []).length === 6,
+       (com.match(/class="pokeball(?: ko)?"/g) || []).length + ' bolas');
+    ok('  e as caidas escuras, na mesma ordem do chip', (com.match(/class="pokeball ko"/g) || []).length === 2);
+    ok('  o nome do treinador e escapado',
+       S.fighterHtml(mFake, 'p', { hp: 20, passo: 0, visualNovo: true, treinador: '<b>x</b>', vivos: 1, total: 1 }).indexOf('<b>x') < 0);
+    /* ⚠️ E ELE NAO ENTRA NO CAMINHO ANTIGO: la nao ha painel, e o placar continua na fileira. */
+    ok('  e o caminho antigo nao ganha placar no lutador',
+       trilha(S.fighterHtml(mFake, 'p', { hp: 20, passo: 0, treinador: 'Ash', vivos: 1, total: 1 })).painel === 0);
+
+    /* ⚠️ E A TRAVA QUE IMPORTA E A DAS TELAS: ela LE O CODIGO, porque os casos acima chamam o
+       fighterHtml direto e passariam com um render ainda emitindo a fileira por cima. */
+    /* ⚠️ O SEGUNDO NOME DE CADA PAR É ONDE O TREINADOR VIAJA, e na pescaria ele NÃO é o mesmo do
+       container: lá o container só emite a fileira, e quem chama o fighterHtml é a função irmã. */
+    const cinco = [
+      ['renderBattling',        'renderBattling'],
+      ['renderSpecialBattling', 'renderSpecialBattling'],
+      ['renderTrainerBattling', 'renderTrainerBattling'],
+      ['renderLeagueWatch',     'renderLeagueWatch'],
+      ['pescariaBatalhaHtml',   'pescariaLutadoresHtml'],
+    ];
+    const fatiaDe = (f) => { const i = cli.indexOf('function ' + f); return cli.slice(i, cli.indexOf('\nfunction ', i + 1)); };
+    cinco.forEach(([container, quemPassa]) => {
+      const fa = fatiaDe(container), fp = fatiaDe(quemPassa);
+      ok('(a fatia de ' + container + ' tem o que ler)', fa.length > 400 && fp.length > 200,
+         fa.length + '/' + fp.length + ' chars');
+      ok('  ' + container + ': a fileira de cima e condicional a NAO ter cena',
+         !/team-alive-row/.test(fa) || /cenaNova \? '' : `<div class="team-alive-row"/.test(fa));
+      ok('  ' + container + ': e o treinador viaja pro lutador (' + quemPassa + ')', /treinador:/.test(fp));
+    });
+    /* ⚠️ AS DUAS DO ONLINE SAO O CONTRARIO, e de proposito: elas nao tem cena, entao a fileira
+       delas NAO pode ser condicional -- condicionada, o online ficaria sem placar nenhum. */
+    ['renderOnlineCountdown', 'renderOnlineFight'].forEach(f => {
+      const i = cli.indexOf('function ' + f);
+      const fatia = cli.slice(i, cli.indexOf('\nfunction ', i + 1));
+      ok('  ' + f + ': a fileira fica, sem condicao', /<div class="team-alive-row">/.test(fatia)
+         && !/cenaNova \? '' : `<div class="team-alive-row"/.test(fatia));
+    });
+
+    /* O CSS -- nada disso aparece em asserção de HTML. */
+    ok('as pokebolas do painel encolhem (o chip de 13px nao cabe em ~158px)',
+       /\.battle-mon-treinador \.pokeball\{[^}]*width:9px/.test(css));
+    /* ⚠️ E ELAS NUNCA QUEBRAM DE LINHA: quem cede espaco e o NOME, a mesma regra do chip de cima.
+       Medido no navegador a 320px: as seis somam 64px numa linha de 131, e o nome de 20 letras
+       trunca em 61px. */
+    ok('  e nunca quebram de linha', /\.battle-mon-treinador \.team-alive-bolas\{[^}]*flex-wrap:nowrap/.test(css));
+    ok('  e o nome trunca em vez de empurrar',
+       /\.battle-mon-treinador-nome\{[^}]*text-overflow:ellipsis/.test(css) &&
+       /\.battle-mon-treinador-nome\{[^}]*min-width:0/.test(css));
+  }
 }
 
 console.log('\n=== A CENA DO REMOINHO: SAI / VAZIO / ENTRA COM A BARRA ENCHENDO (15/09/2026) ===');

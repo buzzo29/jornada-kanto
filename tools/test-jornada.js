@@ -1158,7 +1158,19 @@ console.log('\nO CANTO DA JIGGLYPUFF ACONTECE NA TELA DE BATALHA');
      por pokemon do time, as caidas em preto. O que esta trava cobra continua sendo o mesmo -- o
      placar do JOGADOR mostra os TRES de pe, porque o canto nao desmaia ninguem.
      So o chip do Buzzo entra na conta: o do adversario tem outro time e outro numero. */
-  const chipDoBuzzo = (tela.split('team-alive-chip').find(p => p.indexOf('Buzzo') >= 0) || '');
+  /* ⚠️ E ELE MUDOU DE LUGAR DE NOVO em 22/09/2026: com o cenario atras, o treinador e as pokebolas
+     moram DENTRO do painel do lutador, e a fileira de chips de cima sai. O que esta trava cobra
+     continua sendo o NUMERO -- entao ela procura o bloco do lado do Buzzo onde ele estiver: o
+     quadro do lutador primeiro, o chip de cima como fallback (o desenho antigo, que ainda serve o
+     Boss, a Selecao, o desafio por codigo e o online).
+     ⚠️ O PRIMEIRO PEDACO DO SPLIT E DESCARTADO: ele e tudo que vem ANTES do primeiro lutador, e
+     com a fileira de cima de volta ele conteria os dois chips -- a conta sairia dos dois lados. */
+  const pedacoDe = (alvo) => {
+    const lados = tela.split('id="battle-fighter-').slice(1);
+    return lados.find(p => p.indexOf(alvo) >= 0)
+        || (tela.split('team-alive-chip').slice(1).find(p => p.indexOf(alvo) >= 0) || '');
+  };
+  const chipDoBuzzo = pedacoDe('Buzzo');
   const vivas = (chipDoBuzzo.match(/class="pokeball"/g) || []).length;
   const pretas = (chipDoBuzzo.match(/class="pokeball ko"/g) || []).length;
   ok('com o placar de quem esta de pe ANTES do canto (ninguem desmaiou)',

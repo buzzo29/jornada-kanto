@@ -310,7 +310,15 @@ console.log('\n=== A BATALHA DA TELA É A DA JORNADA ===');
      html.indexOf('id="hp-fill-player"') >= 0 && html.indexOf('id="hp-fill-enemy"') >= 0);
   ok('  e com o HP em NÚMERO, que a tela não mostrava',
      html.indexOf('id="hp-label-player"') >= 0 && /\d+\/\d+ HP/.test(html));
-  ok('  o placar de pokébolas em cima', html.indexOf('team-alive-row') >= 0 && html.indexOf('pokeball') >= 0);
+  /* ⚠️ O PLACAR DE POKÉBOLAS MUDOU DE LUGAR (22/09/2026): com o cenário atrás, o treinador e as
+     bolas moram DENTRO do painel de cada lutador, e a fileira de cima sai -- os dois seriam a
+     mesma coisa duas vezes na mesma tela. A trava dizia "em cima", que era a POSIÇÃO; hoje ela
+     cobra a REGRA: o placar existe, e ele está num lugar só. */
+  ok('  o placar de pokébolas, um por lutador',
+     (html.match(/battle-mon-treinador"/g) || []).length === 2 && html.indexOf('pokeball') >= 0,
+     (html.match(/battle-mon-treinador"/g) || []).length + ' placares');
+  ok('  e a fileira de cima saiu (ela diria a mesma coisa duas vezes)',
+     html.indexOf('team-alive-row') < 0);
   ok('  o VS girando no meio', html.indexOf('vs-swords spin') >= 0);
   ok('  e a caixa de status da casa', html.indexOf('battle-status-area') >= 0 && html.indexOf('id="battle-status-txt"') >= 0);
   /* ⚠️ E A MARCAÇÃO PRÓPRIA NÃO PODE TER SOBRADO: ela é o defeito, não uma alternativa. */
