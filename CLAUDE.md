@@ -5540,7 +5540,12 @@ outro, coloque setinhas para ir paginando os dias"*.
   visível do que era (o dia com um inscrito só leva ouro **e mais nada**; o dia vazio não tem
   medalha nenhuma).
 
-## A CENA NOVA DE BATALHA, ATRÁS DO GATE DE ADMIN (22/09/2026)
+## A CENA NOVA DE BATALHA (22/09/2026)
+
+> **⚠️ ELA NASCEU ATRÁS DE UM GATE DE ADMIN E FOI ABERTA PRA TODO MUNDO NO MESMO DIA**, a pedido —
+> ver **A CHAVE FOI ABERTA**, no fim desta seção. Tudo que este texto diz sobre "o não-admin
+> continua vendo a batalha de hoje" é a régua de algumas horas, e continua valendo como história:
+> é ela que explica por que a porta é uma FUNÇÃO SÓ e por que o caminho antigo não foi apagado.
 
 Pedida assim: *"ele possui um cenário gráfico diferente do index atual no momento das batalhas, com
 sprites, cenários e animações diferentes ... pegue SOMENTE essa parte gráfica ... coloque que somente
@@ -5870,15 +5875,78 @@ Só o **online** (`renderOnlineFight`/`renderOnlineCountdown`), e não é teimos
 refactor `virarMatchup`, que **não é gateável** — ele muda o que o lado B vê pra TODO MUNDO. A
 medição está na seção acima.
 
+### ⚠️ A CHAVE FOI ABERTA: A CENA É DE TODO MUNDO (22/09/2026)
+
+Pedido no mesmo dia, horas depois de ela subir: *"pode tirar que só quem tem admin=true consegue ver
+a nova tela"*. `visualNovoDeBatalha()` passou a devolver **`true`**.
+
+- **⚠️ ELA CONTINUA SENDO UMA FUNÇÃO SÓ, e é isso que a mudança comprou de volta:** voltar atrás é
+  **uma linha**. É o molde do `MOSTRAR_TM_HM` — que já foi puxado e devolvido uma vez — e do
+  `BOSS_ATIVO`. Trocar os **nove** pontos de leitura por um `true` escrito em cada um seria o
+  caminho sem volta, e o próximo ponto nasceria sem a chave.
+- **⚠️ E O CAMINHO ANTIGO NÃO VIROU LETRA MORTA, o que é o que permite deixá-lo de pé:** ele
+  continua desenhando o **Boss de Domingo**, a **Seleção** da Ilha Kumquat, o desafio por **código de
+  treinador** e o **online** — os quatro que não ganharam cenário. Não havia o que apagar.
+- **NO MOTOR, NADA:** `MOTOR 47d16bcb4c3f / DIARIO 053483c8b60c`, idêntico em 900 batalhas semeadas.
+  E **37 de 37** baterias passam.
+
+#### ⚠️ O CUSTO QUE ABRIR ISTO CRIOU, MEDIDO — ele era ZERO e deixou de ser
+
+Enquanto a cena era de admin, o resto do jogo **não pagava um byte**: `background-image` de uma regra
+que ninguém casa não é requisitada. Agora todo jogador baixa os atlas conforme cada batalha desenha.
+
+| | |
+|---|---|
+| cada atlas | **~2,26 MB** (2,36 / 2,36 / 2,26 / 2,33 / 2,35 / 1,88) |
+| os 6 juntos | **13,54 MB** |
+| atlas distintos numa jornada de 9 batalhas | **4,79 em média** (5 em 47% delas, os 6 em 18%) |
+| **por jornada, na PRIMEIRA vez** | **~10,8 MB** |
+
+**⚠️ E ELES REVALIDAM DE VERDADE, ao contrário do `index.html`.** Medido em produção: o PNG vem com
+`Cache-Control: max-age=3600` e, com `If-None-Match`, devolve **304 com 0 bytes em 67 ms** — contra
+os 486 KB e ~1,1 s que o `index.html` baixa **em toda abertura** por nunca devolver 304 (ver a seção
+de Deploy). Ou seja o custo é a **primeira** baixada de cada atlas, e ela é espalhada: um atlas por
+vez, quando a batalha daquele terreno desenha, e não um bloco no carregamento.
+
+**Se um dia incomodar**, as réguas são: um `headers` pra `/assets/**` com `max-age` longo (tira a
+revalidação de hora em hora, que hoje custa 67 ms), recortar os atlas em imagens menores por terreno
+(hoje é uma folha 3×3 pra 9 terrenos, então baixa-se 9 cenários pra usar 1), ou a própria chave —
+que é a linha que devolve tudo ao que era.
+
+#### ⚠️ E A JANELA DE CARREGAMENTO MOSTRAVA UMA CAIXA VAZIA — a regressão que a extração criou
+
+A regra de cada atlas **SUBSTITUI** o `background-image`, então o gradiente de céu-e-grama que a
+regra base declara como fallback **nunca aparecia**. Medido no navegador: o `background-color` da
+cena era **`rgba(0,0,0,0)`** e o do pai é **`rgb(254,251,240)`** — ou seja, enquanto os 2,26 MB não
+chegavam, o que se via era **o creme da caixa com os dois lutadores boiando nele**.
+
+**⚠️ ISSO NÃO EXISTE NO ARQUIVO DE ORIGEM, e é por isso que consertar não é desviar dele:** lá os
+atlas são **base64 dentro do CSS**, ou seja vêm com a folha de estilo e não há janela nenhuma. A
+janela é consequência da extração pra arquivo — que é a decisão que poupou **15,0 MB de gzip por
+abertura** pra todo jogador (ver acima).
+
+O conserto é **uma linha** (`background-color:#8bbb62`, o verde da metade de baixo do próprio
+gradiente de fallback): durante a carga vê-se um campo, não um quadro vazio.
+**⚠️ E ELE NÃO ENCOSTA NO ACOPLAMENTO DO ATLAS** — conferido no navegador, `background-position`
+segue `50% 0%` e `background-size` segue `300% 300%`, e a cena depois de carregada sai idêntica.
+Mexer no `background-size` pra empilhar o gradiente como segunda camada daria um placeholder mais
+bonito e **tocaria justamente as duas propriedades que o seletor `[style*="--battle-atlas:N;"]`
+acopla** — não valeu o risco por menos de um segundo de tela.
+
 ### ⚠️ O QUE FICA EM ABERTO
 
-- **A janela do `ehAdmin`.** Ele é lido de forma assíncrona no `loadPermanentUserData`, então uma
-  batalha que rodasse antes da conta carregar sairia no desenho antigo pra um admin. O erro é pro
-  lado conservador (ninguém vê a cena por engano) e a jornada sempre passa pela home antes, mas fica
-  dito: se um dia incomodar, o molde é o `contaCarregada` que as outras portas usam.
-- **O `id="battle-fx-layer"` é global** e está nas duas telas. Hoje é inofensivo — o `render()` troca
-  o `innerHTML` inteiro e só existe uma tela de batalha por vez —, mas é o tipo de coisa que quebra
-  no dia em que duas convivirem.
+- ~~**A janela do `ehAdmin`**~~ — ela era o risco de uma batalha rodar antes de a conta carregar e
+  sair no desenho antigo pra um admin. **Ela morreu quando a chave foi aberta**: a cena não depende
+  mais de nada assíncrono. Fica registrada porque ela **volta** no dia em que a chave voltar a
+  olhar o campo, e aí o molde é o `contaCarregada` que as outras portas usam.
+- **O `id="battle-fx-layer"` é global** e está nas cinco telas com cenário. Hoje é inofensivo — o
+  `render()` troca o `innerHTML` inteiro e só existe uma tela de batalha por vez —, mas é o tipo de
+  coisa que quebra no dia em que duas convivirem.
+- **⚠️ QUANTO A PRIMEIRA BATALHA DE UM TERRENO NOVO DEMORA NUM CELULAR NÃO FOI MEDIDO.** O atlas
+  tem ~2,26 MB, ele **só começa a baixar quando a cena desenha** (é `background-image`, não entra no
+  `preloadBattleSprites`) e daqui leva **0,36 s** — numa rede de celular é mais. O que a janela
+  MOSTRA já está medido e consertado (o item abaixo). Se for pra encurtá-la, o caminho é pôr o atlas
+  do terreno no `preloadBattleSprites`, que já roda antes da luta.
 
 ## Bifurcação Kanto / Johto
 

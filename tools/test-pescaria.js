@@ -283,20 +283,24 @@ console.log('\n=== A BATALHA DA TELA É A DA JORNADA ===');
   S.pescariaSurgir(5);
   S.pescariaComecarBatalha(0, S.pescaria.oportunidades[5]);
   const p0 = S.pescaria.jogadores[0];
-  /* ⚠️ O GATE DA CENA NOVA TROCA A MARCAÇÃO, e o contaAdmin() acima o LIGA. As travas abaixo
-     descrevem o visual de quem NÃO é admin -- o que todo jogador vê --, então o bloco desliga o
-     gate pra medi-lo. A cena entra logo em seguida, pela MESMA função. Sem isso elas mediriam a
-     cena e acusariam o que está certo, que é a trava que envelhece junto com a tela. */
-  g.ehAdmin = false;
+  /* ⚠️ ESTAS TRAVAS JÁ ENVELHECERAM DUAS VEZES NO MESMO DIA, e por isso hoje elas medem o que é
+     INVARIANTE: primeiro elas cravavam `class="fighter"` e `sprite-lg`, o que era o visual antigo
+     -- e o fixture chama contaAdmin(), que LIGAVA o gate da cena; consertado isso desligando o
+     gate, a chave foi aberta pra todo mundo horas depois e o desligar parou de desligar.
+     O que este bloco existe pra provar não é a marcação: é que o quadro da pescaria sai das MESMAS
+     funções do renderBattling. Isso vale nos dois visuais, e é assim que ele passou a ser escrito. */
   const html = S.pescariaBatalhaHtml(p0);
-  g.ehAdmin = true;
-  const htmlCena = S.pescariaBatalhaHtml(p0);
-  g.ehAdmin = false;
 
   /* ---- O LAYOUT: são as MESMAS funções do renderBattling ---- */
-  ok('o quadro usa o fighterHtml da casa', (html.match(/class="fighter"/g) || []).length === 2,
-     (html.match(/class="fighter"/g) || []).length + ' lutadores');
-  ok('  com o sprite GRANDE da batalha', html.indexOf('sprite-lg') >= 0);
+  /* ⚠️ A CLASSE É PROCURADA NA LISTA, nunca por igualdade: na cena o lutador é
+     `class="fighter battle-fighter player"`, e um `class="fighter"` cravado casa com ZERO. É a
+     mesma armadilha das regex do `mlog-mais` e do `matchup-row`. */
+  ok('o quadro usa o fighterHtml da casa', (html.match(/class="fighter[ "]/g) || []).length === 2,
+     (html.match(/class="fighter[ "]/g) || []).length + ' lutadores');
+  /* ⚠️ E O SPRITE É O DA BATALHA -- o `sprite-lg` no visual antigo, o GIF animado na cena. O que
+     a trava cobra é que ele NÃO seja o sprite pequeno que a tela da pescaria tinha antes. */
+  ok('  com o sprite da batalha (grande ou animado)',
+     html.indexOf('sprite-lg') >= 0 || html.indexOf('battle-sprite-animated') >= 0);
   ok('  com os selos de tipo', html.indexOf('fighter-types') >= 0);
   ok('  com o nível', html.indexOf('fighter-level') >= 0);
   /* ⚠️ OS IDs DAS BARRAS SÃO OS GLOBAIS DA JORNADA. Com `pescHpA`/`pescHpB`, o
@@ -319,15 +323,19 @@ console.log('\n=== A BATALHA DA TELA É A DA JORNADA ===');
   ok('  e sem o selo de terreno (não há terreno aqui)', html.indexOf('#s-terreno') < 0);
   ok('o prêmio está na tela da luta', html.indexOf('PTS') >= 0);
 
-  /* ---- E COM O GATE LIGADO É A MESMA fighterHtml, na cena nova (22/09/2026) ---- */
-  ok('com admin o quadro vira a CENA, pela mesma fighterHtml',
-     (htmlCena.match(/class="fighter battle-fighter/g) || []).length === 2,
-     (htmlCena.match(/class="fighter battle-fighter/g) || []).length + ' lutadores');
+  /* ---- E A CENA, que desde 22/09/2026 é de TODO MUNDO (a chave foi aberta) ---- */
+  ok('o quadro é a CENA, pela mesma fighterHtml',
+     (html.match(/class="fighter battle-fighter/g) || []).length === 2,
+     (html.match(/class="fighter battle-fighter/g) || []).length + ' lutadores');
   /* ⚠️ E O CENÁRIO É O MANGUEZAL, sempre: aqui o id do terreno é uma COORDENADA DE IMAGEM.
      O atlas 3 é o recorte dele -- e o fallback (campo_aberto) cai no atlas 0, então este número
      também prova que a tabela reconheceu o id. */
-  ok('  no cenário do Manguezal (atlas 3)', /--battle-atlas:3;/.test(htmlCena));
-  ok('  e ele é SÓ cenário: nenhum selo de terreno', htmlCena.indexOf('#s-terreno') < 0);
+  ok('  no cenário do Manguezal (atlas 3)', /--battle-atlas:3;/.test(html));
+  ok('  e ele é SÓ cenário: nenhum selo de terreno', html.indexOf('#s-terreno') < 0);
+  /* ⚠️ E A CHAVE NÃO OLHA MAIS O ADMIN: ela é uma função SÓ (o molde do MOSTRAR_TM_HM), e é isso
+     que faz voltar atrás custar uma linha. Sem esta trava, alguém a reescreve em nove lugares. */
+  ok('  e a chave da cena é uma função só, sem olhar o admin',
+     /function visualNovoDeBatalha\(\)\s*\{\s*return true;\s*\}/.test(src));
 
   /* ---- O RITMO: os números são os do advanceReveal ---- */
   /* ⚠️ ESTA TRAVA LÊ O CÓDIGO DA JORNADA. Escritos à mão nos dois lugares, os números divergiriam

@@ -915,6 +915,14 @@
     overflow:hidden;
     border:3px solid var(--box-border);
     border-radius:8px;
+    /* ⚠️ A COR DE FUNDO É O QUE APARECE ENQUANTO O ATLAS NÃO CHEGA, e ela só precisou existir
+       quando os atlas sairam do base64 pra assets/batalha/*.png: embutidos eles vinham com a
+       folha de estilo e nao havia janela nenhuma. Em arquivo ha -- sao ~2,26 MB que so comecam a
+       baixar quando a cena desenha --, e a regra do atlas SUBSTITUI o background-image, entao o
+       gradiente de fallback logo abaixo nunca aparece. Sem esta linha o fundo fica transparente e
+       o que se ve e o creme da caixa: um quadro vazio com os lutadores boiando. Medido no
+       navegador: background-color era rgba(0,0,0,0) e o pai e rgb(254,251,240). */
+    background-color:#8bbb62;
     background-image:linear-gradient(180deg,#8fd4fb 0 42%,#8bbb62 43% 100%);
     background-size:var(--battle-terrain-size, 300% 300%);
     background-position:var(--battle-terrain-position, 50% 0%);
@@ -6241,16 +6249,28 @@ function battleGroundBaseClass(speciesId){
 }
 
 /* ---------------------------------------------------------------------------
-   O GATE DA CENA NOVA DE BATALHA.
-   A cena nova (sprites animados, cenario por terreno, animacoes de golpe e de
-   status) so e desenhada para quem tem admin === true na conta. Quem nao tem
-   continua vendo a batalha exatamente como ela era -- e "exatamente" aqui e
-   literal: toda chamada nova ou some do HTML, ou devolve o texto de antes.
-   Uma funcao SO, porque ela e lida em seis lugares: os dois containers de
-   batalha, os dois fighterHtml, o sprite com status e o preload dos GIFs.
-   Escrita em cada lugar, o proximo ponto nasceria sem o gate e a cena
-   vazaria para todo mundo -- que e o defeito que este arquivo mais paga. */
-function visualNovoDeBatalha(){ return game.ehAdmin === true; }
+   A CHAVE DA CENA NOVA DE BATALHA -- hoje LIGADA PRA TODO MUNDO (22/09/2026).
+   A cena (sprites animados, cenario por terreno, animacoes de golpe e de
+   status) nasceu atras de um gate de admin === true e foi aberta no mesmo dia,
+   a pedido. O caminho ANTIGO nao virou letra morta com isso: ele continua
+   desenhando o Boss de Domingo, a Selecao da Ilha Kumquat, o desafio por
+   codigo de treinador e o online -- os quatro que nao ganharam cenario.
+   ELA CONTINUA SENDO UMA FUNCAO SO, e e isso que faz voltar atras custar uma
+   linha (o molde do MOSTRAR_TM_HM e do BOSS_ATIVO): ela e lida em NOVE
+   lugares -- os CINCO containers de batalha (renderBattling,
+   renderSpecialBattling, renderTrainerBattling, renderLeagueWatch e
+   pescariaBatalhaHtml), o pescariaLutadoresHtml, o sprite com status, o
+   pintor dos status e o preload dos GIFs. Escrita em cada lugar, o proximo
+   ponto nasceria sem ela -- que e o defeito que este arquivo mais paga.
+   ATENCAO AO CUSTO QUE ABRIR ISTO CRIOU: o cenario vem dos 6 atlas de
+   assets/batalha/, ~2,26 MB cada. Enquanto ela era de admin, o custo do resto
+   do jogo era ZERO (background-image de regra que ninguem casa nao e
+   requisitada). Agora sao ~10,8 MB por jornada na PRIMEIRA vez -- medido, 4,79
+   atlas distintos em 9 batalhas de terreno sorteado --, baixados um a um
+   conforme cada batalha desenha. Depois disso eles revalidam por ETag: medido
+   em producao, 304 com 0 bytes em 67ms, ao contrario do index.html, que nunca
+   devolve 304. */
+function visualNovoDeBatalha(){ return true; }
 
 function hexToRgba(hex, alpha){
   const clean = hex.replace('#','');
