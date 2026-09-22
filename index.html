@@ -4927,6 +4927,21 @@ const CHANCE_ILHAS = 0.25;
    nada -- ele só destrava o que o dado já havia decidido. */
 function ilhasSaemNoTrecho(leg){
   if(game.ehAdmin !== true) return false;
+  /* ⚠️ UMA VEZ POR JORNADA (21/09/2026, a pedido: *"se a travessia para a ilha laranja ja apareceu
+     1x na jornada, ela nao deve aparecer mais"*). É a mesma regra da mata, com um mecanismo
+     DIFERENTE -- e a diferença é a razão de ele existir.
+
+     ⚠️ A MATA *DERIVA* (o `legDaMataFechada` varre os trechos e fica com o primeiro que passa no
+     dado), e isso funciona lá porque o dado dela **só depende do trecho**. Aqui ele depende também
+     do TIME estar completo -- e o time muda ao longo da jornada. Varrendo, a pergunta "ela saiu no
+     trecho 0?" seria respondida com o time de HOJE, quando naquele trecho o jogador tinha dois
+     pokémon: a travessia seria dada como gasta num trecho em que ela nunca pôde aparecer.
+     Por isso aqui a aparição é GRAVADA (ver o `cartasDeRota`), e não deduzida.
+
+     ⚠️ E "APARECEU" É A CARTA TER SIDO OFERECIDA, não o jogador ter entrado -- é o pedido ao pé da
+     letra, e é o que a mata já faz: lá a carta também aparece trancada pra quem não tem o Corte e
+     a chance vai embora com o trecho. */
+  if(game.ilhasTrecho != null) return game.ilhasTrecho === leg;
   if(((game.team) || []).length < ILHAS_TIME_MINIMO) return false;
   /* ⚠️ UMA TERCEIRA CARTA POR TRECHO, e a ordem é a de antiguidade: a mata (4º) tem preferência
      sobre a montanha (6º), e as duas sobre esta. Com duas no mesmo trecho seriam QUATRO cartas, e
@@ -5206,7 +5221,18 @@ function cartasDeRota(leg){
   /* ⚠️ E AS ILHAS SÃO A TERCEIRA CONCORRENTE -- a última do `else if` porque ela é a mais nova e a
      que tem a condição mais larga (qualquer trecho, com o time cheio): posta na frente, ela
      roubaria trechos da mata e da montanha e mudaria a jornada de quem já tem save aberto. */
-  else if(ilhasSaemNoTrecho(leg)) ids.push(ROTA_DAS_ILHAS.id);
+  else if(ilhasSaemNoTrecho(leg)){
+    ids.push(ROTA_DAS_ILHAS.id);
+    /* ⚠️ A APARIÇÃO É MARCADA AQUI, que é o único ponto em que a carta de fato entra na lista --
+       os três chamadores desta função fazem `game.routeCards = cartasDeRota(...)`, ou seja montar
+       a lista É aparecer.
+       ⚠️ E ELA NÃO ESTRAGA O REDESENHO NEM A AUTO-RECUPERAÇÃO: com o trecho marcado, a guarda lá
+       em cima responde `marcado === leg` -- então no MESMO trecho a carta continua saindo, e só
+       nos seguintes ela some. Sem isso, recuperar as cartas de um save antigo (o que o
+       `renderRouteCardsBlock` faz quando elas vêm vazias) apagaria a própria carta que ele acabou
+       de recuperar. */
+    if(game.ilhasTrecho == null) game.ilhasTrecho = leg;
+  }
   return ids;
 }
 
@@ -5684,6 +5710,8 @@ function freshGameDefaults(){
     montanhaGuarda:null,
     /* a visita as Ilhas Laranja pela jornada (ver `entrarNasIlhasDaJornada`) */
     ilhasJornada:null, ilhasResultado:null,
+    /* em que trecho a carta das Ilhas apareceu -- ela e UMA por jornada (ver `ilhasSaemNoTrecho`) */
+    ilhasTrecho:null,
     montanhaPremio:null,
     startersSorteados:{},   // {"slot:modo": {bulbasaur:bool,...}} -- vem da conta, ver sorteioDosIniciais
     geracaoDosSlots:{},     // {"0": 3} -- quantas tentativas daquele slot já CONTARAM (ver encerrarTentativaDoSlot)
@@ -18690,6 +18718,9 @@ function serializeGame(){
     /* ⚠️ A VISITA VAI PRO SAVE: ela tem cinco partidas dentro e um premio no fim, e fechar a aba
        no meio nao pode perder o progresso. O `ilhasResultado` e de TELA e vai junto porque ela e
        ponto seguro de gravacao -- sem ele, um F5 ali engoliria o anuncio do premio. */
+    /* ⚠️ `== null` e NAO `|| null`: o trecho 0 e um trecho valido, e `0 || null` da NULL -- a
+       travessia voltaria a aparecer pra quem a viu no primeiro trecho. */
+    ilhasTrecho: (game.ilhasTrecho == null) ? null : game.ilhasTrecho,
     ilhasJornada: game.ilhasJornada || null,
     ilhasResultado: game.ilhasResultado || null,
     montanhaPremio: game.montanhaPremio || null,
@@ -18947,6 +18978,19 @@ function applySavedState(data){
   game.montanha = data.montanha || null;
   game.montanhaGuarda = arrumarVigilia(data.montanhaGuarda);
   game.montanhaPremio = arrumarVigilia(data.montanhaPremio);
+  /* ⚠️ AS ILHAS PRECISAM DOS DOIS, e o `ilhasJornada` estava sendo GRAVADO e NUNCA LIDO DE VOLTA:
+     o `serializeGame` o mandava pro banco e este bloco -- que é explícito campo a campo, e não um
+     `Object.assign` -- não o restaurava. Ou seja um F5 no meio da travessia (ou voltar pra home e
+     reabrir o save) apagava a visita: o jogador reencontrava as quatro portas de time respondendo
+     como se ele estivesse na HOME, com o time de todos os saves campeões.
+     ⚠️ E A TRAVA QUE EU TINHA ESCRITO NÃO PEGOU porque ela olhava o `serializeGame` -- ela provava
+     que o campo SAI, nunca que ele VOLTA. Trava de save tem que fazer a IDA E A VOLTA.
+
+     ⚠️ E O `ilhasTrecho` NÃO PODE USAR `|| null`: o trecho 0 é um trecho válido e `0 || null` dá
+     NULL -- a travessia voltaria a aparecer pra quem a viu no primeiro trecho, que é exatamente o
+     que a regra de uma-vez-por-jornada existe pra impedir. */
+  game.ilhasTrecho = (data.ilhasTrecho == null) ? null : data.ilhasTrecho;
+  game.ilhasJornada = data.ilhasJornada || null;
   game.evolucaoDepois = data.evolucaoDepois || null;
   game.escolhaDeAtaques = data.escolhaDeAtaques || null;
   game.escolhaDepois = data.escolhaDepois || null;

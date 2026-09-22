@@ -14719,12 +14719,47 @@ pra perder.
 |---|---|
 | a rota sai por trecho | **20,1%** (a constante é 25%; a mata come 14,8% dos trechos e a montanha 13,0%) |
 | jornadas que veem as Ilhas **alguma** vez | **60,6%** |
-| travessias por jornada | 0× em 39,4%, 1× em 38,8%, **2× em 18,3%, 3× em 3,6%** (média 0,86) |
+| travessias por jornada | **0× em 38,6%, 1× em 61,4%** — e nunca mais que uma |
 
-**⚠️ E ELA PODE SAIR MAIS DE UMA VEZ, ao contrário da mata (que é 1× por jornada desde 18/09).** É o
-pedido ao pé da letra ("em qualquer momento"), e o custo está na tabela: **até 3 travessias = até
-+9 níveis**, contra +4 do Bônus de Kanto. Se um dia incomodar, a régua é a mesma da mata — guardar
-o trecho da primeira e recusar as seguintes —, e o número pra decidir está aqui.
+### ⚠️ UMA TRAVESSIA POR JORNADA (21/09/2026) — e o mecanismo é o OPOSTO do da mata
+
+Pedido assim: *"se a travessia para a ilha laranja ja apareceu 1x na jornada, ela nao deve aparecer
+mais"*. Ela nasceu podendo sair **até 3×** (0× em 39,4%, 1× em 38,8%, **2× em 18,3%, 3× em 3,6%**),
+o que dava **até +9 níveis** contra +4 do Bônus de Kanto — a régua que esta seção já apontava.
+
+**⚠️ E "APARECEU" É A CARTA TER SIDO OFERECIDA, não o jogador ter entrado** — é o pedido ao pé da
+letra, e é o que a mata já faz: lá a carta também aparece trancada pra quem não tem o Corte e a
+chance vai embora com o trecho.
+
+**⚠️ A MATA *DERIVA* E ESTA *GRAVA*, e a diferença não é gosto.** O `legDaMataFechada` varre os
+trechos e fica com o primeiro que passa no dado — e isso funciona lá porque **o dado da mata só
+depende do trecho**. O das Ilhas depende também do **TIME estar completo**, e o time muda ao longo
+da jornada: varrendo, a pergunta *"ela saiu no trecho 0?"* seria respondida com o time de HOJE,
+quando naquele trecho o jogador tinha dois pokémon — e a travessia seria dada como **gasta num
+trecho em que ela nunca pôde aparecer**. Por isso aqui a aparição é gravada (`game.ilhasTrecho`).
+
+- **⚠️ A MARCA É POSTA NO `cartasDeRota`**, que é o único ponto em que a carta de fato entra na
+  lista — os três chamadores dele fazem `game.routeCards = cartasDeRota(...)`, ou seja **montar a
+  lista É aparecer**.
+- **⚠️ E NO MESMO TRECHO A CARTA CONTINUA SAINDO** (`marcado === leg`). Sem isso o
+  `renderRouteCardsBlock` — que remonta as cartas quando elas vêm vazias, a auto-recuperação de
+  save antigo — **apagaria a própria carta que ele acabou de recuperar**. Há trava.
+- **⚠️ O `ilhasTrecho` USA `== null`, NUNCA `|| null`**, nos dois lados (gravar e ler): **o trecho
+  0 é um trecho válido e `0 || null` dá NULL** — a travessia voltaria a aparecer pra quem a viu no
+  primeiro trecho, que é exatamente o que a regra existe pra impedir.
+- **Save anterior à regra nasce sem marca** e se comporta como antes: o dado decide.
+
+**MEDIDO, e são DOIS números — o segundo é o que fecha a mudança:**
+
+| | antes | depois |
+|---|---|---|
+| jornadas que veem a travessia **alguma** vez | 60,6% | **61,4%** (não caiu) |
+| travessias por jornada | até **3×** (média 0,86) | **no máximo 1** (média 0,61) |
+| teto do prêmio | **+9 níveis** | **+3** |
+
+**⚠️ E A PRIMEIRA TRAVESSIA CAI EXATAMENTE ONDE CAÍA: conferido em 800 jornadas, o trecho da
+primeira é IDÊNTICO ao do build anterior.** É a mesma propriedade que a mata garante — *"some só a
+repetição"* —, e é ela que faz a mudança não alterar a jornada de quem já tem save aberto.
 
 ### AS TRÊS ROTAS DE CHAVE VIRARAM UMA TABELA
 
@@ -14809,15 +14844,29 @@ viraram desenho (18/09). Os cinco foram consertados.
 lateral), o checklist em 281×228px com 5 linhas de 25px, nenhum nome truncado, **nenhum selo sem
 desenho**; a carta nova sai **trancada** sem surfista e **aberta** com ele, em 145px.
 
-`tools/test-ilhas.js` foi a **281 asserções**, e **os 18 defeitos religados acusam** (2 a 8 falhas
+`tools/test-ilhas.js` foi a **293 asserções**, e **os 24 defeitos religados acusam** (2 a 8 falhas
 cada).
+
+### ⚠️ E A VISITA ERA GRAVADA NO SAVE E NUNCA LIDA DE VOLTA
+
+Achado ao escrever a trava do "uma vez", não por relato. O `serializeGame` mandava o `ilhasJornada`
+pro banco e **o `applySavedState` não o restaurava** — ele é explícito **campo a campo**, e não um
+`Object.assign`.
+
+**O estrago:** um F5 no meio da travessia (ou voltar pra home e reabrir o save) **apagava a
+visita** — o jogador reencontrava as quatro portas de time respondendo como se ele estivesse na
+HOME, com o time de todos os saves campeões, e as ilhas já vencidas zeradas.
+
+**⚠️ E A TRAVA QUE EU TINHA ESCRITO NÃO PEGOU PORQUE ELA OLHAVA O `serializeGame`: ela provava que
+o campo SAI, nunca que ele VOLTA.** Hoje ela faz o **round-trip** (serializa, zera o `game`,
+aplica de volta e cobra a visita e o surfista de pé), e o trecho 0 passa pelo mesmo caminho.
+**Trava de save tem que fazer a IDA E A VOLTA** — vale pro próximo campo de save que nascer.
 
 ### O QUE FICA PENDENTE
 
 - **o fluxo de ponta a ponta no navegador** (entrar → jogar os cinco → voltar) não foi exercitado:
   o que está medido é cada peça e o estado, não a travessia inteira num navegador;
-- **a Seleção não tem restrição de time**, e é o desenho — mas ela conta pro prêmio;
-- **a rota pode sair até 3× por jornada** (+9 níveis no teto), e a régua está acima.
+- **a Seleção não tem restrição de time**, e é o desenho — mas ela conta pro prêmio.
 
 ## AS ILHAS LARANJA ABRIRAM PRA TODO MUNDO, E O MONITOR NASCEU JUNTO (21/09/2026)
 

@@ -900,6 +900,43 @@ function blocoDaTravessia(){
   ok('nunca duas rotas de chave no mesmo trecho', colisao === 0, colisao + ' colisões');
   ok('  e nenhum trecho passa de TRÊS cartas', cartas3 === 0, cartas3 + ' trechos com 4+');
 
+  /* ⚠️ UMA TRAVESSIA POR JORNADA (a pedido). Ela é medida VARRENDO a jornada inteira de muitos
+     saves -- e a conta tem que passar pelo `cartasDeRota`, que é quem MARCA: chamando só o
+     `ilhasSaemNoTrecho` a marca nunca seria posta e a trava mediria o jogo de antes da regra. */
+  let maisDeUma = 0, comTravessia = 0;
+  for(let slot = 0; slot < 20; slot++) for(let gen = 0; gen < 20; gen++){
+    g.currentSaveSlot = slot; g.saveGen = gen; g.ilhasTrecho = null;
+    let n = 0;
+    for(let l = 0; l < 8; l++) if(S.cartasDeRota(l).indexOf(S.ROTA_DAS_ILHAS.id) >= 0) n++;
+    if(n > 1) maisDeUma++;
+    if(n > 0) comTravessia++;
+  }
+  ok('a travessia sai NO MÁXIMO uma vez por jornada', maisDeUma === 0,
+     maisDeUma + ' jornadas com duas ou mais (de 400)');
+  /* ⚠️ E A OUTRA METADE: ela continua SAINDO. Sem este caso, uma guarda que a matasse de vez
+     passaria na linha acima -- zero é zero. */
+  ok('  e ela continua saindo em boa parte das jornadas', comTravessia > 200,
+     comTravessia + ' de 400 veem a travessia');
+
+  /* ⚠️ NO MESMO TRECHO ELA CONTINUA APARECENDO, e isso não é detalhe: o `renderRouteCardsBlock`
+     remonta as cartas quando elas vêm vazias (a auto-recuperação de save antigo), e sem isso ele
+     apagaria a própria carta que acabou de recuperar. */
+  g.currentSaveSlot = 0; g.saveGen = 0; g.ilhasTrecho = null;
+  let onde = -1;
+  for(let slot = 0; slot < 30 && onde < 0; slot++){
+    g.currentSaveSlot = slot; g.ilhasTrecho = null;
+    for(let l = 0; l < 8; l++) if(S.cartasDeRota(l).indexOf(S.ROTA_DAS_ILHAS.id) >= 0){ onde = l; break; }
+  }
+  ok('(o painel achou um trecho com a travessia)', onde >= 0, 'trecho ' + onde);
+  ok('  no MESMO trecho ela continua saindo', S.cartasDeRota(onde).indexOf(S.ROTA_DAS_ILHAS.id) >= 0,
+     'senão a auto-recuperação das cartas apagaria a carta que ela acabou de recuperar');
+  const seguintes = [];
+  for(let l = 0; l < 8; l++) if(l !== onde && S.cartasDeRota(l).indexOf(S.ROTA_DAS_ILHAS.id) >= 0) seguintes.push(l);
+  ok('  e em nenhum outro', seguintes.length === 0, 'saiu também em ' + seguintes.join(','));
+  ok('  a marca guarda o trecho', g.ilhasTrecho === onde, String(g.ilhasTrecho));
+  g.ilhasTrecho = null;
+  g.currentSaveSlot = 0; g.saveGen = 0;
+
   /* ---------------------------------------------------------------- 3) A CHAVE */
   g.currentSaveSlot = 0; g.saveGen = 0;
   ok('o surfista do time é quem tem o Surf', (S.surfistaDoTime() || {}).speciesId === 'lapras');
@@ -1048,7 +1085,37 @@ function blocoDaTravessia(){
      'ela tem cinco partidas dentro e um prêmio no fim -- fechar a aba no meio não pode perder isso');
   ok('  e as duas telas são ponto seguro de gravação',
      S.SAFE_SAVE_SCREENS.has('ilhas') && S.SAFE_SAVE_SCREENS.has('ilhasFim'));
-  g.ilhasJornada = null;
+
+  /* ⚠️ E ELA VOLTA DO SAVE -- a metade que faltava, e ela pegou um defeito de verdade: o
+     `ilhasJornada` era GRAVADO e nunca LIDO DE VOLTA, porque o `applySavedState` é explícito campo
+     a campo e não um `Object.assign`. Um F5 no meio da travessia apagava a visita, e as quatro
+     portas de time voltavam a responder como se o jogador estivesse na HOME.
+     A trava anterior olhava só o `serializeGame`: ela provava que o campo SAI, nunca que ele VOLTA.
+     **Trava de save tem que fazer a IDA E A VOLTA.** */
+  g.ilhasJornada = null; g.ilhasTrecho = null;
+  S.applySavedState(JSON.parse(JSON.stringify(salvo)));
+  ok('  e ela VOLTA do save', S.naJornadaDasIlhas() &&
+     (S.ilhasDaJornada().vencidas || []).indexOf('mikan') >= 0,
+     'um F5 no meio da travessia não pode devolver o jogador ao modo da home');
+  ok('  com o surfista intacto', (S.ilhasSurfistaDaVisita() || {}).speciesId === 'lapras');
+
+  /* ⚠️ E O TRECHO 0 SOBREVIVE, que é a armadilha do `|| null`: `0 || null` dá NULL, e a travessia
+     voltaria a aparecer pra quem a viu no PRIMEIRO trecho. */
+  g.ilhasTrecho = 0;
+  const s0 = S.serializeGame();
+  ok('o trecho 0 sobrevive ao save', s0.ilhasTrecho === 0, String(s0.ilhasTrecho));
+  g.ilhasTrecho = null;
+  S.applySavedState(JSON.parse(JSON.stringify(s0)));
+  ok('  e volta do save como 0', g.ilhasTrecho === 0, String(g.ilhasTrecho));
+  ok('  então a travessia não reaparece nos outros trechos',
+     [1,2,3,4,5,6,7].every(l => !S.ilhasSaemNoTrecho(l)));
+
+  /* save ANTIGO (sem o campo) se comporta como antes: o dado decide */
+  const velho = JSON.parse(JSON.stringify(salvo)); delete velho.ilhasTrecho;
+  S.applySavedState(velho);
+  ok('  e save anterior à regra nasce sem marca', g.ilhasTrecho === null, String(g.ilhasTrecho));
+
+  g.ilhasJornada = null; g.ilhasTrecho = null;
 }
 
 (async () => {
