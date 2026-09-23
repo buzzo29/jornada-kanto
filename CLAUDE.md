@@ -5269,6 +5269,27 @@ num lugar e não no outro, e a da `fraseDoEspecial`. Uma trava varre os quatro e
 **⚠️ O TETO DA COR NÃO É O GOSTO: É O TÍTULO BATENDO NO AA.** Ele é `--muted` (o texto mais claro do
 card) e já está em **5,20:1** sobre o branco. Medidas quatro intensidades no navegador:
 
+**⚠️ E ELA FICOU MAIS VIVA NO MESMO DIA (8% → 16%), a pedido — e o que cedeu foi o TEXTO, não o
+fundo.** O gargalo é o `--muted` (o título, o `Lv.` e o `x/y` de HP), que a 16% cai pra 4,34/4,05,
+**abaixo do AA**. Por isso o card colorido **redeclara a variável** (`#5f5f73`), e o valor não foi
+escolhido no gosto: é o que devolve os **5,20:1** que eles davam sobre o BRANCO antes de a cor
+existir. Ou seja **a cor deixou de custar leitura nenhuma**:
+
+| | 8% | **16% (hoje)** |
+|---|---|---|
+| ΔE do branco | 6,0 / 6,8 | **11,9 / 14,0** |
+| ΔE verde–vermelho | 8,5 | **17,3** |
+| título / `Lv.` / HP | 4,75 / 4,59 | **5,20 / 4,85** (com o `--muted` local) |
+| passo a passo | 15,6 | 14,3 |
+| nome no título (já sai em verde/vermelho ESCURO) | 6,0 | 5,5 |
+
+**⚠️ E O NOME JÁ SAÍA NA COR DO RESULTADO, o que este arquivo dizia errado:** o `.mlog-quem` é
+`--green-dark`/`--red-dark`, não azul — ou seja ele já casava com o fundo antes de o fundo existir.
+
+**⚠️ SE ELA PRECISAR FICAR MAIS VIVA AINDA, o lugar continua sendo o TEXTO:** a 24% o `#5f5f73` já
+cai pra 4,3 no vermelho. E a trava passou a **medir o contraste de verdade** em vez de um proxy —
+a primeira versão somava os canais do fundo ("perto do branco") e **caducou no dia seguinte**.
+
 | tom sobre o branco | título verde / vermelho | ΔE p/ o branco | ΔE verde–vermelho |
 |---|---|---|---|
 | 5% | 4,92 / 4,81 | **3,5 / 4,5** | 5,4 |

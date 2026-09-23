@@ -1460,14 +1460,26 @@
      mouse num card verde o deixaria creme. E a mesma armadilha que o `.pesc-puxar.puxando`, o
      `.pesc-zona:disabled` e o `.minha` do Resgate ja custaram, e por isso cada cor tem o hover
      dela.
-     ⚠️ E A COR E LEVE PORQUE FOI PEDIDA LEVE: 8% do tom da casa sobre o branco. Medido no
-     navegador, o texto do log (`--ink` sobre o verde) fica em 14,9:1 e o titulo (`--muted`) em
-     6,3:1 -- os dois acima do 4,5:1 do AA, e praticamente onde ja estavam sobre o branco. O que
-     a cor NAO pode fazer e roubar leitura, e o numero e que diz isso. */
-  .mlog-card.venceu{background:#eef7f0;}
-  .mlog-card.perdeu{background:#fbeeed;}
-  .mlog-card.venceu:hover{background:#e6f2e9;}
-  .mlog-card.perdeu:hover{background:#f7e4e2;}
+     ⚠️ A COR E 16% DO TOM DA CASA SOBRE O BRANCO -- ela nasceu em 8% e ficou mais viva a pedido
+     no mesmo dia. Medido no navegador, o que ela custa de leitura:
+       o nome do lutador e o passo a passo (`--ink`)  15,6 -> 14,3:1   folgadissimos
+       o nome no titulo (ja sai em verde/vermelho ESCURO)  6,0 -> 5,5:1
+       o titulo, o `Lv.` e o `x/y` de HP (`--muted`)  4,75 -> 4,34:1   ABAIXO do 4,5 do AA
+     ⚠️ OS TRES ULTIMOS SAO O GARGALO, e por isso o `--muted` escurece DENTRO do card colorido
+     (regra abaixo): com `#5f5f73` eles voltam a 5,20:1, que e exatamente o que eles davam sobre o
+     BRANCO antes de a cor existir -- ou seja a cor deixou de custar leitura nenhuma.
+     ⚠️ E SE ELA PRECISAR FICAR AINDA MAIS VIVA, o lugar de mexer continua sendo o TEXTO e nao o
+     fundo: e ele quem bate no AA primeiro. A 24% o `#5f5f73` ja cai pra 4,3 no vermelho.
+     Pra comparar o quanto ela se ve: o ΔE dela pro branco foi de 6,0/6,8 para 11,9/14,0, e entre
+     o verde e o vermelho de 8,5 para 17,3 -- o dobro nos dois. */
+  .mlog-card.venceu{background:#deefe1;}
+  .mlog-card.perdeu{background:#f8dddb;}
+  .mlog-card.venceu:hover{background:#d3ebd8;}
+  .mlog-card.perdeu:hover{background:#f5d2cf;}
+  /* ⚠️ O TEXTO CLARO ACOMPANHA O FUNDO. Sao TRES que usam `--muted` dentro do card -- o titulo,
+     o `Lv.` e o `x/y` de HP --, e escurecer a variavel num lugar so resolve os tres. O valor nao
+     foi escolhido no gosto: e o que devolve os 5,20:1 que eles tinham sobre o branco. */
+  .mlog-card.venceu, .mlog-card.perdeu{ --muted:#5f5f73; }
   .mlog-card:active{transform:translate(1px,1px);box-shadow:none;}
   .mlog-card:focus-visible{outline:2px solid var(--blue);outline-offset:2px;}
   /* ⚠️ O TITULO DIZ QUEM VENCEU, e e a unica coisa que o confronto FECHADO precisa dizer: sem ele,

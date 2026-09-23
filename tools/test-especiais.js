@@ -7952,15 +7952,37 @@ console.log('\n=== ABRIR UM CONFRONTO ZERA O PASSO, ANTES DO DESENHO (15/09/2026
                    && cliL.indexOf('.mlog-card.perdeu{') > iHover);
     ok('  e cada cor tem o hover DELA', /\.mlog-card\.venceu:hover\{/.test(cliL)
        && /\.mlog-card\.perdeu:hover\{/.test(cliL));
-    /* ⚠️ E A COR E LEVE PORQUE FOI PEDIDA LEVE. O teto nao e o gosto: medido no navegador, o
-       titulo (`--muted`, que e o texto mais claro do card) cai de 5,20:1 no branco para 4,75 no
-       verde e 4,59 no vermelho -- e a 12% ele ja REPROVA no AA (4,30). A trava guarda o teto pelo
-       lado que da pra ler daqui: as duas cores tem que ficar bem perto do branco. */
-    const claro = (hex) => parseInt(hex.slice(1,3),16) + parseInt(hex.slice(3,5),16) + parseInt(hex.slice(5,7),16);
+    /* ⚠️ O TETO DA COR NAO E O GOSTO: e o TEXTO batendo no AA. O `--muted` (o titulo, o `Lv.` e o
+       `x/y` de HP) e o mais claro do card, e e ele que chega no limite primeiro -- medido no
+       navegador, com o `--muted` de fabrica a cor a 16% o derruba pra 4,34/4,05, ABAIXO do 4,5.
+       Por isso o card colorido redeclara a variavel, e por isso esta trava mede o CONTRASTE de
+       verdade em vez de um proxy: a versao anterior somava os canais do fundo ("perto do branco"),
+       e isso caducou no dia seguinte, quando a cor ficou mais viva a pedido. */
+    const lumin = (hex) => {
+      const c = [1,3,5].map(i => parseInt(hex.slice(i, i+2), 16) / 255)
+        .map(v => v <= .03928 ? v/12.92 : Math.pow((v+.055)/1.055, 2.4));
+      return .2126*c[0] + .7152*c[1] + .0722*c[2];
+    };
+    const contraste = (a, b) => { const x = lumin(a), y = lumin(b);
+      return ((Math.max(x,y) + .05) / (Math.min(x,y) + .05)); };
     const fundo = (cls) => (cliL.match(new RegExp('\\.mlog-card\\.' + cls + '\\{background:(#[0-9a-f]{6})')) || [])[1];
+    /* o `--muted` que vale DENTRO do card colorido -- se ninguem redeclarar, vale o de fabrica */
+    const mutLocal = (cliL.match(/\.mlog-card\.venceu, \.mlog-card\.perdeu\{[^}]*--muted:(#[0-9a-f]{6})/) || [])[1]
+      || (cliL.match(/--muted:(#[0-9a-f]{6})/) || [])[1];
+    ok('  o card colorido redeclara o --muted', /\.mlog-card\.venceu, \.mlog-card\.perdeu\{[^}]*--muted:/.test(cliL),
+       'vale ' + mutLocal);
     ['venceu', 'perdeu'].forEach(cls => {
       const c = fundo(cls);
-      ok('  o fundo `' + cls + '` e LEVE (perto do branco)', !!c && claro(c) >= 3 * 232, c);
+      const r = c && mutLocal ? contraste(mutLocal, c) : 0;
+      ok('  e o texto mais claro sobre o `' + cls + '` passa o AA', r >= 4.5,
+         (c || '(sem fundo)') + ' -> ' + r.toFixed(2) + ':1');
+    });
+    /* ⚠️ E O PASSO A PASSO (`--ink`) NAO PODE ENCOSTAR NO LIMITE: ele e o texto que se LE, e a cor
+       existe pra nao atrapalhar essa leitura -- foi o pedido ao pe da letra. */
+    const inkC = (cliL.match(/--ink:(#[0-9a-f]{6})/) || [])[1];
+    ['venceu', 'perdeu'].forEach(cls => {
+      const r = contraste(inkC, fundo(cls));
+      ok('  e o passo a passo sobre o `' + cls + '` fica FOLGADO', r >= 10, r.toFixed(1) + ':1');
     });
   }
   /* ⚠️ E O BOTAO AZUL SUMIU -- ele durou horas, entre o + solto no bloco do × e o card. As tres
