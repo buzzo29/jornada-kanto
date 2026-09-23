@@ -2871,6 +2871,24 @@ function tentarCongelar(quemBate, alvo, rng){
   return golpe;
 }
 function doExchange(active, enemy, rng, diario){
+  /* ⚠️ QUEM ENTRA EM CAMPO COM BUFF DE TERRENO ANUNCIA (23/09/2026, a pedido: *"antes de iniciar
+     um confronto, caso o pokemon tenha buff de terreno, exiba uma mensagem ... espera aquele 1,5s
+     e segue com a batalha, para todos os pokemons que entrar na batalha e tiver buff de terreno"*).
+     ⚠️ E É NA ENTRADA, UMA VEZ POR POKÉMON POR BATALHA -- não a cada confronto. Quem sobrevive a
+     três confrontos não "entrou" três vezes, e repetir a frase custaria 1,5s por confronto que ele
+     fica de pé.
+     O marcador vive na INSTÂNCIA e começa com `_` (não vai pro Firestore), e é solto no
+     `encerrarBatalha` junto com os outros -- sem isso o pokémon sairia da batalha "já anunciado"
+     e nunca mais anunciaria, que é o vazamento que o teto de HP da Fúria e o `_congelado` tiveram.
+     ⚠️ E ELA NÃO LÊ O `rng`: não há sorteio nenhum aqui (o pokémon TEM ou NÃO TEM a flag), então
+     a semente não se move e a batalha continua terminando exatamente onde terminava. */
+  const anunciaTerreno = (p, q) => {
+    if(!p || !p.terrainBuffed || p._terrenoAnunciado) return;
+    p._terrenoAnunciado = true;
+    if(diario) diario.push({ q, x:'terreno', d:0, g: p.name });
+  };
+  anunciaTerreno(active, 'p');
+  anunciaTerreno(enemy, 'e');
   /* Golpe especial: só na PRIMEIRA troca de cada confronto. O marcador é o próprio
      adversário -- oponente novo, confronto novo, e as chances valem de novo. */
   if(active._especialContra !== enemy){
@@ -3445,6 +3463,10 @@ function encerrarBatalha(team, inimigos){
        contrario das do cliente, que vao pro SAVE. Fica registrado pro dia em que algum caminho do
        servidor passar a reusar instancia: ali os tres vazam junto. */
     p._paralisado = null;
+    /* ⚠️ E O DO ANUNCIO DE TERRENO, pelo mesmo motivo dos de cima: sem soltar, o pokemon sai
+       da batalha "ja anunciado" e nunca mais anuncia -- e a flag `terrainBuffed` e recalculada
+       a cada batalha, entao o anuncio tem que valer de novo. */
+    p._terrenoAnunciado = false;
     limparEstagios(p);   // os estagios duram a BATALHA (ver o cliente)
   });
 }

@@ -11698,6 +11698,24 @@ function tentarCongelar(quemBate, alvo, rng){
   return golpe;
 }
 function doExchange(active, enemy, rng, diario){
+  /* ⚠️ QUEM ENTRA EM CAMPO COM BUFF DE TERRENO ANUNCIA (23/09/2026, a pedido: *"antes de iniciar
+     um confronto, caso o pokemon tenha buff de terreno, exiba uma mensagem ... espera aquele 1,5s
+     e segue com a batalha, para todos os pokemons que entrar na batalha e tiver buff de terreno"*).
+     ⚠️ E É NA ENTRADA, UMA VEZ POR POKÉMON POR BATALHA -- não a cada confronto. Quem sobrevive a
+     três confrontos não "entrou" três vezes, e repetir a frase custaria 1,5s por confronto que ele
+     fica de pé.
+     O marcador vive na INSTÂNCIA e começa com `_` (não vai pro Firestore), e é solto no
+     `encerrarBatalha` junto com os outros -- sem isso o pokémon sairia da batalha "já anunciado"
+     e nunca mais anunciaria, que é o vazamento que o teto de HP da Fúria e o `_congelado` tiveram.
+     ⚠️ E ELA NÃO LÊ O `rng`: não há sorteio nenhum aqui (o pokémon TEM ou NÃO TEM a flag), então
+     a semente não se move e a batalha continua terminando exatamente onde terminava. */
+  const anunciaTerreno = (p, q) => {
+    if(!p || !p.terrainBuffed || p._terrenoAnunciado) return;
+    p._terrenoAnunciado = true;
+    if(diario) diario.push({ q, x:'terreno', d:0, g: p.name });
+  };
+  anunciaTerreno(active, 'p');
+  anunciaTerreno(enemy, 'e');
   /* Golpe especial: só na PRIMEIRA troca de cada confronto. O marcador é o próprio
      adversário -- oponente novo, confronto novo, e as chances valem de novo. */
   if(active._especialContra !== enemy){
@@ -12318,6 +12336,11 @@ function encerrarBatalha(team, inimigos){
        no F5 e congelado ate la. E o mesmo vazamento que o teto de HP da Furia teve. */
     p._congelado = null;
     p._paralisado = null;
+    /* ⚠️ E O DO ANUNCIO DE TERRENO, pelo mesmo motivo dos de cima: sem soltar, o pokemon sai
+       da batalha "ja anunciado" e nunca mais anuncia -- e a flag `terrainBuffed` e recalculada
+       a cada batalha, entao o anuncio tem que valer de novo. */
+    p._terrenoAnunciado = false;
+
     /* ⚠️ OS ESTAGIOS junto: eles duram a BATALHA, e o time vai pro SAVE. Sem soltar, um
        pokemon sairia da luta com a Defesa em -3 PRA SEMPRE -- e o campo comeca com _ (nao vai
        pro Firestore), entao o save nem guardaria o motivo. O mesmo vazamento do teto de HP da
@@ -15486,7 +15509,10 @@ function fatiaDoGolpe(semente){ return (1 - JITTER_DO_GOLPE) + ((Math.abs(sement
    elas SÃO um passo da animação com dano ZERO, então a frase cobre o passo delas e o segundo e meio
    de leitura vem da marca `leitura`. Fora desta tabela, a frase valeria PRA SEMPRE -- o defeito que
    a anulação teve. */
-const passosDaAbertura = { recover:1, pocao:1, absorb:2, disable:1, semSono:1, sono:1, furia:1, confusao:1, furiadragao:1, chuva:1, chuvafim:1, acordou:1, congelou:1, gelado:1, degelou:1, queimou:1, queima:1, dormindo:1, envenenou:1, veneno:1, paralisou:1, paralisado:1, estagio:1, remoinho:2, remoinhoEntra:1,
+/* ⚠️ O `terreno` VALE 1 PASSO, como toda abertura que nao mexe barra nenhuma: e a entrada dele
+   aqui que faz a frase virar um passo PROPRIO da animacao e ganhar o 1,5s de leitura. Fora desta
+   tabela ela valeria pra SEMPRE -- o defeito que a anulacao teve. */
+const passosDaAbertura = { terreno:1, recover:1, pocao:1, absorb:2, disable:1, semSono:1, sono:1, furia:1, confusao:1, furiadragao:1, chuva:1, chuvafim:1, acordou:1, congelou:1, gelado:1, degelou:1, queimou:1, queima:1, dormindo:1, envenenou:1, veneno:1, paralisou:1, paralisado:1, estagio:1, remoinho:2, remoinhoEntra:1,
   espadas:1, pluma:1 };
 function buildAnimatedHitSequence(m){
   const seq = sequenciaDoConfronto(m).map(g => {
@@ -23730,7 +23756,9 @@ const NOME_DO_ATRIBUTO = { atk:'o Ataque', def:'a Defesa', spAtk:'o Ataque Espec
    Os que ficaram emoji são os que não têm desenho: o 🚫 da anulação, o 💚 do Recuperar, o 🌿 da
    drenagem, o 🎗️ da Faixa, o ⚖️ do desempate e o ⏰ do despertar -- eles aparecem pouco, e cada
    desenho custa uma iteração de verdade pra ficar legível a 12px. */
-const ICONES_ESPECIAIS = { boom:selo('explosao'), sono:selo('sono'), disable:'🚫', recover:'💚', absorb:'🌿', faixa:'🎗️', desempate:'⚖️', furia:selo('furia'), confusao:selo('confusao'), furiadragao:selo('dragao'), chuva:selo('chuva'), chuvafim:selo('sol'), acordou:'⏰', remoinho:selo('remoinho'), espadas:selo('espada'), pluma:selo('pluma'),
+/* ⚠️ O SELO DO `terreno` E O MESMO DO RESTO DO JOGO (o do quadro do lutador e o da faixa): o
+   jogador le o simbolo aqui e reconhece o do pokemon buffado sem precisar ligar as duas coisas. */
+const ICONES_ESPECIAIS = { terreno:selo('terreno'), boom:selo('explosao'), sono:selo('sono'), disable:'🚫', recover:'💚', absorb:'🌿', faixa:'🎗️', desempate:'⚖️', furia:selo('furia'), confusao:selo('confusao'), furiadragao:selo('dragao'), chuva:selo('chuva'), chuvafim:selo('sol'), acordou:'⏰', remoinho:selo('remoinho'), espadas:selo('espada'), pluma:selo('pluma'),
   /* ⚠️ AS TRES LINHAS DO CONGELAMENTO DIVIDEM O MESMO ❄️, e e de proposito: elas sao o mesmo
      evento visto em tres momentos (pegou / perdeu a vez / passou). Icones diferentes fariam o
      jogador procurar tres mecanicas onde ha uma. Todo o resto do bloco tem selo, e sem ele estas
@@ -23983,7 +24011,10 @@ function seloDeChuvaClicavel(nome){
 /* Os quadros `remoinhoVazio` e `remoinhoEntra` NÃO entram aqui: esta função filtra o DIÁRIO, e o
    motor grava um registro só de remoinho -- quem reparte em três é a apresentação. Quem precisa do
    quadro do novo na lista de avisos o acrescenta à mão (ver avisoDoConfronto). */
-function ehGolpeEspecial(g){ return g && (g.x === 'boom' || g.x === 'sono' || g.x === 'disable' || g.x === 'recover' || g.x === 'furia' || g.x === 'confusao' || g.x === 'furiadragao' || g.x === 'chuva' || g.x === "chuvafim" || g.x === "acordou" || g.x === "congelou" || g.x === "gelado" || g.x === "degelou" || g.x === "queimou" || g.x === "queima" || g.x === "dormindo" || g.x === "envenenou" || g.x === "veneno" || g.x === "paralisou" || g.x === "paralisado" || g.x === "estagio" || g.x === 'remoinho' || g.x === 'espadas' || g.x === 'pluma' || g.x === 'semSono' || g.x === 'pocao' || g.x === 'absorb'); }
+/* ⚠️ O `terreno` ENTRA AQUI, senao a linha cai no ramo do GOLPE COMUM e sai como `-0 de HP` com
+   o nome de um golpe que o pokemon nao tem -- foi exatamente isso que aconteceu com as tres linhas
+   do congelamento em 16/09/2026, e foi o navegador que pegou. */
+function ehGolpeEspecial(g){ return g && (g.x === 'terreno' || g.x === 'boom' || g.x === 'sono' || g.x === 'disable' || g.x === 'recover' || g.x === 'furia' || g.x === 'confusao' || g.x === 'furiadragao' || g.x === 'chuva' || g.x === "chuvafim" || g.x === "acordou" || g.x === "congelou" || g.x === "gelado" || g.x === "degelou" || g.x === "queimou" || g.x === "queima" || g.x === "dormindo" || g.x === "envenenou" || g.x === "veneno" || g.x === "paralisou" || g.x === "paralisado" || g.x === "estagio" || g.x === 'remoinho' || g.x === 'espadas' || g.x === 'pluma' || g.x === 'semSono' || g.x === 'pocao' || g.x === 'absorb'); }
 /* Os itens da mochila: o que cada um se chama na tela e quanto cura. O motor manda o id (g.g), o
    cliente escolhe a palavra -- mesmo caminho do MOVE_BY_TYPE. */
 const ITENS_DE_BATALHA = {
@@ -24023,6 +24054,17 @@ function fraseDoEspecial(g, quem, alvo, op){
     const base = quem + ' deixou ' + alvo + ' confuso' + causa + ', e ele se acertou';
     if(!(g.am && GOLPES[g.am])) return base;
     return base + ' com ' + comoGolpe(nomeDoAtaque(g.am), GOLPES[g.am][0]);
+  }
+  /* ⚠️ O BUFF DE TERRENO (23/09/2026, a pedido, palavra por palavra: *"Onix é afetado pelo
+     terreno e ganha buff de 15% em todos atributos"*).
+     ⚠️ OS 15% SAEM DA CONSTANTE, nunca escritos na frase: e o mesmo cuidado da caixa que explica
+     o especial (`{CURA}`, `{FURIA}`) e a razao de ela existir -- a especialidade ja teve este
+     arquivo dizendo "~13 pontos percentuais" por um texto ter sobrevivido a mudanca do valor.
+     O nome sai do PROPRIO registro (`g.g`), como o do `acordou`: esta linha e sobre UM pokemon, e
+     o `q` dela e o DELE. */
+  if(g.x === 'terreno'){
+    const pct = Math.round((TERRAIN_BUFF_MULT - 1) * 100);
+    return (golpe || quem) + ' é afetado pelo terreno e ganha buff de ' + pct + '% em todos atributos';
   }
   if(g.x === 'acordou'){
     /* ACORDOU (14/09/2026, a pedido, palavra por palavra: *"Krabby acordou e voltou à luta!"*).

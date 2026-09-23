@@ -5329,6 +5329,73 @@ a classe do resultado entrou no meio (`mlog-card venceu aberto`) — ela caiu co
 mesma armadilha da `resultTime` cravada por igualdade exata, que passou a casar com ZERO no dia em
 que a segunda classe entrou na mesma lista. **Classe se procura na LISTA, nunca colada.**
 
+
+### QUEM ENTRA EM CAMPO COM BUFF DE TERRENO ANUNCIA (23/09/2026)
+
+Pedido assim: *"antes de iniciar um confronto, caso o pokémon tenha buff de terreno, exiba uma
+mensagem dizendo 'Onix é afetado pelo terreno e ganha buff de 15% em todos atributos (símbolo de
+buff de terreno)', espera aquele 1,5s e segue com a batalha, para todos os pokémons que entrar na
+batalha e tiver buff de terreno"*.
+
+**⚠️ É NA ENTRADA, UMA VEZ POR POKÉMON POR BATALHA -- não a cada confronto.** Quem sobrevive a três
+confrontos não "entrou" três vezes, e as duas metades do pedido se conciliaçam aí: *"antes de
+iniciar um confronto"* é o começo do confronto **dele**, e *"que ENTRAR na batalha"* é a entrada.
+
+**MEDIDO em 900 batalhas com terreno sorteado:**
+
+| | linhas por batalha | de tela |
+|---|---|---|
+| **por ENTRADA (o que foi feito)** | **1,73** | **+2,6s** |
+| por CONFRONTO | 3,29 | +4,9s |
+
+Ou seja por confronto seriam **1,90× mais frases**. Num painel de terreno forte (Termas Vulcânicas,
+que pega 5 dos 12) são **+3,8 a +4,4s por batalha**, com teto de 5 linhas (+7,5s).
+**Se um dia for pra valer a cada confronto, é tirar o `_terrenoAnunciado` da guarda** -- e a régua
+está aqui.
+
+- **⚠️ ELA NÃO LÊ O `rng`**, e isso é o que a torna barata: não há sorteio nenhum (o pokémon TEM
+  ou NÃO TEM a flag), então a semente não se move. **Conferido por impressão, 900 batalhas COM
+  terreno: o MOTOR fica idêntico (`d25352d084c0`) e só o DIÁRIO muda** -- que é o que uma linha
+  nova deve fazer. Sem terreno, os dois ficam idênticos (`5481ce57abca / a4c6725aa4aa`).
+- **⚠️ O MARCADOR É SOLTO NO `encerrarBatalha`**, com o `_congelado` e o `_furia`: sem isso o
+  pokémon sai da batalha "já anunciado" e **nunca mais anuncia** -- e a flag `terrainBuffed` é
+  recalculada a cada batalha. É o vazamento que o teto de HP da Fúria teve.
+  ⚠️ **E A ÂNCORA É OUTRA NO SERVIDOR**: o `encerrarBatalha` de lá não solta o `_congelado`, o
+  `_queimado` nem o `_envenenado` -- a nota disso já estava escrita ali desde a paralisia.
+- **OS 15% SAEM DA CONSTANTE**, nunca escritos na frase: é o cuidado da caixa que explica o
+  especial, e a razão de ela existir -- a especialidade já teve este arquivo dizendo "~13 pontos
+  percentuais" por um texto ter sobrevivido à mudança do valor.
+- **O SELO É O MESMO DO TERRENO DO RESTO DO JOGO** (o do quadro do lutador e o da faixa): o jogador
+  lê o símbolo aqui e reconhece o do pokémon buffado sem ligar as duas coisas.
+- **O `q` DA LINHA É DO PRÓPRIO POKÉMON**, como o do `acordou` e o da Fúria: ela é sobre UM
+  pokémon, não sobre um causador e um alvo. Lido ao contrário, a frase nomeia o adversário.
+- **O 1,5s vem da entrada no `passosDaAbertura`** (1 passo, como toda frase que não mexe barra).
+  Fora da tabela ela valeria pra SEMPRE -- o defeito que a anulação teve.
+- **⚠️ E O `ehGolpeEspecial` TEM QUE CONHECÊ-LA**, senão a linha cai no ramo do GOLPE COMUM e sai
+  como `-0 de HP` com o nome de um golpe que o pokémon não tem: foi o que aconteceu com as três
+  linhas do congelamento em 16/09/2026, e foi o **navegador** que pegou.
+
+**⚠️ E A COMPARAÇÃO DAS 300 BATALHAS NÃO SERVE PRA ISSO: ela roda SEM TERRENO.** Religando o
+defeito "o servidor não anuncia", a bateria inteira passava **em branco** -- ou seja os dois
+motores podiam divergir numa linha do diário sem nada acusar. Por isso ela tem **painel próprio**:
+120 batalhas com o terreno marcado nos dois lados, batendo golpe a golpe (**0 divergências, 597
+linhas, 600 pokémon buffados**). É a mesma decisão do gelo e da queimadura.
+
+**⚠️ E DUAS TRAVAS MINHAS MEDIAM O QUE NÃO DÁ PRA MEDIR DE FORA:**
+
+1. *"o marcador FICA durante a batalha"* -- o `simulateGymBattle` **JÁ chama o `encerrarBatalha`**
+   no fim, então ele nunca está de pé quando ela volta. Quem prova a regra é o `doExchange`
+   chamado na mão: a primeira troca anuncia os dois, a segunda não repete, o encerrar solta, e a
+   batalha seguinte anuncia de novo.
+2. *"o número é DERIVADO da constante"* -- **`const` dentro do sandbox não é reatribuível de
+   fora**: escrever em `S.TERRAIN_BUFF_MULT` só troca a propriedade do objeto, e a ligação léxica
+   de dentro do script continua a mesma. É a mesma lição do `const` que não vira global, que a
+   Queimada já custou. Hoje quem prova é o **código**: a frase lê a constante e não tem o número
+   escrito.
+
+**Medido a 320px:** a linha cai na caixa amarela das aberturas, com o selo, **antes** do primeiro
+golpe -- e **zero `-0 de HP`** no log. **Os 10 defeitos religados acusam** (1 a 14 falhas cada).
+
 ### O SONO DURA DE 1 A 3 TROCAS, 1/3 CADA (15/09/2026)
 
 Pedido assim: *"quando um pokemon dormir, coloque 1/3 de chance para ele tomar 1 ataque, 1/3 de

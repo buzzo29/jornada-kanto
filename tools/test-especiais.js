@@ -7985,6 +7985,142 @@ console.log('\n=== ABRIR UM CONFRONTO ZERA O PASSO, ANTES DO DESENHO (15/09/2026
       ok('  e o passo a passo sobre o `' + cls + '` fica FOLGADO', r >= 10, r.toFixed(1) + ':1');
     });
   }
+
+  /* 6c) ⚠️ QUEM ENTRA EM CAMPO COM BUFF DE TERRENO ANUNCIA (23/09/2026, a pedido). */
+  {
+    const inst2 = (id, lv) => { const p = S.createInstance(id, lv); p.hp = p.maxHp = S.calcMaxHp(p); return p; };
+    /* Termas Vulcânicas e Fire/Water: pega o Charizard e o Blastoise de um lado, o Lapras, o
+       Arcanine e a Starmie do outro -- 5 dos 12, que e o terreno que mais pega este painel. */
+    const TER = S.TERRAINS.find(t => t.name === 'Termas Vulcânicas');
+    ok('o painel tem o terreno que a trava precisa', !!TER, TER && TER.types.join('/'));
+    const monta = (comTerreno) => {
+      const a = ['venusaur','charizard','blastoise','gengar','alakazam','golem'].map(id => inst2(id, 55));
+      const b = ['machamp','lapras','arcanine','snorlax','starmie','weezing'].map(id => inst2(id, 57));
+      S.equiparNpc(b);
+      if(comTerreno){ S.applyTerrainBuff(a, TER); S.applyTerrainBuff(b, TER); }
+      return [a, b];
+    };
+    const roda = (comTerreno, semente) => {
+      let x = semente; const rng = () => (x = (x * 1103515245 + 12345) % 2147483648) / 2147483648;
+      const [a, b] = monta(comTerreno);
+      const r = S.simulateGymBattle(a, b, rng);
+      return { r, a, b, linhas: (r.matchups || []).flatMap(m => (m.golpes || []).filter(g => g.x === 'terreno')) };
+    };
+
+    const comTer = roda(true, 987654321);
+    ok('a linha sai pra quem tem buff de terreno', comTer.linhas.length > 0, comTer.linhas.length + ' linhas');
+    /* ⚠️ UMA VEZ POR POKÉMON POR BATALHA, e não a cada confronto: quem sobrevive a três confrontos
+       não "entrou" três vezes. Medido em 900 batalhas, por confronto seriam 1,90x mais frases
+       (3,29 por batalha contra 1,73) -- +4,9s de tela em vez de +2,6s. */
+    const nomes = comTer.linhas.map(g => g.g);
+    ok('  e UMA VEZ por pokémon (não a cada confronto)', new Set(nomes).size === nomes.length,
+       nomes.join(', '));
+    /* ⚠️ E SÓ PRA QUEM TEM O BUFF: a linha nomeia o pokémon, e nomear quem não ganhou nada seria
+       prometer um bônus que a batalha não dá -- o mesmo defeito do selo do terreno na Torre. */
+    const buffados = comTer.a.concat(comTer.b).filter(p => p.terrainBuffed).map(p => p.name);
+    ok('  e só pra quem TEM o buff', nomes.every(n2 => buffados.indexOf(n2) >= 0),
+       'anunciados: ' + nomes.join(', ') + ' | buffados: ' + buffados.join(', '));
+    /* ⚠️ E O `q` DA LINHA É DO PRÓPRIO POKÉMON, como o do `acordou` e o da Fúria: ela é sobre UM
+       pokémon, não sobre um causador e um alvo. Lido ao contrário, a frase nomearia o adversário. */
+    const ladoCerto = (comTer.r.matchups || []).every(m =>
+      (m.golpes || []).filter(g => g.x === 'terreno')
+        .every(g => (g.q === 'p' ? m.player : m.enemy) === g.g));
+    ok('  e o `q` dela é do próprio pokémon', ladoCerto);
+
+    const semTer = roda(false, 987654321);
+    ok('  sem terreno nenhum, ela não sai', semTer.linhas.length === 0, semTer.linhas.length + ' linhas');
+    /* ⚠️ E O MOTOR NÃO MUDA: ela não lê o `rng` (não há sorteio -- o pokémon TEM ou NÃO TEM a
+       flag), então a semente não se move. Medido em 900 batalhas COM terreno: a impressão do MOTOR
+       fica idêntica (d25352d084c0) e só a do DIÁRIO muda, que é o que uma linha nova deve fazer. */
+    const impr = (x) => (x.matchups || []).map(m => m.playerHpAfter + ',' + m.enemyHpAfter).join(';');
+    const A = roda(true, 555), B = roda(true, 555);
+    ok('  e ela é determinística (não lê o rng)', impr(A.r) === impr(B.r) && A.linhas.length === B.linhas.length);
+
+    /* ⚠️ O MARCADOR É SOLTO NO FIM DA BATALHA, senão o pokémon sai dela "já anunciado" e nunca
+       mais anuncia -- e a flag `terrainBuffed` é recalculada a cada batalha. É o vazamento que o
+       teto de HP da Fúria e o `_congelado` tiveram. */
+    /* ⚠️ QUEM PROVA ISSO É O `doExchange` CHAMADO NA MÃO, e não uma batalha inteira: o
+       `simulateGymBattle` JÁ chama o `encerrarBatalha` no fim, então o marcador nunca está de pé
+       quando ela volta -- a primeira versão desta trava media isso e falhava com o código certo. */
+    const [a2, b2] = monta(true);
+    const x1 = a2.find(p => p.terrainBuffed), y1 = b2.find(p => p.terrainBuffed);
+    ok('  o painel tem um buffado de cada lado', !!x1 && !!y1);
+    const d1 = []; S.doExchange(x1, y1, () => .5, d1);
+    ok('  o primeiro doExchange anuncia os DOIS',
+       d1.filter(g => g.x === 'terreno').length === 2, d1.filter(g => g.x === 'terreno').length);
+    ok('  e o marcador FICA de pé', x1._terrenoAnunciado === true && y1._terrenoAnunciado === true);
+    const d2 = []; S.doExchange(x1, y1, () => .5, d2);
+    ok('  e a segunda troca NÃO repete', d2.filter(g => g.x === 'terreno').length === 0);
+    S.encerrarBatalha(a2, b2);
+    ok('  e o `encerrarBatalha` SOLTA o marcador', a2.concat(b2).every(p => !p._terrenoAnunciado));
+    const d3 = []; S.doExchange(x1, y1, () => .5, d3);
+    ok('  e a batalha seguinte anuncia de novo', d3.filter(g => g.x === 'terreno').length === 2);
+
+    /* ⚠️ OS 15% SAEM DA CONSTANTE, nunca escritos na frase: é o cuidado da caixa que explica o
+       especial, e a razão de ela existir -- a especialidade já teve o CLAUDE.md dizendo "~13 pontos
+       percentuais" por um texto ter sobrevivido à mudança do valor. A trava mexe na constante e
+       cobra que a frase acompanhe: um texto fixo passaria no caso nomeado e falharia só nesse. */
+    const pct = Math.round((S.TERRAIN_BUFF_MULT - 1) * 100);
+    ok('a frase é a pedida, palavra por palavra',
+       S.fraseDoEspecial({ x:'terreno', g:'Onix' }, 'Onix', 'Machamp')
+       === 'Onix é afetado pelo terreno e ganha buff de ' + pct + '% em todos atributos',
+       S.fraseDoEspecial({ x:'terreno', g:'Onix' }, 'Onix', 'Machamp'));
+    /* ⚠️ QUEM PROVA A DERIVAÇÃO É O CÓDIGO, e não mexer na constante: `const` dentro do sandbox
+       NÃO É REATRIBUÍVEL de fora -- escrever em `S.TERRAIN_BUFF_MULT` só troca a propriedade do
+       objeto, e a ligação léxica de dentro do script continua a mesma. É a mesma lição do `const`
+       que não vira global, que a Queimada já custou. */
+    const bloco = (cliL.match(/if\(g\.x === 'terreno'\)\{[\s\S]{0,400}?\n  \}/) || [''])[0];
+    ok('  a trava tem o bloco da frase pra ler', bloco.length > 50, bloco.length + ' chars');
+    ok('  e o número é DERIVADO da constante, nunca escrito na frase',
+       bloco.indexOf('TERRAIN_BUFF_MULT') >= 0 && !/\b15%|\b15 ?%/.test(bloco), bloco.slice(0, 160));
+
+    /* ⚠️ O 1,5s DE LEITURA vem da entrada no `passosDaAbertura`: é ela que faz a frase virar um
+       passo PRÓPRIO da animação. Fora da tabela ela valeria pra SEMPRE -- o defeito da anulação. */
+    ok('  e ela vale 1 passo na abertura (o 1,5s)', S.passosDaAbertura.terreno === 1,
+       S.passosDaAbertura.terreno);
+    /* ⚠️ E O `ehGolpeEspecial` TEM QUE CONHECÊ-LA, senão a linha cai no ramo do GOLPE COMUM e sai
+       como `-0 de HP` com o nome de um golpe que o pokémon não tem -- foi o que aconteceu com as
+       três linhas do congelamento em 16/09/2026, e foi o NAVEGADOR que pegou. */
+    ok('  e o ehGolpeEspecial a reconhece', S.ehGolpeEspecial({ x:'terreno' }) === true);
+    ok('  e o selo dela é o MESMO do terreno do resto do jogo',
+       S.ICONES_ESPECIAIS.terreno === S.selo('terreno'), S.ICONES_ESPECIAIS.terreno);
+    /* o teste que o navegador fez: nenhuma linha de terreno vira `-0 de HP` na TELA */
+    const comLinha = (comTer.r.matchups || []).find(m => (m.golpes || []).some(g => g.x === 'terreno'));
+    const htmlT = logAberto([comLinha]);
+    ok('  e no LOG ela sai como frase, nunca como `-0 de HP`',
+       /afetado pelo terreno/.test(htmlT) && !/[-−]0 de HP/.test(htmlT));
+
+    /* ⚠️ OS DOIS MOTORES, COM PAINEL PRÓPRIO -- e isso não é zelo: a comparação das 300 batalhas
+       roda SEM TERRENO (ela não chama o `applyTerrainBuff`), então ela NUNCA toca nesta linha.
+       Conferido pelo lado do erro: religando o defeito "o servidor não anuncia", a bateria inteira
+       passava em BRANCO. É a mesma razão pela qual o gelo e a queimadura têm painel próprio.
+       ⚠️ E A FLAG É MARCADA À MÃO porque o servidor não exporta o `_applyTerrainBuff` -- isto é
+       exatamente o que ele faz (os tipos do pokémon contra os do terreno). O HP também não precisa
+       ser montado: o motor CURA os dois times na entrada. */
+    let divTer = 0, linhasTer = 0, buffTer = 0;
+    for(let k = 0; k < 120; k++){
+      const semente = 'ter-' + k;
+      const mk = (cria) => [
+        ['venusaur','charizard','blastoise','gengar','alakazam','golem'].map(id => cria(id, 55)),
+        ['machamp','lapras','arcanine','snorlax','starmie','weezing'].map(id => cria(id, 57))
+      ];
+      const [aC, bC] = mk((id, lv) => S.createInstance(id, lv));
+      const [aS, bS] = mk((id, lv) => srv._createInstance(id, lv));
+      const marca = (t) => t.forEach(p => { p.terrainBuffed = p.types.some(x => TER.types.indexOf(x) >= 0); });
+      [aC, bC, aS, bS].forEach(marca);
+      buffTer += aC.concat(bC).filter(p => p.terrainBuffed).length;
+      const rC = S.simulateGymBattle(aC, bC, S.makeSeededRng(semente));
+      const rS = srv._simulateGymBattle(aS, bS, srv._makeSeededRng(semente));
+      linhasTer += (rC.matchups || []).reduce((t, m) => t + (m.golpes || []).filter(g => g.x === 'terreno').length, 0);
+      if(resumo(rC) !== resumo(rS)) divTer++;
+    }
+    ok('120 batalhas COM TERRENO batem golpe a golpe nos dois motores', divTer === 0, divTer + ' divergencias');
+    /* ⚠️ E A TRAVA COBRA QUE O PAINEL TOCOU NA MECÂNICA: sem esta linha ela daria verde comparando
+       120 batalhas que por acaso não tivessem buff nenhum -- o "zero perfeito" que este projeto já
+       registra em cinco lugares. */
+    ok('  e o painel realmente anunciou terreno', linhasTer > 0,
+       linhasTer + ' linhas, ' + buffTer + ' pokémon buffados')
+  }
   /* ⚠️ E O BOTAO AZUL SUMIU -- ele durou horas, entre o + solto no bloco do × e o card. As tres
      tentativas do mesmo dia estao registradas no CLAUDE.md; esta trava impede que os restos de
      qualquer uma delas voltem sem querer. */
