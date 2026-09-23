@@ -16001,6 +16001,51 @@ os três velhos, a tabela (líderes casando com a Corrida, `abrir` sendo funçã
 ilhas), a ação recusando, o mapa, o pino DERIVADO do centro, os defs numa cópia só, e a volta.
 **Conferido que ele acusa os 7 defeitos religados.**
 
+
+#### ⚠️ AS ETIQUETAS DO MAPA CRESCERAM 45%, E O TETO NÃO É O GOSTO (23/09/2026)
+
+Pedido assim: *"na tela que aparece as 5 ilhas das ilhas laranjas, aumente os textos do nome das
+ilhas e do modo que se joga em cada ilha"*.
+
+| a 320px | antes | **depois** |
+|---|---|---|
+| o nome da ilha | `.62rem` — **9,9px** | `.9rem` — **14,4px** |
+| o jogo | `.5rem` — **8px** | `.72rem` — **11,5px** |
+| altura das duas | 18 / 15px | 22 / 18px |
+| folga até o fim do mapa | 29px | **21px** |
+| folga à esquerda / direita | 39 / 41 | **28 / 30** |
+| etiquetas fora do mapa, colisões, texto cortado | nenhuma | **nenhuma** |
+
+**⚠️ O TETO É O `overflow:hidden` DO MAPA, e não o gosto.** A etiqueta de baixo da ilha mais baixa
+(Kumquat, `cy` 274 de 380) é a que chega mais perto da borda — e o mapa **RECORTA** o que passar
+dela. Medido em iframe de 320px, que é a menor largura que a casa mira, foram comparadas quatro
+variantes (+26%, +35%, +45% e o de hoje): **as quatro cabem**, e a de +45% é a maior que ainda
+deixa 21px embaixo. Crescer mais começa a cortar — **e cortar não aparece como erro, aparece como
+um nome pela metade**.
+
+- **⚠️ E O `top` DO JOGO ANDOU JUNTO (67 → 72px), que é o par que faz isto funcionar:** ele não é
+  uma posição solta, é **o fim da etiqueta de cima mais o respiro**. O nome é `position:absolute`
+  com `line-height` e uma borda de 1px de cada lado, então a altura dele é `line-height + 2` — hoje
+  47+20+2 = **69**, e o 72 deixa os 3px que separam as duas. **Mexer na fonte do nome sem mexer aqui
+  faz as duas se encostarem**, e encostar também não dá erro: dá duas caixas grudadas.
+  Na primeira rodada de medição, com o `line-height` derivado por fórmula, **as três variantes
+  caíram em `entre 0`** — foi ela que mostrou que o segundo número tinha que ser escolhido à mão.
+- **A HIERARQUIA FICA DE PÉ:** o nome continua maior que o jogo. Iguais, o olho não sabe qual dos
+  dois ler primeiro — o nome é o que se procura e o jogo é a legenda dele.
+- **⚠️ E O NOME MAIS LONGO DE HOJE TEM 7 LETRAS** (Trovita, Kumquat, Pummelo), com 85px de etiqueta
+  e 28 de folga lateral. Uma ilha de nome bem mais longo ficaria apertada — a conta é a largura da
+  etiqueta centrada no `cx` da ilha, e a mais à esquerda (Kumquat, `cx` 82) é a que aperta primeiro.
+
+**⚠️ A TRAVA É UM PISO, e não o valor exato** (`.8rem` no nome, `.65rem` no jogo): cravar `.9rem`
+ali faria ela envelhecer no próximo ajuste — a família que já caiu **cinco vezes** só na Corrida (a
+metragem do revezamento, o texto do botão de modalidade, o cache, a fileira da classificação). O
+que ela existe pra impedir é a **regressão** pro tamanho que foi reclamado. E ela **lê o CSS**:
+tamanho de fonte e posição não aparecem em asserção de HTML nenhuma — a lição do `[hidden]` que
+deixou o modal da contagem preso na tela e da `section-title` fantasma que saía em texto de corpo.
+
+**No motor, nada:** `MOTOR 5481ce57abca / DIARIO a4c6725aa4aa`, idêntico em 900 batalhas semeadas.
+**Os 6 defeitos religados acusam.**
+
 ## A TRAVESSIA PELAS ILHAS LARANJA, A PARTIR DA JORNADA (21/09/2026)
 
 Pedida assim: *"em qualquer momento quando o treinador tiver 6 pokemons, vai aparecer aleatoriamente

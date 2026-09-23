@@ -236,6 +236,40 @@ console.log('\n=== O MAPA DO ARQUIPÉLAGO ===');
     ok('  o selo `' + i.selo + '` existe', !!S.DESENHOS[i.selo]);
   });
   ok('  e o pino usa o selo da ilha', /selo\(ilha\.selo,'selo-ilha'\)/.test(src.replace(/\s/g, '')));
+
+  /* ⚠️ AS DUAS ETIQUETAS DO PINO, LIDAS DO CSS -- tamanho de fonte e posicao nao aparecem em
+     asserçao de HTML nenhuma, que e a liçao do `[hidden]` que deixou o modal da contagem preso na
+     tela e da `section-title` fantasma que saia em texto de corpo. */
+  const rNome = (src.match(/\.ilhas-mapa \.ilha-nome\{([^}]*)\}/) || [])[1] || '';
+  const rJogo = (src.match(/\.ilhas-mapa \.ilha-jogo\{([^}]*)\}/) || [])[1] || '';
+  ok('  as duas etiquetas têm regra no CSS', !!rNome && !!rJogo);
+  const numCss = (r, p) => parseFloat((r.match(new RegExp(p + ':([-\\d.]+)')) || [])[1]);
+  const fNome = numCss(rNome, 'font-size'), fJogo = numCss(rJogo, 'font-size');
+  /* ⚠️ É UM PISO, e não o valor exato: cravar `.9rem` aqui faria a trava envelhecer no próximo
+     ajuste -- a família que já caiu cinco vezes na Corrida (a metragem do revezamento, o texto do
+     botão de modalidade, o cache, a fileira da classificação). O que ela existe pra impedir é a
+     REGRESSÃO pro tamanho de antes de 23/09/2026 (.62 e .5rem), que foi o que o jogador reclamou. */
+  ok('  o nome é pelo menos .8rem', fNome >= .8, fNome + 'rem');
+  ok('  e o jogo pelo menos .65rem', fJogo >= .65, fJogo + 'rem');
+  /* ⚠️ E A HIERARQUIA: o nome da ilha é o que se procura, o jogo é a legenda dele. Iguais, o olho
+     não sabe qual dos dois ler primeiro. */
+  ok('  e o nome é MAIOR que o jogo', fNome > fJogo, fNome + ' x ' + fJogo);
+  /* ⚠️ E O `top` DO JOGO NÃO É UMA POSIÇÃO SOLTA: ele é o fim da etiqueta de cima mais o respiro.
+     O nome é `position:absolute` com `line-height` e uma borda de 1px de cada lado, então a altura
+     dele é `line-height + 2`. Mexer na fonte do nome sem mexer aqui faz as duas SE ENCOSTAREM -- e
+     encostar não aparece como erro, aparece como duas caixas grudadas. Medido a 320px com os
+     valores de hoje: 3px entre elas. */
+  const fimDoNome = numCss(rNome, 'top') + numCss(rNome, 'line-height') + 2;
+  ok('  e o jogo começa DEPOIS do fim do nome', numCss(rJogo, 'top') >= fimDoNome,
+     'jogo em ' + numCss(rJogo, 'top') + ', o nome acaba em ' + fimDoNome);
+  ok('  com respiro, sem colar nele', numCss(rJogo, 'top') - fimDoNome >= 2,
+     (numCss(rJogo, 'top') - fimDoNome) + 'px');
+  /* ⚠️ E O MAPA CORTA O QUE PASSAR DELE (`overflow:hidden`), então o teto do tamanho não é o gosto:
+     é a etiqueta de baixo da ilha mais baixa chegando na borda. Medido no navegador a 320px, que é
+     a menor largura que a casa mira: sobram 21px embaixo, 28 à esquerda e 30 à direita, e nenhuma
+     etiqueta encosta na de outra ilha. */
+  ok('  e o mapa recorta o que passar dele',
+     /\.ilhas-mapa\{[^}]*overflow:hidden/.test(src));
 }
 
 /* ============================================================================

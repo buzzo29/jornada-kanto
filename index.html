@@ -3530,11 +3530,21 @@
   .novidades-lista .novidades-resumo{display:block;font-size:.66rem;line-height:1.35;color:var(--muted);}
   .ilhas-mapa .ilha-selo{display:block;line-height:46px;font:800 18px/46px var(--font-ui);}
   .ilhas-mapa .ilha-selo .selo-ilha{width:26px;height:26px;vertical-align:-6px;}
+  /* As DUAS etiquetas cresceram 45% em 23/09/2026 (a pedido: os textos estavam pequenos) -- o nome
+     de .62 para .9rem (9,9 -> 14,4px) e o jogo de .5 para .72rem (8 -> 11,5px).
+     ⚠️ O TETO NAO E O GOSTO, E O MAPA: ele e `overflow:hidden`, e a etiqueta de baixo da ilha mais
+     baixa (Kumquat, cy 274 de 380) e a que chega mais perto da borda. Medido a 320px, que e a menor
+     largura que a casa mira: sobram 21px embaixo, 28 a esquerda e 30 a direita, e NENHUMA etiqueta
+     encosta na de outra ilha. Crescer mais que isto comeca a cortar no rodape do mapa -- e cortar
+     nao aparece como erro, aparece como um nome pela metade.
+     ⚠️ E O `top` DO JOGO ANDA JUNTO: ele nao e uma posicao solta, e o fim da etiqueta de cima mais
+     o respiro. Com o nome em 22px de altura (linha 20 + as duas bordas), 47+22 = 69, e o 72 deixa
+     os ~3px que separam as duas. Mexer na fonte do nome sem mexer aqui faz as duas se encostarem. */
   .ilhas-mapa .ilha-nome{position:absolute;top:47px;left:50%;transform:translateX(-50%);
-    font-size:.62rem;line-height:16px;white-space:nowrap;color:#fff9e4;background:#133448e8;
+    font-size:.9rem;line-height:20px;white-space:nowrap;color:#fff9e4;background:#133448e8;
     border:1px solid #9ec5cb;border-radius:3px;padding:0 5px;font-weight:800;}
-  .ilhas-mapa .ilha-jogo{position:absolute;left:50%;top:67px;transform:translateX(-50%);
-    white-space:nowrap;font-size:.5rem;line-height:13px;padding:1px 4px;background:#133448e8;
+  .ilhas-mapa .ilha-jogo{position:absolute;left:50%;top:72px;transform:translateX(-50%);
+    white-space:nowrap;font-size:.72rem;line-height:16px;padding:1px 4px;background:#133448e8;
     color:#fff;border-radius:3px;font-weight:800;}
   /* ⚠️ A ILHA SEM JOGO APAGA E GANHA O TRACEJADO, que e o que diz 'nao e aqui' -- o mesmo par
      (opacidade + borda tracejada) do ponto ocupado da Pescaria. E ela e um `<span>`: cursor de
