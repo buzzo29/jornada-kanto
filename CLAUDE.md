@@ -5910,10 +5910,17 @@ Depois de ver a cena, três pedidos em sequência:
    sai da cena** em passo nenhum.
    ⚠️ **O JOGADOR NÃO FOI TOCADO** — ele continua subindo e só então atravessando, que é a mesma
    forma vista do outro lado da câmera (ele vai PRA LONGE, e por isso também encolhe).
+5. ***"coloque o sprite do pokemon adversario só um pouco mais para cima"*** — o Y dele subiu **2
+   pontos** nos 51, somado ao valor de cada um (a mesma regra do X).
+   ⚠️ **QUEM SOBE É O PÉ, não o sprite solto** — e é isso que faz a sombra ir junto: ela lê a MESMA
+   variável (`--battle-enemy-y`). Subindo só o sprite, ele voltaria a flutuar acima dela, que é
+   justamente o que o ajuste anterior consertou. Medido: a sombra continua em `dy=1px` do pé.
+   **E ele ainda LIMPOU o resto de sobreposição**: a maior entre sprite e cartão nos 51, com o
+   Snorlax e o Dragonite, foi de **125px² para ZERO**.
 
-**MEDIDO DEPOIS DOS TRÊS, a 320px, nos 51 terrenos com os DOIS MAIORES sprites do jogo** (Snorlax e
-Dragonite): a maior sobreposição entre sprite e cartão é **125px²**, **zero** sprites saem da cena e
-**não há rolagem lateral** (documento em 320 de 320).
+**MEDIDO DEPOIS DOS CINCO, a 320px, nos 51 terrenos com os DOIS MAIORES sprites do jogo** (Snorlax e
+Dragonite): a sobreposição entre sprite e cartão é **ZERO**, **zero** sprites saem da cena e **não há
+rolagem lateral** (documento em 320 de 320).
 
 #### ⚠️ A SOMBRA DO ADVERSÁRIO: 15px PRA CIMA TÊM CAUSA, 2% PRA ESQUERDA SÃO UMA MÉDIA
 
