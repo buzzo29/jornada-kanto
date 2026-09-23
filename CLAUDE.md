@@ -5243,6 +5243,71 @@ da chuva fica FORA dele, e que o CSS zera o estilo de fábrica. E o ajudante `lo
 arquivo passou a abrir **pela API de verdade** — o que faz toda trava que lê o log exercitar o
 caminho do clique.
 
+
+#### O FUNDO DO CARD DIZ O RESULTADO (23/09/2026)
+
+Pedido assim: *"no log de batalha, deixe o fundo de cada card que o pokémon do treinador que venceu
+de verde, e o que a batalha ele perdeu, deixe vermelho, mas deixe uma cor leve, para não atrapalhar
+a leitura"*.
+
+**⚠️ ELE NÃO AFIRMA NADA NOVO — é a MESMA coisa que o título diz desde 16/09**, e é isso que o torna
+seguro: a cor se lê **antes** da palavra, que é o ponto numa lista de vários cards. E `m.player` é
+sempre o pokémon do treinador nas **nove** telas que mostram este log — no online o
+`logDaMinhaVista` já virou a perspectiva, e no Ginásio da Cidade quem lê o resultado é o
+DESAFIANTE. É a mesma convenção que o título já usa pra pintar o nome de azul.
+
+*(O CLAUDE.md dizia "sete telas, inclusive a liga assistida" — conferido: são **nove** hoje, a
+Seleção e a Pescaria entraram depois, e a **liga assistida não usa este log**: ela tem quadro
+próprio e animação, e nunca chamou o `renderMatchupLog`.)*
+
+**⚠️ QUEM VENCEU PASSOU A VIVER NUMA FUNÇÃO SÓ** (`vencedorDoConfronto`), lida pelo título E pela
+cor. Duas contas em paralelo divergiriam no primeiro ajuste, e o sintoma seria o pior possível: **um
+card verde com o título dizendo que o adversário venceu.** É a lição do `EXPOENTE_TIPO`, que valia
+num lugar e não no outro, e a da `fraseDoEspecial`. Uma trava varre os quatro estados e cobra o
+**PAR** — uma que só olhasse a classe passaria com o título refazendo a conta.
+
+**⚠️ O TETO DA COR NÃO É O GOSTO: É O TÍTULO BATENDO NO AA.** Ele é `--muted` (o texto mais claro do
+card) e já está em **5,20:1** sobre o branco. Medidas quatro intensidades no navegador:
+
+| tom sobre o branco | título verde / vermelho | ΔE p/ o branco | ΔE verde–vermelho |
+|---|---|---|---|
+| 5% | 4,92 / 4,81 | **3,5 / 4,5** | 5,4 |
+| **8% (hoje)** | **4,75 / 4,59** | **6,0 / 6,8** | **8,5** |
+| 12% | 4,54 / **4,30** ❌ | 8,8 / 10,5 | 12,9 |
+| 16% | **4,34** ❌ / **4,05** ❌ | 11,9 / 14,0 | 17,3 |
+
+**12% e 16% REPROVAM no AA** (o mínimo é 4,5) — descartados por medição, não por gosto. E **5% fica
+a ΔE 3,5 do branco, ou seja indistinguível do próprio `:hover` do card (ΔE 3,6)**: a cor existiria e
+não se veria. **8% é o ponto** — o mais forte que mantém o título acima do AA nas duas cores.
+O texto do passo a passo (`--ink`) nem chega perto do limite: **17,06 no branco, 15,6 no verde**.
+
+**⚠️ SE UM DIA A COR PRECISAR SER MAIS FORTE, o lugar de mexer é a cor do TÍTULO**, não a do fundo:
+é ele o gargalo, e escurecê-lo sobe os dois números de uma vez.
+
+- **⚠️ AS DUAS REGRAS VÊM DEPOIS DO `:hover` GENÉRICO, e cada cor tem o hover dela.** Elas têm a
+  MESMA especificidade (0-2-0), então quem vence o empate é a **última declarada** — declaradas
+  antes, passar o mouse num card verde o deixaria creme. É a armadilha que o `.pesc-puxar.puxando`,
+  o `.pesc-zona:disabled` e o `.minha` do Resgate já custaram, e ela **não aparece em asserção de
+  HTML nenhuma** — a trava lê a ORDEM no arquivo.
+- **⚠️ OS DOIS CAÍREM NÃO GANHA COR** (1,2% dos confrontos, e é sempre autodestruição): ali não
+  houve vencedor, e pintar de um dos dois seria escolher um por acaso. É a mesma decisão da medalha
+  do pódio da Arena 1x1. Os dois de pé, que não acontece hoje, idem.
+- **⚠️ E O LOG ANTIGO (sem passos) FICA DE FORA**: ele não vira card, não tem título e não tem
+  fundo branco pra tingir — a cor sairia como uma faixa solta no meio da lista tracejada.
+- **O card ABERTO continua com a borda azul** por cima da cor: a borda diz QUAL está aberto e o
+  fundo diz o resultado. As duas coisas convivem, conferido no navegador.
+
+**Medido a 320px, num log de 10 confrontos com os três casos:** sem rolagem lateral, o passo a passo
+aberto sobre o verde em 15,6:1, e o card "Os dois caíram" em branco puro.
+
+**No motor, nada:** `MOTOR 5481ce57abca / DIARIO a4c6725aa4aa`, idêntico em 900 batalhas semeadas.
+**Os 8 defeitos religados acusam** (1 a 5 falhas cada).
+
+**⚠️ E UMA TRAVA MEDIA A FORMA DA STRING DE CLASSE:** ela contava `mlog-card aberto` **colado**, e
+a classe do resultado entrou no meio (`mlog-card venceu aberto`) — ela caiu com o código certo. É a
+mesma armadilha da `resultTime` cravada por igualdade exata, que passou a casar com ZERO no dia em
+que a segunda classe entrou na mesma lista. **Classe se procura na LISTA, nunca colada.**
+
 ### O SONO DURA DE 1 A 3 TROCAS, 1/3 CADA (15/09/2026)
 
 Pedido assim: *"quando um pokemon dormir, coloque 1/3 de chance para ele tomar 1 ataque, 1/3 de

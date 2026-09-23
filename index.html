@@ -1455,6 +1455,19 @@
      QUAL deles esta aberto sem precisar olhar o conteudo. */
   .mlog-card.aberto{border-color:var(--blue);box-shadow:2px 2px 0 rgba(42,95,214,.18);}
   .mlog-card:hover{background:#fbfaf4;}
+  /* ⚠️ O FUNDO DO RESULTADO, E ELE VEM DEPOIS DO `:hover` DE PROPOSITO: as duas regras tem a MESMA
+     especificidade (0-2-0), entao quem vence o empate e a ultima -- declaradas antes, passar o
+     mouse num card verde o deixaria creme. E a mesma armadilha que o `.pesc-puxar.puxando`, o
+     `.pesc-zona:disabled` e o `.minha` do Resgate ja custaram, e por isso cada cor tem o hover
+     dela.
+     ⚠️ E A COR E LEVE PORQUE FOI PEDIDA LEVE: 8% do tom da casa sobre o branco. Medido no
+     navegador, o texto do log (`--ink` sobre o verde) fica em 14,9:1 e o titulo (`--muted`) em
+     6,3:1 -- os dois acima do 4,5:1 do AA, e praticamente onde ja estavam sobre o branco. O que
+     a cor NAO pode fazer e roubar leitura, e o numero e que diz isso. */
+  .mlog-card.venceu{background:#eef7f0;}
+  .mlog-card.perdeu{background:#fbeeed;}
+  .mlog-card.venceu:hover{background:#e6f2e9;}
+  .mlog-card.perdeu:hover{background:#f7e4e2;}
   .mlog-card:active{transform:translate(1px,1px);box-shadow:none;}
   .mlog-card:focus-visible{outline:2px solid var(--blue);outline-offset:2px;}
   /* ⚠️ O TITULO DIZ QUEM VENCEU, e e a unica coisa que o confronto FECHADO precisa dizer: sem ele,
@@ -22931,17 +22944,35 @@ function alternarLogDoConfronto(i){
    quando alguem cai.
    O NOME SAI NA COR DO LADO (azul pro jogador, vermelho pro adversario), as mesmas do log -- e o
    que faz o titulo se ler de relance sem precisar do nome. */
-function tituloDoConfronto(m){
+/* ⚠️ QUEM VENCEU O CONFRONTO, num lugar so -- o titulo e a COR do card leem a mesma resposta.
+   Escritas em separado elas divergiriam no primeiro ajuste, e o sintoma seria o pior possivel: um
+   card verde com o titulo dizendo que o adversario venceu.
+   Devolve 'p' (o pokemon do treinador venceu), 'e' (o adversario) ou '' -- e o vazio cobre DOIS
+   casos que nao tem vencedor: os dois cairem (a autodestruicao, 1,2% dos confrontos) e os dois
+   ficarem de pe (que nao acontece hoje: o confronto so termina quando alguem cai). */
+function vencedorDoConfronto(m){
   const vivoP = (m.playerHpAfter || 0) > 0, vivoE = (m.enemyHpAfter || 0) > 0;
+  if(vivoP && !vivoE) return 'p';
+  if(!vivoP && vivoE) return 'e';
+  return '';
+}
+function tituloDoConfronto(m){
+  /* ⚠️ ELE LE O `vencedorDoConfronto`, nunca refaz a conta: o titulo e a COR do card dizem a MESMA
+     coisa, e duas contas em paralelo divergiriam no primeiro ajuste -- um card verde com o titulo
+     dizendo que o adversario venceu. E a licao do EXPOENTE_TIPO, que valia num lugar e nao no
+     outro, e a da `fraseDoEspecial`, que vive numa funcao so pelo mesmo motivo. */
+  const venc = vencedorDoConfronto(m);
   const nome = (q) => `<span class="mlog-quem ${q}">${escapeHtmlSafe((q === "p" ? m.player : m.enemy) || "")}</span>`;
   /* ⚠️ "Vitória Charizard", sem o "do" (a pedido). Alem de mais curto, ele some com um problema
      de genero que o jogo tem em toda frase: "Vitória do Jynx" e "Vitória do Nidoqueen" saem
      errados, e o jogo nao guarda genero de especie -- foi a mesma razao que fez as frases de
      status usarem "com" em vez de "pelo". Sem a preposicao, o problema nao existe. */
-  if(vivoP && !vivoE) return `Vitória ${nome("p")}`;
-  if(!vivoP && vivoE) return `Vitória ${nome("e")}`;
-  if(!vivoP && !vivoE) return "Os dois caíram";
-  return "";                       // os dois de pe: nao acontece hoje, e sem titulo e melhor que mentir
+  if(venc) return `Vitória ${nome(venc)}`;
+  /* ⚠️ SEM VENCEDOR SAO DOIS CASOS, e so um deles tem o que dizer: os dois CAIREM e a
+     autodestruicao (1,2% dos confrontos), e os dois de PE nao acontece hoje -- ali sem titulo e
+     melhor que mentir. */
+  const vivoP = (m.playerHpAfter || 0) > 0, vivoE = (m.enemyHpAfter || 0) > 0;
+  return (!vivoP && !vivoE) ? "Os dois caíram" : "";
 }
 function renderMatchupLog(matchups){
   const lado = (m, id) => {
@@ -23000,7 +23031,21 @@ function renderMatchupLog(matchups){
       ` role="button" tabindex="0" aria-expanded="${aberto}"` +
       ` onclick="alternarLogDoConfronto(${i})"` +
       ` onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();alternarLogDoConfronto(${i});}"`;
-    return `<div class="matchup-row mlog${semPassos ? '' : ' mlog-card'}${aberto ? ' aberto' : ''}"${abre}>
+    /* ⚠️ O FUNDO DO CARD DIZ O RESULTADO (23/09/2026, a pedido: *"deixe o fundo de cada card que
+       o pokemon do treinador venceu de verde, e o que ele perdeu, vermelho, mas uma cor leve, para
+       nao atrapalhar a leitura"*). Ele nao AFIRMA nada novo: e a mesma coisa que o titulo diz desde
+       16/09 -- so que a cor se le antes da palavra, o que e o ponto de uma lista de varios cards.
+       ⚠️ E `m.player` E SEMPRE O POKEMON DO TREINADOR nas nove telas que mostram este log: no
+       online o `logDaMinhaVista` ja virou a perspectiva, e no Ginasio da Cidade quem le o resultado
+       e o DESAFIANTE. E a mesma convencao que o titulo ja usa pra pintar o nome de azul.
+       ⚠️ OS DOIS CAIREM NAO GANHA COR, e e a mesma decisao da medalha do podio da Arena 1x1: ali
+       nao houve vencedor, e pintar de um dos dois seria escolher um por acaso.
+       ⚠️ E O CARD SEM PASSOS (log antigo, gravado antes de o diario existir) fica de fora: ele nao
+       vira card, nao tem titulo e nao tem fundo branco pra tingir -- a cor sairia como uma faixa
+       solta no meio da lista tracejada. */
+    const venc = semPassos ? '' : vencedorDoConfronto(m);
+    const corDoCard = venc === 'p' ? ' venceu' : venc === 'e' ? ' perdeu' : '';
+    return `<div class="matchup-row mlog${semPassos ? '' : ' mlog-card'}${corDoCard}${aberto ? ' aberto' : ''}"${abre}>
       ${tit ? `<div class="mlog-titulo">${tit}</div>` : ''}
       ${cab}
       ${aberto ? passosHtml(m) : ''}

@@ -7796,7 +7796,12 @@ console.log('\n=== ABRIR UM CONFRONTO ZERA O PASSO, ANTES DO DESENHO (15/09/2026
     ok('abrir o do meio mostra o passo a passo dele', /mlog-passo/.test(html));
     ok('e SO dele', (html.match(/mlog-passos/g) || []).length === 1,
        (html.match(/mlog-passos/g) || []).length + ' blocos abertos');
-    ok('e so o do meio ganhou a classe aberto', (html.match(/mlog-card aberto/g) || []).length === 1,
+    /* ⚠️ ELA CONTA A CLASSE NA LISTA, e nao `mlog-card aberto` colado: a classe do RESULTADO
+       (verde/vermelho) entrou no meio em 23/09/2026 e a string virou `mlog-card venceu aberto` --
+       a trava caiu com o codigo certo. E a mesma armadilha da `resultTime` cravada por igualdade
+       exata, que passou a casar com ZERO no dia em que a segunda classe entrou na mesma lista. */
+    ok('e so o do meio ganhou a classe aberto',
+       (html.match(/class="[^"]*\bmlog-card\b[^"]*\baberto\b[^"]*"/g) || []).length === 1,
        (html.match(/mlog-card[^"]*/g) || []).join(' | '));
     /* e fechar volta */
     S.alternarLogDoConfronto(1);
@@ -7893,6 +7898,70 @@ console.log('\n=== ABRIR UM CONFRONTO ZERA O PASSO, ANTES DO DESENHO (15/09/2026
     vivos[0].playerHpAfter = 50; vivos[0].enemyHpAfter = 50;
     ok('e os dois de pe nao ganham titulo nenhum', !/mlog-titulo/.test(S.renderMatchupLog(vivos)));
     ok('o titulo e centralizado', /\.mlog-titulo\{[^}]*text-align:center/.test(cliL));
+  }
+
+  /* 6b) ⚠️ O FUNDO DO CARD DIZ O RESULTADO (23/09/2026, a pedido). Ele nao afirma nada novo -- e
+        a MESMA coisa que o titulo diz desde 16/09 --, e e por isso que os dois leem a mesma
+        funcao: duas contas em paralelo divergiriam no primeiro ajuste, e o sintoma seria um card
+        verde com o titulo dizendo que o adversario venceu. */
+  {
+    const um = conf(1);                                  // o player vence
+    ok('o card de quem VENCEU e verde', /class="matchup-row mlog mlog-card venceu/.test(S.renderMatchupLog(um)),
+       (S.renderMatchupLog(um).match(/class="matchup-row[^"]*"/) || [''])[0]);
+    const doInimigo = conf(1);
+    doInimigo[0].playerHpAfter = 0; doInimigo[0].enemyHpAfter = 50;
+    ok('  e o de quem PERDEU e vermelho', /class="matchup-row mlog mlog-card perdeu/.test(S.renderMatchupLog(doInimigo)));
+    /* ⚠️ OS DOIS CAIREM NAO GANHA COR, e e a mesma decisao da medalha do podio da Arena 1x1: ali
+       nao houve vencedor, e pintar de um dos dois seria escolher um por acaso. */
+    const ambos = conf(1);
+    ambos[0].playerHpAfter = 0; ambos[0].enemyHpAfter = 0;
+    const hAmbos = S.renderMatchupLog(ambos);
+    ok('  e os dois cairem NAO ganha cor nenhuma', !/venceu|perdeu/.test(hAmbos),
+       (hAmbos.match(/class="matchup-row[^"]*"/) || [''])[0]);
+    const vivos = conf(1);
+    vivos[0].playerHpAfter = 50; vivos[0].enemyHpAfter = 50;
+    ok('  nem os dois de pe', !/venceu|perdeu/.test(S.renderMatchupLog(vivos)));
+    /* ⚠️ E O TITULO LE A MESMA FUNCAO: e isso que impede a cor e a palavra de divergirem. A trava
+       varre os quatro estados e cobra o PAR -- uma que so olhasse a classe passaria com o titulo
+       refazendo a conta por conta propria. */
+    [[50, 0, 'venceu', 'Vitória'], [0, 50, 'perdeu', 'Vitória'],
+     [0, 0, '', 'Os dois caíram'], [50, 50, '', '']].forEach(([hp, he, cls, tit]) => {
+      const c = conf(1); c[0].playerHpAfter = hp; c[0].enemyHpAfter = he;
+      const h = S.renderMatchupLog(c);
+      const temCls = /mlog-card (venceu|perdeu)/.test(h) ? h.match(/mlog-card (venceu|perdeu)/)[1] : '';
+      const temTit = /mlog-titulo/.test(h);
+      ok('  a cor e o titulo concordam em ' + hp + '/' + he,
+         temCls === cls && temTit === !!tit && (!tit || h.indexOf(tit) >= 0),
+         'classe "' + temCls + '", titulo ' + (temTit ? 'sim' : 'nao'));
+    });
+    /* ⚠️ CARD SEM PASSOS (log antigo, gravado antes de o diario existir) fica de fora: ele nao
+       vira card e nao tem fundo branco pra tingir -- a cor sairia como uma faixa solta no meio da
+       lista tracejada. */
+    const velho = conf(1); velho[0].golpes = [];
+    const hVelho = S.renderMatchupLog(velho);
+    ok('  e o log ANTIGO (sem passos) nao ganha cor', !/venceu|perdeu/.test(hVelho),
+       (hVelho.match(/class="matchup-row[^"]*"/) || [''])[0]);
+    /* ⚠️ AS DUAS REGRAS TEM QUE VIR DEPOIS DO `:hover` GENERICO: elas tem a MESMA especificidade
+       (0-2-0), entao quem vence o empate e a ULTIMA declarada. Declaradas antes, passar o mouse num
+       card verde o deixaria creme -- e isso nao aparece em assercao de HTML nenhuma. E a mesma
+       armadilha que o `.pesc-puxar.puxando`, o `.pesc-zona:disabled` e o `.minha` do Resgate ja
+       custaram. */
+    const iHover = cliL.indexOf('.mlog-card:hover{');
+    ok('  o CSS das duas cores vem DEPOIS do :hover generico',
+       iHover >= 0 && cliL.indexOf('.mlog-card.venceu{') > iHover
+                   && cliL.indexOf('.mlog-card.perdeu{') > iHover);
+    ok('  e cada cor tem o hover DELA', /\.mlog-card\.venceu:hover\{/.test(cliL)
+       && /\.mlog-card\.perdeu:hover\{/.test(cliL));
+    /* ⚠️ E A COR E LEVE PORQUE FOI PEDIDA LEVE. O teto nao e o gosto: medido no navegador, o
+       titulo (`--muted`, que e o texto mais claro do card) cai de 5,20:1 no branco para 4,75 no
+       verde e 4,59 no vermelho -- e a 12% ele ja REPROVA no AA (4,30). A trava guarda o teto pelo
+       lado que da pra ler daqui: as duas cores tem que ficar bem perto do branco. */
+    const claro = (hex) => parseInt(hex.slice(1,3),16) + parseInt(hex.slice(3,5),16) + parseInt(hex.slice(5,7),16);
+    const fundo = (cls) => (cliL.match(new RegExp('\\.mlog-card\\.' + cls + '\\{background:(#[0-9a-f]{6})')) || [])[1];
+    ['venceu', 'perdeu'].forEach(cls => {
+      const c = fundo(cls);
+      ok('  o fundo `' + cls + '` e LEVE (perto do branco)', !!c && claro(c) >= 3 * 232, c);
+    });
   }
   /* ⚠️ E O BOTAO AZUL SUMIU -- ele durou horas, entre o + solto no bloco do × e o card. As tres
      tentativas do mesmo dia estao registradas no CLAUDE.md; esta trava impede que os restos de
