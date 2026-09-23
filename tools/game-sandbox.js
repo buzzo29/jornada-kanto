@@ -194,7 +194,17 @@ function createSandbox(htmlPath){
        um TypeError sem relacao com o que estava sendo testado. Ele devolve um objeto RECONHECIVEL,
        pra o teste poder afirmar "isto foi um arrayUnion destes valores" em vez de so nao quebrar.
        E a mesma licao do fake-firestore: o duble tem que fazer o que o de verdade faz. */
-    firebase:{ initializeApp(){}, auth(){ return {}; },
+    /* ⚠️ O AUTH DO DUBLE ANOTA O QUE FOI CHAMADO (`__auth`), como o `__timers` e o `__ops`. Sem
+       isso a trava do CONVIDADO (23/09/2026) so conseguiria dizer "nao quebrou" -- e o defeito que
+       ela existe pra pegar e justamente um que NAO quebra: trocar `linkWithPopup` por
+       `signInWithPopup` cria uma conta NOVA e abandona o convidado com os saves dentro, sem erro
+       nenhum na tela. Anotado, ela AFIRMA qual verbo foi usado.
+       E a mesma licao do fake-firestore e do `classList` de verdade: o duble tem que fazer -- e
+       registrar -- o que o de verdade faz. */
+    firebase:{ initializeApp(){}, auth: Object.assign(function(){ return {}; }, {
+        GoogleAuthProvider: function(){ this.__provedor = 'google'; },
+        EmailAuthProvider: { credential: (email, senha) => ({ __cred:'email', email, senha }) },
+      }),
       firestore: Object.assign(function(){ return firestoreStub(); }, {
         FieldValue: {
           arrayUnion: (...v) => ({ __op:'arrayUnion', valores: v }),
@@ -203,7 +213,17 @@ function createSandbox(htmlPath){
           serverTimestamp: () => ({ __op:'serverTimestamp' }),
         },
       }) },
-    auth:{ onAuthStateChanged(){}, signOut(){ return Promise.resolve(); } },
+    auth:{
+      onAuthStateChanged(){}, signOut(){ return Promise.resolve(); },
+      /* o teste troca o `currentUser` e o `__auth.erro` pra montar cada caso */
+      currentUser: null,
+      signInAnonymously(){
+        sandbox.__auth.chamadas.push('signInAnonymously');
+        return sandbox.__auth.erro ? Promise.reject(sandbox.__auth.erro) : Promise.resolve({});
+      },
+      signInWithPopup(){ sandbox.__auth.chamadas.push('signInWithPopup'); return Promise.resolve({}); },
+    },
+    __auth: { chamadas: [], erro: null },
     db: firestoreStub(),
     /* `db`, `auth` e `functionsClient` nascem num <script> SEPARADO da página (o da config do
        Firebase), e o sandbox só carrega o bloco maior -- o do jogo. Por isso eles entram aqui na
@@ -222,6 +242,7 @@ function createSandbox(htmlPath){
     'SPECIES','TYPE_CHART','EVOLUTIONS','LEGS','GYMS','STARTERS','ROUTE_MAP','LEGENDARY_BIRDS',
     'DECLARED_CHALLENGES','ROULETTE_PRIZES','WIN_BASE_POINTS','SURVIVOR_BONUS_CAP','STREAK_BONUS_CAP',
     'REMATCH_LEVEL_CAP','GIOVANNI_RELIEF_CAP','DEFEAT_ADVANCE','SHINY_CHANCE','ACHIEVEMENTS',
+    'CONVIDADO_MODOS','exigeCadastro','entrarSemConta','abrirCriarLogin','vincularComGoogle','vincularComEmail','concluirCadastro','linkErrorMessage','trocarModoDoLink','fecharAvisoDeConvidado','renderConvidadoModal','renderCriarLoginModal','CAMPOS_DA_CONTA','renderAuth',
     'createInstance','calcMaxHp','calcDamage','doExchange','simulateGymBattle','makeSeededRng',
     'applyTeamBonuses','badgeDamageBonus','diversityDamageBonus','bestMultiplier','rolledMultiplier',
     'firstStrikeChance','tryEvolve','bstOf','rarityWeight','weightedPick','computeVictoryRewards',

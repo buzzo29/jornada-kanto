@@ -1605,6 +1605,27 @@
      então a tela não muda de cara -- muda de arrumação. */
   .notif-corpo-titulo{ font-family:var(--font-ui); font-size:.9rem; font-weight:800; color:var(--ink); margin:0; line-height:1.3; }
   .notif-corpo-texto{ margin:8px 0 0; }
+  /* ⚠️ O BOTAO "Criar Login" (23/09/2026) mora na MESMA linha do nick, e ele NAO pode herdar o
+     `.btn` da casa inteiro: aquele e `display:block; width:100%`, e num container flex isso o faz
+     ocupar a linha inteira e empurrar o sino pra fora -- e o mesmo defeito que o card do parceiro
+     da Pescaria teve. Aqui ele vira um item de largura propria, como o sino ao lado.
+     ⚠️ E O `margin:0` NAO E ENFEITE: o `.btn` traz margem de baixo, e com ela o botao ficaria
+     desalinhado do nick e do sino na mesma linha. */
+  /* ⚠️ ELE FICA COLADO EMBAIXO DO NICK, e NAO na mesma linha -- e isso foi MEDIDO, nao escolhido.
+     A 320px (o alvo da casa) a linha do nick ja tem o quadro do treinador e o sino, e com um
+     terceiro elemento o NOME DO TREINADOR ficava com largura ZERO: ele sumia inteiro, porque a
+     moeda ao lado e `flex-shrink:0` e comia o que sobrava. A linha continuava PARECENDO certa --
+     o quadro, a moeda e o botao apareciam --, e e a mesma familia do nome que sumiu no card da
+     Maquina: medir a dimensao errada da verde num defeito que se ve no primeiro print.
+     Encolher o botao nao resolve: mesmo em 52px (ilegivel) o nome ainda cortava.
+
+     ⚠️ E O `flex-wrap` NA LINHA FOI TENTADO E E PIOR: ele quebra na ordem do DOM, entao quem
+     descia era o SINO -- sozinho numa linha, desalinhado. Um comportamento so, em toda largura,
+     vale mais que um arranjo esperto que so funciona em algumas.
+
+     Ele e `.box` pra herdar a moldura da casa e `text-align:center` porque a linha e dele. */
+  .criar-login-row{ margin-bottom:14px; }
+  .criar-login-btn{ margin:0; }
   .notif-bell-btn{
     position:relative;
     flex-shrink:0;
@@ -18839,6 +18860,13 @@ const CAMPOS_DA_CONTA = [
   /* o aviso de versão nova é da ABA, não do save: sem ele aqui, abrir um save e voltar pra home
      apagaria a marca e o botão sumiria até a próxima pergunta (que é folgada em 1 minuto) */
   'saveSlotsCarregados','contaCarregada','versaoNova','ehAdmin',
+  /* ⚠️ `ehConvidado` e da SESSAO, nao do save -- sem ele aqui o `resetGame` o apagaria ao abrir um
+     save, e o convidado passaria a ver os cinco modos abertos ate voltar pra home. E o mesmo
+     defeito que o `ehAdmin` e o `saveSlotsCarregados` teriam sem esta lista.
+     `convidadoModal` e `linkModo`/`linkErro`/`linkBusy` sao estado de TELA do modal de cadastro:
+     eles nao vao pro banco (o `serializeGame` e uma lista de permissao), mas precisam atravessar
+     a abertura de um save -- o botao "Criar Login" existe na home E dentro da jornada. */
+  'ehConvidado','convidadoModal','linkModo','linkErro','linkBusy','linkEmail','linkFeito',
   /* o que a conta JA resgatou de conquista -- ver as moedas das conquistas */
   'achievementsPaid',
   'hms',   // as Máquinas Ocultas são da CONTA, não do save -- ver darHM
@@ -18964,6 +18992,136 @@ async function registerWithEmail(){
     render();
   }
 }
+/* ============================================================================
+   JOGAR SEM CRIAR CONTA (23/09/2026)
+
+   Pedido: *"faca na tela de login um meio de poder jogar mas sem criar conta ... e apos ele se
+   cadastrar, mantem os times que ele montou nessa conta. Seria possivel isso? Visto que a Jornada
+   usa muito o banco de dados"*.
+
+   ⚠️ E POSSIVEL JUSTAMENTE PORQUE ELA USA O BANCO. A sessao ANONIMA do Firebase da um uid de
+   verdade, com documento em `users/{uid}` e subcolecao `saves/` como qualquer outro -- ou seja o
+   convidado ja grava no lugar CERTO desde o primeiro clique. Quando ele se cadastra, o
+   `linkWithCredential`/`linkWithPopup` PRESERVA O MESMO UID: a conta troca de METODO DE LOGIN, e
+   nao de dono.
+
+   ⚠️ ENTAO NAO HA MIGRACAO DE DADOS -- e e isso que torna a feature segura. O caminho que a
+   pergunta teme (guardar no localStorage e copiar depois) e que seria arriscado: sao 20 slots, uma
+   subcolecao por save e um formato que ja mudou varias vezes; copiar isso na mao perderia coisa em
+   silencio, e este projeto ja perdeu 49 especies da Pokedex de um jogador por uma escrita de lista
+   que encolheu. Aqui nada e copiado: os bytes nunca saem do lugar.
+
+   ⚠️ O QUE ELE PRECISA DO CONSOLE: o provedor "Anonimo" tem que estar LIGADO em
+   Authentication -> Sign-in method. Sem isso o `signInAnonymously` recusa com
+   `auth/operation-not-allowed` e o botao explica o que houve, em vez de falhar calado.
+   ============================================================================ */
+async function entrarSemConta(){
+  game.authBusy = true; game.authError = null; game.authNotice = null; render();
+  try{
+    await auth.signInAnonymously();
+    /* nao mexe na tela nem no authBusy: quem faz isso e o onAuthStateChanged, como nos outros tres
+       caminhos de entrada -- dois lugares decidindo pra onde ir divergiriam no primeiro ajuste */
+  } catch(e){
+    game.authError = (e && e.code === 'auth/operation-not-allowed')
+      ? 'O modo convidado ainda não está liberado neste servidor. Crie uma conta pra jogar.'
+      : authErrorMessage(e);
+    game.authBusy = false;
+    render();
+  }
+}
+/* ⚠️ OS CINCO MODOS FECHADOS, e o texto de cada um e o que o pedido chama de "ver o que e".
+   A tabela existe pra a frase nascer COM o modo: escrita em cada botao, o sexto modo nasceria com
+   a recusa muda -- que e a familia de defeito que este arquivo registra no `CLASSE_DO_BANNER`
+   (tres contextos caindo numa string vazia) e nas seis portas das Ilhas. */
+const CONVIDADO_MODOS = {
+  ligas:    { nome:'Ligas Pokémon',        o:'Campeonatos entre treinadores do mundo todo, com chaveamento, ranking e prêmio pro campeão.' },
+  ginasio:  { nome:'Ginásio da Cidade',    o:'Times de jogadores de verdade defendem o ginásio da sua cidade. Vencer o líder põe o seu no lugar.' },
+  torre:    { nome:'Torre dos Treinadores',o:'30 andares que sobem de nível sem parar. O ranking do dia mostra até onde cada um chegou.' },
+  online:   { nome:'Batalha Online',       o:'Duelo ao vivo contra outro treinador, escolhendo o pokémon a cada confronto.' },
+  ilhas:    { nome:'Ilhas Laranja',        o:'Cinco ilhas com cinco desafios — corrida, pescaria, resgate, arena e seleção — com ranking em cada um.' },
+};
+/* A PORTA DOS CINCO, no molde do `exigeTimeCampeao`: quem chama e a acao, nao o botao -- um botao
+   apagado nao diz por que, e o que falta aqui e justamente saber o que fazer pra abrir aquilo. */
+function exigeCadastro(modoId){
+  if(!game.ehConvidado) return true;
+  game.convidadoModal = modoId;
+  render();
+  return false;
+}
+function fecharAvisoDeConvidado(){ game.convidadoModal = null; render(); }
+/* ============================================================================
+   CRIAR A CONTA SEM PERDER NADA (o botao vermelho ao lado do nick)
+
+   ⚠️ E `link`, NUNCA `signIn`. Um `signInWithPopup` aqui TROCARIA de uid -- e o convidado
+   continuaria existindo, orfao, com os saves dentro. O `link` prende o metodo novo ao uid que ja
+   esta jogando; e por isso que "mantem os times" sai de graca.
+   ============================================================================ */
+function abrirCriarLogin(){
+  if(!game.ehConvidado) return;
+  game.convidadoModal = null;
+  game.linkModo = 'menu'; game.linkErro = null; game.linkBusy = false; game.linkEmail = '';
+  render();
+}
+function fecharCriarLogin(){ game.linkModo = null; game.linkErro = null; render(); }
+function trocarModoDoLink(modo){
+  const campo = document.getElementById('link-email-input');
+  if(campo) game.linkEmail = campo.value;   // mesma razao do switchAuthMode: nao apagar o digitado
+  game.linkModo = modo; game.linkErro = null; render();
+}
+/* ⚠️ A CONTA QUE JA EXISTE E O CASO DIFICIL, e ele e o unico em que "mantem os times" NAO vale.
+   Se o e-mail (ou a conta Google) ja pertence a outro uid, o Firebase recusa o vinculo -- e entrar
+   naquela conta abandonaria o progresso de convidado, sem volta e sem aviso. Entao a recusa DIZ
+   isso, em vez de oferecer um caminho que perde dado em silencio. */
+function linkErrorMessage(e){
+  const code = e && e.code;
+  if(code==='auth/credential-already-in-use' || code==='auth/email-already-in-use'){
+    return 'Já existe uma conta com esse login. Entrar nela deixaria pra trás o progresso deste convidado — use outro e-mail, ou saia e entre na conta antiga.';
+  }
+  if(code==='auth/provider-already-linked') return 'Essa conta já está ligada.';
+  if(code==='auth/requires-recent-login')  return 'Por segurança, entre de novo e repita.';
+  return authErrorMessage(e);
+}
+async function vincularComGoogle(){
+  const u = auth.currentUser;
+  if(!u){ game.linkErro = 'Sessão perdida. Recarregue a página.'; render(); return; }
+  game.linkBusy = true; game.linkErro = null; render();
+  try{
+    await u.linkWithPopup(new firebase.auth.GoogleAuthProvider());
+    await concluirCadastro();
+  } catch(e){
+    game.linkErro = linkErrorMessage(e); game.linkBusy = false; render();
+  }
+}
+async function vincularComEmail(){
+  const u = auth.currentUser;
+  const email = document.getElementById('link-email-input')?.value.trim();
+  const senha = document.getElementById('link-password-input')?.value;
+  game.linkEmail = email || '';
+  if(!u){ game.linkErro = 'Sessão perdida. Recarregue a página.'; render(); return; }
+  if(!email || !senha){ game.linkErro = 'Preencha e-mail e senha.'; render(); return; }
+  if(senha.length < 6){ game.linkErro = 'A senha precisa ter pelo menos 6 caracteres.'; render(); return; }
+  game.linkBusy = true; game.linkErro = null; render();
+  try{
+    await u.linkWithCredential(firebase.auth.EmailAuthProvider.credential(email, senha));
+    await concluirCadastro();
+  } catch(e){
+    game.linkErro = linkErrorMessage(e); game.linkBusy = false; render();
+  }
+}
+/* ⚠️ O `onAuthStateChanged` DISPARA no vinculo e ja poria `ehConvidado` em false -- isto aqui NAO
+   e a rede pra ele: e a ORDEM. O callback e assincrono, e sem escrever na hora a tela seguinte
+   ainda desenharia o botao vermelho e os cinco modos fechados por alguns quadros. */
+async function concluirCadastro(){
+  game.ehConvidado = false;
+  game.linkBusy = false; game.linkModo = null; game.linkErro = null;
+  game.convidadoModal = null;
+  const u = auth.currentUser;
+  if(u) game.authUser = { uid:u.uid, email:u.email, displayName:u.displayName };
+  agendarAvisoDesafio();   // agora ele pode receber desafio de amigo -- ver o onAuthStateChanged
+  game.linkFeito = true;   // a home confirma o cadastro; sem isso a unica pista seria o botao sumir
+  render();
+}
+function fecharAvisoDeCadastro(){ game.linkFeito = false; render(); }
 /* Recuperação de senha.
 
    E-MAIL DESCONHECIDO NÃO É ERRO AQUI. O Firebase devolve auth/user-not-found, e repassar isso pra
@@ -24065,6 +24223,57 @@ function fecharEspecialInfo(){
   game.especialInfo = null;
   render();
 }
+/* ============================================================================
+   O AVISO DOS CINCO MODOS FECHADOS (23/09/2026)
+
+   ⚠️ O MODAL E QUEM MOSTRA "o que e o modo" -- e essa foi a leitura do pedido (*"ele so vai
+   conseguir ver o que e, nao pode jogar nenhum desses modos, exibir um modal avisando"*). A
+   alternativa era deixar a TELA do modo abrir e ficar inerte, e ela foi descartada com motivo:
+   aquelas telas CHAMAM o servidor ao abrir (a Torre gera a torre do dia, o Ginasio pede a
+   geolocalizacao, o online entra na fila), e o servidor agora recusa o convidado -- ele veria
+   cinco telas quebrando com erro em vez de descobrir o que o modo e.
+
+   Aqui ele le o que o modo e, em uma frase, e sabe o que fazer pra jogar.
+   ============================================================================ */
+function renderConvidadoModal(){
+  const m = CONVIDADO_MODOS[game.convidadoModal];
+  if(!m) return '';   /* modo desconhecido nao abre caixa vazia -- a regra do `abrirEspecialInfo` */
+  return `
+  <div class="modal-overlay" onclick="fecharAvisoDeConvidado()">
+    <div class="modal-box" onclick="event.stopPropagation();">
+      <div class="modal-icon">${selo('cadeado')}</div>
+      <h2>${escapeHtmlSafe(m.nome)}</h2>
+      <p>${escapeHtmlSafe(m.o)}</p>
+      <p class="hint-text">Este modo é disputado com outros treinadores, então ele só abre com conta criada. <b>Criar a conta mantém tudo</b> — seus times, sua Pokédex e suas moedas continuam onde estão.</p>
+      <button class="btn danger" onclick="abrirCriarLogin()">Criar Login</button>
+      <button class="btn secondary" onclick="fecharAvisoDeConvidado()">Agora não</button>
+    </div>
+  </div>`;
+}
+/* ⚠️ ELE E O MESMO FORMULARIO DA TELA DE LOGIN, e e de proposito: o pedido diz *"assim como na
+   tela de login hoje"*, e reaprender um formulario no meio de uma decisao e o que esta feature
+   existe pra evitar. O que muda e o VERBO -- la e `signIn`, aqui e `link`. */
+function renderCriarLoginModal(){
+  const modo = game.linkModo;
+  return `
+  <div class="modal-overlay" onclick="fecharCriarLogin()">
+    <div class="modal-box" onclick="event.stopPropagation();">
+      <h2>Criar seu login</h2>
+      <p class="hint-text">Você continua com <b>tudo que já jogou</b>: os times, a Pokédex, as conquistas e as moedas. O que muda é só o jeito de entrar.</p>
+      ${game.linkErro ? `<p class="error-text">${escapeHtmlSafe(game.linkErro)}</p>` : ''}
+      ${modo === 'email' ? `
+        <input type="email" id="link-email-input" class="code-input u-auto-h" placeholder="E-mail" value="${escapeHtmlSafe(game.linkEmail||'')}">
+        <input type="password" id="link-password-input" class="code-input u-auto-h" placeholder="Senha (mín. 6 caracteres)">
+        <button class="btn danger" ${game.linkBusy?'disabled':''} onclick="vincularComEmail()">${game.linkBusy?'Criando...':'Criar conta'}</button>
+        <button class="btn secondary" ${game.linkBusy?'disabled':''} onclick="trocarModoDoLink('menu')">⬅ Voltar</button>
+      ` : `
+        <button class="btn primary" ${game.linkBusy?'disabled':''} onclick="vincularComGoogle()">🔵 Conectar com Google</button>
+        <button class="btn secondary" ${game.linkBusy?'disabled':''} onclick="trocarModoDoLink('email')">Criar com e-mail e senha</button>
+        <button class="btn secondary" ${game.linkBusy?'disabled':''} onclick="fecharCriarLogin()">Fechar</button>
+      `}
+    </div>
+  </div>`;
+}
 function renderEspecialInfoModal(){
   const e = game.especialInfo;
   const x = EXPLICACAO_DO_ESPECIAL[e.efeito];
@@ -28064,6 +28273,16 @@ function renderAuth(){
   </div>
   <div class="box">
     <button class="btn primary" ${game.authBusy?'disabled':''} onclick="signInWithGoogle()">🔵 Entrar com Google</button>
+  </div>
+  ${/* ⚠️ ELE FICA DEPOIS DO GOOGLE E ANTES DO E-MAIL, e não no fim: quem já tem conta entra no
+       primeiro botão, e quem está chegando agora precisa achar este ANTES de desistir num
+       formulário. A frase diz o preço logo -- descobrir depois de uma jornada inteira que os
+       modos online estão fechados seria pior que não ter o modo convidado. */''}
+  <div class="box">
+    <h2>Só quero jogar</h2>
+    <p>Dá pra começar a jornada agora, sem cadastro. Você cria a conta depois e <b>mantém tudo</b> — os times continuam onde estão.</p>
+    <p class="hint-text">Sem conta, os modos que envolvem outros treinadores (Ligas, Ginásio da Cidade, Torre, Batalha Online e Ilhas Laranja) ficam só pra ver.</p>
+    <button class="btn secondary" ${game.authBusy?'disabled':''} onclick="entrarSemConta()">${game.authBusy?'Entrando...':'Jogar sem criar conta'}</button>
   </div>
   <div class="box">
     <h2>${titulo}</h2>
@@ -32165,10 +32384,16 @@ function renderSaveSelect(){
       <span class="trainer-name-value">${escapeHtmlSafe(game.trainerName||'')}</span>
       <span class="moeda-conta" title="Suas moedas">${selo('moeda')} ${game.moedas||0}</span>
     </button>
+    ${/* ⚠️ O BOTAO SO EXISTE PRA CONVIDADO, e ele fica COLADO no nick de propósito: é o nick que
+         diz quem você é, e é sobre ele que a frase "crie seu login" fala. Num rodapé ele viraria
+         mais um botão da home. Medido a 320px -- ver o CLAUDE.md. */''}
     <button class="notif-bell-btn" onclick="openNotificationsScreen()" aria-label="Notificações">
       ${selo('sino', 'selo-menu')}${(game.notificationsUnreadCount||0)>0 ? `<span class="notif-badge">${game.notificationsUnreadCount>9?'9+':game.notificationsUnreadCount}</span>` : ''}
     </button>
   </div>
+  ${game.ehConvidado ? `<div class="criar-login-row"><button class="btn danger criar-login-btn" onclick="abrirCriarLogin()">Criar Login</button></div>` : ''}
+  ${game.linkFeito ? `<div class="box"><p class="hint-text">${selo('porta')} Conta criada! Seus times e sua Pokédex continuam aqui — agora você entra por e-mail ou Google e pode jogar todos os modos.</p>
+    <button class="btn success" onclick="fecharAvisoDeCadastro()">Beleza</button></div>` : ''}
   <div class="home-menu-row">
     <button class="home-menu-card pokedex" onclick="openPokedex()">
       <span class="home-menu-icon">${pokedexIcon('menu')}</span>
@@ -32203,14 +32428,14 @@ function renderSaveSelect(){
   <div class="home-modes-row">
     <!-- O ! APARECE QUANDO HÁ LIGA ABERTA E ELE ESTÁ DE FORA (13/09/2026, a pedido). É o MESMO
          selo do sino e do card de Amigos: um sinal que o jogador já sabe ler como "tem coisa aqui". -->
-    <button class="home-nav-btn leagues-big-btn" onclick="openLeagueTypesList()">
+    <button class="home-nav-btn leagues-big-btn" onclick="if(exigeCadastro('ligas')) openLeagueTypesList()">
       <span class="home-mode-icon">${icone('ligas','modo')}</span><span>Ligas Pokémon</span>${
         game.avisoLiga ? '<span class="notif-badge">!</span>' : ''}</button>
-    <button class="home-nav-btn leagues-big-btn" style="background:var(--green);" onclick="openNeighborhoodGymScreen()">
+    <button class="home-nav-btn leagues-big-btn" style="background:var(--green);" onclick="if(exigeCadastro('ginasio')) openNeighborhoodGymScreen()">
       <span class="home-mode-icon">${icone('ginasio','modo')}</span><span>Ginásio da Cidade</span></button>
-    <button class="home-nav-btn leagues-big-btn" style="background:#8a5a00;" onclick="openTrainerTower()">
+    <button class="home-nav-btn leagues-big-btn" style="background:#8a5a00;" onclick="if(exigeCadastro('torre')) openTrainerTower()">
       <span class="home-mode-icon">${icone('torre','modo')}</span><span>Torre dos Treinadores</span></button>
-    <button class="home-nav-btn leagues-big-btn" style="background:#7038f8;" onclick="openOnlineBattle()">
+    <button class="home-nav-btn leagues-big-btn" style="background:#7038f8;" onclick="if(exigeCadastro('online')) openOnlineBattle()">
       <span class="home-mode-icon">${icone('batalha','modo')}</span><span>Batalha Online</span></button>
     ${/* ⚠️ AS ILHAS ABRIRAM PRA TODO MUNDO em 21/09/2026, a pedido -- o botão era `admin === true`
          desde 21/09 de manhã, e a porta saiu das SEIS entradas (este botão, o `abrirIlhas` e os
@@ -32219,7 +32444,7 @@ function renderSaveSelect(){
          `registrarPartidaDaIlha`.
          ⚠️ O QUE NÃO SAIU foram as portas de JOGO: a Corrida individual, a Pescaria e o Resgate
          continuam pedindo um time com as 8 insígnias, porque elas montam a partir dos saves. */''}
-    <button class="home-nav-btn leagues-big-btn home-btn-largo" style="background:${COR_ILHAS};" onclick="abrirIlhas()">
+    <button class="home-nav-btn leagues-big-btn home-btn-largo" style="background:${COR_ILHAS};" onclick="if(exigeCadastro('ilhas')) abrirIlhas()">
       ${/* ⚠️ ELE USA O SELO, e não o `icone()` dos outros quatro modos: os selos são o sistema vivo
            (é pra lá que os emojis foram em 17/09) e um PNG base64 novo seria pixel art à mão.
            A classe fixa 26px, que é a medida do `.dex-icon.modo` -- em `1em` ele sairia menor
@@ -39964,6 +40189,11 @@ function render(){
   if(game.ninhoAberto){ html += renderNinhoModal(); }
   if(game.especialInfo){ html += renderEspecialInfoModal(); }
   if(corrida.timeDoRank){ html += renderCorridaTimeModal(); }
+  /* ⚠️ OS DOIS DO CONVIDADO, e a ORDEM entre eles é a regra da casa: o de "crie a conta" é aberto
+     de DENTRO do aviso do modo, então ele vem DEPOIS -- vindo antes, abriria ATRÁS. E os dois vêm
+     antes do convite online, que tem 15 segundos de prazo e fica por cima de tudo. */
+  if(game.convidadoModal){ html += renderConvidadoModal(); }
+  if(game.linkModo){ html += renderCriarLoginModal(); }
   /* ⚠️ O HM GANHO vem DEPOIS da ficha e da caixa do especial e ANTES do convite online: ele pode
      nascer em QUALQUER tela (a captura, ou o carregamento da conta), entao ele nao pode ficar
      preso a uma; e o convite, que tem 15 segundos de prazo, tem que ficar por cima dele. */
@@ -40040,11 +40270,21 @@ const authCheckedOnce = new Promise(res=>{ resolveAuthChecked = res; });
 auth.onAuthStateChanged((user)=>{
   if(user){
     game.authUser = { uid:user.uid, email:user.email, displayName:user.displayName };
+    /* ⚠️ QUEM RESPONDE "e convidado?" E O FIREBASE, nao um campo nosso. O `isAnonymous` sai do
+       token; um campo no documento seria uma linha no console pra se declarar cadastrado.
+       ⚠️ E ELE E RELIDO AQUI A CADA MUDANCA de sessao -- e isso e o que faz o VINCULO se propagar:
+       ao ligar a conta, o Firebase dispara este callback de novo com `isAnonymous:false`. */
+    game.ehConvidado = user.isAnonymous === true;
     game.authBusy = false;
     if(game.screen==='auth'){ openSaveSelect(); }
-    agendarAvisoDesafio();   // desafio de amigo pode chegar em qualquer tela, a partir de agora
+    /* ⚠️ O CONVIDADO NAO AGENDA O AVISO DE DESAFIO: aceitar um desafio de amigo entra numa BATALHA
+       ONLINE, e o servidor recusa isso pra ele (`respondFriendChallenge`). Agendado, o poll rodaria
+       a cada 10s em toda tela pra nunca poder responder nada -- e o modal do desafio apareceria
+       oferecendo uma luta que a acao ia recusar. */
+    if(!game.ehConvidado) agendarAvisoDesafio();
   } else {
     game.authUser = null;
+    game.ehConvidado = false;
     game.currentSaveSlot = null;
     pararAvisoDesafio();
     /* devolve o formulário ao estado inicial: sem isso, quem sai da conta com a tela em "criar

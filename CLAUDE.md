@@ -12181,6 +12181,161 @@ os outros ficam igual na pokedex, exibindo apenas #A, #B e assim vai"*.
 
 ## Conta e login
 
+### JOGAR SEM CRIAR CONTA: O CONVIDADO (23/09/2026)
+
+Pedido assim: *"faça na tela de login um meio de poder jogar mas sem criar conta ... quando o
+usuario clicar nos botoes para jogar a torre dos treinadores, ligas classicas, ilhas laranjas,
+batalhas onlines e ginasio da cidade, ele só vai conseguir ver o que é ... E adicionar um botao
+vermelho do lado do nick dele com o texto: 'Criar Login' ... E após ele se cadastrar, mantem os
+times que ele montou nessa conta. Seria possivel isso? Visto que a Jornada usa muito o banco de
+dados"*.
+
+#### ⚠️ É POSSÍVEL JUSTAMENTE PORQUE ELA USA O BANCO — e essa é a resposta da pergunta
+
+A **sessão anônima** do Firebase dá um `uid` de verdade, com documento em `users/{uid}` e
+subcoleção `saves/` como qualquer outra conta. Ou seja **o convidado já grava no lugar CERTO desde
+o primeiro clique**. Quando ele se cadastra, o `linkWithCredential`/`linkWithPopup` **PRESERVA O
+MESMO UID**: a conta troca de MÉTODO DE LOGIN, não de dono.
+
+**⚠️ ENTÃO NÃO HÁ MIGRAÇÃO DE DADOS, e é isso que torna a feature segura.** O caminho que a
+pergunta teme — guardar no `localStorage` e copiar depois — é que seria arriscado: são 20 slots,
+uma subcoleção por save e um formato que já mudou várias vezes; copiar isso à mão perderia coisa em
+silêncio, e este projeto **já perdeu 49 espécies da Pokédex de um jogador** por uma escrita de
+lista que encolheu. Aqui nada é copiado: **os bytes nunca saem do lugar**.
+
+**CONFERIDO NO SDK que o jogo carrega** (`firebase-auth-compat.js` **10.7.1**, baixado e lido — a
+lição do `count()`, que o CLAUDE.md registra como ausente no compat): `signInAnonymously`,
+`linkWithPopup`, `linkWithCredential` e `isAnonymous` **estão todos lá**.
+
+#### ⚠️ MAS BLOQUEAR OS BOTÕES NÃO BLOQUEIA NADA — e esse é o achado que organizou o trabalho
+
+**O convidado é um `request.auth` de verdade.** Ele passa em `request.auth != null` — que era, até
+aqui, a **única** pergunta que as regras e as **81 callables** faziam. Ligar a sessão anônima e
+confiar na tela daria a ele escrita na **agenda da Liga**, no **chaveamento** e nos **inscritos**.
+
+**SÃO TRÊS CAMADAS, e nenhuma substitui a outra:**
+
+| | protege | por que ela não pode faltar |
+|---|---|---|
+| **o CLIENTE** recusa na porta | a UX pedida | é ela que mostra o modal que diz o que o modo é |
+| **as REGRAS** recusam a escrita | **a Liga Clássica** | ⚠️ a inscrição dela é **ESCRITA DIRETA DO CLIENTE** (`registerForLeague` mora no `index.html`, não nas functions) — **não existe callable pra guardar**, a trava só pode estar ali |
+| **as CALLABLES** recusam | Torre, Ginásio, online, Ilhas | callable é chamável direto do console, sem passar por tela nenhuma — é a mesma razão do `bossRequireTester` |
+
+**O `sign_in_provider` é quem responde**, nos dois lados. Ele vem **dentro do token emitido pelo
+Firebase Auth**, não de um campo do documento — e é isso que o faz servir de trava: o cliente não
+tem como escrevê-lo. Pra sessão anônima ele vale exatamente `'anonymous'`.
+
+#### ⚠️ A GUARDA DO SERVIDOR NÃO LÊ O BANCO — e é isso que permite pô-la em 39 callables
+
+O `exigeAdmin`, que é o precedente, **paga uma leitura por chamada** (o campo `admin` mora no
+documento). O `exigeCadastro` não: o dado já está no token. **Custo ZERO**, e por isso ela cabe nas
+39 sem pesar em nada.
+
+#### ⚠️ E NÃO DÁ PRA FILTRAR AS CALLABLES POR NOME
+
+`reportMewtwoBattleResult` tem **"Battle"** no nome e é o desafio do Mewtwo, que sai da **Pokédex**
+— jogo principal. E três que um grep pegaria são chamadas **de fora dos modos**:
+
+| | quem chama | o que aconteceria se fosse bloqueada |
+|---|---|---|
+| `getMyActiveGymDefenses` | **a HOME**, em toda abertura | erro no console toda visita |
+| `checkNeighborhoodGymDefenseForSlot` | o **apagar save** | idem |
+| `vacateNeighborhoodGymForDeletedSave` | idem | idem |
+
+As três devolvem vazio pro convidado **por construção** — ele nunca lidera ginásio, porque o
+`setNeighborhoodGymDefense` está preso.
+
+**A classificação é por ESCRITO, em duas listas** (39 protegidas / 42 livres), e o que a trava
+cobra é que a **união seja TODAS as 81**: uma callable nova cai fora das duas e fica barulhenta. É
+o molde do `prateleiraDoItem` (*"todo comprável aparece em exatamente uma"*).
+
+#### O QUE O CONVIDADO JOGA
+
+**A jornada inteira** — captura, ginásios, evolução, Elite 4, Pokédex, conquistas, moedas, loja,
+Mewtwo. Tudo isso é `users/{uid}` e `users/{uid}/saves/*`, que **continuam livres pro dono**:
+fechar isso seria fechar o jogo pra ele. Ele passa pela mesma tela de nome de treinador
+(`exigeNomeDeTreinador`), que já funcionava sem uma linha nova — e é dela que sai o **nick** ao
+lado do qual o pedido quer o botão.
+
+#### ⚠️ O MODAL É QUEM MOSTRA "O QUE O MODO É" — e a alternativa foi descartada com motivo
+
+A outra leitura seria deixar a **TELA** do modo abrir e ficar inerte. Ela cai porque aquelas telas
+**chamam o servidor ao abrir**: a Torre gera a torre do dia, o Ginásio pede a geolocalização, o
+online entra na fila. Com o servidor recusando, o convidado veria **cinco telas quebrando com
+erro** em vez de descobrir o que o modo é.
+
+A frase de cada modo mora numa **tabela** (`CONVIDADO_MODOS`), e não escrita em cada botão: escrita
+em cada um, o sexto modo nasceria com a recusa **muda** — a família de defeito do
+`CLASSE_DO_BANNER` (três contextos caindo numa string vazia) e das seis portas das Ilhas.
+
+#### ⚠️ O BOTÃO NÃO COUBE AO LADO DO NICK, E O NÚMERO É BRUTAL
+
+O pedido diz *"do lado do nick"*. **Medido a 320px** (o alvo da casa), com os três na mesma linha:
+
+| | largura |
+|---|---|
+| o quadro do nick | 101px |
+| **o NOME DO TREINADOR dentro dele** | **0px** |
+
+**Ele sumia inteiro** — a moeda ao lado é `flex-shrink:0` e comia o que sobrava. E a linha
+continuava **PARECENDO certa**: o quadro, a moeda e o botão apareciam. É exatamente a família do
+nome que sumiu no card da Máquina (16/09): **medir a dimensão errada dá verde num defeito que se vê
+no primeiro print** — a primeira medição olhou `nomeCortado` e não a LARGURA.
+
+**Encolher o botão não resolve:** medido em 72 / 64 / 58 / **52px** (já ilegível), o nome ainda
+cortava — ele ganhava 57 de 58.
+
+**⚠️ E O `flex-wrap` FOI TENTADO E É PIOR:** ele quebra na **ordem do DOM**, então quem descia era
+o **SINO** — sozinho numa linha, desalinhado. (A 320px o `min-width:165px` no nick fazia o botão
+descer, mas só porque ele estava antes do sino; com o sino no meio a conta desanda.)
+
+**Hoje ele é uma LINHA PRÓPRIA, colada embaixo do nick.** Um comportamento só, em toda largura, vale
+mais que um arranjo esperto que funciona em algumas. Medido depois, a **320 e a 390**: nick e sino
+na mesma linha, **nome inteiro (58 de 58)**, botão de 281px abaixo, **sem rolagem lateral**.
+
+#### ⚠️ A CONTA QUE JÁ EXISTE É O ÚNICO CASO EM QUE "MANTÉM OS TIMES" NÃO VALE
+
+Se o e-mail (ou a conta Google) já pertence a outro uid, o Firebase recusa o vínculo
+(`credential-already-in-use` / `email-already-in-use`) — e **entrar naquela conta abandonaria o
+progresso de convidado, sem volta e sem aviso**. Então a recusa **diz isso**, em vez de oferecer um
+caminho que perde dado em silêncio. Há trava cobrando que ela **não** ofereça "entrar assim mesmo".
+
+#### O QUE ISSO CUSTOU AO JOGO: NADA
+
+**`MOTOR d19915312988 / DIARIO 741ec5a626c3`, idêntico** em 900 batalhas semeadas. Bateria: **38 de
+38**. E os **19 defeitos religados acusam** (1 a 3 falhas cada).
+
+#### ⚠️ O QUE ELE PRECISA LIGAR NO CONSOLE — sem isto NADA funciona
+
+**Authentication → Sign-in method → Anônimo → Ativar.** Sem isso o `signInAnonymously` recusa com
+`auth/operation-not-allowed`, e o botão **explica o que houve** em vez de falhar calado. Não deu
+pra conferir daqui: o MCP do Firebase não expõe os provedores de auth, e descobrir pela API REST
+**criaria uma conta anônima de verdade na produção** — escrever no banco pra ler uma configuração
+não vale a pena quando a resposta é um clique.
+
+#### ⚠️ O QUE FICOU DE FORA, E É DECISÃO REGISTRADA
+
+**OS AMIGOS.** O pedido nomeia **cinco** modos, e a lista de amigos não é um deles. Então um
+convidado consegue aparecer na **busca de treinadores**, mandar pedido de amizade e ser aceito — e
+se ele limpar o navegador, a conta anônima fica órfã e sobra um **amigo fantasma** na lista de quem
+é cadastrado. O que ele **não** consegue é desafiar nem aceitar desafio (as duas estão protegidas),
+que é a parte que vira batalha online — e por isso o **poll de desafio não é agendado pra ele**:
+ele rodaria a cada 10s pra nunca poder responder nada.
+**Se um dia incomodar, são 4 nomes a mover de LIVRES pra PROTEGIDAS** no `test-convidado.js`:
+`sendFriendRequest`, `respondFriendRequest`, `searchTrainers` e `compareTrainers`.
+
+**O BOSS DE DOMINGO** também ficou de fora — ele não está nos cinco, e o evento está **desligado**
+(`BOSS_ATIVO`), então ele já recusa todo mundo.
+
+#### ⚠️ E UM ACHADO NO CAMINHO, NÃO MEXIDO: a travessia das Ilhas ainda é de ADMIN
+
+O `ilhasSaemNoTrecho` abre com **`if(game.ehAdmin !== true) return false;`** — ou seja **a rota das
+Ilhas Laranja pela JORNADA não existe pra 99% dos jogadores**. A seção das Ilhas diz que a porta
+*"saiu das SEIS entradas"* em 21/09 (o botão da home, o `abrirIlhas` e os cinco jogos); conferido,
+os seis estão abertos e **esta sétima ficou**. Não foi tocada porque não foi pedido — e mexer nela
+muda a jornada de todo mundo (a travessia dá **+3 níveis** no time).
+
+
 ### NENHUMA JORNADA COMEÇA SEM NOME DE TREINADOR (13/09/2026)
 
 Reportado assim: *"tem alguns usuários que estão sem nome de treinador mesmo depois de se

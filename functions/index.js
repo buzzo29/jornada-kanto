@@ -5316,6 +5316,7 @@ function pescariaRankDocRef(uid){ return pescariaRankCollRef().doc(uid); }
 /* ⚠️ SÓ SOBE, nunca desce: o recorde é o MELHOR resultado, e uma partida ruim depois de uma boa
    não pode apagar a boa. A transação é o que impede duas abas de gravarem por cima uma da outra. */
 exports.submitFishingScore = onCall(async (request) => {
+  exigeCadastro(request);
   const uid = request.auth && request.auth.uid;
   if(!uid) throw new HttpsError('unauthenticated', 'Faça login.');
   const pontos = pontosDeRankingValidos((request.data || {}).pontos);
@@ -5341,6 +5342,7 @@ exports.submitFishingScore = onCall(async (request) => {
    documento do chefe é escrito a cada ataque e a consulta entraria no caminho crítico; aqui a
    tela é aberta raramente e a consulta custa 10 leituras, uma por linha. */
 exports.getFishingRanking = onCall(async (request) => {
+  exigeCadastro(request);
   const uid = request.auth && request.auth.uid;
   if(!uid) throw new HttpsError('unauthenticated', 'Faça login.');
   const snap = await pescariaRankCollRef().orderBy('pontos', 'desc').limit(PESCARIA_RANK_TOPO).get();
@@ -5379,6 +5381,41 @@ exports._pescariaRank = { topo: PESCARIA_RANK_TOPO };
 /* ⚠️ A PORTA VIVE NUMA FUNÇÃO SÓ: ela estava escrita à mão no `adminListTrainers`, e três cópias
    novas garantiriam que a quarta chamada nascesse sem ela -- numa função administrativa, isso não
    é um defeito de tela, é a porta aberta. */
+/* ============================================================================
+   A GUARDA DO CONVIDADO (23/09/2026)
+
+   Quem entra SEM criar conta usa a sessao ANONIMA do Firebase -- ele tem uid e tem documento em
+   users/{uid}, entao ele passa em `request.auth`, que e a unica pergunta que as 81 callables
+   faziam. Ele joga a JORNADA inteira (que e dele), e fica de fora dos CINCO modos que aparecem
+   pra outros jogadores: Torre, Ligas, Ilhas Laranja, Batalha Online e Ginasio da Cidade.
+
+   ⚠️ O CLIENTE JA RECUSA NA PORTA (ver `ehConvidado` no index.html), e isso NAO basta: uma callable
+   e chamavel direto do console, sem passar por tela nenhuma. E a mesma razao pela qual o
+   `bossRequireTester` existe apesar de o botao do Boss ser escondido.
+
+   ⚠️ ELA NAO LE O BANCO -- e a diferenca pro `exigeAdmin`, que paga uma leitura por chamada. O
+   `sign_in_provider` ja vem DENTRO do token que o Firebase emitiu, entao a guarda custa ZERO
+   leitura e pode entrar em 39 callables sem pesar em nada.
+
+   ⚠️ E O QUE ELA PROTEGE NAO E "escrita": e o que e COMPARTILHADO com outros jogadores. Por isso
+   tres callables que o grep pegaria pelo nome ficam de FORA, e elas sao chamadas pelo jogo
+   principal -- bloquea-las daria erro no console em toda abertura da home:
+     - getMyActiveGymDefenses            (a HOME chama, pra saber que card mostra "Ver ginasio")
+     - checkNeighborhoodGymDefenseForSlot  (o APAGAR SAVE chama)
+     - vacateNeighborhoodGymForDeletedSave (idem)
+   Elas devolvem vazio pro convidado por construcao: ele nunca lidera ginasio nenhum, porque o
+   `setNeighborhoodGymDefense` esta protegido.
+   ============================================================================ */
+function exigeCadastro(request){
+  if(!request.auth){ throw new HttpsError('unauthenticated', 'Faça login.'); }
+  /* o provedor vem do token emitido pelo Firebase Auth, nao de campo escrito pelo cliente */
+  const prov = request.auth.token && request.auth.token.firebase
+    && request.auth.token.firebase.sign_in_provider;
+  if(prov === 'anonymous'){
+    throw new HttpsError('permission-denied', 'Crie sua conta pra jogar este modo.');
+  }
+  return request.auth.uid;
+}
 async function exigeAdmin(request){
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   const uid = request.auth.uid;
@@ -5554,6 +5591,7 @@ function resgateRankDocRef(uid){ return resgateRankCollRef().doc(uid); }
 /* ⚠️ SÓ SOBE, nunca desce, e em TRANSAÇÃO: o recorde é o MELHOR resultado, uma partida ruim depois
    de uma boa não pode apagar a boa, e duas abas não podem gravar por cima uma da outra. */
 exports.submitRescueScore = onCall(async (request) => {
+  exigeCadastro(request);
   const uid = request.auth && request.auth.uid;
   if(!uid) throw new HttpsError('unauthenticated', 'Faça login.');
   const pontos = pontosDeRankingValidos((request.data || {}).pontos);
@@ -5580,6 +5618,7 @@ exports.submitRescueScore = onCall(async (request) => {
    declarado no `firestore.indexes.json` -- sem ele a consulta morre com `FAILED_PRECONDITION` e o
    ranking não carrega NUNCA, que é justamente o defeito que o jogador reportou em 21/09/2026. */
 exports.getRescueRanking = onCall(async (request) => {
+  exigeCadastro(request);
   const uid = request.auth && request.auth.uid;
   if(!uid) throw new HttpsError('unauthenticated', 'Faça login.');
   const snap = await resgateRankCollRef().orderBy('pontos', 'desc').limit(RESGATE_RANK_TOPO).get();
@@ -5645,6 +5684,7 @@ exports._resgateRank = { topo: RESGATE_RANK_TOPO };
 const ILHAS_DO_ARQUIPELAGO = ['mikan', 'navel', 'trovita', 'kumquat', 'pummelo'];
 
 exports.registerIslandPlay = onCall(async (request) => {
+  exigeCadastro(request);
   const uid = request.auth && request.auth.uid;
   if(!uid) throw new HttpsError('unauthenticated', 'Faça login.');
   const ilha = String((request.data && request.data.ilha) || '');
@@ -5662,6 +5702,7 @@ function selecaoRankCollRef(){ return db.collection('selecaoRanking'); }
 function selecaoRankDocRef(uid){ return selecaoRankCollRef().doc(uid); }
 
 exports.sendSelecaoResult = onCall(async (request) => {
+  exigeCadastro(request);
   const uid = request.auth && request.auth.uid;
   if(!uid) throw new HttpsError('unauthenticated', 'Faça login.');
   const venceu = !!(request.data && request.data.venceu);
@@ -5693,6 +5734,7 @@ exports.sendSelecaoResult = onCall(async (request) => {
 });
 
 exports.getSelecaoRanking = onCall(async (request) => {
+  exigeCadastro(request);
   const uid = request.auth && request.auth.uid;
   if(!uid) throw new HttpsError('unauthenticated', 'Faça login.');
   /* ⚠️ ORDENADO PELO APROVEITAMENTO, ao pé da letra do pedido, com as PARTIDAS como desempate.
@@ -5767,6 +5809,7 @@ function corridaTimeSaneado(bruto){
   }).filter(p => p.speciesId);
 }
 exports.submitRaceTime = onCall(async (request) => {
+  exigeCadastro(request);
   const uid = request.auth && request.auth.uid;
   if(!uid) throw new HttpsError('unauthenticated', 'Faça login.');
   const d = request.data || {};
@@ -5799,6 +5842,7 @@ exports.submitRaceTime = onCall(async (request) => {
 /* Os dois tops numa chamada só: a tela mostra o da modalidade escolhida, e trocar de modalidade
    não pode custar outra ida ao servidor. */
 exports.getRaceRanking = onCall(async (request) => {
+  exigeCadastro(request);
   const uid = request.auth && request.auth.uid;
   if(!uid) throw new HttpsError('unauthenticated', 'Faça login.');
   const meuDoc = await corridaRankDocRef(uid).get();
@@ -5916,6 +5960,7 @@ function neighborhoodGymLeaderRecordRef(gymRef, uid){
 // no PRÓPRIO cliente, pra nem chamar essa função à toa quando a pessoa não se moveu). Só o servidor
 // fala com o Nominatim -- centraliza e limita o ritmo de chamadas pro serviço gratuito deles
 exports.resolveNeighborhood = onCall(async (request) => {
+  exigeCadastro(request);
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   const { lat, lon } = request.data || {};
   if(typeof lat !== 'number' || typeof lon !== 'number'){
@@ -5948,6 +5993,7 @@ exports.resolveNeighborhood = onCall(async (request) => {
 // abre, mesmo quando a localização em si veio do cache -- a liderança pode ter mudado sem a pessoa
 // ter se movido nadinha
 exports.getNeighborhoodGymDetail = onCall(async (request) => {
+  exigeCadastro(request);
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   const { city, countryCode } = request.data || {};
   if(!city){ throw new HttpsError('invalid-argument', 'Cidade não informada.'); }
@@ -5976,6 +6022,7 @@ exports.getNeighborhoodGymDetail = onCall(async (request) => {
 // e trocar sua PRÓPRIA defesa também não é uma disputa contra ninguém). Só falha se já existir um
 // líder DIFERENTE -- nesse caso é preciso desafiar de verdade (challengeNeighborhoodGym)
 exports.setNeighborhoodGymDefense = onCall(async (request) => {
+  exigeCadastro(request);
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   const uid = request.auth.uid;
   const { city, countryCode, team, terrainId } = request.data || {};
@@ -6062,6 +6109,7 @@ const NEIGHBORHOOD_GYM_CHALLENGE_COOLDOWN_MS = 10 * 60 * 1000; // 10min -- por t
    Permuta o CÓDIGO, e não o time do save: o save pode ter mudado de ordem (ou de nível) desde que
    a defesa foi montada, e o líder está reordenando o que ele vê defendendo. */
 exports.reorderNeighborhoodGymDefense = onCall(async (request) => {
+  exigeCadastro(request);
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   const uid = request.auth.uid;
   const { city, countryCode } = request.data || {};
@@ -6123,6 +6171,7 @@ function ataquesDoDoc(lista){
   });
 }
 exports.challengeNeighborhoodGym = onCall(async (request) => {
+  exigeCadastro(request);
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   const uid = request.auth.uid;
   const { city, countryCode, team } = request.data || {};
@@ -6342,6 +6391,7 @@ exports.challengeNeighborhoodGym = onCall(async (request) => {
    jogador lidera poucos ginásios, e o teto abaixo garante isso. */
 const MAX_GINASIOS_LIDERADOS = 50;
 exports.listMyNeighborhoodGyms = onCall(async (request) => {
+  exigeCadastro(request);
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   const uid = request.auth.uid;
   const snap = await db.collection('neighborhoodGyms').where('leaderUid', '==', uid).limit(MAX_GINASIOS_LIDERADOS).get();
@@ -6363,6 +6413,7 @@ exports.listMyNeighborhoodGyms = onCall(async (request) => {
   return { gyms };
 });
 exports.getNeighborhoodGymChallengeCooldowns = onCall(async (request) => {
+  exigeCadastro(request);
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   const uid = request.auth.uid;
   const { city, countryCode } = request.data || {};
@@ -6438,6 +6489,7 @@ exports.vacateNeighborhoodGymForDeletedSave = onCall(async (request) => {
 // esperar ser destronado pra "valer". Se o mesmo treinador aparece em mais de um lugar (foi líder
 // várias vezes), só entra UMA vez no ranking, com o maior valor de cada métrica já alcançado por ele
 exports.getNeighborhoodGymLeaderboard = onCall(async (request) => {
+  exigeCadastro(request);
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   const { city, countryCode } = request.data || {};
   if(!city){ throw new HttpsError('invalid-argument', 'Cidade não informada.'); }
@@ -6497,6 +6549,7 @@ exports.getMyActiveGymDefenses = onCall(async (request) => {
 // líder abandona VOLUNTARIAMENTE o posto -- o ginásio fica vago (pronto pra qualquer um reivindicar)
 // e o time dele é liberado do índice de exclusividade (pode passar a liderar outro ginásio, se quiser)
 exports.leaveNeighborhoodGymLeadership = onCall(async (request) => {
+  exigeCadastro(request);
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   const uid = request.auth.uid;
   const { city, countryCode } = request.data || {};
@@ -6591,6 +6644,7 @@ exports.markNotificationsRead = onCall(async (request) => {
 // só resume o que interessa pra uma lista (sem o log de confrontos detalhado, que é pesado demais
 // pra uma lista de histórico -- só faz sentido na tela de resultado da própria luta)
 exports.getNeighborhoodGymChallengeHistory = onCall(async (request) => {
+  exigeCadastro(request);
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   const { city, countryCode } = request.data || {};
   if(!city){ throw new HttpsError('invalid-argument', 'Cidade não informada.'); }
@@ -7419,6 +7473,7 @@ function towerVisibleFloors(torre, run){
 }
 
 exports.getTrainerTower = onCall(async (request) => {
+  exigeCadastro(request);
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   await towerRequireTester(request.auth.uid);
   const torre = await towerGetToday();
@@ -7579,6 +7634,7 @@ async function resolverTimeDosSaves(uid, escolhidos, tamanho, ondeErro, minimo){
   return time;
 }
 exports.startTrainerTowerRun = onCall(async (request) => {
+  exigeCadastro(request);
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   const uid = request.auth.uid;
   await towerRequireTester(uid);
@@ -7602,6 +7658,7 @@ exports.startTrainerTowerRun = onCall(async (request) => {
    perder deixa o jogador NO MESMO ANDAR, com o time intacto -- ele tenta de novo, com o mesmo
    time ou com outro. */
 exports.fightTrainerTowerFloor = onCall(async (request) => {
+  exigeCadastro(request);
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   const uid = request.auth.uid;
   await towerRequireTester(uid);
@@ -7832,6 +7889,7 @@ async function towerRegisterClear(uid, dateId){
    resultado. Fica no servidor porque o time da subida mora lá -- o cliente só manda a nova ordem.
    Aceita apenas uma PERMUTAÇÃO do time atual: não dá pra trocar pokémon nem nível por aqui. */
 exports.setTrainerTowerOrder = onCall(async (request) => {
+  exigeCadastro(request);
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   const uid = request.auth.uid;
   await towerRequireTester(uid);
@@ -8802,6 +8860,7 @@ exports.useRareCandy = onCall(async (request) => {
 });
 
 exports.getTrainerTowerRanking = onCall(async (request) => {
+  exigeCadastro(request);
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   await towerRequireTester(request.auth.uid);
   /* Ordena por DIAS NO TOPO -- quantas vezes o treinador chegou no andar mais alto do dia. O
@@ -8842,6 +8901,7 @@ exports.getTrainerTowerRanking = onCall(async (request) => {
    um dia a mais ou a menos que o ranking. */
 const TORRE_DIAS_NO_HISTORICO = 5;
 exports.getTrainerTowerHistory = onCall(async (request) => {
+  exigeCadastro(request);
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   await towerRequireTester(request.auth.uid);
   const hoje = trainersLeagueTodayDateStr();
@@ -9254,6 +9314,7 @@ function battleView(estado, uid){
 }
 
 exports.joinBattleQueue = onCall(async (request) => {
+  exigeCadastro(request);
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   const uid = request.auth.uid;
   await battleRequireTester(uid);
@@ -9337,6 +9398,7 @@ function montarBatalhaOnline(aSide, bSide){
 
 /* Aceita a partida. Quando os DOIS aceitam, a batalha é criada aqui mesmo, na transação. */
 exports.acceptOnlineMatch = onCall(async (request) => {
+  exigeCadastro(request);
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   const uid = request.auth.uid;
   const matchId = String(request.data?.matchId || '');
@@ -9387,6 +9449,7 @@ async function battleExpirePending(matchId){
 }
 
 exports.pollBattleQueue = onCall(async (request) => {
+  exigeCadastro(request);
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   const uid = request.auth.uid;
   await battleRequireTester(uid);
@@ -9429,6 +9492,7 @@ exports.pollBattleQueue = onCall(async (request) => {
 
 /* Histórico e placar do jogador, pra tela da Batalha Online. */
 exports.getMyBattleHistory = onCall(async (request) => {
+  exigeCadastro(request);
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   const snap = await db.collection('users').doc(request.auth.uid).get();
   const d = snap.exists ? snap.data() : {};
@@ -9443,6 +9507,7 @@ exports.getMyBattleHistory = onCall(async (request) => {
 /* Devolve uma batalha encerrada pra reprise. Só quem participou pode ver -- o documento guarda
    os times dos dois, e sem essa checagem qualquer um leria o time de qualquer jogador. */
 exports.getOnlineBattleReplay = onCall(async (request) => {
+  exigeCadastro(request);
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   const uid = request.auth.uid;
   const battleId = String(request.data?.battleId || '');
@@ -9461,6 +9526,7 @@ exports.getOnlineBattleReplay = onCall(async (request) => {
 });
 
 exports.leaveBattleQueue = onCall(async (request) => {
+  exigeCadastro(request);
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   const uid = request.auth.uid;
   await battleQueueColl().doc(uid).delete().catch(()=>{});
@@ -9492,6 +9558,7 @@ exports.leaveBattleQueue = onCall(async (request) => {
    a transação resolve o confronto antes de responder. Os dois clientes chamam a cada
    segundo, então qualquer um dos dois faz a partida avançar. */
 exports.getOnlineBattle = onCall(async (request) => {
+  exigeCadastro(request);
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   const uid = request.auth.uid;
   const battleId = String(request.data?.battleId || '');
@@ -9601,6 +9668,7 @@ async function battleApplyStats(estado){
    nunca um código novo. Aceitar um código aqui deixaria montar o time depois de ver o adversário,
    que é exatamente o que a escolha às cegas existe pra impedir. */
 exports.pickOnlineBattleTeam = onCall(async (request) => {
+  exigeCadastro(request);
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   const uid = request.auth.uid;
   const battleId = String(request.data?.battleId || '');
@@ -9627,6 +9695,7 @@ exports.pickOnlineBattleTeam = onCall(async (request) => {
 /* Escolhe quem entra no próximo confronto. Se os DOIS já escolheram, a espera acaba na hora --
    não faz sentido segurar os 5 segundos se ninguém mais precisa deles. */
 exports.pickOnlineBattlePokemon = onCall(async (request) => {
+  exigeCadastro(request);
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   const uid = request.auth.uid;
   const battleId = String(request.data?.battleId || '');
@@ -9676,6 +9745,7 @@ const LOBBY_TTL_MS = 20 * 1000;   // sem carimbo por esse tempo = saiu da lista
 function lobbyColl(){ return db.collection('battleLobby'); }
 
 exports.joinBattleLobby = onCall(async (request) => {
+  exigeCadastro(request);
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   const uid = request.auth.uid;
   const codes = battleCodes(request.data);
@@ -9735,6 +9805,7 @@ exports.joinBattleLobby = onCall(async (request) => {
 });
 
 exports.leaveBattleLobby = onCall(async (request) => {
+  exigeCadastro(request);
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   await lobbyColl().doc(request.auth.uid).delete().catch(()=>{});
   return { ok: true };
@@ -9743,6 +9814,7 @@ exports.leaveBattleLobby = onCall(async (request) => {
 /* Desafia alguém do lobby. O desafiante já entra como "aceito": ele acabou de clicar,
    não faz sentido pedir confirmação de novo. */
 exports.challengeLobbyPlayer = onCall(async (request) => {
+  exigeCadastro(request);
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   const uid = request.auth.uid;
   const alvo = String(request.data?.targetUid || '');
@@ -10433,6 +10505,7 @@ async function encerrarDesafio(d){
 }
 
 exports.challengeFriend = onCall(async (request) => {
+  exigeCadastro(request);
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   const uid = request.auth.uid;
   const alvo = String(request.data?.targetUid || '').trim();
@@ -10543,6 +10616,7 @@ exports.cancelFriendChallenge = onCall(async (request) => {
    (mesma regra do lobby: montar time depois de ver o adversário é o que a escolha às cegas
    existe pra impedir). */
 exports.respondFriendChallenge = onCall(async (request) => {
+  exigeCadastro(request);
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   const uid = request.auth.uid;
   const id = String(request.data?.challengeId || '').trim();
