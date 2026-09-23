@@ -193,8 +193,13 @@ ok('o pe do adversario fica ACIMA do pe do jogador nos 51', invertidos.length ==
 const sub = estilos.find(e => e.id === 'submarino_afundado');
 ok('o submarino tem cena dedicada',
    dedicadas.some(r => r.sel.indexOf('submarino_afundado') >= 0));
-ok('o pe do adversario no submarino desceu do 64% fixo de antes',
-   !!sub && pes(sub.st).ey > 64, sub ? pes(sub.st).ey + '%' : '-');
+/* ⚠️ ELA MEDIA O NUMERO ATE 23/09/2026 ("desceu do 64% fixo de antes") e caiu quando a tabela
+   INTEIRA subiu 4 pontos -- sem nada estar errado. Hoje ela mede a REGRA: o submarino foi AFINADO
+   a parte, e e isso que o protege de alguem normalizar a tabela e devolve-lo pra dentro da parede. */
+const generico = estilos.find(e => e.id === 'campo_aberto');
+ok('o submarino tem posicao propria, diferente da generica',
+   !!sub && !!generico && pes(sub.st).ey !== pes(generico.st).ey,
+   sub && generico ? 'submarino ' + pes(sub.st).ey + '% x campo_aberto ' + pes(generico.st).ey + '%' : '-');
 
 /* ⚠️ E O CSS LE AS QUATRO COMO VARIAVEL COM PADRAO: terreno que saia da tabela um dia volta ao
    comportamento antigo em vez de ficar sem chao. */
@@ -203,6 +208,39 @@ const semPadrao = leituras.filter(v => !/,\s*[\d.]+%/.test(v));
 ok('TODA leitura das quatro posicoes no CSS tem valor padrao',
    leituras.length >= 4 && semPadrao.length === 0,
    leituras.length + ' leituras' + (semPadrao.length ? ' -- sem padrao: ' + semPadrao.join(', ') : ''));
+
+
+/* ============================================================================
+   TODO ADVERSARIO NA MESMA ALTURA (23/09/2026).
+
+   ⚠️ REPORTADO: *"o gyarados tava mais pra cima, ele morreu e entrou um raichu, e ai o raichu
+   ficou mais pra baixo"*. O estilo da cena era IDENTICO nos 11 confrontos -- quem mudava era a
+   ESPECIE: quem VOA leva `padding-bottom:10px` no wrap, e como o sprite do adversario e ampliado
+   1,55x esses 10px viram 15,5px. Sao 37 das 250 que voam, entao a diferenca ia e vinha de
+   confronto pra confronto sem nada na tela explicando.
+
+   Estas travas leem o CSS porque o defeito e de CSS: o HTML das duas especies e legitimamente
+   diferente (a classe do ground-base muda, e ela decide a FORMA da sombra) -- o que nao pode
+   diferir e a ALTURA.
+   ============================================================================ */
+console.log('\nCENA DE BATALHA -- todo adversario na mesma altura');
+/* ⚠️ A REGRA GENERICA E ANCORADA NO COMECO DA LINHA: sem isso o padrao casa tambem com a do
+   ADVERSARIO (que a CONTEM por inteiro), e a trava passa a medir a regra errada -- ela reportou
+   "padding-bottom:0" como se fosse o levantamento. E a familia do padrao largo demais. */
+const regraAr = htmlCena.match(/\n\s*\.battle-ground-base\.air \+ \.battle-sprite-stage \.battle-sprite-wrap\{([^}]*)\}/);
+ok('a regra que levanta quem voa existe', !!regraAr, regraAr ? regraAr[1] : '-');
+const zeraAr = htmlCena.match(/\.battle-fighter\.enemy[^{]*\.battle-sprite-wrap\{padding-bottom:0;?\}/);
+ok('no lado do ADVERSARIO ela e zerada', !!zeraAr,
+   zeraAr ? zeraAr[0].slice(0, 70) : 'quem voa voltaria a ficar 15px acima de quem nao voa');
+/* ⚠️ E A COMPENSACAO DA SOMBRA TEM QUE TER SAIDO JUNTO: ela existia SO por causa do levantamento
+   (a sombra subia 15px pra alcancar o pe). Com o levantamento fora, ela poria a sombra 15px ACIMA
+   do pe -- ou seja, os dois andam juntos nos dois sentidos. */
+ok('a compensacao de 15px da sombra saiu junto',
+   htmlCena.indexOf('.battle-fighter.enemy .battle-ground-base.air{margin-top:') < 0);
+/* o levantamento continua valendo do lado do JOGADOR -- ali ele nunca foi reportado, e e o que
+   faz quem voa parecer que voa */
+ok('do lado do JOGADOR o levantamento continua',
+   !/\.battle-fighter\.player[^{]*\.battle-sprite-wrap\{padding-bottom:0/.test(htmlCena));
 
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
 process.exit(falhas ? 1 : 0);

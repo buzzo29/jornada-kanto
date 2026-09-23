@@ -1029,7 +1029,20 @@
      e `inset:0` dela), enquanto o `left`/`right` do `::after` resolve contra o PALCO -- que e 40%
      da cena. Por isso os mesmos 2% viram -11% num e 5 pontos no outro. */
   .battle-scene .battle-fighter.enemy .battle-ground-base{margin-left:-10%;}
-  .battle-scene .battle-fighter.enemy .battle-ground-base.air{margin-top:-19px;}
+  /* ⚠️ TODO ADVERSARIO FICA NA MESMA ALTURA (23/09/2026, reportado: *"o gyarados tava mais pra
+     cima, ele morreu e entrou um raichu, e ai o raichu ficou mais pra baixo"*).
+     ⚠️ O ESTILO DA CENA ERA IDENTICO NOS 11 CONFRONTOS -- medido. Quem mudava era a ESPECIE: quem
+     VOA leva `padding-bottom:10px` no wrap logo abaixo, e como o sprite do adversario e ampliado
+     1,55x esses 10px viram **15,5px** de altura a mais. Gyarados e Agua/VOADOR e Raichu e
+     Eletrico -- sao **37 das 250** que voam, entao a diferenca aparecia e sumia de confronto pra
+     confronto sem nada na tela explicando.
+     ⚠️ E O CONSERTO SAO DOIS PASSOS QUE ANDAM JUNTOS: a `TERRAIN_BATTLE_FOOTING` subiu 4 pontos
+     (pra a altura em que o voador ja estava, que e a que foi pedida) E o levantamento por especie
+     saiu daqui. Um sem o outro poe o voador 15px acima de todo mundo de novo.
+     ⚠️ O JOGADOR NAO FOI TOCADO: ali o levantamento continua valendo, e ele nunca foi reportado --
+     o quadro de baixo tem o chao muito mais perto, entao os 17,5px dele (10 x 1,75) se leem como
+     o pokemon flutuando, nao como um confronto diferente do outro. */
+  .battle-scene .battle-fighter.enemy .battle-ground-base.air + .battle-sprite-stage .battle-sprite-wrap{padding-bottom:0;}
   .battle-scene .battle-fighter.enemy .battle-sprite-stage::after{left:25.5%;right:30.5%;}
   .battle-sprite-stage{
     position:absolute;width:40%;height:148px;margin:0;
@@ -6384,57 +6397,57 @@ const TERRAIN_SCENE_TILES = {
    ⚠️ E O CSS LE ESTAS QUATRO COMO VARIAVEL, com o valor de hoje como PADRAO: cenario que saia
    desta tabela nao fica sem chao -- ele volta ao comportamento antigo. */
 const TERRAIN_BATTLE_FOOTING = {
-  "vulcao": [24, 80, 73, 67],
-  "arena_suspensa": [24, 82, 76, 67],
-  "pantano": [24, 81, 72, 69],
-  "recifes_coral": [24, 81, 73, 68],
-  "caverna_cristais": [24, 81, 73, 68],
-  "usina_eletrica": [24, 82, 76, 67],
-  "floresta_ancestral": [24, 81, 72, 69],
-  "deserto": [24, 82, 76, 67],
-  "montanha_nevada": [24, 81, 73, 68],
-  "dojo_tradicional": [24, 82, 76, 67],
-  "campo_aberto": [24, 82, 76, 67],
-  "mina_subterranea": [24, 82, 76, 67],
-  "castelo_assombrado": [24, 82, 76, 67],
-  "templo_mistico": [24, 82, 74, 69],
-  "jardim_venenoso": [24, 81, 72, 69],
-  "cachoeira_congelada": [24, 82, 72, 69],
-  "pico_tempestade": [24, 82, 76, 67],
-  "caverna_dragao": [24, 81, 73, 68],
-  "tundra": [24, 81, 73, 68],
-  "ilha_vulcanica": [24, 82, 76, 67],
-  "navio_fantasma": [24, 82, 76, 67],
-  "mansao_incendiada": [24, 82, 76, 67],
-  "arena_subterranea": [24, 82, 76, 67],
-  "jardim_zen": [24, 82, 76, 67],
-  "colmeia_chamas": [24, 82, 74, 68],
-  "torre_toxica": [24, 82, 76, 67],
-  "cidade_iluminada": [24, 82, 76, 67],
-  "arena_campeoes": [24, 82, 76, 67],
-  "falesias_glaciais": [24, 81, 73, 68],
-  "santuario_draconico": [24, 82, 74, 69],
-  "termas_vulcanicas": [24, 82, 78, 67],
-  "canion_rochoso": [24, 81, 73, 68],
-  "reserva_natural": [24, 82, 73, 69],
-  "porto_abandonado": [24, 81, 72, 69],
-  "jardim_borboletas": [24, 82, 76, 67],
-  "templo_monges": [24, 82, 74, 69],
-  "pantano_radioativo": [24, 82, 76, 67],
-  "ninho_ancestral": [24, 81, 73, 68],
-  "floresta_eletrificada": [24, 81, 72, 69],
-  "beco_sombrio": [24, 82, 76, 67],
-  "torre_queimada": [24, 82, 74, 69],
-  "mata_fechada": [24, 81, 72, 69],
-  "gruta_sem_luz": [24, 81, 73, 68],
-  "noite_lua_cheia": [24, 81, 72, 69],
-  "covil_dos_lobos": [24, 81, 73, 68],
-  "ferro_velho": [24, 82, 73, 68],
-  "fortaleza_ferro": [24, 82, 74, 69],
-  "submarino_afundado": [24, 82, 76, 68],
-  "hangar_gelado": [24, 82, 76, 67],
-  "torre_de_radio": [24, 82, 74, 69],
-  "ninho_blindado": [24, 82, 76, 67]
+  "vulcao": [24, 80, 73, 63],
+  "arena_suspensa": [24, 82, 76, 63],
+  "pantano": [24, 81, 72, 65],
+  "recifes_coral": [24, 81, 73, 64],
+  "caverna_cristais": [24, 81, 73, 64],
+  "usina_eletrica": [24, 82, 76, 63],
+  "floresta_ancestral": [24, 81, 72, 65],
+  "deserto": [24, 82, 76, 63],
+  "montanha_nevada": [24, 81, 73, 64],
+  "dojo_tradicional": [24, 82, 76, 63],
+  "campo_aberto": [24, 82, 76, 63],
+  "mina_subterranea": [24, 82, 76, 63],
+  "castelo_assombrado": [24, 82, 76, 63],
+  "templo_mistico": [24, 82, 74, 65],
+  "jardim_venenoso": [24, 81, 72, 65],
+  "cachoeira_congelada": [24, 82, 72, 65],
+  "pico_tempestade": [24, 82, 76, 63],
+  "caverna_dragao": [24, 81, 73, 64],
+  "tundra": [24, 81, 73, 64],
+  "ilha_vulcanica": [24, 82, 76, 63],
+  "navio_fantasma": [24, 82, 76, 63],
+  "mansao_incendiada": [24, 82, 76, 63],
+  "arena_subterranea": [24, 82, 76, 63],
+  "jardim_zen": [24, 82, 76, 63],
+  "colmeia_chamas": [24, 82, 74, 64],
+  "torre_toxica": [24, 82, 76, 63],
+  "cidade_iluminada": [24, 82, 76, 63],
+  "arena_campeoes": [24, 82, 76, 63],
+  "falesias_glaciais": [24, 81, 73, 64],
+  "santuario_draconico": [24, 82, 74, 65],
+  "termas_vulcanicas": [24, 82, 78, 63],
+  "canion_rochoso": [24, 81, 73, 64],
+  "reserva_natural": [24, 82, 73, 65],
+  "porto_abandonado": [24, 81, 72, 65],
+  "jardim_borboletas": [24, 82, 76, 63],
+  "templo_monges": [24, 82, 74, 65],
+  "pantano_radioativo": [24, 82, 76, 63],
+  "ninho_ancestral": [24, 81, 73, 64],
+  "floresta_eletrificada": [24, 81, 72, 65],
+  "beco_sombrio": [24, 82, 76, 63],
+  "torre_queimada": [24, 82, 74, 65],
+  "mata_fechada": [24, 81, 72, 65],
+  "gruta_sem_luz": [24, 81, 73, 64],
+  "noite_lua_cheia": [24, 81, 72, 65],
+  "covil_dos_lobos": [24, 81, 73, 64],
+  "ferro_velho": [24, 82, 73, 64],
+  "fortaleza_ferro": [24, 82, 74, 65],
+  "submarino_afundado": [24, 82, 76, 64],
+  "hangar_gelado": [24, 82, 76, 63],
+  "torre_de_radio": [24, 82, 74, 65],
+  "ninho_blindado": [24, 82, 76, 63]
 };
 function terrainBattleSceneStyle(terrain){
   const id = terrain && terrain.id;
@@ -6445,7 +6458,13 @@ function terrainBattleSceneStyle(terrain){
   /* ⚠️ O `--battle-scene-id` E LIDO POR SELETOR DE ATRIBUTO no CSS (os tres cenarios
      dedicados), entao o FORMATO importa: sem espaco depois dos dois-pontos e COM ponto-e-virgula
      no fim. E a mesma armadilha que o `--battle-atlas` ja carrega -- mexer aqui faz o fundo sumir
-     sem erro nenhum. */
+     sem erro nenhum.
+     ⚠️ E NADA PODE ESCREVER NO `style` DESTE ELEMENTO PELO JS: qualquer `el.style.x = ...` ou
+     `setProperty` RE-SERIALIZA o atributo inteiro e o navegador poe **espaco depois de cada
+     dois-pontos** -- o `--battle-atlas:0;` vira `--battle-atlas: 0;`, o seletor para de casar e o
+     cenario fica VAZIO, sem erro. Conferido no navegador. Quem precisar mexer numa das variaveis
+     tem que fazer por REGRA de CSS, nunca pelo style do elemento (nem por um ancestral: as quatro
+     estao inline aqui, e inline ganha de heranca). */
   return `--battle-player-x:${px}%;--battle-player-y:${py}%;--battle-enemy-x:${ex}%;--battle-enemy-y:${ey}%;--battle-scene-id:${id || 'campo_aberto'};--battle-atlas:${atlas};--battle-terrain-size:300% ${rows*100}%;--battle-terrain-position:${col*50}% ${row*100/(rows-1)}%;--battle-platform:${m[5]};--battle-platform-dark:${m[6]};--battle-platform-accent:${m[7]};`;
 }
 

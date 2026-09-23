@@ -5957,6 +5957,64 @@ cena. Por isso os mesmos 2% viram `-11%` num e 5 pontos no outro.
 
 **O jogador não foi tocado** (medido: desvio 0 em x e em y, antes e depois).
 
+
+#### ⚠️ SÓ O PRIMEIRO CONFRONTO PARECIA AJUSTADO — E A CAUSA ERA A ESPÉCIE (23/09/2026)
+
+Reportado assim: *"somente o primeiro confronto que esta com o sprite do pokemon mais para cima ...
+numa luta o gyarados tava mais pra cima, ele morreu e entrou um raichu, e ai o raichu ficou mais
+pra baixo"*.
+
+**⚠️ O ESTILO DA CENA ERA IDÊNTICO NOS ONZE CONFRONTOS, e isso foi a primeira coisa medida** —
+`enemy-y=67%` em todos, numa batalha de verdade renderizada confronto a confronto. Ou seja o
+ajuste PEGOU em todos: o que mudava era **a espécie**.
+
+**Quem VOA leva `padding-bottom:10px` no wrap** (é o que faz o pokémon pairar), e como o sprite do
+adversário é ampliado **1,55×** esses 10px viram **15,5px** de altura a mais. O **Gyarados é
+Água/VOADOR** e o **Raichu é Elétrico** — o relato descreve exatamente isso. Medido nas 250:
+**37 voam**, 12 são aquáticas e 201 ficam no chão, então a diferença ia e vinha de confronto pra
+confronto sem nada na tela explicando.
+
+**O CONSERTO SÃO DOIS PASSOS QUE ANDAM JUNTOS**, e um sem o outro devolve o defeito:
+
+1. a `TERRAIN_BATTLE_FOOTING` subiu **4 pontos** nos 51 (67→63 no caso comum) — que é a altura em
+   que o voador já estava, e é a que foi pedida;
+2. o **levantamento por espécie saiu do lado do adversário** — senão o voador ficaria 15px acima de
+   todo mundo de novo, só que mais alto ainda.
+
+E a **compensação de 15px da sombra saiu junto**: ela existia SÓ por causa do levantamento (a
+sombra subia pra alcançar o pé). Com o levantamento fora, ela poria a sombra 15px **acima** do pé —
+os dois andam juntos nos dois sentidos, e há trava pra isso.
+
+**⚠️ O JOGADOR NÃO FOI TOCADO, e é decisão:** ali o levantamento continua valendo e nunca foi
+reportado — o quadro de baixo tem o chão muito mais perto, então os 17,5px dele (10 × 1,75) se leem
+como o pokémon pairando, não como um confronto diferente do outro.
+
+**MEDIDO DEPOIS, a 320px:** Gyarados e Raichu no **mesmo pé (62,8%)** no campo aberto e no deserto,
+com a sombra em `dy=0` nos dois. Varrendo os 51 terrenos com os dois maiores sprites do jogo: o pé
+do adversário cai em **62,8 / 63,8 / 64,8%** (as três faixas afinadas), a sobreposição com o cartão
+é **ZERO**, ninguém sai da cena e não há rolagem lateral.
+
+**⚠️ E O QUE ISSO CUSTOU FOI MEDIDO ANTES DE ESCOLHER O LADO.** Havia duas saídas — trazer o voador
+pra baixo ou levar todo mundo pra cima —, e elas dão pixels diferentes: a primeira põe o pé na
+linha que a arte tinha, a segunda o sobe 15px. Conferido no navegador nos cenários de horizonte
+mais apertado (deserto, mina subterrânea, dojo): a **63% o pé ainda cai no chão desenhado**, então
+a segunda coube — e ela é a que o relato pede.
+
+#### ⚠️ E O HARNESS ENCONTROU UMA ARMADILHA QUE VALE PRO JOGO: `el.style` DERRUBA O FUNDO
+
+Sondando a altura no navegador eu fiz `cena.style.setProperty('--battle-enemy-y','63%')` — e o
+**cenário sumiu**. A causa: qualquer escrita em `el.style` **RE-SERIALIZA o atributo inteiro**, e o
+navegador põe **espaço depois de cada dois-pontos**. O `--battle-atlas:0;` vira `--battle-atlas: 0;`,
+o seletor `[style*="--battle-atlas:0;"]` para de casar e o fundo fica vazio **sem erro nenhum**.
+
+Conferido no navegador, o atributo depois do `setProperty`:
+`--battle-player-x: 24%; ... --battle-atlas: 0; ...`
+
+**Hoje nada no jogo faz isso** (o único ponto que escreve `style` na cena escreve em elementos que
+ele mesmo CRIA), e o aviso ficou no comentário do `terrainBattleSceneStyle`. **E não adianta mexer
+num ancestral**: as quatro variáveis estão inline no próprio elemento, e inline ganha de herança —
+quem precisar sondar tem que fazer por REGRA de CSS.
+
 #### ⚠️ O QUE O PORT CUSTOU E NÃO ESTAVA PEDIDO: O NOME DO TREINADOR TRUNCA
 
 Com o painel indo de 54% pra 50% no celular, o nome do treinador **passa a cortar quando o time tem
@@ -5987,6 +6045,8 @@ São 15 pontas, e as que importam:
   inteira, não um slot de uma folha 3×3);
 - **todo terreno tem posição PRÓPRIA na tabela** (nenhum cai no padrão) e **o pé do adversário fica
   ACIMA do do jogador** nos 51 — a câmera é frontal, e invertido os dois trocam de profundidade;
+- **no lado do adversário, quem voa NÃO é levantado** — é a trava do relato do Gyarados × Raichu, e
+  ela anda em par com *"a compensação de 15px da sombra saiu junto"*;
 - **TODA leitura das quatro posições no CSS tem valor padrão** (16 leituras) — cenário que saia da
   tabela um dia volta ao comportamento antigo em vez de ficar sem chão.
 
