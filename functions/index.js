@@ -2991,9 +2991,30 @@ function doExchange(active, enemy, rng, diario){
     if(alvo.hp < alvo.maxHp) return null;              // só vale contra quem está CHEIO
     const raspando = quemBate.hp <= quemBate.maxHp * MORIBUNDO_ABAIXO_DE;
     const dif = (quemBate.level || 0) - (alvo.level || 0);
-    /* a diferença é do ATACANTE sobre o alvo; negativa cai no piso pelo clamp abaixo */
+    /* ⚠️ O CRÍTICO IGNORA A TRAVA DE NÍVEL (23/09/2026, a pedido: *"se o dano for crítico, para
+       ignorar essa trava de 15 levels de diferença, se for crítico, pode deixar matar de
+       primeira"*).
+
+       ⚠️ ELE LÊ O MESMO CAMPO QUE DECIDE O SELO (`lastCrit`), e isso é a decisão: se a tela diz
+       CRÍTICO, o golpe mata; se não diz, não mata. Qualquer outra fonte -- "algum tapa foi
+       crítico", por exemplo -- deixaria uma troca matar de vida cheia SEM o selo na tela, e aí o
+       jogador não teria como ligar uma coisa à outra. O log já trata o crítico como propriedade
+       da TROCA (o `c` do diário sai do mesmo `lastCrit` pra todas as linhas daquele atacante),
+       então as duas leituras já concordam por construção.
+
+       ⚠️ E ELE SÓ DERRUBA A TRAVA DE NÍVEL -- a de 14/09, de quem está RASPANDO, continua valendo.
+       As duas são regras diferentes: esta olha a diferença de PODER e aquela olha o ESTADO do
+       atacante (*"um pokémon muito ferido não deveria aguentar tanto numa luta"*), e um crítico
+       não muda o fato de que quem bateu está quase morto. Um atacante raspando continua parando
+       em 70% mesmo com crítico e 20 níveis de vantagem.
+
+       ⚠️ E O `lastCrit` PODE ESTAR VELHO quando o atacante não atacou (dormindo, congelado,
+       paralisado) -- é a armadilha do `lastMove` que os seis `tentar*` já pagaram em 18/09. Aqui
+       ela não alcança porque o `tetoDeQuemRaspa` sai antes com a lista vazia, e é essa a razão da
+       primeira linha dele. */
+    const critico = !!quemBate.lastCrit;
     let porNivel = null;
-    if(dif <= CHEIO_DIF_MAXIMA){
+    if(!critico && dif <= CHEIO_DIF_MAXIMA){
       const t = Math.max(0, Math.min(CHEIO_DIF_MAXIMA, dif)) / CHEIO_DIF_MAXIMA;
       porNivel = CHEIO_TETO_MIN + (CHEIO_TETO_MAX - CHEIO_TETO_MIN) * t;
     }
@@ -3006,6 +3027,10 @@ function doExchange(active, enemy, rng, diario){
      quatro matarem do mesmo jeito. */
   const tetoDeQuemRaspa = (quemBate, alvo, golpes) => {
     if(!quemBate || !alvo) return golpes;
+    /* ⚠️ SEM GOLPE NÃO HÁ O QUE APARAR -- e é ela que garante que o `lastCrit` lido acima seja o
+       DESTA troca: quem não atacou não passou pelo `golpesDaTroca`, e o campo dele ficou de uma
+       troca anterior (ou de outro confronto). */
+    if(!golpes.length) return golpes;
     const frac = tetoNoAlvoCheio(quemBate, alvo);
     if(frac == null) return golpes;
     const total = golpes.reduce((a, d) => a + d, 0);
@@ -3035,7 +3060,19 @@ function doExchange(active, enemy, rng, diario){
          quando sobra menos da metade: ai o selo de CRITICO passa a contradizer o proprio numero
          ao lado. Quem le esse campo e so o selo. */
       const efetivo = antes - alvo.hp;
-      saiu.push({ d: efetivo, hp: alvo.hp, cap: efetivo * 2 < d });
+      /* ⚠️ E O `cap` NAO VALE QUANDO A BARRA CAIU INTEIRA (23/09/2026, junto com o critico passar a
+         matar de vida cheia). Ele existe pra o selo nao prometer uma barra que caiu o DOBRO quando
+         ela caiu o que sobrava -- o relato de 12/09 era um critico mostrando "-9" ao lado de um
+         golpe comum de -152. Num alvo que estava CHEIO e foi a ZERO nao ha contradicao nenhuma: o
+         numero mostrado E o maxHp dele, ou seja o maior que existe pra aquele alvo, e a barra caiu
+         100%. Escondido ali, o jogador ve um pokemon de vida cheia morrer num golpe -- o que a
+         regra de 17/09 diz que NAO acontece com dif <= 15 -- e sem nada na tela explicando que foi
+         critico. Medido antes de tratar: **42,6% dos golpes que passaram a matar saiam sem selo**.
+         ⚠️ E A CONDICAO E "cheio E foi a zero", nunca so uma das duas: so "foi a zero" devolve o
+         defeito de 12/09 (o golpe final que raspa os ultimos 9), e so "estava cheio" poria selo
+         num golpe APARADO pela trava, que e justamente um que nao caiu o dobro. */
+      const barraInteira = antes === alvo.maxHp && alvo.hp === 0;
+      saiu.push({ d: efetivo, hp: alvo.hp, cap: efetivo * 2 < d && !barraInteira });
     }
     return saiu;
   };

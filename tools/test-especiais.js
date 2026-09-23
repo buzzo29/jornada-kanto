@@ -8535,7 +8535,11 @@ console.log('\n=== VIDA CHEIA NAO MORRE NUM GOLPE (17/09/2026) ===');
   /* ---------- 1) O INVARIANTE: com diferenca <= 15, ninguem de vida cheia morre no 1o golpe ---------- */
   const ids2 = Object.keys(S.SPECIES);
   const rnd2 = n => Math.floor(Math.random()*n);
-  let n = 0, morreu = 0, comAbertura = 0; let exMorte = '';
+  /* ⚠️ O CRITICO IGNORA A TRAVA DESDE 23/09/2026 (a pedido), entao o invariante ganhou uma
+     excecao -- e com ela a trava ganhou a metade que a torna forte: nao basta "os nao-criticos
+     nao morrem", tem que valer tambem que **todo morto era critico**. Sem a segunda, um furo
+     qualquer na condicao (um `return null` a mais, por exemplo) passaria em branco. */
+  let n = 0, morreu = 0, morreuSemCrit = 0, comAbertura = 0; let exMorte = '';
   for(let i = 0; i < 12000; i++){
     const dif = rnd2(S.CHEIO_DIF_MAXIMA + 1);          // 0 a 15: a trava TEM que valer
     const lvAlvo = 20 + rnd2(40);
@@ -8550,7 +8554,8 @@ console.log('\n=== VIDA CHEIA NAO MORRE NUM GOLPE (17/09/2026) ===');
     n++;
     if(p1.hp === 0){
       morreu++;
-      if(!exMorte){
+      if(!p1.c) morreuSemCrit++;
+      if(!p1.c && !exMorte){
         const nvA = p1.q === 'p' ? m.playerLevel : m.enemyLevel;
         const nvB = p1.q === 'p' ? m.enemyLevel : m.playerLevel;
         exMorte = (p1.q === 'p' ? m.player : m.enemy) + ' Lv.' + nvA + ' matou ' +
@@ -8559,7 +8564,13 @@ console.log('\n=== VIDA CHEIA NAO MORRE NUM GOLPE (17/09/2026) ===');
     }
   }
   ok('amostra de sobra', n > 8000, n + ' confrontos (' + comAbertura + ' com abertura, descartados)');
-  ok('com dif <= 15, NINGUEM de vida cheia morre no 1o golpe', morreu === 0, morreu + (exMorte ? '  ex: ' + exMorte : ''));
+  ok('com dif <= 15, ninguem de vida cheia morre no 1o golpe SEM ser critico',
+     morreuSemCrit === 0, morreuSemCrit + (exMorte ? '  ex: ' + exMorte : ''));
+  /* ⚠️ E A OUTRA METADE: as mortes que SOBRAM sao todas criticas, e elas EXISTEM. Sem a segunda
+     condicao a trava passaria num build em que o critico voltasse a ser segurado -- ela mediria
+     um conjunto vazio, que e o "zero perfeito" que este arquivo registra em cinco lugares. */
+  ok('e as que morrem sao criticas -- e elas acontecem', morreu > 50 && morreu === morreu - morreuSemCrit,
+     morreu + ' mortes, todas com selo de critico');
 
   /* ---------- 2) A CURVA, medida onde a trava AGE ---------- */
   /* ⚠️ QUANDO ELA AGE o alvo para EXATAMENTE em `maxHp - round(maxHp*teto)`. Contar quantos caem
@@ -8568,7 +8579,10 @@ console.log('\n=== VIDA CHEIA NAO MORRE NUM GOLPE (17/09/2026) ===');
   const tetoEsperado = dif => S.CHEIO_TETO_MIN +
         (S.CHEIO_TETO_MAX - S.CHEIO_TETO_MIN) * Math.max(0, Math.min(S.CHEIO_DIF_MAXIMA, dif)) / S.CHEIO_DIF_MAXIMA;
   [8, 10, 12, 15].forEach(dif => {
-    let travados = 0, casos = 0, mortes = 0;
+    /* ⚠️ O CRITICO SAI DA CONTA (23/09/2026): ele ignora a trava e mata, entao medi-lo junto
+       derrubaria a curva sem nada estar errado. O que a trava cobra agora e o par: o NAO-critico
+       para no teto exato, e o critico mata -- e os dois conjuntos tem gente. */
+    let travados = 0, casos = 0, mortes = 0, criticos = 0, critMatou = 0;
     for(let i = 0; i < 300; i++){
       const r = S.simulateGymBattle([inst2('machamp', 40 + dif)], [inst2('caterpie', 40)],
                                     S.makeSeededRng('curva|' + dif + '|' + i));
@@ -8577,13 +8591,16 @@ console.log('\n=== VIDA CHEIA NAO MORRE NUM GOLPE (17/09/2026) ===');
       if(gs.some(g => ABERTURA.has(g.x))) continue;
       const p1 = gs.find(g => !g.x && g.d > 0);
       if(!p1 || p1.q !== 'p') continue;
+      if(p1.c){ criticos++; if(p1.hp === 0) critMatou++; continue; }
       casos++;
       if(p1.hp === 0) mortes++;
       const resto = m.enemyMaxHp - Math.max(1, Math.round(m.enemyMaxHp * tetoEsperado(dif)));
       if(p1.hp === resto) travados++;
     }
-    ok('dif ' + dif + ': o alvo para no teto da curva', casos > 100 && travados === casos && mortes === 0,
+    ok('dif ' + dif + ': o alvo NAO-critico para no teto da curva', casos > 100 && travados === casos && mortes === 0,
        travados + ' de ' + casos + ' no resto exato, ' + mortes + ' mortes');
+    ok('dif ' + dif + ': e o CRITICO mata', criticos > 5 && critMatou === criticos,
+       critMatou + ' de ' + criticos + ' criticos');
   });
 
   /* ---------- 3) O OUTRO LADO DA REGRA: acima de 15 ele MATA ---------- */
@@ -8683,6 +8700,81 @@ console.log('\n=== VIDA CHEIA NAO MORRE NUM GOLPE (17/09/2026) ===');
     }
     ok('quem RASPA para em 70% mesmo com 20 niveis de vantagem',
        casos > 100 && matou === 0 && noTeto === casos, noTeto + ' de ' + casos + ' no teto de 70%, ' + matou + ' mortes');
+  }
+
+
+  /* ---------- 7) O CRITICO IGNORA A TRAVA DE NIVEL (23/09/2026) ---------- */
+  /* Pedido assim: *"se o dano for critico, para ignorar essa trava de 15 levels de diferenca, se
+     for critico, pode deixar matar de primeira"*.
+     ⚠️ ELE LE O MESMO CAMPO QUE DECIDE O SELO, e e isso que estas travas cobram: se a tela diz
+     CRITICO o golpe mata, e se nao diz, nao mata. Qualquer outra fonte ("algum tapa foi critico")
+     deixaria uma troca matar de vida cheia SEM o selo, e o jogador nao teria como ligar as duas
+     coisas. */
+  {
+    /* ⚠️ O PAR E LIMPO DE PROPOSITO -- nem Fearow nem Caterpie tem passiva nenhuma. Com um rng
+       forcado em ~0 pra garantir o critico, TODA passiva dispararia, e a Furia do Dragao (que tira
+       40 antes da luta) TIRA O ALVO DO "CHEIO": a trava nem chegaria a ser lida, e a medicao diria
+       que o critico matou quando quem matou foi a abertura. Isso aconteceu de verdade medindo
+       isto. */
+    const semCrit = () => 0.5;      // 0.5 nunca cai abaixo de 1/16 nem de 1/8
+    const comCrit = () => 0.0001;   // sempre critico
+    const duelo = (difNivel, hpAtacante, rng) => {
+      const a = inst2('fearow', 20 + difNivel), b = inst2('caterpie', 20);
+      a.hp = Math.max(1, Math.round(a.maxHp * hpAtacante));
+      const r = S.simulateGymBattle([a], [b], rng, { preservePlayerHp: true });
+      const m = (r.matchups || [])[0];
+      const gs = (m && m.golpes) || [];
+      const p1 = gs.find(g => !g.x && g.d > 0);
+      return { m, p1, abertura: gs.some(g => ABERTURA.has(g.x)) };
+    };
+    let semMataram = 0, comMataram = 0, comSelo = 0, difs = 0;
+    [-5, 0, 5, 10, 15].forEach(d => {
+      const s1 = duelo(d, 1.0, semCrit), c1 = duelo(d, 1.0, comCrit);
+      if(s1.p1 && !s1.abertura){ difs++; if(s1.p1.hp === 0) semMataram++; }
+      if(c1.p1 && !c1.abertura){ if(c1.p1.hp === 0) comMataram++; if(c1.p1.c) comSelo++; }
+    });
+    ok('sem critico, nenhuma das 5 diferencas mata de vida cheia', difs === 5 && semMataram === 0,
+       semMataram + ' de ' + difs);
+    ok('COM critico, as 5 matam', comMataram === 5, comMataram + ' de 5');
+    /* ⚠️ E O SELO SAI NAS 5: e a promessa da regra. Medido antes de tratar o `cap`, 42,6% dos
+       golpes que passaram a matar saiam SEM selo -- o alvo morria de vida cheia e a tela nao
+       dizia por que. Ver o `barraInteira` do aplicarGolpes. */
+    ok('e o selo de CRITICO sai nas 5', comSelo === 5, comSelo + ' de 5');
+
+    /* ⚠️ MAS A TRAVA DE 14/09 NAO CAI COM O CRITICO: sao regras diferentes -- esta olha a diferenca
+       de PODER e aquela o ESTADO do atacante (*"um pokemon muito ferido nao deveria aguentar tanto
+       numa luta"*), e um critico nao muda o fato de que quem bateu esta quase morto. */
+    let raspMatou = 0, raspNoTeto = 0, raspCasos = 0;
+    [0, 15, 30].forEach(d => {
+      const r = duelo(d, 0.05, comCrit);
+      if(!r.p1 || r.abertura) return;
+      raspCasos++;
+      if(r.p1.hp === 0) raspMatou++;
+      const resto = r.m.enemyMaxHp - Math.max(1, Math.round(r.m.enemyMaxHp * S.MORIBUNDO_TETO_NO_CHEIO));
+      if(r.p1.hp === resto) raspNoTeto++;
+    });
+    ok('quem RASPA para em 70% mesmo COM critico e 30 niveis de vantagem',
+       raspCasos === 3 && raspMatou === 0 && raspNoTeto === 3,
+       raspNoTeto + ' de ' + raspCasos + ' no teto, ' + raspMatou + ' mortes');
+
+    /* ⚠️ E O `lastCrit` SO E LIDO QUANDO O ATACANTE ATACOU: quem nao atacou (dormindo, congelado,
+       paralisado) nao passou pelo `golpesDaTroca`, e o campo dele ficou de uma troca anterior. E a
+       armadilha do `lastMove` que os seis `tentar*` pagaram em 18/09. Quem fecha essa porta e a
+       primeira linha do `tetoDeQuemRaspa` -- e e ela que esta trava le. */
+    const cli = require('fs').readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+    const srvT = require('fs').readFileSync(path.join(__dirname, '..', 'functions', 'index.js'), 'utf8');
+    [['cliente', cli], ['servidor', srvT]].forEach(([qual, txt]) => {
+      const i = txt.indexOf('const tetoDeQuemRaspa = ');
+      const corpo = i >= 0 ? txt.slice(i, i + 700) : '';
+      ok('no ' + qual + ' o aparo sai antes com a lista vazia (o lastCrit nao fica velho)',
+         corpo.length > 200 && /if\(!golpes\.length\) return golpes;/.test(corpo));
+      ok('e no ' + qual + ' o critico derruba SO a trava de nivel',
+         /if\(!critico && dif <= CHEIO_DIF_MAXIMA\)/.test(txt)
+         && /if\(raspando\) return MORIBUNDO_TETO_NO_CHEIO;/.test(txt));
+      ok('e no ' + qual + ' o selo nao some num golpe que levou a barra INTEIRA',
+         /const barraInteira = antes === alvo\.maxHp && alvo\.hp === 0;/.test(txt)
+         && /cap: efetivo \* 2 < d && !barraInteira/.test(txt));
+    });
   }
 
   /* ---------- 6) OS DOIS MOTORES ---------- */

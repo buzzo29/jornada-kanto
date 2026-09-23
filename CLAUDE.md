@@ -4395,6 +4395,7 @@ lado — pelo ALVO, e não pelo contra-golpe.
 | 10 | 13,3% | 86,7% |
 | 15 | **5%** | 95% |
 | **> 15** | — | **sem trava: mata** |
+| **qualquer, se o golpe for CRÍTICO** | — | **sem trava: mata** (23/09, ver abaixo) |
 
 Entre 0 e 15 é linear (`CHEIO_TETO_MIN`, `CHEIO_TETO_MAX`, `CHEIO_DIF_MAXIMA`). **Atacante MAIS
 FRACO cai no piso**: um pokémon de nível menor matando um alvo cheio num golpe é o caso mais
@@ -4454,6 +4455,132 @@ justamente os pares com **diferença acima de 15**, que é a regra.
   para no resto EXATO em 4 diferenças), o outro lado da regra em 3 diferenças acima de 15, o alvo
   machucado continuando a morrer, o golpe que não ia matar saindo inteiro, quem RASPA parando em
   70% mesmo com 20 níveis, e as constantes no servidor.
+
+
+#### ⚠️ O CRÍTICO IGNORA A TRAVA DE NÍVEL (23/09/2026)
+
+Pedido assim: *"se o dano for crítico, para ignorar essa trava de 15 levels de diferença, se for
+crítico, pode deixar matar de primeira"*.
+
+**⚠️ ELE LÊ O MESMO CAMPO QUE DECIDE O SELO (`lastCrit`), e essa é a decisão:** se a tela diz
+**CRÍTICO**, o golpe mata; se não diz, não mata. Qualquer outra fonte — *"algum tapa foi crítico"*,
+por exemplo — deixaria uma troca matar de vida cheia **SEM o selo na tela**, e o jogador não teria
+como ligar uma coisa à outra: ele veria um pokémon de vida cheia morrer num golpe, que é
+exatamente o que a regra de 17/09 promete que não acontece com dif ≤ 15.
+O log já trata o crítico como propriedade da **TROCA** (o `c` do diário sai do mesmo `lastCrit`
+pra todas as linhas daquele atacante), então as duas leituras já concordavam por construção.
+
+**A CURVA, medida** (Fearow × Caterpie Lv.20 — os dois sem passiva nenhuma):
+
+| diferença | sem crítico | **com crítico** |
+|---|---|---|
+| **−5** (atacante mais fraco) | 30,3% | **mata** |
+| 0 | 30,3% | mata |
+| 5 | 21,7% | mata |
+| 10 | 13,1% | mata |
+| 15 | 5,1% | mata |
+| 16 em diante | mata | mata |
+
+**⚠️ E ELE SÓ DERRUBA A TRAVA DE NÍVEL — a de 14/09, de quem está RASPANDO, continua valendo.** As
+duas são regras diferentes: esta olha a diferença de **PODER** e aquela olha o **ESTADO** do
+atacante (*"um pokémon muito ferido não deveria aguentar tanto numa luta"*), e um crítico não muda
+o fato de que quem bateu está quase morto. Medido: um atacante abaixo de 10% da barra **para em
+70% com crítico e 30 níveis de vantagem**. Elas continuam convivendo pelo MENOR teto — o crítico
+só apaga um dos dois termos da conta.
+
+**⚠️ E O `lastCrit` PODE ESTAR VELHO quando o atacante NÃO atacou** (dormindo, congelado,
+paralisado): quem não atacou não passou pelo `golpesDaTroca`, e o campo dele ficou de uma troca
+anterior — ou de outro confronto. É a armadilha do `lastMove` que os seis `tentar*` pagaram em
+18/09. Quem fecha essa porta é a **primeira linha do `tetoDeQuemRaspa`** (`if(!golpes.length)
+return golpes`), e é por isso que ela existe.
+
+**QUANTO ISSO ALCANÇA, medido** (900 batalhas 6x6, 8.639 confrontos, 28.337 trocas):
+
+| | |
+|---|---|
+| trocas contra alvo de vida **CHEIA** (a trava chega a valer) | **9.489** — 33,5% das trocas |
+| **APARADAS** (o golpe mataria e o teto segurou) | **1.468** — 5,2% das trocas, 17,0% dos confrontos |
+| dessas, com o atacante **RASPANDO** (a de 14/09, que fica) | 146 |
+| **PASSAM A MATAR** (críticas e o atacante não raspando) | **225** — 15,3% das aparadas, **2,60% dos confrontos** |
+
+**⚠️ O PREÇO NA JORNADA: +1,92 PONTO DE CONCLUSÃO, 3,0σ — fora do ruído, e para o lado FÁCIL.**
+**53,75% → 55,67%**, 16 blocos de 800 jornadas de cada lado (**12.800 de cada**, o MESMO bot contra
+duas cópias congeladas, desvio tirado de ENTRE os blocos), com **13 de 16 blocos** pro lado do
+crítico.
+
+**⚠️ E OS 8 PRIMEIROS BLOCOS DAVAM 2,1σ, que é o limite do ruído — foi DOBRAR a amostra que fechou
+a conta.** Vale registrar porque é o oposto do caso de 14/09 que este arquivo guarda (lá 6 blocos
+deram 2,1σ e o dobro derrubou pra 1,1σ): **em nenhuma das duas direções meia amostra decide**.
+
+**E A FORMA SE MOVE NO MEIO, não nas pontas** (os 16 blocos somados):
+
+| ginásio | sem | com | |
+|---|---|---|---|
+| 1º | 621 | 646 | +4% |
+| **5º** | 998 | **932** | **−7%** |
+| **6º** | 1.856 | **1.711** | **−8%** |
+| 8º | 2.369 | 2.309 | −3% |
+
+**⚠️ O MECANISMO NÃO FOI ISOLADO, e é honesto dizer.** A mudança cai dos DOIS lados, então a
+direção não é óbvia — e um painel fixo **não responde**: medido num 6x6 com os dois times iguais
+ela dá **−12 pontos**, e no mesmo 6x6 com o lado B levando o moveset de NPC ela dá **+13**. É a
+mesma lição do *painel forte demais* que este arquivo registra na medição do Smeargle e na do
+revide: **o arranjo do painel decide o sinal**, e por isso o número que vale aqui é o da JORNADA,
+medido com o bot jogando de verdade.
+
+**Se um dia incomodar, não há constante nova pra mexer: a régua é a própria condição** (`!critico`
+no `tetoNoAlvoCheio`). Tirá-la devolve a curva de 17/09 inteira, e a conta de quanto isso vale está
+aqui.
+
+#### ⚠️ E ELE OBRIGOU O SELO A PARAR DE SUMIR NA BARRA INTEIRA
+
+**Medido antes de tratar: 42,6% dos golpes que passaram a matar saíam SEM o selo de crítico.** Ou
+seja o alvo morria de vida cheia e a tela **não dizia por quê** — a promessa da regra acima ficaria
+falsa em quase metade dos casos.
+
+A causa é o `cap` do `aplicarGolpes`, que é de 12/09: ele esconde o selo quando *"o corte comeu a
+dobra"* (`efetivo * 2 < sorteado`), porque o selo promete uma barra que caiu o **DOBRO** e num
+golpe encolhido ela caiu o que sobrava. O relato daquele dia era um crítico mostrando **−9** ao
+lado de um golpe comum de −152.
+
+**⚠️ MAS NUM ALVO QUE ESTAVA CHEIO E FOI A ZERO NÃO HÁ CONTRADIÇÃO NENHUMA:** o número mostrado **É
+o maxHp dele** — o maior que existe pra aquele alvo — e a barra caiu **100%**. Os exemplos medidos
+são literais: *"tirou 250 de 250"*, *"tirou 435 de 435"*. Hoje o `cap` não vale nesse caso, e o
+selo sai em **100%** deles.
+
+**⚠️ E A CONDIÇÃO É "cheio E foi a zero", nunca só uma das duas** — as duas metades foram medidas:
+
+| só | o que volta a quebrar |
+|---|---|
+| *"foi a zero"* | devolve o defeito de 12/09 — o golpe final que raspa os últimos 9 de HP volta a mostrar selo |
+| *"estava cheio"* | põe selo num golpe **APARADO** pela trava, que é justamente um em que a barra caiu 30% e não o dobro |
+
+**NA TELA, o mesmo par nos dois casos:**
+
+```
+COM crítico:  Fearow atacou Caterpie com Bicada e tirou −175 de HP. CRÍTICO
+SEM crítico:  Fearow atacou Caterpie com Bicada e tirou −152 de HP.
+              Caterpie atacou Fearow com Agulha Dupla 2x e tirou −12 de HP.
+              Fearow atacou Caterpie com Bicada e tirou −23 de HP.
+```
+
+**⚠️ E ISSO MUDA A IMPRESSÃO DO MOTOR, e tem que mudar:** `MOTOR 5130995a7232 → 5481ce57abca`.
+É mudança de MECÂNICA, não de apresentação — e o `cap`, que é só do selo, andou junto porque ele
+entra no diário. **Os dois motores continuam concordando: 0 divergências em 300 batalhas** com a
+mesma semente, que é o que mantém a liga e a animação de pé.
+
+**⚠️ E CINCO TRAVAS MEDIAM A REGRA ANTIGA**, e caíram de uma vez — o invariante (*"com dif ≤ 15,
+NINGUÉM de vida cheia morre no 1º golpe"*) e as quatro da curva. Elas não foram afrouxadas: o
+invariante virou **duas metades** (*nenhum NÃO-crítico morre* **e** *todas as mortes são críticas,
+e elas acontecem*), e a curva passou a cobrar o **par** — o não-crítico para no teto exato, o
+crítico mata. Sem a segunda metade, um build que voltasse a segurar o crítico passaria medindo um
+**conjunto vazio**, que é o "zero perfeito" que este arquivo já registra em cinco lugares.
+
+**⚠️ E ELE CUSTOU UM DESSES ZEROS NO CAMINHO:** a primeira medição de frequência deu **0 aparadas**
+em 8.639 confrontos — o que se lê como *"a mecânica não acontece"*. O contador estava sendo lido do
+`globalThis` **deste processo**, e o sandbox é um contexto de `vm` próprio: o `globalThis` de
+dentro dele **É** o objeto devolvido pelo `createSandbox`. Lido de `S.__c`, ele dá 1.468.
+**Quem for instrumentar o sandbox: o contador se lê em `S.<nome>`, nunca no globalThis de fora.**
 
 #### ⚠️ ELA APAGOU TRÊS CENÁRIOS DE TESTE, e os três pela mesma razão
 
