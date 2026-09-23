@@ -5734,11 +5734,15 @@ Hoje ela pergunta o que sempre quis perguntar — **nenhuma REGRA QUE ALCANCE UM
 devolver o crispEdges — e continua acusando quando ele volta pro selo (conferido religando o
 defeito). É a mesma família de trava-que-envelhece que este arquivo já registra meia dúzia de vezes.
 
-### ⚠️ O SUBMARINO AFUNDADO NÃO TEM ONDE PÔR O ADVERSÁRIO (22/09/2026) — medido e NÃO consertado
+### ⚠️ O SUBMARINO AFUNDADO NÃO TINHA ONDE PÔR O ADVERSÁRIO (22/09/2026) — CONSERTADO EM 23/09
+
+> **⚠️ ISTO É HISTÓRIA: ele foi consertado em 23/09/2026** — ver o bloco no fim desta seção. O que
+> ela continua valendo é a MEDIÇÃO: ela é a razão pela qual nenhum dos dois caminhos sozinho
+> resolvia, e é ela que explica por que o conserto precisou de arte NOVA.
 
 Reportado com print: *"o Gengar parece nao estar posicionado corretamente no chão? Ele esta na
-parede ... a maioria esta correto, mas este não"*. **O relato está certo, e o defeito continua no
-jogo** — esta seção existe pra dizer POR QUE, e pra ninguém tentar de novo sem saber o preço.
+parede ... a maioria esta correto, mas este não"*. **O relato estava certo**, e por um dia esta
+seção existiu pra dizer POR QUE o defeito ficava.
 
 #### A MEDIÇÃO: ele é o único dos 51
 
@@ -5808,6 +5812,186 @@ Ele afirmava que *"cada cenário reserva chão livre"* nas duas alturas — e er
 fazia ninguém procurar a exceção. Hoje ele traz a medição inteira e a razão de o defeito ficar.
 **Um defeito conhecido e escrito é melhor que um defeito conhecido e calado** — e é o que separa
 esta seção de um TODO.
+
+#### ⚠️ ELE FOI CONSERTADO EM 23/09/2026, PELOS DOIS CAMINHOS QUE ESTA SEÇÃO APONTAVA
+
+O arquivo de referência (`index-novos-graficos.html`) trouxe **as duas coisas juntas**, e é por isso
+que ele coube: a posição do pé virou **POR CENÁRIO** (`TERRAIN_BATTLE_FOOTING`, 51 entradas de
+`[jogadorX, jogadorY, adversárioX, adversárioY]`) **e** o submarino ganhou um **tile REDESENHADO**.
+
+**A medição inteira desta seção continua valendo como história** — ela é a razão pela qual nenhuma
+das duas sozinha resolvia: com a posição fixa, não havia altura possível; com a posição por cenário
+mas a arte antiga, o piso continuaria começando em 68%.
+
+Medido no navegador a 320px, no submarino: o adversário põe o pé em **70%** (era 64% fixo) e o
+jogador em 82%, os dois **sobre o convés** — e a sobreposição entre sprite e cartão fica em **ZERO**
+nos dois lados.
+
+### ⚠️ O VISUAL NOVO DA BATALHA, COLHIDO DO ARQUIVO DE REFERÊNCIA (23/09/2026)
+
+Pedido assim: *"adicionei umas mudanças na tela de batalha no arquivo index-novos-graficos.html,
+esse arquivo ta desatualizado de algumas mecanicas, como o login anonimo, entao só altere o visual
+da batalha como o cenário do terreno e as movimentações dos sprites conforme esse html, nao altere
+mais nenhuma mecanica"*.
+
+**⚠️ O ARQUIVO DE REFERÊNCIA É UM RAMO ANTIGO DO MESMO `index.html`** (39.906 linhas contra 40.499),
+então o diff entre os dois é quase todo **REMOÇÃO**: o que falta nele é mecânica recente (o login
+anônimo, a travessia das Ilhas aberta, o `CAMPOS_DA_CONTA` novo). Trazer o diff inteiro seria
+**desfazer** essas features. O que veio foi a colheita seletiva do que é VISUAL — e o que sobrou no
+diff depois dela são exatamente as 21 mudanças de mecânica que **não** podiam vir.
+
+**O QUE MUDOU, medido a 320px no navegador:**
+
+| | antes | depois |
+|---|---|---|
+| altura da cena | 330px (306 no celular) | **384px (368)** — ver o ajuste do dia, abaixo |
+| painel do lutador | 56% (54 no celular) | **50%** |
+| palco do sprite | 36% | **40%** |
+| sprite do JOGADOR | `max-width:83,3%` × 1,2 | **60% × 1,75** |
+| sprite do ADVERSÁRIO | sem regra (1,0) | **68% × 1,55** |
+| posição do pé | FIXA nos 51 | **por cenário** |
+| cenários dedicados | nenhum | **3** (submarino, termas, colmeia) |
+
+**⚠️ OS DOIS `max-width` FORAM ESCOLHIDOS PRA CAIR NO MESMO LUGAR, e vale saber porque não parece:**
+o `max-width` é medido **ANTES** da escala, então `60% × 1,75` e `68% × 1,55` dão os **mesmos ~95px**
+de largura desenhada. Ou seja todo sprite sai com a mesma largura e só a ALTURA varia com a
+proporção dele — é a escolha do arquivo de referência, e ela achata a diferença de tamanho entre as
+espécies que o quadro de 96px preservava.
+
+**⚠️ E O `transform-origin:50% 100%` É O QUE FAZ A ESCALA SER SEGURA:** ela cresce a partir dos PÉS,
+então o sprite sobe em vez de afundar no chão — a posição do pé continua sendo a que a tabela diz.
+Sem ele o bicho cresceria pro centro e entraria no piso.
+
+#### ⚠️ AS IMAGENS FICARAM EM ARQUIVO, E ISSO CONTRARIA O ARQUIVO DE REFERÊNCIA
+
+Ele traz os fundos **embutidos em base64** (20,11 MB), e o comentário dele diz que é pra *"o cenário
+não ficar verde quando um atlas externo falta"*. **A medição de 22/09 que os tirou de lá continua
+valendo, e ela é grande:** embutidos, o **gzip de toda abertura do jogo iria de 799 KB para ~15 MB**
+— e o `index.html` **nunca devolve 304** (ver a seção de Deploy), ou seja isso cairia em todo jogador
+em toda abertura, inclusive em quem nunca vê a cena.
+
+**E o problema que o embutido resolveria já está resolvido**: a cor de espera (`#8bbb62`) que nasceu
+naquela mesma medição.
+
+**⚠️ O QUE VEIO FOI O FORMATO: os atlas viraram WebP.** Medido: os seis vão de **14,0 MB (PNG) pra
+11,7 MB — 17% menos**, com as MESMAS dimensões. Mais as três cenas dedicadas (3,54 MB), o conjunto
+fica em **15,08 MB** em `assets/batalha/`.
+
+**⚠️ E O CUSTO POR JORNADA FOI REMEDIDO, porque os números velhos caducaram nos dois sentidos** (o
+PNG virou WebP e as cenas dedicadas nasceram):
+
+| | antes | agora |
+|---|---|---|
+| cada atlas | 2,26 MB | **1,92 MB** |
+| arquivos distintos em 9 batalhas | 4,79 | **5,15** |
+| **por jornada, na PRIMEIRA vez** | ~10,8 MB | **9,61 MB** |
+
+**⚠️ QUEM TEM CENA DEDICADA NÃO BAIXA O ATLAS DELE**: as duas regras alcançam a mesma cena com a
+mesma especificidade, então a dedicada (que vem depois) vence o `background-image` — e o navegador
+só pede a imagem da regra que venceu. É por isso que a conta não é "6 atlas + 3 cenas".
+
+#### OS TRÊS AJUSTES PEDIDOS NO MESMO DIA
+
+Depois de ver a cena, três pedidos em sequência:
+
+1. ***"jogar o sprite do pokemon adversario um pouco para a direita"*** — o X dele andou **+4 pontos
+   em todos os 51**, somado ao valor de cada um. **⚠️ NÃO É UM X FIXO**: as posições foram afinadas
+   uma a uma (cada cenário tem chão num lugar), e cravar um número jogaria fora essa afinação.
+   Somando, a diferença relativa entre eles fica de pé. Medido: o maior X vai a 78%, e **nenhum
+   sprite sai da cena** nos 51.
+2. ***"diminuir a altura do quadro da luta em 20%"*** — **480 → 384px** (e 460 → 368 no celular).
+   ⚠️ **Só a altura**: a largura da cena nunca foi tocada — ela é 100% do container, como sempre foi.
+3. ***"mover a sombra do adversario para a esquerda e subir ela um pouco para ficar no pé"*** — ver
+   o bloco abaixo, que é o que tem número.
+
+**MEDIDO DEPOIS DOS TRÊS, a 320px, nos 51 terrenos com os DOIS MAIORES sprites do jogo** (Snorlax e
+Dragonite): a maior sobreposição entre sprite e cartão é **125px²**, **zero** sprites saem da cena e
+**não há rolagem lateral** (documento em 320 de 320).
+
+#### ⚠️ A SOMBRA DO ADVERSÁRIO: 15px PRA CIMA TÊM CAUSA, 2% PRA ESQUERDA SÃO UMA MÉDIA
+
+**A vertical não era a sombra — era o VOADOR.** Quem voa (`.air`) ganha `padding-bottom:10px` no
+wrap, e o sprite do adversário é ampliado 1,55× — então esses 10px viram **15,5px** de folga entre o
+pé dele e o chão. A sombra marca o CHÃO; o pé fica acima dela. Medido: sombra no y=256 e pé no
+y=241. **E só o `.air` precisa disso**: no `.water` o sprite não leva padding e o pé já cai em cima
+da ondinha (desvio de meio pixel).
+
+**⚠️ A HORIZONTAL É ARTE, E A DISPERSÃO É GRANDE — este é o número honesto da mudança.** A sombra é
+centrada na **CAIXA** do sprite, e o pé de cada bicho não fica no centro da caixa dele. Medido em
+**20 sprites**, varrendo os pixels opacos da folha:
+
+| | desvio do pé em relação ao centro do quadro |
+|---|---|
+| **média** | **−4,6%** (ou seja, pra a esquerda) |
+| pior pra a esquerda | −22% (Dragonite, Gyarados, Arcanine, Mewtwo) |
+| pior pra a direita | **+22% (Blastoise)**, +18% (Alakazam) |
+
+O sprite desenha ~106px numa cena de 243px, então esses 4,6% são **~2% da cena** — e é esse o
+empurrão. **Ele acerta a média e a maioria, e continua errando nos dois extremos**: acertar cada um
+exigiria uma tabela de pé POR ESPÉCIE, que é outra feature.
+
+**⚠️ E O `%` DO `margin-left` RESOLVE CONTRA A CENA** (o bloco que contém é o `.battle-fighter`, que
+é `inset:0` dela), enquanto o `left`/`right` do `::after` resolve contra o **PALCO** — que é 40% da
+cena. Por isso os mesmos 2% viram `-11%` num e 5 pontos no outro.
+
+**O jogador não foi tocado** (medido: desvio 0 em x e em y, antes e depois).
+
+#### ⚠️ O QUE O PORT CUSTOU E NÃO ESTAVA PEDIDO: O NOME DO TREINADOR TRUNCA
+
+Com o painel indo de 54% pra 50% no celular, o nome do treinador **passa a cortar quando o time tem
+6 pokébolas**. Medido a 320px: "Buzzo" precisa de 32px e tem **29** — sai `BUZ...`. O lado do
+adversário (4 pokébolas) não corta. **Se incomodar, a régua é uma linha**: o painel de volta a 54%
+no `@media`.
+
+#### NO MOTOR, NADA — e o instrumento é sensível
+
+**`MOTOR 5130995a7232 / DIARIO 416ea6822949`, idêntico** ao build de antes em 900 batalhas semeadas
+— e a mesma medição com o `CRIT_BASE` mexido muda os dois hashes, que é o que impede um hash imóvel
+de não provar nada. Tudo isto é CSS, uma tabela de posição e apresentação.
+
+#### AS TRAVAS: `tools/test-terrenos.js` GANHOU A CENA
+
+⚠️ **O QUE ELAS EXISTEM PRA PEGAR É O DEFEITO QUE NÃO DÁ ERRO**: o fundo sai de um **seletor de
+atributo** (`[style*="--battle-atlas:0;"]`), então um espaço a mais depois dos dois-pontos, um
+ponto-e-vírgula que sumiu ou um arquivo com o nome trocado fazem o cenário sair **VAZIO** — sem erro
+no console, sem quebrar teste nenhum, e a tela continua desenhando os dois lutadores sobre a cor de
+espera. É a família da classe fantasma e do `[hidden]` que não vence o `display`.
+
+São 15 pontas, e as que importam:
+
+- **toda imagem que o CSS pede existe em disco** — um nome trocado é um cenário mudo;
+- **cada um dos 51 casa com EXATAMENTE UMA regra de imagem** — zero é cenário vazio, duas do mesmo
+  tipo é a arte de um terreno aparecendo noutro;
+- **as dedicadas vêm DEPOIS das do atlas** e **sobrescrevem o `background-size`** (elas são a cena
+  inteira, não um slot de uma folha 3×3);
+- **todo terreno tem posição PRÓPRIA na tabela** (nenhum cai no padrão) e **o pé do adversário fica
+  ACIMA do do jogador** nos 51 — a câmera é frontal, e invertido os dois trocam de profundidade;
+- **TODA leitura das quatro posições no CSS tem valor padrão** (16 leituras) — cenário que saia da
+  tabela um dia volta ao comportamento antigo em vez de ficar sem chão.
+
+**Conferido que os 9 defeitos religados acusam.** E duas lições saíram daí:
+
+1. **⚠️ O `:not(...)` TEM QUE SAIR ANTES DE LER OS SELETORES**, e foi ele que derrubou a primeira
+   versão: a regra do atlas 1 é **DUPLA** — ela vale pra quem tem `--battle-atlas:1;` E pra quem
+   **não tem a variável nenhuma**. Lido cru, o `[style*="--battle-atlas:"]` de dentro do `:not` é
+   substring de TODOS os 51, e a trava acusava os 42 de uma vez.
+2. **⚠️ UMA TRAVA MINHA MEDIA FRACO**: ela pedia que **ALGUÉM** lesse a posição com valor padrão — e
+   há duas regras por variável, então tirar o padrão de uma passava em branco. A regra é que **TODA**
+   leitura tenha.
+
+#### ⚠️ E O HARNESS DA PRÉVIA INVENTOU UM DEFEITO DUAS VEZES
+
+1. **A primeira prévia saiu SEM POKÉMON NENHUM** — as cenas certas, os painéis certos, e nenhum
+   sprite. Não era o jogo: o **`createInstance` devolve `hp:0/maxHp:0`** (quem enche a barra é o
+   `calcMaxHp`), então os dois lados entravam com hp 0, o `fighterHtml` os marcava como **MORTOS** e
+   o `battle-fainted` os apagava. É a mesma família do `preservePlayerHp` que cura o time B.
+2. **E a medição de "rola pro lado" acusou 12px que eram meus**: o harness dava `width:320px` ao
+   `.app` DENTRO de um body que já tem a margem do jogo. Com ele em `auto`, o documento fica em
+   **320 de 320**.
+
+⚠️ **E A JANELA DO CHROME NÃO DESCE ABAIXO DE ~500px**: pedir 320 devolve uma janela maior e o
+`innerWidth` continua grande — a medição sai certa e **descrevendo outra largura**. O que mede 320 de
+verdade é um **iframe de 320px**.
 
 ### A CENA CHEGOU NA TORRE, NA LIGA E NO GINÁSIO DA CIDADE (22/09/2026)
 
@@ -5972,10 +6156,10 @@ que ninguém casa não é requisitada. Agora todo jogador baixa os atlas conform
 
 | | |
 |---|---|
-| cada atlas | **~2,26 MB** (2,36 / 2,36 / 2,26 / 2,33 / 2,35 / 1,88) |
+| cada atlas | **~2,26 MB** (2,36 / 2,36 / 2,26 / 2,33 / 2,35 / 1,88) — ⚠️ **1,92 MB desde 23/09**, quando eles viraram WebP |
 | os 6 juntos | **13,54 MB** |
 | atlas distintos numa jornada de 9 batalhas | **4,79 em média** (5 em 47% delas, os 6 em 18%) |
-| **por jornada, na PRIMEIRA vez** | **~10,8 MB** |
+| **por jornada, na PRIMEIRA vez** | **~10,8 MB** — ⚠️ **9,61 MB desde 23/09** (WebP + as 3 cenas dedicadas) |
 
 **⚠️ E ELES REVALIDAM DE VERDADE, ao contrário do `index.html`.** Medido em produção: o PNG vem com
 `Cache-Control: max-age=3600` e, com `If-None-Match`, devolve **304 com 0 bytes em 67 ms** — contra

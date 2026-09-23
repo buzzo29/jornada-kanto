@@ -910,14 +910,14 @@
   .battle-vs.battle-scene{
     position:relative;
     display:block;
-    height:330px;
+    height:384px;
     margin:10px 0 12px;
     overflow:hidden;
     border:3px solid var(--box-border);
     border-radius:8px;
     /* ⚠️ A COR DE FUNDO É O QUE APARECE ENQUANTO O ATLAS NÃO CHEGA, e ela só precisou existir
-       quando os atlas sairam do base64 pra assets/batalha/*.png: embutidos eles vinham com a
-       folha de estilo e nao havia janela nenhuma. Em arquivo ha -- sao ~2,26 MB que so comecam a
+       quando os atlas sairam do base64 pra assets/batalha/: embutidos eles vinham com a
+       folha de estilo e nao havia janela nenhuma. Em arquivo ha -- sao ~1,92 MB que so comecam a
        baixar quando a cena desenha --, e a regra do atlas SUBSTITUI o background-image, entao o
        gradiente de fallback logo abaixo nunca aparece. Sem esta linha o fundo fica transparente e
        o que se ve e o creme da caixa: um quadro vazio com os lutadores boiando. Medido no
@@ -939,16 +939,16 @@
     opacity:0;
   }
   .battle-scene .battle-fighter{
-    position:absolute;inset:0;z-index:3;text-align:left;pointer-events:none;
+    position:absolute;inset:0;z-index:auto;text-align:left;pointer-events:none;
     min-width:0;
   }
   .battle-scene .battle-fighter .battle-mon-panel{
-    position:absolute;width:56%;max-width:220px;
+    position:absolute;width:50%;max-width:220px;
     background:rgba(254,251,240,.96);
     border:3px solid var(--box-border);border-radius:6px;
     box-shadow:3px 3px 0 rgba(0,0,0,.18);
     padding:7px 9px 8px;
-    z-index:6;
+    z-index:10;
   }
   .battle-scene .battle-fighter.player .battle-mon-panel{right:8px;bottom:11px;}
   .battle-scene .battle-fighter.enemy .battle-mon-panel{left:8px;top:9px;}
@@ -1002,16 +1002,41 @@
     width:18%;height:9px;border-radius:50%;background:rgba(24,35,43,.28);
     margin-left:-9%;margin-top:-4px;
   }
-  .battle-fighter.player .battle-ground-base{left:22%;top:84%;}
-  .battle-fighter.enemy .battle-ground-base{left:78%;top:64%;}
+  .battle-fighter.player .battle-ground-base{left:var(--battle-player-x,24%);top:var(--battle-player-y,82%);}
+  .battle-fighter.enemy .battle-ground-base{left:var(--battle-enemy-x,72%);top:var(--battle-enemy-y,69%);}
+  /* ⚠️ A SOMBRA DO ADVERSARIO ANDA PRA ESQUERDA E PRA CIMA (23/09/2026, a pedido: *"consegue mover
+     a sombra do adversario para a esquerda e subir ela um pouco para ficar no pe do pokemon?"*).
+
+     ⚠️ OS 15px PRA CIMA TEM CAUSA, e ela nao e a sombra: quem VOA (`.air`) ganha
+     `padding-bottom:10px` no wrap -- e o sprite do adversario e ampliado 1,55x, entao esses 10px
+     viram **15,5px** de folga entre o pe dele e o chao. A sombra marca o CHAO; o pe fica acima
+     dela. Medido no navegador a 320px: sombra no y=256 e pe no y=241.
+     ⚠️ E SO O `.air` PRECISA DISSO: no `.water` o sprite nao leva padding, entao o pe ja cai em
+     cima da ondinha (medido: desvio de meio pixel).
+
+     ⚠️ E OS 2% PRA ESQUERDA SAO A MEDIA MEDIDA, nao um chute -- mas a dispersao e grande e vale
+     saber: a sombra e centrada na CAIXA do sprite, e o pe de cada bicho nao fica no centro da
+     caixa dele. Medido em 20 sprites (varrendo os pixels opacos da folha), o pe desvia **-4,6% da
+     largura do quadro** em media -- ou seja pra ESQUERDA --, com casos indo de -22% (Dragonite,
+     Gyarados, Arcanine, Mewtwo) a +22% (Blastoise) e +18% (Alakazam). O sprite desenha ~106px
+     numa cena de 243px, entao esses 4,6% sao ~2% da CENA.
+     Ou seja: este empurrao acerta a media e a maioria, e ele continua errando nos dois extremos --
+     acertar cada um exigiria uma tabela de pe POR ESPECIE, que e outra feature.
+
+     ⚠️ E O % DO `margin-left` RESOLVE CONTRA A CENA (o bloco que contem e o `.battle-fighter`, que
+     e `inset:0` dela), enquanto o `left`/`right` do `::after` resolve contra o PALCO -- que e 40%
+     da cena. Por isso os mesmos 2% viram -11% num e 5 pontos no outro. */
+  .battle-scene .battle-fighter.enemy .battle-ground-base{margin-left:-11%;}
+  .battle-scene .battle-fighter.enemy .battle-ground-base.air{margin-top:-19px;}
+  .battle-scene .battle-fighter.enemy .battle-sprite-stage::after{left:23%;right:33%;}
   .battle-sprite-stage{
-    position:absolute;width:36%;height:148px;margin:0;
+    position:absolute;width:40%;height:148px;margin:0;
     display:flex;align-items:flex-end;justify-content:center;
     z-index:5;transform-origin:50% 100%;
     will-change:transform,filter,opacity;
   }
-  .battle-fighter.player .battle-sprite-stage{left:4%;bottom:16%;}
-  .battle-fighter.enemy .battle-sprite-stage{right:4%;top:auto;bottom:36%;}
+  .battle-fighter.player .battle-sprite-stage{left:calc(var(--battle-player-x,24%) - 20%);bottom:calc(100% - var(--battle-player-y,82%));}
+  .battle-fighter.enemy .battle-sprite-stage{left:calc(var(--battle-enemy-x,72%) - 20%);right:auto;top:auto;bottom:calc(100% - var(--battle-enemy-y,69%));}
   .battle-sprite-stage::after{
     content:'';position:absolute;left:28%;right:28%;bottom:-3px;height:7px;
     border-radius:50%;background:rgba(24,32,39,.3);z-index:-1;
@@ -1035,16 +1060,27 @@
   }
   .battle-vs.battle-scene .vs-swords.spin{animation:none;}
 
+  /* ⚠️ A ENTRADA ANIMA SO O SPRITE, nao o lutador inteiro: o `.battle-fighter` cobre a cena
+     toda (inset:0) e leva o PAINEL junto, entao um transform nele passava por cima do painel do
+     adversario durante a entrada. */
+  .battle-scene .battle-fighter.fighter-entra{animation:none;}
+
   /* Ataque: quem bate avança. O jogador vai para a direita/cima; o inimigo para a esquerda/baixo. */
   .battle-sprite-stage.battle-attack-player{animation:battleAttackPlayer .46s cubic-bezier(.2,.8,.2,1);}
   .battle-sprite-stage.battle-attack-enemy{animation:battleAttackEnemy .46s cubic-bezier(.2,.8,.2,1);}
+  /* ⚠️ A INVESTIDA SOBE E VAI AO CENTRO, em vez de avancar na diagonal (23/09/2026). O avanco
+     diagonal foi desenhado pra uma cena de 330px; com ela em 480 o atacante ficava a meio caminho
+     do alvo. Os passos em PORCENTAGEM (e nao px) sao o que faz o golpe chegar no mesmo lugar em
+     qualquer largura de tela. */
   @keyframes battleAttackPlayer{
-    0%{transform:translate(0,0) scale(1)} 36%{transform:translate(48px,-25px) scale(1.08)}
-    56%{transform:translate(58px,-30px) scale(1.05)} 100%{transform:translate(0,0) scale(1)}
+    0%,100%{transform:translate(0,0)}
+    20%,78%{transform:translate(0,-48px) scale(.75)}
+    45%,56%{transform:translate(38%,-48px) scale(.75)}
   }
   @keyframes battleAttackEnemy{
-    0%{transform:translate(0,0) scale(1)} 36%{transform:translate(-46px,27px) scale(1.08)}
-    56%{transform:translate(-55px,31px) scale(1.05)} 100%{transform:translate(0,0) scale(1)}
+    0%,100%{transform:translate(0,0)}
+    20%,78%{transform:translate(0,26px)}
+    45%,56%{transform:translate(-38%,26px)}
   }
   /* Dano: flash curto + recoil. A animação fica no palco, não no <img>, para o GIF continuar
      rodando sem ser reiniciado. */
@@ -1071,8 +1107,8 @@
     box-shadow:0 0 0 5px rgba(255,255,255,.55),0 0 22px var(--fx-color);
     animation:battleImpact .48s ease-out forwards;
   }
-  .battle-impact.player{left:26%;top:65%;}
-  .battle-impact.enemy{left:76%;top:40%;}
+  .battle-impact.player{left:var(--battle-player-x,24%);top:calc(var(--battle-player-y,82%) - 15%);}
+  .battle-impact.enemy{left:var(--battle-enemy-x,72%);top:calc(var(--battle-enemy-y,69%) - 15%);}
   .battle-impact::before,.battle-impact::after{
     content:'';position:absolute;left:50%;top:50%;width:8px;height:34px;border-radius:5px;
     background:var(--fx-color);transform-origin:50% 50%;
@@ -1091,8 +1127,8 @@
     color:#fff;text-shadow:2px 2px 0 var(--red-dark),-1px -1px 0 var(--red-dark);
     animation:battleDamagePop .8s ease-out forwards;white-space:nowrap;
   }
-  .battle-damage-pop.player{left:18%;top:47%;}
-  .battle-damage-pop.enemy{right:12%;top:23%;}
+  .battle-damage-pop.player{left:calc(var(--battle-player-x,24%) - 6%);top:calc(var(--battle-player-y,82%) - 28%);}
+  .battle-damage-pop.enemy{left:calc(var(--battle-enemy-x,72%) - 6%);right:auto;top:calc(var(--battle-enemy-y,69%) - 28%);}
   .battle-damage-pop.crit{color:var(--yellow);font-size:.72rem;}
   @keyframes battleDamagePop{
     0%{opacity:0;transform:translateY(10px) scale(.7)} 20%{opacity:1;transform:translateY(0) scale(1.12)}
@@ -1110,12 +1146,12 @@
   .battle-fighter.enemy.battle-empty .battle-empty-mark{right:54px;top:82px;}
 
   @media (max-width:380px){
-    .battle-vs.battle-scene{height:306px;}
+    .battle-vs.battle-scene{height:368px;}
     .battle-sprite-stage{height:128px;}
     .battle-sprite-stage .battle-sprite-animated{max-height:118px;}
     .battle-fighter.player .battle-sprite-stage .battle-sprite-animated{max-height:124px;}
     .battle-fighter.enemy .battle-sprite-stage .battle-sprite-animated{max-height:112px;}
-    .battle-scene .battle-fighter .battle-mon-panel{width:54%;padding:6px 7px;}
+    .battle-scene .battle-fighter .battle-mon-panel{width:50%;padding:6px 7px;}
     .battle-mon-name{font-size:.76rem;}
   }
   @media (prefers-reduced-motion:reduce){
@@ -4251,19 +4287,45 @@
   .u-mt8{margin:8px 0 0;}
   .u-mb2{margin:0 0 2px;}
 
-/* Atlas embutidos: seletor direto evita o limite de tamanho de variáveis CSS. */
-.battle-vs.battle-scene[style*="--battle-atlas:0;"]{background-image:url("assets/batalha/atlas-0.png");}
-.battle-vs.battle-scene:not([style*="--battle-atlas:"]),.battle-vs.battle-scene[style*="--battle-atlas:1;"]{background-image:url("assets/batalha/atlas-1.png");}
-.battle-vs.battle-scene[style*="--battle-atlas:2;"]{background-image:url("assets/batalha/atlas-2.png");}
-.battle-vs.battle-scene[style*="--battle-atlas:3;"]{background-image:url("assets/batalha/atlas-3.png");}
-.battle-vs.battle-scene[style*="--battle-atlas:4;"]{background-image:url("assets/batalha/atlas-4.png");}
-.battle-vs.battle-scene[style*="--battle-atlas:5;"]{background-image:url("assets/batalha/atlas-5.png");}
+/* Atlas: seletor direto evita o limite de tamanho de variáveis CSS.
+   ⚠️ E O FORMATO E WEBP desde 23/09/2026 -- os mesmos desenhos, recomprimidos: medido, os seis vao
+   de 14,0 MB (PNG) pra 11,7 MB, **17% menos**, com as MESMAS dimensoes. Eles continuam em ARQUIVO,
+   e nao embutidos: o arquivo de referencia os traz em base64, e a medicao de 22/09 que os tirou de
+   la continua valendo -- embutidos, o gzip de toda abertura do jogo iria de 799 KB pra ~15 MB, e o
+   `index.html` NUNCA devolve 304 (ver a secao de Deploy). O problema que o embutido resolveria --
+   o cenario aparecer vazio enquanto a imagem nao chega -- ja esta resolvido pela cor de espera do
+   `.battle-vs.battle-scene`. */
+.battle-vs.battle-scene[style*="--battle-atlas:0;"]{background-image:url("assets/batalha/atlas-0.webp");}
+.battle-vs.battle-scene:not([style*="--battle-atlas:"]),.battle-vs.battle-scene[style*="--battle-atlas:1;"]{background-image:url("assets/batalha/atlas-1.webp");}
+.battle-vs.battle-scene[style*="--battle-atlas:2;"]{background-image:url("assets/batalha/atlas-2.webp");}
+.battle-vs.battle-scene[style*="--battle-atlas:3;"]{background-image:url("assets/batalha/atlas-3.webp");}
+.battle-vs.battle-scene[style*="--battle-atlas:4;"]{background-image:url("assets/batalha/atlas-4.webp");}
+.battle-vs.battle-scene[style*="--battle-atlas:5;"]{background-image:url("assets/batalha/atlas-5.webp");}
+/* ⚠️ OS TRES CENARIOS DEDICADOS (23/09/2026) -- e eles SOBRESCREVEM o recorte do atlas
+   (`background-size:100% 100%`), porque nao sao um slot de uma folha 3x3: sao a cena inteira.
+   Eles existem porque o piso daqueles tres nao caia onde a cena poe o pe dos lutadores -- e o
+   SUBMARINO AFUNDADO e justamente o defeito que este arquivo registrava como "medido e NAO
+   consertado", com a conclusao de que so o REDESENHO do tile resolveria. Foi o que aconteceu.
+   ⚠️ E A REGRA VEM DEPOIS das do atlas: as duas alcancam a mesma cena e a especificidade e a
+   mesma, entao quem vence e a ultima. */
+.battle-vs.battle-scene[style*="--battle-scene-id:termas_vulcanicas;"]{background-image:url("assets/batalha/cena-termas_vulcanicas.webp");background-size:100% 100%;background-position:center;}
+.battle-vs.battle-scene[style*="--battle-scene-id:colmeia_chamas;"]{background-image:url("assets/batalha/cena-colmeia_chamas.webp");background-size:100% 100%;background-position:center;}
+.battle-vs.battle-scene[style*="--battle-scene-id:submarino_afundado;"]{background-image:url("assets/batalha/cena-submarino_afundado.webp");background-size:100% 100%;background-position:center;}
 
 /* Status de batalha: acompanha a caixa real do sprite, sem recriar o GIF. */
 .battle-status-host{position:relative;display:inline-flex;align-items:flex-end;justify-content:center;max-width:100%;vertical-align:bottom;line-height:0;}
 .battle-status-host>.battle-sprite-wrap{max-width:100%;}
-/* Amplia o Pokémon de costas em 20%, ancorado pelos pés; a largura máxima protege o painel de HP. */
-.battle-scene .battle-fighter.player .battle-status-host{max-width:83.333%;transform:scale(1.2);transform-origin:50% 100%;}
+/* ⚠️ OS DOIS SPRITES SAO AMPLIADOS, e os quatro numeros sao do arquivo de referencia
+   (23/09/2026). Antes so o do JOGADOR crescia, 20%, e o do adversario saia no tamanho cru --
+   com a cena em 480px de altura os dois ficavam pequenos no meio de um cenario grande.
+   ⚠️ O `transform-origin:50% 100%` E O QUE FAZ A ESCALA SER SEGURA: ela cresce a partir dos
+   PES, entao o sprite sobe em vez de afundar no chao -- a posicao do pe continua sendo a que o
+   `TERRAIN_BATTLE_FOOTING` diz. Sem ele o bicho cresceria pro centro e entraria no piso.
+   ⚠️ E O `max-width` E O FREIO: ele e medido ANTES da escala, entao ele e que impede o sprite
+   ampliado de cobrir o painel de HP do lado. O do jogador e mais apertado (60% contra 68%)
+   porque ele cresce mais. */
+.battle-scene .battle-fighter.player .battle-status-host{max-width:60%;transform:scale(1.75);transform-origin:50% 100%;}
+.battle-scene .battle-fighter.enemy .battle-status-host{max-width:68%;transform:scale(1.55);transform-origin:50% 100%;}
 .battle-status-fx{position:absolute;bottom:calc(100% + 3px);left:50%;transform:translateX(-50%);display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:3px;width:max-content;max-width:100px;z-index:8;pointer-events:none;line-height:1;}
 .battle-status-fx:empty{display:none;}
 .battle-status-effect{position:relative;display:inline-flex;align-items:center;justify-content:center;width:27px;height:28px;filter:drop-shadow(1px 2px 0 rgba(22,25,55,.5));}
@@ -5914,36 +5976,30 @@ const TERRAINS = [
   { id:'torre_de_radio', name:'Torre de Rádio', icon:'📡', types:['Steel','Flying'] },
   { id:'ninho_blindado', name:'Ninho Blindado', icon:'🐲', types:['Steel','Dragon'] }
 ];
-/* 51 cenários em pixel art com câmera frontal. O pé do jogador fica em (22%,84%)
-   e o do adversário em (78%,64%). Os atlas ficam em assets/batalha (ver a nota do
-   CSS); nenhuma imagem de terreno depende de rede de terceiro.
+/* 51 cenários em pixel art com câmera frontal. Os atlas e as três cenas dedicadas
+   ficam em assets/batalha (ver a nota do CSS); nenhuma imagem de terreno depende de
+   rede de terceiro.
 
-   ⚠️ E "cada cenário reserva chão livre nas duas alturas" era o que este comentário
-   AFIRMAVA -- e UM dos 51 não reserva. DEFEITO CONHECIDO E MEDIDO (22/09/2026),
-   deixado como está de propósito:
+   ⚠️ ONDE CADA UM PÕE O PÉ NÃO ESTÁ AQUI: está no `TERRAIN_BATTLE_FOOTING`, logo
+   abaixo. Até 22/09/2026 as duas posições eram FIXAS no CSS -- (22%,84%) e (78%,64%),
+   iguais nos 51 -- e o CENÁRIO é que tinha de ter chão ali.
 
-   No `submarino_afundado` o piso metálico só começa em **68%** da altura (medido no
-   atlas, na coluna do adversário; de 58% a 67% é a parede com os canos e a
-   escotilha), então o adversário nasce DENTRO da parede. Ele é o único dos 51 com
-   folga negativa -- a folga dos outros vai de +1 (deserto) a +15 (vulcão).
+   ⚠️ E O SUBMARINO AFUNDADO NÃO TINHA: o piso metálico dele só começa em 68% da
+   altura (medido no atlas, na coluna do adversário; de 58% a 67% é a parede com os
+   canos e a escotilha), então o adversário nascia DENTRO da parede. Ele era o único
+   dos 51 com folga negativa -- a dos outros ia de +1 (deserto) a +15 (vulcão) --, e
+   ficou registrado por um dia como DEFEITO CONHECIDO E NÃO CONSERTADO, porque não
+   existia altura que resolvesse: o cartão do pokémon do jogador começa em 65,8%, ou
+   seja ACIMA de 68%, então descer o pé até o piso invadia o cartão (medido: 1.667px²
+   de sobreposição a 73%), e mover pra a esquerda só trocava de vítima. Uma tentativa
+   pela posição chegou a ir pro ar e foi revertida no mesmo dia: ela trocou "flutua na
+   parede" por "cobre o cartão", que é pior.
 
-   ⚠️ NÃO HÁ ONDE PÔR O SPRITE, e isso foi medido, não suposto: o cartão do jogador
-   começa em **65,8%** da altura, ou seja ABAIXO de 68% -- descer o pé até o piso
-   invade o cartão (medido: 1.667px² de sobreposição a 73%). E mover pra a esquerda
-   só troca de vítima: a 45% ele cobre 582px² do cartão E 805px² do pokémon do
-   jogador; a 58%, 1.758px² do pokémon. A posição de hoje é a ÚNICA com zero
-   conflito nos dois lados.
-
-   ⚠️ E CONSERTAR PELO RECORTE CUSTA A ARTE: pra subir o horizonte de 72% para 60%
-   seria preciso 1,4x de zoom no tile (conta: com o rodapé ancorado, o horizonte
-   aparente é 1 - 0,28k), o que corta ~40% da imagem e come justamente as escotilhas
-   e os canos do topo -- a identidade do cenário. E os atlas são PNG prontos: não há
-   gerador pra redesenhar o piso mais alto.
-
-   Uma tentativa de conserto pela posição chegou a ir pro ar e foi revertida no mesmo
-   dia: ela trocou "flutua na parede" por "cobre o cartão", que é pior. Se um dia
-   isto for pra valer, o caminho é REDESENHAR o tile (subir a linha do piso na arte),
-   não mexer na posição. */
+   ⚠️ ELE FOI CONSERTADO EM 23/09/2026, e pelos DOIS caminhos que este comentário
+   apontava como os únicos possíveis: a posição virou POR CENÁRIO (cada terreno diz
+   onde ele tem chão) e o tile foi REDESENHADO -- o submarino, as Termas Vulcânicas e
+   a Colmeia de Chamas têm cena própria, e a regra `--battle-scene-id` do CSS a põe
+   no lugar do slot do atlas. */
 const TERRAIN_SCENE_META = {
   vulcao:              ['volcano','#9ed8f5','#6b6670','#9a6547','#744436','#c48a61','#84523c','#ef6a32'],
   arena_suspensa:      ['floating','#9fddff','#ccecff','#b8d78d','#86ad68','#c9e3a5','#7fa35f','#ffffff'],
@@ -6305,12 +6361,84 @@ const TERRAIN_SCENE_TILES = {
     2
   ]
 };
+/* ⚠️ ONDE CADA CENARIO POE O PE DOS DOIS LUTADORES (23/09/2026), em porcentagem:
+   [jogador X, jogador Y, adversario X, adversario Y].
+
+   ⚠️ ATE AQUI AS DUAS POSICOES ERAM FIXAS NO CSS (22%/84% e 78%/64%), iguais nos 51 -- e o
+   CENARIO e que tinha que ter chao ali. Isso funcionava em 50 deles e falhou em um: o SUBMARINO
+   AFUNDADO, cujo piso so comeca em 68% da altura. O defeito ficou registrado como "medido e NAO
+   consertado", porque nao existe altura que ponha o pe no chao sem invadir o cartao do pokemon do
+   jogador (ele comeca em 65,8%).
+
+   Com a posicao POR CENARIO o conserto passa a caber: cada terreno diz onde ele tem chao. E o
+   submarino ganhou, alem disso, um cenario REDESENHADO -- ver as regras `--battle-scene-id` no CSS.
+
+   ⚠️ E O CSS LE ESTAS QUATRO COMO VARIAVEL, com o valor de hoje como PADRAO: cenario que saia
+   desta tabela nao fica sem chao -- ele volta ao comportamento antigo. */
+const TERRAIN_BATTLE_FOOTING = {
+  "vulcao": [24, 80, 73, 69],
+  "arena_suspensa": [24, 82, 76, 69],
+  "pantano": [24, 81, 72, 71],
+  "recifes_coral": [24, 81, 73, 70],
+  "caverna_cristais": [24, 81, 73, 70],
+  "usina_eletrica": [24, 82, 76, 69],
+  "floresta_ancestral": [24, 81, 72, 71],
+  "deserto": [24, 82, 76, 69],
+  "montanha_nevada": [24, 81, 73, 70],
+  "dojo_tradicional": [24, 82, 76, 69],
+  "campo_aberto": [24, 82, 76, 69],
+  "mina_subterranea": [24, 82, 76, 69],
+  "castelo_assombrado": [24, 82, 76, 69],
+  "templo_mistico": [24, 82, 74, 71],
+  "jardim_venenoso": [24, 81, 72, 71],
+  "cachoeira_congelada": [24, 82, 72, 71],
+  "pico_tempestade": [24, 82, 76, 69],
+  "caverna_dragao": [24, 81, 73, 70],
+  "tundra": [24, 81, 73, 70],
+  "ilha_vulcanica": [24, 82, 76, 69],
+  "navio_fantasma": [24, 82, 76, 69],
+  "mansao_incendiada": [24, 82, 76, 69],
+  "arena_subterranea": [24, 82, 76, 69],
+  "jardim_zen": [24, 82, 76, 69],
+  "colmeia_chamas": [24, 82, 74, 70],
+  "torre_toxica": [24, 82, 76, 69],
+  "cidade_iluminada": [24, 82, 76, 69],
+  "arena_campeoes": [24, 82, 76, 69],
+  "falesias_glaciais": [24, 81, 73, 70],
+  "santuario_draconico": [24, 82, 74, 71],
+  "termas_vulcanicas": [24, 82, 78, 69],
+  "canion_rochoso": [24, 81, 73, 70],
+  "reserva_natural": [24, 82, 73, 71],
+  "porto_abandonado": [24, 81, 72, 71],
+  "jardim_borboletas": [24, 82, 76, 69],
+  "templo_monges": [24, 82, 74, 71],
+  "pantano_radioativo": [24, 82, 76, 69],
+  "ninho_ancestral": [24, 81, 73, 70],
+  "floresta_eletrificada": [24, 81, 72, 71],
+  "beco_sombrio": [24, 82, 76, 69],
+  "torre_queimada": [24, 82, 74, 71],
+  "mata_fechada": [24, 81, 72, 71],
+  "gruta_sem_luz": [24, 81, 73, 70],
+  "noite_lua_cheia": [24, 81, 72, 71],
+  "covil_dos_lobos": [24, 81, 73, 70],
+  "ferro_velho": [24, 82, 73, 70],
+  "fortaleza_ferro": [24, 82, 74, 71],
+  "submarino_afundado": [24, 82, 76, 70],
+  "hangar_gelado": [24, 82, 76, 69],
+  "torre_de_radio": [24, 82, 74, 71],
+  "ninho_blindado": [24, 82, 76, 69]
+};
 function terrainBattleSceneStyle(terrain){
   const id = terrain && terrain.id;
   const tile = TERRAIN_SCENE_TILES[id] || TERRAIN_SCENE_TILES.campo_aberto;
   const [atlas, col, row, rows] = tile;
   const m = TERRAIN_SCENE_META[id] || TERRAIN_SCENE_META.campo_aberto;
-  return `--battle-atlas:${atlas};--battle-terrain-size:300% ${rows*100}%;--battle-terrain-position:${col*50}% ${row*100/(rows-1)}%;--battle-platform:${m[5]};--battle-platform-dark:${m[6]};--battle-platform-accent:${m[7]};`;
+  const [px, py, ex, ey] = TERRAIN_BATTLE_FOOTING[id] || TERRAIN_BATTLE_FOOTING.campo_aberto;
+  /* ⚠️ O `--battle-scene-id` E LIDO POR SELETOR DE ATRIBUTO no CSS (os tres cenarios
+     dedicados), entao o FORMATO importa: sem espaco depois dos dois-pontos e COM ponto-e-virgula
+     no fim. E a mesma armadilha que o `--battle-atlas` ja carrega -- mexer aqui faz o fundo sumir
+     sem erro nenhum. */
+  return `--battle-player-x:${px}%;--battle-player-y:${py}%;--battle-enemy-x:${ex}%;--battle-enemy-y:${ey}%;--battle-scene-id:${id || 'campo_aberto'};--battle-atlas:${atlas};--battle-terrain-size:300% ${rows*100}%;--battle-terrain-position:${col*50}% ${row*100/(rows-1)}%;--battle-platform:${m[5]};--battle-platform-dark:${m[6]};--battle-platform-accent:${m[7]};`;
 }
 
 /* Espécies que visualmente precisam de água sob o sprite. Não é regra de
@@ -6341,14 +6469,20 @@ function battleGroundBaseClass(speciesId){
    pescariaBatalhaHtml), o pescariaLutadoresHtml, o sprite com status, o
    pintor dos status e o preload dos GIFs. Escrita em cada lugar, o proximo
    ponto nasceria sem ela -- que e o defeito que este arquivo mais paga.
-   ATENCAO AO CUSTO QUE ABRIR ISTO CRIOU: o cenario vem dos 6 atlas de
-   assets/batalha/, ~2,26 MB cada. Enquanto ela era de admin, o custo do resto
-   do jogo era ZERO (background-image de regra que ninguem casa nao e
-   requisitada). Agora sao ~10,8 MB por jornada na PRIMEIRA vez -- medido, 4,79
-   atlas distintos em 9 batalhas de terreno sorteado --, baixados um a um
-   conforme cada batalha desenha. Depois disso eles revalidam por ETag: medido
-   em producao, 304 com 0 bytes em 67ms, ao contrario do index.html, que nunca
-   devolve 304. */
+   ATENCAO AO CUSTO QUE ABRIR ISTO CRIOU: o cenario vem de 9 imagens em
+   assets/batalha/ -- os 6 atlas (1,92 MB cada, em media) mais as 3 cenas
+   dedicadas. Enquanto ela era de admin, o custo do resto do jogo era ZERO
+   (background-image de regra que ninguem casa nao e requisitada).
+   ⚠️ REMEDIDO EM 23/09/2026, quando os atlas viraram WebP e as 3 cenas
+   nasceram: sao **9,61 MB por jornada** na PRIMEIRA vez -- 5,15 arquivos
+   distintos em 9 batalhas de terreno sorteado, medido nos 51 terrenos --,
+   baixados um a um conforme cada batalha desenha. Os numeros velhos (2,26 MB
+   cada e 10,8 MB por jornada) eram do PNG e de antes das cenas dedicadas.
+   ⚠️ E QUEM TEM CENA DEDICADA NAO BAIXA O ATLAS DELE: as duas regras alcancam
+   a mesma cena e a dedicada vem depois, entao o navegador so pede a imagem da
+   regra que venceu o background-image.
+   Depois disso eles revalidam por ETag: medido em producao, 304 com 0 bytes em
+   67ms, ao contrario do index.html, que nunca devolve 304. */
 function visualNovoDeBatalha(){ return true; }
 
 function hexToRgba(hex, alpha){
