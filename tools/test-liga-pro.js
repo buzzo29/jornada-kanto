@@ -488,8 +488,160 @@ console.log('\n=== PONTA A PONTA (o drawCycle de verdade) ===');
        alguém que está disputando um chaveamento da Pro. */
     ok('a trava do painel varre a Liga Pro',
        /const tipos = \[CLASSIC_LEAGUE_TYPE, PRO_LEAGUE_TYPE\]/.test(srvSrc));
+    await separacaoDaClassica(F, db, cod);
 
     console.log('\n' + (falhas ? falhas + ' FALHA(S)' : 'Tudo certo.') + '  (' + total + ' asserções)');
     process.exit(falhas ? 1 : 0);
   })().catch(e => { console.log('\nESTOUROU: ' + e.message); process.exit(1); });
+}
+
+/* ============================================================================
+   11) A SEPARAÇÃO DA CLÁSSICA -- inscritos e times
+   ============================================================================
+   ⚠️ O PIOR CASO É O DE VERDADE: as duas ligas rodam de hora em hora pelo MESMO relógio
+   (`computeNextScheduledTime`), então o `cycleId` delas COINCIDE. O que separa é só o prefixo do
+   documento (`classic__<id>` contra `pro__<id>`) -- e é por isso que esta trava usa o MESMO id
+   nas duas: com ids diferentes ela passaria por acidente e não mediria nada. */
+async function separacaoDaClassica(F, db, cod){
+  console.log('\n=== A SEPARAÇÃO DA CLÁSSICA ===');
+  const T = F._PRO_LEAGUE_TYPE, MESMO = '1758900000000';
+  const dc = (t) => db.collection('leagueCycles').doc(t + '__' + MESMO);
+  const sc = (t) => db.collection('leagues').doc('schedule_' + t);
+  const timeCla = ['charizard','blastoise','venusaur','snorlax','alakazam','gyarados']
+    .map(id => ({ speciesId: id, level: 70 }));
+
+  for(const t of ['classic', T]){
+    await sc(t).set({ cycles: [{ id: MESMO, scheduledTime: Date.now() - 1000,
+      status: 'registering', ...(t === T ? { proFaixa: 0 } : {}) }],
+      ...(t === T ? { proFaixaIdx: 0 } : {}) });
+  }
+  /* o MESMO treinador nas duas, com times DIFERENTES de propósito */
+  const eu = 'buzzo';
+  const meuPro = F._proSorteiaBolo(eu, MESMO, 0).slice(0, 6)
+    .map(p => ({ speciesId: p.id, level: p.level, shiny: p.shiny }));
+  await dc('classic').collection('registrants').doc(eu)
+    .set({ name: 'Buzzo', uid: eu, code: cod(timeCla), registeredAt: 1000 });
+  await dc(T).collection('registrants').doc(eu)
+    .set({ name: 'Buzzo', uid: eu, code: cod(meuPro), registeredAt: 1000 });
+  for(let i = 0; i < 7; i++){
+    await dc('classic').collection('registrants').doc('c' + i)
+      .set({ name: 'C' + i, uid: 'c' + i, code: cod(timeCla), registeredAt: 1100 + i });
+    const u = 'p' + i;
+    const b = F._proSorteiaBolo(u, MESMO, 0).slice(0, 6)
+      .map(p => ({ speciesId: p.id, level: p.level, shiny: p.shiny }));
+    await dc(T).collection('registrants').doc(u)
+      .set({ name: 'P' + i, uid: u, code: cod(b), registeredAt: 1200 + i });
+  }
+
+  const regCla = await dc('classic').collection('registrants').get();
+  const regPro = await dc(T).collection('registrants').get();
+  ok('com o MESMO cycleId, as listas não se misturam',
+     regCla.size === 8 && regPro.size === 8, regCla.size + ' / ' + regPro.size);
+  ok('  e nenhum inscrito da Clássica aparece na Pro',
+     !regPro.docs.some(d => /^c[0-6]$/.test(d.id)), regPro.docs.map(d => d.id).join(','));
+  ok('  e nenhum da Pro aparece na Clássica',
+     !regCla.docs.some(d => /^p[0-6]$/.test(d.id)), regCla.docs.map(d => d.id).join(','));
+
+  /* ⚠️ O MESMO TREINADOR ESTÁ NAS DUAS, e isso é a regra da casa: a trava do jogador é POR LIGA
+     (o `accountLeagueSlots` é indexado por typeId, e a tela diz *"já está disputando ESSA Liga
+     em outra rodada"*), não por conta -- vale igual entre a Clássica e uma customizada. O que ela
+     tem que garantir é que o TIME de cada uma seja o DELA. */
+  const tCla = F._decodeTeamCode((await dc('classic').collection('registrants').doc(eu).get()).data().code);
+  const tPro = F._decodeTeamCode((await dc(T).collection('registrants').doc(eu).get()).data().code);
+  ok('  e o MESMO treinador leva times DIFERENTES em cada uma',
+     tCla.map(p => p.speciesId).join() !== tPro.map(p => p.speciesId).join(),
+     tCla[0].speciesId + '... / ' + tPro[0].speciesId + '...');
+  ok('  e o da Clássica é o que ELE montou', tCla[0].speciesId === 'charizard');
+  ok('  e o da Pro é o do BOLO dele',
+     F._proInscricaoValida({ uid: eu, code: cod(tPro) }, { id: MESMO, proFaixa: 0 }));
+
+  /* os dois chaveamentos, sorteados um depois do outro no mesmo ciclo */
+  const quem = {};
+  for(const t of ['classic', T]){
+    const sd = (await sc(t).get()).data();
+    await F._drawCycle(t, sd.cycles[0], { id: t, name: t, botFillEnabled: false });
+    const d = (await dc(t).get()).data() || {};
+    const set = new Set();
+    Object.values(((d.leagues || [])[0] || {}).rounds || {}).forEach(r => (r || []).forEach(m => {
+      if(m.a) set.add(m.a.uid); if(m.b) set.add(m.b.uid); }));
+    quem[t] = [...set].sort();
+  }
+  ok('cada chaveamento tem 8', quem.classic.length === 8 && quem[T].length === 8,
+     quem.classic.length + ' / ' + quem[T].length);
+  ok('  e ninguém da Pro cai no chaveamento da Clássica',
+     !quem.classic.some(u => /^p[0-6]$/.test(u)), quem.classic.join(','));
+  ok('  e ninguém da Clássica cai no da Pro',
+     !quem[T].some(u => /^c[0-6]$/.test(u)), quem[T].join(','));
+
+  /* ===== o lado do CLIENTE =====
+     ⚠️ AQUI O RISCO É DE CAMPO GLOBAL: o `game` tem UM `proBolo` e UM `leagueTeamPickError`,
+     não um por tipo. Se algum não for zerado ao trocar de liga, ele vaza -- que é exatamente o
+     defeito que o quadro "🌐 Últimas Ligas" tinha. */
+  S.game.authUser = { uid: 'buzzo' }; S.game.trainerName = 'Buzzo';
+  S.game.currentLeagueTypeId = T;
+  S.game.proCicloId = MESMO; S.game.proFaixa = 0;
+  S.game.proBolo = S.proSorteiaBolo('buzzo', MESMO, 0);
+  S.game.proEscolhidos = [0, 1, 2];
+  const pkPro = S.renderLeagueTeamPicker();
+  S.game.currentLeagueTypeId = 'classic';
+  const pkCla = S.renderLeagueTeamPicker();
+  ok('o picker da Pro mostra o bolo', /selecao-bolo/.test(pkPro));
+  ok('  e o da Clássica NÃO mostra o bolo da Pro', !/selecao-bolo/.test(pkCla));
+  /* ⚠️ E O PICKER DA PRO ZERA bolo, seleção e erro NA PRIMEIRA LINHA: sem isso, um ciclo que virou
+     deixaria os índices escolhidos apontando pro bolo ANTIGO. */
+  ok('  e o picker da Pro zera bolo/seleção/erro na 1ª linha',
+     /async function abrirBoloDaLigaPro\(\)\{\s*\n\s*game\.leagueTeamPickError = null;\s*\n\s*game\.proBolo = null;\s*\n\s*game\.proEscolhidos = \[\];/.test(src));
+  S.game.leagueTeamPickError = 'erro do picker da Pro';
+  S.game.screen = 'league';
+  S.game.currentLeagueTypeConfig = { id: 'classic', name: 'Liga Clássica' };
+  S.game.leagueData = { cycles: [{ id: '1', scheduledTime: Date.now() + 600000,
+    status: 'registering', registrantCount: 2, registrants: [] }] };
+  ok('  e o erro do picker não vaza pra tela da Liga',
+     S.renderLeague().indexOf('erro do picker da Pro') < 0);
+
+  /* ⚠️ E "SUAS ÚLTIMAS LIGAS" MOSTRA AS DUAS, DE PROPÓSITO: ele é por CONTA (lê o
+     `leaguePlacements` do documento do usuário), cada linha NOMEIA a liga e o "Rever" leva o
+     `leagueTypeId` dela. Filtrar por liga aqui esconderia metade do histórico do jogador. */
+  S.game.currentLeagueTypeId = T;
+  S.game.currentLeagueTypeConfig = { id: T, name: 'Liga Pro' };
+  S.game.leagueData = { cycles: [{ id: '1', scheduledTime: Date.now() + 600000,
+    status: 'registering', proFaixa: 0, registrantCount: 2, registrants: [] }] };
+  S.game.leagueTeamPickError = null;
+  S.game.myLeagueHistory = [
+    { cycleId: 'a', leagueId: 0, cycleTime: Date.now() - 3600000, placement: 'Campeão',
+      leagueTypeId: T, leagueTypeName: 'Liga Pro', leagueSize: 8 },
+    { cycleId: 'b', leagueId: 0, cycleTime: Date.now() - 7200000, placement: 'Semifinal',
+      leagueTypeId: 'classic', leagueTypeName: 'Liga Clássica', leagueSize: 8 } ];
+  S.game.quadrosAbertos = { ...(S.game.quadrosAbertos || {}), minhas_ligas: true };
+  const hh = S.renderLeague();
+  const revs = [...hh.matchAll(/viewLeagueHistory\('([^']+)'/g)].map(m => m[1]);
+  ok('o histórico pessoal mostra as DUAS ligas', revs.length === 2, JSON.stringify(revs));
+  ok('  e o "Rever" de cada uma leva ao tipo DELA', revs[0] === T && revs[1] === 'classic',
+     JSON.stringify(revs));
+  ok('  e cada linha nomeia a liga', /Liga Pro/.test(hh) && /Liga Clássica/.test(hh));
+
+  /* ===== e o que só a LEITURA DO CÓDIGO alcança =====
+     ⚠️ O bloco acima roda contra o `db` do SERVIDOR, então um `cycleDocRef` do CLIENTE que
+     perdesse o prefixo do tipo passaria em branco por ele -- e as duas ligas passariam a escrever
+     no MESMO documento sem nada acusar. Foi a conferência de acusação que mostrou esse buraco. */
+  [['cycleDocRef', /function cycleDocRef\(typeId, cycleId\)\{[^}]*\(typeId\|\|CLASSIC_LEAGUE_TYPE\)\+'__'\+cycleId/],
+   ['scheduleDocRef', /function scheduleDocRef\(typeId\)\{[^}]*'schedule_'\+\(typeId\|\|CLASSIC_LEAGUE_TYPE\)/],
+   ['registrantsCollRef', /function registrantsCollRef\(typeId, cycleId\)\{[^}]*cycleDocRef\(typeId, cycleId\)/]
+  ].forEach(([nome, re]) => {
+    ok('o ' + nome + ' leva o tipo no caminho, nos DOIS motores',
+       re.test(src) && re.test(srvSrc));
+  });
+  /* ⚠️ E A INSCRIÇÃO DA PRO GRAVA NO CAMINHO DELA: ela é um caminho PRÓPRIO (não passa pelo
+     `registerForLeague`), então nada garante por construção que ela use o tipo certo. */
+  const insPro = (src.match(/async function inscreverNaLigaPro\(\)[\s\S]{0,3000}/) || [''])[0];
+  ok('a inscrição da Pro grava no caminho da PRO', insPro.length > 500 &&
+     /registrantDocRef\(PRO_LEAGUE_TYPE, cycleEntry\.id, uid\)/.test(insPro) &&
+     !/registrantDocRef\(CLASSIC_LEAGUE_TYPE/.test(insPro));
+  ok('  e o contador dela sobe no ciclo da PRO',
+     /cycleDocRef\(PRO_LEAGUE_TYPE, cycleEntry\.id\)/.test(insPro));
+  /* ⚠️ E O PICKER DESPACHA PELO TIPO: sem essa linha, a tela da Clássica desenharia o bolo. */
+  ok('  e o picker despacha pelo tipo',
+     /function renderLeagueTeamPicker\(\)\{\s*\n\s*if\(game\.currentLeagueTypeId === PRO_LEAGUE_TYPE\)\{ return renderProPicker\(\); \}/.test(src));
+  ok('  e o abrir do picker também',
+     /function openLeagueTeamPicker\(\)\{\s*\n\s*if\(game\.currentLeagueTypeId === PRO_LEAGUE_TYPE\)\{ abrirBoloDaLigaPro\(\); return; \}/.test(src));
 }

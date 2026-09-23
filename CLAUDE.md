@@ -19256,6 +19256,38 @@ a partida lutaria como A.
 Ela foi **NOMEADA** na trava (com um caso cobrando que ela seja a ÚNICA), em vez de a regra ser
 afrouxada — o próximo clone que nascer continua tendo que recolar.
 
+### ⚠️ A SEPARAÇÃO DA CLÁSSICA, MEDIDA NO PIOR CASO
+
+**As duas rodam de hora em hora pelo MESMO relógio** (`computeNextScheduledTime`), então o
+**`cycleId` delas COINCIDE** — e o que separa é só o prefixo do documento (`classic__<id>` contra
+`pro__<id>`). Por isso a trava usa o MESMO id nas duas: com ids diferentes ela passaria por acidente.
+
+Medido com 8 inscritos em cada, no mesmo ciclo, e o MESMO treinador nas duas:
+
+| | |
+|---|---|
+| inscritos | **8 / 8**, sem um nome cruzado |
+| chaveamento | **8 / 8**, ninguém da outra |
+| o time do mesmo treinador | Charizard... na Clássica, o **bolo dele** na Pro |
+| o bolo no picker da Clássica | **não vaza** |
+| o erro do picker na tela da Liga | **não vaza** |
+
+- **⚠️ O MESMO TREINADOR PODE ESTAR NAS DUAS, e isso é a regra da casa** — o `accountLeagueSlots`
+  é indexado por `typeId` e a tela diz *"já está disputando ESSA Liga em outra rodada"*. Vale igual
+  entre a Clássica e uma customizada. **O painel de admin é mais restritivo** (a trava dele é da
+  CONTA), e é por isso que a Pro precisou entrar na lista dele.
+- **⚠️ E "SUAS ÚLTIMAS LIGAS" MOSTRA AS DUAS, DE PROPÓSITO:** ele é por CONTA (lê o
+  `leaguePlacements` do documento do usuário), cada linha NOMEIA a liga e o "Rever" leva o
+  `leagueTypeId` dela. Filtrar por liga ali esconderia metade do histórico do jogador.
+- **O picker da Pro zera bolo, seleção e erro NA PRIMEIRA LINHA** — sem isso, um ciclo que virou
+  deixaria os índices escolhidos apontando pro bolo ANTIGO.
+
+**⚠️ E A CONFERÊNCIA DE ACUSAÇÃO ACHOU TRÊS BURACOS NAS PRÓPRIAS TRAVAS:** duas **passavam em
+branco** porque o bloco roda contra o `db` do SERVIDOR — um `cycleDocRef` do **CLIENTE** que
+perdesse o prefixo do tipo não era alcançado por comportamento nenhum, e as duas ligas passariam a
+escrever no mesmo documento sem nada acusar. O que fecha isso é **ler o código** dos dois motores.
+As **8 misturas religadas acusam** (2 a 9 falhas cada).
+
 ### O QUE ISSO CUSTOU AO MOTOR: NADA
 
 `MOTOR 5481ce57abca / DIARIO a4c6725aa4aa`, idêntico em 900 batalhas semeadas. A Liga Pro é uma tela
@@ -19265,7 +19297,7 @@ de inscrição e uma constante que gira.
 **"Ligas especiais"** (o `else out.custom` do `compareTrainers`, que é o balaio das customizadas). O
 **total** está certo; o rótulo cobre bem a Pro, e por isso não foi mexido.
 
-`tools/test-liga-pro.js` tranca **93 pontas**: as constantes e a ordem das faixas, o bolo em 600
+`tools/test-liga-pro.js` tranca **116 pontas**: as constantes e a ordem das faixas, o bolo em 600
 sorteios nos dois motores, a semente (mesma = mesmo bolo; outro ciclo/treinador = outro; outra faixa
 = as MESMAS linhas noutra forma), as 9 forjas recusadas, a faixa carimbada e andando só quando a liga
 acontece, o tipo na lista do cron, a tela, a inscrição, o ranking/histórico comparados com a Clássica
