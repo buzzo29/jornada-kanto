@@ -3971,6 +3971,17 @@
      GRADE de 6 colunas -- e é ela que faz seis sprites caberem em 243px. Um flex-wrap próprio
      deixava cada sprite em 48px e a fileira quebrava em duas linhas. */
   .resultRow .resultTime{ grid-column:1/-1; margin-top:2px; }
+  /* ⚠️ A FILEIRA ZERA A MARGEM DE CIMA DENTRO DELA. Antes o `.resultTime` ERA a fileira (as duas
+     classes no MESMO elemento), e ali a `margin-top:2px` daqui GANHAVA do `margin:5px 0` dela
+     por especificidade. Com o retrato no meio elas viraram dois elementos e as margens passaram
+     a SOMAR: medido a 320px, o revezamento cresceu 5px por linha -- 20px numa classificação de
+     quatro -- sem que nada dele tivesse sido pedido. */
+  .resultRow .resultTime > .save-slot-team-row{ margin:0 0 5px; }
+  /* ⚠️ O RETRATO DE UM POKÉMON SÓ CENTRALIZA POR CONTA PRÓPRIA. O `.modal-icon` centralizava por
+     acidente do container (o `.modal-box` é `text-align:center`), e a classificação é uma GRADE --
+     ali ele saía encostado à esquerda. Sem isto, a função que decide a forma funcionaria em duas
+     telas e quebraria na terceira, em silêncio. */
+  .corrida-retrato{ text-align:center; }
   /* a linha do jogador ganha um destaque leve: ela é a que ele procura primeiro */
   .resultRow.eu{background:rgba(255,203,5,.2);border-radius:6px;padding-left:6px;padding-right:6px;}
   /* o Speed da corrida, que é o número pelo qual a lista se ordena */
@@ -33843,11 +33854,17 @@ function corridaRetratoDoTime(time, comNivel){
   if(!lista.length) return ``;
   /* vários ⇒ a MESMA fileira do card de time da casa: o jogador reconhece um time por ela */
   if(lista.length > 1) return `<div class="save-slot-team-row spread">${pescariaTimeSprites(lista)}</div>`;
-  /* ⚠️ UM SÓ ⇒ `modal-icon`, que é a classe do retrato de um modal e JÁ CENTRALIZA (o `.modal-box`
-     é `text-align:center`). O `font-size:2rem` dela não é enfeite: quando o sprite não carrega, o
-     fallback é TEXTO (o emoji da espécie), e é ele que dá tamanho a esse caso. */
+  /* ⚠️ UM SÓ ⇒ o retrato GRANDE e centrado. O `modal-icon` entra pelo `font-size:2rem`, que não é
+     enfeite: quando o sprite não carrega, o fallback é TEXTO (o emoji da espécie), e é ele que dá
+     tamanho a esse caso.
+     ⚠️ E O `corrida-retrato` EXISTE PORQUE O `modal-icon` SOZINHO NÃO CENTRALIZA: ele centralizava
+     no modal por acidente do container (o `.modal-box` é `text-align:center`), e na linha da
+     classificação -- que é uma GRADE -- ele saía encostado à esquerda. Esta função tem TRÊS
+     chamadores hoje (o modal do ranking, o anúncio de vitória e a classificação), e depender do
+     contexto de cada um é a forma de defeito que este projeto mais paga: ela funciona em dois
+     lugares e quebra no terceiro, em silêncio. */
   const p = lista[0];
-  return `<div class="modal-icon">${spriteHtml(p, `sprite-lg`)}`
+  return `<div class="modal-icon corrida-retrato">${spriteHtml(p, `sprite-lg`)}`
     + (comNivel ? `<div class="save-slot-mon-level">Lv.${p.level}</div>` : ``)
     + `</div>`;
 }
@@ -35049,11 +35066,20 @@ function renderCorrida(){
           <b>${c.chegada.toFixed(2)}s</b>
           ${/* ⚠️ OS SPRITES DO TIME, e não o nome dele (20/09/2026, a pedido): o nome respondia
                "de quem era a equipe" e os sprites respondem **QUAL era** -- que é a pergunta que
-               se faz olhando uma classificação. Vale pros dois formatos: 6 no revezamento, 1 na
-               individual, sem exceção nenhuma.
+               se faz olhando uma classificação.
+               ⚠️ E QUEM DECIDE A FORMA É O `corridaRetratoDoTime` (23/09/2026, a pedido: *"como só
+               tem um pokémon, pode exibir esse único pokémon centralizado e com a sprite maior"*).
+               Ela cravava a fileira de SEIS colunas nos dois formatos -- e com um pokémon só ele
+               ocupava 1/6 da largura, encostado à esquerda, com cinco colunas vazias: medido a
+               320px, o centro do sprite caía em 24 de 171. É o MESMO defeito que o modal do
+               ranking teve em 21/09, na terceira tela.
                ⚠️ E ELA OCUPA A LINHA INTEIRA (`grid-column:1/-1`): a coluna do nome tem **83px** a
                320px, e seis sprites ali dariam 13px cada. */''}
-          <div class="resultTime save-slot-team-row spread">${pescariaTimeSprites(c.time)}</div>
+          ${/* ⚠️ E O NÍVEL VAI JUNTO, como no modal do ranking: ele diz **com o que aquele tempo
+               foi feito**, e a velocidade da Corrida escala com o nível. A fileira do revezamento
+               já o mostra em cada sprite -- sem ele aqui, a individual PERDERIA uma informação que
+               ela tinha, o que é regressão em silêncio. */''}
+          <div class="resultTime">${corridaRetratoDoTime(c.time, true)}</div>
         </div>`).join('')}
       <button class="btn success" onclick="corridaLargar()">Correr de novo</button>
       <button class="btn secondary" onclick="corridaReiniciar()">Configurar</button>

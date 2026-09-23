@@ -18791,6 +18791,60 @@ O `sprite-lg` (110px) é o **maior tamanho que a casa tem**, e é o que o anúnc
 certo. Escrever um decodificador é inventar um instrumento; servir o arquivo do mesmo origin e usar
 o `getImageData` é medir com o que já funciona.
 
+
+#### ⚠️ E A CLASSIFICAÇÃO ERA A TERCEIRA TELA COM O MESMO DEFEITO (23/09/2026)
+
+Reportado assim: *"na tela de resultado da corrida individual, no quadro que aparece o 1, 2, 3 e 4
+lugares, como só tem um pokémon, pode exibir esse único pokémon centralizado e com a sprite maior"*.
+
+**⚠️ É O MESMO DEFEITO QUE O MODAL DO RANKING TEVE DOIS DIAS ANTES, e pela mesma causa:** a linha
+cravava a `save-slot-team-row spread`, que é uma **GRADE de 6 colunas** — com um pokémon só ele
+ocupa **1/6 da largura**, encostado à esquerda, com cinco colunas vazias. Medido a 320px antes de
+mexer: sprite de **48px** com o centro em **24 de 171** (o centro da fileira é 86).
+
+| a 320px | antes | **depois** |
+|---|---|---|
+| sprite | 48px | **110px** (`sprite-lg`) |
+| desvio do centro | **−91px** | **0** |
+| altura da linha | 124px | 185px |
+| a caixa da classificação | 694px | **938px** (+35%) |
+| a página | 1.015px | 1.259px, **sem rolagem lateral** |
+| **o revezamento** | — | **idêntico em tudo** |
+
+**A REGRA JÁ EXISTIA — o que faltava era esta tela usá-la.** O `corridaRetratoDoTime` (21/09)
+decide pela QUANTIDADE: vários ⇒ a fileira do card de time; um ⇒ o retrato grande e centrado. Ele
+já servia o modal do ranking e o anúncio de vitória, e a classificação era o terceiro chamador
+que ainda montava o HTML à mão.
+
+**⚠️ E O RETRATO PASSOU A CENTRALIZAR POR CONTA PRÓPRIA (`corrida-retrato`), que é a parte que
+valia consertar:** o `modal-icon` centralizava por **ACIDENTE do container** — o `.modal-box` é
+`text-align:center` —, e a classificação é uma GRADE. Uma função com três chamadores que depende
+do contexto de cada um é a forma de defeito que este projeto mais paga: ela funciona em dois
+lugares e **quebra no terceiro, em silêncio**. Conferido: o modal e o anúncio saem **visualmente
+idênticos** (110×110, desvio 0, página nos mesmos 800px) — a classe é redundante lá, e é ela que
+torna a função independente do lugar.
+
+**⚠️ E O NÍVEL CONTINUA NA TELA.** A primeira versão passou `comNivel:false` e o "Lv.60" sumiu da
+individual — o antes o mostrava (a fileira o traz em cada sprite). Ele diz **com o que aquele tempo
+foi feito**, e a velocidade da Corrida **escala com o nível**: tirá-lo seria regressão em silêncio,
+pelo mesmo argumento que o pôs no modal do ranking.
+
+**⚠️ E O REVEZAMENTO CRESCEU 20px SEM NADA TER SIDO PEDIDO — a armadilha da margem que passou a
+SOMAR.** Antes o `.resultTime` **ERA** a fileira (as duas classes no MESMO elemento), e ali o
+`margin-top:2px` do primeiro **ganhava** do `margin:5px 0` da segunda por especificidade. Com o
+retrato no meio elas viraram **dois elementos**, e as margens passaram a se somar: **+5px por
+linha, 20px numa classificação de quatro**. Uma linha de CSS (`.resultTime > .save-slot-team-row`)
+devolve o revezamento ao que era — conferido medida a medida.
+
+**⚠️ E AS DUAS TRAVAS QUE CAÍRAM MEDIAM A REGRA ANTIGA** (*"é a mesma fileira, com um sprite só"*)
+— a **quinta** vez que essa família envelhece na Corrida. Elas não foram afrouxadas: passaram a
+cobrar o par (no revezamento é a fileira e ela é FILHA do `.resultTime`; na individual **não** é a
+fileira, é o retrato), mais o nível, a classe que centraliza e a margem que não soma — as três
+**lidas do CSS**, porque nada disso aparece em asserção de HTML.
+
+**No motor, nada:** `MOTOR 5481ce57abca / DIARIO a4c6725aa4aa`, idêntico. **Os 6 defeitos religados
+acusam.**
+
 #### ⚠️ E A CLASSE DO ANÚNCIO ERA FANTASMA
 
 A `corrida-anuncio-time` tinha **1 uso no HTML e ZERO regras no CSS** — ela não fazia nada desde que

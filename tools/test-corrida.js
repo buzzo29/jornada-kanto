@@ -2070,18 +2070,33 @@ console.log('\n=== OS SPRITES DO TIME NA CLASSIFICAÇÃO ===');
   ok('  com um sprite por membro do time',
      (dentro.match(/save-slot-mon"/g) || []).length >= S.CORRIDA_TRECHOS,
      (dentro.match(/save-slot-mon"/g) || []).length + ' membros nas duas fileiras');
-  /* ⚠️ E ELA É A FILEIRA DO CARD DE VERDADE (`save-slot-team-row spread`), que é uma GRADE de 6
-     colunas -- é isso que faz seis sprites caberem em 243px. Com um flex-wrap próprio eles saíam
-     em 48px e a fileira quebrava em DUAS linhas (a linha de resultado ia a 180px). */
-  ok('  e ela É a fileira do card de time',
-     /class="resultTime save-slot-team-row spread"/.test(html));
+  /* ⚠️ E NO REVEZAMENTO ELA É A FILEIRA DO CARD DE VERDADE (`save-slot-team-row spread`), que é uma
+     GRADE de 6 colunas -- é isso que faz seis sprites caberem em 243px. Com um flex-wrap próprio
+     eles saíam em 48px e a fileira quebrava em DUAS linhas (a linha ia a 180px).
+     ⚠️ E ELA DEIXOU DE SER O PRÓPRIO `.resultTime` em 23/09/2026: quem decide a forma passou a ser
+     o `corridaRetratoDoTime`, então a fileira é FILHA dele. É por isso que a trava procura a classe
+     DENTRO da fileira em vez de cravar as duas juntas no mesmo elemento. */
+  ok('  e no revezamento ela É a fileira do card de time',
+     /class="resultTime"[^>]*>\s*<div class="save-slot-team-row spread"/.test(html));
   ok('  e ela reusa o `pescariaTimeSprites` (o mesmo do card)',
      html.indexOf('save-slot-mon-level') >= 0);
   /* ⚠️ ELA OCUPA A LINHA INTEIRA: na coluna do nome (83px a 320px) seis sprites dariam 13px cada */
   ok('  e o CSS a põe na linha inteira do grid',
      /\.resultRow \.resultTime\{[^}]*grid-column:1\/-1/.test(src));
+  /* ⚠️ E A FILEIRA ZERA A MARGEM DE CIMA DENTRO DELA. Antes o `.resultTime` ERA a fileira (as duas
+     classes no MESMO elemento), e ali a `margin-top:2px` GANHAVA do `margin:5px 0` dela por
+     especificidade. Com o retrato no meio elas viraram dois elementos e as margens passaram a
+     SOMAR: medido a 320px, o revezamento cresceu 5px por linha -- 20px numa classificação de
+     quatro -- sem que nada dele tivesse sido pedido. */
+  ok('  e a margem da fileira não soma com a do .resultTime',
+     /\.resultRow \.resultTime > \.save-slot-team-row\{\s*margin:0 0 5px;?\s*\}/.test(src));
 
-  /* na INDIVIDUAL é a mesma fileira, com UM sprite -- sem exceção nenhuma */
+  /* ⚠️ NA INDIVIDUAL É O RETRATO GRANDE E CENTRADO (23/09/2026, a pedido: *"como só tem um pokémon,
+     pode exibir esse único pokémon centralizado e com a sprite maior"*).
+     ⚠️ A TRAVA MEDIA A REGRA ANTIGA (*"é a mesma fileira, com um sprite só"*) -- e a fileira é uma
+     GRADE de 6 colunas, então com um pokémon ele ocupava 1/6 da largura, encostado à esquerda, com
+     cinco colunas vazias. Medido a 320px: sprite de 48px com o centro em 24 de 171. É o MESMO
+     defeito que o modal do ranking teve em 21/09, na terceira tela. */
   S.corridaZerar();
   S.corrida.formato = 'single';
   const solo = S.corridaNovoCorredor([S.corridaInstancia(mk('jolteon', 60), true)], true);
@@ -2089,9 +2104,16 @@ console.log('\n=== OS SPRITES DO TIME NA CLASSIFICAÇÃO ===');
   S.corrida.corredores = [solo];
   S.corrida.fase = 'fim';
   const h2 = S.renderCorrida();
-  ok('na individual é a mesma fileira, com um sprite só',
+  ok('na individual NÃO é a fileira de seis colunas',
      (h2.match(/class="[^"]*\bresultTime\b[^"]*"/g) || []).length === 1
-     && (h2.match(/save-slot-mon"/g) || []).length === 1);
+     && h2.indexOf('save-slot-team-row spread') < 0);
+  ok('  é o retrato grande e centrado (a MESMA função do modal e do anúncio)',
+     /class="resultTime"[^>]*>\s*<div class="modal-icon corrida-retrato"/.test(h2)
+     && h2.indexOf('sprite-lg') >= 0);
+  /* ⚠️ E O NÍVEL CONTINUA NA TELA: a fileira do revezamento o mostra em cada sprite, e sem ele aqui
+     a individual PERDERIA uma informação que ela tinha -- regressão em silêncio. Ele diz com o que
+     aquele tempo foi feito, e a velocidade da Corrida escala com o nível. */
+  ok('  e o nível continua sendo mostrado', /save-slot-mon-level/.test(h2));
 }
 
 console.log('\n=== O MODAL DO TIME NO RANKING ===');
@@ -2218,6 +2240,14 @@ console.log('\n=== O RETRATO DE UM TIME ===');
 
   /* a decisão é pela QUANTIDADE, não pela modalidade: com um pokémon o retrato grande é o certo
      nos dois modos, e é o que a fileira de 6 colunas não consegue fazer. */
+  /* ⚠️ E ELE CENTRALIZA POR CONTA PRÓPRIA (23/09/2026). O `modal-icon` centralizava por ACIDENTE do
+     container -- o `.modal-box` é `text-align:center` --, e a classificação é uma GRADE: ali ele
+     saía encostado à esquerda. Esta função tem TRÊS chamadores, e depender do contexto de cada um
+     é a forma de defeito que este projeto mais paga: ela funciona em dois lugares e quebra no
+     terceiro, em silêncio. A regra tem que existir no CSS -- isso não aparece em asserção de HTML
+     nenhuma. */
+  ok('  e o retrato de UM centraliza por conta própria',
+     /\.corrida-retrato\{\s*text-align:center;?\s*\}/.test(src));
   const r1 = S.corridaRetratoDoTime(um, false);
   ok('UM ⇒ retrato grande', r1.indexOf('modal-icon') >= 0 && r1.indexOf('sprite-lg') >= 0);
   ok('  e não a fileira', r1.indexOf('save-slot-team-row') < 0);
