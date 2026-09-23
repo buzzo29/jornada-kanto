@@ -5903,6 +5903,13 @@ Depois de ver a cena, três pedidos em sequência:
    ⚠️ **Só a altura**: a largura da cena nunca foi tocada — ela é 100% do container, como sempre foi.
 3. ***"mover a sombra do adversario para a esquerda e subir ela um pouco para ficar no pé"*** — ver
    o bloco abaixo, que é o que tem número.
+4. ***"o pokemon adversario ... faz uma animação de ir para baixo e depois ir reto ... consegue
+   colocar para a animação ir reto e depois descer?"*** — a troca é de **ORDEM**, não de valor: os
+   dois destinos (−38% e 26px) são os mesmos, e o que muda é qual eixo sai primeiro. Medido
+   congelando a animação: `0% (0,0) → 20% (−38%, 0) → 45% (−38%, 26px)`, e a 320px o sprite **não
+   sai da cena** em passo nenhum.
+   ⚠️ **O JOGADOR NÃO FOI TOCADO** — ele continua subindo e só então atravessando, que é a mesma
+   forma vista do outro lado da câmera (ele vai PRA LONGE, e por isso também encolhe).
 
 **MEDIDO DEPOIS DOS TRÊS, a 320px, nos 51 terrenos com os DOIS MAIORES sprites do jogo** (Snorlax e
 Dragonite): a maior sobreposição entre sprite e cartão é **125px²**, **zero** sprites saem da cena e
@@ -5926,9 +5933,16 @@ centrada na **CAIXA** do sprite, e o pé de cada bicho não fica no centro da ca
 | pior pra a esquerda | −22% (Dragonite, Gyarados, Arcanine, Mewtwo) |
 | pior pra a direita | **+22% (Blastoise)**, +18% (Alakazam) |
 
-O sprite desenha ~106px numa cena de 243px, então esses 4,6% são **~2% da cena** — e é esse o
-empurrão. **Ele acerta a média e a maioria, e continua errando nos dois extremos**: acertar cada um
-exigiria uma tabela de pé POR ESPÉCIE, que é outra feature.
+**⚠️ E ELE NASCEU COM A MÉDIA INTEIRA E VOLTOU METADE NO MESMO DIA.** O sprite desenha ~106px numa
+cena de 243px, então os 4,6% são **~2% da cena** — e a 2% foi reportado na hora: *"a sombra passou
+um pouco o corpo do pokémon"*. Faz sentido, e é a dispersão cobrando: pra quem tem o pé à **direita**
+do centro da caixa (Blastoise +22%, Alakazam +18%), andar a média inteira pra esquerda tira a sombra
+de debaixo do bicho.
+
+Hoje ele é **1% da cena** — metade. Medido: o desvio do centro da caixa vai de **−5px para −2px**, e
+o pé continua na altura certa (dy=1px). **Ele acerta o caso comum sem estourar o outro extremo**, e
+continua errando nos dois: acertar cada um exigiria uma tabela de pé POR ESPÉCIE, que é outra
+feature.
 
 **⚠️ E O `%` DO `margin-left` RESOLVE CONTRA A CENA** (o bloco que contém é o `.battle-fighter`, que
 é `inset:0` dela), enquanto o `left`/`right` do `::after` resolve contra o **PALCO** — que é 40% da

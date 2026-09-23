@@ -1014,21 +1014,23 @@
      ⚠️ E SO O `.air` PRECISA DISSO: no `.water` o sprite nao leva padding, entao o pe ja cai em
      cima da ondinha (medido: desvio de meio pixel).
 
-     ⚠️ E OS 2% PRA ESQUERDA SAO A MEDIA MEDIDA, nao um chute -- mas a dispersao e grande e vale
+     ⚠️ E O EMPURRAO PRA ESQUERDA E METADE DA MEDIA MEDIDA (1% da cena), e a razao de ser METADE
      saber: a sombra e centrada na CAIXA do sprite, e o pe de cada bicho nao fica no centro da
      caixa dele. Medido em 20 sprites (varrendo os pixels opacos da folha), o pe desvia **-4,6% da
      largura do quadro** em media -- ou seja pra ESQUERDA --, com casos indo de -22% (Dragonite,
-     Gyarados, Arcanine, Mewtwo) a +22% (Blastoise) e +18% (Alakazam). O sprite desenha ~106px
-     numa cena de 243px, entao esses 4,6% sao ~2% da CENA.
-     Ou seja: este empurrao acerta a media e a maioria, e ele continua errando nos dois extremos --
-     acertar cada um exigiria uma tabela de pe POR ESPECIE, que e outra feature.
+     Gyarados, Arcanine, Mewtwo) a **+22% (Blastoise)** e +18% (Alakazam).
+     ⚠️ E FOI JUSTAMENTE A DISPERSAO QUE COBROU: o empurrao nasceu com a media inteira (~2% da
+     cena) e foi reportado no mesmo dia -- *"a sombra passou um pouco o corpo do pokemon"*. Faz
+     sentido: pra quem tem o pe a DIREITA do centro da caixa, andar a media inteira pra esquerda
+     tira a sombra de debaixo do bicho. Metade acerta o caso comum sem estourar o outro extremo.
+     Acertar cada um exigiria uma tabela de pe POR ESPECIE, que e outra feature.
 
      ⚠️ E O % DO `margin-left` RESOLVE CONTRA A CENA (o bloco que contem e o `.battle-fighter`, que
      e `inset:0` dela), enquanto o `left`/`right` do `::after` resolve contra o PALCO -- que e 40%
      da cena. Por isso os mesmos 2% viram -11% num e 5 pontos no outro. */
-  .battle-scene .battle-fighter.enemy .battle-ground-base{margin-left:-11%;}
+  .battle-scene .battle-fighter.enemy .battle-ground-base{margin-left:-10%;}
   .battle-scene .battle-fighter.enemy .battle-ground-base.air{margin-top:-19px;}
-  .battle-scene .battle-fighter.enemy .battle-sprite-stage::after{left:23%;right:33%;}
+  .battle-scene .battle-fighter.enemy .battle-sprite-stage::after{left:25.5%;right:30.5%;}
   .battle-sprite-stage{
     position:absolute;width:40%;height:148px;margin:0;
     display:flex;align-items:flex-end;justify-content:center;
@@ -1077,9 +1079,15 @@
     20%,78%{transform:translate(0,-48px) scale(.75)}
     45%,56%{transform:translate(38%,-48px) scale(.75)}
   }
+  /* ⚠️ O ADVERSARIO VAI RETO E SO ENTAO DESCE (23/09/2026, a pedido: *"hoje o pokemon adversario
+     quando vai atacar, faz uma animacao de ir para baixo e depois ir reto ... consegue colocar
+     para a animacao ir reto e depois descer?"*). A troca e de ORDEM, nao de valor: os dois
+     destinos (-38% e 26px) sao os mesmos, e o que muda e qual eixo sai primeiro.
+     ⚠️ E O JOGADOR CONTINUA COMO ESTAVA -- ele sobe e so entao atravessa, que e a mesma forma
+     vista do outro lado da camera (ele vai PRA LONGE, e por isso ele tambem encolhe). */
   @keyframes battleAttackEnemy{
     0%,100%{transform:translate(0,0)}
-    20%,78%{transform:translate(0,26px)}
+    20%,78%{transform:translate(-38%,0)}
     45%,56%{transform:translate(-38%,26px)}
   }
   /* Dano: flash curto + recoil. A animação fica no palco, não no <img>, para o GIF continuar
