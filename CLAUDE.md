@@ -19321,6 +19321,222 @@ lado a lado, e o **PONTA A PONTA** com 8 e com 5 inscritos.
    cheios**, onde quem barra é o TETO; e a dos quadros cobrava **igualdade** com a Clássica, o que
    passaria de volta com o vazamento do histórico global. As duas só apareceram na conferência.
 
+## A POKÉDEX CONTA 251, E A BARRA NUNCA FECHA (23/09/2026)
+
+Reportado assim: *"na pokedex tem um texto que fala '130 de 250 especies registradas…', mas é 251 o
+correto"*. **E ele estava certo — a tela discordava de si mesma:** a conta dizia 250 (o tamanho do
+`SPECIES`) e a **grade desenhava 251**, porque o quadro do **#151 (Mew)** entra nela desde
+01/09/2026 pra a numeração não pular do #150 pro #152.
+
+- **⚠️ E O NÚMERO É DERIVADO DAS DUAS TABELAS** (`SPECIES` + `SPECIES_FORA_DA_DEX`), nunca o 251
+  escrito à mão: ele envelheceria na próxima espécie que entrasse na dex — a família de trava e de
+  texto fixo que já caiu meia dúzia de vezes neste projeto.
+  **⚠️ E COMPARAR A CONTA COM A SOMA DAS TABELAS NÃO DISTINGUE OS DOIS**, porque hoje 250+1 dá 251:
+  um número fixo passa. Quem distingue é **MEXER na tabela** e cobrar que a conta acompanhe — a
+  mesma técnica do asterisco do cartão de golpe, que mexe na chance e cobra a frase.
+- **⚠️ O CUSTO É CONHECIDO E ACEITO: A BARRA NUNCA FECHA.** O Mew é o chefe da raide e **ninguém o
+  registra**, então o máximo possível é **250 de 251**. É o preço de a conta bater com a grade — e
+  fica trancado no teste pra ser decisão e não surpresa.
+- **⚠️ E NENHUMA CONQUISTA QUEBRA, o que foi conferido antes de mexer:** o desafio do Mewtwo e o
+  "Mestre Pokémon" cobram *"capturou todo o resto"* lendo o **`SPECIES`**, que continua em 250. A
+  conta da tela é **só texto** — se ela alimentasse a conquista, os dois ficariam impossíveis pra
+  sempre, que é o que já aconteceu neste jogo com o Celebi e ficou dias sem ninguém notar.
+- **⚠️ ISSO REVERTE A DECISÃO DE 01/09/2026**, que era *"ele entra na GRADE mas NÃO entra na
+  CONTA"*. Ela existia pela razão do item acima — e a razão valia pro `SPECIES`, não pro texto.
+
+**A trava do `test-online-dex.js` FIXAVA 250 e caiu com o código certo** — a família que este
+arquivo já registra meia dúzia de vezes. Ela não foi afrouxada: passou a cobrar a **regra** (a conta
+BATE com o que a grade desenha, ela é derivada, e o teto real é uma a menos que o total).
+
+## O RANKING SEMANAL DOS TRÊS JOGOS DAS ILHAS (23/09/2026)
+
+Pedido assim: *"crie um ranking semanal para os jogos pescaria, corrida e resgate das ilhas
+laranjas. O lider de cada semana ganha 2 rare candy, o vice lider ganha 1 rare candy e o terceiro
+colocado ganha 50 moedas, reseta toda segunda feira meia noite, e mantem o rank de sempre, serao 2
+rankings, coloque 2 abas no ranking que existe hoje, e pode copiar os dois igual, porque como
+começou antes de ontem, só teve essa semana"*.
+
+### ⚠️ NÃO EXISTE "RESETAR" — cada semana é uma SUBCOLEÇÃO própria
+
+`<base>Weekly/<segunda>/players/<uid>`. Semana nova é **outra subcoleção**, então **não há o que
+apagar** — e isso resolve três coisas de uma vez:
+
+| | |
+|---|---|
+| o reset | não acontece: a semana velha fica onde está |
+| o **índice** | a consulta continua sendo um `orderBy` de **um campo só** — filtrar por semana dentro do mesmo documento exigiria composto, e o primeiro que este projeto precisou **nasceu quebrado** (o da Luana, 21/09) |
+| o histórico | fica de graça, e é dele que o fechamento paga |
+
+**⚠️ E O MOLDE JÁ EXISTIA NO JOGO: é o `trainerTowerDays/{dateId}/players/{uid}` da Torre**, com o
+fechamento no cron e a trava de "já pago" por treinador. **Nada aqui é caminho novo.**
+
+### A SEMANA: segunda a domingo, no FUSO DO JOGO
+
+`semanaDoRanking(ts)` devolve a data da **segunda** daquela semana, e ela é o id.
+
+- **⚠️ A CONTA REUSA O `trainersLeagueDateStrFromTime` / `trainersLeagueTimeOnDate`:** uma segunda
+  regra de data (a minha, em UTC) discordaria da do jogo em algum fuso, e a virada aconteceria numa
+  hora que o jogador não reconhece. Medido: **23:59 de domingo (SP) ainda é a semana velha e 00:01
+  de segunda já é a nova** — que é o *"reseta toda segunda feira meia noite"* do pedido.
+- **⚠️ E ELA É CALCULADA AO MEIO-DIA**, como o `trainersLeagueDateStrPlusDays` já faz: é o que evita
+  a borda do horário de verão.
+
+### ⚠️ O GERAL E O SEMANAL SÃO INDEPENDENTES, e é isso que faz a aba nova existir
+
+As duas leituras acontecem na **MESMA transação** (o Firestore exige todas as leituras antes das
+escritas) e **cada uma decide sozinha**. Medido: um placar de **350** não bate o recorde de sempre
+(400) e **É** o recorde da semana.
+
+Sem isso a aba da semana mostraria os mesmos números da de sempre e a feature não teria acontecido.
+
+- **A Corrida tem o mesmo desenho com MENOR é melhor**, e com **merge**: as duas modalidades vivem
+  no mesmo documento, e sem ele a segunda apagaria a primeira — quem correu as duas perderia uma.
+
+### OS PRÊMIOS, E O PÓDIO É DE PLACAR DISTINTO
+
+| | |
+|---|---|
+| **1º** | 2 Doces Raros |
+| **2º** | 1 Doce Raro |
+| **3º** | 🪙 50 moedas |
+
+- **⚠️ O PÓDIO É DE PLACAR, NÃO DE PESSOA** — a regra que a Torre já pratica: com dois empatados no
+  topo, os **DOIS** são líderes e o 2º degrau é o próximo placar que teve alguém. Medido: cinco
+  jogadores com 900/900/700/500/100 pagam **quatro** prêmios.
+- **A notificação diz a posição, o que ele ganhou e que a posição foi DIVIDIDA** — prêmio que o
+  jogador não vê é o erro da especialidade de novo (ela valia 1%, não tinha selo, e a conclusão foi
+  *"não mudou nada"*).
+
+**⚠️ SÃO QUATRO PÓDIOS, e não três: a Corrida tem DOIS rankings** (individual e revezamento), e eles
+são coisas diferentes — não dá pra somar tempo de um com o do outro.
+
+**⚠️ E POR ISSO A TRAVA DE "JÁ PAGO" LEVA O RANKING NA CHAVE** (`pago_<base>_<campo>_<semana>`), e
+não só a semana: o mesmo treinador pode estar no pódio das duas modalidades, e com a chave só da
+semana **a segunda não seria paga**. Há trava.
+
+**O CUSTO POR SEMANA, no teto** (exige 3 placares distintos nos quatro pódios):
+
+| | |
+|---|---|
+| | **12 Doces Raros + 🪙 200** |
+| em valor de loja (o doce custa 300) | **🪙 3.800** |
+| em renda de jogo (a jornada paga 70) | **54,3 jornadas completas** |
+| por ano | 624 doces |
+
+**⚠️ E O NÚMERO QUE DESARMA ISSO É A COMPARAÇÃO COM A TORRE: ela já paga 1 doce por dia a cada um
+dos três degraus, ou seja 21 doces por semana no teto — 1,8× o que o semanal das Ilhas paga.** Não é
+uma torneira de escala nova; é uma segunda da mesma ordem.
+**Se um dia incomodar**, a régua é o `RANK_SEMANAL_PREMIOS`, e a conta está aqui: 1 doce é +1 nível,
+que sozinho vale **+0,54 ponto** de vitória (dentro do ruído) — o que ele compra é ACÚMULO (+5
+níveis valem +4,25 e +10 valem +8,19).
+
+### O FECHAMENTO É O DA TORRE, LINHA POR LINHA — inclusive a ORDEM
+
+- **⚠️ A MARCA `awarded` VAI POR ÚLTIMO.** Marcar a semana como paga **antes** de pagar faria um erro
+  no meio do laço **apagar o resto do pódio pra sempre**, porque a volta seguinte do cron veria a
+  marca e iria embora. Pagar duas vezes **não** é o risco — quem trava isso é a chave por treinador,
+  dentro da transação.
+  **⚠️ E A TRAVA DISSO PASSOU EM BRANCO NA PRIMEIRA VERSÃO:** ela media a **ÚLTIMA** ocorrência da
+  marca, e o defeito religado acrescenta uma **ANTES** sem tirar a de depois. Hoje ela mede a
+  primeira ocorrência **depois do pódio** — e a fatia começa ali de propósito, porque o ramo da
+  semana **VAZIA** marca antes por desenho (não há o que pagar).
+- **⚠️ O CRON FECHA A ANTERIOR, NUNCA A CORRENTE.** Fechando a corrente, o prêmio sairia no meio da
+  semana e ela continuaria aceitando pontuação depois de paga — quem jogasse na quarta correria por
+  nada. Há trava cobrando as duas metades.
+- **Ele varre `RANK_SEMANAS_A_FECHAR` (4) semanas pra trás**, do mais VELHO pro mais novo, pelo mesmo
+  motivo da Torre: uma semana que ficou pra fora se recupera sozinha em vez de esperar um relato.
+- **A semana VAZIA fecha e fica MARCADA**, senão o cron voltaria nela de hora em hora pra sempre.
+
+### ⚠️ A CÓPIA INICIAL, e ela roda UMA VEZ SÓ
+
+Foi o pedido (*"pode copiar os dois igual, porque como começou antes de ontem, só teve essa
+semana"*): os três jogos nasceram há poucos dias, então **todo recorde de sempre é também desta
+semana** — e sem a cópia a aba da semana abriria **VAZIA pra todo mundo no dia do deploy**, o que se
+leria como o ranking ter sido apagado.
+
+- **⚠️ ELA SÓ PREENCHE QUEM FALTA.** Quem já jogou nesta semana tem placar próprio, e ele manda — o
+  do geral pode ser de um dia anterior. **Reescrevendo, ela apagaria um recorde novo com o valor
+  velho.** Medido: um jogador com 800 no geral e 300 na semana **fica com 300**.
+- **⚠️ E A MARCA (`copiado`) É O QUE A FAZ RODAR UMA VEZ:** o cron passa de hora em hora, e sem ela
+  cada volta **varreria as três coleções inteiras**.
+  **⚠️ E ISSO CUSTOU UMA TRAVA MUDA, porque as duas guardas protegem o DADO igual** (a marca e o
+  `if(ja.exists)`): com a marca removida, o teste continuava verde. O que **só** a marca garante é
+  observável de outro jeito — **quem entra no geral DEPOIS da cópia não é copiado** —, e é isso que
+  a trava passou a cobrar. (E não é buraco: quem faz um placar de sempre novo o fez **jogando**, e o
+  envio grava nos dois.)
+- **⚠️ E ELA SÓ COPIA A SEMANA CORRENTE.** Semana passada não tem o que copiar: o geral não guarda
+  QUANDO cada recorde foi feito, então espalhar o de sempre pelas anteriores **inventaria um passado
+  que não aconteceu — e pagaria prêmio por ele**.
+- **A cópia vem ANTES do fechamento no cron**: ela só mexe na corrente e ele só nas anteriores, então
+  os dois nunca se cruzam — mas invertida, uma semana que virasse no meio da passada teria o
+  fechamento rodando sobre uma lista ainda vazia.
+
+### AS DUAS ABAS
+
+**"Da semana"** e **"De sempre"**, nas três telas, com a lista da semana como **padrão**: é ela que
+muda, e é nela que ainda dá pra fazer alguma coisa hoje — o de sempre é histórico, e quem o procura
+sabe onde ele está.
+
+- **⚠️ A ABA É A `tower-rank-aba` DA TORRE, e não uma nova:** o jogo **já tinha** esse controle
+  (Hoje/Histórico), e um próprio faria o jogador reaprender a ler o mesmo botão. O nome ficou com o
+  prefixo de onde ela nasceu — renomeá-lo seria mexer numa tela que funciona e numa trava frágil pra
+  trocar uma palavra que só aparece no CSS, a mesma decisão que a Arena 1x1 tomou.
+- **⚠️ E A PRIMEIRA VERSÃO ERA UMA CLASSE PRÓPRIA QUE NASCEU INVISÍVEL:** a borda dela usava um nome
+  de variável de cor que **não existe na paleta**, e o navegador **DESCARTA a declaração inteira** —
+  a aba inativa saía com o **MESMO fundo da caixa e sem moldura nenhuma**. Em asserção de HTML ela
+  passa; foi a **medição no navegador** que pegou. É a **nona** vez desta família aqui (`--cream`,
+  `--yellow-soft`, `.section-title`, `.app-shell`, a variante do botão de fisgar, `mewtwo-loan-cta`,
+  `corrida-anuncio-time`, `pesc-trocar`).
+- **⚠️ AS DUAS LISTAS VÊM NA MESMA RESPOSTA do servidor**, então trocar de aba **não custa rede** — e
+  é por isso que a troca é só um `render()`. Duas chamadas fariam a aba piscar *"Carregando…"* a cada
+  toque, que é o oposto do que uma aba promete.
+- **⚠️ QUAL LISTA DESENHAR SAI DE UMA FUNÇÃO SÓ** (`rankListaDaAba`), e não de um `if` em cada tela:
+  três cópias divergiriam no primeiro ajuste, e o sintoma seria uma tela mostrando a aba certa e
+  outra a errada.
+- **A aba é POR JOGO** (`rankAba.pescaria` / `.corrida` / `.resgate`): as três são telas diferentes,
+  e uma aba só faria a escolha de uma valer na outra. **É estado de TELA e não vai pro save** —
+  ninguém volta amanhã querendo o ranking aberto numa aba específica.
+- **⚠️ NA CORRIDA SÃO DOIS EIXOS** — a MODALIDADE e a ABA —, e os dois leitores (a tela e o **modal
+  do time**) têm que olhar a **MESMA célula**. Lendo `corridaRank[formato]` direto, um toque na aba da
+  semana abriria o time do ranking **de SEMPRE**, e o modal mostraria um time que não é o da linha.
+  Por isso ela vive no `corridaRankDaAba`.
+- **O VAZIO DA SEMANA DIZ OUTRA COISA** (*"ninguém pontuou NESTA SEMANA ainda"*): ali não é "nunca",
+  e as abas continuam na tela pra dar pra voltar ao de sempre.
+- **⚠️ E SEM A LISTA DA SEMANA ELE CAI NO DE SEMPRE em vez de estourar:** um cliente que leu antes do
+  deploy — ou um erro de rede — tem `semanal` nulo.
+- **A nota do prêmio (`🏅 Lidere a semana e ganhe Doces Raros`) só sai na aba da semana**, e ela
+  **nomeia a segunda em que a semana começou**: no de sempre não há prêmio pra convidar, e ela
+  mentiria.
+
+**Medido a 320px, no navegador, nas cinco telas** (as três da semana, a de sempre e a semana vazia):
+**nenhuma rola pro lado**, abas de **126×30px** em duas colunas, a nota em 14px, **nenhum nome
+truncado** (nem "TreinadorNomeComprido") e as linhas uniformes em 23-24px. A caixa vai de **173 para
+211px** (aba de sempre) e **231px** (aba da semana, com a nota) — **+33% no pior caso**, que é o
+preço de a aba existir.
+
+### AS REGRAS, E O QUE ELAS PROTEGEM AQUI É MAIOR QUE ANTES
+
+As três coleções semanais são `allow read: if request.auth != null` e **`allow write: if false`**,
+inclusive pro dono — como as três de sempre.
+
+**⚠️ E AGORA ISSO PESA MAIS: o prêmio é DOCE RARO, ou seja NÍVEL.** Nos rankings de sempre uma linha
+no console poria um número bom no topo; aqui ela **compraria nível**. Há trava lendo as regras como
+texto, nas seis portas (o documento da semana e a subcoleção `players` das três).
+
+### O QUE ISSO CUSTOU AO MOTOR: NADA
+
+`MOTOR 5481ce57abca / DIARIO a4c6725aa4aa`, **idêntico** em 900 batalhas semeadas.
+
+`tools/test-rank-semanal.js` tranca **95 pontas**: a conta da semana (a virada na meia-noite do fuso
+do jogo, o domingo ainda na semana velha), a independência do geral e do semanal, as duas listas na
+mesma resposta **com números que DIFEREM de verdade**, a Corrida com as duas modalidades e o merge,
+o pódio de placar distinto com empate, os três prêmios, a notificação, o fechamento idempotente
+(inclusive **com a marca da semana apagada**), a chave por ranking, a semana vazia, o cron fechando a
+anterior e não a corrente, a cópia inicial nas três formas, as regras lidas como texto, e as abas
+(as duas, só uma acesa, a padrão, a nota só na semana, o vazio, o fallback e o modal do time da
+Corrida lendo a mesma célula).
+**Conferido que os 15 defeitos religados acusam** (1 a 7 falhas cada).
+
 ## Frontend
 
 - **A tela de notificações é uma caixa de entrada**: lista de títulos em cima, corpo do que está

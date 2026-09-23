@@ -77,17 +77,45 @@ ok('o prazo e proprio e curto', S.PRAZO_HISTORICO_MS > 0 && S.PRAZO_HISTORICO_MS
    S.PRAZO_HISTORICO_MS + 'ms por tentativa');
 
 console.log('\nO QUADRO #151 (MEW) NA POKEDEX');
-/* Ele entra na GRADE pra numeracao nao pular do #150 pro #152, mas NAO entra na CONTA: o desafio
-   do Mewtwo e a conquista "Mestre Pokemon" cobram "capturou todo o resto", e uma vaga que ninguem
-   consegue preencher deixaria os dois impossiveis pra sempre -- que ja aconteceu neste jogo, com
-   o Celebi, e ficou dias sem ninguem notar. */
+/* Ele entra na GRADE pra numeracao nao pular do #150 pro #152.
+   ⚠️ E A CONTA DA TELA E DAS 251 ENTRADAS DESDE 23/09/2026 (reportado: *"tem um texto que fala
+   '130 de 250 especies registradas', mas é 251 o correto"*). Ela dizia 250, que e o tamanho do
+   `SPECIES` -- e a grade sempre desenhou 251, entao a tela discordava de si mesma.
+   ⚠️ O QUE NAO MUDOU e o que importa: o desafio do Mewtwo e a conquista "Mestre Pokemon" cobram
+   "capturou todo o resto" lendo o `SPECIES`, e continuam em 250 -- a conta da tela e SO texto. */
 ok('o Mew continua FORA do SPECIES', !S.SPECIES['mew'] && !!S.SPECIES_FORA_DA_DEX['mew']);
-ok('e o total da Pokedex nao mudou', Object.keys(S.SPECIES).length === 250, Object.keys(S.SPECIES).length + '');
+ok('e o total capturavel nao mudou', Object.keys(S.SPECIES).length === 250, Object.keys(S.SPECIES).length + '');
 g = S.__getGame(); g.screen = 'pokedex'; g.pokedexView = 'normal'; g.pokedexModal = false; S.__setGame(g);
 const grade = S.renderPokedex();
 const celulas = (grade.match(/class="pokedex-cell/g) || []).length;
 ok('a grade tem uma celula a mais que o SPECIES', celulas === 251, celulas + ' células');
-ok('e a conta na tela continua dizendo 250', /de 250 espécies/.test(grade));
+/* ⚠️ E A CONTA BATE COM A GRADE, que e a regra: um texto que diz um numero e uma grade que
+   desenha outro e a tela se contradizendo -- era exatamente o relato. */
+ok('e a conta da tela BATE com o que a grade desenha',
+   new RegExp('de ' + celulas + ' espécies').test(grade),
+   (grade.match(/de (\d+) espécies/) || [])[0]);
+/* ⚠️ E ELA E DERIVADA, nunca o numero escrito a mao: um 251 fixo envelheceria na proxima especie
+   que entrasse na dex -- a familia de trava que ja caiu meia duzia de vezes neste projeto.
+   ⚠️ E COMPARAR COM A SOMA DAS TABELAS NAO DISTINGUE OS DOIS: hoje 250+1 da 251, entao um numero
+   fixo passaria. Quem distingue e MEXER na tabela e cobrar que a conta acompanhe -- a mesma
+   tecnica do asterisco do cartao de golpe, que mexe na chance e cobra a frase. */
+ok('  e ela e DERIVADA das duas tabelas',
+   new RegExp('de ' + (Object.keys(S.SPECIES).length + Object.keys(S.SPECIES_FORA_DA_DEX).length) + ' espécies').test(grade));
+{
+  const antes = Object.keys(S.SPECIES).length;
+  S.SPECIES['zztestez'] = { name: 'Testez', types: ['Normal'], dex: 999, hp: 1, attack: 1, defense: 1, speed: 1, emoji: '?' };
+  const g2 = S.renderPokedex();
+  delete S.SPECIES['zztestez'];
+  const conta2 = Number((g2.match(/de (\d+) espécies/) || [])[1]);
+  const cel2 = (g2.match(/class="pokedex-cell/g) || []).length;
+  ok('  (a especie de teste entrou mesmo na grade)', cel2 === celulas + 1, cel2 + ' x ' + celulas);
+  ok('  e com uma especie A MAIS a conta ACOMPANHA', conta2 === antes + 1 + Object.keys(S.SPECIES_FORA_DA_DEX).length,
+     conta2 + ' (esperado ' + (antes + 1 + Object.keys(S.SPECIES_FORA_DA_DEX).length) + ')');
+}
+/* ⚠️ E A BARRA NUNCA FECHA, e e o custo aceito: o Mew e o unico que ninguem registra, entao o
+   maximo possivel e 250 de 251. Fica trancado pra ser decisao e nao surpresa. */
+ok('  e o teto real e uma a menos que o total (o Mew nao se registra)',
+   Object.keys(S.SPECIES).length === celulas - 1, celulas - 1 + ' de ' + celulas);
 /* Celula COMUM de nao-descoberto: nada nela promete que da pra conseguir, e nada nela chama
    atencao -- e a mesma coisa que o jogador ve em qualquer espécie que ele ainda nao capturou. */
 ok('o #151 esta la, como um quadro comum de nao-descoberto', grade.includes('#151'));

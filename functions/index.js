@@ -5565,6 +5565,238 @@ function pontosDeRankingValidos(x){
   const n = Number(x);
   return Number.isFinite(n) && n > 0 && n <= RANK_PONTOS_MAX ? Math.floor(n) : 0;
 }
+/* =====================================================================
+   O RANKING SEMANAL DOS TRES JOGOS DAS ILHAS (23/09/2026)
+   =====================================================================
+   Pedido assim: *"crie um ranking semanal para os jogos pescaria, corrida e resgate das ilhas
+   laranjas. O lider de cada semana ganha 2 rare candy, o vice lider ganha 1 rare candy e o
+   terceiro colocado ganha 50 moedas, reseta toda segunda feira meia noite, e mantem o rank de
+   sempre, serao 2 rankings"*.
+
+   ⚠️ NAO HA RESET NENHUM, E ESSA E A DECISAO: a semana e uma SUBCOLECAO propria
+   (`<base>Weekly/{semanaId}/players/{uid}`), entao semana nova e subcolecao nova -- o placar da
+   semana passada simplesmente nao esta la. Um reset de verdade (zerar os documentos na virada)
+   teria que alcancar TODO MUNDO, e um reset preguicoso (na hora do envio) deixaria no ranking o
+   placar velho de quem nao jogasse na semana nova.
+   E de quebra o `orderBy` fica SIMPLES: filtrar por semana no mesmo documento exigiria
+   `where + orderBy` em campos diferentes, ou seja INDICE COMPOSTO -- que este projeto so tem um.
+
+   ⚠️ E O MOLDE JA EXISTIA NO JOGO: e o `trainerTowerDays/{dateId}/players/{uid}` da Torre, com o
+   fechamento no cron e a trava de "ja pago" por treinador. Nada aqui e caminho novo. */
+const RANK_SEMANAS_A_FECHAR = 4;   // recupera uma semana que ficou pra tras, como os 7 dias da Torre
+/* ⚠️ O PODIO E DE PLACAR DISTINTO, nao de pessoa -- a regra que a Torre ja pratica: com dois
+   empatados no topo, os DOIS sao lideres e o 2o degrau e o proximo placar que teve alguem. */
+const RANK_SEMANAL_PREMIOS = [
+  { doces: 2, moedas: 0,  rotulo: 'líder da semana' },
+  { doces: 1, moedas: 0,  rotulo: 'vice-líder da semana' },
+  { doces: 0, moedas: 50, rotulo: '3º colocado da semana' }
+];
+/* ⚠️ A SEMANA COMECA NA SEGUNDA 00:00 NO FUSO DO JOGO, e o id dela e a data dessa segunda. A conta
+   reusa o `trainersLeagueDateStrFromTime` / `trainersLeagueTimeOnDate`: uma segunda regra de data
+   (a minha, em UTC) discordaria da do jogo em algum fuso, e ai a virada da semana aconteceria numa
+   hora que o jogador nao reconhece. */
+function semanaDoRanking(ts){
+  const hoje = trainersLeagueDateStrFromTime(ts == null ? Date.now() : ts);
+  /* o meio-dia evita a borda do horario de verao, como o `trainersLeagueDateStrPlusDays` ja faz */
+  const d = new Date(trainersLeagueTimeOnDate(hoje, 12, 0));
+  const dia = d.getUTCDay();                  // 0=domingo ... 1=segunda
+  const recuar = (dia + 6) % 7;               // segunda recua 0, domingo recua 6
+  return trainersLeagueDateStrPlusDays(hoje, -recuar);
+}
+function semanaMaisDias(semanaId, dias){ return trainersLeagueDateStrPlusDays(semanaId, dias); }
+function rankSemanaDocRef(base, semanaId){ return db.collection(base + 'Weekly').doc(semanaId); }
+function rankSemanaPlayersRef(base, semanaId){ return rankSemanaDocRef(base, semanaId).collection('players'); }
+
+/* ⚠️ O GERAL E O SEMANAL SAO INDEPENDENTES, e isso nao e detalhe: um jogador pode NAO bater o
+   recorde de sempre e mesmo assim bater o da semana. Por isso as duas leituras acontecem na MESMA
+   transacao (o Firestore exige todas as leituras antes das escritas) e cada uma decide sozinha. */
+async function gravarRankPontos(base, uid, dados){
+  const semanaId = semanaDoRanking();
+  const geralRef = db.collection(base).doc(uid);
+  const semRef = rankSemanaPlayersRef(base, semanaId).doc(uid);
+  let recorde = false, recordeSemana = false;
+  await db.runTransaction(async (tx) => {
+    const [g, w] = await Promise.all([tx.get(geralRef), tx.get(semRef)]);
+    const antesG = g.exists ? (Number(g.data().pontos) || 0) : -1;
+    const antesW = w.exists ? (Number(w.data().pontos) || 0) : -1;
+    if(dados.pontos > antesG){ recorde = true; tx.set(geralRef, dados); }
+    if(dados.pontos > antesW){ recordeSemana = true; tx.set(semRef, { ...dados, semanaId }); }
+  });
+  return { recorde, recordeSemana, semanaId };
+}
+/* a mesma coisa pro tempo da Corrida, onde MELHOR e MENOR e ha DUAS modalidades no mesmo doc */
+async function gravarRankTempo(base, uid, modalidade, dados){
+  const semanaId = semanaDoRanking();
+  const geralRef = db.collection(base).doc(uid);
+  const semRef = rankSemanaPlayersRef(base, semanaId).doc(uid);
+  const tempo = dados[modalidade];
+  let recorde = false, recordeSemana = false;
+  await db.runTransaction(async (tx) => {
+    const [g, w] = await Promise.all([tx.get(geralRef), tx.get(semRef)]);
+    const melhor = (snap) => { const t = snap.exists ? Number(snap.data()[modalidade]) : NaN;
+                               return (isFinite(t) && t > 0) ? t : Infinity; };
+    if(tempo < melhor(g)){ recorde = true; tx.set(geralRef, dados, { merge: true }); }
+    if(tempo < melhor(w)){ recordeSemana = true; tx.set(semRef, { ...dados, semanaId }, { merge: true }); }
+  });
+  return { recorde, recordeSemana, semanaId };
+}
+
+/* ⚠️ O FECHAMENTO E O DA TORRE, linha por linha -- inclusive a ORDEM: o resumo vai primeiro e o
+   `awarded` so no FIM. Marcar a semana como paga antes de pagar faria um erro no meio do laco
+   apagar o resto do podio pra sempre, porque a volta seguinte do cron veria o `awarded` e iria
+   embora. Pagar duas vezes nao e o risco -- quem trava isso e a chave por treinador, na transacao. */
+async function fecharSemanaDoRanking(base, semanaId, campo, maiorEMelhor, rotulo){
+  const semRef = rankSemanaDocRef(base, semanaId);
+  const snap = await semRef.get();
+  const marca = 'awarded_' + campo;
+  if(snap.exists && snap.data()[marca]) return null;
+  const jogadores = await rankSemanaPlayersRef(base, semanaId).get();
+  const todos = jogadores.docs.map(d => d.data())
+    .filter(x => { const v = Number(x[campo]); return isFinite(v) && v > 0; });
+  if(!todos.length){
+    await semRef.set({ [marca]: true, ['podium_' + campo]: [], closedAt: Date.now() }, { merge: true });
+    return { premiados: 0 };
+  }
+  const valores = [...new Set(todos.map(x => Number(x[campo])))]
+    .sort((a, b) => maiorEMelhor ? b - a : a - b)
+    .slice(0, RANK_SEMANAL_PREMIOS.length);
+  const premiados = todos.filter(x => valores.indexOf(Number(x[campo])) >= 0);
+  await semRef.set({ ['podium_' + campo]: valores, closedAt: Date.now() }, { merge: true });
+  for(const p of premiados){
+    const v = Number(p[campo]);
+    const pos = valores.indexOf(v) + 1;
+    const juntos = todos.filter(x => Number(x[campo]) === v).length;
+    await premiarSemana(base, campo, p.uid, p.nome, semanaId, pos, juntos, v, maiorEMelhor, rotulo);
+  }
+  await semRef.set({ [marca]: true }, { merge: true });
+  return { premiados: premiados.length, podio: valores };
+}
+/* ⚠️ A TRAVA DE 'JA PAGO' E POR TREINADOR E POR RANKING (a chave leva o `base` e o `campo`), e nao
+   so por semana: a Corrida tem DUAS modalidades e o mesmo treinador pode estar no podio das duas.
+   Com a chave so da semana, a segunda nao seria paga. */
+async function premiarSemana(base, campo, uid, nome, semanaId, pos, juntos, valor, maiorEMelhor, rotulo){
+  const premio = RANK_SEMANAL_PREMIOS[pos - 1];
+  if(!premio || !uid) return;
+  const chave = 'pago_' + base + '_' + campo + '_' + semanaId;
+  const ref = db.collection('users').doc(uid);
+  let jaPago = false;
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const d = snap.exists ? snap.data() : {};
+    if((d.premiosSemanais || {})[chave]){ jaPago = true; return; }
+    const patch = { premiosSemanais: { ...(d.premiosSemanais || {}), [chave]: pos } };
+    if(premio.doces)  patch.rareCandies = admin.firestore.FieldValue.increment(premio.doces);
+    if(premio.moedas) patch.moedas = admin.firestore.FieldValue.increment(premio.moedas);
+    tx.set(ref, patch, { merge: true });
+  });
+  if(jaPago) return;
+  const medalha = pos === 1 ? '🥇' : pos === 2 ? '🥈' : '🥉';
+  const ganhou = premio.doces ? premio.doces + ' 🍬 Doce' + (premio.doces > 1 ? 's' : '') + ' Raro' + (premio.doces > 1 ? 's' : '')
+                              : '🪙 ' + premio.moedas + ' moedas';
+  const dividido = juntos > 1 ? ' Você dividiu essa posição com mais ' + (juntos - 1) +
+                   ' treinador' + (juntos - 1 === 1 ? '' : 'es') + '.' : '';
+  const marca = maiorEMelhor ? valor + ' pontos' : valor.toFixed(2).replace('.', ',') + 's';
+  await createNotification(uid, 'rank_semanal', medalha + ' Você foi ' + RANK_SEMANAL_PREMIOS[pos-1].rotulo + '!',
+    'Na semana de ' + semanaId.slice(8,10) + '/' + semanaId.slice(5,7) + ' você ficou em ' + pos +
+    'º no ranking de ' + rotulo + ', com ' + marca + '.' + dividido + ' Ganhou ' + ganhou + '.');
+}
+/* ⚠️ SAO QUATRO PODIOS, e nao tres: a Corrida tem DOIS rankings (individual e revezamento), e eles
+   sao coisas diferentes -- nao da pra somar tempo de um com o do outro. A tela ja mostra os dois
+   separados desde que o ranking dela nasceu. */
+const RANKS_SEMANAIS = [
+  { base: 'fishingRanking', campo: 'pontos', maior: true,  rotulo: 'Pescaria' },
+  { base: 'rescueRanking',  campo: 'pontos', maior: true,  rotulo: 'Resgate' },
+  { base: 'raceRanking',    campo: 'single', maior: false, rotulo: 'Corrida individual' },
+  { base: 'raceRanking',    campo: 'relay',  maior: false, rotulo: 'Corrida em revezamento' }
+];
+/* ⚠️ VARRE AS ULTIMAS SEMANAS em vez de so a anterior, pela mesma razao da Torre: uma semana que
+   nao fecha e um premio que ninguem recebe, e o unico jeito de perceber seria alguem reclamar.
+   Da mais VELHA pra a mais nova, pras notificacoes chegarem na ordem em que as semanas passaram. */
+/* ⚠️ A COPIA INICIAL (23/09/2026, a pedido: *"pode copiar os dois igual, porque como começou antes
+   de ontem, só teve essa semana"*). Os tres jogos nasceram ha poucos dias, entao TODO recorde de
+   sempre e tambem desta semana -- e sem a copia a aba da semana abriria VAZIA pra todo mundo no
+   dia do deploy, o que se leria como o ranking ter sido apagado.
+   ⚠️ ELA RODA UMA VEZ SO, e a marca e o proprio documento da semana (`copiado`): o cron passa de
+   hora em hora, e sem ela cada volta reescreveria os placares -- inclusive por CIMA de um recorde
+   novo que alguem tivesse feito no meio-tempo, com o valor antigo do geral.
+   ⚠️ E ELA SO COPIA A SEMANA CORRENTE. Semana passada nao tem o que copiar: o geral nao guarda
+   QUANDO cada recorde foi feito por semana, entao espalhar o de sempre pelas anteriores inventaria
+   um passado que nao aconteceu -- e pagaria premio por ele. */
+async function copiarGeralParaASemana(){
+  const semanaId = semanaDoRanking();
+  for(const base of ['fishingRanking', 'rescueRanking', 'raceRanking']){
+    const semRef = rankSemanaDocRef(base, semanaId);
+    try{
+      const marca = await semRef.get();
+      if(marca.exists && marca.data().copiado) continue;
+      const geral = await db.collection(base).get();
+      let n = 0;
+      for(const d of geral.docs){
+        const dados = d.data() || {};
+        /* ⚠️ `create`-like: quem JA jogou nesta semana tem placar proprio, e ele manda -- o do
+           geral pode ser de um dia anterior. Por isso a copia so preenche quem nao esta la. */
+        const alvo = rankSemanaPlayersRef(base, semanaId).doc(d.id);
+        const ja = await alvo.get();
+        if(ja.exists) continue;
+        await alvo.set({ ...dados, semanaId });
+        n++;
+      }
+      await semRef.set({ copiado: true, copiadoEm: Date.now(), copiados: n }, { merge: true });
+      if(n) logger.info('Ranking semanal ' + base + '/' + semanaId + ': ' + n + ' copiado(s) do geral.');
+    } catch(e){ logger.error('Falha ao copiar o ranking ' + base + ' para a semana ' + semanaId, e); }
+  }
+}
+async function fecharSemanasPendentes(){
+  const atual = semanaDoRanking();
+  for(let i = RANK_SEMANAS_A_FECHAR; i >= 1; i--){
+    const sem = semanaMaisDias(atual, -7 * i);
+    for(const r of RANKS_SEMANAIS){
+      await fecharSemanaDoRanking(r.base, sem, r.campo, r.maior, r.rotulo)
+        .catch(e => logger.error('Falha ao fechar ' + r.base + '/' + r.campo + ' da semana ' + sem, e));
+    }
+  }
+}
+exports._rankSemanal = { semanaDoRanking, fecharSemanaDoRanking, fecharSemanasPendentes,
+                         copiarGeralParaASemana,
+                         RANKS_SEMANAIS, RANK_SEMANAL_PREMIOS, RANK_SEMANAS_A_FECHAR,
+                         gravarRankPontos, gravarRankTempo, rankSemanaPlayersRef, rankSemanaDocRef };
+/* ⚠️ UM LEITOR SO PRO GERAL E PRO SEMANAL: `semanaId` nulo le a colecao de sempre, preenchido le a
+   subcolecao da semana. Dois leitores divergiriam no primeiro ajuste -- e o sintoma seria uma aba
+   mostrando uma coisa e a outra mostrando outra, do MESMO jogo. */
+const RANK_TOPO = 10;
+async function lerRankPontos(base, semanaId, uid, extra){
+  const coll = semanaId ? rankSemanaPlayersRef(base, semanaId) : db.collection(base);
+  const snap = await coll.orderBy('pontos', 'desc').limit(RANK_TOPO).get();
+  const linha = (x, i, id) => {
+    const o = { pos: i + 1, uid: id, nome: x.nome || 'Treinador', pontos: x.pontos || 0,
+                venceu: !!x.venceu, eu: id === uid };
+    if(extra) o[extra] = x[extra] || 0;
+    return o;
+  };
+  const lista = snap.docs.map((d, i) => linha(d.data() || {}, i, d.id));
+  /* ⚠️ E O MEU RESULTADO VEM JUNTO mesmo fora do top: sem ele, quem esta em 14o abre a tela e nao
+     ve nada seu -- e o proprio recorde e a informacao que ele mais procura. Vale nas DUAS abas. */
+  let meu = null;
+  if(!lista.some(x => x.eu)){
+    const m = await coll.doc(uid).get();
+    if(m.exists){ meu = linha(m.data() || {}, -1, uid); meu.pos = null; }
+  }
+  return { lista, meu };
+}
+async function lerRankTempo(base, semanaId, uid, modalidade){
+  const coll = semanaId ? rankSemanaPlayersRef(base, semanaId) : db.collection(base);
+  const snap = await coll.orderBy(modalidade, 'asc').limit(RANK_TOPO).get();
+  const linha = (x, i, id) => ({ pos: i + 1, uid: id, nome: x.nome || 'Treinador',
+    tempo: Number(x[modalidade]) || 0, info: x[modalidade + 'Info'] || null, eu: id === uid });
+  const lista = snap.docs.map((d, i) => linha(d.data() || {}, i, d.id));
+  let meu = null;
+  if(!lista.some(x => x.eu)){
+    const m = await coll.doc(uid).get();
+    const t = m.exists ? Number(m.data()[modalidade]) : NaN;
+    if(isFinite(t) && t > 0){ meu = linha(m.data(), -1, uid); meu.pos = null; }
+  }
+  return { lista, meu };
+}
 const PESCARIA_RANK_TOPO = 10;
 function pescariaRankCollRef(){ return db.collection('fishingRanking'); }
 function pescariaRankDocRef(uid){ return pescariaRankCollRef().doc(uid); }
@@ -5582,16 +5814,11 @@ exports.submitFishingScore = onCall(async (request) => {
   if(pontos <= 0) return { gravado: false, motivo: "zero" };
   const conta = await db.collection('users').doc(uid).get();
   const nome = (conta.exists && conta.data().trainerName) || 'Treinador';
-  let recorde = false;
-  await db.runTransaction(async (tx) => {
-    const ref = pescariaRankDocRef(uid);
-    const snap = await tx.get(ref);
-    const antes = snap.exists ? (Number(snap.data().pontos) || 0) : -1;
-    if(pontos <= antes) return;
-    recorde = true;
-    tx.set(ref, { uid, nome, pontos, venceu, capturas, quando: Date.now() });
-  });
-  return { gravado: recorde, pontos };
+  /* ⚠️ O GERAL E O SEMANAL SAO INDEPENDENTES: da pra nao bater o recorde de sempre e mesmo assim
+     bater o da semana. O ajudante decide os dois na MESMA transacao -- ver o nucleo do semanal. */
+  const r = await gravarRankPontos('fishingRanking', uid,
+    { uid, nome, pontos, venceu, capturas, quando: Date.now() });
+  return { gravado: r.recorde, gravadoSemana: r.recordeSemana, pontos };
 });
 /* O top 10. ⚠️ Ele NÃO tem cache num documento à parte (ao contrário do ranking do Mew): lá o
    documento do chefe é escrito a cada ataque e a consulta entraria no caminho crítico; aqui a
@@ -5600,21 +5827,13 @@ exports.getFishingRanking = onCall(async (request) => {
   exigeCadastro(request);
   const uid = request.auth && request.auth.uid;
   if(!uid) throw new HttpsError('unauthenticated', 'Faça login.');
-  const snap = await pescariaRankCollRef().orderBy('pontos', 'desc').limit(PESCARIA_RANK_TOPO).get();
-  const lista = snap.docs.map((d, i) => {
-    const x = d.data() || {};
-    return { pos: i + 1, uid: d.id, nome: x.nome || 'Treinador', pontos: x.pontos || 0,
-             capturas: x.capturas || 0, venceu: !!x.venceu, eu: d.id === uid };
-  });
-  /* ⚠️ E O MEU RESULTADO VEM JUNTO mesmo fora do top: sem ele, quem está em 14º abre a tela e não
-     vê nada seu -- e o próprio recorde é a informação que ele mais procura. */
-  let meu = null;
-  if(!lista.some(x => x.eu)){
-    const m = await pescariaRankDocRef(uid).get();
-    if(m.exists) meu = { nome: (m.data().nome || 'Você'), pontos: m.data().pontos || 0,
-                         capturas: m.data().capturas || 0, eu: true };
-  }
-  return { lista, meu };
+  /* ⚠️ AS DUAS LISTAS VEM NUMA CHAMADA SO: trocar de aba nao pode custar outra ida ao servidor --
+     o mesmo desenho do ranking da Corrida, que ja devolve as duas modalidades juntas. */
+  const [geral, semana] = await Promise.all([
+    lerRankPontos('fishingRanking', null, uid, 'capturas'),
+    lerRankPontos('fishingRanking', semanaDoRanking(), uid, 'capturas')
+  ]);
+  return { ...geral, semanal: semana, semanaId: semanaDoRanking() };
 });
 exports._pescariaRank = { topo: PESCARIA_RANK_TOPO };
 /* =====================================================================
@@ -5867,16 +6086,9 @@ exports.submitRescueScore = onCall(async (request) => {
   if(pontos <= 0) return { gravado: false, motivo: 'zero' };
   const conta = await db.collection('users').doc(uid).get();
   const nome = (conta.exists && conta.data().trainerName) || 'Treinador';
-  let recorde = false;
-  await db.runTransaction(async (tx) => {
-    const ref = resgateRankDocRef(uid);
-    const snap = await tx.get(ref);
-    const antes = snap.exists ? (Number(snap.data().pontos) || 0) : -1;
-    if(pontos <= antes) return;
-    recorde = true;
-    tx.set(ref, { uid, nome, pontos, venceu, resgatados, quando: Date.now() });
-  });
-  return { gravado: recorde, pontos };
+  const r = await gravarRankPontos('rescueRanking', uid,
+    { uid, nome, pontos, venceu, resgatados, quando: Date.now() });
+  return { gravado: r.recorde, gravadoSemana: r.recordeSemana, pontos };
 });
 /* ⚠️ UM `orderBy` SÓ, num campo só: isso usa o índice de campo único que o Firestore cria sozinho,
    e é de propósito. O ranking da Seleção pedia DOIS e por isso precisou de um índice composto
@@ -5886,21 +6098,11 @@ exports.getRescueRanking = onCall(async (request) => {
   exigeCadastro(request);
   const uid = request.auth && request.auth.uid;
   if(!uid) throw new HttpsError('unauthenticated', 'Faça login.');
-  const snap = await resgateRankCollRef().orderBy('pontos', 'desc').limit(RESGATE_RANK_TOPO).get();
-  const lista = snap.docs.map((d, i) => {
-    const x = d.data() || {};
-    return { pos: i + 1, uid: d.id, nome: x.nome || 'Treinador', pontos: x.pontos || 0,
-             resgatados: x.resgatados || 0, venceu: !!x.venceu, eu: d.id === uid };
-  });
-  /* ⚠️ E O MEU VEM JUNTO mesmo fora do top: quem está em 14º abre a tela e não vê nada seu -- e o
-     próprio recorde é o que ele mais procura ali. */
-  let meu = null;
-  if(!lista.some(x => x.eu)){
-    const m = await resgateRankDocRef(uid).get();
-    if(m.exists) meu = { nome: (m.data().nome || 'Você'), pontos: m.data().pontos || 0,
-                         resgatados: m.data().resgatados || 0, eu: true };
-  }
-  return { lista, meu };
+  const [geral, semana] = await Promise.all([
+    lerRankPontos('rescueRanking', null, uid, 'resgatados'),
+    lerRankPontos('rescueRanking', semanaDoRanking(), uid, 'resgatados')
+  ]);
+  return { ...geral, semanal: semana, semanaId: semanaDoRanking() };
 });
 exports._resgateRank = { topo: RESGATE_RANK_TOPO };
 
@@ -6089,34 +6291,26 @@ exports.submitRaceTime = onCall(async (request) => {
   const especie = String(d.especie || '').slice(0, 40);
   const time = corridaTimeSaneado(d.time);
   const venceu = !!d.venceu;
-  let recorde = false;
-  await db.runTransaction(async (tx) => {
-    const ref = corridaRankDocRef(uid);
-    const snap = await tx.get(ref);
-    const antes = snap.exists ? Number(snap.data()[modalidade]) : NaN;
-    if(isFinite(antes) && antes > 0 && tempo >= antes) return;
-    recorde = true;
-    const dados = { uid, nome, quando: Date.now() };
-    dados[modalidade] = tempo;
-    dados[modalidade + 'Info'] = { especie, venceu, time, quando: Date.now() };
-    /* ⚠️ `merge` -- sem ele o recorde de uma modalidade APAGA o da outra */
-    tx.set(ref, dados, { merge: true });
-  });
-  return { gravado: recorde, tempo, modalidade };
+  const dados = { uid, nome, quando: Date.now() };
+  dados[modalidade] = tempo;
+  dados[modalidade + 'Info'] = { especie, venceu, time, quando: Date.now() };
+  /* ⚠️ o `merge` vive DENTRO do ajudante, nos dois documentos: sem ele o recorde de uma
+     modalidade APAGA o da outra -- e isso vale igual no semanal */
+  const r = await gravarRankTempo('raceRanking', uid, modalidade, dados);
+  return { gravado: r.recorde, gravadoSemana: r.recordeSemana, tempo, modalidade };
 });
 /* Os dois tops numa chamada só: a tela mostra o da modalidade escolhida, e trocar de modalidade
    não pode custar outra ida ao servidor. */
-exports.getRaceRanking = onCall(async (request) => {
-  exigeCadastro(request);
-  const uid = request.auth && request.auth.uid;
-  if(!uid) throw new HttpsError('unauthenticated', 'Faça login.');
-  const meuDoc = await corridaRankDocRef(uid).get();
-  const meu = meuDoc.exists ? (meuDoc.data() || {}) : null;
+/* ⚠️ O CORPO VIROU UMA FUNCAO QUE RECEBE A COLECAO, pra ela rodar no geral E no semanal sem uma
+   segunda copia: duas cópias divergiriam no primeiro ajuste, e o sintoma seria uma aba mostrando
+   uma coisa e a outra, do MESMO jogo, mostrando outra. */
+async function lerRankDaCorrida(coll, meuDoc, uid){
+  const meu = meuDoc && meuDoc.exists ? (meuDoc.data() || {}) : null;
   const saida = {};
   for(const m of CORRIDA_MODALIDADES){
     /* ⚠️ ASCENDENTE: no tempo, o MENOR é o primeiro. E quem não tem o campo fica de fora desta
        consulta por conta do Firestore, que é exatamente o certo. */
-    const snap = await corridaRankCollRef().orderBy(m, 'asc').limit(CORRIDA_RANK_TOPO).get();
+    const snap = await coll.orderBy(m, 'asc').limit(CORRIDA_RANK_TOPO).get();
     const lista = snap.docs.map((doc, i) => {
       const x = doc.data() || {};
       const info = x[m + 'Info'] || {};
@@ -6135,6 +6329,19 @@ exports.getRaceRanking = onCall(async (request) => {
     saida[m] = { lista, meu: oMeu };
   }
   return saida;
+}
+exports.getRaceRanking = onCall(async (request) => {
+  exigeCadastro(request);
+  const uid = request.auth && request.auth.uid;
+  if(!uid) throw new HttpsError('unauthenticated', 'Faça login.');
+  const semanaId = semanaDoRanking();
+  const semColl = rankSemanaPlayersRef('raceRanking', semanaId);
+  const [meuGeral, meuSem] = await Promise.all([corridaRankDocRef(uid).get(), semColl.doc(uid).get()]);
+  const [geral, semanal] = await Promise.all([
+    lerRankDaCorrida(corridaRankCollRef(), meuGeral, uid),
+    lerRankDaCorrida(semColl, meuSem, uid)
+  ]);
+  return { ...geral, semanal, semanaId };
 });
 exports._corridaRank = { topo: CORRIDA_RANK_TOPO, modalidades: CORRIDA_MODALIDADES,
                          tempoMax: CORRIDA_TEMPO_MAX, timeMax: CORRIDA_RANK_TIME_MAX,
@@ -7686,6 +7893,15 @@ exports.generateTrainerTower = onSchedule('every 60 minutes', async () => {
     const dia = trainersLeagueDateStrPlusDays(dateId, -i);
     await towerFecharDia(dia).catch(e => logger.error('Falha ao fechar a torre de ' + dia, e));
   }
+  /* ⚠️ O RANKING SEMANAL DAS ILHAS PEGA CARONA NESTE CRON em vez de ter um proprio: ele ja roda de
+     hora em hora, o que e de sobra pra fechar uma semana -- e um segundo agendado seria mais uma
+     funcao pra manter, pagando cold start pra fazer nada em 167 das 168 horas da semana.
+     ⚠️ E ele fecha as semanas ANTERIORES, nunca a corrente: a semana so fecha quando ela acaba. */
+  /* ⚠️ A COPIA VEM ANTES DO FECHAMENTO, e a ordem importa: ela so mexe na semana CORRENTE e o
+     fechamento so mexe nas anteriores, entao os dois nunca se cruzam -- mas invertida, uma semana
+     que virasse no meio da passada teria o fechamento rodando sobre uma lista ainda vazia. */
+  await copiarGeralParaASemana().catch(e => logger.error('Falha ao copiar o ranking para a semana', e));
+  await fecharSemanasPendentes().catch(e => logger.error('Falha ao fechar as semanas do ranking', e));
   return null;
 });
 

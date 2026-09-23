@@ -3685,6 +3685,17 @@
      perde a coluna que ele esta comparando. O `minmax(0,1fr)` no nome e o que o deixa truncar em
      vez de empurrar os pontos pra fora -- a armadilha do `1fr` que este projeto ja pagou duas
      vezes (a fileira de cinco cards da home e o placar da pescaria). */
+  /* ⚠️ A ABA DO RANKING É A `tower-rank-aba` DA TORRE, e não uma nova: o jogo já tinha esse
+     desenho (Hoje/Histórico), e um próprio faria o jogador reaprender a ler o mesmo controle.
+     O nome ficou com o prefixo de onde ela nasceu -- renomeá-lo seria mexer numa tela que
+     funciona e numa trava frágil pra trocar uma palavra que só aparece no CSS.
+     ⚠️ A PRIMEIRA VERSÃO ERA UMA CLASSE PRÓPRIA E ELA NASCEU INVISÍVEL: a borda usava um nome
+     de variável de cor que não existe na paleta, e o navegador DESCARTA a declaração inteira --
+     a aba inativa ficava com o MESMO fundo da caixa e sem moldura nenhuma. Só a medição pegou;
+     em asserção de HTML ela passa. É a mesma família da `section-title` e do papel fantasma.
+     O que sobra aqui é a NOTA, que a Torre não tem: ela é o convite do prêmio da semana. */
+  .rank-aba-nota{font-size:.6rem;color:var(--muted);text-align:center;margin:0 0 6px;}
+  .rank-aba-desde{opacity:.75;}
   .pesc-rank{display:flex;flex-direction:column;gap:2px;}
   .pesc-rank-linha{display:grid;grid-template-columns:34px minmax(0,1fr) auto;align-items:center;
     gap:6px;padding:4px 6px;border-bottom:1px dashed var(--box-border-soft,#d9d5c4);}
@@ -33351,9 +33362,18 @@ function renderPokedex(){
   const caught = getAllCaughtSpecies();
   const shinyCaught = new Set(game.permanentShinyDex || []);
   const allSpecies = Object.keys(SPECIES).map(id=>({id, dex:SPECIES[id].dex, name:SPECIES[id].name})).sort((a,b)=>a.dex-b.dex);
-  const totalSpecies = Object.keys(SPECIES).length; // inclui o Mewtwo, NÃO inclui o #151 (ver abaixo)
-  /* A grade mostra o #151; a conta acima ignora. São coisas diferentes de propósito -- ver o
-     comentário da célula lá embaixo. */
+  /* ⚠️ A CONTA É DAS 251 ENTRADAS DA DEX, e não das 250 capturáveis (23/09/2026, reportado: *"tem
+     um texto que fala '130 de 250 espécies registradas', mas é 251 o correto"*). Ele estava certo:
+     a dex vai de #001 a #251 SEM BURACO (medido) e a GRADE desenha as 251 -- só a contagem dizia
+     250, porque ela lia o `SPECIES`, que exclui o #151.
+     ⚠️ O CUSTO É CONHECIDO E ACEITO: a barra NUNCA FECHA. O máximo é **250 de 251**, porque
+     ninguém registra o Mew -- não existe um `markCaught('mew')` em lugar nenhum do jogo. Isso é
+     fiel ao original, onde o #151 é justamente o que não se pega sem evento.
+     ⚠️ E NENHUMA CONQUISTA QUEBRA, o que foi conferido antes de mexer: o "Mestre Pokémon", a
+     "Pokédex de Kanto" e a "Pokédex de Johto" têm contas PRÓPRIAS (`kantoCaught >= kantoTotal` e
+     companhia) e não leem este número.
+     E ele é DERIVADO, nunca o 251 escrito à mão: uma espécie nova entra na conta sozinha. */
+  const totalSpecies = Object.keys(SPECIES).length + Object.keys(SPECIES_FORA_DA_DEX).length;
   const naGrade = allSpecies.concat(Object.keys(SPECIES_FORA_DA_DEX).map(id => ({
     id, dex: SPECIES_FORA_DA_DEX[id].dex, name: SPECIES_FORA_DA_DEX[id].name, foraDaDex: true
   }))).sort((a,b)=>a.dex-b.dex);
@@ -34129,7 +34149,7 @@ const corrida = {
    o servidor grava no documento de quem chamou. O adversário não tem conta.
    ⚠️ E O QUE VAI É O QUE O MOTOR CONTOU, nunca um número montado na tela.
    ============================================================================ */
-const corridaRank = { single: null, relay: null, carregando: false, erro: null, recorde: null, lidoEm: 0 };
+const corridaRank = { single: null, relay: null, semanal: null, semanaId: null, carregando: false, erro: null, recorde: null, lidoEm: 0 };
 /* ⚠️ BEST-EFFORT dos dois lados, como o da pescaria: um ranking que não carrega é uma caixa a
    menos na tela, e um envio que falha é um recorde perdido -- nenhum dos dois pode derrubar a
    corrida. */
@@ -34141,6 +34161,8 @@ async function corridaCarregarRank(forcar){
     const r = await functionsClient.httpsCallable('getRaceRanking')({});
     corridaRank.single = (r.data && r.data.single) || { lista: [], meu: null };
     corridaRank.relay = (r.data && r.data.relay) || { lista: [], meu: null };
+    corridaRank.semanal = (r.data && r.data.semanal) || null;
+    corridaRank.semanaId = (r.data && r.data.semanaId) || null;
     corridaRank.lidoEm = Date.now();
   } catch(e){
     console.error('Erro ao ler o ranking da corrida:', e);
@@ -34177,6 +34199,15 @@ async function corridaEnviarRank(){
 }
 /* o tempo como o jogo escreve em toda tela de corrida: segundos com dois decimais */
 const corridaTempoTxt = (t) => Number(t).toFixed(2) + 's';
+/* ⚠️ A CORRIDA TEM DOIS EIXOS: a MODALIDADE (individual/revezamento) e a ABA (semana/sempre). Os
+   dois leitores -- a tela e o modal do time -- têm que olhar a MESMA célula, senão o modal abre o
+   time de OUTRO ranking e ninguém liga uma coisa à outra. Por isso ela vive numa função só. */
+function corridaRankDaAba(){
+  const m = corrida.formato;
+  const aba = rankAba.corrida || 'semana';
+  if(aba === 'sempre' || !corridaRank.semanal) return corridaRank[m] || null;
+  return corridaRank.semanal[m] || { lista: [], meu: null };
+}
 function corridaRankHtml(){
   /* ⚠️ A MODALIDADE FICA NUMA LINHA PRÓPRIA, e não no `<h2>`: a 320px o título na fonte de pixel
      quebrava em duas linhas com o "m" sozinho embaixo. O `<h2>` fica com o nome curto (como o
@@ -34190,10 +34221,12 @@ function corridaRankHtml(){
     return caixa(`<p class="hint-text">${escapeHtmlSafe(corridaRank.erro)}</p>`
       + `<button class="btn secondary" onclick="corridaCarregarRank(true)">Tentar de novo</button>`);
   }
-  const r = corridaRank[corrida.formato];
+  const r = corridaRankDaAba();
   if(!r) return caixa(`<p class="hint-text">Carregando…</p>`);
   if(!r.lista.length && !r.meu){
-    return caixa(`<p class="hint-text">Ninguém correu esta modalidade ainda. O primeiro tempo pode ser o seu.</p>`);
+    /* ⚠️ O VAZIO DA SEMANA DIZ OUTRA COISA: ali ninguém correu NESTA semana, e não "nunca". */
+    return caixa(rankAbasHtml('corrida', corridaRank.semanaId)
+      + `<p class="hint-text">${rankAba.corrida === 'semana' ? 'Ninguém correu esta modalidade nesta semana ainda. O primeiro tempo pode ser o seu.' : 'Ninguém correu esta modalidade ainda. O primeiro tempo pode ser o seu.'}</p>`);
   }
   /* ⚠️ A LINHA É A DO RANKING DA PESCARIA (`pesc-rank-*`), e as medalhas são as do pódio: o jogo
      inteiro desenha as suas desde 17/09/2026, e reusar a linha é o que faz os dois rankings se
@@ -34214,7 +34247,8 @@ function corridaRankHtml(){
       + nome
       + `<span class="pesc-rank-pts">${corridaTempoTxt(x.tempo)}</span></div>`;
   };
-  return caixa((corridaRank.recorde === corrida.formato ? `<p class="pesc-rank-novo">Recorde novo!</p>` : ``)
+  return caixa(rankAbasHtml('corrida', corridaRank.semanaId)
+    + (corridaRank.recorde === corrida.formato ? `<p class="pesc-rank-novo">Recorde novo!</p>` : ``)
     + `<div class="pesc-rank corrida">${r.lista.map((x, i) => linha(x, 'lista', i)).join('')}`
     + (r.meu ? `<div class="pesc-rank-sep">você</div>` + linha(r.meu, 'meu', 0) : ``)
     + `</div>`);
@@ -34225,7 +34259,9 @@ function corridaRankHtml(){
    ⚠️ E O ESTADO GUARDA ONDE ACHAR (lista/meu + índice), nunca uma cópia da linha: a lista é
    relida e uma cópia ficaria velha em silêncio. */
 function corridaVerTimeDoRank(onde, i){
-  const r = corridaRank[corrida.formato];
+  /* ⚠️ O MESMO AJUDANTE DA TELA: lendo `corridaRank[formato]` direto, um toque na aba da SEMANA
+     abriria o time do ranking de SEMPRE -- e o modal mostraria um time que não é o da linha. */
+  const r = corridaRankDaAba();
   if(!r) return;
   const x = onde === 'meu' ? r.meu : (r.lista || [])[i];
   if(!x || !Array.isArray(x.time) || !x.time.length) return;
@@ -35625,11 +35661,42 @@ const pescaria = {
    relê (o `abrirX` força), tocar várias vezes seguidas não, e uma partida sempre relê -- o duelo
    da pescaria sozinho dura 90s. */
 const RANK_VALIDADE_MS = 30000;
+/* ⚠️ AS DUAS ABAS DO RANKING (23/09/2026): "Da semana" e "De sempre", nos três jogos das Ilhas.
+   Pedido: *"mantem o rank de sempre, serao 2 rankings, coloque 2 abas no ranking que existe hoje"*.
+   ⚠️ QUAL ABA ESTÁ ABERTA É ESTADO DE TELA, não vai pro save: ninguém volta amanhã querendo o
+   ranking aberto numa aba específica. E ela é POR JOGO -- a Pescaria e a Corrida são telas
+   diferentes, e uma aba só faria a escolha de uma valer na outra.
+   ⚠️ E O PADRÃO É A SEMANA, de propósito: é ela que muda, e é nela que ainda dá pra fazer alguma
+   coisa hoje. O de sempre é histórico, e quem o procura sabe onde ele está. */
+const rankAba = { pescaria: 'semana', corrida: 'semana', resgate: 'semana' };
+function rankTrocarAba(qual, aba){
+  if(rankAba[qual] === aba) return;
+  rankAba[qual] = aba;
+  render();
+}
+/* ⚠️ AS DUAS LISTAS VÊM NA MESMA RESPOSTA do servidor, então trocar de aba NÃO custa rede -- e é
+   por isso que a troca é só um `render()`. Duas chamadas fariam a aba piscar "Carregando…" a cada
+   toque, que é o oposto do que uma aba promete. */
+function rankAbasHtml(qual, semanaId){
+  const aba = rankAba[qual] || 'semana';
+  const bt = (id, txt, dica) => `<button class="tower-rank-aba${aba === id ? ' on' : ''}" onclick="rankTrocarAba('${qual}','${id}')" title="${dica}">${txt}</button>`;
+  /* a data da segunda em que a semana começou -- ela diz QUAL semana o jogador está vendo */
+  const desde = semanaId ? ' <span class="rank-aba-desde">(desde ' + semanaId.slice(8,10) + '/' + semanaId.slice(5,7) + ')</span>' : '';
+  return `<div class="tower-rank-abas">${bt('semana','Da semana','Zera toda segunda-feira')}${bt('sempre','De sempre','O recorde de todos os tempos')}</div>`
+    + (aba === 'semana' ? `<p class="rank-aba-nota">🏅 Lidere a semana e ganhe Doces Raros${desde}</p>` : '');
+}
+/* ⚠️ QUAL LISTA DESENHAR sai daqui, e não de um `if` em cada tela: três cópias divergiriam no
+   primeiro ajuste, e o sintoma seria uma tela mostrando a aba certa e outra a errada. */
+function rankListaDaAba(qual, dados){
+  const aba = rankAba[qual] || 'semana';
+  if(aba === 'sempre' || !dados.semanal) return { lista: dados.lista || [], meu: dados.meu || null };
+  return { lista: dados.semanal.lista || [], meu: dados.semanal.meu || null };
+}
 function rankVencido(r){ return !r || !r.lidoEm || (Date.now() - r.lidoEm) > RANK_VALIDADE_MS; }
 /* zera a IDADE, não a lista: a tela continua mostrando o que tem enquanto o novo não chega --
    apagar a lista faria a caixa piscar vazia a cada abertura. */
 function rankInvalidar(r){ if(r) r.lidoEm = 0; }
-const pescariaRank = { lista: null, meu: null, carregando: false, erro: null, recorde: false, lidoEm: 0 };
+const pescariaRank = { lista: null, meu: null, semanal: null, semanaId: null, carregando: false, erro: null, recorde: false, lidoEm: 0 };
 /* ⚠️ BEST-EFFORT dos dois lados: um ranking que não carrega é uma caixa a menos na tela, e um
    envio que falha é um recorde perdido -- nenhum dos dois pode derrubar o duelo. */
 async function pescariaCarregarRank(forcar){
@@ -35640,6 +35707,9 @@ async function pescariaCarregarRank(forcar){
     const r = await functionsClient.httpsCallable('getFishingRanking')({});
     pescariaRank.lista = (r.data && r.data.lista) || [];
     pescariaRank.meu = (r.data && r.data.meu) || null;
+    /* ⚠️ AS DUAS LISTAS VÊM NA MESMA RESPOSTA: trocar de aba não custa rede nenhuma. */
+    pescariaRank.semanal = (r.data && r.data.semanal) || null;
+    pescariaRank.semanaId = (r.data && r.data.semanaId) || null;
     pescariaRank.lidoEm = Date.now();
   } catch(e){
     console.error(`Erro ao ler o ranking da pescaria:`, e);
@@ -37930,12 +38000,20 @@ function pescariaRankHtml(){
     + `<span class="pesc-rank-pos">${x.pos ? (MEDALHA_DO_POSTO[x.pos - 1] ? selo(MEDALHA_DO_POSTO[x.pos - 1]) : x.pos + "º") : "—"}</span>`
     + `<span class="pesc-rank-nome">${escapeHtmlSafe(x.nome)}</span>`
     + `<span class="pesc-rank-pts">${x.pontos}</span></div>`;
+  /* ⚠️ A ABA DECIDE QUAL LISTA SAI, e a conta vive numa função só (`rankListaDaAba`): três telas
+     com o `if` escrito à mão divergiriam no primeiro ajuste. */
+  const d = rankListaDaAba('pescaria', pescariaRank);
   return `<div class="box">`
     + `<h2>${selo("trofeu")} Melhores pescarias</h2>`
+    + rankAbasHtml('pescaria', pescariaRank.semanaId)
     + (pescariaRank.recorde ? `<p class="pesc-rank-novo">Recorde novo!</p>` : ``)
-    + `<div class="pesc-rank">${pescariaRank.lista.map(linha).join("")}`
-    + (pescariaRank.meu ? `<div class="pesc-rank-sep">você</div>` + linha(pescariaRank.meu) : ``)
-    + `</div></div>`;
+    + (d.lista.length ? `<div class="pesc-rank">${d.lista.map(linha).join("")}`
+        + (d.meu ? `<div class="pesc-rank-sep">você</div>` + linha(d.meu) : ``)
+        + `</div>`
+      /* ⚠️ A LISTA VAZIA PRECISA DE FRASE PRÓPRIA AQUI: a de cima é do ranking INTEIRO, e na aba
+         da semana o vazio quer dizer outra coisa -- ninguém pontuou NESTA semana ainda. */
+      : `<p class="hint-text">${rankAba.pescaria === 'semana' ? 'Ninguém pontuou nesta semana ainda. O primeiro pode ser você.' : 'Ninguém pontuou ainda. O primeiro recorde pode ser o seu.'}</p>`)
+    + `</div>`;
 }
 function pescariaPickerHtml(){
   const slots = pescariaElegiveis();
@@ -38745,7 +38823,7 @@ function resgateRetornoAutomatico(){
    ===================================================================== */
 /* ⚠️ VIVE FORA DO `resgate`, e de propósito: o `resgateZerar` limpa a prova, e o ranking não é da
    prova -- relê-lo a cada "resgatar de novo" custaria 11 leituras por partida. */
-const resgateRank = { lista: null, meu: null, carregando: false, erro: null, recorde: false, lidoEm: 0 };
+const resgateRank = { lista: null, meu: null, semanal: null, semanaId: null, carregando: false, erro: null, recorde: false, lidoEm: 0 };
 /* ⚠️ BEST-EFFORT dos dois lados: um ranking que não carrega é uma caixa a menos na tela, e um envio
    que falha é um recorde perdido -- nenhum dos dois pode derrubar a prova. */
 async function resgateCarregarRank(forcar){
@@ -38756,6 +38834,8 @@ async function resgateCarregarRank(forcar){
     const r = await functionsClient.httpsCallable('getRescueRanking')({});
     resgateRank.lista = (r.data && r.data.lista) || [];
     resgateRank.meu = (r.data && r.data.meu) || null;
+    resgateRank.semanal = (r.data && r.data.semanal) || null;
+    resgateRank.semanaId = (r.data && r.data.semanaId) || null;
     resgateRank.lidoEm = Date.now();
   } catch(e){
     console.error('Erro ao ler o ranking do resgate:', e);
@@ -38800,12 +38880,16 @@ function resgateRankHtml(){
     + `<span class="pesc-rank-pos">${x.pos ? (MEDALHA_DO_POSTO[x.pos - 1] ? selo(MEDALHA_DO_POSTO[x.pos - 1]) : x.pos + 'º') : '—'}</span>`
     + `<span class="pesc-rank-nome">${escapeHtmlSafe(x.nome)}</span>`
     + `<span class="pesc-rank-pts">${x.pontos}</span></div>`;
+  const d = rankListaDaAba('resgate', resgateRank);
   return `<div class="box">`
     + `<h2>${selo('trofeu')} Melhores resgates</h2>`
+    + rankAbasHtml('resgate', resgateRank.semanaId)
     + (resgateRank.recorde ? `<p class="pesc-rank-novo">Recorde novo!</p>` : ``)
-    + `<div class="pesc-rank">${resgateRank.lista.map(linha).join('')}`
-    + (resgateRank.meu ? `<div class="pesc-rank-sep">você</div>` + linha(resgateRank.meu) : ``)
-    + `</div></div>`;
+    + (d.lista.length ? `<div class="pesc-rank">${d.lista.map(linha).join('')}`
+        + (d.meu ? `<div class="pesc-rank-sep">você</div>` + linha(d.meu) : ``)
+        + `</div>`
+      : `<p class="hint-text">${rankAba.resgate === 'semana' ? 'Ninguém pontuou nesta semana ainda. O primeiro pode ser você.' : 'Ninguém pontuou ainda. O primeiro recorde pode ser o seu.'}</p>`)
+    + `</div>`;
 }
 function resgateTerminar(){
   if(resgate.laco){ cancelAnimationFrame(resgate.laco); resgate.laco = null; }

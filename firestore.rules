@@ -211,6 +211,35 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow write: if false;
     }
+
+    // ⚠️ OS RANKINGS SEMANAIS (23/09/2026): uma subcolecao por semana, pelos tres jogos das Ilhas.
+    // A regra e a MESMA dos rankings de sempre -- leitura livre pra quem esta logado, escrita
+    // NEGADA a todos, inclusive ao dono: placar e publico, e uma linha no console poria qualquer
+    // numero no topo. Quem grava sao as callables, pelo Admin SDK, que ignora estas regras.
+    match /fishingRankingWeekly/{semanaId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+      match /players/{playerId} {
+        allow read: if request.auth != null;
+        allow write: if false;
+      }
+    }
+    match /rescueRankingWeekly/{semanaId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+      match /players/{playerId} {
+        allow read: if request.auth != null;
+        allow write: if false;
+      }
+    }
+    match /raceRankingWeekly/{semanaId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+      match /players/{playerId} {
+        allow read: if request.auth != null;
+        allow write: if false;
+      }
+    }
     // Ranking da Corrida: os dois tempos (individual e revezamento). Mesma regra do da pescaria --
     // tempo e placar publico, e escrita do cliente poria 0,01 s no topo. So a callable escreve.
     match /raceRanking/{playerId} {
