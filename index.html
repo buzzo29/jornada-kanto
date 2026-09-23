@@ -18754,6 +18754,24 @@ function savesCampeoes(){
    justamente pra quem o pedido quer deixar entrar.
    ⚠️ E ela NÃO vale pras LIGAS nem pro ONLINE: ali a regra continua sendo o `savesCampeoes`, e
    é esse o ponto inteiro da aposentadoria. */
+/* ⚠️ OS TIMES QUE UM JOGO DE ILHA ACEITA -- e ela existe porque a resposta MUDA na travessia.
+   Pela HOME é o `savesCampeoes()` de sempre; pela JORNADA é o save da jornada, e SÓ ele (o pedido
+   de 21/09: *"na pescaria, ele vai usar o time que ele esta na jornada agora"*).
+   ⚠️ E ELA DEVOLVE SLOTS NOS DOIS CASOS, que é o defeito que ela nasceu pra fechar: a versão
+   anterior devolvia o OBJETO do save na visita e um número fora dela -- duas formas pra mesma
+   lista. O card fazia `Time ${slot + 1}` e saía **`Time [object Object]1`** com a estrela em 0
+   (reportado com print em 22/09/2026), e a AÇÃO fazia `indexOf(Number(slot))` sobre objetos:
+   `Number({})` é NaN, `indexOf(NaN)` é -1, e **escolher o time era impossível**. Ou seja a
+   Pescaria estava TRAVADA na travessia, e não só feia.
+   ⚠️ E O REVEZAMENTO DA CORRIDA ESTAVA TRAVADO POR OUTRA PORTA, no mesmo dia: ele validava com
+   `savesCampeoes()`, e o save da jornada pode não ter as 8 insígnias -- o do relato tinha 5. A
+   régua das 8 é pra quem entra pela HOME escolher um time que terminou uma jornada; na travessia
+   o time é o que o jogador está jogando, e exigir dele um troféu que a jornada ainda não deu
+   fecharia o modo pra quem o pedido quer deixar entrar. */
+function timesDeIlhaElegiveis(){
+  if(naJornadaDasIlhas()) return (game.currentSaveSlot == null) ? [] : [game.currentSaveSlot];
+  return savesCampeoes();
+}
 function quantosParaTorreOuGinasio(){
   return savesComOitoInsignias().length + aposentados().length;
 }
@@ -33718,8 +33736,28 @@ function corridaElegiveis(){
                  || (b.level - a.level)
                  || String(a.speciesId).localeCompare(String(b.speciesId)));
 }
+/* ⚠️ NA VISITA PELA JORNADA A EQUIPE DO REVEZAMENTO JÁ ENTRA (22/09/2026, a pedido: *"para a
+   corrida de revezamento tambem"*): são os seis da jornada, na ordem do time -- a mesma que o
+   `corridaEscolherTime` usaria. Só a INDIVIDUAL continua pedindo escolha, e ali ela existe de
+   verdade: qual dos seis corre.
+   ⚠️ E SÓ PREENCHE SE ESTIVER VAZIO, senão ele desfaria a REORDENAÇÃO que o jogador acabou de
+   fazer com as setas da tela de revezamento toda vez que ele fosse à individual e voltasse. */
+function corridaAutoEquipe(){
+  if(!naJornadaDasIlhas()) return;
+  const jaTem = corrida.formato === 'relay'
+    ? corrida.escolhidos.length
+    : ((corrida.escolhaPorFormato && corrida.escolhaPorFormato.relay) || []).length;
+  if(jaTem) return;
+  const time = ilhasTimeDaJornada().slice(0, CORRIDA_TRECHOS);
+  if(!time.length) return;
+  corrida.escolhaPorFormato.relay = time;
+  if(corrida.formato === 'relay') corrida.escolhidos = time;
+}
 function corridaAbrirPicker(){
   if(corrida.fase === 'correndo' || corrida.fase === 'contagem') return;
+  /* ⚠️ NA TRAVESSIA O REVEZAMENTO NÃO ESCOLHE: a equipe é a da jornada. A individual continua
+     abrindo, porque lá a escolha existe (qual dos seis corre). Quem recusa é a AÇÃO. */
+  if(naJornadaDasIlhas() && corrida.formato === 'relay') return;
   /* ⚠️ ZERA A PÁGINA, como o `abrirMontador`: o `game.montadorPagina` é COMPARTILHADO com a Torre
      e o Ginásio, e uma página 3 sobrando de lá abriria esta lista no meio. */
   game.montadorPagina = 0;
@@ -33742,11 +33780,14 @@ function corridaFecharPicker(){ corrida.picker = false; render(); }
 function corridaEscolherTime(slot){
   if(corrida.fase === 'correndo' || corrida.fase === 'contagem') return;
   if(corrida.formato !== 'relay') return;
-  if(savesCampeoes().indexOf(Number(slot)) < 0) return;
+  /* ⚠️ A RÉGUA É A DA LISTA, e não o `savesCampeoes()` cru: na travessia o time é o da jornada, e
+     ele pode não ter as 8 insígnias -- com a régua velha a ação recusava em silêncio e o
+     revezamento era impossível pela jornada. */
+  if(timesDeIlhaElegiveis().indexOf(Number(slot)) < 0) return;
   const sv = (game.saveSlots && game.saveSlots[Number(slot)]) || {};
   /* a ordem é a do SAVE -- é a que o jogador já arrumou na tela de ordem de batalha; as setas da
      tela de revezamento continuam existindo pra mexer nela aqui. */
-  corrida.escolhidos = (sv.team || []).slice(0, CORRIDA_TRECHOS).map((p, idx) =>
+  corrida.escolhidos = timeDoSlot(Number(slot)).slice(0, CORRIDA_TRECHOS).map((p, idx) =>
     Object.assign({}, p, { slot: Number(slot), idx, teamName: sv.customName || (`Time ${Number(slot) + 1}`) }));
   corrida.picker = false;
   render();
@@ -33789,6 +33830,7 @@ function corridaTrocarFormato(f){
   corrida.escolhaPorFormato[corrida.formato] = corrida.escolhidos;
   corrida.formato = f;
   corrida.escolhidos = corrida.escolhaPorFormato[f] || [];
+  corridaAutoEquipe();   /* na travessia o relay já entra montado */
   corrida.fase = 'setup'; render();
 }
 
@@ -34269,6 +34311,9 @@ function corridaPintarHud(){
 function abrirCorrida(){
   rankInvalidar(corridaRank);   /* entrar no modo relê: é o caso do relato */
   corrida.fase = 'setup'; corrida.picker = false; corrida.aviso = '';
+  /* ⚠️ AQUI e não no `corridaZerar`: entrar na Corrida NÃO passa por ele (quem o chama é o
+     `sairDaCorrida`), então o auto-preenchimento posto só lá nunca rodaria na entrada. */
+  corridaAutoEquipe();
   game.modoBloqueado = null;
   game.screen = 'corrida';
   render();
@@ -34304,13 +34349,14 @@ function corridaLinhaEscolhido(p, i){
    ⚠️ E O SLOT É CARIMBADO, senão o `effectiveSpeed` não acha a especialidade da conta e o número
    do card sairia MENOR que o da pista pra quem é especialista. */
 function corridaSpeedDoTime(slot){
-  const sv = (game.saveSlots && game.saveSlots[slot]) || {};
-  return (sv.team || []).reduce((a, p) =>
+  /* ⚠️ O TIME VIVO, pelo mesmo motivo do card da Pescaria: na travessia o `saveSlots` é a cópia
+     da home, e o número no rodapé do card discordaria da pista. */
+  return timeDoSlot(Number(slot)).reduce((a, p) =>
     a + speedDaCorrida(corridaInstancia(Object.assign({}, p, { slot: Number(slot) }), true)), 0);
 }
 /* O card de TIME do revezamento -- o mesmo `save-slot-card` da Liga, da home e da Pescaria. */
 function corridaPickerDeTimes(){
-  const slots = savesCampeoes();
+  const slots = timesDeIlhaElegiveis();
   if(!slots.length){
     return `<div class="box"><p class="error-text">Nenhum time seu venceu as 8 insígnias ainda.`
       + ` Termine uma jornada primeiro!</p>`
@@ -34419,7 +34465,10 @@ function renderCorrida(){
            é uma EQUIPE inteira, e "corredor" no singular descrevia a individual. As duas telas
            pra onde ele leva já são diferentes (a lista de POKÉMON na individual, a de TIMES no
            revezamento) -- o botão é que dizia a mesma coisa pras duas. */''}
-      <button class="btn primary" onclick="corridaAbrirPicker()">${corridaRotuloDaEscolha()}</button>
+      ${/* ⚠️ NA TRAVESSIA O REVEZAMENTO NÃO TEM BOTÃO: a equipe é a da jornada e não há segunda.
+           A individual mantém o dele -- lá a escolha é qual dos seis corre. */''}
+      ${naJornadaDasIlhas() && corrida.formato === 'relay' ? '' :
+        `<button class="btn primary" onclick="corridaAbrirPicker()">${corridaRotuloDaEscolha()}</button>`}
       ${corrida.aviso ? `<p class="error-text">⚠️ ${escapeHtmlSafe(corrida.aviso)}</p>` : ''}
       <button class="btn success" ${corridaCompleto() && corrida.fase !== 'carregando' ? '' : 'disabled'} onclick="corridaLargar()">
         ${corrida.fase === 'carregando' ? 'Carregando os sprites…' : (corridaCompleto() ? '🏁 Largar' : 'Escolha ' + corridaQuantos() + (corridaQuantos() > 1 ? ' Pokémon' : ' Pokémon'))}
@@ -34714,7 +34763,12 @@ function pescariaZerar(){
      esta linha aquele save/restore não fazia nada, e a intenção dele só se lia no comentário.
      A `semente` numera as oportunidades (`op7`) E semeia o rng de cada batalha. Zerá-la faz o
      mesmo duelo ser reproduzível, que é o que toda medição deste projeto precisa. */
-  pescaria.escolhido = null; pescaria.semente = 1;
+  /* ⚠️ NA VISITA PELA JORNADA O TIME JÁ ENTRA ESCOLHIDO (22/09/2026, a pedido: *"quando vier
+     atraves da jornada, nem precisa pedir o time, ja deixa automaticamente o time da jornada
+     atual"*). Só existe um time possível ali, e **uma tela de uma resposta só é pior que tela
+     nenhuma** -- é a mesma regra que já dispensa a tela de golpes de quem tem 2 ou menos. */
+  pescaria.escolhido = naJornadaDasIlhas() ? game.currentSaveSlot : null;
+  pescaria.semente = 1;
   /* ⚠️ E A MARCA DO PAINEL DA BATALHA VAI JUNTO, que é a consequência não óbvia de zerar a
      semente: o pintor só remonta o painel quando o `dataset.peixe` muda, e com a numeração
      recomeçando do zero dois duelos passam pelos MESMOS ids -- o primeiro peixe do duelo novo
@@ -34760,26 +34814,29 @@ function sairDaPescaria(){
 /* ⚠️ PELA JORNADA é o save da jornada, e só ele: *"na pescaria, ele vai usar o time que ele esta na
    jornada agora, nao vai poder escolher o time igual acessando diretamente pela tela home"*. A
    Pescaria escolhe por SAVE (não por pokémon), então a restrição é a lista de saves. */
-function pescariaElegiveis(){
-  if(naJornadaDasIlhas()){
-    const sv = game.saveSlots && game.saveSlots[game.currentSaveSlot];
-    return sv ? [sv] : [];
-  }
-  return savesCampeoes();
-}
+/* ⚠️ `function` e nao `const`: declaracao de funcao e hoisted e vira global no sandbox dos
+   testes; um `const` ali voltaria `undefined` pra quem o chamasse de fora. */
+function pescariaElegiveis(){ return timesDeIlhaElegiveis(); }
 /* O time de um slot, montado do zero -- instâncias PRÓPRIAS da pescaria, nunca as do save: elas
    vão tomar dano e morrer, e o save não pode sentir nada disso (conferido por impressão). */
 /* ⚠️ O SLOT VIAJA JUNTO, e isso não é detalhe: a chave do ITEM equipado é `slot:raiz-da-linha`,
    e sem ele o `equiparItens` procura o item com slot nulo -- ou seja, a poção que o jogador
    equipou no parceiro simplesmente NÃO VALERIA aqui, em silêncio. */
+/* ⚠️ O TIME SAI DO `timeDoSlot`, e não do `game.saveSlots` direto: aquele é a cópia carregada na
+   HOME, e o do save ABERTO é o `game.team` -- o time VIVO. Na travessia isso é a diferença entre
+   pescar com o time de agora e pescar com o de antes da última captura e da última distribuição
+   de níveis. É a mesma lição que o HM01 já tinha custado, e é a função dele que se reusa aqui. */
 function pescariaTimeDoSlot(slot){
-  const sv = game.saveSlots && game.saveSlots[slot];
-  return ((sv && sv.team) || []).map(p => pescariaInstancia(Object.assign({}, p, { slot }), true));
+  return timeDoSlot(Number(slot))
+    .map(p => pescariaInstancia(Object.assign({}, p, { slot: Number(slot) }), true));
 }
 /* quantos ainda estão de pé -- é o que decide se o pescador ainda pode fisgar */
 const pescariaVivos = (p) => ((p && p.time) || []).filter(x => x.hp > 0).length;
 function pescariaAbrirPicker(){
   if(pescaria.fase !== 'setup') return;
+  /* ⚠️ NA TRAVESSIA NÃO HÁ O QUE ESCOLHER, e quem recusa é a AÇÃO: o botão escondido é
+     apresentação, e um toque forjado no console não pode abrir uma lista de um item só. */
+  if(naJornadaDasIlhas()) return;
   /* ⚠️ ZERA A PÁGINA: o `game.montadorPagina` é COMPARTILHADO com a Torre, o Ginásio e a
      Corrida, e uma página 3 sobrando de lá abriria esta lista no meio. */
   game.montadorPagina = 0;
@@ -36924,8 +36981,11 @@ function cardDeTimeHtml(time, nome, opcoes){
     : `<div class="${cls}">${corpo}</div>`;
 }
 function pescariaCardDoTime(slot, selecionado, acao, rodape){
-  const sv = (game.saveSlots && game.saveSlots[slot]) || {};
-  return cardDeTimeHtml(sv.team, sv.customName || (`Time ${slot + 1}`),
+  const sv = (game.saveSlots && game.saveSlots[Number(slot)]) || {};
+  /* ⚠️ O TIME VEM DO `timeDoSlot` (o VIVO do save aberto) e o NOME do `saveSlots` -- o nome
+     custom não existe no `game`. Lendo o time do `saveSlots` também, o card da travessia mostrava
+     a cópia da home: a média e os sprites ficavam atrasados em relação ao que vai pescar. */
+  return cardDeTimeHtml(timeDoSlot(Number(slot)), sv.customName || (`Time ${Number(slot) + 1}`),
     { selecionado: selecionado, acao: acao, rodape: rodape });
 }
 /* ⚠️ O RANKING É DA PRIMEIRA TELA, e é ele que dá razão pra voltar: sem placar, um duelo ganho
@@ -37013,13 +37073,16 @@ function renderPescaria(){
          Pokédex, o card do log de batalha e as prateleiras da loja já seguem: aquele botão é de
          AÇÃO, e aqui a linha é informação que por acaso se toca. De quebra o alvo de toque passa a
          ser a linha toda, em vez de um botãozinho na ponta. */''}
+    ${/* ⚠️ NA TRAVESSIA O CARD É UMA PRÉVIA, sem ação e sem o "Trocar": o time é o da jornada e
+         não há segundo. Um card clicável que reabre uma lista de um item só convida um toque que
+         não leva a lugar nenhum. */''}
     ${temTime
-      ? pescariaCardDoTime(esc, false, `pescariaAbrirPicker()`)
+      ? pescariaCardDoTime(esc, false, naJornadaDasIlhas() ? null : `pescariaAbrirPicker()`)
       : `<button class="pesc-parceiro" onclick="pescariaAbrirPicker()">`
         + `<span class="pesc-parceiro-info"><b>Nenhum time escolhido</b>`
         + `<small>Escolha o time que vai lutar por você</small></span>`
         + `<span class="pesc-parceiro-acao">Escolher</span></button>`}
-    ${temTime ? `<button class="btn secondary" onclick="pescariaAbrirPicker()">Trocar de time</button>` : ``}
+    ${temTime && !naJornadaDasIlhas() ? `<button class="btn secondary" onclick="pescariaAbrirPicker()">Trocar de time</button>` : ``}
     ${/* O adversário: o mesmo card de time, com a fileira dos seis dele. ⚠️ E a linha do BST saiu
          (a pedido) -- ela contava a REGRA do sorteio, que é detalhe de motor; o que o jogador
          precisa ver é QUEM ele vai enfrentar, e isso a fileira já mostra. */''}

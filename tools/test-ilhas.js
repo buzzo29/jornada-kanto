@@ -1226,6 +1226,166 @@ function blocoDaTravessia(){
 
   g.ilhasJornada = null; g.ilhasResultado = null; g.ilhasTrecho = null;
 
+  /* ---------------------------------------------------------------- 12) ⚠️ O TIME DA TRAVESSIA
+     Reportado com print em 22/09/2026: o picker da Pescaria mostrava **`Time [object Object]1`**
+     com a estrela em `0`. A causa é que o `pescariaElegiveis` mudava de TIPO -- devolvia o OBJETO
+     do save na visita e um SLOT fora dela --, e a lista tem que ter um tipo só.
+
+     ⚠️ E O SINTOMA ERA O MENOR DOS DOIS PROBLEMAS: a AÇÃO fazia `indexOf(Number(slot))` sobre
+     objetos, e `Number({})` é NaN -- ou seja **escolher o time era impossível** e a Pescaria estava
+     TRAVADA na travessia. O revezamento da Corrida estava travado por outra porta: ele validava
+     com `savesCampeoes()`, e o save da jornada pode não ter as 8 insígnias (o do relato tinha 5).
+
+     ⚠️ A TRAVA ANTERIOR NÃO PEGAVA NENHUM DOS DOIS porque ela media a CONTAGEM (`length <= 1`), e
+     tanto `[objeto]` quanto `[slot]` têm tamanho 1. Aqui ela mede o TIPO e a USABILIDADE. */
+  {
+    /* ⚠️ O ESTADO DO RANKING É GUARDADO E REPOSTO: este bloco desenha a tela da Pescaria, e o
+       `renderPescaria` PEDE o ranking -- sem repor, o bloco do ranking (que roda depois) via a
+       lista já carregada e as travas dele de "a primeira leitura pede ao servidor" caíam sem
+       nada estar errado. Trava que deixa rastro derruba a vizinha. */
+    const rankAntes = JSON.parse(JSON.stringify(S.pescariaRank));
+    /* o save ABERTO é o do relato: no meio da jornada, SEM as 8 insígnias */
+    const saveDaJornada = { team: saveDe('A', 6).team, badgeCount: 5, customName: 'Time da jornada' };
+    const montar = () => {
+      g.saveSlots = [saveDaJornada, saveDe('B', 6)];
+      g.aposentados = []; g.ehAdmin = true;
+      g.currentSaveSlot = 0; g.saveGen = 0; g.gymIndex = 3;
+      g.team = timeDe(6, true);           /* o time VIVO -- espécies diferentes das do saveSlots */
+      g.ilhasJornada = null; g.ilhasResultado = null;
+      S.pescariaZerar(); S.corridaZerar();
+    };
+
+    /* ---- o TIPO: a lista é de SLOTS nos dois modos ---- */
+    montar();
+    const foraDaVisita = S.pescariaElegiveis();
+    ok('fora da visita a lista de times é de NÚMEROS',
+       foraDaVisita.length > 0 && foraDaVisita.every(x => typeof x === 'number'),
+       JSON.stringify(foraDaVisita));
+    S.entrarNasIlhasDaJornada();
+    const naVisita = S.pescariaElegiveis();
+    ok('  e na travessia TAMBÉM (era o objeto do save)',
+       naVisita.length === 1 && typeof naVisita[0] === 'number' && naVisita[0] === 0,
+       JSON.stringify(naVisita));
+
+    /* ---- o SINTOMA DO PRINT: o card não pode sair com o objeto no nome nem com média 0 ---- */
+    const card = S.pescariaCardDoTime(naVisita[0], false, null);
+    ok('  então o card não mostra "[object Object]"', card.indexOf('[object Object]') < 0,
+       'era o nome que o jogador viu no print');
+    const media = (card.match(/team-avg-star-num">(\d+)</) || [])[1];
+    ok('  e a média do time não é zero', Number(media) > 0, 'média no card: ' + media);
+
+    /* ---- e a AÇÃO aceita o slot da jornada: era ela que travava o modo ---- */
+    S.pescariaEscolher(naVisita[0]);
+    ok('a AÇÃO aceita o time da jornada', S.pescaria.escolhido === 0,
+       'escolhido=' + JSON.stringify(S.pescaria.escolhido) + ' -- com a lista de objetos ela recusava');
+
+    /* ⚠️ ---- e o time que vai pescar é o VIVO, não a cópia do `saveSlots` ---- */
+    const vivos = S.pescariaTimeDoSlot(0).map(p => p.speciesId);
+    ok('  e ele pesca com o time VIVO da jornada',
+       vivos[0] === g.team[0].speciesId && vivos.length === g.team.length,
+       vivos.join(',') + ' (o saveSlots tem ' + saveDaJornada.team.map(p => p.speciesId).join(',') + ')');
+
+    /* ---- O PEDIDO: pela jornada o time já entra escolhido, e não há o que trocar ---- */
+    montar();
+    S.entrarNasIlhasDaJornada();
+    S.abrirPescaria();
+    ok('pela JORNADA o time já entra escolhido', S.pescaria.escolhido === 0,
+       'uma tela de uma resposta só é pior que tela nenhuma');
+    S.pescaria.picker = false;
+    S.pescariaAbrirPicker();
+    ok('  e a AÇÃO recusa abrir o picker', S.pescaria.picker === false);
+    const telaPesca = S.renderPescaria();
+    ok('  e a tela não oferece "Trocar de time"', telaPesca.indexOf('Trocar de time') < 0);
+    ok('  mas mostra o card do time', telaPesca.indexOf('save-slot-card') >= 0);
+
+    /* ---- e pela HOME nada muda: ele escolhe, como sempre ---- */
+    montar();
+    S.abrirPescaria();
+    ok('pela HOME ele continua escolhendo', S.pescaria.escolhido === null);
+    S.pescariaAbrirPicker();
+    ok('  e o picker abre', S.pescaria.picker === true);
+    S.pescaria.picker = false;
+    S.pescaria.escolhido = 0;
+    ok('  e o "Trocar de time" continua lá', S.renderPescaria().indexOf('Trocar de time') >= 0);
+
+    /* ================= A CORRIDA: o revezamento ================= */
+    /* ⚠️ O SAVE DA JORNADA NÃO É CAMPEÃO, e era isso que travava o relay: a régua das 8 insígnias
+       é pra quem entra pela HOME escolher um time que terminou uma jornada. */
+    montar();
+    S.entrarNasIlhasDaJornada();
+    ok('(o save da jornada NÃO tem as 8 insígnias)', S.savesCampeoes().indexOf(0) < 0,
+       'é o caso do relato -- sem isso esta trava não mede nada');
+
+    S.abrirCorrida();
+    S.corridaTrocarFormato('relay');
+    ok('pela JORNADA a equipe do revezamento já entra montada',
+       S.corrida.escolhidos.length === S.CORRIDA_TRECHOS,
+       S.corrida.escolhidos.length + ' de ' + S.CORRIDA_TRECHOS);
+    ok('  e ela é o time da jornada, na ordem dele',
+       S.corrida.escolhidos.every((p, i) => p.speciesId === g.team[i].speciesId),
+       S.corrida.escolhidos.map(p => p.speciesId).join(','));
+    S.corrida.picker = false;
+    S.corridaAbrirPicker();
+    ok('  e a AÇÃO recusa abrir o picker de times', S.corrida.picker === false);
+    ok('  e a tela não oferece "Escolher equipe"',
+       S.renderCorrida().indexOf('corridaAbrirPicker()') < 0);
+    /* ⚠️ E A LISTA DO PICKER DE TIMES TAMBÉM É A DA TRAVESSIA, mesmo ele sendo INALCANÇÁVEL ali
+       hoje (a ação recusa abrir). Sem esta trava o `corridaPickerDeTimes` podia voltar ao
+       `savesCampeoes()` sem nada acusar -- conferido: o defeito religado passava em branco --, e
+       ele viraria uma bomba-relógio pro dia em que a guarda do picker mudasse. É a mesma decisão
+       da guarda do `registrarSketch`, que vale pro caminho que ainda não existe. */
+    S.corrida.picker = true;
+    const pickerNaVisita = S.corridaPickerDeTimes();
+    ok('  e o picker de times, se aberto, lista SÓ o da jornada',
+       (pickerNaVisita.match(/save-slot-card/g) || []).length === 1
+       && pickerNaVisita.indexOf('corridaEscolherTime(0)') >= 0,
+       (pickerNaVisita.match(/save-slot-card/g) || []).length + ' cards');
+    S.corrida.picker = false;
+
+    /* ⚠️ e a AÇÃO aceita o save da jornada -- ela recusava com o `savesCampeoes()` cru */
+    S.corrida.escolhidos = [];
+    S.corridaEscolherTime(0);
+    ok('  e a AÇÃO aceita o time da jornada', S.corrida.escolhidos.length === S.CORRIDA_TRECHOS,
+       'com a régua das 8 insígnias ela recusava em silêncio');
+
+    /* ---- a INDIVIDUAL continua pedindo escolha: lá ela existe (qual dos seis corre) ---- */
+    S.corridaTrocarFormato('single');
+    ok('mas a INDIVIDUAL continua escolhendo', S.corrida.escolhidos.length === 0);
+    ok('  e o botão dela continua na tela',
+       S.renderCorrida().indexOf('corridaAbrirPicker()') >= 0);
+    S.corridaAbrirPicker();
+    ok('  e o picker dela abre', S.corrida.picker === true);
+    S.corrida.picker = false;
+
+    /* ⚠️ ---- e voltar pro relay NÃO desfaz a reordenação que o jogador fez com as setas ---- */
+    S.corridaTrocarFormato('relay');
+    const ordemTrocada = S.corrida.escolhidos.slice().reverse();
+    S.corrida.escolhidos = ordemTrocada;
+    S.corridaTrocarFormato('single');
+    S.corridaTrocarFormato('relay');
+    ok('a reordenação do revezamento sobrevive à ida e volta',
+       S.corrida.escolhidos.map(p => p.speciesId).join(',') === ordemTrocada.map(p => p.speciesId).join(','),
+       S.corrida.escolhidos.map(p => p.speciesId).join(','));
+
+    /* ---- e pela HOME nada muda ---- */
+    montar();
+    S.abrirCorrida();
+    S.corridaTrocarFormato('relay');
+    ok('pela HOME o revezamento continua escolhendo', S.corrida.escolhidos.length === 0);
+    ok('  e o botão continua lá', S.renderCorrida().indexOf('corridaAbrirPicker()') >= 0);
+    S.corridaAbrirPicker();
+    ok('  e o picker abre', S.corrida.picker === true);
+    S.corrida.picker = false;
+    /* e ali a régua das 8 insígnias CONTINUA valendo: o save 0 não é campeão */
+    S.corridaEscolherTime(0);
+    ok('  e a régua das 8 insígnias continua valendo fora da travessia',
+       S.corrida.escolhidos.length === 0, 'a porta da home não pode aceitar time sem as 8');
+
+    montar();
+    S.corridaZerar(); S.pescariaZerar();
+    Object.assign(S.pescariaRank, rankAntes);
+  }
+
   g.ilhasJornada = null; g.ilhasTrecho = null;
 }
 

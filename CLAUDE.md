@@ -15535,6 +15535,93 @@ silêncio, e é a varredura das outras 29 telas seguras que a pega.
 armadilha do padrão largo demais, a mesma das regex do `mlog-mais` e do `matchup-row` — e a que já
 fez um comentário acusar a si mesmo cinco vezes neste arquivo.
 
+### ⚠️ E O TIME DA TRAVESSIA: `Time [object Object]1`, E DOIS JOGOS TRAVADOS (22/09/2026)
+
+Reportado com print do picker da Pescaria: o card saía **`Time [object Object]1`** com a estrela em
+**0**, e o pedido veio junto — *"quando vier atraves da jornada, nem precisa pedir o time, ja deixa
+automaticamente o time da jornada atual, para a corrida de revezamento tambem"*.
+
+**⚠️ A CAUSA É A LISTA TER DOIS TIPOS.** O `pescariaElegiveis` devolvia o **OBJETO do save** na
+visita e um **SLOT** fora dela:
+
+```js
+if(naJornadaDasIlhas()){ const sv = game.saveSlots[game.currentSaveSlot]; return sv ? [sv] : []; }
+return savesCampeoes();   // <- numeros
+```
+
+E o card faz `Time ${slot + 1}` — com um objeto, `slot + 1` é **`"[object Object]1"`**. A média
+zerou pelo mesmo motivo: o `game.saveSlots[objeto]` é `undefined`, então o card desenhava um time
+vazio.
+
+**⚠️ MAS O SINTOMA DO PRINT ERA O MENOR DOS DOIS PROBLEMAS — a Pescaria estava TRAVADA.** A ação
+faz `pescariaElegiveis().indexOf(Number(slot))`, e `Number({})` é **NaN**: `indexOf(NaN)` é sempre
+**-1**, então **escolher o time era impossível** e o duelo nunca começava.
+
+**⚠️ E O REVEZAMENTO DA CORRIDA ESTAVA TRAVADO POR OUTRA PORTA, no mesmo dia.** Ele validava com
+`savesCampeoes()` — e **o save da jornada pode não ter as 8 insígnias**: o do relato tinha **5**.
+A ação recusava em silêncio, e o `corridaPickerDeTimes` ainda listava **os times campeões da
+conta**, que não são o time da travessia. Ou seja **dois dos cinco jogos não davam pra jogar pela
+jornada**, e só um deles tinha sintoma visível.
+
+**⚠️ E A RÉGUA DAS 8 INSÍGNIAS NÃO É A MESMA NOS DOIS CAMINHOS, e é isso que a correção separa:**
+pela HOME ela existe pra o jogador trazer um time que **terminou** uma jornada; na travessia o time
+é **o que ele está jogando agora**, e exigir dele um troféu que a jornada ainda não deu fecharia o
+modo justamente pra quem o pedido quer deixar entrar.
+
+#### O CONSERTO: uma lista, um tipo
+
+- **`timesDeIlhaElegiveis()`** é a porta única: `savesCampeoes()` pela home, `[currentSaveSlot]` na
+  travessia — **slots nos dois casos**. Ela é lida pelos quatro pontos que decidiam por conta
+  própria (os dois `Elegiveis`, o picker de times e a validação do relay).
+- **⚠️ E O TIME VEM DO `timeDoSlot`, não do `game.saveSlots`** — a função que o HM01 já tinha
+  criado pra isto: *"o `game.saveSlots` é uma cópia carregada na HOME; o `game.team` é o time VIVO
+  do save aberto"*. Na travessia isso é a diferença entre pescar com o time de agora e pescar com o
+  de antes da última captura e da última distribuição de níveis. Vale nos três lugares que liam a
+  cópia (o time da pescaria, o card e o `corridaSpeedDoTime`).
+- **E O TIME JÁ ENTRA ESCOLHIDO** (o pedido): na travessia só existe **um** time possível, e **uma
+  tela de uma resposta só é pior que tela nenhuma** — a mesma regra que já dispensa a tela de
+  golpes de quem tem 2 ou menos disponíveis. O botão de trocar some, o card vira uma **prévia** (uma
+  `<div>`, sem ação: um card clicável que reabre uma lista de um item só convida um toque que não
+  leva a lugar nenhum) e **quem recusa abrir o picker é a AÇÃO**, não o botão escondido.
+- **⚠️ A INDIVIDUAL DA CORRIDA CONTINUA PEDINDO**, e não é exceção esquecida: lá a escolha **existe**
+  — qual dos seis corre. O auto-preenchimento é do **revezamento**, onde a equipe é o time inteiro.
+- **⚠️ E ELE SÓ PREENCHE SE ESTIVER VAZIO**, senão desfaria a **reordenação** que o jogador acabou de
+  fazer com as setas da tela de revezamento toda vez que ele fosse à individual e voltasse.
+- **⚠️ O GANCHO DA CORRIDA FICA NO `abrirCorrida`, e não no `corridaZerar`:** entrar na Corrida
+  **não passa** pelo zerar (quem o chama é o `sairDaCorrida`), então o auto posto só lá nunca
+  rodaria na entrada. Na Pescaria é o contrário — o `abrirPescaria` chama o `pescariaZerar`, e é
+  nele que ele mora.
+
+**MEDIDO A 320px, no navegador:** o card da travessia fica em **216×114px**, é uma **`<div>`**, o
+nome sai certo (**zero** `[object Object]`), a média é **51** com os **6 sprites**, **nenhum texto
+cortado** e **nada rola pro lado** nas quatro telas. Pela home a oferta de escolher continua lá,
+inteira (**216×76px**).
+
+**CONFERIDO QUE NÃO É MOTOR, por impressão:** `MOTOR d19915312988 / DIARIO 741ec5a626c3`, idêntico.
+Bateria: **37 de 37**.
+
+#### ⚠️ E A TRAVA QUE EXISTIA MEDIA A CONTAGEM, NÃO O TIPO
+
+Ela era `naVisita.pesca.length <= 1` — e **`[objeto]` e `[slot]` têm o mesmo tamanho**, então ela
+passava nas duas formas e não pegou nada disto. Hoje ela mede o **TIPO** (`typeof === 'number'` nos
+dois modos), o **SINTOMA** (o card sem `[object Object]` e com média > 0) e a **USABILIDADE** (a
+ação aceitando o slot da jornada) — que é o que estava quebrado de verdade.
+
+**⚠️ E O FIXTURE PRECISOU DE UM SAVE NÃO-CAMPEÃO.** O do bloco tinha `badgeCount: 8` em todos, e
+com ele a trava do revezamento **não distinguiria nada**: o defeito é justamente o save da jornada
+**não** ter as 8. Há um `ok` só pra afirmar que o fixture cai na faixa em que a regra vale.
+
+**⚠️ E UM DOS SETE DEFEITOS RELIGADOS PASSOU EM BRANCO:** o `corridaPickerDeTimes` voltando ao
+`savesCampeoes()`. A razão é que, com a guarda da ação, **ele é inalcançável na travessia hoje** —
+e deixá-lo com a lista errada seria uma bomba-relógio pro dia em que a guarda mudasse. A trava
+**força o picker aberto** e cobra a lista, que é a mesma decisão da guarda do `registrarSketch`:
+ela vale pro caminho que ainda não existe. Com ela, os **7 acusam**.
+
+**⚠️ E UMA TRAVA MINHA DERRUBOU A VIZINHA:** o bloco desenha a tela da Pescaria, e o
+`renderPescaria` **PEDE o ranking** — isso deixava o `pescariaRank` carregado e as três travas de
+*"a primeira leitura pede ao servidor"* do bloco seguinte caíam **sem nada estar errado**. O estado
+é guardado e reposto no fim. **Trava que deixa rastro derruba a vizinha.**
+
 ## AS ILHAS LARANJA ABRIRAM PRA TODO MUNDO, E O MONITOR NASCEU JUNTO (21/09/2026)
 
 Pedido assim: *"crie um monitor para eu conseguir ver quais treinadores já jogaram algum jogo das
