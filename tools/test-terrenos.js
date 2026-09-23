@@ -242,5 +242,94 @@ ok('a compensacao de 15px da sombra saiu junto',
 ok('do lado do JOGADOR o levantamento continua',
    !/\.battle-fighter\.player[^{]*\.battle-sprite-wrap\{padding-bottom:0/.test(htmlCena));
 
+/* ============================================================================
+   A SOMBRA CRESCE COM O POKEMON (23/09/2026).
+
+   ⚠️ ATE AQUI ELA TINHA TAMANHO FIXO -- 42px pra todo mundo --, e o sprite DESENHADO varia 1,8x
+   (medido em 20 especies a 320px: 56px no Caterpie, 100px no Onix). A razao sombra/sprite ia de
+   0,75 a 0,42.
+
+   ⚠️ ESTAS TRAVAS LEEM O CSS porque o defeito e de CSS -- e porque o que sustenta a mecanica nao
+   aparece em asserção de HTML nenhuma: a sombra so e proporcional se ela morar DENTRO do sprite.
+   ============================================================================ */
+console.log('\nCENA DE BATALHA -- a sombra cresce com o pokemon');
+
+/* ⚠️ A REGRA TEM QUE SER DO `.battle-sprite-wrap`, e nao do palco nem do ground-base: o wrap e o
+   UNICO elemento da cena que tem a largura do POKEMON (o palco e 40% fixo da cena e o ground-base
+   e irmao dele). Movida pra qualquer um dos dois, a sombra volta a ter tamanho fixo -- e continua
+   aparecendo na tela, que e o que faz isso passar despercebido. */
+const regraSombra = htmlCena.match(/\.battle-scene \.battle-sprite-wrap::after\{([^}]*)\}/);
+ok('a sombra e um ::after do .battle-sprite-wrap (onde existe a largura do pokemon)',
+   !!regraSombra, regraSombra ? regraSombra[1].replace(/\s+/g, ' ').slice(0, 90) : 'nao achei a regra');
+const corpoSombra = regraSombra ? regraSombra[1] : '';
+
+/* ⚠️ A LARGURA E EM %, nunca em px: em px ela volta a ser a mesma pra todo bicho, que e o defeito. */
+ok('a largura sai de left/right em % (nao de um px fixo)',
+   /left:calc\(\s*[\d.]+%/.test(corpoSombra) && /right:calc\(\s*[\d.]+%/.test(corpoSombra)
+   && !/width:\s*\d+px/.test(corpoSombra),
+   corpoSombra.replace(/\s+/g, ' ').slice(0, 70));
+
+/* ⚠️ E A ALTURA SAI DO `aspect-ratio`: uma altura em % resolveria contra a ALTURA do wrap, e ai um
+   sprite alto e fino ganharia uma sombra alta. Uma em px nao cresceria com o bicho. */
+ok('a altura sai do aspect-ratio (nao de px nem de %)',
+   /aspect-ratio:/.test(corpoSombra) && !/height:\s*[\d.]+(px|%)/.test(corpoSombra),
+   (corpoSombra.match(/aspect-ratio:[^;]*/) || ['-'])[0]);
+
+/* ⚠️ E O `translateY(50%)` CENTRA ELA NA LINHA DO PE -- e onde as tres variantes antigas ficavam
+   (todas tinham margin-top de metade da propria altura). Sem ele a sombra fica inteira ACIMA. */
+ok('ela e centrada na linha do pe (translateY 50%)', /transform:translateY\(50%\)/.test(corpoSombra));
+
+/* ⚠️ E ELA E ESCOPADA NA CENA: o `battleAnimatedSpriteHtml` e exclusivo dela hoje, mas ele e uma
+   FUNCAO -- reusado noutra tela, um ::after sem escopo poria uma sombra la sem ninguem ver. */
+ok('a regra e escopada na .battle-scene',
+   htmlCena.indexOf('.battle-scene .battle-sprite-wrap::after') >= 0
+   && !/\n\s*\.battle-sprite-wrap::after\{/.test(htmlCena));
+
+/* ⚠️ E AS TRES VARIANTES DESENHADAS TEM QUE TER SAIDO DO `.battle-ground-base`: elas tinham
+   tamanho fixo (18% e 24% da CENA), entao uma que sobrasse desenharia uma segunda sombra --
+   daquelas que nao crescem -- por cima da nova. Ele hoje e so o portador da classe. */
+ok('o .battle-ground-base nao desenha mais nada',
+   /\.battle-ground-base\{display:none;\}/.test(htmlCena)
+   && !/\.battle-ground-base\.(air|water)\{[^}]*border-radius/.test(htmlCena));
+/* ⚠️ MAS ELE CONTINUA NO HTML: e ele que diz, pelo combinador `+`, se a especie voa ou nada. */
+ok('mas ele continua sendo emitido (as regras de + dependem dele)',
+   htmlCena.indexOf('class="battle-ground-base ${battleGroundBaseClass(') >= 0);
+
+/* ⚠️ E A SOMBRA DE CONTATO TEM QUE TER SAIDO DO PALCO pelo mesmo motivo: `left:28%;right:28%` dele
+   e 42px pra todo bicho, e duas sombras empilhadas nao se leem como defeito -- se leem como uma
+   sombra que nao cresce. */
+ok('a sombra de contato saiu do palco',
+   !/\.battle-sprite-stage::after\{[^}]*border-radius/.test(htmlCena));
+
+/* ⚠️ A ONDINHA DE QUEM NADA REUSA A MESMA CAIXA -- se ela voltar a ter largura propria, ela volta a
+   ser fixa. O que ela pode ter de proprio e a PINTURA e a razao (ela sempre foi mais gorda). */
+const regraAgua = htmlCena.match(/\.battle-ground-base\.water \+ \.battle-sprite-stage \.battle-sprite-wrap::after\{([^}]*)\}/);
+ok('a ondinha da agua reusa a caixa da sombra (so troca a pintura)',
+   !!regraAgua && !/(left|right|width):/.test(regraAgua[1]),
+   regraAgua ? regraAgua[1].replace(/\s+/g, ' ').slice(0, 70) : 'nao achei a regra');
+
+/* ⚠️ E O EMPURRAO PRA ESQUERDA DO ADVERSARIO E EM % DO SPRITE, que e a unidade em que ele foi
+   MEDIDO (o pe desvia -4,6% da largura do QUADRO, e ele e metade disso). Em % da cena, cada
+   tamanho de sprite recebia um empurrao diferente do que a medicao diz. */
+const dx = htmlCena.match(/\.battle-scene \.battle-fighter\.enemy \.battle-sprite-wrap\{--sombra-dx:(-[\d.]+)%;\}/);
+ok('o empurrao do adversario e uma variavel em % do SPRITE', !!dx, dx ? dx[1] + '%' : '-');
+ok('e a sombra LE essa variavel com padrao 0 (o jogador nao anda)',
+   /var\(--sombra-dx,\s*0%\)/.test(corpoSombra));
+
+/* ============================================================================
+   AS ESPADINHAS NAO APARECEM NA CENA (23/09/2026).
+   ⚠️ Reportado: *"no fundo dos cenarios ainda esta exibindo aquele simbolos de espadinhas que
+   exibia no modo antigo"*. Elas vinham do arquivo de referencia como marca d agua no centro.
+   ============================================================================ */
+console.log('\nCENA DE BATALHA -- as espadinhas');
+ok('a cena esconde as espadinhas',
+   /\.battle-vs\.battle-scene \.vs-swords\{display:none;\}/.test(htmlCena));
+/* ⚠️ E A REGRA E ESCOPADA NA CENA: no caminho ANTIGO o `.vs-swords` e o **x entre os dois
+   lutadores** (e e nele que o 🌧️ da chuva se pendura), e o Boss, a Selecao, o desafio por codigo e
+   o online seguem naquele desenho. Escondido sem escopo, quatro telas perdem o x. */
+ok('e ela NAO alcanca o caminho antigo',
+   !/\n\s*\.vs-swords\{[^}]*display:none/.test(htmlCena)
+   && htmlCena.indexOf('.vs-swords{font-size:1.4rem;display:inline-block;}') >= 0);
+
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
 process.exit(falhas ? 1 : 0);

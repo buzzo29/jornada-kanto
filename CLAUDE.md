@@ -5909,6 +5909,9 @@ Depois de ver a cena, três pedidos em sequência:
    ⚠️ **Só a altura**: a largura da cena nunca foi tocada — ela é 100% do container, como sempre foi.
 3. ***"mover a sombra do adversario para a esquerda e subir ela um pouco para ficar no pé"*** — ver
    o bloco abaixo, que é o que tem número.
+   ⚠️ **A metade "PRA CIMA" CADUCOU no mesmo dia**: ela era um `margin-top` num elemento que deixou
+   de existir — hoje a sombra é um `::after` do próprio sprite e cai no pé por construção (ver **A
+   SOMBRA CRESCE COM O POKÉMON**). O empurrão lateral continua, em outra unidade.
 4. ***"o pokemon adversario ... faz uma animação de ir para baixo e depois ir reto ... consegue
    colocar para a animação ir reto e depois descer?"*** — a troca é de **ORDEM**, não de valor: os
    dois destinos (−38% e 26px) são os mesmos, e o que muda é qual eixo sai primeiro. Medido
@@ -6020,6 +6023,90 @@ Conferido no navegador, o atributo depois do `setProperty`:
 ele mesmo CRIA), e o aviso ficou no comentário do `terrainBattleSceneStyle`. **E não adianta mexer
 num ancestral**: as quatro variáveis estão inline no próprio elemento, e inline ganha de herança —
 quem precisar sondar tem que fazer por REGRA de CSS.
+
+
+#### ⚠️ A SOMBRA CRESCE COM O POKÉMON (23/09/2026)
+
+Pedida assim: *"você consegue crescer o tamanho da sombra de acordo que fique proporcional ao
+tamanho do pokémon?"*.
+
+**⚠️ E A PRIMEIRA COISA MEDIDA FOI SE HAVIA O QUE CRESCER — havia, e muito.** A sombra era
+**42px pra TODO MUNDO** (o `.battle-sprite-stage::after` era `left:28%;right:28%` de um palco de
+largura FIXA), e o sprite desenhado varia bastante. Medido a 320px em 20 espécies:
+
+| | sprite desenhado | sombra | razão |
+|---|---|---|---|
+| **Caterpie** | **56px** | 42px | **0,75** |
+| Pikachu | 78px | 42px | 0,54 |
+| Abra, Geodude, Vulpix | 93–96px | 42px | 0,45 |
+| **Onix, Snorlax, Raichu, Arcanine** | **100px** | 42px | **0,42** |
+
+O bichinho tinha uma sombra **quase da largura dele** e o grandão uma que **não chegava à metade**.
+
+**⚠️ O QUE FAZ ELA SER PROPORCIONAL É ELA MUDAR DE DONO, e isso não é detalhe de onde escrever a
+regra: nenhum dos três elementos que desenhavam a sombra sabe o tamanho do bicho.** O palco é 40%
+fixo da cena e o `.battle-ground-base` é **irmão** dele — os dois são grandezas da CENA. Quem tem
+a largura do POKÉMON é o **`.battle-sprite-wrap`**, que ABRAÇA a imagem (medido bicho por bicho: a
+largura dele é exatamente a largura desenhada do sprite).
+
+Hoje a sombra é um **`::after` do wrap**, com `left`/`right` em % dele. E como o wrap está DENTRO
+do `.battle-status-host`, que é escalado (**1,75** no jogador e **1,55** no adversário), ela é
+escalada junto — que é exatamente o que "proporcional ao tamanho" quer dizer.
+
+**MEDIDO DEPOIS, nas mesmas 20 espécies: a razão ficou CONSTANTE em 0,580** (0,579 do lado do
+jogador, 0,584 do adversário — a diferença é o arredondamento da escala). A sombra do Onix foi de
+42 pra **58px** e a do Caterpie de 42 pra **32px**.
+
+- **⚠️ O `aspect-ratio` É O QUE FAZ A ALTURA ACOMPANHAR.** Uma altura em `%` resolveria contra a
+  **ALTURA** do wrap, e aí um sprite alto e fino ganharia uma sombra alta; uma em px não cresceria
+  com o bicho. Com a razão fixa a elipse guarda a forma em qualquer tamanho — **6:1**, que é a
+  razão que a sombra de contato já tinha, e **4,5:1** na ondinha de quem nada, que sempre foi mais
+  gorda.
+- **⚠️ E O `translateY(50%)` A CENTRA NA LINHA DO PÉ**, que é onde as três variantes antigas
+  ficavam — as três tinham `margin-top` de metade da própria altura, e o `bottom:-3px` do palco
+  fazia o mesmo. Sem ele a sombra fica inteira ACIMA do pé. Medido: `dy = 0,0` nas 20.
+- **⚠️ E QUEM VOA CONTINUA COM A SOMBRA NO CHÃO de graça, sem uma exceção sequer:** o `.air` põe
+  `padding-bottom:10px` no wrap, e `bottom:0` resolve contra o **PADDING box** — ou seja abaixo da
+  imagem, que é onde o chão está. Medido: **dy = 17,5px** (10 × 1,75) no jogador, e **0,0** no
+  adversário, onde esse levantamento é zerado desde o relato do Gyarados × Raichu. Os dois casos
+  saem da MESMA regra.
+- **⚠️ E ELA É ESCOPADA NA `.battle-scene` de propósito.** O `battleAnimatedSpriteHtml` é exclusivo
+  da cena hoje — conferido: o caminho antigo usa o `spriteHtml`, que não emite o wrap —, mas ele é
+  uma **FUNÇÃO**: reusado noutra tela, um `::after` sem escopo poria uma sombra lá sem ninguém ver.
+
+**⚠️ E O `.battle-ground-base` VIROU SÓ O PORTADOR DA CLASSE.** Ele não desenha mais nada, e as
+duas âncoras de posição dele saíram junto (elas liam o footing pra posicionar um elemento que hoje
+é `display:none` — letra morta). **Ele fica no HTML**, porque é ele que diz, pelo combinador `+`,
+se a espécie voa, nada ou anda no chão: tirar o elemento derrubaria as duas regras que dependem
+disso.
+
+**⚠️ E O EMPURRÃO PRA ESQUERDA DO ADVERSÁRIO MUDOU DE UNIDADE, o que o deixa mais certo do que
+era:** ele agora é uma variável em **% do SPRITE** (`--sombra-dx:-2.3%`), que é a unidade em que
+ele foi MEDIDO — o pé desvia −4,6% da largura do **QUADRO** do bicho, e ele é metade disso. Antes
+ele era traduzido pra % da CENA (1%), ou seja **todo tamanho de sprite recebia o mesmo empurrão em
+pixels**, quando a medição diz que ele é uma fração do bicho. Medido agora: de **−1,3px** no
+Caterpie a **−2,3px** no Onix. A sombra do jogador não anda (o padrão da variável é 0).
+
+**CONFERIDO QUE O CAMINHO ANTIGO NÃO MUDOU, e por duas medições:** o HTML das 16 telas dele sai
+**byte a byte igual** (mesmo hash), e no navegador ele tem **ZERO `.battle-sprite-wrap`** — ou
+seja a regra nova não tem por onde alcançá-lo.
+
+**No motor, nada:** `MOTOR 5130995a7232 / DIARIO 416ea6822949`, idêntico em 900 batalhas semeadas.
+
+#### AS ESPADINHAS SAÍRAM DO FUNDO DA CENA (23/09/2026)
+
+Reportado: *"no fundo dos cenários ainda está exibindo aquele símbolos de espadinhas que exibia no
+modo antigo, retire"*. Elas vinham do arquivo de referência como uma **marca d'água no centro**
+(`opacity:.18`) — e com o cenário desenhado atrás, elas são mais um desenho no meio da luta.
+
+**⚠️ O ELEMENTO CONTINUA NO HTML, e tem que continuar:** no caminho ANTIGO ele é o **× entre os
+dois lutadores** — e é nele que o 🌧️ da Dança da Chuva se pendura —, e o **Boss de Domingo**, a
+**Seleção**, o desafio por **código de treinador** e o **online** seguem naquele desenho. Quem
+esconde é o escopo `.battle-vs.battle-scene`: a cena é a exceção, não o contrário. Medido no
+navegador, lado a lado: no antigo o `.vs-swords` é `display:block` (26×27px) e na cena é `none`.
+
+A trava tem as **duas metades** — a cena esconde E o caminho antigo continua mostrando. Sem a
+segunda, esconder sem escopo passaria e quatro telas perderiam o ×.
 
 #### ⚠️ O QUE O PORT CUSTOU E NÃO ESTAVA PEDIDO: O NOME DO TREINADOR TRUNCA
 

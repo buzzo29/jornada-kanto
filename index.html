@@ -988,47 +988,14 @@
   .battle-scene .battle-mon-panel .hp-bar-track{height:10px;border-width:2px;}
   .battle-scene .battle-mon-panel .hp-bar-label{text-align:right;font-size:.56rem;margin-top:2px;}
 
-  /* Os pés e as sombras compartilham âncoras proporcionais ao cenário.
-     O piso faz parte da arte: espécies terrestres recebem só sombra de contato. */
-  .battle-ground-base{position:absolute;z-index:4;pointer-events:none;}
-  .battle-ground-base.ground{display:none;}
-  .battle-ground-base.water{
-    width:24%;height:15px;border-radius:50%;
-    background:repeating-linear-gradient(0deg,#8cdeec 0 2px,#46a8ce 2px 5px);
-    border:2px solid #bcebf2;box-shadow:0 2px 0 #377eaa;
-    margin-left:-12%;margin-top:-7px;
-  }
-  .battle-ground-base.air{
-    width:18%;height:9px;border-radius:50%;background:rgba(24,35,43,.28);
-    margin-left:-9%;margin-top:-4px;
-  }
-  .battle-fighter.player .battle-ground-base{left:var(--battle-player-x,24%);top:var(--battle-player-y,82%);}
-  .battle-fighter.enemy .battle-ground-base{left:var(--battle-enemy-x,72%);top:var(--battle-enemy-y,69%);}
-  /* ⚠️ A SOMBRA DO ADVERSARIO ANDA PRA ESQUERDA E PRA CIMA (23/09/2026, a pedido: *"consegue mover
-     a sombra do adversario para a esquerda e subir ela um pouco para ficar no pe do pokemon?"*).
-
-     ⚠️ OS 15px PRA CIMA TEM CAUSA, e ela nao e a sombra: quem VOA (`.air`) ganha
-     `padding-bottom:10px` no wrap -- e o sprite do adversario e ampliado 1,55x, entao esses 10px
-     viram **15,5px** de folga entre o pe dele e o chao. A sombra marca o CHAO; o pe fica acima
-     dela. Medido no navegador a 320px: sombra no y=256 e pe no y=241.
-     ⚠️ E SO O `.air` PRECISA DISSO: no `.water` o sprite nao leva padding, entao o pe ja cai em
-     cima da ondinha (medido: desvio de meio pixel).
-
-     ⚠️ E O EMPURRAO PRA ESQUERDA E METADE DA MEDIA MEDIDA (1% da cena), e a razao de ser METADE
-     saber: a sombra e centrada na CAIXA do sprite, e o pe de cada bicho nao fica no centro da
-     caixa dele. Medido em 20 sprites (varrendo os pixels opacos da folha), o pe desvia **-4,6% da
-     largura do quadro** em media -- ou seja pra ESQUERDA --, com casos indo de -22% (Dragonite,
-     Gyarados, Arcanine, Mewtwo) a **+22% (Blastoise)** e +18% (Alakazam).
-     ⚠️ E FOI JUSTAMENTE A DISPERSAO QUE COBROU: o empurrao nasceu com a media inteira (~2% da
-     cena) e foi reportado no mesmo dia -- *"a sombra passou um pouco o corpo do pokemon"*. Faz
-     sentido: pra quem tem o pe a DIREITA do centro da caixa, andar a media inteira pra esquerda
-     tira a sombra de debaixo do bicho. Metade acerta o caso comum sem estourar o outro extremo.
-     Acertar cada um exigiria uma tabela de pe POR ESPECIE, que e outra feature.
-
-     ⚠️ E O % DO `margin-left` RESOLVE CONTRA A CENA (o bloco que contem e o `.battle-fighter`, que
-     e `inset:0` dela), enquanto o `left`/`right` do `::after` resolve contra o PALCO -- que e 40%
-     da cena. Por isso os mesmos 2% viram -11% num e 5 pontos no outro. */
-  .battle-scene .battle-fighter.enemy .battle-ground-base{margin-left:-10%;}
+  /* O PÉ de cada lutador sai de âncoras proporcionais ao cenário (TERRAIN_BATTLE_FOOTING); o
+     piso faz parte da arte. A SOMBRA não sai mais daqui -- ver o `.battle-sprite-wrap::after`. */
+  /* ⚠️ O `.battle-ground-base` NAO DESENHA MAIS NADA -- ele e so o PORTADOR DA CLASSE que diz se a
+     especie voa, nada ou anda no chao (`battleGroundBaseClass`). Quem desenha a sombra hoje e o
+     `.battle-sprite-wrap::after`, mais abaixo, porque e la que existe a largura do POKEMON.
+     Ele fica no HTML porque as regras de `.air`/`.water` o alcancam pelo combinador `+`; tirar o
+     elemento derrubaria as duas. */
+  .battle-ground-base{display:none;}
   /* ⚠️ TODO ADVERSARIO FICA NA MESMA ALTURA (23/09/2026, reportado: *"o gyarados tava mais pra
      cima, ele morreu e entrou um raichu, e ai o raichu ficou mais pra baixo"*).
      ⚠️ O ESTILO DA CENA ERA IDENTICO NOS 11 CONFRONTOS -- medido. Quem mudava era a ESPECIE: quem
@@ -1043,7 +1010,6 @@
      o quadro de baixo tem o chao muito mais perto, entao os 17,5px dele (10 x 1,75) se leem como
      o pokemon flutuando, nao como um confronto diferente do outro. */
   .battle-scene .battle-fighter.enemy .battle-ground-base.air + .battle-sprite-stage .battle-sprite-wrap{padding-bottom:0;}
-  .battle-scene .battle-fighter.enemy .battle-sprite-stage::after{left:25.5%;right:30.5%;}
   .battle-sprite-stage{
     position:absolute;width:40%;height:148px;margin:0;
     display:flex;align-items:flex-end;justify-content:center;
@@ -1052,14 +1018,69 @@
   }
   .battle-fighter.player .battle-sprite-stage{left:calc(var(--battle-player-x,24%) - 20%);bottom:calc(100% - var(--battle-player-y,82%));}
   .battle-fighter.enemy .battle-sprite-stage{left:calc(var(--battle-enemy-x,72%) - 20%);right:auto;top:auto;bottom:calc(100% - var(--battle-enemy-y,69%));}
-  .battle-sprite-stage::after{
-    content:'';position:absolute;left:28%;right:28%;bottom:-3px;height:7px;
-    border-radius:50%;background:rgba(24,32,39,.3);z-index:-1;
-  }
-  .battle-ground-base.air + .battle-sprite-stage::after,
-  .battle-ground-base.water + .battle-sprite-stage::after{display:none;}
+  /* ⚠️ A SOMBRA DE CONTATO SAIU DO PALCO (23/09/2026): ela era `left:28%;right:28%` dele, e o palco
+     tem largura FIXA (40% da cena) -- ou seja 42px pra todo bicho. Hoje ela vive no
+     `.battle-sprite-wrap`, logo abaixo, onde a largura E a do pokemon. */
   .battle-ground-base.air + .battle-sprite-stage .battle-sprite-wrap{padding-bottom:10px;}
-  .battle-sprite-wrap{display:flex;justify-content:center;align-items:flex-end;max-width:100%;line-height:0;}
+  .battle-sprite-wrap{display:flex;justify-content:center;align-items:flex-end;max-width:100%;line-height:0;position:relative;}
+  /* ⚠️ A SOMBRA CRESCE COM O POKEMON (23/09/2026, a pedido: *"consegue crescer o tamanho da sombra
+     de acordo que fique proporcional ao tamanho do pokemon?"*).
+
+     ⚠️ ATE AQUI ELA TINHA TAMANHO FIXO -- 42px pra TODO MUNDO -- e o sprite desenhado varia muito:
+     medido a 320px em 20 especies, de **56px** (Caterpie) a **100px** (Onix, Snorlax, Raichu,
+     Arcanine), 1,8x. A razao sombra/sprite ia de **0,75** no Caterpie a **0,42** no Onix -- o
+     bichinho tinha uma sombra quase da largura dele e o grandao uma que nao chegava a metade.
+
+     ⚠️ O QUE FAZ ELA SER PROPORCIONAL E ELA VIVER DENTRO DO SPRITE, e isso nao e detalhe de onde
+     escrever a regra: o `.battle-sprite-wrap` ABRACA a imagem (medido bicho por bicho: a largura
+     dele e a largura desenhada do sprite), entao `left`/`right` em % dele nascem com a largura do
+     POKEMON. E o wrap esta DENTRO do `.battle-status-host`, que e escalado (1,75 no jogador e
+     1,55 no adversario), entao a sombra e escalada junto. Nenhum outro elemento da cena sabe o
+     tamanho do bicho -- o palco e 40% fixo e o `.battle-ground-base` e irmao do palco.
+
+     ⚠️ O `aspect-ratio` E O QUE FAZ A ALTURA ACOMPANHAR. Uma altura em `%` resolveria contra a
+     ALTURA do wrap, e ai um sprite alto e fino ganharia uma sombra alta. Com a razao fixa a
+     elipse guarda a forma em qualquer tamanho -- 6:1 e a razao que a sombra de contato ja tinha.
+
+     ⚠️ E O `translateY(50%)` CENTRA ELA NA LINHA DO PE, que e onde as tres variantes antigas
+     ficavam (as tres tinham `margin-top` de metade da propria altura). Sem ele a sombra fica
+     inteira ACIMA do pe.
+
+     ⚠️ E QUEM VOA CONTINUA COM A SOMBRA NO CHAO de graca: o `.air` poe `padding-bottom:10px` no
+     wrap, e `bottom:0` resolve contra o PADDING box -- ou seja abaixo da imagem, que e onde o chao
+     esta. Do lado do ADVERSARIO esse levantamento e zerado (ver a nota do Gyarados x Raichu), e la
+     a sombra fica no pe. Os dois casos saem da MESMA regra, sem excecao nenhuma.
+
+     ⚠️ E ELA E ESCOPADA NA `.battle-scene` de proposito: o `battleAnimatedSpriteHtml` e exclusivo
+     da cena hoje, mas ele e uma funcao -- reusado noutra tela, um `::after` sem escopo poria uma
+     sombra la sem ninguem ver. */
+  .battle-scene .battle-sprite-wrap::after{
+    content:'';position:absolute;z-index:-1;pointer-events:none;
+    left:calc(21% + var(--sombra-dx,0%));right:calc(21% - var(--sombra-dx,0%));
+    bottom:0;transform:translateY(50%);aspect-ratio:6/1;
+    border-radius:50%;background:rgba(24,32,39,.3);
+  }
+  /* a ondinha de quem anda na agua: a MESMA caixa, outra pintura (e mais gorda, como ela era) */
+  .battle-scene .battle-ground-base.water + .battle-sprite-stage .battle-sprite-wrap::after{
+    aspect-ratio:4.5/1;
+    background:repeating-linear-gradient(0deg,#8cdeec 0 2px,#46a8ce 2px 5px);
+    border:2px solid #bcebf2;box-shadow:0 2px 0 #377eaa;
+  }
+  /* ⚠️ A SOMBRA DO ADVERSARIO ANDA UM POUCO PRA ESQUERDA (23/09/2026, a pedido: *"mover a sombra do
+     adversario para a esquerda ... para ficar no pe do pokemon"*), e agora em % do SPRITE -- que e
+     a unidade em que ela foi MEDIDA. Antes ela era traduzida pra % da CENA (1%), e assim cada
+     tamanho de sprite recebia um empurrao diferente do que a medicao dizia.
+
+     ⚠️ E ELE E METADE DA MEDIA MEDIDA, e a razao de ser metade vale saber: a sombra e centrada na
+     CAIXA do sprite, e o pe de cada bicho nao fica no centro da caixa dele. Medido em 20 sprites
+     (varrendo os pixels opacos da folha), o pe desvia **-4,6% da largura do quadro** em media --
+     pra ESQUERDA --, com casos indo de -22% (Dragonite, Gyarados, Arcanine, Mewtwo) a **+22%
+     (Blastoise)** e +18% (Alakazam).
+     ⚠️ E FOI A DISPERSAO QUE COBROU: o empurrao nasceu com a media INTEIRA e foi reportado no mesmo
+     dia -- *"a sombra passou um pouco o corpo do pokemon"*. Pra quem tem o pe a DIREITA do centro,
+     andar a media inteira tira a sombra de debaixo do bicho. Metade acerta o caso comum sem
+     estourar o outro extremo; acertar cada um exigiria uma tabela de pe POR ESPECIE. */
+  .battle-scene .battle-fighter.enemy .battle-sprite-wrap{--sombra-dx:-2.3%;}
   .battle-sprite-stage .battle-sprite-animated{
     display:block;max-width:100%;max-height:136px;width:auto;height:auto;
     image-rendering:pixelated;image-rendering:crisp-edges;
@@ -1069,11 +1090,16 @@
   .battle-fighter.enemy .battle-sprite-stage .battle-sprite-animated{max-width:100%;max-height:124px;}
   .battle-sprite-fallback{display:none;font-size:2.6rem;line-height:1;}
 
-  .battle-vs.battle-scene .vs-swords{
-    position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
-    z-index:2;opacity:.18;font-size:1rem;
-  }
-  .battle-vs.battle-scene .vs-swords.spin{animation:none;}
+  /* ⚠️ AS ESPADINHAS NAO APARECEM NA CENA (23/09/2026, a pedido: *"no fundo dos cenarios ainda esta
+     exibindo aquele simbolos de espadinhas que exibia no modo antigo, retire"*). Elas vinham do
+     arquivo de referencia como uma marca d agua no centro (opacity .18) -- e com o cenario
+     desenhado atras elas sao mais um desenho no meio da luta.
+
+     ⚠️ O ELEMENTO CONTINUA NO HTML, e tem que continuar: no caminho ANTIGO ele e o **x entre os
+     dois lutadores** (e e nele que o 🌧️ da Danca da Chuva se pendura), e o Boss, a Selecao, o
+     desafio por codigo e o online seguem naquele desenho. Quem esconde e o escopo
+     `.battle-vs.battle-scene`, ou seja a cena e a excecao -- nao o contrario. */
+  .battle-vs.battle-scene .vs-swords{display:none;}
 
   /* ⚠️ A ENTRADA ANIMA SO O SPRITE, nao o lutador inteiro: o `.battle-fighter` cobre a cena
      toda (inset:0) e leva o PAINEL junto, entao um transform nele passava por cima do painel do
