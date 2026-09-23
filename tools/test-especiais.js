@@ -8071,6 +8071,60 @@ console.log('\n=== ABRIR UM CONFRONTO ZERA O PASSO, ANTES DO DESENHO (15/09/2026
        que não vira global, que a Queimada já custou. */
     const bloco = (cliL.match(/if\(g\.x === 'terreno'\)\{[\s\S]{0,400}?\n  \}/) || [''])[0];
     ok('  a trava tem o bloco da frase pra ler', bloco.length > 50, bloco.length + ' chars');
+    /* ⚠️ O SELO SAI NA COR DO TERRENO (23/09/2026, a pedido: *"deixe a cor do simbolo de buff, da
+       mesma cor que fica ao lado do nome do pokemon com o simbolo de buff"*). As duas pontas têm
+       que dar a MESMA cor, senão o selo da frase e o galão do quadro discordam na MESMA tela.
+       ⚠️ E A COR SAI DA LINHA (`tt`), não do estado da tela: o log é relido dias depois, e ali o
+       terreno da batalha corrente não é o daquele confronto. */
+    {
+      const srvT = require('fs').readFileSync(require('path').join(raiz, 'functions', 'index.js'), 'utf8');
+      const terr = S.TERRAINS.find(t => t.types[0] === 'Fire');
+      const pT = S.createInstance('charizard', 60), qT = S.createInstance('onix', 60);
+      S.applyTerrainBuff([pT], terr);
+      pT.hp = S.calcMaxHp(pT); qT.hp = S.calcMaxHp(qT);
+      const dT = []; S.doExchange(pT, qT, () => .5, dT);
+      const linhaT = dT.find(g => g.x === 'terreno');
+      ok('a linha do terreno carrega o TIPO dele', !!linhaT && linhaT.tt === 'Fire', JSON.stringify(linhaT));
+      /* ⚠️ O CAMPO É `tt` E NÃO `t`: o `t` do passo animado já quer dizer QUANTOS TAPAS, e uma
+         string ali seria colisão de nome -- o tipo de coisa que não dá erro e some numa comparação. */
+      ok('  e o campo é `tt`, que não colide com o `t` dos tapas',
+         !!linhaT && linhaT.t === undefined, JSON.stringify(linhaT));
+      const icT = S.iconeDoEspecial(linhaT);
+      const corT = (icT.match(/color:([^;"]+)/) || [])[1];
+      ok('  e o selo da frase sai na cor do terreno', corT === S.terrainColor(terr),
+         corT + ' x ' + S.terrainColor(terr));
+      /* ⚠️ E ELA É A MESMA QUE O GALÃO DO QUADRO USA (`terrainColor(terrain)` no `fighterHtml`). */
+      ok('  que é a MESMA que o quadro do lutador usa',
+         S.TYPE_COLORS[linhaT.tt] === S.terrainColor(terr));
+      /* ⚠️ LINHA ANTIGA (sem o campo) CAI NO PADRÃO -- log velho não pode sumir. A trava compara o
+         fallback com ele mesmo (um tipo desconhecido dá a mesma cor) em vez de ler a constante:
+         `const` dentro do sandbox NÃO vira global, e ler `S.COR_TERRENO_PADRAO` devolve undefined
+         -- ou seja a trava passaria com QUALQUER cor. É a lição que a Queimada já custou. */
+      const corVelha = (S.iconeDoEspecial({ x:'terreno', g:'Onix' }).match(/color:([^;"]+)/) || [])[1];
+      const corDesconhecida = (S.iconeDoEspecial({ x:'terreno', tt:'NaoExiste' }).match(/color:([^;"]+)/) || [])[1];
+      ok('  e linha antiga (sem o campo) cai no padrão',
+         !!corVelha && corVelha === corDesconhecida && corVelha !== corT,
+         corVelha + ' (a do terreno é ' + corT + ')');
+      /* e os outros especiais continuam com o ícone fixo */
+      ok('  e os outros especiais não mudam',
+         S.iconeDoEspecial({ x:'sono' }) === S.ICONES_ESPECIAIS.sono &&
+         S.iconeDoEspecial({ x:'furia' }) === S.ICONES_ESPECIAIS.furia);
+      /* ⚠️ E OS DOIS MOTORES GRAVAM O MESMO CAMPO: o diário do servidor é o que vai pro log da liga. */
+      const reTT = /x:'terreno', d:0, g: p\.name, tt:/;
+      ok('  e os DOIS motores gravam o `tt`', reTT.test(srvT) && reTT.test(cliL),
+         'servidor ' + reTT.test(srvT) + ' / cliente ' + reTT.test(cliL));
+    }
+    /* ⚠️ E A PAUSA DELA É PRÓPRIA: 2s, e SÓ dela (a pedido: *"aumente o tempo dessa mensagem para
+       2s"*). O `PAUSA_LEITURA_ESPECIAL_MS` vale pra TODA frase de passiva -- subir a constante
+       deixaria toda batalha do jogo meio segundo mais lenta POR FRASE. */
+    ok('a pausa do terreno é de 2s', S.pausaDaFaixa({ leitura:true, x:'terreno' }) === 2000,
+       S.pausaDaFaixa({ leitura:true, x:'terreno' }) + 'ms');
+    ok('  e as OUTRAS frases continuam em 1,5s',
+       S.pausaDaFaixa({ leitura:true, x:'sono' }) === S.PAUSA_LEITURA_ESPECIAL_MS &&
+       S.pausaDaFaixa({ leitura:true, x:'queimou' }) === S.PAUSA_LEITURA_ESPECIAL_MS &&
+       S.pausaDaFaixa({ leitura:true, x:'paralisou' }) === S.PAUSA_LEITURA_ESPECIAL_MS,
+       S.pausaDaFaixa({ leitura:true, x:'sono' }) + 'ms');
+    ok('  e um passo comum continua sem pausa nenhuma', S.pausaDaFaixa({ x:'golpe' }) === 0);
     ok('  e o número é DERIVADO da constante, nunca escrito na frase',
        bloco.indexOf('TERRAIN_BUFF_MULT') >= 0 && !/\b15%|\b15 ?%/.test(bloco), bloco.slice(0, 160));
 

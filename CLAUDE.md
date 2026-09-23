@@ -5396,6 +5396,43 @@ linhas, 600 pokémon buffados**). É a mesma decisão do gelo e da queimadura.
 **Medido a 320px:** a linha cai na caixa amarela das aberturas, com o selo, **antes** do primeiro
 golpe -- e **zero `-0 de HP`** no log. **Os 10 defeitos religados acusam** (1 a 14 falhas cada).
 
+
+#### ⚠️ O SELO SAI NA COR DO TERRENO, E A FRASE DURA 2s (23/09/2026)
+
+Pedido assim: *"a mensagem de que tal pokemon ganhou buff de terreno, deixe a cor do simbolo de
+buff, da mesma cor que fica ao lado do nome do pokemon com o simbolo de buff, e aumente o tempo
+dessa mensagem para 2s"*.
+
+**⚠️ A LINHA GANHOU O TIPO DO TERRENO (`tt`), e a cor sai DELA — nunca do estado da tela.** O log é
+relido dias depois, e ali o terreno da batalha corrente não é o daquele confronto: lido do estado,
+a frase de um log antigo sairia na cor do terreno de hoje. É a mesma razão pela qual o `sai` do
+Remoinho e o `a` da anulação viajam no diário.
+
+- **⚠️ O CAMPO É `tt` E NÃO `t`:** o `t` do passo animado já quer dizer **quantos TAPAS**, e um
+  colide com o outro no mesmo objeto. Há trava cobrando que a linha do terreno não tenha `t`.
+- **A COR É O `TYPE_COLORS[tt]`, que é o MESMO que o `terrainColor` do quadro do lutador usa** —
+  as duas pontas têm que dar a mesma cor, senão o selo da frase e o galão do quadro discordam na
+  MESMA tela. Medido no navegador: `#F08030` nos dois, num terreno de Fogo.
+- **⚠️ E OS DOIS MOTORES GRAVAM O CAMPO.** O diário do servidor é o que vai pro log da liga —
+  gravando só no cliente, a frase da liga sairia no verde padrão.
+- **LINHA ANTIGA (sem o campo) CAI NO `COR_TERRENO_PADRAO`**, que é o verde que ela sempre teve:
+  log velho não pode sumir nem mudar de cor.
+
+**⚠️ E A PAUSA É PRÓPRIA (`PAUSA_TERRENO_MS`, 2000ms), NÃO A CONSTANTE DE SEMPRE.** O
+`PAUSA_LEITURA_ESPECIAL_MS` (1500) vale pra **TODA** frase de passiva do jogo — subi-lo deixaria
+toda batalha mais lenta por frase, que não foi o que se pediu. Quem separa os dois casos é o
+`pausaDaFaixa`, e há trava cobrando que as outras continuem em 1,5s e que um passo comum continue
+sem pausa nenhuma.
+
+**⚠️ NO MOTOR, NADA — e a impressão de SEMPRE não prova isso sozinha: ela roda SEM TERRENO**, então
+ela não alcança a linha. Medido com uma impressão COM terreno (900 batalhas, um terreno por
+batalha): **MOTOR `3bd460a0238a` idêntico** e **DIÁRIO mudando** (`79fb3fe4a3bf` → `03abfbce4535`),
+que é exatamente o que um campo novo de apresentação deve fazer.
+
+`tools/test-especiais.js` tranca: o `tt` na linha (e o `t` não colidindo), a cor batendo com o
+`terrainColor`, a linha antiga caindo no padrão, os outros especiais intactos, os dois motores
+gravando, os 2s só do terreno e o 1,5s dos outros. **Conferido que os 4 defeitos religados acusam.**
+
 ### O SONO DURA DE 1 A 3 TROCAS, 1/3 CADA (15/09/2026)
 
 Pedido assim: *"quando um pokemon dormir, coloque 1/3 de chance para ele tomar 1 ataque, 1/3 de
@@ -19321,6 +19358,95 @@ lado a lado, e o **PONTA A PONTA** com 8 e com 5 inscritos.
    cheios**, onde quem barra é o TETO; e a dos quadros cobrava **igualdade** com a Clássica, o que
    passaria de volta com o vazamento do histórico global. As duas só apareceram na conferência.
 
+
+### ⚠️ A DESCRIÇÃO ERA A DA CLÁSSICA, O CONTADOR SOMAVA AS DUAS, E OS GOLPES FALTAVAM (23/09/2026)
+
+Pedido assim: *"na liga pro, muda a descrição, esta aparecendo a descrição da Liga Classica.
+Atualize para ficar no mesmo modelo da Liga Classica mas explicando como funciona a Liga Pro. O
+contador de quantas vezes venceu 'Campeao da Liga Pokemon', pode fazer separado somente para a
+Liga Pro. E coloque que após escolher os 6 pokemons, o usuario vai precisar escolher os ataques de
+cada pokemon tambem, até aquele level que ele esta, e ai sim a inscrição vai ser feita"*.
+
+#### ⚠️ A DESCRIÇÃO CAÍA NO `else`, E A CAUSA É A PRO SER UM TIPO RESERVADO
+
+O render tinha **dois** ramos: `typeConfig ? (a customizada) : (a CLÁSSICA)`. E a Pro, como a
+Clássica, **não vive na coleção `leagueTypes`** — ela não tem `typeConfig`, então caía no `else`
+e o jogador lia a descrição da liga errada. Hoje são três.
+
+**⚠️ E TODO NÚMERO DELA É DERIVADO** (`PRO_SORTEADOS`, `PRO_ESCOLHE`, `PRO_FAIXAS`,
+`REGULAR_LIGA_SIZE`): um `12` escrito na frase envelheceria no primeiro ajuste, que é o defeito do
+*"Revezamento · 900 m"*. **⚠️ E COMPARAR O HTML COM A CONSTANTE NÃO DISTINGUE OS DOIS** — hoje 12 é
+12 —, então quem prova a derivação é **ler o código**. É a mesma técnica que a conta da Pokédex
+precisou horas antes, onde 250+1 dava 251 e o número fixo passava.
+
+**Ela explica só o que a Pro tem de DIFERENTE**, e é o pedido ao pé da letra (*"no mesmo modelo da
+Liga Classica"*): o resto da mecânica é igual, e repeti-lo faria duas telas dizendo a mesma coisa.
+
+#### O CONTADOR: SEPARADO NA TELA, SOMADO NA CONTA
+
+| | |
+|---|---|
+| a tela da **Pro** | `leagueWinsPro` · *"Campeão da Liga Pro"* |
+| a tela da **Clássica** (e das customizadas) | `leagueWinsTotal` · *"Campeão da Liga Pokémon"* |
+
+**⚠️ E A PRO CONTA NOS DOIS CAMPOS — o recorte é só a TELA.** Contando só no dela, as **conquistas
+e o histórico deixariam de ver a Pro**; contando só no total, a tela dela mostraria as vitórias da
+Clássica junto, que é exatamente o que o pedido tira. Ela sobe por `increment` na mesma escrita.
+
+- **⚠️ OS DOIS MOTORES CONTAM**: o `recordLeagueChampionWin` existe no cliente **e** no servidor (é
+  ele que roda quando o navegador de outro jogador resolve a partida). Divergindo, o contador
+  ficaria certo em umas contas e errado em outras — e ninguém saberia quais.
+- **E o campo entrou no `CAMPOS_DA_CONTA`**: sem isso o `resetGame` o apagaria ao abrir um save.
+
+#### ⚠️ OS GOLPES: A TELA DA JORNADA, REUSADA — E ELA É A SEGUNDA METADE DA INSCRIÇÃO
+
+Antes o botão dos 6 inscrevia direto, e o time entrava com o `ataquesPadrao` (os mais fortes,
+escolhidos pelo motor). Hoje ele leva a uma **fila de telas de golpe**, e só a última inscreve.
+
+**⚠️ E A ESCOLHA É A DECISÃO MAIS FORTE DO JOGO:** medido em 09/09/2026, o par de golpes vale
+**79 pontos** de taxa de vitória entre o melhor e o pior par. Numa liga em que o time é sorteado,
+ela é a **única** coisa que o jogador decide além de quais 6 levar.
+
+- **⚠️ A LISTA É A MESMA DA JORNADA** (`listaDeGolpesHtml`, extraída pra isso): as telas de golpe
+  da casa dividem os blocos desde 09/09, e montadas em separado elas **já tinham divergido no
+  texto e no tamanho da fonte**. Uma cópia aqui seria a quarta.
+- **⚠️ QUEM TEM `MAX_GOLPES` OU MENOS DISPONÍVEIS NÃO VÊ TELA** — escolher 3 entre 3 não é escolha,
+  e uma tela de uma resposta só é pior que tela nenhuma. É a MESMA regra da captura na jornada.
+- **QUANTAS TELAS ISSO DÁ, MEDIDO** (40 bolos por faixa, dos 6 escolhidos):
+
+  | faixa | telas de 6 |
+  |---|---|
+  | **55–70** | **5,0** |
+  | 15–30 | **0,9** |
+  | 35–50 | 3,8 |
+
+  ⚠️ **A faixa 15–30 quase não pergunta**, e é aritmética: ali quase todo mundo ainda tem 3 golpes
+  ou menos. A rodada de 55–70 é a que cobra a decisão.
+- **⚠️ O MAPA É POR ÍNDICE DO BOLO** (`game.proGolpes`), nunca por espécie: voltar ao picker pra
+  trocar UM dos seis **não custa os golpes dos outros**. Por espécie, dois pokémon iguais no bolo
+  colidiriam; por posição do time, trocar um deslocaria todos.
+- **⚠️ E O CICLO QUE VIRA LIMPA OS GOLPES JUNTO**, pelo mesmo motivo: o bolo passa a ser OUTRO, e
+  o índice 3 herdaria os golpes de um bicho que nem está mais na tela.
+- **QUEM VALIDA É A AÇÃO**: o `proConfirmarGolpes` revalida contra o `ataquesEscolhiveis` e recusa
+  com menos que `MAX_GOLPES` — a mesma regra do `confirmarAtaques` da jornada.
+- **⚠️ E A INSCRIÇÃO FILTRA DE NOVO**, com o `ataquesPadrao` só de rede: um golpe que a espécie não
+  aprende sumiria no `golpesValidos` do servidor, e o time entraria na liga com **menos golpe do
+  que a tela mostrou**.
+
+**⚠️ E A TRAVA DISSO PASSOU EM BRANCO NA PRIMEIRA VERSÃO.** A inscrição fala com o Firestore, então
+ela é **dublada** no teste — e a asserção *"são os escolhidos"* media a **cópia da regra que o
+próprio teste escreveu**. É a armadilha do *"trava que pergunta à função que ela mede não é
+trava"*, e só a conferência de acusação a pegou. Hoje quem prova isso é a leitura do código.
+
+**NO MOTOR, NADA:** `MOTOR 5481ce57abca / DIARIO a4c6725aa4aa`, idêntico em 900 batalhas semeadas.
+
+**Medido a 320px, no navegador:** a tela da Pro em **305×1.503px** (a Clássica em 1.377), a de
+golpes em **826px**, cards de golpe em 243px, **todos os `<h2>` em uma linha**, nenhum texto
+cortado e **sem rolagem lateral** em nenhuma das três.
+
+`tools/test-liga-pro.js` foi a **157 asserções**, e **os 14 defeitos religados acusam** (1 a 12
+falhas cada).
+
 ## A POKÉDEX CONTA 251, E A BARRA NUNCA FECHA (23/09/2026)
 
 Reportado assim: *"na pokedex tem um texto que fala '130 de 250 especies registradas…', mas é 251 o
@@ -19514,6 +19640,26 @@ truncado** (nem "TreinadorNomeComprido") e as linhas uniformes em 23-24px. A cai
 211px** (aba de sempre) e **231px** (aba da semana, com a nota) — **+33% no pior caso**, que é o
 preço de a aba existir.
 
+
+#### A NOTA DIZ O PRAZO, NÃO A ABERTURA (23/09/2026)
+
+Pedido no mesmo dia em que ela nasceu: *"na mensagem do ranking da semana onde aparece escrito
+'Lidere a semana e ganhe Doces Raros (desde 21/09)', coloque assim: 'Lidere até o fim da semana e
+ganhe Doces Raros (Até 27/09)'"*.
+
+**⚠️ A DATA TROCOU DE PONTA: era a SEGUNDA (quando a contagem abriu) e virou o DOMINGO (o prazo).**
+O que decide se vale a pena jogar hoje é **quanto tempo ainda há**, não quando ela começou — e a
+abertura é a informação que o jogador menos usa, porque ela já passou.
+
+- **⚠️ O DOMINGO É DERIVADO do `trainersLeagueDateStrPlusDays(semanaId, 6)`**, e não de uma conta
+  minha: o `semanaId` É a segunda, e essa é a **MESMA regra de data que o cron usa pra fechar a
+  semana**. Uma segunda regra discordaria dele em algum fuso, e a tela anunciaria um prazo que o
+  fechamento não pratica. É a lição que a própria conta da semana já registra.
+- **A nota continua saindo SÓ na aba da semana**: no de sempre não há prêmio pra convidar.
+
+**CUSTO MEDIDO a 320px, no navegador:** a nota vai de **14px (1 linha) para 29px (2 linhas)** —
+**+15px** —, nas três telas, **sem rolagem lateral**.
+
 ### AS REGRAS, E O QUE ELAS PROTEGEM AQUI É MAIOR QUE ANTES
 
 As três coleções semanais são `allow read: if request.auth != null` e **`allow write: if false`**,
@@ -19527,7 +19673,7 @@ texto, nas seis portas (o documento da semana e a subcoleção `players` das tr�
 
 `MOTOR 5481ce57abca / DIARIO a4c6725aa4aa`, **idêntico** em 900 batalhas semeadas.
 
-`tools/test-rank-semanal.js` tranca **95 pontas**: a conta da semana (a virada na meia-noite do fuso
+`tools/test-rank-semanal.js` tranca **96 pontas**: a conta da semana (a virada na meia-noite do fuso
 do jogo, o domingo ainda na semana velha), a independência do geral e do semanal, as duas listas na
 mesma resposta **com números que DIFEREM de verdade**, a Corrida com as duas modalidades e o merge,
 o pódio de placar distinto com empate, os três prêmios, a notificação, o fechamento idempotente

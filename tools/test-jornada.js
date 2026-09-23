@@ -1925,17 +1925,28 @@ console.log('\n=== AS 28 FORMAS DO UNOWN (16/09/2026) ===');
        próprio jogo já pratica em toda liga e no online. Por isso o bolo dela também não sorteia
        letra: sorteando, a TELA mostraria um Unown Q que a partida lutaria como A, que é a tela
        prometendo o que a batalha não entrega. Ela é nomeada aqui em vez de a regra ser afrouxada
-       -- o próximo clone que nascer continua tendo que recolar. */
-    const inicioPro = txt.indexOf('async function inscreverNaLigaPro(');
-    const fimPro = txt.indexOf('\nasync function ', inicioPro + 10);
-    ok('  a trava achou onde a exceção mora', inicioPro > 0 && fimPro > inicioPro);
-    const foraDaPro = blocos.filter(m => !(m.index > inicioPro && m.index < fimPro)).map(m => m[0]);
+       -- o próximo clone que nascer continua tendo que recolar.
+       ⚠️ E DESDE 23/09/2026 SÃO DUAS FUNÇÕES, não uma: o `proInstanciaDoBolo` nasceu quando a Pro
+       passou a pedir os GOLPES de cada um (o jogador escolhe o pokémon E o moveset dele), e ele é
+       a fonte dos dois usos -- a tela de golpes e a inscrição. A exceção é a MESMA, pelo mesmo
+       motivo. */
+    const zonasPro = ['async function inscreverNaLigaPro(', 'function proInstanciaDoBolo(']
+      .map(marca => {
+        const i = txt.indexOf(marca);
+        const j = txt.indexOf('\nfunction ', i + 10);
+        const k = txt.indexOf('\nasync function ', i + 10);
+        return { i, fim: Math.min(j < 0 ? 1e9 : j, k < 0 ? 1e9 : k) };
+      });
+    ok('  a trava achou onde as exceções moram',
+       zonasPro.every(z => z.i > 0 && z.fim > z.i), JSON.stringify(zonasPro));
+    const naPro = m => zonasPro.some(z => m.index > z.i && m.index < z.fim);
+    const foraDaPro = blocos.filter(m => !naPro(m)).map(m => m[0]);
     const comShiny = foraDaPro.filter(b => /.shiny/.test(b));
     const semLetra = comShiny.filter(b => !/.unown/.test(b) && !/bits[2]/.test(b) && !/shinyIdx/.test(b));
     ok('todo clone que recola o shiny recola a letra', semLetra.length === 0,
        semLetra.length + ' sem: ' + semLetra.map(b => b.slice(0, 60)).join(' /// '));
-    ok('  e a Liga Pro é a Única exceção', blocos.length - foraDaPro.length === 1,
-       (blocos.length - foraDaPro.length) + ' dentro do inscreverNaLigaPro');
+    ok('  e a Liga Pro é a Única exceção', blocos.length - foraDaPro.length === 2,
+       (blocos.length - foraDaPro.length) + ' dentro da Liga Pro');
     ok('e sao os quatro conhecidos', comShiny.length >= 4, comShiny.length + ' clones');
   }
 

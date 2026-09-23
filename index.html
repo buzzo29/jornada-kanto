@@ -6711,7 +6711,7 @@ function freshGameDefaults(){
     leagueTeamPickError:null,
     permanentPokedex:[],
     permanentShinyDex:[],
-    leagueWinsTotal:0,
+    leagueWinsTotal:0, leagueWinsPro:0,
     trainerBestStreak:0,
     trainerLastStreak:0,
     leagueLeaderboard:[],
@@ -9129,6 +9129,7 @@ async function loadPermanentUserData(){
     game.achievementsPaid = Array.isArray(d.achievementsPaid) ? d.achievementsPaid : [];
     game.accountEliteChampion = !!d.eliteChampion;
     game.leagueWinsTotal = d.leagueWinsTotal || 0;
+    game.leagueWinsPro = d.leagueWinsPro || 0;
     game.trainerBestStreak = d.trainerBestStreak || 0;
     game.trainerLastStreak = d.trainerLastStreak || 0;
     game.shinyBonusExpiresAt = d.shinyBonusExpiresAt || 0; // se a pessoa recarregar o app com o bônus ainda ativo, continua valendo
@@ -9195,8 +9196,14 @@ async function recordLeagueChampionWin(name, uid, typeId){
   if(uid && game.authUser && game.authUser.uid===uid){
     try{
       const extraFlags = typeId===TRAINERS_LEAGUE_TYPE ? { anyTrainersChampion: true, achievementFlagsMigrated: true } : {};
-      await userDocRef(uid).set({ leagueWinsTotal: firebase.firestore.FieldValue.increment(1), ...extraFlags }, { merge: true });
+      /* ⚠️ A PRO CONTA NOS DOIS: o total é o "quantas ligas essa conta venceu" (e alimenta as
+         conquistas e o histórico), e o `leagueWinsPro` é o recorte que a tela da Pro mostra.
+         Contando só num deles, ou a conquista deixaria de ver a Pro, ou a tela dela mostraria as
+         vitórias da Clássica junto -- que é o que o pedido tira. */
+      const proFlag = typeId===PRO_LEAGUE_TYPE ? { leagueWinsPro: firebase.firestore.FieldValue.increment(1) } : {};
+      await userDocRef(uid).set({ leagueWinsTotal: firebase.firestore.FieldValue.increment(1), ...proFlag, ...extraFlags }, { merge: true });
       game.leagueWinsTotal = (game.leagueWinsTotal||0) + 1;
+      if(typeId===PRO_LEAGUE_TYPE) game.leagueWinsPro = (game.leagueWinsPro||0) + 1;
       if(game.achievementsExtra && typeId===TRAINERS_LEAGUE_TYPE){ game.achievementsExtra = { ...game.achievementsExtra, anyTrainersChampion:true }; }
     } catch(e){ console.error('Erro ao registrar campeão na conta:', e); }
   }
@@ -11723,7 +11730,17 @@ function doExchange(active, enemy, rng, diario){
   const anunciaTerreno = (p, q) => {
     if(!p || !p.terrainBuffed || p._terrenoAnunciado) return;
     p._terrenoAnunciado = true;
-    if(diario) diario.push({ q, x:'terreno', d:0, g: p.name });
+    /* ⚠️ O TIPO DO TERRENO VIAJA NA LINHA (`tt`, 23/09/2026, a pedido: *"deixe a cor do simbolo de
+       buff, da mesma cor que fica ao lado do nome do pokemon com o simbolo de buff"*).
+       ⚠️ ELE VIAJA NO REGISTRO e não é passado por parâmetro até a tela: o log é relido dias
+       depois, e ali o terreno da batalha corrente não é o daquele confronto. No registro, a cor
+       continua certa pra sempre -- e não custa nada, porque o `_terreno` JÁ está na instância
+       desde 17/09 (é o Poder Secreto que o lê).
+       ⚠️ O CAMPO É `tt` E NÃO `t`: o `t` do passo já quer dizer QUANTOS TAPAS (multi-tapa), e uma
+       string ali seria colisão de nome -- o tipo de coisa que não dá erro e some numa comparação.
+       ⚠️ E É O PRIMEIRO TIPO, que é exatamente o que o `terrainColor` usa: as duas pontas têm que
+       dar a MESMA cor, senão o selo da frase e o do quadro discordam na mesma tela. */
+    if(diario) diario.push({ q, x:'terreno', d:0, g: p.name, tt: (p._terreno || [])[0] || null });
   };
   anunciaTerreno(active, 'p');
   anunciaTerreno(enemy, 'e');
@@ -13540,6 +13557,20 @@ function golpesDoTimeHtml(p){
    jogador precisa saber ali é o que fazer e o que ele perde, não como o motor escolhe.
    SAIU O "Nível N" DE CADA CARD: ele dizia em que nível a espécie ensina aquele golpe, que é
    informação de tabela e não ajuda a escolher entre dois golpes que ele JÁ tem disponíveis. */
+/* ⚠️ A LISTA DE GOLPES É UMA CÓPIA SÓ, lida pela tela da jornada E pela da Liga Pro. As telas de
+   golpe da casa já dividem os blocos (`golpe-cab` e `cartaoDeGolpe`) desde 09/09/2026, e pela
+   mesma razão: montadas em separado elas já tinham divergido no texto e no tamanho da fonte.
+   O nome da função de marcar entra como PARÂMETRO porque as duas mexem em estados diferentes --
+   a da jornada no `game.team`, a da Pro no bolo sorteado. */
+function listaDeGolpesHtml(disp, marcados, fnMarcar){
+  return disp.map(id => {
+    const i = marcados.indexOf(id);
+    return `<button class="btn golpe-opcao ${i>=0?'selected':''}" style="border-left-color:${corDoGolpe(id)}" onclick="${fnMarcar}('${escJs(id)}')">
+      <span class="mont-num">${i>=0 ? (i+1)+'º' : ''}</span>
+      ${cartaoDeGolpe(id, true)}
+    </button>`;
+  }).join('');
+}
 function renderEscolhaDeAtaques(){
   const p = (game.team || []).find(x => x.id === game.escolhaDeAtaques);
   if(!p) return `<div class="box"><p>Carregando...</p></div>`;
@@ -13556,13 +13587,7 @@ function renderEscolhaDeAtaques(){
     ${faltam ? `<p class="hint-text">Mais ${faltam} pokémon ${faltam===1?'espera':'esperam'} escolha depois deste.</p>` : ''}
   </div>
   <div class="box">
-    ${disp.map(id=>{
-      const i = marcados.indexOf(id);
-      return `<button class="btn golpe-opcao ${i>=0?'selected':''}" style="border-left-color:${corDoGolpe(id)}" onclick="marcarAtaque('${escJs(id)}')">
-        <span class="mont-num">${i>=0 ? (i+1)+'º' : ''}</span>
-        ${cartaoDeGolpe(id, true)}
-      </button>`;
-    }).join('')}
+    ${listaDeGolpesHtml(disp, marcados, 'marcarAtaque')}
   </div>
   <button class="btn success" ${marcados.length===MAX_GOLPES?'':'disabled'} onclick="confirmarAtaques()">
     ${marcados.length===MAX_GOLPES ? `Confirmar os ${MAX_GOLPES} golpes` : `Escolha ${MAX_GOLPES-marcados.length} golpe${MAX_GOLPES-marcados.length===1?'':'s'}`}
@@ -17347,6 +17372,117 @@ async function registerForLeague(typeId, slot, ficarNaTela){
    ⚠️ E OS GOLPES SÃO OS DA ESPÉCIE POR NÍVEL (`ataquesPadrao`), que é a regra da casa pra quem
    não ESCOLHE golpe -- aqui o jogador escolhe o pokémon, não o moveset. Sem eles o time cairia no
    motor de tipo, e o servidor ainda valida cada um pelo `golpesValidos`. */
+/* ⚠️ OS GOLPES DA PRO (23/09/2026, a pedido). Até aqui o time saía com o `ataquesPadrao` -- os três
+   que mais batem --, que é a regra da casa pra quem NÃO escolhe. Agora quem escolhe é o jogador,
+   e a escolha é a mais forte do jogo: medido em 09/09, o par de golpes vale 79 pontos de taxa de
+   vitória entre o melhor e o pior par.
+
+   ⚠️ O MAPA É INDEXADO PELO ÍNDICE DO BOLO, nunca pela posição na seleção: assim, voltar e trocar
+   um dos seis NÃO invalida os golpes dos outros cinco -- e trocar a ORDEM não invalida nada.
+
+   ⚠️ E QUEM TEM ${'MAX_GOLPES'} OU MENOS DISPONÍVEIS NÃO VÊ TELA: escolher 3 entre 3 não é escolha, e
+   uma tela de uma resposta só é pior que tela nenhuma. É a MESMA regra da captura na jornada. */
+function proInstanciaDoBolo(i){
+  const p = (game.proBolo || [])[i];
+  if(!p) return null;
+  const inst = createInstance(p.id, p.level);
+  inst.shiny = !!p.shiny;   // o createInstance NÃO copia a flag -- armadilha da casa
+  return inst;
+}
+/* a fila: os índices (na ordem da escolha) que ainda precisam de tela */
+function proGolpesPendentes(){
+  const feitos = game.proGolpes || {};
+  return (game.proEscolhidos || []).filter(i => !Array.isArray(feitos[i]));
+}
+/* ⚠️ O PREENCHIMENTO AUTOMÁTICO roda ANTES de abrir a tela, e é ele que faz a fila encurtar: quem
+   tem poucos golpes leva todos e some da fila. Com ele depois, o jogador veria uma tela de uma
+   resposta só antes de o jogo perceber que não havia o que escolher. */
+function proPreencherOsSemEscolha(){
+  const feitos = { ...(game.proGolpes || {}) };
+  for(const i of (game.proEscolhidos || [])){
+    if(Array.isArray(feitos[i])) continue;
+    const inst = proInstanciaDoBolo(i);
+    if(!inst) continue;
+    const disp = ataquesEscolhiveis(inst);
+    if(disp.length <= MAX_GOLPES) feitos[i] = disp.slice(0, MAX_GOLPES);
+  }
+  game.proGolpes = feitos;
+}
+function proIrParaOsGolpes(){
+  const sel = game.proEscolhidos || [];
+  /* quem VALIDA é a ação, nunca o botão desabilitado */
+  if(sel.length !== PRO_ESCOLHE){
+    game.leagueTeamPickError = 'Escolha exatamente ' + PRO_ESCOLHE + ' pokémon.'; render(); return;
+  }
+  game.leagueTeamPickError = null;
+  proPreencherOsSemEscolha();
+  const fila = proGolpesPendentes();
+  /* ninguém precisa escolher nada ⇒ inscreve direto */
+  if(!fila.length){ inscreverNaLigaPro(); return; }
+  game.proGolpeDe = fila[0];
+  game.proGolpesMarcados = [];
+  game.screen = 'proGolpes';
+  render();
+}
+function proMarcarGolpe(golpe){
+  const m = game.proGolpesMarcados || (game.proGolpesMarcados = []);
+  const i = m.indexOf(golpe);
+  if(i >= 0) m.splice(i, 1);
+  else if(m.length < MAX_GOLPES) m.push(golpe);
+  render();
+}
+function proConfirmarGolpes(){
+  const idx = game.proGolpeDe;
+  const inst = proInstanciaDoBolo(idx);
+  if(!inst){ game.screen = 'leagueTeamPicker'; render(); return; }
+  const disp = ataquesEscolhiveis(inst);
+  /* A FUNÇÃO É A REGRA, a tela é a apresentação: revalida que os marcados são golpes que ele
+     realmente pode ter -- do mesmo jeito que o `confirmarAtaques` da jornada faz. */
+  const escolhidos = (game.proGolpesMarcados || []).filter(g => disp.indexOf(g) >= 0).slice(0, MAX_GOLPES);
+  if(escolhidos.length !== MAX_GOLPES) return;
+  game.proGolpes = { ...(game.proGolpes || {}), [idx]: escolhidos };
+  game.proGolpesMarcados = [];
+  const fila = proGolpesPendentes();
+  if(fila.length){ game.proGolpeDe = fila[0]; render(); return; }
+  inscreverNaLigaPro();
+}
+function proVoltarDosGolpes(){
+  /* ⚠️ O QUE JÁ FOI ESCOLHIDO FICA: o mapa é por índice do bolo, então voltar pra trocar um
+     pokémon não custa os golpes dos outros. */
+  game.proGolpesMarcados = [];
+  game.proGolpeDe = null;
+  game.screen = 'leagueTeamPicker';
+  render();
+}
+function renderProGolpes(){
+  const idx = game.proGolpeDe;
+  const inst = proInstanciaDoBolo(idx);
+  if(!inst) return `<div class="box"><p>Carregando...</p></div>`;
+  const disp = ataquesEscolhiveis(inst);
+  const marcados = game.proGolpesMarcados || [];
+  const faltam = proGolpesPendentes().length - 1;
+  const feitos = PRO_ESCOLHE - proGolpesPendentes().length;
+  return `
+  <div class="eyebrow">GOLPES DA LIGA PRO</div>
+  <div class="box cursor">
+    <div class="golpe-cab">
+      <span class="golpe-cab-sprite">${spriteHtml(inst,'sprite-md')}</span>
+      <span class="golpe-cab-txt">Escolha <strong>${MAX_GOLPES}</strong> golpes para
+        <strong>${escapeHtmlSafe(inst.name)}</strong> Lv.${inst.level} levar pra liga</span>
+    </div>
+    <p class="hint-text" style="text-align:center">${feitos} de ${PRO_ESCOLHE} prontos${faltam > 0 ? ' — mais ' + faltam + ' depois deste' : ''}</p>
+  </div>
+  ${game.leagueTeamPickError ? `<div class="box"><p class="error-text">${game.leagueTeamPickError}</p></div>` : ''}
+  <div class="box">
+    ${listaDeGolpesHtml(disp, marcados, 'proMarcarGolpe')}
+  </div>
+  <button class="btn success" ${marcados.length===MAX_GOLPES && !game.leagueSubmitting ? '' : 'disabled'} onclick="proConfirmarGolpes()">
+    ${game.leagueSubmitting ? 'Inscrevendo...' :
+      marcados.length===MAX_GOLPES ? (faltam > 0 ? 'Próximo pokémon ➜' : 'Inscrever o time ⚔️')
+      : 'Escolha ' + (MAX_GOLPES-marcados.length) + ' golpe' + (MAX_GOLPES-marcados.length===1?'':'s')}
+  </button>
+  <button class="btn secondary" onclick="proVoltarDosGolpes()">⬅ Voltar aos ${PRO_SORTEADOS}</button>`;
+}
 async function inscreverNaLigaPro(){
   if(!game.authUser){ game.leagueTeamPickError = 'Você precisa estar logado.'; render(); return; }
   const name = (game.trainerName || '').trim();
@@ -17357,11 +17493,18 @@ async function inscreverNaLigaPro(){
   if(sel.length !== PRO_ESCOLHE || sel.some(i => !bolo[i])){
     game.leagueTeamPickError = 'Escolha exatamente ' + PRO_ESCOLHE + ' pokémon.'; render(); return;
   }
+  /* ⚠️ OS GOLPES SÃO OS QUE O JOGADOR ESCOLHEU, e o `ataquesPadrao` é a REDE: um índice sem
+     escolha (chamada por fora, estado meio-gravado) cai nos três que mais batem em vez de entrar
+     sem golpe nenhum e lutar no motor de tipo. O servidor ainda valida cada um pelo
+     `golpesValidos`, que reconstrói o que a espécie aprende NAQUELE nível. */
+  const feitos = game.proGolpes || {};
   const time = sel.map(i => {
     const p = bolo[i];
     const inst = createInstance(p.id, p.level);
     inst.shiny = !!p.shiny;              // o createInstance NÃO copia a flag -- armadilha da casa
-    inst.ataques = ataquesPadrao(inst);
+    const disp = ataquesEscolhiveis(inst);
+    const meus = (feitos[i] || []).filter(g => disp.indexOf(g) >= 0).slice(0, MAX_GOLPES);
+    inst.ataques = meus.length ? meus : ataquesPadrao(inst);
     return inst;
   });
   game.leagueSubmitting = true;
@@ -17381,6 +17524,12 @@ async function inscreverNaLigaPro(){
       game.proFaixa = proFaixaDoCiclo(cycleEntry);
       game.proBolo = proSorteiaBolo(uid, cycleEntry.id, game.proFaixa);
       game.proEscolhidos = [];
+      /* ⚠️ E OS GOLPES VÃO JUNTO: eles são por índice do bolo, e o bolo é OUTRO. Mantidos, o
+         pokémon do índice 3 herdaria os golpes de um bicho que nem está mais na tela. */
+      game.proGolpes = {};
+      game.proGolpeDe = null;
+      game.proGolpesMarcados = [];
+      game.screen = 'leagueTeamPicker';
       render();
       return;
     }
@@ -18999,9 +19148,12 @@ function renderProPicker(){
       return `<button class="selecao-card" onclick="proAlternar(${i})">${dentro}</button>`;
     }).join('')}</div>
   </div>` : ''}
+  ${/* ⚠️ O BOTÃO NÃO INSCREVE MAIS: ele leva à ESCOLHA DOS GOLPES (23/09/2026, a pedido:
+       *"após escolher os 6 pokemons, o usuario vai precisar escolher os ataques de cada pokemon
+       tambem, até aquele level que ele esta, e ai sim a inscrição vai ser feita"*). */''}
   ${bolo ? `<button class="btn success" ${pronto && !game.leagueSubmitting ? '' : 'disabled'}
-     onclick="inscreverNaLigaPro()">${game.leagueSubmitting ? 'Inscrevendo...' :
-       pronto ? 'Inscrever estes ' + PRO_ESCOLHE + ' ⚔️' : 'Escolha ' + (PRO_ESCOLHE - sel.length) + ' pokémon'}</button>` : ''}
+     onclick="proIrParaOsGolpes()">${game.leagueSubmitting ? 'Inscrevendo...' :
+       pronto ? 'Escolher os golpes ➜' : 'Escolha ' + (PRO_ESCOLHE - sel.length) + ' pokémon'}</button>` : ''}
   <button class="btn secondary" onclick="game.screen='league';render();">⬅ Voltar</button>`;
 }
 function renderLeagueTeamPicker(){
@@ -19426,7 +19578,7 @@ function exigeTimeCampeao(incluirAposentados){
 }
 const CAMPOS_DA_CONTA = [
   'authUser','saveSlots','trainerName','rivalNameDefault','permanentPokedex','permanentShinyDex',
-  'accountEliteChampion','leagueWinsTotal','leagueLeaderboard','trainerBestStreak','trainerLastStreak',
+  'accountEliteChampion','leagueWinsTotal','leagueWinsPro','leagueLeaderboard','trainerBestStreak','trainerLastStreak',
   'shinyBonusExpiresAt','shinyPityCount','specialties','specialtyCounts','rareCandies','moedas',
   'inventario','equipados',
   'mewtwoLoanActive','mewtwoLoanCooldownUntil','mewtwoLoanUnlocked','mewtwoLoanReadyToClaim',
@@ -24289,6 +24441,16 @@ function seloDeChuvaClicavel(nome){
 /* ⚠️ O `terreno` ENTRA AQUI, senao a linha cai no ramo do GOLPE COMUM e sai como `-0 de HP` com
    o nome de um golpe que o pokemon nao tem -- foi exatamente isso que aconteceu com as tres linhas
    do congelamento em 16/09/2026, e foi o navegador que pegou. */
+/* ⚠️ O ÍCONE DA FRASE. Quase todos são fixos (o `ICONES_ESPECIAIS`), e o do TERRENO é a exceção:
+   ele sai na COR daquele terreno, pra casar com o galão que fica ao lado do nome do pokémon no
+   quadro do lutador (que é `selo('terreno','selo-g', corDoTerreno)`).
+   ⚠️ A COR SAI DA LINHA (`g.tt`), não do estado da tela -- e é isso que mantém o log certo quando
+   ele é relido dias depois. Linha antiga (sem o campo) cai no verde padrão, que é o mesmo
+   fallback que o quadro do lutador já usa. */
+function iconeDoEspecial(g){
+  if(g && g.x === 'terreno') return selo('terreno', '', TYPE_COLORS[g.tt] || COR_TERRENO_PADRAO);
+  return ICONES_ESPECIAIS[g.x] || '';
+}
 function ehGolpeEspecial(g){ return g && (g.x === 'terreno' || g.x === 'boom' || g.x === 'sono' || g.x === 'disable' || g.x === 'recover' || g.x === 'furia' || g.x === 'confusao' || g.x === 'furiadragao' || g.x === 'chuva' || g.x === "chuvafim" || g.x === "acordou" || g.x === "congelou" || g.x === "gelado" || g.x === "degelou" || g.x === "queimou" || g.x === "queima" || g.x === "dormindo" || g.x === "envenenou" || g.x === "veneno" || g.x === "paralisou" || g.x === "paralisado" || g.x === "estagio" || g.x === 'remoinho' || g.x === 'espadas' || g.x === 'pluma' || g.x === 'semSono' || g.x === 'pocao' || g.x === 'absorb'); }
 /* Os itens da mochila: o que cada um se chama na tela e quanto cura. O motor manda o id (g.g), o
    cliente escolhe a palavra -- mesmo caminho do MOVE_BY_TYPE. */
@@ -24968,7 +25130,7 @@ function avisoDoConfronto(m, passo){
       const f = seq[iFaixa];
       const nP = escapeHtmlSafe(m.player || ''), nE = escapeHtmlSafe(m.enemy || '');
       const doJ = f.q === 'p';
-      return (ICONES_ESPECIAIS[f.x] || '') + ' ' +
+      return iconeDoEspecial(f) + ' ' +
              pontuada(fraseDoEspecial(f, doJ ? nP : nE, doJ ? nE : nP, {}));
     }
   }
@@ -25085,7 +25247,7 @@ function avisoDoConfronto(m, passo){
   if(!g) return '';
   const nomeP = escapeHtmlSafe(m.player || ''), nomeE = escapeHtmlSafe(m.enemy || '');
   const doJogador = g.q === 'p';
-  return (ICONES_ESPECIAIS[g.x] || '') + ' ' +
+  return iconeDoEspecial(g) + ' ' +
          pontuada(fraseDoEspecial(g, doJogador ? nomeP : nomeE, doJogador ? nomeE : nomeP,
                          { especieDoAlvo: doJogador ? m.enemySpecies : m.playerSpecies }));
 }
@@ -25347,7 +25509,15 @@ function pausaDoEspecial(m){ return avisoDoConfronto(m, 0) ? PAUSA_LEITURA_ESPEC
 /* `leitura` é o mesmo caso por outro caminho: uma ABERTURA que não é o primeiro passo (a linha do
    sono, depois que o moribundo de quem dormiu passou pra frente dela). Os dois querem a mesma
    coisa -- um segundo pra a frase ser lida num passo que não move barra nenhuma. */
-function pausaDaFaixa(hit){ return (hit && (hit.faixa || hit.leitura)) ? PAUSA_LEITURA_ESPECIAL_MS : 0; }
+/* ⚠️ O BUFF DE TERRENO TEM PAUSA PRÓPRIA (2s, 23/09/2026, a pedido: *"aumente o tempo dessa
+   mensagem para 2s"*). Ela é SÓ dela: o `PAUSA_LEITURA_ESPECIAL_MS` vale pra TODA frase de
+   passiva (sono, gelo, queimadura, veneno, paralisia, as duas danças…), e subir a constante
+   deixaria toda batalha do jogo meio segundo mais lenta por frase -- o pedido é sobre ESTA. */
+const PAUSA_TERRENO_MS = 2000;
+function pausaDaFaixa(hit){
+  if(!hit || !(hit.faixa || hit.leitura)) return 0;
+  return hit.x === 'terreno' ? PAUSA_TERRENO_MS : PAUSA_LEITURA_ESPECIAL_MS;
+}
 function passosHtml(m){
   const golpes = sequenciaDoConfronto(m);   // a MESMA lista que a animação vai reproduzir
   if(!golpes.length) return '';
@@ -25383,7 +25553,7 @@ function passosHtml(m){
      o mesmo caso do "!!" que o `pontuada` já resolvia no aviso do meio da batalha. */
   const linhaEspecial = (g) => {
     const doJogador = g.q === 'p';
-    return `<div class="mlog-passo especial ${doJogador?'p':'e'}">${ICONES_ESPECIAIS[g.x]||''} ${
+    return `<div class="mlog-passo especial ${doJogador?'p':'e'}">${iconeDoEspecial(g)} ${
       pontoFinal(fraseDoEspecial(g, ladoHtml(doJogador), ladoHtml(!doJogador),
         { comGolpe:true, selo:true, especieDoAlvo: doJogador ? m.enemySpecies : m.playerSpecies }))}</div>`;
   };
@@ -28056,12 +28226,33 @@ function renderLeague(){
   const alreadyIn = registeringCycle ? !!registeringCycle.amIRegistered : false;
   const typeConfig = game.currentLeagueTypeConfig;
 
+  /* ⚠️ A DESCRIÇÃO DA PRO É UM RAMO PRÓPRIO (23/09/2026, reportado: *"na liga pro, muda a
+     descrição, esta aparecendo a descrição da Liga Classica"*). E a causa é estrutural: a Pro é um
+     tipo RESERVADO como a Clássica -- ela NÃO vive na coleção `leagueTypes` --, então ela não tem
+     `typeConfig` e caía no `else`, que é o bloco da Clássica. (A Trainers League não cai aqui: ela
+     tem tela própria.)
+     ⚠️ E O QUE ELA EXPLICA É SÓ O QUE A PRO TEM DE DIFERENTE -- o resto da mecânica é a MESMA da
+     Clássica, e é isso que o pedido diz (*"no mesmo modelo da Liga Classica mas explicando como
+     funciona a Liga Pro"*). Os números saem das constantes, nunca escritos na frase: eles
+     envelheceriam no primeiro ajuste, que é o defeito que o rótulo do revezamento da Corrida teve. */
+  const ehPro = game.currentLeagueTypeId === PRO_LEAGUE_TYPE;
   let body = `
   <div class="box">
     ${typeConfig ? `
     <h2>${typeConfig.icon||'🏆'} ${escapeHtmlSafe(typeConfig.name)}</h2>
     ${typeConfig.allowedTypes && typeConfig.allowedTypes.length>0 ? `<div class="league-type-filter-row">${typesHtml(typeConfig.allowedTypes)}</div>` : ''}
     <p>${escapeHtmlSafe(typeConfig.description||'')}</p>
+    ` : ehPro ? `
+    <h2>${selo('trofeu')} Liga Pro</h2>
+    <p>Aqui <strong>ninguém traz o time de casa</strong>: ao se inscrever você recebe
+       <strong>${PRO_SORTEADOS} pokémon sorteados</strong> e escolhe <strong>${PRO_ESCOLHE}</strong> deles —
+       e escolhe também os <strong>golpes</strong> de cada um. Cada jogador recebe os seus, e sair e
+       voltar não muda o sorteio.</p>
+    <p>Cada rodada tem uma <strong>faixa de nível</strong>, e ela gira a cada liga que acontece:
+       ${PRO_FAIXAS.map(x => x[0] + '–' + x[1]).join(', depois ')}, e volta ao começo.</p>
+    <p>Ela só forma com <strong>${REGULAR_LIGA_SIZE} treinadores</strong>. Faltando gente, ninguém perde a vez:
+       a fila continua e a faixa <strong>não</strong> gira — ela só anda quando uma liga acontece de verdade.</p>
+    <p>O vencedor ganha <strong>bônus shiny de 1h</strong>, como na Clássica.</p>
     ` : `
     <h2>⚔️ Liga Clássica</h2>
     <p>Ligas de 16 ou 8 jogadores de acordo com o número de jogadores inscritos. Cada jogador irá selecionar um time vencedor das 8 insígnias para participar.</p>
@@ -28069,11 +28260,17 @@ function renderLeague(){
     <p>O vencedor da liga clássica ganha <strong>bônus shiny de 1h</strong>, aumentando as chances de encontrar pokémon shiny selvagem em suas jornadas.</p>
     `}
   </div>
+  ${/* ⚠️ O CONTADOR DA PRO É SEPARADO (23/09/2026, a pedido). O `leagueWinsTotal` conta
+       QUALQUER liga -- Clássica, customizada, Trainers e Pro --, e o pedido é que a tela da Pro
+       mostre só as dela. O campo novo (`leagueWinsPro`) é incrementado ao lado do total, nunca no
+       lugar dele: o total continua alimentando o "Campeão da Liga" das conquistas e o histórico.
+       ⚠️ E NÃO HÁ RETROATIVO A RECUPERAR: a Liga Pro nasceu em 23/09 e o primeiro ciclo dela ainda
+       não fechou, então zero é a verdade pra todo mundo. */''}
   <div class="box league-wins-total-box">
     <span class="league-wins-total-icon">🏅</span>
     <div>
-      <div class="league-wins-total-num">${game.leagueWinsTotal||0}</div>
-      <div class="league-wins-total-label">Campeão da Liga Pokémon</div>
+      <div class="league-wins-total-num">${(ehPro ? game.leagueWinsPro : game.leagueWinsTotal)||0}</div>
+      <div class="league-wins-total-label">${ehPro ? 'Campeão da Liga Pro' : 'Campeão da Liga Pokémon'}</div>
     </div>
   </div>
   <div class="box">
@@ -35680,10 +35877,16 @@ function rankTrocarAba(qual, aba){
 function rankAbasHtml(qual, semanaId){
   const aba = rankAba[qual] || 'semana';
   const bt = (id, txt, dica) => `<button class="tower-rank-aba${aba === id ? ' on' : ''}" onclick="rankTrocarAba('${qual}','${id}')" title="${dica}">${txt}</button>`;
-  /* a data da segunda em que a semana começou -- ela diz QUAL semana o jogador está vendo */
-  const desde = semanaId ? ' <span class="rank-aba-desde">(desde ' + semanaId.slice(8,10) + '/' + semanaId.slice(5,7) + ')</span>' : '';
+  /* ⚠️ A DATA É O DOMINGO -- o PRAZO, não a data em que a semana começou. Ela dizia "desde
+     21/09", e isso é história: o que decide se vale a pena jogar hoje é QUANTO TEMPO ainda há,
+     não quando a contagem abriu.
+     ⚠️ E ELA SAI DO `trainersLeagueDateStrPlusDays`, nunca de uma conta minha: uma segunda regra
+     de data discordaria da do jogo em algum fuso, e o prazo da tela deixaria de ser o prazo que o
+     cron fecha. O `semanaId` é a SEGUNDA, então o fim é ela mais seis. */
+  const fimStr = semanaId ? trainersLeagueDateStrPlusDays(semanaId, 6) : '';
+  const ate = fimStr ? ' <span class="rank-aba-desde">(Até ' + fimStr.slice(8,10) + '/' + fimStr.slice(5,7) + ')</span>' : '';
   return `<div class="tower-rank-abas">${bt('semana','Da semana','Zera toda segunda-feira')}${bt('sempre','De sempre','O recorde de todos os tempos')}</div>`
-    + (aba === 'semana' ? `<p class="rank-aba-nota">🏅 Lidere a semana e ganhe Doces Raros${desde}</p>` : '');
+    + (aba === 'semana' ? `<p class="rank-aba-nota">🏅 Lidere até o fim da semana e ganhe Doces Raros${ate}</p>` : '');
 }
 /* ⚠️ QUAL LISTA DESENHAR sai daqui, e não de um `if` em cada tela: três cópias divergiriam no
    primeiro ajuste, e o sintoma seria uma tela mostrando a aba certa e outra a errada. */
@@ -40869,6 +41072,7 @@ function render(){
     case 'league': html = renderLeague(); break;
     case 'leagueTypesList': html = renderLeagueTypesList(); break;
     case 'leagueTeamPicker': html = renderLeagueTeamPicker(); break;
+    case 'proGolpes': html = renderProGolpes(); break;
     case 'trainersLeague': html = renderTrainersLeagueScreen(); break;
     case 'trainersLeagueTeamSwapPicker': html = renderTrainersLeagueTeamSwapPicker(); break;
     case 'trainersLeagueTerrainPicker': html = renderTrainersLeagueTerrainPicker(); break;

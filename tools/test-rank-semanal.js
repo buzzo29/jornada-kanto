@@ -330,15 +330,23 @@ console.log('\n=== A TELA: as duas abas ===');
   ok('só UMA está acesa', (h.match(/tower-rank-aba on"/g) || []).length === 1);
   ok('a padrão é a DA SEMANA', /tower-rank-aba on"[^>]*>Da semana</.test(h));
   ok('  e ela mostra a lista da SEMANA', JSON.stringify(nomes(h)) === '["CIDA"]', JSON.stringify(nomes(h)));
-  ok('  com a nota do prêmio', /Lidere a semana e ganhe Doces Raros/.test(h));
-  ok('  nomeando a segunda em que ela começou', /desde 21\/09/.test(h));
+  ok('  com a nota do prêmio', /Lidere até o fim da semana e ganhe Doces Raros/.test(h));
+  /* ⚠️ A DATA É O PRAZO (o DOMINGO), não a abertura: o que decide se vale jogar hoje é quanto
+     tempo ainda há. O `semanaId` é a segunda (21/09), então a nota tem que dizer 27/09.
+     ⚠️ E ELA É DERIVADA do `trainersLeagueDateStrPlusDays` -- a MESMA regra de data que o cron
+     usa pra fechar a semana. Uma conta própria discordaria dele em algum fuso, e a tela
+     anunciaria um prazo que o fechamento não pratica. */
+  ok('  nomeando o FIM da semana, não o começo', /Até 27\/09/.test(h) && !/desde 21\/09/.test(h),
+     (h.match(/\(([^)]*)\)<\/span>/) || [])[1]);
+  ok('  e a data vem da regra do jogo, não de uma conta própria',
+     /trainersLeagueDateStrPlusDays\(semanaId, 6\)/.test(HTML));
 
   S2.rankTrocarAba('pescaria', 'sempre');
   h = S2.pescariaRankHtml();
   ok('a aba de sempre mostra a lista de sempre', JSON.stringify(nomes(h)) === '["ANA"]', JSON.stringify(nomes(h)));
   ok('  e a acesa passou a ser ela', /tower-rank-aba on"[^>]*>De sempre</.test(h));
   /* ⚠️ A NOTA É SÓ DA SEMANA: no de sempre não há prêmio pra convidar, e ela mentiria. */
-  ok('  e a nota do prêmio SOME', !/Lidere a semana/.test(h));
+  ok('  e a nota do prêmio SOME', !/Lidere/.test(h) && !/Doces Raros/.test(h));
 
   /* ⚠️ A ABA É POR JOGO: a Pescaria e o Resgate são telas diferentes, e uma aba só faria a
      escolha de uma valer na outra. */

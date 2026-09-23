@@ -2885,7 +2885,17 @@ function doExchange(active, enemy, rng, diario){
   const anunciaTerreno = (p, q) => {
     if(!p || !p.terrainBuffed || p._terrenoAnunciado) return;
     p._terrenoAnunciado = true;
-    if(diario) diario.push({ q, x:'terreno', d:0, g: p.name });
+    /* ⚠️ O TIPO DO TERRENO VIAJA NA LINHA (`tt`, 23/09/2026, a pedido: *"deixe a cor do simbolo de
+       buff, da mesma cor que fica ao lado do nome do pokemon com o simbolo de buff"*).
+       ⚠️ ELE VIAJA NO REGISTRO e não é passado por parâmetro até a tela: o log é relido dias
+       depois, e ali o terreno da batalha corrente não é o daquele confronto. No registro, a cor
+       continua certa pra sempre -- e não custa nada, porque o `_terreno` JÁ está na instância
+       desde 17/09 (é o Poder Secreto que o lê).
+       ⚠️ O CAMPO É `tt` E NÃO `t`: o `t` do passo já quer dizer QUANTOS TAPAS (multi-tapa), e uma
+       string ali seria colisão de nome -- o tipo de coisa que não dá erro e some numa comparação.
+       ⚠️ E É O PRIMEIRO TIPO, que é exatamente o que o `terrainColor` usa: as duas pontas têm que
+       dar a MESMA cor, senão o selo da frase e o do quadro discordam na mesma tela. */
+    if(diario) diario.push({ q, x:'terreno', d:0, g: p.name, tt: (p._terreno || [])[0] || null });
   };
   anunciaTerreno(active, 'p');
   anunciaTerreno(enemy, 'e');
@@ -4120,8 +4130,13 @@ async function recordLeagueChampionWin(name, uid, typeId, isElite){
   if(uid){
     try{
       const extraFlags = typeId===TRAINERS_LEAGUE_TYPE ? { anyTrainersChampion: true, achievementFlagsMigrated: true } : {};
+      /* ⚠️ A PRO CONTA NOS DOIS (23/09/2026): o total alimenta as conquistas e o histórico, e o
+          é o recorte que a TELA da Pro mostra. Esta escrita é o espelho da do
+         cliente -- quando o navegador de outro jogador (ou ninguém) resolve a partida, é ela que
+         roda; se as duas divergirem, o contador fica certo em algumas contas e errado em outras. */
+      const proFlag = typeId===PRO_LEAGUE_TYPE ? { leagueWinsPro: admin.firestore.FieldValue.increment(1) } : {};
       await db.collection('users').doc(uid).set(
-        { leagueWinsTotal: admin.firestore.FieldValue.increment(1), ...extraFlags },
+        { leagueWinsTotal: admin.firestore.FieldValue.increment(1), ...proFlag, ...extraFlags },
         { merge: true }
       );
     } catch(e){ logger.error('Erro ao registrar campeão na conta:', e); }

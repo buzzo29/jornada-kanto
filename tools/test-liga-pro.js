@@ -297,7 +297,12 @@ console.log('\n=== A TELA ===');
      JSON.stringify(S.game.proEscolhidos));
   S.game.proEscolhidos = [0, 1, 2, 3, 4, 5];
   const h3 = S.renderProPicker();
-  ok('  e com seis o botao libera', /Inscrever estes 6/.test(h3));
+  /* ⚠️ O BOTÃO NÃO INSCREVE MAIS: desde 23/09 ele leva à escolha dos GOLPES, e a inscrição só
+     acontece no fim dela. A trava media o TEXTO antigo e caiu com o código certo -- ela passou a
+     cobrar o DESTINO, que é a regra. */
+  ok('  e com seis o botao libera', /Escolher os golpes/.test(h3),
+     (h3.match(/onclick="pro\w+\(\)/g) || []).join(' '));
+  ok('  e ele leva à escolha dos golpes', /onclick="proIrParaOsGolpes\(\)"/.test(h3));
   ok('  e os nao escolhidos viram <span>, nao botao apagado',
      (h3.match(/<span class="selecao-card off"/g) || []).length === 6,
      (h3.match(/<span class="selecao-card off"/g) || []).length);
@@ -311,7 +316,12 @@ console.log('\n=== A INSCRICAO ===');
   /* ⚠️ ELA GRAVA O MESMO DOCUMENTO DA CLASSICA (name, uid, code, ataques, specialties, elite):
      e isso que faz a Pro herdar o `drawCycle`, o `advanceLeague`, o ranking e o historico sem uma
      linha nova. O que muda e de onde o `code` vem. */
-  const bloco = (src.match(/async function inscreverNaLigaPro\(\)[\s\S]{0,3000}/) || [''])[0];
+  /* ⚠️ A FATIA VAI ATÉ O FIM DA FUNÇÃO, e não por offset fixo: com um teto de caracteres ela
+     envelheceu no primeiro comentário novo -- os campos `specialties`, `elite` e o contador saíram
+     da janela e TRÊS travas certas caíram, com o código certo. É a quarta vez desta família aqui. */
+  const iIns = src.indexOf('async function inscreverNaLigaPro()');
+  const fIns = src.indexOf('\nasync function ', iIns + 10);
+  const bloco = iIns >= 0 ? src.slice(iIns, fIns > iIns ? fIns : src.length) : '';
   ok('a trava tem o bloco pra ler', bloco.length > 500, bloco.length + ' chars');
   ['name', 'code:', 'uid', 'ataques:', 'specialties:', 'elite:'].forEach(c => {
     ok('  o documento leva `' + c.replace(':', '') + '`', bloco.indexOf(c) >= 0);
@@ -489,6 +499,7 @@ console.log('\n=== PONTA A PONTA (o drawCycle de verdade) ===');
     ok('a trava do painel varre a Liga Pro',
        /const tipos = \[CLASSIC_LEAGUE_TYPE, PRO_LEAGUE_TYPE\]/.test(srvSrc));
     await separacaoDaClassica(F, db, cod);
+    descricaoContadorEGolpes();
 
     console.log('\n' + (falhas ? falhas + ' FALHA(S)' : 'Tudo certo.') + '  (' + total + ' asserções)');
     process.exit(falhas ? 1 : 0);
@@ -633,7 +644,11 @@ async function separacaoDaClassica(F, db, cod){
   });
   /* ⚠️ E A INSCRIÇÃO DA PRO GRAVA NO CAMINHO DELA: ela é um caminho PRÓPRIO (não passa pelo
      `registerForLeague`), então nada garante por construção que ela use o tipo certo. */
-  const insPro = (src.match(/async function inscreverNaLigaPro\(\)[\s\S]{0,3000}/) || [''])[0];
+  /* ⚠️ ATÉ O FIM DA FUNÇÃO, pela mesma razão do bloco da inscrição: offset fixo envelhece no
+     primeiro comentário novo e derruba uma trava certa. */
+  const iPro = src.indexOf('async function inscreverNaLigaPro()');
+  const fPro = src.indexOf('\nasync function ', iPro + 10);
+  const insPro = iPro >= 0 ? src.slice(iPro, fPro > iPro ? fPro : src.length) : '';
   ok('a inscrição da Pro grava no caminho da PRO', insPro.length > 500 &&
      /registrantDocRef\(PRO_LEAGUE_TYPE, cycleEntry\.id, uid\)/.test(insPro) &&
      !/registrantDocRef\(CLASSIC_LEAGUE_TYPE/.test(insPro));
@@ -644,4 +659,218 @@ async function separacaoDaClassica(F, db, cod){
      /function renderLeagueTeamPicker\(\)\{\s*\n\s*if\(game\.currentLeagueTypeId === PRO_LEAGUE_TYPE\)\{ return renderProPicker\(\); \}/.test(src));
   ok('  e o abrir do picker também',
      /function openLeagueTeamPicker\(\)\{\s*\n\s*if\(game\.currentLeagueTypeId === PRO_LEAGUE_TYPE\)\{ abrirBoloDaLigaPro\(\); return; \}/.test(src));
+}
+
+/* ============================================================================
+   12) A DESCRIÇÃO, O CONTADOR E OS GOLPES (23/09/2026, a tarde)
+   ============================================================================ */
+function descricaoContadorEGolpes(){
+/* ⚠️ AS CONSTANTES SAO LIDAS DO SERVIDOR (`srv._X`): `const` no sandbox do cliente nao vira
+   propriedade do objeto -- a licao do `const` que nao vira global. O bloco 1 ja cobra que as duas
+   copias batem, entao comparar com a do servidor E comparar com a do cliente. */
+const P_SORT = srv._PRO_SORTEADOS, P_ESC = srv._PRO_ESCOLHE, P_FX = srv._PRO_FAIXAS;
+const P_TIPO = srv._PRO_LEAGUE_TYPE, C_TIPO = S.CLASSIC_LEAGUE_TYPE;
+const P_MIN = Number((srvSrc.match(/const REGULAR_LIGA_SIZE = (\d+);/) || [])[1]);
+console.log('\n=== A DESCRIÇÃO DA PRO ===');
+{
+  /* ⚠️ A PRO É UM TIPO RESERVADO (como a Clássica): ela NÃO vive na coleção `leagueTypes`, então
+     não tem `typeConfig` -- e caía no `else` do render, que é o bloco da CLÁSSICA. Reportado:
+     *"na liga pro, muda a descrição, esta aparecendo a descrição da Liga Classica"*. */
+  const g = S.__getGame();
+  g.leagueScreenLoading = false;
+  g.leagueData = { cycles: [] };
+  g.currentLeagueTypeConfig = null;
+
+  g.currentLeagueTypeId = P_TIPO; S.__setGame(g);
+  const hPro = S.renderLeague();
+  g.currentLeagueTypeId = C_TIPO; S.__setGame(g);
+  const hCla = S.renderLeague();
+
+  ok('a Pro tem título próprio', hPro.indexOf('Liga Pro</h2>') > 0);
+  ok('  e NÃO mostra a descrição da Clássica', hPro.indexOf('Ligas de 16 ou 8 jogadores') < 0);
+  ok('  (e a Clássica continua com a dela)', hCla.indexOf('Ligas de 16 ou 8 jogadores') > 0);
+  ok('  e a Clássica não ganhou a da Pro', hCla.indexOf('ninguém traz o time de casa') < 0);
+
+  /* ⚠️ OS NÚMEROS SÃO DERIVADOS das constantes, nunca escritos na frase: um número fixo
+     envelheceria no primeiro ajuste -- é o defeito que o rótulo do revezamento da Corrida teve. */
+  ok('  ela diz quantos são sorteados', hPro.indexOf('<strong>' + P_SORT + ' pokémon sorteados</strong>') > 0);
+  ok('  e quantos ele escolhe', hPro.indexOf('<strong>' + P_ESC + '</strong>') > 0);
+  ok('  e as TRÊS faixas, na ordem',
+     hPro.indexOf(P_FX.map(x => x[0] + '–' + x[1]).join(', depois ')) > 0,
+     P_FX.map(x => x[0] + '–' + x[1]).join(', depois '));
+  ok('  e o mínimo pra formar', hPro.indexOf('<strong>' + P_MIN + ' treinadores</strong>') > 0);
+  /* ⚠️ E ELA EXPLICA O QUE A PRO TEM DE DIFERENTE, não a mecânica inteira: o resto é igual à
+     Clássica, e é isso que o pedido diz (*"no mesmo modelo da Liga Classica"*). */
+  ok('  e ela nomeia a escolha dos golpes', /golpes<\/strong>/.test(hPro));
+  ok('  e o prêmio (o mesmo da Clássica)', /bônus shiny de 1h/.test(hPro) && /bônus shiny de 1h/.test(hCla));
+  /* ⚠️ E A PROVA DE QUE ELES SAO DERIVADOS E LER O CODIGO: comparar o HTML com a constante nao
+     distingue um numero escrito a mao (hoje 12 e 12). E a mesma tecnica que a conta da Pokedex
+     precisou -- ali 250+1 dava 251 e o fixo passava. */
+  {
+    const ini = src.indexOf('const ehPro = game.currentLeagueTypeId === PRO_LEAGUE_TYPE;');
+    /* ⚠️ A FATIA VAI ATÉ O `league-wins-total-label`, e não por OFFSET: fatia por offset envelhece
+       no primeiro comentário novo -- foi o que derrubou quatro travas deste arquivo hoje. */
+    const bl = ini < 0 ? '' : src.slice(ini, src.indexOf('league-wins-total-label', ini));
+    ok('  (a trava tem o bloco da descrição pra ler)', bl.length > 800, bl.length + ' chars');
+    ok('  e os números vêm das CONSTANTES, não escritos na frase',
+       bl.indexOf('${PRO_SORTEADOS}') > 0 && bl.indexOf('${PRO_ESCOLHE}') > 0
+       && bl.indexOf('PRO_FAIXAS.map') > 0 && bl.indexOf('${REGULAR_LIGA_SIZE}') > 0);
+  }
+}
+
+console.log('\n=== O CONTADOR SEPARADO ===');
+{
+  const g = S.__getGame();
+  g.leagueScreenLoading = false; g.leagueData = { cycles: [] }; g.currentLeagueTypeConfig = null;
+  g.leagueWinsTotal = 7; g.leagueWinsPro = 2;
+
+  g.currentLeagueTypeId = P_TIPO; S.__setGame(g);
+  const hPro = S.renderLeague();
+  g.currentLeagueTypeId = C_TIPO; S.__setGame(g);
+  const hCla = S.renderLeague();
+  const num = h => (h.match(/league-wins-total-num">(\d+)</) || [])[1];
+  const rot = h => (h.match(/league-wins-total-label">([^<]*)</) || [])[1];
+
+  ok('a Pro mostra SÓ as vitórias dela', num(hPro) === '2', num(hPro));
+  ok('  com rótulo próprio', rot(hPro) === 'Campeão da Liga Pro', rot(hPro));
+  ok('a Clássica continua no total', num(hCla) === '7', num(hCla));
+  ok('  com o rótulo de sempre', rot(hCla) === 'Campeão da Liga Pokémon', rot(hCla));
+
+  /* ⚠️ E A PRO CONTA NOS DOIS: o total alimenta as conquistas e o histórico, e o recorte é só a
+     TELA. Contando só num deles, ou a conquista deixaria de ver a Pro, ou a tela dela mostraria
+     as vitórias da Clássica junto -- que é o que o pedido tira. */
+  const bloco = (src.match(/async function recordLeagueChampionWin\([\s\S]*?\n\}/) || [''])[0];
+  ok('  (a trava tem o bloco pra ler)', bloco.length > 300, bloco.length + ' chars');
+  ok('  o cliente conta nos DOIS', /leagueWinsTotal: firebase\.firestore\.FieldValue\.increment\(1\)/.test(bloco)
+     && /typeId===PRO_LEAGUE_TYPE \? \{ leagueWinsPro/.test(bloco));
+  /* ⚠️ E O SERVIDOR É O ESPELHO: quando o navegador de outro jogador (ou ninguém) resolve a
+     partida, é ele que roda -- se os dois divergirem, o contador fica certo em umas contas e
+     errado em outras. */
+  const blocoSrv = (srvSrc.match(/async function recordLeagueChampionWin\([\s\S]*?\n\}/) || [''])[0];
+  ok('  e o servidor também', /typeId===PRO_LEAGUE_TYPE \? \{ leagueWinsPro/.test(blocoSrv), blocoSrv.length + ' chars');
+  /* ⚠️ E O CAMPO ENTRA NO `CAMPOS_DA_CONTA`: sem isso o `resetGame` o apagaria ao abrir um save. */
+  ok('  e o campo está no CAMPOS_DA_CONTA', /'leagueWinsTotal','leagueWinsPro'/.test(src));
+}
+
+console.log('\n=== OS GOLPES, DEPOIS DOS 6 ===');
+{
+  /* Pedido: *"após escolher os 6 pokemons, o usuario vai precisar escolher os ataques de cada
+     pokemon tambem, até aquele level que ele esta, e ai sim a inscrição vai ser feita"*. */
+  const g = S.__getGame();
+  g.authUser = { uid: 'u1' }; g.trainerName = 'Buzzo';
+  g.currentLeagueTypeId = P_TIPO;
+  g.proCicloId = 'c1'; g.proFaixa = 0;
+  g.proBolo = S.proSorteiaBolo('u1', 'c1', 0);
+  g.proEscolhidos = [0, 1, 2, 3, 4, 5];
+  g.proGolpes = {}; g.proGolpesMarcados = [];
+  S.__setGame(g);
+
+  /* ⚠️ A INSCRIÇÃO É DUBLADA: ela fala com o Firestore, que não existe aqui -- o que se mede é o
+     FLUXO de tela, e o time que chega nela. */
+  let inscrito = null;
+  const original = S.inscreverNaLigaPro;
+  S.inscreverNaLigaPro = function(){
+    const feitos = S.__getGame().proGolpes || {};
+    inscrito = (S.__getGame().proEscolhidos || []).map(i => {
+      const inst = S.proInstanciaDoBolo(i);
+      const disp = S.ataquesEscolhiveis(inst);
+      const meus = (feitos[i] || []).filter(x => disp.indexOf(x) >= 0).slice(0, S.MAX_GOLPES);
+      inst.ataques = meus.length ? meus : S.ataquesPadrao(inst);
+      return inst;
+    });
+    const gg = S.__getGame(); gg.screen = 'league'; S.__setGame(gg);
+  };
+
+  S.proIrParaOsGolpes();
+  ok('o botão dos 6 leva à tela de GOLPES', S.__getGame().screen === 'proGolpes', S.__getGame().screen);
+
+  /* ⚠️ QUEM TEM <= MAX_GOLPES DISPONÍVEIS NÃO VÊ TELA: escolher 3 entre 3 não é escolha, e uma
+     tela de uma resposta só é pior que tela nenhuma. É a MESMA regra da captura na jornada. */
+  const semEscolha = (S.__getGame().proEscolhidos || [])
+    .filter(i => S.ataquesEscolhiveis(S.proInstanciaDoBolo(i)).length <= S.MAX_GOLPES);
+  ok('  e quem tinha ' + S.MAX_GOLPES + ' ou menos já veio preenchido',
+     semEscolha.every(i => Array.isArray(S.__getGame().proGolpes[i])),
+     semEscolha.length + ' preenchido(s) sem tela');
+
+  const h = S.renderProGolpes();
+  const alvo = S.proInstanciaDoBolo(S.__getGame().proGolpeDe);
+  ok('  a tela nomeia o pokémon', h.indexOf(alvo.name) > 0);
+  ok('  e o NÍVEL dele (a lista é até aquele nível)', h.indexOf('Lv.' + alvo.level) > 0);
+  ok('  e mostra as opções', (h.match(/golpe-opcao/g) || []).length === S.ataquesEscolhiveis(alvo).length,
+     (h.match(/golpe-opcao/g) || []).length + ' de ' + S.ataquesEscolhiveis(alvo).length);
+  ok('  e diz quantos faltam', /de \d+ prontos/.test(h), (h.match(/hint-text[^>]*>([^<]*)/) || [])[1]);
+  /* ⚠️ A LISTA É A MESMA DA TELA DA JORNADA (o `listaDeGolpesHtml`): as telas de golpe da casa
+     dividem os blocos desde 09/09, e montadas em separado elas já tinham divergido no texto. */
+  ok('  e a lista é a MESMA função da tela da jornada',
+     /function listaDeGolpesHtml\(disp, marcados, fnMarcar\)/.test(src)
+     && /listaDeGolpesHtml\(disp, marcados, 'marcarAtaque'\)/.test(src)
+     && /listaDeGolpesHtml\(disp, marcados, 'proMarcarGolpe'\)/.test(src));
+
+  const dispAlvo = S.ataquesEscolhiveis(alvo);
+  dispAlvo.slice(0, S.MAX_GOLPES + 2).forEach(x => S.proMarcarGolpe(x));
+  ok('  o teto é ' + S.MAX_GOLPES, (S.__getGame().proGolpesMarcados || []).length === S.MAX_GOLPES,
+     (S.__getGame().proGolpesMarcados || []).length + ' marcados');
+
+  /* ⚠️ QUEM VALIDA É A AÇÃO: com menos que MAX_GOLPES ela recusa, e golpe forjado ela filtra */
+  {
+    const gg = S.__getGame(); const antes = gg.proGolpeDe;
+    gg.proGolpesMarcados = [dispAlvo[0]]; S.__setGame(gg);
+    S.proConfirmarGolpes();
+    ok('  e a AÇÃO recusa com menos que ' + S.MAX_GOLPES,
+       S.__getGame().proGolpeDe === antes && !S.__getGame().proGolpes[antes]);
+    const g2 = S.__getGame();
+    g2.proGolpesMarcados = ['hyperbeam', 'naoexiste', dispAlvo[0]]; S.__setGame(g2);
+    S.proConfirmarGolpes();
+    ok('  e golpe que ele NÃO aprende é filtrado (não confirma)',
+       S.__getGame().proGolpeDe === antes && !S.__getGame().proGolpes[antes]);
+  }
+
+  let telas = 0;
+  while (S.__getGame().screen === 'proGolpes' && telas++ < 20) {
+    const inst = S.proInstanciaDoBolo(S.__getGame().proGolpeDe);
+    const d = S.ataquesEscolhiveis(inst);
+    const gg = S.__getGame(); gg.proGolpesMarcados = []; S.__setGame(gg);
+    d.slice(0, S.MAX_GOLPES).forEach(x => S.proMarcarGolpe(x));
+    S.proConfirmarGolpes();
+  }
+  ok('a fila termina e INSCREVE', S.__getGame().screen === 'league' && !!inscrito, S.__getGame().screen);
+  ok('  com os SEIS', (inscrito || []).length === P_ESC);
+  ok('  todos com ' + S.MAX_GOLPES + ' golpes', (inscrito || []).every(p => (p.ataques || []).length === S.MAX_GOLPES),
+     JSON.stringify((inscrito || []).map(p => (p.ataques || []).length)));
+  /* ⚠️ E SÃO OS QUE O JOGADOR ESCOLHEU, não o `ataquesPadrao`: a escolha é a mais forte do jogo
+     (o par de golpes vale 79 pontos de taxa de vitória entre o melhor e o pior par).
+     ⚠️ ISSO SE PROVA LENDO O CÓDIGO, e não pelo `inscrito` acima: a inscrição de verdade fala com
+     o Firestore, então ela é DUBLADA aqui -- e uma asserção sobre o dublê mede a cópia da regra
+     que o próprio teste escreveu. É a armadilha do *"trava que pergunta à função que ela mede"*,
+     e foi a conferência de acusação que a pegou (o defeito passava em branco). */
+  {
+    const i0 = src.indexOf('async function inscreverNaLigaPro(');
+    const bl = i0 < 0 ? '' : src.slice(i0, src.indexOf('\nasync function ', i0 + 10));
+    ok('  (a trava tem a inscrição pra ler)', bl.length > 500, bl.length + ' chars');
+    ok('  e ela usa os golpes ESCOLHIDOS, com o automático só de rede',
+       /inst\.ataques = meus\.length \? meus : ataquesPadrao\(inst\)/.test(bl));
+    ok('  e ela filtra pelo que a espécie aprende NAQUELE nível',
+       /const disp = ataquesEscolhiveis\(inst\)/.test(bl)
+       && /\(feitos\[i\] \|\| \[\]\)\.filter\(g => disp\.indexOf\(g\) >= 0\)\.slice\(0, MAX_GOLPES\)/.test(bl));
+  }
+  /* ⚠️ E TODO GOLPE É DA ESPÉCIE NAQUELE NÍVEL -- o servidor valida isso pelo `golpesValidos`, e um
+     golpe que ele não aprende sumiria lá, deixando o time com menos golpe que a tela mostrou. */
+  ok('  e todo golpe é da espécie NAQUELE nível', (inscrito || []).every(p => {
+    const disp = S.ataquesDisponiveis(p.speciesId, p.level);
+    return (p.ataques || []).every(x => disp.indexOf(x) >= 0);
+  }));
+
+  /* ⚠️ O MAPA É POR ÍNDICE DO BOLO: voltar e trocar um dos seis NÃO invalida os golpes dos outros */
+  {
+    const guardados = JSON.stringify(S.__getGame().proGolpes);
+    S.proVoltarDosGolpes();
+    ok('  e o Voltar leva ao picker', S.__getGame().screen === 'leagueTeamPicker', S.__getGame().screen);
+    ok('  e o que já foi escolhido FICA', JSON.stringify(S.__getGame().proGolpes) === guardados);
+  }
+  /* ⚠️ E O CICLO QUE VIRA LIMPA OS GOLPES: eles são por índice do bolo, e o bolo passa a ser OUTRO */
+  ok('  e o ciclo que vira limpa os golpes junto',
+     /game\.proBolo = proSorteiaBolo\(uid, cycleEntry\.id, game\.proFaixa\);[\s\S]{0,400}game\.proGolpes = \{\};/.test(src));
+
+  S.inscreverNaLigaPro = original;
+}
 }
