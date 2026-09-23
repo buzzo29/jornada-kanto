@@ -1919,11 +1919,23 @@ console.log('\n=== AS 28 FORMAS DO UNOWN (16/09/2026) ===');
      projeto, nos MESMOS tres lugares. Todo lugar que recola o shiny tem que recolar a letra. */
   {
     const txt = require('fs').readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
-    const blocos = [...txt.matchAll(/const inst = createInstance\([^)]*\);[\s\S]{0,420}?return inst;/g)].map(m => m[0]);
-    const comShiny = blocos.filter(b => /\.shiny/.test(b));
-    const semLetra = comShiny.filter(b => !/\.unown/.test(b) && !/bits\[2\]/.test(b) && !/shinyIdx/.test(b));
+    const blocos = [...txt.matchAll(/const inst = createInstance\([^)]*\);[\s\S]{0,420}?return inst;/g)];
+    /* ⚠️ A LIGA PRO É A EXCEÇÃO NOMEADA, e ela não é esquecimento: o time dela viaja como
+       CÓDIGO (`especie:nivel:shiny`), e o código de time NÃO CARREGA LETRA -- é a regra que o
+       próprio jogo já pratica em toda liga e no online. Por isso o bolo dela também não sorteia
+       letra: sorteando, a TELA mostraria um Unown Q que a partida lutaria como A, que é a tela
+       prometendo o que a batalha não entrega. Ela é nomeada aqui em vez de a regra ser afrouxada
+       -- o próximo clone que nascer continua tendo que recolar. */
+    const inicioPro = txt.indexOf('async function inscreverNaLigaPro(');
+    const fimPro = txt.indexOf('\nasync function ', inicioPro + 10);
+    ok('  a trava achou onde a exceção mora', inicioPro > 0 && fimPro > inicioPro);
+    const foraDaPro = blocos.filter(m => !(m.index > inicioPro && m.index < fimPro)).map(m => m[0]);
+    const comShiny = foraDaPro.filter(b => /.shiny/.test(b));
+    const semLetra = comShiny.filter(b => !/.unown/.test(b) && !/bits[2]/.test(b) && !/shinyIdx/.test(b));
     ok('todo clone que recola o shiny recola a letra', semLetra.length === 0,
        semLetra.length + ' sem: ' + semLetra.map(b => b.slice(0, 60)).join(' /// '));
+    ok('  e a Liga Pro é a Única exceção', blocos.length - foraDaPro.length === 1,
+       (blocos.length - foraDaPro.length) + ' dentro do inscreverNaLigaPro');
     ok('e sao os quatro conhecidos', comShiny.length >= 4, comShiny.length + ' clones');
   }
 

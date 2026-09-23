@@ -3881,6 +3881,167 @@ function computeNextScheduledTime(){
   return target.getTime();
 }
 const CLASSIC_LEAGUE_TYPE = 'classic';
+/* ⚠️ AS TRES FUNCOES DE FORMA SAO PORTADAS DO CLIENTE, e nao uma tabela nova: elas sao DERIVADAS
+   do `EVOLUTIONS` e do `EVOLUTION_CHOICES`, que ja estao duplicados aqui. O servidor precisa delas
+   pra REFAZER o bolo da Liga Pro e validar os seis escolhidos -- sem isso a validacao teria que
+   confiar no cliente, e a inscricao da liga e escrita DIRETA (nao passa por callable nenhuma). */
+function especieNoNivel(id, nivel){
+  let cur = id, guarda = 0;
+  while(EVOLUTIONS[cur] && nivel >= EVOLUTIONS[cur].level && guarda++ < 10){
+    if(EVOLUTION_CHOICES[cur]) break;
+    cur = EVOLUTIONS[cur].into;
+  }
+  return cur;
+}
+let _nivelDeChegada = null;
+function nivelDeChegada(id){
+  if(!_nivelDeChegada){
+    _nivelDeChegada = {};
+    for(const de in EVOLUTIONS){ _nivelDeChegada[EVOLUTIONS[de].into] = { de, level: EVOLUTIONS[de].level }; }
+    for(const de in EVOLUTION_CHOICES){
+      EVOLUTION_CHOICES[de].forEach(d => {
+        if(EVOLUTIONS[de]) _nivelDeChegada[d] = { de, level: EVOLUTIONS[de].level };
+      });
+    }
+  }
+  return _nivelDeChegada[id] || null;
+}
+function formaNoNivel(id, nivel){
+  let cur = id, guarda = 0;
+  let pai = nivelDeChegada(cur);
+  while(pai && nivel < pai.level && guarda++ < 10){ cur = pai.de; pai = nivelDeChegada(cur); }
+  return especieNoNivel(cur, nivel);
+}
+/* a lista de lendarios do cliente (LEGENDARY_BIRDS + as bestas + Lugia e Ho-oh) -- aqui ela so
+   serve pra tirar do bolo da Liga Pro, entao vai escrita */
+const LENDARIOS_DO_JOGO = ['articuno','zapdos','moltres','mewtwo','raikou','entei','suicune','lugia','hooh','celebi'];
+/* ====================================================================================
+   LIGA PRO (23/09/2026) -- a liga em que o TIME e sorteado, nao trazido de casa.
+
+   Pedida assim: *"crie a liga Pro, onde quando o usuario se inscrever, sera sorteado 12 pokemons
+   e ele tera que escolher 6 desses 12 para ir para a liga ... a mecanica e toda igual a Liga
+   Classica, a unica diferenca e na hora de se inscrever"*.
+
+   ⚠️ E É ISSO QUE A FAZ CABER SEM UMA LIGA NOVA: a Classica ja e generica por `typeId` --
+   `scheduleDocRef('pro')`, `cycleDocRef('pro', id)`, o `drawCycle`, o `advanceLeague`, o ranking e
+   o historico funcionam identicos. O que a Pro acrescenta e a INSCRICAO e a FAIXA que gira.
+
+   A FAIXA DE NIVEL GIRA A CADA CAMPEONATO REALIZADO: 55-70 -> 15-30 -> 35-50 -> 55-70...
+   ⚠️ E ela so anda quando a liga ACONTECE. Foi o pedido ao pe da letra: *"se nao fechar 8
+   treinadores, continua os que estao na fila ate fechar no minimo 8 treinadores, so quando
+   acontecer um campeonato de uma faixa de level, que o troca a faixa de level"*.
+   O minimo de 8 ja e o `REGULAR_LIGA_SIZE` da Classica -- com menos, o `drawCycle` forma ZERO
+   ligas e manda todo mundo pro `leftover`, que vai pro ciclo seguinte. Nao foi preciso inventar
+   regra nenhuma: o comportamento pedido ja era o que a Classica faz. */
+const PRO_LEAGUE_TYPE = 'pro';
+const PRO_FAIXAS = [[55, 70], [15, 30], [35, 50]];
+const PRO_SORTEADOS = 12;      // quantos aparecem na tela
+const PRO_ESCOLHE = 6;         // quantos entram na liga
+const PRO_CHANCE_SHINY = 0.05; // por pokemon, como pedido
+function proFaixaDe(idx){ return PRO_FAIXAS[((idx | 0) % PRO_FAIXAS.length + PRO_FAIXAS.length) % PRO_FAIXAS.length]; }
+
+/* ⚠️ A SEMENTE E `uid + cycleId`, e isso e a trava anti re-sorteio -- a mesma do encontro
+   selvagem. Com `Math.random` bastaria sair da tela e voltar ate vir um bolo bom; semeada assim, o
+   mesmo jogador no mesmo ciclo ve SEMPRE os mesmos 12, e so o ciclo seguinte muda.
+   ⚠️ E E ELA QUE PERMITE O SERVIDOR VALIDAR DE GRACA: como o sorteio e deterministico, o
+   `drawCycle` REFAZ o bolo de cada inscrito e descarta quem mandou pokemon que nao estava nele.
+   Sem isso, um cliente forjado inscreveria seis Mewtwo -- e a inscricao da liga e escrita DIRETA
+   do cliente (nao passa por callable nenhuma), entao nao ha outro lugar pra conferir.
+   A validacao acontece onde o dado e USADO, nao onde ele e escrito, e custa aritmetica. */
+function proSementeDoBolo(uid, cycleId){ return 'pro-' + uid + '-' + cycleId; }
+/* ⚠️ A FAIXA E CARIMBADA NA ENTRADA DO CICLO, nao lida da agenda na hora.
+   Se ela fosse lida da agenda, ela MUDARIA debaixo de quem ja se inscreveu: o jogador escolhe os 6
+   dele vendo uma faixa, a liga anterior termina, a faixa gira, e ele entra numa liga de outro
+   nivel. Carimbada no ciclo, ela e estavel do primeiro inscrito ao sorteio.
+   ⚠️ E CICLO SEM O CAMPO CAI NA FAIXA 0, que e a primeira pedida (55-70): a Liga Pro nasce hoje,
+   entao nao ha ciclo antigo -- mas a rede existe pelo mesmo motivo que log velho nao pode sumir. */
+function proFaixaDoCiclo(entry){ return (entry && entry.proFaixa != null) ? entry.proFaixa : 0; }
+
+/* ⚠️ O SERVIDOR REFAZ O BOLO DE CADA INSCRITO E DESCARTA QUEM MANDOU O QUE NAO ESTAVA NELE.
+   Isto nao e zelo: a inscricao da liga e ESCRITA DIRETA do cliente (o `registerForLeague` grava no
+   Firestore, nao passa por callable nenhuma), e a regra so confere que o documento e do proprio
+   uid. Sem esta validacao, um cliente forjado inscreveria seis Mewtwo nivel 70 -- e na Classica
+   isso nao acontece porque o time tem que SER da conta (8 insignias), mas aqui o time e sorteado.
+   ⚠️ E ELA E DE GRACA PORQUE O SORTEIO E DETERMINISTICO: a semente e `uid + cycleId`, entao o
+   servidor refaz o mesmo bolo com aritmetica, sem uma leitura a mais. A validacao acontece onde o
+   dado e USADO (o sorteio do chaveamento), e nao onde ele e escrito.
+   ⚠️ O QUE ELA COBRA E A TRINCA especie+nivel+shiny: so a especie deixaria passar um Charizard
+   Lv.70 num bolo que tinha um Lv.56, e so o nivel deixaria passar um shiny que nao foi sorteado.
+   ⚠️ E O TAMANHO TAMBEM: um time de 12 seria o dobro do que a liga permite.
+   Inscrito que nao passa e DESCARTADO do sorteio -- ele nao entra na liga e nao ocupa vaga. */
+function proInscricaoValida(reg, cycleEntry){
+  if(!reg || !reg.uid || !reg.code) return false;
+  let time;
+  try{ time = decodeTeamCode(reg.code); } catch(e){ return false; }
+  if(!Array.isArray(time) || time.length !== PRO_ESCOLHE) return false;
+  const bolo = proSorteiaBolo(reg.uid, cycleEntry.id, proFaixaDoCiclo(cycleEntry));
+  const chave = (p) => p.speciesId + ':' + p.level + ':' + (p.shiny ? 1 : 0);
+  const doBolo = bolo.map(p => p.id + ':' + p.level + ':' + (p.shiny ? 1 : 0));
+  const usados = [];
+  for(const p of time){
+    const k = chave(p);
+    /* ⚠️ E CADA UM SO PODE SER USADO UMA VEZ: sem isto daria pra inscrever seis copias do melhor
+       do bolo, que e justamente o que o sorteio existe pra impedir. */
+    if(doBolo.indexOf(k) < 0 || usados.indexOf(k) >= 0) return false;
+    usados.push(k);
+  }
+  return true;
+}
+
+
+/* Os 12 sorteados. Devolve [{ id, level, shiny }], todos ja na FORMA que existe naquele nivel.
+   ⚠️ A FORMA TEM QUE BATER COM O NIVEL (o pedido: *"se foi sorteado um charmander e a liga e
+   entre o level 35 e 50, ele vai ter que ser ou um charmeleon se o level for 35 ou charizard se
+   for entre 36 e 50"*), e quem faz isso e o `formaNoNivel` -- que DESCE a linha ate a forma que
+   existe ali e so entao deixa o `especieNoNivel` subir. E a licao da VIGILIA, relatada em
+   14/09/2026 com print (*"esta aparecendo Charizard no level 24"*): o `especieNoNivel` sozinho so
+   anda PRA FRENTE, e quem sorteia da dex inteira nao tem piso nenhum pra barrar.
+   ⚠️ SEM REPETIR LINHA EVOLUTIVA, e nao so "especie diferente": duas entradas diferentes viram a
+   MESMA forma no mesmo nivel (charmander e charmeleon no 40 sao os dois Charizard). Pela linha,
+   os 12 saem distintos por construcao -- e e a mesma regra do encontro selvagem e da Selecao.
+   ⚠️ SEM LENDARIO NEM INTOCAVEL, a convencao da casa: um Mewtwo no bolo decidiria a liga
+   sozinho, e os intocaveis sao justamente os que o jogador nao tem como ter. */
+function proSorteiaBolo(uid, cycleId, faixaIdx, especies){
+  const [minL, maxL] = proFaixaDe(faixaIdx);
+  const rng = makeSeededRng(proSementeDoBolo(uid, cycleId));
+  const pool = (especies || Object.keys(SPECIES)).filter(id =>
+    proForaDoBolo().indexOf(id) < 0);
+  const bolo = [], linhas = [];
+  let guarda = 0;
+  while(bolo.length < PRO_SORTEADOS && guarda++ < 2000){
+    const base = pool[Math.floor(rng() * pool.length)];
+    const level = minL + Math.floor(rng() * (maxL - minL + 1));
+    const id = formaNoNivel(base, level);
+    const raiz = raizDaLinha(id);
+    if(linhas.indexOf(raiz) >= 0) continue;
+    linhas.push(raiz);
+    /* ⚠️ O SHINY E LIDO SEMPRE, inclusive de quem vai ser descartado pela linha repetida? NAO:
+       ele e lido DEPOIS do `continue`, de proposito. Assim a sequencia do rng depende so de quem
+       ENTROU no bolo, e o bolo continua o mesmo se um dia a lista de exclusoes mudar de ordem. */
+    bolo.push({ id, level, shiny: rng() < PRO_CHANCE_SHINY });
+  }
+  return bolo;
+}
+/* ⚠️ QUEM NUNCA ENTRA NO BOLO -- e e FUNCAO, nao const: o  do servidor e
+   declarado 4.500 linhas DEPOIS deste bloco, e  tem zona morta temporal. Escrito como
+   constante, o arquivo inteiro morria ao carregar com "Cannot access before initialization" -- e
+   a QUINTA vez que esta armadilha aparece neste projeto (as quatro telas de revelacao em 09/09,
+   o aviso de versao em 13/09, o cycleTime da liga em 18/09, o raizDaLinha do item em 21/09).
+   Funcao e imune a ordem, e o resultado e guardado na primeira chamada. */
+let _proForaDoBolo = null;
+function proForaDoBolo(){
+  if(!_proForaDoBolo){
+    /* ⚠️ O MEWTWO PRECISA SER NOMEADO: ele NAO esta no  do jogo (aquela lista e a dos
+       oito CAPTURAVEIS em rota) nem no  (que sao os tres que ninguem pega).
+       Quem o cobre no encontro selvagem e o , que nao existe no servidor.
+       Sem esta linha ele entrava no bolo e decidia a liga sozinho -- conferido, a primeira versao
+       deixava passar. */
+    _proForaDoBolo = ESPECIES_INTOCAVEIS.concat(LENDARIOS_DO_JOGO, ['mewtwo', 'mew'])
+      .filter((x, i, a) => a.indexOf(x) === i);
+  }
+  return _proForaDoBolo;
+}
+
 function leagueTypesCollRef(){ return db.collection('leagueTypes'); }
 function scheduleDocRef(typeId){ return db.collection('leagues').doc('schedule_'+(typeId||CLASSIC_LEAGUE_TYPE)); }
 function cycleDocRef(typeId, cycleId){ return db.collection('leagueCycles').doc((typeId||CLASSIC_LEAGUE_TYPE)+'__'+cycleId); }
@@ -3893,6 +4054,14 @@ function sanitizeForDocId(str){
 async function listActiveLeagueTypes(){
   const classicEntry = { id: CLASSIC_LEAGUE_TYPE, name: 'Liga Clássica', description: null, allowedTypes: null, allowedTerrains: null, botFillEnabled: false };
   const types = [classicEntry];
+  /* ⚠️ A LIGA PRO E UM TIPO RESERVADO, como a Classica -- ela nao vive na colecao `leagueTypes`
+     (que e das ligas CUSTOMIZADAS, criadas por jogador). Sem esta entrada o cron nunca a avancaria:
+     ele itera exatamente esta lista, e uma liga que ninguem avanca fica presa em `registering`
+     pra sempre -- inscricoes abertas, sorteio que nunca acontece.
+     `botFillEnabled: false` de proposito: o minimo de 8 E a regra da Pro (com menos, a fila espera
+     e a faixa nao troca), e encher com bot desfaria isso. */
+  const proEntry = { id: PRO_LEAGUE_TYPE, name: 'Liga Pro', description: null, allowedTypes: null, allowedTerrains: null, botFillEnabled: false };
+  types.push(proEntry);
   try{
     const snap = await leagueTypesCollRef().get();
     snap.forEach(doc=>{
@@ -3901,6 +4070,8 @@ async function listActiveLeagueTypes(){
         classicEntry.botFillEnabled = !!data.botFillEnabled;
         return;
       }
+      /* o id `pro` e reservado: um doc com esse nome na colecao nao vira uma liga a parte */
+      if(doc.id === PRO_LEAGUE_TYPE) return;
       if(data.active){ types.push({ id: doc.id, ...data }); }
     });
   } catch(e){ logger.error('Erro ao carregar tipos de liga customizados:', e); }
@@ -4145,7 +4316,21 @@ async function drawCycle(typeId, cycleEntry, leagueTypeConfig){
   if(!claimed) return false;
   try{
     const regSnap = await registrantsCollRef(typeId, cycleEntry.id).get();
-    const registrants = regSnap.docs.map(d=>d.data());
+    let registrants = regSnap.docs.map(d=>d.data());
+    /* ⚠️ NA LIGA PRO O SERVIDOR REFAZ O BOLO DE CADA UM antes de sortear o chaveamento: o sorteio
+       e deterministico (uid + cycleId), entao ele consegue conferir sem guardar nada. E o UNICO
+       ponto do caminho em que da pra conferir, porque a inscricao de liga e escrita DIRETA do
+       cliente -- nao passa por callable nenhuma.
+       ⚠️ E ESTE COMENTARIO NAO CITA O NOME DA FUNCAO de proposito: a trava le esta linha, e um
+       comentario que reproduz o que ela procura ESCONDE o defeito dela. Ja aconteceu sete vezes
+       neste projeto -- seis vezes acusando o que estava certo, e uma escondendo um defeito real. */
+    if(typeId === PRO_LEAGUE_TYPE){
+      const antes = registrants.length;
+      registrants = registrants.filter(r => proInscricaoValida(r, cycleEntry));
+      if(registrants.length !== antes){
+        logger.warn('Liga Pro: ' + (antes - registrants.length) + ' inscricao(oes) descartada(s) por nao bater com o bolo sorteado.');
+      }
+    }
     // prioriza por ordem de inscrição -- quem chegou primeiro tem prioridade de entrar no sorteio dessa
     // rodada; quem sobrar (por ter chegado por último) é quem fica de fora e vai pra próxima Liga
     const ordered = registrants.slice().sort((a,b)=>(a.registeredAt||0)-(b.registeredAt||0));
@@ -4226,8 +4411,19 @@ async function drawCycle(typeId, cycleEntry, leagueTypeConfig){
       const data = snap.exists ? snap.data() : { cycles: [], updatedAt: Date.now() };
       const entry = data.cycles.find(c=>c.id===cycleEntry.id);
       if(entry){ entry.status = leagues.length>0 ? 'drawn' : 'complete'; }
+      /* ⚠️ A FAIXA DA LIGA PRO SO ANDA QUANDO A LIGA ACONTECE (`leagues.length > 0`), e isso e o
+         pedido ao pe da letra: *"so quando acontecer um campeonato de uma faixa de level, que o
+         troca a faixa de level"*. Com menos de 8 inscritos o `drawCycle` forma ZERO ligas e manda
+         todo mundo pro `leftover` -- ou seja a fila continua na MESMA faixa, que e o que se pediu.
+         ⚠️ E O PROXIMO CICLO JA NASCE CARIMBADO com a faixa nova: quem se inscrever nele ve o bolo
+         certo desde o primeiro. */
+      if(typeId === PRO_LEAGUE_TYPE && leagues.length > 0){
+        data.proFaixaIdx = ((data.proFaixaIdx | 0) + 1) % PRO_FAIXAS.length;
+      }
       if(!data.cycles.some(c=>c.id===nextCycleId)){
-        data.cycles.push({ id: nextCycleId, scheduledTime: nextScheduledTime, status:'registering' });
+        const novo = { id: nextCycleId, scheduledTime: nextScheduledTime, status:'registering' };
+        if(typeId === PRO_LEAGUE_TYPE){ novo.proFaixa = (data.proFaixaIdx | 0) % PRO_FAIXAS.length; }
+        data.cycles.push(novo);
       }
       data.updatedAt = Date.now();
       tx.set(scheduleDocRef(typeId), data);
@@ -5503,7 +5699,12 @@ async function adminCicloAberto(){
    `isAccountActiveInLeague`; aqui é a versão de servidor, e ela varre os tipos TODOS (a trava é da
    CONTA, não de um tipo de liga). */
 async function adminAtivoEmAlgumaLiga(uid, pularCicloAberto){
-  const tipos = [CLASSIC_LEAGUE_TYPE];
+  /* ⚠️ OS TIPOS RESERVADOS ENTRAM NA MAO: a Classica e a Pro NAO vivem na colecao `leagueTypes`
+     (que e das customizadas), entao sem esta linha a trava nao veria a Pro -- e o painel deixaria
+     inscrever na Classica alguem que esta disputando um chaveamento da Pro, que e exatamente o que
+     ela existe pra impedir. A Pro usa a MESMA estrutura da Classica (`schedule_pro`,
+     `leagueCycles/pro__<id>`, `registrants`), entao ela e alcancada de graca. */
+  const tipos = [CLASSIC_LEAGUE_TYPE, PRO_LEAGUE_TYPE];
   try{
     const ts = await leagueTypesCollRef().get();
     ts.forEach(d => { if(d.id !== CLASSIC_LEAGUE_TYPE) tipos.push(d.id); });
@@ -5944,6 +6145,23 @@ exports._golpesEspeciais = { AUTODESTRUICAO, SONIFEROS, METRONOMO, CHANCE_AUTODE
 exports._apagarSubcolecoes = apagarSubcolecoes;   // testado direto: no ar ele roda dentro da poda
 exports._SUBCOLECOES_DO_CICLO = SUBCOLECOES_DO_CICLO;
 exports._reconciliarContadorDeInscritos = reconciliarContadorDeInscritos;
+/* LIGA PRO -- exportados pra a trava comparar o bolo dos dois motores: o cliente sorteia e o
+   servidor REFAZ pra validar, entao os dois tem que dar exatamente o mesmo. */
+exports._proSorteiaBolo = proSorteiaBolo;
+exports._proInscricaoValida = proInscricaoValida;
+exports._proFaixaDoCiclo = proFaixaDoCiclo;
+exports._PRO_LEAGUE_TYPE = PRO_LEAGUE_TYPE;
+exports._PRO_ESCOLHE = PRO_ESCOLHE;
+exports._PRO_SORTEADOS = PRO_SORTEADOS;
+exports._PRO_FAIXAS = PRO_FAIXAS;
+exports._proFaixaDe = proFaixaDe;
+exports._proForaDoBolo = proForaDoBolo;
+exports._formaNoNivel = formaNoNivel;
+/* ⚠️ O CICLO DE LIGA E TESTADO DIRETO: no ar estas duas rodam dentro do cron, e a Liga Pro precisa
+   provar que ela passa pelos MESMOS pontos da Classica (o chaveamento, o ranking e o historico sao
+   genericos por `typeId` -- o que a trava cobra e que o caminho dela chega neles). */
+exports._drawCycle = drawCycle;
+exports._advanceLeagueOnceForType = advanceLeagueOnceForType;
 exports._trainersLeagueSplitGroups = trainersLeagueSplitGroups;
 exports._trainersLeagueGatherEligibleCodes = trainersLeagueGatherEligibleCodesForUid;
 exports._decodeTeamCode = decodeTeamCode;

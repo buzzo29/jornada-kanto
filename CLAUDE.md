@@ -19126,6 +19126,169 @@ o último elemento da tela, 304×52px, sem rolagem lateral.
 **No motor, nada:** `MOTOR 079861051846 / DIARIO cfedb1fdcab2`, idêntico. **Os 8 defeitos religados
 acusam** (2 a 7 falhas cada).
 
+## A LIGA PRO: O TIME É SORTEADO (23/09/2026)
+
+Pedida assim: *"crie a liga Pro, onde quando o usuário se inscrever, será sorteado 12 pokemons e ele
+terá que escolher 6 desses 12 para ir para a liga ... primeiro vai acontecer uma liga de pokemons
+entre os levels 55 e 70 ... depois 15-30 ... depois 35-50 ... cada pokemon tem 5% de chance de ser
+shiny, e os pokemons nao podem se repetir ... sempre respeitar a evolução de acordo com o level ...
+se nao fechar 8 treinadores, continua os que estao na fila até fechar no minimo 8 treinadores, só
+quando acontecer um campeonato de uma faixa de level, que o troca a faixa ... a mecanica é toda
+igual a Liga Classica, a unica diferença é na hora de se inscrever ... criar ranking e histórico
+igual a Liga Classica"*.
+
+### ⚠️ QUASE NADA FOI ESCRITO, E ISSO É O QUE A ARQUITETURA DE LIGA JÁ TINHA COMPRADO
+
+**Toda a máquina de liga já é genérica por `typeId`** — a agenda (`scheduleDocRef`), o ciclo
+(`cycleDocRef`), os inscritos, o `drawCycle`, as fases, o `advanceLeague`, o ranking global
+(`champions_alltime_<typeId>`), o histórico pessoal e as notificações. A Pro não ganhou UM caminho
+novo: ela ganhou **uma tela de inscrição e uma faixa que gira**.
+
+**E as duas regras que pareciam novas já existiam:**
+
+| o pedido | quem já fazia |
+|---|---|
+| *"se não fechar 8 treinadores, continua os que estão na fila"* | o `REGULAR_LIGA_SIZE` (8): com menos, o `drawCycle` forma **ZERO** ligas e todo mundo cai no `leftover` |
+| *"só quando acontecer um campeonato é que troca a faixa"* | é a mesma condição — a faixa anda em `leagues.length > 0` |
+
+**Medido de ponta a ponta** (8 inscritos + 1 forjado, contra o Firestore em memória): 1 liga formada,
+os 8 no chaveamento, o forjado **descartado**, a faixa indo de 55-70 pra 15-30. E com **5** inscritos:
+**zero ligas**, a faixa **parada** e os 5 no `leftover`.
+
+### ⚠️ O BOLO É SEMEADO POR `uid + cycleId`, E ISSO RESOLVE DUAS COISAS DE UMA VEZ
+
+1. **sair e voltar devolve o MESMO bolo** — a trava anti re-sorteio, a mesma do encontro selvagem
+   (sem ela bastaria fechar a aba até vir um bolo bom);
+2. **o servidor consegue VALIDAR sem guardar nada**: ele REFAZ o bolo de cada inscrito no
+   `drawCycle` e descarta quem não bate.
+
+**⚠️ E O SEGUNDO É OBRIGATÓRIO, não é zelo: a inscrição de liga é ESCRITA DIRETA DO CLIENTE.** Não há
+callable pra guardar — a regra do Firestore só confere que o documento é do próprio uid. Na Clássica
+isso não é problema porque o time tem que **SER da conta**; aqui ele é sorteado, então sem a
+validação **um cliente forjado inscreveria seis Mewtwo**. Medido: as 9 tentativas de forja são
+recusadas (seis Mewtwo, o mesmo do bolo 6×, 5 em vez de 6, os 12 inteiros, nível adulterado, shiny
+adulterado, o bolo de outro treinador, o de outro ciclo, código lixo).
+
+- **A CHAVE É A TRINCA espécie+nível+shiny**: só a espécie deixaria passar um Charizard Lv.70 num
+  bolo que tinha um Lv.56; só o nível deixaria passar um shiny que não foi sorteado.
+- **E cada um do bolo só vale UMA vez** — sem isso daria pra inscrever seis cópias do melhor.
+
+### O BOLO: 12 FORMAS, NA FAIXA, SEM REPETIR LINHA
+
+- **⚠️ SEM REPETIR LINHA EVOLUTIVA, e não "espécie diferente"**: charmander e charmeleon no nível 40
+  são os **dois** Charizard. Pela linha os 12 saem distintos por construção — é a regra que o
+  encontro selvagem e os guardiões da Montanha já usam.
+- **⚠️ E A FORMA TEM QUE BATER COM O NÍVEL** (`formaNoNivel`), que é o pedido ao pé da letra. **É a
+  lição da Vigília** (14/09/2026, relatada como *"está aparecendo Charizard no level 24"*): o
+  `especieNoNivel` sozinho só anda **PRA FRENTE**, e quem sorteia da dex inteira não tem piso
+  nenhum pra barrar. Lá isso alcançava **28,5%** dos sorteados.
+- **⚠️ O MEWTWO PRECISOU SER NOMEADO**: ele **NÃO** está no `LENDARIOS` (a lista dos capturáveis em
+  rota) **nem** no `ESPECIES_INTOCAVEIS` (os três que ninguém pega) — a primeira versão o deixava
+  passar, e ele decidiria o draft sozinho.
+- **O shiny é 5% por pokémon**, medido: **4,92% em 60.000 sorteios** (−0,9σ).
+- **As três faixas dão três jogos diferentes**: 132 / 181 / 166 espécies alcançáveis em cada uma.
+
+### ⚠️ A ROTAÇÃO É CARIMBADA NO CICLO, NUNCA LIDA NA HORA
+
+A faixa vive no ciclo (`proFaixa`), e não é consultada quando o jogador abre a tela: lida da agenda
+na hora, ela **mudaria debaixo de quem já se inscreveu** — o bolo dele é da faixa antiga e a liga
+aconteceria noutra.
+
+- **Os DOIS lados carimbam**: o servidor ao criar o ciclo seguinte e o cliente no
+  `ensureRegisteringCycle`. Sem o do cliente, um ciclo criado pelo primeiro inscrito nasceria sempre
+  na faixa 0 e a rotação **nunca sairia do lugar**.
+- **⚠️ E A INSCRIÇÃO RE-SORTEIA SE O CICLO VIROU** enquanto o jogador escolhia: o `cycleId` entra na
+  semente, então inscrever ali mandaria um time que o servidor descarta **em silêncio**.
+
+### A TELA
+
+- **⚠️ O CARD É O DO DRAFT DA SELEÇÃO**, e a grade também: é o MESMO problema (escolher alguns entre
+  doze sorteados, olhando o sprite), resolvido lá em 21/09. O `.btn` da casa — que foi a primeira
+  tentativa — é `display:block;width:100%`: ele **esticou cada card pra a largura inteira** e os doze
+  viraram uma pilha. É a mesma armadilha que o card do parceiro da Pescaria já custou.
+- **⚠️ E O `spriteHtml` PRECISA DO `speciesId`**, enquanto o bolo guarda `id`: passando o objeto cru
+  o sprite saía **VAZIO em todos os doze**, sem erro nenhum — foi o navegador que pegou.
+- **A FAIXA DA RODADA APARECE NAS DUAS TELAS** (a da Liga e o picker), derivada da constante: ela é a
+  informação que decide a inscrição, e sem ela o jogador só descobre o nível depois de abrir o
+  picker. Um texto fixo mentiria na volta seguinte — a família do *"Revezamento · 900 m"*.
+- **Quem recusa é a AÇÃO**: o sétimo escolhido e o índice forjado, com vaga sobrando ou não.
+
+**Medido a 320px, no navegador:** o picker em **305×992px** com 12 cards de **78×127**, os shiny com
+estrela e os escolhidos com a faixa "1º/2º/3º"; a tela da Liga em **305×1078px** com os cinco `<h2>`
+em uma linha; a lista de ligas com o botão da Pro em **281×94px**. **Nenhuma rola pro lado e nenhum
+nome trunca.**
+
+### O RANKING E O HISTÓRICO
+
+A Pro tem o **Top 10** e o **"Suas últimas Ligas"** — os dois quadros que são POR LIGA —, e o
+"Rever" dela leva ao chaveamento **dela** (a linha carrega o `leagueTypeId`).
+
+**⚠️ O QUADRO GLOBAL ("🌐 Últimas Ligas") É DA CLÁSSICA, e não é esquecimento:** o
+`loadGlobalLeagueHistory` varre o `schedule_classic` e o botão dele **crava** o tipo clássico em
+cada linha — ele nunca foi por liga, e a Trainers League também não o tem.
+
+**⚠️ E ELE VAZAVA — um defeito ANTERIOR, que a Pro tornou visível.** O campo é carregado só quando a
+Clássica abre e **nunca é limpo**: quem abria a Clássica e depois outra liga via o histórico DELA ali
+dentro, com o "Rever" levando ao chaveamento da Clássica. Alcançava as ligas customizadas desde
+sempre. Hoje o render só o desenha na Clássica.
+
+### ⚠️ E A TRAVA DO PAINEL NÃO CONHECIA A PRO
+
+O `adminAtivoEmAlgumaLiga` monta a lista com `[CLASSIC]` + os tipos da coleção `leagueTypes` — e a
+Pro é um tipo **RESERVADO**, como a Clássica: ela não vive na coleção. Sem ela na lista, **o painel
+deixaria inscrever na Clássica alguém que está disputando um chaveamento da Pro**, que é exatamente
+o que aquela trava existe pra impedir.
+
+**⚠️ E O TIPO PRECISA ENTRAR NO `listActiveLeagueTypes`, que é a trava mais importante do arquivo de
+teste:** o cron itera exatamente aquela lista, e uma liga que ninguém avança fica presa em
+`registering` **pra sempre** — inscrições abertas e sorteio que nunca chega.
+`botFillEnabled: false` de propósito: o mínimo de 8 **É** a regra da Pro, e encher com bot a
+desfaria.
+
+### ⚠️ O UNOWN DA PRO É A EXCEÇÃO NOMEADA DA TRAVA DOS CLONES
+
+A trava de 21/09 cobra que **todo clone que recola o `shiny` recole a letra do Unown** — e ela pegou
+o `inscreverNaLigaPro` na primeira bateria. O caso é legítimo: o time da liga viaja como **CÓDIGO**
+(`especie:nivel:shiny`), e **código de time não carrega letra** — é a regra que toda liga e o online
+já praticam. Por isso o bolo também **não sorteia letra**: sorteando, a tela mostraria um Unown Q que
+a partida lutaria como A.
+
+Ela foi **NOMEADA** na trava (com um caso cobrando que ela seja a ÚNICA), em vez de a regra ser
+afrouxada — o próximo clone que nascer continua tendo que recolar.
+
+### O QUE ISSO CUSTOU AO MOTOR: NADA
+
+`MOTOR 5481ce57abca / DIARIO a4c6725aa4aa`, idêntico em 900 batalhas semeadas. A Liga Pro é uma tela
+de inscrição e uma constante que gira.
+
+**⚠️ E UMA CONSEQUÊNCIA REGISTRADA:** na tela de comparação de treinadores, um título da Pro cai em
+**"Ligas especiais"** (o `else out.custom` do `compareTrainers`, que é o balaio das customizadas). O
+**total** está certo; o rótulo cobre bem a Pro, e por isso não foi mexido.
+
+`tools/test-liga-pro.js` tranca **93 pontas**: as constantes e a ordem das faixas, o bolo em 600
+sorteios nos dois motores, a semente (mesma = mesmo bolo; outro ciclo/treinador = outro; outra faixa
+= as MESMAS linhas noutra forma), as 9 forjas recusadas, a faixa carimbada e andando só quando a liga
+acontece, o tipo na lista do cron, a tela, a inscrição, o ranking/histórico comparados com a Clássica
+lado a lado, e o **PONTA A PONTA** com 8 e com 5 inscritos.
+**Conferido que os 35 defeitos religados acusam** (1 a 7 falhas cada).
+
+### AS QUATRO LIÇÕES QUE SAÍRAM DAQUI
+
+1. **⚠️ TDZ PELA QUINTA VEZ NO PROJETO.** A lista de exclusão nasceu como
+   `const PRO_FORA_DO_BOLO = ESPECIES_INTOCAVEIS...` na linha 3987, e o `ESPECIES_INTOCAVEIS` mora na
+   8549 — `ReferenceError` no carregamento, ou seja **o servidor inteiro morria**. Virou função
+   memoizada, que é imune à ordem.
+2. **⚠️ UM COMENTÁRIO ESCONDEU UM DEFEITO REAL — e é a SÉTIMA vez desta família.** As seis anteriores
+   foram comentários **acusando o que estava certo**; esta foi o contrário: o comentário do
+   `drawCycle` citava o nome da função de validação, e a trava lia uma **fatia** que o incluía — com
+   a validação removida ela **passou em branco**. Hoje ela lê a LINHA do `filter`, e o comentário não
+   reproduz o nome.
+3. **⚠️ TRÊS ÂNCORAS DO MEU SCRIPT DE ACUSAÇÃO ESTAVAM ERRADAS**, e "âncora não casou" se lê igual a
+   "a trava passou em branco". O script confere que **o arquivo MUDOU** antes de rodar o teste.
+4. **⚠️ E DUAS TRAVAS MINHAS NÃO DISTINGUIAM NADA**: a do índice forjado testava com os **seis
+   cheios**, onde quem barra é o TETO; e a dos quadros cobrava **igualdade** com a Clássica, o que
+   passaria de volta com o vazamento do histórico global. As duas só apareceram na conferência.
+
 ## Frontend
 
 - **A tela de notificações é uma caixa de entrada**: lista de títulos em cima, corpo do que está

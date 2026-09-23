@@ -16151,6 +16151,104 @@ function shuffleWithSeed(arr, seedStr){
 }
 
 const CLASSIC_LEAGUE_TYPE = 'classic';
+/* no cliente a lista de lendarios ja existe com outro nome -- o nucleo le esta */
+const LENDARIOS_DO_JOGO = LENDARIOS;
+/* ====================================================================================
+   LIGA PRO (23/09/2026) -- a liga em que o TIME e sorteado, nao trazido de casa.
+
+   Pedida assim: *"crie a liga Pro, onde quando o usuario se inscrever, sera sorteado 12 pokemons
+   e ele tera que escolher 6 desses 12 para ir para a liga ... a mecanica e toda igual a Liga
+   Classica, a unica diferenca e na hora de se inscrever"*.
+
+   ⚠️ E É ISSO QUE A FAZ CABER SEM UMA LIGA NOVA: a Classica ja e generica por `typeId` --
+   `scheduleDocRef('pro')`, `cycleDocRef('pro', id)`, o `drawCycle`, o `advanceLeague`, o ranking e
+   o historico funcionam identicos. O que a Pro acrescenta e a INSCRICAO e a FAIXA que gira.
+
+   A FAIXA DE NIVEL GIRA A CADA CAMPEONATO REALIZADO: 55-70 -> 15-30 -> 35-50 -> 55-70...
+   ⚠️ E ela so anda quando a liga ACONTECE. Foi o pedido ao pe da letra: *"se nao fechar 8
+   treinadores, continua os que estao na fila ate fechar no minimo 8 treinadores, so quando
+   acontecer um campeonato de uma faixa de level, que o troca a faixa de level"*.
+   O minimo de 8 ja e o `REGULAR_LIGA_SIZE` da Classica -- com menos, o `drawCycle` forma ZERO
+   ligas e manda todo mundo pro `leftover`, que vai pro ciclo seguinte. Nao foi preciso inventar
+   regra nenhuma: o comportamento pedido ja era o que a Classica faz. */
+const PRO_LEAGUE_TYPE = 'pro';
+const PRO_FAIXAS = [[55, 70], [15, 30], [35, 50]];
+const PRO_SORTEADOS = 12;      // quantos aparecem na tela
+const PRO_ESCOLHE = 6;         // quantos entram na liga
+const PRO_CHANCE_SHINY = 0.05; // por pokemon, como pedido
+function proFaixaDe(idx){ return PRO_FAIXAS[((idx | 0) % PRO_FAIXAS.length + PRO_FAIXAS.length) % PRO_FAIXAS.length]; }
+
+/* ⚠️ A SEMENTE E `uid + cycleId`, e isso e a trava anti re-sorteio -- a mesma do encontro
+   selvagem. Com `Math.random` bastaria sair da tela e voltar ate vir um bolo bom; semeada assim, o
+   mesmo jogador no mesmo ciclo ve SEMPRE os mesmos 12, e so o ciclo seguinte muda.
+   ⚠️ E E ELA QUE PERMITE O SERVIDOR VALIDAR DE GRACA: como o sorteio e deterministico, o
+   `drawCycle` REFAZ o bolo de cada inscrito e descarta quem mandou pokemon que nao estava nele.
+   Sem isso, um cliente forjado inscreveria seis Mewtwo -- e a inscricao da liga e escrita DIRETA
+   do cliente (nao passa por callable nenhuma), entao nao ha outro lugar pra conferir.
+   A validacao acontece onde o dado e USADO, nao onde ele e escrito, e custa aritmetica. */
+function proSementeDoBolo(uid, cycleId){ return 'pro-' + uid + '-' + cycleId; }
+/* ⚠️ A FAIXA E CARIMBADA NA ENTRADA DO CICLO, nao lida da agenda na hora.
+   Se ela fosse lida da agenda, ela MUDARIA debaixo de quem ja se inscreveu: o jogador escolhe os 6
+   dele vendo uma faixa, a liga anterior termina, a faixa gira, e ele entra numa liga de outro
+   nivel. Carimbada no ciclo, ela e estavel do primeiro inscrito ao sorteio.
+   ⚠️ E CICLO SEM O CAMPO CAI NA FAIXA 0, que e a primeira pedida (55-70): a Liga Pro nasce hoje,
+   entao nao ha ciclo antigo -- mas a rede existe pelo mesmo motivo que log velho nao pode sumir. */
+function proFaixaDoCiclo(entry){ return (entry && entry.proFaixa != null) ? entry.proFaixa : 0; }
+
+
+/* Os 12 sorteados. Devolve [{ id, level, shiny }], todos ja na FORMA que existe naquele nivel.
+   ⚠️ A FORMA TEM QUE BATER COM O NIVEL (o pedido: *"se foi sorteado um charmander e a liga e
+   entre o level 35 e 50, ele vai ter que ser ou um charmeleon se o level for 35 ou charizard se
+   for entre 36 e 50"*), e quem faz isso e o `formaNoNivel` -- que DESCE a linha ate a forma que
+   existe ali e so entao deixa o `especieNoNivel` subir. E a licao da VIGILIA, relatada em
+   14/09/2026 com print (*"esta aparecendo Charizard no level 24"*): o `especieNoNivel` sozinho so
+   anda PRA FRENTE, e quem sorteia da dex inteira nao tem piso nenhum pra barrar.
+   ⚠️ SEM REPETIR LINHA EVOLUTIVA, e nao so "especie diferente": duas entradas diferentes viram a
+   MESMA forma no mesmo nivel (charmander e charmeleon no 40 sao os dois Charizard). Pela linha,
+   os 12 saem distintos por construcao -- e e a mesma regra do encontro selvagem e da Selecao.
+   ⚠️ SEM LENDARIO NEM INTOCAVEL, a convencao da casa: um Mewtwo no bolo decidiria a liga
+   sozinho, e os intocaveis sao justamente os que o jogador nao tem como ter. */
+function proSorteiaBolo(uid, cycleId, faixaIdx, especies){
+  const [minL, maxL] = proFaixaDe(faixaIdx);
+  const rng = makeSeededRng(proSementeDoBolo(uid, cycleId));
+  const pool = (especies || Object.keys(SPECIES)).filter(id =>
+    proForaDoBolo().indexOf(id) < 0);
+  const bolo = [], linhas = [];
+  let guarda = 0;
+  while(bolo.length < PRO_SORTEADOS && guarda++ < 2000){
+    const base = pool[Math.floor(rng() * pool.length)];
+    const level = minL + Math.floor(rng() * (maxL - minL + 1));
+    const id = formaNoNivel(base, level);
+    const raiz = raizDaLinha(id);
+    if(linhas.indexOf(raiz) >= 0) continue;
+    linhas.push(raiz);
+    /* ⚠️ O SHINY E LIDO SEMPRE, inclusive de quem vai ser descartado pela linha repetida? NAO:
+       ele e lido DEPOIS do `continue`, de proposito. Assim a sequencia do rng depende so de quem
+       ENTROU no bolo, e o bolo continua o mesmo se um dia a lista de exclusoes mudar de ordem. */
+    bolo.push({ id, level, shiny: rng() < PRO_CHANCE_SHINY });
+  }
+  return bolo;
+}
+/* ⚠️ QUEM NUNCA ENTRA NO BOLO -- e e FUNCAO, nao const: o  do servidor e
+   declarado 4.500 linhas DEPOIS deste bloco, e  tem zona morta temporal. Escrito como
+   constante, o arquivo inteiro morria ao carregar com "Cannot access before initialization" -- e
+   a QUINTA vez que esta armadilha aparece neste projeto (as quatro telas de revelacao em 09/09,
+   o aviso de versao em 13/09, o cycleTime da liga em 18/09, o raizDaLinha do item em 21/09).
+   Funcao e imune a ordem, e o resultado e guardado na primeira chamada. */
+let _proForaDoBolo = null;
+function proForaDoBolo(){
+  if(!_proForaDoBolo){
+    /* ⚠️ O MEWTWO PRECISA SER NOMEADO: ele NAO esta no  do jogo (aquela lista e a dos
+       oito CAPTURAVEIS em rota) nem no  (que sao os tres que ninguem pega).
+       Quem o cobre no encontro selvagem e o , que nao existe no servidor.
+       Sem esta linha ele entrava no bolo e decidia a liga sozinho -- conferido, a primeira versao
+       deixava passar. */
+    _proForaDoBolo = ESPECIES_INTOCAVEIS.concat(LENDARIOS_DO_JOGO, ['mewtwo', 'mew'])
+      .filter((x, i, a) => a.indexOf(x) === i);
+  }
+  return _proForaDoBolo;
+}
+
 
 /* -------------------------------------------------------------------
    TRAINERS LEAGUE -- liga diária de pontos corridos (todos contra todos),
@@ -17121,6 +17219,11 @@ async function ensureRegisteringCycle(typeId){
     let entry = data.cycles.find(c=>c.status==='registering');
     if(!entry){
       entry = makeFreshScheduleCycleEntry(computeNextScheduledTime());
+      /* ⚠️ O CICLO DA LIGA PRO NASCE COM A FAIXA CARIMBADA, lida do contador da agenda. O cliente
+         cria ciclo tambem (e nao so o `drawCycle` do servidor), entao ele precisa carimbar aqui --
+         sem isto, um ciclo criado pelo primeiro inscrito nasceria sempre na faixa 0 e a rotacao
+         nunca sairia do lugar. Tudo dentro da MESMA transacao que ja le a agenda. */
+      if(typeId === PRO_LEAGUE_TYPE){ entry.proFaixa = (data.proFaixaIdx | 0) % PRO_FAIXAS.length; }
       data.cycles.push(entry);
       data.updatedAt = Date.now();
       tx.set(scheduleDocRef(typeId), data);
@@ -17222,6 +17325,78 @@ async function registerForLeague(typeId, slot, ficarNaTela){
     else { console.error(e); game.leagueError = 'Erro ao se inscrever. Confira sua conexão e tente de novo.'; }
     /* O `leagueError` é lido pelas DUAS telas: a da Liga e o modal do aviso. Com o modal aberto,
        deixar o erro só na tela da Liga seria falhar em silêncio na cara de quem clicou. */
+    render();
+  }
+}
+/* ⚠️ A INSCRIÇÃO DA PRO NÃO TEM SAVE POR TRÁS: o time é o bolo sorteado, e o `code` é montado
+   dele. Fora isso ela grava EXATAMENTE o mesmo documento da Clássica (mesmo `name`, `uid`, `code`,
+   `ataques`, `specialties`, `elite`), porque o `drawCycle`, o `advanceLeague`, o ranking e o
+   histórico são genéricos por `typeId` -- é isso que faz a Pro herdar a mecânica inteira.
+   ⚠️ O `slot` VAI `null`: não há save. Ele só é lido pra mostrar de onde o time veio.
+   ⚠️ E OS GOLPES SÃO OS DA ESPÉCIE POR NÍVEL (`ataquesPadrao`), que é a regra da casa pra quem
+   não ESCOLHE golpe -- aqui o jogador escolhe o pokémon, não o moveset. Sem eles o time cairia no
+   motor de tipo, e o servidor ainda valida cada um pelo `golpesValidos`. */
+async function inscreverNaLigaPro(){
+  if(!game.authUser){ game.leagueTeamPickError = 'Você precisa estar logado.'; render(); return; }
+  const name = (game.trainerName || '').trim();
+  if(!name){ game.leagueTeamPickError = 'Sua conta não tem um nome de treinador definido.'; render(); return; }
+  const bolo = game.proBolo || [];
+  const sel = game.proEscolhidos || [];
+  /* quem VALIDA é a ação, nunca o botão desabilitado */
+  if(sel.length !== PRO_ESCOLHE || sel.some(i => !bolo[i])){
+    game.leagueTeamPickError = 'Escolha exatamente ' + PRO_ESCOLHE + ' pokémon.'; render(); return;
+  }
+  const time = sel.map(i => {
+    const p = bolo[i];
+    const inst = createInstance(p.id, p.level);
+    inst.shiny = !!p.shiny;              // o createInstance NÃO copia a flag -- armadilha da casa
+    inst.ataques = ataquesPadrao(inst);
+    return inst;
+  });
+  game.leagueSubmitting = true;
+  game.leagueTeamPickError = null;
+  render();
+  const uid = game.authUser.uid;
+  try{
+    const { entry: cycleEntry, ativo } = await preambuloDaInscricao(PRO_LEAGUE_TYPE, uid);
+    if(ativo){ throw new Error('ACTIVE_ELSEWHERE'); }
+    /* ⚠️ O CICLO PODE TER VIRADO enquanto o jogador escolhia -- e aí o bolo dele é de OUTRO
+       ciclo, porque o `cycleId` entra na semente. Inscrever assim mandaria um time que o servidor
+       vai descartar na validação, em silêncio. Melhor re-sortear e pedir de novo. */
+    if(cycleEntry.id !== game.proCicloId){
+      game.leagueSubmitting = false;
+      game.leagueTeamPickError = 'A rodada virou enquanto você escolhia — estes são os seus novos ' + PRO_SORTEADOS + '.';
+      game.proCicloId = cycleEntry.id;
+      game.proFaixa = proFaixaDoCiclo(cycleEntry);
+      game.proBolo = proSorteiaBolo(uid, cycleEntry.id, game.proFaixa);
+      game.proEscolhidos = [];
+      render();
+      return;
+    }
+    const regRef = registrantDocRef(PRO_LEAGUE_TYPE, cycleEntry.id, uid);
+    await db.runTransaction(async (tx)=>{
+      const snap = await tx.get(regRef);
+      if(snap.exists){ throw new Error('DUPLICATE'); }
+      tx.set(regRef, { name, code: encodeTeamCode(time), uid, slot: null,
+                       ataques: golpesDoTime(time), specialties: game.specialties||[],
+                       elite: !!game.accountEliteChampion, registeredAt: Date.now() });
+      tx.set(cycleDocRef(PRO_LEAGUE_TYPE, cycleEntry.id),
+             { registrantCount: firebase.firestore.FieldValue.increment(1) }, { merge: true });
+    });
+    game.accountLeagueSlots = { ...(game.accountLeagueSlots||{}), [PRO_LEAGUE_TYPE]: 'pro' };
+    game.leagueSubmitting = false;
+    game.screen = 'league';
+    render();
+    checkLeagueRegistrationStatus(PRO_LEAGUE_TYPE);
+    refreshLeagueView(PRO_LEAGUE_TYPE, false);
+  } catch(e){
+    game.leagueSubmitting = false;
+    if(e.message==='DUPLICATE' || e.message==='ACTIVE_ELSEWHERE'){
+      game.leagueTeamPickError = 'Sua conta já está inscrita nessa Liga em outra rodada.';
+    } else {
+      console.error(e);
+      game.leagueTeamPickError = 'Erro ao se inscrever. Confira sua conexão e tente de novo.';
+    }
     render();
   }
 }
@@ -17913,6 +18088,9 @@ function openLeagueTypesList(){
     const types = [];
     snap.forEach(doc=>{
       if(doc.id === CLASSIC_LEAGUE_TYPE) return; // esse é o doc reservado só pra configurar bots da Clássica, não é uma liga separada pra listar
+      /* ⚠️ E O `pro` TAMBÉM É RESERVADO: ele já tem botão fixo na tela, e sem esta linha um doc com
+         esse id na coleção o faria aparecer DUAS vezes na lista de ligas. */
+      if(doc.id === PRO_LEAGUE_TYPE) return;
       const data = doc.data();
       if(data.active){ types.push({ id: doc.id, ...data }); }
     });
@@ -18677,6 +18855,10 @@ function renderLeagueTypesList(){
     <span class="mon-name">${selo('vs')} Liga Clássica</span>
     <span class="mon-sub">Times de 8 ou 16 treinadores, mata-mata direto. Sempre rolando.</span>
   </button>
+  <button class="btn league-type-card" onclick="openLeague('${PRO_LEAGUE_TYPE}')">
+    <span class="mon-name">${selo('medalha_ouro')} Liga Pro</span>
+    <span class="mon-sub">Seu time é SORTEADO: ${PRO_SORTEADOS} pokémon, você escolhe ${PRO_ESCOLHE}. A faixa de nível gira a cada campeonato.</span>
+  </button>
   <button class="btn league-type-card" onclick="openTrainersLeague()">
     <span class="mon-name">${selo('bandeira')} Trainers League</span>
     <span class="mon-sub">Pontos corridos, até 16 treinadores, todos contra todos. Começa 11h; inscrições abrem quando a liga do dia anterior termina.</span>
@@ -18720,7 +18902,43 @@ function toggleCustomPickerMon(speciesId){
   game.customPickerSelected = selected;
   render();
 }
+/* ⚠️ NA LIGA PRO O TIME NÃO É ESCOLHIDO, É SORTEADO -- e por isso ela abre uma tela própria.
+   O bolo depende do CICLO ABERTO (ele entra na semente), então o picker precisa carregá-lo antes
+   de desenhar. Quem faz isso é o `preambuloDaInscricao`, o MESMO que a inscrição usa: assim o
+   ciclo em que o jogador escolhe é exatamente o ciclo em que ele se inscreve -- e não dois ciclos
+   diferentes, que é o que aconteceria se cada tela lesse a agenda por conta própria. */
+async function abrirBoloDaLigaPro(){
+  game.leagueTeamPickError = null;
+  game.proBolo = null;
+  game.proEscolhidos = [];
+  game.screen = 'leagueTeamPicker';
+  render();
+  if(!game.authUser){ game.leagueTeamPickError = 'Você precisa estar logado.'; render(); return; }
+  try{
+    const { entry, ativo } = await preambuloDaInscricao(PRO_LEAGUE_TYPE, game.authUser.uid);
+    if(ativo){ game.leagueTeamPickError = 'Sua conta já está inscrita nessa Liga em outra rodada.'; render(); return; }
+    game.proCicloId = entry.id;
+    game.proFaixa = proFaixaDoCiclo(entry);
+    game.proBolo = proSorteiaBolo(game.authUser.uid, entry.id, game.proFaixa);
+  } catch(e){
+    console.error('Erro ao sortear o bolo da Liga Pro:', e);
+    game.leagueTeamPickError = 'Não deu pra sortear seus pokémon. Confira sua conexão e tente de novo.';
+  }
+  if(game.screen === 'leagueTeamPicker'){ render(); }
+}
+/* ⚠️ MARCAR É ALTERNAR, e quem RECUSA é a AÇÃO: um índice forjado ou um 7º marcado não entram.
+   O card desabilitado é apresentação -- a mesma regra do `confirmarAtaques` e do `chooseRoute`. */
+function proAlternar(i){
+  const bolo = game.proBolo || [];
+  if(!bolo[i]) return;
+  const sel = game.proEscolhidos || (game.proEscolhidos = []);
+  const at = sel.indexOf(i);
+  if(at >= 0){ sel.splice(at, 1); }
+  else if(sel.length < PRO_ESCOLHE){ sel.push(i); }
+  render();
+}
 function openLeagueTeamPicker(){
+  if(game.currentLeagueTypeId === PRO_LEAGUE_TYPE){ abrirBoloDaLigaPro(); return; }
   game.leagueTeamPickError = null;
   const typeConfig = game.currentLeagueTypeConfig;
   if(typeConfig && typeConfig.allowedTypes && typeConfig.allowedTypes.length>0){
@@ -18730,7 +18948,53 @@ function openLeagueTeamPicker(){
   game.screen = 'leagueTeamPicker';
   render();
 }
+/* A TELA DOS 12. A ordem da ESCOLHA é a ordem de batalha -- a mesma convenção da Seleção e do
+   montador --, e por isso o número do card diz a POSIÇÃO e não só "marcado". */
+function renderProPicker(){
+  const bolo = game.proBolo;
+  const sel = game.proEscolhidos || [];
+  const faixa = proFaixaDe(game.proFaixa || 0);
+  const pronto = sel.length === PRO_ESCOLHE;
+  return `
+  <div class="box cursor">
+    <h2>Seus ${PRO_SORTEADOS} da Liga Pro</h2>
+    <p>Escolha <strong>${PRO_ESCOLHE}</strong> pra representar você. Esta rodada é entre os níveis
+       <strong>${faixa[0]} e ${faixa[1]}</strong>, e os ${PRO_SORTEADOS} são sorteados de novo a cada
+       liga — sair e voltar não muda os seus.</p>
+  </div>
+  ${game.leagueTeamPickError ? `<div class="box"><p class="error-text">${game.leagueTeamPickError}</p></div>` : ''}
+  ${bolo === null ? `<div class="box"><p class="hint-text">Sorteando seus pokémon...</p></div>` : ''}
+  ${bolo ? `<div class="box">
+    <p class="hint-text" style="text-align:center">${sel.length} de ${PRO_ESCOLHE} escolhidos</p>
+    ${/* ⚠️ O CARD É O DO DRAFT DA SELEÇÃO, e a grade também: é o MESMO problema (escolher
+         alguns entre doze sorteados, olhando o sprite), resolvido lá em 21/09. Um desenho próprio
+         obrigaria a reaprender a ler, e o `.btn` da casa -- que foi a primeira tentativa aqui --
+         é `display:block;width:100%`: ele esticou cada card pra a largura inteira e os doze
+         viraram uma pilha. É a mesma armadilha que o card do parceiro da Pescaria já custou. */''}
+    <div class="selecao-bolo">${bolo.map((p, i) => {
+      const pos = sel.indexOf(i);
+      const sp = SPECIES[p.id] || {};
+      const cheio = pos < 0 && sel.length >= PRO_ESCOLHE;
+      /* ⚠️ O `spriteHtml` PRECISA DO `speciesId`, e o bolo guarda `id`: passando o objeto cru o
+         sprite saía VAZIO em todos os doze -- sem erro nenhum, e foi o navegador que pegou. */
+      const dentro = spriteHtml(p.id, 'sprite-sm', !!p.shiny)
+        + `<span class="selecao-nome">${escapeHtmlSafe(sp.name || p.id)}${p.shiny ? ' ' + selo('shiny') : ''}</span>`
+        + `<span class="selecao-lv">Lv.${p.level}</span>`
+        + `<span class="selecao-tipos">${(sp.types || []).map(t => typePill(t)).join('')}</span>`
+        + (pos >= 0 ? `<span class="selecao-dono eu">${pos + 1}º</span>` : '');
+      /* cheio ⇒ o card vira <span>: um botão que não responde convida um toque que não leva a
+         lugar nenhum -- a mesma decisão da ilha sem jogo e da ilhota do setup do Resgate */
+      if(cheio) return `<span class="selecao-card off">${dentro}</span>`;
+      return `<button class="selecao-card" onclick="proAlternar(${i})">${dentro}</button>`;
+    }).join('')}</div>
+  </div>` : ''}
+  ${bolo ? `<button class="btn success" ${pronto && !game.leagueSubmitting ? '' : 'disabled'}
+     onclick="inscreverNaLigaPro()">${game.leagueSubmitting ? 'Inscrevendo...' :
+       pronto ? 'Inscrever estes ' + PRO_ESCOLHE + ' ⚔️' : 'Escolha ' + (PRO_ESCOLHE - sel.length) + ' pokémon'}</button>` : ''}
+  <button class="btn secondary" onclick="game.screen='league';render();">⬅ Voltar</button>`;
+}
 function renderLeagueTeamPicker(){
+  if(game.currentLeagueTypeId === PRO_LEAGUE_TYPE){ return renderProPicker(); }
   const typeConfig = game.currentLeagueTypeConfig;
   if(typeConfig && typeConfig.allowedTypes && typeConfig.allowedTypes.length>0){
     return renderCustomLeagueTeamPicker(typeConfig);
@@ -27847,7 +28111,20 @@ function renderLeague(){
       <p>Escolha qual time da sua conta vai representar <strong>${game.trainerName}</strong> nessa Liga.</p>
       ${(game.accountLeagueSlots||{})[game.currentLeagueTypeId]!=null ? `<p class="hint-text">⚠️ Sua conta já está disputando essa Liga em outra rodada com o <strong>${escapeHtmlSafe(slotDisplayName((game.accountLeagueSlots||{})[game.currentLeagueTypeId]))}</strong>. Espere ela terminar pra poder se inscrever de novo.</p>` : ''}
       ${game.leagueError ? `<p class="error-text">${game.leagueError}</p>` : ''}
-      <button class="btn danger" ${(game.accountLeagueSlots||{})[game.currentLeagueTypeId]!=null?'disabled':''} onclick="openLeagueTeamPicker()">Escolher time ⚔️</button>
+      ${/* ⚠️ A FAIXA DA RODADA É A INFORMAÇÃO QUE DECIDE a inscrição na Pro: ela gira a cada
+           campeonato, e sem ela na tela o jogador só descobre em que nível vai lutar depois de
+           abrir o picker. Ela sai da ENTRADA do ciclo, que é onde a faixa é carimbada. */''}
+      ${(() => {
+        if(game.currentLeagueTypeId !== PRO_LEAGUE_TYPE) return '';
+        /* ⚠️ O CICLO ABERTO é o que está em `registering` -- o `leagueData` é `{ cycles }`, e não
+           `{ entry }`: a primeira versão desta linha lia um campo que não existe e a faixa nunca
+           apareceria na tela, sem erro nenhum. */
+        const aberto = ((game.leagueData || {}).cycles || []).find(c => c.status === 'registering');
+        if(!aberto) return '';
+        const f = proFaixaDe(proFaixaDoCiclo(aberto));
+        return `<p class="hint-text" style="text-align:center">Esta rodada é entre os níveis <strong>${f[0]} e ${f[1]}</strong>.</p>`;
+      })()}
+      <button class="btn danger" ${(game.accountLeagueSlots||{})[game.currentLeagueTypeId]!=null?'disabled':''} onclick="openLeagueTeamPicker()">${game.currentLeagueTypeId === PRO_LEAGUE_TYPE ? 'Ver meus ' + PRO_SORTEADOS + ' ⚔️' : 'Escolher time ⚔️'}</button>
     </div>` : `
     <div class="box">
       <h2>✅ Você está inscrito!</h2>
@@ -27891,7 +28168,15 @@ function renderLeague(){
         </div>`)}
       </div>`;
     }
-    const globalHistory = game.globalLeagueHistory || [];
+    /* ⚠️ O QUADRO GLOBAL É DA CLÁSSICA, e a guarda é aqui porque o CAMPO VAZA: ele é carregado
+       só quando a Clássica abre (`if(typeId === CLASSIC_LEAGUE_TYPE)` no `refreshLeagueHistories`)
+       e nunca é limpo -- então quem abria a Clássica e depois outra liga via o histórico DELA aqui,
+       com o botão "Rever" levando ao chaveamento da Clássica. Achado escrevendo a trava da Liga Pro,
+       e o defeito é anterior: ele já alcançava as ligas customizadas.
+       ⚠️ E ele NÃO pode virar por liga sem custo: o `loadGlobalLeagueHistory` varre até 20 ciclos
+       do calendário, e o botão dele crava o tipo clássico em cada linha. */
+    const globalHistory = game.currentLeagueTypeId === CLASSIC_LEAGUE_TYPE
+      ? (game.globalLeagueHistory || []) : [];
     if(globalHistory.length>0){
       body += `
       <div class="box">
