@@ -242,7 +242,7 @@ function createSandbox(htmlPath){
     'SPECIES','TYPE_CHART','EVOLUTIONS','LEGS','GYMS','STARTERS','ROUTE_MAP','LEGENDARY_BIRDS',
     'DECLARED_CHALLENGES','ROULETTE_PRIZES','WIN_BASE_POINTS','SURVIVOR_BONUS_CAP','STREAK_BONUS_CAP',
     'REMATCH_LEVEL_CAP','GIOVANNI_RELIEF_CAP','DEFEAT_ADVANCE','SHINY_CHANCE','ACHIEVEMENTS',
-    'CONVIDADO_MODOS','exigeCadastro','entrarSemConta','abrirCriarLogin','vincularComGoogle','vincularComEmail','concluirCadastro','linkErrorMessage','trocarModoDoLink','fecharAvisoDeConvidado','renderConvidadoModal','renderCriarLoginModal','CAMPOS_DA_CONTA','renderAuth',
+    'CONVIDADO_MODOS','ehAnonimoDesligado','exigeCadastro','entrarSemConta','abrirCriarLogin','vincularComGoogle','vincularComEmail','concluirCadastro','linkErrorMessage','trocarModoDoLink','fecharAvisoDeConvidado','renderConvidadoModal','renderCriarLoginModal','CAMPOS_DA_CONTA','renderAuth',
     'createInstance','calcMaxHp','calcDamage','doExchange','simulateGymBattle','makeSeededRng',
     'applyTeamBonuses','badgeDamageBonus','diversityDamageBonus','bestMultiplier','rolledMultiplier',
     'firstStrikeChance','tryEvolve','bstOf','rarityWeight','weightedPick','computeVictoryRewards',

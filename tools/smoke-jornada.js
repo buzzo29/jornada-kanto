@@ -36,6 +36,10 @@ const CORTE = args.includes('--corte');
    rota nunca e escolhida. E o unico jeito de medir a montanha contra o encontro selvagem que ela
    substitui. */
 const VOO = args.includes('--voo');
+/* --surf e o mesmo pras ILHAS LARANJA (23/09/2026, quando a travessia deixou de ser so de admin):
+   finge um treinador que ja tem o HM03 e o ensinou. Sem ele a carta aparece TRANCADA e o bot nunca
+   entra -- que e exatamente o que um jogador sem o HM03 vive. */
+const SURF = args.includes('--surf');
 /* quanto a Montanha foi jogada, e quantos ninhos acenderam pelo caminho */
 const montanha = { entrou:0, venceu:0, ninhos:0, lendario:0, porTrecho:{}, porNinho:{} };
 /* quanto a Vigilia foi jogada e como ela terminou -- o numero que interessa nao e so a conclusao */
@@ -84,15 +88,24 @@ function act(g, log){
           voa.ataques = [g.GOLPE_DO_VOO].concat((voa.ataques||[]).slice(0, g.MAX_GOLPES - 1));
         }
       }
+      if(SURF){
+        /* ensina o Surf a quem puder -- o que um treinador com o HM03 na mochila faria */
+        const nada = (game.team||[]).find(p => g.podeAprenderHM('hm03', p.speciesId));
+        if(nada && (nada.ataques||[]).indexOf(g.GOLPE_DO_SURF) < 0){
+          nada.ataques = [g.GOLPE_DO_SURF].concat((nada.ataques||[]).slice(0, g.MAX_GOLPES - 1));
+        }
+      }
       const abertas = game.routeCards.filter(id => {
         const r = g.routeById(id);
-        return r && (!r.corte || g.timeQueCorta(game.team)) && (!r.voo || g.podeVoar());
+        return r && (!r.corte || g.timeQueCorta(game.team)) && (!r.voo || g.podeVoar())
+          && (!r.surf || g.podeSurfar());
       });
       /* com --corte a mata e SEMPRE preferida: o que se quer medir e o desvio, nao a chance de o
          bot aleatorio cair nele */
       const mata = CORTE && abertas.find(id => { const r = g.routeById(id); return r && r.corte; });
       const monte = VOO && abertas.find(id => { const r = g.routeById(id); return r && r.voo; });
-      g.chooseRoute(mata || monte || abertas[Math.floor(Math.random()*abertas.length)]);
+      const ilha  = SURF && abertas.find(id => { const r = g.routeById(id); return r && r.surf; });
+      g.chooseRoute(mata || monte || ilha || abertas[Math.floor(Math.random()*abertas.length)]);
       return true;
     }
     /* A VIGILIA: a clareira e a escolha do premio. O bot pega sempre o primeiro -- o que ele mede

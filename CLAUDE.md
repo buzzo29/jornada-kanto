@@ -12315,25 +12315,94 @@ não vale a pena quando a resposta é um clique.
 
 #### ⚠️ O QUE FICOU DE FORA, E É DECISÃO REGISTRADA
 
-**OS AMIGOS.** O pedido nomeia **cinco** modos, e a lista de amigos não é um deles. Então um
-convidado consegue aparecer na **busca de treinadores**, mandar pedido de amizade e ser aceito — e
-se ele limpar o navegador, a conta anônima fica órfã e sobra um **amigo fantasma** na lista de quem
-é cadastrado. O que ele **não** consegue é desafiar nem aceitar desafio (as duas estão protegidas),
-que é a parte que vira batalha online — e por isso o **poll de desafio não é agendado pra ele**:
-ele rodaria a cada 10s pra nunca poder responder nada.
-**Se um dia incomodar, são 4 nomes a mover de LIVRES pra PROTEGIDAS** no `test-convidado.js`:
-`sendFriendRequest`, `respondFriendRequest`, `searchTrainers` e `compareTrainers`.
+**⚠️ OS AMIGOS FICARAM DE FORA POR ALGUMAS HORAS, e ENTRARAM no mesmo dia** — ver **OS AMIGOS
+ENTRARAM NA LISTA**, logo abaixo. O que esta nota apontava como decisão em aberto (*"se um dia
+incomodar, são 4 nomes a mover de LIVRES pra PROTEGIDAS"*) foi exatamente o que aconteceu, e o
+motivo que ela já registrava é o que sustenta a mudança: **a amizade é MÚTUA**, e um convidado que
+some deixa um pedido pendente pra sempre na conta de quem é cadastrado.
 
-**O BOSS DE DOMINGO** também ficou de fora — ele não está nos cinco, e o evento está **desligado**
+**O BOSS DE DOMINGO** continua de fora — ele não está nos cinco, e o evento está **desligado**
 (`BOSS_ATIVO`), então ele já recusa todo mundo.
 
-#### ⚠️ E UM ACHADO NO CAMINHO, NÃO MEXIDO: a travessia das Ilhas ainda é de ADMIN
+**O `pollFriendChallenge` e o `cancelFriendChallenge`** também: o poll já não é agendado pro
+convidado e o cancel é limpeza — bloqueá-los só daria erro em console sem proteger nada.
 
-O `ilhasSaemNoTrecho` abre com **`if(game.ehAdmin !== true) return false;`** — ou seja **a rota das
-Ilhas Laranja pela JORNADA não existe pra 99% dos jogadores**. A seção das Ilhas diz que a porta
-*"saiu das SEIS entradas"* em 21/09 (o botão da home, o `abrirIlhas` e os cinco jogos); conferido,
-os seis estão abertos e **esta sétima ficou**. Não foi tocada porque não foi pedido — e mexer nela
-muda a jornada de todo mundo (a travessia dá **+3 níveis** no time).
+#### ⚠️ O ERRO DO ANÔNIMO DESLIGADO TINHA DOIS CÓDIGOS, E EU TRATEI SÓ UM (23/09/2026)
+
+Reportado no primeiro teste: *"aparece a mensagem em vermelho: 'Algo deu errado. Tente de novo.' e
+não sai disso"*, com o console mostrando **`auth/admin-restricted-operation`**.
+
+**Era defeito meu, e do tipo que esta feature existia pra evitar.** Eu escrevi a mensagem
+explicativa para o `auth/operation-not-allowed` — e o Identity Toolkit devolve
+**`auth/admin-restricted-operation`** quando o provedor Anônimo está desligado. O jogador caiu no
+genérico do `authErrorMessage`, ou seja **exatamente o "falhar calado"** que o comentário do código
+prometia não acontecer.
+
+Hoje os dois caem na mesma frase (`ehAnonimoDesligado`): eles querem dizer a mesma coisa pra quem
+está na tela. **A lição é a de sempre com código de erro: um caso não é a família** — e a que pega
+isso é uma trava que lista os dois por nome, porque um `catch` genérico passaria nos dois.
+
+#### OS AMIGOS ENTRARAM NA LISTA (23/09/2026)
+
+Pedido: *"pode colocar que nao pode adicionar amigos enquanto nao cria conta"*. Eles eram a decisão
+que esta seção registrava em aberto, e a régua estava escrita aqui — foram os **4 nomes** que ela
+apontava, mais quatro do mesmo ciclo. **O card Amigos virou o SEXTO modo fechado**, com o mesmo
+modal.
+
+**⚠️ E FECHAR SÓ A PORTA DELE NÃO BASTA: a amizade é MÚTUA.** Ele não pode **aceitar** pedido (o
+`respondFriendRequest` está protegido) — então um pedido mandado **PRA ele** ficaria pendente **pra
+sempre** na conta de quem é cadastrado. E conta anônima é descartável: basta limpar o navegador.
+
+Por isso ele **não aparece na busca de treinadores**, e o mecanismo tem duas partes:
+
+- **quem marca é o SERVIDOR** (`touchLastSeen` grava `anon`), porque só ele sabe — o dado vem do
+  token de quem chama, e os quatro chamadores daquela função passam o próprio uid. Na prática quem
+  escreve é o **`getMyNotifications`**: dos quatro, os outros três são de modos que ele não joga;
+- **⚠️ E O FILTRO É NO RESULTADO, não na consulta.** Não bastava deixar de gravar o
+  `trainerNameLower`: o `searchTrainers` tem uma **SEGUNDA** consulta, por `trainerName` **EXATO**
+  (a rede de segurança pras contas antigas), e por ela o convidado apareceria do mesmo jeito.
+
+**O `pollFriendChallenge` e o `cancelFriendChallenge` ficaram LIVRES**, de propósito: o poll já não
+é agendado pro convidado e o cancel é limpeza — bloqueá-los só geraria erro em console sem proteger
+nada.
+
+#### ⚠️ A TRAVESSIA DAS ILHAS ABRIU PRA TODO MUNDO (23/09/2026)
+
+Pedido junto: *"pode tirar a travessia para as ilhas laranjas serem somente para admin = true,
+libere para todos"*. Era a **sétima entrada** das Ilhas — a única que ficou fechada quando as outras
+seis abriram em 21/09, e que este arquivo registrava como achado no dia anterior.
+
+**O PREÇO NA JORNADA: NADA. 53,19% sem contra 53,03% com** — **−0,16 ponto, 0,1σ** (8 blocos de 400
+jornadas de cada lado, **3.200 de cada**, o MESMO bot contra duas cópias congeladas, desvio tirado
+de ENTRE os blocos, **4 de 8 blocos** pra cada lado). Ruído absolutamente puro.
+
+**E ele é zero POR CONSTRUÇÃO pra quem não tem o HM03**: a carta aparece **trancada**, como a mata
+faz pra quem não tem o Corte, e o jogador escolhe entre as mesmas duas rotas de sempre.
+
+**⚠️ O QUE ELA VALE PRA QUEM TEM O HM03 NÃO DEU PRA MEDIR COM O BOT, e é honesto dizer:** ele não
+sabe jogar os cinco minigames — com `--surf` ele entra na travessia e **trava na tela das Ilhas**
+(13 falhas em 40). O que dá pra medir é o **prêmio**: os **+3 níveis no time inteiro** valem
+**+12,75 pontos** de vitória num 6x6 (4.000 batalhas de cada lado, mesmos times e mesmas sementes,
+47,85% → 60,60%). Em troca ele abre mão do encontro selvagem daquele trecho, que são **duas**
+capturas.
+
+**⚠️ E O SMOKE GANHOU `--surf` E UM CONSERTO QUE ELE PRECISAVA ANTES DE MEDIR.** O filtro de rotas
+abertas do bot conhecia `r.corte` e `r.voo` e **não conhecia `r.surf`** — com a carta destravada ele
+escolheria uma rota trancada, a ação recusaria em silêncio e **a jornada travaria até o
+`MAX_STEPS`**. É literalmente o defeito que o comentário do `--corte` descreve logo acima dele, e
+sem o conserto o A/B teria medido jornadas travadas.
+
+**⚠️ E A TRAVA DO GATE NÃO FOI APAGADA: ela foi VIRADA DO AVESSO.** Ela cobrava que a rota *não*
+existisse sem admin; hoje cobra que ela **exista**, e que ser admin **não mude nada** no sorteio.
+Sem ela, alguém reintroduz a porta e a travessia volta a ser letra morta pra 99% dos jogadores **sem
+ninguém ver** — que foi exatamente o que aconteceu de 21 a 23/09. Conferido: com o gate de volta ela
+acusa **8** falhas.
+
+**⚠️ E A PRIMEIRA MEDIÇÃO DELA DEU ZERO NOS DOIS LADOS**, o que teria "provado" que abrir não muda
+nada: era o **slot 0 / geração 0**, cujos oito dados dão todos acima de 0,25. É a **terceira** vez
+que a amostra única engana nesta feature, e o próprio arquivo já registrava as duas anteriores —
+**sorteio semeado se mede varrendo** (20 slots × 10 gerações: 20,4% dos trechos, 164 de 200 saves).
+
 
 
 ### NENHUMA JORNADA COMEÇA SEM NOME DE TREINADOR (13/09/2026)

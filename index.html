@@ -5234,7 +5234,12 @@ const CHANCE_ILHAS = 0.25;
    mesmo, e o que muda é a carta ser OFERECIDA ou não. Assim capturar o sexto pokémon não re-sorteia
    nada -- ele só destrava o que o dado já havia decidido. */
 function ilhasSaemNoTrecho(leg){
-  if(game.ehAdmin !== true) return false;
+  /* ⚠️ ELA ABRIU PRA TODO MUNDO EM 23/09/2026, a pedido. Ate aqui havia um
+     `if(game.ehAdmin !== true) return false;` nesta linha -- ou seja a travessia pela JORNADA era
+     a SETIMA entrada das Ilhas, e a unica que ficou fechada quando as outras seis (o botao da
+     home, o `abrirIlhas` e os cinco jogos) abriram em 21/09. Ela passou dois dias sendo letra
+     morta pra 99% dos jogadores, e o CLAUDE.md ja registrava a porta como "saiu das SEIS entradas"
+     sem notar que existia uma setima. */
   /* ⚠️ UMA VEZ POR JORNADA (21/09/2026, a pedido: *"se a travessia para a ilha laranja ja apareceu
      1x na jornada, ela nao deve aparecer mais"*). É a mesma regra da mata, com um mecanismo
      DIFERENTE -- e a diferença é a razão de ele existir.
@@ -19015,6 +19020,17 @@ async function registerWithEmail(){
    Authentication -> Sign-in method. Sem isso o `signInAnonymously` recusa com
    `auth/operation-not-allowed` e o botao explica o que houve, em vez de falhar calado.
    ============================================================================ */
+/* ⚠️ SAO DOIS CODIGOS PRO MESMO MOTIVO, e isso custou o primeiro relato desta feature: eu tratei
+   so o `operation-not-allowed` e o Firebase devolveu **`auth/admin-restricted-operation`** -- o
+   jogador viu o generico *"Algo deu errado. Tente de novo."*, que e exatamente o "falhar calado"
+   que a mensagem existe pra evitar.
+   O `admin-restricted-operation` e o que o Identity Toolkit manda quando o provedor ANONIMO esta
+   desligado no console; o `operation-not-allowed` e a forma antiga e aparece em outros SDKs. Os
+   dois querem dizer a MESMA coisa pra quem esta na tela, entao os dois caem na mesma frase. */
+function ehAnonimoDesligado(e){
+  const c = e && e.code;
+  return c === 'auth/admin-restricted-operation' || c === 'auth/operation-not-allowed';
+}
 async function entrarSemConta(){
   game.authBusy = true; game.authError = null; game.authNotice = null; render();
   try{
@@ -19022,7 +19038,7 @@ async function entrarSemConta(){
     /* nao mexe na tela nem no authBusy: quem faz isso e o onAuthStateChanged, como nos outros tres
        caminhos de entrada -- dois lugares decidindo pra onde ir divergiriam no primeiro ajuste */
   } catch(e){
-    game.authError = (e && e.code === 'auth/operation-not-allowed')
+    game.authError = ehAnonimoDesligado(e)
       ? 'O modo convidado ainda não está liberado neste servidor. Crie uma conta pra jogar.'
       : authErrorMessage(e);
     game.authBusy = false;
@@ -19039,6 +19055,11 @@ const CONVIDADO_MODOS = {
   torre:    { nome:'Torre dos Treinadores',o:'30 andares que sobem de nível sem parar. O ranking do dia mostra até onde cada um chegou.' },
   online:   { nome:'Batalha Online',       o:'Duelo ao vivo contra outro treinador, escolhendo o pokémon a cada confronto.' },
   ilhas:    { nome:'Ilhas Laranja',        o:'Cinco ilhas com cinco desafios — corrida, pescaria, resgate, arena e seleção — com ranking em cada um.' },
+  /* ⚠️ OS AMIGOS ENTRARAM EM 23/09/2026, a pedido (*"pode colocar que nao pode adicionar amigos
+     enquanto nao cria conta"*). Ele e o SEXTO, e nao estava nos cinco originais -- a razao pra
+     fechar e a mesma dos outros: a amizade e MUTUA, e uma conta anonima some quando o navegador e
+     limpo. Sem isso sobrava amigo fantasma na lista de quem e cadastrado. */
+  amigos:   { nome:'Amigos',               o:'Sua lista de treinadores: dá pra comparar coleções, ver quem está online e desafiar pra uma batalha.' },
 };
 /* A PORTA DOS CINCO, no molde do `exigeTimeCampeao`: quem chama e a acao, nao o botao -- um botao
    apagado nao diz por que, e o que falta aqui e justamente saber o que fazer pra abrir aquilo. */
@@ -32409,7 +32430,7 @@ function renderSaveSelect(){
       <span class="home-menu-title">Conquistas</span>
       ${achievementsTeaser ? `<span class="home-menu-stat">${achievementsTeaser}</span>` : ''}
     </button>
-    <button class="home-menu-card friends" onclick="openFriends()">
+    <button class="home-menu-card friends" onclick="if(exigeCadastro('amigos')) openFriends()">
       <span class="home-menu-icon">${selo('amigos', 'selo-menu')}${(game.friendRequestCount||0)>0 ? `<span class="notif-badge">${game.friendRequestCount>9?'9+':game.friendRequestCount}</span>` : ''}</span>
       <span class="home-menu-title">Amigos</span>
     </button>

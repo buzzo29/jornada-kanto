@@ -855,11 +855,19 @@ function blocoDaTravessia(){
       g.currentSaveSlot = slot; g.saveGen = gen;
       for(let l = 0; l < 8; l++) if(S.ilhasSaemNoTrecho(l)) n++; }
     g.currentSaveSlot = 0; g.saveGen = 0; return n; };
+  /* ⚠️ ELA ABRIU PRA TODO MUNDO EM 23/09/2026, a pedido -- e esta trava é a MESMA de antes, virada
+     do avesso: ela cobrava que a rota NÃO existisse sem admin (a guarda morava no sorteio, porque
+     uma carta trancada que ninguém consegue abrir é pior que carta nenhuma). Hoje ela cobra o
+     contrário, e continua existindo pelo mesmo motivo: sem ela, alguém reintroduz a porta e a
+     travessia volta a ser letra morta pra 99% dos jogadores SEM NINGUÉM VER -- que foi exatamente
+     o que aconteceu de 21 a 23/09, quando as outras SEIS entradas abriram e esta ficou. */
   g.ehAdmin = false;
-  ok('sem admin a rota não existe EM LUGAR NENHUM', varre() === 0,
-     'por enquanto ela é administrativa -- e a guarda mora no SORTEIO, não no cadeado: uma carta '
-   + 'trancada que ninguém consegue abrir é pior que carta nenhuma');
+  ok('a rota existe pra quem NÃO é admin', varre() > 0,
+     'ela é a sétima entrada das Ilhas, e ficou fechada dois dias depois de as outras seis abrirem');
   g.ehAdmin = true;
+  const comAdmin = varre();
+  g.ehAdmin = false;
+  ok('  e ser admin não muda NADA no sorteio', comAdmin === varre(), comAdmin + ' trechos');
   g.team = timeDe(5, true);
   ok('com o time incompleto tampouco', varre() === 0,
      'são ' + S.ILHAS_TIME_MINIMO + ' pokémon: os cinco desafios usam o time da jornada');

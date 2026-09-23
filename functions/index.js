@@ -5386,8 +5386,10 @@ exports._pescariaRank = { topo: PESCARIA_RANK_TOPO };
 
    Quem entra SEM criar conta usa a sessao ANONIMA do Firebase -- ele tem uid e tem documento em
    users/{uid}, entao ele passa em `request.auth`, que e a unica pergunta que as 81 callables
-   faziam. Ele joga a JORNADA inteira (que e dele), e fica de fora dos CINCO modos que aparecem
-   pra outros jogadores: Torre, Ligas, Ilhas Laranja, Batalha Online e Ginasio da Cidade.
+   faziam. Ele joga a JORNADA inteira (que e dele), e fica de fora dos modos que aparecem pra outros
+   jogadores: Torre, Ligas, Ilhas Laranja, Batalha Online, Ginasio da Cidade e -- desde 23/09, a
+   pedido -- os AMIGOS (ver o searchTrainers: ele tambem nao aparece na busca, porque nao pode
+   ACEITAR pedido e ele ficaria pendente pra sempre).
 
    ⚠️ O CLIENTE JA RECUSA NA PORTA (ver `ehConvidado` no index.html), e isso NAO basta: uma callable
    e chamavel direto do console, sem passar por tela nenhuma. E a mesma razao pela qual o
@@ -5406,12 +5408,15 @@ exports._pescariaRank = { topo: PESCARIA_RANK_TOPO };
    Elas devolvem vazio pro convidado por construcao: ele nunca lidera ginasio nenhum, porque o
    `setNeighborhoodGymDefense` esta protegido.
    ============================================================================ */
+/* o provedor vem do token emitido pelo Firebase Auth, nao de campo escrito pelo cliente */
+function ehConvidado(request){
+  const prov = request && request.auth && request.auth.token && request.auth.token.firebase
+    && request.auth.token.firebase.sign_in_provider;
+  return prov === 'anonymous';
+}
 function exigeCadastro(request){
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Faça login.'); }
-  /* o provedor vem do token emitido pelo Firebase Auth, nao de campo escrito pelo cliente */
-  const prov = request.auth.token && request.auth.token.firebase
-    && request.auth.token.firebase.sign_in_provider;
-  if(prov === 'anonymous'){
+  if(ehConvidado(request)){
     throw new HttpsError('permission-denied', 'Crie sua conta pra jogar este modo.');
   }
   return request.auth.uid;
@@ -6623,7 +6628,7 @@ exports.getMyNotifications = onCall(async (request) => {
   catch(e){ logger.error('Erro ao contar pedidos de amizade:', e); }
   try{
     const u = await db.collection('users').doc(uid).get();
-    await touchLastSeen(uid, u.exists ? u.data() : null);
+    await touchLastSeen(uid, u.exists ? u.data() : null, ehConvidado(request));
   } catch(e){ logger.error('Erro ao carimbar presença:', e); }
   return { notifications, unreadCount, friendRequests };
 });
@@ -7144,6 +7149,7 @@ async function buildTrainerProfile(askedUid, askedName){
 }
 
 exports.getTrainerProfile = onCall(async (request) => {
+  exigeCadastro(request);
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   const askedUid = typeof request.data?.uid === 'string' ? request.data.uid.trim() : '';
   const askedName = typeof request.data?.name === 'string' ? request.data.name.trim().slice(0, 60) : '';
@@ -9892,15 +9898,25 @@ function rivalryRef(a, b){ return db.collection('rivalries').doc([a,b].sort().jo
    uma vez só.
    O trainerNameLower vai junto porque é o índice da busca de treinadores (searchTrainers) e não
    existe backfill: cada conta ganha o campo na primeira vez que aparecer online depois do deploy. */
-async function touchLastSeen(uid, userData){
+/* ⚠️ O `anon` E GRAVADO AQUI PORQUE SO O SERVIDOR SABE (23/09/2026). Ele vem do token de quem
+   CHAMA, e os quatro chamadores desta funcao passam o proprio uid -- entao a marca e sempre do
+   dono do documento.
+   Ela existe pra o CONVIDADO nao aparecer na busca de treinadores: ele nao pode ACEITAR pedido de
+   amizade (o `respondFriendRequest` esta protegido), entao um pedido mandado pra ele ficaria
+   pendente pra sempre na conta de quem e cadastrado.
+   ⚠️ E na pratica quem a escreve e o `getMyNotifications`: dos quatro chamadores, os outros tres
+   sao de modos que o convidado nao joga. */
+async function touchLastSeen(uid, userData, anon){
   try{
     const agora = Date.now();
     const d = userData || {};
     const nomeLower = (d.trainerName || '').toLowerCase();
     const precisaNome = nomeLower && d.trainerNameLower !== nomeLower;
-    if(!precisaNome && agora - (d.lastSeenAt || 0) < LAST_SEEN_THROTTLE_MS) return;
+    const precisaAnon = anon !== undefined && d.anon !== !!anon;
+    if(!precisaNome && !precisaAnon && agora - (d.lastSeenAt || 0) < LAST_SEEN_THROTTLE_MS) return;
     const patch = { lastSeenAt: agora };
     if(precisaNome) patch.trainerNameLower = nomeLower;
+    if(precisaAnon) patch.anon = !!anon;
     await db.collection('users').doc(uid).set(patch, { merge: true });
   } catch(e){ logger.error('Erro ao carimbar presença de '+uid+':', e); }
 }
@@ -9945,6 +9961,7 @@ async function rivalryFor(meuUid, outroUid){
    pokédex, vitórias online e quando foi visto. Escolher pelo nome só seria adivinhar.
    -------------------------------------------------------------------------- */
 exports.searchTrainers = onCall(async (request) => {
+  exigeCadastro(request);
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   const uid = request.auth.uid;
   const bruto = String(request.data?.q || '').trim().slice(0, 40);
@@ -9967,6 +9984,11 @@ exports.searchTrainers = onCall(async (request) => {
   for(const doc of [...porLower.docs, ...porExato.docs]){
     if(vistos.has(doc.id)) continue;
     vistos.add(doc.id);
+    /* ⚠️ O CONVIDADO NAO APARECE NA BUSCA (23/09/2026). Ele nao pode ACEITAR pedido de amizade --
+       o `respondFriendRequest` esta protegido --, entao um pedido mandado pra ele ficaria pendente
+       PRA SEMPRE na lista de quem e cadastrado. E a conta anonima e descartavel: basta limpar o
+       navegador. A marca `anon` e escrita pelo SERVIDOR (ver o touchLastSeen). */
+    if(doc.data() && doc.data().anon === true) continue;
     const d = doc.data() || {};
     if(!d.trainerName) continue;   // conta sem nome ainda: não existe pra busca
     achados.push(friendCardFrom(doc.id, d));
@@ -9994,6 +10016,7 @@ exports.searchTrainers = onCall(async (request) => {
    PEDIDO DE AMIZADE
    -------------------------------------------------------------------------- */
 exports.sendFriendRequest = onCall(async (request) => {
+  exigeCadastro(request);
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   const uid = request.auth.uid;
   const alvo = String(request.data?.targetUid || '').trim();
@@ -10060,6 +10083,7 @@ async function firmarAmizade(uidA, dadosA, uidB, dadosB){
 }
 
 exports.respondFriendRequest = onCall(async (request) => {
+  exigeCadastro(request);
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   const uid = request.auth.uid;
   const de = String(request.data?.fromUid || '').trim();
@@ -10098,6 +10122,7 @@ exports.respondFriendRequest = onCall(async (request) => {
 });
 
 exports.removeFriend = onCall(async (request) => {
+  exigeCadastro(request);
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   const uid = request.auth.uid;
   const alvo = String(request.data?.targetUid || '').trim();
@@ -10390,6 +10415,7 @@ exports.adminListTrainers = onCall(async (request) => {
 });
 
 exports.getMyFriends = onCall(async (request) => {
+  exigeCadastro(request);
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   const uid = request.auth.uid;
   const meuSnap = await db.collection('users').doc(uid).get();
@@ -10433,6 +10459,7 @@ exports.getMyFriends = onCall(async (request) => {
 
 /* Só a contagem de pedidos, pro selo do botão na home -- a tela inteira é cara demais pra isso. */
 exports.getFriendRequestCount = onCall(async (request) => {
+  exigeCadastro(request);
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   const snap = await friendRequestsColl(request.auth.uid).get();
   return { count: snap.size };
@@ -10445,6 +10472,7 @@ exports.getFriendRequestCount = onCall(async (request) => {
    outra metade carrega -- e comparação com um lado vazio não compara nada.
    -------------------------------------------------------------------------- */
 exports.compareTrainers = onCall(async (request) => {
+  exigeCadastro(request);
   if(!request.auth){ throw new HttpsError('unauthenticated', 'Login necessário.'); }
   const uid = request.auth.uid;
   const alvo = String(request.data?.uid || '').trim();

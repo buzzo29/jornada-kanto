@@ -1,8 +1,8 @@
 /**
  * JOGAR SEM CRIAR CONTA -- o convidado (23/09/2026)
  *
- * O pedido: um jeito de jogar sem cadastro; os CINCO modos que envolvem outros treinadores
- * (Ligas, Ginasio da Cidade, Torre, Batalha Online, Ilhas Laranja) so dao pra VER; um botao
+ * O pedido: um jeito de jogar sem cadastro; os modos que envolvem outros treinadores (Ligas,
+ * Ginasio da Cidade, Torre, Batalha Online, Ilhas Laranja e -- desde 23/09 -- Amigos) so dao pra VER; um botao
  * "Criar Login" ao lado do nick; e -- a parte que faz a feature existir -- *"apos ele se
  * cadastrar, mantem os times que ele montou nessa conta"*.
  *
@@ -44,7 +44,10 @@ ok('existe um `exigeCadastro`', /function exigeCadastro\(request\)/.test(SRV));
    aqui o dado vem DENTRO do token, entao a guarda custa ZERO leitura -- e e isso que permite
    po-la em 39 callables sem pesar. Se alguem a trocar por uma leitura, 39 chamadas passam a
    custar uma leitura a mais cada. */
-const corpoGuarda = (SRV.match(/function exigeCadastro\(request\)\{[\s\S]*?\n\}/) || [''])[0];
+/* ⚠️ SAO DUAS FUNCOES: o `exigeCadastro` chama o `ehConvidado`, e sem as duas o `new Function`
+   abaixo estoura com ReferenceError -- e o teste acusaria a guarda inteira por um erro DELE. */
+const corpoGuarda = ((SRV.match(/function ehConvidado\(request\)\{[\s\S]*?\n\}/) || [''])[0]
+  + '\n' + (SRV.match(/function exigeCadastro\(request\)\{[\s\S]*?\n\}/) || [''])[0]);
 ok('  a fatia da guarda tem o que ler', corpoGuarda.length > 80, corpoGuarda.length + ' chars');
 ok('  ela NAO le o banco (custo zero)', !/db\.|await /.test(corpoGuarda));
 ok('  ela le o sign_in_provider do TOKEN', /sign_in_provider/.test(corpoGuarda));
@@ -79,32 +82,33 @@ ok('auth sem token nenhum nao estoura', tenta({ auth:{ uid:'u5' } }).uid === 'u5
    ============================================================================ */
 console.log('\nA COBERTURA (a callable nova tem que ser classificada)');
 const PROTEGIDAS = ['acceptOnlineMatch','challengeFriend','challengeLobbyPlayer','challengeNeighborhoodGym',
-'fightTrainerTowerFloor','getFishingRanking','getMyBattleHistory','getNeighborhoodGymChallengeCooldowns',
-'getNeighborhoodGymChallengeHistory','getNeighborhoodGymDetail','getNeighborhoodGymLeaderboard',
-'getOnlineBattle','getOnlineBattleReplay','getRaceRanking','getRescueRanking','getSelecaoRanking',
-'getTrainerTower','getTrainerTowerHistory','getTrainerTowerRanking','joinBattleLobby','joinBattleQueue',
-'leaveBattleLobby','leaveBattleQueue','leaveNeighborhoodGymLeadership','listMyNeighborhoodGyms',
-'pickOnlineBattlePokemon','pickOnlineBattleTeam','pollBattleQueue','registerIslandPlay',
-'reorderNeighborhoodGymDefense','resolveNeighborhood','respondFriendChallenge','sendSelecaoResult',
-'setNeighborhoodGymDefense','setTrainerTowerOrder','startTrainerTowerRun','submitFishingScore',
-'submitRaceTime','submitRescueScore'];
+'compareTrainers','fightTrainerTowerFloor','getFishingRanking','getFriendRequestCount','getMyBattleHistory',
+'getMyFriends','getNeighborhoodGymChallengeCooldowns','getNeighborhoodGymChallengeHistory',
+'getNeighborhoodGymDetail','getNeighborhoodGymLeaderboard','getOnlineBattle','getOnlineBattleReplay',
+'getRaceRanking','getRescueRanking','getSelecaoRanking','getTrainerProfile','getTrainerTower',
+'getTrainerTowerHistory','getTrainerTowerRanking','joinBattleLobby','joinBattleQueue','leaveBattleLobby',
+'leaveBattleQueue','leaveNeighborhoodGymLeadership','listMyNeighborhoodGyms','pickOnlineBattlePokemon',
+'pickOnlineBattleTeam','pollBattleQueue','registerIslandPlay','removeFriend','reorderNeighborhoodGymDefense',
+'resolveNeighborhood','respondFriendChallenge','respondFriendRequest','searchTrainers','sendFriendRequest',
+'sendSelecaoResult','setNeighborhoodGymDefense','setTrainerTowerOrder','startTrainerTowerRun',
+'submitFishingScore','submitRaceTime','submitRescueScore'];
 /* AS LIVRES, e o motivo de cada grupo:
    - JOGO PRINCIPAL (a jornada, a loja, a Pokedex, as moedas): e a conta DELE, e e o que o
      convidado veio jogar. Bloquear aqui seria bloquear o jogo.
    - AS TRES DE FORA DO MODO: a home e o apagar-save as chamam. Elas devolvem vazio pro convidado
      por construcao -- ele nunca lidera ginasio, porque o `setNeighborhoodGymDefense` esta preso.
    - ADMIN: ja tem o `exigeAdmin`, e admin nunca e convidado.
-   - AMIGOS: NAO foram pedidos. Ver a nota no fim deste arquivo.
+   - AMIGOS: PROTEGIDOS desde 23/09/2026, a pedido ("nao pode adicionar amigos enquanto nao cria
+     conta"). Sobram aqui o `pollFriendChallenge` e o `cancelFriendChallenge`: o poll ja nao e
+     agendado pro convidado e o cancel e limpeza -- bloquea-los so daria erro em console.
    - BOSS: nao esta nos cinco, e o evento esta desligado (`BOSS_ATIVO`). */
 const LIVRES = ['activateBoughtShinyBonus','activateEliteShinyBonus','activateMewtwoLoan','activateShinyBonus',
 'adminAddLeagueRegistration','adminLeagueQueue','adminListTrainers','adminRemoveLeagueRegistration','buyItem',
 'cancelFriendChallenge','checkMewtwoLoanUnlock','checkNeighborhoodGymDefenseForSlot','claimAchievementCoins',
-'claimEliteShinyBonus','claimJourneyCoins','compareTrainers','consumeEquipped','deleteNotification',
-'deleteNotifications','equipItem','fightSundayBoss','getFriendRequestCount','getMyActiveGymDefenses',
-'getMyFriends','getMyNotifications','getSundayBoss','getTrainerProfile','markNotificationsRead','payHardMode',
-'pollFriendChallenge','removeFriend','reportMewtwoBattleResult','rerollWildOffer','respondFriendRequest',
-'searchTrainers','sellItem','sendFriendRequest','syncTrainerSpecialties','unequipItem','usarTM','useRareCandy',
-'vacateNeighborhoodGymForDeletedSave'];
+'claimEliteShinyBonus','claimJourneyCoins','consumeEquipped','deleteNotification','deleteNotifications',
+'equipItem','fightSundayBoss','getMyActiveGymDefenses','getMyNotifications','getSundayBoss',
+'markNotificationsRead','payHardMode','pollFriendChallenge','reportMewtwoBattleResult','rerollWildOffer',
+'sellItem','syncTrainerSpecialties','unequipItem','usarTM','useRareCandy','vacateNeighborhoodGymForDeletedSave'];
 const TODAS = [...SRV.matchAll(/^exports\.([a-zA-Z0-9_]+) = onCall/gm)].map(m => m[1]).sort();
 ok('a varredura achou as callables', TODAS.length > 60, TODAS.length + ' callables');
 const semClasse = TODAS.filter(n => !PROTEGIDAS.includes(n) && !LIVRES.includes(n));
@@ -197,23 +201,23 @@ Promise.resolve().then(()=>{}); // a rejeicao e tratada dentro da funcao
 setTimeout(()=>{}, 0);
 
 console.log('\nA PORTA DOS CINCO MODOS');
-const MODOS = ['ligas','ginasio','torre','online','ilhas'];
-ok('os cinco modos estao na tabela', MODOS.every(m => S.CONVIDADO_MODOS[m]),
+const MODOS = ['ligas','ginasio','torre','online','ilhas','amigos'];
+ok('os modos estao na tabela', MODOS.every(m => S.CONVIDADO_MODOS[m]),
    Object.keys(S.CONVIDADO_MODOS).join(','));
 ok('  e cada um diz O QUE ELE E (o "ver o que e" do pedido)',
    MODOS.every(m => (S.CONVIDADO_MODOS[m].o || '').length > 40));
 ok('  e nenhum texto se repete', new Set(MODOS.map(m => S.CONVIDADO_MODOS[m].o)).size === MODOS.length);
 
 S.game.ehConvidado = false;
-ok('quem e CADASTRADO passa nos cinco', MODOS.every(m => S.exigeCadastro(m) === true));
+ok('quem e CADASTRADO passa em todos', MODOS.every(m => S.exigeCadastro(m) === true));
 S.game.ehConvidado = true;
 const recusou = MODOS.filter(m => { S.game.convidadoModal = null; return S.exigeCadastro(m) === false && S.game.convidadoModal === m; });
-ok('o CONVIDADO e recusado nos cinco, com o modal do modo certo', recusou.length === 5, recusou.join(','));
+ok('o CONVIDADO e recusado em todos, com o modal do modo certo', recusou.length === MODOS.length, recusou.join(','));
 
 /* os cinco BOTOES da home passam pela porta -- a acao e quem recusa, mas o botao tem que chamar */
 console.log('\nOS CINCO BOTOES DA HOME');
 [['ligas','openLeagueTypesList'],['ginasio','openNeighborhoodGymScreen'],['torre','openTrainerTower'],
- ['online','openOnlineBattle'],['ilhas','abrirIlhas']].forEach(([id, fn]) => {
+ ['online','openOnlineBattle'],['ilhas','abrirIlhas'],['amigos','openFriends']].forEach(([id, fn]) => {
   ok('  ' + fn + ' passa pela porta',
      HTML.includes(`onclick="if(exigeCadastro('${id}')) ${fn}()"`));
 });
@@ -221,7 +225,41 @@ console.log('\nOS CINCO BOTOES DA HOME');
    "⬅ Voltar" de DENTRO do proprio modo -- um Voltar que abre modal de cadastro. Foi a armadilha
    do padrao largo demais (a mesma das regex do `mlog-mais` e do `matchup-row`). */
 const portas = (HTML.match(/if\(exigeCadastro\('/g) || []).length;
-ok('  a porta esta em exatamente 5 lugares (nao nos "Voltar")', portas === 5, portas + ' lugares');
+/* ⚠️ O NUMERO SAI DA TABELA, nunca escrito: ele ja envelheceu uma vez -- era 5, e virou 6 quando
+   os Amigos entraram (23/09/2026). E a familia de trava que este projeto ve envelhecer toda vez
+   que uma regua muda (as cinco da metragem do revezamento, o "59 especies" da ficha). */
+const nModos = Object.keys(S.CONVIDADO_MODOS).length;
+ok('  a porta esta em UM lugar por modo (nao nos "Voltar")', portas === nModos,
+   portas + ' portas para ' + nModos + ' modos');
+
+/* ============================================================================
+   ⚠️ O PROVEDOR DESLIGADO NO CONSOLE -- o caso mais provavel de tudo isto nao funcionar, e o que
+   custou o PRIMEIRO relato desta feature: eu tratei so o `operation-not-allowed`, o Firebase
+   devolveu `auth/admin-restricted-operation`, e o jogador viu o generico "Algo deu errado. Tente
+   de novo." -- exatamente o "falhar calado" que a mensagem existe pra evitar.
+   ============================================================================ */
+console.log('\nQUANDO O ANONIMO ESTA DESLIGADO NO CONSOLE');
+[['auth/admin-restricted-operation', 'o que o Firebase devolve de verdade'],
+ ['auth/operation-not-allowed',      'a forma antiga, de outros SDKs']].forEach(([code, o]) => {
+  ok('  ' + code + ' explica o que houve  (' + o + ')', S.ehAnonimoDesligado({ code }));
+});
+ok('  e outro erro qualquer NAO cai nessa frase', !S.ehAnonimoDesligado({ code:'auth/network-request-failed' }));
+ok('  e `undefined` tambem nao', !S.ehAnonimoDesligado(undefined) && !S.ehAnonimoDesligado({}));
+
+console.log('\nO CONVIDADO NAO APARECE NA BUSCA DE TREINADORES');
+/* ⚠️ E o outro lado do "nao pode adicionar amigos": ele nao consegue ACEITAR pedido (o
+   `respondFriendRequest` esta protegido), entao um pedido mandado PRA ele ficaria pendente pra
+   sempre na conta de quem e cadastrado -- e a conta anonima e descartavel.
+   ⚠️ E NAO BASTA nao gravar o `trainerNameLower`: o `searchTrainers` tem uma SEGUNDA consulta, por
+   `trainerName` EXATO (a rede de seguranca pras contas antigas). Por isso o filtro e no resultado. */
+ok('o servidor sabe quem e convidado pelo TOKEN', /function ehConvidado\(request\)/.test(SRV));
+ok('  e a marca `anon` e gravada pelo SERVIDOR, nao pelo cliente',
+   /async function touchLastSeen\(uid, userData, anon\)/.test(SRV) && !/anon:\s*true/.test(HTML));
+ok('  o getMyNotifications passa o provedor (e o unico dos 4 que o convidado alcanca)',
+   /touchLastSeen\(uid, u\.exists \? u\.data\(\) : null, ehConvidado\(request\)\)/.test(SRV));
+const corpoBusca = (SRV.match(/exports\.searchTrainers = onCall[\s\S]*?\n\}\);/) || [''])[0];
+ok('  a fatia da busca tem o que ler', corpoBusca.length > 400, corpoBusca.length + ' chars');
+ok('  e a busca PULA quem esta marcado', /\.anon === true\) continue/.test(corpoBusca));
 
 console.log('\nO MODAL QUE EXPLICA');
 S.game.convidadoModal = 'torre';
@@ -274,7 +312,7 @@ S.game.ehConvidado = true;
      !S.__auth.chamadas.includes('signInWithPopup'));
   ok('  e o uid e o MESMO -- e por isso que os times ficam', S.auth.currentUser.uid === 'convidado-1');
   ok('  depois do vinculo ele deixa de ser convidado', S.game.ehConvidado === false);
-  ok('  e os cinco modos abrem', MODOS.every(m => S.exigeCadastro(m) === true));
+  ok('  e todos os modos abrem', MODOS.every(m => S.exigeCadastro(m) === true));
   ok('  e a home confirma o cadastro', S.game.linkFeito === true);
 
   /* e-mail/senha */
@@ -331,10 +369,7 @@ S.game.ehConvidado = true;
 
 /* ⚠️ O QUE FICOU DE FORA, e e decisao registrada -- nao esquecimento:
 
-   OS AMIGOS. O pedido nomeia CINCO modos, e a lista de amigos nao e um deles. Entao um convidado
-   consegue aparecer na busca de treinadores, mandar pedido de amizade e ser aceito -- e se ele
-   limpar o navegador, a conta anonima fica orfa e sobra um amigo fantasma na lista de quem e
-   cadastrado. O que ele NAO consegue e desafiar nem aceitar desafio (as duas estao protegidas),
-   que e a parte que vira batalha online.
-   Se um dia incomodar, sao 4 nomes a mover de LIVRES pra PROTEGIDAS: sendFriendRequest,
-   respondFriendRequest, searchTrainers e compareTrainers. */
+   O BOSS DE DOMINGO. Ele nao esta nos cinco modos do pedido, e o evento esta DESLIGADO
+   (`BOSS_ATIVO`) -- ou seja ele ja recusa todo mundo. Se voltar, entra aqui.
+
+   O `pollFriendChallenge` e o `cancelFriendChallenge` -- ver a nota das LIVRES acima. */
