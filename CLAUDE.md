@@ -5734,6 +5734,101 @@ Hoje ela pergunta o que sempre quis perguntar — **nenhuma REGRA QUE ALCANCE UM
 devolver o crispEdges — e continua acusando quando ele volta pro selo (conferido religando o
 defeito). É a mesma família de trava-que-envelhece que este arquivo já registra meia dúzia de vezes.
 
+### ⚠️ O ADVERSÁRIO NASCIA DENTRO DA PAREDE NO SUBMARINO AFUNDADO (22/09/2026)
+
+Reportado com print de uma luta no Submarino Afundado: *"o Gengar parece nao estar posicionado
+corretamente no chão? Ele esta na parede ... todos os cenários devem estar preparados para os
+pokemons ficarem numa base, a maioria esta correto, mas este não"*.
+
+**A cena põe o pé do jogador em 84% da altura e o do adversário em 64%, iguais nos 51** — e o
+CENÁRIO é que tem que ter chão nessas duas alturas. O comentário da tabela afirmava isso com todas
+as letras (*"cada cenário reserva chão livre para jogador (22%,84%) e adversário (78%,64%)"*), e
+**um dos 51 não reservava**.
+
+#### A MEDIÇÃO: o único com folga NEGATIVA
+
+Medido nos atlas, na coluna do adversário (78%), a folga entre o pé e a linha do horizonte:
+
+| cenário | horizonte | folga do pé (64%) |
+|---|---|---|
+| campo_aberto, hangar_gelado, tundra | 55% | **+9** |
+| vulcao, arena_suspensa | 49% | +15 |
+| dojo_tradicional | 50% | +14 |
+| mina_subterranea | 58% | +6 |
+| deserto | 63% | +1 |
+| **submarino_afundado** | **72%** | **−8** |
+
+**Ele é o ÚNICO negativo dos 51** — o pé nascia ACIMA do horizonte. Medida fina na coluna dele, o
+piso metálico só clareia a partir de **68%**; de 58% a 67% é a parede, com os canos e a escotilha.
+Era ali que o Gengar aparecia.
+
+**E a confirmação foi VISUAL, com a cena de verdade** — o `fighterHtml` do jogo, o cenário por
+terreno e o sprite, a 320px, comparando o Submarino com Campo Aberto, Hangar Gelado e Dojo: nos
+três o pokémon pisa no chão, no quarto ele flutua na escotilha. O usuário estava certo nas duas
+metades: **é um só, e a maioria está correta.**
+
+#### ⚠️ O CONSERTO É A POSIÇÃO, E NÃO O DESENHO — e isso foi medido antes de escolher
+
+O pedido foi *"ajustar o cenário"*, e a leitura literal seria repintar o atlas. Ela foi descartada
+com conta:
+
+- **os atlas são PNG prontos** (extraídos do `index-novos-graficos.html`), e **não existe gerador**
+  — não há de onde regerar o desenho;
+- **subir o horizonte pelo RECORTE exigiria 1,4× de zoom** (calculado: pra levar o horizonte de 72%
+  a 60% mantendo o rodapé na base, `k = 1,4`), o que **corta 40% da arte** e come justamente as
+  escotilhas e os canos do topo — a identidade do cenário. Consertaria a posição estragando o
+  cenário.
+
+Então o que se move é o **pé do adversário naquele cenário**: `CENARIO_CHAO_ADVERSARIO`.
+
+- **⚠️ SÓ AS EXCEÇÕES ENTRAM NA TABELA.** 50 dos 51 usam o padrão, e uma tabela com os 51 seria 50
+  linhas esperando pra divergir do CSS no primeiro ajuste — é a mesma razão pela qual as chances de
+  status vivem por golpe e não por espécie.
+- **⚠️ UMA VARIÁVEL SÓ, e a base de água/ar é DERIVADA dela** (`calc(100% - var(...))`): duas fontes
+  pro mesmo número divergiriam no primeiro ajuste, e o sintoma seria a base separada do sprite.
+- **O padrão mora no CSS** (`var(--battle-enemy-bottom,36%)`), então os outros 50 saem byte a byte
+  como saíam — conferido: **nenhum deles** carrega a variável.
+- **O valor é 27% (o pé em 73%)**, escolhido comparando **36/30/27/25/23 na cena REAL**: em 30% ele
+  ainda encosta na quina da parede, e de 25% pra baixo ele começa a **cobrir o cartão do pokémon do
+  jogador**. Em 73% a folga sobre o piso é +5, dentro da faixa dos outros cenários (+1 a +15).
+
+**CONFERIDO QUE NÃO É MOTOR, por impressão:** `MOTOR d19915312988 / DIARIO 741ec5a626c3`, idêntico.
+Bateria: **37 de 37**. E os **7 defeitos religados acusam** — inclusive o do **excesso** (a variável
+emitida pra todos) e o do **id fantasma** na tabela, que não daria erro nenhum: ele só nunca casaria,
+e o cenário continuaria com o defeito.
+
+#### ⚠️ E O COMENTÁRIO DA TABELA ESTAVA MENTINDO
+
+Ele afirmava que *"cada cenário reserva chão livre"* nas duas alturas — e era essa afirmação que
+fazia ninguém procurar a exceção. Hoje ele diz que a exceção existe e onde ela mora. É a mesma
+família do *"Golpe repete entre 2-5x"* e do *"Revezamento · 900 m"*: **texto que descreve uma regra
+envelhece quando a regra ganha exceção**.
+
+#### ⚠️ E TRÊS INSTRUMENTOS MEUS MENTIRAM ANTES DE UM FUNCIONAR
+
+Vale registrar porque os três são da mesma família — **medir com a régua errada dá um número
+plausível**:
+
+| tentativa | o que ela disse |
+|---|---|
+| contar pixels "cor de chão" pelas cores do `TERRAIN_SCENE_META` | **0% em todos os 51** — as cores da tabela não são as do PNG |
+| o índice do pixel usando a largura do tile | `undefined` em quase toda amostra: **1736/3 não é inteiro**, e eu usei o valor fracionário no índice `(y*tw+x)*4` |
+| "horizonte = onde a cor para de parecer com a do rodapé" | disse que o **Vulcão** tem horizonte em 91% e o Templo dos Monges em 94% — os dois têm chão amplo |
+
+**Um zero perfeito em 51 de 51 é mais suspeito que um número feio** — é a lição que este arquivo já
+registra na medição do Smeargle e nos quatro erros seguidos do congelamento. O que funcionou foi
+medir a **luminância** na coluna do adversário e, principalmente, **OLHAR a cena real**: o
+julgamento aqui é visual, e a métrica serve pra triar, não pra decidir.
+
+**⚠️ E O HEREDOC COMEU AS BARRAS DE UMA REGEX, de novo** (`\{([\s\S]*?)\n\}` virou `{([sS]*?)` com
+uma quebra de linha de verdade no meio) — a armadilha que este arquivo já registra três vezes. **Pra
+texto com escape, a ferramenta de edição de arquivo, nunca o heredoc.**
+
+**⚠️ E A TRAVA NASCEU ESTOURANDO EM VEZ DE FALHAR:** ela lia a tabela pelo sandbox, e `const` **não
+vira propriedade global** lá — o `Object.keys(undefined)` derrubava o arquivo inteiro de teste. Hoje
+ela lê a tabela do ARQUIVO. **Uma trava que estoura é pior que uma que falha: ela leva as vizinhas
+junto.**
+
 ### A CENA CHEGOU NA TORRE, NA LIGA E NO GINÁSIO DA CIDADE (22/09/2026)
 
 Três pedidos em sequência, no mesmo dia: *"na torre dos treinadores, pode deixar o cenário sendo

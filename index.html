@@ -1003,7 +1003,7 @@
     margin-left:-9%;margin-top:-4px;
   }
   .battle-fighter.player .battle-ground-base{left:22%;top:84%;}
-  .battle-fighter.enemy .battle-ground-base{left:78%;top:64%;}
+  .battle-fighter.enemy .battle-ground-base{left:78%;top:calc(100% - var(--battle-enemy-bottom,36%));}
   .battle-sprite-stage{
     position:absolute;width:36%;height:148px;margin:0;
     display:flex;align-items:flex-end;justify-content:center;
@@ -1011,7 +1011,7 @@
     will-change:transform,filter,opacity;
   }
   .battle-fighter.player .battle-sprite-stage{left:4%;bottom:16%;}
-  .battle-fighter.enemy .battle-sprite-stage{right:4%;top:auto;bottom:36%;}
+  .battle-fighter.enemy .battle-sprite-stage{right:4%;top:auto;bottom:var(--battle-enemy-bottom,36%);}
   .battle-sprite-stage::after{
     content:'';position:absolute;left:28%;right:28%;bottom:-3px;height:7px;
     border-radius:50%;background:rgba(24,32,39,.3);z-index:-1;
@@ -5888,9 +5888,14 @@ const TERRAINS = [
   { id:'torre_de_radio', name:'Torre de Rádio', icon:'📡', types:['Steel','Flying'] },
   { id:'ninho_blindado', name:'Ninho Blindado', icon:'🐲', types:['Steel','Dragon'] }
 ];
-/* 51 cenários em pixel art com câmera frontal. Cada cenário reserva chão livre
-   para jogador (22%,84%) e adversário (78%,64%). Os atlas ficam no CSS uma
-   única vez, embutidos no HTML; nenhuma imagem de terreno depende da rede. */
+/* 51 cenários em pixel art com câmera frontal. O pé do jogador fica em (22%,84%)
+   e o do adversário em (78%,64%).
+   ⚠️ E "cada cenário reserva chão livre nas duas alturas" era o que este comentário
+   AFIRMAVA -- e um dos 51 não reservava: no submarino_afundado o piso só começa em
+   68%, e o adversário nascia dentro da parede. Quem declara a exceção é o
+   `CENARIO_CHAO_ADVERSARIO`, lá embaixo, junto do estilo que a emite.
+   Os atlas ficam em assets/batalha (ver a nota do CSS); nenhum deles depende de rede
+   de terceiro. */
 const TERRAIN_SCENE_META = {
   vulcao:              ['volcano','#9ed8f5','#6b6670','#9a6547','#744436','#c48a61','#84523c','#ef6a32'],
   arena_suspensa:      ['floating','#9fddff','#ccecff','#b8d78d','#86ad68','#c9e3a5','#7fa35f','#ffffff'],
@@ -6252,12 +6257,36 @@ const TERRAIN_SCENE_TILES = {
     2
   ]
 };
+/* ⚠️ ONDE O PE DO ADVERSARIO PISA, quando o cenario NAO segue o padrao.
+   A cena poe o pe do jogador em 84% da altura e o do adversario em 64%, iguais nos 51 -- e o
+   cenario tem que ter CHAO nessas duas alturas. Medido nos atlas, na coluna do adversario, a
+   folga entre o pe e a linha do horizonte: campo_aberto +9, hangar_gelado +9, tundra +9, dojo
+   +14, vulcao +15, arena_suspensa +15, deserto +1, mina_subterranea +6 -- e o
+   **submarino_afundado -8**, o UNICO negativo dos 51: o horizonte dele fica em ~72% (o piso
+   metalico so comeca em 68%), entao o adversario nascia DENTRO da parede, em cima da escotilha.
+   Reportado com print em 22/09/2026: *"o Gengar parece nao estar posicionado corretamente no
+   chao, ele esta na parede"*.
+   ⚠️ E O CONSERTO E A POSICAO, nao o desenho: os atlas sao PNG prontos (nao ha gerador), e
+   subir o horizonte deles exigiria 1,4x de zoom no recorte -- o que cortaria 40% da arte e
+   comeria justamente as escotilhas, que sao a identidade do cenario. Medido.
+   ⚠️ SO AS EXCECOES ENTRAM AQUI: 50 dos 51 usam o padrao, e uma tabela com os 51 seria 50
+   linhas esperando pra divergir do CSS no primeiro ajuste. */
+const CENARIO_CHAO_ADVERSARIO = {
+  /* o pe em 73% (bottom 27%): 5 pontos abaixo do inicio do piso, dentro da faixa de folga dos
+     outros cenarios. Escolhido comparando 36/30/27/25/23 na cena REAL -- em 25% e abaixo ele
+     comeca a cobrir o cartao do pokemon do jogador. */
+  submarino_afundado: 27
+};
 function terrainBattleSceneStyle(terrain){
   const id = terrain && terrain.id;
   const tile = TERRAIN_SCENE_TILES[id] || TERRAIN_SCENE_TILES.campo_aberto;
   const [atlas, col, row, rows] = tile;
   const m = TERRAIN_SCENE_META[id] || TERRAIN_SCENE_META.campo_aberto;
-  return `--battle-atlas:${atlas};--battle-terrain-size:300% ${rows*100}%;--battle-terrain-position:${col*50}% ${row*100/(rows-1)}%;--battle-platform:${m[5]};--battle-platform-dark:${m[6]};--battle-platform-accent:${m[7]};`;
+  /* ⚠️ UMA VARIAVEL SO, e a posicao da base de agua/ar e DERIVADA dela no CSS: duas fontes pro
+     mesmo numero divergiriam no primeiro ajuste, e o sintoma seria a base separada do sprite. */
+  const chao = CENARIO_CHAO_ADVERSARIO[id];
+  return `--battle-atlas:${atlas};--battle-terrain-size:300% ${rows*100}%;--battle-terrain-position:${col*50}% ${row*100/(rows-1)}%;--battle-platform:${m[5]};--battle-platform-dark:${m[6]};--battle-platform-accent:${m[7]};`
+    + (chao == null ? `` : `--battle-enemy-bottom:${chao}%;`);
 }
 
 /* Espécies que visualmente precisam de água sob o sprite. Não é regra de
