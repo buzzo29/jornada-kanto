@@ -5897,8 +5897,14 @@ Depois de ver a cena, três pedidos em sequência:
 1. ***"jogar o sprite do pokemon adversario um pouco para a direita"*** — o X dele andou **+4 pontos
    em todos os 51**, somado ao valor de cada um. **⚠️ NÃO É UM X FIXO**: as posições foram afinadas
    uma a uma (cada cenário tem chão num lugar), e cravar um número jogaria fora essa afinação.
-   Somando, a diferença relativa entre eles fica de pé. Medido: o maior X vai a 78%, e **nenhum
-   sprite sai da cena** nos 51.
+   Somando, a diferença relativa entre eles fica de pé.
+   ⚠️ **E ELE VOLTOU 2 PONTOS no mesmo dia** (*"coloque o pokemon e a sombra dele um pouco para a
+   esquerda"*), ou seja o saldo é **+2**. Medido: o centro do adversário fica entre **69,5% e
+   75,4%** da cena, **nenhum sprite sai** nos 51 e a sobreposição com o cartão continua **ZERO**.
+   ⚠️ **O POKÉMON E A SOMBRA ANDAM JUNTOS POR CONSTRUÇÃO** — os dois leem a MESMA variável
+   (`--battle-enemy-x`): o palco em `left:calc(X − 20%)` e a sombra em `left:X`. Medido, o empurrão
+   de 1% que a sombra tem por cima (a média do pé) se preserva: ela continua a **−2px** do centro
+   da caixa do sprite nos 51.
 2. ***"diminuir a altura do quadro da luta em 20%"*** — **480 → 384px** (e 460 → 368 no celular).
    ⚠️ **Só a altura**: a largura da cena nunca foi tocada — ela é 100% do container, como sempre foi.
 3. ***"mover a sombra do adversario para a esquerda e subir ela um pouco para ficar no pé"*** — ver
