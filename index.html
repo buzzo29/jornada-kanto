@@ -1003,7 +1003,7 @@
     margin-left:-9%;margin-top:-4px;
   }
   .battle-fighter.player .battle-ground-base{left:22%;top:84%;}
-  .battle-fighter.enemy .battle-ground-base{left:78%;top:calc(100% - var(--battle-enemy-bottom,36%));}
+  .battle-fighter.enemy .battle-ground-base{left:78%;top:64%;}
   .battle-sprite-stage{
     position:absolute;width:36%;height:148px;margin:0;
     display:flex;align-items:flex-end;justify-content:center;
@@ -1011,7 +1011,7 @@
     will-change:transform,filter,opacity;
   }
   .battle-fighter.player .battle-sprite-stage{left:4%;bottom:16%;}
-  .battle-fighter.enemy .battle-sprite-stage{right:4%;top:auto;bottom:var(--battle-enemy-bottom,36%);}
+  .battle-fighter.enemy .battle-sprite-stage{right:4%;top:auto;bottom:36%;}
   .battle-sprite-stage::after{
     content:'';position:absolute;left:28%;right:28%;bottom:-3px;height:7px;
     border-radius:50%;background:rgba(24,32,39,.3);z-index:-1;
@@ -5889,13 +5889,35 @@ const TERRAINS = [
   { id:'ninho_blindado', name:'Ninho Blindado', icon:'🐲', types:['Steel','Dragon'] }
 ];
 /* 51 cenários em pixel art com câmera frontal. O pé do jogador fica em (22%,84%)
-   e o do adversário em (78%,64%).
+   e o do adversário em (78%,64%). Os atlas ficam em assets/batalha (ver a nota do
+   CSS); nenhuma imagem de terreno depende de rede de terceiro.
+
    ⚠️ E "cada cenário reserva chão livre nas duas alturas" era o que este comentário
-   AFIRMAVA -- e um dos 51 não reservava: no submarino_afundado o piso só começa em
-   68%, e o adversário nascia dentro da parede. Quem declara a exceção é o
-   `CENARIO_CHAO_ADVERSARIO`, lá embaixo, junto do estilo que a emite.
-   Os atlas ficam em assets/batalha (ver a nota do CSS); nenhum deles depende de rede
-   de terceiro. */
+   AFIRMAVA -- e UM dos 51 não reserva. DEFEITO CONHECIDO E MEDIDO (22/09/2026),
+   deixado como está de propósito:
+
+   No `submarino_afundado` o piso metálico só começa em **68%** da altura (medido no
+   atlas, na coluna do adversário; de 58% a 67% é a parede com os canos e a
+   escotilha), então o adversário nasce DENTRO da parede. Ele é o único dos 51 com
+   folga negativa -- a folga dos outros vai de +1 (deserto) a +15 (vulcão).
+
+   ⚠️ NÃO HÁ ONDE PÔR O SPRITE, e isso foi medido, não suposto: o cartão do jogador
+   começa em **65,8%** da altura, ou seja ABAIXO de 68% -- descer o pé até o piso
+   invade o cartão (medido: 1.667px² de sobreposição a 73%). E mover pra a esquerda
+   só troca de vítima: a 45% ele cobre 582px² do cartão E 805px² do pokémon do
+   jogador; a 58%, 1.758px² do pokémon. A posição de hoje é a ÚNICA com zero
+   conflito nos dois lados.
+
+   ⚠️ E CONSERTAR PELO RECORTE CUSTA A ARTE: pra subir o horizonte de 72% para 60%
+   seria preciso 1,4x de zoom no tile (conta: com o rodapé ancorado, o horizonte
+   aparente é 1 - 0,28k), o que corta ~40% da imagem e come justamente as escotilhas
+   e os canos do topo -- a identidade do cenário. E os atlas são PNG prontos: não há
+   gerador pra redesenhar o piso mais alto.
+
+   Uma tentativa de conserto pela posição chegou a ir pro ar e foi revertida no mesmo
+   dia: ela trocou "flutua na parede" por "cobre o cartão", que é pior. Se um dia
+   isto for pra valer, o caminho é REDESENHAR o tile (subir a linha do piso na arte),
+   não mexer na posição. */
 const TERRAIN_SCENE_META = {
   vulcao:              ['volcano','#9ed8f5','#6b6670','#9a6547','#744436','#c48a61','#84523c','#ef6a32'],
   arena_suspensa:      ['floating','#9fddff','#ccecff','#b8d78d','#86ad68','#c9e3a5','#7fa35f','#ffffff'],
@@ -6257,36 +6279,12 @@ const TERRAIN_SCENE_TILES = {
     2
   ]
 };
-/* ⚠️ ONDE O PE DO ADVERSARIO PISA, quando o cenario NAO segue o padrao.
-   A cena poe o pe do jogador em 84% da altura e o do adversario em 64%, iguais nos 51 -- e o
-   cenario tem que ter CHAO nessas duas alturas. Medido nos atlas, na coluna do adversario, a
-   folga entre o pe e a linha do horizonte: campo_aberto +9, hangar_gelado +9, tundra +9, dojo
-   +14, vulcao +15, arena_suspensa +15, deserto +1, mina_subterranea +6 -- e o
-   **submarino_afundado -8**, o UNICO negativo dos 51: o horizonte dele fica em ~72% (o piso
-   metalico so comeca em 68%), entao o adversario nascia DENTRO da parede, em cima da escotilha.
-   Reportado com print em 22/09/2026: *"o Gengar parece nao estar posicionado corretamente no
-   chao, ele esta na parede"*.
-   ⚠️ E O CONSERTO E A POSICAO, nao o desenho: os atlas sao PNG prontos (nao ha gerador), e
-   subir o horizonte deles exigiria 1,4x de zoom no recorte -- o que cortaria 40% da arte e
-   comeria justamente as escotilhas, que sao a identidade do cenario. Medido.
-   ⚠️ SO AS EXCECOES ENTRAM AQUI: 50 dos 51 usam o padrao, e uma tabela com os 51 seria 50
-   linhas esperando pra divergir do CSS no primeiro ajuste. */
-const CENARIO_CHAO_ADVERSARIO = {
-  /* o pe em 73% (bottom 27%): 5 pontos abaixo do inicio do piso, dentro da faixa de folga dos
-     outros cenarios. Escolhido comparando 36/30/27/25/23 na cena REAL -- em 25% e abaixo ele
-     comeca a cobrir o cartao do pokemon do jogador. */
-  submarino_afundado: 27
-};
 function terrainBattleSceneStyle(terrain){
   const id = terrain && terrain.id;
   const tile = TERRAIN_SCENE_TILES[id] || TERRAIN_SCENE_TILES.campo_aberto;
   const [atlas, col, row, rows] = tile;
   const m = TERRAIN_SCENE_META[id] || TERRAIN_SCENE_META.campo_aberto;
-  /* ⚠️ UMA VARIAVEL SO, e a posicao da base de agua/ar e DERIVADA dela no CSS: duas fontes pro
-     mesmo numero divergiriam no primeiro ajuste, e o sintoma seria a base separada do sprite. */
-  const chao = CENARIO_CHAO_ADVERSARIO[id];
-  return `--battle-atlas:${atlas};--battle-terrain-size:300% ${rows*100}%;--battle-terrain-position:${col*50}% ${row*100/(rows-1)}%;--battle-platform:${m[5]};--battle-platform-dark:${m[6]};--battle-platform-accent:${m[7]};`
-    + (chao == null ? `` : `--battle-enemy-bottom:${chao}%;`);
+  return `--battle-atlas:${atlas};--battle-terrain-size:300% ${rows*100}%;--battle-terrain-position:${col*50}% ${row*100/(rows-1)}%;--battle-platform:${m[5]};--battle-platform-dark:${m[6]};--battle-platform-accent:${m[7]};`;
 }
 
 /* Espécies que visualmente precisam de água sob o sprite. Não é regra de
