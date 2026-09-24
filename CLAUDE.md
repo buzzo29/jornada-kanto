@@ -7254,10 +7254,10 @@ choveria porque está chovendo HOJE — ou não choveria tendo chovido.
 
 #### SÃO DUAS CAMADAS, E O QUE AS SEPARA É O POKÉMON NO MEIO
 
-| | ladrilhos | passo por ciclo | duração | velocidade | z-index |
-|---|---|---|---|---|---|
-| **trás** | 20×8 e 40×24 | (−40, 120) | .36s | **333 px/s** | **2** |
-| **frente** | 28×14 e 56×42 | (−56, 168) | .34s | **494 px/s** | **7** |
+| | ladrilho | gotas nele | passo por ciclo | duração | velocidade | z-index |
+|---|---|---|---|---|---|---|
+| **trás** | 84×126 | 23 | (−84, 252) | .76s | **332 px/s** | **2** |
+| **frente** | 60×90 | 7 | (−60, 180) | .36s | **500 px/s** | **7** |
 
 **⚠️ É O z-index QUE PÕE O BICHO DENTRO DA CHUVA em vez de na frente de um papel de parede.** A pilha
 da cena é grade=1, lutadores=0, impacto=2, palco do sprite=5, efeitos=8, painel e número de dano=10:
@@ -7265,7 +7265,7 @@ a de **trás** fica atrás do pokémon e a da **frente** passa na frente dele �
 do número de dano e do painel**, porque chuva por cima deles esconderia justamente o que o jogador
 está lendo naquele instante.
 
-- **AS DUAS CAEM COM A MESMA INCLINAÇÃO** (3, ou seja 120/40 = 168/56): é o mesmo vento. A de trás
+- **AS DUAS CAEM COM A MESMA INCLINAÇÃO** (3, ou seja 252/84 = 180/60): é o mesmo vento. A de trás
   cai mais devagar porque ela está longe — é a paralaxe que dá profundidade, e há trava cobrando a
   ordem (invertida, a chuva longe correria mais que a de perto).
 - **⚠️ O ÂNGULO DO GRADIENTE NÃO É A INCLINAÇÃO: é `atan2(dy,dx)`, e a conta engana.** No CSS a
@@ -7298,7 +7298,7 @@ coisas são **uma conta e não uma opinião**: com passo `(dx,dy)` e camadas `(w
 sub-passo invariante se e só se o **mdc de todos os `dx/w_i` e `dy/h_i` é maior que 1**. Medido: nas
 duas camadas ele é **1** — zero sub-passos invariantes.
 
-- **A FOLGA DO `inset` COBRE UM CICLO INTEIRO** (`-130px -48px` atrás, `-180px -64px` na frente),
+- **A FOLGA DO `inset` COBRE UM CICLO INTEIRO** (`-260px -96px` atrás, `-190px -70px` na frente),
   senão a borda de cima aparece **vazia** no fim dele. O que sobra é clipado pelo `overflow:hidden`
   da cena, então a folga é de graça.
 - **⚠️ O MOVIMENTO É `transform`, NUNCA `background-position`:** aquele é composto na GPU e este
@@ -7314,8 +7314,8 @@ toda abertura**, porque o Hosting nunca devolve 304 pra ele. Um PNG embutido ent
 
 | | |
 |---|---|
-| o arquivo | 2.680.848 → **2.685.695 bytes** (+4.847, quase tudo comentário) |
-| **o que TRAFEGA (gzip)** | **849,5 → 851,2 KB — +1.749 bytes** |
+| o arquivo | 2.680.848 → **2.690.706 bytes** (+9.858, quase tudo comentário) |
+| **o que TRAFEGA (gzip)** | **849,5 → 852,2 KB — +2.806 bytes** |
 | e **zero** quando não chove | a função devolve string vazia: nem as camadas existem no DOM |
 
 #### O QUE FOI MEDIDO
@@ -7338,9 +7338,9 @@ uma linha do que a trava lê** — zero ocorrências de `sequenciaDoConfronto`, 
 `buildAnimatedHitSequence` e `simulateGymBattle` nas 76 linhas mexidas. Mais a impressão idêntica e
 3 rodadas limpas em seguida.
 
-- **Se um dia incomodar**, as réguas são a **opacidade** das faixas (`.52`/`.30` atrás, `.60`/`.32` na
-  frente) e a **duração** — e mexer no passo obriga a refazer a conta do ciclo, que é o que a trava
-  cobra. Tirar a chuva inteira é uma linha no `chuvaDaCenaHtml`.
+- **Se um dia incomodar**, as réguas são a **densidade** (as células do gerador), a **opacidade** das
+  faixas de peso e a **duração** — e mexer no passo obriga a refazer a conta do ciclo, que é o que a
+  trava cobra. Tirar a chuva inteira é uma linha no `chuvaDaCenaHtml`.
 
 `tools/test-terrenos.js` ganhou **20 asserções**, e todas leem os números **do `index.html`**
 (escritos no teste, ele mediria a si mesmo): as duas camadas existindo, o passo sendo inteiro em TODA
@@ -7350,6 +7350,98 @@ função só emitindo com `m.chuva`, as duas camadas, e — a que importa — **
 chamando a chuva**, contado contra o **número de cenas** e não contra um 5 escrito ali, que
 envelheceria na sexta.
 **Conferido que os 13 defeitos religados acusam.**
+
+#### ⚠️ E ELA NASCEU COM LISTRAS, QUE É O QUE `linear-gradient` SABE FAZER (24/09/2026)
+
+Reportado no mesmo dia: *"os traços da chuva tão muito contínuo, seguindo o mesmo padrão, deixe
+aleatório e correndo na diagonal para dar impressão de chuva mesmo"*.
+
+**⚠️ E A CAUSA NÃO É AJUSTE, É O QUE A FERRAMENTA PRODUZ: `linear-gradient` só faz listra
+INFINITA.** Ela atravessa o ladrilho de ponta a ponta e **EMENDA com a do vizinho** — o comprimento
+do traço fica preso ao tamanho do ladrilho, e ladrilho pequeno (que é o que o ciclo pede, pra o
+salto do recomeço ser pequeno) é justamente o que faz a emenda. Não existe `linear-gradient` que
+dê traço curto: o que se vê é sempre uma **grade de riscos contínuos**.
+
+**Hoje cada camada é um LADRILHO SVG com gotas curtas**, e o ladrilho continua sendo ladrilho — é
+ele que sustenta a conta do ciclo. **O que mudou foi o desenho DENTRO dele, não a mecânica.**
+
+| | antes | **hoje** |
+|---|---|---|
+| o desenho | 2 `linear-gradient` por camada | um **ladrilho SVG** por camada |
+| o traço | **atravessa o ladrilho** e emenda | **17% dele** (trás) e 37% (frente) |
+| as posições | uma listra por ladrilho, em fileira | **jitter em grade**, uma gota por célula |
+| trás | ladrilho 20×8 e 40×24 | **84×126**, 23 gotas, passo (−84, 252), .76s |
+| frente | 28×14 e 56×42 | **60×90**, 7 gotas, passo (−60, 180), .36s |
+| velocidade | 333 / 494 px/s | 332 / **500** px/s |
+| gzip | +1.749 bytes | **+1.057** |
+
+#### ⚠️ JITTER EM GRADE, NUNCA SORTEIO UNIFORME PURO
+
+Uniforme puro **AGLOMERA** — buracos grandes e três gotas coladas —, e **o olho lê aglomerado como
+padrão tanto quanto lê fileira**. Uma gota por célula, deslocada dentro dela, dá a aparência de
+acaso sem a aparência de grade — desde que o jitter cubra a célula inteira.
+
+- **⚠️ E O WRAP É OBRIGATÓRIO: a gota que sai por uma borda tem que REENTRAR pela oposta.** Sem ele
+  sobra uma faixa vazia em volta do ladrilho e a repetição vira **uma grade de corredores** — o
+  padrão que este desenho existe pra tirar. Só as cópias que podem tocar o ladrilho são desenhadas
+  (o SVG recorta o resto), então isso custa uma ou duas por gota, não nove. Há trava.
+- **O desenho é GERADO e semeado** (o gerador vive no scratchpad), como os selos: o que vai pro
+  jogo é o resultado. Regerar com a mesma semente dá o mesmo desenho.
+
+#### ⚠️ O CUSTO CAIU 4,2× AGRUPANDO AS GOTAS — e isso não é só byte
+
+`stroke-width` e `opacity` escritos em **cada** gota são quase metade do arquivo. Com um `<g>` por
+faixa de peso e **UM `<path>` com vários subcaminhos** dentro dele, o atributo sai uma vez por
+faixa: medido, **10,1 KB → 2,4 KB** na mesma densidade.
+
+**⚠️ E ELA CONTINUA SENDO DESENHO, não imagem:** a regra da casa (nenhuma imagem de fora) mais a
+lição dos atlas — um PNG embutido entraria na conta do `index.html`, que é baixado **INTEIRO em
+toda abertura** porque o Hosting nunca devolve 304 pra ele.
+
+#### ⚠️ E A TRAVA NOVA PEGOU UM DEFEITO MEU NA PRIMEIRA VEZ QUE RODOU
+
+Arredondar as coordenadas pra inteiro (a otimização de bytes) **entorta a inclinação das gotas
+curtas**: com `dx` e `dy` arredondados em separado, um traço de 10px sai com `10/3 = 3,33` em vez
+de 3 — e num traço desse tamanho o erro se vê. **2 das 33 gotas** da camada de trás estavam tortas.
+
+O conserto não custa um byte: **`dy` é DERIVADO do `dx`** (`dy = -dx × k`), e aí a inclinação é
+exata pra qualquer `dx` inteiro.
+
+#### AS TRÊS TRAVAS QUE O PEDIDO CRIOU
+
+Elas leem o SVG do `index.html`, decodificam os paths e medem o desenho — não um número escrito no
+teste:
+
+| | o que ela impede |
+|---|---|
+| **o desenho são GOTAS, nunca listras de `linear-gradient`** | a regressão literal do relato |
+| **nenhuma gota atravessa o ladrilho** | atravessando, ela emenda com a do vizinho e **vira listra** — o critério é estrutural, não um limiar de gosto |
+| **toda gota cai na MESMA inclinação do passo** | desenhada noutra, o risco atravessa a trajetória em vez de segui-la — a gota anda de lado |
+| **a gota da borda REENTRA pela oposta** | o corredor vazio que vira grade |
+
+**⚠️ E AS DUAS QUE MEDIAM O ÂNGULO DO GRADIENTE NÃO FORAM APAGADAS: elas viraram as da inclinação
+das GOTAS.** A conta do `atan2` continua registrada acima porque ela é a lição do
+`linear-gradient`; o que ela media deixou de existir quando o desenho mudou de ferramenta.
+
+#### O QUE FOI MEDIDO
+
+**A 320px, no navegador, com e sem chuva:** documento em **320 de 320** (sem rolagem lateral), a
+cena com a **MESMA altura nos dois casos (368px)**, **2 camadas com chuva e ZERO sem**, z-index 2 e
+7, `pointer-events:none` nas duas, e o texto do painel do lutador em **16,47:1** de contraste
+(o mínimo do AA é 4,5).
+
+**NO MOTOR, NADA:** `MOTOR e6cd16d15e0f / DIARIO 1e9b7214c627`, idêntico ao HEAD em 900 batalhas
+semeadas.
+
+- **A densidade é a régua, e ela foi escolhida OLHANDO** — quatro níveis comparados lado a lado na
+  cena real, a 320px. A escolhida é a mais rala das quatro (**23 gotas por ladrilho na de trás, 7
+  na da frente**): ela lê como chuva e deixa o cenário e os pokémon respirarem.
+  Mexer nela é mexer nas `colunas`/`linhas` do gerador, e o custo em bytes anda junto.
+- **⚠️ E O QUE NÃO SE MEXE SEM REFAZER A CONTA é o PASSO**: ele tem que continuar sendo um número
+  inteiro de ladrilhos, e nenhum sub-passo pode repetir o padrão. As duas coisas são cobradas pela
+  trava, lendo os números do arquivo.
+
+**Conferido que os 15 defeitos religados acusam.**
 
 ### ⚠️ O QUE FICA EM ABERTO
 

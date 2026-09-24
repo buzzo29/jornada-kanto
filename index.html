@@ -959,36 +959,80 @@
      ⚠️ E ELA É DESENHO, não imagem: a regra da casa (nenhuma imagem de fora) mais a lição dos
      atlas -- um PNG embutido cresceria o index.html, que é baixado INTEIRO em toda abertura do
      jogo, porque o Hosting nunca devolve 304 pra ele. Em CSS ela custa ~1 KB. */
+  /* ⚠️ O DESENHO SAO GOTAS CURTAS, e nao listras: um `linear-gradient` so produz listra INFINITA
+     -- ela atravessa o ladrilho de ponta a ponta e EMENDA com a do vizinho, formando uma grade de
+     riscos continuos. O comprimento do traco fica preso ao tamanho do ladrilho, e ladrilho pequeno
+     (que e o que o loop pede) e justamente o que faz a emenda. Foi assim que a chuva nasceu, e foi
+     reportado: "os tracos tao muito continuo, seguindo o mesmo padrao".
+     Hoje cada camada e um LADRILHO SVG com as gotas espalhadas por jitter em grade -- uma por
+     celula, deslocada dentro dela. ⚠️ Sorteio uniforme puro nao serve: ele AGLOMERA, e o olho le
+     aglomerado como padrao tanto quanto le fileira.
+     ⚠️ E O LADRILHO CONTINUA SENDO LADRILHO: e ele que sustenta a conta do ciclo logo abaixo. O
+     que mudou foi o desenho DENTRO dele, nao a mecanica.
+     ⚠️ ELE E GERADO (tools do scratchpad), nao escrito a mao -- como os selos, o que vai pro jogo
+     e o resultado. As gotas sao agrupadas por peso num <path> com varios subcaminhos: `stroke-width`
+     e `opacity` escritos em cada gota sao quase metade do arquivo. Medido: 5x menor.
+     ⚠️ E ELA E DESENHO, nao imagem: a regra da casa (nenhuma imagem de fora) mais a licao dos
+     atlas -- um PNG embutido cresceria o index.html, que e baixado INTEIRO em toda abertura do
+     jogo, porque o Hosting nunca devolve 304 pra ele. */
+  /* ⚠️ O DESENHO SAO GOTAS CURTAS, e nao listras: um `linear-gradient` so produz listra INFINITA
+     -- ela atravessa o ladrilho de ponta a ponta e EMENDA com a do vizinho, formando uma grade de
+     riscos continuos. O comprimento do traco fica preso ao tamanho do ladrilho, e ladrilho pequeno
+     (que e o que o loop pede) e justamente o que faz a emenda. Foi assim que a chuva nasceu, e foi
+     reportado: "os tracos tao muito continuo, seguindo o mesmo padrao".
+     Hoje cada camada e um LADRILHO SVG com as gotas espalhadas por jitter em grade -- uma por
+     celula, deslocada dentro dela. ⚠️ Sorteio uniforme puro nao serve: ele AGLOMERA, e o olho le
+     aglomerado como padrao tanto quanto le fileira.
+     ⚠️ E O LADRILHO CONTINUA SENDO LADRILHO: e ele que sustenta a conta do ciclo logo abaixo. O
+     que mudou foi o desenho DENTRO dele, nao a mecanica.
+     ⚠️ ELE E GERADO (tools do scratchpad), nao escrito a mao -- como os selos, o que vai pro jogo
+     e o resultado. As gotas sao agrupadas por peso num <path> com varios subcaminhos: `stroke-width`
+     e `opacity` escritos em cada gota sao quase metade do arquivo. Medido: 5x menor.
+     ⚠️ E ELA E DESENHO, nao imagem: a regra da casa (nenhuma imagem de fora) mais a licao dos
+     atlas -- um PNG embutido cresceria o index.html, que e baixado INTEIRO em toda abertura do
+     jogo, porque o Hosting nunca devolve 304 pra ele. */
+  /* ⚠️ O DESENHO SAO GOTAS CURTAS, e nao listras: um `linear-gradient` so produz listra INFINITA
+     -- ela atravessa o ladrilho de ponta a ponta e EMENDA com a do vizinho, formando uma grade de
+     riscos continuos. O comprimento do traco fica preso ao tamanho do ladrilho, e ladrilho pequeno
+     (que e o que o loop pede) e justamente o que faz a emenda. Foi assim que a chuva nasceu, e foi
+     reportado: "os tracos tao muito continuo, seguindo o mesmo padrao".
+     Hoje cada camada e um LADRILHO SVG com as gotas espalhadas por jitter em grade -- uma por
+     celula, deslocada dentro dela. ⚠️ Sorteio uniforme puro nao serve: ele AGLOMERA, e o olho le
+     aglomerado como padrao tanto quanto le fileira.
+     ⚠️ E O LADRILHO CONTINUA SENDO LADRILHO: e ele que sustenta a conta do ciclo logo abaixo. O
+     que mudou foi o desenho DENTRO dele, nao a mecanica.
+     ⚠️ ELE E GERADO (tools do scratchpad), nao escrito a mao -- como os selos, o que vai pro jogo
+     e o resultado. As gotas sao agrupadas por peso num <path> com varios subcaminhos: `stroke-width`
+     e `opacity` escritos em cada gota sao quase metade do arquivo. Medido: 5x menor.
+     ⚠️ E ELA E DESENHO, nao imagem: a regra da casa (nenhuma imagem de fora) mais a licao dos
+     atlas -- um PNG embutido cresceria o index.html, que e baixado INTEIRO em toda abertura do
+     jogo, porque o Hosting nunca devolve 304 pra ele. */
   .battle-chuva{
     position:absolute;pointer-events:none;background-repeat:repeat;will-change:transform;
   }
-  /* a de TRÁS: fina, esparsa e mais lenta -- é a que está longe. ⚠️ A folga do `inset` tem que
-     cobrir o caminho de UM CICLO (o `translate3d` logo abaixo), senão a borda de cima aparece
-     vazia no fim dele; o que sobra é clipado pelo overflow:hidden da cena, então a folga é de
-     graça. Há trava cobrando a conta -- ela é a que envelhece se alguém mexer no passo. */
+  /* a de TRAS: fina, esparsa e mais lenta -- e a que esta longe, e o veu dela e o ceu fechando.
+     ⚠️ A folga do `inset` tem que cobrir o caminho de UM CICLO (o `translate3d` logo abaixo),
+     senao a borda de cima aparece vazia no fim dele; o que sobra e clipado pelo overflow:hidden
+     da cena, entao a folga e de graca. Ha trava cobrando a conta. */
   .battle-chuva.atras{
-    inset:-130px -48px -8px -48px;
+    inset:-260px -96px -8px -96px;
     z-index:2;
     background-color:rgba(38,62,96,.12);
-    background-image:
-      linear-gradient(108deg,transparent 0 47%,rgba(226,240,255,.52) 47% 52%,transparent 52% 100%),
-      linear-gradient(108deg,transparent 0 60%,rgba(226,240,255,.30) 60% 62.5%,transparent 62.5% 100%);
-    background-size:20px 8px, 40px 24px;
-    animation:battle-chuva-atras .36s linear infinite;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='84' height='126' viewBox='0 0 84 126'%3E%3Cg fill='none' stroke='%23e2f0ff' stroke-linecap='round'%3E%3Cg stroke-width='.8' opacity='.3'%3E%3Cpath d='M5 10l-4 12M14 73l-6 18M20 77l-4 12M26 40l-4 12M40 101l-5 15M42 117l-7 21M42 -9l-7 21M62 40l-6 18M43 51l-6 18M68 125l-6 18M68 -1l-6 18'/%3E%3C/g%3E%3Cg stroke-width='1.1' opacity='.45'%3E%3Cpath d='M24 10l-4 12M25 73l-4 12M63 15l-3 9'/%3E%3C/g%3E%3Cg stroke-width='1.5' opacity='.62'%3E%3Cpath d='M13 41l-6 18M13 113l-7 21M13 -13l-7 21M43 84l-4 12M53 103l-4 12M65 6l-4 12M83 26l-7 21M75 71l-5 15M65 85l-6 18'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+    background-size:84px 126px;
+    animation:battle-chuva-atras 0.76s linear infinite;
   }
-  /* a da FRENTE: maior, mais clara e mais rápida -- é a que passa perto. Ela veia o pokémon de
-     leve, e é isso que põe o bicho DENTRO da chuva em vez de na frente de um papel de parede. */
+  /* a da FRENTE: maior, mais clara e mais rapida -- e a que passa perto. Ela veia o pokemon de
+     leve, e e isso que poe o bicho DENTRO da chuva em vez de na frente de um papel de parede. */
   .battle-chuva.frente{
-    inset:-180px -64px -8px -64px;
+    inset:-190px -70px -8px -70px;
     z-index:7;
-    background-image:
-      linear-gradient(108deg,transparent 0 45%,rgba(255,255,255,.60) 45% 49.5%,transparent 49.5% 100%),
-      linear-gradient(108deg,transparent 0 68%,rgba(255,255,255,.32) 68% 70%,transparent 70% 100%);
-    background-size:28px 14px, 56px 42px;
-    animation:battle-chuva-frente .34s linear infinite;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='90' viewBox='0 0 60 90'%3E%3Cg fill='none' stroke='%23ffffff' stroke-linecap='round'%3E%3Cg stroke-width='1.5' opacity='.52'%3E%3Cpath d='M18 43l-10 30M29 66l-5 15M48 15l-11 33M43 81l-10 30M43 -9l-10 30'/%3E%3C/g%3E%3Cg stroke-width='2' opacity='.7'%3E%3Cpath d='M11 17l-8 24M52 33l-9 27'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+    background-size:60px 90px;
+    animation:battle-chuva-frente 0.36s linear infinite;
   }
-  @keyframes battle-chuva-atras{ to{ transform:translate3d(-40px,120px,0); } }
-  @keyframes battle-chuva-frente{ to{ transform:translate3d(-56px,168px,0); } }
+  @keyframes battle-chuva-atras{ to{ transform:translate3d(-84px,252px,0); } }
+  @keyframes battle-chuva-frente{ to{ transform:translate3d(-60px,180px,0); } }
   .battle-scene .battle-fighter{
     position:absolute;inset:0;z-index:auto;text-align:left;pointer-events:none;
     min-width:0;

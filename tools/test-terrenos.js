@@ -359,8 +359,20 @@ console.log('\nCENA DE BATALHA -- a chuva');
     return m ? m[1].split(',').map(s => s.trim().split(/\s+/)
                                     .map(v => Number(v.replace('px', '')))) : [];
   };
+  const svgDe = (b) => {
+    const m = b.match(/background-image:url\("data:image\/svg\+xml,([^"]+)"\)/);
+    return m ? decodeURIComponent(m[1]) : '';
+  };
+  const gotasDe = (svg) => [...svg.matchAll(/M(-?\d+) (-?\d+)l(-?\d+) (-?\d+)/g)]
+    .map(m => ({ x: +m[1], y: +m[2], dx: +m[3], dy: +m[4] }));
   ok('as duas camadas existem (a de tras e a da frente)',
      !!blocoChuva('atras') && !!blocoChuva('frente'));
+  /* ⚠️ A REGRESSAO LITERAL DO RELATO: `linear-gradient` so produz listra INFINITA, que atravessa o
+     ladrilho e emenda com a do vizinho -- foi assim que a chuva nasceu e foi por isso que ela foi
+     reportada ("os tracos tao muito continuo"). O desenho tem que ser o ladrilho de gotas. */
+  ok('o desenho sao GOTAS, nunca listras de linear-gradient',
+     !/\.battle-chuva[^}]*linear-gradient/.test(htmlCena)
+     && gotasDe(svgDe(blocoChuva('atras'))).length > 0);
   [['atras', 2], ['frente', 7]].forEach(([cls, zEsperado]) => {
     const b = blocoChuva(cls), passo = passoDe(cls), tiles = ladrilhosDe(b);
     ok('  ' + cls + ': tem passo e ladrilhos pra ler', !!passo && tiles.length >= 1);
@@ -369,20 +381,42 @@ console.log('\nCENA DE BATALHA -- a chuva');
     ok('  ' + cls + ': o passo e um numero INTEIRO de ladrilhos em TODA camada',
        tiles.every(([w, h]) => Math.abs(dx) % w === 0 && dy % h === 0),
        tiles.map(([w, h]) => (Math.abs(dx) / w) + 'x' + (dy / h)).join(' e '));
-    /* ⚠️ A CONTA DO SUB-PASSO, e ela nao e sobre fracoes 1/k: um sub-passo t*(dx,dy) cai na rede
-       quando t*n_i e t*m_i sao INTEIROS em toda camada (n_i = |dx|/w_i, m_i = dy/h_i). O menor
-       t>0 assim e 1/G, com G = mdc de TODOS os n_i e m_i -- ou seja existe sub-passo invariante
-       exatamente quando G > 1. Testar so t = 1/k perderia os t = j/G com j > 1. */
-    const mdc = (a2, b2) => b2 ? mdc(b2, a2 % b2) : a2;
-    const G = tiles.reduce((g, [w, h]) => mdc(mdc(g, Math.abs(dx) / w), dy / h), 0);
+    let invariantes = 0;
+    for(let k = 2; k <= 400; k++){
+      if(dx % k || dy % k) continue;
+      if(tiles.every(([w, h]) => (Math.abs(dx) / k) % w === 0 && (dy / k) % h === 0)) invariantes++;
+    }
     ok('  ' + cls + ': e NENHUM sub-passo repete o padrao (ela nao parece parada)',
-       G === 1, 'o menor passo que repete e 1/' + G + ' do ciclo');
-    /* ⚠️ a faixa de cor sai PERPENDICULAR a direcao do gradiente, entao pra ela ficar paralela ao
-       caminho da gota a conta e tan A = dy/dx -- e A e A+180 desenham a MESMA faixa. */
-    const a = Number((b.match(/linear-gradient\((\d+)deg/) || [])[1]);
-    const aEsperado = ((Math.atan2(dy, dx) * 180 / Math.PI) + 180) % 180;
-    ok('  ' + cls + ': a faixa sai PARALELA ao caminho da gota',
-       Math.abs((a % 180) - aEsperado) <= 1.5, a + 'deg (a conta pede ' + aEsperado.toFixed(1) + ')');
+       invariantes === 0, invariantes + ' sub-passos invariantes');
+    /* ⚠️ AS GOTAS CAEM NA MESMA DIRECAO DO PASSO: desenhadas noutra inclinacao, o risco atravessa
+       a trajetoria em vez de segui-la -- a gota andaria de lado. */
+    const gs = gotasDe(svgDe(b)), incl = dy / Math.abs(dx);
+    const fora = gs.filter(g => Math.abs((g.dy / Math.abs(g.dx)) - incl) > 0.25);
+    ok('  ' + cls + ': toda gota cai na MESMA inclinacao do passo', gs.length > 0 && !fora.length,
+       gs.length + ' gotas, ' + fora.length + ' fora da inclinacao ' + incl);
+    /* ⚠️ E ELA E CURTA: a gota que atravessa o ladrilho EMENDA com a do vizinho e vira listra --
+       o criterio e estrutural, nao um limiar de gosto. */
+    const [w0, h0] = tiles[0];
+    const comp = gs.map(g => Math.max(Math.abs(g.dx) / w0, Math.abs(g.dy) / h0));
+    ok('  ' + cls + ': e nenhuma gota atravessa o ladrilho (senao ela emenda e vira listra)',
+       comp.every(c => c < 1),
+       'a maior ocupa ' + Math.round(Math.max.apply(null, comp) * 100) + '% do ladrilho');
+    /* ⚠️ E O WRAP: a gota que sai por uma borda tem que REENTRAR pela oposta, senao sobra uma faixa
+       vazia em volta do ladrilho e a repeticao vira uma GRADE de corredores -- o padrao que este
+       desenho existe pra tirar. */
+    const tem = (g) => gs.some(o => o.dx === g.dx && o.dy === g.dy && o.x === g.x && o.y === g.y);
+    const semVolta = gs.filter(g => {
+      const oxs = [], oys = [];
+      if(Math.min(g.x, g.x + g.dx) < 0) oxs.push(w0);
+      if(Math.max(g.x, g.x + g.dx) > w0) oxs.push(-w0);
+      if(Math.min(g.y, g.y + g.dy) < 0) oys.push(h0);
+      if(Math.max(g.y, g.y + g.dy) > h0) oys.push(-h0);
+      if(!oxs.length && !oys.length) return false;
+      return !oxs.concat(0).some(ox => oys.concat(0).some(oy =>
+        (ox || oy) && tem({ x: g.x + ox, y: g.y + oy, dx: g.dx, dy: g.dy })));
+    });
+    ok('  ' + cls + ': a gota que sai por uma borda REENTRA pela oposta (sem corredor vazio)',
+       !semVolta.length, gs.length + ' gotas, ' + semVolta.length + ' sem a volta');
     /* a folga do inset cobre o caminho de um ciclo, senao a borda de cima fica VAZIA no fim dele */
     const ins = (b.match(/inset:(-?\d+)px (-?\d+)px/) || []).slice(1).map(Number);
     ok('  ' + cls + ': a folga do inset cobre o ciclo inteiro',
