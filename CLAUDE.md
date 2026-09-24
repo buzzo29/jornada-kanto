@@ -19793,6 +19793,232 @@ deles (o selo tirado de UM dos dois botões) só foi pego porque a trava passou 
 em vez de usar `indexOf`.
 
 
+### A ARENA DA SEMANA (24/09/2026) — a Arena 1x1 virou progressão
+
+Pedida assim: *"toda semana sera sorteado um pokemon acima do bst 500, e durante a semana todo mundo
+enfrenta esse pokemon, e cada vez que o treinador vence esse pokemon, ele sobe 1 nivel, e o pokemon
+da arena sobe 3 levels a cada nivel. Entao voce vai criar um ranking mostrando os treinadores que
+chegaram no nivel mais alto durante a semana. O nivel 1 começa com o pokemon adversário no level
+60"*.
+
+**⚠️ É O MESMO DESENHO DA TORRE DOS TREINADORES, e é ele que explica por que o nível não tem teto:**
+*"o que ela mede é até onde cada um chega, não quem termina"*. O adversário sobe 3 por nível e passa
+do `NIVEL_MAXIMO` (99) no nível **14** — e os 99 são o teto do **JOGADOR**, não do motor (o Mew da
+raide é Lv.4999).
+
+| nível | 1 | 5 | 8 | 14 | 20 | 30 | 100 |
+|---|---|---|---|---|---|---|---|
+| **o adversário** | **Lv.60** | 72 | 81 | **99** | 117 | 147 | 357 |
+
+### ⚠️ ATÉ ONDE DÁ PRA CHEGAR, MEDIDO — e a curva desce de verdade
+
+| | n1 | n5 | n8 | n11 | n14 | n18 | n24 | n30 |
+|---|---|---|---|---|---|---|---|---|
+| Jolteon **Lv.70** × Dragonite | 95% | 93% | 38% | 25% | 8% | 8% | 0% | 0% |
+| Jolteon **Lv.99** × Dragonite | 100% | 100% | 70% | 73% | 73% | 40% | 8% | 13% |
+| Snorlax Lv.70 × Dragonite | 100% | 78% | 53% | 40% | 23% | 15% | 5% | 0% |
+| **Shuckle** Lv.70 × Dragonite | **0%** | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
+
+Um time normal (Lv.70) para entre o **8 e o 14**; um Lv.99 chega a **18–24**. O Shuckle não vence
+nem o nível 1, que é o certo — ele é o pior corpo do jogo.
+
+**⚠️ E O MELHOR CASO POSSÍVEL MORRE POR VOLTA DO 40:** Mewtwo Lv.99 contra a Ninetales (a mais fraca
+da lista), com mira alta — **n20=80%, n30=35%, n40=10%, n50=0%**. É esse número que calibra o teto
+de gravação.
+
+### ⚠️ O SORTEIO É SEMEADO PELA SEMANA, E O `semanaId` VEM DO SERVIDOR
+
+Não há documento pra ler nem cron pra escrever: `arenaDaSemana(semanaId)` é determinístico, o molde
+do `torre-<data>` e do bolo da Liga Pro.
+
+- **⚠️ E A SEMANA NÃO PODE VIR DO RELÓGIO DO CELULAR.** Ela chega na resposta do ranking. Calculada
+  no cliente, dois jogadores em fusos diferentes enfrentariam **bichos diferentes** na virada — e o
+  sorteio é COMPARTILHADO (*"durante a semana todo mundo enfrenta esse pokemon"*). É a mesma razão do
+  `agoraServidor` da batalha online, e o oposto do relógio do Espeon/Umbreon (que é uma preferência
+  pessoal, não um sorteio comum).
+  **Consequência: sem o ranking carregado a Arena NÃO larga** — não se sabe nem quem é o adversário
+  nem em que nível. A tela diz o motivo e oferece "Tentar de novo", que é a regra do sprite que falta.
+- **⚠️ A LISTA VAI ORDENADA**, e não na ordem do `Object.keys`: sortear por índice numa lista que
+  depende da ordem de declaração amarra o sorteio ao arquivo — a lição do `POOL_METRONOMO`.
+- **⚠️ E ELE É INDISTINGUÍVEL DO `Math.random`, medido em 2.000 semanas** (χ² **33,4** contra 44,8 do
+  controle, crítico a 5% = 49,8; 58 repetições em semanas seguidas contra ~55,5 esperadas). Nas 12
+  PRIMEIRAS semanas o Entei sai **três vezes seguidas** — e isso é sorte da amostra pequena, não
+  viés: é a lição do *"amostra única não é medição"*.
+  **Se um dia repetir incomodar**, a saída é não repetir o da semana passada — e a régua está aqui.
+
+### ⚠️ SÃO 36 CANDIDATOS, E EXCLUIR OS QUATRO INTOCÁVEIS É O QUE SEGURA A VARIEDADE
+
+Os 40 de BST > 500 menos o Mewtwo, o Lugia, o Ho-Oh e o Celebi — **e eles são justamente o TOPO da
+faixa** (680, 680, 680 e 600). Com eles o teto seria **1,35× o do Tyranitar**, e uma semana em nove
+seria contra um corpo que nenhuma outra alcança. Sem eles a faixa fica em **505 (Ninetales) a 600
+(Tyranitar)**, com média 539.
+
+**⚠️ E OS SEIS LENDÁRIOS CAPTURÁVEIS FICAM** (as três aves e as três bestas, todos BST 580): o
+precedente do **ADVERSÁRIO** é o da Pescaria, que exclui só os quatro — a Liga Pro exclui lendário
+porque lá o bolo vira o **TIME** do jogador, e aqui ele não ganha nada. Uma semana contra o Zapdos é
+um evento, não um problema.
+
+### ⚠️ A SEMANA É JOGÁVEL, E A ESCOLHA DO POKÉMON VIROU DECISIVA
+
+O adversário deixou de ser **pareado por BST**, então a dificuldade do nível 1 passou a depender de
+duas coisas: a espécie da semana e quem o jogador leva. Medido com um time campeão típico
+(Venusaur 62, Charizard 60, Gyarados 63, Arcanine 59, Alakazam 61, Snorlax 64), nas 12 primeiras
+semanas:
+
+| | |
+|---|---|
+| dos seis, quantos vencem o nível 1 | **3 a 6** (média 4,6) |
+| o **melhor** do time, média das 12 semanas | **99%** |
+| semanas em que NENHUM do time passa de 25% | **0 de 12** |
+
+**⚠️ E A SEMANA MUDA QUEM VALE A PENA LEVAR, que é a decisão inteira:** contra o **Entei** o Venusaur
+faz **0%** e o Gyarados **100%**; contra o **Exeggutor** o Venusaur faz 7% e o Charizard **97%**. Não
+é só BST — na Queimada quem decide é o HP (aguenta), o Speed (desvia), a Sp.Def (escudo) e o ataque
+(dano), e é por isso que o Arcanine faz 95% contra a Ninetales (505) e 7% contra o Gyarados (540).
+
+### ⚠️ A PROGRESSÃO NÃO VALE NA TRAVESSIA DAS ILHAS — a única decisão que o pedido obrigou a tomar
+
+Na travessia o time é o da **JORNADA** (Lv.~55-65) e o desafio é **OBRIGATÓRIO** pra o prêmio de +3
+níveis. Medido, **com o nível valendo lá** (time de jornada, as 2 chances do pedido):
+
+| nível | adversário | uma chance | com 2 chances |
+|---|---|---|---|
+| 1 | Lv.60 | 75% | **94%** |
+| 4 | Lv.69 | 22% | 39% |
+| 8 | Lv.81 | 10% | **19%** |
+| 12 | Lv.93 | 0% | **0%** |
+| 16 | Lv.105 | 0% | 0% |
+
+Ou seja **o jogador seria PUNIDO por jogar a Arena**, e a travessia ficaria **impossível a partir do
+nível 12**.
+
+**⚠️ E MESMO O NÍVEL 1 SOZINHO JÁ A ENDURECE — e de forma muito desigual:**
+
+| time de fim de jornada | pareado (hoje) | n1 × Ninetales | × Gyarados | × Dragonite |
+|---|---|---|---|---|
+| Venusaur Lv.60 | 40% | **2%** | 7% | **0%** |
+| Charizard Lv.58 | 53% | 62% | 10% | 10% |
+| Gyarados Lv.61 | 88% | 100% | 70% | 62% |
+| Arcanine Lv.57 | 48% | **95%** | **7%** | 25% |
+
+Por isso **a travessia continua com o adversário PAREADO POR BST, exatamente como hoje**: o custo
+dela é **ZERO por construção**, e o `queimadaSortearNpc` não virou letra morta — ele é o adversário
+de lá.
+
+- **⚠️ A GUARDA MORA ONDE O ADVERSÁRIO É MONTADO** (`arenaValeAqui`), e não nos chamadores: é o
+  precedente do `registrarSketch`, que só vale na jornada pela mesma razão — **dois modos usam a
+  MESMA tela**.
+- **E ela vale nas duas pontas**: na travessia o adversário é pareado **e** vencer lá não sobe nível.
+
+### O RANKING: O DOCUMENTO DA SEMANA É O PRÓPRIO RANKING
+
+`arenaRankingWeekly/<segunda>/players/<uid>` guarda o **nível**, e é ele que o top 10 ordena. O nível
+é monotônico (só sobe) e já é por semana, então **não há uma segunda coleção a manter** — e o
+`orderBy` fica de **UM campo só**, ou seja índice de campo único, que o Firestore cria sozinho. O
+primeiro composto que este projeto precisou **nasceu quebrado** (o da Seleção, 21/09).
+
+- **⚠️ NÃO HÁ ABA "DE SEMPRE", ao contrário dos outros três jogos das Ilhas, e a razão é que ela
+  compararia coisas DIFERENTES:** o adversário muda de espécie toda semana, e nível 8 contra a
+  Ninetales não é nível 8 contra o Dragonite — medido, um Jolteon Lv.99 faz **93%** no nível 8 contra
+  o Kingdra e **70%** contra o Dragonite. Nos outros a mecânica é a mesma toda semana, e lá as duas
+  abas comparam a mesma coisa.
+- **⚠️ NÃO HÁ RESET, pelo mesmo desenho dos outros:** semana nova é **subcoleção nova**, então o
+  nível da semana passada simplesmente não está na de hoje. É o molde do
+  `trainerTowerDays/{dia}/players/{uid}` da Torre.
+- **⚠️ E ELE NÃO ENTRA NO `RANKS_SEMANAIS`: prêmio não foi pedido.** Aquela lista é a do que o cron
+  **FECHA E PAGA**, e acrescentá-lo abriria uma torneira de Doce Raro que ninguém pediu — é **uma
+  linha** no dia em que for. Sem prêmio não há o que fechar: a subcoleção da semana passada fica onde
+  está, como histórico.
+- **O MEU NÍVEL VOLTA SEMPRE, e não só quando estou fora do top:** ele não é enfeite de tela — é ele
+  que decide o **NÍVEL DO ADVERSÁRIO**, ou seja a partida não existe sem ele.
+
+### ⚠️ QUEM SOMA É O SERVIDOR, E O QUE CHEGA É UM BOOLEANO
+
+Aceitar o `nivel` do cliente seria deixá-lo escrever o próprio lugar no ranking por outro caminho.
+É a mesma regra do `venceu` da Seleção — e, como lá, **o duelo NÃO dá pra validar**: a Arena é um
+minigame de tempo real, não uma batalha do motor.
+
+- **A transação é OBRIGATÓRIA aqui, e não conveniência:** o que se escreve **depende do que se leu**.
+  Nos rankings de placar ela protege um empate; aqui ela protege a **CONTAGEM** — duas abas
+  terminando ao mesmo tempo somariam uma vitória só.
+- **`venceu` é lido como booleano ESTRITO** (`=== true`): um `'sim'` seria truthy num campo que o
+  servidor não controla. Há caso de teste pros seis truthy.
+- **⚠️ PERDER NÃO DESCE E NEM CRIA DOCUMENTO** — o pedido fala só da vitória, e um jogador que só
+  perdeu seria uma linha de "nível 1" no ranking que não diz nada.
+- **⚠️ O TETO É `ARENA_NIVEL_MAX = 100`, e ele recusa o ABSURDO, não a forja:** um cliente forjado
+  chama a callable N vezes e sobe N níveis, que é a **mesma superfície dos outros quatro rankings**.
+  Ele é 2,5× o melhor caso medido (nível 40), ou seja não recusa nenhuma partida possível — é a régua
+  dos 100.000 pontos do `pontosDeRankingValidos`.
+  **Pra escala:** uma partida dura **31,3 s de mediana** (min 11,2, max 84,4), então 50 vitórias
+  legítimas são ~26 minutos de jogo.
+
+### NA TELA
+
+- **A caixa do Pokémon da semana** (sprite, nome, tipos e o **Lv. que o meu nível manda**) e a do
+  **ranking**, nas DUAS telas: o setup e o FIM — é no fim que o nível novo existe, e mandar o jogador
+  voltar ao setup pra ver o próprio nível seria esconder o resultado da jogada.
+- **⚠️ O ADVERSÁRIO DEIXOU DE SER SURPRESA, e isso é a feature:** é ele que o jogador estuda pra
+  escolher quem levar — a mesma razão do (i) das ilhotas do Resgate.
+- **⚠️ E NENHUMA DAS DUAS APARECE NA TRAVESSIA:** lá o adversário é pareado e continua sendo surpresa.
+  Prometer um bicho que aquela partida não usa é pior que não prometer nada.
+- **Os números da frase saem das CONSTANTES** (`ARENA_NIVEL_PASSO`), nunca escritos — a família do
+  *"Golpe repete entre 2-5x"*.
+
+**Medido a 320px, no navegador, nas cinco telas** (nível 1, 7 e 30, o erro de rede e a travessia):
+**documento em 305 de 320 nas cinco — sem rolagem lateral — e zero textos cortados.**
+
+| | |
+|---|---|
+| a caixa da semana | **281×271px** (184 no erro) |
+| a caixa do ranking | 133px vazia, **238** com 5 linhas, 291 com 6 |
+| a página | 1.053 a **1.269px** (676 na travessia, que não tem nenhuma das duas) |
+
+**⚠️ O `<h2>` "Pokémon da semana" CAI EM DUAS LINHAS, e ele está a 4px de não cair:** o título tem
+**243px**, o selo come **18**, e o texto precisa de **218** — o espaço entre os dois consome a folga.
+O artigo foi tirado por isso (de *"O Pokémon da semana"*, que media 243 exatos), e duas linhas é o
+comportamento desta tela: **o `<h2>` vizinho — o `Ilha Pummelo · Drake`, que já existia — também tem
+duas.** Se um dia incomodar, a régua é o texto, e ele está medido.
+
+### O QUE ISSO CUSTOU AO MOTOR: NADA
+
+`MOTOR e6cd16d15e0f / DIARIO 1e9b7214c627`, **idêntico** ao build anterior em 900 batalhas semeadas —
+e o instrumento é sensível (com o `CRIT_BASE` em 1/8 os dois hashes mudam). A Arena é apresentação
+mais um chamador novo do `createInstance`.
+
+`tools/test-arena.js` e `tools/test-arena-rank.js` trancam **77 pontas**: os candidatos (o corte
+estrito, os quatro fora, os lendários dentro, a lista ordenada), o sorteio (mesma semana = mesmo
+bicho, independente do treinador, sem a semana devolve null, e **o cliente não calcula a semana**), a
+escada (nível 1 = 60, o passo, passando do 99, o nível ausente valendo 1, e ela sendo **derivada**),
+a instância (o moveset, a vida cheia, sem a especialidade do jogador), **a travessia continuando
+pareada nas duas pontas**, a partida não largando sem a semana (e largando na travessia), o envio (o
+booleano, só na vitória, nunca na travessia, sem login nem tentando), a tela nos cinco estados, a
+abertura relendo, e o servidor (a transação, o teto, o `venceu` estrito, perder não criando, o top
+ordenado, o meu nível voltando, a semana sendo subcoleção, **não existir coleção de sempre**, e as
+regras fechando a escrita pra todos).
+**Conferido que os 24 defeitos religados acusam** (1 a 10 falhas cada) — um deles **MATA** o
+`test-arena-rank`, que é a acusação mais forte que existe: o `fake-firestore` recusa a query sem
+índice **exatamente como a produção**.
+
+### ⚠️ E ELE CUSTOU QUATRO LIÇÕES
+
+1. **⚠️ O MEU COMENTÁRIO ACUSOU A SI MESMO — a DÉCIMA vez desta família.** Eu citei o literal
+   *"Revezamento · 900 m"* ao explicar por que a frase da Arena é derivada, e a trava do
+   `test-corrida` **varre o arquivo inteiro** procurando exatamente esse texto. Ela acusou o
+   comentário. **Comentário não reproduz o literal que uma trava proíbe.**
+2. **⚠️ A TRAVA DA COBERTURA DE CALLABLES PEGOU AS DUAS NOVAS, pelo nome** — é o que ela existe pra
+   fazer. As duas foram classificadas como **protegidas**: elas são chamadas só de dentro da tela da
+   Arena, que é um modo das Ilhas, e o convidado não joga as Ilhas.
+3. **⚠️ MEDI O TÍTULO SEM O SELO QUE ESTÁ AO LADO DELE** — o `textContent` do clone apagava o `<svg>`,
+   e a medição disse que ele cabia em uma linha. **Medir um elemento sem o vizinho que divide a linha
+   com ele mede outra coisa.**
+4. **⚠️ E UMA TRAVA MINHA MEDIU A TELA ERRADA:** o bloco anterior tinha terminado uma partida, e o
+   `queimadaTerminar` deixa a fase em `anuncio` — o `contaDeTeste` mexe no `game`, não no estado da
+   partida, então o render caía no ramo da QUADRA. **Seis asserções falharam com o código certo.**
+
+- **Se um dia incomodar**, as réguas são o `ARENA_NIVEL_PASSO` (3 — é ele que decide quantas semanas
+  um jogador aguenta), o `ARENA_NIVEL_BASE` (60) e o `ARENA_BST_MIN` (500, que decide o elenco).
+
+
 ## OS QUATRO RANKINGS DAS ILHAS (21/09/2026) -- o que não atualizava e o que nunca funcionou
 
 Quatro pedidos numa leva, e dois deles eram defeito de verdade -- um relatado, outro **suspeitado**:

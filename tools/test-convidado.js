@@ -91,7 +91,10 @@ const PROTEGIDAS = ['acceptOnlineMatch','challengeFriend','challengeLobbyPlayer'
 'pickOnlineBattleTeam','pollBattleQueue','registerIslandPlay','removeFriend','reorderNeighborhoodGymDefense',
 'resolveNeighborhood','respondFriendChallenge','respondFriendRequest','searchTrainers','sendFriendRequest',
 'sendSelecaoResult','setNeighborhoodGymDefense','setTrainerTowerOrder','startTrainerTowerRun',
-'submitFishingScore','submitRaceTime','submitRescueScore'];
+'submitFishingScore','submitRaceTime','submitRescueScore',
+/* A ARENA DA SEMANA: as duas sao chamadas SO de dentro da tela dela (o `abrirQueimada` e o
+   `arenaEnviarVitoria`), que e um modo das ILHAS -- e o convidado nao joga as Ilhas. */
+'getArenaRanking','submitArenaWin'];
 /* AS LIVRES, e o motivo de cada grupo:
    - JOGO PRINCIPAL (a jornada, a loja, a Pokedex, as moedas): e a conta DELE, e e o que o
      convidado veio jogar. Bloquear aqui seria bloquear o jogo.

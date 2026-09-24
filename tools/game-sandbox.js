@@ -339,7 +339,9 @@ function createSandbox(htmlPath){
     'QUEIMADA_TIRO_RECARGA','QUEIMADA_ESPECIAL_RECARGA','QUEIMADA_BOLA_V','QUEIMADA_BOLA_V_ESP',
     'QUEIMADA_BOLA_V_DEVOLVIDA','queimadaCorDaCauda','QUEIMADA_RECARGA_FREIO','queimadaAndar','queimadaDesenharAtor','queimadaFecharAnuncio','queimadaAnuncioHtml','queimadaDevolver','selecaoFileiraHtml','cardDeTimeHtml','pescariaCardDoTime','queimadaPintar','QUEIMADA_CAUDA_FUNDO','QUEIMADA_CONTORNO_BOLA','QUEIMADA_REFLEXO_MULT','QUEIMADA_REFLEXO_TETO',
     'QUEIMADA_REFLEXO_DESCONTO','QUEIMADA_ATORDOA','QUEIMADA_RAIO',
-    'QUEIMADA_LAVA_A_CADA','QUEIMADA_LAVA_AVISO','QUEIMADA_SPRITE_K','QUEIMADA_NPC_VIZINHOS'
+    'QUEIMADA_LAVA_A_CADA','QUEIMADA_LAVA_AVISO','QUEIMADA_SPRITE_K','QUEIMADA_NPC_VIZINHOS',
+    /* A ARENA DA SEMANA (ver test-arena.js) -- os const dela, pela mesma razao acima */
+    'arenaRank','ARENA_BST_MIN','ARENA_NIVEL_BASE','ARENA_NIVEL_PASSO'
   ];
   const epilogue = '\n;globalThis.render = function(){};\n' +
     EXPORTS.map(n=>`try{ globalThis[${JSON.stringify(n)}] = ${n}; }catch(e){}`).join('\n') +

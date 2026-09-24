@@ -4315,7 +4315,10 @@
   .q-placar .pesc-lado-info small{white-space:normal;overflow-wrap:anywhere;}
   .q-placar .hp-bar-wrap{margin-top:4px;width:100%;}
   .q-placar .pesc-lado-estado{text-align:center;}
-  .q-ficha{display:flex;justify-content:space-between;gap:6px;margin:7px 0;
+  /* A ARENA DA SEMANA: o nivel do jogador e o selo de que ele acabou de subir. */
+.arena-nivel{margin:6px 0 2px;font-size:.82rem}
+.arena-subiu{color:var(--green-dark);font-weight:800}
+.q-ficha{display:flex;justify-content:space-between;gap:6px;margin:7px 0;
     font-size:.62rem;color:var(--muted);text-align:center;}
   .q-ficha b{display:block;font-size:.82rem;color:var(--blue-dark);
     font-variant-numeric:tabular-nums;}
@@ -40718,6 +40721,143 @@ function queimadaOriginalDoSave(p){
    ⚠️ ELA REUSA O `MONT_POR_PAGINA` e o `montadorPaginaValida` da Torre, do Ginásio da Cidade e da
    Corrida: uma paginação própria divergiria delas na primeira mexida.
    ============================================================================ */
+/* ============================================================================
+   A ARENA DA SEMANA (24/09/2026, a pedido)
+   ----------------------------------------------------------------------------
+   Pedido assim: *"toda semana sera sorteado um pokemon acima do bst 500, e durante a semana todo
+   mundo enfrenta esse pokemon, e cada vez que o treinador vence esse pokemon, ele sobe 1 nivel, e o
+   pokemon da arena sobe 3 levels a cada nivel ... o nivel 1 comeca com o pokemon adversario no
+   level 60"*.
+
+   ⚠️ E O MESMO DESENHO DA TORRE DOS TREINADORES, e e ele que explica por que o nivel nao tem teto:
+   *"o que ela mede e ate onde cada um chega, nao quem termina"*. O adversario sobe 3 por nivel e
+   passa do `NIVEL_MAXIMO` (99) no nivel 14 -- o teto de 99 e o do JOGADOR, nao do motor (o Mew da
+   raide e Lv.4999). Medido, o melhor caso possivel (Mewtwo Lv.99 contra a Ninetales, que e a mais
+   fraca da lista, com mira alta) morre por volta do nivel 40: n20=80%, n30=35%, n40=10%, n50=0%.
+
+   ⚠️ O ADVERSARIO E O MESMO PRA TODO MUNDO NA SEMANA, e o sorteio e SEMEADO pelo `semanaId` --
+   nao ha documento pra ler nem cron pra escrever. E o molde do `torre-<data>` e do bolo da Liga Pro.
+   ⚠️ E O `semanaId` VEM DO SERVIDOR, nunca do relogio do celular: ele chega na resposta do
+   ranking. Calculado aqui, dois jogadores em fusos diferentes teriam bichos diferentes na virada --
+   e o sorteio e COMPARTILHADO. E a mesma razao do `agoraServidor` da batalha online.
+   Consequencia: sem o ranking carregado a Arena NAO larga, e a tela diz por que (a mesma regra dos
+   sprites que faltam).
+
+   ⚠️ SAO 36 CANDIDATOS: os 40 de BST > 500 menos os QUATRO INTOCAVEIS -- e isso nao e zelo, e o que
+   segura a variedade. Os quatro sao justamente o TOPO da faixa (Mewtwo, Lugia e Ho-Oh com 680 e o
+   Celebi com 600), entao com eles o teto seria 1,35x o do Tyranitar e uma semana em nove seria
+   contra um corpo que nenhuma outra alcanca. Sem eles a faixa fica em 505 (Ninetales) a 600
+   (Tyranitar), com media 539.
+   ⚠️ E OS SEIS LENDARIOS CAPTURAVEIS FICAM (as tres aves e as tres bestas, todos BST 580): o
+   precedente do ADVERSARIO e o da Pescaria, que exclui so os quatro -- a Liga Pro exclui lendario
+   porque lá o bolo vira o TIME do jogador, e aqui ele nao ganha nada. Uma semana contra o Zapdos e
+   um evento, nao um problema.
+
+   ⚠️ A LISTA VAI ORDENADA, e nao na ordem do `Object.keys`: sortear por indice numa lista que
+   depende da ordem de declaracao amarra o sorteio ao arquivo -- a licao do `POOL_METRONOMO`, que os
+   dois motores escrevem em ordens diferentes. Ordenada, o bicho da semana e o mesmo para sempre.
+   ============================================================================ */
+const ARENA_BST_MIN = 500;          /* "acima do bst 500" -- o pedido, e e estrito */
+const ARENA_NIVEL_BASE = 60;        /* "o nivel 1 comeca com o pokemon adversario no level 60" */
+const ARENA_NIVEL_PASSO = 3;        /* "o pokemon da arena sobe 3 levels a cada nivel" */
+let _arenaCandidatos = null;
+function arenaCandidatos(){
+  if(!_arenaCandidatos){
+    _arenaCandidatos = Object.keys(SPECIES)
+      .filter(id => bstOf(id) > ARENA_BST_MIN && SEM_CAPTURA_SELVAGEM.indexOf(id) < 0)
+      .sort();
+  }
+  return _arenaCandidatos;
+}
+/* ⚠️ MESMA SEMANA = MESMO POKEMON, pra todo mundo. Sem `semanaId` ele devolve null, e e o null que
+   impede a partida de largar sem se saber quem e o adversario. */
+function arenaDaSemana(semanaId){
+  if(!semanaId) return null;
+  const pool = arenaCandidatos();
+  return pool[Math.floor(makeSeededRng('arena-' + semanaId)() * pool.length)];
+}
+/* ⚠️ O NIVEL DO ADVERSARIO E DERIVADO, nunca guardado: guardado, ele so conseguiria ficar velho --
+   e ele e a coisa que o ranking inteiro descreve. O piso de 1 existe porque quem nunca venceu nao
+   tem documento, e `nivel` ausente tem que valer 1 (o Lv.60 do pedido). */
+function arenaNivelDoAdversario(nivel){
+  return ARENA_NIVEL_BASE + ARENA_NIVEL_PASSO * (Math.max(1, Number(nivel) || 1) - 1);
+}
+/* A instancia do adversario da semana, no nivel que o MEU nivel manda. */
+function arenaAdversario(semanaId, nivel){
+  const id = arenaDaSemana(semanaId);
+  if(!id) return null;
+  const inst = createInstance(id, arenaNivelDoAdversario(nivel));
+  inst.hp = inst.maxHp = calcMaxHp(inst);
+  /* ⚠️ O MOVESET POR NIVEL, como o adversario pareado ja levava: sem ele o dano dele sairia do
+     poder implicito de 60 e o Lv.357 do nivel 100 nao significaria nada. */
+  equiparNpc([inst]);
+  return inst;
+}
+/* o meu nivel na semana: 1 enquanto eu nao vencer nada */
+function arenaMeuNivel(){ return Math.max(1, Number(arenaRank.nivel) || 1); }
+/* ⚠️ A PROGRESSAO NAO VALE NA TRAVESSIA DAS ILHAS, e ela e a UNICA decisao que este pedido obrigou
+   a tomar -- ela foi MEDIDA, nao escolhida no gosto. Na travessia o time e o da JORNADA (Lv.~55-65)
+   e o desafio e OBRIGATORIO pra o premio de +3 niveis; com o nivel valendo la, medido com 2 chances:
+
+     nivel  1 (adv Lv.60)  94%      nivel  8 (adv Lv.81)  19%
+     nivel  4 (adv Lv.69)  39%      nivel 12 (adv Lv.93)   0%
+
+   Ou seja o jogador seria PUNIDO por jogar a Arena, e a travessia ficaria impossivel a partir do
+   nivel 12. E mesmo o nivel 1 sozinho ja a endurece: o adversario deixa de ser pareado pelo BST do
+   pokemon dele, e medido com time de fim de jornada ele vai de 40% (pareado, hoje) pra 0-7% contra
+   um Dragonite -- e varia de 7% a 95% conforme a especie da semana.
+   Por isso a travessia continua com o adversario PAREADO POR BST, exatamente como hoje: o custo
+   dela e ZERO por construcao, e a guarda mora onde o adversario e montado. E o precedente do
+   `registrarSketch`, que so vale na jornada pela mesma razao -- dois modos usam a MESMA tela. */
+function arenaValeAqui(){ return !naJornadaDasIlhas(); }
+
+/* O ranking da semana. ⚠️ ELE NAO TEM ABA "DE SEMPRE", e a razao e que um ranking de sempre
+   compararia coisas DIFERENTES: o adversario muda de especie toda semana, e nivel 8 contra a
+   Ninetales nao e nivel 8 contra o Dragonite -- medido, um Jolteon Lv.99 faz 93% no nivel 8 contra
+   o Kingdra e 70% contra o Dragonite. Nos outros tres jogos a mecanica e a mesma toda semana, e la
+   as duas abas comparam a mesma coisa.
+   ⚠️ E O DOCUMENTO DA SEMANA E O PROPRIO RANKING: o nivel e monotonico (so sobe) e ja e por semana,
+   entao nao ha uma segunda colecao a manter -- e o `orderBy` fica de UM campo so, ou seja indice de
+   campo unico, que o Firestore cria sozinho. O primeiro composto que este projeto precisou nasceu
+   quebrado (o da Selecao, 21/09). */
+const arenaRank = { lista: null, meu: null, nivel: 1, semanaId: null,
+                    carregando: false, erro: null, subiu: false, lidoEm: 0 };
+async function arenaCarregarRank(forcar){
+  if(arenaRank.carregando) return;
+  if(arenaRank.lista && !forcar && !rankVencido(arenaRank)) return;
+  arenaRank.carregando = true; arenaRank.erro = null;
+  try{
+    const r = await functionsClient.httpsCallable('getArenaRanking')({});
+    arenaRank.lista = (r.data && r.data.lista) || [];
+    arenaRank.meu = (r.data && r.data.meu) || null;
+    arenaRank.nivel = Math.max(1, Number(r.data && r.data.nivel) || 1);
+    arenaRank.semanaId = (r.data && r.data.semanaId) || null;
+    arenaRank.lidoEm = Date.now();
+  } catch(e){
+    console.error('Erro ao ler o ranking da Arena:', e);
+    arenaRank.erro = 'Nao deu pra carregar a Arena agora.';
+  }
+  arenaRank.carregando = false;
+  if(game.screen === 'queimada') render();
+}
+/* ⚠️ O QUE VAI E UM BOOLEANO, e quem soma e o SERVIDOR: aceitar o `nivel` do cliente seria deixa-lo
+   escrever o proprio lugar no ranking por outro caminho. E a mesma regra do `venceu` da Selecao.
+   ⚠️ E ELE NAO ENVIA NA TRAVESSIA -- ver o `arenaValeAqui`. */
+async function arenaEnviarVitoria(){
+  if(!game.authUser || !arenaValeAqui()) return;
+  try{
+    const r = await functionsClient.httpsCallable('submitArenaWin')({ venceu: true });
+    if(r.data && r.data.nivel != null){
+      arenaRank.nivel = Math.max(1, Number(r.data.nivel) || 1);
+      arenaRank.subiu = !!r.data.subiu;
+    }
+    /* ⚠️ INVALIDA SEMPRE: mesmo sem eu subir, outro pode ter entrado no top 10 enquanto eu jogava. */
+    rankInvalidar(arenaRank);
+    arenaCarregarRank(true);
+  } catch(e){ console.error('Erro ao enviar a vitoria da Arena:', e); }
+  if(game.screen === 'queimada') render();
+}
+
 function queimadaElegiveis(){
   /* ⚠️ ORDENADA PELO SPEED **DA QUEIMADA**, que é o número que decide o movimento na quadra -- a
      mesma decisão da Corrida, e pelo mesmo motivo: o montador ordena por nível/nome/time, e aqui
@@ -40990,6 +41130,10 @@ function queimadaEliminacao(){
 function queimadaTerminar(){
   /* o `queimadaVencedor` devolve 1 (eu), -1 (ele) ou 0 (empate) -- e empate NÃO é vitória */
   registrarResultadoDaIlha('pummelo', queimadaVencedor() > 0);
+  /* ⚠️ SO A VITORIA MEXE NO NIVEL, e perder nao desce nada -- foi o pedido ("cada vez que o
+     treinador vence esse pokemon, ele sobe 1 nivel"). E ele e best-effort: um envio que falha e um
+     nivel perdido, e travar a tela por causa dele seria o placar atrapalhando a partida. */
+  if(queimadaVencedor() > 0) arenaEnviarVitoria();
   queimada.fase = 'anuncio';
   queimada.bolas = [];
   if(queimada.laco){ cancelAnimationFrame(queimada.laco); queimada.laco = null; }
@@ -41096,7 +41240,22 @@ async function queimadaComecar(){
   if(!queimada.escolhido || queimada.fase === 'jogando' || queimada.fase === 'carregando') return;
 
   const meu = queimadaInstancia(queimada.escolhido, true);
-  const dele = queimadaSortearNpc(queimada.escolhido.speciesId, queimada.escolhido.level);
+  /* ⚠️ DOIS ADVERSARIOS POSSIVEIS, e a guarda mora AQUI -- onde ele e montado. Na ILHA ele e o da
+     SEMANA, no nivel que o meu manda; na TRAVESSIA ele continua PAREADO POR BST, byte a byte como
+     antes desta mudanca (ver o `arenaValeAqui`, que tem a medicao de por que).
+     ⚠️ E SEM O `semanaId` A PARTIDA NAO LARGA: ele vem do SERVIDOR, e sem ele nao se sabe nem quem
+     e o adversario nem em que nivel -- a mesma regra do sprite que falta. */
+  let dele;
+  if(arenaValeAqui()){
+    if(!arenaRank.semanaId){
+      queimada.fase = 'setup';
+      queimada.aviso = 'Nao deu pra saber qual e o Pokemon da semana. Toque em "Tentar de novo".';
+      arenaCarregarRank(true); render(); return;
+    }
+    dele = arenaAdversario(arenaRank.semanaId, arenaMeuNivel());
+  } else {
+    dele = queimadaSortearNpc(queimada.escolhido.speciesId, queimada.escolhido.level);
+  }
 
   /* ⚠️ OS SPRITES VÊM ANTES DA PARTIDA, e se algum faltar ela NÃO começa -- a mesma regra dos
      outros minigames: nunca se substitui o sprite de uma espécie pelo de outra, e a tela diz QUAL
@@ -41581,6 +41740,72 @@ function queimadaFimHtml(a, b, v){
     + '<span class="q-fim-vs">' + selo('vs') + '</span>'
     + lado(b, v < 0, false) + '</div>';
 }
+/* ⚠️ O ADVERSARIO DA SEMANA DEIXOU DE SER SURPRESA, e isso e a feature: e ele que o jogador estuda
+   pra escolher quem levar -- a mesma razao do (i) das ilhotas do Resgate. Ele mostra a especie, os
+   tipos e o NIVEL que o meu nivel manda, que e a unica coisa da tela que muda sozinha.
+   ⚠️ E ELA NAO APARECE NA TRAVESSIA: la o adversario e pareado por BST e continua sendo surpresa,
+   como sempre foi. Prometer um bicho que aquela partida nao usa seria pior que nao prometer nada. */
+function arenaDaSemanaHtml(){
+  if(!arenaValeAqui()) return '';
+  if(arenaRank.erro){
+    return `<div class="box"><h2>${selo('estadio')} Pokémon da semana</h2>`
+      + `<p class="hint-text">${escapeHtmlSafe(arenaRank.erro)}</p>`
+      + `<button class="btn secondary" onclick="arenaCarregarRank(true)">Tentar de novo</button></div>`;
+  }
+  const id = arenaDaSemana(arenaRank.semanaId);
+  if(!id){
+    return `<div class="box"><h2>${selo('estadio')} Pokémon da semana</h2>`
+      + `<p class="hint-text">Carregando…</p></div>`;
+  }
+  const sp = SPECIES[id] || {};
+  const nivel = arenaMeuNivel();
+  const lv = arenaNivelDoAdversario(nivel);
+  return `<div class="box">
+    <h2>${selo('estadio')} Pokémon da semana</h2>
+    <div class="order-row">
+      <div class="order-info">
+        <span class="mon-name">${spriteHtml(id, 'sprite-sm')} ${escapeHtmlSafe(sp.name || id)} <span class="mont-lv">— Lv.${lv}</span></span>
+        <span class="mon-sub">${typesHtml(sp.types || [])}</span>
+      </div>
+    </div>
+    <p class="arena-nivel"><b>Seu nível: ${nivel}</b>${arenaRank.subiu ? ' <span class="arena-subiu">subiu!</span>' : ''}</p>
+    ${/* ⚠️ A FRASE DIZ A REGRA, com os numeros saindo das CONSTANTES: um "+3 por nivel" escrito aqui
+         envelheceria no primeiro ajuste -- a familia dos rotulos de metragem da Corrida. */''}
+    <p class="hint-text">Vença e você sobe 1 nível — e ele sobe ${ARENA_NIVEL_PASSO}. Toda semana é
+       sorteado um Pokémon novo, e o nível volta ao 1.</p>
+  </div>`;
+}
+/* ⚠️ O RANKING E SO DA SEMANA -- ver o `arenaRank` pra a razao (um "de sempre" compararia niveis
+   contra especies diferentes). Por isso ele nao usa o `rankAbasHtml`: ali sao DUAS abas, e aqui uma
+   aba sozinha seria um controle que nao controla nada. */
+function arenaRankHtml(){
+  if(!arenaValeAqui()) return '';
+  const cab = `<h2>${selo('trofeu')} Níveis da semana</h2>`;
+  if(arenaRank.erro){
+    return `<div class="box">${cab}<p class="hint-text">${escapeHtmlSafe(arenaRank.erro)}</p>`
+      + `<button class="btn secondary" onclick="arenaCarregarRank(true)">Tentar de novo</button></div>`;
+  }
+  if(!arenaRank.lista) return `<div class="box">${cab}<p class="hint-text">Carregando…</p></div>`;
+  /* ⚠️ A DATA E O DOMINGO -- o PRAZO, e nao a segunda em que a semana abriu: e a mesma decisao (e a
+     mesma conta) do `rankAbasHtml`, e ela sai do `trainersLeagueDateStrPlusDays` pra nao existir uma
+     segunda regra de data discordando da que o servidor usa. */
+  const fim = arenaRank.semanaId ? trainersLeagueDateStrPlusDays(arenaRank.semanaId, 6) : '';
+  const ate = fim ? ` <span class="rank-aba-desde">(até ${fim.slice(8,10)}/${fim.slice(5,7)})</span>` : '';
+  if(!arenaRank.lista.length){
+    return `<div class="box">${cab}<p class="hint-text">Ninguém venceu nesta semana ainda${ate}.
+      O primeiro nível pode ser o seu.</p></div>`;
+  }
+  const linha = (x) => `<div class="pesc-rank-linha${x.eu ? ' eu' : ''}">`
+    + `<span class="pesc-rank-pos">${x.pos ? (MEDALHA_DO_POSTO[x.pos - 1] ? selo(MEDALHA_DO_POSTO[x.pos - 1]) : x.pos + 'º') : '—'}</span>`
+    + `<span class="pesc-rank-nome">${escapeHtmlSafe(x.nome)}</span>`
+    + `<span class="pesc-rank-pts">nível ${x.nivel}</span></div>`;
+  return `<div class="box">${cab}`
+    + `<p class="rank-aba-nota">Zera toda segunda-feira, com o Pokémon novo${ate}</p>`
+    + `<div class="pesc-rank">${arenaRank.lista.map(linha).join('')}`
+    + (arenaRank.meu ? `<div class="pesc-rank-sep">você</div>` + linha(arenaRank.meu) : '')
+    + `</div></div>`;
+}
+
 function renderQueimada(){
   if(queimada.picker) return queimadaCabecalho() + queimadaPickerHtml();
   const jogando = queimada.fase === 'jogando';
@@ -41603,11 +41828,16 @@ function renderQueimada(){
       <button class="btn success" onclick="queimadaComecar()">Jogar de novo</button>
       <button class="btn secondary" onclick="queimadaReiniciar()">Trocar Pokémon</button>
     </div>
+    ${/* ⚠️ AS DUAS CAIXAS APARECEM AQUI TAMBEM: e neste instante que o nivel novo existe, e mandar
+         o jogador voltar ao setup pra ver o proprio nivel seria esconder o resultado da jogada. */''}
+    ${arenaDaSemanaHtml()}
+    ${arenaRankHtml()}
     <button class="btn secondary" onclick="sairDaQueimada()">⬅ Sair</button>`;
   }
 
   if(!jogando && !anunciando){
     return `${queimadaCabecalho()}
+    ${arenaDaSemanaHtml()}
     <div class="box">
       <h2>Ilha Pummelo · ${escapeHtmlSafe(queimadaLider())}</h2>
       <p>Campo dividido ao meio e uma bola só. Desvie, <b>receba</b> no tempo certo e devolva mais
@@ -41618,6 +41848,7 @@ function renderQueimada(){
       <button class="btn primary" onclick="queimadaComecar()" ${queimada.escolhido && queimada.fase !== 'carregando' ? '' : 'disabled'}>
         ${queimada.fase === 'carregando' ? 'Carregando os sprites…' : 'Entrar na quadra'}</button>
     </div>
+    ${arenaRankHtml()}
     <button class="btn secondary" onclick="sairDaQueimada()">⬅ Sair</button>`;
   }
 
@@ -41692,6 +41923,12 @@ function abrirQueimada(){
   queimadaZerar();
   game.modoBloqueado = null;
   game.screen = 'queimada';
+  /* ⚠️ INVALIDA E LE, e nesta ordem: o nivel e o bicho da semana mudam entre duas aberturas (outro
+     jogador entrou no top, a semana virou, eu venci noutra aba), e o `rankInvalidar` so zera a
+     IDADE -- a caixa continua mostrando o que tem enquanto o novo nao chega. */
+  arenaRank.subiu = false;
+  rankInvalidar(arenaRank);
+  arenaCarregarRank(true);
   render();
 }
 /* ⚠️ VOLTA PRA AS ILHAS, e não pra home: o jogo mora numa ilha, e sair dele é voltar pro mapa. */

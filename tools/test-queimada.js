@@ -51,9 +51,20 @@ const inst = (id, lv, ex) => S.queimadaInstancia(Object.assign({ speciesId: id, 
    suíte mediria o caminho do ERRO em vez do da partida. É a mesma folha do test-corrida. */
 const folha = { img: {}, w: 32, h: 32, durations: [4, 4], caixas: [[4, 4, 28, 30], [4, 4, 28, 30]] };
 function semearSprites(){ Object.keys(SP).forEach(id => { S.pmdCache[id] = folha; S.pmdCache[id + ':shiny'] = folha; }); }
+/* ⚠️ A ARENA NAO LARGA SEM O `semanaId`: ele vem do SERVIDOR (na resposta do ranking), e sem ele
+   nao se sabe nem quem e o adversario da semana nem em que nivel. O fixture o preenche como a
+   callable faria -- e e por isso que ele vive num ajudante: escrito em cada bloco, o proximo
+   nasceria sem ele e a trava mediria a RECUSA em vez da partida. */
+const SEMANA_DE_TESTE = '2026-09-21';
+function semanaDeTeste(nivel){
+  S.arenaRank.semanaId = SEMANA_DE_TESTE;
+  S.arenaRank.nivel = nivel == null ? 1 : nivel;
+  S.arenaRank.lista = []; S.arenaRank.meu = null; S.arenaRank.erro = null;
+  S.arenaRank.lidoEm = Date.now();
+}
 /* monta uma partida de verdade e devolve os dois atores */
 async function partida(slot, idx){
-  contaDeTeste(); semearSprites();
+  contaDeTeste(); semearSprites(); semanaDeTeste();
   g.screen = 'queimada';
   S.queimadaEscolher(slot == null ? 0 : slot, idx == null ? 0 : idx);
   await S.queimadaComecar();
@@ -90,7 +101,7 @@ console.log('\n=== O ACESSO É SÓ DE QUEM TEM admin === true ===');
 }
 console.log('\n=== E A LARGADA CONFERE DE NOVO ===');
 (async () => {
-  contaDeTeste(); semearSprites(); g.screen = 'queimada';
+  contaDeTeste(); semearSprites(); semanaDeTeste(); g.screen = 'queimada';
   S.queimadaEscolher(0, 0);
   g.ehAdmin = false;
   await S.queimadaComecar();
@@ -293,9 +304,14 @@ console.log('\n=== O DANO É COMPRIMIDO: NUNCA MENOS DE 2 NEM MAIS DE 8 GOLPES =
 }
 
 /* ============================================================================
-   6) O ADVERSÁRIO -- pareado por BST, e ele NÃO é do jogador
+   6) O ADVERSÁRIO DA TRAVESSIA -- pareado por BST, e ele NÃO é do jogador
+   ----------------------------------------------------------------------------
+   ⚠️ DESDE 24/09/2026 ESTE E O ADVERSARIO DA **TRAVESSIA DAS ILHAS**, e nao o da ilha: na ilha ele
+   e o Pokemon DA SEMANA, no nivel da progressao (ver tools/test-arena.js). O pareamento continua
+   aqui porque tirar dele a travessia a tornaria impossivel -- medido, com o nivel valendo la ela
+   cai pra 19% no nivel 8 e ZERO no 12, com o time da jornada e 2 chances.
    ============================================================================ */
-console.log('\n=== O ADVERSÁRIO É PAREADO POR BST ===');
+console.log('\n=== O ADVERSÁRIO DA TRAVESSIA É PAREADO POR BST ===');
 {
   contaDeTeste();
   const pool = S.finaisDaCorrida();
@@ -343,6 +359,12 @@ console.log('\n=== O ADVERSÁRIO É PAREADO POR BST ===');
      daria o buff ao adversário em silêncio. */
   ok('  e o `ehDoJogador` não tem padrão', /function queimadaInstancia\(p, ehDoJogador\)\s*\{/.test(src));
   ok('  e o NPC é montado sem ele', /queimadaSortearNpc\(queimada\.escolhido\.speciesId/.test(src));
+  /* ⚠️ E O PAREADO VALE SO NA TRAVESSIA: na ilha o adversario e o da semana. Sem esta trava, alguem
+     troca um pelo outro e o defeito nao aparece como erro -- aparece como a travessia ficando
+     impossivel (ou a semana deixando de existir), e cada um so num dos dois modos. */
+  ok('  e o pareado é o adversário da TRAVESSIA, não o da ilha',
+     /arenaValeAqui\(\)[\s\S]{0,400}?arenaAdversario\(/.test(src)
+     && /else\s*\{[\s\S]{0,200}?queimadaSortearNpc\(/.test(src));
   g.specialties = [];
 }
 

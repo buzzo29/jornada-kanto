@@ -240,6 +240,21 @@ service cloud.firestore {
         allow write: if false;
       }
     }
+    // ⚠️ A ARENA DA SEMANA (24/09/2026): aqui a subcolecao da semana E o proprio ranking -- ela
+    // guarda o NIVEL de cada treinador, que e o que o top 10 ordena. A regra e a mesma dos outros
+    // quatro (leitura livre pra quem esta logado, escrita NEGADA a todos, inclusive ao dono), e
+    // aqui ela pesa como na Selecao: o que se grava nao e um recorde que so sobe por comparacao, e
+    // um CONTADOR que o servidor incrementa -- uma linha no console poria nivel 99 no topo.
+    // Nao ha colecao "de sempre": o adversario muda de especie toda semana, e nivel 8 contra a
+    // Ninetales nao e nivel 8 contra o Dragonite.
+    match /arenaRankingWeekly/{semanaId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+      match /players/{playerId} {
+        allow read: if request.auth != null;
+        allow write: if false;
+      }
+    }
     // Ranking da Corrida: os dois tempos (individual e revezamento). Mesma regra do da pescaria --
     // tempo e placar publico, e escrita do cliente poria 0,01 s no topo. So a callable escreve.
     match /raceRanking/{playerId} {

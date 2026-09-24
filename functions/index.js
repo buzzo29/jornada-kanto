@@ -6435,6 +6435,97 @@ exports.getRescueRanking = onCall(async (request) => {
 });
 exports._resgateRank = { topo: RESGATE_RANK_TOPO };
 
+/* =====================================================================
+   A ARENA DA SEMANA (24/09/2026, a pedido) -- o nivel de cada treinador na semana.
+
+   Pedido assim: *"toda semana sera sorteado um pokemon acima do bst 500 ... cada vez que o
+   treinador vence esse pokemon, ele sobe 1 nivel, e o pokemon da arena sobe 3 levels a cada nivel
+   ... voce vai criar um ranking mostrando os treinadores que chegaram no nivel mais alto durante a
+   semana. O nivel 1 comeca com o pokemon adversario no level 60"*.
+
+   ⚠️ O DOCUMENTO DA SEMANA E O PROPRIO RANKING, e nao ha uma segunda colecao: o nivel e monotonico
+   (so sobe) e ja e por semana, entao `arenaRankingWeekly/{semana}/players/{uid}` guarda o progresso
+   E ordena o top 10. Com isso o `orderBy` fica de UM campo so -- indice de campo unico, que o
+   Firestore cria sozinho. O primeiro composto que este projeto precisou nasceu quebrado (o da
+   Selecao, 21/09), e e uma armadilha que da pra nao repetir.
+
+   ⚠️ NAO HA RANKING "DE SEMPRE", ao contrario dos outros tres, e a razao e que ele compararia coisas
+   DIFERENTES: o adversario muda de especie toda semana, e nivel 8 contra a Ninetales nao e nivel 8
+   contra o Dragonite -- medido, um Jolteon Lv.99 faz 93% no nivel 8 contra o Kingdra e 70% contra o
+   Dragonite. Nos outros a mecanica e a mesma toda semana, e la as duas abas comparam a mesma coisa.
+
+   ⚠️ E ELE NAO ENTRA NO `RANKS_SEMANAIS`: aquela lista e a do que o cron FECHA E PAGA, e premio nao
+   foi pedido. Acrescenta-lo la seria abrir uma torneira de Doce Raro sem pedido -- e e uma linha no
+   dia em que for. Sem premio nao ha o que fechar: a subcolecao da semana passada simplesmente fica
+   onde esta, como historico.
+
+   ⚠️ QUEM SOMA E O SERVIDOR, e o que chega do cliente e UM BOOLEANO: aceitar o `nivel` seria
+   deixa-lo escrever o proprio lugar no ranking por outro caminho. E a mesma regra do `venceu` da
+   Selecao -- e, como la, o duelo NAO da pra validar: a Arena e um minigame de tempo real, nao uma
+   batalha do motor. Um cliente forjado chama a callable N vezes e sobe N niveis; e a mesma
+   superficie dos outros quatro rankings, e o teto abaixo e o que recusa o absurdo.
+   ===================================================================== */
+/* ⚠️ O TETO E FOLGADO DE PROPOSITO, como os 100.000 pontos do `pontosDeRankingValidos`: ele recusa
+   o ABSURDO, nao a forja. Medido, o melhor caso POSSIVEL (Mewtwo Lv.99 contra a Ninetales, que e a
+   mais fraca da lista, com mira alta) morre por volta do nivel 40 -- n30=35%, n40=10%, n50=0%.
+   Cem e 2,5x isso, ou seja ele nao recusa nenhuma partida possivel. */
+const ARENA_NIVEL_MAX = 100;
+const ARENA_RANK_TOPO = 10;
+async function lerRankArena(semanaId, uid){
+  const coll = rankSemanaPlayersRef('arenaRanking', semanaId);
+  const snap = await coll.orderBy('nivel', 'desc').limit(ARENA_RANK_TOPO).get();
+  const linha = (x, i, id) => ({ pos: i + 1, uid: id, nome: x.nome || 'Treinador',
+                                 nivel: Number(x.nivel) || 1, eu: id === uid });
+  const lista = snap.docs.map((d, i) => linha(d.data() || {}, i, d.id));
+  /* ⚠️ O MEU NIVEL VOLTA SEMPRE, e nao so quando eu estou fora do top: ele nao e enfeite de tela --
+     e ele que decide o NIVEL DO ADVERSARIO, ou seja a partida nao existe sem ele. */
+  const m = await coll.doc(uid).get();
+  const nivel = m.exists ? Math.max(1, Number(m.data().nivel) || 1) : 1;
+  let meu = null;
+  if(m.exists && !lista.some(x => x.eu)){ meu = linha(m.data() || {}, -1, uid); meu.pos = null; }
+  return { lista, meu, nivel };
+}
+exports.submitArenaWin = onCall(async (request) => {
+  exigeCadastro(request);
+  const uid = request.auth && request.auth.uid;
+  if(!uid) throw new HttpsError('unauthenticated', 'Faça login.');
+  /* ⚠️ `venceu` LIDO COMO BOOLEANO: um `'sim'` seria truthy num campo que o servidor nao controla. */
+  const venceu = (request.data || {}).venceu === true;
+  const semanaId = semanaDoRanking();
+  const conta = await db.collection('users').doc(uid).get();
+  const nome = (conta.exists && conta.data().trainerName) || 'Treinador';
+  const ref = rankSemanaPlayersRef('arenaRanking', semanaId).doc(uid);
+  let nivel = 1, subiu = false;
+  /* ⚠️ A TRANSACAO E OBRIGATORIA aqui, e nao conveniencia: o que se escreve DEPENDE do que se leu.
+     Nos rankings de placar ela protege um empate; aqui ela protege a CONTAGEM -- duas abas
+     terminando ao mesmo tempo somariam uma vitoria so. */
+  await db.runTransaction(async (tx) => {
+    const d = await tx.get(ref);
+    const antes = d.exists ? Math.max(1, Number(d.data().nivel) || 1) : 1;
+    nivel = antes;
+    if(!venceu){
+      /* ⚠️ PERDER NAO DESCE NADA (o pedido fala so da vitoria), e tambem nao CRIA documento: um
+         jogador que so perdeu no ranking seria uma linha de "nivel 1" que nao diz nada. */
+      return;
+    }
+    if(antes >= ARENA_NIVEL_MAX){ nivel = ARENA_NIVEL_MAX; return; }
+    nivel = antes + 1; subiu = true;
+    tx.set(ref, { uid, nome, nivel, semanaId, quando: Date.now() }, { merge: true });
+  });
+  return { nivel, subiu, semanaId };
+});
+exports.getArenaRanking = onCall(async (request) => {
+  exigeCadastro(request);
+  const uid = request.auth && request.auth.uid;
+  if(!uid) throw new HttpsError('unauthenticated', 'Faça login.');
+  const semanaId = semanaDoRanking();
+  const r = await lerRankArena(semanaId, uid);
+  return { ...r, semanaId };
+});
+exports._arena = { NIVEL_MAX: ARENA_NIVEL_MAX, topo: ARENA_RANK_TOPO };
+
+
+
 
 /* =====================================================================
    RANKING DA SELEÇÃO (21/09/2026, a pedido) -- o aproveitamento contra a Luana.
