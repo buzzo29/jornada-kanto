@@ -275,9 +275,32 @@ console.log('\n=== A TRAVESSIA CONTINUA COM O ADVERSÁRIO PAREADO ===');
     ok('o setup mostra o pokémon da semana', h.indexOf(bicho) >= 0, bicho);
     ok('  e o nível DELE, que sai da escada', h.indexOf('Lv.' + S.arenaNivelDoAdversario(3)) >= 0,
        'Lv.' + S.arenaNivelDoAdversario(3));
-    ok('  e o MEU nível', /Seu n[íi]vel: 3/.test(h));
+    /* ⚠️ O SPRITE É GRANDE (24/09/2026, a pedido) -- o `sprite-lg`, o maior que a casa tem. A trava
+       cobra a CLASSE e não o tamanho em px: o px vive no CSS, e cravá-lo aqui faria ela envelhecer
+       no primeiro ajuste.
+       ⚠️ E A FATIA VAI ATÉ O FIM DA CAIXA (o próximo `<div class="box`), nunca até o ranking: a caixa
+       do PARCEIRO fica no meio das duas, e ela tem um `sprite-sm` legítimo -- a primeira versão desta
+       trava acusava ELE, com o código certo. É a armadilha do padrão largo demais. */
+    const depoisDoH2 = h.slice(h.indexOf('Pokémon da semana'));
+    const fim = depoisDoH2.indexOf('<div class="box');
+    const caixa = fim > 0 ? depoisDoH2.slice(0, fim) : depoisDoH2;
+    ok('  (a fatia é só a caixa da semana)', caixa.length > 200 && caixa.indexOf('Níveis') < 0,
+       caixa.length + ' chars');
+    ok('  com o sprite GRANDE (sprite-lg, e nenhum sprite-sm nela)',
+       caixa.indexOf('sprite-lg') >= 0 && caixa.indexOf('sprite-sm') < 0);
+    /* ⚠️ E O MEU NÍVEL SAI DESTACADO, não como legenda: ele é o número que decide o adversário. */
+    ok('  e o MEU nível, com destaque próprio', /arena-meu-num">3</.test(h));
+    ok('    e com o rótulo em cima dele (o número não precisa de contexto)',
+       h.indexOf('arena-meu-rotulo') >= 0 && /SEU N[IÍ]VEL/i.test(h));
     ok('  e o ranking da semana', h.indexOf('Níveis da semana') >= 0 && h.indexOf('Ana') >= 0
        && h.indexOf('nível 9') >= 0);
+    /* ⚠️ A NOTA DO PRÊMIO É A MESMA DOS OUTROS TRÊS (24/09/2026): a Arena passou a pagar, e uma tela
+       que esconde o prêmio não convida ninguém. O "com o Pokémon novo" fica como segunda linha --
+       ele é o que ESTA Arena tem de diferente (lá zera o placar, aqui zera o ADVERSÁRIO). */
+    ok('  e a nota do prêmio, a MESMA dos outros três rankings',
+       h.indexOf('Lidere até o fim da semana e ganhe Doces Raros') >= 0);
+    ok('    e ela diz o que ESTA Arena tem de diferente (o Pokémon novo)',
+       h.indexOf('com o Pokémon novo') >= 0);
     /* ⚠️ NÃO HÁ ABA "DE SEMPRE": um ranking de sempre compararia níveis contra espécies diferentes. */
     ok('  e ele NÃO tem aba de "de sempre"', h.indexOf('De sempre') < 0);
     /* ⚠️ E AS DUAS CAIXAS NÃO APARECEM NA TRAVESSIA: lá o adversário é pareado e continua surpresa. */
@@ -294,6 +317,42 @@ console.log('\n=== A TRAVESSIA CONTINUA COM O ADVERSÁRIO PAREADO ===');
     S.arenaRank.erro = null; S.arenaRank.lista = [];
     ok('  e o vazio fala da SEMANA, não de "nunca"',
        /nesta semana/i.test(S.renderQueimada()));
+    /* ⚠️ E O VAZIO TAMBÉM CONVIDA: sem a nota, a primeira semana de um jogador abriria uma caixa que
+       só diz "ninguém venceu" -- e é justamente ali que o prêmio é o argumento pra jogar. */
+    ok('    e ele convida com o prêmio',
+       S.renderQueimada().indexOf('ganhe Doces Raros') >= 0);
+    /* ⚠️ O CSS: tamanho de src e centralização NÃO aparecem em asserção de HTML nenhuma -- é a
+       lição do `[hidden]` que deixou o modal da contagem da Corrida preso na tela. */
+    const css = src.slice(src.indexOf('<style'), src.indexOf('</style>'));
+    const regra = (sel) => {
+      const i = css.indexOf(sel + '{');
+      return i < 0 ? '' : css.slice(i, css.indexOf('}', i));
+    };
+    ok('  e a caixa CENTRALIZA por conta própria (o `.box` não é center)',
+       /text-align:\s*center/.test(regra('.arena-semana')), regra('.arena-semana') || '(sem regra)');
+    /* ⚠️ E O NÚMERO É MAIOR QUE O RÓTULO: um piso, nunca o valor exato -- cravá-lo faria a trava
+       envelhecer no primeiro ajuste, a família que já caiu meia dúzia de vezes aqui. */
+    const rem = (sel) => parseFloat((regra(sel).match(/font-size:\s*([\d.]+)rem/) || [, 0])[1]);
+    ok('  e o número do nível é bem maior que o rótulo dele',
+       rem('.arena-meu-num') >= 1.2 && rem('.arena-meu-num') > rem('.arena-meu-rotulo') * 2,
+       rem('.arena-meu-num') + 'rem contra ' + rem('.arena-meu-rotulo') + 'rem');
+    /* ⚠️ E UM RISCO SEPARA AS DUAS INFORMAÇÕES da caixa -- o ADVERSÁRIO em cima e EU embaixo. Sem
+       ele o "SEU NÍVEL" se lê como continuação do card do bicho, e isso NÃO aparece em asserção de
+       HTML nenhuma: foi a captura de tela que pegou. */
+    ok('  e um risco separa o adversário do MEU nível',
+       /border-top:\s*\d+px dashed/.test(regra('.arena-meu')), regra('.arena-meu') || '(sem regra)');
+    /* ⚠️ E A NOTA DO PRÊMIO VIVE NUMA FUNÇÃO SÓ: ela tem DOIS leitores desde que a Arena passou a
+       pagar, e o que ela promete é um PRÊMIO -- duas cópias divergiriam e o jogador não saberia
+       qual das duas telas vale. */
+    ok('  e os DOIS leitores da nota leem a MESMA função',
+       (src.match(/notaDoPremioSemanal\(/g) || []).length >= 4,
+       (src.match(/notaDoPremioSemanal\(/g) || []).length + ' usos');
+    /* ⚠️ E A FRASE EXISTE UMA VEZ SÓ no arquivo -- é isso que prova que não há cópia. A primeira
+       versão desta trava procurava a frase FORA da função e acusava a PRÓPRIA função que ela mede:
+       a armadilha do padrão largo demais, dentro da trava. */
+    ok('    e a frase do prêmio existe UMA vez só (nenhuma cópia)',
+       (src.match(/Lidere até o fim da semana e ganhe Doces Raros/g) || []).length === 1,
+       (src.match(/Lidere até o fim da semana e ganhe Doces Raros/g) || []).length + ' ocorrência(s)');
   }
 
   /* ---------- 9) a abertura ---------- */
@@ -328,10 +387,14 @@ console.log('\n=== A TRAVESSIA CONTINUA COM O ADVERSÁRIO PAREADO ===');
     /* ⚠️ `venceu` LIDO COMO BOOLEANO ESTRITO: um `'sim'` seria truthy. */
     ok('  e `venceu` é lido como booleano estrito',
        /\(request\.data \|\| \{\}\)\.venceu === true/.test(c2));
-    /* ⚠️ E ELE NÃO ENTRA NO `RANKS_SEMANAIS`: prêmio não foi pedido. */
+    /* ⚠️ ELE ENTRA NO `RANKS_SEMANAIS` desde 24/09/2026 (a pedido), e esta trava era a INVERSA -- ela
+       cobrava que ele ficasse FORA, porque prêmio não tinha sido pedido. Ela não foi apagada: virou
+       a trava da regra nova, senão alguém o tira da lista e o prêmio para de sair EM SILÊNCIO -- o
+       cron não reclama de uma entrada que não existe. O `test-arena-rank` mede o pagamento; aqui se
+       mede só que ele está na lista que o cron varre. */
     const rs = srvSrc.slice(srvSrc.indexOf('const RANKS_SEMANAIS'));
-    ok('  e ele NÃO entra na lista do cron (prêmio não foi pedido)',
-       rs.slice(0, rs.indexOf(']')).indexOf('arenaRanking') < 0);
+    ok('  e ele ENTRA na lista que o cron fecha e paga',
+       rs.slice(0, rs.indexOf('];')).indexOf("base: 'arenaRanking'") >= 0);
     /* as regras */
     const regras = require('fs').readFileSync(path.join(raiz, 'firestore.rules'), 'utf8');
     const m = regras.match(/match \/arenaRankingWeekly\/\{semanaId\} \{[\s\S]*?\n    \}/);

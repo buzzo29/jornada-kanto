@@ -4316,8 +4316,24 @@
   .q-placar .hp-bar-wrap{margin-top:4px;width:100%;}
   .q-placar .pesc-lado-estado{text-align:center;}
   /* A ARENA DA SEMANA: o nivel do jogador e o selo de que ele acabou de subir. */
-.arena-nivel{margin:6px 0 2px;font-size:.82rem}
-.arena-subiu{color:var(--green-dark);font-weight:800}
+/* ⚠️ A CAIXA CENTRALIZA POR CONTA PROPRIA: o `.box` nao e `text-align:center`, e depender do
+   container e o defeito que o `corrida-retrato` custou (ele centralizava no modal por acidente e
+   saia encostado a esquerda na grade da classificacao). */
+.arena-semana{text-align:center}
+.arena-retrato{margin:2px 0 0}
+.arena-nome{margin:0;font-weight:800;font-size:.9rem;text-transform:uppercase}
+.arena-lv{font-weight:800;color:var(--blue-dark)}
+.arena-tipos{margin:3px 0 8px}
+/* ⚠️ O NUMERO DO NIVEL E O TAMANHO DA COLOCACAO DO PODIO DA CORRIDA (1.5rem): e ele que decide o
+   nivel do adversario, e em .82rem ele se lia como legenda do sprite. */
+/* ⚠️ O TRACEJADO SEPARA DUAS INFORMACOES DIFERENTES na mesma caixa -- o ADVERSARIO em cima e EU
+   embaixo. Sem ele o "SEU NIVEL" se le como continuacao do card do bicho (so a captura de tela
+   pega isso), e e o mesmo risco que o card do parceiro ja usa logo abaixo nesta tela. */
+.arena-meu{display:flex;flex-direction:column;align-items:center;gap:0;margin:0 0 6px;
+  border-top:2px dashed rgba(26,26,46,.25);padding-top:6px}
+.arena-meu-rotulo{font-size:.55rem;color:var(--muted);letter-spacing:.08em}
+.arena-meu-num{font-size:1.5rem;font-weight:800;line-height:1.1}
+.arena-subiu{color:var(--green-dark);font-weight:800;font-size:.7rem}
 .q-ficha{display:flex;justify-content:space-between;gap:6px;margin:7px 0;
     font-size:.62rem;color:var(--muted);text-align:center;}
   .q-ficha b{display:block;font-size:.82rem;color:var(--blue-dark);
@@ -36500,10 +36516,19 @@ function rankAbasHtml(qual, semanaId){
      ⚠️ E ELA SAI DO `trainersLeagueDateStrPlusDays`, nunca de uma conta minha: uma segunda regra
      de data discordaria da do jogo em algum fuso, e o prazo da tela deixaria de ser o prazo que o
      cron fecha. O `semanaId` é a SEGUNDA, então o fim é ela mais seis. */
+  return `<div class="tower-rank-abas">${bt('semana','Da semana','Zera toda segunda-feira')}${bt('sempre','De sempre','O recorde de todos os tempos')}</div>`
+    + (aba === 'semana' ? notaDoPremioSemanal(semanaId) : '');
+}
+/* ⚠️ A NOTA DO PREMIO VIVE NUMA FUNCAO SO desde 24/09/2026, quando a ARENA passou a pagar tambem e
+   ela ganhou o SEGUNDO leitor. Escrita nos dois, a segunda divergiria no primeiro ajuste -- e o que
+   ela promete e um PREMIO: uma tela dizendo "Doces Raros" e a outra dizendo outra coisa manda o
+   jogador procurar qual das duas vale. (E o prazo sai do `trainersLeagueDateStrPlusDays`, nunca de
+   uma conta propria: ele e a MESMA regra de data que o cron usa pra fechar a semana.) */
+function notaDoPremioSemanal(semanaId, extra){
   const fimStr = semanaId ? trainersLeagueDateStrPlusDays(semanaId, 6) : '';
   const ate = fimStr ? ' <span class="rank-aba-desde">(Até ' + fimStr.slice(8,10) + '/' + fimStr.slice(5,7) + ')</span>' : '';
-  return `<div class="tower-rank-abas">${bt('semana','Da semana','Zera toda segunda-feira')}${bt('sempre','De sempre','O recorde de todos os tempos')}</div>`
-    + (aba === 'semana' ? `<p class="rank-aba-nota">🏅 Lidere até o fim da semana e ganhe Doces Raros${ate}</p>` : '');
+  return `<p class="rank-aba-nota">🏅 Lidere até o fim da semana e ganhe Doces Raros${ate}`
+    + (extra ? `<br>${extra}` : '') + `</p>`;
 }
 /* ⚠️ QUAL LISTA DESENHAR sai daqui, e não de um `if` em cada tela: três cópias divergiriam no
    primeiro ajuste, e o sintoma seria uma tela mostrando a aba certa e outra a errada. */
@@ -41760,15 +41785,23 @@ function arenaDaSemanaHtml(){
   const sp = SPECIES[id] || {};
   const nivel = arenaMeuNivel();
   const lv = arenaNivelDoAdversario(nivel);
-  return `<div class="box">
+  return `<div class="box arena-semana">
     <h2>${selo('estadio')} Pokémon da semana</h2>
-    <div class="order-row">
-      <div class="order-info">
-        <span class="mon-name">${spriteHtml(id, 'sprite-sm')} ${escapeHtmlSafe(sp.name || id)} <span class="mont-lv">— Lv.${lv}</span></span>
-        <span class="mon-sub">${typesHtml(sp.types || [])}</span>
-      </div>
+    ${/* ⚠️ O SPRITE GRANDE E O `sprite-lg` (110px), o maior tamanho que a casa tem -- o mesmo do
+         retrato da Corrida. E a caixa CENTRALIZA por conta propria (`.arena-semana`), nunca pelo
+         container: o `.box` nao e `text-align:center`, e depender do contexto e a forma de defeito
+         que o `corrida-retrato` ja custou -- ele funcionava no modal e quebrava na grade. */''}
+    <div class="arena-retrato">${spriteHtml(id, 'sprite-lg')}</div>
+    <p class="arena-nome">${escapeHtmlSafe(sp.name || id)} <span class="arena-lv">Lv.${lv}</span></p>
+    <p class="arena-tipos">${typesHtml(sp.types || [])}</p>
+    ${/* ⚠️ O NIVEL DO TREINADOR E A OUTRA METADE DA TELA, e ele e o NUMERO que decide o adversario:
+         em .82rem ele se lia como legenda do sprite. Ele sai grande, como o "1º" do podio da
+         Corrida -- e o rotulo em cima dele, pra o numero nao precisar de contexto. */''}
+    <div class="arena-meu">
+      <span class="arena-meu-rotulo">SEU NÍVEL</span>
+      <span class="arena-meu-num">${nivel}</span>
+      ${arenaRank.subiu ? `<span class="arena-subiu">subiu!</span>` : ''}
     </div>
-    <p class="arena-nivel"><b>Seu nível: ${nivel}</b>${arenaRank.subiu ? ' <span class="arena-subiu">subiu!</span>' : ''}</p>
     ${/* ⚠️ A FRASE DIZ A REGRA, com os numeros saindo das CONSTANTES: um "+3 por nivel" escrito aqui
          envelheceria no primeiro ajuste -- a familia dos rotulos de metragem da Corrida. */''}
     <p class="hint-text">Vença e você sobe 1 nível — e ele sobe ${ARENA_NIVEL_PASSO}. Toda semana é
@@ -41786,21 +41819,23 @@ function arenaRankHtml(){
       + `<button class="btn secondary" onclick="arenaCarregarRank(true)">Tentar de novo</button></div>`;
   }
   if(!arenaRank.lista) return `<div class="box">${cab}<p class="hint-text">Carregando…</p></div>`;
-  /* ⚠️ A DATA E O DOMINGO -- o PRAZO, e nao a segunda em que a semana abriu: e a mesma decisao (e a
-     mesma conta) do `rankAbasHtml`, e ela sai do `trainersLeagueDateStrPlusDays` pra nao existir uma
-     segunda regra de data discordando da que o servidor usa. */
+  /* ⚠️ A NOTA E A MESMA DOS OUTROS TRES desde 24/09/2026 (o `notaDoPremioSemanal`), porque a Arena
+     passou a PAGAR: ela dizia so "Zera toda segunda-feira", e uma tela que esconde o premio e uma
+     tela que nao convida ninguem. O "com o Pokémon novo" continua como segunda linha -- ele e o que
+     esta Arena tem de diferente das outras tres (la o que zera e o placar, aqui zera o ADVERSARIO). */
   const fim = arenaRank.semanaId ? trainersLeagueDateStrPlusDays(arenaRank.semanaId, 6) : '';
   const ate = fim ? ` <span class="rank-aba-desde">(até ${fim.slice(8,10)}/${fim.slice(5,7)})</span>` : '';
   if(!arenaRank.lista.length){
     return `<div class="box">${cab}<p class="hint-text">Ninguém venceu nesta semana ainda${ate}.
-      O primeiro nível pode ser o seu.</p></div>`;
+      O primeiro nível pode ser o seu.</p>`
+      + notaDoPremioSemanal(arenaRank.semanaId, 'Zera toda segunda-feira, com o Pokémon novo') + `</div>`;
   }
   const linha = (x) => `<div class="pesc-rank-linha${x.eu ? ' eu' : ''}">`
     + `<span class="pesc-rank-pos">${x.pos ? (MEDALHA_DO_POSTO[x.pos - 1] ? selo(MEDALHA_DO_POSTO[x.pos - 1]) : x.pos + 'º') : '—'}</span>`
     + `<span class="pesc-rank-nome">${escapeHtmlSafe(x.nome)}</span>`
     + `<span class="pesc-rank-pts">nível ${x.nivel}</span></div>`;
   return `<div class="box">${cab}`
-    + `<p class="rank-aba-nota">Zera toda segunda-feira, com o Pokémon novo${ate}</p>`
+    + notaDoPremioSemanal(arenaRank.semanaId, 'Zera toda segunda-feira, com o Pokémon novo')
     + `<div class="pesc-rank">${arenaRank.lista.map(linha).join('')}`
     + (arenaRank.meu ? `<div class="pesc-rank-sep">você</div>` + linha(arenaRank.meu) : '')
     + `</div></div>`;

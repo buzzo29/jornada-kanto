@@ -133,6 +133,88 @@ function ok(titulo, cond, extra){
   ok('  e não existe coleção "de sempre"', sempre.empty || sempre.size === 0,
      (sempre.size || 0) + ' documentos');
 
+  /* ---------- 5b) o PREMIO da semana (24/09/2026) ---------- */
+  console.log('\n=== O PRÊMIO DO LÍDER DA SEMANA ===');
+  const RS = mod._rankSemanal;
+  const arena = (RS.RANKS_SEMANAIS || []).filter(r => r.base === 'arenaRanking');
+  ok('a Arena entra no RANKS_SEMANAIS (é o cron que fecha e paga)', arena.length === 1,
+     arena.length + ' entrada(s)');
+  ok('  e ela declara o campo `nivel`, com maior sendo melhor',
+     !!arena[0] && arena[0].campo === 'nivel' && arena[0].maior === true);
+  /* ⚠️ A UNIDADE É O QUE IMPEDE A NOTIFICAÇÃO DE MENTIR: os outros quatro medem PLACAR, e sem ela o
+     texto genérico diria "com 12 pontos" onde o certo é "no nível 12". */
+  ok('  e a UNIDADE dela é o nível (os outros quatro medem placar)',
+     !!arena[0] && arena[0].unidade === 'nivel', arena[0] ? String(arena[0].unidade) : '-');
+  /* ⚠️ E ELA NÃO ENTRA NA CÓPIA INICIAL: ela não TEM coleção de sempre pra copiar. Aquela lista é
+     escrita à mão de propósito -- derivada do RANKS_SEMANAIS, a Arena entraria e o cron marcaria
+     `copiado: true` sobre uma coleção que não existe. */
+  const fonteCopia = fs.readFileSync(path.join(raiz, 'functions', 'index.js'), 'utf8');
+  const listaCopia = (fonteCopia.match(/for\(const base of \[([^\]]*)\]\)/) || [, ''])[1];
+  ok('  e ela NÃO entra na cópia inicial (não há coleção de sempre pra copiar)',
+     listaCopia.indexOf('arenaRanking') < 0 && listaCopia.indexOf('fishingRanking') >= 0,
+     listaCopia.replace(/['\s]/g, ''));
+
+  /* o fechamento de verdade, com três níveis distintos */
+  const semAnterior = RS.semanaDoRanking(Date.now() - 7 * 864e5);
+  const P = RS.rankSemanaPlayersRef('arenaRanking', semAnterior);
+  for(const [uid, nome, n] of [['p1','Lider',12],['p2','Vice',8],['p3','Terceiro',5],['p4','Quarto',2]]){
+    await db.collection('users').doc(uid).set({ trainerName: nome, rareCandies: 0, moedas: 0 });
+    await P.doc(uid).set({ uid, nome, nivel: n, semanaId: semAnterior, quando: Date.now() });
+  }
+  const fech = await RS.fecharSemanaDoRanking('arenaRanking', semAnterior, 'nivel', true,
+                                              arena[0].rotulo, arena[0].unidade);
+  ok('o fechamento premia os TRÊS degraus (e não o quarto)', fech && fech.premiados === 3,
+     fech ? fech.premiados + ' premiado(s)' : '(nulo)');
+  const doc1 = (await db.collection('users').doc('p1').get()).data();
+  const doc2 = (await db.collection('users').doc('p2').get()).data();
+  const doc3 = (await db.collection('users').doc('p3').get()).data();
+  const doc4 = (await db.collection('users').doc('p4').get()).data();
+  /* ⚠️ OS VALORES SAEM DA TABELA, nunca escritos aqui: cravá-los faria a trava envelhecer no primeiro
+     reajuste de prêmio -- a família que já caiu meia dúzia de vezes neste projeto. */
+  const PR = RS.RANK_SEMANAL_PREMIOS;
+  ok('  o líder ganha Doce Raro', doc1.rareCandies === PR[0].doces, doc1.rareCandies + ' doce(s)');
+  ok('  o vice ganha menos que ele, e mais que zero',
+     doc2.rareCandies === PR[1].doces && PR[1].doces > 0 && PR[1].doces < PR[0].doces,
+     doc2.rareCandies + ' doce(s)');
+  ok('  o terceiro ganha moedas', doc3.moedas === PR[2].moedas, '🪙 ' + doc3.moedas);
+  ok('  e o quarto não ganha nada', !doc4.rareCandies && !doc4.moedas);
+  /* ⚠️ A FRASE: "no nível 12", nunca "com 12 pontos" */
+  const notas = (await db.collection('users').doc('p1').collection('notifications').get()).docs
+    .map(d => d.data()).filter(x => x.type === 'rank_semanal');
+  ok('  e a notificação chega', notas.length === 1, notas.length + ' nota(s)');
+  ok('  e ela diz "no nível 12", nunca "com 12 pontos"',
+     !!notas[0] && notas[0].body.indexOf('no nível 12') >= 0 && notas[0].body.indexOf('pontos') < 0,
+     notas[0] ? notas[0].body : '-');
+  ok('  e ela nomeia o ranking', !!notas[0] && notas[0].body.indexOf(arena[0].rotulo) >= 0);
+  /* ⚠️ E O TEXTO DOS QUATRO QUE JÁ EXISTEM NÃO MUDA -- sem esta metade, uma mudança que trocasse a
+     frase dos cinco passaria. */
+  const sem2 = RS.semanaDoRanking(Date.now() - 14 * 864e5);
+  await db.collection('users').doc('q1').set({ trainerName: 'Pescador', rareCandies: 0 });
+  await RS.rankSemanaPlayersRef('fishingRanking', sem2).doc('q1')
+          .set({ uid: 'q1', nome: 'Pescador', pontos: 550, semanaId: sem2 });
+  await RS.fecharSemanaDoRanking('fishingRanking', sem2, 'pontos', true, 'Pescaria', undefined);
+  const nq = (await db.collection('users').doc('q1').collection('notifications').get()).docs
+    .map(d => d.data()).filter(x => x.type === 'rank_semanal');
+  ok('  e a Pescaria continua dizendo "com 550 pontos"',
+     !!nq[0] && nq[0].body.indexOf('com 550 pontos') >= 0, nq[0] ? nq[0].body : '-');
+
+  /* ⚠️ E O CAMINHO DE VERDADE: o CRON. Os casos acima chamam o `fecharSemanaDoRanking` na mão, com a
+     unidade passada por aqui -- então eles passariam com o cron tendo parado de repassá-la, e a
+     conferência de acusação mostrou isso: aquele defeito ficou MUDO. Este dirige a cadeia inteira
+     (cron -> fechar -> premiar), que é a única forma de provar que a unidade viaja. */
+  const sem3 = RS.semanaDoRanking(Date.now() - 21 * 864e5);
+  await db.collection('users').doc('z1').set({ trainerName: 'Cronado', rareCandies: 0 });
+  await RS.rankSemanaPlayersRef('arenaRanking', sem3).doc('z1')
+          .set({ uid: 'z1', nome: 'Cronado', nivel: 20, semanaId: sem3 });
+  await RS.fecharSemanasPendentes();
+  const nz = (await db.collection('users').doc('z1').collection('notifications').get()).docs
+    .map(d => d.data()).filter(x => x.type === 'rank_semanal');
+  ok('e o CRON fecha a semana da Arena sozinho', nz.length === 1, nz.length + ' nota(s)');
+  ok('  e a unidade VIAJA por ele (a frase diz "no nível 20")',
+     !!nz[0] && nz[0].body.indexOf('no nível 20') >= 0 && nz[0].body.indexOf('pontos') < 0,
+     nz[0] ? nz[0].body : '-');
+  ok('  e ele pagou o doce', (await db.collection('users').doc('z1').get()).data().rareCandies === PR[0].doces);
+
   /* ---------- 6) o acesso ---------- */
   console.log('\n=== O ACESSO ===');
   let recusou = false;

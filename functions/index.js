@@ -5974,7 +5974,7 @@ async function gravarRankTempo(base, uid, modalidade, dados){
    `awarded` so no FIM. Marcar a semana como paga antes de pagar faria um erro no meio do laco
    apagar o resto do podio pra sempre, porque a volta seguinte do cron veria o `awarded` e iria
    embora. Pagar duas vezes nao e o risco -- quem trava isso e a chave por treinador, na transacao. */
-async function fecharSemanaDoRanking(base, semanaId, campo, maiorEMelhor, rotulo){
+async function fecharSemanaDoRanking(base, semanaId, campo, maiorEMelhor, rotulo, unidade){
   const semRef = rankSemanaDocRef(base, semanaId);
   const snap = await semRef.get();
   const marca = 'awarded_' + campo;
@@ -5995,7 +5995,7 @@ async function fecharSemanaDoRanking(base, semanaId, campo, maiorEMelhor, rotulo
     const v = Number(p[campo]);
     const pos = valores.indexOf(v) + 1;
     const juntos = todos.filter(x => Number(x[campo]) === v).length;
-    await premiarSemana(base, campo, p.uid, p.nome, semanaId, pos, juntos, v, maiorEMelhor, rotulo);
+    await premiarSemana(base, campo, p.uid, p.nome, semanaId, pos, juntos, v, maiorEMelhor, rotulo, unidade);
   }
   await semRef.set({ [marca]: true }, { merge: true });
   return { premiados: premiados.length, podio: valores };
@@ -6003,7 +6003,7 @@ async function fecharSemanaDoRanking(base, semanaId, campo, maiorEMelhor, rotulo
 /* ⚠️ A TRAVA DE 'JA PAGO' E POR TREINADOR E POR RANKING (a chave leva o `base` e o `campo`), e nao
    so por semana: a Corrida tem DUAS modalidades e o mesmo treinador pode estar no podio das duas.
    Com a chave so da semana, a segunda nao seria paga. */
-async function premiarSemana(base, campo, uid, nome, semanaId, pos, juntos, valor, maiorEMelhor, rotulo){
+async function premiarSemana(base, campo, uid, nome, semanaId, pos, juntos, valor, maiorEMelhor, rotulo, unidade){
   const premio = RANK_SEMANAL_PREMIOS[pos - 1];
   if(!premio || !uid) return;
   const chave = 'pago_' + base + '_' + campo + '_' + semanaId;
@@ -6024,10 +6024,13 @@ async function premiarSemana(base, campo, uid, nome, semanaId, pos, juntos, valo
                               : '🪙 ' + premio.moedas + ' moedas';
   const dividido = juntos > 1 ? ' Você dividiu essa posição com mais ' + (juntos - 1) +
                    ' treinador' + (juntos - 1 === 1 ? '' : 'es') + '.' : '';
-  const marca = maiorEMelhor ? valor + ' pontos' : valor.toFixed(2).replace('.', ',') + 's';
+  /* ⚠️ A UNIDADE TROCA A PREPOSICAO JUNTO ('no nivel 12', nao 'com 12 nivel'), e sem ela o texto
+     sai IDENTICO ao dos quatro que ja existem -- e tem que sair: a notificacao deles esta no ar. */
+  const marca = unidade === 'nivel' ? 'no nível ' + valor
+    : 'com ' + (maiorEMelhor ? valor + ' pontos' : valor.toFixed(2).replace('.', ',') + 's');
   await createNotification(uid, 'rank_semanal', medalha + ' Você foi ' + RANK_SEMANAL_PREMIOS[pos-1].rotulo + '!',
     'Na semana de ' + semanaId.slice(8,10) + '/' + semanaId.slice(5,7) + ' você ficou em ' + pos +
-    'º no ranking de ' + rotulo + ', com ' + marca + '.' + dividido + ' Ganhou ' + ganhou + '.');
+    'º no ranking de ' + rotulo + ', ' + marca + '.' + dividido + ' Ganhou ' + ganhou + '.');
 }
 /* ⚠️ SAO QUATRO PODIOS, e nao tres: a Corrida tem DOIS rankings (individual e revezamento), e eles
    sao coisas diferentes -- nao da pra somar tempo de um com o do outro. A tela ja mostra os dois
@@ -6036,7 +6039,14 @@ const RANKS_SEMANAIS = [
   { base: 'fishingRanking', campo: 'pontos', maior: true,  rotulo: 'Pescaria' },
   { base: 'rescueRanking',  campo: 'pontos', maior: true,  rotulo: 'Resgate' },
   { base: 'raceRanking',    campo: 'single', maior: false, rotulo: 'Corrida individual' },
-  { base: 'raceRanking',    campo: 'relay',  maior: false, rotulo: 'Corrida em revezamento' }
+  { base: 'raceRanking',    campo: 'relay',  maior: false, rotulo: 'Corrida em revezamento' },
+  /* ⚠️ A ARENA E A UNICA QUE MEDE UM CONTADOR, e nao um PLACAR -- por isso ela declara a unidade:
+     sem ela a notificacao diria "com 12 pontos" onde o certo e "no nivel 12", e texto de premio que
+     mente e a familia que este projeto mais paga. O resto do fechamento serve a ela de graca, porque
+     ele so pergunta o CAMPO e se maior e melhor.
+     ⚠️ E ELA NAO ENTRA NA COPIA INICIAL (a copiarGeralParaASemana): ela nao TEM colecao de sempre
+     pra copiar -- ver a razao la, que e a mesma pela qual a tela dela nao tem aba. */
+  { base: 'arenaRanking',   campo: 'nivel',  maior: true,  rotulo: 'Arena 1x1', unidade: 'nivel' }
 ];
 /* ⚠️ VARRE AS ULTIMAS SEMANAS em vez de so a anterior, pela mesma razao da Torre: uma semana que
    nao fecha e um premio que ninguem recebe, e o unico jeito de perceber seria alguem reclamar.
@@ -6080,7 +6090,7 @@ async function fecharSemanasPendentes(){
   for(let i = RANK_SEMANAS_A_FECHAR; i >= 1; i--){
     const sem = semanaMaisDias(atual, -7 * i);
     for(const r of RANKS_SEMANAIS){
-      await fecharSemanaDoRanking(r.base, sem, r.campo, r.maior, r.rotulo)
+      await fecharSemanaDoRanking(r.base, sem, r.campo, r.maior, r.rotulo, r.unidade)
         .catch(e => logger.error('Falha ao fechar ' + r.base + '/' + r.campo + ' da semana ' + sem, e));
     }
   }

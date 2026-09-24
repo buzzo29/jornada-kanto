@@ -255,14 +255,29 @@ console.log('\n=== A CÓPIA INICIAL ===');
      !(await semana('rescueRanking', sem, 'fabio').get()).exists);
 }
 
-console.log('\n=== O SERVIDOR: as quatro listas e as portas (lendo o código) ===');
+console.log('\n=== O SERVIDOR: as listas e as portas (lendo o código) ===');
 {
-  ok('são QUATRO pódios (a Corrida tem duas modalidades)', S.RANKS_SEMANAIS.length === 4,
-     JSON.stringify(S.RANKS_SEMANAIS.map(x => x.base + '.' + x.campo)));
+  /* ⚠️ ESTA TRAVA FIXAVA "QUATRO" e caiu em 24/09/2026, com o código certo, quando a ARENA entrou
+     na lista -- a família que já envelheceu meia dúzia de vezes neste projeto. Ela não foi
+     afrouxada: passou a cobrar a REGRA (um pódio por MODALIDADE, nenhum repetido, e a Corrida sendo
+     a única em que MENOR é melhor), que é o que ela sempre quis provar. O número sai da tabela. */
   const chaves = S.RANKS_SEMANAIS.map(x => x.base + '.' + x.campo);
-  ok('  e nenhum repete', new Set(chaves).size === 4);
-  ok('  a Corrida é MENOR é melhor', S.RANKS_SEMANAIS.filter(x => !x.maior).length === 2);
-  ok('  e os outros dois são MAIOR é melhor', S.RANKS_SEMANAIS.filter(x => x.maior).length === 2);
+  ok('há um pódio por modalidade, e a Corrida tem DUAS',
+     chaves.length >= 4 && S.RANKS_SEMANAIS.filter(x => x.base === 'raceRanking').length === 2,
+     JSON.stringify(chaves));
+  ok('  e nenhum repete', new Set(chaves).size === chaves.length);
+  /* ⚠️ MENOR É MELHOR É SÓ DA CORRIDA: lá o placar é TEMPO. Um ranking novo que nascesse com
+     `maior: false` estaria medindo tempo -- e o texto da notificação o trataria como segundos. */
+  ok('  a Corrida é a ÚNICA em que MENOR é melhor',
+     S.RANKS_SEMANAIS.filter(x => !x.maior).every(x => x.base === 'raceRanking')
+     && S.RANKS_SEMANAIS.filter(x => !x.maior).length === 2);
+  ok('  e todo o resto é MAIOR é melhor',
+     S.RANKS_SEMANAIS.filter(x => x.maior).length === chaves.length - 2);
+  /* ⚠️ E A UNIDADE SÓ EXISTE EM QUEM MEDE UM CONTADOR: os outros medem PLACAR, e declará-la neles
+     trocaria a frase de uma notificação que já está no ar. */
+  ok('  e só quem mede CONTADOR declara `unidade`',
+     S.RANKS_SEMANAIS.filter(x => x.unidade).every(x => x.base === 'arenaRanking'),
+     S.RANKS_SEMANAIS.filter(x => x.unidade).map(x => x.base).join(',') || '(nenhum)');
   ok('os prêmios são 2 doces / 1 doce / 50 moedas',
      JSON.stringify(S.RANK_SEMANAL_PREMIOS.map(p => p.doces + ':' + p.moedas)) === '["2:0","1:0","0:50"]',
      JSON.stringify(S.RANK_SEMANAL_PREMIOS.map(p => p.doces + ':' + p.moedas)));

@@ -20019,6 +20019,114 @@ regras fechando a escrita pra todos).
   um jogador aguenta), o `ARENA_NIVEL_BASE` (60) e o `ARENA_BST_MIN` (500, que decide o elenco).
 
 
+#### O LÍDER DA SEMANA GANHA DOCE RARO, E O SPRITE FICOU GRANDE (24/09/2026)
+
+Pedido assim: *"pode adicionar que o lider da semana ganha rare candy tambem, e na tela principal da
+arena 1x1, exiba um sprite grande de qual o pokemon da semana e em qual nivel o treinador esta"*.
+
+**⚠️ ISSO REVERTE A DECISÃO DA SEÇÃO ACIMA**, que era *"ele NÃO entra no `RANKS_SEMANAIS`: prêmio
+não foi pedido"* — e ela mesma dizia que voltar atrás **é uma linha**. Foi.
+
+#### ⚠️ O PRÊMIO É O DOS OUTROS TRÊS, e ele coube numa entrada de tabela
+
+O `RANK_SEMANAL_PREMIOS` já existe e já paga **2 doces ao líder, 1 ao vice e 🪙 50 ao terceiro** —
+"também" quer dizer igual aos outros, e reusar a tabela é o que impede o quinto ranking de ter uma
+escada própria. **O fechamento, o pódio de placar distinto, a trava de "já pago" por treinador e a
+varredura das 4 últimas semanas serviram à Arena de graça**: o cron só pergunta o CAMPO e se maior
+é melhor.
+
+**⚠️ MAS UMA COISA NÃO SERVIA: A FRASE DA NOTIFICAÇÃO.** As outras quatro medem **PLACAR** (pontos
+ou segundos) e a Arena mede um **CONTADOR** — o texto genérico diria *"com 12 pontos"* onde o certo
+é *"no nível 12"*. Por isso a entrada dela declara a **`unidade`**, e ela viaja pela cadeia inteira
+(cron → fechar → premiar):
+
+| | a frase |
+|---|---|
+| Pescaria | *"...ficou em 1º no ranking de Pescaria, **com 550 pontos**."* |
+| **Arena** | *"...ficou em 1º no ranking de Arena 1x1, **no nível 12**."* |
+
+**⚠️ A UNIDADE TROCA A PREPOSIÇÃO JUNTO** (`'no nível 12'`, não `'com 12 nível'`), e sem ela o texto
+dos quatro que já estão no ar teria que mudar — **há trava cobrando as DUAS metades**: a Arena
+dizendo "no nível" **e** a Pescaria continuando a dizer "com 550 pontos". Sem a segunda, uma
+mudança que trocasse a frase dos cinco passaria.
+
+- **⚠️ E ELA NÃO ENTRA NA CÓPIA INICIAL**, que é a única parte do mecanismo semanal que não serve a
+  ela: **a Arena não TEM coleção de sempre pra copiar** (é a mesma razão pela qual a tela dela não
+  tem aba). Aquela lista é **escrita à mão** de propósito — derivada do `RANKS_SEMANAIS`, a Arena
+  entraria e o cron marcaria `copiado: true` sobre uma coleção que não existe. Há trava.
+
+#### ⚠️ E UM DEFEITO PASSOU EM BRANCO ATÉ A TRAVA DIRIGIR O CRON
+
+A conferência de acusação achou **um mudo**: tirar o `r.unidade` da chamada do cron **não era
+observável**, porque os casos chamavam o `fecharSemanaDoRanking` **direto**, passando a unidade na
+mão. É a armadilha do *"os casos chamam a função na mão e passariam com a chamada órfã"*, que este
+projeto registra meia dúzia de vezes.
+
+Hoje há um caso que **prepara a semana e chama o `fecharSemanasPendentes()`** — a cadeia inteira —,
+e cobra que a notificação que chega diga *"no nível 20"*. Com ele, os **12 defeitos religados
+acusam**.
+
+#### A TELA: O SPRITE FOI PRO `sprite-lg`, E O NÍVEL VIROU UM NÚMERO
+
+| a 320px | antes | **depois** |
+|---|---|---|
+| o sprite do adversário | `sprite-sm` | **`sprite-lg` (110px)**, o maior da casa |
+| o meu nível | `Seu nível: 7` a .82rem | **24px (1.5rem)**, com o rótulo em cima |
+| a caixa | 271px | **371px** |
+| a página | 1.269px | **1.331px** |
+| documento / textos cortados | 305 de 320 / zero | **301 de 320 / zero** |
+
+- **⚠️ A CAIXA CENTRALIZA POR CONTA PRÓPRIA** (`.arena-semana`), nunca pelo container: o `.box`
+  **não** é `text-align:center`, e depender do contexto é a forma de defeito que o
+  `corrida-retrato` já custou — ele centralizava no modal por acidente e saía encostado à esquerda
+  na grade da classificação.
+- **⚠️ E UM RISCO TRACEJADO SEPARA AS DUAS INFORMAÇÕES da caixa** — o ADVERSÁRIO em cima e EU
+  embaixo. Sem ele o "SEU NÍVEL" se lê como continuação do card do bicho, e **isso não aparece em
+  asserção de HTML nenhuma: foi a captura de tela que pegou**. É o mesmo risco que o card do
+  parceiro usa logo abaixo, na mesma tela.
+- **O número é o tamanho da colocação do pódio da Corrida**, e ele não é enfeite: **é ele que decide
+  o nível do adversário**. Em .82rem ele se lia como legenda do sprite.
+- **Contraste medido**: o número em **16,47:1** e a nota em **5,02:1**, contra o mínimo de 4,5 do AA.
+- **⚠️ E O `<h2>` CONTINUA EM DUAS LINHAS**, o que já estava registrado: ele está a 4px de caber, e o
+  vizinho (`Ilha Pummelo · Drake`) também tem duas.
+
+#### ⚠️ A NOTA DO PRÊMIO VIROU UMA FUNÇÃO SÓ
+
+A caixa do ranking dizia só *"Zera toda segunda-feira, com o Pokémon novo"* — e **uma tela que
+esconde o prêmio não convida ninguém**. Hoje ela diz a **MESMA frase** dos outros três
+(*"🏅 Lidere até o fim da semana e ganhe Doces Raros (Até 27/09)"*), com o "Pokémon novo" como
+segunda linha: ele é o que ESTA Arena tem de diferente — **lá zera o placar, aqui zera o
+ADVERSÁRIO**.
+
+**⚠️ E ELA GANHOU O SEGUNDO LEITOR, então virou função** (`notaDoPremioSemanal`): escrita nos dois,
+a segunda divergiria no primeiro ajuste — e o que ela promete é um **PRÊMIO**, ou seja uma tela
+dizendo "Doces Raros" e a outra dizendo outra coisa manda o jogador procurar qual das duas vale.
+**A trava conta: a frase existe UMA vez no arquivo.**
+
+⚠️ **E A PRIMEIRA VERSÃO DELA ACUSOU A PRÓPRIA FUNÇÃO QUE ELA MEDE** — ela procurava a frase "fora"
+da função, e a função a contém. É a armadilha do padrão largo demais, agora dentro da trava.
+
+**E o vazio convida também**: a primeira semana de um jogador abriria uma caixa que só diz "ninguém
+venceu", e é justamente ali que o prêmio é o argumento pra jogar.
+
+#### ⚠️ E O QUE ISSO CUSTA DE DOCE RARO POR SEMANA
+
+O teto sobe de 12 pra **14 doces + 🪙 200** (são cinco pódios agora, e o quinto paga 2+1 doces). Em
+valor de loja, **🪙 4.400 — 63 jornadas completas**. A comparação que desarma isso continua sendo a
+mesma: **a Torre paga 21 doces por semana no teto**, 1,5× o conjunto das Ilhas.
+
+**Se um dia incomodar**, a régua é o `RANK_SEMANAL_PREMIOS` — e ela vale pros CINCO de uma vez, que
+é o que a tabela única compra.
+
+#### ⚠️ E O BASH COMEU DUAS PALAVRAS DE UM COMENTÁRIO
+
+Escrevendo o patch por `node -e` dentro do Bash, as **crases** do comentário (\`unidade\`,
+\`copiarGeralParaASemana\`) viraram **substituição de comando** — e o arquivo saiu com
+*"ela declara a :"* e *"E ELA NAO ENTRA NA :"*. É a mesma família do heredoc que come as barras
+duplas, só que pior: **a crase EXECUTA**. Pra texto com crase ou `${...}`, o caminho é a ferramenta
+de edição de arquivo — e o sintoma é sempre uma palavra que sumiu sem erro nenhum.
+
+
 ## OS QUATRO RANKINGS DAS ILHAS (21/09/2026) -- o que não atualizava e o que nunca funcionou
 
 Quatro pedidos numa leva, e dois deles eram defeito de verdade -- um relatado, outro **suspeitado**:
