@@ -7342,7 +7342,7 @@ uma linha do que a trava lê** — zero ocorrências de `sequenciaDoConfronto`, 
   faixas de peso e a **duração** — e mexer no passo obriga a refazer a conta do ciclo, que é o que a
   trava cobra. Tirar a chuva inteira é uma linha no `chuvaDaCenaHtml`.
 
-`tools/test-terrenos.js` ganhou **20 asserções**, e todas leem os números **do `index.html`**
+`tools/test-terrenos.js` ganhou **17 asserções**, e todas leem os números **do `index.html`**
 (escritos no teste, ele mediria a si mesmo): as duas camadas existindo, o passo sendo inteiro em TODA
 camada, o mdc, o ângulo pela conta, a folga do inset, os dois z-index, `transform` e não
 `background-position`, a mesma inclinação nas duas, a de trás mais devagar, o `pointer-events`, a
@@ -7442,6 +7442,86 @@ semeadas.
   trava, lendo os números do arquivo.
 
 **Conferido que os 15 defeitos religados acusam.**
+
+#### ⚠️ ELA SEGUE A DANÇA DA CHUVA, E ISSO FOI MEDIDO (24/09/2026)
+
+Pedido assim: *"garanta que o efeito de chuva só começa quando tem dança da chuva e quando acabar o
+efeito da dança da chuva, também acaba o efeito de chuva no cenário"*.
+
+**⚠️ A MECÂNICA JÁ ESTAVA CERTA — e a garantia é a MEDIÇÃO, não uma correção: o `index.html` e o
+`functions/index.js` não mudaram um caractere.** O que entrou foram **9 travas** que rodam batalhas
+de verdade e comparam o campo `m.chuva` (de onde a cena sai) com as **marcas do DIÁRIO** — ou seja
+a fonte da TELA é conferida contra a fonte do MOTOR:
+
+| marca | o que ela diz |
+|---|---|
+| `x:'chuva'` | a chuva **começou** neste confronto |
+| `x:'chuvafim'` | este foi o **último** debaixo dela |
+
+**O QUE FOI MEDIDO:**
+
+| | |
+|---|---|
+| com Dança da Chuva no time | **3.789 confrontos** em 900 batalhas, **752 chovendo** (19,8%) |
+| confrontos que mostram chuva **fora** de um trecho | **ZERO** |
+| confrontos **dentro** de um trecho que saem secos | **ZERO** |
+| **sem ninguém que dance** | **0 de 4.229** confrontos chovem |
+| a cena discordando do campo | **ZERO** |
+| maior trecho visto | **3** confrontos — exatamente o `CHUVA_EM_CONFRONTOS` |
+
+#### ⚠️ O CASO DELICADO É A CHUVA SAIR DUAS VEZES, E O PAINEL COMUM NÃO O PRODUZ
+
+Ela **pode** sair mais de uma vez na mesma batalha (acabados os 3 confrontos, o portador que entrar
+no seguinte sorteia de novo) — e aí existe um **BURACO de confrontos secos** entre os dois trechos.
+É nele que um *"acabou mas continua chovendo"* apareceria.
+
+**Medido: 0 em 900 batalhas do painel comum.** Ou seja ele **não exercita** o caso — a trava passaria
+em branco sobre ele. Por isso há um painel **FORÇADO**: seis dançarinos de cada lado, que é o que faz
+a batalha ser longa e o dado rolar muitas vezes.
+
+| no painel forçado (2.500 batalhas) | |
+|---|---|
+| batalhas com **dois trechos** | **1.129** |
+| confrontos **secos** entre eles | **2.016** |
+| deles chovendo na cena | **ZERO** |
+| o 2º trecho começando seco | **ZERO** |
+
+#### ⚠️ E O VAZAMENTO ENTRE BATALHAS TEM PAINEL PRÓPRIO
+
+O `chuvaRestante` é variável de **MÓDULO**, e no servidor a instância é reaproveitada entre
+invocações: uma batalha **cortada com chuva no ar** deixaria a próxima começando debaixo dela —
+**sem Dança da Chuva nenhuma**, que é exatamente o que o pedido proíbe. Quem fecha isso é o
+`limparClima()`.
+
+Medido em **80 batalhas cortadas com chuva no ar**: **zero vazamentos**. E a trava cobra que o
+painel **tenha** esses casos — sem isso ela daria verde medindo um conjunto vazio.
+
+#### ⚠️ E O SERVIDOR GRAVA IGUAL — porque a LIGA ASSISTIDA desenha a cena a partir do log DELE
+
+Não é zelo: se os dois motores divergirem, **a mesma partida chove numa tela e não chove na outra**
+— e o log da liga é justamente o que ninguém confere depois. Medido em **400 batalhas com a mesma
+semente**: **1.549 confrontos, 440 chovendo, ZERO divergências**.
+
+**⚠️ E O CAMPO É SEMPRE UM BOOLEANO**, nunca `comChuva || undefined` (que foi como ele nasceu). No
+cliente o `undefined` é inofensivo pro Firestore; no **servidor** o Admin SDK recusa a gravação
+**INTEIRA** — foi assim que as duas ligas morreram de 11 a 13/09/2026. Do lado do servidor quem
+cobra é o `test-liga-treinadores` (conferido: o defeito religado derruba **6** travas lá); aqui se
+cobra o do cliente, que é o que vai pro save.
+
+**Conferido que os 7 defeitos religados acusam** — e eles são no **MOTOR da chuva**, não no desenho,
+que é a única forma de provar que estas travas medem a REGRA e não a aparência: o campo sempre
+ligado, sempre desligado, a chuva que nunca acaba, o clima vazando entre batalhas, o campo lido
+ANTES da luta (o confronto em que ela nasce sairia seco), o `undefined` e a cena desenhando sempre.
+
+**⚠️ E O QUINTO PRECISOU SER REESCRITO PRA COMPILAR:** movido de qualquer jeito ele dava
+`SyntaxError` e a trava acusava **morrendo** — e *"acusa morrendo"* prova menos que *"acusa
+medindo"*, porque não distingue uma trava que mede a regra de uma que só não roda.
+
+**⚠️ E O FLAKE DO `test-especiais` APARECEU DE NOVO** (1 falha em 4 rodadas, o par
+`Charmeleon × Mankey` que este arquivo nomeia desde 17/09) — **e aqui a prova de que não é
+regressão é a mais forte que existe: o diff não toca UMA linha do jogo.** Ele é
+`tools/test-terrenos.js` e este arquivo, e mais nada. Mais a impressão idêntica e 3 rodadas limpas
+em seguida.
 
 ### ⚠️ O QUE FICA EM ABERTO
 

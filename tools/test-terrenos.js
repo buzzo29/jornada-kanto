@@ -461,5 +461,156 @@ console.log('\nCENA DE BATALHA -- a chuva');
      cenas + ' cenas, ' + chamadas + ' chamadas');
 }
 
+/* ============================================================================
+   A CHUVA DA CENA SEGUE A DANCA DA CHUVA (24/09/2026, a pedido: "garanta que o efeito de chuva so
+   comeca quando tem danca da chuva e quando acabar o efeito da danca, tambem acaba no cenario").
+   ⚠️ ELAS NAO LEEM O CODIGO: rodam batalhas de verdade e comparam o campo `m.chuva` -- de onde a
+   cena sai -- com as MARCAS DO DIARIO (`x:'chuva'` = comecou aqui, `x:'chuvafim'` = este foi o
+   ultimo debaixo dela). Ou seja a fonte da tela e conferida contra a fonte do motor.
+   ⚠️ E A LISTA SAI DO ARQUIVO: `const CHUVA` nao vira propriedade global do sandbox, entao
+   `S.CHUVA` volta undefined -- e a trava mediria o nada. */
+console.log('\nCENA DE BATALHA -- a chuva segue a Danca da Chuva');
+{
+  const DANCA = (htmlCena.match(/const CHUVA = \[([\s\S]*?)\];/) || [])[1]
+    .split(',').map(s => s.trim().replace(/^'|'$/g, '')).filter(Boolean);
+  const TETO = Number((htmlCena.match(/const CHUVA_EM_CONFRONTOS = (\d+)/) || [])[1]);
+  ok('a lista da Danca da Chuva e o teto foram lidos do arquivo', DANCA.length > 5 && TETO > 0,
+     DANCA.length + ' especies, teto ' + TETO);
+  /* ⚠️ o hp/maxHp nao e setado a mao: o simulateGymBattle CURA os dois times na entrada, e o
+     createInstance devolve 0/0 -- a armadilha que este projeto ja registra em quatro medicoes. */
+  const mk = (id, lv) => { const p = S.createInstance(id, lv); p.ataques = S.ataquesPadrao(p); return p; };
+  const semDanca = ['machamp', 'onix', 'rhydon', 'tauros', 'hitmonlee', 'kangaskhan']
+    .filter(id => DANCA.indexOf(id) < 0);
+  /* os trechos em que a chuva viveu, lidos do DIARIO */
+  const trechos = (ms) => {
+    const t = [];
+    ms.forEach((m, i) => {
+      const d = m.golpes || [];
+      if(d.some(g => g.x === 'chuva')) t.push({ ini: i, fim: null });
+      if(d.some(g => g.x === 'chuvafim') && t.length) t[t.length - 1].fim = i;
+    });
+    return t;
+  };
+
+  /* ===== 1) com Danca da Chuva no time: o campo casa com os trechos, confronto a confronto ===== */
+  let erros = [], conf = 0, chovendo = 0, comTrecho = 0;
+  for(let n = 0; n < 300; n++){
+    const meu = [DANCA[n % DANCA.length], 'machamp', 'onix'].map(id => mk(id, 55));
+    const dele = [DANCA[(n + 3) % DANCA.length], 'rhydon', 'tauros'].map(id => mk(id, 54));
+    const ms = (S.simulateGymBattle(meu, dele, S.makeSeededRng('segue-' + n)).matchups) || [];
+    const t = trechos(ms);
+    if(t.length) comTrecho++;
+    conf += ms.length;
+    chovendo += ms.filter(m => m.chuva).length;
+    /* A) quem mostra chuva esta DENTRO de um trecho */
+    ms.forEach((m, i) => {
+      if(m.chuva && !t.some(x => i >= x.ini && (x.fim === null || i <= x.fim)))
+        erros.push(n + ':' + i + ' mostra chuva fora do trecho');
+    });
+    /* B) e quem esta dentro MOSTRA */
+    t.forEach(x => { const ate = x.fim === null ? ms.length - 1 : x.fim;
+      for(let i = x.ini; i <= ate; i++) if(!ms[i].chuva) erros.push(n + ':' + i + ' dentro do trecho e seco'); });
+    /* C) ⚠️ O PEDIDO LITERAL: o confronto DEPOIS do `chuvafim` nao chove (a nao ser que outro
+       trecho comece nele -- a chuva pode sair mais de uma vez na mesma batalha). */
+    t.forEach(x => { if(x.fim === null) return;
+      const dep = x.fim + 1;
+      if(dep < ms.length && ms[dep].chuva && !t.some(y => y.ini === dep))
+        erros.push(n + ':' + dep + ' continua chovendo depois do fim'); });
+    /* D) o trecho nao passa do teto sem outro trecho pra explicar */
+    t.forEach(x => { const ate = x.fim === null ? ms.length - 1 : x.fim;
+      if(ate - x.ini + 1 > TETO && !t.some(y => y !== x && y.ini > x.ini && y.ini <= ate))
+        erros.push(n + ': trecho de ' + (ate - x.ini + 1) + ' confrontos'); });
+    /* E) e a CENA desenha exatamente onde o campo diz */
+    ms.forEach((m, i) => {
+      if((S.chuvaDaCenaHtml(m).length > 0) !== !!m.chuva) erros.push(n + ':' + i + ' a cena discorda do campo');
+    });
+  }
+  ok('a chuva da cena casa com a Danca da Chuva, confronto a confronto', erros.length === 0,
+     erros.slice(0, 3).join(' | ') || conf + ' confrontos em 300 batalhas');
+  ok('e ela ACONTECE no painel (senao a trava nao mediu nada)', comTrecho > 10 && chovendo > 20,
+     comTrecho + ' batalhas com chuva, ' + chovendo + ' confrontos chovendo');
+
+  /* ===== 2) sem ninguem que dance: NUNCA chove ===== */
+  let semChuva = 0, confSem = 0;
+  for(let n = 0; n < 300; n++){
+    const meu = [semDanca[n % 3], semDanca[(n + 1) % 3], semDanca[(n + 2) % 3]].map(id => mk(id, 55));
+    const dele = [semDanca[(n + 3) % 6], semDanca[(n + 4) % 6], semDanca[(n + 5) % 6]].map(id => mk(id, 54));
+    const ms = (S.simulateGymBattle(meu, dele, S.makeSeededRng('seco-' + n)).matchups) || [];
+    confSem += ms.length;
+    semChuva += ms.filter(m => m.chuva).length;
+  }
+  ok('sem ninguem que dance, NENHUM confronto chove', semChuva === 0 && confSem > 100,
+     semChuva + ' de ' + confSem + ' confrontos');
+
+  /* ⚠️ E O CAMPO E SEMPRE UM BOOLEANO, nunca `comChuva || undefined` (que foi como ele nasceu).
+     No cliente o undefined e inofensivo pro Firestore (o JSON.stringify some com a chave), mas o
+     SERVIDOR grava o log da liga -- e o Admin SDK recusa a gravacao INTEIRA. Isso matou as duas
+     ligas de 11 a 13/09/2026. Do lado do servidor quem cobra e o test-liga-treinadores; aqui se
+     cobra o do cliente, que e o que vai pro save. */
+  let foraDeBool = 0, checados = 0;
+  for(let n = 0; n < 120; n++){
+    const ms = (S.simulateGymBattle(
+      [DANCA[n % DANCA.length], 'onix'].map(id => mk(id, 55)),
+      ['machamp', 'rhydon'].map(id => mk(id, 54)),
+      S.makeSeededRng('bool-' + n)).matchups) || [];
+    ms.forEach(m => { checados++; if(typeof m.chuva !== 'boolean') foraDeBool++; });
+  }
+  ok('e o campo `chuva` e sempre um BOOLEANO', foraDeBool === 0 && checados > 100,
+     foraDeBool + ' de ' + checados + ' matchups fora de booleano');
+
+  /* ===== 3) o caso DELICADO: a chuva sai DUAS vezes na mesma batalha =====
+     ⚠️ O painel comum quase nao produz isso (0 em 900 batalhas), entao ele e FORCADO: seis
+     dancarinos de cada lado. Entre os dois trechos tem que haver confronto SECO -- e e nele que
+     um "acabou mas continua chovendo" apareceria. */
+  let comDois = 0, buracos = 0, errosDois = [];
+  for(let n = 0; n < 250; n++){
+    const time = (off) => Array.from({ length: 6 }, (_, i) => mk(DANCA[(off + i) % DANCA.length], 60));
+    const ms = (S.simulateGymBattle(time(n), time(n + 5), S.makeSeededRng('dois-' + n)).matchups) || [];
+    const t = trechos(ms);
+    if(t.length < 2) continue;
+    comDois++;
+    for(let k = 0; k + 1 < t.length; k++){
+      if(t[k].fim === null) continue;
+      for(let i = t[k].fim + 1; i < t[k + 1].ini; i++){
+        buracos++;
+        if(ms[i].chuva || S.chuvaDaCenaHtml(ms[i]).length)
+          errosDois.push(n + ':' + i + ' chove no buraco entre dois trechos');
+      }
+      const volta = t[k + 1].ini;
+      if(!ms[volta].chuva || !S.chuvaDaCenaHtml(ms[volta]).length)
+        errosDois.push(n + ':' + volta + ' o 2o trecho comeca seco');
+    }
+  }
+  ok('o painel forcado produziu o caso de DOIS trechos', comDois > 3 && buracos > 3,
+     comDois + ' batalhas, ' + buracos + ' confrontos secos entre os trechos');
+  ok('a chuva PARA no buraco entre dois trechos e VOLTA no seguinte', errosDois.length === 0,
+     errosDois.slice(0, 3).join(' | ') || comDois + ' batalhas conferidas');
+
+  /* ===== 4) o clima nao vaza de uma batalha pra outra =====
+     ⚠️ o `chuvaRestante` e variavel de MODULO, e no servidor a instancia e reaproveitada entre
+     invocacoes: uma batalha cortada com chuva no ar deixaria a proxima comecando debaixo dela --
+     sem Danca da Chuva nenhuma. Quem fecha isso e o `limparClima()`. */
+  let vazou = 0, casos = 0;
+  for(let n = 0; n < 200 && casos < 40; n++){
+    const ms1 = (S.simulateGymBattle(
+      [DANCA[n % DANCA.length], 'machamp'].map(id => mk(id, 55)),
+      [DANCA[(n + 2) % DANCA.length], 'onix'].map(id => mk(id, 54)),
+      S.makeSeededRng('vaza-a-' + n)).matchups) || [];
+    const ult = ms1[ms1.length - 1];
+    if(!ult || !ult.chuva) continue;
+    if((ult.golpes || []).some(g => g.x === 'chuvafim')) continue;   /* ela fechou sozinha */
+    casos++;
+    const ms2 = (S.simulateGymBattle(
+      [semDanca[0], semDanca[1]].map(id => mk(id, 55)),
+      [semDanca[2], semDanca[3]].map(id => mk(id, 54)),
+      S.makeSeededRng('vaza-b-' + n)).matchups) || [];
+    if(ms2.some(m => m.chuva)) vazou++;
+  }
+  ok('a chuva que sobra de uma batalha nao vaza pra a seguinte', vazou === 0,
+     vazou + ' vazamentos');
+  ok('e o painel do vazamento tem caso (senao ele nao mediu nada)', casos > 3,
+     casos + ' batalhas cortadas com chuva no ar');
+}
+
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
 process.exit(falhas ? 1 : 0);
