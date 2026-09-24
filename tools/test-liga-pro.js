@@ -304,9 +304,54 @@ console.log('\n=== A TELA ===');
      card (23/09/2026, a pedido). Sem o escopo, a Selecao da Ilha Kumquat -- que usa o MESMO card
      e a MESMA classe -- mudaria junto, numa tela que ninguem pediu. */
   ok('  e com a classe que escopa o Level maior', /class="selecao-bolo pro-bolo"/.test(h));
-  ok('  e o Level da Pro e MAIOR que o da Selecao, mas nao passa do nome',
-     /\.pro-bolo \.selecao-lv\{font-size:\.58rem/.test(src)
-     && /\.selecao-lv\{display:block;font-size:\.52rem/.test(src));
+  /* ⚠️ ESTA TRAVA JA ENVELHECEU UMA VEZ, em 24/09/2026: ela cravava `.58rem` e CAIU com o codigo
+     certo no dia em que a fonte subiu a pedido. E a familia que este projeto ja registra meia
+     duzia de vezes -- trava que fixa um NUMERO envelhece com ele. Hoje ela mede a REGRA: os tres
+     tamanhos sao DERIVADOS do CSS e comparados entre si.
+     Pedido em 24/09/2026: *"os textos que estao escritos dentro de cada card do pokemon, nome,
+     level e selo com os tipos, pode aumenta a fonte de todos os textos"*. */
+  /* ⚠️ A REGRA BASE USA O ATALHO `font:` E A DA PRO USA `font-size:` -- uma regex que procure só
+     `font-size` na base ATRAVESSA a regra e casa com a da Pro, e aí a trava compara a Pro com ela
+     mesma (o nome sairia "72 -> 72", como se ele não tivesse aumentado). É a mesma armadilha do
+     atalho `font` que o ranking da Corrida já custou. As duas formas são aceitas, e o início da
+     regra é ANCORADO pra a base nunca casar com a da Pro. */
+  const rem = (re) => { const m = src.match(re); return m ? Number(m[1]) : null; };
+  const F = {
+    proNome:  rem(/\.pro-bolo \.selecao-nome\{[^}]*font-size:\.(\d+)rem/),
+    proLv:    rem(/\.pro-bolo \.selecao-lv\{[^}]*font-size:\.(\d+)rem/),
+    proPill:  rem(/\.pro-bolo \.selecao-tipos \.type-pill\{[^}]*font-size:\.(\d+)rem/),
+    selNome:  rem(/\n\s*\.selecao-nome\{[^}]*font(?:-size)?:[^;}]*?\.(\d+)rem/),
+    selLv:    rem(/\n\s*\.selecao-lv\{[^}]*font(?:-size)?:[^;}]*?\.(\d+)rem/),
+    selPill:  rem(/\n\s*\.selecao-tipos \.type-pill[^{]*\{[^}]*font-size:\.(\d+)rem/),
+  };
+  ok('  a folha tem os seis tamanhos pra ler', Object.keys(F).every(k => F[k] !== null),
+     JSON.stringify(F));
+  /* o pedido e "aumenta a fonte de TODOS os textos": os tres do card da Pro passam os da Selecao */
+  ok('  o nome, o Level e o selo da Pro sao MAIORES que os da Selecao',
+     F.proNome > F.selNome && F.proLv > F.selLv && F.proPill > F.selPill,
+     'nome ' + F.selNome + '->' + F.proNome + '  lv ' + F.selLv + '->' + F.proLv
+     + '  selo ' + F.selPill + '->' + F.proPill);
+  /* ⚠️ E A HIERARQUIA FICA DE PE: maior que o nome, o numero e lido ANTES da especie -- e o card
+     existe pra o jogador reconhecer QUEM ele esta escolhendo. */
+  ok('  mas o Level nao passa do nome', F.proLv <= F.proNome, F.proLv + ' <= ' + F.proNome);
+  ok('    nem o selo de tipo', F.proPill < F.proNome, F.proPill + ' < ' + F.proNome);
+  /* ⚠️ O ESCOPO E O QUE MANTEM A SELECAO INTACTA: as duas telas usam o MESMO card e a MESMA
+     classe, e sem ele uma tela que ninguem pediu mudaria junto. */
+  ok('  e as tres regras sao ESCOPADAS na Pro',
+     (src.match(/\.pro-bolo \.selecao-(nome|lv|tipos)/g) || []).length >= 3,
+     (src.match(/\.pro-bolo \.selecao-\w+/g) || []).join(' '));
+  /* ⚠️ O NOME QUEBRA EM VEZ DE TRUNCAR, e isso foi MEDIDO antes de escolher: a 320px, deixando
+     o nome numa linha so, o truncamento explode (7 nomes de 500 a .52rem contra 115 a .72rem).
+     Quebrando, os truncados sao ZERO em qualquer tamanho -- e o preco e +108px no bolo de 12
+     (527 -> 635px, +20,5%), medido no navegador. */
+  const rNome = (src.match(/\.pro-bolo \.selecao-nome\{[^}]*\}/) || [''])[0];
+  ok('  e o nome QUEBRA em vez de cortar', /white-space:normal/.test(rNome)
+     && /overflow-wrap:anywhere/.test(rNome), rNome.slice(0, 90));
+  /* ⚠️ E OS CARDS CONTINUAM DO MESMO TAMANHO: sem o `min-height` de duas linhas, um nome curto
+     deixaria o card mais baixo que o vizinho e a grade de 3 ficaria desalinhada -- e a grade e
+     justamente onde o olho compara. */
+  ok('    com a altura de duas linhas reservada', /min-height:32px/.test(rNome),
+     (rNome.match(/min-height:[^;]*/) || ['(sem min-height)'])[0]);
   ok('  e nao no `.btn` da casa (que estica o card)', !/class="btn tower-pick/.test(h));
   /* ⚠️ O `spriteHtml` PRECISA DO `speciesId`, e o bolo guarda `id`: passando o objeto cru o sprite
      saia VAZIO em todos os doze, sem erro nenhum -- foi o navegador que pegou. */
@@ -576,7 +621,133 @@ console.log('\n=== PONTA A PONTA (o drawCycle de verdade) ===');
     await separacaoDaClassica(F, db, cod);
     descricaoContadorEGolpes();
 
-    console.log('\n' + (falhas ? falhas + ' FALHA(S)' : 'Tudo certo.') + '  (' + total + ' asserções)');
+    console.log('\n=== REABRIR O PICKER PEDE OS GOLPES DE NOVO (24/09/2026) ===');
+{
+  /* Reportado assim: *"coloquei o raichu e a bellossom no meu time, e nao pediu para eu escolher
+     os golpes deles. E quando eu cancelar a inscricao, e inscrever um novo time, tem que pedir os
+     golpes de cada pokemon de novo"*.
+     ⚠️ AS DUAS METADES SAO A MESMA CAUSA: o `abrirBoloDaLigaPro` zerava o bolo e a selecao e
+     NAO zerava os golpes. E o bolo e o MESMO ao reabrir (a semente e por RODADA), entao os
+     indices batiam e a fila saia vazia -- quem ja tinha sido perguntado nao era perguntado de
+     novo.
+     ⚠️ E O RAICHU TINHA UMA SEGUNDA RAZAO, que a heranca de 24/09 ja consertou: antes dela ele
+     tinha EXATAMENTE 3 golpes escolhiveis no Lv.67, e ai nao pedir e a REGRA (escolher 3 entre 3
+     nao e escolha). Com o Trovao e o Golpe de Corpo herdados do Pikachu ele vai a 5 e passa a
+     pedir. Ha caso pros dois. */
+
+  /* --- a regra, primeiro: quem tem mais que MAX_GOLPES PEDE --- */
+  const escolhiveis = (id, lv) => {
+    const inst = S.createInstance(id, lv);
+    return S.ataquesEscolhiveis(inst);
+  };
+  ok('o Raichu Lv.67 pede tela (5 golpes, com os herdados do Pikachu)',
+     escolhiveis('raichu', 67).length > S.MAX_GOLPES, escolhiveis('raichu', 67).join(','));
+  ok('  e a Bellossom Lv.63 tambem', escolhiveis('bellossom', 63).length > S.MAX_GOLPES,
+     escolhiveis('bellossom', 63).join(','));
+  /* ⚠️ E O OUTRO LADO DA REGRA, que e o que impede a trava de virar 'pede sempre': quem tem
+     MAX_GOLPES ou menos NAO ve tela -- uma tela de uma resposta so e pior que tela nenhuma. */
+  ok('  mas quem tem 3 ou menos continua sem ver tela (o Venusaur Lv.56)',
+     escolhiveis('venusaur', 56).length <= S.MAX_GOLPES, escolhiveis('venusaur', 56).join(','));
+
+  /* --- o caminho de verdade: escolher, confirmar um, e REABRIR o picker --- */
+  S.game.authUser = { uid: 'u-pro' };
+  S.game.proCicloId = 'c1';
+  S.game.proBolo = [
+    { id: 'raichu', level: 67, shiny: false }, { id: 'bellossom', level: 63, shiny: false },
+    { id: 'golem', level: 62, shiny: false },  { id: 'venusaur', level: 56, shiny: false },
+    { id: 'starmie', level: 60, shiny: false }, { id: 'alakazam', level: 61, shiny: false },
+  ];
+  S.game.proEscolhidos = [0, 1, 2, 3, 4, 5];
+  S.proLimparGolpes();
+  S.proPreencherOsSemEscolha();
+  const filaAntes = S.proGolpesPendentes();
+  ok('a fila comeca com quem tem mais de 3 golpes', filaAntes.length > 0 && filaAntes.indexOf(0) >= 0
+     && filaAntes.indexOf(1) >= 0, 'fila: ' + filaAntes.join(','));
+  ok('  e quem tem 3 ou menos ja sai preenchido, fora da fila',
+     filaAntes.indexOf(3) < 0, 'o indice 3 (Venusaur) esta na fila');
+
+  /* responde o primeiro da fila, como o jogador faria */
+  S.game.proGolpeDe = filaAntes[0];
+  const disp = S.ataquesEscolhiveis(S.createInstance('raichu', 67));
+  S.game.proGolpesMarcados = disp.slice(0, S.MAX_GOLPES);
+  S.proConfirmarGolpes();
+  ok('respondida, ela some da fila', S.proGolpesPendentes().indexOf(0) < 0,
+     'fila: ' + S.proGolpesPendentes().join(','));
+  const gravados = Object.keys(S.game.proGolpes || {}).length;
+  ok('  e o que foi respondido fica gravado', gravados > 0, gravados + ' gravados');
+
+  /* ⚠️ VOLTAR PRA TROCAR UM POKEMON NAO PODE CUSTAR OS GOLPES DOS OUTROS -- e a decisao que a
+     limpeza do picker NAO pode desfazer. */
+  S.proVoltarDosGolpes();
+  ok('voltar pra trocar um pokemon MANTEM o que ja foi escolhido',
+     Object.keys(S.game.proGolpes || {}).length === gravados,
+     Object.keys(S.game.proGolpes || {}).length + ' de ' + gravados);
+
+  /* --- e o conserto: REABRIR o picker zera tudo --- */
+  /* ⚠️ SUJAR OS TRES CAMPOS ANTES, senao a trava mede o estado HERDADO e nao a limpeza: o
+     `proConfirmarGolpes` ja zera os marcados e o `proVoltarDosGolpes` ja zera o `proGolpeDe`, entao
+     sem isto tirar qualquer uma das duas linhas da funcao passava EM BRANCO. E o fixture que nao
+     cai na faixa em que a regra vale, que este projeto ja registra meia duzia de vezes. */
+  S.game.proGolpeDe = 4;
+  S.game.proGolpesMarcados = ['tackle'];
+
+  /* ⚠️ E QUEM DIRIGE E O `abrirBoloDaLigaPro` DE VERDADE, com o preambulo dublado: chamar o
+     `proLimparGolpes` na mao provaria que a FUNCAO limpa, nunca que a PORTA a chama -- e era
+     justamente a porta que estava sem a chamada. O dublê devolve o MESMO ciclo, pra o bolo sair
+     igual e a comparacao da fila valer. */
+  const preambuloOriginal = S.preambuloDaInscricao;
+  S.preambuloDaInscricao = async function(){ return { entry: { id: 'c1', proRodada: 0 }, ativo: false }; };
+  await S.abrirBoloDaLigaPro();
+  S.preambuloDaInscricao = preambuloOriginal;
+
+  ok('reabrir o picker ZERA os golpes', Object.keys(S.game.proGolpes || {}).length === 0,
+     Object.keys(S.game.proGolpes || {}).length + ' sobraram');
+  /* ⚠️ OS TRES CAMPOS, nao so o mapa: um `proGolpeDe` sobrando abre a tela de golpes apontando
+     pra um indice de outra passada, e um marcado sobrando entra na escolha do proximo. */
+  ok('  e os outros dois campos da fila tambem zeram',
+     S.game.proGolpeDe === null && (S.game.proGolpesMarcados || []).length === 0,
+     'proGolpeDe=' + S.game.proGolpeDe + ' marcados=' + (S.game.proGolpesMarcados || []).length);
+
+  /* a fila volta INTEIRA -- ele e perguntado de novo. O bolo e o MESMO (a semente e por rodada),
+     entao os indices sao os mesmos: e exatamente o caso que nao perguntava. */
+  S.game.proBolo = [
+    { id: 'raichu', level: 67, shiny: false }, { id: 'bellossom', level: 63, shiny: false },
+    { id: 'golem', level: 62, shiny: false },  { id: 'venusaur', level: 56, shiny: false },
+    { id: 'starmie', level: 60, shiny: false }, { id: 'alakazam', level: 61, shiny: false },
+  ];
+  S.game.proEscolhidos = [0, 1, 2, 3, 4, 5];
+  S.proPreencherOsSemEscolha();
+  ok('  e a fila volta INTEIRA (ele e perguntado de novo)',
+     S.proGolpesPendentes().length === filaAntes.length,
+     S.proGolpesPendentes().length + ' de ' + filaAntes.length);
+  ok('  e o indice do Raichu esta nela de novo', S.proGolpesPendentes().indexOf(0) >= 0);
+
+  /* ⚠️ E QUEM CHAMA A LIMPEZA E A PORTA DE ENTRADA, nao o cancelamento: o
+     `cancelLeagueRegistration` e generico (serve todas as ligas) e o `abrirBoloDaLigaPro` e a
+     porta UNICA do picker da Pro. Os casos acima chamam a funcao na mao e passariam com a chamada
+     orfa -- por isso esta le o CODIGO. */
+  const iAbrir = src.indexOf('async function abrirBoloDaLigaPro(){');
+  const corpoAbrir = iAbrir < 0 ? '' : src.slice(iAbrir, src.indexOf('\n}', iAbrir));
+  ok('  (a fatia do abrirBoloDaLigaPro tem o que ler)', corpoAbrir.length > 200, corpoAbrir.length + ' chars');
+  ok('o abrirBoloDaLigaPro chama a limpeza', corpoAbrir.indexOf('proLimparGolpes()') > 0);
+  const iVoltar = src.indexOf('function proVoltarDosGolpes(){');
+  const corpoVoltar = iVoltar < 0 ? '' : src.slice(iVoltar, src.indexOf('\n}', iVoltar));
+  ok('  e o proVoltarDosGolpes NAO chama (voltar mantem)',
+     corpoVoltar.length > 50 && corpoVoltar.indexOf('proLimparGolpes()') < 0, corpoVoltar.length + ' chars');
+  /* ⚠️ E A LIMPEZA MORA NUM LUGAR SO: escrita nos dois leitores, o proximo campo da fila ficaria
+     pra tras num deles -- e uma fila meio-limpa nao da erro, ela so deixa de perguntar. */
+  /* ⚠️ O `proLimparGolpes()` CRU CASA COM A DECLARACAO TAMBEM (`function proLimparGolpes(){`) --
+     a primeira versao contou 3 onde esperava 2 e falhou com o codigo certo. As CHAMADAS terminam
+     em ponto-e-virgula; a declaracao, em chave. */
+  const chamadas = (src.match(/proLimparGolpes\(\);/g) || []).length;
+  const decls = (src.match(/function proLimparGolpes\(\)\{/g) || []).length;
+  ok('  e a limpeza mora num lugar so (2 leitores, 1 funcao)',
+     chamadas === 2 && decls === 1
+     && (src.match(/game\.proGolpes = \{\};/g) || []).length === 1,
+     chamadas + ' chamadas, ' + decls + ' declaracao');
+}
+
+console.log('\n' + (falhas ? falhas + ' FALHA(S)' : 'Tudo certo.') + '  (' + total + ' asserções)');
     process.exit(falhas ? 1 : 0);
   })().catch(e => { console.log('\nESTOUROU: ' + e.message); process.exit(1); });
 }
@@ -996,9 +1167,12 @@ console.log('\n=== OS GOLPES, DEPOIS DOS 6 ===');
     ok('  e o Voltar leva ao picker', S.__getGame().screen === 'leagueTeamPicker', S.__getGame().screen);
     ok('  e o que já foi escolhido FICA', JSON.stringify(S.__getGame().proGolpes) === guardados);
   }
-  /* ⚠️ E O CICLO QUE VIRA LIMPA OS GOLPES: eles são por índice do bolo, e o bolo passa a ser OUTRO */
+  /* ⚠️ E O CICLO QUE VIRA LIMPA OS GOLPES: eles são por índice do bolo, e o bolo passa a ser OUTRO.
+     ⚠️ ELA MEDIA O LITERAL DAS TRES LINHAS e caiu com o codigo CERTO quando elas viraram uma
+     chamada (24/09/2026) -- a familia de trava que mede a FORMA e nao a regra, que este projeto ja
+     registra meia duzia de vezes. Hoje ela cobra o que sempre quis: aquele ramo LIMPA. */
   ok('  e o ciclo que vira limpa os golpes junto',
-     /game\.proBolo = proSorteiaBolo\(uid, cycleEntry\);[\s\S]{0,400}game\.proGolpes = \{\};/.test(src));
+     /game\.proBolo = proSorteiaBolo\(uid, cycleEntry\);[\s\S]{0,400}proLimparGolpes\(\);/.test(src));
 
   S.inscreverNaLigaPro = original;
 }

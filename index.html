@@ -2032,6 +2032,22 @@
   }
   /* rótulo à esquerda, contador do bônus à direita, na mesma linha */
   .home-section-row{ display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; }
+  /* ⚠️ ELE NÃO USA O `.btn` DA CASA: aquele é botão de AÇÃO, `display:block;width:100%` -- ele
+     esticaria pra a linha inteira e empurraria o rótulo. Aqui é um controle de lista, o mesmo
+     raciocínio que já tirou o `.btn` das abas do ranking e das prateleiras da loja. */
+  .home-ordem-btn{ font:800 .62rem/1 var(--font-ui); color:var(--muted); background:var(--box);
+    border:2px solid var(--box-border); border-radius:5px; padding:5px 8px; cursor:pointer;
+    display:inline-flex; align-items:center; gap:4px; white-space:nowrap; }
+  /* a estrela e a MESMA do card da media -- e ela que o botao ordena */
+  .home-ordem-btn svg{ width:.95em; height:.95em; }
+  /* ligado ele acende: sem isso as duas ordens se leem iguais e o jogador não sabe em qual está */
+  /* ⚠️ O FUNDO DO ATIVO É OPACO, e isso não é gosto: a .home-section-row fica FORA de qualquer
+     .box, direto sobre o fundo escuro da página -- um fundo com alpha revela o escuro e o
+     var(--ink) do texto SOME nele. Medido: 1,00:1 com alpha (ele vira a MESMA cor do fundo),
+     contra 15,0:1 com o amarelo opaco. É a mesma lição que a legenda da trilha de insígnias já
+     registra (*"com var(--muted)/var(--ink) ela sumia no próprio fundo"*), e o amarelo opaco é o
+     que o .btn.selected da casa usa pra dizer "é este". */
+  .home-ordem-btn.ativo{ color:var(--ink); border-color:var(--box-border); background:var(--yellow); }
   .shiny-bonus-counter{
     font-family:var(--font-pixel);
     font-size:.55rem;
@@ -3640,7 +3656,26 @@
      todos dentro dela, e o que separa um do outro é justamente o nível.
      ⚠️ E ELE NÃO PASSA DO NOME (.58rem): maior que ele, a hierarquia do card inverte e o olho lê
      o número antes da espécie. */
-  .pro-bolo .selecao-lv{font-size:.58rem;color:var(--ink);}
+  .pro-bolo .selecao-lv{font-size:.70rem;color:var(--ink);}
+  /* ⚠️ OS TRÊS TEXTOS DO CARD CRESCERAM (24/09/2026, a pedido: *"os textos que estao escritos
+     dentro de cada card do pokemon, nome, level e selo com os tipos, pode aumenta a fonte de todos
+     os textos"*). Nome 9,3 → 11,5px, level 9,3 → 11,2, selo 7,2 → 9,3, medido a 320px.
+     ⚠️ E O NOME PRECISOU QUEBRAR EM VEZ DE TRUNCAR, senão o aumento sai caro demais: medido nas
+     250 espécies × (com e sem shiny), o nome cortado vai de 7 de 500 hoje para 40 (.64rem), 82
+     (.68) e 115 (.72) -- 23% dos cards. Com quebra são ZERO, e o preço é altura: o bolo de 12 vai
+     de 527 para 635px (+20%) a 320px.
+     ⚠️ QUEM DOMINA O TRUNCAMENTO É O SELO DO SHINY: dos 7 que cortam hoje, os 7 são shiny -- ele
+     come ~14px da linha do nome.
+     ⚠️ O `min-height` DE DUAS LINHAS é o que mantém a grade alinhada: sem ele a linha do `Lv.`
+     sobe nos cards de nome curto e desce nos de nome longo, e é justamente entre dois cards que o
+     olho compara. E o flex centra o nome de uma linha dentro do espaço de duas.
+     ⚠️ E TUDO ISTO É SÓ DA LIGA PRO: o card é o MESMO da Seleção da Ilha Kumquat, com a mesma
+     classe, e lá ele carrega TAMBÉM os golpes -- conteúdo a mais num card da mesma largura. O
+     pedido veio com o print da Pro, e o precedente do Level (23/09) já tinha escopado aqui. */
+  .pro-bolo .selecao-nome{font-size:.72rem;line-height:16px;min-height:32px;
+    white-space:normal;overflow-wrap:anywhere;
+    display:flex;align-items:center;justify-content:center;text-align:center;}
+  .pro-bolo .selecao-tipos .type-pill{font-size:.58rem;line-height:14px;padding:0 5px;}
   .selecao-card.off{opacity:.5;cursor:default;}
   .selecao-card.off .selecao-dono{opacity:1;}
   /* o ranking reusa a linha do ranking da Pescaria e da Corrida -- mesma leitura, uma cópia só */
@@ -17602,6 +17637,15 @@ function proPreencherOsSemEscolha(){
   }
   game.proGolpes = feitos;
 }
+/* ⚠️ A FILA DE GOLPES INTEIRA, NUM LUGAR SO. Ela tem DOIS leitores (a entrada no picker e o
+   ramo do ciclo que virou), e sao TRES campos: escrita nos dois, o proximo campo que nascer
+   ficaria pra tras num deles -- e o sintoma e mudo, porque uma fila meio-limpa nao da erro: ela
+   so deixa de perguntar. */
+function proLimparGolpes(){
+  game.proGolpes = {};
+  game.proGolpeDe = null;
+  game.proGolpesMarcados = [];
+}
 function proIrParaOsGolpes(){
   const sel = game.proEscolhidos || [];
   /* quem VALIDA é a ação, nunca o botão desabilitado */
@@ -17720,9 +17764,7 @@ async function inscreverNaLigaPro(){
       game.proEscolhidos = [];
       /* ⚠️ E OS GOLPES VÃO JUNTO: eles são por índice do bolo, e o bolo é OUTRO. Mantidos, o
          pokémon do índice 3 herdaria os golpes de um bicho que nem está mais na tela. */
-      game.proGolpes = {};
-      game.proGolpeDe = null;
-      game.proGolpesMarcados = [];
+      proLimparGolpes();
       game.screen = 'leagueTeamPicker';
       render();
       return;
@@ -19277,6 +19319,17 @@ async function abrirBoloDaLigaPro(){
   game.leagueTeamPickError = null;
   game.proBolo = null;
   game.proEscolhidos = [];
+  /* ⚠️ E OS GOLPES ZERAM JUNTO (24/09/2026, a pedido: *"quando eu cancelar a inscricao, e
+     inscrever um novo time, tem que pedir os golpes de cada pokemon de novo"*).
+     ⚠️ SEM ISSO ELE NAO ERA PERGUNTADO DE NOVO, e a causa e o bolo ser o MESMO: a semente e por
+     RODADA, entao cancelar e voltar devolve os mesmos 12 -- e os golpes sao gravados por INDICE do
+     bolo, entao os indices batiam e a fila saia vazia. Era a mesma causa do outro lado do relato
+     (*"coloquei o raichu e a bellossom e nao pediu para escolher os golpes deles"*).
+     ⚠️ E O LUGAR E AQUI, nao no cancelamento: o `cancelLeagueRegistration` e generico (serve
+     todas as ligas), e esta e a porta UNICA de entrada no picker da Pro. O `proVoltarDosGolpes`
+     continua NAO limpando de proposito -- voltar pra trocar um pokemon nao pode custar os golpes
+     dos outros cinco. */
+  proLimparGolpes();
   game.screen = 'leagueTeamPicker';
   render();
   if(!game.authUser){ game.leagueTeamPickError = 'Você precisa estar logado.'; render(); return; }
@@ -19793,7 +19846,10 @@ const CAMPOS_DA_CONTA = [
      dos modos de campeão pararia de bloquear em silêncio */
   /* o aviso de versão nova é da ABA, não do save: sem ele aqui, abrir um save e voltar pra home
      apagaria a marca e o botão sumiria até a próxima pergunta (que é folgada em 1 minuto) */
-  'saveSlotsCarregados','contaCarregada','versaoNova','ehAdmin',
+  /* ⚠️ `homeOrdem` É DA ABA, não do save: sem ele aqui, abrir um time e voltar pra home desfaria a
+     ordenação -- e ir e voltar de um save é justamente o que mais se faz nessa tela. Ele NÃO vai
+     pro banco (o `serializeGame` é uma lista de permissão). */
+  'saveSlotsCarregados','contaCarregada','versaoNova','ehAdmin','homeOrdem',
   /* ⚠️ `ehConvidado` e da SESSAO, nao do save -- sem ele aqui o `resetGame` o apagaria ao abrir um
      save, e o convidado passaria a ver os cinco modos abertos ate voltar pra home. E o mesmo
      defeito que o `ehAdmin` e o `saveSlotsCarregados` teriam sem esta lista.
@@ -33483,6 +33539,53 @@ function shinyBonusCounterHtml(){
   const texto = min >= 1 ? `${min}min` : `${seg}s`;
   return `<span class="shiny-bonus-counter" title="Chance aumentada de shiny nos encontros selvagens">🌟 Shiny Bônus: ${texto}</span>`;
 }
+/* ⚠️ A MÉDIA DO TIME MORA NUMA FUNÇÃO SÓ. Ela tem DOIS leitores -- a estrela do card e a ordem --
+   e escrita nos dois elas divergiriam no primeiro ajuste: o card mostraria um número e a lista
+   ordenaria por outro, que é o pior defeito possível numa ordenação (ela fica "errada" sem nada
+   estar errado). */
+function mediaDoTime(s){
+  const team = (s && s.team) || [];
+  if(!team.length) return 0;
+  return Math.round(team.reduce((soma, p) => soma + (p.level || 0), 0) / team.length);
+}
+/* ⚠️ A ORDEM DOS SLOTS NA HOME (24/09/2026, a pedido: *"no home, de para ordernar os slots que tem
+   um time, pela média de level do time"*). São DUAS: a de sempre (por slot) e a nova.
+   ⚠️ QUEM TEM TIME VEM PRIMEIRO, e os vazios vão pro fim na ordem de slot -- o pedido é sobre "os
+   slots que TÊM um time", e deixar os vazios no meio faria os cards cheios pularem por cima deles.
+   Isso sai da própria média (ver `ordemPorMedia`), e não de uma guarda em cima dela.
+   ⚠️ DECRESCENTE: é a mesma régua do montador (*"quem monta time pra lutar procura o mais forte
+   primeiro"*), e é a única que responde à pergunta que essa ordem existe pra responder.
+   ⚠️ E O DESEMPATE É EXPLÍCITO: dois times de mesma média trocariam de lugar entre um render e
+   outro, e a lista piscaria debaixo do dedo de quem vai clicar -- é a mesma nota que as três
+   ordens do montador já carregam. */
+/* ⚠️ O COMPARADOR É DUAS LINHAS, e ele já põe os vazios no fim SOZINHO -- slot sem save tem média
+   ZERO, e zero é menor que qualquer time. Ele nasceu com uma guarda de "quem tem time primeiro"
+   na frente (`if(ca !== cb) …; if(!ca) return a - b;`), e ela era LETRA MORTA: medido, os 20
+   slots saem na MESMA ordem com e sem ela.
+   ⚠️ E TIRÁ-LA PELA METADE É QUE É O PERIGO -- deixar o `if(!ca) return a - b` sem o `if(ca !== cb)`
+   em cima torna o comparador CONTRADITÓRIO: medido, 30 dos 190 pares passam a dizer a MESMA coisa
+   nos dois sentidos (`cmp(a,b)` e `cmp(b,a)` os dois negativos). Isso não dá erro nenhum -- ele dá
+   uma ordem que depende de em que ordem o TimSort resolveu comparar, e no painel medido ela saía
+   certa por acaso. É o que a trava da ANTISSIMETRIA existe pra pegar. */
+function ordemPorMedia(a, b){
+  return mediaDoTime(game.saveSlots[b]) - mediaDoTime(game.saveSlots[a])
+    || a - b;                                         // ⚠️ o desempate é EXPLÍCITO -- ver acima
+}
+function slotsDaHome(){
+  const todos = Array.from({ length: MAX_SAVE_SLOTS }, (_, i) => i);
+  if(game.homeOrdem !== 'media') return todos;
+  return todos.slice().sort(ordemPorMedia);
+}
+/* ⚠️ SÓ APARECE COM DOIS TIMES OU MAIS: com um save só, ordenar não ordena nada -- é a mesma regra
+   que esconde a paginação do montador quando há uma página só. */
+function homePodeOrdenar(){
+  return Array.from({ length: MAX_SAVE_SLOTS }, (_, i) => i)
+    .filter(s => { const x = game.saveSlots[s]; return !!(x && x.team && x.team.length); }).length >= 2;
+}
+function alternarOrdemDaHome(){
+  game.homeOrdem = game.homeOrdem === 'media' ? 'slot' : 'media';
+  render();
+}
 function renderSaveSelect(){
   const caughtCount = getAllCaughtSpecies().size;
   const totalSpecies = Object.keys(SPECIES).length;
@@ -33600,9 +33703,12 @@ function renderSaveSelect(){
   </div>
   <div class="home-section-row">
     <span class="home-section-label">${selo('disco')} SEUS TIMES</span>
+    ${homePodeOrdenar() ? `<button class="home-ordem-btn${game.homeOrdem === 'media' ? ' ativo' : ''}"
+      onclick="alternarOrdemDaHome()" aria-pressed="${game.homeOrdem === 'media'}">${STAR_SVG} ${
+      game.homeOrdem === 'media' ? 'Por média' : 'Por slot'}</button>` : ''}
     ${shinyBonusCounterHtml()}
   </div>
-  ${Array.from({length:MAX_SAVE_SLOTS}, (_, i) => i).map(slot=>{
+  ${slotsDaHome().map(slot=>{
     const s = game.saveSlots[slot];
     if(!s){
       return `<button class="save-slot-card empty" onclick="startNewSave(${slot})">
@@ -33617,7 +33723,7 @@ function renderSaveSelect(){
     // média de nível do time, arredondada. É o que diz de relance se um save está pronto pra uma liga --
     // as insígnias saíram daqui porque, com a jornada terminada em quase todos os saves, "8/8" era a
     // mesma informação em todo card e não distinguia nada
-    const avgLevel = team.length ? Math.round(team.reduce((soma,p)=> soma + (p.level||0), 0) / team.length) : 0;
+    const avgLevel = mediaDoTime(s);   // a MESMA conta que a ordem usa -- ver `mediaDoTime`
     const displayName = s.customName || `Time ${slot+1}`;
     return `<div class="save-slot-card ${s.favorite?'favorited':''} ${team.length?'has-avg-star':''} ${s.gameMode==='hard'?'hard-save':''} clickable"
       onclick="openSaveCard(${slot})" role="button" tabindex="0" aria-label="Abrir ${escapeHtmlSafe(displayName)}">

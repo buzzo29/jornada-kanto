@@ -11640,6 +11640,88 @@ inteira estoura antes de devolver marcação.
 
 ## Home
 
+### OS SLOTS SE ORDENAM PELA MÉDIA DO TIME (24/09/2026)
+
+Pedido assim: *"no home, de para ordernar os slots que tem um time, pela média de level do time"*.
+São **duas** ordens — a de sempre (por slot) e a nova —, e o botão fica na linha do `SEUS TIMES`.
+
+- **⚠️ A MÉDIA MORA NUMA FUNÇÃO SÓ** (`mediaDoTime`), e ela tem **DOIS leitores**: a estrela do card
+  e a ordem. Escrita nos dois, elas divergiriam no primeiro ajuste — e o sintoma seria o **pior
+  defeito possível numa ordenação**: o card mostrando um número e a lista ordenando por outro, ou
+  seja *"ela fica errada sem nada estar errado"*, e o jogador sem ter como saber qual dos dois está
+  certo. **⚠️ E ISSO SÓ SE PROVA LENDO O CÓDIGO** — hoje as duas contas dão o mesmo número, então
+  comparar a estrela com a `mediaDoTime` passaria com a conta duplicada. É a mesma técnica que a
+  conta da Pokédex e o asterisco do cartão de golpe precisaram.
+- **DECRESCENTE**, que é a régua do montador (*"quem monta time pra lutar procura o mais forte
+  primeiro"*) — é a única que responde à pergunta que essa ordem existe pra responder.
+- **⚠️ OS VAZIOS VÃO PRO FIM SOZINHOS, e isso não precisou de guarda:** slot sem save tem média
+  **ZERO**, e zero é menor que qualquer time.
+
+#### ⚠️ E A GUARDA QUE EU PUS EM CIMA DISSO ERA LETRA MORTA — mas tirá-la PELA METADE contradiz
+
+O comparador nasceu com um `if(ca !== cb) return ca ? -1 : 1; if(!ca) return a - b;` na frente da
+média. **Medido: os 20 slots saem na MESMA ordem com e sem ela** — ela não mudava o resultado de
+nada, porque a média zero já resolve.
+
+**⚠️ O QUE É PERIGOSO É O MEIO-TERMO:** deixar o `if(!ca) return a - b` **sem** o `if(ca !== cb)` em
+cima — que é o que alguém faria "simplificando" o comparador sem medir. Aí ele fica
+**CONTRADITÓRIO**: medido num painel de 4 times entre 16 vazios, **30 dos 190 pares passam a dizer a
+MESMA coisa nos dois sentidos** (`cmp(a,b)` e `cmp(b,a)` os dois negativos).
+
+**⚠️ E ISSO NÃO DÁ ERRO NENHUM — o resultado continua saindo CERTO.** O TimSort do V8 compara numa
+ordem que mascara a contradição; a ordem que sai passa a depender do motor. Foi exatamente assim que
+a conferência de acusação achou o caso: o defeito religado **não movia uma linha do resultado**, e
+nenhuma das treze asserções de ordem pegava.
+
+**A trava que separa *"a ordem está certa"* de *"a ordem está certa POR ACASO"* é a da
+ANTISSIMETRIA**: para os 190 pares, `cmp(a,b)` e `cmp(b,a)` têm que ter sinais opostos, e o
+comparador só pode empatar consigo mesmo. Ela é a única que acusa o meio-termo, e é ela que impede
+que alguém o reintroduza.
+
+**⚠️ E EU INVERTI A CONCLUSÃO NO CAMINHO, o que vale registrar:** medi um comparador **sem** a guarda
+e atribuí os 30 pares contraditórios **a ela**, quando eles eram da **ausência parcial** dela — e
+cheguei a escrever isso no comentário do código. Foi a conferência de acusação que desfez:
+religando a guarda inteira, a trava **não acusou** (ela é consistente), e foi esse mudo que apontou
+o erro da leitura. **Um "mudo" na acusação é tão informativo quanto uma falha.**
+
+#### O BOTÃO
+
+- **⚠️ SÓ APARECE COM DOIS TIMES OU MAIS**: com um save só, ordenar não ordena nada — a mesma regra
+  que esconde a paginação do montador quando há uma página só, e a do "pular a tela de golpes" de
+  quem tem 3 ou menos disponíveis.
+- **⚠️ ELE NÃO USA O `.btn` DA CASA:** aquele é botão de AÇÃO, `display:block;width:100%` — ele
+  **esticaria pra a linha inteira** e empurraria o rótulo `SEUS TIMES`. É a armadilha que o card do
+  parceiro da Pescaria já custou, e o mesmo raciocínio que tirou o `.btn` das abas do ranking e das
+  prateleiras da loja.
+- **ELE ACENDE quando a ordem é a média**: sem isso as duas se leem iguais e o jogador não sabe em
+  qual está.
+- **⚠️ O AMARELO DO ATIVO É OPACO, e isso foi medido:** a `.home-section-row` fica **FORA de
+  qualquer `.box`**, sobre o fundo escuro da página — com o `--yellow` em alpha, o que aparecia por
+  baixo era o escuro, e o `--ink` em cima dele dava **1,00:1** (ilegível). Opaco ele dá **11,21:1**.
+  É a mesma família do `--cream` e do `--yellow-soft` fantasmas, agora por transparência em vez de
+  variável inexistente.
+- **A estrela é a MESMA do card da média** (o `STAR_SVG`), que é justamente o que ele ordena.
+- **⚠️ `homeOrdem` ESTÁ NO `CAMPOS_DA_CONTA`** — sem ele, abrir um time e voltar pra home
+  **desfaria a ordenação**, e ir e voltar de um save é justamente o que mais se faz nessa tela.
+  E ele **NÃO vai pro banco**: o `serializeGame` é uma lista de permissão, e isto é estado de ABA.
+
+**Medido a 320px, no navegador:**
+
+| | docW | botão | contraste | ordem dos quatro times |
+|---|---|---|---|---|
+| **POR SLOT** | 305 | 75×24px | 5,02:1 | 42, 71, 58, 63 *(a de sempre)* |
+| **POR MÉDIA** | 305 | 88×24px | **11,21:1** | **71, 63, 58, 42** |
+
+**Zero nomes truncados** e sem rolagem lateral nos dois.
+
+**No motor, nada:** `MOTOR 2d6a83f24cf1 / DIARIO 72e61601d1fb`, idêntico em 900 batalhas semeadas.
+
+`tools/test-inventario.js` tranca 26 pontas: a média (o arredondamento, o save sem time), **a
+estrela LENDO a função** (pelo código), a ordem por slot saindo byte a byte como antes, a por média
+com os vazios no fim, ninguém sumindo nem repetindo, o empate desempatando pelo slot, **a
+antissimetria nos 190 pares**, o botão nos quatro estados, e o campo atravessando o `resetGame` sem
+ir pro banco. **Conferido que os 8 defeitos religados acusam.**
+
 ### O BOTÃO DE ATUALIZAR, QUANDO SAI VERSÃO NOVA (13/09/2026)
 
 Pedido assim: *"caso algum usuário esteja jogando em uma versão que não é a mais atual, aparecer um
@@ -20054,6 +20136,80 @@ custado.
 **⚠️ E UMA CONSTANTE DE TESTE LIDA POR DOIS BLOCOS PRECISA FICAR NO ESCOPO DO MÓDULO:** declarada
 dentro de um deles, o outro não a vê (`ReferenceError` no meio do arquivo). Ela nasceu ao lado do
 `P_MIN`, que está dentro de um bloco, e o bloco do prêmio — 370 linhas abaixo — não a enxergava.
+
+### ⚠️ O PICKER NÃO PEDIA OS GOLPES DE NOVO (24/09/2026)
+
+Reportado assim: *"Algo de estranho ta na parte que escolhe os golpes dos pokemons que serão
+inscritos na Liga Pro, porque eu coloquei o raichu e a bellossom no meu time, e nao pediu para eu
+escolher os golpes deles. E quando eu cancelar a inscrição, e inscrever um novo time, tem que pedir
+os golpes de cada pokemon de novo"*.
+
+**⚠️ AS DUAS METADES DO RELATO SÃO UM DEFEITO SÓ:** o `game.proGolpes` é indexado **por índice do
+bolo** (é o que faz voltar ao picker pra trocar UM dos seis não custar os golpes dos outros), e
+**reabrir o picker não o limpava**. Então o índice 3 do bolo NOVO herdava os golpes do índice 3 do
+bolo ANTIGO — e um pokémon que já tem golhes gravados **não entra na fila**, ou seja ele não é
+perguntado.
+
+- **A porta é uma função só** (`proLimparGolpes`), chamada de **dois** lugares: o `abrirBoloDaLigaPro`
+  e o ramo do "ciclo virou". Escrita nos dois, o próximo ponto que abrir o picker nasceria sem ela.
+- **⚠️ E O `proVoltarDosGolpes` NÃO CHAMA, de propósito:** voltar pra trocar um pokémon não pode
+  custar os golpes dos outros cinco — é exatamente o que a indexação por índice compra.
+
+**⚠️ E O RAICHU E A BELLOSSOM TÊM CAUSAS DIFERENTES — o relato juntou dois casos.** Medido antes de
+mexer, quantos golpes **escolhíveis** cada um tem no nível do bolo:
+
+| | antes da herança | hoje |
+|---|---|---|
+| **Raichu** | **exatamente 3** | **5** |
+| **Bellossom** | 4 | 4 |
+
+Ou seja: o Raichu **não ser perguntado era a REGRA funcionando** (quem tem `MAX_GOLPES` ou menos
+disponíveis não vê tela — escolher 3 entre 3 não é escolha), e ele só passou a ter escolha porque a
+**herança do aprendizado da linha** entrou no mesmo dia. A Bellossom tinha 4 e **devia** ter sido
+perguntada — essa metade era o `proGolpes` sujo.
+
+`tools/test-liga-pro.js` tranca o caso do relato dirigindo o `abrirBoloDaLigaPro` de VERDADE (com o
+preâmbulo dublado), e cobra as três pontas: o mapa dos golpes zerado, a tela pendente zerada e os
+marcados zerados. **⚠️ E OS TRÊS PRECISARAM SER SUJADOS ANTES**, senão a trava passa em branco: o
+`proConfirmarGolpes` já zera os marcados e o `proVoltarDosGolpes` já zera a tela pendente, então um
+fixture "limpo" não distingue os dois lados. Conferido que os 2 defeitos religados acusam.
+
+### A FONTE DO CARD DOS 12 CRESCEU (24/09/2026)
+
+Pedida com print do picker: *"os textos que estao escritos dentro de cada card do pokemon, nome,
+level e selo com os tipos, pode aumenta a fonte de todos os textos"*.
+
+| a 320px | Seleção (o card base) | **Liga Pro** |
+|---|---|---|
+| nome | `.58rem` — 9,28px | **`.72rem` — 11,52px** |
+| Level | `.52rem` — 9,28px | **`.70rem` — 11,2px** |
+| selo de tipo | `.45rem` — 7,2px | **`.58rem` — 9,28px** |
+| card | 78×128px | 78×**155px** |
+| o bolo de 12 | 527px | **635px (+20,5%)** |
+
+- **⚠️ E O NOME PASSOU A QUEBRAR EM VEZ DE TRUNCAR, e isso foi MEDIDO antes de escolher:** deixando
+  o nome numa linha só, o truncamento **explode** — de **7 nomes de 500** a `.52rem` para **115** a
+  `.72rem`. Quebrando em duas linhas, os truncados são **ZERO em qualquer tamanho**, e o preço são
+  os 108px do bolo. **Medido no navegador nos dois builds, com a mesma largura útil: 0 truncados.**
+- **⚠️ E O `min-height` DE DUAS LINHAS É O QUE MANTÉM A GRADE ALINHADA:** sem ele, um nome curto
+  deixa o card mais baixo que o vizinho — e a grade de 3 é justamente onde o olho compara.
+- **⚠️ AS TRÊS REGRAS SÃO ESCOPADAS NO `.pro-bolo`**, porque o card é o **MESMO** da Seleção da Ilha
+  Kumquat, com a mesma classe. Sem o escopo, uma tela que ninguém pediu mudaria junto.
+- **A HIERARQUIA FICA DE PÉ:** o Level não passa do nome. Maior que ele, o número seria lido **antes
+  da espécie** — e o card existe pra o jogador reconhecer QUEM ele está escolhendo.
+
+**⚠️ E A TRAVA QUE EXISTIA CRAVAVA `.58rem` E CAIU COM O CÓDIGO CERTO** — a **sexta** vez que essa
+família envelhece neste projeto. Ela não foi afrouxada: passou a medir a **REGRA**, com os seis
+tamanhos **derivados do CSS** e comparados entre si (os três da Pro maiores que os da Seleção, e o
+Level e o selo abaixo do nome).
+
+**⚠️ E ESCREVÊ-LA PEGOU UMA ARMADILHA CONHECIDA: o CSS base usa o atalho `font:` e o da Pro usa
+`font-size:`.** Uma regex que procure só `font-size` na regra base **atravessa** a regra e casa com
+a da Pro — e aí a trava compara a Pro **com ela mesma**: o nome saía *"72 → 72"*, como se ele não
+tivesse aumentado. É o mesmo atalho `font` que o ranking da Corrida já custou.
+
+**No motor, nada:** `MOTOR 2d6a83f24cf1 / DIARIO 72e61601d1fb`, idêntico em 900 batalhas semeadas.
+**Conferido que os 7 defeitos religados acusam.**
 
 ## A BIFURCAÇÃO PARAVA O SORTEIO EM TRÊS LUGARES (24/09/2026)
 

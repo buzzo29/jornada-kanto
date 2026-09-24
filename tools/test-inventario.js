@@ -3307,6 +3307,142 @@ console.log('\n=== OS TRES HMs NA MOCHILA, E A PALAVRA QUE SAIU (17/09/2026) ===
     ok('e a Trainers League continua abrindo a liga', bTr.indexOf('irParaALiga') >= 0, bTr.slice(0, 80));
   }
 
+  console.log('\n=== A ORDEM DOS SLOTS NA HOME (24/09/2026) ===');
+  {
+    /* Pedida assim: *"no home, de para ordernar os slots que tem um time, pela média de level do
+       time"*. Sao DUAS ordens -- a de sempre (por slot) e a nova.
+       ⚠️ O QUE ESTA TRAVA EXISTE PRA PEGAR e a ordem ficar "errada" sem nada estar errado: a media
+       do CARD e a da ORDEM tem que sair da MESMA conta, senao o card mostra um numero e a lista
+       ordena por outro -- e o jogador nao tem como saber qual dos dois esta certo. */
+    const time = (lv) => ({ team: [{ speciesId:'pikachu', level: lv }, { speciesId:'gyarados', level: lv }],
+                            badgeCount: 8, gameMode: 'normal' });
+    /* a ordem que a home DESENHA: o `openSaveCard(N)`/`startNewSave(N)` de cada card, na ordem do HTML */
+    const ordemDesenhada = (h) => (h.match(/(?:openSaveCard|startNewSave)\((\d+)\)/g) || [])
+      .map(s => Number(s.replace(/\D/g, '')));
+
+    function home({ ordem = 'slot', slots = {} } = {}){
+      conta({ doces: 0 });
+      const g = S.__getGame();
+      g.saveSlots = [];
+      Object.keys(slots).forEach(k => { g.saveSlots[Number(k)] = slots[k]; });
+      g.homeOrdem = ordem;
+      g.saveSlotsCarregados = true; g.contaCarregada = true;
+      S.__setGame(g);
+      return S.renderSaveSelect();
+    }
+
+    /* ---- a media e a MESMA conta do card ---- */
+    ok('a media do time e a media dos niveis', S.mediaDoTime(time(42)) === 42, String(S.mediaDoTime(time(42))));
+    ok('e ela arredonda', S.mediaDoTime({ team:[{level:40},{level:41},{level:42},{level:44}] }) === 42,
+       String(S.mediaDoTime({ team:[{level:40},{level:41},{level:42},{level:44}] })));
+    ok('save sem time da zero', S.mediaDoTime({ team: [] }) === 0 && S.mediaDoTime(null) === 0);
+    /* ⚠️ E O CARD LE A FUNCAO, nao refaz a conta -- e isso so se prova LENDO O CODIGO: hoje os dois
+       dao o mesmo numero, entao comparar a estrela com a `mediaDoTime` passaria com a conta
+       duplicada. E a mesma tecnica que a conta da Pokedex e o asterisco do cartao de golpe precisam. */
+    {
+      const cli = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
+      /* ⚠️ A FATIA VAI ATE O FIM DA FUNCAO, nunca um offset fixo: um `slice(i, i+N)` envelhece
+         quando a funcao cresce e passa a medir MENOS do que ela diz medir -- e ai ela da verde
+         sobre o defeito que existe pra pegar. */
+      const i = cli.indexOf('function renderSaveSelect(');
+      const corpo = i < 0 ? '' : cli.slice(i, cli.indexOf('\nfunction ', i + 10));
+      ok('a fatia do render tem o que ler', corpo.length > 5000 && corpo.indexOf('save-slot-card') > 0,
+         corpo.length + ' chars');
+      ok('a estrela do card LE a mediaDoTime', /const avgLevel = mediaDoTime\(s\)/.test(corpo),
+         (corpo.match(/const avgLevel = [^;]*/) || ['(sumiu)'])[0].slice(0, 70));
+      ok('e ela nao refaz a conta no render', !/avgLevel\s*=\s*team\.length \?/.test(corpo));
+    }
+
+    /* ---- POR SLOT: a ordem de sempre, byte a byte ---- */
+    const slots = { 0: time(42), 2: time(71), 4: time(58), 9: time(63) };
+    const hSlot = home({ ordem: 'slot', slots });
+    const oSlot = ordemDesenhada(hSlot);
+    ok('POR SLOT desenha os 20 na ordem de sempre',
+       oSlot.length === S.MAX_SAVE_SLOTS && oSlot.every((v, i) => v === i), oSlot.slice(0, 12).join(','));
+    /* ⚠️ A NAO-REGRESSAO E ESTA: sem a ordem nova ligada, a home sai IDENTICA a de antes. */
+    const hSem = home({ ordem: undefined, slots });
+    ok('e sem campo nenhum ela e a mesma coisa', hSem.replace(/home-ordem-btn[\s\S]*?<\/button>/, '')
+       === hSlot.replace(/home-ordem-btn[\s\S]*?<\/button>/, ''));
+
+    /* ---- POR MEDIA: decrescente, com os vazios no fim ---- */
+    const hMedia = home({ ordem: 'media', slots });
+    const oMedia = ordemDesenhada(hMedia);
+    ok('POR MEDIA poe os times na frente, do maior pro menor',
+       oMedia.slice(0, 4).join(',') === '2,9,4,0', oMedia.slice(0, 6).join(','));
+    /* ⚠️ QUEM TEM TIME VEM PRIMEIRO: o pedido e sobre "os slots que TEM um time", e deixar os vazios
+       no meio faria os cards cheios pularem por cima deles. */
+    ok('e os vazios vao pro fim, na ordem de slot',
+       oMedia.slice(4).join(',') === [1,3,5,6,7,8,10,11,12,13,14,15,16,17,18,19].join(','),
+       oMedia.slice(4).join(','));
+    ok('ninguem some nem repete', oMedia.length === S.MAX_SAVE_SLOTS &&
+       new Set(oMedia).size === S.MAX_SAVE_SLOTS, oMedia.length + ' cards');
+    /* ⚠️ O DESEMPATE E EXPLICITO: dois times de mesma media trocariam de lugar entre um render e
+       outro, e a lista piscaria debaixo do dedo de quem vai clicar. */
+    const hEmp = home({ ordem: 'media', slots: { 5: time(50), 1: time(50), 8: time(50) } });
+    ok('empate desempata pelo SLOT, sempre igual',
+       ordemDesenhada(hEmp).slice(0, 3).join(',') === '1,5,8', ordemDesenhada(hEmp).slice(0, 3).join(','));
+    /* save com o campo `team` vazio conta como vazio, e nao como media zero no meio da lista */
+    const hVaz = home({ ordem: 'media', slots: { 3: { team: [], badgeCount: 0 }, 7: time(20) } });
+    ok('save sem time fica atras de quem tem', ordemDesenhada(hVaz)[0] === 7, ordemDesenhada(hVaz).slice(0,3).join(','));
+    /* ⚠️ E ESTA E A TRAVA QUE SEPARA "a ordem esta certa" de "a ordem esta certa POR ACASO": o
+       comparador tem que ser ANTISSIMETRICO -- `cmp(a,b)` e `cmp(b,a)` com sinais opostos, pra
+       TODO par.
+       O comparador nasceu com uma guarda de "quem tem time primeiro" em cima da media, e ela era
+       letra morta (os 20 slots saem na mesma ordem sem ela). O PERIGO e tira-la PELA METADE:
+       deixar o `if(!ca) return a - b` sem o `if(ca !== cb)` faz 30 dos 190 pares dizerem a MESMA
+       coisa nos dois sentidos -- e o resultado continua saindo certo, porque o TimSort do V8
+       compara numa ordem que mascara isso. Comparador contraditorio nao da erro: ele da uma ordem
+       que depende do motor. */
+    {
+      home({ ordem: 'media', slots: { 1: time(60), 6: time(45), 12: time(70), 17: time(30) } });
+      const N = S.MAX_SAVE_SLOTS; let contra = 0, ex = '';
+      for(let i = 0; i < N; i++) for(let j = i + 1; j < N; j++){
+        const x = S.ordemPorMedia(i, j), y = S.ordemPorMedia(j, i);
+        if(x !== 0 && Math.sign(x) === Math.sign(y)){ contra++; if(!ex) ex = i + 'x' + j + ' -> ' + x + ' e ' + y; }
+      }
+      ok('e o comparador NUNCA se contradiz', contra === 0, contra + ' pares  ' + ex);
+      /* e ele e TOTAL: so empata consigo mesmo -- sem isso dois slots trocariam de lugar entre um
+         render e outro, e a lista piscaria debaixo do dedo de quem vai clicar */
+      let empates = 0;
+      for(let i = 0; i < N; i++) for(let j = i + 1; j < N; j++) if(S.ordemPorMedia(i, j) === 0) empates++;
+      ok('  e so empata consigo mesmo', empates === 0, empates + ' empates entre slots diferentes');
+    }
+
+    /* ---- o botao ---- */
+    const bt = (h) => (h.match(/home-ordem-btn[^>]*>[\s\S]*?<\/button>/) || [''])[0];
+    ok('o botao existe e diz em que ordem esta', /Por slot/.test(bt(hSlot)) && /Por média/.test(bt(hMedia)),
+       bt(hSlot).replace(/<[^>]*>/g, '').trim() + ' | ' + bt(hMedia).replace(/<[^>]*>/g, '').trim());
+    /* ligado ele ACENDE: sem isso as duas ordens se leem iguais e o jogador nao sabe em qual esta */
+    ok('e ele acende quando a ordem e a media',
+       !/home-ordem-btn ativo/.test(hSlot) && /home-ordem-btn ativo/.test(hMedia));
+    ok('com a estrela da media, que e o que ele ordena', bt(hMedia).indexOf('<svg') >= 0);
+    /* ⚠️ COM UM TIME SO ORDENAR NAO ORDENA NADA -- a mesma regra que esconde a paginacao do montador
+       quando ha uma pagina so. */
+    ok('com UM time o botao nem aparece', bt(home({ ordem: 'slot', slots: { 3: time(30) } })) === '');
+    ok('com nenhum time idem', bt(home({ ordem: 'slot', slots: {} })) === '');
+    ok('com DOIS ele aparece', bt(home({ ordem: 'slot', slots: { 3: time(30), 8: time(40) } })) !== '');
+    /* e alternar troca de verdade, nos dois sentidos */
+    {
+      const g = S.__getGame(); g.homeOrdem = 'slot'; S.__setGame(g);
+      S.alternarOrdemDaHome(); ok('alternar liga a media', S.__getGame().homeOrdem === 'media');
+      S.alternarOrdemDaHome(); ok('e alternar de novo volta', S.__getGame().homeOrdem === 'slot');
+    }
+
+    /* ---- o campo atravessa a abertura de um save, e NAO vai pro banco ---- */
+    {
+      const cli = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
+      const i = cli.indexOf('const CAMPOS_DA_CONTA');
+      const lista = i < 0 ? '' : cli.slice(i, cli.indexOf('];', i));
+      ok('a lista do CAMPOS_DA_CONTA tem o que ler', lista.length > 100, lista.length + ' chars');
+      /* ⚠️ SEM ELE AQUI, abrir um time e voltar pra home desfaria a ordenacao -- e ir e voltar de um
+         save e justamente o que mais se faz nessa tela. */
+      ok('homeOrdem atravessa o resetGame', lista.indexOf("'homeOrdem'") >= 0, lista.slice(-160));
+      const j = cli.indexOf('function serializeGame(');
+      const ser = j < 0 ? '' : cli.slice(j, cli.indexOf('\n}', j));
+      ok('e ele NAO vai pro banco', ser.length > 500 && ser.indexOf('homeOrdem') < 0, ser.length + ' chars');
+    }
+  }
+
   console.log('\n=== A FAIXA DE UPDATE ===');
   {
     /* ⚠️ A FAIXA VIVE NO `<body>` ESTATICO, fora de qualquer template literal -- um ${selo(...)}
