@@ -42,6 +42,10 @@ const S = require('./game-sandbox.js').createSandbox(path.join(raiz, 'index.html
 const srv = require(path.join(raiz, 'functions', 'index.js'));
 const src = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
 const srvSrc = require('fs').readFileSync(path.join(raiz, 'functions', 'index.js'), 'utf8');
+/* ⚠️ NO ESCOPO DO MODULO de proposito: DOIS blocos a leem (a descricao da tela e o premio do
+   campeao), e declarada dentro de um deles o outro nao a ve -- `ReferenceError` no meio do arquivo.
+   E ela sai do FONTE por regex, nunca do sandbox: `const` nao vira propriedade global dele. */
+const P_MOEDAS = Number((srvSrc.match(/const MOEDAS_CAMPEAO_PRO = (\d+);/) || [])[1]);
 
 let falhas = 0, total = 0;
 function ok(nome, cond, extra){
@@ -96,7 +100,8 @@ console.log('\n=== O BOLO DOS 12 ===');
   const N = 600;
   for(let i = 0; i < N; i++){
     const f = i % 3, uid = 'u' + i, cid = String(1758600000000 + i * 3600000);
-    const bC = S.proSorteiaBolo(uid, cid, f), bS = srv._proSorteiaBolo(uid, cid, f);
+    const ent = { id: cid, proFaixa: f, proRodada: i };
+    const bC = S.proSorteiaBolo(uid, ent), bS = srv._proSorteiaBolo(uid, ent);
     if(JSON.stringify(bC) !== JSON.stringify(bS)) div++;
     if(bC.length !== srv._PRO_SORTEADOS) curto++;
     const [mi, ma] = srv._proFaixaDe(f);
@@ -136,16 +141,30 @@ console.log('\n=== O BOLO DOS 12 ===');
    ============================================================================ */
 console.log('\n=== A SEMENTE ===');
 {
-  const a = S.proSorteiaBolo('u', 'c', 0);
+  const ent = (rodada, faixa, id) => ({ id: id || 'c' + rodada, proRodada: rodada, proFaixa: faixa || 0 });
+  const a = S.proSorteiaBolo('u', ent(0));
   ok('a mesma semente da o MESMO bolo (sair e voltar nao muda)',
-     JSON.stringify(a) === JSON.stringify(S.proSorteiaBolo('u', 'c', 0)));
-  ok('  e outro CICLO da outro bolo',
-     JSON.stringify(S.proSorteiaBolo('u', 'c1', 0)) !== JSON.stringify(S.proSorteiaBolo('u', 'c2', 0)));
+     JSON.stringify(a) === JSON.stringify(S.proSorteiaBolo('u', ent(0))));
+  /* ⚠️ E ESTA E A TRAVA DO CONSERTO DE 24/09: o bolo muda por RODADA, nao por CICLO. Era
+     `uid + cycleId`, e isso MATAVA o leftover -- quem esperava na fila tinha o bolo trocado de
+     hora em hora debaixo dele, o `code` gravado deixava de bater e o `drawCycle` o DESCARTAVA. */
+  ok('  ⚠️ e o MESMO ciclo noutra RODADA da outro bolo',
+     JSON.stringify(S.proSorteiaBolo('u', ent(0, 0, 'mesmo'))) !== JSON.stringify(S.proSorteiaBolo('u', ent(1, 0, 'mesmo'))));
+  ok('  ⚠️ e OUTRO ciclo na MESMA rodada da o MESMO bolo (e o que salva a fila)',
+     JSON.stringify(S.proSorteiaBolo('u', ent(0, 0, 'ciclo-A'))) === JSON.stringify(S.proSorteiaBolo('u', ent(0, 0, 'ciclo-B'))));
   ok('  e outro TREINADOR da outro bolo',
-     JSON.stringify(S.proSorteiaBolo('u1', 'c', 0)) !== JSON.stringify(S.proSorteiaBolo('u2', 'c', 0)));
+     JSON.stringify(S.proSorteiaBolo('u1', ent(0))) !== JSON.stringify(S.proSorteiaBolo('u2', ent(0))));
+  /* ⚠️ O CAMPO DE MIGRACAO: com ele, o bolo de quem ja estava inscrito quando isto mudou
+     continua byte a byte o mesmo -- e e ele que impede a virada de derrubar a fila que existia. */
+  ok('  e o proSementeLegado devolve a semente ANTIGA (uid + cycleId)',
+     JSON.stringify(S.proSorteiaBolo('u', { id: 'X', proRodada: 9, proFaixa: 0, proSementeLegado: 'X' }))
+     === JSON.stringify(S.proSorteiaBolo('u', { id: 'X', proRodada: 0, proFaixa: 0, proSementeLegado: 'X' })),
+     'o legado nao esta mandando');
+  ok('    e ciclo SEM o campo nao cai nele', S.proSementeDoBolo('u', { proRodada: 3 }) === 'pro-u-r3',
+     S.proSementeDoBolo('u', { proRodada: 3 }));
   /* ⚠️ E A FAIXA MUDA O BOLO MANTENDO A LINHA: o mesmo sorteio base, noutra faixa, devolve a
      forma daquele nivel. E isso que faz o pedido do charmander/charmeleon/charizard valer. */
-  const b0 = S.proSorteiaBolo('u', 'c', 0), b1 = S.proSorteiaBolo('u', 'c', 1);
+  const b0 = S.proSorteiaBolo('u', ent(0, 0)), b1 = S.proSorteiaBolo('u', ent(0, 1));
   const mesmasLinhas = b0.every((p, i) => S.raizDaLinha(p.id) === S.raizDaLinha(b1[i].id));
   ok('  e a mesma semente noutra faixa da as MESMAS linhas, noutra forma',
      mesmasLinhas && b0.some((p, i) => p.id !== b1[i].id),
@@ -157,9 +176,9 @@ console.log('\n=== A SEMENTE ===');
    ============================================================================ */
 console.log('\n=== A VALIDACAO (o servidor REFAZ o bolo) ===');
 {
-  const cyc = { id: '1758600000000', proFaixa: 0 };
+  const cyc = { id: '1758600000000', proFaixa: 0, proRodada: 0 };
   const uid = 'trainer-1';
-  const bolo = srv._proSorteiaBolo(uid, cyc.id, 0);
+  const bolo = srv._proSorteiaBolo(uid, cyc);
   const cod = (t) => Buffer.from(t.map(p => p.speciesId + ':' + p.level + (p.shiny ? ':1' : '')).join(','))
     .toString('base64').replace(/=+$/, '');
   const seis = bolo.slice(0, 6).map(p => ({ speciesId: p.id, level: p.level, shiny: p.shiny }));
@@ -184,7 +203,13 @@ console.log('\n=== A VALIDACAO (o servidor REFAZ o bolo) ===');
   ok('  o SHINY adulterado NAO passa',
      !srv._proInscricaoValida({ uid, code: cod(seis.map((p, i) => i ? p : { ...p, shiny: !p.shiny })) }, cyc));
   ok('  o bolo de OUTRO treinador NAO passa', !srv._proInscricaoValida({ uid: 'outro', code: cod(seis) }, cyc));
-  ok('  o bolo de OUTRO ciclo NAO passa', !srv._proInscricaoValida({ uid, code: cod(seis) }, { id: '999', proFaixa: 0 }));
+  /* ⚠️ ESTA TRAVA MUDOU DE ALVO EM 24/09: 'outro CICLO' deixou de ser forja -- na mesma RODADA o
+     bolo e o mesmo de proposito, e e isso que salva quem espera na fila. O que continua sendo forja
+     e mandar o bolo de outra RODADA. */
+  ok('  o bolo de OUTRA RODADA NAO passa',
+     !srv._proInscricaoValida({ uid, code: cod(seis) }, { id: '999', proFaixa: 0, proRodada: 7 }));
+  ok('  mas o MESMO bolo noutro CICLO da mesma rodada PASSA (e o conserto do leftover)',
+     srv._proInscricaoValida({ uid, code: cod(seis) }, { id: '999', proFaixa: 0, proRodada: 0 }));
   ok('  codigo lixo NAO passa', !srv._proInscricaoValida({ uid, code: 'nao-e-base64-!!!' }, cyc));
   ok('  e inscricao sem uid ou sem code NAO passa',
      !srv._proInscricaoValida({ code: cod(seis) }, cyc) && !srv._proInscricaoValida({ uid }, cyc));
@@ -207,14 +232,24 @@ console.log('\n=== A FAIXA SO ANDA QUANDO A LIGA ACONTECE ===');
 {
   /* ⚠️ ISSO SE LE DO CODIGO porque o `drawCycle` precisa de Firestore, de inscritos e de um ciclo
      travado pra rodar -- e o que a trava quer provar e a CONDICAO, que e uma linha. */
-  const bloco = (srvSrc.match(/if\(typeId === PRO_LEAGUE_TYPE && leagues\.length > 0\)\{[\s\S]{0,200}?\}/) || [''])[0];
-  ok('o drawCycle avanca a faixa', bloco.length > 30, bloco.replace(/\s+/g, ' ').slice(0, 90));
+  /* ⚠️ O LIMITE ERA `{0,200}` E O BLOCO PASSOU DELE quando a rodada entrou -- a trava caiu com o
+     codigo CERTO, achando string vazia. E a familia do `slice(i, i+1600)`: quantificador de limite
+     fixo envelhece junto com o bloco que ele le. */
+  const bloco = (srvSrc.match(/if\(typeId === PRO_LEAGUE_TYPE && leagues\.length > 0\)\{[\s\S]{0,600}?\n      \}/) || [''])[0];
+  ok('o drawCycle avanca a faixa', /data\.proFaixaIdx = /.test(bloco), bloco.replace(/\s+/g, ' ').slice(0, 70));
+  /* ⚠️ E A RODADA ANDA NO MESMO `if`: separados, um giraria sem o outro e o bolo deixaria de bater
+     com a faixa. E a rodada e o que troca o bolo de todo mundo quando a liga sai. */
+  ok('  e a RODADA anda no MESMO if (e ela que troca o bolo)', /data\.proRodada = \(Number\(data\.proRodada\) \|\| 0\) \+ 1/.test(bloco));
   /* ⚠️ E A CONDICAO E `leagues.length > 0`, nao "o ciclo terminou": com menos de 8 inscritos o
      drawCycle forma ZERO ligas e manda todo mundo pro leftover -- a fila continua na MESMA faixa,
      que e o pedido ao pe da letra. */
   ok('  e so quando ELA ACONTECE (leagues.length > 0)', /leagues\.length > 0/.test(bloco));
   ok('  e o proximo ciclo ja nasce carimbado',
      /novo\.proFaixa = \(data\.proFaixaIdx \| 0\) % PRO_FAIXAS\.length/.test(srvSrc));
+  /* ⚠️ E COM A RODADA TAMBEM: sem ela carimbada no ciclo, o bolo seria lido da agenda na hora e
+     mudaria debaixo de quem ja escolheu -- a mesma razao pela qual a faixa e carimbada. */
+  ok('    com a RODADA junto', /novo\.proRodada = Number\(data\.proRodada\) \|\| 0/.test(srvSrc));
+  ok('    e o cliente carimba as duas', /entry\.proRodada = Number\(data\.proRodada\) \|\| 0/.test(src));
   /* ⚠️ O CLIENTE TAMBEM CRIA CICLO (`ensureRegisteringCycle`), entao ele precisa carimbar: sem
      isto, um ciclo criado pelo primeiro inscrito nasceria sempre na faixa 0 e a rotacao nunca
      sairia do lugar. */
@@ -256,7 +291,7 @@ console.log('\n=== A TELA ===');
   S.game.currentLeagueTypeId = 'pro';
   S.game.proCicloId = '1758600000000';
   S.game.proFaixa = 0;
-  S.game.proBolo = S.proSorteiaBolo('trainer-1', '1758600000000', 0);
+  S.game.proBolo = S.proSorteiaBolo('trainer-1', { id: '1758600000000', proRodada: 0, proFaixa: 0 });
   S.game.proEscolhidos = [];
   const h = S.renderProPicker();
   ok('a tela desenha os 12', (h.match(/class="selecao-card/g) || []).length === 12,
@@ -354,7 +389,7 @@ console.log('\n=== A INSCRICAO ===');
      porque o cycleId entra na semente. Inscrever assim mandaria um time que o servidor descarta,
      em silencio. */
   ok('  e se o ciclo virou, ela RE-SORTEIA em vez de inscrever',
-     /cycleEntry\.id !== game\.proCicloId/.test(bloco) && /proSorteiaBolo\(uid, cycleEntry\.id/.test(bloco));
+     /cycleEntry\.id !== game\.proCicloId/.test(bloco) && /proSorteiaBolo\(uid, cycleEntry\)/.test(bloco));
   ok('  e a trava de "ja inscrito em outra rodada" vale', /ACTIVE_ELSEWHERE/.test(bloco));
 }
 
@@ -478,7 +513,7 @@ console.log('\n=== PONTA A PONTA (o drawCycle de verdade) ===');
       status: 'registering', proFaixa: 0 }], proFaixaIdx: 0 });
     for(let i = 0; i < 8; i++){
       const uid = 'tr' + i;
-      const seis = F._proSorteiaBolo(uid, CID, 0).slice(0, N)
+      const seis = F._proSorteiaBolo(uid, { id: CID, proRodada: 0, proFaixa: 0 }).slice(0, N)
         .map(p => ({ speciesId: p.id, level: p.level, shiny: p.shiny }));
       await cyc().collection('registrants').doc(uid).set({ name: 'Treinador ' + i, uid,
         code: cod(seis), slot: null, ataques: {}, specialties: [], elite: false, registeredAt: 1000 + i });
@@ -518,7 +553,7 @@ console.log('\n=== PONTA A PONTA (o drawCycle de verdade) ===');
       status: 'registering', proFaixa: 1 }], proFaixaIdx: 1 });
     for(let i = 0; i < 5; i++){
       const uid = 'p' + i;
-      const seis = F._proSorteiaBolo(uid, CID2, 1).slice(0, N)
+      const seis = F._proSorteiaBolo(uid, { id: CID2, proRodada: 0, proFaixa: 1 }).slice(0, N)
         .map(p => ({ speciesId: p.id, level: p.level, shiny: p.shiny }));
       await cyc2().collection('registrants').doc(uid).set({ name: 'T' + i, uid, code: cod(seis),
         slot: null, ataques: {}, specialties: [], elite: false, registeredAt: 2000 + i });
@@ -568,7 +603,7 @@ async function separacaoDaClassica(F, db, cod){
   }
   /* o MESMO treinador nas duas, com times DIFERENTES de propósito */
   const eu = 'buzzo';
-  const meuPro = F._proSorteiaBolo(eu, MESMO, 0).slice(0, 6)
+  const meuPro = F._proSorteiaBolo(eu, { id: MESMO, proRodada: 0, proFaixa: 0 }).slice(0, 6)
     .map(p => ({ speciesId: p.id, level: p.level, shiny: p.shiny }));
   await dc('classic').collection('registrants').doc(eu)
     .set({ name: 'Buzzo', uid: eu, code: cod(timeCla), registeredAt: 1000 });
@@ -578,7 +613,7 @@ async function separacaoDaClassica(F, db, cod){
     await dc('classic').collection('registrants').doc('c' + i)
       .set({ name: 'C' + i, uid: 'c' + i, code: cod(timeCla), registeredAt: 1100 + i });
     const u = 'p' + i;
-    const b = F._proSorteiaBolo(u, MESMO, 0).slice(0, 6)
+    const b = F._proSorteiaBolo(u, { id: MESMO, proRodada: 0, proFaixa: 0 }).slice(0, 6)
       .map(p => ({ speciesId: p.id, level: p.level, shiny: p.shiny }));
     await dc(T).collection('registrants').doc(u)
       .set({ name: 'P' + i, uid: u, code: cod(b), registeredAt: 1200 + i });
@@ -631,7 +666,7 @@ async function separacaoDaClassica(F, db, cod){
   S.game.authUser = { uid: 'buzzo' }; S.game.trainerName = 'Buzzo';
   S.game.currentLeagueTypeId = T;
   S.game.proCicloId = MESMO; S.game.proFaixa = 0;
-  S.game.proBolo = S.proSorteiaBolo('buzzo', MESMO, 0);
+  S.game.proBolo = S.proSorteiaBolo('buzzo', { id: MESMO, proRodada: 0, proFaixa: 0 });
   S.game.proEscolhidos = [0, 1, 2];
   const pkPro = S.renderLeagueTeamPicker();
   S.game.currentLeagueTypeId = 'classic';
@@ -766,7 +801,22 @@ console.log('\n=== A DESCRIÇÃO DA PRO ===');
   /* ⚠️ E ELA EXPLICA O QUE A PRO TEM DE DIFERENTE, não a mecânica inteira: o resto é igual à
      Clássica, e é isso que o pedido diz (*"no mesmo modelo da Liga Classica"*). */
   ok('  e ela nomeia a escolha dos golpes', /golpes<\/strong>/.test(hPro));
-  ok('  e o prêmio (o mesmo da Clássica)', /bônus shiny de 1h/.test(hPro) && /bônus shiny de 1h/.test(hCla));
+  /* ⚠️ O PREMIO DELA DEIXOU DE SER O DA CLASSICA em 24/09/2026, a pedido: 100 MOEDAS, pagas na hora.
+     Esta trava media o premio ANTIGO (`bonus shiny de 1h` nas duas telas) e caiu com o codigo certo
+     -- a familia de trava que este projeto ja viu meia duzia de vezes. Ela cobra o PAR: a Pro diz
+     moeda e a Classica CONTINUA dizendo bonus shiny (sem a segunda metade, uma mudanca que trocasse
+     o premio das DUAS passaria). */
+  /* ⚠️ A CONSTANTE SAI DO FONTE, nunca do sandbox: `const` nao vira propriedade global dele (so
+     declaracao de FUNCAO vira), e `S.MOEDAS_CAMPEAO_PRO` volta `undefined` -- a trava passaria a
+     procurar "undefined moedas" e falharia com o codigo certo. E a mesma licao que a Queimada
+     custou, e e por isso que o `P_MIN` aqui em cima tambem e lido por regex. */
+  ok('  e o prêmio da Pro é moeda', hPro.indexOf('<strong>🪙 ' + P_MOEDAS + ' moedas</strong>') > 0);
+  ok('    e o texto do bônus shiny não sobrou nela', hPro.indexOf('bônus shiny') < 0);
+  ok('    e a Clássica continua com o bônus shiny', /bônus shiny de 1h/.test(hCla));
+  /* ⚠️ E O NUMERO E DERIVADO: com ele escrito a mao, mexer na constante nao mexe na tela. E a mesma
+     tecnica do asterisco do cartao de golpe (mexe na chance e cobra a frase). */
+  ok('    e o número sai da CONSTANTE, não escrito na frase',
+     /\$\{MOEDAS_CAMPEAO_PRO\} moedas<\/strong>/.test(src));
   /* ⚠️ E A PROVA DE QUE ELES SAO DERIVADOS E LER O CODIGO: comparar o HTML com a constante nao
      distingue um numero escrito a mao (hoje 12 e 12). E a mesma tecnica que a conta da Pokedex
      precisou -- ali 250+1 dava 251 e o fixo passava. */
@@ -823,11 +873,18 @@ console.log('\n=== OS GOLPES, DEPOIS DOS 6 ===');
   const g = S.__getGame();
   g.authUser = { uid: 'u1' }; g.trainerName = 'Buzzo';
   g.currentLeagueTypeId = P_TIPO;
-  g.proCicloId = 'c1'; g.proFaixa = 0;
-  g.proBolo = S.proSorteiaBolo('u1', 'c1', 0);
+  /* ⚠️ A FAIXA 2 (Ouro, 55-70) NÃO É ESCOLHA DE GOSTO: na Bronze quase metade das espécies tem 3
+     golpes ou menos naquele nível, e aí os 6 vêm preenchidos e a TELA NUNCA ABRE -- o bloco inteiro
+     mediria o ramo errado. Este fixture cai com 4 dos 6 abrindo tela e 2 preenchidos, ou seja ele
+     exercita os DOIS ramos. Há um `ok` logo abaixo cobrando isso. */
+  g.proCicloId = 'c1'; g.proFaixa = 2;
+  g.proBolo = S.proSorteiaBolo('u1', { id: 'c1', proRodada: 0, proFaixa: 2 });
   g.proEscolhidos = [0, 1, 2, 3, 4, 5];
   g.proGolpes = {}; g.proGolpesMarcados = [];
   S.__setGame(g);
+  const abremTela = g.proEscolhidos.filter(i => S.ataquesEscolhiveis(S.proInstanciaDoBolo(i)).length > S.MAX_GOLPES).length;
+  ok('(o fixture cai na faixa em que a regra vale: uns abrem tela, outros não)',
+     abremTela > 0 && abremTela < 6, abremTela + ' dos 6 abrem tela');
 
   /* ⚠️ A INSCRIÇÃO É DUBLADA: ela fala com o Firestore, que não existe aqui -- o que se mede é o
      FLUXO de tela, e o time que chega nela. */
@@ -941,8 +998,193 @@ console.log('\n=== OS GOLPES, DEPOIS DOS 6 ===');
   }
   /* ⚠️ E O CICLO QUE VIRA LIMPA OS GOLPES: eles são por índice do bolo, e o bolo passa a ser OUTRO */
   ok('  e o ciclo que vira limpa os golpes junto',
-     /game\.proBolo = proSorteiaBolo\(uid, cycleEntry\.id, game\.proFaixa\);[\s\S]{0,400}game\.proGolpes = \{\};/.test(src));
+     /game\.proBolo = proSorteiaBolo\(uid, cycleEntry\);[\s\S]{0,400}game\.proGolpes = \{\};/.test(src));
 
   S.inscreverNaLigaPro = original;
 }
+}
+
+/* ============================================================================
+   OS DOIS DEFEITOS DE 24/09, relatados juntos.
+   ============================================================================ */
+console.log('\n=== A BIFURCACAO NAO FICA PRESA ONDE NAO HA ESCOLHA ===');
+{
+  /* Relato: *"apareceu um poliwhirl, porem pelo level 56 deveria ser um poliwarth"*. */
+  const BIF = ['gloom', 'poliwhirl', 'slowpoke', 'tyrogue'];
+  ok('as quatro bifurcacoes do jogo', BIF.every(id => S.EVOLUTION_CHOICES[id]), Object.keys(S.EVOLUTION_CHOICES).join(', '));
+
+  /* ⚠️ O PADRAO CONTINUA PARANDO -- e o encontro selvagem, onde quem escolhe e o JOGADOR. Sem este
+     caso, um conserto que resolvesse a bifurcacao em TODO lugar passaria, e ele tiraria a escolha do
+     jogador antes da captura. */
+  ok('  sem o argumento, o Poliwhirl Lv.56 CONTINUA Poliwhirl (a regra do encontro selvagem)',
+     S.formaNoNivel('poliwhirl', 56) === 'poliwhirl', S.formaNoNivel('poliwhirl', 56));
+  ok('    e isso vale pras quatro', BIF.every(id => S.formaNoNivel(id, 70) === id));
+
+  /* ⚠️ E COM `semEscolha` ELE RESOLVE, pelo destino do EVOLUTIONS (o de Kanto) -- o MESMO precedente
+     que o `finalEvolutionOf` ja usa pra montar time de NPC. */
+  ok('  com semEscolha, o Poliwhirl Lv.56 vira Poliwrath', S.formaNoNivel('poliwhirl', 56, true) === 'poliwrath',
+     S.formaNoNivel('poliwhirl', 56, true));
+  ok('    o Gloom vira Vileplume', S.formaNoNivel('gloom', 56, true) === 'vileplume', S.formaNoNivel('gloom', 56, true));
+  ok('    o Slowpoke vira Slowbro', S.formaNoNivel('slowpoke', 56, true) === 'slowbro', S.formaNoNivel('slowpoke', 56, true));
+  ok('    e o Tyrogue resolve tambem', S.formaNoNivel('tyrogue', 56, true) !== 'tyrogue', S.formaNoNivel('tyrogue', 56, true));
+  /* ⚠️ E ABAIXO DO NIVEL ELE NAO EVOLUI NADA: o `semEscolha` resolve a bifurcacao, nao antecipa. */
+  ok('  e abaixo do nivel ele NAO evolui (semEscolha nao antecipa)',
+     S.formaNoNivel('poliwhirl', 30, true) === 'poliwhirl', S.formaNoNivel('poliwhirl', 30, true));
+
+  /* ⚠️ E O BOLO DA LIGA PRO NAO TRAZ NENHUM PRESO -- que e o relato. Medido nas TRES faixas, porque
+     a Bronze quase nao alcanca as bifurcacoes (os niveis sao baixos) e passaria por acaso. */
+  const evolui = (id, lv) => { const e = S.EVOLUTIONS[id]; return !!(e && lv >= e.level); };
+  let presos = 0, total = 0;
+  S._PRO_FAIXAS_TESTE = null;
+  [0,1,2].forEach(f => {
+    for(let r = 0; r < 200; r++){
+      S.proSorteiaBolo('u' + r, { id: 'c', proRodada: r, proFaixa: f }).forEach(p => {
+        total++; if(evolui(p.id, p.level)) presos++;
+      });
+    }
+  });
+  ok('  e o bolo da Liga Pro nao traz NENHUM atrasado', presos === 0, presos + ' de ' + total);
+
+  /* ⚠️ E OS OUTROS DOIS SORTEIOS SEM ESCOLHA passam pelo mesmo caminho -- eles tem o MESMO defeito e
+     nenhum foi relatado. Lido do codigo: os casos chamam o `formaNoNivel` na mao e passariam com a
+     chamada sem o argumento. */
+  ok('  o draft da Ilha Kumquat tambem resolve', /formaNoNivel\(sorteado, nivel, true\)/.test(src), 'sem o semEscolha');
+  ok('  e os guardioes da Montanha tambem', /formaNoNivel\(id, nivel, true\)/.test(src), 'sem o semEscolha');
+  /* ⚠️ E A VIGILIA CONTINUA PARANDO, de proposito: o premio dela vai pro TIME do jogador, e ele
+     escolhe na proxima distribuicao de niveis. Sem este caso, 'resolver em todo lugar' passaria. */
+  ok('  mas a VIGILIA continua parando (o premio vai pro time e o jogador escolhe)',
+     /const id = formaNoNivel\(cru, nivel\);/.test(src), 'a vigilia passou a resolver sozinha');
+}
+
+console.log('\n=== O LEFTOVER NAO E MAIS DESCARTADO ===');
+{
+  /* Relato: *"era pra uma liga as 8h e so tinha 4 treinadores inscritos, ele ta resetando e jogando
+     fora os 4 treinadores ao inves de manter para a proxima"*.
+     ⚠️ A CAUSA ERA A SEMENTE POR CICLO: o leftover copia o inscrito pro ciclo seguinte com o `code`
+     dele, o `drawCycle` de la refazia o bolo com o cycleId NOVO, nada batia e a validacao descartava
+     EM SILENCIO. Reproduzido antes do conserto: 4 viravam ZERO. */
+  const reg = (uid, ent) => {
+    const seis = srv._proSorteiaBolo(uid, ent).slice(0, srv._PRO_ESCOLHE)
+      .map(p => ({ speciesId: p.id, level: p.level, shiny: p.shiny }));
+    return { uid, code: Buffer.from(seis.map(p => p.speciesId + ':' + p.level + (p.shiny ? ':1' : '')).join(','))
+      .toString('base64').replace(/=+$/, '') };
+  };
+  const c1 = { id: '1790000000000', proFaixa: 0, proRodada: 0 };
+  const c2 = { id: '1790003600000', proFaixa: 0, proRodada: 0 };   // ciclo seguinte, MESMA rodada
+  const c3 = { id: '1790007200000', proFaixa: 1, proRodada: 1 };   // a liga aconteceu
+  const r = reg('tr0', c1);
+  ok('a inscricao do ciclo 1 vale no ciclo 1', srv._proInscricaoValida(r, c1));
+  /* ⚠️ ESTA E A TRAVA DO RELATO: ela e a diferenca entre a fila acumular e a fila sumir. */
+  ok('  ⚠️ e CONTINUA VALENDO no ciclo seguinte da mesma rodada (o leftover)', srv._proInscricaoValida(r, c2));
+  ok('  mas NAO vale depois de a liga acontecer (rodada nova, bolo novo)', !srv._proInscricaoValida(r, c3));
+
+  /* ⚠️ E A RODADA SO ANDA COM A LIGA: os dois campos vivem no MESMO `if` do drawCycle -- ha trava
+     lendo isso no bloco da faixa, acima. Aqui se cobra o efeito. */
+  const b1 = srv._proSorteiaBolo('tr0', c1).map(p => p.id).join(',');
+  const b2 = srv._proSorteiaBolo('tr0', c2).map(p => p.id).join(',');
+  const b3 = srv._proSorteiaBolo('tr0', c3).map(p => p.id).join(',');
+  ok('  o bolo nao muda enquanto ele espera na fila', b1 === b2);
+  ok('  e muda quando a liga acontece (o que a tela promete)', b1 !== b3);
+
+  /* ⚠️ E O `Number(x) || 0` NAO PODE VIRAR `| 0`: o campo de migracao carrega um id de ciclo de 13
+     digitos, e o `| 0` trunca em 32 bits -- daria um numero errado SEM ERRO NENHUM. */
+  ok('  a rodada aguenta um numero de 13 digitos', srv._proRodadaDoCiclo({ proRodada: 1790215200000 }) === 1790215200000,
+     String(srv._proRodadaDoCiclo({ proRodada: 1790215200000 })));
+  ok('  e ciclo sem o campo cai em 0', srv._proRodadaDoCiclo({}) === 0 && srv._proRodadaDoCiclo(null) === 0);
+
+  /* ⚠️ AS DUAS COPIAS: uma divergencia aqui faz o cliente mostrar um bolo e o servidor validar outro
+     -- o jogador escolhe 6 que a liga descarta, em silencio. */
+  /* ⚠️ O EXTRATOR TEM QUE ACEITAR FUNCAO DE UMA LINHA: o `proRodadaDoCiclo` cabe numa linha so, e um
+     extrator que procura `\n}` atravessa o arquivo ate o proximo fecha-chaves -- ele acusava DIVERGEM
+     com as duas copias identicas. */
+  ['proSementeDoBolo', 'proRodadaDoCiclo'].forEach(nome => {
+    const pega = (t) => {
+      const i = t.indexOf('function ' + nome + '(');
+      if(i < 0) return null;
+      const fimLinha = t.indexOf('\n', i);
+      const linha = t.slice(i, fimLinha);
+      if(linha.trim().endsWith('}')) return linha;      // de uma linha so
+      return t.slice(i, t.indexOf('\n}', i) + 2);
+    };
+    const a = pega(srvSrc), b = pega(src);
+    ok('  as duas copias concordam byte a byte: ' + nome, !!a && !!b && a === b,
+       !a ? 'falta no servidor' : !b ? 'falta no cliente' : 'DIVERGEM');
+  });
+}
+
+console.log('\n=== O CAMPEAO DA LIGA PRO GANHA MOEDA, NAO BONUS SHINY (24/09/2026) ===');
+{
+  /* Pedido: *"coloque para o vencedor da liga pro, ao inves de ganhar bonus shiny, ganha 100
+     moedas"*.
+     ⚠️ O QUE FAZ ISSO SER DELICADO E A NOTIFICACAO SER A MESMA (`league_champion`): ela E o CUPOM do
+     bonus shiny na Classica -- a unica porta dele --, e SEIS leitores decidem por ela. Escrito em
+     cada um, a da Pro viraria um CUPOM FANTASMA: dava pra ativar 1h de shiny ALEM das 100 moedas. */
+  ok('a constante existe no servidor', Number.isFinite(P_MOEDAS) && P_MOEDAS > 0, String(P_MOEDAS));
+  ok('  e ela e a MESMA no cliente', P_MOEDAS === Number((src.match(/const MOEDAS_CAMPEAO_PRO = (\d+);/) || [])[1]),
+     'as duas copias divergem');
+
+  /* ⚠️ O CRITERIO E POSITIVO: notificacao gravada ANTES desta data nao tem `meta.moedas` e continua
+     sendo cupom. Sem este caso, um criterio por `leagueTypeId` apagaria o premio de quem ja ganhou. */
+  ok('  notificacao ANTIGA (sem o campo) continua sendo cupom',
+     srv._notifDeCampeaoTemCupom({ meta: { leagueTypeId: 'classic', activated: false } }) === true);
+  ok('  e sem meta nenhum tambem', srv._notifDeCampeaoTemCupom({}) === true && srv._notifDeCampeaoTemCupom(null) === true);
+  ok('  a da Liga Pro NAO e cupom', srv._notifDeCampeaoTemCupom({ meta: { leagueTypeId: 'pro', moedas: 100 } }) === false);
+  /* ⚠️ `moedas: 0` conta como pago (o `== null` pega so undefined/null): e a armadilha do indice 0
+     que o `proFaixa` ja registra, e ela vale nos dois sentidos. */
+  ok('    e `moedas: 0` tambem nao e cupom', srv._notifDeCampeaoTemCupom({ meta: { moedas: 0 } }) === false);
+
+  /* ⚠️ AS DUAS COPIAS DA FUNCAO: divergindo, o cliente oferece ativar o que o servidor recusa. */
+  const pegaFn = (t) => {
+    const i = t.indexOf('function notifDeCampeaoTemCupom(');
+    return i < 0 ? null : t.slice(i, t.indexOf('\n}', i) + 2);
+  };
+  const fa = pegaFn(srvSrc), fb = pegaFn(src);
+  ok('  as duas copias concordam byte a byte', !!fa && !!fb && fa === fb,
+     !fa ? 'falta no servidor' : !fb ? 'falta no cliente' : 'DIVERGEM');
+
+  /* ⚠️ O PAGAMENTO SO EXISTE NO SERVIDOR, e nem poderia existir no cliente: `moedas` esta na trava de
+     campos do firestore.rules. Conferido junto: a regra continua barrando o cliente. */
+  const regras = require('fs').readFileSync(path.join(raiz, 'firestore.rules'), 'utf8');
+  ok('  `moedas` continua na trava das regras (o cliente nao paga)', /hasAny\(\[[^\]]*'moedas'/.test(regras));
+  ok('  o pagamento usa increment e sai do PRO_LEAGUE_TYPE',
+     /typeId === PRO_LEAGUE_TYPE \? MOEDAS_CAMPEAO_PRO : 0/.test(srvSrc)
+     && /moedas: admin\.firestore\.FieldValue\.increment\(moedas\)/.test(srvSrc));
+  /* ⚠️ E ELE VEM ANTES DO ANUNCIO -- a regra que as 376 notificacoes de 13/09 custaram. Ler "ganhou
+     100 moedas" sem te-las e o lado errado pra errar. */
+  const trecho = srvSrc.slice(srvSrc.indexOf('const moedas = typeId === PRO_LEAGUE_TYPE'));
+  ok('    e ANTES do createNotification',
+     trecho.indexOf('increment(moedas)') > 0
+     && trecho.indexOf('increment(moedas)') < trecho.indexOf("createNotification(champ.uid, 'league_champion'"));
+  /* ⚠️ E O `activated` E O `moedas` SAO EXCLUDENTES: um campo inerte no documento e dado morto, e e
+     do `moedas` que as seis portas deduzem que nao ha cupom. */
+  ok('  o meta leva `moedas` OU `activated`, nunca os dois',
+     /if\(moedas > 0\) meta\.moedas = moedas; else meta\.activated = false;/.test(srvSrc));
+
+  /* --- as duas portas do SERVIDOR --- */
+  ok('  a ativacao recusa quem nao tem cupom (a forja)',
+     /if\(!notifDeCampeaoTemCupom\(notifSnap\.data\(\)\)\)\{/.test(srvSrc));
+  ok('  e o resgate ao apagar tambem (nao credita shiny por liga que pagou moeda)',
+     /if\(!notifDeCampeaoTemCupom\(d\.data\(\)\)\) return;/.test(srvSrc));
+
+  /* --- as tres portas do CLIENTE, por COMPORTAMENTO --- */
+  const nPro = { id:'n1', type:'league_champion', meta:{ leagueTypeId:'pro', moedas:P_MOEDAS, cycleId:1, leagueId:0, cycleTime:0 } };
+  const nCla = { id:'n2', type:'league_champion', meta:{ leagueTypeId:'classic', activated:false, cycleId:1, leagueId:0, cycleTime:0 } };
+  ok('  a tela nao avisa "bonus nao ativado" na da Pro', S.notificationPendingReward(nPro) === null);
+  ok('    e continua avisando na da Classica', !!S.notificationPendingReward(nCla));
+
+  const ctaPro = S.ctaDaNotificacao(nPro), ctaCla = S.ctaDaNotificacao(nCla);
+  ok('  o CTA da Pro CONFIRMA as moedas', ctaPro.indexOf(P_MOEDAS + ' moedas creditadas') > 0, ctaPro.slice(0,140));
+  ok('    e nao oferece a mochila (item que nao existe)', ctaPro.indexOf('openInventario') < 0);
+  /* ⚠️ COM `cycleId`/`leagueId`/`cycleTime` no meta o botao e o "Ver o chaveamento"
+     (`viewLeagueHistory`), nao o `irParaALiga` -- quem decide e o `botaoDaLigaHtml`. O que esta trava
+     cobra e que ele NAO se perdeu quando o bloco do premio virou um `return` antecipado. */
+  ok('    mas o botao da liga fica', ctaPro.indexOf("viewLeagueHistory('pro'") > 0, ctaPro.slice(0,200));
+  ok('  e o da Classica continua oferecendo a mochila', ctaCla.indexOf('openInventario') > 0);
+
+  S.game.inventarioNotificacoes = [nPro, nCla];
+  S.game.saveSlots = [];
+  const fontes = S.cuponsDeBonusShiny();
+  ok('  a mochila nao lista a da Pro como cupom de shiny',
+     fontes.filter(f => f.id === 'n1').length === 0, JSON.stringify(fontes));
+  ok('    e continua listando a da Classica', fontes.filter(f => f.id === 'n2').length === 1);
 }

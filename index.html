@@ -3297,6 +3297,9 @@
   .league-match-title{font-size:.62rem;font-weight:800;color:var(--muted);text-transform:uppercase;margin-bottom:4px;}
   .league-match-players{font-size:.85rem;font-weight:700;}
   .league-match-players .vs{color:var(--muted);font-weight:800;margin:0 6px;}
+  /* ⚠️ O SELO DO BYE E VERDE, no mesmo tom da borda de .league-match.resolved: ele e um
+     confronto RESOLVIDO, nao um pendente -- e a cor e o que diz isso de relance, antes da frase. */
+  .bye-tag{color:var(--green-dark);font-weight:800;font-size:.7rem;margin-left:8px;text-transform:uppercase;letter-spacing:.5px;}
   .league-match-status{font-size:.75rem;margin-top:4px;color:var(--muted);font-weight:700;}
   .league-match.resolved{border-style:solid;border-color:var(--green-dark);}
   .league-match.my-match{
@@ -5015,10 +5018,21 @@ function rollWildLevel(speciesId, minLevel, maxLevel){
    É a MESMA regra do tryEvolve, inclusive parando nos pontos de bifurcação (Gloom, Poliwhirl,
    Slowpoke): quem escolhe entre Vileplume e Bellossom é o jogador, e escolher por ele aqui seria
    tirar a escolha ANTES mesmo da captura. Ele decide no primeiro nível que subir depois de pegar. */
-function especieNoNivel(id, nivel){
+/* ⚠️ O `semEscolha` E PRA QUEM NAO TEM TELA DE ESCOLHA (24/09/2026), e ele nasceu de um relato:
+   *"apareceu um poliwhirl, porem pelo level 56 deveria ser um poliwarth"*.
+   O `break` na bifurcacao esta CERTO no encontro selvagem -- ali quem escolhe entre Poliwrath e
+   Politoed e o JOGADOR, e resolver por ele seria tirar a escolha antes da captura. Mas ha contextos
+   em que nao existe ninguem pra escolher (o bolo da Liga Pro, o draft da Ilha Kumquat, os guardioes
+   da Montanha): la o pokemon ia direto pra batalha e ficava preso na forma atrasada PRA SEMPRE.
+   ⚠️ O PADRAO E O COMPORTAMENTO DE HOJE (parar), entao quem esquecer o argumento erra pro lado
+   seguro -- o contrario do `corridaInstancia`, onde o padrao perigoso e que obrigou o parametro a
+   nao ter um. Quem passa `true` e so quem sabe que nao ha escolha.
+   ⚠️ E O DESTINO E O DO `EVOLUTIONS`, que e o de Kanto -- o MESMO precedente que o `finalEvolutionOf`
+   ja usa pra montar time de NPC (rival, Torre): quando nao ha quem escolha, vale o padrao. */
+function especieNoNivel(id, nivel, semEscolha){
   let cur = id, guarda = 0;
   while(EVOLUTIONS[cur] && nivel >= EVOLUTIONS[cur].level && guarda++ < 10){
-    if(EVOLUTION_CHOICES[cur]) break;
+    if(!semEscolha && EVOLUTION_CHOICES[cur]) break;
     cur = EVOLUTIONS[cur].into;
   }
   return cur;
@@ -5048,11 +5062,11 @@ function nivelDeChegada(id){
   }
   return _nivelDeChegada[id] || null;
 }
-function formaNoNivel(id, nivel){
+function formaNoNivel(id, nivel, semEscolha){
   let cur = id, guarda = 0;
   let pai = nivelDeChegada(cur);
   while(pai && nivel < pai.level && guarda++ < 10){ cur = pai.de; pai = nivelDeChegada(cur); }
-  return especieNoNivel(cur, nivel);
+  return especieNoNivel(cur, nivel, semEscolha);
 }
 
 /* SEIS iniciais desde 30/08/2026: os três de Kanto e os três de Johto. A jornada agora se bifurca
@@ -8498,7 +8512,7 @@ function contarBonusResgatado(quantos){
 }
 function notificationPendingReward(n){
   if(!n) return null;
-  if(n.type==='league_champion' && !(n.meta && n.meta.activated)){
+  if(n.type==='league_champion' && notifDeCampeaoTemCupom(n) && !(n.meta && n.meta.activated)){
     /* O AVISO DEIXOU DE SER DE PERDA em 10/09/2026: apagar a mensagem manda o bônus pra Mochila em
        vez de destruí-lo (ver resgatarPremiosDasNotificacoes no servidor). A frase FICA porque o
        jogador precisa saber PRA ONDE o prêmio foi -- foi justamente vê-lo sumir da mochila que
@@ -9162,6 +9176,18 @@ async function loadPermanentUserData(){
        `.then()` do `Promise.all` da home, que já chama `render()` quando a tela é a home. */
     conferirNovidades();
   } catch(e){ console.error('Erro ao carregar dados permanentes da conta:', e); }
+}
+/* ⚠️ O PREMIO DO CAMPEAO NAO E O MESMO EM TODA LIGA, e quem responde isso e UMA funcao. A
+   notificacao `league_champion` da Classica e das customizadas E O CUPOM do bonus shiny -- ela e a
+   unica porta dele --, e a da Liga Pro e so um ANUNCIO: as moedas ja foram pagas.
+   SEIS leitores dependem disso (a ativacao, o resgate ao apagar, o aviso de premio pendente, o CTA,
+   a lista de fontes da mochila e o proprio pagamento), e escrito em cada um o proximo premio novo
+   nasceria com um CUPOM FANTASMA: dava pra ativar um bonus shiny que ninguem ganhou.
+   ⚠️ O CRITERIO E POSITIVO (`meta.moedas` presente), nunca `leagueTypeId === pro`: notificacao
+   gravada ANTES desta data nao tem o campo e continua sendo cupom, que e o que ela sempre foi. */
+function notifDeCampeaoTemCupom(n){
+  const meta = (n && n.meta) || {};
+  return meta.moedas == null;
 }
 async function recordLeagueChampionWin(name, uid, typeId){
   // 1) ranking global (por nome de treinador, nunca é removido mesmo que o time seja apagado depois) --
@@ -14334,12 +14360,13 @@ function montarOsGuardioes(){
     const nivel = Math.max(2, Math.min(NIVEL_MAXIMO, media + desvios[mons.length]));
     /* a espécie tem que bater com o nível, como em toda oferta do jogo: um Pidgey nível 60 não
        existe -- aos 18 ele virou Pidgeotto e aos 36, Pidgeot. */
-    mons.push({ speciesId: formaNoNivel(id, nivel), level: nivel, shiny: false });
+    /* ⚠️ `semEscolha`: eles sao NPC e vao direto pra batalha -- ver o `especieNoNivel`. */
+    mons.push({ speciesId: formaNoNivel(id, nivel, true), level: nivel, shiny: false });
   }
   /* se o pool não deu (não dá pra acontecer com 30+ voadores, mas a rede fica), completa repetindo */
   while(mons.length < MONTANHA_GUARDIOES){
     const nivel = media + desvios[mons.length];
-    mons.push({ speciesId: formaNoNivel(pool[0], nivel), level: nivel, shiny: false });
+    mons.push({ speciesId: formaNoNivel(pool[0], nivel, true), level: nivel, shiny: false });
   }
   return mons;
 }
@@ -16142,13 +16169,89 @@ function roundLabelsFor(numRounds){
   if(numRounds===4) return ['Oitavas de Final','Quartas de Final','Semifinal','Final'];
   return ['Quartas de Final','Semifinal','Final'];
 }
-function buildRounds(players){
-  const n = players.length; // 8 (Liga normal) ou 16 (Grande Liga)
-  const numRounds = Math.round(Math.log2(n));
+/* ⚠️ A PROXIMA POTENCIA DE 2, que e o tamanho MINIMO de chave que cabe N jogadores.
+   Ela tem piso 2: uma chave de 1 nao e chave, e com `numRounds === 0` o laco das rodadas nao
+   roda e a liga nasceria sem nenhum confronto -- travada, sem nunca definir campeao. */
+function proximaPotenciaDe2(numeroTimes){ return Math.pow(2, Math.ceil(Math.log2(Math.max(2, numeroTimes)))); }
+/* ⚠️ EM QUANTAS CHAVES OS INSCRITOS SE DIVIDEM (24/09/2026): antes, quem nao cabia num grupo EXATO
+   de 16 ou 8 ia pro `leftover` e esperava o ciclo seguinte -- 27 inscritos formavam 16+8 e deixavam
+   TRES de fora. Hoje ninguem sobra: o que ia pro leftover virou BYE.
+   ⚠️ A REGRA E GULOSA E MINIMIZA BYE, e nao 'chaves do mesmo tamanho': enquanto sobrar pra uma chave
+   CHEIA e ainda uma chave valida depois dela, tira `maxPorChave`; o resto (de `chaveMinima` a
+   `max+min-1`) vira uma chave so, ou -- se passar do maximo -- uma de (resto-min) mais uma de min.
+   O total de vagas fica em `ceil(N/8)*8`, que e o MINIMO possivel. Com 24 inscritos isso da 16+8 e
+   ZERO BYE; dividir em chaves do mesmo tamanho daria 12+12, com OITO byes.
+   ⚠️ E TODO MULTIPLO DE 8 SAI BYTE A BYTE COMO ANTES -- e ai que a nao-regressao mora: 8, 16, 24,
+   32, 40, 48 e 56 formam exatamente os mesmos grupos, na mesma ordem, com a mesma semente.
+   ⚠️ ABAIXO DO MINIMO NAO SE FORMA NADA e todo mundo vai pro leftover, como sempre: e a regra que a
+   Liga Pro depende ('no minimo 8 treinadores') e a que faz a faixa dela nao girar num ciclo vazio.
+   ⚠️ E NENHUMA CHAVE FICA ABAIXO DO MINIMO, por construcao -- e isso importa porque uma chave de 1
+   coroaria campeao sem uma unica partida.
+   O `chaveMinima` e as DUAS coisas de propósito (o minimo pra formar E o tamanho da chave pequena):
+   no jogo os dois sao o mesmo `REGULAR_LIGA_SIZE`, e separa-los seria inventar um terceiro numero
+   que ninguem pediu. */
+function dividirEmChaves(total, maxPorChave, chaveMinima){
+  const tamanhos = [];
+  if(!(total >= chaveMinima)) return tamanhos;
+  let resto = total;
+  while(resto >= maxPorChave + chaveMinima){ tamanhos.push(maxPorChave); resto -= maxPorChave; }
+  if(resto <= maxPorChave) tamanhos.push(resto);
+  else { tamanhos.push(resto - chaveMinima); tamanhos.push(chaveMinima); }
+  return tamanhos;
+}
+/* ⚠️ ONDE OS BYES CAEM, e o ponto e ESPALHAR: amontoados numa ponta, uma METADE da chave ficaria
+   com quase todo mundo passando direto e a outra se estraçalhando na primeira rodada -- o
+   chaveamento deixaria de ser equilibrado. O passo e `total/byes`, que distribui por construcao.
+   ⚠️ E ELE E DETERMINISTICO (sem rng): o chaveamento e montado no SERVIDOR e o CLIENTE tambem
+   resolve partida de liga -- as duas copias tem que chegar no MESMO resultado. Quem embaralha os
+   jogadores antes e o `shuffleWithSeed`, que e semeado pelo mesmo motivo. */
+function calcularPosicoesBye(totalPartidas, quantidadeByes){
+  const posicoes = [];
+  if(quantidadeByes <= 0 || totalPartidas <= 0) return posicoes;
+  /* ⚠️ O TETO E UM BYE POR CONFRONTO, e e ele que garante o `TIME x BYE` -- nunca `BYE x BYE`.
+     Com o tamanho sendo a proxima potencia de 2 isso vale por aritmetica (n > size/2 ⇒ byes <
+     size/2), mas a guarda fica pro dia em que alguem forcar uma fase inicial maior. */
+  const quantos = Math.min(quantidadeByes, totalPartidas);
+  const intervalo = totalPartidas / quantos;
+  for(let i = 0; i < quantos; i++){
+    let posicao = Math.floor(i * intervalo);
+    /* ⚠️ O TETO DE VOLTAS NAO E ZELO: sem ele este `while` gira PRA SEMPRE assim que a chave
+       enche -- e a unica coisa que impede isso e o `Math.min` da linha de cima, que mora fora do
+       laco. Medido religando o defeito: o processo TRAVA (o teste nao falha, ele nunca termina), e
+       um laco que nao termina no servidor segura a funcao ate o timeout da instancia. Com o teto,
+       o pior caso vira um BYE a menos -- que a conta do `buildRounds` absorve sozinha. */
+    let voltas = 0;
+    while(posicoes.indexOf(posicao) >= 0 && voltas++ < totalPartidas) posicao = (posicao + 1) % totalPartidas;
+    if(posicoes.indexOf(posicao) >= 0) break;   // a chave encheu: nao ha mais onde por BYE
+    posicoes.push(posicao);
+  }
+  return posicoes.sort((a,b) => a-b);
+}
+/* ⚠️ A CHAVE ACEITA MENOS TIMES QUE VAGAS (24/09/2026): o `bracketSize` e opcional, e SEM ele o
+   comportamento e byte a byte o de sempre (chave do tamanho exato do grupo, zero BYEs). Foi assim
+   que a mudanca coube sem tocar em nenhum dos dois chamadores de producao.
+   ⚠️ E O `proximaPartidaId`/`proximaPosicao` NAO EXISTEM COMO CAMPO, de proposito: a ligacao entre
+   as rodadas e DERIVADA do indice -- o confronto `mi` da rodada `r` alimenta o `floor(mi/2)` da
+   rodada `r+1`, na posicao `a` se `mi` e par e `b` se e impar. E o que o `advanceCyclePhases` ja
+   fazia; guardado num campo, ele so conseguiria ficar velho. */
+function buildRounds(players, bracketSize){
+  const n = players.length;
+  const size = bracketSize || n; // sem o 2o argumento: 8 (Liga normal) ou 16 (Grande Liga)
+  const numRounds = Math.round(Math.log2(size));
+  const slots = Math.floor(size/2);
+  const byes = Math.max(0, Math.min(size - n, slots));
+  const posByes = calcularPosicoesBye(slots, byes);
   const rounds = {};
   const firstRound = [];
-  for(let i=0;i<n;i+=2){
-    firstRound.push({ a:players[i], b:players[i+1], winner:null, matchups:null, resolved:false });
+  let k = 0;
+  for(let i=0;i<slots;i++){
+    const comBye = posByes.indexOf(i) >= 0;
+    const a = players[k++] || null;
+    /* ⚠️ QUEM RECEBE BYE JA NASCE RESOLVIDO: o `advanceCyclePhases` so resolve confronto com os
+       DOIS lados (`!match.resolved && match.a && match.b`), entao um BYE nunca vira batalha -- ele
+       nao espera partida nenhuma, que e o que o BYE significa. */
+    if(comBye && a){ firstRound.push({ a, b:null, bye:true, winner:a, matchups:null, resolved:true }); }
+    else { firstRound.push({ a, b:(players[k++] || null), winner:null, matchups:null, resolved:false }); }
   }
   rounds['0'] = firstRound;
   let matchCount = firstRound.length;
@@ -16157,6 +16260,16 @@ function buildRounds(players){
     const roundMatches = [];
     for(let i=0;i<matchCount;i++){ roundMatches.push({ a:null, b:null, winner:null, matchups:null, resolved:false }); }
     rounds[String(r)] = roundMatches;
+  }
+  /* ⚠️ E ELE JA AVANCA PRA PROXIMA FASE AQUI, na montagem: o BYE e conhecido no instante em que a
+     chave nasce, e deixar pro `advanceCyclePhases` promover exigiria um segundo caminho la dentro
+     -- que so rodaria na primeira fase e so as vezes, ou seja o caminho menos testado do codigo. */
+  if(numRounds > 1){
+    firstRound.forEach((m, mi) => {
+      if(!m.bye || !m.winner) return;
+      const prox = rounds['1'][Math.floor(mi/2)];
+      if(mi % 2 === 0) prox.a = m.winner; else prox.b = m.winner;
+    });
   }
   return rounds;
 }
@@ -16228,7 +16341,32 @@ function proRotuloDaFaixa(f){ return 'Liga Pro ' + proNomeDaFaixa(f) + ': Level 
    Sem isso, um cliente forjado inscreveria seis Mewtwo -- e a inscricao da liga e escrita DIRETA
    do cliente (nao passa por callable nenhuma), entao nao ha outro lugar pra conferir.
    A validacao acontece onde o dado e USADO, nao onde ele e escrito, e custa aritmetica. */
-function proSementeDoBolo(uid, cycleId){ return 'pro-' + uid + '-' + cycleId; }
+/* ⚠️ A SEMENTE DO BOLO E POR RODADA, NAO POR CICLO (24/09/2026) -- e isso foi um defeito NO AR.
+   Ela era `uid + cycleId`, e isso MATAVA O LEFTOVER: quem nao cabia numa liga era copiado pro ciclo
+   seguinte com o `code` dele, o `drawCycle` de la REFAZIA o bolo com o cycleId novo, nada batia, e a
+   validacao o descartava EM SILENCIO -- sem erro, sem notificacao, sem nada na tela.
+   ⚠️ E ISSO TORNAVA A LIGA PRO IMPOSSIVEL: ela precisa de 8 inscritos, eles so acumulam pelo
+   leftover, e o leftover invalidava todo mundo. Reproduzido: 4 inscritos viravam ZERO na passada
+   seguinte, e o ciclo 3 nascia vazio.
+   ⚠️ A RODADA E O QUE O JOGADOR ESPERA: ela so anda quando uma liga ACONTECE (o mesmo `if` que gira
+   a faixa), entao o bolo fica estavel enquanto ele espera na fila e muda quando a liga sai -- que e
+   exatamente o que a tela promete. Por ciclo, ele mudava de hora em hora debaixo de quem esperava.
+   ⚠️ E ELA NAO ABRE FORJA: a rodada vem do CICLO (carimbada como a faixa), nunca do documento de
+   inscricao. Guardar a origem no INSCRITO seria o contrario -- ali quem escreve e o cliente, e ele
+   escolheria um ciclo de bolo bom. */
+function proSementeDoBolo(uid, entry){
+  /* ⚠️ O `proSementeLegado` e um campo de MIGRACAO, pra ser carimbado UMA vez no ciclo que ja estava
+     aberto quando isto mudou: com ele o bolo de quem JA tinha se inscrito continua byte a byte o
+     mesmo, e ninguem perde a inscricao na virada. Ciclo novo nao o tem, e ele some sozinho. */
+  const legado = entry && entry.proSementeLegado;
+  return 'pro-' + uid + '-' + (legado != null ? legado : 'r' + proRodadaDoCiclo(entry));
+}
+/* ⚠️ QUANTAS LIGAS PRO JA ACONTECERAM. Ela e CARIMBADA NA ENTRADA DO CICLO, como a faixa e pelo
+   mesmo motivo: lida da agenda na hora, ela mudaria debaixo de quem ja se inscreveu e o bolo dele
+   viraria outro entre a escolha e o sorteio.
+   ⚠️ E O `Number(x) || 0` NAO E `| 0`: o `| 0` trunca em 32 bits, e o campo de migracao pode
+   carregar um id de ciclo (13 digitos) -- ali ele daria um numero errado sem erro nenhum. */
+function proRodadaDoCiclo(entry){ return (entry && entry.proRodada != null) ? (Number(entry.proRodada) || 0) : 0; }
 /* ⚠️ A FAIXA E CARIMBADA NA ENTRADA DO CICLO, nao lida da agenda na hora.
    Se ela fosse lida da agenda, ela MUDARIA debaixo de quem ja se inscreveu: o jogador escolhe os 6
    dele vendo uma faixa, a liga anterior termina, a faixa gira, e ele entra numa liga de outro
@@ -16250,9 +16388,12 @@ function proFaixaDoCiclo(entry){ return (entry && entry.proFaixa != null) ? entr
    os 12 saem distintos por construcao -- e e a mesma regra do encontro selvagem e da Selecao.
    ⚠️ SEM LENDARIO NEM INTOCAVEL, a convencao da casa: um Mewtwo no bolo decidiria a liga
    sozinho, e os intocaveis sao justamente os que o jogador nao tem como ter. */
-function proSorteiaBolo(uid, cycleId, faixaIdx, especies){
-  const [minL, maxL] = proFaixaDe(faixaIdx);
-  const rng = makeSeededRng(proSementeDoBolo(uid, cycleId));
+/* ⚠️ ELE RECEBE A ENTRADA DO CICLO INTEIRA, nao a faixa e o id soltos: a entrada carrega a faixa, a
+   rodada e o campo de migracao, entao o chamador nao tem como esquecer um deles -- e esquecer a
+   rodada e justamente o defeito que matava o leftover. */
+function proSorteiaBolo(uid, cycleEntry, especies){
+  const [minL, maxL] = proFaixaDe(proFaixaDoCiclo(cycleEntry));
+  const rng = makeSeededRng(proSementeDoBolo(uid, cycleEntry));
   const pool = (especies || Object.keys(SPECIES)).filter(id =>
     proForaDoBolo().indexOf(id) < 0);
   const bolo = [], linhas = [];
@@ -16260,7 +16401,9 @@ function proSorteiaBolo(uid, cycleId, faixaIdx, especies){
   while(bolo.length < PRO_SORTEADOS && guarda++ < 2000){
     const base = pool[Math.floor(rng() * pool.length)];
     const level = minL + Math.floor(rng() * (maxL - minL + 1));
-    const id = formaNoNivel(base, level);
+    /* ⚠️ `semEscolha`: o bolo vai DIRETO pra batalha, entao um Poliwhirl Lv.56 ficaria preso na forma
+       atrasada pra sempre -- foi o relato de 24/09. Ver o `especieNoNivel`. */
+    const id = formaNoNivel(base, level, true);
     const raiz = raizDaLinha(id);
     if(linhas.indexOf(raiz) >= 0) continue;
     linhas.push(raiz);
@@ -17265,7 +17408,10 @@ async function ensureRegisteringCycle(typeId){
          cria ciclo tambem (e nao so o `drawCycle` do servidor), entao ele precisa carimbar aqui --
          sem isto, um ciclo criado pelo primeiro inscrito nasceria sempre na faixa 0 e a rotacao
          nunca sairia do lugar. Tudo dentro da MESMA transacao que ja le a agenda. */
-      if(typeId === PRO_LEAGUE_TYPE){ entry.proFaixa = (data.proFaixaIdx | 0) % PRO_FAIXAS.length; }
+      if(typeId === PRO_LEAGUE_TYPE){
+        entry.proFaixa = (data.proFaixaIdx | 0) % PRO_FAIXAS.length;
+        entry.proRodada = Number(data.proRodada) || 0;
+      }
       data.cycles.push(entry);
       data.updatedAt = Date.now();
       tx.set(scheduleDocRef(typeId), data);
@@ -17528,7 +17674,7 @@ async function inscreverNaLigaPro(){
       game.leagueTeamPickError = 'A rodada virou enquanto você escolhia — estes são os seus novos ' + PRO_SORTEADOS + '.';
       game.proCicloId = cycleEntry.id;
       game.proFaixa = proFaixaDoCiclo(cycleEntry);
-      game.proBolo = proSorteiaBolo(uid, cycleEntry.id, game.proFaixa);
+      game.proBolo = proSorteiaBolo(uid, cycleEntry);
       game.proEscolhidos = [];
       /* ⚠️ E OS GOLPES VÃO JUNTO: eles são por índice do bolo, e o bolo é OUTRO. Mantidos, o
          pokémon do índice 3 herdaria os golpes de um bicho que nem está mais na tela. */
@@ -17736,18 +17882,18 @@ async function drawCycle(typeId, cycleEntry, leagueTypeConfig){
         workingList = workingList.concat(realRemainder, bots);
       }
     }
-    const grandeCount = Math.floor(workingList.length / GRANDE_LIGA_SIZE);
-    for(let i=0;i<grandeCount;i++){
-      const group = shuffleWithSeed(workingList.slice(cursor, cursor+GRANDE_LIGA_SIZE), `draw-${cycleEntry.scheduledTime}-g${leagues.length}`);
-      leagues.push({ id: leagues.length, size: GRANDE_LIGA_SIZE, rounds: buildRounds(group), champion:null });
-      cursor += GRANDE_LIGA_SIZE;
-    }
-    const remaining = workingList.length - cursor;
-    const regularCount = Math.floor(remaining / REGULAR_LIGA_SIZE);
-    for(let i=0;i<regularCount;i++){
-      const group = shuffleWithSeed(workingList.slice(cursor, cursor+REGULAR_LIGA_SIZE), `draw-${cycleEntry.scheduledTime}-g${leagues.length}`);
-      leagues.push({ id: leagues.length, size: REGULAR_LIGA_SIZE, rounds: buildRounds(group), champion:null });
-      cursor += REGULAR_LIGA_SIZE;
+    /* ⚠️ NINGUEM SOBRA MAIS: quem nao cabia num grupo exato virou BYE. Ver o `dividirEmChaves`, que e
+       onde a regra e o preco dela estao escritos. A SEMENTE POR GRUPO nao mudou (`g${leagues.length}`),
+       e e isso que faz todo multiplo de 8 sair byte a byte como antes.
+       ⚠️ E O `size` CONTINUA SENDO O TAMANHO DA CHAVE, nao quantos jogadores entraram: e ele que o
+       `computePlacement` e o titulo da tela leem, e o que define as rodadas. A consequencia e que uma
+       'Grande Liga' pode ter 13 jogadores -- ela E a chave de 16, com 4 fases e as mesmas colocacoes. */
+    const tamanhosDasChaves = dividirEmChaves(workingList.length, GRANDE_LIGA_SIZE, REGULAR_LIGA_SIZE);
+    for(const tam of tamanhosDasChaves){
+      const group = shuffleWithSeed(workingList.slice(cursor, cursor+tam), `draw-${cycleEntry.scheduledTime}-g${leagues.length}`);
+      const bracket = proximaPotenciaDe2(tam);
+      leagues.push({ id: leagues.length, size: bracket, rounds: buildRounds(group, bracket), champion:null });
+      cursor += tam;
     }
     if(!botFillEnabled){ leftover = ordered.slice(cursor); }
     // sorteia o terreno das Quartas (round 0) já aqui, assim que os confrontos são conhecidos -- as fases
@@ -17755,7 +17901,10 @@ async function drawCycle(typeId, cycleEntry, leagueTypeConfig){
     const allowedTerrainIds = leagueTypeConfig ? leagueTypeConfig.allowedTerrains : null;
     for(const league of leagues){
       (league.rounds['0']||[]).forEach((match, mi)=>{
-        assignMatchTerrain(match, `${cycleEntry.scheduledTime}-L${league.id}-R0-M${mi}`, allowedTerrainIds);
+        /* ⚠️ BYE NAO GANHA TERRENO: ali nao ha luta, e um terreno na tela prometeria uma
+           partida que nunca acontece -- a mesma razao pela qual o selo de terreno nao aparece na
+           Torre, que tambem nao tem terreno escolhido. */
+        if(!match.bye) assignMatchTerrain(match, `${cycleEntry.scheduledTime}-L${league.id}-R0-M${mi}`, allowedTerrainIds);
       });
     }
     const detail = {
@@ -18065,12 +18214,21 @@ function computePlacement(league, playerName){
   if(finalMatch.a && finalMatch.b && (finalMatch.a.name===playerName || finalMatch.b.name===playerName)){
     return 'Vice-campeão';
   }
+  /* ⚠️ O TETO E A OCUPACAO, NAO A CAPACIDADE (24/09/2026): numa chave com BYE a primeira rodada tem 8
+     confrontos e pode ter 13 jogadores -- `round.length*2` prometeria um '14º Lugar' que nao existe.
+     ⚠️ NUMA CHAVE CHEIA OS DOIS NUMEROS COINCIDEM, entao isto nao muda um caractere do que ja esta no
+     ar. E o `nextSize` passou a ser o `round.length` (quantos SOBREVIVEM aquela rodada), que e o mesmo
+     `eliminatedInSize/2` de antes quando a chave esta cheia -- e o certo quando ela nao esta. */
+  const inscritosNaChave = (league.rounds[roundKeys[0]]||[]).reduce((n,m)=>n+(m.a?1:0)+(m.b?1:0), 0);
   for(let ri=lastRoundIdx-1; ri>=0; ri--){
     const round = league.rounds[roundKeys[ri]];
     const wasHere = round.some(m=> m.a && m.b && (m.a.name===playerName || m.b.name===playerName));
     if(wasHere){
-      const eliminatedInSize = round.length * 2;
-      const nextSize = eliminatedInSize / 2;
+      const eliminatedInSize = Math.min(round.length * 2, inscritosNaChave || round.length * 2);
+      const nextSize = round.length;
+      /* com BYE a faixa pode ficar de UM lugar so (9 jogadores numa chave de 16: o eliminado da
+         primeira fase e o 9º e mais nada) -- '9º–9º Lugar' se leria como defeito. */
+      if(nextSize + 1 >= eliminatedInSize) return `${eliminatedInSize}º Lugar`;
       return `${nextSize+1}º–${eliminatedInSize}º Lugar`;
     }
   }
@@ -19085,7 +19243,7 @@ async function abrirBoloDaLigaPro(){
     if(ativo){ game.leagueTeamPickError = 'Sua conta já está inscrita nessa Liga em outra rodada.'; render(); return; }
     game.proCicloId = entry.id;
     game.proFaixa = proFaixaDoCiclo(entry);
-    game.proBolo = proSorteiaBolo(game.authUser.uid, entry.id, game.proFaixa);
+    game.proBolo = proSorteiaBolo(game.authUser.uid, entry);
   } catch(e){
     console.error('Erro ao sortear o bolo da Liga Pro:', e);
     game.leagueTeamPickError = 'Não deu pra sortear seus pokémon. Confira sua conexão e tente de novo.';
@@ -26802,7 +26960,13 @@ function botaoDaLigaHtml(n){
 function ctaDaNotificacao(n){
   if(n.type==='league_champion'){
     /* ⚠️ AQUI SÃO DOIS BOTÕES, e a ordem importa: o prêmio vem primeiro porque é a ação que
-       EXPIRA (o bônus shiny vale uma hora depois de ativado), e a liga é só pra rever. */
+       EXPIRA (o bônus shiny vale uma hora depois de ativado), e a liga é só pra rever.
+       ⚠️ NA LIGA PRO NAO HA ACAO NENHUMA: as moedas já estão na conta, então o bloco do prêmio só
+       CONFIRMA -- oferecer a mochila ali mandaria o jogador procurar um item que não existe. */
+    if(!notifDeCampeaoTemCupom(n)){
+      const q = (n.meta && n.meta.moedas) || 0;
+      return `<p class="u-mt8 win-text">✅ 🪙 ${q} moedas creditadas na sua conta</p>` + botaoDaLigaHtml(n);
+    }
     const premio = (n.meta && n.meta.activated)
       ? `<p class="u-mt8 win-text">✅ Bônus já ativado</p>`
       : `<p class="u-mt8 hint-text">O <strong>Bônus Shiny</strong> está guardado na sua mochila.</p>
@@ -27801,6 +27965,14 @@ function leagueMatchRow(match, roundLabel, ct, li, rk, mi, leagueRounds, phaseTi
     const known = match.a || match.b;
     const knownSide = match.a ? 'a' : 'b';
     const knownName = known ? displayName(knownSide) : '?';
+    /* ⚠️ O BYE E O CONTRARIO DE "aguardando": ali nao ha partida pra esperar -- ele passou
+       direto. Com a mesma frase dos dois, o jogador ficaria esperando uma luta que nunca vem. */
+    if(match.bye){
+      return `<div class="league-match resolved${highlightClass}">
+        <div class="league-match-title">${roundLabel}</div>
+        <div class="league-match-players centered">${knownName} <span class="bye-tag">passou direto</span></div>
+      </div>`;
+    }
     return `<div class="league-match pending${highlightClass}">
       <div class="league-match-title">${roundLabel}</div>
       <div class="league-match-players">${knownName} <span class="vs">vs</span> ${match.a&&match.b?'':'(aguardando adversário)'}</div>
@@ -28274,7 +28446,7 @@ function renderLeague(){
     <p>É necessário no mínimo <strong>${REGULAR_LIGA_SIZE} treinadores</strong> inscritos para começar.
        Caso não tenha, automaticamente os treinadores são inscritos novamente para a próxima Liga,
        que se mantém na <strong>mesma faixa de Level</strong>.</p>
-    <p>O vencedor ganha <strong>bônus shiny de 1h</strong>, como na Clássica.</p>
+    <p>O vencedor ganha <strong>🪙 ${MOEDAS_CAMPEAO_PRO} moedas</strong>, creditadas na hora.</p>
     ` : `
     <h2>⚔️ Liga Clássica</h2>
     <p>Ligas de 16 ou 8 jogadores de acordo com o número de jogadores inscritos. Cada jogador irá selecionar um time vencedor das 8 insígnias para participar.</p>
@@ -29926,7 +30098,9 @@ function cuponsDeBonusShiny(){
     }
   });
   (game.inventarioNotificacoes||[]).forEach(n => {
-    if(n.type === 'league_champion' && !(n.meta && n.meta.activated)){
+    /* ⚠️ a da Liga Pro nao entra: ela pagou em MOEDA, e listá-la aqui ofereceria ativar um bônus
+       que não existe -- a tela prometendo o que a AÇÃO recusa. */
+    if(n.type === 'league_champion' && notifDeCampeaoTemCupom(n) && !(n.meta && n.meta.activated)){
       fontes.push({ origem:'notificacao', id:n.id, rotulo:'Campeão de liga' });
     }
   });
@@ -30964,7 +31138,11 @@ const MONT_ORDENS = [
 ];
 /* DEZ POR PÁGINA. Com dez saves de seis, a lista chega a 60 linhas -- e uma lista de 60 numa tela
    de 320px é rolagem demais pra uma decisão que se toma olhando poucos de cada vez. */
-const MOEDAS_RESSORTEIO = 5;   // tem que bater com o do servidor (ver rerollWildOffer)
+const MOEDAS_RESSORTEIO = 5;
+/* ⚠️ o CLIENTE nao paga (`moedas` esta na trava do firestore.rules): ele so DESENHA o numero.
+   Ele existe aqui porque a TELA o le -- um 100 escrito na frase envelheceria no primeiro reajuste,
+   a familia do rotulo de metragem do revezamento da Corrida. */
+const MOEDAS_CAMPEAO_PRO = 100;   // tem que bater com o do servidor (ver rerollWildOffer)
 /* O TETO DE RE-SORTEIOS POR SAVE (11/09/2026, a pedido). O número vive aqui E no servidor
    (MAX_RESSORTEIOS_POR_SAVE nos dois): o cliente precisa dele pra desabilitar o botão e dizer
    quantos sobram, o servidor é quem RECUSA. Se os dois divergirem, a tela oferece um re-sorteio que
@@ -37238,7 +37416,8 @@ function selecaoSortearPool(rng, faixa){
     if(linhas.has(raiz)) continue;
     linhas.add(raiz);
     const nivel = f[0] + Math.floor(r() * (f[1] - f[0] + 1));
-    const p = createInstance(formaNoNivel(sorteado, nivel), nivel);
+    /* ⚠️ `semEscolha`: o draft vai DIRETO pra batalha, sem tela de escolha -- ver o `especieNoNivel`. */
+    const p = createInstance(formaNoNivel(sorteado, nivel, true), nivel);
     equiparNpc([p]);
     escolhidos.push({ id: p.speciesId, nivel: nivel, mon: p, dono: null });
   }

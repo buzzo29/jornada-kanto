@@ -19410,6 +19410,96 @@ adulterado, o bolo de outro treinador, o de outro ciclo, código lixo).
   bolo que tinha um Lv.56; só o nível deixaria passar um shiny que não foi sorteado.
 - **E cada um do bolo só vale UMA vez** — sem isso daria pra inscrever seis cópias do melhor.
 
+#### ⚠️⚠️ O `cycleId` NA SEMENTE MATAVA O LEFTOVER — CONSERTADO EM 24/09/2026
+
+Reportado assim: *"quando acaba o tempo e nao tem player suficiente, por exemplo, era pra uma liga as
+8h e só tinha 4 treinadores inscritos, ele ta resetanddo e jogando fora os 4 treinadore ao invés de
+manter para a proxima"*. **E era literal: quem caía no `leftover` era DESCARTADO em silêncio** — o que
+tornava a liga **impossível**, porque ela precisa de **8** inscritos, eles só acumulam pelo leftover,
+e o leftover invalidava todo mundo.
+
+A cadeia é curta, e cada elo estava certo sozinho:
+
+```
+o bolo era semeado por uid + cycleId
+o leftover copia o inscrito pro ciclo SEGUINTE (preservando o registeredAt)
+o drawCycle REFAZ o bolo com o cycleId NOVO -> nao bate com o `code` gravado
+a validacao filtra ele fora -- e ela roda ANTES do leftover
+```
+
+**⚠️ PROVADO NO FIRESTORE DE PRODUÇÃO, minuto a minuto — não foi deduzido:**
+
+```
+06:21  o Red se inscreve no ciclo das 07:00  (bolo semeado por cycleId=1790244000000)
+07:00  cron: 1 inscrito, nao forma liga. o code BATE (o bolo e do proprio ciclo)
+       -> leftover copia pro ciclo das 08:00, com o mesmo registeredAt e o mesmo code
+08:00  cron: o bolo agora e semeado por cycleId=1790247600000 -> o code NAO bate
+       -> DESCARTADO. leftover VAZIO.
+09:00  ZERO inscritos.
+```
+
+Ou seja ele sobrevivia **uma** passada e caía na segunda: **não ia pra liga e não voltava pra fila**.
+Sem erro, sem notificação, sem nada na tela. A faixa ficou **travada em 2 por 11 ciclos seguidos**
+(das 23h às 10h), porque ela só gira quando uma liga **acontece**.
+
+**⚠️ ELE NASCEU COM A LIGA PRO**, ou seja é meu: a Clássica não tem o problema porque o time dela
+**É da conta** e não muda de ciclo pra ciclo.
+
+#### ⚠️ A SEMENTE PASSOU A SER A RODADA DA FAIXA, e não a faixa
+
+```js
+function proSementeDoBolo(uid, entry){
+  const legado = entry && entry.proSementeLegado;
+  return 'pro-' + uid + '-' + (legado != null ? legado : 'r' + proRodadaDoCiclo(entry));
+}
+```
+
+**⚠️ `uid + faixa` FOI A PRIMEIRA IDEIA E ELA TEM UM FURO: o bolo REPETIRIA a cada volta da
+rotação.** Com três faixas, a Bronze de hoje e a Bronze da próxima volta dariam **exatamente os
+mesmos 12** — e o jogador decoraria o bolo dele. O `proRodada` é um **contador que só sobe**, então a
+faixa se repete e o bolo não.
+
+- **⚠️ ELE ANDA QUANDO A LIGA ACONTECE, na MESMA condição que move a faixa** (`leagues.length > 0`) —
+  e é isso que faz o bolo **ficar parado enquanto o jogador espera na fila**, que é a coisa toda: sem
+  isso o leftover volta a matar todo mundo. Medido: os 4 esperam duas passadas, 4 mais chegam, e a
+  liga se forma **com os 4 originais dentro**.
+- **⚠️ E O CICLO É CARIMBADO, nunca lido da agenda na hora** — a mesma decisão do `proFaixa`: lida na
+  hora, a rodada mudaria **debaixo de quem já se inscreveu** e o `code` dele deixaria de bater.
+  **Os DOIS motores carimbam** (o servidor ao criar o ciclo seguinte e o cliente no
+  `ensureRegisteringCycle`): sem o do cliente, um ciclo criado pelo primeiro inscrito nasceria em
+  `r0` e o bolo **voltaria pro da primeira rodada**.
+- **⚠️ E É `Number(x) || 0`, NUNCA `x | 0`:** o `| 0` trunca em **32 bits**, e um contador que só sobe
+  chegaria lá — daí em diante dois ciclos diferentes dariam o **mesmo** bolo. É a mesma armadilha do
+  `== null` que o `proFaixa` já registra (o índice 0 é válido).
+- **⚠️ E A TELA JÁ PROMETIA ISSO, e a promessa era FALSA:** o picker diz *"os 12 são sorteados de novo
+  a cada liga — sair e voltar não muda os seus"*. Antes do conserto eles mudavam **a cada ciclo**, ou
+  seja **de hora em hora**. Não houve texto a mudar: o conserto tornou verdadeira a frase que já
+  estava lá.
+
+**⚠️ O `proSementeLegado` É A REDE DO DEPLOY, e ele tem UM uso datado:** se na hora do deploy houver
+inscrito no ciclo aberto, o `code` dele é do bolo por **cycleId** e ele cai na primeira passada.
+Carimbar `proSementeLegado = <cycleId>` naquele ciclo mantém a inscrição dele válida.
+
+**⚠️ E NA HORA DO DEPLOY (24/09/2026, 10:27 SP) HAVIA 1 INSCRITO — e a migração foi AVALIADA e
+RECUSADA.** O inscrito era o mesmo **Red**, com um time que bate **0 de 6** com o bolo novo. Os dois
+números que decidiram:
+
+| | |
+|---|---|
+| **a inscrição já estava condenada** | pelo código VELHO ele passaria às 11:00 e seria descartado às **12:00** (o leftover); pelo novo, às 11:00. O deploy adianta a perda em uma hora, **não a causa** |
+| **a escrita é no documento que o cron mexe** | o `leagues/schedule_pro` é escrito pelo cron **de minuto em minuto**, e uma escrita minha não-transacional por cima pode desfazer a dele — risco maior que salvar uma inscrição que a liga nem formaria (1 de 8) |
+
+Ou seja: **o campo continua sem uso até hoje**, e ele fica porque o dia em que a semente mudar de
+novo ele é a diferença entre migrar e descartar todo mundo que estiver na fila. Se for pra usar, o
+caminho seguro é uma **transação** no mesmo documento, nunca um `update` solto.
+
+**⚠️ AS DUAS ALTERNATIVAS FORAM CONSIDERADAS E SÃO PIORES:**
+
+| saída | por que não |
+|---|---|
+| guardar o `cycleId` de origem no inscrito | **abre forja**: o cliente escolheria um `cycleId` de bolo bom, e é ele quem escreve o documento de inscrição |
+| re-sortear o bolo no leftover | **escolheria os 6 pelo jogador** — ele montou o time dele, e o bolo novo não tem os mesmos pokémon |
+
 ### O BOLO: 12 FORMAS, NA FAIXA, SEM REPETIR LINHA
 
 - **⚠️ SEM REPETIR LINHA EVOLUTIVA, e não "espécie diferente"**: charmander e charmeleon no nível 40
@@ -19747,6 +19837,450 @@ rolagem lateral nem texto cortado** em nenhuma das três.
 
 `tools/test-liga-pro.js` foi a **170 asserções**, e **os 11 defeitos religados acusam** — três deles
 passavam em branco até as travas cobrarem o TEXTO das frases e a classe inteira do quadro.
+
+### O CAMPEÃO DA LIGA PRO GANHA MOEDA, NÃO BÔNUS SHINY (24/09/2026)
+
+Pedido assim: *"coloque para o vencedor da liga pro, ao inves de ganhar bonus shiny, ganha 100
+moedas"*. São **🪙 100** (`MOEDAS_CAMPEAO_PRO`), **1,4 jornada completa** de renda.
+
+#### ⚠️ ELA É PAGA NA HORA, E NÃO É UM CUPOM — e essa é a decisão
+
+O bônus shiny é cupom por uma razão: ele vale **1h A PARTIR da ativação**, então ativar na hora
+errada desperdiça o prêmio. **Moeda não expira.** Um cupom dela seria um clique sem razão e, pior,
+**um jeito de PERDER o prêmio** — apagar a notificação, que é exatamente o defeito de 10/09/2026
+(*"deletei a notificação e o bônus shiny sumiu da mochila"*).
+
+Então a notificação da Pro é só um **ANÚNCIO**: as moedas já estão na conta quando ela chega.
+
+#### ⚠️ MAS A NOTIFICAÇÃO É A MESMA (`league_champion`), E ISSO ABRE SEIS PORTAS
+
+Ela **É o cupom** do bônus shiny na Clássica — a única porta dele —, e **seis leitores** decidem
+por ela. Escrito em cada um, a da Pro viraria um **CUPOM FANTASMA**: dava pra ativar 1h de shiny
+**além** das 100 moedas.
+
+| onde | o que a porta faz |
+|---|---|
+| `advanceCyclePhases` (servidor) | paga e escolhe o corpo da mensagem |
+| `activateShinyBonus` (servidor) | **recusa** ativar a da Pro — é aqui que a forja para |
+| `resgatarPremiosDasNotificacoes` (servidor) | não credita `bonus_shiny` ao apagá-la |
+| `notificationPendingReward` (cliente) | não avisa "bônus ainda não ativado" |
+| `ctaDaNotificacao` (cliente) | confirma as moedas em vez de oferecer a mochila |
+| `cuponsDeBonusShiny` (cliente) | não a lista como fonte de shiny |
+
+Quem responde é **uma função só**, `notifDeCampeaoTemCupom`, duplicada nos dois motores.
+
+- **⚠️ O CRITÉRIO É POSITIVO (`meta.moedas` presente), nunca `leagueTypeId === 'pro'`:** notificação
+  gravada **antes** desta data não tem o campo e continua sendo cupom — que é o que ela sempre foi.
+  Pelo `leagueTypeId`, o critério seria sobre a LIGA e não sobre o PRÊMIO, e uma liga que mudasse de
+  prêmio um dia apagaria o cupom de quem já tinha ganhado.
+- **⚠️ E `moedas: 0` CONTA COMO PAGO** (o `== null` pega só `undefined`/`null`) — a armadilha do
+  índice 0 que o `proFaixa` já registra, valendo nos dois sentidos.
+- **O `activated` e o `moedas` são EXCLUDENTES no meta**: um descreve um cupom e o outro um prêmio
+  já pago, e pôr os dois deixaria no documento um campo que não significa nada.
+
+#### ⚠️ O PAGAMENTO SÓ EXISTE NO SERVIDOR — e nem poderia existir no cliente
+
+`moedas` está na **trava de campos do `firestore.rules`**: uma escrita vinda do cliente é recusada.
+E isso casou de graça com o que já era verdade — **conferido: o cliente nunca criou a notificação de
+campeão** (ele só chama o `recordLeagueChampionWin`), então esta porta já era exclusiva do servidor.
+
+- **⚠️ E O PAGAMENTO VEM ANTES DO ANÚNCIO**, que é a regra que as 376 notificações de 13/09
+  custaram: se ele falhar, o campeão fica sem aviso — e o contrário (ler *"ganhou 100 moedas"* sem
+  tê-las) é o lado errado pra errar. Há trava sobre a ORDEM, não só sobre a presença.
+- **A trava das regras entrou junto**: sem `moedas` naquela lista, o pagamento continuaria
+  funcionando **e** o cliente passaria a poder se pagar sozinho.
+
+#### ⚠️ UMA FRAGILIDADE HERDADA, e ela é anterior a isto
+
+**Se o CLIENTE resolver a final, ninguém é notificado nem pago.** O `advanceCyclePhases` do cliente
+grava o campeão e chama o `recordLeagueChampionWin`, mas **não cria a notificação** — e na passada
+seguinte o cron vê o ciclo `complete` e não roda mais. Ou seja o prêmio (o shiny na Clássica e agora
+a moeda na Pro) depende de o **cron** resolver a última partida.
+
+Isso **não foi mexido** — é anterior, não foi reportado e não foi pedido. Fica registrado porque a
+moeda herdou a mesma dependência. Se um dia for pra valer, o lugar é o laço de campeões do cliente —
+e ali o pagamento continuaria sendo impossível (a trava das regras), então a saída seria uma
+callable.
+
+#### NA TELA
+
+| | |
+|---|---|
+| a descrição da Liga Pro | *"O vencedor ganha **🪙 100 moedas**, creditadas na hora."* |
+| a notificação | *"Sua recompensa: 🪙 100 moedas, já creditadas na sua conta."* |
+| o CTA dela | **✅ 🪙 100 moedas creditadas na sua conta** + o botão do chaveamento |
+
+- **⚠️ O NÚMERO SAI DA CONSTANTE, nunca escrito na frase** — ele envelheceria no primeiro reajuste,
+  que é a família do *"Revezamento · 900 m"*. A constante existe no cliente **só pra a tela lê-la**;
+  quem paga é o servidor.
+- **O botão da liga FICA** no CTA: o que saiu foi só a oferta da mochila. Com `cycleId` no meta ele é
+  o **"Ver o chaveamento"**, e há trava cobrando que ele não se perdeu quando o bloco do prêmio virou
+  um `return` antecipado.
+- **A Clássica não muda um caractere** — e a trava cobra o PAR: a Pro diz moeda **e** a Clássica
+  continua dizendo bônus shiny. Sem a segunda metade, uma mudança que trocasse o prêmio das DUAS
+  passaria.
+
+**Medido a 320px, no navegador:** a tela da Pro vai de 1.503 para **1.505px** (a frase nova é mais
+curta que a antiga), o CTA em **296×276px**, **zero textos cortados** e **nenhuma rolagem lateral**
+nas duas.
+
+**NO MOTOR, NADA:** `MOTOR 2d6a83f24cf1 / DIARIO 72e61601d1fb`, idêntico em 900 batalhas semeadas.
+
+#### ⚠️ E ELE CUSTOU UM TDZ QUE DERRUBAVA O SERVIDOR INTEIRO
+
+Eu exportei a constante (`exports._MOEDAS_CAMPEAO_PRO = MOEDAS_CAMPEAO_PRO`) numa linha **2.500
+acima** da declaração dela: `ReferenceError` no carregamento do módulo, ou seja **nenhuma function
+sobe**. É a **sexta** vez desta armadilha no projeto, e a segunda em que ela mata o servidor (a
+outra foi o `PRO_FORA_DO_BOLO`).
+
+**Declaração de `function` é hoisted; `const` não.** O export da FUNÇÃO podia ficar ali; o da
+constante, não — e ele nem era necessário: **o teste lê o valor do FONTE por regex**, que é o padrão
+dele (o `P_MIN`). ⚠️ E tinha que ser assim de qualquer jeito: **`const` não vira propriedade global
+do sandbox**, então `S.MOEDAS_CAMPEAO_PRO` volta `undefined` — a lição que a Queimada já tinha
+custado.
+
+**⚠️ E UMA CONSTANTE DE TESTE LIDA POR DOIS BLOCOS PRECISA FICAR NO ESCOPO DO MÓDULO:** declarada
+dentro de um deles, o outro não a vê (`ReferenceError` no meio do arquivo). Ela nasceu ao lado do
+`P_MIN`, que está dentro de um bloco, e o bloco do prêmio — 370 linhas abaixo — não a enxergava.
+
+## A BIFURCAÇÃO PARAVA O SORTEIO EM TRÊS LUGARES (24/09/2026)
+
+Reportado com print do picker da Liga Pro: *"apareceu um poliwhirl, porem pelo level 56 deveria ser um
+poliwarth"*. **E estava certo:** o Poliwhirl evolui no 40, o card dizia **Lv.56**, e a forma que existe
+naquele nível é o **Poliwrath**.
+
+### ⚠️ A CAUSA É UMA GUARDA QUE ESTÁ CERTA NA JORNADA E ERRADA AQUI
+
+```js
+while(EVOLUTIONS[cur] && nivel >= EVOLUTIONS[cur].level){
+  if(EVOLUTION_CHOICES[cur]) break;   // <- ela PARA na bifurcacao
+  cur = EVOLUTIONS[cur].into;
+}
+```
+
+Ela existe desde a bifurcação Kanto/Johto e o motivo dela é bom: **na jornada quem escolhe entre
+Poliwrath e Politoed é o JOGADOR**, na tela do `evoChoice` — parar ali é o que impede o jogo de
+decidir no lugar dele.
+
+**⚠️ MAS ONDE NINGUÉM VAI ESCOLHER, PARAR É MOSTRAR UMA FORMA QUE NÃO EXISTE NAQUELE NÍVEL.** E são
+**QUATRO** as linhas travadas (`gloom`, `poliwhirl`, `slowpoke`, `tyrogue`) — o relato nomeou uma.
+
+**MEDIDO NO BOLO DA LIGA PRO, antes de mexer:**
+
+| faixa | entradas travadas | **bolos com pelo menos uma** |
+|---|---|---|
+| Bronze 15-30 | 0,00% | 0,0% |
+| Prata 35-50 | 1,64% | 17,9% |
+| **Ouro 55-70** | **2,10%** | **23,0%** |
+
+⚠️ **Quase um bolo em quatro na faixa Ouro** — não é caso de canto. E na Bronze é zero por aritmética:
+o Poliwhirl só evolui no 40, então abaixo disso ele **É** a forma certa.
+
+### ⚠️ ERAM TRÊS LUGARES, E SÓ UM FOI RELATADO
+
+O `semEscolha` é opcional e **quem o pede é o CHAMADOR** — a guarda continua cega por padrão, então a
+jornada não muda um caractere:
+
+| onde | quem escolheria | passa `semEscolha` |
+|---|---|---|
+| **o bolo da Liga Pro** | ninguém — os 12 são sorteados | **sim** |
+| **o draft da Ilha Kumquat** | ninguém — o bolo é sorteado | **sim** |
+| **os guardiões da Montanha Sagrada** | ninguém — são adversários | **sim** |
+| a **VIGÍLIA do Arco-Íris** | **o JOGADOR** — o prêmio vira pokémon dele | **não** |
+| a jornada, o encontro selvagem, a Torre | o jogador | não |
+
+**⚠️ A VIGÍLIA É A EXCEÇÃO E ELA É DELIBERADA:** o prêmio dela **entra no time como um selvagem
+capturado**, e resolver a bifurcação ali seria escolher Poliwrath ou Politoed pelo jogador — a coisa
+mais definitiva do jogo. Ela continua parando, e **há caso de teste cobrando isso** (religá-lo acusa).
+
+**⚠️ E O PARÂMETRO É OPCIONAL, NUNCA O PADRÃO.** Com `semEscolha` implícito, a próxima chamada
+esquecida **tiraria a escolha do jogador em silêncio** — é a mesma armadilha do `ehDoJogador` do
+`corridaInstancia` e do `pescariaInstancia`, pelo lado oposto. Há caso de teste pros dois sentidos.
+
+**⚠️ E O `formaNoNivel` TEM QUE REPASSAR**, senão ele desce a linha e o `especieNoNivel` volta a
+parar na subida — o sintoma fica **idêntico** ao defeito. É a única linha que liga os três chamadores
+à guarda, e ela tem trava própria.
+
+**MEDIDO DEPOIS: 0 de 7.200** nas três faixas da Liga Pro, e zero nos três chamadores.
+
+**NO MOTOR, NADA:** `MOTOR 2d6a83f24cf1 / DIARIO 72e61601d1fb`, idêntico em 900 batalhas semeadas — e
+o instrumento é sensível (com o `CRIT_BASE` em 1/8 os dois hashes mudam). O `formaNoNivel` é sorteio
+de espécie, não conta de dano.
+
+**⚠️ E ELE CUSTOU UM PATCH QUE DEIXOU OS DOIS MOTORES DIVERGINDO NO DISCO:** o script escreveu o
+`functions/index.js` e **estourou** no `index.html` (âncora errada — eu copiei a linha do servidor, e
+a chamada da Kumquat no cliente é `createInstance(formaNoNivel(sorteado, nivel), nivel)`). Restaurado
+do backup, e o patch passou a **preparar TODOS os arquivos e só então escrever qualquer um** — a regra
+que vale pra tudo que é duplicado aqui.
+
+## O CHAVEAMENTO ACEITA MENOS TIMES QUE VAGAS: O BYE (24/09/2026)
+
+Pedido assim: *"preciso que você altere a lógica de geração do chaveamento eliminatório para suportar
+campeonatos com menos times do que a capacidade da fase inicial ... o campeonato começa nas oitavas
+de final, portanto a chave possui 16 vagas, mas existem apenas 13 times inscritos. Nesse caso, a
+lógica deve criar 3 BYEs"* — com a regra escrita passo a passo (espalhar os BYEs, nunca `BYE x BYE`,
+avançar automaticamente quem recebe BYE, manter a ligação entre as rodadas) e a instrução que
+organizou o trabalho: *"Antes de alterar o código, analise como o index.html atual gera os
+campeonatos e adapte essa solução à estrutura existente, em vez de criar um sistema paralelo
+completamente separado"*.
+
+⚠️ **O MOTOR NASCEU SEM MUDAR NADA EM PRODUÇÃO, de propósito:** ele aceita BYE, e o `drawCycle`
+continuou formando só grupos exatos de 8 e 16 até a **regra de agrupamento** ser decidida. Ela foi —
+é a **(D)**, no fim desta seção.
+
+### ⚠️ ELE COUBE NA ESTRUTURA QUE JÁ EXISTIA — o pedido já era ela, com outros nomes
+
+| o pedido | o jogo |
+|---|---|
+| `gerarChaveEliminatoria(times, tamanhoDaChave)` | **`buildRounds(players, bracketSize)`** — o 2º argumento é a única coisa nova |
+| `time1` / `time2` / `vencedor` / `status` | `a` / `b` / `winner` / `resolved` |
+| `embaralharArray` | o **`shuffleWithSeed`**, que já embaralha os inscritos antes |
+| `proximaPotenciaDe2` / `calcularPosicoesBye` | criadas como o pedido escreveu |
+
+**⚠️ SEM O 2º ARGUMENTO ELE SAI BYTE A BYTE IGUAL AO DE ANTES** (chave do tamanho exato do grupo,
+zero BYEs) — e é isso que fez a mudança caber **sem tocar em nenhum dos dois chamadores de
+produção**. Há trava comparando os cinco tamanhos possíveis.
+⚠️ **E ELA VALE DEPOIS DA (D) TAMBÉM**, por outro caminho: hoje os chamadores PASSAM tamanho, e o que
+garante a não-regressão é **todo múltiplo de 8 formar exatamente os mesmos grupos de antes**.
+
+**13 numa chave de 16, a saída real:**
+
+```
+jogo 1: T1  x BYE  -> T1 avança (resolved)     jogo 5: T7  x T8
+jogo 2: T2  x T3                                jogo 6: T9  x BYE  -> T9 avança
+jogo 3: T4  x BYE  -> T4 avança                 jogo 7: T10 x T11
+jogo 4: T5  x T6                                jogo 8: T12 x T13
+```
+
+5 partidas + 3 BYEs = 8 nas quartas, com os três já **na posição certa** delas.
+
+### TRÊS DECISÕES QUE FUGIRAM DO QUE FOI PEDIDO, e por quê
+
+- **⚠️ O EMBARALHAMENTO NÃO PODE SER `Math.random`.** O chaveamento é montado no **SERVIDOR** e o
+  **CLIENTE também resolve partida de liga** — as duas cópias têm que chegar no MESMO resultado,
+  senão a mesma liga termina diferente nos dois. A distribuição dos BYEs é determinística pelo mesmo
+  motivo, e há trava comparando os dois motores em 8 tamanhos.
+- **⚠️ `proximaPartidaId` / `proximaPosicao` NÃO VIRARAM CAMPO.** A ligação já é **DERIVADA do
+  índice**: o confronto `mi` da rodada `r` alimenta o `floor(mi/2)` da rodada `r+1`, na posição `a`
+  se `mi` é par e `b` se é ímpar — é o que o `advanceCyclePhases` já fazia. Guardada num campo, ela
+  só conseguiria ficar velha.
+- **A `faseInicial` configurada é respeitada por construção:** ela **É** o `bracketSize`. Não houve
+  um segundo caminho a escrever.
+
+### ⚠️ QUEM RECEBE BYE JÁ NASCE RESOLVIDO, e é isso que o faz não esperar partida
+
+O `advanceCyclePhases` só resolve confronto com os **DOIS** lados
+(`!match.resolved && match.a && match.b`), então um BYE **nunca vira batalha**. Ele nasce
+`{a, b:null, bye:true, winner:a, resolved:true}` **e já é promovido pra fase seguinte na montagem** —
+deixar pro `advanceCyclePhases` promover exigiria um segundo caminho lá dentro que só rodaria na
+primeira fase e só às vezes, ou seja o caminho menos testado do código.
+
+- **⚠️ E ELE NÃO GANHA TERRENO:** o `assignMatchTerrain` ficou atrás de `if(!match.bye)`. Terreno
+  sorteado pra um confronto que não acontece é dado morto — e o selo do terreno apareceria numa
+  partida que ninguém joga.
+- **⚠️ E A POTÊNCIA DE 2 TEM PISO 2:** uma chave de 1 não é chave, e com `numRounds === 0` o laço das
+  rodadas não roda — a liga nasceria **sem confronto nenhum**, travada, sem nunca definir campeão.
+
+### O QUE SAI NA TELA
+
+A linha do BYE dizia *"aguardando adversário"*, que é o texto de uma vaga que ainda vai ser
+preenchida — e aqui ela **nunca** será. Hoje ela diz **"PASSOU DIRETO"** em verde, ao lado do nome.
+
+E a notificação de início não diz mais *"contra a definir"*: quem passou direto é avisado disso, com
+a **fase seguinte** e o horário dela.
+
+⚠️ **A FRASE FOI EXTRAÍDA PRA UMA FUNÇÃO** (`avisoDeInicioDeLiga`), e não por estilo: a versão inline
+só dava pra testar **lendo o texto do arquivo** — e texto no arquivo **sobrevive a um
+`const corpo = false`**, porque o ramo só fica inalcançável. A trava passava em branco com o BYE
+ignorado. Hoje são 11 asserções de comportamento.
+
+**Medido a 320px, no navegador**, com 13 numa chave de 16: os 3 BYEs caem nos jogos 1, 3 e 6, a linha
+do BYE mede **53px** contra 77 de um confronto normal, o selo em `rgb(31,107,47)` a 11,2px, e
+**nenhuma rolagem lateral**.
+
+### ⚠️ O QUE FALTA É A REGRA DE AGRUPAMENTO, E AS TRÊS SAÍDAS FORAM MEDIDAS
+
+Hoje o `drawCycle` forma grupos **exatos** e manda o resto pro `leftover` (o inscrito é copiado pro
+ciclo seguinte preservando o `registeredAt`, ou seja a ordem de prioridade).
+
+| inscritos | **(A) hoje** | **(B) uma chave só** | **(D) chaves equilibradas** |
+|---|---|---|---|
+| 13 | 8 jogam, **5 sobram** | 13/16 (3 byes) | 13/16 (3 byes) |
+| 20 | 16 jogam, **4 sobram** | 20/**32** (12 byes) | 10/16 + 10/16 |
+| 27 | 16+8, **3 sobram** | 27/**32** (5 byes) | 14/16 + 13/16 |
+| 57 | 16+16+16+8, **1 sobra** | 57/**64** (7 byes) | 15/16 + 14/16 ×3 |
+| **rodadas no máximo** | **4** | **5 e 6** | **4** |
+
+⚠️ **A (B) — literalmente o que foi pedido — ESTOURA A MÁQUINA DE FASES.** Ela tem **quatro horários
+fixos** (`phaseTimes = [qfTime, sfTime, finalTime, phase4Time]`) e o `roundLabelsFor` só conhece
+chave de 3 e de 4 rodadas: uma de 32 precisa de 5 e uma de 64 de 6. E ela **piora o caso de 20**, que
+hoje forma uma liga cheia de 16 e passaria a ser uma chave de 32 com **12 vagas vazias**.
+
+A **(D)** nunca passa de 4 rodadas, **não deixa ninguém de fora** e mantém o número de campeões igual
+ao de hoje. **FOI ELA** (*"Faça a D, chaves equilibradas"*) — ver a seção logo abaixo, que é onde a
+regra e o preço dela estão medidos.
+
+### ⚠️ E ELE CUSTOU QUATRO LIÇÕES
+
+1. **⚠️ UM DEFEITO MEU FAZIA O LAÇO GIRAR PRA SEMPRE.** O `while` que procura vaga livre não tinha
+   teto de voltas: com a chave cheia ele nunca acha vaga. O teste **TRAVOU em vez de falhar**, e o
+   script de acusação leu isso como *"passou em branco"* — ele passou a reconhecer **timeout** como
+   acusação. O conserto foi um teto de voltas mais um `break`, e o pior caso virou **um BYE a
+   menos**, que a conta absorve.
+2. **⚠️ DUAS GUARDAS QUE DIZEM A MESMA COISA NÃO SE TESTAM UMA A UMA.** O `Math.min` e o `break`
+   garantem a MESMA regra (nunca mais BYEs que confrontos), então tirar só um **não é observável** —
+   e tirar só o `break` é o caso 1. O caso de acusação tira **os dois**.
+3. **⚠️ O SCRIPT DE ACUSAÇÃO CONTAVA `FALHA` E O TESTE IMPRIME `FALHOU`** — a **quarta** vez desta
+   armadilha aqui. Os defeitos apareciam todos como *"1 falha"* (o sumário `N FALHA(S)`), e **um
+   deles estava passando em branco escondido nesse 1**. Um "1 falha" idêntico em treze casos
+   diferentes é o sinal.
+4. **⚠️ E UMA TRAVA MINHA ASSUMIU UMA OCORRÊNCIA DE `if(!match.resolved && match.a && match.b)`** —
+   há **DUAS** em cada motor (a segunda é o *"há trabalho pendente?"*). Hoje ela cobra as duas, nos
+   dois arquivos.
+
+**NO MOTOR, NADA:** `MOTOR 2d6a83f24cf1 / DIARIO 72e61601d1fb`, idêntico ao build anterior em 900
+batalhas semeadas — e o instrumento é sensível (com o `CRIT_BASE` em 1/8 os dois hashes mudam).
+Bateria: **41 de 41**.
+
+`tools/test-chaveamento.js` é novo, com **60 asserções**: a não-regressão sem o 2º argumento (5
+tamanhos byte a byte, mais os dois chamadores de produção nos dois arquivos), a potência de 2 com o
+piso, o espalhamento medido por **INTERVALO** e não por índice exato, a chave de 13/16 carta por
+carta, o caminho até o campeão em 8 casos, os dois motores concordando e sendo determinísticos (sem
+`Math.random`), as duas guardas do avanço, o terreno, o aviso de início, a tela e o
+`computePlacement`.
+**Conferido que os 15 defeitos religados acusam** — um deles só por **timeout**.
+
+### ⚠️ AS CHAVES FICARAM EQUILIBRADAS: NINGUÉM SOBRA (24/09/2026)
+
+Escolhida entre as três saídas da tabela acima: *"Faça a D, chaves equilibradas"*. O `drawCycle`
+deixou de formar grupos **EXATOS** e mandar o resto pro `leftover` — hoje **todo mundo que passa do
+mínimo entra**, e o que sobrava virou BYE.
+
+**⚠️ O NÚMERO QUE JUSTIFICA A MUDANÇA:** de 8 a 64 inscritos, o agrupamento de antes deixava **196
+inscrições de fora — em 49 dos 57 valores de N (86%)**. Hoje deixa **ZERO**.
+
+| inscritos | antes | **hoje** | vagas | byes |
+|---|---|---|---|---|
+| 13 | 8 jogam, **5 sobram** | **13/16** | 16 | 3 |
+| 20 | 16 jogam, **4 sobram** | **12/16 + 8/8** | 24 | 4 |
+| 24 | 16+8, ninguém sobra | **16/16 + 8/8** | 24 | **0** |
+| 27 | 16+8, **3 sobram** | **16/16 + 11/16** | 32 | 5 |
+| 57 | 16+16+16+8, **1 sobra** | **16/16 ×3 + 9/16** | 64 | 7 |
+
+#### ⚠️ A REGRA MINIMIZA BYE — ela NÃO é "chaves do mesmo tamanho", e o caso de 24 é o que separa
+
+A leitura ingênua de *"equilibradas"* é `ceil(N/16)` grupos do mesmo tamanho. **Ela PIORA o caso que
+hoje já é perfeito:** 24 inscritos viram **12+12**, ou seja duas chaves de 16 com **OITO** vagas
+vazias — quando 16+8 fecha as duas sem um BYE sequer.
+
+A regra é **GULOSA**: enquanto sobrar pra uma chave CHEIA de 16 **e ainda uma chave válida depois
+dela**, tira 16; o resto (8 a 23) vira uma chave só, ou — se passar de 16 — uma de (resto−8) mais
+uma de 8.
+
+**⚠️ E ISSO PÕE O TOTAL DE VAGAS NO MÍNIMO POSSÍVEL, que é `ceil(N/8)*8`** — conferido em **493 de
+493** valores de N, de 8 a 500. Não existe arranjo com menos BYE.
+
+#### ⚠️ A NÃO-REGRESSÃO É "TODO MÚLTIPLO DE 8", e ela é exata
+
+**8, 16, 24, 32, 40, 48, 56… formam exatamente os mesmos grupos de antes, na mesma ordem, com a
+MESMA semente por grupo** (`draw-<hora>-g<índice>`, que não mudou) — conferido em **25 de 25**
+múltiplos de 8 até 200. Ou seja o ciclo de quem já joga hoje com número redondo sai byte a byte
+igual, e a mudança só alcança quem sobrava.
+
+**⚠️ E O `botFillEnabled` DAS LIGAS CUSTOMIZADAS NÃO MUDOU UM CARACTERE, de graça:** ele já enche com
+bot até um múltiplo de 8, e sobre um múltiplo de 8 a regra nova é a antiga. **Não foi preciso
+decidir nada sobre bot × BYE** — se um dia for, a régua é tirar o `botFillEnabled` e deixar o BYE
+fazer o trabalho sem inventar adversário.
+
+#### ⚠️ O MÍNIMO DE 8 CONTINUA SENDO O MÍNIMO — e é ele que a Liga Pro depende
+
+Abaixo de `REGULAR_LIGA_SIZE` **não se forma liga nenhuma** e todo mundo vai pro `leftover`, como
+sempre. É a regra que a Liga Pro escreve com todas as letras (*"no mínimo 8 treinadores"*) e a que
+faz a **faixa dela não girar** num ciclo que não aconteceu.
+
+**⚠️ E NENHUMA CHAVE NASCE ABAIXO DE 8**, o que cai da própria regra — conferido, a menor chave em
+N de 8 a 500 tem **8**. Sem isso uma chave de 1 coroaria campeão **sem uma única partida**.
+
+#### ⚠️ NUNCA PASSA DE 4 RODADAS — e é isso que faz a (D) caber
+
+A máquina de fases tem **quatro horários fixos** (`phaseTimes`) e o `roundLabelsFor` só conhece
+chave de 3 e de 4 rodadas. Conferido de N=8 a 500: **4 rodadas no máximo**. Era exatamente isto que
+a saída *"uma chave só"* estourava — 32 precisaria de 5 e 64 de 6.
+
+#### ⚠️ O PIOR CASO É N ≡ 1 (mod 8): SETE BYEs NA ÚLTIMA CHAVE
+
+Com 9, 17, 25, 57… a última chave fica com **9 jogadores em 16 vagas** — ou seja **8 dos 9 dela
+passam direto** e a primeira fase tem **uma partida real**. É o preço de ninguém ficar de fora, ele
+está medido, e fica **FIXADO no teste** pra ser decisão e não surpresa. Não há arranjo melhor: 9 não
+se divide em dois grupos de 8.
+
+**⚠️ E A LIGA CLÁSSICA ESTÁ A UM INSCRITO DESSE CASO — medido em produção (24/09/2026):** os ciclos
+recentes dela têm **6, 6, 7, 7, 7 e 8** inscritos, e o `leagueTypes/classic` tem
+**`botFillEnabled: false`** (ou seja ela **não** é protegida pelo preenchimento com bot, que é o que
+faria a regra nova ser idêntica à antiga por cair sempre em múltiplo de 8).
+
+Na faixa em que ela vive hoje **nada muda**, e isso não é sorte — é a regra:
+
+| inscritos | antes | hoje |
+|---|---|---|
+| **6, 7** | nenhuma liga (o mínimo é 8) | **igual** — o `dividirEmChaves` devolve `[]` abaixo do mínimo |
+| **8** | uma Liga de 8 | **igual**, byte a byte |
+| **9** | 8 jogam, **1 sobra** | **9/16 com 7 BYEs** — a 1ª fase tem UMA partida |
+| 13 | 8 jogam, 5 sobram | 13/16 com 3 BYEs |
+| 17 | 16 jogam, 1 sobra | 9/16 + 8/8, 7 BYEs |
+
+Ou seja: **o próximo degrau da Clássica é justamente o pior caso.** Fica dito porque é o primeiro
+lugar onde a (D) vai aparecer pra o jogador — e a alternativa, se um dia incomodar, é a chave só
+aceitar BYE até metade das vagas (com 9 ela formaria 8/8 e mandaria 1 pro leftover, como antes), o
+que é mecânica nova e não foi pedido.
+
+#### ⚠️ O `size` DA LIGA É O TAMANHO DA CHAVE — uma "Grande Liga" pode ter 13
+
+Ele é lido pelo `computePlacement`, pelas rodadas e pelo **título da tela**
+(`league.size === GRANDE_LIGA_SIZE ? '🌟 Grande Liga' : '🏆 Liga'`). Uma chave de 16 com 13
+jogadores **É** a Grande Liga em tudo que importa: 4 fases e as mesmas colocações. A consequência
+fica registrada aqui e trancada no teste.
+
+#### ⚠️ E ELA DESENTERROU UM DEFEITO DE RÓTULO NO `computePlacement`
+
+`eliminatedInSize = round.length * 2` é a **CAPACIDADE** da rodada, não a **OCUPAÇÃO**. Numa chave
+de 16 com 13 jogadores, quem cai na primeira fase era anunciado como **"9º–16º Lugar"** — um 14º,
+15º e 16º que **não existem**.
+
+- Hoje o teto é `min(capacidade, quantos entraram)`, contado da rodada 0 → **"9º–13º Lugar"**.
+- **⚠️ NUMA CHAVE CHEIA OS DOIS NÚMEROS COINCIDEM**, então isto **não muda um caractere** do que já
+  está no ar — há trava comparando com o rótulo de antes na chave de 16 e na de 8.
+- E o `nextSize` virou `round.length` (quantos **SOBREVIVEM** a rodada), que é o mesmo
+  `eliminatedInSize/2` de antes quando a chave está cheia — e o certo quando ela não está.
+- **⚠️ COM 9 NUMA CHAVE DE 16 A FAIXA TEM UM LUGAR SÓ:** *"9º–9º Lugar"* se leria como defeito, então
+  ali sai **"9º Lugar"**.
+
+#### ⚠️ E DUAS TRAVAS MINHAS PASSARAM EM BRANCO — as duas do CLIENTE
+
+Elas mediam a **PRESENÇA** (o nome da função, o nome da variável) — e presença **sobrevive a `= []`
+e a `= 0`**: com o cliente divergindo do servidor, as duas ficaram verdes. Só a conferência de
+acusação pegou.
+
+Hoje os **três** trechos duplicados (`dividirEmChaves`, o bloco do agrupamento e o
+`computePlacement`) são comparados **BYTE A BYTE** entre os dois arquivos, mais um caso cobrando que
+o agrupamento antigo não sobre em nenhum dos dois. Uma divergência ali faz a **MESMA liga terminar
+diferente no cliente e no servidor** — sem erro, e só na hora do sorteio.
+
+**NO MOTOR, NADA:** `MOTOR 2d6a83f24cf1 / DIARIO 72e61601d1fb`, idêntico em 900 batalhas semeadas —
+e o instrumento é sensível (com o `CRIT_BASE` em 1/8 os dois hashes mudam). Bateria: **41 de 41**.
+
+**Medido a 320px, no navegador**, nas duas telas: N=13 (uma chave de 16, 3 BYEs) em **305×1.732px** e
+N=20 (12/16 + 8/8, 4 BYEs) em **305×2.623px** — **nenhuma rolagem lateral**, **zero textos cortados**,
+todos os `<h2>` em uma linha (inclusive *"🎽 Sua Liga — 🌟 Grande Liga"*), a linha do BYE em **53px**
+contra 77 de um confronto normal.
+
+`tools/test-chaveamento.js` foi a **97 asserções**, e a que importa é a de **PONTA A PONTA**: ela
+roda o `drawCycle` de VERDADE contra o Firestore em memória com **13 inscritos** e cobra que a liga
+se forme, que os 13 entrem, que o **leftover fique VAZIO**, que os 3 BYEs nasçam resolvidos e já
+promovidos na posição certa, e que **nenhum deles ganhe terreno** — mais **7** (continua sem formar,
+os 7 pro leftover) e **24** (16+8, zero BYE). Todos os outros casos chamam o `dividirEmChaves` e o
+`buildRounds` na mão e **passariam com a chamada órfã**.
+**Conferido que os 10 defeitos religados acusam** (1 a 9 falhas cada).
 
 ## A POKÉDEX CONTA 251, E A BARRA NUNCA FECHA (23/09/2026)
 
