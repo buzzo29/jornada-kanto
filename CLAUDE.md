@@ -16250,6 +16250,13 @@ pokemons dele ganha + 3 levels"*.
 a carta não chega a existir pra quem não é. Sem isso ela apareceria trancada — e um cadeado que
 ninguém consegue abrir é pior que carta nenhuma.
 
+> **⚠️ ISTO É HISTÓRIA desde 23/09/2026: a CARTA saiu do sorteio** — a travessia virou uma caixa
+> na tela de FIM da jornada, ao lado da Elite 4 (ver **A TRAVESSIA SAIU DA JORNADA E FOI PRO FIM
+> DELA**, logo abaixo). O que esta seção continua descrevendo inteiro são as **quatro restrições de
+> time**, as **2 chances por desafio** e o **prêmio de +3 níveis** — essas não mudaram. O que virou
+> história é tudo que fala do SORTEIO da carta, do `ILHAS_TIME_MINIMO` e do teto de uma por
+> jornada (que hoje é o `game.ilhasFeita`).
+
 ### ⚠️ COPIAR OS CINCO JOGOS OU PÔR UM CONTEXTO? A pergunta foi do pedido, e ela foi MEDIDA
 
 | | |
@@ -16441,6 +16448,199 @@ aplica de volta e cobra a visita e o surfista de pé), e o trecho 0 passa pelo m
 - **o fluxo de ponta a ponta no navegador** (entrar → jogar os cinco → voltar) não foi exercitado:
   o que está medido é cada peça e o estado, não a travessia inteira num navegador;
 - **a Seleção não tem restrição de time**, e é o desenho — mas ela conta pro prêmio.
+
+
+## ⚠️ A TRAVESSIA SAIU DA JORNADA E FOI PRO FIM DELA (23/09/2026)
+
+Pedida assim: *"tire o acesso a ilhas laranjas durante a jornada, como opção de terceira rota. Faça
+com que ela apareça sempre na mesma tela que aparece para enfrentar a Elite 4, no fim da jornada, e
+o treinador só consegue acessar se um dos pokemons do time tiver Surf, então quando ele clicar no
+botão para entrar nas Ilhas Laranjas e ele não ter um pokemon que tem Surf, porém ele tem o HM03,
+exiba um modal ... caso ele não tenha o HM03, exibir ..."*.
+
+**Ela era a TERCEIRA ROTA DE CHAVE** (com a Mata Fechada e a Montanha Sagrada), sorteada em 1 de
+cada 4 trechos pra quem tivesse o time cheio. Hoje ela é uma caixa na tela de fim da jornada, ao
+lado da caixa da Elite 4 — e tudo que a seção acima descreve sobre o SORTEIO virou história.
+
+### ⚠️ O ALCANCE MUDOU MUITO, E É O NÚMERO QUE JUSTIFICA A MUDANÇA
+
+A porta velha tinha **dois filtros em série**, e o segundo era invisível até o jogador chegar nele:
+
+| | |
+|---|---|
+| jornadas que **VIAM** a carta alguma vez | **60,6%** |
+| e ela vinha **TRANCADA** sem um surfista **naquele trecho** | — |
+
+Medido agora, com o bot jogando 600 jornadas inteiras:
+
+| | |
+|---|---|
+| jornadas **CONCLUÍDAS** com um surfista no time | **93,3%** (318 de 341) |
+| jornadas (todas) com um surfista no time no fim | 87,0% |
+| quantos dos seis surfam, em média | **2,02** |
+
+**⚠️ E A DIFERENÇA NÃO É SÓ O NÚMERO: é QUANDO ele é medido.** A carta perguntava *"você tem um
+surfista AGORA, no trecho 4?"*; a tela de fim pergunta no fim da jornada, quando o time já está
+montado — e é por isso que ela sobe pra 93%. Os **65 surfistas** são 26% do bestiário e **40 das
+138 evoluções finais**, então um time de seis quase sempre tem um.
+
+### ⚠️ O CADEADO MUDO VIROU UM CAMINHO — e é isso que o pedido pede
+
+Na carta, quem não tinha Surf via um card **apagado** e mais nada. Aqui o botão **sempre responde**,
+e a recusa diz o que fazer:
+
+| o estado | o modal |
+|---|---|
+| **tem o HM03** | *"É necessário que algum Pokemon do seu time saiba o movimento Surf(HM03). Ensinar o Surf para seu time atual?"* — com o botão que ensina |
+| **não tem** | *"É necessário que algum Pokemon do seu time saiba o movimento Surf(HM03). Para obte-lo, tenha todos os pokemons da Zona Safári na Pokedex."* |
+
+As duas frases foram ditadas no pedido e são trancadas **palavra por palavra**, como as dos golpes
+especiais. A primeira é uma **PERGUNTA** porque ali há o que fazer; a segunda é um aviso, porque o
+caminho é longo (as 17 da Zona de Safári) e não cabe num botão.
+
+- **⚠️ O ATALHO É O `ensinarMaquinaNesteTime`, e não o `abrirEnsinarHm` cru.** Aquele já fixa o time
+  **ABERTO** e guarda a volta — e o pedido diz *"ensinar o Surf para seu time ATUAL"*. Com o
+  `abrirEnsinarHm`, o jogador cairia na lista de **TIMES**: uma pergunta cuja resposta já está na
+  tela. É a mesma decisão que o picker da travessia já tinha tomado.
+- **⚠️ E QUEM TEM A MÁQUINA MAS NENHUM CANDIDATO NO TIME não recebe a pergunta:** o HM03 na conta
+  não garante que **ALGUM** dos seis aprende Surf, e um botão que abre uma lista vazia é pior que
+  botão nenhum. Medido: um time de Gengar e Onix mostra *"Nenhum dos seis aprende Surf"* e nenhum
+  botão. É o único ramo desta tela que a medição no navegador não alcançou, e ele tem trava própria.
+- **⚠️ QUEM VALIDA É A AÇÃO**, nunca o botão: um toque forjado no console não atravessa sem ninguém
+  que nade. A regra da casa, e há caso de teste.
+
+### ⚠️ ELA NÃO DEPENDE DA ELITE 4 — verificado (23/09/2026)
+
+Perguntado assim: *"só verifique que o usuario pode fazer o desafio das ilhas laranjas a qualquer
+momento em que ele vencer as 8 insignias, independente de ele ter vencido a elite 4 ou nao"* e, logo
+depois, *"mesmo se ele tiver vencido a elite 4 mas nao tenha jogado o desafio da ilha laranja, ele
+pode"*.
+
+**Pode nos dois casos — e isso foi MEDIDO, não lido.** A condição da caixa é o `won` do
+`renderJourneyEnd`, que é `game.badgesEarned.length === numGinasios()`: as **8 insígnias**, e mais
+nada. Nem o `ilhasNaJornadaHtml`, nem o `pedirIlhasDaJornada`, nem o `entrarNasIlhasDaJornada` leem
+o `eliteStatus`.
+
+**⚠️ O ÚNICO BLOQUEIO É O `ilhasFeita` — a matriz dos dois campos:**
+
+| `eliteStatus` | ainda **não** atravessou | **já** atravessou | *(o APOSENTAR, na mesma tela)* |
+|---|---|---|---|
+| **`null`** (nunca enfrentou a Elite) | **PODE** | não | — |
+| **`inProgress`** (no meio dela) | **PODE** | não | — |
+| **`champion`** | **PODE** | não | ✓ |
+| **`defeated`** | **PODE** | não | ✓ |
+
+A coluna da direita é a resposta da segunda pergunta: **campeão que ainda não jogou as Ilhas entra**,
+e o que fecha a porta é só já ter atravessado **naquela jornada**. A **AÇÃO** entra nos quatro
+estados também — não é só o botão aparecendo.
+
+**⚠️ O APOSENTAR É O CONTROLE, e ele é a metade que faz a medição valer:** ele fica na **MESMA
+tela** e **só** aparece com a Elite resolvida (2 de 4). Sem ele, um fixture em que os quatro
+estados não mudassem nada daria "4 de 4" e a trava não estaria medindo coisa nenhuma — é a lição do
+*fixture que não distingue os dois lados*.
+
+**⚠️ E TERMINAR A ELITE VOLTA PRO `journeyEnd`**, que é onde a caixa está: campeão e derrotado caem
+lá, e só quem está **no meio** dela vai pro `eliteHeal`. Sem isso a caixa existiria e seria
+**inalcançável** pra quem já jogou a Elite — há trava lendo essa linha.
+
+**E O PONTA A PONTA CONFIRMA O OUTRO LADO:** em **600 jornadas do bot**, as **221 concluídas**
+chegam ao `journeyEnd` com `eliteStatus: null` — ou seja **sem nunca terem enfrentado a Elite** — e
+a caixa está presente em **221 de 221**. O bot não joga a Elite, então esse é literalmente o caso
+"venceu as 8 e ainda não foi lá".
+
+**⚠️ E A REABERTURA DO SAVE TAMBÉM**, que é o caminho de quem fecha o jogo e volta noutro dia: o
+`journeyEnd` é tela segura de gravação, e nenhuma das redes de segurança do `applySavedState` (que
+existem pra Elite em batalha, evolução pendente e resultado sem resultado) o desvia. Medido o
+round-trip nos quatro estados: grava `journeyEnd`, reabre em `journeyEnd`, **e a caixa continua lá
+nos quatro**.
+
+**⚠️ E A TRAVA NOVA É A ÚNICA QUE PEGA UM DOS CASOS:** religando *"a caixa passa a exigir a Elite
+NÃO começada"*, as duas travas antigas (*a caixa está na tela*, *com o botão*) **passam** — porque o
+fixture delas já roda com `eliteStatus` nulo. Conferido: os **sete** defeitos de amarração à Elite
+acusam (1 a 14 falhas cada), inclusive *"o campeão é barrado"*, que é o caso perguntado.
+
+### ⚠️ DUAS COISAS QUE A CARTA DAVA DE GRAÇA E PRECISARAM DE CAMPO
+
+1. **UMA VEZ POR JORNADA.** Pela carta a regra vinha sozinha (ela sumia do trecho, pelo
+   `game.ilhasTrecho`); no fim da jornada **a tela fica lá pra sempre**, e sem uma marca o prêmio de
+   **+3 níveis** sairia de novo a cada visita, sem teto. Hoje é o `game.ilhasFeita`, escrito quando
+   a travessia termina.
+   **⚠️ E ELE FAZ A IDA E A VOLTA DO SAVE** — o `applySavedState` é explícito campo a campo, e um
+   campo que sai e não volta se perde num F5. Foi exatamente o que aconteceu com o `ilhasJornada`
+   até 22/09, e lá o custo era a travessia inteira; aqui seria o prêmio saindo de novo. Há trava
+   fazendo o **round-trip**, que é a única forma que pega isso.
+2. **PRA ONDE VOLTAR.** Agora são **DUAS portas com destinos diferentes**: pelo fim da jornada o
+   jogador volta pro `journeyEnd`, e pela **CARTA** — que um save antigo ainda pode ter na mão — ele
+   segue pro encontro selvagem do trecho, como as outras duas rotas de chave fazem. Sem o campo
+   (`ilhasJornada.volta`, repassado no `ilhasResultado`), quem entra pelo fim cairia num encontro
+   selvagem que aquela tela não tem.
+   **⚠️ A VOLTA ATRAVESSA O RESULTADO porque a visita é ANULADA antes do `seguirDasIlhas`** — e sem
+   o campo o `seguirDasIlhas` cai no encontro selvagem, que é o certo pra a porta velha, **inclusive
+   num save gravado antes deste campo existir**.
+
+### ⚠️ A ROTA E A CHAVE FICARAM DE PÉ, E O SORTEIO MORREU
+
+O que saiu foi o **sorteio**: o `ILHAS_TIME_MINIMO`, a `CHANCE_ILHAS` e o `ilhasSaemNoTrecho`
+(2.701 caracteres). O `ROTA_DAS_ILHAS` e a entrada `surf` do `ROTAS_DE_CHAVE` **continuam** — save
+parado na tela de escolha **COM a carta na mão** continua com ela funcionando, cadeado e tudo.
+Tirar os dois deixaria aquele card clicável levando a lugar nenhum, e é a mesma razão pela qual log
+velho nunca some deste jogo.
+
+**⚠️ E O `game.ilhasTrecho` CONTINUA SENDO GRAVADO E LIDO**: é ele que impede a carta de reaparecer
+num save que já a viu, enquanto aquela carta existir.
+
+**⚠️ E AS TRAVAS DO SORTEIO NÃO FORAM APAGADAS: elas viraram a trava da regra NOVA.** Sem elas,
+alguém reintroduz a carta no `cartasDeRota` e a rota volta ao meio da jornada **sem ninguém ver** —
+é a mesma decisão das que viraram do avesso quando as Ilhas abriram pra todo mundo. Hoje elas
+varrem **1.280 trechos** (20 slots × 20 gerações × 8) cobrando **zero** cartas, e um segundo caso
+cobra que a **mata e a montanha continuam saindo**: sem ele, uma guarda que matasse as TRÊS passaria
+na primeira linha, porque zero é zero.
+
+### O QUE ISSO CUSTOU AO MOTOR: NADA
+
+`MOTOR 2d6a83f24cf1 / DIARIO 72e61601d1fb`, **idêntico ao HEAD** em 900 batalhas semeadas — e o
+instrumento é sensível (com o `CRIT_BASE` em 1/8 os dois hashes mudam). O smoke da jornada roda
+**600 jornadas com 0 falhas**, atravessando 22 telas.
+
+**⚠️ E O NÚMERO ABSOLUTO DA IMPRESSÃO SÓ VALE COMPARADO COM O MESMO SCRIPT.** Ele mudou de
+`5481ce57abca` pra `2d6a83f24cf1` sem que o motor tivesse mudado — o que mudou foi o painel do
+script. O que prova alguma coisa é rodar o MESMO script contra as duas cópias, e foi isso que foi
+feito (`git show HEAD:index.html` contra a árvore).
+
+**⚠️ E O PARÂMETRO DO SMOKE É `--runs`, NÃO `--n`:** um `--n 1200` roda os **20** do padrão e
+imprime *"20 jornadas completas"* na mesma linha — uma medição que parece grande e é pequena. Foi
+assim que três smokes desta sessão mediram 20 jornadas achando que mediam centenas.
+
+**Medido a 320px, no navegador, nas cinco telas** (com Surf, sem Surf, já atravessada e os dois
+modais): **nenhuma rola pro lado** (305 de 320) e **nenhum texto cortado**.
+
+| | |
+|---|---|
+| a caixa das Ilhas, **com** um surfista | **281×283px** (ela nomeia quem leva o time, com o sprite) |
+| **sem** surfista | 281×226px |
+| já atravessada | 281×162px |
+| o modal de **ensinar** | **265×307px**, a frase em 4 linhas, com os dois botões |
+| o modal de **como conseguir** | 265×272px, a frase em 5 linhas, só o Fechar |
+
+A caixa fica **logo abaixo da caixa da Elite** (281×214px), que é o que o pedido diz — as duas são o
+que há pra fazer quando a jornada acaba.
+
+### AS LIÇÕES DE TESTE QUE SAÍRAM DAQUI
+
+1. **⚠️ O CONTADOR DO SCRIPT DE ACUSAÇÃO CONTOU `FALHA` E O TESTE IMPRIME `FALHOU`** — a **terceira**
+   vez desta armadilha neste projeto. Os 13 defeitos religados apareciam como *"1 falha"* (o sumário
+   `N FALHA(S)`), e um deles **estava passando em branco** escondido nesse 1. Um "1 falha" idêntico
+   em treze casos diferentes é o sinal.
+2. **⚠️ E O DETECTOR DE "MORREU" DAVA FALSO POSITIVO:** o `TypeError: snap.forEach` do stub de saves
+   acontece **em toda rodada**, inclusive no build certo. Detector que dispara sempre não é detector.
+3. **⚠️ O HEREDOC COMEU AS BARRAS DUPLAS PELA QUARTA VEZ NESTA SESSÃO:** a regex que procura a
+   chamada do modal no render virou outra coisa (os parênteses escapados viraram grupo e as chaves,
+   quantificador), e ela **falhava com o código certo**. O caminho seguro é o `indexOf`, que não tem
+   o que escapar.
+4. **⚠️ E UMA TRAVA MINHA DEIXOU RASTRO E DERRUBOU A VIZINHA:** ela trocava o `saveSlots[0]` pra
+   medir o ramo sem candidato e o **reconstruía** no fim, com o time da jornada dentro — e a trava
+   do **Resgate**, que conta os surfistas dos SAVES, caiu. O save original é **guardado**, nunca
+   remontado.
 
 ## ⚠️ O SAVE ENTRAVA DIRETO NAS ILHAS LARANJA (22/09/2026)
 
@@ -19445,7 +19645,108 @@ golpes em **826px**, cards de golpe em 243px, **todos os `<h2>` em uma linha**, 
 cortado e **sem rolagem lateral** em nenhuma das três.
 
 `tools/test-liga-pro.js` foi a **157 asserções**, e **os 14 defeitos religados acusam** (1 a 12
-falhas cada).
+falhas cada). ⚠️ **Ele foi a 170 horas depois** -- ver a seção seguinte.
+
+
+### BRONZE, PRATA E OURO — E A ROTAÇÃO MUDOU DE ORDEM (23/09/2026)
+
+Pedido assim: *"A cada vez que acontece uma Liga Pro, uma faixa de level é selecionada seguindo a
+ordem: Liga Pro Bronze: Level 15-30. Liga Pro Prata: Level 35-50. Liga Pro Ouro: Level 55-70"* —
+mais a frase do mínimo de 8, o Level maior no card dos 12 e *"crie um quadro indicando qual é a
+faixa de level que é a liga atual"*.
+
+#### ⚠️ A ORDEM ERA OUTRA, E REORDENAR A TABELA MEXE EM QUEM JÁ ESTÁ INSCRITO
+
+A `PRO_FAIXAS` era `[[55,70],[15,30],[35,50]]` — a ordem do pedido de quando a liga nasceu. Hoje é
+a escada **Bronze → Prata → Ouro**.
+
+**⚠️ E ISSO NÃO É SÓ TROCAR TRÊS PARES DE NÚMEROS: o `proFaixa` do ciclo é um ÍNDICE.** Reordenar
+muda a faixa de **todo ciclo já gravado** — e como o bolo é semeado por `uid + cycleId + faixa`, o
+time de quem já se inscreveu deixa de bater. O filtro do `drawCycle` roda **ANTES do leftover**,
+então ele **descartaria o jogador em silêncio**: ele não vai pra liga e nem volta pra fila.
+
+**Medido no Firestore antes de mexer:** o ciclo aberto (`1790208000000`) tinha `proFaixa: 0` e
+**1 inscrito**. Por isso a virada veio com o carimbo reconciliado em produção — o ciclo aberto foi
+para o índice que continua sendo 55-70 (o **2** na ordem nova), e o `proFaixaIdx` junto.
+**A pedido:** *"pode deixar que essa primeira fique no level que está e siga o ciclo que
+combinamos"*. Conferido: o bolo daquele jogador sai **idêntico** antes e depois.
+
+#### ⚠️ O NOME DO TIER SAI DO NÍVEL, NUNCA DO ÍNDICE
+
+`proNomeDaFaixa` ordena as faixas **por nível** e usa a posição nessa ordem: a mais baixa é a
+Bronze, a do meio a Prata, a mais alta a Ouro.
+
+Indexado pela posição na **rotação**, reordenar renomearia os três — e quem viu *"Liga Pro Prata:
+Level 35-50"* ontem leria *"Ouro: 35-50"* hoje. É a mesma família do rótulo que descreve uma tabela
+e envelhece quando ela muda.
+
+- **A tabela de nomes vive SÓ NO CLIENTE**, como o `MOVE_BY_TYPE` e o `TIPO_DO_ESPECIAL`: o
+  servidor não tem tela, e o que ele precisa da faixa são os dois números.
+- **⚠️ E O RÓTULO TEM UM DONO** (`proRotuloDaFaixa`), lido pelas três telas que o mostram: a
+  descrição, o quadro e o picker. Escritos em separado, o quadro diria "Prata" e a descrição diria
+  outra coisa no primeiro ajuste — e o nome do tier é justamente o que liga as duas leituras.
+- **⚠️ E A LISTA DA DESCRIÇÃO SAI NA ORDEM DA ROTAÇÃO**, não ordenada por nível: a frase diz
+  *"seguindo a ordem"*, então é a rotação que ela descreve. Hoje as duas coincidem; no dia em que a
+  rotação mudar, é a rotação que a lista tem que mostrar. Há trava que religa a ordem inversa.
+
+#### O QUADRO DA RODADA — E ELE DIZ QUAL VEM DEPOIS
+
+A faixa já estava na tela, mas como uma **linha** dentro do bloco de inscrição: ela sumia
+justamente depois de o jogador entrar, que é quem vai lutar nela. Hoje é um quadro próprio, acima
+do contador, com três linhas — `A RODADA DE AGORA` · `Liga Pro Ouro` · `Level 55-70` — mais a
+**próxima** da rotação (*"Depois dela vem a Liga Pro Bronze: Level 15-30"*), a pedido.
+
+- **⚠️ ELE SAI DA ENTRADA DO CICLO, não do `game.proFaixa`:** aquele campo só é preenchido quando o
+  picker abre, e a tela da Liga pode nunca ter passado por lá.
+- **⚠️ A PRÓXIMA É UMA PROMESSA CONDICIONAL**, e a frase diz *"depois dela"* e não *"amanhã"*: a
+  faixa só anda quando uma liga **acontece**, e com menos de 8 inscritos a fila continua nesta
+  mesma. Quem conta a condição é a descrição logo acima.
+- **A linha velha saiu**: com as duas, a tela diria a mesma coisa duas vezes na mesma rolagem.
+- **⚠️ E A TRAVA DELE CASAVA COM A CLASSE PELA METADE:** `/pro-faixa-box/` casa com
+  `pro-faixa-box-QUALQUERCOISA`, e foi assim que o defeito religado **passou em branco** na
+  conferência de acusação. Hoje ela procura `class="box pro-faixa-box"` inteiro. É a armadilha do
+  padrão largo demais, agora dentro da própria trava.
+
+#### O LEVEL DO CARD DOS 12: .52rem → .58rem, E SÓ NA PRO
+
+Medido a 320px: **8,32px → 9,28px**, com a cor indo do `--muted` para o `--ink`. Ele **não passa do
+nome** (que é `.58rem`): maior, a hierarquia do card inverte e o olho lê o número antes da espécie.
+
+**⚠️ E ELE É ESCOPADO NO `.pro-bolo`**, porque o card é o **MESMO** da Seleção da Ilha Kumquat, com
+a mesma classe. Sem o escopo, uma tela que ninguém pediu mudaria junto — e lá a faixa de nível não
+é a mecânica da liga, enquanto aqui é: os 12 saem todos dentro dela, e o que separa um do outro é
+justamente o nível. Há trava cobrando que a Seleção continue em `.52rem`.
+
+#### ⚠️ E A FAIXA NOVA DESENTERROU UMA TRAVA QUE MEDIA O PAINEL
+
+A do fluxo de golpes cobrava *"todos com 3 golpes"* — verdade enquanto a rotação começava no
+**Ouro**, e falsa na **Bronze**. Medido em 720 sorteios por faixa, quantos golpes de dano a espécie
+aprende **naquele nível**:
+
+| faixa | 3 golpes | 2 | 1 | nenhum |
+|---|---|---|---|---|
+| **Bronze 15-30** | **43,6%** | 38,8% | 15,6% | 2,1% |
+| Prata 35-50 | 89,4% | 6,9% | 2,6% | 1,0% |
+| Ouro 55-70 | **94,3%** | 1,8% | 2,9% | 1,0% |
+
+**Isso não é defeito: é o auto-preenchimento funcionando.** Quem tem `MAX_GOLPES` ou menos
+disponíveis não vê tela e leva o que dá — a mesma regra da captura na jornada. A trava passou a
+cobrar **"cada um leva o que dá, até 3"**, que é a regra; o "3" era o painel.
+
+⚠️ **E ISSO É UMA CONSEQUÊNCIA REAL DA ORDEM NOVA:** a Bronze é a rodada em que a escolha de golpes
+quase não é pedida (0,9 tela de 6, contra 5,0 na Ouro), e em que quase metade dos times entra com
+menos de três golpes por pokémon. Ela é a mais fraca das três **por construção**, e agora é a
+primeira da rotação.
+
+**NO MOTOR, NADA:** `MOTOR 5481ce57abca / DIARIO a4c6725aa4aa`, idêntico em 900 batalhas semeadas —
+a faixa muda QUAIS pokémon são sorteados, e o motor de batalha não sabe da liga.
+
+**Medido a 320px, no navegador:** a tela da Pro em **305×1.589px** (era 1.503), o quadro em
+**281×117px** com a linha da próxima em 1 linha, os pickers em 996px nas duas faixas, e **nenhuma
+rolagem lateral nem texto cortado** em nenhuma das três.
+
+`tools/test-liga-pro.js` foi a **170 asserções**, e **os 11 defeitos religados acusam** — três deles
+passavam em branco até as travas cobrarem o TEXTO das frases e a classe inteira do quadro.
 
 ## A POKÉDEX CONTA 251, E A BARRA NUNCA FECHA (23/09/2026)
 

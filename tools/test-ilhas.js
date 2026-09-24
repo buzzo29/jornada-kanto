@@ -853,10 +853,15 @@ console.log('=== O ANUNCIO APARECE UMA VEZ SO ===');
    ============================================================================ */
 function blocoDaTravessia(){
   console.log('\n=== A TRAVESSIA PELA JORNADA ===');
-  const timeDe = (n, comSurf) => Array.from({ length: n }, (_, i) => ({
-    id: 'm' + i, speciesId: ['venusaur','jolteon','snorlax','lapras','gengar','onix'][i],
-    level: 40 + i, ataques: (comSurf && i === 3) ? ['surf','icebeam'] : ['tackle']
-  }));
+  /* ⚠️ O TIME SAI DO `createInstance`, e não de um objeto montado à mão: a tela de FIM da jornada
+     desenha os TIPOS de cada um (`typesHtml(p.types)`), e um fixture sem `types` estoura ali --
+     ou seja a trava morreria em vez de falhar, que é pior. */
+  const timeDe = (n, comSurf) => Array.from({ length: n }, (_, i) => {
+    const p = S.createInstance(['venusaur','jolteon','snorlax','lapras','gengar','onix'][i], 40 + i);
+    p.id = 'm' + i;
+    p.ataques = (comSurf && i === 3) ? ['surf','icebeam'] : ['tackle'];
+    return p;
+  });
   /* ⚠️ O FIXTURE PRECISA DE SAVES CAMPEÕES, senão o `towerEligiblePokemon` devolve ZERO e as
      quatro travas de restrição não distinguem nada -- foi assim que três delas passaram em branco
      na conferência de acusação. Com dois saves de 6, fora da visita são 12 e dentro são 6. */
@@ -881,103 +886,192 @@ function blocoDaTravessia(){
   ok('fora da visita o contexto é nulo', !S.naJornadaDasIlhas());
 
   /* ---------------------------------------------------------------- 2) A PORTA */
-  /* ⚠️ VARRENDO, e não um trecho de um save: a primeira versão testava só o trecho 3 do slot 0,
-     cujo dado JÁ dava não -- ela passava em branco com a guarda removida. É a terceira vez que
-     a amostra única engana nesta feature. */
-  const varre = () => { let n = 0;
-    for(let slot = 0; slot < 10; slot++) for(let gen = 0; gen < 10; gen++){
-      g.currentSaveSlot = slot; g.saveGen = gen;
-      for(let l = 0; l < 8; l++) if(S.ilhasSaemNoTrecho(l)) n++; }
-    g.currentSaveSlot = 0; g.saveGen = 0; return n; };
-  /* ⚠️ ELA ABRIU PRA TODO MUNDO EM 23/09/2026, a pedido -- e esta trava é a MESMA de antes, virada
-     do avesso: ela cobrava que a rota NÃO existisse sem admin (a guarda morava no sorteio, porque
-     uma carta trancada que ninguém consegue abrir é pior que carta nenhuma). Hoje ela cobra o
-     contrário, e continua existindo pelo mesmo motivo: sem ela, alguém reintroduz a porta e a
-     travessia volta a ser letra morta pra 99% dos jogadores SEM NINGUÉM VER -- que foi exatamente
-     o que aconteceu de 21 a 23/09, quando as outras SEIS entradas abriram e esta ficou. */
-  g.ehAdmin = false;
-  ok('a rota existe pra quem NÃO é admin', varre() > 0,
-     'ela é a sétima entrada das Ilhas, e ficou fechada dois dias depois de as outras seis abrirem');
-  g.ehAdmin = true;
-  const comAdmin = varre();
-  g.ehAdmin = false;
-  ok('  e ser admin não muda NADA no sorteio', comAdmin === varre(), comAdmin + ' trechos');
-  g.team = timeDe(5, true);
-  ok('com o time incompleto tampouco', varre() === 0,
-     'são ' + S.ILHAS_TIME_MINIMO + ' pokémon: os cinco desafios usam o time da jornada');
+  /* ⚠️ A TRAVESSIA SAIU DA JORNADA EM 23/09/2026 (a pedido: *"tire o acesso a ilhas laranjas
+     durante a jornada, como opção de terceira rota. Faça com que ela apareça sempre na mesma tela
+     que aparece para enfrentar a Elite 4, no fim da jornada"*).
+
+     ⚠️ E ESTAS TRAVAS NÃO FORAM APAGADAS: elas viraram a trava da regra NOVA. Sem elas, alguém
+     reintroduz a carta no `cartasDeRota` e a rota volta ao meio da jornada SEM NINGUÉM VER -- é a
+     mesma decisão das que viraram do avesso quando as Ilhas abriram pra todo mundo. */
+  const varreCarta = () => { let n = 0;
+    for(let slot = 0; slot < 20; slot++) for(let gen = 0; gen < 20; gen++){
+      g.currentSaveSlot = slot; g.saveGen = gen; g.ilhasTrecho = null;
+      for(let l = 0; l < 8; l++) if(S.cartasDeRota(l).indexOf(S.ROTA_DAS_ILHAS.id) >= 0) n++; }
+    g.currentSaveSlot = 0; g.saveGen = 0; g.ilhasTrecho = null; return n; };
+  /* ⚠️ VARRENDO, e não um trecho de um save: a primeira versão desta família testava só o trecho 3
+     do slot 0, cujo dado JÁ dava não -- ela passava em branco com a guarda removida. É a terceira
+     vez que a amostra única engana nesta feature. */
   g.team = timeDe(6, true);
-
-  /* ⚠️ A CHANCE É MEDIDA EM MUITOS SAVES, nunca num só: o primeiro smoke usou o slot 0/geração 0,
-     os oito dados dele deram acima de 0,25 e a conclusão foi "a rota nunca sai". É a mesma lição
-     que este projeto registra sobre o σ binomial -- amostra única não é medição. */
-  let saiu = 0, tot = 0;
+  ok('a carta das Ilhas não sai em trecho NENHUM', varreCarta() === 0,
+     '1.280 trechos varridos (20 slots x 20 gerações x 8)');
+  /* ⚠️ E AS OUTRAS DUAS CONTINUAM SAINDO: sem este caso, uma guarda que matasse as TRÊS passaria
+     na linha acima -- zero é zero, e a mata e a montanha não foram tocadas. */
+  let outras = 0;
   for(let slot = 0; slot < 20; slot++) for(let gen = 0; gen < 20; gen++){
     g.currentSaveSlot = slot; g.saveGen = gen;
-    for(let l = 0; l < 8; l++){ tot++; if(S.ilhasSaemNoTrecho(l)) saiu++; }
+    for(let l = 0; l < 8; l++) if(S.temRotaDoCorte(l) || S.montanhaSaiNoTrecho(l)) outras++;
   }
-  const taxa = saiu / tot;
-  ok('a taxa fica perto da constante', taxa > 0.15 && taxa < S.CHANCE_ILHAS + 0.03,
-     (100*taxa).toFixed(1) + '% (a constante é ' + (100*S.CHANCE_ILHAS) + '%, e a mata/montanha comem parte)');
-
-  /* ⚠️ SEMEADO: sem isso bastaria sair do save e voltar até a rota aparecer */
-  g.currentSaveSlot = 3; g.saveGen = 7;
-  const a1 = [0,1,2,3,4,5,6,7].map(l => S.ilhasSaemNoTrecho(l)).join('');
-  const a2 = [0,1,2,3,4,5,6,7].map(l => S.ilhasSaemNoTrecho(l)).join('');
-  ok('  e o sorteio é SEMEADO pelo save', a1 === a2, a1);
-  g.saveGen = 8;
-  const a3 = [0,1,2,3,4,5,6,7].map(l => S.ilhasSaemNoTrecho(l)).join('');
-  ok('  e a geração do slot troca o perfil', a1 !== a3, a1 + ' vs ' + a3);
-
-  /* ⚠️ UMA TERCEIRA CARTA POR TRECHO: com duas seriam QUATRO, e a promessa é de uma terceira */
-  let colisao = 0, cartas3 = 0;
-  for(let slot = 0; slot < 20; slot++) for(let gen = 0; gen < 20; gen++){
-    g.currentSaveSlot = slot; g.saveGen = gen;
-    for(let l = 0; l < 8; l++){
-      const n = [S.temRotaDoCorte(l), S.montanhaSaiNoTrecho(l), S.ilhasSaemNoTrecho(l)].filter(Boolean).length;
-      if(n > 1) colisao++;
-      const cs = S.cartasDeRota(l);
-      if(cs.length > 3) cartas3++;
-    }
-  }
-  ok('nunca duas rotas de chave no mesmo trecho', colisao === 0, colisao + ' colisões');
-  ok('  e nenhum trecho passa de TRÊS cartas', cartas3 === 0, cartas3 + ' trechos com 4+');
-
-  /* ⚠️ UMA TRAVESSIA POR JORNADA (a pedido). Ela é medida VARRENDO a jornada inteira de muitos
-     saves -- e a conta tem que passar pelo `cartasDeRota`, que é quem MARCA: chamando só o
-     `ilhasSaemNoTrecho` a marca nunca seria posta e a trava mediria o jogo de antes da regra. */
-  let maisDeUma = 0, comTravessia = 0;
-  for(let slot = 0; slot < 20; slot++) for(let gen = 0; gen < 20; gen++){
-    g.currentSaveSlot = slot; g.saveGen = gen; g.ilhasTrecho = null;
-    let n = 0;
-    for(let l = 0; l < 8; l++) if(S.cartasDeRota(l).indexOf(S.ROTA_DAS_ILHAS.id) >= 0) n++;
-    if(n > 1) maisDeUma++;
-    if(n > 0) comTravessia++;
-  }
-  ok('a travessia sai NO MÁXIMO uma vez por jornada', maisDeUma === 0,
-     maisDeUma + ' jornadas com duas ou mais (de 400)');
-  /* ⚠️ E A OUTRA METADE: ela continua SAINDO. Sem este caso, uma guarda que a matasse de vez
-     passaria na linha acima -- zero é zero. */
-  ok('  e ela continua saindo em boa parte das jornadas', comTravessia > 200,
-     comTravessia + ' de 400 veem a travessia');
-
-  /* ⚠️ NO MESMO TRECHO ELA CONTINUA APARECENDO, e isso não é detalhe: o `renderRouteCardsBlock`
-     remonta as cartas quando elas vêm vazias (a auto-recuperação de save antigo), e sem isso ele
-     apagaria a própria carta que acabou de recuperar. */
-  g.currentSaveSlot = 0; g.saveGen = 0; g.ilhasTrecho = null;
-  let onde = -1;
-  for(let slot = 0; slot < 30 && onde < 0; slot++){
-    g.currentSaveSlot = slot; g.ilhasTrecho = null;
-    for(let l = 0; l < 8; l++) if(S.cartasDeRota(l).indexOf(S.ROTA_DAS_ILHAS.id) >= 0){ onde = l; break; }
-  }
-  ok('(o painel achou um trecho com a travessia)', onde >= 0, 'trecho ' + onde);
-  ok('  no MESMO trecho ela continua saindo', S.cartasDeRota(onde).indexOf(S.ROTA_DAS_ILHAS.id) >= 0,
-     'senão a auto-recuperação das cartas apagaria a carta que ela acabou de recuperar');
-  const seguintes = [];
-  for(let l = 0; l < 8; l++) if(l !== onde && S.cartasDeRota(l).indexOf(S.ROTA_DAS_ILHAS.id) >= 0) seguintes.push(l);
-  ok('  e em nenhum outro', seguintes.length === 0, 'saiu também em ' + seguintes.join(','));
-  ok('  a marca guarda o trecho', g.ilhasTrecho === onde, String(g.ilhasTrecho));
-  g.ilhasTrecho = null;
   g.currentSaveSlot = 0; g.saveGen = 0;
+  ok('  e a mata e a montanha continuam saindo', outras > 100, outras + ' trechos');
+  /* ⚠️ E O SORTEIO MORREU DE VEZ: a função, a chance e o mínimo de time saíram junto. Letra morta
+     que fica é o que faz alguém achar que a regra ainda existe. */
+  ok('  e o sorteio da carta não existe mais',
+     typeof S.ilhasSaemNoTrecho === 'undefined' && typeof S.CHANCE_ILHAS === 'undefined',
+     typeof S.ilhasSaemNoTrecho + ' / ' + typeof S.CHANCE_ILHAS);
+  /* ⚠️ MAS A ROTA E A CHAVE FICAM DE PÉ: save parado na tela de escolha COM a carta na mão
+     continua com ela funcionando. Tirar as duas deixaria aquele card clicável levando a lugar
+     nenhum -- e é a mesma razão pela qual log velho nunca some deste jogo. */
+  ok('  mas a rota e a chave do Surf continuam existindo (save antigo com a carta na mão)',
+     !!S.ROTA_DAS_ILHAS && !!S.ROTAS_DE_CHAVE.surf, JSON.stringify(Object.keys(S.ROTAS_DE_CHAVE)));
+
+  /* --------- A PORTA NOVA: a tela de fim da jornada --------- */
+  const semIlhas = () => { g.ilhasFeita = false; g.ilhasAviso = null; g.ilhasJornada = null; };
+  g.badgesEarned = ['Pedra','Cascata','Trovão','Arco-Íris','Alma','Pântano','Vulcão','Terra'];
+  g.team = timeDe(6, true); semIlhas();
+  const telaFim = () => { g.screen = 'journeyEnd'; return S.renderJourneyEnd(); };
+  ok('a caixa das Ilhas está na tela de fim da jornada', /Ilhas Laranja/.test(telaFim()));
+  ok('  com o botão de atravessar', /pedirIlhasDaJornada\(\)/.test(telaFim()));
+  /* ⚠️ ELA FICA AO LADO DA CAIXA DA ELITE, que é o que o pedido diz (*"na mesma tela que aparece
+     para enfrentar a Elite 4"*) -- e por isso ela depende das 8 insígnias, como a de lá. */
+  const antesB = g.badgesEarned;
+  g.badgesEarned = ['Pedra'];
+  ok('  e NÃO aparece sem as 8 insígnias', !/pedirIlhasDaJornada/.test(telaFim()));
+  g.badgesEarned = antesB;
+
+  /* --------- ⚠️ ELA NÃO DEPENDE DA ELITE 4, E ISSO É PEDIDO --------- */
+  /* ⚠️ A CONDIÇÃO É *AS 8 INSÍGNIAS*, nunca o `eliteStatus`: o jogador atravessa a qualquer momento
+     depois de fechar os ginásios -- antes de enfrentar a Elite, no meio dela, campeão ou derrotado.
+     A caixa das Ilhas divide a tela com a da Elite, e as duas são coisas independentes.
+     ⚠️ E O CONTROLE É A CAIXA DE APOSENTAR, que fica na MESMA tela e SÓ aparece com a Elite
+     resolvida: sem ele, um fixture em que os quatro estados não mudassem nada passaria aqui e a
+     trava não estaria medindo nada -- é a lição do fixture que não distingue os dois lados. */
+  {
+    const antesE = g.eliteStatus;
+    const ESTADOS = [null, 'inProgress', 'champion', 'defeated'];
+    let comCaixa = 0, comBotao = 0, comAposentar = 0, entrou = 0;
+    ESTADOS.forEach(st => {
+      g.eliteStatus = st; semIlhas();
+      const h = telaFim();
+      if(/Ilhas Laranja/.test(h)) comCaixa++;
+      if(h.indexOf('pedirIlhasDaJornada()') >= 0) comBotao++;
+      if(/[Aa]posentar/.test(h)) comAposentar++;
+      /* e a AÇÃO também: o botão é apresentação, e quem entra de verdade é ela */
+      g.team = timeDe(6, true); semIlhas();
+      S.pedirIlhasDaJornada();
+      if(g.screen === 'ilhas' && !!g.ilhasJornada) entrou++;
+      g.screen = 'journeyEnd';
+    });
+    ok('a caixa das Ilhas vale nos QUATRO estados da Elite', comCaixa === 4,
+       comCaixa + ' de 4 (' + ESTADOS.map(String).join(', ') + ')');
+    ok('  com o botão nos quatro', comBotao === 4, comBotao + ' de 4');
+    ok('  e a AÇÃO entra nos quatro', entrou === 4, entrou + ' de 4');
+    /* ⚠️ O CONTROLE: o APOSENTAR é da MESMA tela e SÓ vale com a Elite resolvida (2 de 4). Se ele
+       der 4 ou 0, o fixture parou de distinguir os estados e as três travas acima viram enfeite. */
+    ok('  e o controle distingue: o APOSENTAR só vale com a Elite resolvida', comAposentar === 2,
+       comAposentar + ' de 4 (champion e defeated)');
+    /* ⚠️ E O ÚNICO BLOQUEIO É O `ilhasFeita`, nunca a Elite -- é a matriz dos dois campos, e ela
+       responde o caso que foi perguntado duas vezes: *"mesmo se ele tiver vencido a elite 4 mas não
+       tenha jogado o desafio da ilha laranja, ele pode"*. Sem o segundo eixo, uma guarda que
+       amarrasse a travessia à Elite E outra que a amarrasse ao `ilhasFeita` se confundiriam. */
+    let pode = 0, bloqueou = 0;
+    ESTADOS.forEach(st => {
+      g.eliteStatus = st;
+      semIlhas();
+      if(telaFim().indexOf('pedirIlhasDaJornada()') >= 0) pode++;
+      semIlhas(); g.ilhasFeita = true;
+      if(telaFim().indexOf('pedirIlhasDaJornada()') < 0) bloqueou++;
+    });
+    ok('  quem NÃO atravessou pode, nos quatro (o campeão inclusive)', pode === 4, pode + ' de 4');
+    ok('  e quem JÁ atravessou não, nos quatro', bloqueou === 4, bloqueou + ' de 4');
+    /* ⚠️ E TERMINAR A ELITE VOLTA PRO `journeyEnd`, que é onde a caixa está: campeão e derrotado
+       caem lá (só quem está NO MEIO dela vai pro `eliteHeal`). Sem isso o campeão nunca
+       reencontraria a tela -- a caixa existiria e seria inalcançável. */
+    ok('  e terminar a Elite volta pro journeyEnd (campeão e derrotado)',
+       /game\.screen = \(game\.eliteStatus==='inProgress'\) \? 'eliteHeal' : 'journeyEnd'/.test(src));
+    g.eliteStatus = antesE; semIlhas();
+    g.team = timeDe(6, true);
+  }
+
+
+  /* --------- OS TRÊS CAMINHOS DA AÇÃO --------- */
+  /* ⚠️ QUEM VALIDA É A AÇÃO: o botão é apresentação, e um toque forjado no console não pode
+     atravessar sem ninguém que nade. */
+  g.team = timeDe(6, false); g.hms = []; semIlhas();
+  S.pedirIlhasDaJornada();
+  ok('sem Surf e sem o HM03, a ação NÃO entra', g.screen !== 'ilhas' && !g.ilhasJornada, g.screen);
+  ok('  e o aviso é o de como CONSEGUIR o HM03', g.ilhasAviso === 'semHm', String(g.ilhasAviso));
+  /* ⚠️ AS DUAS FRASES SÃO AS PEDIDAS, palavra por palavra: elas foram ditadas no pedido, e é a
+     mesma razão pela qual as frases dos golpes especiais são trancadas assim. */
+  ok('  com a frase pedida',
+     S.ilhasAvisoHtml().indexOf('É necessário que algum Pokemon do seu time saiba o movimento Surf(HM03). Para obte-lo, tenha todos os pokemons da Zona Safári na Pokedex.') > 0,
+     (S.ilhasAvisoHtml().match(/<p>([^<]*)/) || [])[1]);
+  ok('  e ela NÃO oferece ensinar (ele não tem a Máquina)',
+     !/ensinarSurfDaJornada/.test(S.ilhasAvisoHtml()));
+
+  g.hms = ['hm03']; semIlhas();
+  S.pedirIlhasDaJornada();
+  ok('com o HM03 e sem Surf, a ação NÃO entra', g.screen !== 'ilhas' && !g.ilhasJornada, g.screen);
+  ok('  e o aviso é o de ENSINAR', g.ilhasAviso === 'ensinar', String(g.ilhasAviso));
+  ok('  com a frase pedida',
+     S.ilhasAvisoHtml().indexOf('É necessário que algum Pokemon do seu time saiba o movimento Surf(HM03). Ensinar o Surf para seu time atual?') > 0,
+     (S.ilhasAvisoHtml().match(/<p>([^<]*)/) || [])[1]);
+  ok('  e ela oferece ensinar', /ensinarSurfDaJornada\(\)/.test(S.ilhasAvisoHtml()));
+  /* ⚠️ E QUEM TEM A MÁQUINA MAS NENHUM CANDIDATO NO TIME não recebe a pergunta: o HM03 na conta
+     não garante que ALGUM dos seis aprende Surf, e um botão que abre uma lista vazia é pior que
+     botão nenhum. É o único ramo desta tela que a medição no navegador não alcançou. */
+  {
+    /* ⚠️ E O SAVE ORIGINAL É GUARDADO, nunca reconstruído: a primeira versão o remontava com o
+       time da jornada dentro, e isso derrubou a trava do RESGATE lá embaixo -- que conta os
+       surfistas dos SAVES. Trava que deixa rastro derruba a vizinha. */
+    const antes = g.team, antesSv = g.saveSlots[0];
+    g.team = [S.createInstance('gengar', 50), S.createInstance('onix', 50)];
+    g.saveSlots[0] = { team: g.team, badgeCount: 8, customName: 'A' };
+    ok('    mas sem ninguém que APRENDA, ela não oferece',
+       S.ilhasAvisoHtml().indexOf('ensinarSurfDaJornada') < 0 && S.ilhasAvisoHtml().indexOf('Nenhum dos seis aprende Surf') > 0);
+    g.team = antes; g.saveSlots[0] = antesSv;
+  }
+  /* ⚠️ E O ATALHO É O `ensinarMaquinaNesteTime`, que já fixa o time ABERTO: o pedido diz *"ensinar
+     o Surf para seu time atual"*, e o `abrirEnsinarHm` cru cairia na lista de TIMES -- uma
+     pergunta cuja resposta já está na tela. */
+  ok('    pelo atalho do time ABERTO, não pela lista de times',
+     /function ensinarSurfDaJornada\(\)\{[\s\S]{0,600}ensinarMaquinaNesteTime\('hm03'\)/.test(src));
+
+  g.team = timeDe(6, true); semIlhas();
+  S.pedirIlhasDaJornada();
+  ok('COM Surf no time, ela entra', g.screen === 'ilhas' && !!g.ilhasJornada, g.screen);
+  /* ⚠️ E A VOLTA É GRAVADA: pela porta nova o jogador volta pro `journeyEnd`, e pela CARTA (que
+     save antigo ainda pode ter) ele segue pro encontro selvagem. Sem o campo, quem entra pelo fim
+     cairia num encontro selvagem que aquela tela não tem. */
+  ok('  e ela guarda pra onde voltar', (g.ilhasJornada || {}).volta === 'journeyEnd',
+     String((g.ilhasJornada || {}).volta));
+
+  /* --------- UMA VEZ POR JORNADA --------- */
+  /* ⚠️ PELA CARTA a regra vinha de graça (a carta sumia do trecho); no FIM da jornada a tela fica
+     lá pra sempre, e sem a marca o prêmio de +3 níveis sairia de novo a cada visita, sem teto. */
+  S.sairDasIlhas();
+  ok('sair da travessia marca a jornada', g.ilhasFeita === true);
+  g.screen = 'journeyEnd';
+  ok('  e a caixa passa a dizer que já foi', /não abre duas vezes/.test(telaFim()));
+  ok('  e o botão some', !/pedirIlhasDaJornada/.test(telaFim()));
+  S.pedirIlhasDaJornada();
+  ok('  e a AÇÃO recusa a segunda vez', g.screen !== 'ilhas' && !g.ilhasJornada, g.screen);
+  /* ⚠️ A MARCA FAZ A IDA E A VOLTA DO SAVE: o `applySavedState` é explícito campo a campo, e um
+     campo que sai e não volta se perde num F5 -- foi o que aconteceu com o `ilhasJornada` até
+     22/09, e ali o custo era a travessia inteira. Aqui seria o prêmio saindo de novo. */
+  {
+    const doc = S.serializeGame();
+    ok('  e ela vai pro save', doc.ilhasFeita === true, JSON.stringify(doc.ilhasFeita));
+    g.ilhasFeita = false;
+    S.applySavedState(doc);
+    ok('    e VOLTA dele', S.__getGame().ilhasFeita === true);
+  }
+  semIlhas();
+  /* ⚠️ O MODAL É ANEXADO PELO RENDER PRINCIPAL, e isso se prova LENDO O CÓDIGO: os casos acima
+     chamam o `ilhasAvisoHtml` direto, e passariam com a chamada órfã -- foi exatamente o que a
+     conferência de acusação mostrou. É a mesma trava que a caixa do especial e o `hmGanhoModal`
+     já têm, e ela existe porque um modal que nunca é desenhado não dá erro nenhum. */
+  ok('  e o modal é anexado pelo render principal',
+     src.indexOf('if(game.ilhasAviso){ html += ilhasAvisoHtml(); }') > 0);
 
   /* ---------------------------------------------------------------- 3) A CHAVE */
   g.currentSaveSlot = 0; g.saveGen = 0;
@@ -1150,7 +1244,7 @@ function blocoDaTravessia(){
   S.applySavedState(JSON.parse(JSON.stringify(s0)));
   ok('  e volta do save como 0', g.ilhasTrecho === 0, String(g.ilhasTrecho));
   ok('  então a travessia não reaparece nos outros trechos',
-     [1,2,3,4,5,6,7].every(l => !S.ilhasSaemNoTrecho(l)));
+     [1,2,3,4,5,6,7].every(l => S.cartasDeRota(l).indexOf(S.ROTA_DAS_ILHAS.id) < 0));
 
   /* save ANTIGO (sem o campo) se comporta como antes: o dado decide */
   const velho = JSON.parse(JSON.stringify(salvo)); delete velho.ilhasTrecho;

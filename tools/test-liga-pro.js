@@ -60,16 +60,22 @@ console.log('\n=== AS FAIXAS ===');
      custou). O que a trava compara entre os dois lados e o COMPORTAMENTO, logo abaixo. */
   ok('sao 12 sorteados e 6 escolhidos', srv._PRO_SORTEADOS === 12 && srv._PRO_ESCOLHE === 6,
      srv._PRO_SORTEADOS + ' / ' + srv._PRO_ESCOLHE);
-  /* ⚠️ A ORDEM E A PEDIDA, e ela importa: o pedido nomeia as tres na sequencia em que elas
-     acontecem. Uma ordem diferente daria as mesmas faixas num ciclo que nao e o pedido. */
-  ok('  e a ordem e 55-70, 15-30, 35-50',
-     JSON.stringify(srv._PRO_FAIXAS) === JSON.stringify([[55,70],[15,30],[35,50]]),
+  /* ⚠️ A ORDEM E A ESCADA BRONZE -> PRATA -> OURO (23/09/2026, a pedido). Ela era
+     55-70 -> 15-30 -> 35-50, que foi o pedido de quando a liga nasceu.
+     ⚠️ A TRAVA COBRA A REGRA, nao os numeros: uma lista fixa aqui envelheceria no proximo
+     ajuste -- e a regra e que a rotacao SOBE (a mais baixa primeiro), que e o que os nomes
+     Bronze/Prata/Ouro prometem. */
+  ok('  e a ordem SOBE (a mais baixa primeiro)',
+     srv._PRO_FAIXAS.every((f, i) => i === 0 || f[0] > srv._PRO_FAIXAS[i-1][1]),
      JSON.stringify(srv._PRO_FAIXAS));
+  ok('  e as tres faixas nao se encostam nem se repetem',
+     new Set(srv._PRO_FAIXAS.map(f => f.join('-'))).size === srv._PRO_FAIXAS.length
+     && srv._PRO_FAIXAS.every(f => f[0] < f[1]));
   /* ⚠️ A ROTACAO E CIRCULAR e tolera indice fora: a faixa vem de um contador que so cresce, e
      sem o modulo ela sairia `undefined` na quarta liga -- um bolo sem faixa nenhuma. */
   ok('  e ela gira (a 4a volta ao comeco)',
-     JSON.stringify(srv._proFaixaDe(3)) === JSON.stringify([55,70])
-     && JSON.stringify(srv._proFaixaDe(4)) === JSON.stringify([15,30]));
+     JSON.stringify(srv._proFaixaDe(3)) === JSON.stringify(srv._PRO_FAIXAS[0])
+     && JSON.stringify(srv._proFaixaDe(4)) === JSON.stringify(srv._PRO_FAIXAS[1]));
   ok('  e indice negativo ou absurdo nao quebra',
      Array.isArray(srv._proFaixaDe(-1)) && Array.isArray(srv._proFaixaDe(999)),
      JSON.stringify(srv._proFaixaDe(-1)) + ' / ' + JSON.stringify(srv._proFaixaDe(999)));
@@ -258,20 +264,27 @@ console.log('\n=== A TELA ===');
   /* ⚠️ O CARD E O DO DRAFT DA SELECAO, e a grade tambem: e o MESMO problema, resolvido la em
      21/09. O `.btn` da casa -- que foi a primeira tentativa -- e `display:block;width:100%`, e
      ele esticou cada card pra a largura inteira: os doze viraram uma pilha. */
-  ok('  na grade de 3 por linha do draft', /class="selecao-bolo"/.test(h));
+  ok('  na grade de 3 por linha do draft', /class="selecao-bolo/.test(h));
+  /* ⚠️ E A GRADE DA PRO LEVA A CLASSE PROPRIA (`pro-bolo`): e ela que escopa o Level maior do
+     card (23/09/2026, a pedido). Sem o escopo, a Selecao da Ilha Kumquat -- que usa o MESMO card
+     e a MESMA classe -- mudaria junto, numa tela que ninguem pediu. */
+  ok('  e com a classe que escopa o Level maior', /class="selecao-bolo pro-bolo"/.test(h));
+  ok('  e o Level da Pro e MAIOR que o da Selecao, mas nao passa do nome',
+     /\.pro-bolo \.selecao-lv\{font-size:\.58rem/.test(src)
+     && /\.selecao-lv\{display:block;font-size:\.52rem/.test(src));
   ok('  e nao no `.btn` da casa (que estica o card)', !/class="btn tower-pick/.test(h));
   /* ⚠️ O `spriteHtml` PRECISA DO `speciesId`, e o bolo guarda `id`: passando o objeto cru o sprite
      saia VAZIO em todos os doze, sem erro nenhum -- foi o navegador que pegou. */
   ok('  com o sprite de cada um', (h.match(/sprite-wrap|sprite-img|sprite-fallback/g) || []).length >= 12,
      (h.match(/sprite-wrap|sprite-img|sprite-fallback/g) || []).length);
   /* ⚠️ A FAIXA TEM QUE ESTAR ESCRITA NA TELA: ela gira a cada campeonato, e o bolo dos 12 só
-     faz sentido sabendo em que nível a liga vai ser. A trava procura o NÚMERO, e não o texto em
-     volta -- a frase quebra linha no meio (o HTML é indentado), e um padrão largo passaria com a
-     faixa ERRADA na tela. */
-  ok('  e a faixa da rodada escrita', h.indexOf('<strong>55 e 70</strong>') >= 0,
+     faz sentido sabendo em que nível a liga vai ser. A trava procura os DOIS NÚMEROS da faixa
+     que o estado diz, e não o texto em volta. */
+  const nums = f => '<strong>' + f[0] + ' e ' + f[1] + '</strong>';
+  ok('  e a faixa da rodada escrita', h.indexOf(nums(srv._proFaixaDe(0))) >= 0,
      (h.match(/<strong>[0-9]+ e [0-9]+<[/]strong>/) || ['(nao achei)'])[0]);
   S.game.proFaixa = 1;
-  ok('  e ela acompanha a faixa', S.renderProPicker().indexOf('<strong>15 e 30</strong>') >= 0);
+  ok('  e ela acompanha a faixa', S.renderProPicker().indexOf(nums(srv._proFaixaDe(1))) >= 0);
   S.game.proFaixa = 0;
 
   S.proAlternar(0); S.proAlternar(3); S.proAlternar(5);
@@ -396,7 +409,34 @@ console.log('\n=== O RANKING E O HISTÓRICO ===');
      quadros(hPro) + ' na Pro / ' + quadros(hCla) + ' na Clássica');
   /* ⚠️ O QUE SÓ A PRO TEM é a faixa da rodada: ela gira, e sem ela na tela o jogador só descobre
      em que nível vai lutar depois de abrir o picker. */
-  ok('  e só a Pro anuncia a faixa', /<strong>55 e 70<\/strong>/.test(hPro) && !/níveis/.test(hCla));
+  /* ⚠️ E A FAIXA DA RODADA VIROU UM QUADRO (23/09/2026, a pedido: *"crie um quadro indicando qual
+     é a faixa de level que é a liga atual"*). Ela era uma LINHA dentro do bloco de inscrição --
+     ou seja sumia justamente depois de o jogador entrar, que é quem vai lutar nela. */
+  /* ⚠️ A CLASSE SE PROCURA COMPLETA, com o `"` que a fecha: `/pro-faixa-box/` casa com
+     `pro-faixa-box-QUALQUERCOISA`, e foi assim que o defeito religado passou em branco na
+     conferência de acusação. É a mesma armadilha das regex do `mlog-mais` e do `matchup-row`. */
+  ok('  e só a Pro anuncia a faixa',
+     hPro.indexOf('class="box pro-faixa-box"') > 0 && hCla.indexOf('pro-faixa-box') < 0);
+  const fAtual = srv._proFaixaDe(((S.game.leagueData||{}).cycles||[]).find(c=>c.status==='registering').proFaixa||0);
+  ok('  e o quadro diz o NOME do tier e o level',
+     hPro.indexOf('Liga Pro ' + S.proNomeDaFaixa(fAtual)) > 0 && hPro.indexOf('Level ' + fAtual[0] + '-' + fAtual[1]) > 0,
+     (hPro.match(/pro-faixa-nome">([^<]*)/) || [])[1]);
+  /* ⚠️ E ELE DIZ A PRÓXIMA (23/09/2026, a pedido: *"siga o ciclo que combinamos, mas escreve isso
+     no quadro"*). Ela é DERIVADA do índice seguinte -- escrita à mão, ela mentiria no dia em que
+     a rotação mudasse, que é justamente o que acabou de acontecer com a ordem. */
+  {
+    const idxA = ((S.game.leagueData||{}).cycles||[]).find(c=>c.status==='registering').proFaixa||0;
+    const prox = srv._proFaixaDe(idxA + 1);
+    ok('  e diz qual vem DEPOIS dela',
+       hPro.indexOf('Liga Pro ' + S.proNomeDaFaixa(prox)) > 0
+       && hPro.indexOf('Level ' + prox[0] + '-' + prox[1]) > 0
+       && /pro-faixa-prox/.test(hPro),
+       S.proNomeDaFaixa(prox) + ' ' + prox.join('-'));
+    ok('    e ela NÃO é a de agora', S.proNomeDaFaixa(prox) !== S.proNomeDaFaixa(fAtual));
+  }
+  /* ⚠️ E A LINHA VELHA NÃO VOLTA: com as duas, a tela diria a mesma coisa duas vezes na mesma
+     rolagem -- e a de baixo só aparecia pra quem NÃO estava inscrito. */
+  ok('  e a linha velha não sobrou', !/Esta rodada é entre os níveis/.test(hPro));
   ok('  e ela nomeia a liga no título', /Liga Pro/.test(hPro));
   Object.assign(S.game, { currentLeagueTypeId: antes.id, currentLeagueTypeConfig: antes.cfg,
     leagueData: antes.data, leagueLeaderboard: antes.lb, leagueHistory: antes.hist,
@@ -463,8 +503,8 @@ console.log('\n=== PONTA A PONTA (o drawCycle de verdade) ===');
     const s1 = (await sch().get()).data();
     ok('  e a faixa ANDOU (a liga aconteceu)', s1.proFaixaIdx === 1, 'proFaixaIdx=' + s1.proFaixaIdx);
     const novo = s1.cycles.find(c => c.id !== CID) || {};
-    ok('  e o ciclo novo nasce na faixa 15-30',
-       JSON.stringify(F._proFaixaDe(novo.proFaixa)) === '[15,30]',
+    ok('  e o ciclo novo nasce na faixa SEGUINTE da rotação',
+       JSON.stringify(F._proFaixaDe(novo.proFaixa)) === JSON.stringify(F._PRO_FAIXAS[1]),
        JSON.stringify(F._proFaixaDe(novo.proFaixa)));
     ok('  e o ciclo velho virou `drawn`',
        (s1.cycles.find(c => c.id === CID) || {}).status === 'drawn');
@@ -695,10 +735,34 @@ console.log('\n=== A DESCRIÇÃO DA PRO ===');
      envelheceria no primeiro ajuste -- é o defeito que o rótulo do revezamento da Corrida teve. */
   ok('  ela diz quantos são sorteados', hPro.indexOf('<strong>' + P_SORT + ' pokémon sorteados</strong>') > 0);
   ok('  e quantos ele escolhe', hPro.indexOf('<strong>' + P_ESC + '</strong>') > 0);
-  ok('  e as TRÊS faixas, na ordem',
-     hPro.indexOf(P_FX.map(x => x[0] + '–' + x[1]).join(', depois ')) > 0,
-     P_FX.map(x => x[0] + '–' + x[1]).join(', depois '));
+  /* ⚠️ AS TRÊS VIRARAM UMA LISTA, com o NOME do tier (23/09/2026, a pedido) -- e ela sai na ordem
+     da ROTAÇÃO, porque a frase diz *"seguindo a ordem"*. */
+  ok('  e as TRÊS faixas, na ordem da rotação, com o nome do tier',
+     P_FX.every(f => hPro.indexOf('Liga Pro ' + S.proNomeDaFaixa(f) + ': Level ' + f[0] + '-' + f[1]) > 0)
+     && hPro.indexOf('pro-tiers') > 0,
+     P_FX.map(f => S.proNomeDaFaixa(f)).join(' > '));
+  ok('    e na ORDEM da rotação, não ordenada por outra coisa',
+     P_FX.map(f => hPro.indexOf('Liga Pro ' + S.proNomeDaFaixa(f)))
+         .every((p, i, a) => i === 0 || p > a[i-1]));
+  /* ⚠️ O NOME É DERIVADO DO NÍVEL, não do índice: a mais baixa é a Bronze. Indexado por posição,
+     reordenar a rotação RENOMEARIA os três, e quem viu "Prata 35-50" ontem leria outra coisa. */
+  ok('    e o nome sai do NÍVEL (a mais baixa é a Bronze)',
+     S.proNomeDaFaixa([15,30]) === 'Bronze' && S.proNomeDaFaixa([35,50]) === 'Prata'
+     && S.proNomeDaFaixa([55,70]) === 'Ouro'
+     && /const ord = PRO_FAIXAS\.slice\(\)\.sort/.test(src));
+  /* ⚠️ AS DUAS FRASES SÃO COBRADAS PELO TEXTO, e não só pelo número: os textos VELHOS também
+     traziam o 8 e as três faixas, então uma trava que olhasse só os números passava com eles de
+     volta -- foi o que a conferência de acusação mostrou. */
   ok('  e o mínimo pra formar', hPro.indexOf('<strong>' + P_MIN + ' treinadores</strong>') > 0);
+  ok('  com a frase pedida (o mínimo)',
+     hPro.indexOf('É necessário no mínimo') > 0
+     && hPro.indexOf('inscritos para começar') > 0
+     && hPro.indexOf('mesma faixa de Level') > 0);
+  ok('    e a frase velha não sobrou', hPro.indexOf('Faltando gente') < 0);
+  ok('  e com a frase pedida (a ordem das faixas)',
+     hPro.indexOf('A cada vez que acontece uma Liga Pro') > 0
+     && hPro.indexOf('seguindo a ordem') > 0);
+  ok('    e a frase velha não sobrou', hPro.indexOf('e ela gira a cada liga que acontece') < 0);
   /* ⚠️ E ELA EXPLICA O QUE A PRO TEM DE DIFERENTE, não a mecânica inteira: o resto é igual à
      Clássica, e é isso que o pedido diz (*"no mesmo modelo da Liga Classica"*). */
   ok('  e ela nomeia a escolha dos golpes', /golpes<\/strong>/.test(hPro));
@@ -835,8 +899,16 @@ console.log('\n=== OS GOLPES, DEPOIS DOS 6 ===');
   }
   ok('a fila termina e INSCREVE', S.__getGame().screen === 'league' && !!inscrito, S.__getGame().screen);
   ok('  com os SEIS', (inscrito || []).length === P_ESC);
-  ok('  todos com ' + S.MAX_GOLPES + ' golpes', (inscrito || []).every(p => (p.ataques || []).length === S.MAX_GOLPES),
-     JSON.stringify((inscrito || []).map(p => (p.ataques || []).length)));
+  /* ⚠️ A REGRA É "CADA UM LEVA O QUE DÁ, ATÉ `MAX_GOLPES`", e não "todo mundo leva 3": na faixa
+     Bronze (15-30) só 43,6% das espécies aprendem três golpes de dano naquele nível -- medido em
+     720 sorteios. A trava dizia 3 porque ela nasceu com a rotação começando no OURO, onde 94,3%
+     levam três. É a mesma família das travas que mediam o painel e não a regra. */
+  ok('  cada um leva o que dá, até ' + S.MAX_GOLPES,
+     (inscrito || []).every((p, k) => {
+       const i = S.__getGame().proEscolhidos[k];
+       const disp = S.ataquesEscolhiveis(S.proInstanciaDoBolo(i));
+       return (p.ataques || []).length === Math.min(S.MAX_GOLPES, disp.length);
+     }), JSON.stringify((inscrito || []).map(p => (p.ataques || []).length)));
   /* ⚠️ E SÃO OS QUE O JOGADOR ESCOLHEU, não o `ataquesPadrao`: a escolha é a mais forte do jogo
      (o par de golpes vale 79 pontos de taxa de vitória entre o melhor e o pior par).
      ⚠️ ISSO SE PROVA LENDO O CÓDIGO, e não pelo `inscrito` acima: a inscrição de verdade fala com

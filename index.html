@@ -3631,9 +3631,29 @@
   .selecao-dono.npc{background:var(--red);}
   /* ⚠️ A REGRA DO APAGADO VEM DEPOIS DAS DUAS DE CIMA: mesma especificidade, ganha a última -- e a
      FAIXA precisa continuar legível por cima do card apagado, que é a única coisa que ela conta. */
+  /* ⚠️ O LEVEL MAIOR NO CARD DOS 12 É SÓ DA LIGA PRO (23/09/2026, a pedido). O card é o MESMO da
+     Seleção da Ilha Kumquat, e a classe também -- escopado no `.pro-bolo`, a tela da Luana fica
+     byte a byte como estava. Ali a faixa de nível não é a mecânica da liga, aqui é: os 12 saem
+     todos dentro dela, e o que separa um do outro é justamente o nível.
+     ⚠️ E ELE NÃO PASSA DO NOME (.58rem): maior que ele, a hierarquia do card inverte e o olho lê
+     o número antes da espécie. */
+  .pro-bolo .selecao-lv{font-size:.58rem;color:var(--ink);}
   .selecao-card.off{opacity:.5;cursor:default;}
   .selecao-card.off .selecao-dono{opacity:1;}
   /* o ranking reusa a linha do ranking da Pescaria e da Corrida -- mesma leitura, uma cópia só */
+  /* a escada dos tiers, na descrição da Pro -- uma linha por faixa, na ordem da rotação */
+  .pro-tiers{list-style:none;margin:10px 0;padding:0;}
+  .pro-tiers li{font:800 .78rem/1.5 var(--font-ui);color:var(--ink);}
+  /* ⚠️ O QUADRO DA RODADA é uma COLUNA, e não uma linha: a 320px "Liga Pro Bronze" e "Level
+     15-30" lado a lado não cabem em nada legível. O rótulo de cima é o que diz que ele é sobre
+     AGORA -- sem ele o quadro se leria como mais uma explicação da mecânica. */
+  .pro-faixa-box{display:flex;flex-direction:column;align-items:center;gap:2px;text-align:center;}
+  .pro-faixa-rotulo{font:800 .5rem/1.2 var(--font-ui);color:var(--muted);letter-spacing:.06em;}
+  .pro-faixa-nome{font:.85rem/1.3 var(--font-title);color:var(--blue-dark);}
+  .pro-faixa-lv{font:800 1rem/1.2 var(--font-ui);color:var(--ink);font-variant-numeric:tabular-nums;}
+  /* a linha da PRÓXIMA é um degrau abaixo: ela é o que vem depois, não o que vale agora */
+  .pro-faixa-prox{font:.6rem/1.4 var(--font-ui);color:var(--muted);margin-top:4px;
+    border-top:1px dashed var(--box-border);padding-top:4px;width:100%;}
   .selecao-rank-col{display:flex;gap:6px;align-items:center;font-size:.6rem;font-weight:800;}
   .selecao-rank-col b{font-size:.72rem;color:var(--ink);font-variant-numeric:tabular-nums;}
   .selecao-rank-v{color:var(--green-dark);}
@@ -5392,44 +5412,10 @@ const ROTA_DAS_ILHAS = {
 };
 /* ⚠️ O TIME CHEIO É A CONDIÇÃO, e o número vive numa constante porque ele é a régua: baixá-lo pra
    5 faria a rota aparecer antes de o time estar pronto pros cinco desafios. */
-const ILHAS_TIME_MINIMO = 6;
-const CHANCE_ILHAS = 0.25;
-/* ⚠️ SEMEADO PELO SAVE, como as outras duas: com `Math.random` bastaria sair do save e voltar até
-   a rota aparecer. A semente carrega o slot, a GERAÇÃO do slot e o trecho.
-   ⚠️ E A CONDIÇÃO DE TIME É LIDA FORA DA SEMENTE, de propósito: o dado de cada trecho é sempre o
-   mesmo, e o que muda é a carta ser OFERECIDA ou não. Assim capturar o sexto pokémon não re-sorteia
-   nada -- ele só destrava o que o dado já havia decidido. */
-function ilhasSaemNoTrecho(leg){
-  /* ⚠️ ELA ABRIU PRA TODO MUNDO EM 23/09/2026, a pedido. Ate aqui havia um
-     uma guarda de ADMIN nesta linha -- ou seja a travessia pela JORNADA era
-     a SETIMA entrada das Ilhas, e a unica que ficou fechada quando as outras seis (o botao da
-     home, o `abrirIlhas` e os cinco jogos) abriram em 21/09. Ela passou dois dias sendo letra
-     morta pra 99% dos jogadores, e o CLAUDE.md ja registrava a porta como "saiu das SEIS entradas"
-     sem notar que existia uma setima. */
-  /* ⚠️ UMA VEZ POR JORNADA (21/09/2026, a pedido: *"se a travessia para a ilha laranja ja apareceu
-     1x na jornada, ela nao deve aparecer mais"*). É a mesma regra da mata, com um mecanismo
-     DIFERENTE -- e a diferença é a razão de ele existir.
-
-     ⚠️ A MATA *DERIVA* (o `legDaMataFechada` varre os trechos e fica com o primeiro que passa no
-     dado), e isso funciona lá porque o dado dela **só depende do trecho**. Aqui ele depende também
-     do TIME estar completo -- e o time muda ao longo da jornada. Varrendo, a pergunta "ela saiu no
-     trecho 0?" seria respondida com o time de HOJE, quando naquele trecho o jogador tinha dois
-     pokémon: a travessia seria dada como gasta num trecho em que ela nunca pôde aparecer.
-     Por isso aqui a aparição é GRAVADA (ver o `cartasDeRota`), e não deduzida.
-
-     ⚠️ E "APARECEU" É A CARTA TER SIDO OFERECIDA, não o jogador ter entrado -- é o pedido ao pé da
-     letra, e é o que a mata já faz: lá a carta também aparece trancada pra quem não tem o Corte e
-     a chance vai embora com o trecho. */
-  if(game.ilhasTrecho != null) return game.ilhasTrecho === leg;
-  if(((game.team) || []).length < ILHAS_TIME_MINIMO) return false;
-  /* ⚠️ UMA TERCEIRA CARTA POR TRECHO, e a ordem é a de antiguidade: a mata (4º) tem preferência
-     sobre a montanha (6º), e as duas sobre esta. Com duas no mesmo trecho seriam QUATRO cartas, e
-     a promessa é de uma TERCEIRA -- a tela deixaria de ser a que o jogador conhece. */
-  if(temRotaDoCorte(leg)) return false;
-  if(montanhaSaiNoTrecho(leg)) return false;
-  const rng = makeSeededRng("ilhas|" + game.currentSaveSlot + "|" + (game.saveGen||0) + "|" + leg);
-  return rng() < CHANCE_ILHAS;
-}
+/* ⚠️ O SORTEIO DA CARTA MORREU EM 23/09/2026, junto com a rota (ver o `cartasDeRota`). Eram o
+   `ILHAS_TIME_MINIMO`, a `CHANCE_ILHAS` e o `ilhasSaemNoTrecho` -- e o `game.ilhasTrecho`, que
+   guardava em que trecho ela tinha aparecido. O campo continua sendo lido e gravado no save: ele
+   é o que impede a carta de reaparecer num save que já a viu, enquanto aquela carta existir. */
 /* QUEM ABRE O CAMINHO: alguém do time que saiba Surf. O espelho exato do `cortadorDoTime` e do
    `voadorDoTime`, e a pergunta é feita NO DESENHO -- este time, AGORA, sabe nadar?
    ⚠️ E ELE NÃO É SÓ O CADEADO: é este pokémon que o Resgate vai EXIGIR do outro lado (o pedido diz
@@ -5741,21 +5727,12 @@ function cartasDeRota(leg){
      `montanhaSaiNoTrecho`): com as duas no mesmo trecho seriam QUATRO, e a promessa é de uma
      TERCEIRA. */
   else if(montanhaSaiNoTrecho(leg)) ids.push(MONTANHA.id);
-  /* ⚠️ E AS ILHAS SÃO A TERCEIRA CONCORRENTE -- a última do `else if` porque ela é a mais nova e a
-     que tem a condição mais larga (qualquer trecho, com o time cheio): posta na frente, ela
-     roubaria trechos da mata e da montanha e mudaria a jornada de quem já tem save aberto. */
-  else if(ilhasSaemNoTrecho(leg)){
-    ids.push(ROTA_DAS_ILHAS.id);
-    /* ⚠️ A APARIÇÃO É MARCADA AQUI, que é o único ponto em que a carta de fato entra na lista --
-       os três chamadores desta função fazem `game.routeCards = cartasDeRota(...)`, ou seja montar
-       a lista É aparecer.
-       ⚠️ E ELA NÃO ESTRAGA O REDESENHO NEM A AUTO-RECUPERAÇÃO: com o trecho marcado, a guarda lá
-       em cima responde `marcado === leg` -- então no MESMO trecho a carta continua saindo, e só
-       nos seguintes ela some. Sem isso, recuperar as cartas de um save antigo (o que o
-       `renderRouteCardsBlock` faz quando elas vêm vazias) apagaria a própria carta que ele acabou
-       de recuperar. */
-    if(game.ilhasTrecho == null) game.ilhasTrecho = leg;
-  }
+  /* ⚠️ AS ILHAS SAÍRAM DAQUI EM 23/09/2026 (a pedido: *"tire o acesso a ilhas laranjas durante a
+     jornada, como opção de terceira rota"*). Elas eram a terceira concorrente desta lista e hoje
+     moram no FIM da jornada, ao lado da Elite 4 -- ver o `ilhasNaJornadaHtml`.
+     ⚠️ O QUE FICOU DE PÉ é o `ROTA_DAS_ILHAS` e a entrada `surf` do `ROTAS_DE_CHAVE`: save parado
+     na tela de escolha COM a carta na mão continua com ela funcionando, cadeado e tudo. Tirar os
+     dois deixaria aquele card clicável levando a lugar nenhum. */
   return ids;
 }
 
@@ -6748,7 +6725,14 @@ function freshGameDefaults(){
     montanhaGuarda:null,
     /* a visita as Ilhas Laranja pela jornada (ver `entrarNasIlhasDaJornada`) */
     ilhasJornada:null, ilhasResultado:null,
-    /* em que trecho a carta das Ilhas apareceu -- ela e UMA por jornada (ver `ilhasSaemNoTrecho`) */
+    /* a travessia ja feita NESTA jornada -- vai pro save, porque a regra e por jornada */
+    ilhasFeita:false,
+    /* qual aviso das Ilhas esta aberto: estado de TELA, nao vai pro save */
+    ilhasAviso:null,
+    /* em que trecho a carta das Ilhas apareceu. A carta saiu do sorteio em 23/09/2026 (a travessia
+       virou uma caixa no FIM da jornada), entao o campo so serve a save antigo que ainda a tenha na
+       mao: e ele que impede a carta de reaparecer num save que ja a viu. Quem limita a travessia a
+       uma por jornada hoje e o `ilhasFeita`. */
     ilhasTrecho:null,
     montanhaPremio:null,
     startersSorteados:{},   // {"slot:modo": {bulbasaur:bool,...}} -- vem da conta, ver sorteioDosIniciais
@@ -16208,11 +16192,33 @@ const LENDARIOS_DO_JOGO = LENDARIOS;
    ligas e manda todo mundo pro `leftover`, que vai pro ciclo seguinte. Nao foi preciso inventar
    regra nenhuma: o comportamento pedido ja era o que a Classica faz. */
 const PRO_LEAGUE_TYPE = 'pro';
-const PRO_FAIXAS = [[55, 70], [15, 30], [35, 50]];
+/* ⚠️ A ORDEM DA ROTACAO E BRONZE -> PRATA -> OURO (23/09/2026, a pedido: *"uma faixa de level e
+   selecionada seguindo a ordem: Liga Pro Bronze: Level 15-30 ... Prata: 35-50 ... Ouro: 55-70"*).
+   Ela era 55-70 -> 15-30 -> 35-50, que foi o pedido de quando a liga nasceu -- e a escada de
+   prestigio e o que vale hoje.
+   ⚠️ REORDENAR ESTA TABELA MUDA A FAIXA DE TODO CICLO JA GRAVADO, porque o `proFaixa` do ciclo e
+   um INDICE. E como o bolo e semeado por `uid + cycleId + faixa`, o time de quem ja se inscreveu
+   deixaria de bater e o `drawCycle` o DESCARTARIA em silencio (o filtro roda antes do leftover).
+   Por isso a virada veio com o carimbo do ciclo aberto reconciliado em producao. */
+const PRO_FAIXAS = [[15, 30], [35, 50], [55, 70]];
 const PRO_SORTEADOS = 12;      // quantos aparecem na tela
 const PRO_ESCOLHE = 6;         // quantos entram na liga
 const PRO_CHANCE_SHINY = 0.05; // por pokemon, como pedido
 function proFaixaDe(idx){ return PRO_FAIXAS[((idx | 0) % PRO_FAIXAS.length + PRO_FAIXAS.length) % PRO_FAIXAS.length]; }
+/* ⚠️ OS NOMES SAO DERIVADOS DO NIVEL, nao do indice da rotacao: a mais baixa e a Bronze, a do
+   meio a Prata, a mais alta a Ouro. Indexados por posicao, reordenar a rotacao RENOMEARIA os
+   tres -- e um jogador que viu "Prata 35-50" ontem leria "Ouro 35-50" hoje.
+   ⚠️ E ELES VIVEM SO NO CLIENTE, como o `MOVE_BY_TYPE` e o `TIPO_DO_ESPECIAL`: o servidor nao tem
+   tela, e o que ele precisa saber da faixa sao os dois numeros. */
+const PRO_TIERS = ['Bronze', 'Prata', 'Ouro'];
+function proNomeDaFaixa(f){
+  const ord = PRO_FAIXAS.slice().sort((a, b) => a[0] - b[0]);
+  const i = ord.findIndex(x => x[0] === f[0] && x[1] === f[1]);
+  return i >= 0 ? PRO_TIERS[i] : '';
+}
+/* o rotulo inteiro -- e ele tem UM dono, porque as tres telas que o mostram tem que dizer a
+   mesma coisa: a descricao, o quadro da rodada e o picker */
+function proRotuloDaFaixa(f){ return 'Liga Pro ' + proNomeDaFaixa(f) + ': Level ' + f[0] + '-' + f[1]; }
 
 /* ⚠️ A SEMENTE E `uid + cycleId`, e isso e a trava anti re-sorteio -- a mesma do encontro
    selvagem. Com `Math.random` bastaria sair da tela e voltar ate vir um bolo bom; semeada assim, o
@@ -19131,7 +19137,7 @@ function renderProPicker(){
          obrigaria a reaprender a ler, e o `.btn` da casa -- que foi a primeira tentativa aqui --
          é `display:block;width:100%`: ele esticou cada card pra a largura inteira e os doze
          viraram uma pilha. É a mesma armadilha que o card do parceiro da Pescaria já custou. */''}
-    <div class="selecao-bolo">${bolo.map((p, i) => {
+    <div class="selecao-bolo pro-bolo">${bolo.map((p, i) => {
       const pos = sel.indexOf(i);
       const sp = SPECIES[p.id] || {};
       const cheio = pos < 0 && sel.length >= PRO_ESCOLHE;
@@ -20523,6 +20529,11 @@ function serializeGame(){
     /* ⚠️ `== null` e NAO `|| null`: o trecho 0 e um trecho valido, e `0 || null` da NULL -- a
        travessia voltaria a aparecer pra quem a viu no primeiro trecho. */
     ilhasTrecho: (game.ilhasTrecho == null) ? null : game.ilhasTrecho,
+    /* ⚠️ A TRAVESSIA JA FEITA vai pro save, e a IDA E A VOLTA tem que existir: o applySavedState e
+       explicito campo a campo, e um campo que sai e nao volta se perde num F5 -- foi exatamente o
+       que aconteceu com o  ate 22/09. Sem ele, o premio de +3 niveis sairia de novo
+       na proxima vez que a tela de fim abrisse. */
+    ilhasFeita: !!game.ilhasFeita,
     ilhasJornada: game.ilhasJornada || null,
     ilhasResultado: game.ilhasResultado || null,
     montanhaPremio: game.montanhaPremio || null,
@@ -20792,6 +20803,7 @@ function applySavedState(data){
      NULL -- a travessia voltaria a aparecer pra quem a viu no primeiro trecho, que é exatamente o
      que a regra de uma-vez-por-jornada existe pra impedir. */
   game.ilhasTrecho = (data.ilhasTrecho == null) ? null : data.ilhasTrecho;
+  game.ilhasFeita = !!data.ilhasFeita;
   game.ilhasJornada = data.ilhasJornada || null;
   /* ⚠️ E O `ilhasResultado` TINHA O MESMO DEFEITO DO VIZINHO, deixado pra tras quando ele foi
      consertado: ele era GRAVADO e nunca lido de volta. O comentario do `serializeGame` promete
@@ -27622,6 +27634,9 @@ function renderJourneyEnd(){
       : `<p class="hint-text">A partir de 23 derrotas o bônus zera. Numa próxima jornada, perder menos rende até +4 níveis pro time todo.</p>`}
   </div>` : ''}
   ${won ? eliteJourneyBoxHtml() : ''}
+  ${/* ⚠️ AS ILHAS FICAM AO LADO DA ELITE (23/09/2026, a pedido): as duas são o que há pra fazer
+       quando a jornada acaba, e a travessia deixou de ser uma carta de rota do meio do caminho. */''}
+  ${won ? ilhasNaJornadaHtml() : ''}
   <div class="box">
     <h2>${selo('medalha_ouro')} Insígnias conquistadas</h2>
     ${won
@@ -28248,10 +28263,17 @@ function renderLeague(){
        <strong>${PRO_SORTEADOS} pokémon sorteados</strong> e escolhe <strong>${PRO_ESCOLHE}</strong> deles —
        e escolhe também os <strong>golpes</strong> de cada um. Cada jogador recebe os seus, e sair e
        voltar não muda o sorteio.</p>
-    <p>Cada rodada tem uma <strong>faixa de nível</strong>, e ela gira a cada liga que acontece:
-       ${PRO_FAIXAS.map(x => x[0] + '–' + x[1]).join(', depois ')}, e volta ao começo.</p>
-    <p>Ela só forma com <strong>${REGULAR_LIGA_SIZE} treinadores</strong>. Faltando gente, ninguém perde a vez:
-       a fila continua e a faixa <strong>não</strong> gira — ela só anda quando uma liga acontece de verdade.</p>
+    <p>A cada vez que acontece uma Liga Pro, uma faixa de level é selecionada seguindo a ordem:</p>
+    ${/* ⚠️ A LISTA SAI NA ORDEM DA ROTAÇÃO (`PRO_FAIXAS`), e não ordenada por nível: a frase diz
+         *"seguindo a ordem"*, então é a rotação que ela descreve. Hoje as duas coincidem; no dia em
+         que a rotação mudar, é ela que a lista tem que mostrar.
+         ⚠️ E O RÓTULO SAI DO `proRotuloDaFaixa`, que é o MESMO das outras duas telas: escritos em
+         separado, o quadro da rodada diria "Prata" e a descrição diria outra coisa no primeiro
+         ajuste -- e o nome do tier é justamente o que liga as duas leituras. */''}
+    <ul class="pro-tiers">${PRO_FAIXAS.map(f => `<li>${proRotuloDaFaixa(f)}.</li>`).join('')}</ul>
+    <p>É necessário no mínimo <strong>${REGULAR_LIGA_SIZE} treinadores</strong> inscritos para começar.
+       Caso não tenha, automaticamente os treinadores são inscritos novamente para a próxima Liga,
+       que se mantém na <strong>mesma faixa de Level</strong>.</p>
     <p>O vencedor ganha <strong>bônus shiny de 1h</strong>, como na Clássica.</p>
     ` : `
     <h2>⚔️ Liga Clássica</h2>
@@ -28266,6 +28288,31 @@ function renderLeague(){
        lugar dele: o total continua alimentando o "Campeão da Liga" das conquistas e o histórico.
        ⚠️ E NÃO HÁ RETROATIVO A RECUPERAR: a Liga Pro nasceu em 23/09 e o primeiro ciclo dela ainda
        não fechou, então zero é a verdade pra todo mundo. */''}
+  ${/* ⚠️ O QUADRO DA RODADA (23/09/2026, a pedido: *"crie um quadro indicando qual é a faixa de
+       level que é a liga atual"*). Ele existia como uma LINHA de `hint-text` dentro do bloco de
+       inscrição -- ou seja só aparecia pra quem ainda não estava inscrito, e sumia justamente
+       depois de o jogador entrar. A faixa é a mecânica da liga: ela vale pra quem está dentro
+       também, que é quem vai lutar nela.
+       ⚠️ E ELE SAI DA ENTRADA DO CICLO, não do `game.proFaixa`: aquele campo só é preenchido
+       quando o picker abre, e aqui a tela pode nunca ter passado por lá. */''}
+  ${(() => {
+    if(!ehPro) return '';
+    const aberto = ((game.leagueData || {}).cycles || []).find(c => c.status === 'registering');
+    if(!aberto) return '';
+    const idx = proFaixaDoCiclo(aberto);
+    const f = proFaixaDe(idx);
+    /* ⚠️ A PRÓXIMA É O ÍNDICE SEGUINTE DA ROTAÇÃO, e ela é derivada -- nunca escrita. Mas ela
+         é uma promessa CONDICIONAL: a faixa só anda quando uma liga ACONTECE de verdade, e com
+         menos de 8 inscritos a fila continua nesta mesma. Por isso a frase diz *"depois dela"* e
+         não *"amanhã"*, e a descrição logo acima é quem conta a condição. */
+    const prox = proFaixaDe(idx + 1);
+    return `<div class="box pro-faixa-box">
+      <span class="pro-faixa-rotulo">A RODADA DE AGORA</span>
+      <span class="pro-faixa-nome">Liga Pro ${proNomeDaFaixa(f)}</span>
+      <span class="pro-faixa-lv">Level ${f[0]}-${f[1]}</span>
+      <span class="pro-faixa-prox">Depois dela vem a <strong>Liga Pro ${proNomeDaFaixa(prox)}</strong>: Level ${prox[0]}-${prox[1]}</span>
+    </div>`;
+  })()}
   <div class="box league-wins-total-box">
     <span class="league-wins-total-icon">🏅</span>
     <div>
@@ -28322,16 +28369,8 @@ function renderLeague(){
       ${/* ⚠️ A FAIXA DA RODADA É A INFORMAÇÃO QUE DECIDE a inscrição na Pro: ela gira a cada
            campeonato, e sem ela na tela o jogador só descobre em que nível vai lutar depois de
            abrir o picker. Ela sai da ENTRADA do ciclo, que é onde a faixa é carimbada. */''}
-      ${(() => {
-        if(game.currentLeagueTypeId !== PRO_LEAGUE_TYPE) return '';
-        /* ⚠️ O CICLO ABERTO é o que está em `registering` -- o `leagueData` é `{ cycles }`, e não
-           `{ entry }`: a primeira versão desta linha lia um campo que não existe e a faixa nunca
-           apareceria na tela, sem erro nenhum. */
-        const aberto = ((game.leagueData || {}).cycles || []).find(c => c.status === 'registering');
-        if(!aberto) return '';
-        const f = proFaixaDe(proFaixaDoCiclo(aberto));
-        return `<p class="hint-text" style="text-align:center">Esta rodada é entre os níveis <strong>${f[0]} e ${f[1]}</strong>.</p>`;
-      })()}
+      ${/* ⚠️ A LINHA DA FAIXA SAIU DAQUI: ela virou o QUADRO lá em cima, que aparece inscrito ou
+           não. Mantida, a tela diria a mesma coisa duas vezes na mesma rolagem. */''}
       <button class="btn danger" ${(game.accountLeagueSlots||{})[game.currentLeagueTypeId]!=null?'disabled':''} onclick="openLeagueTeamPicker()">${game.currentLeagueTypeId === PRO_LEAGUE_TYPE ? 'Ver meus ' + PRO_SORTEADOS + ' ⚔️' : 'Escolher time ⚔️'}</button>
     </div>` : `
     <div class="box">
@@ -37798,15 +37837,93 @@ function registrarResultadoDaIlha(id, venceu){
 }
 /* qual ilha está sendo jogada agora -- é ela que recebe o resultado */
 function ilhaEmJogo(){ const v = ilhasDaJornada(); return (v && v.ilha) || null; }
-function entrarNasIlhasDaJornada(){
+/* ============================================================================
+   AS ILHAS LARANJA NO FIM DA JORNADA (23/09/2026)
+   ----------------------------------------------------------------------------
+   Pedido assim: *"tire o acesso a ilhas laranjas durante a jornada, como opção de terceira rota.
+   Faça com que ela apareça sempre na mesma tela que aparece para enfrentar a Elite 4, no fim da
+   jornada, e o treinador só consegue acessar se um dos pokemons do time tiver Surf"*.
+
+   ⚠️ A CHAVE CONTINUA SENDO O SURF NO TIME, e não o HM03 na conta: o que a travessia pede é um
+   pokémon que SAIBA nadar, e ter a Máquina guardada não é a mesma coisa. O que mudou é que a
+   recusa deixou de ser um cadeado mudo e virou um caminho -- ver o `pedirIlhasDaJornada`.
+============================================================================ */
+function ilhasNaJornadaHtml(){
+  /* ⚠️ ELA SÓ EXISTE COM AS 8 INSÍGNIAS, como a caixa da Elite ao lado: as duas são o que há pra
+     fazer quando a jornada acaba, e o chamador já decide isso. */
+  const surfista = surfistaDoTime();
+  if(game.ilhasFeita){
+    return `<div class="box">
+      <h2>${selo('ilhas')} Ilhas Laranja</h2>
+      <p>Esta jornada já atravessou o arquipélago. Ele <strong>não abre duas vezes</strong> no mesmo
+         save -- numa próxima jornada dá pra voltar.</p>
+    </div>`;
+  }
+  return `<div class="box">
+    <h2>${selo('ilhas')} Ilhas Laranja</h2>
+    <p>Cinco ilhas, cinco desafios -- e só se chega <strong>nadando</strong>. Vencer os cinco rende
+       <strong>+${ILHAS_PREMIO_NIVEIS} níveis</strong> pro time inteiro.</p>
+    ${surfista
+      ? `<p class="hint-text">${spriteHtml(surfista,'sprite-sm')} <strong>${escapeHtmlSafe(surfista.name)}</strong> leva o time até lá.</p>`
+      : ''}
+    <button class="btn primary" onclick="pedirIlhasDaJornada()">${selo('ilhas')} Atravessar pras Ilhas Laranja</button>
+  </div>`;
+}
+/* ⚠️ O BOTÃO NÃO FICA APAGADO quando falta o Surf, e essa é a decisão: um cadeado mudo não diz o
+   que fazer, e aqui SEMPRE há o que fazer -- ou ensinar o HM03 que ele já tem, ou saber como
+   consegui-lo. É a mesma razão pela qual a porta dos modos de campeão recusa com uma mensagem em
+   vez de desabilitar o botão. */
+function pedirIlhasDaJornada(){
+  if(game.ilhasFeita) return;
+  /* ⚠️ QUEM VALIDA É A AÇÃO: o botão é apresentação, e um toque forjado no console não pode
+     atravessar sem ninguém que nade. */
+  if(surfistaDoTime()){ entrarNasIlhasDaJornada('journeyEnd'); return; }
+  game.ilhasAviso = temHM('hm03') ? 'ensinar' : 'semHm';
+  render();
+}
+function fecharIlhasAviso(){ game.ilhasAviso = null; render(); }
+function ensinarSurfDaJornada(){
+  game.ilhasAviso = null;
+  /* ⚠️ O ATALHO É O `ensinarMaquinaNesteTime`, que já fixa o time ABERTO e guarda a volta: ele
+     nasceu pro "Seu time" da jornada e responde exatamente o que o pedido diz (*"ensinar o Surf
+     para seu time atual"*). Abrindo o `abrirEnsinarHm` cru, o jogador cairia na lista de TIMES --
+     uma pergunta cuja resposta já está na tela. */
+  ensinarMaquinaNesteTime('hm03');
+}
+/* ⚠️ AS DUAS FRASES SÃO AS PEDIDAS, palavra por palavra. A primeira é uma PERGUNTA porque ali há
+   o que fazer; a segunda é um aviso, porque o caminho é longo (as 17 da Zona de Safári) e não cabe
+   num botão. */
+function ilhasAvisoHtml(){
+  if(!game.ilhasAviso) return '';
+  const ensinar = game.ilhasAviso === 'ensinar';
+  /* ⚠️ E QUEM NÃO TEM CANDIDATO NO TIME não recebe a pergunta: o HM03 na conta não garante que
+     ALGUM dos seis aprende Surf, e um botão que abre uma lista vazia é pior que botão nenhum. */
+  const podeEnsinar = ensinar && candidatosDaMaquina('hm03', game.currentSaveSlot).length > 0;
+  return `<div class="modal-overlay" onclick="fecharIlhasAviso()">
+    <div class="modal-box" onclick="event.stopPropagation()">
+      <div class="modal-icon">${selo('ilhas', 'selo-tit')}</div>
+      <p>${ensinar
+        ? 'É necessário que algum Pokemon do seu time saiba o movimento Surf(HM03). Ensinar o Surf para seu time atual?'
+        : 'É necessário que algum Pokemon do seu time saiba o movimento Surf(HM03). Para obte-lo, tenha todos os pokemons da Zona Safári na Pokedex.'}</p>
+      ${podeEnsinar ? `<button class="btn success" onclick="ensinarSurfDaJornada()">Ensinar o Surf</button>` : ''}
+      ${ensinar && !podeEnsinar ? `<p class="hint-text">Nenhum dos seis aprende Surf.</p>` : ''}
+      <button class="btn secondary" onclick="fecharIlhasAviso()">Fechar</button>
+    </div>
+  </div>`;
+}
+function entrarNasIlhasDaJornada(volta){
   const quem = surfistaDoTime();
   if(!quem) return;   /* a AÇÃO recusa de novo: o card apagado é apresentação */
   const idx = (game.team || []).indexOf(quem);
   game.ilhasJornada = {
     surfista: { idx, monId: quem.id || null, speciesId: quem.speciesId, level: quem.level, shiny: !!quem.shiny },
     vencidas: [], tentativas: {},
-    /* ⚠️ PRA ONDE VOLTAR quando as ilhas acabarem: a jornada segue pro encontro selvagem do trecho,
-       como as outras duas rotas de chave fazem quando terminam. */
+    /* ⚠️ PRA ONDE VOLTAR quando as ilhas acabarem, e ela é GRAVADA porque as duas portas voltam
+       pra lugares diferentes: pelo FIM da jornada (a porta de hoje) o jogador volta pro
+       `journeyEnd`, e pela CARTA (a porta velha, que save antigo ainda pode ter na mão) ele segue
+       pro encontro selvagem do trecho. Sem o campo, quem entrasse pelo fim cairia num encontro
+       selvagem que aquela tela não tem. */
+    volta: volta,
     trecho: game.gymIndex
   };
   abrirIlhas();
@@ -37825,7 +37942,15 @@ function abrirIlhas(){
 function sairDasIlhas(){
   if(!naJornadaDasIlhas()){ openSaveSelect(); return; }
   const tudo = ilhasFechouTudo();
-  game.ilhasResultado = { tudo, vencidas: ilhasVencidas(), total: ilhasComJogo().length, niveis: 0 };
+  /* ⚠️ A VOLTA ATRAVESSA O RESULTADO porque a visita é ANULADA três linhas abaixo -- e é dela que
+     o `seguirDasIlhas` precisa. Sem repassar, o jogador que entrou pelo fim da jornada cairia no
+     encontro selvagem, que é a volta da porta velha. */
+  const voltaPra = (game.ilhasJornada || {}).volta || null;
+  game.ilhasResultado = { tudo, vencidas: ilhasVencidas(), total: ilhasComJogo().length, niveis: 0, volta: voltaPra };
+  /* ⚠️ UMA VEZ POR JORNADA, e a marca é o que sustenta isso: pela CARTA a regra vinha de graça (a
+     carta sumia do trecho), e no FIM da jornada a tela fica lá pra sempre -- sem a marca, o prêmio
+     de +${ILHAS_PREMIO_NIVEIS} níveis sairia de novo a cada visita, sem teto. */
+  game.ilhasFeita = true;
   /* ⚠️ O PRÊMIO É PAGO UMA VEZ SÓ, e quem garante isso é o CONTEXTO SER ANULADO três linhas
      abaixo: a segunda chamada não acha visita nenhuma e não paga. Houve aqui uma marca
      `premiado` de cinto-e-suspensório, e a conferência de acusação a pegou -- religando o
@@ -37844,7 +37969,11 @@ function sairDasIlhas(){
    time inteiro é a maior recompensa da jornada fora do Bônus de Kanto -- pagá-la em silêncio seria
    o erro da especialidade que valia 1% e não tinha selo. */
 function seguirDasIlhas(){
+  const volta = (game.ilhasResultado || {}).volta;
   game.ilhasResultado = null;
+  /* ⚠️ SEM O CAMPO ele cai no encontro selvagem, que é o que a porta VELHA (a carta) fazia -- e é
+     o certo pra quem entrou por ela, inclusive num save gravado antes deste campo existir. */
+  if(volta){ game.screen = volta; maybeAutoSave(); render(); return; }
   goToWildEncounter();
 }
 function renderIlhasFim(){
@@ -41158,6 +41287,7 @@ function render(){
   if(game.maquinaAptos){ html += renderAptosModal(); }
   if(game.aposentarPergunta){ html += renderAposentadoriaModal(); }
   if(game.hmGanhoModal){ html += renderHmGanhoModal(); }
+  if(game.ilhasAviso){ html += ilhasAvisoHtml(); }
   /* AS NOVIDADES: nascem só na home (o `conferirNovidades` guarda a tela), então a ordem aqui não
      disputa com ninguém -- ficam antes do convite online pela razão de sempre: ele tem 15 segundos
      de prazo e precisa ficar por cima de tudo. */

@@ -3944,7 +3944,15 @@ const LENDARIOS_DO_JOGO = ['articuno','zapdos','moltres','mewtwo','raikou','ente
    ligas e manda todo mundo pro `leftover`, que vai pro ciclo seguinte. Nao foi preciso inventar
    regra nenhuma: o comportamento pedido ja era o que a Classica faz. */
 const PRO_LEAGUE_TYPE = 'pro';
-const PRO_FAIXAS = [[55, 70], [15, 30], [35, 50]];
+/* ⚠️ A ORDEM DA ROTACAO E BRONZE -> PRATA -> OURO (23/09/2026, a pedido: *"uma faixa de level e
+   selecionada seguindo a ordem: Liga Pro Bronze: Level 15-30 ... Prata: 35-50 ... Ouro: 55-70"*).
+   Ela era 55-70 -> 15-30 -> 35-50, que foi o pedido de quando a liga nasceu -- e a escada de
+   prestigio e o que vale hoje.
+   ⚠️ REORDENAR ESTA TABELA MUDA A FAIXA DE TODO CICLO JA GRAVADO, porque o `proFaixa` do ciclo e
+   um INDICE. E como o bolo e semeado por `uid + cycleId + faixa`, o time de quem ja se inscreveu
+   deixaria de bater e o `drawCycle` o DESCARTARIA em silencio (o filtro roda antes do leftover).
+   Por isso a virada veio com o carimbo do ciclo aberto reconciliado em producao. */
+const PRO_FAIXAS = [[15, 30], [35, 50], [55, 70]];
 const PRO_SORTEADOS = 12;      // quantos aparecem na tela
 const PRO_ESCOLHE = 6;         // quantos entram na liga
 const PRO_CHANCE_SHINY = 0.05; // por pokemon, como pedido
