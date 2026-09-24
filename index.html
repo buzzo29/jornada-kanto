@@ -938,6 +938,57 @@
       linear-gradient(0deg,transparent 58%,rgba(255,255,255,.10) 58.3%,transparent 58.6%);
     opacity:0;
   }
+  /* ⚠️ A CHUVA CAINDO NA CENA (24/09/2026) -- ver a nota do `chuvaDaCenaHtml`.
+     SÃO DUAS CAMADAS, e a profundidade é o motivo: a de TRÁS fica ATRÁS dos pokémon (z-index 2,
+     abaixo do palco do sprite, que é 5) e a da FRENTE na frente deles (7) e ATRÁS da camada de
+     efeitos (8) e dos painéis (10) -- chuva por cima do número de dano esconderia justamente o que
+     o jogador está lendo naquele instante.
+     ⚠️ O LOOP FECHA EXATO, e isso NÃO é estética: o `render()` recria o innerHTML da tela inteira
+     (nos passos marcados da animação) e TODA animação de CSS recomeça junto -- é o mesmo motivo
+     pelo qual o GIF do sprite volta ao primeiro quadro, que a Pescaria já pagou. Como o desenho é
+     um padrão que se REPETE e o movimento é de um número INTEIRO de ladrilhos por ciclo, o quadro
+     final é idêntico ao inicial: o recomeço é invisível. Com um movimento que não fosse múltiplo
+     do ladrilho, a chuva daria um pulo a cada redesenho.
+     ⚠️ E O MOVIMENTO É `transform`, nunca `background-position`: aquele é composto na GPU e este
+     REPINTA o elemento inteiro a 60fps -- num celular, numa camada do tamanho da cena.
+     ⚠️ E O RISCO NÃO PODE SER PARALELO À DIAGONAL DO LADRILHO, senão ele CONECTA com o do
+     ladrilho de cima e a chuva vira uma grade de linhas infinitas -- e linha infinita deslizando
+     sobre si mesma parece PARADA. Por isso o passo é 1 ladrilho na horizontal e 3 na vertical
+     (inclinação 3), e não 1 e 1. A inclinação 3 é a que dá os 108deg do gradiente: a faixa de cor
+     é perpendicular à direção do gradiente, então ela sai paralela ao caminho da gota.
+     ⚠️ E ELA É DESENHO, não imagem: a regra da casa (nenhuma imagem de fora) mais a lição dos
+     atlas -- um PNG embutido cresceria o index.html, que é baixado INTEIRO em toda abertura do
+     jogo, porque o Hosting nunca devolve 304 pra ele. Em CSS ela custa ~1 KB. */
+  .battle-chuva{
+    position:absolute;pointer-events:none;background-repeat:repeat;will-change:transform;
+  }
+  /* a de TRÁS: fina, esparsa e mais lenta -- é a que está longe. ⚠️ A folga do `inset` tem que
+     cobrir o caminho de UM CICLO (o `translate3d` logo abaixo), senão a borda de cima aparece
+     vazia no fim dele; o que sobra é clipado pelo overflow:hidden da cena, então a folga é de
+     graça. Há trava cobrando a conta -- ela é a que envelhece se alguém mexer no passo. */
+  .battle-chuva.atras{
+    inset:-130px -48px -8px -48px;
+    z-index:2;
+    background-color:rgba(38,62,96,.12);
+    background-image:
+      linear-gradient(108deg,transparent 0 47%,rgba(226,240,255,.52) 47% 52%,transparent 52% 100%),
+      linear-gradient(108deg,transparent 0 60%,rgba(226,240,255,.30) 60% 62.5%,transparent 62.5% 100%);
+    background-size:20px 8px, 40px 24px;
+    animation:battle-chuva-atras .36s linear infinite;
+  }
+  /* a da FRENTE: maior, mais clara e mais rápida -- é a que passa perto. Ela veia o pokémon de
+     leve, e é isso que põe o bicho DENTRO da chuva em vez de na frente de um papel de parede. */
+  .battle-chuva.frente{
+    inset:-180px -64px -8px -64px;
+    z-index:7;
+    background-image:
+      linear-gradient(108deg,transparent 0 45%,rgba(255,255,255,.60) 45% 49.5%,transparent 49.5% 100%),
+      linear-gradient(108deg,transparent 0 68%,rgba(255,255,255,.32) 68% 70%,transparent 70% 100%);
+    background-size:28px 14px, 56px 42px;
+    animation:battle-chuva-frente .34s linear infinite;
+  }
+  @keyframes battle-chuva-atras{ to{ transform:translate3d(-40px,120px,0); } }
+  @keyframes battle-chuva-frente{ to{ transform:translate3d(-56px,168px,0); } }
   .battle-scene .battle-fighter{
     position:absolute;inset:0;z-index:auto;text-align:left;pointer-events:none;
     min-width:0;
@@ -22622,7 +22673,7 @@ function renderSpecialBattling(){
       ${placarDoTreinador(game.trainerName||'Você', (loading||animating||emboscada)?m.playerAliveBefore:m.playerAliveAfter, m.playerTeamSize)}
       ${placarDoTreinador(cfg.meta.opponentName||'Adversário', (loading||animating||emboscada)?m.enemyAliveBefore:m.enemyAliveAfter, m.enemyTeamSize)}
     </div>`}
-    <div class="battle-vs${cenaNova ? ' battle-scene' : ''}"${cenaNova ? ` style="${terrainBattleSceneStyle(cfg.context==='elite' ? game.eliteTerrain : null)}"` : ''}>${cenaNova ? '\n      <div class="battle-scene-grid"></div>' : ''}
+    <div class="battle-vs${cenaNova ? ' battle-scene' : ''}"${cenaNova ? ` style="${terrainBattleSceneStyle(cfg.context==='elite' ? game.eliteTerrain : null)}"` : ''}>${cenaNova ? '\n      <div class="battle-scene-grid"></div>' + chuvaDaCenaHtml(m) : ''}
       ${fighterHtml(m, 'p', { hp: displayPlayerHp, passo: game.specialHitStep, hit: game.specialLastHit, comTerreno: false, visualNovo: cenaNova, treinador: cenaNova ? (game.trainerName||'Você') : null, vivos: (loading||animating||emboscada)?m.playerAliveBefore:m.playerAliveAfter, total: m.playerTeamSize })}
       <span class="vs-swords ${(loading||animating||emboscada)?'spin':''}">${selo('vs', 'selo-g')}</span>
       ${fighterHtml(m, 'e', { hp: displayEnemyHp, passo: game.specialHitStep, hit: game.specialLastHit, comTerreno: false, visualNovo: cenaNova, treinador: cenaNova ? (cfg.meta.opponentName||'Adversário') : null, vivos: (loading||animating||emboscada)?m.enemyAliveBefore:m.enemyAliveAfter, total: m.enemyTeamSize })}${cenaNova ? '\n      <div class="battle-fx-layer" id="battle-fx-layer"></div>' : ''}
@@ -23289,7 +23340,7 @@ function renderTrainerBattling(){
       ${placarDoTreinador(game.trainerBattlePlayerName||game.trainerName||'Você', (loading||animating)?m.playerAliveBefore:m.playerAliveAfter, m.playerTeamSize)}
       ${placarDoTreinador(game.trainerBattleOpponentName||'Adversário', (loading||animating)?m.enemyAliveBefore:m.enemyAliveAfter, m.enemyTeamSize)}
     </div>`}
-    <div class="battle-vs${cenaNova ? ' battle-scene' : ''}"${cenaNova ? ` style="${terrainBattleSceneStyle({ id: CENARIO_DA_TORRE })}"` : ''}>${cenaNova ? '\n      <div class="battle-scene-grid"></div>' : ''}
+    <div class="battle-vs${cenaNova ? ' battle-scene' : ''}"${cenaNova ? ` style="${terrainBattleSceneStyle({ id: CENARIO_DA_TORRE })}"` : ''}>${cenaNova ? '\n      <div class="battle-scene-grid"></div>' + chuvaDaCenaHtml(m) : ''}
       ${fighterHtml(m, 'p', { hp: displayPlayerHp, passo: game.trainerHitStep, hit: game.trainerLastHit, comTerreno: false, visualNovo: cenaNova, treinador: cenaNova ? (game.trainerBattlePlayerName||game.trainerName||'Você') : null, vivos: (loading||animating)?m.playerAliveBefore:m.playerAliveAfter, total: m.playerTeamSize })}
       <span class="vs-swords ${(loading||animating)?'spin':''}">${selo('vs', 'selo-g')}</span>
       ${fighterHtml(m, 'e', { hp: displayEnemyHp, passo: game.trainerHitStep, hit: game.trainerLastHit, comTerreno: false, visualNovo: cenaNova, treinador: cenaNova ? (game.trainerBattleOpponentName||'Adversário') : null, vivos: (loading||animating)?m.enemyAliveBefore:m.enemyAliveAfter, total: m.enemyTeamSize })}${cenaNova ? '\n      <div class="battle-fx-layer" id="battle-fx-layer"></div>' : ''}
@@ -23709,6 +23760,21 @@ function chuvaBadgeHtml(m){
   return `<div class="terrain-badge-row"><button class="terrain-inline-badge chuva-badge" ` +
          `onclick="event.stopPropagation();abrirEspecialInfo('chuva','Dança da Chuva','Water',${CHANCE_CHUVA},1)">` +
          `🌧️ Dança da Chuva</button></div>`;
+}
+/* ⚠️ A CHUVA CAINDO NA CENA (24/09/2026, a pedido: *"quando tiver acontecendo a dança da chuva,
+   você consegue colocar um efeito de chuva no cenário? Como se tivesse chovendo ao fundo?"*).
+   ELA VEM DO MATCHUP (`m.chuva`), como o selo -- e pelo MESMO motivo: o log é relido dias depois,
+   e ali o `chuvaRestante` já não existe. Confronto gravado antes do campo sai sem chuva, que é o
+   que ele era. E o campo é lido DEPOIS da troca de golpes, então o confronto em que a chuva
+   COMEÇOU também chove -- lido antes, ela sumiria justamente onde nasceu.
+   É UMA FUNÇÃO SÓ, lida pelas CINCO telas que desenham a cena nova (jornada/ginásio da cidade,
+   batalha especial, Torre, liga assistida e pescaria). Cinco cópias divergiriam no primeiro
+   ajuste, e a que fica pra trás é a que ninguém olha depois.
+   ⚠️ E ELA NÃO PRECISA DE GUARDA DE CENA: as cinco só a chamam de dentro do ramo `cenaNova`, e
+   fora dele as classes não existem na folha -- o desenho antigo continua byte a byte o que era. */
+function chuvaDaCenaHtml(m){
+  if(!m || !m.chuva) return '';
+  return '<div class="battle-chuva atras"></div><div class="battle-chuva frente"></div>';
 }
 /* ⚠️ QUAIS CONFRONTOS ESTAO ABERTOS -- estado de TELA, nao vai pro save (o serializeGame e uma
    lista de permissao, e este campo nao esta nela).
@@ -26393,7 +26459,7 @@ function renderBattling(){
       ${placarDoTreinador(game.trainerName||'Você', (loading||animating)?m.playerAliveBefore:m.playerAliveAfter, m.playerTeamSize)}
       ${placarDoTreinador(enemyLabel, (loading||animating)?m.enemyAliveBefore:m.enemyAliveAfter, m.enemyTeamSize)}
     </div>`}
-    <div class="battle-vs${cenaNova ? ' battle-scene' : ''}"${cenaNova ? ` style="${terrainBattleSceneStyle(terrain)}"` : ''}>${cenaNova ? '\n      <div class="battle-scene-grid"></div>' : ''}
+    <div class="battle-vs${cenaNova ? ' battle-scene' : ''}"${cenaNova ? ` style="${terrainBattleSceneStyle(terrain)}"` : ''}>${cenaNova ? '\n      <div class="battle-scene-grid"></div>' + chuvaDaCenaHtml(m) : ''}
       ${fighterHtml(m, 'p', { hp: displayPlayerHp, passo: game.revealHitStep, hit: game.revealLastHit, comTerreno: true, corDoTerreno: terrain ? terrainColor(terrain) : null, visualNovo: cenaNova, treinador: cenaNova ? (game.trainerName||'Você') : null, vivos: (loading||animating)?m.playerAliveBefore:m.playerAliveAfter, total: m.playerTeamSize })}
       <span class="vs-swords ${(loading||animating)?'spin':''}">${selo('vs', 'selo-g')}</span>
       ${fighterHtml(m, 'e', { hp: displayEnemyHp, passo: game.revealHitStep, hit: game.revealLastHit, comTerreno: true, corDoTerreno: terrain ? terrainColor(terrain) : null, visualNovo: cenaNova, treinador: cenaNova ? enemyLabel : null, vivos: (loading||animating)?m.enemyAliveBefore:m.enemyAliveAfter, total: m.enemyTeamSize })}${cenaNova ? '\n      <div class="battle-fx-layer" id="battle-fx-layer"></div>' : ''}
@@ -28505,7 +28571,7 @@ function renderLeagueWatch(){
       ${placarDoTreinador(w.playerBName, (loading||animating)?m.enemyAliveBefore:m.enemyAliveAfter, m.enemyTeamSize)}
     </div>`}
     ${cenaNova ? `<div class="battle-vs battle-scene" style="${terrainBattleSceneStyle(w.terrain)}">
-      <div class="battle-scene-grid"></div>
+      <div class="battle-scene-grid"></div>${chuvaDaCenaHtml(m)}
       ${fighterHtml(m, 'p', { hp: displayPlayerHp, passo: game.leagueWatchHitStep, hit: game.leagueWatchLastHit, comTerreno: true, corDoTerreno: w.terrain ? terrainColor(w.terrain) : null, visualNovo: true, treinador: w.playerAName, vivos: (loading||animating)?m.playerAliveBefore:m.playerAliveAfter, total: m.playerTeamSize })}
       <span class="vs-swords ${(loading||animating)?'spin':''}">${selo('vs', 'selo-g')}</span>
       ${fighterHtml(m, 'e', { hp: displayEnemyHp, passo: game.leagueWatchHitStep, hit: game.leagueWatchLastHit, comTerreno: true, corDoTerreno: w.terrain ? terrainColor(w.terrain) : null, visualNovo: true, treinador: w.playerBName, vivos: (loading||animating)?m.enemyAliveBefore:m.enemyAliveAfter, total: m.enemyTeamSize })}
@@ -36980,7 +37046,7 @@ function pescariaLutadoresHtml(b){
      pescariaPintarArea, e agora ele vem junto do painel, que o pintor já repinta a cada passo. */
   const vivosP = b.fim ? m.playerAliveAfter : m.playerAliveBefore;
   const vivosE = b.fim ? m.enemyAliveAfter : m.enemyAliveBefore;
-  return (cenaNova ? '<div class="battle-scene-grid"></div>' : '')
+  return (cenaNova ? '<div class="battle-scene-grid"></div>' + chuvaDaCenaHtml(m) : '')
        + fighterHtml(m, 'p', { hp: b.hpP, passo: b.passo, hit: b.hit, visualNovo: cenaNova,
                                treinador: cenaNova ? (game.trainerName || 'Você') : null, vivos: vivosP, total: m.playerTeamSize })
        + '<span class="vs-swords spin">' + selo('vs', 'selo-g') + '</span>'

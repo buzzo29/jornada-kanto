@@ -331,5 +331,101 @@ ok('e ela NAO alcanca o caminho antigo',
    !/\n\s*\.vs-swords\{[^}]*display:none/.test(htmlCena)
    && htmlCena.indexOf('.vs-swords{font-size:1.4rem;display:inline-block;}') >= 0);
 
+/* ============================================================================
+   A CHUVA CAINDO NA CENA (24/09/2026, a pedido).
+   ⚠️ O QUE ELAS EXISTEM PRA PEGAR nao e o desenho -- e a ARITMETICA que faz o desenho funcionar,
+   e ela nao aparece em print nenhum:
+     1) o passo tem que ser um numero INTEIRO de ladrilhos em TODA camada, senao o recomeco da
+        animacao (o render() recria o innerHTML e toda animacao de CSS reinicia junto) da um PULO;
+     2) e NENHUM sub-passo pode repetir o padrao, senao a chuva desliza sobre si mesma e parece
+        PARADA -- a armadilha da linha infinita, o primeiro desenho a ser descartado.
+   Um padrao ladrilhado (w,h) so e invariante pelas translacoes da rede {(a*w, b*h)}, entao as duas
+   coisas sao uma CONTA e nao uma opiniao. ⚠️ E ela ja pegou um defeito real: a 2a camada da FRENTE
+   tinha ladrilho 56x42 com passo (-28,84) -- 28/56 nao e inteiro, e so ELA pularia.
+   ⚠️ E OS NUMEROS SAO LIDOS DO index.html: escritos aqui, a trava mediria a si mesma. */
+console.log('\nCENA DE BATALHA -- a chuva');
+{
+  const blocoChuva = (cls) => {
+    const i = htmlCena.indexOf('.battle-chuva.' + cls + '{');
+    return i < 0 ? '' : htmlCena.slice(i, htmlCena.indexOf('}', i));
+  };
+  const passoDe = (nome) => {
+    const m = htmlCena.match(new RegExp('@keyframes battle-chuva-' + nome +
+      '\\{ to\\{ transform:translate3d\\((-?\\d+)px,(-?\\d+)px,0\\); \\} \\}'));
+    return m ? [Number(m[1]), Number(m[2])] : null;
+  };
+  const ladrilhosDe = (b) => {
+    const m = b.match(/background-size:([^;]+);/);
+    return m ? m[1].split(',').map(s => s.trim().split(/\s+/)
+                                    .map(v => Number(v.replace('px', '')))) : [];
+  };
+  ok('as duas camadas existem (a de tras e a da frente)',
+     !!blocoChuva('atras') && !!blocoChuva('frente'));
+  [['atras', 2], ['frente', 7]].forEach(([cls, zEsperado]) => {
+    const b = blocoChuva(cls), passo = passoDe(cls), tiles = ladrilhosDe(b);
+    ok('  ' + cls + ': tem passo e ladrilhos pra ler', !!passo && tiles.length >= 1);
+    if(!passo || !tiles.length) return;
+    const [dx, dy] = passo;
+    ok('  ' + cls + ': o passo e um numero INTEIRO de ladrilhos em TODA camada',
+       tiles.every(([w, h]) => Math.abs(dx) % w === 0 && dy % h === 0),
+       tiles.map(([w, h]) => (Math.abs(dx) / w) + 'x' + (dy / h)).join(' e '));
+    /* ⚠️ A CONTA DO SUB-PASSO, e ela nao e sobre fracoes 1/k: um sub-passo t*(dx,dy) cai na rede
+       quando t*n_i e t*m_i sao INTEIROS em toda camada (n_i = |dx|/w_i, m_i = dy/h_i). O menor
+       t>0 assim e 1/G, com G = mdc de TODOS os n_i e m_i -- ou seja existe sub-passo invariante
+       exatamente quando G > 1. Testar so t = 1/k perderia os t = j/G com j > 1. */
+    const mdc = (a2, b2) => b2 ? mdc(b2, a2 % b2) : a2;
+    const G = tiles.reduce((g, [w, h]) => mdc(mdc(g, Math.abs(dx) / w), dy / h), 0);
+    ok('  ' + cls + ': e NENHUM sub-passo repete o padrao (ela nao parece parada)',
+       G === 1, 'o menor passo que repete e 1/' + G + ' do ciclo');
+    /* ⚠️ a faixa de cor sai PERPENDICULAR a direcao do gradiente, entao pra ela ficar paralela ao
+       caminho da gota a conta e tan A = dy/dx -- e A e A+180 desenham a MESMA faixa. */
+    const a = Number((b.match(/linear-gradient\((\d+)deg/) || [])[1]);
+    const aEsperado = ((Math.atan2(dy, dx) * 180 / Math.PI) + 180) % 180;
+    ok('  ' + cls + ': a faixa sai PARALELA ao caminho da gota',
+       Math.abs((a % 180) - aEsperado) <= 1.5, a + 'deg (a conta pede ' + aEsperado.toFixed(1) + ')');
+    /* a folga do inset cobre o caminho de um ciclo, senao a borda de cima fica VAZIA no fim dele */
+    const ins = (b.match(/inset:(-?\d+)px (-?\d+)px/) || []).slice(1).map(Number);
+    ok('  ' + cls + ': a folga do inset cobre o ciclo inteiro',
+       ins.length === 2 && -ins[0] >= dy && -ins[1] >= Math.abs(dx),
+       'topo ' + (-ins[0]) + '>=' + dy + ', direita ' + (-ins[1]) + '>=' + Math.abs(dx));
+    ok('  ' + cls + ': fica no z-index ' + zEsperado + ' (' +
+       (zEsperado < 5 ? 'atras do pokemon' : 'na frente dele, e atras do dano e do painel') + ')',
+       new RegExp('z-index:' + zEsperado + ';').test(b));
+  });
+  /* ⚠️ E O MOVIMENTO E `transform`, nunca `background-position`: aquele e composto na GPU e este
+     REPINTA a camada inteira a 60fps, num celular, do tamanho da cena. */
+  ok('o movimento e transform (composto na GPU), nao background-position',
+     /@keyframes battle-chuva-atras\{ to\{ transform:/.test(htmlCena)
+     && !/@keyframes battle-chuva-\w+\{ to\{ background-position:/.test(htmlCena));
+  /* as duas caem com o MESMO vento, e a de tras mais devagar -- e a que esta longe */
+  const pa = passoDe('atras'), pf = passoDe('frente');
+  ok('as duas caem com a MESMA inclinacao (e o mesmo vento)',
+     !!pa && !!pf && Math.abs((pa[1] / Math.abs(pa[0])) - (pf[1] / Math.abs(pf[0]))) < 0.01,
+     pa && pf ? (pa[1] / Math.abs(pa[0])).toFixed(2) + ' e ' + (pf[1] / Math.abs(pf[0])).toFixed(2) : '');
+  const durDe = (cls) => Number((blocoChuva(cls).match(/animation:battle-chuva-\w+ ([\d.]+)s/) || [])[1]);
+  ok('e a de TRAS cai mais devagar que a da FRENTE (paralaxe)',
+     !!pa && !!pf && (pa[1] / durDe('atras')) < (pf[1] / durDe('frente')),
+     pa && pf ? Math.round(pa[1] / durDe('atras')) + ' px/s contra ' + Math.round(pf[1] / durDe('frente')) : '');
+  ok('e ela nao recebe toque (pointer-events:none)',
+     /\.battle-chuva\{[^}]*pointer-events:none/.test(htmlCena));
+
+  /* ⚠️ ELA VEM DO MATCHUP, nunca de estado global: o log e relido dias depois e ali o
+     `chuvaRestante` ja nao existe. Confronto gravado antes do campo sai SEM chuva. */
+  ok('so chove quando o CONFRONTO diz que choveu',
+     S.chuvaDaCenaHtml({ chuva: true }).length > 0
+     && S.chuvaDaCenaHtml({ chuva: false }) === ''
+     && S.chuvaDaCenaHtml({}) === '' && S.chuvaDaCenaHtml(null) === '');
+  ok('e ela desenha as DUAS camadas',
+     (S.chuvaDaCenaHtml({ chuva: true }).match(/class="battle-chuva /g) || []).length === 2,
+     S.chuvaDaCenaHtml({ chuva: true }));
+  /* ⚠️ TODA TELA QUE DESENHA A CENA TEM QUE CHAMAR: escrita em cada uma, a que ficasse pra tras
+     nao teria chuva nenhuma -- e a que ninguem olha e a do log relido. A conta e contra o NUMERO
+     de cenas, e nao um 5 escrito aqui, que envelheceria na sexta. */
+  const cenas = (htmlCena.match(/battle-scene-grid"><\/div>/g) || []).length;
+  const chamadas = (htmlCena.match(/chuvaDaCenaHtml\(m\)/g) || []).length - 1; /* menos a declaracao */
+  ok('TODA tela que desenha a cena chama a chuva', cenas > 0 && chamadas === cenas,
+     cenas + ' cenas, ' + chamadas + ' chamadas');
+}
+
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
 process.exit(falhas ? 1 : 0);

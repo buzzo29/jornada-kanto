@@ -50,6 +50,16 @@ Estrutura de arquivos, dependências e o que cada função faz: leia o código, 
   intervalo devolve o comportamento velho -- foi exatamente o que aconteceu no print da Faixa.
   Conferir com o `Deploy complete!` e, na dúvida, comparar o arquivo no ar com o local
   (`curl -s https://jornadakanto.com/index.html | cmp - index.html`).
+- **⚠️ E TODA PRÉVIA QUE FICAR NA RAIZ VAI AO AR JUNTO.** Descoberto em 24/09/2026, depois de um
+  deploy: a `previa-confusao.html` que eu tinha deixado ali respondia **200** em
+  `jornadakanto.com/previa-confusao.html`. Não é vazamento de dado (é uma tela do jogo desenhada
+  fora dele), é **lixo publicado** — e o `hosting.ignore` ganhou `**/previa-*.html` por isso, que é
+  a mesma rede que o `firestore.rules` já tinha.
+  **O arquivo sai do ar no PRÓXIMO deploy**: cada `firebase deploy --only hosting` publica um
+  instantâneo completo do diretório, então apagar aqui basta — não há o que remover na mão.
+  ⚠️ **A lição vale pra o diretório inteiro:** o que serve pra MEDIR (as prévias, os relatórios) não
+  pode morar na raiz sem entrar no ignore — e o `tools/` e o `CLAUDE.md` já estão no ar pelo mesmo
+  motivo, esses de propósito.
 - **`firestore.rules` é a fonte da verdade desde 30/08/2026**, quando o `firebase.json` ganhou a
   seção `firestore`. Antes disso ele não era publicado por nada e o console era quem mandava —
   então o arquivo derrapou até ficar **70 linhas atrás** da produção (47 contra 117). Publicá-lo
@@ -3330,6 +3340,9 @@ explicação de menos. Hoje:
 - **E O SELO DE FAIXA CONTINUA nas QUATRO telas de batalha** (`chuvaBadgeHtml`), na forma do selo de
   terreno: ele é o vizinho na tela e já ensina a ler aquela faixa como "condição desta partida". É
   ele que responde "este confronto está sob chuva?" nos confrontos 2 e 3, onde a frase já cedeu.
+- **⚠️ E DESDE 24/09/2026 SÃO QUATRO: CHOVE NO CENÁRIO** — ver **A CHUVA CAINDO NA CENA**, na seção
+  da cena nova de batalha. Ela sai do MESMO `m.chuva` que o emoji e o selo, então ela responde a
+  pergunta dos confrontos 2 e 3 **sem uma palavra** — e é a única das quatro que se vê sem ler.
   Ele **saiu do log**, onde virou a linha + o emoji.
 - Tudo isso sai do **MATCHUP** (`m.chuva` e o registro do diário), não de um estado global: o log é
   relido dias depois, e ali o `chuvaRestante` já não existe. E o `m.chuva` é lido **DEPOIS** da
@@ -7208,6 +7221,135 @@ pelo sandbox, que não tem body. Todo `<use href="#s-x">` sai **vazio, do tamanh
 MEDIÇÃO de largura estava certa e a TELA parecia quebrada.
 A prévia passou a injetar o `svgDosSelos()` na mão (79 símbolos). **É a mesma nota que a seção do
 anúncio das Ilhas já carrega**, e ela custou uma rodada aqui de novo.
+
+### A CHUVA CAINDO NA CENA (24/09/2026)
+
+Pedida assim: *"Quando tiver acontecendo a dança da chuva, voce consegue colocar um efeito de chuva
+no cenário? Como se tisse chovendo ao fundo?"*.
+
+**⚠️ A DANÇA DA CHUVA JÁ TINHA TRÊS COISAS NA TELA** (a frase, a linha do log e o 🌧️ em cima do ×) —
+e **as três são TEXTO**: elas contam que está chovendo. Com o cenário desenhado atrás dos lutadores
+desde 22/09, o clima passou a ser a única condição de batalha que **não se vê**. Esta é a quarta, e
+é a única que se lê sem ler.
+
+#### ⚠️ ELA VEM DO MATCHUP, NUNCA DE ESTADO GLOBAL
+
+```js
+function chuvaDaCenaHtml(m){
+  if(!m || !m.chuva) return '';
+  return '<div class="battle-chuva atras"></div><div class="battle-chuva frente"></div>';
+}
+```
+
+O `m.chuva` é a MESMA fonte do emoji e do selo, e a razão dela existir é a de sempre aqui: **o log é
+relido dias depois**, e ali o `chuvaRestante` já não existe. Lendo o estado, um confronto de ontem
+choveria porque está chovendo HOJE — ou não choveria tendo chovido.
+
+- **⚠️ E ISSO DÁ DE GRAÇA O QUE OS CONFRONTOS 2 E 3 PRECISAVAM.** A frase só sai no confronto que
+  ATIVOU a chuva (*"somente na batalha que foi ativada"*, o pedido de 11/09), então nos dois
+  seguintes o que restava era o emoji. Agora eles chovem.
+- **Confronto gravado antes do campo sai seco**, como sempre saiu — log velho não pode sumir.
+- **⚠️ E NÃO HÁ GUARDA DE CENA, de propósito:** a função é chamada de DENTRO do ramo que desenha a
+  cena, nas cinco telas. Uma segunda pergunta ali seria a mesma regra escrita duas vezes.
+
+#### SÃO DUAS CAMADAS, E O QUE AS SEPARA É O POKÉMON NO MEIO
+
+| | ladrilhos | passo por ciclo | duração | velocidade | z-index |
+|---|---|---|---|---|---|
+| **trás** | 20×8 e 40×24 | (−40, 120) | .36s | **333 px/s** | **2** |
+| **frente** | 28×14 e 56×42 | (−56, 168) | .34s | **494 px/s** | **7** |
+
+**⚠️ É O z-index QUE PÕE O BICHO DENTRO DA CHUVA em vez de na frente de um papel de parede.** A pilha
+da cena é grade=1, lutadores=0, impacto=2, palco do sprite=5, efeitos=8, painel e número de dano=10:
+a de **trás** fica atrás do pokémon e a da **frente** passa na frente dele — **e as duas ficam abaixo
+do número de dano e do painel**, porque chuva por cima deles esconderia justamente o que o jogador
+está lendo naquele instante.
+
+- **AS DUAS CAEM COM A MESMA INCLINAÇÃO** (3, ou seja 120/40 = 168/56): é o mesmo vento. A de trás
+  cai mais devagar porque ela está longe — é a paralaxe que dá profundidade, e há trava cobrando a
+  ordem (invertida, a chuva longe correria mais que a de perto).
+- **⚠️ O ÂNGULO DO GRADIENTE NÃO É A INCLINAÇÃO: é `atan2(dy,dx)`, e a conta engana.** No CSS a
+  DIREÇÃO do gradiente é `(sin A, −cos A)` e **a faixa de cor sai PERPENDICULAR a ela** — pra a faixa
+  ficar paralela ao caminho da gota, `tan A = dy/dx`. Com inclinação 3 isso dá **108,4deg** (o CSS
+  usa 108), e não os 251,6 que uma leitura direta da direção pede. A trava confere a conta, e
+  **módulo 180**: A e A+180 desenham a MESMA faixa.
+
+#### ⚠️ A PARTE QUE NÃO APARECE EM PRINT NENHUM: O CICLO TEM QUE FECHAR
+
+**O `render()` recria o `innerHTML` inteiro, e com ele TODA animação de CSS reinicia** — é o mesmo
+motivo pelo qual o GIF do sprite volta ao primeiro quadro, que a Pescaria já pagou em 19/09. E o
+render acontece nos passos marcados da animação, ou seja **várias vezes por confronto**.
+
+O que salva é o desenho ser **ladrilhado** e o passo ser um número **INTEIRO de ladrilhos**: o quadro
+final é idêntico ao inicial, então **o recomeço é invisível**. Com um passo que não fosse múltiplo do
+ladrilho, a chuva daria um **pulo a cada redesenho**.
+
+**⚠️ E ISSO PEGOU UM DEFEITO REAL, QUE O OLHO NÃO PEGARIA: a 2ª camada da FRENTE tinha ladrilho 56×42
+com passo (−28, 84).** `28/56` não é inteiro — então **só ELA** pularia, no meio de uma chuva em que
+todo o resto fecha. Um pulo de uma camada de 32% de opacidade, num quadro, num celular: só a conta
+acha. O passo foi pra (−56, 168) e a duração de .28 pra .34s.
+
+**⚠️ E A SEGUNDA METADE É O OPOSTO: NENHUM SUB-PASSO PODE REPETIR O PADRÃO.** Se o padrão já voltar a
+ser o mesmo na metade do caminho, a chuva **desliza sobre si mesma e parece PARADA** — que é a
+armadilha da linha infinita, o primeiro desenho a ser descartado aqui.
+
+Um padrão ladrilhado `(w,h)` só é invariante pelas translações da rede `{(a·w, b·h)}`, então as duas
+coisas são **uma conta e não uma opinião**: com passo `(dx,dy)` e camadas `(w_i,h_i)`, existe
+sub-passo invariante se e só se o **mdc de todos os `dx/w_i` e `dy/h_i` é maior que 1**. Medido: nas
+duas camadas ele é **1** — zero sub-passos invariantes.
+
+- **A FOLGA DO `inset` COBRE UM CICLO INTEIRO** (`-130px -48px` atrás, `-180px -64px` na frente),
+  senão a borda de cima aparece **vazia** no fim dele. O que sobra é clipado pelo `overflow:hidden`
+  da cena, então a folga é de graça.
+- **⚠️ O MOVIMENTO É `transform`, NUNCA `background-position`:** aquele é composto na GPU e este
+  **REPINTA a camada inteira a 60fps**, do tamanho da cena, num celular. Há trava.
+- **E ela não recebe toque** (`pointer-events:none`): duas camadas por cima da cena tapariam os
+  cliques dela.
+
+#### ⚠️ É DESENHO, NÃO IMAGEM — e o custo é o argumento
+
+A regra da casa é que **nenhuma imagem vem de fora** (dois episódios de hotlink que funcionavam
+local e morriam publicados), e a lição dos atlas é mais forte: **o `index.html` é baixado INTEIRO em
+toda abertura**, porque o Hosting nunca devolve 304 pra ele. Um PNG embutido entraria nessa conta.
+
+| | |
+|---|---|
+| o arquivo | 2.680.848 → **2.685.695 bytes** (+4.847, quase tudo comentário) |
+| **o que TRAFEGA (gzip)** | **849,5 → 851,2 KB — +1.749 bytes** |
+| e **zero** quando não chove | a função devolve string vazia: nem as camadas existem no DOM |
+
+#### O QUE FOI MEDIDO
+
+**Medido a 320px, no navegador, com e sem chuva:** o documento fica em **320 de 320** (sem rolagem
+lateral), a cena tem a **MESMA altura nos dois casos (368px)** — as camadas são `position:absolute`,
+então elas não empurram nada —, e o texto do painel do lutador fica entre **15,24 e 16,48:1** de
+contraste **por cima da chuva**, contra o mínimo de 4,5 do AA. Ela é atmosfera; ela não disputa a
+leitura com o que importa.
+
+**NO MOTOR, NADA:** `MOTOR e6cd16d15e0f / DIARIO 1e9b7214c627`, **idêntico ao HEAD** em 900 batalhas
+semeadas — e o instrumento é sensível (com o `CRIT_BASE` mexido os dois hashes mudam). Isto é CSS,
+uma função de apresentação e cinco interpolações.
+
+**⚠️ E O `test-especiais` FALHOU UMA VEZ EM QUATRO RODADAS**, no flake que este arquivo já nomeia
+desde 17/09 (*"NINGUÉM ataca com a barra em zero"*, sempre no par `Charmeleon × Mankey`). Ele **não
+é sinal de regressão**, e a perna mais barata da prova é a que resolveu aqui: **o diff não encosta em
+uma linha do que a trava lê** — zero ocorrências de `sequenciaDoConfronto`, `passosVisiveis`,
+`fraseDoEspecial`, `doExchange`, `calcDamage`, `marcarCriticos`, `fatiaDoGolpe`,
+`buildAnimatedHitSequence` e `simulateGymBattle` nas 76 linhas mexidas. Mais a impressão idêntica e
+3 rodadas limpas em seguida.
+
+- **Se um dia incomodar**, as réguas são a **opacidade** das faixas (`.52`/`.30` atrás, `.60`/`.32` na
+  frente) e a **duração** — e mexer no passo obriga a refazer a conta do ciclo, que é o que a trava
+  cobra. Tirar a chuva inteira é uma linha no `chuvaDaCenaHtml`.
+
+`tools/test-terrenos.js` ganhou **20 asserções**, e todas leem os números **do `index.html`**
+(escritos no teste, ele mediria a si mesmo): as duas camadas existindo, o passo sendo inteiro em TODA
+camada, o mdc, o ângulo pela conta, a folga do inset, os dois z-index, `transform` e não
+`background-position`, a mesma inclinação nas duas, a de trás mais devagar, o `pointer-events`, a
+função só emitindo com `m.chuva`, as duas camadas, e — a que importa — **TODA tela que desenha a cena
+chamando a chuva**, contado contra o **número de cenas** e não contra um 5 escrito ali, que
+envelheceria na sexta.
+**Conferido que os 13 defeitos religados acusam.**
 
 ### ⚠️ O QUE FICA EM ABERTO
 
