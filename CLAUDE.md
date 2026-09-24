@@ -547,10 +547,14 @@ de golpes.
   `tools/test-especiais.js` confere que todo golpe que o motor sabe gerar tem tipo declarado — sem
   isso o selo sairia num cinza genérico, e só no confronto que teve aquele golpe.
   (**O número "59 espécies das quatro listas" que estava aqui era de outra época** e envelheceu
-  calado: são ONZE listas hoje, e **157 das 250** espécies têm pelo menos um especial — 9
-  autodestruição, 43 sono, 17 anulação, 6 Metrônomo, 10 Recuperar, 23 drenagem, 19 Fúria, 82
-  confusão, 7 Fúria do Dragão, 1 Sketch, 13 Dança da Chuva e 2 Sino Curativo, com sobreposição. O teste varre as
-  listas em vez de contar, que é o que impede o próximo número de envelhecer do mesmo jeito.)
+  calado: são DOZE listas hoje, e **113 das 250** espécies têm pelo menos um especial — 9
+  autodestruição, 43 sono, 17 anulação, 6 Metrônomo, 10 Recuperar, 2 Sino Curativo, 19 Fúria, 7
+  Fúria do Dragão, 13 Dança da Chuva, 6 Remoinho, 4 Dança das Espadas, 3 Dança da Pluma e 1 Sketch,
+  com sobreposição. O teste varre as listas em vez de contar, que é o que impede o próximo número de
+  envelhecer do mesmo jeito.)
+  **⚠️ ERAM 157 E ONZE LISTAS até 24/09/2026**, e as duas mudanças que derrubaram isso já estavam
+  escritas aqui: a **drenagem** saiu da ficha em 15/09 (ela virou efeito de GOLPE) e a **confusão**
+  em 24/09, pelo mesmo motivo — e ela levava **82 espécies** consigo, que é quase toda a queda.
 - **A linha do log tem forma própria aqui.** A regra do log é "uma forma só" (ver a seção acima), e
   estes três são as **exceções**: não são dano, são o confronto inteiro decidido de uma vez, e o
   jogador precisa ler por quê. Um `−0` solto faria procurar bug onde é regra — o mesmo motivo do
@@ -1060,6 +1064,12 @@ registra pra Clefable foram medidos COM o defeito. O ganho real da mecânica é 
   repassando o `op`, os dois motores fixando o golpe, e as duas frases.
 
 ### A CONFUSÃO: O ADVERSÁRIO SE ACERTA (10/09/2026)
+
+> **⚠️ ISTO É HISTÓRIA desde 24/09/2026: a PASSIVA acabou e a confusão virou STATUS POR ATAQUE** —
+> ver **A CONFUSÃO VIROU STATUS POR ATAQUE**, logo abaixo. Nenhum pokémon tem mais passiva de
+> confusão; quem confunde é o GOLPE, com a chance dele. O que continua valendo inteiro daqui é a
+> **conta do auto-dano** (o espelho sem tipo e sem crítico, e a cauda de atributo que ela produz) e
+> a **apresentação da marca velha** (`confusao`), que fica porque log velho não pode sumir.
 
 Pedida assim: *"os pokemons que possuem o ataque confusão têm 10% de chance de deixar o adversário
 confuso. Esse evento ocorre logo no início da partida. Caso dê positivo, o adversário ataca ele
@@ -1722,6 +1732,317 @@ do painel geral **não mudou** — o caso é raro o bastante para não aparecer 
 de 800 jornadas de cada lado, **6.400 de cada**, o MESMO bot contra duas cópias congeladas, desvio
 tirado de ENTRE os blocos, **5 de 8 blocos** pro lado do conserto). Ruído, e a direção é a esperada:
 o que sumiu foi status aplicado **por quem não atacou**, e isso caía dos dois lados.
+
+### A CONFUSÃO VIROU STATUS POR ATAQUE (24/09/2026)
+
+Pedida assim, com a Bulbapedia como fonte: *"hoje ele é dano passivo que tem chance de acontecer no
+início da batalha, agora você vai tirar esse passivo e vamos colocar ele para ter chance do oponente
+ficar confuso de acordo com a chance que o ataque tem de causar confusão. É basicamente a mesma
+mecânica que os ataques de fogo que deixam o oponente queimando ... tem uma chance de ao invés de
+atacar o oponente, ele se ataca durante a confusão. Não esquece de colocar o * nos cards de ataques
+falando que aquele ataque tem % de deixar o oponente confuso"*.
+
+**⚠️ ELA É A QUINTA MECÂNICA POR ATAQUE — e a ÚNICA que entrou no lugar de uma PASSIVA.** As quatro
+anteriores (gelo, queimadura, veneno, paralisia) nasceram do nada; esta **substituiu** a passiva de
+10% por confronto que 82 espécies tinham desde 10/09/2026.
+
+| | a passiva (até 23/09) | o status por ataque (hoje) |
+|---|---|---|
+| quem confunde | a **ESPÉCIE** (82 delas, `CONFUSAO`) | o **GOLPE** (6 deles, `GOLPES_QUE_CONFUNDEM`) |
+| quando é sorteado | na **ABERTURA**, 1× por confronto | a cada **GOLPE que conecta** |
+| a chance | **10%**, uma só | **10% a 100%**, por golpe |
+| quanto dura | **um** auto-golpe e acabou | **2 a 5 turnos**, e ela ATRAVESSA confrontos |
+| sai em | **5,7%** dos confrontos | **0,65%** |
+
+**⚠️ ELA FICOU 8,8× MAIS RARA, e isso é o preço da fidelidade:** medido, ela sai em **0,65% dos
+confrontos e 2,7% das batalhas 3x3** — entre o gelo (0,18%) e a queimadura (0,80%), quando **era a
+mais comum de todo o bloco**. A causa é dupla: 82 espécies viraram **30 que LEVAM** um dos seis no
+Lv.70, e a chance passou a ser do golpe.
+
+#### OS SEIS GOLPES, com as chances oficiais da Gen 3
+
+| golpe | poder | chance |
+|---|---|---|
+| **Soco Dinâmico** | 100 | **100%** |
+| Pulso de Água | 60 | 20% |
+| Soco Tonto | 70 | 20% |
+| Confusão | 50 | 10% |
+| Psicoraio | 65 | 10% |
+| Feixe de Sinal | 75 | 10% |
+
+**A lista saiu do dado** (Showdown, mod da Gen 3), o mesmo caminho das outras quatro.
+**⚠️ E OS CINCO GOLPES DE STATUS QUE CONFUNDIAM FICARAM DE FORA** — Supersom, Raio Confuso, Bravata,
+Beijo Doce e Bajulação são **poder 0**, e a base só cadastra dano. É a MESMA regra que tirou o Pó
+Venenoso do veneno e o Will-O-Wisp da queimadura.
+
+**⚠️ E É ELA QUE EXPLICA A QUEDA, não uma escolha — medido, pra onde foram os 82 donos da passiva:**
+
+| | |
+|---|---|
+| **continuam confundindo** (levam um dos seis) | **28** |
+| perderam porque o golpe deles era de **STATUS** | **48** |
+| perderam porque **não LEVAM** o de dano no moveset | 6 (Exeggutor, Noctowl, Octillery…) |
+| **confundem hoje e NÃO estavam na passiva** | **2** — Kabutops e **Mewtwo** |
+
+Ou seja **48 dos 54 que perderam** é a regra do poder 0, e os outros 6 são o motor escolhendo outro
+golpe. **28 + 2 = os 30 de hoje.**
+
+#### ⚠️ O SOCO DINÂMICO É 100% E QUASE NUNCA SAI — o contrário do Canhão de Choque
+
+O precedente exato é a paralisia: lá o **Canhão de Choque** (100%) vale **+24,7 pontos** num
+Magneton, a maior alavanca individual daquela série. Aqui **não acontece**, e a razão é o moveset:
+quem aprende o Soco Dinâmico é a linha do **Machop**, e ela também aprende o **GOLPE CRUZADO** —
+mesmo poder 100, Lutador igual, **e crítico alto**. O `melhorAtaque` escolhe o Cruzado.
+
+Medido, 1x1 contra um painel de 8 no Lv.50 (2.000 batalhas por célula):
+
+| | leva | USA | sem | com | |
+|---|---|---|---|---|---|
+| **Golduck** | Confusão | **6/8** | 26,1% | **29,3%** | **+3,3** |
+| **Venomoth** | Psicoraio, Confusão | 4/8 | 29,6% | 30,9% | +1,2 |
+| Machop | **Soco Dinâmico (100%)** | **0/8** | 10,1% | 10,1% | **0,0** |
+| Hypno | Confusão | 0/8 | 53,6% | 53,6% | 0,0 |
+| Kangaskhan | Soco Tonto | 0/8 | 31,3% | 31,3% | 0,0 |
+
+**⚠️ OS ZEROS SÃO EXATOS, e é isso que os explica: o rng nem é consumido** — o `tentarConfundir` sai
+antes do `rng()` quando o golpe não está na tabela. O Hypno tem **Psíquico (90)** e o Kangaskhan tem
+**Mega Soco (80)**: os dois preferem. É a mesma conclusão do Rolamento, dos golpes de prender e do
+gelo — **o motor está certo em recusar**.
+
+**Se um dia o Soco Dinâmico for pra valer, a régua não é a chance dele** (já é 100%): é tirar o
+Golpe Cruzado do moveset da linha do Machop, que é mexer na base de golpes.
+
+#### AS REGRAS DA GEN 3, uma a uma
+
+- **2 a 5 turnos, uniforme** (`CONFUSAO_TURNOS_MIN/MAX`) — medido, média **3,50** em 20.000 sorteios.
+- **50% por turno de se acertar** (`CHANCE_CONFUSAO_ACERTA`). **⚠️ Os 33% são da Gen 7**, e este jogo
+  é Gen 3 — a mesma armadilha de geração que o Low Kick e o Tackle 35/95 já custaram.
+- **O auto-golpe é um golpe SEM TIPO, FÍSICO, de poder 40, sem crítico e sem STAB** (`CONFUSAO_PODER`).
+  **⚠️ O FÍSICO É NOVO**: a passiva usava a categoria do TIPO (a regra da Gen 1 deste motor), e o
+  auto-golpe da Gen 3 é sempre físico. Medido: um **Alakazam** (Atk 50, Sp.Atk 135) se acerta com
+  **16,1%** da barra; especial, ele se arrebentaria.
+- **⚠️ NENHUM TIPO É IMUNE** — nem na Gen 3 nem em geração nenhuma. O que existe é a **imunidade do
+  GOLPE** (o mesmo `golpeAfetaOAlvo` da paralisia): um Psicoraio não confunde um **Sombrio** que ele
+  nem alcança, porque este motor sempre "conecta" (piso de 1 de dano e golpe teimoso).
+- **NÃO ACUMULA**: quem já está confuso não é reconfundido — a marca seria reescrita e o contador
+  voltaria ao começo a cada golpe.
+- **⚠️ E ELA ATRAVESSA CONFRONTOS**, como a queimadura: o `_confuso` só é solto no `encerrarBatalha`.
+  Sem soltar, um pokémon sairia da batalha confuso **pra sempre** — e como o campo começa com `_`,
+  o save nem guardaria o motivo (ele voltaria são no F5 e confuso até lá). É o vazamento que o teto
+  de HP da Fúria teve.
+
+#### ⚠️ QUEM ESTÁ CONFUSO NÃO ATACA NAQUELA TROCA, e o contador anda na ENTRADA
+
+O `confunde()` roda no começo do `doExchange`, ao lado da trava da paralisia, e ele decide **três**
+coisas de uma vez: decrementa o contador, devolve `"saiu"` quando ele zera, e sorteia os 50%.
+
+- **⚠️ ELE DECREMENTA ANTES DE SORTEAR**, e isso é o que faz *"2 a 5 turnos"* ser verdade: o turno
+  conta tenha havido auto-golpe ou não. É a mesma regra do sono (*"o sono compra TURNOS, não
+  golpes"*).
+- **A guarda de quem não ataca é a mesma dos outros**: o `activeConfuso` entra ao lado da paralisia
+  e do sono no `dmgToEnemy`/`dmgToActive`. Escrita em cada `tentar*`, o próximo estado nasceria sem.
+- **⚠️ E O `tentarConfundir` PRECISA DA GUARDA DO GOLPE TER SAÍDO** (`!primeiroAtacou`) — é a lição
+  de 18/09: o `lastMove` de quem não atacou fica da troca ANTERIOR, e sem ela um pokémon **dormindo**
+  confundiria o adversário. **Os `tentar*` por lado foram de SEIS para SETE**, e a trava conta.
+
+#### ⚠️ E ELA FUROU A FAIXA DE FOCO — o defeito que a trava genérica pegou
+
+O auto-golpe é o **quinto** caminho que zera HP no `doExchange`, e ele precisou da Faixa como os
+outros quatro. **Mas o caso duro não é o óbvio:** um pokémon que **já estava com 1 de HP** e se
+acerta faz a Faixa vigiar e **SER GASTA**, e aí `antes - p.hp` dá **ZERO** — o `seAcertou` devolvia
+`null` ali, o item saía do bolso **sem uma linha na tela**, e o golpe seguinte o matava sem Faixa.
+
+**⚠️ ISSO FURA A PROMESSA DO ITEM** (*"quem carrega a Faixa nunca termina um confronto em 0 sem ela
+ter disparado antes"*), que é exatamente o que aquela trava existe pra cobrar — e ela pegou. Medido:
+ela o acha em **~1 rodada de 20** (são 6.000 batalhas por rodada, com `Math.random`), e o exemplo
+trazia `confundiu` nas duas vezes.
+
+Hoje a Faixa disparando **conta mesmo com dano zero**, e a **linha do auto-dano não sai** nesse caso
+(dano zero não vira linha — a regra da casa). Quem explica o 1 na barra é a linha da FAIXA.
+**⚠️ E A TRAVA NOVA É DETERMINÍSTICA**, porque a genérica é 1-em-20: ela monta o caso direto, e o
+fixture precisou de **três** coisas — o alvo **já** confuso (o contador anda na entrada, então quem
+acaba de ficar confuso só se acerta na troca seguinte), o alvo **mais rápido** (com 1 de HP qualquer
+golpe o mata, e a Faixa sairia no golpe em vez do auto-dano) e o alvo com a Faixa e 1 de HP.
+**A primeira versão dela passou por ACIDENTE** — a linha `faixa` que ela achava era do golpe comum.
+
+#### NA TELA: três linhas, e o ícone segue o molde do GELO
+
+| linha | quando | frase |
+|---|---|---|
+| `confundiu` | depois do golpe que causou | *💫 Snorlax ficou confuso com SOCO DINÂMICO!* |
+| `confuso` | no lugar do golpe dele | *💫 Snorlax se acertou na própria confusão e perdeu 59 de HP* |
+| `saiuConfusao` | quando ela passa | *💫 Snorlax não está mais confuso!* |
+
+- **"COM" E NÃO "PELO"**, a decisão do congelamento: SOCO DINÂMICO é masculino e **CONFUSÃO é
+  feminina** — a preposição neutra serve aos seis sem uma tabela de gênero pra uma frase só.
+- **⚠️ A DO MEIO TRAZ O NÚMERO**, e é a única das três: a linha de um especial não ganha o *"e tirou
+  −N de HP"* automático, e sem ele **a soma das linhas não fecharia com a barra**.
+- **AS TRÊS DIVIDEM O 💫**, como as três do gelo dividem o ❄️: é o mesmo evento visto em três
+  momentos, e ícones diferentes fariam procurar três mecânicas onde há uma.
+- **⚠️ O `q` DO `confuso` É DE QUEM PERDE** (como a queimadura e o veneno), então **o passo da
+  animação NÃO inverte o lado**. **⚠️ E A MARCA VELHA (`confusao`) ESTÁ NA FAMÍLIA OPOSTA** — o `q`
+  dela é de quem CONFUNDIU. As duas convivem, e há trava cobrando que elas saiam em lados
+  **contrários** pro mesmo `q`: é esse par que prova que não foram confundidas uma com a outra.
+- **⚠️ O ÍCONE DO QUADRO SEGUE O GELO e não a queimadura, porque ela PASSA:** se a primeira marca do
+  lado é `confundiu`, ele não estava confuso antes — o ícone acende no passo dela; se é `confuso` ou
+  `saiuConfusao`, ele entrou no confronto **JÁ** confuso e vale desde o primeiro quadro. E ele
+  **APAGA** no `saiuConfusao`, como o gelo faz no `degelou`.
+- **⚠️ ELE FICA NOS ÍCONES FLUTUANTES da cena nova, não no `selosDoConfronto`** — e isso não é
+  omissão: ali estão os **três que PASSAM** (sono, gelo, confusão) e o quadro tem os **três que NÃO
+  passam** (queimadura, veneno, paralisia). Um selo de campo pro que passa mentiria: o campo do
+  matchup é o estado no FIM do confronto, e quem saiu da confusão no meio sairia sem selo nenhum.
+
+#### O ASTERISCO, E O 100% PASSOU A AFIRMAR
+
+O aviso do cartão era *"Dá a passiva de confusão: 10% por confronto"* — uma frase que descrevia a
+**espécie**. Hoje é `pct(GOLPES_QUE_CONFUNDEM[id])`, **derivado da tabela**: ela varia de 10% a 100%,
+e um texto fixo mentiria em três dos seis.
+
+**⚠️ E O `pct()` PASSOU A AFIRMAR NO 100% — a decisão já estava escrita e nunca tinha sido exercida.**
+O asterisco do **ESTÁGIO** registra, desde 17/09, que *"100% de chance de" é uma condicional que não
+existe; ali o certo é afirmar*, com a nota *"nenhum dos quatro de hoje é 100%"*. Só que o `pct()` é
+**compartilhado pelos cinco status**, e o **CANHÃO DE CHOQUE dizia "100% de chance de causar
+paralisia" desde 16/09**. Consertar no `pct` alinhou os dois de uma vez:
+
+| | antes | hoje |
+|---|---|---|
+| Soco Dinâmico | 100% de chance de causar confusão | **Sempre causa confusão** |
+| Canhão de Choque | 100% de chance de causar paralisia | **Sempre causa paralisia** |
+| os outros | 10%, 20%, 30%, 50% | **iguais** |
+
+#### A FICHA DA POKÉDEX PERDEU A LINHA, e os especiais foram de TREZE a DOZE
+
+A ficha conta o que a espécie faz **SOZINHA**, e confundir deixou de ser isso — quem confunde é o
+golpe. É a **mesma decisão** que tirou a drenagem daqui em 15/09/2026, e a entrada
+`EXPLICACAO_DO_ESPECIAL.confusao` saiu junto (senão ela ficaria **órfã**, e há trava cobrando que
+nenhuma explicação sobre sem dono).
+
+**⚠️ E ISSO MUDOU O JOGO PRO MEW E PRO MEWTWO:** eles são imunes ao **BLOCO de especiais**
+(`tentarGolpeEspecial`), não aos status por ataque — então o Mewtwo, que aprende Confusão, **passou
+a poder confundir E a ser confundido**. É o mesmo que já valia pros outros quatro (o gelo, a
+queimadura, o veneno e a paralisia nunca respeitaram aquela imunidade).
+
+#### ⚠️ E ELA APAGOU A EXCEÇÃO DO TM03 — o caminho próprio virou o caminho normal
+
+O **TM03 (Pulso de Água)** tinha um caminho próprio desde 17/09/2026, pedido assim: *"os TMs que dão
+habilidade passiva ... o pokemon também deve ganhar a habilidade passiva enquanto estiver com esse
+movimento"*. Ele existia porque a confusão era da **ESPÉCIE**, e quem ensinasse o golpe não entrava
+na lista — então o `golpeQueConfunde` punha o golpe carregado **na frente** da espécie.
+
+**Com o status por ataque isso É a mecânica**: carregar o golpe é o que confunde, e a função inteira
+saiu. **⚠️ E A TRAVA DELE NÃO FOI APAGADA: ela virou a trava da regra NOVA** (o Blastoise com o TM03
+confunde, sem ele não confunde, e a **espécie** não confunde mais). Sem isso alguém devolve a passiva
+e o TM03 volta a precisar de exceção **sem ninguém ver** — e há um caso que pergunta pelo **ARQUIVO**
+se a tabela `CONFUSAO` voltou, porque `const` não vira propriedade global do sandbox e um
+`typeof S.CONFUSAO === 'undefined'` seria **VERDADE com a tabela de volta**.
+
+**⚠️ E FOI ELA QUE PEGOU O REFACTOR PELA METADE: o `test-inventario` MORREU** com
+`S.golpeQueConfunde is not a function` — a bateria acusou antes de qualquer print. É a mesma família
+do *"uma trava que estoura é pior que uma que falha"*, do lado bom: **ela estourou no lugar certo**.
+
+#### O PREÇO NA JORNADA: NADA
+
+**55,39% (a passiva) contra 55,80% (o status por ataque)** — **+0,41 ponto, 0,4σ**, 8 blocos de 800
+jornadas de cada lado (**6.400 de cada**, o MESMO bot contra duas cópias congeladas, desvio tirado de
+ENTRE os blocos, **4 de 8 blocos** pra cada lado). Ruído absolutamente puro.
+
+**⚠️ E ISSO SURPREENDE, porque a frequência caiu 8,8×.** A razão é a de sempre aqui: ela **cai dos
+DOIS lados** — as 82 espécies confusoras apareciam em time de líder tanto quanto no do jogador — e o
+auto-dano é pequeno (o espelho sem tipo).
+
+**A impressão do motor MUDA, e tem que mudar** (`MOTOR 2d6a83f24cf1 → e6cd16d15e0f`): a passiva lia
+o rng dentro do `tentarGolpeEspecial`, então tirá-la desloca a semente de toda batalha que tem uma
+das 82. **E os dois motores continuam concordando: 0 divergências em 300 batalhas** com a mesma
+semente, mais **120 com confusão garantida** no painel próprio.
+
+- **Se um dia incomodar**, as réguas são as **chances por golpe** (`GOLPES_QUE_CONFUNDEM`, que são
+  por GOLPE), a **duração** (2 a 5) e a **chance de se acertar** (50% — a mais forte das três, e
+  mexer nela é sair da Gen 3).
+- **⚠️ E ELA NÃO ALCANÇA as ligas nem o online**, pela mesma razão dos outros quatro: lá o time vem
+  de um CÓDIGO e ninguém tem golpe escolhido, então o motor cai no de tipo e não há id pra consultar
+  na tabela. A única porta é o **METRÔNOMO**.
+
+**Medido a 320px, no navegador:** as quatro linhas em **243×58px** (com o selo em cada), os seis
+cartões em **66px**, e o documento em **305 de 320** — sem rolagem lateral.
+
+`tools/test-especiais.js` tranca ~60 pontas: os seis golpes com as chances oficiais, as quatro
+constantes iguais nos dois motores, a passiva **não existindo mais**, as duas guardas (caído e já
+confuso), **nenhum tipo imune** (cinco espécies nomeadas) e a imunidade do GOLPE, as chances medidas
+com um rng contínuo, as **duas saídas antecipadas do rng**, a duração, o auto-dano (a fração da
+barra, **o FÍSICO por comparação de perfis opostos**, o `lastMove` intocado), as três linhas com o
+`q` de cada uma, **quem se acertou não atacando**, a confusão passando e a marca solta, as três
+frases palavra por palavra, os três selos, o passo **não invertendo o lado** (com a marca velha
+invertendo), o ícone só a partir do passo (e a **herdada** desde o quadro 0, e o apagar), o asterisco
+nos seis com o 100% **afirmando**, a ficha e a explicação saindo juntas, **a Faixa no auto-golpe**, e
+**120 batalhas com confusão garantida** batendo golpe a golpe nos dois motores.
+**Conferido que os 22 defeitos religados acusam** (1 a 22 falhas cada).
+E `tools/test-inventario.js` tranca o outro lado, no bloco do TM03: o Blastoise com o golpe
+confundindo e sem ele não, a marca no ALVO com 2 a 5 turnos (as constantes lidas do **FONTE**), a
+**espécie não confundindo mais**, a tabela `CONFUSAO` fora dos dois motores e os seis valendo.
+**Conferido que os 6 defeitos religados acusam** (1 a 5 falhas cada).
+
+#### ⚠️ E ELA DESENTERROU UM DEFEITO ANTIGO DA SUAVIZAÇÃO — achado e NÃO mexido
+
+A trava da **banda da fórmula** passou a acusar 4 de 3.677 lados. Investigado, **não era regressão**:
+o deslocamento de semente fez o painel dela sortear confrontos que ele não sorteava, e **o defeito
+já estava no HEAD** — medido lá com 12.000 iterações, **21 de 25.174 lados**, com o pior em **9,63×**
+(o painel de 1.700 da trava passava por SORTE).
+
+**SÃO DUAS CAUSAS, e as duas são da suavização:**
+
+1. **o golpe APARADO pelo teto do alvo cheio.** Medido no caso que acusou (Shuckle Lv.50 × Rapidash
+   Lv.50, mesmo nível ⇒ o teto MÍNIMO de 70%): o Rolamento `rl16` tirou **241 de 345** —
+   `345 − round(345×0,30)`, o teto exato — e o `rl1` seguinte tirou 28. Dividido pela escala isso dá
+   15,1 contra 28. **Nada está errado**: o golpe grande foi cortado por uma regra que a tela
+   EXPLICA. A trava passou a **isentá-lo**, como já isenta o golpe que MATA (o outro caso de aparo);
+2. **a SOBRA do arredondamento vai TODA pro último item do grupo.** O último não é uma fatia, é o
+   **RESTO**, e o desvio dele é a soma dos desvios dos outros: ~`√(n−1) × JITTER`. Num par isso é
+   8%; num grupo de nove, **23%**. Medido num `slam` de oito tapas: o MOTOR produziu
+   `23,23,23,27,23,23,23,27` (razão **1,174, DENTRO da banda**) e a tela mostrou
+   `22,24,25,23,25,22,23,29` (**1,318**). A tolerância da trava, calibrada num PAR, passou a ser
+   **derivada do tamanho do grupo**.
+
+**⚠️ O QUE SOBRA É UM DEFEITO DE APRESENTAÇÃO REAL E NÃO MEXIDO:** o **Rolamento pós-reset**. Quando
+a sequência reseta (o `% ROLAMENTO_USOS`), o peso do golpe novo é 1 contra 16 do anterior, e a
+suavização lhe dá **1/17 do total** — o jogador vê um Rolamento de **1 de dano**. Medido: 12 de
+25.169 lados no HEAD com a tolerância derivada, o pior em 9,63×. **Consertá-lo é mexer no
+`fatiaDoGolpe`, o código de apresentação mais sensível do projeto**, e ele não foi pedido — fica
+escrito. A saída, se um dia for pra valer, é **distribuir a sobra** em vez de jogá-la no último.
+
+#### ⚠️ E O FLAKE DO `Charmeleon × Mankey` FOI PROVADO ANTERIOR — pelo método semeado
+
+A trava *"NINGUÉM ataca com a barra em zero"* falhou, no par que este arquivo já nomeia desde 17/09.
+**Mas eu mexi no código que ela lê** (o diário, o `buildAnimatedHitSequence`, o `fraseDoEspecial`),
+então a terceira perna da prova (*"ver se o diff encosta no que a trava lê"*) **não isentava**.
+
+E o HEAD deu **0 em 4 rodadas** — o que parecia regressão. A resposta veio do método que este
+arquivo prescreve: **o bloco da trava foi extraído LITERAL** (não reimplementado — isso já traiu
+duas vezes nesta sessão) e rodado com o `Math.random` **semeado** nos dois builds:
+
+| | falhas em 8 sementes |
+|---|---|
+| HEAD | **2** (sementes 11 e 66) |
+| com a confusão nova | **2** (sementes 66 e 77) |
+
+**Mesmo patamar, e a semente 66 falha nos dois.** Sem semear, comparar um teste flaky entre dois
+builds não é medição — e 4 rodadas de 0 num flake de ~25% é 32% de chance.
+
+#### ⚠️ E QUATRO TRAVAS MINHAS NASCERAM MUDAS — as quatro pela mesma família
+
+Só a conferência de acusação as pegou, e cada uma é uma armadilha que este arquivo já registra:
+
+| trava | por que ela não media nada |
+|---|---|
+| *"o auto-dano é FÍSICO"* | era um **limiar frouxo** (`< 30% da barra`) e o especial **caberia nele**. Virou comparativa: a ordem entre Machamp e Alakazam **INVERTE** se for especial |
+| *"o passo não inverte o lado"* | **não existia** — eu tinha a decisão no comentário e nenhuma asserção |
+| *"o ícone só a partir do passo"* | idem, e a primeira versão procurava a chave `confusao` quando ela é **`confusion` em inglês** — devolvia sempre false |
+| *"a Faixa no auto-golpe"* | passava por **ACIDENTE**: a linha `faixa` que ela achava era do golpe comum contra um alvo de 1 de HP |
+
+**⚠️ E TRÊS CHAMADAS DE `fraseDoEspecial` PASSAVAM O `op` NO LUGAR DO NOME.** A assinatura é
+`(g, quem, alvo, op)` — quatro argumentos —, e `(g, {})` põe o objeto no `quem`. As três frases novas
+passavam **por acidente** (elas tiram o nome do campo `g.g` do registro, não do parâmetro); a da
+marca **VELHA** usa os parâmetros, e ali isso saía como *"[object Object] deixou undefined confuso"*
+— **com a trava VERDE**.
 
 ### O CONGELAMENTO: O PRIMEIRO STATUS POR ATAQUE (16/09/2026)
 
@@ -3631,11 +3952,17 @@ aleatório precisa de invariante, e o invariante tem que comparar coisas do mesm
 
 Pedida assim: *"para todos os ataques especiais/passivas, coloque que quando o usuário clicar em
 cima dessa habilidade passiva, abre um modal explicando o que ocorre quando acontece aquela
-habilidade na partida"*. São **doze** hoje: autodestruição, sono, anulação, Metrônomo, Recuperar,
-drenagem, Fúria, confusão, Fúria do Dragão, **Sketch** — este acrescentado à ficha no mesmo dia,
-também a pedido, e SÓ pra aparecer: a mecânica dele não foi tocada —, a **Dança da Chuva**, que
-chegou logo depois e é a única POR BATALHA, e o **Remoinho** (12/09/2026), que é o único que muda
-QUEM está no confronto.
+habilidade na partida"*. São **doze** hoje: autodestruição, sono, anulação, Metrônomo, cura (o
+Recuperar E o Sino Curativo — a caixa é indexada pelo EFEITO, ver abaixo), Fúria, Fúria do Dragão,
+**Sketch** — este acrescentado à ficha no mesmo dia, também a pedido, e SÓ pra aparecer: a mecânica
+dele não foi tocada —, a **Dança da Chuva**, que chegou logo depois e é a única POR BATALHA, o
+**Remoinho** (12/09/2026), que é o único que muda QUEM está no confronto, e as **duas Danças** de
+ataque (12/09/2026).
+**⚠️ A DRENAGEM E A CONFUSÃO SAÍRAM DA LISTA** — a primeira em 15/09/2026 e a segunda em
+24/09/2026, as duas porque viraram efeito de **GOLPE** e a ficha só conta o que a espécie faz
+SOZINHA. As entradas do `EXPLICACAO_DO_ESPECIAL` saíram junto, senão elas ficariam **órfãs** — e há
+trava cobrando que os dois lados batam: hoje são **12 efeitos na ficha e 12 explicações**, sem uma
+sobrando de cada lado.
 
 - **ELA É INDEXADA PELO EFEITO, NÃO PELO NOME** (`EXPLICACAO_DO_ESPECIAL`), e essa é a decisão que
   sustenta o resto. O nome é **por espécie** — o Zubat confunde com Supersom e o Alakazam com
@@ -7893,21 +8220,31 @@ do save é serializado inteiro.
 
 ### ⚠️ A PASSIVA PELO GOLPE (o TM03)
 
+> **⚠️ ELA VIROU A MECÂNICA em 24/09/2026** — ver **A CONFUSÃO VIROU STATUS POR ATAQUE**. O que este
+> bloco pediu como EXCEÇÃO (*"quem CARREGA um golpe que confunde ganha a passiva"*) é o
+> comportamento normal hoje: quem confunde é o GOLPE, e a passiva da espécie não existe mais. O
+> `golpeQueConfunde` e a tabela `CONFUSAO` saíram junto, e **a trava disto não foi apagada: ela virou
+> a trava da regra NOVA**, senão alguém devolve a passiva e o TM03 volta a precisar de caminho
+> próprio sem ninguém ver.
+
 *"Os TMs que dão habilidade passiva ... o pokemon também deve ganhar a habilidade passiva enquanto
-estiver com esse movimento"*. A confusão do jogo é por ESPÉCIE (`CONFUSAO`, 82 espécies, cada uma com
-o NOME do golpe dela); agora **quem CARREGA um golpe que confunde ganha a passiva**, mesmo não estando
-na tabela.
+estiver com esse movimento"*. A confusão do jogo era por ESPÉCIE (`CONFUSAO`, 82 espécies, cada uma
+com o NOME do golpe dela); daqui em diante **quem CARREGA um golpe que confunde ganha a passiva**,
+mesmo não estando na tabela.
 
 - **⚠️ E VALE PRA QUALQUER GOLPE QUE CONFUNDA, não só pro TM03**: a regra é "o golpe dá a passiva", e
   limitar ao Water Pulse seria a mesma exceção que este projeto passa a vida tirando. Alcança os seis
   golpes de **dano** que confundem (Confusão, Psicoraio, Feixe de Sinal, Soco Dinâmico, Pulso de Água,
   Soco Tonto); os de status (Supersom, Raio Confuso, Bravata, Beijo Doce, Bajulação) não estão na
-  tabela de golpes e continuam vindo só pela espécie.
-- **O GOLPE CARREGADO VEM PRIMEIRO**, e a espécie é o fallback: um Blastoise que ensinou o TM03 passa
-  a confundir com "Pulso de Água"; o Zubat sem golpe continua confundindo com "Supersom".
+  tabela de golpes e vinham só pela espécie. **⚠️ E É ESSA METADE QUE ACABOU EM 24/09**: sem a
+  passiva, os cinco de status deixaram de confundir — e eles eram **48 dos 54 donos** que a mudança
+  levou.
+- **O GOLPE CARREGADO VINHA PRIMEIRO**, e a espécie era o fallback: um Blastoise que ensinou o TM03
+  passava a confundir com "Pulso de Água"; o Zubat sem golpe continuava confundindo com "Supersom".
+  **Hoje o primeiro caso é a regra e o segundo não acontece.**
 - **⚠️ E ELA MEXEU EM UMA ESPÉCIE SEM TM NENHUM: o MEWTWO**, que aprende `confusion` por nível e não
-  estava no `CONFUSAO`. Na prática não roda — ele é imune ao bloco inteiro de especiais —, mas é a
-  única que o acréscimo alcança sozinha, e por isso ela fica fora do painel de impressão.
+  estava no `CONFUSAO`. Ali não rodava — ele é imune ao bloco de especiais —, e **em 24/09 ele passou
+  a confundir de verdade**: os status por ataque nunca respeitaram aquela imunidade.
 
 ### A LOJA E A LISTA DE APTOS
 

@@ -76,7 +76,11 @@ const danoSemGolpe = (g) => !!g && (g.x === 'absorbdano' || g.x === 'confusao' |
    -- e o sintoma seria a soma nao fechar, que e justamente o que essas contas medem. */
 /* ⚠️ O VENENO (16/09/2026) entrou aqui junto da queimadura: sao os DOIS status de dano por turno,
    e nos dois o `q` e de quem PERDE. Uma linha so -- a licao de sempre deste arquivo. */
-const danoNoProprio = (g) => !!g && (g.x === 'queima' || g.x === 'veneno');
+/* ⚠️ A CONFUSAO MUDOU DE FAMILIA EM 24/09/2026, e isso e o que uma leitura ingenua erraria: a
+   marca VELHA (`confusao`, a passiva) tem o `q` de QUEM CONFUNDIU, e a NOVA (`confuso`, o
+   auto-golpe) tem o `q` de QUEM SE ACERTOU -- como a queimadura e o veneno. As duas convivem
+   porque log velho nao pode sumir, e por isso cada uma esta numa lista. */
+const danoNoProprio = (g) => !!g && (g.x === 'queima' || g.x === 'veneno' || g.x === 'confuso');
 /* ⚠️ E QUEM RESPONDE "QUANTO O LADO X PERDEU SEM SER GOLPE DO OUTRO" E ESTA FUNCAO, nao cada conta
    invertendo o `q` na mao. Com duas convencoes de `q` convivendo, a inversao escrita a mao em oito
    lugares era garantia de que um deles ficaria pra tras -- a mesma licao que fez o `danoSemGolpe`
@@ -933,7 +937,8 @@ console.log('\nA FAIXA DE FOCO NAO PODE SER FURADA POR CAMINHO NENHUM');
              `passosHtml` a ANEXA a linha do golpe que a gerou ("tirou -45 e recuperou +22"). Contada
              aqui, ela inflava o numero sem existir na tela. */
           const ABERTURAS_LOG = ['recover','pocao','absorb','absorbdano','sono','semSono','furia',
-                                 'confusao','furiadragao','chuva','chuvafim','acordou','remoinho','dreno'];
+                                 'confusao','confundiu','confuso','saiuConfusao',
+                                 'furiadragao','chuva','chuvafim','acordou','remoinho','dreno'];
           /* ⚠️ E O CONFRONTO COM ROLAMENTO NAO CONTA (14/09/2026): ele sai do TETO de propósito --
              a reconstrucao nao conhece a escala do golpe e achatava a mecanica em 68% dos casos
              (ver sequenciaDoConfronto). Entao ali as linhas sao REAIS e podem passar de 7 sem nada
@@ -1164,7 +1169,12 @@ console.log('\nA AUDITORIA DAS LISTAS (04/09/2026)');
   for(const id of ['mew','mewtwo']){
     if(S.SONIFEROS[id]) imunesNaLista.push('SONIFEROS:' + id);
     if(S.DISABLE.includes(id)) imunesNaLista.push('DISABLE:' + id);
-    if(S.CONFUSAO[id]) imunesNaLista.push('CONFUSAO:' + id);
+    /* ⚠️ A CONFUSAO SAIU DESTA CONTA EM 24/09/2026, com a passiva: ela virou status por ATAQUE e
+       nao passa mais pelo tentarGolpeEspecial, entao nao ha lista de especie pra conferir.
+       ⚠️ E ISSO MUDA O JOGO PRO MEW E PRO MEWTWO: eles sao imunes ao BLOCO de especiais, nao aos
+       status por ataque -- o Mewtwo, que aprende Confusao, passou a poder confundir E a poder
+       ser confundido. E o mesmo que ja valia pros outros quatro (o gelo, a queimadura, o veneno
+       e a paralisia nunca respeitaram essa imunidade). */
   }
   ok('e os dois imunes nao estao em lista nenhuma', imunesNaLista.length === 0, imunesNaLista.join(', '));
 })();
@@ -1947,6 +1957,31 @@ console.log('\n=== O GOLPE APARADO NAO APARECE COM O NUMERO APARADO ===');
      diferir pelo sorteio de 0,85 a 1,00 do calcDamageNew -- no maximo 1,176x. Fora isso so o
      CRITICO, que tem selo proprio, e o golpe de VARIOS TAPAS, que tem o Nx. */
   const BANDA_APARO = 1 / 0.85;
+  /* ⚠️ O TETO DO ALVO CHEIO E LIDO DO FONTE, e nao escrito aqui: ele decide a isencao abaixo, e um
+     numero fixo divergiria dele no primeiro ajuste. `const` nao vira propriedade global do sandbox
+     (a licao da Queimada), entao o caminho e o regex -- o mesmo do `konst` do bloco da confusao. */
+  const CHEIO_MIN = Number((require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8')
+                            .match(/const CHEIO_TETO_MIN = ([0-9.]+)/) || [])[1]);
+  const JITTER_APARO = Number((require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8')
+                               .match(/const JITTER_DO_GOLPE = ([0-9.]+)/) || [])[1]);
+  ok('o teto do alvo cheio esta no codigo, numa constante', CHEIO_MIN > 0 && CHEIO_MIN < 1,
+     'CHEIO_TETO_MIN = ' + CHEIO_MIN);
+  /* ⚠️ E A TOLERANCIA DEIXOU DE SER UM NUMERO FIXO (24/09/2026), porque ela era calibrada num PAR
+     e o grupo pode ter nove. A suavizacao reparte com jitter e da a SOBRA do arredondamento TODA
+     pro ultimo item (`if(k === n - 1) novos.push(Math.max(1, sobra))`) -- ou seja o ultimo nao e
+     uma fatia, e o RESTO, e o desvio dele e a soma dos desvios dos outros: ~sqrt(n-1) x JITTER.
+     Num par isso e 8% (o 1,25 de sempre cobre); num grupo de nove e 23%, e a razao legitima vai a
+     1,33. Medido no caso que acusou (Lickitung x Shuckle, slam): o MOTOR produziu 23,23,23,27,23,
+     23,23,27 -- razao 1,174, DENTRO da banda -- e a tela mostrou 22,24,25,23,25,22,23,29 (1,318).
+     ⚠️ ELA NAO ESCONDE NADA: medida no build de 23/09 com 12.000 iteracoes, a tolerancia derivada
+     continua acusando 12 de 25.169 lados, com o pior em 9,63x -- o ROLAMENTO POS-RESET, que e
+     defeito de verdade e esta registrado no CLAUDE.md como achado e nao mexido. O `n` e o do GRUPO
+     QUE A SUAVIZACAO REPARTIU (`g2cru`), nao o do que a trava mede: o critico e o golpe final
+     entram no rateio e deslocam os outros, mesmo saindo da conta. */
+  const tolDoGrupo = (n) => Math.max(1.25,
+      (1 + Math.sqrt(Math.max(1, n - 1)) * JITTER_APARO) / (1 - JITTER_APARO));
+  ok('  e a tolerancia do arredondamento cresce com o grupo', tolDoGrupo(2) < tolDoGrupo(9),
+     'par ' + tolDoGrupo(2).toFixed(2) + 'x  ->  grupo de 9 ' + tolDoGrupo(9).toFixed(2) + 'x');
   const todos = Object.keys(S.SPECIES);
   let conf = 0, lados = 0, fora = 0, pior = 1, exemplo = '';
   let somaOk = 0, somaTot = 0, zero = 0, negativo = 0;
@@ -1995,7 +2030,33 @@ console.log('\n=== O GOLPE APARADO NAO APARECE COM O NUMERO APARADO ===');
            a razao volta pras dezenas. Medido na troca: os pares fora da banda vao de 199 pra 960, e
            825 deles sao o golpe que matou -- ZERO ficam sem explicacao, antes e depois. */
         const ultimo = g2cru.length ? g2cru[g2cru.length - 1] : null;
-        const g2 = (ultimo && ultimo.hp != null && ultimo.hp <= 0) ? g2cru.slice(0, -1) : g2cru;
+        const semOUltimo = (ultimo && ultimo.hp != null && ultimo.hp <= 0) ? g2cru.slice(0, -1) : g2cru;
+        /* ⚠️ E O GOLPE APARADO NO ALVO CHEIO SAI TAMBEM (24/09/2026), pela MESMA razao do golpe que
+           matou: `d / rl` deixa de descrever o dano-base quando o dano foi APARADO.
+           Quem apara ali e a regra de 17/09 -- *"quando um pokemon esta de vida cheia, ele nunca
+           morre com um so golpe"* --, e ela morde justamente o Rolamento de escala alta. Medido no
+           caso que acusou (Shuckle Lv.50 x Rapidash Lv.50, os dois de mesmo nivel, ou seja o teto
+           MINIMO de 70%): o `rl16` tirou 241 de 345 (= 345 - round(345*0,30), o teto exato) e o
+           `rl1` seguinte tirou 28. Dividido pela escala isso da 15,1 contra 28 -- 1,86x -- e nada
+           esta errado: o golpe grande foi cortado por uma regra que a tela EXPLICA (a barra mostra
+           o alvo parando em 30%).
+           ⚠️ E ELE NAO E NOVO: medido no build de 23/09 com 12.000 iteracoes, ele aparece em 21 de
+           25.174 lados, com o pior caso em 9,63x (Lickitung x Shuckle). O painel de 1.700 desta
+           trava passava por SORTE -- ela nao sorteava nenhum deles. Ver o CLAUDE.md, na secao da
+           suavizacao: o que sobra dali e um defeito de APRESENTACAO (a suavizacao pesa por `rl` e
+           achata o pos-reset), registrado e nao mexido.
+           O sinal e exato: o alvo estava com a vida CHEIA antes do golpe e sobreviveu a ele -- que
+           e a unica situacao em que aquele teto pode ter agido. */
+        /* ⚠️ O SINAL TEM TRES PARTES, e a terceira e a que segura a cobertura: sem ela a isencao
+           pega o PRIMEIRO golpe de todo lado (o alvo entra cheio em todo confronto) e a amostra cai
+           pela metade -- medido, de 3.593 lados para 1.761. O teto so pode ter agido quando o alvo
+           PAROU DENTRO DA FAIXA dele: ele deixa entre 5% e 30% do maxHp, e o 30% e derivado do
+           CHEIO_TETO_MIN. O `ceil` cobre o arredondamento do motor (`round`). */
+        const maxDoAlvo = lado === 'p' ? mm.enemyMaxHp : mm.playerMaxHp;
+        const noTetoDoCheio = (g) => g.hp != null && g.hp > 0 && maxDoAlvo
+                                  && g.hp + g.d >= maxDoAlvo
+                                  && g.hp <= Math.ceil(maxDoAlvo * (1 - CHEIO_MIN));
+        const g2 = semOUltimo.filter(g => !noTetoDoCheio(g));
         if(g2.length < 2) return;
         lados++;
         /* ⚠️ A COMPARACAO E POR PESO, nao pelo numero cru -- e o ROLAMENTO obrigou isso (14/09/2026).
@@ -2032,10 +2093,11 @@ console.log('\n=== O GOLPE APARADO NAO APARECE COM O NUMERO APARADO ===');
           const rr = Math.max.apply(null, arr) / Math.max(1, Math.min.apply(null, arr));
           if(rr > r) r = rr;
         }
-        /* A tolerancia de 1,25 e o ARREDONDAMENTO: as fatias sao inteiras, e num total pequeno
-           (27 e 32) o inteiro mais proximo passa de 1,176 por alguns centesimos. O que a trava
-           existe pra pegar e a faixa REABRINDO -- ali a razao volta pras dezenas. */
-        if(r > 1.25){ fora++; if(r > pior){ pior = r; exemplo = mm.player + ' x ' + mm.enemy + ': ' + g2.map(g => g.d + (g.rl > 1 ? '(x' + g.rl + ')' : '')).join(' e '); } }
+        /* A tolerancia e o ARREDONDAMENTO, e ela cresce com o tamanho do GRUPO -- ver o comentario
+           do `tolDoGrupo`, la em cima. O que a trava existe pra pegar e a faixa REABRINDO e o
+           Rolamento pos-reset: ali a razao volta pras dezenas, muito acima de qualquer tolerancia.
+           ⚠️ O `n` E O DO GRUPO REPARTIDO (`g2cru`), nao o do medido. */
+        if(r > tolDoGrupo(g2cru.length)){ fora++; if(r > pior){ pior = r; exemplo = mm.player + ' x ' + mm.enemy + ': ' + g2.map(g => g.d + (g.rl > 1 ? '(x' + g.rl + ')' : '')).join(' e '); } }
       });
     });
   }
@@ -2370,178 +2432,488 @@ console.log('\n=== O REMOINHO MOSTRA A TROCA: SAI, FICA VAZIO, ENTRA ===');
      require('fs').readFileSync(path.join(raiz, 'functions', 'index.js'), 'utf8').indexOf('remoinhoVazio') < 0);
 }
 
-console.log('\n=== A CONFUSAO: O ADVERSARIO SE ACERTA, E A LUTA ACONTECE DEPOIS ===');
+console.log('\n=== A CONFUSAO VIROU STATUS POR ATAQUE (24/09/2026) ===');
 {
-  /* Pedida em 10/09/2026: quem tem Confusao tem 10% por confronto de deixar o outro confuso; o
-     confuso leva UM golpe DELE MESMO (o dano sai de um ESPELHO -- mesma especie, nivel, atributos e
-     golpe) e so entao a luta comeca, "como se fosse uma nova". */
-  /* ONZE GOLPES CONFUNDEM, nao so a Confusao -- reportado em 10/09/2026: "alguns pokemons tambem
-     possuem confusao que voce nao colocou, mas porque o nome e outro, como o Zubat, Tentacool,
-     Magnemite, que possuem Supersonic". Sao 83 especies, e cada uma guarda o NOME do golpe DELA
-     (a regra do SONIFEROS): sem isso o Zubat confundiria com "Confusao". */
-  const especiesConf = Object.keys(S.CONFUSAO);
-  /* 82: sao 83 na base, MENOS o Mewtwo -- ele aprende Confusao no nivel 1 e ficou de fora porque o
-     tentarGolpeEspecial corta o bloco inteiro quando ele ou o Mew esta no confronto. */
-  ok('sao as 82 especies que confundem por nivel', especiesConf.length === 82, especiesConf.length + '');
-  ok('a chance e 10% por confronto', S.CHANCE_CONFUSAO === 0.10, (100*S.CHANCE_CONFUSAO) + '%');
-  ok('a lista e a MESMA nos dois motores', JSON.stringify(esp.CONFUSAO) === JSON.stringify(S.CONFUSAO));
-  ok('e a chance tambem', esp.CHANCE_CONFUSAO === S.CHANCE_CONFUSAO);
-  /* OS TRES DO RELATO, nomeados: uma contagem sozinha nao diz QUAL faltou -- e a licao da auditoria
-     dos golpes especiais de 04/09/2026, quando sete especies estavam faltando. */
-  ok('o Zubat, o Tentacool e o Magnemite confundem com SUPERSOM',
-     S.CONFUSAO.zubat === 'Supersom' && S.CONFUSAO.tentacool === 'Supersom' && S.CONFUSAO.magnemite === 'Supersom',
-     [S.CONFUSAO.zubat, S.CONFUSAO.tentacool, S.CONFUSAO.magnemite].join(' / '));
-  ok('e cada golpe tem TIPO declarado, pro selo',
-     [...new Set(Object.values(S.CONFUSAO))].every(g => S.TIPO_DO_ESPECIAL[g]),
-     [...new Set(Object.values(S.CONFUSAO))].filter(g => !S.TIPO_DO_ESPECIAL[g]).join(',') || 'todos');
-  ok('sao ONZE golpes distintos', [...new Set(Object.values(S.CONFUSAO))].length === 11,
-     [...new Set(Object.values(S.CONFUSAO))].sort().join(', '));
-  /* O OUTRAGE, O PETAL DANCE E O THRASH confundem o PROPRIO USUARIO no fim da sequencia, que e
-     outro efeito -- e por isso o Dratini e o Tauros NAO entram por causa deles. */
-  ok('quem so tem Outrage/Thrash NAO entra (eles confundem o proprio usuario)',
-     !S.CONFUSAO.dratini && !S.CONFUSAO.dragonair,
-     'dratini:' + (S.CONFUSAO.dratini || '-') + '  dragonair:' + (S.CONFUSAO.dragonair || '-'));
-  /* O MEWTWO aprende Confusao no nivel 1 e ficou de fora de proposito: o tentarGolpeEspecial corta
-     o bloco INTEIRO quando qualquer um dos dois e Mew ou Mewtwo, entao a entrada seria letra morta
-     -- o mesmo motivo que ja o tirou do Disable e do Recuperar. */
-  ok('o Mewtwo e o Mew ficam de fora (seria letra morta)', !S.CONFUSAO.mewtwo && !S.CONFUSAO.mew);
-  ok('e nenhuma da lista esta fora do SPECIES',
-     especiesConf.filter(id => !S.SPECIES[id]).length === 0, especiesConf.filter(id => !S.SPECIES[id]).join(','));
+  /* Pedida assim: *"hoje ele e dano passivo que tem chance de acontecer no inicio da batalha,
+     agora voce vai tirar esse passivo e vamos colocar ele para ter chance do oponente ficar
+     confuso de acordo com a chance que o ataque tem de causar confusao ... tem uma chance de ao
+     inves de atacar o oponente, ele se ataca durante a confusao"*, com a Bulbapedia como fonte.
+     E a QUINTA mecanica POR ATAQUE, e a unica que ENTROU no lugar de uma passiva. */
+  const esp2 = srv._golpesEspeciais;
+  const TAB = S.GOLPES_QUE_CONFUNDEM;
+  const mkConf = (id, lv) => { const q = S.createInstance(id, lv); q.maxHp = S.calcMaxHp(q); q.hp = q.maxHp; q.ataques = S.ataquesPadrao(q); return q; };
 
-  /* NA BATALHA. O par e escolhido pra isolar a mecanica: o Alakazam confunde, e o Machamp nao tem
-     especial nenhum -- entao tudo que aparece no confronto e da confusao. */
+  /* ---------- a tabela e as constantes ---------- */
+  ok('sao os SEIS golpes de dano que confundem na Gen 3',
+     Object.keys(TAB).sort().join(',') === 'confusion,dizzypunch,dynamicpunch,psybeam,signalbeam,waterpulse',
+     Object.keys(TAB).sort().join(','));
+  /* AS CHANCES SAO AS OFICIAIS, do dado (Showdown, mod da Gen 3) -- o mesmo caminho das outras
+     quatro listas. Elas VARIAM, entao um texto fixo de "10%" mentiria em tres dos seis. */
+  ok('  com as chances oficiais de cada um',
+     TAB.confusion === 0.10 && TAB.psybeam === 0.10 && TAB.signalbeam === 0.10 &&
+     TAB.waterpulse === 0.20 && TAB.dizzypunch === 0.20 && TAB.dynamicpunch === 1.00,
+     JSON.stringify(TAB));
+  /* ⚠️ E ELES TEM QUE EXISTIR NA TABELA DE GOLPES: cadastrar um golpe que ninguem tem e letra
+     morta -- a licao da Lamina Solar. */
+  const semGolpe = Object.keys(TAB).filter(id => !S.GOLPES[id]);
+  ok('  e os seis existem na tabela GOLPES', semGolpe.length === 0, semGolpe.join(', '));
+  const semNome = Object.keys(TAB).filter(id => !S.GOLPES_PT[id]);
+  ok('  e todos tem nome em portugues', semNome.length === 0, semNome.join(', '));
+  /* ⚠️ E ALGUEM PRECISA LEVA-LOS DE VERDADE -- a licao da Furia, que ao pe da letra saia em 0,0%. */
   {
-    const semTag = h => String(h||'').replace(/<[^>]*>/g,'').replace(/\s+/g,' ').trim();
-    let achou = 0, naFrente = 0, nuncaMata = 0, lutouDepois = 0, comFrase = 0, noLog = 0, nomeouGolpe = 0, semCritico = 0;
-    let somaPct = 0;
-    for(let v = 0; v < 4000 && achou < 60; v++){
-      const a = [inst('alakazam', 45)]; a[0].ataques = S.ataquesPadrao(a[0]);
-      const b = [inst('machamp', 45)];  b[0].ataques = S.ataquesPadrao(b[0]);
-      const m = (S.simulateGymBattle(a, b, S.makeSeededRng('conf' + v)).matchups || [])[0];
-      if(!m) continue;
-      const c = (m.golpes || []).find(g => g.x === 'confusao');
-      if(!c) continue;
-      achou++;
-      const seq = S.sequenciaDoConfronto(m);
-      /* 1. ELA ABRE O CONFRONTO -- e o pedido: o evento acontece no inicio. */
-      if(seq[0] && seq[0].x === 'confusao') naFrente++;
-      /* 2. NAO MATA: o alvo fica com no minimo 1. */
-      if(c.hp >= 1) nuncaMata++;
-      if(!c.c) semCritico++;
-      /* 3. E A LUTA ACONTECE DEPOIS -- "como se fosse uma nova". Sem golpe nenhum depois dela, o
-            confronto teria sido resolvido pela abertura, que e o que ela NAO faz. */
-      if(seq.filter(g => !g.x).length > 0) lutouDepois++;
-      /* 4. A FRASE acompanha a barra caindo (passosDaAbertura = 2). */
-      const anim = S.buildAnimatedHitSequence(m);
-      const iC = anim.findIndex(h => h.x === 'confusao');
-      if(iC >= 0 && /confuso/.test(semTag(S.statusDoConfronto(m, iC + 1, anim[iC]).html))) comFrase++;
-      /* 5. E vira linha no log, com o NOME do golpe que ele usou em si mesmo. */
-      const log = semTag(S.passosHtml(m));
-      if(log.indexOf('confuso') >= 0) noLog++;
-      if(c.am && GOLPES_OK(S, c.am) && log.indexOf(S.nomeDoAtaque(c.am)) >= 0) nomeouGolpe++;
-      somaPct += 100 * c.d / Math.max(1, m.enemyMaxHp);
-    }
-    ok('a confusao sai o bastante pra medir', achou >= 20, achou + ' confrontos');
-    ok('ela ABRE o confronto', naFrente === achou, naFrente + ' de ' + achou);
-    ok('e nunca mata (piso de 1 de HP)', nuncaMata === achou, nuncaMata + ' de ' + achou);
-    ok('e nunca sai critica', semCritico === achou, semCritico + ' de ' + achou);
-    ok('a luta acontece DEPOIS dela', lutouDepois === achou, lutouDepois + ' de ' + achou);
-    ok('a frase acompanha a barra caindo', comFrase === achou, comFrase + ' de ' + achou);
-    ok('e vira linha no log', noLog === achou, noLog + ' de ' + achou);
-    ok('nomeando o golpe que ele usou em si', nomeouGolpe === achou, nomeouGolpe + ' de ' + achou);
-    ok('o golpe do espelho tem tamanho de golpe de verdade', (somaPct/achou) > 5 && (somaPct/achou) < 70,
-       (somaPct/achou).toFixed(1) + '% da propria vida, em media');
+    const levam = new Set();
+    Object.keys(S.SPECIES).forEach(sp => {
+      const at = S.ataquesPadrao(S.createInstance(sp, 70)) || [];
+      if(at.some(a => TAB[a])) levam.add(sp);
+    });
+    ok('  e 25+ especies LEVAM um deles no Lv.70', levam.size >= 25, levam.size + ' especies');
   }
+  /* AS REGRAS DA GEN 3, uma a uma (Bulbapedia, Confusion) */
+  /* ⚠️ AS CONSTANTES SAO LIDAS DO FONTE, e nao do sandbox: `const` NAO vira propriedade global,
+     entao `S.CONFUSAO_PODER` volta undefined e a trava mediria o NADA -- a licao que a Queimada e
+     a Arena 1x1 ja custaram. */
+  const srcCli = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
+  const konst = (nome) => {
+    const m = srcCli.match(new RegExp('const ' + nome + ' = ([0-9.]+)'));
+    return m ? Number(m[1]) : null;
+  };
+  ok('dura de 2 a 5 turnos', konst('CONFUSAO_TURNOS_MIN') === 2 && konst('CONFUSAO_TURNOS_MAX') === 5,
+     konst('CONFUSAO_TURNOS_MIN') + '-' + konst('CONFUSAO_TURNOS_MAX'));
+  /* ⚠️ 50% E A REGRA DA GEN 1 A 6 -- os 33% so valem da Gen 7 em diante, e este jogo e Gen 3. */
+  ok('  e a chance de se acertar e 50% por turno', konst('CHANCE_CONFUSAO_ACERTA') === 0.50,
+     (100 * konst('CHANCE_CONFUSAO_ACERTA')) + '%');
+  ok('  e o auto-dano e um golpe de poder 40', konst('CONFUSAO_PODER') === 40, konst('CONFUSAO_PODER') + '');
+  /* as duas copias concordam -- uma divergencia aqui faz a mesma batalha terminar diferente */
+  ok('a tabela e as quatro constantes sao IGUAIS nos dois motores',
+     JSON.stringify(esp2.GOLPES_QUE_CONFUNDEM) === JSON.stringify(TAB) &&
+     esp2.CONFUSAO_TURNOS_MIN === konst('CONFUSAO_TURNOS_MIN') &&
+     esp2.CONFUSAO_TURNOS_MAX === konst('CONFUSAO_TURNOS_MAX') &&
+     esp2.CHANCE_CONFUSAO_ACERTA === konst('CHANCE_CONFUSAO_ACERTA') &&
+     esp2.CONFUSAO_PODER === konst('CONFUSAO_PODER'),
+     JSON.stringify([esp2.CONFUSAO_TURNOS_MIN, esp2.CONFUSAO_TURNOS_MAX,
+                     esp2.CHANCE_CONFUSAO_ACERTA, esp2.CONFUSAO_PODER]));
+  /* ⚠️ A PASSIVA MORREU, e com ela o `golpeQueConfunde` e a tabela de 82 especies. */
+  ok('a passiva por ESPECIE nao existe mais',
+     S.CONFUSAO === undefined && esp2.CONFUSAO === undefined && S.CHANCE_CONFUSAO === undefined);
+  ok('  nem o golpeQueConfunde', typeof S.golpeQueConfunde !== 'function');
 
-  /* O ESPELHO NAO PODE SUJAR O ORIGINAL. O calcDamage ESCREVE lastMove/lastMoveType/lastCrit no
-     atacante -- e o atacante aqui e uma copia. Sem ela, o golpe que o pokemon usa na luta seguinte
-     sairia trocado no log. */
+  /* ---------- quem pode ser confundido ---------- */
+  const novo = (id, lv) => { const p = S.createInstance(id, lv); p.maxHp = S.calcMaxHp(p); p.hp = p.maxHp; return p; };
   {
-    const alvo = inst('machamp', 45); alvo.ataques = S.ataquesPadrao(alvo);
-    alvo.maxHp = S.calcMaxHp(alvo); alvo.hp = alvo.maxHp;
-    alvo.lastMove = 'tackle'; alvo.lastMoveType = 'Normal';
-    const quem = inst('alakazam', 45); quem.ataques = S.ataquesPadrao(quem);
-    quem.maxHp = S.calcMaxHp(quem); quem.hp = quem.maxHp;
+    const alvo = novo('snorlax', 60);
+    ok('quem ja caiu nao fica confuso', (alvo.hp = 0, S.podeConfundir(alvo) === false));
+    alvo.hp = alvo.maxHp;
+    ok('  e quem JA esta confuso tambem nao', (alvo._confuso = 3, S.podeConfundir(alvo) === false));
+    alvo._confuso = null;
+    ok('  mas um alvo inteiro pode', S.podeConfundir(alvo) === true);
+    /* ⚠️ NENHUM TIPO E IMUNE A CONFUSAO, em geracao nenhuma -- ao contrario do gelo (o Gelo), da
+       queimadura (o Fogo), do veneno (Veneno e Aco). O unico "imune" e o do GOLPE. */
+    ['gastly','alakazam','machamp','snorlax','magnemite'].forEach(id => {
+      ok('  e ' + id + ' (nenhum tipo e imune) pode', S.podeConfundir(novo(id, 60)) === true);
+    });
+  }
+  /* ⚠️ O GOLPE QUE NAO AFETA O ALVO NAO CONFUNDE: este motor sempre "conecta" (piso de 1 de dano e
+     golpe teimoso), entao sem essa guarda um Psicoraio confundiria um Sombrio que ele nem alcanca. */
+  {
+    const bate = novo('alakazam', 60); bate.lastMove = 'psybeam';
+    const sombrio = novo('umbreon', 60);
+    let pegou = 0;
+    for(let i = 0; i < 400; i++){ sombrio._confuso = null; if(S.tentarConfundir(bate, sombrio, () => 0.01)) pegou++; }
+    ok('Psicoraio nao confunde um SOMBRIO (o golpe nao o afeta)', pegou === 0, pegou + ' de 400');
+    const normal = novo('snorlax', 60);
+    let pegou2 = 0;
+    for(let i = 0; i < 400; i++){ normal._confuso = null; if(S.tentarConfundir(bate, normal, () => 0.01)) pegou2++; }
+    ok('  mas confunde um Normal', pegou2 === 400, pegou2 + ' de 400');
+  }
+  /* ---------- a chance, medida com um rng CONTINUO ---------- */
+  {
+    const bate = novo('blastoise', 60);
+    const medir = (golpe) => {
+      bate.lastMove = golpe;
+      const alvo = novo('snorlax', 60);
+      let n = 0, seed = 7;
+      const rng = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
+      for(let i = 0; i < 6000; i++){ alvo._confuso = null; if(S.tentarConfundir(bate, alvo, rng)) n++; }
+      return n / 6000;
+    };
+    [['waterpulse', 0.20], ['confusion', 0.10]].forEach(([g, esperado]) => {
+      const taxa = medir(g);
+      const sigma = Math.sqrt(esperado * (1 - esperado) / 6000);
+      ok('  a chance medida do ' + g + ' bate com a tabela', Math.abs(taxa - esperado) < 4 * sigma,
+         (100 * taxa).toFixed(2) + '% (esperado ' + (100 * esperado) + '%)');
+    });
+    /* ⚠️ O p=1 E COBRADO POR IGUALDADE EXATA: ali o sigma e zero. */
+    ok('  e o Soco Dinamico e 100% (a precisao que este motor nao tem)', medir('dynamicpunch') === 1);
+  }
+  /* ⚠️ AS DUAS SAIDAS ANTECIPADAS DO rng: lido sempre, ele deslocaria a semente de toda batalha
+     sem golpe de confusao nenhum -- a mesma armadilha do Remoinho, do gelo e da paralisia. */
+  {
+    let lidas = 0; const rng = () => { lidas++; return 0.01; };
+    const bate = novo('snorlax', 60); bate.lastMove = 'tackle';
+    S.tentarConfundir(bate, novo('pikachu', 60), rng);
+    ok('o rng NAO e lido quando o golpe nao confunde', lidas === 0, lidas + ' leituras');
+    bate.lastMove = 'confusion';
+    const jaConfuso = novo('pikachu', 60); jaConfuso._confuso = 3;
+    S.tentarConfundir(bate, jaConfuso, rng);
+    ok('  nem quando o alvo ja esta confuso', lidas === 0, lidas + ' leituras');
+  }
+  /* ---------- a duracao ---------- */
+  {
+    const bate = novo('blastoise', 60); bate.lastMove = 'dynamicpunch';
+    const vistos = {};
+    let seed = 3; const rng = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
+    for(let i = 0; i < 4000; i++){
+      const alvo = novo('snorlax', 60);
+      S.tentarConfundir(bate, alvo, rng);
+      vistos[alvo._confuso] = (vistos[alvo._confuso] || 0) + 1;
+    }
+    const chaves = Object.keys(vistos).map(Number).sort((a, b) => a - b);
+    ok('a duracao sorteada fica entre 2 e 5',
+       chaves[0] === 2 && chaves[chaves.length - 1] === 5 && chaves.length === 4, chaves.join(','));
+  }
+  /* ---------- o auto-dano: typeless, FISICO, poder 40, sem critico ---------- */
+  {
+    /* ⚠️ SEM TIPO: o espelho aplicaria a tabela contra ELE MESMO, e Fantasma contra Fantasma e 2x
+       -- foi o que fez um Haunter tirar 299 dos proprios 300 quando a passiva nasceu. */
+    const haunter = novo('haunter', 60);
+    const d = S.danoDaConfusao(haunter, () => 0.5);
+    const fracao = d / haunter.maxHp;
+    ok('o auto-dano nao passa de um terco da propria barra', fracao < 0.34,
+       (100 * fracao).toFixed(1) + '% da barra do Haunter');
+    /* ⚠️ E ELE E FISICO, e a trava e COMPARATIVA em vez de um limiar -- ela era `< 30% da barra` e
+       PASSAVA com o auto-dano especial: o Alakazam especial da 1,43x o fisico (SpAtk 135/SpDef 85
+       contra Atk 50/Def 45) e isso ainda cabia nos 30%. Medido, a trava dava verde com o defeito.
+       O sinal exato e a ORDEM ENTRE DOIS PERFIS OPOSTOS INVERTER:
+         Machamp  fisico 130/80 = 1,63  |  especial  65/85 = 0,76
+         Alakazam fisico  50/45 = 1,11  |  especial 135/85 = 1,59
+       Fisico, o Machamp se machuca MAIS (18,1% contra 16,1% da barra); especial, MENOS. Nao ha
+       limiar escolhido -- e a razao dos atributos, e ela vem da tabela. */
+    const ala = novo('alakazam', 60);
+    const dAla = S.danoDaConfusao(ala, () => 0.5);
+    const mach = novo('machamp', 60);
+    const dMach = S.danoDaConfusao(mach, () => 0.5);
+    const gengar = novo('gengar', 60);
+    ok('  e ele e FISICO (a ordem entre Machamp e Alakazam inverte se for especial)',
+       (dMach / mach.maxHp) > (dAla / ala.maxHp),
+       'Machamp ' + (100*dMach/mach.maxHp).toFixed(1) + '%  >  Alakazam ' + (100*dAla/ala.maxHp).toFixed(1) + '%');
+    /* ⚠️ E ELE NAO SUJA O `lastMove` DO POKEMON: o calcDamage ESCREVE nele, e sem a copia o golpe
+       da luta seguinte sairia trocado no log E os cinco `tentar*` sortearia em cima dele. */
+    gengar.lastMove = 'shadowball';
+    S.danoDaConfusao(gengar, () => 0.5);
+    ok('  e o espelho nao suja o lastMove de quem se acertou', gengar.lastMove === 'shadowball',
+       String(gengar.lastMove));
+  }
+  /* ---------- o ciclo inteiro, numa troca de verdade ---------- */
+  {
+    /* ⚠️ O ALVO E UM SHUCKLE (Defesa 230) E O ATACANTE E FRACO: com um Snorlax o confronto acabava
+       em 4 golpes, ANTES de a confusao render um auto-acerto -- e a trava media o VAZIO. O painel
+       tem que cair na faixa em que a regra vale, que e a licao dos fixtures deste arquivo. */
+    const a = novo('machamp', 40), b = novo('shuckle', 60);
+    a.ataques = ['dynamicpunch']; b.ataques = ['rockthrow'];
+    let seed = 11; const rng = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
     const d = [];
-    for(let i = 0; i < 400 && !d.length; i++){ quem._especialContra = null; S.tentarGolpeEspecial(quem, alvo, Math.random, d); }
-    const saiu = d.find(g => g.x === 'confusao');
-    ok('a confusao saiu no teste do espelho', !!saiu);
-    ok('e o espelho NAO sobrescreveu o lastMove do original',
-       alvo.lastMove === 'tackle', String(alvo.lastMove));
+    for(let t = 0; t < 14 && a.hp > 0 && b.hp > 0; t++) S.doExchange(a, b, rng, d, 'p', 'e');
+    const marcas = d.map(g => g.x).filter(Boolean);
+    ok('a troca gera a linha de quem FICOU confuso', marcas.includes('confundiu'), marcas.join(','));
+    ok('  e a linha de quem SE ACERTOU', marcas.includes('confuso'), marcas.join(','));
+    /* ⚠️ O `q` DA LINHA DO AUTO-DANO E DE QUEM PERDE (a familia da queimadura), e nao de quem
+       causou: lido ao contrario, a barra que desce e a do pokemon errado -- e o defeito nao
+       aparece como erro, aparece como o adversario perdendo vida do nada. */
+    const auto = d.find(g => g.x === 'confuso');
+    ok('  e o `q` dela e de QUEM SE ACERTOU', auto && auto.q === 'e' && auto.g === b.name,
+       auto ? (auto.q + ' / ' + auto.g) : '(sem linha)');
+    ok('  com o dano escrito na linha', auto && auto.d > 0, auto ? String(auto.d) : '-');
+    /* ⚠️ QUEM SE ACERTA NAO ATACA NAQUELE TURNO -- a mesma guarda do sono, do gelo e da paralisia.
+       Sem ela, ele ainda aplicaria status com o `lastMove` da troca anterior (o defeito de 18/09). */
+    let erros = 0;
+    for(let i = 0; i < d.length; i++){
+      if(d[i].x !== 'confuso') continue;
+      /* nenhum golpe DELE pode sair entre o auto-dano e a proxima troca */
+      for(let j = i + 1; j < d.length; j++){
+        if(d[j].x === 'confuso' || d[j].x === 'saiuConfusao') break;
+        if(!d[j].x && d[j].q === d[i].q) { erros++; break; }
+        if(d[j].x === 'confundiu' || d[j].x === 'paralisou') continue;
+        if(!d[j].x) break;      /* o golpe do OUTRO lado fecha a troca */
+      }
+    }
+    ok('  e quem se acertou NAO ataca naquela troca', erros === 0, erros + ' golpes de quem se acertou');
   }
-
-  /* O DANO E SEM TIPO, como no jogo oficial (a pedido, 10/09/2026). O espelho aplicava a tabela
-     contra ELE MESMO -- Fantasma contra Fantasma e 2x --, e um Haunter tirava 299 dos proprios 300.
-     A prova e direta: o MESMO espelho, com e sem a opcao, contra um alvo cujo golpe e
-     super-eficaz nele. */
+  /* ---------- ela PASSA, e a linha de saida existe ---------- */
   {
-    const alvo = inst('haunter', 45); alvo.ataques = S.ataquesPadrao(alvo);
-    alvo.maxHp = S.calcMaxHp(alvo); alvo.hp = alvo.maxHp;
-    let comTipo = 0, semTipo = 0;
-    for(let i = 0; i < 300; i++){
-      comTipo += S.calcDamageNew(Object.assign({}, alvo, { _anulado:null }), alvo, S.makeSeededRng('t' + i));
-      semTipo += S.calcDamageNew(Object.assign({}, alvo, { _anulado:null }), alvo, S.makeSeededRng('t' + i), { semTipo: true });
-    }
-    ok('sem tipo o espelho bate MENOS num alvo super-eficaz contra si', semTipo < comTipo * 0.85,
-       'com tipo ' + (100*(comTipo/300)/alvo.maxHp).toFixed(0) + '%   sem tipo ' + (100*(semTipo/300)/alvo.maxHp).toFixed(0) + '% da vida');
-    /* E o que SOBRA e atributo, nao tipo: um Shuckle (defesa 230) mal se arranha e um Haunter
-       (defesa 45) se arrebenta. E o certo -- o espelho e ele mesmo. */
-    const shuckle = inst('shuckle', 45); shuckle.ataques = S.ataquesPadrao(shuckle);
-    shuckle.maxHp = S.calcMaxHp(shuckle); shuckle.hp = shuckle.maxHp;
-    let tanque = 0;
-    for(let i = 0; i < 300; i++) tanque += S.calcDamageNew(Object.assign({}, shuckle, { _anulado:null }), shuckle, S.makeSeededRng('s' + i), { semTipo: true });
-    ok('e quem e duro mal se arranha', (tanque/300) / shuckle.maxHp < 0.15,
-       (100*(tanque/300)/shuckle.maxHp).toFixed(0) + '% da propria vida');
-    /* E SEM CRITICO, tambem como no jogo oficial (a pedido). Medido antes de tirar: 43% dos golpes
-       que deixavam o confuso em 1 de HP eram criticos -- e o critico dobra o dano SEM selo nenhum
-       na linha da confusao, que e a mesma classe de defeito dos "dois golpes impossiveis". */
-    {
-      let comCrit = 0, semCrit = 0;
-      const p3 = inst('gengar', 45); p3.ataques = S.ataquesPadrao(p3);
-      p3.maxHp = S.calcMaxHp(p3); p3.hp = p3.maxHp;
-      for(let i = 0; i < 4000; i++){
-        const e1 = Object.assign({}, p3, { _anulado:null });
-        S.calcDamageNew(e1, p3, S.makeSeededRng('k' + i), { semTipo: true });
-        if(e1.lastCrit) comCrit++;
-        const e2 = Object.assign({}, p3, { _anulado:null });
-        S.calcDamageNew(e2, p3, S.makeSeededRng('k' + i), { semTipo: true, semCritico: true });
-        if(e2.lastCrit) semCrit++;
-      }
-      ok('sem a opcao o critico sai normalmente', comCrit > 100, comCrit + ' de 4000');
-      ok('e com ela nunca sai', semCrit === 0, semCrit + ' de 4000');
-      /* O RNG E CONSUMIDO DO MESMO JEITO: os dois motores tem que ler a mesma quantidade de numeros
-         da mesma semente, senao a batalha diverge do 2o golpe em diante. A prova e que o dano NAO
-         critico e identico com e sem a opcao. */
-      let iguais = 0, naoCrit = 0;
-      for(let i = 0; i < 2000; i++){
-        const e1 = Object.assign({}, p3, { _anulado:null });
-        const d1 = S.calcDamageNew(e1, p3, S.makeSeededRng('r' + i), { semTipo: true });
-        if(e1.lastCrit) continue;
-        naoCrit++;
-        const d2 = S.calcDamageNew(Object.assign({}, p3, { _anulado:null }), p3, S.makeSeededRng('r' + i), { semTipo: true, semCritico: true });
-        if(d1 === d2) iguais++;
-      }
-      ok('e o golpe NAO critico da o mesmo numero (o rng anda igual)', iguais === naoCrit,
-         iguais + ' de ' + naoCrit);
-    }
-
-    /* A OPCAO NAO PODE VAZAR pro resto do jogo: sem ela a conta e a de sempre. */
-    const a2 = inst('charizard', 50), b2 = inst('venusaur', 50);
-    a2.ataques = S.ataquesPadrao(a2); b2.ataques = S.ataquesPadrao(b2);
-    b2.maxHp = S.calcMaxHp(b2); b2.hp = b2.maxHp;
-    const normal = S.calcDamageNew(a2, b2, S.makeSeededRng('z'));
-    const zerado = S.calcDamageNew(a2, b2, S.makeSeededRng('z'), { semTipo: true });
-    ok('e o golpe COMUM continua com tipo (Fogo x Planta e 2x)', normal > zerado,
-       'com tipo ' + normal + '   sem tipo ' + zerado);
+    const a = novo('machamp', 30), b = novo('shuckle', 70);
+    a.ataques = ['dynamicpunch']; b.ataques = ['rockthrow'];
+    let seed = 23; const rng = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
+    const d = [];
+    for(let t = 0; t < 14 && a.hp > 0 && b.hp > 0; t++) S.doExchange(a, b, rng, d, 'p', 'e');
+    ok('a confusao PASSA, e a saida vira linha', d.some(g => g.x === 'saiuConfusao'),
+       d.map(g => g.x).filter(Boolean).join(','));
+    /* ⚠️ E ELA E VOLATIL: solta no fim da batalha, como as outras marcas. O campo comeca com `_`,
+       entao ele nao vai pro Firestore -- sem soltar, o pokemon voltaria confuso do save. */
+    b._confuso = 4;
+    S.encerrarBatalha([a], [b]);
+    ok('  e a marca e solta no fim da batalha', !b._confuso, String(b._confuso));
   }
-
-  /* NA FICHA DA POKEDEX, com a chance -- ela e por CONFRONTO, e sem o numero o jogador acharia que
-     sai todo golpe. */
-  ok('a ficha do Alakazam anuncia a Confusao',
-     S.especiaisDaEspecie('alakazam').some(e => e.nome === 'Confusão' && e.chance === S.CHANCE_CONFUSAO),
-     JSON.stringify(S.especiaisDaEspecie('alakazam')));
-  ok('e o selo dela e Psiquico', S.TIPO_DO_ESPECIAL['Confusão'] === 'Psychic');
+  /* ---------- as tres frases, palavra por palavra ---------- */
+  {
+    /* ⚠️ A ASSINATURA E `(g, quem, alvo, op)` -- QUATRO argumentos. Chamando `(g, {})` o `op` cai
+       no lugar do NOME, e as tres frases novas passariam por acidente (elas tiram o nome do campo
+       `g.g` do registro, nao do parametro). A da marca VELHA usa os parametros, e ali isso saia
+       como *"[object Object] deixou undefined confuso"* -- com a trava VERDE. */
+    const fr = (g) => S.fraseDoEspecial(g, 'Golduck', 'Snorlax', {});
+    ok('a frase de quem ficou confuso nomeia o GOLPE',
+       fr({ x:'confundiu', g:'Snorlax', mv:'dynamicpunch' }) === 'Snorlax ficou confuso com SOCO DINÂMICO!',
+       fr({ x:'confundiu', g:'Snorlax', mv:'dynamicpunch' }));
+    /* ⚠️ "COM" E NAO "PELO": SOCO DINAMICO e masculino e CONFUSAO e feminina -- a preposicao neutra
+       serve aos seis sem uma tabela de genero pra uma frase so (a licao do congelamento). */
+    ok('  e com o "com" neutro nos seis',
+       Object.keys(TAB).every(id => fr({ x:'confundiu', g:'X', mv:id }).indexOf(' com ') > 0));
+    /* ⚠️ ELA TRAZ O NUMERO, e e a unica das tres: a linha de um especial nao ganha o "e tirou -N"
+       automatico, e sem ele a soma das linhas nao fecharia com a barra. */
+    ok('a frase do auto-dano traz o NUMERO',
+       fr({ x:'confuso', g:'Snorlax', d:87 }) === 'Snorlax se acertou na própria confusão e perdeu 87 de HP',
+       fr({ x:'confuso', g:'Snorlax', d:87 }));
+    ok('a frase da saida', fr({ x:'saiuConfusao', g:'Snorlax' }) === 'Snorlax não está mais confuso!',
+       fr({ x:'saiuConfusao', g:'Snorlax' }));
+    /* AS TRES DIVIDEM O MESMO SELO, como as tres do gelo dividem o ❄️: e o mesmo evento visto em
+       tres momentos, e icones diferentes fariam procurar tres mecanicas onde ha uma. */
+    ['confundiu','confuso','saiuConfusao'].forEach(x => {
+      ok('  ' + x + ' sai com o selo da confusao',
+         temSelo(S.fraseDoEspecial({ x:x, g:'X', mv:'confusion', d:10 }, 'X', 'Y', { selo:true, icone:true }), 'confusao') ||
+         temSelo(S.ICONES_ESPECIAIS[x], 'confusao'), String(S.ICONES_ESPECIAIS[x]).slice(0, 40));
+    });
+  }
+  /* ---------- a FAIXA DE FOCO no auto-golpe ---------- */
+  {
+    /* ⚠️ O CASO DURO E O POKEMON JA ESTAR COM 1 DE HP: ali a Faixa vigia e E GASTA, e o dano
+       EFETIVO do auto-golpe da ZERO (`antes - p.hp` = 1 - 1). O `seAcertou` devolvia null nesse
+       caso, entao o item saia do bolso SEM UMA LINHA na tela -- e o golpe seguinte matava o pokemon
+       sem Faixa, furando a promessa de que *"quem carrega a Faixa nunca termina um confronto em 0
+       sem ela ter disparado antes"*.
+       ⚠️ ELE NAO DA PRA MEDIR PELA TRAVA GENERICA DA FAIXA: medido, ela o pega em ~1 rodada de 20
+       (6.000 batalhas com `Math.random`). Esta o monta DIRETO e e deterministica.
+       ⚠️ E O FIXTURE PRECISOU DE TRES COISAS, senao ele mede outro caminho (a primeira versao dele
+       passou por ACIDENTE -- a linha `faixa` que ela achava era do GOLPE COMUM contra um alvo de 1
+       de HP, e nao do auto-golpe):
+         1. o alvo JA confuso (`_confuso`), porque o `confunde()` roda na ENTRADA da troca -- quem
+            acaba de ficar confuso so se acerta na troca SEGUINTE;
+         2. o alvo MAIS RAPIDO, pra ele agir antes de o outro bater (com 1 de HP, qualquer golpe o
+            mata e a Faixa sairia no golpe em vez do auto-dano);
+         3. o alvo com a Faixa e com 1 de HP. */
+    const alvo = mkConf('jolteon', 55); alvo.item = 'faixa_foco'; alvo.hp = 1; alvo._confuso = 3;
+    const lento = mkConf('snorlax', 55);
+    const viciado = () => 0.0001;   /* se acerta sempre */
+    ok('  o fixture cai na faixa certa: o alvo e mais rapido', S.effectiveSpeed(alvo) > S.effectiveSpeed(lento),
+       S.effectiveSpeed(alvo) + ' x ' + S.effectiveSpeed(lento));
+    const d1 = [];
+    S.doExchange(alvo, lento, viciado, d1);
+    const iConf = d1.findIndex(g => g.x === 'confuso' && g.q === 'p');
+    const iFaixa = d1.findIndex(g => g.x === 'faixa' && g.q === 'p');
+    ok('com 1 de HP, o auto-golpe faz a Faixa DEIXAR A LINHA dela', iFaixa >= 0,
+       d1.map(g => (g.x || 'golpe') + ':' + (g.d || 0) + '(' + g.q + ')').join(' '));
+    ok('  e a linha do auto-dano NAO sai (dano zero nao vira linha)', iConf < 0, String(iConf));
+    /* ⚠️ A LINHA DA FAIXA VEM ANTES DO GOLPE DO ADVERSARIO, e e isso que prova que ela e do
+       AUTO-GOLPE e nao do golpe comum: a primeira versao desta trava passava por acidente porque a
+       linha que ela achava era a do Snorlax batendo num alvo de 1 de HP.
+       ⚠️ E O ALVO MORRE NO GOLPE SEGUINTE, e esta certo: a Faixa e UMA. O que ela promete e nunca
+       terminar em 0 SEM ter disparado -- e ela disparou, com linha na tela. */
+    const iGolpeDele = d1.findIndex(g => !g.x && g.q === 'e');
+    ok('  e ela vem ANTES do golpe do adversario (ou seja e do auto-golpe)',
+       iFaixa >= 0 && (iGolpeDele < 0 || iFaixa < iGolpeDele), 'faixa em ' + iFaixa + ', golpe dele em ' + iGolpeDele);
+    /* e o caso NORMAL (vida cheia) continua gravando a linha do auto-dano, com a Faixa intocada */
+    const alvo2 = mkConf('jolteon', 55); alvo2.item = 'faixa_foco'; alvo2._confuso = 3;
+    const d2 = [];
+    S.doExchange(alvo2, mkConf('snorlax', 55), viciado, d2);
+    /* ⚠️ COM VIDA CHEIA a linha do auto-dano sai com dano de verdade. A Faixa tambem aparece nesse
+       fixture, e esta certo: o Snorlax bate 317 num Jolteon de ~300 e ela segura o GOLPE dele --
+       o que a trava cobra aqui e so que o auto-dano voltou a ter linha. */
+    ok('  e com vida cheia a linha do auto-dano sai normalmente',
+       d2.some(g => g.x === 'confuso' && g.q === 'p' && g.d > 0),
+       d2.map(g => (g.x || 'golpe') + ':' + (g.d || 0) + '(' + g.q + ')').join(' '));
+  }
+  /* ---------- a ANIMACAO: o passo do auto-golpe nao inverte o lado ---------- */
+  {
+    /* ⚠️ O `q` DO `confuso` E DE QUEM PERDE, como o da queimadura e o do veneno -- entao o passo
+       NAO inverte o lado. O passo comum le o `q` como QUEM BATE e desce a barra do OUTRO; aqui nao
+       ha causador na troca (o pokemon se acertou), e invertido a barra que desce e a do pokemon
+       ERRADO. O defeito nao aparece como erro: aparece como o adversario perdendo vida do nada.
+       ⚠️ E A MARCA VELHA (`confusao`, a passiva) ESTA NA FAMILIA OPOSTA -- o `q` dela e de QUEM
+       CONFUNDIU --, entao as duas tem que sair em lados CONTRARIOS pro mesmo `q`. E esse par que
+       prova que elas nao foram confundidas uma com a outra. */
+    const seqDe = (g) => S.buildAnimatedHitSequence({ playerHpBefore: 200, enemyHpBefore: 200,
+      playerMaxHp: 200, enemyMaxHp: 200, playerHpAfter: 150, enemyHpAfter: 200, golpes: [g] });
+    const novo = seqDe({ x:'confuso', q:'p', g:'X', d:50 })[0];
+    ok('o passo do auto-golpe desce a barra de QUEM SE ACERTOU', novo && novo.side === 'player',
+       novo ? novo.side + ' (amount ' + novo.amount + ')' : 'sem passo');
+    ok('  e a marca VELHA continua descendo a do OUTRO lado (ela e de quem CONFUNDIU)',
+       (() => { const v = seqDe({ x:'confusao', q:'p', g:'X', d:50 })[0]; return v && v.side === 'enemy'; })(),
+       (() => { const v = seqDe({ x:'confusao', q:'p', g:'X', d:50 })[0]; return v ? v.side : 'sem passo'; })());
+    /* e o amount e POSITIVO: a barra DESCE (os lacos fazem hp - amount) */
+    ok('  e o amount e positivo (a barra desce, nao sobe)', novo && novo.amount > 0, String(novo && novo.amount));
+  }
+  /* ---------- o SELO do quadro do lutador ---------- */
+  {
+    /* ⚠️ A CONFUSAO NAO ENTRA NO `selosDoConfronto` (o selo ao lado do nome, nas cinco telas) e SIM
+       nos ICONES FLUTUANTES da cena nova (`statusVisuaisDaSequencia`) -- e isso nao e omissao: ali
+       estao os TRES status que PASSAM (sono, gelo e confusao), enquanto o quadro tem os tres que
+       NAO passam (queimadura, veneno, paralisia). Um selo de campo pro que passa mentiria: o campo
+       do matchup e o estado no FIM do confronto, e quem saiu da confusao no meio sairia sem selo em
+       quadro nenhum.
+       ⚠️ ELA SEGUE O MOLDE DO GELO: se a primeira marca do lado e `confundiu`, ele NAO estava
+       confuso antes -- o icone so acende no passo dela; se e `confuso` ou `saiuConfusao`, ele entrou
+       no confronto JA confuso (ela atravessa trocas) e vale desde o primeiro quadro. Sem isso o
+       icone entregaria a confusao ANTES de ela acontecer, que e o defeito que o 🔥 teve em
+       16/09/2026 e que custou um relato.
+       ⚠️ E A CHAVE E `confusion` EM INGLES (como `freeze` e `paralysis`), enquanto o SELO se chama
+       `confusao`: procurar pelo nome do selo devolve sempre false e a trava mede NADA. Conferir a
+       FORMA do retorno antes de medir. */
+    let comIcone = null, herdado = null;
+    for(let k = 0; k < 900 && !(comIcone && herdado); k++){
+      const a = [mkConf('golduck', 55), mkConf('venomoth', 55)];
+      const b = [mkConf('machoke', 52), mkConf('snorlax', 52)];
+      S.simulateGymBattle(a, b, S.makeSeededRng('selo' + k)).matchups.forEach(m => {
+        const seq = S.sequenciaDoConfronto(m);
+        const i = seq.findIndex(x => x.x === 'confundiu');
+        if(!comIcone && i > 0 && seq.length > i + 1) comIcone = { m, i, seq };
+        /* HERDADA: ha `confuso` do lado e NENHUM `confundiu` dele -- ela veio de antes */
+        if(!herdado){
+          ['p','e'].forEach(lado => {
+            if(herdado) return;
+            const temConf = seq.some(x => x.x === 'confuso' && x.q === lado);
+            const temIni  = seq.some(x => x.x === 'confundiu' && x.q === lado);
+            if(temConf && !temIni) herdado = { m, lado, seq };
+          });
+        }
+      });
+    }
+    ok('achei um confronto com o icone de confusao', !!comIcone);
+    if(comIcone){
+      const { m, i, seq } = comIcone;
+      const lado = seq[i].q;
+      const tem = (passo) => S.statusVisuaisDaSequencia(m, lado, passo, seq).indexOf('confusion') >= 0;
+      let antes = 0, depois = 0;
+      for(let passo = 0; passo <= seq.length; passo++){
+        if(passo < i + 1 && tem(passo)) antes++;
+        if(passo >= i + 1 && !tem(passo)
+           && !seq.slice(0, passo).some(g => g.x === 'saiuConfusao' && g.q === lado)) depois++;
+      }
+      ok('o icone NAO aparece antes do passo em que a confusao pega', antes === 0, antes + ' quadros cedo demais');
+      ok('  e aparece do passo dela em diante (ate ela passar)', depois === 0, depois + ' quadros sem o icone');
+    }
+    /* ⚠️ E QUANDO ELA PASSA, O ICONE APAGA -- o gelo faz igual com o `degelou`. Sem isso o jogador
+       continuaria vendo o aviso de um status que acabou. */
+    if(comIcone){
+      const mFim = { playerHpBefore: 200, enemyHpBefore: 200, playerMaxHp: 200, enemyMaxHp: 200,
+        playerHpAfter: 200, enemyHpAfter: 160,
+        golpes: [{ x:'confuso', q:'e', g:'B', d:40 }, { x:'saiuConfusao', q:'e', g:'B' }] };
+      const sf = S.sequenciaDoConfronto(mFim);
+      const iSaiu = sf.findIndex(g => g.x === 'saiuConfusao');
+      ok('  e o icone APAGA no passo em que ela passa',
+         S.statusVisuaisDaSequencia(mFim, 'e', iSaiu, sf).indexOf('confusion') >= 0 &&
+         S.statusVisuaisDaSequencia(mFim, 'e', iSaiu + 1, sf).indexOf('confusion') < 0,
+         JSON.stringify([S.statusVisuaisDaSequencia(mFim, 'e', iSaiu, sf),
+                         S.statusVisuaisDaSequencia(mFim, 'e', iSaiu + 1, sf)]));
+    }
+    /* ⚠️ HERDADA: sem marca de `confundiu`, ela veio de ANTES -- e ai o icone vale desde o quadro 0.
+       Procurar a marca e nao achar significa *"veio de antes"*, nao *"nao houve"*. */
+    ok('e a confusao HERDADA vale desde o primeiro quadro',
+       !herdado || S.statusVisuaisDaSequencia(herdado.m, herdado.lado, 0, herdado.seq).indexOf('confusion') >= 0,
+       herdado ? 'lado ' + herdado.lado : 'nenhum confronto herdado na amostra');
+    ok('  e o fixture ACHOU um caso herdado (senao a trava acima mede o vazio)', !!herdado);
+  }
+  /* ---------- as tres pausam 1,5s e sao golpe ESPECIAL (nao caem no ramo do golpe comum) ---------- */
+  {
+    ['confundiu','confuso','saiuConfusao'].forEach(x => {
+      ok('  ' + x + ' vale 1 passo de leitura', S.passosDaAbertura[x] === 1, String(S.passosDaAbertura[x]));
+      ok('  ' + x + ' e reconhecida como especial', S.ehGolpeEspecial({ x:x }) === true);
+    });
+  }
+  /* ---------- o asterisco do cartao ---------- */
+  {
+    const obs = (id) => (S.obsDoGolpe(id) || []).join(' | ');
+    ok('o cartao avisa a confusao nos SEIS', Object.keys(TAB).every(id => /confus/i.test(obs(id))),
+       Object.keys(TAB).filter(id => !/confus/i.test(obs(id))).join(', ') || 'todos avisam');
+    /* ⚠️ A CHANCE SAI DA TABELA, nunca escrita a mao: ela VARIA de 10% a 100%, entao um texto fixo
+       mentiria em tres dos seis.
+       ⚠️ E O DE 100% AFIRMA em vez de dizer porcentagem (24/09/2026) -- *"100% de chance de"* e uma
+       condicional que nao existe. A decisao ja estava escrita no asterisco do ESTAGIO e nunca tinha
+       sido exercida; o `pct()` e compartilhado pelos cinco status, entao ela alinhou o SOCO DINAMICO
+       e o CANHAO DE CHOQUE de uma vez. */
+    ok('  com a chance de CADA um', /20%/.test(obs('waterpulse')) && /10%/.test(obs('confusion')),
+       obs('confusion') + ' // ' + obs('waterpulse'));
+    ok('  e o de 100% AFIRMA, sem dizer porcentagem',
+       /Sempre causa/.test(obs('dynamicpunch')) && !/100%/.test(obs('dynamicpunch')),
+       obs('dynamicpunch').replace(/<[^>]*>/g, '').trim());
+    ok('  e golpe que nao confunde nao avisa', !/confus/i.test(obs('tackle')), obs('tackle'));
+    /* e o texto da PASSIVA saiu junto com ela */
+    ok('  e o aviso da passiva ("por confronto") sumiu', !/por confronto de o adversário/.test(obs('waterpulse')));
+  }
+  /* ---------- a ficha da Pokedex perdeu a linha, e a explicacao nao ficou orfa ---------- */
+  {
+    const especiais = S.especiaisDaEspecie('zubat') || [];
+    ok('a ficha do Zubat nao fala mais em confusao',
+       !especiais.some(e => e.efeito === 'confusao'), JSON.stringify(especiais.map(e => e.efeito)));
+    /* ⚠️ A TABELA DE EXPLICACAO E INDEXADA PELO EFEITO: uma entrada sem dono deixaria a caixa
+       abrindo vazia, e o teste do bloco de especiais cobra que nenhuma sobre. */
+    ok('  e a explicacao da confusao saiu junto', !S.EXPLICACAO_DO_ESPECIAL.confusao,
+       JSON.stringify(Object.keys(S.EXPLICACAO_DO_ESPECIAL).slice(0, 12)));
+  }
+  /* ---------- OS DOIS MOTORES, num painel que GARANTE confusao ---------- */
+  {
+    /* ⚠️ A COMPARACAO DAS 300 BATALHAS NAO SERVE PRA ISSO: sao 30 especies em 250 e a confusao sai em
+       0,65% dos confrontos -- ela daria verde sem tocar a mecanica uma vez, que e o pior tipo de
+       teste que existe. Por isso ela tem painel PROPRIO, como o gelo, a queimadura, o veneno e o
+       sono. Uma divergencia aqui faz a MESMA partida de liga terminar diferente no cliente e no
+       servidor -- e a confusao MUDA O HP NO MEIO DA TROCA, entao os dois passam a discordar do golpe
+       seguinte em diante.
+       ⚠️ O PAINEL E O GOLDUCK E O VENOMOTH porque eles USAM o golpe de verdade (6 de 8 e 4 de 8 do
+       painel, medido) -- o Machop LEVA o Soco Dinamico de 100% e nunca o escolhe, porque ele tem o
+       Golpe Cruzado de mesmo poder e credito alto. Montar com ele daria zero confusoes. */
+    const cliC = require('fs').readFileSync(require('path').join(raiz, 'index.html'), 'utf8');
+    const srvC = require('fs').readFileSync(require('path').join(raiz, 'functions', 'index.js'), 'utf8');
+    ok('a tabela e as constantes sao iguais nos dois motores (pelo fonte)',
+       /dynamicpunch: 1.00/.test(cliC) && /dynamicpunch: 1.00/.test(srvC) &&
+       /CONFUSAO_PODER = 40/.test(cliC) && /CONFUSAO_PODER = 40/.test(srvC));
+    const ALVOS = ['machamp', 'snorlax', 'rhydon', 'tauros', 'dragonite', 'starmie'];
+    let div = 0, comC = 0, autos = 0, ex = null;
+    for(let i = 0; i < 120; i++){
+      const alvo = ALVOS[i % ALVOS.length];
+      const monta = (novo) => { const a = novo('golduck', 60); a.ataques = ['confusion'];
+                                const b = novo('venomoth', 60); b.ataques = ['psybeam']; return [a, b]; };
+      const advs = (novo) => [novo(alvo, 62), novo(ALVOS[(i + 3) % ALVOS.length], 62)];
+      const rC = S.simulateGymBattle(monta((id, lv) => S.createInstance(id, lv)),
+                                     advs((id, lv) => S.createInstance(id, lv)), S.makeSeededRng('c2m' + i));
+      const rS = srv._simulateGymBattle(monta((id, lv) => srv._createInstance(id, lv)),
+                                        advs((id, lv) => srv._createInstance(id, lv)), srv._makeSeededRng('c2m' + i));
+      const marcas = (r) => (r.matchups || []).reduce((a, m) =>
+        a + (m.golpes || []).filter(g => g.x === 'confundiu').length, 0);
+      if(marcas(rC) > 0) comC++;
+      autos += (rC.matchups || []).reduce((a, m) =>
+        a + (m.golpes || []).filter(g => g.x === 'confuso').length, 0);
+      if(resumo(rC) !== resumo(rS)){ div++; if(!ex) ex = 'volta ' + i + ' contra ' + alvo; }
+    }
+    ok('120 batalhas com confusao garantida batem golpe a golpe nos dois motores', div === 0,
+       div + ' divergencias' + (ex ? '  |  ' + ex : ''));
+    /* ⚠️ E ELA TEM QUE ESTAR DENTRO DELAS -- sem esta segunda linha o painel daria verde comparando
+       120 trocas de golpe comum, que e o caso em que os dois motores nunca divergiriam. */
+    ok('e a confusao esta dentro delas', comC >= 25 && autos > 0,
+       comC + ' batalhas com confusao, ' + autos + ' auto-golpes');
+  }
+  /* ---------- log VELHO continua se lendo ---------- */
+  {
+    /* ⚠️ A MARCA VELHA (`confusao`, a passiva) CONTINUA DESENHADA: confronto gravado antes de hoje
+       tem ela, e sem isso aquele log perde uma linha E a soma para de fechar com a barra. E a
+       mesma decisao do `x:'desempate'` e da marca `m` do moribundo. */
+    ok('a marca VELHA continua sendo um especial', S.ehGolpeEspecial({ x:'confusao' }) === true);
+    /* ⚠️ AQUI OS DOIS NOMES VEM DOS PARAMETROS (a frase velha e `quem + ' deixou ' + alvo`), e e
+       por isso que esta chamada precisa dos quatro argumentos -- ver o comentario do `fr`. */
+    const frVelha = S.fraseDoEspecial({ x:'confusao', g:'Zubat', a2:'Machop' }, 'Zubat', 'Machop', {});
+    ok('  e continua tendo frase', /confus/i.test(frVelha) && frVelha.indexOf('Zubat') === 0
+       && frVelha.indexOf('Machop') > 0 && frVelha.indexOf('undefined') < 0, frVelha);
+  }
 }
+
+/* ⚠️ ELE MORAVA NO BLOCO DA CONFUSAO VELHA e e usado pelo bloco da Furia do Dragao -- quando
+   aquele bloco saiu (24/09/2026), este ficou apontando pro nada. Hoje ele e solto. */
 function GOLPES_OK(S, id){ return !!(S.GOLPES && S.GOLPES[id]); }
 
 console.log('\n=== A FURIA DO DRAGAO: 40 FIXOS NA ABERTURA, E A LUTA ACONTECE DEPOIS ===');
@@ -4642,9 +5014,13 @@ console.log('\n=== A CAIXA QUE EXPLICA O ESPECIAL (11/09/2026) ===');
   /* ⚠️ ERAM CATORZE ATE 15/09/2026: o 'drenar' saiu quando a PASSIVA de drenagem acabou -- quem
      drena hoje nao tem passiva, tem um GOLPE, e quem conta isso e o cartao dele (ver a observacao
      do obsDoGolpe). O NUMERO continua FIXADO de proposito: especial novo tem que passar por aqui. */
-  ok('sao os TREZE especiais do jogo', efeitos.size === 13, efeitos.size + ': ' + [...efeitos].sort().join(', '));
+  /* ⚠️ E ERAM TREZE ATE 24/09/2026: o 'confusao' saiu quando a PASSIVA de confusao acabou -- quem
+     confunde hoje nao tem passiva, tem um GOLPE, e quem conta isso e o cartao dele (o asterisco do
+     obsDoGolpe). E a MESMA saida do 'drenar' em 15/09, pela mesma razao: a ficha conta o que a
+     especie faz SOZINHA, e confundir deixou de ser isso. */
+  ok('sao os DOZE especiais do jogo', efeitos.size === 12, efeitos.size + ': ' + [...efeitos].sort().join(', '));
   ok('e sao estes',
-     [...efeitos].sort().join(',') === 'anula,chuva,confusao,cura,espadas,explosao,furia,furiadragao,metronomo,pluma,remoinho,sketch,sono',
+     [...efeitos].sort().join(',') === 'anula,chuva,cura,espadas,explosao,furia,furiadragao,metronomo,pluma,remoinho,sketch,sono',
      [...efeitos].sort().join(', '));
   ok('e o Sketch e do Smeargle, e so dele',
      Object.keys(S.SPECIES).filter(id => S.especiaisDaEspecie(id).some(e => e.efeito === 'sketch')).join(',') === 'smeargle',
@@ -4682,25 +5058,26 @@ console.log('\n=== A CAIXA QUE EXPLICA O ESPECIAL (11/09/2026) ===');
   /* 3) A CAIXA E POR MECANICA, NAO POR NOME -- e e isso que a estrutura promete. O sono tem 5
         nomes e a confusao 11; todos abrem o MESMO texto, com o nome DAQUELA especie no titulo.
         Sem isso o texto teria que ser escrito 19 vezes, e a vigesima divergiria. */
+  /* ⚠️ A CONFUSAO SAIU DESTE EXEMPLO EM 24/09/2026: ela era o caso mais forte dele (11 nomes,
+     um texto so) e deixou de ser passiva de especie -- hoje quem confunde e o GOLPE, e quem
+     explica e o asterisco do cartao. O SONO continua provando a mesma regra, com 5 nomes. */
   const nomesDoSono = [...new Set(Object.values(S.SONIFEROS))];
-  const nomesDaConf = [...new Set(Object.values(S.CONFUSAO))];
   ok('o sono tem 5 nomes e uma explicacao so', nomesDoSono.length === 5, nomesDoSono.join(', '));
-  ok('e a confusao tem 11', nomesDaConf.length === 11, nomesDaConf.length + '');
   {
-    /* O Zubat confunde com Supersom e o Alakazam com Confusao: MESMO texto, titulos diferentes. */
-    const a = S.especiaisDaEspecie('zubat').find(e => e.efeito === 'confusao');
-    const b = S.especiaisDaEspecie('alakazam').find(e => e.efeito === 'confusao');
+    /* O Paras dorme com Esporo e a Jigglypuff com Canto: MESMO texto, titulos diferentes. */
+    const a = S.especiaisDaEspecie('paras').find(e => e.efeito === 'sono');
+    const b = S.especiaisDaEspecie('jigglypuff').find(e => e.efeito === 'sono');
     S.abrirEspecialInfo(a.efeito, a.nome, a.tipo, a.chance);
     const hA = S.renderEspecialInfoModal();
     S.abrirEspecialInfo(b.efeito, b.nome, b.tipo, b.chance);
     const hB = S.renderEspecialInfoModal();
-    ok('o Zubat e o Alakazam leem o MESMO texto', limpo(hA).replace('Supersom','') === limpo(hB).replace('Confusão',''),
+    ok('o Paras e a Jigglypuff leem o MESMO texto', limpo(hA).replace('Esporo','') === limpo(hB).replace('Canto',''),
        a.nome + ' / ' + b.nome);
     ok('mas cada um com o NOME da especie dele no titulo',
-       hA.indexOf('Supersom') >= 0 && hB.indexOf('Confusão') >= 0 && hA.indexOf('Confusão') < 0);
-    /* E o SELO sai na cor do tipo daquele nome -- o Supersom e Normal, a Confusao e Psiquico. */
+       hA.indexOf('Esporo') >= 0 && hB.indexOf('Canto') >= 0 && hA.indexOf('Canto') < 0);
+    /* E o SELO sai na cor do tipo daquele nome -- o Esporo e Planta, o Canto e Normal. */
     ok('e o selo sai na cor do tipo daquele nome',
-       hA.indexOf(S.TYPE_COLORS.Normal) >= 0 && hB.indexOf(S.TYPE_COLORS.Psychic) >= 0);
+       hA.indexOf(S.TYPE_COLORS.Grass) >= 0 && hB.indexOf(S.TYPE_COLORS.Normal) >= 0);
   }
 
   /* 4) OS NUMEROS SAEM DAS CONSTANTES, nao escritos a mao no texto. E o que impede a caixa de
@@ -8436,12 +8813,18 @@ console.log('\nA PARALISIA NA TELA: AS DUAS FRASES E O SELO');
   ok('os dez golpes avisam no cartao',
      Object.keys(S.GOLPES_QUE_PARALISAM).every(id => (S.obsDoGolpe(id) || []).some(o => /paralisia/.test(o))),
      Object.keys(S.GOLPES_QUE_PARALISAM).filter(id => !(S.obsDoGolpe(id)||[]).some(o => /paralisia/.test(o))).join(', ') || 'todos');
-  /* ⚠️ A CHANCE SAI DA TABELA, nunca escrita a mao: ela VARIA de 10% a 100% nestes dez */
+  /* ⚠️ A CHANCE SAI DA TABELA, nunca escrita a mao: ela VARIA de 10% a 100% nestes dez.
+     ⚠️ E O CANHAO DE CHOQUE PASSOU A AFIRMAR em 24/09/2026: ele dizia *"100% de chance de causar
+     paralisia"* desde 16/09, e o conserto veio pelo `pct()` compartilhado, junto com o Soco
+     Dinamico da confusao. Ver o comentario de la. */
   ok('e a chance do cartao e a da tabela',
      (S.obsDoGolpe('thunderbolt')||[]).some(o => /10%/.test(o)) &&
-     (S.obsDoGolpe('thunder')||[]).some(o => /30%/.test(o)) &&
-     (S.obsDoGolpe('zapcannon')||[]).some(o => /100%/.test(o)),
-     (S.obsDoGolpe('zapcannon')||[]).join(' | '));
+     (S.obsDoGolpe('thunder')||[]).some(o => /30%/.test(o)),
+     (S.obsDoGolpe('thunderbolt')||[]).join(' | '));
+  ok('e o de 100% AFIRMA, sem dizer porcentagem',
+     (S.obsDoGolpe('zapcannon')||[]).some(o => /Sempre causa/.test(o)) &&
+     !(S.obsDoGolpe('zapcannon')||[]).some(o => /100%/.test(o)),
+     (S.obsDoGolpe('zapcannon')||[]).join(' | ').replace(/<[^>]*>/g, '').trim());
   /* e golpe que NAO paralisa nao ganha o aviso */
   ok('e um golpe que nao paralisa nao avisa',
      !(S.obsDoGolpe('karatechop')||[]).some(o => /paralisia/.test(o)));
@@ -9390,10 +9773,13 @@ console.log('\n=== VIDA CHEIA NAO MORRE NUM GOLPE (17/09/2026) ===');
     ok('o ' + qual + ' deriva a guarda do golpe que saiu',
        txt.indexOf('const primeiroAtacou = dmgByFirst.length > 0;') >= 0 &&
        txt.indexOf('const segundoAtacou  = dmgBySecond.length > 0;') >= 0);
-    /* os SEIS de cada lado -- e a contagem, pra um tentar* novo nao nascer sem a guarda */
+    /* os SETE de cada lado -- e a contagem, pra um tentar* novo nao nascer sem a guarda.
+       ⚠️ ERAM SEIS ATE 24/09/2026: o `tentarConfundir` entrou com a confusao por ATAQUE, e ele
+       precisa da MESMA guarda pelo mesmo motivo -- o `lastMove` de quem nao atacou fica da troca
+       ANTERIOR, e sem ela um pokemon dormindo confundiria o adversario. */
     const doFirst = txt.split('(segundoCaiu || !primeiroAtacou) ? null : tentar').length - 1;
     const doSecond = txt.split('pulaOSegundo ? null : tentar').length - 1;
-    ok('  e os SEIS de cada lado passam por ela (' + qual + ')', doFirst === 6 && doSecond === 6,
+    ok('  e os SETE de cada lado passam por ela (' + qual + ')', doFirst === 7 && doSecond === 7,
        doFirst + ' do first, ' + doSecond + ' do second');
   });
 }

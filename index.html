@@ -10291,7 +10291,10 @@ function calcDamageNew(attacker, defender, rng, op){
   attacker.lastMoveType = best.type;
   attacker.lastMove = best.golpe || null;   // qual GOLPE saiu -- é o que o log nomeia
   attacker.lastMetronomo = !!best.metronomo;  // veio do sorteio do Metrônomo? (ver tipoDoGolpe)
-  const special = isSpecialType(best.type); // o tipo do golpe decide se é físico ou especial (tabela oficial Gen 1)
+  /* ⚠️ `op.fisico` -- forca o golpe a ser FISICO. Existe pra o AUTO-DANO DA CONFUSAO, que na
+     Gen 3 e um golpe TYPELESS FISICO de poder 40: sem isso, quem carrega um golpe de tipo
+     especial se acertaria com o Sp.Atk contra o proprio Sp.Def, que e outra conta. */
+  const special = op.fisico ? false : isSpecialType(best.type); // o tipo do golpe decide se é físico ou especial (tabela oficial Gen 1)
   // STAB só quando o tipo escolhido é PRÓPRIO do atacante. Subtipo não só perde o bônus como
   // ainda leva o redutor -- é isso que impede o subtipo de virar poder de graça
   const STAB = op.semTipo ? 1 : (best.stab ? 1.5 : SUBTYPE_PENALTY);
@@ -10319,7 +10322,9 @@ function calcDamageNew(attacker, defender, rng, op){
      multiplicar de novo aqui dobraria duas vezes. É a MESMA armadilha que o poder efetivo dos
      multi-tapa custou em 09/09/2026 (cada tapa saía com 45 em vez de 15 E batia de 2 a 5 vezes).
      Regra da casa: quem mexe em poder mexe no `melhorAtaque`, e só lá. */
-  const potencia = best.poder || MOVE_POWER;
+  /* ⚠️ `op.poderFixo` -- o PODER vem de fora, e nao do golpe. Existe pra o auto-dano da
+     confusao (poder 40 na Gen 3). Lido so quando vem, entao nenhum outro caminho muda. */
+  const potencia = op.poderFixo || best.poder || MOVE_POWER;
   const core = Math.floor(Math.floor(2*Leff/5 + 2) * potencia * A / D / 50) + 2;
   const typeMult = op.semTipo ? 1 : Math.pow(best.mult, EXPOENTE_TIPO);
   /* A CHUVA: +50% em Água, -50% em Fogo e no Raio Solar, +25% em Elétrico. É o MESMO multDaChuva
@@ -10707,61 +10712,10 @@ const CURA_MAXIMO_DO_HP = 0.7;
    A LISTA saiu da base por script, não foi escrita à mão: são as 82 espécies que aprendem algum
    dos onze por NÍVEL na Gen 3. O MEWTWO e o MEW não entram -- o tentarGolpeEspecial corta o bloco
    inteiro quando qualquer um dos dois está no confronto, e a entrada seria letra morta. */
-/* ⚠️ OS GOLPES DE DANO QUE CONFUNDEM, com o nome que a frase mostra. Eles são os que estão na
-   tabela GOLPES (os de status -- Supersom, Raio Confuso, Bravata, Beijo Doce, Bajulação -- não
-   têm poder e por isso nunca entraram nela).
-   Ela existe pro pedido dos TMs: quem CARREGA um deles ganha a passiva de confusão, mesmo que a
-   espécie não esteja no CONFUSAO. Ver `golpeQueConfunde`.
-   O nome sai do GOLPES_PT, então ele é o MESMO que o log e o cartão mostram -- escrito à mão aqui,
-   a frase da confusão nomearia um golpe com uma palavra e o log com outra. */
-const GOLPES_QUE_CONFUNDEM = {
-  confusion: 1, psybeam: 1, signalbeam: 1, dynamicpunch: 1, waterpulse: 1, dizzypunch: 1
-};
-Object.keys(GOLPES_QUE_CONFUNDEM).forEach(id => { GOLPES_QUE_CONFUNDEM[id] = GOLPES_PT[id] || id; });
-/* ⚠️ COM QUE GOLPE ESTE POKÉMON CONFUNDE -- e a resposta tem DUAS fontes desde 17/09/2026.
-   A primeira é a de sempre: a espécie está no CONFUSAO, e o nome do golpe é o DELA (o Zubat
-   confunde com Supersom e o Alakazam com Confusão -- sem isso os dois confundiriam com a mesma
-   palavra, que foi o relato que criou a tabela).
-   A segunda é o pedido dos TMs: *"os TMs que dão habilidade passiva, como o TM03 (Water Pulse), o
-   pokemon também deve ganhar a habilidade passiva enquanto estiver com esse movimento"*. Ou seja,
-   quem CARREGA um golpe que confunde ganha a passiva -- mesmo que a espécie não esteja na tabela.
-   ⚠️ E ELA VALE PRA QUALQUER GOLPE QUE CONFUNDA, não só pro Water Pulse: a regra é "o golpe dá a
-   passiva", e limitar ao TM03 seria a mesma exceção que este projeto passa a vida tirando. Hoje
-   isso alcança os golpes de DANO que confundem (Confusão, Psicoraio, Feixe de Sinal, Soco
-   Dinâmico, Pulso de Água, Soco Tonto) -- os de status (Supersom, Raio Confuso, Bravata, Beijo
-   Doce, Bajulação) não entram na tabela de golpes e continuam vindo só pela espécie.
-   ⚠️ O GOLPE CARREGADO VEM PRIMEIRO: um Kabuto que ensinou o TM03 já confundia com "Pulso de Água"
-   pela espécie, e o resultado é o mesmo; mas um Blastoise que ensinou passa a confundir com o
-   NOME do golpe que ele leva, e não com nada. */
-function golpeQueConfunde(p){
-  const leva = (p && p.ataques) || [];
-  for(const id of leva){ if(GOLPES_QUE_CONFUNDEM[id]) return GOLPES_QUE_CONFUNDEM[id]; }
-  return CONFUSAO[p && p.speciesId] || null;
-}
-const CONFUSAO = {
-  aerodactyl:'Supersom', alakazam:'Confusão', butterfree:'Confusão', celebi:'Confusão',
-  chinchou:'Supersom', cleffa:'Beijo Doce', cloyster:'Supersom', crobat:'Supersom',
-  dewgong:'Feixe de Sinal', drowzee:'Confusão', entei:'Bravata', espeon:'Confusão',
-  exeggcute:'Confusão', exeggutor:'Confusão', gastly:'Raio Confuso', gengar:'Raio Confuso',
-  girafarig:'Confusão', golbat:'Supersom', goldeen:'Supersom', golduck:'Confusão',
-  haunter:'Raio Confuso', hoothoot:'Confusão', hypno:'Confusão', igglybuff:'Beijo Doce',
-  kabuto:'Pulso de Água', kadabra:'Confusão', kangaskhan:'Soco Tonto', lanturn:'Supersom',
-  lapras:'Raio Confuso', ledian:'Supersom', ledyba:'Supersom', lickitung:'Supersom',
-  machamp:'Soco Dinâmico', machoke:'Soco Dinâmico', machop:'Soco Dinâmico', magby:'Raio Confuso',
-  magmar:'Raio Confuso', magnemite:'Supersom', magneton:'Supersom', mankey:'Bravata',
-  mantine:'Supersom', meowth:'Bravata', misdreavus:'Raio Confuso',
-  mrmime:'Confusão', natu:'Raio Confuso', nidoranf:'Bajulação', nidoranm:'Bajulação',
-  nidorina:'Bajulação', nidorino:'Bajulação', ninetales:'Raio Confuso', noctowl:'Confusão',
-  octillery:'Psicoraio', persian:'Bravata', pichu:'Beijo Doce', politoed:'Bravata',
-  porygon:'Psicoraio', porygon2:'Psicoraio', primeape:'Bravata', psyduck:'Confusão',
-  remoraid:'Psicoraio', seaking:'Supersom', shellder:'Supersom', slowbro:'Confusão',
-  slowking:'Confusão', slowpoke:'Confusão', smoochum:'Beijo Doce', stantler:'Raio Confuso',
-  starmie:'Raio Confuso', tauros:'Bravata', tentacool:'Supersom', tentacruel:'Supersom',
-  togepi:'Beijo Doce', togetic:'Beijo Doce', umbreon:'Raio Confuso', unown:'Confusão',
-  venomoth:'Supersom', venonat:'Supersom', vulpix:'Raio Confuso', wobbuffet:'Confusão',
-  xatu:'Raio Confuso', yanma:'Supersom', zubat:'Supersom'
-};
-const CHANCE_CONFUSAO = 0.10;   // por confronto, como o Disable, o Recuperar e a drenagem
+/* ⚠️ A CONFUSÃO DEIXOU DE SER PASSIVA DE ESPÉCIE EM 24/09/2026 (a pedido) e virou a QUINTA
+   mecânica POR ATAQUE, ao lado do congelamento, da queimadura, do veneno e da paralisia.
+   A tabela `CONFUSAO` (82 espécies) e o `golpeQueConfunde` saíram junto: hoje quem confunde é
+   o GOLPE, e a tabela dele mora com as outras quatro -- ver `GOLPES_QUE_CONFUNDEM`. */
 /* FÚRIA DO DRAGÃO: 40 de HP no adversário, na abertura do confronto (11/09/2026, a pedido).
    É o NONO golpe especial, ao lado do sono, da autodestruição, do Metrônomo, do Disable, do
    Recuperar, da drenagem, da fúria e da confusão -- e o mais simples de todos: não sorteia dano,
@@ -11133,13 +11087,11 @@ function sorteiaGolpeEspecial(p, rng){
   }
   /* A drenagem vem por último. Quem tem dois especiais cai na chance composta, como o Kadabra
      (Disable + Recuperar): um Vileplume, que também é sonífero, absorve em 0,95 x 10% = 9,5%. */
-  /* A CONFUSÃO VEM POR ÚLTIMO, e isso é de propósito: acrescentar um efeito no FIM da fila não
-     dilui nenhum dos que já estavam medidos -- quem cai na chance composta é ela. Um Alakazam
-     (Disable + Recuperar + Confusão) confunde em 0,9 × 0,9 × 10% = 8,1%. */
-  const confundeCom = golpeQueConfunde(p);
-  if(confundeCom && rng() < CHANCE_CONFUSAO){
-    return { efeito:'confusao', golpe: confundeCom };
-  }
+  /* ⚠️ A CONFUSÃO SAIU DAQUI em 24/09/2026: ela virou status POR ATAQUE (ver
+     `tentarConfundir`), e com isso ela deixou de disputar a vaga única deste sorteio.
+     ⚠️ E ISSO DEVOLVE CHANCE AOS OUTROS: ela vinha no FIM da fila justamente pra não diluir
+     ninguém, então tirá-la não mexe em nenhuma das chances medidas -- o que muda é a Fúria do
+     Dragão, que estava atrás dela, deixar de pagar a composta com ela. */
   /* A FÚRIA DO DRAGÃO É A ÚLTIMA DA FILA, pelo mesmo motivo que a confusão foi um dia: o efeito que
      entra no FIM não dilui nenhum dos que já estavam medidos -- quem paga a chance composta é ele.
      A linha do Charmander, que já tem Fúria (30%), dispara esta em 0,7 x 10% = 7%; o Gyarados e a
@@ -11377,36 +11329,6 @@ function tentarGolpeEspecial(active, enemy, rng, diario){
            crescimento. `n` é a que vez é esta, pra a frase dizer "fúria x2". */
         diario.push({ q: marca, d: ganho, hp: quem.hp, c:0, m:0, z:0, x:'furia',
                       g: especial.golpe, n: quem._furia });
-      }
-      continue;
-    }
-    if(especial.efeito === 'confusao'){
-      /* O ALVO SE ACERTA. O dano sai de um ESPELHO dele -- uma cópia rasa, com os mesmos atributos
-         e o mesmo golpe -- batendo NELE. A cópia não é firula: o `calcDamageNew` ESCREVE
-         `lastMove`, `lastMoveType` e `lastCrit` no atacante, e sem ela o golpe que o pokémon usa na
-         luta seguinte sairia trocado no log.
-         Ele também não pode levar a anulação consigo: o `_anulado` é contra o OPONENTE, e o
-         espelho é ele mesmo.
-         NÃO MATA (piso de 1), e quem já está em 1 não gera linha nenhuma: um passo de dano 0 é o
-         que este log evita em toda regra. */
-      const espelho = Object.assign({}, alvo, { _anulado: null });
-      /* SEM TIPO, como no jogo oficial (a pedido, 10/09/2026). O espelho aplicava a tabela de tipos
-         contra ele mesmo -- e Fantasma contra Fantasma e 2x, entao um Haunter tirava 299 dos
-         proprios 300. O que sobra do espelho e o que o pedido descreve: mesmo nivel, mesmos
-         atributos e o poder do golpe dele. */
-      const dano = calcDamageNew(espelho, alvo, rng, { semTipo: true, semCritico: true });
-      const antes = alvo.hp;
-      alvo.hp = Math.max(1, alvo.hp - dano);
-      const saiu = antes - alvo.hp;
-      if(saiu <= 0) continue;
-      if(diario){
-        /* `q` é quem CONFUNDIU, não quem apanhou -- é a convenção do diário (o `q` do sono também
-           é quem usou o golpe), e é ela que faz a animação mover a barra do lado certo: o passo
-           comum inverte `q` pra achar quem APANHA.
-           `am` guarda o golpe que ele usou em si mesmo, pro selo da linha nomear o golpe certo. */
-        const reg = { q: marca, d: saiu, hp: alvo.hp, c:0, m:0, z:0, x:'confusao', g: especial.golpe };
-        if(espelho.lastMove) reg.am = espelho.lastMove;
-        diario.push(reg);
       }
       continue;
     }
@@ -11749,6 +11671,69 @@ function tentarParalisar(quemBate, alvo, rng){
 function withParalisia(v, p){
   return (p && p._paralisado) ? Math.round(v * PARALISIA_VELOCIDADE) : v;
 }
+/* ⚠️ A CONFUSÃO (24/09/2026), a QUINTA mecânica POR ATAQUE -- e a única que ENTROU no lugar de uma
+   passiva que já existia. Pedida assim: *"hoje ele é dano passivo que tem chance de acontecer no
+   inicio da batalha, agora voce vai tirar esse passivo e vamos colocar ele para ter chance do
+   oponente ficar confuso de acordo com a chance que o ataque tem de causar confusão ... tem uma
+   chance de ao inves de atacar o oponente, ele se ataca durante a confusão"*.
+
+   AS REGRAS SÃO AS DA GEN 3 (Bulbapedia, Confusion):
+     - dura de 2 a 5 TURNOS, sorteado quando ela pega (`CONFUSAO_TURNOS_MIN/MAX`);
+     - a cada turno, 50% de chance de se acertar EM VEZ de atacar (`CHANCE_CONFUSAO_ACERTA`) -- os
+       33% só valem da Gen 7 em diante, e este jogo é Gen 3;
+     - o auto-dano é um golpe TYPELESS FÍSICO de poder 40 (`CONFUSAO_PODER`), SEM crítico e SEM
+       STAB -- e é por isso que o `calcDamage` ganhou o `op.fisico` e o `op.poderFixo`;
+     - ela NÃO pega em quem já está confuso;
+     - e ela é VOLÁTIL: sai quando o pokémon deixa o campo, ao contrário da queimadura, do veneno
+       e da paralisia, que duram a batalha inteira.
+
+   ⚠️ AS CHANCES SÃO AS OFICIAIS DE CADA GOLPE, tiradas do dado (Showdown, mod da Gen 3) -- o mesmo
+   caminho das outras quatro listas. Elas variam de 10% a 100%.
+   ⚠️ O SOCO DINÂMICO É 100%, e aqui isso pesa MUITO mais que no jogo original: lá ele tem 50% de
+   PRECISÃO, e é esse o preço dele. Este motor não tem errar -- todo golpe acerta --, então ele
+   confunde em todo ataque. É o mesmo caso do Canhão de Choque na paralisia, e se um dia incomodar
+   a régua é uma linha: baixar o `dynamicpunch` aqui modela a precisão que este motor não tem.
+   ⚠️ FICARAM DE FORA os cinco golpes de STATUS que confundiam pela passiva (Supersom, Raio
+   Confuso, Bravata, Beijo Doce, Bajulação): eles têm poder 0 e a base só cadastra dano -- a MESMA
+   regra que tirou o Pó Venenoso do veneno e o Will-O-Wisp da queimadura. É por isso que a troca
+   custa 54 espécies (medido): 48 delas confundiam por um desses cinco. */
+const GOLPES_QUE_CONFUNDEM = { confusion: 0.10, psybeam: 0.10, signalbeam: 0.10,
+                               dynamicpunch: 1.00, waterpulse: 0.20, dizzypunch: 0.20 };
+const CONFUSAO_TURNOS_MIN = 2;       // a Gen 3 sorteia de 2 a 5 turnos
+const CONFUSAO_TURNOS_MAX = 5;
+const CHANCE_CONFUSAO_ACERTA = 0.50; // por turno -- a regra da Gen 1 a 6 (a Gen 7 baixou pra 33%)
+const CONFUSAO_PODER = 40;           // o poder do golpe typeless com que ele se acerta
+/* ⚠️ NENHUM TIPO É IMUNE À CONFUSÃO -- nem na Gen 3 nem em geração nenhuma. O que existe é a
+   imunidade do GOLPE (o mesmo `golpeAfetaOAlvo` da paralisia): um Psicoraio não confunde um
+   Sombrio que ele nem alcança, porque este motor sempre "conecta" (piso de 1 de dano e golpe
+   teimoso). Quem já caiu e quem JÁ está confuso também não: a marca seria reescrita e o contador
+   de turnos voltaria ao começo a cada golpe. */
+function podeConfundir(p){
+  return !!p && p.hp > 0 && !p._confuso;
+}
+/* Sorteia a confusão DEPOIS de o golpe conectar. Devolve o id do golpe (pra a frase nomeá-lo) ou
+   null. Sai ANTES do rng() quando o golpe não confunde ou o alvo não pode: lido sempre, ele
+   deslocaria a semente de toda batalha que não tem golpe de confusão nenhum. */
+function tentarConfundir(quemBate, alvo, rng){
+  if(!quemBate || quemBate.hp <= 0) return null;
+  const golpe = quemBate.lastMove;
+  const chance = GOLPES_QUE_CONFUNDEM[golpe];
+  if(!chance || !podeConfundir(alvo) || !golpeAfetaOAlvo(golpe, alvo)) return null;
+  if(rng() >= chance) return null;
+  alvo._confuso = CONFUSAO_TURNOS_MIN +
+    Math.floor(rng() * (CONFUSAO_TURNOS_MAX - CONFUSAO_TURNOS_MIN + 1));
+  return golpe;
+}
+/* ⚠️ O AUTO-DANO SAI DE UM ESPELHO, e a cópia não é firula: o calcDamageNew ESCREVE `lastMove`,
+   `lastMoveType` e `lastCrit` no atacante -- e o atacante aqui é o próprio alvo. Sem ela, o golpe
+   que o pokémon usa na luta seguinte sairia trocado no log, e o `lastMove` sujo faria os cinco
+   `tentar*` sortearem em cima do golpe errado (o defeito de 18/09).
+   A cópia também zera o `_anulado`: a anulação é contra o OPONENTE, e o espelho é ele mesmo. */
+function danoDaConfusao(p, rng){
+  const espelho = Object.assign({}, p, { _anulado: null });
+  return calcDamageNew(espelho, p, rng, { semTipo: true, semCritico: true, fisico: true,
+                                             poderFixo: CONFUSAO_PODER });
+}
 /* ⚠️ POKÉMON DE GELO NÃO CONGELA, como no jogo original -- e aqui isso pesa mais que lá: quase
    todo dono de golpe de gelo É de Gelo (Articuno, Lapras, Dewgong, Jynx, Cloyster), então sem a
    imunidade o efeito mais comum seria dois pokémon de Gelo se congelando um ao outro. */
@@ -11881,6 +11866,20 @@ function doExchange(active, enemy, rng, diario){
      toda batalha sem paralisia nenhuma -- a mesma armadilha do Remoinho e do congelamento. */
   const trava = (p) => !!p._paralisado && rng() < CHANCE_PARALISIA_TRAVA;
   const activeTravado = trava(active), enemyTravado = trava(enemy);
+  /* ⚠️ A CONFUSÃO SORTEIA NA ENTRADA DA TROCA, como o degelo e a trava da paralisia -- quem está
+     confuso já entra sabendo se joga. E ela é a única das cinco que ANDA: o contador cai um por
+     turno e, no turno em que ele zera, o pokémon SAI da confusão e ataca normalmente (*"on the
+     final turn of confusion, a Pokémon will snap out of its confusion and attack normally"*).
+     ⚠️ E O `rng()` SÓ É LIDO DE QUEM ESTÁ CONFUSO. Lido sempre, ele deslocaria a semente de toda
+     batalha sem confusão nenhuma -- a mesma armadilha do Remoinho, do gelo e da paralisia. */
+  const confunde = (p) => {
+    if(!p._confuso) return null;
+    p._confuso--;
+    if(p._confuso <= 0){ p._confuso = null; return "saiu"; }
+    return rng() < CHANCE_CONFUSAO_ACERTA ? "acerta" : "passou";
+  };
+  const activeConf = confunde(active), enemyConf = confunde(enemy);
+  const activeConfuso = activeConf === "acerta", enemyConfuso = enemyConf === "acerta";
 
   const acordaram = [];
   if(activeDorme && active._dormindoPor <= 0) acordaram.push({ q:'p', nome: active.name, p: active });
@@ -11893,8 +11892,12 @@ function doExchange(active, enemy, rng, diario){
      depois dos dois `golpesDaTroca`: ele vale pra ESTA troca e mais nada. */
   active._dormeAgora = activeDorme;
   enemy._dormeAgora = enemyDorme;
-  const dmgToEnemy = (activeDorme || activeCongelado || activeTravado) ? [] : golpesDaTroca(active, enemy, rng);
-  const dmgToActive = (enemyDorme || enemyCongelado || enemyTravado) ? [] : golpesDaTroca(enemy, active, rng);
+  /* ⚠️ QUEM SE ACERTA NÃO ATACA -- e é por isso que a confusão entra AQUI, na mesma lista do sono,
+     do gelo e da paralisia: os cinco `tentar*` leem o `lastMove`, e a guarda deles é o golpe ter
+     SAÍDO (`dmgByFirst.length`). Sem entrar aqui, um confuso que se acertou continuaria
+     aplicando status com o golpe da troca anterior -- o defeito de 18/09, por uma porta nova. */
+  const dmgToEnemy = (activeDorme || activeCongelado || activeTravado || activeConfuso) ? [] : golpesDaTroca(active, enemy, rng);
+  const dmgToActive = (enemyDorme || enemyCongelado || enemyTravado || enemyConfuso) ? [] : golpesDaTroca(enemy, active, rng);
   active._dormeAgora = false;
   enemy._dormeAgora = false;
   const spdActive = effectiveSpeed(active);
@@ -12059,6 +12062,34 @@ function doExchange(active, enemy, rng, diario){
   /* A FAIXA APARA O ÚLTIMO GOLPE que saiu, seja ele o único ou o último tapa. Sem aparar, a soma
      das linhas do log passaria do que o pokémon perdeu de verdade -- ele foi a zero e voltou a 1. */
   const aparaAFaixa = (saiu) => { const u = saiu[saiu.length - 1]; if(u){ u.d = Math.max(0, u.d - 1); u.hp = 1; } };
+  /* ⚠️ O AUTO-DANO ACONTECE NA VEZ DE CADA UM, e não os dois juntos na entrada da troca -- é a
+     ordem da Gen 3 e é a única que não mente na tela: aplicados juntos, o SECOND se acertaria
+     ANTES do golpe do first, e um second que o first derrubou ainda teria se machucado.
+     ⚠️ ELE PASSA PELA FAIXA DE FOCO, e isso é a Gen 3 ao pé da letra (*"Focus Band can now prevent
+     a Pokémon from knocking itself out due to confusion"*) E a promessa que a casa fez pro item:
+     *"quem carrega a Faixa nunca termina um confronto em 0 sem ela ter disparado antes"*. */
+  const seAcertou = (p, q, confuso) => {
+    if(!confuso || p.hp <= 0) return null;
+    const dano = danoDaConfusao(p, rng);
+    const antes = p.hp;
+    p.hp = Math.max(0, p.hp - dano);
+    /* ⚠️ E ELA DEIXA A LINHA DELA, como em todo caminho que a Faixa segura: sem ela o jogador vê a
+       barra parar em 1 sem nada explicando, e o item some do bolso sem ter aparecido. Foi a trava
+       do "NENHUM caminho a fura" que pegou -- ela procura a linha `faixa`, e não o HP em 1. */
+    const faixou = p.hp <= 0 && faixaDeFoco(p, q);
+    if(faixou) p.hp = 1;
+    const saiu = antes - p.hp;
+    /* ⚠️ A FAIXA DISPARANDO CONTA MESMO COM DANO ZERO, e foi a trava do *"NENHUM caminho a fura"*
+       que pegou: um pokémon que JÁ estava com 1 de HP e se acerta faz a Faixa vigiar e SER GASTA, e
+       aí `antes - p.hp` dá ZERO. Devolvendo null ali, o item saía do bolso sem uma linha na tela --
+       e o golpe seguinte o matava sem Faixa, furando a promessa de que *"quem carrega a Faixa nunca
+       termina um confronto em 0 sem ela ter disparado antes"*.
+       ⚠️ Medido: ~1 rodada em 20 da trava (ela roda 6.000 batalhas), sempre com `confundiu` no
+       exemplo -- ou seja ela é exclusiva deste caminho. */
+    return (saiu > 0 || faixou) ? { d: saiu, hp: p.hp, faixa: faixou } : null;
+  };
+  const acertouOFirst = seAcertou(first, (first === active) ? "p" : "e",
+                                  (first === active) ? activeConfuso : enemyConfuso);
   const saiuNoSegundo = aplicarGolpes(second, tetoDeQuemRaspa(first, second, dmgByFirst));
   /* A Faixa segura ANTES de o diário ser escrito: assim o dano gravado é o EFETIVO (o que saiu de
      verdade, parando em 1) e a barra da tela desce até 1, que é o que aconteceu. A LINHA dela é
@@ -12109,11 +12140,16 @@ function doExchange(active, enemy, rng, diario){
   const queimouOSegundo = (segundoCaiu || !primeiroAtacou) ? null : tentarQueimar(first, second, rng);
   const envenenouOSegundo = (segundoCaiu || !primeiroAtacou) ? null : tentarEnvenenar(first, second, rng);
   const paralisouOSegundo = (segundoCaiu || !primeiroAtacou) ? null : tentarParalisar(first, second, rng);
+  const confundiuOSegundo = (segundoCaiu || !primeiroAtacou) ? null : tentarConfundir(first, second, rng);
   const estagioDoSegundo = (segundoCaiu || !primeiroAtacou) ? null : tentarEstagio(first, second, rng);
   /* ⚠️ O PODER SECRETO (TM43) vem DEPOIS dos quatro, e ele é o único golpe que pode aplicar
      qualquer um deles -- qual, decide o TERRENO. Pondo-o antes, a marca dele bloquearia o
      `tentar*` da mesma marca nesta troca. Fora de terreno ele não faz nada (nem lê o rng). */
   const secretoNoSegundo = (segundoCaiu || !primeiroAtacou) ? null : tentarPoderSecreto(first, second, rng);
+  /* ⚠️ O DO SECOND SÓ VALE SE ELE SOBREVIVEU AO GOLPE DO FIRST: quem caiu não se acerta.
+     Ele vem DEPOIS do golpe do first e ANTES do revide, que é a vez dele. */
+  const acertouOSecond = segundoCaiu ? null : seAcertou(second, (second === active) ? "p" : "e",
+                                  (second === active) ? activeConfuso : enemyConfuso);
   const saiuNoPrimeiro = (segundoCaiu || congelouOSegundo) ? [] : aplicarGolpes(first, tetoDeQuemRaspa(second, first, dmgBySecond));
   /* O PISO DO REVIDE (1%-10%) SAIU JUNTO COM O REVIDE, em 15/09/2026 -- ver o bloco acima. Ele
      existia pra o revide de quem caiu não matar o outro ("jamais os 2 devem morrer juntos e um
@@ -12135,6 +12171,7 @@ function doExchange(active, enemy, rng, diario){
   const queimouOPrimeiro = pulaOSegundo ? null : tentarQueimar(second, first, rng);
   const envenenouOPrimeiro = pulaOSegundo ? null : tentarEnvenenar(second, first, rng);
   const paralisouOPrimeiro = pulaOSegundo ? null : tentarParalisar(second, first, rng);
+  const confundiuOPrimeiro = pulaOSegundo ? null : tentarConfundir(second, first, rng);
   const estagioDoPrimeiro = pulaOSegundo ? null : tentarEstagio(second, first, rng);
   const secretoNoPrimeiro = pulaOSegundo ? null : tentarPoderSecreto(second, first, rng);
   const hpDoSecondAposDreno = second.hp;
@@ -12251,6 +12288,30 @@ function doExchange(active, enemy, rng, diario){
     /* A linha da PARALISIA tem a mesma forma das outras tres: dano 0, o `q` de QUEM FOI
        PARALISADO e o golpe no `mv` -- e o golpe que a frase nomeia. */
     const paralisou = (p, q, mv) => { if(mv) diario.push({ q:q, d:0, hp:null, c:0, m:0, z:0, x:"paralisou", g:p.name, mv:mv }); };
+    /* A linha de QUEM FICOU CONFUSO tem a forma das outras quatro: dano 0, o `q` de quem foi
+       confundido e o golpe no `mv` -- e o golpe que a frase nomeia. */
+    const confundiu = (p, q, mv) => { if(mv) diario.push({ q:q, d:0, hp:null, c:0, m:0, z:0, x:"confundiu", g:p.name, mv:mv }); };
+    /* ⚠️ E AS DUAS DE ESTADO SAEM NO SLOT DE QUEM ELAS DESCREVEM, como a do sono, a do gelo e a da
+       paralisia: elas falam de UM pokemon, nao de um causador e um alvo.
+       ⚠️ O `confuso` E A UNICA DAS TRES QUE TEM DANO -- e o `q` dele e de QUEM PERDE, como o da
+       queimadura e o do veneno. As outras quatro linhas de dano sem golpe do adversario
+       (absorbdano, furiadragao, e a confusao VELHA) tem o `q` de quem CAUSOU: lido igual, a barra
+       que desce e a do pokemon errado, e o defeito nao aparece como erro. */
+    const confusaoDe = (p, q, acertou, saiu) => {
+      if(p.hp <= 0 && !acertou) return;                 /* quem ja caiu nao perde turno */
+      if(saiu === "saiu"){ diario.push({ q:q, d:0, hp:null, c:0, m:0, z:0, x:"saiuConfusao", g:p.name }); return; }
+      if(acertou){
+        /* ⚠️ DANO ZERO NÃO VIRA LINHA -- a regra da casa (um `−0 de HP` faz procurar bug onde é
+           regra, o mesmo motivo do *"mas não teve efeito"* da imunidade). Isso acontece num caso só:
+           a Faixa segurando quem JÁ estava com 1 de HP. A linha DELA sai de qualquer forma, logo
+           abaixo -- é ela que explica o item gasto. */
+        if(acertou.d > 0) diario.push({ q:q, d:acertou.d, hp:acertou.hp, c:0, m:0, z:0, x:"confuso", g:p.name });
+        /* ⚠️ A LINHA DA FAIXA VEM DEPOIS da do auto-dano, como em todo caminho dela: ela explica
+           o 1 que a barra acabou de mostrar. O `ho` e a vida do OUTRO lado -- aqui nao ha outro
+           lado (ele se acertou), entao vai a dele mesma. */
+        if(acertou.faixa) diario.push(marcaDaFaixa(q, acertou.hp));
+      }
+    };
     /* ⚠️ O PODER SECRETO REUSA A LINHA DO STATUS QUE ELE APLICOU: o jogador precisa ler "ficou
        queimado", e não "sofreu o efeito do terreno" -- a mecânica é a mesma, o que muda é de onde
        ela veio. O `mv` continua sendo o GOLPE, então a frase sai *"X ficou queimado com PODER
@@ -12288,6 +12349,8 @@ function doExchange(active, enemy, rng, diario){
        e foi congelado de novo na mesma troca lia 'congelou / degelou', a ordem invertida da cena. */
     geloDe(first, qDoFirst);
     travadoDe(first, qDoFirst);
+    /* ⚠️ A LINHA DO FIRST VEM ANTES DO GOLPE DELE, que e onde o auto-dano dele foi aplicado. */
+    confusaoDe(first, qDoFirst, acertouOFirst, (first === active) ? activeConf : enemyConf);
     dormeDe(first, qDoFirst);
     geloDe(second, qDoSecond);
     if(!primeiroDormiu){
@@ -12301,6 +12364,7 @@ function doExchange(active, enemy, rng, diario){
     queimou(second, qDoSecond, queimouOSegundo);
     envenenou(second, qDoSecond, envenenouOSegundo);
     paralisou(second, qDoSecond, paralisouOSegundo);
+    confundiu(second, qDoSecond, confundiuOSegundo);
     estagio(first, qDoFirst, second, qDoSecond, estagioDoSegundo);
     secreto(second, qDoSecond, secretoNoSegundo);
     /* ⚠️ O "CONTINUA A DORMIR" DO SECOND VEM DEPOIS DO GOLPE DO FIRST, e nao junto do geloDe la
@@ -12310,6 +12374,9 @@ function doExchange(active, enemy, rng, diario){
        As duas do GELO ficam juntas la em cima de proposito, e por um caso que o sono nao tem: o
        recongelamento na mesma troca (ver o comentario delas). */
     travadoDe(second, qDoSecond);
+    /* ⚠️ E A DO SECOND DEPOIS DO GOLPE DO FIRST -- a vez dele e depois da de quem e mais rapido,
+       e e ali que o auto-dano dele foi aplicado. */
+    confusaoDe(second, qDoSecond, acertouOSecond, (second === active) ? activeConf : enemyConf);
     dormeDe(second, qDoSecond);
     if(!segundoDormiu){
       gravar(qDoSecond, saiuNoPrimeiro, second, segundoCaiu?1:0);
@@ -12320,6 +12387,7 @@ function doExchange(active, enemy, rng, diario){
     queimou(first, qDoFirst, queimouOPrimeiro);
     envenenou(first, qDoFirst, envenenouOPrimeiro);
     paralisou(first, qDoFirst, paralisouOPrimeiro);
+    confundiu(first, qDoFirst, confundiuOPrimeiro);
     estagio(second, qDoSecond, first, qDoFirst, estagioDoPrimeiro);
     secreto(first, qDoFirst, secretoNoPrimeiro);
     // AGORA sim: ele apanhou nesta troca, e só então acorda (ver o comentario do `acordaram`)
@@ -12451,6 +12519,10 @@ function encerrarBatalha(team, inimigos){
        no F5 e congelado ate la. E o mesmo vazamento que o teto de HP da Furia teve. */
     p._congelado = null;
     p._paralisado = null;
+    /* ⚠️ A CONFUSÃO É VOLÁTIL na Gen 3 -- ela sai quando o pokémon deixa o campo. Aqui ela sai
+       no fim da batalha, como as outras marcas: o time vai pro SAVE, e um campo `_` não vai pro
+       Firestore -- ele voltaria descongelado no F5 e confuso até lá. */
+    p._confuso = null;
     /* ⚠️ E O DO ANUNCIO DE TERRENO, pelo mesmo motivo dos de cima: sem soltar, o pokemon sai
        da batalha "ja anunciado" e nunca mais anuncia -- e a flag `terrainBuffed` e recalculada
        a cada batalha, entao o anuncio tem que valer de novo. */
@@ -12632,6 +12704,7 @@ function simulateGymBattle(team, brockTeam, rng, opts){
         playerQueimado: !!active._queimado, enemyQueimado: !!enemy._queimado,
         playerEnvenenado: !!active._envenenado, enemyEnvenenado: !!enemy._envenenado,
         playerParalisado: !!active._paralisado, enemyParalisado: !!enemy._paralisado,
+        playerConfuso: !!active._confuso, enemyConfuso: !!enemy._confuso,
         player:active.name, playerSpecies:active.speciesId, playerLevel:active.level, playerShiny: !!active.shiny, playerBuffed: !!active.terrainBuffed, playerSpecialty: !!active.specialtyBuffed,
         enemy:enemy.name, enemySpecies:enemy.speciesId, enemyLevel:enemy.level, enemyShiny: !!enemy.shiny, enemyBuffed: !!enemy.terrainBuffed, enemySpecialty: !!enemy.specialtyBuffed,
         playerTrainerStreak: playerStreak, enemyTrainerStreak: enemyStreak,
@@ -15636,7 +15709,7 @@ function fatiaDoGolpe(semente){ return (1 - JITTER_DO_GOLPE) + ((Math.abs(sement
 /* ⚠️ O `terreno` VALE 1 PASSO, como toda abertura que nao mexe barra nenhuma: e a entrada dele
    aqui que faz a frase virar um passo PROPRIO da animacao e ganhar o 1,5s de leitura. Fora desta
    tabela ela valeria pra SEMPRE -- o defeito que a anulacao teve. */
-const passosDaAbertura = { terreno:1, recover:1, pocao:1, absorb:2, disable:1, semSono:1, sono:1, furia:1, confusao:1, furiadragao:1, chuva:1, chuvafim:1, acordou:1, congelou:1, gelado:1, degelou:1, queimou:1, queima:1, dormindo:1, envenenou:1, veneno:1, paralisou:1, paralisado:1, estagio:1, remoinho:2, remoinhoEntra:1,
+const passosDaAbertura = { terreno:1, recover:1, pocao:1, absorb:2, disable:1, semSono:1, sono:1, furia:1, confusao:1, furiadragao:1, chuva:1, chuvafim:1, acordou:1, congelou:1, gelado:1, degelou:1, queimou:1, queima:1, dormindo:1, envenenou:1, veneno:1, paralisou:1, paralisado:1, confundiu:1, confuso:1, saiuConfusao:1, estagio:1, remoinho:2, remoinhoEntra:1,
   espadas:1, pluma:1 };
 function buildAnimatedHitSequence(m){
   const seq = sequenciaDoConfronto(m).map(g => {
@@ -15664,7 +15737,10 @@ function buildAnimatedHitSequence(m){
     /* A QUEIMADURA E O VENENO NAO INVERTEM O LADO: o `q` deles e de QUEM PERDE (nao ha causador na
        troca em que eles doem). Invertido, a barra que desce e a do pokemon errado -- e o defeito
        nao aparece como erro, aparece como o adversario perdendo vida do nada. */
-    if(g.x === 'queima' || g.x === 'veneno') return { side: g.q === 'p' ? 'player' : 'enemy', amount: g.d, q: g.q, x: g.x };
+    /* ⚠️ O `confuso` ENTRA AQUI e NAO na familia da confusao VELHA: o `q` dele e de QUEM PERDE,
+       como o da queimadura -- entao o passo NAO inverte o lado. A marca `confusao` (a passiva,
+       ate 24/09/2026) continua na familia oposta, porque log velho nao pode sumir. */
+    if(g.x === 'queima' || g.x === 'veneno' || g.x === 'confuso') return { side: g.q === 'p' ? 'player' : 'enemy', amount: g.d, q: g.q, x: g.x };
     if(g.x === 'faixa') return { side: g.q === 'p' ? 'player' : 'enemy', amount: 0, faixa: true, q: g.q, x: g.x };
     /* O DESEMPATE FAZ A BARRA DO SOBREVIVENTE SUBIR, e é a única linha do log que devolve vida sem
        ser uma cura. O `amount` NEGATIVO é o que faz isso (os laços fazem `hp - amount`), a mesma
@@ -24453,7 +24529,7 @@ const NOME_DO_ATRIBUTO = { atk:'o Ataque', def:'a Defesa', spAtk:'o Ataque Espec
    desenho custa uma iteração de verdade pra ficar legível a 12px. */
 /* ⚠️ O SELO DO `terreno` E O MESMO DO RESTO DO JOGO (o do quadro do lutador e o da faixa): o
    jogador le o simbolo aqui e reconhece o do pokemon buffado sem precisar ligar as duas coisas. */
-const ICONES_ESPECIAIS = { terreno:selo('terreno'), boom:selo('explosao'), sono:selo('sono'), disable:'🚫', recover:'💚', absorb:'🌿', faixa:'🎗️', desempate:'⚖️', furia:selo('furia'), confusao:selo('confusao'), furiadragao:selo('dragao'), chuva:selo('chuva'), chuvafim:selo('sol'), acordou:'⏰', remoinho:selo('remoinho'), espadas:selo('espada'), pluma:selo('pluma'),
+const ICONES_ESPECIAIS = { terreno:selo('terreno'), boom:selo('explosao'), sono:selo('sono'), disable:'🚫', recover:'💚', absorb:'🌿', faixa:'🎗️', desempate:'⚖️', furia:selo('furia'), confusao:selo('confusao'), confundiu:selo('confusao'), confuso:selo('confusao'), saiuConfusao:selo('confusao'), furiadragao:selo('dragao'), chuva:selo('chuva'), chuvafim:selo('sol'), acordou:'⏰', remoinho:selo('remoinho'), espadas:selo('espada'), pluma:selo('pluma'),
   /* ⚠️ AS TRES LINHAS DO CONGELAMENTO DIVIDEM O MESMO ❄️, e e de proposito: elas sao o mesmo
      evento visto em tres momentos (pegou / perdeu a vez / passou). Icones diferentes fariam o
      jogador procurar tres mecanicas onde ha uma. Todo o resto do bloco tem selo, e sem ele estas
@@ -24592,7 +24668,13 @@ function obsDoGolpe(id){
      E golpe novo numa das tres tabelas ja nasce com o aviso.
      O EMOJI E O MESMO DO LOG E DO QUADRO DO LUTADOR (ICONES_ESPECIAIS): o jogador le o aviso aqui
      e reconhece o selo la, sem precisar ligar as duas coisas. */
-  const pct = (c) => Math.round(c * 100) + "% de chance de causar ";
+  /* ⚠️ O GOLPE DE 100% AFIRMA, e nao diz porcentagem (24/09/2026): "100% de chance de" é uma
+     condicional que não existe. A decisão já estava escrita no asterisco do ESTÁGIO, logo abaixo,
+     e ela nunca tinha sido exercida -- o comentário de lá diz *"nenhum dos quatro de hoje é 100%,
+     mas o Rock Tomb é"*. Hoje há DOIS golpes de 100% passando por aqui: o CANHÃO DE CHOQUE (que
+     dizia "100% de chance de causar paralisia" desde 16/09) e o SOCO DINÂMICO, que chegou com a
+     confusão por ataque. Consertar no `pct` alinha os dois de uma vez. */
+  const pct = (c) => c >= 1 ? "Sempre causa " : (Math.round(c * 100) + "% de chance de causar ");
   if(GOLPES_QUE_QUEIMAM[id])   obs.push(pct(GOLPES_QUE_QUEIMAM[id])   + "queimadura "     + ICONES_ESPECIAIS.queimou);
   if(GOLPES_QUE_CONGELAM[id])  obs.push(pct(GOLPES_QUE_CONGELAM[id])  + "congelamento "   + ICONES_ESPECIAIS.congelou);
   if(GOLPES_QUE_ENVENENAM[id]) obs.push(pct(GOLPES_QUE_ENVENENAM[id]) + "envenenamento "  + ICONES_ESPECIAIS.envenenou);
@@ -24612,14 +24694,16 @@ function obsDoGolpe(id){
      ⚠️ E OS DOIS SAEM DAS PRÓPRIAS CONSTANTES (o multiplicador e a chance), nunca de um texto
      fixo: mexer no balanceamento sem a frase acompanhar é o defeito que a especialidade teve, e
      que a chance dos três status já evitou aqui. */
-  /* ⚠️ O GOLPE QUE CONFUNDE avisa aqui, e ele é a "habilidade passiva" que o pedido dos TMs nomeia
-     (*"os TMs que dão habilidade passiva, como o TM03 (Water Pulse), o pokemon também deve ganhar a
-     habilidade passiva enquanto estiver com esse movimento"*). Carregar o golpe dá a passiva de
-     confusão -- e sem a frase, um Pulso de Água de poder 60 se lê como um golpe de Água qualquer.
-     A chance é a do bloco de especiais (CHANCE_CONFUSAO), lida da constante. */
+  /* ⚠️ O GOLPE QUE CONFUNDE entrou na MESMA linha dos outros quatro status em 24/09/2026, quando a
+     confusão deixou de ser passiva de espécie e virou status por ATAQUE. Antes o aviso dizia *"Dá a
+     passiva de confusão: 10% por confronto"* -- uma frase que descrevia a espécie, não o golpe.
+     ⚠️ E A CHANCE PASSOU A SAIR DA TABELA DO GOLPE (`GOLPES_QUE_CONFUNDEM`), como as dos outros
+     quatro: ela varia de 10% (Confusão, Psicoraio, Feixe de Sinal) a 20% (Pulso de Água, Soco
+     Tonto) e 100% (Soco Dinâmico) -- uma frase fixa mentiria em três dos seis. Antes ela era UMA
+     (a `CHANCE_CONFUSAO` da passiva), porque a espécie tinha uma chance só.
+     Sem a frase, um Pulso de Água de poder 60 se lê como um golpe de Água qualquer. */
   if(GOLPES_QUE_CONFUNDEM[id]){
-    obs.push("Dá a passiva de confusão: " + Math.round(CHANCE_CONFUSAO * 100) +
-             "% por confronto de o adversário se acertar " + ICONES_ESPECIAIS.confusao);
+    obs.push(pct(GOLPES_QUE_CONFUNDEM[id]) + "confusão " + ICONES_ESPECIAIS.confusao);
   }
   if(id === GOLPE_FACHADA){
     obs.push("Vale " + FACHADA_MULT + "x se quem usa estiver queimado, envenenado ou paralisado");
@@ -24719,7 +24803,7 @@ function iconeDoEspecial(g){
   if(g && g.x === 'terreno') return selo('terreno', '', TYPE_COLORS[g.tt] || COR_TERRENO_PADRAO);
   return ICONES_ESPECIAIS[g.x] || '';
 }
-function ehGolpeEspecial(g){ return g && (g.x === 'terreno' || g.x === 'boom' || g.x === 'sono' || g.x === 'disable' || g.x === 'recover' || g.x === 'furia' || g.x === 'confusao' || g.x === 'furiadragao' || g.x === 'chuva' || g.x === "chuvafim" || g.x === "acordou" || g.x === "congelou" || g.x === "gelado" || g.x === "degelou" || g.x === "queimou" || g.x === "queima" || g.x === "dormindo" || g.x === "envenenou" || g.x === "veneno" || g.x === "paralisou" || g.x === "paralisado" || g.x === "estagio" || g.x === 'remoinho' || g.x === 'espadas' || g.x === 'pluma' || g.x === 'semSono' || g.x === 'pocao' || g.x === 'absorb'); }
+function ehGolpeEspecial(g){ return g && (g.x === 'terreno' || g.x === 'boom' || g.x === 'sono' || g.x === 'disable' || g.x === 'recover' || g.x === 'furia' || g.x === 'confusao' || g.x === 'furiadragao' || g.x === 'chuva' || g.x === "chuvafim" || g.x === "acordou" || g.x === "congelou" || g.x === "gelado" || g.x === "degelou" || g.x === "queimou" || g.x === "queima" || g.x === "dormindo" || g.x === "envenenou" || g.x === "veneno" || g.x === "paralisou" || g.x === "paralisado" || g.x === "confundiu" || g.x === "confuso" || g.x === "saiuConfusao" || g.x === "estagio" || g.x === 'remoinho' || g.x === 'espadas' || g.x === 'pluma' || g.x === 'semSono' || g.x === 'pocao' || g.x === 'absorb'); }
 /* Os itens da mochila: o que cada um se chama na tela e quanto cura. O motor manda o id (g.g), o
    cliente escolhe a palavra -- mesmo caminho do MOVE_BY_TYPE. */
 const ITENS_DE_BATALHA = {
@@ -24819,6 +24903,23 @@ function fraseDoEspecial(g, quem, alvo, op){
     if(!(g.mv && GOLPES[g.mv])) return nomeP + " ficou paralisado!";
     return nomeP + " ficou paralisado com " + (op.selo ? seloDeGolpe(nomeDoAtaque(g.mv), GOLPES[g.mv][0])
                                                        : escapeHtmlSafe(nomeDoAtaque(g.mv).toUpperCase())) + "!";
+  }
+  if(g.x === "confundiu"){
+    /* A FRASE NOMEIA O GOLPE, como as dos outros quatro status, e com o "com" neutro pela mesma
+       razao de genero: SOCO DINAMICO e masculino, mas CONFUSAO e feminina. */
+    const nomeC = escapeHtmlSafe(golpe || "Ele");
+    if(!(g.mv && GOLPES[g.mv])) return nomeC + " ficou confuso!";
+    return nomeC + " ficou confuso com " + (op.selo ? seloDeGolpe(nomeDoAtaque(g.mv), GOLPES[g.mv][0])
+                                                    : escapeHtmlSafe(nomeDoAtaque(g.mv).toUpperCase())) + "!";
+  }
+  if(g.x === "confuso"){
+    /* ⚠️ ELA TRAZ O NUMERO, e e a unica das tres que traz -- pela mesma razao da queimadura e do
+       veneno: a linha de um especial nao ganha o "e tirou -N de HP" automatico, e sem o numero a
+       soma das linhas nao fecharia com a barra. */
+    return escapeHtmlSafe(golpe || "Ele") + " se acertou na própria confusão e perdeu " + (g.d || 0) + " de HP";
+  }
+  if(g.x === "saiuConfusao"){
+    return escapeHtmlSafe(golpe || "Ele") + " não está mais confuso!";
   }
   if(g.x === "paralisado"){
     /* ⚠️ ELA EXPLICA UMA BARRA PARADA, que e a mesma razao do "gelado" e do "continua a dormir":
@@ -25066,7 +25167,10 @@ function especiaisDaEspecie(id){
   /* A FÚRIA é passiva da espécie desde 10/09/2026, e por isso mora AQUI e não no cartão do golpe:
      ela não é escolha do jogador. É a de maior chance da lista -- 30% por confronto. */
   if(FURIA.includes(id))          out.push({ nome:'Fúria',          chance: CHANCE_FURIA, efeito:'furia' });
-  if(CONFUSAO[id])                out.push({ nome: CONFUSAO[id],   chance: CHANCE_CONFUSAO, efeito:'confusao' });
+  /* ⚠️ A CONFUSAO SAIU DAQUI em 24/09/2026: ela deixou de ser passiva de ESPECIE e virou
+     status por ATAQUE. Quem confunde agora e o GOLPE, e quem avisa e o asterisco do
+     cartao dele -- a ficha conta o que a especie faz SOZINHA, e confundir deixou de
+     ser isso. E a mesma decisao que tirou a drenagem daqui em 15/09/2026. */
   /* A FÚRIA DO DRAGÃO mora AQUI e não no cartão do golpe, pelo mesmo motivo da Fúria: ela é passiva
      da ESPÉCIE, e quem escolhe golpe não escolhe passiva. E aqui ela é a única coisa que conta ao
      jogador que aquele bicho existe -- o `dragonrage` tem poder variável e nunca entrou na tabela
@@ -25168,17 +25272,9 @@ const EXPLICACAO_DO_ESPECIAL = {
       'O acúmulo é por BATALHA — ele zera quando a próxima começa.'
     ]
   },
-  confusao: {
-    quando: 'Abre o confronto',
-    texto: 'Deixa o adversário confuso, e ele se acerta: leva um golpe DELE MESMO, como se um ' +
-           'espelho o atacasse. Depois disso a luta acontece inteira, do zero.',
-    detalhes: [
-      'O golpe do espelho não tem tipo nem crítico — o que conta são o nível, os atributos e o ' +
-      'poder do golpe dele.',
-      'Quem é frágil e forte se arrebenta; quem é duro mal se arranha. E nunca mata: sobra ao ' +
-      'menos 1 de HP.'
-    ]
-  },
+  /* ⚠️ A ENTRADA `confusao` SAIU em 24/09/2026, junto com a passiva: esta tabela e indexada
+     pelo EFEITO, e um efeito que a ficha nao mostra mais deixaria a explicacao ORFA -- o teste
+     cobra que nenhuma sobre sem dono. Quem explica a confusao hoje e o asterisco do cartao. */
   chuva: {
     /* O CLIMA É O QUINTO MOMENTO desta tabela, e o único que vale por VÁRIOS confrontos: os outros
        abrem ou resolvem UM confronto, o Metrônomo vale a cada golpe, o Sketch é depois da batalha.
@@ -25634,6 +25730,12 @@ function tipoVisualDoHit(m, hit){
   if(hit.x === 'paralisado' || hit.x === 'paralisou') return 'Electric';
   if(hit.x === 'congelou' || hit.x === 'gelado' || hit.x === 'degelou') return 'Ice';
   if(hit.x === 'confusao') return 'Psychic';
+  /* ⚠️ AS TRES LINHAS NOVAS PEGAM A COR DO GOLPE que confundiu, quando ele existe -- o
+     Pulso de Agua sai no azul da Agua e o Soco Dinamico no vermelho do Lutador. Sem
+     golpe (as duas de estado) cai no Psiquico, que e a cor do proprio simbolo. */
+  if(hit.x === 'confundiu' || hit.x === 'confuso' || hit.x === 'saiuConfusao'){
+    return (hit.mv && GOLPES[hit.mv]) ? GOLPES[hit.mv][0] : 'Psychic';
+  }
   const especie = hit.q === 'p' ? m.playerSpecies : m.enemySpecies;
   const sp = especieParaTela(especie);
   return (sp && sp.types && sp.types[0]) || 'Normal';
@@ -25713,7 +25815,10 @@ function animarGolpeNaCena(m, hit, atrasoImpacto){
   const alvo = hit.side === 'player' ? 'player' : 'enemy';
   const cura = hit.amount < 0 || hit.cura;
   const dano = hit.amount > 0;
-  const efeitoSemAtacante = hit.x === 'queima' || hit.x === 'veneno' || hit.x === 'gelado' || hit.x === 'paralisado';
+  /* ⚠️ AS DUAS DE ESTADO DA CONFUSAO ENTRAM AQUI: elas falam de UM pokemon e nao tem
+     causador nesta troca -- a `confundiu` NAO entra, porque ela e causada pelo golpe
+     que acabou de sair. */
+  const efeitoSemAtacante = hit.x === 'queima' || hit.x === 'veneno' || hit.x === 'gelado' || hit.x === 'paralisado' || hit.x === 'confuso' || hit.x === 'saiuConfusao';
   const atacante = hit.q === 'p' ? 'player' : 'enemy';
   const tipo = tipoVisualDoHit(m, hit);
   const delay = Math.max(0, atrasoImpacto || 0);
@@ -25980,18 +26085,25 @@ function statusVisuaisDaSequencia(m, lado, passo, seq){
   const primeiroSono = seq.find(g => (g.x === 'sono' && !proprio(g)) ||
     (proprio(g) && (g.x === 'dormindo' || g.x === 'acordou')));
   const primeiroGelo = seq.find(g => proprio(g) && ['congelou','gelado','degelou'].includes(g.x));
+  /* ⚠️ A CONFUSAO SEGUE O MOLDE DO GELO e nao o da queimadura, porque ela PASSA: se a
+     primeira marca dele e `confundiu`, ele nao estava confuso antes; se e `confuso` ou
+     `saiuConfusao`, ele entrou no confronto JA confuso (ela atravessa trocas, e quem
+     sobrevive continua em campo). */
+  const primeiraConf = seq.find(g => proprio(g) && ['confundiu','confuso','saiuConfusao'].includes(g.x));
   const st = {
     sleep: !!primeiroSono && primeiroSono.x !== 'sono',
     poison: herdado('Envenenado','envenenou','veneno'),
     burn: herdado('Queimado','queimou','queima'),
     paralysis: herdado('Paralisado','paralisou','paralisado'),
     freeze: !!primeiroGelo && primeiroGelo.x !== 'congelou',
-    confusion: false
+    confusion: !!primeiraConf ? primeiraConf.x !== 'confundiu' : !!m[prefix + 'Confuso']
   };
   for(let i=0;i<n;i++){
     const g=seq[i];
     if(g.x==='sono' && !proprio(g)) st.sleep=true;
-    if(g.x==='confusao' && !proprio(g) && i===n-1) st.confusion=true;
+    if(g.x==='confusao' && !proprio(g) && i===n-1) st.confusion=true;   // a passiva, ate 24/09/2026
+    if(proprio(g) && (g.x==='confundiu' || g.x==='confuso')) st.confusion=true;
+    if(proprio(g) && g.x==='saiuConfusao') st.confusion=false;
     if(!proprio(g)) continue;
     if(g.x==='dormindo') st.sleep=true;
     if(g.x==='acordou') st.sleep=false;

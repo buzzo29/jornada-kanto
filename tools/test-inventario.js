@@ -2754,21 +2754,53 @@ console.log('\n=== AS MAQUINAS DE TECNICA (TMs) ===');
        Object.keys(S.EFEITO_DO_TERRENO).slice().sort().join(',') === 'Electric,Fire,Ice,Poison',
        Object.keys(S.EFEITO_DO_TERRENO).join(','));
   }
-  /* ⚠️ A PASSIVA DE CONFUSAO PELO GOLPE -- o pedido nomeia o TM03 (Water Pulse). */
+  /* ⚠️ O TM03 (Pulso de Agua): a "PASSIVA PELO GOLPE" de 17/09 VIROU A MECANICA em 24/09/2026.
+     Ate aquela data a confusao era passiva da ESPECIE e carregar um golpe que confunde DAVA a
+     passiva a quem nao estava na lista; hoje quem confunde e o GOLPE, com a chance dele -- ou seja
+     o que o pedido do TM03 queria virou o comportamento normal, sem caminho proprio.
+     ⚠️ ESTA TRAVA NAO FOI APAGADA: ela virou a trava da regra NOVA. Sem ela, alguem devolve a
+     passiva da especie e o TM03 volta a precisar de excecao **sem ninguem ver**. */
   {
-    const p2 = S.createInstance('blastoise', 50);
-    ok('sem o golpe, o Blastoise nao confunde', S.golpeQueConfunde(p2) === null);
-    p2.ataques = ['waterpulse','surf'];
-    ok('com o Pulso de Agua ele ganha a passiva', S.golpeQueConfunde(p2) === 'Pulso de Água',
-       String(S.golpeQueConfunde(p2)));
-    /* ⚠️ E A ESPECIE CONTINUA VALENDO pra quem nao carrega golpe nenhum */
-    ok('e a especie continua valendo (o Zubat confunde com Supersom)',
-       S.golpeQueConfunde(S.createInstance('zubat', 30)) === 'Supersom');
-    /* ⚠️ E VALE PRA QUALQUER GOLPE QUE CONFUNDA, nao so pro TM03: a regra e "o golpe da a passiva" */
-    ok('e vale pros seis golpes de dano que confundem',
+    /* ⚠️ o createInstance devolve hp 0 -- quem enche a barra e o calcMaxHp (a armadilha da casa) */
+    const mkc = (id, lv, ats) => { const q = S.createInstance(id, lv || 50); q.maxHp = S.calcMaxHp(q);
+                                   q.hp = q.maxHp; if(ats){ q.ataques = ats; q.lastMove = ats[0]; } return q; };
+    const alvoDe = () => mkc('snorlax', 50);
+    const semGolpe = mkc('blastoise', 50, ['surf']);
+    ok('sem o golpe, o Blastoise nao confunde ninguem',
+       S.tentarConfundir(semGolpe, alvoDe(), () => 0.001) === null);
+    const comGolpe = mkc('blastoise', 50, ['waterpulse','surf']);
+    const alvo2 = alvoDe();
+    ok('com o Pulso de Agua ele confunde',
+       S.tentarConfundir(comGolpe, alvo2, () => 0.001) === 'waterpulse');
+    /* ⚠️ AS CONSTANTES SAO LIDAS DO FONTE: `const` NAO vira propriedade global do sandbox, entao
+       `S.CONFUSAO_TURNOS_MIN` volta undefined e a comparacao daria FALSO com o valor CERTO -- a
+       licao que a Queimada e a Arena 1x1 ja custaram. */
+    const konstC = (n2) => { const m = require('fs')
+        .readFileSync(path.join(raiz, 'index.html'), 'utf8')
+        .match(new RegExp('const ' + n2 + ' = ([0-9.]+)')); return m ? Number(m[1]) : null; };
+    const tMin = konstC('CONFUSAO_TURNOS_MIN'), tMax = konstC('CONFUSAO_TURNOS_MAX');
+    ok('e a marca fica no ALVO, com ' + tMin + ' a ' + tMax + ' turnos',
+       tMin === 2 && tMax === 5 && alvo2._confuso >= tMin && alvo2._confuso <= tMax,
+       String(alvo2._confuso));
+    /* ⚠️ A ESPECIE NAO CONFUNDE MAIS -- a passiva acabou, e e isso que o pedido de 24/09 pede.
+       O Zubat era o dono declarado dela (o Supersom), e o Supersom e golpe de STATUS: ele nem
+       esta na base, ou seja ninguem o carrega. */
+    const zubat = mkc('zubat', 30, ['wingattack']);
+    ok('e a ESPECIE nao confunde mais (o Zubat era o dono do Supersom)',
+       S.tentarConfundir(zubat, alvoDe(), () => 0.001) === null);
+    /* ⚠️ E ESTA PERGUNTA E FEITA AO ARQUIVO, nunca ao sandbox: `const CONFUSAO = {...}` NAO vira
+       propriedade global, entao `typeof S.CONFUSAO === 'undefined'` seria VERDADE mesmo com a
+       tabela de volta -- a trava passaria em branco sobre a volta da passiva. */
+    ok('e a tabela da passiva nao existe mais (no FONTE, nos dois motores)',
+       !/const CONFUSAO = /.test(require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8')) &&
+       !/const CONFUSAO = /.test(require('fs').readFileSync(path.join(raiz, 'functions', 'index.js'), 'utf8')));
+    ok('e o Supersom nao esta entre os seis (golpe de STATUS)',
+       !S.GOLPES_QUE_CONFUNDEM.supersonic && !S.GOLPES.supersonic);
+    /* ⚠️ E VALE PRA QUALQUER GOLPE QUE CONFUNDA, nao so pro TM03 */
+    ok('e vale pros seis golpes que confundem',
        Object.keys(S.GOLPES_QUE_CONFUNDEM).every(g => {
-         const q = S.createInstance('snorlax', 50); q.ataques = [g];
-         return S.golpeQueConfunde(q) === S.GOLPES_PT[g]; }),
+         const q = mkc('snorlax', 50, [g]);
+         return S.tentarConfundir(q, alvoDe(), () => 0.001) === g; }),
        Object.keys(S.GOLPES_QUE_CONFUNDEM).join(','));
     ok('e todos eles existem na tabela de golpes',
        Object.keys(S.GOLPES_QUE_CONFUNDEM).every(g => !!S.GOLPES[g]));
