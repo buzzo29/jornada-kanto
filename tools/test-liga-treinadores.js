@@ -409,11 +409,18 @@ console.log('\n=== OS GOLPES ESCOLHIDOS CHEGAM NA LIGA E NO ONLINE (16/09/2026) 
   /* ===== O CAMINHO REAL DA LIGA ===== */
   /* A prova que importa: a MESMA partida, com e sem o mapa de golpes ao lado do codigo. */
   {
-    /* o elenco tem dono de DRENAGEM (a linha do Oddish, o Zubat) e de MULTI-TAPA (Jigglypuff,
-       Doduo, Rhyhorn) de proposito: sem eles a trava mediria o que nao esta la. */
+    /* o elenco tem dono de DRENAGEM (a linha do Oddish, o Gastly) e de MULTI-TAPA de proposito:
+       sem eles a trava mediria o que nao esta la.
+       ⚠️ OS DONOS DE MULTI-TAPA TROCARAM EM 24/09/2026, quando a forma evoluida passou a HERDAR o
+       aprendizado da linha: os antigos (Jigglypuff, Wigglytuff, Doduo, Dodrio, Rhyhorn, Rhydon)
+       ganharam golpes MUITO mais fortes e o `ataquesPadrao` -- que pega os 3 de maior poder --
+       parou de escolher o tapa deles. A Wigglytuff e o caso extremo: 15 -> 120. A trava caiu com o
+       codigo certo (`0 -> 0`), e o conserto e o elenco, nao a regra: estes oito AINDA levam um
+       multi-tapa no Lv.50 (medido). E a mesma licao do dono do Missil Agulha, que ja trocou do
+       Beedrill pro Qwilfish quando o Beedrill ganhou a Agulha Dupla. */
     const ELENCO = ['oddish','gloom','vileplume','zubat','golbat','crobat','paras','parasect',
                     'bellsprout','weepinbell','victreebel','gastly','haunter','gengar','venonat',
-                    'jigglypuff','wigglytuff','doduo','dodrio','rhyhorn','rhydon','cloyster'];
+                    'golduck','marowak','lickitung','chansey','dragonair','ariados','corsola'];
     const sorteia = (i,n) => { const o=[]; const b=(i*7)%ELENCO.length;
       for(let k=0;k<n;k++) o.push(ELENCO[(b+k*5)%ELENCO.length]); return o; };
     const terreno = fns._TERRAINS[0];

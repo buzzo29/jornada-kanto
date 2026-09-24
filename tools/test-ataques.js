@@ -640,14 +640,20 @@ console.log('\n=== O GOLPE NAO SOME NA EVOLUCAO ===');
      S.aprendizadosPendentes().filter(x => x.p === cf && x.golpe === 'magicalleaf').length === 1,
      S.aprendizadosPendentes().filter(x => x.p === cf).map(x => S.nomeDoAtaque(x.golpe)).join(', '));
 
-  /* O CONTRA-EXEMPLO, e ele e que faz a regra ser uma regra: o Trovao do Pikachu e nivel 41 e o
-     Pikachu evolui no 40 -- quem chega la ja e Raichu, e a Raichu nao ensina. Continua perdido, e
-     e assim no jogo original. Sao 22 golpes nessa situacao. */
+  /* ⚠️ O CONTRA-EXEMPLO DESTA REGRA ACABOU EM 24/09/2026, e esta trava media a regra ANTIGA.
+     Ate ali o Trovao do Pikachu (nivel 41) era perdido: ele evolui no 40, quem chega la ja e
+     Raichu, e a Raichu nao ensinava. Com a forma evoluida HERDANDO o aprendizado da linha, a
+     Raichu ENSINA -- e o Trovao volta pra a fila no 41.
+     Ela nao foi apagada: virou a trava da regra NOVA. Sem isso, alguem reintroduz o descarte e os
+     22 golpes que este caso nomeia voltam a se perder SEM NINGUEM VER. */
   g.team = []; const pk = inst('pikachu', 40);
   pk.ataques = ['thunderbolt','quickattack']; pk.nivelDosAtaques = 40; pk.especieDosAtaques = 'pikachu';
   g.team = [pk]; pk.level = 41; S.tryEvolve(pk);
-  ok('mas o que vem DEPOIS da evolucao nao volta (Raichu sem Trovao)',
-     S.aprendizadosPendentes().filter(x => x.p === pk && x.golpe === 'thunder').length === 0);
+  ok('e o que vem DEPOIS da evolucao agora VOLTA (a Raichu herda o Trovao)',
+     S.aprendizadosPendentes().filter(x => x.p === pk && x.golpe === 'thunder').length === 1,
+     S.aprendizadosPendentes().filter(x => x.p === pk).map(x => S.nomeDoAtaque(x.golpe)).join(', '));
+  ok('  e ele vem com o NIVEL do ancestral (41), nao inventado',
+     (S.aprendizadosPendentes().find(x => x.p === pk && x.golpe === 'thunder') || {}).nivel === 41);
   /* E a Batida, que o Pikachu aprende no 20 (antes do 40), ESSA volta. */
   g.team = []; const pk2 = inst('pikachu', 19);
   pk2.ataques = ['thundershock']; pk2.nivelDosAtaques = 19; pk2.especieDosAtaques = 'pikachu';
@@ -752,13 +758,179 @@ console.log('\n=== O METRONOMO SORTEIA E DEPOIS ESCOLHE ===');
      S.golpesDoTimeHtml(S.createInstance('abra', 20)) === '');
 }
 
+console.log('\n=== A FORMA EVOLUIDA HERDA O APRENDIZADO DA LINHA (24/09/2026) ===');
+{
+  /* Pedido assim: *"o Cloyster originalmente tem apenas 3 ataques se voce olhar na pokedex, mas
+     ele vem do shellder, entao o cloyster tem que herdar todos os ataques que o shelder tambem
+     tinha, sem repetir moves"*.
+     ⚠️ E ISSO REVERTE a decisao de 09/09/2026 (*"os 30 que sobram sao os que a forma nova
+     realmente nao sabe -- que e a regra do jogo original e fica como esta"*). As duas travas que
+     mediam AQUELA regra (o Raichu sem Trovao e a Starmie sem Raio de Bolhas) viraram a trava da
+     regra NOVA, acima -- elas nao foram apagadas. */
+  const G = S.GOLPES_IDS;
+  /* ⚠️ este arquivo nao tem os fontes no topo (ao contrario do test-liga-pro), entao eles sao
+     lidos aqui. E do FONTE, nunca do sandbox: declaracao com const nao vira propriedade global
+     dele -- a licao que a Queimada custou. */
+  const srvSrc = fs.readFileSync(path.join(RAIZ, 'functions', 'index.js'), 'utf8');
+  const src = fs.readFileSync(path.join(RAIZ, 'index.html'), 'utf8');
+  const nivelDe = (esp, golpe) => {
+    const par = S.aprendizadoDaEspecie(esp).find(x => G[x[1]] === golpe);
+    return par ? par[0] : null;
+  };
+
+  /* --- o caso do relato, carta por carta --- */
+  const shel = S.aprendizadoDaEspecie('shellder').map(x => G[x[1]]);
+  const cloy = S.aprendizadoDaEspecie('cloyster').map(x => G[x[1]]);
+  ok('o Cloyster herda TODOS os golpes do Shellder',
+     shel.every(g => cloy.indexOf(g) >= 0), shel.filter(g => cloy.indexOf(g) < 0).join(','));
+  ok('  e ele tinha 3 golpes proprios', (S.APRENDIZADO['cloyster'] || []).length === 3,
+     String((S.APRENDIZADO['cloyster'] || []).length));
+  ok('  agora sao 7, sem repetir', cloy.length === 7 && new Set(cloy).size === cloy.length,
+     cloy.join(','));
+  /* ⚠️ O RAIO CONGELANTE E O CASO QUE JUSTIFICA A MUDANCA: o Shellder o aprende no Lv.49 e
+     evolui no 40, entao ele era INALCANCAVEL pra a LINHA INTEIRA. */
+  ok('  e o Raio Congelante (95), que era inalcancavel, chega', cloy.indexOf('icebeam') >= 0);
+  ok('    com o nivel do Shellder (49), nao inventado', nivelDe('cloyster', 'icebeam') === 49,
+     String(nivelDe('cloyster', 'icebeam')));
+
+  /* --- a regra, nao o caso --- */
+  /* ⚠️ A FORMA ATUAL MANDA NO EMPATE: o Raio Aurora e Lv.17 no Shellder e Lv.1 no Cloyster, e
+     o que vale e o dela -- ela esta mais perto, e e a tabela dela que a ficha mostra. */
+  ok('no empate vale o nivel da forma ATUAL',
+     nivelDe('cloyster', 'aurorabeam') === 1 && nivelDe('shellder', 'aurorabeam') === 17,
+     nivelDe('cloyster', 'aurorabeam') + ' vs ' + nivelDe('shellder', 'aurorabeam'));
+  /* ⚠️ A LINHA INTEIRA, nao so o pai -- e o caso tem que ser um em que o AVO ensina algo que o PAI
+     nao ensina, senao uma heranca de UM degrau passa (foi o que a conferencia de acusacao pegou:
+     com `voltas < 2` a trava do Venusaur continuava verde, porque o Ivysaur ja tem tudo do
+     Bulbasaur). Sao TRES no jogo, medidos: weedle->kakuna->beedrill (poisonsting),
+     caterpie->metapod->butterfree (tackle) e cleffa->clefairy->clefable (magicalleaf). */
+  [['weedle', 'beedrill', 'poisonsting'], ['caterpie', 'butterfree', 'tackle'],
+   ['cleffa', 'clefable', 'magicalleaf']].forEach(([avo, neto, golpe]) => {
+    const l = S.aprendizadoDaEspecie(neto).map(x => G[x[1]]);
+    ok('a heranca sobe a LINHA INTEIRA: ' + neto + ' pega ' + golpe + ' do ' + avo,
+       l.indexOf(golpe) >= 0, l.join(','));
+  });
+  /* ⚠️ A BIFURCACAO TAMBEM E EVOLUCAO: o Politoed herda do Poliwhirl como o Poliwrath herda.
+     Sem o EVOLUTION_CHOICES no mapa de pais, os destinos de bifurcacao ficariam de fora -- e sao
+     justamente Politoed, Bellossom, Slowking e os tres do Tyrogue. */
+  const pw = S.aprendizadoDaEspecie('poliwhirl').map(x => G[x[1]]);
+  ['politoed', 'poliwrath'].forEach(d => {
+    const l = S.aprendizadoDaEspecie(d).map(x => G[x[1]]);
+    ok('  e a bifurcacao herda igual: ' + d, pw.every(g => l.indexOf(g) >= 0),
+       pw.filter(g => l.indexOf(g) < 0).join(','));
+  });
+  ok('  o Bellossom tambem (o outro lado do Gloom)',
+     S.aprendizadoDaEspecie('gloom').map(x => G[x[1]])
+      .every(g => S.aprendizadoDaEspecie('bellossom').map(y => G[y[1]]).indexOf(g) >= 0));
+
+  /* ⚠️ QUEM NAO TEM PAI NAO MUDA UM BYTE -- e isso e metade da prova: sem este caso, uma
+     heranca que devolvesse lixo pra todo mundo passaria nos de cima. */
+  let iguais = 0; const difs = [];
+  const pais = S.paiDaEspecie();
+  for(const id in S.SPECIES){
+    if(pais[id]) continue;
+    const a = (S.APRENDIZADO[id] || []).map(x => x.join(':')).join(',');
+    const b = S.aprendizadoDaEspecie(id).map(x => x.join(':')).join(',');
+    if(a === b) iguais++; else difs.push(id);
+  }
+  ok('quem nao tem ancestral sai IDENTICO a tabela', difs.length === 0 && iguais > 50,
+     iguais + ' iguais, difere em: ' + difs.slice(0, 5).join(','));
+
+  /* ⚠️ E A TABELA ORIGINAL NUNCA E MUTADA: a funcao clona os PARES. Sem o clone, um leitor que
+     escrevesse num par reescreveria o APRENDIZADO pra todo o jogo -- e isso nao da erro, da um
+     nivel de aprendizado errado pra sempre.
+     ⚠️ A PRIMEIRA VERSAO DESTA TRAVA FAZIA UM `sort` E NAO MEDIA NADA: ordenar o array devolvido
+     nao toca nos pares, entao ela passava com o clone removido. Quem mede e escrever DENTRO do par
+     -- e o valor e restaurado no fim porque o retorno E o cache. */
+  const antes = JSON.stringify(S.APRENDIZADO['shellder']);
+  const alvo = S.aprendizadoDaEspecie('shellder')[0];
+  const guardado = alvo[0];
+  alvo[0] = 999;
+  ok('a tabela APRENDIZADO nao e mutada (os pares sao clonados)',
+     JSON.stringify(S.APRENDIZADO['shellder']) === antes, S.APRENDIZADO['shellder'][0].join(':'));
+  alvo[0] = guardado;
+
+  /* --- por onde isso chega no jogo --- */
+  ok('a ESCOLHA do jogador enxerga o herdado',
+     S.ataquesDisponiveis('cloyster', 50).indexOf('icebeam') >= 0);
+
+  /* ⚠️ A FILA DE APRENDIZADO, e o caso tem que ser SEM `especieDosAtaques` -- com ele, o segundo
+     `varrer` (o do resgate da forma antiga) traz o golpe pela tabela crua e a trava passa em
+     branco. Foi o que a conferencia de acusacao pegou usando o Raichu.
+     Aqui o Cloyster ja E Cloyster ha tempos (nenhuma evolucao pendente) e cruza o Lv.49: o Raio
+     Congelante so pode chegar pela HERANCA. */
+  {
+    g.team = []; g.evolucaoDepois = null; g.aprenderAtaque = null; g.golpesAprendidos = [];
+    const cl = inst('cloyster', 48);
+    cl.ataques = ['aurorabeam', 'dive', 'spikecannon'];
+    cl.nivelDosAtaques = 48; cl.especieDosAtaques = 'cloyster';
+    cl.level = 49; g.team = [cl];
+    const fila = S.aprendizadosPendentes().filter(x => x.p === cl);
+    ok('a FILA oferece o golpe herdado ao cruzar o nivel dele',
+       fila.filter(x => x.golpe === 'icebeam').length === 1,
+       fila.map(x => S.nomeDoAtaque(x.golpe) + '@' + x.nivel).join(', ') || '(vazia)');
+  }
+
+  /* ⚠️ E A FICHA DA POKEDEX, que e onde o relato comecou (*"se voce olhar na pokedex"*). Ela le a
+     MESMA tabela da tela de escolha, entao sem a heranca ali o jogador continuaria vendo 3 golpes
+     num pokemon que leva 7. */
+  {
+    const ficha = S.especieFichaHtml ? S.especieFichaHtml('cloyster') : (S.renderDexFicha ? S.renderDexFicha('cloyster') : null);
+    if(ficha == null){
+      /* sem um montador de ficha exportado, a prova e de onde ela tira a lista */
+      ok('a FICHA le a heranca (o leitor da Pokedex)',
+         src.indexOf('const lista = aprendizadoDaEspecie(id);') > 0);
+    } else {
+      ok('a FICHA mostra o golpe herdado', ficha.indexOf(S.nomeDoAtaque('icebeam')) > 0);
+    }
+  }
+  ok('  e o ataquesPadrao passa a pegar o melhor golpe da linha',
+     S.ataquesPadrao({ speciesId: 'cloyster', level: 50, ataques: [] }).indexOf('icebeam') >= 0);
+  /* ⚠️ E A LIGA ACEITA DE GRACA, e o que prova isso e de ONDE o golpesValidos tira a lista: ele
+     usa o ataquesDisponiveis. Com uma lista propria, o golpe herdado seria RECUSADO EM SILENCIO
+     na liga -- o defeito que o fly custou. */
+  ok('  e a LIGA aceita o herdado (o golpesValidos le o ataquesDisponiveis)',
+     srvSrc.indexOf('const porNivel = new Set(ataquesDisponiveis(speciesId, nivel));') > 0);
+  /* ⚠️ OS DOIS MOTORES: o ataquesDisponiveis alimenta o equiparNpc, e divergir aqui e divergir
+     a BATALHA -- o NPC do servidor lutaria com um moveset que o cliente nao mostra. */
+  const pega = (txt, nome) => {
+    const i = txt.indexOf('function ' + nome + '(');
+    return i < 0 ? null : txt.slice(i, txt.indexOf('\n}', i) + 2);
+  };
+  const fa = pega(srvSrc, 'aprendizadoDaEspecie'), fb = pega(src, 'aprendizadoDaEspecie');
+  ok('as duas copias da heranca concordam byte a byte', !!fa && !!fb && fa === fb,
+     !fa ? 'falta no servidor' : !fb ? 'falta no cliente' : 'DIVERGEM');
+  /* ⚠️ E O LEITOR TAMBEM, nao so a funcao: a conferencia de acusacao pegou um caso em que SO o
+     servidor voltava a ler a tabela crua -- a funcao continuava identica nos dois e a trava acima
+     passava em branco. E o `ataquesDisponiveis` que alimenta o `equiparNpc`: o NPC do servidor
+     lutaria com um moveset que o cliente nao mostra, e a mesma batalha terminaria diferente. */
+  const da = pega(srvSrc, 'ataquesDisponiveis'), db = pega(src, 'ataquesDisponiveis');
+  ok('  e o ataquesDisponiveis dos dois motores tambem', !!da && da === db,
+     !da ? 'falta no servidor' : 'DIVERGEM');
+  const pa = pega(srvSrc, 'paiDaEspecie'), pb = pega(src, 'paiDaEspecie');
+  ok('  e o mapa de pais tambem', !!pa && pa === pb,
+     !pa ? 'falta no servidor' : 'DIVERGEM');
+  /* ⚠️ E ELA E LAZY: no SERVIDOR o EVOLUTION_CHOICES e declarado DEPOIS do ataquesDisponiveis,
+     e uma const computada no topo e zona morta temporal -- o servidor inteiro morre no
+     carregamento. Foi a sexta vez dessa armadilha no projeto. */
+  ok('  e o mapa de pais e montado LAZY',
+     srvSrc.indexOf('let _paiDaEspecie = null;') > 0
+     && srvSrc.indexOf('if(_paiDaEspecie) return _paiDaEspecie;') > 0);
+}
+
 console.log('\n=== O GOLPE DA FORMA ANTERIOR NAO SE PERDE NA EVOLUCAO ===');
 {
   /* Reportado em 09/09/2026: a Staryu aprende Raio de Bolhas no 28 e a Starmie nao ensina esse
      golpe em nivel NENHUM. Quem evolui com ele tem que continuar com ele -- e so dali pra frente
      passa a valer o moveset da forma nova. */
-  ok('a Starmie realmente nao ensina Raio de Bolhas',
-     S.ataquesDisponiveis('starmie', 99).indexOf('bubblebeam') < 0);
+  /* ⚠️ A STARMIE PASSOU A ENSINAR EM 24/09/2026 (a forma evoluida herda o aprendizado da linha),
+     e esta trava media o contrario. O BLOCO continua valendo inteiro: o `ataquesEscolhiveis` ainda
+     precisa somar "o que ele JA CARREGA", porque golpe de HM e de TM nao vem do APRENDIZADO e o
+     Smeargle copia o dele -- nenhum dos tres esta na tabela da especie. */
+  ok('a Starmie HERDA o Raio de Bolhas do Staryu',
+     S.ataquesDisponiveis('starmie', 99).indexOf('bubblebeam') >= 0);
+  ok('  e com o nivel do Staryu (28), nao inventado',
+     S.nivelDoAtaque('starmie', 'bubblebeam') === 28, String(S.nivelDoAtaque('starmie', 'bubblebeam')));
 
   g.team = []; g.evolucaoDepois = null; g.aprenderAtaque = null; g.golpesAprendidos = [];
   const st2 = inst('staryu', 28);

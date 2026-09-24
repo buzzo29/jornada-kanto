@@ -893,7 +893,11 @@ perguntou qual tirar; e o Togepi deveria aparecer o Metrônomo, porém não exib
   (70) do Ursaring, Bomba de Ovo (100) da Blissey. Hoje a **janela vale pras duas formas**, e o
   resgate só alcança golpe que a forma NOVA também ensina: **90 → 30**, e os 30 que sobram são os
   que a forma nova realmente não sabe (Raichu sem Trovão, Donphan sem Derrubada, Scizor sem Ataque
-  de Asa) — que é a regra do jogo original e fica como está.
+  de Asa).
+  **⚠️ A ÚLTIMA FRASE DESTE ITEM DIZIA "e fica como está", E ISSO CADUCOU EM 24/09/2026:** a forma
+  evoluída passou a HERDAR o aprendizado da linha inteira, então o Raichu tem Trovão. Ver **A FORMA
+  EVOLUÍDA HERDA O APRENDIZADO DA LINHA**, mais abaixo — foi um Cloyster de 3 golpes que trouxe a
+  mudança, e o que a justificou é que o Raio Congelante dele era inalcançável pra a linha INTEIRA.
 - **TIRAR UM GOLPE TRAVAVA O JOGO NUM CARROSSEL INFINITO.** `responderAprendizado` punha o golpe
   novo no lugar do escolhido e não anotava nada — e o retirado voltava pra fila no instante
   seguinte, porque o nível dele ainda está DENTRO da janela sempre que os dois foram aprendidos na
@@ -2808,6 +2812,112 @@ a valer o moveset da forma nova.
   acima do nível da evolução e a nova nunca ensina (ver "O que foi medido e NÃO foi mexido").
   Continuam inalcançáveis pra quem nunca os teve — o que muda é que quem OS TEM não os perde mais.
 
+### A FORMA EVOLUÍDA HERDA O APRENDIZADO DA LINHA (24/09/2026)
+
+Pedida assim: *"o Cloyster originalmente tem apenas 3 ataques se voce olhar na pokedex, mas ele vem
+do shellder, então o cloyster tem que herdar todos os ataques que o shelder tambem tinha, sem
+repetir moves"*.
+
+**⚠️ ISSO REVERTE A DECISÃO DE 09/09/2026, que está na seção acima:** *"os 30 que sobram são os que
+a forma nova realmente não sabe — que é a regra do jogo original e fica como está"*. As duas travas
+que mediam AQUELA regra (o Raichu sem Trovão e a Starmie sem Raio de Bolhas) **viraram a trava da
+regra nova** — elas não foram apagadas.
+
+**⚠️ E O CASO DO RELATO É O QUE JUSTIFICA A REVERSÃO: o Raio Congelante era INALCANÇÁVEL pra a linha
+inteira.** O Shellder o aprende no **Lv.49** e evolui no **40** — então nem ele (que já virou
+Cloyster) nem o Cloyster (que não o ensina) chegavam nele. Não é "um golpe que a forma nova não
+sabe": é um golpe que **ninguém daquela linha consegue ter**, e que a ficha mostra como se existisse.
+
+| Cloyster | |
+|---|---|
+| golpes próprios | **3** |
+| **agora** | **7**, sem repetir |
+| e ele ganha | `icebeam` (95), `dive`, `clamp`, `tackle` |
+
+#### ⚠️ A REGRA, e as três coisas que ela não é
+
+- **SOBE A LINHA INTEIRA, não só o pai.** O Venusaur herda do Ivysaur **E** do Bulbasaur. Com um
+  passo só, a terceira forma de toda linha de três ficaria sem o que a primeira ensina — e o teste
+  tem caso de 3 gerações justamente porque um Venusaur passa num teste de 2 passos por acidente.
+- **⚠️ A BIFURCAÇÃO TAMBÉM É EVOLUÇÃO**, e ela mora noutra tabela: o mapa de pais lê o `EVOLUTIONS`
+  **e** o `EVOLUTION_CHOICES`. Sem a segunda metade ficariam de fora justamente **Politoed,
+  Bellossom, Slowking e os três do Tyrogue** — e o Poliwrath herdaria enquanto o Politoed não,
+  na mesma tela.
+- **⚠️ NO EMPATE VALE O NÍVEL DA FORMA ATUAL.** O Raio Aurora é Lv.17 no Shellder e **Lv.1** no
+  Cloyster; o que vale é o dela — ela está mais perto, e é a tabela dela que a ficha mostra.
+- **⚠️ E ELA CLONA OS PARES, nunca devolve a tabela.** Um `sort` num leitor reordenaria o
+  `APRENDIZADO` **pra o jogo inteiro** — e o defeito não apareceria como erro: apareceria como a
+  ordem dos golpes mudando de uma tela pra outra.
+
+#### ⚠️ ELA É LAZY, E ISSO FOI A SEXTA VEZ DESSA ARMADILHA
+
+No **SERVIDOR** o `EVOLUTION_CHOICES` é declarado **DEPOIS** do `ataquesDisponiveis`, e uma `const`
+computada no topo é zona morta temporal: **o servidor inteiro morre no carregamento**. O mapa de
+pais é montado na primeira chamada (`let _paiDaEspecie = null`), e a lista de cada espécie é
+memoizada.
+
+#### POR ONDE ISSO CHEGA NO JOGO — cinco leitores, uma função
+
+`aprendizadoDaEspecie` é a porta única, e os cinco leem ela: a **ESCOLHA** do jogador
+(`ataquesDisponiveis`), o **nível** que a tela mostra (`nivelDoAtaque`), a **fila** de aprendizado
+por nível, a **ficha** da Pokédex e — por tabela — o `ataquesPadrao` dos NPCs.
+
+**⚠️ E A LIGA ACEITA DE GRAÇA, e o que garante isso é de ONDE o `golpesValidos` tira a lista:** ele
+usa o `ataquesDisponiveis`. Com uma lista própria, o golpe herdado seria **RECUSADO EM SILÊNCIO** na
+liga e no online — o defeito que o `fly` custou em 16/09.
+
+#### O QUE ISSO MUDA, MEDIDO
+
+| | |
+|---|---|
+| espécies COM ancestral | **117** |
+| **ganham golpe** | **35** (69 golpes no total) |
+| **ganham um golpe MAIS FORTE** | **12** |
+| o `ataquesPadrao` muda em | **9,6%** das combinações espécie × nível (456 de 4.750) |
+| e o poder médio do melhor golpe | **74,1 → 75,6** |
+
+Os que mais ganham: **Wigglytuff 15 → 120**, **Clefable 15 → 100**, Politoed 40 → 120,
+Ninetales 40 → 95, Poliwrath 80 → 120, Starmie 90 → 120, **Cloyster 65 → 95**, Raichu 95 → 120.
+
+**⚠️ E 117 COMBINAÇÕES PERDEM UM MULTI-TAPA**, o que é o outro lado da mesma moeda: com um golpe
+mais forte disponível, o `ataquesPadrao` para de escolher o de vários tapas. Não é regressão — é o
+motor escolhendo pelo dano, como sempre.
+
+**O PREÇO NA JORNADA: NADA. 56,16% contra 55,72% de conclusão** — **−0,44 ponto, 0,4σ** (8 blocos de
+800 jornadas de cada lado, **6.400 de cada**, o MESMO bot contra duas cópias congeladas, desvio
+tirado de ENTRE os blocos, **3 de 8 blocos** pro lado da herança). Ruído puro, e a direção é até
+negativa.
+
+**⚠️ E ISSO FAZ SENTIDO PORQUE ELA CAI DOS DOIS LADOS:** o `equiparNpc` dá ao líder, ao rival e ao
+treinador da Torre o moveset da espécie **pelo `ataquesDisponiveis`** — então o Onix do Brock também
+herda. É a mesma conclusão da drenagem, do sono e da Fúria do Dragão.
+
+#### ⚠️ A IMPRESSÃO DO MOTOR NÃO VÊ MUDANÇA DE TABELA DE GOLPES — a lição de instrumento
+
+A impressão de sempre (`impressao.js`, 900 batalhas semeadas) veio **IDÊNTICA**, e eu quase a
+reportei como prova de que o motor não mudou. Ela não vê: o painel dela é
+`S.createInstance(id, lv)` e **nunca equipa ninguém** — sem `ataques`, o motor cai no de tipo e a
+tabela de aprendizado não é lida uma vez sequer.
+
+Com um painel que dá moveset (`p.ataques = S.ataquesPadrao(p)`), ela **MUDA** — e tem que mudar:
+
+| | MOTOR / DIARIO |
+|---|---|
+| sem herança | `8f10c9218239 / d3f7bb9a1003` |
+| **com herança** | **`3d20f17fc6d3 / 84a63092b7cc`** |
+
+E o instrumento foi conferido nas duas pontas: o **mesmo build duas vezes** dá o mesmo hash, e com o
+`CRIT_BASE` mexido ele muda. **Um hash imóvel só prova alguma coisa quando o painel exercita o
+caminho que a mudança toca** — e pra mudança de golpe o painel tem que equipar.
+
+`tools/test-ataques.js` tranca: o caso do relato carta por carta, o `icebeam` chegando **com o nível
+do Shellder (49) e não inventado**, o empate valendo a forma atual, a linha inteira (3 gerações), a
+bifurcação nos dois lados do Gloom e do Poliwhirl, **quem não tem ancestral saindo IDÊNTICO à tabela**
+(sem esse caso, uma herança que devolvesse lixo pra todo mundo passaria nos outros), a tabela não
+sendo mutada, os cinco leitores, a liga lendo o `ataquesDisponiveis`, as duas cópias byte a byte
+(a herança, o mapa de pais **e** o `ataquesDisponiveis`) e o mapa sendo LAZY.
+**Conferido que os 11 defeitos religados acusam.**
+
 ### A DANÇA DA CHUVA: O PRIMEIRO CLIMA DO JOGO (11/09/2026)
 
 Pedida assim: *"10% de chance de acontecer na batalha ... vai durar por 3 confrontos, e durante
@@ -3662,10 +3772,12 @@ Achados na mesma varredura, com número, e deixados como estão porque não foi 
   própria, logo abaixo. O diagnóstico que estava aqui era exato (*"a pendência CORRETA gravada, e
   quem a resolve é só o `continueFromEvolution`"*), e foi ele que apontou o conserto: uma fila nova
   ao abrir o save, no molde da `escolhaDoSavePendente`.
-- **13 golpes ficam inalcançáveis pra LINHA INTEIRA** porque a evolução aqui é sempre automática por
-  nível: o que a forma antiga ensinaria ACIMA do nível da evolução e a nova nunca ensina não tem
-  como ser aprendido (a Starmie é o caso mais duro). É fiel ao jogo original, que também não volta
-  atrás — mas lá existe Everstone.
+- **⚠️ ISTO É HISTÓRIA desde 24/09/2026: os 13 golpes que ficavam inalcançáveis pra LINHA INTEIRA
+  passaram a ser herdados.** O item dizia: *"o que a forma antiga ensinaria ACIMA do nível da
+  evolução e a nova nunca ensina não tem como ser aprendido (a Starmie é o caso mais duro)"* — e era
+  exatamente esse buraco que o relato do Cloyster apontou, só que pelo Raio Congelante. Ver **A FORMA
+  EVOLUÍDA HERDA O APRENDIZADO DA LINHA**. O que continua valendo daqui é o diagnóstico: a evolução
+  neste jogo é sempre automática por nível, e não existe Everstone.
 
 
 ### ⚠️ O DOCE RARO NÃO OFERECIA O GOLPE DO NÍVEL NOVO (17/09/2026)
@@ -20281,6 +20393,89 @@ promovidos na posição certa, e que **nenhum deles ganhe terreno** — mais **7
 os 7 pro leftover) e **24** (16+8, zero BYE). Todos os outros casos chamam o `dividirEmChaves` e o
 `buildRounds` na mão e **passariam com a chamada órfã**.
 **Conferido que os 10 defeitos religados acusam** (1 a 9 falhas cada).
+
+### ⚠️ QUEM PASSOU DIRETO APARECE NA FASE SEGUINTE, NÃO NA DELE (24/09/2026)
+
+Reportado com print de uma chave de 16 com 10 inscritos: *"esse que ja passaram direto nao precisa
+exibir o quadro nas oitavas, ja coloca eles direto no quadro das quartas de final"*.
+
+**⚠️ E O PRINT MOSTRAVA DOIS DEFEITOS, não um:** as oitavas com **SEIS linhas "PASSOU DIRETO"** (uma
+parede de não-partidas) **e as quartas dizendo "❓ A definir" em TODAS as vagas** — inclusive nas
+seis que já tinham dono.
+
+| a 320px, 10 numa chave de 16 | antes | **depois** |
+|---|---|---|
+| linhas na 1ª fase | 8 | **2** (só as partidas de verdade) |
+| "passou direto" | **6** | 0 |
+| "A definir" nas quartas | **6** | **0** — os seis nomes aparecem |
+| altura da tela | 1.398px | **1.002px** (**−28%**) |
+| rolagem lateral | nenhuma | nenhuma |
+
+#### ⚠️ A SEGUNDA METADE É A QUE IMPORTA: O GATING NÃO TINHA O QUE ESCONDER
+
+O `displayName` esconde o nome quando a partida que ALIMENTA aquele slot ainda não foi revelada —
+e ele existe por uma razão boa: *"senão dava pra descobrir quem ganhou só vendo quem apareceu na
+fase seguinte, mesmo sem assistir a partida"*.
+
+**Só que um BYE nasce `resolved` e NUNCA é assistido**, então ele nunca era revelado até a hora da
+fase seguinte chegar. **Num BYE não houve partida: esconder ali não protege nada** — só faz a fase
+seguinte dizer "A definir" num lugar que já tem dono.
+
+- **⚠️ E O GATING CONTINUA VALENDO PRA QUEM VEIO DE PARTIDA DE VERDADE.** Sem essa metade o conserto
+  seria uma porta aberta, e há caso de teste com a chave CHEIA (zero bye) cobrando que o "A definir"
+  continue lá.
+
+#### ⚠️ O FILTRO É UMA FUNÇÃO COM DONO, e não um `m.bye ? ''` em cada render
+
+Os **dois** lugares que desenham rodada (a liga ao vivo e o "Rever" do histórico) leem o mesmo
+`linhasDaRodada`. Escrito em cada um, o segundo divergiria no primeiro ajuste — e **o que fica pra
+trás é o do histórico, que é onde ninguém olha depois**.
+
+**⚠️ E ELA NASCEU PORQUE A TRAVA NÃO CONSEGUIA MEDIR O FILTRO INLINE.** A primeira versão do teste
+reimplementava a decisão no próprio helper (`(filtra && m.bye) ? '' : ...`) — e a conferência de
+acusação mostrou que, removendo o filtro do JOGO, **só a trava que lê o código acusava**: as de
+comportamento passavam em branco, porque o helper continuava filtrando. É a armadilha do *"trava que
+pergunta à função que ela mede não é trava"*, e foi ela que fez o filtro virar função.
+
+#### ⚠️ ELA DEVOLVE `''`, NUNCA FILTRA A LISTA — e isso não é estilo
+
+O `mi` é o **ÍNDICE do confronto na rodada**, e ele vai pro `matchKey` e pro `watchLeagueMatch`.
+Com um `.filter()` antes do `.map()`, a partida do slot 3 receberia `mi=0`:
+
+- o jogador **assistiria OUTRA partida**;
+- e a chave que o `watchedMatches` marca deixaria de ser a que a fase seguinte procura — **o nome
+  ficaria "A definir" pra sempre pra quem assistiu.**
+
+Não dá erro nenhum. Há trava medindo o `matchKey` e o `watchLeagueMatch` das duas partidas reais
+(slots **3 e 7**, não 0 e 1).
+
+#### O DADO NÃO MUDA, E A FASE NUNCA FICA VAZIA
+
+- **⚠️ O `rounds['0']` CONTINUA com os registros de BYE** — é deles que sai a promoção (eles nascem
+  `resolved` e já carimbam a fase seguinte na montagem). Só a TELA deixou de desenhar.
+- **⚠️ E A PRIMEIRA FASE NUNCA FICA SEM PARTIDA, por construção:** as reais são `n − size/2`, o
+  `dividirEmChaves` nunca põe menos de 8 numa chave, e 9 numa de 16 já dá 1. **Varrido de N=8 a 500:
+  o pior caso é exatamente esse — 1 partida em N=9.** Por isso não existe guarda de "fase vazia":
+  ela seria código que nunca roda.
+
+#### ACHADO NO CAMINHO E NÃO MEXIDO
+
+Um confronto com **NENHUM** dos dois lados definido sai como **`? vs (aguardando adversário)`** — um
+"?" solto. Medido nas duas versões: **idêntico**, ou seja é anterior a isto e não foi tocado (não foi
+pedido). Ele aparece nas fases que ainda não receberam ninguém.
+
+**NO MOTOR, NADA:** isto é apresentação inteira — o `buildRounds`, o `drawCycle` e o
+`advanceCyclePhases` não foram tocados.
+
+`tools/test-chaveamento.js` tranca: o caso do print (6 byes, 2 partidas), a fase do BYE com 2 linhas
+e zero "passou direto", **a MESMA rodada desenhada CRUA dando o print de volta** (8 linhas, 6 "passou
+direto"), os seis nomes na fase seguinte, o gating continuando a esconder quem veio de partida real,
+o `matchKey` e o `watchLeagueMatch` com o índice REAL, o `rounds[0]` intacto, a varredura de 8 a 500
+(**com um `ok` cobrando que ela leu alguma coisa** — a primeira versão chamava o `dividirEmChaves`
+com um argumento só, ele devolvia lista vazia e ela passava medindo NADA), os dois renders lendo a
+MESMA função e o filtro morando num lugar só.
+**Conferido que os 5 defeitos religados acusam**, e cada um derruba a trava que descreve o que ele
+quebrou.
 
 ## A POKÉDEX CONTA 251, E A BARRA NUNCA FECHA (23/09/2026)
 

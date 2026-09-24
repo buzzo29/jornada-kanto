@@ -1188,9 +1188,51 @@ const APRENDIZADO = {
    e o Poder Ancestral do Togepi vale de verdade a partir do nível 21. */
 /* O que a espécie aprende por nível ATÉ aquele nível, do mais forte pro mais fraco. Cópia exata da
    do cliente -- as duas alimentam o equiparNpc, e divergir aqui é divergir a batalha. */
+/* ⚠️ A FORMA EVOLUIDA HERDA O APRENDIZADO DA LINHA INTEIRA (24/09/2026, a pedido: *"o Cloyster
+   originalmente tem apenas 3 ataques se voce olhar na pokedex, mas ele vem do shellder, entao o
+   cloyster tem que herdar todos os ataques que o shelder tambem tinha, sem repetir moves"*).
+   ⚠️ O NIVEL HERDADO E O DO ANCESTRAL, nunca inventado: o Cloyster ganha o Raio Congelante no
+   Lv.49 (onde o Shellder o aprende) e nao no 1. E como ele so existe a partir do 40, o golpe fica
+   alcancavel -- hoje ele e inalcancavel pra a LINHA INTEIRA, porque o Shellder evolui no 40.
+   ⚠️ A FORMA ATUAL MANDA no empate: se ela ja ensina o golpe, o nivel dela vale. Ela esta mais
+   perto, e e a tabela dela que o jogo mostra na ficha.
+   ⚠️ E ELA E LAZY (memoizada na 1a chamada), nunca uma `const` computada no topo: no SERVIDOR o
+   `EVOLUTION_CHOICES` e declarado ~2.500 linhas ABAIXO do `ataquesDisponiveis`, e ler dali no topo
+   e zona morta temporal -- `ReferenceError` no carregamento, ou seja o servidor inteiro morre. */
+let _paiDaEspecie = null;
+function paiDaEspecie(){
+  if(_paiDaEspecie) return _paiDaEspecie;
+  const m = {};
+  for(const de in EVOLUTIONS) m[EVOLUTIONS[de].into] = de;
+  /* a bifurcacao tambem e evolucao: o Politoed herda do Poliwhirl como o Poliwrath herda */
+  for(const de in EVOLUTION_CHOICES) (EVOLUTION_CHOICES[de] || []).forEach(into => { m[into] = de; });
+  _paiDaEspecie = m;
+  return m;
+}
+const _aprendizadoDaEspecie = {};
+function aprendizadoDaEspecie(id){
+  if(_aprendizadoDaEspecie[id]) return _aprendizadoDaEspecie[id];
+  const pais = paiDaEspecie();
+  const vistos = {}, out = [];
+  let cur = id, voltas = 0;
+  /* o teto de voltas e a rede contra um ciclo no mapa de pais: sem ele um `a -> b -> a` trava o
+     jogo num laco infinito, e isso nao aparece como erro -- aparece como a tela congelada. */
+  while(cur && voltas++ < 10){
+    (APRENDIZADO[cur] || []).forEach(par => {
+      const g = GOLPES_IDS[par[1]];
+      if(vistos[g]) return;
+      vistos[g] = 1;
+      out.push([par[0], par[1]]);   // clona: a tabela original nunca e mutada
+    });
+    cur = pais[cur];
+  }
+  out.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  _aprendizadoDaEspecie[id] = out;
+  return out;
+}
 function ataquesDisponiveis(speciesId, nivel){
-  const lista = APRENDIZADO[speciesId];
-  if(!lista) return [];
+  const lista = aprendizadoDaEspecie(speciesId);
+  if(!lista.length) return [];
   const ids = [];
   for(const par of lista){ if(par[0] <= nivel) ids.push(GOLPES_IDS[par[1]]); }
   return ids.sort((a, b) => GOLPES[b][1] - GOLPES[a][1] || a.localeCompare(b));

@@ -9602,9 +9602,51 @@ function registrarSketch(matchups){
    do Metrônomo -- elas nunca chegavam no melhorAtaque, então uma tela pedindo escolha teria sido
    uma tela mentindo. Isso acabou em 10/09/2026: o Metrônomo agora DISPUTA com os golpes próprios,
    e o Poder Ancestral do Togepi vale de verdade a partir do nível 21. */
+/* ⚠️ A FORMA EVOLUIDA HERDA O APRENDIZADO DA LINHA INTEIRA (24/09/2026, a pedido: *"o Cloyster
+   originalmente tem apenas 3 ataques se voce olhar na pokedex, mas ele vem do shellder, entao o
+   cloyster tem que herdar todos os ataques que o shelder tambem tinha, sem repetir moves"*).
+   ⚠️ O NIVEL HERDADO E O DO ANCESTRAL, nunca inventado: o Cloyster ganha o Raio Congelante no
+   Lv.49 (onde o Shellder o aprende) e nao no 1. E como ele so existe a partir do 40, o golpe fica
+   alcancavel -- hoje ele e inalcancavel pra a LINHA INTEIRA, porque o Shellder evolui no 40.
+   ⚠️ A FORMA ATUAL MANDA no empate: se ela ja ensina o golpe, o nivel dela vale. Ela esta mais
+   perto, e e a tabela dela que o jogo mostra na ficha.
+   ⚠️ E ELA E LAZY (memoizada na 1a chamada), nunca uma `const` computada no topo: no SERVIDOR o
+   `EVOLUTION_CHOICES` e declarado ~2.500 linhas ABAIXO do `ataquesDisponiveis`, e ler dali no topo
+   e zona morta temporal -- `ReferenceError` no carregamento, ou seja o servidor inteiro morre. */
+let _paiDaEspecie = null;
+function paiDaEspecie(){
+  if(_paiDaEspecie) return _paiDaEspecie;
+  const m = {};
+  for(const de in EVOLUTIONS) m[EVOLUTIONS[de].into] = de;
+  /* a bifurcacao tambem e evolucao: o Politoed herda do Poliwhirl como o Poliwrath herda */
+  for(const de in EVOLUTION_CHOICES) (EVOLUTION_CHOICES[de] || []).forEach(into => { m[into] = de; });
+  _paiDaEspecie = m;
+  return m;
+}
+const _aprendizadoDaEspecie = {};
+function aprendizadoDaEspecie(id){
+  if(_aprendizadoDaEspecie[id]) return _aprendizadoDaEspecie[id];
+  const pais = paiDaEspecie();
+  const vistos = {}, out = [];
+  let cur = id, voltas = 0;
+  /* o teto de voltas e a rede contra um ciclo no mapa de pais: sem ele um `a -> b -> a` trava o
+     jogo num laco infinito, e isso nao aparece como erro -- aparece como a tela congelada. */
+  while(cur && voltas++ < 10){
+    (APRENDIZADO[cur] || []).forEach(par => {
+      const g = GOLPES_IDS[par[1]];
+      if(vistos[g]) return;
+      vistos[g] = 1;
+      out.push([par[0], par[1]]);   // clona: a tabela original nunca e mutada
+    });
+    cur = pais[cur];
+  }
+  out.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  _aprendizadoDaEspecie[id] = out;
+  return out;
+}
 function ataquesDisponiveis(speciesId, nivel){
-  const lista = APRENDIZADO[speciesId];
-  if(!lista) return [];
+  const lista = aprendizadoDaEspecie(speciesId);
+  if(!lista.length) return [];
   const ids = [];
   for(const par of lista){ if(par[0] <= nivel) ids.push(GOLPES_IDS[par[1]]); }
   return ids.sort((a, b) => GOLPES[b][1] - GOLPES[a][1] || a.localeCompare(b));
@@ -9635,7 +9677,7 @@ function ataquesEscolhiveis(p){
 }
 /* O NÍVEL em que a espécie aprende aquele golpe -- pra tela dizer "aprendeu no 20". */
 function nivelDoAtaque(speciesId, golpe){
-  const lista = APRENDIZADO[speciesId] || [];
+  const lista = aprendizadoDaEspecie(speciesId);
   for(const par of lista){ if(GOLPES_IDS[par[1]] === golpe) return par[0]; }
   return null;
 }
@@ -13423,7 +13465,7 @@ function aprendizadosPendentes(){
        seguro: nunca inventa golpe. */
     const varrer = (especie, comoFormaAntiga) => {
       const nivelDaEvolucao = comoFormaAntiga ? ((EVOLUTIONS[especie] || {}).level || 0) : 0;
-      (APRENDIZADO[especie] || []).forEach(par => {
+      aprendizadoDaEspecie(especie).forEach(par => {
         const nivel = par[0], id = GOLPES_IDS[par[1]];
         if(nivel <= (p.nivelDosAtaques || 0) || nivel > p.level) return;
         if(comoFormaAntiga && nivel > nivelDaEvolucao && nivelDoAtaque(p.speciesId, id) == null) return;
@@ -27935,6 +27977,26 @@ function escJs(str){
     .replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))
     .replace(/'/g,'&#39;');
 }
+/* ⚠️ A LINHA DO BYE NAO E DESENHADA na fase dele (24/09/2026, a pedido: *"esse que ja passaram
+   direto nao precisa exibir o quadro nas oitavas, ja coloca eles direto no quadro das quartas"*).
+   Quem passou direto ja aparece na fase SEGUINTE -- com seis deles, a fase virava uma parede de
+   linhas que nao sao partidas.
+   ⚠️ ELA E UMA FUNCAO COM DONO, e nao o filtro escrito nos dois renders: os DOIS lugares que
+   desenham rodada leem ela, e escrito em cada um o segundo divergiria no primeiro ajuste -- e o que
+   fica pra tras e o da tela de HISTORICO (o 'Rever'), que e onde ninguem olha depois. E ela e o que
+   o teste consegue CHAMAR: um filtro inline so da pra testar reimplementando-o no proprio teste,
+   que e a trava que pergunta a funcao que ela mede.
+   ⚠️ DEVOLVE '' EM VEZ DE FILTRAR A LISTA, e isso nao e estilo: o `mi` e o INDICE do confronto na
+   rodada, e ele vai pro matchKey e pro watchLeagueMatch. Com um .filter() antes do .map(), a
+   partida do slot 3 receberia mi=0 -- o jogador assistiria OUTRA partida, e a chave que o
+   watchedMatches marca deixaria de ser a que a fase seguinte procura. Nao da erro: o nome fica
+   'A definir' pra sempre pra quem assistiu.
+   ⚠️ E A FASE NUNCA FICA VAZIA, por construcao: as partidas reais sao `n - size/2`, o
+   `dividirEmChaves` nunca poe menos de 8 numa chave, e 9 numa de 16 ja da 1. */
+function linhasDaRodada(rounds, rk, roundLabel, ct, li, phaseTimes, typeId){
+  return rounds[rk].map((m, mi) => m.bye ? '' :
+    leagueMatchRow(m, roundLabel, ct, li, rk, mi, rounds, phaseTimes, typeId)).join('');
+}
 function leagueMatchRow(match, roundLabel, ct, li, rk, mi, leagueRounds, phaseTimes, typeId){
   const isMyMatch = match.a && match.b && game.authUser && (match.a.uid===game.authUser.uid || match.b.uid===game.authUser.uid);
   const highlightClass = isMyMatch ? ' my-match' : '';
@@ -27957,6 +28019,13 @@ function leagueMatchRow(match, roundLabel, ct, li, rk, mi, leagueRounds, phaseTi
     const feedingIndex = side==='a' ? mi*2 : mi*2+1;
     const feedingMatch = feedingRound[feedingIndex];
     if(!feedingMatch || !feedingMatch.resolved) return shown; // ainda nem foi resolvida -- não tem o que esconder
+    /* ⚠️ QUEM VEIO DE UM BYE APARECE NA HORA (24/09/2026, a pedido: *"esse que ja passaram direto
+       nao precisa exibir o quadro nas oitavas, ja coloca eles direto no quadro das quartas"*).
+       O gating existe pra nao entregar o RESULTADO de uma partida antes de a pessoa assistir -- e
+       num BYE nao houve partida: esconder ali nao protege nada e so faz a fase seguinte dizer
+       'A definir' num lugar que ja tem dono. Era o que o print mostrava: seis 'PASSOU DIRETO' nas
+       oitavas e quatro 'A definir' nas quartas. */
+    if(feedingMatch.bye) return shown;
     const feedingKey = `${typeId}__${cycleId}__${li}__${feedingRoundKey}__${feedingIndex}`;
     return isMatchRevealed(feedingKey, roundIndex-1, phaseTimes) ? shown : '❓ A definir';
   }
@@ -28351,7 +28420,7 @@ function renderLeagueCycle(cycle){
   ${Object.keys(myLeague.rounds).sort((a,b)=>Number(a)-Number(b)).map((rk,ri)=>`
     <div class="box">
       <h2>${roundNames[ri]}</h2>
-      ${myLeague.rounds[rk].map((m,mi)=>leagueMatchRow(m, roundNames[ri], cycle.scheduledTime, myLeague.id, rk, mi, myLeague.rounds, phaseTimes, game.currentLeagueTypeId)).join('')}
+      ${linhasDaRodada(myLeague.rounds, rk, roundNames[ri], cycle.scheduledTime, myLeague.id, phaseTimes, game.currentLeagueTypeId)}
     </div>
   `).join('')}
   ${myLeague.champion ? `
@@ -28384,7 +28453,7 @@ function renderLeagueHistoryScreen(){
   ${roundKeys.map((rk,ri)=>`
     <div class="box">
       <h2>${roundNames[ri]}</h2>
-      ${league.rounds[rk].map((m,mi)=>leagueMatchRow(m, roundNames[ri], cycleTime, league.id, rk, mi, league.rounds, null, null)).join('')}
+      ${linhasDaRodada(league.rounds, rk, roundNames[ri], cycleTime, league.id, null, null)}
     </div>
   `).join('')}
   ${league.champion ? `
@@ -33744,7 +33813,7 @@ function renderPokedexFicha(){
            É a MESMA tabela que a tela de escolha usa (APRENDIZADO), então ela só traz golpe de
            DANO: o que está aqui é exatamente o que ele pode levar pra batalha. Espécie sem golpe
            nenhum (o Ditto) não ganha a seção -- uma lista vazia diria menos que nada. */
-        const lista = APRENDIZADO[id] || [];
+        const lista = aprendizadoDaEspecie(id);
         if(!lista.length) return '';
         const linhas = lista.map(par => {
           const golpe = GOLPES_IDS[par[1]];

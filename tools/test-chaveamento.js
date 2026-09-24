@@ -496,7 +496,145 @@ console.log('\n=== PONTA A PONTA (o drawCycle de verdade) ===');
        ls.map(l => l.size).join('+'));
     ok('  e ZERO BYEs (a regra minimiza vaga vazia, nao "equilibra" em 12+12)', byes24 === 0, byes24 + ' byes');
 
-    console.log('\n' + (falhas ? falhas + ' FALHA(S)' : 'Tudo certo.'));
+    /* ------------------------------------------------- 8) A TELA NAO DESENHA A LINHA DO BYE */
+console.log('\n=== QUEM PASSOU DIRETO APARECE NA FASE SEGUINTE, NAO NA DELE (24/09/2026) ===');
+{
+  /* Pedido com print: *"esse que ja passaram direto nao precisa exibir o quadro nas oitavas, ja
+     coloca eles direto no quadro das quartas de final"*. O print era 10 numa chave de 16: SEIS
+     linhas 'PASSOU DIRETO' nas oitavas e as quartas dizendo 'A definir' em todas as vagas -- ou
+     seja a fase de cima era uma parede de nao-partidas e a de baixo nao mostrava quem ja tinha
+     dono. */
+  const AGORA = Date.now();
+  /* as fases NO FUTURO: e o estado do print -- o ciclo sorteado e a hora da fase ainda vindo. E o
+     unico estado em que o gating morde, entao e o unico que prova as duas metades. */
+  const PT = [AGORA + 60000, AGORA + 120000, AGORA + 180000, AGORA + 240000];
+  const NOMES = S.roundLabelsFor(4);
+  const texto = h => h.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+  /* ⚠️ O HELPER CHAMA O JOGO, nunca reimplementa o filtro -- e a primeira versao dele
+     reimplementava (`(filtra && m.bye) ? '' : leagueMatchRow(...)`). Com isso, remover o filtro do
+     JOGO nao era observavel aqui: o helper continuava filtrando, e a conferencia de acusacao mostrou
+     que so a trava que LE O CODIGO acusava -- as de comportamento passavam em branco. E a armadilha
+     do 'trava que pergunta a funcao que ela mede', e foi ela que fez o filtro virar funcao com dono. */
+  const tela = (rounds, rk) => S.linhasDaRodada(rounds, rk, NOMES[Number(rk)], 1790000000000, 'L1', PT, 'classic');
+  /* a rodada CRUA, do jeito que a tela desenhava ANTES -- e com o que o A/B compara */
+  const telaCrua = (rounds, rk) => rounds[rk].map((m, mi) =>
+    S.leagueMatchRow(m, NOMES[Number(rk)], 1790000000000, 'L1', rk, mi, rounds, PT, 'classic')).join('');
+  S.game.authUser = { uid: 'u0' };
+  S.game.trainerName = 'T1';
+  S.game.watchedMatches = new Set();
+  S.game.currentLeagueTypeId = 'classic';
+
+  const r = S.buildRounds(times(10), 16);
+  const byes = r['0'].filter(m => m.bye).length;
+  ok('o caso do print: 10 numa chave de 16 da 6 byes e 2 partidas',
+     byes === 6 && r['0'].length === 8, byes + ' byes em ' + r['0'].length + ' slots');
+
+  /* ---- a fase do BYE ---- */
+  const oitavas = tela(r, '0');
+  ok('a fase do BYE desenha SO as partidas de verdade',
+     (oitavas.match(/class="league-match /g) || []).length === 2,
+     (oitavas.match(/class="league-match /g) || []).length + ' linhas');
+  ok('  e nenhuma linha "passou direto" sobra nela',
+     oitavas.indexOf('passou direto') < 0);
+  ok('  mas as partidas reais continuam inteiras, com os dois nomes',
+     /T4.*vs.*T5/.test(texto(oitavas)) && /T9.*vs.*T10/.test(texto(oitavas)), texto(oitavas).slice(0, 90));
+  /* ⚠️ O A/B, que e o que prova que a mudanca e a mudanca: desenhada CRUA (do jeito de antes) a
+     mesma rodada da exatamente o print -- 8 linhas com SEIS 'passou direto'. */
+  const cruas = telaCrua(r, '0');
+  const nCruas = (cruas.match(/class="league-match /g) || []).length;
+  const nPassou = (cruas.match(/passou direto/g) || []).length;
+  ok('  (crua, a MESMA rodada da o print: 8 linhas e 6 "passou direto")',
+     nCruas === 8 && nPassou === 6, nCruas + ' linhas, ' + nPassou + ' passou-direto');
+
+  /* ---- a fase SEGUINTE ---- */
+  /* ⚠️ ESTA E A METADE QUE O PRINT MOSTRAVA QUEBRADA: o gating existe pra nao entregar o RESULTADO
+     de uma partida antes de a pessoa assistir, e num BYE nao houve partida -- esconder ali nao
+     protege nada e so faz a fase seguinte dizer 'A definir' num lugar que ja tem dono. */
+  const quartas = tela(r, '1');
+  const visiveis = (texto(quartas).match(/T\d+/g) || []);
+  ok('quem passou direto aparece NOMEADO na fase seguinte',
+     ['T1','T2','T3','T6','T7','T8'].every(n => visiveis.indexOf(n) >= 0), visiveis.join(','));
+  ok('  e "A definir" nao aparece mais nela',
+     quartas.indexOf('A definir') < 0, texto(quartas).slice(0, 120));
+
+  /* ⚠️ E O GATING CONTINUA VALENDO PRA QUEM VEIO DE PARTIDA DE VERDADE -- sem este caso, o
+     conserto acima seria uma porta aberta: daria pra saber quem ganhou a oitava so vendo quem
+     'apareceu' nas quartas, sem assistir. */
+  const r2 = S.buildRounds(times(16), 16);   // chave CHEIA: zero bye, tudo partida
+  const v = S.buildRounds(times(16), 16);
+  v['0'][0].resolved = true; v['0'][0].winner = v['0'][0].a;
+  v['0'][1].resolved = true; v['0'][1].winner = v['0'][1].a;
+  v['1'][0].a = v['0'][0].winner; v['1'][0].b = v['0'][1].winner;
+  const q2 = tela(v, '1');
+  ok('o gating CONTINUA escondendo quem veio de partida de verdade',
+     q2.indexOf('A definir') >= 0, texto(q2).slice(0, 110));
+  ok('  (e a chave cheia nao tem bye nenhum pra esconder)',
+     r2['0'].every(m => !m.bye) && r2['0'].length === 8);
+
+  /* ⚠️ O `mi` NAO PODE SER RENUMERADO, e e por isso que a linha do BYE devolve '' em vez de ser
+     filtrada: ele e o INDICE do confronto na rodada, e ele vai pro matchKey e pro
+     watchLeagueMatch. Com um .filter() antes do .map(), a partida do slot 3 receberia mi=0 -- o
+     jogador assistiria OUTRA partida, e a chave que o watchedMatches marca deixaria de ser a que
+     a fase seguinte procura. Nao da erro: o nome fica 'A definir' pra sempre pra quem assistiu. */
+  const rm = S.buildRounds(times(10), 16);
+  [3, 7].forEach(idx => {
+    const m = rm['0'][idx];
+    m.resolved = true; m.winner = m.a; m.matchups = [{ playerSpecies: 'pikachu', brockSpecies: 'onix' }];
+  });
+  S.game.authUser = { uid: 'u3' }; S.game.trainerName = 'T4';
+  const oit2 = tela(rm, '0');
+  ok('o matchKey da partida real leva o indice REAL do slot (3 e 7, nao 0 e 1)',
+     oit2.indexOf('__0__3') > 0 && oit2.indexOf('__0__7') > 0 && oit2.indexOf('__0__0') < 0,
+     (oit2.match(/__0__\d/g) || []).join(','));
+  ok('  e o watchLeagueMatch tambem',
+     /watchLeagueMatch\(1790000000000,L1,'0',3,/.test(oit2) && /watchLeagueMatch\(1790000000000,L1,'0',7,/.test(oit2),
+     (oit2.match(/watchLeagueMatch\([^)]*\)/g) || []).join(' | ').slice(0, 130));
+  S.game.authUser = { uid: 'u0' }; S.game.trainerName = 'T1';
+
+  /* ⚠️ O DADO NAO MUDA: e o registro de BYE que PROMOVE quem passou direto (ele nasce resolved e
+     ja carimba a fase seguinte na montagem). Tirando-o do `rounds`, ninguem sobe -- so a TELA
+     deixou de desenhar. */
+  ok('o rounds[0] CONTINUA com os registros de BYE (e deles que sai a promocao)',
+     r['0'].filter(m => m.bye).length === 6 && r['1'].filter(m => m.a || m.b).length === 4,
+     r['0'].filter(m => m.bye).length + ' byes, ' + r['1'].filter(m => m.a || m.b).length + ' quartas com dono');
+
+  /* ⚠️ E A FASE NUNCA FICA VAZIA, por construcao -- e a conta esta aqui pra ninguem precisar de uma
+     guarda que nunca roda: o `dividirEmChaves` nunca poe menos de 8 numa chave, e 9 numa de 16 ja
+     da 1 partida real. Sem esta varredura, uma mudanca na regra de agrupamento deixaria a primeira
+     fase em branco e ninguem veria. */
+  let piorN = null, piorReais = 99;
+  for(let n = 8; n <= 500; n++){
+    /* ⚠️ O `dv` DO ARQUIVO, nao o `S.dividirEmChaves` cru: a assinatura dele e
+       (total, maxPorChave, chaveMinima), e com UM argumento so ela devolve LISTA VAZIA -- o laco
+       nao rodava uma volta e a trava passava medindo NADA, com um `pior: 99 em N=null`. E o zero
+       perfeito que este projeto ja registra meia duzia de vezes, e e por isso que existe o ok() de
+       'a varredura achou o que ler' logo abaixo. */
+    for(const tam of dv(n)){
+      const size = srv._proximaPotenciaDe2(tam);
+      const reais = tam - size / 2;
+      if(reais < piorReais){ piorReais = reais; piorN = n + ' (chave de ' + tam + '/' + size + ')'; }
+    }
+  }
+  ok('  a varredura achou o que ler', piorN !== null && piorReais < 99, 'piorN=' + piorN);
+  ok('nenhuma primeira fase fica sem uma partida real (8 a 500)', piorReais >= 1,
+     'pior: ' + piorReais + ' em N=' + piorN);
+
+  /* ⚠️ OS DOIS CHAMADORES FILTRAM -- um deles ficaria pra tras, e o outro so aparece na tela de
+     HISTORICO (o 'Rever'), que e onde ninguem olha depois. */
+  const pelaFuncao = (cliSrc.match(/linhasDaRodada\(myLeague|linhasDaRodada\(league/g) || []).length;
+  const crus = (cliSrc.match(/rounds\[rk\]\.map\(\(m,mi\)=>leagueMatchRow/g) || []).length;
+  ok('os DOIS lugares que desenham rodada leem a MESMA funcao', pelaFuncao === 2 && crus === 0,
+     pelaFuncao + ' pela funcao, ' + crus + ' crus');
+  /* ⚠️ E O FILTRO MORA NUM LUGAR SO: escrito nos dois renders, o segundo divergiria no primeiro
+     ajuste -- e o que fica pra tras e o da tela de HISTORICO, onde ninguem olha depois. */
+  ok('  e o filtro do BYE mora na funcao, num lugar so',
+     (cliSrc.match(/m\.bye \? '' :/g) || []).length === 1,
+     (cliSrc.match(/m\.bye \? '' :/g) || []).length + ' lugares filtram');
+  ok('  e o displayName solta o nome de quem veio de BYE',
+     cliSrc.indexOf('if(feedingMatch.bye) return shown;') > 0);
+}
+
+console.log('\n' + (falhas ? falhas + ' FALHA(S)' : 'Tudo certo.'));
     process.exit(falhas ? 1 : 0);
   })();
 }
