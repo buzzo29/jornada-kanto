@@ -83,3 +83,6 @@ preview-telas.html
 # tabelas de golpe geradas pelo tools/gerar-tabelas-golpes.js -- sao coladas nos dois motores,
 # entao o que vale e o que esta no index.html e no functions/index.js. Este arquivo e a saida.
 tools/_tabelas-golpes.txt
+
+# o backup do tools/patch.js
+.patch-bak/

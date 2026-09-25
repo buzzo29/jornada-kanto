@@ -222,6 +222,36 @@ game.friendCompare = { loading:false, nome:'Gary Oak', error:null, data:{
 add('Amigos', 'Comparar conquistas', ()=>sb.renderFriendsScreen() + sb.renderFriendCompareModal());
 game.friendCompare = null;
 
+/* ---- Ligas ----
+   ⚠️ A TELA DA LIGA PRECISA DO leagueData JÁ CARREGADO: o renderLeague desenha "Carregando..."
+   enquanto o leagueScreenLoading for verdadeiro, e aí a prévia mediria a tela de espera -- que é
+   exatamente o tipo de zero perfeito que este projeto paga caro. */
+game.authUser = { uid:'u1' };
+game.contaCarregada = true;
+game.novidadeVista = null;
+game.novidadesModal = true;
+add('Ligas', 'Anúncio da Liga Pro', ()=>sb.renderNovidadesModal());
+game.novidadesModal = false;
+
+game.screen = 'league';
+game.currentLeagueTypeId = 'classic';
+game.leagueScreenLoading = false;
+game.leagueData = { cycles: [{ id:'c9', status:'registering', scheduledTime: agora + 6e5,
+                               registrants: [{ name:'Ash' }, { name:'Misty' }], amIRegistered: false }] };
+add('Ligas', 'Clássica — inscrição aberta', ()=>sb.renderLeague());
+
+/* ⚠️ o caso que mais me custou medição: quem JÁ está num chaveamento em andamento continua podendo
+   se inscrever no ciclo seguinte (24/09/2026) -- o botão fica CLICÁVEL e o aviso é informativo. */
+game.accountLeagueSlots = { classic: 3 };
+add('Ligas', 'Clássica — com um chaveamento rodando', ()=>sb.renderLeague());
+game.accountLeagueSlots = null;
+
+game.currentLeagueTypeId = 'pro';
+add('Ligas', 'Liga Pro — inscrição aberta', ()=>sb.renderLeague());
+game.leagueData = null;
+game.currentLeagueTypeId = null;
+game.screen = 'saveSelect';
+
 /* ---- a página ---- */
 const grupos = [...new Set(telas.map(t=>t.grupo))];
 const abas = grupos.map(g=>`<div class="pv-grupo"><span class="pv-grupo-l">${g}</span>${
@@ -249,9 +279,12 @@ ${links}
   .pv-aba.ativa{ background:#ffcb05; color:#11152b; border-color:#ffcb05; }
   .pv-larguras{ display:flex; gap:5px; margin-top:6px; }
   .pv-palco{ display:flex; justify-content:center; padding:16px 8px 60px; }
-  .pv-tela{ width:var(--pv-w,390px); max-width:100%; }
+  /* o transform faz o position:fixed dos modais se ancorar NESTA caixa, e nao na janela --
+   sem ele o modal e medido com a largura do navegador e a conferencia a 320px nao vale nada */
+.pv-tela{transform:translateZ(0); width:var(--pv-w,390px); max-width:100%; }
   .pv-tela .app{ padding:10px 12px; }
   [hidden]{ display:none !important; }
+.pv-medida{margin:8px 0 0;padding:8px;background:#11131a;color:#cfe3ff;font:11px/1.5 ui-monospace,Consolas,monospace;white-space:pre-wrap;border-radius:6px;max-height:40vh;overflow:auto}
 </style></head>
 <body>
 <div class="pv-topo">
@@ -263,7 +296,12 @@ ${links}
     <button class="pv-aba ativa" onclick="largura(390,this)">390px</button>
     <button class="pv-aba" onclick="largura(430,this)">430px</button>
   </div>
+  <div class="pv-grupo"><span class="pv-grupo-l">Conferir</span>
+    <button class="pv-aba" onclick="mostrarMedida()">Medir TODAS a 320px</button>
+  </div>
+  <pre id="pv-medida" class="pv-medida" hidden></pre>
 </div>
+${sb.svgDosSelos ? sb.svgDosSelos() : ''}
 <div class="pv-palco">${telas.map((t,i)=>
   `<div class="pv-tela" id="pv${i}" ${i?'hidden':''}><div class="app">${t.corpo}</div></div>`).join('')}</div>
 <script>
@@ -282,10 +320,135 @@ ${links}
     botao.classList.add('ativa');
   }
   mostrar(0);
+
+  /* A MEDICAO MORA AQUI, e nao num script solto por sessao: montar iframe na mao ja fez ler a TELA
+     ERRADA (dois iframes empilhados no mesmo canto, o querySelector pegou o velho), e a versao por
+     servidor HTTP local ainda custava subir e matar um processo. Aqui ela varre TODAS as telas de
+     uma vez, na largura que decide -- 320 e a menor que a casa mira.
+
+     ATENCAO: ela mede as telas ESCONDIDAS tambem. Um elemento com hidden tem caixa ZERO, entao ela
+     revela cada tela pra medir e esconde de novo. Sem isso ela reportaria "0x0, nada cortado" pra
+     29 das 30 telas -- um zero perfeito, que e o falso verde mais comum deste projeto.
+
+     Chame medir() no console pra receber o objeto, ou aperte o botao pra ver a tabela. */
+  var DOLAR_CHAVE = String.fromCharCode(36) + String.fromCharCode(123);
+
+  function medir(w){
+    w = w || 320;
+    var antes = atual, linhas = [];
+    document.querySelectorAll('.pv-tela').forEach(function(el){ el.style.setProperty('--pv-w', w+'px'); });
+
+    document.querySelectorAll('.pv-tela').forEach(function(tela, i){
+      var escondida = tela.hidden;
+      if(escondida) tela.hidden = false;
+      /* ATENCAO: num modal o .app fica com altura ~0 -- a caixa e position:fixed e sai do fluxo.
+         Medir o .app ali reporta "20px, nada cortado" pra uma tela inteira. */
+      var app = tela.querySelector('.modal-box') || tela.querySelector('.app');
+      var r = app.getBoundingClientRect();
+
+      /* texto cortado: so FOLHAS com texto -- um pai com filhos rola por desenho */
+      var cortados = [];
+      app.querySelectorAll('*').forEach(function(e){
+        if(e.children.length || !e.textContent.trim()) return;
+        /* ATENCAO: dentro de <svg> o scrollWidth nao quer dizer "cortado" -- um <text> de SVG
+           reporta overflow por desenho, e sem esta guarda cada emoji do mapa vira um falso
+           positivo (foram 5 telas na primeira medicao). */
+        if(e.closest && e.closest('svg')) return;
+        if(e.scrollWidth > e.clientWidth + 1 || e.scrollHeight > e.clientHeight + 1)
+          cortados.push(e.textContent.trim().slice(0, 24));
+      });
+
+      /* selo fantasma: o <use> existe e desenha NADA. Ele nao da erro -- some em silencio. */
+      var usos = app.querySelectorAll('use'), vazios = 0;
+      usos.forEach(function(u){ var b = u.getBoundingClientRect(); if(b.width < 2 || b.height < 2) vazios++; });
+
+      /* interpolacao que nao interpolou: ela sai LITERAL na tela, e o node --check aprova */
+      var literal = app.textContent.indexOf(DOLAR_CHAVE) >= 0;
+
+      /* h2 em mais de uma linha: na fonte de pixel isso quase sempre e texto longo demais */
+      var h2duplo = [];
+      app.querySelectorAll('h2').forEach(function(h){
+        if(h.getBoundingClientRect().height > 26) h2duplo.push(h.textContent.trim().slice(0, 22));
+      });
+
+      var aba = document.querySelector('.pv-aba[data-i="' + i + '"]');
+      linhas.push({
+        tela: aba ? aba.textContent.trim() : ('#' + i),
+        alturaPx: Math.round(r.height),
+        estouraLargura: app.scrollWidth > w ? (app.scrollWidth + ' > ' + w) : '',
+        cortados: cortados,
+        selosVazios: vazios ? (vazios + ' de ' + usos.length) : '',
+        interpolacaoLiteral: literal,
+        h2emDuasLinhas: h2duplo
+      });
+      if(escondida) tela.hidden = true;
+    });
+    mostrar(antes);
+    return linhas;
+  }
+
+  function mostrarMedida(){
+    var out = medir(320);
+    var ruim = out.filter(function(l){
+      return l.estouraLargura || l.cortados.length || l.selosVazios || l.interpolacaoLiteral || l.h2emDuasLinhas.length;
+    });
+    /* ATENCAO: este texto vive dentro de um template literal do gerar-preview.js, entao um \n
+       escrito aqui viraria uma QUEBRA DE LINHA DE VERDADE na hora de montar a pagina -- e uma
+       quebra literal dentro de aspas simples e SyntaxError: o script inteiro para de rodar, e o
+       node --check do gerador PASSA, porque quem quebra e o artefato. Por isso: array + join. */
+    var NL = String.fromCharCode(10);
+    var L = ['MEDIDO A 320px -- ' + out.length + ' telas, ' + ruim.length + ' com algo a olhar', ''];
+    (ruim.length ? ruim : out).forEach(function(l){
+      L.push(l.tela + '  (' + l.alturaPx + 'px)');
+      if(l.estouraLargura)        L.push('    ESTOURA A LARGURA: ' + l.estouraLargura);
+      if(l.interpolacaoLiteral)   L.push('    INTERPOLACAO LITERAL na tela');
+      if(l.selosVazios)           L.push('    selos vazios: ' + l.selosVazios);
+      if(l.h2emDuasLinhas.length) L.push('    h2 em 2 linhas: ' + l.h2emDuasLinhas.join(' | '));
+      if(l.cortados.length)       L.push('    texto cortado: ' + l.cortados.join(' | '));
+    });
+    if(!ruim.length) L.push('(nenhuma tela com problema)');
+    var el = document.getElementById('pv-medida');
+    el.textContent = L.join(NL); el.hidden = false;
+  }
 </script>
 </body></html>`;
 
+const SERVIR = process.argv.indexOf('--servir') > 0;
+/* ⚠️ CONFERE O ARTEFATO, e não só este arquivo. O que quebra a prévia é quase sempre uma camada
+   de escape a mais ou a menos entre o template literal daqui e o <script> da página -- e nenhuma
+   verificação do gerador pega isso, porque o gerador está válido. Um script de página que não
+   compila não dá erro visível: as abas simplesmente param de responder. */
+function conferaOsScriptsDaPagina(html){
+  const re = /<script(?![^>]*src=)[^>]*>([\s\S]*?)<\/script>/g;
+  let m, i = 0;
+  while((m = re.exec(html))){
+    i++;
+    try{ new Function(m[1]); }
+    catch(e){
+      console.error('X o <script> #' + i + ' da pagina NAO COMPILA: ' + e.message);
+      console.error('  (nada foi escrito -- a previa abriria com as abas mortas)');
+      process.exit(1);
+    }
+  }
+}
+
 const saida = path.join(RAIZ, 'preview-telas.html');
+conferaOsScriptsDaPagina(pagina);
 fs.writeFileSync(saida, pagina);
 console.log('Gerado: ' + saida);
+
+if(SERVIR){
+  /* servidor mínimo: um arquivo, sem cache. O no-store é o que evita medir a versão ANTERIOR
+     depois de regerar -- e "medi a tela velha" já custou uma volta inteira. */
+  const porta = 8765;
+  require('http').createServer((req, res) => {
+    const alvo = req.url.split('?')[0] === '/' ? saida : path.join(RAIZ, decodeURIComponent(req.url.split('?')[0]));
+    if(!alvo.startsWith(RAIZ) || !fs.existsSync(alvo)){ res.writeHead(404); return res.end('nao achei'); }
+    res.writeHead(200, { 'Content-Type': /\.html$/.test(alvo) ? 'text/html; charset=utf-8' : 'application/octet-stream',
+                         'Cache-Control': 'no-store' });
+    res.end(fs.readFileSync(alvo));
+  }).listen(porta, () => {
+    console.log('Servindo em http://127.0.0.1:' + porta + '/   (Ctrl+C pra parar)');
+  });
+}
 console.log(telas.length + ' telas. Abra o arquivo no navegador -- não precisa de servidor.');

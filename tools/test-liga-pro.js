@@ -435,7 +435,12 @@ console.log('\n=== A INSCRICAO ===');
      em silencio. */
   ok('  e se o ciclo virou, ela RE-SORTEIA em vez de inscrever',
      /cycleEntry\.id !== game\.proCicloId/.test(bloco) && /proSorteiaBolo\(uid, cycleEntry\)/.test(bloco));
-  ok('  e a trava de "ja inscrito em outra rodada" vale', /ACTIVE_ELSEWHERE/.test(bloco));
+  /* ⚠️ ESTA TRAVA VIROU DO AVESSO EM 24/09/2026: ela cobrava que o ACTIVE_ELSEWHERE valia, e ele
+     era justamente a trava de "ja esta DISPUTANDO" -- que saiu a pedido. Ela fica cobrando que ele
+     nao voltou, no ARQUIVO inteiro: sem isso alguem o reintroduz e ninguem ve. */
+  ok('  e a trava de "ja esta disputando" nao voltou', !/ACTIVE_ELSEWHERE/.test(cli));
+  /* ⚠️ E A OUTRA TRAVA FICA: a de inscricao dupla no MESMO ciclo, que e a transacao da gravacao. */
+  ok('  e a de inscricao dupla no mesmo ciclo continua', /DUPLICATE/.test(bloco));
 }
 
 /* ============================================================================

@@ -21196,6 +21196,231 @@ tivesse aumentado. É o mesmo atalho `font` que o ranking da Corrida já custou.
 **No motor, nada:** `MOTOR 2d6a83f24cf1 / DIARIO 72e61601d1fb`, idêntico em 900 batalhas semeadas.
 **Conferido que os 7 defeitos religados acusam.**
 
+### ⚠️ A TRAVA DE "JÁ ESTÁ DISPUTANDO" ACABOU (24/09/2026)
+
+Pedida assim: *"quando um jogador esta disputando uma liga e a partida começa, hoje existe uma trava
+que enquanto nao acabar o campeonato, ele nao pode se inscrever de novo, tire isso"*.
+
+**⚠️ ERAM DUAS TRAVAS COM NOMES PARECIDOS, E SÓ UMA SAIU.** A que fica é a `DUPLICATE` — a transação
+que impede a **mesma conta se inscrever duas vezes no MESMO ciclo aberto**, e ela é o que protege o
+chaveamento de ter o jogador em duas vagas. A que saiu é a `ACTIVE_ELSEWHERE`: ela olhava os ciclos
+**já sorteados** (`drawn`/`advancing`) e recusava a inscrição no ciclo **seguinte**.
+
+#### ⚠️ ELA CUSTAVA UMA IDA AO SERVIDOR POR CICLO EM ANDAMENTO
+
+O `isAccountActiveInLeague` **varria o calendário**: lia a agenda e, pra **cada** ciclo em
+andamento, lia o documento dele inteiro pra procurar o uid dentro do chaveamento. Hoje é uma leitura
+só — `registrantDocRef(typeId, cycleId, uid).get()`, o documento da própria inscrição:
+
+| o clique de inscrever, com uma liga rodando | idas ao servidor |
+|---|---|
+| antes | **4** |
+| **hoje** | **3** |
+
+⚠️ **E ISSO SE SOMA AO CONSERTO DE 16/09**, que já tinha levado o clique de 6 pra 4 (o preâmbulo
+único). A 200ms de ida e volta daqui até o Firestore — ele está em `nam5`, nos EUA, e os jogadores
+no Brasil (ver **PERFORMANCE: A GEOGRAFIA MANDA**) —, são **800ms em vez de 1.000**.
+
+#### ⚠️ O QUE A TELA MOSTRAVA, E POR QUE ELA NÃO PRECISOU DE CAMPO NOVO
+
+O aviso e o botão desabilitado saem do `game.accountLeagueSlots`, que é preenchido pelo
+`checkLeagueRegistrationStatus` — e ele olha **o ciclo aberto primeiro**. Dentro do ramo
+`!alreadyIn` (que é onde o bloco de inscrição vive), um `accountLeagueSlots` não-nulo **só pode ter
+vindo de um ciclo sorteado**: se ele fosse do aberto, o `alreadyIn` seria verdadeiro.
+
+**A condição da tela já isolava o caso**, então não houve estado novo a inventar — o que mudou é o
+que ela FAZ com ele:
+
+| | antes | hoje |
+|---|---|---|
+| o botão | `disabled` | **clicável** |
+| o aviso | *"…Espere ela terminar pra poder se inscrever de novo."* | *"… — e pode se inscrever nesta aqui também."* |
+
+**⚠️ E O AVISO FICA, de informativo:** ele nomeia **qual time** está na disputa, e sem ele o jogador
+que já tem um chaveamento rodando não teria como saber disso ao montar o próximo.
+
+#### ⚠️ O SERVIDOR NÃO FILTRAVA — conferido antes de mexer
+
+O `drawCycle` monta a liga com **quem está na subcoleção de inscritos**, e ele não lê ciclo nenhum
+em andamento. Ou seja **a trava era inteiramente do cliente**, e tirá-la lá bastou.
+
+**⚠️ E O PAINEL DE ADMIN CONTINUA MAIS RESTRITIVO, o que é uma assimetria DELIBERADA e anterior:**
+o `adminJaInscritoEmAlgumaLiga` varre **todos os tipos** (a trava dele é da CONTA, não da liga),
+enquanto a do jogador sempre foi por TIPO — o `accountLeagueSlots` é um mapa indexado por `typeId`,
+e a tela diz *"já está disputando ESSA Liga em outra rodada"*. O que saiu do painel foi só o mesmo
+ramo do chaveamento; a varredura por tipo ficou.
+
+**⚠️ E ISSO ABRE UMA PORTA QUE VALE REGISTRAR: a mesma conta pode terminar em DOIS chaveamentos do
+mesmo tipo**, um em andamento e o do ciclo seguinte. É o que o pedido pede, e o `DUPLICATE` continua
+impedindo o caso que quebra o sorteio (duas vagas na MESMA chave). Se um dia incomodar, a régua é
+devolver a checagem — e o custo dela está medido acima.
+
+**Medido a 320px, no navegador**, com um chaveamento em andamento: o botão **não** está desabilitado
+(243px), o aviso fica em **243×58px** (4 linhas), ele **nomeia o slot**, **não** manda esperar, e a
+tela fica em **305 de 320** — sem rolagem lateral e **zero textos cortados**.
+
+**No motor, nada:** `MOTOR e6cd16d15e0f / DIARIO 1e9b7214c627`, idêntico em 900 batalhas semeadas.
+
+**⚠️ E AS TRAVAS QUE MEDIAM A TRAVA VELHA NÃO FORAM APAGADAS: elas foram VIRADAS DO AVESSO.** A do
+aviso da jornada cobrava que quem está num chaveamento **não** visse o convite; hoje ela cobra que
+ele **VEJA** — e que o chaveamento **nem seja lido**, que é a metade que prova a economia de idas.
+Mais um bloco novo sobre a tela (o botão clicável, o aviso informativo, e quem JÁ está inscrito no
+ciclo aberto continuando a ver a outra caixa). Sem elas, alguém devolve a trava e ninguém vê.
+
+### A APOSTA COM O RIVAL (24/09/2026)
+
+Pedida junto do anúncio: *"na jornada, ao perder para o seu rival, voce tem que pagar 5 de moeda
+para ele, e se vencer, voce ganha 5"*.
+
+**⚠️ ELA NÃO EXISTIA — o pedido a descrevia como se existisse, e isso foi conferido antes de
+anunciar.** Anunciar uma mecânica que o jogo não tem seria pior que não anunciar, então ela foi
+implementada.
+
+**⚠️ E ELA É A ÚNICA FONTE DE MOEDA DO JOGO QUE ANDA PROS DOIS LADOS.** Tudo o mais só soma (a
+insígnia, a Elite, o campeão da Pro) ou é uma COMPRA que o jogador escolhe fazer (o re-sorteio, a
+loja). Aqui a moeda **sai da conta sem ele ter pedido**.
+
+| | |
+|---|---|
+| o rival aparece em | **3 trechos** (`RIVAL_LEGS = [2,4,6]`), uma batalha cada |
+| o teto de uma jornada | **±15** |
+| a jornada paga | **70** (8×5 + 10 + 20) |
+| **com a aposta** | **55 a 85** — uma amplitude de **30, ou 43% da jornada** |
+
+Pra escala: 15 moedas são **3 re-sorteios** do encontro selvagem, e 30 (a amplitude) são 6.
+
+#### ⚠️ ELA HERDOU A IDEMPOTÊNCIA DE GRAÇA, E ISSO DECIDIU O DESENHO
+
+O `claimJourneyCoins` paga **por DIFERENÇA**: ele recalcula do zero quanto o save já rendeu
+(`moedasDevidasDoSave`) e paga o que falta, guardando o total no `coinsPaid`. Então o saldo da
+aposta entrou como **mais um termo daquela soma** — e com isso um F5, duas abas ou uma chamada que
+morreu na rede não cobram duas vezes, sem uma linha de trava nova.
+
+O cliente só acumula (`game.rivalCoins += ±MOEDAS_RIVAL`); quem paga e quem cobra é o servidor.
+
+- **⚠️ E O TERMO PODE SER NEGATIVO, o que quase o fez sumir em silêncio:** o `claimJourneyCoins`
+  fazia `Math.max(0, diferenca)` — uma guarda que existia pra nunca pagar negativo. Com ela, **a
+  cobrança seria ENGOLIDA**: o `coinsPaid` andaria e a moeda não sairia. Há trava, e ela acusa.
+- **⚠️ E A COBRANÇA É APARADA NO SALDO** (`Math.max(diferenca, -moedasAgora)`): o jogador **nunca
+  fica negativo**. A parte impagável da dívida é **esquecida**, não fica pendente — o `coinsPaid` é
+  carimbado com o devido de qualquer jeito, senão ela voltaria a ser cobrada na próxima vitória.
+- **⚠️ E O CAMPO É NOVO, então TODO save existente lê 0:** ninguém é cobrado retroativamente. É a
+  mesma decisão que o `coinsPaid` tomou quando ele nasceu.
+
+#### ⚠️ O ROUND-TRIP DO SAVE TEM QUE SER INTEIRO, E O NEGATIVO ATRAVESSA
+
+O `applySavedState` é explícito **campo a campo** — um campo que sai e não volta se perde num F5, e
+isso já aconteceu com o `ilhasJornada` (21/09) e com o `ilhasResultado` (22/09).
+
+**⚠️ E A LEITURA É `Number(data.rivalCoins) || 0`, NUNCA `Math.max(0, ...)`:** com o clamp, uma
+dívida **sumiria na primeira reabertura do save** — o jogador perderia a batalha, fecharia o jogo e
+voltaria sem dever nada. Há trava pras duas metades (o campo vai, o campo volta, e o negativo
+atravessa).
+
+#### ⚠️ O PAGAMENTO É PEDIDO NO PONTO DO RIVAL, e não no ginásio seguinte
+
+O `receberMoedasDaJornada()` roda no fim do ramo do rival. Sem ele ali, a dívida só chegaria ao
+servidor na próxima vitória de ginásio — e o jogador veria o saldo da tela discordar do que ele
+acabou de fazer.
+
+**E a TELA mostra a cobrança**, que é a outra metade: o `moedasGanhasHtml` só escondia o zero, e um
+`n <= 0` ali engoliria justamente o caso novo. Hoje ele diz *"−5 moedas — a aposta com o rival saiu
+da sua conta"*; o zero continua mudo.
+
+**As duas frases da batalha carregam o número da constante**, nunca escrito — a família do
+*"Revezamento · 900 m"*.
+
+**No motor, nada:** `MOTOR e6cd16d15e0f / DIARIO 1e9b7214c627`, idêntico em 900 batalhas semeadas —
+a aposta é um campo de save e uma linha de conta, não uma regra de batalha.
+
+**⚠️ E NA DIFICULDADE ELA NÃO MOVE A JORNADA, por construção: o bot do smoke não gasta moeda.** O
+que ela muda é o poder de compra — e a régua está aqui: **43% da renda de uma jornada**, ou seja
+quem perde as três batalhas do rival compra **6 re-sorteios a menos** que quem ganha as três.
+Se um dia incomodar, o lugar é o `MOEDAS_RIVAL` (nos DOIS motores).
+
+### O ANÚNCIO DA LIGA PRO (24/09/2026)
+
+Pedido junto: *"adicione um modal quando o usuario logar indicando a novidade da Ligo Pro na tela
+home, aquele modal que tem igual informando a novidade das Ilhas Laranjas ... coloque um botao
+levando para a tela principal da liga pro. Fale que o vencedor ganha 100 moedas"*.
+
+**⚠️ O MECANISMO INTEIRO JÁ EXISTIA, E O ANÚNCIO NOVO FOI UMA LINHA** — que é o que a
+`NOVIDADES_VERSAO` foi criada pra comprar, em 21/09: *"com um booleano este seria o único anúncio da
+vida do jogo… com a versão, o próximo é uma linha"*. Ela girou de `ilhas-laranja` pra `liga-pro`, e
+quem já leu o anterior vê este.
+
+- **⚠️ E ELE NÃO É MAIS DE ADMIN.** O das Ilhas era, porque as Ilhas eram administrativas na época
+  (ele anunciaria cinco jogos que ninguém conseguia abrir). A Liga Pro é de todo mundo, então a
+  guarda de admin saiu junto com a versão. **O `contaCarregada` FICA**, e a razão é outra: o
+  `novidadeVista` vem do documento da conta, e sem esperar a leitura ele é `undefined` no primeiro
+  desenho — o anúncio abriria de novo pra quem já leu.
+- **O `novidadesIrParaAsIlhas` MORREU** — ele ficou com zero chamadores no instante em que a versão
+  girou, e função de apresentação sem chamador é o tipo de coisa que fica anos no arquivo.
+- **O botão que leva à Liga Pro MARCA COMO LIDO**, como o das Ilhas: o que marca é ter **LIDO**, não
+  o caminho tomado — sem isso, quem clica em "Ver a Liga Pro" reencontra o anúncio na próxima home.
+
+#### ⚠️ O CORTE FOI MEDIDO A 320px, E ELE ACONTECEU DUAS VEZES
+
+A caixa tem **483px de teto** (85vh de 568) e **o que NÃO é lista não cede** — só a lista tem o
+`min-height:0`. É a mesma conta que o anúncio das Ilhas já tinha feito em 21/09.
+
+| | a lista mostrava |
+|---|---|
+| 1ª versão (2 parágrafos, **DUAS listas**, fixos em 284px) | **11px e 6px** — ou seja invisíveis |
+| 2ª (uma lista de **4 linhas**) | **2 de 4** (135 de 270px) |
+| **hoje (2 linhas)** | **106 de 106px — NÃO rola** |
+
+**⚠️ E A SEGUNDA MEDIÇÃO É A QUE DECIDIU O CORTE: os dois itens que ficavam escondidos eram
+justamente OS GOLPES e AS 100 MOEDAS** — e o prêmio é uma das três coisas que o pedido nomeia. Uma
+lista que rola por dentro **esconde sem avisar**.
+
+O critério do corte foi o PEDIDO: ficaram **o time sorteado** e **o prêmio do campeão**. Os golpes
+viraram meia frase do resumo da primeira (eles são a segunda metade da mesma inscrição), e **as
+faixas saíram** — elas têm um **quadro próprio na tela da Liga Pro**, que é pra onde o botão leva, e
+lá elas dizem a rodada de AGORA.
+
+| medido a 320px, depois | |
+|---|---|
+| a caixa | **280×453px** |
+| a lista | **106 de 106px** (não rola) |
+| o último botão | y=**477 de 568** |
+| textos cortados / selos vazios | **0 / 0** |
+| rolagem lateral | **nenhuma** (docW 320) |
+
+#### ⚠️ E O SELO DA PRIMEIRA LINHA ERA A BANDEIRA DA CORRIDA
+
+Ela é a **linha de chegada**, e num anúncio de liga se lê como outro modo. **Foi a captura de tela a
+320px que pegou** — em asserção de HTML ela passa, porque o selo existe e desenha. Hoje é o selo de
+**TIME** da casa, e a trava é **comparativa**: ela extrai o selo do botão *"Seu time"* do jogo e
+cobra que a linha use o mesmo. Cravado o nome aqui, ela envelheceria no dia em que a casa trocasse o
+dela.
+
+**Todos os números do modal são DERIVADOS** (`PRO_SORTEADOS`, `PRO_ESCOLHE`, `MAX_GOLPES`,
+`MOEDAS_CAMPEAO_PRO`, `MOEDAS_RIVAL`), e há trava lendo o **código** pra provar isso — comparar o
+HTML com a constante não distingue os dois, porque hoje 12 é 12. É a mesma técnica que a conta da
+Pokédex precisou.
+
+**⚠️ E AS TRÊS TRAVAS DAS FAIXAS NÃO FORAM APAGADAS: elas viraram a trava do corte** — a lista cabe
+em 2 linhas, as faixas **não** estão no anúncio, e — a metade que faz o corte ser seguro — **elas
+continuam na TELA da Liga Pro**. Sem essa segunda metade, alguém as devolve ao anúncio e a lista
+volta a esconder o prêmio, **e só quem abrisse numa tela de 568 descobriria**.
+
+**No motor, nada:** `MOTOR e6cd16d15e0f / DIARIO 1e9b7214c627`, idêntico em 900 batalhas semeadas.
+
+**Conferido que os 20 defeitos religados acusam** (2 a 8 falhas cada).
+
+#### ⚠️ E ELE CUSTOU DUAS LIÇÕES DE FERRAMENTA
+
+1. **⚠️ O `node -e` E O HEREDOC COMERAM AS BARRAS DUPLAS, pela QUINTA vez nesta sessão.** Um
+   `new RegExp('... (\\d+)')` escrito num heredoc chega no node como `(d+)` — e ele **não dá erro**:
+   ele simplesmente não casa, e a medição devolve **zero**. Foi assim que a conta da aposta saiu
+   `0 de 0 = NaN%`. **O caminho seguro é o regex LITERAL** (`/const X = (\d+)/`), que não tem o que
+   escapar, e a ferramenta de edição de arquivo pra texto com escape.
+2. **⚠️ UM `}` A MAIS SOBROU NUM CORTE, E O `node --check` PASSOU.** Chave extra dentro de um
+   template literal é **TEXTO**: ela sairia literal na tela, depois do selo. É a mesma família do
+   `${…}` que não interpola — **verificação de sintaxe não é verificação de conteúdo**, e o que a
+   pegou foi ler o HTML gerado.
+
 ## A BIFURCAÇÃO PARAVA O SORTEIO EM TRÊS LUGARES (24/09/2026)
 
 Reportado com print do picker da Liga Pro: *"apareceu um poliwhirl, porem pelo level 56 deveria ser um
@@ -21853,6 +22078,173 @@ anterior e não a corrente, a cópia inicial nas três formas, as regras lidas c
 (as duas, só uma acesa, a padrão, a nota só na semana, o vazio, o fallback e o modal do time da
 Corrida lendo a mesma célula).
 **Conferido que os 15 defeitos religados acusam** (1 a 7 falhas cada).
+
+## O FERRAMENTAL DE DESENVOLVIMENTO (24/09/2026)
+
+Pedido assim, depois de uma leva que demorou mais que o trabalho que ela entregou: *"por que estamos
+levando mais de 1h para fazer as ações?"* e *"pode tudo que deixar melhor a performance do nosso
+desenvolvimento"*.
+
+### ⚠️ O GARGALO NÃO ERA A BATERIA — ELA LEVA 52 SEGUNDOS
+
+Medido teste a teste: **52s para os 43**, e **40 deles são do `test-especiais`**. Ou seja rodar tudo
+a cada mudança é barato, e nada aqui precisa de execução seletiva.
+
+**O GARGALO É QUE EU REESCREVIA AS MESMAS QUATRO FERRAMENTAS A CADA LEVA.** Contado no scratchpad da
+sessão: **453 arquivos**, dos quais **119 são a mesma coisa de novo** —
+
+| | quantos |
+|---|---|
+| `previa*` (montar uma tela pra olhar) | **40** |
+| `acusar*` (a conferência de acusação) | **34** |
+| `medir*` (os números a 320px) | **23** |
+| patch/troca de texto | **22** |
+
+Cada um escrito do zero traz junto a chance de um escape quebrar, uma âncora não casar **em
+silêncio**, ou um harness medir o vazio. Nesta leva sozinha isso custou: cinco escapes comidos pelo
+shell, um comentário com duas palavras apagadas por crases que executaram, uma troca de selo que
+**não foi aplicada** enquanto o "ok sintaxe" dizia que sim, um script que estourou no meio e deixou
+o **defeito injetado no arquivo**, e uma medição feita no **iframe errado** (dois empilhados no
+mesmo canto).
+
+Nasceram quatro ferramentas versionadas em `tools/`, e cada garantia delas é um defeito real deste
+projeto.
+
+### `tools/patch.js` — trocas de texto, tudo-ou-nada
+
+```
+node tools/patch.js <receita.js> [--seco]
+```
+
+A receita é um **ARQUIVO JS** (escrito pela ferramenta de edição, nunca pelo shell) com uma lista de
+`{arquivo, de, para, rotulo, vezes}`; `de` aceita string ou RegExp.
+
+**⚠️ ELA É UM ARQUIVO JUSTAMENTE PORQUE O SHELL COME ESCAPE.** Um `\\d` num heredoc chega no node
+como `d`, um `${` vira `bad substitution`, e uma **crase EXECUTA como comando** — e nenhum dos três
+dá erro: o patch "roda", imprime ok, e o arquivo fica errado ou intocado.
+
+As cinco garantias:
+
+| | o defeito que ela existe pra impedir |
+|---|---|
+| **a CONTAGEM** (`de` tem que aparecer exatamente `vezes`) | âncora que não casa se lê igual a "deu certo" |
+| **TUDO-OU-NADA** (prepara tudo em memória, só então escreve) | um script que escreve o cliente e estoura no servidor deixa os **dois motores divergindo no disco** |
+| **o DELTA DE TAMANHO, sempre impresso** | um `process.argv[1]` no lugar do `[2]` já apagou a tabela de desenhos — **55.642 caracteres viraram 472, e o `node --check` PASSOU** |
+| **a SINTAXE nos dois formatos** (`.js` pelo vm; no HTML, cada `<script>` à parte) | a crase que fecha um template literal: com um número PAR delas o arquivo continua válido e a tela só morre no navegador |
+| **BACKUP** em `.patch-bak/` | desfazer sem depender do git |
+
+**Conferido que as quatro primeiras acusam** (âncora, contagem, sintaxe e tudo-ou-nada), com exit
+code 1 e o arquivo **intocado** nos quatro.
+
+### `tools/acusar.js` — a conferência de acusação
+
+```
+node tools/acusar.js <casos.js> [--caso N]
+```
+
+Mesmo formato da receita, mais `testes:['test-x']`. Ele religa cada defeito, roda os testes, e diz
+se alguma trava caiu. **São quatro veredictos, e os quatro foram provados:**
+
+| | |
+|---|---|
+| **acusa** | o defeito foi religado e uma trava caiu |
+| **MUDO** | o arquivo MUDOU e nada caiu — a trava é decoração |
+| **ANCORA** | o `de` não casou; nada foi testado (e isso **não é** um mudo) |
+| **NAO COMPILA** | o recorte comeu uma chave: o teste morreria por sintaxe, não pela regra |
+
+- **⚠️ ELE CONTA `FALHOU` **E** `FALHA`**, porque metade dos testes da casa imprime um e metade o
+  outro — e o sumário imprime `N FALHA(S)`, então contar só ele dá "1 falha" em TODO caso. Um "1"
+  idêntico em treze casos foi o que denunciou, e era a quarta vez desta armadilha.
+- **⚠️ E "MORREU" É NÃO TER IMPRESSO O SUMÁRIO, nunca o stderr ter a palavra "Error".** O
+  `test-ilhas` escreve **1.401 bytes de `console.error` MESMO PASSANDO** (ele exercita o caminho de
+  erro de propósito), então o detector antigo marcava "(e morreu)" em tudo. **Detector que dispara
+  sempre não é detector** — a mesma lição que o TypeError do stub de saves já tinha custado.
+- **⚠️ ELE RESTAURA NO `finally` E NO `SIGINT`.** Um script que estoura no meio deixa o **defeito
+  injetado no arquivo** — aconteceu nesta mesma sessão, e só o teste seguinte pegou.
+
+### `tools/impressao.js` — a impressão do motor
+
+```
+node tools/impressao.js <a.html> <b.html>     (o uso que importa)
+node tools/impressao.js index.html --sensivel
+node tools/impressao.js ... --equipa --terreno
+```
+
+Ela já existia no scratchpad e era copiada a cada leva. Versionada, ela ganhou três coisas:
+
+- **compara DUAS cópias** e diz o que mudou: *só o DIARIO* é apresentação, *os dois* é mecânica;
+- **⚠️ `--sensivel`**, que mexe no `CRIT_BASE` e mostra os dois hashes andando. **Sem essa prova,
+  "o hash está igual" e "o painel não alcança o código" são indistinguíveis** — e um hash imóvel só
+  prova alguma coisa quando o painel exercita o caminho que a mudança toca;
+- **⚠️ `--equipa` e `--terreno`**, porque o painel padrão **não equipa ninguém**: sem `ataques` o
+  motor cai no de tipo e a tabela de aprendizado não é lida uma vez sequer. Em 24/09 isso quase fez
+  uma mudança de moveset ser reportada como "não mexeu no motor".
+
+### `tools/gerar-preview.js` — ele já existia, e ganhou a MEDIÇÃO
+
+**⚠️ ELE ESTAVA VERSIONADO O TEMPO TODO** (30 telas, um arquivo só, sem servidor e sem rede, com
+seletor de 320/390/430px) **e eu escrevi 40 prévias descartáveis por fora.** Na última delas cheguei
+a subir um servidor HTTP na mão e a montar iframes que se empilharam.
+
+O que ele ganhou:
+
+- **`medir()` e um botão "Medir TODAS a 320px"** — a medição que eu fazia com 40 linhas de JS
+  inline, uma tela por vez, agora varre as 34 de uma vez e reporta: **estouro de largura, texto
+  cortado, selo vazio, interpolação literal na tela e `<h2>` em duas linhas**.
+  **⚠️ Ela REVELA cada tela pra medir**: elemento com `hidden` tem caixa ZERO, e sem isso ela
+  reportaria *"0x0, nada cortado"* em 33 das 34 — o zero perfeito, que é o falso verde mais comum
+  daqui.
+- **`--servir`**, porque a automação de navegador **recusa `file://`**. Pro humano continuam sendo
+  dois cliques; pra mim é uma flag em vez de um servidor escrito do zero.
+- **⚠️ O GERADOR PASSOU A CONFERIR O HTML QUE ELE GERA**, e essa é a lacuna de verdade: o `patch.js`
+  confere o ARQUIVO que escreve, e a página é um artefato produzido depois. Um `\n` meu virou uma
+  **quebra de linha de verdade** dentro de aspas simples (dupla camada de template literal), o
+  script inteiro da página parou de rodar — **e o `node --check` do gerador passou**, porque ele
+  estava válido. Sem a conferência, a única forma de descobrir é abrir e ver as abas mortas.
+  Conferido que ela acusa.
+- **as telas da Liga**: o anúncio da Liga Pro, a Clássica, a Clássica **com um chaveamento rodando**
+  (o caso que mais me custou medição) e a Liga Pro.
+
+#### ⚠️ E A MEDIÇÃO ACHOU DOIS DEFEITOS NA PRÓPRIA PRÉVIA
+
+1. **TODA tela dela saía com os selos VAZIOS** desde que os emojis viraram desenho (18/09/2026): o
+   `montarSelos()` injeta os símbolos no `document.body` **de verdade**, e a prévia é montada pelo
+   sandbox, que não tem body. Cada `<use href="#s-x">` saía do tamanho certo e **sem desenho**.
+2. **O modal era medido com a largura da JANELA**, não a da prévia — o overlay é `position:fixed`.
+   O conserto é uma propriedade: **um ancestral com `transform` vira o bloco de contenção de
+   qualquer descendente fixed**, então o `.pv-tela` ganhou `translateZ(0)` e o modal passou a se
+   ancorar na caixa de 320px — que é o que o jogo faz num celular.
+
+**Medido depois dos consertos: as telas com algo a olhar vão de 26 para 10** — e as 10 são achados
+REAIS (um `<h2>` em duas linhas em quatro telas, `"🏆 Gary Oak"` cortado na lista de amigos), em
+telas que ninguém tinha tocado. Elas ficam registradas aqui e **não foram mexidas**: não foram
+pedidas e não são regressão.
+
+### ⚠️ E ELE ACHOU 985 KB DE LIXO PUBLICADO
+
+O `firebase.json` publica a RAIZ inteira, e o `hosting.ignore` é a única rede. Conferido em
+produção: **`preview-telas.html` respondia 200** (542 KB), e os **quatro protótipos de referência**
+(`corrida-`, `pescaria-`, `queimada-` e `resgate-pokemon.html`, 443 KB) também.
+
+**⚠️ É O MESMO EPISÓDIO DE 24/09/2026** (a `previa-confusao.html`) por um padrão que não casa: o
+`**/previa-*.html` que nasceu dali cobre *previa-* e não *preview-*. E os protótipos nunca entraram,
+embora o `index-novos-graficos.html` — que é exatamente o mesmo tipo de arquivo — já estivesse lá.
+
+**Não é vazamento de dado: é peso e ruído.** Os dois padrões entraram no ignore, e eles **saem do ar
+no próximo deploy sozinhos** — cada `--only hosting` publica um instantâneo completo do diretório.
+
+⚠️ **O `CLAUDE.md` (1,5 MB) continua no ar de propósito**, como o `tools/` — isso já estava
+registrado na seção de Deploy e não foi mexido.
+
+### ⚠️ AS TRÊS REGRAS QUE FICAM
+
+1. **Texto com escape nunca passa pelo shell.** Receita em arquivo, e **regex LITERAL**
+   (`/const X = (\d+)/`) em vez de `new RegExp('...')` — o literal não tem o que escapar.
+2. **Medir a caixa ANTES de escrever o conteúdo que vai dentro dela.** O anúncio da Liga Pro foi
+   cortado duas vezes por causa disso.
+3. **Verificação de sintaxe não é verificação de conteúdo.** O `node --check` aprova um `}` a mais
+   dentro de um template literal (ele é TEXTO), um arquivo 30% menor e um artefato quebrado. O que
+   denuncia é o **número** — o delta de tamanho, a contagem de asserções, a de ocorrências.
 
 ## Frontend
 

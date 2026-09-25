@@ -1960,9 +1960,15 @@ console.log('\n=== O AVISO DA LIGA VIROU UMA CONTAGEM (14/09/2026) ===');
     ok('a conta usa o relogio do servidor', /agoraServidor\(\)/.test(fn) && !/Date\.now\(\)/.test(fn));
     /* ⚠️ E ELA E FEITA NO DESENHO, nao guardada: o atualizarAvisoDaLiga so roda a cada 5 minutos, e
        um numero congelado la erraria por ate 5 minutos. */
-    const upd = cli.slice(cli.indexOf('async function atualizarAvisoDaLiga()'));
+    /* ⚠️ A FATIA IA ATE 1200 CARACTERES FIXOS e caiu com o codigo certo em 24/09/2026: um
+       comentario novo dentro da funcao empurrou a linha pra fora da janela. E a QUARTA vez desta
+       familia no projeto -- hoje ela vai ate o fim da FUNCAO, com um ok cobrando que a fatia tem o
+       que ler (uma fatia vazia passa em branco, que e o outro lado da mesma armadilha). */
+    const i0 = cli.indexOf('async function atualizarAvisoDaLiga()');
+    const upd = cli.slice(i0, cli.indexOf('\nfunction ', i0 + 10));
+    ok('a fatia do aviso tem o que ler', upd.length > 400 && upd.length < 4000, String(upd.length));
     ok('e o aviso guarda a HORA, nao os minutos',
-       /avisoLiga = jaEstaNaLiga \? null : \{ hora: ciclo\.scheduledTime \}/.test(upd.slice(0, 1200)));
+       /avisoLiga = jaEstaNaLiga \? null : \{ hora: ciclo\.scheduledTime \}/.test(upd));
     /* MAIS VISIVEL: fonte de TEXTO (a de pixel come largura demais numa frase de duas oracoes) e
        moldura. O teste le o CSS -- nada disso aparece em asserção de HTML. */
     const css = (cli.match(/\.aviso-liga-jornada\{[^}]*\}/) || [''])[0];

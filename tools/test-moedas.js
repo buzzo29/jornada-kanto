@@ -574,6 +574,66 @@ console.log('\n=== A LOJA: VENDER POR METADE ===');
     ok('e o servidor paga exatamente essa metade', divergem.length === 0, divergem.join(','));
   }
 }
+console.log('\n=== A APOSTA COM O RIVAL (24/09/2026) ===');
+{
+  /* ⚠️ ELA É A ÚNICA FONTE DE MOEDA DO JOGO QUE ANDA PROS DOIS LADOS: vencer paga, PERDER COBRA. O
+     cliente acumula o saldo no save (`rivalCoins`) e o servidor paga a DIFERENÇA -- ou seja ela
+     herda de graça a idempotência do `coinsPaid`.
+     ⚠️ E O VALOR É LIDO DO FONTE DO SERVIDOR, nunca escrito aqui: ele envelheceria no primeiro
+     reajuste. É o padrão do test-liga-pro. */
+  const srvSrc = require('fs').readFileSync(path.join(__dirname, '..', 'functions', 'index.js'), 'utf8');
+  const M = ((/const MOEDAS_RIVAL = (\d+);/.exec(srvSrc) || [0, 0])[1]) | 0;
+  ok('o MOEDAS_RIVAL existe no servidor', M > 0, String(M));
+
+  await conta('r1', jaVisto({ rivalCoins: M }));
+  const v = await chamar('claimJourneyCoins', 'r1', { slot:'0' });
+  ok('vencer o rival paga ' + M, v.ganhou === M && v.moedas === M, JSON.stringify(v));
+  const v2 = await chamar('claimJourneyCoins', 'r1', { slot:'0' });
+  ok('  e chamar de novo nao paga em dobro', v2.ganhou === 0 && v2.moedas === M, JSON.stringify(v2));
+
+  /* ⚠️ A COBRANÇA: ela precisa ATRAVESSAR o `Math.max(0, ...)` que havia aqui -- ele a engoliria
+     em silêncio, e o jogador perderia pro rival sem pagar nada. */
+  await conta('r2', jaVisto({ rivalCoins: -M }), 100);
+  const p = await chamar('claimJourneyCoins', 'r2', { slot:'0' });
+  ok('perder pro rival COBRA ' + M, p.ganhou === -M && p.moedas === 100 - M, JSON.stringify(p));
+  const p2 = await chamar('claimJourneyCoins', 'r2', { slot:'0' });
+  ok('  e chamar de novo nao cobra em dobro', p2.ganhou === 0 && p2.moedas === 100 - M, JSON.stringify(p2));
+
+  /* ⚠️ E ELA É APARADA NO SALDO: "pagar 5" com 2 moedas na mão cobra 2. Sem o aparo o saldo ficaria
+     NEGATIVO -- a loja compara `moedas >= preco` e não quebraria, mas o número apareceria na tela. */
+  await conta('r3', jaVisto({ rivalCoins: -M }), 2);
+  const a = await chamar('claimJourneyCoins', 'r3', { slot:'0' });
+  ok('a cobranca e aparada no saldo (tinha 2, devia ' + M + ')', a.ganhou === -2 && a.moedas === 0,
+     JSON.stringify(a));
+  ok('  e o saldo NUNCA fica negativo', a.moedas >= 0, String(a.moedas));
+  /* ⚠️ E O `coinsPaid` AVANÇA MESMO APARADO: a dívida que não caberia é ESQUECIDA, não fica
+     pendente -- senão o jogador seria cobrado de novo numa hora que ele não liga a nada. */
+  const a2 = await chamar('claimJourneyCoins', 'r3', { slot:'0' });
+  ok('  e a divida nao fica pendente', a2.ganhou === 0 && a2.moedas === 0, JSON.stringify(a2));
+
+  /* ⚠️ COM A CONTA VAZIA ELA NÃO COBRA NADA, e nem tenta: é o caso de quem gastou tudo na loja. */
+  await conta('r4', jaVisto({ rivalCoins: -M }), 0);
+  const z = await chamar('claimJourneyCoins', 'r4', { slot:'0' });
+  ok('conta vazia nao e cobrada', z.ganhou === 0 && z.moedas === 0, JSON.stringify(z));
+
+  /* O SALDO SOMA COM O RESTO DO SAVE, e as três batalhas cabem: o teto de uma jornada é 3x. */
+  await conta('r5', jaVisto({ badgesEarned:['1','2'], badgeCount:2, rivalCoins: M * 3 }));
+  const s = await chamar('claimJourneyCoins', 'r5', { slot:'0' });
+  ok('o saldo soma com as insignias', s.ganhou === 10 + M * 3, JSON.stringify(s));
+
+  /* ⚠️ SAVE ANTIGO NÃO É COBRADO: o campo é NOVO, então todo save existente lê 0. Sem isto, um save
+     sem o campo poderia virar uma cobrança do nada no dia do deploy. */
+  await conta('r6', jaVisto({ badgesEarned:['1'], badgeCount:1 }), 50);
+  const o = await chamar('claimJourneyCoins', 'r6', { slot:'0' });
+  ok('save sem o campo nao e cobrado', o.ganhou === 5 && o.moedas === 55, JSON.stringify(o));
+
+  /* ⚠️ E AS DUAS CONSTANTES BATEM -- o cliente ACUMULA e o servidor PAGA. Divergindo, a tela
+     prometeria um número que a cobrança não pratica. */
+  const cli = require('fs').readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  const Mc = ((/const MOEDAS_RIVAL = (\d+);/.exec(cli) || [0, 0])[1]) | 0;
+  ok('o cliente e o servidor concordam no valor', Mc === M, 'cliente ' + Mc + ' / servidor ' + M);
+}
+
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
 process.exit(falhas ? 1 : 0);
 

@@ -142,21 +142,79 @@ S.__setGame(g);
 await S.registerForLeague(TIPO, 1, false);
 ok('inscrever apaga o aviso na hora', S.__getGame().avisoLiga === null,
    JSON.stringify(S.__getGame().avisoLiga));
-/* E quem está DISPUTANDO um ciclo já sorteado também não pode ver o convite: a tela da Liga não
-   deixa se inscrever no próximo enquanto o atual não acabar. */
+/* ⚠️ ESTA TRAVA VIROU DO AVESSO EM 24/09/2026, e ela NAO foi apagada: ela media "quem esta
+   DISPUTANDO um ciclo ja sorteado nao ve o convite", com a razao de que a tela da Liga BLOQUEAVA a
+   inscricao nesse caso. A porta abriu (a pedido), e agora ela cobra o contrario -- senao alguem
+   reintroduz a trava e ninguem ve.
+   ⚠️ E O CASO NOVO E DE COMPORTAMENTO, nunca com a funcao dublada: dublando, ele passaria de volta
+   com o ramo do chaveamento inteiro no lugar. O calendario tem um ciclo `drawn` COM o uid no
+   chaveamento e um `registering` onde ele NAO esta -- e o convite tem que SAIR. */
 estadoBase();
-g.avisoLiga = null; S.__setGame(g);
-S.isAccountActiveInLeague = () => Promise.resolve(true);
+g.avisoLiga = null; g.ultimaChecagemDaLiga = 0; S.__setGame(g);
+let leuChaveamento = 0;
+S.scheduleDocRef = () => ({ get: () => Promise.resolve({ exists:true,
+  data: () => ({ cycles:[{ id:'emcurso', status:'drawn' },
+                          { id:'c9', status:'registering', scheduledTime: Date.now()+600000 }] }) }) });
+S.cycleDocRef = () => ({ get: () => { leuChaveamento++; return Promise.resolve({ exists:true,
+  data: () => ({ leagues:[{ id:'L1', rounds:{ 0:[{ a:{ uid:'u1' }, b:{ uid:'x' } }] } }] }) }); } });
+S.registrantDocRef = () => ({ get: () => Promise.resolve({ exists:false }) });
+await S.atualizarAvisoDaLiga();
+ok('quem esta DISPUTANDO um chaveamento VE o convite', !!S.__getGame().avisoLiga,
+   JSON.stringify(S.__getGame().avisoLiga));
+ok('  e o chaveamento nem e lido (a varredura saiu)', leuChaveamento === 0, String(leuChaveamento));
+/* ⚠️ MAS QUEM JA ESTA INSCRITO NO CICLO ABERTO CONTINUA SEM VER -- essa metade da trava FICA, e sem
+   ela uma mudanca que apagasse a checagem inteira passaria. */
+estadoBase();
+g.avisoLiga = null; g.ultimaChecagemDaLiga = 0; S.__setGame(g);
 S.scheduleDocRef = () => ({ get: () => Promise.resolve({ exists:true,
   data: () => ({ cycles:[{ id:'c9', status:'registering', scheduledTime: Date.now()+600000 }] }) }) });
+S.registrantDocRef = () => ({ get: () => Promise.resolve({ exists:true, data: () => ({ slot:0 }) }) });
 await S.atualizarAvisoDaLiga();
-ok('quem ja esta na liga nao ve o convite', S.__getGame().avisoLiga === null);
-S.isAccountActiveInLeague = () => Promise.resolve(false);
+ok('quem ja esta INSCRITO no ciclo aberto nao ve', S.__getGame().avisoLiga === null,
+   JSON.stringify(S.__getGame().avisoLiga));
+S.registrantDocRef = () => ({ get: () => Promise.resolve({ exists:false }) });
 g.ultimaChecagemDaLiga = 0;   // a folga de 5min ja tinha sido gasta pela checagem acima
 S.__setGame(g);
 await S.atualizarAvisoDaLiga();
 ok('e quem esta de fora ve', !!S.__getGame().avisoLiga, JSON.stringify(S.__getGame().avisoLiga));
 
+
+/* =====================================================================
+   A TELA COM UM CHAVEAMENTO EM ANDAMENTO (24/09/2026)
+   ⚠️ E ELA QUE O JOGADOR VE: o aviso e o `disabled` do botao liam o `accountLeagueSlots`, e dentro
+   do ramo "NAO estou inscrito" ele so pode vir de um ciclo JA SORTEADO -- se fosse o ciclo ABERTO, o
+   `alreadyIn` seria true e aquele bloco nem existiria. Ou seja a condicao isola o caso sozinha, e o
+   que mudou foi o botao destravar e o texto deixar de mandar esperar.
+   ===================================================================== */
+console.log('\n=== A TELA COM UM CHAVEAMENTO EM ANDAMENTO ===');
+{
+  estadoBase();
+  g.screen = 'league';
+  g.currentLeagueTypeId = TIPO;
+  g.accountLeagueSlots = { [TIPO]: 3 };
+  /* ⚠️ O ESTADO QUE O renderLeague LE E O leagueData, com os ciclos -- e o leagueScreenLoading
+     precisa estar DESLIGADO, senao ele cai no ramo "Carregando..." e a trava mede o VAZIO. A
+     primeira versao deste fixture usava um leagueView que nao existe, e as seis asserções falhavam
+     com o codigo certo: e a armadilha do fixture que nao cai na faixa em que a regra vale. */
+  g.leagueScreenLoading = false;
+  g.leagueData = { cycles: [{ id:'c9', status:'registering', scheduledTime: Date.now()+6e5,
+                             registrants: [], amIRegistered: false }] };
+  S.__setGame(g);
+  const tela = S.renderLeague();
+  ok('o botao de escolher time NAO esta desabilitado',
+     /openLeagueTeamPicker\(\)/.test(tela) &&
+     !/<button[^>]*disabled[^>]*onclick="openLeagueTeamPicker/.test(tela));
+  ok('  e o aviso continua na tela, informativo', /j[aá] est[aá] disputando essa Liga/.test(tela));
+  ok('    e ele nao manda mais ESPERAR', !/Espere ela terminar/.test(tela));
+  ok('    e nomeia o time que esta disputando', tela.indexOf(S.slotDisplayName(3)) >= 0);
+  /* ⚠️ E QUEM ESTA INSCRITO NO CICLO ABERTO continua vendo a outra caixa -- essa metade nao mudou, e
+     sem este caso uma mudanca que apagasse o `alreadyIn` passaria. */
+  g.leagueData.cycles[0].amIRegistered = true;
+  S.__setGame(g);
+  const dentro = S.renderLeague();
+  ok('quem JA esta inscrito ve a caixa de inscrito', /Voc[eê] est[aá] inscrito/.test(dentro));
+  ok('  e nao ve o botao de escolher time', !/openLeagueTeamPicker\(\)/.test(dentro));
+}
 
 /* =====================================================================
    QUANTAS IDAS AO SERVIDOR O CLIQUE CUSTA (16/09/2026)

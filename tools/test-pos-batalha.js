@@ -352,6 +352,60 @@ console.log('=== A TORRE PASSOU A TER LOG DEPOIS DA BATALHA ===');
   }
 
   console.log('');
+  console.log('=== A APOSTA COM O RIVAL (24/09/2026) ===');
+  {
+    const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'index.html'), 'utf8');
+    const M = ((/const MOEDAS_RIVAL = (\d+);/.exec(src) || [0, 0])[1]) | 0;
+    const g = S.__getGame();
+
+    /* ⚠️ O SALDO É ACUMULADO NO PONTO DO RESULTADO, que roda UMA VEZ por batalha -- o
+       `maybeRivalBattle` marca o trecho no `rivalBattlesDone` ANTES de começar, então cada trecho
+       rende um resultado só. É isso que faz o saldo não contar duas vezes a mesma luta. */
+    const resultado = src.slice(src.indexOf("} else if(cfg.context==='rival'){"),
+                                src.indexOf("} else if(cfg.context==='elite'){"));
+    ok('a fatia do resultado do rival tem o que ler', resultado.length > 400 && resultado.length < 3500,
+       String(resultado.length));
+    ok('vencer SOMA e perder SUBTRAI o mesmo valor',
+       /game\.rivalCoins = \(game\.rivalCoins \|\| 0\) \+ \(win \? MOEDAS_RIVAL : -MOEDAS_RIVAL\)/.test(resultado));
+    /* ⚠️ E AS DUAS FRASES DIZEM O NÚMERO, derivado da constante: sem elas a moeda sai da conta e o
+       jogador não tem como saber que aquilo aconteceu -- o erro da especialidade de 1% de novo. */
+    ok('  e as DUAS frases dizem o valor, derivado da constante',
+       (resultado.match(/\$\{MOEDAS_RIVAL\}/g) || []).length === 2,
+       String((resultado.match(/\$\{MOEDAS_RIVAL\}/g) || []).length) + ' ocorrencias');
+    ok('    e nenhuma delas o escreve a mao', resultado.indexOf('🪙 ' + M + ' ') < 0);
+    /* ⚠️ O PAGAMENTO SAI AQUI e não no ginásio seguinte: sem esta linha o saldo só chegaria na conta
+       na próxima vitória de ginásio, e a tela do resultado -- que é onde o jogador está lendo sobre
+       a aposta -- mostraria a moeda de outra coisa. */
+    ok('  e o pagamento e pedido no MESMO ponto', /receberMoedasDaJornada\(\);/.test(resultado));
+
+    /* ⚠️ O ROUND-TRIP DO SAVE, as três pontas: campo que SAI e não VOLTA se perde num F5, e isso já
+       custou a travessia das Ilhas inteira. */
+    g.rivalCoins = M * 2;
+    S.__setGame(g);
+    const doc = S.serializeGame();
+    ok('o saldo vai pro save', doc.rivalCoins === M * 2, JSON.stringify(doc.rivalCoins));
+    g.rivalCoins = 0; S.__setGame(g);
+    S.applySavedState(doc);
+    ok('  e VOLTA dele', S.__getGame().rivalCoins === M * 2, String(S.__getGame().rivalCoins));
+    /* ⚠️ E O NEGATIVO ATRAVESSA TAMBÉM: um `|| 0` no lugar errado o zeraria, e a cobrança sumiria. */
+    S.applySavedState(Object.assign({}, doc, { rivalCoins: -M }));
+    ok('  e o NEGATIVO atravessa', S.__getGame().rivalCoins === -M, String(S.__getGame().rivalCoins));
+    S.applySavedState(Object.assign({}, doc, { rivalCoins: undefined }));
+    ok('  e save antigo nasce em zero', S.__getGame().rivalCoins === 0, String(S.__getGame().rivalCoins));
+
+    /* ⚠️ A TELA MOSTRA O NEGATIVO: com o `n <= 0` que havia ali, a COBRANÇA saía da conta sem uma
+       linha na tela. E o ZERO continua mudo -- ele é o caso comum. */
+    g.moedasGanhasAgora = M; S.__setGame(g);
+    const ganho = S.moedasGanhasHtml();
+    ok('a tela mostra o ganho', /\+/.test(ganho) && ganho.indexOf(String(M)) >= 0, ganho);
+    g.moedasGanhasAgora = -M; S.__setGame(g);
+    const perda = S.moedasGanhasHtml();
+    ok('  e mostra a PERDA', perda.length > 0 && perda.indexOf(String(M)) >= 0 && /rival/i.test(perda), perda);
+    g.moedasGanhasAgora = 0; S.__setGame(g);
+    ok('  e o zero continua mudo', S.moedasGanhasHtml() === '');
+  }
+
+  console.log('');
   console.log(falhas ? falhas + ' FALHA(S).' : 'Tudo certo.');
   process.exit(falhas ? 1 : 0);
 })();

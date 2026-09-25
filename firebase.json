@@ -8,7 +8,9 @@
       "firestore.rules",
       "firestore.indexes.json",
       "index-novos-graficos.html",
-      "**/previa-*.html"
+      "**/previa-*.html",
+      "preview-telas.html",
+      "*-pokemon.html"
     ],
     "headers": [
       {

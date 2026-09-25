@@ -172,23 +172,38 @@ console.log('\n=== O QUE NÃO ENTRA ===');
 
 console.log('\n=== A TRAVA DE "JÁ ESTÁ EM OUTRA LIGA" ===');
 {
-  /* ⚠️ É ELA QUE PROTEGE O CHAVEAMENTO: quem está disputando um ciclo já sorteado não pode entrar
-     no próximo, senão a mesma conta aparece em dois. O jogador tem essa trava; o painel também. */
+  /* ⚠️ ESTA TRAVA VIROU DO AVESSO EM 24/09/2026, e ela NAO foi apagada. Ela dizia "é ela que
+     protege o chaveamento: quem está disputando um ciclo já sorteado não pode entrar no próximo" --
+     e era a MESMA trava que o jogador tinha. As duas saíram a pedido, e agora ela cobra que o
+     painel deixe entrar: sem isso alguém a reintroduz do lado do servidor e ninguém vê. */
   await db.collection('leagues').doc('schedule_custom1').set({
     cycles: [{ id: 'emcurso', status: 'drawn', scheduledTime: 1 }] });
   await db.collection('leagueTypes').doc('custom1').set({ name: 'Liga do Fogo' });
   await db.collection('leagueCycles').doc('custom1__emcurso').set({
     leagues: [{ id: 'L1', rounds: { 0: [{ a: { uid: 'misty', name: 'Misty' }, b: { uid: 'x' } }] } }] });
 
+  const r = await chamar(fns.adminAddLeagueRegistration, 'chefe', { uid: 'misty', slot: '0' });
+  ok('quem está numa liga EM ANDAMENTO ENTRA', r.ok === true, JSON.stringify(r));
+
+  /* ⚠️ MAS A METADE QUE SOBROU CONTINUA VALENDO, e ela é da CONTA (varre os tipos TODOS): o painel
+     recusa inscrever na Clássica quem está inscrito no ciclo ABERTO de outra Liga. Sem este caso,
+     uma mudança que apagasse a trava inteira passaria. */
+  await db.collection('leagueCycles').doc('custom1__emcurso').set({ leagues: [] });
+  await chamar(fns.adminRemoveLeagueRegistration, 'chefe', { uid: 'misty' }).catch(() => {});
+  await db.collection('leagues').doc('schedule_custom1').set({
+    cycles: [{ id: 'aberto2', status: 'registering', scheduledTime: Date.now() + 6e5 }] });
+  await db.collection('leagueCycles').doc('custom1__aberto2')
+    .collection('registrants').doc('misty').set({ uid: 'misty', name: 'Misty', code: 'x', slot: 0 });
   const e = await erroDe(fns.adminAddLeagueRegistration, 'chefe', { uid: 'misty', slot: '0' });
-  ok('quem está numa liga EM ANDAMENTO não entra', e && e.code === 'failed-precondition',
-     (e && e.message) || 'PASSOU');
+  ok('  mas quem esta INSCRITO no ciclo aberto de outra Liga nao entra',
+     e && e.code === 'failed-precondition', (e && e.message) || 'PASSOU');
   ok('  e a mensagem diz ONDE ele está', e && /custom1/.test(e.message), e && e.message);
 
   /* tirando ele de lá, ele entra */
-  await db.collection('leagueCycles').doc('custom1__emcurso').set({ leagues: [] });
-  const r = await chamar(fns.adminAddLeagueRegistration, 'chefe', { uid: 'misty', slot: '0' });
-  ok('  e entra depois que aquela liga o solta', r.ok === true, JSON.stringify(r));
+  await db.collection('leagueCycles').doc('custom1__aberto2')
+    .collection('registrants').doc('misty').delete();
+  const r2 = await chamar(fns.adminAddLeagueRegistration, 'chefe', { uid: 'misty', slot: '0' });
+  ok('  e entra depois que aquela liga o solta', r2.ok === true, JSON.stringify(r2));
 }
 
 console.log('\n=== REMOVER ===');

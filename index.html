@@ -6932,6 +6932,7 @@ function freshGameDefaults(){
     rivalStarterId:null,
     rivalTaunt:'',
     rivalBattlesDone:[],
+    rivalCoins:0,
     stolenMon:null,
     hideoutStage:0,
     hideoutAttemptsLeft:3,
@@ -15382,14 +15383,26 @@ function finishSpecialBattle(){
     game.vigilia = null;
     saveCurrentGame();
   } else if(cfg.context==='rival'){
+    /* ⚠️ A APOSTA É ACUMULADA NO SAVE, e o pagamento é do SERVIDOR: `moedas` está na trava de campos
+       do `firestore.rules` (é poder de compra), então o cliente não a escreve -- ele escreve o
+       SALDO, e o `claimJourneyCoins` paga a diferença lendo o save gravado.
+       ⚠️ E ESTE PONTO RODA UMA VEZ POR BATALHA: o `maybeRivalBattle` marca o trecho no
+       `rivalBattlesDone` ANTES de começar, então cada trecho rende um resultado só -- ganhe ou
+       perca. É isso que faz o saldo não ter como contar duas vezes a mesma luta. */
+    game.rivalCoins = (game.rivalCoins || 0) + (win ? MOEDAS_RIVAL : -MOEDAS_RIVAL);
     if(win){
       // vencer o rival rende 3 níveis em TODOS os modos (era 5 no normal).
       // A constante segue existindo caso um dia o difícil precise de um valor próprio
       game.specialGrantsLevels = isHardMode() ? HARD_RIVAL_BONUS : RIVAL_WIN_BONUS;
-      msg = `Você venceu ${cfg.meta.opponentName}! «Droga... da próxima eu ganho.» Isso rendeu <strong>+${game.specialGrantsLevels} levels bônus</strong> pro seu time.`;
+      msg = `Você venceu ${cfg.meta.opponentName}! «Droga... da próxima eu ganho.» Isso rendeu <strong>+${game.specialGrantsLevels} levels bônus</strong> pro seu time e <strong>🪙 ${MOEDAS_RIVAL} moedas</strong> da aposta.`;
     } else {
-      msg = `${cfg.meta.opponentName} venceu dessa vez. «Ainda bem que treinei mais que você.» Essa derrota <strong>não contou</strong> nas suas 5.`;
+      msg = `${cfg.meta.opponentName} venceu dessa vez. «Ainda bem que treinei mais que você.» Essa derrota <strong>não contou</strong> nas suas 5, mas a aposta custou <strong>🪙 ${MOEDAS_RIVAL} moedas</strong>.`;
     }
+    /* ⚠️ O PAGAMENTO SAI AQUI, e não no ginásio seguinte: sem esta linha o saldo só chegaria na
+       conta na próxima vitória de ginásio -- e a tela do resultado, que é onde o jogador está
+       lendo sobre a aposta, mostraria a moeda de outra coisa. Ele grava o save antes (é o que o
+       servidor lê) e é best-effort: uma chamada que se perde é coberta pela próxima. */
+    receberMoedasDaJornada();
   } else if(cfg.context==='elite'){
     // registra o pico ANTES de qualquer avanço ou reset -- eliteStage aqui ainda é "quantos membros
     // já foram batidos ao entrar nessa luta", então isso acumula o melhor de TODAS as tentativas,
@@ -17648,7 +17661,7 @@ async function migrateOldLeagueDataIfNeeded(){
    SEIS idas em sequência. Três eram evitáveis:
      - o `ensureRegisteringCycle` abria uma TRANSAÇÃO mesmo quando o ciclo já existe, que é o caso
        comum -- transação custa duas idas (ler + confirmar) e uma leitura simples custa uma;
-     - o calendário era lido de novo pelo `isAccountActiveInLeague`;
+     - o calendário era lido de novo pela checagem de "já está na liga";
      - o documento do inscrito era lido por ele E pela transação da gravação.
    ⚠️ LER ANTES É SEGURO AQUI: no SDK compat o `get()` vai ao SERVIDOR quando online (o cache só
    entra offline), e quando o ciclo NÃO existe a criação continua dentro da transação -- que relê e
@@ -17661,8 +17674,11 @@ async function preambuloDaInscricao(typeId, uid){
   let entry = cycles.find(c => c.status === 'registering');
   /* só quando falta: aí sim vale a transação, que é o que impede duas abas de criarem dois */
   if(!entry){ entry = await ensureRegisteringCycle(typeId); }
-  const ativo = await isAccountActiveInLeague(typeId, uid, { cycles, pularInscricao: true });
-  return { entry, ativo };
+  /* ⚠️ ELE NÃO CHECA MAIS NADA AQUI, e a razão é que não sobrou o que checar: a trava de "já está
+     DISPUTANDO" saiu em 24/09/2026 (a pedido), e a de "já está INSCRITO neste ciclo" é a própria
+     transação da gravação -- ela relê o mesmo documento e recusa com DUPLICATE. Uma checagem aqui
+     seria uma ida ao servidor pra confirmar o que a transação garante três linhas depois. */
+  return { entry };
 }
 async function ensureRegisteringCycle(typeId){
   return await db.runTransaction(async (tx)=>{
@@ -17733,8 +17749,7 @@ async function registerForLeague(typeId, slot, ficarNaTela){
   // o time do save, e ponto: se o Mewtwo emprestado estiver nele, ele vai junto como qualquer outro
   const code = encodeTeamCode(saveData.team);
   try{
-    const { entry: cycleEntry, ativo } = await preambuloDaInscricao(typeId, uid);
-    if(ativo){ throw new Error('ACTIVE_ELSEWHERE'); }
+    const { entry: cycleEntry } = await preambuloDaInscricao(typeId, uid);
     const regRef = registrantDocRef(typeId, cycleEntry.id, uid);
     await db.runTransaction(async (tx)=>{
       const snap = await tx.get(regRef);
@@ -17776,7 +17791,7 @@ async function registerForLeague(typeId, slot, ficarNaTela){
   } catch(e){
     game.leagueSubmitting = false;
     game.leagueSubmittingSlot = null;
-    if(e.message==='DUPLICATE' || e.message==='ACTIVE_ELSEWHERE') game.leagueError = 'Sua conta já está inscrita nessa Liga em outra rodada.';
+    if(e.message==='DUPLICATE') game.leagueError = 'Sua conta já está inscrita nessa Liga.';
     else { console.error(e); game.leagueError = 'Erro ao se inscrever. Confira sua conexão e tente de novo.'; }
     /* O `leagueError` é lido pelas DUAS telas: a da Liga e o modal do aviso. Com o modal aberto,
        deixar o erro só na tela da Liga seria falhar em silêncio na cara de quem clicou. */
@@ -17940,8 +17955,7 @@ async function inscreverNaLigaPro(){
   render();
   const uid = game.authUser.uid;
   try{
-    const { entry: cycleEntry, ativo } = await preambuloDaInscricao(PRO_LEAGUE_TYPE, uid);
-    if(ativo){ throw new Error('ACTIVE_ELSEWHERE'); }
+    const { entry: cycleEntry } = await preambuloDaInscricao(PRO_LEAGUE_TYPE, uid);
     /* ⚠️ O CICLO PODE TER VIRADO enquanto o jogador escolhia -- e aí o bolo dele é de OUTRO
        ciclo, porque o `cycleId` entra na semente. Inscrever assim mandaria um time que o servidor
        vai descartar na validação, em silêncio. Melhor re-sortear e pedir de novo. */
@@ -17977,7 +17991,7 @@ async function inscreverNaLigaPro(){
     refreshLeagueView(PRO_LEAGUE_TYPE, false);
   } catch(e){
     game.leagueSubmitting = false;
-    if(e.message==='DUPLICATE' || e.message==='ACTIVE_ELSEWHERE'){
+    if(e.message==='DUPLICATE'){
       game.leagueTeamPickError = 'Sua conta já está inscrita nessa Liga em outra rodada.';
     } else {
       console.error(e);
@@ -19524,7 +19538,7 @@ async function abrirBoloDaLigaPro(){
   render();
   if(!game.authUser){ game.leagueTeamPickError = 'Você precisa estar logado.'; render(); return; }
   try{
-    const { entry, ativo } = await preambuloDaInscricao(PRO_LEAGUE_TYPE, game.authUser.uid);
+    const { entry } = await preambuloDaInscricao(PRO_LEAGUE_TYPE, game.authUser.uid);
     if(ativo){ game.leagueTeamPickError = 'Sua conta já está inscrita nessa Liga em outra rodada.'; render(); return; }
     game.proCicloId = entry.id;
     game.proFaixa = proFaixaDoCiclo(entry);
@@ -19693,8 +19707,7 @@ async function registerCustomTeamForLeague(){
   const uid = game.authUser.uid;
   const code = encodeTeamCode(team);
   try{
-    const { entry: cycleEntry, ativo } = await preambuloDaInscricao(typeId, uid);
-    if(ativo){ throw new Error('ACTIVE_ELSEWHERE'); }
+    const { entry: cycleEntry } = await preambuloDaInscricao(typeId, uid);
     const regRef = registrantDocRef(typeId, cycleEntry.id, uid);
     await db.runTransaction(async (tx)=>{
       const snap = await tx.get(regRef);
@@ -19710,7 +19723,7 @@ async function registerCustomTeamForLeague(){
     refreshLeagueView(typeId, false);
   } catch(e){
     game.leagueSubmitting = false;
-    if(e.message==='DUPLICATE' || e.message==='ACTIVE_ELSEWHERE') game.leagueTeamPickError = 'Sua conta já está inscrita nessa Liga em outra rodada.';
+    if(e.message==='DUPLICATE') game.leagueTeamPickError = 'Sua conta já está inscrita nessa Liga.';
     else { console.error(e); game.leagueTeamPickError = 'Erro ao se inscrever. Confira sua conexão e tente de novo.'; }
     render();
   }
@@ -21021,6 +21034,10 @@ function serializeGame(){
     rivalPool: game.rivalPool || [],
     rivalStarterId: game.rivalStarterId || null,
     rivalBattlesDone: game.rivalBattlesDone || [],
+    /* ⚠️ O SALDO DA APOSTA COM O RIVAL VAI PRO BANCO, e é dele que o servidor calcula o pagamento --
+       sem esta linha a aposta não existiria pra quem paga. Ele volta no `applySavedState`: campo
+       que sai e não volta se perde num F5, e isso já custou a travessia das Ilhas inteira. */
+    rivalCoins: game.rivalCoins || 0,
     stolenMon: game.stolenMon || null,
     hideoutStage: game.hideoutStage || 0,
     hideoutAttemptsLeft: game.hideoutAttemptsLeft!=null ? game.hideoutAttemptsLeft : 3,
@@ -21297,6 +21314,7 @@ function applySavedState(data){
   game.rivalPool = data.rivalPool || [];
   game.rivalStarterId = data.rivalStarterId || null;
   game.rivalBattlesDone = data.rivalBattlesDone || [];
+  game.rivalCoins = Number(data.rivalCoins) || 0;   // a volta do round-trip (ver o serializeGame)
   game.stolenMon = data.stolenMon || null;
   game.hideoutStage = data.hideoutStage || 0;
   game.hideoutAttemptsLeft = data.hideoutAttemptsLeft!=null ? data.hideoutAttemptsLeft : 3;
@@ -21437,43 +21455,21 @@ async function continueCompleteSave(slot){
     render();
   } catch(e){ console.error(e); }
 }
-/* ⚠️ AS DUAS OPÇÕES EXISTEM POR TEMPO DE TELA, e cada uma corta UMA ida ao servidor (16/09/2026).
-   Medido no caminho do botão "Inscrever time": ele fazia SEIS idas em sequência, e a 150ms de RTT
-   (celular) isso é quase um segundo parado. Duas delas eram desperdício puro -- o calendário era
-   lido duas vezes e o documento do inscrito também.
-   `cycles` — os ciclos que quem chamou JÁ leu. Sem ele esta função relê o mesmo documento de 9,5 KB
-     que o preâmbulo acabou de ler.
-   `pularInscricao` — não confere o ciclo ABERTO. Quem vai GRAVAR não precisa: a transação da
-     gravação lê o mesmo documento e recusa com DUPLICATE, e as duas saídas dão a MESMA mensagem
-     na tela ("já está inscrita nessa Liga em outra rodada"). Quem só quer SABER (o aviso da
-     jornada) não passa a opção e continua conferindo tudo. */
-async function isAccountActiveInLeague(typeId, uid, opcoes){
-  if(!uid) return false;
-  const op = opcoes || {};
+/* ⚠️ ELA RESPONDE UMA PERGUNTA SÓ: "esta conta já está INSCRITA no ciclo que ainda vai sortear?".
+   ⚠️ E ATÉ 24/09/2026 ELA RESPONDIA DUAS -- ela tinha outro nome e varria
+   também os ciclos `drawn`/`advancing` procurando o uid no chaveamento. Era essa metade que
+   impedia o jogador de se inscrever de novo antes de o campeonato dele acabar, e ela saiu a
+   pedido -- ver a seção da trava que acabou, no CLAUDE.md.
+   ⚠️ E ELA CUSTAVA UMA IDA AO SERVIDOR POR CICLO EM ANDAMENTO: medido, o clique de inscrever ia de
+   3 pra 4 idas quando havia uma liga rolando, e o aviso da jornada relia o calendário inteiro de
+   9,5 KB só pra chegar nela.
+   ⚠️ O `cycleId` VEM DE QUEM CHAMOU, que já o tem na mão: sem ele isto releria o calendário -- e
+   era exatamente assim que o aviso da jornada o lia duas vezes. */
+async function jaInscritoNoCicloAberto(typeId, uid, cycleId){
+  if(!uid || !cycleId) return false;
   try{
-    let cycles = op.cycles;
-    if(!cycles){
-      const scheduleSnap = await scheduleDocRef(typeId).get();
-      if(!scheduleSnap.exists) return false;
-      cycles = scheduleSnap.data().cycles || [];
-    }
-    const checks = await Promise.all(cycles.map(async (entry)=>{
-      if(entry.status==='registering'){
-        if(op.pularInscricao) return false;
-        const regSnap = await registrantDocRef(typeId, entry.id, uid).get();
-        return regSnap.exists;
-      } else if(entry.status==='drawn' || entry.status==='advancing'){
-        const detailSnap = await cycleDocRef(typeId, entry.id).get();
-        if(!detailSnap.exists) return false;
-        return (detailSnap.data().leagues||[]).some(league=>
-          Object.values(league.rounds||{}).some(round=>
-            round.some(m=> (m.a && m.a.uid===uid) || (m.b && m.b.uid===uid))
-          )
-        );
-      }
-      return false;
-    }));
-    return checks.some(Boolean);
+    const regSnap = await registrantDocRef(typeId, cycleId, uid).get();
+    return regSnap.exists;
   } catch(e){ console.error('Erro ao checar Liga:', e); return false; }
 }
 function openEditTrainerNameModal(){
@@ -26982,10 +26978,18 @@ function ninhosAcesosHtml(){
     </div>`;
   }).join("");
 }
+/* ⚠️ ELA MOSTRA O NEGATIVO DESDE 24/09/2026: a aposta com o rival é a única fonte de moeda que anda
+   pros dois lados, e com o `n <= 0` de antes a COBRANÇA saía da conta sem uma linha na tela -- que
+   é o erro da especialidade de 1% de novo (o jogador não tem como saber que aquilo aconteceu).
+   ⚠️ E O ZERO CONTINUA MUDO: ele é o caso comum (a chamada que não achou diferença nenhuma), e
+   "+0 moedas" diria menos que nada. */
 function moedasGanhasHtml(){
   const n = game.moedasGanhasAgora || 0;
-  if(n <= 0) return '';
-  return `<div class="box moeda-premio"><p>${selo('moeda')} <strong>+${n} moeda${n===1?'':'s'}</strong> — já estão na sua conta.</p></div>`;
+  if(n === 0) return '';
+  const q = Math.abs(n);
+  return n > 0
+    ? `<div class="box moeda-premio"><p>${selo('moeda')} <strong>+${q} moeda${q===1?'':'s'}</strong> — já estão na sua conta.</p></div>`
+    : `<div class="box moeda-premio"><p>${selo('moeda')} <strong>−${q} moeda${q===1?'':'s'}</strong> — a aposta com o rival saiu da sua conta.</p></div>`;
 }
 function renderBattleResult(win){
   const gym = gymAtual();
@@ -28902,14 +28906,21 @@ function renderLeague(){
     <div class="box">
       <h2>Inscreva-se</h2>
       <p>Escolha qual time da sua conta vai representar <strong>${game.trainerName}</strong> nessa Liga.</p>
-      ${(game.accountLeagueSlots||{})[game.currentLeagueTypeId]!=null ? `<p class="hint-text">⚠️ Sua conta já está disputando essa Liga em outra rodada com o <strong>${escapeHtmlSafe(slotDisplayName((game.accountLeagueSlots||{})[game.currentLeagueTypeId]))}</strong>. Espere ela terminar pra poder se inscrever de novo.</p>` : ''}
+      ${/* ⚠️ ESTA LINHA ERA UM BLOQUEIO E VIROU UM AVISO (24/09/2026). Dentro do ramo "NÃO estou
+           inscrito", o accountLeagueSlots só pode vir de um ciclo JÁ SORTEADO -- se fosse o ciclo
+           ABERTO, o alreadyIn seria true e este bloco nem existiria. Ou seja a condição já isola o
+           caso sozinha, e o que mudou foi o texto deixar de mandar esperar.
+           ⚠️ E O SINAL DE ATENÇÃO SAIU COM ELE: ele quer dizer "algo te impede", e nada impede
+           mais. Este comentário vive DENTRO de um template literal, então ele não pode ter crase
+           nenhuma -- uma crase aqui FECHA a string e a tela morre só no navegador. */''}
+      ${(game.accountLeagueSlots||{})[game.currentLeagueTypeId]!=null ? `<p class="hint-text">Sua conta já está disputando essa Liga em outra rodada, com o <strong>${escapeHtmlSafe(slotDisplayName((game.accountLeagueSlots||{})[game.currentLeagueTypeId]))}</strong> — e pode se inscrever nesta aqui também.</p>` : ''}
       ${game.leagueError ? `<p class="error-text">${game.leagueError}</p>` : ''}
       ${/* ⚠️ A FAIXA DA RODADA É A INFORMAÇÃO QUE DECIDE a inscrição na Pro: ela gira a cada
            campeonato, e sem ela na tela o jogador só descobre em que nível vai lutar depois de
            abrir o picker. Ela sai da ENTRADA do ciclo, que é onde a faixa é carimbada. */''}
       ${/* ⚠️ A LINHA DA FAIXA SAIU DAQUI: ela virou o QUADRO lá em cima, que aparece inscrito ou
            não. Mantida, a tela diria a mesma coisa duas vezes na mesma rolagem. */''}
-      <button class="btn danger" ${(game.accountLeagueSlots||{})[game.currentLeagueTypeId]!=null?'disabled':''} onclick="openLeagueTeamPicker()">${game.currentLeagueTypeId === PRO_LEAGUE_TYPE ? 'Ver meus ' + PRO_SORTEADOS + ' ⚔️' : 'Escolher time ⚔️'}</button>
+      <button class="btn danger" onclick="openLeagueTeamPicker()">${game.currentLeagueTypeId === PRO_LEAGUE_TYPE ? 'Ver meus ' + PRO_SORTEADOS + ' ⚔️' : 'Escolher time ⚔️'}</button>
     </div>` : `
     <div class="box">
       <h2>✅ Você está inscrito!</h2>
@@ -31509,6 +31520,11 @@ const MOEDAS_RESSORTEIO = 5;
    Ele existe aqui porque a TELA o le -- um 100 escrito na frase envelheceria no primeiro reajuste,
    a familia do rotulo de metragem do revezamento da Corrida. */
 const MOEDAS_CAMPEAO_PRO = 100;   // tem que bater com o do servidor (ver rerollWildOffer)
+/* ⚠️ A APOSTA COM O RIVAL: tem que bater com o do servidor, que é quem PAGA. Aqui ela serve a duas
+   coisas -- acumular o saldo no save e escrever o número na tela. Escrito à mão na frase, ele
+   envelheceria no primeiro reajuste -- a família do rótulo de metragem da Corrida,
+   que este arquivo registra meia dúzia de vezes. */
+const MOEDAS_RIVAL = 5;
 /* O TETO DE RE-SORTEIOS POR SAVE (11/09/2026, a pedido). O número vive aqui E no servidor
    (MAX_RESSORTEIOS_POR_SAVE nos dois): o cliente precisa dele pra desabilitar o botão e dizer
    quantos sobram, o servidor é quem RECUSA. Se os dois divergirem, a tela oferece um re-sorteio que
@@ -32125,10 +32141,14 @@ async function atualizarAvisoDaLiga(){
     const snap = await scheduleDocRef(CLASSIC_LEAGUE_TYPE).get();
     const ciclo = snap.exists ? (snap.data().cycles||[]).find(c=>c.status==='registering') : null;
     if(!ciclo){ game.avisoLiga = null; return; }
-    /* "Já está dentro" é mais do que estar inscrito NESTE ciclo: quem está disputando um ciclo já
-       sorteado não consegue se inscrever no próximo (a própria tela da Liga bloqueia), e avisar
-       seria convidar pra uma porta fechada. O isAccountActiveInLeague cobre os dois casos. */
-    const jaEstaNaLiga = await isAccountActiveInLeague(CLASSIC_LEAGUE_TYPE, game.authUser.uid);
+    /* ⚠️ "JÁ ESTÁ DENTRO" VIROU SÓ "JÁ ESTÁ INSCRITO NESTE CICLO" (24/09/2026). Antes ele também
+       cobria "está disputando um chaveamento", e a razão escrita era boa: a tela da Liga BLOQUEAVA a
+       inscrição nesse caso, então convidar seria convidar pra uma porta fechada. A porta abriu, e o
+       convite passou a valer -- quem está no meio de um campeonato PODE entrar no próximo.
+       ⚠️ E O CICLO VAI NA MÃO, que é o que corta as idas: a função era chamada SEM os ciclos, então
+       ela relia o calendário inteiro de 9,5 KB MAIS um documento por ciclo em andamento -- de 2+N
+       pra UMA leitura. Ele roda no `runBattle`, ou seja durante a jornada, com folga de 5 min. */
+    const jaEstaNaLiga = await jaInscritoNoCicloAberto(CLASSIC_LEAGUE_TYPE, game.authUser.uid, ciclo.id);
     game.avisoLiga = jaEstaNaLiga ? null : { hora: ciclo.scheduledTime };
   } catch(e){ /* é um aviso: falhar aqui não pode atrapalhar a jornada */ }
 }
@@ -38747,7 +38767,11 @@ function renderIlhas(){
    dela no dia em que uma ilha nascesse ou trocasse de jogo -- é a mesma razão pela qual aquele
    texto mora na tabela, ao lado do nome e do líder. Ilha sem entrada lá não entra no anúncio,
    porque ali não há o que resumir. */
-const NOVIDADES_VERSAO = 'ilhas-laranja';
+/* ⚠️ ELA GIROU EM 24/09/2026 (de 'ilhas-laranja' pra cá), e é exatamente o que o campo existe pra
+   fazer: quem já leu o anúncio das Ilhas vê este, e conta nova vê este também. Com um booleano de
+   "já viu" este teria sido o único anúncio da vida do jogo, e alguém teria que limpar o campo de
+   todas as contas na mão. */
+const NOVIDADES_VERSAO = 'liga-pro';
 /* ⚠️ A GUARDA DE TELA É A HOME, e ela é necessária: o `loadPermanentUserData` roda também ao abrir
    a Pokédex e as Conquistas, e o pedido diz "na tela home". Sem ela o anúncio nasceria por cima de
    outra tela -- e um modal cobre a tela inteira. */
@@ -38779,27 +38803,66 @@ function fecharNovidades(){ marcarNovidadesLidas(); render(); }
 /* fecha E vai pras ilhas: o anúncio é sobre um modo que tem botão logo atrás dele, e fazer o
    jogador fechar pra depois procurar o botão seria uma volta a mais. Os DOIS botões marcam como
    lido -- o que marca é ter LIDO, não o caminho tomado. O `abrirIlhas` já redesenha. */
-function novidadesIrParaAsIlhas(){ marcarNovidadesLidas(); abrirIlhas(); }
+/* fecha E abre a Liga Pro, pelo mesmo motivo do irParaAsIlhas: o anúncio é sobre um modo que tem
+   botão logo atrás dele, e fazer o jogador fechar pra depois procurar seria uma volta a mais.
+   ⚠️ OS DOIS BOTÕES MARCAM COMO LIDO: o que marca é ter LIDO, não o caminho tomado -- sem isso quem
+   clica em "Ver a Liga Pro" reencontraria o anúncio na próxima vez que abrisse a home. */
+function novidadesIrParaALigaPro(){ marcarNovidadesLidas(); openLeague(PRO_LEAGUE_TYPE); }
+/* ⚠️ TODO NÚMERO DAQUI É DERIVADO DAS CONSTANTES, nunca escrito na frase: os 12, os 6, as três
+   faixas, as 100 moedas do campeão e os 5 da aposta. Escritos à mão eles envelheceriam no primeiro
+   reajuste -- é a família do rótulo de metragem da Corrida e do aviso de multi-tapa, que este arquivo
+   registra meia dúzia de vezes.
+   ⚠️ E AS TRÊS FAIXAS SAEM NA ORDEM DA ROTAÇÃO (o `PRO_FAIXAS`), não ordenadas por nível: a frase
+   diz "uma por campeonato, nesta ordem", então é a rotação que ela descreve.
+   ⚠️ E AS TRÊS MEDALHAS CASAM COM OS TRÊS NOMES -- o `proNomeDaFaixa` ordena as faixas POR NÍVEL e
+   devolve Bronze/Prata/Ouro, então o selo é indexado pela mesma ordem. Sem isso a medalha de ouro
+   sairia ao lado da faixa Bronze no dia em que a rotação mudar de ordem. */
 function renderNovidadesModal(){
-  const linhas = ILHAS_LARANJA.map(ilha => {
-    const como = ILHAS_COMO[ilha.id];
-    if(!como) return '';
-    return `<li>
-      <span>${ilha.selo ? selo(ilha.selo) : ''}</span>
-      <span>
-        <b>${escapeHtmlSafe(ilha.nome)} · ${escapeHtmlSafe(ilha.lider)} — ${escapeHtmlSafe(ilha.jogo)}</b>
-        <span class="novidades-resumo">${escapeHtmlSafe(como.resumo)}</span>
-      </span>
-    </li>`;
-  }).join('');
-  const quantas = ILHAS_LARANJA.filter(i => ILHAS_COMO[i.id]).length;
   return `
   <div class="modal-overlay" onclick="fecharNovidades()">
-    <div class="modal-box novidades-box" style="border-color:${COR_ILHAS}" onclick="event.stopPropagation()">
-      <h2>${selo('ilhas', 'selo-titulo')} Novidades</h2>
-      <p>As <strong>Ilhas Laranja</strong> abriram — ${quantas} desafios novos:</p>
-      <ul class="novidades-lista">${linhas}</ul>
-      <button class="btn primary" style="background:${COR_ILHAS}" onclick="novidadesIrParaAsIlhas()">Ver as Ilhas Laranja</button>
+    <div class="modal-box novidades-box" onclick="event.stopPropagation()">
+      ${/* ⚠️ O SELO É O MESMO DO CARD DA LIGA PRO na lista de ligas, e não um escolhido aqui: o
+           jogador lê o símbolo no anúncio e reconhece o card que ele manda procurar. É a mesma
+           razão pela qual o anúncio das Ilhas levava o selo do botão da home delas, e há trava
+           lendo o selo DO CARD -- se ele trocar um dia, é este título que tem que acompanhar. */''}
+      <h2>${selo('medalha_ouro', 'selo-titulo')} Novidades</h2>
+      ${/* ⚠️ O CONTEÚDO FOI CORTADO DEPOIS DE MEDIR A 320px, e é a mesma conta que o anúncio das
+           Ilhas fez: a caixa tem 483px de teto (85vh de 568), e o que NÃO é lista não cede -- só a
+           lista tem o \u0060min-height:0\u0060. Com um parágrafo de abertura de 3 linhas, um segundo
+           parágrafo pras faixas, uma SEGUNDA lista e a linha do rival em 2 linhas, os fixos somavam
+           284px e as duas listas ficavam com 11 e 6px de altura VISÍVEL -- ou seja invisíveis.
+           ⚠️ E O QUE SAIU FOI O QUE A PRÓPRIA LISTA JÁ DIZIA: a segunda lista virou uma LINHA da
+           primeira (os três rótulos no resumo), o parágrafo que a anunciava saiu com ela, e a
+           abertura e a linha do rival encurtaram pra uma linha cada.
+           ⚠️ E NA SEGUNDA MEDIÇÃO, com QUATRO linhas, a lista mostrava **2 de 4** (135 de 270px): os
+           dois que ficavam escondidos eram justamente OS GOLPES e AS 100 MOEDAS -- e o prêmio é uma
+           das três coisas que o pedido nomeia. Uma lista que rola por dentro esconde sem avisar.
+           ⚠️ ENTÃO ELA FICOU COM DUAS LINHAS, e o critério foi o PEDIDO: o time sorteado e o prêmio
+           do campeão. Os golpes viraram meia frase do resumo da primeira (eles são a segunda metade
+           da mesma inscrição), e AS FAIXAS SAÍRAM -- elas têm um quadro próprio na tela da Liga Pro,
+           que é pra onde o botão leva, e lá elas dizem a rodada de AGORA. */''}
+      <p>A <strong>Liga Pro</strong> abriu — e nela o time é <strong>sorteado</strong>.</p>
+      <ul class="novidades-lista">
+        <li>
+          ${/* ⚠️ O SELO DE EQUIPE, e não a bandeira quadriculada: aquela é a da CORRIDA (a linha de
+               chegada), e num anúncio de liga ela se lê como outro modo -- foi a captura de tela a
+               320px que pegou. Esta linha é sobre montar um TIME: 12 viram 6. */''}
+          <span>${selo('amigos')}</span>
+          <span>
+            <b>${PRO_SORTEADOS} aparecem, você escolhe ${PRO_ESCOLHE}</b>
+            <span class="novidades-resumo">E os golpes de cada um, até ${MAX_GOLPES}. O que decide é a ESCOLHA.</span>
+          </span>
+        </li>
+        <li>
+          <span>${selo('moeda')}</span>
+          <span>
+            <b>O campeão leva 🪙 ${MOEDAS_CAMPEAO_PRO} moedas</b>
+            <span class="novidades-resumo">Creditadas na hora — sem cupom pra ativar.</span>
+          </span>
+        </li>
+      </ul>
+      <p class="hint-text">E na <strong>jornada</strong>: o rival agora aposta <strong>🪙 ${MOEDAS_RIVAL}</strong> — vencer paga, perder custa.</p>
+      <button class="btn primary" onclick="novidadesIrParaALigaPro()">Ver a Liga Pro</button>
       <button class="btn secondary" onclick="fecharNovidades()">Fechar</button>
     </div>
   </div>`;

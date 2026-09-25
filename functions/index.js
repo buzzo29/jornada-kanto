@@ -6252,11 +6252,17 @@ async function adminCicloAberto(){
   return (agenda.data().cycles || []).find(c => c.status === 'registering') || null;
 }
 
-/* ⚠️ A MESMA TRAVA QUE O JOGADOR TEM: quem está disputando um ciclo já sorteado não pode entrar no
-   próximo -- senão a mesma conta aparece em dois chaveamentos. O cliente faz isso no
-   `isAccountActiveInLeague`; aqui é a versão de servidor, e ela varre os tipos TODOS (a trava é da
-   CONTA, não de um tipo de liga). */
-async function adminAtivoEmAlgumaLiga(uid, pularCicloAberto){
+/* ⚠️ ELA RESPONDE "ESTA CONTA JÁ ESTÁ INSCRITA NO CICLO ABERTO DE ALGUMA LIGA?", e até 24/09/2026
+   ela respondia também "está DISPUTANDO um chaveamento" -- a mesma trava que o jogador tinha. Essa
+   metade saiu junto com a dele, a pedido: quem está no meio de um campeonato pode se inscrever no
+   próximo. O comentário antigo daqui dizia "senão a mesma conta aparece em dois chaveamentos", e é
+   exatamente isso que passou a ser permitido.
+   ⚠️ O QUE SOBRA CONTINUA SENDO DA CONTA, e não de um tipo de liga: ela varre os tipos TODOS, então
+   o painel continua recusando inscrever na Clássica quem está inscrito no ciclo ABERTO da Pro. Isso
+   é MAIS restritivo que a tela do jogador (onde o `accountLeagueSlots` é indexado por typeId e a
+   mesma conta pode estar nas duas) -- a assimetria é anterior a esta mudança e continua deliberada:
+   mexer no ESCOPO é outra decisão, e ela não foi pedida. */
+async function adminJaInscritoEmAlgumaLiga(uid, pularCicloAberto){
   /* ⚠️ OS TIPOS RESERVADOS ENTRAM NA MAO: a Classica e a Pro NAO vivem na colecao `leagueTypes`
      (que e das customizadas), entao sem esta linha a trava nao veria a Pro -- e o painel deixaria
      inscrever na Classica alguem que esta disputando um chaveamento da Pro, que e exatamente o que
@@ -6275,13 +6281,6 @@ async function adminAtivoEmAlgumaLiga(uid, pularCicloAberto){
         if(pularCicloAberto && typeId === CLASSIC_LEAGUE_TYPE) continue;
         const r = await registrantDocRef(typeId, c.id, uid).get();
         if(r.exists) return { typeId, cycleId: c.id, status: c.status };
-      } else if(c.status === 'drawn' || c.status === 'advancing'){
-        const det = await cycleDocRef(typeId, c.id).get();
-        if(!det.exists) continue;
-        const achou = (det.data().leagues || []).some(l =>
-          Object.values(l.rounds || {}).some(r =>
-            r.some(m => (m.a && m.a.uid === uid) || (m.b && m.b.uid === uid))));
-        if(achou) return { typeId, cycleId: c.id, status: c.status };
       }
     }
   }
@@ -6349,12 +6348,12 @@ exports.adminAddLeagueRegistration = onCall(async (request) => {
   const nome = (cd.trainerName || s.trainerName || '').trim();
   if(!nome) throw new HttpsError('failed-precondition', 'Esse treinador não tem nome definido.');
 
-  /* ⚠️ E A TRAVA DE "JÁ ESTÁ EM OUTRA LIGA" VALE IGUAL: o admin não pode pôr alguém em dois
-     chaveamentos. O ciclo aberto da clássica é pulado porque a duplicata nele é tratada na
-     transação abaixo, com uma mensagem mais útil. */
-  const ativo = await adminAtivoEmAlgumaLiga(alvo, true);
+  /* ⚠️ E A TRAVA QUE SOBROU É "JÁ INSCRITO NO CICLO ABERTO DE OUTRA LIGA" -- a de "está disputando
+     um chaveamento" saiu em 24/09/2026, junto com a do jogador. O ciclo aberto da clássica é pulado
+     porque a duplicata nele é tratada na transação abaixo, com uma mensagem mais útil. */
+  const ativo = await adminJaInscritoEmAlgumaLiga(alvo, true);
   if(ativo) throw new HttpsError('failed-precondition',
-    'Esse treinador já está numa liga em andamento (' + ativo.typeId + ' / ' + ativo.cycleId + ').');
+    'Esse treinador já está inscrito em outra Liga (' + ativo.typeId + ' / ' + ativo.cycleId + ').');
 
   const ref = registrantDocRef(CLASSIC_LEAGUE_TYPE, ciclo.id, alvo);
   await db.runTransaction(async (tx) => {
@@ -9344,6 +9343,10 @@ const MOEDAS_POR_GINASIO = 5;
 const MOEDAS_JORNADA_COMPLETA = 10;   // as 8 insígnias
 const MOEDAS_ELITE = 20;
 const MOEDAS_RESSORTEIO = 5;
+/* ⚠️ A APOSTA COM O RIVAL (24/09/2026): vencer paga, PERDER COBRA -- e ela é a única fonte de moeda
+   do jogo que anda pros DOIS lados. O rival aparece em três trechos (o RIVAL_LEGS do cliente), e o
+   `rivalBattlesDone` garante uma batalha por trecho: o teto de uma jornada é ±15. */
+const MOEDAS_RIVAL = 5;
 /* ⚠️ O CAMPEAO DA LIGA PRO GANHA MOEDA, nao o bonus shiny (24/09/2026, a pedido). Ela e paga NA
    HORA e nao e um cupom: moeda nao EXPIRA, entao um cupom dela seria um clique sem razao e, pior,
    um jeito de PERDER o premio (apagar a notificacao -- o defeito de 10/09/2026). O bonus shiny e
@@ -9373,6 +9376,12 @@ function moedasDevidasDoSave(save){
   let total = insignias * MOEDAS_POR_GINASIO;
   if(insignias >= 8) total += MOEDAS_JORNADA_COMPLETA;
   if(s.eliteStatus === 'champion') total += MOEDAS_ELITE;
+  /* ⚠️ O SALDO DAS BATALHAS DE RIVAL ENTRA AQUI, e ele pode ser NEGATIVO -- é o único termo desta
+     soma que desce. Ele é acumulado pelo cliente no save (±MOEDAS_RIVAL por batalha), e entrar no
+     "devido" é o que faz a aposta herdar de graça a idempotência do `coinsPaid`: o que se paga é
+     sempre a DIFERENÇA, então um F5 ou duas abas não cobram duas vezes.
+     ⚠️ E O CAMPO É NOVO, ou seja todo save existente lê 0 -- ninguém é cobrado retroativamente. */
+  total += Number(s.rivalCoins) || 0;
   return total;
 }
 
@@ -9408,9 +9417,20 @@ exports.claimJourneyCoins = onCall(async (request) => {
       tx.set(saveRef, { coinsPaid: devido }, { merge: true });
       return { moedas: moedasAgora, ganhou: 0, base: devido };
     }
-    const ganhou = Math.max(0, devido - save.coinsPaid);
-    if(ganhou > 0){
+    /* ⚠️ A DIFERENÇA PODE SER NEGATIVA desde 24/09/2026 (a aposta com o rival cobra quando ele
+       ganha), e até aqui havia um `Math.max(0, ...)` que a engoliria em silêncio.
+       ⚠️ E ELA É APARADA NO SALDO DA CONTA: "pagar 5 ao rival" com 2 moedas na mão cobra 2, e o
+       jogador nunca fica NEGATIVO -- a loja compara `moedas >= preco`, então um saldo negativo não
+       quebraria nada, mas ele apareceria na tela e ninguém pediu isso.
+       ⚠️ E O `coinsPaid` AVANÇA PRO DEVIDO DE QUALQUER FORMA: a parte da dívida que não caberia no
+       saldo é ESQUECIDA, e não fica pendente. Guardá-la seria uma segunda conta a manter, e o
+       jogador seria cobrado por uma derrota antiga numa hora que ele não liga a nada. */
+    const diferenca = devido - save.coinsPaid;
+    const ganhou = diferenca < 0 ? Math.max(diferenca, -moedasAgora) : diferenca;
+    if(ganhou !== 0){
       tx.set(userRef, { moedas: admin.firestore.FieldValue.increment(ganhou) }, { merge: true });
+    }
+    if(diferenca !== 0){
       tx.set(saveRef, { coinsPaid: devido }, { merge: true });
     }
     return { moedas: moedasAgora + ganhou, ganhou };

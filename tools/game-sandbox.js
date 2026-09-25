@@ -308,7 +308,7 @@ function createSandbox(htmlPath){
     'moedasAResgatar','temConquistaAResgatar','resgatarConquistas','renderAchievements',
     'closeAchievements','CHANCE_HOOH_VIGILIA',
     // inscricao na Liga (ver test-liga-inscricao.js)
-    'registerForLeague','cancelLeagueRegistration','renderLeagueTeamPicker','atualizarAvisoDaLiga','isAccountActiveInLeague','STAR_SVG','checkLeagueRegistrationStatus','useRareCandyOn','loadSaveSlots','refreshLeagueView','ensureRegisteringCycle','isAccountActiveInLeague','registrantDocRef','scheduleDocRef','encodeTeamCode','decodeTeamCode',
+    'registerForLeague','cancelLeagueRegistration','renderLeagueTeamPicker','atualizarAvisoDaLiga','jaInscritoNoCicloAberto','STAR_SVG','checkLeagueRegistrationStatus','useRareCandyOn','loadSaveSlots','refreshLeagueView','ensureRegisteringCycle','preambuloDaInscricao','registrantDocRef','scheduleDocRef','encodeTeamCode','decodeTeamCode',
     // caixa de entrada (ver test-notificacoes.js)
     'renderNotificationsScreen','ctaDaNotificacao','irParaALiga','botaoDaLigaHtml','openLeague','openTrainersLeague','leagueTypeDocRef','TRAINERS_LEAGUE_TYPE','CLASSIC_LEAGUE_TYPE','abrirNotificacao','notificationIcon',
     'entrarNoModoSelecao','sairDoModoSelecao','alternarSelecaoNotificacao','marcarTodasNotificacoes','pedirApagarSelecionadas','cancelarApagarSelecionadas','confirmarApagarSelecionadas','renderDeleteNotificationsBulkModal','notificationPendingReward',

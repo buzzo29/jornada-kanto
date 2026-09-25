@@ -543,44 +543,110 @@ console.log('=== O ANUNCIO DAS NOVIDADES ===');
   ok('  e nao reabre depois disso', S.conferirNovidades() === false);
 
   /* ⚠️ O BOTAO PRINCIPAL TAMBEM MARCA: o que marca e ter LIDO, nao o caminho tomado -- senao quem
-     clica em "Ver as Ilhas" reencontra o anuncio na proxima vez que abrir a home. */
+     clica nele reencontra o anuncio na proxima vez que abrir a home.
+     ⚠️ ELE ERA O "Ver as Ilhas" E VIROU O "Ver a Liga Pro" quando a versao girou (24/09/2026) -- e a
+     funcao antiga SAIU do jogo no mesmo dia, porque ela ficou com ZERO chamadores. */
   contaLimpa();
   S.conferirNovidades();
-  S.novidadesIrParaAsIlhas();
-  ok('o botao que leva as ilhas tambem marca', g.novidadeVista === S.NOVIDADES_VERSAO && !g.novidadesModal);
-  ok('  e leva mesmo pras ilhas', g.screen === 'ilhas', 'tela: ' + g.screen);
+  S.novidadesIrParaALigaPro();
+  ok('o botao que leva a Liga Pro tambem marca', g.novidadeVista === S.NOVIDADES_VERSAO && !g.novidadesModal);
+  ok('  e leva mesmo pra a Liga Pro', g.screen === 'league' && g.currentLeagueTypeId === 'pro',
+     'tela: ' + g.screen + ' / liga: ' + g.currentLeagueTypeId);
+  /* ⚠️ E A FUNCAO DO ANUNCIO ANTIGO NAO PODE VOLTAR: ela era letra morta, e letra morta e o tipo de
+     coisa que fica anos no arquivo sem ninguem saber que esta morta. */
+  ok('    e a do anuncio antigo nao existe mais', src.indexOf('function novidadesIrParaAsIlhas') < 0);
 
-  /* ---- 4) o conteudo sai do ILHAS_COMO ---- */
+  /* ---- 4) o conteudo: a VERSAO GIROU pra a Liga Pro (24/09/2026) ----
+     ⚠️ ESTE BLOCO MEDIA O ANUNCIO DAS ILHAS e ele NAO foi apagado: o anuncio trocou de assunto, e
+     cada trava passou a cobrar a MESMA regra sobre o conteudo novo. A regra que importa e a de
+     baixo -- os numeros sao DERIVADOS das constantes --, e ela e a razao de o bloco existir.
+     ⚠️ E AS CONSTANTES SAO LIDAS DO FONTE, nao do sandbox: `const` nao vira propriedade global
+     dele (a licao que a Queimada e a Arena ja custaram), e exportar uma de longe ja matou o
+     servidor inteiro com um TDZ. E o padrao do test-liga-pro. */
   contaLimpa(); S.conferirNovidades();
   const modal = S.renderNovidadesModal();
-  ok('o anuncio lista as ' + S.ILHAS_LARANJA.length + ' ilhas',
-     S.ILHAS_LARANJA.every(i => modal.indexOf(i.nome) >= 0));
-  ok('  com o lider de cada uma', S.ILHAS_LARANJA.every(i => modal.indexOf(i.lider) >= 0));
-  ok('  e o jogo de cada uma', S.ILHAS_LARANJA.every(i => modal.indexOf(i.jogo) >= 0));
-  ok('  e o RESUMO de cada uma, palavra por palavra',
-     S.ILHAS_LARANJA.every(i => !S.ILHAS_COMO[i.id] || modal.indexOf(S.ILHAS_COMO[i.id].resumo) >= 0));
+  /* ⚠️ O TETO DA LISTA E UMA DECISAO DE TELA, medida a 320px -- nao ha constante no jogo pra
+     derivar dele. Ele vale 2 porque numa caixa de 483px (85vh de 568) sobram 135px pra lista, e o
+     item mede ~67: com quatro, os dois de baixo (os golpes e as 100 MOEDAS) ficavam escondidos. */
+  const NOVIDADES_LINHAS_MAX = 2;
+  /* a tela pra onde o botao leva -- e la que as faixas continuam sendo ditas */
+  const gPro = S.__getGame();
+  gPro.screen = 'league'; gPro.currentLeagueTypeId = S.PRO_LEAGUE_TYPE || 'pro';
+  gPro.leagueScreenLoading = false;
+  gPro.leagueData = { cycles: [{ id:'cp', status:'registering', scheduledTime: Date.now()+6e5,
+                                 registrants: [], amIRegistered: false }] };
+  S.__setGame(gPro);
+  const telaPro = S.renderLeague();
+  contaLimpa(); S.conferirNovidades();
+  const numDo = n => ((new RegExp('const ' + n + ' = (\\d+);').exec(src) || [0, 0])[1]) | 0;
+  const PRO_SORTEADOS = numDo('PRO_SORTEADOS');
+  const PRO_ESCOLHE   = numDo('PRO_ESCOLHE');
+  const MOEDAS_PRO    = numDo('MOEDAS_CAMPEAO_PRO');
+  const MOEDAS_RIVAL  = numDo('MOEDAS_RIVAL');
+  const PRO_FAIXAS    = JSON.parse(/const PRO_FAIXAS = (\[[^;]*\]);/.exec(src)[1]);
+  /* ⚠️ A VERSAO NAO PODE SER A DE UM ANUNCIO ANTERIOR, e esta trava nasceu de um MUDO da
+     conferencia de acusacao (24/09/2026): devolvendo a NOVIDADES_VERSAO pra a das Ilhas, quem JA
+     leu aquele anuncio nunca veria este -- e nenhuma trava acusava, porque o teste inteiro usa o
+     valor DERIVADO (S.NOVIDADES_VERSAO) em vez de crava-lo.
+     ⚠️ E ELA E UMA LISTA DO QUE JA FOI USADO, nunca o valor de hoje cravado: cravado, ela
+     envelheceria no PROXIMO anuncio -- e a regra que importa e a de nunca REUSAR. */
+  const VERSOES_JA_USADAS = ['ilhas-laranja'];
+  ok('a versao do anuncio nao reusa nenhuma anterior',
+     VERSOES_JA_USADAS.indexOf(S.NOVIDADES_VERSAO) < 0, 'versao: ' + S.NOVIDADES_VERSAO);
+  ok('o anuncio fala da Liga Pro', modal.indexOf('Liga Pro') >= 0);
+  ok('  e diz que o time e SORTEADO', /sorteado/i.test(modal));
+  ok('  com os ' + PRO_SORTEADOS + ' que aparecem e os ' + PRO_ESCOLHE + ' que entram',
+     modal.indexOf(String(PRO_SORTEADOS)) >= 0 && modal.indexOf(String(PRO_ESCOLHE)) >= 0);
+  /* ⚠️ AS FAIXAS SAIRAM DO ANUNCIO, e esta trava media o conteudo que saiu -- ela nao foi apagada:
+     virou a trava da regra NOVA. A razao do corte esta medida (320px): com QUATRO linhas a lista
+     mostrava 2 de 4, e os dois escondidos eram OS GOLPES e AS 100 MOEDAS -- o premio e uma das tres
+     coisas que o pedido nomeia, e uma lista que rola por dentro esconde sem avisar.
+     ⚠️ E A SEGUNDA METADE E A QUE FAZ O CORTE SER SEGURO: as faixas continuam na TELA DA LIGA PRO,
+     que e pra onde o botao leva. Sem ela, alguem devolve as tres ao anuncio e a lista volta a
+     esconder o premio -- e so quem abrisse numa tela de 568 descobriria. */
+  ok('  e a lista cabe em ' + NOVIDADES_LINHAS_MAX + ' linhas (medido a 320px)',
+     (modal.match(/<li>/g) || []).length <= NOVIDADES_LINHAS_MAX,
+     (modal.match(/<li>/g) || []).length + ' linhas');
+  ok('  e as faixas NAO estao no anuncio (elas tem quadro proprio na tela da Liga Pro)',
+     PRO_FAIXAS.every(f => modal.indexOf(S.proRotuloDaFaixa(f)) < 0));
+  /* ⚠️ O SELO DA LINHA DO TIME E O DE TIME DA CASA, e nao a bandeira quadriculada -- aquela e a
+     LINHA DE CHEGADA da Corrida, e num anuncio de liga ela se le como outro modo (foi a captura de
+     tela a 320px que pegou). A comparacao e DERIVADA do botao "Seu time" do jogo: cravado o nome do
+     selo aqui, a trava envelheceria no dia em que a casa trocasse o dela. */
+  const seloDeTime = (S.botaoSeuTimeHtml() .match(/#s-[a-z_0-9]+/) || [''])[0];
+  ok('  e a linha do time leva o selo de TIME da casa (' + seloDeTime + ')',
+     seloDeTime.length > 4 && (function(){
+       const i = modal.indexOf(String(PRO_SORTEADOS) + ' aparecem');
+       if(i <= 0) return false;
+       const li = modal.lastIndexOf('<li>', i);
+       return modal.lastIndexOf(seloDeTime, i) > li;
+     })());
+  ok('  e o premio do campeao (' + MOEDAS_PRO + ')', modal.indexOf(String(MOEDAS_PRO)) >= 0);
+  ok('  e a aposta com o rival (' + MOEDAS_RIVAL + ')',
+     /rival/i.test(modal) && modal.indexOf(String(MOEDAS_RIVAL)) >= 0);
+  ok('  e os golpes escolhidos, ate ' + S.MAX_GOLPES, modal.indexOf(String(S.MAX_GOLPES)) >= 0);
 
-  /* ⚠️ E ELE E DERIVADO: mexendo na TABELA o anuncio acompanha. Sem este caso, uma segunda lista
-     escrita a mao passaria em todos os de cima -- e divergiria no dia em que uma ilha trocasse
-     de jogo. E a mesma prova que a trava do asterisco dos status usa. */
-  const guardado = S.ILHAS_COMO.mikan.resumo;
-  S.ILHAS_COMO.mikan.resumo = 'Um resumo trocado so pra este caso.';
-  ok('  e o texto vem da TABELA, nao de uma copia',
-     S.renderNovidadesModal().indexOf('Um resumo trocado so pra este caso.') >= 0);
-  S.ILHAS_COMO.mikan.resumo = guardado;
-
-  /* ⚠️ ILHA SEM ENTRADA NO ILHAS_COMO NAO ENTRA: ali nao ha o que resumir. E a mesma regra que
-     faz o (i) do mapa nao aparecer nela. */
-  const semComo = S.ILHAS_COMO.pummelo;
-  delete S.ILHAS_COMO.pummelo;
-  const sem = S.renderNovidadesModal();
-  ok('  e a ilha sem resumo fica de fora', sem.indexOf('Pummelo') < 0);
-  ok('    e as outras continuam', sem.indexOf('Mikan') >= 0);
-  S.ILHAS_COMO.pummelo = semComo;
+  /* ⚠️ E ELES SAO DERIVADOS, nao escritos na frase -- a trava LE O CODIGO porque hoje os numeros
+     coincidem: uma frase com "12" passaria em todos os casos de cima. E a mesma tecnica que a
+     descricao da Liga Pro e a conta da Pokedex precisaram. */
+  const fnModal = src.slice(src.indexOf('function renderNovidadesModal()'),
+                            src.indexOf('const PESCARIA_ILHA_SVG'));
+  ok('a fatia do modal tem o que ler', fnModal.length > 800 && fnModal.length < 6000, String(fnModal.length));
+  ok('  e os numeros sao DERIVADOS das constantes',
+     /\$\{PRO_SORTEADOS\}/.test(fnModal) && /\$\{PRO_ESCOLHE\}/.test(fnModal) &&
+     /\$\{MOEDAS_CAMPEAO_PRO\}/.test(fnModal) && /\$\{MOEDAS_RIVAL\}/.test(fnModal) &&
+     /\$\{MAX_GOLPES\}/.test(fnModal));
+  ok('    e nenhum deles esta escrito a mao',
+     fnModal.indexOf('>' + PRO_SORTEADOS + ' ') < 0 && !new RegExp('🪙 ' + MOEDAS_PRO).test(fnModal));
+  /* ⚠️ E O QUE O ANUNCIO DEIXOU DE DIZER, A TELA DA LIGA PRO CONTINUA DIZENDO -- e a metade que
+     prova que o corte nao perdeu nada. */
+  ok('    e as faixas continuam na TELA da Liga Pro, com o rotulo da casa',
+     PRO_FAIXAS.every(f => telaPro.indexOf(S.proRotuloDaFaixa(f)) >= 0),
+     PRO_FAIXAS.map(f => S.proRotuloDaFaixa(f)).join(' / '));
 
   /* ---- 5) a tela ---- */
   ok('o anuncio tem os dois botoes',
-     modal.indexOf('novidadesIrParaAsIlhas()') >= 0 && modal.indexOf('fecharNovidades()') >= 0);
+     modal.indexOf('novidadesIrParaALigaPro()') >= 0 && modal.indexOf('fecharNovidades()') >= 0);
   ok('  e usa o modal-overlay da casa -- classe que nao existe nao da erro, so nao faz nada',
      modal.indexOf('modal-overlay') >= 0 && modal.indexOf('novidades-box') >= 0);
 
@@ -617,19 +683,23 @@ console.log('=== O ICONE NO TITULO E O LARANJA ===');
   S.conferirNovidades();
   const m = S.renderNovidadesModal();
 
-  /* ⚠️ O MESMO SELO DO BOTAO DA HOME -- e a trava le o selo DA HOME em vez de escrever 'ilhas'
-     aqui: se o botao trocar de selo um dia, e o anuncio que tem que acompanhar. */
-  const seloDaHome = (S.renderSaveSelect().match(/#s-([a-z0-9-]+)"\/><\/svg><\/span><span>Ilhas Laranja/) || [])[1];
-  ok('o titulo leva o MESMO selo do botao da home',
-     !!seloDaHome && new RegExp('<h2>[^<]*<svg[^>]*><use href="#s-' + seloDaHome + '"').test(m),
-     'selo da home: ' + seloDaHome);
+  /* ⚠️ O MESMO SELO DO CARD DA LIGA PRO -- e a trava le o selo DO CARD em vez de escrever o nome
+     aqui: se ele trocar um dia, e o anuncio que tem que acompanhar. Ela media o selo do botao das
+     ILHAS na home e VIROU esta quando a versao girou (24/09/2026), porque o anuncio trocou de
+     assunto -- a REGRA e a mesma: o simbolo do anuncio e o do lugar que ele manda procurar. */
+  const seloDoCard = (S.renderLeagueTypesList().match(/#s-([a-z0-9_-]+)"\/><\/svg> Liga Pro/) || [])[1];
+  ok('o titulo leva o MESMO selo do card da Liga Pro',
+     !!seloDoCard && new RegExp('<h2>[^<]*<svg[^>]*><use href="#s-' + seloDoCard + '"').test(m),
+     'selo do card: ' + seloDoCard);
   ok('  e o icone nao aparece DUAS vezes na caixa', m.indexOf('modal-icon') < 0,
      'ele foi pro titulo, entao o modal-icon saiu -- e isso devolveu 45px de lista');
 
-  /* ⚠️ A COR SAI DA CONSTANTE, e o BOTAO DA HOME le a mesma: escrita a mao nos dois, a segunda
-     divergiria no primeiro ajuste e o anuncio deixaria de casar com o botao que manda procurar. */
-  ok('a caixa tem a borda na cor das ilhas', m.indexOf('border-color:' + S.COR_ILHAS) >= 0);
-  ok('  e o botao principal tambem', m.indexOf('background:' + S.COR_ILHAS) >= 0);
+  /* ⚠️ A CAIXA NAO TEM COR PROPRIA, e isso e decisao: a das Ilhas tinha porque o laranja E a
+     identidade delas, e a Liga Pro nao tem cor no jogo -- inventar uma seria inventar identidade
+     que ninguem pediu. A moldura e a padrao do modal.
+     ⚠️ MAS A REGRA DO "UM DONO" CONTINUA COBRADA no botao da home das Ilhas, que existe e le a
+     constante: e ela que impede o valor de ser escrito a mao num segundo lugar. */
+  ok('a caixa usa a moldura padrao do modal', m.indexOf('border-color:') < 0, m.slice(0, 160));
   ok('  e o botao da HOME le a MESMA constante',
      S.renderSaveSelect().indexOf('background:' + S.COR_ILHAS) >= 0, 'a cor tem UM dono');
   ok('    e o valor nao esta escrito a mao em lugar nenhum',
