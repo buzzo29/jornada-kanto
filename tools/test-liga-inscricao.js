@@ -317,8 +317,15 @@ console.log('\nOS QUADROS QUE ABREM E FECHAM (17/09/2026)');
     g2.leagueLeaderboard = Array.from({length:10},(_,i)=>({ uid:'u'+i, name:'T'+(i+1), count:10-i }));
     g2.myLeagueHistory = [{ cycleId:'c1', leagueId:1, cycleTime:1758000000, placement:'Campeão',
                             leagueSize:16, leagueTypeId:'classic', leagueTypeName:'Liga Clássica' }];
-    g2.globalLeagueHistory = [{ cycleId:'g1', cycleTime:1758000000,
-                                league:{ id:1, size:16, champion:{ name:'Buzzo' } } }];
+    /* ⚠️ O CAMPO E UM MAPA POR TIPO desde 25/09/2026, quando a Liga Pro ganhou o quadro global: ele
+       era um campo so, carregado apenas quando a Classica abria e NUNCA limpo -- o historico dela
+       aparecia nas outras ligas, com o "Rever" levando ao chaveamento errado. Hoje o render le a
+       chave do tipo CORRENTE, e um array aqui deixa a Classica sem o quadro (foi o que esta trava
+       acusou, e ela estava certa: o fixture e que estava no formato antigo).
+       ⚠️ QUEM TEM A ABA ABERTA DE ANTES DO DEPLOY tem o formato velho por alguns segundos -- o campo
+       nao vai pro save, e a proxima varredura (a abertura da liga ou o tique de 5s) repoe o mapa. */
+    g2.globalLeagueHistory = { classic: [{ cycleId:'g1', cycleTime:1758000000,
+                                league:{ id:1, size:16, champion:{ name:'Buzzo' } } }] };
     g2.quadrosAbertos = {};
     SQ.__setGame(g2);
     const conta = h => (h.match(/quadro-dobra-cab/g) || []).length;

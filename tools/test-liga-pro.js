@@ -464,10 +464,19 @@ console.log('\n=== O RANKING E O HISTÓRICO ===');
     scheduledTime: Date.now() - 3600000, champion: { name: 'Ana' } }];
   S.game.myLeagueHistory = [{ cycleId: '1758500000000', leagueId: 0, cycleTime: Date.now() - 3600000,
     placement: 'Campeão', leagueTypeId: 'pro', leagueTypeName: 'Liga Pro', leagueSize: 8 }];
-  /* ⚠️ o fixture do global é da CLÁSSICA de propósito: é o que prova que o quadro existe lá e
-     não aqui -- sem ele, as duas ligas sairiam sem o quadro e a trava não distinguiria nada */
-  S.game.globalLeagueHistory = [{ cycleId: '1758500000000', cycleTime: Date.now() - 3600000,
-    league: { id: 0, size: 8, champion: { name: 'Ana' } } }];
+  /* ⚠️ O FIXTURE E UM MAPA POR TIPO desde 25/09/2026, quando a Pro ganhou o quadro global (a
+     pedido). Ele era um ARRAY, e o campo do jogo tambem: um campo so, carregado apenas quando a
+     Classica abria e nunca limpo -- o historico DELA aparecia nas outras ligas, com o "Rever"
+     levando ao chaveamento errado.
+     ⚠️ E OS DOIS CAMPEOES SAO DIFERENTES de proposito: e o que prova que cada liga le a chave DELA.
+     Com o mesmo nome nos dois, a trava passaria de volta com o vazamento inteiro -- que e o defeito
+     que ela existe pra impedir. */
+  S.game.globalLeagueHistory = {
+    classic: [{ cycleId: '1758500000000', cycleTime: Date.now() - 3600000,
+      league: { id: 0, size: 8, champion: { name: 'AnaDaClassica' } } }],
+    pro: [{ cycleId: '1758500000000', cycleTime: Date.now() - 3600000,
+      league: { id: 0, size: 8, champion: { name: 'BrunoDaPro' } } }],
+  };
 
   S.game.currentLeagueTypeId = 'pro';
   S.game.currentLeagueTypeConfig = { id: 'pro', name: 'Liga Pro' };
@@ -479,19 +488,71 @@ console.log('\n=== O RANKING E O HISTÓRICO ===');
 
   ok('a Pro tem o Top 10', /Top 10/.test(hPro));
   ok('  e "Suas últimas Ligas"', /Suas últimas Ligas/.test(hPro));
-  /* ⚠️ O QUADRO GLOBAL ("🌐 Últimas Ligas") É DA CLÁSSICA, e não é esquecimento: o
-     `loadGlobalLeagueHistory` varre o `schedule_classic` e o botão "Rever" dele CRAVA o tipo
-     clássico -- ele nunca foi por liga. A Trainers League também não o tem. O que "histórico"
-     quer dizer por liga é o PESSOAL, que é o que a Pro tem: ele carrega o `leagueTypeId` de cada
-     linha, então o "Rever" dela leva ao chaveamento DELA. */
-  ok('  e o global continua sendo da Clássica', /Últimas Ligas/.test(hCla) && !/🌐/.test(hPro));
+  /* ⚠️ O QUADRO GLOBAL ("🌐 Últimas Ligas") PASSOU A VALER NA PRO EM 25/09/2026 (a pedido: *"crie
+     tambem um quadro na liga pro exibindo o historico das ultimas ligas pro, igual como ja existe
+     hoje para a liga classica"*). Ele era da Classica e SO dela -- o `loadGlobalLeagueHistory`
+     varria o `schedule_classic` e o botao "Rever" CRAVAVA o tipo classico.
+     ⚠️ ESTAS TRAVAS MEDIAM A REGRA ANTIGA e nao foram apagadas: elas viraram as da nova, e a
+     METADE QUE IMPORTA e cada liga mostrar O SEU -- sem ela, o vazamento do campo (que era um
+     campo so, nunca limpo) passaria de volta com as duas mostrando o mesmo. */
+  ok('  e o global vale nas DUAS ligas', /🌐 Últimas Ligas/.test(hCla) && /🌐 Últimas Ligas/.test(hPro));
+  /* ⚠️ O QUADRO E DOBRAVEL e o conteudo SO E MONTADO ABERTO (17/09/2026) -- sem abrir, as travas de
+     CONTEUDO medem o titulo e mais nada. E foi assim que a trava antiga passava com o vazamento: ela
+     so olhava o titulo, e o titulo e o mesmo nas duas ligas. */
+  const abreGlobal = (t) => {
+    S.game.currentLeagueTypeId = t;
+    S.game.currentLeagueTypeConfig = { id: t, name: 'Liga ' + t };
+    S.game.quadrosAbertos = { ultimas_ligas: true };
+    return S.renderLeague();
+  };
+  const aPro = abreGlobal('pro'), aCla = abreGlobal('classic');
+  S.game.quadrosAbertos = {};
+  ok('  e cada uma mostra O SEU historico',
+     aPro.indexOf('BrunoDaPro') > 0 && aPro.indexOf('AnaDaClassica') < 0 &&
+     aCla.indexOf('AnaDaClassica') > 0 && aCla.indexOf('BrunoDaPro') < 0);
+  /* ⚠️ E O "Rever" DELE LEVA A LIGA CORRENTE, e ele tinha o tipo CLASSICO cravado: numa linha da
+     Pro ele abriria o chaveamento de uma liga da Classica -- e o `cycleId` COINCIDE entre as duas
+     (elas rodam de hora em hora pelo MESMO relogio), entao ele abriria um chaveamento de VERDADE,
+     o errado, sem nada parecendo quebrado. */
+  ok('  e o "Rever" do global leva a liga CORRENTE',
+     /viewLeagueHistory\('pro'/.test(aPro) && !/viewLeagueHistory\('classic'/.test(aPro) &&
+     /viewLeagueHistory\('classic'/.test(aCla) && !/viewLeagueHistory\('pro'/.test(aCla),
+     ((aPro.match(/viewLeagueHistory\('[^']*'/g)||[]).join(' ') + '  |  ' +
+      (aCla.match(/viewLeagueHistory\('[^']*'/g)||[]).join(' ')).slice(0, 110));
   ok('  e o "Rever" do histórico pessoal leva ao tipo CERTO',
      /viewLeagueHistory\('\$\{h\.leagueTypeId\|\|CLASSIC_LEAGUE_TYPE\}'/.test(src));
-  /* ⚠️ A PRO TEM OS DOIS QUADROS POR LIGA e a Clássica tem TRÊS (o global é só dela): a trava
-     cobra a DIFERENÇA de exatamente um, e não a igualdade. Igualando, ela passaria de volta com o
-     vazamento do campo global -- que era o defeito. */
-  ok('  e a Clássica tem UM quadro a mais (o global)', quadros(hCla) - quadros(hPro) === 2,
+  /* ⚠️ AS DUAS TEM OS TRES QUADROS AGORA, e a trava cobra a IGUALDADE -- o que distingue as duas
+     deixou de ser a EXISTENCIA do quadro e passou a ser o CONTEUDO dele (a trava acima). */
+  ok('  e as duas tem os MESMOS tres quadros', quadros(hCla) === quadros(hPro),
      quadros(hPro) + ' na Pro / ' + quadros(hCla) + ' na Clássica');
+  /* ⚠️ E A BUSCA RECEBE O TIPO, sem padrao: com `= CLASSIC_LEAGUE_TYPE` implicito, a proxima liga
+     que chamasse isto traria o historico da Classica EM SILENCIO -- o proprio defeito do
+     vazamento. E a mesma decisao do `ehDoJogador` do corridaInstancia. */
+  ok('  e a busca do global recebe o TIPO, sem padrao',
+     /async function loadGlobalLeagueHistory\(limit, typeId\)\{/.test(src) &&
+     !/loadGlobalLeagueHistory\(limit, typeId = /.test(src));
+  /* ⚠️ E A FUNCAO INTEIRA NAO PODE CITAR O TIPO CLASSICO -- ela tem DUAS leituras (a agenda e cada
+     ciclo), e uma trava por leitura deixa a proxima passar. Cobrando a FATIA, o caso da leitura dos
+     ciclos deixa de ser MUDO: ele nao e alcancavel por comportamento nenhum, porque o teste nao
+     chama a funcao (ela fala com o Firestore). */
+  {
+    const iL = src.indexOf('async function loadGlobalLeagueHistory');
+    const fatia = src.slice(iL, src.indexOf('\nasync function ', iL + 1));
+    ok('  (a fatia da busca do global tem o que ler)', fatia.length > 800, fatia.length + ' chars');
+    ok('  e ela NAO cita o tipo classico em lugar nenhum',
+       fatia.indexOf('CLASSIC_LEAGUE_TYPE') < 0,
+       (fatia.match(/.*CLASSIC_LEAGUE_TYPE.*/) || ['(nenhuma)'])[0].trim().slice(0, 90));
+  }
+  /* ⚠️ E O CAMPO E UM MAPA, nao um campo so -- e isso fecha o vazamento por CONSTRUCAO: o render
+     le a chave do tipo CORRENTE, entao nao existe estado de outra liga pra aparecer aqui. */
+  ok('  e o campo do jogo e um MAPA por tipo',
+     /globalLeagueHistory:\{\}/.test(src) &&
+     /\(game\.globalLeagueHistory \|\| \{\}\)\[game\.currentLeagueTypeId\]/.test(src) &&
+     !/game\.currentLeagueTypeId === CLASSIC_LEAGUE_TYPE\s*$/m.test(src));
+  /* ⚠️ E A TRAINERS LEAGUE E AS CUSTOMIZADAS CONTINUAM SEM O QUADRO, e e decisao: o pedido nomeia a
+     Pro, e cada tipo que entrar aqui paga 1 + ate 20 leituras por abertura da tela dele. */
+  ok('  e so a Classica e a Pro CARREGAM o global',
+     /typeId === CLASSIC_LEAGUE_TYPE \|\| typeId === PRO_LEAGUE_TYPE/.test(src));
   /* ⚠️ O QUE SÓ A PRO TEM é a faixa da rodada: ela gira, e sem ela na tela o jogador só descobre
      em que nível vai lutar depois de abrir o picker. */
   /* ⚠️ E A FAIXA DA RODADA VIROU UM QUADRO (23/09/2026, a pedido: *"crie um quadro indicando qual

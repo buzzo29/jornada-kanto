@@ -18354,6 +18354,75 @@ volta a esconder o prêmio, **e só quem abrisse numa tela de 568 descobriria**.
    `${…}` que não interpola — **verificação de sintaxe não é verificação de conteúdo**, e o que a
    pegou foi ler o HTML gerado.
 
+### O HISTÓRICO DAS ÚLTIMAS LIGAS PRO (25/09/2026)
+
+Pedido assim: *"crie tambem um quadro na liga pro exibindo o historico das ultimas ligas pro, igual
+como ja existe hoje para a liga classica"*.
+
+**⚠️ O QUE FALTAVA ERA O QUADRO GLOBAL, e não o pessoal:** a Pro **já tinha** o Top 10 e o *"Suas
+últimas Ligas"* — os dois que são POR LIGA. O que ela não tinha era o **"🌐 Últimas Ligas"** (as
+últimas ligas de QUALQUER treinador), que era da Clássica e só dela.
+
+E este arquivo registrava a razão de ele não ser por liga: *"o `loadGlobalLeagueHistory` varre o
+`schedule_classic` e o botão dele CRAVA o tipo clássico em cada linha — ele nunca foi por liga"*.
+**Era isso e mais nada**: o custo é 1 + até 20 leituras **no calendário de UM tipo**, ou seja a Pro
+paga o MESMO que a Clássica já paga, na tela dela — **não é um custo a mais**.
+
+### ⚠️ E ELE VAZAVA — e a correção de hoje fecha isso por CONSTRUÇÃO
+
+O campo era **UM só** (`game.globalLeagueHistory`), carregado apenas quando a Clássica abria e
+**nunca limpo** — então quem abria a Clássica e depois outra liga via o histórico DELA ali, com o
+"Rever" levando ao chaveamento da Clássica. O defeito é anterior (ele já alcançava as customizadas),
+e a guarda ficava no RENDER.
+
+Hoje ele é um **MAPA por `typeId`** e o render lê a chave do tipo CORRENTE — **não existe estado de
+outra liga pra aparecer aqui.**
+
+### AS DECISÕES
+
+- **⚠️ O PARÂMETRO `typeId` NÃO TEM PADRÃO.** Com `= CLASSIC_LEAGUE_TYPE` implícito, a próxima liga
+  que chamasse a busca traria o histórico da Clássica **em silêncio** — que é literalmente o defeito
+  do vazamento. É a mesma decisão do `ehDoJogador` do `corridaInstancia` e do `pescariaInstancia`.
+- **⚠️ E O "REVER" SAI DA LIGA CORRENTE, e ele tinha o tipo clássico CRAVADO.** Numa linha da Pro ele
+  abriria o chaveamento de uma liga da Clássica — e o **`cycleId` COINCIDE entre as duas** (elas
+  rodam de hora em hora pelo MESMO relógio), então ele abriria um chaveamento **de verdade, o
+  errado**, sem nada parecendo quebrado.
+- **⚠️ A TRAINERS LEAGUE E AS CUSTOMIZADAS CONTINUAM SEM O QUADRO**, e é decisão: o pedido nomeia a
+  Pro, e cada tipo que entrar aqui paga 1 + até 20 leituras por abertura da tela dele. Pra
+  acrescentar um, é a linha do `refreshLeagueHistoriesInBackground`.
+- **O campo NÃO entra no `CAMPOS_DA_CONTA` nem no `serializeGame`:** é cache de tela, relido a cada
+  abertura da liga — e trocar de save deve limpá-lo.
+- **⚠️ QUEM TEM A ABA ABERTA DE ANTES DO DEPLOY** tem o formato velho (um array) por alguns segundos
+  e vê o quadro sumir; a próxima varredura (a abertura da liga ou o tique de 5s) repõe o mapa. Não
+  há migração porque o campo não vai pro banco.
+
+**Medido a 320px, no navegador, nas duas telas:** o quadro sai em **296×274px** — **idêntico** nas
+duas —, com 3 linhas, a Grande Liga com a estrela, **cada uma mostrando os campeões dela**, o "Rever"
+apontando pra liga certa, **nenhum texto cortado e sem rolagem lateral**. A marcação é a MESMA
+(conferido por comparação do HTML), então não há layout novo.
+
+**NO MOTOR, NADA:** `MOTOR 64db1d5912f1 / DIARIO 4a442b813ad9`, idêntico — e o instrumento é
+sensível (com o `CRIT_BASE` mexido os dois hashes mudam).
+
+**⚠️ E TRÊS TRAVAS MEDIAM A REGRA ANTIGA** (*"o global continua sendo da Clássica"*, *"a Clássica tem
+UM quadro a mais"*). Elas não foram apagadas: viraram as da regra nova, e a **metade que importa é
+cada liga mostrar O SEU** — com as duas mostrando o mesmo, o vazamento passaria de volta. Por isso o
+fixture tem **campeões diferentes** em cada uma.
+
+**⚠️ E ELAS PRECISARAM ABRIR O QUADRO:** ele é **DOBRÁVEL** e o conteúdo só é montado aberto
+(17/09/2026) — e foi exatamente assim que a trava antiga passava com o vazamento, **ela só olhava o
+título**, que é o mesmo nas duas.
+
+**⚠️ E UM CASO DA CONFERÊNCIA DE ACUSAÇÃO FICOU MUDO:** a leitura dos ciclos (`cycleDocRef`) não é
+alcançável por comportamento nenhum — o teste não chama a busca, que fala com o Firestore. A trava
+que a pega **fatia a função inteira** e cobra que ela não cite o `CLASSIC_LEAGUE_TYPE` em lugar
+nenhum: ela tem DUAS leituras, e uma trava por leitura deixa a próxima passar. Com ela, **7 de 7
+defeitos acusam**.
+
+**⚠️ E O FIXTURE DO `test-liga-inscricao` ESTAVA NO FORMATO ANTIGO, e a trava dele acusou o certo:**
+*"a Liga Clássica desenha os TRÊS quadros — 2 quadros"*. Um array ali deixa a Clássica sem o quadro,
+porque o render lê a chave do tipo. **A trava estava certa; o fixture é que envelheceu.**
+
 ## A BIFURCAÇÃO PARAVA O SORTEIO EM TRÊS LUGARES (24/09/2026)
 
 Reportado com print do picker da Liga Pro: *"apareceu um poliwhirl, porem pelo level 56 deveria ser um

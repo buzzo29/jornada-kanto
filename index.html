@@ -6876,6 +6876,11 @@ function freshGameDefaults(){
     trainersLeaguePrevDayDone: null,
     trainersLeagueNextDayInfo: null,
     myLeagueHistory:[],
+    /* ⚠️ MAPA por typeId, e nao um campo so: ele era um campo unico carregado apenas quando a
+       Classica abria e NUNCA limpo -- o historico dela aparecia nas outras ligas, com o "Rever"
+       levando ao chaveamento errado. Ele NAO esta no CAMPOS_DA_CONTA de proposito: e cache de tela,
+       relido a cada abertura da liga, e trocar de save deve limpa-lo. */
+    globalLeagueHistory:{},
 
     trainerName:'',
     rivalNameDefault:'',    // rival padrão da CONTA (não do save) -- ver nomeDoRivalPadrao
@@ -18577,12 +18582,22 @@ async function loadLeagueViewData(typeId){
     return { cycles: [] };
   }
 }
-async function loadGlobalLeagueHistory(limit){
+/* ⚠️ ELE RECEBE O TIPO desde 25/09/2026, quando a Liga Pro ganhou o quadro dela (a pedido). Ele era
+   da Clássica e só dela -- o `CLASSIC_LEAGUE_TYPE` estava escrito nas DUAS leituras aqui e na
+   chamada do botão "Rever".
+   ⚠️ E O PARÂMETRO NÃO TEM PADRÃO, de propósito: com `= CLASSIC_LEAGUE_TYPE` implícito, a próxima
+   liga que chamasse isto traria o histórico da CLÁSSICA em silêncio -- que é literalmente o defeito
+   do vazamento que este campo já teve (ver o render). É a mesma decisão do `ehDoJogador` do
+   `corridaInstancia` e do `pescariaInstancia`.
+   ⚠️ O CUSTO NÃO MUDOU: são 1 + até 20 leituras, e elas acontecem no calendário de UM tipo só --
+   ou seja a Pro paga o MESMO que a Clássica já paga, na tela dela, e não um custo a mais. */
+async function loadGlobalLeagueHistory(limit, typeId){
   // busca as últimas N Ligas concluídas, de QUALQUER treinador -- diferente de "Suas últimas Ligas"
   // (que lê direto da própria conta), essa precisa vasculhar os ciclos recentes do calendário da Liga,
   // já que não existe uma lista "global" pronta em lugar nenhum
+  if(!typeId) return [];
   try{
-    const scheduleSnap = await scheduleDocRef(CLASSIC_LEAGUE_TYPE).get();
+    const scheduleSnap = await scheduleDocRef(typeId).get();
     if(!scheduleSnap.exists) return [];
     const cycles = scheduleSnap.data().cycles || [];
     const completedEntries = cycles
@@ -18593,7 +18608,7 @@ async function loadGlobalLeagueHistory(limit){
     // eram até 20 idas e voltas sequenciais ao Firestore, que sozinhas seguravam a tela por vários
     // segundos no celular. Lê alguns docs a mais do que o limite estritamente precisaria, mas o
     // tempo total cai de ~20x a latência pra ~1x
-    const detailSnaps = await Promise.all(completedEntries.map(entry=>cycleDocRef(CLASSIC_LEAGUE_TYPE, entry.id).get().catch(()=>null)));
+    const detailSnaps = await Promise.all(completedEntries.map(entry=>cycleDocRef(typeId, entry.id).get().catch(()=>null)));
     const allLeagues = [];
     for(let i=0;i<completedEntries.length;i++){
       if(allLeagues.length >= limit) break;
@@ -19912,7 +19927,16 @@ async function refreshLeagueHistoriesInBackground(typeId){
     await reconcileLeagueWinsFromHistory();
     if(game.currentLeagueTypeId !== typeId){ return; } // saiu dessa liga durante a varredura
     game.myLeagueHistory = await loadMyLeagueHistory(5);
-    if(typeId === CLASSIC_LEAGUE_TYPE){ game.globalLeagueHistory = await loadGlobalLeagueHistory(10); }
+    /* ⚠️ O CAMPO É UM MAPA POR TIPO desde 25/09/2026, e isso fecha o VAZAMENTO por construção: ele
+       era um campo só, carregado apenas quando a Clássica abria e nunca limpo -- então quem abria a
+       Clássica e depois outra liga via o histórico DELA ali, com o "Rever" levando ao chaveamento da
+       Clássica. A guarda ficava no RENDER; hoje o render lê a chave do tipo corrente e não há o que
+       vazar. */
+    if(typeId === CLASSIC_LEAGUE_TYPE || typeId === PRO_LEAGUE_TYPE){
+      const h = await loadGlobalLeagueHistory(10, typeId);
+      if(game.currentLeagueTypeId !== typeId) return;   /* saiu da liga durante a varredura */
+      game.globalLeagueHistory = Object.assign({}, game.globalLeagueHistory, { [typeId]: h });
+    }
     if(game.currentLeagueTypeId === typeId && game.screen==='league'){ render(); }
   } catch(e){ console.error('Erro ao atualizar históricos da Liga:', e); }
   finally{ leagueHistoryRefreshInFlight = false; }
@@ -29099,15 +29123,14 @@ function renderLeague(){
         </div>`)}
       </div>`;
     }
-    /* ⚠️ O QUADRO GLOBAL É DA CLÁSSICA, e a guarda é aqui porque o CAMPO VAZA: ele é carregado
-       só quando a Clássica abre (`if(typeId === CLASSIC_LEAGUE_TYPE)` no `refreshLeagueHistories`)
-       e nunca é limpo -- então quem abria a Clássica e depois outra liga via o histórico DELA aqui,
-       com o botão "Rever" levando ao chaveamento da Clássica. Achado escrevendo a trava da Liga Pro,
-       e o defeito é anterior: ele já alcançava as ligas customizadas.
-       ⚠️ E ele NÃO pode virar por liga sem custo: o `loadGlobalLeagueHistory` varre até 20 ciclos
-       do calendário, e o botão dele crava o tipo clássico em cada linha. */
-    const globalHistory = game.currentLeagueTypeId === CLASSIC_LEAGUE_TYPE
-      ? (game.globalLeagueHistory || []) : [];
+    /* ⚠️ O QUADRO GLOBAL VALE NA CLÁSSICA E NA PRO (25/09/2026, a pedido), e ele é lido do MAPA pela
+       chave do tipo CORRENTE -- não há mais guarda de tipo aqui, e não há como vazar: o campo era um
+       só, carregado apenas quando a Clássica abria e nunca limpo, então quem abria a Clássica e
+       depois outra liga via o histórico DELA aqui, com o "Rever" levando ao chaveamento da Clássica.
+       ⚠️ A TRAINERS LEAGUE E AS CUSTOMIZADAS CONTINUAM SEM O QUADRO, e é decisão: o pedido nomeia a
+       Pro, e cada tipo que entrar aqui paga 1 + até 20 leituras por abertura da tela dele. Pra
+       acrescentar um, é a linha do `refreshLeagueHistoriesInBackground`. */
+    const globalHistory = (game.globalLeagueHistory || {})[game.currentLeagueTypeId] || [];
     if(globalHistory.length>0){
       body += `
       <div class="box">
@@ -29117,7 +29140,11 @@ function renderLeague(){
             <div class="status-row">
               <span class="icon">${h.league.size===GRANDE_LIGA_SIZE?'🌟':'🏆'}</span>
               <span>${h.league.size===GRANDE_LIGA_SIZE?'Grande Liga':'Liga'} ${formatDateShort(h.cycleTime)} - ${formatClock(h.cycleTime)}${h.league.champion?` — campeão: <strong>${escapeHtmlSafe(h.league.champion.name)}</strong>`:''}</span>
-              <button class="league-history-btn" onclick="viewLeagueHistory('${CLASSIC_LEAGUE_TYPE}','${h.cycleId}',${h.league.id},${h.cycleTime})">▶ Rever</button>
+              ${/* ⚠️ O TIPO SAI DA LIGA CORRENTE, e ele era o CLÁSSICO cravado: numa linha da Pro o
+                    "Rever" abriria o chaveamento de uma liga da Clássica -- e o `cycleId` coincide
+                    entre as duas (as duas rodam de hora em hora pelo MESMO relógio), então ele
+                    abriria um chaveamento de VERDADE, o errado, sem nada parecendo quebrado. */''}
+              <button class="league-history-btn" onclick="viewLeagueHistory('${escJs(game.currentLeagueTypeId)}','${h.cycleId}',${h.league.id},${h.cycleTime})">▶ Rever</button>
             </div>
           `).join('')}
         </div>`)}

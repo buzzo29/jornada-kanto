@@ -248,6 +248,28 @@ game.accountLeagueSlots = null;
 
 game.currentLeagueTypeId = 'pro';
 add('Ligas', 'Liga Pro — inscrição aberta', ()=>sb.renderLeague());
+
+/* ⚠️ O QUADRO GLOBAL ("🌐 Últimas Ligas") PASSOU A VALER NA PRO EM 25/09/2026, e ele é DOBRÁVEL --
+   o conteúdo só é montado ABERTO, então sem o `quadrosAbertos` a prévia mostraria só o título.
+   As duas telas ficam aqui porque o que distingue as duas é o CONTEÚDO, não o quadro existir: a
+   marcação é idêntica (conferido), e o que muda é cada uma ler a chave DELA. */
+const histGlobal = (q) => [1,2,3].map(i => ({ cycleId:'g'+i, cycleTime: agora - i*36e5,
+  league:{ id:0, size: i===1 ? 16 : 8, champion:{ name: q + ' Campeão ' + i } } }));
+/* ⚠️ O QUADRO GLOBAL VIVE DENTRO DE `if(game.trainerName)` -- sem o nome ele nao e desenhado, e a
+   previa saia com a tela CERTA e o quadro AUSENTE. Foi o navegador que pegou. */
+game.trainerName = 'Buzzo';
+game.globalLeagueHistory = { classic: histGlobal('Ash'), pro: histGlobal('Gary') };
+game.myLeagueHistory = [{ cycleId:'g1', leagueId:0, cycleTime: agora - 36e5, placement:'Campeão',
+                          leagueSize:8, leagueTypeId:'pro', leagueTypeName:'Liga Pro' }];
+game.leagueLeaderboard = [{ name:'Gary', wins:4 }, { name:'Ash', wins:2 }];
+game.quadrosAbertos = { ultimas_ligas: true, top10: true, minhas_ligas: true };
+add('Ligas', 'Liga Pro — o histórico das últimas Ligas Pro', ()=>sb.renderLeague());
+game.currentLeagueTypeId = 'classic';
+add('Ligas', 'Clássica — o histórico dela, pra comparar', ()=>sb.renderLeague());
+game.quadrosAbertos = {};
+game.globalLeagueHistory = {};
+game.myLeagueHistory = [];
+game.leagueLeaderboard = [];
 game.leagueData = null;
 game.currentLeagueTypeId = null;
 game.screen = 'saveSelect';
