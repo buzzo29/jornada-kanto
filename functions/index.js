@@ -3029,36 +3029,82 @@ function doExchange(active, enemy, rng, diario){
     }
     return tiposDeAtaque(alvo, contra).length >= 2;
   };
+  /* ⚠️ E QUEM ESTA IMPEDIDO NAO AGE -- reportado com print em 25/09/2026, e era o mesmo defeito do
+     adormecido que atacava por outra porta: as guardas de "perdeu a vez" barravam o GOLPE e nao a
+     ACAO, entao um pokemon DORMINDO usava o Po do Sono. Medido no par Butterfree x Venomoth (os dois
+     sonifieros): 854 trocas em 16.023 (5,3%).
+     A lista e a MESMA das cinco coisas que fazem perder a troca -- quem nao joga nao age. */
+  const podeAgirNaTroca = (p) => {
+    if(p === active) return !(activeDorme || activeCongelado || activeTravado || activeConfuso || activeCura);
+    return !(enemyDorme || enemyCongelado || enemyTravado || enemyConfuso || enemyCura);
+  };
   const acaoDaTroca = (p, alvo, marca) => {
     if(!p || p.hp <= 0 || !alvo || alvo.hp <= 0) return null;
     if(ehImuneAEspecial(p) || ehImuneAEspecial(alvo)) return null;
+    if(!podeAgirNaTroca(p)) return null;
     const alvoDormeAgora = (alvo === active) ? activeDorme : enemyDorme;
     if(SONIFEROS[p.speciesId] && !(alvo._dormindoPor > 0) && !alvoDormeAgora && rng() < CHANCE_SONO){
       /* O DESPERTAR E DO ALVO e segura o sono venha de quem vier. A chance E CONSUMIDA: ele tentou
          e falhou, e e isso que a linha do log conta. */
       const jaSegurou = alvo._semSonoContra === p;
       if(alvo.item === 'awakening' || jaSegurou){
-        if(!jaSegurou){
+        return { x:'semSono', golpe: SONIFEROS[p.speciesId], hp: alvo.hp, aplica: () => {
+          if(jaSegurou) return;
           /* O ITEM E GASTO UMA VEZ SO -- da segunda em diante quem segura e a marca. */
           alvo.item = null;
           alvo._semSonoContra = p;
           itensGastos.push({ dono: marca === 'p' ? 'e' : 'p', especie: alvo.speciesId, slot: alvo.slotDaConta, item: 'awakening' });
-        }
-        return { x:'semSono', golpe: SONIFEROS[p.speciesId], hp: alvo.hp };
+        } };
       }
-      alvo._dormindoPor = sorteiaTrocasDeSono(rng);
-      return { x:'sono', golpe: SONIFEROS[p.speciesId], hp: alvo.hp };
+      return { x:'sono', golpe: SONIFEROS[p.speciesId], hp: alvo.hp,
+               aplica: () => { alvo._dormindoPor = sorteiaTrocasDeSono(rng); } };
     }
     if(DISABLE.includes(p.speciesId) && !(alvo._anulado && alvo._anulado.contra === p)
        && temSegundoGolpe(alvo, p) && rng() < CHANCE_DISABLE){
       const escolha = bestAttackType(alvo, p);
-      alvo._anulado = { tipo: escolha.type, contra: p };
-      return { x:'disable', golpe:'Anulação', hp: alvo.hp, a: escolha.type, am: escolha.golpe || null };
+      return { x:'disable', golpe:'Anulação', hp: alvo.hp, a: escolha.type, am: escolha.golpe || null,
+               aplica: () => { alvo._anulado = { tipo: escolha.type, contra: p }; } };
     }
     return null;
   };
-  const activeAcao = acaoDaTroca(active, enemy, 'p'), enemyAcao = acaoDaTroca(enemy, active, 'e');
+  /* ⚠️ A ORDEM DA TROCA E DECIDIDA AQUI, ANTES DAS ACOES -- e este e o conserto de 25/09/2026.
+     Reportado com print: *"o dugtrio e o rhyhorn atacaram depois de dormir, isso deveria ser
+     impossivel"*, e o print tinha DOIS casos, nao um:
+       - o RHYHORN (vel 40) e muito mais lento que o Jumpluff (128): o Jumpluff dormiu PRIMEIRO e ele
+         ainda atacou. Medido: 425 de 425 vezes. E o defeito de MECANICA;
+       - o DUGTRIO (vel 162) e mais RAPIDO: ele atacou ANTES de o sono sair, o golpe e legitimo, e o
+         que estava errado era a ORDEM no log (ver a linha da acao do second, la embaixo).
+     Os dois saem da mesma causa: as acoes rodavam pelos DOIS lados de uma vez, com a ordem de
+     velocidade decidida so DEPOIS. Hoje elas rodam NA ORDEM, e quem e dormido antes da vez dele nao
+     age nem ataca -- que e o que acontece no jogo original.
+     ⚠️ E A VELOCIDADE PASSOU A SER LIDA ANTES DOS GOLPES, o que e consequencia disto e e MAIS fiel
+     (no original a ordem do turno e decidida no comeco dele): a paralisia aplicada NA PROPRIA troca
+     deixou de contar pra ordem dela. Medido: a ordem inverteria em 1,12% das trocas, e o rng() do
+     desempate so e lido nos 1,08% em que ha empate. */
   const activeConfuso = activeConf === "acerta", enemyConfuso = enemyConf === "acerta";
+  const spdActive = effectiveSpeed(active);
+  const spdEnemy = effectiveSpeed(enemy);
+  // empate de velocidade: sorteio -- usa o mesmo rng da batalha, então nas Ligas (seed fixa) é determinístico
+  const activeFirst = spdActive > spdEnemy || (spdActive === spdEnemy && rng() < 0.5);
+  const first  = activeFirst ? active : enemy;
+  const second = activeFirst ? enemy : active;
+  /* ⚠️ O acaoDaTroca DECIDE e devolve o efeito num aplica() -- ele nao mexe em nada sozinho. Isso
+     existe por causa do SECOND: a acao dele so vale se ele SOBREVIVER ao golpe do first, e isso so
+     se sabe la embaixo (o segundoCaiu). Medido antes desta separacao: 61 de 3.485 acoes eram de
+     quem JA TINHA CAIDO na mesma troca -- 1,75% --, e o log mostrava "X caiu / X fez Y dormir".
+     ⚠️ E O PADRAO E O DOS SEIS tentar*, que ja usam (segundoCaiu || !primeiroAtacou) ? null: quem
+     cai nao sofre status, e nao devia agir tampouco. O que mudou e a acao entrar nessa regra. */
+  const acaoDoFirst = acaoDaTroca(first, second, activeFirst ? 'p' : 'e');
+  if(acaoDoFirst) acaoDoFirst.aplica();
+  /* ⚠️ QUEM FOI DORMIDO ANTES DA VEZ DELE NAO AGE NEM ATACA. A pergunta e pelo x:'sono' e nao pelo
+     _dormindoPor: o semSono (o Despertar segurou) e o disable NAO tiram o turno do alvo. */
+  const segundoDormiuAgora = !!(acaoDoFirst && acaoDoFirst.x === 'sono');
+  const acaoPendenteDoSecond = segundoDormiuAgora ? null : acaoDaTroca(second, first, activeFirst ? 'e' : 'p');
+  /* ⚠️ E O GOLPE DELE JA E BARRADO AQUI, mesmo com o efeito pendente: se ele cair, o golpe e
+     descartado na aplicacao do mesmo jeito (o saiuNoPrimeiro tem `segundoCaiu ? []`), entao os dois
+     caminhos chegam no mesmo lugar. */
+  const activeAcao = activeFirst ? acaoDoFirst : acaoPendenteDoSecond;
+  const enemyAcao  = activeFirst ? acaoPendenteDoSecond : acaoDoFirst;
 
   const acordaram = [];
   if(activeDorme && active._dormindoPor <= 0) acordaram.push({ q:'p', nome: active.name, p: active });
@@ -3081,16 +3127,15 @@ function doExchange(active, enemy, rng, diario){
   /* ⚠️ E QUEM DORMIU O OUTRO OU ANULOU TAMBEM NAO ATACA -- e esse o preco que equilibra os dois
      terem passado a ser sorteados a cada troca, e e o pedido ao pe da letra (*"ao inves de
      atacar"*). Na abertura eles saiam de graca. */
-  const dmgToEnemy = (activeDorme || activeCongelado || activeTravado || activeConfuso || activeCura || activeAcao) ? [] : golpesDaTroca(active, enemy, rng);
-  const dmgToActive = (enemyDorme || enemyCongelado || enemyTravado || enemyConfuso || enemyCura || enemyAcao) ? [] : golpesDaTroca(enemy, active, rng);
+  /* ⚠️ E QUEM ACABOU DE SER DORMIDO PELO FIRST NAO ATACA -- o conserto do print de 25/09/2026. Sem
+     isso o adormecido dava o golpe dele DEPOIS de ja estar dormindo, porque o activeDorme e calculado
+     no acorda(), na entrada da troca, e o sono sai no meio dela. */
+  const activeSoneca = activeDorme || (segundoDormiuAgora && second === active);
+  const enemySoneca  = enemyDorme  || (segundoDormiuAgora && second === enemy);
+  const dmgToEnemy = (activeSoneca || activeCongelado || activeTravado || activeConfuso || activeCura || activeAcao) ? [] : golpesDaTroca(active, enemy, rng);
+  const dmgToActive = (enemySoneca || enemyCongelado || enemyTravado || enemyConfuso || enemyCura || enemyAcao) ? [] : golpesDaTroca(enemy, active, rng);
   active._dormeAgora = false;
   enemy._dormeAgora = false;
-  const spdActive = effectiveSpeed(active);
-  const spdEnemy = effectiveSpeed(enemy);
-  // empate de velocidade: sorteio -- rng com seed fixa nas Ligas, então continua determinístico
-  const activeFirst = spdActive > spdEnemy || (spdActive === spdEnemy && rng() < 0.5);
-  const first  = activeFirst ? active : enemy;
-  const second = activeFirst ? enemy : active;
   const dmgByFirst  = activeFirst ? dmgToEnemy : dmgToActive;
   const dmgBySecond = activeFirst ? dmgToActive : dmgToEnemy;
   /* ⚠️ `firstHpBefore` É `let` POR CAUSA DA DRENAGEM: ele significa "a vida do first no instante em
@@ -3282,6 +3327,12 @@ function doExchange(active, enemy, rng, diario){
      77 gravava hp:0). Ver o comentário no index.html. */
   const hpDoFirstAposDreno = first.hp;
   const segundoCaiu = second.hp <= 0;
+  /* ⚠️ A ACAO DO SECOND SO VALE AGORA, e so se ele sobreviveu ao golpe do first -- a mesma regra dos
+     seis tentar* logo abaixo. Sem isso ele dormia o adversario DEPOIS de ter caido, e desde que a
+     linha dele passou a sair no lugar certo (25/09/2026) isso apareceria no log como "X caiu / X fez
+     Y dormir". Medido: 61 de 3.485 acoes. */
+  const acaoDoSecond = segundoCaiu ? null : acaoPendenteDoSecond;
+  if(acaoDoSecond) acaoDoSecond.aplica();
   /* =====================================================================================
      ⚠️ QUEM CAI NÃO REVIDA (15/09/2026, a pedido). O GOLPE MORIBUNDO ACABOU.
      Saíram junto o `DYING_BLOW_FACTOR`, o PISO de 1%-10%, o `apararRevide` que o piso obrigava,
@@ -3509,8 +3560,10 @@ function doExchange(active, enemy, rng, diario){
     /* ⚠️ A ACAO E GRAVADA NA MESMA SEQUENCIA DA CURA, e antes dos golpes da troca. As marcas
        (`sono`, `semSono`, `disable`) sao as MESMAS de quando eles eram abertura, entao o log, a
        animacao, o selo e a pausa de 1,5s vem de graca -- e log antigo continua legivel. */
+    /* ⚠️ ELE LE POR first/second, e nao por active/enemy: a do second pode ter sido DESCARTADA (ele
+       caiu no golpe do first), e o activeAcao/enemyAcao guardam a decisao, nao o que valeu. */
     const acaoDe = (p, q) => {
-      const a = (p === active) ? activeAcao : enemyAcao;
+      const a = (p === first) ? acaoDoFirst : acaoDoSecond;
       if(!a) return;
       const reg = { q:q, d:0, hp:a.hp, c:0, m:0, z:0, x:a.x, g:a.golpe };
       if(a.a) reg.a = a.a;
@@ -3520,7 +3573,6 @@ function doExchange(active, enemy, rng, diario){
     curaDe(first, qDoFirst);
     curaDe(second, qDoSecond);
     acaoDe(first, qDoFirst);
-    acaoDe(second, qDoSecond);
     geloDe(first, qDoFirst);
     travadoDe(first, qDoFirst);
     /* ⚠️ A LINHA DO FIRST VEM ANTES DO GOLPE DELE, que e onde o auto-dano dele foi aplicado. */
@@ -3547,6 +3599,12 @@ function doExchange(active, enemy, rng, diario){
        continua a dormir / Gengar atacou" -- a ordem invertida da cena.
        As duas do GELO ficam juntas la em cima de proposito, e por um caso que o sono nao tem: o
        recongelamento na mesma troca (ver o comentario delas). */
+    /* ⚠️ E A ACAO DO SECOND TAMBEM -- ela era gravada la em cima, junto da do first, e era isso que
+       fazia o log dizer "fez Dugtrio dormir / Dugtrio atacou" quando o DUGTRIO era o mais rapido: o
+       golpe dele e legitimo (ele bateu antes de o sono sair), mas a linha do sono aparecia na frente.
+       A acao e A VEZ dele, e a vez dele e depois do golpe de quem e mais rapido -- a mesma razao do
+       travadoDe e do dormeDe, que ja estavam aqui. */
+    acaoDe(second, qDoSecond);
     travadoDe(second, qDoSecond);
     /* ⚠️ E A DO SECOND DEPOIS DO GOLPE DO FIRST -- a vez dele e depois da de quem e mais rapido,
        e e ali que o auto-dano dele foi aplicado. */

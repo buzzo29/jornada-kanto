@@ -163,11 +163,32 @@
      ⚠️ ELE NAO TROCA A COR DO TEXTO, so poe um halo -- e isso e a decisao: no log de batalha o nome
      ja sai em AZUL (eu) ou VERMELHO (o adversario), e no titulo do card ele sai em verde/vermelho
      escuro pelo resultado. Um dourado por cima apagaria tudo isso.
-     ⚠️ SAO DUAS SOMBRAS, e a de dentro e a que faz ele ler no fundo CREME das caixas: um halo largo
+     ⚠️ SAO TRES SOMBRAS, e a de dentro e a que faz ele ler no fundo CREME das caixas: um halo largo
      e translucido some contra o claro -- e ali some junto a informacao de que o pokemon e shiny,
-     que vale 1,20x em todos os atributos. */
+     que vale 1,20x em todos os atributos.
+     E ELE FICOU AMARELO EM 25/09/2026 (a pedido: *"deixe ele mais amarelo"*). Ele era AMBAR -- a
+     primeira sombra era rgba(214,150,0), um laranja queimado --, e na tela ele lia como um contorno
+     alaranjado, nao como brilho.
+     E A INTUICAO ERRA AQUI: o medo era que o amarelo (mais claro) sumisse no creme, e MEDIDO no
+     navegador ele nao some -- o creme tem saturacao quase zero, entao o que separa o halo do fundo
+     e a SATURACAO e nao a luminancia. Ele melhorou nos DOIS fundos.
+     E A AMBAR FINA POR BAIXO FOI TENTADA E E PIOR: ela suja o amarelo (saturacao 100% -> 80%) e na
+     captura ele volta a ler como laranja. Quem segura o halo no creme e a OPACIDADE das camadas de
+     dentro, nao uma cor escura embaixo.
+     E A PRIMEIRA VERSAO DO AMARELO FOI RECUSADA NA TELA: *"ta parecendo que o texto ta com um marca
+     texto"*. Ela tinha DUAS camadas OPACAS coladas no glifo (2px e 5px, alpha 1) -- postas ali pra
+     segurar o halo no creme --, e tinta opaca colada PREENCHE O VAO ENTRE AS LETRAS: o que se ve
+     deixa de ser um halo em volta do nome e vira um bloco amarelo atras dele.
+     E O NUMERO QUE DEFINE ISSO E A TINTA COLADA -- a soma dos alphas das camadas de blur <= 5px: a
+     recusada tinha 2,00 (1,0 + 1,0), a de 24/09 tinha 0,95 e esta tem 0,70. Acima de ~1,0 o vao
+     preenche, e e ai que ele vira marca-texto. NENHUMA camada aqui e opaca.
+     E A FORMA E A DE 24/09 (tres camadas, 3px/8px/16px), que nunca foi reclamada: o que mudou foi a
+     COR, e a camada de dentro ficar MAIS suave. Foram comparadas seis variantes na tela, nos dois
+     fundos -- o glow so difuso some no creme, e o de duas camadas largas borra o nome.
+     CUSTO MEDIDO: nada. 40 nomes brilhando (4x o pior caso real, que e a tela de ordem) dao 0,2ms
+     com tres camadas, com quatro e sem sombra nenhuma -- indistinguivel. */
   .nome-shiny{
-    text-shadow:0 0 3px rgba(214,150,0,.95), 0 0 8px rgba(255,190,0,.75), 0 0 14px rgba(255,190,0,.45);
+    text-shadow:0 0 3px rgba(255,200,0,.7), 0 0 8px rgba(255,205,0,.45), 0 0 16px rgba(255,200,0,.28);
   }
   .btn .mon-name{font-size:1rem;font-weight:800;display:block;}
   .btn .mon-sub{font-size:.7rem;font-weight:600;opacity:.85;display:block;margin-top:3px;}
@@ -12072,36 +12093,82 @@ function doExchange(active, enemy, rng, diario){
     }
     return tiposDeAtaque(alvo, contra).length >= 2;
   };
+  /* ⚠️ E QUEM ESTA IMPEDIDO NAO AGE -- reportado com print em 25/09/2026, e era o mesmo defeito do
+     adormecido que atacava por outra porta: as guardas de "perdeu a vez" barravam o GOLPE e nao a
+     ACAO, entao um pokemon DORMINDO usava o Po do Sono. Medido no par Butterfree x Venomoth (os dois
+     sonifieros): 854 trocas em 16.023 (5,3%).
+     A lista e a MESMA das cinco coisas que fazem perder a troca -- quem nao joga nao age. */
+  const podeAgirNaTroca = (p) => {
+    if(p === active) return !(activeDorme || activeCongelado || activeTravado || activeConfuso || activeCura);
+    return !(enemyDorme || enemyCongelado || enemyTravado || enemyConfuso || enemyCura);
+  };
   const acaoDaTroca = (p, alvo, marca) => {
     if(!p || p.hp <= 0 || !alvo || alvo.hp <= 0) return null;
     if(ehImuneAEspecial(p) || ehImuneAEspecial(alvo)) return null;
+    if(!podeAgirNaTroca(p)) return null;
     const alvoDormeAgora = (alvo === active) ? activeDorme : enemyDorme;
     if(SONIFEROS[p.speciesId] && !(alvo._dormindoPor > 0) && !alvoDormeAgora && rng() < CHANCE_SONO){
       /* O DESPERTAR E DO ALVO e segura o sono venha de quem vier. A chance E CONSUMIDA: ele tentou
          e falhou, e e isso que a linha do log conta. */
       const jaSegurou = alvo._semSonoContra === p;
       if(alvo.item === 'awakening' || jaSegurou){
-        if(!jaSegurou){
+        return { x:'semSono', golpe: SONIFEROS[p.speciesId], hp: alvo.hp, aplica: () => {
+          if(jaSegurou) return;
           /* O ITEM E GASTO UMA VEZ SO -- da segunda em diante quem segura e a marca. */
           alvo.item = null;
           alvo._semSonoContra = p;
           itensGastos.push({ dono: marca === 'p' ? 'e' : 'p', especie: alvo.speciesId, slot: alvo.slotDaConta, item: 'awakening' });
-        }
-        return { x:'semSono', golpe: SONIFEROS[p.speciesId], hp: alvo.hp };
+        } };
       }
-      alvo._dormindoPor = sorteiaTrocasDeSono(rng);
-      return { x:'sono', golpe: SONIFEROS[p.speciesId], hp: alvo.hp };
+      return { x:'sono', golpe: SONIFEROS[p.speciesId], hp: alvo.hp,
+               aplica: () => { alvo._dormindoPor = sorteiaTrocasDeSono(rng); } };
     }
     if(DISABLE.includes(p.speciesId) && !(alvo._anulado && alvo._anulado.contra === p)
        && temSegundoGolpe(alvo, p) && rng() < CHANCE_DISABLE){
       const escolha = bestAttackType(alvo, p);
-      alvo._anulado = { tipo: escolha.type, contra: p };
-      return { x:'disable', golpe:'Anulação', hp: alvo.hp, a: escolha.type, am: escolha.golpe || null };
+      return { x:'disable', golpe:'Anulação', hp: alvo.hp, a: escolha.type, am: escolha.golpe || null,
+               aplica: () => { alvo._anulado = { tipo: escolha.type, contra: p }; } };
     }
     return null;
   };
-  const activeAcao = acaoDaTroca(active, enemy, 'p'), enemyAcao = acaoDaTroca(enemy, active, 'e');
+  /* ⚠️ A ORDEM DA TROCA E DECIDIDA AQUI, ANTES DAS ACOES -- e este e o conserto de 25/09/2026.
+     Reportado com print: *"o dugtrio e o rhyhorn atacaram depois de dormir, isso deveria ser
+     impossivel"*, e o print tinha DOIS casos, nao um:
+       - o RHYHORN (vel 40) e muito mais lento que o Jumpluff (128): o Jumpluff dormiu PRIMEIRO e ele
+         ainda atacou. Medido: 425 de 425 vezes. E o defeito de MECANICA;
+       - o DUGTRIO (vel 162) e mais RAPIDO: ele atacou ANTES de o sono sair, o golpe e legitimo, e o
+         que estava errado era a ORDEM no log (ver a linha da acao do second, la embaixo).
+     Os dois saem da mesma causa: as acoes rodavam pelos DOIS lados de uma vez, com a ordem de
+     velocidade decidida so DEPOIS. Hoje elas rodam NA ORDEM, e quem e dormido antes da vez dele nao
+     age nem ataca -- que e o que acontece no jogo original.
+     ⚠️ E A VELOCIDADE PASSOU A SER LIDA ANTES DOS GOLPES, o que e consequencia disto e e MAIS fiel
+     (no original a ordem do turno e decidida no comeco dele): a paralisia aplicada NA PROPRIA troca
+     deixou de contar pra ordem dela. Medido: a ordem inverteria em 1,12% das trocas, e o rng() do
+     desempate so e lido nos 1,08% em que ha empate. */
   const activeConfuso = activeConf === "acerta", enemyConfuso = enemyConf === "acerta";
+  const spdActive = effectiveSpeed(active);
+  const spdEnemy = effectiveSpeed(enemy);
+  // empate de velocidade: sorteio -- usa o mesmo rng da batalha, então nas Ligas (seed fixa) é determinístico
+  const activeFirst = spdActive > spdEnemy || (spdActive === spdEnemy && rng() < 0.5);
+  const first  = activeFirst ? active : enemy;
+  const second = activeFirst ? enemy : active;
+  /* ⚠️ O acaoDaTroca DECIDE e devolve o efeito num aplica() -- ele nao mexe em nada sozinho. Isso
+     existe por causa do SECOND: a acao dele so vale se ele SOBREVIVER ao golpe do first, e isso so
+     se sabe la embaixo (o segundoCaiu). Medido antes desta separacao: 61 de 3.485 acoes eram de
+     quem JA TINHA CAIDO na mesma troca -- 1,75% --, e o log mostrava "X caiu / X fez Y dormir".
+     ⚠️ E O PADRAO E O DOS SEIS tentar*, que ja usam (segundoCaiu || !primeiroAtacou) ? null: quem
+     cai nao sofre status, e nao devia agir tampouco. O que mudou e a acao entrar nessa regra. */
+  const acaoDoFirst = acaoDaTroca(first, second, activeFirst ? 'p' : 'e');
+  if(acaoDoFirst) acaoDoFirst.aplica();
+  /* ⚠️ QUEM FOI DORMIDO ANTES DA VEZ DELE NAO AGE NEM ATACA. A pergunta e pelo x:'sono' e nao pelo
+     _dormindoPor: o semSono (o Despertar segurou) e o disable NAO tiram o turno do alvo. */
+  const segundoDormiuAgora = !!(acaoDoFirst && acaoDoFirst.x === 'sono');
+  const acaoPendenteDoSecond = segundoDormiuAgora ? null : acaoDaTroca(second, first, activeFirst ? 'e' : 'p');
+  /* ⚠️ E O GOLPE DELE JA E BARRADO AQUI, mesmo com o efeito pendente: se ele cair, o golpe e
+     descartado na aplicacao do mesmo jeito (o saiuNoPrimeiro tem `segundoCaiu ? []`), entao os dois
+     caminhos chegam no mesmo lugar. */
+  const activeAcao = activeFirst ? acaoDoFirst : acaoPendenteDoSecond;
+  const enemyAcao  = activeFirst ? acaoPendenteDoSecond : acaoDoFirst;
 
   const acordaram = [];
   if(activeDorme && active._dormindoPor <= 0) acordaram.push({ q:'p', nome: active.name, p: active });
@@ -12124,16 +12191,15 @@ function doExchange(active, enemy, rng, diario){
   /* ⚠️ E QUEM DORMIU O OUTRO OU ANULOU TAMBEM NAO ATACA -- e esse o preco que equilibra os dois
      terem passado a ser sorteados a cada troca, e e o pedido ao pe da letra (*"ao inves de
      atacar"*). Na abertura eles saiam de graca. */
-  const dmgToEnemy = (activeDorme || activeCongelado || activeTravado || activeConfuso || activeCura || activeAcao) ? [] : golpesDaTroca(active, enemy, rng);
-  const dmgToActive = (enemyDorme || enemyCongelado || enemyTravado || enemyConfuso || enemyCura || enemyAcao) ? [] : golpesDaTroca(enemy, active, rng);
+  /* ⚠️ E QUEM ACABOU DE SER DORMIDO PELO FIRST NAO ATACA -- o conserto do print de 25/09/2026. Sem
+     isso o adormecido dava o golpe dele DEPOIS de ja estar dormindo, porque o activeDorme e calculado
+     no acorda(), na entrada da troca, e o sono sai no meio dela. */
+  const activeSoneca = activeDorme || (segundoDormiuAgora && second === active);
+  const enemySoneca  = enemyDorme  || (segundoDormiuAgora && second === enemy);
+  const dmgToEnemy = (activeSoneca || activeCongelado || activeTravado || activeConfuso || activeCura || activeAcao) ? [] : golpesDaTroca(active, enemy, rng);
+  const dmgToActive = (enemySoneca || enemyCongelado || enemyTravado || enemyConfuso || enemyCura || enemyAcao) ? [] : golpesDaTroca(enemy, active, rng);
   active._dormeAgora = false;
   enemy._dormeAgora = false;
-  const spdActive = effectiveSpeed(active);
-  const spdEnemy = effectiveSpeed(enemy);
-  // empate de velocidade: sorteio -- usa o mesmo rng da batalha, então nas Ligas (seed fixa) é determinístico
-  const activeFirst = spdActive > spdEnemy || (spdActive === spdEnemy && rng() < 0.5);
-  const first  = activeFirst ? active : enemy;
-  const second = activeFirst ? enemy : active;
   const dmgByFirst  = activeFirst ? dmgToEnemy : dmgToActive;
   const dmgBySecond = activeFirst ? dmgToActive : dmgToEnemy;
   /* ⚠️ `firstHpBefore` É `let` POR CAUSA DA DRENAGEM: ele significa "a vida do first no instante em
@@ -12336,6 +12402,12 @@ function doExchange(active, enemy, rng, diario){
      campo é lido pela reconstrução (o laço do `base`) e pelas contas que leem o diário. */
   const hpDoFirstAposDreno = first.hp;
   const segundoCaiu = second.hp <= 0;
+  /* ⚠️ A ACAO DO SECOND SO VALE AGORA, e so se ele sobreviveu ao golpe do first -- a mesma regra dos
+     seis tentar* logo abaixo. Sem isso ele dormia o adversario DEPOIS de ter caido, e desde que a
+     linha dele passou a sair no lugar certo (25/09/2026) isso apareceria no log como "X caiu / X fez
+     Y dormir". Medido: 61 de 3.485 acoes. */
+  const acaoDoSecond = segundoCaiu ? null : acaoPendenteDoSecond;
+  if(acaoDoSecond) acaoDoSecond.aplica();
   /* =====================================================================================
      ⚠️ QUEM CAI NÃO REVIDA (15/09/2026, a pedido: *"esse negócio de golpe moribundo eu queria
      acabar com ele"*). O GOLPE MORIBUNDO ACABOU.
@@ -12587,8 +12659,10 @@ function doExchange(active, enemy, rng, diario){
     /* ⚠️ A ACAO E GRAVADA NA MESMA SEQUENCIA DA CURA, e antes dos golpes da troca. As marcas
        (`sono`, `semSono`, `disable`) sao as MESMAS de quando eles eram abertura, entao o log, a
        animacao, o selo e a pausa de 1,5s vem de graca -- e log antigo continua legivel. */
+    /* ⚠️ ELE LE POR first/second, e nao por active/enemy: a do second pode ter sido DESCARTADA (ele
+       caiu no golpe do first), e o activeAcao/enemyAcao guardam a decisao, nao o que valeu. */
     const acaoDe = (p, q) => {
-      const a = (p === active) ? activeAcao : enemyAcao;
+      const a = (p === first) ? acaoDoFirst : acaoDoSecond;
       if(!a) return;
       const reg = { q:q, d:0, hp:a.hp, c:0, m:0, z:0, x:a.x, g:a.golpe };
       if(a.a) reg.a = a.a;
@@ -12598,7 +12672,6 @@ function doExchange(active, enemy, rng, diario){
     curaDe(first, qDoFirst);
     curaDe(second, qDoSecond);
     acaoDe(first, qDoFirst);
-    acaoDe(second, qDoSecond);
     geloDe(first, qDoFirst);
     travadoDe(first, qDoFirst);
     /* ⚠️ A LINHA DO FIRST VEM ANTES DO GOLPE DELE, que e onde o auto-dano dele foi aplicado. */
@@ -12625,6 +12698,12 @@ function doExchange(active, enemy, rng, diario){
        continua a dormir / Gengar atacou" -- a ordem invertida da cena.
        As duas do GELO ficam juntas la em cima de proposito, e por um caso que o sono nao tem: o
        recongelamento na mesma troca (ver o comentario delas). */
+    /* ⚠️ E A ACAO DO SECOND TAMBEM -- ela era gravada la em cima, junto da do first, e era isso que
+       fazia o log dizer "fez Dugtrio dormir / Dugtrio atacou" quando o DUGTRIO era o mais rapido: o
+       golpe dele e legitimo (ele bateu antes de o sono sair), mas a linha do sono aparecia na frente.
+       A acao e A VEZ dele, e a vez dele e depois do golpe de quem e mais rapido -- a mesma razao do
+       travadoDe e do dormeDe, que ja estavam aqui. */
+    acaoDe(second, qDoSecond);
     travadoDe(second, qDoSecond);
     /* ⚠️ E A DO SECOND DEPOIS DO GOLPE DO FIRST -- a vez dele e depois da de quem e mais rapido,
        e e ali que o auto-dano dele foi aplicado. */
@@ -14815,7 +14894,7 @@ function renderMontanha(){
       <div class="order-row">
         <div class="order-num">${idx+1}º ${botaoDeItemHtml(p)}</div>
         <div class="order-info">
-          <span class="mon-name">${spriteHtml(p, "sprite-sm")} ${escapeHtmlSafe(p.name)}${p.shiny?" "+selo("shiny"):""} — Lv.${p.level}</span>
+          <span class="mon-name">${spriteHtml(p, "sprite-sm")} ${nomeBrilhante(escapeHtmlSafe(p.name), p.shiny)} — Lv.${p.level}</span>
           <span class="mon-sub">${typesHtml(p.types)}</span>
         </div>
         ${/* ⚠️ ELAS CHAMAVAM `moveTeam`, QUE NUNCA EXISTIU (consertado em 18/09/2026, reportado:
@@ -15042,7 +15121,7 @@ function renderMataFechada(){
       return `<div class="order-row">
         <div class="order-num">${i + 1}º</div>
         <div class="order-info">
-          <span class="mon-name">${spriteHtml(m,"sprite-sm")} ${escapeHtmlSafe(sp.name)}${m.shiny ? " "+selo("shiny") : ""} — Lv.${m.level}</span>
+          <span class="mon-name">${spriteHtml(m,"sprite-sm")} ${nomeBrilhante(escapeHtmlSafe(sp.name), m.shiny)} — Lv.${m.level}</span>
           <span class="mon-sub">${typesHtml(sp.types)}</span>
         </div>
       </div>`;
@@ -15064,7 +15143,7 @@ function renderMataFechada(){
     ${meu.map((p, i) => `<div class="order-row">
       <div class="order-num">${i + 1}º${botaoDeItemHtml(p)}</div>
       <div class="order-info">
-        <span class="mon-name">${spriteHtml(p,"sprite-sm")} ${escapeHtmlSafe(p.name)}${p.shiny ? " "+selo("shiny") : ""} — Lv.${p.level}</span>
+        <span class="mon-name">${spriteHtml(p,"sprite-sm")} ${nomeBrilhante(escapeHtmlSafe(p.name), p.shiny)} — Lv.${p.level}</span>
         <span class="mon-sub">${typesHtml(p.types || (SPECIES[p.speciesId] || {}).types || [])}</span>
       </div>
       <div class="order-controls">
@@ -15142,7 +15221,7 @@ function renderVigiliaPremio(){
       const sp = SPECIES[m.speciesId];
       return `<div class="evo-linha">
         <button class="btn" onclick="escolherOPremioDaVigilia(${i})">
-          <span class="mon-name">${spriteHtml(m,"sprite-sm")} ${escapeHtmlSafe(sp.name)}${m.shiny ? " "+selo("shiny") : ""} <span class="wild-lv">— Lv.${m.level}</span></span>
+          <span class="mon-name">${spriteHtml(m,"sprite-sm")} ${nomeBrilhante(escapeHtmlSafe(sp.name), m.shiny)} <span class="wild-lv">— Lv.${m.level}</span></span>
           <span class="mon-sub">${typesHtml(sp.types)}</span>
         </button>
         <button class="wild-dex" onclick="abrirPokedexFicha(\'${escJs(m.speciesId)}\', ${m.shiny ? "true" : "false"})"
@@ -23430,7 +23509,7 @@ function renderTeamOrder(){
       return `<div class="order-row">
         <div class="order-num">${idx+1}º${botaoDeItemHtml(p)}</div>
         <div class="order-info">
-          <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${p.name}${p.shiny?" "+selo("shiny"):""} — Lv.${p.level}</span>
+          <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${nomeBrilhante(p.name, p.shiny)} — Lv.${p.level}</span>
           <span class="mon-sub">${typesHtml(p.types)}</span>
           ${golpesDoTimeHtml(p)}
         </div>
@@ -26572,9 +26651,17 @@ function fighterHtml(m, lado, op){
   const especie = saindo ? g.ss : (doJogador ? m.playerSpecies : m.enemySpecies);
   const contra  = doJogador ? m.enemySpecies : m.playerSpecies;
   const sp = SPECIES[especie];
-  const nome = saindo ? escapeHtmlSafe(g.sai || (sp ? sp.name : '')) : (doJogador ? m.player : m.enemy);
+  const nomeCru = saindo ? escapeHtmlSafe(g.sai || (sp ? sp.name : '')) : (doJogador ? m.player : m.enemy);
   const nivel = saindo ? (g.sl || '?') : (doJogador ? m.playerLevel : m.enemyLevel);
   const shiny = saindo ? !!g.sh : (doJogador ? m.playerShiny : m.enemyShiny);
+  /* ⚠️ O NOME DO SHINY BRILHA AQUI TAMBEM (25/09/2026, a pedido: *"durante a batalha ainda tava
+     mostrando a estrela ao invez de deixar o nome brilhando"*). Ele era o MAIOR dos pontos que
+     ficaram pra tras em 24/09, porque as CINCO telas de batalha passam por aqui -- e e a tela em que
+     o 1,20x em todos os atributos mais decide.
+     ⚠️ E ELE E UMA VARIAVEL SO, lida pelos DOIS ramos (a cena nova e o caminho antigo): envolvida
+     aqui, os dois ganham o brilho e perdem a estrela de uma vez -- escrita em cada ramo, a segunda
+     ficaria pra tras, que e literalmente o que aconteceu em 24/09. */
+  const nome = nomeBrilhante(nomeCru, shiny);
   const buffed = saindo ? false : (doJogador ? m.playerBuffed : m.enemyBuffed);
   const especialidade = saindo ? false : (doJogador ? m.playerSpecialty : m.enemySpecialty);
   const hp = saindo ? (g.shp != null ? g.shp : 0) : op.hp;
@@ -26585,7 +26672,7 @@ function fighterHtml(m, lado, op){
      sem efeito colateral: sem `op.visualNovo` este ramo inteiro nao existe. */
   if(op.visualNovo){
     const side = doJogador ? 'player' : 'enemy';
-    const badges = `${shiny ? selo('shiny','selo-g') : ''}${(op.comTerreno && buffed) ? selo('terreno','selo-g', op.corDoTerreno || COR_TERRENO_PADRAO) : ''}${especialidade ? selo('medalha_ouro','selo-g') : ''}${saindo ? '' : selosDoConfronto(m, lado, op.passo)}`;
+    const badges = `${(op.comTerreno && buffed) ? selo('terreno','selo-g', op.corDoTerreno || COR_TERRENO_PADRAO) : ''}${especialidade ? selo('medalha_ouro','selo-g') : ''}${saindo ? '' : selosDoConfronto(m, lado, op.passo)}`;
     const morto = hp <= 0 && !saindo;
     const explodiu = !saindo && caiuNaExplosao(m, side) && sequenciaDoConfronto(m).slice(0, op.passo == null ? Infinity : op.passo).some(g => g.x === 'boom');
     /* ⚠️ O TREINADOR E AS POKÉBOLAS MORAM NO PAINEL (22/09/2026, a pedido: *"vamos agora colocar
@@ -26645,7 +26732,7 @@ function fighterHtml(m, lado, op){
              ⚠️ E ELE NÃO PODE TER CRASE NENHUMA: o comentário vive dentro de um template literal, e
              uma crase ímpar aqui FECHA a string -- o node --check acusa, mas com um número PAR de
              crases ele passa e a tela quebra só no navegador. */''}
-        <div class="fighter-emoji">${sp ? battleSpriteHtml(especie, contra, 'sprite-lg', shiny, doJogador) : ''}</div>${nome}${shiny?' '+selo('shiny','selo-g'):''}${(op.comTerreno && buffed)?' '+selo('terreno','selo-g', op.corDoTerreno || COR_TERRENO_PADRAO):''}${especialidade?' '+selo('medalha_ouro','selo-g'):''}${saindo?'':selosDoConfronto(m, lado, op.passo)} <span class="fighter-level">Lv.${nivel}</span>
+        <div class="fighter-emoji">${sp ? battleSpriteHtml(especie, contra, 'sprite-lg', shiny, doJogador) : ''}</div>${nome}${(op.comTerreno && buffed)?' '+selo('terreno','selo-g', op.corDoTerreno || COR_TERRENO_PADRAO):''}${especialidade?' '+selo('medalha_ouro','selo-g'):''}${saindo?'':selosDoConfronto(m, lado, op.passo)} <span class="fighter-level">Lv.${nivel}</span>
         <div class="fighter-types">${sp ? typesHtml(sp.types) : ''}</div>
         ${renderHpBar(hp, maxHp, doJogador ? 'hp-fill-player' : 'hp-fill-enemy', doJogador ? 'hp-label-player' : 'hp-label-enemy', entrando)}
       </div>`;
@@ -28056,7 +28143,7 @@ function renderNeighborhoodGymChallengeOrderPicker(){
     ${team.map((p,idx)=>`<div class="order-row">
       <div class="order-num">${idx+1}º${botaoDeItemHtml(p)}</div>
       <div class="order-info">
-        <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${p.name}${p.shiny?" "+selo("shiny"):""} — Lv.${p.level}</span>
+        <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${nomeBrilhante(p.name, p.shiny)} — Lv.${p.level}</span>
         <span class="mon-sub">${typesHtml(p.types)}</span>
         ${golpesDoTimeHtml(p)}
       </div>
@@ -28321,7 +28408,7 @@ function renderJourneyEnd(){
       return `<div class="order-row">
         <div class="order-num">${idx+1}º</div>
         <div class="order-info">
-          <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${p.name}${p.shiny?" "+selo("shiny"):""} — Lv.${p.level}</span>
+          <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${nomeBrilhante(p.name, p.shiny)} — Lv.${p.level}</span>
           <span class="mon-sub">${typesHtml(p.types)}</span>
         </div>
       </div>`;

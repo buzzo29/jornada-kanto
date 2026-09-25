@@ -226,12 +226,16 @@ ok('e o log diz qual golpe foi', !!sonoLinha && sonoLinha.g === 'Canto', sonoLin
      segundo golpe -- e isso acabou em 17/09, quando alvo de vida cheia parou de morrer num golpe.
      ⚠️ E E A QUARTA VEZ QUE UMA TRAVA DO SONO MEDE A DURACAO EM VEZ DA REGRA. A regra e: enquanto
      ele esta dormindo, so o dono bate. Quem marca o fim disso e o `acordou`, nao um numero. */
-  /* ⚠️ E A QUINTA VEZ QUE ESTA TRAVA MUDA, e agora por uma mudanca de MECANICA: desde 25/09/2026 o
-     sono e um golpe da TROCA, e quem o usa PERDE o ataque daquela troca. Entao o adormecido AINDA
-     ATACA na troca em que ele e dormido (ele nao estava dormindo quando ela comecou), e so a partir
-     da seguinte e que ele perde o turno.
-     O INVARIANTE NOVO e preciso e nao depende da duracao: todo golpe do adormecido no intervalo vem
-     ANTES de qualquer golpe do dono, e existe no maximo UM -- o da troca do sono. */
+  /* ⚠️ E A SEXTA VEZ QUE ESTA TRAVA MUDA, e a quinta versao durou UM DIA. Ela dizia que o adormecido
+     ainda atacava na troca em que era dormido, e isso foi REPORTADO com print em 25/09/2026 (*"o
+     dugtrio e o rhyhorn atacaram depois de dormir, isso deveria ser impossivel"*) -- ver a secao do
+     CLAUDE.md. Hoje as acoes rodam NA ORDEM de velocidade, e quem e dormido antes da vez dele nao
+     ataca.
+     ⚠️ E ELA TOLERAVA (`doAdormecido <= 1`) EM VEZ DE EXIGIR: por isso ela passou na regra nova sem
+     nada acusar. O invariante de hoje e ZERO, e ele vale nos DOIS casos -- quando o adormecido e o
+     mais rapido, o golpe dele e legitimo e sai ANTES da linha do sono, ou seja fora desta janela.
+     ⚠️ E O PAINEL DAQUI (Paras 35 x Onix 89) so exercita o alvo mais RAPIDO. O outro caso -- o do
+     Rhyhorn, que e o defeito de mecanica -- tem painel proprio logo abaixo. */
   /* ⚠️ E A JANELA COMECA NO SONO, nao no indice 0 (25/09/2026): enquanto ele era ABERTURA o sono
      ERA a primeira linha, e contar do zero dava no mesmo. Hoje ele sai no meio da luta, entao os
      golpes ANTES dele entravam na conta -- medido, 6 de 10 confrontos. */
@@ -242,11 +246,123 @@ ok('e o log diz qual golpe foi', !!sonoLinha && sonoLinha.g === 'Canto', sonoLin
   const doAdormecido = livres.filter(g => g.q === 'e').length;
   const primeiroDoDono = livres.findIndex(g => g.q === 'p');
   const ultimoDoAlvo = livres.reduce((a, g, k) => g.q === 'e' ? k : a, -1);
-  ok('os golpes livres sao do dono -- menos o da troca em que o sono saiu',
-     livres.length > 0 && doAdormecido <= 1 &&
+  ok('os golpes livres sao TODOS do dono',
+     livres.length > 0 && doAdormecido === 0 &&
      (primeiroDoDono < 0 || ultimoDoAlvo < primeiroDoDono),
      livres.length + ' livres: ' + livres.map(g=>g.q).join(','));
 })();
+/* ⚠️ O NOME DO SHINY BRILHA NA BATALHA, em vez da estrela ao lado (25/09/2026, a pedido: *"durante a
+   batalha ainda tava mostrando a estrela ao invez de deixar o nome brilhando"*).
+   ⚠️ ESTA TRAVA NASCEU DE UM CASO MUDO: a conferencia de acusacao religou o defeito (o fighterHtml
+   voltando a nao envolver o nome) e NENHUMA trava caiu -- o brilho tinha 33 usos no arquivo e
+   nenhum deles era a tela de batalha. Sem ela, alguem desfaz e ninguem ve, que e literalmente o que
+   aconteceu em 24/09, quando nove pontos ficaram pra tras.
+   ⚠️ E ELA COBRA O PAR: o brilho aparece E a estrela nao. Uma metade so passaria com os dois na
+   tela, que e o estado que o pedido recusa. */
+(function(){
+  const m = { player:'Charizard', playerSpecies:'charizard', playerLevel:60, playerShiny:true,
+    playerMaxHp:300, enemy:'Venusaur', enemySpecies:'venusaur', enemyLevel:60, enemyShiny:false,
+    enemyMaxHp:310, golpes:[], playerWon:true };
+  /* os DOIS ramos: a cena nova (jornada, telas especiais, Torre, liga, Ginasio da Cidade) e o
+     caminho antigo (o Boss, a Selecao, o desafio por codigo, o online) */
+  [['a cena NOVA', true], ['o caminho ANTIGO', false]].forEach(([rotulo, novo]) => {
+    const shiny = S.fighterHtml(m, 'p', { hp: 230, passo: 0, visualNovo: novo });
+    const comum = S.fighterHtml(m, 'e', { hp: 180, passo: 0, visualNovo: novo });
+    ok('o nome do shiny BRILHA em ' + rotulo, shiny.indexOf('class="nome-shiny"') >= 0);
+    ok('  e a ESTRELA nao sai mais em ' + rotulo, shiny.indexOf('#s-shiny') < 0,
+       shiny.indexOf('#s-shiny') < 0 ? '' : 'ainda tem a estrela');
+    ok('  e quem NAO e shiny continua sem os dois em ' + rotulo,
+       comum.indexOf('nome-shiny') < 0 && comum.indexOf('#s-shiny') < 0);
+  });
+  /* ⚠️ E A VARREDURA E A METADE QUE PEGA A PROXIMA OMISSAO: nenhum render do jogo pode emitir a
+     estrela, com DUAS excecoes nomeadas -- as duas sao DECORATIVAS (a estrela como icone de premio
+     nas Ilhas Laranja), e ali nao ha pokemon shiny nenhum. Contando so o total, a proxima tela que
+     nascer com a estrela passaria se outra a perdesse no mesmo commit. */
+  const _fsS = require('fs');
+  const srcS = _fsS.readFileSync(path.join(raiz, 'index.html'), 'utf8');
+  const linhas = srcS.split('\n').map((l, i) => [i + 1, l])
+    .filter(([, l]) => /selo\((['"])shiny\1/.test(l));
+  const decorativas = linhas.filter(([, l]) =>
+    l.indexOf('Todo o time subiu') >= 0 || l.indexOf('Os cinco caíram') >= 0);
+  ok('a estrela do shiny so sobra nos DOIS pontos decorativos', linhas.length === 2,
+     linhas.map(([n]) => 'linha ' + n).join(', '));
+  ok('  e os dois sao os das Ilhas Laranja (o premio e o "Os cinco cairam")',
+     decorativas.length === linhas.length, decorativas.length + ' de ' + linhas.length);
+})();
+/* ⚠️ O ADORMECIDO NAO ATACA NA TROCA EM QUE ELE DORME (25/09/2026). Reportado com print, e o print
+   tinha DOIS casos -- cada um com painel proprio aqui, porque eles tem causas diferentes:
+     - o RHYHORN era mais LENTO que quem o dormiu: ele atacou DEPOIS de ja estar dormindo. Defeito
+       de MECANICA, medido em 425 de 425 trocas;
+     - o DUGTRIO era mais RAPIDO: ele atacou ANTES de o sono sair, o golpe e legitimo, e o que
+       estava errado era a linha do sono aparecer na FRENTE dele no log.
+   ⚠️ E O PAINEL DE CADA UM E DIRIGIDO PELA VELOCIDADE: com um par em que o dono e mais lento, o
+   primeiro caso NUNCA ACONTECE e a trava passaria medindo o conjunto vazio. */
+(function(){
+  /* o DONO e muito mais rapido (Jumpluff 137 x Snorlax 41): o alvo e dormido ANTES da vez dele */
+  let trocas = 0, alvoAtacou = 0;
+  for(let i = 0; i < 4000 && trocas < 200; i++){
+    const t = umaTroca('jumpluff', 'snorlax', 60);
+    if(!t.d.some(g => g.x === 'sono')) continue;
+    trocas++;
+    if(t.d.some(g => !g.x && g.q === 'e' && g.d > 0)) alvoAtacou++;
+  }
+  ok('(achei trocas com o dono mais RAPIDO que o alvo)', trocas >= 50, trocas + ' trocas');
+  ok('o alvo mais LENTO nao ataca na troca em que e dormido', trocas > 0 && alvoAtacou === 0,
+     alvoAtacou + ' de ' + trocas + ' (era 425 de 425 antes do conserto)');
+
+  /* o DONO e mais lento (Vileplume 65 x Jolteon 161): o alvo ja atacou quando o sono sai */
+  let t2 = 0, atacou = 0, antesDoSono = 0;
+  for(let i = 0; i < 6000 && t2 < 200; i++){
+    const t = umaTroca('vileplume', 'jolteon', 60);
+    const iS = t.d.findIndex(g => g.x === 'sono');
+    if(iS < 0) continue;
+    t2++;
+    const iG = t.d.findIndex(g => !g.x && g.q === 'e' && g.d > 0);
+    if(iG >= 0){ atacou++; if(iG < iS) antesDoSono++; }
+  }
+  ok('(achei trocas com o alvo mais RAPIDO que o dono)', t2 >= 50, t2 + ' trocas');
+  ok('o alvo mais RAPIDO ataca (o golpe dele e legitimo)', t2 > 0 && atacou > 0,
+     atacou + ' de ' + t2);
+  /* ⚠️ ESTA E A METADE DO DUGTRIO: o golpe dele e o mesmo, o que muda e a ORDEM no log. */
+  ok('e o golpe dele vem ANTES da linha do sono no log', atacou > 0 && antesDoSono === atacou,
+     antesDoSono + ' de ' + atacou + ' antes (era 0 de 993)');
+})();
+/* ⚠️ E QUEM ESTA IMPEDIDO NAO AGE -- o mesmo defeito por outra porta: as guardas de "perdeu a vez"
+   barravam o GOLPE e nao a ACAO, entao um pokemon DORMINDO usava o Po do Sono. */
+(function(){
+  let trocas = 0, agiuDormindo = 0;
+  for(let i = 0; i < 4000; i++){
+    const a = inst('butterfree', 50), b = inst('venomoth', 50);
+    a.maxHp = S.calcMaxHp(a); a.hp = a.maxHp; b.maxHp = S.calcMaxHp(b); b.hp = b.maxHp;
+    let n = 0;
+    while(a.hp > 0 && b.hp > 0 && n++ < 30){
+      const dA = a._dormindoPor > 0, dB = b._dormindoPor > 0, d = [];
+      S.doExchange(a, b, Math.random, d, 'p', 'e');
+      trocas++;
+      d.forEach(g => { if(['sono','semSono','disable'].indexOf(g.x) < 0) return;
+        if(g.q === 'p' ? dA : dB) agiuDormindo++; });
+    }
+  }
+  ok('(achei trocas no par de dois sonifieros)', trocas > 5000, trocas + ' trocas');
+  ok('quem esta DORMINDO nao usa o sono nem a anulacao', agiuDormindo === 0,
+     agiuDormindo + ' de ' + trocas + ' (eram 854 em 16.023)');
+})();
+/* ⚠️ E A GUARDA LISTA AS CINCO CONDICOES, nos DOIS motores -- a lista e a MESMA que barra o golpe.
+   Sem ler o codigo, a proxima condicao que nascer entra no golpe e fica de fora da acao, e so o
+   painel que a produzisse acusaria. */
+/* ⚠️ AS FONTES SAO LIDAS AQUI, e nao reusadas de outro bloco: o `src` daquele arquivo e LOCAL de
+   cada bloco que o le -- usado daqui ele daria ReferenceError. */
+const _fs = require('fs');
+[['index.html', _fs.readFileSync(path.join(raiz, 'index.html'), 'utf8')],
+ ['functions/index.js', _fs.readFileSync(path.join(raiz, 'functions', 'index.js'), 'utf8')]].forEach(([nome, txt]) => {
+  const i = txt.indexOf('const podeAgirNaTroca');
+  const fatia = txt.slice(i, txt.indexOf('};', i));
+  ok('  (a guarda de quem pode agir existe em ' + nome + ')', i > 0 && fatia.length > 100,
+     fatia.length + ' chars');
+  ['Dorme', 'Congelado', 'Travado', 'Confuso', 'Cura'].forEach(cond => {
+    ok('  e ela olha o ' + cond + ' em ' + nome, fatia.indexOf('active' + cond) > 0 && fatia.indexOf('enemy' + cond) > 0);
+  });
+});
 /* E o alvo pode SOBREVIVER e ganhar -- o que antes era impossivel. */
 (function(){
   let venceuDepoisDeDormir = 0, total = 0;

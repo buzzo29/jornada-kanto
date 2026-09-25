@@ -667,6 +667,13 @@ de ser só no inicio da batalha, vai ser a qualquer ataque"*.
 É o **mesmo molde do Recuperar**, feito no dia anterior — e é a terceira passiva a sair da fila de
 abertura.
 
+> **⚠️ UMA PARTE DISTO DUROU UM DIA: em 25/09/2026 o adormecido deixou de atacar na troca em que ele
+> é dormido** — ver **QUEM DORME NÃO ATACA**, logo abaixo. Foi reportado com print (*"o dugtrio e o
+> rhyhorn atacaram depois de dormir"*), e com ele saíram mais duas portas do mesmo defeito: um
+> pokémon **dormindo** usando o Pó do Sono (854 em 16.023) e a ação de quem **caiu** na mesma troca
+> (61 em 3.485). O que continua valendo desta seção inteira é o **preço do turno perdido**, que é o
+> que equilibra as duas passarem a ser sorteadas a cada troca.
+
 | | antes | agora |
 |---|---|---|
 | quando é sorteado | **ABERTURA**: uma vez por confronto | **a cada TROCA** |
@@ -706,6 +713,9 @@ que uma mudança de mecânica deve fazer.
     acordado — o dono o redormia **antes de ele acordar uma vez**. Quem responde é o `activeDorme`
     daquela troca;
   - **não anula quem JÁ ESTÁ ANULADO por ele.** Anular duas vezes não tem o que tirar.
+  - ⚠️ **E A TERCEIRA NASCEU NO DIA SEGUINTE: quem está IMPEDIDO não age** (`podeAgirNaTroca`). As
+    duas acima olham o ALVO; faltava olhar quem AGE — e sem ela um pokémon **dormindo** usava o Pó
+    do Sono, medido em 854 trocas de 16.023. Ver **QUEM DORME NÃO ATACA**, logo abaixo.
 - **⚠️ A GUARDA DO "SEGUNDO GOLPE" DO DISABLE VEM ANTES DO DADO.** Checada depois, o pokémon perderia
   o ataque **por nada** contra um Onix (que não tem o que perder). Na abertura isso não doía, porque
   lá ele atacava do mesmo jeito.
@@ -828,6 +838,210 @@ lições:
 **⚠️ E O FLAKE DO `Charmeleon × Mankey` CONTINUA** (1 rodada em ~4), agora **sem** a causa da
 queimadura: medido, a taxa é **indistinguível entre os dois builds** (0 em 700 voltas de cada, no
 painel da trava do selo). Ele é o mesmo que este arquivo nomeia desde 17/09.
+
+## ⚠️ QUEM DORME NÃO ATACA: AS AÇÕES PASSARAM A RODAR NA ORDEM (25/09/2026)
+
+Reportado com print, no dia seguinte ao sono virar golpe da troca: *"o dugtrio e o rhyhorn atacaram
+depois de dormir, isso deveria ser impossivel"*. **E o print tinha DOIS casos, não um** — o mesmo
+sintoma com causas diferentes, e é essa separação que organiza tudo aqui:
+
+| no print | velocidade | o que aconteceu |
+|---|---|---|
+| **Rhyhorn 40** × Jumpluff 128 | o Jumpluff é **muito mais rápido** | ele dormiu primeiro e o Rhyhorn **ainda atacou**. ⚠️ Medido: **425 de 425** |
+| **Dugtrio 162** × Jumpluff 128 | o **Dugtrio** é mais rápido | ele atacou **antes** do sono — o golpe é **legítimo** —, mas o log mostrava a linha do sono **na frente** |
+
+### ⚠️ A CAUSA É UMA SÓ: AS AÇÕES RODAVAM PELOS DOIS LADOS ANTES DE A ORDEM EXISTIR
+
+O `acaoDaTroca` era chamado pro `active` e pro `enemy` de uma vez, e o `activeFirst` — quem bate
+primeiro — era decidido **trinta linhas depois**. Sem a ordem, não há como saber se o alvo já estava
+dormindo quando chegou a vez dele.
+
+Hoje a ordem é decidida **antes**, as ações rodam **nela**, e **quem é dormido antes da vez dele não
+age nem ataca** — que é o que acontece no jogo original.
+
+- **⚠️ A PERGUNTA É PELO `x:'sono'`, e não pelo `_dormindoPor`:** o `semSono` (o Despertar segurou) e
+  o `disable` **não tiram o turno** do alvo — ele apanha e revida normalmente.
+- **⚠️ E A VELOCIDADE PASSOU A SER LIDA ANTES DOS GOLPES**, o que é consequência disto e é **mais
+  fiel** (no original a ordem do turno é decidida no começo dele): a paralisia aplicada **na própria
+  troca** deixou de contar pra ordem dela. **Medido: a ordem inverteria em 1,12% das trocas**, e o
+  `rng()` do desempate só é lido nos **1,08%** em que há empate.
+- **A LINHA DA AÇÃO DO SECOND DESCEU** pra junto do `travadoDe(second)` e do `dormeDe(second)` — a
+  ação **é a vez dele**, e a vez dele é depois do golpe de quem é mais rápido. É a metade do Dugtrio,
+  e as duas linhas vizinhas já estavam ali desde 16/09 pela mesma razão.
+
+**MEDIDO DEPOIS**, nos mesmos pares do print: o alvo mais lento atacando **425 de 425 → 0 de 563**, e
+o golpe do alvo mais rápido vindo antes da linha do sono **0 de 993 → 789 de 789**.
+
+### ⚠️ E O MESMO DEFEITO TINHA MAIS DUAS PORTAS — as duas achadas medindo, não por relato
+
+#### 1) UM POKÉMON DORMINDO USAVA O PÓ DO SONO
+
+As cinco guardas de *"perdeu a vez"* (`activeDorme || activeCongelado || activeTravado ||
+activeConfuso || activeCura`) barravam **o GOLPE e não a AÇÃO**. **Medido no par Butterfree ×
+Venomoth** (os dois soníferos): **854 trocas em 16.023 — 5,3%** com alguém dormindo agindo.
+
+Hoje quem responde é o **`podeAgirNaTroca`**, e ele lê **a mesma lista** que barra o golpe: quem não
+joga, não age. Depois: **0 em 10.302**.
+
+- **⚠️ A TRAVA DISSO LÊ O CÓDIGO, nos dois motores**, e cobra que a guarda liste **as cinco**: sem
+  isso a próxima condição que nascer entra no golpe, fica de fora da ação, e **só o painel que a
+  produzisse acusaria**.
+- **⚠️ E O NOME É `podeAgirNaTroca`, e não `podeAgir`:** o cliente já tem **dois** `podeAgir` locais
+  (o do Resgate e o da Queimada). Eles não se sombreiam — os três são `const` dentro de funções
+  próprias —, mas três funções com o mesmo nome é ruim de procurar, e este projeto já pagou uma
+  colisão de verdade assim.
+
+#### 2) ⚠️ QUEM CAIU NO GOLPE DO FIRST AINDA AGIA — e esta foi criada pela correção de cima
+
+O `acaoDaTroca` **decidia e aplicava** na mesma linha, antes dos golpes. Então o `second` podia dormir
+o adversário e **cair no golpe do first na mesma troca**. Isso é **anterior** — o que mudou é que, com
+a linha dele no lugar certo, o log passou a mostrar **"X caiu / X fez Y dormir"**. ⚠️ **Deixá-la seria
+uma regressão minha.**
+
+**Medido: 61 de 3.485 ações (1,75%)** eram de quem já tinha caído.
+
+O conserto é **separar decidir de aplicar**: o `acaoDaTroca` devolve o efeito num `aplica()`, o
+`first` aplica na hora, e **o do `second` só vale depois do `segundoCaiu`**. Depois: **0 de 3.203**.
+
+- **⚠️ E O PADRÃO JÁ ESTAVA NO ARQUIVO: os SEIS `tentar*` usam `(segundoCaiu || !primeiroAtacou) ?
+  null`** — quem cai não sofre status. A ação só não estava nessa regra.
+- **⚠️ E O DIÁRIO PASSOU A LER POR `first`/`second`**, não por `active`/`enemy`: o `activeAcao`/
+  `enemyAcao` guardam a **decisão**, e a do second pode ter sido **descartada**.
+
+### O QUE ISSO CUSTOU
+
+**A impressão do motor MUDA nos dois** (`07728f31cb93/370db4d361fd` → `128473196c86/86697ceb8e91`),
+que é o que uma mudança de mecânica deve fazer.
+
+**NA JORNADA: −0,53 ponto, 0,6σ** — 54,09% → 53,56%, 8 blocos de 800 de cada lado (**6.400 de cada**,
+o MESMO bot contra duas cópias congeladas, desvio tirado de ENTRE os blocos, **3 de 8 blocos** pro
+lado do conserto). Ruído puro, e pela razão de sempre: **os líderes também têm Oddish, Paras, Venonat
+e Jumpluff**, então o corte cai dos dois lados.
+
+### ⚠️ E UMA TRAVA DE ONTEM PASSOU NA REGRA NOVA POR ACASO
+
+A do `'os golpes livres sao do dono'` era **`doAdormecido <= 1`** — ela **TOLERAVA** o golpe do
+adormecido em vez de exigir zero, então ela ficou verde com o conserto inteiro aplicado. É a **sexta**
+vez que essa trava muda, e a quinta versão **durou um dia**.
+
+Hoje ela é **`=== 0`**, e o invariante vale nos dois casos — quando o adormecido é o mais rápido, o
+golpe dele sai **antes** da linha do sono, ou seja fora da janela.
+
+**⚠️ E O PAINEL DELA (Paras 35 × Onix 89) SÓ EXERCITA O ALVO MAIS RÁPIDO** — o caso do Rhyhorn, que é
+o defeito de mecânica, **nunca aconteceria nele**. Os dois casos ganharam painel **dirigido pela
+velocidade**: Jumpluff 137 × Snorlax 41 (o dono mais rápido) e Vileplume 65 × Jolteon 161 (o alvo
+mais rápido). Sem isso a trava passaria medindo o conjunto vazio.
+
+**Conferido que os 6 defeitos religados acusam** (8 a 13 falhas cada).
+
+## O NOME DO SHINY BRILHA NA BATALHA (25/09/2026)
+
+Pedido junto: *"tem que alterar todos os pontos que hoje mostra que um pokemon é shiny, durante a
+batalha ainda tava mostrando a estrela ao invez de deixar o nome brilhando"*.
+
+⚠️ **ERAM NOVE PONTOS, e o maior deles é o `fighterHtml`** — as CINCO telas de batalha passam por
+ele, e é a tela em que o 1,20× em todos os atributos mais decide. Os outros oito: a fila da Montanha
+Sagrada, a clareira e o prêmio da Vigília, a tela de ordem de batalha, a ordem do desafio do Ginásio
+da Cidade e o time do fim da jornada.
+
+- **⚠️ NO `fighterHtml` FOI UMA LINHA, porque o `nome` é uma VARIÁVEL SÓ** lida pelos dois ramos (a
+  cena nova e o caminho antigo). Envolvida ali, os dois ganham o brilho e perdem a estrela de uma vez
+  — escrita em cada ramo, a segunda ficaria pra trás, **que é literalmente o que aconteceu em 24/09**.
+- **⚠️ E SOBRARAM DOIS `selo('shiny')`, que são DECORATIVOS e ficam:** o prêmio das Ilhas Laranja
+  (*"Todo o time subiu +N níveis"*) e o *"Os cinco caíram!"* — **não há pokémon shiny em nenhum dos
+  dois**, a estrela ali é ícone. O `nomeBrilhante` foi de **25 para 33 usos**.
+
+### ⚠️ A TRAVA NASCEU DE UM CASO MUDO
+
+A conferência de acusação religou o defeito (o `fighterHtml` voltando a não envolver o nome) e
+**nenhuma trava caiu** — o brilho tinha 33 usos no arquivo e nenhum deles era a tela de batalha.
+
+Ela cobra **o par** (o brilho sai **E** a estrela não) nos dois ramos, e — a metade que pega a próxima
+omissão — **varre o arquivo e cobra que a estrela sobre em exatamente os dois pontos decorativos,
+nomeados**. Contando só o total, a próxima tela que nascer com a estrela passaria se outra a perdesse
+no mesmo commit. Conferido: **4 de 4 defeitos acusam**.
+
+### ⚠️ E O AMARELO FOI RECUSADO NA PRIMEIRA VERSÃO: ELE VIROU MARCA-TEXTO
+
+Pedido junto: *"o texto com o nome do pokemon shiny deixe ele mais amarelo"*. O halo era **âmbar**
+(`rgba(214,150,0)`, um laranja queimado) e na tela lia como **contorno alaranjado**, não como brilho.
+
+**⚠️ E A INTUIÇÃO ERRA AQUI:** o medo era que o amarelo (mais claro) sumisse no fundo **creme** das
+caixas. Medido no navegador, ele **não some** — o creme tem saturação quase zero, então o que separa
+o halo do fundo é a **SATURAÇÃO** e não a luminância. Ele melhorou nos dois fundos.
+
+**⚠️ MAS A PRIMEIRA VERSÃO FOI RECUSADA NA TELA:** *"ta parecendo que o texto ta com um marca
+texto"*. Ela tinha **duas camadas OPACAS coladas no glifo** (2px e 5px, alpha 1) — postas ali
+justamente pra segurar o halo no creme —, e **tinta opaca colada PREENCHE O VÃO ENTRE AS LETRAS**: o
+que se vê deixa de ser um halo em volta do nome e vira um bloco amarelo atrás dele.
+
+**⚠️ O NÚMERO QUE DEFINE ISSO É A TINTA COLADA — a soma dos alphas das camadas de blur ≤ 5px:**
+
+| | tinta colada | na tela |
+|---|---|---|
+| a de 24/09 (âmbar) | 0,95 | halo, mas alaranjado |
+| **a recusada** | **2,00** (1,0 + 1,0) | **bloco amarelo** |
+| **hoje** | **0,70** | halo amarelo, sem preencher o vão |
+
+**Acima de ~1,0 o vão preenche**, e é aí que ele vira marca-texto. **Nenhuma camada de hoje é opaca.**
+
+- **⚠️ E A FORMA É A DE 24/09** (três camadas, 3px/8px/16px), que nunca foi reclamada: o que mudou foi
+  a **cor** e a camada de dentro ficar **mais suave**. Foram comparadas **seis variantes** na tela,
+  nos dois fundos — o glow só difuso **some no creme**, o de duas camadas largas **borra o nome**, e
+  a âmbar fina por baixo **suja o amarelo** (saturação 100% → 80%: ela volta a ler como laranja).
+- **CUSTO MEDIDO: nada.** 40 nomes brilhando (**4× o pior caso real**, que é a tela de ordem) dão
+  **0,2ms** com três camadas, com quatro e **sem sombra nenhuma** — indistinguível.
+
+### ⚠️ E O HALO É CORTADO NO PAINEL DO LUTADOR, de propósito
+
+O `.battle-mon-name` é `overflow:hidden` com ellipsis (a regra de 22/09: *"quem cede espaço é o
+nome"*), e medido a 320px ele **se ajusta ao texto** — a sobra à direita fica entre **0 e 0,5px** em
+todos os nomes do jogo. Ou seja o halo mais externo (18px, alpha 0,28) é recortado.
+
+**Fica assim**, e o que salva é a forma nova: as camadas que definem o brilho são a de **3px** e a de
+**8px**, e elas cabem. Conferido na captura — o nome brilha e lê. Tirar o `overflow` desfaria o
+truncamento, que é uma decisão registrada.
+
+**NO MOTOR, NADA:** o shiny é apresentação inteira.
+
+### ⚠️ E O FLAKE DO SELO PRECISOU DE UMA PROVA NOVA — a de sempre não valia aqui
+
+O `test-especiais` tem um flake conhecido desde 17/09 (*"NENHUM selo num número < 1/3"*), e a prova
+de que ele não é regressão tem três pernas: **o diff não encostar no que a trava lê**, a impressão do
+motor, e rodar o build de antes. ⚠️ **Aqui a primeira perna NÃO vale** — este trabalho mexe no
+`doExchange` e no diário, que é exatamente o que ela lê.
+
+Então ele foi medido dos dois jeitos, com **duas árvores congeladas** (cada uma com o `index.html` e
+o `functions/index.js` do seu build e o teste de HOJE nas duas):
+
+| | build ANTIGO | build de HOJE |
+|---|---|---|
+| **com semente** (11 sementes) | 0 | 0 |
+| **sem semente** (8 rodadas cada) | **0 de 8** | **0 de 8** |
+| asserções por rodada | 1.440 | 1.440 |
+| falhas totais no antigo | **22** (as travas novas caem lá) | — |
+
+**Os dois se comportam igual**, e o "1 em 3" observado numa rodada avulsa foi sorte — o CLAUDE.md já
+registra que a taxa dele é instável (já foi 1 em 17, 6 em 12 e 3 em 6). ⚠️ **E as 22 falhas do build
+antigo são o que prova que a árvore está certa**: sem elas, ela estaria rodando o build de hoje dos
+dois lados e a comparação não mediria nada.
+
+### ⚠️ E O JOGADOR TINHA ESCRITO O TESTE DO PRÓPRIO RELATO
+
+Junto do print vieram dois testes Playwright em `qa-agent/tests/sono-jynx-onix.spec.ts` — um por caso:
+*"Onix nao ataca na mesma troca nem nas seguintes depois de Jynx faze-lo dormir"* (a Jynx é mais
+rápida: o caso do Rhyhorn) e *"o log respeita a velocidade no caso Jumpluff contra Dugtrio da
+captura"*.
+
+**Os dois FALHAM no build de antes e PASSAM no de hoje** — é a confirmação mais direta que existe de
+que o conserto é o que foi pedido, e ela não é minha.
+
+### ⚠️ E UMA LIÇÃO DE FERRAMENTA SAIU DAQUI: NÃO MEXER NOS ARQUIVOS COM UM A/B RODANDO
+
+O primeiro A/B do build final deu **NaN**, e a causa fui eu: um `git stash push`/`pop` (pra medir um
+flake do teste) **trocou o `index.html` no meio dele** — a partir do bloco 4 o lado "depois" saiu
+vazio. A medição que vale usa **duas cópias congeladas**, e é por isso que o CLAUDE.md descreve o
+método assim em toda medição de jornada. Com elas, dá pra mexer no repositório à vontade.
 
 ## O NOME DO SHINY BRILHA, EM VEZ DA ESTRELA (24/09/2026)
 
