@@ -5,6 +5,7 @@
       "firebase.json",
       "**/.*",
       "**/node_modules/**",
+      "qa-agent/**",
       "firestore.rules",
       "firestore.indexes.json",
       "**/index-novos-graficos.html",

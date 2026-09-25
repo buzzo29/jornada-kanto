@@ -1245,7 +1245,12 @@ console.log('\n=== O PEIXE LEVA O MOVESET DA ESPÉCIE ===');
      ⚠️ E O QUE IMPORTA NÃO É A TAXA: é que um peixe que ESCOLHE um golpe de status realmente o
      aplica. O motor escolhe pelo DANO, então quase todo golpe de status perde a vaga -- medido,
      só três pescáveis escolhem um: Poliwag e Chinchou (Golpe de Corpo e Faísca, 30% de paralisar)
-     e o Gyarados Lv.53 (Salto). Com o dono certo a trava vira determinística: 51% em 300. */
+     e o Gyarados Lv.53 (Salto). Com o dono certo a trava vira determinística.
+     ⚠️ E O DONO MUDOU DE POLIWAG PRA CHINCHOU EM 25/09/2026, quando o sono virou um golpe da
+     TROCA: o Poliwag está no SONIFEROS, então ele passou a DORMIR o parceiro em vez de atacar e a
+     trava caiu pra 299 de 300 -- com o código certo. O Chinchou escolhe Faísca e não é sonífero,
+     então ele ataca em 300 de 300. É a mesma lição dos donos do multi-tapa: cada golpe precisa de
+     um dono que só tenha ELE. */
   {
     /* um parceiro que NÃO mata em um golpe -- com o time forte a luta acaba antes de o peixe agir */
     const q = jogoNaTela([{ speciesId: 'snorlax', level: 45, id: 'p0' }]);
@@ -1254,10 +1259,10 @@ console.log('\n=== O PEIXE LEVA O MOVESET DA ESPÉCIE ===');
       S.pescaria.oportunidades = new Array(6).fill(null);
       S.pescariaSurgir(1);
       const o = S.pescaria.oportunidades[1];
-      o.speciesId = 'poliwag'; o.nivel = 35;
+      o.speciesId = 'chinchou'; o.nivel = 35;
       S.pescariaComecarBatalha(0, o);
       const mm = S.pescaria.jogadores[0].batalha.matchup || {};
-      if(mm.enemyMoveId === 'bodyslam') escolheu++;
+      if(mm.enemyMoveId === 'spark') escolheu++;
       if(((mm && mm.golpes) || []).some(x => ['queimou','envenenou','paralisou','congelou'].indexOf(x.x) >= 0)) comStatus++;
       const j = S.pescaria.jogadores[0]; j.estado = 'parado'; j.op = null; j.batalha = null;
       /* ⚠️ CURA O TIME A CADA VOLTA: este painel mede a BATALHA, não o desgaste. Sem isso o time
@@ -1267,7 +1272,7 @@ console.log('\n=== O PEIXE LEVA O MOVESET DA ESPÉCIE ===');
     /* ⚠️ O GOLPE ESCOLHIDO É COBRADO À PARTE: sem isso a trava mediria o sorteio da espécie em vez
        da regra -- um moveset vazio daria zero pelos dois motivos e ela não saberia distinguir. */
     ok('  o peixe ESCOLHE o golpe de status que ele leva', escolheu === 300,
-       escolheu + ' de 300 com Golpe de Corpo');
+       escolheu + ' de 300 com Faísca');
     ok('  e status por ataque ACONTECE', comStatus > 30,
        comStatus + ' de 300 (a chance do golpe é 30%)');
   }
@@ -1279,14 +1284,22 @@ console.log('\n=== OS SELOS 🔥🟣⚡ APARECEM NO QUADRO ===');
      só devolve esses três A PARTIR do passo em que o status pega. Na jornada quem os faz aparecer
      é o `render()` do ramo `animating`, disparado justamente nesses passos (eles carregam a marca
      `leitura`). Aqui quem faz isso é o `pescariaPintarArea`, que repinta o bloco dos lutadores. */
-  const p = jogoNaTela();
+  /* ⚠️ O PAINEL É DIRIGIDO, e ele ERA sorteado até 25/09/2026: com o time padrão do fixture
+     (Lv.55-70) o peixe morre em 1,93 troca e quase nunca ataca -- medido, o painel antigo achava
+     **8 confrontos com status em 2.500** e a trava pede 5. Ou seja ela falhava sozinha ~10% das
+     rodadas, e o sono virando golpe da TROCA (que come as poucas trocas do peixe: 49 -> 67 sonos)
+     a empurrou pra ZERO ESTÁVEL -- com o código certo, medido em 38,3% de status no 1x1.
+     É a MESMA correção que a trava vizinha já tinha feito, e o comentário dela previa esta:
+     "medir a FREQUÊNCIA num pool sorteado é o pior tipo de trava". */
+  const p = jogoNaTela([{ speciesId: 'snorlax', level: 45, id: 'p0' }]);
   const CAMPO = { queimou: 1, envenenou: 1, paralisou: 1 };
   let achados = 0, certos = 0;
-  for(let i = 0; i < 2500 && achados < 40; i++){
+  for(let i = 0; i < 600 && achados < 40; i++){
     S.pescaria.oportunidades = new Array(6).fill(null);
-    S.pescariaSurgir(i % 6);
-    const z = S.pescaria.oportunidades.findIndex(o => o);
-    S.pescariaComecarBatalha(0, S.pescaria.oportunidades[z]);
+    S.pescariaSurgir(1);
+    const o = S.pescaria.oportunidades[1];
+    o.speciesId = 'chinchou'; o.nivel = 35;
+    S.pescariaComecarBatalha(0, o);
     const b = S.pescaria.jogadores[0].batalha;
     const d = (b.matchup && b.matchup.golpes) || [];
     const k = d.findIndex(x => CAMPO[x.x]);

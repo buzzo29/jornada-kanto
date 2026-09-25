@@ -657,6 +657,178 @@ está mais** na fila de abertura.
   `CURA_MAXIMO_DO_HP` (50%) — e a segunda é a mais forte, porque ela decide **quantas trocas** são
   elegíveis (medido: 59,1% delas, com o pokémon entrando machucado).
 
+## O SONO E A ANULAÇÃO VIRARAM GOLPES DA TROCA (25/09/2026)
+
+Pedido assim: *"pegue todos pokemons que possui habilidade passiva de dormir e disable e ao invés de
+ser somente no início da batalha, colocar uma chance a cada ataque para que ao invés de atacar, ele
+possa colocar o adversario para dormir/desativar um ataque, tudo como ja funciona hoje, mas ao inves
+de ser só no inicio da batalha, vai ser a qualquer ataque"*.
+
+É o **mesmo molde do Recuperar**, feito no dia anterior — e é a terceira passiva a sair da fila de
+abertura.
+
+| | antes | agora |
+|---|---|---|
+| quando é sorteado | **ABERTURA**: uma vez por confronto | **a cada TROCA** |
+| o preço | **nenhum** — ele dormia/anulava E atacava | ⚠️ **ele PERDE o ataque daquela troca** |
+| quantas vezes por confronto | uma | **quantas o dado der** (o sono sai 2× em 1,4% deles) |
+
+**⚠️ O SEGUNDO É O QUE EQUILIBRA O PRIMEIRO, e ele é o pedido ao pé da letra** (*"ao invés de
+atacar"*). Sem ele o sono passaria de 16,5% pra 31,8% dos confrontos **sem custo nenhum** — e ele já
+é a mecânica mais forte do jogo (+29 pontos de efeito isolado).
+
+### O QUE FOI MEDIDO
+
+| 1x1, 3.000 confrontos de cada lado | antes | agora |
+|---|---|---|
+| confrontos com sono | 16,5% | **31,8%** |
+| trocas com o alvo dormindo | 5,7% | **15,8%** |
+| **o sonífero vence** | 47,5% | **46,4%** |
+| confrontos com anulação | 5,5% | **14,7%** |
+| **o dono do Disable vence** | 52,3% | **52,0%** |
+
+**⚠️ AS DUAS DOBRAM DE FREQUÊNCIA E NENHUMA DAS DUAS GANHA MAIS** — é exatamente o que o preço do
+turno perdido compra.
+
+**NA JORNADA: −0,42 ponto, 0,7σ** — 54,80% → 54,38%, 8 blocos de 800 de cada lado (**6.400 de
+cada**, o MESMO bot contra duas cópias congeladas, desvio tirado de ENTRE os blocos, **5 de 8 blocos**
+pro lado difícil). Ruído puro, e pela razão de sempre: **os líderes também têm Oddish, Paras, Venonat
+e Slowbro**, então o corte cai dos dois lados.
+
+**A impressão mudou nos dois** (`ae3a573de09f/96b335858a1b` → `64db1d5912f1/4a442b813ad9`), que é o
+que uma mudança de mecânica deve fazer.
+
+### AS DECISÕES
+
+- **⚠️ AS DUAS GUARDAS NOVAS SÃO O QUE IMPEDE A MECÂNICA DE SE MORDER**, e sem elas ela vira trava:
+  - **não dorme quem JÁ DORME.** ⚠️ E a pergunta não pode ser o `_dormindoPor`: o `acorda()` o
+    decrementa na ENTRADA da troca, então na última troca de sono ele já está em 0 e o alvo parecia
+    acordado — o dono o redormia **antes de ele acordar uma vez**. Quem responde é o `activeDorme`
+    daquela troca;
+  - **não anula quem JÁ ESTÁ ANULADO por ele.** Anular duas vezes não tem o que tirar.
+- **⚠️ A GUARDA DO "SEGUNDO GOLPE" DO DISABLE VEM ANTES DO DADO.** Checada depois, o pokémon perderia
+  o ataque **por nada** contra um Onix (que não tem o que perder). Na abertura isso não doía, porque
+  lá ele atacava do mesmo jeito.
+- **⚠️ O `rng()` SÓ É LIDO DE QUEM PODE AGIR** — a armadilha que o Remoinho, o gelo, a paralisia, a
+  confusão, o TM43 e a cura já registram. As guardas (a espécie, o estado do alvo, o segundo golpe)
+  vêm todas antes do dado.
+- **⚠️ E OS DOIS CONTINUAM NA MESMA SEQUÊNCIA, com o sono primeiro:** a taxa composta de quem tem os
+  dois (a Jigglypuff) continua sendo `(1 − 0,15) × 0,10 = 8,5%`. A regra não mudou, mudou o lugar.
+- **O METRÔNOMO CONTINUA NA FILA DE ABERTURA** devolvendo `sono` e `anula`, então os dois ramos do
+  `tentarGolpeEspecial` **não ficaram órfãos** — ele é *"qualquer poder existente no jogo"*, sorteado
+  uma vez, e continua sendo abertura.
+- **A APRESENTAÇÃO VEIO QUASE DE GRAÇA:** as marcas do diário são as MESMAS, o `passosDaAbertura` já
+  tem `sono:1`, `semSono:1` e `disable:1`, e o `ehGolpeEspecial` já os conhecia. **E log antigo
+  continua legível.**
+
+### ⚠️ E ELE OBRIGOU A ANULAÇÃO A SAIR DO TOPO DO LOG
+
+O CLAUDE.md registrava a razão de ela ficar fora da sequência: *"ele não tira HP e a luta continua
+depois dele, então viraria um passo de dano 0"* **e** *"a anulação acontece na abertura, e a luta que
+se lê embaixo já é a luta com o golpe anulado"*. **A segunda metade deixou de ser verdade.**
+
+E não era só incoerência de leitura — eram **dois defeitos medidos**:
+
+1. **tirar a linha do meio da sequência COLAVA os dois golpes em volta dela**: medido, a tela criava
+   colagem que o diário não tinha em **7 casos de 40** (`p:100  e:disable  p:98` saía `p:100 p:98`),
+   que é exatamente o que a trava da colagem existe pra impedir;
+2. **na animação a anulação não tinha passo nenhum** — e o dono **PERDE o ataque** pra fazê-la, então
+   o jogador via o pokémon parado sem nada explicando.
+
+Hoje ela entra na sequência, no lugar dela. As três peças já estavam prontas (o `ehGolpeEspecial` já
+a conhecia, o `passosDaAbertura` já tinha `disable:1`, o `linhaEspecial` já a desenhava), e o que
+saiu foi a montagem no topo mais o `return ''` do `passosHtml`.
+Medido depois: **colagem criada 7 → 0**, e a anulação aparece na sequência em **253 de 253**.
+
+**⚠️ E A PAUSA DE ABERTURA FICOU SEM DONO NENHUM.** A anulação era a **última** que ainda a usava —
+justamente porque ela era filtrada fora da sequência e o passo dela ERA o 0. Hoje o segundo de
+leitura dela vem do passo, pela marca `leitura`, como o de todos os outros.
+
+### ⚠️ E O DESPERTAR PASSOU A VALER O CONFRONTO INTEIRO
+
+Pedido logo depois: *"O despertar vale pro confronto inteiro"*. **E ele nasceu de uma medição:** com
+o sono sorteado a cada troca, o adversário rola o dado várias vezes — o item segurava o primeiro,
+era gasto, e o próximo passava.
+
+| Machop com Despertar × Jynx, 3.000 batalhas | segurou | **DORMIU** | linhas/batalha |
+|---|---|---|---|
+| o sono era ABERTURA | 14,6% | **0,0%** | 0,15 |
+| o sono virou TROCA, o item se gastava | 25,3% | **1,9%** | 0,25 |
+| **o item vale o CONFRONTO** | 25,6% | **0,0%** | 0,27 |
+
+Ou seja: um item de **50 moedas** que existe pra que isso não aconteça deixava o dono dormir em 1,9%
+das batalhas. Hoje ele volta a zero, e a linha extra no log custa **0,02 por batalha**.
+
+- **⚠️ O ITEM CONTINUA SENDO GASTO UMA VEZ SÓ** — o que muda é que, depois de segurar o primeiro
+  sono, ele segura os seguintes **até o fim daquele confronto**. Da segunda em diante quem segura é
+  a marca.
+- **⚠️ E A MARCA É CASADA COM O ADVERSÁRIO** (`_semSonoContra`), no molde do `_anulado` e do
+  `_especialContra`: confronto novo, adversário novo, e ela não casa. Nos confrontos seguintes ele
+  não tem mais item — a proteção vale só onde o item foi gasto, que é o que *"o confronto inteiro"*
+  quer dizer.
+- **⚠️ E A LINHA DO LOG SAI TODA VEZ, de propósito:** quem tentou dormir **PERDEU o ataque** daquela
+  troca, e sem a linha o jogador vê o adversário parado sem explicação — o erro da especialidade de
+  novo.
+
+- **Se um dia incomodar**, as réguas são o `CHANCE_SONO` (15% por troca) e o `CHANCE_DISABLE` (10%) —
+  e agora elas valem **por troca**, ou seja um confronto de 2 trocas dobra a chance efetiva de
+  antes.
+
+### ⚠️ E ELE DESENTERROU DOIS DEFEITOS DE CONTA NO TESTE, E ELES ERAM REAIS
+
+Os dois estavam no arquivo há tempo e **passavam por acidente** — o sono virando golpe da troca
+alongou os confrontos e os revelou:
+
+1. **A CONTA DO CADÁVER INVERTIA O LADO DA QUEIMADURA.** O `q` do `queima`/`veneno`/`confuso` é de
+   **QUEM PERDE** (não há causador na troca em que eles doem), e a conta tratava todos como "quem
+   bate". Resultado: o dano da queimadura do ADVERSÁRIO era descontado do MEU pokémon, e um confronto
+   longo o bastante chegava a zerar a barra na conta — *"atacando a zero"* num confronto em que o
+   motor grava `p:−66{17}` com ele de pé.
+   ⚠️ **E a conta IRMÃ (a da colagem, 950 linhas acima) JÁ TINHA a linha certa** — esta ficou pra
+   trás. É a **SÉTIMA** vez que uma conta deste arquivo copia uma lista à mão, e o comentário do
+   próprio `danoNoProprio` previa o sintoma com todas as letras.
+   Medido: **0 em 8.327 confrontos antes, 3 em 8.450 depois**.
+2. **A CONTA DA SOMA DE DANO NÃO SOMAVA O `dreno` NEM O DANO SEM GOLPE.** Ela só conhecia o
+   DESEMPATE — e passava porque o Gastly daquele painel **não usava Comedor de Sonhos** enquanto o
+   sono era abertura. Com o sono na troca ele passou a usar em **22 dos 40** confrontos, e a soma
+   parou de fechar em 24 deles. É a **SEXTA** vez desta mesma lição (a quinta foi ontem, com a cura).
+
+### ⚠️ E DEZOITO TRAVAS MEDIAM A FILA DE ABERTURA
+
+Nenhuma foi afrouxada — elas passaram a ler o `doExchange`, e entraram as que faltavam (**quem dormiu
+ou anulou NÃO atacou naquela troca**, a anulação **na** sequência, e a pausa vindo do passo dela). As
+lições:
+
+- **⚠️ O `seq.indexOf(objeto)` DEVOLVE −1:** a `sequenciaDoConfronto` **RECRIA** os objetos (a
+  suavização reparte golpes, os tapas viram N passos). Com −1 a janela passava a ser o confronto
+  INTEIRO, **sem nada acusar** — 6 de 40. Índice se acha pela **MARCA**.
+- **⚠️ SEIS PAINÉIS ESTAVAM FORTES DEMAIS**, e os seis pelo mesmo motivo: com o dono perdendo o
+  ataque na troca do sono, um adversário de nível alto o mata **ali mesmo**, antes de o sono render
+  nada. O caso extremo: Butterfree Lv.45 × Snorlax Lv.**80** dava **243 confrontos com sono e ZERO
+  linhas `dormindo`** — com a mecânica dando `{0:218, 1:58, 2:50}` num painel parelho. É a lição do
+  *painel forte demais*, pela sexta vez neste arquivo.
+- **⚠️ E A TRAVA DA BARRA DA CURA ACOMPANHAVA O HP ACUMULADO**, que a **suavização do log** altera de
+  propósito (ela reparte golpes mantendo o total). Medido: ela acertava **94,7% antes desta leva e
+  88,7% depois** — ou seja ela sempre foi um flake, e o comentário dela já registrava isso. Hoje ela
+  lê o **PASSO** da cura e o `hp` que o motor gravou.
+- **⚠️ E TRÊS INVARIANTES PASSARAM A SER POR PAR, não por confronto** (o Comedor de Sonhos, a linha
+  *"continua a dormir"*, o despertar na tela): com o sono sorteado a cada troca, um confronto pode
+  ter **vários** pares `sono → acordou`, e pode até abrir com um `acordou` de sono **herdado do
+  confronto anterior** e receber um `sono` novo depois dele. Lendo o PRIMEIRO de cada um, a conta
+  nunca fechava — 26 de 200 no despertar, 15 de 1078 no Comedor.
+- **⚠️ E A TRAVA DO PEIXE DA PESCARIA TROCOU DE DONO:** o painel dela era o **Poliwag**, que está no
+  `SONIFEROS` — ele passou a **dormir** o parceiro em vez de atacar, e a trava caiu pra 299 de 300
+  com o código certo. Hoje o dono é o **Chinchou** (Faísca, não sonífero). É a mesma lição dos donos
+  do multi-tapa: **cada golpe precisa de um dono que só tenha ELE**.
+- **⚠️ E O PAINEL DA TRAVA DOS SELOS DA PESCARIA ERA SORTEADO, e ele estava a 3 eventos de falhar**:
+  com o time Lv.55-70 o peixe morre em 1,93 troca e quase nunca ataca — medido, **8 confrontos com
+  status em 2.500**, e a trava pede 5 (ou seja ~10% de falha por rodada). O sono comendo as poucas
+  trocas do peixe (49 → 67) a empurrou pra **zero estável**. Hoje ele é dirigido.
+
+**⚠️ E O FLAKE DO `Charmeleon × Mankey` CONTINUA** (1 rodada em ~4), agora **sem** a causa da
+queimadura: medido, a taxa é **indistinguível entre os dois builds** (0 em 700 voltas de cada, no
+painel da trava do selo). Ele é o mesmo que este arquivo nomeia desde 17/09.
+
 ## O NOME DO SHINY BRILHA, EM VEZ DA ESTRELA (24/09/2026)
 
 Pedido junto: *"o pokemon shiny, consegue ao inves de exibir uma estrela, deixar o nome dele mais

@@ -2200,12 +2200,13 @@ function sorteiaGolpeEspecial(p, rng){
   if(AUTODESTRUICAO.includes(p.speciesId) && rng() < CHANCE_AUTODESTRUICAO){
     return { efeito:'explosao', golpe:'auto-destruição' };
   }
-  if(SONIFEROS[p.speciesId] && rng() < CHANCE_SONO){
-    return { efeito:'sono', golpe: SONIFEROS[p.speciesId] };
-  }
-  if(DISABLE.includes(p.speciesId) && rng() < CHANCE_DISABLE){
-    return { efeito:'anula', golpe:'Anulação' };
-  }
+  /* ⚠️ O SONO E A ANULACAO SAIRAM DESTA FILA EM 25/09/2026: eles viraram golpes da TROCA (ver
+     `acaoDaTroca`), pelo mesmo caminho que o Recuperar tinha feito no dia anterior. Aqui eles eram
+     sorteados UMA vez por confronto e saiam de GRACA -- o pokemon dormia o outro E atacava na
+     mesma troca. Agora ele troca o ATAQUE pela acao, que e o que o pedido diz.
+     ⚠️ E O METRONOMO CONTINUA DEVOLVENDO `sono` E `anula` daqui, entao os dois ramos do doExchange
+     NAO ficaram orfaos: ele e 'qualquer poder existente no jogo', sorteado uma vez, e continua
+     sendo abertura. */
   /* ⚠️ O RECUPERAR E O SINO SAIRAM DESTA FILA EM 24/09/2026: eles deixaram de ser ABERTURA e
      viraram um golpe da TROCA (ver `curaDaTroca`). Aqui eles eram sorteados UMA vez por confronto
      e curavam de GRACA -- o pokemon curava E atacava na mesma troca.
@@ -3005,6 +3006,58 @@ function doExchange(active, enemy, rng, diario){
     return { golpe, curado, hp: p.hp };
   };
   const activeCura = curaDaTroca(active), enemyCura = curaDaTroca(enemy);
+
+  /* ⚠️ O SONO E A ANULACAO SAO GOLPES DA TROCA (25/09/2026, a pedido: *"ao inves de ser somente no
+     inicio da batalha, colocar uma chance a cada ataque para que ao inves de atacar, ele possa
+     colocar o adversario para dormir/desativar um ataque"*). Eles entram na MESMA lista do sono,
+     do gelo, da paralisia, da confusao e da cura -- as seis coisas que fazem alguem perder a troca.
+     ⚠️ AS DUAS GUARDAS NOVAS SAO O QUE IMPEDE O LOOP, e sem elas a mecanica se morde:
+       - nao dorme quem JA DORME. Sem isso o dono redormia o alvo antes de ele acordar, e o sono
+         (que ja e a mecanica mais forte do jogo, +29 pontos de efeito isolado) virava uma trava;
+       - nao anula quem JA ESTA ANULADO por ele. Anular duas vezes nao tem o que tirar.
+     ⚠️ E A GUARDA DO SEGUNDO GOLPE DO DISABLE VEM ANTES DO DADO: checada depois, o pokemon perderia
+     o ataque por NADA contra um Onix (que nao tem o que perder). Na abertura isso nao doia, porque
+     la ele atacava do mesmo jeito.
+     ⚠️ E O rng() SO E LIDO DE QUEM PODE AGIR -- a armadilha que o Remoinho, o gelo, a paralisia, a
+     confusao, o TM43 e a cura ja registram. */
+  const temSegundoGolpe = (alvo, contra) => {
+    const golpesDele = Array.isArray(alvo.ataques) ? alvo.ataques.filter(id => GOLPES[id]) : [];
+    if(golpesDele.length){
+      const tiposDele = [];
+      golpesDele.forEach(id => { if(tiposDele.indexOf(GOLPES[id][0]) < 0) tiposDele.push(GOLPES[id][0]); });
+      return tiposDele.length >= 2;
+    }
+    return tiposDeAtaque(alvo, contra).length >= 2;
+  };
+  const acaoDaTroca = (p, alvo, marca) => {
+    if(!p || p.hp <= 0 || !alvo || alvo.hp <= 0) return null;
+    if(ehImuneAEspecial(p) || ehImuneAEspecial(alvo)) return null;
+    const alvoDormeAgora = (alvo === active) ? activeDorme : enemyDorme;
+    if(SONIFEROS[p.speciesId] && !(alvo._dormindoPor > 0) && !alvoDormeAgora && rng() < CHANCE_SONO){
+      /* O DESPERTAR E DO ALVO e segura o sono venha de quem vier. A chance E CONSUMIDA: ele tentou
+         e falhou, e e isso que a linha do log conta. */
+      const jaSegurou = alvo._semSonoContra === p;
+      if(alvo.item === 'awakening' || jaSegurou){
+        if(!jaSegurou){
+          /* O ITEM E GASTO UMA VEZ SO -- da segunda em diante quem segura e a marca. */
+          alvo.item = null;
+          alvo._semSonoContra = p;
+          itensGastos.push({ dono: marca === 'p' ? 'e' : 'p', especie: alvo.speciesId, slot: alvo.slotDaConta, item: 'awakening' });
+        }
+        return { x:'semSono', golpe: SONIFEROS[p.speciesId], hp: alvo.hp };
+      }
+      alvo._dormindoPor = sorteiaTrocasDeSono(rng);
+      return { x:'sono', golpe: SONIFEROS[p.speciesId], hp: alvo.hp };
+    }
+    if(DISABLE.includes(p.speciesId) && !(alvo._anulado && alvo._anulado.contra === p)
+       && temSegundoGolpe(alvo, p) && rng() < CHANCE_DISABLE){
+      const escolha = bestAttackType(alvo, p);
+      alvo._anulado = { tipo: escolha.type, contra: p };
+      return { x:'disable', golpe:'Anulação', hp: alvo.hp, a: escolha.type, am: escolha.golpe || null };
+    }
+    return null;
+  };
+  const activeAcao = acaoDaTroca(active, enemy, 'p'), enemyAcao = acaoDaTroca(enemy, active, 'e');
   const activeConfuso = activeConf === "acerta", enemyConfuso = enemyConf === "acerta";
 
   const acordaram = [];
@@ -3025,8 +3078,11 @@ function doExchange(active, enemy, rng, diario){
   /* ⚠️ QUEM CUROU NAO ATACA -- e e esse o preco que equilibra a cura ter passado a ser sorteada a
      cada troca. Num confronto de ~2 trocas (a mediana medida), perder o ataque e perder metade
      deles. E e o que o Recover faz no jogo original: ele USA o turno. */
-  const dmgToEnemy = (activeDorme || activeCongelado || activeTravado || activeConfuso || activeCura) ? [] : golpesDaTroca(active, enemy, rng);
-  const dmgToActive = (enemyDorme || enemyCongelado || enemyTravado || enemyConfuso || enemyCura) ? [] : golpesDaTroca(enemy, active, rng);
+  /* ⚠️ E QUEM DORMIU O OUTRO OU ANULOU TAMBEM NAO ATACA -- e esse o preco que equilibra os dois
+     terem passado a ser sorteados a cada troca, e e o pedido ao pe da letra (*"ao inves de
+     atacar"*). Na abertura eles saiam de graca. */
+  const dmgToEnemy = (activeDorme || activeCongelado || activeTravado || activeConfuso || activeCura || activeAcao) ? [] : golpesDaTroca(active, enemy, rng);
+  const dmgToActive = (enemyDorme || enemyCongelado || enemyTravado || enemyConfuso || enemyCura || enemyAcao) ? [] : golpesDaTroca(enemy, active, rng);
   active._dormeAgora = false;
   enemy._dormeAgora = false;
   const spdActive = effectiveSpeed(active);
@@ -3450,8 +3506,21 @@ function doExchange(active, enemy, rng, diario){
       if(!c || c.curado <= 0) return;
       diario.push({ q:q, d:c.curado, hp:c.hp, c:0, m:0, z:0, x:'recover', g:c.golpe });
     };
+    /* ⚠️ A ACAO E GRAVADA NA MESMA SEQUENCIA DA CURA, e antes dos golpes da troca. As marcas
+       (`sono`, `semSono`, `disable`) sao as MESMAS de quando eles eram abertura, entao o log, a
+       animacao, o selo e a pausa de 1,5s vem de graca -- e log antigo continua legivel. */
+    const acaoDe = (p, q) => {
+      const a = (p === active) ? activeAcao : enemyAcao;
+      if(!a) return;
+      const reg = { q:q, d:0, hp:a.hp, c:0, m:0, z:0, x:a.x, g:a.golpe };
+      if(a.a) reg.a = a.a;
+      if(a.am) reg.am = a.am;
+      diario.push(reg);
+    };
     curaDe(first, qDoFirst);
     curaDe(second, qDoSecond);
+    acaoDe(first, qDoFirst);
+    acaoDe(second, qDoSecond);
     geloDe(first, qDoFirst);
     travadoDe(first, qDoFirst);
     /* ⚠️ A LINHA DO FIRST VEM ANTES DO GOLPE DELE, que e onde o auto-dano dele foi aplicado. */

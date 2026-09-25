@@ -24,6 +24,28 @@ function ok(nome, cond, extra){
   if(!cond) falhas++;
 }
 const inst = (id, lv) => S.createInstance(id, lv || 50);
+/* ⚠️ O SONO E A ANULACAO VIRARAM GOLPES DA TROCA EM 25/09/2026 (a pedido), entao quem os exercita
+   e o doExchange -- nao mais o tentarGolpeEspecial, que e a fila de ABERTURA. Este ajudante roda
+   UMA troca com instancias novas e devolve o diario dela, que e o que as travas de chance e de
+   marca precisam ler.
+   ⚠️ E O METRONOMO CONTINUA NA FILA DE ABERTURA devolvendo sono e anula, entao os dois ramos do
+   tentarGolpeEspecial NAO ficaram orfaos -- e e por isso que as travas dele continuam. */
+function umaTroca(donoId, alvoId, lv){
+  const x = inst(donoId, lv), y = inst(alvoId, lv);
+  x.maxHp = S.calcMaxHp(x); x.hp = x.maxHp;
+  y.maxHp = S.calcMaxHp(y); y.hp = y.maxHp;
+  const d = [];
+  S.doExchange(x, y, Math.random, d, 'p', 'e');
+  return { d, dono: x, alvo: y };
+}
+/* acha a PRIMEIRA troca em que a marca saiu, e devolve o cenario dela */
+function trocaCom(marca, donoId, alvoId, lv, max){
+  for(let i = 0; i < (max || 4000); i++){
+    const t = umaTroca(donoId, alvoId, lv);
+    if(t.d.some(g => g.x === marca)) return t;
+  }
+  return null;
+}
 // rng de teste: devolve os numeros que a gente mandar, e depois 0.99 (nada acontece)
 /* rng que sempre devolve o mesmo numero: com 0.01 todo sorteio de chance passa, com 0.99 nenhum.
    Mais legivel que uma sequencia -- a ordem em que o motor consome os numeros nao importa aqui. */
@@ -146,12 +168,23 @@ ok('o log ganha a linha da explosao', diario.some(g => g.x === 'boom' && g.g ===
    (medido, valia +1,4 ponto de vitoria contra +0,8 do Recuperar), era a FORMA -- perder um pokemon
    inteiro pra um sorteio de 5%, sem jogada possivel e sem tomar um golpe.
    Medido depois da mudanca: o ganho cai de +1,4 pra +0,7 ponto. */
-a = inst('jigglypuff'); b = inst('onix');
-a.maxHp = S.calcMaxHp(a); a.hp = a.maxHp; b.maxHp = S.calcMaxHp(b); b.hp = b.maxHp;
-const hpAntes = a.hp;
-diario = [];
-ok('dormiu: o confronto NAO se resolve ali', S.tentarGolpeEspecial(a, b, rngFixo(0.01), diario) === false);
-ok('ninguem cai por causa do sono', b.hp === b.maxHp && a.hp === hpAntes, 'a=' + a.hp + ' b=' + b.hp);
+/* ⚠️ O SONO SAIU DA FILA DE ABERTURA EM 25/09/2026: ele virou um golpe da TROCA, sorteado a cada
+   uma, e quem o usa PERDE o ataque daquela troca. Antes ele era sorteado uma vez por confronto e
+   saia de graca -- o pokemon dormia o outro E atacava na mesma troca.
+   Estas travas passaram a ler o doExchange; o que elas cobram e o mesmo de sempre, mais a regra
+   nova (o dono nao atacou). */
+const tSono = trocaCom('sono', 'jigglypuff', 'onix');
+ok('dormiu: o sono sai numa TROCA, nao na abertura', !!tSono);
+const sonoLinha = tSono ? tSono.d.find(g => g.x === 'sono') : null;
+ok('e ele nao resolve o confronto -- os dois continuam de pe',
+   !!tSono && tSono.dono.hp > 0 && tSono.alvo.hp > 0,
+   tSono ? 'dono=' + tSono.dono.hp + ' alvo=' + tSono.alvo.hp : '');
+/* ⚠️ A REGRA NOVA, e ela e o preco que equilibra o sono ter passado a ser sorteado a cada troca:
+   quem dorme o outro nao ataca. Sem isso ele dormiria E bateria, que e como era na abertura. */
+ok('e QUEM DORMIU O OUTRO nao atacou naquela troca',
+   !!tSono && !tSono.d.some(g => !g.x && g.q === 'p' && g.d > 0),
+   tSono ? tSono.d.map(g => g.q + ':' + (g.x || g.d)).join(' ') : '');
+b = tSono ? tSono.alvo : inst('onix');
 /* ⚠️ DE 1 A 3 TROCAS, 1/3 CADA (15/09/2026, a pedido). Era um numero FIXO (2 ate 09/09, 1 dai em
    diante) e virou a tabela SONO_EM_TROCAS, com peso. O que a trava cobra aqui e o INVARIANTE --
    o valor marcado e sempre uma das duracoes da tabela --, e nao um numero escrito a mao: assim
@@ -171,7 +204,7 @@ ok('e o alvo fica marcado por uma das duracoes da tabela', duracoes.includes(b._
      duracoes.map((d,i) => d + ':' + pcts[i].toFixed(1) + '%').join('  '));
   ok('e nenhuma outra duracao sai', Object.keys(c).length === duracoes.length, Object.keys(c).join(','));
 })();
-ok('e o log diz qual golpe foi', diario.some(g => g.x === 'sono' && g.g === 'Canto'));
+ok('e o log diz qual golpe foi', !!sonoLinha && sonoLinha.g === 'Canto', sonoLinha ? sonoLinha.g : '');
 /* QUEM DORME NAO ATACA -- e nao vira linha no log. Uma linha de "-0 de HP" faria o log dizer que
    ele atacou e nao machucou, quando o que aconteceu foi ele nao ter atacado. */
 (function(){
@@ -193,11 +226,25 @@ ok('e o log diz qual golpe foi', diario.some(g => g.x === 'sono' && g.g === 'Can
      segundo golpe -- e isso acabou em 17/09, quando alvo de vida cheia parou de morrer num golpe.
      ⚠️ E E A QUARTA VEZ QUE UMA TRAVA DO SONO MEDE A DURACAO EM VEZ DA REGRA. A regra e: enquanto
      ele esta dormindo, so o dono bate. Quem marca o fim disso e o `acordou`, nao um numero. */
-  const jAcordou = comSono.golpes.findIndex(g => g.x === 'acordou');
-  const livres = jAcordou < 0 ? golpes
-                              : comSono.golpes.slice(0, jAcordou).filter(g => !g.x && g.d > 0);
-  ok('os golpes livres sao todos de quem usou o sono',
-     livres.length > 0 && livres.every(g => g.q === 'p'),
+  /* ⚠️ E A QUINTA VEZ QUE ESTA TRAVA MUDA, e agora por uma mudanca de MECANICA: desde 25/09/2026 o
+     sono e um golpe da TROCA, e quem o usa PERDE o ataque daquela troca. Entao o adormecido AINDA
+     ATACA na troca em que ele e dormido (ele nao estava dormindo quando ela comecou), e so a partir
+     da seguinte e que ele perde o turno.
+     O INVARIANTE NOVO e preciso e nao depende da duracao: todo golpe do adormecido no intervalo vem
+     ANTES de qualquer golpe do dono, e existe no maximo UM -- o da troca do sono. */
+  /* ⚠️ E A JANELA COMECA NO SONO, nao no indice 0 (25/09/2026): enquanto ele era ABERTURA o sono
+     ERA a primeira linha, e contar do zero dava no mesmo. Hoje ele sai no meio da luta, entao os
+     golpes ANTES dele entravam na conta -- medido, 6 de 10 confrontos. */
+  const jSono = comSono.golpes.findIndex(g => g.x === 'sono');
+  const jAcordou = comSono.golpes.findIndex((g, k) => k > jSono && g.x === 'acordou');
+  const livres = comSono.golpes.filter((g, k) =>
+    !g.x && g.d > 0 && k > jSono && (jAcordou < 0 || k < jAcordou));
+  const doAdormecido = livres.filter(g => g.q === 'e').length;
+  const primeiroDoDono = livres.findIndex(g => g.q === 'p');
+  const ultimoDoAlvo = livres.reduce((a, g, k) => g.q === 'e' ? k : a, -1);
+  ok('os golpes livres sao do dono -- menos o da troca em que o sono saiu',
+     livres.length > 0 && doAdormecido <= 1 &&
+     (primeiroDoDono < 0 || ultimoDoAlvo < primeiroDoDono),
      livres.length + ' livres: ' + livres.map(g=>g.q).join(','));
 })();
 /* E o alvo pode SOBREVIVER e ganhar -- o que antes era impossivel. */
@@ -241,7 +288,11 @@ ok('e o log diz qual golpe foi', diario.some(g => g.x === 'sono' && g.g === 'Can
   /* O PRIMEIRO GOLPE DEPOIS DO SONO, e nao o primeiro da lista: o revide MORIBUNDO de quem dormiu
      vai pra FRENTE da linha do sono desde 10/09/2026, entao a lista pode abrir com um golpe do
      adormecido -- e ele e legitimo (e do mesmo instante do golpe que o matou). */
-  const primeiroGolpe = seq.slice(iSono + 1).find(g => !g.x);
+  /* ⚠️ E O PRIMEIRO GOLPE DEPOIS DO SONO PASSOU A SER DO ADORMECIDO (25/09/2026): na troca em que
+     o sono sai, quem dorme o outro PERDE o ataque e o alvo ainda ataca (ele nao estava dormindo
+     quando aquela troca comecou). Quem abre a sequencia de golpes livres e o SEGUNDO. */
+  const golpesDepois = seq.slice(iSono + 1).filter(g => !g.x && g.d > 0);
+  const primeiroGolpe = golpesDepois[1] || golpesDepois[0];
   ok('e quem dormiu NAO ataca logo depois de dormir',
      dobrado || (primeiroGolpe && primeiroGolpe.q === sono.q),
      (dobrado ? '(sono duplo -- ninguem ganha troca livre) ' : '') + seq.map(g=>(g.x||'golpe')+':'+g.q).join(' '));
@@ -484,7 +535,14 @@ function frequencia(id, alvo, n){
 }
 const fGeo = frequencia('geodude', 'onix', 6000);
 ok('autodestruicao perto de 15%', Math.abs(fGeo.boom - 0.15) < 0.02, (fGeo.boom*100).toFixed(1) + '%');
-const fJig = frequencia('jigglypuff', 'onix', 6000);
+/* ⚠️ A FREQUENCIA DO SONO PASSOU A SER MEDIDA NA TROCA (25/09/2026) -- o frequencia() le a fila de
+   ABERTURA, que hoje so devolve sono pelo METRONOMO. A chance e a MESMA constante; o que mudou e
+   onde o dado e rolado. */
+const fJig = { sono: (function(){
+  let c = 0; const n = 6000;
+  for(let i = 0; i < n; i++) if(umaTroca('jigglypuff', 'onix').d.some(g => g.x === 'sono')) c++;
+  return c / n;
+})() };
 /* ⚠️ A CHANCE SAI DA CONSTANTE, nao de um numero escrito aqui (15/09/2026): ela foi de 5% pra 15%
    a pedido, e uma trava com o numero a mao precisaria ser editada junto -- o que e exatamente a
    classe de manutencao que faz um teste envelhecer calado. A tolerancia acompanha a escala. */
@@ -562,35 +620,40 @@ ok('quem tem um golpe so nunca e anulado', anulouMono === 0, S.SPECIES[monoTipo]
 /* Ao contrario dos outros dois, o Disable NAO resolve o confronto -- a luta acontece inteira.
    A vitima aqui e um Charizard de proposito: um Gengar responderia com Hipnose (ele esta no
    SONIFEROS) e o confronto acabaria ali -- pelo sono, nao pelo Disable. */
-const vitima = inst('charizard'), anulador = inst('alakazam');
-vitima.maxHp = S.calcMaxHp(vitima); vitima.hp = vitima.maxHp;
-anulador.maxHp = S.calcMaxHp(anulador); anulador.hp = anulador.maxHp;
-const dRegistro = [];
-const resolveu = S.tentarGolpeEspecial(anulador, vitima, rngFixo(0.01), dRegistro);
-ok('o Disable nao encerra o confronto', resolveu === false);
-ok('ninguem cai por causa dele', vitima.hp === vitima.maxHp && anulador.hp === anulador.maxHp);
-ok('e o alvo fica marcado', !!vitima._anulado && vitima._anulado.contra === anulador);
-ok('o log ganha a linha da anulacao', dRegistro.some(g => g.x === 'disable' && g.d === 0));
+/* ⚠️ A ANULACAO SAIU DA FILA DE ABERTURA EM 25/09/2026, junto do sono: ela virou um golpe da
+   TROCA, e quem anula PERDE o ataque daquela troca. */
+const tAnul = trocaCom('disable', 'alakazam', 'charizard');
+ok('o Disable sai numa TROCA e nao encerra o confronto',
+   !!tAnul && tAnul.dono.hp > 0 && tAnul.alvo.hp > 0);
+ok('e o alvo fica marcado',
+   !!tAnul && !!tAnul.alvo._anulado && tAnul.alvo._anulado.contra === tAnul.dono);
+ok('o log ganha a linha da anulacao',
+   !!tAnul && tAnul.d.some(g => g.x === 'disable' && g.d === 0));
+/* a regra nova, a mesma do sono */
+ok('e QUEM ANULOU nao atacou naquela troca',
+   !!tAnul && !tAnul.d.some(g => !g.x && g.q === 'p' && g.d > 0),
+   tAnul ? tAnul.d.map(g => g.q + ':' + (g.x || g.d)).join(' ') : '');
 /* E o outro lado ainda pode usar o especial DELE na mesma abertura: anular nao consome o
    confronto. Um Gengar anulado responde com Hipnose e resolve a luta ali mesmo. */
-let anulouEDormiu = 0;
-for(let i=0;i<600;i++){
-  const g2 = inst('gengar'), a2 = inst('alakazam');
-  g2.maxHp = S.calcMaxHp(g2); g2.hp = g2.maxHp; a2.maxHp = S.calcMaxHp(a2); a2.hp = a2.maxHp;
-  const d2 = [];
-  S.tentarGolpeEspecial(a2, g2, rngFixo(0.01), d2);
-  if(g2._anulado && d2.some(x => x.x === 'sono')) anulouEDormiu++;
+/* ⚠️ OS DOIS LADOS AGEM NA MESMA TROCA -- o acaoDaTroca roda pra cada um deles, em ordem de
+   velocidade. Entao o Alakazam anula E o Gengar dorme, na mesma troca, exatamente como acontecia
+   na fila de abertura. O que mudou e que nenhum dos dois ataca. */
+let anulouEDormiu = 0, amostraAnul = 0;
+for(let i = 0; i < 6000 && amostraAnul < 200; i++){
+  const t = umaTroca('alakazam', 'gengar');
+  if(!t.d.some(x => x.x === 'disable')) continue;
+  amostraAnul++;
+  if(t.d.some(x => x.x === 'sono')) anulouEDormiu++;
 }
-ok('depois de anular, o outro lado ainda joga o especial dele', anulouEDormiu === 600, anulouEDormiu + ' de 600');
+ok('amostra de trocas com anulacao', amostraAnul >= 100, amostraAnul + ' trocas');
+ok('depois de anular, o outro lado ainda joga o especial dele na MESMA troca',
+   amostraAnul > 0 && anulouEDormiu > amostraAnul * 0.05, anulouEDormiu + ' de ' + amostraAnul);
 
 console.log('\nA CHANCE DO DISABLE');
+/* ⚠️ MEDIDA NA TROCA desde 25/09/2026 -- ver o umaTroca. A chance e a MESMA constante. */
 function taxaDisable(id, alvoId, n){
   let c = 0;
-  for(let i=0;i<n;i++){
-    const alvo = inst(alvoId);
-    S.tentarGolpeEspecial(inst(id), alvo, Math.random, []);
-    if(alvo._anulado) c++;
-  }
+  for(let i=0;i<n;i++) if(umaTroca(id, alvoId).alvo._anulado) c++;
   return c/n;
 }
 /* ⚠️ O ALVO NÃO PODE TER ESPECIAL NENHUM, e o Gengar tinha (15/09/2026). Estas duas travas medem a
@@ -637,26 +700,41 @@ const mDis = { player:'Alakazam', enemy:'Gengar', playerSpecies:'alakazam', enem
   golpes:[{ q:'p', d:0, hp:120, x:'disable', g:'Anulação' }, { q:'p', d:40, hp:80 }, { q:'e', d:30, hp:90 }] };
 ok('disable: "Gengar teve seu melhor ataque anulado por Alakazam"',
    S.avisoDoConfronto(mDis) === '🚫 Gengar teve seu melhor ataque anulado por Alakazam!', S.avisoDoConfronto(mDis));
-/* O Disable nao pode virar um golpe de dano 0 na animacao nem gastar vaga do teto de 3 golpes:
-   com ele contando, uma troca real de 2 golpes estouraria o teto e o log inteiro cairia na
-   reconstrucao, perdendo os golpes de verdade. */
+/* ⚠️ A ANULACAO ENTROU NA SEQUENCIA EM 25/09/2026, e ela ficava FORA desde que nasceu: a razao era
+   que *"ele nao tira HP e a luta continua depois dele"* e que *"a anulacao acontece na abertura"*.
+   A segunda metade deixou de ser verdade quando o Disable virou um golpe da TROCA.
+   ⚠️ E TIRA-LA DO MEIO DA SEQUENCIA ERA UM DEFEITO MEDIDO, nao so uma incoerencia de leitura: ela
+   COLAVA os dois golpes em volta dela (7 casos em 40), que e o que a trava da colagem proibe -- e
+   na animacao o passo dela nao existia, entao o dono perdia o ataque sem nada na tela explicando. */
 const seq = S.sequenciaDoConfronto(mDis);
-ok('e ele nao entra na sequencia de golpes', seq.length === 2 && !seq.some(g=>g.x==='disable'), seq.length + ' passos');
+ok('e ele ENTRA na sequencia, no lugar dele', seq.length === 3 && seq.some(g=>g.x==='disable'), seq.length + ' passos');
+ok('  e no lugar EXATO em que ele aconteceu', (seq.findIndex(g=>g.x==='disable')) === 0,
+   seq.map(g=>g.x||('d'+g.d)).join(' '));
 const htmlDis = S.passosHtml(mDis);
 ok('mas a linha dele aparece no log, e vem primeiro',
    htmlDis.indexOf('anulado por') > 0 && htmlDis.indexOf('anulado por') < htmlDis.indexOf('atacou'));
 
 /* Sem golpe especial, a linha e a de sempre -- e o aviso nao aparece. */
 ok('confronto comum nao ganha aviso', S.avisoDoConfronto({ player:'A', enemy:'B', golpes:[{q:'p',d:10,hp:5}] }) === '');
-/* ⚠️ A PAUSA DE ABERTURA HOJE E SO DA ANULACAO. Desde 12/09/2026 a frase nasce no passo do
-   EVENTO, nao no passo 0 -- entao quem E um passo da animacao (explosao, sono, chuva...) nao tem
-   nada escrito no passo 0 e nao precisa da pausa de la: o segundo de leitura dele vem DEPOIS do
-   passo, pela marca `leitura`. A anulacao nao e um passo (nao move barra, e filtrada fora da
-   sequencia), entao o passo dela E o 0 -- e e so ela que ainda usa esta pausa. */
-ok('a pausa de abertura e so de quem NAO tem passo proprio (a anulacao)',
-   S.pausaDoEspecial(mDis) === S.PAUSA_LEITURA_ESPECIAL_MS && S.pausaDoEspecial(mBoom) === 0 &&
+/* ⚠️ A PAUSA DE ABERTURA NAO TEM MAIS DONO NENHUM (25/09/2026). Desde 12/09 a frase nasce no passo
+   do EVENTO, e a ANULACAO era a ultima que ainda usava esta pausa -- justamente porque ela era
+   filtrada fora da sequencia e o passo dela ERA o 0. Com ela entrando na sequencia, o segundo de
+   leitura dela vem DEPOIS do passo, pela marca `leitura`, como o de todos os outros.
+   ⚠️ A PAUSA NAO SUMIU: ela mudou de lugar, e a trava logo abaixo cobra que ela exista no passo
+   do disable. Sem essa segunda metade, a frase apareceria e sumiria no mesmo quadro. */
+ok('a pausa de ABERTURA nao vale mais pra ninguem do bloco',
+   S.pausaDoEspecial(mDis) === 0 && S.pausaDoEspecial(mBoom) === 0 &&
    S.pausaDoEspecial({ golpes:[{q:'p',d:10}] }) === 0,
    'anulacao ' + S.pausaDoEspecial(mDis) + 'ms  |  explosao ' + S.pausaDoEspecial(mBoom) + 'ms');
+/* ⚠️ E O SEGUNDO DE LEITURA DA ANULACAO VEM DO PASSO DELA, pela marca `leitura` -- e a mesma que o
+   sono usa desde 10/09/2026. Sem isso a frase nasceria e morreria no mesmo quadro. */
+{
+  const anim = S.buildAnimatedHitSequence(mDis);
+  const iD = anim.findIndex(h => h.x === 'disable');
+  ok('  e o segundo de leitura dela vem do PASSO dela',
+     iD >= 0 && S.pausaDaFaixa(anim[iD]) === S.PAUSA_LEITURA_ESPECIAL_MS,
+     'passo ' + iD + ' -> ' + (iD >= 0 ? S.pausaDaFaixa(anim[iD]) : '-') + 'ms');
+}
 
 console.log('\nDITTO: O GOLPE ACOMPANHA A TRANSFORMACAO');
 /* A tela ja mostrava o sprite do adversario desde sempre; o golpe passou a acompanhar. Ele SOMA os
@@ -1349,16 +1427,25 @@ ok('tres golpes + cura continuam sendo os golpes REAIS', seq3.length === 4 && se
     ok('a cura aparece na sequencia, na troca em que saiu', iCura >= 0,
        seq.map(g => g.x || 'golpe').join(','));
   }
-  /* A luta comeca da vida CHEIA -- e o que a reconstrucao tem que enxergar. */
+  /* ⚠️ ELA LE O PASSO DA CURA, e nao o HP ACUMULADO pela animacao (25/09/2026). A conta antiga
+     partia do hpBefore e ia somando cada passo -- e a SUAVIZACAO do log reparte os golpes mantendo
+     o TOTAL, de proposito, entao o HP intermediario dela legitimamente nao bate com o real. Medido
+     em 150 confrontos: ela acertava 94,7% ANTES desta leva e 88,7% depois, ou seja ela sempre foi
+     um flake -- o proprio comentario dela ja registrava isso (*"~2 rodadas em 14: o pior tipo de
+     teste"*), e o sono virando golpe da TROCA so alongou os confrontos e piorou a taxa.
+     O QUE A REGRA PROMETE e que a barra SOBE na cura e que ela vai ao TETO -- as duas coisas estao
+     no passo e no registro do diario, sem depender de reconstruir o HP passo a passo. */
   const cura = m.golpes.find(g=>g.x==='recover');
   const eu = cura.q === 'p';
-  let hp = eu ? m.playerHpBefore : m.enemyHpBefore;
   const maxHp = eu ? m.playerMaxHp : m.enemyMaxHp;
   const anim = S.buildAnimatedHitSequence(m);
   const lado = eu ? 'player' : 'enemy';
-  let chegouNoCheio = false;
-  anim.forEach(h => { if(h.side===lado){ hp = Math.max(0, hp - h.amount); if(hp === maxHp) chegouNoCheio = true; } });
-  ok('a barra sobe ate o maximo logo no comeco', chegouNoCheio, 'maxHp: ' + maxHp);
+  const passoDaCura = anim.find(h => h.x === 'recover');
+  ok('a barra SOBE no passo da cura, no lado de quem curou',
+     !!passoDaCura && passoDaCura.side === lado && passoDaCura.amount < 0 && passoDaCura.cura === true,
+     passoDaCura ? (passoDaCura.side + ' amount=' + passoDaCura.amount) : '(nao achei o passo)');
+  ok('  e ela vai ao TETO -- o motor gravou o maxHp na linha', cura.hp === maxHp,
+     'hp gravado: ' + cura.hp + '  maxHp: ' + maxHp);
   ok('e o log fala da cura', /restaurou seu HP/.test(S.passosHtml(m)));
 })();
 
@@ -4397,9 +4484,21 @@ console.log('\n=== QUEM MANDA NA LINHA DE STATUS, PASSO A PASSO ===');
          ⚠️ SO SE ELE DEU DOIS: com o golpe moribundo fora (15/09/2026), o confronto pode acabar com
          UM golpe so do dono do sono -- a troca livre mata, e o adormecido nao revida mais. Ai nao ha
          par pra colar, e cobrar colagem seria cobrar o que a mecanica nao promete. Medido: 3 dos 40. */
-      const golpesDoDono = dano.filter(g => g.q === sono.q).length;
+      /* ⚠️ E A CONTA E SO ATE O DESPERTAR desde 25/09/2026: com o sono virando golpe da TROCA, ele
+         pode sair mais de uma vez no confronto (medido, 1,4% deles) e o adormecido volta a bater
+         depois de acordar -- dois golpes do dono separados por um golpe de quem JA acordou nao sao
+         colagem que falta, sao a luta seguindo. Contado no confronto inteiro, isso dava 32 de 40
+         com o codigo certo. */
+      /* ⚠️ POR MARCA, NUNCA POR IDENTIDADE: a `sequenciaDoConfronto` RECRIA os objetos (a suavizacao
+         reparte golpes, os tapas viram N passos), entao `seq.indexOf(sono)` devolve -1 -- e com -1
+         a janela passa a ser o confronto INTEIRO, sem nada acusar. Medido: 6 de 40 confrontos com a
+         janela errada, e os tres exemplos eram a lista toda em vez do trecho do sono. */
+      const kSono = seq.findIndex(g => g.x === 'sono');
+      const kAcordou = seq.findIndex((g, k) => k > kSono && g.x === 'acordou');
+      const janela = seq.filter((g, k) => !g.x && g.d > 0 && k > kSono && (kAcordou < 0 || k < kAcordou));
+      const golpesDoDono = janela.filter(g => g.q === sono.q).length;
       let temColados = false;
-      for(let k = 0; k + 1 < dano.length; k++) if(dano[k].q === sono.q && dano[k+1].q === sono.q) temColados = true;
+      for(let k = 0; k + 1 < janela.length; k++) if(janela[k].q === sono.q && janela[k+1].q === sono.q) temColados = true;
       if(golpesDoDono < 2 || temColados) colados++;
       /* 3. NINGUEM ATACA COM A BARRA EM ZERO. E a razao de o reordenamento existir, e mover o
             revide pra frente nao pode desfaze-la. */
@@ -4421,10 +4520,30 @@ console.log('\n=== QUEM MANDA NA LINHA DE STATUS, PASSO A PASSO ===');
       /* 4. A SOMA CONTINUA FECHANDO: mudou a ordem, nao o dano. */
       /* A SOMA CONTINUA FECHANDO: mudou a ordem, nao o dano. O desempate devolve vida, e por
          isso entra na conta como ganho do lado OPOSTO ao q (ver devolveVida). */
-      const voltouP = seq.filter(g => devolveVida(g) && g.q === 'e').reduce((x, g) => x + g.d, 0);
-      const voltouE = seq.filter(g => devolveVida(g) && g.q === 'p').reduce((x, g) => x + g.d, 0);
-      const tomouP = dano.filter(g => g.q === 'e').reduce((x, g) => x + g.d, 0);
-      const tomouE = dano.filter(g => g.q === 'p').reduce((x, g) => x + g.d, 0);
+      /* ⚠️ E ELA CONTA O `subiuAVida` JUNTO desde 25/09/2026 -- e a SEXTA vez que uma conta deste
+         arquivo copia essa lista a mao (a quinta foi ontem, com a cura). Ela so conhecia o
+         DESEMPATE, e passava por acidente: o Gastly deste painel nao usava Comedor de Sonhos
+         (que DRENA) enquanto o sono era abertura. Com o sono na troca ele passou a usar em 22 dos
+         40 confrontos, e a soma parou de fechar em 24 deles -- com o motor certo.
+         O `devolveVida` sobe o lado OPOSTO ao q (o desempate); o `subiuAVida` sobe o DO q. */
+      const voltouP = seq.filter(g => devolveVida(g) && g.q === 'e').reduce((x, g) => x + g.d, 0)
+                    + seq.filter(g => subiuAVida(g) && g.q === 'p').reduce((x, g) => x + g.d, 0);
+      const voltouE = seq.filter(g => devolveVida(g) && g.q === 'p').reduce((x, g) => x + g.d, 0)
+                    + seq.filter(g => subiuAVida(g) && g.q === 'e').reduce((x, g) => x + g.d, 0);
+      /* ⚠️ E O DANO QUE NAO VEM DE GOLPE ENTRA NA CONTA (25/09/2026): a confusao, a queimadura, o
+         veneno e a Furia do Dragao tiram HP sem serem um golpe do outro lado, e esta conta so
+         somava as linhas de golpe. Ela passava por acidente -- o auto-dano da confusao nao caia
+         nestes 40 confrontos enquanto o sono era abertura (o Psyduck confunde, e com o sono no meio
+         da luta o confronto ficou longo o bastante pra ele se acertar).
+         ⚠️ SAO DUAS LISTAS E O LADO E DIFERENTE EM CADA UMA: no `danoSemGolpe` o `q` e de quem
+         CAUSOU (inverte) e no `danoNoProprio` e de quem PERDE (nao inverte). E a lição que o
+         proprio comentario dessas listas registra, e ela vale nas oito contas do arquivo. */
+      const tomouP = dano.filter(g => g.q === 'e').reduce((x, g) => x + g.d, 0)
+                   + seq.filter(g => danoSemGolpe(g) && g.q === 'e').reduce((x, g) => x + g.d, 0)
+                   + seq.filter(g => danoNoProprio(g) && g.q === 'p').reduce((x, g) => x + g.d, 0);
+      const tomouE = dano.filter(g => g.q === 'p').reduce((x, g) => x + g.d, 0)
+                   + seq.filter(g => danoSemGolpe(g) && g.q === 'p').reduce((x, g) => x + g.d, 0)
+                   + seq.filter(g => danoNoProprio(g) && g.q === 'e').reduce((x, g) => x + g.d, 0);
       if(tomouP === m.playerHpBefore + voltouP - m.playerHpAfter &&
          tomouE === m.enemyHpBefore + voltouE - m.enemyHpAfter) somaOk++;
       /* 5. A LINHA DO MEIO DA BATALHA acompanha: o revide sai com o NOME DO GOLPE dele, e a frase
@@ -4538,7 +4657,18 @@ console.log('\n=== QUEM MORREU NAO ATACA DEPOIS DE MORRER ===');
         const mexeVida = !g.x || ehCura(g) || g.x === 'boom' || g.x === 'boomself' || danoSemGolpe(g) || danoNoProprio(g);
         if(!mexeVida) return;
         /* a cura e a explosao em si mexem a vida de QUEM AGE; todo o resto mexe a do outro lado */
-        const noProprio = ehCura(g) || g.x === 'boomself';
+        /* ⚠️ E O `danoNoProprio` TAMBEM NAO INVERTE -- a queimadura, o veneno e o auto-golpe da
+           confusao tem o `q` de QUEM PERDE, porque nao ha causador na troca em que eles doem. A
+           conta IRMA desta (a da colagem, ~950 linhas acima) ja tinha esta linha e ESTA ficou pra
+           tras: e a SETIMA vez que uma conta deste arquivo copia uma lista a mao, e o comentario do
+           proprio `danoNoProprio` previa o sintoma com todas as letras.
+           ⚠️ ELA PASSAVA POR ACIDENTE: invertido, o dano da queimadura do ADVERSARIO era descontado
+           do MEU pokemon -- e so um confronto longo o bastante pra a queimadura doer duas vezes
+           chegava a zerar a barra na conta. Medido, o painel nao produzia isso (0 em 8.327) ate o
+           sono virar golpe da TROCA em 25/09/2026, que alongou os confrontos: virou 3 em 8.450, e o
+           exemplo era literal -- Charmeleon 72 -> 8 pela queimadura DO MANKEY, e ai "atacando a
+           zero". O MOTOR estava certo: o diario grava `p:-66{17}` com ele de pe. */
+        const noProprio = ehCura(g) || g.x === 'boomself' || danoNoProprio(g);
         const alvoP = noProprio ? (g.q === 'p') : (g.q !== 'p');
         if(alvoP){ hpP = (g.hp != null && g.x !== 'desempate') ? g.hp : Math.max(0, ehCura(g) ? hpP + g.d : hpP - g.d);
                    if(hpP <= 0 && caiuNoPasso.p < 0) caiuNoPasso.p = passo; }
@@ -5642,8 +5772,17 @@ console.log('\n=== AS DUAS FRASES NOVAS: acordou e chuva terminou ===');
           if(!(x.golpes || []).some(g => g.x === 'acordou')) return;
           n++;
           const seq = S.sequenciaDoConfronto(x);
-          const jS = seq.findIndex(g => g.x === 'sono');
+          /* ⚠️ A CONTA E POR PAR (sono -> acordou), e nao por confronto (25/09/2026). Com o sono
+             virando golpe da TROCA um confronto pode ter VARIOS pares -- e pode abrir com um
+             `acordou` de sono HERDADO do confronto anterior e receber um `sono` novo depois dele.
+             Medido: 26 de 200 confrontos assim, com o motor certo.
+             Exemplo real: p72, ACORDOU, e214, p151, SONO, p80, e91 -- o primeiro despertar nao tem
+             sono nenhum antes (o ponto de partida dele e o comeco do confronto) e o sono do meio
+             nao tem despertar depois (o confronto acabou com ele dormindo). */
           const jA = seq.findIndex(g => g.x === 'acordou');
+          /* o sono DESTE despertar e o ultimo antes dele; sem nenhum, o inicio e o confronto */
+          let jS = -1;
+          for(let k = 0; k < jA; k++) if(seq[k].x === 'sono') jS = k;
           const jG = seq.findIndex((g, k) => k > jS && !g.x && g.d > 0);
           /* ⚠️ MAS SO QUANDO ALGUEM PODIA BATER. Esta trava nasceu supondo que quem dorme SEMPRE
              apanha antes de acordar -- e isso era verdade so enquanto nada podia travar o
@@ -5665,9 +5804,20 @@ console.log('\n=== AS DUAS FRASES NOVAS: acordou e chuva terminou ===');
              o sono virar de 1 a 3 trocas, a segunda a paralisia. A regra e "ele nao acorda antes
              da vez dele"; de onde o sono veio nao muda isso. Sem `sono` na sequencia, o ponto de
              partida e o COMECO do confronto. */
+          /* ⚠️ E O `acordou` QUE INTERESSA E O DE DEPOIS DO SONO (25/09/2026). Com o sono virando
+             golpe da TROCA, um confronto pode ter um `acordou` de um sono HERDADO do confronto
+             anterior E um `sono` novo depois dele -- e ai o jA ficava ANTES do jS e a conta nunca
+             fechava. Medido: 26 de 200, com o motor certo.
+             Exemplo real: p72, acordou, e214, p151, SONO, p80, e91. */
           const inicio = jS >= 0 ? jS : -1;
           const jGreal = seq.findIndex((g, k) => k > inicio && !g.x && g.d > 0);
-          const travouReal = seq.some((g, k) => k > inicio && k < jA && (g.x === 'paralisado' || g.x === 'gelado'));
+          /* ⚠️ E O `dormindo` E PROVA DIRETA de que ele perdeu o turno (25/09/2026). No SONO DUPLO
+             (os dois se dormem na mesma troca) ninguem bate -- os contadores correm juntos --, e o
+             que a regra promete e que ele nao acorda ANTES DA VEZ DELE, nao que alguem bateu nele.
+             Sem isso a trava acusava 13 de 200 com o motor certo, e o exemplo era literal:
+             p124, e76, SONO, SONO, DORMINDO, acordou. */
+          const travouReal = seq.some((g, k) => k > inicio && k < jA &&
+            (g.x === 'paralisado' || g.x === 'gelado' || g.x === 'dormindo'));
           if(!(travouReal || (jGreal >= 0 && jGreal < jA))){ fora++; if(!exemplo) exemplo = seq.map(g => g.x || (g.q + g.d)).join(','); }
         });
       }
@@ -5932,8 +6082,12 @@ console.log('\n=== QUEM MORRE DORMINDO NAO ACORDA (14/09/2026) ===');
     if(iS < 0) continue;
     const ladoDormiu = g[iS].q === 'p' ? 'e' : 'p';
     if(ladoDormiu !== 'p') continue;
-    /* ele VOLTOU A ATACAR depois do sono -- ou seja, acordou */
-    const voltou = g.some((x, k) => k > iS && !x.x && x.d > 0 && x.q === ladoDormiu);
+    /* ⚠️ "VOLTOU A ATACAR" MUDOU DE MEDIDA EM 25/09/2026, e sem isso a trava acusava o certo em 28
+       de 120: com o sono virando golpe da TROCA, o adormecido AINDA ATACA na troca em que ele e
+       dormido -- ele nao voltou, ele nem tinha parado. O que prova que ele voltou e ele bater
+       DEPOIS de o dono ter batido, porque o dono so bate sozinho enquanto o outro dorme. */
+    const iDono = g.findIndex((x, k) => k > iS && !x.x && x.d > 0 && x.q !== ladoDormiu);
+    const voltou = iDono >= 0 && g.some((x, k) => k > iDono && !x.x && x.d > 0 && x.q === ladoDormiu);
     if(!voltou) continue;
     sobreviveu++;
     if(g.some(x => x.x === 'acordou')) semLinha++;
@@ -6726,23 +6880,44 @@ console.log('\n=== O COMEDOR DE SONHOS AVISA NO CARTAO, E A TRAVA VALE NA BATALH
      com o alvo ACORDADO ele NUNCA sai -- e o motor troca de golpe quando o outro acorda. */
   const mk3 = (id, lv) => { const p = S.createInstance(id, lv); p.maxHp = S.calcMaxHp(p); p.hp = p.maxHp;
                             p.ataques = S.ataquesPadrao(p); return p; };
-  let comSono = 0, dormindo = 0, acordado = 0, trocou = 0;
+  let comSono = 0, dormindo = 0, acordado = 0, trocou = 0, semGolpe = 0;
   for(let v = 0; v < 3000; v++){
     const r = S.simulateGymBattle([mk3('gengar', 50)], [mk3('machoke', 50)], S.makeSeededRng('dr' + v));
     const m = (r.matchups || [])[0];
     if(!m || !(m.golpes||[]).some(g => g.x === 'sono')) continue;
     comSono++;
     const g = m.golpes;
-    const iS = g.findIndex(x => x.x === 'sono'), iA = g.findIndex(x => x.x === 'acordou');
+    /* ⚠️ A JANELA E POR SONO desde 25/09/2026, e nao a do PRIMEIRO sono: com ele virando golpe da
+       TROCA, o alvo pode acordar e voltar a dormir no mesmo confronto (medido, 1,4% deles) -- e a
+       conta antiga lia o primeiro `acordou` e chamava de "acordado" um golpe dado com o alvo
+       dormindo de novo (15 de 1078, com o motor certo).
+       ⚠️ E O DONO PODE NAO CHEGAR A ATACAR: na troca em que ele dorme o outro ele PERDE o ataque,
+       entao ele pode morrer ali mesmo -- medido, 90 de 1078, e em todos eles o sono foi a ultima
+       acao do confronto. Cobrar o Comedor ali seria cobrar um golpe que nao existe. */
     const dele = g.map((x,k)=>({x,k})).filter(y => !y.x.x && y.x.q === 'p' && y.x.d > 0);
-    const antes = dele.filter(y => y.k > iS && (iA < 0 || y.k < iA)).map(y => y.x.mv);
-    const depois = dele.filter(y => iA >= 0 && y.k > iA).map(y => y.x.mv);
+    /* as janelas de sono: de cada sono ate o acordou seguinte */
+    const janelas = [];
+    g.forEach((x, k) => {
+      if(x.x !== 'sono') return;
+      const fim = g.findIndex((y, j) => j > k && y.x === 'acordou');
+      janelas.push([k, fim < 0 ? g.length : fim]);
+    });
+    const dormindoAgora = (k) => janelas.some(([a, b]) => k > a && k < b);
+    const antes  = dele.filter(y => dormindoAgora(y.k)).map(y => y.x.mv);
+    const depois = dele.filter(y => !dormindoAgora(y.k) && y.k > janelas[0][0]).map(y => y.x.mv);
     if(antes.includes('dreameater')) dormindo++;
+    else if(!antes.length) semGolpe++;
     if(depois.includes('dreameater')) acordado++;
     if(antes.includes('dreameater') && depois.length && !depois.includes('dreameater')) trocou++;
   }
   ok('amostra de confrontos com sono', comSono > 100, comSono + ' confrontos');
-  ok('ele USA com o adversario dormindo', dormindo === comSono, dormindo + ' de ' + comSono);
+  /* ⚠️ OS QUE NAO CONTAM SAO OS EM QUE O DONO NAO CHEGOU A ATACAR dormindo -- ele perdeu o ataque
+     pra dormir o outro e morreu na mesma troca. Sao 8,3% dos confrontos com sono, e cobra-los
+     seria cobrar um golpe que o motor nao deu. */
+  ok('amostra de confrontos em que ele chegou a atacar dormindo', comSono - semGolpe > 100,
+     (comSono - semGolpe) + ' de ' + comSono + '   (' + semGolpe + ' sem golpe nenhum dormindo)');
+  ok('ele USA com o adversario dormindo', dormindo === comSono - semGolpe,
+     dormindo + ' de ' + (comSono - semGolpe));
   ok('e NUNCA usa depois de ele acordar', acordado === 0, acordado + ' de ' + comSono);
   ok('e o motor troca de golpe quando o outro acorda', trocou > 5, trocou + ' confrontos com a troca visivel');
 }
@@ -7288,10 +7463,14 @@ console.log('\n=== ABRIR UM CONFRONTO ZERA O PASSO, ANTES DO DESENHO (15/09/2026
      mesmo defeito e ninguem ve -- que e exatamente o que aconteceu aqui. */
   ok('quem decide a frase no log e o ehGolpeEspecial, nao uma lista escrita a mao',
      /if\(ehGolpeEspecial\(g\) \|\| g\.x === 'faixa' \|\| g\.x === 'desempate'\) return linhaEspecial\(g\);/.test(cliG));
-  /* ⚠️ MENOS O `disable`: ele ESTA no ehGolpeEspecial e as anulacoes ja foram desenhadas antes de
-     tudo (elas acontecem na abertura do confronto). Sem a guarda, ele sairia DUAS vezes. */
-  ok('e o disable fica de fora, porque as anulacoes ja saem la em cima',
-     /if\(g\.x === 'disable'\) return '';/.test(cliG));
+  /* ⚠️ O `disable` ERA A EXCECAO AQUI, com um `return ''`, e ela saiu em 25/09/2026: com o Disable
+     virando golpe da TROCA, a anulacao deixou de ser desenhada no topo do log e passou a sair pelo
+     caminho comum, no lugar dela. Sem esta trava, alguem devolve a guarda e a linha SOME do log --
+     porque a montagem no topo tambem nao existe mais. */
+  ok('e o disable NAO fica mais de fora -- ele sai no lugar dele',
+     !/if\(g\.x === 'disable'\) return '';/.test(cliG));
+  ok('  e a montagem no topo do log nao existe mais',
+     !/const anulacoes = /.test(cliG) && !/\$\{anulacoes\}/.test(cliG));
   /* AS TRES DIVIDEM O MESMO SELO ❄️ -- elas sao o mesmo evento em tres momentos. Sem selo, seriam
      as unicas frases mudas da linha de status: todo o resto do bloco tem o dele. */
   ok('e as tres dividem o MESMO selo de gelo',
@@ -7693,15 +7872,30 @@ console.log('\n=== ABRIR UM CONFRONTO ZERA O PASSO, ANTES DO DESENHO (15/09/2026
     const dist = {};
     let confs = 0, contradiz = 0, atacouDormindo = 0, ex = null;
     for(let i = 0; i < 2500; i++){
+      /* ⚠️ O SNORLAX CAIU DE 80 PRA 45 EM 25/09/2026, e o motivo e a mudanca do sono: com ele
+         virando golpe da TROCA, quem dorme o outro PERDE o ataque daquela troca -- e um Snorlax
+         Lv.80 matava o Butterfree Lv.45 ali mesmo, antes de o sono render uma unica linha. Medido:
+         243 confrontos com sono e ZERO linhas `dormindo`, com o motor certo (a mecanica da
+         `{0:218, 1:58, 2:50}` num painel parelho). E a licao do painel forte demais, pela sexta
+         vez neste arquivo. */
       const a = vd('butterfree', 45); a.ataques = ['gust'];
-      const b = vd('snorlax', 80); b.ataques = ['bodyslam'];
+      const b = vd('snorlax', 45); b.ataques = ['bodyslam'];
       const r = S.simulateGymBattle([a], [b], S.makeSeededRng('sono' + i));
       for(const m of (r.matchups || [])){
         const g = m.golpes || [];
         if(!g.some(x => x.x === 'sono')) continue;
         confs++;
-        const n = g.filter(x => x.x === 'dormindo').length;
-        dist[n] = (dist[n] || 0) + 1;
+        /* ⚠️ A CONTA E POR SONO, e nao por CONFRONTO (25/09/2026): com o sono sorteado a cada troca,
+           o alvo pode acordar e voltar a dormir no mesmo confronto (medido, 1,4% deles) -- e as
+           linhas dos dois sonos somadas passavam de 2, chegando a 7 num painel de luta longa. O que
+           o invariante diz e sobre UM sono: ele rende (duracao - 1) linhas. */
+        g.forEach((x, k) => {
+          if(x.x !== 'sono') return;
+          const fim = g.findIndex((y, j) => j > k && (y.x === 'acordou' || y.x === 'sono'));
+          const ate = fim < 0 ? g.length : fim;
+          const n = g.filter((y, j) => j > k && j < ate && y.x === 'dormindo').length;
+          dist[n] = (dist[n] || 0) + 1;
+        });
         /* ⚠️ A CONTRADICAO: a linha e o `acordou` do mesmo lado nao podem ser VIZINHAS na ordem --
            seria "continua a dormir / acordou" no mesmo turno. */
         for(let k = 0; k + 1 < g.length; k++){
@@ -7802,7 +7996,12 @@ console.log('\n=== ABRIR UM CONFRONTO ZERA O PASSO, ANTES DO DESENHO (15/09/2026
     for(let i = 0; i < 120; i++){
       const alvo = ALVOS[i % ALVOS.length];
       const monta = (novo) => { const a = novo('butterfree', 50); a.ataques = ['gust']; return [a]; };
-      const advs = (novo) => [novo(alvo, 70), novo(ALVOS[(i + 2) % ALVOS.length], 70)];
+      /* ⚠️ OS ADVERSARIOS CAIRAM DE 70 PRA 50 EM 25/09/2026, pelo mesmo motivo do painel do bloco
+         da linha: com o sono virando golpe da TROCA, quem dorme o outro PERDE o ataque -- e um alvo
+         Lv.70 matava o Butterfree Lv.50 naquela troca, antes de a linha `dormindo` existir. Medido:
+         1 batalha com a linha em 120, e a trava pede 5. O que este bloco mede e os DOIS MOTORES
+         concordando, e pra isso a linha precisa ACONTECER. */
+      const advs = (novo) => [novo(alvo, 50), novo(ALVOS[(i + 2) % ALVOS.length], 50)];
       const rC = S.simulateGymBattle(monta((id, lv) => S.createInstance(id, lv)),
                                      advs((id, lv) => S.createInstance(id, lv)), S.makeSeededRng('d2m' + i));
       const rS = srv._simulateGymBattle(monta((id, lv) => srv._createInstance(id, lv)),

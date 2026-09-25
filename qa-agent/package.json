@@ -1,0 +1,20 @@
+{
+  "name": "jornada-kanto-qa-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Testes automatizados locais da Jornada Kanto com Playwright e TypeScript.",
+  "scripts": {
+    "jarbas": "tsx src/jarbas.ts",
+    "test": "playwright test",
+    "test:smoke": "playwright test tests/smoke.spec.ts --project=chromium",
+    "test:smoke:headed": "playwright test tests/smoke.spec.ts --project=chromium --headed",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^26.6.2",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}
