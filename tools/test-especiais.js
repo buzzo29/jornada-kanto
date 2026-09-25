@@ -252,13 +252,15 @@ ok('e o log diz qual golpe foi', !!sonoLinha && sonoLinha.g === 'Canto', sonoLin
      livres.length + ' livres: ' + livres.map(g=>g.q).join(','));
 })();
 /* ⚠️ O NOME DO SHINY BRILHA NA BATALHA, em vez da estrela ao lado (25/09/2026, a pedido: *"durante a
-   batalha ainda tava mostrando a estrela ao invez de deixar o nome brilhando"*).
-   ⚠️ ESTA TRAVA NASCEU DE UM CASO MUDO: a conferencia de acusacao religou o defeito (o fighterHtml
-   voltando a nao envolver o nome) e NENHUMA trava caiu -- o brilho tinha 33 usos no arquivo e
-   nenhum deles era a tela de batalha. Sem ela, alguem desfaz e ninguem ve, que e literalmente o que
-   aconteceu em 24/09, quando nove pontos ficaram pra tras.
-   ⚠️ E ELA COBRA O PAR: o brilho aparece E a estrela nao. Uma metade so passaria com os dois na
-   tela, que e o estado que o pedido recusa. */
+   batalha ainda tava mostrando a estrela ao invez de deixar o nome brilhando"*) -- e o brilho foi
+   DESFEITO no dia seguinte, tambem a pedido: *"nao ta legal nao, volte como era antes com a estrela
+   mesmo e esqueca isso de deixar o nome brilhando"*.
+   ⚠️ ELA NAO FOI APAGADA, ela foi VIRADA: hoje ela cobra a ESTRELA nos dois ramos, e que o brilho
+   NAO volte. A razao de ela existir continua a mesma -- ela nasceu de um caso MUDO, em que o
+   fighterHtml regrediu e nenhuma trava caiu, porque as CINCO telas de batalha passam por aqui e
+   nenhuma outra trava as lia.
+   ⚠️ E ELA COBRA O PAR: a estrela aparece E o brilho nao. Uma metade so passaria com os dois na
+   tela. */
 (function(){
   const m = { player:'Charizard', playerSpecies:'charizard', playerLevel:60, playerShiny:true,
     playerMaxHp:300, enemy:'Venusaur', enemySpecies:'venusaur', enemyLevel:60, enemyShiny:false,
@@ -268,26 +270,26 @@ ok('e o log diz qual golpe foi', !!sonoLinha && sonoLinha.g === 'Canto', sonoLin
   [['a cena NOVA', true], ['o caminho ANTIGO', false]].forEach(([rotulo, novo]) => {
     const shiny = S.fighterHtml(m, 'p', { hp: 230, passo: 0, visualNovo: novo });
     const comum = S.fighterHtml(m, 'e', { hp: 180, passo: 0, visualNovo: novo });
-    ok('o nome do shiny BRILHA em ' + rotulo, shiny.indexOf('class="nome-shiny"') >= 0);
-    ok('  e a ESTRELA nao sai mais em ' + rotulo, shiny.indexOf('#s-shiny') < 0,
-       shiny.indexOf('#s-shiny') < 0 ? '' : 'ainda tem a estrela');
+    ok('o shiny leva a ESTRELA em ' + rotulo, shiny.indexOf('#s-shiny') >= 0,
+       shiny.indexOf('#s-shiny') >= 0 ? '' : 'a estrela sumiu do painel do lutador');
+    ok('  e o nome NAO brilha em ' + rotulo, shiny.indexOf('nome-shiny') < 0);
     ok('  e quem NAO e shiny continua sem os dois em ' + rotulo,
        comum.indexOf('nome-shiny') < 0 && comum.indexOf('#s-shiny') < 0);
   });
-  /* ⚠️ E A VARREDURA E A METADE QUE PEGA A PROXIMA OMISSAO: nenhum render do jogo pode emitir a
-     estrela, com DUAS excecoes nomeadas -- as duas sao DECORATIVAS (a estrela como icone de premio
-     nas Ilhas Laranja), e ali nao ha pokemon shiny nenhum. Contando so o total, a proxima tela que
-     nascer com a estrela passaria se outra a perdesse no mesmo commit. */
+  /* ⚠️ E A VARREDURA E A METADE QUE PEGA A VOLTA DO BRILHO: ele chegou a viver em 33 pontos do
+     arquivo, e desfaze-lo pela metade deixaria telas com o nome dourado e outras com a estrela --
+     que e o estado que o pedido recusa. Contando so um render, a proxima tela que nascesse com o
+     brilho passaria.
+     ⚠️ E A ESTRELA TEM QUE ESTAR EM MUITOS PONTOS: ela e a forma de marcar o shiny no jogo inteiro.
+     Um piso (e nao um numero exato) porque tela nova com shiny nasce somando. */
   const _fsS = require('fs');
   const srcS = _fsS.readFileSync(path.join(raiz, 'index.html'), 'utf8');
-  const linhas = srcS.split('\n').map((l, i) => [i + 1, l])
-    .filter(([, l]) => /selo\((['"])shiny\1/.test(l));
-  const decorativas = linhas.filter(([, l]) =>
-    l.indexOf('Todo o time subiu') >= 0 || l.indexOf('Os cinco caíram') >= 0);
-  ok('a estrela do shiny so sobra nos DOIS pontos decorativos', linhas.length === 2,
-     linhas.map(([n]) => 'linha ' + n).join(', '));
-  ok('  e os dois sao os das Ilhas Laranja (o premio e o "Os cinco cairam")',
-     decorativas.length === linhas.length, decorativas.length + ' de ' + linhas.length);
+  const estrelas = srcS.split('\n').filter(l => /selo\((['"])shiny\1/.test(l));
+  ok('o BRILHO nao existe em lugar nenhum do jogo',
+     srcS.indexOf('nome-shiny') < 0 && srcS.indexOf('nomeBrilhante') < 0,
+     'sobrou nome-shiny ou nomeBrilhante');
+  ok('e a ESTRELA marca o shiny em toda tela (>= 30 pontos)', estrelas.length >= 30,
+     estrelas.length + ' pontos');
 })();
 /* ⚠️ O ADORMECIDO NAO ATACA NA TROCA EM QUE ELE DORME (25/09/2026). Reportado com print, e o print
    tinha DOIS casos -- cada um com painel proprio aqui, porque eles tem causas diferentes:
@@ -807,10 +809,32 @@ ok('o aviso do meio da batalha diz o mesmo',
 
 const mSono = { player:'Butterfree', enemy:'Arbok', playerSpecies:'butterfree', enemySpecies:'arbok',
   golpes:[{ q:'p', d:100, hp:0, x:'sono', g:'Pó do Sono' }] };
-ok('sono: "Butterfree fez Arbok dormir"',
-   S.avisoDoConfronto(mSono) === S.ICONES_ESPECIAIS.sono + ' Butterfree fez Arbok dormir!', S.avisoDoConfronto(mSono));
-/* No log cabe o nome do golpe -- ele e por especie de proposito (o Paras dorme com Esporo). */
-ok('e no log ainda da pra ver com que golpe', /dormir com <span class="type-pill"[^>]*>Pó do Sono</.test(S.passosHtml(mSono)));
+/* ⚠️ ESTA TRAVA MEDIA A REGRA DE ANTES DE 25/09/2026 (*"Butterfree fez Arbok dormir"*, sem golpe
+   no aviso). Ela nao foi afrouxada: ela virou a da regra NOVA, e cobra o PAR -- o aviso e o log
+   dizem a MESMA coisa, com o selo. Sem a segunda metade, um build que voltasse a esconder o golpe
+   no aviso passaria medindo so o log. */
+const avisoSono = S.avisoDoConfronto(mSono);
+ok('sono no AVISO: "...dormir com <selo Po do Sono>"',
+   avisoSono.indexOf(S.ICONES_ESPECIAIS.sono + ' Butterfree fez Arbok dormir com ') === 0
+   && avisoSono.indexOf('>Pó do Sono</span>!') === avisoSono.length - '>Pó do Sono</span>!'.length,
+   avisoSono);
+ok('e o selo sai na cor do TIPO do golpe (Po do Sono e Planta)',
+   avisoSono.indexOf('background:' + S.TYPE_COLORS[S.TIPO_DO_ESPECIAL['Pó do Sono']]) > 0,
+   S.TIPO_DO_ESPECIAL['Pó do Sono'] + ' / ' + avisoSono);
+ok('e no log a frase e a MESMA', /dormir com <span class="type-pill"[^>]*>Pó do Sono</.test(S.passosHtml(mSono)));
+/* ⚠️ E O SELO SO ENTRA ONDE HA GOLPE: confronto gravado antes do campo `g` existir cai na frase
+   curta, e log velho nao pode sumir nem sair com um selo vazio. */
+const mSonoVelho = { player:'Butterfree', enemy:'Arbok', playerSpecies:'butterfree', enemySpecies:'arbok',
+  golpes:[{ q:'p', d:100, hp:0, x:'sono' }] };
+ok('sem o golpe gravado, a frase curta',
+   S.avisoDoConfronto(mSonoVelho) === S.ICONES_ESPECIAIS.sono + ' Butterfree fez Arbok dormir!',
+   S.avisoDoConfronto(mSonoVelho));
+/* ⚠️ E OS OUTROS RAMOS CONTINUAM SEM SELO NO AVISO: a regra geral (texto puro, que se le em um
+   segundo) nao mudou -- o que mudou foi o SONO ser a excecao pedida. */
+const mConf = { player:'Zubat', enemy:'Onix', playerSpecies:'zubat', enemySpecies:'onix',
+  golpes:[{ q:'p', d:0, hp:200, x:'confusao', g:'Supersom' }] };
+ok('a confusao continua em texto puro no aviso',
+   S.avisoDoConfronto(mConf).indexOf('type-pill') < 0, S.avisoDoConfronto(mConf));
 
 const mDis = { player:'Alakazam', enemy:'Gengar', playerSpecies:'alakazam', enemySpecies:'gengar',
   golpes:[{ q:'p', d:0, hp:120, x:'disable', g:'Anulação' }, { q:'p', d:40, hp:80 }, { q:'e', d:30, hp:90 }] };

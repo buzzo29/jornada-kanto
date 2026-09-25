@@ -60,11 +60,13 @@ montaSaves();
 const html = () => S.montadorDeTimeHtml(S.__getGame().towerPick, 'towerTogglePick', 6);
 const contaEm = (t, re) => (t.match(re)||[]).length;
 const linhas = (t) => contaEm(t, /class="mont-linha"/g);
-  /* ⚠️ O NOME DO SHINY VEM DENTRO DE UM <span class="nome-shiny"> desde 24/09/2026 (ele brilha em
-     vez de ter a estrela ao lado), e um [^<]* casa com STRING VAZIA nele -- o teste reportava um
-     nome em branco no meio da lista. Desfazer o span ANTES de extrair e a mudanca minima. */
-  const semBrilho = (t) => t.replace(/<span class="nome-shiny">([^<]*)<\/span>/g, '$1');
-  const nomesNaTela = (t) => (semBrilho(t).match(/class="mont-nome">([^<]*)/g)||[]).map(x => x.replace(/class="mont-nome">/, '').trim());
+  /* ⚠️ ESTE EXTRATOR JA PRECISOU DESFAZER UM <span class="nome-shiny"> ANTES DE LER O NOME: de 24 a
+     25/09/2026 o shiny era o nome BRILHANDO, e um [^<]* casa com STRING VAZIA num nome envolvido em
+     span -- o teste reportava um nome em branco no meio da lista. Com o brilho desfeito a pedido, o
+     nome voltou a ser texto solto e o remendo saiu.
+     ⚠️ FICA A LICAO: quem le TEXTO de um HTML quebra quando o HTML ganha uma tag no meio, e o
+     sintoma e um nome VAZIO, nao um erro. */
+  const nomesNaTela = (t) => (t.match(/class="mont-nome">([^<]*)/g)||[]).map(x => x.replace(/class="mont-nome">/, '').trim());
 /* A lista inteira, atravessando as páginas -- pro que se afirma sobre "os doze". Volta pra página
    em que estava, senão cada leitura mexeria no estado que o teste seguinte vai olhar. */
 function todasAsPaginas(){
@@ -132,12 +134,12 @@ console.log('\n=== UMA LINHA POR POKEMON, COM TUDO QUE SE PRECISA PRA ESCOLHER =
   const tudo = todasAsPaginas();
   ok('e de que time ele e', contaEm(tudo, /mont-time">Kanto/g) === 6 && contaEm(tudo, /mont-time">Johto/g) === 6,
      contaEm(tudo, /mont-time">Kanto/g) + ' Kanto, ' + contaEm(tudo, /mont-time">Johto/g) + ' Johto');
-  /* ⚠️ ESTA TRAVA MEDIA A ESTRELA AO LADO DO NOME, e ela saiu em 24/09/2026: o shiny passou a ser
-     o NOME BRILHANDO (o nomeBrilhante, um <span class="nome-shiny">). Ela nao foi afrouxada --
-     virou a da regra nova, e cobra as DUAS metades: o brilho esta no shiny E a estrela nao voltou. */
-  ok('o shiny aparece com o nome brilhante', contaEm(tudo, /class="nome-shiny"/g) === 1,
-     contaEm(tudo, /class="nome-shiny"/g) + ' brilhantes');
-  ok('  e a estrela ao lado do nome nao voltou', contaEm(tudo, /#s-shiny/g) === 0);
+  /* ⚠️ ESTA TRAVA JA MEDIU AS DUAS REGRAS: a estrela ao lado do nome (ate 24/09/2026), o nome
+     BRILHANDO (de 24 a 25/09) e a estrela de novo, quando o brilho foi desfeito a pedido. Ela nunca
+     foi afrouxada -- o que muda e qual das duas ela cobra, e ela sempre cobra o PAR. */
+  ok('o shiny aparece com a estrela ao lado', contaEm(tudo, /#s-shiny/g) === 1,
+     contaEm(tudo, /#s-shiny/g) + ' estrelas');
+  ok('  e o nome nao brilha', contaEm(tudo, /class="nome-shiny"/g) === 0);
   /* A GRADE POR SAVE SAIU: se o agrupamento voltar sem querer, esta linha acusa. */
   ok('e a grade antiga por save nao existe mais', !tudo.includes('tower-pick-group'));
 }

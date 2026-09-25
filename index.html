@@ -187,9 +187,6 @@
      fundos -- o glow so difuso some no creme, e o de duas camadas largas borra o nome.
      CUSTO MEDIDO: nada. 40 nomes brilhando (4x o pior caso real, que e a tela de ordem) dao 0,2ms
      com tres camadas, com quatro e sem sombra nenhuma -- indistinguivel. */
-  .nome-shiny{
-    text-shadow:0 0 3px rgba(255,200,0,.7), 0 0 8px rgba(255,205,0,.45), 0 0 16px rgba(255,200,0,.28);
-  }
   .btn .mon-name{font-size:1rem;font-weight:800;display:block;}
   .btn .mon-sub{font-size:.7rem;font-weight:600;opacity:.85;display:block;margin-top:3px;}
 
@@ -6880,6 +6877,7 @@ function freshGameDefaults(){
     leagueScreenLoading:false,
     customLeagueTypes:null,
     registeredTeam:null,
+    registeredTeamCycle:null,   /* de QUAL ciclo veio o time acima -- ver updateRegisteredTeamCode */
     leagueTeamPickError:null,
     permanentPokedex:[],
     permanentShinyDex:[],
@@ -7930,16 +7928,6 @@ function montarSelos(){
    17/09/2026). O desenho usa `currentColor` no corpo e branco/preto TRANSLUCIDOS no volume, entao
    um desenho so serve aos 23 TMs e aos 17 tipos -- em vez de 23 simbolos iguais de cor diferente.
    Vale pro frasco da Pocao tambem: ela e a Super Pocao com outro liquido. */
-/* ⚠️ O NOME DO SHINY BRILHA, em vez da estrela ao lado (24/09/2026, a pedido).
-   ⚠️ ELA EXISTE PORQUE ISSO ESTAVA EM 25 PONTOS: escrito em cada um, o proximo card que nascer
-   sai sem o brilho e ninguem ve -- a familia de defeito que este projeto mais paga.
-   ⚠️ E O BRILHO NAO TROCA A COR DO TEXTO, so poe um halo: no log de batalha o nome ja sai em AZUL
-   (eu) ou VERMELHO (o adversario), e pintar de dourado apagaria essa informacao.
-   ⚠️ O NOME JA VEM ESCAPADO de quem chama (varios passam escapeHtmlSafe(...)), entao esta funcao
-   NAO escapa de novo -- escapar duas vezes transforma o & das entidades em &amp;. */
-function nomeBrilhante(nome, shiny){
-  return shiny ? '<span class="nome-shiny">' + nome + '</span>' : nome;
-}
 function selo(nome, cls, cor){
   if(!DESENHOS[nome]) return '';
   montarSelos();
@@ -14346,7 +14334,7 @@ function renderRegisteredTeamOrderModal(){
         <div class="order-row">
           <div class="order-num">${idx+1}º</div>
           <div class="order-info">
-            <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${nomeBrilhante(p.name, p.shiny)} — Lv.${p.level}</span>
+            <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${p.name}${p.shiny ? ' ' + selo('shiny') : ''} — Lv.${p.level}</span>
           </div>
           <div class="order-controls">
             <button class="circle-btn" onclick="moveRegisteredTeamOrder('${p.id}', -1)" ${idx===0?'disabled':''}>▲</button>
@@ -14894,7 +14882,7 @@ function renderMontanha(){
       <div class="order-row">
         <div class="order-num">${idx+1}º ${botaoDeItemHtml(p)}</div>
         <div class="order-info">
-          <span class="mon-name">${spriteHtml(p, "sprite-sm")} ${nomeBrilhante(escapeHtmlSafe(p.name), p.shiny)} — Lv.${p.level}</span>
+          <span class="mon-name">${spriteHtml(p, "sprite-sm")} ${escapeHtmlSafe(p.name)}${p.shiny ? ' ' + selo('shiny') : ''} — Lv.${p.level}</span>
           <span class="mon-sub">${typesHtml(p.types)}</span>
         </div>
         ${/* ⚠️ ELAS CHAMAVAM `moveTeam`, QUE NUNCA EXISTIU (consertado em 18/09/2026, reportado:
@@ -15121,7 +15109,7 @@ function renderMataFechada(){
       return `<div class="order-row">
         <div class="order-num">${i + 1}º</div>
         <div class="order-info">
-          <span class="mon-name">${spriteHtml(m,"sprite-sm")} ${nomeBrilhante(escapeHtmlSafe(sp.name), m.shiny)} — Lv.${m.level}</span>
+          <span class="mon-name">${spriteHtml(m,"sprite-sm")} ${escapeHtmlSafe(sp.name)}${m.shiny ? ' ' + selo('shiny') : ''} — Lv.${m.level}</span>
           <span class="mon-sub">${typesHtml(sp.types)}</span>
         </div>
       </div>`;
@@ -15143,7 +15131,7 @@ function renderMataFechada(){
     ${meu.map((p, i) => `<div class="order-row">
       <div class="order-num">${i + 1}º${botaoDeItemHtml(p)}</div>
       <div class="order-info">
-        <span class="mon-name">${spriteHtml(p,"sprite-sm")} ${nomeBrilhante(escapeHtmlSafe(p.name), p.shiny)} — Lv.${p.level}</span>
+        <span class="mon-name">${spriteHtml(p,"sprite-sm")} ${escapeHtmlSafe(p.name)}${p.shiny ? ' ' + selo('shiny') : ''} — Lv.${p.level}</span>
         <span class="mon-sub">${typesHtml(p.types || (SPECIES[p.speciesId] || {}).types || [])}</span>
       </div>
       <div class="order-controls">
@@ -15221,7 +15209,7 @@ function renderVigiliaPremio(){
       const sp = SPECIES[m.speciesId];
       return `<div class="evo-linha">
         <button class="btn" onclick="escolherOPremioDaVigilia(${i})">
-          <span class="mon-name">${spriteHtml(m,"sprite-sm")} ${nomeBrilhante(escapeHtmlSafe(sp.name), m.shiny)} <span class="wild-lv">— Lv.${m.level}</span></span>
+          <span class="mon-name">${spriteHtml(m,"sprite-sm")} ${escapeHtmlSafe(sp.name)}${m.shiny ? ' ' + selo('shiny') : ''} <span class="wild-lv">— Lv.${m.level}</span></span>
           <span class="mon-sub">${typesHtml(sp.types)}</span>
         </button>
         <button class="wild-dex" onclick="abrirPokedexFicha(\'${escJs(m.speciesId)}\', ${m.shiny ? "true" : "false"})"
@@ -18237,6 +18225,7 @@ async function cancelLeagueRegistration(typeId){
     }
     game.accountLeagueSlots = { ...(game.accountLeagueSlots||{}), [typeId]: null };
     game.registeredTeam = null;   // senão a lista do time que acabou de sair continua na tela
+    game.registeredTeamCycle = null;
     game.ultimaChecagemDaLiga = 0;     // saiu da liga: o aviso pode voltar a valer, então relê na próxima
     game.leagueSubmitting = false;
     render();
@@ -18248,16 +18237,55 @@ async function cancelLeagueRegistration(typeId){
     render();
   }
 }
+/* O MESMO TIME, SO QUE EM OUTRA ORDEM -- e a unica coisa que o sync abaixo pode escrever.
+   Ele compara o MULTISET de especie:nivel:shiny: reordenar preserva, trocar de time nao.
+   ⚠️ E ELE E UMA REDE, nao a correcao: a correcao e o sync so mexer no ciclo de onde o time veio
+   (o `registeredTeamCycle`, logo abaixo). Esta rede existe porque o `registeredTeam` e escrito em
+   dois pontos e pode ser escrito num terceiro um dia -- e o estrago de escrever o time errado num
+   chaveamento EM ANDAMENTO ja aconteceu em producao (25/09/2026, a Liga Pro das 01:00). */
+function mesmoTimeEmOutraOrdem(codeA, codeB){
+  const a = decodeTeamCode(codeA), b = decodeTeamCode(codeB);
+  if(!a || !b || a.length !== b.length) return false;
+  const chave = t => t.map(p => p.speciesId + ':' + p.level + ':' + (p.shiny?1:0)).sort().join('|');
+  return chave(a) === chave(b);
+}
+/* ⚠️ O SYNC SO MEXE NO CICLO DE ONDE O TIME VEIO -- e esta linha e o conserto de 25/09/2026.
+
+   O QUE ACONTECEU: ele varria TODOS os ciclos drawn e reescrevia o code de todo confronto nao
+   resolvido em que o uid aparecesse, com o game.registeredTeam. Isso esta certo na Liga Classica
+   -- la o time E da conta, e reordenar o mesmo time continua sendo o mesmo time. Na LIGA PRO o time
+   e SORTEADO por ciclo: quem disputava a Bronze (15-30) e se inscrevia na Prata (35-50) do ciclo
+   seguinte ficava com o registeredTeam da PRATA (o checkLeagueRegistrationStatus olha o ciclo
+   registering PRIMEIRO), e o sync o aplicava no chaveamento da BRONZE, em andamento.
+   Medido no Firestore: a rodada 0 com furret:17 ... quilava:30 e a semifinal com
+   nidoking:40 ... venusaur:45 -- o MESMO jogador, o mesmo chaveamento, e ele foi campeao.
+   O time novo ainda se propagou pra a FINAL sozinho, porque o advanceCyclePhases promove o
+   objeto do vencedor (nextMatch.a = match.winner), que ja estava com o codigo trocado.
+
+   ⚠️ E ISSO E CONSEQUENCIA DIRETA DE 24/09, quando a trava de ja-esta-disputando saiu a pedido:
+   ate ali nao havia como estar nos dois ciclos ao mesmo tempo. O CLAUDE.md registrou a porta que
+   se abria (a mesma conta pode terminar em DOIS chaveamentos do mesmo tipo) e nao previu que o
+   time de um vazaria pro outro.
+
+   ⚠️ O SERVIDOR JA FAZIA O CERTO, e a comparacao aponta o erro: o atualizarInscricoesComTime (o
+   caminho do Doce Raro) so mexe em ciclo registering, com a razao escrita ao lado -- mudar o
+   nivel no meio de uma disputa seria pior que nao atualizar. O cliente fazia o CONTRARIO: so
+   mexia em ciclo drawn. */
 async function updateRegisteredTeamCode(typeId){
   if(!game.authUser || !game.registeredTeam) return;
   const uid = game.authUser.uid;
   const newCode = encodeTeamCode(game.registeredTeam);
+  const origem = game.registeredTeamCycle;
+  /* Sem carimbo nao da pra saber a QUAL ciclo aquele time pertence, e escrever no errado e o
+     defeito que esta funcao acabou de custar. Nao escrever nada e o lado certo pra errar: o pior
+     caso e a reordenacao nao valer, e a proxima leitura da tela repoe a ordem gravada. */
+  if(!origem || origem.typeId !== typeId || !origem.id) return;
   try{
     const scheduleSnap = await scheduleDocRef(typeId).get();
     if(!scheduleSnap.exists) return;
     const cycles = scheduleSnap.data().cycles || [];
     const registering = cycles.find(c=>c.status==='registering');
-    if(registering){
+    if(registering && registering.id === origem.id){
       const regRef = registrantDocRef(typeId, registering.id, uid);
       const regSnap = await regRef.get();
       /* os golpes vao junto: o Doce Raro sobe o nivel, e nivel novo pode ter destravado golpe novo */
@@ -18265,6 +18293,7 @@ async function updateRegisteredTeamCode(typeId){
     }
     for(const entry of cycles){
       if(entry.status!=='drawn') continue;
+      if(entry.id !== origem.id) continue;
       await db.runTransaction(async (tx)=>{
         const ref = cycleDocRef(typeId, entry.id);
         const snap = await tx.get(ref);
@@ -18277,8 +18306,15 @@ async function updateRegisteredTeamCode(typeId){
               if(!match.resolved){
                 // casa por uid, não por nome -- mais confiável, já que o nome sozinho poderia colidir
                 // entre contas diferentes
-                if(match.a && match.a.uid===uid){ match.a.code = newCode; touched = true; }
-                if(match.b && match.b.uid===uid){ match.b.code = newCode; touched = true; }
+                /* ⚠️ E SO SE FOR O MESMO TIME EM OUTRA ORDEM. A unica coisa que chega aqui e a
+                   REORDENACAO (o moveRegisteredTeamOrder e o unico chamador), e ela nao muda o
+                   conjunto -- entao um code que mude o conjunto veio do lugar errado. */
+                for(const lado of ['a','b']){
+                  const s = match[lado];
+                  if(!s || s.uid !== uid) continue;
+                  if(!mesmoTimeEmOutraOrdem(s.code, newCode)) continue;
+                  s.code = newCode; touched = true;
+                }
               }
             }
           }
@@ -18801,6 +18837,7 @@ async function checkLeagueRegistrationStatus(typeId){
         const data = regSnap.data();
         game.accountLeagueSlots = { ...(game.accountLeagueSlots||{}), [typeId]: data.slot!=null ? data.slot : null };
         game.registeredTeam = decodeTeamCode(data.code);
+        game.registeredTeamCycle = { typeId, id: registering.id, status:'registering' };
         if(game.screen==='league'){ render(); }
         return;
       }
@@ -18820,6 +18857,7 @@ async function checkLeagueRegistrationStatus(typeId){
             if(mine){
               game.accountLeagueSlots = { ...(game.accountLeagueSlots||{}), [typeId]: mine.slot!=null ? mine.slot : null };
               game.registeredTeam = decodeTeamCode(mine.code);
+              game.registeredTeamCycle = { typeId, id: entry.id, status: entry.status };
               if(game.screen==='league'){ render(); }
               return;
             }
@@ -18884,6 +18922,7 @@ function openLeague(typeId, typeConfig){
   game.currentLeagueTypeConfig = typeConfig || null;
   game.leagueError = null;
   game.registeredTeam = null;
+  game.registeredTeamCycle = null;   /* o carimbo e do time: os dois andam juntos */
   // limpa tudo que é específico da liga anterior -- sem isso, a tela mostrava por um tempo os
   // confrontos/terrenos/ranking de qualquer que fosse a última liga vista, até o carregamento terminar
   game.leagueData = null;
@@ -19081,7 +19120,7 @@ function renderTrainersLeagueOrderModal(){
         <div class="order-row">
           <div class="order-num">${idx+1}º</div>
           <div class="order-info">
-            <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${nomeBrilhante(p.name, p.shiny)} — Lv.${p.level}</span>
+            <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${p.name}${p.shiny ? ' ' + selo('shiny') : ''} — Lv.${p.level}</span>
           </div>
           <div class="order-controls">
             <button class="circle-btn" onclick="moveTrainersLeagueOrder(${idx}, -1)" ${idx===0?'disabled':''}>▲</button>
@@ -19829,7 +19868,7 @@ function renderProPicker(){
       /* ⚠️ O `spriteHtml` PRECISA DO `speciesId`, e o bolo guarda `id`: passando o objeto cru o
          sprite saía VAZIO em todos os doze -- sem erro nenhum, e foi o navegador que pegou. */
       const dentro = spriteHtml(p.id, 'sprite-sm', !!p.shiny)
-        + `<span class="selecao-nome">${nomeBrilhante(escapeHtmlSafe(sp.name || p.id), p.shiny)}</span>`
+        + `<span class="selecao-nome">${escapeHtmlSafe(sp.name || p.id)}${p.shiny ? ' ' + selo('shiny') : ''}</span>`
         + `<span class="selecao-lv">Lv.${p.level}</span>`
         + `<span class="selecao-tipos">${(sp.types || []).map(t => typePill(t)).join('')}</span>`
         + (pos >= 0 ? `<span class="selecao-dono eu">${pos + 1}º</span>` : '');
@@ -19912,7 +19951,7 @@ function renderCustomLeagueTeamPicker(typeConfig){
     const isSel = selected.includes(p.speciesId);
     const disabled = (!isSel && selected.length>=6) ? 'disabled' : '';
     return `<button class="btn ${isSel?'selected':''}" ${disabled} onclick="toggleCustomPickerMon('${p.speciesId}')">
-      <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${nomeBrilhante(sp.name, p.shiny)} — Lv.${p.level} ${isSel?'✓':''}</span>
+      <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${sp.name}${p.shiny ? ' ' + selo('shiny') : ''} — Lv.${p.level} ${isSel?'✓':''}</span>
       <span class="mon-sub">${typesHtml(sp.types)} <span class="pool-origin-tag">${escapeHtmlSafe(slotDisplayName(p.sourceSlot))}</span></span>
     </button>`;
   }).join('')}
@@ -21959,7 +21998,7 @@ function renderAposentados(){
     return `<div class="carvalho-linha">
       <div class="carvalho-sprite">${spriteHtml(p, 'sprite-sm')}</div>
       <div class="carvalho-info">
-        <div class="mon-name">${nomeBrilhante(escapeHtmlSafe(sp.name), p.shiny)} <span class="mon-sub">Lv.${p.level}</span></div>
+        <div class="mon-name">${escapeHtmlSafe(sp.name)}${p.shiny ? ' ' + selo('shiny') : ''} <span class="mon-sub">Lv.${p.level}</span></div>
         <div class="carvalho-tipos">${tipos}</div>
         ${golpes ? `<div class="carvalho-golpes">${golpes}</div>` : ''}
       </div>
@@ -23296,7 +23335,7 @@ function renderTimeModal(){
           <span class="time-modal-pos">${i+1}º</span>
           <span class="time-modal-sprite">${spriteHtml(p,'sprite-sm')}</span>
           <span class="time-modal-info">
-            <span class="time-modal-nome">${nomeBrilhante(escapeHtmlSafe(sp.name), p.shiny)}</span>
+            <span class="time-modal-nome">${escapeHtmlSafe(sp.name)}${p.shiny ? ' ' + selo('shiny') : ''}</span>
             <span class="time-modal-sub"><span class="time-modal-lv">Lv.${p.level}</span>${typesHtml(sp.types)}</span>
           </span>
         </div>`;
@@ -23425,7 +23464,7 @@ function renderRelease(){
       const isSel = game.releaseSelected.includes(p.id);
       const disabled = (!isSel && game.releaseSelected.length>=excess) ? 'disabled' : '';
       return `<button class="btn ${isSel?'selected':''}" ${disabled} onclick="toggleRelease('${p.id}')">
-        <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${nomeBrilhante(p.name, p.shiny)} — Lv.${p.level} ${isSel?'📦':''}</span>
+        <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${p.name}${p.shiny ? ' ' + selo('shiny') : ''} — Lv.${p.level} ${isSel?'📦':''}</span>
         <span class="mon-sub">${typesHtml(p.types)}</span>
       </button>`;
     }).join('')}
@@ -23470,7 +23509,7 @@ function renderLevels(){
       const capLabel = atLevelCap ? ' (nível 55 — só sobe desmaiando em batalha)' : (atLevel40Cap ? ' (máx. +3 além do nível 40)' : (atPoolMax ? ' (máx.)' : ''));
       return `<div class="level-row">
         <div class="level-info">
-          <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${nomeBrilhante(p.name, p.shiny)} — Lv.${current}${capLabel}</span>
+          <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${p.name}${p.shiny ? ' ' + selo('shiny') : ''} — Lv.${current}${capLabel}</span>
           <span class="mon-sub">${typesHtml(p.types)}</span>
         </div>
         <div class="level-controls">
@@ -23509,7 +23548,7 @@ function renderTeamOrder(){
       return `<div class="order-row">
         <div class="order-num">${idx+1}º${botaoDeItemHtml(p)}</div>
         <div class="order-info">
-          <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${nomeBrilhante(p.name, p.shiny)} — Lv.${p.level}</span>
+          <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${p.name}${p.shiny ? ' ' + selo('shiny') : ''} — Lv.${p.level}</span>
           <span class="mon-sub">${typesHtml(p.types)}</span>
           ${golpesDoTimeHtml(p)}
         </div>
@@ -23552,7 +23591,7 @@ function renderPreBattle(){
           <span class="team-grid-num">${idx+1}</span>
           <span class="team-grid-sprite">${spriteHtml(p,'sprite-sm')}</span>
           <div class="team-grid-info">
-            <span class="team-grid-name">${nomeBrilhante(p.name, p.shiny)}</span>
+            <span class="team-grid-name">${p.name}${p.shiny ? ' ' + selo('shiny') : ''}</span>
             <span class="team-grid-level">Lv.${p.level}</span>
           </div>
         </div>`;
@@ -24152,7 +24191,7 @@ function renderMatchupLog(matchups){
     const hp = Math.max(0, m.hp || 0);
     return `<div class="mlog-lado ${hp<=0?'caiu':''}">
       <div class="mlog-spr">${SPECIES[m.sp] ? spriteHtml(m.sp,'sprite-sm',!!m.shiny) : '❔'}</div>
-      <div class="mlog-nome">${nomeBrilhante(escapeHtmlSafe(m.nome||''), m.shiny)}${m.lvl?` <span class="mlog-lv">Lv.${m.lvl}</span>`:''}</div>
+      <div class="mlog-nome">${escapeHtmlSafe(m.nome||'')}${m.shiny ? ' ' + selo('shiny') : ''}${m.lvl?` <span class="mlog-lv">Lv.${m.lvl}</span>`:''}</div>
       <div class="mlog-vida">
         ${renderHpBar(hp, maxHp, 'mlog-f-'+id, 'mlog-l-'+id)}
         <span class="mlog-hp">${hp}/${maxHp}</span>
@@ -25184,12 +25223,21 @@ function fraseDoEspecial(g, quem, alvo, op){
     const n = golpe || 'auto-destruição';
     return quem + ' usou ' + comoGolpe(n, TIPO_DO_ESPECIAL[n] || 'Normal');
   }
-  /* O nome do golpe de sono (Esporo, Canto, Hipnose...) entra só no LOG. Ele é por espécie de
-     propósito -- o Paras dorme com Esporo e a Jigglypuff com Canto -- mas no aviso do meio da
-     batalha a frase curta é a que chega. */
+  /* ⚠️ O SONO NOMEIA O GOLPE COM SELO NOS DOIS LUGARES (25/09/2026, a pedido, com o exemplo
+     escrito: *"Venosaur fez muk dormir com PO DO SONO (colocar o selo do ataque)"*).
+     ⚠️ ISSO REVERTE a regra que valia pra este ramo -- *"o nome entra so no LOG; no aviso do meio
+     da batalha a frase curta e a que chega"*. Ela nasceu de uma regra geral boa (no aviso o texto
+     e puro, porque ele se le em um segundo e um selo no meio e mais uma coisa pra o olho parar) e
+     era a errada AQUI: o golpe do sono e por ESPECIE -- o Paras dorme com Esporo, a Jigglypuff
+     com Canto, o Butterfree com Po do Sono --, entao ele e a unica coisa que a frase tem a dizer
+     alem de QUEM dormiu. Nos outros ramos o golpe justifica um NUMERO que ja esta na tela; aqui
+     nao ha numero nenhum: a barra do adormecido fica PARADA.
+     ⚠️ E ELE NAO LE O `op`: as duas opcoes valem pra frase inteira, e respeita-las aqui deixaria
+     o aviso sem selo justamente onde ele foi pedido. Quem continua lendo o `op` sao os outros
+     ramos -- a confusao, o veneno, a queimadura --, que seguem com a regra geral. */
   if(g.x === 'sono'){
-    if(!(op.comGolpe && golpe)) return quem + ' fez ' + alvo + ' dormir';
-    return quem + ' fez ' + alvo + ' dormir com ' + comoGolpe(golpe, TIPO_DO_ESPECIAL[golpe] || 'Normal');
+    if(!golpe) return quem + ' fez ' + alvo + ' dormir';
+    return quem + ' fez ' + alvo + ' dormir com ' + seloDeGolpe(golpe, TIPO_DO_ESPECIAL[golpe] || 'Normal');
   }
   if(g.x === 'confusao'){
     /* Nomeia os DOIS: quem confundiu e quem se acertou. O jogador está olhando pra uma barra que
@@ -26651,17 +26699,10 @@ function fighterHtml(m, lado, op){
   const especie = saindo ? g.ss : (doJogador ? m.playerSpecies : m.enemySpecies);
   const contra  = doJogador ? m.enemySpecies : m.playerSpecies;
   const sp = SPECIES[especie];
-  const nomeCru = saindo ? escapeHtmlSafe(g.sai || (sp ? sp.name : '')) : (doJogador ? m.player : m.enemy);
+  const nome = saindo ? escapeHtmlSafe(g.sai || (sp ? sp.name : '')) : (doJogador ? m.player : m.enemy);
   const nivel = saindo ? (g.sl || '?') : (doJogador ? m.playerLevel : m.enemyLevel);
   const shiny = saindo ? !!g.sh : (doJogador ? m.playerShiny : m.enemyShiny);
-  /* ⚠️ O NOME DO SHINY BRILHA AQUI TAMBEM (25/09/2026, a pedido: *"durante a batalha ainda tava
-     mostrando a estrela ao invez de deixar o nome brilhando"*). Ele era o MAIOR dos pontos que
-     ficaram pra tras em 24/09, porque as CINCO telas de batalha passam por aqui -- e e a tela em que
-     o 1,20x em todos os atributos mais decide.
-     ⚠️ E ELE E UMA VARIAVEL SO, lida pelos DOIS ramos (a cena nova e o caminho antigo): envolvida
-     aqui, os dois ganham o brilho e perdem a estrela de uma vez -- escrita em cada ramo, a segunda
-     ficaria pra tras, que e literalmente o que aconteceu em 24/09. */
-  const nome = nomeBrilhante(nomeCru, shiny);
+
   const buffed = saindo ? false : (doJogador ? m.playerBuffed : m.enemyBuffed);
   const especialidade = saindo ? false : (doJogador ? m.playerSpecialty : m.enemySpecialty);
   const hp = saindo ? (g.shp != null ? g.shp : 0) : op.hp;
@@ -26672,7 +26713,7 @@ function fighterHtml(m, lado, op){
      sem efeito colateral: sem `op.visualNovo` este ramo inteiro nao existe. */
   if(op.visualNovo){
     const side = doJogador ? 'player' : 'enemy';
-    const badges = `${(op.comTerreno && buffed) ? selo('terreno','selo-g', op.corDoTerreno || COR_TERRENO_PADRAO) : ''}${especialidade ? selo('medalha_ouro','selo-g') : ''}${saindo ? '' : selosDoConfronto(m, lado, op.passo)}`;
+    const badges = `${shiny ? selo('shiny','selo-g') : ''}${(op.comTerreno && buffed) ? selo('terreno','selo-g', op.corDoTerreno || COR_TERRENO_PADRAO) : ''}${especialidade ? selo('medalha_ouro','selo-g') : ''}${saindo ? '' : selosDoConfronto(m, lado, op.passo)}`;
     const morto = hp <= 0 && !saindo;
     const explodiu = !saindo && caiuNaExplosao(m, side) && sequenciaDoConfronto(m).slice(0, op.passo == null ? Infinity : op.passo).some(g => g.x === 'boom');
     /* ⚠️ O TREINADOR E AS POKÉBOLAS MORAM NO PAINEL (22/09/2026, a pedido: *"vamos agora colocar
@@ -26732,7 +26773,7 @@ function fighterHtml(m, lado, op){
              ⚠️ E ELE NÃO PODE TER CRASE NENHUMA: o comentário vive dentro de um template literal, e
              uma crase ímpar aqui FECHA a string -- o node --check acusa, mas com um número PAR de
              crases ele passa e a tela quebra só no navegador. */''}
-        <div class="fighter-emoji">${sp ? battleSpriteHtml(especie, contra, 'sprite-lg', shiny, doJogador) : ''}</div>${nome}${(op.comTerreno && buffed)?' '+selo('terreno','selo-g', op.corDoTerreno || COR_TERRENO_PADRAO):''}${especialidade?' '+selo('medalha_ouro','selo-g'):''}${saindo?'':selosDoConfronto(m, lado, op.passo)} <span class="fighter-level">Lv.${nivel}</span>
+        <div class="fighter-emoji">${sp ? battleSpriteHtml(especie, contra, 'sprite-lg', shiny, doJogador) : ''}</div>${nome}${shiny?' '+selo('shiny','selo-g'):''}${(op.comTerreno && buffed)?' '+selo('terreno','selo-g', op.corDoTerreno || COR_TERRENO_PADRAO):''}${especialidade?' '+selo('medalha_ouro','selo-g'):''}${saindo?'':selosDoConfronto(m, lado, op.passo)} <span class="fighter-level">Lv.${nivel}</span>
         <div class="fighter-types">${sp ? typesHtml(sp.types) : ''}</div>
         ${renderHpBar(hp, maxHp, doJogador ? 'hp-fill-player' : 'hp-fill-enemy', doJogador ? 'hp-label-player' : 'hp-label-enemy', entrando)}
       </div>`;
@@ -27456,7 +27497,7 @@ function renderEliteHeal(){
       return `<div class="order-row elite-row">
         <div class="order-num">${idx+1}º</div>
         <div class="order-info">
-          <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${nomeBrilhante(p.name, p.shiny)} — Lv.${p.level}</span>
+          <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${p.name}${p.shiny ? ' ' + selo('shiny') : ''} — Lv.${p.level}</span>
           ${renderHpBar(hp, p.maxHp, `elite-hp-fill-${p.id}`, `elite-hp-label-${p.id}`)}
         </div>
         <div class="order-controls-compact">
@@ -28080,7 +28121,7 @@ function renderNeighborhoodGymDefenseOrder(){
       return `<div class="order-row">
         <div class="order-num">${idx+1}º${botaoDeItemHtml(p)}</div>
         <div class="order-info">
-          <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${nomeBrilhante(escapeHtmlSafe(sp?sp.name:'?'), p.shiny)} — Lv.${p.level}${buff?' 🔺':''}</span>
+          <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${escapeHtmlSafe(sp?sp.name:'?')}${p.shiny ? ' ' + selo('shiny') : ''} — Lv.${p.level}${buff?' 🔺':''}</span>
           <span class="mon-sub">${sp?typesHtml(sp.types):''}</span>
           ${golpesDoTimeHtml(p)}
         </div>
@@ -28143,7 +28184,7 @@ function renderNeighborhoodGymChallengeOrderPicker(){
     ${team.map((p,idx)=>`<div class="order-row">
       <div class="order-num">${idx+1}º${botaoDeItemHtml(p)}</div>
       <div class="order-info">
-        <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${nomeBrilhante(p.name, p.shiny)} — Lv.${p.level}</span>
+        <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${p.name}${p.shiny ? ' ' + selo('shiny') : ''} — Lv.${p.level}</span>
         <span class="mon-sub">${typesHtml(p.types)}</span>
         ${golpesDoTimeHtml(p)}
       </div>
@@ -28408,7 +28449,7 @@ function renderJourneyEnd(){
       return `<div class="order-row">
         <div class="order-num">${idx+1}º</div>
         <div class="order-info">
-          <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${nomeBrilhante(p.name, p.shiny)} — Lv.${p.level}</span>
+          <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${p.name}${p.shiny ? ' ' + selo('shiny') : ''} — Lv.${p.level}</span>
           <span class="mon-sub">${typesHtml(p.types)}</span>
         </div>
       </div>`;
@@ -28685,7 +28726,7 @@ function renderPlayerTeamModal(){
         ${sorted.length>0 ? sorted.map(p=>{
           const sp = SPECIES[p.speciesId];
           const buffed = terrainTypes && sp && sp.types.some(t=>terrainTypes.includes(t));
-          return `<div class="status-row"><span class="icon">${spriteHtml(p,'sprite-sm')}</span><span>${nomeBrilhante(p.name, p.shiny)} — Lv.${p.level}${buffed?' 🔺':''}</span></div>`;
+          return `<div class="status-row"><span class="icon">${spriteHtml(p,'sprite-sm')}</span><span>${p.name} — Lv.${p.level}${p.shiny?' '+selo('shiny'):''}${buffed?' 🔺':''}</span></div>`;
         }).join('') : '<p>Não foi possível carregar esse time.</p>'}
       </div>
       ${(anyBuffed || sorted.some(p=>p.shiny)) ? `<p class="hint-text">${anyBuffed?'🔺 Buffado pelo terreno da partida. ':''}${sorted.some(p=>p.shiny)?'🌟 Shiny (+20% em todos os atributos).':''}</p>` : ''}
@@ -29178,7 +29219,7 @@ function renderLeague(){
         <div class="order-row">
           <div class="order-num">${idx+1}º</div>
           <div class="order-info">
-            <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${nomeBrilhante(p.name, p.shiny)} — Lv.${p.level}</span>
+            <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${p.name}${p.shiny ? ' ' + selo('shiny') : ''} — Lv.${p.level}</span>
           </div>
           <div class="order-controls">
             <button class="circle-btn" onclick="moveRegisteredTeamOrder('${p.id}', -1)" ${idx===0?'disabled':''}>▲</button>
@@ -29434,7 +29475,7 @@ function renderTowerOrderModal(){
           return `<div class="order-row">
             <div class="order-num">${idx+1}º${botaoDeItemHtml(p)}</div>
             <div class="order-info">
-              <span class="mon-name">${sp?spriteHtml(p,'sprite-sm'):'❔'} ${nomeBrilhante(escapeHtmlSafe(sp?sp.name:'?'), p.shiny)} — Lv.${p.level}</span>
+              <span class="mon-name">${sp?spriteHtml(p,'sprite-sm'):'❔'} ${escapeHtmlSafe(sp?sp.name:'?')}${p.shiny ? ' ' + selo('shiny') : ''} — Lv.${p.level}</span>
               ${golpesDoTimeHtml(p)}
             </div>
             <div class="order-controls">
@@ -31916,7 +31957,7 @@ function montadorDeTimeHtml(escolhidos, nomeDoToggle, max, esperas){
         <span class="mont-num">${sel ? (posicao+1)+'º' : ''}</span>
         ${sp?spriteHtml(p,'sprite-sm'):'❔'}
         <span class="mont-info">
-          <span class="mont-nome">${nomeBrilhante(escapeHtmlSafe(sp?sp.name:'?'), p.shiny)} <span class="mont-lv">— ${falta>0 ? '⏳'+Math.ceil(falta/60000)+'min' : 'Lv.'+p.level}</span></span>
+          <span class="mont-nome">${escapeHtmlSafe(sp?sp.name:'?')}${p.shiny ? ' ' + selo('shiny') : ''} <span class="mont-lv">— ${falta>0 ? '⏳'+Math.ceil(falta/60000)+'min' : 'Lv.'+p.level}</span></span>
           <span class="mont-sub">${sp?typesHtml(sp.types):''}<span class="mont-time">${escapeHtmlSafe(p.teamName)}</span></span>
         </span>
       </button>
@@ -33419,7 +33460,7 @@ function painelTimesHtml(st, anim, precisaEscolher, restam, padraoOnline){
       title="${escapeHtmlSafe(sp?sp.name:'?')} — ${p.hp}/${p.maxHp} HP">
       ${escolhido?'<span class="online-pick-check">✓</span>':''}
       ${sp?spriteHtml(p,'sprite-md'):'❔'}
-      <span class="online-pick-nome">${nomeBrilhante(escapeHtmlSafe(sp?sp.name:'?'), p.shiny)}</span>
+      <span class="online-pick-nome">${escapeHtmlSafe(sp?sp.name:'?')}${p.shiny ? ' ' + selo('shiny') : ''}</span>
       <span class="online-pick-lvl">Lv.${p.level}</span>
       <span class="online-pick-hp"><span class="hp-bar-fill ${hpBarClass(pct)}" id="online-pickhp-${i}" style="transform:scaleX(${pct/100})"></span></span>
       <span class="tower-pick-lv" id="online-picklv-${i}">${morto?'✖ caiu':hpMostrado+'/'+p.maxHp}</span>
@@ -33432,7 +33473,7 @@ function painelTimesHtml(st, anim, precisaEscolher, restam, padraoOnline){
     const sp = SPECIES[p.speciesId];
     return `<div class="tower-pick online-pick sem-clique ${morto?'off':''}" title="${escapeHtmlSafe(sp?sp.name:'?')} — Lv.${p.level}">
       ${sp?spriteHtml(p,'sprite-md'):'❔'}
-      <span class="online-pick-nome">${nomeBrilhante(escapeHtmlSafe(sp?sp.name:'?'), p.shiny)}</span>
+      <span class="online-pick-nome">${escapeHtmlSafe(sp?sp.name:'?')}${p.shiny ? ' ' + selo('shiny') : ''}</span>
       <span class="online-pick-lvl">Lv.${p.level}</span>
       <span class="tower-pick-lv">${morto?'✖ caiu':'&nbsp;'}</span>
     </div>`;
@@ -36377,7 +36418,7 @@ function corridaLinhaEscolhido(p, i){
   return `<div class="order-row">
     <div class="order-num">${corrida.formato === 'relay' ? (i + 1) + 'º' : ''}</div>
     <div class="order-info">
-      <span class="mon-name">${spriteHtml(p, 'sprite-sm')} ${nomeBrilhante(escapeHtmlSafe(sp.name || p.speciesId), p.shiny)} <span class="mont-lv">— Lv.${p.level}</span></span>
+      <span class="mon-name">${spriteHtml(p, 'sprite-sm')} ${escapeHtmlSafe(sp.name || p.speciesId)}${p.shiny ? ' ' + selo('shiny') : ''} <span class="mont-lv">— Lv.${p.level}</span></span>
       <span class="mon-sub">${typesHtml(sp.types || [])}</span>
     </div>
     ${setas}
@@ -36457,7 +36498,7 @@ function corridaPickerHtml(){
           <span class="mont-num">${sel >= 0 ? (sel + 1) + 'º' : ''}</span>
           ${spriteHtml(p, 'sprite-sm')}
           <span class="mont-info">
-            <span class="mont-nome">${nomeBrilhante(escapeHtmlSafe(sp.name || '?'), p.shiny)} <span class="mont-lv">— Lv.${p.level}</span></span>
+            <span class="mont-nome">${escapeHtmlSafe(sp.name || '?')}${p.shiny ? ' ' + selo('shiny') : ''} <span class="mont-lv">— Lv.${p.level}</span></span>
             <span class="mont-sub">${typesHtml(sp.types || [])}<span class="mont-time">${escapeHtmlSafe(p.teamName || '')}</span></span>
           </span>
           <span class="corrida-speed-badge">${p.speedCorrida}</span>
@@ -40568,7 +40609,7 @@ function resgateEtiqueta(i){
 function resgateLinhaDoEscolhido(p){
   const sp = SPECIES[p.speciesId] || {};
   return '<div class="pesc-parceiro">' + spriteHtml(p, 'sprite-sm')
-    + '<span class="pesc-parceiro-info"><b>' + nomeBrilhante(escapeHtmlSafe(sp.name || '?'), p.shiny)
+    + '<span class="pesc-parceiro-info"><b>' + escapeHtmlSafe(sp.name || '?') + (p.shiny ? ' ' + selo('shiny') : '')
     + '</b>'
     + '<small>Lv.' + p.level + ' · ' + escapeHtmlSafe(p.teamName || '')
     + ' · ' + Math.round(p.velocidade) + ' de velocidade</small></span></div>';
@@ -40604,7 +40645,7 @@ function resgatePickerHtml(){
           <span class="mont-num">${sel ? '✔' : ''}</span>
           ${spriteHtml(p, 'sprite-sm')}
           <span class="mont-info">
-            <span class="mont-nome">${nomeBrilhante(escapeHtmlSafe(sp.name || '?'), p.shiny)} <span class="mont-lv">— Lv.${p.level}</span></span>
+            <span class="mont-nome">${escapeHtmlSafe(sp.name || '?')}${p.shiny ? ' ' + selo('shiny') : ''} <span class="mont-lv">— Lv.${p.level}</span></span>
             <span class="mont-sub">${typesHtml(sp.types || [])}<span class="mont-time">${escapeHtmlSafe(p.teamName || '')}</span></span>
           </span>
           <span class="corrida-speed-badge">${Math.round(p.velocidade)}</span>
@@ -42020,7 +42061,7 @@ function queimadaPickerHtml(){
           <span class="mont-num">${sel ? '✔' : ''}</span>
           ${spriteHtml(p, 'sprite-sm')}
           <span class="mont-info">
-            <span class="mont-nome">${nomeBrilhante(escapeHtmlSafe(sp.name || '?'), p.shiny)} <span class="mont-lv">— Lv.${p.level}</span></span>
+            <span class="mont-nome">${escapeHtmlSafe(sp.name || '?')}${p.shiny ? ' ' + selo('shiny') : ''} <span class="mont-lv">— Lv.${p.level}</span></span>
             <span class="mont-sub">${typesHtml(sp.types || [])}<span class="mont-time">${escapeHtmlSafe(p.teamName || '')}</span></span>
           </span>
           <span class="corrida-speed-badge">${p.velocidade}</span>
@@ -42045,7 +42086,7 @@ function queimadaFichaHtml(){
   return `
     <div class="order-row">
       <div class="order-info">
-        <span class="mon-name">${spriteHtml(p, 'sprite-sm')} ${nomeBrilhante(escapeHtmlSafe(sp.name || p.speciesId), p.shiny)} <span class="mont-lv">— Lv.${p.level}</span></span>
+        <span class="mon-name">${spriteHtml(p, 'sprite-sm')} ${escapeHtmlSafe(sp.name || p.speciesId)}${p.shiny ? ' ' + selo('shiny') : ''} <span class="mont-lv">— Lv.${p.level}</span></span>
         <span class="mon-sub">${typesHtml(sp.types || [])}</span>
       </div>
     </div>

@@ -978,145 +978,111 @@ mais rápido). Sem isso a trava passaria medindo o conjunto vazio.
 
 **Conferido que os 6 defeitos religados acusam** (8 a 13 falhas cada).
 
-## O NOME DO SHINY BRILHA NA BATALHA (25/09/2026)
+## ⚠️ O NOME DO SHINY NÃO BRILHA — a estrela é a marca, e isso já foi testado (25/09/2026)
 
-Pedido junto: *"tem que alterar todos os pontos que hoje mostra que um pokemon é shiny, durante a
-batalha ainda tava mostrando a estrela ao invez de deixar o nome brilhando"*.
+**O shiny é marcado por uma ESTRELA ao lado do nome** (`selo('shiny')`, em **35 pontos** do
+arquivo), e é assim desde sempre. Em 24/09/2026 isso virou o **nome brilhando** a pedido
+(*"consegue ao invés de exibir uma estrela, deixar o nome dele mais brilhante?"*), e em **25/09 foi
+desfeito**, também a pedido: *"não tá legal não, volte como era antes com a estrela mesmo e esqueça
+isso de deixar o nome brilhando"*.
 
-⚠️ **ERAM NOVE PONTOS, e o maior deles é o `fighterHtml`** — as CINCO telas de batalha passam por
-ele, e é a tela em que o 1,20× em todos os atributos mais decide. Os outros oito: a fila da Montanha
-Sagrada, a clareira e o prêmio da Vigília, a tela de ordem de batalha, a ordem do desafio do Ginásio
-da Cidade e o time do fim da jornada.
+**⚠️ ESTA SEÇÃO EXISTE PRA A IDEIA NÃO VOLTAR POR ESQUECIMENTO.** Ela foi tentada em **três voltas**
+— halo âmbar, halo amarelo, miolo dourado com traço —, e cada uma foi recusada na tela. Os números
+abaixo são o que se aprendeu, e eles valem pra **qualquer** texto brilhante que alguém proponha.
 
-- **⚠️ NO `fighterHtml` FOI UMA LINHA, porque o `nome` é uma VARIÁVEL SÓ** lida pelos dois ramos (a
-  cena nova e o caminho antigo). Envolvida ali, os dois ganham o brilho e perdem a estrela de uma vez
-  — escrita em cada ramo, a segunda ficaria pra trás, **que é literalmente o que aconteceu em 24/09**.
-- **⚠️ E SOBRARAM DOIS `selo('shiny')`, que são DECORATIVOS e ficam:** o prêmio das Ilhas Laranja
-  (*"Todo o time subiu +N níveis"*) e o *"Os cinco caíram!"* — **não há pokémon shiny em nenhum dos
-  dois**, a estrela ali é ícone. O `nomeBrilhante` foi de **25 para 33 usos**.
+### ⚠️ POR QUE O HALO NUNCA RESOLVE: o `text-shadow` fica ATRÁS do glifo
 
-### ⚠️ A TRAVA NASCEU DE UM CASO MUDO
+Por mais forte que o brilho seja, **o miolo da letra continua sendo a `color`** — e no log o nome
+já sai em **azul** (eu) ou **vermelho** (o adversário), que no fundo **creme** das caixas é escuro.
+Foi exatamente esse o terceiro relato: *"tá muito preto dentro"*.
 
-A conferência de acusação religou o defeito (o `fighterHtml` voltando a não envolver o nome) e
-**nenhuma trava caiu** — o brilho tinha 33 usos no arquivo e nenhum deles era a tela de batalha.
+### ⚠️ E O MIOLO DOURADO NÃO LÊ NO CLARO — a tabela que fecha a questão
 
-Ela cobra **o par** (o brilho sai **E** a estrela não) nos dois ramos, e — a metade que pega a próxima
-omissão — **varre o arquivo e cobra que a estrela sobre em exatamente os dois pontos decorativos,
-nomeados**. Contando só o total, a próxima tela que nascer com a estrela passaria se outra a perdesse
-no mesmo commit. Conferido: **4 de 4 defeitos acusam**.
+| miolo | creme (a caixa) | escuro (fora) | a cena (verde) |
+|---|---|---|---|
+| `#e8a600` | **2,05** | 7,26 | **1,05** |
+| `#ffd84d` | **1,44** | 10,37 | **1,50** |
+| `#ffe066` | **1,26** | 11,83 | 1,72 |
 
-### ⚠️ E O AMARELO FOI RECUSADO NA PRIMEIRA VERSÃO: ELE VIROU MARCA-TEXTO
+**Todos reprovam no AA (4,5) nos dois fundos CLAROS**, e não há tom dourado que passe ali e ainda
+brilhe no escuro. A saída era um **traço escuro** com `paint-order:stroke fill` (no creme quem
+desenha a letra é o traço, 13,67:1; no escuro é o miolo, 10,37:1) — funcionava, e mesmo assim foi
+recusada. **A estrela resolve o mesmo problema sem nada disso.**
 
-Pedido junto: *"o texto com o nome do pokemon shiny deixe ele mais amarelo"*. O halo era **âmbar**
-(`rgba(214,150,0)`, um laranja queimado) e na tela lia como **contorno alaranjado**, não como brilho.
+### ⚠️ A MÉTRICA DO MARCA-TEXTO, que vale pra qualquer halo
 
-**⚠️ E A INTUIÇÃO ERRA AQUI:** o medo era que o amarelo (mais claro) sumisse no fundo **creme** das
-caixas. Medido no navegador, ele **não some** — o creme tem saturação quase zero, então o que separa
-o halo do fundo é a **SATURAÇÃO** e não a luminância. Ele melhorou nos dois fundos.
-
-**⚠️ MAS A PRIMEIRA VERSÃO FOI RECUSADA NA TELA:** *"ta parecendo que o texto ta com um marca
-texto"*. Ela tinha **duas camadas OPACAS coladas no glifo** (2px e 5px, alpha 1) — postas ali
-justamente pra segurar o halo no creme —, e **tinta opaca colada PREENCHE O VÃO ENTRE AS LETRAS**: o
-que se vê deixa de ser um halo em volta do nome e vira um bloco amarelo atrás dele.
-
-**⚠️ O NÚMERO QUE DEFINE ISSO É A TINTA COLADA — a soma dos alphas das camadas de blur ≤ 5px:**
+A primeira versão foi recusada com *"tá parecendo que o texto tá com um marca texto"*. O número que
+define isso é a **tinta colada** — a soma dos alphas das camadas de `text-shadow` com blur ≤ 5px:
 
 | | tinta colada | na tela |
 |---|---|---|
 | a de 24/09 (âmbar) | 0,95 | halo, mas alaranjado |
-| **a recusada** | **2,00** (1,0 + 1,0) | **bloco amarelo** |
-| **hoje** | **0,70** | halo amarelo, sem preencher o vão |
+| **a recusada** | **2,00** | **bloco amarelo** |
+| a última (miolo dourado) | 0,55 | halo, sem preencher o vão |
 
-**Acima de ~1,0 o vão preenche**, e é aí que ele vira marca-texto. **Nenhuma camada de hoje é opaca.**
+**Acima de ~1,0 o vão entre as letras preenche**, e é aí que vira marca-texto.
 
-- **⚠️ E A FORMA É A DE 24/09** (três camadas, 3px/8px/16px), que nunca foi reclamada: o que mudou foi
-  a **cor** e a camada de dentro ficar **mais suave**. Foram comparadas **seis variantes** na tela,
-  nos dois fundos — o glow só difuso **some no creme**, o de duas camadas largas **borra o nome**, e
-  a âmbar fina por baixo **suja o amarelo** (saturação 100% → 80%: ela volta a ler como laranja).
-- **CUSTO MEDIDO: nada.** 40 nomes brilhando (**4× o pior caso real**, que é a tela de ordem) dão
-  **0,2ms** com três camadas, com quatro e **sem sombra nenhuma** — indistinguível.
+### ⚠️ E A LIÇÃO DE FERRAMENTA: desfazer isso custou um defeito que a sintaxe não pega
 
-### ⚠️ E O HALO É CORTADO NO PAINEL DO LUTADOR, de propósito
+A reversão trocou `${nomeBrilhante(A,B)}` por `${A}${B ? ' ' + selo('shiny') : ''}` em 32 pontos —
+e a primeira versão **não consumia o `}` que fechava a interpolação original**. Sobrava um `}` em
+**toda linha**, e ele é **TEXTO dentro do template literal**: o `node --check` passa, a bateria
+passa, e a chave aparece na tela depois de cada nome.
 
-O `.battle-mon-name` é `overflow:hidden` com ellipsis (a regra de 22/09: *"quem cede espaço é o
-nome"*), e medido a 320px ele **se ajusta ao texto** — a sobra à direita fica entre **0 e 0,5px** em
-todos os nomes do jogo. Ou seja o halo mais externo (18px, alpha 0,28) é recortado.
+**Quem pegou foi a conferência BYTE A BYTE contra o arquivo de antes do brilho** (`bf40164^`), que
+é a prova que vale numa reversão: **32 das 33 linhas com a estrela hoje são idênticas** (a menos de
+espaço e aspas) a uma linha de lá. A única sem par é o card do parceiro da Pescaria, que **nasceu
+depois** — não há forma de antes pra ele.
 
-**Fica assim**, e o que salva é a forma nova: as camadas que definem o brilho são a de **3px** e a de
-**8px**, e elas cabem. Conferido na captura — o nome brilha e lê. Tirar o `overflow` desfaria o
-truncamento, que é uma decisão registrada.
+⚠️ **E `git revert` não servia:** os dois commits do brilho (`bf40164` e `84f3919`) o misturam com
+mecânica de batalha (o Recuperar virando golpe da troca, e o *"quem dorme não ataca"*), que fica.
 
-**NO MOTOR, NADA:** o shiny é apresentação inteira.
+### O QUE FICOU NO CÓDIGO
 
-### ⚠️ E O FLAKE DO SELO PRECISOU DE UMA PROVA NOVA — a de sempre não valia aqui
+- **A estrela está em 35 linhas**, o mesmo número de antes do brilho. Duas delas são **decorativas**
+  (o prêmio das Ilhas e o *"Os cinco caíram!"* — **não há pokémon shiny ali**, a estrela é ícone).
+- **No `fighterHtml` ela NÃO vai dentro do nome**: ela é um **selo grande** na fileira de selos do
+  painel do lutador, ao lado do terreno (🔺) e da medalha (🎖️), nos **dois ramos** (a cena nova e o
+  caminho antigo). Pôr dentro do nome seria errado — o `.battle-mon-name` é `overflow:hidden` com
+  ellipsis, e a estrela seria a primeira coisa cortada.
+- **No `status-row` ela vem DEPOIS do nível**, colada no 🔺 — é o único ponto fora do padrão, e a
+  reversão mecânica quase o alinhou com os outros 31 por engano.
+- **As travas não foram apagadas, foram VIRADAS**: as quatro que cobravam o brilho hoje cobram a
+  estrela, sempre em **par** (a estrela aparece **E** o brilho não), mais uma varredura que proíbe
+  `nome-shiny`/`nomeBrilhante` no arquivo inteiro. **Conferido: os 5 defeitos religados acusam.**
 
-O `test-especiais` tem um flake conhecido desde 17/09 (*"NENHUM selo num número < 1/3"*), e a prova
-de que ele não é regressão tem três pernas: **o diff não encostar no que a trava lê**, a impressão do
-motor, e rodar o build de antes. ⚠️ **Aqui a primeira perna NÃO vale** — este trabalho mexe no
-`doExchange` e no diário, que é exatamente o que ela lê.
+**NO MOTOR, NADA:** `MOTOR 128473196c86 / DIARIO 86697ceb8e91`, idêntico — o shiny é apresentação
+inteira.
 
-Então ele foi medido dos dois jeitos, com **duas árvores congeladas** (cada uma com o `index.html` e
-o `functions/index.js` do seu build e o teste de HOJE nas duas):
+## A FRASE DO SONO NOMEIA O GOLPE, COM SELO (25/09/2026)
 
-| | build ANTIGO | build de HOJE |
-|---|---|---|
-| **com semente** (11 sementes) | 0 | 0 |
-| **sem semente** (8 rodadas cada) | **0 de 8** | **0 de 8** |
-| asserções por rodada | 1.440 | 1.440 |
-| falhas totais no antigo | **22** (as travas novas caem lá) | — |
+Pedida assim: *"quando um pokemon fazer o outro dormir, durante a batalha exibir na mensagem qual a
+habilidade que fez dormir, por exemplo: 'Venosaur fez muk dormir com PO DO SONO (colocar o selo do
+ataque)'"*.
 
-**Os dois se comportam igual**, e o "1 em 3" observado numa rodada avulsa foi sorte — o CLAUDE.md já
-registra que a taxa dele é instável (já foi 1 em 17, 6 em 12 e 3 em 6). ⚠️ **E as 22 falhas do build
-antigo são o que prova que a árvore está certa**: sem elas, ela estaria rodando o build de hoje dos
-dois lados e a comparação não mediria nada.
+**⚠️ O LOG JÁ DIZIA ISSO DESDE SEMPRE — o que não dizia era o AVISO DO MEIO DA BATALHA**, e a razão
+estava escrita ali: *"o nome do golpe de sono entra só no log; o aviso se lê em um segundo e ali a
+frase curta é a que chega"*. Ela vinha de uma regra geral boa — no aviso o texto é **puro**, porque
+um selo colorido no meio é mais uma coisa pra o olho parar.
 
-### ⚠️ E O JOGADOR TINHA ESCRITO O TESTE DO PRÓPRIO RELATO
+**⚠️ E ELA ERA A ERRADA AQUI, por um motivo que vale pro próximo caso:** nos outros ramos o golpe
+justifica um **NÚMERO que já está na tela** (a queimadura, o veneno, a confusão), então a frase curta
+basta. **No sono não há número nenhum** — a barra do adormecido fica **PARADA** —, e o golpe é por
+ESPÉCIE (o Paras dorme com Esporo, a Jigglypuff com Canto, o Butterfree com Pó do Sono). Ele é a
+única coisa que a frase tem a dizer além de QUEM dormiu.
 
-Junto do print vieram dois testes Playwright em `qa-agent/tests/sono-jynx-onix.spec.ts` — um por caso:
-*"Onix nao ataca na mesma troca nem nas seguintes depois de Jynx faze-lo dormir"* (a Jynx é mais
-rápida: o caso do Rhyhorn) e *"o log respeita a velocidade no caso Jumpluff contra Dugtrio da
-captura"*.
+- **⚠️ O RAMO DO SONO DEIXOU DE LER O `op`**, e é isso que faz o selo chegar: o `comGolpe` e o `selo`
+  valem pra frase inteira, e respeitá-los ali deixaria o aviso sem selo justamente onde ele foi
+  pedido. **Os outros ramos continuam lendo o `op`** — a regra geral não mudou, o sono é a exceção.
+- **E COM ISSO AS DUAS FRASES FICARAM IGUAIS**: o log e o aviso saem do mesmo `fraseDoEspecial` e
+  agora dizem a mesma coisa. Era justamente aqui que eles divergiam.
+- **Confronto gravado antes do campo `g` existir cai na frase curta** — log velho não some nem sai
+  com um selo vazio. Há trava.
+- **Medido a 320px:** `Venusaur fez Muk dormir com [PÓ DO SONO]`, com o selo no verde de Planta, nos
+  três fundos.
 
-**Os dois FALHAM no build de antes e PASSAM no de hoje** — é a confirmação mais direta que existe de
-que o conserto é o que foi pedido, e ela não é minha.
-
-### ⚠️ E UMA LIÇÃO DE FERRAMENTA SAIU DAQUI: NÃO MEXER NOS ARQUIVOS COM UM A/B RODANDO
-
-O primeiro A/B do build final deu **NaN**, e a causa fui eu: um `git stash push`/`pop` (pra medir um
-flake do teste) **trocou o `index.html` no meio dele** — a partir do bloco 4 o lado "depois" saiu
-vazio. A medição que vale usa **duas cópias congeladas**, e é por isso que o CLAUDE.md descreve o
-método assim em toda medição de jornada. Com elas, dá pra mexer no repositório à vontade.
-
-## O NOME DO SHINY BRILHA, EM VEZ DA ESTRELA (24/09/2026)
-
-Pedido junto: *"o pokemon shiny, consegue ao inves de exibir uma estrela, deixar o nome dele mais
-brilhante?"*.
-
-- **⚠️ ISSO ESTAVA EM 25 PONTOS DO ARQUIVO**, e por isso virou uma função (`nomeBrilhante`):
-  escrito em cada um, o próximo card que nascer sai sem o brilho e ninguém vê — a família de
-  defeito que este projeto mais paga.
-- **⚠️ O BRILHO NÃO TROCA A COR DO TEXTO, só põe um halo** — e essa é a decisão: no log de batalha
-  o nome já sai em **azul** (eu) ou **vermelho** (o adversário), e no título do card ele sai em
-  verde/vermelho pelo resultado. Um dourado por cima apagaria tudo isso.
-- **SÃO TRÊS SOMBRAS, e a de dentro é a que faz ele ler no fundo CREME das caixas:** um halo largo
-  e translúcido some contra o claro — e ali some junto a informação de que o pokémon é shiny, que
-  vale **1,20x em todos os atributos**.
-- **⚠️ DOIS DOS 25 NÃO ESTAVAM NO PADRÃO**, e os dois precisaram de tratamento próprio: um é
-  **DECORATIVO** (a frase *"Os cinco caíram!"* das Ilhas usa a estrela como ícone — **não há
-  pokémon shiny ali**, e ele ficou intocado), e o outro monta o HTML por **CONCATENAÇÃO**, não por
-  template literal, então o parser não o alcançava.
-- **⚠️ E O PARSER TEM QUE SER DE CHAVES BALANCEADAS:** um padrão que pare no primeiro fecha-chaves
-  quebra numa interpolação que tem função dentro.
-
-**⚠️ E ISSO MUDA A ESTRUTURA DO HTML pra quem lê TEXTO dele:** duas travas extraíam o nome parando
-no primeiro `<`, e isso passou a casar com **string vazia** (o nome agora está dentro de um
-`<span>`) — o `test-montador` reportava um nome **em branco** no meio da lista ordenada. O jogo não
-faz parsing do próprio HTML, então isso alcança só os testes.
-
-**⚠️ O QUE FICA EM ABERTO, e é honesto dizer: o brilho NÃO foi medido no navegador.** A extensão do
-Chrome não estava conectada nesta sessão, então não dá pra afirmar que ele lê bem no fundo creme —
-e é justamente ali que um halo dourado corre risco de sumir. A prévia (`node tools/gerar-preview.js`)
-mostra as telas; se ele estiver fraco, a régua é a **primeira** das três sombras do `.nome-shiny`.
+**NO MOTOR, NADA** (a frase é montada na tela; o diário já gravava o `g`), e **os 3 defeitos
+religados acusam**.
 
 ## Golpes por nível (data/golpes.json) — a base da GEN 3 / FireRed
 

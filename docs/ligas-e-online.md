@@ -1936,6 +1936,94 @@ defeitos acusam**.
 *"a Liga Clássica desenha os TRÊS quadros — 2 quadros"*. Um array ali deixa a Clássica sem o quadro,
 porque o render lê a chave do tipo. **A trava estava certa; o fixture é que envelheceu.**
 
+### ⚠️ O TIME DE UM CICLO VAZAVA PRO CHAVEAMENTO DE OUTRO (25/09/2026)
+
+Reportado assim: *"um usuário estava na liga com todo o time da Liga Pro Bronze, pokemons entre o
+level 15-30. E aí antes da semi final, ele se inscreveu para a liga pro prata... E aí os pokemons
+dele foi substituído no meio da competição"*.
+
+**⚠️ REPRODUZIDO NOS DADOS DE PRODUÇÃO — o relato é literal.** O ciclo `pro__1790308800000` (o de
+01:00, Bronze), lido do Firestore:
+
+| rodada | o time dele |
+|---|---|
+| **0 (quartas)** | `furret:17 swinub:18 doduo:27 wobbuffet:28 wartortle:25 quilava:30` — **17 a 30** |
+| **1 (semi)** | `nidoking:40 octillery:50 porygon2:44 exeggutor:41 weezing:41 venusaur:45` — **40 a 50** |
+| **2 (final)** | o mesmo time PRATA, contra um adversário com 25–29 |
+
+Ele foi campeão — contra gente com o time da faixa certa.
+
+#### ⚠️ A CAUSA É UMA FUNÇÃO QUE EXISTE PRA REORDENAR
+
+O `updateRegisteredTeamCode` (cliente) **varria TODOS os ciclos `drawn`** e reescrevia o `code` de
+todo confronto não resolvido em que o uid aparecesse, com o `game.registeredTeam`:
+
+```js
+for(const entry of cycles){
+  if(entry.status!=='drawn') continue;          // o chaveamento EM ANDAMENTO
+  ... if(match.a && match.a.uid===uid){ match.a.code = newCode; ... }
+```
+
+Ele existe por uma razão legítima — **o jogador reordena o time na tela e o chaveamento acompanha**
+— e ela vale na Clássica, onde o time **É da conta**: reordenar o mesmo time continua sendo o mesmo
+time. **Na Liga Pro o time é SORTEADO por ciclo**, e aí:
+
+1. o jogador disputa a Bronze (`drawn`) e se inscreve na Prata (`registering`) — **possível desde
+   24/09**, quando a trava de *"já está disputando"* saiu a pedido;
+2. o `checkLeagueRegistrationStatus` olha o ciclo **`registering` PRIMEIRO** ⇒ o `registeredTeam`
+   vira o time **PRATA**;
+3. ele reordena ⇒ o sync aplica o time Prata **no chaveamento da Bronze**;
+4. e o `advanceCyclePhases` promove o **objeto** do vencedor (`nextMatch.a = match.winner`) ⇒ **o
+   código trocado chega na final sozinho**.
+
+**⚠️ E O CLAUDE.md JÁ TINHA REGISTRADO A PORTA QUE 24/09 ABRIU** (*"a mesma conta pode terminar em
+DOIS chaveamentos do mesmo tipo"*) — o que não foi previsto é o time de um **vazar** pro outro.
+
+**⚠️ E O SERVIDOR JÁ FAZIA O CERTO, o que aponta o erro:** o `atualizarInscricoesComTime` (o caminho
+do Doce Raro) **só mexe em ciclo `registering`**, com a razão escrita ao lado — *"mudar o nível no
+meio de uma disputa seria pior que não atualizar"*. **O cliente fazia o CONTRÁRIO: só mexia em ciclo
+`drawn`.**
+
+#### O CONSERTO SÃO DUAS CAMADAS, E ELAS PEGAM CASOS DIFERENTES
+
+| | |
+|---|---|
+| **1. a CAUSA** | o `registeredTeam` passou a carregar **de qual ciclo veio** (`registeredTeamCycle`), e o sync só mexe NELE |
+| **2. a REDE** | e só se o code novo for o **MESMO time em outra ORDEM** (o multiset de `espécie:nível:shiny`) |
+
+- **⚠️ A REDE É EXATA porque a reordenação é o ÚNICO chamador do sync** — e reordenar não muda o
+  conjunto. O nível entra na chave de propósito: **o Doce Raro** sobe nível, e subir nível no meio de
+  um chaveamento é justamente o que o servidor já recusa. O shiny também (ele vale 1,20× em tudo).
+- **⚠️ SEM CARIMBO O SYNC NÃO ESCREVE NADA**, e é o lado certo pra errar: o pior caso é a reordenação
+  não valer, e a próxima leitura da tela repõe a ordem gravada.
+- **Os dois pontos que escrevem um TIME são os dois que carimbam**, e há trava lendo o código: todos
+  os outros pontos escrevem `null`, e o sync sai por `!game.registeredTeam` antes de olhar o carimbo.
+
+#### ⚠️ E A CONFERÊNCIA DE ACUSAÇÃO ACHOU QUE A CAMADA 1 ERA INOBSERVÁVEL
+
+Religando **o defeito de produção inteiro**, o teste **passava em branco** — porque no relato o time
+Prata **não é permutação** do Bronze, e a **rede sozinha** já o barrava. Ou seja: o caso do relato
+não distingue as duas camadas.
+
+**⚠️ O CASO QUE SÓ A CAUSA PEGA É DA LIGA CLÁSSICA**, e ele é real: lá o time é da conta, então quem
+disputa um chaveamento e se inscreve no ciclo seguinte se inscreve com **o MESMO time**. Reordenar a
+inscrição nova não pode mexer na ordem de entrada do chaveamento que já está rolando — ele foi
+congelado de propósito. O mesmo vale pra quem está em **dois chaveamentos `drawn`**.
+
+Com esse caso no teste, **os 6 defeitos religados acusam**.
+
+**NO MOTOR, NADA:** `MOTOR 128473196c86 / DIARIO 86697ceb8e91`, idêntico — e o instrumento foi
+provado sensível.
+
+**⚠️ O QUE ISTO NÃO CONSERTA: a liga das 01:00 já aconteceu.** O campeão dela lutou a semi e a final
+com um time de outra faixa, e o resultado está gravado. Desfazer exigiria reescrever o chaveamento e
+a colocação de todo mundo — e o registro do que aconteceu vale mais que um placar remendado.
+
+**⚠️ E A ESCRITA NO `leagueCycles` É DO CLIENTE** (`allow write: if cadastrado()`), o que é o modelo
+do projeto — é ele quem resolve partida de liga. Ou seja **a trava acima é de comportamento, não de
+segurança**: um cliente forjado continua podendo reescrever um chaveamento. Isso é anterior a este
+defeito e não foi mexido; fechá-lo exigiria mover a resolução de partida inteira pro servidor.
+
 ## O CHAVEAMENTO ACEITA MENOS TIMES QUE VAGAS: O BYE (24/09/2026)
 
 Pedido assim: *"preciso que você altere a lógica de geração do chaveamento eliminatório para suportar
