@@ -3096,11 +3096,30 @@ acima).
 
 ### O QUE FICOU DE FORA, E É DECISÃO — não esquecimento
 
+> **⚠️ REVISADO EM 24/09/2026, e o item 1 JÁ FOI FEITO:** a **liga assistida** ganhou a cena horas
+> depois disto (ver **A CENA CHEGOU NA TORRE, NA LIGA E NO GINÁSIO DA CIDADE**), então o que restou
+> desta lista é só o **online**.
+>
+> **⚠️ E O `virarMatchup` NUNCA FOI UM REFACTOR A FAZER — ele existe desde 28/08/2026**, e é usado na
+> reprise e no **log** do online (o `logDaMinhaVista`). O texto abaixo o descreve como se ele
+> precisasse ser criado, e isso está errado: o que falta é **USÁ-LO na ANIMAÇÃO**. Medido no código
+> hoje, são duas coisas, as duas com padrão pronto no jogo:
+>
+> 1. o `meuM` da virada de perspectiva **carrega só HP** — o comentário do próprio jogo diz isso ao
+>    lado dele —, então o lado B continua vendo a **reconstrução**. O `virarMatchup` resolve;
+> 2. o `renderOnlineFight` desenha com `battle-vs` **sem** `battle-scene`, ou seja a cena não chegou.
+>
+> **⚠️ E A CONSEQUÊNCIA É QUE O ARQUIVO DE REFERÊNCIA DEIXOU DE SER NECESSÁRIO:** a arte está toda
+> extraída em `assets/batalha/` (**15,4 MB em 9 WebP**, pedidos por 12 pontos do CSS), a cena está
+> implementada (**49 usos de `battle-scene`**) e os dois itens acima são a aplicação de padrões que o
+> jogo já tem. Ele foi **tirado do diretório em 24/09/2026** — ele tinha **23 MB, ~6 milhões de
+> tokens**, e uma varredura que o lesse estourava o contexto sozinha.
+
 O arquivo de origem tem, na MESMA camada, mais duas coisas que **não** trocam cenário nenhum (são só
 os seis ícones de status sobre o sprite antigo):
 
 1. **A LIGA ASSISTIDA.** Custo **zero** e auto-gateada pelo `spriteComStatusHtml`. Ficou de fora só
-   porque o pedido é sobre a batalha da jornada; são duas linhas quando se quiser.
+   porque o pedido é sobre a batalha da jornada; são duas linhas quando se quiser. **← FEITO em 22/09.**
 2. **⚠️ O ONLINE — e este NÃO é gateável.** Ele depende do refactor `virarMatchup`, e **ele não é só
    refactor: ele muda o online pra TODO MUNDO** (só pro lado B). Medido em 4.000 confrontos, o que
    ele consertaria:
