@@ -66,6 +66,16 @@ subseção e a conta continua fechando.
 - **⚠️ O A/B DE JORNADA CUSTA ~12 MINUTOS E RODA UMA VEZ, NO FIM.** Rodá-lo no meio mede um build
   intermediário e ele tem que ser refeito. E ele só é necessário quando a **impressão do MOTOR**
   muda: se só o DIÁRIO mudou, é apresentação e não há dificuldade a medir.
+  ⚠️ **O parâmetro é `--runs`, nunca `--n`** — o smoke IGNORA um `--n` e roda o padrão de 20
+  jornadas. Em 25/09/2026 isso fez um A/B "de 12.800" medir **160 por lado** sem nada acusar: os
+  dois lados leem o mesmo número errado, então o resultado sai plausível.
+- **⚠️ UM A/B DE 8 BLOCOS AINDA DÁ 2,6σ POR ACASO — e isso foi medido em 25/09/2026.** O primeiro
+  A/B dos terrenos de ginásio deu **+1,66 ponto, 2,6σ, 7 de 8 blocos**; o segundo, idêntico, deu
+  **−0,27, 0,3σ, 2 de 8**. **Quando o A/B contradiz uma conta direta (aqui: quantos pokémon de cada
+  lado o terreno beneficia), rodar o segundo é mais barato que acreditar no primeiro.**
+- **⚠️ E A MEDIÇÃO PAREADA GANHA DA NÃO-PAREADA.** O smoke **não semeia o `Math.random`**, então
+  cada lado do A/B roda jornadas diferentes; já uma medição de BATALHA (mesmo time, mesma semente,
+  só o parâmetro muda) isola o efeito. Onde der pra fazer a pareada, ela é o número que vale.
 
 ## Deploy
 
@@ -1776,6 +1786,9 @@ INTEIRO em toda sessão, e ele tinha chegado a 1.360 KB.)*
   pessoa. Dá pra adiantar o relógio e pegar o outro — é o mesmo "custo" que o jogo original tinha.
   As duas nunca aparecem juntas; as outras quatro opções (manter, Vaporeon, Jolteon, Flareon)
   continuam sempre disponíveis.
+- **⚠️ O GINÁSIO NÃO SORTEIA TERRENO (25/09/2026)** — ver a seção **O TERRENO DO GINÁSIO É O
+  PRÓPRIO GINÁSIO**, mais abaixo. Os **51 abaixo continuam valendo pra LIGA, o Ginásio do Bairro e
+  a Trainers League**; o ginásio da jornada usa os 16 do `GYM_TERRAINS`, que é outra tabela.
 - **Terrenos: 51, seis de CADA um dos 17 tipos.** A conta importa porque o terreno é sorteado da
   lista e quem for do tipo dele ganha 1,15× em todos os atributos (~15 níveis, ver acima) — um tipo
   com mais terrenos ganha o buff com mais frequência. A tabela tinha 39 terrenos, exatos 5 por
@@ -3762,6 +3775,289 @@ O **desempate de velocidade** continua sendo sorteado a CADA troca. Com os empat
 para ~0,7% isso ficou muito mais raro, mas no **espelho** (mesma espécie, mesmo nível) ele continua
 valendo 70% dos confrontos. A alternativa — sortear uma vez por confronto — está medida no item do
 log de batalha e não foi feita porque não foi pedida.
+
+## O TERRENO DO GINÁSIO É O PRÓPRIO GINÁSIO (25/09/2026)
+
+Pedido assim: *"quando for desafiar os líderes dos ginásios, não vai mais assumir nenhum terreno
+aleatoriamente, porque o terreno vai virar 'Ginásio de Pedra'... vai ser a mesma coisa que os outros
+terrenos, porém esse vai dar o buff apenas para pokémons de pedra"*.
+
+São **16 terrenos** (`GYM_TERRAINS`), um por tipo de ginásio — o `Ginásio de Pedra` do exemplo até o
+`Ginásio de Dragão`. Cada um dá **1,15× em todos os seis atributos** pra **um tipo só**.
+
+### ⚠️ O GINÁSIO JÁ ESCOLHIA UM TERRENO DO TIPO DO LÍDER — o que muda é o TIPO EXTRA
+
+Esta é a parte que a intuição erra. O `pickGymTerrain` **não sorteava entre os 51**: ele já filtrava
+pelo tipo do líder. O problema é que **94,8% dos terrenos carregam mais de um tipo** — a Caverna de
+Cristais é `Rock/Psychic` —, então no Brock um **Alakazam do jogador pegava 1,15× em tudo de graça**.
+
+| ginásio | os tipos EXTRAS que o terreno sorteado podia beneficiar |
+|---|---|
+| Pedra | Psychic, Ground, Dragon, Fire, Ice, Dark |
+| Água | Ice, Fighting, Ghost, Fire, Bug, Steel |
+| Fogo | Ground, Rock, Ghost, Bug, Water, Dark |
+
+**MEDIDO, em 40.000 visitas a ginásio com time aleatório de 6:**
+
+| | o time do JOGADOR pega buff de terreno |
+|---|---|
+| antes (terreno sorteado, 1 a 3 tipos) | **62,4%** |
+| hoje (Ginásio de X, 1 tipo só) | **39,3%** |
+
+**⚠️ E O LÍDER QUASE NÃO PERDE — mas não é "nada", e essa conta me pegou:** **12% dos pokémon de
+líder NÃO são do tipo do próprio ginásio** (o Sandshrew do Brock é Terra puro, os Magnemite e o
+Electabuzz da Jasmine são Elétrico, o Gyarados da Clair é Água/Voador). Medido em pokémon com buff
+por batalha: o jogador cai **0,99 → 0,50** (−0,49) e o líder **4,11 → 4,03** (−0,08). O jogador
+perde **6× mais**.
+
+### O CUSTO MEDIDO: a batalha aperta, a jornada não se move
+
+| | n | resultado |
+|---|---|---|
+| **a BATALHA de ginásio isolada** (mesmo time, mesma semente, só o terreno muda) | 6.400 batalhas | **−1,81 ponto** pro jogador |
+| **a JORNADA** (16 blocos de 800, duas cópias congeladas) | **12.800 de cada lado** | **+0,70 ponto, 1,3σ** — ruído |
+
+A batalha isolada é a medição **pareada**, e ela concorda com a conta de buff: o ginásio ficou mais
+apertado. Na jornada isso se dilui — o jogo compensa derrota com níveis (o bolo de +5 por ginásio
+perdido, e o limite de 5 derrotas é POR ginásio), e os game overs por ginásio mexem pouco e em
+direções alternadas (−13 no 1º, +15 no 5º, −20 no 8º, somando −14 em 2.400 jornadas).
+
+**⚠️ E O PRIMEIRO A/B DEU 2,6σ QUE NÃO SE REPETIU — esta é a lição que vale mais que o número.**
+Ele deu **+1,66 ponto, 2,6σ, 7 de 8 blocos** pro lado fácil, o que pareceria efeito real e
+**contradizia a direção da conta de buff**. O segundo, idêntico, deu **−0,27, 0,3σ, 2 de 8**. Os 16
+juntos dão 1,3σ. Ou seja: **8 blocos de 800 ainda produzem 2,6σ por acaso neste simulador** — o
+CLAUDE.md já registrava que ele varia ~2 pontos entre amostras grandes, e agora há um caso com o
+σ calculado. **Quando o A/B contradiz uma conta direta, rodar o segundo é mais barato que acreditar
+no primeiro.**
+
+### AS DECISÕES
+
+- **⚠️ ELES FICAM FORA DO `TERRAINS`, e isso é decisão e não organização.** Aquela tabela é
+  **sorteada pela Liga**, oferecida ao líder do **Ginásio do Bairro**, escolhida na **Trainers
+  League** e listada na tela de terrenos — jogar os 16 lá dentro os poria em todos esses lugares.
+  E quebraria a conta de **6 terrenos por tipo**, que existe por uma razão medida: ela é o que faz o
+  buff sair com a mesma frequência pros 17 tipos.
+- **⚠️ MAS A TABELA SEPARADA TEM UM PREÇO, e ele é o `terrenoPorId`:** o selo do ginásio chama o
+  `openTerrainInfoModal`, que procurava no `TERRAINS` — e o sintoma de não achar é **MUDO**: o selo
+  continua na tela e o clique não abre nada. Hoje ele olha as duas tabelas.
+  **⚠️ E os 5 `TERRAINS.find` da Liga ficaram como estavam, de propósito:** ali o find é uma
+  **validação implícita** (só terreno de liga vale na liga), e trocá-lo passaria a aceitar um id de
+  ginásio gravado por engano em vez de recusá-lo. Há trava cobrando os dois lados.
+- **⚠️ A FUNÇÃO TROCOU DE NOME** (`pickGymTerrain` → `terrenoDoGinasio`): um `pick` que devolve
+  sempre a mesma coisa é um nome que mente, e neste arquivo nome caduco já custou investigação mais
+  de uma vez.
+- **⚠️ O NOME É ESCRITO À MÃO, e não `'Ginásio de ' + o tipo`:** quatro tipos são **adjetivos**
+  (Elétrico, Psíquico, Voador, Normal) e com a preposição sairiam errados em português. Ficaram
+  *Ginásio Elétrico*, *Ginásio Psíquico*, *Ginásio Voador* e *Ginásio Normal*; os outros doze usam
+  o *"de"*, e o exemplo do pedido (*"Ginásio de Pedra"*) está preservado exatamente.
+- **SAVE ANTIGO NÃO QUEBRA E NÃO MUDA NO MEIO:** o `gymTerrain` é serializado, então quem parou
+  dentro de um ginásio com um terreno sorteado **continua com ele** até aquele ginásio acabar — o
+  `game.gymTerrain = null` da vitória é que traz o novo. E o modal continua achando o terreno velho,
+  porque o `terrenoPorId` olha as duas tabelas.
+
+### OS 16 CENÁRIOS ENTRARAM (25/09/2026)
+
+A arte vem de fora (*"estou usando uma outra IA para gerar as imagens do fundo"*). O Brock entrou
+primeiro, pra conferir a forma; os outros 15 na mesma tarde, quando os arquivos chegaram nomeados
+**exatamente pelos ids da tabela** — 16 de 16, sem sobra dos dois lados.
+
+**⚠️ CADA UMA FOI UMA LINHA DE CSS, e é isso que o `GYM_TERRAINS` tinha comprado:** o
+`terrainBattleSceneStyle` já emitia `--battle-scene-id:ginasio_pedra` mesmo sem imagem, então bastou
+a regra pelo seletor de atributo — a **mesma porta** dos três cenários dedicados (termas vulcânicas,
+colmeia de chamas, submarino afundado), com `background-size:100% 100%` porque é a cena INTEIRA e
+não um slot da folha 3×3 do atlas.
+
+**⚠️ AS ARTES NÃO TÊM TODAS A MESMA PROPORÇÃO, e isso foi medido antes de aceitar:** são **três
+grupos** — 1402×1122 (razão **1,25**, dez delas), 1466×1073 (**1,37**, quatro) e 1484×1060
+(**1,40**, duas). A caixa da cena é **320×384 (0,83)**, e o `background-size:100% 100%` **estica**:
+a largura fica em **67%** da original nas de 1,25 e em **60%** nas de 1,40. São **7 pontos** de
+diferença entre a mais e a menos espremida — conferido na tela, não se nota. Os três cenários que
+já existiam são 1,28, ou seja no meio do grupo.
+
+**⚠️ OS ARQUIVOS SÃO WEBP: 34 MB de PNG viraram 4,9 MB** (de 233 a 401 KB cada; os três cenários
+antigos pesam ~1,2 MB **cada**, então os 16 novos juntos pesam pouco mais que quatro deles). Não há
+`cwebp` nem `sharp` nesta máquina — a conversão foi pelo **canvas do navegador**, em lote, com o
+navegador fazendo POST de cada binário direto pro servidor local: nenhum base64 atravessou a
+conversa.
+
+**⚠️ E A PASTA DAS ARTES TEVE QUE ENTRAR NO `hosting.ignore`: são 34 MB de PNG** (16 gerações) e a
+raiz inteira é publicada. É a **terceira vez** que esta armadilha aparece — a `previa-confusao.html`
+em 24/09 e os 985 KB de protótipos no mesmo dia. Entrou `ginasios-cenarios/**` e o `ginasio_pedra`
+solto na raiz; **há trava lendo o `firebase.json`**.
+
+**⚠️ E AS DUAS TRAVAS OLHAM EM DIREÇÕES OPOSTAS, de propósito:** a nova vai da **TABELA pro CSS**
+(todo ginásio tem regra de cena) e a que já existia vai do **CSS pro DISCO** (toda imagem pedida
+existe). Juntas elas fecham o circuito — e é por isso que a nova **não** confere arquivo: seria a
+mesma conta, pior feita. Mais um teto de **600 KB** por cena, que existe pra pegar um PNG que entre
+**sem passar pela conversão** (a maior hoje tem 401 KB).
+
+**QUANDO UM GINÁSIO NOVO NASCER** são dois passos: o arquivo em `assets/batalha/cena-<id>.webp` e a
+linha de CSS. A trava varre a **tabela**, então ela cai sozinha — nomear os 16 à mão deixaria o
+próximo entrar sem cena, caindo no `campo_aberto` **sem nada quebrar**, que é o jeito mudo de
+falhar.
+
+### ⚠️ E "Ginásio de Fantasma" QUEBRA EM DUAS LINHAS NO SELO — e isso é PRÉ-EXISTENTE
+
+Medido a 320px, na linha do ginásio, com o líder de nome mais longo (Lt. Surge): o selo vai de
+**21px para 33px** nesse único caso. **Não é novidade da mudança** — o *Submarino Afundado*, que já
+existe no `TERRAINS`, quebra exatamente igual. Consertar isso mexeria no selo da Liga também, o que
+não foi pedido. Nenhum nome estoura a caixa e o nome do líder nunca é cortado.
+
+`tools/test-terrenos.js` tranca 16 pontas, e as que importam são a **cobertura** (todo ginásio tem
+terreno, senão ele lutaria sem terreno e o sintoma é mudo), o **tipo** (o buff é o do líder), o **um
+tipo só**, o **não vazamento** pro `TERRAINS` da liga, e — a que a conferência de acusação cobrou —
+o **SELO abrindo a caixa**, exercitando o `openTerrainInfoModal` de verdade em vez do `terrenoPorId`
+na mão. **Conferido: os 5 defeitos religados acusam.**
+
+## O NÍVEL DO SELVAGEM TEM QUE CABER NA ROTA (25/09/2026)
+
+Reportado com print: *"estou na segunda rota, antes do ginásio de inseto, e apareceu um Magcargo
+level 39 para capturar, isso é bug ou tá definido assim?"*.
+
+**Era a MECÂNICA, não um defeito** — e é a **segunda vez** que ela aparece: o **Dugtrio Lv.28** nas
+rotas iniciais (11/09/2026) é o mesmo mecanismo. O `Slugma` evolui no **38**, e o
+`EVOLVED_MIN_LEVEL` impede uma forma evoluída de sair abaixo do nível em que ela existiria (senão o
+jogo entregaria um "Magcargo Lv.9" que a regra de espécie-por-nível converteria em Slugma na hora).
+A Caverna União é **8–13** e ele saía **38–43**.
+
+### ERAM QUATRO, E A VARREDURA É O QUE OS ACHOU
+
+| região | trecho | rota | pokémon | a rota é | ele saía em | |
+|---|---|---|---|---|---|---|
+| Johto | 2 | Caverna União | **Magcargo** | 8–13 | 38–43 | **+25** |
+| Kanto | 4 | Desvio por Lavender | **Rhydon** | 18–23 | 42–47 | **+19** |
+| Kanto | 6 | Dojo Lutador | Poliwrath | 28–33 | 40–45 | +7 |
+| Kanto | 6 | Silph Co. | Porygon2 | 28–33 | 40–45 | +7 |
+
+**Os quatro foram pro trecho 8** (50–55), onde o piso **não morde** — ali o `faixaDeNivelSelvagem`
+devolve a faixa da rota inteira. E cada um com afinidade de tipo, não no gosto:
+
+- **Magcargo** (Fire/**Rock**) e **Rhydon** (Ground/**Rock**) → **Victory Road** (Rock/Fighting), e
+  **o Rhyhorn já morava lá** — a linha se junta;
+- **Poliwrath** (**Water**/Fighting) → **Covil do Dragão** (Dragon/Water);
+- **Porygon2** (Normal) → **Usina de Força**, onde **o Porygon já morava**.
+
+**⚠️ O TRECHO 7 NÃO RESOLVIA, e a conta diz por quê:** lá a faixa é 33–38 e o piso 38 produz
+`[38, 43]` — ainda **5 acima do teto da rota**. A fórmula é `[piso, piso + (max − min)]`, então o
+piso só some quando ele é **menor que o mínimo** do trecho.
+
+**⚠️ O EEVEE DA MANSÃO CONTINUA SAINDO ACIMA (Lv.45 numa rota de 33–38), e é DECISÃO:** o nível
+dele vem do `route.niveis`, não do piso. Ele é a **exceção nomeada** na trava.
+
+### ⚠️ TRÊS VARREDURAS MINHAS DERAM "ZERO ACHADOS" ANTES DESTA
+
+E as três pelo mesmo motivo — **medir a dimensão errada, com o zero parecendo resultado**:
+
+1. a primeira usou o **`routesForLeg`**, que escolhe a região pelo **save** — com um save de Kanto
+   ela varreu **metade do jogo**;
+2. a segunda e a terceira leram **`.min`** num retorno que é um **array `[de, ate]`**:
+   `undefined − 13 > 3` é falso, então nada aparecia.
+
+**A trava cobra as duas coisas**: que nenhum selvagem saia mais de 3 níveis acima do teto da rota,
+**e que a varredura tenha olhado as 32 rotas das duas regiões** — essa segunda linha é o que separa
+*"não achou"* de *"não procurou"*. Mais uma por pokémon movido, cobrando que ele **continue em
+alguma rota**: tirar sem pôr deixaria um buraco na Pokédex.
+
+**Conferido: o defeito religado acusa nas DUAS regiões** — o Magcargo de volta na Caverna União e o
+Rhydon de volta no Desvio por Lavender.
+
+## A ROCKET E O RIVAL GANHARAM TERRENO, E OS SELOS FICARAM LADO A LADO (25/09/2026)
+
+Pedido assim: *"os encontros com a equipe rocket e o rival, sempre vai sortear um terreno para
+acontecer a batalha. O selo da dança da chuva, hoje aparece embaixo do selo do terreno, coloque
+para ficar ao lado"*.
+
+### ⚠️ SÃO QUATRO CONTEXTOS, E NÃO DOIS
+
+O `hideout1` e o `hideout2` **são a Equipe Rocket** — o guarda e o chefe do esconderijo. Nomear só
+o `rocket` deixaria as **duas lutas mais longas da linha** sem terreno, e o jogador veria o selo
+sumir no meio da sequência.
+
+**A `elite` fica de fora porque ela já tem o dela** (um por membro, escolhido no chaveamento) — e
+se entrasse na lista, o sorteado sobrescreveria o do membro. **A montanha e a vigília ficam de
+fora** porque não foram pedidas, e as duas são batalhas de PRÊMIO, com recompensa calibrada.
+
+- **⚠️ O SORTEIO MORA NO `startSpecialBattle`, e não no `runSpecialBattle`:** aquele roda de novo a
+  cada tentativa, e o terreno mudaria embaixo do jogador entre a tela de abertura e a luta. Aqui
+  ele nasce junto com a batalha e vale até ela acabar. **Há trava cobrando que ele não mude.**
+- **⚠️ E O `eliteTerrainBadgeHtml` SAIU, por causa do nome:** quando a Rocket e o rival ganharam
+  terreno, ele deixou de ser "da Elite". Nome que mente já custou investigação mais de uma vez
+  neste arquivo. Quem lê o terreno agora é o `terrenoDaBatalhaEspecial()`, e quem desenha é a
+  fileira.
+
+**O CUSTO MEDIDO: nada.** Isolado (3.000 batalhas, 6 meus contra 4 do NPC, mesmo time e mesma
+semente dos dois lados): **70,83% → 70,20%**, −0,63 ponto. Na jornada: **−0,80 ponto, 0,8σ**
+(8 blocos de 800 de cada lado, 3 de 8 pro lado novo). Faz sentido — **o terreno beneficia os DOIS
+lados**, e a fatia é quase igual: **0,94 de 6** do meu time e **0,70 de 4** do NPC.
+
+### ⚠️ E O PRIMEIRO A/B DEU +4,83 PONTOS (5,3σ) — ERA UM VAZAMENTO QUE EU TINHA ACABADO DE CRIAR
+
+**O buff de terreno saía da batalha e ia pra jornada inteira.** A flag `terrainBuffed` ficava
+LIGADA depois da luta, e ela vale **1,15× nos seis atributos, teto de HP incluído**: um Pikachu
+Lv.30 saía da batalha do rival com **teto 220 em vez de 215, velocidade 68 em vez de 59 e ataque
+63 em vez de 55**.
+
+**⚠️ ISSO NASCEU COM ESTA MUDANÇA:** antes só a Elite aplicava terreno ali, e lá o vazamento não
+tinha pra onde ir (é o fim da jornada). O ginásio **limpava por acidente** — o `applyTerrainBuff`
+DESLIGA a flag de quem o terreno não alcança —, então o vazamento durava da batalha especial até o
+ginásio seguinte, e no meio estão a distribuição de níveis e a cura, que leem o teto de HP.
+
+**⚠️ O QUE O DENUNCIOU FORAM DOIS NÚMEROS DISCORDANDO**, e é a lição que fica:
+
+| | delta | σ | blocos |
+|---|---|---|---|
+| a batalha ISOLADA (pareada) | **−0,63** | — | — |
+| o A/B **com** o vazamento | **+4,83** | **5,3σ** | 8/8 |
+| o A/B **depois** do conserto | **−0,80** | 0,8σ | 3/8 |
+
+**A medição pareada estava certa o tempo todo.** Um A/B que contradiz uma conta direta e ainda dá
+5,3σ não é "efeito surpreendente" — é sinal de que a mudança alcançou algo que ela não devia
+alcançar. **Procurar o vazamento é mais barato que acreditar no número.**
+
+- **⚠️ A LIMPEZA VEM DEPOIS DO `simulateGymBattle`, nunca antes** — a luta precisa do buff.
+- **⚠️ E ELA NÃO TOCA NO HP:** o `preservePlayerHp` da Elite carrega o valor entre as lutas, e mexer
+  no teto ali deixaria um pokémon com `hp` acima do `maxHp` — o defeito do Gyarados de 504 num teto
+  de 490 que este arquivo já registra.
+- **⚠️ E A TRAVA PRECISOU ESPIAR A LUTA:** o buff tem que estar **ligado durante** e **desligado
+  depois**, então olhar só o estado final faz as duas travas se contradizerem. O dublê anota o time
+  no instante da chamada e repassa pro original.
+- **⚠️ E A PRIMEIRA VERSÃO DESSA TRAVA PASSOU COM O DEFEITO RELIGADO:** ela sorteava o terreno e
+  podia não alcançar o time — medindo o conjunto vazio. Hoje ela reusa o painel que sorteia **até**
+  alcançar.
+
+### ⚠️ OS SELOS EMPILHAVAM POR CAUSA DA ESTRUTURA, NÃO DO ESTILO
+
+Cada selo emitia o **próprio** `.terrain-badge-row` — um bloco com margem. Dois blocos empilham por
+construção, e **nenhum ajuste de CSS os junta sem um pai comum**. Hoje quem monta a fileira é a
+`faixaDeSelosDaBatalha(terreno, m)`, e os selos são irmãos dentro dela.
+
+**⚠️ E A PRIMEIRA VERSÃO DA REGRA FALHOU POR 2 PIXELS — medido, não deduzido.** Ela nasceu
+`flex-wrap:wrap; gap:6px`, e com o selo no padding antigo (9px) os dois somavam **278px** numa
+fileira de **276px**: o wrap fazia exatamente o que o pedido veio consertar. Duas coisas mudaram:
+
+| | antes | agora |
+|---|---|---|
+| a fileira | `wrap`, gap 6 | **`nowrap`, gap 4** |
+| o padding do selo | `3px 9px` | **`3px 6px`** |
+| o pior caso (Ginásio de Fantasma + Dança da Chuva) | **empilhado, 60px** | **lado a lado, 21px, sobra 4px** |
+
+**⚠️ O `nowrap` É DELIBERADO:** com o wrap, um nome comprido devolve o empilhamento sozinho. Não
+cabendo, quem cede é o **texto por dentro do selo** — que é o que o *Submarino Afundado* já faz.
+
+**⚠️ E A TRAVA QUE COBRAVA `chuvaBadgeHtml(m)` NAS QUATRO TELAS CADUCOU** — três delas trocaram de
+porta. Ela não foi afrouxada: hoje cobra que a tela emita a fileira por alguma das duas, que é a
+regra de verdade.
+
+### ⚠️ E A CONFERÊNCIA DE ACUSAÇÃO PEGOU UMA TRAVA QUE LIA SÓ A TELA
+
+Religando o motor pra ignorar o `specialTerrain` — **o defeito mais grave da lista, porque a tela
+mostraria o selo e a luta não daria o buff** — todas as travas continuavam **verdes**: elas liam o
+`terrenoDaBatalhaEspecial()`, que é o lado da TELA. Hoje há uma que **roda o `runSpecialBattle` de
+verdade** e confere que o time saiu marcado, cobrando o par (com terreno marca, sem terreno não).
+
+**⚠️ E O `MUDO` DA PRIMEIRA RODADA ERA MEU:** eu tinha apontado o caso pro `test-especiais` e a
+trava está no `test-terrenos`. **Um "mudo" pode ser o teste errado, não uma trava fraca** — vale
+conferir o par antes de reescrever a trava.
 
 ## A BIFURCAÇÃO PARAVA O SORTEIO EM TRÊS LUGARES (24/09/2026)
 

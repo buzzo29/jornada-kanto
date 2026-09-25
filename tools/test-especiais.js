@@ -5272,8 +5272,35 @@ console.log('\n=== A DANCA DA CHUVA: O PRIMEIRO CLIMA DO JOGO (11/09/2026) ===')
     for(const fn of ['renderSpecialBattling','renderTrainerBattling','renderBattling','renderLeagueWatch']){
       const i = txt.indexOf('function ' + fn + '(');
       const fim = txt.indexOf('\nfunction ', i + 1);
-      ok('o ' + fn + ' mostra o selo da chuva', txt.slice(i, fim).indexOf('chuvaBadgeHtml(m)') > 0);
+      /* ⚠️ ESTA TRAVA COBRAVA O NOME `chuvaBadgeHtml(m)`, E ISSO CADUCOU EM 25/09/2026: os selos
+         passaram a dividir UMA fileira (`faixaDeSelosDaBatalha`) e tres das quatro telas trocaram
+         de porta. Ela nao foi afrouxada -- hoje cobra que a tela emita a fileira por ALGUMA das
+         duas, que e a regra de verdade ("esta tela mostra o selo"). */
+      const corpoTela = txt.slice(i, fim);
+      ok('o ' + fn + ' mostra o selo da chuva',
+         corpoTela.indexOf('chuvaBadgeHtml(m)') > 0 || corpoTela.indexOf('faixaDeSelosDaBatalha(') > 0);
     }
+    /* ⚠️ E OS DOIS SELOS FICAM NA MESMA FILEIRA (25/09/2026, a pedido: *"o selo da danca da chuva,
+       hoje aparece embaixo do selo do terreno, coloque para ficar ao lado"*).
+       ⚠️ A CAUSA ERA ESTRUTURAL e nao de estilo -- cada selo emitia o PROPRIO `.terrain-badge-row`,
+       que e um bloco com margem --, entao a trava conta as FILEIRAS em vez de olhar o CSS: com dois
+       selos tem que sair UMA. */
+    const terrenoT = S.TERRAINS[0];
+    const comChuva = { chuva:true };
+    const faixa2 = S.faixaDeSelosDaBatalha(terrenoT, comChuva);
+    ok('com terreno E chuva sai UMA fileira so',
+       (faixa2.match(/terrain-badge-row/g) || []).length === 1, faixa2.slice(0, 110));
+    ok('  e ela tem os DOIS selos',
+       (faixa2.match(/terrain-inline-badge/g) || []).length === 2);
+    ok('  com o da chuva DEPOIS do terreno',
+       faixa2.indexOf('chuva-badge') > faixa2.indexOf(terrenoT.name));
+    ok('so com terreno sai um selo',
+       (S.faixaDeSelosDaBatalha(terrenoT, null).match(/terrain-inline-badge/g) || []).length === 1);
+    ok('so com chuva sai um selo',
+       (S.faixaDeSelosDaBatalha(null, comChuva).match(/terrain-inline-badge/g) || []).length === 1);
+    /* ⚠️ SEM NENHUM DOS DOIS ELA NAO PODE SAIR VAZIA: a fileira tem margem, e uma fileira vazia
+       deixaria 10px sobrando em toda tela de batalha sem terreno e sem chuva -- que sao a maioria. */
+    ok('sem nenhum dos dois nao sai fileira', S.faixaDeSelosDaBatalha(null, null) === '');
   }
 
   /* A FICHA DA POKEDEX. Ela e a unica passiva POR BATALHA, e a ficha tem que dizer isso: um

@@ -86,3 +86,9 @@ tools/_tabelas-golpes.txt
 
 # o backup do tools/patch.js
 .patch-bak/
+
+# Artes de origem dos cenarios de ginasio (34 MB de PNG).
+# O jogo usa os webp em assets/batalha/cena-ginasio_*.webp (4,9 MB), que SAO versionados.
+# Estes PNG sao a fonte pra regerar: guarde-os fora do repo.
+ginasios-cenarios/
+ginasio_pedra

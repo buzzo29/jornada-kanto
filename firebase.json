@@ -11,6 +11,8 @@
       "**/index-novos-graficos.html",
       "ilhas-laranjas/**",
       "**/previa-*.html",
+      "ginasios-cenarios/**",
+      "ginasio_pedra",
       "**/preview-telas.html",
       "**/*-pokemon.html"
     ],

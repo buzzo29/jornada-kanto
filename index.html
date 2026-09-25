@@ -2232,7 +2232,17 @@
   .league-wins-total-num{font-family:var(--font-pixel);font-size:1.5rem;color:var(--blue-dark);line-height:1;}
   .league-wins-total-label{font-size:.7rem;color:var(--muted);font-weight:700;margin-top:4px;}
   .league-watch-wrap{position:relative;}
-  .terrain-badge-row{text-align:center; margin-bottom:10px;}
+  /* ⚠️ O `nowrap` E O `gap:4px` SAO MEDIDOS, e a primeira versao desta regra FALHOU POR 2 PIXELS.
+     Ela nasceu `flex-wrap:wrap; gap:6px` -- e com o selo no padding antigo (9px) os dois somavam
+     **278px** numa fileira de **276px**: o wrap fazia exatamente o que o pedido veio consertar,
+     empilhar. Medido no navegador, nao deduzido; e a conta de largura e o que diz que cabe.
+     ⚠️ O `nowrap` E DELIBERADO, e nao descuido: o pedido e *"ao lado"*, e com o wrap um nome
+     comprido devolve o empilhamento sozinho. Nao cabendo, quem cede e o TEXTO por dentro do selo
+     -- que e o que o *Submarino Afundado* ja faz hoje na tela do ginasio.
+     ⚠️ E O PADDING DO SELO DESCEU DE 9 PRA 6 (logo abaixo) pelo mesmo motivo: com 9 o pior caso
+     (Ginasio de Fantasma + Danca da Chuva) estourava por 1px. Com 6 a sobra e de 4px.
+     O flex tambem CENTRALIZA, entao o `text-align:center` saiu. */
+  .terrain-badge-row{display:flex; justify-content:center; flex-wrap:nowrap; gap:4px; margin-bottom:10px;}
   /* O SELO DA CHUVA usa a MESMA forma do selo de terreno (ele e o vizinho na tela e ensina a ler
      aquela faixa como "condicao desta partida"), so que no azul do tipo Agua, que e o tipo do
      golpe que a invoca. */
@@ -2243,7 +2253,7 @@
   .type-pill.selo-clicavel{ border:0; font:inherit; font-size:inherit; cursor:pointer; }
   .terrain-inline-badge{
     display:inline-block;
-    padding:3px 9px;
+    padding:3px 6px;   /* era 9px -- ver a nota da `.terrain-badge-row`: com 9 os dois selos nao cabiam lado a lado a 320px */
     border-radius:4px;
     font-family:var(--font-ui);
     font-size:.62rem;
@@ -4616,6 +4626,31 @@
 .battle-vs.battle-scene[style*="--battle-scene-id:termas_vulcanicas;"]{background-image:url("assets/batalha/cena-termas_vulcanicas.webp");background-size:100% 100%;background-position:center;}
 .battle-vs.battle-scene[style*="--battle-scene-id:colmeia_chamas;"]{background-image:url("assets/batalha/cena-colmeia_chamas.webp");background-size:100% 100%;background-position:center;}
 .battle-vs.battle-scene[style*="--battle-scene-id:submarino_afundado;"]{background-image:url("assets/batalha/cena-submarino_afundado.webp");background-size:100% 100%;background-position:center;}
+/* ⚠️ O PRIMEIRO CENARIO DE GINASIO (25/09/2026). Ele entra pela MESMA porta dos tres acima -- um
+   seletor pelo `--battle-scene-id` com `background-size:100% 100%` -- e nao pelo atlas, porque e a
+   cena INTEIRA e nao um slot de uma folha 3x3.
+   ⚠️ E E ESSA PORTA QUE O `GYM_TERRAINS` DEIXOU PRONTA: o `terrainBattleSceneStyle` ja emitia
+   `--battle-scene-id:ginasio_pedra` mesmo sem imagem (caindo no recorte neutro do campo_aberto),
+   entao acrescentar a cena e UMA LINHA e nada mais precisa saber dela.
+   ⚠️ O ARQUIVO E WEBP, como os tres de cima: o PNG de origem tem 2,1 MB e o webp 289 KB (o canvas
+   do navegador converteu -- nao ha cwebp nem sharp nesta maquina). Os outros tres pesam ~1,2 MB,
+   entao este e o mais leve dos quatro. */
+.battle-vs.battle-scene[style*="--battle-scene-id:ginasio_pedra;"]{background-image:url("assets/batalha/cena-ginasio_pedra.webp");background-size:100% 100%;background-position:center;}
+.battle-vs.battle-scene[style*="--battle-scene-id:ginasio_agua;"]{background-image:url("assets/batalha/cena-ginasio_agua.webp");background-size:100% 100%;background-position:center;}
+.battle-vs.battle-scene[style*="--battle-scene-id:ginasio_eletrico;"]{background-image:url("assets/batalha/cena-ginasio_eletrico.webp");background-size:100% 100%;background-position:center;}
+.battle-vs.battle-scene[style*="--battle-scene-id:ginasio_planta;"]{background-image:url("assets/batalha/cena-ginasio_planta.webp");background-size:100% 100%;background-position:center;}
+.battle-vs.battle-scene[style*="--battle-scene-id:ginasio_veneno;"]{background-image:url("assets/batalha/cena-ginasio_veneno.webp");background-size:100% 100%;background-position:center;}
+.battle-vs.battle-scene[style*="--battle-scene-id:ginasio_psiquico;"]{background-image:url("assets/batalha/cena-ginasio_psiquico.webp");background-size:100% 100%;background-position:center;}
+.battle-vs.battle-scene[style*="--battle-scene-id:ginasio_fogo;"]{background-image:url("assets/batalha/cena-ginasio_fogo.webp");background-size:100% 100%;background-position:center;}
+.battle-vs.battle-scene[style*="--battle-scene-id:ginasio_terra;"]{background-image:url("assets/batalha/cena-ginasio_terra.webp");background-size:100% 100%;background-position:center;}
+.battle-vs.battle-scene[style*="--battle-scene-id:ginasio_voador;"]{background-image:url("assets/batalha/cena-ginasio_voador.webp");background-size:100% 100%;background-position:center;}
+.battle-vs.battle-scene[style*="--battle-scene-id:ginasio_inseto;"]{background-image:url("assets/batalha/cena-ginasio_inseto.webp");background-size:100% 100%;background-position:center;}
+.battle-vs.battle-scene[style*="--battle-scene-id:ginasio_normal;"]{background-image:url("assets/batalha/cena-ginasio_normal.webp");background-size:100% 100%;background-position:center;}
+.battle-vs.battle-scene[style*="--battle-scene-id:ginasio_fantasma;"]{background-image:url("assets/batalha/cena-ginasio_fantasma.webp");background-size:100% 100%;background-position:center;}
+.battle-vs.battle-scene[style*="--battle-scene-id:ginasio_lutador;"]{background-image:url("assets/batalha/cena-ginasio_lutador.webp");background-size:100% 100%;background-position:center;}
+.battle-vs.battle-scene[style*="--battle-scene-id:ginasio_aco;"]{background-image:url("assets/batalha/cena-ginasio_aco.webp");background-size:100% 100%;background-position:center;}
+.battle-vs.battle-scene[style*="--battle-scene-id:ginasio_gelo;"]{background-image:url("assets/batalha/cena-ginasio_gelo.webp");background-size:100% 100%;background-position:center;}
+.battle-vs.battle-scene[style*="--battle-scene-id:ginasio_dragao;"]{background-image:url("assets/batalha/cena-ginasio_dragao.webp");background-size:100% 100%;background-position:center;}
 
 /* Status de batalha: acompanha a caixa real do sprite, sem recriar o GIF. */
 .battle-status-host{position:relative;display:inline-flex;align-items:flex-end;justify-content:center;max-width:100%;vertical-align:bottom;line-height:0;}
@@ -5345,7 +5380,7 @@ const ROUTE_MAP = [
       pool:['machop','graveler','cubone','teddiursa','larvitar','rhyhorn','diglett','mankey','omanyte'], rare:['golbat'] },
     { id:'lavender_detour', name:'Desvio por Lavender', icon:'👻', types:['Ghost','Ground'],
       rumor:'A torre chora à noite. Alguma coisa lá dentro não é sólida.',
-      pool:['gastly','cubone','ratata','drowzee','growlithe','exeggcute','misdreavus','murkrow','rhydon'], rare:['haunter'] }
+      pool:['gastly','cubone','ratata','drowzee','growlithe','exeggcute','misdreavus','murkrow'], rare:['haunter'] }
   ],
   [ // antes de Koga (Veneno)
     { id:'cycling_road', name:'Estrada Ciclável', icon:'🚴', types:['Poison','Electric'],
@@ -5360,10 +5395,10 @@ const ROUTE_MAP = [
       rumor:'O mestre entrega um discípulo pra quem vencer. Mas lutador não gosta de psíquico…',
       /* Os TRÊS Lutadores que faltavam no jogo inteiro: fora da linha do Machop, do Mankey e dos
          Hitmon, sobram só estes. O Dojo é onde eles cabem -- e é o pool mais forte da etapa 6. */
-      pool:['machop','machoke','mankey','hitmonlee','hitmonchan','hitmontop','heracross','poliwrath'], rare:[] },
+      pool:['machop','machoke','mankey','hitmonlee','hitmonchan','hitmontop','heracross'], rare:[] },
     { id:'silph_co', name:'Silph Co.', icon:'🏢', types:['Poison','Psychic'],
       rumor:'Onze andares tomados pela Rocket. Dizem que há um experimento estranho guardado no cofre.',
-      pool:['grimer','drowzee','abra','mrmime','kadabra','electabuzz','eevee','natu','porygon2','smoochum','porygon','unown'],
+      pool:['grimer','drowzee','abra','mrmime','kadabra','electabuzz','eevee','natu','smoochum','porygon','unown'],
       niveis:{ eevee:[30,35] }, rare:['ditto'] }
   ],
   [ // antes de Blaine (Fogo)
@@ -5380,10 +5415,10 @@ const ROUTE_MAP = [
       rumor:'A usina abandonada ainda tem energia. E ela tem asas.',
       /* Usina abandonada: o Lanturn pelo Elétrico e o Weezing pelo que apodrece num prédio parado
          (é o mesmo motivo de o Grimer morar na usina do FireRed). */
-      pool:['electabuzz','voltorb','electrode','raichu','jolteon','porygon','mareep','flaaffy','elekid'], rare:[{species:'zapdos',chance:0.05}, {species:'dragonite',chance:0.10}] },
+      pool:['electabuzz','voltorb','electrode','raichu','jolteon','porygon','mareep','flaaffy','elekid', 'porygon2'], rare:[{species:'zapdos',chance:0.05}, {species:'dragonite',chance:0.10}] },
     { id:'victory_road', name:'Victory Road', icon:'🏔️', types:['Rock','Fighting'],
       rumor:'Só passa quem merece. Uma chama vive no topo da montanha.',
-      pool:['rhyhorn','snorlax','marowak','dragonair','pupitar','ursaring','donphan','aerodactyl','shuckle'], rare:[{species:'moltres',chance:0.05}, {species:'dragonite',chance:0.10}] }
+      pool:['rhyhorn','snorlax','marowak','dragonair','pupitar','ursaring','donphan','aerodactyl','shuckle', 'magcargo', 'rhydon'], rare:[{species:'moltres',chance:0.05}, {species:'dragonite',chance:0.10}] }
   ]
 ];
 /* Rotas de Johto -- duas por etapa, seguindo o caminho real do Crystal até cada ginásio.
@@ -5408,7 +5443,7 @@ const JOHTO_ROUTE_MAP = [
       pool:['mareep','bellsprout','hoppip','wooper','ratata','zubat','magikarp','ekans','elekid'], rare:['quagsire'] },
     { id:'union_cave', name:'Caverna União', icon:'🪨', types:['Rock','Water'],
       rumor:'Nas sextas-feiras, dizem que algo enorme e gentil aparece no lago do fundo.',
-      pool:['geodude','zubat','onix','sandshrew','slowpoke','marill','larvitar','magcargo'], rare:[{species:'lapras', chance:0.08},'unown'] }
+      pool:['geodude','zubat','onix','sandshrew','slowpoke','marill','larvitar'], rare:[{species:'lapras', chance:0.08},'unown'] }
   ],
   [ // antes da Whitney (Normal) -- Floresta Ilex e Rota 34
     { id:'ilex_forest', name:'Floresta Ilex', icon:'🌳', types:['Bug','Grass'],
@@ -5474,7 +5509,7 @@ const JOHTO_ROUTE_MAP = [
          A rota tinha 9 entradas mas so SEIS formas -- no nivel 50-55 o dratini e o dragonair viram
          os dois Dragonite, o magikarp e o gyarados viram os dois Gyarados, e o horsea e o seadra
          viram os dois Kingdra. Pool nao e o que aparece na tela. */
-      pool:['dratini','dragonair','magikarp','horsea','seadra','gyarados','psyduck','remoraid','staryu','lapras','kabutops','omastar','qwilfish'], rare:[{species:'kingdra', chance:0.10},{species:'dragonite', chance:0.08}] }
+      pool:['dratini','dragonair','magikarp','horsea','seadra','gyarados','psyduck','remoraid','staryu','lapras','kabutops','omastar','qwilfish', 'poliwrath'], rare:[{species:'kingdra', chance:0.10},{species:'dragonite', chance:0.08}] }
   ]
 ];
 
@@ -6249,6 +6284,59 @@ const TERRAINS = [
   { id:'torre_de_radio', name:'Torre de Rádio', icon:'📡', types:['Steel','Flying'] },
   { id:'ninho_blindado', name:'Ninho Blindado', icon:'🐲', types:['Steel','Dragon'] }
 ];
+
+/* OS TERRENOS DE GINASIO (25/09/2026, a pedido: *"quando for desafiar os lideres dos ginasios, nao
+   vai mais assumir nenhum terreno aleatoriamente, porque o terreno vai virar 'Ginasio de Pedra'"*).
+
+   ⚠️ ELES FICAM FORA DO `TERRAINS`, E ISSO E A DECISAO -- nao e organizacao. O `TERRAINS` e sorteado
+   pela LIGA, oferecido ao lider do GINASIO DO BAIRRO, escolhido na TRAINERS LEAGUE e listado na tela
+   de terrenos. Jogar os 16 la dentro os poria em todos esses lugares, que nao e o pedido -- e ainda
+   quebraria a conta de **6 terrenos por tipo** que o `test-terrenos.js` tranca, e que existe por uma
+   razao medida: ela e o que faz o buff de terreno sair com a MESMA frequencia pros 17 tipos.
+
+   ⚠️ E CADA UM TEM UM TIPO SO, que e o pedido ao pe da letra (*"vai dar o buff apenas para pokemons
+   de pedra"*). Hoje o ginasio sorteia entre os 6 terrenos do tipo do lider, e **94,8% deles carregam
+   tipos EXTRAS** -- a Caverna de Cristais e Rock/Psychic, entao no Brock um Alakazam do jogador
+   pegava 1,15x em tudo de graca. MEDIDO: o time do jogador pega buff de terreno no ginasio em
+   **62,4%** das visitas hoje e em **39,3%** com o terreno fixo. O LIDER nao perde nada -- o terreno
+   continua sendo do tipo dele.
+
+   ⚠️ O NOME E ESCRITO A MAO, e nao 'Ginasio de ' + o tipo: quatro tipos sao ADJETIVOS (Eletrico,
+   Psiquico, Voador, Normal) e com a preposicao sairiam errados em portugues. O exemplo do pedido
+   (*"Ginasio de Pedra"*) esta preservado exatamente.
+
+   ⚠️ O CENARIO AINDA NAO EXISTE, e e de proposito (a pedido: *"o cenario desses terrenos/ginasios
+   por enquanto nao tem... deixe sem o fundo que eu peco para a outra IA criar"*). Sem entrada nas
+   tres tabelas de cena (`TERRAIN_SCENE_TILES`, `TERRAIN_SCENE_META`, `TERRAIN_BATTLE_FOOTING`) eles
+   caem no `campo_aberto`, que e o fundo neutro -- e e ali que as 16 imagens entram quando chegarem,
+   uma linha por ginasio em cada tabela, sem tocar em mais nada. */
+const GYM_TERRAINS = [
+  { id:'ginasio_pedra',     name:'Ginásio de Pedra',    icon:'🪨', types:['Rock'] },
+  { id:'ginasio_agua',      name:'Ginásio de Água',     icon:'💧', types:['Water'] },
+  { id:'ginasio_eletrico',  name:'Ginásio Elétrico',    icon:'⚡', types:['Electric'] },
+  { id:'ginasio_planta',    name:'Ginásio de Planta',   icon:'🌿', types:['Grass'] },
+  { id:'ginasio_veneno',    name:'Ginásio de Veneno',   icon:'☠️', types:['Poison'] },
+  { id:'ginasio_psiquico',  name:'Ginásio Psíquico',    icon:'🔮', types:['Psychic'] },
+  { id:'ginasio_fogo',      name:'Ginásio de Fogo',     icon:'🔥', types:['Fire'] },
+  { id:'ginasio_terra',     name:'Ginásio de Terra',    icon:'⛰️', types:['Ground'] },
+  { id:'ginasio_voador',    name:'Ginásio Voador',      icon:'🕊️', types:['Flying'] },
+  { id:'ginasio_inseto',    name:'Ginásio de Inseto',   icon:'🐛', types:['Bug'] },
+  { id:'ginasio_normal',    name:'Ginásio Normal',      icon:'⚪', types:['Normal'] },
+  { id:'ginasio_fantasma',  name:'Ginásio de Fantasma', icon:'👻', types:['Ghost'] },
+  { id:'ginasio_lutador',   name:'Ginásio de Lutador',  icon:'👊', types:['Fighting'] },
+  { id:'ginasio_aco',       name:'Ginásio de Aço',      icon:'⚙️', types:['Steel'] },
+  { id:'ginasio_gelo',      name:'Ginásio de Gelo',     icon:'❄️', types:['Ice'] },
+  { id:'ginasio_dragao',    name:'Ginásio de Dragão',   icon:'🐉', types:['Dragon'] }
+];
+/* ⚠️ QUEM LE TERRENO DE GINASIO USA ESTA FUNCAO; quem le terreno de LIGA continua no
+   `TERRAINS.find`, E ISSO E DE PROPOSITO -- ali o find e uma VALIDACAO implicita: so terreno de
+   liga vale na liga, e trocar por esta funcao passaria a aceitar um id de ginasio gravado por
+   engano em vez de recusa-lo. Os 5 finds que sobram (a Trainers League e a Classica) sao todos
+   desses, e ha trava cobrando que eles NAO achem terreno de ginasio.
+   O sintoma de errar isto pro outro lado e MUDO: o selo fica na tela e o clique nao abre nada. */
+function terrenoPorId(id){
+  return TERRAINS.find(t => t.id === id) || GYM_TERRAINS.find(t => t.id === id) || null;
+}
 /* 51 cenários em pixel art com câmera frontal. Os atlas e as três cenas dedicadas
    ficam em assets/batalha (ver a nota do CSS); nenhuma imagem de terreno depende de
    rede de terceiro.
@@ -15220,7 +15308,20 @@ function renderVigiliaPremio(){
   ${botaoSeuTimeHtml()}`;
 }
 
+/* ⚠️ OS CONTEXTOS QUE SORTEIAM TERRENO (25/09/2026, a pedido: *"os encontros com a equipe rocket e
+   o rival, sempre vai sortear um terreno para acontecer a batalha"*).
+   ⚠️ SAO QUATRO E NAO DOIS: o esconderijo (`hideout1`/`hideout2`) E a Equipe Rocket -- o guarda e
+   o chefe. Nomear so `rocket` deixaria as duas lutas mais longas da linha SEM terreno, e o jogador
+   veria o selo sumir no meio da sequencia.
+   ⚠️ A `elite` FICA DE FORA porque ela ja tem o dela (`game.eliteTerrain`, um por membro, escolhido
+   no chaveamento); a montanha e a vigilia ficam porque nao foram pedidas -- e as duas sao batalhas
+   de PREMIO, onde um buff sorteado mexeria numa recompensa calibrada. */
+const CONTEXTOS_COM_TERRENO = ['rocket', 'hideout1', 'hideout2', 'rival'];
 function startSpecialBattle(context, opponentTeam, meta){
+  /* ⚠️ O SORTEIO E AQUI, e nao no `runSpecialBattle`: aquele roda de novo a cada tentativa, e o
+     terreno mudaria embaixo do jogador entre a tela de abertura e a luta. Aqui ele nasce junto com
+     a batalha e vale ate ela acabar. */
+  game.specialTerrain = CONTEXTOS_COM_TERRENO.indexOf(context) >= 0 ? pickTerrain(Math.random) : null;
   game.specialBattle = { context, opponentTeam, meta: meta||{} };
   game.specialBattleResult = null;
   game.screen = 'specialIntro';
@@ -15289,9 +15390,12 @@ function runSpecialBattle(){
   });
   equiparNpc(foeTeam);   // rival, Elite 4, Rocket, Vigília -- todos NPC, todos com o moveset da espécie
   // limpa primeiro SEMPRE: sem isso, o bônus do último ginásio (ou da luta anterior do rush da Elite)
-  // vazaria pra cá. Rival e Rocket seguem sem terreno; a Elite 4 recebe o do membro logo abaixo
+  // vazaria pra cá.
   game.team.forEach(p=>{ p.terrainBuffed = false; });
-  const terrenoDaLuta = (cfg.context==='elite') ? game.eliteTerrain : null;
+  /* ⚠️ A ELITE TEM O TERRENO DELA (um por membro, do chaveamento); a Rocket e o rival usam o
+     SORTEADO no `startSpecialBattle` (25/09/2026). Os outros contextos continuam sem nenhum, e aí
+     `terrenoDaLuta` é null -- que é o estado que o resto do jogo já sabe desenhar. */
+  const terrenoDaLuta = (cfg.context==='elite') ? game.eliteTerrain : (game.specialTerrain || null);
   if(terrenoDaLuta){
     applyTerrainBuff(game.team, terrenoDaLuta);
     applyTerrainBuff(foeTeam, terrenoDaLuta);
@@ -15305,6 +15409,22 @@ function runSpecialBattle(){
   equiparItens(game.team, game.equipados, game.currentSaveSlot);
   const result = simulateGymBattle(game.team, foeTeam, undefined,
     { preservePlayerHp: cfg.context==='elite' });
+  /* ⚠️ O BUFF DE TERRENO NAO PODE SAIR DAQUI (25/09/2026). Ele vale 1,15x nos SEIS atributos --
+     inclusive no TETO DE HP --, e a flag ficava LIGADA depois da luta: um Pikachu Lv.30 saia da
+     batalha do rival com 220 de teto em vez de 215, velocidade 68 em vez de 59 e ataque 63 em vez
+     de 55, e levava isso pra a jornada inteira.
+     ⚠️ O GINASIO LIMPAVA POR ACIDENTE (o `applyTerrainBuff` DESLIGA a flag de quem o terreno nao
+     alcanca), entao o vazamento durava da batalha especial ate o ginasio seguinte -- e no meio
+     estao a distribuicao de niveis e a cura, que leem o teto de HP.
+     ⚠️ ISSO NASCEU EM 25/09/2026, quando a Rocket e o rival ganharam terreno: antes so a Elite
+     aplicava aqui, e la o vazamento nao tinha pra onde ir (e o fim da jornada).
+     MEDIDO NO A/B: a jornada concluida ia a **+4,83 pontos, 5,3sigma, 8 de 8 blocos** -- e a medicao
+     ISOLADA da batalha dava −0,63. Foram os dois numeros discordando que denunciaram o vazamento.
+     ⚠️ E A LIMPEZA VEM DEPOIS DO `simulateGymBattle`, nunca antes: a luta PRECISA do buff.
+     ⚠️ E ELA NAO TOCA NO HP: o `preservePlayerHp` da Elite carrega o valor entre as lutas, e mexer
+     no teto aqui deixaria um pokemon com hp acima do maxHp -- o defeito que o proprio CLAUDE.md
+     registra (o Gyarados de 504 num teto de 490). Quem recalcula o teto e a batalha seguinte. */
+  game.team.forEach(p => { p.terrainBuffed = false; });
   gastarItensQueTrabalharam();
   updateStreakRecord(result);
   preloadBattleSprites(result.matchups);
@@ -15764,8 +15884,17 @@ function pickTerrainForType(englishType){
   const pool = matching.length>0 ? matching : TERRAINS; // rede de segurança, não deveria cair aqui já que todo tipo tem pelo menos 1 terreno
   return pool[Math.floor(Math.random()*pool.length)];
 }
-function pickGymTerrain(gym){
-  return pickTerrainForType(englishTypeFromPortuguese(gym.gymTypeName));
+/* ⚠️ O TERRENO DO GINASIO E FIXO desde 25/09/2026, e a funcao trocou de NOME junto: ela se chamava
+   `pickGymTerrain` e nao sorteia mais nada -- um `pick` que devolve sempre a mesma coisa e um nome
+   que mente, e neste arquivo nome que mente ja custou mais de uma investigacao.
+   O `pickTerrainForType` continua existindo: quem o usa e a LIGA e o GINASIO DO BAIRRO. */
+function terrenoDoGinasio(gym){
+  const en = englishTypeFromPortuguese(gym.gymTypeName);
+  /* Sem terreno cadastrado pro tipo daquele ginasio a batalha acontece SEM terreno, que e o estado
+     que o resto do jogo ja sabe desenhar (`game.gymTerrain` nasce null). Cair num terreno qualquer
+     seria pior: o selo prometeria um buff que o motor daria a outro tipo. Ha trava cobrando que os
+     16 tipos de ginasio tenham terreno, entao isto e rede e nao caminho. */
+  return GYM_TERRAINS.find(t => t.types[0] === en) || null;
 }
 async function updateStreakRecord(result){
   // sequência = quantas batalhas COMPLETAS foram vencidas em sequência, sem o time inteiro desmaiar --
@@ -22934,12 +23063,19 @@ function renderRouteCardsBlock(cards){
 
 // selo do terreno da luta atual da Elite. Devolve vazio pras batalhas sem terreno (rival, Rocket e a
 // final do rush), então pode ser chamado sem checar contexto
-function eliteTerrainBadgeHtml(){
+/* O TERRENO DA BATALHA ESPECIAL, num lugar só: a Elite tem o do membro, a Rocket e o rival têm o
+   sorteado (25/09/2026), e os outros contextos não têm nenhum. Lido em DOIS lugares -- o motor
+   (`runSpecialBattle`) e o selo da tela --, e se eles divergirem a tela promete um buff que a luta
+   não dá. */
+function terrenoDaBatalhaEspecial(){
   const cfg = game.specialBattle;
-  const t = (cfg && cfg.context==='elite') ? game.eliteTerrain : null;
-  if(!t) return '';
-  return `<div class="terrain-badge-row"><button class="terrain-inline-badge" style="background:${terrainColor(t)}" onclick="event.stopPropagation();openTerrainInfoModal('${t.id}')">${t.icon} ${t.name}</button></div>`;
+  if(!cfg) return null;
+  return cfg.context==='elite' ? (game.eliteTerrain||null) : (game.specialTerrain||null);
 }
+/* ⚠️ O `eliteTerrainBadgeHtml` SAIU EM 25/09/2026, e o motivo foi o nome: quando a Rocket e o rival
+   passaram a ter terreno, ele deixou de ser "da Elite" -- e nome que mente ja custou investigacao
+   mais de uma vez neste arquivo. Quem desenha e a `faixaDeSelosDaBatalha`, nas duas telas (a
+   abertura, que nao tem confronto e por isso passa `null` no lugar da chuva, e a batalha). */
 function renderSpecialIntro(){
   const cfg = game.specialBattle;
   if(!cfg) return '';
@@ -22967,7 +23103,7 @@ function renderSpecialIntro(){
          so -- em duas linhas o nome do lugar e o comodo param de competir pelo mesmo espaco */''}
     ${cfg.meta.sub ? `<div class="encounter-sub">${cfg.meta.sub}</div>` : ''}
   </div>
-  ${eliteTerrainBadgeHtml()}
+  ${faixaDeSelosDaBatalha(terrenoDaBatalhaEspecial(), null)}
   <div class="box cursor">
     <p>${cfg.meta.intro||''}</p>
   </div>
@@ -23001,8 +23137,7 @@ function renderSpecialBattling(){
   const displayEnemyHp = loading ? m.enemyHpBefore : (game.specialCurrentEnemyHp!=null ? game.specialCurrentEnemyHp : m.enemyHpAfter);
   return `
   <div class="eyebrow">${cfg.meta.icon||'⚔️'} ${((cfg.meta.title||'Batalha') + (cfg.meta.sub ? ' — ' + cfg.meta.sub : '')).toUpperCase()}</div>
-  ${eliteTerrainBadgeHtml()}
-  ${chuvaBadgeHtml(m)}
+  ${faixaDeSelosDaBatalha(terrenoDaBatalhaEspecial(), m)}
   <div class="box cursor" style="${terrainBattleBgStyle(cfg.context==='elite' ? game.eliteTerrain : null)}">
     ${/* a fileira de cima só existe onde a cena não desenha -- ver a nota no renderBattling */''}${cenaNova ? '' : `<div class="team-alive-row">
       ${placarDoTreinador(game.trainerName||'Você', (loading||animating||emboscada)?m.playerAliveBefore:m.playerAliveAfter, m.playerTeamSize)}
@@ -23572,7 +23707,7 @@ function renderPreBattle(){
     game.screen = (game.badgesEarned||[]).length>=numGinasios() ? 'journeyEnd' : 'start';
     return game.screen==='journeyEnd' ? renderJourneyEnd() : renderStart();
   }
-  if(!game.gymTerrain){ game.gymTerrain = pickGymTerrain(gym); }
+  if(!game.gymTerrain){ game.gymTerrain = terrenoDoGinasio(gym); }
   const terrain = game.gymTerrain;
   return `
   <div class="eyebrow">🥊 GINÁSIO ${gym.gymTypeName.toUpperCase()}</div>
@@ -24090,11 +24225,33 @@ function golpeSeloHtml(speciesId, tipo, golpeId, vezes, escala){
    "condição desta partida" naquela faixa. Ele é CLICÁVEL e abre a mesma caixa de explicação dos
    especiais: a pergunta que ele levanta ("por que meu Fogo tirou metade?") é a mesma que a caixa
    responde, e criar uma segunda caixa pra isso seria dois textos pra a mesma mecânica. */
-function chuvaBadgeHtml(m){
+/* ⚠️ OS SELOS FICAM LADO A LADO, NUNCA EMPILHADOS (25/09/2026, a pedido: *"o selo da dança da
+   chuva, hoje aparece embaixo do selo do terreno, coloque para ficar ao lado"*).
+   ⚠️ A CAUSA ERA ESTRUTURAL e não de estilo: cada selo emitia o PRÓPRIO `.terrain-badge-row`, que
+   é um bloco com margem -- dois deles empilham por construção, e nenhum ajuste de CSS os junta sem
+   um pai comum. Hoje quem monta a fileira é esta função, e os selos são irmãos DENTRO dela.
+   ⚠️ E ELA DEVOLVE '' QUANDO NÃO HÁ NENHUM: a fileira vazia deixaria 10px de margem sobrando em
+   toda tela de batalha sem terreno e sem chuva, que é a maioria delas. */
+function seloDeTerrenoHtml(t){
+  if(!t) return '';
+  return `<button class="terrain-inline-badge" style="background:${terrainColor(t)}" ` +
+         `onclick="event.stopPropagation();openTerrainInfoModal('${escJs(t.id)}')">${t.icon} ${escapeHtmlSafe(t.name)}</button>`;
+}
+function seloDaChuvaHtml(m){
   if(!m || !m.chuva) return '';
-  return `<div class="terrain-badge-row"><button class="terrain-inline-badge chuva-badge" ` +
+  return `<button class="terrain-inline-badge chuva-badge" ` +
          `onclick="event.stopPropagation();abrirEspecialInfo('chuva','Dança da Chuva','Water',${CHANCE_CHUVA},1)">` +
-         `🌧️ Dança da Chuva</button></div>`;
+         `🌧️ Dança da Chuva</button>`;
+}
+function faixaDeSelosDaBatalha(t, m){
+  const selos = [seloDeTerrenoHtml(t), seloDaChuvaHtml(m)].filter(Boolean);
+  if(!selos.length) return '';
+  return `<div class="terrain-badge-row">${selos.join('')}</div>`;
+}
+/* ⚠️ MANTIDA PRA OS CHAMADORES QUE SÓ TÊM CHUVA (a Torre, a Seleção, a Pescaria): ali não há
+   terreno nenhum, e chamar a fileira com `null` dá o mesmo resultado. */
+function chuvaBadgeHtml(m){
+  return faixaDeSelosDaBatalha(null, m);
 }
 /* ⚠️ A CHUVA CAINDO NA CENA (24/09/2026, a pedido: *"quando tiver acontecendo a dança da chuva,
    você consegue colocar um efeito de chuva no cenário? Como se tivesse chovendo ao fundo?"*).
@@ -26796,8 +26953,7 @@ function renderBattling(){
   return `
   <div class="league-watch-wrap">
   <div class="eyebrow">${eyebrowText}</div>
-  ${terrain ? `<div class="terrain-badge-row"><button class="terrain-inline-badge" style="background:${terrainColor(terrain)}" onclick="openTerrainInfoModal('${terrain.id}')">${terrain.icon} ${terrain.name}</button></div>` : ''}
-  ${chuvaBadgeHtml(m)}
+  ${faixaDeSelosDaBatalha(terrain, m)}
   <div class="box cursor" style="${terrainBattleBgStyle(terrain)}">
     ${/* ⚠️ A FILEIRA DE CIMA SÓ EXISTE ONDE A CENA NÃO DESENHA: com o cenário atrás, o treinador e
           as pokébolas moram DENTRO do painel de cada lutador (22/09/2026, a pedido). Emitir os dois
@@ -28668,7 +28824,9 @@ function leagueMatchRow(match, roundLabel, ct, li, rk, mi, leagueRounds, phaseTi
   </div>`;
 }
 function openTerrainInfoModal(terrainId){
-  const terrain = TERRAINS.find(t=>t.id===terrainId);
+  /* ⚠️ `terrenoPorId` e nao `TERRAINS.find`: o selo do GINASIO chama esta funcao, e o terreno dele
+     vive no `GYM_TERRAINS`. Com o find direto o clique nao abria nada, sem erro nenhum. */
+  const terrain = terrenoPorId(terrainId);
   if(!terrain) return;
   game.terrainInfoTarget = terrain;
   render();
@@ -28917,8 +29075,7 @@ function renderLeagueWatch(){
   return `
   <div class="league-watch-wrap">
   <div class="eyebrow">🏆 ${w.playerAName.toUpperCase()} 🆚 ${w.playerBName.toUpperCase()}</div>
-  ${w.terrain ? `<div class="terrain-badge-row"><button class="terrain-inline-badge" style="background:${terrainColor(w.terrain)}" onclick="openTerrainInfoModal('${w.terrain.id}')">${w.terrain.icon} ${w.terrain.name}</button></div>` : ''}
-  ${chuvaBadgeHtml(m)}
+  ${faixaDeSelosDaBatalha(w.terrain, m)}
   <div class="box cursor" style="${terrainBattleBgStyle(w.terrain)}">
     ${/* a fileira de cima só existe onde a cena não desenha -- ver a nota no renderBattling */''}${cenaNova ? '' : `<div class="team-alive-row">
       ${placarDoTreinador(w.playerAName, (loading||animating)?m.playerAliveBefore:m.playerAliveAfter, m.playerTeamSize)}

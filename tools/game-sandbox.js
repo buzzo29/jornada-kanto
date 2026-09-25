@@ -281,7 +281,7 @@ function createSandbox(htmlPath){
     // o salvamento: o ciclo do _especialContra ja custou save de jogador (ver test-especiais.js)
     'limparParaFirestore','serializeGame','encerrarBatalha','placarDoTreinador','renderTowerRankingModal','openTowerRanking','abrirHistoricoDaTorre','paginarHistoricoDaTorre','abrirHojeDaTorre','closeTowerRanking','renderHpBar','renderTerrainInfoModal','abrirConfronto','formasDaRota','abrirPokemonsDaRota','fecharPokemonsDaRota','renderPokemonsDaRotaModal','faixaDeNivelSelvagem','spriteHtml','FORMAS_DO_UNOWN','sufixoDoUnown','sorteiaFormaDoUnown','spriteMarkupByDex','typesHtml','pokedexIcon','SEM_CAPTURA_SELVAGEM','SURFISTAS','conquistouHM03','formasDoHM03','conferirHM03','darHMComAviso','renderHmGanhoModal','fecharHmGanho','HM03_ROTA','HM03_LEG','markCaught','game','hydrateTeam',
     'REMOINHO','CHANCE_REMOINHO','tentarRemoinho',
-    'TYPE_CHART','TYPE_NAMES_PT','TYPE_COLORS','englishTypeFromPortuguese','TERRAINS','TERRAIN_BUFF_MULT','SHINY_BUFF_MULT','applyTerrainBuff','applySpecialtyBuff','withBuffs',
+    'TYPE_CHART','TYPE_NAMES_PT','TYPE_COLORS','englishTypeFromPortuguese','TERRAINS','GYM_TERRAINS','CONTEXTOS_COM_TERRENO','TERRAIN_BUFF_MULT','SHINY_BUFF_MULT','applyTerrainBuff','applySpecialtyBuff','withBuffs',
     'equiparItens','itemEquipado','chaveDoEquipado','chavesDaLinha','itensGastosDaBatalha','CURA_DA_POCAO','POCAO_GATILHO_HP',
     'effectiveBaseHp','effectiveAttack','effectiveDefense','effectiveSpAtk','effectiveSpDef','effectiveSpeed','gen1MaxHp',
     // lista de amigos: as telas sao HTML puro a partir do estado, entao dao pra renderizar aqui e

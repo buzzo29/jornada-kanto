@@ -1749,6 +1749,64 @@ console.log('\n=== "POKEMONS DESTA ROTA" (15/09/2026) ===');
   Object.assign(g, antes);
 }
 
+/* ============================================================================
+   O NIVEL DO SELVAGEM TEM QUE CABER NA ROTA (25/09/2026)
+   ============================================================================
+   ⚠️ REPORTADO COM PRINT: *"estou na segunda rota, antes do ginasio de inseto, e apareceu um
+   Magcargo level 39 para capturar, isso e bug ou ta definido assim?"*. Era a MECANICA, nao um
+   defeito: o Slugma evolui no 38, e o `EVOLVED_MIN_LEVEL` impede uma forma evoluida de sair
+   abaixo do nivel em que ela existiria -- entao o piso empurrava a faixa inteira. A Caverna Uniao
+   e 8-13 e ele saia 38-43.
+   ⚠️ E ERA A SEGUNDA VEZ: o Dugtrio Lv.28 nas rotas iniciais (11/09/2026) e o MESMO mecanismo, e
+   foi consertado do mesmo jeito. Sem esta trava, a terceira tambem so aparece por print.
+   ⚠️ A VARREDURA TEM QUE SER DAS DUAS REGIOES: a primeira versao dela usou o `routesForLeg`, que
+   escolhe a regiao pelo SAVE -- com um save de Kanto ela varreu metade do jogo e devolveu ZERO,
+   que parecia resultado. E a `faixaDeNivelSelvagem` devolve um ARRAY `[de, ate]`, nao um objeto:
+   ler `.min` nele da `undefined`, e `undefined - 13 > 3` e falso. Os dois erros dao o MESMO
+   sintoma -- zero achados que parecem "esta tudo certo". */
+console.log('\n=== O NIVEL DO SELVAGEM CABE NA ROTA ===');
+{
+  const foraDaFaixa = [];
+  [['Kanto', S.ROUTE_MAP], ['Johto', S.JOHTO_ROUTE_MAP]].forEach(([regiao, mapa]) => {
+    (mapa || []).forEach((par, leg) => {
+      const legObj = S.LEGS[leg];
+      (par || []).forEach(r => {
+        const entradas = [...new Set((r.pool || []).concat((r.rare || []).map(x => x.id || x)))]
+          .filter(x => typeof x === 'string' && S.SPECIES[x]);
+        entradas.forEach(id => {
+          const f = S.faixaDeNivelSelvagem(id, r, legObj);
+          if(!f || f[0] == null) return;
+          const acima = f[0] - legObj.maxLevel;
+          /* ⚠️ O EEVEE DA MANSAO E A EXCECAO NOMEADA, e ela e DECISAO registrada: o nivel dele vem
+             do `route.niveis` (45 na Mansao, como sempre foi), nao do piso da evolucao. */
+          const ehOEeveeDaMansao = id === 'eevee' && r.niveis && r.niveis[id];
+          if(acima > 3 && !ehOEeveeDaMansao){
+            foraDaFaixa.push(regiao + ' tr.' + (leg + 1) + ' ' + (r.name || r.id) + ': ' +
+              S.SPECIES[id].name + ' sai em ' + f[0] + '-' + f[1] +
+              ' numa rota de ' + legObj.minLevel + '-' + legObj.maxLevel + ' (+' + acima + ')');
+          }
+        });
+      });
+    });
+  });
+  ok('nenhum selvagem sai mais de 3 niveis acima do teto da rota', foraDaFaixa.length === 0,
+     foraDaFaixa.join(' | '));
+  /* ⚠️ E A VARREDURA TEM QUE TER OLHADO AS DUAS REGIOES -- senao ela mede metade do jogo e o zero
+     acima nao prova nada. Esta linha e o que separa 'nao achou' de 'nao procurou'. */
+  const rotasVistas = (S.ROUTE_MAP || []).flat().length + (S.JOHTO_ROUTE_MAP || []).flat().length;
+  ok('  e ela varreu as 32 rotas das DUAS regioes', rotasVistas >= 32, rotasVistas + ' rotas');
+  /* ⚠️ E OS QUATRO QUE FORAM MOVIDOS CONTINUAM CAPTURAVEIS -- tirar de uma rota sem por em outra
+     deixaria um buraco na Pokedex, que e o que a regra de 'todo pokemon tem como ser capturado'
+     existe pra impedir. */
+  ['magcargo', 'rhydon', 'poliwrath', 'porygon2'].forEach(id => {
+    let achou = false;
+    [S.ROUTE_MAP, S.JOHTO_ROUTE_MAP].forEach(m => (m || []).forEach(par => par.forEach(r => {
+      if((r.pool || []).includes(id) || (r.rare || []).some(x => (x.id || x) === id)) achou = true;
+    })));
+    ok('  o ' + S.SPECIES[id].name + ' continua em alguma rota', achou);
+  });
+}
+
 console.log('\n=== AS 28 FORMAS DO UNOWN (16/09/2026) ===');
 {
   /* Pedido assim: *"implemente as sprites de todas as letras do alfabeto do unown"*. Ele e a unica

@@ -50,19 +50,220 @@ ok('todo tipo tem nome em portugues', semNome.length === 0, semNome.join(','));
 ok('todo tipo tem cor', semCor.length === 0, semCor.join(','));
 const sobrandoNome = Object.keys(S.TYPE_NAMES_PT).filter(t => !S.TYPE_CHART[t]);
 ok('nenhum nome sobrando de tipo que nao existe', sobrandoNome.length === 0, sobrandoNome.join(','));
-/* pickGymTerrain traduz o nome do ginasio (em portugues) de volta pro ingles pra achar o terreno.
-   Sem o tipo no TYPE_NAMES_PT ele devolve null e o terreno cai no sorteio geral -- o ginasio da
-   Jasmine ficava com um terreno qualquer entre os 51, em vez de um do dominio dele. */
+/* O `terrenoDoGinasio` traduz o nome do ginasio (em portugues) de volta pro ingles pra achar o
+   terreno. Sem o tipo no TYPE_NAMES_PT ele devolve null e o ginasio fica SEM terreno. */
 const semTraducao = S.KANTO_GYMS.concat(S.JOHTO_GYMS)
   .filter(g => !S.englishTypeFromPortuguese(g.gymTypeName));
 ok('o tipo de todo ginasio volta do portugues pro ingles', semTraducao.length === 0,
    semTraducao.map(g => g.leaderName + ' (' + g.gymTypeName + ')').join(', '));
-const semTerrenoProprio = S.KANTO_GYMS.concat(S.JOHTO_GYMS).filter(g => {
-  const en = S.englishTypeFromPortuguese(g.gymTypeName);
-  return !en || !T.some(t => t.types.includes(en));
+
+console.log('\nOS TERRENOS DE GINASIO (25/09/2026)');
+/* ⚠️ ANTES DE 25/09/2026 O GINASIO SORTEAVA entre os 6 terrenos do tipo do lider, e a trava aqui
+   era *'todo ginasio tem terreno do dominio dele'*. Hoje o terreno e FIXO e de UM TIPO SO -- ela
+   nao foi afrouxada, virou a da regra nova. */
+const G = S.GYM_TERRAINS;
+const gyms = S.KANTO_GYMS.concat(S.JOHTO_GYMS);
+ok('sao 16 terrenos de ginasio', G.length === 16, String(G.length));
+/* ⚠️ A COBERTURA E A TRAVA QUE IMPORTA: um ginasio de tipo novo sem terreno cadastrado lutaria SEM
+   terreno, e o sintoma e mudo (some o selo, e o buff do lider some junto). */
+const ginSemTerreno = gyms.filter(g => !S.terrenoDoGinasio(g));
+ok('todo ginasio tem terreno proprio', ginSemTerreno.length === 0,
+   ginSemTerreno.map(g => g.gymTypeName).join(', '));
+/* ⚠️ E O TERRENO TEM QUE SER DO TIPO DO LIDER -- errar isto daria o buff ao tipo errado, e o selo
+   na tela continuaria dizendo o nome certo. */
+const tipoErrado = gyms.filter(g => {
+  const t = S.terrenoDoGinasio(g);
+  return !t || t.types[0] !== S.englishTypeFromPortuguese(g.gymTypeName);
 });
-ok('todo ginasio tem terreno do dominio dele', semTerrenoProprio.length === 0,
-   semTerrenoProprio.map(g => g.leaderName).join(', '));
+ok('e o buff dele e do tipo do lider', tipoErrado.length === 0,
+   tipoErrado.map(g => g.gymTypeName).join(', '));
+/* ⚠️ UM TIPO SO: e o pedido ao pe da letra (*'vai dar o buff apenas para pokemons de pedra'*). Um
+   segundo tipo aqui devolveria em silencio o que a mudanca veio tirar -- o buff de graca pro time
+   do jogador, que hoje sai em 94,8% dos terrenos comuns. */
+const maisDeUm = G.filter(t => t.types.length !== 1);
+ok('cada terreno de ginasio tem UM tipo so', maisDeUm.length === 0,
+   maisDeUm.map(t => t.name + ' (' + t.types.join('/') + ')').join(', '));
+ok('e o nome de todos comeca com "Ginásio"', G.every(t => /^Ginásio/.test(t.name)),
+   G.filter(t => !/^Ginásio/.test(t.name)).map(t => t.name).join(', '));
+ok('e cada um tem id, nome e icone', G.every(t => t.id && t.name && t.icon));
+ok('nenhum id repetido', new Set(G.map(t => t.id)).size === G.length);
+ok('nenhum nome repetido', new Set(G.map(t => t.name)).size === G.length);
+/* ⚠️ ELES NAO PODEM ENTRAR NO `TERRAINS`: aquela tabela e SORTEADA pela liga, oferecida ao lider do
+   ginasio do bairro e listada na tela de terrenos. E ela tem 6 terrenos por tipo de proposito -- a
+   conta que faz o buff sair com a mesma frequencia pros 17 tipos. */
+const vazou = G.filter(t => T.some(x => x.id === t.id));
+ok('nenhum deles entrou no TERRAINS da liga', vazou.length === 0,
+   vazou.map(t => t.id).join(', '));
+ok('e o TERRAINS da liga continua com os 51', T.length === 51, T.length + ' terrenos');
+/* ⚠️ E O `terrenoPorId` ACHA OS DOIS -- e o selo do ginasio chama ele. Com o `TERRAINS.find` direto
+   o clique no selo nao abria nada, sem erro nenhum. */
+ok('o terrenoPorId acha terreno de ginasio', (S.terrenoPorId('ginasio_pedra')||{}).name === 'Ginásio de Pedra');
+ok('  e continua achando os da liga', (S.terrenoPorId('vulcao')||{}).name === 'Vulcão');
+ok('  e devolve null no que nao existe', S.terrenoPorId('nao_existe') === null);
+/* ⚠️ E A LIGA NAO PODE ACEITAR TERRENO DE GINASIO: la o `TERRAINS.find` e uma VALIDACAO implicita,
+   e e por isso que os 5 finds da Trainers League e da Classica ficaram como estavam. */
+ok('a liga NAO acha terreno de ginasio', !T.some(t => t.id === 'ginasio_pedra'));
+
+console.log('\nO TERRENO DA ROCKET E DO RIVAL (25/09/2026)');
+/* ⚠️ SAO QUATRO CONTEXTOS E NAO DOIS: o esconderijo (`hideout1`/`hideout2`) E a Equipe Rocket -- o
+   guarda e o chefe. Nomear so `rocket` deixaria as duas lutas mais longas da linha SEM terreno, e
+   o jogador veria o selo sumir no meio da sequencia. */
+const COM = S.CONTEXTOS_COM_TERRENO;
+ok('os quatro contextos da Rocket e do rival sorteiam',
+   ['rocket','hideout1','hideout2','rival'].every(c => COM.indexOf(c) >= 0), JSON.stringify(COM));
+/* ⚠️ E A ELITE FICA DE FORA porque ela ja tem o dela (um por membro, do chaveamento) -- se ela
+   entrasse aqui, o sorteado sobrescreveria o do membro e o selo da tela mentiria. A montanha e a
+   vigilia ficam de fora porque sao batalhas de PREMIO, com recompensa calibrada. */
+ok('  e a elite, a montanha e a vigilia NAO',
+   ['elite','montanha','montanhaLendarios','vigilia'].every(c => COM.indexOf(c) < 0), JSON.stringify(COM));
+
+/* ⚠️ A TRAVA QUE IMPORTA: o que a TELA mostra tem que ser o que o MOTOR aplica. Sao dois leitores
+   do mesmo terreno (o `runSpecialBattle` e o selo), e divergindo a tela promete um buff que a luta
+   nao da -- o defeito mais caro que este projeto colecionou. */
+['rocket','hideout1','hideout2','rival'].forEach(ctx => {
+  S.startSpecialBattle(ctx, [{ speciesId:'onix', level:20 }], {});
+  const t = S.terrenoDaBatalhaEspecial();
+  ok('  ' + ctx + ' entra com terreno', !!t, t ? t.name : '(nenhum)');
+  ok('    e ele e um terreno da LIGA (nao de ginasio)',
+     !!t && T.some(x => x.id === t.id), t ? t.id : '');
+  /* ⚠️ E ELE NAO PODE MUDAR ENTRE A ABERTURA E A LUTA: por isso o sorteio mora no
+     `startSpecialBattle` e nao no `runSpecialBattle`, que roda de novo a cada tentativa. */
+  ok('    e nao muda quando a tela e lida de novo',
+     S.terrenoDaBatalhaEspecial() === t);
+});
+['montanha','vigilia'].forEach(ctx => {
+  S.startSpecialBattle(ctx, [{ speciesId:'onix', level:20 }], {});
+  ok('  ' + ctx + ' continua sem terreno', S.terrenoDaBatalhaEspecial() === null,
+     String(S.terrenoDaBatalhaEspecial()));
+});
+/* ⚠️ E ELE NAO VAZA DE UMA BATALHA PRA OUTRA: o campo e reescrito em TODA abertura, entao uma luta
+   sem terreno depois de uma com nao pode herdar o buff -- o `terrainBuffed` do time e limpo no
+   `runSpecialBattle`, mas o SELO sai deste campo. */
+S.startSpecialBattle('rival', [{ speciesId:'onix', level:20 }], {});
+const terRival = S.terrenoDaBatalhaEspecial();
+S.startSpecialBattle('vigilia', [{ speciesId:'onix', level:20 }], {});
+ok('  e o terreno de uma nao vaza pra a seguinte',
+   !!terRival && S.terrenoDaBatalhaEspecial() === null);
+/* ⚠️ E ESTA E A TRAVA QUE IMPORTA: ela roda o `runSpecialBattle` DE VERDADE e confere que o time
+   saiu com o buff. Foi a conferencia de acusacao que a cobrou -- religando o motor pra ignorar o
+   `specialTerrain` (o defeito MAIS GRAVE da lista: a tela mostra o selo e a luta nao da o buff),
+   todas as travas acima continuavam VERDES, porque elas leem so o lado da TELA.
+   ⚠️ E ela cobra o PAR: com terreno o time e marcado, sem terreno nao. Uma metade so passaria com
+   um motor que marcasse SEMPRE. */
+(function(){
+  const g = S.__getGame();
+  const montaTime = () => [S.createInstance('pikachu', 30), S.createInstance('onix', 30)]
+    .map(p => { p.hp = S.calcMaxHp(p); p.maxHp = p.hp; return p; });
+  /* ⚠️ ELA ESPIA O `simulateGymBattle` EM VEZ DE OLHAR DEPOIS, e a razao e que as duas travas
+     seriam CONTRADITORIAS: o buff tem que estar LIGADO durante a luta e DESLIGADO depois dela
+     (senao vaza pra jornada). Olhando so o estado final, uma das duas sempre falha.
+     O dublê anota o time no INSTANTE da chamada e repassa pro original -- a luta acontece igual. */
+  const rodou = (ctx) => {
+    g.team = montaTime();
+    g.equipados = {}; g.currentSaveSlot = 0;
+    S.startSpecialBattle(ctx, [{ speciesId:'pidgey', level:28 }], {});
+    const t = S.terrenoDaBatalhaEspecial();
+    const original = S.simulateGymBattle;
+    let duranteALuta = null;
+    S.simulateGymBattle = function(meu, dele, rng, op){
+      duranteALuta = meu.filter(p => p.terrainBuffed).length;
+      return original.apply(this, arguments);
+    };
+    try { S.runSpecialBattle(); } finally { S.simulateGymBattle = original; }
+    return { t, marcados: duranteALuta,
+             depois: g.team.filter(p => p.terrainBuffed).length,
+             doTipo: t ? g.team.filter(p => (S.SPECIES[p.speciesId].types||[]).some(ty => t.types.indexOf(ty) >= 0)).length : 0 };
+  };
+  /* sorteia ate cair um terreno que alcance o time -- senao a trava mede o conjunto vazio, que e
+     o falso verde mais comum deste arquivo */
+  let r = null;
+  for(let i = 0; i < 60 && !(r && r.doTipo > 0); i++) r = rodou('rival');
+  ok('o MOTOR aplica o terreno da batalha do rival', !!r && r.doTipo > 0 && r.marcados === r.doTipo,
+     r ? (r.t ? r.t.name : '(sem terreno)') + ': ' + r.marcados + ' marcados de ' + r.doTipo + ' do tipo' : '(nao rodou)');
+  const semTerreno = rodou('vigilia');
+  ok('  e NAO aplica onde nao ha terreno', semTerreno.marcados === 0,
+     semTerreno.marcados + ' marcados');
+  /* ⚠️ E O BUFF NAO PODE SAIR DA BATALHA (25/09/2026). Ele vale 1,15x nos SEIS atributos, teto de
+     HP incluido, e a flag ficava LIGADA depois da luta -- o time levava o bonus do terreno do
+     rival pra a jornada inteira. Medido no A/B: a conclusao ia a +4,83 pontos (5,3 sigma, 8 de 8
+     blocos) enquanto a medicao ISOLADA da batalha dava −0,63. Foram os dois numeros discordando
+     que denunciaram.
+     ⚠️ E A TRAVA OLHA DEPOIS DA LUTA, nao durante: durante ela TEM que estar ligada. */
+  /* ⚠️ ELA REUSA O `rodou`, que sorteia ate cair um terreno que ALCANCE o time -- sem isso ela
+     mede o conjunto vazio: com um terreno que nao alcanca ninguem, a flag fica falsa de qualquer
+     jeito e a trava passa com o vazamento religado. Foi a conferencia de acusacao que pegou. */
+  ok('  e o buff NAO sai da batalha especial', r.depois === 0,
+     r.depois + ' com a flag ligada depois da luta (e ' + r.marcados + ' durante)');
+})();
+
+/* ⚠️ E O SORTEIO LE O `TERRAINS`, nunca uma lista propria: um terreno novo na tabela entra aqui
+   de graca, e um que saia nao fica orfao. Medido: 400 sorteios cobrem mais de um terco da tabela. */
+const vistos = new Set();
+for(let i = 0; i < 400; i++){
+  S.startSpecialBattle('rocket', [{ speciesId:'onix', level:20 }], {});
+  vistos.add(S.terrenoDaBatalhaEspecial().id);
+}
+ok('  e o sorteio varre a tabela da liga', vistos.size > T.length / 3,
+   vistos.size + ' terrenos distintos em 400 sorteios, de ' + T.length);
+
+/* ⚠️ E ESTA TRAVA EXERCITA O CAMINHO, nao a funcao -- foi a conferencia de acusacao que cobrou:
+   com o `openTerrainInfoModal` voltando ao `TERRAINS.find`, TODAS as travas acima continuavam
+   verdes, porque elas chamam o `terrenoPorId` na mao. O modal e quem o selo do ginasio chama, e
+   o sintoma de errar la e MUDO: o selo fica na tela e o clique nao abre nada.
+   ⚠️ E ela cobra o PAR -- o de ginasio abre E o da liga continua abrindo. */
+S.openTerrainInfoModal('ginasio_pedra');
+const alvoGin = S.__getGame().terrainInfoTarget;
+ok('o SELO do ginasio abre a caixa do terreno',
+   !!alvoGin && alvoGin.name === 'Ginásio de Pedra', alvoGin ? alvoGin.name : '(nao abriu)');
+S.openTerrainInfoModal('vulcao');
+const alvoLiga = S.__getGame().terrainInfoTarget;
+ok('  e o selo de um terreno da liga tambem',
+   !!alvoLiga && alvoLiga.name === 'Vulcão', alvoLiga ? alvoLiga.name : '(nao abriu)');
+S.closeTerrainInfoModal();
+
+/* ⚠️ SAVE ANTIGO NAO QUEBRA E NAO MUDA NO MEIO: o `gymTerrain` e serializado, entao quem parou
+   dentro de um ginasio com um terreno SORTEADO continua com ele ate aquele ginasio acabar. O que
+   nao pode e a tela deixar de achar aquele terreno -- o selo ficaria mudo. */
+S.openTerrainInfoModal('caverna_cristais');
+const alvoVelho = S.__getGame().terrainInfoTarget;
+ok('um terreno SORTEADO de save antigo continua sendo achado',
+   !!alvoVelho && alvoVelho.name === 'Caverna de Cristais', alvoVelho ? alvoVelho.name : '(nao abriu)');
+S.closeTerrainInfoModal();
+
+/* ⚠️ O `--battle-scene-id` SAI COM O ID DO GINASIO, e e por esse seletor de atributo que a imagem
+   entra -- foi ele que permitiu o cenario do Brock ser UMA LINHA de CSS em 25/09/2026. */
+const estGin = S.terrainBattleSceneStyle(G[0]);
+ok('o scene-id e o do proprio ginasio', /--battle-scene-id:ginasio_pedra;/.test(estGin));
+
+/* ⚠️ OS 16 GINASIOS TEM CENA PROPRIA desde 25/09/2026, e a trava cobra o CONJUNTO, nunca um nome:
+   ela varre a TABELA e exige que cada id tenha a regra de CSS. Nomeando os 16 a mao, o proximo
+   ginasio que nascer entraria sem cena e ninguem veria -- ele cairia no `campo_aberto` e a batalha
+   continuaria funcionando, que e o jeito mudo de falhar.
+   ⚠️ E A DIRECAO IMPORTA: esta olha da TABELA pro CSS. A do bloco 'CENA DE BATALHA' mais abaixo
+   olha do CSS pro DISCO (toda imagem pedida existe) -- as duas juntas fecham o circuito, e por
+   isso esta aqui NAO confere arquivo: seria a mesma conta, pior feita. */
+const RAIZ = path.join(__dirname, '..');
+const _srcT = fs.readFileSync(path.join(RAIZ, 'index.html'), 'utf8');
+const semRegra = G.filter(t =>
+  _srcT.indexOf('--battle-scene-id:' + t.id + ';"]{background-image:url("assets/batalha/cena-' + t.id + '.webp")') < 0);
+ok('os ' + G.length + ' ginasios tem cena propria no CSS', semRegra.length === 0,
+   semRegra.map(t => t.id).join(', '));
+/* ⚠️ E NENHUMA PODE SER UM PNG DE 2 MB: a raiz e publicada e o jogo ja baixa 2,7 MB de HTML.
+   O teto e generoso (600 KB) porque a maior hoje tem 401 KB -- ele existe pra pegar um arquivo
+   que entre SEM passar pela conversao, nao pra apertar a arte. */
+const cenasPesadas = G.map(t => ({ id:t.id, arq: path.join(RAIZ,'assets','batalha','cena-'+t.id+'.webp') }))
+  .filter(x => fs.existsSync(x.arq))
+  .map(x => ({ id:x.id, kb: Math.round(fs.statSync(x.arq).size/1024) }))
+  .filter(x => x.kb > 600);
+ok('  e nenhuma passa de 600 KB', cenasPesadas.length === 0,
+   cenasPesadas.map(x => x.id + ' ' + x.kb + 'KB').join(', '));
+/* ⚠️ E A PASTA DAS ARTES NAO PODE IR AO AR: a raiz inteira e publicada, e `ginasios-cenarios/`
+   tem 34 MB de PNG. E a mesma licao que a `previa-confusao.html` e o `preview-telas.html` ja
+   custaram -- lixo publicado, achado depois do deploy. */
+const _fb = JSON.parse(fs.readFileSync(path.join(RAIZ, 'firebase.json'), 'utf8'));
+ok('a pasta das artes esta no hosting.ignore',
+   (_fb.hosting.ignore || []).indexOf('ginasios-cenarios/**') >= 0,
+   JSON.stringify(_fb.hosting.ignore));
 
 console.log('\nIDENTIDADE');
 ok('nenhum id de terreno repetido', new Set(T.map(t => t.id)).size === T.length, String(T.length));
