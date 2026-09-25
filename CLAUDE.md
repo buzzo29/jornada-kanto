@@ -18941,6 +18941,56 @@ e foram apagadas; o que elas custavam era espaço em disco, não contexto.
 cena nova está no jogo, 49 usos de `battle-scene`) e está no `hosting.ignore`, então não vai ao ar —
 mas **23 MB são ~6 milhões de tokens**: uma varredura que o leia por engano estoura o contexto
 sozinha. Ele é untracked e não é meu; fica registrado como a coisa mais perigosa do diretório.
+### ⚠️ A BATERIA MENTIU, E TRÊS DEFEITOS MEUS FORAM PRO AR DE UMA VEZ (24/09/2026)
+
+Reportado com print: *"está dando esse erro quando clica pra se inscrever na liga pro"* — a tela
+dizendo **"Não deu pra sortear seus pokémon. Confira sua conexão"**. ⚠️ **A Liga Pro estava quebrada
+em produção: ninguém conseguia se inscrever.**
+
+**A CADEIA TEM TRÊS ELOS, e os três são meus:**
+
+| | |
+|---|---|
+| **1. a trava** | ao inverter uma trava do `test-liga-pro` eu escrevi **`cli`** onde a variável é **`src`** — `ReferenceError` **no teste** |
+| **2. a bateria** | ⚠️ **ela contou o teste morto como OK**, então nenhuma trava da Liga Pro rodava |
+| **3. o código** | ao tirar a trava de "já está disputando", o `preambuloDaInscricao` deixou de devolver `ativo` — e o **`if(ativo)` ficou órfão** no `abrirBoloDaLigaPro`. `ReferenceError` → o `catch` → a mensagem do print |
+
+**⚠️ O ELO 2 É O QUE IMPORTA: sem ele os outros dois teriam sido pegos na hora.** O meu laço de
+bateria era um `grep -qE "FALHA|FALHOU"` na saída — e **um teste que MORRE não imprime nenhuma das
+duas palavras**: ele imprime um stack trace. O laço contava isso como passou, e a sessão inteira
+rodou com **43 de 43** enquanto um teste estava morto.
+
+**⚠️ E A LIÇÃO JÁ ESTAVA ESCRITA — no `tools/acusar.js`, do mesmo dia:** *"MORREU é não ter impresso
+o sumário, nunca o stderr ter a palavra Error"*. Ela tinha sido aplicada à **conferência de
+acusação** e não à **bateria**. É a mesma armadilha em duas ferramentas irmãs.
+
+**`tools/bateria.js` é a bateria com o critério certo, e ele é o EXIT CODE** — o único universal:
+node sai != 0 quando o script estoura, quando o timeout dispara e quando o teste faz
+`process.exit(1)`.
+
+**⚠️ E O SUMÁRIO NÃO SERVE DE CRITÉRIO, o que a primeira versão dela provou na cara:** os testes da
+casa têm **CINCO formatos** — `Tudo certo.` (35 deles), `N/N casos passaram.` (5),
+`Tudo certo. (N casos)`, `Tudo certo.  (N asserções)` e `tudo certo` em minúscula. Conhecendo só o
+primeiro, ela reportou **6 testes CERTOS como mortos**. Hoje o sumário entra só pra dizer POR QUE
+falhou. **Conferido que ela pega o que o laço antigo deixava passar**: com o defeito religado, o
+laço diz OK e ela diz `MORREU`.
+
+**⚠️ E ELA ACHOU MAIS SEIS MORTOS NA PRIMEIRA RODADA — que eram falso positivo dela mesma.** Os seis
+passavam, com um dos outros quatro formatos. É o lembrete de que **uma ferramenta nova mente nos
+dois sentidos** até ser conferida contra o conjunto todo.
+
+**O CONSERTO DO JOGO são duas linhas**, e a segunda estava no mesmo print:
+
+- **o `if(ativo)` saiu** — e remover é o conserto CERTO, não um remendo: a trava foi tirada **a
+  pedido** no mesmo dia. ⚠️ E o `node --check` passa nisso: `ativo` é uma variável, e o erro só
+  existe em **RUNTIME** — a família do `moveTeam` que nunca existiu e do TDZ;
+- **o erro e o "Sorteando…" apareciam JUNTOS** (está no print), porque eram duas condições
+  independentes. ⚠️ Um "carregando" ao lado de um erro é pior que ruído: ele diz que ainda há o que
+  esperar quando já acabou e falhou, e o jogador fica esperando.
+
+**⚠️ E O QUE ISSO DIZ SOBRE AS TRAVAS DA LIGA PRO: elas ESTAVAM certas.** O `test-liga-pro` já
+exercita o `abrirBoloDaLigaPro` **de verdade** (com o preâmbulo dublado) desde 24/09 — conferido,
+religando o `if(ativo)` ele **acusa**. O que faltou não foi trava: foi **rodá-la**.
 ### ⚠️ AS TRÊS REGRAS QUE FICAM
 
 1. **Texto com escape nunca passa pelo shell.** Receita em arquivo, e **regex LITERAL**

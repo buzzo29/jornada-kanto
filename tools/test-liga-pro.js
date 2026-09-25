@@ -438,7 +438,7 @@ console.log('\n=== A INSCRICAO ===');
   /* ⚠️ ESTA TRAVA VIROU DO AVESSO EM 24/09/2026: ela cobrava que o ACTIVE_ELSEWHERE valia, e ele
      era justamente a trava de "ja esta DISPUTANDO" -- que saiu a pedido. Ela fica cobrando que ele
      nao voltou, no ARQUIVO inteiro: sem isso alguem o reintroduz e ninguem ve. */
-  ok('  e a trava de "ja esta disputando" nao voltou', !/ACTIVE_ELSEWHERE/.test(cli));
+  ok('  e a trava de "ja esta disputando" nao voltou', !/ACTIVE_ELSEWHERE/.test(src));
   /* ⚠️ E A OUTRA TRAVA FICA: a de inscricao dupla no MESMO ciclo, que e a transacao da gravacao. */
   ok('  e a de inscricao dupla no mesmo ciclo continua', /DUPLICATE/.test(bloco));
 }

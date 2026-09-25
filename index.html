@@ -19539,7 +19539,6 @@ async function abrirBoloDaLigaPro(){
   if(!game.authUser){ game.leagueTeamPickError = 'Você precisa estar logado.'; render(); return; }
   try{
     const { entry } = await preambuloDaInscricao(PRO_LEAGUE_TYPE, game.authUser.uid);
-    if(ativo){ game.leagueTeamPickError = 'Sua conta já está inscrita nessa Liga em outra rodada.'; render(); return; }
     game.proCicloId = entry.id;
     game.proFaixa = proFaixaDoCiclo(entry);
     game.proBolo = proSorteiaBolo(game.authUser.uid, entry);
@@ -19586,7 +19585,10 @@ function renderProPicker(){
        liga — sair e voltar não muda os seus.</p>
   </div>
   ${game.leagueTeamPickError ? `<div class="box"><p class="error-text">${game.leagueTeamPickError}</p></div>` : ''}
-  ${bolo === null ? `<div class="box"><p class="hint-text">Sorteando seus pokémon...</p></div>` : ''}
+  ${/* ⚠️ O "SORTEANDO" SO SAI SEM ERRO: com as duas condicoes independentes os dois
+       apareciam JUNTOS (reportado com print em 24/09/2026), e um "carregando" ao lado de um erro
+       e pior que ruido -- ele diz que ainda ha o que esperar quando ja acabou e falhou. */''}
+  ${bolo === null && !game.leagueTeamPickError ? `<div class="box"><p class="hint-text">Sorteando seus pokémon...</p></div>` : ''}
   ${bolo ? `<div class="box">
     <p class="hint-text" style="text-align:center">${sel.length} de ${PRO_ESCOLHE} escolhidos</p>
     ${/* ⚠️ O CARD É O DO DRAFT DA SELEÇÃO, e a grade também: é o MESMO problema (escolher
