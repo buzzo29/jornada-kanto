@@ -7,10 +7,11 @@
       "**/node_modules/**",
       "firestore.rules",
       "firestore.indexes.json",
-      "index-novos-graficos.html",
+      "**/index-novos-graficos.html",
+      "ilhas-laranjas/**",
       "**/previa-*.html",
-      "preview-telas.html",
-      "*-pokemon.html"
+      "**/preview-telas.html",
+      "**/*-pokemon.html"
     ],
     "headers": [
       {
