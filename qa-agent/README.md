@@ -17,12 +17,13 @@ Durante o teste, toda requisicao externa e bloqueada. Isso inclui Firebase, Goog
 
 ```powershell
 npm run jarbas -- "teste se a Jornada Kanto abre"
+npm run jarbas -- "verifique se o Onix dormindo não ataca depois do sono da Jynx"
 npm run jarbas -- "abra o site com navegador visual"
 npm run test:smoke
 npm run test:smoke:headed
 npm run typecheck
 ```
 
-O comando `jarbas` aceita linguagem natural, mostra o plano e escolhe o smoke test disponivel. Pedidos de outros cenarios sao recusados com uma explicacao clara ate que esses testes sejam implementados.
+O comando `jarbas` aceita linguagem natural, mostra o plano e escolhe entre os cenarios disponiveis. Pedidos de outros cenarios sao recusados com uma explicacao clara ate que esses testes sejam implementados.
 
 Falhas geram evidencias em `test-results/` e um relatorio HTML em `playwright-report/`.
