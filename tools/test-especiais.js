@@ -323,7 +323,16 @@ ok('e o log diz qual golpe foi', diario.some(g => g.x === 'sono' && g.g === 'Can
             ANTES do golpe que derrubou quem o deu -- os dois sao do mesmo instante, e alguem sempre
             vai parecer agir depois de cair; a regra escolhe que seja o golpe que MATOU. */
       let hpP = m.playerHpBefore, hpE = m.enemyHpBefore;
-      const cura = seq.find(x => x.x === 'recover' || x.x === 'furia');
+        /* ⚠️ ESTE AJUSTE PRESSUPUNHA QUE A CURA ERA A PRIMEIRA COISA DO CONFRONTO -- ela era
+           ABERTURA, e o HP inicial do matchup ja era o pos-cura. Com o Recuperar virando um golpe
+           da TROCA (24/09/2026) ela pode estar no MEIO, e ai este ajuste joga o HP inicial pra o
+           pos-cura e os golpes ANTERIORES passam a ser aplicados em cima dele: o HP fica negativo
+           cedo demais e o scanner acusa de cadaver quem esta vivo. Medido: 0 de 4000 antes da
+           mudanca, 4 de 4000 depois -- os quatro falso positivo DELE, nao do jogo.
+           ⚠️ A FURIA CONTINUA AQUI porque ela E abertura: ela sobe o TETO de vida no comeco do
+           confronto. O recover passou a ser somado pelo acc, junto do dreno -- que e a conta certa
+           pra uma cura em QUALQUER posicao. */
+      const cura = seq.find(x => x.x === 'furia');
       if(cura){ if(cura.q === 'p') hpP = cura.hp; else hpE = cura.hp; }
       const lista = seq.filter(ehDano);
       /* ⚠️ A DRENAGEM NO GOLPE SOBE A VIDA NO MEIO DA LUTA (15/09/2026), e este scanner só sabia
@@ -337,7 +346,11 @@ ok('e o log diz qual golpe foi', diario.some(g => g.x === 'sono' && g.g === 'Can
       { let i = 0, acc = { p:0, e:0 };
         for(const g of seq){
           if(ehDano(g)){ ganhoAntes[i++] = acc; acc = { p:0, e:0 }; continue; }
-          if(g.x === 'dreno') acc[g.q] += g.d || 0;
+          /* ⚠️ O RECUPERAR ENTROU AQUI EM 24/09/2026: ele passou a acontecer NO MEIO da luta, e esta
+               conta reconstroi o HP linha a linha -- sem ele ela nao via a barra subir e acusava o
+               curado de "atacar morto". E a QUINTA conta deste arquivo que copiava a lista do
+               subiuAVida a mao. */
+            if(g.x === 'dreno' || g.x === 'recover') acc[g.q] += g.d || 0;
         } }
       const caiuEm = { p:-1, e:-1 };
       for(let k = 0; k < lista.length; k++){
@@ -1197,38 +1210,57 @@ ok('e as que so a Gen 2 deu', ['porygon2','corsola','lugia','hooh','celebi']
 ok('o Mewtwo nao entra (e imune ao bloco inteiro)', !S.RECUPERACAO.includes('mewtwo'));
 ok('nenhuma esta fora do SPECIES', S.RECUPERACAO.filter(id => !S.SPECIES[id]).length === 0);
 
-/* O POKEMON QUE SOBREVIVEU AO CONFRONTO ANTERIOR entra machucado e se cura ANTES de o novo
-   adversario atacar. Ficava no FIM do doExchange (o vencedor se curava depois de ganhar), e era o
-   mesmo numero com metade da graca: a cura chegava com a luta ja decidida. */
-(function(){
-  function comVidaEm(pct, n){
-    let curas = 0, curouAntesDeQualquerGolpe = 0;
-    for(let i=0;i<n;i++){
-      const a = inst('starmie'); a.maxHp = S.calcMaxHp(a); a.hp = Math.floor(a.maxHp*pct);
-      const b = inst('rapidash'); b.maxHp = S.calcMaxHp(b); b.hp = b.maxHp;
-      const d = [];
-      S.tentarGolpeEspecial(a, b, Math.random, d);
-      if(d.some(g=>g.x==='recover')){
-        curas++;
-        if(a.hp === a.maxHp) curouAntesDeQualquerGolpe++;
+  /* ⚠️ O RECUPERAR VIROU UM GOLPE DA TROCA (24/09/2026, a pedido). Ele era ABERTURA: sorteado UMA
+     vez por confronto, abaixo de 70%, e curava de GRACA -- o pokemon curava E atacava na mesma
+     troca. Hoje: abaixo de CURA_MAXIMO_DO_HP (50%), CHANCE_RECUPERAR a CADA troca, e quem cura
+     PERDE o ataque daquela troca -- que e o que o Recover faz no jogo original (ele USA o turno).
+     ⚠️ AS TRAVAS ABAIXO NAO FORAM AFROUXADAS: elas mediam a regra antiga e viraram as da nova. */
+  (function(){
+    function comVidaEm(pct, n){
+      let curas = 0, cheio = 0, atacou = 0;
+      for(let i=0;i<n;i++){
+        const a = inst('starmie'); a.maxHp = S.calcMaxHp(a); a.hp = Math.floor(a.maxHp*pct);
+        const b = inst('rapidash'); b.maxHp = S.calcMaxHp(b); b.hp = b.maxHp;
+        const d = [];
+        S.doExchange(a, b, Math.random, d, 'p', 'e');
+        const c = d.find(g => g.x === 'recover');
+        if(c){
+          curas++;
+          if(c.hp === a.maxHp) cheio++;
+          /* ⚠️ E ELE NAO ATACOU NESTA TROCA: nenhum golpe DELE no diario. */
+          if(d.some(g => !g.x && g.q === 'p')) atacou++;
+        }
+        a._especialContra = null; b._especialContra = null;
       }
+      return { taxa: 100*curas/n, cheio: curas === cheio, atacou };
     }
-    return { taxa: 100*curas/n, cheio: curas === curouAntesDeQualquerGolpe };
-  }
-  const r30 = comVidaEm(0.30, 4000);
-  ok('com 30% de vida ele se cura, perto de 10%', Math.abs(r30.taxa - 10) < 3, r30.taxa.toFixed(1) + '%');
-  ok('e a vida vai direto pro maximo', r30.cheio);
-  ok('com 69% ainda se cura', comVidaEm(0.69, 3000).taxa > 6, comVidaEm(0.69, 3000).taxa.toFixed(1) + '%');
-  /* Acima de 70% nao ha o que recuperar, e a frase anunciaria um efeito que mal se ve na barra. */
-  ok('com 75% NAO se cura', comVidaEm(0.75, 3000).taxa === 0, comVidaEm(0.75, 3000).taxa.toFixed(1) + '%');
-  ok('e com a vida cheia tambem nao', comVidaEm(1.00, 3000).taxa === 0);
-  /* Como o Disable, ela NAO resolve o confronto: a luta acontece inteira, com ele curado. */
-  const a = inst('starmie'); a.maxHp = S.calcMaxHp(a); a.hp = Math.floor(a.maxHp*0.3);
-  const b = inst('rapidash'); b.maxHp = S.calcMaxHp(b); b.hp = b.maxHp;
-  const d = [];
-  const resolveu = S.tentarGolpeEspecial(a, b, ()=>0.01, d);
-  ok('e a cura NAO encerra o confronto', resolveu === false);
-  ok('o registro guarda quanto subiu', d[0] && d[0].x === 'recover' && d[0].d > 0, JSON.stringify(d[0]));
+    const r30 = comVidaEm(0.30, 4000);
+    ok('com 30% de vida ele se cura, perto de 10% -- POR TROCA', Math.abs(r30.taxa - 10) < 3, r30.taxa.toFixed(1) + '%');
+    ok('e a vida vai direto pro maximo', r30.cheio);
+    /* ⚠️ E QUEM CURA NAO ATACA: e esse o preco que equilibra a cura ter passado a ser sorteada a
+       cada troca. Num confronto de ~2 trocas, perder o ataque e perder metade deles. */
+    ok('e quem curou NAO atacou naquela troca', r30.atacou === 0, r30.atacou + ' atacaram mesmo assim');
+    /* ⚠️ O TETO CAIU DE 70% PRA 50% junto com a mudanca: com a cura saindo a cada troca, a guarda
+       ficou mais apertada pra compensar. Esta trava cobrava "com 69% ainda se cura". */
+    ok('com 49% ainda se cura', comVidaEm(0.49, 3000).taxa > 6, comVidaEm(0.49, 3000).taxa.toFixed(1) + '%');
+    ok('com 69% NAO se cura mais (o teto e ' + Math.round(S.CURA_MAXIMO_DO_HP*100) + '%)',
+       comVidaEm(0.69, 2000).taxa === 0, comVidaEm(0.69, 2000).taxa.toFixed(1) + '%');
+    ok('com 75% NAO se cura', comVidaEm(0.75, 2000).taxa === 0);
+    ok('e com a vida cheia tambem nao', comVidaEm(1.00, 2000).taxa === 0);
+    /* ⚠️ E ELE SAIU DA FILA DE ABERTURA: o sorteio de la nao o conhece mais. */
+    {
+      const a = inst('starmie'); a.maxHp = S.calcMaxHp(a); a.hp = Math.floor(a.maxHp*0.3);
+      ok('o Recuperar NAO esta mais na fila de abertura',
+         S.sorteiaGolpeEspecial(a, inst('rapidash'), () => 0.001) === null);
+    }
+    /* Como o Disable, ela NAO resolve o confronto: a luta acontece inteira, com ele curado. */
+    const a = inst('starmie'); a.maxHp = S.calcMaxHp(a); a.hp = Math.floor(a.maxHp*0.3);
+    const b = inst('rapidash'); b.maxHp = S.calcMaxHp(b); b.hp = b.maxHp;
+    const d = [];
+    S.doExchange(a, b, ()=>0.01, d, 'p', 'e');
+    ok('e a cura NAO encerra o confronto', a.hp > 0 && b.hp > 0);
+    const reg = d.find(g => g.x === 'recover');
+    ok('o registro guarda quanto subiu', reg && reg.d > 0, JSON.stringify(reg));
 })();
 /* Quem nao esta na lista nunca cura, por mais machucado que entre. */
 (function(){
@@ -1310,7 +1342,11 @@ ok('tres golpes + cura continuam sendo os golpes REAIS', seq3.length === 4 && se
   {
     const iCura = seq.findIndex(g => g.x === 'recover');
     const iGolpe = seq.findIndex(g => !g.x);
-    ok('e ela vem ANTES de qualquer golpe', iCura >= 0 && (iGolpe < 0 || iCura < iGolpe),
+    /* ⚠️ ESTA TRAVA MEDIA A REGRA ANTIGA: a cura era ABERTURA, entao ela vinha sempre no topo do
+       confronto. Desde 24/09/2026 ela e um golpe da TROCA -- ela acontece ONDE o sorteio dela
+          saiu, e vir depois de golpes e o esperado. O que continua valendo e que ela EXISTE na
+          sequencia e que a barra sobe nela. */
+    ok('a cura aparece na sequencia, na troca em que saiu', iCura >= 0,
        seq.map(g => g.x || 'golpe').join(','));
   }
   /* A luta comeca da vida CHEIA -- e o que a reconstrucao tem que enxergar. */
@@ -1772,7 +1808,10 @@ function comItem(instancia, item){
     }
   }
   ok('o Recuperar continua saindo com a pocao armada', comRec > 50, comRec + ' vezes');
-  ok('mas nunca os dois no mesmo confronto', juntos === 0, juntos + ' confrontos com os dois');
+  /* ⚠️ ANTES OS DOIS NUNCA SAIAM JUNTOS: a pocao curava e o Recuperar, que so valia abaixo de
+     70%, deixava de disparar -- a ordem resolvia sozinha. Com a cura virando um golpe da TROCA
+     (24/09/2026) ela pode sair DEPOIS da pocao, noutra troca, e os dois no mesmo confronto
+     passaram a ser legitimos. O que a trava cobra agora e que o Recuperar continue saindo. */
 
   /* NA TELA: a cura e o primeiro passo e a barra SOBE, igual a do Recuperar. */
   const m = { player:'Machamp', enemy:'Rhydon', playerSpecies:'machamp', enemySpecies:'rhydon',
@@ -5512,13 +5551,27 @@ console.log('\n=== O SINO CURATIVO (Heal Bell) ===');
   ok('sao a Miltank e o Celebi', S.SINO_CURATIVO.join(',') === 'miltank,celebi', S.SINO_CURATIVO.join(','));
   ok('com a mesma chance do Recuperar', S.CHANCE_SINO === S.CHANCE_RECUPERAR, S.CHANCE_SINO + ' x ' + S.CHANCE_RECUPERAR);
   const mk = (id, lv) => { const p = S.createInstance(id, lv); p.maxHp = S.calcMaxHp(p); p.hp = p.maxHp; return p; };
-  const sorteio = S.sorteiaGolpeEspecial(mk('miltank', 50), () => 0.001);
-  ok('a Miltank cura com o Sino', sorteio && sorteio.efeito === 'cura' && sorteio.golpe === 'Sino Curativo',
-     JSON.stringify(sorteio));
+  /* ⚠️ ELE SAIU DA FILA DE ABERTURA EM 24/09/2026: o Recuperar e o Sino viraram um golpe da TROCA
+     (o curaDaTroca), entao o sorteio de abertura nao os conhece mais. A trava nao foi afrouxada --
+     ela virou a da regra nova. */
+  ok('o Sino NAO esta mais na fila de abertura',
+     S.sorteiaGolpeEspecial(mk('miltank', 50), () => 0.001) === null);
+  {
+    const p = mk('miltank', 50); p.hp = Math.round(p.maxHp * 0.3);
+    const d = [];
+    S.doExchange(p, mk('machop', 30), () => 0.001, d, 'p', 'e');
+    ok('a Miltank cura com o Sino, na troca',
+       d.some(g => g.x === 'recover' && g.g === 'Sino Curativo'), d.map(g => g.x + ':' + (g.g||'')).join(','));
+  }
   /* ⚠️ O CELEBI JA ESTA NO RECUPERACAO, e o Recuperar vem ANTES na fila: ele cura com "Recuperar" e
      o Sino sai na chance composta. Fica registrado porque a ficha dele mostra os dois. */
-  ok('e o Celebi, que tem os dois, cura com o Recuperar (o primeiro da fila)',
-     S.sorteiaGolpeEspecial(mk('celebi', 50), () => 0.001).golpe === 'Recuperar');
+  {
+    const p = mk('celebi', 50); p.hp = Math.round(p.maxHp * 0.3);
+    const d = [];
+    S.doExchange(p, mk('machop', 30), () => 0.001, d, 'p', 'e');
+    const c = d.find(g => g.x === 'recover');
+    ok('e o Celebi, que tem os dois, cura com o Recuperar', c && c.g === 'Recuperar', c ? c.g : '(nao curou)');
+  }
   /* a mecanica e a MESMA: so abaixo do teto, e nao resolve o confronto */
   {
     const p = mk('miltank', 50); p.hp = p.maxHp;   // cheia: nao cura
@@ -5530,9 +5583,9 @@ console.log('\n=== O SINO CURATIVO (Heal Bell) ===');
   {
     const p = mk('miltank', 50); p.hp = Math.round(p.maxHp * 0.3);
     const d = [];
-    const resolveu = S.tentarGolpeEspecial(p, mk('machop', 48), () => 0.001, d);
-    ok('machucada ela cura', d.some(g => g.x === 'recover' && g.g === 'Sino Curativo'), d.map(g => g.x + ':' + (g.g||'')).join(','));
-    ok('e NAO resolve o confronto -- a luta acontece inteira depois', !resolveu);
+    S.doExchange(p, mk('machop', 30), () => 0.001, d, 'p', 'e');
+    ok('machucada ela cura, na troca', d.some(g => g.x === 'recover' && g.g === 'Sino Curativo'),
+       d.map(g => g.x + ':' + (g.g||'')).join(','));
   }
   ok('a ficha da Pokedex anuncia', (S.especiaisDaEspecie('miltank') || []).some(e => e.nome === 'Sino Curativo'),
      JSON.stringify(S.especiaisDaEspecie('miltank')));

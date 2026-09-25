@@ -1816,7 +1816,10 @@ const CHANCE_SINO = 0.10;
    existe mais é GERAR um caso novo. */
 /* A cura só sai com a vida ABAIXO disso. Com o pokémon quase cheio não há o que recuperar, e a
    frase anunciaria um efeito que mal se vê na barra. */
-const CURA_MAXIMO_DO_HP = 0.7;
+/* ⚠️ ERA 0.7 ATE 24/09/2026, e a mudanca veio junto com o Recuperar deixar de ser abertura: ele
+   passou a ser sorteado A CADA TROCA, entao a guarda ficou mais apertada pra compensar. Ela e lida
+   pela caixa que explica o especial (o {CURA}), entao o texto da tela acompanha sozinho. */
+const CURA_MAXIMO_DO_HP = 0.5;
 /* CONFUSÃO: o adversário se acerta, e a luta acontece inteira depois (10/09/2026, a pedido).
    Quem confunde tem 10% por CONFRONTO de deixar o outro confuso. O confuso leva UM golpe DELE
    MESMO -- um ESPELHO: mesma espécie, nível, atributos e golpe -- e só então a luta começa, do
@@ -2203,14 +2206,15 @@ function sorteiaGolpeEspecial(p, rng){
   if(DISABLE.includes(p.speciesId) && rng() < CHANCE_DISABLE){
     return { efeito:'anula', golpe:'Anulação' };
   }
-  if(RECUPERACAO.includes(p.speciesId) && rng() < CHANCE_RECUPERAR){
-    return { efeito:'cura', golpe:'Recuperar' };
-  }
+  /* ⚠️ O RECUPERAR E O SINO SAIRAM DESTA FILA EM 24/09/2026: eles deixaram de ser ABERTURA e
+     viraram um golpe da TROCA (ver `curaDaTroca`). Aqui eles eram sorteados UMA vez por confronto
+     e curavam de GRACA -- o pokemon curava E atacava na mesma troca.
+     ⚠️ E ISSO DEVOLVE CHANCE A QUEM VINHA DEPOIS DELES NA FILA: o Kadabra e o Alakazam tem
+     Disable + Recuperar, e o Recuperar saia em 0,9 x 10% = 9% (medido, 9,2%). Com ele fora, o
+     Disable volta aos 10% cheios e a cura passa a ser independente da fila. */
   /* O SINO CURATIVO vem logo depois, e cai no MESMO ramo de efeito -- o que muda é o nome que a
      frase e o selo mostram. Ver SINO_CURATIVO. */
-  if(SINO_CURATIVO.includes(p.speciesId) && rng() < CHANCE_SINO){
-    return { efeito:'cura', golpe:'Sino Curativo' };
-  }
+
   /* A drenagem vem por último. Quem tem dois especiais cai na chance composta, como o Kadabra
      (Disable + Recuperar): um Vileplume, que também é sonífero, absorve em 0,95 x 10% = 9,5%. */
   /* ⚠️ A CONFUSÃO SAIU DAQUI em 24/09/2026: ela virou status POR ATAQUE (ver
@@ -2977,6 +2981,30 @@ function doExchange(active, enemy, rng, diario){
     return rng() < CHANCE_CONFUSAO_ACERTA ? "acerta" : "passou";
   };
   const activeConf = confunde(active), enemyConf = confunde(enemy);
+
+  /* ⚠️ O RECUPERAR E UM GOLPE DA TROCA (24/09/2026): abaixo de CURA_MAXIMO_DO_HP ele tem
+     CHANCE_RECUPERAR de, EM VEZ DE ATACAR, recuperar todo o HP. Ele entra na mesma lista do sono,
+     do gelo, da paralisia e da confusao -- as cinco coisas que fazem alguem perder a troca.
+     ⚠️ E A CURA E APLICADA AQUI, antes dos golpes, e isso NAO e detalhe de ordem: o
+     `tetoNoAlvoCheio` olha o HP do ALVO, entao curar pra 100% e o que ativa a trava de "vida cheia
+     nao morre num golpe". Aplicada depois, ela nao protegeria da troca em que acontece.
+     ⚠️ E O rng() SO E LIDO DE QUEM PODE CURAR: lido sempre, ele deslocaria a semente de TODA
+     batalha sem ninguem que cure -- a armadilha que o Remoinho, o gelo, a paralisia, a confusao e
+     o TM43 ja registram. As duas guardas de cima nao leem o dado. */
+  const curaDaTroca = (p) => {
+    if(!p || p.hp <= 0) return null;
+    const golpe = RECUPERACAO.includes(p.speciesId) ? 'Recuperar'
+                : SINO_CURATIVO.includes(p.speciesId) ? 'Sino Curativo' : null;
+    if(!golpe) return null;
+    if(p.hp >= p.maxHp * CURA_MAXIMO_DO_HP) return null;
+    if(rng() >= (golpe === 'Recuperar' ? CHANCE_RECUPERAR : CHANCE_SINO)) return null;
+    const curado = p.maxHp - p.hp;
+    p.hp = p.maxHp;
+    /* ⚠️ O `hp` E CAPTURADO AQUI, no instante da cura: o curaDe (que grava) roda DEPOIS de o dano
+       da troca ter sido aplicado, entao ler o p.hp la devolve o pos-golpe. */
+    return { golpe, curado, hp: p.hp };
+  };
+  const activeCura = curaDaTroca(active), enemyCura = curaDaTroca(enemy);
   const activeConfuso = activeConf === "acerta", enemyConfuso = enemyConf === "acerta";
 
   const acordaram = [];
@@ -2994,8 +3022,11 @@ function doExchange(active, enemy, rng, diario){
      do gelo e da paralisia: os cinco `tentar*` leem o `lastMove`, e a guarda deles é o golpe ter
      SAÍDO (`dmgByFirst.length`). Sem entrar aqui, um confuso que se acertou continuaria
      aplicando status com o golpe da troca anterior -- o defeito de 18/09, por uma porta nova. */
-  const dmgToEnemy = (activeDorme || activeCongelado || activeTravado || activeConfuso) ? [] : golpesDaTroca(active, enemy, rng);
-  const dmgToActive = (enemyDorme || enemyCongelado || enemyTravado || enemyConfuso) ? [] : golpesDaTroca(enemy, active, rng);
+  /* ⚠️ QUEM CUROU NAO ATACA -- e e esse o preco que equilibra a cura ter passado a ser sorteada a
+     cada troca. Num confronto de ~2 trocas (a mediana medida), perder o ataque e perder metade
+     deles. E e o que o Recover faz no jogo original: ele USA o turno. */
+  const dmgToEnemy = (activeDorme || activeCongelado || activeTravado || activeConfuso || activeCura) ? [] : golpesDaTroca(active, enemy, rng);
+  const dmgToActive = (enemyDorme || enemyCongelado || enemyTravado || enemyConfuso || enemyCura) ? [] : golpesDaTroca(enemy, active, rng);
   active._dormeAgora = false;
   enemy._dormeAgora = false;
   const spdActive = effectiveSpeed(active);
@@ -3410,6 +3441,17 @@ function doExchange(active, enemy, rng, diario){
        nao consegue atacar por estar congelado, E O ARTICUNO ATACA NOVAMENTE"*.
        ⚠️ POSTAS NO SLOT DE CADA UM elas saiam ao contrario no caso do RECONGELAMENTO: quem degelou
        e foi congelado de novo na mesma troca lia 'congelou / degelou', a ordem invertida da cena. */
+    /* ⚠️ A CURA E GRAVADA NA MESMA SEQUENCIA DO GELO, e nao junto do sorteio: e aqui que a ordem
+       do diario e montada, e a linha dela tem que vir ANTES dos golpes da troca. O `x:'recover'` e
+       o mesmo de quando ela era abertura, entao o log, a animacao, o selo e a pausa de 1,5s (o
+       `passosDaAbertura` tem `recover:1`) vem de graca -- e log antigo continua legivel. */
+    const curaDe = (p, q) => {
+      const c = (p === active) ? activeCura : enemyCura;
+      if(!c || c.curado <= 0) return;
+      diario.push({ q:q, d:c.curado, hp:c.hp, c:0, m:0, z:0, x:'recover', g:c.golpe });
+    };
+    curaDe(first, qDoFirst);
+    curaDe(second, qDoSecond);
     geloDe(first, qDoFirst);
     travadoDe(first, qDoFirst);
     /* ⚠️ A LINHA DO FIRST VEM ANTES DO GOLPE DELE, que e onde o auto-dano dele foi aplicado. */

@@ -158,6 +158,17 @@
      está equipado), mas o cinza do :disabled diz "não dá" quando o que se quer dizer é "é este".
      Mantém o amarelo e a tinta cheia; só o toque é que não faz nada. */
   .btn.selected:disabled{background:var(--yellow);color:var(--ink);box-shadow:4px 4px 0 var(--box-border);}
+  /* ⚠️ O NOME DO SHINY BRILHA (24/09/2026, a pedido: *"ao inves de exibir uma estrela, deixar o
+     nome dele mais brilhante"*).
+     ⚠️ ELE NAO TROCA A COR DO TEXTO, so poe um halo -- e isso e a decisao: no log de batalha o nome
+     ja sai em AZUL (eu) ou VERMELHO (o adversario), e no titulo do card ele sai em verde/vermelho
+     escuro pelo resultado. Um dourado por cima apagaria tudo isso.
+     ⚠️ SAO DUAS SOMBRAS, e a de dentro e a que faz ele ler no fundo CREME das caixas: um halo largo
+     e translucido some contra o claro -- e ali some junto a informacao de que o pokemon e shiny,
+     que vale 1,20x em todos os atributos. */
+  .nome-shiny{
+    text-shadow:0 0 3px rgba(214,150,0,.95), 0 0 8px rgba(255,190,0,.75), 0 0 14px rgba(255,190,0,.45);
+  }
   .btn .mon-name{font-size:1rem;font-weight:800;display:block;}
   .btn .mon-sub{font-size:.7rem;font-weight:600;opacity:.85;display:block;margin-top:3px;}
 
@@ -7893,6 +7904,16 @@ function montarSelos(){
    17/09/2026). O desenho usa `currentColor` no corpo e branco/preto TRANSLUCIDOS no volume, entao
    um desenho so serve aos 23 TMs e aos 17 tipos -- em vez de 23 simbolos iguais de cor diferente.
    Vale pro frasco da Pocao tambem: ela e a Super Pocao com outro liquido. */
+/* ⚠️ O NOME DO SHINY BRILHA, em vez da estrela ao lado (24/09/2026, a pedido).
+   ⚠️ ELA EXISTE PORQUE ISSO ESTAVA EM 25 PONTOS: escrito em cada um, o proximo card que nascer
+   sai sem o brilho e ninguem ve -- a familia de defeito que este projeto mais paga.
+   ⚠️ E O BRILHO NAO TROCA A COR DO TEXTO, so poe um halo: no log de batalha o nome ja sai em AZUL
+   (eu) ou VERMELHO (o adversario), e pintar de dourado apagaria essa informacao.
+   ⚠️ O NOME JA VEM ESCAPADO de quem chama (varios passam escapeHtmlSafe(...)), entao esta funcao
+   NAO escapa de novo -- escapar duas vezes transforma o & das entidades em &amp;. */
+function nomeBrilhante(nome, shiny){
+  return shiny ? '<span class="nome-shiny">' + nome + '</span>' : nome;
+}
 function selo(nome, cls, cor){
   if(!DESENHOS[nome]) return '';
   montarSelos();
@@ -10805,7 +10826,10 @@ const CHANCE_SINO = 0.10;
    existe mais é GERAR um caso novo. */
 /* A cura só sai com a vida ABAIXO disso. Com o pokémon quase cheio não há o que recuperar, e a
    frase anunciaria um efeito que mal se vê na barra. */
-const CURA_MAXIMO_DO_HP = 0.7;
+/* ⚠️ ERA 0.7 ATE 24/09/2026, e a mudanca veio junto com o Recuperar deixar de ser abertura: ele
+   passou a ser sorteado A CADA TROCA, entao a guarda ficou mais apertada pra compensar. Ela e lida
+   pela caixa que explica o especial (o {CURA}), entao o texto da tela acompanha sozinho. */
+const CURA_MAXIMO_DO_HP = 0.5;
 /* CONFUSÃO: o adversário se acerta, e a luta acontece inteira depois (10/09/2026, a pedido).
    Quem confunde tem 10% por CONFRONTO de deixar o outro confuso. O confuso leva UM golpe DELE
    MESMO -- um ESPELHO: mesma espécie, nível, atributos e golpe -- e só então a luta começa, do
@@ -11192,14 +11216,15 @@ function sorteiaGolpeEspecial(p, rng){
   if(DISABLE.includes(p.speciesId) && rng() < CHANCE_DISABLE){
     return { efeito:'anula', golpe:'Anulação' };
   }
-  if(RECUPERACAO.includes(p.speciesId) && rng() < CHANCE_RECUPERAR){
-    return { efeito:'cura', golpe:'Recuperar' };
-  }
+  /* ⚠️ O RECUPERAR E O SINO SAIRAM DESTA FILA EM 24/09/2026: eles deixaram de ser ABERTURA e
+     viraram um golpe da TROCA (ver `curaDaTroca`). Aqui eles eram sorteados UMA vez por confronto
+     e curavam de GRACA -- o pokemon curava E atacava na mesma troca.
+     ⚠️ E ISSO DEVOLVE CHANCE A QUEM VINHA DEPOIS DELES NA FILA: o Kadabra e o Alakazam tem
+     Disable + Recuperar, e o Recuperar saia em 0,9 x 10% = 9% (medido, 9,2%). Com ele fora, o
+     Disable volta aos 10% cheios e a cura passa a ser independente da fila. */
   /* O SINO CURATIVO vem logo depois, e cai no MESMO ramo de efeito -- o que muda é o nome que a
      frase e o selo mostram. Ver SINO_CURATIVO. */
-  if(SINO_CURATIVO.includes(p.speciesId) && rng() < CHANCE_SINO){
-    return { efeito:'cura', golpe:'Sino Curativo' };
-  }
+
   /* A drenagem vem por último. Quem tem dois especiais cai na chance composta, como o Kadabra
      (Disable + Recuperar): um Vileplume, que também é sonífero, absorve em 0,95 x 10% = 9,5%. */
   /* ⚠️ A CONFUSÃO SAIU DAQUI em 24/09/2026: ela virou status POR ATAQUE (ver
@@ -11994,6 +12019,30 @@ function doExchange(active, enemy, rng, diario){
     return rng() < CHANCE_CONFUSAO_ACERTA ? "acerta" : "passou";
   };
   const activeConf = confunde(active), enemyConf = confunde(enemy);
+
+  /* ⚠️ O RECUPERAR E UM GOLPE DA TROCA (24/09/2026): abaixo de CURA_MAXIMO_DO_HP ele tem
+     CHANCE_RECUPERAR de, EM VEZ DE ATACAR, recuperar todo o HP. Ele entra na mesma lista do sono,
+     do gelo, da paralisia e da confusao -- as cinco coisas que fazem alguem perder a troca.
+     ⚠️ E A CURA E APLICADA AQUI, antes dos golpes, e isso NAO e detalhe de ordem: o
+     `tetoNoAlvoCheio` olha o HP do ALVO, entao curar pra 100% e o que ativa a trava de "vida cheia
+     nao morre num golpe". Aplicada depois, ela nao protegeria da troca em que acontece.
+     ⚠️ E O rng() SO E LIDO DE QUEM PODE CURAR: lido sempre, ele deslocaria a semente de TODA
+     batalha sem ninguem que cure -- a armadilha que o Remoinho, o gelo, a paralisia, a confusao e
+     o TM43 ja registram. As duas guardas de cima nao leem o dado. */
+  const curaDaTroca = (p) => {
+    if(!p || p.hp <= 0) return null;
+    const golpe = RECUPERACAO.includes(p.speciesId) ? 'Recuperar'
+                : SINO_CURATIVO.includes(p.speciesId) ? 'Sino Curativo' : null;
+    if(!golpe) return null;
+    if(p.hp >= p.maxHp * CURA_MAXIMO_DO_HP) return null;
+    if(rng() >= (golpe === 'Recuperar' ? CHANCE_RECUPERAR : CHANCE_SINO)) return null;
+    const curado = p.maxHp - p.hp;
+    p.hp = p.maxHp;
+    /* ⚠️ O `hp` E CAPTURADO AQUI, no instante da cura: o curaDe (que grava) roda DEPOIS de o dano
+       da troca ter sido aplicado, entao ler o p.hp la devolve o pos-golpe. */
+    return { golpe, curado, hp: p.hp };
+  };
+  const activeCura = curaDaTroca(active), enemyCura = curaDaTroca(enemy);
   const activeConfuso = activeConf === "acerta", enemyConfuso = enemyConf === "acerta";
 
   const acordaram = [];
@@ -12011,8 +12060,11 @@ function doExchange(active, enemy, rng, diario){
      do gelo e da paralisia: os cinco `tentar*` leem o `lastMove`, e a guarda deles é o golpe ter
      SAÍDO (`dmgByFirst.length`). Sem entrar aqui, um confuso que se acertou continuaria
      aplicando status com o golpe da troca anterior -- o defeito de 18/09, por uma porta nova. */
-  const dmgToEnemy = (activeDorme || activeCongelado || activeTravado || activeConfuso) ? [] : golpesDaTroca(active, enemy, rng);
-  const dmgToActive = (enemyDorme || enemyCongelado || enemyTravado || enemyConfuso) ? [] : golpesDaTroca(enemy, active, rng);
+  /* ⚠️ QUEM CUROU NAO ATACA -- e e esse o preco que equilibra a cura ter passado a ser sorteada a
+     cada troca. Num confronto de ~2 trocas (a mediana medida), perder o ataque e perder metade
+     deles. E e o que o Recover faz no jogo original: ele USA o turno. */
+  const dmgToEnemy = (activeDorme || activeCongelado || activeTravado || activeConfuso || activeCura) ? [] : golpesDaTroca(active, enemy, rng);
+  const dmgToActive = (enemyDorme || enemyCongelado || enemyTravado || enemyConfuso || enemyCura) ? [] : golpesDaTroca(enemy, active, rng);
   active._dormeAgora = false;
   enemy._dormeAgora = false;
   const spdActive = effectiveSpeed(active);
@@ -12462,6 +12514,17 @@ function doExchange(active, enemy, rng, diario){
        nao consegue atacar por estar congelado, E O ARTICUNO ATACA NOVAMENTE"*.
        ⚠️ POSTAS NO SLOT DE CADA UM elas saiam ao contrario no caso do RECONGELAMENTO: quem degelou
        e foi congelado de novo na mesma troca lia 'congelou / degelou', a ordem invertida da cena. */
+    /* ⚠️ A CURA E GRAVADA NA MESMA SEQUENCIA DO GELO, e nao junto do sorteio: e aqui que a ordem
+       do diario e montada, e a linha dela tem que vir ANTES dos golpes da troca. O `x:'recover'` e
+       o mesmo de quando ela era abertura, entao o log, a animacao, o selo e a pausa de 1,5s (o
+       `passosDaAbertura` tem `recover:1`) vem de graca -- e log antigo continua legivel. */
+    const curaDe = (p, q) => {
+      const c = (p === active) ? activeCura : enemyCura;
+      if(!c || c.curado <= 0) return;
+      diario.push({ q:q, d:c.curado, hp:c.hp, c:0, m:0, z:0, x:'recover', g:c.golpe });
+    };
+    curaDe(first, qDoFirst);
+    curaDe(second, qDoSecond);
     geloDe(first, qDoFirst);
     travadoDe(first, qDoFirst);
     /* ⚠️ A LINHA DO FIRST VEM ANTES DO GOLPE DELE, que e onde o auto-dano dele foi aplicado. */
@@ -14130,7 +14193,7 @@ function renderRegisteredTeamOrderModal(){
         <div class="order-row">
           <div class="order-num">${idx+1}º</div>
           <div class="order-info">
-            <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${p.name}${p.shiny?' '+selo('shiny'):''} — Lv.${p.level}</span>
+            <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${nomeBrilhante(p.name, p.shiny)} — Lv.${p.level}</span>
           </div>
           <div class="order-controls">
             <button class="circle-btn" onclick="moveRegisteredTeamOrder('${p.id}', -1)" ${idx===0?'disabled':''}>▲</button>
@@ -18855,7 +18918,7 @@ function renderTrainersLeagueOrderModal(){
         <div class="order-row">
           <div class="order-num">${idx+1}º</div>
           <div class="order-info">
-            <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${p.name}${p.shiny?' '+selo('shiny'):''} — Lv.${p.level}</span>
+            <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${nomeBrilhante(p.name, p.shiny)} — Lv.${p.level}</span>
           </div>
           <div class="order-controls">
             <button class="circle-btn" onclick="moveTrainersLeagueOrder(${idx}, -1)" ${idx===0?'disabled':''}>▲</button>
@@ -19603,7 +19666,7 @@ function renderProPicker(){
       /* ⚠️ O `spriteHtml` PRECISA DO `speciesId`, e o bolo guarda `id`: passando o objeto cru o
          sprite saía VAZIO em todos os doze -- sem erro nenhum, e foi o navegador que pegou. */
       const dentro = spriteHtml(p.id, 'sprite-sm', !!p.shiny)
-        + `<span class="selecao-nome">${escapeHtmlSafe(sp.name || p.id)}${p.shiny ? ' ' + selo('shiny') : ''}</span>`
+        + `<span class="selecao-nome">${nomeBrilhante(escapeHtmlSafe(sp.name || p.id), p.shiny)}</span>`
         + `<span class="selecao-lv">Lv.${p.level}</span>`
         + `<span class="selecao-tipos">${(sp.types || []).map(t => typePill(t)).join('')}</span>`
         + (pos >= 0 ? `<span class="selecao-dono eu">${pos + 1}º</span>` : '');
@@ -19686,7 +19749,7 @@ function renderCustomLeagueTeamPicker(typeConfig){
     const isSel = selected.includes(p.speciesId);
     const disabled = (!isSel && selected.length>=6) ? 'disabled' : '';
     return `<button class="btn ${isSel?'selected':''}" ${disabled} onclick="toggleCustomPickerMon('${p.speciesId}')">
-      <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${sp.name}${p.shiny?' '+selo('shiny'):''} — Lv.${p.level} ${isSel?'✓':''}</span>
+      <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${nomeBrilhante(sp.name, p.shiny)} — Lv.${p.level} ${isSel?'✓':''}</span>
       <span class="mon-sub">${typesHtml(sp.types)} <span class="pool-origin-tag">${escapeHtmlSafe(slotDisplayName(p.sourceSlot))}</span></span>
     </button>`;
   }).join('')}
@@ -21724,7 +21787,7 @@ function renderAposentados(){
     return `<div class="carvalho-linha">
       <div class="carvalho-sprite">${spriteHtml(p, 'sprite-sm')}</div>
       <div class="carvalho-info">
-        <div class="mon-name">${escapeHtmlSafe(sp.name)}${p.shiny ? ' ' + selo('shiny') : ''} <span class="mon-sub">Lv.${p.level}</span></div>
+        <div class="mon-name">${nomeBrilhante(escapeHtmlSafe(sp.name), p.shiny)} <span class="mon-sub">Lv.${p.level}</span></div>
         <div class="carvalho-tipos">${tipos}</div>
         ${golpes ? `<div class="carvalho-golpes">${golpes}</div>` : ''}
       </div>
@@ -23061,7 +23124,7 @@ function renderTimeModal(){
           <span class="time-modal-pos">${i+1}º</span>
           <span class="time-modal-sprite">${spriteHtml(p,'sprite-sm')}</span>
           <span class="time-modal-info">
-            <span class="time-modal-nome">${escapeHtmlSafe(sp.name)}${p.shiny?' '+selo('shiny'):''}</span>
+            <span class="time-modal-nome">${nomeBrilhante(escapeHtmlSafe(sp.name), p.shiny)}</span>
             <span class="time-modal-sub"><span class="time-modal-lv">Lv.${p.level}</span>${typesHtml(sp.types)}</span>
           </span>
         </div>`;
@@ -23190,7 +23253,7 @@ function renderRelease(){
       const isSel = game.releaseSelected.includes(p.id);
       const disabled = (!isSel && game.releaseSelected.length>=excess) ? 'disabled' : '';
       return `<button class="btn ${isSel?'selected':''}" ${disabled} onclick="toggleRelease('${p.id}')">
-        <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${p.name}${p.shiny?' '+selo('shiny'):''} — Lv.${p.level} ${isSel?'📦':''}</span>
+        <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${nomeBrilhante(p.name, p.shiny)} — Lv.${p.level} ${isSel?'📦':''}</span>
         <span class="mon-sub">${typesHtml(p.types)}</span>
       </button>`;
     }).join('')}
@@ -23235,7 +23298,7 @@ function renderLevels(){
       const capLabel = atLevelCap ? ' (nível 55 — só sobe desmaiando em batalha)' : (atLevel40Cap ? ' (máx. +3 além do nível 40)' : (atPoolMax ? ' (máx.)' : ''));
       return `<div class="level-row">
         <div class="level-info">
-          <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${p.name}${p.shiny?' '+selo('shiny'):''} — Lv.${current}${capLabel}</span>
+          <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${nomeBrilhante(p.name, p.shiny)} — Lv.${current}${capLabel}</span>
           <span class="mon-sub">${typesHtml(p.types)}</span>
         </div>
         <div class="level-controls">
@@ -23317,7 +23380,7 @@ function renderPreBattle(){
           <span class="team-grid-num">${idx+1}</span>
           <span class="team-grid-sprite">${spriteHtml(p,'sprite-sm')}</span>
           <div class="team-grid-info">
-            <span class="team-grid-name">${p.name}${p.shiny?' '+selo('shiny'):''}</span>
+            <span class="team-grid-name">${nomeBrilhante(p.name, p.shiny)}</span>
             <span class="team-grid-level">Lv.${p.level}</span>
           </div>
         </div>`;
@@ -23917,7 +23980,7 @@ function renderMatchupLog(matchups){
     const hp = Math.max(0, m.hp || 0);
     return `<div class="mlog-lado ${hp<=0?'caiu':''}">
       <div class="mlog-spr">${SPECIES[m.sp] ? spriteHtml(m.sp,'sprite-sm',!!m.shiny) : '❔'}</div>
-      <div class="mlog-nome">${escapeHtmlSafe(m.nome||'')}${m.shiny?' '+selo('shiny'):''}${m.lvl?` <span class="mlog-lv">Lv.${m.lvl}</span>`:''}</div>
+      <div class="mlog-nome">${nomeBrilhante(escapeHtmlSafe(m.nome||''), m.shiny)}${m.lvl?` <span class="mlog-lv">Lv.${m.lvl}</span>`:''}</div>
       <div class="mlog-vida">
         ${renderHpBar(hp, maxHp, 'mlog-f-'+id, 'mlog-l-'+id)}
         <span class="mlog-hp">${hp}/${maxHp}</span>
@@ -27212,7 +27275,7 @@ function renderEliteHeal(){
       return `<div class="order-row elite-row">
         <div class="order-num">${idx+1}º</div>
         <div class="order-info">
-          <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${p.name}${p.shiny?' '+selo('shiny'):''} — Lv.${p.level}</span>
+          <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${nomeBrilhante(p.name, p.shiny)} — Lv.${p.level}</span>
           ${renderHpBar(hp, p.maxHp, `elite-hp-fill-${p.id}`, `elite-hp-label-${p.id}`)}
         </div>
         <div class="order-controls-compact">
@@ -27836,7 +27899,7 @@ function renderNeighborhoodGymDefenseOrder(){
       return `<div class="order-row">
         <div class="order-num">${idx+1}º${botaoDeItemHtml(p)}</div>
         <div class="order-info">
-          <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${escapeHtmlSafe(sp?sp.name:'?')}${p.shiny?' '+selo('shiny'):''} — Lv.${p.level}${buff?' 🔺':''}</span>
+          <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${nomeBrilhante(escapeHtmlSafe(sp?sp.name:'?'), p.shiny)} — Lv.${p.level}${buff?' 🔺':''}</span>
           <span class="mon-sub">${sp?typesHtml(sp.types):''}</span>
           ${golpesDoTimeHtml(p)}
         </div>
@@ -28441,7 +28504,7 @@ function renderPlayerTeamModal(){
         ${sorted.length>0 ? sorted.map(p=>{
           const sp = SPECIES[p.speciesId];
           const buffed = terrainTypes && sp && sp.types.some(t=>terrainTypes.includes(t));
-          return `<div class="status-row"><span class="icon">${spriteHtml(p,'sprite-sm')}</span><span>${p.name} — Lv.${p.level}${p.shiny?' '+selo('shiny'):''}${buffed?' 🔺':''}</span></div>`;
+          return `<div class="status-row"><span class="icon">${spriteHtml(p,'sprite-sm')}</span><span>${nomeBrilhante(p.name, p.shiny)} — Lv.${p.level}${buffed?' 🔺':''}</span></div>`;
         }).join('') : '<p>Não foi possível carregar esse time.</p>'}
       </div>
       ${(anyBuffed || sorted.some(p=>p.shiny)) ? `<p class="hint-text">${anyBuffed?'🔺 Buffado pelo terreno da partida. ':''}${sorted.some(p=>p.shiny)?'🌟 Shiny (+20% em todos os atributos).':''}</p>` : ''}
@@ -28934,7 +28997,7 @@ function renderLeague(){
         <div class="order-row">
           <div class="order-num">${idx+1}º</div>
           <div class="order-info">
-            <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${p.name}${p.shiny?' '+selo('shiny'):''} — Lv.${p.level}</span>
+            <span class="mon-name">${spriteHtml(p,'sprite-sm')} ${nomeBrilhante(p.name, p.shiny)} — Lv.${p.level}</span>
           </div>
           <div class="order-controls">
             <button class="circle-btn" onclick="moveRegisteredTeamOrder('${p.id}', -1)" ${idx===0?'disabled':''}>▲</button>
@@ -29187,7 +29250,7 @@ function renderTowerOrderModal(){
           return `<div class="order-row">
             <div class="order-num">${idx+1}º${botaoDeItemHtml(p)}</div>
             <div class="order-info">
-              <span class="mon-name">${sp?spriteHtml(p,'sprite-sm'):'❔'} ${escapeHtmlSafe(sp?sp.name:'?')}${p.shiny?' '+selo('shiny'):''} — Lv.${p.level}</span>
+              <span class="mon-name">${sp?spriteHtml(p,'sprite-sm'):'❔'} ${nomeBrilhante(escapeHtmlSafe(sp?sp.name:'?'), p.shiny)} — Lv.${p.level}</span>
               ${golpesDoTimeHtml(p)}
             </div>
             <div class="order-controls">
@@ -31669,7 +31732,7 @@ function montadorDeTimeHtml(escolhidos, nomeDoToggle, max, esperas){
         <span class="mont-num">${sel ? (posicao+1)+'º' : ''}</span>
         ${sp?spriteHtml(p,'sprite-sm'):'❔'}
         <span class="mont-info">
-          <span class="mont-nome">${escapeHtmlSafe(sp?sp.name:'?')}${p.shiny?' '+selo('shiny'):''} <span class="mont-lv">— ${falta>0 ? '⏳'+Math.ceil(falta/60000)+'min' : 'Lv.'+p.level}</span></span>
+          <span class="mont-nome">${nomeBrilhante(escapeHtmlSafe(sp?sp.name:'?'), p.shiny)} <span class="mont-lv">— ${falta>0 ? '⏳'+Math.ceil(falta/60000)+'min' : 'Lv.'+p.level}</span></span>
           <span class="mont-sub">${sp?typesHtml(sp.types):''}<span class="mont-time">${escapeHtmlSafe(p.teamName)}</span></span>
         </span>
       </button>
@@ -33172,7 +33235,7 @@ function painelTimesHtml(st, anim, precisaEscolher, restam, padraoOnline){
       title="${escapeHtmlSafe(sp?sp.name:'?')} — ${p.hp}/${p.maxHp} HP">
       ${escolhido?'<span class="online-pick-check">✓</span>':''}
       ${sp?spriteHtml(p,'sprite-md'):'❔'}
-      <span class="online-pick-nome">${escapeHtmlSafe(sp?sp.name:'?')}${p.shiny?' '+selo('shiny'):''}</span>
+      <span class="online-pick-nome">${nomeBrilhante(escapeHtmlSafe(sp?sp.name:'?'), p.shiny)}</span>
       <span class="online-pick-lvl">Lv.${p.level}</span>
       <span class="online-pick-hp"><span class="hp-bar-fill ${hpBarClass(pct)}" id="online-pickhp-${i}" style="transform:scaleX(${pct/100})"></span></span>
       <span class="tower-pick-lv" id="online-picklv-${i}">${morto?'✖ caiu':hpMostrado+'/'+p.maxHp}</span>
@@ -33185,7 +33248,7 @@ function painelTimesHtml(st, anim, precisaEscolher, restam, padraoOnline){
     const sp = SPECIES[p.speciesId];
     return `<div class="tower-pick online-pick sem-clique ${morto?'off':''}" title="${escapeHtmlSafe(sp?sp.name:'?')} — Lv.${p.level}">
       ${sp?spriteHtml(p,'sprite-md'):'❔'}
-      <span class="online-pick-nome">${escapeHtmlSafe(sp?sp.name:'?')}${p.shiny?' '+selo('shiny'):''}</span>
+      <span class="online-pick-nome">${nomeBrilhante(escapeHtmlSafe(sp?sp.name:'?'), p.shiny)}</span>
       <span class="online-pick-lvl">Lv.${p.level}</span>
       <span class="tower-pick-lv">${morto?'✖ caiu':'&nbsp;'}</span>
     </div>`;
@@ -36130,7 +36193,7 @@ function corridaLinhaEscolhido(p, i){
   return `<div class="order-row">
     <div class="order-num">${corrida.formato === 'relay' ? (i + 1) + 'º' : ''}</div>
     <div class="order-info">
-      <span class="mon-name">${spriteHtml(p, 'sprite-sm')} ${escapeHtmlSafe(sp.name || p.speciesId)}${p.shiny ? ' ' + selo('shiny') : ''} <span class="mont-lv">— Lv.${p.level}</span></span>
+      <span class="mon-name">${spriteHtml(p, 'sprite-sm')} ${nomeBrilhante(escapeHtmlSafe(sp.name || p.speciesId), p.shiny)} <span class="mont-lv">— Lv.${p.level}</span></span>
       <span class="mon-sub">${typesHtml(sp.types || [])}</span>
     </div>
     ${setas}
@@ -36210,7 +36273,7 @@ function corridaPickerHtml(){
           <span class="mont-num">${sel >= 0 ? (sel + 1) + 'º' : ''}</span>
           ${spriteHtml(p, 'sprite-sm')}
           <span class="mont-info">
-            <span class="mont-nome">${escapeHtmlSafe(sp.name || '?')}${p.shiny ? ' ' + selo('shiny') : ''} <span class="mont-lv">— Lv.${p.level}</span></span>
+            <span class="mont-nome">${nomeBrilhante(escapeHtmlSafe(sp.name || '?'), p.shiny)} <span class="mont-lv">— Lv.${p.level}</span></span>
             <span class="mont-sub">${typesHtml(sp.types || [])}<span class="mont-time">${escapeHtmlSafe(p.teamName || '')}</span></span>
           </span>
           <span class="corrida-speed-badge">${p.speedCorrida}</span>
@@ -40321,8 +40384,8 @@ function resgateEtiqueta(i){
 function resgateLinhaDoEscolhido(p){
   const sp = SPECIES[p.speciesId] || {};
   return '<div class="pesc-parceiro">' + spriteHtml(p, 'sprite-sm')
-    + '<span class="pesc-parceiro-info"><b>' + escapeHtmlSafe(sp.name || '?')
-    + (p.shiny ? ' ' + selo('shiny') : '') + '</b>'
+    + '<span class="pesc-parceiro-info"><b>' + nomeBrilhante(escapeHtmlSafe(sp.name || '?'), p.shiny)
+    + '</b>'
     + '<small>Lv.' + p.level + ' · ' + escapeHtmlSafe(p.teamName || '')
     + ' · ' + Math.round(p.velocidade) + ' de velocidade</small></span></div>';
 }
@@ -40357,7 +40420,7 @@ function resgatePickerHtml(){
           <span class="mont-num">${sel ? '✔' : ''}</span>
           ${spriteHtml(p, 'sprite-sm')}
           <span class="mont-info">
-            <span class="mont-nome">${escapeHtmlSafe(sp.name || '?')}${p.shiny ? ' ' + selo('shiny') : ''} <span class="mont-lv">— Lv.${p.level}</span></span>
+            <span class="mont-nome">${nomeBrilhante(escapeHtmlSafe(sp.name || '?'), p.shiny)} <span class="mont-lv">— Lv.${p.level}</span></span>
             <span class="mont-sub">${typesHtml(sp.types || [])}<span class="mont-time">${escapeHtmlSafe(p.teamName || '')}</span></span>
           </span>
           <span class="corrida-speed-badge">${Math.round(p.velocidade)}</span>
@@ -41773,7 +41836,7 @@ function queimadaPickerHtml(){
           <span class="mont-num">${sel ? '✔' : ''}</span>
           ${spriteHtml(p, 'sprite-sm')}
           <span class="mont-info">
-            <span class="mont-nome">${escapeHtmlSafe(sp.name || '?')}${p.shiny ? ' ' + selo('shiny') : ''} <span class="mont-lv">— Lv.${p.level}</span></span>
+            <span class="mont-nome">${nomeBrilhante(escapeHtmlSafe(sp.name || '?'), p.shiny)} <span class="mont-lv">— Lv.${p.level}</span></span>
             <span class="mont-sub">${typesHtml(sp.types || [])}<span class="mont-time">${escapeHtmlSafe(p.teamName || '')}</span></span>
           </span>
           <span class="corrida-speed-badge">${p.velocidade}</span>
@@ -41798,7 +41861,7 @@ function queimadaFichaHtml(){
   return `
     <div class="order-row">
       <div class="order-info">
-        <span class="mon-name">${spriteHtml(p, 'sprite-sm')} ${escapeHtmlSafe(sp.name || p.speciesId)}${p.shiny ? ' ' + selo('shiny') : ''} <span class="mont-lv">— Lv.${p.level}</span></span>
+        <span class="mon-name">${spriteHtml(p, 'sprite-sm')} ${nomeBrilhante(escapeHtmlSafe(sp.name || p.speciesId), p.shiny)} <span class="mont-lv">— Lv.${p.level}</span></span>
         <span class="mon-sub">${typesHtml(sp.types || [])}</span>
       </div>
     </div>

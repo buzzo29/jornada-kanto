@@ -60,7 +60,11 @@ montaSaves();
 const html = () => S.montadorDeTimeHtml(S.__getGame().towerPick, 'towerTogglePick', 6);
 const contaEm = (t, re) => (t.match(re)||[]).length;
 const linhas = (t) => contaEm(t, /class="mont-linha"/g);
-const nomesNaTela = (t) => (t.match(/class="mont-nome">([^<]*)/g)||[]).map(x => x.replace(/class="mont-nome">/, '').trim());
+  /* ⚠️ O NOME DO SHINY VEM DENTRO DE UM <span class="nome-shiny"> desde 24/09/2026 (ele brilha em
+     vez de ter a estrela ao lado), e um [^<]* casa com STRING VAZIA nele -- o teste reportava um
+     nome em branco no meio da lista. Desfazer o span ANTES de extrair e a mudanca minima. */
+  const semBrilho = (t) => t.replace(/<span class="nome-shiny">([^<]*)<\/span>/g, '$1');
+  const nomesNaTela = (t) => (semBrilho(t).match(/class="mont-nome">([^<]*)/g)||[]).map(x => x.replace(/class="mont-nome">/, '').trim());
 /* A lista inteira, atravessando as páginas -- pro que se afirma sobre "os doze". Volta pra página
    em que estava, senão cada leitura mexeria no estado que o teste seguinte vai olhar. */
 function todasAsPaginas(){
@@ -128,9 +132,12 @@ console.log('\n=== UMA LINHA POR POKEMON, COM TUDO QUE SE PRECISA PRA ESCOLHER =
   const tudo = todasAsPaginas();
   ok('e de que time ele e', contaEm(tudo, /mont-time">Kanto/g) === 6 && contaEm(tudo, /mont-time">Johto/g) === 6,
      contaEm(tudo, /mont-time">Kanto/g) + ' Kanto, ' + contaEm(tudo, /mont-time">Johto/g) + ' Johto');
-  /* ⚠️ o selo VIROU DESENHO NOSSO (17/09/2026): a trava procura o <symbol>, que e a
-     identidade dele, em vez do caractere -- assim o desenho pode ser reajustado sem derrubar. */
-  ok('o shiny aparece com o selo', contaEm(tudo, /#s-shiny/g) === 1);
+  /* ⚠️ ESTA TRAVA MEDIA A ESTRELA AO LADO DO NOME, e ela saiu em 24/09/2026: o shiny passou a ser
+     o NOME BRILHANDO (o nomeBrilhante, um <span class="nome-shiny">). Ela nao foi afrouxada --
+     virou a da regra nova, e cobra as DUAS metades: o brilho esta no shiny E a estrela nao voltou. */
+  ok('o shiny aparece com o nome brilhante', contaEm(tudo, /class="nome-shiny"/g) === 1,
+     contaEm(tudo, /class="nome-shiny"/g) + ' brilhantes');
+  ok('  e a estrela ao lado do nome nao voltou', contaEm(tudo, /#s-shiny/g) === 0);
   /* A GRADE POR SAVE SAIU: se o agrupamento voltar sem querer, esta linha acusa. */
   ok('e a grade antiga por save nao existe mais', !tudo.includes('tower-pick-group'));
 }

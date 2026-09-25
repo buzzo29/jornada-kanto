@@ -3309,7 +3309,10 @@ console.log('\n=== OS TRES HMs NA MOCHILA, E A PALAVRA QUE SAIU (17/09/2026) ===
   ok('e os GOLPES que ele tinha quando se aposentou',
      tem('Raio Solar') && tem('Bomba de Lodo') && tem('Hidro Bomba'),
      'nomeou outro golpe -- confira a ordem dos argumentos do golpeSeloHtml');
-  ok('o shiny ganha selo', tem('#s-shiny'));
+  /* ⚠️ ESTA TRAVA MEDIA A ESTRELA AO LADO DO NOME, e ela saiu em 24/09/2026: o shiny passou a ser
+     o NOME BRILHANDO. Ela virou a da regra nova, com as DUAS metades. */
+  ok('o shiny ganha o nome brilhante', tem('class="nome-shiny"'));
+  ok('  e a estrela ao lado nao voltou', !tem('#s-shiny'));
   ok('quem NAO tem golpe sai sem a linha', h.split('carvalho-golpes').length - 1 === 2,
      String(h.split('carvalho-golpes').length - 1));
   ok('e o mais RECENTE vem primeiro', h.indexOf('Venusaur') < h.indexOf('Alakazam'));

@@ -577,6 +577,117 @@ de golpes.
   é a maior variação de dificuldade desde o golpe moribundo. Se incomodar, o parâmetro a mexer é a
   chance da autodestruição (`CHANCE_AUTODESTRUICAO`), que é a que mais aparece.
 
+## O RECUPERAR VIROU UM GOLPE DA TROCA (24/09/2026)
+
+Pedido assim: *"a partir do momento que o pokemon que possui essa habilidade estiver com menos de
+50% de hp, ele tem 10% de chance de trocar um golpe de ataque pelo recuperar e recupera todo o hp"*.
+
+**⚠️ E A LEMBRANÇA DO PEDIDO ERRAVA EM DOIS PONTOS, o que muda o desenho:** ele não era *"menos de
+30%"* — era **70%** (`CURA_MAXIMO_DO_HP`) —, então os 50% pedidos são **mais restritivos**, não
+menos. E ele **já curava tudo**. As mudanças reais são três:
+
+| | antes | agora |
+|---|---|---|
+| quando é sorteado | **ABERTURA**: uma vez por confronto | **a cada TROCA** |
+| a guarda | abaixo de **70%** | abaixo de **50%** |
+| o preço | **nenhum** — ele curava E atacava | ⚠️ **ele PERDE o ataque daquela troca** |
+
+**⚠️ O TERCEIRO É O QUE EQUILIBRA O SEGUNDO, e é o que o Recover faz no jogo original: ele USA o
+turno.** Medido antes de escrever uma linha: um confronto tem **1,96 troca de mediana** — então
+perder o ataque é perder **metade** deles.
+
+### O QUE FOI MEDIDO
+
+| 1x1, as 10 espécies entrando machucadas, 3.000 confrontos de cada | antes | agora |
+|---|---|---|
+| confrontos em que ele cura | 7,6% | **10,7%** |
+| ele vence | 47,4% | **48,6%** (+1,2) |
+
+**NA JORNADA: +1,03 ponto, 1,9σ** — 54,88% → 55,91%, 8 blocos de 800 de cada lado (**6.400 de
+cada**, o MESMO bot contra duas cópias congeladas, desvio tirado de ENTRE os blocos, **6 de 8
+blocos** pro lado novo). No limite do ruído, e a direção faz sentido: a cura ficou 41% mais
+frequente e cada uso passou a custar um golpe.
+
+**A impressão MUDOU nos dois** (`e6cd16d15e0f/1e9b7214c627` para `ae3a573de09f/96b335858a1b`), que
+é o que uma mudança de mecânica deve fazer.
+
+### AS DECISÕES
+
+- **⚠️ ELE ENTROU NA LISTA DAS CINCO COISAS QUE FAZEM ALGUÉM PERDER A TROCA** (sono, gelo,
+  paralisia, confusão) — a mecânica já tinha o molde exato, e o `curaDaTroca` é a quinta condição
+  do mesmo `if`. Não houve caminho novo a inventar.
+- **⚠️ A CURA É APLICADA NA ENTRADA DA TROCA, e isso não é detalhe de ordem:** o `tetoNoAlvoCheio`
+  olha o HP do ALVO, então curar pra 100% é o que ativa a trava de *"vida cheia não morre num
+  golpe"*. Aplicada depois, ela não protegeria da troca em que acontece.
+- **⚠️ O `rng()` SÓ É LIDO DE QUEM PODE CURAR.** Lido sempre, ele deslocaria a semente de TODA
+  batalha sem ninguém que cure — a armadilha que o Remoinho, o gelo, a paralisia, a confusão e o
+  TM43 já registram. As duas guardas (a espécie e o HP) vêm antes do dado.
+- **⚠️ ELE E O SINO SAÍRAM DA FILA DE ABERTURA, e isso DEVOLVE CHANCE A QUEM VINHA DEPOIS:** o
+  Kadabra e o Alakazam têm Disable + Recuperar, e o Recuperar saía em `0,9 x 10% = 9%` (medido,
+  9,2%). Com ele fora, o Disable volta aos **10% cheios**.
+- **A APRESENTAÇÃO VEIO DE GRAÇA:** a marca do diário é a mesma, o `passosDaAbertura` já tem
+  `recover:1` (a pausa de 1,5s) e ele já lida com abertura fora do índice 0 — a lição que o sono
+  custou em 10/09. **E log antigo continua legível.**
+
+### ⚠️ E ELE CUSTOU UM DEFEITO MEU, QUE A TRAVA NOVA PEGOU
+
+O `curaDe` (que grava no diário) roda **depois** de o dano da troca já ter sido aplicado — então o
+campo `hp` gravava o **pós-golpe**. Medido: um Starmie de maxHp **340** curava pra 340 e o diário
+gravava **263**. O campo é lido pela reconstrução e por toda conta que percorre o diário. Hoje ele
+é capturado **dentro do `curaDaTroca`**, no instante da cura.
+
+### ⚠️ E DUAS CONTAS DO TESTE ACUSAVAM O JOGO DE UM DEFEITO QUE ERA DELAS
+
+A trava *"ninguém ataca depois de cair"* foi de **0 para 10 cadáveres em 4.000** — e o jogo estava
+certo (medido: **zero** casos em que quem curou também atacou). Eram duas contas:
+
+1. o acumulador do ganho de vida só conhecia o **dreno** — a **QUINTA** conta deste arquivo que
+   copia a lista do `subiuAVida` à mão, a mesma lição que o `danoSemGolpe` já tinha custado;
+2. **⚠️ e a pior:** um ajuste que punha o HP inicial no **pós-cura** — ele pressupunha que a cura
+   era a PRIMEIRA coisa do confronto (ela era abertura). Com ela no meio, os golpes **anteriores**
+   passavam a ser aplicados sobre o HP curado, o HP ficava negativo cedo e o scanner acusava de
+   cadáver quem estava vivo. **A fúria continua nesse ajuste, porque ela É abertura.**
+
+**E SEIS TRAVAS MEDIAM A REGRA ANTIGA** (*"com 69% ainda se cura"*, *"ela vem ANTES de qualquer
+golpe"*, *"nunca os dois no mesmo confronto"*). Nenhuma foi afrouxada: elas viraram as da regra
+nova, e entraram as que faltavam — **quem curou NÃO atacou naquela troca**, e o Recuperar **não
+está mais** na fila de abertura.
+
+- **Se um dia incomodar**, as réguas são o `CHANCE_RECUPERAR` (10% por troca) e o
+  `CURA_MAXIMO_DO_HP` (50%) — e a segunda é a mais forte, porque ela decide **quantas trocas** são
+  elegíveis (medido: 59,1% delas, com o pokémon entrando machucado).
+
+## O NOME DO SHINY BRILHA, EM VEZ DA ESTRELA (24/09/2026)
+
+Pedido junto: *"o pokemon shiny, consegue ao inves de exibir uma estrela, deixar o nome dele mais
+brilhante?"*.
+
+- **⚠️ ISSO ESTAVA EM 25 PONTOS DO ARQUIVO**, e por isso virou uma função (`nomeBrilhante`):
+  escrito em cada um, o próximo card que nascer sai sem o brilho e ninguém vê — a família de
+  defeito que este projeto mais paga.
+- **⚠️ O BRILHO NÃO TROCA A COR DO TEXTO, só põe um halo** — e essa é a decisão: no log de batalha
+  o nome já sai em **azul** (eu) ou **vermelho** (o adversário), e no título do card ele sai em
+  verde/vermelho pelo resultado. Um dourado por cima apagaria tudo isso.
+- **SÃO TRÊS SOMBRAS, e a de dentro é a que faz ele ler no fundo CREME das caixas:** um halo largo
+  e translúcido some contra o claro — e ali some junto a informação de que o pokémon é shiny, que
+  vale **1,20x em todos os atributos**.
+- **⚠️ DOIS DOS 25 NÃO ESTAVAM NO PADRÃO**, e os dois precisaram de tratamento próprio: um é
+  **DECORATIVO** (a frase *"Os cinco caíram!"* das Ilhas usa a estrela como ícone — **não há
+  pokémon shiny ali**, e ele ficou intocado), e o outro monta o HTML por **CONCATENAÇÃO**, não por
+  template literal, então o parser não o alcançava.
+- **⚠️ E O PARSER TEM QUE SER DE CHAVES BALANCEADAS:** um padrão que pare no primeiro fecha-chaves
+  quebra numa interpolação que tem função dentro.
+
+**⚠️ E ISSO MUDA A ESTRUTURA DO HTML pra quem lê TEXTO dele:** duas travas extraíam o nome parando
+no primeiro `<`, e isso passou a casar com **string vazia** (o nome agora está dentro de um
+`<span>`) — o `test-montador` reportava um nome **em branco** no meio da lista ordenada. O jogo não
+faz parsing do próprio HTML, então isso alcança só os testes.
+
+**⚠️ O QUE FICA EM ABERTO, e é honesto dizer: o brilho NÃO foi medido no navegador.** A extensão do
+Chrome não estava conectada nesta sessão, então não dá pra afirmar que ele lê bem no fundo creme —
+e é justamente ali que um halo dourado corre risco de sumir. A prévia (`node tools/gerar-preview.js`)
+mostra as telas; se ele estiver fraco, a régua é a **primeira** das três sombras do `.nome-shiny`.
+
 ## Golpes por nível (data/golpes.json) — a base da GEN 3 / FireRed
 
 Base criada em 09/09/2026 e **trocada de geração no mesmo dia**: nasceu na Gen 2 e passou pra
