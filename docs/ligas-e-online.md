@@ -2376,6 +2376,118 @@ MESMA função e o filtro morando num lugar só.
 **Conferido que os 5 defeitos religados acusam**, e cada um derruba a trava que descreve o que ele
 quebrou.
 
+## O RECRUTADOR DA LIGA CLÁSSICA (27/09/2026)
+
+Pedido assim: *"crie uma função que rode das 07h às 23h todos os dias, e essa função vai a cada
+5min pegar um treinador aleatório que não loga há mais de 1 semana e possui um time que venceu as
+8 insígnias, e automaticamente quando achar esse treinador, vai inscrever o time de melhor média
+de level e vencedor das 8 insígnias na liga clássica. Durante as 23h até as 07h, vai fazer a mesma
+coisa porém a cada 1h"*.
+
+**Ele existe pra a Clássica não ficar vazia:** o `drawCycle` só forma chaveamento com
+`REGULAR_LIGA_SIZE` (8), e num dia de pouca gente o ciclo morre sem sortear.
+
+### ⚠️ ELE NÃO TEM ESCRITA PRÓPRIA — e essa é a decisão que sustenta tudo
+
+A montagem e a gravação são o **`montarInscritoDoSave`** e o **`gravarInscritoNaClassica`**, que
+saíram de dentro do `adminAddLeagueRegistration` e viraram função: **o painel de admin e o
+recrutador usam as MESMAS**.
+
+Um segundo caminho de escrita aqui gravaria um inscrito com campo faltando — e o sintoma seria
+**mudo**: a liga roda, e o time cai no motor de tipo por falta do `ataques`. Reusando, as
+exigências vêm de graça: 8 insígnias, time montado, **não aposentado**, nome definido, e o código
+**sanitizado na origem** (reconstruído de espécie+nível+shiny, então save adulterado entra
+normalizado). E as travas do jogador valem: não inscreve quem já está no ciclo aberto (a transação
+recusa) nem quem está no ciclo aberto de OUTRA liga.
+
+⚠️ **Há trava lendo o código pra isso:** o corpo do recrutador não pode ter um `.set(` próprio.
+
+### O SORTEIO, e por que ele é uma JANELA
+
+O Firestore não sorteia. A consulta começa num `lastSeenAt` **sorteado dentro da faixa dos
+inativos** e pega a página dali (`startAfter` + `limit`), depois embaralha a página.
+
+- **Ler todos e sortear um funcionaria hoje** (dezenas de contas) **e deixaria de funcionar
+  sozinho** quando elas forem milhares — e o sintoma seria a conta de leitura, não um erro.
+- ⚠️ **Quem nunca teve `lastSeenAt` fica de fora, de propósito:** o Firestore **pula documento sem
+  o campo** num `where`, e conta que nunca abriu o jogo também nunca teve time campeão.
+- **A janela pode cair no fim da faixa e voltar vazia** — aí ele lê do começo.
+
+### "O TIME DE MELHOR MÉDIA DE LEVEL"
+
+A média é a **MESMA conta da home** (o `mediaDoTime`): soma dos níveis dividida pelo tamanho do
+time. Escrita de outro jeito aqui, o recrutador escolheria um time e a tela mostraria outro como o
+mais forte.
+
+### AS DUAS AGENDAS, E O FUSO
+
+| | agenda |
+|---|---|
+| **dia** (07h–22h59) | `*/5 7-22 * * *` |
+| **noite** (23h–06h59) | `0 23,0,1,2,3,4,5,6 * * *` |
+
+⚠️ **SÃO DUAS, e não uma que pula.** Uma agenda de 5 min que ignorasse 11 de cada 12 voltas à
+noite gastaria 11 invocações por hora pra não fazer nada, e a condição do horário viveria no
+CÓDIGO em vez de na agenda — onde ela é visível no console.
+
+⚠️ **E O FUSO É O DO JOGO (`America/Sao_Paulo`), não o UTC que o `onSchedule` usa por padrão.**
+"Das 07h às 23h" é o horário que o jogador vê; sem isso a janela sairia **3 horas deslocada**.
+
+### O CUSTO, MEDIDO
+
+| | |
+|---|---|
+| voltas por dia | **200** (192 de dia + 8 de noite) |
+| leituras por volta, pior caso | 29 |
+| **por dia, pior caso** | **5.800** |
+| por dia, caso típico (não acha ninguém novo) | ~2.400 |
+| escritas | no máximo 200/dia, e só quando acha alguém |
+
+A cota gratuita do Firestore é **50.000 leituras/dia**, então ele cabe com folga. **Os dois números
+que o seguram são o `RECRUTA_CANDIDATOS` (10) e o `RECRUTA_TENTATIVAS` (3)** — cada leitura a mais
+ali vale 200 por dia.
+
+⚠️ **E A PERGUNTA BARATA VEM ANTES DA CARA:** *"já está neste ciclo?"* é UMA leitura, e ler os
+saves da conta é uma coleção inteira. É a forma das guardas do Remoinho e da prioridade.
+
+### ⚠️ E A TRAVA DESSA GUARDA PASSOU MUDA NA PRIMEIRA VERSÃO
+
+Ela media o RESULTADO — *"a volta seguinte não repete o mesmo treinador"* — e **a transação já
+garante isso sozinha**: tirando a guarda, a duplicata continua sendo recusada. O que a guarda
+compra é **não ler os saves** de quem já está inscrito, e isso se mede em LEITURA.
+
+Hoje ela conta os `get()` da subcoleção de saves **do treinador já inscrito** e exige **zero**.
+⚠️ **E a primeira versão dessa contagem falhou com o código certo**, porque contava os saves de
+TODOS: ler os de quem NÃO está no ciclo é o trabalho legítimo da função.
+
+### ⚠️ E ELE ACHOU UM FALSO-VERDE DE FÁBRICA NO `fake-firestore`
+
+O filtro é um `where('lastSeenAt', '<', limite)` — e **o dublê não conhecia o operador `<`**. O
+fallback dele era **`return true`**, ou seja o filtro simplesmente **não acontecia**: a prova de
+mesa inscreveu um treinador **ATIVO** e passou verde.
+
+⚠️ **É a forma mais silenciosa de falso verde que um dublê pode ter:** a consulta parece filtrar, o
+teste fica verde, e em produção ela filtra de verdade — o teste cobre o **OPOSTO** do que acontece.
+
+Entraram o `<`, o `!=`, o `not-in` e o `array-contains`, e **o operador desconhecido passou a
+ESTOURAR** com o nome dele na mensagem. **Conferido: a bateria inteira continua 44/44** — nenhum
+outro teste dependia do silêncio.
+
+### O QUE FICA REGISTRADO COMO CONSEQUÊNCIA ACEITA
+
+- **O jogador inativo recebe as notificações da liga** que ele não se inscreveu. É inerente ao
+  pedido: ele é recrutado justamente por não estar jogando.
+- **Não há teto de inscritos.** O ciclo da Clássica não tem um, e o pedido não pediu — então o
+  recrutador vai preenchendo um por volta enquanto houver inativo elegível, e para sozinho quando
+  acabarem. Com o tamanho de hoje isso é questão de algumas horas por ciclo.
+- **A inscrição não custa moeda ao jogador** (conferido: o `coinsPaid` é da jornada, não da liga),
+  então ele não é penalizado por ser recrutado.
+
+`tools/test-liga-pro.js` tranca 15 pontas: a melhor média (com o de 3 insígnias e o aposentado
+excluídos), sem ciclo aberto não inscreve, o inativo entra com o save certo, os campos batendo com
+os do painel, não repete, **o ATIVO nunca entra**, as duas agendas, o fuso, e o recrutador não ter
+escrita própria. **10 de 10 defeitos religados acusam.**
+
 ## O PAINEL INSCREVE NA TRAINERS LEAGUE (27/09/2026)
 
 Pedido assim: *"no admin-treinadores coloque também a opção de inscrever players para a trainers

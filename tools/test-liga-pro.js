@@ -773,6 +773,129 @@ console.log('\n=== O PAINEL INSCREVE NA TRAINERS LEAGUE (27/09/2026) ===');
       ok('  o ' + fn + ' e IGUAL nos dois arquivos', !!noCliente && noCliente === noServidor,
          !noCliente ? '(nao achei no index.html)' : (noCliente === noServidor ? '' : 'DIVERGEM'));
     }
+
+    console.log('\n=== O RECRUTADOR DA LIGA CLASSICA (27/09/2026) ===');
+    {
+      /* ⚠️ ELE EXISTE PRA A CLASSICA NAO FICAR VAZIA: o drawCycle so forma chaveamento com 8, e
+         num dia de pouca gente o ciclo morre sem sortear. A cada 5min (07h-23h) e de hora em hora
+         (23h-07h) ele sorteia UM treinador que nao loga ha mais de uma semana e inscreve o time
+         campeao de melhor media de nivel dele. */
+      const R = F2._recrutador;
+      const DIA2 = 24 * 3600 * 1000, ag = Date.now();
+      const time9 = (nv) => [{ speciesId:'gyarados', level:nv, ataques:['surf'] },
+                             { speciesId:'snorlax',  level:nv - 4, ataques:['bodyslam'] }];
+      const conta9 = async (uid, nome, visto, saves) => {
+        await db2.collection('users').doc(uid).set({ trainerName: nome, lastSeenAt: visto });
+        for(const [slot, s] of Object.entries(saves))
+          await db2.collection('users').doc(uid).collection('saves').doc(slot).set(s);
+      };
+      await conta9('rec-velho', 'Velho', ag - 10 * DIA2, {
+        '0': { team: time9(60), badgeCount: 8 },
+        '1': { team: time9(80), badgeCount: 8 },                 /* a MAIOR media */
+        '2': { team: time9(99), badgeCount: 3 },                 /* sem as 8 */
+        '3': { team: time9(95), badgeCount: 8, aposentado: true } /* aposentado */ });
+      await conta9('rec-semtime', 'SemTime', ag - 30 * DIA2, { '0': { team: time9(50), badgeCount: 4 } });
+      await conta9('rec-ativo', 'Ativo', ag - 2 * 3600 * 1000, { '0': { team: time9(70), badgeCount: 8 } });
+
+      /* ⚠️ "O TIME DE MELHOR MEDIA DE LEVEL" foi o pedido ao pe da letra -- e as duas exclusoes
+         (3 insignias e aposentado) sao as MESMAS do jogador, e vem de graca por reusar o nucleo. */
+      ok('o recrutador escolhe o save de MAIOR media',
+         await R.melhorSaveCampeaoDaConta('rec-velho') === '1',
+         String(await R.melhorSaveCampeaoDaConta('rec-velho')));
+      ok('  e ignora o de 3 insignias (media maior) e o aposentado (media maior ainda)',
+         await R.melhorSaveCampeaoDaConta('rec-velho') !== '2'
+         && await R.melhorSaveCampeaoDaConta('rec-velho') !== '3');
+      ok('  e quem nao tem time campeao devolve nada',
+         await R.melhorSaveCampeaoDaConta('rec-semtime') === null);
+
+      /* ⚠️ SEM CICLO ABERTO ELE NAO FAZ NADA -- ele roda 200 vezes por dia, e a maior parte delas
+         tem que custar duas leituras e ir embora. */
+      let r9 = await R.recrutarParaAClassica();
+      ok('sem ciclo com inscricoes abertas ele NAO inscreve',
+         r9.ok === false && /ciclo/.test(r9.motivo), r9.motivo);
+
+      await db2.collection('leagues').doc('schedule_classic').set({
+        cycles: [{ id: 'rec1', status: 'registering', scheduledTime: ag + 6e5 }] });
+      r9 = await R.recrutarParaAClassica();
+      ok('com ciclo aberto ele inscreve o INATIVO', r9.ok === true && r9.uid === 'rec-velho',
+         JSON.stringify(r9));
+      ok('  e com o save de melhor media', r9.slot === '1', String(r9.slot));
+
+      /* ⚠️ E O INSCRITO TEM QUE TER OS MESMOS CAMPOS QUE O PAINEL GRAVA: faltando o `ataques`, o
+         time cai no motor de tipo no dia da liga -- em silencio. E o que a reutilizacao compra. */
+      const reg9 = await db2.collection('leagueCycles').doc('classic__rec1')
+        .collection('registrants').doc('rec-velho').get().catch(() => null);
+      const d9 = reg9 && reg9.exists ? reg9.data() : null;
+      ok('  e o inscrito sai com os MESMOS campos do painel',
+         !!d9 && !!d9.code && !!d9.ataques && d9.uid === 'rec-velho' && d9.slot === '1'
+         && d9.name === 'Velho' && Array.isArray(d9.specialties),
+         d9 ? Object.keys(d9).sort().join(', ') : '(nao gravou)');
+
+      /* ⚠️ E ELE NAO REPETE: a pergunta barata ("ja esta neste ciclo?") vem antes de ler os saves. */
+      r9 = await R.recrutarParaAClassica();
+      ok('a volta seguinte NAO repete o mesmo treinador', !(r9.ok && r9.uid === 'rec-velho'),
+         JSON.stringify(r9));
+      /* ============================================================================
+         ⚠️ E A GUARDA DO "JA INSCRITO" SE MEDE EM LEITURA, nao em resultado -- a primeira versao
+         desta trava passou MUDA na conferencia de acusacao, e com razao: tirando a guarda, a
+         TRANSACAO continua recusando a duplicata, entao o resultado nao muda. O que a guarda
+         compra e nao ler a colecao de saves de quem ja esta inscrito, e ele roda 200 vezes POR
+         DIA -- e o custo que justifica ela existir.
+         ============================================================================ */
+      {
+        let leuSaves = 0;
+        const colOrig = db2.collection.bind(db2);
+        db2.collection = (n) => {
+          const c = colOrig(n);
+          if(n !== 'users') return c;
+          const docOrig = c.doc.bind(c);
+          c.doc = (id) => {
+            const d = docOrig(id), subOrig = d.collection.bind(d);
+            d.collection = (n2) => {
+              const s = subOrig(n2);
+              /* ⚠️ SO O JA INSCRITO CONTA: ler os saves de quem NAO esta no ciclo e o
+                 trabalho legitimo da funcao -- contar todos media a funcao inteira, e a trava
+                 falhava com o codigo certo. */
+              if(n2 === 'saves' && id === 'rec-velho'){ const g = s.get.bind(s); s.get = () => { leuSaves++; return g(); }; }
+              return s;
+            };
+            return d;
+          };
+          return c;
+        };
+        await R.recrutarParaAClassica();
+        db2.collection = colOrig;
+        ok('  e ele NAO le os saves de quem ja esta inscrito (a guarda barata)', leuSaves === 0,
+           leuSaves + ' leitura(s) de saves');
+      }
+
+      /* ⚠️ E O ATIVO NUNCA ENTRA. Esta e A trava desta feature: o filtro e um `where` de
+         comparacao, e o fake-firestore NAO conhecia o operador `<` -- o fallback dele era
+         `return true`, ou seja o filtro nao acontecia e a prova de mesa inscreveu um treinador
+         ATIVO passando verde. O duble foi consertado (e o operador desconhecido passou a ESTOURAR
+         em vez de deixar passar), e esta linha e o que impede a volta disso. */
+      const at9 = await db2.collection('leagueCycles').doc('classic__rec1')
+        .collection('registrants').doc('rec-ativo').get().catch(() => null);
+      ok('o treinador ATIVO nunca e inscrito', !(at9 && at9.exists));
+
+      const SRV = srvSrc;
+      /* ⚠️ E AS DUAS AGENDAS SAO OS DOIS RITMOS DO PEDIDO, no FUSO DO JOGO: o `onSchedule` usa UTC
+         por padrao, e "das 07h as 23h" e o horario que o jogador ve. */
+      ok('a agenda do DIA e a cada 5min das 07h as 22h59',
+         /schedule: '\*\/5 7-22 \* \* \*'/.test(SRV), (SRV.match(/\*\/5 7-22 \* \* \*/) || ['(nao achei)'])[0]);
+      ok('a agenda da NOITE e de hora em hora das 23h as 06h',
+         /schedule: '0 23,0,1,2,3,4,5,6 \* \* \*'/.test(SRV));
+      ok('  e as duas no fuso do JOGO, nao em UTC',
+         (SRV.match(/timeZone: RECRUTA_FUSO/g) || []).length === 2
+         && /RECRUTA_FUSO = 'America\/Sao_Paulo'/.test(SRV));
+      /* ⚠️ E ELE NAO PODE TER ESCRITA PROPRIA: uma segunda gravacao de inscrito divergiria da do
+         painel no primeiro ajuste, e o campo que faltasse so apareceria no dia da liga. */
+      const corpoRec = SRV.slice(SRV.indexOf('async function recrutarParaAClassica'),
+                                 SRV.indexOf('exports.recrutarLigaDeDia'));
+      ok('  (a fatia do recrutador tem o que ler)', corpoRec.length > 300, String(corpoRec.length));
+      ok('  e ele grava pelo MESMO caminho do painel (nenhum set proprio)',
+         corpoRec.indexOf('gravarInscritoNaClassica') > 0 && corpoRec.indexOf('.set(') < 0);
+    }
 }
 
     await sch().set({ cycles: [{ id: CID, scheduledTime: Date.now() - 1000,

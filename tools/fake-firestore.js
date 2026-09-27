@@ -212,11 +212,25 @@ function collRef(parts, filtros, limite, ordem, depoisDe, soIds){
           if(op === '>=') return v !== undefined && v >= valor;
           if(op === '<=') return v !== undefined && v <= valor;
           if(op === '>')  return v !== undefined && v > valor;
+          /* ⚠️ O '<' FALTAVA, e a falta dele nao dava erro: o fallback la embaixo era `return true`,
+             entao o filtro simplesmente NAO ACONTECIA. Descoberto em 27/09/2026 escrevendo o
+             recrutador da Liga Classica, que consulta `where('lastSeenAt','<',limite)` -- a prova
+             de mesa inscreveu um treinador ATIVO e passou verde. Em producao isso seria o
+             contrario do que a funcao existe pra fazer. */
+          if(op === '<')  return v !== undefined && v < valor;
           /* O 'in' do Firestore (ate 30 valores). Sem ele, uma consulta que o usa caia no catch do
              codigo testado e o teste dava verde sem cobrir nada -- foi o caso dos ginasios liderados
              no painel de treinadores. */
           if(op === 'in') return Array.isArray(valor) && valor.indexOf(v) >= 0;
-          return true;
+          if(op === 'not-in') return Array.isArray(valor) && valor.indexOf(v) < 0;
+          if(op === '!=') return v !== valor;
+          if(op === 'array-contains') return Array.isArray(v) && v.indexOf(valor) >= 0;
+          /* ⚠️ E O DESCONHECIDO ESTOURA, nunca passa. O `return true` que estava aqui e a forma
+             mais silenciosa de falso verde que um duble pode ter: a consulta parece filtrar, o
+             teste fica verde, e em producao ela filtra de verdade -- ou seja o teste cobre o
+             OPOSTO do que acontece. Melhor quebrar o teste com o nome do operador. */
+          throw new Error('fake-firestore: operador de where nao suportado: ' + op
+            + ' (acrescente-o em vez de deixar passar)');
         });
         if(ok) docs.push({ id, bruto: dados, ref: docRef(parts.concat([id])),
                            data(){ return soIds ? {} : clone(dados); }, exists:true });

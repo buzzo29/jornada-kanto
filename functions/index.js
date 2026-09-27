@@ -6668,18 +6668,13 @@ exports.adminLeagueQueue = onCall(async (request) => {
            inscritos, contador, real: inscritos.length };
 });
 
-exports.adminAddLeagueRegistration = onCall(async (request) => {
-  await exigeAdmin(request);
-  const alvo = String((request.data || {}).uid || '').trim();
-  const slot = String((request.data || {}).slot || '').trim();
-  if(!alvo || !slot) throw new HttpsError('invalid-argument', 'Informe o treinador e o save.');
-
-  const ciclo = await adminCicloAberto();
-  if(!ciclo) throw new HttpsError('failed-precondition', 'Não há ciclo com inscrições abertas.');
-
-  /* ⚠️ O TIME SAI DO SAVE, e passa pelas MESMAS exigências do jogador: 8 insígnias, time montado e
-     não aposentado. Sem isso o painel poria na liga um time que o próprio jogo recusaria. */
-  const saveSnap = await db.collection('users').doc(alvo).collection('saves').doc(slot).get();
+/* ⚠️ O TIME SAI DO SAVE, e passa pelas MESMAS exigências do jogador: 8 insígnias, time montado e
+   não aposentado. Sem isso o painel poria na liga um time que o próprio jogo recusaria.
+   ⚠️ E ELA VIROU FUNÇÃO EM 27/09/2026, quando o RECRUTADOR nasceu: ele e o painel inscrevem na
+   mesma coleção, e duas cópias desta montagem divergiriam no primeiro ajuste -- o sintoma seria um
+   inscrito com campo faltando, e aí a liga roda e o time cai no motor de tipo, em silêncio. */
+async function montarInscritoDoSave(uid, slot){
+  const saveSnap = await db.collection('users').doc(uid).collection('saves').doc(slot).get();
   if(!saveSnap.exists) throw new HttpsError('not-found', 'Esse save não existe.');
   const s = saveSnap.data() || {};
   if(!s.team || !s.team.length) throw new HttpsError('failed-precondition', 'Esse save não tem time.');
@@ -6698,10 +6693,159 @@ exports.adminAddLeagueRegistration = onCall(async (request) => {
     ataques[chaveDosGolpes(mon)] = mon.ataques.slice(0, MAX_GOLPES);
   }
 
-  const conta = await db.collection('users').doc(alvo).get();
+  const conta = await db.collection('users').doc(uid).get();
   const cd = conta.exists ? (conta.data() || {}) : {};
   const nome = (cd.trainerName || s.trainerName || '').trim();
   if(!nome) throw new HttpsError('failed-precondition', 'Esse treinador não tem nome definido.');
+  return { code, ataques, nome, conta: cd, save: s };
+}
+
+/* ⚠️ E A GRAVAÇÃO TAMBÉM É UMA SÓ: a transação que recusa duplicata, os campos, e o contador
+   reconciliado. O recrutador automático entra por aqui, não por uma segunda escrita. */
+async function gravarInscritoNaClassica(uid, slot, ciclo, montado){
+  const ref = registrantDocRef(CLASSIC_LEAGUE_TYPE, ciclo.id, uid);
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if(snap.exists) throw new HttpsError('already-exists', 'Esse treinador já está inscrito.');
+    tx.set(ref, { name: montado.nome, code: montado.code, ataques: montado.ataques, uid, slot,
+                  specialties: Array.isArray(montado.conta.specialties) ? montado.conta.specialties : [],
+                  elite: !!montado.conta.accountEliteChampion, registeredAt: Date.now() });
+  });
+  await reconciliarContadorDeInscritos(CLASSIC_LEAGUE_TYPE, ciclo);
+}
+
+/* ============================================================================
+   O RECRUTADOR DA LIGA CLÁSSICA (27/09/2026, a pedido: *"pegar um treinador aleatório que não
+   loga há mais de 1 semana e possui um time que venceu as 8 insígnias, e automaticamente
+   inscrever o time de melhor média de level na liga clássica"*).
+
+   Ele existe pra a Clássica não ficar vazia: o `drawCycle` só forma chaveamento com
+   `REGULAR_LIGA_SIZE` (8), e num dia de pouca gente o ciclo morre sem sortear.
+
+   ⚠️ ELE NÃO TEM ESCRITA PRÓPRIA: a montagem e a gravação são o `montarInscritoDoSave` e o
+   `gravarInscritoNaClassica`, as MESMAS do painel de admin. Um segundo caminho de escrita aqui
+   gravaria um inscrito com campo faltando, e o sintoma seria mudo -- a liga roda e o time cai no
+   motor de tipo. Por isso as exigências vêm de graça: 8 insígnias, time montado, não aposentado,
+   nome definido, e o código sanitizado na origem.
+
+   ⚠️ E ELE RESPEITA AS MESMAS TRAVAS DO JOGADOR: não inscreve quem já está no ciclo aberto (a
+   transação recusa) nem quem está no ciclo aberto de OUTRA liga (o `adminJaInscritoEmAlgumaLiga`).
+   ============================================================================ */
+const RECRUTA_INATIVO_MS = 7 * 24 * 60 * 60 * 1000;   // "não loga há mais de 1 semana"
+/* ⚠️ OS DOIS NÚMEROS ABAIXO SÃO O CUSTO DELE, e é por isso que são pequenos. Ele roda 200 vezes
+   por dia (192 de dia + 8 de noite), então cada leitura a mais aqui vale 200 por dia:
+     - CANDIDATOS: quantos inativos a consulta traz por volta;
+     - TENTATIVAS: quantos sorteados ele chega a EXAMINAR (cada exame lê os saves da conta).
+   Medido no pior caso: ~1 + 10 + 3×(1 + saves) ≈ 20 leituras por volta, ~4.000 por dia. */
+const RECRUTA_CANDIDATOS = 10;
+const RECRUTA_TENTATIVAS = 3;
+
+/* ⚠️ A JANELA ALEATÓRIA É O QUE FAZ O "ALEATÓRIO" SEM LER A COLEÇÃO INTEIRA: o Firestore não
+   sorteia, então a consulta começa num `lastSeenAt` sorteado dentro da faixa dos inativos e pega
+   a página dali. Ler todos e sortear um funciona hoje (dezenas de contas) e deixa de funcionar
+   sozinho quando elas forem milhares -- e o sintoma seria a conta de leitura, não um erro.
+   ⚠️ E QUEM NUNCA TEVE `lastSeenAt` FICA DE FORA, de propósito: o Firestore pula documento sem o
+   campo num `where`, e conta que nunca abriu o jogo também nunca teve time campeão. */
+async function sortearInativoComTimeCampeao(ciclo){
+  const limite = Date.now() - RECRUTA_INATIVO_MS;
+  const inicio = Math.floor(Math.random() * limite);
+  let cands = await db.collection('users')
+    .where('lastSeenAt', '<', limite).orderBy('lastSeenAt')
+    .startAfter(inicio).limit(RECRUTA_CANDIDATOS).get();
+  /* a janela pode cair no fim da faixa e voltar vazia -- aí lê do começo */
+  if(cands.empty) cands = await db.collection('users')
+    .where('lastSeenAt', '<', limite).orderBy('lastSeenAt').limit(RECRUTA_CANDIDATOS).get();
+  if(cands.empty) return null;
+
+  /* embaralha a página: sem isto ele tentaria sempre os mesmos da janela sorteada */
+  const uids = cands.docs.map(d => d.id);
+  for(let i = uids.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1));
+    [uids[i], uids[j]] = [uids[j], uids[i]]; }
+
+  let vistos = 0;
+  for(const uid of uids){
+    if(vistos >= RECRUTA_TENTATIVAS) break;
+    /* ⚠️ A PERGUNTA BARATA VEM ANTES DA CARA: "já está neste ciclo?" é UMA leitura, e ler os saves
+       da conta é uma coleção inteira. É a forma das guardas do Remoinho e da prioridade. */
+    const ja = await registrantDocRef(CLASSIC_LEAGUE_TYPE, ciclo.id, uid).get();
+    if(ja.exists) continue;
+    vistos++;
+    if(await adminJaInscritoEmAlgumaLiga(uid, true)) continue;
+    const slot = await melhorSaveCampeaoDaConta(uid);
+    if(slot) return { uid, slot };
+  }
+  return null;
+}
+
+/* ⚠️ "O TIME DE MELHOR MÉDIA DE LEVEL", que foi o pedido ao pé da letra -- e a média é a MESMA
+   conta da home (o `mediaDoTime`): soma dos níveis dividida pelo tamanho do time, arredondada.
+   Escrita de outro jeito aqui, o recrutador escolheria um time e a tela mostraria outro como o
+   mais forte. */
+async function melhorSaveCampeaoDaConta(uid){
+  const saves = await db.collection('users').doc(uid).collection('saves').get();
+  let melhor = null, melhorMedia = -1;
+  saves.forEach(d => {
+    const s = d.data() || {};
+    if(s.aposentado || (s.badgeCount || 0) < 8) return;
+    const time = Array.isArray(s.team) ? s.team.filter(Boolean) : [];
+    if(!time.length) return;
+    const media = time.reduce((a, p) => a + (p.level || 1), 0) / time.length;
+    if(media > melhorMedia){ melhorMedia = media; melhor = d.id; }
+  });
+  return melhor;
+}
+
+/* ⚠️ UMA VOLTA = NO MÁXIMO UM INSCRITO. O pedido diz "pegar UM treinador", e o teto natural é o
+   que impede uma coleção grande de virar uma enxurrada de inscrições numa volta só. */
+async function recrutarParaAClassica(){
+  const ciclo = await adminCicloAberto();
+  if(!ciclo) return { ok: false, motivo: 'sem ciclo com inscrições abertas' };
+  const achado = await sortearInativoComTimeCampeao(ciclo);
+  if(!achado) return { ok: false, motivo: 'nenhum inativo elegível nesta volta' };
+  try{
+    const montado = await montarInscritoDoSave(achado.uid, achado.slot);
+    await gravarInscritoNaClassica(achado.uid, achado.slot, ciclo, montado);
+    logger.info('Recrutado pra Clássica: ' + montado.nome + ' (' + achado.uid + ' / save '
+      + achado.slot + ') no ciclo ' + ciclo.id);
+    return { ok: true, uid: achado.uid, slot: achado.slot, nome: montado.nome, cycleId: ciclo.id };
+  } catch(e){
+    /* ⚠️ ELE ENGOLE E SEGUE: este é um laço de fundo, e um inativo com save estranho não pode
+       derrubar a volta seguinte. A transação já recusa duplicata por conta própria. */
+    logger.warn('Recrutador não conseguiu inscrever ' + achado.uid + ': ' + (e && e.message));
+    return { ok: false, motivo: (e && e.message) || 'erro' };
+  }
+}
+
+/* ⚠️ SÃO DUAS AGENDAS, e não uma que pula: o pedido tem dois ritmos (a cada 5min das 07h às 23h,
+   de hora em hora das 23h às 07h). Uma agenda de 5min que ignorasse 11 de cada 12 voltas à noite
+   gastaria 11 invocações por hora pra não fazer nada, e a condição do horário viveria no CÓDIGO em
+   vez de na agenda -- onde ela é visível no console.
+   ⚠️ E O FUSO É O DO JOGO (America/Sao_Paulo), não o UTC que o `onSchedule` usa por padrão: "das
+   07h às 23h" é o horário que o jogador vê. Sem isto a janela sairia 3 horas deslocada. */
+const RECRUTA_FUSO = 'America/Sao_Paulo';
+exports.recrutarLigaDeDia = onSchedule(
+  { schedule: '*/5 7-22 * * *', timeZone: RECRUTA_FUSO },
+  async () => { await recrutarParaAClassica().catch(e => logger.error('Recrutador (dia):', e)); });
+exports.recrutarLigaDeNoite = onSchedule(
+  { schedule: '0 23,0,1,2,3,4,5,6 * * *', timeZone: RECRUTA_FUSO },
+  async () => { await recrutarParaAClassica().catch(e => logger.error('Recrutador (noite):', e)); });
+
+/* exportado pro teste: a bateria dirige o laço na mão, sem relógio */
+exports._recrutador = { recrutarParaAClassica, sortearInativoComTimeCampeao,
+                        melhorSaveCampeaoDaConta, RECRUTA_INATIVO_MS,
+                        RECRUTA_CANDIDATOS, RECRUTA_TENTATIVAS, RECRUTA_FUSO };
+
+exports.adminAddLeagueRegistration = onCall(async (request) => {
+  await exigeAdmin(request);
+  const alvo = String((request.data || {}).uid || '').trim();
+  const slot = String((request.data || {}).slot || '').trim();
+  if(!alvo || !slot) throw new HttpsError('invalid-argument', 'Informe o treinador e o save.');
+
+  const ciclo = await adminCicloAberto();
+  if(!ciclo) throw new HttpsError('failed-precondition', 'Não há ciclo com inscrições abertas.');
+
+  const montado = await montarInscritoDoSave(alvo, slot);
+  const nome = montado.nome;
 
   /* ⚠️ E A TRAVA QUE SOBROU É "JÁ INSCRITO NO CICLO ABERTO DE OUTRA LIGA" -- a de "está disputando
      um chaveamento" saiu em 24/09/2026, junto com a do jogador. O ciclo aberto da clássica é pulado
@@ -6710,21 +6854,9 @@ exports.adminAddLeagueRegistration = onCall(async (request) => {
   if(ativo) throw new HttpsError('failed-precondition',
     'Esse treinador já está inscrito em outra Liga (' + ativo.typeId + ' / ' + ativo.cycleId + ').');
 
-  const ref = registrantDocRef(CLASSIC_LEAGUE_TYPE, ciclo.id, alvo);
-  await db.runTransaction(async (tx) => {
-    const snap = await tx.get(ref);
-    if(snap.exists) throw new HttpsError('already-exists', 'Esse treinador já está inscrito.');
-    tx.set(ref, { name: nome, code, ataques, uid: alvo, slot,
-                  specialties: Array.isArray(cd.specialties) ? cd.specialties : [],
-                  elite: !!cd.accountEliteChampion, registeredAt: Date.now() });
-  });
-
-  /* ⚠️ O CONTADOR É RECONCILIADO, e não incrementado: ele já nasceu desalinhado uma vez (20/09) e
-     a agregação `count()` custa ~1 leitura. Aqui a ação é manual e rara -- deixar o número certo
-     vale mais que a escrita a menos. */
-  /* ⚠️ O `reconciliar` devolve se MUDOU, nao o numero -- entao o numero e lido logo depois, pela
-     mesma agregacao. Devolver o booleano dali seria uma resposta que parece uma contagem. */
-  await reconciliarContadorDeInscritos(CLASSIC_LEAGUE_TYPE, ciclo);
+  /* ⚠️ O CONTADOR É RECONCILIADO lá dentro, e não incrementado: ele já nasceu desalinhado uma vez
+     (20/09) e a agregação `count()` custa ~1 leitura. */
+  await gravarInscritoNaClassica(alvo, slot, ciclo, montado);
   const contador = await adminContarInscritos(ciclo);
   return { ok: true, uid: alvo, slot, nome, cycleId: ciclo.id, contador };
 });
