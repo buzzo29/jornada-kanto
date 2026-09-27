@@ -3434,12 +3434,22 @@ aprendidas por meio bestiário. E o projeto separou Sp.Atk/Sp.Def justamente pra
 
 | | jogo | Gen 3 | |
 |---|---|---|---|
-| Magnemite / Magneton | Elétrico | **Elétrico/Aço** | eram **GEN 1** (a Gen 2 lhes deu o Aço) |
-| **Psyduck / Golduck** | Água/Psíquico | **Água** | ⚠️ **INVENÇÃO** — eles são Água puro em TODA geração, e o Psíquico não estava registrado em lugar nenhum do projeto |
+| Magnemite / Magneton | Elétrico | **Elétrico/Aço** | eram **GEN 1** (a Gen 2 lhes deu o Aço) — **corrigidos** |
+| **Psyduck / Golduck** | Água/Psíquico | Água | ⚠️ **INVENÇÃO** do projeto — eles são Água puro em TODA geração |
 
-⚠️ **O Psíquico do Psyduck continua saindo, como SUBTIPO** — a tabela de subtipos já lhe dava
-`["Normal","Psychic"]`. O que ele perde é o **STAB**: de 1,5× pra 0,85×, ou seja **1,76× menos
-dano** no golpe Psíquico.
+⚠️ **E O PSYDUCK/GOLDUCK FICOU COMO ESTAVA — é EXCEÇÃO DELIBERADA, decidida pelo número.** Eles
+chegaram a ser corrigidos e foram **devolvidos no mesmo dia**, a pedido, depois de a medição
+mostrar que a correção sozinha custava **−1,50 ponto de conclusão (2,0σ)** — **38%** de tudo que a
+virada pra Gen 3 custou.
+
+**⚠️ O QUE ELES PERDIAM ERA O STAB, e é isso que explica o tamanho:** o Psíquico continua na tabela
+de SUBTIPOS deles, então sem o tipo próprio ele saía a **0,85×** em vez de 1,5× — **1,76× menos
+dano**. E Psíquico é 2× contra Lutador, ou seja era a resposta do Golduck contra Machamp: medido
+1x1, ele caía de **83,0% para 3,7%**.
+
+A exceção está **declarada nos dois lugares que a conferem** — no `tools/test-terrenos.js` (que
+cobra que eles CONTINUEM Água/Psíquico, pra ninguém "consertá-los") e no `tools/conferir-gen3.js`,
+a varredura contra a fonte.
 
 ### 4. O CRÍTICO IGNORA ESTÁGIO, E A PRIORIDADE PASSOU A EXISTIR
 
@@ -3494,8 +3504,11 @@ congeladas, desvio tirado de ENTRE os blocos:
 | | conclusão | |
 |---|---|---|
 | **antes** (a tabela Gen 1) | **55,06%** | desvio entre blocos 2,22 |
-| **depois** (Gen 3 inteira) | **51,16%** | desvio entre blocos 1,55 |
-| | **−3,91 ponto, 4,1σ** | ⚠️ **0 de 8 blocos** pro lado novo |
+| Gen 3 **inteira** (com o Psyduck corrigido) | 51,16% | −3,91 ponto, **4,1σ**, 0 de 8 blocos |
+| **o que FOI AO AR** (Gen 3 **menos** o Psyduck) | **52,66%** | **−2,41 ponto, 2,6σ** |
+
+⚠️ **O NÚMERO QUE VALE É O DO MEIO DA TABELA: −2,41.** O Psyduck foi devolvido a pedido depois da
+medição, e com ele volta **+1,50 ponto**.
 
 **É a segunda maior mexida de dificuldade do projeto**, atrás só do +2 níveis nos líderes (−11,42).
 E a direção faz sentido: **o jogador perdeu mais que os NPCs**, porque quase tudo que mudou tirou
@@ -3510,10 +3523,15 @@ o Golduck perdendo a resposta dele contra Lutador.
 | Gen 3 **sem** a troca do Psyduck | 52,66% | −2,41, 2,6σ |
 | | | **→ o Psyduck sozinho: −1,50, 2,0σ** |
 
-⚠️ **O Psyduck é 38% do custo, e ele mora em 4 das 32 rotas** (Rotas 24/25 no trecho 2 e Seafoam
-no trecho 7, nas duas regiões). **Se um dia incomodar, ele é a alavanca isolada** — devolver o
-Psíquico a ele custa 1,5 ponto de dificuldade e é a única das cinco frentes que não tem respaldo
-em geração nenhuma (ela era invenção do projeto, não herança).
+⚠️ **O Psyduck era 38% do custo, e ele mora em 4 das 32 rotas** (Rotas 24/25 no trecho 2 e Seafoam
+no trecho 7, nas duas regiões). **Foi por isso que ele foi devolvido**, e por ser a única das cinco
+frentes sem respaldo em geração nenhuma: ela era invenção do projeto, não herança de Gen 1 — as
+outras quatro eram todas dívida de geração.
+
+⚠️ **E FOI A ATRIBUIÇÃO QUE PERMITIU ESSA DECISÃO.** Sem o terceiro braço do A/B, a escolha seria
+entre engolir os −3,91 inteiros ou desfazer tudo; com ele, deu pra devolver **exatamente a peça que
+custava mais e valia menos**. Um A/B de duas pontas responde "quanto custou"; um de três responde
+"o que dentro dele custou".
 
 ⚠️ **E OS 2,6σ DO BRAÇO DO MEIO estão exatamente no limiar que este projeto já viu sair por
 acaso** (o A/B dos terrenos de ginásio, 25/09). O que sustenta o número cheio é o **4,1σ com 0 de

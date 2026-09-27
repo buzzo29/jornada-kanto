@@ -934,16 +934,30 @@ console.log('\n=== A TABELA DE TIPOS E A DA GEN 3 (27/09/2026) ===');
 
 console.log('\n=== A TIPAGEM DAS 250 E A DA GEN 3 ===');
 {
-  /* ⚠️ QUATRO ESPECIES DIVERGIAM, e duas delas nenhuma auditoria tinha apontado -- so a varredura
-     achou. Magnemite/Magneton eram GEN 1 (a Gen 2 lhes deu o Aco); Psyduck/Golduck eram
-     INVENCAO -- eles sao Agua puro em TODA geracao, e o Psiquico deles nao estava registrado em
-     lugar nenhum do projeto. O Psiquico continua saindo, como SUBTIPO (sem STAB), que e o que a
-     tabela de subtipos ja lhes dava. */
-  const GEN3_TIPOS = { magnemite:['Electric','Steel'], magneton:['Electric','Steel'],
-                       psyduck:['Water'], golduck:['Water'] };
+  /* ⚠️ QUATRO ESPECIES DIVERGIAM DA GEN 3, e duas delas nenhuma auditoria tinha apontado -- so a
+     varredura das 250 achou (ela esta versionada em tools/conferir-gen3.js, porque precisa de
+     rede e por isso nao entra na bateria).
+     Magnemite/Magneton eram GEN 1: a Gen 2 lhes deu o Aco, e eles foram corrigidos. */
+  const GEN3_TIPOS = { magnemite:['Electric','Steel'], magneton:['Electric','Steel'] };
   for(const sp of Object.keys(GEN3_TIPOS))
     ok('  ' + sp + ' e ' + GEN3_TIPOS[sp].join('/'),
        JSON.stringify(S.SPECIES[sp].types) === JSON.stringify(GEN3_TIPOS[sp]),
+       JSON.stringify(S.SPECIES[sp].types));
+  /* ============================================================================
+     ⚠️ O PSYDUCK E O GOLDUCK SAO EXCECAO DELIBERADA, e esta trava existe pra que ninguem os
+     "conserte". Na Gen 3 (e em toda geracao) eles sao AGUA PURO -- o Psiquico e invencao deste
+     projeto. Eles chegaram a ser corrigidos em 27/09/2026 e foram DEVOLVIDOS no mesmo dia, a
+     pedido, depois do numero: a correcao sozinha custava -1,50 ponto de conclusao de jornada
+     (2,0 sigma), 38% de tudo que a virada pra Gen 3 custou.
+     ⚠️ O QUE ELES PERDIAM ERA O STAB: o Psiquico continua na tabela de SUBTIPOS deles, entao sem
+     o tipo proprio ele saia a 0,85x em vez de 1,5x -- 1,76x menos dano. E o Psiquico e 2x contra
+     Lutador, ou seja era a resposta do Golduck contra Machamp: medido 1x1, ele caia de 83,0%
+     para 3,7%.
+     ============================================================================ */
+  const EXCECAO = { psyduck:['Water','Psychic'], golduck:['Water','Psychic'] };
+  for(const sp of Object.keys(EXCECAO))
+    ok('  ' + sp + ' e ' + EXCECAO[sp].join('/') + '  (EXCECAO deliberada -- a Gen 3 diz Agua puro)',
+       JSON.stringify(S.SPECIES[sp].types) === JSON.stringify(EXCECAO[sp]),
        JSON.stringify(S.SPECIES[sp].types));
   /* e as duas copias tem que bater, como toda tabela duplicada deste projeto */
   const difs = Object.keys(S.SPECIES).filter(sp =>

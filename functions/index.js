@@ -93,8 +93,8 @@ const SPECIES = {
   // Água/Psíquico pra bater com o pokemon-ginasio.html. ATENÇÃO: no jogo original Psyduck e Golduck
   // são Água PURO -- o tipo Psíquico aqui é uma divergência antiga do cliente. Alinhado ao cliente
   // porque é o que os jogadores conhecem; se um dia for corrigido, tem que ser nos DOIS arquivos
-  psyduck:{dex:54, name:'Psyduck', types:['Water'], hp:50, attack:52, defense:48, speed:55},
-  golduck:{dex:55, name:'Golduck', types:['Water'], hp:80, attack:82, defense:78, speed:85},
+  psyduck:{dex:54, name:'Psyduck', types:['Water','Psychic'], hp:50, attack:52, defense:48, speed:55},
+  golduck:{dex:55, name:'Golduck', types:['Water','Psychic'], hp:80, attack:82, defense:78, speed:85},
   krabby:{dex:98, name:'Krabby', types:['Water'], hp:30, attack:105, defense:90, speed:50},
   kingler:{dex:99, name:'Kingler', types:['Water'], hp:55, attack:130, defense:115, speed:75},
   horsea:{dex:116, name:'Horsea', types:['Water'], hp:30, attack:40, defense:70, speed:60},
